@@ -16,6 +16,7 @@
 #include "../caustica.h"
 #include "../SampleCommon/LocalConfig.h"
 #include "../SampleCommon/SampleCommon.h"
+#include "../SampleCommon/ShaderPackFileSystem.h"
 
 #include <donut/app/DeviceManager.h>
 #include <donut/core/log.h>
@@ -514,10 +515,19 @@ bool RenderSession::InitRenderer()
     std::filesystem::path ommShaderPath       = appDirectory / "ShaderPrecompiled/omm"       / shaderTypeName;
 
     auto rootFS = std::make_shared<donut::vfs::RootFileSystem>();
-    rootFS->mount("/ShaderPrecompiled/donut", frameworkShaderPath);
-    rootFS->mount("/ShaderPrecompiled/app",   appShaderPath);
-    rootFS->mount("/ShaderPrecompiled/nrd",   nrdShaderPath);
-    rootFS->mount("/ShaderPrecompiled/omm",   ommShaderPath);
+    const std::filesystem::path shaderPackPath = appDirectory / (std::string("caustica.shaders.") + shaderTypeName + ".pack");
+    auto shaderPackFS = std::make_shared<ShaderPackFileSystem>(shaderPackPath, "ShaderPrecompiled");
+    if (shaderPackFS->isOpen())
+    {
+        rootFS->mount("/ShaderPrecompiled", shaderPackFS);
+    }
+    else
+    {
+        rootFS->mount("/ShaderPrecompiled/donut", frameworkShaderPath);
+        rootFS->mount("/ShaderPrecompiled/app",   appShaderPath);
+        rootFS->mount("/ShaderPrecompiled/nrd",   nrdShaderPath);
+        rootFS->mount("/ShaderPrecompiled/omm",   ommShaderPath);
+    }
 
     auto device = m_deviceManager->GetDevice();
     m_shaderFactory = std::make_shared<donut::engine::ShaderFactory>(device, rootFS, "/ShaderPrecompiled");

@@ -102,6 +102,18 @@ def parse_args() -> argparse.Namespace:
         default=",".join(DEFAULT_MODES),
         help="Comma/semicolon separated modes: reference,realtime.",
     )
+    parser.add_argument(
+        "--global-variant-preset",
+        choices=["default", "coverage"],
+        default="default",
+        help="Accepted for compatibility with build_wheel.py; currently uses the renderer defaults.",
+    )
+    parser.add_argument(
+        "--global-variant",
+        action="append",
+        default=[],
+        help="Accepted for compatibility with build_wheel.py; currently uses the renderer defaults.",
+    )
     parser.add_argument("--frames", type=int, default=1)
     return parser.parse_args()
 

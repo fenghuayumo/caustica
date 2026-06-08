@@ -16,6 +16,7 @@
 #include "../Misc/Korgi.h"
 #include "../SampleUI.h"
 #include "LocalConfig.h"
+#include "ShaderPackFileSystem.h"
 
 #include <donut/app/ApplicationBase.h>
 #include <donut/core/log.h>
@@ -541,16 +542,26 @@ void SampleBaseApp::CreateShaderFactory()
 {
     const char* shaderTypeName = donut::app::GetShaderTypeName(m_DeviceManager->GetGraphicsAPI());
     const std::filesystem::path appDirectory = donut::app::GetDirectoryWithExecutable();
-    std::filesystem::path frameworkShaderPath = appDirectory / "ShaderPrecompiled/framework" / shaderTypeName;
-    std::filesystem::path appShaderPath = appDirectory / "ShaderPrecompiled/caustica" / shaderTypeName;
-    std::filesystem::path nrdShaderPath = appDirectory / "ShaderPrecompiled/nrd" / shaderTypeName;
-    std::filesystem::path ommShaderPath = appDirectory / "ShaderPrecompiled/omm" / shaderTypeName;
 
     std::shared_ptr<donut::vfs::RootFileSystem> rootFS = std::make_shared<donut::vfs::RootFileSystem>();
-    rootFS->mount("/ShaderPrecompiled/donut", frameworkShaderPath);
-    rootFS->mount("/ShaderPrecompiled/app", appShaderPath);
-    rootFS->mount("/ShaderPrecompiled/nrd", nrdShaderPath);
-    rootFS->mount("/ShaderPrecompiled/omm", ommShaderPath);
+    const std::filesystem::path shaderPackPath = appDirectory / (std::string("caustica.shaders.") + shaderTypeName + ".pack");
+    auto shaderPackFS = std::make_shared<ShaderPackFileSystem>(shaderPackPath, "ShaderPrecompiled");
+    if (shaderPackFS->isOpen())
+    {
+        rootFS->mount("/ShaderPrecompiled", shaderPackFS);
+    }
+    else
+    {
+        std::filesystem::path frameworkShaderPath = appDirectory / "ShaderPrecompiled/framework" / shaderTypeName;
+        std::filesystem::path appShaderPath = appDirectory / "ShaderPrecompiled/caustica" / shaderTypeName;
+        std::filesystem::path nrdShaderPath = appDirectory / "ShaderPrecompiled/nrd" / shaderTypeName;
+        std::filesystem::path ommShaderPath = appDirectory / "ShaderPrecompiled/omm" / shaderTypeName;
+
+        rootFS->mount("/ShaderPrecompiled/donut", frameworkShaderPath);
+        rootFS->mount("/ShaderPrecompiled/app", appShaderPath);
+        rootFS->mount("/ShaderPrecompiled/nrd", nrdShaderPath);
+        rootFS->mount("/ShaderPrecompiled/omm", ommShaderPath);
+    }
 
     auto device = m_DeviceManager->GetDevice();
     m_ShaderFactory = std::make_shared<donut::engine::ShaderFactory>(device, rootFS, "/ShaderPrecompiled");

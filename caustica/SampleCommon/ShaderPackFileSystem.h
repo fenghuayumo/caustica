@@ -1,0 +1,86 @@
+/*
+* Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
+*
+* NVIDIA CORPORATION and its licensors retain all intellectual property
+* and proprietary rights in and to this software, related documentation
+* and any modifications thereto.  Any use, reproduction, disclosure or
+* distribution of this software and related documentation without an express
+* license agreement from NVIDIA CORPORATION is strictly prohibited.
+*/
+
+#pragma once
+
+#include <donut/core/vfs/VFS.h>
+
+#include <array>
+#include <cstdint>
+#include <cstdio>
+#include <filesystem>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <unordered_map>
+
+class ShaderPackFileSystem : public donut::vfs::IFileSystem
+{
+public:
+    ShaderPackFileSystem(
+        const std::filesystem::path& packPath,
+        const std::filesystem::path& virtualRoot = std::filesystem::path());
+    ~ShaderPackFileSystem() override;
+
+    [[nodiscard]] bool isOpen() const { return m_packFile != nullptr; }
+
+    bool folderExists(const std::filesystem::path& name) override;
+    bool fileExists(const std::filesystem::path& name) override;
+    std::shared_ptr<donut::vfs::IBlob> readFile(const std::filesystem::path& name) override;
+    bool writeFile(const std::filesystem::path& name, const void* data, size_t size) override;
+    int enumerateFiles(
+        const std::filesystem::path& path,
+        const std::vector<std::string>& extensions,
+        donut::vfs::enumerate_callback_t callback,
+        bool allowDuplicates = false) override;
+    int enumerateDirectories(
+        const std::filesystem::path& path,
+        donut::vfs::enumerate_callback_t callback,
+        bool allowDuplicates = false) override;
+
+private:
+    struct PackKey
+    {
+        uint64_t h0 = 0;
+        uint64_t h1 = 0;
+
+        bool operator==(const PackKey& other) const
+        {
+            return h0 == other.h0 && h1 == other.h1;
+        }
+    };
+
+    struct PackKeyHash
+    {
+        size_t operator()(const PackKey& key) const noexcept
+        {
+            return size_t(key.h0 ^ (key.h1 + 0x9e3779b97f4a7c15ull + (key.h0 << 6) + (key.h0 >> 2)));
+        }
+    };
+
+    struct FileEntry
+    {
+        uint64_t offset = 0;
+        uint64_t size = 0;
+    };
+
+    static PackKey HashPath(const std::string& logicalPath);
+    static void DecodePayload(uint8_t* data, size_t size, const PackKey& key);
+
+    std::string NormalizeLogicalPath(const std::filesystem::path& name) const;
+
+private:
+    std::filesystem::path m_packPath;
+    std::filesystem::path m_virtualRoot;
+    FILE* m_packFile = nullptr;
+    std::mutex m_mutex;
+    std::unordered_map<PackKey, FileEntry, PackKeyHash> m_entries;
+};
+

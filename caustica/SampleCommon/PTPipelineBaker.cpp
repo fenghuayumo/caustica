@@ -10,6 +10,7 @@
 
 #include "PTPipelineBaker.h"
 #include "ShaderCompilerUtils.h"
+#include "ShaderPackFileSystem.h"
 
 #include <donut/app/ApplicationBase.h>
 
@@ -37,6 +38,14 @@ using namespace donut::math;
 using namespace donut::engine;
 
 static const std::string c_PTShaderBinariesRoot = "ShaderDynamic/Bin";
+
+static std::string MakeShaderCacheFileNameNoExt(const std::string& hashHex)
+{
+    if (hashHex.size() >= 2)
+        return hashHex.substr(0, 2) + "/" + hashHex;
+
+    return hashHex;
+}
 
 void PTPipelineVariant::ShaderPermutation::SetPath(const std::filesystem::path & path)
 {
@@ -281,12 +290,15 @@ void PTPipelineVariant::CompileIfNeeded_Enqueue(std::filesystem::file_time_type 
             permutation->ResetShaderLibrary();
         }
 
-        permutation->CompiledFileNameNoExt = permutation->ShaderOutFileName.string() + "_" + permutation->CompiledHashHex;
+        permutation->CompiledFileNameNoExt = MakeShaderCacheFileNameNoExt(permutation->CompiledHashHex);
         permutation->CompiledFullPath = std::filesystem::absolute(baker->GetShaderBinariesPath() / permutation->CompiledFileNameNoExt).string() + ".bin";
         std::string compiledFullPathPdb = std::filesystem::absolute(baker->GetShaderBinariesPath() / permutation->CompiledFileNameNoExt).string() + ".pdb";
+        std::string compiledVfsPath = "/" + c_PTShaderBinariesRoot + "/" + permutation->CompiledFileNameNoExt + ".bin";
 
         // check if the file with the hash baked in exists and if it's newer than the last modified source (the latest modified file in the whole source directory)
-        if (ShaderCompilerUtils::IsCompiledShaderUpToDate(permutation->CompiledFullPath, lastModifiedSourceCode))
+        const bool compiledBlobAvailable = baker->GetFS()->fileExists(compiledVfsPath);
+        const bool diskBlobUpToDate = ShaderCompilerUtils::IsCompiledShaderUpToDate(permutation->CompiledFullPath, lastModifiedSourceCode);
+        if (compiledBlobAvailable && (!baker->CanCompileShaders() || diskBlobUpToDate))
         {
             if (baker->IsVerbose())
                 donut::log::info("No need to compile shader variant of '%s', up-to-date file already exists...", srcFullPath.string().c_str());
@@ -294,6 +306,7 @@ void PTPipelineVariant::CompileIfNeeded_Enqueue(std::filesystem::file_time_type 
         }
         else if (baker->CanCompileShaders()) // we need to re-compile!
         {
+            EnsureDirectoryExists(std::filesystem::path(permutation->CompiledFullPath).parent_path());
             command = commandBase + command;
 #if !PIPELINE_BAKER_EMBED_PDBS
             if (!isVulkanBackend)
@@ -452,7 +465,18 @@ PTPipelineBaker::PTPipelineBaker(nvrhi::IDevice* device, std::shared_ptr<Materia
         donut::log::fatal("Failed to initialize shader compiler configuration");
 
     m_shadersFS = std::make_shared<vfs::RootFileSystem>();
-    m_shadersFS->mount("/" + c_PTShaderBinariesRoot, m_compilerConfig.ShaderBinariesPath);
+    const char* shaderTypeName = donut::app::GetShaderTypeName(device->getGraphicsAPI());
+    const std::filesystem::path shaderPackPath = GetRuntimeDirectory() / (std::string("caustica.shaders.") + shaderTypeName + ".pack");
+    auto shaderPackFS = std::make_shared<ShaderPackFileSystem>(shaderPackPath, c_PTShaderBinariesRoot);
+    if (shaderPackFS->isOpen())
+    {
+        m_shadersFS->mount("/" + c_PTShaderBinariesRoot, shaderPackFS);
+        m_compilerConfig.RuntimeCompilationAvailable = false;
+    }
+    else
+    {
+        m_shadersFS->mount("/" + c_PTShaderBinariesRoot, m_compilerConfig.ShaderBinariesPath);
+    }
 }
 
 PTPipelineBaker::~PTPipelineBaker()
@@ -576,8 +600,11 @@ void PTPipelineBaker::Update(const std::shared_ptr<class ExtendedScene>& scene, 
 
     if (needsUpdate)
     {
-        // we need the output folder
-        EnsureDirectoryExists(m_compilerConfig.ShaderBinariesPath);
+        if (m_compilerConfig.CanCompile())
+        {
+            // we need the output folder
+            EnsureDirectoryExists(m_compilerConfig.ShaderBinariesPath);
+        }
 
         std::optional<std::filesystem::file_time_type> a = m_compilerConfig.CanCompile()
             ? GetLatestModifiedTimeDirectoryRecursive(m_compilerConfig.ShadersPath)

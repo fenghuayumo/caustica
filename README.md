@@ -126,12 +126,24 @@ payload can be adjusted with environment variables:
 | `caustica_WHEEL_ASSETS` | `minimal` | `minimal`, `full`, `none` |
 | `caustica_WHEEL_DYNAMIC_SHADERS` | `bin` | `bin`, `full`, `none` |
 | `caustica_WHEEL_SHADER_API` | `d3d12` on Windows, `vulkan` elsewhere | `d3d12`, `vulkan`, `both` |
+| `CAUSTICA_WHEEL_SHADER_PACK` | `true` | `true`, `false` |
+
+By default, wheel builds package compiled shader binaries into
+`caustica.shaders.<api>.pack` instead of shipping the loose
+`ShaderPrecompiled/` and `ShaderDynamic/Bin/` file trees.
 
 You can also build a wheel explicitly:
 
 ```
-python Support/python/build_wheel.py
+python support/python/build_wheel.py
 python -m pip install dist/caustica-*.whl
+```
+
+For a standalone executable distribution, generate a shader pack next to the
+binary after building and warming the dynamic shader cache:
+
+```
+python support/python/package_shaders.py --shader-api d3d12
 ```
 
 

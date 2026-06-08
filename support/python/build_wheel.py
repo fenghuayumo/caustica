@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import os
 import shutil
+import struct
 import subprocess
 import sys
 import sysconfig
@@ -72,6 +73,150 @@ def directory_size(path: Path) -> int:
     return sum(item.stat().st_size for item in path.rglob("*") if item.is_file())
 
 
+PACK_MAGIC = b"CAUSSHD1"
+PACK_VERSION = 1
+PACK_HEADER = struct.Struct("<8sII")
+PACK_ENTRY = struct.Struct("<QQQQ")
+FNV_MASK = (1 << 64) - 1
+FNV_PRIME = 1099511628211
+FNV_OFFSET = 14695981039346656037
+HEX_CHARS = set("0123456789abcdefABCDEF")
+
+
+def fnv1a64(value: str, seed: int) -> int:
+    h = (FNV_OFFSET ^ seed) & FNV_MASK
+    for byte in value.encode("utf-8"):
+        h ^= byte
+        h = (h * FNV_PRIME) & FNV_MASK
+    return h
+
+
+def shader_pack_key(logical_path: str) -> tuple[int, int]:
+    return (
+        fnv1a64(logical_path, 0x243F6A8885A308D3),
+        fnv1a64(logical_path, 0x13198A2E03707344),
+    )
+
+
+def rotl64(value: int, shift: int) -> int:
+    return ((value << shift) | (value >> (64 - shift))) & FNV_MASK
+
+
+def xorshift64star(state: int) -> tuple[int, int]:
+    state ^= state >> 12
+    state ^= (state << 25) & FNV_MASK
+    state ^= state >> 27
+    state &= FNV_MASK
+    return state, (state * 2685821657736338717) & FNV_MASK
+
+
+def encode_shader_payload(data: bytes, key: tuple[int, int]) -> bytes:
+    state = (key[0] ^ rotl64(key[1], 1) ^ 0xA5A5A5A55A5A5A5A) & FNV_MASK
+    out = bytearray(data)
+    stream_word = 0
+    stream_bytes_left = 0
+    for index in range(len(out)):
+        if stream_bytes_left == 0:
+            state, stream_word = xorshift64star(state)
+            stream_bytes_left = 8
+        out[index] ^= stream_word & 0xFF
+        stream_word >>= 8
+        stream_bytes_left -= 1
+    return bytes(out)
+
+
+def is_hash_hex(value: str) -> bool:
+    return len(value) == 64 and all(ch in HEX_CHARS for ch in value)
+
+
+def normalized_dynamic_shader_rel(path: Path) -> Path:
+    stem = path.stem
+    if is_hash_hex(stem):
+        shader_hash = stem.lower()
+    else:
+        maybe_hash = stem.rsplit("_", 1)[-1].lower()
+        if not is_hash_hex(maybe_hash):
+            return Path(path.name)
+        shader_hash = maybe_hash
+    return Path(shader_hash[:2]) / f"{shader_hash}.bin"
+
+
+def add_shader_pack_tree(
+    entries: dict[str, Path],
+    src_root: Path,
+    logical_root: str,
+    *,
+    normalize_dynamic_names: bool = False,
+) -> None:
+    if not src_root.exists():
+        return
+
+    for item in src_root.rglob("*.bin"):
+        if not item.is_file():
+            continue
+        rel = item.relative_to(src_root)
+        if normalize_dynamic_names:
+            rel = normalized_dynamic_shader_rel(rel)
+        logical_path = f"{logical_root}/{rel.as_posix()}"
+        entries.setdefault(logical_path, item)
+
+
+def collect_shader_pack_entries(shader_type: str, dynamic_shaders: str) -> dict[str, Path]:
+    entries: dict[str, Path] = {}
+    static_roots = {
+        "framework": "ShaderPrecompiled/donut",
+        "caustica": "ShaderPrecompiled/app",
+        "nrd": "ShaderPrecompiled/nrd",
+        "omm": "ShaderPrecompiled/omm",
+    }
+    for source_name, logical_root in static_roots.items():
+        add_shader_pack_tree(
+            entries,
+            BIN_DIR / "ShaderPrecompiled" / source_name / shader_type,
+            logical_root,
+        )
+
+    if dynamic_shaders in {"bin", "full"}:
+        add_shader_pack_tree(
+            entries,
+            BIN_DIR / "ShaderDynamic" / "Bin" / shader_type,
+            "ShaderDynamic/Bin",
+            normalize_dynamic_names=True,
+        )
+
+    return entries
+
+
+def write_shader_pack(shader_type: str, dynamic_shaders: str, output_dir: Path) -> Path:
+    entries = collect_shader_pack_entries(shader_type, dynamic_shaders)
+    if not entries:
+        raise FileNotFoundError(f"No shader binaries found for {shader_type} in {BIN_DIR}")
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    pack_path = output_dir / f"caustica.shaders.{shader_type}.pack"
+    sorted_entries = sorted(entries.items())
+    table_size = PACK_ENTRY.size * len(sorted_entries)
+    data_offset = PACK_HEADER.size + table_size
+
+    packed_entries: list[tuple[int, int, int, int, bytes]] = []
+    cursor = data_offset
+    for logical_path, source_path in sorted_entries:
+        key = shader_pack_key(logical_path)
+        encoded = encode_shader_payload(source_path.read_bytes(), key)
+        packed_entries.append((key[0], key[1], cursor, len(encoded), encoded))
+        cursor += len(encoded)
+
+    with pack_path.open("wb") as f:
+        f.write(PACK_HEADER.pack(PACK_MAGIC, PACK_VERSION, len(packed_entries)))
+        for hash0, hash1, offset, size, _ in packed_entries:
+            f.write(PACK_ENTRY.pack(hash0, hash1, offset, size))
+        for *_, encoded in packed_entries:
+            f.write(encoded)
+
+    print(f"Built shader pack: {pack_path} ({len(packed_entries)} entries)")
+    return pack_path
+
+
 def find_native_extension() -> Path:
     ext_suffix = sysconfig.get_config_var("EXT_SUFFIX")
     if ext_suffix:
@@ -95,6 +240,7 @@ def copy_runtime_files(
     dynamic_shaders: str,
     shader_api: str,
     assets: str,
+    shader_pack: bool = True,
 ) -> None:
     native_extension = find_native_extension()
     copy_file(native_extension, package_dir / native_extension.name)
@@ -121,13 +267,19 @@ def copy_runtime_files(
     elif shader_api != "both":
         raise ValueError(f"Unknown shader API: {shader_api}")
 
-    copy_tree(
-        BIN_DIR / "ShaderPrecompiled",
-        package_dir / "ShaderPrecompiled",
-        path_filter=shader_filter,
-    )
+    shader_types = ["dxil"] if shader_api == "d3d12" else ["spirv"] if shader_api == "vulkan" else ["dxil", "spirv"]
 
-    if dynamic_shaders in {"bin", "full"} and (BIN_DIR / "ShaderDynamic" / "Bin").exists():
+    if shader_pack:
+        for shader_type in shader_types:
+            write_shader_pack(shader_type, dynamic_shaders, package_dir)
+    else:
+        copy_tree(
+            BIN_DIR / "ShaderPrecompiled",
+            package_dir / "ShaderPrecompiled",
+            path_filter=shader_filter,
+        )
+
+    if not shader_pack and dynamic_shaders in {"bin", "full"} and (BIN_DIR / "ShaderDynamic" / "Bin").exists():
         copy_tree(
             BIN_DIR / "ShaderDynamic" / "Bin",
             package_dir / "ShaderDynamic" / "Bin",
@@ -285,6 +437,19 @@ def parse_args() -> argparse.Namespace:
         help="Shader backend payload to include. Windows wheels default to D3D12 only.",
     )
     parser.add_argument(
+        "--shader-pack",
+        dest="shader_pack",
+        action="store_true",
+        default=True,
+        help="Package shader binaries into caustica.shaders.<api>.pack instead of copying shader directories.",
+    )
+    parser.add_argument(
+        "--no-shader-pack",
+        dest="shader_pack",
+        action="store_false",
+        help="Copy shader directories in the legacy layout.",
+    )
+    parser.add_argument(
         "--no-dynamic-shader-bin",
         action="store_true",
         default=argparse.SUPPRESS,
@@ -371,6 +536,7 @@ def main() -> int:
         dynamic_shaders,
         args.shader_api,
         args.assets,
+        shader_pack=args.shader_pack,
     )
     write_build_project(args.version)
 

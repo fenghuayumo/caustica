@@ -82,6 +82,7 @@ class BuildPyWithRuntime(_build_py):
             {"d3d12", "vulkan", "both"},
             "RTXPT_WHEEL_SHADER_API",
         )
+        shader_pack = env_bool("CAUSTICA_WHEEL_SHADER_PACK", True, "RTXPT_WHEEL_SHADER_PACK")
         if os.name != "nt" and shader_api == "d3d12":
             raise RuntimeError(
                 "CAUSTICA_WHEEL_SHADER_API=d3d12 is only valid on Windows. "
@@ -103,6 +104,7 @@ class BuildPyWithRuntime(_build_py):
             dynamic_shaders=dynamic_shaders,
             shader_api=shader_api,
             assets=assets,
+            shader_pack=shader_pack,
         )
         size_mib = directory_size(package_dir) / (1024 * 1024)
         print(f"Staged caustica package size: {size_mib:.1f} MiB")

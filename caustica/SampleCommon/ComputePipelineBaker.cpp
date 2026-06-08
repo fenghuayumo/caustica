@@ -11,6 +11,7 @@
 #include "ComputePipelineBaker.h"
 #include "ShaderCompilerUtils.h"
 #include "SampleCommon.h"
+#include "ShaderPackFileSystem.h"
 
 #include <donut/app/ApplicationBase.h>
 #include <donut/core/log.h>
@@ -25,6 +26,14 @@ using namespace donut::engine;
 
 static const std::string c_ComputeShaderBinariesRoot = "ShaderDynamic/Bin";
 
+static std::string MakeShaderCacheFileNameNoExt(const std::string& hashHex)
+{
+    if (hashHex.size() >= 2)
+        return hashHex.substr(0, 2) + "/" + hashHex;
+
+    return hashHex;
+}
+
 //////////////////////////////////////////////////////////////////////////
 // ComputePipelineBaker implementation
 //////////////////////////////////////////////////////////////////////////
@@ -36,7 +45,18 @@ ComputePipelineBaker::ComputePipelineBaker(nvrhi::IDevice* device, const std::ve
         log::fatal("Failed to initialize compute shader compiler configuration");
 
     m_shadersFS = std::make_shared<vfs::RootFileSystem>();
-    m_shadersFS->mount("/" + c_ComputeShaderBinariesRoot, m_compilerConfig.ShaderBinariesPath);
+    const char* shaderTypeName = donut::app::GetShaderTypeName(device->getGraphicsAPI());
+    const std::filesystem::path shaderPackPath = GetRuntimeDirectory() / (std::string("caustica.shaders.") + shaderTypeName + ".pack");
+    auto shaderPackFS = std::make_shared<ShaderPackFileSystem>(shaderPackPath, c_ComputeShaderBinariesRoot);
+    if (shaderPackFS->isOpen())
+    {
+        m_shadersFS->mount("/" + c_ComputeShaderBinariesRoot, shaderPackFS);
+        m_compilerConfig.RuntimeCompilationAvailable = false;
+    }
+    else
+    {
+        m_shadersFS->mount("/" + c_ComputeShaderBinariesRoot, m_compilerConfig.ShaderBinariesPath);
+    }
     
     // Store additional paths to monitor (converted to absolute)
     for (const auto& path : additionalMonitorPaths)
@@ -160,7 +180,8 @@ void ComputePipelineBaker::Update(bool forceReload)
         return;
 
     // Get latest source modification time (from all monitored paths)
-    EnsureDirectoryExists(m_compilerConfig.ShaderBinariesPath);
+    if (m_compilerConfig.CanCompile())
+        EnsureDirectoryExists(m_compilerConfig.ShaderBinariesPath);
     
     m_lastUpdatedSourceTimestamp = m_compilerConfig.CanCompile()
         ? GetLatestModifiedTimeDirectoryRecursive(m_compilerConfig.ShadersPath)
@@ -384,14 +405,17 @@ void ComputeShaderVariant::PrepareCompilation(std::filesystem::file_time_type la
         ResetPipeline();
     }
 
-    m_compiledFileNameNoExt = m_shaderSrcFileName.stem().string() + "_" + m_entryPoint + "_" + m_compiledHashHex;
+    m_compiledFileNameNoExt = MakeShaderCacheFileNameNoExt(m_compiledHashHex);
     m_compiledFullPath = std::filesystem::absolute(
         baker->GetShaderBinariesPath() / m_compiledFileNameNoExt).string() + ".bin";
     std::string compiledFullPathPdb = std::filesystem::absolute(
         baker->GetShaderBinariesPath() / m_compiledFileNameNoExt).string() + ".pdb";
+    std::string compiledVfsPath = "/" + c_ComputeShaderBinariesRoot + "/" + m_compiledFileNameNoExt + ".bin";
 
     // Check if compiled file is up to date
-    if (ShaderCompilerUtils::IsCompiledShaderUpToDate(m_compiledFullPath, lastModifiedSourceCode))
+    const bool compiledBlobAvailable = baker->GetFS()->fileExists(compiledVfsPath);
+    const bool diskBlobUpToDate = ShaderCompilerUtils::IsCompiledShaderUpToDate(m_compiledFullPath, lastModifiedSourceCode);
+    if (compiledBlobAvailable && (!baker->CanCompileShaders() || diskBlobUpToDate))
     {
         if (baker->IsVerbose())
             log::info("No need to compile compute shader '%s', up-to-date file exists", m_debugName.c_str());
@@ -400,6 +424,7 @@ void ComputeShaderVariant::PrepareCompilation(std::filesystem::file_time_type la
     else if (baker->CanCompileShaders())
     {
         // Need to recompile
+        EnsureDirectoryExists(std::filesystem::path(m_compiledFullPath).parent_path());
         std::string command = baker->GetCompilerConfig().GetCompilerPathQuoted();
         command += cmdResult.CommandBase;
         

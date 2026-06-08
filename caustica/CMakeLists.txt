@@ -53,7 +53,11 @@ set(folder "caustica")
 set(caustica_shaders caustica_shaders)
 
 if (WIN32)
-set(SHADERMAKE_OPTIONS_DXIL "-D ENABLE_DEBUG_PRINT")
+if (CAUSTICA_DISTRIBUTION_BUILD)
+    set(SHADERMAKE_OPTIONS_DXIL "")
+else()
+    set(SHADERMAKE_OPTIONS_DXIL "-D ENABLE_DEBUG_PRINT")
+endif()
 #set(SHADERMAKE_OPTIONS_SPIRV "-D ENABLE_DEBUG_PRINT") # Disable SPIRV debug printf since it causes DXC to crash as of dxc 1.8.2505
 # SPIR-V cannot compile DX12 OMM ray-query variants (see shaders.cfg); match Linux.
 set(SHADERMAKE_OPTIONS_SPIRV "-D NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP=0 -D SPIRV")
@@ -66,15 +70,19 @@ set(SHADERMAKE_OPTIONS_SPIRV "-D NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP=0 -D SP
 endif()
 
 if(DONUT_WITH_AFTERMATH OR DONUT_EMBED_SHADER_PDBS)
-    set(shadermake_options --embedPDB)
+    set(shadermake_options "--embedPDB")
 #else()
 #    set(shadermake_options --PDB)
 endif()
 
 #set(shadermake_options --verbose)
 
+if(CAUSTICA_DISTRIBUTION_BUILD)
+    string(APPEND shadermake_options " --stripReflection")
+endif()
+
 if(RTXPT_D3D_AGILITY_SDK_VERSION AND (RTXPT_D3D_AGILITY_SDK_VERSION GREATER_EQUAL "619"))
-    set(shadermake_options "-m 6_9")
+    string(APPEND shadermake_options " -m 6_9")
 endif()
 
 # SPIR-V builds cannot compile the DX12 OMM shader variants in shaders.cfg.
@@ -113,6 +121,15 @@ endif()
 
 ##########################################################################
 ################ dynamic shader recompile dependencies ###################
+if (CAUSTICA_DISTRIBUTION_BUILD)
+add_custom_target(ShaderDynamicAssets_CopyAlways
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Bin"
+    COMMAND ${CMAKE_COMMAND} -E rm -rf "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Source"
+    COMMAND ${CMAKE_COMMAND} -E rm -rf "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Tools"
+    COMMENT "Pruning runtime shader sources and compiler tools for distribution build"
+)
+add_custom_target(ShaderDynamicAssets ALL)
+else()
 set(DYNSH_COPY1_MARKER "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Tools/copyVK.marker")
 set(DYNSH_COPY2_MARKER "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Tools/copyDX.marker")
 set(DYNSH_COPY3_MARKER "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Source/copy.marker")
@@ -203,6 +220,7 @@ else()
     set(shader_dynamic_copy_deps "")
 endif()
 add_custom_target(ShaderDynamicAssets ALL DEPENDS ${shader_dynamic_copy_deps})
+endif()
 
 ##########################################################################
 
