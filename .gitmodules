@@ -1,0 +1,36 @@
+[submodule]
+	shallow = false
+[submodule "External/RayTracingDenoiser"]
+	path = External/Nrd
+	url = https://github.com/NVIDIA-RTX/NRD.git
+	shallow = false
+[submodule "External/Opacity-MicroMap-SDK"]
+	path = External/Omm
+	url = https://github.com/NVIDIA-RTX/OMM.git
+	branch = main-minimal
+	shallow = false
+[submodule "External/NVAPI"]
+	path = External/NVAPI
+	url = https://github.com/NVIDIA/nvapi.git
+	shallow = false
+[submodule "External/cxxopts"]
+	path = External/cxxopts
+	url = https://github.com/jarro2783/cxxopts.git
+	shallow = false
+[submodule "External/rtxdi-runtime"]
+	path = External/Rtxdi
+	url = https://github.com/fenghuayumo/RTXDI-Library.git
+	shallow = false
+[submodule "External/donut"]
+	path = External/Donut
+	url = https://github.com/fenghuayumo/Donut.git
+	branch = main
+	shallow = false
+[submodule "Assets"]
+	path = Assets
+	url = https://github.com/NVIDIA-RTX/caustica-Assets.git
+	shallow = true
+[submodule "External/Rtxtf"]
+	path = External/Rtxtf
+	url = https://github.com/NVIDIA-RTX/RTXTF-Library.git
+	shallow = false

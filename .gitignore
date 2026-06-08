@@ -1,0 +1,17 @@
+bin/
+build*/
+dist/
+*.egg-info/
+.vs
+Nrd.cfg
+Omm.cfg
+tests/output/*
+.vscode/
+/External/dxc
+/External/AgilitySDK
+/External/Streamline
+/External/OIDN
+
+# local project files for shader development outside of VS
+*.sublime-*
+compile-shaders.bat
