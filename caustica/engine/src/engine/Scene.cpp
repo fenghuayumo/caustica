@@ -43,7 +43,7 @@ this software is released into the Public Domain.
 #include <nvrhi/common/misc.h>
 #include <json/json.h>
 
-#include "engine/ShaderFactory.h"
+#include <engine/ShaderFactory.h>
 
 #include <algorithm>
 #include <array>

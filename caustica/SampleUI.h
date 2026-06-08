@@ -16,14 +16,14 @@
 #include <app/imgui_renderer.h>
 #include <app/imgui_console.h>
 
-#include "engine/RTXDI/RtxdiPass.h"
+#include <render/RTXDI/RtxdiPass.h>
 
 #include <render/TemporalAntiAliasingPass.h>
 
 using namespace donut::math;
 
-#include "engine/ToneMapper/ToneMappingPasses.h"
-#include "Shaders/PathTracer/PathTracerDebug.hlsli"
+#include <render/ToneMapper/ToneMappingPasses.h>
+#include <shaders/PathTracer/PathTracerDebug.hlsli>
 
 #if ENABLE_DEBUG_DELTA_TREE_VIZUALISATION
 #include "ImNodesEz.h"
@@ -33,7 +33,7 @@ using namespace donut::math;
 #include <app/StreamlineInterface.h>
 #endif
 
-#include "engine/NRD/NrdConfig.h"
+#include <render/NRD/NrdConfig.h>
 
 #if RTXPT_STOCHASTIC_TEXTURE_FILTERING_ENABLE
 #include "../../external/RtxTf/STFDefinitions.h"

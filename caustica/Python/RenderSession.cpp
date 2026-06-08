@@ -14,9 +14,9 @@
 
 #include "../AdvancedSample.h"
 #include "../caustica.h"
-#include "../SampleCommon/LocalConfig.h"
-#include "../SampleCommon/SampleCommon.h"
-#include "../SampleCommon/ShaderPackFileSystem.h"
+#include <SampleCommon/LocalConfig.h>
+#include <SampleCommon/SampleCommon.h>
+#include <SampleCommon/ShaderPackFileSystem.h>
 
 #include <app/DeviceManager.h>
 #include <core/log.h>
@@ -517,7 +517,7 @@ bool RenderSession::InitRenderer()
     auto rootFS = std::make_shared<donut::vfs::RootFileSystem>();
     const std::filesystem::path shaderPackPath = appDirectory / (std::string("caustica.shaders.") + shaderTypeName + ".pack");
     auto shaderPackFS = std::make_shared<ShaderPackFileSystem>(shaderPackPath, "ShaderPrecompiled");
-    const bool shaderPackHasCurrentLayout = shaderPackFS->isOpen() && shaderPackFS->fileExists("app/engine/Misc/DebugLines_main_vs.bin");
+    const bool shaderPackHasCurrentLayout = shaderPackFS->isOpen() && shaderPackFS->fileExists("app/engine/shaders/render/Misc/DebugLines_main_vs.bin");
     if (shaderPackFS->isOpen() && !shaderPackHasCurrentLayout)
     {
         donut::log::warning("Shader pack '%s' does not match the current shader layout; falling back to ShaderPrecompiled directories",

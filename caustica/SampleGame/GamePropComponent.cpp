@@ -20,7 +20,7 @@
 #include <engine/View.h>
 #include <cmath>
 
-#include "../engine/Misc/Korgi.h"
+#include <render/Misc/Korgi.h>
 
 using namespace donut;
 using namespace donut::math;

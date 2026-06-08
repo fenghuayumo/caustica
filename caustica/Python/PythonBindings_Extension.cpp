@@ -25,7 +25,7 @@
 #include <nanobind/stl/optional.h>
 
 #include "../caustica.h"
-#include "../SampleUI.h"
+#include <SampleUI.h>
 
 #include <engine/Scene.h>
 #include <core/math/box.h>

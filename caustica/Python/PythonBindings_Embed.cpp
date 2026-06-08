@@ -20,7 +20,7 @@
 #include <nanobind/stl/string.h>
 
 #include "../caustica.h"
-#include "../SampleUI.h"
+#include <SampleUI.h>
 
 #include <stdexcept>
 

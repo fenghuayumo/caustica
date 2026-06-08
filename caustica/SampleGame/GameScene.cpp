@@ -16,11 +16,11 @@
 #include <app/Camera.h>
 #include <cmath>
 
-#include "../SampleCommon/ExtendedScene.h"
+#include <SampleCommon/ExtendedScene.h>
 
 #include "../caustica.h"
 
-#include "../engine/Misc/Korgi.h"
+#include <render/Misc/Korgi.h>
 #include <json/json.h>
 
 using namespace donut;

@@ -10,7 +10,7 @@
 
 #pragma once
 
-#include "../Shaders/PathTracer/Config.h"
+#include <shaders/PathTracer/Config.h>
 
 #include <utility>
 #include <filesystem>

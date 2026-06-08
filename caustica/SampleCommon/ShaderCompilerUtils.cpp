@@ -10,7 +10,7 @@
 
 #include "ShaderCompilerUtils.h"
 #include "SampleCommon.h"
-#include "../engine/Misc/picosha2.h"
+#include <render/Misc/picosha2.h>
 
 #include <app/ApplicationBase.h>
 #include <core/log.h>
@@ -59,10 +59,10 @@ namespace ShaderCompilerUtils
         const char* dxcExecutableName = "dxc";
     #endif
 
-        std::filesystem::path shaderSourcePathDevelopment = 
-            sourceRootDirectory / "caustica/Shaders";
-        std::filesystem::path shaderSourcePathRuntime = 
-            runtimeDirectory / "ShaderDynamic/Source/caustica";
+        std::filesystem::path shaderSourcePathDevelopment =
+            sourceRootDirectory / "caustica/engine/shaders";
+        std::filesystem::path shaderSourcePathRuntime =
+            runtimeDirectory / "ShaderDynamic/Source/caustica/engine/shaders";
 
         ShaderBinariesPath = runtimeDirectory / binarySubfolder / 
             donut::app::GetShaderTypeName(device->getGraphicsAPI());
@@ -81,22 +81,22 @@ namespace ShaderCompilerUtils
                 donut::log::info("Shader source folder '%s' not found; runtime shader compilation is disabled.",
                     shaderSourcePathRuntime.string().c_str());
                 ShadersPath = shaderSourcePathRuntime;
-                ShadersPathExternalIncludes1 = runtimeDirectory / "ShaderDynamic/Source/External";
-                ShadersPathExternalIncludes2 = std::filesystem::path();
+                ShadersPathExternalIncludes1 = runtimeDirectory / "ShaderDynamic/Source/caustica/engine";
+                ShadersPathExternalIncludes2 = runtimeDirectory / "ShaderDynamic/Source/External";
             }
             else
             {
                 ShadersPath = shaderSourcePathRuntime;
-                ShadersPathExternalIncludes1 = runtimeDirectory / "ShaderDynamic/Source/External";
-                ShadersPathExternalIncludes2 = std::filesystem::path();
+                ShadersPathExternalIncludes1 = runtimeDirectory / "ShaderDynamic/Source/caustica/engine";
+                ShadersPathExternalIncludes2 = runtimeDirectory / "ShaderDynamic/Source/External";
             }
         }
         else
         {
             ShadersPath = shaderSourcePathDevelopment;
-            ShadersPathExternalIncludes1 = 
-                sourceRootDirectory / "caustica/engine/include";
-            ShadersPathExternalIncludes2 = 
+            ShadersPathExternalIncludes1 =
+                sourceRootDirectory / "caustica/engine";
+            ShadersPathExternalIncludes2 =
                 sourceRootDirectory / "External";
         }
 

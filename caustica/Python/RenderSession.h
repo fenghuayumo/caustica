@@ -36,7 +36,7 @@
 #include <core/math/math.h>
 #include <app/DeviceManager.h>
 
-#include "../SampleCommon/CommandLine.h"
+#include <SampleCommon/CommandLine.h>
 
 #if DONUT_WITH_DX12 && defined(RTXPT_D3D_AGILITY_SDK_VERSION)
 #include <wrl/client.h>

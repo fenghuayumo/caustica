@@ -19,15 +19,15 @@
 #include <engine/SceneGraph.h>
 #include <iterator>
 #include <imgui_internal.h>
-#include "engine/Materials/MaterialsBaker.h"
+#include <render/Materials/MaterialsBaker.h>
 
-#include "engine/ToneMapper/ToneMappingPasses.h"
-#include "engine/Misc/Korgi.h"
+#include <render/ToneMapper/ToneMappingPasses.h>
+#include <render/Misc/Korgi.h>
 
-#include "engine/OpacityMicroMap/OmmBaker.h"
+#include <render/OpacityMicroMap/OmmBaker.h>
 
 #include "SampleGame/GameScene.h"
-#include "engine/Misc/ZoomTool.h"
+#include <render/Misc/ZoomTool.h>
 
 #include "SampleCommon/CaptureScriptManager.h"
 #include "Python/PythonScripting.h"

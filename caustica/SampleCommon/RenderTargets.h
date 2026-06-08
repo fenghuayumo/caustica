@@ -17,7 +17,7 @@
 #include <memory>
 #include <render/GBuffer.h>
 
-#include "../Shaders/PathTracer/Config.h"
+#include <shaders/PathTracer/Config.h>
 
 namespace donut::engine
 {

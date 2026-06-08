@@ -10,7 +10,7 @@
 
 #pragma once
 
-#include "Shaders/PathTracer/Config.h"
+#include <shaders/PathTracer/Config.h>
 #include "SampleCommon/SampleCommon.h"
 
 #include "SampleCommon/CommandLine.h"
@@ -25,24 +25,24 @@
 #include <render/DLSS.h>
 #endif
 
-#include "engine/RTXDI/RtxdiPass.h"
-#include "engine/NRD/NrdIntegration.h"
+#include <render/RTXDI/RtxdiPass.h>
+#include <render/NRD/NrdIntegration.h>
 //#include "PathTracer/StablePlanes.hlsli"
 #if DONUT_WITH_STREAMLINE
 #include <app/StreamlineInterface.h>
 #endif
 
 #include "SampleCommon/RenderTargets.h"
-#include "engine/ProcessingPasses/PostProcess.h"
-#include "Shaders/SampleConstantBuffer.h"
-#include "engine/ProcessingPasses/AccumulationPass.h"
-#include "engine/ProcessingPasses/GaussianSplatEmissionProxy.h"
+#include <render/ProcessingPasses/PostProcess.h>
+#include <shaders/SampleConstantBuffer.h>
+#include <render/ProcessingPasses/AccumulationPass.h>
+#include <render/ProcessingPasses/GaussianSplatEmissionProxy.h>
 #include "SampleCommon/ExtendedScene.h"
 
-#include "engine/Lighting/Distant/EnvMapBaker.h"
-#include "engine/Lighting/LightsBaker.h"
+#include <render/Lighting/Distant/EnvMapBaker.h>
+#include <render/Lighting/LightsBaker.h>
 
-#include "engine/Misc/ShaderDebug.h"
+#include <render/Misc/ShaderDebug.h>
 
 #include <map>
 

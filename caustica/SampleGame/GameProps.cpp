@@ -18,12 +18,12 @@
 #include <app/Camera.h>
 #include <cmath>
 
-#include "../SampleCommon/CommandLine.h"
+#include <SampleCommon/CommandLine.h>
 
-#include "../SampleCommon/ExtendedScene.h"
+#include <SampleCommon/ExtendedScene.h>
 
-#include "../engine/Misc/Korgi.h"
-#include "../SampleCommon/SampleCommon.h"
+#include <render/Misc/Korgi.h>
+#include <SampleCommon/SampleCommon.h>
 #include <json/json.h>
 
 #include <fstream>

@@ -10,7 +10,7 @@
 
 #include "LocalConfig.h"
 
-#include "../SampleUI.h"
+#include <SampleUI.h>
 #include "../caustica.h"
 
 void LocalConfig::PreferredSceneOverride(std::string& preferredScene)

@@ -10,8 +10,30 @@
 include(../External/cmake/compileshaders.cmake)
 file(GLOB_RECURSE shaders "*.hlsl" "*.hlsli")
 file(GLOB_RECURSE shared_sources "*.cpp" "*.h" "*.md")
-list(FILTER shaders EXCLUDE REGEX "/engine/(include|src|shaders)/")
+list(FILTER shaders EXCLUDE REGEX "/engine/(include|src)/")
 list(FILTER shared_sources EXCLUDE REGEX "/engine/(include|src|shaders)/")
+
+set(rtxpt_render_module_sources "")
+foreach(rtxpt_render_module
+    GPUSort
+    Lighting
+    Materials
+    Misc
+    NRD
+    OpacityMicroMap
+    ProcessingPasses
+    RTXDI
+    ToneMapper
+)
+    file(GLOB_RECURSE rtxpt_render_module_files
+        "${CMAKE_CURRENT_SOURCE_DIR}/engine/include/render/${rtxpt_render_module}/*.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/engine/include/render/${rtxpt_render_module}/*.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/engine/src/render/${rtxpt_render_module}/*.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/engine/src/render/${rtxpt_render_module}/*.c"
+    )
+    list(APPEND rtxpt_render_module_sources ${rtxpt_render_module_files})
+endforeach()
+list(APPEND shared_sources ${rtxpt_render_module_sources})
 # Separate out shared sources from entry point files
 list(REMOVE_ITEM shared_sources 
     "${CMAKE_CURRENT_SOURCE_DIR}/AdvancedSample.cpp"
@@ -96,7 +118,7 @@ set(rtxpt_shader_compile_common
     TARGET caustica_shaders
     SOURCES ${shaders}
     FOLDER ${folder}
-    INCLUDES ${CMAKE_SOURCE_DIR}/External/Nrd/Shaders/Include ${CMAKE_SOURCE_DIR}/External/Rtxdi/Include ${CMAKE_SOURCE_DIR}/External
+    INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/engine ${CMAKE_SOURCE_DIR}/External/Nrd/Shaders/Include ${CMAKE_SOURCE_DIR}/External/Rtxdi/Include ${CMAKE_SOURCE_DIR}/External
     SHADERMAKE_OPTIONS ${shadermake_options}
 )
 if (WIN32)
@@ -189,14 +211,9 @@ add_custom_command(
 )
 endif()
 
-# shader files - main caustica
-set(SOURCE_DIR_RTXPT_SHADERS "${PROJECT_SOURCE_DIR}/caustica/Shaders")
-set(DEST_DIR_RTXPT_SHADERS "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Source/caustica")
-# shader files - localized framework shader dependencies
-set(SOURCE_DIR_DONUT_SHADERS "${PROJECT_SOURCE_DIR}/caustica/engine/include/shaders")
-set(DEST_DIR_DONUT_SHADERS "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Source/External/shaders")
-set(SOURCE_DIR_RTXPT_ENGINE_SHADERS "${PROJECT_SOURCE_DIR}/caustica/engine")
-set(DEST_DIR_RTXPT_ENGINE_SHADERS "${DEST_DIR_RTXPT_SHADERS}/engine")
+# shader files - main caustica and localized framework shader dependencies
+set(SOURCE_DIR_RTXPT_SHADERS "${PROJECT_SOURCE_DIR}/caustica/engine/shaders")
+set(DEST_DIR_RTXPT_SHADERS "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Source/caustica/engine/shaders")
 # shader files - NVAPI shader dependencies
 set(SOURCE_DIR_NVAPI_SHADERS "${PROJECT_SOURCE_DIR}/External/NVAPI")
 set(DEST_DIR_NVAPI_SHADERS "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Source/External/NVAPI")
@@ -206,18 +223,6 @@ add_custom_target(ShaderDynamicAssets_CopyAlways
 #    OUTPUT "${DYNSH_COPY3_MARKER}" <- let this run every build; it will only update changed
     COMMAND ${CMAKE_COMMAND} -E make_directory ${DEST_DIR_RTXPT_SHADERS}
     COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${SOURCE_DIR_RTXPT_SHADERS} ${DEST_DIR_RTXPT_SHADERS}
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${DEST_DIR_RTXPT_ENGINE_SHADERS}
-    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${SOURCE_DIR_RTXPT_ENGINE_SHADERS}/GPUSort ${DEST_DIR_RTXPT_ENGINE_SHADERS}/GPUSort
-    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${SOURCE_DIR_RTXPT_ENGINE_SHADERS}/Lighting ${DEST_DIR_RTXPT_ENGINE_SHADERS}/Lighting
-    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${SOURCE_DIR_RTXPT_ENGINE_SHADERS}/RTXDI ${DEST_DIR_RTXPT_ENGINE_SHADERS}/RTXDI
-    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${SOURCE_DIR_RTXPT_ENGINE_SHADERS}/Materials ${DEST_DIR_RTXPT_ENGINE_SHADERS}/Materials
-    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${SOURCE_DIR_RTXPT_ENGINE_SHADERS}/ToneMapper ${DEST_DIR_RTXPT_ENGINE_SHADERS}/ToneMapper
-    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${SOURCE_DIR_RTXPT_ENGINE_SHADERS}/NRD ${DEST_DIR_RTXPT_ENGINE_SHADERS}/NRD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${SOURCE_DIR_RTXPT_ENGINE_SHADERS}/ProcessingPasses ${DEST_DIR_RTXPT_ENGINE_SHADERS}/ProcessingPasses
-    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${SOURCE_DIR_RTXPT_ENGINE_SHADERS}/OpacityMicroMap ${DEST_DIR_RTXPT_ENGINE_SHADERS}/OpacityMicroMap
-    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${SOURCE_DIR_RTXPT_ENGINE_SHADERS}/Misc ${DEST_DIR_RTXPT_ENGINE_SHADERS}/Misc
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${DEST_DIR_DONUT_SHADERS}
-    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${SOURCE_DIR_DONUT_SHADERS} ${DEST_DIR_DONUT_SHADERS}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${DEST_DIR_NVAPI_SHADERS}
     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SOURCE_DIR_NVAPI_SHADERS_FILES} ${DEST_DIR_NVAPI_SHADERS}
 #    COMMAND ${CMAKE_COMMAND} -E touch "${DYNSH_COPY3_MARKER}" <- let this run every build; it will only update changed

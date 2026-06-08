@@ -11,7 +11,7 @@
 #include "CaptureScriptManager.h"
 
 #include <string>
-#include "../SampleUI.h"
+#include <SampleUI.h>
 #include "../caustica.h"
 #include "SampleCommon.h"
 #include "CommandLine.h"

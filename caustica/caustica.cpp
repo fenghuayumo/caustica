@@ -44,23 +44,23 @@
 
 #include "SampleCommon/AccelerationStructureUtil.h"
 
-#include "engine/Lighting/Distant/EnvMapImportanceSamplingBaker.h"
-#include "engine/Materials/MaterialsBaker.h"
+#include <render/Lighting/Distant/EnvMapImportanceSamplingBaker.h>
+#include <render/Materials/MaterialsBaker.h>
 
-#include "engine/OpacityMicroMap/OmmBaker.h"
+#include <render/OpacityMicroMap/OmmBaker.h>
 
 #include "SampleCommon/LocalConfig.h"
 #include "SampleCommon/SampleBaseApp.h"
 #include "SampleCommon/CaptureScriptManager.h"
-#include "engine/Misc/Korgi.h"
+#include <render/Misc/Korgi.h>
 
-#include "engine/GPUSort/GPUSort.h"
+#include <render/GPUSort/GPUSort.h>
 
-#include "engine/Misc/ZoomTool.h"
+#include <render/Misc/ZoomTool.h>
 
-#include "engine/ProcessingPasses/DenoisingGuidesBaker.h"
-#include "engine/ProcessingPasses/OidnDenoiser.h"
-#include "engine/ProcessingPasses/GaussianSplatPass.h"
+#include <render/ProcessingPasses/DenoisingGuidesBaker.h>
+#include <render/ProcessingPasses/OidnDenoiser.h>
+#include <render/ProcessingPasses/GaussianSplatPass.h>
 
 #include <engine/GltfImporter.h>
 #include <engine/SceneGraph.h>
@@ -455,8 +455,8 @@ void Sample::Init(const std::string& preferredScene,
     //Draw lines from the feedback buffer - this is old and should all be replaced by ShaderDebug
     {
         std::vector<ShaderMacro> drawLinesMacro = { ShaderMacro("DRAW_LINES_SHADERS_OLD", "1") };
-        m_linesVertexShader = m_shaderFactory->CreateShader("app/engine/Misc/DebugLines.hlsl", "main_vs", &drawLinesMacro, nvrhi::ShaderType::Vertex);
-        m_linesPixelShader = m_shaderFactory->CreateShader("app/engine/Misc/DebugLines.hlsl", "main_ps", &drawLinesMacro, nvrhi::ShaderType::Pixel);
+        m_linesVertexShader = m_shaderFactory->CreateShader("app/engine/shaders/render/Misc/DebugLines.hlsl", "main_vs", &drawLinesMacro, nvrhi::ShaderType::Vertex);
+        m_linesPixelShader = m_shaderFactory->CreateShader("app/engine/shaders/render/Misc/DebugLines.hlsl", "main_ps", &drawLinesMacro, nvrhi::ShaderType::Pixel);
 
         nvrhi::VertexAttributeDesc attributes[] = {
             nvrhi::VertexAttributeDesc()
@@ -1698,7 +1698,7 @@ bool Sample::CreatePTPipeline(engine::ShaderFactory& shaderFactory)
     {
         std::vector<donut::engine::ShaderMacro> shaderMacros;
 		// shaderMacros.push_back(donut::engine::ShaderMacro({ "USE_RTXDI", "0" }));
-        m_exportVBufferCS = m_shaderFactory->CreateShader("app/engine/ProcessingPasses/ExportVisibilityBuffer.hlsl", "main", &shaderMacros, nvrhi::ShaderType::Compute);
+        m_exportVBufferCS = m_shaderFactory->CreateShader("app/engine/shaders/render/ProcessingPasses/ExportVisibilityBuffer.hlsl", "main", &shaderMacros, nvrhi::ShaderType::Compute);
         nvrhi::ComputePipelineDesc pipelineDesc;
 		pipelineDesc.bindingLayouts = { m_bindingLayout, m_bindlessLayout };
 		pipelineDesc.CS = m_exportVBufferCS;
@@ -2974,10 +2974,7 @@ void Sample::Render(nvrhi::IFramebuffer* framebuffer)
             
             m_ptPipelineBaker = std::make_shared<PTPipelineBaker>(GetDevice(), m_materialsBaker, m_bindingLayout, m_bindlessLayout);
             
-            // Additional paths to monitor for compute shader hot reload (besides the default Shaders path)
-            std::vector<std::filesystem::path> additionalShaderPaths = {
-                GetRuntimeDirectory().parent_path() / "caustica/engine/Lighting"  // For shaders outside the main Shaders folder
-            };
+            std::vector<std::filesystem::path> additionalShaderPaths;
             m_computePipelineBaker = std::make_shared<ComputePipelineBaker>(GetDevice(), additionalShaderPaths);
             
             CreateRTPipelines();

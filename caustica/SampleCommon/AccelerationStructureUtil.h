@@ -12,7 +12,7 @@
 
 #include <engine/SceneTypes.h>
 #include <nvrhi/nvrhi.h>
-#include "../engine/Materials/MaterialsBaker.h"
+#include <render/Materials/MaterialsBaker.h>
 
 namespace bvh
 {

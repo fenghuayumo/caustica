@@ -80,6 +80,7 @@ add_library(causticaEngine STATIC
 
 target_include_directories(causticaEngine
     PUBLIC
+        "${CMAKE_CURRENT_SOURCE_DIR}"
         "${CMAKE_CURRENT_SOURCE_DIR}/include"
     PRIVATE
         "$<$<BOOL:${DONUT_WITH_STREAMLINE}>:${CMAKE_CURRENT_SOURCE_DIR}/src/app/streamline>"

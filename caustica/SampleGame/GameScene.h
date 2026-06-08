@@ -10,8 +10,8 @@
 
 #pragma once
 
-#include "../Shaders/PathTracer/Config.h"
-//#include "../SampleUI.h"
+#include <shaders/PathTracer/Config.h>
+//#include <SampleUI.h>
 
 #include <app/Camera.h>
 

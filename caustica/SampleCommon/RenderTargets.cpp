@@ -10,7 +10,7 @@
 
 #define USE_DENOISING_NRD 1     // <- this define should come from elsewhere
 
-#include "../Shaders/PathTracer/Config.h"
+#include <shaders/PathTracer/Config.h>
 
 #include "RenderTargets.h"
 
@@ -19,9 +19,9 @@
 #include <core/math/math.h>
 using namespace donut::math;
 
-#include "../Shaders/PathTracer/StablePlanes.hlsli"
+#include <shaders/PathTracer/StablePlanes.hlsli>
 
-#include "../engine/RTXDI/ShaderParameters.h"
+#include <shaders/render/RTXDI/ShaderParameters.h>
 #include <core/log.h>
 
 #include <cmath>

@@ -20,11 +20,11 @@
 #include <nanobind/operators.h>
 
 #include "../caustica.h"
-#include "../SampleUI.h"
-#include "../SampleCommon/ExtendedScene.h"
-#include "../engine/Materials/MaterialsBaker.h"
-#include "../engine/Lighting/LightsBaker.h"
-#include "../engine/OpacityMicroMap/OmmBaker.h"
+#include <SampleUI.h>
+#include <SampleCommon/ExtendedScene.h>
+#include <render/Materials/MaterialsBaker.h>
+#include <render/Lighting/LightsBaker.h>
+#include <render/OpacityMicroMap/OmmBaker.h>
 
 #include <engine/Scene.h>
 #include <engine/SceneTypes.h>

@@ -14,10 +14,10 @@
 
 #include <app/ApplicationBase.h>
 
-#include "../engine/Materials/MaterialsBaker.h"
+#include <render/Materials/MaterialsBaker.h>
 #include "ExtendedScene.h"
 #include "SampleCommon.h"
-#include "../Shaders/PathTracer/PathTracerShared.h"
+#include <shaders/PathTracer/PathTracerShared.h>
 
 #define BAKER_ENABLE_MULTITHREADED_COMPILE_SHADER 1
 #define BAKER_ENABLE_MULTITHREADED_COMPILE_PSO 1

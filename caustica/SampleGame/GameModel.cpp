@@ -17,10 +17,10 @@
 #include <app/Camera.h>
 #include <cmath>
 
-#include "../SampleCommon/ExtendedScene.h"
+#include <SampleCommon/ExtendedScene.h>
 
-#include "../engine/Misc/Korgi.h"
-#include "../SampleCommon/SampleCommon.h"
+#include <render/Misc/Korgi.h>
+#include <SampleCommon/SampleCommon.h>
 
 #include <fstream>
 #include <iostream>

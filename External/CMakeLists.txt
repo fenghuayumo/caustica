@@ -88,16 +88,15 @@ if (DONUT_WITH_NVRHI)
 
     add_subdirectory(nvrhi)
 
-    set(DONUT_SHADER_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/caustica/engine/include" CACHE PATH "" FORCE)
+    set(DONUT_SHADER_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/caustica/engine" CACHE PATH "" FORCE)
 
     set(caustica_engine_shader_dir "${CMAKE_SOURCE_DIR}/caustica/engine/shaders")
     set(caustica_engine_shader_config "${caustica_engine_shader_dir}/EngineShaders.cfg")
 
-    file(GLOB caustica_engine_shader_sources
+    file(GLOB_RECURSE caustica_engine_shader_sources
         "${caustica_engine_shader_dir}/*.hlsl"
-        "${caustica_engine_shader_dir}/passes/*.hlsl"
-        "${CMAKE_SOURCE_DIR}/caustica/engine/include/shaders/*.hlsli"
-        "${CMAKE_SOURCE_DIR}/caustica/engine/include/shaders/*.h"
+        "${caustica_engine_shader_dir}/*.hlsli"
+        "${caustica_engine_shader_dir}/*.h"
     )
     list(FILTER caustica_engine_shader_sources EXCLUDE REGEX "/passes/tonemapping_ps\\.hlsl$")
 

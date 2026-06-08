@@ -19,8 +19,8 @@
 using namespace donut::math;
 #include <shaders/light_cb.h>
 
-#include "../engine/Materials/MaterialsBaker.h"
-#include "../engine/OpacityMicroMap/OmmBaker.h"
+#include <render/Materials/MaterialsBaker.h>
+#include <render/OpacityMicroMap/OmmBaker.h>
 
 #include "SampleCommon.h"
 #include "LocalConfig.h"

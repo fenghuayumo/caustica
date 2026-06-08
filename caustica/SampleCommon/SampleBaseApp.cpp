@@ -13,8 +13,8 @@
 #include <algorithm>
 #include <cctype>
 #include <string>
-#include "../engine/Misc/Korgi.h"
-#include "../SampleUI.h"
+#include <render/Misc/Korgi.h>
+#include <SampleUI.h>
 #include "LocalConfig.h"
 #include "ShaderPackFileSystem.h"
 
@@ -550,7 +550,7 @@ void SampleBaseApp::CreateShaderFactory()
     std::shared_ptr<donut::vfs::RootFileSystem> rootFS = std::make_shared<donut::vfs::RootFileSystem>();
     const std::filesystem::path shaderPackPath = appDirectory / (std::string("caustica.shaders.") + shaderTypeName + ".pack");
     auto shaderPackFS = std::make_shared<ShaderPackFileSystem>(shaderPackPath, "ShaderPrecompiled");
-    const bool shaderPackHasCurrentLayout = shaderPackFS->isOpen() && shaderPackFS->fileExists("app/engine/Misc/DebugLines_main_vs.bin");
+    const bool shaderPackHasCurrentLayout = shaderPackFS->isOpen() && shaderPackFS->fileExists("app/engine/shaders/render/Misc/DebugLines_main_vs.bin");
     if (shaderPackFS->isOpen() && !shaderPackHasCurrentLayout)
     {
         donut::log::warning("Shader pack '%s' does not match the current shader layout; falling back to ShaderPrecompiled directories",
