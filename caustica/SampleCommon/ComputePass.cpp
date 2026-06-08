@@ -10,9 +10,9 @@
 
 #include "ComputePass.h"
 
-#include <donut/engine/ShaderFactory.h>
-#include <donut/core/math/math.h>
-#include <donut/core/log.h>
+#include <engine/ShaderFactory.h>
+#include <core/math/math.h>
+#include <core/log.h>
 #include <nvrhi/utils.h>
 
 using namespace donut::engine;

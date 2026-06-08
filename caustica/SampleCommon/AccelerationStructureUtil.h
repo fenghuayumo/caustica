@@ -10,9 +10,9 @@
 
 #pragma once
 
-#include <donut/engine/SceneTypes.h>
+#include <engine/SceneTypes.h>
 #include <nvrhi/nvrhi.h>
-#include "../Materials/MaterialsBaker.h"
+#include "../engine/Materials/MaterialsBaker.h"
 
 namespace bvh
 {

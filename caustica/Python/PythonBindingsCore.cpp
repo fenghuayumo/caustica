@@ -22,15 +22,15 @@
 #include "../caustica.h"
 #include "../SampleUI.h"
 #include "../SampleCommon/ExtendedScene.h"
-#include "../Materials/MaterialsBaker.h"
-#include "../Lighting/LightsBaker.h"
-#include "../OpacityMicroMap/OmmBaker.h"
+#include "../engine/Materials/MaterialsBaker.h"
+#include "../engine/Lighting/LightsBaker.h"
+#include "../engine/OpacityMicroMap/OmmBaker.h"
 
-#include <donut/engine/Scene.h>
-#include <donut/engine/SceneTypes.h>
-#include <donut/engine/SceneGraph.h>
-#include <donut/core/log.h>
-#include <donut/core/math/math.h>
+#include <engine/Scene.h>
+#include <engine/SceneTypes.h>
+#include <engine/SceneGraph.h>
+#include <core/log.h>
+#include <core/math/math.h>
 
 #include <stdexcept>
 #include <cmath>

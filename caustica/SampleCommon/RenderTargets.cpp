@@ -14,15 +14,15 @@
 
 #include "RenderTargets.h"
 
-#include <donut/engine/FramebufferFactory.h>
+#include <engine/FramebufferFactory.h>
 
-#include <donut/core/math/math.h>
+#include <core/math/math.h>
 using namespace donut::math;
 
 #include "../Shaders/PathTracer/StablePlanes.hlsli"
 
-#include "../RTXDI/ShaderParameters.h"
-#include <donut/core/log.h>
+#include "../engine/RTXDI/ShaderParameters.h"
+#include <core/log.h>
 
 #include <cmath>
 #include <algorithm>

@@ -10,20 +10,20 @@
 
 #include "caustica.h"
 
-#include <donut/engine/FramebufferFactory.h>
-#include <donut/engine/ShaderFactory.h>
-#include <donut/engine/CommonRenderPasses.h>
-#include <donut/engine/TextureCache.h>
-#include <donut/engine/BindingCache.h>
-#include <donut/engine/View.h>
-#include <donut/app/DeviceManager.h>
-#include <donut/core/log.h>
-#include <donut/core/json.h>
-#include <donut/core/vfs/VFS.h>
-#include <donut/core/math/float.h>
-#include <donut/core/math/math.h>
-#include <donut/shaders/light_cb.h>
-#include <donut/shaders/view_cb.h>
+#include <engine/FramebufferFactory.h>
+#include <engine/ShaderFactory.h>
+#include <engine/CommonRenderPasses.h>
+#include <engine/TextureCache.h>
+#include <engine/BindingCache.h>
+#include <engine/View.h>
+#include <app/DeviceManager.h>
+#include <core/log.h>
+#include <core/json.h>
+#include <core/vfs/VFS.h>
+#include <core/math/float.h>
+#include <core/math/math.h>
+#include <shaders/light_cb.h>
+#include <shaders/view_cb.h>
 #include <nvrhi/utils.h>
 #include <nvrhi/common/misc.h>
 #include <algorithm>
@@ -44,26 +44,26 @@
 
 #include "SampleCommon/AccelerationStructureUtil.h"
 
-#include "Lighting/Distant/EnvMapImportanceSamplingBaker.h"
-#include "Materials/MaterialsBaker.h"
+#include "engine/Lighting/Distant/EnvMapImportanceSamplingBaker.h"
+#include "engine/Materials/MaterialsBaker.h"
 
-#include "OpacityMicroMap/OmmBaker.h"
+#include "engine/OpacityMicroMap/OmmBaker.h"
 
 #include "SampleCommon/LocalConfig.h"
 #include "SampleCommon/SampleBaseApp.h"
 #include "SampleCommon/CaptureScriptManager.h"
-#include "Misc/Korgi.h"
+#include "engine/Misc/Korgi.h"
 
-#include "GPUSort/GPUSort.h"
+#include "engine/GPUSort/GPUSort.h"
 
-#include "Misc/ZoomTool.h"
+#include "engine/Misc/ZoomTool.h"
 
-#include "ProcessingPasses/DenoisingGuidesBaker.h"
-#include "ProcessingPasses/OidnDenoiser.h"
-#include "ProcessingPasses/GaussianSplatPass.h"
+#include "engine/ProcessingPasses/DenoisingGuidesBaker.h"
+#include "engine/ProcessingPasses/OidnDenoiser.h"
+#include "engine/ProcessingPasses/GaussianSplatPass.h"
 
-#include <donut/engine/GltfImporter.h>
-#include <donut/engine/SceneGraph.h>
+#include <engine/GltfImporter.h>
+#include <engine/SceneGraph.h>
 
 #include <stb_image.h>
 #include <stb_image_write.h>
@@ -455,8 +455,8 @@ void Sample::Init(const std::string& preferredScene,
     //Draw lines from the feedback buffer - this is old and should all be replaced by ShaderDebug
     {
         std::vector<ShaderMacro> drawLinesMacro = { ShaderMacro("DRAW_LINES_SHADERS_OLD", "1") };
-        m_linesVertexShader = m_shaderFactory->CreateShader("app/Misc/DebugLines.hlsl", "main_vs", &drawLinesMacro, nvrhi::ShaderType::Vertex);
-        m_linesPixelShader = m_shaderFactory->CreateShader("app/Misc/DebugLines.hlsl", "main_ps", &drawLinesMacro, nvrhi::ShaderType::Pixel);
+        m_linesVertexShader = m_shaderFactory->CreateShader("app/engine/Misc/DebugLines.hlsl", "main_vs", &drawLinesMacro, nvrhi::ShaderType::Vertex);
+        m_linesPixelShader = m_shaderFactory->CreateShader("app/engine/Misc/DebugLines.hlsl", "main_ps", &drawLinesMacro, nvrhi::ShaderType::Pixel);
 
         nvrhi::VertexAttributeDesc attributes[] = {
             nvrhi::VertexAttributeDesc()
@@ -1698,7 +1698,7 @@ bool Sample::CreatePTPipeline(engine::ShaderFactory& shaderFactory)
     {
         std::vector<donut::engine::ShaderMacro> shaderMacros;
 		// shaderMacros.push_back(donut::engine::ShaderMacro({ "USE_RTXDI", "0" }));
-        m_exportVBufferCS = m_shaderFactory->CreateShader("app/ProcessingPasses/ExportVisibilityBuffer.hlsl", "main", &shaderMacros, nvrhi::ShaderType::Compute);
+        m_exportVBufferCS = m_shaderFactory->CreateShader("app/engine/ProcessingPasses/ExportVisibilityBuffer.hlsl", "main", &shaderMacros, nvrhi::ShaderType::Compute);
         nvrhi::ComputePipelineDesc pipelineDesc;
 		pipelineDesc.bindingLayouts = { m_bindingLayout, m_bindlessLayout };
 		pipelineDesc.CS = m_exportVBufferCS;
@@ -2976,7 +2976,7 @@ void Sample::Render(nvrhi::IFramebuffer* framebuffer)
             
             // Additional paths to monitor for compute shader hot reload (besides the default Shaders path)
             std::vector<std::filesystem::path> additionalShaderPaths = {
-                GetRuntimeDirectory().parent_path() / "caustica/Lighting"  // For shaders outside the main Shaders folder
+                GetRuntimeDirectory().parent_path() / "caustica/engine/Lighting"  // For shaders outside the main Shaders folder
             };
             m_computePipelineBaker = std::make_shared<ComputePipelineBaker>(GetDevice(), additionalShaderPaths);
             

@@ -33,8 +33,8 @@
 #include <vector>
 #include <cstdint>
 
-#include <donut/core/math/math.h>
-#include <donut/app/DeviceManager.h>
+#include <core/math/math.h>
+#include <app/DeviceManager.h>
 
 #include "../SampleCommon/CommandLine.h"
 

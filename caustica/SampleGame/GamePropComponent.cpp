@@ -13,14 +13,14 @@
 #include "GameProps.h"
 #include "GameModel.h"
 
-#include <donut/core/log.h>
-#include <donut/core/json.h>
-#include <donut/core/math/math.h>
-#include <donut/app/Camera.h>
-#include <donut/engine/View.h>
+#include <core/log.h>
+#include <core/json.h>
+#include <core/math/math.h>
+#include <app/Camera.h>
+#include <engine/View.h>
 #include <cmath>
 
-#include "../Misc/Korgi.h"
+#include "../engine/Misc/Korgi.h"
 
 using namespace donut;
 using namespace donut::math;

@@ -14,7 +14,7 @@
 //#include "../SampleCommon.h"
 #include "../SampleUI.h"
 
-#include <donut/app/Camera.h>
+#include <app/Camera.h>
 
 namespace donut::app
 {

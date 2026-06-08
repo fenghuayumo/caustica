@@ -10,19 +10,19 @@
 
 #pragma once
 
-#include <donut/core/math/math.h>
-#include <donut/engine/Scene.h>
+#include <core/math/math.h>
+#include <engine/Scene.h>
 
-#include <donut/app/imgui_renderer.h>
-#include <donut/app/imgui_console.h>
+#include <app/imgui_renderer.h>
+#include <app/imgui_console.h>
 
-#include "RTXDI/RtxdiPass.h"
+#include "engine/RTXDI/RtxdiPass.h"
 
-#include <donut/render/TemporalAntiAliasingPass.h>
+#include <render/TemporalAntiAliasingPass.h>
 
 using namespace donut::math;
 
-#include "ToneMapper/ToneMappingPasses.h"
+#include "engine/ToneMapper/ToneMappingPasses.h"
 #include "Shaders/PathTracer/PathTracerDebug.hlsli"
 
 #if ENABLE_DEBUG_DELTA_TREE_VIZUALISATION
@@ -30,10 +30,10 @@ using namespace donut::math;
 #endif
 
 #if DONUT_WITH_STREAMLINE
-#include <donut/app/StreamlineInterface.h>
+#include <app/StreamlineInterface.h>
 #endif
 
-#include "NRD/NrdConfig.h"
+#include "engine/NRD/NrdConfig.h"
 
 #if RTXPT_STOCHASTIC_TEXTURE_FILTERING_ENABLE
 #include "../../external/RtxTf/STFDefinitions.h"

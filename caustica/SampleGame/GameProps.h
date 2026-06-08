@@ -14,8 +14,8 @@
 //#include "../SampleCommon.h"
 #include "../SampleUI.h"
 
-// #include <donut/core/vfs/VFS.h>
-#include <donut/app/Camera.h>
+// #include <core/vfs/VFS.h>
+#include <app/Camera.h>
 
 #include "GameModel.h"
 

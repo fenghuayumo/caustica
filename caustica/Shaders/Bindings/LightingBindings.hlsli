@@ -11,8 +11,8 @@
 #ifndef __LIGHTING_BINDINGS_HLSLI__    // using instead of "#pragma once" due to https://github.com/microsoft/DirectXShaderCompiler/issues/3943
 #define __LIGHTING_BINDINGS_HLSLI__
 
-#include <donut/shaders/bindless.h>
-#include <donut/shaders/binding_helpers.hlsli>
+#include <shaders/bindless.h>
+#include <shaders/binding_helpers.hlsli>
 
 #include "../PathTracer/Lighting/LightingTypes.hlsli"
 

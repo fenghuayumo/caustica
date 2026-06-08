@@ -10,10 +10,10 @@
 
 #include "ShaderCompilerUtils.h"
 #include "SampleCommon.h"
-#include "../Misc/picosha2.h"
+#include "../engine/Misc/picosha2.h"
 
-#include <donut/app/ApplicationBase.h>
-#include <donut/core/log.h>
+#include <app/ApplicationBase.h>
+#include <core/log.h>
 
 namespace ShaderCompilerUtils
 {
@@ -95,7 +95,7 @@ namespace ShaderCompilerUtils
         {
             ShadersPath = shaderSourcePathDevelopment;
             ShadersPathExternalIncludes1 = 
-                sourceRootDirectory / "caustica/Framework/include";
+                sourceRootDirectory / "caustica/engine/include";
             ShadersPathExternalIncludes2 = 
                 sourceRootDirectory / "External";
         }

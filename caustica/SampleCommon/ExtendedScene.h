@@ -10,7 +10,7 @@
 
 #pragma once
 
-#include <donut/engine/Scene.h>
+#include <engine/Scene.h>
 #include <string.h>
 
 constexpr int LightType_Environment = 1000;

@@ -13,7 +13,7 @@
 #include "../Shaders/PathTracer/Config.h"
 //#include "../SampleUI.h"
 
-#include <donut/app/Camera.h>
+#include <app/Camera.h>
 
 #include "GameModel.h"
 #include "GameProps.h"

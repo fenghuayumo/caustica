@@ -18,15 +18,15 @@
 #include "../SampleCommon/SampleCommon.h"
 #include "../SampleCommon/ShaderPackFileSystem.h"
 
-#include <donut/app/DeviceManager.h>
-#include <donut/core/log.h>
-#include <donut/core/vfs/VFS.h>
-#include <donut/engine/ShaderFactory.h>
-#include <donut/engine/TextureCache.h>
-#include <donut/engine/CommonRenderPasses.h>
-#include <donut/app/UserInterfaceUtils.h>
+#include <app/DeviceManager.h>
+#include <core/log.h>
+#include <core/vfs/VFS.h>
+#include <engine/ShaderFactory.h>
+#include <engine/TextureCache.h>
+#include <engine/CommonRenderPasses.h>
+#include <app/UserInterfaceUtils.h>
 #if RTXPT_WITH_NATIVE_DLSS
-#include <donut/render/DLSS.h>
+#include <render/DLSS.h>
 #endif
 
 #include <GLFW/glfw3.h>
@@ -509,7 +509,7 @@ bool RenderSession::InitRenderer()
     const std::filesystem::path appDirectory = ResolveRuntimeDirectory();
     SetRuntimeDirectoryOverride(appDirectory);
     SetLocalPathBaseOverride(ResolveResourceRoot(appDirectory));
-    std::filesystem::path frameworkShaderPath = appDirectory / "ShaderPrecompiled/framework" / shaderTypeName;
+    std::filesystem::path engineShaderPath    = appDirectory / "ShaderPrecompiled/engine"    / shaderTypeName;
     std::filesystem::path appShaderPath       = appDirectory / "ShaderPrecompiled/caustica"  / shaderTypeName;
     std::filesystem::path nrdShaderPath       = appDirectory / "ShaderPrecompiled/nrd"       / shaderTypeName;
     std::filesystem::path ommShaderPath       = appDirectory / "ShaderPrecompiled/omm"       / shaderTypeName;
@@ -517,13 +517,20 @@ bool RenderSession::InitRenderer()
     auto rootFS = std::make_shared<donut::vfs::RootFileSystem>();
     const std::filesystem::path shaderPackPath = appDirectory / (std::string("caustica.shaders.") + shaderTypeName + ".pack");
     auto shaderPackFS = std::make_shared<ShaderPackFileSystem>(shaderPackPath, "ShaderPrecompiled");
-    if (shaderPackFS->isOpen())
+    const bool shaderPackHasCurrentLayout = shaderPackFS->isOpen() && shaderPackFS->fileExists("app/engine/Misc/DebugLines_main_vs.bin");
+    if (shaderPackFS->isOpen() && !shaderPackHasCurrentLayout)
+    {
+        donut::log::warning("Shader pack '%s' does not match the current shader layout; falling back to ShaderPrecompiled directories",
+            shaderPackPath.string().c_str());
+    }
+
+    if (shaderPackHasCurrentLayout)
     {
         rootFS->mount("/ShaderPrecompiled", shaderPackFS);
     }
     else
     {
-        rootFS->mount("/ShaderPrecompiled/donut", frameworkShaderPath);
+        rootFS->mount("/ShaderPrecompiled/donut", engineShaderPath);
         rootFS->mount("/ShaderPrecompiled/app",   appShaderPath);
         rootFS->mount("/ShaderPrecompiled/nrd",   nrdShaderPath);
         rootFS->mount("/ShaderPrecompiled/omm",   ommShaderPath);

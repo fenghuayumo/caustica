@@ -10,7 +10,7 @@
 
 #pragma once
 
-#include <donut/core/vfs/VFS.h>
+#include <core/vfs/VFS.h>
 
 #include <array>
 #include <cstdint>

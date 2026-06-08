@@ -12,9 +12,9 @@
 #include "ShaderCompilerUtils.h"
 #include "ShaderPackFileSystem.h"
 
-#include <donut/app/ApplicationBase.h>
+#include <app/ApplicationBase.h>
 
-#include "../Materials/MaterialsBaker.h"
+#include "../engine/Materials/MaterialsBaker.h"
 #include "ExtendedScene.h"
 #include "SampleCommon.h"
 #include "../Shaders/PathTracer/PathTracerShared.h"

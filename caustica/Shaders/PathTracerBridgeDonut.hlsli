@@ -20,11 +20,11 @@
 #include "Misc/OmmDebug.hlsli"
 
 // Donut-specific (native engine - we can include before PathTracer to avoid any collisions)
-#include <donut/shaders/bindless.h>
-#include <donut/shaders/utils.hlsli>
-#include <donut/shaders/binding_helpers.hlsli>
-#include <donut/shaders/surface.hlsli>
-#include <donut/shaders/scene_material.hlsli>
+#include <shaders/bindless.h>
+#include <shaders/utils.hlsli>
+#include <shaders/binding_helpers.hlsli>
+#include <shaders/surface.hlsli>
+#include <shaders/scene_material.hlsli>
 
 #include "Bindings/SceneBindings.hlsli"
 #include "Bindings/LightingBindings.hlsli"

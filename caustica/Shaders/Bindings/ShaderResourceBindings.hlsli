@@ -13,7 +13,7 @@
 
 #include "../SampleConstantBuffer.h"
 #include "BindingDataTypes.hlsli"
-#include <donut/shaders/binding_helpers.hlsli>
+#include <shaders/binding_helpers.hlsli>
 
 ConstantBuffer<SampleConstants>         g_Const                         : register(b0);
 VK_PUSH_CONSTANT ConstantBuffer<SampleMiniConstants> g_MiniConst        : register(b1);

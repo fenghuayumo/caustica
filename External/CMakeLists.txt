@@ -8,7 +8,7 @@
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 
 ##########################################################################
-########################### Framework dependencies ########################
+########################### Engine dependencies ########################
 ##########################################################################
 
 include(FetchContent)
@@ -16,8 +16,8 @@ include(cmake/compileshaders.cmake)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 option(DONUT_WITH_NVRHI "Enable NVRHI and related projects" ON)
-option(DONUT_WITH_AFTERMATH "Enable Aftermath crash dump generation with framework runtime code" OFF)
-option(DONUT_WITH_STATIC_SHADERS "Build framework runtime code with statically linked shaders" OFF)
+option(DONUT_WITH_AFTERMATH "Enable Aftermath crash dump generation with engine runtime code" OFF)
+option(DONUT_WITH_STATIC_SHADERS "Build engine runtime code with statically linked shaders" OFF)
 option(DONUT_WITH_AUDIO "Include Audio features (XAudio2)" OFF)
 option(DONUT_WITH_TINYEXR "Include TinyEXR" ON)
 option(DONUT_WITH_UNIT_TESTS "Donut unit-tests" OFF)
@@ -88,33 +88,34 @@ if (DONUT_WITH_NVRHI)
 
     add_subdirectory(nvrhi)
 
-    set(DONUT_SHADER_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/caustica/Framework/include" CACHE PATH "" FORCE)
+    set(DONUT_SHADER_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/caustica/engine/include" CACHE PATH "" FORCE)
 
-    set(caustica_framework_shader_dir "${CMAKE_SOURCE_DIR}/caustica/Framework/shaders")
-    set(caustica_framework_shader_config "${caustica_framework_shader_dir}/FrameworkShaders.cfg")
+    set(caustica_engine_shader_dir "${CMAKE_SOURCE_DIR}/caustica/engine/shaders")
+    set(caustica_engine_shader_config "${caustica_engine_shader_dir}/EngineShaders.cfg")
 
-    file(GLOB caustica_framework_shader_sources
-        "${caustica_framework_shader_dir}/*.hlsl"
-        "${caustica_framework_shader_dir}/passes/*.hlsl"
-        "${CMAKE_SOURCE_DIR}/caustica/Framework/include/donut/shaders/*.hlsli"
-        "${CMAKE_SOURCE_DIR}/caustica/Framework/include/donut/shaders/*.h"
+    file(GLOB caustica_engine_shader_sources
+        "${caustica_engine_shader_dir}/*.hlsl"
+        "${caustica_engine_shader_dir}/passes/*.hlsl"
+        "${CMAKE_SOURCE_DIR}/caustica/engine/include/shaders/*.hlsli"
+        "${CMAKE_SOURCE_DIR}/caustica/engine/include/shaders/*.h"
     )
-    list(FILTER caustica_framework_shader_sources EXCLUDE REGEX "/passes/tonemapping_ps\\.hlsl$")
+    list(FILTER caustica_engine_shader_sources EXCLUDE REGEX "/passes/tonemapping_ps\\.hlsl$")
 
     if(DONUT_SHADERS_OUTPUT_DIR AND NOT DONUT_WITH_STATIC_SHADERS)
-        set(caustica_framework_shader_output_base ${DONUT_SHADERS_OUTPUT_DIR})
+        set(caustica_engine_shader_output_base ${DONUT_SHADERS_OUTPUT_DIR})
     else()
-        set(CAUSTICA_FRAMEWORK_STATIC_SHADERS_DIR "${CMAKE_BINARY_DIR}/caustica/Framework/shaders" CACHE INTERNAL "")
-        set(caustica_framework_shader_output_base ${CAUSTICA_FRAMEWORK_STATIC_SHADERS_DIR})
+        set(CAUSTICA_ENGINE_STATIC_SHADERS_DIR "${CMAKE_BINARY_DIR}/caustica/engine/shaders" CACHE INTERNAL "")
+        set(CAUSTICA_ENGINE_STATIC_SHADERS_DIR "${CAUSTICA_ENGINE_STATIC_SHADERS_DIR}" CACHE INTERNAL "")
+        set(caustica_engine_shader_output_base ${CAUSTICA_ENGINE_STATIC_SHADERS_DIR})
     endif()
 
     if(DONUT_WITH_STATIC_SHADERS)
-        set(caustica_framework_shader_output_format "HEADER")
+        set(caustica_engine_shader_output_format "HEADER")
     else()
-        set(caustica_framework_shader_output_format "BINARY")
+        set(caustica_engine_shader_output_format "BINARY")
     endif()
 
-    set(caustica_framework_shader_byproducts
+    set(caustica_engine_shader_byproducts
         blit_ps
         fullscreen_vs
         ies_profile_cs
@@ -155,19 +156,19 @@ if (DONUT_WITH_NVRHI)
     )
 
     if(DONUT_WITH_AFTERMATH OR DONUT_EMBED_SHADER_PDBS)
-        set(caustica_framework_shader_options --embedPDB)
+        set(caustica_engine_shader_options --embedPDB)
     endif()
 
     donut_compile_shaders_all_platforms(
-        TARGET causticaFrameworkShaders
-        PROJECT_NAME "CausticaFramework"
-        CONFIG ${caustica_framework_shader_config}
-        FOLDER "caustica/Framework"
-        OUTPUT_BASE ${caustica_framework_shader_output_base}
-        OUTPUT_FORMAT ${caustica_framework_shader_output_format}
-        SOURCES ${caustica_framework_shader_sources}
-        BYPRODUCTS_NO_EXT ${caustica_framework_shader_byproducts}
-        SHADERMAKE_OPTIONS ${caustica_framework_shader_options}
+        TARGET causticaEngineShaders
+        PROJECT_NAME "CausticaEngine"
+        CONFIG ${caustica_engine_shader_config}
+        FOLDER "caustica/engine"
+        OUTPUT_BASE ${caustica_engine_shader_output_base}
+        OUTPUT_FORMAT ${caustica_engine_shader_output_format}
+        SOURCES ${caustica_engine_shader_sources}
+        BYPRODUCTS_NO_EXT ${caustica_engine_shader_byproducts}
+        SHADERMAKE_OPTIONS ${caustica_engine_shader_options}
     )
 endif()
 
@@ -235,7 +236,7 @@ if (RTXPT_WITH_NATIVE_DLSS)
             COMMAND ${CMAKE_COMMAND} -E copy_if_different ${rtxpt_native_dlss_runtime_libraries} "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
             COMMENT "Copying native DLSS runtime libraries"
         )
-        set_target_properties(RtxptNativeDLSSRuntime PROPERTIES FOLDER "External/Framework")
+        set_target_properties(RtxptNativeDLSSRuntime PROPERTIES FOLDER "External/engine")
     endif()
 endif()
 

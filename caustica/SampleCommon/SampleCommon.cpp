@@ -9,11 +9,11 @@
 */
 
 #include "SampleCommon.h"
-#include <donut/core/log.h>
+#include <core/log.h>
 
-#include <donut/core/json.h>
-#include <donut/app/ApplicationBase.h>
-#include <donut/engine/SceneTypes.h>
+#include <core/json.h>
+#include <app/ApplicationBase.h>
+#include <engine/SceneTypes.h>
 #include <json/json.h>
 #include <fstream>
 #include <format>

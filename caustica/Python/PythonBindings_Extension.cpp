@@ -27,9 +27,9 @@
 #include "../caustica.h"
 #include "../SampleUI.h"
 
-#include <donut/engine/Scene.h>
-#include <donut/core/math/box.h>
-#include <donut/core/math/math.h>
+#include <engine/Scene.h>
+#include <core/math/box.h>
+#include <core/math/math.h>
 
 #include <stdexcept>
 

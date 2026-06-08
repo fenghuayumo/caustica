@@ -12,8 +12,8 @@
 
 #include <memory>
 
-#include "donut/app/DeviceManager.h"
-#include "donut/core/log.h"
+#include "app/DeviceManager.h"
+#include "core/log.h"
 
 #include "SampleCommon.h"
 #include "CommandLine.h"

@@ -15,7 +15,7 @@
 #include <filesystem>
 #include <optional>
 #include <nvrhi/nvrhi.h>
-#include <donut/engine/ShaderFactory.h>
+#include <engine/ShaderFactory.h>
 
 namespace ShaderCompilerUtils
 {

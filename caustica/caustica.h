@@ -16,33 +16,33 @@
 #include "SampleCommon/CommandLine.h"
 #include "SampleUI.h"
 
-#include <donut/app/ApplicationBase.h>
-#include <donut/core/vfs/VFS.h>
-#include <donut/render/BloomPass.h>
-#include <donut/app/Camera.h>
-#include <donut/engine/CommonRenderPasses.h>
+#include <app/ApplicationBase.h>
+#include <core/vfs/VFS.h>
+#include <render/BloomPass.h>
+#include <app/Camera.h>
+#include <engine/CommonRenderPasses.h>
 #if RTXPT_WITH_NATIVE_DLSS
-#include <donut/render/DLSS.h>
+#include <render/DLSS.h>
 #endif
 
-#include "RTXDI/RtxdiPass.h"
-#include "NRD/NrdIntegration.h"
+#include "engine/RTXDI/RtxdiPass.h"
+#include "engine/NRD/NrdIntegration.h"
 //#include "PathTracer/StablePlanes.hlsli"
 #if DONUT_WITH_STREAMLINE
-#include <donut/app/StreamlineInterface.h>
+#include <app/StreamlineInterface.h>
 #endif
 
 #include "SampleCommon/RenderTargets.h"
-#include "ProcessingPasses/PostProcess.h"
+#include "engine/ProcessingPasses/PostProcess.h"
 #include "Shaders/SampleConstantBuffer.h"
-#include "ProcessingPasses/AccumulationPass.h"
-#include "ProcessingPasses/GaussianSplatEmissionProxy.h"
+#include "engine/ProcessingPasses/AccumulationPass.h"
+#include "engine/ProcessingPasses/GaussianSplatEmissionProxy.h"
 #include "SampleCommon/ExtendedScene.h"
 
-#include "Lighting/Distant/EnvMapBaker.h"
-#include "Lighting/LightsBaker.h"
+#include "engine/Lighting/Distant/EnvMapBaker.h"
+#include "engine/Lighting/LightsBaker.h"
 
-#include "Misc/ShaderDebug.h"
+#include "engine/Misc/ShaderDebug.h"
 
 #include <map>
 

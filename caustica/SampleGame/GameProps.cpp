@@ -12,17 +12,17 @@
 #include "GameProps.h"
 #include "GamePropComponent.h"
 
-#include <donut/core/log.h>
-#include <donut/core/json.h>
-#include <donut/core/math/math.h>
-#include <donut/app/Camera.h>
+#include <core/log.h>
+#include <core/json.h>
+#include <core/math/math.h>
+#include <app/Camera.h>
 #include <cmath>
 
 #include "../SampleCommon/CommandLine.h"
 
 #include "../SampleCommon/ExtendedScene.h"
 
-#include "../Misc/Korgi.h"
+#include "../engine/Misc/Korgi.h"
 #include "../SampleCommon/SampleCommon.h"
 #include <json/json.h>
 

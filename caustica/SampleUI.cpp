@@ -13,21 +13,21 @@
 
 #include <inttypes.h>
 
-#include <donut/app/UserInterfaceUtils.h>
-#include <donut/core/vfs/VFS.h>
-#include <donut/engine/SceneTypes.h>
-#include <donut/engine/SceneGraph.h>
+#include <app/UserInterfaceUtils.h>
+#include <core/vfs/VFS.h>
+#include <engine/SceneTypes.h>
+#include <engine/SceneGraph.h>
 #include <iterator>
 #include <imgui_internal.h>
-#include "Materials/MaterialsBaker.h"
+#include "engine/Materials/MaterialsBaker.h"
 
-#include "ToneMapper/ToneMappingPasses.h"
-#include "Misc/Korgi.h"
+#include "engine/ToneMapper/ToneMappingPasses.h"
+#include "engine/Misc/Korgi.h"
 
-#include "OpacityMicroMap/OmmBaker.h"
+#include "engine/OpacityMicroMap/OmmBaker.h"
 
 #include "SampleGame/GameScene.h"
-#include "Misc/ZoomTool.h"
+#include "engine/Misc/ZoomTool.h"
 
 #include "SampleCommon/CaptureScriptManager.h"
 #include "Python/PythonScripting.h"

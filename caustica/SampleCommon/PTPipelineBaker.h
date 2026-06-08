@@ -13,8 +13,8 @@
 #include <mutex>
 #include <memory>
 #include <nvrhi/nvrhi.h>
-#include <donut/engine/ShaderFactory.h>
-#include <donut/engine/ThreadPool.h>
+#include <engine/ShaderFactory.h>
+#include <engine/ThreadPool.h>
 #include <unordered_set>
 
 #include "ShaderCompilerUtils.h"

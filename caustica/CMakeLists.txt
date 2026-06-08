@@ -10,8 +10,8 @@
 include(../External/cmake/compileshaders.cmake)
 file(GLOB_RECURSE shaders "*.hlsl" "*.hlsli")
 file(GLOB_RECURSE shared_sources "*.cpp" "*.h" "*.md")
-list(FILTER shaders EXCLUDE REGEX "/Framework/")
-list(FILTER shared_sources EXCLUDE REGEX "/Framework/")
+list(FILTER shaders EXCLUDE REGEX "/engine/(include|src|shaders)/")
+list(FILTER shared_sources EXCLUDE REGEX "/engine/(include|src|shaders)/")
 # Separate out shared sources from entry point files
 list(REMOVE_ITEM shared_sources 
     "${CMAKE_CURRENT_SOURCE_DIR}/AdvancedSample.cpp"
@@ -193,8 +193,10 @@ endif()
 set(SOURCE_DIR_RTXPT_SHADERS "${PROJECT_SOURCE_DIR}/caustica/Shaders")
 set(DEST_DIR_RTXPT_SHADERS "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Source/caustica")
 # shader files - localized framework shader dependencies
-set(SOURCE_DIR_DONUT_SHADERS "${PROJECT_SOURCE_DIR}/caustica/Framework/include/donut/shaders")
-set(DEST_DIR_DONUT_SHADERS "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Source/External/donut/shaders")
+set(SOURCE_DIR_DONUT_SHADERS "${PROJECT_SOURCE_DIR}/caustica/engine/include/shaders")
+set(DEST_DIR_DONUT_SHADERS "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Source/External/shaders")
+set(SOURCE_DIR_RTXPT_ENGINE_SHADERS "${PROJECT_SOURCE_DIR}/caustica/engine")
+set(DEST_DIR_RTXPT_ENGINE_SHADERS "${DEST_DIR_RTXPT_SHADERS}/engine")
 # shader files - NVAPI shader dependencies
 set(SOURCE_DIR_NVAPI_SHADERS "${PROJECT_SOURCE_DIR}/External/NVAPI")
 set(DEST_DIR_NVAPI_SHADERS "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Source/External/NVAPI")
@@ -204,6 +206,16 @@ add_custom_target(ShaderDynamicAssets_CopyAlways
 #    OUTPUT "${DYNSH_COPY3_MARKER}" <- let this run every build; it will only update changed
     COMMAND ${CMAKE_COMMAND} -E make_directory ${DEST_DIR_RTXPT_SHADERS}
     COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${SOURCE_DIR_RTXPT_SHADERS} ${DEST_DIR_RTXPT_SHADERS}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${DEST_DIR_RTXPT_ENGINE_SHADERS}
+    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${SOURCE_DIR_RTXPT_ENGINE_SHADERS}/GPUSort ${DEST_DIR_RTXPT_ENGINE_SHADERS}/GPUSort
+    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${SOURCE_DIR_RTXPT_ENGINE_SHADERS}/Lighting ${DEST_DIR_RTXPT_ENGINE_SHADERS}/Lighting
+    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${SOURCE_DIR_RTXPT_ENGINE_SHADERS}/RTXDI ${DEST_DIR_RTXPT_ENGINE_SHADERS}/RTXDI
+    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${SOURCE_DIR_RTXPT_ENGINE_SHADERS}/Materials ${DEST_DIR_RTXPT_ENGINE_SHADERS}/Materials
+    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${SOURCE_DIR_RTXPT_ENGINE_SHADERS}/ToneMapper ${DEST_DIR_RTXPT_ENGINE_SHADERS}/ToneMapper
+    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${SOURCE_DIR_RTXPT_ENGINE_SHADERS}/NRD ${DEST_DIR_RTXPT_ENGINE_SHADERS}/NRD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${SOURCE_DIR_RTXPT_ENGINE_SHADERS}/ProcessingPasses ${DEST_DIR_RTXPT_ENGINE_SHADERS}/ProcessingPasses
+    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${SOURCE_DIR_RTXPT_ENGINE_SHADERS}/OpacityMicroMap ${DEST_DIR_RTXPT_ENGINE_SHADERS}/OpacityMicroMap
+    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${SOURCE_DIR_RTXPT_ENGINE_SHADERS}/Misc ${DEST_DIR_RTXPT_ENGINE_SHADERS}/Misc
     COMMAND ${CMAKE_COMMAND} -E make_directory ${DEST_DIR_DONUT_SHADERS}
     COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${SOURCE_DIR_DONUT_SHADERS} ${DEST_DIR_DONUT_SHADERS}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${DEST_DIR_NVAPI_SHADERS}
@@ -225,7 +237,7 @@ endif()
 ##########################################################################
 
 # Create a static library for shared code (used by both samples)
-add_subdirectory(Framework)
+add_subdirectory(engine)
 add_library(causticaCore STATIC ${shared_sources})
 if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(causticaCore PRIVATE
@@ -238,7 +250,7 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         $<$<CXX_COMPILER_ID:GNU>:-Wno-error=unused-result>
     )
 endif()
-target_link_libraries(causticaCore PUBLIC cxxopts causticaFramework NRD Rtxdi omm-lib omm-gpu-nvrhi)
+target_link_libraries(causticaCore PUBLIC cxxopts causticaEngine NRD Rtxdi omm-lib omm-gpu-nvrhi)
 target_include_directories(causticaCore PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}" "../External/Nrd/Include" ${CMAKE_SOURCE_DIR}/External/Rtxdi/Include)
 target_compile_definitions(causticaCore PUBLIC RTXPT_D3D12_WITH_NVAPI=$<BOOL:${NVRHI_WITH_NVAPI}>)
 target_compile_definitions(causticaCore PUBLIC RTXPT_WITH_OIDN=$<BOOL:${RTXPT_WITH_OIDN}>)

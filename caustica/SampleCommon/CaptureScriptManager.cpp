@@ -16,9 +16,9 @@
 #include "SampleCommon.h"
 #include "CommandLine.h"
 
-#include <donut/app/UserInterfaceUtils.h>
+#include <app/UserInterfaceUtils.h>
 
-#include <donut/core/math/math.h>
+#include <core/math/math.h>
 
 using namespace donut::app;
 using namespace donut::engine;

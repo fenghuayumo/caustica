@@ -11,8 +11,8 @@
 #ifndef __SCENE_BINDINGS_HLSLI__    // using instead of "#pragma once" due to https://github.com/microsoft/DirectXShaderCompiler/issues/3943
 #define __SCENE_BINDINGS_HLSLI__
 
-#include <donut/shaders/bindless.h>
-#include <donut/shaders/binding_helpers.hlsli>
+#include <shaders/bindless.h>
+#include <shaders/binding_helpers.hlsli>
 
 #include "../SubInstanceData.h"
 #include "../PathTracer/Materials/MaterialPT.h"

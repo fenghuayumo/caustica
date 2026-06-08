@@ -12,7 +12,7 @@
 #define __RESTIR_GI_BINDINGS_HLSLI__
 
 #include "BindingDataTypes.hlsli"
-#include <donut/shaders/binding_helpers.hlsli>
+#include <shaders/binding_helpers.hlsli>
 
 // ReSTIR GI resources
 RWTexture2D<float4>                     u_SecondarySurfacePositionNormal: register(u60);

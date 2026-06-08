@@ -20,7 +20,7 @@
 #include <optional>
 #include <nvrhi/nvrhi.h>
 #include <nvrhi/utils.h>
-#include <donut/core/math/math.h>
+#include <core/math/math.h>
 
 
 #define UI_SCOPED_INDENT(indent) RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent); )

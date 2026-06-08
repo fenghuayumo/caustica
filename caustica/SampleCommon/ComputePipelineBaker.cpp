@@ -13,9 +13,9 @@
 #include "SampleCommon.h"
 #include "ShaderPackFileSystem.h"
 
-#include <donut/app/ApplicationBase.h>
-#include <donut/core/log.h>
-#include <donut/core/vfs/VFS.h>
+#include <app/ApplicationBase.h>
+#include <core/log.h>
+#include <core/vfs/VFS.h>
 
 #define COMPUTE_BAKER_ENABLE_MULTITHREADED_COMPILE 1
 #define COMPUTE_BAKER_EMBED_PDBS 0

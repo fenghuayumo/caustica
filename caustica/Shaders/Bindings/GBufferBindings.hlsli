@@ -12,7 +12,7 @@
 #define __GBUFFER_BINDINGS_HLSLI__
 
 #include "../PathTracer/Utils/utils.hlsli"
-#include <donut/shaders/utils.hlsli>
+#include <shaders/utils.hlsli>
 
 enum GBufferShaderId
 {

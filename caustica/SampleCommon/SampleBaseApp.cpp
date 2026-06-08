@@ -13,15 +13,15 @@
 #include <algorithm>
 #include <cctype>
 #include <string>
-#include "../Misc/Korgi.h"
+#include "../engine/Misc/Korgi.h"
 #include "../SampleUI.h"
 #include "LocalConfig.h"
 #include "ShaderPackFileSystem.h"
 
-#include <donut/app/ApplicationBase.h>
-#include <donut/core/log.h>
+#include <app/ApplicationBase.h>
+#include <core/log.h>
 #if RTXPT_WITH_NATIVE_DLSS
-#include <donut/render/DLSS.h>
+#include <render/DLSS.h>
 #endif
 #include "../caustica.h"
 
@@ -542,22 +542,28 @@ void SampleBaseApp::CreateShaderFactory()
 {
     const char* shaderTypeName = donut::app::GetShaderTypeName(m_DeviceManager->GetGraphicsAPI());
     const std::filesystem::path appDirectory = donut::app::GetDirectoryWithExecutable();
+    const std::filesystem::path engineShaderPath = appDirectory / "ShaderPrecompiled/engine" / shaderTypeName;
+    const std::filesystem::path appShaderPath = appDirectory / "ShaderPrecompiled/caustica" / shaderTypeName;
+    const std::filesystem::path nrdShaderPath = appDirectory / "ShaderPrecompiled/nrd" / shaderTypeName;
+    const std::filesystem::path ommShaderPath = appDirectory / "ShaderPrecompiled/omm" / shaderTypeName;
 
     std::shared_ptr<donut::vfs::RootFileSystem> rootFS = std::make_shared<donut::vfs::RootFileSystem>();
     const std::filesystem::path shaderPackPath = appDirectory / (std::string("caustica.shaders.") + shaderTypeName + ".pack");
     auto shaderPackFS = std::make_shared<ShaderPackFileSystem>(shaderPackPath, "ShaderPrecompiled");
-    if (shaderPackFS->isOpen())
+    const bool shaderPackHasCurrentLayout = shaderPackFS->isOpen() && shaderPackFS->fileExists("app/engine/Misc/DebugLines_main_vs.bin");
+    if (shaderPackFS->isOpen() && !shaderPackHasCurrentLayout)
+    {
+        donut::log::warning("Shader pack '%s' does not match the current shader layout; falling back to ShaderPrecompiled directories",
+            shaderPackPath.string().c_str());
+    }
+
+    if (shaderPackHasCurrentLayout)
     {
         rootFS->mount("/ShaderPrecompiled", shaderPackFS);
     }
     else
     {
-        std::filesystem::path frameworkShaderPath = appDirectory / "ShaderPrecompiled/framework" / shaderTypeName;
-        std::filesystem::path appShaderPath = appDirectory / "ShaderPrecompiled/caustica" / shaderTypeName;
-        std::filesystem::path nrdShaderPath = appDirectory / "ShaderPrecompiled/nrd" / shaderTypeName;
-        std::filesystem::path ommShaderPath = appDirectory / "ShaderPrecompiled/omm" / shaderTypeName;
-
-        rootFS->mount("/ShaderPrecompiled/donut", frameworkShaderPath);
+        rootFS->mount("/ShaderPrecompiled/donut", engineShaderPath);
         rootFS->mount("/ShaderPrecompiled/app", appShaderPath);
         rootFS->mount("/ShaderPrecompiled/nrd", nrdShaderPath);
         rootFS->mount("/ShaderPrecompiled/omm", ommShaderPath);

@@ -12,7 +12,7 @@
 
 #if RTXPT_WITH_PYTHON
 
-#include <donut/core/log.h>
+#include <core/log.h>
 
 // nanobind & CPython
 #include <nanobind/nanobind.h>
@@ -249,7 +249,7 @@ std::string PythonScripting::ConsumeOutputLog()
 
 #else // RTXPT_WITH_PYTHON
 
-#include <donut/core/log.h>
+#include <core/log.h>
 
 PythonScripting::PythonScripting(Sample& app) : m_app(app) {}
 PythonScripting::~PythonScripting() {}

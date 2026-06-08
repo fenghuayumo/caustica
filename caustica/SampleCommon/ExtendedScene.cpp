@@ -9,18 +9,18 @@
 */
 
 #include "ExtendedScene.h"
-#include <donut/core/json.h>
-#include <donut/core/vfs/VFS.h>
-#include <donut/core/log.h>
+#include <core/json.h>
+#include <core/vfs/VFS.h>
+#include <core/log.h>
 #include <nvrhi/utils.h>
 #include <nvrhi/common/misc.h>
 #include <json/json.h>
 
 using namespace donut::math;
-#include <donut/shaders/light_cb.h>
+#include <shaders/light_cb.h>
 
-#include "../Materials/MaterialsBaker.h"
-#include "../OpacityMicroMap/OmmBaker.h"
+#include "../engine/Materials/MaterialsBaker.h"
+#include "../engine/OpacityMicroMap/OmmBaker.h"
 
 #include "SampleCommon.h"
 #include "LocalConfig.h"

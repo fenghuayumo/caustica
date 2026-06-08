@@ -10,12 +10,12 @@
 
 #pragma once
 
-#include <donut/core/math/math.h>
+#include <core/math/math.h>
 #include <nvrhi/nvrhi.h>
 #include <nvrhi/utils.h>
 #include <nvrhi/common/misc.h>
 #include <memory>
-#include <donut/render/GBuffer.h>
+#include <render/GBuffer.h>
 
 #include "../Shaders/PathTracer/Config.h"
 
