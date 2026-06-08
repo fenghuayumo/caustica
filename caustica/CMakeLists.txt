@@ -10,6 +10,8 @@
 include(../External/Donut/compileshaders.cmake)
 file(GLOB_RECURSE shaders "*.hlsl" "*.hlsli")
 file(GLOB_RECURSE shared_sources "*.cpp" "*.h" "*.md")
+list(FILTER shaders EXCLUDE REGEX "/Framework/")
+list(FILTER shared_sources EXCLUDE REGEX "/Framework/")
 # Separate out shared sources from entry point files
 list(REMOVE_ITEM shared_sources 
     "${CMAKE_CURRENT_SOURCE_DIR}/IntroSample.cpp"
@@ -174,8 +176,8 @@ endif()
 # shader files - main caustica
 set(SOURCE_DIR_RTXPT_SHADERS "${PROJECT_SOURCE_DIR}/caustica/Shaders")
 set(DEST_DIR_RTXPT_SHADERS "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Source/caustica")
-# shader files - donut shader dependencies
-set(SOURCE_DIR_DONUT_SHADERS "${PROJECT_SOURCE_DIR}/External/Donut/include/donut/shaders")
+# shader files - localized framework shader dependencies
+set(SOURCE_DIR_DONUT_SHADERS "${PROJECT_SOURCE_DIR}/caustica/Framework/include/donut/shaders")
 set(DEST_DIR_DONUT_SHADERS "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Source/External/donut/shaders")
 # shader files - NVAPI shader dependencies
 set(SOURCE_DIR_NVAPI_SHADERS "${PROJECT_SOURCE_DIR}/External/NVAPI")
@@ -206,6 +208,7 @@ add_custom_target(ShaderDynamicAssets ALL DEPENDS ${shader_dynamic_copy_deps})
 ##########################################################################
 
 # Create a static library for shared code (used by both samples)
+add_subdirectory(Framework)
 add_library(causticaCore STATIC ${shared_sources})
 if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(causticaCore PRIVATE
@@ -218,7 +221,7 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         $<$<CXX_COMPILER_ID:GNU>:-Wno-error=unused-result>
     )
 endif()
-target_link_libraries(causticaCore PUBLIC cxxopts donut_render donut_app donut_engine NRD Rtxdi omm-lib omm-gpu-nvrhi)
+target_link_libraries(causticaCore PUBLIC cxxopts causticaFramework NRD Rtxdi omm-lib omm-gpu-nvrhi)
 target_include_directories(causticaCore PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}" "../External/Nrd/Include" ${CMAKE_SOURCE_DIR}/External/Rtxdi/Include)
 target_compile_definitions(causticaCore PUBLIC RTXPT_D3D12_WITH_NVAPI=$<BOOL:${NVRHI_WITH_NVAPI}>)
 target_compile_definitions(causticaCore PUBLIC RTXPT_WITH_OIDN=$<BOOL:${RTXPT_WITH_OIDN}>)

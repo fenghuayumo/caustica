@@ -41,7 +41,14 @@ if (MSVC)
 endif()
 
 # we can't run with DX11
-option(DONUT_WITH_DX11 OFF)
+option(DONUT_WITH_DX11 "Enable the DX11 version of the framework runtime code" OFF)
+
+if (WIN32)
+    set(RTXPT_DEFAULT_WITH_DX12 ON)
+else()
+    set(RTXPT_DEFAULT_WITH_DX12 OFF)
+endif()
+option(DONUT_WITH_DX12 "Enable the DX12 version of the framework runtime code" ${RTXPT_DEFAULT_WITH_DX12})
 
 # Vulkan is required for Linux/WSL builds because the D3D backends are Windows-only.
 if (WIN32)

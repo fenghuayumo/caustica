@@ -11,8 +11,174 @@
 ################################ Donut ####################################
 ##########################################################################
 
+include(FetchContent)
 include(Donut/compileshaders.cmake)
-add_subdirectory(Donut)
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/Donut/cmake")
+
+option(DONUT_WITH_NVRHI "Enable NVRHI and related projects" ON)
+option(DONUT_WITH_AFTERMATH "Enable Aftermath crash dump generation with framework runtime code" OFF)
+option(DONUT_WITH_STATIC_SHADERS "Build framework runtime code with statically linked shaders" OFF)
+option(DONUT_WITH_AUDIO "Include Audio features (XAudio2)" OFF)
+option(DONUT_WITH_TINYEXR "Include TinyEXR" ON)
+option(DONUT_WITH_UNIT_TESTS "Donut unit-tests" OFF)
+
+if (WIN32)
+    option(DONUT_FORCE_DISCRETE_GPU "Declare symbols to make the OS run the app on discrete GPU on laptops" OFF)
+endif()
+
+add_subdirectory(Donut/thirdparty)
+
+if (NOT TARGET ShaderMake)
+    option(SHADERMAKE_FIND_FXC "" "${DONUT_WITH_DX11}")
+    if (DONUT_WITH_DX12 OR DONUT_WITH_VULKAN)
+        option(SHADERMAKE_FIND_DXC "" ON)
+    else()
+        option(SHADERMAKE_FIND_DXC "" OFF)
+    endif()
+    option(SHADERMAKE_FIND_DXC_VK "" "${DONUT_WITH_VULKAN}")
+
+    add_subdirectory(Donut/ShaderMake)
+endif()
+
+if (DONUT_WITH_NVRHI)
+    set(NVRHI_WITH_DX11 "${DONUT_WITH_DX11}" CACHE BOOL "" FORCE)
+    set(NVRHI_WITH_DX12 "${DONUT_WITH_DX12}" CACHE BOOL "" FORCE)
+    set(NVRHI_WITH_VULKAN "${DONUT_WITH_VULKAN}" CACHE BOOL "" FORCE)
+    set(NVRHI_WITH_AFTERMATH "${DONUT_WITH_AFTERMATH}" CACHE BOOL "" FORCE)
+
+    add_subdirectory(Donut/nvrhi)
+
+    set(DONUT_SHADER_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/caustica/Framework/include" CACHE PATH "" FORCE)
+
+    set(caustica_framework_shader_dir "${CMAKE_SOURCE_DIR}/caustica/Framework/shaders")
+    set(caustica_framework_shader_config "${caustica_framework_shader_dir}/FrameworkShaders.cfg")
+
+    file(GLOB caustica_framework_shader_sources
+        "${caustica_framework_shader_dir}/*.hlsl"
+        "${caustica_framework_shader_dir}/passes/*.hlsl"
+        "${CMAKE_SOURCE_DIR}/caustica/Framework/include/donut/shaders/*.hlsli"
+        "${CMAKE_SOURCE_DIR}/caustica/Framework/include/donut/shaders/*.h"
+    )
+    list(FILTER caustica_framework_shader_sources EXCLUDE REGEX "/passes/tonemapping_ps\\.hlsl$")
+
+    if(DONUT_SHADERS_OUTPUT_DIR AND NOT DONUT_WITH_STATIC_SHADERS)
+        set(caustica_framework_shader_output_base ${DONUT_SHADERS_OUTPUT_DIR})
+    else()
+        set(CAUSTICA_FRAMEWORK_STATIC_SHADERS_DIR "${CMAKE_BINARY_DIR}/caustica/Framework/shaders" CACHE INTERNAL "")
+        set(caustica_framework_shader_output_base ${CAUSTICA_FRAMEWORK_STATIC_SHADERS_DIR})
+    endif()
+
+    if(DONUT_WITH_STATIC_SHADERS)
+        set(caustica_framework_shader_output_format "HEADER")
+    else()
+        set(caustica_framework_shader_output_format "BINARY")
+    endif()
+
+    set(caustica_framework_shader_byproducts
+        blit_ps
+        fullscreen_vs
+        ies_profile_cs
+        imgui_pixel
+        imgui_vertex
+        rect_vs
+        sharpen_ps
+        skinning_cs
+        passes/bloom_ps
+        passes/cubemap_gs
+        passes/deferred_lighting_cs
+        passes/depth_ps
+        passes/depth_vs
+        passes/dlss_exposure_cs
+        passes/environment_map_ps
+        passes/exposure_cs
+        passes/forward_ps
+        passes/forward_vs
+        passes/gbuffer_ps
+        passes/gbuffer_vs
+        passes/histogram_cs
+        passes/joints_main_ps
+        passes/joints_main_vs
+        passes/light_probe_cubemap_gs
+        passes/light_probe_diffuse_probe_ps
+        passes/light_probe_environment_brdf_ps
+        passes/light_probe_mip_ps
+        passes/light_probe_specular_probe_ps
+        passes/material_id_ps
+        passes/mipmapgen_cs
+        passes/motion_vectors_ps
+        passes/pixel_readback_cs
+        passes/sky_ps
+        passes/ssao_blur_cs
+        passes/ssao_compute_cs
+        passes/ssao_deinterleave_cs
+        passes/taa_cs
+    )
+
+    if(DONUT_WITH_AFTERMATH OR DONUT_EMBED_SHADER_PDBS)
+        set(caustica_framework_shader_options --embedPDB)
+    endif()
+
+    donut_compile_shaders_all_platforms(
+        TARGET causticaFrameworkShaders
+        PROJECT_NAME "CausticaFramework"
+        CONFIG ${caustica_framework_shader_config}
+        FOLDER "caustica/Framework"
+        OUTPUT_BASE ${caustica_framework_shader_output_base}
+        OUTPUT_FORMAT ${caustica_framework_shader_output_format}
+        SOURCES ${caustica_framework_shader_sources}
+        BYPRODUCTS_NO_EXT ${caustica_framework_shader_byproducts}
+        SHADERMAKE_OPTIONS ${caustica_framework_shader_options}
+    )
+endif()
+
+if (DONUT_WITH_DLSS)
+    message(STATUS "Updating DLSS from " ${DONUT_DLSS_FETCH_URL} ", tag " ${DONUT_DLSS_FETCH_TAG} ", into folder " ${DONUT_DLSS_FETCH_DIR} " - please wait!" )
+    FetchContent_Declare(
+        DLSS
+        GIT_REPOSITORY ${DONUT_DLSS_FETCH_URL}
+        GIT_TAG ${DONUT_DLSS_FETCH_TAG}
+        SOURCE_DIR ${DONUT_DLSS_FETCH_DIR}
+    )
+    FetchContent_MakeAvailable(DLSS)
+
+    include(Donut/cmake/DLSS.cmake)
+endif()
+
+if (DONUT_WITH_STREAMLINE)
+    if (NOT CMAKE_RUNTIME_OUTPUT_DIRECTORY)
+        message(SEND_ERROR "Streamline integration requires that CMAKE_RUNTIME_OUTPUT_DIRECTORY is non-empty.")
+    endif()
+
+    if (DONUT_STREAMLINE_FETCH_TAG)
+        message(WARNING "DONUT_STREAMLINE_FETCH_TAG is deprecated. Use DONUT_STREAMLINE_FETCH_SHA256 instead. Tag fetching from the public repo no longer has the binaries.")
+    endif()
+
+    if ((DONUT_STREAMLINE_FETCH_URL AND NOT DONUT_STREAMLINE_FETCH_SHA256) OR
+        (NOT DONUT_STREAMLINE_FETCH_URL AND DONUT_STREAMLINE_FETCH_SHA256))
+        message(SEND_ERROR "Both DONUT_STREAMLINE_FETCH_URL and DONUT_STREAMLINE_FETCH_SHA256 must be defined together")
+    endif()
+
+    if (DONUT_STREAMLINE_FETCH_URL AND DONUT_STREAMLINE_FETCH_SHA256)
+        message(STATUS "Updating Streamline from " ${DONUT_STREAMLINE_FETCH_URL} ", SHA256 " ${DONUT_STREAMLINE_FETCH_SHA256} ", into folder " ${DONUT_STREAMLINE_FETCH_DIR} " - please wait!" )
+        FetchContent_Declare(
+            streamline
+            URL ${DONUT_STREAMLINE_FETCH_URL}
+            URL_HASH SHA256=${DONUT_STREAMLINE_FETCH_SHA256}
+            SOURCE_DIR ${DONUT_STREAMLINE_FETCH_DIR}
+            DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+        )
+        FetchContent_MakeAvailable(streamline)
+    else()
+        if (DONUT_STREAMLINE_SEARCH_PATHS)
+            set(STREAMLINE_SEARCH_PATHS ${DONUT_STREAMLINE_SEARCH_PATHS})
+        endif()
+        find_package(STREAMLINE REQUIRED)
+
+        if (STREAMLINE_FOUND)
+            add_subdirectory(${STREAMLINE_SOURCE_DIR} ${CMAKE_BINARY_DIR}/streamline)
+        endif()
+    endif()
+endif()
 
 if (RTXPT_WITH_NATIVE_DLSS)
     set(rtxpt_native_dlss_runtime_libraries "")
@@ -29,7 +195,7 @@ if (RTXPT_WITH_NATIVE_DLSS)
             COMMAND ${CMAKE_COMMAND} -E copy_if_different ${rtxpt_native_dlss_runtime_libraries} "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
             COMMENT "Copying native DLSS runtime libraries"
         )
-        set_target_properties(RtxptNativeDLSSRuntime PROPERTIES FOLDER "External/Donut")
+        set_target_properties(RtxptNativeDLSSRuntime PROPERTIES FOLDER "External/Framework")
     endif()
 endif()
 
