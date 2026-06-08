@@ -163,7 +163,6 @@ public:
     void                                    RtxdiSetupFrame(nvrhi::IFramebuffer* framebuffer, PathTracerCameraData cameraData, uint2 renderDims);
 
     // Extendable sample interface
-    virtual bool                            NeedsIntroPathTracerBuffers() { return false; } // TODO: do this in a nicer way, no time now
     virtual bool                            NeedsRasterPrecompute() { return false; } // TODO: do this in a nicer way, no time now
     virtual void                            SampleRenderCode(nvrhi::IFramebuffer* framebuffer, nvrhi::CommandListHandle commandList, const SampleConstants& constants) = 0; // TODO: Rename this
     virtual void                            CreateRTPipelines() = 0;

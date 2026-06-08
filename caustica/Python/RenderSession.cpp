@@ -13,7 +13,7 @@
 #if RTXPT_WITH_PYTHON
 
 #include "../AdvancedSample.h"
-#include "../Sample.h"
+#include "../caustica.h"
 #include "../SampleCommon/LocalConfig.h"
 #include "../SampleCommon/SampleCommon.h"
 

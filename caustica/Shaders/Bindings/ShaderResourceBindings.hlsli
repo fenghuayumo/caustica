@@ -57,10 +57,10 @@ Texture2D<float4>                       t_SSRBlurChain                  : regist
 Texture2D<float2>                       t_BRDFLUT                       : register(t83);  // Split-sum BRDF integration LUT
 Texture2D<float>                        t_DepthHierarchy                : register(t84);  // Hi-Z depth pyramid for SSR
 
-// SSR result UAV (depth hierarchy UAVs u80-84 are in a dedicated binding set in IntroSample)
+// SSR result UAV
 RWTexture2D<float4>                     u_SSRResult                     : register(u85);  // SSR output (rgb=color, a=confidence)
 
-// GTAO output (full-res, written by GTAORenderer, read by deferred lighting)
+// Ambient occlusion output consumed by deferred lighting
 Texture2D<float>                        t_GTAOOutput                    : register(t86);
 
 // Previous frame depth (full-res, for temporal reprojection / disocclusion detection)

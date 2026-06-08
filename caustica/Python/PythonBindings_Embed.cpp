@@ -19,7 +19,7 @@
 #include <nanobind/nanobind.h>
 #include <nanobind/stl/string.h>
 
-#include "../Sample.h"
+#include "../caustica.h"
 #include "../SampleUI.h"
 
 #include <stdexcept>

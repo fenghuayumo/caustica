@@ -15,7 +15,7 @@
 
 #pragma once
 
-#include "Sample.h"
+#include "caustica.h"
 #include "SampleCommon/PTPipelineBaker.h"
 
 class AdvancedPathTracer : public Sample

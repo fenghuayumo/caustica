@@ -24,7 +24,7 @@ using namespace donut;
 using namespace donut::math;
 using namespace donut::engine;
 
-std::filesystem::path GetLocalPath(std::string subfolder);  // defined in Sample.cpp
+std::filesystem::path GetLocalPath(std::string subfolder);  // defined in caustica.cpp
 
 SampleProceduralSky::SampleProceduralSky( nvrhi::IDevice* device, std::shared_ptr<donut::engine::TextureCache> textureCache, std::shared_ptr<donut::engine::CommonRenderPasses> commonPasses, nvrhi::ICommandList* commandList )
     : m_device(device)

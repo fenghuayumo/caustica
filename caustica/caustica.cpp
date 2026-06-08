@@ -8,7 +8,7 @@
 * license agreement from NVIDIA CORPORATION is strictly prohibited.
 */
 
-#include "Sample.h"
+#include "caustica.h"
 
 #include <donut/engine/FramebufferFactory.h>
 #include <donut/engine/ShaderFactory.h>
@@ -425,7 +425,7 @@ void Sample::Init(const std::string& preferredScene,
     // Local cubemap UAV (for RT pass)
     globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_UAV(10));   // u_LocalCubemap
 
-    // Reflection system textures (used by IntroSample for improved reflections)
+    // Reflection system textures
     globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_SRV(80));   // t_LocalCubemapGGX
     globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_SRV(81));   // t_DiffuseIrradianceCube
     globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_SRV(82));   // t_SSRBlurChain
@@ -437,7 +437,7 @@ void Sample::Init(const std::string& preferredScene,
     // SSR result UAV (depth hierarchy UAVs u80-84 are in a dedicated binding set)
     globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_UAV(85));   // u_SSRResult
 
-    // GTAO output (written by GTAORenderer, read by deferred lighting)
+    // Ambient occlusion output consumed by deferred lighting
     globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_SRV(86));   // t_GTAOOutput
     // Previous frame depth (for temporal reprojection / disocclusion detection)
     globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_SRV(87));   // t_PrevDepth
@@ -2916,7 +2916,7 @@ void Sample::Render(nvrhi::IFramebuffer* framebuffer)
         ResetReferenceOIDN();
         m_bindingCache->Clear( );
         m_renderTargets = std::make_unique<RenderTargets>( );
-        m_renderTargets->Init(GetDevice( ), m_renderSize, m_displaySize, true, true, c_SwapchainCount, NeedsIntroPathTracerBuffers());
+        m_renderTargets->Init(GetDevice( ), m_renderSize, m_displaySize, true, true, c_SwapchainCount);
 
         needNewPasses = true;
         OnRenderTargetsRecreated();
@@ -3459,7 +3459,7 @@ void Sample::RecreateBindingSet()
         bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(84, m_CommonPasses->m_BlackTexture));  // t_DepthHierarchy placeholder
         bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::ConstantBuffer(10, m_constantBuffer)); // ReflectionConstants (reuse main constant buffer as placeholder)
         
-        // SSR result UAV (depth hierarchy UAVs u80-84 are in a dedicated binding set in IntroSample)
+        // SSR result UAV placeholder
         bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_UAV(85, m_renderTargets->Depth));   // u_SSRResult placeholder
 
         // GTAO output (default to white = no occlusion; overridden by AddCustomBindings)

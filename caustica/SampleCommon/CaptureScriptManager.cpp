@@ -12,7 +12,7 @@
 
 #include <string>
 #include "../SampleUI.h"
-#include "../Sample.h"
+#include "../caustica.h"
 #include "SampleCommon.h"
 #include "CommandLine.h"
 

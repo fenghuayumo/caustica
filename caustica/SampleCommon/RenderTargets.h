@@ -103,7 +103,7 @@ public:
     std::shared_ptr<donut::engine::FramebufferFactory> ProcessedOutputFramebuffer;
     std::shared_ptr<donut::engine::FramebufferFactory> LdrFramebuffer;
 
-    void Init(nvrhi::IDevice* device, donut::math::uint2 renderSize, donut::math::uint2 displaySize, bool enableMotionVectors, bool useReverseProjection, int backbufferCount, bool introSample);// override;
+    void Init(nvrhi::IDevice* device, donut::math::uint2 renderSize, donut::math::uint2 displaySize, bool enableMotionVectors, bool useReverseProjection, int backbufferCount);// override;
     [[nodiscard]] bool IsUpdateRequired(donut::math::uint2 renderSize, donut::math::uint2 displaySize, donut::math::uint sampleCount = 1) const;
     void Clear(nvrhi::ICommandList* commandList);
 

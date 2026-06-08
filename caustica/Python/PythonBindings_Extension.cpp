@@ -24,7 +24,7 @@
 #include <nanobind/stl/tuple.h>
 #include <nanobind/stl/optional.h>
 
-#include "../Sample.h"
+#include "../caustica.h"
 #include "../SampleUI.h"
 
 #include <donut/engine/Scene.h>

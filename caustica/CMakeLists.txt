@@ -14,7 +14,6 @@ list(FILTER shaders EXCLUDE REGEX "/Framework/")
 list(FILTER shared_sources EXCLUDE REGEX "/Framework/")
 # Separate out shared sources from entry point files
 list(REMOVE_ITEM shared_sources 
-    "${CMAKE_CURRENT_SOURCE_DIR}/IntroSample.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/AdvancedSample.cpp"
 )
 
@@ -342,8 +341,6 @@ macro(add_caustica_sample TARGET_NAME MAIN_SOURCE)
     endif()
 endmacro()
 
-# Build both sample executables
-#add_caustica_sample(IntroSample "IntroSample.cpp") # Work in progress!
 add_caustica_sample(caustica "AdvancedSample.cpp")
 
 # -------------------------------------------------------------------

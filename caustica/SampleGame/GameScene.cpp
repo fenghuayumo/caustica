@@ -18,7 +18,7 @@
 
 #include "../SampleCommon/ExtendedScene.h"
 
-#include "../Sample.h"
+#include "../caustica.h"
 
 #include "../Misc/Korgi.h"
 #include <json/json.h>

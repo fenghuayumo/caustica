@@ -22,7 +22,7 @@
 #if RTXPT_WITH_NATIVE_DLSS
 #include <donut/render/DLSS.h>
 #endif
-#include "../Sample.h"
+#include "../caustica.h"
 
 #include <GLFW/glfw3.h>
 

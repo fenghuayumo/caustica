@@ -38,8 +38,7 @@ void RenderTargets::Init(
         donut::math::uint2 displaySize,
         bool enableMotionVectors,
         bool useReverseProjection,
-        int backbufferCount,
-        bool introSample
+        int backbufferCount
     )
 {
     m_UseReverseProjection = useReverseProjection;
@@ -198,12 +197,9 @@ void RenderTargets::Init(
     desc.debugName = "RRTransparencyLayer";
     // RRTransparencyLayer = device->createTexture(desc); // not currently used
 
-    // GBuffer targets
-    if (!introSample)
-    {
-        renderSize.x = 1;
-        renderSize.y = 1;
-    }
+    // GBuffer targets are kept as placeholders for the main path-tracing renderer.
+    renderSize.x = 1;
+    renderSize.y = 1;
 
     desc.debugName = "GBufferBaseColor"; // Can reuse RRDiffuseAlbedo?
     desc.format = nvrhi::Format::R11G11B10_FLOAT;
