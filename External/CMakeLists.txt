@@ -26,7 +26,47 @@ if (WIN32)
     option(DONUT_FORCE_DISCRETE_GPU "Declare symbols to make the OS run the app on discrete GPU on laptops" OFF)
 endif()
 
-add_subdirectory(FrameworkThirdParty)
+set(third_party_folder "Third-Party Libraries")
+
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+
+if (DONUT_WITH_NVRHI AND NOT TARGET imgui)
+    include(imgui.cmake)
+    set_target_properties(imgui PROPERTIES FOLDER ${third_party_folder})
+endif()
+
+if (NOT TARGET jsoncpp_static)
+    add_library(jsoncpp_static)
+    set(jsoncpp_path "${CMAKE_CURRENT_SOURCE_DIR}/jsoncpp-amalgam")
+    target_include_directories(jsoncpp_static PUBLIC "${jsoncpp_path}")
+    target_sources(jsoncpp_static PRIVATE "${jsoncpp_path}/jsoncpp.cpp")
+    set_target_properties(jsoncpp_static PROPERTIES FOLDER ${third_party_folder})
+endif()
+
+if (NOT TARGET stb)
+    add_library(stb INTERFACE)
+    target_include_directories(stb INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/stb)
+endif()
+
+if (NOT TARGET cgltf)
+    add_library(cgltf INTERFACE)
+    target_include_directories(cgltf INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/cgltf)
+endif()
+
+if (DONUT_WITH_TINYEXR AND NOT TARGET tinyexr)
+    add_library(tinyexr INTERFACE)
+    target_include_directories(tinyexr INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/tinyexr)
+endif()
+
+if (DONUT_WITH_NVRHI AND NOT TARGET glfw)
+    option(GLFW_BUILD_EXAMPLES "" OFF)
+    option(GLFW_BUILD_TESTS "" OFF)
+    option(GLFW_BUILD_DOCS "" OFF)
+    option(GLFW_INSTALL "" OFF)
+    add_subdirectory(glfw)
+    set_target_properties(glfw PROPERTIES FOLDER ${third_party_folder})
+    set_target_properties(update_mappings PROPERTIES FOLDER ${third_party_folder})
+endif()
 
 if (NOT TARGET ShaderMake)
     option(SHADERMAKE_FIND_FXC "" "${DONUT_WITH_DX11}")

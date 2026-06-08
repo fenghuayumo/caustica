@@ -29,14 +29,14 @@
 	path = External/Rtxtf
 	url = https://github.com/NVIDIA-RTX/RTXTF-Library.git
 	shallow = false
-[submodule "External/FrameworkThirdParty/cgltf"]
-	path = External/FrameworkThirdParty/cgltf
+[submodule "External/cgltf"]
+	path = External/cgltf
 	url = https://github.com/jkuhlmann/cgltf
-[submodule "External/FrameworkThirdParty/glfw"]
-	path = External/FrameworkThirdParty/glfw
+[submodule "External/glfw"]
+	path = External/glfw
 	url = https://github.com/glfw/glfw.git
-[submodule "External/FrameworkThirdParty/stb"]
-	path = External/FrameworkThirdParty/stb
+[submodule "External/stb"]
+	path = External/stb
 	url = https://github.com/nothings/stb.git
 [submodule "External/nvrhi"]
 	path = External/nvrhi
@@ -44,6 +44,6 @@
 [submodule "External/ShaderMake"]
 	path = External/ShaderMake
 	url = https://github.com/NVIDIA-RTX/ShaderMake.git
-[submodule "External/FrameworkThirdParty/imgui"]
-	path = External/FrameworkThirdParty/imgui
+[submodule "External/imgui"]
+	path = External/imgui
 	url = https://github.com/ocornut/imgui
