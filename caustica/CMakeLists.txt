@@ -7,7 +7,7 @@
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 
 
-include(../External/Donut/compileshaders.cmake)
+include(../External/cmake/compileshaders.cmake)
 file(GLOB_RECURSE shaders "*.hlsl" "*.hlsli")
 file(GLOB_RECURSE shared_sources "*.cpp" "*.h" "*.md")
 list(FILTER shaders EXCLUDE REGEX "/Framework/")

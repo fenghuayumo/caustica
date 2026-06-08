@@ -21,11 +21,6 @@
 	path = External/Rtxdi
 	url = https://github.com/fenghuayumo/RTXDI-Library.git
 	shallow = false
-[submodule "External/donut"]
-	path = External/Donut
-	url = https://github.com/fenghuayumo/Donut.git
-	branch = main
-	shallow = false
 [submodule "Assets"]
 	path = Assets
 	url = https://github.com/NVIDIA-RTX/caustica-Assets.git
@@ -34,3 +29,21 @@
 	path = External/Rtxtf
 	url = https://github.com/NVIDIA-RTX/RTXTF-Library.git
 	shallow = false
+[submodule "External/FrameworkThirdParty/cgltf"]
+	path = External/FrameworkThirdParty/cgltf
+	url = https://github.com/jkuhlmann/cgltf
+[submodule "External/FrameworkThirdParty/glfw"]
+	path = External/FrameworkThirdParty/glfw
+	url = https://github.com/glfw/glfw.git
+[submodule "External/FrameworkThirdParty/stb"]
+	path = External/FrameworkThirdParty/stb
+	url = https://github.com/nothings/stb.git
+[submodule "External/nvrhi"]
+	path = External/nvrhi
+	url = https://github.com/NVIDIA-RTX/NVRHI.git
+[submodule "External/ShaderMake"]
+	path = External/ShaderMake
+	url = https://github.com/NVIDIA-RTX/ShaderMake.git
+[submodule "External/FrameworkThirdParty/imgui"]
+	path = External/FrameworkThirdParty/imgui
+	url = https://github.com/ocornut/imgui

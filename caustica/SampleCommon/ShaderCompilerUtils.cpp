@@ -95,7 +95,7 @@ namespace ShaderCompilerUtils
         {
             ShadersPath = shaderSourcePathDevelopment;
             ShadersPathExternalIncludes1 = 
-                sourceRootDirectory / "External/Donut/include";
+                sourceRootDirectory / "caustica/Framework/include";
             ShadersPathExternalIncludes2 = 
                 sourceRootDirectory / "External";
         }

@@ -8,12 +8,12 @@
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 
 ##########################################################################
-################################ Donut ####################################
+########################### Framework dependencies ########################
 ##########################################################################
 
 include(FetchContent)
-include(Donut/compileshaders.cmake)
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/Donut/cmake")
+include(cmake/compileshaders.cmake)
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 option(DONUT_WITH_NVRHI "Enable NVRHI and related projects" ON)
 option(DONUT_WITH_AFTERMATH "Enable Aftermath crash dump generation with framework runtime code" OFF)
@@ -26,7 +26,7 @@ if (WIN32)
     option(DONUT_FORCE_DISCRETE_GPU "Declare symbols to make the OS run the app on discrete GPU on laptops" OFF)
 endif()
 
-add_subdirectory(Donut/thirdparty)
+add_subdirectory(FrameworkThirdParty)
 
 if (NOT TARGET ShaderMake)
     option(SHADERMAKE_FIND_FXC "" "${DONUT_WITH_DX11}")
@@ -37,7 +37,7 @@ if (NOT TARGET ShaderMake)
     endif()
     option(SHADERMAKE_FIND_DXC_VK "" "${DONUT_WITH_VULKAN}")
 
-    add_subdirectory(Donut/ShaderMake)
+    add_subdirectory(ShaderMake)
 endif()
 
 if (DONUT_WITH_NVRHI)
@@ -46,7 +46,7 @@ if (DONUT_WITH_NVRHI)
     set(NVRHI_WITH_VULKAN "${DONUT_WITH_VULKAN}" CACHE BOOL "" FORCE)
     set(NVRHI_WITH_AFTERMATH "${DONUT_WITH_AFTERMATH}" CACHE BOOL "" FORCE)
 
-    add_subdirectory(Donut/nvrhi)
+    add_subdirectory(nvrhi)
 
     set(DONUT_SHADER_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/caustica/Framework/include" CACHE PATH "" FORCE)
 
@@ -141,7 +141,7 @@ if (DONUT_WITH_DLSS)
     )
     FetchContent_MakeAvailable(DLSS)
 
-    include(Donut/cmake/DLSS.cmake)
+    include(cmake/DLSS.cmake)
 endif()
 
 if (DONUT_WITH_STREAMLINE)

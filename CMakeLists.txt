@@ -56,7 +56,7 @@ if (WIN32)
 else()
     set(RTXPT_DEFAULT_WITH_VULKAN ON)
 endif()
-option(DONUT_WITH_VULKAN "Enable the Vulkan version of Donut" ${RTXPT_DEFAULT_WITH_VULKAN})
+option(DONUT_WITH_VULKAN "Enable the Vulkan version of the framework runtime code" ${RTXPT_DEFAULT_WITH_VULKAN})
 
 # we want shader PDBs always embedded
 option(DONUT_EMBED_SHADER_PDBS "" ON)
@@ -133,6 +133,9 @@ if (RTXPT_WITH_NATIVE_DLSS AND NOT DONUT_WITH_VULKAN)
     set(RTXPT_WITH_NATIVE_DLSS OFF CACHE BOOL "Enable native NVIDIA NGX DLSS integration for Vulkan builds without Streamline" FORCE)
 endif()
 set(DONUT_WITH_DLSS ${RTXPT_WITH_NATIVE_DLSS} CACHE BOOL "Enable the NGX DLSS integration used by caustica native DLSS" FORCE)
+set(DONUT_DLSS_FETCH_URL "https://github.com/NVIDIA/DLSS.git" CACHE STRING "URL of the DLSS Git repository to fetch from")
+set(DONUT_DLSS_FETCH_TAG "a8ed84e2d1cc1efa7bef63fb9394be6cb06c0d74" CACHE STRING "Git commit hash or tag for DLSS")
+set(DONUT_DLSS_FETCH_DIR "${CMAKE_CURRENT_SOURCE_DIR}/External/DLSS" CACHE STRING "Directory to fetch DLSS to, empty uses build directory default")
 #----------------------------------------------------------------------------------------------------------------------
 
 #----------------------------------------------------------------------------------------------------------------------

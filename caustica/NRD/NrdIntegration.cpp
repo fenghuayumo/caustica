@@ -191,7 +191,7 @@ bool NrdIntegration::Initialize(uint32_t width, uint32_t height, donut::engine::
         }
 
         // our NRD integration compiles shaders using donut_compile_shaders (see \external\CMakeLists.txt) - that's why we're not relying on libraryDesc.spirvBindingOffsets anymore!
-        // see NVRHI_DEFAULT_VK_REGISTER_OFFSETS in \external\donut\compileshaders.cmake - it now matches the NVRHI defaults
+        // see NVRHI_DEFAULT_VK_REGISTER_OFFSETS in \external\cmake\compileshaders.cmake - it now matches the NVRHI defaults
 		nvrhi::VulkanBindingOffsets cNRDBindingOffsets; // = { .shaderResource = libraryDesc.spirvBindingOffsets.textureOffset, .sampler = libraryDesc.spirvBindingOffsets.samplerOffset, .constantBuffer = libraryDesc.spirvBindingOffsets.constantBufferOffset, .unorderedAccess = libraryDesc.spirvBindingOffsets.storageTextureAndBufferOffset };
         
         pipeline.ResourcesBindingLayout = CreateResourcesBindingLayout(instanceDesc, nrdPipelineDesc);
