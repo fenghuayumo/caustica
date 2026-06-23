@@ -2,7 +2,7 @@
 
 #include <engine/CommonRenderPasses.h>
 #include <engine/ConsoleObjects.h>
-#include <engine/DDSFile.h>
+#include <assets/loader/DDSFile.h>
 #include <engine/ThreadPool.h>
 #include <core/vfs/VFS.h>
 #include <core/log.h>

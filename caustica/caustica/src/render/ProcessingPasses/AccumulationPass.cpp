@@ -1,6 +1,6 @@
 #include <render/ProcessingPasses/AccumulationPass.h>
 
-#include <engine/ShaderFactory.h>
+#include <assets/loader/ShaderFactory.h>
 #include <engine/View.h>
 #include <core/log.h>
 

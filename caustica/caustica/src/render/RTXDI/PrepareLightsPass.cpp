@@ -3,7 +3,7 @@
 #include <SampleCommon/ExtendedScene.h>
 #include <engine/Scene.h>
 
-#include <engine/ShaderFactory.h>
+#include <assets/loader/ShaderFactory.h>
 #include <engine/CommonRenderPasses.h>
 #include <core/log.h>
 #include <rhi/utils.h>

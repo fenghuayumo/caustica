@@ -3,7 +3,7 @@
 #include <mutex>
 #include <memory>
 #include <rhi/nvrhi.h>
-#include <engine/ShaderFactory.h>
+#include <assets/loader/ShaderFactory.h>
 #include <engine/ThreadPool.h>
 #include <unordered_set>
 

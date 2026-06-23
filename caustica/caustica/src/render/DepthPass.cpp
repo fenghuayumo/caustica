@@ -1,6 +1,6 @@
 #include <render/DepthPass.h>
 #include <render/DrawStrategy.h>
-#include <engine/ShaderFactory.h>
+#include <assets/loader/ShaderFactory.h>
 #include <engine/SceneTypes.h>
 #include <engine/CommonRenderPasses.h>
 #include <engine/View.h>

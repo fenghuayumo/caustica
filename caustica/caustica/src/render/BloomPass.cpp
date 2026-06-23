@@ -1,6 +1,6 @@
 #include <render/BloomPass.h>
 #include <engine/FramebufferFactory.h>
-#include <engine/ShaderFactory.h>
+#include <assets/loader/ShaderFactory.h>
 #include <engine/CommonRenderPasses.h>
 #include <engine/View.h>
 #include <utility>

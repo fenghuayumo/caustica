@@ -1,5 +1,5 @@
 #include <render/RTXDI/GeneratePdfMipsPass.h>
-#include <engine/ShaderFactory.h>
+#include <assets/loader/ShaderFactory.h>
 #include <rhi/utils.h>
 
 #include <math/math.h>

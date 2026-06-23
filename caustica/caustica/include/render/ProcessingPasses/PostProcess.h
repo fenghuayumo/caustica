@@ -2,7 +2,7 @@
 
 #include <engine/BindingCache.h>
 #include <rhi/nvrhi.h>
-#include <engine/ShaderFactory.h>
+#include <assets/loader/ShaderFactory.h>
 #include <engine/CommonRenderPasses.h>
 #include <math/math.h>
 #include <memory>

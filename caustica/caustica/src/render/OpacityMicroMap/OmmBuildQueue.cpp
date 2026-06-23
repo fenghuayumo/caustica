@@ -2,7 +2,7 @@
 
 #include <math/math.h>
 #include <core/vfs/VFS.h>
-#include <engine/ShaderFactory.h>
+#include <assets/loader/ShaderFactory.h>
 #include <rhi/common/misc.h>
 #include <rhi/utils.h>
 #include <render/Materials/MaterialsBaker.h>

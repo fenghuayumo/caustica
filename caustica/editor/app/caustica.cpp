@@ -3,7 +3,7 @@
 #include <core/path_utils.h>
 #include <engine/scene_utils.h>
 #include <engine/FramebufferFactory.h>
-#include <engine/ShaderFactory.h>
+#include <assets/loader/ShaderFactory.h>
 #include <engine/CommonRenderPasses.h>
 #include <assets/cache/TextureCache.h>
 #include <engine/BindingCache.h>

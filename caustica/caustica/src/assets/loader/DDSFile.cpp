@@ -1,7 +1,7 @@
 // This file is loosely based on DDSTextureLoader.cpp from Microsoft DirectXTK library.
 
 
-#include <engine/DDSFile.h>
+#include <assets/loader/DDSFile.h>
 
 #include "dds.h"
 

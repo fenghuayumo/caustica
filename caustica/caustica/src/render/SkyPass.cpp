@@ -1,7 +1,7 @@
 #include <render/SkyPass.h>
 #include <render/DrawStrategy.h>
 #include <engine/FramebufferFactory.h>
-#include <engine/ShaderFactory.h>
+#include <assets/loader/ShaderFactory.h>
 #include <engine/ShadowMap.h>
 #include <engine/CommonRenderPasses.h>
 #include <engine/View.h>

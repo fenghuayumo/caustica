@@ -5,7 +5,7 @@
 #include <filesystem>
 #include <optional>
 #include <rhi/nvrhi.h>
-#include <engine/ShaderFactory.h>
+#include <assets/loader/ShaderFactory.h>
 
 namespace ShaderCompilerUtils
 {

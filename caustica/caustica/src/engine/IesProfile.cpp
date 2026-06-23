@@ -1,5 +1,5 @@
 #include <engine/IesProfile.h>
-#include <engine/ShaderFactory.h>
+#include <assets/loader/ShaderFactory.h>
 #include <engine/DescriptorTableManager.h>
 #include <core/vfs/VFS.h>
 #include <math/math.h>

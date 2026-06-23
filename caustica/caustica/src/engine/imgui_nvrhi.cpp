@@ -3,7 +3,7 @@
 #include <imgui.h>
 
 #include <rhi/nvrhi.h>
-#include <engine/ShaderFactory.h>
+#include <assets/loader/ShaderFactory.h>
 #include <engine/imgui_nvrhi.h>
 #include <core/log.h>
 

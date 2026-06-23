@@ -1,5 +1,5 @@
 #include <render/MipMapGenPass.h>
-#include <engine/ShaderFactory.h>
+#include <assets/loader/ShaderFactory.h>
 #include <engine/CommonRenderPasses.h>
 
 #if DONUT_WITH_STATIC_SHADERS

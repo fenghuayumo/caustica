@@ -1,6 +1,6 @@
 #include <render/EnvironmentMapPass.h>
 #include <engine/FramebufferFactory.h>
-#include <engine/ShaderFactory.h>
+#include <assets/loader/ShaderFactory.h>
 #include <engine/CommonRenderPasses.h>
 #include <engine/View.h>
 #include <math/math.h>

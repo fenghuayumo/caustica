@@ -7,7 +7,7 @@
 #include <rhi/common/misc.h>
 #include <json/json.h>
 
-#include <engine/ShaderFactory.h>
+#include <assets/loader/ShaderFactory.h>
 
 #include <algorithm>
 #include <array>

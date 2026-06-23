@@ -6,7 +6,7 @@
 #include <SampleCommon/SampleCommon.h>
 
 #include <engine/BindingCache.h>
-#include <engine/ShaderFactory.h>
+#include <assets/loader/ShaderFactory.h>
 #include <engine/FramebufferFactory.h>
 #include <engine/CommonRenderPasses.h>
 #include <assets/cache/TextureCache.h>
@@ -17,7 +17,7 @@
 
 #include <engine/imgui_renderer.h>
 #include <core/vfs/VFS.h>
-#include <engine/DDSFile.h>
+#include <assets/loader/DDSFile.h>
 
 #include <fstream>
 

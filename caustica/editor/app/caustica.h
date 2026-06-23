@@ -7,6 +7,7 @@
 #include "SampleUI.h"
 
 #include <engine/SceneRender.h>
+#include <platform/Input.h>
 #include <core/vfs/VFS.h>
 #include <render/BloomPass.h>
 #include <engine/Camera.h>
@@ -46,7 +47,7 @@ class PythonScripting;
 #endif
 class GaussianSplatPass;
 
-class Sample : public caustica::SceneRender
+class Sample : public caustica::SceneRender, public caustica::IInputHandler
 {
     // static constexpr uint32_t c_PathTracerVariants   = 6; // see shaders.cfg and CreatePTPipeline for details on variants
 
@@ -126,10 +127,22 @@ public:
     virtual bool                            LoadScene(std::shared_ptr<caustica::IFileSystem> fs, const std::filesystem::path& sceneFileName) override;
     virtual void                            SceneLoaded() override;
     virtual bool                            ShouldRenderUnfocused() override;
+    // Legacy input methods (called by IInputHandler overrides below)
     virtual bool                            KeyboardUpdate(int key, int scancode, int action, int mods);
     virtual bool                            MousePosUpdate(double xpos, double ypos);
     virtual bool                            MouseButtonUpdate(int button, int action, int mods);
     virtual bool                            MouseScrollUpdate(double xoffset, double yoffset);
+
+    // IInputHandler overrides (registered with Input layer)
+    bool onKeyEvent(int key, int scancode, int action, int mods) override
+        { return KeyboardUpdate(key, scancode, action, mods); }
+    bool onMouseMoveEvent(double xpos, double ypos) override
+        { return MousePosUpdate(xpos, ypos); }
+    bool onMouseButtonEvent(int button, int action, int mods) override
+        { return MouseButtonUpdate(button, action, mods); }
+    bool onMouseScrollEvent(double xoffset, double yoffset) override
+        { return MouseScrollUpdate(xoffset, yoffset); }
+
     virtual void                            Animate(float fElapsedTimeSeconds) override;
 
     void                                    FillPTPipelineGlobalMacros(std::vector<caustica::ShaderMacro> & macros);

@@ -5,7 +5,7 @@
 
 #include <core/log.h>
 #include <engine/FramebufferFactory.h>
-#include <engine/ShaderFactory.h>
+#include <assets/loader/ShaderFactory.h>
 #include <engine/View.h>
 #include <shaders/view_cb.h>
 #include <rhi/utils.h>

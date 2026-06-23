@@ -1,6 +1,6 @@
 #include "ComputePass.h"
 
-#include <engine/ShaderFactory.h>
+#include <assets/loader/ShaderFactory.h>
 #include <math/math.h>
 #include <core/log.h>
 #include <rhi/utils.h>

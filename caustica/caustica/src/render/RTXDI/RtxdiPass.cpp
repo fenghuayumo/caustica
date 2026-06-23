@@ -4,7 +4,7 @@
 
 #include <render/RTXDI/RtxdiResources.h>
 #include <render/RTXDI/PrepareLightsPass.h>
-#include <engine/ShaderFactory.h>
+#include <assets/loader/ShaderFactory.h>
 #include <engine/CommonRenderPasses.h>
 #include <engine/View.h>
 #include <render/RTXDI/GeneratePdfMipsPass.h>

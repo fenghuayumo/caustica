@@ -2,7 +2,7 @@
 #include <render/DrawStrategy.h>
 #include <render/GBuffer.h>
 #include <engine/FramebufferFactory.h>
-#include <engine/ShaderFactory.h>
+#include <assets/loader/ShaderFactory.h>
 #include <engine/ShadowMap.h>
 #include <engine/SceneTypes.h>
 #include <engine/CommonRenderPasses.h>

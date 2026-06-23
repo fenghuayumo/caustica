@@ -4,7 +4,7 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <rhi/utils.h>
-#include <engine/ShaderFactory.h>
+#include <assets/loader/ShaderFactory.h>
 #include <engine/CommonRenderPasses.h>
 #include <render/ProcessingPasses/DenoisingGuidesBaker.h>
 #include <SampleCommon/SampleCommon.h>

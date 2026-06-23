@@ -1,5 +1,5 @@
 #include <engine/CommonRenderPasses.h>
-#include <engine/ShaderFactory.h>
+#include <assets/loader/ShaderFactory.h>
 #include <engine/BindingCache.h>
 
 #if DONUT_WITH_STATIC_SHADERS

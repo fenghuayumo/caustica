@@ -1,7 +1,7 @@
 #if DONUT_WITH_DLSS
 
 #include <render/DLSS.h>
-#include <engine/ShaderFactory.h>
+#include <assets/loader/ShaderFactory.h>
 
 #if DONUT_WITH_STATIC_SHADERS
 #if DONUT_WITH_DX11
