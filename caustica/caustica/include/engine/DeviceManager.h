@@ -39,7 +39,8 @@
 
 namespace caustica
 {
-    class Input;  // Engine layer: input dispatch
+    class Input;   // Engine layer: input dispatch
+    class Window;  // Platform layer: window abstraction
 
     struct DefaultMessageCallback : public nvrhi::IMessageCallback
     {
@@ -251,7 +252,8 @@ namespace caustica
         bool m_windowIsInFocus = true;
 
         DeviceCreationParameters m_DeviceParams;
-        GLFWwindow *m_Window = nullptr;
+        GLFWwindow *m_Window = nullptr;       // Old path: DeviceManager owns the GLFW window
+        Window* m_WindowPtr = nullptr;        // New path: external GlfwWindow
 	    Input* m_Input = nullptr;  // Engine layer: extracted input dispatch
         bool m_EnableRenderDuringWindowMovement = false;
         // set to true if running on NV GPU

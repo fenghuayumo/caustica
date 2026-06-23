@@ -73,13 +73,13 @@ list(APPEND caustica_engine_engine_src
     src/platform/glfw_window.cpp
 )
 
-# Engine layer: Input (extracted from DeviceManager)
+# Platform layer: Input dispatch (keyboard/mouse/joystick)
 list(APPEND caustica_engine_engine_src
-    include/engine/Input.h
-    src/engine/Input.cpp
+    include/platform/Input.h
+    src/platform/Input.cpp
 )
 
-# Backend layer headers (implementation deferred)
+# Backend layer: GpuDevice API (implementation deferred)
 list(APPEND caustica_engine_engine_src
     include/backend/GpuDevice.h
 )

@@ -16,6 +16,8 @@
 #include "caustica.h"
 
 #include <GLFW/glfw3.h>
+#include <platform/glfw_window.h>
+#include <platform/window.h>
 
 extern SampleUIData g_sampleUIData;
 extern const char* g_windowTitle;
@@ -304,6 +306,9 @@ void SampleBaseApp::End()
     m_MainSceneRender.reset();
 
     m_ShaderFactory.reset();
+
+    // Window must outlive DeviceManager (new GlfwWindow path)
+    m_Window.reset();
 }
 
 void SampleBaseApp::RunMainLoop()
@@ -486,12 +491,27 @@ bool SampleBaseApp::InitDeviceAndWindow(const caustica::DeviceCreationParameters
     }
     else
     {
-        // Use the existing DeviceManager path that creates the window internally.
-        // The Window/GlfwWindow abstraction (platform layer) is available for
-        // future use when DeviceManager is properly split into GpuDevice +
-        // SwapChain + Input classes.
-        const char* windowTitle = g_windowTitle ? g_windowTitle : "caustica";
-        if (!m_DeviceManager->CreateWindowDeviceAndSwapChain(deviceParams, windowTitle))
+        // --- Platform layer: create Window via GlfwWindow ---
+        caustica::GlfwWindow::makeDefault();
+
+        caustica::WindowDesc wDesc;
+        wDesc.Width      = deviceParams.backBufferWidth;
+        wDesc.Height     = deviceParams.backBufferHeight;
+        wDesc.Fullscreen = deviceParams.startFullscreen;
+        wDesc.Borderless = deviceParams.startBorderless;
+        wDesc.VSync      = deviceParams.vsyncEnabled;
+        wDesc.Title      = g_windowTitle ? g_windowTitle : "caustica";
+        wDesc.RenderAPI  = static_cast<int>(m_DeviceManager->GetGraphicsAPI());
+
+        m_Window.reset(caustica::Window::create(wDesc));
+        if (!m_Window || !m_Window->hasInitialised())
+        {
+            caustica::fatal("Cannot create window via platform layer");
+            return false;
+        }
+
+        // --- Backend layer: GPU device + swapchain via DeviceManager ---
+        if (!m_DeviceManager->CreateDeviceAndSwapChain(deviceParams, m_Window.get()))
         {
             caustica::fatal("Cannot initialize a graphics device with the requested parameters");
             return false;

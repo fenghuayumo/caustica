@@ -1,6 +1,7 @@
 #include <engine/DeviceManager.h>
-#include <engine/Input.h>        // Engine layer: input dispatch
-#include <platform/window.h>     // New 4-layer Window abstraction
+#include <platform/Input.h>      // Platform layer: input dispatch
+#include <platform/window.h>     // Platform layer: Window abstraction
+#include <platform/glfw_window.h>// Platform layer: GLFW window
 #include <math/math.h>
 #include <core/log.h>
 #include <rhi/utils.h>
@@ -398,44 +399,50 @@ bool DeviceManager::CreateDeviceAndSwapChain(const DeviceCreationParameters& par
         return false;
     }
 
-    // Get the native GLFW window handle from the platform Window
-    GLFWwindow* nativeWindow = static_cast<GLFWwindow*>(window->getNativeHandle());
-    if (!nativeWindow)
+    // Get the GLFW window handle for GLFW API calls.
+    // IMPORTANT: getNativeHandle() returns the platform HWND (Win32),
+    // NOT a GLFWwindow*. Use GlfwWindow::glfwWindow() for GLFW API.
+    GlfwWindow* glfwWin = dynamic_cast<GlfwWindow*>(window);
+    if (!glfwWin)
     {
-        caustica::error("CreateDeviceAndSwapChain: Window has no native GLFW handle");
+        caustica::error("CreateDeviceAndSwapChain: Window is not a GlfwWindow");
         return false;
     }
 
-    // Use the existing GLFW window instead of creating one
-    m_Window = nativeWindow;
+    GLFWwindow* glfwHandle = glfwWin->glfwWindow();
+    if (!glfwHandle)
+    {
+        caustica::error("CreateDeviceAndSwapChain: Window has no GLFW handle");
+        return false;
+    }
+
+    // Store both the Window* (new path) and GLFWwindow* (for legacy code)
+    m_WindowPtr = window;
+    m_Window = glfwHandle;  // Actual GLFWwindow*, NOT native handle
     m_WindowTitle = window->getTitle();
 
-    // Take ownership of the GLFW window callbacks.
-    // The GlfwWindow previously set its own callbacks — we must replace ALL of them
-    // because glfwSetWindowUserPointer now points to DeviceManager, not GlfwWindow.
-    glfwSetWindowUserPointer(m_Window, this);
+    // GlfwWindow already owns ALL GLFW callbacks (window events, DPI tracking).
+    // We do NOT overwrite glfwSetWindowUserPointer or any window callbacks.
 
-    glfwSetWindowPosCallback(m_Window, WindowPosCallback_GLFW);
-    glfwSetWindowCloseCallback(m_Window, WindowCloseCallback_GLFW);
-    glfwSetWindowRefreshCallback(m_Window, WindowRefreshCallback_GLFW);
-    glfwSetWindowFocusCallback(m_Window, WindowFocusCallback_GLFW);
-    glfwSetWindowIconifyCallback(m_Window, WindowIconifyCallback_GLFW);
-    glfwSetKeyCallback(m_Window, KeyCallback_GLFW);
-    glfwSetCharModsCallback(m_Window, CharModsCallback_GLFW);
-    glfwSetCursorPosCallback(m_Window, MousePosCallback_GLFW);
-    glfwSetMouseButtonCallback(m_Window, MouseButtonCallback_GLFW);
-    glfwSetScrollCallback(m_Window, MouseScrollCallback_GLFW);
+    // Install Input (keyboard/mouse) callbacks on the GLFW window.
+    if (!m_Input) m_Input = new Input();
+    m_Input->installCallbacks(glfwHandle);  // Pass GLFWwindow*, not native handle
 
-    // Disable callbacks that GlfwWindow set but DeviceManager handles differently.
-    // WindowSize is polled via UpdateWindowSize() in the main loop.
-    glfwSetWindowSizeCallback(m_Window, nullptr);
-    glfwSetDropCallback(m_Window, nullptr);
-    glfwSetCharCallback(m_Window, nullptr);
+    // DPI tracking is handled by GlfwWindow::onMove(). Sync initial values.
+    m_DPIScaleFactorX = window->getDPIScaleX();
+    m_DPIScaleFactorY = window->getDPIScaleY();
 
-    // Create GPU device and swapchain using the existing native window
+    // Render-during-move: delegate to GlfwWindow
+    window->setRenderDuringMove(m_EnableRenderDuringWindowMovement);
+
+    // Create GPU instance, device, and swapchain
+    if (!CreateInstance(m_DeviceParams))
+    {
+        caustica::error("CreateDeviceAndSwapChain: Failed to create GPU instance");
+        return false;
+    }
     if (!CreateDevice())
         return false;
-
     if (!CreateSwapChain())
         return false;
 
@@ -745,6 +752,32 @@ void DeviceManager::RunMessageLoop()
 #if DONUT_WITH_AFTERMATH
     bool dumpingCrash = false;
 #endif
+    // New path: use Window* for exit check and polling
+    if (m_WindowPtr)
+    {
+        while (!m_WindowPtr->getExit())
+        {
+#if DONUT_WITH_STREAMLINE
+            if (!m_DeviceParams.headlessDevice)
+                StreamlineIntegration::Get().SimStart(*this);
+#endif
+            if (m_callbacks.beforeFrame) m_callbacks.beforeFrame(*this, m_FrameIndex);
+
+            m_WindowPtr->onUpdate();  // polls GLFW events, dispatches callbacks
+            UpdateWindowSize();
+
+            // Sync window state for remaining legacy code
+            m_windowVisible  = m_WindowPtr->isVisible();
+            m_windowIsInFocus = m_WindowPtr->isFocused();
+            m_DPIScaleFactorX = m_WindowPtr->getDPIScaleX();
+            m_DPIScaleFactorY = m_WindowPtr->getDPIScaleY();
+
+            bool presentSuccess = AnimateRenderPresent();
+            if (!presentSuccess) break;
+        }
+    }
+    else
+    {
     while(m_Window == nullptr || !glfwWindowShouldClose(m_Window))
     {
 #if DONUT_WITH_STREAMLINE
@@ -772,6 +805,7 @@ void DeviceManager::RunMessageLoop()
             break;
         }
     }
+    } // else (old GLFW-owned path)
 
     bool waitSuccess = GetDevice()->waitForIdle();
 #if DONUT_WITH_AFTERMATH
@@ -1140,14 +1174,15 @@ void DeviceManager::Shutdown()
 
     DestroyDeviceAndSwapChain();
 
-    if (m_Window)
+    // New path: GlfwWindow owns the GLFW window, don't double-destroy
+    if (m_Window && !m_WindowPtr)
     {
         glfwDestroyWindow(m_Window);
         m_Window = nullptr;
+        glfwTerminate();
     }
 
-    glfwTerminate();
-
+    m_WindowPtr = nullptr;
     delete m_Input;
     m_Input = nullptr;
 

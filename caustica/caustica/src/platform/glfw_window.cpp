@@ -129,10 +129,9 @@ bool GlfwWindow::initialise(const WindowDesc& desc)
 
     if (!m_Window)
     {
-        fprintf(stderr, "GlfwWindow: Failed to create GLFW window\n");
+        fprintf(stderr, "[GlfwWindow] Failed to create GLFW window\n");
         return false;
     }
-
     // Store this pointer for GLFW callbacks
     glfwSetWindowUserPointer(m_Window, this);
 

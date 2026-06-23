@@ -4,6 +4,7 @@
 
 #include "engine/DeviceManager.h"
 #include "core/log.h"
+#include <platform/window.h>
 
 #include "SampleCommon.h"
 #include "CommandLine.h"
@@ -64,6 +65,7 @@ private:
 	CommandLineOptions m_CmdLine;
 
 	std::unique_ptr<caustica::DeviceManager> m_DeviceManager;
+	std::unique_ptr<caustica::Window>       m_Window;
 	std::shared_ptr<caustica::ShaderFactory> m_ShaderFactory;
 	std::unique_ptr<Sample> m_MainSceneRender; // 3d render of the scene. Where Path Tracing happens
 	std::unique_ptr<SampleUI> m_UIRender;
