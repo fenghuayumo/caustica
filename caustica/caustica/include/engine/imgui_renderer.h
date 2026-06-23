@@ -104,11 +104,6 @@ namespace caustica
         // Returns the default font.
         std::shared_ptr<RegisteredFont> GetDefaultFont() { return m_defaultFont; }
 
-        virtual bool KeyboardUpdate(int key, int scancode, int action, int mods) override;
-        virtual bool KeyboardCharInput(unsigned int unicode, int mods) override;
-        virtual bool MousePosUpdate(double xpos, double ypos) override;
-        virtual bool MouseScrollUpdate(double xoffset, double yoffset) override;
-        virtual bool MouseButtonUpdate(int button, int action, int mods) override;
         virtual void Animate(float elapsedTimeSeconds) override;
         virtual void Render(nvrhi::IFramebuffer* framebuffer) override;
         virtual void BackBufferResizing() override;

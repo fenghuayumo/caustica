@@ -1,5 +1,7 @@
 #include "caustica.h"
 
+#include <core/path_utils.h>
+#include <engine/scene_utils.h>
 #include <engine/FramebufferFactory.h>
 #include <engine/ShaderFactory.h>
 #include <engine/CommonRenderPasses.h>
@@ -248,6 +250,13 @@ Sample::Sample(caustica::GpuDevice& deviceManager,
 #endif
 
     RefreshEnvironmentMapMediaList();
+
+    // Wire SceneLoader to the subclass virtual LoadScene().
+    m_Loader.setLoadFunc([this](std::shared_ptr<caustica::IFileSystem> fs,
+                                const std::filesystem::path& path)
+    {
+        return LoadScene(std::move(fs), path);
+    });
 
     m_captureScriptManager = std::make_unique<CaptureScriptManager>(*this, m_ui, m_cmdLine);
 

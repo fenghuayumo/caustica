@@ -3,6 +3,7 @@
 #include <render/Misc/picosha2.h>
 
 #include <engine/SceneRender.h>
+#include <backend/ShaderUtils.h>
 #include <core/log.h>
 
 namespace ShaderCompilerUtils

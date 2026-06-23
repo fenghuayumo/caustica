@@ -23,6 +23,12 @@ file(GLOB caustica_engine_engine_src
     src/engine/*.h
 )
 
+# Asset layer: loading, caching, importers (DIVSHOT-style 4-layer architecture)
+file(GLOB caustica_engine_assets_src
+    include/assets/loader/*.h
+    src/assets/loader/*.cpp
+)
+
 file(GLOB caustica_engine_render_src
     LIST_DIRECTORIES false
     include/render/*.h
@@ -115,6 +121,7 @@ add_library(causticaEngine STATIC
     ${caustica_engine_core_src}
     ${caustica_engine_math_src}
     ${caustica_engine_engine_src}
+    ${caustica_engine_assets_src}
     ${caustica_engine_render_src}
 )
 

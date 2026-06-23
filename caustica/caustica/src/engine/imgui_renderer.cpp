@@ -206,64 +206,10 @@ std::shared_ptr<RegisteredFont> ImGui_Renderer::CreateFontFromMemoryCompressed(v
     return CreateFontFromMemoryInternal(pData, size, true, fontSize);
 }
 
-bool ImGui_Renderer::KeyboardUpdate(int key, int scancode, int action, int mods)
-{
-    auto& io = ImGui::GetIO();
 
-    bool keyIsDown;
-    if (action == GLFW_PRESS || action == GLFW_REPEAT)
-    {
-        keyIsDown = true;
-    } else {
-        keyIsDown = false;
-    }
 
-    ImGui_ImplGlfw_UpdateKeyModifiers(io, GetGpuDevice()->GetWindow());
 
-    ImGuiKey imKey = ImGui_ImplGlfw_KeyToImGuiKey(key);
-    io.AddKeyEvent(imKey, keyIsDown);
 
-    return io.WantCaptureKeyboard;
-}
-
-bool ImGui_Renderer::KeyboardCharInput(unsigned int unicode, int mods)
-{
-    auto& io = ImGui::GetIO();
-
-    io.AddInputCharacter(unicode);
-
-    return io.WantCaptureKeyboard;
-}
-
-bool ImGui_Renderer::MousePosUpdate(double xpos, double ypos)
-{
-    auto& io = ImGui::GetIO();
-
-    io.AddMousePosEvent(float(xpos), float(ypos));
-
-    return io.WantCaptureMouse;
-}
-
-bool ImGui_Renderer::MouseScrollUpdate(double xoffset, double yoffset)
-{
-    auto& io = ImGui::GetIO();
-
-    io.AddMouseWheelEvent(float(xoffset), float(yoffset));
-
-    return io.WantCaptureMouse;
-}
-
-bool ImGui_Renderer::MouseButtonUpdate(int button, int action, int mods)
-{
-    auto& io = ImGui::GetIO();
-
-    ImGui_ImplGlfw_UpdateKeyModifiers(io, GetGpuDevice()->GetWindow());
-    
-    if (button >= 0 && button < ImGuiMouseButton_COUNT)
-        io.AddMouseButtonEvent(button, action == GLFW_PRESS);
-
-    return io.WantCaptureMouse;
-}
 
 void ImGui_Renderer::Animate(float elapsedTimeSeconds)
 {

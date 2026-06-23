@@ -3,6 +3,7 @@
 #include "ShaderPackFileSystem.h"
 
 #include <engine/SceneRender.h>
+#include <backend/ShaderUtils.h>
 
 #include <render/Materials/MaterialsBaker.h>
 #include "ExtendedScene.h"

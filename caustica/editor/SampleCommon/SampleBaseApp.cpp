@@ -9,6 +9,9 @@
 #include "ShaderPackFileSystem.h"
 
 #include <engine/SceneRender.h>
+#include <backend/ShaderUtils.h>
+#include <core/path_utils.h>
+#include <platform/cmdline_utils.h>
 #include <core/log.h>
 #if RTXPT_WITH_NATIVE_DLSS
 #include <render/DLSS.h>

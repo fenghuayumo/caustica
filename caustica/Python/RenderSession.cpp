@@ -9,7 +9,9 @@
 #include <SampleCommon/ShaderPackFileSystem.h>
 
 #include <backend/GpuDevice.h>
+#include <backend/ShaderUtils.h>
 #include <core/log.h>
+#include <core/path_utils.h>
 #include <core/vfs/VFS.h>
 #include <engine/ShaderFactory.h>
 #include <engine/TextureCache.h>

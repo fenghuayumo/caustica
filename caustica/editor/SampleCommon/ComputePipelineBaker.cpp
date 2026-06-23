@@ -4,6 +4,7 @@
 #include "ShaderPackFileSystem.h"
 
 #include <engine/SceneRender.h>
+#include <backend/ShaderUtils.h>
 #include <core/log.h>
 #include <core/vfs/VFS.h>
 
