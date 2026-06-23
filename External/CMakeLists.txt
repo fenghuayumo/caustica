@@ -88,6 +88,26 @@ if (DONUT_WITH_NVRHI)
 
     add_subdirectory(nvrhi)
 
+    # Create causticaRhi wrapper target(s) expected by OMM.
+    # Omm enables its GPU NVRHI integration layer only when these
+    # targets exist (see Omm/CMakeLists.txt).  They are simple
+    # INTERFACE wrappers around the NVRHI backends.
+    if (NOT TARGET causticaRhi)
+        add_library(causticaRhi INTERFACE)
+        target_link_libraries(causticaRhi INTERFACE nvrhi)
+        set_target_properties(causticaRhi PROPERTIES FOLDER "External")
+    endif()
+    if (NVRHI_WITH_DX12 AND NOT TARGET causticaRhi_d3d12)
+        add_library(causticaRhi_d3d12 INTERFACE)
+        target_link_libraries(causticaRhi_d3d12 INTERFACE nvrhi_d3d12)
+        set_target_properties(causticaRhi_d3d12 PROPERTIES FOLDER "External")
+    endif()
+    if (NVRHI_WITH_VULKAN AND NOT TARGET causticaRhi_vk)
+        add_library(causticaRhi_vk INTERFACE)
+        target_link_libraries(causticaRhi_vk INTERFACE nvrhi_vk)
+        set_target_properties(causticaRhi_vk PROPERTIES FOLDER "External")
+    endif()
+
     set(DONUT_SHADER_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/caustica/engine" CACHE PATH "" FORCE)
 
     set(caustica_engine_shader_dir "${CMAKE_SOURCE_DIR}/caustica/engine/shaders")
