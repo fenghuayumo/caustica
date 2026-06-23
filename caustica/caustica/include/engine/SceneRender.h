@@ -1,7 +1,7 @@
 
 #pragma once
 
-#include <engine/DeviceManager.h>
+#include <backend/GpuDevice.h>
 #include <core/vfs/VFS.h>
 #include <rhi/nvrhi.h>
 #include <filesystem>
@@ -34,7 +34,7 @@ namespace caustica
         bool m_IsAsyncLoad;
 
     public:
-        SceneRender(DeviceManager* deviceManager);
+        SceneRender(GpuDevice* deviceManager);
 
         virtual void SetLatewarpOptions() override { }
         virtual void Render(nvrhi::IFramebuffer* framebuffer) override;

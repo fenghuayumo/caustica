@@ -610,7 +610,7 @@ void InitializeSampleUIDataFromCommandLine(SampleUIData& ui, const CommandLineOp
     ui.EnableBloom &= !cmdLine.DisablePostProcessFilters;
 }
 
-SampleUI::SampleUI(DeviceManager* deviceManager, SampleBaseApp & baseApp, Sample& app, SampleUIData& ui, bool NVAPI_SERSupported, const CommandLineOptions& cmdLine)
+SampleUI::SampleUI(GpuDevice* deviceManager, SampleBaseApp & baseApp, Sample& app, SampleUIData& ui, bool NVAPI_SERSupported, const CommandLineOptions& cmdLine)
         : ImGui_Renderer(deviceManager)
         , m_baseApp(baseApp)
         , m_app(app)
@@ -687,7 +687,7 @@ void SampleUI::Animate(float elapsedTimeSeconds)
     caustica::ImGui_Renderer::Animate(elapsedTimeSeconds);
 
     int w, h;
-    GetDeviceManager()->GetWindowDimensions(w, h);
+    GetGpuDevice()->GetWindowDimensions(w, h);
     ImGuiIO& io = ImGui::GetIO();
 
     m_showSceneWidgets = dm::clamp(m_showSceneWidgets + elapsedTimeSeconds * 8.0f * ((io.MousePos.y >= 0 && io.MousePos.y < h * 0.1f) ? (1) : (-1)), 0.0f, 1.0f);
@@ -772,7 +772,7 @@ void SampleUI::BuildUIResolutionPicker()
         std::string displayLabel = std::string(res.label) + (isCurrent ? "  [current]" : "");
         if (ImGui::Selectable(displayLabel.c_str(), isCurrent))
         {
-            glfwSetWindowSize(GetDeviceManager()->GetWindow(), res.w, res.h);
+            glfwSetWindowSize(GetGpuDevice()->GetWindow(), res.w, res.h);
             ImGui::CloseCurrentPopup();
         }
     }
@@ -879,7 +879,7 @@ void SampleUI::buildUI(void)
             
         const float indent = (int)ImGui::GetStyle().IndentSpacing*0.4f;
 
-        ImGui::Text("%s, %s", GetDeviceManager()->GetRendererString(), m_app.GetResolutionInfo().c_str() );
+        ImGui::Text("%s, %s", GetGpuDevice()->GetRendererString(), m_app.GetResolutionInfo().c_str() );
         ImGui::Text("%s", m_app.GetFPSInfo().c_str());
 
         if (BuildUIScriptsAndEtc())

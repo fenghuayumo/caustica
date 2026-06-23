@@ -511,7 +511,7 @@ void InitializeSampleUIDataFromCommandLine(SampleUIData& ui, const struct Comman
 class SampleUI : public caustica::ImGui_Renderer
 {
 public:
-    SampleUI(caustica::DeviceManager* deviceManager, class SampleBaseApp & baseApp, class Sample & app, SampleUIData& ui, bool NVAPI_SERSupported, const struct CommandLineOptions& cmdLine);
+    SampleUI(caustica::GpuDevice* deviceManager, class SampleBaseApp & baseApp, class Sample & app, SampleUIData& ui, bool NVAPI_SERSupported, const struct CommandLineOptions& cmdLine);
     virtual ~SampleUI();
 protected:
     virtual void buildUI(void) override;

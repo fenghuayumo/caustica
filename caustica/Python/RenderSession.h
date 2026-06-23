@@ -1,6 +1,6 @@
 // RenderSession is the offline / extension-mode counterpart to SampleBaseApp.
 // Where SampleBaseApp drives a blocking GLFW message loop, RenderSession
-// initialises the same DeviceManager + AdvancedPathTracer pipeline but lets
+// initialises the same GpuDevice + AdvancedPathTracer pipeline but lets
 // Python step frames manually and dump the framebuffer to disk.
 //
 // Usage from C++:
@@ -12,7 +12,7 @@
 //    session->SaveScreenshot("out.png");
 //
 // Headless = no OS window or swap chain is created. The renderer uses
-// offscreen back buffers owned by DeviceManager.
+// offscreen back buffers owned by GpuDevice.
 
 #pragma once
 
@@ -24,7 +24,7 @@
 #include <cstdint>
 
 #include <math/math.h>
-#include <engine/DeviceManager.h>
+#include <backend/GpuDevice.h>
 
 #include <SampleCommon/CommandLine.h>
 
@@ -105,7 +105,7 @@ public:
     Sample*       GetSample()       { return reinterpret_cast<Sample*>(m_renderer.get()); }
     const Sample* GetSample() const { return reinterpret_cast<const Sample*>(m_renderer.get()); }
 
-    caustica::DeviceManager* GetDeviceManager() { return m_deviceManager.get(); }
+    caustica::GpuDevice* GetGpuDevice() { return m_deviceManager.get(); }
     const Config&              GetConfig() const  { return m_config; }
 
 private:
@@ -115,7 +115,7 @@ private:
 
     Config                                          m_config;
     CommandLineOptions                              m_cmdLine;
-    std::unique_ptr<caustica::DeviceManager>      m_deviceManager;
+    std::unique_ptr<caustica::GpuDevice>      m_deviceManager;
     std::shared_ptr<caustica::ShaderFactory>   m_shaderFactory;
     std::unique_ptr<AdvancedPathTracer>             m_renderer;
 #if DONUT_WITH_DX12 && defined(RTXPT_D3D_AGILITY_SDK_VERSION)

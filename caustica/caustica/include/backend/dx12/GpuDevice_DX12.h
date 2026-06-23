@@ -2,7 +2,7 @@
 
 #include <vector>
 
-#include <engine/DeviceManager.h>
+#include <backend/GpuDevice.h>
 
 #include <Windows.h>
 #include <dxgi1_5.h>
@@ -11,7 +11,7 @@
 #include <rhi/d3d12.h>
 #include <rhi/validation.h>
 
-class GpuDevice_DX12 : public caustica::DeviceManager
+class GpuDevice_DX12 : public caustica::GpuDevice
 {
 protected:
     nvrhi::RefCountPtr<IDXGIFactory2>               m_DxgiFactory2;

@@ -47,7 +47,7 @@ public:
 
     void setEventCallback(const EventCallbackFn& callback) override;
 
-    // --- Window events (with DPI tracking from DeviceManager) ---
+    // --- Window events (with DPI tracking from GpuDevice) ---
     void onFocusChanged(bool focused) override;
     void onIconifyChanged(bool iconified) override;
     void onMove(int x, int y) override;
@@ -58,7 +58,7 @@ public:
     // Access the raw GLFW window
     GLFWwindow* glfwWindow() const { return m_Window; }
 
-    // Render-during-move callback (set by DeviceManager/Application)
+    // Render-during-move callback (set by GpuDevice/Application)
     using RenderDuringMoveFn = std::function<void()>;
     void setRenderDuringMoveCallback(RenderDuringMoveFn fn) { m_OnRenderDuringMove = std::move(fn); }
 

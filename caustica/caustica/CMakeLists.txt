@@ -88,8 +88,9 @@ list(APPEND caustica_engine_engine_src
 # Backend layer: GpuDevice + SwapChain
 list(APPEND caustica_engine_engine_src
     include/backend/GpuDevice.h
-    src/backend/GpuDevice.cpp
     include/backend/SwapChain.h
+        include/backend/GpuDevice.h
+        src/backend/GpuDevice.cpp
 )
 
 # Engine layer: Application (message loop, frame pacing)

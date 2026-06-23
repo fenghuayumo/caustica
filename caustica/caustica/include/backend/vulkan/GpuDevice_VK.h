@@ -4,7 +4,7 @@
 #include <queue>
 #include <unordered_set>
 
-#include <engine/DeviceManager.h>
+#include <backend/GpuDevice.h>
 #include <core/log.h>
 
 #include <rhi/vulkan.h>
@@ -15,7 +15,7 @@
 #endif
 #include <vulkan/vulkan.hpp>
 
-class GpuDevice_VK : public caustica::DeviceManager
+class GpuDevice_VK : public caustica::GpuDevice
 {
 public:
     [[nodiscard]] nvrhi::IDevice* GetDevice() const override

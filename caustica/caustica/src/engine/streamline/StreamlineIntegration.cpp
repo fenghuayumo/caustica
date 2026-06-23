@@ -1630,7 +1630,7 @@ void StreamlineIntegration::GetReflexState(ReflexState& state) const
     }
 }
 
-void StreamlineIntegration::SimStart(DeviceManager& manager)
+void StreamlineIntegration::SimStart(GpuDevice& manager)
 {
     successCheck(slGetNewFrameToken(m_currentFrame, nullptr), "SL_GetFrameToken");
 
@@ -1645,7 +1645,7 @@ void StreamlineIntegration::SimStart(DeviceManager& manager)
     }
 }
 
-void StreamlineIntegration::SimEnd(DeviceManager& manager)
+void StreamlineIntegration::SimEnd(GpuDevice& manager)
 {
     if (IsPCLAvailable())
     {
@@ -1653,7 +1653,7 @@ void StreamlineIntegration::SimEnd(DeviceManager& manager)
     }
 }
 
-void StreamlineIntegration::RenderStart(DeviceManager& manager)
+void StreamlineIntegration::RenderStart(GpuDevice& manager)
 {
     if (IsPCLAvailable())
     {
@@ -1661,7 +1661,7 @@ void StreamlineIntegration::RenderStart(DeviceManager& manager)
     }
 }
 
-void StreamlineIntegration::RenderEnd(DeviceManager& manager)
+void StreamlineIntegration::RenderEnd(GpuDevice& manager)
 {
     if (IsPCLAvailable())
     {
@@ -1669,7 +1669,7 @@ void StreamlineIntegration::RenderEnd(DeviceManager& manager)
     }
 }
 
-void StreamlineIntegration::PresentStart(DeviceManager& manager)
+void StreamlineIntegration::PresentStart(GpuDevice& manager)
 {
     if (IsPCLAvailable())
     {
@@ -1677,7 +1677,7 @@ void StreamlineIntegration::PresentStart(DeviceManager& manager)
     }
 }
 
-void StreamlineIntegration::PresentEnd(DeviceManager& manager)
+void StreamlineIntegration::PresentEnd(GpuDevice& manager)
 {
     if (IsPCLAvailable())
     {

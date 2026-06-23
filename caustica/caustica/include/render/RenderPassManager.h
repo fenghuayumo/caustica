@@ -9,7 +9,7 @@ class IRenderPass;
 // =============================================================================
 // RenderPassManager — Renderer layer: ordered container of render passes.
 //
-// Extracted from DeviceManager. Manages pass registration, removal,
+// Extracted from GpuDevice. Manages pass registration, removal,
 // and back-buffer resize notifications. Does NOT own the passes.
 // =============================================================================
 class RenderPassManager

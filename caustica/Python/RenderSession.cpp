@@ -8,7 +8,7 @@
 #include <SampleCommon/SampleCommon.h>
 #include <SampleCommon/ShaderPackFileSystem.h>
 
-#include <engine/DeviceManager.h>
+#include <backend/GpuDevice.h>
 #include <core/log.h>
 #include <core/vfs/VFS.h>
 #include <engine/ShaderFactory.h>
@@ -438,10 +438,10 @@ bool RenderSession::InitDevice()
         m_d3d12DeviceFactory = CreateD3D12AgilityDeviceFactory();
 #endif
 
-    m_deviceManager.reset(caustica::DeviceManager::Create(api));
+    m_deviceManager.reset(caustica::GpuDevice::Create(api));
     if (!m_deviceManager)
     {
-        caustica::error("RenderSession: DeviceManager::Create returned null");
+        caustica::error("RenderSession: GpuDevice::Create returned null");
         return false;
     }
     m_deviceManager->SetFrameTimeUpdateInterval(1.0f);
@@ -470,7 +470,7 @@ bool RenderSession::InitDevice()
     }
 
     m_deviceManager->m_callbacks.beforePresent =
-        [this](caustica::DeviceManager& manager, uint32_t) {
+        [this](caustica::GpuDevice& manager, uint32_t) {
             m_lastRenderedBackBufferIndex = manager.GetCurrentBackBufferIndex();
         };
 

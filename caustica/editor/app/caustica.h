@@ -53,7 +53,7 @@ class Sample : public caustica::SceneRender
 public:
     using SceneRender::SceneRender;
 
-    Sample(caustica::DeviceManager& deviceManager,
+    Sample(caustica::GpuDevice& deviceManager,
         const CommandLineOptions& cmdLine);
     virtual ~Sample();
 
@@ -197,7 +197,7 @@ public:
     const std::unique_ptr<class ZoomTool> & GetZoomTool() const { return m_zoomTool; }
     caustica::BindingCache &           GetBindingCache() { return *m_bindingCache; }
 
-    GLFWwindow *                            GetGLFWWindow() const { return GetDeviceManager()->GetWindow(); }
+    GLFWwindow *                            GetGLFWWindow() const { return GetGpuDevice()->GetWindow(); }
 
     int                                     GetAccumulationSampleIndex() const { return m_accumulationSampleIndex; }
 

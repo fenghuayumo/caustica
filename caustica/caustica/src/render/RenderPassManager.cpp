@@ -1,5 +1,5 @@
 #include "render/RenderPassManager.h"
-#include "engine/DeviceManager.h"  // IRenderPass definition
+#include "backend/GpuDevice.h"  // IRenderPass definition
 
 namespace caustica {
 

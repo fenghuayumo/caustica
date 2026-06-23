@@ -1,5 +1,5 @@
 #include "platform/Input.h"
-#include "engine/DeviceManager.h"  // IRenderPass (for legacy compat in JoystickManager)
+#include "backend/GpuDevice.h"  // IRenderPass (for legacy compat in JoystickManager)
 #include "math/vector.h"
 
 #include <GLFW/glfw3.h>

@@ -1,6 +1,6 @@
 #if DONUT_WITH_STREAMLINE
 #include <engine/StreamlineInterface.h>
-#include <engine/DeviceManager.h>
+#include <backend/GpuDevice.h>
 
 // Streamline Core
 #include <sl.h>
@@ -134,12 +134,12 @@ public:
     StreamlineIntegration& operator=(const StreamlineIntegration&) = delete;
     StreamlineIntegration& operator=(StreamlineIntegration&&) = delete;
 
-    void SimStart(DeviceManager& manager) override;
-    void SimEnd(DeviceManager& manager) override;
-    void RenderStart(DeviceManager& manager) override;
-    void RenderEnd(DeviceManager& manager) override;
-    void PresentStart(DeviceManager& manager) override;
-    void PresentEnd(DeviceManager& manager) override;
+    void SimStart(GpuDevice& manager) override;
+    void SimEnd(GpuDevice& manager) override;
+    void RenderStart(GpuDevice& manager) override;
+    void RenderEnd(GpuDevice& manager) override;
+    void PresentStart(GpuDevice& manager) override;
+    void PresentEnd(GpuDevice& manager) override;
 
     bool InitializePreDevice(nvrhi::GraphicsAPI api, int appId, const bool checkSig = true, const bool enableLog = false);
 #if DONUT_WITH_DX11 || DONUT_WITH_DX12

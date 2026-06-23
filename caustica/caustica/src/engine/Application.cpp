@@ -1,5 +1,5 @@
 #include "engine/Application.h"
-#include "engine/DeviceManager.h"
+#include "backend/GpuDevice.h"
 #include "platform/window.h"
 #include "platform/Input.h"
 
@@ -23,7 +23,7 @@ static double GetNow(bool headless)
     return std::chrono::duration<double>(Clock::now() - start).count();
 }
 
-Application::Application(DeviceManager* dm, Window* window)
+Application::Application(GpuDevice* dm, Window* window)
     : m_DM(dm), m_Window(window) {}
 
 void Application::syncWindowState()

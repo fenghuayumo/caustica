@@ -1,6 +1,6 @@
 #pragma once
 
-#include <engine/DeviceManager.h>
+#include <backend/GpuDevice.h>
 #include <engine/imgui_nvrhi.h>
 
 #include <filesystem>
@@ -84,7 +84,7 @@ namespace caustica
         bool m_imguiFrameOpened = false;
 
     public:
-        ImGui_Renderer(DeviceManager *devManager);
+        ImGui_Renderer(GpuDevice *devManager);
         ~ImGui_Renderer();
         bool Init(std::shared_ptr<caustica::ShaderFactory> shaderFactory);
 

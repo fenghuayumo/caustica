@@ -35,7 +35,7 @@ static void DumpFileCallback(const void* pGpuCrashDump, const uint32_t gpuCrashD
             {
                 GFSDK_Aftermath_ShaderBinaryHash shaderHash = {};
                 GFSDK_Aftermath_GetShaderHashForShaderInfo(decoder, &shaderInfo, &shaderHash);
-                nvrhi::AftermathCrashDumpHelper& crashDumpHelper = dumper->GetDeviceManager().GetDevice()->getAftermathCrashDumpHelper();
+                nvrhi::AftermathCrashDumpHelper& crashDumpHelper = dumper->GetGpuDevice().GetDevice()->getAftermathCrashDumpHelper();
                 nvrhi::BinaryBlob shaderLookupResult = crashDumpHelper.findShaderBinary(shaderHash.hash, caustica::AftermathCrashDump::GetShaderHashForBinary);
                 if (shaderLookupResult.second > 0)
                 {
@@ -70,7 +70,7 @@ static void ShaderDebugInfoCallback(const void* pShaderDebugInfo, const uint32_t
 static void DescriptionCallback(PFN_GFSDK_Aftermath_AddGpuCrashDumpDescription addDescription, void* pUserData)
 {
     caustica::AftermathCrashDump* dumper = reinterpret_cast<caustica::AftermathCrashDump*>(pUserData);
-    addDescription(GFSDK_Aftermath_GpuCrashDumpDescriptionKey_ApplicationName, dumper->GetDeviceManager().GetWindowTitle());
+    addDescription(GFSDK_Aftermath_GpuCrashDumpDescriptionKey_ApplicationName, dumper->GetGpuDevice().GetWindowTitle());
 }
 
 // this callback should call into the nvrhi device which has the necessary information
@@ -161,7 +161,7 @@ void caustica::AftermathCrashDump::InitializeAftermathCrashDump(AftermathCrashDu
 }
 
 
-caustica::AftermathCrashDump::AftermathCrashDump(DeviceManager& deviceManager) :
+caustica::AftermathCrashDump::AftermathCrashDump(GpuDevice& deviceManager) :
     m_deviceManager(deviceManager)
 {
 }
@@ -184,7 +184,7 @@ const std::string& caustica::AftermathCrashDump::ResolveMarker(uint64_t markerHa
     return markerString;
 }
 
-caustica::DeviceManager& caustica::AftermathCrashDump::GetDeviceManager()
+caustica::GpuDevice& caustica::AftermathCrashDump::GetGpuDevice()
 {
     return m_deviceManager;
 }

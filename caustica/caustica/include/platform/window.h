@@ -105,7 +105,7 @@ public:
     virtual void onMove(int x, int y);
     virtual void onRefresh()           {}
 
-    // --- Render-while-moving (was in DeviceManager) ---
+    // --- Render-while-moving (was in GpuDevice) ---
     void setRenderDuringMove(bool enable) { m_RenderDuringMove = enable; }
     bool getRenderDuringMove() const      { return m_RenderDuringMove; }
 

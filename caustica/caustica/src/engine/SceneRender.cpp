@@ -17,7 +17,7 @@
 
 using namespace caustica;
 
-SceneRender::SceneRender(DeviceManager* deviceManager)
+SceneRender::SceneRender(GpuDevice* deviceManager)
     : Super(deviceManager)
     , m_SceneLoaded(false)
     , m_AllTexturesFinalized(false)

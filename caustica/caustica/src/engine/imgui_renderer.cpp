@@ -5,7 +5,7 @@ using namespace caustica;
 using namespace caustica;
 using namespace caustica;
 
-ImGui_Renderer::ImGui_Renderer(DeviceManager *devManager)
+ImGui_Renderer::ImGui_Renderer(GpuDevice *devManager)
     : IRenderPass(devManager)
     , m_supportExplicitDisplayScaling(devManager->GetDeviceParams().supportExplicitDisplayScaling)
 {
@@ -218,7 +218,7 @@ bool ImGui_Renderer::KeyboardUpdate(int key, int scancode, int action, int mods)
         keyIsDown = false;
     }
 
-    ImGui_ImplGlfw_UpdateKeyModifiers(io, GetDeviceManager()->GetWindow());
+    ImGui_ImplGlfw_UpdateKeyModifiers(io, GetGpuDevice()->GetWindow());
 
     ImGuiKey imKey = ImGui_ImplGlfw_KeyToImGuiKey(key);
     io.AddKeyEvent(imKey, keyIsDown);
@@ -257,7 +257,7 @@ bool ImGui_Renderer::MouseButtonUpdate(int button, int action, int mods)
 {
     auto& io = ImGui::GetIO();
 
-    ImGui_ImplGlfw_UpdateKeyModifiers(io, GetDeviceManager()->GetWindow());
+    ImGui_ImplGlfw_UpdateKeyModifiers(io, GetGpuDevice()->GetWindow());
     
     if (button >= 0 && button < ImGuiMouseButton_COUNT)
         io.AddMouseButtonEvent(button, action == GLFW_PRESS);
@@ -282,7 +282,7 @@ void ImGui_Renderer::Animate(float elapsedTimeSeconds)
 
     // Make sure that all registered fonts have corresponding ImFont objects at the current DPI scale
     float scaleX, scaleY;
-    GetDeviceManager()->GetDPIScaleInfo(scaleX, scaleY);
+    GetGpuDevice()->GetDPIScaleInfo(scaleX, scaleY);
     for (auto& font : m_fonts)
     {
         if (!font->GetScaledFont())
@@ -293,7 +293,7 @@ void ImGui_Renderer::Animate(float elapsedTimeSeconds)
     imgui_nvrhi->updateFontTexture();
     
     int w, h;
-    GetDeviceManager()->GetWindowDimensions(w, h);
+    GetGpuDevice()->GetWindowDimensions(w, h);
 
     ImGuiIO& io = ImGui::GetIO();
     io.DisplaySize = ImVec2(float(w), float(h));

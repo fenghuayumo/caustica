@@ -7,7 +7,7 @@
 
 namespace caustica 
 {
-class DeviceManager;
+class GpuDevice;
 
 class StreamlineInterface
 {
@@ -370,12 +370,12 @@ public:
         nvrhi::ITexture* outputColor
     ) = 0;
 
-    virtual void SimStart(DeviceManager& manager) = 0;
-    virtual void SimEnd(DeviceManager& manager) = 0;
-    virtual void RenderStart(DeviceManager& manager) = 0;
-    virtual void RenderEnd(DeviceManager& manager) = 0;
-    virtual void PresentStart(DeviceManager& manager) = 0;
-    virtual void PresentEnd(DeviceManager& manager) = 0;
+    virtual void SimStart(GpuDevice& manager) = 0;
+    virtual void SimEnd(GpuDevice& manager) = 0;
+    virtual void RenderStart(GpuDevice& manager) = 0;
+    virtual void RenderEnd(GpuDevice& manager) = 0;
+    virtual void PresentStart(GpuDevice& manager) = 0;
+    virtual void PresentEnd(GpuDevice& manager) = 0;
 };
 
 

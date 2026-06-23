@@ -5,19 +5,19 @@
 
 namespace caustica {
 
-class DeviceManager;
+class GpuDevice;
 class Window;
 
 // =============================================================================
 // Application — Engine layer: message loop, frame pacing, animation, rendering.
 //
-// Extracted from DeviceManager. Uses friend access to DeviceManager for
+// Extracted from GpuDevice. Uses friend access to GpuDevice for
 // GPU device/swapchain operations until GpuDevice and SwapChain are ready.
 // =============================================================================
 class Application
 {
 public:
-    Application(DeviceManager* dm, Window* window = nullptr);
+    Application(GpuDevice* dm, Window* window = nullptr);
     ~Application() = default;
 
     // --- Message loop ---
@@ -32,8 +32,8 @@ public:
     void animate(double elapsedTime, bool windowIsFocused);
     void render();
 
-    // --- Callbacks (mirror DeviceManager's for migration) ---
-    using FrameCallback = std::function<void(DeviceManager&, uint32_t frameIndex)>;
+    // --- Callbacks (mirror GpuDevice's for migration) ---
+    using FrameCallback = std::function<void(GpuDevice&, uint32_t frameIndex)>;
     FrameCallback beforeFrame;
     FrameCallback beforeAnimate;
     FrameCallback afterAnimate;
@@ -47,7 +47,7 @@ private:
     void updateWindowSize();
     bool shouldRenderUnfocused() const;
 
-    DeviceManager* m_DM;
+    GpuDevice* m_DM;
     Window*        m_Window;
 };
 

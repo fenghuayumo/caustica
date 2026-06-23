@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "engine/DeviceManager.h"
+#include "backend/GpuDevice.h"
 #include "engine/Application.h"
 #include "core/log.h"
 #include <platform/window.h>
@@ -48,7 +48,7 @@ public:
     bool QueryVideoMemoryInfo(uint64_t& outBudget, uint64_t& outCurrentUsage, uint64_t& outAvailableForReservation, uint64_t& outCurrentReservation); // RTXPT_ENABLE_VIDEO_MEMORY_INFO for this to work, otherwise return false
 
 private:
-	virtual std::unique_ptr<Sample> CreateMainRenderPass(caustica::DeviceManager& deviceManager, const CommandLineOptions& cmdLineOptions) = 0;
+	virtual std::unique_ptr<Sample> CreateMainRenderPass(caustica::GpuDevice& deviceManager, const CommandLineOptions& cmdLineOptions) = 0;
 
 	// Initialization methods
 	void RegisterDonutCallback();
@@ -65,7 +65,7 @@ private:
 
 	CommandLineOptions m_CmdLine;
 
-	std::unique_ptr<caustica::DeviceManager> m_DeviceManager;
+	std::unique_ptr<caustica::GpuDevice> m_GpuDevice;
 	std::unique_ptr<caustica::Window>       m_Window;
 	std::unique_ptr<caustica::Application>      m_AppLoop;
 	std::shared_ptr<caustica::ShaderFactory> m_ShaderFactory;

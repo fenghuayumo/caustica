@@ -4,7 +4,7 @@
 #include <memory>
 #include <sstream>
 
-#include <engine/DeviceManager.h>
+#include <backend/GpuDevice.h>
 #include <backend/vulkan/GpuDevice_VK.h>
 
 #include <rhi/vulkan.h>
@@ -1227,7 +1227,7 @@ bool GpuDevice_VK::Present()
     return true;
 }
 
-DeviceManager *DeviceManager::CreateVK()
+GpuDevice *GpuDevice::CreateVK()
 {
     return new GpuDevice_VK();
 }

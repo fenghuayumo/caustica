@@ -6,7 +6,7 @@
 #include <engine/TextureCache.h>
 #include <engine/BindingCache.h>
 #include <engine/View.h>
-#include <engine/DeviceManager.h>
+#include <backend/GpuDevice.h>
 #include <core/log.h>
 #include <core/json.h>
 #include <core/vfs/VFS.h>
@@ -226,7 +226,7 @@ const float c_envMapRadianceScale = 1.0f / 4.0f; // used to make input 32bit flo
 
 static FPSLimiter g_FPSLimiter;
 
-Sample::Sample(caustica::DeviceManager& deviceManager,
+Sample::Sample(caustica::GpuDevice& deviceManager,
     const CommandLineOptions& cmdLine)
     : caustica::SceneRender(&deviceManager )
     , m_cmdLine(cmdLine)
@@ -238,12 +238,12 @@ Sample::Sample(caustica::DeviceManager& deviceManager,
     m_camera.SetRotateSpeed(.003f);
 
 #if DONUT_WITH_STREAMLINE
-    if (!GetDeviceManager()->GetDeviceParams().headlessDevice)
+    if (!GetGpuDevice()->GetDeviceParams().headlessDevice)
     {
-        m_ui.IsDLSSSuported = GetDeviceManager()->GetStreamline().IsDLSSAvailable();
-        m_ui.IsDLSSFGSupported = GetDeviceManager()->GetStreamline().IsDLSSGAvailable();
-        m_ui.IsReflexSupported = GetDeviceManager()->GetStreamline().IsReflexAvailable();
-        m_ui.IsDLSSRRSupported = GetDeviceManager()->GetStreamline().IsDLSSRRAvailable();
+        m_ui.IsDLSSSuported = GetGpuDevice()->GetStreamline().IsDLSSAvailable();
+        m_ui.IsDLSSFGSupported = GetGpuDevice()->GetStreamline().IsDLSSGAvailable();
+        m_ui.IsReflexSupported = GetGpuDevice()->GetStreamline().IsReflexAvailable();
+        m_ui.IsDLSSRRSupported = GetGpuDevice()->GetStreamline().IsDLSSRRAvailable();
     }
 #endif
 
@@ -1290,7 +1290,7 @@ bool Sample::KeyboardUpdate(int key, int scancode, int action, int mods)
     {
         // As GLFW abstracts away from Windows messages
         // We instead set the F13 as the PC_Ping key in the constants and compare against that.
-         GetDeviceManager()->GetStreamline().ReflexTriggerPcPing(GetFrameIndex());
+         GetGpuDevice()->GetStreamline().ReflexTriggerPcPing(GetFrameIndex());
     }
 #endif
 
@@ -1335,7 +1335,7 @@ bool Sample::MouseButtonUpdate(int button, int action, int mods)
 #if DONUT_WITH_STREAMLINE
     if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
     {
-         GetDeviceManager()->GetStreamline().ReflexTriggerFlash(GetFrameIndex());
+         GetGpuDevice()->GetStreamline().ReflexTriggerFlash(GetFrameIndex());
     }
 #endif
 
@@ -1453,7 +1453,7 @@ void Sample::Animate(float fElapsedTimeSeconds)
     m_captureScriptManager->PostAnim();
 
 
-    double frameTime = GetDeviceManager()->GetAverageFrameTimeSeconds();
+    double frameTime = GetGpuDevice()->GetAverageFrameTimeSeconds();
     if (frameTime > 0.0)
     {
 #if DONUT_WITH_STREAMLINE
@@ -1474,7 +1474,7 @@ void Sample::Animate(float fElapsedTimeSeconds)
         + ")";
 
 
-    GetDeviceManager()->SetInformativeWindowTitle(g_windowTitle, false, extraInfo.c_str());
+    GetGpuDevice()->SetInformativeWindowTitle(g_windowTitle, false, extraInfo.c_str());
 }
 
 std::string Sample::GetResolutionInfo() const
@@ -1991,21 +1991,21 @@ void Sample::BackBufferResizing()
 
 // NOTE: we're not yet sure if this is necessary to avoid crash with going in/out of fullscreen and FG
 #if DONUT_WITH_STREAMLINE
-    if (!GetDeviceManager()->GetDeviceParams().headlessDevice &&
+    if (!GetGpuDevice()->GetDeviceParams().headlessDevice &&
         (m_ui.DLSSFGOptions.mode == StreamlineInterface::DLSSGMode::eOn || m_ui.ActualDLSSFGMode() == StreamlineInterface::DLSSGMode::eOn)) 
     {
-        GetDeviceManager()->GetStreamline().CleanupDLSS(false);
-        GetDeviceManager()->GetStreamline().CleanupDLSSG(false);
+        GetGpuDevice()->GetStreamline().CleanupDLSS(false);
+        GetGpuDevice()->GetStreamline().CleanupDLSSG(false);
 
-        if (GetDeviceManager()->GetStreamline().IsDLSSGAvailable())
+        if (GetGpuDevice()->GetStreamline().IsDLSSGAvailable())
         {
             auto dlssgOptions = StreamlineInterface::DLSSGOptions{};
             StreamlineInterface::DLSSGState state;
-            GetDeviceManager()->GetStreamline().GetDLSSGState(state, dlssgOptions);
+            GetGpuDevice()->GetStreamline().GetDLSSGState(state, dlssgOptions);
             m_ui.DLSSFGMultiplier = state.numFramesActuallyPresented;
             m_ui.DLSSFGMaxNumFramesToGenerate = state.numFramesToGenerateMax;
 
-            GetDeviceManager()->GetStreamline().SetDLSSGOptions(dlssgOptions);
+            GetGpuDevice()->GetStreamline().SetDLSSGOptions(dlssgOptions);
             m_ui.DLSSFGOptions = dlssgOptions;
         }
     }
@@ -2397,7 +2397,7 @@ bool Sample::ShouldRenderUnfocused()
 void Sample::StreamlinePreRender()
 {
 #if DONUT_WITH_STREAMLINE
-    if (GetDeviceManager()->GetDeviceParams().headlessDevice)
+    if (GetGpuDevice()->GetDeviceParams().headlessDevice)
         return;
 
     // Setup Reflex
@@ -2408,11 +2408,11 @@ void Sample::StreamlinePreRender()
         reflexConsts.useMarkersToOptimize = true;
         reflexConsts.virtualKey = VK_F13;
         reflexConsts.idThread = 0; // std::hash<std::thread::id>()(std::this_thread::get_id())
-        GetDeviceManager()->GetStreamline().SetReflexConsts(reflexConsts);
+        GetGpuDevice()->GetStreamline().SetReflexConsts(reflexConsts);
 
         // Need to update StreamlineIntegration with the ability to query reflex state
         caustica::StreamlineInterface::ReflexState reflexState{};
-        GetDeviceManager()->GetStreamline().GetReflexState(reflexState);
+        GetGpuDevice()->GetStreamline().GetReflexState(reflexState);
         if (m_ui.IsReflexSupported)
         {
             m_ui.IsReflexLowLatencyAvailable = reflexState.lowLatencyAvailable;
@@ -2450,7 +2450,7 @@ void Sample::StreamlinePreRender()
     {
         // If DLSS-G has been turned off, then we tell tell SL to clean it up expressly
         if (m_ui.DLSSFGOptions.mode == StreamlineInterface::DLSSGMode::eOn && m_ui.ActualDLSSFGMode() == StreamlineInterface::DLSSGMode::eOff) {
-            GetDeviceManager()->GetStreamline().CleanupDLSSG(true);
+            GetGpuDevice()->GetStreamline().CleanupDLSSG(true);
         }
 
         // This is where DLSS-G is toggled On and Off (using dlssgOptions.mode) and where we set DLSS-G parameters.
@@ -2459,14 +2459,14 @@ void Sample::StreamlinePreRender()
         dlssgOptions.numFramesToGenerate = m_ui.DLSSFGNumFramesToGenerate;
 
         // This is where we query DLSS-G minimum swapchain size
-        if (GetDeviceManager()->GetStreamline().IsDLSSGAvailable())
+        if (GetGpuDevice()->GetStreamline().IsDLSSGAvailable())
         {
             StreamlineInterface::DLSSGState state;
-            GetDeviceManager()->GetStreamline().GetDLSSGState(state, dlssgOptions);
+            GetGpuDevice()->GetStreamline().GetDLSSGState(state, dlssgOptions);
             m_ui.DLSSFGMultiplier = state.numFramesActuallyPresented;
             m_ui.DLSSFGMaxNumFramesToGenerate = state.numFramesToGenerateMax;
 
-            GetDeviceManager()->GetStreamline().SetDLSSGOptions(dlssgOptions);
+            GetGpuDevice()->GetStreamline().SetDLSSGOptions(dlssgOptions);
             m_ui.DLSSFGOptions = dlssgOptions;
         }
     }
@@ -2510,7 +2510,7 @@ void Sample::StreamlinePreRender()
                 dlssOptions.useAutoExposure = true;     // Optional: provide proper "kBufferTypeExposure" for 0-lag for better precision handling
                 dlssOptions.preset = StreamlineInterface::DLSSPreset::eDefault;
                 // if (m_ui.RealtimeAA < 4) <- docs https://github.com/NVIDIAGameWorks/Streamline/blob/main/docs/ProgrammingGuideDLSS_RR.md#50-provide-dlss--dlss-rr-options seem to imply that these should be set even when DLSS-RR enabled
-                    GetDeviceManager()->GetStreamline().SetDLSSOptions(dlssOptions);
+                    GetGpuDevice()->GetStreamline().SetDLSSOptions(dlssOptions);
             }
             else
             {
@@ -2524,7 +2524,7 @@ void Sample::StreamlinePreRender()
                 if (dlssResizeRequired)
                 {
                     // Only quality, target width and height matter here
-                    GetDeviceManager()->GetStreamline().QueryDLSSOptimalSettings(dlssOptions, m_recommendedDLSSSettings);
+                    GetGpuDevice()->GetStreamline().QueryDLSSOptimalSettings(dlssOptions, m_recommendedDLSSSettings);
 
                     // this is an example on how to override defaults - overriding default 2/3 to higher res 3/4
                     if (dlssOptions.mode == SI::DLSSMode::eMaxQuality)
@@ -2573,7 +2573,7 @@ void Sample::StreamlinePreRender()
             {
                 StreamlineInterface::DLSSOptions dlssOptions = {};
                 dlssOptions.mode = StreamlineInterface::DLSSMode::eOff;
-                GetDeviceManager()->GetStreamline().SetDLSSOptions(dlssOptions);
+                GetGpuDevice()->GetStreamline().SetDLSSOptions(dlssOptions);
             }
 
             m_renderSize = m_displaySize;
@@ -3329,7 +3329,7 @@ void Sample::Render(nvrhi::IFramebuffer* framebuffer)
         m_temporalAntiAliasingPass->AdvanceFrame();
 
 	std::swap(m_view, m_viewPrevious);
-	GetDeviceManager()->SetVsyncEnabled(m_ui.ActualEnableVsync());
+	GetGpuDevice()->SetVsyncEnabled(m_ui.ActualEnableVsync());
 
     PostUpdatePathTracing();
 }
@@ -5661,7 +5661,7 @@ void Sample::PostProcessAA(nvrhi::IFramebuffer* framebuffer, bool reset)
         }
 
 #if DONUT_WITH_STREAMLINE
-        const bool useStreamlineThisFrame = !GetDeviceManager()->GetDeviceParams().headlessDevice;
+        const bool useStreamlineThisFrame = !GetGpuDevice()->GetDeviceParams().headlessDevice;
         if (useStreamlineThisFrame)
         {
         // SET STREAMLINE CONSTANTS
@@ -5697,7 +5697,7 @@ void Sample::PostProcessAA(nvrhi::IFramebuffer* framebuffer, bool reset)
             slConstants.motionVectors3D = false;
             slConstants.motionVectorsInvalidValue = FLT_MIN;
 
-            GetDeviceManager()->GetStreamline().SetConstants(slConstants);
+            GetGpuDevice()->GetStreamline().SetConstants(slConstants);
 
             if (m_ui.RealtimeAA == 3) // DLSS-RR
             {
@@ -5705,21 +5705,21 @@ void Sample::PostProcessAA(nvrhi::IFramebuffer* framebuffer, bool reset)
                 m_lastDLSSRROptions.worldToCameraView = dm::affineToHomogeneous(m_view->GetViewMatrix());
                 m_lastDLSSRROptions.cameraViewToWorld = dm::affineToHomogeneous(m_view->GetInverseViewMatrix());
                 
-                GetDeviceManager()->GetStreamline().SetDLSSRROptions(m_lastDLSSRROptions);
+                GetGpuDevice()->GetStreamline().SetDLSSRROptions(m_lastDLSSRROptions);
             }
         }
 
         m_commandList->commitBarriers();
 
         // TAG STREAMLINE RESOURCES
-        GetDeviceManager()->GetStreamline().TagResourcesGeneral(m_commandList,
+        GetGpuDevice()->GetStreamline().TagResourcesGeneral(m_commandList,
             m_view->GetChildView(ViewType::PLANAR, 0),
             m_renderTargets->ScreenMotionVectors,
             m_renderTargets->Depth,
             m_renderTargets->PreUIColor);
 
         // TAG STREAMLINE RESOURCES
-        GetDeviceManager()->GetStreamline().TagResourcesDLSSNIS(m_commandList,
+        GetGpuDevice()->GetStreamline().TagResourcesDLSSNIS(m_commandList,
             m_view->GetChildView(ViewType::PLANAR, 0),
             m_renderTargets->ProcessedOutputColor,
             m_renderTargets->OutputColor);
@@ -5728,7 +5728,7 @@ void Sample::PostProcessAA(nvrhi::IFramebuffer* framebuffer, bool reset)
         {
             RAII_SCOPE(m_commandList->beginMarker("DLSS"); , m_commandList->endMarker(); );
 
-            GetDeviceManager()->GetStreamline().EvaluateDLSS(m_commandList);
+            GetGpuDevice()->GetStreamline().EvaluateDLSS(m_commandList);
             m_commandList->clearState();
         }
         }
@@ -5748,7 +5748,7 @@ void Sample::PostProcessAA(nvrhi::IFramebuffer* framebuffer, bool reset)
             //    gmgkmgk = !gmgkmgk;
 
 #if 0
-            GetDeviceManager()->GetStreamline().TagResourcesDLSSRR(m_commandList,
+            GetGpuDevice()->GetStreamline().TagResourcesDLSSRR(m_commandList,
                 m_view->GetChildView(ViewType::PLANAR, 0),
                 (int2)m_renderSize,
                 (int2)m_displaySize,
@@ -5762,7 +5762,7 @@ void Sample::PostProcessAA(nvrhi::IFramebuffer* framebuffer, bool reset)
                 (useSpecHitT) ? (nullptr) : (m_renderTargets->RRSpecMotionVectors),
                 m_renderTargets->RRTransparencyLayer
 #else
-            GetDeviceManager()->GetStreamline().TagResourcesDLSSRR(m_commandList,
+            GetGpuDevice()->GetStreamline().TagResourcesDLSSRR(m_commandList,
                 m_view->GetChildView(ViewType::PLANAR, 0),
                 (int2)m_renderSize,
                 (int2)m_displaySize,
@@ -5779,7 +5779,7 @@ void Sample::PostProcessAA(nvrhi::IFramebuffer* framebuffer, bool reset)
 
             m_commandList->commitBarriers();
 
-            GetDeviceManager()->GetStreamline().EvaluateDLSSRR(m_commandList);
+            GetGpuDevice()->GetStreamline().EvaluateDLSSRR(m_commandList);
             m_commandList->clearState();
         }
         else if ( !m_ui.ActualUseStandaloneDenoiser() )

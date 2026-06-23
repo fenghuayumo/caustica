@@ -270,7 +270,7 @@ void GlfwWindow::setIcon(const WindowDesc& desc)
 {
     // GLFW image conversion from paths or data
     // Simplified: not implementing full icon loading here;
-    // the existing DeviceManager icon support can be wired
+    // the existing GpuDevice icon support can be wired
     (void)desc;
 }
 
@@ -423,7 +423,7 @@ void GlfwWindow::onMove(int x, int y)
     m_PosX = static_cast<float>(x);
     m_PosY = static_cast<float>(y);
 
-    // DPI tracking (moved from DeviceManager::WindowPosCallback)
+    // DPI tracking (moved from GpuDevice::WindowPosCallback)
 #ifdef _WIN32
     HWND hwnd = glfwGetWin32Window(m_Window);
     if (hwnd)
@@ -444,7 +444,7 @@ void GlfwWindow::onMove(int x, int y)
         glfwGetMonitorContentScale(monitor, &m_DPIScaleX, &m_DPIScaleY);
 #endif
 
-    // Render-during-move (was in DeviceManager)
+    // Render-during-move (was in GpuDevice)
     if (m_RenderDuringMove && m_OnRenderDuringMove)
         m_OnRenderDuringMove();
 }

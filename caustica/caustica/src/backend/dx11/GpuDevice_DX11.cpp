@@ -2,7 +2,7 @@
 #include <algorithm>
 #include <locale>
 
-#include <engine/DeviceManager.h>
+#include <backend/GpuDevice.h>
 #include <backend/dx11/GpuDevice_DX11.h>
 #include <core/log.h>
 
@@ -381,7 +381,7 @@ void GpuDevice_DX11::ResizeSwapChain()
 
 void GpuDevice_DX11::Shutdown()
 {
-    DeviceManager::Shutdown();
+    GpuDevice::Shutdown();
 
     if (m_DeviceParams.enableDebugRuntime)
     {
@@ -395,7 +395,7 @@ bool GpuDevice_DX11::Present()
     return SUCCEEDED(result);
 }
 
-DeviceManager *DeviceManager::CreateD3D11()
+GpuDevice *GpuDevice::CreateD3D11()
 {
     return new GpuDevice_DX11();
 }

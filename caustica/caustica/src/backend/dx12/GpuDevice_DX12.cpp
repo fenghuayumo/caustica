@@ -2,7 +2,7 @@
 #include <algorithm>
 #include <vector>
 
-#include <engine/DeviceManager.h>
+#include <backend/GpuDevice.h>
 #include <backend/dx12/GpuDevice_DX12.h>
 #include <core/log.h>
 
@@ -593,7 +593,7 @@ bool GpuDevice_DX12::Present()
 
 void GpuDevice_DX12::Shutdown()
 {
-    DeviceManager::Shutdown();
+    GpuDevice::Shutdown();
 
     m_DxgiAdapter = nullptr;
     m_DxgiFactory2 = nullptr;
@@ -604,7 +604,7 @@ void GpuDevice_DX12::Shutdown()
     }
 }
 
-DeviceManager *DeviceManager::CreateD3D12(void)
+GpuDevice *GpuDevice::CreateD3D12(void)
 {
     return new GpuDevice_DX12();
 }

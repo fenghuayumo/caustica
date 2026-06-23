@@ -165,14 +165,14 @@ SampleBaseApp::SampleBaseApp()
 #else
     nvrhi::GraphicsAPI api = GetRtxptGraphicsAPIFromCommandLine(0, nullptr);
 #endif
-    m_DeviceManager = std::unique_ptr<caustica::DeviceManager>(caustica::DeviceManager::Create(api));
+    m_GpuDevice = std::unique_ptr<caustica::GpuDevice>(caustica::GpuDevice::Create(api));
 
-    m_DeviceManager->SetFrameTimeUpdateInterval(1.0f);
+    m_GpuDevice->SetFrameTimeUpdateInterval(1.0f);
 }
 
 SampleBaseApp::~SampleBaseApp()
 {
-    m_DeviceManager->Shutdown(); // Is this explicitly necessary?
+    m_GpuDevice->Shutdown(); // Is this explicitly necessary?
     korgi::Shutdown();
 }
 
@@ -204,16 +204,16 @@ SampleBaseApp::InitReturnCodes SampleBaseApp::Init(int argc, const char* const* 
 
     // -- Register render passes into Donut -- 
     // Create the main render pass. This is where path tracing happens
-    m_MainSceneRender = CreateMainRenderPass(*m_DeviceManager, m_CmdLine);
+    m_MainSceneRender = CreateMainRenderPass(*m_GpuDevice, m_CmdLine);
     m_MainSceneRender->Init(preferredScene, m_ShaderFactory);
-    m_DeviceManager->AddRenderPassToBack(m_MainSceneRender.get());
+    m_GpuDevice->AddRenderPassToBack(m_MainSceneRender.get());
 
 #if DONUT_WITH_DX12 && (RTXPT_D3D_AGILITY_SDK_VERSION >= 619)   // temporary
     // When using AgilitySDK >= 619, we require shader model 6.9
-    if (m_DeviceManager->GetDevice()->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D12)
+    if (m_GpuDevice->GetDevice()->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D12)
     {
         ID3D12Device* d3d12Device = static_cast<ID3D12Device*>(
-            m_DeviceManager->GetDevice()->getNativeObject(nvrhi::ObjectTypes::D3D12_Device)
+            m_GpuDevice->GetDevice()->getNativeObject(nvrhi::ObjectTypes::D3D12_Device)
             );
 
         D3D12_FEATURE_DATA_SHADER_MODEL shaderModel = { D3D_SHADER_MODEL_6_9 };
@@ -231,9 +231,9 @@ SampleBaseApp::InitReturnCodes SampleBaseApp::Init(int argc, const char* const* 
     // Optionally create the UP render pass. This exposes run time parameter controls.
     if (!m_CmdLine.noWindow)
     {
-        m_UIRender = std::make_unique<SampleUI>(m_DeviceManager.get(), *this, *m_MainSceneRender, g_sampleUIData, IsSERSupported(), m_CmdLine);
+        m_UIRender = std::make_unique<SampleUI>(m_GpuDevice.get(), *this, *m_MainSceneRender, g_sampleUIData, IsSERSupported(), m_CmdLine);
         m_UIRender->Init(m_ShaderFactory);
-        m_DeviceManager->AddRenderPassToBack(m_UIRender.get());
+        m_GpuDevice->AddRenderPassToBack(m_UIRender.get());
     }
     else
     {
@@ -241,9 +241,9 @@ SampleBaseApp::InitReturnCodes SampleBaseApp::Init(int argc, const char* const* 
     }
 
     // Register GLFW drag-and-drop callback
-    if (!m_CmdLine.noWindow && m_DeviceManager->GetWindow())
+    if (!m_CmdLine.noWindow && m_GpuDevice->GetWindow())
     {
-        glfwSetDropCallback(m_DeviceManager->GetWindow(), [](GLFWwindow* /*window*/, int count, const char** paths)
+        glfwSetDropCallback(m_GpuDevice->GetWindow(), [](GLFWwindow* /*window*/, int count, const char** paths)
         {
             for (int i = 0; i < count; i++)
                 g_sampleUIData.PendingDroppedFiles.emplace_back(paths[i]);
@@ -253,7 +253,7 @@ SampleBaseApp::InitReturnCodes SampleBaseApp::Init(int argc, const char* const* 
     LocalConfig::PostAppInit(g_sampleUIData);
 
 #if RTXPT_ENABLE_VIDEO_MEMORY_INFO && defined(_WIN32)
-    auto device = m_DeviceManager->GetDevice();
+    auto device = m_GpuDevice->GetDevice();
     if (device->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D12)
     {
         ID3D12Device* d3dDevice = device->getNativeObject(nvrhi::ObjectTypes::D3D12_Device);
@@ -290,19 +290,19 @@ void SampleBaseApp::End()
     // Destroy resources in reverse creation order
     if (m_UIRender)
     {
-        m_DeviceManager->RemoveRenderPass(m_UIRender.get());
+        m_GpuDevice->RemoveRenderPass(m_UIRender.get());
         m_UIRender.reset();
     }
 
 #if RTXPT_D3D12_WITH_NVAPI
     if (m_NVAPIValidationHandle != nullptr)
     {
-        auto nativeObj = m_DeviceManager->GetDevice()->getNativeObject(nvrhi::ObjectTypes::D3D12_Device);
+        auto nativeObj = m_GpuDevice->GetDevice()->getNativeObject(nvrhi::ObjectTypes::D3D12_Device);
         NvAPI_D3D12_FlushRaytracingValidationMessages(nativeObj);
     }
 #endif
 
-    m_DeviceManager->RemoveRenderPass(m_MainSceneRender.get());
+    m_GpuDevice->RemoveRenderPass(m_MainSceneRender.get());
     m_MainSceneRender.reset();
 
     m_ShaderFactory.reset();
@@ -310,7 +310,7 @@ void SampleBaseApp::End()
     // Engine layer cleanup
     m_AppLoop.reset();
 
-    // Window must outlive DeviceManager (new GlfwWindow path)
+    // Window must outlive GpuDevice (new GlfwWindow path)
     m_Window.reset();
 }
 
@@ -486,7 +486,7 @@ bool SampleBaseApp::InitDeviceAndWindow(const caustica::DeviceCreationParameters
 {
     if (m_CmdLine.noWindow)
     {
-        if (!m_DeviceManager->CreateHeadlessDevice(deviceParams))
+        if (!m_GpuDevice->CreateHeadlessDevice(deviceParams))
         {
             caustica::fatal("CreateHeadlessDevice failed: Cannot initialize a graphics device with the requested parameters");
             return false;
@@ -504,7 +504,7 @@ bool SampleBaseApp::InitDeviceAndWindow(const caustica::DeviceCreationParameters
         wDesc.Borderless = deviceParams.startBorderless;
         wDesc.VSync      = deviceParams.vsyncEnabled;
         wDesc.Title      = g_windowTitle ? g_windowTitle : "caustica";
-        wDesc.RenderAPI  = static_cast<int>(m_DeviceManager->GetGraphicsAPI());
+        wDesc.RenderAPI  = static_cast<int>(m_GpuDevice->GetGraphicsAPI());
 
         m_Window.reset(caustica::Window::create(wDesc));
         if (!m_Window || !m_Window->hasInitialised())
@@ -513,22 +513,22 @@ bool SampleBaseApp::InitDeviceAndWindow(const caustica::DeviceCreationParameters
             return false;
         }
 
-        // --- Backend layer: GPU device + swapchain via DeviceManager ---
-        if (!m_DeviceManager->CreateDeviceAndSwapChain(deviceParams, m_Window.get()))
+        // --- Backend layer: GPU device + swapchain via GpuDevice ---
+        if (!m_GpuDevice->CreateDeviceAndSwapChain(deviceParams, m_Window.get()))
         {
             caustica::fatal("Cannot initialize a graphics device with the requested parameters");
             return false;
         }
 
         // --- Engine layer: message loop ---
-        m_AppLoop = std::make_unique<caustica::Application>(m_DeviceManager.get(), m_Window.get());
+        m_AppLoop = std::make_unique<caustica::Application>(m_GpuDevice.get(), m_Window.get());
 
         HelpersRegisterActiveWindow();
     }
 
 #if 0 && RTXPT_D3D12_WITH_NVAPI
     static bool NVAPI_VALIDATION = false;
-    auto device = m_DeviceManager->GetDevice();
+    auto device = m_GpuDevice->GetDevice();
     if (NVAPI_VALIDATION && device->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D12)
     {
         NvAPI_Status res;
@@ -544,7 +544,7 @@ bool SampleBaseApp::InitDeviceAndWindow(const caustica::DeviceCreationParameters
 
 bool SampleBaseApp::CheckDeviceFeatureSupport(const caustica::DeviceCreationParameters& deviceParams)
 {
-    auto device = m_DeviceManager->GetDevice();
+    auto device = m_GpuDevice->GetDevice();
     if (!device->queryFeatureSupport(nvrhi::Feature::RayTracingPipeline))
     {
         caustica::fatal("The graphics device does not support Ray Tracing Pipelines");
@@ -562,7 +562,7 @@ bool SampleBaseApp::CheckDeviceFeatureSupport(const caustica::DeviceCreationPara
 
 void SampleBaseApp::CreateShaderFactory()
 {
-    const char* shaderTypeName = caustica::GetShaderTypeName(m_DeviceManager->GetGraphicsAPI());
+    const char* shaderTypeName = caustica::GetShaderTypeName(m_GpuDevice->GetGraphicsAPI());
     const std::filesystem::path appDirectory = caustica::GetDirectoryWithExecutable();
     const std::filesystem::path engineShaderPath = appDirectory / "ShaderPrecompiled/engine" / shaderTypeName;
     const std::filesystem::path appShaderPath = appDirectory / "ShaderPrecompiled/caustica" / shaderTypeName;
@@ -591,13 +591,13 @@ void SampleBaseApp::CreateShaderFactory()
         rootFS->mount("/ShaderPrecompiled/omm", ommShaderPath);
     }
 
-    auto device = m_DeviceManager->GetDevice();
+    auto device = m_GpuDevice->GetDevice();
     m_ShaderFactory = std::make_shared<caustica::ShaderFactory>(device, rootFS, "/ShaderPrecompiled");
 }
 
 bool SampleBaseApp::IsSERSupported() const
 {
-    auto device = m_DeviceManager->GetDevice();
+    auto device = m_GpuDevice->GetDevice();
 
     const bool usingDX12 = device->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D12;
     const bool deviceSupportsSER = device->queryFeatureSupport(nvrhi::Feature::ShaderExecutionReordering);
