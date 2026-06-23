@@ -108,9 +108,9 @@ if (DONUT_WITH_NVRHI)
         set_target_properties(causticaRhi_vk PROPERTIES FOLDER "External")
     endif()
 
-    set(DONUT_SHADER_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/caustica/engine" CACHE PATH "" FORCE)
+    set(DONUT_SHADER_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/caustica/caustica" CACHE PATH "" FORCE)
 
-    set(caustica_engine_shader_dir "${CMAKE_SOURCE_DIR}/caustica/engine/shaders")
+    set(caustica_engine_shader_dir "${CMAKE_SOURCE_DIR}/caustica/caustica/shaders")
     set(caustica_engine_shader_config "${caustica_engine_shader_dir}/EngineShaders.cfg")
 
     file(GLOB_RECURSE caustica_engine_shader_sources
@@ -123,7 +123,7 @@ if (DONUT_WITH_NVRHI)
     if(DONUT_SHADERS_OUTPUT_DIR AND NOT DONUT_WITH_STATIC_SHADERS)
         set(caustica_engine_shader_output_base ${DONUT_SHADERS_OUTPUT_DIR})
     else()
-        set(CAUSTICA_ENGINE_STATIC_SHADERS_DIR "${CMAKE_BINARY_DIR}/caustica/engine/shaders" CACHE INTERNAL "")
+        set(CAUSTICA_ENGINE_STATIC_SHADERS_DIR "${CMAKE_BINARY_DIR}/caustica/caustica/shaders" CACHE INTERNAL "")
         set(CAUSTICA_ENGINE_STATIC_SHADERS_DIR "${CAUSTICA_ENGINE_STATIC_SHADERS_DIR}" CACHE INTERNAL "")
         set(caustica_engine_shader_output_base ${CAUSTICA_ENGINE_STATIC_SHADERS_DIR})
     endif()
@@ -182,7 +182,7 @@ if (DONUT_WITH_NVRHI)
         TARGET causticaEngineShaders
         PROJECT_NAME "CausticaEngine"
         CONFIG ${caustica_engine_shader_config}
-        FOLDER "caustica/engine"
+        FOLDER "caustica/caustica"
         OUTPUT_BASE ${caustica_engine_shader_output_base}
         OUTPUT_FORMAT ${caustica_engine_shader_output_format}
         SOURCES ${caustica_engine_shader_sources}

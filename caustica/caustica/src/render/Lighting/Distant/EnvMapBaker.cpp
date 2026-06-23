@@ -236,7 +236,7 @@ void EnvMapBaker::CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebug, s
         if (m_computePipelineBaker)
         {
             m_ggxPrefilterVariant = m_computePipelineBaker->CreateVariant(
-                "render/Lighting/Distant/CubemapProcessing.hlsl",  // source path relative to ShadersPath (caustica/engine/shaders)
+                "render/Lighting/Distant/CubemapProcessing.hlsl",  // source path relative to ShadersPath (caustica/caustica/shaders)
                 "GGXPrefilterCS",                               // entry point
                 {},                                             // macros (empty)
                 { m_ggxPrefilterBindingLayout },                // binding layouts
@@ -260,7 +260,7 @@ void EnvMapBaker::CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebug, s
         if (m_computePipelineBaker)
         {
             m_irradianceConvolveVariant = m_computePipelineBaker->CreateVariant(
-                "render/Lighting/Distant/CubemapProcessing.hlsl",  // source path relative to ShadersPath (caustica/engine/shaders)
+                "render/Lighting/Distant/CubemapProcessing.hlsl",  // source path relative to ShadersPath (caustica/caustica/shaders)
                 "ConvolveIrradianceCS",                         // entry point
                 {},                                             // macros (empty)
                 { m_irradianceConvolveBindingLayout },          // binding layouts

@@ -10,8 +10,10 @@
 include(../External/cmake/compileshaders.cmake)
 file(GLOB_RECURSE shaders "*.hlsl" "*.hlsli")
 file(GLOB_RECURSE shared_sources "*.cpp" "*.h" "*.md")
-list(FILTER shaders EXCLUDE REGEX "/engine/(include|src)/")
-list(FILTER shared_sources EXCLUDE REGEX "/engine/(include|src|shaders)/")
+list(FILTER shaders EXCLUDE REGEX "/caustica/(include|src)/")
+list(FILTER shared_sources EXCLUDE REGEX "/caustica/(include|src|shaders)/")
+list(FILTER shared_sources EXCLUDE REGEX "/editor/")
+list(FILTER shared_sources EXCLUDE REGEX "/Python/")
 
 set(rtxpt_render_module_sources "")
 foreach(rtxpt_render_module
@@ -26,35 +28,19 @@ foreach(rtxpt_render_module
     ToneMapper
 )
     file(GLOB_RECURSE rtxpt_render_module_files
-        "${CMAKE_CURRENT_SOURCE_DIR}/engine/include/render/${rtxpt_render_module}/*.h"
-        "${CMAKE_CURRENT_SOURCE_DIR}/engine/include/render/${rtxpt_render_module}/*.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/engine/src/render/${rtxpt_render_module}/*.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/engine/src/render/${rtxpt_render_module}/*.c"
+        "${CMAKE_CURRENT_SOURCE_DIR}/caustica/include/render/${rtxpt_render_module}/*.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/caustica/include/render/${rtxpt_render_module}/*.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/caustica/src/render/${rtxpt_render_module}/*.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/caustica/src/render/${rtxpt_render_module}/*.c"
     )
     list(APPEND rtxpt_render_module_sources ${rtxpt_render_module_files})
 endforeach()
 list(APPEND shared_sources ${rtxpt_render_module_sources})
-# Separate out shared sources from entry point files
-list(REMOVE_ITEM shared_sources 
-    "${CMAKE_CURRENT_SOURCE_DIR}/AdvancedSample.cpp"
-)
 
-# Strip the Python sources from the generic shared_sources list - they are handled
-# below using nanobind helpers (only added when RTXPT_WITH_PYTHON is enabled).
 file(GLOB rtxpt_python_sources
     "${CMAKE_CURRENT_SOURCE_DIR}/Python/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Python/*.h"
 )
-if (rtxpt_python_sources)
-    list(REMOVE_ITEM shared_sources ${rtxpt_python_sources})
-endif()
-
-if (NOT WIN32)
-    list(REMOVE_ITEM shared_sources
-        "${CMAKE_CURRENT_SOURCE_DIR}/SampleCommon/SplashScreen.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/SampleCommon/SplashScreen.h"
-    )
-endif()
 
 # The two NB_MODULE entry points are mutually exclusive (one defines the
 # embed-mode `caustica` module that lives inside caustica.exe, the other defines
@@ -118,7 +104,7 @@ set(rtxpt_shader_compile_common
     TARGET caustica_shaders
     SOURCES ${shaders}
     FOLDER ${folder}
-    INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/engine ${CMAKE_SOURCE_DIR}/External/Nrd/Shaders/Include ${CMAKE_SOURCE_DIR}/External/Rtxdi/Include ${CMAKE_SOURCE_DIR}/External
+    INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/caustica ${CMAKE_SOURCE_DIR}/External/Nrd/Shaders/Include ${CMAKE_SOURCE_DIR}/External/Rtxdi/Include ${CMAKE_SOURCE_DIR}/External
     SHADERMAKE_OPTIONS ${shadermake_options}
 )
 if (WIN32)
@@ -212,8 +198,8 @@ add_custom_command(
 endif()
 
 # shader files - main caustica and localized framework shader dependencies
-set(SOURCE_DIR_RTXPT_SHADERS "${PROJECT_SOURCE_DIR}/caustica/engine/shaders")
-set(DEST_DIR_RTXPT_SHADERS "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Source/caustica/engine/shaders")
+set(SOURCE_DIR_RTXPT_SHADERS "${PROJECT_SOURCE_DIR}/caustica/caustica/shaders")
+set(DEST_DIR_RTXPT_SHADERS "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Source/caustica/caustica/shaders")
 # shader files - NVAPI shader dependencies
 set(SOURCE_DIR_NVAPI_SHADERS "${PROJECT_SOURCE_DIR}/External/NVAPI")
 set(DEST_DIR_NVAPI_SHADERS "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Source/External/NVAPI")
@@ -241,9 +227,10 @@ endif()
 
 ##########################################################################
 
-# Create a static library for shared code (used by both samples)
-add_subdirectory(engine)
-add_library(causticaCore STATIC ${shared_sources})
+# Engine runtime + editor/sample application
+add_subdirectory(caustica)
+add_subdirectory(editor)
+add_library(causticaCore STATIC ${shared_sources} ${CAUSTICA_EDITOR_SOURCES})
 if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(causticaCore PRIVATE
         -Wno-error=deprecated-declarations
@@ -256,7 +243,14 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     )
 endif()
 target_link_libraries(causticaCore PUBLIC cxxopts causticaEngine NRD Rtxdi omm-lib omm-gpu-nvrhi)
-target_include_directories(causticaCore PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}" "../External/Nrd/Include" ${CMAKE_SOURCE_DIR}/External/Rtxdi/Include)
+target_include_directories(causticaCore PUBLIC
+    "${CMAKE_CURRENT_SOURCE_DIR}"
+    "${CMAKE_CURRENT_SOURCE_DIR}/editor"
+    "${CMAKE_CURRENT_SOURCE_DIR}/editor/app"
+    "${CMAKE_CURRENT_SOURCE_DIR}/editor/ui"
+    "../External/Nrd/Include"
+    ${CMAKE_SOURCE_DIR}/External/Rtxdi/Include
+)
 target_compile_definitions(causticaCore PUBLIC RTXPT_D3D12_WITH_NVAPI=$<BOOL:${NVRHI_WITH_NVAPI}>)
 target_compile_definitions(causticaCore PUBLIC RTXPT_WITH_OIDN=$<BOOL:${RTXPT_WITH_OIDN}>)
 target_compile_definitions(causticaCore PUBLIC RTXPT_WITH_PYTHON=$<BOOL:${RTXPT_WITH_PYTHON}>)
@@ -376,7 +370,7 @@ macro(add_caustica_sample TARGET_NAME MAIN_SOURCE)
     endif()
 endmacro()
 
-add_caustica_sample(caustica "AdvancedSample.cpp")
+add_caustica_sample(caustica "${CAUSTICA_EDITOR_ENTRY_SOURCE}")
 
 # -------------------------------------------------------------------
 # Python extension module: caustica.pyd

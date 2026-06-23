@@ -23,7 +23,7 @@
 #if RTXPT_WITH_NATIVE_DLSS
 #include <render/DLSS.h>
 #endif
-#include "../caustica.h"
+#include "caustica.h"
 
 #include <GLFW/glfw3.h>
 

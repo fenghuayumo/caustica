@@ -60,9 +60,9 @@ namespace ShaderCompilerUtils
     #endif
 
         std::filesystem::path shaderSourcePathDevelopment =
-            sourceRootDirectory / "caustica/engine/shaders";
+            sourceRootDirectory / "caustica/caustica/shaders";
         std::filesystem::path shaderSourcePathRuntime =
-            runtimeDirectory / "ShaderDynamic/Source/caustica/engine/shaders";
+            runtimeDirectory / "ShaderDynamic/Source/caustica/caustica/shaders";
 
         ShaderBinariesPath = runtimeDirectory / binarySubfolder / 
             donut::app::GetShaderTypeName(device->getGraphicsAPI());
@@ -81,13 +81,13 @@ namespace ShaderCompilerUtils
                 donut::log::info("Shader source folder '%s' not found; runtime shader compilation is disabled.",
                     shaderSourcePathRuntime.string().c_str());
                 ShadersPath = shaderSourcePathRuntime;
-                ShadersPathExternalIncludes1 = runtimeDirectory / "ShaderDynamic/Source/caustica/engine";
+                ShadersPathExternalIncludes1 = runtimeDirectory / "ShaderDynamic/Source/caustica/caustica";
                 ShadersPathExternalIncludes2 = runtimeDirectory / "ShaderDynamic/Source/External";
             }
             else
             {
                 ShadersPath = shaderSourcePathRuntime;
-                ShadersPathExternalIncludes1 = runtimeDirectory / "ShaderDynamic/Source/caustica/engine";
+                ShadersPathExternalIncludes1 = runtimeDirectory / "ShaderDynamic/Source/caustica/caustica";
                 ShadersPathExternalIncludes2 = runtimeDirectory / "ShaderDynamic/Source/External";
             }
         }
@@ -95,7 +95,7 @@ namespace ShaderCompilerUtils
         {
             ShadersPath = shaderSourcePathDevelopment;
             ShadersPathExternalIncludes1 =
-                sourceRootDirectory / "caustica/engine";
+                sourceRootDirectory / "caustica/caustica";
             ShadersPathExternalIncludes2 =
                 sourceRootDirectory / "External";
         }

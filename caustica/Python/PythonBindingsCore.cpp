@@ -19,7 +19,7 @@
 #include <nanobind/stl/optional.h>
 #include <nanobind/operators.h>
 
-#include "../caustica.h"
+#include "caustica.h"
 #include <SampleUI.h>
 #include <SampleCommon/ExtendedScene.h>
 #include <render/Materials/MaterialsBaker.h>

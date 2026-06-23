@@ -18,7 +18,7 @@
 #include <nanobind/nanobind.h>
 #include <Python.h>
 
-#include "../caustica.h"
+#include "caustica.h"
 
 namespace nb = nanobind;
 

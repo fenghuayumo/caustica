@@ -201,7 +201,7 @@ if (TARGET causticaEngineShaders)
     add_dependencies(causticaEngine causticaEngineShaders)
 endif()
 
-set_target_properties(causticaEngine PROPERTIES FOLDER "caustica/engine")
+set_target_properties(causticaEngine PROPERTIES FOLDER "caustica/caustica")
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
     ${caustica_engine_core_src}
     ${caustica_engine_engine_src}
