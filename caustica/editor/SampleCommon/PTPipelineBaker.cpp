@@ -2,7 +2,7 @@
 #include "ShaderCompilerUtils.h"
 #include "ShaderPackFileSystem.h"
 
-#include <engine/Application.h>
+#include <engine/SceneRender.h>
 
 #include <render/Materials/MaterialsBaker.h>
 #include "ExtendedScene.h"

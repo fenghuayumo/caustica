@@ -228,7 +228,7 @@ static FPSLimiter g_FPSLimiter;
 
 Sample::Sample(caustica::DeviceManager& deviceManager,
     const CommandLineOptions& cmdLine)
-    : caustica::Application(&deviceManager )
+    : caustica::SceneRender(&deviceManager )
     , m_cmdLine(cmdLine)
     , m_ui(g_sampleUIData)
 {
@@ -913,7 +913,7 @@ void Sample::BuildGaussianSplatEmissionProxyList()
 void Sample::SceneUnloading( )
 {
     m_ui.TogglableNodes = nullptr;
-    Application::SceneUnloading();
+    SceneRender::SceneUnloading();
     m_bindingSet = nullptr;
     m_topLevelAS = nullptr;
     m_subInstanceBuffer = nullptr;
@@ -1097,7 +1097,7 @@ void Sample::SceneLoaded( )
 
     m_progressLoading.Set(55);
 
-    Application::SceneLoaded( );
+    SceneRender::SceneLoaded( );
 
     m_progressLoading.Set(60);
 
@@ -1977,7 +1977,7 @@ void Sample::BuildTLAS(nvrhi::ICommandList* commandList) const
 
 void Sample::BackBufferResizing()
 {
-    Application::BackBufferResizing();
+    SceneRender::BackBufferResizing();
     
     GetDevice()->waitForIdle();
     GetDevice()->runGarbageCollection();

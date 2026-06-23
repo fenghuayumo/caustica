@@ -404,6 +404,9 @@ if (RTXPT_WITH_PYTHON AND TARGET nanobind-static)
 
     target_link_libraries(caustica_py PRIVATE causticaCore)
     target_compile_definitions(caustica_py PRIVATE RTXPT_BUILDING_EXTENSION=1)
+    if (MSVC)
+        target_compile_options(caustica_py PRIVATE /utf-8)
+    endif()
 
     add_dependencies(caustica_py caustica_shaders nrd_shaders omm_shaders ShaderDynamicAssets ShaderDynamicAssets_CopyAlways)
 

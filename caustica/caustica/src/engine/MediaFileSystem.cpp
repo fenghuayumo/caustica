@@ -1,5 +1,5 @@
 #include <engine/MediaFileSystem.h>
-#include <engine/Application.h>
+#include <engine/SceneRender.h>
 #include <core/log.h>
 #include <core/string_utils.h>
 #include <core/vfs/TarFile.h>

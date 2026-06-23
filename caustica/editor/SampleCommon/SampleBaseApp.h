@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "engine/DeviceManager.h"
+#include "engine/Application.h"
 #include "core/log.h"
 #include <platform/window.h>
 
@@ -66,6 +67,7 @@ private:
 
 	std::unique_ptr<caustica::DeviceManager> m_DeviceManager;
 	std::unique_ptr<caustica::Window>       m_Window;
+	std::unique_ptr<caustica::Application>      m_AppLoop;
 	std::shared_ptr<caustica::ShaderFactory> m_ShaderFactory;
 	std::unique_ptr<Sample> m_MainSceneRender; // 3d render of the scene. Where Path Tracing happens
 	std::unique_ptr<SampleUI> m_UIRender;

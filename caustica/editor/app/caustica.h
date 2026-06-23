@@ -6,7 +6,7 @@
 #include "SampleCommon/CommandLine.h"
 #include "SampleUI.h"
 
-#include <engine/Application.h>
+#include <engine/SceneRender.h>
 #include <core/vfs/VFS.h>
 #include <render/BloomPass.h>
 #include <engine/Camera.h>
@@ -46,12 +46,12 @@ class PythonScripting;
 #endif
 class GaussianSplatPass;
 
-class Sample : public caustica::Application
+class Sample : public caustica::SceneRender
 {
     // static constexpr uint32_t c_PathTracerVariants   = 6; // see shaders.cfg and CreatePTPipeline for details on variants
 
 public:
-    using Application::Application;
+    using SceneRender::SceneRender;
 
     Sample(caustica::DeviceManager& deviceManager,
         const CommandLineOptions& cmdLine);

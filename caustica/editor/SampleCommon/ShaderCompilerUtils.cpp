@@ -2,7 +2,7 @@
 #include "SampleCommon.h"
 #include <render/Misc/picosha2.h>
 
-#include <engine/Application.h>
+#include <engine/SceneRender.h>
 #include <core/log.h>
 
 namespace ShaderCompilerUtils

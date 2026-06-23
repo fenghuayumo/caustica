@@ -8,7 +8,7 @@
 #include "LocalConfig.h"
 #include "ShaderPackFileSystem.h"
 
-#include <engine/Application.h>
+#include <engine/SceneRender.h>
 #include <core/log.h>
 #if RTXPT_WITH_NATIVE_DLSS
 #include <render/DLSS.h>
@@ -307,13 +307,16 @@ void SampleBaseApp::End()
 
     m_ShaderFactory.reset();
 
+    // Engine layer cleanup
+    m_AppLoop.reset();
+
     // Window must outlive DeviceManager (new GlfwWindow path)
     m_Window.reset();
 }
 
 void SampleBaseApp::RunMainLoop()
 {
-    m_DeviceManager->RunMessageLoop();
+    m_AppLoop->run();
 }
 
 void SampleBaseApp::RegisterDonutCallback()
@@ -516,6 +519,10 @@ bool SampleBaseApp::InitDeviceAndWindow(const caustica::DeviceCreationParameters
             caustica::fatal("Cannot initialize a graphics device with the requested parameters");
             return false;
         }
+
+        // --- Engine layer: message loop ---
+        m_AppLoop = std::make_unique<caustica::Application>(m_DeviceManager.get(), m_Window.get());
+
         HelpersRegisterActiveWindow();
     }
 

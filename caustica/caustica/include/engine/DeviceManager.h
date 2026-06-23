@@ -39,8 +39,10 @@
 
 namespace caustica
 {
-    class Input;   // Engine layer: input dispatch
-    class Window;  // Platform layer: window abstraction
+    class Input;              // Platform layer: input dispatch
+    class Window;             // Platform layer: window abstraction
+    class RenderPassManager;  // Renderer layer: pass management
+    class Application;            // Engine layer: message loop
 
     struct DefaultMessageCallback : public nvrhi::IMessageCallback
     {
@@ -200,6 +202,8 @@ namespace caustica
 
     class DeviceManager
     {
+        friend class Application;
+
     public:
         static DeviceManager* Create(nvrhi::GraphicsAPI api);
 
@@ -226,6 +230,7 @@ namespace caustica
         void AddRenderPassToBack(IRenderPass *pController);
         void RemoveRenderPass(IRenderPass *pController);
 
+        // TODO: Move to Application when old Application is refactored
         void RunMessageLoop();
 
         // Step exactly one frame: poll events, animate, render, present.
@@ -238,18 +243,12 @@ namespace caustica
         // returns the size of the window in screen coordinates
         void GetWindowDimensions(int& width, int& height);
         // returns the screen coordinate to pixel coordinate scale factor
-        void GetDPIScaleInfo(float& x, float& y) const
-        {
-            x = m_DPIScaleFactorX;
-            y = m_DPIScaleFactorY;
-        }
+        void GetDPIScaleInfo(float& x, float& y) const;
 
     protected:
         // useful for apps that require 2 frames worth of simulation data before first render
         // apps should extend the DeviceManager classes, and constructor initialized this to true to opt in to the behavior
         bool m_SkipRenderOnFirstFrame = false;
-        bool m_windowVisible = false;
-        bool m_windowIsInFocus = true;
 
         DeviceCreationParameters m_DeviceParams;
         GLFWwindow *m_Window = nullptr;       // Old path: DeviceManager owns the GLFW window
@@ -258,7 +257,9 @@ namespace caustica
         bool m_EnableRenderDuringWindowMovement = false;
         // set to true if running on NV GPU
         bool m_IsNvidia = false;
-        std::list<IRenderPass *> m_vRenderPasses;
+        RenderPassManager* m_PassManager = nullptr;  // Renderer layer: pass management
+        Application* m_AppLoop = nullptr;          // Engine layer: message loop delegate
+        std::list<IRenderPass *> m_vRenderPasses;  // TODO: migrate to m_PassManager
         // timestamp in seconds for the previous frame
         double m_PreviousFrameTimestamp = 0.0;
         // current DPI scale info (updated when window moves)
@@ -325,22 +326,18 @@ namespace caustica
         [[nodiscard]] bool IsVsyncEnabled() const { return m_DeviceParams.vsyncEnabled; }
         virtual void SetVsyncEnabled(bool enabled) { m_RequestedVSync = enabled; /* will be processed later */ }
         virtual void ReportLiveObjects() {}
-        void SetEnableRenderDuringWindowMovement(bool val) {m_EnableRenderDuringWindowMovement = val;} 
+        // Window state (deprecated — use Window::isFocused/isVisible instead)
         bool IsWindowFocused() const { return m_windowIsInFocus; }
         bool IsWindowVisible() const { return m_windowVisible; }
-
-        // Call this function to make sure that the next frame is rendered even if the window is unfocused.
-        // This is useful for applications that want to continue rendering while performing a long operation,
-        // but otherwise do not want to render when unfocused in order to save power.
         void RenderNextFrameWhileUnfocused() { m_RequestedRenderUnfocused = true; }
 
-        // these are public in order to be called from the GLFW callback functions
-        void WindowCloseCallback() { }
-        void WindowIconifyCallback(int iconified) { }
-        void WindowFocusCallback(int focused) { }
-        void WindowRefreshCallback() { }
-        void WindowPosCallback(int xpos, int ypos);
+        // Old-path state: accessed by GLFW callbacks in DeviceManager.cpp.
+        // Remove when old CreateWindowDeviceAndSwapChain path is deleted.
+        bool m_windowVisible = false;
+        bool m_windowIsInFocus = true;
 
+        // Input dispatch (deprecated — use Input class instead)
+        // Called from old-path GLFW callbacks; delegates to Input when available.
         void KeyboardUpdate(int key, int scancode, int action, int mods);
         void KeyboardCharInput(unsigned int unicode, int mods);
         void MousePosUpdate(double xpos, double ypos);

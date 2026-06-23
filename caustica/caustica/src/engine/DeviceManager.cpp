@@ -2,6 +2,8 @@
 #include <platform/Input.h>      // Platform layer: input dispatch
 #include <platform/window.h>     // Platform layer: Window abstraction
 #include <platform/glfw_window.h>// Platform layer: GLFW window
+#include <render/RenderPassManager.h>  // Renderer layer: pass management
+#include <engine/Application.h>            // Engine layer: message loop
 #include <math/math.h>
 #include <core/log.h>
 #include <rhi/utils.h>
@@ -85,34 +87,34 @@ static double GetDeviceManagerTime(bool headlessDevice)
     return std::chrono::duration<double>(Clock::now() - startTime).count();
 }
 
-static void WindowIconifyCallback_GLFW(GLFWwindow *window, int iconified)
+// Window event callbacks for old path (CreateWindowDeviceAndSwapChain).
+// New path uses GlfwWindow which handles these via its own callbacks.
+static void WindowIconifyCallback_GLFW(GLFWwindow* window, int iconified)
 {
-    DeviceManager *manager = reinterpret_cast<DeviceManager *>(glfwGetWindowUserPointer(window));
-    manager->WindowIconifyCallback(iconified);
+    DeviceManager* mgr = reinterpret_cast<DeviceManager*>(glfwGetWindowUserPointer(window));
+    mgr->m_windowVisible = (iconified == GLFW_FALSE);
 }
 
-static void WindowFocusCallback_GLFW(GLFWwindow *window, int focused)
+static void WindowFocusCallback_GLFW(GLFWwindow* window, int focused)
 {
-    DeviceManager *manager = reinterpret_cast<DeviceManager *>(glfwGetWindowUserPointer(window));
-    manager->WindowFocusCallback(focused);
+    DeviceManager* mgr = reinterpret_cast<DeviceManager*>(glfwGetWindowUserPointer(window));
+    mgr->m_windowIsInFocus = (focused == GLFW_TRUE);
 }
 
-static void WindowRefreshCallback_GLFW(GLFWwindow *window)
+static void WindowRefreshCallback_GLFW(GLFWwindow* /*window*/)
 {
-    DeviceManager *manager = reinterpret_cast<DeviceManager *>(glfwGetWindowUserPointer(window));
-    manager->WindowRefreshCallback();
+    // No-op: redraw is driven by the message loop
 }
 
-static void WindowCloseCallback_GLFW(GLFWwindow *window)
+static void WindowCloseCallback_GLFW(GLFWwindow* /*window*/)
 {
-    DeviceManager *manager = reinterpret_cast<DeviceManager *>(glfwGetWindowUserPointer(window));
-    manager->WindowCloseCallback();
+    // No-op: exit is checked via glfwWindowShouldClose in the message loop
 }
 
-static void WindowPosCallback_GLFW(GLFWwindow *window, int xpos, int ypos)
+static void WindowPosCallback_GLFW(GLFWwindow* /*window*/, int /*xpos*/, int /*ypos*/)
 {
-    DeviceManager *manager = reinterpret_cast<DeviceManager *>(glfwGetWindowUserPointer(window));
-    manager->WindowPosCallback(xpos, ypos);
+    // DPI tracking now handled by GlfwWindow::onMove().
+    // Old path: DPI is tracked via UpdateWindowSize in the message loop.
 }
 
 static void KeyCallback_GLFW(GLFWwindow *window, int key, int scancode, int action, int mods)
@@ -462,15 +464,16 @@ void DeviceManager::AddRenderPassToFront(IRenderPass *pRenderPass)
     m_vRenderPasses.remove(pRenderPass);
     m_vRenderPasses.push_front(pRenderPass);
 
-    // Also register with the Input layer
-    if (!m_Input) m_Input = new Input();
-    m_Input->registerPass(pRenderPass);
-
-    pRenderPass->BackBufferResizing();
-    pRenderPass->BackBufferResized(
+    // Delegate to Renderer layer
+    if (!m_PassManager) m_PassManager = new RenderPassManager();
+    m_PassManager->addToFront(pRenderPass,
         m_DeviceParams.backBufferWidth,
         m_DeviceParams.backBufferHeight,
         m_DeviceParams.swapChainSampleCount);
+
+    // Also register with the Input layer
+    if (!m_Input) m_Input = new Input();
+    m_Input->registerPass(pRenderPass);
 }
 
 void DeviceManager::AddRenderPassToBack(IRenderPass *pRenderPass)
@@ -478,20 +481,22 @@ void DeviceManager::AddRenderPassToBack(IRenderPass *pRenderPass)
     m_vRenderPasses.remove(pRenderPass);
     m_vRenderPasses.push_back(pRenderPass);
 
-    // Also register with the Input layer
-    if (!m_Input) m_Input = new Input();
-    m_Input->registerPass(pRenderPass);
-
-    pRenderPass->BackBufferResizing();
-    pRenderPass->BackBufferResized(
+    // Delegate to Renderer layer
+    if (!m_PassManager) m_PassManager = new RenderPassManager();
+    m_PassManager->addToBack(pRenderPass,
         m_DeviceParams.backBufferWidth,
         m_DeviceParams.backBufferHeight,
         m_DeviceParams.swapChainSampleCount);
+
+    // Also register with the Input layer
+    if (!m_Input) m_Input = new Input();
+    m_Input->registerPass(pRenderPass);
 }
 
 void DeviceManager::RemoveRenderPass(IRenderPass *pRenderPass)
 {
     m_vRenderPasses.remove(pRenderPass);
+    if (m_PassManager) m_PassManager->remove(pRenderPass);
     if (m_Input) m_Input->unregisterPass(pRenderPass);
 }
 
@@ -500,22 +505,22 @@ void DeviceManager::BackBufferResizing()
     m_SwapChainFramebuffers.clear();
     m_SwapChainWithDepthFramebuffers.clear();
 
-    for (auto it : m_vRenderPasses)
-    {
-        it->BackBufferResizing();
-    }
+    if (m_PassManager)
+        m_PassManager->notifyResizing();
+    else
+        for (auto it : m_vRenderPasses)
+            it->BackBufferResizing();
 }
 
 void DeviceManager::BackBufferResized()
 {
     CreateDepthBuffer();
 
-    for(auto it : m_vRenderPasses)
-    {
-        it->BackBufferResized(m_DeviceParams.backBufferWidth,
-                              m_DeviceParams.backBufferHeight,
-                              m_DeviceParams.swapChainSampleCount);
-    }
+    if (m_PassManager)
+        m_PassManager->notifyResized(m_DeviceParams.backBufferWidth, m_DeviceParams.backBufferHeight, m_DeviceParams.swapChainSampleCount);
+    else
+        for(auto it : m_vRenderPasses)
+            it->BackBufferResized(m_DeviceParams.backBufferWidth, m_DeviceParams.backBufferHeight, m_DeviceParams.swapChainSampleCount);
 
     uint32_t backBufferCount = GetBackBufferCount();
     m_SwapChainFramebuffers.resize(backBufferCount);
@@ -703,120 +708,23 @@ bool DeviceManager::ShouldRenderUnfocused() const
 
 bool DeviceManager::RunSingleFrame()
 {
-    return RunSingleFrame(-1.0);
+    if (!m_AppLoop) m_AppLoop = new Application(this, m_WindowPtr);
+    m_AppLoop->beforeFrame = m_callbacks.beforeFrame;
+    return m_AppLoop->stepFrame();
 }
 
 bool DeviceManager::RunSingleFrame(double fixedElapsedTimeSeconds)
 {
-    if (m_PreviousFrameTimestamp <= 0.0)
-        m_PreviousFrameTimestamp = GetDeviceManagerTime(m_DeviceParams.headlessDevice);
-
-#if DONUT_WITH_STREAMLINE
-    if (!m_DeviceParams.headlessDevice)
-        StreamlineIntegration::Get().SimStart(*this);
-#endif
-
-    if (m_callbacks.beforeFrame) m_callbacks.beforeFrame(*this, m_FrameIndex);
-
-    if (m_Window != nullptr)
-    {
-        glfwPollEvents();
-        if (m_DeviceParams.headlessDevice)
-        {
-            m_windowVisible = true;
-            m_windowIsInFocus = true;
-        }
-        else
-        {
-            UpdateWindowSize();
-        }
-    }
-    else
-    {
-        // Headless device path: pretend the window is visible so that
-        // AnimateRenderPresent() actually animates and renders something.
-        m_windowVisible  = true;
-        m_windowIsInFocus = true;
-    }
-
-    if (fixedElapsedTimeSeconds >= 0.0)
-        return AnimateRenderPresent(std::max(0.0, fixedElapsedTimeSeconds));
-
-    return AnimateRenderPresent();
+    if (!m_AppLoop) m_AppLoop = new Application(this, m_WindowPtr);
+    m_AppLoop->beforeFrame = m_callbacks.beforeFrame;
+    return m_AppLoop->stepFrame(fixedElapsedTimeSeconds);
 }
 
 void DeviceManager::RunMessageLoop()
 {
-    m_PreviousFrameTimestamp = glfwGetTime();
-
-#if DONUT_WITH_AFTERMATH
-    bool dumpingCrash = false;
-#endif
-    // New path: use Window* for exit check and polling
-    if (m_WindowPtr)
-    {
-        while (!m_WindowPtr->getExit())
-        {
-#if DONUT_WITH_STREAMLINE
-            if (!m_DeviceParams.headlessDevice)
-                StreamlineIntegration::Get().SimStart(*this);
-#endif
-            if (m_callbacks.beforeFrame) m_callbacks.beforeFrame(*this, m_FrameIndex);
-
-            m_WindowPtr->onUpdate();  // polls GLFW events, dispatches callbacks
-            UpdateWindowSize();
-
-            // Sync window state for remaining legacy code
-            m_windowVisible  = m_WindowPtr->isVisible();
-            m_windowIsInFocus = m_WindowPtr->isFocused();
-            m_DPIScaleFactorX = m_WindowPtr->getDPIScaleX();
-            m_DPIScaleFactorY = m_WindowPtr->getDPIScaleY();
-
-            bool presentSuccess = AnimateRenderPresent();
-            if (!presentSuccess) break;
-        }
-    }
-    else
-    {
-    while(m_Window == nullptr || !glfwWindowShouldClose(m_Window))
-    {
-#if DONUT_WITH_STREAMLINE
-        if (!m_DeviceParams.headlessDevice)
-            StreamlineIntegration::Get().SimStart(*this);
-#endif
-        if (m_callbacks.beforeFrame) m_callbacks.beforeFrame(*this, m_FrameIndex);
-        if (m_Window != nullptr)
-        {
-            glfwPollEvents();
-            UpdateWindowSize();
-        }
-        else
-        {
-            // Headless command-line captures do not create a GLFW window.
-            m_windowVisible = true;
-            m_windowIsInFocus = true;
-        }
-        bool presentSuccess = AnimateRenderPresent();
-        if (!presentSuccess)
-        {
-#if DONUT_WITH_AFTERMATH
-            dumpingCrash = true;
-#endif
-            break;
-        }
-    }
-    } // else (old GLFW-owned path)
-
-    bool waitSuccess = GetDevice()->waitForIdle();
-#if DONUT_WITH_AFTERMATH
-    dumpingCrash |= !waitSuccess;
-    // wait for Aftermath dump to complete before exiting application
-    if (dumpingCrash && m_DeviceParams.enableAftermath)
-        AftermathCrashDump::WaitForCrashDump();
-#else
-    assert(waitSuccess);
-    (void)waitSuccess;
-#endif
+    if (!m_AppLoop) m_AppLoop = new Application(this, m_WindowPtr);
+    m_AppLoop->beforeFrame = m_callbacks.beforeFrame;
+    m_AppLoop->run();
 }
 
 bool DeviceManager::AnimateRenderPresent(std::optional<double> elapsedTimeOverride)
@@ -912,10 +820,24 @@ bool DeviceManager::AnimateRenderPresent(std::optional<double> elapsedTimeOverri
     return true;
 }
 
+void DeviceManager::GetDPIScaleInfo(float& x, float& y) const
+{
+    if (m_WindowPtr) { x = m_WindowPtr->getDPIScaleX(); y = m_WindowPtr->getDPIScaleY(); }
+    else            { x = m_DPIScaleFactorX;   y = m_DPIScaleFactorY; }
+}
+
 void DeviceManager::GetWindowDimensions(int& width, int& height)
 {
-    width = m_DeviceParams.backBufferWidth;
-    height = m_DeviceParams.backBufferHeight;
+    if (m_WindowPtr)
+    {
+        width  = static_cast<int>(m_WindowPtr->getWidth());
+        height = static_cast<int>(m_WindowPtr->getHeight());
+    }
+    else
+    {
+        width  = m_DeviceParams.backBufferWidth;
+        height = m_DeviceParams.backBufferHeight;
+    }
 }
 
 const DeviceCreationParameters& DeviceManager::GetDeviceParams()
@@ -964,49 +886,6 @@ void DeviceManager::UpdateWindowSize()
     }
 
     m_DeviceParams.vsyncEnabled = m_RequestedVSync;
-}
-
-void DeviceManager::WindowPosCallback(int x, int y)
-{
-    if (m_DeviceParams.enablePerMonitorDPI)
-    {
-#ifdef _WINDOWS
-        // Use Windows-specific implementation of DPI query because GLFW has issues:
-        // glfwGetWindowMonitor(window) returns NULL for non-fullscreen applications.
-        // This custom code allows us to adjust DPI scaling when a window is moved
-        // between monitors with different scales.
-        
-        HWND hwnd = glfwGetWin32Window(m_Window);
-        auto monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
-
-        unsigned int dpiX;
-        unsigned int dpiY;
-        GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &dpiX, &dpiY);
-
-        m_DPIScaleFactorX = dpiX / 96.f;
-        m_DPIScaleFactorY = dpiY / 96.f;
-#else
-        // Linux support for display scaling using GLFW.
-        // This has limited utility due to the issue described above (NULL monitor),
-        // and because GLFW doesn't support fractional scaling properly.
-        // For example, on a system with 150% scaling it will report scale = 2.0
-        // but the window will be either too small or too big, depending on 'resizeWindowWithDisplayScale'
-
-        GLFWmonitor* monitor = glfwGetWindowMonitor(m_Window);
-
-        // Non-fullscreen windows have NULL monitor, let's use the primary monitor in this case
-        if (!monitor)
-            monitor = glfwGetPrimaryMonitor();
-
-        glfwGetMonitorContentScale(monitor, &m_DPIScaleFactorX, &m_DPIScaleFactorY);
-#endif
-    }
-
-    if (m_EnableRenderDuringWindowMovement && m_SwapChainFramebuffers.size() > 0)
-    {
-        if (m_callbacks.beforeFrame) m_callbacks.beforeFrame(*this, m_FrameIndex);
-        AnimateRenderPresent();
-    }
 }
 
 void DeviceManager::KeyboardUpdate(int key, int scancode, int action, int mods)
@@ -1185,6 +1064,10 @@ void DeviceManager::Shutdown()
     m_WindowPtr = nullptr;
     delete m_Input;
     m_Input = nullptr;
+    delete m_PassManager;
+    m_PassManager = nullptr;
+    delete m_AppLoop;
+    m_AppLoop = nullptr;
 
     m_InstanceCreated = false;
 }

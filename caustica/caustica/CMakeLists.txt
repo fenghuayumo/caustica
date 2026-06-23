@@ -79,9 +79,22 @@ list(APPEND caustica_engine_engine_src
     src/platform/Input.cpp
 )
 
-# Backend layer: GpuDevice API (implementation deferred)
+# Backend layer: GpuDevice + SwapChain API
 list(APPEND caustica_engine_engine_src
     include/backend/GpuDevice.h
+    include/backend/SwapChain.h
+)
+
+# Engine layer: Application (message loop, frame pacing)
+list(APPEND caustica_engine_engine_src
+    include/engine/Application.h
+    src/engine/Application.cpp
+)
+
+# Renderer layer: pass management
+list(APPEND caustica_engine_engine_src
+    include/render/RenderPassManager.h
+    src/render/RenderPassManager.cpp
 )
 
 add_library(causticaEngine STATIC
