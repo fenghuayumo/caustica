@@ -471,9 +471,10 @@ void DeviceManager::AddRenderPassToFront(IRenderPass *pRenderPass)
         m_DeviceParams.backBufferHeight,
         m_DeviceParams.swapChainSampleCount);
 
-    // Also register with the Input layer
+    // Also register with the Input layer (if it implements IInputHandler)
     if (!m_Input) m_Input = new Input();
-    m_Input->registerPass(pRenderPass);
+    if (auto* handler = dynamic_cast<IInputHandler*>(pRenderPass))
+        m_Input->registerHandler(handler);
 }
 
 void DeviceManager::AddRenderPassToBack(IRenderPass *pRenderPass)
@@ -488,16 +489,17 @@ void DeviceManager::AddRenderPassToBack(IRenderPass *pRenderPass)
         m_DeviceParams.backBufferHeight,
         m_DeviceParams.swapChainSampleCount);
 
-    // Also register with the Input layer
+    // Also register with the Input layer (if it implements IInputHandler)
     if (!m_Input) m_Input = new Input();
-    m_Input->registerPass(pRenderPass);
+    if (auto* handler = dynamic_cast<IInputHandler*>(pRenderPass))
+        m_Input->registerHandler(handler);
 }
 
 void DeviceManager::RemoveRenderPass(IRenderPass *pRenderPass)
 {
     m_vRenderPasses.remove(pRenderPass);
     if (m_PassManager) m_PassManager->remove(pRenderPass);
-    if (m_Input) m_Input->unregisterPass(pRenderPass);
+    if (m_Input) { if (auto* h = dynamic_cast<IInputHandler*>(pRenderPass)) m_Input->unregisterHandler(h); }
 }
 
 void DeviceManager::BackBufferResizing()

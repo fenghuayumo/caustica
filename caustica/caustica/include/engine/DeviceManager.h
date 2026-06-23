@@ -34,6 +34,7 @@
 #include <core/log.h>
 #include <backend/GpuDevice.h>
 #include <backend/SwapChain.h>
+#include <backend/GpuBackend.h>
 
 #include <list>
 #include <functional>

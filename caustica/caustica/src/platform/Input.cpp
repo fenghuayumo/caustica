@@ -1,5 +1,5 @@
 #include "platform/Input.h"
-#include "engine/DeviceManager.h"  // IRenderPass definition
+#include "engine/DeviceManager.h"  // IRenderPass (for legacy compat in JoystickManager)
 #include "math/vector.h"
 
 #include <GLFW/glfw3.h>
@@ -7,132 +7,74 @@
 
 namespace caustica {
 
-// =============================================================================
-// JoystickManager — internal singleton (was global in DeviceManager.cpp)
-// =============================================================================
 namespace {
 
 class JoystickManager
 {
 public:
-    static JoystickManager& get()
-    {
-        static JoystickManager instance;
-        return instance;
-    }
+    static JoystickManager& get() { static JoystickManager i; return i; }
 
-    void enumerate()
-    {
-        for (int i = 0; i < 10; ++i)
-            if (glfwJoystickPresent(i))
-                m_JoystickIDs.push_back(i);
+    void enumerate() {
+        for (int j = 0; j < 10; ++j)
+            if (glfwJoystickPresent(j)) m_IDs.push_back(j);
     }
-
-    void eraseDisconnected()
-    {
-        while (!m_RemovedJoysticks.empty())
-        {
-            auto id = m_RemovedJoysticks.back();
-            m_RemovedJoysticks.pop_back();
-            auto it = std::find(m_JoystickIDs.begin(), m_JoystickIDs.end(), id);
-            if (it != m_JoystickIDs.end())
-                m_JoystickIDs.erase(it);
+    void eraseDisconnected() {
+        while (!m_Removed.empty()) {
+            auto id = m_Removed.back(); m_Removed.pop_back();
+            auto it = std::find(m_IDs.begin(), m_IDs.end(), id);
+            if (it != m_IDs.end()) m_IDs.erase(it);
         }
     }
+    void connect(int id)    { m_IDs.push_back(id); }
+    void disconnect(int id) { m_Removed.push_back(id); }
 
-    void connect(int id)     { m_JoystickIDs.push_back(id); }
-    void disconnect(int id)  { m_RemovedJoysticks.push_back(id); }
-
-    void updateAll(const std::list<IRenderPass*>& passes)
-    {
-        for (auto j : m_JoystickIDs)
-            updateJoystick(j, passes);
+    void updateAll(const std::list<IInputHandler*>& handlers) {
+        for (auto j : m_IDs) updateJoystick(j, handlers);
     }
 
 private:
     JoystickManager() = default;
 
-    static void applyDeadZone(dm::float2& v, float deadZone = 0.1f)
-    {
+    static void applyDeadZone(dm::float2& v, float dz = 0.1f) {
         float len = dm::length(v);
-        v *= (len > deadZone) ? ((len - deadZone) / (1.f - deadZone)) : 0.f;
+        v *= (len > dz) ? ((len - dz) / (1.f - dz)) : 0.f;
     }
 
-    void updateJoystick(int j, const std::list<IRenderPass*>& passes)
-    {
-        GLFWgamepadstate gamepadState;
-        if (!glfwGetGamepadState(j, &gamepadState))
-            return;
+    void updateJoystick(int j, const std::list<IInputHandler*>& handlers) {
+        GLFWgamepadstate gs;
+        if (!glfwGetGamepadState(j, &gs)) return;
+        float* ax = gs.axes;
 
-        float* axisValues = gamepadState.axes;
-
-        auto updateAxis = [&](int axis, float val) {
-            for (auto it = passes.crbegin(); it != passes.crend(); ++it)
-                if ((*it)->JoystickAxisUpdate(axis, val))
-                    break;
+        auto updateAxis = [&](int a, float v) {
+            for (auto it = handlers.crbegin(); it != handlers.crend(); ++it)
+                if ((*it)->onJoystickAxisEvent(a, v)) break;
+        };
+        auto updateButton = [&](int b, bool p) {
+            for (auto it = handlers.crbegin(); it != handlers.crend(); ++it)
+                if ((*it)->onJoystickButtonEvent(b, p)) break;
         };
 
-        // Left stick
-        {
-            dm::float2 v(axisValues[GLFW_GAMEPAD_AXIS_LEFT_X], axisValues[GLFW_GAMEPAD_AXIS_LEFT_Y]);
-            applyDeadZone(v);
-            updateAxis(GLFW_GAMEPAD_AXIS_LEFT_X, v.x);
-            updateAxis(GLFW_GAMEPAD_AXIS_LEFT_Y, v.y);
-        }
-
-        // Right stick
-        {
-            dm::float2 v(axisValues[GLFW_GAMEPAD_AXIS_RIGHT_X], axisValues[GLFW_GAMEPAD_AXIS_RIGHT_Y]);
-            applyDeadZone(v);
-            updateAxis(GLFW_GAMEPAD_AXIS_RIGHT_X, v.x);
-            updateAxis(GLFW_GAMEPAD_AXIS_RIGHT_Y, v.y);
-        }
-
-        // Triggers
-        updateAxis(GLFW_GAMEPAD_AXIS_LEFT_TRIGGER,  axisValues[GLFW_GAMEPAD_AXIS_LEFT_TRIGGER]);
-        updateAxis(GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER, axisValues[GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER]);
-
-        // Buttons
+        { dm::float2 v(ax[GLFW_GAMEPAD_AXIS_LEFT_X], ax[GLFW_GAMEPAD_AXIS_LEFT_Y]); applyDeadZone(v);
+          updateAxis(GLFW_GAMEPAD_AXIS_LEFT_X, v.x); updateAxis(GLFW_GAMEPAD_AXIS_LEFT_Y, v.y); }
+        { dm::float2 v(ax[GLFW_GAMEPAD_AXIS_RIGHT_X], ax[GLFW_GAMEPAD_AXIS_RIGHT_Y]); applyDeadZone(v);
+          updateAxis(GLFW_GAMEPAD_AXIS_RIGHT_X, v.x); updateAxis(GLFW_GAMEPAD_AXIS_RIGHT_Y, v.y); }
+        updateAxis(GLFW_GAMEPAD_AXIS_LEFT_TRIGGER,  ax[GLFW_GAMEPAD_AXIS_LEFT_TRIGGER]);
+        updateAxis(GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER, ax[GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER]);
         for (int b = GLFW_GAMEPAD_BUTTON_A; b <= GLFW_GAMEPAD_BUTTON_LAST; ++b)
-        {
-            bool pressed = (gamepadState.buttons[b] == GLFW_PRESS);
-            for (auto it = passes.crbegin(); it != passes.crend(); ++it)
-                if ((*it)->JoystickButtonUpdate(b, pressed))
-                    break;
-        }
+            updateButton(b, gs.buttons[b] == GLFW_PRESS);
     }
 
-    std::list<int> m_JoystickIDs;
-    std::list<int> m_RemovedJoysticks;
+    std::list<int> m_IDs, m_Removed;
 };
 
-// GLFW input callbacks — use window user pointer (set to Input* by installCallbacks)
-static Input* s_InputForCallbacks = nullptr;
+static Input* s_Input = nullptr;
 
-static void glfwKeyCallback(GLFWwindow*, int key, int scancode, int action, int mods)
-{
-    if (s_InputForCallbacks) s_InputForCallbacks->onKey(key, scancode, action, mods);
-}
-static void glfwCharModsCallback(GLFWwindow*, unsigned int codepoint, int mods)
-{
-    if (s_InputForCallbacks) s_InputForCallbacks->onChar(codepoint, mods);
-}
-static void glfwCursorPosCallback(GLFWwindow*, double xpos, double ypos)
-{
-    if (s_InputForCallbacks) s_InputForCallbacks->onMouseMove(xpos, ypos);
-}
-static void glfwMouseButtonCallback(GLFWwindow*, int button, int action, int mods)
-{
-    if (s_InputForCallbacks) s_InputForCallbacks->onMouseButton(button, action, mods);
-}
-static void glfwScrollCallback(GLFWwindow*, double xoffset, double yoffset)
-{
-    if (s_InputForCallbacks) s_InputForCallbacks->onMouseScroll(xoffset, yoffset);
-}
-static void glfwJoystickCallback(int joyId, int event)
-{
-    Input::onJoystickEvent(joyId, event);
-}
+static void glfwKeyCb(GLFWwindow*, int k, int s, int a, int m) { if(s_Input) s_Input->onKey(k,s,a,m); }
+static void glfwCharCb(GLFWwindow*, unsigned int c, int m)     { if(s_Input) s_Input->onChar(c,m); }
+static void glfwCursorCb(GLFWwindow*, double x, double y)      { if(s_Input) s_Input->onMouseMove(x,y); }
+static void glfwMouseCb(GLFWwindow*, int b, int a, int m)      { if(s_Input) s_Input->onMouseButton(b,a,m); }
+static void glfwScrollCb(GLFWwindow*, double x, double y)      { if(s_Input) s_Input->onMouseScroll(x,y); }
+static void glfwJoyCb(int j, int e) { Input::onJoystickEvent(j, e); }
 
 } // anonymous namespace
 
@@ -140,89 +82,47 @@ static void glfwJoystickCallback(int joyId, int event)
 // Input
 // =============================================================================
 
-void Input::registerPass(IRenderPass* pass)
-{
-    m_Passes.remove(pass);
-    m_Passes.push_back(pass);
-}
+void Input::registerHandler(IInputHandler* h) { m_Handlers.remove(h); m_Handlers.push_back(h); }
+void Input::unregisterHandler(IInputHandler* h) { m_Handlers.remove(h); }
 
-void Input::unregisterPass(IRenderPass* pass)
-{
-    m_Passes.remove(pass);
-}
-
-void Input::onKey(int key, int scancode, int action, int mods)
-{
+void Input::onKey(int key, int scancode, int action, int mods) {
     if (key == -1) return;
-    for (auto it = m_Passes.crbegin(); it != m_Passes.crend(); ++it)
-    {
-        if ((*it)->KeyboardUpdate(key, scancode, action, mods))
-            break;
-    }
+    for (auto it = m_Handlers.crbegin(); it != m_Handlers.crend(); ++it)
+        if ((*it)->onKeyEvent(key, scancode, action, mods)) break;
 }
-
-void Input::onChar(unsigned int codepoint, int mods)
-{
-    for (auto it = m_Passes.crbegin(); it != m_Passes.crend(); ++it)
-    {
-        if ((*it)->KeyboardCharInput(codepoint, mods))
-            break;
-    }
+void Input::onChar(unsigned int cp, int mods) {
+    for (auto it = m_Handlers.crbegin(); it != m_Handlers.crend(); ++it)
+        if ((*it)->onCharEvent(cp, mods)) break;
 }
-
-void Input::onMouseMove(double xpos, double ypos)
-{
-    for (auto it = m_Passes.crbegin(); it != m_Passes.crend(); ++it)
-    {
-        if ((*it)->MousePosUpdate(xpos, ypos))
-            break;
-    }
+void Input::onMouseMove(double x, double y) {
+    for (auto it = m_Handlers.crbegin(); it != m_Handlers.crend(); ++it)
+        if ((*it)->onMouseMoveEvent(x, y)) break;
 }
-
-void Input::onMouseButton(int button, int action, int mods)
-{
-    for (auto it = m_Passes.crbegin(); it != m_Passes.crend(); ++it)
-    {
-        if ((*it)->MouseButtonUpdate(button, action, mods))
-            break;
-    }
+void Input::onMouseButton(int b, int a, int m) {
+    for (auto it = m_Handlers.crbegin(); it != m_Handlers.crend(); ++it)
+        if ((*it)->onMouseButtonEvent(b, a, m)) break;
 }
-
-void Input::onMouseScroll(double xoffset, double yoffset)
-{
-    for (auto it = m_Passes.crbegin(); it != m_Passes.crend(); ++it)
-    {
-        if ((*it)->MouseScrollUpdate(xoffset, yoffset))
-            break;
-    }
+void Input::onMouseScroll(double x, double y) {
+    for (auto it = m_Handlers.crbegin(); it != m_Handlers.crend(); ++it)
+        if ((*it)->onMouseScrollEvent(x, y)) break;
 }
-
-void Input::pollJoysticks()
-{
+void Input::pollJoysticks() {
     JoystickManager::get().eraseDisconnected();
-    JoystickManager::get().updateAll(m_Passes);
+    JoystickManager::get().updateAll(m_Handlers);
 }
-
-void Input::onJoystickEvent(int joyId, int event)
-{
-    if (event == GLFW_CONNECTED)
-        JoystickManager::get().connect(joyId);
-    else
-        JoystickManager::get().disconnect(joyId);
+void Input::onJoystickEvent(int j, int e) {
+    if (e == GLFW_CONNECTED) JoystickManager::get().connect(j);
+    else                     JoystickManager::get().disconnect(j);
 }
-
-void Input::installCallbacks(void* glfwWindow)
-{
-    auto* window = static_cast<GLFWwindow*>(glfwWindow);
-    s_InputForCallbacks = this;
-
-    glfwSetKeyCallback(window, glfwKeyCallback);
-    glfwSetCharModsCallback(window, glfwCharModsCallback);
-    glfwSetCursorPosCallback(window, glfwCursorPosCallback);
-    glfwSetMouseButtonCallback(window, glfwMouseButtonCallback);
-    glfwSetScrollCallback(window, glfwScrollCallback);
-    glfwSetJoystickCallback(glfwJoystickCallback);
-
+void Input::installCallbacks(void* w) {
+    auto* win = static_cast<GLFWwindow*>(w);
+    s_Input = this;
+    glfwSetKeyCallback(win, glfwKeyCb);
+    glfwSetCharModsCallback(win, glfwCharCb);
+    glfwSetCursorPosCallback(win, glfwCursorCb);
+    glfwSetMouseButtonCallback(win, glfwMouseCb);
+    glfwSetScrollCallback(win, glfwScrollCb);
+    glfwSetJoystickCallback(glfwJoyCb);
     JoystickManager::get().enumerate();
 }
 
