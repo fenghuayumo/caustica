@@ -343,6 +343,11 @@ namespace caustica
         void MouseScrollUpdate(double xoffset, double yoffset);
 
         [[nodiscard]] GLFWwindow* GetWindow() const { return m_Window; }
+
+        // When window is owned externally (new 4-layer Window), call this
+        // before Shutdown() to prevent double-free of the GLFW window.
+        void ReleaseWindowOwnership() { m_Window = nullptr; }
+
         [[nodiscard]] uint32_t GetFrameIndex() const { return m_FrameIndex; }
 
         virtual nvrhi::ITexture* GetCurrentBackBuffer() = 0;

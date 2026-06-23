@@ -1,4 +1,3 @@
-add_subdirectory(../source ${CMAKE_BINARY_DIR}/caustica/source)
 # ---------------------------------------------------------------------------
 
 file(GLOB caustica_engine_core_src
@@ -66,6 +65,14 @@ if (MSVC)
     list(APPEND caustica_engine_core_src donut.natvis)
 endif()
 
+# Platform layer (Window abstraction)
+list(APPEND caustica_engine_engine_src
+    include/platform/window.h
+    include/platform/glfw_window.h
+    src/platform/window.cpp
+    src/platform/glfw_window.cpp
+)
+
 add_library(causticaEngine STATIC
     ${caustica_engine_core_src}
     ${caustica_engine_math_src}
@@ -77,7 +84,6 @@ target_include_directories(causticaEngine
     PUBLIC
         "${CMAKE_CURRENT_SOURCE_DIR}"
         "${CMAKE_CURRENT_SOURCE_DIR}/include"
-        "${CMAKE_CURRENT_SOURCE_DIR}/../source/include"   # New 4-layer platform/core/engine headers
     PRIVATE
         "$<$<BOOL:${DONUT_WITH_STREAMLINE}>:${CMAKE_CURRENT_SOURCE_DIR}/src/engine/streamline>"
 )
@@ -100,6 +106,9 @@ endif()
 if (WIN32)
     target_compile_definitions(causticaEngine PUBLIC NOMINMAX _CRT_SECURE_NO_WARNINGS)
     target_compile_definitions(causticaEngine PRIVATE DONUT_FORCE_DISCRETE_GPU=$<BOOL:${DONUT_FORCE_DISCRETE_GPU}>)
+endif()
+if (MSVC)
+    target_compile_options(causticaEngine PRIVATE /utf-8)
 endif()
 
 target_compile_definitions(causticaEngine

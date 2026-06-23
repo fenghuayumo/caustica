@@ -223,6 +223,9 @@ endif()
 add_subdirectory(caustica)
 add_subdirectory(editor)
 add_library(causticaCore STATIC ${shared_sources} ${CAUSTICA_EDITOR_SOURCES})
+if (MSVC)
+    target_compile_options(causticaCore PRIVATE /utf-8)
+endif()
 if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(causticaCore PRIVATE
         -Wno-error=deprecated-declarations

@@ -385,6 +385,14 @@ bool DeviceManager::CreateDeviceAndSwapChain(const DeviceCreationParameters& par
     m_DeviceParams.headlessDevice = false;
     m_RequestedVSync         = params.vsyncEnabled;
 
+    // Must create the GPU instance before creating the device.
+    // CreateInstance is idempotent (checks m_InstanceCreated internally).
+    if (!CreateInstance(m_DeviceParams))
+    {
+        caustica::error("CreateDeviceAndSwapChain: Failed to create GPU instance");
+        return false;
+    }
+
     // Get the native GLFW window handle from the platform Window
     GLFWwindow* nativeWindow = static_cast<GLFWwindow*>(window->getNativeHandle());
     if (!nativeWindow)
@@ -397,11 +405,14 @@ bool DeviceManager::CreateDeviceAndSwapChain(const DeviceCreationParameters& par
     m_Window = nativeWindow;
     m_WindowTitle = window->getTitle();
 
-    // Register this DeviceManager for GLFW callbacks
+    // Take ownership of the GLFW window callbacks.
+    // The GlfwWindow previously set its own callbacks — we must replace ALL of them
+    // because glfwSetWindowUserPointer now points to DeviceManager, not GlfwWindow.
     glfwSetWindowUserPointer(m_Window, this);
 
-    // Keep existing GLFW callbacks but chain with Window's event callback
+    glfwSetWindowPosCallback(m_Window, WindowPosCallback_GLFW);
     glfwSetWindowCloseCallback(m_Window, WindowCloseCallback_GLFW);
+    glfwSetWindowRefreshCallback(m_Window, WindowRefreshCallback_GLFW);
     glfwSetWindowFocusCallback(m_Window, WindowFocusCallback_GLFW);
     glfwSetWindowIconifyCallback(m_Window, WindowIconifyCallback_GLFW);
     glfwSetKeyCallback(m_Window, KeyCallback_GLFW);
@@ -409,6 +420,12 @@ bool DeviceManager::CreateDeviceAndSwapChain(const DeviceCreationParameters& par
     glfwSetCursorPosCallback(m_Window, MousePosCallback_GLFW);
     glfwSetMouseButtonCallback(m_Window, MouseButtonCallback_GLFW);
     glfwSetScrollCallback(m_Window, MouseScrollCallback_GLFW);
+
+    // Disable callbacks that GlfwWindow set but DeviceManager handles differently.
+    // WindowSize is polled via UpdateWindowSize() in the main loop.
+    glfwSetWindowSizeCallback(m_Window, nullptr);
+    glfwSetDropCallback(m_Window, nullptr);
+    glfwSetCharCallback(m_Window, nullptr);
 
     // Create GPU device and swapchain using the existing native window
     if (!CreateDevice())

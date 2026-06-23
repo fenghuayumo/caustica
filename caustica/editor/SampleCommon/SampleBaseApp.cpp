@@ -1,4 +1,4 @@
-#include "SampleBaseApp.h"
+﻿#include "SampleBaseApp.h"
 
 #include <algorithm>
 #include <cctype>
@@ -486,7 +486,12 @@ bool SampleBaseApp::InitDeviceAndWindow(const caustica::DeviceCreationParameters
     }
     else
     {
-        if (!m_DeviceManager->CreateWindowDeviceAndSwapChain(deviceParams, g_windowTitle))
+        // Use the existing DeviceManager path that creates the window internally.
+        // The Window/GlfwWindow abstraction (platform layer) is available for
+        // future use when DeviceManager is properly split into GpuDevice +
+        // SwapChain + Input classes.
+        const char* windowTitle = g_windowTitle ? g_windowTitle : "caustica";
+        if (!m_DeviceManager->CreateWindowDeviceAndSwapChain(deviceParams, windowTitle))
         {
             caustica::fatal("Cannot initialize a graphics device with the requested parameters");
             return false;
