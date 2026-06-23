@@ -212,11 +212,11 @@ bool GpuDevice_DX11::CreateDevice()
     deviceDesc.aftermathEnabled = m_DeviceParams.enableAftermath;
 #endif
 
-    m_GpuDevice.device = m_NvrhiDevice = nvrhi::d3d11::createDevice(deviceDesc);
+    m_NvrhiDevice = m_NvrhiDevice = nvrhi::d3d11::createDevice(deviceDesc);
 
     if (m_DeviceParams.enableNvrhiValidationLayer)
     {
-        m_GpuDevice.device = m_NvrhiDevice = nvrhi::validation::createValidationLayer(m_NvrhiDevice);
+        m_NvrhiDevice = m_NvrhiDevice = nvrhi::validation::createValidationLayer(m_NvrhiDevice);
     }
 
 #if DONUT_WITH_STREAMLINE
@@ -303,7 +303,7 @@ bool GpuDevice_DX11::CreateSwapChain()
 void GpuDevice_DX11::DestroyDeviceAndSwapChain()
 {
     m_RhiBackBuffer = nullptr;
-    m_GpuDevice.device = nullptr;
+    m_NvrhiDevice = nullptr;
     m_NvrhiDevice = nullptr;
 
     if (m_SwapChain)

@@ -1018,7 +1018,7 @@ bool GpuDevice_VK::CreateDevice()
     deviceDesc.vulkanLibraryName = m_DeviceParams.vulkanLibraryName;
     deviceDesc.logBufferLifetime = m_DeviceParams.logBufferLifetime;
 
-    m_GpuDevice.device = m_NvrhiDevice = nvrhi::vulkan::createDevice(deviceDesc);
+    m_NvrhiDevice = m_NvrhiDevice = nvrhi::vulkan::createDevice(deviceDesc);
 
     if (m_DeviceParams.enableNvrhiValidationLayer)
     {
@@ -1089,7 +1089,7 @@ void GpuDevice_VK::DestroyDeviceAndSwapChain()
         }
     }
 
-    m_GpuDevice.device = nullptr;
+    m_NvrhiDevice = nullptr;
     m_NvrhiDevice = nullptr;
     m_ValidationLayer = nullptr;
     m_RendererString.clear();

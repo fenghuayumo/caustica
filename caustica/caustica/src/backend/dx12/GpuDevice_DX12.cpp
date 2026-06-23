@@ -286,11 +286,11 @@ bool GpuDevice_DX12::CreateDevice()
     deviceDesc.logBufferLifetime = m_DeviceParams.logBufferLifetime;
     deviceDesc.enableHeapDirectlyIndexed = m_DeviceParams.enableHeapDirectlyIndexed;
 
-    m_GpuDevice.device = m_NvrhiDevice = nvrhi::d3d12::createDevice(deviceDesc);
+    m_NvrhiDevice = m_NvrhiDevice = nvrhi::d3d12::createDevice(deviceDesc);
 
     if (m_DeviceParams.enableNvrhiValidationLayer)
     {
-        m_GpuDevice.device = m_NvrhiDevice = nvrhi::validation::createValidationLayer(m_NvrhiDevice);
+        m_NvrhiDevice = m_NvrhiDevice = nvrhi::validation::createValidationLayer(m_NvrhiDevice);
     }
 
 #if DONUT_WITH_STREAMLINE
@@ -399,7 +399,7 @@ void GpuDevice_DX12::DestroyDeviceAndSwapChain()
 
     ReleaseRenderTargets();
 
-    m_GpuDevice.device = nullptr;
+    m_NvrhiDevice = nullptr;
     m_NvrhiDevice = nullptr;
 
     for (auto fenceEvent : m_FrameFenceEvents)
