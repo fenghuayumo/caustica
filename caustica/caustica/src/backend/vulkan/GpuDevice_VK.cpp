@@ -5,7 +5,7 @@
 #include <sstream>
 
 #include <engine/DeviceManager.h>
-#include <engine/DeviceManager_VK.h>
+#include <backend/vulkan/GpuDevice_VK.h>
 
 #include <rhi/vulkan.h>
 #include <rhi/validation.h>
@@ -49,7 +49,7 @@ static std::vector<T> setToVector(const std::unordered_set<T>& set)
     return ret;
 }
 
-bool DeviceManager_VK::createInstance()
+bool GpuDevice_VK::createInstance()
 {
     if (!m_DeviceParams.headlessDevice)
     {
@@ -211,7 +211,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL vulkanDebugCallback(
     const char* msg,
     void* userData)
 {
-    const DeviceManager_VK* manager = (const DeviceManager_VK*)userData;
+    const GpuDevice_VK* manager = (const GpuDevice_VK*)userData;
 
     if (manager)
     {
@@ -226,7 +226,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL vulkanDebugCallback(
     return VK_FALSE;
 }
 
-void DeviceManager_VK::installDebugCallback()
+void GpuDevice_VK::installDebugCallback()
 {
     auto info = vk::DebugReportCallbackCreateInfoEXT()
                     .setFlags(vk::DebugReportFlagBitsEXT::eError |
@@ -241,7 +241,7 @@ void DeviceManager_VK::installDebugCallback()
     (void)res;
 }
 
-bool DeviceManager_VK::pickPhysicalDevice()
+bool GpuDevice_VK::pickPhysicalDevice()
 {
     VkFormat requestedFormat = nvrhi::vulkan::convertFormat(m_DeviceParams.swapChainFormat);
     vk::Extent2D requestedExtent(m_DeviceParams.backBufferWidth, m_DeviceParams.backBufferHeight);
@@ -443,7 +443,7 @@ bool DeviceManager_VK::pickPhysicalDevice()
     return false;
 }
 
-bool DeviceManager_VK::findQueueFamilies(vk::PhysicalDevice physicalDevice)
+bool GpuDevice_VK::findQueueFamilies(vk::PhysicalDevice physicalDevice)
 {
     auto props = physicalDevice.getQueueFamilyProperties();
 
@@ -502,7 +502,7 @@ bool DeviceManager_VK::findQueueFamilies(vk::PhysicalDevice physicalDevice)
     return true;
 }
 
-bool DeviceManager_VK::createDevice()
+bool GpuDevice_VK::createDevice()
 {
     // figure out which optional extensions are supported
     auto deviceExtensions = m_VulkanPhysicalDevice.enumerateDeviceExtensionProperties();
@@ -750,7 +750,7 @@ bool DeviceManager_VK::createDevice()
     return true;
 }
 
-bool DeviceManager_VK::createWindowSurface()
+bool GpuDevice_VK::createWindowSurface()
 {
     const VkResult res = glfwCreateWindowSurface(m_VulkanInstance, m_Window, nullptr, (VkSurfaceKHR *)&m_WindowSurface);
     if (res != VK_SUCCESS)
@@ -762,7 +762,7 @@ bool DeviceManager_VK::createWindowSurface()
     return true;
 }
 
-void DeviceManager_VK::destroySwapChain()
+void GpuDevice_VK::destroySwapChain()
 {
     if (m_VulkanDevice)
     {
@@ -778,7 +778,7 @@ void DeviceManager_VK::destroySwapChain()
     m_SwapChainImages.clear();
 }
 
-bool DeviceManager_VK::createSwapChain()
+bool GpuDevice_VK::createSwapChain()
 {
     destroySwapChain();
 
@@ -874,7 +874,7 @@ bool DeviceManager_VK::createSwapChain()
 
 #define CHECK(a) if (!(a)) { return false; }
 
-bool DeviceManager_VK::CreateInstanceInternal()
+bool GpuDevice_VK::CreateInstanceInternal()
 {
 #if DONUT_WITH_STREAMLINE
     if (!m_DeviceParams.headlessDevice)
@@ -901,7 +901,7 @@ bool DeviceManager_VK::CreateInstanceInternal()
     return createInstance();
 }
 
-bool DeviceManager_VK::EnumerateAdapters(std::vector<AdapterInfo>& outAdapters)
+bool GpuDevice_VK::EnumerateAdapters(std::vector<AdapterInfo>& outAdapters)
 {
     if (!m_VulkanInstance)
         return false;
@@ -955,7 +955,7 @@ bool DeviceManager_VK::EnumerateAdapters(std::vector<AdapterInfo>& outAdapters)
     return true;
 }
 
-bool DeviceManager_VK::CreateDevice()
+bool GpuDevice_VK::CreateDevice()
 {
     if (m_DeviceParams.enableDebugRuntime)
     {
@@ -1018,7 +1018,7 @@ bool DeviceManager_VK::CreateDevice()
     deviceDesc.vulkanLibraryName = m_DeviceParams.vulkanLibraryName;
     deviceDesc.logBufferLifetime = m_DeviceParams.logBufferLifetime;
 
-    m_NvrhiDevice = nvrhi::vulkan::createDevice(deviceDesc);
+    m_GpuDevice.device = m_NvrhiDevice = nvrhi::vulkan::createDevice(deviceDesc);
 
     if (m_DeviceParams.enableNvrhiValidationLayer)
     {
@@ -1044,7 +1044,7 @@ bool DeviceManager_VK::CreateDevice()
     return true;
 }
 
-bool DeviceManager_VK::CreateSwapChain()
+bool GpuDevice_VK::CreateSwapChain()
 {
     CHECK(createSwapChain())
 
@@ -1067,7 +1067,7 @@ bool DeviceManager_VK::CreateSwapChain()
 }
 #undef CHECK
 
-void DeviceManager_VK::DestroyDeviceAndSwapChain()
+void GpuDevice_VK::DestroyDeviceAndSwapChain()
 {
     destroySwapChain();
 
@@ -1089,6 +1089,7 @@ void DeviceManager_VK::DestroyDeviceAndSwapChain()
         }
     }
 
+    m_GpuDevice.device = nullptr;
     m_NvrhiDevice = nullptr;
     m_ValidationLayer = nullptr;
     m_RendererString.clear();
@@ -1118,7 +1119,7 @@ void DeviceManager_VK::DestroyDeviceAndSwapChain()
     }
 }
 
-bool DeviceManager_VK::BeginFrame()
+bool GpuDevice_VK::BeginFrame()
 {
     if (m_DeviceParams.headlessDevice)
         return BeginHeadlessFrame();
@@ -1164,7 +1165,7 @@ bool DeviceManager_VK::BeginFrame()
     return false;
 }
 
-bool DeviceManager_VK::Present()
+bool GpuDevice_VK::Present()
 {
     if (m_DeviceParams.headlessDevice)
         return PresentHeadlessFrame();
@@ -1228,5 +1229,5 @@ bool DeviceManager_VK::Present()
 
 DeviceManager *DeviceManager::CreateVK()
 {
-    return new DeviceManager_VK();
+    return new GpuDevice_VK();
 }

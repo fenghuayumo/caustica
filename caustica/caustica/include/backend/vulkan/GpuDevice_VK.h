@@ -15,7 +15,7 @@
 #endif
 #include <vulkan/vulkan.hpp>
 
-class DeviceManager_VK : public caustica::DeviceManager
+class GpuDevice_VK : public caustica::DeviceManager
 {
 public:
     [[nodiscard]] nvrhi::IDevice* GetDevice() const override

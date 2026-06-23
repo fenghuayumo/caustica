@@ -12,7 +12,7 @@
 #include <rhi/d3d11.h>
 #include <rhi/validation.h>
 
-class DeviceManager_DX11 : public caustica::DeviceManager
+class GpuDevice_DX11 : public caustica::DeviceManager
 {
 protected:
     nvrhi::RefCountPtr<IDXGIFactory1> m_DxgiFactory;

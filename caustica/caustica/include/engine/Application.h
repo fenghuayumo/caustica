@@ -9,11 +9,10 @@ class DeviceManager;
 class Window;
 
 // =============================================================================
-// Application — Engine layer: owns the message loop, frame pacing, and
-// coordinates subsystems (Window, DeviceManager, Input, RenderPassManager).
+// Application — Engine layer: message loop, frame pacing, animation, rendering.
 //
-// This is the REAL Application class. The old Application (scene loader)
-// has been renamed to SceneApp in Application.h.
+// Extracted from DeviceManager. Uses friend access to DeviceManager for
+// GPU device/swapchain operations until GpuDevice and SwapChain are ready.
 // =============================================================================
 class Application
 {
@@ -24,16 +23,29 @@ public:
     // --- Message loop ---
     void run();
 
-    // --- Single frame (for hosts that drive the loop, e.g. Python) ---
+    // --- Single frame ---
     bool stepFrame();
     bool stepFrame(double fixedElapsedTimeSeconds);
 
-    // --- Frame callbacks ---
+    // --- Per-frame logic ---
+    bool runFrame(std::optional<double> elapsedTimeOverride = std::nullopt);
+    void animate(double elapsedTime, bool windowIsFocused);
+    void render();
+
+    // --- Callbacks (mirror DeviceManager's for migration) ---
     using FrameCallback = std::function<void(DeviceManager&, uint32_t frameIndex)>;
     FrameCallback beforeFrame;
+    FrameCallback beforeAnimate;
+    FrameCallback afterAnimate;
+    FrameCallback beforeRender;
+    FrameCallback afterRender;
+    FrameCallback beforePresent;
+    FrameCallback afterPresent;
 
 private:
     void syncWindowState();
+    void updateWindowSize();
+    bool shouldRenderUnfocused() const;
 
     DeviceManager* m_DM;
     Window*        m_Window;

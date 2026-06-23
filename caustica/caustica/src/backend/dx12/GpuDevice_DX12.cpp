@@ -3,7 +3,7 @@
 #include <vector>
 
 #include <engine/DeviceManager.h>
-#include <engine/DeviceManager_DX12.h>
+#include <backend/dx12/GpuDevice_DX12.h>
 #include <core/log.h>
 
 #include <Windows.h>
@@ -70,7 +70,7 @@ static bool MoveWindowOntoAdapter(IDXGIAdapter* targetAdapter, RECT& rect)
     return false;
 }
 
-void DeviceManager_DX12::ReportLiveObjects()
+void GpuDevice_DX12::ReportLiveObjects()
 {
     nvrhi::RefCountPtr<IDXGIDebug> pDebug;
     DXGIGetDebugInterface1(0, IID_PPV_ARGS(&pDebug));
@@ -86,7 +86,7 @@ void DeviceManager_DX12::ReportLiveObjects()
     }
 }
 
-bool DeviceManager_DX12::CreateInstanceInternal()
+bool GpuDevice_DX12::CreateInstanceInternal()
 {
 #if DONUT_WITH_STREAMLINE
     StreamlineIntegration::Get().InitializePreDevice(nvrhi::GraphicsAPI::D3D12, m_DeviceParams.streamlineAppId, m_DeviceParams.checkStreamlineSignature, m_DeviceParams.enableStreamlineLog);
@@ -106,7 +106,7 @@ bool DeviceManager_DX12::CreateInstanceInternal()
     return true;
 }
 
-bool DeviceManager_DX12::EnumerateAdapters(std::vector<AdapterInfo>& outAdapters)
+bool GpuDevice_DX12::EnumerateAdapters(std::vector<AdapterInfo>& outAdapters)
 {
     if (!m_DxgiFactory2)
         return false;
@@ -142,7 +142,7 @@ bool DeviceManager_DX12::EnumerateAdapters(std::vector<AdapterInfo>& outAdapters
     }
 }
 
-bool DeviceManager_DX12::CreateDevice()
+bool GpuDevice_DX12::CreateDevice()
 {
     if (m_DeviceParams.enableDebugRuntime)
     {
@@ -286,11 +286,11 @@ bool DeviceManager_DX12::CreateDevice()
     deviceDesc.logBufferLifetime = m_DeviceParams.logBufferLifetime;
     deviceDesc.enableHeapDirectlyIndexed = m_DeviceParams.enableHeapDirectlyIndexed;
 
-    m_NvrhiDevice = nvrhi::d3d12::createDevice(deviceDesc);
+    m_GpuDevice.device = m_NvrhiDevice = nvrhi::d3d12::createDevice(deviceDesc);
 
     if (m_DeviceParams.enableNvrhiValidationLayer)
     {
-        m_NvrhiDevice = nvrhi::validation::createValidationLayer(m_NvrhiDevice);
+        m_GpuDevice.device = m_NvrhiDevice = nvrhi::validation::createValidationLayer(m_NvrhiDevice);
     }
 
 #if DONUT_WITH_STREAMLINE
@@ -300,7 +300,7 @@ bool DeviceManager_DX12::CreateDevice()
     return true;
 }
 
-bool DeviceManager_DX12::CreateSwapChain()
+bool GpuDevice_DX12::CreateSwapChain()
 {
     UINT windowStyle = m_DeviceParams.startFullscreen
         ? (WS_POPUP | WS_SYSMENU | WS_VISIBLE)
@@ -392,13 +392,14 @@ bool DeviceManager_DX12::CreateSwapChain()
     return true;
 }
 
-void DeviceManager_DX12::DestroyDeviceAndSwapChain()
+void GpuDevice_DX12::DestroyDeviceAndSwapChain()
 {
     m_RhiSwapChainBuffers.clear();
     m_RendererString.clear();
 
     ReleaseRenderTargets();
 
+    m_GpuDevice.device = nullptr;
     m_NvrhiDevice = nullptr;
 
     for (auto fenceEvent : m_FrameFenceEvents)
@@ -424,7 +425,7 @@ void DeviceManager_DX12::DestroyDeviceAndSwapChain()
     m_Device12 = nullptr;
 }
 
-bool DeviceManager_DX12::CreateRenderTargets()
+bool GpuDevice_DX12::CreateRenderTargets()
 {
     m_SwapChainBuffers.resize(m_SwapChainDesc.BufferCount);
     m_RhiSwapChainBuffers.resize(m_SwapChainDesc.BufferCount);
@@ -452,7 +453,7 @@ bool DeviceManager_DX12::CreateRenderTargets()
     return true;
 }
 
-void DeviceManager_DX12::ReleaseRenderTargets()
+void GpuDevice_DX12::ReleaseRenderTargets()
 {
     if (m_NvrhiDevice)
     {
@@ -472,7 +473,7 @@ void DeviceManager_DX12::ReleaseRenderTargets()
     m_SwapChainBuffers.clear();
 }
 
-void DeviceManager_DX12::ResizeSwapChain()
+void GpuDevice_DX12::ResizeSwapChain()
 {
     ReleaseRenderTargets();
 
@@ -500,7 +501,7 @@ void DeviceManager_DX12::ResizeSwapChain()
     }
 }
 
-bool DeviceManager_DX12::BeginFrame()
+bool GpuDevice_DX12::BeginFrame()
 {
     if (m_DeviceParams.headlessDevice)
         return BeginHeadlessFrame();
@@ -534,7 +535,7 @@ bool DeviceManager_DX12::BeginFrame()
     return true;
 }
 
-nvrhi::ITexture* DeviceManager_DX12::GetCurrentBackBuffer()
+nvrhi::ITexture* GpuDevice_DX12::GetCurrentBackBuffer()
 {
     if (m_DeviceParams.headlessDevice)
         return GetHeadlessBackBuffer(GetCurrentHeadlessBackBufferIndex());
@@ -542,7 +543,7 @@ nvrhi::ITexture* DeviceManager_DX12::GetCurrentBackBuffer()
     return m_RhiSwapChainBuffers[m_SwapChain->GetCurrentBackBufferIndex()];
 }
 
-nvrhi::ITexture* DeviceManager_DX12::GetBackBuffer(uint32_t index)
+nvrhi::ITexture* GpuDevice_DX12::GetBackBuffer(uint32_t index)
 {
     if (m_DeviceParams.headlessDevice)
         return GetHeadlessBackBuffer(index);
@@ -552,7 +553,7 @@ nvrhi::ITexture* DeviceManager_DX12::GetBackBuffer(uint32_t index)
     return nullptr;
 }
 
-uint32_t DeviceManager_DX12::GetCurrentBackBufferIndex()
+uint32_t GpuDevice_DX12::GetCurrentBackBufferIndex()
 {
     if (m_DeviceParams.headlessDevice)
         return GetCurrentHeadlessBackBufferIndex();
@@ -560,7 +561,7 @@ uint32_t DeviceManager_DX12::GetCurrentBackBufferIndex()
     return m_SwapChain->GetCurrentBackBufferIndex();
 }
 
-uint32_t DeviceManager_DX12::GetBackBufferCount()
+uint32_t GpuDevice_DX12::GetBackBufferCount()
 {
     if (m_DeviceParams.headlessDevice)
         return GetHeadlessBackBufferCount();
@@ -568,7 +569,7 @@ uint32_t DeviceManager_DX12::GetBackBufferCount()
     return m_SwapChainDesc.BufferCount;
 }
 
-bool DeviceManager_DX12::Present()
+bool GpuDevice_DX12::Present()
 {
     if (m_DeviceParams.headlessDevice)
         return PresentHeadlessFrame();
@@ -590,7 +591,7 @@ bool DeviceManager_DX12::Present()
     return SUCCEEDED(result);
 }
 
-void DeviceManager_DX12::Shutdown()
+void GpuDevice_DX12::Shutdown()
 {
     DeviceManager::Shutdown();
 
@@ -605,5 +606,5 @@ void DeviceManager_DX12::Shutdown()
 
 DeviceManager *DeviceManager::CreateD3D12(void)
 {
-    return new DeviceManager_DX12();
+    return new GpuDevice_DX12();
 }

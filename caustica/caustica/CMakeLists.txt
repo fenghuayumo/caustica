@@ -46,15 +46,21 @@ if (DONUT_WITH_STREAMLINE)
 endif()
 
 if (DONUT_WITH_DX11)
-    list(APPEND caustica_engine_engine_src src/engine/dx11/DeviceManager_DX11.cpp)
+    list(APPEND caustica_engine_engine_src
+        include/backend/dx11/GpuDevice_DX11.h
+        src/backend/dx11/GpuDevice_DX11.cpp)
 endif()
 
 if (DONUT_WITH_DX12)
-    list(APPEND caustica_engine_engine_src src/engine/dx12/DeviceManager_DX12.cpp)
+    list(APPEND caustica_engine_engine_src
+        include/backend/dx12/GpuDevice_DX12.h
+        src/backend/dx12/GpuDevice_DX12.cpp)
 endif()
 
 if (DONUT_WITH_VULKAN)
-    list(APPEND caustica_engine_engine_src src/engine/vulkan/DeviceManager_VK.cpp)
+    list(APPEND caustica_engine_engine_src
+        include/backend/vulkan/GpuDevice_VK.h
+        src/backend/vulkan/GpuDevice_VK.cpp)
 endif()
 
 if (DONUT_WITH_AFTERMATH)

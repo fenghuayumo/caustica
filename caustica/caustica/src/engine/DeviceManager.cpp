@@ -502,8 +502,8 @@ void DeviceManager::RemoveRenderPass(IRenderPass *pRenderPass)
 
 void DeviceManager::BackBufferResizing()
 {
-    m_SwapChainFramebuffers.clear();
-    m_SwapChainWithDepthFramebuffers.clear();
+    m_SwapChain.framebuffers.clear();
+    m_SwapChain.framebuffersWithDepth.clear();
 
     if (m_PassManager)
         m_PassManager->notifyResizing();
@@ -523,23 +523,23 @@ void DeviceManager::BackBufferResized()
             it->BackBufferResized(m_DeviceParams.backBufferWidth, m_DeviceParams.backBufferHeight, m_DeviceParams.swapChainSampleCount);
 
     uint32_t backBufferCount = GetBackBufferCount();
-    m_SwapChainFramebuffers.resize(backBufferCount);
-    m_SwapChainWithDepthFramebuffers.resize(backBufferCount);
+    m_SwapChain.framebuffers.resize(backBufferCount);
+    m_SwapChain.framebuffersWithDepth.resize(backBufferCount);
     for (uint32_t index = 0; index < backBufferCount; index++)
     {
         nvrhi::FramebufferDesc framebufferDesc = nvrhi::FramebufferDesc()
             .addColorAttachment(GetBackBuffer(index));
         
-        m_SwapChainFramebuffers[index] = GetDevice()->createFramebuffer(framebufferDesc);
+        m_SwapChain.framebuffers[index] = GetDevice()->createFramebuffer(framebufferDesc);
 
-        if (m_DepthBuffer)
+        if (m_SwapChain.depthBuffer)
         {
-            framebufferDesc.setDepthAttachment(m_DepthBuffer);
-            m_SwapChainWithDepthFramebuffers[index] = GetDevice()->createFramebuffer(framebufferDesc);
+            framebufferDesc.setDepthAttachment(m_SwapChain.depthBuffer);
+            m_SwapChain.framebuffersWithDepth[index] = GetDevice()->createFramebuffer(framebufferDesc);
         }
         else
         {
-            m_SwapChainWithDepthFramebuffers[index] = m_SwapChainFramebuffers[index];
+            m_SwapChain.framebuffersWithDepth[index] = m_SwapChain.framebuffers[index];
         }
     }
 }
@@ -554,7 +554,7 @@ void DeviceManager::DisplayScaleChanged()
 
 void DeviceManager::CreateDepthBuffer()
 {
-    m_DepthBuffer = nullptr;
+    m_SwapChain.depthBuffer = nullptr;
 
     if (m_DeviceParams.depthBufferFormat == nvrhi::Format::UNKNOWN)
         return;
@@ -573,7 +573,7 @@ void DeviceManager::CreateDepthBuffer()
         .setIsRenderTarget(true)
         .enableAutomaticStateTracking(nvrhi::ResourceStates::DepthWrite);
 
-    m_DepthBuffer = GetDevice()->createTexture(textureDesc);
+    m_SwapChain.depthBuffer = GetDevice()->createTexture(textureDesc);
 }
 
 bool DeviceManager::CreateHeadlessBackBuffers()
@@ -729,93 +729,73 @@ void DeviceManager::RunMessageLoop()
 
 bool DeviceManager::AnimateRenderPresent(std::optional<double> elapsedTimeOverride)
 {
+    // Delegate to Application (engine layer)
+    if (m_AppLoop)
+    {
+        // Sync callbacks from DeviceManager → Application (they live on Application now)
+        m_AppLoop->beforeAnimate  = m_callbacks.beforeAnimate;
+        m_AppLoop->afterAnimate   = m_callbacks.afterAnimate;
+        m_AppLoop->beforeRender   = m_callbacks.beforeRender;
+        m_AppLoop->afterRender    = m_callbacks.afterRender;
+        m_AppLoop->beforePresent  = m_callbacks.beforePresent;
+        m_AppLoop->afterPresent   = m_callbacks.afterPresent;
+        return m_AppLoop->runFrame(elapsedTimeOverride);
+    }
+
+    // Fallback: legacy implementation (should not be reached in new path)
     double curTime = GetDeviceManagerTime(m_DeviceParams.headlessDevice);
     double elapsedTime = elapsedTimeOverride.value_or(curTime - m_PreviousFrameTimestamp);
 
     if (!m_DeviceParams.headlessDevice)
-    {
         if (m_Input) m_Input->pollJoysticks();
-    }
 
     if (m_windowVisible && (m_windowIsInFocus || ShouldRenderUnfocused() || m_RequestedRenderUnfocused))
     {
         if (m_PrevDPIScaleFactorX != m_DPIScaleFactorX || m_PrevDPIScaleFactorY != m_DPIScaleFactorY)
-        {
-            DisplayScaleChanged();
-            m_PrevDPIScaleFactorX = m_DPIScaleFactorX;
-            m_PrevDPIScaleFactorY = m_DPIScaleFactorY;
-        }
-
+            { DisplayScaleChanged(); m_PrevDPIScaleFactorX = m_DPIScaleFactorX; m_PrevDPIScaleFactorY = m_DPIScaleFactorY; }
         m_RequestedRenderUnfocused = false;
-
         if (m_callbacks.beforeAnimate) m_callbacks.beforeAnimate(*this, m_FrameIndex);
         Animate(elapsedTime, true);
 #if DONUT_WITH_STREAMLINE
-        if (!m_DeviceParams.headlessDevice)
-            StreamlineIntegration::Get().SimEnd(*this);
+        if (!m_DeviceParams.headlessDevice) StreamlineIntegration::Get().SimEnd(*this);
 #endif
         if (m_callbacks.afterAnimate) m_callbacks.afterAnimate(*this, m_FrameIndex);
-
-        // normal rendering           : A0    R0 P0 A1 R1 P1
-        // m_SkipRenderOnFirstFrame on: A0 A1 R0 P0 A2 R1 P1
-        // m_SkipRenderOnFirstFrame simulates multi-threaded rendering frame indices, m_FrameIndex becomes the simulation index
-        // while the local variable below becomes the render/present index, which will be different only if m_SkipRenderOnFirstFrame is set
         if (m_FrameIndex > 0 || !m_SkipRenderOnFirstFrame)
         {
             if (BeginFrame())
             {
-                // first time entering this loop, m_FrameIndex is 1 for m_SkipRenderOnFirstFrame, 0 otherwise;
                 uint32_t frameIndex = m_FrameIndex;
-
+                if (m_SkipRenderOnFirstFrame) frameIndex--;
 #if DONUT_WITH_STREAMLINE
-                if (!m_DeviceParams.headlessDevice)
-                    StreamlineIntegration::Get().RenderStart(*this);
+                if (!m_DeviceParams.headlessDevice) StreamlineIntegration::Get().RenderStart(*this);
 #endif
-                if (m_SkipRenderOnFirstFrame)
-                {
-                    frameIndex--;
-                }
-
                 if (m_callbacks.beforeRender) m_callbacks.beforeRender(*this, frameIndex);
                 Render();
                 if (m_callbacks.afterRender) m_callbacks.afterRender(*this, frameIndex);
 #if DONUT_WITH_STREAMLINE
-                if (!m_DeviceParams.headlessDevice)
-                {
-                    StreamlineIntegration::Get().RenderEnd(*this);
-                    StreamlineIntegration::Get().PresentStart(*this);
-                }
+                if (!m_DeviceParams.headlessDevice) { StreamlineIntegration::Get().RenderEnd(*this); StreamlineIntegration::Get().PresentStart(*this); }
 #endif
                 if (m_callbacks.beforePresent) m_callbacks.beforePresent(*this, frameIndex);
                 bool presentSuccess = Present();
                 if (m_callbacks.afterPresent) m_callbacks.afterPresent(*this, frameIndex);
 #if DONUT_WITH_STREAMLINE
-                if (!m_DeviceParams.headlessDevice)
-                    StreamlineIntegration::Get().PresentEnd(*this);
+                if (!m_DeviceParams.headlessDevice) StreamlineIntegration::Get().PresentEnd(*this);
 #endif
-                if (!presentSuccess)
-                {
-                    return false;
-                }
+                if (!presentSuccess) return false;
             }
         }
     }
     else if (m_windowVisible)
     {
-        // Call Animate() even when not rendering, some render passes (e.g. ImGui) need it to process input.
-        // Whether the before/afterAnimate callbacks are necessary in this case is unclear...
         if (m_callbacks.beforeAnimate) m_callbacks.beforeAnimate(*this, m_FrameIndex);
         Animate(elapsedTime, false);
         if (m_callbacks.afterAnimate) m_callbacks.afterAnimate(*this, m_FrameIndex);
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(0));
-
     GetDevice()->runGarbageCollection();
-
     UpdateAverageFrameTime(elapsedTime);
     m_PreviousFrameTimestamp = curTime;
-
     ++m_FrameIndex;
     return true;
 }
@@ -1046,9 +1026,9 @@ void DeviceManager::Shutdown()
     StreamlineIntegration::Get().Shutdown();
 #endif
 
-    m_SwapChainFramebuffers.clear();
-    m_SwapChainWithDepthFramebuffers.clear();
-    m_DepthBuffer = nullptr;
+    m_SwapChain.framebuffers.clear();
+    m_SwapChain.framebuffersWithDepth.clear();
+    m_SwapChain.depthBuffer = nullptr;
     ReleaseHeadlessBackBuffers();
 
     DestroyDeviceAndSwapChain();
@@ -1081,13 +1061,13 @@ nvrhi::IFramebuffer* caustica::DeviceManager::GetFramebuffer(uint32_t index, boo
 {
     if (withDepth)
     {
-        if (index < m_SwapChainWithDepthFramebuffers.size())
-            return m_SwapChainWithDepthFramebuffers[index];
+        if (index < m_SwapChain.framebuffersWithDepth.size())
+            return m_SwapChain.framebuffersWithDepth[index];
     }
     else
     {
-        if (index < m_SwapChainFramebuffers.size())
-            return m_SwapChainFramebuffers[index];
+        if (index < m_SwapChain.framebuffers.size())
+            return m_SwapChain.framebuffers[index];
     }
 
     return nullptr;

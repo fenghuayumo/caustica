@@ -32,6 +32,8 @@
 #include <GLFW/glfw3native.h>
 #include <rhi/nvrhi.h>
 #include <core/log.h>
+#include <backend/GpuDevice.h>
+#include <backend/SwapChain.h>
 
 #include <list>
 #include <functional>
@@ -42,6 +44,7 @@ namespace caustica
     class Input;              // Platform layer: input dispatch
     class Window;             // Platform layer: window abstraction
     class RenderPassManager;  // Renderer layer: pass management
+    class GpuDevice;          // Backend layer: GPU device
     class Application;            // Engine layer: message loop
 
     struct DefaultMessageCallback : public nvrhi::IMessageCallback
@@ -250,6 +253,8 @@ namespace caustica
         // apps should extend the DeviceManager classes, and constructor initialized this to true to opt in to the behavior
         bool m_SkipRenderOnFirstFrame = false;
 
+        GpuDevice m_GpuDevice;                     // Backend layer: GPU device state
+        SwapChain m_SwapChain;                     // Backend layer: swapchain state
         DeviceCreationParameters m_DeviceParams;
         GLFWwindow *m_Window = nullptr;       // Old path: DeviceManager owns the GLFW window
         Window* m_WindowPtr = nullptr;        // New path: external GlfwWindow
@@ -278,11 +283,8 @@ namespace caustica
 
         uint32_t m_FrameIndex = 0;
 
-        std::vector<nvrhi::FramebufferHandle> m_SwapChainFramebuffers;
-        std::vector<nvrhi::FramebufferHandle> m_SwapChainWithDepthFramebuffers;
         std::vector<nvrhi::TextureHandle> m_HeadlessBackBuffers;
         uint32_t m_HeadlessBackBufferIndex = 0;
-        nvrhi::TextureHandle m_DepthBuffer;
 
         DeviceManager();
 
@@ -358,7 +360,7 @@ namespace caustica
         virtual uint32_t GetBackBufferCount() = 0;
         nvrhi::IFramebuffer* GetCurrentFramebuffer(bool withDepth = true);
         nvrhi::IFramebuffer* GetFramebuffer(uint32_t index, bool withDepth = true);
-        nvrhi::ITexture* GetDepthBuffer() const { return m_DepthBuffer; }
+        nvrhi::ITexture* GetDepthBuffer() const { return m_SwapChain.depthBuffer; }
 
         virtual void Shutdown();
         virtual ~DeviceManager() = default;

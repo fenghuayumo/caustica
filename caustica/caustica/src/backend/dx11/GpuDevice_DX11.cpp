@@ -3,7 +3,7 @@
 #include <locale>
 
 #include <engine/DeviceManager.h>
-#include <engine/DeviceManager_DX11.h>
+#include <backend/dx11/GpuDevice_DX11.h>
 #include <core/log.h>
 
 #include <Windows.h>
@@ -64,7 +64,7 @@ static bool MoveWindowOntoAdapter(IDXGIAdapter* targetAdapter, RECT& rect)
     return false;
 }
 
-bool DeviceManager_DX11::BeginFrame()
+bool GpuDevice_DX11::BeginFrame()
 {
     DXGI_SWAP_CHAIN_DESC newSwapChainDesc;
     if (SUCCEEDED(m_SwapChain->GetDesc(&newSwapChainDesc)))
@@ -87,7 +87,7 @@ bool DeviceManager_DX11::BeginFrame()
     return true;
 }
 
-void DeviceManager_DX11::ReportLiveObjects()
+void GpuDevice_DX11::ReportLiveObjects()
 {
     nvrhi::RefCountPtr<IDXGIDebug> pDebug;
     DXGIGetDebugInterface1(0, IID_PPV_ARGS(&pDebug));
@@ -96,7 +96,7 @@ void DeviceManager_DX11::ReportLiveObjects()
         pDebug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_DETAIL);
 }
 
-bool DeviceManager_DX11::CreateInstanceInternal()
+bool GpuDevice_DX11::CreateInstanceInternal()
 {
 #if DONUT_WITH_STREAMLINE
     StreamlineIntegration::Get().InitializePreDevice(nvrhi::GraphicsAPI::D3D11, m_DeviceParams.streamlineAppId, m_DeviceParams.checkStreamlineSignature, m_DeviceParams.enableStreamlineLog);
@@ -116,7 +116,7 @@ bool DeviceManager_DX11::CreateInstanceInternal()
     return true;
 }
 
-bool DeviceManager_DX11::EnumerateAdapters(std::vector<AdapterInfo>& outAdapters)
+bool GpuDevice_DX11::EnumerateAdapters(std::vector<AdapterInfo>& outAdapters)
 {
     if (!m_DxgiFactory)
         return false;
@@ -152,7 +152,7 @@ bool DeviceManager_DX11::EnumerateAdapters(std::vector<AdapterInfo>& outAdapters
     }
 }
 
-bool DeviceManager_DX11::CreateDevice()
+bool GpuDevice_DX11::CreateDevice()
 {
     int adapterIndex = m_DeviceParams.adapterIndex;
 
@@ -212,11 +212,11 @@ bool DeviceManager_DX11::CreateDevice()
     deviceDesc.aftermathEnabled = m_DeviceParams.enableAftermath;
 #endif
 
-    m_NvrhiDevice = nvrhi::d3d11::createDevice(deviceDesc);
+    m_GpuDevice.device = m_NvrhiDevice = nvrhi::d3d11::createDevice(deviceDesc);
 
     if (m_DeviceParams.enableNvrhiValidationLayer)
     {
-        m_NvrhiDevice = nvrhi::validation::createValidationLayer(m_NvrhiDevice);
+        m_GpuDevice.device = m_NvrhiDevice = nvrhi::validation::createValidationLayer(m_NvrhiDevice);
     }
 
 #if DONUT_WITH_STREAMLINE
@@ -229,7 +229,7 @@ bool DeviceManager_DX11::CreateDevice()
     return true;
 }
 
-bool DeviceManager_DX11::CreateSwapChain()
+bool GpuDevice_DX11::CreateSwapChain()
 {
     UINT windowStyle = m_DeviceParams.startFullscreen
         ? (WS_POPUP | WS_SYSMENU | WS_VISIBLE)
@@ -300,9 +300,10 @@ bool DeviceManager_DX11::CreateSwapChain()
     return true;
 }
 
-void DeviceManager_DX11::DestroyDeviceAndSwapChain()
+void GpuDevice_DX11::DestroyDeviceAndSwapChain()
 {
     m_RhiBackBuffer = nullptr;
+    m_GpuDevice.device = nullptr;
     m_NvrhiDevice = nullptr;
 
     if (m_SwapChain)
@@ -317,7 +318,7 @@ void DeviceManager_DX11::DestroyDeviceAndSwapChain()
     m_Device = nullptr;
 }
 
-bool DeviceManager_DX11::CreateRenderTarget()
+bool GpuDevice_DX11::CreateRenderTarget()
 {
     ReleaseRenderTarget();
 
@@ -347,13 +348,13 @@ bool DeviceManager_DX11::CreateRenderTarget()
     return true;
 }
 
-void DeviceManager_DX11::ReleaseRenderTarget()
+void GpuDevice_DX11::ReleaseRenderTarget()
 {
     m_RhiBackBuffer = nullptr;
     m_D3D11BackBuffer = nullptr;
 }
 
-void DeviceManager_DX11::ResizeSwapChain()
+void GpuDevice_DX11::ResizeSwapChain()
 {
     ReleaseRenderTarget();
 
@@ -378,7 +379,7 @@ void DeviceManager_DX11::ResizeSwapChain()
     }
 }
 
-void DeviceManager_DX11::Shutdown()
+void GpuDevice_DX11::Shutdown()
 {
     DeviceManager::Shutdown();
 
@@ -388,7 +389,7 @@ void DeviceManager_DX11::Shutdown()
     }
 }
 
-bool DeviceManager_DX11::Present()
+bool GpuDevice_DX11::Present()
 {
     HRESULT result = m_SwapChain->Present(m_DeviceParams.vsyncEnabled ? 1 : 0, 0);
     return SUCCEEDED(result);
@@ -396,5 +397,5 @@ bool DeviceManager_DX11::Present()
 
 DeviceManager *DeviceManager::CreateD3D11()
 {
-    return new DeviceManager_DX11();
+    return new GpuDevice_DX11();
 }
