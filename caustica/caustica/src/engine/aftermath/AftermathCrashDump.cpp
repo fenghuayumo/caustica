@@ -24,17 +24,17 @@
 
 #include <core/log.h>
 #include <engine/AftermathCrashDump.h>
-#include "engine/ApplicationBase.h"
+#include "engine/Application.h"
 
 #include <GFSDK_Aftermath_GpuCrashDump.h>
 #include <GFSDK_Aftermath_GpuCrashDumpDecoding.h>
 
 static void DumpFileCallback(const void* pGpuCrashDump, const uint32_t gpuCrashDumpSize, void* pUserData)
 {
-    donut::app::AftermathCrashDump *dumper = reinterpret_cast<donut::app::AftermathCrashDump*>(pUserData);
+    caustica::AftermathCrashDump *dumper = reinterpret_cast<caustica::AftermathCrashDump*>(pUserData);
     std::filesystem::create_directory(dumper->GetDumpFolder());
 
-    auto nativeFS = std::make_unique<donut::vfs::NativeFileSystem>();
+    auto nativeFS = std::make_unique<caustica::NativeFileSystem>();
     std::filesystem::path dumpPath = dumper->GetDumpFolder() / "crash.nv-gpudmp";
     nativeFS->writeFile(dumpPath, pGpuCrashDump, gpuCrashDumpSize);
 
@@ -42,7 +42,7 @@ static void DumpFileCallback(const void* pGpuCrashDump, const uint32_t gpuCrashD
     GFSDK_Aftermath_Result result = GFSDK_Aftermath_GpuCrashDump_CreateDecoder(GFSDK_Aftermath_Version_API, pGpuCrashDump, gpuCrashDumpSize, &decoder);
     if (!GFSDK_Aftermath_SUCCEED(result))
     {
-        donut::log::error("Aftermath crash dump decoder failed create with error 0x%.8x", result);
+        caustica::error("Aftermath crash dump decoder failed create with error 0x%.8x", result);
         return;
     }
     uint32_t numActiveShaders = 0;
@@ -58,7 +58,7 @@ static void DumpFileCallback(const void* pGpuCrashDump, const uint32_t gpuCrashD
                 GFSDK_Aftermath_ShaderBinaryHash shaderHash = {};
                 GFSDK_Aftermath_GetShaderHashForShaderInfo(decoder, &shaderInfo, &shaderHash);
                 nvrhi::AftermathCrashDumpHelper& crashDumpHelper = dumper->GetDeviceManager().GetDevice()->getAftermathCrashDumpHelper();
-                nvrhi::BinaryBlob shaderLookupResult = crashDumpHelper.findShaderBinary(shaderHash.hash, donut::app::AftermathCrashDump::GetShaderHashForBinary);
+                nvrhi::BinaryBlob shaderLookupResult = crashDumpHelper.findShaderBinary(shaderHash.hash, caustica::AftermathCrashDump::GetShaderHashForBinary);
                 if (shaderLookupResult.second > 0)
                 {
                     std::stringstream ss;
@@ -74,10 +74,10 @@ static void DumpFileCallback(const void* pGpuCrashDump, const uint32_t gpuCrashD
 
 static void ShaderDebugInfoCallback(const void* pShaderDebugInfo, const uint32_t shaderDebugInfoSize, void* pUserData)
 {
-    donut::app::AftermathCrashDump* dumper = reinterpret_cast<donut::app::AftermathCrashDump*>(pUserData);
+    caustica::AftermathCrashDump* dumper = reinterpret_cast<caustica::AftermathCrashDump*>(pUserData);
     std::filesystem::create_directory(dumper->GetDumpFolder());
 
-    auto nativeFS = std::make_unique<donut::vfs::NativeFileSystem>();
+    auto nativeFS = std::make_unique<caustica::NativeFileSystem>();
     // the hash used for nsight is stored in the shader debug info file in address 0x20-0x40
     // the name (in terms of uint64s at byte addresses) is 0x28 0x20 - 0x38 0x30
     // which in terms of uint64 addresses is 0x5 0x4 - 0x7 0x6
@@ -91,14 +91,14 @@ static void ShaderDebugInfoCallback(const void* pShaderDebugInfo, const uint32_t
 
 static void DescriptionCallback(PFN_GFSDK_Aftermath_AddGpuCrashDumpDescription addDescription, void* pUserData)
 {
-    donut::app::AftermathCrashDump* dumper = reinterpret_cast<donut::app::AftermathCrashDump*>(pUserData);
+    caustica::AftermathCrashDump* dumper = reinterpret_cast<caustica::AftermathCrashDump*>(pUserData);
     addDescription(GFSDK_Aftermath_GpuCrashDumpDescriptionKey_ApplicationName, dumper->GetDeviceManager().GetWindowTitle());
 }
 
 // this callback should call into the nvrhi device which has the necessary information
 static void ResolveMarkerCallback(const void* pMarkerData, const uint32_t markerDataSize, void* pUserData, void** ppResolvedMarkerData, uint32_t* pResolvedMarkerDataSize)
 {
-    donut::app::AftermathCrashDump* dumper = reinterpret_cast<donut::app::AftermathCrashDump*>(pUserData);
+    caustica::AftermathCrashDump* dumper = reinterpret_cast<caustica::AftermathCrashDump*>(pUserData);
     const uint64_t markerAsHash = reinterpret_cast<const uint64_t>(pMarkerData);
     // as long as the device is not yet destroyed, these references should be ok to pass back
     const std::string& resolvedMarker = dumper->ResolveMarker(markerAsHash);
@@ -106,7 +106,7 @@ static void ResolveMarkerCallback(const void* pMarkerData, const uint32_t marker
     *pResolvedMarkerDataSize = uint32_t(resolvedMarker.length());
 }
 
-void donut::app::AftermathCrashDump::WaitForCrashDump(uint32_t maxTimeoutSeconds)
+void caustica::AftermathCrashDump::WaitForCrashDump(uint32_t maxTimeoutSeconds)
 {
     std::chrono::time_point startTime = std::chrono::system_clock::now();
     bool timedOut = false;
@@ -123,7 +123,7 @@ void donut::app::AftermathCrashDump::WaitForCrashDump(uint32_t maxTimeoutSeconds
     }
 }
 
-uint64_t donut::app::AftermathCrashDump::GetShaderHashForBinary(std::pair<const void*, size_t> shaderBinary, nvrhi::GraphicsAPI api)
+uint64_t caustica::AftermathCrashDump::GetShaderHashForBinary(std::pair<const void*, size_t> shaderBinary, nvrhi::GraphicsAPI api)
 {
 #if DONUT_WITH_VULKAN
     if (api == nvrhi::GraphicsAPI::VULKAN)
@@ -151,7 +151,7 @@ uint64_t donut::app::AftermathCrashDump::GetShaderHashForBinary(std::pair<const 
 }
 
 static bool AftermathInitialized = false;
-void donut::app::AftermathCrashDump::InitializeAftermathCrashDump(AftermathCrashDump* dumper)
+void caustica::AftermathCrashDump::InitializeAftermathCrashDump(AftermathCrashDump* dumper)
 {
     // if already initialized, reinit with new crash dumper
     if (AftermathInitialized)
@@ -178,17 +178,17 @@ void donut::app::AftermathCrashDump::InitializeAftermathCrashDump(AftermathCrash
         dumper);
     if (!GFSDK_Aftermath_SUCCEED(result))
     {
-        log::error("Aftermath crash dump enable failed with error 0x%.8x", result);
+        caustica::error("Aftermath crash dump enable failed with error 0x%.8x", result);
     }
 }
 
 
-donut::app::AftermathCrashDump::AftermathCrashDump(DeviceManager& deviceManager) :
+caustica::AftermathCrashDump::AftermathCrashDump(DeviceManager& deviceManager) :
     m_deviceManager(deviceManager)
 {
 }
 
-void donut::app::AftermathCrashDump::EnableCrashDumpTracking()
+void caustica::AftermathCrashDump::EnableCrashDumpTracking()
 {
     InitializeAftermathCrashDump(this);
     // create a unique path to store the dump files based on date/time
@@ -197,21 +197,21 @@ void donut::app::AftermathCrashDump::EnableCrashDumpTracking()
     std::time_t t = std::time(nullptr);
     std::tm tm = *std::localtime(&t);
     folder << "crash_" << std::put_time(&tm, "%Y-%m-%d-%H_%M_%S");
-    m_dumpFolder = app::GetDirectoryWithExecutable() / folder.str();
+    m_dumpFolder = caustica::GetDirectoryWithExecutable() / folder.str();
 }
 
-const std::string& donut::app::AftermathCrashDump::ResolveMarker(uint64_t markerHash)
+const std::string& caustica::AftermathCrashDump::ResolveMarker(uint64_t markerHash)
 {
     auto [found, markerString] = m_deviceManager.GetDevice()->getAftermathCrashDumpHelper().ResolveMarker(markerHash);
     return markerString;
 }
 
-donut::app::DeviceManager& donut::app::AftermathCrashDump::GetDeviceManager()
+caustica::DeviceManager& caustica::AftermathCrashDump::GetDeviceManager()
 {
     return m_deviceManager;
 }
 
-std::filesystem::path donut::app::AftermathCrashDump::GetDumpFolder()
+std::filesystem::path caustica::AftermathCrashDump::GetDumpFolder()
 {
     return m_dumpFolder;
 }

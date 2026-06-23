@@ -25,9 +25,9 @@
 #include <engine/SceneGraph.h>
 #include <engine/View.h>
 
-using namespace donut::math;
-using namespace donut::engine;
-using namespace donut::render;
+using namespace caustica::math;
+using namespace caustica;
+using namespace caustica::render;
 
 const DrawItem* PassthroughDrawStrategy::GetNextItem()
 {
@@ -84,7 +84,7 @@ void InstancedOpaqueDrawStrategy::FillChunk()
                 auto meshInstance = dynamic_cast<MeshInstance*>(m_Walker->GetLeaf().get());
                 if (meshInstance)
                 {
-                    const engine::MeshInfo* mesh = meshInstance->GetMesh().get();
+                    const caustica::MeshInfo* mesh = meshInstance->GetMesh().get();
 
                     size_t requiredChunkSize = itemCount + mesh->geometries.size();
                     if (m_InstanceChunk.size() < requiredChunkSize)
@@ -141,7 +141,7 @@ void InstancedOpaqueDrawStrategy::FillChunk()
     m_ReadPtr = 0;
 }
 
-void donut::render::InstancedOpaqueDrawStrategy::PrepareForView(const std::shared_ptr<engine::SceneGraphNode>& rootNode, const engine::IView& view)
+void caustica::render::InstancedOpaqueDrawStrategy::PrepareForView(const std::shared_ptr<caustica::SceneGraphNode>& rootNode, const caustica::IView& view)
 {
     m_Walker = SceneGraphWalker(rootNode.get());
     m_ViewFrustum = view.GetViewFrustum();
@@ -169,7 +169,7 @@ static int CompareDrawItemsTransparent(const DrawItem* a, const DrawItem* b)
     return a->distanceToCamera > b->distanceToCamera;
 }
 
-void TransparentDrawStrategy::PrepareForView(const std::shared_ptr<engine::SceneGraphNode>& rootNode, const IView& view)
+void TransparentDrawStrategy::PrepareForView(const std::shared_ptr<caustica::SceneGraphNode>& rootNode, const IView& view)
 {
     m_ReadPtr = 0;
 
@@ -196,7 +196,7 @@ void TransparentDrawStrategy::PrepareForView(const std::shared_ptr<engine::Scene
                 auto meshInstance = dynamic_cast<MeshInstance*>(walker->GetLeaf().get());
                 if (meshInstance)
                 {
-                    const engine::MeshInfo* mesh = meshInstance->GetMesh().get();
+                    const caustica::MeshInfo* mesh = meshInstance->GetMesh().get();
                     for (const auto& geometry : mesh->geometries)
                     {
                         const auto& material = geometry->material;

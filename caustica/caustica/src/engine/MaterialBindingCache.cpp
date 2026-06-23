@@ -23,7 +23,7 @@
 #include <engine/MaterialBindingCache.h>
 #include <core/log.h>
 
-using namespace donut::engine;
+using namespace caustica;
 
 MaterialBindingCache::MaterialBindingCache(
     nvrhi::IDevice* device, 
@@ -69,7 +69,7 @@ MaterialBindingCache::MaterialBindingCache(
             layoutItem.type = nvrhi::ResourceType::Sampler;
             break;
         default:
-            log::error("MaterialBindingCache: unknown MaterialResource value (%d)", item.resource);
+            caustica::error("MaterialBindingCache: unknown MaterialResource value (%d)", item.resource);
             return;
         }
 
@@ -79,12 +79,12 @@ MaterialBindingCache::MaterialBindingCache(
     m_BindingLayout = m_Device->createBindingLayout(layoutDesc);
 }
 
-nvrhi::IBindingLayout* donut::engine::MaterialBindingCache::GetLayout() const
+nvrhi::IBindingLayout* caustica::MaterialBindingCache::GetLayout() const
 {
     return m_BindingLayout;
 }
 
-nvrhi::IBindingSet* donut::engine::MaterialBindingCache::GetMaterialBindingSet(const Material* material)
+nvrhi::IBindingSet* caustica::MaterialBindingCache::GetMaterialBindingSet(const Material* material)
 {
     std::lock_guard<std::mutex> lockGuard(m_Mutex);
 
@@ -98,7 +98,7 @@ nvrhi::IBindingSet* donut::engine::MaterialBindingCache::GetMaterialBindingSet(c
     return bindingSet;
 }
 
-void donut::engine::MaterialBindingCache::Clear()
+void caustica::MaterialBindingCache::Clear()
 {
     std::lock_guard<std::mutex> lockGuard(m_Mutex);
 
@@ -110,7 +110,7 @@ nvrhi::BindingSetItem MaterialBindingCache::GetTextureBindingSetItem(uint32_t sl
     return nvrhi::BindingSetItem::Texture_SRV(slot, texture && texture->texture ? texture->texture.Get() : m_FallbackTexture.Get());
 }
 
-nvrhi::BindingSetHandle donut::engine::MaterialBindingCache::CreateMaterialBindingSet(const Material* material)
+nvrhi::BindingSetHandle caustica::MaterialBindingCache::CreateMaterialBindingSet(const Material* material)
 {
     nvrhi::BindingSetDesc bindingSetDesc;
     bindingSetDesc.trackLiveness = m_TrackLiveness;
@@ -162,7 +162,7 @@ nvrhi::BindingSetHandle donut::engine::MaterialBindingCache::CreateMaterialBindi
             break;
 
         default:
-            log::error("MaterialBindingCache: unknown MaterialResource value (%d)", item.resource);
+            caustica::error("MaterialBindingCache: unknown MaterialResource value (%d)", item.resource);
             return nullptr;
         }
 

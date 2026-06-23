@@ -26,7 +26,7 @@
 #include <nvrhi/nvrhi.h>
 #include <memory>
 
-namespace donut::engine
+namespace caustica
 {
     class ShaderFactory;
     class CommonRenderPasses;
@@ -35,7 +35,7 @@ namespace donut::engine
 }
 
 
-namespace donut::render
+namespace caustica::render
 {
     class EnvironmentMapPass
     {
@@ -46,21 +46,21 @@ namespace donut::render
         nvrhi::BindingSetHandle m_RenderBindingSet;
         nvrhi::GraphicsPipelineHandle m_RenderPso;
 
-        std::shared_ptr<engine::CommonRenderPasses> m_CommonPasses;
-        std::shared_ptr<engine::FramebufferFactory> m_FramebufferFactory;
+        std::shared_ptr<caustica::CommonRenderPasses> m_CommonPasses;
+        std::shared_ptr<caustica::FramebufferFactory> m_FramebufferFactory;
 
     public:
         EnvironmentMapPass(
             nvrhi::IDevice* device,
-            std::shared_ptr<engine::ShaderFactory> shaderFactory,
-            std::shared_ptr<engine::CommonRenderPasses> commonPasses,
-            std::shared_ptr<engine::FramebufferFactory> framebufferFactory,
-            const engine::ICompositeView& compositeView,
+            std::shared_ptr<caustica::ShaderFactory> shaderFactory,
+            std::shared_ptr<caustica::CommonRenderPasses> commonPasses,
+            std::shared_ptr<caustica::FramebufferFactory> framebufferFactory,
+            const caustica::ICompositeView& compositeView,
             nvrhi::ITexture* environmentMap);
 
         void Render(
             nvrhi::ICommandList* commandList,
-            const engine::ICompositeView& compositeView);
+            const caustica::ICompositeView& compositeView);
     };
 
 }

@@ -23,7 +23,7 @@
 #include <math/math.h>
 #include <assert.h>
 
-namespace donut::math
+namespace caustica::math
 {
 	// Color space conversions
 

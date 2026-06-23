@@ -17,18 +17,15 @@
 class Sample;
 struct SampleUIData;
 
-namespace donut
+namespace caustica
 {
-    namespace engine
-    {
-        struct Material;
-    }
+    struct Material;
 }
 
 struct LocalConfig
 {
     static void        PreferredSceneOverride( std::string & preferredScene );
     static void        PostAppInit(SampleUIData & sampleUI );
-    static void        PostMaterialLoad( donut::engine::Material & material );
+    static void        PostMaterialLoad( caustica::Material & material );
     static void        PostSceneLoad( Sample & sample, SampleUIData & sampleUI );
 };

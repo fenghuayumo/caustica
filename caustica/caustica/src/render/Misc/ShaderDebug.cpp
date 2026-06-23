@@ -20,11 +20,10 @@
 //#include <iostream>
 #include <thread>
 
-using namespace donut;
-using namespace donut::math;
-using namespace donut::engine;
+using namespace caustica::math;
+using namespace caustica;
 
-ShaderDebug::ShaderDebug( nvrhi::IDevice* device, nvrhi::ICommandList* commandList, std::shared_ptr<donut::engine::ShaderFactory> shaderFactory, std::shared_ptr<donut::engine::CommonRenderPasses> commonPasses )
+ShaderDebug::ShaderDebug( nvrhi::IDevice* device, nvrhi::ICommandList* commandList, std::shared_ptr<caustica::ShaderFactory> shaderFactory, std::shared_ptr<caustica::CommonRenderPasses> commonPasses )
     : m_device(device)
     , m_shaderFactory(shaderFactory)
     , m_commonPasses(commonPasses)
@@ -111,8 +110,8 @@ void ShaderDebug::CreateRenderPasses( nvrhi::IFramebuffer * frameBuffer, nvrhi::
     }
 
     {
-        std::vector<donut::engine::ShaderMacro> shaderMacros;
-        shaderMacros.push_back(donut::engine::ShaderMacro({              "BLEND_DEBUG_BUFFER", "1" })); 
+        std::vector<caustica::ShaderMacro> shaderMacros;
+        shaderMacros.push_back(caustica::ShaderMacro({              "BLEND_DEBUG_BUFFER", "1" })); 
 
         m_blendDebugVizPS = m_shaderFactory->CreateShader("app/engine/shaders/Libraries/ShaderDebug/ShaderDebug.hlsl", "main", &shaderMacros, nvrhi::ShaderType::Pixel);
 
@@ -346,7 +345,7 @@ void ShaderDebug::OutputLastBufferPrints()
                 text += std::to_string(it.first) + ": " + it.second + " ";
         }
 
-        log::message(log::Severity::Info, "Shader: %s", text.c_str());
+        caustica::message(caustica::Severity::Info, "Shader: %s", text.c_str());
 
         assert(currentData <= itemStartPtr + header.NumBytes);
         currentData = itemStartPtr + header.NumBytes;
@@ -363,9 +362,9 @@ void ShaderDebug::OutputLastBufferPrints()
 
     if( hadOverflow )
     {
-        log::message(log::Severity::Info, "ShaderDebug: ============================================================================================");
-        log::message(log::Severity::Info, "ShaderDebug: ==== INSUFFICIENT SPACE IN SHADER_DEBUG_PRINT_BUFFER_IN_BYTES TO STORE ALL DebugPrint-s ====");
-        log::message(log::Severity::Info, "ShaderDebug: ============================================================================================");
+        caustica::message(caustica::Severity::Info, "ShaderDebug: ============================================================================================");
+        caustica::message(caustica::Severity::Info, "ShaderDebug: ==== INSUFFICIENT SPACE IN SHADER_DEBUG_PRINT_BUFFER_IN_BYTES TO STORE ALL DebugPrint-s ====");
+        caustica::message(caustica::Severity::Info, "ShaderDebug: ============================================================================================");
     }
 }
 

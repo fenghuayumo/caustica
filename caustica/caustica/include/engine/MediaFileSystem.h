@@ -28,19 +28,19 @@
 #include <memory>
 #include <vector>
 
-namespace donut::app
+namespace caustica
 {
 	//
 	// A dedicated virtual file system for media assets implementing file access
 	// policies as follows:
 	//
 	//   * all media assets are located under a single 'path' under the 'parent' 
-	//     filesystem (typically a physical vfs::NativeFileSystem)
+	//     filesystem (typically a physical caustica::NativeFileSystem)
 	//
 	//   * on creation, the MediaFileSystem scans the media directory for all
 	//     package files at the media directory root (in parent file system), and,
 	//     where possible, opens them with an appropriate virtual file system 
-	//     (ex. vfs::TarFile)
+	//     (ex. caustica::TarFile)
 	//
 	//   * all file paths relative to the MediaFileSystem are resolved uniquely
 	//     in the following order:
@@ -53,7 +53,7 @@ namespace donut::app
 	//
 	// note: MediaFileSystem can be mounted under a RootFileSytem
 	//
-	class MediaFileSystem : public vfs::IFileSystem
+	class MediaFileSystem : public caustica::IFileSystem
 	{
 	public:
 
@@ -68,12 +68,12 @@ namespace donut::app
 
 		bool folderExists(const std::filesystem::path& name) override;
 		bool fileExists(const std::filesystem::path& name) override;
-		std::shared_ptr<vfs::IBlob> readFile(const std::filesystem::path& name) override;
+		std::shared_ptr<caustica::IBlob> readFile(const std::filesystem::path& name) override;
 		bool writeFile(const std::filesystem::path& name, const void* data, size_t size) override;
-		int enumerateFiles(const std::filesystem::path& path, const std::vector<std::string>& extensions, vfs::enumerate_callback_t callback, bool allowDuplicates = false) override;
-		int enumerateDirectories(const std::filesystem::path& path, vfs::enumerate_callback_t callback, bool allowDuplicates = false) override;
+		int enumerateFiles(const std::filesystem::path& path, const std::vector<std::string>& extensions, caustica::enumerate_callback_t callback, bool allowDuplicates = false) override;
+		int enumerateDirectories(const std::filesystem::path& path, caustica::enumerate_callback_t callback, bool allowDuplicates = false) override;
 
 	private:
-		std::vector<std::shared_ptr<vfs::IFileSystem>> m_FileSystems;
+		std::vector<std::shared_ptr<caustica::IFileSystem>> m_FileSystems;
 	};
-} // end namespace donut::app
+} // end namespace caustica

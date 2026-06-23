@@ -15,15 +15,15 @@
 #include <core/log.h>
 #include <nvrhi/utils.h>
 
-using namespace donut::engine;
+using namespace caustica;
 
 
 bool ComputePass::Init(
 	nvrhi::IDevice* device, 
-	donut::engine::ShaderFactory& shaderFactory, 
+	caustica::ShaderFactory& shaderFactory, 
 	const char* fileName, 
     const char* entry, 
-	const std::vector<donut::engine::ShaderMacro>& macros, 
+	const std::vector<caustica::ShaderMacro>& macros, 
 	nvrhi::IBindingLayout* bindingLayout,
 	nvrhi::IBindingLayout* extraBindingLayout /*= nullptr*/, 
 	nvrhi::IBindingLayout* bindlessLayout /*= nullptr*/)
@@ -50,10 +50,10 @@ bool ComputePass::Init(
 
 bool ComputePass::Init(
     nvrhi::IDevice* device,
-    donut::engine::ShaderFactory& shaderFactory,
+    caustica::ShaderFactory& shaderFactory,
     const char* fileName,
     const char* entry,
-    const std::vector<donut::engine::ShaderMacro>& macros,
+    const std::vector<caustica::ShaderMacro>& macros,
     nvrhi::BindingLayoutVector & bindingLayouts )
 {
     m_computeShader = shaderFactory.CreateShader(fileName, entry, &macros, nvrhi::ShaderType::Compute);

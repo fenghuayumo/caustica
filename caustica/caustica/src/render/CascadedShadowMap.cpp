@@ -25,9 +25,9 @@
 #include <render/DrawStrategy.h>
 #include <render/PlanarShadowMap.h>
 
-using namespace donut::math;
-using namespace donut::engine;
-using namespace donut::render;
+using namespace caustica::math;
+using namespace caustica;
+using namespace caustica::render;
 
 CascadedShadowMap::CascadedShadowMap(
     nvrhi::IDevice* device, 
@@ -382,7 +382,7 @@ void CascadedShadowMap::FillShadowConstants(struct ShadowConstants& constants) c
     assert(false);
 }
 
-std::shared_ptr<donut::engine::PlanarView> donut::render::CascadedShadowMap::GetCascadeView(uint32_t cascade)
+std::shared_ptr<caustica::PlanarView> caustica::render::CascadedShadowMap::GetCascadeView(uint32_t cascade)
 {
     if (static_cast<int>(cascade) < m_NumberOfCascades)
         return m_Cascades[cascade]->GetPlanarView();
@@ -390,7 +390,7 @@ std::shared_ptr<donut::engine::PlanarView> donut::render::CascadedShadowMap::Get
     return nullptr;
 }
 
-std::shared_ptr<donut::engine::PlanarView> donut::render::CascadedShadowMap::GetPerObjectView(uint32_t object)
+std::shared_ptr<caustica::PlanarView> caustica::render::CascadedShadowMap::GetPerObjectView(uint32_t object)
 {
     if (object < m_PerObjectShadows.size())
         return m_PerObjectShadows[object]->GetPlanarView();
@@ -398,7 +398,7 @@ std::shared_ptr<donut::engine::PlanarView> donut::render::CascadedShadowMap::Get
     return nullptr;
 }
 
-void donut::render::CascadedShadowMap::SetNumberOfCascadesUnsafe(int cascades)
+void caustica::render::CascadedShadowMap::SetNumberOfCascadesUnsafe(int cascades)
 {
 	m_NumberOfCascades = (cascades < 0 || cascades >= (int)m_Cascades.size()) ? (int)m_Cascades.size() : cascades;
 }

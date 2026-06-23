@@ -21,7 +21,7 @@
 #include <shaders/PathTracer/Lighting/EnvMap.hlsli>
 #include <render/ProcessingPasses/GaussianSplatEmissionProxy.h>
 
-namespace donut::engine
+namespace caustica
 {
     class CommonRenderPasses;
     class ShaderFactory;
@@ -59,26 +59,26 @@ private:
     uint32_t m_MaxLightsInBuffer;
     bool m_OddFrame = false;
     
-    std::shared_ptr<donut::engine::ShaderFactory> m_shaderFactory;
-    std::shared_ptr<donut::engine::CommonRenderPasses> m_commonPasses;
+    std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
+    std::shared_ptr<caustica::CommonRenderPasses> m_commonPasses;
     std::shared_ptr<ExtendedScene> m_Scene;
     std::shared_ptr<class MaterialsBaker> m_materialsBaker;
     std::shared_ptr<class OmmBaker> m_ommBaker;
     nvrhi::BufferHandle m_subInstanceData;
     const std::vector<GaussianSplatEmissionProxy>* m_GaussianSplatEmissionProxies = nullptr;
-    donut::math::float4x4 m_GaussianSplatEmissionObjectToWorld = donut::math::float4x4::identity();
+    caustica::math::float4x4 m_GaussianSplatEmissionObjectToWorld = caustica::math::float4x4::identity();
     float m_GaussianSplatEmissionIntensity = 0.0f;
 
     std::unordered_map<size_t, uint32_t> m_InstanceLightBufferOffsets; // hash(instance*, geometryIndex) -> bufferOffset
-    std::unordered_map<const donut::engine::Light*, uint32_t> m_PrimitiveLightBufferOffsets;
+    std::unordered_map<const caustica::Light*, uint32_t> m_PrimitiveLightBufferOffsets;
 
     std::shared_ptr<ShaderDebug>   m_shaderDebug;
 
 public:
     PrepareLightsPass(
         nvrhi::IDevice* device,
-        std::shared_ptr<donut::engine::ShaderFactory> shaderFactory,
-        std::shared_ptr<donut::engine::CommonRenderPasses> commonPasses,
+        std::shared_ptr<caustica::ShaderFactory> shaderFactory,
+        std::shared_ptr<caustica::CommonRenderPasses> commonPasses,
         std::shared_ptr<ExtendedScene> scene,
         std::shared_ptr<class MaterialsBaker> materialsBaker,
         std::shared_ptr<class OmmBaker> ommBaker,
@@ -88,7 +88,7 @@ public:
     );
 
     void SetScene(std::shared_ptr<ExtendedScene> scene, std::shared_ptr<EnvMapBaker> environmentMap = nullptr, EnvMapSceneParams envMapSceneParams = {} );
-    void SetGaussianSplatEmissionProxies(const std::vector<GaussianSplatEmissionProxy>* proxies, donut::math::float4x4 objectToWorld, float emissionIntensity);
+    void SetGaussianSplatEmissionProxies(const std::vector<GaussianSplatEmissionProxy>* proxies, caustica::math::float4x4 objectToWorld, float emissionIntensity);
     void CreatePipeline();
     void CreateBindingSet(RtxdiResources& resources, const RenderTargets& renderTargets);
     void CountLightsInScene(uint32_t& numEmissiveMeshes, uint32_t& numEmissiveTriangles);

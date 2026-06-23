@@ -44,13 +44,13 @@ namespace game
         void                    SetStoragePath(const std::filesystem::path& path) { m_storagePath = path; }
         void                    SetAnimOffset(double animOffset)        { m_animOffset = animOffset; }
         const std::string &     GetName() const                         { return m_node->GetName(); }
-        const std::shared_ptr<donut::engine::SceneGraphNode> & 
+        const std::shared_ptr<caustica::SceneGraphNode> & 
                                 GetNode() const                         { return m_node; }
         const std::vector<std::shared_ptr<ModelInstance>> &
                                 GetModels() const                       { return m_models; }
 
-        virtual void            GUI(float indent, bool & gameCameraAttached, donut::app::FirstPersonCamera & gameCamera);
-        virtual ScreenGUISel    StandaloneGUI(const std::shared_ptr<donut::engine::PlanarView> & view, const float2 & mousePos, const float2 & displaySize);
+        virtual void            GUI(float indent, bool & gameCameraAttached, caustica::FirstPersonCamera & gameCamera);
+        virtual ScreenGUISel    StandaloneGUI(const std::shared_ptr<caustica::PlanarView> & view, const float2 & mousePos, const float2 & displaySize);
 
     protected:
         std::shared_ptr<ModelInstance> CreateAndAttachModel( const std::shared_ptr<game::ModelType> & modelType, const std::string & instanceName, const dm::float3& translation, const dm::quat& rotation = dm::quat::identity(), const dm::float3& scaling = dm::float3(1,1,1) );
@@ -80,7 +80,7 @@ namespace game
 
         bool                        m_allowKeyMoveIfSelected = true;
 
-        std::shared_ptr<donut::engine::SceneGraphNode> m_node;
+        std::shared_ptr<caustica::SceneGraphNode> m_node;
 
         std::vector<std::shared_ptr<ModelInstance>>
                                     m_models;

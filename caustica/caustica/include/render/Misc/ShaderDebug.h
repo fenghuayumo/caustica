@@ -16,7 +16,7 @@
 
 #include <shaders/Libraries/ShaderDebug/ShaderDebug.hlsl>
 
-namespace donut::engine
+namespace caustica
 {
     class ShaderFactory;
     class CommonRenderPasses;
@@ -56,18 +56,18 @@ private:
     nvrhi::GraphicsPipelineHandle   m_blendDebugVizPSO;
 
 
-    std::shared_ptr<donut::engine::ShaderFactory> m_shaderFactory;
-    std::shared_ptr<donut::engine::CommonRenderPasses> m_commonPasses;
+    std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
+    std::shared_ptr<caustica::CommonRenderPasses> m_commonPasses;
 
     std::array<char, SHADER_DEBUG_HEADER_IN_BYTES>              m_initHeader;
     std::array<char, SHADER_DEBUG_BUFFER_IN_BYTES_NO_TRIANGLES> m_lastBuffer;
 
 public:
-    ShaderDebug( nvrhi::IDevice* device, nvrhi::ICommandList* commandList, std::shared_ptr<donut::engine::ShaderFactory> shaderFactory, std::shared_ptr<donut::engine::CommonRenderPasses> commonPasses );
+    ShaderDebug( nvrhi::IDevice* device, nvrhi::ICommandList* commandList, std::shared_ptr<caustica::ShaderFactory> shaderFactory, std::shared_ptr<caustica::CommonRenderPasses> commonPasses );
 
     void                    CreateRenderPasses( nvrhi::IFramebuffer * frameBuffer, nvrhi::TextureHandle depthBuffer );
 
-    void                    BeginFrame( nvrhi::ICommandList* commandList, const donut::math::float4x4 & matWorldToClip );
+    void                    BeginFrame( nvrhi::ICommandList* commandList, const caustica::math::float4x4 & matWorldToClip );
     void                    ClearDebugVizTexture(nvrhi::CommandListHandle commandList); // not merged with BeginFrame since sometimes you want it to persist between frames
 
     void                    EndFrameAndOutput( nvrhi::ICommandList* commandList, nvrhi::IFramebuffer * frameBuffer, nvrhi::TextureHandle depthBuffer, const nvrhi::Viewport & viewport );

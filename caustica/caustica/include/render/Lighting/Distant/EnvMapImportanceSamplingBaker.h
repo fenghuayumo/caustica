@@ -19,13 +19,13 @@
 
 #include <filesystem>
 
-using namespace donut::math;
+using namespace caustica::math;
 
 #include <shaders/PathTracer/Lighting/LightingTypes.hlsli>
 #include <shaders/PathTracer/Lighting/EnvMap.hlsli>
 #include <shaders/render/Lighting/Distant/EnvMapImportanceSamplingBaker.hlsl>
 
-namespace donut::engine
+namespace caustica
 {
     class FramebufferFactory;
     class TextureCache;
@@ -34,7 +34,7 @@ namespace donut::engine
     class CommonRenderPasses;
     struct TextureData;
 }
-namespace donut::render
+namespace caustica::render
 {
     class MipMapGenPass;
 }
@@ -51,7 +51,7 @@ class EnvMapImportanceSamplingBaker
 public:
 
 public:
-    EnvMapImportanceSamplingBaker( nvrhi::IDevice* device, std::shared_ptr<donut::engine::ShaderFactory> shaderFactory );
+    EnvMapImportanceSamplingBaker( nvrhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory );
     ~EnvMapImportanceSamplingBaker();
 
     void                            CreateRenderPasses();
@@ -83,7 +83,7 @@ private:
 
 private:
     nvrhi::DeviceHandle             m_device;
-    std::shared_ptr<donut::engine::ShaderFactory> m_shaderFactory;
+    std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
 
     nvrhi::SamplerHandle            m_pointClampSampler;
     nvrhi::SamplerHandle            m_linearWrapSampler;
@@ -97,8 +97,8 @@ private:
     nvrhi::BindingLayoutHandle      m_importanceMapBindingLayout;
     nvrhi::ComputePipelineHandle    m_importanceMapPipeline;
     nvrhi::BindingSetHandle         m_importanceMapBindingSet;
-    std::shared_ptr<donut::render::MipMapGenPass> m_MIPMapPass;
-    std::shared_ptr<donut::render::MipMapGenPass> m_MIPMapPassRad;  // for m_radianceMapTexture - should be combined with importance map mip gen
+    std::shared_ptr<caustica::render::MipMapGenPass> m_MIPMapPass;
+    std::shared_ptr<caustica::render::MipMapGenPass> m_MIPMapPassRad;  // for m_radianceMapTexture - should be combined with importance map mip gen
 
 #if 0
     // Pre-sampling approach (faster for path tracing, but limited)

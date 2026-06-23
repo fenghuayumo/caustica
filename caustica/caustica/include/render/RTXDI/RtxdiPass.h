@@ -32,7 +32,7 @@ class EnvMapBaker;
 struct ReGirIndirectConstants;
 class ShaderDebug;
 
-namespace donut::engine
+namespace caustica
 {
 	class ShaderFactory;
 	class CommonRenderPasses;
@@ -93,8 +93,8 @@ struct RtxdiUserSettings
 struct RtxdiBridgeParameters
 {
 	uint32_t frameIndex;
-	donut::math::uint2 frameDims;
-	donut::math::float3 cameraPosition;
+	caustica::math::uint2 frameDims;
+	caustica::math::float3 cameraPosition;
 
 	RtxdiUserSettings userSettings;
 
@@ -102,7 +102,7 @@ struct RtxdiBridgeParameters
     bool usingReGIR;
 
     const std::vector<GaussianSplatEmissionProxy>* gaussianSplatEmissionProxies = nullptr;
-    donut::math::float4x4 gaussianSplatEmissionObjectToWorld = donut::math::float4x4::identity();
+    caustica::math::float4x4 gaussianSplatEmissionObjectToWorld = caustica::math::float4x4::identity();
     float gaussianSplatEmissionIntensity = 0.0f;
 };
 
@@ -111,8 +111,8 @@ class RtxdiPass
 public:
 	RtxdiPass(
 		nvrhi::IDevice* device,
-		std::shared_ptr<donut::engine::ShaderFactory> shaderFactory,
-		std::shared_ptr<donut::engine::CommonRenderPasses> commonRenderPasses,
+		std::shared_ptr<caustica::ShaderFactory> shaderFactory,
+		std::shared_ptr<caustica::CommonRenderPasses> commonRenderPasses,
 		nvrhi::BindingLayoutHandle bindlessLayout);
 	~RtxdiPass();
 
@@ -161,8 +161,8 @@ private:
 	std::unique_ptr<GenerateMipsPass> m_LocalLightPdfMipmapPass;
 
 	nvrhi::DeviceHandle m_device; 
-	std::shared_ptr<donut::engine::ShaderFactory> m_shaderFactory;
-	std::shared_ptr<donut::engine::CommonRenderPasses> m_CommonRenderPasses;
+	std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
+	std::shared_ptr<caustica::CommonRenderPasses> m_CommonRenderPasses;
 	std::shared_ptr<ExtendedScene> m_Scene;
 	nvrhi::BindingLayoutHandle m_bindingLayout;
 	nvrhi::BindingLayoutHandle m_bindlessLayout;
@@ -203,7 +203,7 @@ private:
 		nvrhi::IBindingSet* extraBindingSet = nullptr
 	);
 
-	donut::engine::ShaderMacro GetReGirMacro(const rtxdi::ReGIRStaticParameters& regirParameters);
+	caustica::ShaderMacro GetReGirMacro(const rtxdi::ReGIRStaticParameters& regirParameters);
 
 	void FillConstants(nvrhi::CommandListHandle commandList);
 	void FillSharedConstants(struct RtxdiBridgeConstants& bridgeConstants) const;

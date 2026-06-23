@@ -29,7 +29,7 @@
 
 class RenderTargets;
 
-namespace donut::engine
+namespace caustica
 {
     class ShaderFactory;
     class PlanarView;
@@ -38,7 +38,7 @@ namespace donut::engine
 struct NVSDK_NGX_Handle;
 struct NVSDK_NGX_Parameter;
 
-namespace donut::render
+namespace caustica::render
 {
 
     class DLSS
@@ -77,7 +77,7 @@ namespace donut::render
             bool resetHistory = false;
         };
 
-        DLSS(nvrhi::IDevice* device, donut::engine::ShaderFactory& shaderFactory);
+        DLSS(nvrhi::IDevice* device, caustica::ShaderFactory& shaderFactory);
 
         [[nodiscard]] bool IsDlssSupported() const;
         [[nodiscard]] bool IsDlssInitialized() const;
@@ -90,11 +90,11 @@ namespace donut::render
         virtual bool Evaluate(
             nvrhi::ICommandList* commandList,
             const EvaluateParameters& params,
-            const donut::engine::PlanarView& view) = 0;
+            const caustica::PlanarView& view) = 0;
 
         virtual ~DLSS() = default;
 
-        static std::unique_ptr<DLSS> Create(nvrhi::IDevice* device, donut::engine::ShaderFactory& shaderFactory,
+        static std::unique_ptr<DLSS> Create(nvrhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
             std::string const& directoryWithExecutable, uint32_t applicationID = DefaultApplicationID);
 
         static void GetRequiredVulkanExtensions(std::vector<std::string>& instanceExtensions, std::vector<std::string>& deviceExtensions);
@@ -125,15 +125,15 @@ namespace donut::render
         void ComputeExposure(nvrhi::ICommandList* commandList, nvrhi::IBuffer* toneMapperExposureBuffer, float exposureScale);
         
     #if DONUT_WITH_DX11
-        static std::unique_ptr<DLSS> CreateDX11(nvrhi::IDevice* device, donut::engine::ShaderFactory& shaderFactory,
+        static std::unique_ptr<DLSS> CreateDX11(nvrhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
             std::string const& directoryWithExecutable, uint32_t applicationID);
     #endif
     #if DONUT_WITH_DX12
-        static std::unique_ptr<DLSS> CreateDX12(nvrhi::IDevice* device, donut::engine::ShaderFactory& shaderFactory,
+        static std::unique_ptr<DLSS> CreateDX12(nvrhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
             std::string const& directoryWithExecutable, uint32_t applicationID);
     #endif
     #if DONUT_WITH_VULKAN
-        static std::unique_ptr<DLSS> CreateVK(nvrhi::IDevice* device, donut::engine::ShaderFactory& shaderFactory,
+        static std::unique_ptr<DLSS> CreateVK(nvrhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
             std::string const& directoryWithExecutable, uint32_t applicationID);
     #endif
     };

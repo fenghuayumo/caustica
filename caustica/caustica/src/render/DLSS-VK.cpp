@@ -32,18 +32,17 @@
 #include <core/log.h>
 #include <nvrhi/vulkan.h>
 
-using namespace donut;
-using namespace donut::render;
+using namespace caustica::render;
 
 static void NVSDK_CONV NgxLogCallback(const char* message, NVSDK_NGX_Logging_Level loggingLevel, NVSDK_NGX_Feature sourceComponent)
 {
-    log::info("NGX: %s", message);
+    caustica::info("NGX: %s", message);
 }
 
 class DLSS_VK : public DLSS
 {
 public:
-    DLSS_VK(nvrhi::IDevice* device, donut::engine::ShaderFactory& shaderFactory,
+    DLSS_VK(nvrhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
         std::string const& directoryWithExecutable, uint32_t applicationID)
         : DLSS(device, shaderFactory)
     {
@@ -64,7 +63,7 @@ public:
 
         if (result != NVSDK_NGX_Result_Success)
         {
-            log::warning("Cannot initialize NGX, Result = 0x%08x (%ls)", result, GetNGXResultAsString(result));
+            caustica::warning("Cannot initialize NGX, Result = 0x%08x (%ls)", result, GetNGXResultAsString(result));
             return;
         }
         
@@ -82,7 +81,7 @@ public:
             {
                 result = NVSDK_NGX_Result_Fail;
                 NVSDK_NGX_Parameter_GetI(m_parameters, NVSDK_NGX_Parameter_SuperSampling_FeatureInitResult, (int*)&result);
-                log::warning("NVIDIA DLSS is not available on this system, FeatureInitResult = 0x%08x (%ls)", result, GetNGXResultAsString(result));
+                caustica::warning("NVIDIA DLSS is not available on this system, FeatureInitResult = 0x%08x (%ls)", result, GetNGXResultAsString(result));
             }
         }
 
@@ -95,7 +94,7 @@ public:
             {
                 result = NVSDK_NGX_Result_Fail;
                 NVSDK_NGX_Parameter_GetI(m_parameters, NVSDK_NGX_Parameter_SuperSamplingDenoising_FeatureInitResult, (int*)&result);
-                log::warning("NVIDIA DLSSRR is not available on this system, FeatureInitResult = 0x%08x (%ls)", result, GetNGXResultAsString(result));
+                caustica::warning("NVIDIA DLSSRR is not available on this system, FeatureInitResult = 0x%08x (%ls)", result, GetNGXResultAsString(result));
             }
         }
     }
@@ -159,7 +158,7 @@ public:
 
         if (result != NVSDK_NGX_Result_Success)
         {
-            log::warning("Failed to create a DLSS feautre, Result = 0x%08x (%ls)", result, GetNGXResultAsString(result));
+            caustica::warning("Failed to create a DLSS feautre, Result = 0x%08x (%ls)", result, GetNGXResultAsString(result));
             return;
         }
 
@@ -193,7 +192,7 @@ public:
     bool Evaluate(
         nvrhi::ICommandList* commandList,
         const EvaluateParameters& params,
-        const donut::engine::PlanarView& view) override
+        const caustica::PlanarView& view) override
     {
         if (!m_dlssInitialized && !m_rayReconstructionInitialized)
             return false;
@@ -278,7 +277,7 @@ public:
 
         if (result != NVSDK_NGX_Result_Success)
         {
-            log::warning("Failed to evaluate DLSS feature: 0x%08x", result);
+            caustica::warning("Failed to evaluate DLSS feature: 0x%08x", result);
             return false;
         }
 
@@ -304,7 +303,7 @@ public:
     }
 };
 
-std::unique_ptr<DLSS> DLSS::CreateVK(nvrhi::IDevice* device, donut::engine::ShaderFactory& shaderFactory,
+std::unique_ptr<DLSS> DLSS::CreateVK(nvrhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
     std::string const& directoryWithExecutable, uint32_t applicationID)
 {
     return std::make_unique<DLSS_VK>(device, shaderFactory, directoryWithExecutable, applicationID);

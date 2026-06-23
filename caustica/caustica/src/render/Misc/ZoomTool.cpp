@@ -18,12 +18,12 @@
 #define GLFW_INCLUDE_NONE // Do not include any OpenGL headers
 #include <GLFW/glfw3.h>
 
-using namespace donut::math;
+using namespace caustica::math;
 
 #include <shaders/render/Misc/ZoomTool.hlsl>
 
 
-ZoomTool::ZoomTool( nvrhi::IDevice* device, std::shared_ptr<donut::engine::ShaderFactory> shaderFactory )
+ZoomTool::ZoomTool( nvrhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory )
     : m_device(device)
     , m_bindingCache(device)
 { 
@@ -39,9 +39,9 @@ ZoomTool::ZoomTool( nvrhi::IDevice* device, std::shared_ptr<donut::engine::Shade
 
     // These need to know about the scene
     pipelineDesc.bindingLayouts = { m_bindingLayout };
-    m_CSZoomTool.Init(m_device, *shaderFactory, "app/engine/shaders/render/Misc/ZoomTool.hlsl", "main", std::vector<donut::engine::ShaderMacro>(), pipelineDesc.bindingLayouts);
+    m_CSZoomTool.Init(m_device, *shaderFactory, "app/engine/shaders/render/Misc/ZoomTool.hlsl", "main", std::vector<caustica::ShaderMacro>(), pipelineDesc.bindingLayouts);
 
-    m_constantBuffer = m_device->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ZoomToolShaderConstants), "ZoomToolShaderConstants", donut::engine::c_MaxRenderPassConstantBufferVersions));
+    m_constantBuffer = m_device->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ZoomToolShaderConstants), "ZoomToolShaderConstants", caustica::c_MaxRenderPassConstantBufferVersions));
 }
 
 ZoomTool::~ZoomTool( )
@@ -111,7 +111,7 @@ bool ZoomTool::DebugGUI(float indent)
 
     ImGui::Checkbox("Enabled", &m_settings.Enabled);
     ImGui::InputInt("ZoomFactor", &m_settings.ZoomFactor, 1);
-    m_settings.ZoomFactor = donut::math::clamp(m_settings.ZoomFactor, 2, 32);
+    m_settings.ZoomFactor = caustica::math::clamp(m_settings.ZoomFactor, 2, 32);
 
     ImGui::InputInt2("BoxPos", &m_settings.BoxPos.x);
     ImGui::InputInt2("BoxSize", &m_settings.BoxSize.x);

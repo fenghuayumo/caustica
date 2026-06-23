@@ -28,9 +28,9 @@
 
 #include <filesystem>
 
-using namespace donut::math;
+using namespace caustica::math;
 
-namespace donut::engine
+namespace caustica
 {
     class FramebufferFactory;
     class TextureCache;
@@ -89,15 +89,15 @@ public:
     // Reset scene related stuff
     void                            SceneReloaded();
 
-    void                            CreateRenderPasses(std::shared_ptr<donut::engine::ShaderFactory> shaderFactory, nvrhi::IBindingLayout* bindlessLayout, std::shared_ptr<donut::engine::CommonRenderPasses> commonPasses, std::shared_ptr<ShaderDebug> shaderDebug, const uint2 renderResolution, const uint envMapProcessedResolution);
+    void                            CreateRenderPasses(std::shared_ptr<caustica::ShaderFactory> shaderFactory, nvrhi::IBindingLayout* bindlessLayout, std::shared_ptr<caustica::CommonRenderPasses> commonPasses, std::shared_ptr<ShaderDebug> shaderDebug, const uint2 renderResolution, const uint envMapProcessedResolution);
 
     // Main and only processing stage is split into UpdateBegin/UpdateEnd. These can be called one after the other as soon as screen space motion vectors are available.
     // The split is purely to facilitate any potential async compute.
     
     // UpdateBegin can happen in parallel with any other ray preparatory tracing work - anything from BVH building to laying down denoising layers. Emissive triangle emission must be accessible at this point.
-    void                            UpdateBegin(nvrhi::ICommandList * commandList, donut::engine::BindingCache & bindingCache, const BakeSettings & settings, double sceneTime, const std::shared_ptr<ExtendedScene> & scene, std::shared_ptr<class MaterialsBaker> materialsBaker, std::shared_ptr<class OmmBaker> ommBaker, nvrhi::BufferHandle subInstanceDataBuffer, std::vector<SubInstanceData> & subInstanceData, nvrhi::TextureHandle envMapProcessed);
+    void                            UpdateBegin(nvrhi::ICommandList * commandList, caustica::BindingCache & bindingCache, const BakeSettings & settings, double sceneTime, const std::shared_ptr<ExtendedScene> & scene, std::shared_ptr<class MaterialsBaker> materialsBaker, std::shared_ptr<class OmmBaker> ommBaker, nvrhi::BufferHandle subInstanceDataBuffer, std::vector<SubInstanceData> & subInstanceData, nvrhi::TextureHandle envMapProcessed);
     // UpdateEnd must happen BEFORE any light sampling (e.g. PT pass with NEE) but AFTER screen space motion vectors are available for reprojection.
-    void                            UpdateEnd(nvrhi::ICommandList * commandList, donut::engine::BindingCache & bindingCache, const std::shared_ptr<ExtendedScene> & scene, std::shared_ptr<class MaterialsBaker> materialsBaker, std::shared_ptr<class OmmBaker> ommBaker, nvrhi::BufferHandle subInstanceDataBuffer, nvrhi::TextureHandle depthBuffer, nvrhi::TextureHandle motionVectors);
+    void                            UpdateEnd(nvrhi::ICommandList * commandList, caustica::BindingCache & bindingCache, const std::shared_ptr<ExtendedScene> & scene, std::shared_ptr<class MaterialsBaker> materialsBaker, std::shared_ptr<class OmmBaker> ommBaker, nvrhi::BufferHandle subInstanceDataBuffer, nvrhi::TextureHandle depthBuffer, nvrhi::TextureHandle motionVectors);
 
     nvrhi::BufferHandle             GetControlBuffer() const                    { return m_controlBuffer; }
     nvrhi::BufferHandle             GetLightBuffer() const                      { return m_lightsBuffer; }              // this is the list of lights
@@ -116,7 +116,7 @@ public:
     bool                            InfoGUI(float indent);
     bool                            DebugGUI(float indent);
 
-    void                            SetGlobalShaderMacros(std::vector<donut::engine::ShaderMacro> & macros);
+    void                            SetGlobalShaderMacros(std::vector<caustica::ShaderMacro> & macros);
 
     bool                            TotalLightCountOverflow() const;
 
@@ -138,8 +138,8 @@ private:
 
 private:
     nvrhi::DeviceHandle             m_device;
-    std::shared_ptr<donut::engine::CommonRenderPasses> m_commonPasses;
-    std::shared_ptr<donut::engine::FramebufferFactory> m_framebufferFactory;
+    std::shared_ptr<caustica::CommonRenderPasses> m_commonPasses;
+    std::shared_ptr<caustica::FramebufferFactory> m_framebufferFactory;
     std::shared_ptr<ShaderDebug>    m_shaderDebug;
 
     ComputePass                     m_resetPastToCurrentHistory;

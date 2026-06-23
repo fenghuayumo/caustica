@@ -29,7 +29,7 @@
 #include <vector>
 #include <string>
 
-namespace donut::vfs
+namespace caustica
 {
     class IBlob;
 }
@@ -38,7 +38,7 @@ namespace donut::vfs
 // Low-level Chunk file API
 //
 
-namespace donut::chunk
+namespace caustica::chunk
 {
 
 
@@ -98,7 +98,7 @@ public:
     // deserialization interface
 
     static std::shared_ptr<ChunkFile const> deserialize(
-        std::weak_ptr<donut::vfs::IBlob const> blobPtr, char const * filepath);
+        std::weak_ptr<caustica::IBlob const> blobPtr, char const * filepath);
 
     std::string const & getFilePath() const { return _filepath; }
 
@@ -106,7 +106,7 @@ public:
 
     // serialization interface
 
-    std::shared_ptr<donut::vfs::IBlob const> serialize() const;
+    std::shared_ptr<caustica::IBlob const> serialize() const;
 
     template <typename ChunkDesc> ChunkId addChunk(void const * data, size_t size);
 
@@ -138,7 +138,7 @@ private:
 
     std::vector<std::unique_ptr<Chunk const>> _chunks;
 
-    std::shared_ptr<donut::vfs::IBlob const> _data;
+    std::shared_ptr<caustica::IBlob const> _data;
 };
 
 
@@ -156,13 +156,13 @@ template <typename ChunkDesc> Chunk const * ChunkFile::getChunk(ChunkId chunkId)
 {
     if (!chunkId.valid())
     {
-        log::error("chunkId (%d) not valid");
+        caustica::error("chunkId (%d) not valid");
         return nullptr;
     }
     if (auto const chunk = getChunk(chunkId))
         return validateChunk<ChunkDesc>(chunk) ? chunk : nullptr;
     else
-        log::error("chunk (%d) not found");
+        caustica::error("chunk (%d) not found");
     return nullptr;
 }
 
@@ -173,18 +173,18 @@ template <typename ChunkDesc> bool ChunkFile::validateChunk(Chunk const * chunk)
 
     if (chunk->chunkType!=ChunkDesc::chunktype)
     {
-        log::error("chunk (%d) : wrong type %d (expected %d)",
+        caustica::error("chunk (%d) : wrong type %d (expected %d)",
             chunk->chunkId, chunk->chunkType, ChunkDesc::chunktype);
         return false;
     }
     if (chunk->chunkVersion!=ChunkDesc::version) {
-        log::error("chunk (%d) : wrong version %d (expected %d)",
+        caustica::error("chunk (%d) : wrong version %d (expected %d)",
             chunk->chunkId, chunk->chunkVersion, ChunkDesc::version);
         return false;
     }
     if (chunk->size==0 || chunk->data==nullptr)
     {
-        log::error("no data in chunk (%d)", chunk->chunkId);
+        caustica::error("no data in chunk (%d)", chunk->chunkId);
         return false;
     }
     return true;

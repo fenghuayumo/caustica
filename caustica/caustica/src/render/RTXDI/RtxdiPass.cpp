@@ -26,14 +26,14 @@
 
 #include <SampleCommon/RenderTargets.h>
 
-using namespace donut::math;
-using namespace donut::engine;
-using namespace donut::render;
+using namespace caustica::math;
+using namespace caustica;
+using namespace caustica::render;
 
 RtxdiPass::RtxdiPass(
 	nvrhi::IDevice* device,
-	std::shared_ptr<donut::engine::ShaderFactory> shaderFactory,
-	std::shared_ptr<donut::engine::CommonRenderPasses> commonRenderPasses,
+	std::shared_ptr<caustica::ShaderFactory> shaderFactory,
+	std::shared_ptr<caustica::CommonRenderPasses> commonRenderPasses,
 	nvrhi::BindingLayoutHandle bindlessLayout) :
 		m_device(device),
 		m_shaderFactory(shaderFactory),
@@ -131,7 +131,7 @@ void RtxdiPass::CreatePipelines(nvrhi::BindingLayoutHandle extraBindingLayout /*
 {
 	const auto& reGIRParams = m_ImportanceSamplingContext->GetReGIRContext().GetReGIRStaticParameters();
 	
-	std::vector<donut::engine::ShaderMacro> regirMacros = { GetReGirMacro(reGIRParams) };
+	std::vector<caustica::ShaderMacro> regirMacros = { GetReGirMacro(reGIRParams) };
 
 	m_PresampleLightsPass.Init(m_device, *m_shaderFactory, "app/engine/shaders/render/RTXDI/PresampleLights.hlsl", "main", {}, m_bindingLayout, extraBindingLayout, m_bindlessLayout);
 	m_PresampleEnvMapPass.Init(m_device, *m_shaderFactory, "app/engine/shaders/render/RTXDI/PresampleEnvironmentMap.hlsl", "main", {}, m_bindingLayout, extraBindingLayout, m_bindlessLayout);
@@ -147,7 +147,7 @@ void RtxdiPass::CreatePipelines(nvrhi::BindingLayoutHandle extraBindingLayout /*
 	m_TemporalResamplingPass.Init(m_device, *m_shaderFactory, "app/engine/shaders/render/RTXDI/TemporalResampling.hlsl",
 		{}, useRayQuery, RTXDI_SCREEN_SPACE_GROUP_SIZE, m_bindingLayout, extraBindingLayout, m_bindlessLayout);
 	
-	std::vector<donut::engine::ShaderMacro> finalShadingMacros = { { "USE_RAY_QUERY", "1" } };
+	std::vector<caustica::ShaderMacro> finalShadingMacros = { { "USE_RAY_QUERY", "1" } };
 #if NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP
 	if (m_device->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D12)
 		finalShadingMacros.push_back({ "NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP", "1" });
@@ -675,7 +675,7 @@ void RtxdiPass::ExecuteRayTracingPass(
 	commandList->endMarker();
 }
 
-donut::engine::ShaderMacro RtxdiPass::GetReGirMacro(const rtxdi::ReGIRStaticParameters& regirParameters)
+caustica::ShaderMacro RtxdiPass::GetReGirMacro(const rtxdi::ReGIRStaticParameters& regirParameters)
 {
 	std::string regirMode;
 

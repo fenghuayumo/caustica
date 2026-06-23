@@ -25,7 +25,7 @@
 #include <core/json.h>
 #include <sstream>
 
-using namespace donut::engine;
+using namespace caustica;
 
 const std::string& SceneGraphLeaf::GetName() const
 {
@@ -419,7 +419,7 @@ bool SceneGraphAnimationChannel::Apply(float time) const
         double len = length(quat);
         if (len == 0.0)
         {
-            log::warning("Rotation quaternion interpolated to zero, ignoring.");
+            caustica::warning("Rotation quaternion interpolated to zero, ignoring.");
         }
         else
         {
@@ -438,7 +438,7 @@ bool SceneGraphAnimationChannel::Apply(float time) const
         {
             if (!material->SetProperty(m_LeafPropertyName, value))
             {
-                log::warning("Cannot set property '%s' on material '%s': the material doesn't support this property.",
+                caustica::warning("Cannot set property '%s' on material '%s': the material doesn't support this property.",
                     m_LeafPropertyName.c_str(), material->name.c_str());
             }
         }
@@ -449,13 +449,13 @@ bool SceneGraphAnimationChannel::Apply(float time) const
             {
                 if (!leaf->SetProperty(m_LeafPropertyName, value))
                 {
-                    log::warning("Cannot set property '%s' on node '%s': the leaf doesn't support this property.",
+                    caustica::warning("Cannot set property '%s' on node '%s': the leaf doesn't support this property.",
                         m_LeafPropertyName.c_str(), node->GetName().c_str());
                 }
             }
             else
             {
-                log::warning("Cannot set property '%s' on node '%s' which has no leaf.",
+                caustica::warning("Cannot set property '%s' on node '%s' which has no leaf.",
                     m_LeafPropertyName.c_str(), node->GetName().c_str());
             }
         }
@@ -464,7 +464,7 @@ bool SceneGraphAnimationChannel::Apply(float time) const
         
     case AnimationAttribute::Undefined:
     default:
-        log::warning("Unsupported animation target (%d), ignoring.", uint32_t(m_Attribute));
+        caustica::warning("Unsupported animation target (%d), ignoring.", uint32_t(m_Attribute));
         return false;
     }
 
@@ -925,7 +925,7 @@ std::shared_ptr<SceneGraphNode> SceneGraph::FindNode(const std::filesystem::path
 
     if (!context)
     {
-        log::error("Relative node queries with NULL context are not supported");
+        caustica::error("Relative node queries with NULL context are not supported");
         return nullptr;
     }
 
@@ -1185,7 +1185,7 @@ std::shared_ptr<SkinnedMeshInstance> SceneTypeFactory::CreateSkinnedMeshInstance
     return std::make_shared<SkinnedMeshInstance>(sceneTypeFactory, prototypeMesh);
 }
 
-void donut::engine::PrintSceneGraph(const std::shared_ptr<SceneGraphNode>& root)
+void caustica::PrintSceneGraph(const std::shared_ptr<SceneGraphNode>& root)
 {
     SceneGraphWalker walker(root.get());
     int depth = 0;
@@ -1243,7 +1243,7 @@ void donut::engine::PrintSceneGraph(const std::shared_ptr<SceneGraphNode>& root)
             else if (auto animation = dynamic_cast<SceneGraphAnimation*>(walker->GetLeaf().get()))
             {
                 ss << "Animation (" << animation->GetChannels().size() << " channels)";
-                log::info("%s", ss.str().c_str());
+                caustica::info("%s", ss.str().c_str());
                 ss.str(std::string()); // clear
 
                 for (const auto& channel : animation->GetChannels())
@@ -1278,7 +1278,7 @@ void donut::engine::PrintSceneGraph(const std::shared_ptr<SceneGraphNode>& root)
                         ss << ", " << keyframes[0].time << "s - " << keyframes[keyframes.size() - 1].time << "s";
                     }
 
-                    log::info("%s", ss.str().c_str());
+                    caustica::info("%s", ss.str().c_str());
                     ss.str(std::string()); // clear
                 }
             }
@@ -1356,7 +1356,7 @@ void donut::engine::PrintSceneGraph(const std::shared_ptr<SceneGraphNode>& root)
         }
 
         if (!ss.str().empty())
-            log::info("%s", ss.str().c_str());
+            caustica::info("%s", ss.str().c_str());
 
         depth += walker.Next(true);
     }

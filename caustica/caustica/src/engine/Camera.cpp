@@ -25,8 +25,8 @@
 #include <engine/SceneGraph.h>
 #include <engine/View.h>
 
-using namespace donut::math;
-using namespace donut::app;
+using namespace caustica::math;
+using namespace caustica;
 
 void BaseCamera::UpdateWorldToView()
 {
@@ -363,7 +363,7 @@ void ThirdPersonCamera::SetRotation(float yaw, float pitch)
     m_Pitch = pitch;
 }
 
-void ThirdPersonCamera::SetView(const engine::PlanarView& view)
+void ThirdPersonCamera::SetView(const caustica::PlanarView& view)
 {
     m_ProjectionMatrix = view.GetProjectionMatrix(false);
     m_InverseProjectionMatrix = view.GetInverseProjectionMatrix(false);
@@ -521,7 +521,7 @@ dm::affine3 SwitchableCamera::GetWorldToViewMatrix() const
 
 bool SwitchableCamera::GetSceneCameraProjectionParams(float& verticalFov, float& zNear) const
 {
-    auto perspectiveCamera = std::dynamic_pointer_cast<engine::PerspectiveCamera>(m_SceneCamera);
+    auto perspectiveCamera = std::dynamic_pointer_cast<caustica::PerspectiveCamera>(m_SceneCamera);
     if (perspectiveCamera)
     {
         zNear = perspectiveCamera->zNear;
@@ -575,7 +575,7 @@ void SwitchableCamera::SwitchToThirdPerson(bool copyView, std::optional<float> t
     m_SceneCamera = nullptr;
 }
 
-void SwitchableCamera::SwitchToSceneCamera(std::shared_ptr<engine::SceneCamera> const& sceneCamera)
+void SwitchableCamera::SwitchToSceneCamera(std::shared_ptr<caustica::SceneCamera> const& sceneCamera)
 {
     assert(!!sceneCamera);
     

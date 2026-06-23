@@ -18,7 +18,7 @@
 #include "LocalConfig.h"
 #include "ShaderPackFileSystem.h"
 
-#include <engine/ApplicationBase.h>
+#include <engine/Application.h>
 #include <core/log.h>
 #if RTXPT_WITH_NATIVE_DLSS
 #include <render/DLSS.h>
@@ -44,7 +44,7 @@ static void __stdcall myValidationMessageCallback(void* pUserData, NVAPI_D3D12_R
     case NVAPI_D3D12_RAYTRACING_VALIDATION_MESSAGE_SEVERITY_WARNING: severityString = "warning"; break;
     }
 
-    donut::log::warning("NVAPI Ray Tracing Validation message: %s: [%s] %s\n%s", severityString, messageCode, message, messageDetails);
+    caustica::warning("NVAPI Ray Tracing Validation message: %s: [%s] %s\n%s", severityString, messageCode, message, messageDetails);
 }
 #endif
 #endif
@@ -112,7 +112,7 @@ namespace
     nvrhi::GraphicsAPI GetRtxptGraphicsAPIFromCommandLine(int argc, const char* const* argv)
     {
 #if defined(_WIN32)
-        nvrhi::GraphicsAPI api = donut::app::GetGraphicsAPIFromCommandLine(argc, argv);
+        nvrhi::GraphicsAPI api = caustica::GetGraphicsAPIFromCommandLine(argc, argv);
 
         for (int n = 1; n < argc; ++n)
         {
@@ -149,7 +149,7 @@ namespace
                 if (TryParseBackendName(backend, parsedApi))
                     api = parsedApi;
                 else
-                    donut::log::warning("Unknown render backend '%s'. Falling back to the default backend.", backend.c_str());
+                    caustica::warning("Unknown render backend '%s'. Falling back to the default backend.", backend.c_str());
             }
         }
 
@@ -173,7 +173,7 @@ SampleBaseApp::SampleBaseApp()
 #else
     nvrhi::GraphicsAPI api = GetRtxptGraphicsAPIFromCommandLine(0, nullptr);
 #endif
-    m_DeviceManager = std::unique_ptr<donut::app::DeviceManager>(donut::app::DeviceManager::Create(api));
+    m_DeviceManager = std::unique_ptr<caustica::DeviceManager>(caustica::DeviceManager::Create(api));
 
     m_DeviceManager->SetFrameTimeUpdateInterval(1.0f);
 }
@@ -186,7 +186,7 @@ SampleBaseApp::~SampleBaseApp()
 
 SampleBaseApp::InitReturnCodes SampleBaseApp::Init(int argc, const char* const* argv)
 {
-    donut::app::DeviceCreationParameters deviceParams = GetDefaultDeviceParams();
+    caustica::DeviceCreationParameters deviceParams = GetDefaultDeviceParams();
 
     std::string preferredScene = "default.json";
     LocalConfig::PreferredSceneOverride(preferredScene);
@@ -230,7 +230,7 @@ SampleBaseApp::InitReturnCodes SampleBaseApp::Init(int argc, const char* const* 
         assert(SUCCEEDED(hr));
         if (shaderModel.HighestShaderModel < D3D_SHADER_MODEL_6_9)
         {
-            donut::log::fatal("Shader Model 6.9 is required when compiled with Agility SDK 1.619 or newer, but is unsupported on the current device. Please check for newer graphics drivers, or recompile without Agility SDK");
+            caustica::fatal("Shader Model 6.9 is required when compiled with Agility SDK 1.619 or newer, but is unsupported on the current device. Please check for newer graphics drivers, or recompile without Agility SDK");
             return InitReturnCodes::FailToCreateDevice;
         }
     }
@@ -324,42 +324,42 @@ void SampleBaseApp::RunMainLoop()
 void SampleBaseApp::RegisterDonutCallback()
 {
     // Get the default call back first so we can pass messages through to it.
-    m_DonutDefaultCallback = donut::log::GetCallback();
+    m_DonutDefaultCallback = caustica::GetCallback();
 
     // Register our custom callback to intercept and filter streamline errors
-    donut::log::SetCallback([this](donut::log::Severity severity, const char* message)
+    caustica::SetCallback([this](caustica::Severity severity, const char* message)
         {
             this->SampleLogCallback(severity, message);
         });
 }
 
-void SampleBaseApp::SampleLogCallback(donut::log::Severity severity, const char* message)
+void SampleBaseApp::SampleLogCallback(caustica::Severity severity, const char* message)
 {
     // This lets us demote some of Streamline errors that aren't errors into warnings
-    if (severity == donut::log::Severity::Error)
+    if (severity == caustica::Severity::Error)
     {
         std::string msg(message);
         if (msg.find("Don't know the size") != std::string::npos)
-            severity = donut::log::Severity::Warning;
+            severity = caustica::Severity::Warning;
         if (msg.find("dlss_gEntry.cpp") != std::string::npos)
         {
             if (msg.find("Unable to find DRS context") != std::string::npos
                 || msg.find("NGX indicates DLSS-G is not available") != std::string::npos)
-                severity = donut::log::Severity::Warning;
+                severity = caustica::Severity::Warning;
         }
         if (msg.find("Missing NGX context") != std::string::npos
             || msg.find("Unable to find NGX ") != std::string::npos
             || msg.find("NvAPI_D3D_Sleep") != std::string::npos)
-            severity = donut::log::Severity::Warning;
+            severity = caustica::Severity::Warning;
     }
 
     // Pass all other messages to donut's default callback
     m_DonutDefaultCallback(severity, message);
 }
 
-donut::app::DeviceCreationParameters SampleBaseApp::GetDefaultDeviceParams() const
+caustica::DeviceCreationParameters SampleBaseApp::GetDefaultDeviceParams() const
 {
-    donut::app::DeviceCreationParameters deviceParams;
+    caustica::DeviceCreationParameters deviceParams;
     deviceParams.backBufferWidth = 0;   // initialized from CmdLine
     deviceParams.backBufferHeight = 0;  // initialized from CmdLine
     deviceParams.swapChainSampleCount = 1;
@@ -399,7 +399,7 @@ donut::app::DeviceCreationParameters SampleBaseApp::GetDefaultDeviceParams() con
 
 #if DONUT_WITH_VULKAN
 #if RTXPT_WITH_NATIVE_DLSS
-    donut::render::DLSS::GetRequiredVulkanExtensions(
+    caustica::render::DLSS::GetRequiredVulkanExtensions(
         deviceParams.requiredVulkanInstanceExtensions,
         deviceParams.requiredVulkanDeviceExtensions);
 #endif
@@ -432,7 +432,7 @@ donut::app::DeviceCreationParameters SampleBaseApp::GetDefaultDeviceParams() con
 }
 
 bool SampleBaseApp::ProcessCommandLine(int argc, char const* const* argv,
-    donut::app::DeviceCreationParameters& deviceParams, std::string& preferredScene)
+    caustica::DeviceCreationParameters& deviceParams, std::string& preferredScene)
 {
 #if 1 // use a bit larger window by default if screen large enough
     glfwInit();
@@ -445,7 +445,7 @@ bool SampleBaseApp::ProcessCommandLine(int argc, char const* const* argv,
     }
 #endif
     if (CommandLineWantsConsoleLogging(argc, argv))
-        donut::log::ConsoleApplicationMode();
+        caustica::ConsoleApplicationMode();
 
     if (!m_CmdLine.InitFromCommandLine(argc, argv))
     {
@@ -462,12 +462,12 @@ bool SampleBaseApp::ProcessCommandLine(int argc, char const* const* argv,
 
     if (m_CmdLine.nonInteractive)
     {   
-        donut::log::EnableOutputToMessageBox(false);
+        caustica::EnableOutputToMessageBox(false);
         HelpersSetNonInteractive();
     }
     if (m_CmdLine.noWindow || m_CmdLine.nonInteractive)
     {
-        donut::log::ConsoleApplicationMode();
+        caustica::ConsoleApplicationMode();
     }
 
     if (m_CmdLine.debug)
@@ -484,13 +484,13 @@ bool SampleBaseApp::ProcessCommandLine(int argc, char const* const* argv,
     return true;
 }
 
-bool SampleBaseApp::InitDeviceAndWindow(const donut::app::DeviceCreationParameters& deviceParams)
+bool SampleBaseApp::InitDeviceAndWindow(const caustica::DeviceCreationParameters& deviceParams)
 {
     if (m_CmdLine.noWindow)
     {
         if (!m_DeviceManager->CreateHeadlessDevice(deviceParams))
         {
-            donut::log::fatal("CreateHeadlessDevice failed: Cannot initialize a graphics device with the requested parameters");
+            caustica::fatal("CreateHeadlessDevice failed: Cannot initialize a graphics device with the requested parameters");
             return false;
         }
     }
@@ -498,7 +498,7 @@ bool SampleBaseApp::InitDeviceAndWindow(const donut::app::DeviceCreationParamete
     {
         if (!m_DeviceManager->CreateWindowDeviceAndSwapChain(deviceParams, g_windowTitle))
         {
-            donut::log::fatal("Cannot initialize a graphics device with the requested parameters");
+            caustica::fatal("Cannot initialize a graphics device with the requested parameters");
             return false;
         }
         HelpersRegisterActiveWindow();
@@ -520,18 +520,18 @@ bool SampleBaseApp::InitDeviceAndWindow(const donut::app::DeviceCreationParamete
     return true;
 }
 
-bool SampleBaseApp::CheckDeviceFeatureSupport(const donut::app::DeviceCreationParameters& deviceParams)
+bool SampleBaseApp::CheckDeviceFeatureSupport(const caustica::DeviceCreationParameters& deviceParams)
 {
     auto device = m_DeviceManager->GetDevice();
     if (!device->queryFeatureSupport(nvrhi::Feature::RayTracingPipeline))
     {
-        donut::log::fatal("The graphics device does not support Ray Tracing Pipelines");
+        caustica::fatal("The graphics device does not support Ray Tracing Pipelines");
         return false;
     }
 
     if (!device->queryFeatureSupport(nvrhi::Feature::RayQuery))
     {
-        donut::log::fatal("The graphics device does not support Ray Queries");
+        caustica::fatal("The graphics device does not support Ray Queries");
         return false;
     }
 
@@ -540,20 +540,20 @@ bool SampleBaseApp::CheckDeviceFeatureSupport(const donut::app::DeviceCreationPa
 
 void SampleBaseApp::CreateShaderFactory()
 {
-    const char* shaderTypeName = donut::app::GetShaderTypeName(m_DeviceManager->GetGraphicsAPI());
-    const std::filesystem::path appDirectory = donut::app::GetDirectoryWithExecutable();
+    const char* shaderTypeName = caustica::GetShaderTypeName(m_DeviceManager->GetGraphicsAPI());
+    const std::filesystem::path appDirectory = caustica::GetDirectoryWithExecutable();
     const std::filesystem::path engineShaderPath = appDirectory / "ShaderPrecompiled/engine" / shaderTypeName;
     const std::filesystem::path appShaderPath = appDirectory / "ShaderPrecompiled/caustica" / shaderTypeName;
     const std::filesystem::path nrdShaderPath = appDirectory / "ShaderPrecompiled/nrd" / shaderTypeName;
     const std::filesystem::path ommShaderPath = appDirectory / "ShaderPrecompiled/omm" / shaderTypeName;
 
-    std::shared_ptr<donut::vfs::RootFileSystem> rootFS = std::make_shared<donut::vfs::RootFileSystem>();
+    std::shared_ptr<caustica::RootFileSystem> rootFS = std::make_shared<caustica::RootFileSystem>();
     const std::filesystem::path shaderPackPath = appDirectory / (std::string("caustica.shaders.") + shaderTypeName + ".pack");
     auto shaderPackFS = std::make_shared<ShaderPackFileSystem>(shaderPackPath, "ShaderPrecompiled");
     const bool shaderPackHasCurrentLayout = shaderPackFS->isOpen() && shaderPackFS->fileExists("app/engine/shaders/render/Misc/DebugLines_main_vs.bin");
     if (shaderPackFS->isOpen() && !shaderPackHasCurrentLayout)
     {
-        donut::log::warning("Shader pack '%s' does not match the current shader layout; falling back to ShaderPrecompiled directories",
+        caustica::warning("Shader pack '%s' does not match the current shader layout; falling back to ShaderPrecompiled directories",
             shaderPackPath.string().c_str());
     }
 
@@ -570,7 +570,7 @@ void SampleBaseApp::CreateShaderFactory()
     }
 
     auto device = m_DeviceManager->GetDevice();
-    m_ShaderFactory = std::make_shared<donut::engine::ShaderFactory>(device, rootFS, "/ShaderPrecompiled");
+    m_ShaderFactory = std::make_shared<caustica::ShaderFactory>(device, rootFS, "/ShaderPrecompiled");
 }
 
 bool SampleBaseApp::IsSERSupported() const

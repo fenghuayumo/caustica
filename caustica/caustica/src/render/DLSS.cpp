@@ -37,10 +37,9 @@
 #endif
 #endif
 
-using namespace donut;
-using namespace donut::render;
+using namespace caustica::render;
 
-DLSS::DLSS(nvrhi::IDevice* device, donut::engine::ShaderFactory& shaderFactory)
+DLSS::DLSS(nvrhi::IDevice* device, caustica::ShaderFactory& shaderFactory)
     : m_device(device)
 {
     m_exposureShader = shaderFactory.CreateAutoShader("donut/passes/dlss_exposure_cs.hlsl", "main",
@@ -122,7 +121,7 @@ void DLSS::ComputeExposure(nvrhi::ICommandList* commandList, nvrhi::IBuffer* ton
     commandList->dispatch(1);
 }
 
- std::unique_ptr<DLSS> DLSS::Create(nvrhi::IDevice* device, donut::engine::ShaderFactory& shaderFactory,
+ std::unique_ptr<DLSS> DLSS::Create(nvrhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
     std::string const& directoryWithExecutable, uint32_t applicationID)
 {
     switch(device->getGraphicsAPI())

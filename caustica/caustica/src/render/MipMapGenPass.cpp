@@ -36,14 +36,14 @@
 #endif
 #endif
 
-using namespace donut::math;
+using namespace caustica::math;
 #include <shaders/mipmapgen_cb.h>
 
 #include <cassert>
 #include <mutex>
 
-using namespace donut::engine;
-using namespace donut::render;
+using namespace caustica;
+using namespace caustica::render;
 
 // The compute shader reduces 'NUM_LODS' mip-levels at a time into an
 // array of NUM_LODS bound UAVs. For textures that have a number
@@ -210,7 +210,7 @@ void MipMapGenPass::Dispatch(nvrhi::ICommandList* commandList, int maxLOD)
 }
 
 
-void MipMapGenPass::Display(std::shared_ptr<donut::engine::CommonRenderPasses> commonPasses, nvrhi::ICommandList* commandList, nvrhi::IFramebuffer* target)
+void MipMapGenPass::Display(std::shared_ptr<caustica::CommonRenderPasses> commonPasses, nvrhi::ICommandList* commandList, nvrhi::IFramebuffer* target)
 {
     assert(m_Texture);
     

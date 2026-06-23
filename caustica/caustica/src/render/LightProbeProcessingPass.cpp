@@ -50,13 +50,13 @@
 #endif
 #endif
 
-using namespace donut::math;
+using namespace caustica::math;
 #include <shaders/light_probe_cb.h>
 
 #include <assert.h>
 
-using namespace donut::engine;
-using namespace donut::render;
+using namespace caustica;
+using namespace caustica::render;
 
 LightProbeProcessingPass::LightProbeProcessingPass(
     nvrhi::IDevice* device,

@@ -48,34 +48,34 @@ namespace
         return *g_currentExtensionSample;
     }
 
-    donut::math::float3 ToFloat3(const nb::object& src)
+    caustica::math::float3 ToFloat3(const nb::object& src)
     {
         nb::sequence seq = nb::cast<nb::sequence>(src);
         std::vector<float> v;
         for (auto h : seq) v.push_back(nb::cast<float>(nb::handle(h)));
         if (v.size() != 3)
             throw std::runtime_error("Expected an iterable of 3 floats");
-        return donut::math::float3(v[0], v[1], v[2]);
+        return caustica::math::float3(v[0], v[1], v[2]);
     }
 
-    nb::tuple Float3ToTuple(const donut::math::float3& v) { return nb::make_tuple(v.x, v.y, v.z); }
+    nb::tuple Float3ToTuple(const caustica::math::float3& v) { return nb::make_tuple(v.x, v.y, v.z); }
 
-    bool IsFiniteBox(const donut::math::box3& bounds)
+    bool IsFiniteBox(const caustica::math::box3& bounds)
     {
-        return donut::math::all(donut::math::isfinite(bounds.m_mins))
-            && donut::math::all(donut::math::isfinite(bounds.m_maxs));
+        return caustica::math::all(caustica::math::isfinite(bounds.m_mins))
+            && caustica::math::all(caustica::math::isfinite(bounds.m_maxs));
     }
 
     // Mirrors the helper used by Scene.bounds in the shared core bindings.
     // Returns the C++ Scene bounds, or std::nullopt when no scene is loaded.
-    std::optional<donut::math::box3> CurrentSceneBoundingBox(Sample* app)
+    std::optional<caustica::math::box3> CurrentSceneBoundingBox(Sample* app)
     {
         if (!app)
             return std::nullopt;
         auto scene = app->GetScene();
         if (!scene)
             return std::nullopt;
-        const donut::math::box3 bbox = scene->GetSceneBounds();
+        const caustica::math::box3 bbox = scene->GetSceneBounds();
         if (bbox.isempty() || !IsFiniteBox(bbox))
             return std::nullopt;
         return bbox;

@@ -82,7 +82,7 @@ ShaderPackFileSystem::ShaderPackFileSystem(
     ShaderPackHeader header{};
     if (fread(&header, sizeof(header), 1, m_packFile) != 1)
     {
-        donut::log::warning("Unable to read shader pack header '%s'", m_packPath.string().c_str());
+        caustica::warning("Unable to read shader pack header '%s'", m_packPath.string().c_str());
         fclose(m_packFile);
         m_packFile = nullptr;
         return;
@@ -91,7 +91,7 @@ ShaderPackFileSystem::ShaderPackFileSystem(
     if (std::memcmp(header.magic, c_ShaderPackMagic.data(), c_ShaderPackMagic.size()) != 0 ||
         header.version != c_ShaderPackVersion)
     {
-        donut::log::warning("Shader pack '%s' has an unsupported format", m_packPath.string().c_str());
+        caustica::warning("Shader pack '%s' has an unsupported format", m_packPath.string().c_str());
         fclose(m_packFile);
         m_packFile = nullptr;
         return;
@@ -103,7 +103,7 @@ ShaderPackFileSystem::ShaderPackFileSystem(
         ShaderPackEntry diskEntry{};
         if (fread(&diskEntry, sizeof(diskEntry), 1, m_packFile) != 1)
         {
-            donut::log::warning("Shader pack '%s' has a truncated entry table", m_packPath.string().c_str());
+            caustica::warning("Shader pack '%s' has a truncated entry table", m_packPath.string().c_str());
             fclose(m_packFile);
             m_packFile = nullptr;
             m_entries.clear();
@@ -114,7 +114,7 @@ ShaderPackFileSystem::ShaderPackFileSystem(
         m_entries[key] = FileEntry{ diskEntry.offset, diskEntry.size };
     }
 
-    donut::log::info("Mounted shader pack '%s' at virtual root '%s' (%d entries)",
+    caustica::info("Mounted shader pack '%s' at virtual root '%s' (%d entries)",
         m_packPath.string().c_str(),
         m_virtualRoot.generic_string().c_str(),
         int(m_entries.size()));
@@ -183,7 +183,7 @@ bool ShaderPackFileSystem::fileExists(const std::filesystem::path& name)
     return m_entries.find(key) != m_entries.end();
 }
 
-std::shared_ptr<donut::vfs::IBlob> ShaderPackFileSystem::readFile(const std::filesystem::path& name)
+std::shared_ptr<caustica::IBlob> ShaderPackFileSystem::readFile(const std::filesystem::path& name)
 {
     if (!m_packFile)
         return nullptr;
@@ -196,7 +196,7 @@ std::shared_ptr<donut::vfs::IBlob> ShaderPackFileSystem::readFile(const std::fil
 
     if (entryIt->second.size > static_cast<uint64_t>(std::numeric_limits<size_t>::max()))
     {
-        donut::log::warning("Shader pack entry '%s' is too large to load", logicalPath.c_str());
+        caustica::warning("Shader pack entry '%s' is too large to load", logicalPath.c_str());
         return nullptr;
     }
 
@@ -205,14 +205,14 @@ std::shared_ptr<donut::vfs::IBlob> ShaderPackFileSystem::readFile(const std::fil
         std::lock_guard<std::mutex> lockGuard(m_mutex);
         if (fseeko(m_packFile, int64_t(entryIt->second.offset), SEEK_SET) != 0)
         {
-            donut::log::warning("Unable to seek shader pack '%s' for '%s'",
+            caustica::warning("Unable to seek shader pack '%s' for '%s'",
                 m_packPath.string().c_str(), logicalPath.c_str());
             return nullptr;
         }
 
         if (fread(encodedData.data(), 1, encodedData.size(), m_packFile) != encodedData.size())
         {
-            donut::log::warning("Unable to read shader pack '%s' entry '%s'",
+            caustica::warning("Unable to read shader pack '%s' entry '%s'",
                 m_packPath.string().c_str(), logicalPath.c_str());
             return nullptr;
         }
@@ -225,7 +225,7 @@ std::shared_ptr<donut::vfs::IBlob> ShaderPackFileSystem::readFile(const std::fil
         return nullptr;
 
     std::memcpy(blobData, encodedData.data(), encodedData.size());
-    return std::make_shared<donut::vfs::Blob>(blobData, encodedData.size());
+    return std::make_shared<caustica::Blob>(blobData, encodedData.size());
 }
 
 bool ShaderPackFileSystem::writeFile(const std::filesystem::path&, const void*, size_t)
@@ -236,16 +236,16 @@ bool ShaderPackFileSystem::writeFile(const std::filesystem::path&, const void*, 
 int ShaderPackFileSystem::enumerateFiles(
     const std::filesystem::path&,
     const std::vector<std::string>&,
-    donut::vfs::enumerate_callback_t,
+    caustica::enumerate_callback_t,
     bool)
 {
-    return donut::vfs::status::NotImplemented;
+    return caustica::status::NotImplemented;
 }
 
 int ShaderPackFileSystem::enumerateDirectories(
     const std::filesystem::path&,
-    donut::vfs::enumerate_callback_t,
+    caustica::enumerate_callback_t,
     bool)
 {
-    return donut::vfs::status::NotImplemented;
+    return caustica::status::NotImplemented;
 }

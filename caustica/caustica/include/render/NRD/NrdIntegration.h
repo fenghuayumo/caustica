@@ -21,7 +21,7 @@
 
 class RenderTargets;
 
-namespace donut::engine
+namespace caustica
 {
     class PlanarView;
     class ShaderFactory;
@@ -33,15 +33,15 @@ public:
     NrdIntegration(nvrhi::IDevice* device, nrd::Denoiser method);
     ~NrdIntegration();
 
-    bool Initialize(uint32_t width, uint32_t height, donut::engine::ShaderFactory& shaderFactory);
+    bool Initialize(uint32_t width, uint32_t height, caustica::ShaderFactory& shaderFactory);
     bool IsAvailable() const;
 
     void RunDenoiserPasses(
         nvrhi::ICommandList* commandList,
         const RenderTargets& renderTargets,
         int pass,
-        const donut::engine::PlanarView& view, 
-        const donut::engine::PlanarView& viewPrev,
+        const caustica::PlanarView& view, 
+        const caustica::PlanarView& viewPrev,
         uint32_t frameIndex,
         float disocclusionThreshold,
         float disocclusionThresholdAlternate,
@@ -76,7 +76,7 @@ private:
     std::vector<nvrhi::SamplerHandle> m_samplers;
     std::vector<nvrhi::TextureHandle> m_permanentTextures;
     std::vector<nvrhi::TextureHandle> m_transientTextures;
-    donut::engine::BindingCache m_bindingCache;
+    caustica::BindingCache m_bindingCache;
 };
 
 #endif

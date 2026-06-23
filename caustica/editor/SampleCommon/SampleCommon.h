@@ -44,12 +44,9 @@ public:
 // Usage example: RAII_SCOPE( ImGui::PushID( keyID );, ImGui::PopID( ); )
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
-namespace donut
+namespace caustica
 {
-    namespace engine
-    {
-        struct LoadedTexture;
-    }
+    struct LoadedTexture;
 }
 
 // can be upgraded for special normalmap type (i.e. DXGI_FORMAT_BC5_UNORM) or single channel masks (i.e. DXGI_FORMAT_BC4_UNORM)
@@ -107,7 +104,7 @@ template<typename ... Args> std::string StringFormat(const std::string& format, 
 
 std::string HexString(unsigned int value);
 std::string StripNonAsciiAlnum(const std::string & input);
-bool ParseFloat3Consume(std::string& s, donut::math::float3 & out);
+bool ParseFloat3Consume(std::string& s, dm::float3 & out);
 
 // returns std::string::npos if not found
 size_t FindSubStringIgnoreCase(const std::string & text, const std::string & subString);
@@ -127,7 +124,7 @@ void SetLocalPathBaseOverride(const std::filesystem::path& basePath);
 std::filesystem::path GetRuntimeDirectory();
 void SetRuntimeDirectoryOverride(const std::filesystem::path& runtimeDirectory);
 
-bool CompressTextures(std::map<std::shared_ptr<donut::engine::LoadedTexture>, TextureCompressionType> & uncompressedTextures);
+bool CompressTextures(std::map<std::shared_ptr<caustica::LoadedTexture>, TextureCompressionType> & uncompressedTextures);
 
 void HelpersRegisterActiveWindow(); // call this from process main thread to grab current main window; this is optional and only used for progress bar to appear centered in the main window
 void HelpersSetNonInteractive();

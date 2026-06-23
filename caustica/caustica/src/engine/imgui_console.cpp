@@ -54,13 +54,13 @@ SOFTWARE.
 #include <cstdarg>
 #include <cctype>
 
-using namespace donut::app;
-using namespace donut::engine;
+using namespace caustica;
+using namespace caustica;
 
 
-static ImVec4 getSeverityColor(donut::log::Severity severity)
+static ImVec4 getSeverityColor(caustica::Severity severity)
 {
-	using namespace donut::log;	
+	using namespace caustica;	
 	switch (severity)
 	{
 	case Severity::Info: return ImVec4(.6f, .8f, 1.f, 1.f);
@@ -78,7 +78,7 @@ ImGui_Console::ImGui_Console(std::shared_ptr<console::Interpreter> interpreter, 
 {
 	if (options.capture_log)
 	{
-		donut::log::SetCallback([&](donut::log::Severity severity, char const* msg) {			
+		caustica::SetCallback([&](caustica::Severity severity, char const* msg) {			
 				ImVec4 color = getSeverityColor(severity);
 				this->m_ItemsLog.push_back({severity, color, msg});
 			});
@@ -174,7 +174,7 @@ void ImGui_Console::Render(bool* open)
 		ImGui::PushFont(m_Options.font->GetScaledFont());
 	for (auto const& item : m_ItemsLog)
 	{
-		using namespace donut::log;
+		using namespace caustica;
 
 		bool showItem = true;
 		switch (item.severity)
@@ -240,14 +240,14 @@ void ImGui_Console::Render(bool* open)
 	ImGui::AlignTextToFramePadding();
 	ImGui::Text("Filters : "); ImGui::SameLine();
 	ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1);
-	auto filterButton = [](char const* label, bool* value, donut::log::Severity severity) {
+	auto filterButton = [](char const* label, bool* value, caustica::Severity severity) {
 		ImGui::PushStyleColor(ImGuiCol_Border, getSeverityColor(severity));
 		ImGui::Checkbox(label, value);
 		ImGui::PopStyleColor();
 	};
-	filterButton("Errors", &m_Options.show_errors, donut::log::Severity::Error); ImGui::SameLine();
-	filterButton("Warnings", &m_Options.show_warnings, donut::log::Severity::Warning); ImGui::SameLine();
-	filterButton("Info", &m_Options.show_info, donut::log::Severity::Info);
+	filterButton("Errors", &m_Options.show_errors, caustica::Severity::Error); ImGui::SameLine();
+	filterButton("Warnings", &m_Options.show_warnings, caustica::Severity::Warning); ImGui::SameLine();
+	filterButton("Info", &m_Options.show_info, caustica::Severity::Info);
 	ImGui::PopStyleVar(); // FrameBorder
 
 	ImGui::End();

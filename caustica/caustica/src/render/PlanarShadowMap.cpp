@@ -22,11 +22,11 @@
 
 #include <render/PlanarShadowMap.h>
 
-using namespace donut::math;
+using namespace caustica::math;
 #include <shaders/light_cb.h>
 
-using namespace donut::engine;
-using namespace donut::render;
+using namespace caustica;
+using namespace caustica::render;
 
 PlanarShadowMap::PlanarShadowMap(
     nvrhi::IDevice* device, 
@@ -51,7 +51,7 @@ PlanarShadowMap::PlanarShadowMap(
     m_ShadowMapSize = float2(static_cast<float>(resolution));
     m_TextureSize = m_ShadowMapSize;
 
-    m_View = std::make_shared<engine::PlanarView>();
+    m_View = std::make_shared<caustica::PlanarView>();
     m_View->SetViewport(nvrhi::Viewport(float(resolution), float(resolution)));
     m_View->SetArraySlice(0);
 }
@@ -68,7 +68,7 @@ PlanarShadowMap::PlanarShadowMap(
     m_TextureSize = float2(static_cast<float>(textureDesc.width), static_cast<float>(textureDesc.height));
     m_ShadowMapSize = float2(viewport.maxX - viewport.minX, viewport.maxY - viewport.minY);
 
-    m_View = std::make_shared<engine::PlanarView>();
+    m_View = std::make_shared<caustica::PlanarView>();
     m_View->SetViewport(viewport);
     m_View->SetArraySlice(arraySlice);
 }

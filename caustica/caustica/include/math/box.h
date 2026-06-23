@@ -22,7 +22,7 @@
 
 #pragma once
 
-namespace donut::math
+namespace caustica::math
 {
 	// Generic axis-aligned bounding box (AABB) struct, in mins/maxs form
 	// Note: min > max (on any axis) is an empty (null) box.  All empty boxes are the same.

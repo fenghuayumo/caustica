@@ -25,7 +25,7 @@
 #include <engine/View.h>
 #include <nvrhi/nvrhi.h>
 
-namespace donut::engine
+namespace caustica
 {
     class SceneGraphNode;
     struct MeshInfo;
@@ -36,17 +36,17 @@ namespace donut::engine
     class FramebufferFactory;
 }
 
-namespace donut::render
+namespace caustica::render
 {
     class IDrawStrategy;
 
     struct DrawItem
     {
-        const engine::MeshInstance* instance;
-        const engine::MeshInfo* mesh;
-        const engine::MeshGeometry* geometry;
-        const engine::Material* material;
-        const engine::BufferGroup* buffers;
+        const caustica::MeshInstance* instance;
+        const caustica::MeshInfo* mesh;
+        const caustica::MeshGeometry* geometry;
+        const caustica::Material* material;
+        const caustica::BufferGroup* buffers;
         float distanceToCamera;
         nvrhi::RasterCullMode cullMode;
     };
@@ -58,18 +58,18 @@ namespace donut::render
     class IGeometryPass
     {
     public:
-        [[nodiscard]] virtual engine::ViewType::Enum GetSupportedViewTypes() const = 0;
-        virtual void SetupView(GeometryPassContext& context, nvrhi::ICommandList* commandList, const engine::IView* view, const engine::IView* viewPrev) = 0;
-        virtual bool SetupMaterial(GeometryPassContext& context, const engine::Material* material, nvrhi::RasterCullMode cullMode, nvrhi::GraphicsState& state) = 0;
-        virtual void SetupInputBuffers(GeometryPassContext& context, const engine::BufferGroup* buffers, nvrhi::GraphicsState& state) = 0;
+        [[nodiscard]] virtual caustica::ViewType::Enum GetSupportedViewTypes() const = 0;
+        virtual void SetupView(GeometryPassContext& context, nvrhi::ICommandList* commandList, const caustica::IView* view, const caustica::IView* viewPrev) = 0;
+        virtual bool SetupMaterial(GeometryPassContext& context, const caustica::Material* material, nvrhi::RasterCullMode cullMode, nvrhi::GraphicsState& state) = 0;
+        virtual void SetupInputBuffers(GeometryPassContext& context, const caustica::BufferGroup* buffers, nvrhi::GraphicsState& state) = 0;
         virtual void SetPushConstants(GeometryPassContext& context, nvrhi::ICommandList* commandList, nvrhi::GraphicsState& state, nvrhi::DrawArguments& args) = 0;
         virtual ~IGeometryPass() = default;
     };
 
     void RenderView(
         nvrhi::ICommandList* commandList, 
-        const engine::IView* view, 
-        const engine::IView* viewPrev, 
+        const caustica::IView* view, 
+        const caustica::IView* viewPrev, 
         nvrhi::IFramebuffer* framebuffer,
         IDrawStrategy& drawStrategy,
         IGeometryPass& pass,
@@ -78,10 +78,10 @@ namespace donut::render
 
     void RenderCompositeView(
         nvrhi::ICommandList* commandList,
-        const engine::ICompositeView* compositeView,
-        const engine::ICompositeView* compositeViewPrev,
-        engine::FramebufferFactory& framebufferFactory,
-        const std::shared_ptr<engine::SceneGraphNode>& rootNode,
+        const caustica::ICompositeView* compositeView,
+        const caustica::ICompositeView* compositeViewPrev,
+        caustica::FramebufferFactory& framebufferFactory,
+        const std::shared_ptr<caustica::SceneGraphNode>& rootNode,
         IDrawStrategy& drawStrategy,
         IGeometryPass& pass,
         GeometryPassContext& passContext,

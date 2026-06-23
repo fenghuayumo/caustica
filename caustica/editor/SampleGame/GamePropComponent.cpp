@@ -22,10 +22,9 @@
 
 #include <render/Misc/Korgi.h>
 
-using namespace donut;
-using namespace donut::math;
-using namespace donut::engine;
-using namespace donut::render;
+using namespace caustica::math;
+using namespace caustica;
+using namespace caustica::render;
 
 using namespace game;
 
@@ -146,7 +145,7 @@ protected:
     {
     }
 
-    ScreenGUISel StandaloneGUI(const std::shared_ptr<donut::engine::PlanarView> & view, const float2 & mousePos, const float2 & displaySize) override
+    ScreenGUISel StandaloneGUI(const std::shared_ptr<caustica::PlanarView> & view, const float2 & mousePos, const float2 & displaySize) override
     {
         ScreenGUISel sel;
 

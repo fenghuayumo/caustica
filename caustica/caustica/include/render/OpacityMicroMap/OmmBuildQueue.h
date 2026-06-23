@@ -19,13 +19,10 @@
 #include <unordered_map>
 #include <list>
 
-namespace donut
+namespace caustica
 {
-	namespace engine
-	{
 		class ShaderFactory;
 		class DescriptorTableManager;
-	}
 }
 
 class OmmBuildQueue
@@ -36,7 +33,7 @@ public:
 		struct Geometry
 		{
 			int geometryIndexInMesh = -1;
-			std::shared_ptr < donut::engine::TextureData > alphaTexture;
+			std::shared_ptr < caustica::TextureData > alphaTexture;
 
 			// Settings
 			uint32_t maxSubdivisionLevel = 5;
@@ -56,15 +53,15 @@ public:
 			bool enableNsightDebugMode = false;
 		};
 
-		std::shared_ptr < donut::engine::MeshInfo > mesh;
+		std::shared_ptr < caustica::MeshInfo > mesh;
 		std::vector < Geometry > geometries;
 		bvh::Config bvhCfg;
 	};
 
 	OmmBuildQueue(
 		nvrhi::DeviceHandle& device, 
-		std::shared_ptr<donut::engine::DescriptorTableManager>,
-		std::shared_ptr<donut::engine::ShaderFactory> shaderFactory
+		std::shared_ptr<caustica::DescriptorTableManager>,
+		std::shared_ptr<caustica::ShaderFactory> shaderFactory
 	);
 	~OmmBuildQueue();
 
@@ -145,7 +142,7 @@ private:
 	nvrhi::EventQueryHandle m_InFlightQuery;
 
 	nvrhi::DeviceHandle m_device;
-	std::shared_ptr<donut::engine::DescriptorTableManager> m_descriptorTable;
-	std::shared_ptr<donut::engine::ShaderFactory> m_shaderFactory;
+	std::shared_ptr<caustica::DescriptorTableManager> m_descriptorTable;
+	std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
 	std::unique_ptr<omm::GpuBakeNvrhi> m_baker;
 };

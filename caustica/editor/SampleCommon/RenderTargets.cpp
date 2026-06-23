@@ -17,7 +17,7 @@
 #include <engine/FramebufferFactory.h>
 
 #include <math/math.h>
-using namespace donut::math;
+using namespace caustica::math;
 
 #include <shaders/PathTracer/StablePlanes.hlsli>
 
@@ -29,13 +29,12 @@ using namespace donut::math;
 #include <cstdint>
 
 using namespace dm;
-using namespace donut;
-using namespace donut::math;
+using namespace caustica::math;
 
 void RenderTargets::Init(
         nvrhi::IDevice* device,
-        donut::math::uint2 renderSize, 
-        donut::math::uint2 displaySize,
+        dm::uint2 renderSize, 
+        dm::uint2 displaySize,
         bool enableMotionVectors,
         bool useReverseProjection,
         int backbufferCount
@@ -325,13 +324,13 @@ void RenderTargets::Init(
         SSRBlurMipChain = device->createTexture(ssrDesc);
     }
 
-    OutputFramebuffer = std::make_shared<donut::engine::FramebufferFactory>(device);
+    OutputFramebuffer = std::make_shared<caustica::FramebufferFactory>(device);
     OutputFramebuffer->RenderTargets = { OutputColor };
 
-    ProcessedOutputFramebuffer = std::make_shared<donut::engine::FramebufferFactory>(device);
+    ProcessedOutputFramebuffer = std::make_shared<caustica::FramebufferFactory>(device);
     ProcessedOutputFramebuffer->RenderTargets = { ProcessedOutputColor };
 
-    LdrFramebuffer = std::make_shared<donut::engine::FramebufferFactory>(device);
+    LdrFramebuffer = std::make_shared<caustica::FramebufferFactory>(device);
     LdrFramebuffer->RenderTargets = { LdrColor };
 
     { // Stable planes
@@ -363,7 +362,7 @@ void RenderTargets::Init(
     }
 }
 
-[[nodiscard]] bool RenderTargets::IsUpdateRequired(donut::math::uint2 renderSize, donut::math::uint2 displaySize, donut::math::uint sampleCount) const
+[[nodiscard]] bool RenderTargets::IsUpdateRequired(dm::uint2 renderSize, dm::uint2 displaySize, dm::uint sampleCount) const
 {
     if (any(RenderSize != renderSize) || any(DisplaySize != displaySize) || m_SampleCount != sampleCount) return true;
     return false;

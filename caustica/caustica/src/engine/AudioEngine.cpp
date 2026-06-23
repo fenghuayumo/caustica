@@ -37,8 +37,7 @@
 #include <thread>
 #include <unordered_map>
 
-using namespace donut;
-using namespace donut::math;
+using namespace caustica::math;
 
 // lock-free container for safe asynchronous manipulation of small data items
 template <typename T> class Lockfree
@@ -61,7 +60,7 @@ private:
     volatile bool toggle; // toggle pointing at safe-to-read value
 };
 
-namespace donut::engine::audio
+namespace caustica::audio
 {
 
 static uint32_t makeKey(std::shared_ptr<AudioData const> sample)
@@ -148,7 +147,7 @@ static bool setOutputVoice(IXAudio2SubmixVoice * submix, IXAudio2SourceVoice * s
 
     HRESULT hr;
     if (FAILED(hr = source->SetOutputVoices(&sendList))) {
-        log::warning("AudioEngine : Xaudio2 failed to assign output voice (%08x)", hr);
+        caustica::warning("AudioEngine : Xaudio2 failed to assign output voice (%08x)", hr);
         return false;
     }
     return true;
@@ -186,7 +185,7 @@ static bool computePanMatrix(float pan, int nchannels, float * result)
         } break;
 
         default:
-            log::warning("AudioEngine : mono or stereo source data supported only for panning matrix");
+            caustica::warning("AudioEngine : mono or stereo source data supported only for panning matrix");
             return false;
     }
     return true;
@@ -205,7 +204,7 @@ static bool applyPan(float pan, IXAudio2SourceVoice * voice, int nchannels)
     HRESULT hr;
     if (FAILED(hr = voice->SetOutputMatrix(nullptr, nchannels, 2, matrix)))
     {
-        log::warning("AudioEngine : failed to set output matrix for voice (%08x)", hr);
+        caustica::warning("AudioEngine : failed to set output matrix for voice (%08x)", hr);
         return false;
     }
     return true;
@@ -231,7 +230,7 @@ struct Xaudio2Effect : public Effect
     float played() override;
     void setEffectCallback(EffectCallback const & callback) override;
 
-    bool setEmitterTransform(donut::math::affine3 const & transform) override;
+    bool setEmitterTransform(caustica::math::affine3 const & transform) override;
 
     std::shared_ptr<AudioData const > sample;
     bool stopped = false;
@@ -249,7 +248,7 @@ void Xaudio2Effect::setPitch(float pitch) { if (voice) voice->SetFrequencyRatio(
 void Xaudio2Effect::pause() { if (voice) voice->Stop(); }
 void Xaudio2Effect::stop() { pause(); (const_cast<Xaudio2Effect *>(this))->stopped = true; }
 void Xaudio2Effect::setPan(float pan) { if (sample) applyPan(pan, voice, sample->nchannels); }
-bool Xaudio2Effect::setEmitterTransform(donut::math::affine3 const & transform) { return false; }
+bool Xaudio2Effect::setEmitterTransform(caustica::math::affine3 const & transform) { return false; }
 void Xaudio2Effect::setEffectCallback(EffectCallback const & cb) { callback = cb; }
 
 float Xaudio2Effect::played()
@@ -268,7 +267,7 @@ float Xaudio2Effect::played()
 
 struct Xaudio2Effect3D : public Xaudio2Effect
 {
-    virtual bool setEmitterTransform(donut::math::affine3 const & transform);
+    virtual bool setEmitterTransform(caustica::math::affine3 const & transform);
 
     void update(std::chrono::system_clock::time_point const & now, bool leftHanded);
 
@@ -278,7 +277,7 @@ struct Xaudio2Effect3D : public Xaudio2Effect
     std::chrono::system_clock::time_point prevTime;
 };
 
-bool Xaudio2Effect3D::setEmitterTransform(donut::math::affine3 const & xform) 
+bool Xaudio2Effect3D::setEmitterTransform(caustica::math::affine3 const & xform) 
 {
     transform = xform;
     return true; 
@@ -418,7 +417,7 @@ private:
         STDMETHOD_(void, OnProcessingPassEnd)() override {}
         STDMETHOD_(void, OnCriticalError) (THIS_ HRESULT error)
         {
-            log::fatal("AudioEngine : critical error %08x", error);
+            caustica::fatal("AudioEngine : critical error %08x", error);
         }
     } m_callback;
 };
@@ -468,33 +467,33 @@ void Xaudio2Implementation::setMasterVolume(float volume)
 {
     HRESULT hr;
     if (!m_master || FAILED(hr = m_master->SetVolume(volume)))
-        log::warning("AudioEngine : cannot set master volume");
+        caustica::warning("AudioEngine : cannot set master volume");
 }
 
 void Xaudio2Implementation::setEffectsVolume(float volume)
 {
     HRESULT hr;
     if (!m_effects || FAILED(hr = m_effects->SetVolume(volume)))
-        log::warning("AudioEngine : cannot set effects volume");
+        caustica::warning("AudioEngine : cannot set effects volume");
 }
 
 void Xaudio2Implementation::setMusicVolume(float volume)
 {
     HRESULT hr;
     if (!m_music || FAILED(hr = m_music->SetVolume(volume)))
-        log::warning("AudioEngine : cannot set music volume");
+        caustica::warning("AudioEngine : cannot set music volume");
 }
 
 bool Xaudio2Implementation::canPlaySample(std::shared_ptr<AudioData const> sample)
 {
     if (!sample)
     {
-        log::warning("AudioEngine : no sample passed");
+        caustica::warning("AudioEngine : no sample passed");
         return false;
     }
     if (sample->format != AudioData::Format::WAVE_PCM_INTEGER)
     {
-        log::warning("AudioEngine : audio format not supported");
+        caustica::warning("AudioEngine : audio format not supported");
         return false;
     }
     return true;
@@ -506,7 +505,7 @@ IXAudio2SourceVoice * Xaudio2Implementation::allocateVoice(uint32_t key, WAVEFOR
 
     if (m_activeVoices.size() >= m_options.maxVoices)
     {
-        log::warning("AudioEngine : cannot allocate voice ; max pool size reached");
+        caustica::warning("AudioEngine : cannot allocate voice ; max pool size reached");
         return nullptr;
     }
 
@@ -524,7 +523,7 @@ IXAudio2SourceVoice * Xaudio2Implementation::allocateVoice(uint32_t key, WAVEFOR
         {
             HRESULT hr;
             if (FAILED(hr = m_xaudio2->CreateSourceVoice(&voice, &wfx, 0, 4.0f))) {
-                log::warning("AudioEngine : Xaudio2 failed to create source voice (%08x)", hr);
+                caustica::warning("AudioEngine : Xaudio2 failed to create source voice (%08x)", hr);
                 return nullptr;
             }
         }
@@ -554,7 +553,7 @@ std::weak_ptr<Effect> Xaudio2Implementation::playSample(IXAudio2SubmixVoice * su
 #ifdef _DEBUG
             // manuelk : not sure why sometimes Xaudio2 returns XAUDIO2_E_INVALID_CALL here
             // when queuing many effects too quickly - setting to fail silently in release mode
-            log::warning("AudioEngine : failed to set sample rate for audio sample (%08x)", hr);
+            caustica::warning("AudioEngine : failed to set sample rate for audio sample (%08x)", hr);
 #endif
             return result;
         }
@@ -569,7 +568,7 @@ std::weak_ptr<Effect> Xaudio2Implementation::playSample(IXAudio2SubmixVoice * su
         buffer.LoopCount = desc.loop == 1 ? XAUDIO2_NO_LOOP_REGION : std::min(desc.loop, (uint32_t)XAUDIO2_LOOP_INFINITE);
 
         if (voice->SubmitSourceBuffer(&buffer) != S_OK) {
-            log::warning("AudioEngine : error SubmitSourceBuffer");
+            caustica::warning("AudioEngine : error SubmitSourceBuffer");
             return result;
         }
 
@@ -582,7 +581,7 @@ std::weak_ptr<Effect> Xaudio2Implementation::playSample(IXAudio2SubmixVoice * su
 
         if (FAILED(hr = voice->Start(0)))
         {
-            log::warning("Error starting voice for audio sample");
+            caustica::warning("Error starting voice for audio sample");
             return result;
         }
 
@@ -750,7 +749,7 @@ void Xaudio2Implementation::update()
                             HRESULT hr;
                             if (FAILED(hr=effect3D->voice->SetOutputMatrix(m_effects, effect3D->sample->nchannels, 2, matrix)))
                             {
-                                log::warning("AudioEngine : failed to apply output matrix to effect");
+                                caustica::warning("AudioEngine : failed to apply output matrix to effect");
                             }
                         }
                     ++it;
@@ -758,7 +757,7 @@ void Xaudio2Implementation::update()
             }
             else
             {
-                log::warning("AudioEngine : update thread encountered null effect");
+                caustica::warning("AudioEngine : update thread encountered null effect");
                 ++it;
             }
         }
@@ -796,7 +795,7 @@ bool Xaudio2Implementation::startUpdateThread()
 {
     if (m_updateThread.joinable())
     {
-        log::error("AudioEngine : update thread already running");
+        caustica::error("AudioEngine : update thread already running");
         return false;
     }
     m_updateRunning = true;
@@ -816,7 +815,7 @@ std::unique_ptr<Engine::Implementation> Xaudio2Implementation::create(Options co
     HRESULT hr;
     if (FAILED(hr = CoInitializeEx(NULL, COINIT_MULTITHREADED)))
     {
-        log::warning("AudioEngine : cannot initialize multi-threaded mode");
+        caustica::warning("AudioEngine : cannot initialize multi-threaded mode");
         return nullptr;
     }
 
@@ -825,27 +824,27 @@ std::unique_ptr<Engine::Implementation> Xaudio2Implementation::create(Options co
     // interface
     if (FAILED(hr = XAudio2Create(&result->m_xaudio2, 0)))
     {
-        log::warning("AudioEngine : cannot initialize XAudio2 interface");
+        caustica::warning("AudioEngine : cannot initialize XAudio2 interface");
         return nullptr;
     }
 
     if (FAILED(hr = result->m_xaudio2->RegisterForCallbacks(&result->m_callback)))
     {
-        log::warning("AudioEngine : failed to register XAudio2 callback");
+        caustica::warning("AudioEngine : failed to register XAudio2 callback");
         return nullptr;
     }
 
     // mastering voice
     if (FAILED(hr = result->m_xaudio2->CreateMasteringVoice(&result->m_master, 2, opts.masteringRate)))
     {
-        log::warning("AudioEngine : cannot initialize mastering mixer");
+        caustica::warning("AudioEngine : cannot initialize mastering mixer");
         return nullptr;
     }
 
     DWORD masterMask;
     if (FAILED(hr = result->m_master->GetChannelMask(&masterMask)))
     {
-        log::warning("AudioEngine : error retrivieving mastering voice mask");
+        caustica::warning("AudioEngine : error retrivieving mastering voice mask");
         return nullptr;
     }
     result->m_masterMask = masterMask;
@@ -855,14 +854,14 @@ std::unique_ptr<Engine::Implementation> Xaudio2Implementation::create(Options co
     result->m_masterChannels = details.InputChannels;
     result->m_masterRate = details.InputSampleRate;
 
-    log::info("AudioEngine master voice : %d channels %d kHz 0x%x", details.InputChannels, details.InputSampleRate, masterMask);
+    caustica::info("AudioEngine master voice : %d channels %d kHz 0x%x", details.InputChannels, details.InputSampleRate, masterMask);
 
     result->m_master->SetVolume(opts.masterVolume);
 
     // submix voices
     if (FAILED(hr = result->m_xaudio2->CreateSubmixVoice(&result->m_music, 2, opts.masteringRate)))
     {
-        log::warning("AudioEngine : cannot initialize music mixer");
+        caustica::warning("AudioEngine : cannot initialize music mixer");
         return nullptr;
     }
 
@@ -870,7 +869,7 @@ std::unique_ptr<Engine::Implementation> Xaudio2Implementation::create(Options co
 
     if (FAILED(hr = result->m_xaudio2->CreateSubmixVoice(&result->m_effects, 2, opts.masteringRate)))
     {
-        log::warning("AudioEngine : cannot initialize effects mixer");
+        caustica::warning("AudioEngine : cannot initialize effects mixer");
         return nullptr;
     }
     result->m_effects->SetVolume(opts.effectsVolume);
@@ -881,7 +880,7 @@ std::unique_ptr<Engine::Implementation> Xaudio2Implementation::create(Options co
     {
         if (FAILED(hr = X3DAudioInitialize(masterMask, X3DAUDIO_SPEED_OF_SOUND, result->m_X3Daudio)))
         {
-            log::warning("AudioEngine : cannot initialize 3D audio");
+            caustica::warning("AudioEngine : cannot initialize 3D audio");
             return nullptr;
         }
         result->setListenerTransform(affine3::identity());
@@ -949,7 +948,7 @@ Engine::Engine(Options opts)
 #ifdef WIN32
     m_implementation = Xaudio2Implementation::create(opts);
 #else
-    log::warning("Audio not supported on this platform");
+    caustica::warning("Audio not supported on this platform");
 #endif
 }
 
@@ -1023,4 +1022,4 @@ void Engine::setListenerCallback(ListenerCallback const & callback)
         m_implementation->setListenerCallback(callback);
 }
 
-} // namespace donut::engine::audio
+} // namespace caustica::audio

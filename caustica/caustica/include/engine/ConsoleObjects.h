@@ -31,7 +31,7 @@
 #include <vector>
 #include <string.h>
 
-namespace donut::engine
+namespace caustica
 {
 
 	namespace console {
@@ -344,4 +344,4 @@ namespace donut::engine
 	typedef console::AutoVariable<dm::float4> cvarFloat4;
 	typedef console::AutoVariable<std::string> cvarString;
 
-} // end namespace donut::engine
+} // end namespace caustica

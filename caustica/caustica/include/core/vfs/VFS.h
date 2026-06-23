@@ -35,7 +35,7 @@ The VFS provides read and sometimes write access to entire files stored in a
 real file system, mounted into a virtual tree, stored in archives or resources.
 */
 
-namespace donut::vfs
+namespace caustica
 {
     namespace status
     {
@@ -105,12 +105,12 @@ namespace donut::vfs
 
         // Search for files with any of the provided 'extensions' in 'path'.
         // Extensions should not include any wildcard characters.
-        // Returns the number of files found, or a negative number on errors - see donut::vfs::status.
+        // Returns the number of files found, or a negative number on errors - see caustica::status.
         // The file names, relative to the 'path', are passed to 'callback' in no particular order.
         virtual int enumerateFiles(const std::filesystem::path& path, const std::vector<std::string>& extensions, enumerate_callback_t callback, bool allowDuplicates = false) = 0;
 
         // Search for directories in 'path'.
-        // Returns the number of directories found, or a negative number on errors - see donut::vfs::status.
+        // Returns the number of directories found, or a negative number on errors - see caustica::status.
         // The directory names, relative to the 'path', are passed to 'callback' in no particular order.
         virtual int enumerateDirectories(const std::filesystem::path& path, enumerate_callback_t callback, bool allowDuplicates = false) = 0;
     };

@@ -25,7 +25,7 @@
 #include <set>
 #include <nvrhi/common/aftermath.h>
 
-namespace donut::app
+namespace caustica
 {
     class DeviceManager;
 
@@ -52,4 +52,4 @@ namespace donut::app
         DeviceManager& m_deviceManager;
         std::filesystem::path m_dumpFolder;
     };
-} // end namespace donut::app
+} // end namespace caustica

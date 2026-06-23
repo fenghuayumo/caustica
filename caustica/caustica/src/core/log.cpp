@@ -29,7 +29,7 @@
 #include <Windows.h>
 #endif
 
-namespace donut::log
+namespace caustica
 {
     static constexpr size_t g_MessageBufferSize = 4096;
 

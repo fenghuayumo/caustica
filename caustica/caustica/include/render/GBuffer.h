@@ -26,13 +26,13 @@
 #include <nvrhi/nvrhi.h>
 #include <memory>
 
-namespace donut::engine
+namespace caustica
 {
     class CommonRenderPasses;
     class FramebufferFactory;
 }
 
-namespace donut::render
+namespace caustica::render
 {
     class GBufferRenderTargets
     {
@@ -50,7 +50,7 @@ namespace donut::render
 
         nvrhi::TextureHandle MotionVectors;
 
-        std::shared_ptr<engine::FramebufferFactory> GBufferFramebuffer;
+        std::shared_ptr<caustica::FramebufferFactory> GBufferFramebuffer;
 
         virtual ~GBufferRenderTargets() = default;
 

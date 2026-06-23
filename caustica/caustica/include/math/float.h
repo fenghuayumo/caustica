@@ -26,7 +26,7 @@
 #include <limits>
 #include "vector.h"
 
-namespace donut::math
+namespace caustica::math
 {
     // 16-bit floating point number, E5M10.
     struct float16_t
@@ -134,32 +134,32 @@ namespace donut::math
 
 namespace std
 {
-    template<> class numeric_limits<donut::math::float16_t>
+    template<> class numeric_limits<caustica::math::float16_t>
     {
     public:
-        static constexpr donut::math::float16_t(min)() noexcept {
-            return donut::math::float16_t{ 0x0400 }; // 6.1035e-5
+        static constexpr caustica::math::float16_t(min)() noexcept {
+            return caustica::math::float16_t{ 0x0400 }; // 6.1035e-5
         }
-        static constexpr donut::math::float16_t(max)() noexcept {
-            return donut::math::float16_t{ 0x7bff }; // 65504.0
+        static constexpr caustica::math::float16_t(max)() noexcept {
+            return caustica::math::float16_t{ 0x7bff }; // 65504.0
         }
-        static constexpr donut::math::float16_t lowest() noexcept {
+        static constexpr caustica::math::float16_t lowest() noexcept {
             return min();
         }
-        static constexpr donut::math::float16_t epsilon() noexcept {
-            return donut::math::float16_t{ 0x1400 }; // f16(0x3c01) - f16(0x3c00)
+        static constexpr caustica::math::float16_t epsilon() noexcept {
+            return caustica::math::float16_t{ 0x1400 }; // f16(0x3c01) - f16(0x3c00)
         }
-        static constexpr donut::math::float16_t round_error() noexcept {
-            return donut::math::float16_t{ 0x3800 }; // 0.5
+        static constexpr caustica::math::float16_t round_error() noexcept {
+            return caustica::math::float16_t{ 0x3800 }; // 0.5
         }
-        static constexpr donut::math::float16_t denorm_min() noexcept {
-            return donut::math::float16_t{ 0x0001 }; // 5.9604e-8
+        static constexpr caustica::math::float16_t denorm_min() noexcept {
+            return caustica::math::float16_t{ 0x0001 }; // 5.9604e-8
         }
-        static constexpr donut::math::float16_t infinity() noexcept {
-            return donut::math::float16_t{ 0x7C00 };
+        static constexpr caustica::math::float16_t infinity() noexcept {
+            return caustica::math::float16_t{ 0x7C00 };
         }
-        static constexpr donut::math::float16_t quiet_NaN() noexcept {
-            return donut::math::float16_t{ 0x7FFF };
+        static constexpr caustica::math::float16_t quiet_NaN() noexcept {
+            return caustica::math::float16_t{ 0x7FFF };
         }
 
         static constexpr int digits             = 11;
@@ -178,29 +178,29 @@ namespace std
         static constexpr float_round_style round_style = round_to_nearest;
     };
 
-    template<> class numeric_limits<donut::math::float8e4m3_t>
+    template<> class numeric_limits<caustica::math::float8e4m3_t>
     {
     public:
-        static constexpr donut::math::float8e4m3_t(min)() noexcept {
-            return donut::math::float8e4m3_t{ 0x08 }; // 0.01562
+        static constexpr caustica::math::float8e4m3_t(min)() noexcept {
+            return caustica::math::float8e4m3_t{ 0x08 }; // 0.01562
         }
-        static constexpr donut::math::float8e4m3_t(max)() noexcept {
-            return donut::math::float8e4m3_t{ 0x7e }; // 448.0
+        static constexpr caustica::math::float8e4m3_t(max)() noexcept {
+            return caustica::math::float8e4m3_t{ 0x7e }; // 448.0
         }
-        static constexpr donut::math::float8e4m3_t lowest() noexcept {
+        static constexpr caustica::math::float8e4m3_t lowest() noexcept {
             return min();
         }
-        static constexpr donut::math::float8e4m3_t epsilon() noexcept {
-            return donut::math::float8e4m3_t{ 0x20 }; // f8(0x39) - f8(0x38)
+        static constexpr caustica::math::float8e4m3_t epsilon() noexcept {
+            return caustica::math::float8e4m3_t{ 0x20 }; // f8(0x39) - f8(0x38)
         }
-        static constexpr donut::math::float8e4m3_t round_error() noexcept {
-            return donut::math::float8e4m3_t{ 0x30 }; // 0.5
+        static constexpr caustica::math::float8e4m3_t round_error() noexcept {
+            return caustica::math::float8e4m3_t{ 0x30 }; // 0.5
         }
-        static constexpr donut::math::float8e4m3_t denorm_min() noexcept {
-            return donut::math::float8e4m3_t{ 0x01 }; // 0.001953	
+        static constexpr caustica::math::float8e4m3_t denorm_min() noexcept {
+            return caustica::math::float8e4m3_t{ 0x01 }; // 0.001953	
         }
-        static constexpr donut::math::float8e4m3_t quiet_NaN() noexcept {
-            return donut::math::float8e4m3_t{ 0x7f };
+        static constexpr caustica::math::float8e4m3_t quiet_NaN() noexcept {
+            return caustica::math::float8e4m3_t{ 0x7f };
         }
 
         static constexpr int digits             = 4;
@@ -219,32 +219,32 @@ namespace std
         static constexpr float_round_style round_style = round_to_nearest;
     };
     
-    template<> class numeric_limits<donut::math::float8e5m2_t>
+    template<> class numeric_limits<caustica::math::float8e5m2_t>
     {
     public:
-        static constexpr donut::math::float8e5m2_t(min)() noexcept {
-            return donut::math::float8e5m2_t{ 0x04 }; // 0.000061
+        static constexpr caustica::math::float8e5m2_t(min)() noexcept {
+            return caustica::math::float8e5m2_t{ 0x04 }; // 0.000061
         }
-        static constexpr donut::math::float8e5m2_t(max)() noexcept {
-            return donut::math::float8e5m2_t{ 0x7b }; // 57344.0
+        static constexpr caustica::math::float8e5m2_t(max)() noexcept {
+            return caustica::math::float8e5m2_t{ 0x7b }; // 57344.0
         }
-        static constexpr donut::math::float8e5m2_t lowest() noexcept {
+        static constexpr caustica::math::float8e5m2_t lowest() noexcept {
             return min();
         }
-        static constexpr donut::math::float8e5m2_t epsilon() noexcept {
-            return donut::math::float8e5m2_t{ 0x34 }; // f8(0x3d) - f8(0x3c)
+        static constexpr caustica::math::float8e5m2_t epsilon() noexcept {
+            return caustica::math::float8e5m2_t{ 0x34 }; // f8(0x3d) - f8(0x3c)
         }
-        static constexpr donut::math::float8e5m2_t round_error() noexcept {
-            return donut::math::float8e5m2_t{ 0x38 }; // 0.5
+        static constexpr caustica::math::float8e5m2_t round_error() noexcept {
+            return caustica::math::float8e5m2_t{ 0x38 }; // 0.5
         }
-        static constexpr donut::math::float8e5m2_t denorm_min() noexcept {
-            return donut::math::float8e5m2_t{ 0x01 }; // 0.0000153
+        static constexpr caustica::math::float8e5m2_t denorm_min() noexcept {
+            return caustica::math::float8e5m2_t{ 0x01 }; // 0.0000153
         }
-        static constexpr donut::math::float8e5m2_t infinity() noexcept {
-            return donut::math::float8e5m2_t{ 0x7c };
+        static constexpr caustica::math::float8e5m2_t infinity() noexcept {
+            return caustica::math::float8e5m2_t{ 0x7c };
         }
-        static constexpr donut::math::float8e5m2_t quiet_NaN() noexcept {
-            return donut::math::float8e5m2_t{ 0x7f };
+        static constexpr caustica::math::float8e5m2_t quiet_NaN() noexcept {
+            return caustica::math::float8e5m2_t{ 0x7f };
         }
 
         static constexpr int digits             = 3;

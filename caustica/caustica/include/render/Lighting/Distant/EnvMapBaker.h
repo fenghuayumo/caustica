@@ -20,14 +20,14 @@
 
 #include <SampleCommon/SampleCommon.h>
 
-using namespace donut::math;
+using namespace caustica::math;
 
 #include <shaders/render/Lighting/Distant/EnvMapBaker.hlsl>
 #include <shaders/render/Lighting/Distant/BRDFLUTGenerator.hlsl>
 
 #include "SampleProceduralSky.h"
 
-namespace donut::engine
+namespace caustica
 {
     class BindingCache;
     class FramebufferFactory;
@@ -82,16 +82,16 @@ public:
     
 
 public:
-    EnvMapBaker( nvrhi::IDevice* device, std::shared_ptr<donut::engine::TextureCache> textureCache, bool enableRasterPrecompute );
+    EnvMapBaker( nvrhi::IDevice* device, std::shared_ptr<caustica::TextureCache> textureCache, bool enableRasterPrecompute );
     ~EnvMapBaker();
 
     void                            SceneReloaded()                 { m_targetResolution = 0; } // change default target resolution on each scene load
 
-    void                            CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebug, std::shared_ptr<donut::engine::ShaderFactory> shaderFactory, std::shared_ptr<ComputePipelineBaker> computePipelineBaker);
+    void                            CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebug, std::shared_ptr<caustica::ShaderFactory> shaderFactory, std::shared_ptr<ComputePipelineBaker> computePipelineBaker);
 
-    void                            PreUpdate( nvrhi::ICommandList* commandList, std::shared_ptr<donut::engine::CommonRenderPasses> commonPasses, std::string envMapBackgroundPath, const std::filesystem::path& sceneDirectory = std::filesystem::path() );    // use to update to figure out GetTargetCubeResolution() default cubemap resolution and needed before Update; Ignore return if not needed.
+    void                            PreUpdate( nvrhi::ICommandList* commandList, std::shared_ptr<caustica::CommonRenderPasses> commonPasses, std::string envMapBackgroundPath, const std::filesystem::path& sceneDirectory = std::filesystem::path() );    // use to update to figure out GetTargetCubeResolution() default cubemap resolution and needed before Update; Ignore return if not needed.
     // Returns 'true' if contents changed; note: directionalLights must be transformed to Environment map local space. 
-    bool                            Update( nvrhi::ICommandList * commandList, donut::engine::BindingCache & bindingCache, std::shared_ptr<donut::engine::CommonRenderPasses> commonPasses, const BakeSettings & settings, double sceneTime, EMB_DirectionalLight const * directionalLights, uint directionaLightCount, bool forceInstantUpdate );
+    bool                            Update( nvrhi::ICommandList * commandList, caustica::BindingCache & bindingCache, std::shared_ptr<caustica::CommonRenderPasses> commonPasses, const BakeSettings & settings, double sceneTime, EMB_DirectionalLight const * directionalLights, uint directionaLightCount, bool forceInstantUpdate );
 
     nvrhi::TextureHandle            GetEnvMapCube() const           { return (m_outputIsCompressed)?(m_cubemapBC6H):(m_cubemap); }
     nvrhi::SamplerHandle            GetEnvMapCubeSampler() const    { return m_linearSampler; }
@@ -118,20 +118,20 @@ public:
     // This allows reusing the mip generation, GGX filtering, and SH projection for external cubemaps (e.g., local RT cubemap)
     void                            ProcessCubemap(
                                         nvrhi::ICommandList* commandList,
-                                        donut::engine::BindingCache& bindingCache,
+                                        caustica::BindingCache& bindingCache,
                                         nvrhi::TextureHandle sourceCubemap,
                                         const CubemapProcessingOptions& options,
                                         const CubemapProcessingResults& results);
     
     // Generate the BRDF integration LUT (should be called once during initialization)
-    bool                            GenerateBRDFLUT(nvrhi::ICommandList* commandList, donut::engine::BindingCache& bindingCache);
+    bool                            GenerateBRDFLUT(nvrhi::ICommandList* commandList, caustica::BindingCache& bindingCache);
     
 private:
-    void                            GGXPrefilterCubemap(nvrhi::ICommandList* commandList, donut::engine::BindingCache& bindingCache, 
+    void                            GGXPrefilterCubemap(nvrhi::ICommandList* commandList, caustica::BindingCache& bindingCache, 
                                         nvrhi::TextureHandle srcCubemap, nvrhi::TextureHandle dstCubemap);
-    void                            ConvolveDiffuseIrradiance(nvrhi::ICommandList* commandList, donut::engine::BindingCache& bindingCache,
+    void                            ConvolveDiffuseIrradiance(nvrhi::ICommandList* commandList, caustica::BindingCache& bindingCache,
                                         nvrhi::TextureHandle srcCubemap, nvrhi::TextureHandle dstCubemap);
-    void                            GenerateCubemapMips(nvrhi::ICommandList* commandList, donut::engine::BindingCache& bindingCache, 
+    void                            GenerateCubemapMips(nvrhi::ICommandList* commandList, caustica::BindingCache& bindingCache, 
                                         nvrhi::TextureHandle cubemap);
 
     void                            InitBuffers(uint cubeDim);
@@ -139,7 +139,7 @@ private:
 
 private:
     nvrhi::DeviceHandle             m_device;
-    std::shared_ptr<donut::engine::TextureCache> m_textureCache;
+    std::shared_ptr<caustica::TextureCache> m_textureCache;
     std::shared_ptr<ShaderDebug>    m_shaderDebug;
 
     nvrhi::ShaderHandle             m_lowResPrePassLayerCS;
@@ -169,8 +169,8 @@ private:
 
     std::string                     m_sourceBackgroundPath;
     std::string                     m_loadedSourceBackgroundPath;
-    std::shared_ptr<donut::engine::TextureData>    m_loadedSourceBackgroundTextureEquirect;
-    std::shared_ptr<donut::engine::TextureData>    m_loadedSourceBackgroundTextureCubemap;
+    std::shared_ptr<caustica::TextureData>    m_loadedSourceBackgroundTextureEquirect;
+    std::shared_ptr<caustica::TextureData>    m_loadedSourceBackgroundTextureCubemap;
 
     nvrhi::TextureHandle            m_cubemap;
     nvrhi::TextureDesc              m_cubemapDesc;

@@ -23,7 +23,7 @@
 #pragma once
 #include <chrono>
 
-namespace donut::app
+namespace caustica
 {
     class HiResTimer
     {

@@ -86,7 +86,7 @@ freely, subject to the following restrictions:
 #include <functional>
 #include <optional>
 
-namespace donut::app
+namespace caustica
 {
     struct DefaultMessageCallback : public nvrhi::IMessageCallback
     {
@@ -121,7 +121,7 @@ namespace donut::app
         bool enablePerMonitorDPI = false;
 
         // Severity of the information log messages from the device manager, like the device name or enabled extensions.
-        log::Severity infoLogSeverity = log::Severity::Info;
+        caustica::Severity infoLogSeverity = caustica::Severity::Info;
 
 #if DONUT_WITH_VULKAN
         // Allows overriding the Vulkan library name with something custom, useful for Streamline

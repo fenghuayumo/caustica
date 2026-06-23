@@ -25,7 +25,7 @@
 #include <wrl/client.h> // Microsoft::WRL::ComPtr
 #endif
 
-namespace donut::engine
+namespace caustica
 {
 	class ShaderFactory;
 }
@@ -56,25 +56,25 @@ public:
     bool QueryVideoMemoryInfo(uint64_t& outBudget, uint64_t& outCurrentUsage, uint64_t& outAvailableForReservation, uint64_t& outCurrentReservation); // RTXPT_ENABLE_VIDEO_MEMORY_INFO for this to work, otherwise return false
 
 private:
-	virtual std::unique_ptr<Sample> CreateMainRenderPass(donut::app::DeviceManager& deviceManager, const CommandLineOptions& cmdLineOptions) = 0;
+	virtual std::unique_ptr<Sample> CreateMainRenderPass(caustica::DeviceManager& deviceManager, const CommandLineOptions& cmdLineOptions) = 0;
 
 	// Initialization methods
 	void RegisterDonutCallback();
-	void SampleLogCallback(donut::log::Severity severity, const char* message);
-	donut::app::DeviceCreationParameters GetDefaultDeviceParams() const;
+	void SampleLogCallback(caustica::Severity severity, const char* message);
+	caustica::DeviceCreationParameters GetDefaultDeviceParams() const;
 	bool ProcessCommandLine(int argc, char const* const* argv,
-		donut::app::DeviceCreationParameters& deviceParams, std::string& preferredScene);
-	bool InitDeviceAndWindow(const donut::app::DeviceCreationParameters& deviceParams);
-	bool CheckDeviceFeatureSupport(const donut::app::DeviceCreationParameters& deviceParams);
+		caustica::DeviceCreationParameters& deviceParams, std::string& preferredScene);
+	bool InitDeviceAndWindow(const caustica::DeviceCreationParameters& deviceParams);
+	bool CheckDeviceFeatureSupport(const caustica::DeviceCreationParameters& deviceParams);
 	void CreateShaderFactory();
 
-	donut::log::Callback m_DonutDefaultCallback = nullptr;
+	caustica::Callback m_DonutDefaultCallback = nullptr;
 	FPSLimiter m_FPSLimiter;
 
 	CommandLineOptions m_CmdLine;
 
-	std::unique_ptr<donut::app::DeviceManager> m_DeviceManager;
-	std::shared_ptr<donut::engine::ShaderFactory> m_ShaderFactory;
+	std::unique_ptr<caustica::DeviceManager> m_DeviceManager;
+	std::shared_ptr<caustica::ShaderFactory> m_ShaderFactory;
 	std::unique_ptr<Sample> m_MainSceneRender; // 3d render of the scene. Where Path Tracing happens
 	std::unique_ptr<SampleUI> m_UIRender;
 

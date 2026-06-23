@@ -27,7 +27,7 @@
 #include <unordered_map>
 #include <mutex>
 
-namespace donut::engine
+namespace caustica
 {
     enum class MaterialResource
     {

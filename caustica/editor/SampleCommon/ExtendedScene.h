@@ -21,7 +21,7 @@ struct LightSamplerLink
     int         LastUpdateTag = -1;     // identifier of when IndexOrBase was last updated (either frame index or similar)
 };
 
-struct LightExtension// : virtual public donut::engine::Light
+struct LightExtension// : virtual public caustica::Light
 {
     LightSamplerLink            LightLink;
     std::vector<std::string>    Proxies;
@@ -31,7 +31,7 @@ struct LightExtension// : virtual public donut::engine::Light
     void Copy(LightExtension & src)         { LightLink = src.LightLink; Proxies = src.Proxies; }
 };
 
-class SpotLightEx : public donut::engine::SpotLight, public LightExtension
+class SpotLightEx : public caustica::SpotLight, public LightExtension
 {
 public:
     [[nodiscard]] std::shared_ptr<SceneGraphLeaf> Clone() override;
@@ -39,7 +39,7 @@ public:
     void Store(Json::Value& node) const override;
 };
 
-class PointLightEx : public donut::engine::PointLight, public LightExtension
+class PointLightEx : public caustica::PointLight, public LightExtension
 {
 public:
     [[nodiscard]] std::shared_ptr<SceneGraphLeaf> Clone() override;
@@ -56,21 +56,21 @@ struct MeshInstanceExtension
     void Copy(MeshInstanceExtension& src) { PerGeometryLightSamplerLinks = src.PerGeometryLightSamplerLinks; }
 };
 
-class MeshInstanceEx : public donut::engine::MeshInstance, public MeshInstanceExtension
+class MeshInstanceEx : public caustica::MeshInstance, public MeshInstanceExtension
 {
 public:
-    explicit MeshInstanceEx(const std::shared_ptr<donut::engine::MeshInfo> & mesh);
+    explicit MeshInstanceEx(const std::shared_ptr<caustica::MeshInfo> & mesh);
     [[nodiscard]] std::shared_ptr<SceneGraphLeaf> Clone() override;
 };
 
-class SkinnedMeshInstanceEx : public donut::engine::SkinnedMeshInstance, public MeshInstanceExtension
+class SkinnedMeshInstanceEx : public caustica::SkinnedMeshInstance, public MeshInstanceExtension
 {
 public:
-    explicit SkinnedMeshInstanceEx(std::shared_ptr<donut::engine::SceneTypeFactory> sceneTypeFactory, std::shared_ptr<donut::engine::MeshInfo> prototypeMesh);
+    explicit SkinnedMeshInstanceEx(std::shared_ptr<caustica::SceneTypeFactory> sceneTypeFactory, std::shared_ptr<caustica::MeshInfo> prototypeMesh);
     [[nodiscard]] std::shared_ptr<SceneGraphLeaf> Clone() override;
 };
 
-class EnvironmentLight : public donut::engine::Light
+class EnvironmentLight : public caustica::Light
 {
 public:
     dm::float3 radianceScale = 1.f;
@@ -85,7 +85,7 @@ public:
     bool SetProperty(const std::string& name, const dm::float4& value) override { assert( false ); return false; }    // not yet implemented, never needed
 };
 
-class GaussianSplat : public donut::engine::SceneGraphLeaf
+class GaussianSplat : public caustica::SceneGraphLeaf
 {
 public:
     std::string path;
@@ -98,7 +98,7 @@ public:
     void Load(const Json::Value& node) override;
 };
 
-class PerspectiveCameraEx : public donut::engine::PerspectiveCamera
+class PerspectiveCameraEx : public caustica::PerspectiveCamera
 {
 public:
     std::optional<bool>     enableAutoExposure;
@@ -113,7 +113,7 @@ public:
 };
 
 // used to setup initial sample scene settings
-class SampleSettings : public donut::engine::SceneGraphLeaf
+class SampleSettings : public caustica::SceneGraphLeaf
 {
 public:
     std::optional<bool>         realtimeMode;
@@ -129,7 +129,7 @@ public:
 };
 
 // used to setup initial sample game settings (if any)
-class GameSettings : public donut::engine::SceneGraphLeaf
+class GameSettings : public caustica::SceneGraphLeaf
 {
     std::string                 jsonData;
 
@@ -140,18 +140,18 @@ public:
     const std::string           GetJsonData() const { return jsonData; }
 };
 
-class ExtendedSceneTypeFactory : public donut::engine::SceneTypeFactory
+class ExtendedSceneTypeFactory : public caustica::SceneTypeFactory
 {
 public:
-    std::shared_ptr<donut::engine::SceneGraphLeaf>  CreateLeaf(const std::string& type) override;
-    std::shared_ptr<donut::engine::Material>        CreateMaterial() override;
-    std::shared_ptr<donut::engine::MeshInfo>        CreateMesh() override;
-    std::shared_ptr<donut::engine::MeshGeometry>    CreateMeshGeometry() override;
-    std::shared_ptr<donut::engine::MeshInstance>    CreateMeshInstance(const std::shared_ptr<donut::engine::MeshInfo>& mesh);
-    std::shared_ptr<donut::engine::SkinnedMeshInstance> CreateSkinnedMeshInstance(const std::shared_ptr<donut::engine::SceneTypeFactory> & sceneTypeFactory, const std::shared_ptr<donut::engine::MeshInfo> & prototypeMesh) override;
+    std::shared_ptr<caustica::SceneGraphLeaf>  CreateLeaf(const std::string& type) override;
+    std::shared_ptr<caustica::Material>        CreateMaterial() override;
+    std::shared_ptr<caustica::MeshInfo>        CreateMesh() override;
+    std::shared_ptr<caustica::MeshGeometry>    CreateMeshGeometry() override;
+    std::shared_ptr<caustica::MeshInstance>    CreateMeshInstance(const std::shared_ptr<caustica::MeshInfo>& mesh);
+    std::shared_ptr<caustica::SkinnedMeshInstance> CreateSkinnedMeshInstance(const std::shared_ptr<caustica::SceneTypeFactory> & sceneTypeFactory, const std::shared_ptr<caustica::MeshInfo> & prototypeMesh) override;
 };
 
-class ExtendedScene : public donut::engine::Scene
+class ExtendedScene : public caustica::Scene
 {
 private:
     std::shared_ptr<SampleSettings> m_loadedSettings = nullptr;
@@ -160,22 +160,22 @@ private:
 public:
     using Scene::Scene;
 
-    bool LoadWithThreadPool(const std::filesystem::path& jsonFileName, donut::engine::ThreadPool* threadPool) override;
+    bool LoadWithThreadPool(const std::filesystem::path& jsonFileName, caustica::ThreadPool* threadPool) override;
     bool LoadFromJsonString(const std::string& sceneJson, const std::filesystem::path& scenePath = {}) override;
     std::shared_ptr<SampleSettings> GetSampleSettingsNode() const   { return m_loadedSettings; }
     std::shared_ptr<GameSettings>   GetGameSettingsNode() const     { return m_loadedGameSettings; }
 
-    const std::vector<donut::engine::SceneImportResult> & GetModels() const               { return m_Models; }
+    const std::vector<caustica::SceneImportResult> & GetModels() const               { return m_Models; }
 
 protected:
     bool LoadModelFile(
         const std::filesystem::path& fileName,
-        donut::engine::ThreadPool* threadPool,
-        donut::engine::SceneImportResult& result) override;
+        caustica::ThreadPool* threadPool,
+        caustica::SceneImportResult& result) override;
 
 private:
     // maybe switch to SceneGraphWalker?
-    void ProcessNodesRecursive(std::shared_ptr<donut::engine::SceneGraphNode> node);
+    void ProcessNodesRecursive(std::shared_ptr<caustica::SceneGraphNode> node);
 };
 
-std::shared_ptr<EnvironmentLight> FindEnvironmentLight(std::vector <std::shared_ptr<donut::engine::Light>> lights);
+std::shared_ptr<EnvironmentLight> FindEnvironmentLight(std::vector <std::shared_ptr<caustica::Light>> lights);

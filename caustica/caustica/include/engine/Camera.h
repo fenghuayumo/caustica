@@ -32,13 +32,13 @@
 #define GLFW_INCLUDE_NONE // Do not include any OpenGL headers
 #include <GLFW/glfw3.h>
 
-namespace donut::engine
+namespace caustica
 {
     class PlanarView;
     class SceneCamera;
 }
 
-namespace donut::app
+namespace caustica
 {
 
     // A camera with position and orientation. Methods for moving it come from derived classes.
@@ -190,7 +190,7 @@ namespace donut::app
         float GetMaxDistance() const { return m_MaxDistance; }
         void SetMaxDistance(float value) { m_MaxDistance = value; }
 
-        void SetView(const engine::PlanarView& view);
+        void SetView(const PlanarView& view);
 
         void LookAt(dm::float3 cameraPos, dm::float3 cameraTarget);
         void LookTo(dm::float3 cameraPos, dm::float3 cameraDir,
@@ -267,7 +267,7 @@ namespace donut::app
         ThirdPersonCamera& GetThirdPersonCamera() { return m_ThirdPerson; }
 
         // Returns the active scene camera object, or nullptr if a user camera is active.
-        std::shared_ptr<engine::SceneCamera>& GetSceneCamera() { return m_SceneCamera; }
+        std::shared_ptr<SceneCamera>& GetSceneCamera() { return m_SceneCamera; }
 
         // Returns the view matrix for the currently active camera.
         dm::affine3 GetWorldToViewMatrix() const;
@@ -289,7 +289,7 @@ namespace donut::app
 
         // Switches to the provided scene graph camera that must not be a nullptr.
         // The user-controllable cameras are not affected by this call.
-        void SwitchToSceneCamera(std::shared_ptr<engine::SceneCamera> const& sceneCamera);
+        void SwitchToSceneCamera(std::shared_ptr<SceneCamera> const& sceneCamera);
 
         // The following methods direct user input events to the active user camera
         // and return 'true' if such camera is active.
@@ -308,7 +308,7 @@ namespace donut::app
     private:
         FirstPersonCamera m_FirstPerson;
         ThirdPersonCamera m_ThirdPerson;
-        std::shared_ptr<engine::SceneCamera> m_SceneCamera;
+        std::shared_ptr<SceneCamera> m_SceneCamera;
         bool m_UseFirstPerson = false;
     };
 }

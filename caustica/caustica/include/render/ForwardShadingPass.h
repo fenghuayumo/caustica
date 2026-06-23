@@ -29,7 +29,7 @@
 #include <mutex>
 #include <unordered_map>
 
-namespace donut::engine
+namespace caustica
 {
     class ShaderFactory;
     class Light;
@@ -40,11 +40,11 @@ namespace donut::engine
     struct LightProbe;
 }
 
-namespace donut::render
+namespace caustica::render
 {
     struct ForwardShadingPassPipelineKey
     {
-        engine::MaterialDomain domain = engine::MaterialDomain::Opaque;
+        caustica::MaterialDomain domain = caustica::MaterialDomain::Opaque;
         nvrhi::RasterCullMode cullMode = nvrhi::RasterCullMode::Back;
         bool frontCounterClockwise = false;
         bool reverseDepth = false;
@@ -78,9 +78,9 @@ namespace std
         }
     };
 
-    template<> struct hash<donut::render::ForwardShadingPassPipelineKey>
+    template<> struct hash<caustica::render::ForwardShadingPassPipelineKey>
     {
-        std::size_t operator()(donut::render::ForwardShadingPassPipelineKey const& key) const noexcept
+        std::size_t operator()(caustica::render::ForwardShadingPassPipelineKey const& key) const noexcept
         {
             size_t hash = 0;
             nvrhi::hash_combine(hash, key.domain);
@@ -93,7 +93,7 @@ namespace std
     };
 }
 
-namespace donut::render
+namespace caustica::render
 {
     class ForwardShadingPass : public IGeometryPass
     {
@@ -114,7 +114,7 @@ namespace donut::render
 
         struct CreateParameters
         {
-            std::shared_ptr<engine::MaterialBindingCache> materialBindings;
+            std::shared_ptr<caustica::MaterialBindingCache> materialBindings;
             bool singlePassCubemap = false;
             bool trackLiveness = true;
 
@@ -138,7 +138,7 @@ namespace donut::render
         nvrhi::BindingSetHandle m_ViewBindingSet;
         nvrhi::BindingLayoutHandle m_ShadingBindingLayout;
         nvrhi::BindingLayoutHandle m_InputBindingLayout;
-        engine::ViewType::Enum m_SupportedViewTypes = engine::ViewType::PLANAR;
+        caustica::ViewType::Enum m_SupportedViewTypes = caustica::ViewType::PLANAR;
         nvrhi::BufferHandle m_ForwardViewCB;
         nvrhi::BufferHandle m_ForwardLightCB;
         bool m_TrackLiveness = true;
@@ -148,32 +148,32 @@ namespace donut::render
 
         std::unordered_map<ForwardShadingPassPipelineKey, nvrhi::GraphicsPipelineHandle> m_Pipelines;
         std::unordered_map<std::pair<nvrhi::ITexture*, nvrhi::ITexture*>, nvrhi::BindingSetHandle> m_ShadingBindingSets;
-        std::unordered_map<const engine::BufferGroup*, nvrhi::BindingSetHandle> m_InputBindingSets;
+        std::unordered_map<const caustica::BufferGroup*, nvrhi::BindingSetHandle> m_InputBindingSets;
         
-        std::shared_ptr<engine::CommonRenderPasses> m_CommonPasses;
-        std::shared_ptr<engine::MaterialBindingCache> m_MaterialBindings;
+        std::shared_ptr<caustica::CommonRenderPasses> m_CommonPasses;
+        std::shared_ptr<caustica::MaterialBindingCache> m_MaterialBindings;
         
-        virtual nvrhi::ShaderHandle CreateVertexShader(engine::ShaderFactory& shaderFactory, const CreateParameters& params);
-        virtual nvrhi::ShaderHandle CreateGeometryShader(engine::ShaderFactory& shaderFactory, const CreateParameters& params);
-        virtual nvrhi::ShaderHandle CreatePixelShader(engine::ShaderFactory& shaderFactory, const CreateParameters& params, bool transmissiveMaterial);
+        virtual nvrhi::ShaderHandle CreateVertexShader(caustica::ShaderFactory& shaderFactory, const CreateParameters& params);
+        virtual nvrhi::ShaderHandle CreateGeometryShader(caustica::ShaderFactory& shaderFactory, const CreateParameters& params);
+        virtual nvrhi::ShaderHandle CreatePixelShader(caustica::ShaderFactory& shaderFactory, const CreateParameters& params, bool transmissiveMaterial);
         virtual nvrhi::InputLayoutHandle CreateInputLayout(nvrhi::IShader* vertexShader, const CreateParameters& params);
         virtual nvrhi::BindingLayoutHandle CreateViewBindingLayout();
         virtual nvrhi::BindingSetHandle CreateViewBindingSet();
         virtual nvrhi::BindingLayoutHandle CreateShadingBindingLayout();
         virtual nvrhi::BindingSetHandle CreateShadingBindingSet(nvrhi::ITexture* shadowMapTexture, nvrhi::ITexture* diffuse, nvrhi::ITexture* specular, nvrhi::ITexture* environmentBrdf);
         virtual nvrhi::BindingLayoutHandle CreateInputBindingLayout();
-        virtual nvrhi::BindingSetHandle CreateInputBindingSet(const engine::BufferGroup* bufferGroup);
-        virtual std::shared_ptr<engine::MaterialBindingCache> CreateMaterialBindingCache(engine::CommonRenderPasses& commonPasses);
+        virtual nvrhi::BindingSetHandle CreateInputBindingSet(const caustica::BufferGroup* bufferGroup);
+        virtual std::shared_ptr<caustica::MaterialBindingCache> CreateMaterialBindingCache(caustica::CommonRenderPasses& commonPasses);
         virtual nvrhi::GraphicsPipelineHandle CreateGraphicsPipeline(ForwardShadingPassPipelineKey const& key, nvrhi::FramebufferInfo const& framebufferInfo);
-        nvrhi::BindingSetHandle GetOrCreateInputBindingSet(const engine::BufferGroup* bufferGroup);
+        nvrhi::BindingSetHandle GetOrCreateInputBindingSet(const caustica::BufferGroup* bufferGroup);
 
     public:
         ForwardShadingPass(
             nvrhi::IDevice* device,
-            std::shared_ptr<engine::CommonRenderPasses> commonPasses);
+            std::shared_ptr<caustica::CommonRenderPasses> commonPasses);
 
         virtual void Init(
-            engine::ShaderFactory& shaderFactory,
+            caustica::ShaderFactory& shaderFactory,
             const CreateParameters& params);
 
         void ResetBindingCache();
@@ -181,17 +181,17 @@ namespace donut::render
         virtual void PrepareLights(
             Context& context,
             nvrhi::ICommandList* commandList,
-            const std::vector<std::shared_ptr<engine::Light>>& lights,
+            const std::vector<std::shared_ptr<caustica::Light>>& lights,
             dm::float3 ambientColorTop,
             dm::float3 ambientColorBottom,
-            const std::vector<std::shared_ptr<engine::LightProbe>>& lightProbes);
+            const std::vector<std::shared_ptr<caustica::LightProbe>>& lightProbes);
 
         // IGeometryPass implementation
 
-        [[nodiscard]] engine::ViewType::Enum GetSupportedViewTypes() const override;
-        void SetupView(GeometryPassContext& context, nvrhi::ICommandList* commandList, const engine::IView* view, const engine::IView* viewPrev) override;
-        bool SetupMaterial(GeometryPassContext& context, const engine::Material* material, nvrhi::RasterCullMode cullMode, nvrhi::GraphicsState& state) override;
-        void SetupInputBuffers(GeometryPassContext& context, const engine::BufferGroup* buffers, nvrhi::GraphicsState& state) override;
+        [[nodiscard]] caustica::ViewType::Enum GetSupportedViewTypes() const override;
+        void SetupView(GeometryPassContext& context, nvrhi::ICommandList* commandList, const caustica::IView* view, const caustica::IView* viewPrev) override;
+        bool SetupMaterial(GeometryPassContext& context, const caustica::Material* material, nvrhi::RasterCullMode cullMode, nvrhi::GraphicsState& state) override;
+        void SetupInputBuffers(GeometryPassContext& context, const caustica::BufferGroup* buffers, nvrhi::GraphicsState& state) override;
         void SetPushConstants(GeometryPassContext& context, nvrhi::ICommandList* commandList, nvrhi::GraphicsState& state, nvrhi::DrawArguments& args) override;
     };
 

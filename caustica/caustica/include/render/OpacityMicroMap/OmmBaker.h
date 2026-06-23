@@ -24,7 +24,7 @@
 
 #include <shaders/Misc/OmmGeometryDebugData.hlsli>
 
-namespace donut::engine
+namespace caustica
 {
     class Scene;
     class FramebufferFactory;
@@ -48,15 +48,15 @@ struct MeshGeometryDebugData
 
 struct MeshDebugData
 {
-    std::shared_ptr<donut::engine::DescriptorHandle> ommArrayDataBufferDescriptor;
-    std::shared_ptr<donut::engine::DescriptorHandle> ommDescBufferDescriptor;
-    std::shared_ptr<donut::engine::DescriptorHandle> ommIndexBufferDescriptor;
+    std::shared_ptr<caustica::DescriptorHandle> ommArrayDataBufferDescriptor;
+    std::shared_ptr<caustica::DescriptorHandle> ommDescBufferDescriptor;
+    std::shared_ptr<caustica::DescriptorHandle> ommIndexBufferDescriptor;
     nvrhi::BufferHandle ommArrayDataBuffer; // for use by applications
     nvrhi::BufferHandle ommDescBuffer; // for use by applications
     nvrhi::BufferHandle ommIndexBuffer; // for use by applications
 };
 
-struct MeshGeometryEx : public donut::engine::MeshGeometry
+struct MeshGeometryEx : public caustica::MeshGeometry
 {
     // (Debug) OMM buffers.
     MeshGeometryDebugData DebugData;
@@ -64,7 +64,7 @@ struct MeshGeometryEx : public donut::engine::MeshGeometry
     virtual ~MeshGeometryEx() = default;
 };
 
-struct MeshInfoEx : public donut::engine::MeshInfo
+struct MeshInfoEx : public caustica::MeshInfo
 {
     nvrhi::rt::AccelStructHandle AccelStructOMM; // for use by application
     std::vector<nvrhi::rt::OpacityMicromapHandle> OpacityMicroMaps; // for use by application
@@ -129,43 +129,43 @@ class OmmBaker
 {
 public:
     OmmBaker(nvrhi::DeviceHandle device,
-        std::shared_ptr<donut::engine::DescriptorTableManager> descriptorTableManager,
-        std::shared_ptr<donut::engine::TextureCache> textureCache,
-        std::shared_ptr<donut::engine::ShaderFactory> shaderFactory);
+        std::shared_ptr<caustica::DescriptorTableManager> descriptorTableManager,
+        std::shared_ptr<caustica::TextureCache> textureCache,
+        std::shared_ptr<caustica::ShaderFactory> shaderFactory);
     ~OmmBaker();
 
-    void                            CreateRenderPasses(nvrhi::BindingLayoutHandle bindlessLayout, std::shared_ptr<donut::engine::CommonRenderPasses> commonPasses);
+    void                            CreateRenderPasses(nvrhi::BindingLayoutHandle bindlessLayout, std::shared_ptr<caustica::CommonRenderPasses> commonPasses);
 
-    bool                            Update(nvrhi::ICommandList& commandList, const donut::engine::Scene& scene);
+    bool                            Update(nvrhi::ICommandList& commandList, const caustica::Scene& scene);
 
     OpacityMicroMapUIData &         UIData()    { return m_uiData; }
-    bool                            DebugGUI(float indent, const donut::engine::Scene& scene);
+    bool                            DebugGUI(float indent, const caustica::Scene& scene);
 
-    void                            SceneLoaded(const donut::engine::Scene& scene);
+    void                            SceneLoaded(const caustica::Scene& scene);
     void                            SceneUnloading();
 
-    void                            CreateOpacityMicromaps(const donut::engine::Scene& scene);
-    void                            DestroyOpacityMicromaps(nvrhi::ICommandList& commandList, const donut::engine::Scene& scene);
-    void                            BuildOpacityMicromaps(nvrhi::ICommandList& commandList, const donut::engine::Scene& scene);
+    void                            CreateOpacityMicromaps(const caustica::Scene& scene);
+    void                            DestroyOpacityMicromaps(nvrhi::ICommandList& commandList, const caustica::Scene& scene);
+    void                            BuildOpacityMicromaps(nvrhi::ICommandList& commandList, const caustica::Scene& scene);
     void                            WriteGeometryDebugBuffer(nvrhi::ICommandList& commandList);
-    void                            UpdateDebugGeometry(const donut::engine::MeshInfo& mesh);
+    void                            UpdateDebugGeometry(const caustica::MeshInfo& mesh);
 
     [[nodiscard]] nvrhi::IBuffer*   GetGeometryDebugBuffer() const { return m_geometryDebugBuffer; }
 
-    void                            SetGlobalShaderMacros(std::vector<donut::engine::ShaderMacro> & macros);
+    void                            SetGlobalShaderMacros(std::vector<caustica::ShaderMacro> & macros);
 
 
 private:
     nvrhi::DeviceHandle             m_device;
-    std::shared_ptr<donut::engine::TextureCache> m_textureCache;
-    std::shared_ptr<donut::engine::CommonRenderPasses> m_commonPasses;
-    std::shared_ptr<donut::engine::FramebufferFactory> m_framebufferFactory;
-    std::shared_ptr<donut::engine::DescriptorTableManager> m_descriptorTableManager;
-    std::shared_ptr<donut::engine::ShaderFactory> m_shaderFactory;
+    std::shared_ptr<caustica::TextureCache> m_textureCache;
+    std::shared_ptr<caustica::CommonRenderPasses> m_commonPasses;
+    std::shared_ptr<caustica::FramebufferFactory> m_framebufferFactory;
+    std::shared_ptr<caustica::DescriptorTableManager> m_descriptorTableManager;
+    std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
 
     nvrhi::BindingLayoutHandle      m_commonBindingLayout;
     nvrhi::BindingLayoutHandle      m_bindlessLayout;
-    donut::engine::BindingCache     m_bindingCache;
+    caustica::BindingCache     m_bindingCache;
 
     ComputePass                     m_examplePass;
 

@@ -16,13 +16,13 @@
 #include <engine/FramebufferFactory.h>
 #include <core/log.h>
 
-using namespace donut::math;
+using namespace caustica::math;
 #include <render/ToneMapper/ToneMappingPasses.h>
 #include <shaders/render/ToneMapper/ToneMapping_cb.h>
 #include <render/ToneMapper/ColorUtils.h>
 
-using namespace donut::engine;
-using namespace donut::render;
+using namespace caustica;
+using namespace caustica::render;
 
 #ifndef TONEMAPPING_AUTOEXPOSURE_CPU
 #error this must be defined
@@ -30,10 +30,10 @@ using namespace donut::render;
 
 ToneMappingPass::ToneMappingPass(
     nvrhi::IDevice* device,
-    std::shared_ptr<donut::engine::ShaderFactory> shaderFactory,
-    std::shared_ptr<donut::engine::CommonRenderPasses> commonPasses,
-    std::shared_ptr<donut::engine::FramebufferFactory> colorFramebufferFactory,
-    const donut::engine::ICompositeView& compositeView,
+    std::shared_ptr<caustica::ShaderFactory> shaderFactory,
+    std::shared_ptr<caustica::CommonRenderPasses> commonPasses,
+    std::shared_ptr<caustica::FramebufferFactory> colorFramebufferFactory,
+    const caustica::ICompositeView& compositeView,
 	nvrhi::TextureHandle sourceTexture)
     : m_device(device)
     , m_commonPasses(commonPasses)
@@ -194,7 +194,7 @@ void ToneMappingPass::PreRender(const ToneMappingParameters& params)
 
 bool ToneMappingPass::Render(
     nvrhi::ICommandList* commandList, 
-    const donut::engine::ICompositeView& compositeView,
+    const caustica::ICompositeView& compositeView,
     nvrhi::ITexture* sourceTexture, bool enabled)
 {
     assert( m_FrameParamsSet ); // forgot to call PreRender before this?

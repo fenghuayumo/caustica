@@ -28,7 +28,7 @@
 #include <nvrhi/nvrhi.h>
 
 
-namespace donut::engine
+namespace caustica
 {
     class ShaderFactory;
     class CommonRenderPasses;
@@ -36,7 +36,7 @@ namespace donut::engine
     class ICompositeView;
 }
 
-namespace donut::render
+namespace caustica::render
 {
     class PixelReadbackPass
     {
@@ -53,7 +53,7 @@ namespace donut::render
     public:
         PixelReadbackPass(
             nvrhi::IDevice* device,
-            std::shared_ptr<engine::ShaderFactory> shaderFactory,
+            std::shared_ptr<caustica::ShaderFactory> shaderFactory,
             nvrhi::ITexture* inputTexture,
             nvrhi::Format format,
             uint32_t arraySlice = 0,

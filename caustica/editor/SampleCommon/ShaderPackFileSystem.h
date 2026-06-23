@@ -21,7 +21,7 @@
 #include <string>
 #include <unordered_map>
 
-class ShaderPackFileSystem : public donut::vfs::IFileSystem
+class ShaderPackFileSystem : public caustica::IFileSystem
 {
 public:
     ShaderPackFileSystem(
@@ -33,16 +33,16 @@ public:
 
     bool folderExists(const std::filesystem::path& name) override;
     bool fileExists(const std::filesystem::path& name) override;
-    std::shared_ptr<donut::vfs::IBlob> readFile(const std::filesystem::path& name) override;
+    std::shared_ptr<caustica::IBlob> readFile(const std::filesystem::path& name) override;
     bool writeFile(const std::filesystem::path& name, const void* data, size_t size) override;
     int enumerateFiles(
         const std::filesystem::path& path,
         const std::vector<std::string>& extensions,
-        donut::vfs::enumerate_callback_t callback,
+        caustica::enumerate_callback_t callback,
         bool allowDuplicates = false) override;
     int enumerateDirectories(
         const std::filesystem::path& path,
-        donut::vfs::enumerate_callback_t callback,
+        caustica::enumerate_callback_t callback,
         bool allowDuplicates = false) override;
 
 private:

@@ -24,7 +24,7 @@
 
 #include <functional>
 
-namespace donut::log
+namespace caustica
 {
     enum class Severity
     {

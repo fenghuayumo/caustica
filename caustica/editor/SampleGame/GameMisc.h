@@ -16,7 +16,7 @@
 
 #include <engine/Camera.h>
 
-namespace donut::app
+namespace caustica
 {
     class FirstPersonCamera;
 }
@@ -65,7 +65,7 @@ namespace game
     // properly update actual light radius from node scaling, which isn't set from node transforms.
     struct LightController
     {
-        donut::engine::SceneGraphNode * Node                = nullptr;
+        caustica::SceneGraphNode * Node                = nullptr;
 
         float3                          Color               = float3(1,1,1);
         float                           Intensity           = 1.0;
@@ -77,8 +77,8 @@ namespace game
         float                           AutoOnTime          = 0.0f; // for blinking lights // TODO: make it so that negative means random()*abs(val)
         float                           AutoOnOffTimeOffset = 0.0f; // ability to desync blinking lights if many
 
-        donut::engine::SpotLight *      GetSpotLight()      { if ( Node == nullptr ) return nullptr; return dynamic_cast<donut::engine::SpotLight*>(Node->GetLeaf().get() ); }
-        donut::engine::PointLight *     GetPointLight()     { if ( Node == nullptr ) return nullptr; return dynamic_cast<donut::engine::PointLight*>(Node->GetLeaf().get() ); }
+        caustica::SpotLight *      GetSpotLight()      { if ( Node == nullptr ) return nullptr; return dynamic_cast<caustica::SpotLight*>(Node->GetLeaf().get() ); }
+        caustica::PointLight *     GetPointLight()     { if ( Node == nullptr ) return nullptr; return dynamic_cast<caustica::PointLight*>(Node->GetLeaf().get() ); }
 
         bool                            Read(const Json::Value& node);
         Json::Value                     Write();

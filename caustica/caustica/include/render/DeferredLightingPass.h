@@ -28,7 +28,7 @@
 #include <unordered_map>
 #include <engine/BindingCache.h>
 
-namespace donut::engine
+namespace caustica
 {
     class ShaderFactory;
     class Light;
@@ -39,7 +39,7 @@ namespace donut::engine
     struct LightProbe;
 }
 
-namespace donut::render
+namespace caustica::render
 {
     class GBufferRenderTargets;
     
@@ -55,14 +55,14 @@ namespace donut::render
         nvrhi::ComputePipelineHandle m_Pso;
 
         nvrhi::BindingLayoutHandle m_BindingLayout;
-        engine::BindingCache m_BindingSets;
+        caustica::BindingCache m_BindingSets;
 
-        std::shared_ptr<engine::CommonRenderPasses> m_CommonPasses;
+        std::shared_ptr<caustica::CommonRenderPasses> m_CommonPasses;
 
     protected:
 
         virtual nvrhi::ShaderHandle CreateComputeShader(
-            engine::ShaderFactory& shaderFactory);
+            caustica::ShaderFactory& shaderFactory);
 
     public:
         struct Inputs
@@ -78,8 +78,8 @@ namespace donut::render
             nvrhi::ITexture* ambientOcclusion = nullptr;
             nvrhi::ITexture* output = nullptr;
 
-            const std::vector<std::shared_ptr<engine::Light>>* lights = nullptr;
-            const std::vector<std::shared_ptr<engine::LightProbe>>* lightProbes = nullptr;
+            const std::vector<std::shared_ptr<caustica::Light>>* lights = nullptr;
+            const std::vector<std::shared_ptr<caustica::LightProbe>>* lightProbes = nullptr;
 
             dm::float3 ambientColorTop = 0.f;
             dm::float3 ambientColorBottom = 0.f;
@@ -90,13 +90,13 @@ namespace donut::render
 
         DeferredLightingPass(
             nvrhi::IDevice* device,
-            std::shared_ptr<engine::CommonRenderPasses> commonPasses);
+            std::shared_ptr<caustica::CommonRenderPasses> commonPasses);
 
-        virtual void Init(const std::shared_ptr<engine::ShaderFactory>& shaderFactory);
+        virtual void Init(const std::shared_ptr<caustica::ShaderFactory>& shaderFactory);
 
         void Render(
             nvrhi::ICommandList* commandList,
-            const engine::ICompositeView& compositeView,
+            const caustica::ICompositeView& compositeView,
             const Inputs& inputs,
             dm::float2 randomOffset = dm::float2::zero());
 

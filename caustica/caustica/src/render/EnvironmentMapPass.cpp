@@ -39,11 +39,11 @@
 #endif
 #endif
 
-using namespace donut::math;
+using namespace caustica::math;
 #include <shaders/sky_cb.h>
 
-using namespace donut::engine;
-using namespace donut::render;
+using namespace caustica;
+using namespace caustica::render;
 
 EnvironmentMapPass::EnvironmentMapPass(
     nvrhi::IDevice* device,
@@ -59,8 +59,8 @@ EnvironmentMapPass::EnvironmentMapPass(
     bool isCubeMap = (envMapDimension == nvrhi::TextureDimension::TextureCube) || 
         (envMapDimension == nvrhi::TextureDimension::TextureCubeArray);
 
-    std::vector<engine::ShaderMacro> PSMacros;
-    PSMacros.push_back(engine::ShaderMacro("LATLONG_TEXTURE", isCubeMap ? "0" : "1"));
+    std::vector<caustica::ShaderMacro> PSMacros;
+    PSMacros.push_back(caustica::ShaderMacro("LATLONG_TEXTURE", isCubeMap ? "0" : "1"));
 
     m_PixelShader = shaderFactory->CreateAutoShader("donut/passes/environment_map_ps.hlsl", "main", 
         DONUT_MAKE_PLATFORM_SHADER(g_environment_map_ps), &PSMacros, nvrhi::ShaderType::Pixel);
@@ -70,7 +70,7 @@ EnvironmentMapPass::EnvironmentMapPass(
     constantBufferDesc.debugName = "SkyConstants";
     constantBufferDesc.isConstantBuffer = true;
     constantBufferDesc.isVolatile = true;
-    constantBufferDesc.maxVersions = engine::c_MaxRenderPassConstantBufferVersions;
+    constantBufferDesc.maxVersions = caustica::c_MaxRenderPassConstantBufferVersions;
     m_SkyCB = device->createBuffer(constantBufferDesc);
 
     const IView* sampleView = compositeView.GetChildView(ViewType::PLANAR, 0);

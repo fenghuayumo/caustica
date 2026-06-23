@@ -36,11 +36,11 @@
 #endif
 #endif
 
-using namespace donut::math;
+using namespace caustica::math;
 #include <shaders/pixel_readback_cb.h>
 
-using namespace donut::engine;
-using namespace donut::render;
+using namespace caustica;
+using namespace caustica::render;
 
 PixelReadbackPass::PixelReadbackPass(
     nvrhi::IDevice* device, 
@@ -85,7 +85,7 @@ PixelReadbackPass::PixelReadbackPass(
     constantBufferDesc.isConstantBuffer = true;
     constantBufferDesc.isVolatile = true;
     constantBufferDesc.debugName = "PixelReadbackPass/Constants";
-    constantBufferDesc.maxVersions = engine::c_MaxRenderPassConstantBufferVersions;
+    constantBufferDesc.maxVersions = caustica::c_MaxRenderPassConstantBufferVersions;
     m_ConstantBuffer = m_Device->createBuffer(constantBufferDesc);
 
     nvrhi::BindingLayoutDesc layoutDesc;

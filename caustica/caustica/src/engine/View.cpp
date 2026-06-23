@@ -23,8 +23,8 @@
 #include <engine/View.h>
 #include <algorithm>
 
-using namespace donut::math;
-using namespace donut::engine;
+using namespace caustica::math;
+using namespace caustica;
 
 #include <shaders/view_cb.h>
 

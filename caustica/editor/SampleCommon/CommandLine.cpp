@@ -106,7 +106,7 @@ bool CommandLineOptions::InitFromCommandLine(int _argc, char const* const* _argv
             }
             else
             {
-                donut::log::error("Unknown render backend '%s'. Expected dx12/d3d12 or vulkan/vk.", graphicsBackend.c_str());
+                caustica::error("Unknown render backend '%s'. Expected dx12/d3d12 or vulkan/vk.", graphicsBackend.c_str());
                 return false;
             }
         }
@@ -114,7 +114,7 @@ bool CommandLineOptions::InitFromCommandLine(int _argc, char const* const* _argv
 		if (help)
 		{
 			std::string helpMessage = options.help();
-			donut::log::info("%s", helpMessage.c_str());
+			caustica::info("%s", helpMessage.c_str());
 			return false;
 		}
 
@@ -123,7 +123,7 @@ bool CommandLineOptions::InitFromCommandLine(int _argc, char const* const* _argv
 	catch (const exceptions::exception& e)
 	{
 		std::string errorMessage = e.what();
-		donut::log::error("%s", errorMessage.c_str());
+		caustica::error("%s", errorMessage.c_str());
 		return false;
 	}
 }

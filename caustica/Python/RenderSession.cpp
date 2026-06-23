@@ -54,7 +54,7 @@
 #include <dlfcn.h>
 #endif
 
-using namespace donut;
+
 
 namespace
 {
@@ -86,7 +86,7 @@ namespace
             return std::filesystem::path(info.dli_fname).parent_path();
 #endif
 
-        return donut::app::GetDirectoryWithExecutable();
+        return caustica::GetDirectoryWithExecutable();
     }
 
     std::filesystem::path ResolveRuntimeDirectory()
@@ -95,7 +95,7 @@ namespace
         if (std::filesystem::exists(moduleDirectory / "ShaderPrecompiled"))
             return moduleDirectory;
 
-        std::filesystem::path executableDirectory = donut::app::GetDirectoryWithExecutable();
+        std::filesystem::path executableDirectory = caustica::GetDirectoryWithExecutable();
         if (std::filesystem::exists(executableDirectory / "ShaderPrecompiled"))
             return executableDirectory;
 
@@ -111,7 +111,7 @@ namespace
         if (std::filesystem::exists(parentDirectory / c_AssetsFolder))
             return parentDirectory;
 
-        return donut::app::GetDirectoryWithExecutable();
+        return caustica::GetDirectoryWithExecutable();
     }
 
     std::string TrimCopy(const std::string& value)
@@ -255,7 +255,7 @@ namespace
         {
             if (factory && hr == E_NOINTERFACE)
                 return false;
-            log::warning("RenderSession: D3D12 experimental shader models could not be enabled, HRESULT = 0x%08x", unsigned(hr));
+            caustica::warning("RenderSession: D3D12 experimental shader models could not be enabled, HRESULT = 0x%08x", unsigned(hr));
             return false;
         }
         return true;
@@ -281,11 +281,11 @@ namespace
                 return factory;
             }
 
-            log::warning("RenderSession: ID3D12SDKConfiguration1::CreateDeviceFactory('%s') failed, HRESULT = 0x%08x", sdkPath.c_str(), unsigned(hr));
+            caustica::warning("RenderSession: ID3D12SDKConfiguration1::CreateDeviceFactory('%s') failed, HRESULT = 0x%08x", sdkPath.c_str(), unsigned(hr));
         }
         else
         {
-            log::warning("RenderSession: D3D12GetInterface(ID3D12SDKConfiguration1) failed, HRESULT = 0x%08x", unsigned(hr));
+            caustica::warning("RenderSession: D3D12GetInterface(ID3D12SDKConfiguration1) failed, HRESULT = 0x%08x", unsigned(hr));
         }
 
         // Fallback for older runtimes. This works when the host process has
@@ -294,14 +294,14 @@ namespace
         hr = D3D12GetInterface(CLSID_D3D12SDKConfiguration, IID_PPV_ARGS(&sdkConfig));
         if (FAILED(hr))
         {
-            log::warning("RenderSession: D3D12GetInterface(ID3D12SDKConfiguration) failed, HRESULT = 0x%08x", unsigned(hr));
+            caustica::warning("RenderSession: D3D12GetInterface(ID3D12SDKConfiguration) failed, HRESULT = 0x%08x", unsigned(hr));
             return nullptr;
         }
 
         hr = sdkConfig->SetSDKVersion(RTXPT_D3D_AGILITY_SDK_VERSION, sdkPath.c_str());
         if (FAILED(hr))
         {
-            log::warning("RenderSession: ID3D12SDKConfiguration::SetSDKVersion('%s') failed, HRESULT = 0x%08x", sdkPath.c_str(), unsigned(hr));
+            caustica::warning("RenderSession: ID3D12SDKConfiguration::SetSDKVersion('%s') failed, HRESULT = 0x%08x", sdkPath.c_str(), unsigned(hr));
             return nullptr;
         }
 
@@ -310,9 +310,9 @@ namespace
     }
 #endif
 
-    donut::app::DeviceCreationParameters MakeDeviceParams(const RenderSession::Config& cfg)
+    caustica::DeviceCreationParameters MakeDeviceParams(const RenderSession::Config& cfg)
     {
-        donut::app::DeviceCreationParameters p;
+        caustica::DeviceCreationParameters p;
         p.backBufferWidth        = cfg.width;
         p.backBufferHeight       = cfg.height;
         p.swapChainSampleCount   = 1;
@@ -340,7 +340,7 @@ namespace
 
 #if DONUT_WITH_VULKAN
 #if RTXPT_WITH_NATIVE_DLSS
-        donut::render::DLSS::GetRequiredVulkanExtensions(
+        caustica::render::DLSS::GetRequiredVulkanExtensions(
             p.requiredVulkanInstanceExtensions,
             p.requiredVulkanDeviceExtensions);
 #endif
@@ -367,11 +367,11 @@ namespace
         return cfg.useVulkan ? nvrhi::GraphicsAPI::VULKAN : nvrhi::GraphicsAPI::D3D12;
 #elif DONUT_WITH_VULKAN
         if (!cfg.useVulkan)
-            log::warning("RenderSession: DX12 was requested but this build only has Vulkan; using Vulkan.");
+            caustica::warning("RenderSession: DX12 was requested but this build only has Vulkan; using Vulkan.");
         return nvrhi::GraphicsAPI::VULKAN;
 #elif DONUT_WITH_DX12
         if (cfg.useVulkan)
-            log::warning("RenderSession: Vulkan was requested but this build only has DX12; using DX12.");
+            caustica::warning("RenderSession: Vulkan was requested but this build only has DX12; using DX12.");
         return nvrhi::GraphicsAPI::D3D12;
 #else
         static_assert(DONUT_WITH_DX12 || DONUT_WITH_VULKAN, "RTXPT requires at least one graphics backend");
@@ -408,21 +408,21 @@ RenderSession::RenderSession(const Config& cfg)
 
     if (cfg.nonInteractive)
     {
-        log::EnableOutputToMessageBox(false);
-        log::EnableOutputToConsole(true);
-        log::SetMinSeverity(log::Severity::Warning);
+        caustica::EnableOutputToMessageBox(false);
+        caustica::EnableOutputToConsole(true);
+        caustica::SetMinSeverity(caustica::Severity::Warning);
         HelpersSetNonInteractive();
     }
 
     if (!InitDevice())
     {
-        log::error("RenderSession: failed to initialize the graphics device");
+        caustica::error("RenderSession: failed to initialize the graphics device");
         return;
     }
 
     if (!InitRenderer())
     {
-        log::error("RenderSession: failed to initialize the renderer");
+        caustica::error("RenderSession: failed to initialize the renderer");
         return;
     }
 
@@ -448,10 +448,10 @@ bool RenderSession::InitDevice()
         m_d3d12DeviceFactory = CreateD3D12AgilityDeviceFactory();
 #endif
 
-    m_deviceManager.reset(donut::app::DeviceManager::Create(api));
+    m_deviceManager.reset(caustica::DeviceManager::Create(api));
     if (!m_deviceManager)
     {
-        log::error("RenderSession: DeviceManager::Create returned null");
+        caustica::error("RenderSession: DeviceManager::Create returned null");
         return false;
     }
     m_deviceManager->SetFrameTimeUpdateInterval(1.0f);
@@ -466,7 +466,7 @@ bool RenderSession::InitDevice()
     {
         if (!m_deviceManager->CreateHeadlessDevice(deviceParams))
         {
-            log::error("RenderSession: failed to create headless device and offscreen back buffers");
+            caustica::error("RenderSession: failed to create headless device and offscreen back buffers");
             return false;
         }
     }
@@ -474,26 +474,26 @@ bool RenderSession::InitDevice()
     {
         if (!m_deviceManager->CreateWindowDeviceAndSwapChain(deviceParams, "caustica_py"))
         {
-            log::error("RenderSession: failed to create device and swap chain");
+            caustica::error("RenderSession: failed to create device and swap chain");
             return false;
         }
     }
 
     m_deviceManager->m_callbacks.beforePresent =
-        [this](donut::app::DeviceManager& manager, uint32_t) {
+        [this](caustica::DeviceManager& manager, uint32_t) {
             m_lastRenderedBackBufferIndex = manager.GetCurrentBackBufferIndex();
         };
 
     auto device = m_deviceManager->GetDevice();
     if (!device->queryFeatureSupport(nvrhi::Feature::RayTracingPipeline))
     {
-        log::error("RenderSession: the graphics device does not support Ray Tracing Pipelines");
+        caustica::error("RenderSession: the graphics device does not support Ray Tracing Pipelines");
         return false;
     }
 
     if (!device->queryFeatureSupport(nvrhi::Feature::RayQuery))
     {
-        log::error("RenderSession: the graphics device does not support Ray Queries");
+        caustica::error("RenderSession: the graphics device does not support Ray Queries");
         return false;
     }
 
@@ -505,7 +505,7 @@ bool RenderSession::InitRenderer()
     // Shader factory pulls precompiled shaders from the host executable's
     // ShaderPrecompiled folder - this folder is assumed to live next to the
     // .pyd / caustica.exe binary.
-    const char* shaderTypeName = donut::app::GetShaderTypeName(m_deviceManager->GetGraphicsAPI());
+    const char* shaderTypeName = caustica::GetShaderTypeName(m_deviceManager->GetGraphicsAPI());
     const std::filesystem::path appDirectory = ResolveRuntimeDirectory();
     SetRuntimeDirectoryOverride(appDirectory);
     SetLocalPathBaseOverride(ResolveResourceRoot(appDirectory));
@@ -514,13 +514,13 @@ bool RenderSession::InitRenderer()
     std::filesystem::path nrdShaderPath       = appDirectory / "ShaderPrecompiled/nrd"       / shaderTypeName;
     std::filesystem::path ommShaderPath       = appDirectory / "ShaderPrecompiled/omm"       / shaderTypeName;
 
-    auto rootFS = std::make_shared<donut::vfs::RootFileSystem>();
+    auto rootFS = std::make_shared<caustica::RootFileSystem>();
     const std::filesystem::path shaderPackPath = appDirectory / (std::string("caustica.shaders.") + shaderTypeName + ".pack");
     auto shaderPackFS = std::make_shared<ShaderPackFileSystem>(shaderPackPath, "ShaderPrecompiled");
     const bool shaderPackHasCurrentLayout = shaderPackFS->isOpen() && shaderPackFS->fileExists("app/engine/shaders/render/Misc/DebugLines_main_vs.bin");
     if (shaderPackFS->isOpen() && !shaderPackHasCurrentLayout)
     {
-        donut::log::warning("Shader pack '%s' does not match the current shader layout; falling back to ShaderPrecompiled directories",
+        caustica::warning("Shader pack '%s' does not match the current shader layout; falling back to ShaderPrecompiled directories",
             shaderPackPath.string().c_str());
     }
 
@@ -537,7 +537,7 @@ bool RenderSession::InitRenderer()
     }
 
     auto device = m_deviceManager->GetDevice();
-    m_shaderFactory = std::make_shared<donut::engine::ShaderFactory>(device, rootFS, "/ShaderPrecompiled");
+    m_shaderFactory = std::make_shared<caustica::ShaderFactory>(device, rootFS, "/ShaderPrecompiled");
 
     m_renderer = std::make_unique<AdvancedPathTracer>(*m_deviceManager, m_cmdLine);
     InitializeSampleUIDataFromCommandLine(g_sampleUIData, m_cmdLine);
@@ -598,7 +598,7 @@ bool RenderSession::WaitUntilReady(int maxFrames)
         if (m_renderer && m_renderer->IsSceneLoaded() && !m_renderer->IsSceneLoading())
             return true;
     }
-    log::warning("RenderSession: scene did not finish loading within %d frames", maxFrames);
+    caustica::warning("RenderSession: scene did not finish loading within %d frames", maxFrames);
     return false;
 }
 
@@ -626,7 +626,7 @@ bool RenderSession::Step(float dt)
     {
         if (!m_deviceManager->GetDevice()->waitForIdle())
         {
-            log::error("RenderSession: GPU device lost or removed");
+            caustica::error("RenderSession: GPU device lost or removed");
             return false;
         }
     }
@@ -693,14 +693,14 @@ bool RenderSession::SaveScreenshot(const std::string& outputPath)
 
     if (!tex)
     {
-        log::error("RenderSession: no current output texture");
+        caustica::error("RenderSession: no current output texture");
         return false;
     }
 
     auto commonPasses = m_renderer->GetCommonPasses();
     if (!commonPasses)
     {
-        log::error("RenderSession: common passes not initialized yet");
+        caustica::error("RenderSession: common passes not initialized yet");
         return false;
     }
 
@@ -708,7 +708,7 @@ bool RenderSession::SaveScreenshot(const std::string& outputPath)
     // frame to finish so LdrColor is not still in use by an in-flight submit.
     if (!m_deviceManager->GetDevice()->waitForIdle())
     {
-        log::error("RenderSession: GPU device lost or removed before screenshot");
+        caustica::error("RenderSession: GPU device lost or removed before screenshot");
         return false;
     }
 
@@ -716,7 +716,7 @@ bool RenderSession::SaveScreenshot(const std::string& outputPath)
     if (p.has_parent_path())
         EnsureDirectoryExists(p.parent_path());
 
-    return donut::engine::SaveTextureToFile(
+    return caustica::SaveTextureToFile(
         m_deviceManager->GetDevice(),
         commonPasses.get(),
         tex,
@@ -724,13 +724,13 @@ bool RenderSession::SaveScreenshot(const std::string& outputPath)
         outputPath.c_str());
 }
 
-bool RenderSession::SetCamera(const donut::math::float3& pos,
-                              const donut::math::float3& dir,
-                              const donut::math::float3& up)
+bool RenderSession::SetCamera(const caustica::math::float3& pos,
+                              const caustica::math::float3& dir,
+                              const caustica::math::float3& up)
 {
     if (!m_renderer) return false;
 
-    auto v3 = [](const donut::math::float3& v) {
+    auto v3 = [](const caustica::math::float3& v) {
         return std::to_string(v.x) + "," + std::to_string(v.y) + "," + std::to_string(v.z);
     };
     std::string s = v3(pos) + "," + v3(dir) + "," + v3(up);
@@ -740,7 +740,7 @@ bool RenderSession::SetCamera(const donut::math::float3& pos,
 void RenderSession::SetCameraFOV(float verticalFovDegrees)
 {
     if (m_renderer)
-        m_renderer->SetCameraVerticalFOV(donut::math::radians(verticalFovDegrees));
+        m_renderer->SetCameraVerticalFOV(caustica::math::radians(verticalFovDegrees));
 }
 
 void RenderSession::SetCameraIntrinsics(float fx, float fy, float cx, float cy, float width, float height)

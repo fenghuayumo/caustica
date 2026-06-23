@@ -39,11 +39,11 @@
 #endif
 #endif
 
-using namespace donut::math;
+using namespace caustica::math;
 #include <shaders/bloom_cb.h>
 
-using namespace donut::engine;
-using namespace donut::render;
+using namespace caustica;
+using namespace caustica::render;
 
 BloomPass::BloomPass(
     nvrhi::IDevice* device,
@@ -63,7 +63,7 @@ BloomPass::BloomPass(
     constantBufferDesc.isConstantBuffer = true;
     constantBufferDesc.isVolatile = true;
     constantBufferDesc.debugName = "BloomConstantsH";
-    constantBufferDesc.maxVersions = engine::c_MaxRenderPassConstantBufferVersions;
+    constantBufferDesc.maxVersions = caustica::c_MaxRenderPassConstantBufferVersions;
     m_BloomHBlurCB = device->createBuffer(constantBufferDesc);
     constantBufferDesc.debugName = "BloomConstantsV";
     m_BloomVBlurCB = device->createBuffer(constantBufferDesc);

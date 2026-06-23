@@ -36,7 +36,7 @@ public:
     void CreateRTPipelines() override
     {
         auto pipelineBaker = GetRTPipelineBaker();
-        using SM = donut::engine::ShaderMacro;
+        using SM = caustica::ShaderMacro;
 
         // these don't actually compile any shaders - this happens later in m_ptPipelineBaker->Update
         m_ptPipelineReference         = pipelineBaker->CreateVariant("PathTracerSample.hlsl", { SM("PATH_TRACER_MODE", "PATH_TRACER_MODE_REFERENCE") }, "REF");

@@ -32,7 +32,7 @@
 #include <filesystem>
 #include <stack>
 
-namespace donut::engine
+namespace caustica
 {
     class SceneGraph;
     class SceneGraphNode;

@@ -26,7 +26,7 @@
 #include <unordered_map>
 #include <shared_mutex>
 
-namespace donut::engine
+namespace caustica
 {
     /*
     BindingCache maintains a dictionary that maps binding set descriptors

@@ -12,15 +12,14 @@
 #include <core/log.h>
 
 #include <core/json.h>
-#include <engine/ApplicationBase.h>
+#include <engine/Application.h>
 #include <engine/SceneTypes.h>
 #include <json/json.h>
 #include <fstream>
 #include <format>
 #include <charconv>
 
-using namespace donut;
-using namespace donut::math;
+using namespace caustica::math;
 
 namespace
 {
@@ -53,7 +52,7 @@ bool EnsureDirectoryExists(const std::filesystem::path& dir)
     {
         if (!std::filesystem::is_directory(dir))
         {
-            log::error("Attempting ensure directory exists, but path '%s' is a file", dir.string().c_str());
+            caustica::error("Attempting ensure directory exists, but path '%s' is a file", dir.string().c_str());
             return false;
         }
         return true;
@@ -67,7 +66,7 @@ bool EnsureDirectoryExists(const std::filesystem::path& dir)
         {
             if (!std::filesystem::is_directory(pathSoFar))
             {
-                log::error("Attempting ensure directory exists, but path '%s' is a file", pathSoFar.string().c_str());
+                caustica::error("Attempting ensure directory exists, but path '%s' is a file", pathSoFar.string().c_str());
                 return false;
             }
         }
@@ -75,7 +74,7 @@ bool EnsureDirectoryExists(const std::filesystem::path& dir)
         {
             if (!std::filesystem::create_directory(pathSoFar))
             {
-                log::error("Attempting ensure directory exists, but unable to create or access '%s' directory", pathSoFar.string().c_str());
+                caustica::error("Attempting ensure directory exists, but unable to create or access '%s' directory", pathSoFar.string().c_str());
                 return false;
             }
         }
@@ -118,7 +117,7 @@ bool SaveJsonToFile( const std::filesystem::path & filePath, const class Json::V
     std::ofstream outFile(filePath, std::ios::trunc);
     if (!outFile.is_open())
     {
-        log::error("Error attempting to save json contents to file '%s'", filePath.string().c_str());
+        caustica::error("Error attempting to save json contents to file '%s'", filePath.string().c_str());
         return false;
     }
     Json::StreamWriterBuilder builder;
@@ -138,16 +137,16 @@ bool LoadJsonFromFile( const std::filesystem::path & filePath, Json::Value & out
         inFile.open(filePath);
         if (!inFile.is_open())
         {
-            donut::log::warning("Error attempting to load json file '%s'", filePath.string().c_str());
+            caustica::warning("Error attempting to load json file '%s'", filePath.string().c_str());
             return false;
         }
     }
 
     try { inFile >> outRootNode; }
     catch (const Json::RuntimeError& e) 
-    { donut::log::warning("Caught Json::RuntimeError: %s", e.what()); return false; } 
+    { caustica::warning("Caught Json::RuntimeError: %s", e.what()); return false; } 
     catch (const std::exception& e) 
-    { donut::log::warning("Caught std::exception: %s", e.what()); return false; }
+    { caustica::warning("Caught std::exception: %s", e.what()); return false; }
     return true;
 }
 
@@ -477,10 +476,10 @@ std::filesystem::path GetLocalPath(std::string subfolder)
     {
         std::filesystem::path baseOverride = GetLocalPathBaseOverride();
         std::filesystem::path candidateA = baseOverride.empty()
-            ? donut::app::GetDirectoryWithExecutable() / subfolder
+            ? caustica::GetDirectoryWithExecutable() / subfolder
             : baseOverride / subfolder;
         std::filesystem::path candidateB = baseOverride.empty()
-            ? donut::app::GetDirectoryWithExecutable().parent_path() / subfolder
+            ? caustica::GetDirectoryWithExecutable().parent_path() / subfolder
             : baseOverride.parent_path() / subfolder;
         if (std::filesystem::exists(candidateA))
             oneChoice = candidateA;
@@ -504,7 +503,7 @@ std::filesystem::path GetRuntimeDirectory()
     if (!g_runtimeDirectoryOverride.empty())
         return g_runtimeDirectoryOverride;
 
-    return donut::app::GetDirectoryWithExecutable();
+    return caustica::GetDirectoryWithExecutable();
 }
 
 void SetRuntimeDirectoryOverride(const std::filesystem::path& runtimeDirectory)
@@ -661,7 +660,7 @@ std::optional<fs::file_time_type> GetLatestModifiedTimeDirectoryRecursive(const 
 
     if (!fs::exists(directory, ec) || !fs::is_directory(directory, ec)) 
     {
-        //log::info("Invalid directory or access error: '%s'", directory.string().c_str());
+        //caustica::info("Invalid directory or access error: '%s'", directory.string().c_str());
         return std::nullopt;
     }
 
@@ -689,7 +688,7 @@ std::optional<fs::file_time_type> GetLatestModifiedTimeDirectoryRecursive(const 
 
     if (ec) 
     {
-        log::warning("Invalid directory or access error for '%s', error: ", directory.string().c_str(), ec.message().c_str());
+        caustica::warning("Invalid directory or access error for '%s', error: ", directory.string().c_str(), ec.message().c_str());
         return std::nullopt;
     }
 
@@ -702,14 +701,14 @@ std::optional<std::filesystem::file_time_type> GetFileModifiedTime(const std::fi
 
     if (!fs::exists(file, ec) || !fs::is_regular_file(file, ec))
     {
-        //log::info("File does not exist or is not a regular file: '%s'", file.string().c_str());
+        //caustica::info("File does not exist or is not a regular file: '%s'", file.string().c_str());
         return std::nullopt;
     }
 
     auto ftime = fs::last_write_time(file, ec);
     if (ec)
     {
-        log::warning("Failed to get last write time for file '%s', error: %s", file.string().c_str(), ec.message().c_str());
+        caustica::warning("Failed to get last write time for file '%s', error: %s", file.string().c_str(), ec.message().c_str());
         return std::nullopt;
     }
 
@@ -778,7 +777,7 @@ void FPSLimiter::FramerateLimit(int fpsTarget)
     m_lastTimestamp += std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::duration<double>(m_prevError));
 }
 
-bool CompressTextures(std::map<std::shared_ptr<donut::engine::LoadedTexture>, TextureCompressionType> & uncompressedTextures)
+bool CompressTextures(std::map<std::shared_ptr<caustica::LoadedTexture>, TextureCompressionType> & uncompressedTextures)
 {
     // if async needed, do something like std::thread([sytemCommand](){ system( sytemCommand.c_str() ); }).detach();
 
@@ -786,7 +785,7 @@ bool CompressTextures(std::map<std::shared_ptr<donut::engine::LoadedTexture>, Te
     std::ofstream batchFile(batchFileName, std::ios_base::trunc);
     if (!batchFile.is_open())
     {
-        log::message(log::Severity::Error, "Unable to write %s", batchFileName.c_str());
+        caustica::message(caustica::Severity::Error, "Unable to write %s", batchFileName.c_str());
         return false;
     }
 

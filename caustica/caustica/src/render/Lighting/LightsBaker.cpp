@@ -39,9 +39,8 @@
 #include <render/Materials/MaterialsBaker.h>
 #include <render/OpacityMicroMap/OmmBaker.h>
 
-using namespace donut;
-using namespace donut::math;
-using namespace donut::engine;
+using namespace caustica::math;
+using namespace caustica;
 
 LightsBaker::LightsBaker(nvrhi::IDevice* device)
     : m_device(device)
@@ -89,13 +88,13 @@ LightsBaker::~LightsBaker()
 {
 }
 
-void LightsBaker::CreateRenderPasses(std::shared_ptr<donut::engine::ShaderFactory> shaderFactory, nvrhi::IBindingLayout* bindlessLayout, std::shared_ptr<engine::CommonRenderPasses> commonPasses, std::shared_ptr<ShaderDebug> shaderDebug, const uint2 renderResolution, const uint envMapProcessedResolution)
+void LightsBaker::CreateRenderPasses(std::shared_ptr<caustica::ShaderFactory> shaderFactory, nvrhi::IBindingLayout* bindlessLayout, std::shared_ptr<caustica::CommonRenderPasses> commonPasses, std::shared_ptr<ShaderDebug> shaderDebug, const uint2 renderResolution, const uint envMapProcessedResolution)
 {
     m_commonPasses = commonPasses;
     m_shaderDebug = shaderDebug;
 
-    std::vector<donut::engine::ShaderMacro> shaderMacros;
-    //shaderMacros.push_back(donut::engine::ShaderMacro({              "BLEND_DEBUG_BUFFER", "1" }));
+    std::vector<caustica::ShaderMacro> shaderMacros;
+    //shaderMacros.push_back(caustica::ShaderMacro({              "BLEND_DEBUG_BUFFER", "1" }));
 
     const char * shaderFile = "app/engine/shaders/render/Lighting/LightsBaker.hlsl";
         
@@ -1042,7 +1041,7 @@ void LightsBaker::UpdateLocalJitter()
     }
 }
 
-void LightsBaker::UpdateBegin(nvrhi::ICommandList* commandList, donut::engine::BindingCache & bindingCache, const BakeSettings& _settings, double sceneTime, const std::shared_ptr<ExtendedScene>& scene, std::shared_ptr<class MaterialsBaker> materialsBaker, 
+void LightsBaker::UpdateBegin(nvrhi::ICommandList* commandList, caustica::BindingCache & bindingCache, const BakeSettings& _settings, double sceneTime, const std::shared_ptr<ExtendedScene>& scene, std::shared_ptr<class MaterialsBaker> materialsBaker, 
     std::shared_ptr<class OmmBaker> ommBaker, nvrhi::BufferHandle subInstanceDataBuffer, std::vector<SubInstanceData>& subInstanceData, nvrhi::TextureHandle envMapProcessed)
 {
     RAII_SCOPE( commandList->beginMarker("LightingUpdateBegin");, commandList->endMarker(); );
@@ -1411,7 +1410,7 @@ void LightsBaker::UpdateBegin(nvrhi::ICommandList* commandList, donut::engine::B
 
 #define UAV_BARRIER_m_NEE_AT_LocalSamplingBuffer() { commandList->setBufferState(m_NEE_AT_LocalSamplingBuffer, nvrhi::ResourceStates::UnorderedAccess); }
 
-void LightsBaker::UpdateEnd(nvrhi::ICommandList * commandList, donut::engine::BindingCache & bindingCache, const std::shared_ptr<ExtendedScene> & scene, std::shared_ptr<class MaterialsBaker> materialsBaker, std::shared_ptr<class OmmBaker> ommBaker, nvrhi::BufferHandle subInstanceDataBuffer, nvrhi::TextureHandle depthBuffer, nvrhi::TextureHandle motionVectors)
+void LightsBaker::UpdateEnd(nvrhi::ICommandList * commandList, caustica::BindingCache & bindingCache, const std::shared_ptr<ExtendedScene> & scene, std::shared_ptr<class MaterialsBaker> materialsBaker, std::shared_ptr<class OmmBaker> ommBaker, nvrhi::BufferHandle subInstanceDataBuffer, nvrhi::TextureHandle depthBuffer, nvrhi::TextureHandle motionVectors)
 {
     RAII_SCOPE(commandList->beginMarker("LightingUpdateEnd");, commandList->endMarker(); );
 
@@ -1608,7 +1607,7 @@ bool LightsBaker::DebugGUI(float indent)
     return resetAccumulation;
 }
 
-void LightsBaker::SetGlobalShaderMacros(std::vector<donut::engine::ShaderMacro> & macros)
+void LightsBaker::SetGlobalShaderMacros(std::vector<caustica::ShaderMacro> & macros)
 {
     macros.push_back({ "NEE_AT_SAMPLE_BAKED_ENVIRONMENT", (m_advSetting_SampleBakedEnvironment) ? ("1") : ("0") });
 }

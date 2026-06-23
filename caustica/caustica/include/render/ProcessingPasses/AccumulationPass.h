@@ -13,7 +13,7 @@
 #include <nvrhi/nvrhi.h>
 #include <memory>
 
-namespace donut::engine
+namespace caustica
 {
     class ShaderFactory;
     class IView;
@@ -22,11 +22,11 @@ namespace donut::engine
 class AccumulationPass
 {
 public:
-    AccumulationPass(nvrhi::IDevice* device, std::shared_ptr<donut::engine::ShaderFactory> shaderFactory);
+    AccumulationPass(nvrhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory);
 
     void CreatePipeline();
     void CreateBindingSet(nvrhi::ITexture* inputTexture, nvrhi::ITexture* outputTexture, nvrhi::ITexture* renderOutputTexture);
-    void Render(nvrhi::ICommandList* commandList, const donut::engine::IView& sourceView, const donut::engine::IView& upscaledView, float accumulationWeight);
+    void Render(nvrhi::ICommandList* commandList, const caustica::IView& sourceView, const caustica::IView& upscaledView, float accumulationWeight);
 
 private:
     nvrhi::DeviceHandle m_device;
@@ -37,5 +37,5 @@ private:
     nvrhi::SamplerHandle m_sampler;
     nvrhi::TextureHandle m_compositedColor;
 
-    std::shared_ptr<donut::engine::ShaderFactory> m_shaderFactory;
+    std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
 };

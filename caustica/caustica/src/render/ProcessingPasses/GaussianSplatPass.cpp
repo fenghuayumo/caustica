@@ -33,8 +33,7 @@
 #include <sstream>
 #include <utility>
 
-using namespace donut;
-using namespace donut::math;
+using namespace caustica::math;
 
 namespace
 {
@@ -631,14 +630,14 @@ namespace
         std::ifstream file(fileName, std::ios::binary);
         if (!file)
         {
-            log::error("Failed to open Gaussian splat PLY file: %s", fileName.string().c_str());
+            caustica::error("Failed to open Gaussian splat PLY file: %s", fileName.string().c_str());
             return false;
         }
 
         std::string line;
         if (!std::getline(file, line) || Trim(line) != "ply")
         {
-            log::error("Invalid Gaussian splat PLY header: %s", fileName.string().c_str());
+            caustica::error("Invalid Gaussian splat PLY header: %s", fileName.string().c_str());
             return false;
         }
 
@@ -711,7 +710,7 @@ namespace
                 if (property.type == PlyScalarType::Invalid ||
                     (property.isList && property.listCountType == PlyScalarType::Invalid))
                 {
-                    log::error("Unsupported PLY property type in %s", fileName.string().c_str());
+                    caustica::error("Unsupported PLY property type in %s", fileName.string().c_str());
                     return false;
                 }
 
@@ -721,7 +720,7 @@ namespace
 
         if (format == PlyFormat::Unsupported)
         {
-            log::error("Unsupported PLY format in %s", fileName.string().c_str());
+            caustica::error("Unsupported PLY format in %s", fileName.string().c_str());
             return false;
         }
 
@@ -730,7 +729,7 @@ namespace
 
         if (vertexElementIt == elements.end() || vertexElementIt->count == 0)
         {
-            log::error("Gaussian splat PLY has no vertex element: %s", fileName.string().c_str());
+            caustica::error("Gaussian splat PLY has no vertex element: %s", fileName.string().c_str());
             return false;
         }
 
@@ -785,7 +784,7 @@ namespace
 
         if (!hasRequired3dgsProperties)
         {
-            log::error("PLY file does not contain the expected 3DGS attributes: %s", fileName.string().c_str());
+            caustica::error("PLY file does not contain the expected 3DGS attributes: %s", fileName.string().c_str());
             return false;
         }
 
@@ -808,7 +807,7 @@ namespace
                     }
                     else if (!SkipElementRowBinary(file, element))
                     {
-                        log::error("Failed while skipping PLY element in %s", fileName.string().c_str());
+                        caustica::error("Failed while skipping PLY element in %s", fileName.string().c_str());
                         return false;
                     }
                 }
@@ -821,7 +820,7 @@ namespace
                 {
                     if (!std::getline(file, line))
                     {
-                        log::error("Unexpected end of PLY vertex data: %s", fileName.string().c_str());
+                        caustica::error("Unexpected end of PLY vertex data: %s", fileName.string().c_str());
                         return false;
                     }
 
@@ -844,7 +843,7 @@ namespace
                         }
                         else if (!ParseScalarAscii(rowParser, property.type, values[propertyIndex]))
                         {
-                            log::error("Failed to parse PLY vertex row in %s", fileName.string().c_str());
+                            caustica::error("Failed to parse PLY vertex row in %s", fileName.string().c_str());
                             return false;
                         }
                     }
@@ -866,7 +865,7 @@ namespace
                         }
                         else if (!ReadScalarBinary(file, property.type, values[propertyIndex]))
                         {
-                            log::error("Failed to read PLY vertex row in %s", fileName.string().c_str());
+                            caustica::error("Failed to read PLY vertex row in %s", fileName.string().c_str());
                             return false;
                         }
                     }
@@ -932,14 +931,14 @@ namespace
             }
         }
 
-        log::info("Loaded %zu Gaussian splats from %s (SH degree %u)", splats.size(), fileName.string().c_str(), shDegree);
+        caustica::info("Loaded %zu Gaussian splats from %s (SH degree %u)", splats.size(), fileName.string().c_str(), shDegree);
         return !splats.empty();
     }
 }
 
 GaussianSplatPass::GaussianSplatPass(
     nvrhi::IDevice* device,
-    std::shared_ptr<donut::engine::ShaderFactory> shaderFactory)
+    std::shared_ptr<caustica::ShaderFactory> shaderFactory)
     : m_device(device)
     , m_shaderFactory(std::move(shaderFactory))
 {
@@ -998,7 +997,7 @@ bool GaussianSplatPass::LoadFromFile(const std::filesystem::path& fileName, bool
     const std::string extension = ToLower(fileName.extension().string());
     if (extension != ".ply")
     {
-        log::error("Unsupported Gaussian splat file extension '%s'. This pass currently supports 3DGS .ply files.", extension.c_str());
+        caustica::error("Unsupported Gaussian splat file extension '%s'. This pass currently supports 3DGS .ply files.", extension.c_str());
         return false;
     }
 
@@ -1432,7 +1431,7 @@ void GaussianSplatPass::CreateStochasticFramebuffer(const RenderTargets& renderT
     auto createFramebuffer = [this](
         const nvrhi::TextureHandle& colorTarget,
         nvrhi::TextureHandle& depthBuffer,
-        std::shared_ptr<donut::engine::FramebufferFactory>& framebuffer,
+        std::shared_ptr<caustica::FramebufferFactory>& framebuffer,
         const char* depthName)
     {
         if (!colorTarget)
@@ -1486,7 +1485,7 @@ void GaussianSplatPass::CreateStochasticFramebuffer(const RenderTargets& renderT
             && framebuffer->DepthTarget.Get() == depthBuffer.Get();
         if (!framebufferMatches)
         {
-            framebuffer = std::make_shared<donut::engine::FramebufferFactory>(m_device);
+            framebuffer = std::make_shared<caustica::FramebufferFactory>(m_device);
             framebuffer->RenderTargets = { colorTarget };
             framebuffer->DepthTarget = depthBuffer;
         }
@@ -1503,20 +1502,20 @@ void GaussianSplatPass::CreatePipeline(const RenderTargets& renderTargets)
 
     CreateStochasticFramebuffer(renderTargets);
 
-    std::vector<donut::engine::ShaderMacro> rasterShadowMacros = {
-        donut::engine::ShaderMacro({ "GAUSSIAN_SPLAT_HYBRID_SHADOWS", "0" })
+    std::vector<caustica::ShaderMacro> rasterShadowMacros = {
+        caustica::ShaderMacro({ "GAUSSIAN_SPLAT_HYBRID_SHADOWS", "0" })
     };
     m_rasterVertexShader = m_shaderFactory->CreateShader("app/engine/shaders/render/ProcessingPasses/GaussianSplatRaster.hlsl", "vs_main", &rasterShadowMacros, nvrhi::ShaderType::Vertex);
     m_rasterPixelShader = m_shaderFactory->CreateShader("app/engine/shaders/render/ProcessingPasses/GaussianSplatRaster.hlsl", "ps_main", &rasterShadowMacros, nvrhi::ShaderType::Pixel);
 
-    std::vector<donut::engine::ShaderMacro> hybridShadowMacros = {
-        donut::engine::ShaderMacro({ "GAUSSIAN_SPLAT_HYBRID_SHADOWS", "1" })
+    std::vector<caustica::ShaderMacro> hybridShadowMacros = {
+        caustica::ShaderMacro({ "GAUSSIAN_SPLAT_HYBRID_SHADOWS", "1" })
     };
     m_hybridVertexShader = m_shaderFactory->CreateShader("app/engine/shaders/render/ProcessingPasses/GaussianSplatRaster.hlsl", "vs_main", &hybridShadowMacros, nvrhi::ShaderType::Vertex);
     m_hybridPixelShader = m_shaderFactory->CreateShader("app/engine/shaders/render/ProcessingPasses/GaussianSplatRaster.hlsl", "ps_main", &hybridShadowMacros, nvrhi::ShaderType::Pixel);
 
-    std::vector<donut::engine::ShaderMacro> sortKeyMacros = {
-        donut::engine::ShaderMacro({ "GAUSSIAN_SPLAT_SORT_KEYS", "1" })
+    std::vector<caustica::ShaderMacro> sortKeyMacros = {
+        caustica::ShaderMacro({ "GAUSSIAN_SPLAT_SORT_KEYS", "1" })
     };
     m_sortKeyShader = m_shaderFactory->CreateShader("app/engine/shaders/render/ProcessingPasses/GaussianSplatRaster.hlsl", "cs_sort_keys", &sortKeyMacros, nvrhi::ShaderType::Compute);
 
@@ -1818,7 +1817,7 @@ void GaussianSplatPass::UpdateSplatIndices(nvrhi::ICommandList* commandList, con
 
 void GaussianSplatPass::Render(
     nvrhi::ICommandList* commandList,
-    const donut::engine::IView& view,
+    const caustica::IView& view,
     nvrhi::rt::IAccelStruct* meshTopLevelAS,
     const RenderTargets& renderTargets,
     const GaussianSplatRenderSettings& settings)
@@ -1833,7 +1832,7 @@ void GaussianSplatPass::Render(
     const bool distanceStageCulling = settings.frustumCulling == GaussianSplatFrustumCulling::AtDistanceStage;
     const bool stochasticToOutput = stochasticSplats && settings.renderTarget == GaussianSplatRenderTarget::OutputColor;
     nvrhi::TextureHandle stochasticDepthBuffer = stochasticToOutput ? m_stochasticDepthBuffer : m_stochasticProcessedDepthBuffer;
-    std::shared_ptr<donut::engine::FramebufferFactory> stochasticFramebuffer = stochasticToOutput
+    std::shared_ptr<caustica::FramebufferFactory> stochasticFramebuffer = stochasticToOutput
         ? m_stochasticFramebuffer
         : m_stochasticProcessedFramebuffer;
     if (stochasticSplats && (!stochasticFramebuffer || !stochasticDepthBuffer))

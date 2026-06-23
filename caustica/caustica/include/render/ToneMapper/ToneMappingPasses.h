@@ -16,7 +16,7 @@
 #include <render/MipMapGenPass.h>
 #include <shaders/render/ToneMapper/ToneMapping_cb.h>
 
-namespace donut::engine
+namespace caustica
 {
     class ShaderFactory;
     class CommonRenderPasses;
@@ -79,7 +79,7 @@ private:
     {
         nvrhi::TextureHandle luminanceTexture;
 		nvrhi::FramebufferHandle luminanceFrameBuffer;
-        std::unique_ptr<donut::render::MipMapGenPass> mipMapPass;
+        std::unique_ptr<caustica::render::MipMapGenPass> mipMapPass;
         nvrhi::BindingSetHandle luminanceBindingSet;
         nvrhi::BindingSetHandle colorBindingSet;
         nvrhi::TextureHandle sourceTexture;
@@ -114,8 +114,8 @@ private:
     nvrhi::ComputePipelineHandle m_CaptureLumPso;
 #endif
 
-    std::shared_ptr<donut::engine::CommonRenderPasses> m_commonPasses;
-    std::shared_ptr<donut::engine::FramebufferFactory> m_FramebufferFactory;
+    std::shared_ptr<caustica::CommonRenderPasses> m_commonPasses;
+    std::shared_ptr<caustica::FramebufferFactory> m_FramebufferFactory;
         
     ExposureMode m_ExposureMode;
     ToneMapperOperator m_ToneMapOperator;
@@ -158,17 +158,17 @@ public:
 
     ToneMappingPass(
         nvrhi::IDevice* device,
-        std::shared_ptr<donut::engine::ShaderFactory> shaderFactory,
-        std::shared_ptr<donut::engine::CommonRenderPasses> commonPasses,
-        std::shared_ptr<donut::engine::FramebufferFactory> colorFramebufferFactory,
-        const donut::engine::ICompositeView& compositeView,
+        std::shared_ptr<caustica::ShaderFactory> shaderFactory,
+        std::shared_ptr<caustica::CommonRenderPasses> commonPasses,
+        std::shared_ptr<caustica::FramebufferFactory> colorFramebufferFactory,
+        const caustica::ICompositeView& compositeView,
         nvrhi::TextureHandle sourceTexture
         );
 
     void PreRender(const ToneMappingParameters& params);
 
     // note - if enable == false, it still does autoexposure (if enabled) and everything else, but the output is just passthrough
-    bool Render( nvrhi::ICommandList* commandList, const donut::engine::ICompositeView& compositeView, nvrhi::ITexture* sourceTexture, bool enabled );
+    bool Render( nvrhi::ICommandList* commandList, const caustica::ICompositeView& compositeView, nvrhi::ITexture* sourceTexture, bool enabled );
 
 #if TONEMAPPING_AUTOEXPOSURE_CPU
     float3 GetPreExposedGray( uint viewIndex );

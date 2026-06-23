@@ -29,7 +29,7 @@
 
 struct PlanarViewConstants;
 
-namespace donut::engine
+namespace caustica
 {
     class IView;
 

@@ -22,7 +22,7 @@
 
 #include <shaders/SampleConstantBuffer.h>
 
-namespace donut::engine
+namespace caustica
 {
     class FramebufferFactory;
     class IView;
@@ -83,7 +83,7 @@ struct GaussianSplatRenderSettings
     float splatScale = 1.0f;
     float alphaScale = 1.0f;
     float brightness = 1.0f;
-    donut::math::float3 tintColor = donut::math::float3(1.0f);
+    caustica::math::float3 tintColor = caustica::math::float3(1.0f);
     float alphaCullThreshold = 1.0f / 255.0f;
     float shadowStrength = 0.75f;
     float shadowRayTMax = 100000.0f;
@@ -95,8 +95,8 @@ struct GaussianSplatRenderSettings
     float frustumDilation = 0.20f;
     float minPixelCoverage = 1.0f;
     uint32_t stochasticFrameIndex = 0;
-    donut::math::float3 shadowDirectionToLight = donut::math::float3(0.0f, 1.0f, 0.0f);
-    donut::math::float4x4 objectToWorld = donut::math::float4x4::identity();
+    caustica::math::float3 shadowDirectionToLight = caustica::math::float3(0.0f, 1.0f, 0.0f);
+    caustica::math::float4x4 objectToWorld = caustica::math::float4x4::identity();
 };
 
 class GaussianSplatPass
@@ -104,7 +104,7 @@ class GaussianSplatPass
 public:
     GaussianSplatPass(
         nvrhi::IDevice* device,
-        std::shared_ptr<donut::engine::ShaderFactory> shaderFactory);
+        std::shared_ptr<caustica::ShaderFactory> shaderFactory);
 
     void SetGpuSort(std::shared_ptr<GPUSort> gpuSort);
 
@@ -125,12 +125,12 @@ public:
         float splatScale,
         uint32_t kernelDegree,
         bool adaptiveClamp,
-        donut::math::float3 tintColor,
+        caustica::math::float3 tintColor,
         float alphaCullThreshold);
 
     void Render(
         nvrhi::ICommandList* commandList,
-        const donut::engine::IView& view,
+        const caustica::IView& view,
         nvrhi::rt::IAccelStruct* meshTopLevelAS,
         const RenderTargets& renderTargets,
         const GaussianSplatRenderSettings& settings);
@@ -156,7 +156,7 @@ private:
     void InvalidateSortCache();
 
     nvrhi::DeviceHandle m_device;
-    std::shared_ptr<donut::engine::ShaderFactory> m_shaderFactory;
+    std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
     std::shared_ptr<GPUSort> m_gpuSort;
 
     nvrhi::BufferHandle m_constantBuffer;
@@ -195,12 +195,12 @@ private:
     nvrhi::rt::AccelStructHandle m_splatBottomLevelAS;
     nvrhi::rt::AccelStructHandle m_splatTopLevelAS;
     nvrhi::rt::IAccelStruct* m_hybridRenderMeshTopLevelAS = nullptr;
-    std::shared_ptr<donut::engine::FramebufferFactory> m_stochasticFramebuffer;
-    std::shared_ptr<donut::engine::FramebufferFactory> m_stochasticProcessedFramebuffer;
+    std::shared_ptr<caustica::FramebufferFactory> m_stochasticFramebuffer;
+    std::shared_ptr<caustica::FramebufferFactory> m_stochasticProcessedFramebuffer;
 
     std::vector<GaussianSplatData> m_splats;
-    std::vector<donut::math::float4> m_colorOpacity;
-    std::vector<donut::math::float4> m_shCoefficients;
+    std::vector<caustica::math::float4> m_colorOpacity;
+    std::vector<caustica::math::float4> m_shCoefficients;
     std::vector<GaussianSplatEmissionProxy> m_emissionProxies;
     std::vector<uint8_t> m_packedColorOpacity;
     std::vector<uint8_t> m_packedShCoefficients;
@@ -220,7 +220,7 @@ private:
     float m_cachedEmissionProxySplatScale = 1.0f;
     uint32_t m_cachedEmissionProxyKernelDegree = 0;
     bool m_cachedEmissionProxyAdaptiveClamp = true;
-    donut::math::float3 m_cachedEmissionProxyTintColor = donut::math::float3(1.0f);
+    caustica::math::float3 m_cachedEmissionProxyTintColor = caustica::math::float3(1.0f);
     float m_cachedEmissionProxyAlphaCullThreshold = 0.0f;
     bool m_emissionProxyBuildPending = true;
     uint32_t m_shadowPrimitiveCountPerSplat = 1;
@@ -229,8 +229,8 @@ private:
     GaussianSplatSortMode m_cachedSortMode = GaussianSplatSortMode::GpuSort;
     GaussianSplatStorageFormat m_currentShFormat = GaussianSplatStorageFormat::Float32;
     GaussianSplatStorageFormat m_currentRgbaFormat = GaussianSplatStorageFormat::Float32;
-    donut::math::float4x4 m_cachedSortWorldToClipNoOffset = donut::math::float4x4::identity();
-    donut::math::float4x4 m_cachedSortObjectToWorld = donut::math::float4x4::identity();
+    caustica::math::float4x4 m_cachedSortWorldToClipNoOffset = caustica::math::float4x4::identity();
+    caustica::math::float4x4 m_cachedSortObjectToWorld = caustica::math::float4x4::identity();
     std::vector<uint32_t> m_randomIndices;
     std::string m_sourceFileName;
 };

@@ -44,7 +44,7 @@
 
 class Sample;
 class AdvancedPathTracer;
-namespace donut::engine { class ShaderFactory; }
+namespace caustica { class ShaderFactory; }
 
 namespace rtxpt_py
 {
@@ -106,16 +106,16 @@ public:
     bool SaveScreenshot(const std::string& outputPath);
 
     // Convenience helpers for camera control (mirror the embed-mode API).
-    bool SetCamera(const donut::math::float3& pos,
-                   const donut::math::float3& dir,
-                   const donut::math::float3& up);
+    bool SetCamera(const caustica::math::float3& pos,
+                   const caustica::math::float3& dir,
+                   const caustica::math::float3& up);
     void SetCameraFOV(float verticalFovDegrees);
     void SetCameraIntrinsics(float fx, float fy, float cx, float cy, float width, float height);
 
     Sample*       GetSample()       { return reinterpret_cast<Sample*>(m_renderer.get()); }
     const Sample* GetSample() const { return reinterpret_cast<const Sample*>(m_renderer.get()); }
 
-    donut::app::DeviceManager* GetDeviceManager() { return m_deviceManager.get(); }
+    caustica::DeviceManager* GetDeviceManager() { return m_deviceManager.get(); }
     const Config&              GetConfig() const  { return m_config; }
 
 private:
@@ -125,8 +125,8 @@ private:
 
     Config                                          m_config;
     CommandLineOptions                              m_cmdLine;
-    std::unique_ptr<donut::app::DeviceManager>      m_deviceManager;
-    std::shared_ptr<donut::engine::ShaderFactory>   m_shaderFactory;
+    std::unique_ptr<caustica::DeviceManager>      m_deviceManager;
+    std::shared_ptr<caustica::ShaderFactory>   m_shaderFactory;
     std::unique_ptr<AdvancedPathTracer>             m_renderer;
 #if DONUT_WITH_DX12 && defined(RTXPT_D3D_AGILITY_SDK_VERSION)
     Microsoft::WRL::ComPtr<ID3D12DeviceFactory>     m_d3d12DeviceFactory;

@@ -28,13 +28,13 @@
 #include <memory>
 #include <vector>
 
-namespace donut::engine
+namespace caustica
 {
     class ShaderFactory;
     class SceneGraph;
 }
 
-namespace donut::render
+namespace caustica::render
 {
     // A rasterization pass that draws lines for each joint
     // of all the animated skeletons in a SceneGraph
@@ -67,20 +67,20 @@ namespace donut::render
 
         std::vector<Vertex> m_Vertices;
 
-        void UpdateVertices(const engine::SceneGraph& sceneGraph);
+        void UpdateVertices(const caustica::SceneGraph& sceneGraph);
 
     public:
 
         JointsRenderPass(nvrhi::IDevice* device);
 
-        void Init(donut::engine::ShaderFactory& shaderFactory);
+        void Init(caustica::ShaderFactory& shaderFactory);
 
         void ResetCaches();
 
         void RenderView(
             nvrhi::ICommandList* commandList,
-            const engine::IView* view,
+            const caustica::IView* view,
             nvrhi::IFramebuffer* framebuffer,
-            std::shared_ptr<engine::SceneGraph const> sceneGraph);
+            std::shared_ptr<caustica::SceneGraph const> sceneGraph);
     };
-} // end namespace donut::render
+} // end namespace caustica::render

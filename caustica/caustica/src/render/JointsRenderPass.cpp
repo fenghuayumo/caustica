@@ -42,18 +42,18 @@
 #endif
 #endif
 
-using namespace donut::math;
-using namespace donut::engine;
-using namespace donut::render;
+using namespace caustica::math;
+using namespace caustica;
+using namespace caustica::render;
 
 #include <shaders/view_cb.h>
 
-namespace donut::render
+namespace caustica::render
 {
 
-    donut::render::JointsRenderPass::JointsRenderPass(nvrhi::IDevice* device) : m_Device(device) { }
+    caustica::render::JointsRenderPass::JointsRenderPass(nvrhi::IDevice* device) : m_Device(device) { }
 
-    void donut::render::JointsRenderPass::Init(donut::engine::ShaderFactory& shaderFactory)
+    void caustica::render::JointsRenderPass::Init(caustica::ShaderFactory& shaderFactory)
     {
         m_ConstantsBuffer = m_Device->createBuffer(
             nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(PlanarViewConstants), "JointsWidget_Constants", 16));
@@ -86,7 +86,7 @@ namespace donut::render
         m_InputLayout = m_Device->createInputLayout(inputDescs, uint32_t(std::size(inputDescs)), m_VertexShader);
     }
 
-    nvrhi::BufferHandle donut::render::JointsRenderPass::CreateVertexBuffer(uint32_t numVertices) const
+    nvrhi::BufferHandle caustica::render::JointsRenderPass::CreateVertexBuffer(uint32_t numVertices) const
     {
         nvrhi::BufferDesc bufferDesc;
         bufferDesc.isVertexBuffer = true;
@@ -104,7 +104,7 @@ namespace donut::render
         m_Vertices.clear();
     }
 
-    void donut::render::JointsRenderPass::UpdateVertices(const engine::SceneGraph& sceneGraph)
+    void caustica::render::JointsRenderPass::UpdateVertices(const caustica::SceneGraph& sceneGraph)
     {
         static const uint32_t blue = vectorToSnorm8(float3(0.f, 0.f, 1.f));
         static const uint32_t red = vectorToSnorm8(float3(1.f, 0.f, 0.f));
@@ -155,9 +155,9 @@ namespace donut::render
 
     void JointsRenderPass::RenderView(
         nvrhi::ICommandList* commandList, 
-        const engine::IView* view,
+        const caustica::IView* view,
         nvrhi::IFramebuffer* framebuffer,
-        std::shared_ptr<engine::SceneGraph const> sceneGraph)
+        std::shared_ptr<caustica::SceneGraph const> sceneGraph)
     {
       
         const auto& skinnedInstances = sceneGraph->GetSkinnedMeshInstances();
@@ -236,4 +236,4 @@ namespace donut::render
         commandList->endMarker();
     }
 
-} // end namespace donut::render
+} // end namespace caustica::render

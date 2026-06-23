@@ -14,8 +14,8 @@
 
 struct GaussianSplatEmissionProxy
 {
-    donut::math::float3 center = donut::math::float3(0.0f);
+    caustica::math::float3 center = caustica::math::float3(0.0f);
     float radius = 0.0f;
-    donut::math::float3 radiance = donut::math::float3(0.0f);
+    caustica::math::float3 radiance = caustica::math::float3(0.0f);
     float weight = 0.0f;
 };

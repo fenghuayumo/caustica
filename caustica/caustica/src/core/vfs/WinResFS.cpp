@@ -25,7 +25,7 @@
 #include <core/string_utils.h>
 #include <Windows.h>
 
-using namespace donut::vfs;
+using namespace caustica;
 namespace fs = std::filesystem;
 
 class NonOwningBlob : public IBlob
@@ -51,7 +51,7 @@ static BOOL CALLBACK EnumResourcesCallback(HMODULE hModule, LPCSTR lpType, LPSTR
     return true;
 }
 
-donut::vfs::WinResFileSystem::WinResFileSystem(const void* hModule, const char* type)
+caustica::WinResFileSystem::WinResFileSystem(const void* hModule, const char* type)
     : m_hModule(hModule)
     , m_Type(type)
 {
@@ -66,7 +66,7 @@ bool WinResFileSystem::folderExists(const fs::path& name)
 bool WinResFileSystem::fileExists(const fs::path& name)
 {
     std::string nameString = name.lexically_normal().generic_string();
-    donut::string_utils::ltrim(nameString, '/');
+    caustica::string_utils::ltrim(nameString, '/');
 
     HRSRC hResource = FindResourceA((HMODULE)m_hModule, nameString.c_str(), m_Type.c_str());
 
@@ -76,7 +76,7 @@ bool WinResFileSystem::fileExists(const fs::path& name)
 std::shared_ptr<IBlob> WinResFileSystem::readFile(const fs::path& name)
 {
     std::string nameString = name.lexically_normal().generic_string();
-    donut::string_utils::ltrim(nameString, '/');
+    caustica::string_utils::ltrim(nameString, '/');
 
     HRSRC hResource = FindResourceA((HMODULE)m_hModule, nameString.c_str(), m_Type.c_str());
 

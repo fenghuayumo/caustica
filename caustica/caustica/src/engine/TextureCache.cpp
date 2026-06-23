@@ -77,9 +77,9 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <chrono>
 #include <regex>
 
-using namespace donut::math;
-using namespace donut::vfs;
-using namespace donut::engine;
+using namespace caustica::math;
+using namespace caustica;
+using namespace caustica;
 
 class StbImageBlob : public IBlob
 {
@@ -171,7 +171,7 @@ std::shared_ptr<IBlob> TextureCache::ReadTextureFile(const std::filesystem::path
     auto fileData = m_fs->readFile(path);
 
     if (!fileData)
-        log::message(m_ErrorLogSeverity, "Couldn't read texture file '%s'", path.generic_string().c_str());
+        caustica::message(m_ErrorLogSeverity, "Couldn't read texture file '%s'", path.generic_string().c_str());
 
     return fileData;
 }
@@ -182,7 +182,7 @@ std::shared_ptr<TextureData> TextureCache::CreateTextureData()
 }
 
 bool TextureCache::FillTextureData(
-    const std::shared_ptr<vfs::IBlob>& fileData,
+    const std::shared_ptr<caustica::IBlob>& fileData,
     const std::shared_ptr<TextureData>& texture,
     const std::string& extension,
     const std::string& mimeType) const
@@ -193,7 +193,7 @@ bool TextureCache::FillTextureData(
         if (!LoadDDSTextureFromMemory(*texture))
         {
             texture->data = nullptr;
-            log::message(m_ErrorLogSeverity, "Couldn't load DDS texture '%s'", texture->path.c_str());
+            caustica::message(m_ErrorLogSeverity, "Couldn't load DDS texture '%s'", texture->path.c_str());
             return false;
         }
     }
@@ -231,7 +231,7 @@ bool TextureCache::FillTextureData(
         }
         else
         {
-            log::warning("Couldn't load EXR texture '%s'", texture->path.c_str());
+            caustica::warning("Couldn't load EXR texture '%s'", texture->path.c_str());
             return false;
         }
     }
@@ -245,7 +245,7 @@ bool TextureCache::FillTextureData(
             static_cast<int>(fileData->size()), 
             &width, &height, &originalChannels))
         {
-            log::message(m_ErrorLogSeverity, "Couldn't process image header for texture '%s'", texture->path.c_str());
+            caustica::message(m_ErrorLogSeverity, "Couldn't process image header for texture '%s'", texture->path.c_str());
             return false;
         }
 
@@ -283,7 +283,7 @@ bool TextureCache::FillTextureData(
 
         if (!bitmap)
         {
-            log::message(m_ErrorLogSeverity, "Couldn't load generic texture '%s'", texture->path.c_str());
+            caustica::message(m_ErrorLogSeverity, "Couldn't load generic texture '%s'", texture->path.c_str());
             return false;
         }
 
@@ -318,7 +318,7 @@ bool TextureCache::FillTextureData(
         default:
             texture->data.reset(); // release the bitmap data
 
-            log::message(m_ErrorLogSeverity, "Unsupported number of components (%d) for texture '%s'", channels, texture->path.c_str());
+            caustica::message(m_ErrorLogSeverity, "Unsupported number of components (%d) for texture '%s'", channels, texture->path.c_str());
             return false;
         }
     }
@@ -476,10 +476,10 @@ void TextureCache::TextureLoaded(std::shared_ptr<TextureData> texture)
     std::lock_guard<std::mutex> guard(m_TexturesToFinalizeMutex);
 
     if (texture->mimeType.empty())
-        log::message(m_InfoLogSeverity, "Loaded %d x %d, %d bpp: %s", texture->width, texture->height,
+        caustica::message(m_InfoLogSeverity, "Loaded %d x %d, %d bpp: %s", texture->width, texture->height,
         texture->originalBitsPerPixel, texture->path.c_str());
     else
-        log::message(m_InfoLogSeverity, "Loaded %d x %d, %d bpp: %s (%s)", texture->width, texture->height,
+        caustica::message(m_InfoLogSeverity, "Loaded %d x %d, %d bpp: %s (%s)", texture->width, texture->height,
         texture->originalBitsPerPixel, texture->path.c_str(), texture->mimeType.c_str());
 }
 
@@ -578,7 +578,7 @@ std::shared_ptr<LoadedTexture> TextureCache::LoadTextureFromFileAsync(
 }
 
 std::shared_ptr<LoadedTexture> TextureCache::LoadTextureFromMemoryAsync(
-    const std::shared_ptr<vfs::IBlob>& data,
+    const std::shared_ptr<caustica::IBlob>& data,
     const std::string& name,
     const std::string& mimeType,
     bool sRGB,
@@ -608,7 +608,7 @@ std::shared_ptr<LoadedTexture> TextureCache::LoadTextureFromMemoryAsync(
 }
 
 std::shared_ptr<LoadedTexture> TextureCache::LoadTextureFromMemory(
-    const std::shared_ptr<vfs::IBlob>& data,
+    const std::shared_ptr<caustica::IBlob>& data,
     const std::string& name,
     const std::string& mimeType,
     bool sRGB,
@@ -634,7 +634,7 @@ std::shared_ptr<LoadedTexture> TextureCache::LoadTextureFromMemory(
 }
 
 std::shared_ptr<LoadedTexture> TextureCache::LoadTextureFromMemoryDeferred(
-    const std::shared_ptr<vfs::IBlob>& data,
+    const std::shared_ptr<caustica::IBlob>& data,
     const std::string& name,
     const std::string& mimeType,
     bool sRGB)
@@ -731,7 +731,7 @@ void TextureCache::SetMaxTextureSize(uint32_t size)
 #define strcasecmp _stricmp
 #endif
 
-namespace donut::engine
+namespace caustica
 {
     bool SaveTextureToFile(
         nvrhi::IDevice* device,

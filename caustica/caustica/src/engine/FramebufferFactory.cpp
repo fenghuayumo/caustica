@@ -23,7 +23,7 @@
 #include <engine/FramebufferFactory.h>
 #include <engine/View.h>
 
-using namespace donut::engine;
+using namespace caustica;
 
 nvrhi::IFramebuffer* FramebufferFactory::GetFramebuffer(const nvrhi::TextureSubresourceSet& subresources)
 {

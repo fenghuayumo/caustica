@@ -20,7 +20,7 @@
 * DEALINGS IN THE SOFTWARE.
 */
 
-#include <engine/ApplicationBase.h>
+#include <engine/Application.h>
 #include <engine/Scene.h>
 #include <engine/TextureCache.h>
 #include <engine/CommonRenderPasses.h>
@@ -37,11 +37,9 @@
 #define PATH_MAX MAX_PATH
 #endif // _WIN32
 
-using namespace donut::vfs;
-using namespace donut::engine;
-using namespace donut::app;
+using namespace caustica;
 
-ApplicationBase::ApplicationBase(DeviceManager* deviceManager)
+Application::Application(DeviceManager* deviceManager)
     : Super(deviceManager)
     , m_SceneLoaded(false)
     , m_AllTexturesFinalized(false)
@@ -49,7 +47,7 @@ ApplicationBase::ApplicationBase(DeviceManager* deviceManager)
 {
 }
 
-void ApplicationBase::Render(nvrhi::IFramebuffer* framebuffer)
+void Application::Render(nvrhi::IFramebuffer* framebuffer)
 {
     if (m_TextureCache)
     {
@@ -80,22 +78,22 @@ void ApplicationBase::Render(nvrhi::IFramebuffer* framebuffer)
     RenderScene(framebuffer);
 }
 
-void ApplicationBase::RenderScene(nvrhi::IFramebuffer* framebuffer)
+void Application::RenderScene(nvrhi::IFramebuffer* framebuffer)
 {
 
 }
 
-void ApplicationBase::RenderSplashScreen(nvrhi::IFramebuffer* framebuffer)
+void Application::RenderSplashScreen(nvrhi::IFramebuffer* framebuffer)
 {
 
 }
 
-void ApplicationBase::SceneUnloading()
+void Application::SceneUnloading()
 {
 
 }
 
-void ApplicationBase::SceneLoaded()
+void Application::SceneLoaded()
 {
     if (m_TextureCache)
     {
@@ -105,22 +103,22 @@ void ApplicationBase::SceneLoaded()
     m_SceneLoaded = true;
 }
 
-void ApplicationBase::SetAsynchronousLoadingEnabled(bool enabled)
+void Application::SetAsynchronousLoadingEnabled(bool enabled)
 {
     m_IsAsyncLoad = enabled;
 }
 
-bool ApplicationBase::IsSceneLoading() const
+bool Application::IsSceneLoading() const
 {
     return m_SceneLoadingThread != nullptr;
 }
 
-bool ApplicationBase::IsSceneLoaded() const
+bool Application::IsSceneLoaded() const
 {
     return m_SceneLoaded;
 }
 
-void ApplicationBase::BeginLoadingScene(std::shared_ptr<IFileSystem> fs, const std::filesystem::path& sceneFileName)
+void Application::BeginLoadingScene(std::shared_ptr<IFileSystem> fs, const std::filesystem::path& sceneFileName)
 {
     if (m_SceneLoaded)
         SceneUnloading();
@@ -149,12 +147,12 @@ void ApplicationBase::BeginLoadingScene(std::shared_ptr<IFileSystem> fs, const s
     }
 }
 
-std::shared_ptr<CommonRenderPasses> ApplicationBase::GetCommonPasses() const
+std::shared_ptr<CommonRenderPasses> Application::GetCommonPasses() const
 {
     return m_CommonPasses;
 }
 
-const char* donut::app::GetShaderTypeName(nvrhi::GraphicsAPI api)
+const char* caustica::GetShaderTypeName(nvrhi::GraphicsAPI api)
 {
     switch (api)
     {
@@ -170,7 +168,7 @@ const char* donut::app::GetShaderTypeName(nvrhi::GraphicsAPI api)
     }
 }
 
-std::filesystem::path donut::app::FindDirectoryWithShaderBin(nvrhi::GraphicsAPI api, IFileSystem& fs, const std::filesystem::path& startPath, const std::filesystem::path& relativeFilePath, const std::string& baseFileName, int maxDepth)
+std::filesystem::path caustica::FindDirectoryWithShaderBin(nvrhi::GraphicsAPI api, IFileSystem& fs, const std::filesystem::path& startPath, const std::filesystem::path& relativeFilePath, const std::string& baseFileName, int maxDepth)
 {
 	std::string shaderFileSuffix = ".bin";
     std::filesystem::path shaderFileBasePath = GetShaderTypeName(api);
@@ -178,7 +176,7 @@ std::filesystem::path donut::app::FindDirectoryWithShaderBin(nvrhi::GraphicsAPI 
 	return FindDirectoryWithFile(fs, startPath, findBytecodeFileName, maxDepth);
 }
 
-std::filesystem::path donut::app::FindDirectory(IFileSystem& fs, const std::filesystem::path& startPath, const std::filesystem::path& dirname, int maxDepth)
+std::filesystem::path caustica::FindDirectory(IFileSystem& fs, const std::filesystem::path& startPath, const std::filesystem::path& dirname, int maxDepth)
 {
 	std::filesystem::path searchPath = "";
 
@@ -196,7 +194,7 @@ std::filesystem::path donut::app::FindDirectory(IFileSystem& fs, const std::file
 	return {};
 }
 
-std::filesystem::path donut::app::FindDirectoryWithFile(IFileSystem& fs, const std::filesystem::path& startPath, const std::filesystem::path& relativeFilePath, int maxDepth)
+std::filesystem::path caustica::FindDirectoryWithFile(IFileSystem& fs, const std::filesystem::path& startPath, const std::filesystem::path& relativeFilePath, int maxDepth)
 {
     std::filesystem::path searchPath = "";
 
@@ -214,9 +212,9 @@ std::filesystem::path donut::app::FindDirectoryWithFile(IFileSystem& fs, const s
 	return {};
 }
 
-std::filesystem::path donut::app::FindMediaFolder(const std::filesystem::path& name)
+std::filesystem::path caustica::FindMediaFolder(const std::filesystem::path& name)
     {
-		donut::vfs::NativeFileSystem fs;
+		caustica::NativeFileSystem fs;
 
 	// first check if the environment variable is set
 	const char* value = getenv(env_donut_media_path);
@@ -227,7 +225,7 @@ std::filesystem::path donut::app::FindMediaFolder(const std::filesystem::path& n
 }
 
 // XXXX mk: as of C++20, there is no portable solution (yet ?)
-std::filesystem::path donut::app::GetDirectoryWithExecutable()
+std::filesystem::path caustica::GetDirectoryWithExecutable()
 {
 	
     char path[PATH_MAX] = {0};
@@ -250,7 +248,7 @@ std::filesystem::path donut::app::GetDirectoryWithExecutable()
     return result;
 }
 
-nvrhi::GraphicsAPI donut::app::GetGraphicsAPIFromCommandLine(int argc, const char* const* argv)
+nvrhi::GraphicsAPI caustica::GetGraphicsAPIFromCommandLine(int argc, const char* const* argv)
 {
     for (int n = 1; n < argc; n++)
     {
@@ -275,7 +273,7 @@ nvrhi::GraphicsAPI donut::app::GetGraphicsAPIFromCommandLine(int argc, const cha
 #endif
 }
 
-std::vector<std::string> donut::app::FindScenes(vfs::IFileSystem& fs, std::filesystem::path const& path)
+std::vector<std::string> caustica::FindScenes(caustica::IFileSystem& fs, std::filesystem::path const& path)
 {
     std::vector<std::string> scenes;
     std::vector<std::string> sceneExtensions = { ".scene.json", ".gltf", ".glb" };
@@ -305,7 +303,7 @@ std::vector<std::string> donut::app::FindScenes(vfs::IFileSystem& fs, std::files
     return scenes;
 }
 
-std::string donut::app::FindPreferredScene(const std::vector<std::string>& available, const std::string& preferred)
+std::string caustica::FindPreferredScene(const std::vector<std::string>& available, const std::string& preferred)
 {
     if (available.empty())
         return "";

@@ -31,7 +31,7 @@ template <typename T, int N> char(&dim_helper(T(&)[N]))[N];
 #define dim_field(S, m) dim(((S*)0)->m)
 #define sizeof_field(S, m) (sizeof(((S*)0)->m))
 
-namespace donut::math
+namespace caustica::math
 {
 	// "uint" is a lot shorter than "unsigned int"
 	typedef unsigned int uint;

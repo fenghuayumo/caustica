@@ -29,7 +29,7 @@
 #include <memory>
 #include <vector>
 
-namespace donut::engine
+namespace caustica
 {
     class ShaderFactory;
     class CommonRenderPasses;
@@ -37,7 +37,7 @@ namespace donut::engine
 
 // Compute reduction pass to generate mipmap levels
 
-namespace donut::render
+namespace caustica::render
 {
 
     class MipMapGenPass {
@@ -54,7 +54,7 @@ namespace donut::render
         // note : 'texture' must have been allocated with some mip levels
         MipMapGenPass(
             nvrhi::IDevice* device,
-            std::shared_ptr<engine::ShaderFactory> shaderFactory,
+            std::shared_ptr<caustica::ShaderFactory> shaderFactory,
             nvrhi::TextureHandle texture,
             Mode mode = Mode::MODE_MAX);
 
@@ -65,7 +65,7 @@ namespace donut::render
         // debug : blits mip-map levels in spiral pattern to 'target'
         // (assumes 'target' texture resolution is high enough...)
         void Display(
-            std::shared_ptr<engine::CommonRenderPasses> commonPasses,
+            std::shared_ptr<caustica::CommonRenderPasses> commonPasses,
             nvrhi::ICommandList* commandList, 
             nvrhi::IFramebuffer* target);
 
@@ -83,8 +83,8 @@ namespace donut::render
         struct NullTextures;
         std::shared_ptr<NullTextures> m_NullTextures;
 
-        engine::BindingCache m_BindingCache;
+        caustica::BindingCache m_BindingCache;
 
     };
 
-} // end namespace donut::render
+} // end namespace caustica::render

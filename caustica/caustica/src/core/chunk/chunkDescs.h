@@ -31,7 +31,7 @@
 
 // chunks access
 
-namespace donut::chunk
+namespace caustica::chunk
 {
 
 enum ChunkType : uint32_t
@@ -151,21 +151,21 @@ struct Stream_ChunkDesc_0x100
     // semantic |  4   | chunk data semantic
 
     void setFlags(Type type, Vary vary, Semantic semantic) {
-        flags = donut::math::insertBits<size_t>(type, 4, 0) |
-                donut::math::insertBits<size_t>(vary, 2, 4) |
-                donut::math::insertBits<size_t>(semantic, 4, 6);
+        flags = caustica::math::insertBits<size_t>(type, 4, 0) |
+                caustica::math::insertBits<size_t>(vary, 2, 4) |
+                caustica::math::insertBits<size_t>(semantic, 4, 6);
     }
 
     Type getType() const {
-        return (Type)donut::math::extractBits<size_t>(flags, 4, 0);
+        return (Type)caustica::math::extractBits<size_t>(flags, 4, 0);
     }
 
     Vary getVary() const {
-        return (Vary)donut::math::extractBits<size_t>(flags, 2, 4);
+        return (Vary)caustica::math::extractBits<size_t>(flags, 2, 4);
     }
 
     Semantic getSemantic() const {
-        return (Semantic)donut::math::extractBits<size_t>(flags, 4, 6);
+        return (Semantic)caustica::math::extractBits<size_t>(flags, 4, 6);
     }
 
     size_t flags,
@@ -196,11 +196,11 @@ struct MeshInfos_ChunkDesc_0x100
     // type     |  3   | chunk data type
 
     void setFlags(Type type) {
-        flags = donut::math::insertBits<uint32_t>(type, 3, 0);
+        flags = caustica::math::insertBits<uint32_t>(type, 3, 0);
     }
 
     Type getType() const {
-        return (Type)donut::math::extractBits<uint32_t>(flags, 4, 0);
+        return (Type)caustica::math::extractBits<uint32_t>(flags, 4, 0);
     }
 
     uint32_t flags,
@@ -259,11 +259,11 @@ struct MeshSet_ChunkDesc_0x100
     // type     |  4   | chunk data type
 
     void setFlags(Type type) {
-        flags = donut::math::insertBits<uint32_t>(type, 4, 0);
+        flags = caustica::math::insertBits<uint32_t>(type, 4, 0);
     }
 
     Type getType() const {
-        return (Type)donut::math::extractBits<uint32_t>(flags, 4, 0);
+        return (Type)caustica::math::extractBits<uint32_t>(flags, 4, 0);
     }
 
     uint32_t flags,
@@ -295,7 +295,7 @@ struct MeshSet_ChunkDesc_0x100
             instancesChunkId,
             nodesChunkId;
 
-    donut::math::box3 bbox;
+    caustica::math::box3 bbox;
 };
 
 };

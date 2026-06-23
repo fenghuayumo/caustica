@@ -86,7 +86,7 @@ extern "C"
 }
 #endif
 
-using namespace donut::app;
+using namespace caustica;
 
 // The joystick interface in glfw is not per-window like the keys, mouse, etc. The joystick callbacks
 // don't take a window arg. So glfw's model is a global joystick shared by all windows. Hence, the equivalent 
@@ -327,7 +327,7 @@ bool DeviceManager::CreateWindowDeviceAndSwapChain(const DeviceCreationParameter
 
     if (!foundFormat)
     {
-        log::error("Unknown format %s (%d) used for the swap chain",
+        caustica::error("Unknown format %s (%d) used for the swap chain",
             nvrhi::getFormatInfo(params.swapChainFormat).name,
             int(params.swapChainFormat));
     }
@@ -530,7 +530,7 @@ bool DeviceManager::CreateHeadlessBackBuffers()
 
     if (m_DeviceParams.backBufferWidth == 0 || m_DeviceParams.backBufferHeight == 0)
     {
-        log::error("Cannot create headless back buffers with a zero-sized extent.");
+        caustica::error("Cannot create headless back buffers with a zero-sized extent.");
         return false;
     }
 
@@ -556,7 +556,7 @@ bool DeviceManager::CreateHeadlessBackBuffers()
         nvrhi::TextureHandle texture = GetDevice()->createTexture(textureDesc);
         if (!texture)
         {
-            log::error("Failed to create headless back buffer %u.", index);
+            caustica::error("Failed to create headless back buffer %u.", index);
             ReleaseHeadlessBackBuffers();
             return false;
         }
@@ -847,7 +847,7 @@ const DeviceCreationParameters& DeviceManager::GetDeviceParams()
     return m_DeviceParams;
 }
 
-donut::app::DeviceManager::DeviceManager()
+caustica::DeviceManager::DeviceManager()
 #if DONUT_WITH_AFTERMATH
     : m_AftermathCrashDumper(*this)
 #endif
@@ -1112,12 +1112,12 @@ void DeviceManager::Shutdown()
     m_InstanceCreated = false;
 }
 
-nvrhi::IFramebuffer* donut::app::DeviceManager::GetCurrentFramebuffer(bool withDepth)
+nvrhi::IFramebuffer* caustica::DeviceManager::GetCurrentFramebuffer(bool withDepth)
 {
     return GetFramebuffer(GetCurrentBackBufferIndex(), withDepth);
 }
 
-nvrhi::IFramebuffer* donut::app::DeviceManager::GetFramebuffer(uint32_t index, bool withDepth)
+nvrhi::IFramebuffer* caustica::DeviceManager::GetFramebuffer(uint32_t index, bool withDepth)
 {
     if (withDepth)
     {
@@ -1180,12 +1180,12 @@ void DeviceManager::SetInformativeWindowTitle(const char* applicationName, bool 
     SetWindowTitle(ss.str().c_str());
 }
 
-const char* donut::app::DeviceManager::GetWindowTitle()
+const char* caustica::DeviceManager::GetWindowTitle()
 {
     return m_WindowTitle.c_str();
 }
 
-donut::app::DeviceManager* donut::app::DeviceManager::Create(nvrhi::GraphicsAPI api)
+caustica::DeviceManager* caustica::DeviceManager::Create(nvrhi::GraphicsAPI api)
 {
     switch (api)
     {
@@ -1202,7 +1202,7 @@ donut::app::DeviceManager* donut::app::DeviceManager::Create(nvrhi::GraphicsAPI 
         return CreateVK();
 #endif
     default:
-        log::error("DeviceManager::Create: Unsupported Graphics API (%d)", api);
+        caustica::error("DeviceManager::Create: Unsupported Graphics API (%d)", api);
         return nullptr;
     }
 }
@@ -1215,24 +1215,24 @@ DefaultMessageCallback& DefaultMessageCallback::GetInstance()
 
 void DefaultMessageCallback::message(nvrhi::MessageSeverity severity, const char* messageText)
 {
-    donut::log::Severity donutSeverity = donut::log::Severity::Info;
+    caustica::Severity donutSeverity = caustica::Severity::Info;
     switch (severity)
     {
     case nvrhi::MessageSeverity::Info:
-        donutSeverity = donut::log::Severity::Info;
+        donutSeverity = caustica::Severity::Info;
         break;
     case nvrhi::MessageSeverity::Warning:
-        donutSeverity = donut::log::Severity::Warning;
+        donutSeverity = caustica::Severity::Warning;
         break;
     case nvrhi::MessageSeverity::Error:
-        donutSeverity = donut::log::Severity::Error;
+        donutSeverity = caustica::Severity::Error;
         break;
     case nvrhi::MessageSeverity::Fatal:
-        donutSeverity = donut::log::Severity::Fatal;
+        donutSeverity = caustica::Severity::Fatal;
         break;
     }
     
-    donut::log::message(donutSeverity, "%s", messageText);
+    caustica::message(donutSeverity, "%s", messageText);
 }
 
 #if DONUT_WITH_STREAMLINE

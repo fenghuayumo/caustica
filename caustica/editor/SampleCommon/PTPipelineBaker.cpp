@@ -12,7 +12,7 @@
 #include "ShaderCompilerUtils.h"
 #include "ShaderPackFileSystem.h"
 
-#include <engine/ApplicationBase.h>
+#include <engine/Application.h>
 
 #include <render/Materials/MaterialsBaker.h>
 #include "ExtendedScene.h"
@@ -33,9 +33,8 @@
 
 #define PIPELINE_BAKER_USE_OPTIMIZATIONS 1
 
-using namespace donut;
-using namespace donut::math;
-using namespace donut::engine;
+using namespace caustica::math;
+using namespace caustica;
 
 static const std::string c_PTShaderBinariesRoot = "ShaderDynamic/Bin";
 
@@ -56,7 +55,7 @@ void PTPipelineVariant::ShaderPermutation::SetPath(const std::filesystem::path &
     ShaderOutFileName.replace_extension();
 }
 
-void PTPipelineVariant::ShaderPermutation::FromMaterialPermutation(const std::string & shortUniqueDebugID, const std::vector<donut::engine::ShaderMacro> & macros, const struct MaterialShaderPermutation & msp)
+void PTPipelineVariant::ShaderPermutation::FromMaterialPermutation(const std::string & shortUniqueDebugID, const std::vector<caustica::ShaderMacro> & macros, const struct MaterialShaderPermutation & msp)
 {
     SetPath( msp.ShaderFilePath );
     CombinedAndSpecializedMacros = macros;
@@ -73,7 +72,7 @@ void PTPipelineVariant::ShaderPermutation::CompileIfNeeded()
     if (US_compileCmdLine == "")
         return;
 
-    donut::log::info("Compiling shader '%s' file '%s'...", PermutationName.c_str(), CompiledFullPath.c_str() );
+    caustica::info("Compiling shader '%s' file '%s'...", PermutationName.c_str(), CompiledFullPath.c_str() );
 
     auto [resNum, resString, resErrorString] = SystemShell(US_compileCmdLine, false);
 
@@ -83,7 +82,7 @@ void PTPipelineVariant::ShaderPermutation::CompileIfNeeded()
         US_compileError = StringFormat("ERROR compiling shader, command \n   %s\n result: \n   %s", US_compileCmdLine.c_str(), resErrorString.c_str());
 
     if (US_compileError != "")
-        donut::log::warning(US_compileError.c_str());
+        caustica::warning(US_compileError.c_str());
 }
 
 void PTPipelineVariant::ShaderPermutation::ResetShaderLibrary()
@@ -96,7 +95,7 @@ void PTPipelineVariant::ShaderPermutation::LoadShaderLibraryIfNeeded(PTPipelineB
     if (US_compileError != "" || ShaderLibrary != nullptr)
         return;
 
-    std::shared_ptr<donut::vfs::IBlob> data = baker.GetFS()->readFile(("/" + c_PTShaderBinariesRoot + "/" + CompiledFileNameNoExt + ".bin").c_str());
+    std::shared_ptr<caustica::IBlob> data = baker.GetFS()->readFile(("/" + c_PTShaderBinariesRoot + "/" + CompiledFileNameNoExt + ".bin").c_str());
 
     if (data)
         ShaderLibrary = baker.GetDevice()->createShaderLibrary(data->data(), data->size());
@@ -105,7 +104,7 @@ void PTPipelineVariant::ShaderPermutation::LoadShaderLibraryIfNeeded(PTPipelineB
         US_compileError = StringFormat("ERROR creating ShaderLibrary for file %s", CompiledFullPath.c_str());
 }
 
-PTPipelineVariant::PTPipelineVariant(const std::string & relativeSourcePath, const std::vector<donut::engine::ShaderMacro> & variantMacros, const std::shared_ptr<PTPipelineBaker>& baker, const std::string & shortUniqueDebugID, bool raygenOnly)
+PTPipelineVariant::PTPipelineVariant(const std::string & relativeSourcePath, const std::vector<caustica::ShaderMacro> & variantMacros, const std::shared_ptr<PTPipelineBaker>& baker, const std::string & shortUniqueDebugID, bool raygenOnly)
     : m_macros(variantMacros), m_baker(baker), m_rayGenOnly(raygenOnly)
 {
     m_raygen.SetPath(relativeSourcePath);
@@ -301,7 +300,7 @@ void PTPipelineVariant::CompileIfNeeded_Enqueue(std::filesystem::file_time_type 
         if (compiledBlobAvailable && (!baker->CanCompileShaders() || diskBlobUpToDate))
         {
             if (baker->IsVerbose())
-                donut::log::info("No need to compile shader variant of '%s', up-to-date file already exists...", srcFullPath.string().c_str());
+                caustica::info("No need to compile shader variant of '%s', up-to-date file already exists...", srcFullPath.string().c_str());
             permutation->US_compileCmdLine = "";
         }
         else if (baker->CanCompileShaders()) // we need to re-compile!
@@ -315,7 +314,7 @@ void PTPipelineVariant::CompileIfNeeded_Enqueue(std::filesystem::file_time_type 
             command += " -Fo \"" + permutation->CompiledFullPath + "\"";
 
             if (baker->IsVerbose())
-                donut::log::info("Enqueuing shader variant of '%s'...", srcFullPath.string().c_str());
+                caustica::info("Enqueuing shader variant of '%s'...", srcFullPath.string().c_str());
             permutation->US_compileCmdLine = command;
             resetPipelineNeeded = true;
             permutation->ResetShaderLibrary();
@@ -326,7 +325,7 @@ void PTPipelineVariant::CompileIfNeeded_Enqueue(std::filesystem::file_time_type 
             permutation->US_compileError = StringFormat(
                 "Missing precompiled shader '%s' and runtime shader compilation is disabled.",
                 permutation->CompiledFullPath.c_str());
-            donut::log::error("%s", permutation->US_compileError.c_str());
+            caustica::error("%s", permutation->US_compileError.c_str());
         }
         baker->EnqueueShaderPermutation(permutation);
     }
@@ -462,10 +461,10 @@ PTPipelineBaker::PTPipelineBaker(nvrhi::IDevice* device, std::shared_ptr<Materia
     , m_enableNVAPIShaderExtension(device->queryFeatureSupport(nvrhi::Feature::HlslExtensionUAV))
 {
     if (!m_compilerConfig.Initialize(device, c_PTShaderBinariesRoot))
-        donut::log::fatal("Failed to initialize shader compiler configuration");
+        caustica::fatal("Failed to initialize shader compiler configuration");
 
-    m_shadersFS = std::make_shared<vfs::RootFileSystem>();
-    const char* shaderTypeName = donut::app::GetShaderTypeName(device->getGraphicsAPI());
+    m_shadersFS = std::make_shared<caustica::RootFileSystem>();
+    const char* shaderTypeName = caustica::GetShaderTypeName(device->getGraphicsAPI());
     const std::filesystem::path shaderPackPath = GetRuntimeDirectory() / (std::string("caustica.shaders.") + shaderTypeName + ".pack");
     auto shaderPackFS = std::make_shared<ShaderPackFileSystem>(shaderPackPath, c_PTShaderBinariesRoot);
     if (shaderPackFS->isOpen())
@@ -509,7 +508,7 @@ HitGroupInfo ComputeSubInstanceHitGroupInfo(const MaterialsBaker & baker, const 
     return info;
 }
 
-static bool macrosEqual(donut::engine::ShaderMacro& a, donut::engine::ShaderMacro& b)
+static bool macrosEqual(caustica::ShaderMacro& a, caustica::ShaderMacro& b)
 {
     return a.name == b.name && a.definition == b.definition;
 }
@@ -525,7 +524,7 @@ void PTPipelineBaker::EnqueueShaderPermutation(PTPipelineVariant::ShaderPermutat
     m_parallelCompileListAll.push_back(perm);
 }
 
-void PTPipelineBaker::Update(const std::shared_ptr<class ExtendedScene>& scene, unsigned int subInstanceCount, const std::function<void(std::vector<donut::engine::ShaderMacro>& macros)>& globalMacrosGetter, bool forceShaderReload)
+void PTPipelineBaker::Update(const std::shared_ptr<class ExtendedScene>& scene, unsigned int subInstanceCount, const std::function<void(std::vector<caustica::ShaderMacro>& macros)>& globalMacrosGetter, bool forceShaderReload)
 {
     // Auto-reload: poll for source file changes
     if (m_compilerConfig.CanCompile() && !forceShaderReload && !m_variants.empty())
@@ -551,7 +550,7 @@ void PTPipelineBaker::Update(const std::shared_ptr<class ExtendedScene>& scene, 
                     // Source files changed - trigger reload
                     m_cachedSourceTimestamp = currentTimestamp;
                     forceShaderReload = true;
-                    log::info("RT shader source changes detected - triggering hot reload...");
+                    caustica::info("RT shader source changes detected - triggering hot reload...");
                 }
             }
         }
@@ -562,7 +561,7 @@ void PTPipelineBaker::Update(const std::shared_ptr<class ExtendedScene>& scene, 
     for (const std::shared_ptr<PTPipelineVariant>& variant : m_variants)
         needsUpdate |= variant->m_pipeline == nullptr;
 
-    std::vector<donut::engine::ShaderMacro> newMacros;
+    std::vector<caustica::ShaderMacro> newMacros;
     globalMacrosGetter(newMacros);
     if (!std::equal(newMacros.begin(), newMacros.end(), m_macros.begin(), m_macros.end(), macrosEqual))
     {
@@ -617,7 +616,7 @@ void PTPipelineBaker::Update(const std::shared_ptr<class ExtendedScene>& scene, 
 
     if (!m_lastUpdatedSourceTimestamp.has_value())
     {
-        log::error("There is something wrong with the shader source path or logic - unable to load or dynamically compile shaders");
+        caustica::error("There is something wrong with the shader source path or logic - unable to load or dynamically compile shaders");
         return;
     }
 
@@ -733,7 +732,7 @@ void PTPipelineBaker::Update(const std::shared_ptr<class ExtendedScene>& scene, 
 
         if (firstError!="")
         {
-            log::error("%s", firstError.c_str());
+            caustica::error("%s", firstError.c_str());
             bool retry = false;
 #if _WIN32
             if (!HelpersIsNonInteractive())
@@ -775,7 +774,7 @@ void PTPipelineBaker::ReleaseVariant(std::shared_ptr<PTPipelineVariant>& variant
     assert(false);
 }
 
-std::shared_ptr<PTPipelineVariant> PTPipelineBaker::CreateVariant(const std::string & relativeSourcePath, std::vector<donut::engine::ShaderMacro> variantMacros, const std::string & shortUniqueDebugID, bool rayGenOnly)
+std::shared_ptr<PTPipelineVariant> PTPipelineBaker::CreateVariant(const std::string & relativeSourcePath, std::vector<caustica::ShaderMacro> variantMacros, const std::string & shortUniqueDebugID, bool rayGenOnly)
 {
     std::shared_ptr<PTPipelineVariant> variant = std::shared_ptr<PTPipelineVariant>(new PTPipelineVariant(relativeSourcePath, variantMacros, this->shared_from_this(), shortUniqueDebugID, rayGenOnly));
     m_variants.push_back(variant);

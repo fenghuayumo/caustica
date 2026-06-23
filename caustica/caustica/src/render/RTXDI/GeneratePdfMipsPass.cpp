@@ -15,19 +15,19 @@
 #include <math/math.h>
 #include <core/log.h>
 
-using namespace donut::math;
+using namespace caustica::math;
 
 #include <shaders/render/RTXDI/ShaderParameters.h>
 
 GenerateMipsPass::GenerateMipsPass(
     nvrhi::IDevice* device, 
-    std::shared_ptr<donut::engine::ShaderFactory> shaderFactory,
+    std::shared_ptr<caustica::ShaderFactory> shaderFactory,
     nvrhi::ITexture* sourceEnvironmentMap,
     nvrhi::ITexture* destinationTexture)
     : m_sourceTexture(sourceEnvironmentMap)
     , m_destinationTexture(destinationTexture)
 {
-    donut::log::debug("Initializing GenerateMipsPass...");
+    caustica::debug("Initializing GenerateMipsPass...");
 
     const auto& destinationDesc = m_destinationTexture->getDesc();
 
@@ -62,7 +62,7 @@ GenerateMipsPass::GenerateMipsPass(
     nvrhi::utils::CreateBindingSetAndLayout(device, nvrhi::ShaderType::Compute, 0,
         bindingSetDesc, bindingLayout, m_bindingSet);
 
-    std::vector<donut::engine::ShaderMacro> macros = { { "INPUT_ENVIRONMENT_MAP", sourceEnvironmentMap ? "1" : "0" } };
+    std::vector<caustica::ShaderMacro> macros = { { "INPUT_ENVIRONMENT_MAP", sourceEnvironmentMap ? "1" : "0" } };
 
     nvrhi::ShaderHandle shader = shaderFactory->CreateShader("app/engine/shaders/render/RTXDI/PreprocessEnvironmentMap.hlsl", "main", &macros, nvrhi::ShaderType::Compute);
 

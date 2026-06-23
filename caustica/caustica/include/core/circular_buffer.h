@@ -28,7 +28,7 @@
 #include <vector>
 #include <stdexcept>
 
-namespace donut::core
+namespace caustica::core
 {
 
 	// Static-sized circular buffer container and iterators
@@ -223,4 +223,4 @@ namespace donut::core
 		return reverse_iterator(*this, size());
 	}
 
-} // end namespace donut::core
+} // end namespace caustica::core

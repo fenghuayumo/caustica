@@ -23,7 +23,7 @@
 #include <engine/ThreadPool.h>
 #include <cassert>
 
-namespace donut::engine
+namespace caustica
 {
 
 // A simple task wrapper for a function object

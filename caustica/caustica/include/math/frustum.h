@@ -24,7 +24,7 @@
 
 #include <stdint.h>
 
-namespace donut::math
+namespace caustica::math
 {
 
     // a plane equation, so that any point (v) for which (dot(normal, v) == distance) lies on the plane

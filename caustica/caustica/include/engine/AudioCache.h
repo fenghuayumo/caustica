@@ -29,18 +29,18 @@
 #include <mutex>
 #include <string>
 
-namespace donut::vfs
+namespace caustica
 {
     class IBlob;
     class IFileSystem;
 }
 
-namespace donut::engine
+namespace caustica
 {
     class ThreadPool;
 }
 
-namespace donut::engine::audio
+namespace caustica::audio
 {
 
 class AudioCache;
@@ -83,17 +83,17 @@ private:
 
     friend class AudioCache;
 
-    std::shared_ptr<donut::vfs::IBlob> m_data;
+    std::shared_ptr<caustica::IBlob> m_data;
 };
 
 // AudioCache : cache for audio data with synch & async read from 
-// donut vfs::IFileSystem
+// donut caustica::IFileSystem
 //
 class AudioCache
 {
 public:
 
-    AudioCache(std::shared_ptr<vfs::IFileSystem> fs);
+    AudioCache(std::shared_ptr<caustica::IFileSystem> fs);
 
     // Release all cached audio files
     void Reset();
@@ -108,7 +108,7 @@ public:
 
 private:
 
-    static std::shared_ptr<AudioData const> importRiff(std::shared_ptr<donut::vfs::IBlob> blob, char const * filepath);
+    static std::shared_ptr<AudioData const> importRiff(std::shared_ptr<caustica::IBlob> blob, char const * filepath);
 
     std::shared_ptr<AudioData const> loadAudioFile (const std::filesystem::path & path);
 
@@ -122,7 +122,7 @@ private:
 
     std::map<std::string, std::shared_ptr<AudioData const>> m_LoadedAudioData;
 
-    std::shared_ptr<donut::vfs::IFileSystem> m_fs;
+    std::shared_ptr<caustica::IFileSystem> m_fs;
 };
 
-} // namespace donut::engine::audio
+} // namespace caustica::audio

@@ -41,9 +41,8 @@
 
 #include <shaders/bindless.h>
 
-using namespace donut;
-using namespace donut::math;
-using namespace donut::engine;
+using namespace caustica::math;
+using namespace caustica;
 
 static std::string kNoModel = "<no_model>";
 
@@ -127,7 +126,7 @@ static std::filesystem::path ResolveMaterialTexturePath(
     return fullPath;
 }
 
-void PTTexture::InitFromLoadedTexture(std::shared_ptr<donut::engine::LoadedTexture> & loaded, bool _sRGB, bool _normalMap, const std::filesystem::path & mediaPath)
+void PTTexture::InitFromLoadedTexture(std::shared_ptr<caustica::LoadedTexture> & loaded, bool _sRGB, bool _normalMap, const std::filesystem::path & mediaPath)
 {
     if (loaded == nullptr)
     { LocalPath = ""; sRGB = false; Loaded = nullptr; NormalMap = false; Enabled = false; return; }
@@ -248,14 +247,14 @@ void PTMaterial::Write(Json::Value& output)
 bool PTMaterial::Read(
     Json::Value& input,
     const std::filesystem::path& mediaPath,
-    const std::shared_ptr<donut::engine::TextureCache>& textureCache,
+    const std::shared_ptr<caustica::TextureCache>& textureCache,
     const std::filesystem::path& sceneDirectory)
 {
     // int version = -1;
     // input["version"] >> version;
     // if (version != 1)
     // {
-    //     donut::log::warning("Unsupported/missing material version"); return nullptr;
+    //     caustica::warning("Unsupported/missing material version"); return nullptr;
     // }
 
     const bool hasMaterialModelField = input.isMember("MaterialModel");
@@ -274,7 +273,7 @@ bool PTMaterial::Read(
         texJ["path"] >> localPath; output.LocalPath = localPath;
         if (output.LocalPath == "")
         {
-            donut::log::warning("Path for texture is empty"); return;
+            caustica::warning("Path for texture is empty"); return;
         }
         texJ["sRGB"] >> output.sRGB;
         texJ["NormalMap"] >> output.NormalMap;
@@ -412,7 +411,7 @@ bool PTMaterial::Read(
 std::shared_ptr<PTMaterial> PTMaterial::FromJson(
     Json::Value& input,
     const std::filesystem::path& mediaPath,
-    const std::shared_ptr<donut::engine::TextureCache>& textureCache,
+    const std::shared_ptr<caustica::TextureCache>& textureCache,
     const std::string& modelName,
     const std::string& name,
     const std::filesystem::path& sceneDirectory)
@@ -785,7 +784,7 @@ static void GetBindlessTextureIndex(const std::shared_ptr<LoadedTexture>& textur
     bindlessDescIndex &= 0xFFFF;
 
     const auto desc = texture->texture->getDesc();
-    float baseLODf = donut::math::log2f((float)desc.width * desc.height);
+    float baseLODf = caustica::math::log2f((float)desc.width * desc.height);
     uint baseLOD = (uint)(baseLODf + 0.5f);
     uint mipLevels = desc.mipLevels;
     assert(baseLOD >= 0 && baseLOD <= 255);
@@ -796,7 +795,7 @@ static void GetBindlessTextureIndex(const std::shared_ptr<LoadedTexture>& textur
 
 bool PTMaterial::IsEmissive() const
 {
-    return (EmissiveIntensity > 0) && (donut::math::any(EmissiveColor>0.0f)) || UseDonutEmissiveIntensity;  // UseDonutEmissiveIntensity can animate on/off so just assume we're emissive and pay the cost
+    return (EmissiveIntensity > 0) && (caustica::math::any(EmissiveColor>0.0f)) || UseDonutEmissiveIntensity;  // UseDonutEmissiveIntensity can animate on/off so just assume we're emissive and pay the cost
 }
 
 void PTMaterial::FillData(PTMaterialData & data)
@@ -897,7 +896,7 @@ std::filesystem::path MaterialsBaker::GetMaterialStoragePath(PTMaterialBase& mat
     return matPath;
 }
 
-MaterialsBaker::MaterialsBaker(const std::string & relativeShaderSourcePath, nvrhi::IDevice* device, std::shared_ptr<donut::engine::TextureCache> textureCache, std::shared_ptr<donut::engine::ShaderFactory> shaderFactory)
+MaterialsBaker::MaterialsBaker(const std::string & relativeShaderSourcePath, nvrhi::IDevice* device, std::shared_ptr<caustica::TextureCache> textureCache, std::shared_ptr<caustica::ShaderFactory> shaderFactory)
     : m_relativeShaderSourcePath(relativeShaderSourcePath)
     , m_device(device)
     , m_textureCache(textureCache)
@@ -978,12 +977,12 @@ void MaterialsBaker::RecordTexture(const PTTexture& texture)
     {
         if (existing->second.NormalMap != texture.NormalMap)
         {
-            donut::log::warning("Texture with path '%s' is used as a NormalMap and not a NormalMap - this is not supported, expect errors.", texture.LocalPath.string().c_str());
+            caustica::warning("Texture with path '%s' is used as a NormalMap and not a NormalMap - this is not supported, expect errors.", texture.LocalPath.string().c_str());
             assert(false);
         }
         if (existing->second.sRGB != texture.sRGB)
         {
-            donut::log::warning("Texture with path '%s' is marked as both sRGB and not sRGB in different places - this is not supported, expect errors.", texture.LocalPath.string().c_str());
+            caustica::warning("Texture with path '%s' is marked as both sRGB and not sRGB in different places - this is not supported, expect errors.", texture.LocalPath.string().c_str());
             assert(false);
         }
     }
@@ -1018,7 +1017,7 @@ bool MaterialsBaker::SetMaterialTexture(
 
     if (!std::filesystem::exists(fullPath))
     {
-        donut::log::warning("Material texture '%s' resolved to missing file '%s'.", localPath.string().c_str(), fullPath.string().c_str());
+        caustica::warning("Material texture '%s' resolved to missing file '%s'.", localPath.string().c_str(), fullPath.string().c_str());
         return false;
     }
 
@@ -1134,7 +1133,7 @@ static bool IsBuiltinModelFileName(const std::string& modelFileName)
     return normalized.rfind(builtinPrefix, 0) == 0;
 }
 
-std::shared_ptr<PTMaterial> MaterialsBaker::ImportFromDonut(donut::engine::Material& material)
+std::shared_ptr<PTMaterial> MaterialsBaker::ImportFromDonut(caustica::Material& material)
 {
     std::shared_ptr<PTMaterial> materialPT = std::make_shared<PTMaterial>();
 
@@ -1234,14 +1233,14 @@ std::shared_ptr<PTMaterial> MaterialsBaker::Load(const std::string & modelFileNa
     }
     if (actualLoadedFileName=="")
     {
-        donut::log::warning("No RTXPT material definition file found '%s' - consider doing Scene->Materials->Advanced->Save All", (modelName + "." + name + c_MaterialsExtension).c_str()); 
+        caustica::warning("No RTXPT material definition file found '%s' - consider doing Scene->Materials->Advanced->Save All", (modelName + "." + name + c_MaterialsExtension).c_str()); 
         return nullptr;
     }
 
     std::shared_ptr<PTMaterial> materialPT = materialPT->FromJson(rootJ, m_mediaPath, m_textureCache, modelName, name, m_sceneDirectory);
     if (materialPT == nullptr)
     {
-        donut::log::warning("Error while parsing material file '%s'", actualLoadedFileName.c_str()); 
+        caustica::warning("Error while parsing material file '%s'", actualLoadedFileName.c_str()); 
         return nullptr;
     }
     materialPT->SharedWithAllScenes = shared; // this property is not loaded from the file, but determined based on where the file was loaded from
@@ -1275,7 +1274,7 @@ void MaterialsBaker::CompleteDeferredTexturesLoad(nvrhi::ICommandList* commandLi
     }
 }
 
-static std::string MacrosToString( const std::vector<donut::engine::ShaderMacro> & macros )
+static std::string MacrosToString( const std::vector<caustica::ShaderMacro> & macros )
 {
     std::string result;
     result.reserve(macros.size() * 16); // optional optimization guess
@@ -1326,7 +1325,7 @@ MaterialShaderPermutationKey::MaterialShaderPermutationKey( const MaterialShader
 void MaterialsBaker::BakeShaderPermutations()
 {
     // first generate ubershader variant - that will likely go away in the future
-    std::vector<donut::engine::ShaderMacro> macros;
+    std::vector<caustica::ShaderMacro> macros;
     macros.push_back({ "RTXPT_MATERIAL_PERMUTATIONS_ENABLED", "0" });
     MaterialShaderPermutation ubershader{ .ShaderFilePath = m_relativeShaderSourcePath, .Macros = macros };
     InitializeStableShaderIdentity(ubershader);
@@ -1364,7 +1363,7 @@ void MaterialsBaker::BakeShaderPermutations()
     }
 }
 
-void MaterialsBaker::CreateRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* bindlessLayout, std::shared_ptr<engine::CommonRenderPasses> commonPasses, const std::shared_ptr<ExtendedScene>& scene, const std::filesystem::path& sceneFilePath, const std::filesystem::path & mediaPath )
+void MaterialsBaker::CreateRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* bindlessLayout, std::shared_ptr<caustica::CommonRenderPasses> commonPasses, const std::shared_ptr<ExtendedScene>& scene, const std::filesystem::path& sceneFilePath, const std::filesystem::path & mediaPath )
 {
     assert(!mediaPath.empty());
     //m_bindlessLayout = bindlessLayout;
@@ -1442,7 +1441,7 @@ void MaterialsBaker::CreateRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* b
                 auto existing = materialsPTUniqueNames.find(keyName);
                 if (existing != materialsPTUniqueNames.end() )
                 {
-                    donut::log::warning("Potential error while loading/converting materials for scene '%s' - there are at least two materials with the same name key '%s'.\nThis is not supported and will result in errors.\nIt's possible to fix some name collisions by including Material::materialIndexInModel into the name.",
+                    caustica::warning("Potential error while loading/converting materials for scene '%s' - there are at least two materials with the same name key '%s'.\nThis is not supported and will result in errors.\nIt's possible to fix some name collisions by including Material::materialIndexInModel into the name.",
                         sceneFilePath.string().c_str(), keyName.c_str());
                 }
                 else
@@ -1461,7 +1460,7 @@ void MaterialsBaker::CreateRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* b
         std::sort(m_materials.begin(), m_materials.end(), [](const auto & a, const auto & b) { return a->Name < b->Name; } );
 
         if (initializedFromDonutCount > 0)
-            donut::log::warning("There were %d materials not found in RTXPT material materials folder '%s'; consider doing Scene->Materials->Advanced->Save", initializedFromDonutCount, m_materialsPath.string().c_str());
+            caustica::warning("There were %d materials not found in RTXPT material materials folder '%s'; consider doing Scene->Materials->Advanced->Save", initializedFromDonutCount, m_materialsPath.string().c_str());
 
         m_deferredTextureLoadInProgress = true;
     }
@@ -1483,7 +1482,7 @@ void MaterialsBaker::CreateRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* b
 }
 
 // NOTE: this also handles some of the geometry data and mixed geometry&material stuff - it might be a good idea to rethink whether it needs to live outside of material baker
-void UpdateSubInstanceData(SubInstanceData & ret, const std::shared_ptr<ExtendedScene> & scene, const donut::engine::MeshInstance& meshInstance, const donut::engine::MeshGeometry& geometry, uint meshGeometryIndex, const PTMaterial& material)
+void UpdateSubInstanceData(SubInstanceData & ret, const std::shared_ptr<ExtendedScene> & scene, const caustica::MeshInstance& meshInstance, const caustica::MeshGeometry& geometry, uint meshGeometryIndex, const PTMaterial& material)
 {
     bool alphaTest = material.HasAlphaTest();
 
@@ -1596,7 +1595,7 @@ void MaterialsBaker::LoadAll(std::unordered_map<std::string, std::shared_ptr<PTM
     std::ifstream inFile(m_sceneMaterialsFilePath);
 
     if (!inFile.is_open())
-        { donut::log::warning("No RTXPT material definition file found at '%s' - consider doing Scene->Materials->Advanced->Save", m_sceneMaterialsFilePath.string().c_str()); return; }
+        { caustica::warning("No RTXPT material definition file found at '%s' - consider doing Scene->Materials->Advanced->Save", m_sceneMaterialsFilePath.string().c_str()); return; }
 
     Json::Value rootJ;
     inFile >> rootJ;
@@ -1604,23 +1603,23 @@ void MaterialsBaker::LoadAll(std::unordered_map<std::string, std::shared_ptr<PTM
     int version = -1;
     rootJ["RTXPTMaterials"]["version"] >> version;
     if (version != 1)
-        { donut::log::warning("Malformed or unsupported RTXPT material definition file version '%s' - consider doing Scene->Materials->Advanced->Save", m_sceneMaterialsFilePath.string().c_str()); return; }
+        { caustica::warning("Malformed or unsupported RTXPT material definition file version '%s' - consider doing Scene->Materials->Advanced->Save", m_sceneMaterialsFilePath.string().c_str()); return; }
 
     Json::Value materialsJ;
 
     materialsJ = rootJ["materials"];
     if (materialsJ.empty() || !materialsJ.isArray())
-        { donut::log::warning("Malformed or empty material definition file '%s' - consider doing Scene->Materials->Advanced->Save", m_sceneMaterialsFilePath.string().c_str()); return; }
+        { caustica::warning("Malformed or empty material definition file '%s' - consider doing Scene->Materials->Advanced->Save", m_sceneMaterialsFilePath.string().c_str()); return; }
 
     for ( Json::Value materialJ : materialsJ )
     {
         std::shared_ptr<PTMaterial> materialPT = materialPT->FromJson(materialJ, m_mediaPath, m_textureCache);
         if (materialPT == nullptr)
-            { donut::log::warning("Error while reading material in material definition file '%s'", m_sceneMaterialsFilePath.string().c_str()); continue; }
+            { caustica::warning("Error while reading material in material definition file '%s'", m_sceneMaterialsFilePath.string().c_str()); continue; }
         
         auto existing = container.find(materialPT->Name);
         if (existing != container.end())
-            { donut::log::warning("Duplicated materials with name '%s' found in material definition file '%s' - subsequent instances ignored.", materialPT->Name.c_str(), m_sceneMaterialsFilePath.string().c_str()); assert( false ); continue; }
+            { caustica::warning("Duplicated materials with name '%s' found in material definition file '%s' - subsequent instances ignored.", materialPT->Name.c_str(), m_sceneMaterialsFilePath.string().c_str()); assert( false ); continue; }
         else
             container.insert( make_pair(materialPT->Name, materialPT) );
     }
@@ -1633,7 +1632,7 @@ bool MaterialsBaker::LoadSingle(PTMaterialBase & material)
     Json::Value rootJ;
     if ( !LoadJsonFromFile(inPath, rootJ) )
     {
-        donut::log::warning("No RTXPT material definition file found '%s'- consider doing Scene->Materials->Advanced->Save All", inPath.string().c_str());
+        caustica::warning("No RTXPT material definition file found '%s'- consider doing Scene->Materials->Advanced->Save All", inPath.string().c_str());
         return false;
     }
     assert( material.Name != "" );
@@ -1663,7 +1662,7 @@ bool MaterialsBaker::SaveSingle(PTMaterialBase & material)
     std::ofstream outFile(outPath, std::ios::trunc);
     if (!outFile.is_open())
     {
-        log::error("Error attempting to save material to file '%s'", outPath.c_str());
+        caustica::error("Error attempting to save material to file '%s'", outPath.c_str());
         return false;
     }
 
@@ -1752,7 +1751,7 @@ bool MaterialsBaker::DebugGUI(float indent)
 
 MaterialShaderPermutation PTMaterial::ComputeShaderPermutation(const std::string& defaultShaderPath)
 {
-    std::vector<donut::engine::ShaderMacro> macros;
+    std::vector<caustica::ShaderMacro> macros;
     macros.push_back({ "RTXPT_MATERIAL_PERMUTATIONS_ENABLED", "1" });
 
     PTMaterialData data; FillData(data);

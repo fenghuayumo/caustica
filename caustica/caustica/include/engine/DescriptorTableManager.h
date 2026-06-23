@@ -26,7 +26,7 @@
 #include <unordered_map>
 #include <memory>
 
-namespace donut::engine
+namespace caustica
 {
     class DescriptorTableManager;
     typedef int DescriptorIndex;

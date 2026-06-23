@@ -27,7 +27,7 @@
 #include <memory>
 
 
-namespace donut::engine
+namespace caustica
 {
     class ShaderFactory;
     class ShadowMap;
@@ -39,7 +39,7 @@ namespace donut::engine
 
 struct ProceduralSkyShaderParameters;
 
-namespace donut::render
+namespace caustica::render
 {
     struct SkyParameters
     {
@@ -64,24 +64,24 @@ namespace donut::render
         nvrhi::BindingSetHandle m_RenderBindingSet;
         nvrhi::GraphicsPipelineHandle m_RenderPso;
         
-        std::shared_ptr<engine::FramebufferFactory> m_FramebufferFactory;
+        std::shared_ptr<caustica::FramebufferFactory> m_FramebufferFactory;
 
     public:
         SkyPass(
             nvrhi::IDevice* device,
-            const std::shared_ptr<engine::ShaderFactory>& shaderFactory,
-            const std::shared_ptr<engine::CommonRenderPasses>& commonPasses,
-            const std::shared_ptr<engine::FramebufferFactory>& framebufferFactory,
-            const engine::ICompositeView& compositeView);
+            const std::shared_ptr<caustica::ShaderFactory>& shaderFactory,
+            const std::shared_ptr<caustica::CommonRenderPasses>& commonPasses,
+            const std::shared_ptr<caustica::FramebufferFactory>& framebufferFactory,
+            const caustica::ICompositeView& compositeView);
 
         void Render(
             nvrhi::ICommandList* commandList,
-            const engine::ICompositeView& compositeView,
-            const engine::DirectionalLight& light,
+            const caustica::ICompositeView& compositeView,
+            const caustica::DirectionalLight& light,
             const SkyParameters& params) const;
 
         static void FillShaderParameters(
-            const engine::DirectionalLight& light,
+            const caustica::DirectionalLight& light,
             const SkyParameters& input,
             ProceduralSkyShaderParameters& output);
     };

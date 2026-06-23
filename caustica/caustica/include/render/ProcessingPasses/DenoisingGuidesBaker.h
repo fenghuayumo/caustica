@@ -17,7 +17,7 @@
 
 enum class DebugViewType;
 
-namespace donut::engine
+namespace caustica
 {
     class ShaderFactory;
 }
@@ -29,7 +29,7 @@ class DenoisingGuidesBaker
 {
 public:
 
-    DenoisingGuidesBaker( nvrhi::IDevice* device, std::shared_ptr<donut::engine::ShaderFactory> shaderFactory, const std::unique_ptr<RenderTargets> & renderTargets, const std::shared_ptr<ShaderDebug> & shaderDebug, nvrhi::BindingLayoutHandle globalBindingLayout );
+    DenoisingGuidesBaker( nvrhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory, const std::unique_ptr<RenderTargets> & renderTargets, const std::shared_ptr<ShaderDebug> & shaderDebug, nvrhi::BindingLayoutHandle globalBindingLayout );
     ~DenoisingGuidesBaker( );
 
 public:
@@ -48,7 +48,7 @@ private:
     ComputePass                     m_csDebugViz;
 
     nvrhi::BindingLayoutHandle      m_bindingLayout;
-    donut::engine::BindingCache     m_bindingCache;
+    caustica::BindingCache     m_bindingCache;
 
     const std::unique_ptr<RenderTargets> & m_renderTargets;
     const std::shared_ptr<ShaderDebug> & m_shaderDebug;

@@ -45,10 +45,10 @@
 #endif
 #endif
 
-using namespace donut::math;
+using namespace caustica::math;
 #include <shaders/blit_cb.h>
 
-using namespace donut::engine;
+using namespace caustica;
 
 CommonRenderPasses::CommonRenderPasses(nvrhi::IDevice* device, std::shared_ptr<ShaderFactory> shaderFactory)
     : m_Device(device)

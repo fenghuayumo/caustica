@@ -188,7 +188,7 @@ typedef enum DXGI_FORMAT
 #endif /* defined(MAKEFOURCC) */
 
 
-namespace donut::engine::dds
+namespace caustica::dds
 {
 #pragma pack(push,1)
 

@@ -19,7 +19,7 @@
 
 #include "ShaderCompilerUtils.h"
 
-namespace donut::vfs
+namespace caustica
 {
     class RootFileSystem;
 }
@@ -38,7 +38,7 @@ public:
     std::shared_ptr<ComputeShaderVariant> CreateVariant(
         const std::string& shaderSourcePath,
         const std::string& entryPoint,
-        const std::vector<donut::engine::ShaderMacro>& macros,
+        const std::vector<caustica::ShaderMacro>& macros,
         const nvrhi::BindingLayoutVector& bindingLayouts,
         const std::string& debugName);
 
@@ -67,7 +67,7 @@ private:
     const std::filesystem::path& GetShadersPathExternalIncludes1() const { return m_compilerConfig.ShadersPathExternalIncludes1; }
     const std::filesystem::path& GetShadersPathExternalIncludes2() const { return m_compilerConfig.ShadersPathExternalIncludes2; }
     
-    std::shared_ptr<donut::vfs::RootFileSystem> GetFS() { return m_shadersFS; }
+    std::shared_ptr<caustica::RootFileSystem> GetFS() { return m_shadersFS; }
     std::mutex& GetMutex() { return m_mutex; }
 
     int64_t GetVersion() const { return m_version; }
@@ -77,7 +77,7 @@ private:
 
 private:
     nvrhi::DeviceHandle m_device;
-    std::shared_ptr<donut::vfs::RootFileSystem> m_shadersFS;
+    std::shared_ptr<caustica::RootFileSystem> m_shadersFS;
     
     ShaderCompilerUtils::ShaderCompilerConfig m_compilerConfig;
     
@@ -87,7 +87,7 @@ private:
     std::vector<ComputeShaderVariant*> m_parallelCompileListAll;
     std::unordered_map<std::string, ComputeShaderVariant*> m_parallelCompileListUnique;
     
-    donut::engine::ThreadPool m_threadPool;
+    caustica::ThreadPool m_threadPool;
     
     std::optional<std::filesystem::file_time_type> m_lastUpdatedSourceTimestamp;
     
@@ -129,7 +129,7 @@ private:
     ComputeShaderVariant(
         const std::string& shaderSourcePath,
         const std::string& entryPoint,
-        const std::vector<donut::engine::ShaderMacro>& macros,
+        const std::vector<caustica::ShaderMacro>& macros,
         const nvrhi::BindingLayoutVector& bindingLayouts,
         const std::string& debugName,
         const std::shared_ptr<ComputePipelineBaker>& baker);
@@ -153,7 +153,7 @@ private:
     // Shader source info
     std::filesystem::path m_shaderSrcFileName;
     std::string m_entryPoint;
-    std::vector<donut::engine::ShaderMacro> m_macros;
+    std::vector<caustica::ShaderMacro> m_macros;
     nvrhi::BindingLayoutVector m_bindingLayouts;
     std::string m_debugName;
 

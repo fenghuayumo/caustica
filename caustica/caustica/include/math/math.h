@@ -22,8 +22,8 @@
 
 #pragma once
 
-namespace donut::math {}
-namespace dm = donut::math;
+namespace caustica::math {}
+namespace dm = caustica::math;
 
 #include "basics.h"
 #include "vector.h"

@@ -33,7 +33,7 @@
 #include <nvrhi/d3d12.h>
 #include <nvrhi/validation.h>
 
-class DeviceManager_DX12 : public donut::app::DeviceManager
+class DeviceManager_DX12 : public caustica::DeviceManager
 {
 protected:
     nvrhi::RefCountPtr<IDXGIFactory2>               m_DxgiFactory2;
@@ -82,7 +82,7 @@ public:
     }
 
     void ReportLiveObjects() override;
-    bool EnumerateAdapters(std::vector<donut::app::AdapterInfo>& outAdapters) override;
+    bool EnumerateAdapters(std::vector<caustica::AdapterInfo>& outAdapters) override;
 
     nvrhi::GraphicsAPI GetGraphicsAPI() const override
     {

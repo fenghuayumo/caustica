@@ -24,7 +24,7 @@
 
 #include <core/vfs/VFS.h>
 
-namespace donut::vfs
+namespace caustica
 {
     /*
 

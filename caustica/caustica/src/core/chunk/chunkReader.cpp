@@ -30,7 +30,7 @@
 #include <memory>
 #include <vector>
 
-namespace donut::chunk
+namespace caustica::chunk
 {
 
 // helper class to deserialize chunks blob
@@ -115,7 +115,7 @@ bool ChunkReader::loadMeshInfosChunk_0x100(
                     return false;
                 break;
             default:
-                log::error("incorrect meshinfo type in asset '%s'", cfile->getFilePath().c_str());
+                caustica::error("incorrect meshinfo type in asset '%s'", cfile->getFilePath().c_str());
                 return false;
         }
 
@@ -150,7 +150,7 @@ bool ChunkReader::loadMeshInfosChunk_0x100(
         return true;
     }
     else
-        log::error("bad MeshInfo chunk in asset '%s'", cfile->getFilePath().c_str());
+        caustica::error("bad MeshInfo chunk in asset '%s'", cfile->getFilePath().c_str());
 
     return false;
 }
@@ -183,7 +183,7 @@ bool ChunkReader::loadMeshInstancesChunk_0x100(
         return true;
     }
     else
-        log::error("bad MeshInstance chunk in asset '%s'", cfile->getFilePath().c_str());
+        caustica::error("bad MeshInstance chunk in asset '%s'", cfile->getFilePath().c_str());
 
     return false;
 }
@@ -212,7 +212,7 @@ bool ChunkReader::loadMeshNodesChunk_0x100(
         return true;
     }
     else
-        log::error("bad MeshNode chunk in asset '%s'", cfile->getFilePath().c_str());
+        caustica::error("bad MeshNode chunk in asset '%s'", cfile->getFilePath().c_str());
 
     return false;
 }
@@ -235,32 +235,32 @@ bool ChunkReader::loadStreamChunk_0x100(ChunkId chunkId, StreamHandle * handle) 
 
         if (desc.getType()!=handle->type)
         {
-            log::error("datastream chunk (%d) : bad type in asset '%s'",
+            caustica::error("datastream chunk (%d) : bad type in asset '%s'",
                 chunkId, cfile->getFilePath().c_str());
             return false;
         }
         if (desc.getVary()!=handle->vary)
         {
-            log::error("datastream chunk (%d) : bad vertex vary in asset '%s'",
+            caustica::error("datastream chunk (%d) : bad vertex vary in asset '%s'",
                 chunkId, cfile->getFilePath().c_str());
             return false;
         }
 
         if (desc.getSemantic()!=handle->semantic)
         {
-            log::error("datastream chunk (%d) : bad semantic in asset '%s'",
+            caustica::error("datastream chunk (%d) : bad semantic in asset '%s'",
                 chunkId, cfile->getFilePath().c_str());
             return false;
         }
         if (handle->elemSize!=0 && desc.elemSize!=handle->elemSize)
         {
-            log::error("datastream chunk (%d) : bad elemSize in asset '%s'",
+            caustica::error("datastream chunk (%d) : bad elemSize in asset '%s'",
                 chunkId, cfile->getFilePath().c_str());
             return false;
         }
         if (handle->elemCount!=0 && desc.elemCount!=handle->elemCount)
         {
-            log::error("datastream chunk (%d) : bad elemCount in asset '%s'",
+            caustica::error("datastream chunk (%d) : bad elemCount in asset '%s'",
                 chunkId, cfile->getFilePath().c_str());
             return false;
         }
@@ -271,7 +271,7 @@ bool ChunkReader::loadStreamChunk_0x100(ChunkId chunkId, StreamHandle * handle) 
         return true;
     }
     else
-        log::error("Chunk deserialize : invalid ChunkId for stream in asset '%s'",
+        caustica::error("Chunk deserialize : invalid ChunkId for stream in asset '%s'",
             cfile->getFilePath().c_str());
 
     return false;
@@ -303,7 +303,7 @@ std::shared_ptr<MeshSetBase> ChunkReader::loadMeshSetChunk_0x100(Chunk const * c
             break;
 
         default:
-            log::error("incorrect Set type (%d)", stype);
+            caustica::error("incorrect Set type (%d)", stype);
             return nullptr;
     }
 
@@ -312,21 +312,21 @@ std::shared_ptr<MeshSetBase> ChunkReader::loadMeshSetChunk_0x100(Chunk const * c
 
     StreamHandle handle;
 
-    handle = {"Position", FP32, VERTEX, POSITION, 0, sizeof(donut::math::float3), nullptr};
+    handle = {"Position", FP32, VERTEX, POSITION, 0, sizeof(caustica::math::float3), nullptr};
     if (loadStreamChunk_0x100(desc.streamChunkIds[Desc::POSITIONS], &handle))
     {
-        mset->streams.position = (donut::math::float3 const *)handle.data;
+        mset->streams.position = (caustica::math::float3 const *)handle.data;
         mset->nverts = (uint32_t)handle.elemCount;
     } else
         return nullptr;
 
-    handle = {"TexCoord0", FP32, VERTEX, TEXCOORD, mset->nverts, sizeof(donut::math::float2), nullptr};
+    handle = {"TexCoord0", FP32, VERTEX, TEXCOORD, mset->nverts, sizeof(caustica::math::float2), nullptr};
     if (loadStreamChunk_0x100(desc.streamChunkIds[Desc::TEXCOORDS0], &handle))
-        mset->streams.texcoord0 = (donut::math::float2 const *)handle.data;
+        mset->streams.texcoord0 = (caustica::math::float2 const *)handle.data;
 
-    handle = {"TexCoord1", FP32, VERTEX, TEXCOORD, mset->nverts, sizeof(donut::math::float2), nullptr};
+    handle = {"TexCoord1", FP32, VERTEX, TEXCOORD, mset->nverts, sizeof(caustica::math::float2), nullptr};
     if (loadStreamChunk_0x100(desc.streamChunkIds[Desc::TEXCOORDS1], &handle))
-        mset->streams.texcoord1 = (donut::math::float2 const *)handle.data;
+        mset->streams.texcoord1 = (caustica::math::float2 const *)handle.data;
 
     handle = {"Normal", UINT32, VERTEX, NORMAL, mset->nverts, sizeof(uint32_t), nullptr};
     if (loadStreamChunk_0x100(desc.streamChunkIds[Desc::NORMALS], &handle))
@@ -405,7 +405,7 @@ std::shared_ptr<MeshSetBase> ChunkReader::loadMeshSetChunk_0x100(Chunk const * c
 //
 
 std::shared_ptr<MeshSetBase const> deserialize(
-    std::weak_ptr<donut::vfs::IBlob const> iblob, char const * assetpath)
+    std::weak_ptr<caustica::IBlob const> iblob, char const * assetpath)
 {
 
     ChunkReader reader;
@@ -420,7 +420,7 @@ std::shared_ptr<MeshSetBase const> deserialize(
             reader.cfile->getChunks(CHUNKTYPE_STRINGS_TABLE, chunks);
             if (chunks.size()!=1)
             {
-                log::error("Chunk deserialize : invalid number of"
+                caustica::error("Chunk deserialize : invalid number of"
                     " string table chunks in asset '%s'", assetpath);
                 return nullptr;
             }
@@ -431,7 +431,7 @@ std::shared_ptr<MeshSetBase const> deserialize(
             reader.cfile->getChunks(CHUNKTYPE_MESHSET, chunks);
             if (chunks.size()!=1)
             {
-                log::error("Chunk deserialize : invalid number of"
+                caustica::error("Chunk deserialize : invalid number of"
                     " meshset chunks in asset '%s'", assetpath);
                 return nullptr;
             }
@@ -447,7 +447,7 @@ std::shared_ptr<MeshSetBase const> deserialize(
     }
     else
     {
-        log::error("Chunk deserialize : invalid data blob in asset '%s'", assetpath);
+        caustica::error("Chunk deserialize : invalid data blob in asset '%s'", assetpath);
     }
     return nullptr;
 }

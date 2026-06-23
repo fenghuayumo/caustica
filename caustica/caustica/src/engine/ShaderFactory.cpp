@@ -30,8 +30,8 @@
 #endif
 
 using namespace std;
-using namespace donut::vfs;
-using namespace donut::engine;
+using namespace caustica;
+using namespace caustica;
 
 ShaderFactory::ShaderFactory(nvrhi::DeviceHandle rendererInterface,
 	std::shared_ptr<IFileSystem> fs,
@@ -88,7 +88,7 @@ std::shared_ptr<IBlob> ShaderFactory::GetBytecode(const char* fileName, const ch
 
     if (!data)
     {
-        log::error("Couldn't read the binary file for shader %s from %s", fileName, shaderFilePath.generic_string().c_str());
+        caustica::error("Couldn't read the binary file for shader %s from %s", fileName, shaderFilePath.generic_string().c_str());
         return nullptr;
     }
 
@@ -142,7 +142,7 @@ nvrhi::ShaderHandle ShaderFactory::CreateStaticShader(StaticShader shader, const
     if (!ShaderMake::FindPermutationInBlob(shader.pBytecode, shader.size, constants.data(), uint32_t(constants.size()), &permutationBytecode, &permutationSize))
     {
         const std::string message = ShaderMake::FormatShaderNotFoundMessage(shader.pBytecode, shader.size, constants.data(), uint32_t(constants.size()));
-        log::error("%s", message.c_str());
+        caustica::error("%s", message.c_str());
         
         return nullptr;
     }
@@ -196,7 +196,7 @@ nvrhi::ShaderLibraryHandle ShaderFactory::CreateStaticShaderLibrary(StaticShader
     if (!ShaderMake::FindPermutationInBlob(shader.pBytecode, shader.size, constants.data(), uint32_t(constants.size()), &permutationBytecode, &permutationSize))
     {
         const std::string message = ShaderMake::FormatShaderNotFoundMessage(shader.pBytecode, shader.size, constants.data(), uint32_t(constants.size()));
-        log::error("%s", message.c_str());
+        caustica::error("%s", message.c_str());
 
         return nullptr;
     }
@@ -250,7 +250,7 @@ nvrhi::ShaderLibraryHandle ShaderFactory::CreateAutoShaderLibrary(const char* fi
     return CreateShaderLibrary(fileName, pDefines);
 }
 
-std::pair<const void*, size_t> donut::engine::ShaderFactory::FindShaderFromHash(uint64_t hash, std::function<uint64_t(std::pair<const void*, size_t>, nvrhi::GraphicsAPI)> hashGenerator)
+std::pair<const void*, size_t> caustica::ShaderFactory::FindShaderFromHash(uint64_t hash, std::function<uint64_t(std::pair<const void*, size_t>, nvrhi::GraphicsAPI)> hashGenerator)
 {
     for (auto& entry : m_BytecodeCache)
     {
@@ -270,10 +270,10 @@ std::pair<const void*, size_t> donut::engine::ShaderFactory::FindShaderFromHash(
                 permutationConstants.clear();
                 permutationDefines.clear();
                 // split the string by spaces to get individual defines
-                std::vector<std::string> permutationStrings = donut::string_utils::split(permutation, " ");
+                std::vector<std::string> permutationStrings = caustica::string_utils::split(permutation, " ");
                 for (auto& s : permutationStrings)
                 {
-                    std::vector<std::string> keyValue = donut::string_utils::split(s, "=");
+                    std::vector<std::string> keyValue = caustica::string_utils::split(s, "=");
                     permutationDefines[keyValue[0]] = keyValue[1];
                 }
                 // now that we have processed all defines in this permutation, can create the shader constants

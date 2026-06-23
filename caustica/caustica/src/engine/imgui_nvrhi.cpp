@@ -68,8 +68,8 @@ SOFTWARE.
 #endif
 #endif
 
-using namespace donut::engine;
-using namespace donut::app;
+using namespace caustica;
+using namespace caustica;
 
 struct VERTEX_CONSTANT_BUFFER
 {
@@ -131,7 +131,7 @@ bool ImGui_NVRHI::init(nvrhi::IDevice* device, std::shared_ptr<ShaderFactory> sh
     
     if (!vertexShader || !pixelShader)
     {
-        log::error("Failed to create an ImGUI shader");
+        caustica::error("Failed to create an ImGUI shader");
         return false;
     } 
 

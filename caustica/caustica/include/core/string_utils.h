@@ -35,7 +35,7 @@
 
 // A set of thread-safe string manipulation functions
 
-namespace donut::string_utils {
+namespace caustica::string_utils {
 
 	// case-insensitive string comparison
 
@@ -188,13 +188,13 @@ namespace donut::string_utils {
 	
 	template <typename T> bool istrue(T const& s)
 	{
-		namespace ds = donut::string_utils;
+		namespace ds = caustica::string_utils;
 		return ds::strcasecmp(s, T("true")) || ds::strcasecmp(s, T("on")) || ds::strcasecmp(s, T("yes")) || ds::strcasecmp(s, T("1"));
 	}
 
 	template <typename T> bool isfalse(T const& s)
 	{
-		namespace ds = donut::string_utils;
+		namespace ds = caustica::string_utils;
 		return ds::strcasecmp(s, T("false")) || ds::strcasecmp(s, T("off")) || ds::strcasecmp(s, T("no")) || ds::strcasecmp(s, T("0"));
 	}
 
@@ -222,7 +222,7 @@ namespace donut::string_utils {
 
 	template <typename T> std::optional<T> parse(std::string_view s)
 	{
-		namespace ds = donut::string_utils;
+		namespace ds = caustica::string_utils;
 
 		trim(s);		
 		if (ds::strcasencmp(s, std::string_view("0x"), 2)) 
@@ -310,6 +310,6 @@ namespace donut::string_utils {
 
 
 
-} // end namespace donut::string_utils
+} // end namespace caustica::string_utils
 
-namespace ds = donut::string_utils;
+namespace ds = caustica::string_utils;

@@ -25,11 +25,11 @@
 #include <core/json.h>
 #include <json/json-forwards.h>
 
-using namespace donut::math;
+using namespace caustica::math;
 #include <shaders/light_cb.h>
 #include <shaders/bindless.h>
 
-using namespace donut::engine;
+using namespace caustica;
 
 void Light::FillLightConstants(LightConstants& lightConstants) const
 {
@@ -315,7 +315,7 @@ bool PointLight::SetProperty(const std::string& name, const dm::float4& value)
     return Light::SetProperty(name, value);
 }
 
-nvrhi::VertexAttributeDesc donut::engine::GetVertexAttributeDesc(VertexAttribute attribute, const char* name, uint32_t bufferIndex)
+nvrhi::VertexAttributeDesc caustica::GetVertexAttributeDesc(VertexAttribute attribute, const char* name, uint32_t bufferIndex)
 {
     nvrhi::VertexAttributeDesc result = {};
     result.name = name;
@@ -361,7 +361,7 @@ nvrhi::VertexAttributeDesc donut::engine::GetVertexAttributeDesc(VertexAttribute
     return result;
 }
 
-const char* donut::engine::MaterialDomainToString(MaterialDomain domain)
+const char* caustica::MaterialDomainToString(MaterialDomain domain)
 {
     switch (domain)
     {

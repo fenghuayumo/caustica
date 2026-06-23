@@ -56,11 +56,11 @@
 #endif
 #endif
 
-using namespace donut::math;
+using namespace caustica::math;
 #include <shaders/gbuffer_cb.h>
 
-using namespace donut::engine;
-using namespace donut::render;
+using namespace caustica;
+using namespace caustica::render;
 
 GBufferFillPass::GBufferFillPass(nvrhi::IDevice* device, std::shared_ptr<CommonRenderPasses> commonPasses)
     : m_Device(device)
@@ -287,7 +287,7 @@ ViewType::Enum GBufferFillPass::GetSupportedViewTypes() const
     return m_SupportedViewTypes;
 }
 
-void GBufferFillPass::SetupView(GeometryPassContext& abstractContext, nvrhi::ICommandList* commandList, const engine::IView* view, const engine::IView* viewPrev)
+void GBufferFillPass::SetupView(GeometryPassContext& abstractContext, nvrhi::ICommandList* commandList, const caustica::IView* view, const caustica::IView* viewPrev)
 {
     auto& context = static_cast<Context&>(abstractContext);
     
@@ -300,7 +300,7 @@ void GBufferFillPass::SetupView(GeometryPassContext& abstractContext, nvrhi::ICo
     context.keyTemplate.bits.reverseDepth = view->IsReverseDepth();
 }
 
-bool GBufferFillPass::SetupMaterial(GeometryPassContext& abstractContext, const engine::Material* material, nvrhi::RasterCullMode cullMode, nvrhi::GraphicsState& state)
+bool GBufferFillPass::SetupMaterial(GeometryPassContext& abstractContext, const caustica::Material* material, nvrhi::RasterCullMode cullMode, nvrhi::GraphicsState& state)
 {
     auto& context = static_cast<Context&>(abstractContext);
     
@@ -353,7 +353,7 @@ bool GBufferFillPass::SetupMaterial(GeometryPassContext& abstractContext, const 
     return true;
 }
 
-void GBufferFillPass::SetupInputBuffers(GeometryPassContext& abstractContext, const engine::BufferGroup* buffers, nvrhi::GraphicsState& state)
+void GBufferFillPass::SetupInputBuffers(GeometryPassContext& abstractContext, const caustica::BufferGroup* buffers, nvrhi::GraphicsState& state)
 {
     auto& context = static_cast<Context&>(abstractContext);
 
@@ -424,7 +424,7 @@ nvrhi::BindingSetHandle GBufferFillPass::GetOrCreateInputBindingSet(const Buffer
 }
 
 void GBufferFillPass::SetPushConstants(
-    donut::render::GeometryPassContext& abstractContext,
+    caustica::render::GeometryPassContext& abstractContext,
     nvrhi::ICommandList* commandList,
     nvrhi::GraphicsState& state,
     nvrhi::DrawArguments& args)
@@ -450,7 +450,7 @@ void GBufferFillPass::SetPushConstants(
 }
 
 void MaterialIDPass::Init(
-    engine::ShaderFactory& shaderFactory,
+    caustica::ShaderFactory& shaderFactory,
     const CreateParameters& params)
 {
     CreateParameters paramsCopy = params;
@@ -462,7 +462,7 @@ void MaterialIDPass::Init(
     GBufferFillPass::Init(shaderFactory, paramsCopy);
 }
 
-nvrhi::ShaderHandle MaterialIDPass::CreatePixelShader(engine::ShaderFactory& shaderFactory, const CreateParameters& params, bool alphaTested)
+nvrhi::ShaderHandle MaterialIDPass::CreatePixelShader(caustica::ShaderFactory& shaderFactory, const CreateParameters& params, bool alphaTested)
 {
     std::vector<ShaderMacro> PixelShaderMacros;
     PixelShaderMacros.push_back(ShaderMacro("ALPHA_TESTED", alphaTested ? "1" : "0"));

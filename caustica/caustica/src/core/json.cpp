@@ -39,17 +39,17 @@ this software is released into the Public Domain.
 #include <core/log.h>
 #include <json/json-forwards.h>
 
-using namespace donut::math;
-using namespace donut::vfs;
+using namespace caustica::math;
+using namespace caustica;
 
-namespace donut::json
+namespace caustica::json
 {
     bool LoadFromFile(IFileSystem& fs, const std::filesystem::path& jsonFileName, Json::Value& documentRoot)
     {
         std::shared_ptr<IBlob> data = fs.readFile(jsonFileName);
         if (!data)
         {
-            log::error("Couldn't read file %s", jsonFileName.generic_string().c_str());
+            caustica::error("Couldn't read file %s", jsonFileName.generic_string().c_str());
             return false;
         }
 
@@ -63,7 +63,7 @@ namespace donut::json
 
         if (!success)
         {
-            log::error("Couldn't parse JSON file %s:\n%s", jsonFileName.generic_string().c_str(), errors.c_str());
+            caustica::error("Couldn't parse JSON file %s:\n%s", jsonFileName.generic_string().c_str(), errors.c_str());
         }
 
         delete reader;

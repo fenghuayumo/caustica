@@ -31,7 +31,7 @@
 #include <vulkan/vulkan.hpp>
 #endif
 
-namespace donut::app
+namespace caustica
 {
 
 // Implementation for StreamlineInterface interface, so that sl types are not exposed to the rest of the app
@@ -76,14 +76,14 @@ public:
 
     virtual void TagResourcesGeneral(
         nvrhi::ICommandList* commandList,
-        const donut::engine::IView* view,
+        const caustica::IView* view,
         nvrhi::ITexture* motionVectors,
         nvrhi::ITexture* depth,
         nvrhi::ITexture* finalColorHudless) override;
 
     virtual void TagResourcesDLSSNIS(
         nvrhi::ICommandList* commandList,
-        const donut::engine::IView* view,
+        const caustica::IView* view,
         nvrhi::ITexture* output,
         nvrhi::ITexture* input) override;
 
@@ -94,7 +94,7 @@ public:
 
     virtual void TagResourcesDeepDVC(
         nvrhi::ICommandList* commandList,
-        const donut::engine::IView* view,
+        const caustica::IView* view,
         nvrhi::ITexture* output) override;
 
     virtual void UnTagResourcesDeepDVC() override;
@@ -106,7 +106,7 @@ public:
     //   documentation for more detail.
     virtual void TagResourcesDLSSRR(
         nvrhi::ICommandList* commandList,
-        const donut::engine::IView* view,
+        const caustica::IView* view,
         dm::int2 renderSize,
         dm::int2 displaySize,
         nvrhi::ITexture* inputColor,
@@ -222,6 +222,6 @@ public:
 #endif
 };
 
-} // namespace donut::app
+} // namespace caustica
 
 #endif

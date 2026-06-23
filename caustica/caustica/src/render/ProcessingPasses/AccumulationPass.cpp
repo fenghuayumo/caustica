@@ -14,11 +14,11 @@
 #include <engine/View.h>
 #include <core/log.h>
 
-using namespace donut::math;
+using namespace caustica::math;
 
 #include <shaders/render/ProcessingPasses/AccumulationPass.hlsl>
 
-using namespace donut::engine;
+using namespace caustica;
 
 
 AccumulationPass::AccumulationPass(nvrhi::IDevice* device, std::shared_ptr<ShaderFactory> shaderFactory)
@@ -71,8 +71,8 @@ void AccumulationPass::CreateBindingSet(nvrhi::ITexture* inputTexture, nvrhi::IT
 
 void AccumulationPass::Render(
     nvrhi::ICommandList* commandList,
-    const donut::engine::IView& sourceView,
-    const donut::engine::IView& upscaledView,
+    const caustica::IView& sourceView,
+    const caustica::IView& upscaledView,
     float accumulationWeight)
 {
     commandList->beginMarker("Accumulation");

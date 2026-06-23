@@ -31,7 +31,7 @@
 #define ftello _ftelli64
 #endif
 
-using namespace donut::vfs;
+using namespace caustica;
 
 struct header_posix_ustar
 {
@@ -119,7 +119,7 @@ TarFile::TarFile(const std::filesystem::path& archivePath)
             // validate the size
             if (currentPosition + fileSize > archiveSize)
             {
-                log::warning("Malformed tar archive '%s': file '%s' size (%ull bytes) exceeds the archive range",
+                caustica::warning("Malformed tar archive '%s': file '%s' size (%ull bytes) exceeds the archive range",
                     m_ArchivePath.c_str(), fileName, fileSize);
                 errors = true;
                 break;
@@ -197,7 +197,7 @@ std::shared_ptr<IBlob> TarFile::readFile(const std::filesystem::path& name)
     
     if (fseeko(m_ArchiveFile, entry->second.offset, SEEK_SET) != 0)
     {
-        log::warning("Error seeking to offset %ull for file '%s' in tar archive '%s'",
+        caustica::warning("Error seeking to offset %ull for file '%s' in tar archive '%s'",
             entry->second.offset, normalizedName.c_str(), m_ArchivePath.c_str());
         return nullptr;
     }
@@ -211,7 +211,7 @@ std::shared_ptr<IBlob> TarFile::readFile(const std::filesystem::path& name)
 
     if (sizeRead != entry->second.size)
     {
-        log::warning("Error reading file '%s' (%ull bytes) from tar archive '%s'", 
+        caustica::warning("Error reading file '%s' (%ull bytes) from tar archive '%s'", 
             entry->second.size, normalizedName.c_str(), m_ArchivePath.c_str());
         free(data);
         return nullptr;

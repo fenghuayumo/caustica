@@ -40,11 +40,11 @@ this software is released into the Public Domain.
 #include <json/json-forwards.h>
 #include <cassert>
 
-using namespace donut::math;
-using namespace donut::engine;
-using namespace donut::engine::animation;
+using namespace caustica::math;
+using namespace caustica;
+using namespace caustica::animation;
 
-float4 donut::engine::animation::Interpolate(const InterpolationMode mode,
+float4 caustica::animation::Interpolate(const InterpolationMode mode,
     const Keyframe& a, const Keyframe& b, const Keyframe& c, const Keyframe& d, const float t, const float dt)
 {
     switch (mode)
@@ -207,7 +207,7 @@ void Sampler::Load(Json::Value& node)
             }
             else if ((valueNode.isObject() || valueNode.isString()) && !warningPrinted)
             {
-                log::warning("Objects and strings are not supported as animation keyframe values.");
+                caustica::warning("Objects and strings are not supported as animation keyframe values.");
                 warningPrinted = true;
                 continue;
             }

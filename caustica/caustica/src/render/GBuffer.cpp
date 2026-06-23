@@ -25,9 +25,9 @@
 #include <engine/FramebufferFactory.h>
 #include <nvrhi/utils.h>
 
-using namespace donut::math;
-using namespace donut::engine;
-using namespace donut::render;
+using namespace caustica::math;
+using namespace caustica;
+using namespace caustica::render;
 
 // Resources
 

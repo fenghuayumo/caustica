@@ -26,7 +26,7 @@
 #include <math/math.h>
 #include <nvrhi/nvrhi.h>
 
-namespace donut::app 
+namespace caustica 
 {
 class DeviceManager;
 
@@ -336,9 +336,9 @@ public:
     };
     struct DLSSRRSettings
     {
-        donut::math::int2 optimalRenderSize;
-        donut::math::int2 minRenderSize;
-        donut::math::int2 maxRenderSize;
+        caustica::math::int2 optimalRenderSize;
+        caustica::math::int2 minRenderSize;
+        caustica::math::int2 maxRenderSize;
         float sharpness;
     };
     virtual void SetDLSSRROptions(const DLSSRROptions& options) = 0;
@@ -348,14 +348,14 @@ public:
 
     virtual void TagResourcesGeneral(
         nvrhi::ICommandList* commandList,
-        const donut::engine::IView* view,
+        const caustica::IView* view,
         nvrhi::ITexture* motionVectors,
         nvrhi::ITexture* depth,
         nvrhi::ITexture* finalColorHudless) = 0;
 
     virtual void TagResourcesDLSSNIS(
         nvrhi::ICommandList* commandList,
-        const donut::engine::IView* view,
+        const caustica::IView* view,
         nvrhi::ITexture* output,
         nvrhi::ITexture* input) = 0;
 
@@ -366,7 +366,7 @@ public:
 
     virtual void TagResourcesDeepDVC(
         nvrhi::ICommandList* commandList,
-        const donut::engine::IView* view,
+        const caustica::IView* view,
         nvrhi::ITexture* output) = 0;
 
     virtual void UnTagResourcesDeepDVC() = 0;
@@ -378,7 +378,7 @@ public:
 	//   documentation for more detail.
     virtual void TagResourcesDLSSRR(
         nvrhi::ICommandList* commandList,
-        const donut::engine::IView* view,
+        const caustica::IView* view,
         dm::int2 renderSize,
         dm::int2 displaySize,
         nvrhi::ITexture* inputColor,
@@ -400,4 +400,4 @@ public:
 };
 
 
-} // namespace donut::app
+} // namespace caustica

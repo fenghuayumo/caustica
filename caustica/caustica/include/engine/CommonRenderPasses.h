@@ -27,7 +27,7 @@
 #include <memory>
 #include <unordered_map>
 
-namespace donut::engine
+namespace caustica
 {
     class BindingCache;
     class ShaderFactory;

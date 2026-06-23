@@ -24,7 +24,7 @@
 #include <cmath>
 #include <algorithm>
 
-namespace donut::math
+namespace caustica::math
 {
 
 #define MATRIX_MEMBERS(T, rows, cols) \

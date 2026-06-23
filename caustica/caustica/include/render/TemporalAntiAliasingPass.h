@@ -27,7 +27,7 @@
 #include <nvrhi/nvrhi.h>
 #include <memory>
 
-namespace donut::engine
+namespace caustica
 {
     class ShaderFactory;
     class ShadowMap;
@@ -36,7 +36,7 @@ namespace donut::engine
     class ICompositeView;
 }
 
-namespace donut::render
+namespace caustica::render
 {
     enum class TemporalAntiAliasingJitter
     {
@@ -62,7 +62,7 @@ namespace donut::render
     class TemporalAntiAliasingPass
     {
     private:
-        std::shared_ptr<engine::CommonRenderPasses> m_CommonPasses;
+        std::shared_ptr<caustica::CommonRenderPasses> m_CommonPasses;
 
         nvrhi::ShaderHandle m_MotionVectorPS;
         nvrhi::ShaderHandle m_TemporalAntiAliasingCS;
@@ -72,7 +72,7 @@ namespace donut::render
         nvrhi::BindingLayoutHandle m_MotionVectorsBindingLayout;
         nvrhi::BindingSetHandle m_MotionVectorsBindingSet;
         nvrhi::GraphicsPipelineHandle m_MotionVectorsPso;
-        std::unique_ptr<engine::FramebufferFactory> m_MotionVectorsFramebufferFactory;
+        std::unique_ptr<caustica::FramebufferFactory> m_MotionVectorsFramebufferFactory;
 
         nvrhi::BindingLayoutHandle m_ResolveBindingLayout;
         nvrhi::BindingSetHandle m_ResolveBindingSet;
@@ -105,23 +105,23 @@ namespace donut::render
 
         TemporalAntiAliasingPass(
             nvrhi::IDevice* device,
-            std::shared_ptr<engine::ShaderFactory> shaderFactory,
-            std::shared_ptr<engine::CommonRenderPasses> commonPasses,
-            const engine::ICompositeView& compositeView,
+            std::shared_ptr<caustica::ShaderFactory> shaderFactory,
+            std::shared_ptr<caustica::CommonRenderPasses> commonPasses,
+            const caustica::ICompositeView& compositeView,
             const CreateParameters& params);
 
         void RenderMotionVectors(
             nvrhi::ICommandList* commandList,
-            const engine::ICompositeView& compositeView,
-            const engine::ICompositeView& compositeViewPrevious,
+            const caustica::ICompositeView& compositeView,
+            const caustica::ICompositeView& compositeViewPrevious,
             dm::float3 preViewTranslationDifference = dm::float3::zero());
 
         void TemporalResolve(
             nvrhi::ICommandList* commandList,
             const TemporalAntiAliasingParameters& params,
             bool feedbackIsValid,
-            const engine::ICompositeView& compositeViewInput,
-            const engine::ICompositeView& compositeViewOutput);
+            const caustica::ICompositeView& compositeViewInput,
+            const caustica::ICompositeView& compositeViewOutput);
 
         void AdvanceFrame();
         void SetJitter(TemporalAntiAliasingJitter jitter);

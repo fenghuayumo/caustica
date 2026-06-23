@@ -16,7 +16,7 @@
 #include <nvrhi/common/misc.h>
 #include <json/json.h>
 
-using namespace donut::math;
+using namespace caustica::math;
 #include <shaders/light_cb.h>
 
 #include <render/Materials/MaterialsBaker.h>
@@ -25,12 +25,11 @@ using namespace donut::math;
 #include "SampleCommon.h"
 #include "LocalConfig.h"
 
-using namespace donut;
-using namespace donut::engine;
+using namespace caustica;
 
 #pragma region ExtendedLights
 
-std::shared_ptr<engine::SceneGraphLeaf> EnvironmentLight::Clone()
+std::shared_ptr<caustica::SceneGraphLeaf> EnvironmentLight::Clone()
 {
     auto copy = std::make_shared<EnvironmentLight>();
     copy->color = color;
@@ -131,7 +130,7 @@ void GaussianSplat::Load(const Json::Value& node)
     node["enabled"] >> enabled;
 }
 
-std::shared_ptr<donut::engine::SceneGraphLeaf> ExtendedSceneTypeFactory::CreateLeaf(const std::string& type)
+std::shared_ptr<caustica::SceneGraphLeaf> ExtendedSceneTypeFactory::CreateLeaf(const std::string& type)
 {
     if (type == "EnvironmentLight")
     {
@@ -184,7 +183,7 @@ std::shared_ptr<Material> ExtendedSceneTypeFactory::CreateMaterial()
     return std::static_pointer_cast<Material>(std::make_shared<MaterialEx>());
 }
 
-MeshInstanceEx::MeshInstanceEx(const std::shared_ptr<donut::engine::MeshInfo>& mesh)
+MeshInstanceEx::MeshInstanceEx(const std::shared_ptr<caustica::MeshInfo>& mesh)
     : MeshInstance(mesh)
 {
     PerGeometryLightSamplerLinks.resize(mesh->geometries.size(), { -1, -1 });
@@ -197,12 +196,12 @@ MeshInstanceEx::MeshInstanceEx(const std::shared_ptr<donut::engine::MeshInfo>& m
     return copy;
 }
 
-std::shared_ptr<donut::engine::MeshInstance> ExtendedSceneTypeFactory::CreateMeshInstance(const std::shared_ptr<MeshInfo>& mesh)
+std::shared_ptr<caustica::MeshInstance> ExtendedSceneTypeFactory::CreateMeshInstance(const std::shared_ptr<MeshInfo>& mesh)
 {
     return std::static_pointer_cast<MeshInstance>(std::make_shared<MeshInstanceEx>(mesh));
 }
 
-SkinnedMeshInstanceEx::SkinnedMeshInstanceEx(std::shared_ptr<donut::engine::SceneTypeFactory> sceneTypeFactory, std::shared_ptr<donut::engine::MeshInfo> prototypeMesh)
+SkinnedMeshInstanceEx::SkinnedMeshInstanceEx(std::shared_ptr<caustica::SceneTypeFactory> sceneTypeFactory, std::shared_ptr<caustica::MeshInfo> prototypeMesh)
     : SkinnedMeshInstance(sceneTypeFactory, prototypeMesh) 
 { 
     PerGeometryLightSamplerLinks.resize(prototypeMesh->geometries.size(), {-1, -1} ); 
@@ -220,12 +219,12 @@ SkinnedMeshInstanceEx::SkinnedMeshInstanceEx(std::shared_ptr<donut::engine::Scen
     return std::static_pointer_cast<SceneGraphLeaf>(copy);
 }
 
-std::shared_ptr<donut::engine::SkinnedMeshInstance> ExtendedSceneTypeFactory::CreateSkinnedMeshInstance(const std::shared_ptr<donut::engine::SceneTypeFactory> & sceneTypeFactory, const std::shared_ptr<donut::engine::MeshInfo> & prototypeMesh)
+std::shared_ptr<caustica::SkinnedMeshInstance> ExtendedSceneTypeFactory::CreateSkinnedMeshInstance(const std::shared_ptr<caustica::SceneTypeFactory> & sceneTypeFactory, const std::shared_ptr<caustica::MeshInfo> & prototypeMesh)
 {
     return std::static_pointer_cast<SkinnedMeshInstance>(std::make_shared<SkinnedMeshInstanceEx>(sceneTypeFactory, prototypeMesh));
 }
 
-void ExtendedScene::ProcessNodesRecursive(std::shared_ptr<donut::engine::SceneGraphNode> node)
+void ExtendedScene::ProcessNodesRecursive(std::shared_ptr<caustica::SceneGraphNode> node)
 {
     // std::find_if doesn't compile on linux.
     auto _find_if = [](
@@ -254,7 +253,7 @@ void ExtendedScene::ProcessNodesRecursive(std::shared_ptr<donut::engine::SceneGr
             auto it = _find_if( materials.begin(), materials.end(), [&name](const std::shared_ptr<Material> & mat) { return mat->name == name; });
             if (it == materials.end())
             {
-                log::warning("Material patch '%s' can't find material to patch!", name.c_str() );
+                caustica::warning("Material patch '%s' can't find material to patch!", name.c_str() );
                 assert( false );
             }
             else
@@ -301,7 +300,7 @@ void ExtendedScene::ProcessNodesRecursive(std::shared_ptr<donut::engine::SceneGr
         ProcessNodesRecursive(node->GetChild(i)->shared_from_this());
 }
 
-bool ExtendedScene::LoadWithThreadPool(const std::filesystem::path& jsonFileName, donut::engine::ThreadPool* threadPool)
+bool ExtendedScene::LoadWithThreadPool(const std::filesystem::path& jsonFileName, caustica::ThreadPool* threadPool)
 {
 	if (!Scene::LoadWithThreadPool(jsonFileName, threadPool))
 		return false;
@@ -337,7 +336,7 @@ bool ExtendedScene::LoadFromJsonString(const std::string& sceneJson, const std::
     return true;
 }
 
-std::shared_ptr<EnvironmentLight> FindEnvironmentLight(std::vector <std::shared_ptr<donut::engine::Light>> lights)
+std::shared_ptr<EnvironmentLight> FindEnvironmentLight(std::vector <std::shared_ptr<caustica::Light>> lights)
 {
     for (auto light : lights)
     {

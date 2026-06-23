@@ -16,7 +16,7 @@
 #include "SampleCommon/CommandLine.h"
 #include "SampleUI.h"
 
-#include <engine/ApplicationBase.h>
+#include <engine/Application.h>
 #include <core/vfs/VFS.h>
 #include <render/BloomPass.h>
 #include <engine/Camera.h>
@@ -56,22 +56,22 @@ class PythonScripting;
 #endif
 class GaussianSplatPass;
 
-class Sample : public donut::app::ApplicationBase
+class Sample : public caustica::Application
 {
     // static constexpr uint32_t c_PathTracerVariants   = 6; // see shaders.cfg and CreatePTPipeline for details on variants
 
 public:
-    using ApplicationBase::ApplicationBase;
+    using Application::Application;
 
-    Sample(donut::app::DeviceManager& deviceManager,
+    Sample(caustica::DeviceManager& deviceManager,
         const CommandLineOptions& cmdLine);
     virtual ~Sample();
 
-    //std::shared_ptr<donut::vfs::IFileSystem> GetRootFs() const                      { return m_RootFS; }
-    std::shared_ptr<donut::engine::ShaderFactory> GetShaderFactory() const          { return m_shaderFactory; }
-    std::shared_ptr<donut::engine::CommonRenderPasses> GetCommonPasses() const      { return m_CommonPasses; }
+    //std::shared_ptr<caustica::IFileSystem> GetRootFs() const                      { return m_RootFS; }
+    std::shared_ptr<caustica::ShaderFactory> GetShaderFactory() const          { return m_shaderFactory; }
+    std::shared_ptr<caustica::CommonRenderPasses> GetCommonPasses() const      { return m_CommonPasses; }
     nvrhi::ITexture*                       GetLdrColorTexture() const               { return m_renderTargets ? m_renderTargets->LdrColor.Get() : nullptr; }
-    std::shared_ptr<donut::engine::Scene>   GetScene() const                        { return m_scene; }
+    std::shared_ptr<caustica::Scene>   GetScene() const                        { return m_scene; }
     std::vector<std::string> const &        GetAvailableScenes() const              { return m_sceneFilesAvailable; }
     std::string                             GetCurrentSceneName() const             { return m_currentSceneName; }
     const DebugFeedbackStruct &             GetFeedbackData() const                 { return m_feedbackData; }
@@ -85,29 +85,29 @@ public:
     
     void                                    SetUIPick()                             { m_pick = true; }
 
-    std::shared_ptr<donut::engine::Material> FindMaterial( int materialID ) const;
-    std::shared_ptr<donut::engine::SceneGraphNode> FindNodeByInstanceIndex(int instanceIndex) const;
+    std::shared_ptr<caustica::Material> FindMaterial( int materialID ) const;
+    std::shared_ptr<caustica::SceneGraphNode> FindNodeByInstanceIndex(int instanceIndex) const;
 
     void                                    HandleDroppedFiles();
     bool                                    LoadMeshFile(const std::filesystem::path& filePath);
     bool                                    LoadGltfMeshFile(const std::filesystem::path& filePath);
     bool                                    LoadObjMeshFile(const std::filesystem::path& filePath);
-    void                                    FinalizeRuntimeSceneMutation(const std::shared_ptr<donut::engine::SceneGraphNode>& importedRoot);
-    bool                                    DeleteSceneNode(const std::shared_ptr<donut::engine::SceneGraphNode>& node);
+    void                                    FinalizeRuntimeSceneMutation(const std::shared_ptr<caustica::SceneGraphNode>& importedRoot);
+    bool                                    DeleteSceneNode(const std::shared_ptr<caustica::SceneGraphNode>& node);
     void                                    RequestFullRebuild();
-    std::vector<donut::math::float3>        GetMeshVertices(const std::shared_ptr<donut::engine::MeshInfo>& mesh) const;
-    void                                    SetMeshVertices(const std::shared_ptr<donut::engine::MeshInfo>& mesh,
-                                                            const std::vector<donut::math::float3>& vertices,
+    std::vector<dm::float3>        GetMeshVertices(const std::shared_ptr<caustica::MeshInfo>& mesh) const;
+    void                                    SetMeshVertices(const std::shared_ptr<caustica::MeshInfo>& mesh,
+                                                            const std::vector<dm::float3>& vertices,
                                                             bool recomputeNormals = true,
                                                             bool rebuildAccelerationStructure = true);
-    std::vector<donut::math::float3>        GetMeshVerticesWorld(const std::shared_ptr<donut::engine::MeshInfo>& mesh);
-    std::vector<donut::math::float3>        GetMeshVerticesWorld(const std::shared_ptr<donut::engine::SceneGraphNode>& node);
-    void                                    SetMeshVerticesWorld(const std::shared_ptr<donut::engine::MeshInfo>& mesh,
-                                                            const std::vector<donut::math::float3>& vertices,
+    std::vector<dm::float3>        GetMeshVerticesWorld(const std::shared_ptr<caustica::MeshInfo>& mesh);
+    std::vector<dm::float3>        GetMeshVerticesWorld(const std::shared_ptr<caustica::SceneGraphNode>& node);
+    void                                    SetMeshVerticesWorld(const std::shared_ptr<caustica::MeshInfo>& mesh,
+                                                            const std::vector<dm::float3>& vertices,
                                                             bool recomputeNormals = true,
                                                             bool rebuildAccelerationStructure = true);
-    void                                    SetMeshVerticesWorld(const std::shared_ptr<donut::engine::SceneGraphNode>& node,
-                                                            const std::vector<donut::math::float3>& vertices,
+    void                                    SetMeshVerticesWorld(const std::shared_ptr<caustica::SceneGraphNode>& node,
+                                                            const std::vector<dm::float3>& vertices,
                                                             bool recomputeNormals = true,
                                                             bool rebuildAccelerationStructure = true);
     
@@ -125,7 +125,7 @@ public:
 
     float                                   GetAvgTimePerFrame() const;
 
-    void                                    Init(const std::string& preferredScene, const std::shared_ptr<donut::engine::ShaderFactory>& shaderFactory);
+    void                                    Init(const std::string& preferredScene, const std::shared_ptr<caustica::ShaderFactory>& shaderFactory);
     void                                    SetCurrentScene(const std::string& sceneName, bool forceReload = false);
     bool                                    LoadGaussianSplatFile(const std::filesystem::path& fileName, bool convertRdfToDonut = true);
     uint32_t                                GetGaussianSplatCount() const;
@@ -133,7 +133,7 @@ public:
     const std::string&                      GetGaussianSplatFileName() const;
 
     virtual void                            SceneUnloading() override;
-    virtual bool                            LoadScene(std::shared_ptr<donut::vfs::IFileSystem> fs, const std::filesystem::path& sceneFileName) override;
+    virtual bool                            LoadScene(std::shared_ptr<caustica::IFileSystem> fs, const std::filesystem::path& sceneFileName) override;
     virtual void                            SceneLoaded() override;
     virtual bool                            ShouldRenderUnfocused() override;
     virtual bool                            KeyboardUpdate(int key, int scancode, int action, int mods) override;
@@ -142,15 +142,15 @@ public:
     virtual bool                            MouseScrollUpdate(double xoffset, double yoffset) override;
     virtual void                            Animate(float fElapsedTimeSeconds) override;
 
-    void                                    FillPTPipelineGlobalMacros(std::vector<donut::engine::ShaderMacro> & macros);
-    bool                                    CreatePTPipeline(donut::engine::ShaderFactory& shaderFactory);
+    void                                    FillPTPipelineGlobalMacros(std::vector<caustica::ShaderMacro> & macros);
+    bool                                    CreatePTPipeline(caustica::ShaderFactory& shaderFactory);
     void                                    DestroyOpacityMicromaps(nvrhi::ICommandList* commandList);
     void                                    CreateOpacityMicromaps();
     void                                    CreateBlases(nvrhi::ICommandList* commandList);
     void                                    CreateTlas(nvrhi::ICommandList* commandList);
     void                                    CreateAccelStructs(nvrhi::ICommandList* commandList);
     void                                    RecreateAccelStructs(nvrhi::ICommandList* commandList);
-    void                                    RequestMeshAccelRebuild(const std::shared_ptr<donut::engine::MeshInfo>& mesh);
+    void                                    RequestMeshAccelRebuild(const std::shared_ptr<caustica::MeshInfo>& mesh);
     void                                    RebuildDirtyMeshAccelStructs(nvrhi::ICommandList* commandList);
     void                                    UpdateSkinnedBLASs(nvrhi::ICommandList* commandList, uint32_t frameIndex) const;
     void                                    BuildTLAS(nvrhi::ICommandList* commandList) const;
@@ -182,13 +182,13 @@ public:
     void                                    PreUpdateLighting(nvrhi::CommandListHandle commandList, bool& needNewBindings);     // this can (re)allocate buffers depending on scene changes
     void                                    UpdateLighting(nvrhi::CommandListHandle commandList);                               // this will process and fill up all lighting buffers
 
-    donut::math::float2                     ComputeCameraJitter( uint frameIndex );
+    dm::float2                     ComputeCameraJitter( uint frameIndex );
 
     std::string                             GetResolutionInfo() const;
     std::string                             GetFPSInfo() const              { return m_fpsInfo; }
 
     void                                    DebugDrawLine( float3 start, float3 stop, float4 col1, float4 col2 );
-    const donut::app::FirstPersonCamera &   GetCurrentCamera( ) const { return m_camera; }
+    const caustica::FirstPersonCamera &   GetCurrentCamera( ) const { return m_camera; }
     const auto &                            GetCurrentView( ) const { return m_view; }
 
     void                                    SetSceneTime( double sceneTime );
@@ -205,7 +205,7 @@ public:
     const std::shared_ptr<MaterialsBaker> & GetMaterialsBaker() const { return m_materialsBaker; }
     const std::shared_ptr<class OmmBaker> & GetOMMBaker() const { return m_ommBaker; }
     const std::unique_ptr<class ZoomTool> & GetZoomTool() const { return m_zoomTool; }
-    donut::engine::BindingCache &           GetBindingCache() { return *m_bindingCache; }
+    caustica::BindingCache &           GetBindingCache() { return *m_bindingCache; }
 
     GLFWwindow *                            GetGLFWWindow() const { return GetDeviceManager()->GetWindow(); }
 
@@ -245,10 +245,10 @@ protected:
     nvrhi::BindingLayoutHandle                  m_bindlessLayout;
     nvrhi::BindingSetHandle                     m_bindingSet;
 
-    std::shared_ptr<donut::engine::DescriptorTableManager> m_DescriptorTable;
+    std::shared_ptr<caustica::DescriptorTableManager> m_DescriptorTable;
 
     // QoL accessors for derived samples
-    const donut::engine::PlanarView& GetView() const { return *m_view; }
+    const caustica::PlanarView& GetView() const { return *m_view; }
     std::shared_ptr<class PTPipelineBaker>  GetRTPipelineBaker() const { return m_ptPipelineBaker; }
     std::shared_ptr<ComputePipelineBaker>   GetComputePipelineBaker() const { return m_computePipelineBaker; }
 
@@ -268,20 +268,20 @@ protected:
 private:
     struct GaussianSplatSceneObject;
 
-    void                                    UpdateCameraFromScene( const std::shared_ptr<donut::engine::PerspectiveCamera> & sceneCamera );
+    void                                    UpdateCameraFromScene( const std::shared_ptr<caustica::PerspectiveCamera> & sceneCamera );
     void                                    UpdateViews( nvrhi::IFramebuffer* framebuffer );
     void                                    DenoisedScreenshot( nvrhi::ITexture * framebufferTexture ) const;
     void                                    ResetReferenceOIDN();
     void                                    ApplyReferenceOIDN();
-    void                                    PostProcessPreToneMapping(nvrhi::ICommandList* commandList, const donut::engine::ICompositeView& compositeView);
-    void                                    PostProcessPostToneMapping(nvrhi::ICommandList* commandList, const donut::engine::ICompositeView& compositeView);
+    void                                    PostProcessPreToneMapping(nvrhi::ICommandList* commandList, const caustica::ICompositeView& compositeView);
+    void                                    PostProcessPostToneMapping(nvrhi::ICommandList* commandList, const caustica::ICompositeView& compositeView);
     void                                    LoadGaussianSplatsFromScene();
     bool                                    AttachGaussianSplatToScene(const std::filesystem::path& fileName, bool convertRdfToDonut);
     void                                    PrepareGaussianSplatPass(GaussianSplatPass& pass);
     void                                    UpdateGaussianSplatUIState();
     uint32_t                                GetTotalGaussianSplatCount() const;
     void                                    RenderGaussianSplats(bool renderToOutputColor);
-    void                                    AccumulateGaussianSplats(const donut::engine::IView& splatView);
+    void                                    AccumulateGaussianSplats(const caustica::IView& splatView);
     void                                    BuildGaussianSplatEmissionProxyList();
     void                                    RefreshEnvironmentMapMediaList();
 #if RTXPT_WITH_NATIVE_DLSS
@@ -292,16 +292,16 @@ private:
     struct GaussianSplatSceneObject
     {
         std::shared_ptr<GaussianSplat> splat;
-        std::weak_ptr<donut::engine::SceneGraphNode> node;
+        std::weak_ptr<caustica::SceneGraphNode> node;
         std::unique_ptr<GaussianSplatPass> pass;
     };
 
     std::filesystem::path                       ResolveGaussianSplatPath(const GaussianSplat& splat) const;
-    donut::math::float4x4                       GetGaussianSplatObjectToWorld(const GaussianSplatSceneObject& object) const;
+    dm::float4x4                       GetGaussianSplatObjectToWorld(const GaussianSplatSceneObject& object) const;
     GaussianSplatSceneObject*                   GetPrimaryGaussianSplatObject();
     const GaussianSplatSceneObject*             GetPrimaryGaussianSplatObject() const;
 
-    std::shared_ptr<donut::vfs::RootFileSystem> m_RootFS;
+    std::shared_ptr<caustica::RootFileSystem> m_RootFS;
 
     // scene
     std::vector<std::string>                    m_sceneFilesAvailable;
@@ -314,16 +314,16 @@ private:
     uint                                        m_selectedCameraIndex = 0;  // 0 is first person camera, the rest (if any) are scene cameras
 
     // device setup
-    std::shared_ptr<donut::engine::ShaderFactory> m_shaderFactory;
-    std::shared_ptr<donut::engine::CommonRenderPasses> m_CommonPasses;
-    std::unique_ptr<donut::engine::BindingCache> m_bindingCache;
+    std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
+    std::shared_ptr<caustica::CommonRenderPasses> m_CommonPasses;
+    std::unique_ptr<caustica::BindingCache> m_bindingCache;
     nvrhi::CommandListHandle                    m_commandList;
 
-    std::unique_ptr<donut::render::TemporalAntiAliasingPass> m_temporalAntiAliasingPass;
+    std::unique_ptr<caustica::render::TemporalAntiAliasingPass> m_temporalAntiAliasingPass;
 
     // rendering
-    std::vector <std::shared_ptr<donut::engine::Light>> m_lights;
-    std::unique_ptr<donut::render::BloomPass>   m_bloomPass;
+    std::vector <std::shared_ptr<caustica::Light>> m_lights;
+    std::unique_ptr<caustica::render::BloomPass>   m_bloomPass;
     std::unique_ptr<ToneMappingPass>            m_toneMappingPass;
     nvrhi::BufferHandle                         m_constantBuffer;
 
@@ -361,12 +361,12 @@ private:
 
     // raytracing basics
     nvrhi::rt::AccelStructHandle                m_topLevelAS;
-    std::vector<std::shared_ptr<donut::engine::MeshInfo>> m_meshesPendingAccelRebuild;
+    std::vector<std::shared_ptr<caustica::MeshInfo>> m_meshesPendingAccelRebuild;
 
     // camera
-    donut::app::FirstPersonCamera               m_camera;
-    std::shared_ptr<donut::engine::PlanarView>  m_view;
-    std::shared_ptr<donut::engine::PlanarView>  m_viewPrevious;
+    caustica::FirstPersonCamera               m_camera;
+    std::shared_ptr<caustica::PlanarView>  m_view;
+    std::shared_ptr<caustica::PlanarView>  m_viewPrevious;
     float                                       m_cameraVerticalFOV = 60.0f;
     float                                       m_cameraZNear = 0.001f;
     float                                       m_cameraZFar = 100000.0f;
@@ -432,14 +432,14 @@ private:
     nvrhi::ComputePipelineHandle                m_exportVBufferPSO;
 
     // texture compression: used but not compressed textures
-    std::map<std::shared_ptr<donut::engine::LoadedTexture>, TextureCompressionType> m_uncompressedTextures;
+    std::map<std::shared_ptr<caustica::LoadedTexture>, TextureCompressionType> m_uncompressedTextures;
 
 #if DONUT_WITH_STREAMLINE
-    donut::app::StreamlineInterface::DLSSSettings   m_recommendedDLSSSettings = {};
-    donut::app::StreamlineInterface::DLSSRROptions  m_lastDLSSRROptions;
+    caustica::StreamlineInterface::DLSSSettings   m_recommendedDLSSSettings = {};
+    caustica::StreamlineInterface::DLSSRROptions  m_lastDLSSRROptions;
 #endif
 #if RTXPT_WITH_NATIVE_DLSS
-    std::unique_ptr<donut::render::DLSS>     m_nativeDLSS;
+    std::unique_ptr<caustica::render::DLSS>     m_nativeDLSS;
 #endif
     uint2                                       m_renderSize;   // native render resolution
     uint2                                       m_displaySize;  // final output resolution

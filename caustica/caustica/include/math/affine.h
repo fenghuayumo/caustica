@@ -22,7 +22,7 @@
 
 #pragma once
 
-namespace donut::math
+namespace caustica::math
 {
 	// Generic affine transform struct, with a matrix and translation vector
 

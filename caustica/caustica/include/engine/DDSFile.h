@@ -26,12 +26,12 @@
 #include <vector>
 #include <memory>
 
-namespace donut::vfs
+namespace caustica
 {
     class IBlob;
 }
 
-namespace donut::engine
+namespace caustica
 {
     struct TextureData;
 
@@ -39,7 +39,7 @@ namespace donut::engine
     bool LoadDDSTextureFromMemory(TextureData& textureInfo);
 
     // Creates a texture based on DDS data in memory
-    nvrhi::TextureHandle CreateDDSTextureFromMemory(nvrhi::IDevice* device, nvrhi::ICommandList* commandList, std::shared_ptr<vfs::IBlob> data, const char* debugName = nullptr, bool forceSRGB = false);
+    nvrhi::TextureHandle CreateDDSTextureFromMemory(nvrhi::IDevice* device, nvrhi::ICommandList* commandList, std::shared_ptr<caustica::IBlob> data, const char* debugName = nullptr, bool forceSRGB = false);
 
-    std::shared_ptr<vfs::IBlob> SaveStagingTextureAsDDS(nvrhi::IDevice* device, nvrhi::IStagingTexture* stagingTexture);
+    std::shared_ptr<caustica::IBlob> SaveStagingTextureAsDDS(nvrhi::IDevice* device, nvrhi::IStagingTexture* stagingTexture);
 }

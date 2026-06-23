@@ -19,9 +19,9 @@
 
 #include <filesystem>
 
-using namespace donut::math;
+using namespace caustica::math;
 
-namespace donut::engine
+namespace caustica
 {
     class ShaderFactory;
     class CommonRenderPasses;
@@ -36,10 +36,10 @@ class ShaderDebug;
 class GPUSort
 {
 public:
-    GPUSort(nvrhi::IDevice* device, std::shared_ptr<donut::engine::ShaderFactory> shaderFactory);
+    GPUSort(nvrhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory);
     ~GPUSort();
 
-    void                            CreateRenderPasses(std::shared_ptr<donut::engine::CommonRenderPasses> commonPasses, std::shared_ptr<ShaderDebug> shaderDebug);
+    void                            CreateRenderPasses(std::shared_ptr<caustica::CommonRenderPasses> commonPasses, std::shared_ptr<ShaderDebug> shaderDebug);
 
     // Provide number of items to be sorted as a uint32 variable within the controlBuffer at the itemCountByteOffset. Must be less than or equal to maxItemCount. If bigger, behaviour is undefined.
     // Provide sort keys in the keys buffer (uint32). These will NOT be touched - only indices are sorted.
@@ -53,8 +53,8 @@ private:
 
 private:
     nvrhi::DeviceHandle             m_device;
-    std::shared_ptr<donut::engine::CommonRenderPasses> m_commonPasses;
-    std::shared_ptr<donut::engine::ShaderFactory> m_shaderFactory;
+    std::shared_ptr<caustica::CommonRenderPasses> m_commonPasses;
+    std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
     std::shared_ptr<ShaderDebug>   m_shaderDebug;
 
     nvrhi::ShaderHandle             m_CSSetupIndirect;
@@ -78,7 +78,7 @@ private:
 
     nvrhi::BindingLayoutHandle      m_initBindingLayout;
     nvrhi::BindingLayoutHandle      m_commonBindingLayout;
-    donut::engine::BindingCache     m_bindingCache;
+    caustica::BindingCache     m_bindingCache;
 
     nvrhi::BufferHandle             m_controlBuffer;
     nvrhi::BufferHandle             m_dispatchIndirectBuffer;

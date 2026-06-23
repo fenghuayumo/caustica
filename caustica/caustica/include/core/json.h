@@ -33,14 +33,14 @@ namespace Json
     class Value;
 }
 
-namespace donut::vfs
+namespace caustica
 {
     class IFileSystem;
 }
 
-namespace donut::json
+namespace caustica::json
 {
-    bool LoadFromFile(vfs::IFileSystem& fs, const std::filesystem::path& jsonFileName, Json::Value& documentRoot);
+    bool LoadFromFile(caustica::IFileSystem& fs, const std::filesystem::path& jsonFileName, Json::Value& documentRoot);
 
     template<typename T> T Read(const Json::Value& node, const T& defaultValue);
     template<typename T> void Write(Json::Value& node, const T& value);
@@ -90,7 +90,7 @@ namespace donut::json
 // Use like this: myNode["name"] >> variable;
 template<typename T> void operator >> (const Json::Value& node, T& dest)
 {
-    dest = donut::json::Read<T>(node, dest);
+    dest = caustica::json::Read<T>(node, dest);
 }
 
 // Overloaded operator for reading data from Json nodes.
@@ -103,14 +103,14 @@ template<typename T> void operator >> (const Json::Value& node, std::optional<T>
         return;
     }
 
-    dest = std::optional<T>(donut::json::Read<T>(node, T()));
+    dest = std::optional<T>(caustica::json::Read<T>(node, T()));
 }
 
 // Overloaded operator for writing data into Json nodes.
 // Use like this: myNode["name"] << variable;
 template<typename T> void operator << (Json::Value& node, const T& src)
 {
-    donut::json::Write<T>(node, src);
+    caustica::json::Write<T>(node, src);
 }
 
 // Specialization of the writing operator for literal strings.

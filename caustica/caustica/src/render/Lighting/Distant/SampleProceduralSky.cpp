@@ -20,13 +20,12 @@
 
 #include <SampleCommon/SampleCommon.h>
 
-using namespace donut;
-using namespace donut::math;
-using namespace donut::engine;
+using namespace caustica::math;
+using namespace caustica;
 
 std::filesystem::path GetLocalPath(std::string subfolder);  // defined in caustica.cpp
 
-SampleProceduralSky::SampleProceduralSky( nvrhi::IDevice* device, std::shared_ptr<donut::engine::TextureCache> textureCache, std::shared_ptr<donut::engine::CommonRenderPasses> commonPasses, nvrhi::ICommandList* commandList )
+SampleProceduralSky::SampleProceduralSky( nvrhi::IDevice* device, std::shared_ptr<caustica::TextureCache> textureCache, std::shared_ptr<caustica::CommonRenderPasses> commonPasses, nvrhi::ICommandList* commandList )
     : m_device(device)
     , m_textureCache(textureCache)
 {
@@ -105,7 +104,7 @@ bool SampleProceduralSky::Update( double sceneTime, ProceduralSkyConstants & out
 
     if (presetType != c_EnvMapProcSky)
     {
-        float deltaTime = (float)donut::math::clamp(sceneTime - m_lastSceneTime, 0.0, 0.3);
+        float deltaTime = (float)caustica::math::clamp(sceneTime - m_lastSceneTime, 0.0, 0.3);
 
         float timeOfDayTarget = -FLT_MAX;
         if (presetType == c_EnvMapProcSky_Morning)

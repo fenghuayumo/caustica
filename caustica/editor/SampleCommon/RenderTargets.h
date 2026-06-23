@@ -19,12 +19,12 @@
 
 #include <shaders/PathTracer/Config.h>
 
-namespace donut::engine
+namespace caustica
 {
     class FramebufferFactory;
 }
 
-class RenderTargets// : public donut::render::GBufferRenderTargets
+class RenderTargets// : public caustica::render::GBufferRenderTargets
 {
     const dm::uint m_SampleCount = 1; // no MSAA supported in this sample
     bool m_UseReverseProjection = false;
@@ -95,16 +95,16 @@ public:
 
     nvrhi::HeapHandle Heap;
 
-    donut::math::uint2 RenderSize;// size of render targets pre-DLSS
-    donut::math::uint2 DisplaySize; // size of render targets post-DLSS
+    dm::uint2 RenderSize;// size of render targets pre-DLSS
+    dm::uint2 DisplaySize; // size of render targets post-DLSS
 
     // Framebuffers are used by the bloom and tone mapping passes
-    std::shared_ptr<donut::engine::FramebufferFactory> OutputFramebuffer;
-    std::shared_ptr<donut::engine::FramebufferFactory> ProcessedOutputFramebuffer;
-    std::shared_ptr<donut::engine::FramebufferFactory> LdrFramebuffer;
+    std::shared_ptr<caustica::FramebufferFactory> OutputFramebuffer;
+    std::shared_ptr<caustica::FramebufferFactory> ProcessedOutputFramebuffer;
+    std::shared_ptr<caustica::FramebufferFactory> LdrFramebuffer;
 
-    void Init(nvrhi::IDevice* device, donut::math::uint2 renderSize, donut::math::uint2 displaySize, bool enableMotionVectors, bool useReverseProjection, int backbufferCount);// override;
-    [[nodiscard]] bool IsUpdateRequired(donut::math::uint2 renderSize, donut::math::uint2 displaySize, donut::math::uint sampleCount = 1) const;
+    void Init(nvrhi::IDevice* device, dm::uint2 renderSize, dm::uint2 displaySize, bool enableMotionVectors, bool useReverseProjection, int backbufferCount);// override;
+    [[nodiscard]] bool IsUpdateRequired(dm::uint2 renderSize, dm::uint2 displaySize, dm::uint sampleCount = 1) const;
     void Clear(nvrhi::ICommandList* commandList);
 
     static uint32_t GetNumMipLevels(uint32_t width, uint32_t height);

@@ -44,11 +44,11 @@
 #endif
 #endif
 
-using namespace donut::math;
+using namespace caustica::math;
 #include <shaders/deferred_lighting_cb.h>
 
-using namespace donut::engine;
-using namespace donut::render;
+using namespace caustica;
+using namespace caustica::render;
 
 void DeferredLightingPass::Inputs::SetGBuffer(const GBufferRenderTargets& targets)
 {
@@ -68,7 +68,7 @@ DeferredLightingPass::DeferredLightingPass(
 {
 }
 
-void donut::render::DeferredLightingPass::Init(const std::shared_ptr<engine::ShaderFactory>& shaderFactory)
+void caustica::render::DeferredLightingPass::Init(const std::shared_ptr<caustica::ShaderFactory>& shaderFactory)
 {
     auto samplerDesc = nvrhi::SamplerDesc()
         .setAllAddressModes(nvrhi::SamplerAddressMode::Border)
@@ -171,7 +171,7 @@ void DeferredLightingPass::Render(
                 {
                     if (shadowMapTexture != light->shadowMap->GetTexture())
                     {
-                        log::error("All lights submitted to DeferredLightingPass::Render(...) must use the same shadow map textures");
+                        caustica::error("All lights submitted to DeferredLightingPass::Render(...) must use the same shadow map textures");
                         return;
                     }
                 }
@@ -179,7 +179,7 @@ void DeferredLightingPass::Render(
 
             if (deferredConstants.numLights >= DEFERRED_MAX_LIGHTS)
             {
-                log::warning("Maximum number of active lights (%d) exceeded in DeferredLightingPass",
+                caustica::warning("Maximum number of active lights (%d) exceeded in DeferredLightingPass",
                     DEFERRED_MAX_LIGHTS);
                 break;
             }
@@ -232,7 +232,7 @@ void DeferredLightingPass::Render(
 
             if (deferredConstants.numLightProbes >= DEFERRED_MAX_LIGHT_PROBES)
             {
-                log::warning("Maximum number of active light probes (%d) exceeded in DeferredLightingPass",
+                caustica::warning("Maximum number of active light probes (%d) exceeded in DeferredLightingPass",
                     DEFERRED_MAX_LIGHT_PROBES);
                 break;
             }
@@ -247,7 +247,7 @@ void DeferredLightingPass::Render(
             {
                 if (lightProbeDiffuse != probe->diffuseMap || lightProbeSpecular != probe->specularMap || lightProbeEnvironmentBrdf != probe->environmentBrdf)
                 {
-                    log::error("All light probes submitted to DeferredLightingPass::Render(...) must use the same set of textures");
+                    caustica::error("All light probes submitted to DeferredLightingPass::Render(...) must use the same set of textures");
                     return;
                 }
             }

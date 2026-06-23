@@ -29,7 +29,6 @@
 #include <cstdint>
 #include <cstring>
 
-using namespace donut;
 
 // RIFF (wav) file chunk headers
 
@@ -62,10 +61,10 @@ struct DataChunk
     uint32_t  dataChunkSize;  // Sampled data length
 };
 
-namespace donut::engine::audio
+namespace caustica::audio
 {
 
-AudioCache::AudioCache(std::shared_ptr<vfs::IFileSystem> fs) : m_fs(fs) { }
+AudioCache::AudioCache(std::shared_ptr<caustica::IFileSystem> fs) : m_fs(fs) { }
 
 void AudioCache::Reset()
 {
@@ -74,7 +73,7 @@ void AudioCache::Reset()
     m_LoadedAudioData.clear();
 }
 
-std::shared_ptr<AudioData const> AudioCache::importRiff(std::shared_ptr<donut::vfs::IBlob> blob, char const * filepath)
+std::shared_ptr<AudioData const> AudioCache::importRiff(std::shared_ptr<caustica::IBlob> blob, char const * filepath)
 {
     uint8_t const * data = (uint8_t const *)blob->data(),
                   * ptr = data;
@@ -82,11 +81,11 @@ std::shared_ptr<AudioData const> AudioCache::importRiff(std::shared_ptr<donut::v
     RiffChunk const * riffchunk = (RiffChunk const *)ptr;
     if (!riffchunk->valid())
     {
-        log::warning("Invalid RIFF header `%`", filepath);
+        caustica::warning("Invalid RIFF header `%`", filepath);
         return nullptr;
     }
     if (riffchunk->chunkSize!=blob->size()-8) {
-        log::warning("RIFF invalid chunk size `%`", filepath);
+        caustica::warning("RIFF invalid chunk size `%`", filepath);
         return nullptr;
     }
     ptr += sizeof(RiffChunk);
@@ -94,17 +93,17 @@ std::shared_ptr<AudioData const> AudioCache::importRiff(std::shared_ptr<donut::v
     WaveChunk const * wavechunk = (WaveChunk const *)ptr;
     if (!wavechunk->valid())
     {
-        log::warning("Invalid Wave chunk header `%s`", filepath);
+        caustica::warning("Invalid Wave chunk header `%s`", filepath);
         return nullptr;
     }
     if (wavechunk->fmtChunkSize<16)
     {
-        log::warning("Wave chunk header invalid size `%s`", filepath);
+        caustica::warning("Wave chunk header invalid size `%s`", filepath);
         return nullptr;
     }
     if (wavechunk->audioFormat!=1)
     {
-        log::warning("Wave chunk header unsupported format %d (PCM=1) `%s`", wavechunk->audioFormat, filepath);
+        caustica::warning("Wave chunk header unsupported format %d (PCM=1) `%s`", wavechunk->audioFormat, filepath);
         return nullptr;
     }
     ptr += sizeof(WaveChunk);
@@ -119,12 +118,12 @@ std::shared_ptr<AudioData const> AudioCache::importRiff(std::shared_ptr<donut::v
 
     if (!datachunk)
     {
-        log::warning("Cannot find Data chunk `%s`", filepath);
+        caustica::warning("Cannot find Data chunk `%s`", filepath);
         return nullptr;
     }
     if (ptr+datachunk->dataChunkSize>=data+blob->size())
     {
-        log::warning("Invalid data chunk size `%s`", filepath);
+        caustica::warning("Invalid data chunk size `%s`", filepath);
         return nullptr;
     }
     ptr += sizeof(DataChunk);
@@ -158,10 +157,10 @@ static bool strcaseequals(const std::string& a, const std::string& b)
 std::shared_ptr<AudioData const> AudioCache::loadAudioFile (const std::filesystem::path & path)
 {
 
-    std::shared_ptr<vfs::IBlob> blob = m_fs->readFile(path);
+    std::shared_ptr<caustica::IBlob> blob = m_fs->readFile(path);
     if (!blob)
     {
-        log::warning("Couldn't read audio file `%s`", path.generic_string().c_str());
+        caustica::warning("Couldn't read audio file `%s`", path.generic_string().c_str());
         return nullptr;
     }
 
@@ -171,7 +170,7 @@ std::shared_ptr<AudioData const> AudioCache::loadAudioFile (const std::filesyste
         return importRiff(blob, path.generic_string().c_str());
     }
     else
-        log::warning("Unsupported audio format `%s` for file `%s`", extension.c_str());
+        caustica::warning("Unsupported audio format `%s` for file `%s`", extension.c_str());
 
     return nullptr;
 }
@@ -193,7 +192,7 @@ bool AudioCache::findInCache(const std::filesystem::path & path, std::shared_ptr
 
 void AudioCache::sendAudioLoadedMessage(std::shared_ptr<AudioData const> audio, char const * path)
 {
-    log::info("Loaded (%dkHz) : %s", audio->sampleRate/1000, path);
+    caustica::info("Loaded (%dkHz) : %s", audio->sampleRate/1000, path);
 }
 
 std::shared_ptr<AudioData const> AudioCache::LoadFromFile(const std::filesystem::path & path)
@@ -227,4 +226,4 @@ std::shared_ptr<AudioData const> AudioCache::LoadFromFileAsync(const std::filesy
     return audio;
 }
 
-} // namespace donut::engine::audio
+} // namespace caustica::audio

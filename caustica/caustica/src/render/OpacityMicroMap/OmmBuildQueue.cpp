@@ -20,12 +20,12 @@
 
 namespace
 {
-    static omm::GpuBakeNvrhi::Input GetBakeInput(omm::GpuBakeNvrhi::Operation op, const donut::engine::MeshInfo& mesh, const OmmBuildQueue::BuildInput::Geometry& geometry)
+    static omm::GpuBakeNvrhi::Input GetBakeInput(omm::GpuBakeNvrhi::Operation op, const caustica::MeshInfo& mesh, const OmmBuildQueue::BuildInput::Geometry& geometry)
     {
-        using namespace donut;
-        using namespace donut::math;
 
-        const donut::engine::MeshGeometry* meshGeometry = mesh.geometries[geometry.geometryIndexInMesh].get();
+        using namespace caustica::math;
+
+        const caustica::MeshGeometry* meshGeometry = mesh.geometries[geometry.geometryIndexInMesh].get();
 
         const uint32_t indexOffset = mesh.indexOffset + meshGeometry->indexOffsetInMesh;
         const uint32_t vertexOffset = (mesh.vertexOffset + meshGeometry->vertexOffsetInMesh);
@@ -43,7 +43,7 @@ namespace
         params.sampleMode = nvrhi::SamplerAddressMode::Wrap;
         params.indexBuffer = mesh.buffers->indexBuffer;
         params.texCoordBuffer = mesh.buffers->vertexBuffer;
-        params.texCoordBufferOffsetInBytes = (uint)(vertexOffset * sizeof(float2) + mesh.buffers->getVertexBufferRange(engine::VertexAttribute::TexCoord1).byteOffset);
+        params.texCoordBufferOffsetInBytes = (uint)(vertexOffset * sizeof(float2) + mesh.buffers->getVertexBufferRange(caustica::VertexAttribute::TexCoord1).byteOffset);
         params.texCoordStrideInBytes = sizeof(float2);
         params.indexBufferOffsetInBytes = size_t(indexOffset) * sizeof(uint32_t);
         params.numIndices = meshGeometry->numIndices;
@@ -144,8 +144,8 @@ namespace
 
 OmmBuildQueue::OmmBuildQueue(
     nvrhi::DeviceHandle& device, 
-    std::shared_ptr<donut::engine::DescriptorTableManager> descriptorTable, 
-    std::shared_ptr<donut::engine::ShaderFactory> shaderFactory)
+    std::shared_ptr<caustica::DescriptorTableManager> descriptorTable, 
+    std::shared_ptr<caustica::ShaderFactory> shaderFactory)
     : m_device(device)
     , m_descriptorTable(std::move(descriptorTable))
     , m_shaderFactory(std::move(shaderFactory))
@@ -157,13 +157,13 @@ OmmBuildQueue::OmmBuildQueue(
 
     provider.shaders = [this](nvrhi::ShaderType type, const char* shaderName, const char* shaderEntryName)->nvrhi::ShaderHandle
     {
-        std::vector<donut::engine::ShaderMacro> defines = { donut::engine::ShaderMacro("COMPILER_DXC", "1") };
+        std::vector<caustica::ShaderMacro> defines = { caustica::ShaderMacro("COMPILER_DXC", "1") };
         std::string shaderNameStr = std::string("omm/Omm/libraries/omm-lib/shaders/") + shaderName;
         return m_shaderFactory->CreateShader(shaderNameStr.c_str(), shaderEntryName, &defines, type);
     };
 
     omm::GpuBakeNvrhi::MessageCallback messageCb = [](omm::MessageSeverity severity, const char* message) {
-        donut::log::info("[OMM SDK]: %d %s", severity, message);
+        caustica::info("[OMM SDK]: %d %s", severity, message);
     };
 
     // Intialize the the internal baker, which records some buffer updates into a command list
@@ -186,7 +186,7 @@ void OmmBuildQueue::RunSetup(nvrhi::ICommandList& commandList, BuildTask& task)
 {
     assert(task.state == BuildState::None);
 
-    std::shared_ptr < donut::engine::MeshInfo > mesh = task.input.mesh;
+    std::shared_ptr < caustica::MeshInfo > mesh = task.input.mesh;
 
     LinearBufferAllocator ommIndexBufferAllocator;
     LinearBufferAllocator ommDescBufferAllocator;
@@ -310,7 +310,7 @@ void OmmBuildQueue::BakeOmmArrayData(nvrhi::ICommandList& commandList, BuildTask
 
     commandList.clearBufferUInt(task.buffers.ommArrayDataBuffer, 0);
 
-    std::shared_ptr < donut::engine::MeshInfo > mesh = task.input.mesh;
+    std::shared_ptr < caustica::MeshInfo > mesh = task.input.mesh;
 
     for (uint32_t i = 0; i < task.input.geometries.size(); ++i)
     {
@@ -427,11 +427,11 @@ void OmmBuildQueue::Finalize(nvrhi::ICommandList& commandList, BuildTask& task)
     debugData->ommIndexBuffer = task.buffers.ommIndexBuffer;
 
     debugData->ommArrayDataBufferDescriptor =
-        std::make_shared<donut::engine::DescriptorHandle>(m_descriptorTable->CreateDescriptorHandle(nvrhi::BindingSetItem::RawBuffer_SRV(0, task.buffers.ommArrayDataBuffer)));
+        std::make_shared<caustica::DescriptorHandle>(m_descriptorTable->CreateDescriptorHandle(nvrhi::BindingSetItem::RawBuffer_SRV(0, task.buffers.ommArrayDataBuffer)));
     debugData->ommDescBufferDescriptor =
-        std::make_shared<donut::engine::DescriptorHandle>(m_descriptorTable->CreateDescriptorHandle(nvrhi::BindingSetItem::RawBuffer_SRV(0, task.buffers.ommDescBuffer)));
+        std::make_shared<caustica::DescriptorHandle>(m_descriptorTable->CreateDescriptorHandle(nvrhi::BindingSetItem::RawBuffer_SRV(0, task.buffers.ommDescBuffer)));
     debugData->ommIndexBufferDescriptor =
-        std::make_shared<donut::engine::DescriptorHandle>(m_descriptorTable->CreateDescriptorHandle(nvrhi::BindingSetItem::RawBuffer_SRV(0, task.buffers.ommIndexBuffer)));
+        std::make_shared<caustica::DescriptorHandle>(m_descriptorTable->CreateDescriptorHandle(nvrhi::BindingSetItem::RawBuffer_SRV(0, task.buffers.ommIndexBuffer)));
 
     auto mesh = std::static_pointer_cast<MeshInfoEx>(task.input.mesh);
     assert(!mesh->DebugData);

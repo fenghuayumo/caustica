@@ -28,13 +28,13 @@
 #include <nvrhi/nvrhi.h>
 #include <memory>
 
-namespace donut::render
+namespace caustica::render
 {
-    class PlanarShadowMap : public engine::IShadowMap
+    class PlanarShadowMap : public caustica::IShadowMap
     {
     private:
         nvrhi::TextureHandle m_ShadowMapTexture;
-        std::shared_ptr<engine::PlanarView> m_View;
+        std::shared_ptr<caustica::PlanarView> m_View;
         bool m_IsLitOutOfBounds = false;
         dm::float2 m_FadeRangeTexels = 1.f;
         dm::float2 m_ShadowMapSize;
@@ -54,12 +54,12 @@ namespace donut::render
             const nvrhi::Viewport& viewport);
 
         bool SetupWholeSceneDirectionalLightView(
-            const engine::DirectionalLight& light, 
+            const caustica::DirectionalLight& light, 
             dm::box3_arg sceneBounds, 
             float fadeRangeWorld = 0.f);
 
         bool SetupDynamicDirectionalLightView(
-            const engine::DirectionalLight& light, 
+            const caustica::DirectionalLight& light, 
             dm::float3 anchor, 
             dm::float3 halfShadowBoxSize, 
             dm::float3 preViewTranslation = 0.f,
@@ -72,10 +72,10 @@ namespace donut::render
         void SetLitOutOfBounds(bool litOutOfBounds);
         void SetFalloffDistance(float distance);
 
-        std::shared_ptr<engine::PlanarView> GetPlanarView();
+        std::shared_ptr<caustica::PlanarView> GetPlanarView();
 
         virtual dm::float4x4 GetWorldToUvzwMatrix() const override;
-        virtual const engine::ICompositeView& GetView() const override;
+        virtual const caustica::ICompositeView& GetView() const override;
         virtual nvrhi::ITexture* GetTexture() const override;
         virtual uint32_t GetNumberOfCascades() const override;
         virtual const IShadowMap* GetCascade(uint32_t index) const override;

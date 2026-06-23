@@ -22,11 +22,10 @@
 
 #include <SampleCommon/SampleCommon.h>
 
-using namespace donut;
-using namespace donut::math;
-using namespace donut::engine;
+using namespace caustica::math;
+using namespace caustica;
 
-EnvMapImportanceSamplingBaker::EnvMapImportanceSamplingBaker( nvrhi::IDevice* device, std::shared_ptr<donut::engine::ShaderFactory> shaderFactory )
+EnvMapImportanceSamplingBaker::EnvMapImportanceSamplingBaker( nvrhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory )
     : m_device(device), m_shaderFactory(shaderFactory)
 {
 }
@@ -171,8 +170,8 @@ void EnvMapImportanceSamplingBaker::CreateImportanceMap()
     texDesc.debugName = "EnvRadianceMap";
     m_radianceMapTexture = m_device->createTexture(texDesc);
 
-    m_MIPMapPass = std::make_unique<donut::render::MipMapGenPass>(m_device, m_shaderFactory, m_importanceMapTexture, donut::render::MipMapGenPass::MODE_COLOR);
-    m_MIPMapPassRad = std::make_unique<donut::render::MipMapGenPass>(m_device, m_shaderFactory, m_radianceMapTexture, donut::render::MipMapGenPass::MODE_COLOR);
+    m_MIPMapPass = std::make_unique<caustica::render::MipMapGenPass>(m_device, m_shaderFactory, m_importanceMapTexture, caustica::render::MipMapGenPass::MODE_COLOR);
+    m_MIPMapPassRad = std::make_unique<caustica::render::MipMapGenPass>(m_device, m_shaderFactory, m_radianceMapTexture, caustica::render::MipMapGenPass::MODE_COLOR);
 }
 
 void EnvMapImportanceSamplingBaker::FillBakerConsts(EnvMapImportanceSamplingBakerConstants & constants, nvrhi::TextureHandle sourceCubemap, int sampleIndex)

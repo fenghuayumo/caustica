@@ -36,7 +36,7 @@
     #define USE_F16C 0
 #endif
 
-namespace donut::math
+namespace caustica::math
 {
     struct FLOAT32
     {

@@ -25,12 +25,11 @@
 #define FFX_CPP
 #include <shaders/render/GPUSort/FFX_ParallelSort.h>
 
-using namespace donut;
-using namespace donut::math;
-using namespace donut::engine;
+using namespace caustica::math;
+using namespace caustica;
 
 
-GPUSort::GPUSort(nvrhi::IDevice* device, std::shared_ptr<donut::engine::ShaderFactory> shaderFactory)
+GPUSort::GPUSort(nvrhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory)
     : m_device(device)
     , m_bindingCache(device)
     , m_shaderFactory(shaderFactory)
@@ -42,7 +41,7 @@ GPUSort::~GPUSort()
 {
 }
 
-void GPUSort::CreateRenderPasses(std::shared_ptr<engine::CommonRenderPasses> commonPasses, std::shared_ptr<ShaderDebug> shaderDebug)
+void GPUSort::CreateRenderPasses(std::shared_ptr<caustica::CommonRenderPasses> commonPasses, std::shared_ptr<ShaderDebug> shaderDebug)
 {
     m_commonPasses = commonPasses;
     m_shaderDebug = shaderDebug;
@@ -75,10 +74,10 @@ void GPUSort::CreateRenderPasses(std::shared_ptr<engine::CommonRenderPasses> com
 
     auto CreateCSPSOPair = [&]( nvrhi::ShaderHandle & shaderHandle, nvrhi::ComputePipelineHandle & psoHandle, const std::string & name, bool initOnly, bool specialInitIndicesFirstPass )
     {
-        std::vector<donut::engine::ShaderMacro> shaderMacros;
+        std::vector<caustica::ShaderMacro> shaderMacros;
 
         if( specialInitIndicesFirstPass )
-            shaderMacros.push_back(donut::engine::ShaderMacro({ "RTXPT_GPUSORT_FIRST_PASS_INIT_INDICES", "1" }));
+            shaderMacros.push_back(caustica::ShaderMacro({ "RTXPT_GPUSORT_FIRST_PASS_INIT_INDICES", "1" }));
 
         shaderHandle = m_shaderFactory->CreateShader("app/engine/shaders/render/GPUSort/GPUSort.hlsl", name.c_str(), &shaderMacros, nvrhi::ShaderType::Compute);
         nvrhi::ComputePipelineDesc pipelineDesc;

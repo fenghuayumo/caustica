@@ -83,7 +83,7 @@ namespace ShaderCompilerUtils
         bool                    EnableDebugPrint = true;
         
         // Additional macros to define
-        std::vector<donut::engine::ShaderMacro> Macros;
+        std::vector<caustica::ShaderMacro> Macros;
         
         // Include paths (in addition to config's external includes)
         std::vector<std::filesystem::path> AdditionalIncludes;

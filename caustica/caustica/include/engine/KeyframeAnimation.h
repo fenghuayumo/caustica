@@ -34,7 +34,7 @@ namespace Json
     class Value;
 }
 
-namespace donut::engine::animation
+namespace caustica::animation
 {
     struct Keyframe
     {

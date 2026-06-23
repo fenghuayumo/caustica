@@ -47,9 +47,9 @@ SOFTWARE.
 #include <engine/imgui_renderer.h>
 #include <core/vfs/VFS.h>
 
-using namespace donut::vfs;
-using namespace donut::engine;
-using namespace donut::app;
+using namespace caustica;
+using namespace caustica;
+using namespace caustica;
 
 ImGui_Renderer::ImGui_Renderer(DeviceManager *devManager)
     : IRenderPass(devManager)
@@ -233,7 +233,7 @@ std::shared_ptr<RegisteredFont> ImGui_Renderer::CreateFontFromMemoryInternal(voi
     // Copy the font data into a blob to make the RegisteredFont object own it
     void* dataCopy = malloc(size);
     memcpy(dataCopy, pData, size);
-    std::shared_ptr<vfs::Blob> blob = std::make_shared<vfs::Blob>(dataCopy, size);
+    std::shared_ptr<caustica::Blob> blob = std::make_shared<caustica::Blob>(dataCopy, size);
     
     auto font = std::make_shared<RegisteredFont>(blob, compressed, fontSize);
     m_fonts.push_back(font);

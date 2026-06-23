@@ -26,12 +26,11 @@
 #include <iostream>
 #include <thread>
 
-using namespace donut;
-using namespace donut::math;
-using namespace donut::app;
-using namespace donut::vfs;
-using namespace donut::engine;
-using namespace donut::render;
+using namespace caustica::math;
+using namespace caustica;
+using namespace caustica;
+using namespace caustica;
+using namespace caustica::render;
 
 using namespace game;
 
@@ -111,7 +110,7 @@ ModelType::ModelType(class GameScene & game, const std::string & name, const Jso
         ///m_lightsInfoJson = SaveJsonToString(lights);
     }
 
-    const std::vector<donut::engine::SceneImportResult>& models = scene->GetModels();
+    const std::vector<caustica::SceneImportResult>& models = scene->GetModels();
 
     if (modelIndex==-1 && modelName != "")
         for( int i = 0; i < models.size(); i++ )
@@ -123,7 +122,7 @@ ModelType::ModelType(class GameScene & game, const std::string & name, const Jso
 
     if (modelIndex<0 || modelIndex>=models.size())
     {
-        log::warning("Referenced model %d is not defined in the model array.", modelIndex);
+        caustica::warning("Referenced model %d is not defined in the model array.", modelIndex);
         return; 
     }
 
@@ -147,7 +146,7 @@ std::string ModelType::FindLightControllerInfo( const std::string & nodeName )
         return it->second;
 }
 
-ModelInstance::ModelInstance( const std::string & name, const std::shared_ptr<ModelType> & modelType, const std::shared_ptr<donut::engine::SceneGraphNode> & parentNode )
+ModelInstance::ModelInstance( const std::string & name, const std::shared_ptr<ModelType> & modelType, const std::shared_ptr<caustica::SceneGraphNode> & parentNode )
     : m_modelType(modelType)
 {
     assert( modelType != nullptr );
@@ -190,7 +189,7 @@ void ModelInstance::MapLightControllers( SceneGraphNode* node )
         }
         else
         {
-            log::warning( "Model instance '%s', light '%s' has no controller", m_node->GetName().c_str(), node->GetName().c_str() );
+            caustica::warning( "Model instance '%s', light '%s' has no controller", m_node->GetName().c_str(), node->GetName().c_str() );
         }
     }
     for (int i = 0; i < node->GetNumChildren(); i++)

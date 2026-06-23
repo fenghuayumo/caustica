@@ -27,7 +27,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-namespace donut::vfs
+namespace caustica
 {
     /* 
     A read-only file system that provides access to files in a tar archive.

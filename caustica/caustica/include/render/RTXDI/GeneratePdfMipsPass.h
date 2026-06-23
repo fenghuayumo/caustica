@@ -13,7 +13,7 @@
 #include <nvrhi/nvrhi.h>
 #include <memory>
 
-namespace donut::engine
+namespace caustica
 {
     class ShaderFactory;
 }
@@ -23,7 +23,7 @@ class GenerateMipsPass
 public:
     GenerateMipsPass(
         nvrhi::IDevice* device,
-        std::shared_ptr<donut::engine::ShaderFactory> shaderFactory,
+        std::shared_ptr<caustica::ShaderFactory> shaderFactory,
         nvrhi::ITexture* sourceEnvironmentMap,
         nvrhi::ITexture* destinationTexture);
     ~GenerateMipsPass();

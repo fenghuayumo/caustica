@@ -48,12 +48,12 @@
 #endif
 #endif
 
-using namespace donut::math;
+using namespace caustica::math;
 #include <shaders/depth_cb.h>
 
 
-using namespace donut::engine;
-using namespace donut::render;
+using namespace caustica;
+using namespace caustica::render;
 
 DepthPass::DepthPass(
     nvrhi::IDevice* device,
@@ -243,7 +243,7 @@ nvrhi::BindingSetHandle DepthPass::GetOrCreateInputBindingSet(const BufferGroup*
 }
 
 void DepthPass::SetPushConstants(
-    donut::render::GeometryPassContext& abstractContext,
+    caustica::render::GeometryPassContext& abstractContext,
     nvrhi::ICommandList* commandList,
     nvrhi::GraphicsState& state,
     nvrhi::DrawArguments& args)
@@ -270,7 +270,7 @@ ViewType::Enum DepthPass::GetSupportedViewTypes() const
     return ViewType::PLANAR;
 }
 
-void DepthPass::SetupView(GeometryPassContext& abstractContext, nvrhi::ICommandList* commandList, const engine::IView* view, const engine::IView* viewPrev)
+void DepthPass::SetupView(GeometryPassContext& abstractContext, nvrhi::ICommandList* commandList, const caustica::IView* view, const caustica::IView* viewPrev)
 {
     auto& context = static_cast<Context&>(abstractContext);
     
@@ -282,7 +282,7 @@ void DepthPass::SetupView(GeometryPassContext& abstractContext, nvrhi::ICommandL
     context.keyTemplate.bits.reverseDepth = view->IsReverseDepth();
 }
 
-bool DepthPass::SetupMaterial(GeometryPassContext& abstractContext, const engine::Material* material, nvrhi::RasterCullMode cullMode, nvrhi::GraphicsState& state)
+bool DepthPass::SetupMaterial(GeometryPassContext& abstractContext, const caustica::Material* material, nvrhi::RasterCullMode cullMode, nvrhi::GraphicsState& state)
 {
     auto& context = static_cast<Context&>(abstractContext);
 
@@ -340,7 +340,7 @@ bool DepthPass::SetupMaterial(GeometryPassContext& abstractContext, const engine
     return true;
 }
 
-void DepthPass::SetupInputBuffers(GeometryPassContext& abstractContext, const engine::BufferGroup* buffers, nvrhi::GraphicsState& state)
+void DepthPass::SetupInputBuffers(GeometryPassContext& abstractContext, const caustica::BufferGroup* buffers, nvrhi::GraphicsState& state)
 {
     auto& context = static_cast<Context&>(abstractContext);
 

@@ -28,17 +28,17 @@
 #include <nvrhi/nvrhi.h>
 #include <memory>
 
-namespace donut::render
+namespace caustica::render
 {
     class PlanarShadowMap;
 
-    class CascadedShadowMap : public engine::IShadowMap
+    class CascadedShadowMap : public caustica::IShadowMap
     {
     private:
         nvrhi::TextureHandle m_ShadowMapTexture;
         std::vector<std::shared_ptr<PlanarShadowMap>> m_Cascades;
         std::vector<std::shared_ptr<PlanarShadowMap>> m_PerObjectShadows;
-        engine::CompositeView m_CompositeView;
+        caustica::CompositeView m_CompositeView;
         int m_NumberOfCascades;
 
     public:
@@ -52,7 +52,7 @@ namespace donut::render
 
         // Computes the cascade projections based on the view frustum, shadow distance, and the distribution exponent.
         bool SetupForPlanarView(
-            const engine::DirectionalLight& light, 
+            const caustica::DirectionalLight& light, 
             dm::frustum viewFrustum, 
             float maxShadowDistance, 
             float lightSpaceZUp, 
@@ -65,7 +65,7 @@ namespace donut::render
         // the shadow map texels have the same world space projections when the camera turns or moves.
         // The downside of this algorithm is that the cascades are often larger than necessary.
         bool SetupForPlanarViewStable(
-            const engine::DirectionalLight& light, 
+            const caustica::DirectionalLight& light, 
             dm::frustum projectionFrustum, 
             dm::affine3 inverseViewMatrix, 
             float maxShadowDistance, 
@@ -77,7 +77,7 @@ namespace donut::render
 
         // Computes the cascade projections to cover an omnidirectional view from a given point. The cascades are all centered on that point.
         bool SetupForCubemapView(
-            const engine::DirectionalLight& light, 
+            const caustica::DirectionalLight& light, 
             dm::float3 center, 
             float maxShadowDistance, float lightSpaceZUp, 
             float lightSpaceZDown, 
@@ -85,7 +85,7 @@ namespace donut::render
             int numberOfCascades = -1);
 
         // Computes a simple directional shadow projection that covers a given world space box.
-        bool SetupPerObjectShadow(const engine::DirectionalLight& light, uint32_t object, const dm::box3& objectBounds);
+        bool SetupPerObjectShadow(const caustica::DirectionalLight& light, uint32_t object, const dm::box3& objectBounds);
 
         void SetupProxyViews();
 
@@ -95,11 +95,11 @@ namespace donut::render
         void SetFalloffDistance(float distance);
 		void SetNumberOfCascadesUnsafe(int cascades);
 
-        std::shared_ptr<engine::PlanarView> GetCascadeView(uint32_t cascade);
-        std::shared_ptr<engine::PlanarView> GetPerObjectView(uint32_t object);
+        std::shared_ptr<caustica::PlanarView> GetCascadeView(uint32_t cascade);
+        std::shared_ptr<caustica::PlanarView> GetPerObjectView(uint32_t object);
 
         virtual dm::float4x4 GetWorldToUvzwMatrix() const override;
-        virtual const engine::ICompositeView& GetView() const override;
+        virtual const caustica::ICompositeView& GetView() const override;
         virtual nvrhi::ITexture* GetTexture() const override;
         virtual uint32_t GetNumberOfCascades() const override;
         virtual const IShadowMap* GetCascade(uint32_t index) const override;

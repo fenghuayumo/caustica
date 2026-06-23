@@ -31,13 +31,13 @@
 #include <functional>
 
 
-namespace donut::vfs
+namespace caustica
 {
     class IBlob;
     class IFileSystem;
 }
 
-namespace donut::engine
+namespace caustica
 {
     struct ShaderMacro
     {
@@ -59,21 +59,21 @@ namespace donut::engine
     };
 
     #if DONUT_WITH_DX11 && DONUT_WITH_STATIC_SHADERS
-    #define DONUT_MAKE_DXBC_SHADER(symbol) donut::engine::StaticShader{symbol,sizeof(symbol)}
+    #define DONUT_MAKE_DXBC_SHADER(symbol) caustica::StaticShader{symbol,sizeof(symbol)}
     #else
-    #define DONUT_MAKE_DXBC_SHADER(symbol) donut::engine::StaticShader()
+    #define DONUT_MAKE_DXBC_SHADER(symbol) caustica::StaticShader()
     #endif
 
     #if DONUT_WITH_DX12 && DONUT_WITH_STATIC_SHADERS
-    #define DONUT_MAKE_DXIL_SHADER(symbol) donut::engine::StaticShader{symbol,sizeof(symbol)}
+    #define DONUT_MAKE_DXIL_SHADER(symbol) caustica::StaticShader{symbol,sizeof(symbol)}
     #else
-    #define DONUT_MAKE_DXIL_SHADER(symbol) donut::engine::StaticShader()
+    #define DONUT_MAKE_DXIL_SHADER(symbol) caustica::StaticShader()
     #endif
 
     #if DONUT_WITH_VULKAN && DONUT_WITH_STATIC_SHADERS
-    #define DONUT_MAKE_SPIRV_SHADER(symbol) donut::engine::StaticShader{symbol,sizeof(symbol)}
+    #define DONUT_MAKE_SPIRV_SHADER(symbol) caustica::StaticShader{symbol,sizeof(symbol)}
     #else
-    #define DONUT_MAKE_SPIRV_SHADER(symbol) donut::engine::StaticShader()
+    #define DONUT_MAKE_SPIRV_SHADER(symbol) caustica::StaticShader()
     #endif
 
     // Macro to use with ShaderFactory::CreateStaticPlatformShader.
@@ -90,21 +90,21 @@ namespace donut::engine
     {
     private:
         nvrhi::DeviceHandle m_Device;
-        std::unordered_map<std::string, std::shared_ptr<vfs::IBlob>> m_BytecodeCache;
-		std::shared_ptr<vfs::IFileSystem> m_fs;
+        std::unordered_map<std::string, std::shared_ptr<caustica::IBlob>> m_BytecodeCache;
+		std::shared_ptr<caustica::IFileSystem> m_fs;
 		std::filesystem::path m_basePath;
 
     public:
         ShaderFactory(
             nvrhi::DeviceHandle device,
-            std::shared_ptr<vfs::IFileSystem> fs,
+            std::shared_ptr<caustica::IFileSystem> fs,
 			const std::filesystem::path& basePath);
 
         virtual ~ShaderFactory();
 
         void ClearCache();
 
-        std::shared_ptr<vfs::IBlob> GetBytecode(const char* fileName, const char* entryName);
+        std::shared_ptr<caustica::IBlob> GetBytecode(const char* fileName, const char* entryName);
 
         // Creates a shader from binary file.
         nvrhi::ShaderHandle CreateShader(const char* fileName, const char* entryName, const std::vector<ShaderMacro>* pDefines, const nvrhi::ShaderDesc& desc);

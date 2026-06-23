@@ -50,7 +50,7 @@ public:
 
     // Queue a Python source file or expression for execution on the next
     // ProcessPendingScripts() call. Both paths are exception-safe and never
-    // throw; failures are logged via donut::log.
+    // throw; failures are logged via caustica.
     void QueueScriptFile(const std::filesystem::path& scriptPath);
     void QueueScriptString(std::string code, std::string label = "<inline>");
 

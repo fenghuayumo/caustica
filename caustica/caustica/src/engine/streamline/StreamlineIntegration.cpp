@@ -75,10 +75,9 @@
 // Set this to a game's specific sdk version
 static constexpr uint64_t SDK_VERSION = sl::kSDKVersion;
 
-using namespace donut;
-using namespace donut::engine;
+using namespace caustica;
 
-namespace donut::app 
+namespace caustica 
 {
 
 // Format conversion functions
@@ -117,16 +116,16 @@ static void logFunctionCallback(sl::LogType type, const char* msg)
     if (type == sl::LogType::eError)
     {
         // Add a breakpoint here to break on errors
-        donut::log::error(msg);
+        caustica::error(msg);
     }
     if (type == sl::LogType::eWarn)
     {
         // Add a breakpoint here to break on warnings
-        donut::log::warning(msg);
+        caustica::warning(msg);
     }
     else
     {
-        donut::log::info(msg);
+        caustica::info(msg);
     }
 }
 
@@ -234,7 +233,7 @@ bool StreamlineIntegration::InitializePreDevice(nvrhi::GraphicsAPI api, int appI
 {
     if (m_slInitialized)
     {
-        log::info("StreamlineIntegration is already initialised.");
+        caustica::info("StreamlineIntegration is already initialised.");
         return true;
     }
 
@@ -311,14 +310,14 @@ bool StreamlineIntegration::InitializePreDevice(nvrhi::GraphicsAPI api, int appI
 
     if (!interposer)
     {
-        donut::log::error("Unable to load Streamline Interposer");
+        caustica::error("Unable to load Streamline Interposer");
         return false;
     }
 
     m_slInitialized = successCheck(slInit(pref, SDK_VERSION), "slInit");
     if (!m_slInitialized)
     {
-        log::error("Failed to initialise SL.");
+        caustica::error("Failed to initialise SL.");
         return false;
     }
 
@@ -331,7 +330,7 @@ bool StreamlineIntegration::SetD3DDevice(IUnknown* nativeDevice)
     bool result = successCheck(slSetD3DDevice(nativeDevice), "slSetD3DDevice");
     if (!result)
     {
-        log::error("Failed to initialise SL.");
+        caustica::error("Failed to initialise SL.");
     }
     return result;
 }
@@ -362,7 +361,7 @@ bool StreamlineIntegration::UpgradeInterface(IUnknown*& interfacePointer)
     sl::Result slRes = slUpgradeInterface((void**)&interfacePointer);
     if (slRes != sl::Result::eOk)
     {
-        donut::log::error("slUpgradeInterface failed.\n");
+        caustica::error("slUpgradeInterface failed.\n");
         return false;
     }
     // Release the native interface
@@ -388,7 +387,7 @@ uint32_t StreamlineIntegration::CheckNumSupportedFeatures(const sl::AdapterInfo 
             sl::Result res = slIsFeatureSupported(feature, adapterInfo);
             if (res == sl::Result::eOk)
             {
-                log::info((feature_name + " is supported on this adapter").c_str());
+                caustica::info((feature_name + " is supported on this adapter").c_str());
             }
             else
             {
@@ -399,7 +398,7 @@ uint32_t StreamlineIntegration::CheckNumSupportedFeatures(const sl::AdapterInfo 
                     errorType = a->second;
                 }
 
-                log::info((feature_name + " is NOT supported on this adapter with error: " + errorType).c_str());
+                caustica::info((feature_name + " is NOT supported on this adapter with error: " + errorType).c_str());
             }
             return (res == sl::Result::eOk);
         };
@@ -441,7 +440,7 @@ uint32_t StreamlineIntegration::FindBestAdapterDX()
         HRESULT hres = CreateDXGIFactory1(IID_PPV_ARGS(&DXGIFactory));
         if (hres != S_OK)
         {
-            donut::log::info("failed to CreateDXGIFactory when finding adapters.\n");
+            caustica::info("failed to CreateDXGIFactory when finding adapters.\n");
             return foundAdapter;
         }
 
@@ -464,7 +463,7 @@ uint32_t StreamlineIntegration::FindBestAdapterDX()
             adapterInfo.deviceLUID = (uint8_t*)&adapterDesc.AdapterLuid;
             adapterInfo.deviceLUIDSizeInBytes = sizeof(LUID);
 
-            log::info("Found adapter: %S, DeviceId=0x%X, Vendor: %i", adapterDesc.Description, adapterDesc.DeviceId, adapterDesc.VendorId);
+            caustica::info("Found adapter: %S, DeviceId=0x%X, Vendor: %i", adapterDesc.Description, adapterDesc.DeviceId, adapterDesc.VendorId);
 
             int supportedSLFeatureCnt = CheckNumSupportedFeatures(adapterInfo);
             if (supportedSLFeatureCnt > maxSLSupportedFeatures)
@@ -480,11 +479,11 @@ uint32_t StreamlineIntegration::FindBestAdapterDX()
 
         if (pBestAdapter != nullptr)
         {
-            log::info("Using adapter: %S, DeviceId=0x%X, Vendor: %i", bestAdapterDesc.Description, bestAdapterDesc.DeviceId, bestAdapterDesc.VendorId);
+            caustica::info("Using adapter: %S, DeviceId=0x%X, Vendor: %i", bestAdapterDesc.Description, bestAdapterDesc.DeviceId, bestAdapterDesc.VendorId);
         }
         else
         {
-            log::info("No ideal adapter was found, we will use the default adapter.");
+            caustica::info("No ideal adapter was found, we will use the default adapter.");
         }
 
         if (DXGIFactory)
@@ -513,7 +512,7 @@ uint32_t StreamlineIntegration::FindBestAdapterVulkan(const std::vector <vk::Phy
 
             auto adapterDesc = ((vk::PhysicalDevice)devicePtr).getProperties();
             auto str = adapterDesc.deviceName.data();
-            log::info("Found adapter: %s, DeviceId=0x%X, Vendor: %i", str, adapterDesc.deviceID, adapterDesc.vendorID);
+            caustica::info("Found adapter: %s, DeviceId=0x%X, Vendor: %i", str, adapterDesc.deviceID, adapterDesc.vendorID);
 
             int supportedSLFeatureCnt = CheckNumSupportedFeatures(adapterInfo);
             if (supportedSLFeatureCnt > maxSLSupportedFeatures)
@@ -529,11 +528,11 @@ uint32_t StreamlineIntegration::FindBestAdapterVulkan(const std::vector <vk::Phy
         if (pBestAdapter != nullptr)
         {
             auto str = bestAdapterDesc.deviceName.data();
-            log::info("Using adapter: %s, DeviceId=0x%X, Vendor: %i", str, bestAdapterDesc.deviceID, bestAdapterDesc.vendorID);
+            caustica::info("Using adapter: %s, DeviceId=0x%X, Vendor: %i", str, bestAdapterDesc.deviceID, bestAdapterDesc.vendorID);
         }
         else
         {
-            log::info("No ideal adapter was found, we will use the default adapter.");
+            caustica::info("No ideal adapter was found, we will use the default adapter.");
         }
     }
     return foundAdapter;
@@ -569,42 +568,42 @@ void StreamlineIntegration::UpdateFeatureAvailable()
     // Check if features are fully functional (2nd call of slIsFeatureSupported onwards)
 #if STREAMLINE_FEATURE_DLSS_SR
     m_dlssAvailable = sl::Result::eOk == slIsFeatureSupported(sl::kFeatureDLSS, adapterInfo), "slIsFeatureSupported_DLSS";
-    if (m_dlssAvailable) log::info("DLSS is supported on this system.");
-    else log::warning("DLSS is not fully functional on this system.");
+    if (m_dlssAvailable) caustica::info("DLSS is supported on this system.");
+    else caustica::warning("DLSS is not fully functional on this system.");
 #endif
 
 #if STREAMLINE_FEATURE_NIS
     m_nisAvailable = sl::Result::eOk == slIsFeatureSupported(sl::kFeatureNIS, adapterInfo), "slIsFeatureSupported_NIS";
-    if (m_nisAvailable) log::info("NIS is supported on this system.");
-    else log::warning("NIS is not fully functional on this system.");
+    if (m_nisAvailable) caustica::info("NIS is supported on this system.");
+    else caustica::warning("NIS is not fully functional on this system.");
 #endif
 
 #if STREAMLINE_FEATURE_DLSS_FG
     m_dlssgAvailable = sl::Result::eOk == slIsFeatureSupported(sl::kFeatureDLSS_G, adapterInfo), "slIsFeatureSupported_DLSSG";
-    if (m_dlssgAvailable) log::info("DLSS-G is supported on this system.");
-    else log::warning("DLSS-G is not fully functional on this system.");
+    if (m_dlssgAvailable) caustica::info("DLSS-G is supported on this system.");
+    else caustica::warning("DLSS-G is not fully functional on this system.");
 #endif
 
     m_pclAvailable = sl::Result::eOk == slIsFeatureSupported(sl::kFeaturePCL, adapterInfo), "slIsFeatureSupported_PCL";
-    if (m_pclAvailable) log::info("PCL is supported on this system.");
-    else log::warning("PCL is not fully functional on this system.");
+    if (m_pclAvailable) caustica::info("PCL is supported on this system.");
+    else caustica::warning("PCL is not fully functional on this system.");
 
 #if STREAMLINE_FEATURE_REFLEX
     m_reflexAvailable = sl::Result::eOk == slIsFeatureSupported(sl::kFeatureReflex, adapterInfo), "slIsFeatureSupported_REFLEX";
-    if (m_reflexAvailable) log::info("Reflex is supported on this system.");
-    else log::warning("Reflex is not fully functional on this system.");
+    if (m_reflexAvailable) caustica::info("Reflex is supported on this system.");
+    else caustica::warning("Reflex is not fully functional on this system.");
 #endif
 
 #if STREAMLINE_FEATURE_DEEPDVC
     m_deepdvcAvailable = sl::Result::eOk == slIsFeatureSupported(sl::kFeatureDeepDVC, adapterInfo), "slIsFeatureSupported_DeepDVC";
-    if (m_deepdvcAvailable) log::info("DeepDVC is supported on this system.");
-    else log::warning("DeepDVC is not fully functional on this system.");
+    if (m_deepdvcAvailable) caustica::info("DeepDVC is supported on this system.");
+    else caustica::warning("DeepDVC is not fully functional on this system.");
 #endif
 
 #if STREAMLINE_FEATURE_DLSS_RR && STREAMLINE_HAS_DLSS_RR
     m_dlssrrAvailable = sl::Result::eOk == slIsFeatureSupported(sl::kFeatureDLSS_RR, adapterInfo), "slIsFeatureSupported_DLSSRR";
-    if (m_dlssrrAvailable) log::info("DLSS-RR is supported on this system.");
-    else log::warning("DLSS-RR is not fully functional on this system.");
+    if (m_dlssrrAvailable) caustica::info("DLSS-RR is supported on this system.");
+    else caustica::warning("DLSS-RR is not fully functional on this system.");
 #endif
 }
 
@@ -673,7 +672,7 @@ void StreamlineIntegration::SetConstants(const Constants& consts)
 
     if (!m_slInitialized)
     {
-        log::warning("SL not initialised.");
+        caustica::warning("SL not initialised.");
         return;
     }
 
@@ -740,7 +739,7 @@ void StreamlineIntegration::SetDLSSOptions(const DLSSOptions& options)
 {
     if (!m_slInitialized || !m_dlssAvailable)
     {
-        log::warning("SL not initialised or DLSS not available.");
+        caustica::warning("SL not initialised or DLSS not available.");
         return;
     }
 
@@ -751,7 +750,7 @@ void StreamlineIntegration::QueryDLSSOptimalSettings(const DLSSOptions& options,
 {
     if (!m_slInitialized || !m_dlssAvailable)
     {
-        log::warning("SL not initialised or DLSS not available.");
+        caustica::warning("SL not initialised or DLSS not available.");
         settings = DLSSSettings{};
         return;
     }
@@ -828,7 +827,7 @@ void StreamlineIntegration::SetDLSSRROptions(const DLSSRROptions& options)
 #if STREAMLINE_HAS_DLSS_RR
     if (!m_slInitialized || !m_dlssrrAvailable)
     {
-        log::warning("SL not initialised or DLSS-RR not available.");
+        caustica::warning("SL not initialised or DLSS-RR not available.");
         return;
     }
 
@@ -841,7 +840,7 @@ void StreamlineIntegration::QueryDLSSRROptimalSettings(const DLSSRROptions& opti
 #if STREAMLINE_HAS_DLSS_RR
     if (!m_slInitialized || !m_dlssrrAvailable)
     {
-        log::warning("SL not initialised or DLSS RR is not available.");
+        caustica::warning("SL not initialised or DLSS RR is not available.");
         settings = DLSSRRSettings{};
         return;
     }
@@ -864,7 +863,7 @@ void StreamlineIntegration::CleanupDLSS(bool wfi)
 {
     if (!m_slInitialized)
     {
-        log::warning("SL not initialised.");
+        caustica::warning("SL not initialised.");
         return;
     }
 
@@ -875,7 +874,7 @@ void StreamlineIntegration::CleanupDLSS(bool wfi)
 
     if (!m_dlssAvailable)
     {
-        log::warning("DLSS not available.");
+        caustica::warning("DLSS not available.");
         return;
     }
 
@@ -908,7 +907,7 @@ void StreamlineIntegration::SetNISOptions(const NISOptions& options)
 
     if (!m_slInitialized || !m_nisAvailable)
     {
-        log::warning("SL not initialised or DLSS not available.");
+        caustica::warning("SL not initialised or DLSS not available.");
         return;
     }
 
@@ -919,13 +918,13 @@ void StreamlineIntegration::CleanupNIS(bool wfi)
 {
     if (!m_slInitialized)
     {
-        log::warning("SL not initialised.");
+        caustica::warning("SL not initialised.");
         return;
     }
 
     if (!m_nisAvailable)
     {
-        log::warning("NIS not available.");
+        caustica::warning("NIS not available.");
         return;
     }
 
@@ -950,7 +949,7 @@ void StreamlineIntegration::SetDeepDVCOptions(const DeepDVCOptions& options)
 
     if (!m_slInitialized || !m_deepdvcAvailable)
     {
-        log::warning("SL not initialised or DeepDVC not available.");
+        caustica::warning("SL not initialised or DeepDVC not available.");
         return;
     }
 
@@ -961,13 +960,13 @@ void StreamlineIntegration::CleanupDeepDVC()
 {
     if (!m_slInitialized)
     {
-        log::warning("SL not initialised.");
+        caustica::warning("SL not initialised.");
         return;
     }
 
     if (!m_deepdvcAvailable)
     {
-        log::warning("DeepDVC not available.");
+        caustica::warning("DeepDVC not available.");
         return;
     }
 
@@ -979,7 +978,7 @@ void StreamlineIntegration::SetDLSSGOptions(const DLSSGOptions& options)
 {
     if (!m_slInitialized || !m_dlssgAvailable)
     {
-        log::warning("SL not initialised or DLSSG not available.");
+        caustica::warning("SL not initialised or DLSSG not available.");
         return;
     }
 
@@ -1012,7 +1011,7 @@ void StreamlineIntegration::GetDLSSGState(DLSSGState& state, const DLSSGOptions&
 {
     if (!m_slInitialized || !m_dlssgAvailable)
     {
-        log::warning("SL not initialised or DLSSG not available.");
+        caustica::warning("SL not initialised or DLSSG not available.");
         return;
     }
 
@@ -1047,7 +1046,7 @@ void StreamlineIntegration::GetDLSSGState(DLSSGState& state, const DLSSGOptions&
     case (sl::DLSSGStatus::eFailCommonConstantsInvalid)             : state.status = DLSSGStatus::eFailCommonConstantsInvalid; break;
     case (sl::DLSSGStatus::eFailGetCurrentBackBufferIndexNotCalled) : state.status = DLSSGStatus::eFailGetCurrentBackBufferIndexNotCalled; break;
     default:
-        log::warning("DLSSG status is unknown.");
+        caustica::warning("DLSSG status is unknown.");
         break;
     }
     state.minWidthOrHeight = slState.minWidthOrHeight;
@@ -1062,13 +1061,13 @@ void StreamlineIntegration::CleanupDLSSG(bool wfi)
 {
     if (!m_slInitialized)
     {
-        log::warning("SL not initialised.");
+        caustica::warning("SL not initialised.");
         return;
     }
 
     if (!m_dlssgAvailable)
     {
-        log::warning("DLSSG not available.");
+        caustica::warning("DLSSG not available.");
         return;
     }
 
@@ -1088,7 +1087,7 @@ sl::Resource StreamlineIntegration::AllocateResourceCallback(const sl::ResourceA
 
     if (device == nullptr)
     {
-        log::warning("No device available for allocation.");
+        caustica::warning("No device available for allocation.");
         return res;
     }
 
@@ -1103,7 +1102,7 @@ sl::Resource StreamlineIntegration::AllocateResourceCallback(const sl::ResourceA
             ID3D11Device* pd3d11Device = (ID3D11Device*)device;
             ID3D11Buffer* pbuffer;
             bool success = SUCCEEDED(pd3d11Device->CreateBuffer(desc, nullptr, &pbuffer));
-            if (!success) log::error("Failed to create buffer in SL allocation callback");
+            if (!success) caustica::error("Failed to create buffer in SL allocation callback");
             res.type = resDesc->type;
             res.native = pbuffer;
 
@@ -1119,7 +1118,7 @@ sl::Resource StreamlineIntegration::AllocateResourceCallback(const sl::ResourceA
             ID3D12Device* pd3d12Device = (ID3D12Device*)device;
             ID3D12Resource* pbuffer;
             bool success = SUCCEEDED(pd3d12Device->CreateCommittedResource(heap, D3D12_HEAP_FLAG_NONE, desc, state, nullptr, IID_PPV_ARGS(&pbuffer)));
-            if (!success) log::error("Failed to create buffer in SL allocation callback");
+            if (!success) caustica::error("Failed to create buffer in SL allocation callback");
             res.type = resDesc->type;
             res.native = pbuffer;
         }
@@ -1134,7 +1133,7 @@ sl::Resource StreamlineIntegration::AllocateResourceCallback(const sl::ResourceA
             ID3D11Device* pd3d11Device = (ID3D11Device*)device;
             ID3D11Texture2D* ptexture;
             bool success = SUCCEEDED(pd3d11Device->CreateTexture2D(desc, nullptr, &ptexture));
-            if (!success) log::error("Failed to create texture in SL allocation callback");
+            if (!success) caustica::error("Failed to create texture in SL allocation callback");
             res.type = resDesc->type;
             res.native = ptexture;
 
@@ -1159,7 +1158,7 @@ sl::Resource StreamlineIntegration::AllocateResourceCallback(const sl::ResourceA
                 pClearValue = &clearValue;
             }
             bool success = SUCCEEDED(pd3d12Device->CreateCommittedResource(heap, D3D12_HEAP_FLAG_NONE, desc, state, pClearValue, IID_PPV_ARGS(&ptexture)));
-            if (!success) log::error("Failed to create texture in SL allocation callback");
+            if (!success) caustica::error("Failed to create texture in SL allocation callback");
             res.type = resDesc->type;
             res.native = ptexture;
         }
@@ -1219,7 +1218,7 @@ nvrhi::Object StreamlineIntegration::GetNativeCommandList(nvrhi::ICommandList* c
 
     if (commandList == nullptr)
     {
-        log::error("Invalid command list!");
+        caustica::error("Invalid command list!");
         return nullptr;
     }
 
@@ -1265,17 +1264,17 @@ static void GetSLResource(
     nvrhi::ICommandList* commandList,
     sl::Resource& slResource,
     nvrhi::ITexture* inputTex,
-    const donut::engine::IView* view)
+    const caustica::IView* view)
 {
     if (commandList == nullptr)
     {
-        log::error("Invalid command list!");
+        caustica::error("Invalid command list!");
         return;
     }
 
     if (commandList->getDevice() == nullptr)
     {
-        log::error("No device available.");
+        caustica::error("No device available.");
         return;
     }
 
@@ -1319,21 +1318,21 @@ static void GetSLResource(
 #endif
 
     default:
-        log::error("Unsupported graphics API.");
+        caustica::error("Unsupported graphics API.");
         break;
     }
 }
 
 void StreamlineIntegration::TagResourcesGeneral(
     nvrhi::ICommandList* commandList,
-    const donut::engine::IView* view,
+    const caustica::IView* view,
     nvrhi::ITexture* motionVectors,
     nvrhi::ITexture* depth,
     nvrhi::ITexture* finalColorHudless)
 {
     if (!m_slInitialized)
     {
-        log::warning("Streamline not initialised.");
+        caustica::warning("Streamline not initialised.");
         return;
     }
 
@@ -1356,13 +1355,13 @@ void StreamlineIntegration::TagResourcesGeneral(
 
 void StreamlineIntegration::TagResourcesDLSSNIS(
     nvrhi::ICommandList* commandList,
-    const donut::engine::IView* view,
+    const caustica::IView* view,
     nvrhi::ITexture* Output,
     nvrhi::ITexture* Input)
 {
     if (!m_slInitialized)
     {
-        log::warning("Streamline not initialised.");
+        caustica::warning("Streamline not initialised.");
         return;
     }
 
@@ -1388,7 +1387,7 @@ void StreamlineIntegration::TagResourcesDLSSFG(
 {
     if (!m_slInitialized)
     {
-        log::warning("Streamline not initialised.");
+        caustica::warning("Streamline not initialised.");
         return;
     }
 
@@ -1404,12 +1403,12 @@ void StreamlineIntegration::TagResourcesDLSSFG(
 
 void StreamlineIntegration::TagResourcesDeepDVC(
     nvrhi::ICommandList* commandList,
-    const donut::engine::IView* view,
+    const caustica::IView* view,
     nvrhi::ITexture* Output)
 {
     if (!m_slInitialized)
     {
-        log::warning("Streamline not initialised.");
+        caustica::warning("Streamline not initialised.");
         return;
     }
 
@@ -1435,7 +1434,7 @@ void StreamlineIntegration::UnTagResourcesDeepDVC()
 
 void StreamlineIntegration::TagResourcesDLSSRR(
     nvrhi::ICommandList* commandList,
-    const donut::engine::IView* view,
+    const caustica::IView* view,
     dm::int2 renderSize,
     dm::int2 displaySize,
     nvrhi::ITexture* inputColor,
@@ -1450,18 +1449,18 @@ void StreamlineIntegration::TagResourcesDLSSRR(
 {
     if (!m_slInitialized)
     {
-        log::warning("Streamline not initialised.");
+        caustica::warning("Streamline not initialised.");
         return;
     }
     if (m_device == nullptr)
     {
-        log::error("No device available.");
+        caustica::error("No device available.");
         return;
     }
 
     if ((specHitDist != nullptr && specMotionVectors != nullptr) || (specHitDist == nullptr && specMotionVectors == nullptr))
     {
-        log::error("SpecHitDist and SpecMotionVectors are mutually exclusive - only one or the other can be used");
+        caustica::error("SpecHitDist and SpecMotionVectors are mutually exclusive - only one or the other can be used");
         return;
     }
 
@@ -1514,7 +1513,7 @@ void StreamlineIntegration::EvaluateDLSS(nvrhi::ICommandList* commandList)
     void* nativeCommandList = GetNativeCommandList(commandList);
     if (nativeCommandList == nullptr)
     {
-        log::warning("Failed to retrieve context for DLSS evaluation.");
+        caustica::warning("Failed to retrieve context for DLSS evaluation.");
         return;
     }
 
@@ -1532,7 +1531,7 @@ void StreamlineIntegration::EvaluateDLSSRR(nvrhi::ICommandList* commandList)
     void* nativeCommandList = GetNativeCommandList(commandList);
     if (nativeCommandList == nullptr)
     {
-        log::warning("Failed to retrieve context for DLSS evaluation.");
+        caustica::warning("Failed to retrieve context for DLSS evaluation.");
         return;
     }
 
@@ -1550,7 +1549,7 @@ void StreamlineIntegration::EvaluateNIS(nvrhi::ICommandList* commandList)
     void* nativeCommandList = GetNativeCommandList(commandList);
     if (nativeCommandList == nullptr)
     {
-        log::warning("Failed to retrieve context for NIS evaluation.");
+        caustica::warning("Failed to retrieve context for NIS evaluation.");
         return;
     }
 
@@ -1567,7 +1566,7 @@ void StreamlineIntegration::EvaluateDeepDVC(nvrhi::ICommandList* commandList)
     void* nativeCommandList = GetNativeCommandList(commandList);
     if (nativeCommandList == nullptr)
     {
-        log::warning("Failed to retrieve context for NIS evaluation.");
+        caustica::warning("Failed to retrieve context for NIS evaluation.");
         return;
     }
 
@@ -1583,7 +1582,7 @@ void StreamlineIntegration::QueryDeepDVCState(uint64_t& estimatedVRamUsage)
 {
     if (!m_slInitialized || !m_deepdvcAvailable)
     {
-        log::warning("SL not initialised or DeepDVC not available.");
+        caustica::warning("SL not initialised or DeepDVC not available.");
         return;
     }
     sl::DeepDVCState state;
@@ -1610,7 +1609,7 @@ void StreamlineIntegration::SetReflexConsts(const ReflexOptions& options)
 
     if (!m_slInitialized || !m_reflexAvailable)
     {
-        log::warning("SL not initialised or Reflex not available.");
+        caustica::warning("SL not initialised or Reflex not available.");
         return;
     }
 
@@ -1621,7 +1620,7 @@ void StreamlineIntegration::GetReflexState(ReflexState& state) const
 {
     if (!m_slInitialized || !m_reflexAvailable)
     {
-        log::warning("SL not initialised or Reflex not available.");
+        caustica::warning("SL not initialised or Reflex not available.");
         return;
     }
 
@@ -1720,6 +1719,6 @@ void StreamlineIntegration::ReflexTriggerPcPing(int frameNumber)
     }
 }
 
-} // namespace donut::app
+} // namespace caustica
 
 #endif

@@ -22,18 +22,18 @@
 
 #include <engine/DescriptorTableManager.h>
 
-donut::engine::DescriptorHandle::DescriptorHandle()
+caustica::DescriptorHandle::DescriptorHandle()
     : m_DescriptorIndex(-1)
 {
 }
 
-donut::engine::DescriptorHandle::DescriptorHandle(const std::shared_ptr<DescriptorTableManager>& managerPtr, DescriptorIndex index)
+caustica::DescriptorHandle::DescriptorHandle(const std::shared_ptr<DescriptorTableManager>& managerPtr, DescriptorIndex index)
     : m_Manager(managerPtr)
     , m_DescriptorIndex(index)
 {
 }
 
-donut::engine::DescriptorHandle::~DescriptorHandle()
+caustica::DescriptorHandle::~DescriptorHandle()
 {
     if (m_DescriptorIndex >= 0)
     {
@@ -44,7 +44,7 @@ donut::engine::DescriptorHandle::~DescriptorHandle()
     }
 }
 
-donut::engine::DescriptorIndex donut::engine::DescriptorHandle::GetIndexInHeap() const
+caustica::DescriptorIndex caustica::DescriptorHandle::GetIndexInHeap() const
 {
     if (m_DescriptorIndex >= 0)
     {
@@ -57,7 +57,7 @@ donut::engine::DescriptorIndex donut::engine::DescriptorHandle::GetIndexInHeap()
     return -1;
 }
 
-donut::engine::DescriptorTableManager::DescriptorTableManager(nvrhi::IDevice* device, nvrhi::IBindingLayout* layout)
+caustica::DescriptorTableManager::DescriptorTableManager(nvrhi::IDevice* device, nvrhi::IBindingLayout* layout)
     : m_Device(device)
 {
     m_DescriptorTable = m_Device->createDescriptorTable(layout);
@@ -68,7 +68,7 @@ donut::engine::DescriptorTableManager::DescriptorTableManager(nvrhi::IDevice* de
     memset(m_Descriptors.data(), 0, sizeof(nvrhi::BindingSetItem) * capacity);
 }
 
-donut::engine::DescriptorIndex donut::engine::DescriptorTableManager::CreateDescriptor(nvrhi::BindingSetItem item)
+caustica::DescriptorIndex caustica::DescriptorTableManager::CreateDescriptor(nvrhi::BindingSetItem item)
 {
     const auto& found = m_DescriptorIndexMap.find(item);
     if (found != m_DescriptorIndexMap.end())
@@ -113,13 +113,13 @@ donut::engine::DescriptorIndex donut::engine::DescriptorTableManager::CreateDesc
     return index;
 }
 
-donut::engine::DescriptorHandle donut::engine::DescriptorTableManager::CreateDescriptorHandle(nvrhi::BindingSetItem item)
+caustica::DescriptorHandle caustica::DescriptorTableManager::CreateDescriptorHandle(nvrhi::BindingSetItem item)
 {
     DescriptorIndex index = CreateDescriptor(item);
     return DescriptorHandle(shared_from_this(), index);
 }
 
-nvrhi::BindingSetItem donut::engine::DescriptorTableManager::GetDescriptor(DescriptorIndex index)
+nvrhi::BindingSetItem caustica::DescriptorTableManager::GetDescriptor(DescriptorIndex index)
 {
     if (size_t(index) >= m_Descriptors.size())
         return nvrhi::BindingSetItem::None(0);
@@ -127,7 +127,7 @@ nvrhi::BindingSetItem donut::engine::DescriptorTableManager::GetDescriptor(Descr
     return m_Descriptors[index];
 }
 
-void donut::engine::DescriptorTableManager::ReleaseDescriptor(DescriptorIndex index)
+void caustica::DescriptorTableManager::ReleaseDescriptor(DescriptorIndex index)
 {
     nvrhi::BindingSetItem& descriptor = m_Descriptors[index];
 
@@ -147,7 +147,7 @@ void donut::engine::DescriptorTableManager::ReleaseDescriptor(DescriptorIndex in
     m_SearchStart = std::min(m_SearchStart, index);
 }
 
-donut::engine::DescriptorTableManager::~DescriptorTableManager()
+caustica::DescriptorTableManager::~DescriptorTableManager()
 {
     for (auto& descriptor : m_Descriptors)
     {

@@ -26,7 +26,7 @@
 #include <nvrhi/nvrhi.h>
 #include <memory>
 
-namespace donut::engine
+namespace caustica
 {
     class ShaderFactory;
     class ShadowMap;
@@ -36,7 +36,7 @@ namespace donut::engine
 }
 
 
-namespace donut::render
+namespace caustica::render
 {
     struct SsaoParameters
     {
@@ -71,7 +71,7 @@ namespace donut::render
         nvrhi::TextureHandle m_DeinterleavedOcclusion;
         dm::float2 m_QuantizedGbufferTextureSize;
                 
-        std::shared_ptr<engine::CommonRenderPasses> m_CommonPasses;
+        std::shared_ptr<caustica::CommonRenderPasses> m_CommonPasses;
 
     public:
         struct CreateParameters
@@ -85,14 +85,14 @@ namespace donut::render
 
         SsaoPass(
             nvrhi::IDevice* device,
-            std::shared_ptr<engine::ShaderFactory> shaderFactory,
-            std::shared_ptr<engine::CommonRenderPasses> commonPasses,
+            std::shared_ptr<caustica::ShaderFactory> shaderFactory,
+            std::shared_ptr<caustica::CommonRenderPasses> commonPasses,
             const CreateParameters& params);
 
         SsaoPass(
             nvrhi::IDevice* device,
-            std::shared_ptr<engine::ShaderFactory> shaderFactory,
-            std::shared_ptr<engine::CommonRenderPasses> commonPasses,
+            std::shared_ptr<caustica::ShaderFactory> shaderFactory,
+            std::shared_ptr<caustica::CommonRenderPasses> commonPasses,
             nvrhi::ITexture* gbufferDepth,
             nvrhi::ITexture* gbufferNormals,
             nvrhi::ITexture* destinationTexture);
@@ -106,7 +106,7 @@ namespace donut::render
         void Render(
             nvrhi::ICommandList* commandList,
             const SsaoParameters& params,
-            const engine::ICompositeView& compositeView,
+            const caustica::ICompositeView& compositeView,
             int bindingSetIndex = 0);
     };
 }

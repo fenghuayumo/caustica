@@ -22,7 +22,7 @@
 
 #include <engine/BindingCache.h>
 
-using namespace donut::engine;
+using namespace caustica;
 
 nvrhi::BindingSetHandle BindingCache::GetCachedBindingSet(const nvrhi::BindingSetDesc& desc, nvrhi::IBindingLayout* layout)
 {

@@ -47,14 +47,14 @@
 #endif
 #endif
 
-using namespace donut::math;
+using namespace caustica::math;
 #include <shaders/ssao_cb.h>
 
 #include <sstream>
 #include <assert.h>
 
-using namespace donut::engine;
-using namespace donut::render;
+using namespace caustica;
+using namespace caustica::render;
 
 
 SsaoPass::SsaoPass(
@@ -70,7 +70,7 @@ SsaoPass::SsaoPass(
     constantBufferDesc.debugName = "SsaoConstants";
     constantBufferDesc.isConstantBuffer = true;
     constantBufferDesc.isVolatile = true;
-    constantBufferDesc.maxVersions = engine::c_MaxRenderPassConstantBufferVersions;
+    constantBufferDesc.maxVersions = caustica::c_MaxRenderPassConstantBufferVersions;
     m_ConstantBuffer = device->createBuffer(constantBufferDesc);
 
     nvrhi::TextureDesc DeinterleavedTextureDesc;
@@ -92,7 +92,7 @@ SsaoPass::SsaoPass(
     m_DeinterleavedOcclusion = device->createTexture(DeinterleavedTextureDesc);
     
     {
-        std::vector<engine::ShaderMacro> macros = { 
+        std::vector<caustica::ShaderMacro> macros = { 
             { "LINEAR_DEPTH", params.inputLinearDepth ? "1" : "0" }
         };
         m_Deinterleave.Shader = shaderFactory->CreateAutoShader("donut/passes/ssao_deinterleave_cs.hlsl", "main", DONUT_MAKE_PLATFORM_SHADER(g_ssao_deinterleave_cs), &macros, nvrhi::ShaderType::Compute);
@@ -115,7 +115,7 @@ SsaoPass::SsaoPass(
     }
 
     {
-        std::vector<engine::ShaderMacro> macros = { 
+        std::vector<caustica::ShaderMacro> macros = { 
             { "OCT_ENCODED_NORMALS", params.octEncodedNormals ? "1" : "0" },
             { "DIRECTIONAL_OCCLUSION", params.directionalOcclusion ? "1" : "0" }
         };
@@ -140,7 +140,7 @@ SsaoPass::SsaoPass(
     }
 
     {
-        std::vector<engine::ShaderMacro> macros = {
+        std::vector<caustica::ShaderMacro> macros = {
             { "DIRECTIONAL_OCCLUSION", params.directionalOcclusion ? "1" : "0" }
         };
         m_Blur.Shader = shaderFactory->CreateAutoShader("donut/passes/ssao_blur_cs.hlsl", "main", DONUT_MAKE_PLATFORM_SHADER(g_ssao_blur_cs), &macros, nvrhi::ShaderType::Compute);

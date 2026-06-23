@@ -29,7 +29,7 @@
 
 #include <cassert>
 
-namespace donut::engine::console
+namespace caustica::console
 {
 	//
 	// Lexer
@@ -198,7 +198,7 @@ namespace donut::engine::console
 				std::string err = "syntax error";
 				err += args.empty() ? "" : " near token \"" + args.back() + '\"';
 				err += " : " + lexer.getErrorString();
-				donut::log::error(err.c_str());
+				caustica::error(err.c_str());
 				return { false };
 			}
 		}
@@ -231,7 +231,7 @@ namespace donut::engine::console
 			}
 		}
 		else
-			donut::log::error("no console object with name '%s' found", std::string(args[0]).c_str());
+			caustica::error("no console object with name '%s' found", std::string(args[0]).c_str());
 
 		return {false};
 	}
@@ -372,7 +372,7 @@ namespace donut::engine::console
 						try { rx = args[2].data(); rxMatch = true; }
 						catch (std::regex_error const& err)
 						{
-							donut::log::error(err.what());
+							caustica::error(err.what());
 							return { false };
 						}
 					}

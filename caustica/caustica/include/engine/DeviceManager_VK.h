@@ -63,7 +63,7 @@ freely, subject to the following restrictions:
 #endif
 #include <vulkan/vulkan.hpp>
 
-class DeviceManager_VK : public donut::app::DeviceManager
+class DeviceManager_VK : public caustica::DeviceManager
 {
 public:
     [[nodiscard]] nvrhi::IDevice* GetDevice() const override
@@ -79,8 +79,8 @@ public:
         return nvrhi::GraphicsAPI::VULKAN;
     }
 
-    bool EnumerateAdapters(std::vector<donut::app::AdapterInfo>& outAdapters) override;
-    const donut::app::DeviceCreationParameters& GetDeviceParams() const { return m_DeviceParams; };
+    bool EnumerateAdapters(std::vector<caustica::AdapterInfo>& outAdapters) override;
+    const caustica::DeviceCreationParameters& GetDeviceParams() const { return m_DeviceParams; };
 
 protected:
     bool CreateInstanceInternal() override;

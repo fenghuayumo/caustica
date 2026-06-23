@@ -14,7 +14,7 @@
 //#include "../SampleCommon.h"
 #include "GameMisc.h"
 
-namespace donut::engine
+namespace caustica
 {
     class PlanarView;
     class SceneCamera;
@@ -30,7 +30,7 @@ namespace game
         virtual ~PropComponentBase() { }
 
         virtual void            Tick(double gameTime, float animationTime, float deltaTime) = 0;
-        virtual ScreenGUISel    StandaloneGUI(const std::shared_ptr<donut::engine::PlanarView> & view, const float2 & mousePos, const float2 & displaySize) { return ScreenGUISel{}; }
+        virtual ScreenGUISel    StandaloneGUI(const std::shared_ptr<caustica::PlanarView> & view, const float2 & mousePos, const float2 & displaySize) { return ScreenGUISel{}; }
 
         static std::shared_ptr<PropComponentBase> Create(class PropBase & prop, const Json::Value & loadData);
 

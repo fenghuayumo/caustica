@@ -37,12 +37,12 @@ namespace Json
     class Value;
 }
 
-namespace donut::vfs
+namespace caustica
 {
     class IBlob;
 }
 
-namespace donut::engine
+namespace caustica
 {
     enum class TextureAlphaMode
     {
@@ -57,7 +57,7 @@ namespace donut::engine
     // It can be from a Data URI (decoded) or from a buffer view.
     struct GltfInlineData
     {
-        std::shared_ptr<vfs::IBlob> buffer;
+        std::shared_ptr<caustica::IBlob> buffer;
 
         // Object name from glTF, if specified.
         // Otherwise, generated as "AssetName.gltf[index]"

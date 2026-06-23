@@ -12,7 +12,7 @@
 
 #include <nvrhi/nvrhi.h>
 
-namespace donut::engine
+namespace caustica
 {
     class ShaderFactory;
     struct ShaderMacro;
@@ -32,9 +32,9 @@ struct RayTracingPass
 
     bool Init(
         nvrhi::IDevice* device,
-        donut::engine::ShaderFactory& shaderFactory,
+        caustica::ShaderFactory& shaderFactory,
         const char* shaderName,
-        const std::vector<donut::engine::ShaderMacro>& extraMacros,
+        const std::vector<caustica::ShaderMacro>& extraMacros,
         bool useRayQuery,
         uint32_t computeGroupSize,
         nvrhi::IBindingLayout* bindingLayout,

@@ -72,10 +72,10 @@
 
 #define D3D11_RESOURCE_MISC_TEXTURECUBE 0x4
 
-using namespace donut::vfs;
-using namespace donut::engine::dds;
+using namespace caustica;
+using namespace caustica::dds;
 
-namespace donut::engine
+namespace caustica
 {
 
     struct FormatMapping

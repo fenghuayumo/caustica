@@ -22,10 +22,10 @@
 
 #include <engine/SceneTypes.h>
 
-using namespace donut::math;
+using namespace caustica::math;
 #include <shaders/material_cb.h>
 
-namespace donut::engine
+namespace caustica
 {
     void Material::FillConstantBuffer(MaterialConstants& constants, bool useResourceDescriptorHeapBindless) const
     {

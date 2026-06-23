@@ -22,7 +22,7 @@
 #include <cmath>
 #include <utility>
 
-using namespace donut::math;
+using namespace caustica::math;
 #include <shaders/render/RTXDI/ShaderParameters.h>
 #include <render/Lighting/Distant/EnvMapBaker.h>
 #include <render/Lighting/Distant/EnvMapImportanceSamplingBaker.h>
@@ -33,13 +33,13 @@ using namespace donut::math;
 #include <render/Materials/MaterialsBaker.h>
 #include <render/OpacityMicroMap/OmmBaker.h>
 
-using namespace donut::engine;
+using namespace caustica;
 
 
 PrepareLightsPass::PrepareLightsPass(
     nvrhi::IDevice* device, 
-    std::shared_ptr<donut::engine::ShaderFactory> shaderFactory, 
-    std::shared_ptr<donut::engine::CommonRenderPasses> commonPasses,
+    std::shared_ptr<caustica::ShaderFactory> shaderFactory, 
+    std::shared_ptr<caustica::CommonRenderPasses> commonPasses,
     std::shared_ptr<ExtendedScene> scene,
     std::shared_ptr<MaterialsBaker> materialsBaker,
     std::shared_ptr<OmmBaker> ommBaker,
@@ -114,7 +114,7 @@ void PrepareLightsPass::SetGaussianSplatEmissionProxies(
 
 void PrepareLightsPass::CreatePipeline()
 {
-    donut::log::debug("Initializing PrepareLightsPass...");
+    caustica::debug("Initializing PrepareLightsPass...");
 
     m_computeShader = m_shaderFactory->CreateShader("app/engine/shaders/render/RTXDI/PrepareLights.hlsl", "main", nullptr, nvrhi::ShaderType::Compute);
 
@@ -248,13 +248,13 @@ static uint16_t fp32ToFp16(float v)
     return (uint16_t)(sign >> 16 | body >> 13) & 0xFFFF;
 }
 
-static bool ConvertLight(const donut::engine::Light& light, PolymorphicLightInfoFull& polymorphic, bool enableImportanceSampledEnvironmentLight, EnvMapBaker* environmentMap)
+static bool ConvertLight(const caustica::Light& light, PolymorphicLightInfoFull& polymorphic, bool enableImportanceSampledEnvironmentLight, EnvMapBaker* environmentMap)
 {
     switch (light.GetLightType())
     {
 #if 0 // we're now baking these into the environment map!
     case LightType_Directional: {
-        auto& directional = static_cast<const donut::engine::DirectionalLight&>(light);
+        auto& directional = static_cast<const caustica::DirectionalLight&>(light);
         float clampedAngularSize = clamp(directional.angularSize, 0.f, 90.f);
         float halfAngularSizeRad = 0.5f * dm::radians(clampedAngularSize);
         float solidAngle = float(2 * dm::PI_d * (1.0 - cos(halfAngularSizeRad)));
@@ -328,7 +328,7 @@ static bool ConvertLight(const donut::engine::Light& light, PolymorphicLightInfo
         return true;
     }*/
     case LightType_Point: {
-        auto& point = dynamic_cast<const donut::engine::PointLight&>(light);
+        auto& point = dynamic_cast<const caustica::PointLight&>(light);
      
         if (point.radius == 0.f)
         {
@@ -426,7 +426,7 @@ static PolymorphicLightInfoFull ConvertGaussianSplatEmissionProxy(
     return polymorphic;
 }
 
-static int isInfiniteLight(const donut::engine::Light& light)
+static int isInfiniteLight(const caustica::Light& light)
 {
     switch (light.GetLightType())
     {

@@ -23,12 +23,11 @@
 #include <render/Misc/Korgi.h>
 #include <json/json.h>
 
-using namespace donut;
-using namespace donut::math;
-using namespace donut::app;
-using namespace donut::vfs;
-using namespace donut::engine;
-using namespace donut::render;
+using namespace caustica::math;
+using namespace caustica;
+using namespace caustica;
+using namespace caustica;
+using namespace caustica::render;
 
 #include <fstream>
 #include <iostream>
@@ -161,7 +160,7 @@ void GameScene::SceneLoaded(const std::shared_ptr<ExtendedScene>& scene, const s
     bool parsingSuccessful = LoadJsonFromString(gameSettings->GetJsonData(), node);
     if (!parsingSuccessful) 
     {
-        log::warning( "Unable to load game settings" );
+        caustica::warning( "Unable to load game settings" );
         assert( false );
         return;
     }
@@ -209,9 +208,9 @@ void GameScene::SceneLoaded(const std::shared_ptr<ExtendedScene>& scene, const s
     if (m_props.empty())
     {
         if (!m_modelTypes.empty())
-            log::warning("GameSettings found model definitions but no props under '%s'", m_gameStoragePath.string().c_str());
+            caustica::warning("GameSettings found model definitions but no props under '%s'", m_gameStoragePath.string().c_str());
         else
-            log::warning("GameSettings present but no SampleGame data found under '%s'", m_gameStoragePath.string().c_str());
+            caustica::warning("GameSettings present but no SampleGame data found under '%s'", m_gameStoragePath.string().c_str());
         m_modelTypes.clear();
         m_gameStoragePath = std::filesystem::path();
         return;
@@ -458,7 +457,7 @@ void GameScene::Tick(float deltaTime, bool globalAnimationEnabled)
         prop->Tick(m_gameTime, deltaTime);
 }
 
-void GameScene::TickCamera(float deltaTime, donut::app::FirstPersonCamera & renderCamera)
+void GameScene::TickCamera(float deltaTime, caustica::FirstPersonCamera & renderCamera)
 {
     // in case we're switching from scene camera (renderCamera) to game camera and back, save/restore scene camera
     if (!m_wasGameCameraActive && CameraActive())
@@ -518,7 +517,7 @@ void GameScene::TickCamera(float deltaTime, donut::app::FirstPersonCamera & rend
     }
 }
 
-void GameScene::StandaloneGUI(const std::shared_ptr<donut::engine::PlanarView> & view, const float2 & displaySize)
+void GameScene::StandaloneGUI(const std::shared_ptr<caustica::PlanarView> & view, const float2 & displaySize)
 {
     // collect toggles
     struct BigButton

@@ -74,12 +74,11 @@
 #include "Python/PythonScripting.h"
 #endif
 
-using namespace donut;
-using namespace donut::math;
-using namespace donut::app;
-using namespace donut::vfs;
-using namespace donut::engine;
-using namespace donut::render;
+using namespace caustica::math;
+using namespace caustica;
+using namespace caustica;
+using namespace caustica;
+using namespace caustica::render;
 
 #include <fstream>
 #include <iostream>
@@ -237,9 +236,9 @@ const float c_envMapRadianceScale = 1.0f / 4.0f; // used to make input 32bit flo
 
 static FPSLimiter g_FPSLimiter;
 
-Sample::Sample(donut::app::DeviceManager& deviceManager,
+Sample::Sample(caustica::DeviceManager& deviceManager,
     const CommandLineOptions& cmdLine)
-    : app::ApplicationBase(&deviceManager )
+    : caustica::Application(&deviceManager )
     , m_cmdLine(cmdLine)
     , m_ui(g_sampleUIData)
 {
@@ -291,26 +290,26 @@ void Sample::DebugDrawLine( float3 start, float3 stop, float4 col1, float4 col2 
 }
 
 void Sample::Init(const std::string& preferredScene,
-    const std::shared_ptr<donut::engine::ShaderFactory>& shaderFactory)
+    const std::shared_ptr<caustica::ShaderFactory>& shaderFactory)
 {
     m_shaderFactory = shaderFactory;
 
-    m_CommonPasses = std::make_shared<engine::CommonRenderPasses>(GetDevice(), m_shaderFactory);
-    m_bindingCache = std::make_unique<engine::BindingCache>(GetDevice());
+    m_CommonPasses = std::make_shared<caustica::CommonRenderPasses>(GetDevice(), m_shaderFactory);
+    m_bindingCache = std::make_unique<caustica::BindingCache>(GetDevice());
 
 #if RTXPT_WITH_NATIVE_DLSS
-    m_nativeDLSS = donut::render::DLSS::Create(GetDevice(), *m_shaderFactory, donut::app::GetDirectoryWithExecutable().string());
+    m_nativeDLSS = caustica::render::DLSS::Create(GetDevice(), *m_shaderFactory, caustica::GetDirectoryWithExecutable().string());
     if (m_nativeDLSS)
     {
         m_ui.IsDLSSSuported = m_nativeDLSS->IsDlssSupported();
         m_ui.IsDLSSRRSupported = m_nativeDLSS->IsRayReconstructionSupported();
-        log::info("Native NGX DLSS support: DLSS=%s, DLSS-RR=%s.",
+        caustica::info("Native NGX DLSS support: DLSS=%s, DLSS-RR=%s.",
             m_ui.IsDLSSSuported ? "yes" : "no",
             m_ui.IsDLSSRRSupported ? "yes" : "no");
     }
     else
     {
-        log::warning("Native NGX DLSS object was not created.");
+        caustica::warning("Native NGX DLSS object was not created.");
     }
 #endif
 
@@ -444,10 +443,10 @@ void Sample::Init(const std::string& preferredScene,
 
     m_bindingLayout = device->createBindingLayout(globalBindingLayoutDesc);
 
-    m_DescriptorTable = std::make_shared<engine::DescriptorTableManager>(device, m_bindlessLayout);
+    m_DescriptorTable = std::make_shared<caustica::DescriptorTableManager>(device, m_bindlessLayout);
 
-    auto nativeFS = std::make_shared<vfs::NativeFileSystem>();
-    m_TextureCache = std::make_shared<engine::TextureCache>(device, nativeFS, m_DescriptorTable);
+    auto nativeFS = std::make_shared<caustica::NativeFileSystem>();
+    m_TextureCache = std::make_shared<caustica::TextureCache>(device, nativeFS, m_DescriptorTable);
 
     memset( &m_feedbackData, 0, sizeof(DebugFeedbackStruct) * 1 );
     memset( &m_debugDeltaPathTree, 0, sizeof(DeltaTreeVizPathVertex) * cDeltaTreeVizMaxVertices );
@@ -489,7 +488,7 @@ void Sample::Init(const std::string& preferredScene,
             bufferDesc.isVolatile = false;
             bufferDesc.canHaveUAVs = true;
             bufferDesc.cpuAccess = nvrhi::CpuAccessMode::None;
-            bufferDesc.maxVersions = engine::c_MaxRenderPassConstantBufferVersions;
+            bufferDesc.maxVersions = caustica::c_MaxRenderPassConstantBufferVersions;
             bufferDesc.structStride = sizeof(DebugFeedbackStruct);
             bufferDesc.keepInitialState = true;
             bufferDesc.initialState = nvrhi::ResourceStates::Common;
@@ -523,7 +522,7 @@ void Sample::Init(const std::string& preferredScene,
             bufferDesc.isVolatile = false;
             bufferDesc.canHaveUAVs = true;
             bufferDesc.cpuAccess = nvrhi::CpuAccessMode::None;
-            bufferDesc.maxVersions = engine::c_MaxRenderPassConstantBufferVersions;
+            bufferDesc.maxVersions = caustica::c_MaxRenderPassConstantBufferVersions;
             bufferDesc.structStride = sizeof(DeltaTreeVizPathVertex);
             bufferDesc.keepInitialState = true;
             bufferDesc.initialState = nvrhi::ResourceStates::Common;
@@ -544,7 +543,7 @@ void Sample::Init(const std::string& preferredScene,
             bufferDesc.isVolatile = false;
             bufferDesc.canHaveUAVs = true;
             bufferDesc.cpuAccess = nvrhi::CpuAccessMode::None;
-            bufferDesc.maxVersions = engine::c_MaxRenderPassConstantBufferVersions;
+            bufferDesc.maxVersions = caustica::c_MaxRenderPassConstantBufferVersions;
             bufferDesc.structStride = sizeof(PathPayload);
             bufferDesc.keepInitialState = true;
             bufferDesc.initialState = nvrhi::ResourceStates::Common;
@@ -555,7 +554,7 @@ void Sample::Init(const std::string& preferredScene,
 
     // Main constant buffer
     m_constantBuffer = device->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(
-        sizeof(SampleConstants), "SampleConstants", engine::c_MaxRenderPassConstantBufferVersions*2));	// *2 because in some cases we update twice per frame
+        sizeof(SampleConstants), "SampleConstants", caustica::c_MaxRenderPassConstantBufferVersions*2));	// *2 because in some cases we update twice per frame
 
     // Command list!
     m_commandList = device->createCommandList();
@@ -619,10 +618,10 @@ void Sample::SetCurrentScene( const std::string & sceneName, bool forceReload )
     m_currentScenePath = scenePath;
     m_progressLoading.Stop();
     m_progressLoading.Start("Loading scene...");
-    BeginLoadingScene( std::make_shared<vfs::NativeFileSystem>(), scenePath );
+    BeginLoadingScene( std::make_shared<caustica::NativeFileSystem>(), scenePath );
     if( m_scene == nullptr )
     {
-        log::error( "Unable to load scene '%s'", sceneName.c_str() );
+        caustica::error( "Unable to load scene '%s'", sceneName.c_str() );
         m_currentScenePath = std::filesystem::path();
         m_progressLoading.Stop();
         return;
@@ -716,7 +715,7 @@ void Sample::LoadGaussianSplatsFromScene()
             const std::filesystem::path splatPath = ResolveGaussianSplatPath(*splat);
             if (splatPath.empty())
             {
-                log::error("Gaussian Splat node '%s' has no path/file field.", walker->GetName().c_str());
+                caustica::error("Gaussian Splat node '%s' has no path/file field.", walker->GetName().c_str());
             }
             else
             {
@@ -735,7 +734,7 @@ void Sample::LoadGaussianSplatsFromScene()
                 }
                 else
                 {
-                    log::error("Failed to load Gaussian Splat node '%s' from '%s'.",
+                    caustica::error("Failed to load Gaussian Splat node '%s' from '%s'.",
                         walker->GetName().c_str(), splatPath.string().c_str());
                 }
             }
@@ -752,12 +751,12 @@ bool Sample::AttachGaussianSplatToScene(const std::filesystem::path& fileName, b
 {
     if (!m_scene || !m_scene->GetSceneGraph() || !m_scene->GetSceneGraph()->GetRootNode())
     {
-        log::error("Cannot load Gaussian splats before a scene is loaded.");
+        caustica::error("Cannot load Gaussian splats before a scene is loaded.");
         return false;
     }
     if (!m_shaderFactory)
     {
-        log::error("Cannot load Gaussian splats before the shader factory is initialized.");
+        caustica::error("Cannot load Gaussian splats before the shader factory is initialized.");
         return false;
     }
 
@@ -767,19 +766,19 @@ bool Sample::AttachGaussianSplatToScene(const std::filesystem::path& fileName, b
 
     if (!std::filesystem::exists(splatPath))
     {
-        log::error("Gaussian Splat file does not exist: '%s'", splatPath.string().c_str());
+        caustica::error("Gaussian Splat file does not exist: '%s'", splatPath.string().c_str());
         return false;
     }
 
     auto pass = std::make_unique<GaussianSplatPass>(GetDevice(), m_shaderFactory);
     if (!pass->LoadFromFile(splatPath, convertRdfToDonut))
     {
-        log::error("Failed to load Gaussian Splat file '%s'.", splatPath.string().c_str());
+        caustica::error("Failed to load Gaussian Splat file '%s'.", splatPath.string().c_str());
         return false;
     }
     if (pass->GetSplatCount() == 0)
     {
-        log::error("Gaussian Splat file '%s' contains no splats.", splatPath.string().c_str());
+        caustica::error("Gaussian Splat file '%s' contains no splats.", splatPath.string().c_str());
         return false;
     }
 
@@ -924,7 +923,7 @@ void Sample::BuildGaussianSplatEmissionProxyList()
 void Sample::SceneUnloading( )
 {
     m_ui.TogglableNodes = nullptr;
-    ApplicationBase::SceneUnloading();
+    Application::SceneUnloading();
     m_bindingSet = nullptr;
     m_topLevelAS = nullptr;
     m_subInstanceBuffer = nullptr;
@@ -955,7 +954,7 @@ void Sample::SceneUnloading( )
     if (m_sampleGame!=nullptr) m_sampleGame->SceneUnloading();
 }
 
-bool Sample::LoadScene(std::shared_ptr<vfs::IFileSystem> fs, const std::filesystem::path& sceneFileName)
+bool Sample::LoadScene(std::shared_ptr<caustica::IFileSystem> fs, const std::filesystem::path& sceneFileName)
 {
     m_scene = std::shared_ptr<ExtendedScene>( new ExtendedScene(GetDevice(), *m_shaderFactory, fs, m_TextureCache, m_DescriptorTable, std::make_shared<ExtendedSceneTypeFactory>() ) );
     m_progressLoading.Set(10);
@@ -972,7 +971,7 @@ bool Sample::LoadScene(std::shared_ptr<vfs::IFileSystem> fs, const std::filesyst
     return false;
 }
 
-void Sample::UpdateCameraFromScene( const std::shared_ptr<donut::engine::PerspectiveCamera> & sceneCamera )
+void Sample::UpdateCameraFromScene( const std::shared_ptr<caustica::PerspectiveCamera> & sceneCamera )
 {
     dm::affine3 viewToWorld = sceneCamera->GetViewToWorldMatrix();
     dm::float3 cameraPos = viewToWorld.m_translation;
@@ -1108,7 +1107,7 @@ void Sample::SceneLoaded( )
 
     m_progressLoading.Set(55);
 
-    ApplicationBase::SceneLoaded( );
+    Application::SceneLoaded( );
 
     m_progressLoading.Set(60);
 
@@ -1424,7 +1423,7 @@ void Sample::Animate(float fElapsedTimeSeconds)
     m_selectedCameraIndex = std::min( m_selectedCameraIndex, GetSceneCameraCount()-1 );
     if (m_selectedCameraIndex > 0)
     {
-        std::shared_ptr<donut::engine::PerspectiveCamera> sceneCamera = std::dynamic_pointer_cast<PerspectiveCamera>(m_scene->GetSceneGraph()->GetCameras()[m_selectedCameraIndex-1]);
+        std::shared_ptr<caustica::PerspectiveCamera> sceneCamera = std::dynamic_pointer_cast<PerspectiveCamera>(m_scene->GetSceneGraph()->GetCameras()[m_selectedCameraIndex-1]);
         if (sceneCamera != nullptr)
             UpdateCameraFromScene( sceneCamera );
     }
@@ -1575,7 +1574,7 @@ void Sample::SaveCurrentCamera() const
     float exposureValue = m_ui.ToneMappingParams.exposureValue;
 
     std::ofstream file;
-    file.open(app::GetDirectoryWithExecutable( ) / "campos.txt", std::ios_base::out | std::ios_base::trunc );
+    file.open(caustica::GetDirectoryWithExecutable( ) / "campos.txt", std::ios_base::out | std::ios_base::trunc );
     if( file.is_open() )
     {
         file << worldPos.x << " " << worldPos.y << " " << worldPos.z << " " << std::endl;
@@ -1614,7 +1613,7 @@ void Sample::LoadCurrentCamera()
     float3 worldUp;
 
     std::ifstream file;
-    file.open(app::GetDirectoryWithExecutable( ) / "campos.txt", std::ios_base::in);
+    file.open(caustica::GetDirectoryWithExecutable( ) / "campos.txt", std::ios_base::in);
     if (file.is_open())
     {
         file >> worldPos.x >> std::ws >> worldPos.y >> std::ws >> worldPos.z; file.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
@@ -1625,7 +1624,7 @@ void Sample::LoadCurrentCamera()
     }
 }
 
-void Sample::FillPTPipelineGlobalMacros(std::vector<donut::engine::ShaderMacro> & macros)
+void Sample::FillPTPipelineGlobalMacros(std::vector<caustica::ShaderMacro> & macros)
 {
     macros.clear();
 
@@ -1693,11 +1692,11 @@ void Sample::FillPTPipelineGlobalMacros(std::vector<donut::engine::ShaderMacro> 
 
 extern HitGroupInfo ComputeSubInstanceHitGroupInfo(const PTMaterial& material);
 
-bool Sample::CreatePTPipeline(engine::ShaderFactory& shaderFactory)
+bool Sample::CreatePTPipeline(caustica::ShaderFactory& shaderFactory)
 {
     {
-        std::vector<donut::engine::ShaderMacro> shaderMacros;
-		// shaderMacros.push_back(donut::engine::ShaderMacro({ "USE_RTXDI", "0" }));
+        std::vector<caustica::ShaderMacro> shaderMacros;
+		// shaderMacros.push_back(caustica::ShaderMacro({ "USE_RTXDI", "0" }));
         m_exportVBufferCS = m_shaderFactory->CreateShader("app/engine/shaders/render/ProcessingPasses/ExportVisibilityBuffer.hlsl", "main", &shaderMacros, nvrhi::ShaderType::Compute);
         nvrhi::ComputePipelineDesc pipelineDesc;
 		pipelineDesc.bindingLayouts = { m_bindingLayout, m_bindlessLayout };
@@ -1712,7 +1711,7 @@ void Sample::CreateBlases(nvrhi::ICommandList* commandList)
 {
     for (const std::shared_ptr<MeshInfo>& mesh : m_scene->GetSceneGraph()->GetMeshes())
     {
-        if (mesh->isSkinPrototype) //buffers->hasAttribute(engine::VertexAttribute::JointWeights))
+        if (mesh->isSkinPrototype) //buffers->hasAttribute(caustica::VertexAttribute::JointWeights))
             continue; // skip the skinning prototypes
 
         bvh::Config cfg = { .excludeTransmissive = m_ui.AS.ExcludeTransmissive };
@@ -1950,7 +1949,7 @@ void Sample::BuildTLAS(nvrhi::ICommandList* commandList) const
             static bool warnedNullBlas = false;
             if (!warnedNullBlas)
             {
-                log::warning("BuildTLAS skipped one or more mesh instances with null BLAS to avoid invalid TLAS input.");
+                caustica::warning("BuildTLAS skipped one or more mesh instances with null BLAS to avoid invalid TLAS input.");
                 warnedNullBlas = true;
             }
             subInstanceCount += meshSubInstanceCount;
@@ -1988,7 +1987,7 @@ void Sample::BuildTLAS(nvrhi::ICommandList* commandList) const
 
 void Sample::BackBufferResizing()
 {
-    ApplicationBase::BackBufferResizing();
+    Application::BackBufferResizing();
     
     GetDevice()->waitForIdle();
     GetDevice()->runGarbageCollection();
@@ -2148,7 +2147,7 @@ void Sample::UpdateLighting(nvrhi::CommandListHandle commandList)
     uint dirLightCount = 0;
     {   // Find and pre-process directional analytic lights, and convert them to environment map local frame so they remain pointing in correct world direction!
         float3 rotationInRadians = radians(m_ui.EnvironmentMapParams.RotationXYZ);
-        affine3 rotationTransform = donut::math::rotation(rotationInRadians);
+        affine3 rotationTransform = dm::rotation(rotationInRadians);
         affine3 inverseTransform = inverse(rotationTransform);
         for (int i = 0; i < (int)m_lights.size(); i++)
         {
@@ -2302,7 +2301,7 @@ void Sample::UpdatePathTracerConstants( PathTracerConstants & constants, const P
     constants.perPixelJitterAAScale = (m_ui.RealtimeMode == false && m_ui.AccumulationAA)?(1):( (m_ui.RealtimeMode && m_ui.RealtimeAA == 3)?(m_ui.DLSSRRMicroJitter):(0.0f) );
 
     // needed to allow super-resolution to work best
-    float dlssBias = -donut::math::log2f(sqrtf((m_displaySize.x * m_displaySize.y) / float(m_renderSize.x * m_renderSize.y)));
+    float dlssBias = -dm::log2f(sqrtf((m_displaySize.x * m_displaySize.y) / float(m_renderSize.x * m_renderSize.y)));
 
     constants.texLODBias = m_ui.TexLODBias + dlssBias;
     constants.sampleBaseIndex = m_sampleIndex * m_ui.ActualSamplesPerPixel();
@@ -2314,7 +2313,7 @@ void Sample::UpdatePathTracerConstants( PathTracerConstants & constants, const P
     constants.imageHeight = m_renderSize.y; assert( m_renderSize.y == m_renderTargets->OutputColor->getDesc().height );
 
     // this is the dynamic luminance that when passed through current tonemapper with current exposure settings, produces the same 50% gray
-    constants.preExposedGrayLuminance = m_ui.EnableToneMapping?(donut::math::luminance(m_toneMappingPass->GetPreExposedGray(0))):(1.0f);
+    constants.preExposedGrayLuminance = m_ui.EnableToneMapping?(dm::luminance(m_toneMappingPass->GetPreExposedGray(0))):(1.0f);
 
     const float disabledFF = 0.0f;
     if (m_ui.RealtimeMode)
@@ -2413,8 +2412,8 @@ void Sample::StreamlinePreRender()
 
     // Setup Reflex
     {
-        auto reflexConsts = donut::app::StreamlineInterface::ReflexOptions{};
-        reflexConsts.mode = (donut::app::StreamlineInterface::ReflexMode) m_ui.ActualReflexMode();
+        auto reflexConsts = caustica::StreamlineInterface::ReflexOptions{};
+        reflexConsts.mode = (caustica::StreamlineInterface::ReflexMode) m_ui.ActualReflexMode();
         reflexConsts.frameLimitUs = m_ui.ReflexCappedFps == 0 ? 0 : int(1000000. / m_ui.ReflexCappedFps);
         reflexConsts.useMarkersToOptimize = true;
         reflexConsts.virtualKey = VK_F13;
@@ -2422,7 +2421,7 @@ void Sample::StreamlinePreRender()
         GetDeviceManager()->GetStreamline().SetReflexConsts(reflexConsts);
 
         // Need to update StreamlineIntegration with the ability to query reflex state
-        donut::app::StreamlineInterface::ReflexState reflexState{};
+        caustica::StreamlineInterface::ReflexState reflexState{};
         GetDeviceManager()->GetStreamline().GetReflexState(reflexState);
         if (m_ui.IsReflexSupported)
         {
@@ -2485,12 +2484,12 @@ void Sample::StreamlinePreRender()
     // Ensure DLSS / DLSS-RR is available
     if (m_ui.RealtimeAA == 3 && !m_ui.IsDLSSRRSupported)
     {
-        log::warning("Requested DLSS-RR mode not available. Switching to DLSS. ");
+        caustica::warning("Requested DLSS-RR mode not available. Switching to DLSS. ");
         m_ui.RealtimeAA = 2;
     }
     if ( m_ui.RealtimeAA == 2 && !m_ui.IsDLSSSuported )
     {
-        log::warning("Requested DLSS mode not available. Switching to TAA. ");
+        caustica::warning("Requested DLSS mode not available. Switching to TAA. ");
         m_ui.RealtimeAA = 1;
     }
 
@@ -2612,13 +2611,13 @@ void Sample::NativeDLSSPreRender()
 
     if (m_ui.RealtimeAA == 3 && !m_ui.IsDLSSRRSupported)
     {
-        log::warning("Requested DLSS-RR mode not available. Switching to DLSS.");
+        caustica::warning("Requested DLSS-RR mode not available. Switching to DLSS.");
         m_ui.RealtimeAA = 2;
     }
 
     if (m_ui.RealtimeAA == 2 && !m_ui.IsDLSSSuported)
     {
-        log::warning("Requested DLSS mode not available. Switching to TAA.");
+        caustica::warning("Requested DLSS mode not available. Switching to TAA.");
         m_ui.RealtimeAA = 1;
     }
 
@@ -2699,9 +2698,9 @@ SimpleViewConstants FromPlanarViewConstants(PlanarViewConstants & view)
     return ret;
 }
 
-void Sample::PostProcessPreToneMapping(nvrhi::ICommandList* commandList, const donut::engine::ICompositeView& compositeView)
+void Sample::PostProcessPreToneMapping(nvrhi::ICommandList* commandList, const caustica::ICompositeView& compositeView)
 { // a.k.a. HDR post-process (e.g. bloom goes here)
-    donut::engine::PlanarView fullscreenView = *m_view;
+    caustica::PlanarView fullscreenView = *m_view;
     nvrhi::Viewport windowViewport(float(m_displaySize.x), float(m_displaySize.y));
     fullscreenView.SetViewport(windowViewport);
     fullscreenView.UpdateCache();
@@ -2736,7 +2735,7 @@ void Sample::PostProcessPreToneMapping(nvrhi::ICommandList* commandList, const d
     }
 }
 
-void Sample::PostProcessPostToneMapping(nvrhi::ICommandList* commandList, const donut::engine::ICompositeView& compositeView)
+void Sample::PostProcessPostToneMapping(nvrhi::ICommandList* commandList, const caustica::ICompositeView& compositeView)
 { // a.k.a. LDR post-process (e.g. colour filters go here)
     if (m_ui.PostProcessEdgeDetection)
     {
@@ -2819,7 +2818,7 @@ void Sample::RenderGaussianSplats(bool renderToOutputColor)
         }
     }
 
-    donut::engine::PlanarView splatView = *m_view;
+    caustica::PlanarView splatView = *m_view;
     if (!renderToOutputColor)
     {
         splatView.SetViewport(nvrhi::Viewport(float(m_displaySize.x), float(m_displaySize.y)));
@@ -2842,7 +2841,7 @@ void Sample::RenderGaussianSplats(bool renderToOutputColor)
         AccumulateGaussianSplats(splatView);
 }
 
-void Sample::AccumulateGaussianSplats(const donut::engine::IView& splatView)
+void Sample::AccumulateGaussianSplats(const caustica::IView& splatView)
 {
     if (m_gaussianSplatAccumulationPass == nullptr || m_renderTargets == nullptr || m_gaussianSplatCurrentColor == nullptr || m_gaussianSplatAccumulatedColor == nullptr)
         return;
@@ -2928,8 +2927,8 @@ void Sample::Render(nvrhi::IFramebuffer* framebuffer)
         float intensity = m_ui.EnvironmentMapParams.Intensity / c_envMapRadianceScale;
         m_envMapSceneParams.ColorMultiplier = m_ui.EnvironmentMapParams.TintColor * intensity;
 
-        float3 rotationInRadians = donut::math::radians(m_ui.EnvironmentMapParams.RotationXYZ);
-        affine3 rotationTransform = donut::math::rotation(rotationInRadians);
+        float3 rotationInRadians = dm::radians(m_ui.EnvironmentMapParams.RotationXYZ);
+        affine3 rotationTransform = dm::rotation(rotationInRadians);
         affine3 inverseTransform = inverse(rotationTransform);
         affineToColumnMajor(rotationTransform, m_envMapSceneParams.Transform);
         affineToColumnMajor(inverseTransform, m_envMapSceneParams.InvTransform);
@@ -3011,7 +3010,7 @@ void Sample::Render(nvrhi::IFramebuffer* framebuffer)
     }
 
     // this is the point where main ray tracing pipelines will actually get compiled
-    m_ptPipelineBaker->Update(m_scene, (unsigned int)m_subInstanceData.size(), [this](std::vector<donut::engine::ShaderMacro> & macros){ this->FillPTPipelineGlobalMacros(macros); }, needNewPasses);
+    m_ptPipelineBaker->Update(m_scene, (unsigned int)m_subInstanceData.size(), [this](std::vector<caustica::ShaderMacro> & macros){ this->FillPTPipelineGlobalMacros(macros); }, needNewPasses);
     
     // Update compute shaders (compile if needed)
     if (m_computePipelineBaker)
@@ -3212,7 +3211,7 @@ void Sample::Render(nvrhi::IFramebuffer* framebuffer)
             RenderGaussianSplats(false);
     }
 
-    donut::engine::PlanarView fullscreenView = *m_view;
+    caustica::PlanarView fullscreenView = *m_view;
     nvrhi::Viewport windowViewport(float(m_displaySize.x), float(m_displaySize.y));
     fullscreenView.SetViewport(windowViewport);
     fullscreenView.UpdateCache();
@@ -3471,7 +3470,7 @@ void Sample::RecreateBindingSet()
     }
 }
 
-std::shared_ptr<donut::engine::Material> Sample::FindMaterial(int materialID) const
+std::shared_ptr<caustica::Material> Sample::FindMaterial(int materialID) const
 {
     // if slow switch to map
     for (const auto& material : m_scene->GetSceneGraph()->GetMaterials())
@@ -3480,7 +3479,7 @@ std::shared_ptr<donut::engine::Material> Sample::FindMaterial(int materialID) co
     return nullptr;
 }
 
-std::shared_ptr<donut::engine::SceneGraphNode> Sample::FindNodeByInstanceIndex(int instanceIndex) const
+std::shared_ptr<caustica::SceneGraphNode> Sample::FindNodeByInstanceIndex(int instanceIndex) const
 {
     if (!m_scene || instanceIndex < 0)
         return nullptr;
@@ -3669,14 +3668,14 @@ namespace
         std::ifstream file(texture.path, std::ios::binary | std::ios::ate);
         if (!file)
         {
-            donut::log::warning("OBJ texture '%s' could not be opened for channel packing.", texture.path.string().c_str());
+            caustica::warning("OBJ texture '%s' could not be opened for channel packing.", texture.path.string().c_str());
             return false;
         }
 
         const std::streamsize fileSize = file.tellg();
         if (fileSize <= 0 || fileSize > std::numeric_limits<int>::max())
         {
-            donut::log::warning("OBJ texture '%s' has unsupported size for channel packing.", texture.path.string().c_str());
+            caustica::warning("OBJ texture '%s' has unsupported size for channel packing.", texture.path.string().c_str());
             return false;
         }
 
@@ -3684,7 +3683,7 @@ namespace
         std::vector<uint8_t> encoded(static_cast<size_t>(fileSize));
         if (!file.read(reinterpret_cast<char*>(encoded.data()), fileSize))
         {
-            donut::log::warning("OBJ texture '%s' could not be read for channel packing.", texture.path.string().c_str());
+            caustica::warning("OBJ texture '%s' could not be read for channel packing.", texture.path.string().c_str());
             return false;
         }
 
@@ -3694,7 +3693,7 @@ namespace
         stbi_uc* pixels = stbi_load_from_memory(encoded.data(), static_cast<int>(encoded.size()), &width, &height, &channels, 4);
         if (!pixels || width <= 0 || height <= 0)
         {
-            donut::log::warning("OBJ texture '%s' could not be decoded for channel packing.", texture.path.string().c_str());
+            caustica::warning("OBJ texture '%s' could not be decoded for channel packing.", texture.path.string().c_str());
             if (pixels)
                 stbi_image_free(pixels);
             return false;
@@ -3804,7 +3803,7 @@ namespace
 
         if (!encoded || encodedPng.empty())
         {
-            donut::log::warning("Failed to encode generated OBJ material texture '%s'.", generatedName.c_str());
+            caustica::warning("Failed to encode generated OBJ material texture '%s'.", generatedName.c_str());
             return nullptr;
         }
 
@@ -3813,7 +3812,7 @@ namespace
             return nullptr;
 
         std::memcpy(pngData, encodedPng.data(), encodedPng.size());
-        auto blob = std::make_shared<vfs::Blob>(pngData, encodedPng.size());
+        auto blob = std::make_shared<caustica::Blob>(pngData, encodedPng.size());
         return textureCache->LoadTextureFromMemoryDeferred(blob, generatedName, "image/png", sRGB);
     }
 
@@ -3962,7 +3961,7 @@ namespace
         std::ifstream file(filePath);
         if (!file)
         {
-            donut::log::warning("OBJ material library '%s' could not be opened.", filePath.string().c_str());
+            caustica::warning("OBJ material library '%s' could not be opened.", filePath.string().c_str());
             return materials;
         }
 
@@ -4285,23 +4284,23 @@ void Sample::HandleDroppedFiles()
 
         if (ext == ".ply")
         {
-            log::info("Drag-drop: loading Gaussian Splat file '%s'", filePath.c_str());
+            caustica::info("Drag-drop: loading Gaussian Splat file '%s'", filePath.c_str());
             if (LoadGaussianSplatFile(path))
-                log::info("Gaussian Splat loaded successfully: %d splats across %d objects", GetGaussianSplatCount(), GetGaussianSplatObjectCount());
+                caustica::info("Gaussian Splat loaded successfully: %d splats across %d objects", GetGaussianSplatCount(), GetGaussianSplatObjectCount());
             else
-                log::error("Failed to load Gaussian Splat file '%s'", filePath.c_str());
+                caustica::error("Failed to load Gaussian Splat file '%s'", filePath.c_str());
         }
         else if (ext == ".gltf" || ext == ".glb" || ext == ".obj")
         {
-            log::info("Drag-drop: loading mesh file '%s'", filePath.c_str());
+            caustica::info("Drag-drop: loading mesh file '%s'", filePath.c_str());
             if (LoadMeshFile(path))
-                log::info("Mesh file loaded successfully: '%s'", filePath.c_str());
+                caustica::info("Mesh file loaded successfully: '%s'", filePath.c_str());
             else
-                log::error("Failed to load mesh file '%s'", filePath.c_str());
+                caustica::error("Failed to load mesh file '%s'", filePath.c_str());
         }
         else
         {
-            log::warning("Drag-drop: unsupported file type '%s' (supported: .ply, .gltf, .glb, .obj)", ext.c_str());
+            caustica::warning("Drag-drop: unsupported file type '%s' (supported: .ply, .gltf, .glb, .obj)", ext.c_str());
         }
     }
 }
@@ -4310,7 +4309,7 @@ bool Sample::LoadMeshFile(const std::filesystem::path& filePath)
 {
     if (!m_scene || !m_shaderFactory || !m_TextureCache)
     {
-        log::error("Cannot load mesh: scene, shader factory, or texture cache not initialized.");
+        caustica::error("Cannot load mesh: scene, shader factory, or texture cache not initialized.");
         return false;
     }
 
@@ -4320,7 +4319,7 @@ bool Sample::LoadMeshFile(const std::filesystem::path& filePath)
 
     if (!std::filesystem::exists(absPath))
     {
-        log::error("File does not exist: '%s'", absPath.string().c_str());
+        caustica::error("File does not exist: '%s'", absPath.string().c_str());
         return false;
     }
 
@@ -4332,18 +4331,18 @@ bool Sample::LoadMeshFile(const std::filesystem::path& filePath)
     if (ext == ".obj")
         return LoadObjMeshFile(absPath);
 
-    log::error("Unsupported mesh file type '%s'.", ext.c_str());
+    caustica::error("Unsupported mesh file type '%s'.", ext.c_str());
     return false;
 }
 
 bool Sample::LoadGltfMeshFile(const std::filesystem::path& filePath)
 {
-    auto fs = std::make_shared<vfs::NativeFileSystem>();
+    auto fs = std::make_shared<caustica::NativeFileSystem>();
     auto sceneTypeFactory = std::make_shared<ExtendedSceneTypeFactory>();
-    auto importer = std::make_shared<engine::GltfImporter>(fs, sceneTypeFactory);
+    auto importer = std::make_shared<caustica::GltfImporter>(fs, sceneTypeFactory);
 
-    engine::SceneLoadingStats stats;
-    engine::SceneImportResult importResult;
+    caustica::SceneLoadingStats stats;
+    caustica::SceneImportResult importResult;
 
     std::filesystem::path sceneDirectory;
     if (m_currentScenePath != std::filesystem::path(c_InlineSceneSentinel))
@@ -4351,13 +4350,13 @@ bool Sample::LoadGltfMeshFile(const std::filesystem::path& filePath)
 
     if (!importer->Load(filePath, *m_TextureCache, stats, nullptr, importResult, sceneDirectory))
     {
-        log::error("GltfImporter failed to load '%s'", filePath.string().c_str());
+        caustica::error("GltfImporter failed to load '%s'", filePath.string().c_str());
         return false;
     }
 
     if (!importResult.rootNode)
     {
-        log::error("GltfImporter produced no root node for '%s'", filePath.string().c_str());
+        caustica::error("GltfImporter produced no root node for '%s'", filePath.string().c_str());
         return false;
     }
 
@@ -4378,7 +4377,7 @@ static bool LoadObjModelFile(
     std::ifstream file(filePath);
     if (!file)
     {
-        log::error("OBJ file could not be opened: '%s'", filePath.string().c_str());
+        caustica::error("OBJ file could not be opened: '%s'", filePath.string().c_str());
         return false;
     }
 
@@ -4505,7 +4504,7 @@ static bool LoadObjModelFile(
                 ObjFaceVertex key;
                 if (!ParseObjFaceVertex(tokens[i], positions.size(), texcoords.size(), normals.size(), key))
                 {
-                    log::warning("Skipping malformed OBJ face at '%s':%u", filePath.string().c_str(), lineNumber);
+                    caustica::warning("Skipping malformed OBJ face at '%s':%u", filePath.string().c_str(), lineNumber);
                     validFace = false;
                     break;
                 }
@@ -4528,7 +4527,7 @@ static bool LoadObjModelFile(
 
     if (mesh->buffers->positionData.empty())
     {
-        log::error("OBJ file '%s' has no usable vertices.", filePath.string().c_str());
+        caustica::error("OBJ file '%s' has no usable vertices.", filePath.string().c_str());
         return false;
     }
 
@@ -4617,7 +4616,7 @@ static bool LoadObjModelFile(
 
         if (!std::filesystem::exists(texturePath))
         {
-            log::warning("OBJ texture '%s' referenced by '%s' was not found.",
+            caustica::warning("OBJ texture '%s' referenced by '%s' was not found.",
                 texturePath.string().c_str(), filePath.string().c_str());
             return nullptr;
         }
@@ -4714,7 +4713,7 @@ static bool LoadObjModelFile(
 
     if (mesh->geometries.empty())
     {
-        log::error("OBJ file '%s' has no usable triangle faces.", filePath.string().c_str());
+        caustica::error("OBJ file '%s' has no usable triangle faces.", filePath.string().c_str());
         return false;
     }
 
@@ -4756,11 +4755,11 @@ bool ExtendedScene::LoadModelFile(
     return Scene::LoadModelFile(fileName, threadPool, result);
 }
 
-void Sample::FinalizeRuntimeSceneMutation(const std::shared_ptr<donut::engine::SceneGraphNode>& importedRoot)
+void Sample::FinalizeRuntimeSceneMutation(const std::shared_ptr<caustica::SceneGraphNode>& importedRoot)
 {
     if (importedRoot)
     {
-        std::unordered_set<donut::engine::Material*> processedMaterials;
+        std::unordered_set<caustica::Material*> processedMaterials;
         SceneGraphWalker walker(importedRoot.get());
         while (walker)
         {
@@ -5103,7 +5102,7 @@ void Sample::SetMeshVerticesWorld(const std::shared_ptr<SceneGraphNode>& node,
     for (const float3& vertex : vertices)
     {
         const float3 objectVertex = worldToLocal.transformPoint(vertex);
-        if (!donut::math::all(donut::math::isfinite(objectVertex)))
+        if (!dm::all(dm::isfinite(objectVertex)))
             throw std::runtime_error("SetMeshVerticesWorld: world-to-object transform produced a non-finite vertex");
         objectVertices.push_back(objectVertex);
     }
@@ -5583,7 +5582,7 @@ bool Sample::EvaluateNativeDLSS(bool reset)
             m_constantBuffer, miniConstants, m_bindingSet, m_bindingLayout, tdesc.width, tdesc.height);
     }
 
-    donut::render::DLSS::InitParameters initParams;
+    caustica::render::DLSS::InitParameters initParams;
     initParams.inputWidth = m_renderSize.x;
     initParams.inputHeight = m_renderSize.y;
     initParams.outputWidth = m_displaySize.x;
@@ -5600,7 +5599,7 @@ bool Sample::EvaluateNativeDLSS(bool reset)
     if (!initialized)
         return false;
 
-    donut::render::DLSS::EvaluateParameters evaluateParams;
+    caustica::render::DLSS::EvaluateParameters evaluateParams;
     evaluateParams.inputColorTexture = m_renderTargets->OutputColor;
     evaluateParams.outputColorTexture = m_renderTargets->ProcessedOutputColor;
     evaluateParams.depthTexture = m_renderTargets->Depth;
@@ -5622,7 +5621,7 @@ bool Sample::EvaluateNativeDLSS(bool reset)
         static bool loggedNativeDLSSEvaluation = false;
         if (!loggedNativeDLSSEvaluation)
         {
-            log::info("Native NGX %s evaluated successfully at %ux%u -> %ux%u.",
+            caustica::info("Native NGX %s evaluated successfully at %ux%u -> %ux%u.",
                 useRayReconstruction ? "DLSS-RR" : "DLSS",
                 m_renderSize.x, m_renderSize.y, m_displaySize.x, m_displaySize.y);
             loggedNativeDLSSEvaluation = true;
@@ -5650,7 +5649,7 @@ void Sample::PostProcessAA(nvrhi::IFramebuffer* framebuffer, bool reset)
                 m_gaussianSplatTemporalSampleIndex = 0;
 
             bool previousViewValid = !reset && !stochasticReset && (GetFrameIndex() != 0);
-            donut::render::TemporalAntiAliasingParameters taaParams = m_ui.TemporalAntiAliasingParams;
+            caustica::render::TemporalAntiAliasingParameters taaParams = m_ui.TemporalAntiAliasingParams;
             if (stochasticSplats)
             {
                 taaParams.enableHistoryClamping = false;
@@ -5957,7 +5956,7 @@ void Sample::ApplyReferenceOIDN()
     nvrhi::TextureDesc sourceDesc = sourceTexture->getDesc();
     if (sourceDesc.format != nvrhi::Format::RGBA32_FLOAT)
     {
-        donut::log::warning("OIDN reference denoiser expected RGBA32_FLOAT accumulation buffer, got %s.", nvrhi::utils::FormatToString(sourceDesc.format));
+        caustica::warning("OIDN reference denoiser expected RGBA32_FLOAT accumulation buffer, got %s.", nvrhi::utils::FormatToString(sourceDesc.format));
         m_oidnDenoiserFailed = true;
         return;
     }
@@ -5987,7 +5986,7 @@ void Sample::ApplyReferenceOIDN()
         nvrhi::CpuAccessMode::Read);
     if (stagingTexture == nullptr)
     {
-        donut::log::warning("OIDN reference denoiser failed to create a staging texture.");
+        caustica::warning("OIDN reference denoiser failed to create a staging texture.");
         m_oidnDenoiserFailed = true;
         return;
     }
@@ -6017,7 +6016,7 @@ void Sample::ApplyReferenceOIDN()
     if (!GetDevice()->waitForIdle())
     {
         m_commandList->open();
-        donut::log::warning("OIDN reference denoiser readback failed because the GPU device was lost.");
+        caustica::warning("OIDN reference denoiser readback failed because the GPU device was lost.");
         m_oidnDenoiserFailed = true;
         return;
     }
@@ -6027,7 +6026,7 @@ void Sample::ApplyReferenceOIDN()
     if (mappedData == nullptr)
     {
         m_commandList->open();
-        donut::log::warning("OIDN reference denoiser failed to map the accumulation buffer.");
+        caustica::warning("OIDN reference denoiser failed to map the accumulation buffer.");
         m_oidnDenoiserFailed = true;
         return;
     }
@@ -6076,7 +6075,7 @@ void Sample::ApplyReferenceOIDN()
 
     if (!success)
     {
-        donut::log::warning("OIDN reference denoiser failed: %s", m_oidnDenoiser->GetLastError().c_str());
+        caustica::warning("OIDN reference denoiser failed: %s", m_oidnDenoiser->GetLastError().c_str());
         m_oidnDenoiserFailed = true;
         return;
     }
@@ -6096,12 +6095,12 @@ void Sample::ApplyReferenceOIDN()
     m_commandList->copyTexture(m_renderTargets->ProcessedOutputColor, nvrhi::TextureSlice(), m_oidnDenoisedOutput, nvrhi::TextureSlice());
     m_oidnDenoisedOutputValid = true;
 
-    donut::log::info("OIDN reference denoiser completed on %s for %ux%u image.",
+    caustica::info("OIDN reference denoiser completed on %s for %ux%u image.",
         m_oidnDenoiser->GetDeviceDescription().c_str(), width, height);
 #else
     if (!m_oidnDenoiserFailed)
     {
-        donut::log::warning("OIDN reference denoiser requested, but RTXPT_WITH_OIDN is disabled in this build.");
+        caustica::warning("OIDN reference denoiser requested, but RTXPT_WITH_OIDN is disabled in this build.");
         m_oidnDenoiserFailed = true;
     }
 #endif
@@ -6109,7 +6108,7 @@ void Sample::ApplyReferenceOIDN()
 
 void Sample::DenoisedScreenshot(nvrhi::ITexture * framebufferTexture) const
 {
-    std::string noisyImagePath = (app::GetDirectoryWithExecutable( ) / "photo.bmp").string();
+    std::string noisyImagePath = (caustica::GetDirectoryWithExecutable( ) / "photo.bmp").string();
 
     auto execute = [&](const std::string & dn = "OptiX")
     {
@@ -6118,11 +6117,11 @@ void Sample::DenoisedScreenshot(nvrhi::ITexture * framebufferTexture) const
 
         const std::string fileName = "photo-denoised_" + dn + "_" + timestamp + ".bmp";
 
-        std::string denoisedImagePath = (app::GetDirectoryWithExecutable() / fileName).string();
+        std::string denoisedImagePath = (caustica::GetDirectoryWithExecutable() / fileName).string();
         std::filesystem::path denoiserPath = GetLocalPath("Support/denoiser_"+dn) / "denoiser.exe";
         if (!std::filesystem::exists(denoiserPath))
         {
-            donut::log::warning("External %s denoiser not found at '%s'.", dn.c_str(), denoiserPath.string().c_str());
+            caustica::warning("External %s denoiser not found at '%s'.", dn.c_str(), denoiserPath.string().c_str());
             return;
         }
 
@@ -6132,9 +6131,9 @@ void Sample::DenoisedScreenshot(nvrhi::ITexture * framebufferTexture) const
         std::string startCmd = "\"" + denoiserPath.string() + "\"" + " -hdr 0 -i \"" + noisyImagePath + "\"" " -o \"" + denoisedImagePath + "\"";
         auto [resNum, resString, errorString] =  SystemShell(startCmd.c_str());
         if (resString!="")
-            donut::log::info("result: %s", resString.c_str());
+            caustica::info("result: %s", resString.c_str());
         if (errorString != "")
-            donut::log::info("error: %s", errorString.c_str());
+            caustica::info("error: %s", errorString.c_str());
 
         std::string viewCmd = "\"" + denoisedImagePath + "\"";
         SystemShell(viewCmd.c_str(), true);
@@ -6143,7 +6142,7 @@ void Sample::DenoisedScreenshot(nvrhi::ITexture * framebufferTexture) const
     execute("OIDN");
 }
 
-donut::math::float2 Sample::ComputeCameraJitter(uint frameIndex)
+dm::float2 Sample::ComputeCameraJitter(uint frameIndex)
 {
     if (!m_ui.RealtimeMode || m_ui.RealtimeAA == 0 || m_temporalAntiAliasingPass == nullptr || m_ui.DbgFreezeRealtimeNoiseSeed)
         return dm::float2(0,0);

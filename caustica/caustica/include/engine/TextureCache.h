@@ -33,13 +33,13 @@
 #include <shared_mutex>
 #include <queue>
 
-namespace donut::vfs
+namespace caustica
 {
     class IBlob;
     class IFileSystem;
 }
 
-namespace donut::engine
+namespace caustica
 {
     class CommonRenderPasses;
     class ThreadPool;
@@ -54,7 +54,7 @@ namespace donut::engine
 
     struct TextureData : public LoadedTexture
     {
-        std::shared_ptr<vfs::IBlob> data;
+        std::shared_ptr<caustica::IBlob> data;
 
         nvrhi::Format format = nvrhi::Format::UNKNOWN;
         uint32_t width = 1;
@@ -82,24 +82,24 @@ namespace donut::engine
         std::shared_ptr<DescriptorTableManager> m_DescriptorTable;
         std::mutex m_TexturesToFinalizeMutex;
 
-        std::shared_ptr<vfs::IFileSystem> m_fs;
+        std::shared_ptr<caustica::IFileSystem> m_fs;
 
         uint32_t m_MaxTextureSize = 0;
 
         bool m_GenerateMipmaps = true;
 
-        log::Severity m_InfoLogSeverity = log::Severity::Info;
-        log::Severity m_ErrorLogSeverity = log::Severity::Warning;
+        caustica::Severity m_InfoLogSeverity = caustica::Severity::Info;
+        caustica::Severity m_ErrorLogSeverity = caustica::Severity::Warning;
 
         std::atomic<uint32_t> m_TexturesRequested = 0;
         std::atomic<uint32_t> m_TexturesLoaded = 0;
         uint32_t m_TexturesFinalized = 0;
 
         bool FindTextureInCache(const std::filesystem::path& path, std::shared_ptr<TextureData>& texture);
-        std::shared_ptr<vfs::IBlob> ReadTextureFile(const std::filesystem::path& path) const;
+        std::shared_ptr<caustica::IBlob> ReadTextureFile(const std::filesystem::path& path) const;
 
         bool FillTextureData(
-            const std::shared_ptr<vfs::IBlob>& fileData,
+            const std::shared_ptr<caustica::IBlob>& fileData,
             const std::shared_ptr<TextureData>& texture,
             const std::string& extension,
             const std::string& mimeType) const;
@@ -115,7 +115,7 @@ namespace donut::engine
     public:
         TextureCache(
             nvrhi::IDevice* device,
-            std::shared_ptr<vfs::IFileSystem> fs,
+            std::shared_ptr<caustica::IFileSystem> fs,
             std::shared_ptr<DescriptorTableManager> descriptorTable);
         virtual ~TextureCache();
 
@@ -143,7 +143,7 @@ namespace donut::engine
 
         // Same as LoadTextureFromFileAsync, but using a memory blob and MIME type instead of file name, and uncached.
         virtual std::shared_ptr<LoadedTexture> LoadTextureFromMemoryAsync(
-            const std::shared_ptr<vfs::IBlob>& data,
+            const std::shared_ptr<caustica::IBlob>& data,
             const std::string& name,
             const std::string& mimeType,
             bool sRGB,
@@ -151,7 +151,7 @@ namespace donut::engine
 
         // Same as LoadTextureFromFile, but using a memory blob and MIME type instead of file name, and uncached.
         virtual std::shared_ptr<LoadedTexture> LoadTextureFromMemory(
-            const std::shared_ptr<vfs::IBlob>& data,
+            const std::shared_ptr<caustica::IBlob>& data,
             const std::string& name,
             const std::string& mimeType,
             bool sRGB,
@@ -160,7 +160,7 @@ namespace donut::engine
 
         // Same as LoadTextureFromFileDeferred, but using a memory blob and MIME type instead of file name, and uncached.
         virtual std::shared_ptr<LoadedTexture> LoadTextureFromMemoryDeferred(
-            const std::shared_ptr<vfs::IBlob>& data,
+            const std::shared_ptr<caustica::IBlob>& data,
             const std::string& name,
             const std::string& mimeType,
             bool sRGB);
@@ -195,10 +195,10 @@ namespace donut::engine
         void SetGenerateMipmaps(bool generateMipmaps);
 
         // Sets the Severity of log messages about textures being loaded.
-        void SetInfoLogSeverity(log::Severity value) { m_InfoLogSeverity = value; }
+        void SetInfoLogSeverity(caustica::Severity value) { m_InfoLogSeverity = value; }
 
         // Sets the Severity of log messages about textures that couldn't be loaded.
-        void SetErrorLogSeverity(log::Severity value) { m_ErrorLogSeverity = value; }
+        void SetErrorLogSeverity(caustica::Severity value) { m_ErrorLogSeverity = value; }
 
         uint32_t GetNumberOfLoadedTextures() { return m_TexturesLoaded.load(); }
         uint32_t GetNumberOfRequestedTextures() { return m_TexturesRequested.load(); }

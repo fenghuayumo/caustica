@@ -34,7 +34,7 @@ namespace bvh
 
     static nvrhi::rt::AccelStructDesc GetMeshBlasDesc(
         const Config& cfg,
-        const donut::engine::MeshInfo& mesh,
+        const caustica::MeshInfo& mesh,
         const OmmAttachment* ommAttachment,
         bool updateSkinMeshes)
     {
@@ -44,7 +44,7 @@ namespace bvh
 
         for (uint32_t geomIt = 0; geomIt < mesh.geometries.size(); ++geomIt)
         {
-            const donut::engine::MeshGeometry* geometry = mesh.geometries[geomIt].get();
+            const caustica::MeshGeometry* geometry = mesh.geometries[geomIt].get();
 
             nvrhi::rt::GeometryDesc geometryDesc;
             auto& triangles = geometryDesc.geometryData.triangles;
@@ -53,14 +53,14 @@ namespace bvh
             triangles.indexFormat = nvrhi::Format::R32_UINT;
             triangles.indexCount = geometry->numIndices;
             triangles.vertexBuffer = mesh.buffers->vertexBuffer;
-            triangles.vertexOffset = (mesh.vertexOffset + geometry->vertexOffsetInMesh) * sizeof(donut::math::float3) + mesh.buffers->getVertexBufferRange(donut::engine::VertexAttribute::Position).byteOffset;
+            triangles.vertexOffset = (mesh.vertexOffset + geometry->vertexOffsetInMesh) * sizeof(dm::float3) + mesh.buffers->getVertexBufferRange(caustica::VertexAttribute::Position).byteOffset;
             triangles.vertexFormat = nvrhi::Format::RGB32_FLOAT;
-            triangles.vertexStride = sizeof(donut::math::float3);
+            triangles.vertexStride = sizeof(dm::float3);
             triangles.vertexCount = geometry->numVertices;
 
             PTMaterial & materialPT = *PTMaterial::SafeCast(geometry->material);
 
-            if ( (cfg.excludeTransmissive && geometry->material->domain == donut::engine::MaterialDomain::Transmissive) 
+            if ( (cfg.excludeTransmissive && geometry->material->domain == caustica::MaterialDomain::Transmissive) 
                 || materialPT.SkipRender )
             {
                 constexpr float nan = std::numeric_limits<float>::quiet_NaN();

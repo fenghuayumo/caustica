@@ -12,7 +12,7 @@
 
 #include <nvrhi/nvrhi.h>
 
-namespace donut::engine
+namespace caustica
 {
     class ShaderFactory;
     struct ShaderMacro;
@@ -24,20 +24,20 @@ class ComputePass
 public:
     bool Init(
         nvrhi::IDevice* device,
-        donut::engine::ShaderFactory& shaderFactory,
+        caustica::ShaderFactory& shaderFactory,
         const char* fileName,
         const char* entry, 
-        const std::vector<donut::engine::ShaderMacro>& macros,
+        const std::vector<caustica::ShaderMacro>& macros,
         nvrhi::IBindingLayout* bindingLayout,
         nvrhi::IBindingLayout* extraBindingLayout = nullptr,
         nvrhi::IBindingLayout* bindlessLayout = nullptr);
 
     bool Init(
         nvrhi::IDevice* device,
-        donut::engine::ShaderFactory& shaderFactory,
+        caustica::ShaderFactory& shaderFactory,
         const char* fileName,
         const char* entry,
-        const std::vector<donut::engine::ShaderMacro>& macros,
+        const std::vector<caustica::ShaderMacro>& macros,
         nvrhi::BindingLayoutVector & bindingLayouts );
 
     void Execute(

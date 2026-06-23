@@ -26,12 +26,12 @@
 #include <memory>
 #include <vector>
 
-namespace donut::engine
+namespace caustica
 {
     class IView;
 }
 
-namespace donut::render
+namespace caustica::render
 {
     struct DrawItem;
 
@@ -39,8 +39,8 @@ namespace donut::render
     {
     public:
         virtual void PrepareForView(
-            const std::shared_ptr<engine::SceneGraphNode>& rootNode,
-            const engine::IView& view) = 0;
+            const std::shared_ptr<caustica::SceneGraphNode>& rootNode,
+            const caustica::IView& view) = 0;
 
         virtual const DrawItem* GetNextItem() = 0;
 
@@ -55,8 +55,8 @@ namespace donut::render
 
     public:
         void PrepareForView(
-            const std::shared_ptr<engine::SceneGraphNode>& rootNode,
-            const engine::IView& view) override { }
+            const std::shared_ptr<caustica::SceneGraphNode>& rootNode,
+            const caustica::IView& view) override { }
 
         const DrawItem* GetNextItem() override;
 
@@ -67,7 +67,7 @@ namespace donut::render
     {
     private:
         dm::frustum m_ViewFrustum;
-        engine::SceneGraphWalker m_Walker;
+        caustica::SceneGraphWalker m_Walker;
         std::vector<DrawItem> m_InstanceChunk;
         std::vector<const DrawItem*> m_InstancePtrChunk;
         size_t m_ReadPtr = 0;
@@ -78,8 +78,8 @@ namespace donut::render
     public:
 
         void PrepareForView(
-            const std::shared_ptr<engine::SceneGraphNode>& rootNode,
-            const engine::IView& view) override;
+            const std::shared_ptr<caustica::SceneGraphNode>& rootNode,
+            const caustica::IView& view) override;
 
         const DrawItem* GetNextItem() override;
 
@@ -98,8 +98,8 @@ namespace donut::render
         bool DrawDoubleSidedMaterialsSeparately = true;
         
         void PrepareForView(
-            const std::shared_ptr<engine::SceneGraphNode>& rootNode,
-            const engine::IView& view) override;
+            const std::shared_ptr<caustica::SceneGraphNode>& rootNode,
+            const caustica::IView& view) override;
 
         const DrawItem* GetNextItem() override;
     };

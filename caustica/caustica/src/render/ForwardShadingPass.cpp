@@ -53,12 +53,12 @@
 #endif
 #endif
 
-using namespace donut::math;
+using namespace caustica::math;
 #include <shaders/forward_cb.h>
 
 
-using namespace donut::engine;
-using namespace donut::render;
+using namespace caustica;
+using namespace caustica::render;
 
 ForwardShadingPass::ForwardShadingPass(
     nvrhi::IDevice* device,
@@ -383,7 +383,7 @@ void ForwardShadingPass::PrepareLights(
         {
             if (lightProbeDiffuse != probe->diffuseMap || lightProbeSpecular != probe->specularMap || lightProbeEnvironmentBrdf != probe->environmentBrdf)
             {
-                log::error("All lights probe submitted to ForwardShadingPass::PrepareLights(...) must use the same set of textures");
+                caustica::error("All lights probe submitted to ForwardShadingPass::PrepareLights(...) must use the same set of textures");
                 return;
             }
         }
@@ -582,7 +582,7 @@ nvrhi::BindingSetHandle ForwardShadingPass::GetOrCreateInputBindingSet(const Buf
 }
 
 void ForwardShadingPass::SetPushConstants(
-    donut::render::GeometryPassContext& abstractContext,
+    caustica::render::GeometryPassContext& abstractContext,
     nvrhi::ICommandList* commandList,
     nvrhi::GraphicsState& state,
     nvrhi::DrawArguments& args)

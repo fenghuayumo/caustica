@@ -28,7 +28,7 @@
 #include <mutex>
 #include <nvrhi/nvrhi.h>
 
-namespace donut::engine
+namespace caustica
 {
     class ShaderFactory;
     class CommonRenderPasses;
@@ -38,7 +38,7 @@ namespace donut::engine
     class IView;
 }
 
-namespace donut::render
+namespace caustica::render
 {
     class DepthPass : public IGeometryPass
     {
@@ -74,7 +74,7 @@ namespace donut::render
 
         struct CreateParameters
         {
-            std::shared_ptr<engine::MaterialBindingCache> materialBindings;
+            std::shared_ptr<caustica::MaterialBindingCache> materialBindings;
             int depthBias = 0;
             float depthBiasClamp = 0.f;
             float slopeScaledDepthBias = 0.f;
@@ -106,39 +106,39 @@ namespace donut::render
         bool m_UseInputAssembler = false;
         bool m_TrackLiveness = true;
 
-        std::unordered_map<const engine::BufferGroup*, nvrhi::BindingSetHandle> m_InputBindingSets;
+        std::unordered_map<const caustica::BufferGroup*, nvrhi::BindingSetHandle> m_InputBindingSets;
         
-        std::shared_ptr<engine::CommonRenderPasses> m_CommonPasses;
-        std::shared_ptr<engine::MaterialBindingCache> m_MaterialBindings;
+        std::shared_ptr<caustica::CommonRenderPasses> m_CommonPasses;
+        std::shared_ptr<caustica::MaterialBindingCache> m_MaterialBindings;
 
-        virtual nvrhi::ShaderHandle CreateVertexShader(engine::ShaderFactory& shaderFactory, const CreateParameters& params);
-        virtual nvrhi::ShaderHandle CreatePixelShader(engine::ShaderFactory& shaderFactory, const CreateParameters& params);
+        virtual nvrhi::ShaderHandle CreateVertexShader(caustica::ShaderFactory& shaderFactory, const CreateParameters& params);
+        virtual nvrhi::ShaderHandle CreatePixelShader(caustica::ShaderFactory& shaderFactory, const CreateParameters& params);
         virtual nvrhi::InputLayoutHandle CreateInputLayout(nvrhi::IShader* vertexShader, const CreateParameters& params);
         virtual nvrhi::BindingLayoutHandle CreateInputBindingLayout();
-        virtual nvrhi::BindingSetHandle CreateInputBindingSet(const engine::BufferGroup* bufferGroup);
+        virtual nvrhi::BindingSetHandle CreateInputBindingSet(const caustica::BufferGroup* bufferGroup);
         virtual void CreateViewBindings(nvrhi::BindingLayoutHandle& layout, nvrhi::BindingSetHandle& set, const CreateParameters& params);
-        virtual std::shared_ptr<engine::MaterialBindingCache> CreateMaterialBindingCache(engine::CommonRenderPasses& commonPasses);
+        virtual std::shared_ptr<caustica::MaterialBindingCache> CreateMaterialBindingCache(caustica::CommonRenderPasses& commonPasses);
         virtual nvrhi::GraphicsPipelineHandle CreateGraphicsPipeline(PipelineKey key, nvrhi::FramebufferInfo const& framebufferInfo);
-        nvrhi::BindingSetHandle GetOrCreateInputBindingSet(const engine::BufferGroup* bufferGroup);
+        nvrhi::BindingSetHandle GetOrCreateInputBindingSet(const caustica::BufferGroup* bufferGroup);
 
 
     public:
         DepthPass(
             nvrhi::IDevice* device,
-            std::shared_ptr<engine::CommonRenderPasses> commonPasses);
+            std::shared_ptr<caustica::CommonRenderPasses> commonPasses);
 
         virtual void Init(
-            engine::ShaderFactory& shaderFactory,
+            caustica::ShaderFactory& shaderFactory,
             const CreateParameters& params);
 
         void ResetBindingCache();
         
         // IGeometryPass implementation
 
-        [[nodiscard]] engine::ViewType::Enum GetSupportedViewTypes() const override;
-        void SetupView(GeometryPassContext& context, nvrhi::ICommandList* commandList, const engine::IView* view, const engine::IView* viewPrev) override;
-        bool SetupMaterial(GeometryPassContext& context, const engine::Material* material, nvrhi::RasterCullMode cullMode, nvrhi::GraphicsState& state) override;
-        void SetupInputBuffers(GeometryPassContext& context, const engine::BufferGroup* buffers, nvrhi::GraphicsState& state) override;
+        [[nodiscard]] caustica::ViewType::Enum GetSupportedViewTypes() const override;
+        void SetupView(GeometryPassContext& context, nvrhi::ICommandList* commandList, const caustica::IView* view, const caustica::IView* viewPrev) override;
+        bool SetupMaterial(GeometryPassContext& context, const caustica::Material* material, nvrhi::RasterCullMode cullMode, nvrhi::GraphicsState& state) override;
+        void SetupInputBuffers(GeometryPassContext& context, const caustica::BufferGroup* buffers, nvrhi::GraphicsState& state) override;
         void SetPushConstants(GeometryPassContext& context, nvrhi::ICommandList* commandList, nvrhi::GraphicsState& state, nvrhi::DrawArguments& args) override;
     };
 

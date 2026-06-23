@@ -25,13 +25,13 @@
 #include <memory>
 #include <filesystem>
 
-namespace donut::vfs
+namespace caustica
 {
     class IBlob;
     class IFileSystem;
 }
 
-namespace donut::engine
+namespace caustica
 {
     struct SceneImportResult;
     struct SceneLoadingStats;
@@ -42,16 +42,16 @@ namespace donut::engine
     class SceneGraphAnimation;
 }
 
-namespace donut::engine
+namespace caustica
 {
     class GltfImporter
     {   
     protected:
-        std::shared_ptr<vfs::IFileSystem> m_fs;
+        std::shared_ptr<caustica::IFileSystem> m_fs;
         std::shared_ptr<SceneTypeFactory> m_SceneTypeFactory;
         
     public:
-        explicit GltfImporter(std::shared_ptr<vfs::IFileSystem> fs, std::shared_ptr<SceneTypeFactory> sceneTypeFactory);
+        explicit GltfImporter(std::shared_ptr<caustica::IFileSystem> fs, std::shared_ptr<SceneTypeFactory> sceneTypeFactory);
         
         bool Load(
             const std::filesystem::path& fileName,

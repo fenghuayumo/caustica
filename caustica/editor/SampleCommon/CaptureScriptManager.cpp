@@ -20,8 +20,8 @@
 
 #include <math/math.h>
 
-using namespace donut::app;
-using namespace donut::engine;
+using namespace caustica;
+using namespace caustica;
 
 CaptureScriptManager::CaptureScriptManager(Sample & sample, SampleUIData & sampleUI, const CommandLineOptions & cmdLine)
     : m_app(sample), m_ui(sampleUI), m_cmdLine(cmdLine)
@@ -268,12 +268,12 @@ void CaptureScriptManager::PostRender(const std::function<bool(const char*)>& du
     {
         if (m_captureSuccess)
         {
-            donut::log::info("Capture of '%s' finished successfully. Exiting.", m_screenshotFileName.string().c_str());
+            caustica::info("Capture of '%s' finished successfully. Exiting.", m_screenshotFileName.string().c_str());
             std::exit(0);
         }
         else
         {
-            donut::log::fatal("Unable capture '%s'. Exiting.", m_screenshotFileName.string().c_str());
+            caustica::fatal("Unable capture '%s'. Exiting.", m_screenshotFileName.string().c_str());
             std::exit(1);
         }
     }

@@ -55,12 +55,12 @@ SOFTWARE.
 
 #include <imgui.h>
 
-namespace donut::engine
+namespace caustica
 {
     class ShaderFactory;
 }
 
-namespace donut::app
+namespace caustica
 {
     struct ImGui_NVRHI
     {
@@ -86,7 +86,7 @@ namespace donut::app
         std::vector<ImDrawVert> vtxBuffer;
         std::vector<ImDrawIdx> idxBuffer;
 
-        bool init(nvrhi::IDevice* device, std::shared_ptr<engine::ShaderFactory> shaderFactory);
+        bool init(nvrhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory);
         bool updateFontTexture();
         bool render(nvrhi::IFramebuffer* framebuffer);
         void backbufferResizing();

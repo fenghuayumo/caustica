@@ -28,7 +28,7 @@
 
 #include <map>
 
-namespace donut::chunk
+namespace caustica::chunk
 {
 
 class ChunkWriter
@@ -134,7 +134,7 @@ static ChunkId chunkStream(StreamHandle const & handle, ChunkWriter & writer)
 
     if (!handle.isValid())
     {
-        log::error("invalid stream : %s", handle.name);
+        caustica::error("invalid stream : %s", handle.name);
         return ChunkId();
     }
 
@@ -269,7 +269,7 @@ static ChunkId chunkMeshNodes(
 }
 
 // serialize MeshSets
-std::shared_ptr<donut::vfs::IBlob const> serialize(MeshSetBase const & mset)
+std::shared_ptr<caustica::IBlob const> serialize(MeshSetBase const & mset)
 {
 
     ChunkWriter writer;
@@ -281,7 +281,7 @@ std::shared_ptr<donut::vfs::IBlob const> serialize(MeshSetBase const & mset)
         case MeshSetBase::MESH : type = Desc::MESH; break;
         case MeshSetBase::MESHLET : type = Desc::MESHLET; break;
         default:
-            log::error("unsupported set type (%d)", mset.type);
+            caustica::error("unsupported set type (%d)", mset.type);
             return nullptr;
     }
 
@@ -297,19 +297,19 @@ std::shared_ptr<donut::vfs::IBlob const> serialize(MeshSetBase const & mset)
 
     if (mset.streams.position)
     {
-        handle = {"Position", FP32, VERTEX, POSITION, mset.nverts, sizeof(donut::math::float3), mset.streams.position};
+        handle = {"Position", FP32, VERTEX, POSITION, mset.nverts, sizeof(caustica::math::float3), mset.streams.position};
         desc.streamChunkIds[Desc::POSITIONS] = chunkStream(handle, writer);
     }
 
     if (mset.streams.texcoord0)
     {
-        handle = {"TexCoord0", FP32, VERTEX, TEXCOORD, mset.nverts, sizeof(donut::math::float2), mset.streams.texcoord0};
+        handle = {"TexCoord0", FP32, VERTEX, TEXCOORD, mset.nverts, sizeof(caustica::math::float2), mset.streams.texcoord0};
         desc.streamChunkIds[Desc::TEXCOORDS0] = chunkStream(handle, writer);
     }
 
     if (mset.streams.texcoord1)
     {
-        handle = {"TexCoord1", FP32, VERTEX, TEXCOORD, mset.nverts, sizeof(donut::math::float2), mset.streams.texcoord1};
+        handle = {"TexCoord1", FP32, VERTEX, TEXCOORD, mset.nverts, sizeof(caustica::math::float2), mset.streams.texcoord1};
         desc.streamChunkIds[Desc::TEXCOORDS1] = chunkStream(handle, writer);
     }
 
@@ -348,7 +348,7 @@ std::shared_ptr<donut::vfs::IBlob const> serialize(MeshSetBase const & mset)
 
         if (set.meshletSize>255)
         {
-            log::error("meshlet info size too big : %d (max 255)", set.meshletSize);
+            caustica::error("meshlet info size too big : %d (max 255)", set.meshletSize);
             return nullptr;
         }
 
@@ -368,7 +368,7 @@ std::shared_ptr<donut::vfs::IBlob const> serialize(MeshSetBase const & mset)
     }
     else
     {
-        log::error("Unknown type of MeshSet");
+        caustica::error("Unknown type of MeshSet");
         return nullptr;
     }
 

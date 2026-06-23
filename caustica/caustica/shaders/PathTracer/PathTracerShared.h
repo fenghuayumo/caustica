@@ -119,10 +119,10 @@ inline PathTracerCameraData BridgeCamera( uint viewportWidth, uint viewportHeigh
     data.ViewportSize   = {viewportWidth, viewportHeight};
 
     // Ray tracing related vectors
-    data.DirectionW = donut::math::normalize( camDir );
-    data.CameraW = donut::math::normalize( camDir ) * data.FocalDistance;
-    data.CameraU = donut::math::normalize( donut::math::cross( data.CameraW, camUp ) );
-    data.CameraV = donut::math::normalize( donut::math::cross( data.CameraU, data.CameraW ) );
+    data.DirectionW = caustica::math::normalize( camDir );
+    data.CameraW = caustica::math::normalize( camDir ) * data.FocalDistance;
+    data.CameraU = caustica::math::normalize( caustica::math::cross( data.CameraW, camUp ) );
+    data.CameraV = caustica::math::normalize( caustica::math::cross( data.CameraU, data.CameraW ) );
     const float ulen = data.FocalDistance * std::tan( fovY * 0.5f ) * data.AspectRatio;
     data.CameraU *= ulen;
     const float vlen = data.FocalDistance * std::tan( fovY * 0.5f );

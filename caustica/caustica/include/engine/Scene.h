@@ -35,14 +35,14 @@ namespace Json
     class Value;
 }
 
-namespace donut::vfs
+namespace caustica
 {
     class IFileSystem;
 }
 
 struct GeometryData;
 
-namespace donut::engine
+namespace caustica
 {
     class ShaderFactory;
     struct SceneImportResult;
@@ -54,7 +54,7 @@ namespace donut::engine
     class Scene
     {
     protected:
-        std::shared_ptr<vfs::IFileSystem> m_fs;
+        std::shared_ptr<caustica::IFileSystem> m_fs;
         std::shared_ptr<SceneTypeFactory> m_SceneTypeFactory;
         std::shared_ptr<TextureCache> m_TextureCache;
         std::shared_ptr<DescriptorTableManager> m_DescriptorTable;
@@ -132,7 +132,7 @@ namespace donut::engine
         Scene(
             nvrhi::IDevice* device,
             ShaderFactory& shaderFactory,
-            std::shared_ptr<vfs::IFileSystem> fs,
+            std::shared_ptr<caustica::IFileSystem> fs,
             std::shared_ptr<TextureCache> textureCache,
             std::shared_ptr<DescriptorTableManager> descriptorTable,
             std::shared_ptr<SceneTypeFactory> sceneTypeFactory);

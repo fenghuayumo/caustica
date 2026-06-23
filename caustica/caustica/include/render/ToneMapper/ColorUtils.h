@@ -11,7 +11,7 @@
 #pragma once
 //#include <glm/gtx/matrix_operation.hpp>
 #include <math/math.h>
-using namespace donut::math;
+using namespace caustica::math;
 
 /** Color conversion utility functions.
 
@@ -46,7 +46,7 @@ using namespace donut::math;
 
 // These are declared as floats but should be doubles? 
 // Hacked f's, accurance maybe affected 
-namespace donut::math
+namespace caustica::math
 {
     // Transform from RGB color in Rec.709 to CIE XYZ.
     static const float3x3 kColorTransform_RGBtoXYZ_Rec709 =

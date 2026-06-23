@@ -64,13 +64,13 @@ this software is released into the Public Domain.
 #endif
 #endif
 
-using namespace donut::math;
+using namespace caustica::math;
 #include <shaders/material_cb.h>
 #include <shaders/skinning_cb.h>
 #include <shaders/bindless.h>
 
-using namespace donut::vfs;
-using namespace donut::engine;
+using namespace caustica;
+using namespace caustica;
 
 static SceneLoadingStats g_LoadingStats;
 
@@ -244,7 +244,7 @@ namespace
         if (name == "plane_cube" || name == "default" || name == "default_scene")
             return { MakePlaneMesh(), MakeCubeMesh() };
 
-        donut::log::error("Unknown builtin primitive model '%s'", builtinName.c_str());
+        caustica::error("Unknown builtin primitive model '%s'", builtinName.c_str());
         return {};
     }
 
@@ -365,7 +365,7 @@ bool Scene::LoadWithThreadPool(const std::filesystem::path& sceneFileName, Threa
         std::filesystem::path scenePath = sceneFileName.parent_path();
 
         Json::Value documentRoot;
-        if (!json::LoadFromFile(*m_fs, sceneFileName, documentRoot))
+        if (!caustica::json::LoadFromFile(*m_fs, sceneFileName, documentRoot))
             return false;
 
         return LoadJsonDocument(documentRoot, scenePath, threadPool);
@@ -385,7 +385,7 @@ bool Scene::LoadFromJsonString(const std::string& sceneJson, const std::filesyst
     std::istringstream stream(sceneJson);
     if (!Json::parseFromStream(readerBuilder, stream, &documentRoot, &errors))
     {
-        log::error("Unable to parse inline scene JSON: %s", errors.c_str());
+        caustica::error("Unable to parse inline scene JSON: %s", errors.c_str());
         return false;
     }
 
@@ -412,7 +412,7 @@ bool Scene::LoadJsonDocument(Json::Value documentRoot, const std::filesystem::pa
     }
     else
     {
-        log::error("Unrecognized structure of the scene description.");
+        caustica::error("Unrecognized structure of the scene description.");
         return false;
     }
 
@@ -552,7 +552,7 @@ void Scene::LoadSceneGraph(const Json::Value& nodeList, const std::shared_ptr<Sc
     {
         if (!src.isObject())
         {
-            log::warning("Non-object node in the scene graph definition.");
+            caustica::warning("Non-object node in the scene graph definition.");
             continue;
         }
 
@@ -570,14 +570,14 @@ void Scene::LoadSceneGraph(const Json::Value& nodeList, const std::shared_ptr<Sc
             customParent = m_SceneGraph->FindNode(parentNode.asString());
             if (!customParent)
             {
-                log::warning("Custom parent '%s' specified for node '%s' not found, skipping the node.",
+                caustica::warning("Custom parent '%s' specified for node '%s' not found, skipping the node.",
                     parentNode.asCString(), nodeName.c_str());
                 continue;
             }
         }
         else if (!parentNode.isNull())
         {
-            log::warning("Custom parent specification for node '%s' is not a string, ignoring.",
+            caustica::warning("Custom parent specification for node '%s' is not a string, ignoring.",
                 nodeName.c_str());
         }
 
@@ -588,14 +588,14 @@ void Scene::LoadSceneGraph(const Json::Value& nodeList, const std::shared_ptr<Sc
         {
             if (!modelNode.isIntegral())
             {
-                log::warning("Model references in the scene graph must be indices into the model array.");
+                caustica::warning("Model references in the scene graph must be indices into the model array.");
                 continue;
             }
 
             int modelIndex = modelNode.asInt();
             if (modelIndex < 0 || modelIndex >= int(m_Models.size()))
             {
-                log::warning("Referenced model %d is not defined in the model array.", modelIndex);
+                caustica::warning("Referenced model %d is not defined in the model array.", modelIndex);
                 continue;
             }
 
@@ -667,13 +667,13 @@ void Scene::LoadSceneGraph(const Json::Value& nodeList, const std::shared_ptr<Sc
             }
             else
             {
-                log::warning("Unknown leaf type '%s' for node '%s', skipping.",
+                caustica::warning("Unknown leaf type '%s' for node '%s', skipping.",
                     leafTypeNode.asCString(), dst->GetName().c_str());
             }
         }
         else if (!leafTypeNode.isNull())
         {
-            log::warning("Leaf type specification for node '%s' is not a string, skipping.",
+            caustica::warning("Leaf type specification for node '%s' is not a string, skipping.",
                 dst->GetName().c_str());
         }
     }
@@ -739,14 +739,14 @@ void Scene::LoadAnimations(const Json::Value& nodeList)
                     else if (modeNode.asString() == "catmull-rom")
                         sampler->SetInterpolationMode(animation::InterpolationMode::CatmullRomSpline);
                     else
-                        log::warning("Unknown interpolation mode '%s' specified for animation '%s' channel %d. "
+                        caustica::warning("Unknown interpolation mode '%s' specified for animation '%s' channel %d. "
                             "Valid interpolation modes are: step, linear, hermite, catmull-rom.",
                             modeNode.asCString(), animation->GetName().c_str(), channelIndex);
                 }
                 else
                 {
                     sampler->SetInterpolationMode(animation::InterpolationMode::Step);
-                    log::warning("Interpolation mode is not specified for animation '%s' channel %d, using step.",
+                    caustica::warning("Interpolation mode is not specified for animation '%s' channel %d, using step.",
                         animation->GetName().c_str(), channelIndex);
                 }
 
@@ -765,7 +765,7 @@ void Scene::LoadAnimations(const Json::Value& nodeList)
                 }
                 else
                 {
-                    log::warning("Attribute is not specified for animation '%s' channel %d, ignoring.",
+                    caustica::warning("Attribute is not specified for animation '%s' channel %d, ignoring.",
                         animation->GetName().c_str(), channelIndex);
                     continue;
                 }
@@ -778,7 +778,7 @@ void Scene::LoadAnimations(const Json::Value& nodeList)
                     const auto& timeNode = dataPoint["time"];
                     if (!timeNode.isNumeric())
                     {
-                        log::warning("Invalid keyframe %d in animation '%s' channel %d: time is not specified or is not numeric.",
+                        caustica::warning("Invalid keyframe %d in animation '%s' channel %d: time is not specified or is not numeric.",
                             keyframeIndex, animation->GetName().c_str(), channelIndex);
                         continue;
                     }
@@ -797,7 +797,7 @@ void Scene::LoadAnimations(const Json::Value& nodeList)
                     if (targetNode.isString())
                     {
                         std::string targetName = targetNode.asString();
-                        if (donut::string_utils::starts_with(targetName, "material:"))
+                        if (caustica::string_utils::starts_with(targetName, "material:"))
                         {
                             targetName = targetName.substr(9);
 
@@ -819,7 +819,7 @@ void Scene::LoadAnimations(const Json::Value& nodeList)
                             }
                             else
                             {
-                                log::warning("Target material '%s' specified for animation '%s' channel %d not found, ignoring.",
+                                caustica::warning("Target material '%s' specified for animation '%s' channel %d not found, ignoring.",
                                     std::string(targetName).c_str(), animation->GetName().c_str(), channelIndex);
                             }
                         }
@@ -835,14 +835,14 @@ void Scene::LoadAnimations(const Json::Value& nodeList)
                             }
                             else
                             {
-                                log::warning("Target node '%s' specified for animation '%s' channel %d not found, ignoring.",
+                                caustica::warning("Target node '%s' specified for animation '%s' channel %d not found, ignoring.",
                                     targetNode.asCString(), animation->GetName().c_str(), channelIndex);
                             }
                         }
                     }
                     else if (!targetNode.isNull())
                     {
-                        log::warning("Target node specification for animation '%s' channel %d is not a string, ignoring.",
+                        caustica::warning("Target node specification for animation '%s' channel %d is not a string, ignoring.",
                             animation->GetName().c_str(), channelIndex);
                     }
                 };
@@ -879,7 +879,7 @@ void Scene::LoadAnimations(const Json::Value& nodeList)
         }
         else
         {
-            log::warning("Animation '%s' processed with no valid channels, ignoring.",
+            caustica::warning("Animation '%s' processed with no valid channels, ignoring.",
                 animation->GetName().c_str());
         }
     }

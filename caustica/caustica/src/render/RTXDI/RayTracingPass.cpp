@@ -15,25 +15,25 @@
 #include <core/log.h>
 #include <nvrhi/utils.h>
 
-using namespace donut::engine;
+using namespace caustica;
 
 
 bool RayTracingPass::Init(
     nvrhi::IDevice* device,
-    donut::engine::ShaderFactory& shaderFactory,
+    caustica::ShaderFactory& shaderFactory,
     const char* shaderName,
-    const std::vector<donut::engine::ShaderMacro>& extraMacros,
+    const std::vector<caustica::ShaderMacro>& extraMacros,
     bool useRayQuery,
     uint32_t computeGroupSize,
     nvrhi::IBindingLayout* bindingLayout,
     nvrhi::IBindingLayout* extraBindingLayout,
     nvrhi::IBindingLayout* bindlessLayout)
 {
-    donut::log::debug("Initializing RayTracingPass %s...", shaderName);
+    caustica::debug("Initializing RayTracingPass %s...", shaderName);
 
     ComputeGroupSize = computeGroupSize;
 
-    std::vector<donut::engine::ShaderMacro> macros = { { "USE_RAY_QUERY", "1" } };
+    std::vector<caustica::ShaderMacro> macros = { { "USE_RAY_QUERY", "1" } };
 
     macros.insert(macros.end(), extraMacros.begin(), extraMacros.end());
 

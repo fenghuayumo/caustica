@@ -28,7 +28,7 @@
 #include <unordered_map>
 
 
-namespace donut::engine
+namespace caustica
 {
     class ShaderFactory;
     class ShadowMap;
@@ -37,13 +37,13 @@ namespace donut::engine
     class ICompositeView;
 }
 
-namespace donut::render
+namespace caustica::render
 {
     class BloomPass
     {
     private:
-        std::shared_ptr<engine::CommonRenderPasses> m_CommonPasses;
-        std::shared_ptr<engine::FramebufferFactory> m_FramebufferFactory;
+        std::shared_ptr<caustica::CommonRenderPasses> m_CommonPasses;
+        std::shared_ptr<caustica::FramebufferFactory> m_FramebufferFactory;
 
         nvrhi::DeviceHandle m_Device;
 
@@ -75,20 +75,20 @@ namespace donut::render
         nvrhi::BindingLayoutHandle m_BloomBlurBindingLayout;
         nvrhi::BindingLayoutHandle m_BloomApplyBindingLayout;
 
-        engine::BindingCache m_BindingCache;
+        caustica::BindingCache m_BindingCache;
 
     public:
         BloomPass(
             nvrhi::IDevice* device,
-            const std::shared_ptr<engine::ShaderFactory>& shaderFactory,
-            std::shared_ptr<engine::CommonRenderPasses> commonPasses,
-            std::shared_ptr<engine::FramebufferFactory> framebufferFactory,
-            const engine::ICompositeView& compositeView);
+            const std::shared_ptr<caustica::ShaderFactory>& shaderFactory,
+            std::shared_ptr<caustica::CommonRenderPasses> commonPasses,
+            std::shared_ptr<caustica::FramebufferFactory> framebufferFactory,
+            const caustica::ICompositeView& compositeView);
 
         void Render(
             nvrhi::ICommandList* commandList,
-            const std::shared_ptr<engine::FramebufferFactory>& framebufferFactory,
-            const engine::ICompositeView& compositeView,
+            const std::shared_ptr<caustica::FramebufferFactory>& framebufferFactory,
+            const caustica::ICompositeView& compositeView,
             nvrhi::ITexture* sourceDestTexture,
             float sigmaInPixels,
             float blendFactor);

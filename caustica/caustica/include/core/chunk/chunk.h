@@ -29,7 +29,7 @@
 #include <cstring>
 
 
-namespace donut::chunk
+namespace caustica::chunk
 {
 
 struct MeshNode
@@ -40,10 +40,10 @@ struct MeshNode
              siblingId,
              instanceId;
 
-    donut::math::affine3 transform,
+    caustica::math::affine3 transform,
                          ctm;
-    donut::math::box3 bbox;
-    donut::math::float3 center;
+    caustica::math::box3 bbox;
+    caustica::math::float3 center;
 };
 
 static_assert(sizeof(MeshNode) == 152);
@@ -55,9 +55,9 @@ struct MeshInstance
     uint32_t minfoId,
              nodeId;
 
-    donut::math::affine3 transform;
-    donut::math::box3 bbox;
-    donut::math::float3 center;
+    caustica::math::affine3 transform;
+    caustica::math::box3 bbox;
+    caustica::math::float3 center;
     uint32_t padding;
 };
 
@@ -69,7 +69,7 @@ struct MeshInfoBase
                * materialName;
 
     uint32_t materialId;
-    donut::math::box3 bbox;
+    caustica::math::box3 bbox;
     uint32_t padding;
 };
 
@@ -109,13 +109,13 @@ public:
     char const * name;
 
     struct VertexStreams {
-        donut::math::float3 const * position;
+        caustica::math::float3 const * position;
 
         uint32_t const * normal,
                        * tangent,
                        * bitangent;
 
-        donut::math::float2 const * texcoord0,
+        caustica::math::float2 const * texcoord0,
                                   * texcoord1;
     } streams;
 
@@ -130,9 +130,9 @@ public:
     uint32_t nnodes,
              rootId;
 
-    donut::math::box3 bbox;
+    caustica::math::box3 bbox;
 
-    std::shared_ptr<donut::vfs::IBlob const> blob;
+    std::shared_ptr<caustica::IBlob const> blob;
 };
 
 struct MeshSet : public MeshSetBase
@@ -167,8 +167,8 @@ struct MeshletSet : public MeshSetBase
     MeshletInfo const * meshInfos;
 };
 
-std::shared_ptr<donut::vfs::IBlob const> serialize(MeshSetBase const & mset);
+std::shared_ptr<caustica::IBlob const> serialize(MeshSetBase const & mset);
 
-std::shared_ptr<MeshSetBase const> deserialize(std::weak_ptr<donut::vfs::IBlob const> blob, char const * assetpath);
+std::shared_ptr<MeshSetBase const> deserialize(std::weak_ptr<caustica::IBlob const> blob, char const * assetpath);
 
 }

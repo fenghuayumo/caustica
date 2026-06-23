@@ -14,12 +14,11 @@
 #include <engine/CommonRenderPasses.h>
 #include <render/Misc/ShaderDebug.h>
 
-using namespace donut;
-using namespace donut::math;
-using namespace donut::engine;
+using namespace caustica::math;
+using namespace caustica;
 
-PostProcess::PostProcess( nvrhi::IDevice* device, std::shared_ptr<donut::engine::ShaderFactory> shaderFactory, 
-    std::shared_ptr<engine::CommonRenderPasses> commonPasses, std::shared_ptr<ShaderDebug> shaderDebug
+PostProcess::PostProcess( nvrhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory, 
+    std::shared_ptr<caustica::CommonRenderPasses> commonPasses, std::shared_ptr<ShaderDebug> shaderDebug
     )
     : m_device(device)
     , m_commonPasses(commonPasses)
@@ -29,40 +28,40 @@ PostProcess::PostProcess( nvrhi::IDevice* device, std::shared_ptr<donut::engine:
 
     for (uint32_t i = 0; i < (uint32_t)ComputePassType::MaxCount; i++)
     {
-        std::vector<donut::engine::ShaderMacro> shaderMacros;
+        std::vector<caustica::ShaderMacro> shaderMacros;
         switch ((ComputePassType)i)
         {
         case(ComputePassType::StablePlanesDebugViz):
-            shaderMacros.push_back(donut::engine::ShaderMacro({ "STABLE_PLANES_DEBUG_VIZ", "1" }));
+            shaderMacros.push_back(caustica::ShaderMacro({ "STABLE_PLANES_DEBUG_VIZ", "1" }));
             break;
         case(ComputePassType::RELAXDenoiserPrepareInputs):
-            shaderMacros.push_back(donut::engine::ShaderMacro({ "DENOISER_PREPARE_INPUTS", "1" }));
-            shaderMacros.push_back(donut::engine::ShaderMacro({ "USE_RELAX", "1" }));
+            shaderMacros.push_back(caustica::ShaderMacro({ "DENOISER_PREPARE_INPUTS", "1" }));
+            shaderMacros.push_back(caustica::ShaderMacro({ "USE_RELAX", "1" }));
             break;
         case(ComputePassType::REBLURDenoiserPrepareInputs):
-            shaderMacros.push_back(donut::engine::ShaderMacro({ "DENOISER_PREPARE_INPUTS", "1" }));
-            shaderMacros.push_back(donut::engine::ShaderMacro({ "USE_RELAX", "0" }));
+            shaderMacros.push_back(caustica::ShaderMacro({ "DENOISER_PREPARE_INPUTS", "1" }));
+            shaderMacros.push_back(caustica::ShaderMacro({ "USE_RELAX", "0" }));
             break;
         case(ComputePassType::RELAXDenoiserFinalMerge): 
-            shaderMacros.push_back(donut::engine::ShaderMacro({ "DENOISER_FINAL_MERGE", "1" })); 
-            shaderMacros.push_back(donut::engine::ShaderMacro({ "USE_RELAX", "1" }));
+            shaderMacros.push_back(caustica::ShaderMacro({ "DENOISER_FINAL_MERGE", "1" })); 
+            shaderMacros.push_back(caustica::ShaderMacro({ "USE_RELAX", "1" }));
             break;
         case(ComputePassType::REBLURDenoiserFinalMerge): 
-            shaderMacros.push_back(donut::engine::ShaderMacro({ "DENOISER_FINAL_MERGE", "1" }));
-            shaderMacros.push_back(donut::engine::ShaderMacro({ "USE_RELAX", "0" }));
+            shaderMacros.push_back(caustica::ShaderMacro({ "DENOISER_FINAL_MERGE", "1" }));
+            shaderMacros.push_back(caustica::ShaderMacro({ "USE_RELAX", "0" }));
             break;
         case(ComputePassType::DLSSRRDenoiserPrepareInputs):
-            shaderMacros.push_back(donut::engine::ShaderMacro({ "DENOISER_PREPARE_INPUTS", "1" }));
-            shaderMacros.push_back(donut::engine::ShaderMacro({ "DENOISER_DLSS_RR", "1" }));
+            shaderMacros.push_back(caustica::ShaderMacro({ "DENOISER_PREPARE_INPUTS", "1" }));
+            shaderMacros.push_back(caustica::ShaderMacro({ "DENOISER_DLSS_RR", "1" }));
             break;
         case(ComputePassType::NoDenoiserFinalMerge):
-            shaderMacros.push_back(donut::engine::ShaderMacro({ "NO_DENOISER_FINAL_MERGE", "1" }));
+            shaderMacros.push_back(caustica::ShaderMacro({ "NO_DENOISER_FINAL_MERGE", "1" }));
             break;
-        case(ComputePassType::DummyPlaceholder): shaderMacros.push_back(donut::engine::ShaderMacro({ "DUMMY_PLACEHOLDER_EFFECT", "1" })); break;
+        case(ComputePassType::DummyPlaceholder): shaderMacros.push_back(caustica::ShaderMacro({ "DUMMY_PLACEHOLDER_EFFECT", "1" })); break;
         };
         m_computeShaders[i] = shaderFactory->CreateShader("app/engine/shaders/render/ProcessingPasses/PostProcess.hlsl", "main", &shaderMacros, nvrhi::ShaderType::Compute);
     }
-    //m_MainCS = shaderFactory->CreateShader("app/engine/shaders/render/ProcessingPasses/PostProcess.hlsl", "main", &std::vector<donut::engine::ShaderMacro>(1, donut::engine::ShaderMacro("USE_CS", "1")), nvrhi::ShaderType::Compute);
+    //m_MainCS = shaderFactory->CreateShader("app/engine/shaders/render/ProcessingPasses/PostProcess.hlsl", "main", &std::vector<caustica::ShaderMacro>(1, caustica::ShaderMacro("USE_CS", "1")), nvrhi::ShaderType::Compute);
 
     nvrhi::BindingLayoutDesc layoutDesc;
 

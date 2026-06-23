@@ -53,25 +53,25 @@ SOFTWARE.
 #include <memory>
 #include <optional>
 
-namespace donut::vfs
+namespace caustica
 {
     class IBlob;
     class IFileSystem;
 }
 
-namespace donut::engine
+namespace caustica
 {
     class ShaderFactory;
 }
 
-namespace donut::app
+namespace caustica
 {
     class RegisteredFont
     {
     protected:
         friend class ImGui_Renderer;
 
-        std::shared_ptr<vfs::IBlob> m_data;
+        std::shared_ptr<caustica::IBlob> m_data;
         bool const m_isDefault;
         bool const m_isCompressed;
         float const m_sizeAtDefaultScale;
@@ -95,7 +95,7 @@ namespace donut::app
         { }
 
         // Creates a custom font
-        RegisteredFont(std::shared_ptr<vfs::IBlob> data, bool isCompressed, float size)
+        RegisteredFont(std::shared_ptr<caustica::IBlob> data, bool isCompressed, float size)
             : m_data(data)
             , m_isDefault(false)
             , m_isCompressed(isCompressed)
@@ -132,11 +132,11 @@ namespace donut::app
     public:
         ImGui_Renderer(DeviceManager *devManager);
         ~ImGui_Renderer();
-        bool Init(std::shared_ptr<engine::ShaderFactory> shaderFactory);
+        bool Init(std::shared_ptr<caustica::ShaderFactory> shaderFactory);
 
         // Loads a TTF font from file and registers it with the ImGui_Renderer.
         // To use the font with ImGUI at runtime, call RegisteredFont::GetScaledFont().
-        std::shared_ptr<RegisteredFont> CreateFontFromFile(vfs::IFileSystem& fs,
+        std::shared_ptr<RegisteredFont> CreateFontFromFile(caustica::IFileSystem& fs,
             std::filesystem::path const& fontFile, float fontSize);
 
         // Registers a TTF font stored in memory with the ImGui_Renderer.

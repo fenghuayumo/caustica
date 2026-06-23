@@ -27,7 +27,7 @@
 #include <string_view>
 #include <vector>
 
-namespace donut::engine
+namespace caustica
 {
 	class TextureCache;
 
@@ -92,4 +92,4 @@ namespace donut::engine
 
 	} // end namespace console
 
-} // end namespace donut::engine
+} // end namespace caustica

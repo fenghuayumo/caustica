@@ -26,11 +26,11 @@
 
 #include <math/math.h>
 
-using namespace donut::math;
+using namespace caustica::math;
 
 #include <shaders/render/Lighting/Distant/SampleProceduralSky.hlsli>
 
-namespace donut::engine
+namespace caustica
 {
     class FramebufferFactory;
     class TextureCache;
@@ -44,7 +44,7 @@ namespace donut::engine
 class SampleProceduralSky 
 {
 public:
-    SampleProceduralSky( nvrhi::IDevice* device, std::shared_ptr<donut::engine::TextureCache> textureCache, std::shared_ptr<donut::engine::CommonRenderPasses> commonPasses, nvrhi::ICommandList* commandList );
+    SampleProceduralSky( nvrhi::IDevice* device, std::shared_ptr<caustica::TextureCache> textureCache, std::shared_ptr<caustica::CommonRenderPasses> commonPasses, nvrhi::ICommandList* commandList );
     ~SampleProceduralSky();
 
     nvrhi::TextureHandle            GetTransmittanceTexture() const;
@@ -61,13 +61,13 @@ private:
     double                          m_lastSceneTime = 0.0;
 
     nvrhi::DeviceHandle                             m_device;
-    std::shared_ptr<donut::engine::TextureCache>    m_textureCache;
+    std::shared_ptr<caustica::TextureCache>    m_textureCache;
 
-    std::shared_ptr<donut::engine::LoadedTexture>   m_transmittanceTexture;
-    std::shared_ptr<donut::engine::LoadedTexture>   m_scatterringTexture;
-    std::shared_ptr<donut::engine::LoadedTexture>   m_irradianceTexture;
-    std::shared_ptr<donut::engine::LoadedTexture>   m_cloudsTexture;
-    std::shared_ptr<donut::engine::LoadedTexture>   m_noiseTexture;
+    std::shared_ptr<caustica::LoadedTexture>   m_transmittanceTexture;
+    std::shared_ptr<caustica::LoadedTexture>   m_scatterringTexture;
+    std::shared_ptr<caustica::LoadedTexture>   m_irradianceTexture;
+    std::shared_ptr<caustica::LoadedTexture>   m_cloudsTexture;
+    std::shared_ptr<caustica::LoadedTexture>   m_noiseTexture;
 
     float3                          m_colorTint                 = float3(1.45f, 1.29f, 1.27f);
     float                           m_brightness                = 1.0f;

@@ -100,14 +100,14 @@ bool PythonScripting::Initialize()
     // immediately `import caustica` without touching sys.path.
     if (PyImport_AppendInittab("caustica", PyInit_caustica) != 0)
     {
-        donut::log::error("PythonScripting: PyImport_AppendInittab failed");
+        caustica::error("PythonScripting: PyImport_AppendInittab failed");
         return false;
     }
 
     Py_InitializeEx(0);
     if (!Py_IsInitialized())
     {
-        donut::log::error("PythonScripting: Py_InitializeEx failed");
+        caustica::error("PythonScripting: Py_InitializeEx failed");
         return false;
     }
 
@@ -123,12 +123,12 @@ bool PythonScripting::Initialize()
         }
         catch (const std::exception& e)
         {
-            donut::log::warning("PythonScripting: post-init script raised %s", e.what());
+            caustica::warning("PythonScripting: post-init script raised %s", e.what());
         }
     }
 
     m_initialized = true;
-    donut::log::info("PythonScripting: embedded CPython %s ready", Py_GetVersion());
+    caustica::info("PythonScripting: embedded CPython %s ready", Py_GetVersion());
     return true;
 }
 
@@ -170,13 +170,13 @@ bool PythonScripting::RunPendingLocked(const PendingScript& script)
 #endif
             if (!fp)
             {
-                donut::log::error("PythonScripting: cannot open script '%s'", script.body.c_str());
+                caustica::error("PythonScripting: cannot open script '%s'", script.body.c_str());
                 return false;
             }
             int rc = PyRun_SimpleFileEx(fp, script.body.c_str(), 1 /*close file*/);
             if (rc != 0)
             {
-                donut::log::error("PythonScripting: script '%s' raised an unhandled exception", script.label.c_str());
+                caustica::error("PythonScripting: script '%s' raised an unhandled exception", script.label.c_str());
                 return false;
             }
         }
@@ -185,14 +185,14 @@ bool PythonScripting::RunPendingLocked(const PendingScript& script)
             int rc = PyRun_SimpleString(script.body.c_str());
             if (rc != 0)
             {
-                donut::log::error("PythonScripting: inline script '%s' raised an unhandled exception", script.label.c_str());
+                caustica::error("PythonScripting: inline script '%s' raised an unhandled exception", script.label.c_str());
                 return false;
             }
         }
     }
     catch (const std::exception& e)
     {
-        donut::log::error("PythonScripting: %s threw a C++ exception: %s", script.label.c_str(), e.what());
+        caustica::error("PythonScripting: %s threw a C++ exception: %s", script.label.c_str(), e.what());
         return false;
     }
 
@@ -256,7 +256,7 @@ PythonScripting::~PythonScripting() {}
 
 bool PythonScripting::Initialize()
 {
-    donut::log::warning("PythonScripting: built without RTXPT_WITH_PYTHON, scripting unavailable");
+    caustica::warning("PythonScripting: built without RTXPT_WITH_PYTHON, scripting unavailable");
     return false;
 }
 void        PythonScripting::QueueScriptFile  (const std::filesystem::path&)             {}

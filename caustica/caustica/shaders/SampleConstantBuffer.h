@@ -14,7 +14,7 @@
 #if !defined(__cplusplus) // not needed in the port so far
 #pragma pack_matrix(row_major) // matrices below are expected in row_major
 #else
-using namespace donut::math;
+using namespace caustica::math;
 #endif
 
 #include "PathTracer/PathTracerShared.h"

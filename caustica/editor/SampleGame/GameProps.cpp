@@ -30,12 +30,11 @@
 #include <iostream>
 #include <thread>
 
-using namespace donut;
-using namespace donut::math;
-using namespace donut::app;
-using namespace donut::vfs;
-using namespace donut::engine;
-using namespace donut::render;
+using namespace caustica::math;
+using namespace caustica;
+using namespace caustica;
+using namespace caustica;
+using namespace caustica::render;
 
 using namespace game;
 
@@ -227,10 +226,10 @@ void PropBase::PostLoadSetup()
                     {
                         (*lit)->Read(lo);
                     }
-                    else { donut::log::warning("Bad light override, prop %s, model %s, light name %s", GetName().c_str(), modelName.c_str(), lightName.c_str()); }
+                    else { caustica::warning("Bad light override, prop %s, model %s, light name %s", GetName().c_str(), modelName.c_str(), lightName.c_str()); }
                 }
             }
-            else { donut::log::warning("Bad light override, prop %s, model %s", GetName().c_str(), modelName.c_str()); }
+            else { caustica::warning("Bad light override, prop %s, model %s", GetName().c_str(), modelName.c_str()); }
         }
     }
     if (m_componentsData != "")
@@ -272,7 +271,7 @@ Json::Value PropBase::Save()
     return jsonRoot;
 }
 
-void PropBase::GUI(float indent, bool & gameCameraAttached, donut::app::FirstPersonCamera & gameCamera)
+void PropBase::GUI(float indent, bool & gameCameraAttached, caustica::FirstPersonCamera & gameCamera)
 {
     RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent); );
     ImGui::Text("Properties for %s", GetName().c_str());
@@ -353,7 +352,7 @@ void PropBase::GUI(float indent, bool & gameCameraAttached, donut::app::FirstPer
 #endif
 }
 
-ScreenGUISel PropBase::StandaloneGUI(const std::shared_ptr<donut::engine::PlanarView> & view, const float2 & mousePos, const float2 & displaySize)
+ScreenGUISel PropBase::StandaloneGUI(const std::shared_ptr<caustica::PlanarView> & view, const float2 & mousePos, const float2 & displaySize)
 {
     ScreenGUISel sel{};
     for (auto& comp : m_components)

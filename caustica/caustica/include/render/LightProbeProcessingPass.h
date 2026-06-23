@@ -28,7 +28,7 @@
 #include <memory>
 #include <unordered_map>
 
-namespace donut::engine
+namespace caustica
 {
     class ShaderFactory;
     class CommonRenderPasses;
@@ -36,7 +36,7 @@ namespace donut::engine
     class ICompositeView;
 }
 
-namespace donut::render
+namespace caustica::render
 {
     class LightProbeProcessingPass
     {
@@ -58,7 +58,7 @@ namespace donut::render
         nvrhi::TextureHandle m_EnvironmentBrdfTexture;
         uint32_t m_EnvironmentBrdfTextureSize;
 
-        std::shared_ptr<engine::CommonRenderPasses> m_CommonPasses;
+        std::shared_ptr<caustica::CommonRenderPasses> m_CommonPasses;
 
         std::unordered_map<nvrhi::FramebufferInfo, nvrhi::GraphicsPipelineHandle> m_BlitPsoCache;
         std::unordered_map<nvrhi::FramebufferInfo, nvrhi::GraphicsPipelineHandle> m_DiffusePsoCache;
@@ -91,8 +91,8 @@ namespace donut::render
     public:
         LightProbeProcessingPass(
             nvrhi::IDevice* device,
-            std::shared_ptr<engine::ShaderFactory> shaderFactory,
-            std::shared_ptr<engine::CommonRenderPasses> commonPasses,
+            std::shared_ptr<caustica::ShaderFactory> shaderFactory,
+            std::shared_ptr<caustica::CommonRenderPasses> commonPasses,
             uint32_t intermediateTextureSize = 1024,
             nvrhi::Format intermediateTextureFormat = nvrhi::Format::RGBA16_FLOAT
         );

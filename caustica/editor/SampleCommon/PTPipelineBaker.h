@@ -19,7 +19,7 @@
 
 #include "ShaderCompilerUtils.h"
 
-namespace donut::vfs
+namespace caustica
 {
     class RootFileSystem;
 }
@@ -32,7 +32,7 @@ class PTPipelineVariant
         std::filesystem::path                   ShaderSrcFileName;
         std::filesystem::path                   ShaderOutFileName;
 
-        std::vector<donut::engine::ShaderMacro> CombinedAndSpecializedMacros;   // combined global + variant + per-material-shader-specialized (if any) macros
+        std::vector<caustica::ShaderMacro> CombinedAndSpecializedMacros;   // combined global + variant + per-material-shader-specialized (if any) macros
 
         std::string                             PermutationName;                // user readable name
 
@@ -48,7 +48,7 @@ class PTPipelineVariant
 
 
         void                                    SetPath(const std::filesystem::path & path);
-        void                                    FromMaterialPermutation(const std::string & shortUniqueDebugID, const std::vector<donut::engine::ShaderMacro> & macros, const struct MaterialShaderPermutation & msp);
+        void                                    FromMaterialPermutation(const std::string & shortUniqueDebugID, const std::vector<caustica::ShaderMacro> & macros, const struct MaterialShaderPermutation & msp);
         void                                    CompileIfNeeded();
         void                                    ResetShaderLibrary();
         void                                    LoadShaderLibraryIfNeeded(class PTPipelineBaker & baker);
@@ -56,14 +56,14 @@ class PTPipelineVariant
 
 private:
     friend class PTPipelineBaker;
-    PTPipelineVariant(const std::string & relativeSourcePath, const std::vector<donut::engine::ShaderMacro> & variantMacros, const std::shared_ptr<PTPipelineBaker> & baker, const std::string & shortUniqueDebugID, bool raygenOnly);
+    PTPipelineVariant(const std::string & relativeSourcePath, const std::vector<caustica::ShaderMacro> & variantMacros, const std::shared_ptr<PTPipelineBaker> & baker, const std::string & shortUniqueDebugID, bool raygenOnly);
 public:
     ~PTPipelineVariant();
 
 public:
 
     // TODO: this will invalidate content; make sure to set m_localVerison to -1 and call ResetPipeline()
-    //void                                    SetMacros(const std::vector<donut::engine::ShaderMacro> & variantMacros);
+    //void                                    SetMacros(const std::vector<caustica::ShaderMacro> & variantMacros);
 
     const nvrhi::rt::ShaderTableHandle &    GetShaderTable() const { return m_shaderTable; }
 
@@ -88,8 +88,8 @@ private:
     std::shared_ptr<class PTPipelineBaker>  m_us_lockedBaker;
 
 
-    std::vector<donut::engine::ShaderMacro> m_macros;                   // global macros (obtained from PTPipelineBaker::GetMacros)
-    std::vector<donut::engine::ShaderMacro> m_combinedMacros;           // per-PTPipelineVariant macros 
+    std::vector<caustica::ShaderMacro> m_macros;                   // global macros (obtained from PTPipelineBaker::GetMacros)
+    std::vector<caustica::ShaderMacro> m_combinedMacros;           // per-PTPipelineVariant macros 
 
 
     // Raygen and (optional) Miss
@@ -118,8 +118,8 @@ public:
     PTPipelineBaker(nvrhi::IDevice* device, std::shared_ptr<class MaterialsBaker> & materialsBaker, nvrhi::BindingLayoutHandle bindingLayout, nvrhi::BindingLayoutHandle bindlessLayout);
     ~PTPipelineBaker();
     
-    void                                Update(const std::shared_ptr<class ExtendedScene> & scene, unsigned int subInstanceCount, const std::function<void(std::vector<donut::engine::ShaderMacro> & macros)>& globalMacrosGetter, bool forceShaderReload);
-    std::shared_ptr<PTPipelineVariant>  CreateVariant(const std::string & relativeSourcePath, std::vector<donut::engine::ShaderMacro> variantMacros, const std::string & shortUniqueDebugID, bool rayGenOnly = false );
+    void                                Update(const std::shared_ptr<class ExtendedScene> & scene, unsigned int subInstanceCount, const std::function<void(std::vector<caustica::ShaderMacro> & macros)>& globalMacrosGetter, bool forceShaderReload);
+    std::shared_ptr<PTPipelineVariant>  CreateVariant(const std::string & relativeSourcePath, std::vector<caustica::ShaderMacro> variantMacros, const std::string & shortUniqueDebugID, bool rayGenOnly = false );
     void                                ReleaseVariant(std::shared_ptr<PTPipelineVariant> & variant);
     
     const std::shared_ptr<class MaterialsBaker> & 
@@ -130,7 +130,7 @@ private:
     const std::vector<HitGroupInfo> &   GetPerSubInstanceHitGroup() const   { return m_perSubInstanceHitGroup; }
     const std::unordered_map<int, HitGroupInfo> &   
                                         GetUniqueHitGroups() const          { return m_uniqueHitGroups; }
-    const std::vector<donut::engine::ShaderMacro> & 
+    const std::vector<caustica::ShaderMacro> & 
                                         GetMacros() const                   { return m_macros; }
     int64_t                             GetVersion() const                  { return m_version; }
 
@@ -151,7 +151,7 @@ private:
     const ShaderCompilerUtils::ShaderCompilerConfig& 
                                         GetCompilerConfig() const           { return m_compilerConfig; }
 
-    std::shared_ptr<donut::vfs::RootFileSystem>     
+    std::shared_ptr<caustica::RootFileSystem>     
                                         GetFS()                             { return m_shadersFS; }
     std::mutex &                        GetMutex()                          { return m_mutex; }
 
@@ -163,14 +163,14 @@ private:
 
 private:
     nvrhi::DeviceHandle                             m_device;
-    std::shared_ptr<donut::vfs::RootFileSystem>     m_shadersFS;
+    std::shared_ptr<caustica::RootFileSystem>     m_shadersFS;
     std::shared_ptr<class MaterialsBaker> &         m_materialsBaker;
     nvrhi::BindingLayoutHandle                      m_bindingLayout;
     nvrhi::BindingLayoutHandle                      m_bindlessLayout;
 
     ShaderCompilerUtils::ShaderCompilerConfig       m_compilerConfig;
 
-    std::vector<donut::engine::ShaderMacro>         m_macros;
+    std::vector<caustica::ShaderMacro>         m_macros;
 
     std::vector<std::shared_ptr<PTPipelineVariant>> m_variants;
 
@@ -189,7 +189,7 @@ private:
     bool                                            m_verbose = false;
     bool                                            m_enableNVAPIShaderExtension = false;
 
-    donut::engine::ThreadPool                       m_threadPool;
+    caustica::ThreadPool                       m_threadPool;
 
     int64_t                                         m_version = -1;
 

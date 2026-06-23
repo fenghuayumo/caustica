@@ -25,7 +25,7 @@
 #include <cmath>
 #include "basics.h"
 
-namespace donut::math
+namespace caustica::math
 {
 	// Macro to define conversion and subscript operators
 #define VECTOR_MEMBERS(T, n) \

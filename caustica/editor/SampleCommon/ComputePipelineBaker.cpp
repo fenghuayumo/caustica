@@ -13,7 +13,7 @@
 #include "SampleCommon.h"
 #include "ShaderPackFileSystem.h"
 
-#include <engine/ApplicationBase.h>
+#include <engine/Application.h>
 #include <core/log.h>
 #include <core/vfs/VFS.h>
 
@@ -21,8 +21,7 @@
 #define COMPUTE_BAKER_EMBED_PDBS 0
 #define COMPUTE_BAKER_USE_OPTIMIZATIONS 1
 
-using namespace donut;
-using namespace donut::engine;
+using namespace caustica;
 
 static const std::string c_ComputeShaderBinariesRoot = "ShaderDynamic/Bin";
 
@@ -42,10 +41,10 @@ ComputePipelineBaker::ComputePipelineBaker(nvrhi::IDevice* device, const std::ve
     : m_device(device)
 {
     if (!m_compilerConfig.Initialize(device, c_ComputeShaderBinariesRoot))
-        log::fatal("Failed to initialize compute shader compiler configuration");
+        caustica::fatal("Failed to initialize compute shader compiler configuration");
 
-    m_shadersFS = std::make_shared<vfs::RootFileSystem>();
-    const char* shaderTypeName = donut::app::GetShaderTypeName(device->getGraphicsAPI());
+    m_shadersFS = std::make_shared<caustica::RootFileSystem>();
+    const char* shaderTypeName = caustica::GetShaderTypeName(device->getGraphicsAPI());
     const std::filesystem::path shaderPackPath = GetRuntimeDirectory() / (std::string("caustica.shaders.") + shaderTypeName + ".pack");
     auto shaderPackFS = std::make_shared<ShaderPackFileSystem>(shaderPackPath, c_ComputeShaderBinariesRoot);
     if (shaderPackFS->isOpen())
@@ -64,7 +63,7 @@ ComputePipelineBaker::ComputePipelineBaker(nvrhi::IDevice* device, const std::ve
         m_additionalMonitorPaths.push_back(std::filesystem::absolute(path));
     }
     
-    log::info("ComputePipelineBaker initialized (monitoring %d additional paths)", (int)m_additionalMonitorPaths.size());
+    caustica::info("ComputePipelineBaker initialized (monitoring %d additional paths)", (int)m_additionalMonitorPaths.size());
 }
 
 ComputePipelineBaker::~ComputePipelineBaker()
@@ -154,7 +153,7 @@ void ComputePipelineBaker::Update(bool forceReload)
                     // Source files changed - trigger reload
                     m_cachedSourceTimestamp = currentTimestamp;
                     forceReload = true;
-                    log::info("Compute shader source changes detected - triggering hot reload...");
+                    caustica::info("Compute shader source changes detected - triggering hot reload...");
                 }
             }
         }
@@ -206,7 +205,7 @@ void ComputePipelineBaker::Update(bool forceReload)
     
     if (!m_lastUpdatedSourceTimestamp.has_value())
     {
-        log::error("Unable to get source timestamp - cannot load or dynamically compile compute shaders");
+        caustica::error("Unable to get source timestamp - cannot load or dynamically compile compute shaders");
         return;
     }
 
@@ -303,7 +302,7 @@ void ComputePipelineBaker::Update(bool forceReload)
 
         if (!firstError.empty())
         {
-            log::error("%s", firstError.c_str());
+            caustica::error("%s", firstError.c_str());
             bool retry = false;
 #if _WIN32
             if (!HelpersIsNonInteractive())
@@ -418,7 +417,7 @@ void ComputeShaderVariant::PrepareCompilation(std::filesystem::file_time_type la
     if (compiledBlobAvailable && (!baker->CanCompileShaders() || diskBlobUpToDate))
     {
         if (baker->IsVerbose())
-            log::info("No need to compile compute shader '%s', up-to-date file exists", m_debugName.c_str());
+            caustica::info("No need to compile compute shader '%s', up-to-date file exists", m_debugName.c_str());
         m_compileCmdLine = "";
     }
     else if (baker->CanCompileShaders())
@@ -435,7 +434,7 @@ void ComputeShaderVariant::PrepareCompilation(std::filesystem::file_time_type la
         command += " -Fo \"" + m_compiledFullPath + "\"";
 
         if (baker->IsVerbose())
-            log::info("Enqueuing compute shader '%s' for compilation...", m_debugName.c_str());
+            caustica::info("Enqueuing compute shader '%s' for compilation...", m_debugName.c_str());
         
         m_compileCmdLine = command;
         ResetPipeline();
@@ -445,7 +444,7 @@ void ComputeShaderVariant::PrepareCompilation(std::filesystem::file_time_type la
         m_compileError = StringFormat(
             "Missing precompiled compute shader '%s' and runtime shader compilation is disabled.",
             m_compiledFullPath.c_str());
-        log::error("%s", m_compileError.c_str());
+        caustica::error("%s", m_compileError.c_str());
     }
 }
 
@@ -454,7 +453,7 @@ void ComputeShaderVariant::CompileIfNeeded()
     if (m_compileCmdLine.empty())
         return;
 
-    log::info("Compiling compute shader '%s'...", m_debugName.c_str());
+    caustica::info("Compiling compute shader '%s'...", m_debugName.c_str());
 
     auto [resNum, resString, resErrorString] = SystemShell(m_compileCmdLine, false);
 
@@ -467,7 +466,7 @@ void ComputeShaderVariant::CompileIfNeeded()
     }
 
     if (!m_compileError.empty())
-        log::warning("%s", m_compileError.c_str());
+        caustica::warning("%s", m_compileError.c_str());
 }
 
 void ComputeShaderVariant::LoadShaderAndCreatePipeline()
@@ -480,7 +479,7 @@ void ComputeShaderVariant::LoadShaderAndCreatePipeline()
 
     // Load the compiled shader blob
     std::string blobPath = "/" + c_ComputeShaderBinariesRoot + "/" + m_compiledFileNameNoExt + ".bin";
-    std::shared_ptr<donut::vfs::IBlob> data = baker->GetFS()->readFile(blobPath.c_str());
+    std::shared_ptr<caustica::IBlob> data = baker->GetFS()->readFile(blobPath.c_str());
 
     if (!data)
     {
@@ -517,5 +516,5 @@ void ComputeShaderVariant::LoadShaderAndCreatePipeline()
         return;
     }
 
-    log::info("Successfully created compute pipeline for '%s'", m_debugName.c_str());
+    caustica::info("Successfully created compute pipeline for '%s'", m_debugName.c_str());
 }

@@ -37,7 +37,7 @@ extern "C" {
 }
 #endif // _WIN32
 
-using namespace donut::vfs;
+using namespace caustica;
 
 Blob::Blob(void* data, size_t size)
     : m_data(data)
@@ -291,14 +291,14 @@ void RootFileSystem::mount(const std::filesystem::path& path, std::shared_ptr<IF
 {
     if (findMountPoint(path, nullptr, nullptr))
     {
-        log::error("Cannot mount a filesystem at %s: there is another FS that includes this path", path.c_str());
+        caustica::error("Cannot mount a filesystem at %s: there is another FS that includes this path", path.c_str());
         return;
     }
 
     m_MountPoints.push_back(std::make_pair(path.lexically_normal().generic_string(), fs));
 }
 
-void donut::vfs::RootFileSystem::mount(const std::filesystem::path& path, const std::filesystem::path& nativePath)
+void caustica::RootFileSystem::mount(const std::filesystem::path& path, const std::filesystem::path& nativePath)
 {
     mount(path, std::make_shared<RelativeFileSystem>(std::make_shared<NativeFileSystem>(), nativePath));
 }
@@ -437,14 +437,14 @@ static void appendPatternToRegex(const std::string& pattern, std::stringstream& 
     }
 }
 
-std::string donut::vfs::getFileSearchRegex(const std::filesystem::path& path, const std::vector<std::string>& extensions)
+std::string caustica::getFileSearchRegex(const std::filesystem::path& path, const std::vector<std::string>& extensions)
 {
     std::filesystem::path normalizedPath = path.lexically_normal();
     std::string normalizedPathStr = normalizedPath.generic_string();
 
     std::stringstream regex;
     appendPatternToRegex(normalizedPathStr, regex);
-    if (!string_utils::ends_with(normalizedPathStr, "/") && !normalizedPath.empty())
+    if (!caustica::string_utils::ends_with(normalizedPathStr, "/") && !normalizedPath.empty())
         regex << '/';
     regex << "[^/]+";
 

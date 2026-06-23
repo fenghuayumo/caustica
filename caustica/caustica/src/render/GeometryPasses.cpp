@@ -25,11 +25,11 @@
 #include <engine/FramebufferFactory.h>
 #include <render/DrawStrategy.h>
 
-using namespace donut::math;
-using namespace donut::engine;
-using namespace donut::render;
+using namespace caustica::math;
+using namespace caustica;
+using namespace caustica::render;
 
-void donut::render::RenderView(
+void caustica::render::RenderView(
     nvrhi::ICommandList* commandList, 
     const IView* view, 
     const IView* viewPrev,
@@ -152,12 +152,12 @@ void donut::render::RenderView(
         commandList->endMarker();
 }
 
-void donut::render::RenderCompositeView(
+void caustica::render::RenderCompositeView(
     nvrhi::ICommandList* commandList, 
     const ICompositeView* compositeView, 
     const ICompositeView* compositeViewPrev, 
     FramebufferFactory& framebufferFactory,
-    const std::shared_ptr<engine::SceneGraphNode>& rootNode,
+    const std::shared_ptr<caustica::SceneGraphNode>& rootNode,
     IDrawStrategy& drawStrategy,
     IGeometryPass& pass,
     GeometryPassContext& passContext,

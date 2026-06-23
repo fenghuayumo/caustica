@@ -22,7 +22,7 @@
 
 #include <math/math.h>
 
-namespace donut::math
+namespace caustica::math
 {
     plane plane::normalize() const
     {

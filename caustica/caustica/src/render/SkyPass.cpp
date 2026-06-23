@@ -40,17 +40,17 @@
 #endif
 #endif
 
-using namespace donut::math;
+using namespace caustica::math;
 #include <shaders/sky_cb.h>
 
-using namespace donut::engine;
-using namespace donut::render;
+using namespace caustica;
+using namespace caustica::render;
 
 SkyPass::SkyPass(
     nvrhi::IDevice* device,
-    const std::shared_ptr<engine::ShaderFactory>& shaderFactory,
-    const std::shared_ptr<engine::CommonRenderPasses>& commonPasses,
-    const std::shared_ptr<engine::FramebufferFactory>& framebufferFactory,
+    const std::shared_ptr<caustica::ShaderFactory>& shaderFactory,
+    const std::shared_ptr<caustica::CommonRenderPasses>& commonPasses,
+    const std::shared_ptr<caustica::FramebufferFactory>& framebufferFactory,
     const ICompositeView& compositeView)
     : m_FramebufferFactory(framebufferFactory)
 {
@@ -61,7 +61,7 @@ SkyPass::SkyPass(
     constantBufferDesc.debugName = "SkyConstants";
     constantBufferDesc.isConstantBuffer = true;
     constantBufferDesc.isVolatile = true;
-    constantBufferDesc.maxVersions = engine::c_MaxRenderPassConstantBufferVersions;
+    constantBufferDesc.maxVersions = caustica::c_MaxRenderPassConstantBufferVersions;
     m_SkyCB = device->createBuffer(constantBufferDesc);
 
     const IView* sampleView = compositeView.GetChildView(ViewType::PLANAR, 0);
@@ -139,7 +139,7 @@ void SkyPass::Render(
     commandList->endMarker();
 }
 
-void SkyPass::FillShaderParameters(const engine::DirectionalLight& light, const SkyParameters& input, ProceduralSkyShaderParameters& output)
+void SkyPass::FillShaderParameters(const caustica::DirectionalLight& light, const SkyParameters& input, ProceduralSkyShaderParameters& output)
 {
     float lightAngularSize = dm::radians(clamp(light.angularSize, 0.1f, 90.f));
     float lightSolidAngle = 4 * dm::PI_f * square(sinf(lightAngularSize * 0.5f));

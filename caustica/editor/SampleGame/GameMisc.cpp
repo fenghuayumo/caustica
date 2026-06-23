@@ -25,12 +25,11 @@
 #include <iostream>
 #include <thread>
 
-using namespace donut;
-using namespace donut::math;
-using namespace donut::app;
-using namespace donut::vfs;
-using namespace donut::engine;
-using namespace donut::render;
+using namespace caustica::math;
+using namespace caustica;
+using namespace caustica;
+using namespace caustica;
+using namespace caustica::render;
 
 using namespace game;
 

@@ -25,7 +25,7 @@
 #include <math/math.h>
 #include <string>
 
-namespace donut::engine
+namespace caustica
 {
     struct Material;
     class Light;
@@ -34,17 +34,17 @@ namespace donut::engine
     class SpotLight;
 }
 
-namespace donut::app
+namespace caustica
 {
     bool FileDialog(bool bOpen, const char* pFilters, std::string& fileName);
     bool FolderDialog(const char* pTitle, const char* pDefaultFolder, std::string& outFolderName);
     
-    bool MaterialEditor(engine::Material* material, bool allowMaterialDomainChanges);
+    bool MaterialEditor(Material* material, bool allowMaterialDomainChanges);
 
-    bool LightEditor_Directional(engine::DirectionalLight& light);
-    bool LightEditor_Point(engine::PointLight& light);
-    bool LightEditor_Spot(engine::SpotLight& light);
-    bool LightEditor(engine::Light& light);
+    bool LightEditor_Directional(DirectionalLight& light);
+    bool LightEditor_Point(PointLight& light);
+    bool LightEditor_Spot(SpotLight& light);
+    bool LightEditor(Light& light);
 
-    bool AzimuthElevationSliders(math::double3& direction, bool negative = false);
+    bool AzimuthElevationSliders(dm::double3& direction, bool negative = false);
 }

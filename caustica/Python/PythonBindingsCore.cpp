@@ -44,12 +44,12 @@
 #include <cctype>
 
 namespace nb = nanobind;
-using namespace donut::engine;
-using donut::math::float2;
-using donut::math::float3;
-using donut::math::float4;
-using donut::math::double3;
-using donut::math::double4;
+using namespace caustica;
+using caustica::math::float2;
+using caustica::math::float3;
+using caustica::math::float4;
+using caustica::math::double3;
+using caustica::math::double4;
 
 // Singleton consumed by embed mode (set by PythonScripting before Py_Initialize).
 // In extension mode this stays nullptr - Renderer manages its own Sample.
@@ -153,21 +153,21 @@ namespace
         return double4(v[0], v[1], v[2], v[3]);
     }
 
-    nb::tuple DQuatToXYZWTuple(const donut::math::dquat& q)
+    nb::tuple DQuatToXYZWTuple(const caustica::math::dquat& q)
     {
         return nb::make_tuple(q.x, q.y, q.z, q.w);
     }
 
-    donut::math::dquat ToDQuatXYZW(const nb::object& src)
+    caustica::math::dquat ToDQuatXYZW(const nb::object& src)
     {
-        return donut::math::dquat::fromXYZW(ToDouble4(src));
+        return caustica::math::dquat::fromXYZW(ToDouble4(src));
     }
 
-    double3 DQuatToEulerRadiansXYZ(const donut::math::dquat& rotation)
+    double3 DQuatToEulerRadiansXYZ(const caustica::math::dquat& rotation)
     {
-        const donut::math::double3x3 m = rotation.toMatrix();
+        const caustica::math::double3x3 m = rotation.toMatrix();
 
-        const double y = std::asin(donut::math::clamp(-m.m_data[2], -1.0, 1.0));
+        const double y = std::asin(caustica::math::clamp(-m.m_data[2], -1.0, 1.0));
         const double cy = std::cos(y);
 
         double x = 0.0;
@@ -383,49 +383,49 @@ namespace
         return result;
     }
 
-    bool IsFiniteBox(const donut::math::box3& bounds)
+    bool IsFiniteBox(const caustica::math::box3& bounds)
     {
-        return donut::math::all(donut::math::isfinite(bounds.m_mins))
-            && donut::math::all(donut::math::isfinite(bounds.m_maxs));
+        return caustica::math::all(caustica::math::isfinite(bounds.m_mins))
+            && caustica::math::all(caustica::math::isfinite(bounds.m_maxs));
     }
 
     // Returns the C++ Scene bounds when they are populated and finite.
-    std::optional<donut::math::box3> ValidSceneBounds(const donut::math::box3& bounds)
+    std::optional<caustica::math::box3> ValidSceneBounds(const caustica::math::box3& bounds)
     {
         if (bounds.isempty() || !IsFiniteBox(bounds))
             return std::nullopt;
         return bounds;
     }
 
-    std::optional<donut::math::box3> SceneBoundsFromScene(const Scene* scene)
+    std::optional<caustica::math::box3> SceneBoundsFromScene(const Scene* scene)
     {
         if (!scene)
             return std::nullopt;
         return ValidSceneBounds(scene->GetSceneBounds());
     }
 
-    std::optional<donut::math::box3> SceneBoundsFromScene(const std::shared_ptr<Scene>& scene)
+    std::optional<caustica::math::box3> SceneBoundsFromScene(const std::shared_ptr<Scene>& scene)
     {
         return SceneBoundsFromScene(scene.get());
     }
 
     // Converts the Scene AABB to a ((min.xyz), (max.xyz)) Python tuple,
     // or `None` if the scene is empty / not loaded yet.
-    nb::object SceneBoundsTuple(const std::optional<donut::math::box3>& bbox)
+    nb::object SceneBoundsTuple(const std::optional<caustica::math::box3>& bbox)
     {
         if (!bbox)
             return nb::none();
         return nb::make_tuple(Float3ToTuple(bbox->m_mins), Float3ToTuple(bbox->m_maxs));
     }
 
-    nb::object SceneBoundsCenter(const std::optional<donut::math::box3>& bbox)
+    nb::object SceneBoundsCenter(const std::optional<caustica::math::box3>& bbox)
     {
         if (!bbox)
             return nb::none();
         return Float3ToTuple(bbox->center());
     }
 
-    nb::object SceneBoundsSize(const std::optional<donut::math::box3>& bbox)
+    nb::object SceneBoundsSize(const std::optional<caustica::math::box3>& bbox)
     {
         if (!bbox)
             return nb::none();
@@ -473,11 +473,11 @@ namespace rtxpt_py
 void RegisterCoreBindings(nb::module_& m)
 {
     // --- helpers ----------------------------------------------------------
-    m.def("log_info",    [](const std::string& s) { donut::log::info("[py] %s", s.c_str()); },
+    m.def("log_info",    [](const std::string& s) { caustica::info("[py] %s", s.c_str()); },
           nb::arg("message"), "Forward a message to the host log at INFO level.");
-    m.def("log_warning", [](const std::string& s) { donut::log::warning("[py] %s", s.c_str()); },
+    m.def("log_warning", [](const std::string& s) { caustica::warning("[py] %s", s.c_str()); },
           nb::arg("message"), "Forward a message to the host log at WARNING level.");
-    m.def("log_error",   [](const std::string& s) { donut::log::error("[py] %s", s.c_str()); },
+    m.def("log_error",   [](const std::string& s) { caustica::error("[py] %s", s.c_str()); },
           nb::arg("message"), "Forward a message to the host log at ERROR level.");
 
     using namespace py_enums;
@@ -956,7 +956,7 @@ void RegisterCoreBindings(nb::module_& m)
             "Local rotation quaternion as `(x, y, z, w)`.")
         .def_prop_rw("euler",
             [](SceneGraphNode& self) { return Double3ToTuple(DQuatToEulerRadiansXYZ(self.GetRotation())); },
-            [](SceneGraphNode& self, nb::object v) { self.SetRotation(donut::math::rotationQuat(ToDouble3(v))); },
+            [](SceneGraphNode& self, nb::object v) { self.SetRotation(caustica::math::rotationQuat(ToDouble3(v))); },
             "Local XYZ Euler rotation in radians. Assigning this updates the node rotation quaternion.")
         .def_prop_rw("scaling",
             [](SceneGraphNode& self) { return Double3ToTuple(self.GetScaling()); },
@@ -1468,7 +1468,7 @@ void RegisterCoreBindings(nb::module_& m)
                 return self.SetCurrentCameraPosDirUp(v);
             }, nb::arg("pos_dir_up"))
 
-        .def("set_camera_fov", [](Sample& self, float fov) { self.SetCameraVerticalFOV(donut::math::radians(fov)); },
+        .def("set_camera_fov", [](Sample& self, float fov) { self.SetCameraVerticalFOV(caustica::math::radians(fov)); },
             nb::arg("vertical_fov_degrees"))
 
         .def("set_camera_intrinsics",

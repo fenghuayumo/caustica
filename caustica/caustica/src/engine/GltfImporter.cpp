@@ -31,9 +31,9 @@
 
 #include "nvrhi/common/misc.h"
 
-using namespace donut::math;
-using namespace donut::vfs;
-using namespace donut::engine;
+using namespace caustica::math;
+using namespace caustica;
+using namespace caustica;
 
 
 class BufferRegionBlob : public IBlob
@@ -64,7 +64,7 @@ public:
 
 
 
-GltfImporter::GltfImporter(std::shared_ptr<vfs::IFileSystem> fs, std::shared_ptr<SceneTypeFactory> sceneTypeFactory)
+GltfImporter::GltfImporter(std::shared_ptr<caustica::IFileSystem> fs, std::shared_ptr<SceneTypeFactory> sceneTypeFactory)
     : m_fs(std::move(fs))
     , m_SceneTypeFactory(std::move(sceneTypeFactory))
 {
@@ -73,7 +73,7 @@ GltfImporter::GltfImporter(std::shared_ptr<vfs::IFileSystem> fs, std::shared_ptr
 
 struct cgltf_vfs_context
 {
-    std::shared_ptr<donut::vfs::IFileSystem> fs;
+    std::shared_ptr<caustica::IFileSystem> fs;
     std::vector<std::shared_ptr<IBlob>> blobs;
 };
 
@@ -343,7 +343,7 @@ static cgltf_texture_extensions cgltf_parse_texture_extensions(const cgltf_textu
         continue;
 
     fail:
-        donut::log::warning("Failed to parse glTF extension %s: %s", ext.name, ext.data);
+        caustica::warning("Failed to parse glTF extension %s: %s", ext.name, ext.data);
     }
 
     return result;
@@ -553,14 +553,14 @@ static const void ParseMaterialExtensions(cgltf_options* options, const cgltf_ma
         int numParsed = jsmn_parse(&parser, ext.data, extensionLength, tokens, numTokens);
         if (numParsed != numTokens)
         {
-            donut::log::warning("Failed to parse the glTF material extension: %s", ext.data);
+            caustica::warning("Failed to parse the glTF material extension: %s", ext.data);
             break;
         }
 
         if (tokens[0].type != JSMN_OBJECT)
         {
             // expecting that the extension is an object
-            donut::log::warning("Failed to parse the glTF material extension: %s", ext.data);
+            caustica::warning("Failed to parse the glTF material extension: %s", ext.data);
             break;
         }
 
@@ -595,7 +595,7 @@ static const void ParseMaterialExtensions(cgltf_options* options, const cgltf_ma
         }
         else
         {
-            donut::log::warning("Failed to parse the glTF material extension: %s", ext.data);
+            caustica::warning("Failed to parse the glTF material extension: %s", ext.data);
         }
     }
 }
@@ -670,14 +670,14 @@ bool GltfImporter::Load(
     cgltf_result res = cgltf_parse_file(&options, normalizedFileName.c_str(), &objects);
     if (res != cgltf_result_success)
     {
-        log::error("Couldn't load glTF file '%s': %s", normalizedFileName.c_str(), cgltf_error_to_string(res));
+        caustica::error("Couldn't load glTF file '%s': %s", normalizedFileName.c_str(), cgltf_error_to_string(res));
         return false;
     }
 
     res = cgltf_load_buffers(&options, objects, normalizedFileName.c_str());
     if (res != cgltf_result_success)
     {
-        log::error("Failed to load buffers for glTF file '%s': ", normalizedFileName.c_str(), cgltf_error_to_string(res));
+        caustica::error("Failed to load buffers for glTF file '%s': ", normalizedFileName.c_str(), cgltf_error_to_string(res));
         return false;
     }
 
@@ -727,7 +727,7 @@ bool GltfImporter::Load(
                 void* dataCopy = malloc(dataSize);
                 assert(dataCopy);
                 memcpy(dataCopy, dataPtr, dataSize);
-                textureData = std::make_shared<vfs::Blob>(dataCopy, dataSize);
+                textureData = std::make_shared<caustica::Blob>(dataCopy, dataSize);
             }
 
             result.data = std::make_shared<GltfInlineData>();
@@ -767,15 +767,15 @@ bool GltfImporter::Load(
                         ? image->name
                         : fileName.filename().generic_string() + "[" + std::to_string(imageIndex) + "]";
                     result.data->mimeType = image->mime_type ? image->mime_type : "";
-                    result.data->buffer = std::make_shared<vfs::Blob>(data, size);
+                    result.data->buffer = std::make_shared<caustica::Blob>(data, size);
 
                     inlineImageDataCache[image] = result.data;
                 }
                 else
-                    log::warning("Failed to decode Base64 data for image %d, ignoring.", int(imageIndex));
+                    caustica::warning("Failed to decode Base64 data for image %d, ignoring.", int(imageIndex));
             }
             else
-                log::warning("Couldn't find a Base64 marker in Data URI for image %d, ignoring.", int(imageIndex));
+                caustica::warning("Couldn't find a Base64 marker in Data URI for image %d, ignoring.", int(imageIndex));
         }
         else
         {
@@ -962,7 +962,7 @@ bool GltfImporter::Load(
         {
             if (material.has_pbr_specular_glossiness)
             {
-                log::warning("Material '%s' uses the KHR_materials_transmission extension, which is undefined on materials using the "
+                caustica::warning("Material '%s' uses the KHR_materials_transmission extension, which is undefined on materials using the "
                     "KHR_materials_pbrSpecularGlossiness extension model.", material.name ? material.name : "<Unnamed>");
             }
 
@@ -1002,7 +1002,7 @@ bool GltfImporter::Load(
               material.normal_texture.transform.offset[0] != 0.0f ||
               material.normal_texture.transform.offset[1] != 0.0f)))
         {
-            log::warning("Material '%s' uses the KHR_texture_transform extension, which is not supported on non-scale transformations and all textures except normal", material.name ? material.name : "<Unnamed>");
+            caustica::warning("Material '%s' uses the KHR_texture_transform extension, which is not supported on non-scale transformations and all textures except normal", material.name ? material.name : "<Unnamed>");
         }
 
         switch (material.alpha_mode)
@@ -1542,7 +1542,7 @@ bool GltfImporter::Load(
             }
             else
             {
-                log::warning("Geometry %d for mesh '%s' doesn't have a material.", uint32_t(minfo->geometries.size()), minfo->name.c_str());
+                caustica::warning("Geometry %d for mesh '%s' doesn't have a material.", uint32_t(minfo->geometries.size()), minfo->name.c_str());
                 if (!emptyMaterial)
                 {
                     emptyMaterial = std::make_shared<Material>();
@@ -1981,7 +1981,7 @@ bool GltfImporter::Load(
             if (!dstSampler->GetKeyframes().empty())
                 animationSamplers[srcSampler] = dstSampler;
             else
-                log::warning("Animation channel imported with no keyframes, ignoring.");
+                caustica::warning("Animation channel imported with no keyframes, ignoring.");
         }
 
         for (size_t channel_idx = 0; channel_idx < srcAnim->channels_count; channel_idx++)
@@ -2010,7 +2010,7 @@ bool GltfImporter::Load(
                 case cgltf_animation_path_type_weights:
                 case cgltf_animation_path_type_invalid:
                 default:
-                    log::warning("Unsupported glTF animation taregt: %d", srcChannel->target_path);
+                    caustica::warning("Unsupported glTF animation taregt: %d", srcChannel->target_path);
                     continue;
             }
 

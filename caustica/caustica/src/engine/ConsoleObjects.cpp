@@ -32,9 +32,9 @@
 #include <sstream>
 #include <stdexcept>
 
-using namespace donut::math;
+using namespace caustica::math;
 
-namespace donut::engine::console
+namespace caustica::console
 {
 
 	static std::string const emptyString;
@@ -48,7 +48,7 @@ namespace donut::engine::console
 			try { rx = s; }
 			catch (std::regex_error const& err)
 			{
-				donut::log::error(err.what());
+				caustica::error(err.what());
 				return std::nullopt;
 			}
 		}
@@ -130,7 +130,7 @@ namespace donut::engine::console
 			{
 				if (!desc.on_execute)
 				{
-					donut::log::fatal("attempting to register console command '%s' with no execution function", desc.name);
+					caustica::fatal("attempting to register console command '%s' with no execution function", desc.name);
 				}
 
 				std::lock_guard<std::mutex> lock(m_Mutex);
@@ -141,10 +141,10 @@ namespace donut::engine::console
 					return cmd;
 				}
 				else
-					donut::log::error("console command with name '%s' already exists", desc.name);
+					caustica::error("console command with name '%s' already exists", desc.name);
 			}
 			else
-				donut::log::error("attempting to register a console command with invalid name '%s'", desc.name);
+				caustica::error("attempting to register a console command with invalid name '%s'", desc.name);
 			return nullptr;
 		}
 
@@ -159,10 +159,10 @@ namespace donut::engine::console
 					return true;
 				}
 				else
-					donut::log::error("unregister command '%s'; object is not a console command");
+					caustica::error("unregister command '%s'; object is not a console command");
 			}
 			else
-				donut::log::error("unregister command '%s'; command does not exist", name);
+				caustica::error("unregister command '%s'; command does not exist", name);
 			return false;
 		}
 
@@ -172,9 +172,9 @@ namespace donut::engine::console
 			// Dynamic registration (from .ini or console) reports errors, but can return nullptr
 			auto handleError = [&](char const* message) -> void {
 				if (state.setby > SetBy::CODE)
-					donut::log::error(message, name);
+					caustica::error(message, name);
 				else
-					donut::log::fatal(message, name);
+					caustica::fatal(message, name);
 			};
 
 			if (IsValidName(name))
@@ -263,7 +263,7 @@ namespace donut::engine::console
 					if (it.second == cobj)
 						return it.first;
 				}
-				donut::log::error("unregistered object");
+				caustica::error("unregistered object");
 			}
 			return emptyString;
 		}
@@ -313,7 +313,7 @@ namespace donut::engine::console
 		if (m_OnExecute)
 			return m_OnExecute(args);
 		else
-			donut::log::error("console command '%s' has no function", this->GetName().c_str());
+			caustica::error("console command '%s' has no function", this->GetName().c_str());
 		return Result();
 	}
 
@@ -339,7 +339,7 @@ namespace donut::engine::console
 		if (m_OnChange)
 			m_OnChange(*this);
 		else
-			donut::log::error("no callback set for CVar '%s'", this->GetName().c_str());
+			caustica::error("no callback set for CVar '%s'", this->GetName().c_str());
 	}
 
 	//
@@ -377,9 +377,9 @@ namespace donut::engine::console
 			{
 				VariableState state = this->GetState();
 				if (state.read_only)
-					donut::log::error("cvar '%s' is read-only - value not set", this->GetName().c_str());
+					caustica::error("cvar '%s' is read-only - value not set", this->GetName().c_str());
 				else
-					donut::log::error("cvar '%s' not enough privilege with '%s' to override '%s' - value not set",
+					caustica::error("cvar '%s' not enough privilege with '%s' to override '%s' - value not set",
 						this->GetName().c_str(), AsString(setby), AsString((SetBy)state.setby));
 			}
 			return false;
@@ -391,7 +391,7 @@ namespace donut::engine::console
 				if (auto value = ds::parse<T>(s))
 					return this->SetData(*value, setby);
 
-			donut::log::error("cvar '%s' failed parsing value string '%s' (expected a %s) - value not set",
+			caustica::error("cvar '%s' failed parsing value string '%s' (expected a %s) - value not set",
 				this->GetName().c_str(), std::string(s).c_str(), AsString((VariableType::Type)m_State.type));
 			return false;
 		}
@@ -414,11 +414,11 @@ namespace donut::engine::console
 		#define DEFINE_TYPED_ACCESSORS_IMPLEMENTATION(name, type) \
 			virtual bool Is##name() const override { return false; } \
 			virtual type Get##name() const override { \
-				donut::log::error("cvar '%s' is not a "#type" (cannot get)", this->GetName().c_str()); \
+				caustica::error("cvar '%s' is not a "#type" (cannot get)", this->GetName().c_str()); \
 				return type(); \
 			} \
 			virtual void Set##name(type value, SetBy) override { \
-				donut::log::error("cvar '%s' is not a "#type" (cannot set)", this->GetName().c_str()); \
+				caustica::error("cvar '%s' is not a "#type" (cannot set)", this->GetName().c_str()); \
 			}
 
 		DEFINE_TYPED_ACCESSORS_IMPLEMENTATION(Bool, bool);
@@ -434,11 +434,11 @@ namespace donut::engine::console
 		#define DEFINE_TYPED_REF_ACCESSORS_IMPLEMENTATION(name, type) \
 			virtual bool Is##name() const override { return false; } \
 			virtual type const& Get##name() const override { \
-				donut::log::error("cvar '%s' is not a "#type" (cannot get)", this->GetName().c_str()); \
+				caustica::error("cvar '%s' is not a "#type" (cannot get)", this->GetName().c_str()); \
 				return emptyString; \
 			} \
 			virtual void Set##name(type const& value, SetBy) override { \
-				donut::log::error("cvar '%s' is not a "#type" (cannot set)", this->GetName().c_str()); \
+				caustica::error("cvar '%s' is not a "#type" (cannot set)", this->GetName().c_str()); \
 			}
 
 		DEFINE_TYPED_REF_ACCESSORS_IMPLEMENTATION(String, std::string);
@@ -655,12 +655,12 @@ namespace donut::engine::console
 			auto tokens = ds::split(line, "[=]");
 			if (tokens.size() == 0)
 			{
-				donut::log::error(" % s: % d parse error : cannot find '=' - skipped line", filename, lineno);
+				caustica::error(" % s: % d parse error : cannot find '=' - skipped line", filename, lineno);
 				continue;
 			}
 			if (tokens.size() != 2)
 			{
-				donut::log::error(" % s: % d parse error : invalid '<token> = <value>' format - skipped line", filename, lineno);
+				caustica::error(" % s: % d parse error : invalid '<token> = <value>' format - skipped line", filename, lineno);
 				continue;
 			}
 
@@ -676,13 +676,13 @@ namespace donut::engine::console
 			{
 				if (!var->SetValueFromString(cvarvalue, VariableState::INI))
 				{
-					donut::log::error("%s:%d parse error : cannot set value for variable '%s'", filename, lineno, cvarname.data());
+					caustica::error("%s:%d parse error : cannot set value for variable '%s'", filename, lineno, cvarname.data());
 				}
 			}
 			else
 			{
-				donut::log::error("%s:%d parse error : unknown console variable name '%s'", filename, lineno, cvarname.data());
+				caustica::error("%s:%d parse error : unknown console variable name '%s'", filename, lineno, cvarname.data());
 			}
 		}
 	}
-} // end namespace donut::engine::console
+} // end namespace caustica::console

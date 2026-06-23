@@ -22,7 +22,7 @@
 
 #pragma once
 
-namespace donut::math
+namespace caustica::math
 {
 
     namespace colors

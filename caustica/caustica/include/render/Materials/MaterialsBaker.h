@@ -27,9 +27,9 @@
 #include <unordered_map>
 
 
-using namespace donut::math;
+using namespace caustica::math;
 
-namespace donut::engine
+namespace caustica
 {
     class FramebufferFactory;
     class TextureCache;
@@ -59,7 +59,7 @@ struct MaterialShaderPermutation
     // const std::string   ClosestHitName;
     // const std::string   AnyHitName;
 
-    const std::vector<donut::engine::ShaderMacro> 
+    const std::vector<caustica::ShaderMacro> 
                         Macros;
 
     // runtime data
@@ -94,7 +94,7 @@ struct PTTexture
 {
     std::filesystem::path   LocalPath;
     bool                    sRGB = false;   // whether to assume that, when loading from sRGB agnostic formats, the texture's .rgb channels are in sRGB (.a is always linear)
-    std::shared_ptr<donut::engine::LoadedTexture>
+    std::shared_ptr<caustica::LoadedTexture>
         Loaded;
     bool                    NormalMap = false; // determines unpacking (not actually used as a flag now by shading, but normalmaps are marked as so for future use)
 
@@ -104,13 +104,13 @@ struct PTTexture
     // float4                  ValueMultiply;
     // float4                  ValueAdd;
 
-    void                    InitFromLoadedTexture(std::shared_ptr<donut::engine::LoadedTexture>& loaded, bool sRGB, bool normalMap, const std::filesystem::path& mediaPath);
+    void                    InitFromLoadedTexture(std::shared_ptr<caustica::LoadedTexture>& loaded, bool sRGB, bool normalMap, const std::filesystem::path& mediaPath);
 };
 
 // All materials share these base properties and some of them have tight integration with the rest of the renderer
 struct PTMaterialBase
 {
-    donut::engine::Material * DonutCounterpart = nullptr;
+    caustica::Material * DonutCounterpart = nullptr;
     MaterialsBaker*          RuntimeBaker = nullptr;
 
     // ModelName + Name is unique identifier for the material; there cannot be two materials with the same ModelName and Name - hopefully.
@@ -132,7 +132,7 @@ struct PTMaterialBase
     virtual bool            Read(
                                 Json::Value& output,
                                 const std::filesystem::path& mediaPath,
-                                const std::shared_ptr<donut::engine::TextureCache>& textureCache,
+                                const std::shared_ptr<caustica::TextureCache>& textureCache,
                                 const std::filesystem::path& sceneDirectory = std::filesystem::path()) = 0;
 
     virtual bool            HasAlphaTest() const = 0;
@@ -235,12 +235,12 @@ struct PTMaterial : public PTMaterialBase
     bool                    IsTextureEnabled(PTMaterialTextureSlot slot) const;
     void                    SetTextureEnabled(PTMaterialTextureSlot slot, bool enabled);
 
-    static std::shared_ptr<PTMaterial> SafeCast(const std::shared_ptr<donut::engine::Material>& donutMaterial);
+    static std::shared_ptr<PTMaterial> SafeCast(const std::shared_ptr<caustica::Material>& donutMaterial);
 
     static std::shared_ptr<PTMaterial> FromJson(
         Json::Value& input,
         const std::filesystem::path& mediaPath,
-        const std::shared_ptr<donut::engine::TextureCache>& textureCache,
+        const std::shared_ptr<caustica::TextureCache>& textureCache,
         const std::string& modelName,
         const std::string& name,
         const std::filesystem::path& sceneDirectory = std::filesystem::path());
@@ -249,7 +249,7 @@ struct PTMaterial : public PTMaterialBase
     virtual bool            Read(
                                 Json::Value& output,
                                 const std::filesystem::path& mediaPath,
-                                const std::shared_ptr<donut::engine::TextureCache>& textureCache,
+                                const std::shared_ptr<caustica::TextureCache>& textureCache,
                                 const std::filesystem::path& sceneDirectory = std::filesystem::path()) override;
 
     virtual MaterialShaderPermutation 
@@ -258,7 +258,7 @@ struct PTMaterial : public PTMaterialBase
     virtual bool            HasAlphaTest() const override       { return EnableAlphaTesting; }
 };
 
-struct MaterialEx : donut::engine::Material
+struct MaterialEx : caustica::Material
 {
     std::shared_ptr<PTMaterial> PTMaterial;              
 };
@@ -266,10 +266,10 @@ struct MaterialEx : donut::engine::Material
 class MaterialsBaker
 {
 public:
-    MaterialsBaker(const std::string & relativeShaderSourcePath, nvrhi::IDevice* device, std::shared_ptr<donut::engine::TextureCache> textureCache, std::shared_ptr<donut::engine::ShaderFactory> shaderFactory);
+    MaterialsBaker(const std::string & relativeShaderSourcePath, nvrhi::IDevice* device, std::shared_ptr<caustica::TextureCache> textureCache, std::shared_ptr<caustica::ShaderFactory> shaderFactory);
     ~MaterialsBaker();
 
-    void                            CreateRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* bindlessLayout, std::shared_ptr<donut::engine::CommonRenderPasses> commonPasses, const std::shared_ptr<ExtendedScene>& scene, const std::filesystem::path & sceneFilePath, const std::filesystem::path & mediaPath);
+    void                            CreateRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* bindlessLayout, std::shared_ptr<caustica::CommonRenderPasses> commonPasses, const std::shared_ptr<ExtendedScene>& scene, const std::filesystem::path & sceneFilePath, const std::filesystem::path & mediaPath);
 
     // this update can happen in parallel with any other ray preparatory tracing work - anything from BVH building to laying down denoising layers
     void                            Update(nvrhi::ICommandList * commandList, const std::shared_ptr<ExtendedScene> & scene, std::vector<SubInstanceData> & subInstanceData);
@@ -309,7 +309,7 @@ private:
     void                            Clear();
 
     std::shared_ptr<PTMaterial>     Load(const std::string & modelFileName, const std::string& name);
-    std::shared_ptr<PTMaterial>     ImportFromDonut(donut::engine::Material & material);
+    std::shared_ptr<PTMaterial>     ImportFromDonut(caustica::Material & material);
     void                            SaveAll();
 
     void                            CompleteDeferredTexturesLoad(nvrhi::ICommandList* commandList);
@@ -322,12 +322,12 @@ private:
 private:
     nvrhi::DeviceHandle             m_device;
     std::string                     m_relativeShaderSourcePath;         // this is the path for the shader file containing material specializations for ClosestHit and (if enabled) AnyHit; it is currently 1 for all materials, but could be per-material
-    std::shared_ptr<donut::engine::TextureCache> m_textureCache;
-    std::shared_ptr<donut::engine::CommonRenderPasses> m_commonPasses;
-    std::shared_ptr<donut::engine::FramebufferFactory> m_framebufferFactory;
-    std::shared_ptr<donut::engine::ShaderFactory> m_shaderFactory;
+    std::shared_ptr<caustica::TextureCache> m_textureCache;
+    std::shared_ptr<caustica::CommonRenderPasses> m_commonPasses;
+    std::shared_ptr<caustica::FramebufferFactory> m_framebufferFactory;
+    std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
 
-    donut::engine::BindingCache     m_bindingCache;
+    caustica::BindingCache     m_bindingCache;
 
     nvrhi::BufferHandle             m_materialData;
     bool                            m_materialDataWasReset = true;

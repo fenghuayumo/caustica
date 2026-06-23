@@ -26,7 +26,7 @@
 #include <cassert>
 #include <cstring>
 
-namespace donut::chunk
+namespace caustica::chunk
 {
 
 //
@@ -112,7 +112,7 @@ void ChunkFile::reset()
     _data.reset();
 }
 
-typedef typename vfs::IBlob IBlob;
+typedef typename caustica::IBlob IBlob;
 
 std::shared_ptr<ChunkFile const> ChunkFile::deserialize(
     std::weak_ptr<IBlob const> blobPtr, char const * filepath)
@@ -122,7 +122,7 @@ std::shared_ptr<ChunkFile const> ChunkFile::deserialize(
     {
         if (!blob->data() || blob->size() < sizeof(Header))
         {
-            log::error("ChunkFile '%s' : invalid header", filepath);
+            caustica::error("ChunkFile '%s' : invalid header", filepath);
             return nullptr;
         }
 
@@ -132,19 +132,19 @@ std::shared_ptr<ChunkFile const> ChunkFile::deserialize(
 
         if (!header.isValid())
         {
-            log::error("ChunkFile '%s' : invalid chunkfile signature", filepath);
+            caustica::error("ChunkFile '%s' : invalid chunkfile signature", filepath);
         }
 
         uint32_t nchunks = header.chunkCount;
         if (nchunks == 0 || nchunks > 1000000)
         {
-            log::error("ChunkFile '%s' : invalid number of chunks in file", filepath);
+            caustica::error("ChunkFile '%s' : invalid number of chunks in file", filepath);
             return nullptr;
         }
 
         if (blob->size() < header.chunkTableOffset + nchunks * sizeof(ChunkTableEntry))
         {
-            log::error("ChunkFile '%s' : invalid chunks table", filepath);
+            caustica::error("ChunkFile '%s' : invalid chunks table", filepath);
             return nullptr;
         }
 
@@ -161,7 +161,7 @@ std::shared_ptr<ChunkFile const> ChunkFile::deserialize(
             ChunkTableEntry const & e = chunktable[index];
 
             if (blob->size() < e.offset + e.size) {
-                log::error("ChunkFile '%s' : chunk %d invalid size/offset", filepath, e.chunkId);
+                caustica::error("ChunkFile '%s' : chunk %d invalid size/offset", filepath, e.chunkId);
                 return nullptr;
             }
 
@@ -177,7 +177,7 @@ std::shared_ptr<ChunkFile const> ChunkFile::deserialize(
     }
     else
     {
-        log::error("ChunkFile '%s' : no data", filepath);
+        caustica::error("ChunkFile '%s' : no data", filepath);
     }
     return nullptr;
 }
@@ -237,11 +237,11 @@ std::shared_ptr<IBlob const> ChunkFile::serialize() const {
 //            offset += chunk->size;
         }
 
-        return std::make_shared<donut::vfs::Blob const>(data, blobSize);
+        return std::make_shared<caustica::Blob const>(data, blobSize);
     }
     else
     {
-        log::error("Chunkfile '%s' : blob allocation failed", _filepath.c_str());
+        caustica::error("Chunkfile '%s' : blob allocation failed", _filepath.c_str());
     }
 
     return nullptr;

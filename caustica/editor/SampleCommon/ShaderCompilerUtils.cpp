@@ -12,7 +12,7 @@
 #include "SampleCommon.h"
 #include <render/Misc/picosha2.h>
 
-#include <engine/ApplicationBase.h>
+#include <engine/Application.h>
 #include <core/log.h>
 
 namespace ShaderCompilerUtils
@@ -43,7 +43,7 @@ namespace ShaderCompilerUtils
             graphicsAPIName = "vk";
         else
         {
-            donut::log::error("Unsupported graphics API for shader compilation");
+            caustica::error("Unsupported graphics API for shader compilation");
             return false;
         }
         
@@ -65,20 +65,20 @@ namespace ShaderCompilerUtils
             runtimeDirectory / "ShaderDynamic/Source/caustica/caustica/shaders";
 
         ShaderBinariesPath = runtimeDirectory / binarySubfolder / 
-            donut::app::GetShaderTypeName(device->getGraphicsAPI());
+            caustica::GetShaderTypeName(device->getGraphicsAPI());
 
         ShaderCompilerPath = std::filesystem::absolute(
             runtimeDirectory / "ShaderDynamic/Tools" / graphicsAPIName / platformName / dxcExecutableName);
         
         if (!std::filesystem::exists(shaderSourcePathDevelopment))
         {
-            donut::log::info("Shaders development folder '%s' not found, trying local '%s'...", 
+            caustica::info("Shaders development folder '%s' not found, trying local '%s'...", 
                 shaderSourcePathDevelopment.string().c_str(), 
                 shaderSourcePathRuntime.string().c_str());
                 
             if (!std::filesystem::exists(shaderSourcePathRuntime))
             {
-                donut::log::info("Shader source folder '%s' not found; runtime shader compilation is disabled.",
+                caustica::info("Shader source folder '%s' not found; runtime shader compilation is disabled.",
                     shaderSourcePathRuntime.string().c_str());
                 ShadersPath = shaderSourcePathRuntime;
                 ShadersPathExternalIncludes1 = runtimeDirectory / "ShaderDynamic/Source/caustica/caustica";
@@ -116,20 +116,20 @@ namespace ShaderCompilerUtils
         {
             if (!std::filesystem::exists(ShaderCompilerPath))
             {
-                donut::log::info("Shader compiler '%s' not found; loading precompiled shader binaries only.",
+                caustica::info("Shader compiler '%s' not found; loading precompiled shader binaries only.",
                     ShaderCompilerPath.string().c_str());
             }
         }
         
         if (RuntimeCompilationAvailable)
         {
-            donut::log::info("Shader compiler: '%s'", ShaderCompilerPath.string().c_str());
-            donut::log::info("Shader sources: '%s' (includes: '%s', '%s')",
+            caustica::info("Shader compiler: '%s'", ShaderCompilerPath.string().c_str());
+            caustica::info("Shader sources: '%s' (includes: '%s', '%s')",
                 ShadersPath.string().c_str(),
                 ShadersPathExternalIncludes1.string().c_str(),
                 ShadersPathExternalIncludes2.string().c_str());
         }
-        donut::log::info("Shader binaries output: '%s'", ShaderBinariesPath.string().c_str());
+        caustica::info("Shader binaries output: '%s'", ShaderBinariesPath.string().c_str());
         
         return true;
     }

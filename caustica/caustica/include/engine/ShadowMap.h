@@ -27,7 +27,7 @@
 
 struct ShadowConstants;
 
-namespace donut::engine
+namespace caustica
 {
     class IShadowMap
     {

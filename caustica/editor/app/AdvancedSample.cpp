@@ -18,7 +18,7 @@
 
 class AdvancedSample : public SampleBaseApp
 {
-    std::unique_ptr<Sample> CreateMainRenderPass(donut::app::DeviceManager& deviceManager, const CommandLineOptions& cmdLineOptions) override
+    std::unique_ptr<Sample> CreateMainRenderPass(caustica::DeviceManager& deviceManager, const CommandLineOptions& cmdLineOptions) override
     {
         return std::make_unique<AdvancedPathTracer>(deviceManager, cmdLineOptions);
     }

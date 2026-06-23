@@ -23,7 +23,7 @@
 #include <core/string_utils.h>
 #include <cstring>
 
-namespace donut::string_utils
+namespace caustica::string_utils
 {
 	template <> long sto_number(std::string const& s) 
 	{ 
@@ -115,5 +115,5 @@ namespace donut::string_utils
 	template <> std::optional<dm::float3> parse(std::string_view s) { return parse_vector<dm::float3>(s); }
 	template <> std::optional<dm::float4> parse(std::string_view s) { return parse_vector<dm::float4>(s); }
 
-} // end namespace donut::string_utils
+} // end namespace caustica::string_utils
 

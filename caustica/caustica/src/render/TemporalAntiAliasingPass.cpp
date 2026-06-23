@@ -41,7 +41,7 @@
 #endif
 #endif
 
-using namespace donut::math;
+using namespace caustica::math;
 #include <shaders/taa_cb.h>
 
 #include <nvrhi/utils.h>
@@ -49,8 +49,8 @@ using namespace donut::math;
 #include <assert.h>
 #include <random>
 
-using namespace donut::engine;
-using namespace donut::render;
+using namespace caustica;
+using namespace caustica::render;
 
 TemporalAntiAliasingPass::TemporalAntiAliasingPass(
     nvrhi::IDevice* device,
@@ -364,7 +364,7 @@ dm::float2 TemporalAntiAliasingPass::GetCurrentPixelOffset()
     }
 }
 
-void donut::render::TemporalAntiAliasingPass::SetJitter(TemporalAntiAliasingJitter jitter)
+void caustica::render::TemporalAntiAliasingPass::SetJitter(TemporalAntiAliasingJitter jitter)
 {
     m_Jitter = jitter;
 }

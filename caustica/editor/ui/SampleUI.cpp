@@ -36,8 +36,8 @@
 #include <cmath>
 #include <filesystem>
 
-using namespace donut::app;
-using namespace donut::engine;
+using namespace caustica;
+using namespace caustica;
 
 std::filesystem::path GetLocalPath(std::string subfolder);
 
@@ -170,22 +170,22 @@ namespace
         return changed;
     }
 
-    bool IsMeshInstanceNode(donut::engine::SceneGraphNode* node)
+    bool IsMeshInstanceNode(caustica::SceneGraphNode* node)
     {
-        return node != nullptr && std::dynamic_pointer_cast<donut::engine::MeshInstance>(node->GetLeaf()) != nullptr;
+        return node != nullptr && std::dynamic_pointer_cast<caustica::MeshInstance>(node->GetLeaf()) != nullptr;
     }
 
-    bool IsGaussianSplatNode(donut::engine::SceneGraphNode* node)
+    bool IsGaussianSplatNode(caustica::SceneGraphNode* node)
     {
         return node != nullptr && std::dynamic_pointer_cast<GaussianSplat>(node->GetLeaf()) != nullptr;
     }
 
-    bool IsInspectableSceneNode(donut::engine::SceneGraphNode* node)
+    bool IsInspectableSceneNode(caustica::SceneGraphNode* node)
     {
         return IsMeshInstanceNode(node) || IsGaussianSplatNode(node);
     }
 
-    bool HasHierarchyEntity(donut::engine::SceneGraphNode* node)
+    bool HasHierarchyEntity(caustica::SceneGraphNode* node)
     {
         if (IsInspectableSceneNode(node))
             return true;
@@ -200,7 +200,7 @@ namespace
         return false;
     }
 
-    void BuildHierarchyNodeUI(SampleUIData& ui, donut::engine::SceneGraphNode* node)
+    void BuildHierarchyNodeUI(SampleUIData& ui, caustica::SceneGraphNode* node)
     {
         if (!HasHierarchyEntity(node))
             return;
@@ -227,7 +227,7 @@ namespace
         std::string label = isMeshNode ? "[Mesh] " + nodeName : (isGaussianSplatNode ? "[3DGS] " + nodeName : "[Group] " + nodeName);
         if (isMeshNode)
         {
-            auto meshInstance = std::dynamic_pointer_cast<donut::engine::MeshInstance>(node->GetLeaf());
+            auto meshInstance = std::dynamic_pointer_cast<caustica::MeshInstance>(node->GetLeaf());
             if (meshInstance && meshInstance->GetMesh())
                 label += "  (" + meshInstance->GetMesh()->name + ")";
         }
@@ -629,7 +629,7 @@ SampleUI::SampleUI(DeviceManager* deviceManager, SampleBaseApp & baseApp, Sample
 {
     m_commandList = GetDevice()->createCommandList();
 
-    auto nativeFS = std::make_shared<donut::vfs::NativeFileSystem>(); // *(app.GetRootFs())
+    auto nativeFS = std::make_shared<caustica::NativeFileSystem>(); // *(app.GetRootFs())
 
     // // auto fontPath = GetLocalPath(c_AssetsFolder) / "fonts/OpenSans/OpenSans-Regular.ttf";
     auto fontPath = GetLocalPath(c_AssetsFolder) / "fonts/DroidSans/DroidSans-Mono.ttf";
@@ -694,7 +694,7 @@ std::string TrimSkyDisplayName(std::string text)
 
 void SampleUI::Animate(float elapsedTimeSeconds)
 {
-    donut::app::ImGui_Renderer::Animate(elapsedTimeSeconds);
+    caustica::ImGui_Renderer::Animate(elapsedTimeSeconds);
 
     int w, h;
     GetDeviceManager()->GetWindowDimensions(w, h);
@@ -845,10 +845,10 @@ void SampleUI::DLSSFGSelectorUI()
     }
 
     m_ui.DLSSFGMode = (currentItem > 0)
-        ? donut::app::StreamlineInterface::DLSSGMode::eOn
-        : donut::app::StreamlineInterface::DLSSGMode::eOff;
+        ? caustica::StreamlineInterface::DLSSGMode::eOn
+        : caustica::StreamlineInterface::DLSSGMode::eOff;
 
-    m_ui.DLSSFGNumFramesToGenerate = (m_ui.DLSSFGMode == donut::app::StreamlineInterface::DLSSGMode::eOn) ? currentItem : 1;
+    m_ui.DLSSFGNumFramesToGenerate = (m_ui.DLSSFGMode == caustica::StreamlineInterface::DLSSGMode::eOn) ? currentItem : 1;
 
     if (!m_ui.RealtimeMode)
         ImGui::TextColored(warnColor, "Note: DLSS-G is DISABLED in Reference PT mode");
@@ -1714,7 +1714,7 @@ void SampleUI::buildUI(void)
             );
             if (changed)
             {
-                donut::log::debug("Magnification Method ", static_cast<int>(m_ui.STFMagnificationMethod));
+                caustica::debug("Magnification Method ", static_cast<int>(m_ui.STFMagnificationMethod));
             }
 
             changed = ImGui::Combo("Filter Type", (int*)&m_ui.STFFilterMode,
@@ -1725,7 +1725,7 @@ void SampleUI::buildUI(void)
             );
             if (changed)
             {
-                donut::log::debug("Filter Type ", static_cast<int>(m_ui.STFFilterMode));
+                caustica::debug("Filter Type ", static_cast<int>(m_ui.STFFilterMode));
             }
 
             ImGui::BeginDisabled(m_ui.STFFilterMode != StfFilterMode::Gaussian);
@@ -1818,7 +1818,7 @@ void SampleUI::buildUI(void)
                 if (m_ui.IsDLSSFGSupported)
                 {
 
-                    if (m_ui.ReflexMode == donut::app::StreamlineInterface::ReflexMode::eOff)
+                    if (m_ui.ReflexMode == caustica::StreamlineInterface::ReflexMode::eOff)
                         ImGui::Text("Please note: Reflex is currently off and will be\nautomatically enabled if DLSS-FG is enabled");
 
                     DLSSFGSelectorUI();
@@ -2448,7 +2448,7 @@ void SampleUI::buildUI(void)
         auto node = m_ui.SelectedNode;
         ImGui::Text("Node: %s", node->GetName().c_str());
 
-        auto meshInstance = std::dynamic_pointer_cast<donut::engine::MeshInstance>(node->GetLeaf());
+        auto meshInstance = std::dynamic_pointer_cast<caustica::MeshInstance>(node->GetLeaf());
         if (meshInstance && meshInstance->GetMesh())
             ImGui::Text("Mesh: %s", meshInstance->GetMesh()->name.c_str());
         auto gaussianSplat = std::dynamic_pointer_cast<GaussianSplat>(node->GetLeaf());
@@ -2897,7 +2897,7 @@ void SampleUI::buildDeltaTreeViz()
         DeltaTreeVizPathVertex      deltaVertex;
         uint                        parentLobe;
         uint                        vertexIndex;
-        std::shared_ptr<donut::engine::Material> material;  // nullptr for sky
+        std::shared_ptr<caustica::Material> material;  // nullptr for sky
         UITreeNode *                parent = nullptr;
         std::vector<UITreeNode *>   children;
 
@@ -3176,7 +3176,7 @@ void SampleUI::BuildPythonScriptingUI(float indent)
     if (ImGui::Button("Browse##PyScript"))
     {
         std::string picked;
-        if (donut::app::FileDialog(true, "Python Scripts (*.py)\0*.py\0All\0*.*\0", picked))
+        if (caustica::FileDialog(true, "Python Scripts (*.py)\0*.py\0All\0*.*\0", picked))
         {
             std::snprintf(pathBuffer, sizeof(pathBuffer), "%s", picked.c_str());
         }
@@ -3224,7 +3224,7 @@ void SampleUI::BuildPythonScriptingUI(float indent)
 }
 #endif // RTXPT_WITH_PYTHON
 
-void UpdateTogglableNodes(std::vector<TogglableNode>& togglableNodes, donut::engine::SceneGraphNode* node)
+void UpdateTogglableNodes(std::vector<TogglableNode>& togglableNodes, caustica::SceneGraphNode* node)
 {
     auto addIfTogglable = [ & ](const std::string & token, SceneGraphNode* node) -> TogglableNode *
     {

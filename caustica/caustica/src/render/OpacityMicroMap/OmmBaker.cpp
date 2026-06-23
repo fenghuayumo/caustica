@@ -27,16 +27,15 @@
 
 #include <render/OpacityMicroMap/OmmBuildQueue.h>
 
-using namespace donut;
-using namespace donut::math;
-using namespace donut::engine;
+using namespace caustica::math;
+using namespace caustica;
 
 #include <shaders/Misc/OmmGeometryDebugData.hlsli>
 
 OmmBaker::OmmBaker(nvrhi::DeviceHandle device,
-    std::shared_ptr<donut::engine::DescriptorTableManager> descriptorTableManager,
-    std::shared_ptr<donut::engine::TextureCache> textureCache,
-    std::shared_ptr<donut::engine::ShaderFactory> shaderFactory)
+    std::shared_ptr<caustica::DescriptorTableManager> descriptorTableManager,
+    std::shared_ptr<caustica::TextureCache> textureCache,
+    std::shared_ptr<caustica::ShaderFactory> shaderFactory)
     : m_device(device)
     , m_textureCache(std::move(textureCache))
     , m_bindingCache(device)
@@ -62,7 +61,7 @@ OmmBaker::~OmmBaker()
 {
 }
 
-void OmmBaker::SceneLoaded(const donut::engine::Scene& scene)
+void OmmBaker::SceneLoaded(const caustica::Scene& scene)
 {
     const size_t allocationGranularity = 1024;
     const size_t geometryCount = scene.GetSceneGraph()->GetGeometryCount();
@@ -88,13 +87,13 @@ void OmmBaker::SceneUnloading()
     m_ommBuildQueue->CancelPendingBuilds();
 }
 
-void OmmBaker::CreateRenderPasses(nvrhi::BindingLayoutHandle bindlessLayout, std::shared_ptr<engine::CommonRenderPasses> commonPasses)
+void OmmBaker::CreateRenderPasses(nvrhi::BindingLayoutHandle bindlessLayout, std::shared_ptr<caustica::CommonRenderPasses> commonPasses)
 {
     m_bindlessLayout = std::move(bindlessLayout);
     m_commonPasses = std::move(commonPasses);
 }
 
-void OmmBaker::CreateOpacityMicromaps(const donut::engine::Scene& scene)
+void OmmBaker::CreateOpacityMicromaps(const caustica::Scene& scene)
 {
     m_ommBuildQueue->CancelPendingBuilds();
 
@@ -104,7 +103,7 @@ void OmmBaker::CreateOpacityMicromaps(const donut::engine::Scene& scene)
 
     for (auto& mesh : scene.GetSceneGraph()->GetMeshes())
     {
-        if (mesh->isSkinPrototype) //buffers->hasAttribute(engine::VertexAttribute::JointWeights))
+        if (mesh->isSkinPrototype) //buffers->hasAttribute(caustica::VertexAttribute::JointWeights))
             continue; // skip the skinning prototypes
         if (mesh->skinPrototype)
             continue;
@@ -114,7 +113,7 @@ void OmmBaker::CreateOpacityMicromaps(const donut::engine::Scene& scene)
 
         for (size_t i = 0; i < mesh->geometries.size(); ++i)
         {
-            const donut::engine::MeshGeometry& geometry = *mesh->geometries[i];
+            const caustica::MeshGeometry& geometry = *mesh->geometries[i];
             const auto material = static_cast<const MaterialEx*>(geometry.material.get())->PTMaterial;
             if (material == nullptr)
                 continue;
@@ -153,7 +152,7 @@ void OmmBaker::CreateOpacityMicromaps(const donut::engine::Scene& scene)
     }
 }
 
-void OmmBaker::DestroyOpacityMicromaps(nvrhi::ICommandList& commandList, const donut::engine::Scene& scene)
+void OmmBaker::DestroyOpacityMicromaps(nvrhi::ICommandList& commandList, const caustica::Scene& scene)
 {
     commandList.close();
     m_device->executeCommandList(&commandList);
@@ -171,7 +170,7 @@ void OmmBaker::DestroyOpacityMicromaps(nvrhi::ICommandList& commandList, const d
     }
 }
 
-void OmmBaker::BuildOpacityMicromaps(nvrhi::ICommandList& commandList, const donut::engine::Scene& scene)
+void OmmBaker::BuildOpacityMicromaps(nvrhi::ICommandList& commandList, const caustica::Scene& scene)
 {
     commandList.beginMarker("OMM Updates");
 
@@ -235,7 +234,7 @@ void OmmBaker::UpdateDebugGeometry(const MeshInfo& _mesh)
     }
 }
 
-bool OmmBaker::Update(nvrhi::ICommandList& commandList, const donut::engine::Scene& scene)
+bool OmmBaker::Update(nvrhi::ICommandList& commandList, const caustica::Scene& scene)
 {
     RAII_SCOPE( commandList.beginMarker("OmmBaker");, commandList.endMarker(); );
 
@@ -257,7 +256,7 @@ bool OmmBaker::Update(nvrhi::ICommandList& commandList, const donut::engine::Sce
     return anyDirty;
 }
 
-void OmmBaker::SetGlobalShaderMacros(std::vector<donut::engine::ShaderMacro>& macros)
+void OmmBaker::SetGlobalShaderMacros(std::vector<caustica::ShaderMacro>& macros)
 {
     if (m_uiData.DebugView == OpacityMicroMapDebugView::InWorld)
         macros.push_back( { "OMM_DEBUG_VIEW_IN_WORLD", "1" } );
@@ -265,7 +264,7 @@ void OmmBaker::SetGlobalShaderMacros(std::vector<donut::engine::ShaderMacro>& ma
         macros.push_back( { "OMM_DEBUG_VIEW_OVERLAY", "1" } );
 }
 
-bool OmmBaker::DebugGUI(float indent, const donut::engine::Scene& scene)
+bool OmmBaker::DebugGUI(float indent, const caustica::Scene& scene)
 {
     RAII_SCOPE(ImGui::PushID("OmmBakerDebugGUI"); , ImGui::PopID(); );
     
@@ -448,7 +447,7 @@ bool OmmBaker::DebugGUI(float indent, const donut::engine::Scene& scene)
             {
                 UI_SCOPED_INDENT(indent);
 
-                for (const std::shared_ptr<donut::engine::MeshInfo>& mesh : scene.GetSceneGraph()->GetMeshes())
+                for (const std::shared_ptr<caustica::MeshInfo>& mesh : scene.GetSceneGraph()->GetMeshes())
                 {
                     bool meshHasOmms = false;
                     for (uint32_t i = 0; i < mesh->geometries.size(); ++i)

@@ -56,12 +56,12 @@ SOFTWARE.
 #include <string_view>
 #include <vector>
 
-namespace donut::engine::console
+namespace caustica::console
 {
 	class Interpreter;
 }
 
-namespace donut::app
+namespace caustica
 {
 	class RegisteredFont;
 
@@ -83,7 +83,7 @@ namespace donut::app
 			bool show_errors = true;
 		};
 
-		ImGui_Console(std::shared_ptr<donut::engine::console::Interpreter> interpreter, Options const& opts);
+		ImGui_Console(std::shared_ptr<caustica::console::Interpreter> interpreter, Options const& opts);
 
 		~ImGui_Console();
 
@@ -112,25 +112,25 @@ namespace donut::app
 		typedef std::array<char, 256> InputBuffer;
 		InputBuffer m_InputBuffer = { 0 };
 
-		typedef donut::core::circular_buffer<std::string, 1024> HistoryBuffer;
+		typedef caustica::core::circular_buffer<std::string, 1024> HistoryBuffer;
 		HistoryBuffer m_History;
 		HistoryBuffer::reverse_iterator m_HistoryIterator = m_History.rend();
 
 		struct LogItem
 		{
-			donut::log::Severity severity = donut::log::Severity::None;
+			caustica::Severity severity = caustica::Severity::None;
 			ImVec4 textColor = ImVec4(1.f, 1.f, 1.f, 1.f);
 			std::string text;
 		};
 
-		typedef donut::core::circular_buffer<LogItem, 5000> ItemsLog;
+		typedef caustica::core::circular_buffer<LogItem, 5000> ItemsLog;
 		ItemsLog m_ItemsLog;
 
 	private:
 
 		Options m_Options;
 
-		std::shared_ptr<donut::engine::console::Interpreter> m_Interpreter;
+		std::shared_ptr<caustica::console::Interpreter> m_Interpreter;
 	};
 
-} // namespace donut::app
+} // namespace caustica

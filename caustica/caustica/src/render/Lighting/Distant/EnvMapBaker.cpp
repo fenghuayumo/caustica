@@ -34,15 +34,14 @@
 #include <render/Misc/ShaderDebug.h>
 
 
-using namespace donut;
-using namespace donut::math;
-using namespace donut::engine;
+using namespace caustica::math;
+using namespace caustica;
 
 std::filesystem::path GetLocalPath(std::string subfolder);
 
 static const int    c_BlockCompressionBlockSize = 4; 
 
-EnvMapBaker::EnvMapBaker( nvrhi::IDevice* device, std::shared_ptr<donut::engine::TextureCache> textureCache, bool enableRasterPrecompute )
+EnvMapBaker::EnvMapBaker( nvrhi::IDevice* device, std::shared_ptr<caustica::TextureCache> textureCache, bool enableRasterPrecompute )
     : m_device(device)
     , m_textureCache(textureCache)
 {
@@ -53,7 +52,7 @@ EnvMapBaker::~EnvMapBaker()
     UnloadSourceBackgrounds();
 }
 
-void EnvMapBaker::CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebug, std::shared_ptr<donut::engine::ShaderFactory> shaderFactory, std::shared_ptr<ComputePipelineBaker> computePipelineBaker)
+void EnvMapBaker::CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebug, std::shared_ptr<caustica::ShaderFactory> shaderFactory, std::shared_ptr<ComputePipelineBaker> computePipelineBaker)
 {
     m_importanceSamplingBaker = nullptr;
     m_shaderDebug = shaderDebug;
@@ -81,8 +80,8 @@ void EnvMapBaker::CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebug, s
     m_brdfLUTPSO = nullptr;
     m_brdfLUTBindingLayout = m_ggxPrefilterBindingLayout = m_irradianceConvolveBindingLayout = nullptr;
 
-    std::vector<donut::engine::ShaderMacro> shaderMacros;
-    //shaderMacros.push_back(donut::engine::ShaderMacro({              "BLEND_DEBUG_BUFFER", "1" }));
+    std::vector<caustica::ShaderMacro> shaderMacros;
+    //shaderMacros.push_back(caustica::ShaderMacro({              "BLEND_DEBUG_BUFFER", "1" }));
 
     m_lowResPrePassLayerCS = shaderFactory->CreateShader("app/engine/shaders/render/Lighting/Distant/EnvMapBaker.hlsl", "LowResPrePassLayerCS", &shaderMacros, nvrhi::ShaderType::Compute);
     m_baseLayerCS = shaderFactory->CreateShader("app/engine/shaders/render/Lighting/Distant/EnvMapBaker.hlsl", "BaseLayerCS", &shaderMacros, nvrhi::ShaderType::Compute);
@@ -164,8 +163,8 @@ void EnvMapBaker::CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebug, s
 
     if (m_BC6UCompressionEnabled)
     {
-        std::vector<donut::engine::ShaderMacro> smQ0 = { donut::engine::ShaderMacro({ "QUALITY", "0" }) };
-        std::vector<donut::engine::ShaderMacro> smQ1 = { donut::engine::ShaderMacro({ "QUALITY", "1" }) };
+        std::vector<caustica::ShaderMacro> smQ0 = { caustica::ShaderMacro({ "QUALITY", "0" }) };
+        std::vector<caustica::ShaderMacro> smQ1 = { caustica::ShaderMacro({ "QUALITY", "1" }) };
         m_BC6UCompressLowCS = shaderFactory->CreateShader("app/engine/shaders/render/Lighting/Distant/BC6UCompress.hlsl", "CSMain", &smQ0, nvrhi::ShaderType::Compute);
         m_BC6UCompressHighCS = shaderFactory->CreateShader("app/engine/shaders/render/Lighting/Distant/BC6UCompress.hlsl", "CSMain", &smQ1, nvrhi::ShaderType::Compute);
 
@@ -205,7 +204,7 @@ void EnvMapBaker::CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebug, s
         m_brdfLUTPSO = m_device->createComputePipeline(pipelineDesc);
         
         m_brdfLUTConstantBuffer = m_device->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(
-            sizeof(BRDFLUTConstants), "BRDFLUTConstants", engine::c_MaxRenderPassConstantBufferVersions));
+            sizeof(BRDFLUTConstants), "BRDFLUTConstants", caustica::c_MaxRenderPassConstantBufferVersions));
         
         // Create BRDF LUT texture
         nvrhi::TextureDesc lutDesc;
@@ -290,7 +289,7 @@ void EnvMapBaker::InitBuffers(uint cubeDim)
 
     // Main constant buffer
     m_constantBuffer = m_device->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(
-        sizeof(EnvMapBakerConstants), "EnvMapBakerConstants", engine::c_MaxRenderPassConstantBufferVersions * 5));	// *5 we could be updating few times per frame
+        sizeof(EnvMapBakerConstants), "EnvMapBakerConstants", caustica::c_MaxRenderPassConstantBufferVersions * 5));	// *5 we could be updating few times per frame
 
     // Main cubemap texture
     {
@@ -362,11 +361,11 @@ int EnvMapBaker::GetTargetCubeResolution() const
     return m_targetResolution; 
 }
 
-void EnvMapBaker::PreUpdate(nvrhi::ICommandList* commandList, std::shared_ptr<donut::engine::CommonRenderPasses> commonPasses, std::string envMapBackgroundPath, const std::filesystem::path& sceneDirectory)
+void EnvMapBaker::PreUpdate(nvrhi::ICommandList* commandList, std::shared_ptr<caustica::CommonRenderPasses> commonPasses, std::string envMapBackgroundPath, const std::filesystem::path& sceneDirectory)
 {
     if( m_device->getGraphicsAPI() == nvrhi::GraphicsAPI::VULKAN && m_BC6UCompressionEnabled )
     {
-        log::warning("There is an unresolved bug in BC6U cubemap compression on Vulkan. Disabling compression until it is fixed.");
+        caustica::warning("There is an unresolved bug in BC6U cubemap compression on Vulkan. Disabling compression until it is fixed.");
         m_BC6UCompressionEnabled = false;
     }
 
@@ -425,7 +424,7 @@ void EnvMapBaker::PreUpdate(nvrhi::ICommandList* commandList, std::shared_ptr<do
         m_proceduralSky = std::make_shared<SampleProceduralSky>(m_device, m_textureCache, commonPasses, commandList);
 }
 
-bool EnvMapBaker::Update(nvrhi::ICommandList* commandList, donut::engine::BindingCache & bindingCache, std::shared_ptr<donut::engine::CommonRenderPasses> commonPasses, const BakeSettings & _settings, double sceneTime, EMB_DirectionalLight const * directionalLights, uint directionaLightCount, bool forceInstantUpdate)
+bool EnvMapBaker::Update(nvrhi::ICommandList* commandList, caustica::BindingCache & bindingCache, std::shared_ptr<caustica::CommonRenderPasses> commonPasses, const BakeSettings & _settings, double sceneTime, EMB_DirectionalLight const * directionalLights, uint directionaLightCount, bool forceInstantUpdate)
 {
     BakeSettings settings = _settings;
 
@@ -681,13 +680,13 @@ bool EnvMapBaker::Update(nvrhi::ICommandList* commandList, donut::engine::Bindin
             {
                 myfile.write((char*)blob->data(), blob->size());
                 myfile.close();
-                donut::log::info("Image saved successfully %s.", m_dbgSaveBaked.c_str());
+                caustica::info("Image saved successfully %s.", m_dbgSaveBaked.c_str());
             }
             else
-                donut::log::fatal("Unable to write into file %s. ", m_dbgSaveBaked.c_str());
+                caustica::fatal("Unable to write into file %s. ", m_dbgSaveBaked.c_str());
         }
         else
-            donut::log::fatal("Unable to bake cubemap for image %s. ", m_dbgSaveBaked.c_str());
+            caustica::fatal("Unable to bake cubemap for image %s. ", m_dbgSaveBaked.c_str());
 
         m_dbgSaveBaked = "<<REFRESH>>"; // need to re-bake one more time with normal settings
 
@@ -744,7 +743,7 @@ bool EnvMapBaker::DebugGUI(float indent)
     if (ImGui::Button("Save baked cubemap"))
     {
         std::string fileName;
-        if (donut::app::FileDialog(false, "DDS files\0*.dds\0\0", fileName))
+        if (caustica::FileDialog(false, "DDS files\0*.dds\0\0", fileName))
             m_dbgSaveBaked = fileName;
     }
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("Save baked cubemap. It will be rebaked with EnvMapRadianceScale set to 1.0 before saving.");
@@ -752,7 +751,7 @@ bool EnvMapBaker::DebugGUI(float indent)
     return resetAccumulation;
 }
 
-bool EnvMapBaker::GenerateBRDFLUT(nvrhi::ICommandList* commandList, donut::engine::BindingCache& bindingCache)
+bool EnvMapBaker::GenerateBRDFLUT(nvrhi::ICommandList* commandList, caustica::BindingCache& bindingCache)
 {
     if (!m_enableRasterPrecompute || m_brdfLUTGenerated)
         return false;
@@ -786,7 +785,7 @@ bool EnvMapBaker::GenerateBRDFLUT(nvrhi::ICommandList* commandList, donut::engin
     return true;
 }
 
-void EnvMapBaker::GGXPrefilterCubemap(nvrhi::ICommandList* commandList, donut::engine::BindingCache& bindingCache, 
+void EnvMapBaker::GGXPrefilterCubemap(nvrhi::ICommandList* commandList, caustica::BindingCache& bindingCache, 
     nvrhi::TextureHandle srcCubemap, nvrhi::TextureHandle dstCubemap)
 {
     if (!m_enableRasterPrecompute)
@@ -843,7 +842,7 @@ void EnvMapBaker::GGXPrefilterCubemap(nvrhi::ICommandList* commandList, donut::e
     }
 }
 
-void EnvMapBaker::ConvolveDiffuseIrradiance(nvrhi::ICommandList* commandList, donut::engine::BindingCache& bindingCache,
+void EnvMapBaker::ConvolveDiffuseIrradiance(nvrhi::ICommandList* commandList, caustica::BindingCache& bindingCache,
     nvrhi::TextureHandle srcCubemap, nvrhi::TextureHandle dstCubemap)
 {
     if (!m_enableRasterPrecompute)
@@ -881,7 +880,7 @@ void EnvMapBaker::ConvolveDiffuseIrradiance(nvrhi::ICommandList* commandList, do
     commandList->dispatch(1, 1, 6);
 }
 
-void EnvMapBaker::GenerateCubemapMips(nvrhi::ICommandList* commandList, donut::engine::BindingCache& bindingCache, 
+void EnvMapBaker::GenerateCubemapMips(nvrhi::ICommandList* commandList, caustica::BindingCache& bindingCache, 
     nvrhi::TextureHandle cubemap)
 {
     // Reuse the existing MIPReduceCS for solid-angle weighted mip generation
@@ -924,7 +923,7 @@ void EnvMapBaker::GenerateCubemapMips(nvrhi::ICommandList* commandList, donut::e
 
 void EnvMapBaker::ProcessCubemap(
     nvrhi::ICommandList* commandList,
-    donut::engine::BindingCache& bindingCache,
+    caustica::BindingCache& bindingCache,
     nvrhi::TextureHandle sourceCubemap,
     const CubemapProcessingOptions& options,
     const CubemapProcessingResults& results)

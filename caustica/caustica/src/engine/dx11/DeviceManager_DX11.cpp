@@ -68,7 +68,7 @@ freely, subject to the following restrictions:
 
 using nvrhi::RefCountPtr;
 
-using namespace donut::app;
+using namespace caustica;
 
 static bool IsNvDeviceID(UINT id)
 {
@@ -156,7 +156,7 @@ bool DeviceManager_DX11::CreateInstanceInternal()
         HRESULT hres = CreateDXGIFactory1(IID_PPV_ARGS(&m_DxgiFactory));
         if (hres != S_OK)
         {
-            donut::log::error("ERROR in CreateDXGIFactory1.\n"
+            caustica::error("ERROR in CreateDXGIFactory1.\n"
                 "For more info, get log from debug D3D runtime: (1) Install DX SDK, and enable Debug D3D from DX Control Panel Utility. (2) Install and start DbgView. (3) Try running the program again.\n");
             return false;
         }
@@ -216,9 +216,9 @@ bool DeviceManager_DX11::CreateDevice()
     if (FAILED(m_DxgiFactory->EnumAdapters(adapterIndex, &m_DxgiAdapter)))
     {
         if (adapterIndex == 0)
-            donut::log::error("Cannot find any DXGI adapters in the system.");
+            caustica::error("Cannot find any DXGI adapters in the system.");
         else
-            donut::log::error("The specified DXGI adapter %d does not exist.", adapterIndex);
+            caustica::error("The specified DXGI adapter %d does not exist.", adapterIndex);
         return false;
     }
     
@@ -335,7 +335,7 @@ bool DeviceManager_DX11::CreateSwapChain()
     
     if(FAILED(hr))
     {
-        donut::log::error("Failed to create a swap chain, HRESULT = 0x%08x", hr);
+        caustica::error("Failed to create a swap chain, HRESULT = 0x%08x", hr);
         return false;
     }
 
@@ -417,13 +417,13 @@ void DeviceManager_DX11::ResizeSwapChain()
 
     if (FAILED(hr))
     {
-        donut::log::fatal("ResizeBuffers failed");
+        caustica::fatal("ResizeBuffers failed");
     }
 
     const bool ret = CreateRenderTarget();
     if (!ret)
     {
-        donut::log::fatal("CreateRenderTarget failed");
+        caustica::fatal("CreateRenderTarget failed");
     }
 }
 

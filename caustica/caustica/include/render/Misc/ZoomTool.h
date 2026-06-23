@@ -22,7 +22,7 @@
 #include <math/math.h>
 #include <engine/BindingCache.h>
 
-namespace donut::engine
+namespace caustica
 {
     class ShaderFactory;
 }
@@ -34,11 +34,11 @@ public:
     {
         bool                Enabled     = false;
         int                 ZoomFactor  = 4;
-        donut::math::int2   BoxPos      = { 400, 300 };
-        donut::math::int2   BoxSize     = { 128, 96 };
+        caustica::math::int2   BoxPos      = { 400, 300 };
+        caustica::math::int2   BoxSize     = { 128, 96 };
     };
 
-    ZoomTool( nvrhi::IDevice* device, std::shared_ptr<donut::engine::ShaderFactory> shaderFactory );
+    ZoomTool( nvrhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory );
     ~ZoomTool( );
 
 public:
@@ -62,8 +62,8 @@ private:
     ComputePass                     m_CSZoomTool;
 
     nvrhi::BindingLayoutHandle      m_bindingLayout;
-    donut::engine::BindingCache     m_bindingCache;
+    caustica::BindingCache     m_bindingCache;
 
-    donut::math::float2             m_lastMousePos;
+    caustica::math::float2             m_lastMousePos;
 };
     

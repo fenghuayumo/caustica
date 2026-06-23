@@ -20,7 +20,7 @@
 
 #include <render/TemporalAntiAliasingPass.h>
 
-using namespace donut::math;
+using namespace caustica::math;
 
 #include <render/ToneMapper/ToneMappingPasses.h>
 #include <shaders/PathTracer/PathTracerDebug.hlsli>
@@ -39,13 +39,13 @@ using namespace donut::math;
 #include "../../external/RtxTf/STFDefinitions.h"
 #endif
 
-namespace donut::engine
+namespace caustica
 {
     class SceneGraphNode;
 }
 
 #if DONUT_WITH_STREAMLINE
-using SI = donut::app::StreamlineInterface;
+using SI = caustica::StreamlineInterface;
 #else
 struct StreamlineCompatibilityTypes
 {
@@ -132,7 +132,7 @@ using SI = StreamlineCompatibilityTypes;
 
 struct TogglableNode
 {
-    donut::engine::SceneGraphNode * SceneNode;
+    caustica::SceneGraphNode * SceneNode;
     dm::double3                     OriginalTranslation;
     std::string                     UIName;
     bool                            IsSelected() const;
@@ -250,9 +250,9 @@ struct SampleUIData
     bool                                ShowConsole                             = false;
     bool                                EnableAnimations                        = false;
     bool                                EnableVsync                             = false;
-    std::shared_ptr<donut::engine::Material> SelectedMaterial;
-    std::shared_ptr<donut::engine::SceneGraphNode> SelectedNode;
-    std::weak_ptr<donut::engine::SceneGraphNode> InspectorRotationNode;
+    std::shared_ptr<caustica::Material> SelectedMaterial;
+    std::shared_ptr<caustica::SceneGraphNode> SelectedNode;
+    std::weak_ptr<caustica::SceneGraphNode> InspectorRotationNode;
     dm::dquat                           InspectorRotationQuat                   = dm::dquat::identity();
     dm::float3                          InspectorRotationEulerDeg               = dm::float3(0.0f);
     bool                                InspectorRotationEulerValid             = false;
@@ -309,13 +309,13 @@ struct SampleUIData
     float                               STFGaussianSigma = 0.3f;
 #endif // RTXPT_STOCHASTIC_TEXTURE_FILTERING_ENABLE
 
-    donut::render::TemporalAntiAliasingParameters TemporalAntiAliasingParams;
-    donut::render::TemporalAntiAliasingJitter     TemporalAntiAliasingJitter = donut::render::TemporalAntiAliasingJitter::R2;   // R2 works best with DLSS-RR
+    caustica::render::TemporalAntiAliasingParameters TemporalAntiAliasingParams;
+    caustica::render::TemporalAntiAliasingJitter     TemporalAntiAliasingJitter = caustica::render::TemporalAntiAliasingJitter::R2;   // R2 works best with DLSS-RR
 
     bool                                ContinuousDebugFeedback = false;
     bool                                ShowDebugLines = false;
-    donut::math::uint2                  DebugPixel = { 0, 0 };
-    donut::math::uint2                  MousePos = { 0, 0 };
+    dm::uint2                  DebugPixel = { 0, 0 };
+    dm::uint2                  MousePos = { 0, 0 };
     float                               DebugLineScale = 0.05f;
 
     bool                                EnableShaderDebug = true;   // see ShaderDebug.hlsli/.h/.cpp
@@ -368,7 +368,7 @@ struct SampleUIData
     static constexpr SI::DLSSMode       DLSSModeDefault = SI::DLSSMode::eBalanced;
     SI::DLSSMode                        DLSSMode = DLSSModeDefault;
     SI::DLSSMode                        DLSSLastMode = SI::DLSSMode::eOff;
-    donut::math::uint2                  DLSSLastDisplaySize = { 0,0 };
+    dm::uint2                  DLSSLastDisplaySize = { 0,0 };
     int                                 DLSSLastRealtimeAA = 0;
     bool                                DLSSLodBiasUseOverride = false;
     float                               DLSSLodBiasOverride = 0.f;
@@ -518,10 +518,10 @@ extern SampleUIData g_sampleUIData;
 
 void InitializeSampleUIDataFromCommandLine(SampleUIData& ui, const struct CommandLineOptions& cmdLine);
 
-class SampleUI : public donut::app::ImGui_Renderer
+class SampleUI : public caustica::ImGui_Renderer
 {
 public:
-    SampleUI(donut::app::DeviceManager* deviceManager, class SampleBaseApp & baseApp, class Sample & app, SampleUIData& ui, bool NVAPI_SERSupported, const struct CommandLineOptions& cmdLine);
+    SampleUI(caustica::DeviceManager* deviceManager, class SampleBaseApp & baseApp, class Sample & app, SampleUIData& ui, bool NVAPI_SERSupported, const struct CommandLineOptions& cmdLine);
     virtual ~SampleUI();
 protected:
     virtual void buildUI(void) override;
@@ -556,8 +556,8 @@ private:
 
     float                       m_showSceneWidgets = 0.0f;
 
-    std::unique_ptr<donut::app::ImGui_Console> m_console;
-    std::shared_ptr<donut::engine::Light> m_SelectedLight;
+    std::unique_ptr<caustica::ImGui_Console> m_console;
+    std::shared_ptr<caustica::Light> m_SelectedLight;
 
     SampleUIData& m_ui;
     nvrhi::CommandListHandle m_commandList;
@@ -569,4 +569,4 @@ private:
 #endif
 };
 
-void UpdateTogglableNodes(std::vector<TogglableNode>& TogglableNodes, donut::engine::SceneGraphNode* node);
+void UpdateTogglableNodes(std::vector<TogglableNode>& TogglableNodes, caustica::SceneGraphNode* node);

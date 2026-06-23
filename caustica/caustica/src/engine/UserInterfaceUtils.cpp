@@ -38,13 +38,13 @@
 #define PATH_MAX MAX_PATH
 #endif // _WIN32
 
-using namespace donut::engine;
-using namespace donut::app;
-using namespace donut::math;
+using namespace caustica;
+using namespace caustica;
+using namespace caustica::math;
 
 namespace fs = std::filesystem;
 
-bool donut::app::FileDialog(bool bOpen, const char* pFilters, std::string& fileName)
+bool caustica::FileDialog(bool bOpen, const char* pFilters, std::string& fileName)
 {
 #ifdef _WIN32
     OPENFILENAMEA ofn;
@@ -84,7 +84,7 @@ bool donut::app::FileDialog(bool bOpen, const char* pFilters, std::string& fileN
     FILE* f = popen(app.c_str(), "r");
     if (!f)
     {
-        donut::log::error("Error executing zenity.");
+        caustica::error("Error executing zenity.");
         return false;
     }
     bool gotname = (nullptr != fgets(chars, PATH_MAX, f));
@@ -93,7 +93,7 @@ bool donut::app::FileDialog(bool bOpen, const char* pFilters, std::string& fileN
     if (gotname && chars[0] != '\0')
     {
         fileName = chars;
-        donut::string_utils::trim(fileName);
+        caustica::string_utils::trim(fileName);
         return true;
     }
     return false;
@@ -109,7 +109,7 @@ static INT CALLBACK BrowseCallbackProc(HWND hwnd, UINT uMsg, LPARAM lp, LPARAM p
     return 0;
 }
 
-bool donut::app::FolderDialog(const char* pTitle, const char* pDefaultFolder, std::string& outFolderName)
+bool caustica::FolderDialog(const char* pTitle, const char* pDefaultFolder, std::string& outFolderName)
 {
     BROWSEINFO browseInfo{};
     browseInfo.hwndOwner = GetForegroundWindow();
@@ -135,7 +135,7 @@ bool donut::app::FolderDialog(const char* pTitle, const char* pDefaultFolder, st
     return false;
 }
 #else
-bool donut::app::FolderDialog(const char* pTitle, const char* pDefaultFolder, std::string& outFolderName)
+bool caustica::FolderDialog(const char* pTitle, const char* pDefaultFolder, std::string& outFolderName)
 {
     char chars[PATH_MAX] = { 0 };
 
@@ -149,7 +149,7 @@ bool donut::app::FolderDialog(const char* pTitle, const char* pDefaultFolder, st
     FILE* f = popen(ss.str().c_str(), "r");
     if (!f)
     {
-        donut::log::error("Error executing zenity.");
+        caustica::error("Error executing zenity.");
         return false;
     }
     bool gotname = (nullptr != fgets(chars, PATH_MAX, f));
@@ -158,7 +158,7 @@ bool donut::app::FolderDialog(const char* pTitle, const char* pDefaultFolder, st
     if (gotname && chars[0] != '\0')
     {
         std::string path = chars;
-        donut::string_utils::trim(path);
+        caustica::string_utils::trim(path);
         if (fs::is_directory(path))
         {
             outFolderName = path;
@@ -169,7 +169,7 @@ bool donut::app::FolderDialog(const char* pTitle, const char* pDefaultFolder, st
 }
 #endif
 
-bool donut::app::MaterialEditor(engine::Material* material, bool allowMaterialDomainChanges)
+bool caustica::MaterialEditor(caustica::Material* material, bool allowMaterialDomainChanges)
 {
     bool update = false;
 
@@ -320,7 +320,7 @@ bool donut::app::MaterialEditor(engine::Material* material, bool allowMaterialDo
     return update;
 }
 
-bool donut::app::LightEditor_Directional(engine::DirectionalLight& light)
+bool caustica::LightEditor_Directional(caustica::DirectionalLight& light)
 {
     bool changed = false;
     double3 direction = light.GetDirection();
@@ -335,7 +335,7 @@ bool donut::app::LightEditor_Directional(engine::DirectionalLight& light)
     return changed;
 }
 
-bool donut::app::LightEditor_Point(engine::PointLight& light)
+bool caustica::LightEditor_Point(caustica::PointLight& light)
 {
     bool changed = false;
     changed |= ImGui::SliderFloat("Radius", &light.radius, 0.01f, 1.f, "%.3f", ImGuiSliderFlags_Logarithmic);
@@ -344,7 +344,7 @@ bool donut::app::LightEditor_Point(engine::PointLight& light)
     return changed;
 }
 
-bool donut::app::LightEditor_Spot(engine::SpotLight& light)
+bool caustica::LightEditor_Spot(caustica::SpotLight& light)
 {
     bool changed = false;
     double3 direction = light.GetDirection();
@@ -361,7 +361,7 @@ bool donut::app::LightEditor_Spot(engine::SpotLight& light)
     return changed;
 }
 
-bool donut::app::LightEditor(engine::Light& light)
+bool caustica::LightEditor(caustica::Light& light)
 {
     switch (light.GetLightType())
     {
@@ -376,7 +376,7 @@ bool donut::app::LightEditor(engine::Light& light)
     }
 }
 
-bool donut::app::AzimuthElevationSliders(math::double3& direction, bool negative)
+bool caustica::AzimuthElevationSliders(dm::double3& direction, bool negative)
 {
     double3 normalizedDir = normalize(direction);
     if (negative) normalizedDir = -normalizedDir;

@@ -26,7 +26,7 @@
 #include <functional>
 #include <memory>
 
-namespace donut::engine::audio
+namespace caustica::audio
 {
 class AudioData;
 
@@ -47,7 +47,7 @@ struct Effect
 
     // update 3D transform of this emitter ; can be set asynchronously
     // (returns false if effect was not set as 3D)
-    virtual bool setEmitterTransform(donut::math::affine3 const & transform) = 0;
+    virtual bool setEmitterTransform(caustica::math::affine3 const & transform) = 0;
 
     // Effect update callback (see engine update thread)
     typedef std::function<void(Effect &)> EffectCallback;
@@ -70,7 +70,7 @@ struct EffectDesc
 
     // if set, creates a 3D omnidirectional sound emitter at the position set by
     // the affine3 translation (see Effect::setEmitterTransform)
-    donut::math::affine3 const * transform = nullptr;
+    caustica::math::affine3 const * transform = nullptr;
 
     // if set, triggers the callback function to be called every tick of the
     // engine update (see Engine update thread)
@@ -115,7 +115,7 @@ struct Options
 class Engine
 {
 public:
-    typedef donut::math::affine3 affine3;
+    typedef caustica::math::affine3 affine3;
 
     Engine(Options options=Options());
 
@@ -155,4 +155,4 @@ public:
     std::unique_ptr<Implementation> m_implementation;
 };
 
-} // namespace donut::engine::audio
+} // namespace caustica::audio

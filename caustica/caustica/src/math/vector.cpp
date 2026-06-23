@@ -22,7 +22,7 @@
 
 #include <math/math.h>
 
-namespace donut::math
+namespace caustica::math
 {
 
     float3 sphericalToCartesian(float azimuth, float elevation, float distance)

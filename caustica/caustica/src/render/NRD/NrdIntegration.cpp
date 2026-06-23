@@ -107,7 +107,7 @@ NrdIntegration::~NrdIntegration()
     }
 }
 
-bool NrdIntegration::Initialize(uint32_t width, uint32_t height, donut::engine::ShaderFactory& shaderFactory)
+bool NrdIntegration::Initialize(uint32_t width, uint32_t height, caustica::ShaderFactory& shaderFactory)
 {
     const nrd::LibraryDesc& libraryDesc = nrd::GetLibraryDesc();
 
@@ -179,7 +179,7 @@ bool NrdIntegration::Initialize(uint32_t width, uint32_t height, donut::engine::
         const nrd::PipelineDesc& nrdPipelineDesc = instanceDesc.pipelines[pipelineIndex];
 
         std::string fileName = std::string("nrd/Nrd/engine/shaders/Source/") + nrdPipelineDesc.shaderFileName;
-        std::vector<donut::engine::ShaderMacro> macros = { {"NRD_COMPILER_DXC", "1"}, {"NRD_NORMAL_ENCODING", "2"}, {"NRD_ROUGHNESS_ENCODING", "1"} };
+        std::vector<caustica::ShaderMacro> macros = { {"NRD_COMPILER_DXC", "1"}, {"NRD_NORMAL_ENCODING", "2"}, {"NRD_ROUGHNESS_ENCODING", "1"} };
         
         NrdPipeline pipeline;
         pipeline.Shader = shaderFactory.CreateShader(fileName.c_str(), "main", &macros, nvrhi::ShaderType::Compute);
@@ -356,8 +356,8 @@ void NrdIntegration::RunDenoiserPasses(
     nvrhi::ICommandList* commandList,
     const RenderTargets& renderTargets,
     int pass,
-    const donut::engine::PlanarView& view, 
-    const donut::engine::PlanarView& viewPrev, 
+    const caustica::PlanarView& view, 
+    const caustica::PlanarView& viewPrev, 
     uint32_t frameIndex,
     float disocclusionThreshold,
     float disocclusionThresholdAlternate,

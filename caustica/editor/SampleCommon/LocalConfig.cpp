@@ -141,7 +141,7 @@ void LocalConfig::PostSceneLoad(Sample& sample, SampleUIData& sampleUI)
 {
 }
 
-void LocalConfig::PostMaterialLoad(donut::engine::Material& mat)
+void LocalConfig::PostMaterialLoad(caustica::Material& mat)
 {
 #if 0 // convert transmissive to white opaque
     if (mat.domain == MaterialDomain::Transmissive || mat.domain == MaterialDomain::TransmissiveAlphaBlended || mat.domain == MaterialDomain::TransmissiveAlphaTested)

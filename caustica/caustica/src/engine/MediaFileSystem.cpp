@@ -21,15 +21,15 @@
 */
 
 #include <engine/MediaFileSystem.h>
-#include <engine/ApplicationBase.h>
+#include <engine/Application.h>
 #include <core/log.h>
 #include <core/string_utils.h>
 #include <core/vfs/TarFile.h>
 
 #include <unordered_set>
 
-using namespace donut::vfs;
-using namespace donut::app;
+using namespace caustica;
+using namespace caustica;
 
 MediaFileSystem::MediaFileSystem(
 	std::shared_ptr<IFileSystem> parent, 
@@ -43,7 +43,7 @@ MediaFileSystem::MediaFileSystem(
 	if (nativeFS)
 	{
 		std::vector<std::string> packs;
-		if (mediafs->enumerateFiles("", { ".tar" }, vfs::enumerate_to_vector(packs)) > 0)
+		if (mediafs->enumerateFiles("", { ".tar" }, caustica::enumerate_to_vector(packs)) > 0)
 		{
 			// sort the packs in reverse because want to search
 			// from 'highest revision' of a pack file down (ex: pack2.pkz is
@@ -55,7 +55,7 @@ MediaFileSystem::MediaFileSystem(
 				std::filesystem::path filePath = mediaFolder / fileName;
 
 				bool mounted = false;
-				if (string_utils::ends_with(fileName, ".tar"))
+				if (caustica::string_utils::ends_with(fileName, ".tar"))
 				{
 					if (auto packfs = std::make_shared<TarFile>(filePath); packfs->isOpen())
 					{
@@ -65,13 +65,13 @@ MediaFileSystem::MediaFileSystem(
 				}
 				else
 				{
-					log::warning("Cannot mount '%s': unsupported format. Skipping.", filePath.string().c_str());
+					caustica::warning("Cannot mount '%s': unsupported format. Skipping.", filePath.string().c_str());
 					continue;
 				}
 
 				if (!mounted)
 				{
-					log::warning("Failed to mount '%s' (see above for errors). Skipping.", filePath.string().c_str());
+					caustica::warning("Failed to mount '%s' (see above for errors). Skipping.", filePath.string().c_str());
 				}
 			}
 		}
@@ -113,7 +113,7 @@ bool MediaFileSystem::fileExists(const std::filesystem::path & path)
 std::shared_ptr<IBlob> MediaFileSystem::readFile(const std::filesystem::path & name)
 {
 	for (const auto& fs : m_FileSystems)
-		if (std::shared_ptr<vfs::IBlob> blob = fs->readFile(name))
+		if (std::shared_ptr<caustica::IBlob> blob = fs->readFile(name))
 			return blob;
 	return nullptr;
 }

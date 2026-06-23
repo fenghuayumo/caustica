@@ -17,12 +17,12 @@
 #include <math/math.h>
 #include <memory>
 
-using namespace donut::math;
+using namespace caustica::math;
 
 #include <SampleCommon/RenderTargets.h>
 #include <shaders/SampleConstantBuffer.h>
 
-namespace donut::engine
+namespace caustica
 {
     class FramebufferFactory;
 }
@@ -50,7 +50,7 @@ public:
 private:
 
     nvrhi::DeviceHandle             m_device;
-    std::shared_ptr<donut::engine::CommonRenderPasses> m_commonPasses;
+    std::shared_ptr<caustica::CommonRenderPasses> m_commonPasses;
 
     nvrhi::ShaderHandle             m_computeShaders[(uint32_t)ComputePassType::MaxCount];
     nvrhi::ComputePipelineHandle    m_computePSOs[(uint32_t)ComputePassType::MaxCount];
@@ -61,7 +61,7 @@ private:
     nvrhi::BindingLayoutHandle      m_bindingLayoutCS;
     nvrhi::BindingSetHandle         m_bindingSetCS;
 
-    donut::engine::BindingCache     m_bindingCache;
+    caustica::BindingCache     m_bindingCache;
 
     std::shared_ptr<ShaderDebug>    m_shaderDebug;
 
@@ -69,10 +69,10 @@ public:
 
     PostProcess(
         nvrhi::IDevice* device,
-        std::shared_ptr<donut::engine::ShaderFactory> shaderFactory,
-        std::shared_ptr<donut::engine::CommonRenderPasses> commonPasses,
+        std::shared_ptr<caustica::ShaderFactory> shaderFactory,
+        std::shared_ptr<caustica::CommonRenderPasses> commonPasses,
         std::shared_ptr<ShaderDebug> shaderDebug
-        //, std::shared_ptr<engine::FramebufferFactory> colorFramebufferFactory
+        //, std::shared_ptr<caustica::FramebufferFactory> colorFramebufferFactory
     );
 
     void Apply(nvrhi::ICommandList* commandList, ComputePassType passType, nvrhi::BufferHandle consts, SampleMiniConstants & miniConsts, nvrhi::BindingSetHandle bindingSet, nvrhi::BindingLayoutHandle bindingLayout, uint32_t width, uint32_t height);

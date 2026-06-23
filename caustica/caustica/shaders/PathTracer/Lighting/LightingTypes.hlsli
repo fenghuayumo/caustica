@@ -14,7 +14,7 @@
 #include "LightingConfig.h"
 
 #if defined(__cplusplus)
-using namespace donut::math;
+using namespace caustica::math;
 #define ROW_MAJOR
 #else
 #define ROW_MAJOR row_major

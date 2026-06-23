@@ -31,11 +31,11 @@ public:
     void                    SceneLoaded( const std::shared_ptr<class ExtendedScene> & scene, const std::filesystem::path& sceneFilePath, const std::filesystem::path & mediaPath );
     void                    SceneUnloading( );
     bool                    DebugGUI(float indent);
-    void                    StandaloneGUI(const std::shared_ptr<donut::engine::PlanarView> & view, const float2 & displaySize);
+    void                    StandaloneGUI(const std::shared_ptr<caustica::PlanarView> & view, const float2 & displaySize);
 
     bool                    IsInitialized() const           { return m_scene != nullptr && !m_props.empty(); }
     bool                    CameraActive() const            { return m_gameCameraAttached.lock() != nullptr; }
-    const donut::app::FirstPersonCamera &
+    const caustica::FirstPersonCamera &
                             GetCamera() const               { return m_gameCamera; }
     std::shared_ptr<game::PropBase>
                             GetCameraAttached() const       { return m_gameCameraAttached.lock(); }
@@ -50,7 +50,7 @@ public:
     void                    MousePosUpdate(double xpos, double ypos);
     void                    MouseButtonUpdate(int button, int action, int mods);
     void                    Tick(float deltaTime, bool globalAnimationEnabled); // globalAnimationEnabled will be false if not in reference mode or global scene animations not enabled
-    void                    TickCamera(float deltaTime, donut::app::FirstPersonCamera & renderCamera);
+    void                    TickCamera(float deltaTime, caustica::FirstPersonCamera & renderCamera);
 
     const std::shared_ptr<ExtendedScene> &
                             GetScene() const { return m_scene; }
@@ -96,7 +96,7 @@ private:
 
     bool                    m_lastTickGlobalAnimationEnabled = false;
 
-    // std::shared_ptr<donut::engine::SceneGraphNode> m_cameraNode;
+    // std::shared_ptr<caustica::SceneGraphNode> m_cameraNode;
     // std::shared_ptr<class PerspectiveCameraEx> m_camera;
 
     std::filesystem::path   m_gameStoragePath;
@@ -107,7 +107,7 @@ private:
     std::vector<game::Pose> m_recordedCameraPoses;
     game::Pose              m_lastRenderCameraPose; // useful for stuff like "set prop to camera pose"
 
-    donut::app::FirstPersonCamera   m_gameCamera;
+    caustica::FirstPersonCamera   m_gameCamera;
     std::weak_ptr<game::PropBase>   m_gameCameraAttached;
 
     bool                            m_wasGameCameraActive = false;
