@@ -85,9 +85,10 @@ list(APPEND caustica_engine_engine_src
     src/platform/Input.cpp
 )
 
-# Backend layer: GpuDevice + SwapChain API
+# Backend layer: GpuDevice + SwapChain
 list(APPEND caustica_engine_engine_src
     include/backend/GpuDevice.h
+    src/backend/GpuDevice.cpp
     include/backend/SwapChain.h
 )
 
