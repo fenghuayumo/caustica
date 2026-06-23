@@ -4,7 +4,7 @@
 #include <memory>
 #include <rhi/nvrhi.h>
 #include <assets/loader/ShaderFactory.h>
-#include <engine/ThreadPool.h>
+#include <core/ThreadPool.h>
 #include <unordered_set>
 
 #include "ShaderCompilerUtils.h"

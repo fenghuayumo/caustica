@@ -1,6 +1,6 @@
 #include <engine/Scene.h>
 #include <assets/loader/GltfImporter.h>
-#include <engine/ThreadPool.h>
+#include <core/ThreadPool.h>
 #include <core/json.h>
 #include <core/log.h>
 #include <core/string_utils.h>

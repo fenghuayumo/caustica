@@ -1,4 +1,4 @@
-#include <engine/ThreadPool.h>
+#include <core/ThreadPool.h>
 #include <cassert>
 
 namespace caustica

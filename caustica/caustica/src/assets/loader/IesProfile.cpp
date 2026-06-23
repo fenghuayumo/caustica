@@ -1,4 +1,4 @@
-#include <engine/IesProfile.h>
+#include <assets/loader/IesProfile.h>
 #include <assets/loader/ShaderFactory.h>
 #include <engine/DescriptorTableManager.h>
 #include <core/vfs/VFS.h>

@@ -1,6 +1,6 @@
 #include <engine/AudioCache.h>
 
-#include <engine/ThreadPool.h>
+#include <core/ThreadPool.h>
 #include <core/vfs/VFS.h>
 #include <core/log.h>
 
