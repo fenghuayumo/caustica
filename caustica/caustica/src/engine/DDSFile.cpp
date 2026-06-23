@@ -7,7 +7,7 @@
 
 #include <iterator>
 
-#include <engine/TextureCache.h>
+#include <assets/cache/TextureCache.h>
 #include <core/vfs/VFS.h>
 
 #define D3D11_RESOURCE_MISC_TEXTURECUBE 0x4

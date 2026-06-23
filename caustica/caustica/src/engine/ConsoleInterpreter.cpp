@@ -1,7 +1,7 @@
 #include <engine/ConsoleInterpreter.h>
 
 #include <engine/ConsoleObjects.h>
-#include <engine/TextureCache.h>
+#include <assets/cache/TextureCache.h>
 #include <core/string_utils.h>
 #include <core/log.h>
 

@@ -1,8 +1,8 @@
 #define CGLTF_IMPLEMENTATION
 #include <cgltf.h>
 
-#include <engine/GltfImporter.h>
-#include <engine/TextureCache.h>
+#include <assets/loader/GltfImporter.h>
+#include <assets/cache/TextureCache.h>
 #include <engine/SceneGraph.h>
 #include <core/vfs/VFS.h>
 #include <core/log.h>

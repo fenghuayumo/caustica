@@ -5,7 +5,7 @@
 #include <engine/FramebufferFactory.h>
 #include <engine/ShaderFactory.h>
 #include <engine/CommonRenderPasses.h>
-#include <engine/TextureCache.h>
+#include <assets/cache/TextureCache.h>
 #include <engine/BindingCache.h>
 #include <engine/View.h>
 #include <backend/GpuDevice.h>
@@ -54,7 +54,7 @@
 #include <render/ProcessingPasses/OidnDenoiser.h>
 #include <render/ProcessingPasses/GaussianSplatPass.h>
 
-#include <engine/GltfImporter.h>
+#include <assets/loader/GltfImporter.h>
 #include <engine/SceneGraph.h>
 
 #include <stb_image.h>

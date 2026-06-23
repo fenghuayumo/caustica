@@ -23,10 +23,12 @@ file(GLOB caustica_engine_engine_src
     src/engine/*.h
 )
 
-# Asset layer: loading, caching, importers (DIVSHOT-style 4-layer architecture)
+# Asset layer: loading, caching (DIVSHOT-style 4-layer architecture)
 file(GLOB caustica_engine_assets_src
     include/assets/loader/*.h
     src/assets/loader/*.cpp
+    include/assets/cache/*.h
+    src/assets/cache/*.cpp
 )
 
 file(GLOB caustica_engine_render_src

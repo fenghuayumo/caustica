@@ -1,4 +1,4 @@
-#include <engine/TextureCache.h>
+#include <assets/cache/TextureCache.h>
 
 #include <engine/CommonRenderPasses.h>
 #include <engine/ConsoleObjects.h>

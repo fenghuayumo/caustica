@@ -1,5 +1,5 @@
 #include <engine/Scene.h>
-#include <engine/GltfImporter.h>
+#include <assets/loader/GltfImporter.h>
 #include <engine/ThreadPool.h>
 #include <core/json.h>
 #include <core/log.h>

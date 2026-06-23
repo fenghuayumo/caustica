@@ -2,7 +2,7 @@
 #include <engine/ShaderFactory.h>
 #include <engine/FramebufferFactory.h>
 #include <engine/CommonRenderPasses.h>
-#include <engine/TextureCache.h>
+#include <assets/cache/TextureCache.h>
 
 #include <rhi/utils.h>
 

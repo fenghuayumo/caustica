@@ -14,7 +14,7 @@
 #include <core/path_utils.h>
 #include <core/vfs/VFS.h>
 #include <engine/ShaderFactory.h>
-#include <engine/TextureCache.h>
+#include <assets/cache/TextureCache.h>
 #include <engine/CommonRenderPasses.h>
 #include <engine/UserInterfaceUtils.h>
 #if RTXPT_WITH_NATIVE_DLSS
