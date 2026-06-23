@@ -48,7 +48,7 @@ SOFTWARE.
 
 #include <imgui.h>
 
-#include <nvrhi/nvrhi.h>
+#include <rhi/nvrhi.h>
 #include <engine/ShaderFactory.h>
 #include <engine/imgui_nvrhi.h>
 #include <core/log.h>

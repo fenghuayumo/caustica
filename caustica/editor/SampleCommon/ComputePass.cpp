@@ -13,7 +13,7 @@
 #include <engine/ShaderFactory.h>
 #include <math/math.h>
 #include <core/log.h>
-#include <nvrhi/utils.h>
+#include <rhi/utils.h>
 
 using namespace caustica;
 

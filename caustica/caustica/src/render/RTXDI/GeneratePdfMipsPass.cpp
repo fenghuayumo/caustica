@@ -10,7 +10,7 @@
 
 #include <render/RTXDI/GeneratePdfMipsPass.h>
 #include <engine/ShaderFactory.h>
-#include <nvrhi/utils.h>
+#include <rhi/utils.h>
 
 #include <math/math.h>
 #include <core/log.h>

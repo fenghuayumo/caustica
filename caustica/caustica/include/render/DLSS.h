@@ -25,7 +25,7 @@
 #if DONUT_WITH_DLSS
 
 #include <memory>
-#include <nvrhi/nvrhi.h>
+#include <rhi/nvrhi.h>
 
 class RenderTargets;
 

@@ -30,8 +30,8 @@
 #include <dxgi1_3.h>
 #include <dxgidebug.h>
 
-#include <nvrhi/d3d11.h>
-#include <nvrhi/validation.h>
+#include <rhi/d3d11.h>
+#include <rhi/validation.h>
 
 class DeviceManager_DX11 : public caustica::DeviceManager
 {

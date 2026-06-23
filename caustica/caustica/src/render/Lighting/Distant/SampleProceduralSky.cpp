@@ -14,7 +14,7 @@
 #include <engine/CommonRenderPasses.h>
 #include <engine/TextureCache.h>
 
-#include <nvrhi/utils.h>
+#include <rhi/utils.h>
 
 #include <engine/imgui_renderer.h>
 

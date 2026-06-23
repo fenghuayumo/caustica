@@ -27,7 +27,7 @@
 #include <engine/ShadowMap.h>
 #include <engine/CommonRenderPasses.h>
 #include <engine/View.h>
-#include <nvrhi/utils.h>
+#include <rhi/utils.h>
 
 #if DONUT_WITH_STATIC_SHADERS
 #if DONUT_WITH_DX11

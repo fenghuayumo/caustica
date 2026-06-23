@@ -15,8 +15,6 @@ include(FetchContent)
 include(cmake/compileshaders.cmake)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
-option(DONUT_WITH_NVRHI "Enable NVRHI and related projects" ON)
-option(DONUT_WITH_AFTERMATH "Enable Aftermath crash dump generation with engine runtime code" OFF)
 option(DONUT_WITH_STATIC_SHADERS "Build engine runtime code with statically linked shaders" OFF)
 option(DONUT_WITH_AUDIO "Include Audio features (XAudio2)" OFF)
 option(DONUT_WITH_TINYEXR "Include TinyEXR" ON)
@@ -81,33 +79,8 @@ if (NOT TARGET ShaderMake)
 endif()
 
 if (DONUT_WITH_NVRHI)
-    set(NVRHI_WITH_DX11 "${DONUT_WITH_DX11}" CACHE BOOL "" FORCE)
-    set(NVRHI_WITH_DX12 "${DONUT_WITH_DX12}" CACHE BOOL "" FORCE)
-    set(NVRHI_WITH_VULKAN "${DONUT_WITH_VULKAN}" CACHE BOOL "" FORCE)
-    set(NVRHI_WITH_AFTERMATH "${DONUT_WITH_AFTERMATH}" CACHE BOOL "" FORCE)
-
-    add_subdirectory(nvrhi)
-
-    # Create causticaRhi wrapper target(s) expected by OMM.
-    # Omm enables its GPU NVRHI integration layer only when these
-    # targets exist (see Omm/CMakeLists.txt).  They are simple
-    # INTERFACE wrappers around the NVRHI backends.
-    if (NOT TARGET causticaRhi)
-        add_library(causticaRhi INTERFACE)
-        target_link_libraries(causticaRhi INTERFACE nvrhi)
-        set_target_properties(causticaRhi PROPERTIES FOLDER "External")
-    endif()
-    if (NVRHI_WITH_DX12 AND NOT TARGET causticaRhi_d3d12)
-        add_library(causticaRhi_d3d12 INTERFACE)
-        target_link_libraries(causticaRhi_d3d12 INTERFACE nvrhi_d3d12)
-        set_target_properties(causticaRhi_d3d12 PROPERTIES FOLDER "External")
-    endif()
-    if (NVRHI_WITH_VULKAN AND NOT TARGET causticaRhi_vk)
-        add_library(causticaRhi_vk INTERFACE)
-        target_link_libraries(causticaRhi_vk INTERFACE nvrhi_vk)
-        set_target_properties(causticaRhi_vk PROPERTIES FOLDER "External")
-    endif()
-
+    # NVRHI backend (nvrhi target + causticaRhi wrappers) is now built from
+    # caustica/backend, which is added before External in the root CMakeLists.
     set(DONUT_SHADER_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/caustica/caustica" CACHE PATH "" FORCE)
 
     set(caustica_engine_shader_dir "${CMAKE_SOURCE_DIR}/caustica/caustica/shaders")

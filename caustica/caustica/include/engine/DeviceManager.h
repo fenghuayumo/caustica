@@ -62,7 +62,7 @@ freely, subject to the following restrictions:
 #endif
 
 #if DONUT_WITH_VULKAN
-#include <nvrhi/vulkan.h>
+#include <rhi/vulkan.h>
 #endif
 
 #if DONUT_WITH_AFTERMATH
@@ -79,7 +79,7 @@ freely, subject to the following restrictions:
 #define GLFW_EXPOSE_NATIVE_WIN32
 #endif // _WIN32
 #include <GLFW/glfw3native.h>
-#include <nvrhi/nvrhi.h>
+#include <rhi/nvrhi.h>
 #include <core/log.h>
 
 #include <list>

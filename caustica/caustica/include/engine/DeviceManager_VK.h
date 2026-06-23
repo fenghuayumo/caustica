@@ -55,8 +55,8 @@ freely, subject to the following restrictions:
 #include <engine/DeviceManager.h>
 #include <core/log.h>
 
-#include <nvrhi/vulkan.h>
-#include <nvrhi/validation.h>
+#include <rhi/vulkan.h>
+#include <rhi/validation.h>
 
 #ifndef VULKAN_HPP_DISPATCH_LOADER_DYNAMIC
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1

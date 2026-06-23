@@ -23,7 +23,7 @@
 #include <render/GBuffer.h>
 #include <engine/CommonRenderPasses.h>
 #include <engine/FramebufferFactory.h>
-#include <nvrhi/utils.h>
+#include <rhi/utils.h>
 
 using namespace caustica::math;
 using namespace caustica;

@@ -11,7 +11,7 @@
 #pragma once
 
 #include <engine/BindingCache.h>
-#include <nvrhi/nvrhi.h>
+#include <rhi/nvrhi.h>
 #include <engine/ShaderFactory.h>
 #include <engine/CommonRenderPasses.h>
 #include <math/math.h>

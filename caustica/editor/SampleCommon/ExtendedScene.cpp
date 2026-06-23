@@ -12,8 +12,8 @@
 #include <core/json.h>
 #include <core/vfs/VFS.h>
 #include <core/log.h>
-#include <nvrhi/utils.h>
-#include <nvrhi/common/misc.h>
+#include <rhi/utils.h>
+#include <rhi/common/misc.h>
 #include <json/json.h>
 
 using namespace caustica::math;

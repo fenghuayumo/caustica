@@ -25,7 +25,7 @@
 
 #include <engine/BindingCache.h>
 #include <math/math.h>
-#include <nvrhi/nvrhi.h>
+#include <rhi/nvrhi.h>
 #include <memory>
 #include <vector>
 

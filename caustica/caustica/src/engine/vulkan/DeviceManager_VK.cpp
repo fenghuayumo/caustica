@@ -56,8 +56,8 @@ freely, subject to the following restrictions:
 #include <engine/DeviceManager.h>
 #include <engine/DeviceManager_VK.h>
 
-#include <nvrhi/vulkan.h>
-#include <nvrhi/validation.h>
+#include <rhi/vulkan.h>
+#include <rhi/validation.h>
 
 #if DONUT_WITH_STREAMLINE
 #include <StreamlineIntegration.h>

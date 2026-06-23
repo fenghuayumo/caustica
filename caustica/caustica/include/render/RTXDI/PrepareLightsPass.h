@@ -11,7 +11,7 @@
 #pragma once
 
 #include <engine/SceneGraph.h>
-#include <nvrhi/nvrhi.h>
+#include <rhi/nvrhi.h>
 #include <rtxdi/DI/ReSTIRDI.h>
 #include <memory>
 #include <unordered_map>

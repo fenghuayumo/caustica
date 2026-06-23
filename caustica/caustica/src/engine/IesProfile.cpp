@@ -4,7 +4,7 @@
 #include <core/vfs/VFS.h>
 #include <math/math.h>
 #include <core/log.h>
-#include <nvrhi/utils.h>
+#include <rhi/utils.h>
 #include <sstream>
 
 #if DONUT_WITH_STATIC_SHADERS

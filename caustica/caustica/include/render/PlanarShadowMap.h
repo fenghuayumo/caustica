@@ -25,7 +25,7 @@
 #include <engine/SceneGraph.h>
 #include <engine/ShadowMap.h>
 #include <engine/View.h>
-#include <nvrhi/nvrhi.h>
+#include <rhi/nvrhi.h>
 #include <memory>
 
 namespace caustica::render

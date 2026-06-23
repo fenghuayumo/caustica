@@ -26,7 +26,7 @@
 #include <render/GeometryPasses.h>
 #include <memory>
 #include <mutex>
-#include <nvrhi/nvrhi.h>
+#include <rhi/nvrhi.h>
 
 namespace caustica
 {

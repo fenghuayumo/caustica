@@ -16,7 +16,7 @@
 #include <engine/TextureCache.h>
 #include <render/MipMapGenPass.h>
 
-#include <nvrhi/utils.h>
+#include <rhi/utils.h>
 
 #include <engine/imgui_renderer.h>
 

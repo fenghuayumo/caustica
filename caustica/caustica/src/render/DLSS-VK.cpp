@@ -30,7 +30,7 @@
 #include <render/DLSS.h>
 #include <engine/View.h>
 #include <core/log.h>
-#include <nvrhi/vulkan.h>
+#include <rhi/vulkan.h>
 
 using namespace caustica::render;
 

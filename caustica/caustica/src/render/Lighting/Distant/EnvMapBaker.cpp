@@ -23,7 +23,7 @@
 
 #include <engine/UserInterfaceUtils.h>
 
-#include <nvrhi/utils.h>
+#include <rhi/utils.h>
 
 #include <engine/imgui_renderer.h>
 #include <core/vfs/VFS.h>

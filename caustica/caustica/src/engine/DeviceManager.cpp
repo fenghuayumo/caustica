@@ -50,7 +50,7 @@ freely, subject to the following restrictions:
 #include <engine/DeviceManager.h>
 #include <math/math.h>
 #include <core/log.h>
-#include <nvrhi/utils.h>
+#include <rhi/utils.h>
 
 #include <cstdio>
 #include <algorithm>

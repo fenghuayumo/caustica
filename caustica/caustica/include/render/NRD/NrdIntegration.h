@@ -15,7 +15,7 @@
 #if WITH_NRD
 
 #include <NRD.h>
-#include <nvrhi/nvrhi.h>
+#include <rhi/nvrhi.h>
 #include <unordered_map>
 #include <engine/BindingCache.h>
 

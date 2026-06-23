@@ -44,7 +44,7 @@
 using namespace caustica::math;
 #include <shaders/taa_cb.h>
 
-#include <nvrhi/utils.h>
+#include <rhi/utils.h>
 
 #include <assert.h>
 #include <random>

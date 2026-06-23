@@ -23,7 +23,7 @@
 #pragma once
 
 #include <engine/View.h>
-#include <nvrhi/nvrhi.h>
+#include <rhi/nvrhi.h>
 
 namespace caustica
 {

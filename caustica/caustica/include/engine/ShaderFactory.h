@@ -25,7 +25,7 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
-#include <nvrhi/nvrhi.h>
+#include <rhi/nvrhi.h>
 #include <memory>
 #include <filesystem>
 #include <functional>

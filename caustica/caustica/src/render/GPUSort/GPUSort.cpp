@@ -17,7 +17,7 @@
 
 //#include <engine/UserInterfaceUtils.h>
 
-#include <nvrhi/utils.h>
+#include <rhi/utils.h>
 
 #include <SampleCommon/SampleCommon.h>
 #include <render/Misc/ShaderDebug.h>

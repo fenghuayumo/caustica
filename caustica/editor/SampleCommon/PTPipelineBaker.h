@@ -12,7 +12,7 @@
 
 #include <mutex>
 #include <memory>
-#include <nvrhi/nvrhi.h>
+#include <rhi/nvrhi.h>
 #include <engine/ShaderFactory.h>
 #include <engine/ThreadPool.h>
 #include <unordered_set>

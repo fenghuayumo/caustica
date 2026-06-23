@@ -18,8 +18,8 @@
 #include <engine/UserInterfaceUtils.h>
 #include <engine/Scene.h>
 
-#include <nvrhi/utils.h>
-#include <nvrhi/common/misc.h>
+#include <rhi/utils.h>
+#include <rhi/common/misc.h>
 
 #include <engine/imgui_renderer.h>
 

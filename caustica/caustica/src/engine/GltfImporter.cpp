@@ -29,7 +29,7 @@
 #include <core/vfs/VFS.h>
 #include <core/log.h>
 
-#include "nvrhi/common/misc.h"
+#include "rhi/common/misc.h"
 
 using namespace caustica::math;
 using namespace caustica;

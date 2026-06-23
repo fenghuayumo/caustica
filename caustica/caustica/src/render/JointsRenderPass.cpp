@@ -24,7 +24,7 @@
 #include <engine/Scene.h>
 #include <engine/ShaderFactory.h>
 #include <math/math.h>
-#include <nvrhi/utils.h>
+#include <rhi/utils.h>
 #include <array>
 
 #if DONUT_WITH_STATIC_SHADERS

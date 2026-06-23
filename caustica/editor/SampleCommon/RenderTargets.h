@@ -11,9 +11,9 @@
 #pragma once
 
 #include <math/math.h>
-#include <nvrhi/nvrhi.h>
-#include <nvrhi/utils.h>
-#include <nvrhi/common/misc.h>
+#include <rhi/nvrhi.h>
+#include <rhi/utils.h>
+#include <rhi/common/misc.h>
 #include <memory>
 #include <render/GBuffer.h>
 

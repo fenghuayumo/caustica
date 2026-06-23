@@ -23,7 +23,7 @@
 #pragma once
 
 #include <math/math.h>
-#include <nvrhi/nvrhi.h>
+#include <rhi/nvrhi.h>
 #include <memory>
 #include <unordered_map>
 #include <engine/BindingCache.h>

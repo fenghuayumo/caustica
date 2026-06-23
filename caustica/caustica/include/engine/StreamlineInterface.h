@@ -24,7 +24,7 @@
 // Donut
 #include <engine/View.h>
 #include <math/math.h>
-#include <nvrhi/nvrhi.h>
+#include <rhi/nvrhi.h>
 
 namespace caustica 
 {

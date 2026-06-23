@@ -23,7 +23,7 @@
 #pragma once
 #include <filesystem>
 #include <set>
-#include <nvrhi/common/aftermath.h>
+#include <rhi/common/aftermath.h>
 
 namespace caustica
 {

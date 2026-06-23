@@ -14,7 +14,7 @@
 #include <vector>
 #include <filesystem>
 #include <optional>
-#include <nvrhi/nvrhi.h>
+#include <rhi/nvrhi.h>
 #include <engine/ShaderFactory.h>
 
 namespace ShaderCompilerUtils

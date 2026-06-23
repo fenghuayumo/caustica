@@ -24,8 +24,8 @@
 #include <math/math.h>
 #include <shaders/light_cb.h>
 #include <shaders/view_cb.h>
-#include <nvrhi/utils.h>
-#include <nvrhi/common/misc.h>
+#include <rhi/utils.h>
+#include <rhi/common/misc.h>
 #include <algorithm>
 #include <array>
 #include <cctype>

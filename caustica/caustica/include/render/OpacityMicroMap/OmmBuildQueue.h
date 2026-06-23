@@ -14,7 +14,7 @@
 #include <engine/TextureCache.h>
 #include <SampleCommon/AccelerationStructureUtil.h>
 
-#include <nvrhi/nvrhi.h>
+#include <rhi/nvrhi.h>
 #include <omm-gpu-nvrhi.h>
 #include <unordered_map>
 #include <list>

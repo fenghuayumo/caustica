@@ -67,6 +67,9 @@ else()
 endif()
 option(DONUT_WITH_VULKAN "Enable the Vulkan version of the framework runtime code" ${RTXPT_DEFAULT_WITH_VULKAN})
 
+option(DONUT_WITH_NVRHI "Enable NVRHI and related projects" ON)
+option(DONUT_WITH_AFTERMATH "Enable Aftermath crash dump generation with engine runtime code" OFF)
+
 # we want shader PDBs always embedded
 option(DONUT_EMBED_SHADER_PDBS "" ON)
 if (CAUSTICA_DISTRIBUTION_BUILD)
@@ -311,6 +314,17 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
 set(DONUT_SHADERS_OUTPUT_DIR "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderPrecompiled/engine")
 option(DONUT_WITH_LZ4 "Include LZ4" OFF)
+
+if (DONUT_WITH_NVRHI)
+    # NVRHI backend variables: forwarded from the project-wide DONUT settings.
+    set(NVRHI_WITH_DX11 "${DONUT_WITH_DX11}" CACHE BOOL "" FORCE)
+    set(NVRHI_WITH_DX12 "${DONUT_WITH_DX12}" CACHE BOOL "" FORCE)
+    set(NVRHI_WITH_VULKAN "${DONUT_WITH_VULKAN}" CACHE BOOL "" FORCE)
+    set(NVRHI_WITH_AFTERMATH "${DONUT_WITH_AFTERMATH}" CACHE BOOL "" FORCE)
+
+    # Engine RHI backend (moved from External/nvrhi to caustica/backend/nvrhi)
+    add_subdirectory(caustica/caustica/src/backend/rhi ${CMAKE_BINARY_DIR}/caustica/caustica/backend)
+endif()
 
 add_subdirectory("External")
 

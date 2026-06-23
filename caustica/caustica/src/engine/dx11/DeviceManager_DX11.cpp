@@ -59,8 +59,8 @@ freely, subject to the following restrictions:
 #include <dxgi1_3.h>
 #include <dxgidebug.h>
 
-#include <nvrhi/d3d11.h>
-#include <nvrhi/validation.h>
+#include <rhi/d3d11.h>
+#include <rhi/validation.h>
 
 #if DONUT_WITH_STREAMLINE
 #include <StreamlineIntegration.h>

@@ -20,7 +20,7 @@
 #pragma once
 
 #include <engine/BindingCache.h>
-#include <nvrhi/nvrhi.h>
+#include <rhi/nvrhi.h>
 #include <math/math.h>
 #include <memory>
 

@@ -23,7 +23,7 @@
 #pragma once
 
 #include <engine/SceneTypes.h>
-#include <nvrhi/nvrhi.h>
+#include <rhi/nvrhi.h>
 #include <unordered_map>
 #include <mutex>
 

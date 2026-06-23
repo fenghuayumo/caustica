@@ -18,7 +18,7 @@
 #include <engine/ShaderFactory.h>
 #include <engine/View.h>
 #include <shaders/view_cb.h>
-#include <nvrhi/utils.h>
+#include <rhi/utils.h>
 
 #include <algorithm>
 #include <array>

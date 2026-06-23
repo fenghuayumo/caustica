@@ -16,7 +16,7 @@
 #include <engine/ShaderFactory.h>
 #include <engine/CommonRenderPasses.h>
 #include <core/log.h>
-#include <nvrhi/utils.h>
+#include <rhi/utils.h>
 
 #include <algorithm>
 #include <cmath>

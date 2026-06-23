@@ -24,7 +24,7 @@
 
 
 #include <math/math.h>
-#include <nvrhi/nvrhi.h>
+#include <rhi/nvrhi.h>
 #include <memory>
 
 namespace caustica

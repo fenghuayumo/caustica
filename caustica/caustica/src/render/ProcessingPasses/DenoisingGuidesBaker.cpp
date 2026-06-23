@@ -8,7 +8,7 @@
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <nvrhi/utils.h>
+#include <rhi/utils.h>
 #include <engine/ShaderFactory.h>
 #include <engine/CommonRenderPasses.h>
 #include <render/ProcessingPasses/DenoisingGuidesBaker.h>

@@ -25,7 +25,7 @@
 #include <engine/SceneTypes.h>
 #include <core/log.h>
 
-#include <nvrhi/nvrhi.h>
+#include <rhi/nvrhi.h>
 #include <atomic>
 #include <filesystem>
 #include <unordered_map>

@@ -29,7 +29,7 @@
 #include <engine/CommonRenderPasses.h>
 #include <engine/MaterialBindingCache.h>
 #include <core/log.h>
-#include <nvrhi/utils.h>
+#include <rhi/utils.h>
 #include <utility>
 
 #if DONUT_WITH_STATIC_SHADERS

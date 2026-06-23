@@ -38,12 +38,18 @@
 [submodule "External/stb"]
 	path = External/stb
 	url = https://github.com/nothings/stb.git
-[submodule "External/nvrhi"]
-	path = External/nvrhi
-	url = https://github.com/NVIDIA-RTX/NVRHI.git
 [submodule "External/ShaderMake"]
 	path = External/ShaderMake
 	url = https://github.com/NVIDIA-RTX/ShaderMake.git
 [submodule "External/imgui"]
 	path = External/imgui
 	url = https://github.com/ocornut/imgui
+[submodule "rtxmu"]
+	path = rtxmu
+	url = https://github.com/NVIDIA-RTX/RTXMU.git
+[submodule "thirdparty/Vulkan-Headers"]
+	path = thirdparty/Vulkan-Headers
+	url = https://github.com/KhronosGroup/Vulkan-Headers.git
+[submodule "thirdparty/DirectX-Headers"]
+	path = thirdparty/DirectX-Headers
+	url = https://github.com/microsoft/DirectX-Headers.git

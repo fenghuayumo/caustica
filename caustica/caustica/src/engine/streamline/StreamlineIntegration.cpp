@@ -46,18 +46,18 @@
 
 #if DONUT_WITH_DX11
 #include <d3d11.h>
-#include <nvrhi/d3d11.h>
+#include <rhi/d3d11.h>
 #endif
 #if DONUT_WITH_DX12
 #include <d3d12.h>
-#include <nvrhi/d3d12.h>
+#include <rhi/d3d12.h>
 #endif
 #if DONUT_WITH_VULKAN
 #ifndef VULKAN_HPP_DISPATCH_LOADER_DYNAMIC
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 #endif
 #include <vulkan/vulkan.hpp>
-#include <nvrhi/vulkan.h>
+#include <rhi/vulkan.h>
 #include <sl_helpers_vk.h>
 #endif
 
