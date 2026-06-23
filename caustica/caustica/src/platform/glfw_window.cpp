@@ -7,6 +7,9 @@
 #ifdef _WIN32
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
+#include <windows.h>
+#include <shellscalingapi.h>
+#pragma comment(lib, "Shcore.lib")
 #endif
 
 // Forward declare event types (will be in engine/events/ once Phase B is done)
@@ -143,6 +146,11 @@ bool GlfwWindow::initialise(const WindowDesc& desc)
     glfwSetWindowSizeCallback(m_Window, glfwWindowSizeCallback);
     glfwSetWindowFocusCallback(m_Window, glfwWindowFocusCallback);
     glfwSetWindowIconifyCallback(m_Window, glfwWindowIconifyCallback);
+    glfwSetWindowPosCallback(m_Window, glfwWindowPosCallback);
+    glfwSetWindowRefreshCallback(m_Window, [](GLFWwindow* w) {
+        auto* self = static_cast<GlfwWindow*>(glfwGetWindowUserPointer(w));
+        if (self) self->onRefresh();
+    });
     glfwSetDropCallback(m_Window, glfwDropCallback);
 
     // Set icon if provided
@@ -370,23 +378,77 @@ void GlfwWindow::glfwWindowFocusCallback(GLFWwindow* window, int focused)
 {
     auto* self = static_cast<GlfwWindow*>(glfwGetWindowUserPointer(window));
     if (self)
-        self->m_WindowFocus = (focused == GLFW_TRUE);
+        self->onFocusChanged(focused == GLFW_TRUE);
 }
 
 void GlfwWindow::glfwWindowIconifyCallback(GLFWwindow* window, int iconified)
 {
-    (void)window;
-    (void)iconified;
-    // Application can query window visibility
+    auto* self = static_cast<GlfwWindow*>(glfwGetWindowUserPointer(window));
+    if (self)
+        self->onIconifyChanged(iconified == GLFW_TRUE);
 }
 
 void GlfwWindow::glfwDropCallback(GLFWwindow* window, int count, const char** paths)
 {
-    // Dropped files — forwarded as paths to the Application
     (void)window;
     (void)count;
     (void)paths;
-    // TODO: Store dropped file paths for Application to process
+}
+
+void GlfwWindow::glfwWindowPosCallback(GLFWwindow* window, int xpos, int ypos)
+{
+    auto* self = static_cast<GlfwWindow*>(glfwGetWindowUserPointer(window));
+    if (self)
+        self->onMove(xpos, ypos);
+}
+
+// ---------------------------------------------------------------------------
+// Window event overrides
+// ---------------------------------------------------------------------------
+
+void GlfwWindow::onFocusChanged(bool focused)
+{
+    Window::onFocusChanged(focused);
+    // Forward to Application via event callback
+}
+
+void GlfwWindow::onIconifyChanged(bool iconified)
+{
+    Window::onIconifyChanged(iconified);
+    // Forward to Application via event callback
+}
+
+void GlfwWindow::onMove(int x, int y)
+{
+    Window::onMove(x, y);
+    m_PosX = static_cast<float>(x);
+    m_PosY = static_cast<float>(y);
+
+    // DPI tracking (moved from DeviceManager::WindowPosCallback)
+#ifdef _WIN32
+    HWND hwnd = glfwGetWin32Window(m_Window);
+    if (hwnd)
+    {
+        auto monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+        unsigned int dpiX = 0, dpiY = 0;
+        if (SUCCEEDED(GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &dpiX, &dpiY)))
+        {
+            m_DPIScaleX = dpiX / 96.0f;
+            m_DPIScaleY = dpiY / 96.0f;
+        }
+    }
+#else
+    GLFWmonitor* monitor = glfwGetWindowMonitor(m_Window);
+    if (!monitor)
+        monitor = glfwGetPrimaryMonitor();
+    if (monitor)
+        glfwGetMonitorContentScale(monitor, &m_DPIScaleX, &m_DPIScaleY);
+#endif
+
+    // Render-during-move (was in DeviceManager)
+    if (m_RenderDuringMove && m_OnRenderDuringMove)
+        m_OnRenderDuringMove();
 }
 
 } // namespace caustica
+

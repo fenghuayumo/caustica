@@ -9,7 +9,7 @@
 namespace caustica
 {
 
-// Forward declarations for the event system (defined later in engine/events/)
+// Forward declarations for the event system
 class Event;
 
 // Window creation descriptor
@@ -26,10 +26,7 @@ struct WindowDesc
     int  RenderAPI    = 1;       // Maps to nvrhi::GraphicsAPI
     std::string FilePath;
 
-    // Window icon paths (platform-specific)
     std::vector<std::string> IconPaths;
-
-    // Raw icon data: <width, pixel_data>
     std::vector<std::pair<uint32_t, uint8_t*>> IconData;
 
     WindowDesc() = default;
@@ -45,70 +42,90 @@ struct WindowDesc
     {}
 };
 
-// Platform window abstraction.
-// Concrete implementations wrap the platform windowing system (GLFW, Win32, etc.)
+// =============================================================================
+// Window — Platform layer: OS window abstraction.
+//
+// Owns the native window handle (GLFWwindow*, HWND, etc.) and tracks all
+// window state: visibility, focus, size, position, DPI scale.
+//
+// Events (close, resize, focus, iconify, move) are dispatched through the
+// EventCallback or overridable virtual methods.
+// =============================================================================
 class Window
 {
 public:
     using EventCallbackFn = std::function<void(Event&)>;
 
-    // Factory: creates a platform-appropriate window. The default factory
-    // function is set by the OS layer during init().
+    // Factory
     static Window* create(const WindowDesc& desc);
 
     virtual ~Window() = default;
 
-    // Returns true if the underlying window was successfully created
+    // --- Lifecycle ---
     virtual bool hasInitialised() const { return m_Init; }
 
-    // Window state queries
-    virtual bool   getExit() const                = 0;
-    virtual void   setExit(bool exit)             = 0;
-    virtual uint32_t getWidth() const             = 0;
-    virtual uint32_t getHeight() const            = 0;
-    virtual float  getDPIScale() const            { return 1.0f; }
-    virtual float  getScreenRatio() const         = 0;
-    virtual bool   getVSync() const               { return m_VSync; }
-    virtual std::string getTitle() const          = 0;
-    virtual void*  getNativeHandle()              { return nullptr; }
-
-    // Returns the framebuffer size in pixels (may differ from window size on HiDPI)
+    // --- Window state queries ---
+    virtual bool     getExit() const                    = 0;
+    virtual void     setExit(bool exit)                 = 0;
+    virtual uint32_t getWidth() const                   = 0;
+    virtual uint32_t getHeight() const                  = 0;
+    virtual float    getDPIScale() const                { return 1.0f; }
+    virtual float    getDPIScaleX() const               { return m_DPIScaleX; }
+    virtual float    getDPIScaleY() const               { return m_DPIScaleY; }
+    virtual float    getScreenRatio() const             = 0;
+    virtual bool     getVSync() const                   { return m_VSync; }
+    virtual bool     isVisible() const                  { return m_Visible; }
+    virtual bool     isFocused() const                  { return m_HasFocus; }
+    virtual std::string getTitle() const                = 0;
+    virtual void*    getNativeHandle()                  { return nullptr; }
     virtual std::array<uint32_t, 2> getFramebufferSize() const = 0;
 
-    // Window controls
+    // --- Window controls ---
     virtual void setWindowTitle(const std::string& title) = 0;
     virtual void toggleVSync()                             = 0;
     virtual void setVSync(bool set)                        = 0;
     virtual void setBorderless(bool borderless)            = 0;
     virtual void maximise()                                {}
     virtual void hideMouse(bool hide)                      {}
-    virtual void setMousePosition(float x, float y)             {}
+    virtual void setMousePosition(float x, float y)        {}
     virtual void setIcon(const WindowDesc& desc)           = 0;
 
-    // Per-frame updates
+    // --- Per-frame updates ---
     virtual void onUpdate()           = 0;
     virtual void processInput()       {}
     virtual void updateCursorImgui()  = 0;
 
-    // Event callback (set by Application)
+    // --- Event callback (set by Application) ---
     virtual void setEventCallback(const EventCallbackFn& callback) = 0;
 
-    // Window state
+    // --- Window events (called from GLFW callbacks, override to hook) ---
+    virtual void onClose()             {}
+    virtual void onFocusChanged(bool focused);
+    virtual void onIconifyChanged(bool iconified);
+    virtual void onMove(int x, int y);
+    virtual void onRefresh()           {}
+
+    // --- Render-while-moving (was in DeviceManager) ---
+    void setRenderDuringMove(bool enable) { m_RenderDuringMove = enable; }
+    bool getRenderDuringMove() const      { return m_RenderDuringMove; }
+
+    // --- Resize tracking ---
     void setHasResized(bool resized) { m_HasResized = resized; }
     bool getHasResized() const       { return m_HasResized; }
-    void setWindowFocus(bool focus)  { m_WindowFocus = focus; }
-    bool getWindowFocus() const      { return m_WindowFocus; }
 
 protected:
-    // The static factory function pointer, set by platform init
     static Window* (*s_CreateFunc)(const WindowDesc&);
 
     Window() = default;
 
     bool m_Init        = false;
     bool m_VSync       = false;
+    bool m_Visible     = true;
+    bool m_HasFocus    = true;
     bool m_HasResized  = false;
-    bool m_WindowFocus = true;
+    bool m_RenderDuringMove = false;
+    float m_DPIScaleX  = 1.0f;
+    float m_DPIScaleY  = 1.0f;
     float m_PosX       = 0.0f;
     float m_PosY       = 0.0f;
 };

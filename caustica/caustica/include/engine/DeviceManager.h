@@ -39,6 +39,8 @@
 
 namespace caustica
 {
+    class Input;  // Engine layer: input dispatch
+
     struct DefaultMessageCallback : public nvrhi::IMessageCallback
     {
         static DefaultMessageCallback& GetInstance();
@@ -250,6 +252,7 @@ namespace caustica
 
         DeviceCreationParameters m_DeviceParams;
         GLFWwindow *m_Window = nullptr;
+	    Input* m_Input = nullptr;  // Engine layer: extracted input dispatch
         bool m_EnableRenderDuringWindowMovement = false;
         // set to true if running on NV GPU
         bool m_IsNvidia = false;

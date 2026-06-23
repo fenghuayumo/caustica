@@ -1,4 +1,5 @@
 #include <engine/DeviceManager.h>
+#include <engine/Input.h>        // Engine layer: input dispatch
 #include <platform/window.h>     // New 4-layer Window abstraction
 #include <math/math.h>
 #include <core/log.h>
@@ -145,10 +146,14 @@ static void MouseScrollCallback_GLFW(GLFWwindow *window, double xoffset, double 
 
 static void JoystickConnectionCallback_GLFW(int joyId, int connectDisconnect)
 {
-	if (connectDisconnect == GLFW_CONNECTED)
-		JoyStickManager::Singleton().ConnectJoystick(joyId);
-	if (connectDisconnect == GLFW_DISCONNECTED)
-		JoyStickManager::Singleton().DisconnectJoystick(joyId);
+    // Relay to Input layer (which manages its own joystick list)
+    Input::onJoystickEvent(joyId, connectDisconnect);
+
+    // Legacy JoyStickManager kept for backward compat during migration
+    if (connectDisconnect == GLFW_CONNECTED)
+        JoyStickManager::Singleton().ConnectJoystick(joyId);
+    if (connectDisconnect == GLFW_DISCONNECTED)
+        JoyStickManager::Singleton().DisconnectJoystick(joyId);
 }
 
 static const struct
@@ -450,6 +455,10 @@ void DeviceManager::AddRenderPassToFront(IRenderPass *pRenderPass)
     m_vRenderPasses.remove(pRenderPass);
     m_vRenderPasses.push_front(pRenderPass);
 
+    // Also register with the Input layer
+    if (!m_Input) m_Input = new Input();
+    m_Input->registerPass(pRenderPass);
+
     pRenderPass->BackBufferResizing();
     pRenderPass->BackBufferResized(
         m_DeviceParams.backBufferWidth,
@@ -462,6 +471,10 @@ void DeviceManager::AddRenderPassToBack(IRenderPass *pRenderPass)
     m_vRenderPasses.remove(pRenderPass);
     m_vRenderPasses.push_back(pRenderPass);
 
+    // Also register with the Input layer
+    if (!m_Input) m_Input = new Input();
+    m_Input->registerPass(pRenderPass);
+
     pRenderPass->BackBufferResizing();
     pRenderPass->BackBufferResized(
         m_DeviceParams.backBufferWidth,
@@ -472,6 +485,7 @@ void DeviceManager::AddRenderPassToBack(IRenderPass *pRenderPass)
 void DeviceManager::RemoveRenderPass(IRenderPass *pRenderPass)
 {
     m_vRenderPasses.remove(pRenderPass);
+    if (m_Input) m_Input->unregisterPass(pRenderPass);
 }
 
 void DeviceManager::BackBufferResizing()
@@ -778,8 +792,7 @@ bool DeviceManager::AnimateRenderPresent(std::optional<double> elapsedTimeOverri
 
     if (!m_DeviceParams.headlessDevice)
     {
-	    JoyStickManager::Singleton().EraseDisconnectedJoysticks();
-	    JoyStickManager::Singleton().UpdateAllJoysticks(m_vRenderPasses);
+        if (m_Input) m_Input->pollJoysticks();
     }
 
     if (m_windowVisible && (m_windowIsInFocus || ShouldRenderUnfocused() || m_RequestedRenderUnfocused))
@@ -964,63 +977,60 @@ void DeviceManager::WindowPosCallback(int x, int y)
 
 void DeviceManager::KeyboardUpdate(int key, int scancode, int action, int mods)
 {
-    if (key == -1)
-    {
-        // filter unknown keys
-        return;
-    }
+    if (m_Input) { m_Input->onKey(key, scancode, action, mods); return; }
 
+    // Fallback: legacy dispatch (removed once Input is always created)
+    if (key == -1) return;
     for (auto it = m_vRenderPasses.crbegin(); it != m_vRenderPasses.crend(); it++)
     {
-        bool ret = (*it)->KeyboardUpdate(key, scancode, action, mods);
-        if (ret)
-            break;
+        if ((*it)->KeyboardUpdate(key, scancode, action, mods)) break;
     }
 }
 
 void DeviceManager::KeyboardCharInput(unsigned int unicode, int mods)
 {
+    if (m_Input) { m_Input->onChar(unicode, mods); return; }
+
     for (auto it = m_vRenderPasses.crbegin(); it != m_vRenderPasses.crend(); it++)
     {
-        bool ret = (*it)->KeyboardCharInput(unicode, mods);
-        if (ret)
-            break;
+        if ((*it)->KeyboardCharInput(unicode, mods)) break;
     }
 }
 
 void DeviceManager::MousePosUpdate(double xpos, double ypos)
 {
+    // Apply DPI scaling
     if (!m_DeviceParams.supportExplicitDisplayScaling)
     {
         xpos /= m_DPIScaleFactorX;
         ypos /= m_DPIScaleFactorY;
     }
-    
+
+    if (m_Input) { m_Input->onMouseMove(xpos, ypos); return; }
+
     for (auto it = m_vRenderPasses.crbegin(); it != m_vRenderPasses.crend(); it++)
     {
-        bool ret = (*it)->MousePosUpdate(xpos, ypos);
-        if (ret)
-            break;
+        if ((*it)->MousePosUpdate(xpos, ypos)) break;
     }
 }
 
 void DeviceManager::MouseButtonUpdate(int button, int action, int mods)
 {
+    if (m_Input) { m_Input->onMouseButton(button, action, mods); return; }
+
     for (auto it = m_vRenderPasses.crbegin(); it != m_vRenderPasses.crend(); it++)
     {
-        bool ret = (*it)->MouseButtonUpdate(button, action, mods);
-        if (ret)
-            break;
+        if ((*it)->MouseButtonUpdate(button, action, mods)) break;
     }
 }
 
 void DeviceManager::MouseScrollUpdate(double xoffset, double yoffset)
 {
+    if (m_Input) { m_Input->onMouseScroll(xoffset, yoffset); return; }
+
     for (auto it = m_vRenderPasses.crbegin(); it != m_vRenderPasses.crend(); it++)
     {
-        bool ret = (*it)->MouseScrollUpdate(xoffset, yoffset);
-        if (ret)
-            break;
+        if ((*it)->MouseScrollUpdate(xoffset, yoffset)) break;
     }
 }
 
@@ -1137,6 +1147,9 @@ void DeviceManager::Shutdown()
     }
 
     glfwTerminate();
+
+    delete m_Input;
+    m_Input = nullptr;
 
     m_InstanceCreated = false;
 }

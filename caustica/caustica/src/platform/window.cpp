@@ -13,4 +13,19 @@ Window* Window::create(const WindowDesc& desc)
     return nullptr;
 }
 
+void Window::onFocusChanged(bool focused)
+{
+    m_HasFocus = focused;
+}
+
+void Window::onIconifyChanged(bool iconified)
+{
+    m_Visible = !iconified;
+}
+
+void Window::onMove(int /*x*/, int /*y*/)
+{
+    // Base: no-op. GlfwWindow overrides with DPI tracking.
+}
+
 } // namespace caustica

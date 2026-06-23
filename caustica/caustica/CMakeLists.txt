@@ -73,6 +73,17 @@ list(APPEND caustica_engine_engine_src
     src/platform/glfw_window.cpp
 )
 
+# Engine layer: Input (extracted from DeviceManager)
+list(APPEND caustica_engine_engine_src
+    include/engine/Input.h
+    src/engine/Input.cpp
+)
+
+# Backend layer headers (implementation deferred)
+list(APPEND caustica_engine_engine_src
+    include/backend/GpuDevice.h
+)
+
 add_library(causticaEngine STATIC
     ${caustica_engine_core_src}
     ${caustica_engine_math_src}
