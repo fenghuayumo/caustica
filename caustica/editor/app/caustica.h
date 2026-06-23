@@ -16,10 +16,10 @@
 #include "SampleCommon/CommandLine.h"
 #include "SampleUI.h"
 
-#include <app/ApplicationBase.h>
+#include <engine/ApplicationBase.h>
 #include <core/vfs/VFS.h>
 #include <render/BloomPass.h>
-#include <app/Camera.h>
+#include <engine/Camera.h>
 #include <engine/CommonRenderPasses.h>
 #if RTXPT_WITH_NATIVE_DLSS
 #include <render/DLSS.h>
@@ -29,7 +29,7 @@
 #include <render/NRD/NrdIntegration.h>
 //#include "PathTracer/StablePlanes.hlsli"
 #if DONUT_WITH_STREAMLINE
-#include <app/StreamlineInterface.h>
+#include <engine/StreamlineInterface.h>
 #endif
 
 #include "SampleCommon/RenderTargets.h"

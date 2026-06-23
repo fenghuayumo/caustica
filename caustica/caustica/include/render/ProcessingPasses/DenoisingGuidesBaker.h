@@ -12,7 +12,7 @@
 
 #include <memory>
 #include <SampleCommon/ComputePass.h>
-#include <core/math/math.h>
+#include <math/math.h>
 #include <engine/BindingCache.h>
 
 enum class DebugViewType;

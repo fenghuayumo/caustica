@@ -18,13 +18,13 @@
 #include <SampleCommon/SampleCommon.h>
 #include <SampleCommon/ShaderPackFileSystem.h>
 
-#include <app/DeviceManager.h>
+#include <engine/DeviceManager.h>
 #include <core/log.h>
 #include <core/vfs/VFS.h>
 #include <engine/ShaderFactory.h>
 #include <engine/TextureCache.h>
 #include <engine/CommonRenderPasses.h>
-#include <app/UserInterfaceUtils.h>
+#include <engine/UserInterfaceUtils.h>
 #if RTXPT_WITH_NATIVE_DLSS
 #include <render/DLSS.h>
 #endif

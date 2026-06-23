@@ -28,8 +28,8 @@
 #include <SampleUI.h>
 
 #include <engine/Scene.h>
-#include <core/math/box.h>
-#include <core/math/math.h>
+#include <math/box.h>
+#include <math/math.h>
 
 #include <stdexcept>
 

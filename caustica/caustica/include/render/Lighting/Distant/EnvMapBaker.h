@@ -11,10 +11,10 @@
 #pragma once
 
 #include <nvrhi/nvrhi.h>
-#include <core/math/math.h>
+#include <math/math.h>
 #include <memory>
 
-#include <core/math/math.h>
+#include <math/math.h>
 
 #include <filesystem>
 

@@ -13,7 +13,7 @@
 
 #include <inttypes.h>
 
-#include <app/UserInterfaceUtils.h>
+#include <engine/UserInterfaceUtils.h>
 #include <core/vfs/VFS.h>
 #include <engine/SceneTypes.h>
 #include <engine/SceneGraph.h>

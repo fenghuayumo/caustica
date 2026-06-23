@@ -16,7 +16,7 @@
 
 #include <engine/FramebufferFactory.h>
 
-#include <core/math/math.h>
+#include <math/math.h>
 using namespace donut::math;
 
 #include <shaders/PathTracer/StablePlanes.hlsli>

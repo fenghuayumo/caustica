@@ -23,7 +23,7 @@
 #include <render/JointsRenderPass.h>
 #include <engine/Scene.h>
 #include <engine/ShaderFactory.h>
-#include <core/math/math.h>
+#include <math/math.h>
 #include <nvrhi/utils.h>
 #include <array>
 

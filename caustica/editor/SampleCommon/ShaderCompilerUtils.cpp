@@ -12,7 +12,7 @@
 #include "SampleCommon.h"
 #include <render/Misc/picosha2.h>
 
-#include <app/ApplicationBase.h>
+#include <engine/ApplicationBase.h>
 #include <core/log.h>
 
 namespace ShaderCompilerUtils

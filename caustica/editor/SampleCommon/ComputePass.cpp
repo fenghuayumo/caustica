@@ -11,7 +11,7 @@
 #include "ComputePass.h"
 
 #include <engine/ShaderFactory.h>
-#include <core/math/math.h>
+#include <math/math.h>
 #include <core/log.h>
 #include <nvrhi/utils.h>
 

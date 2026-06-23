@@ -16,12 +16,12 @@
 #include <engine/TextureCache.h>
 #include <engine/BindingCache.h>
 #include <engine/View.h>
-#include <app/DeviceManager.h>
+#include <engine/DeviceManager.h>
 #include <core/log.h>
 #include <core/json.h>
 #include <core/vfs/VFS.h>
-#include <core/math/float.h>
-#include <core/math/math.h>
+#include <math/float.h>
+#include <math/math.h>
 #include <shaders/light_cb.h>
 #include <shaders/view_cb.h>
 #include <nvrhi/utils.h>

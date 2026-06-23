@@ -17,7 +17,7 @@
 
 #include <engine/BindingCache.h>
 #include <nvrhi/nvrhi.h>
-#include <core/math/math.h>
+#include <math/math.h>
 #include <engine/SceneTypes.h>
 
 #include <SampleCommon/ComputePass.h>

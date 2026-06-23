@@ -10,7 +10,7 @@
 
 #pragma once
 //#include <glm/gtx/matrix_operation.hpp>
-#include <core/math/math.h>
+#include <math/math.h>
 using namespace donut::math;
 
 /** Color conversion utility functions.

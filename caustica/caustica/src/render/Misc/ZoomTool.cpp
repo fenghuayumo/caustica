@@ -13,7 +13,7 @@
 #include <engine/CommonRenderPasses.h>
 #include <render/Misc/ZoomTool.h>
 #include <SampleCommon/SampleCommon.h>
-#include <app/imgui_renderer.h>
+#include <engine/imgui_renderer.h>
 
 #define GLFW_INCLUDE_NONE // Do not include any OpenGL headers
 #include <GLFW/glfw3.h>

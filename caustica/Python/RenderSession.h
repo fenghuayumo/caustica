@@ -33,8 +33,8 @@
 #include <vector>
 #include <cstdint>
 
-#include <core/math/math.h>
-#include <app/DeviceManager.h>
+#include <math/math.h>
+#include <engine/DeviceManager.h>
 
 #include <SampleCommon/CommandLine.h>
 

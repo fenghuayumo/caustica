@@ -25,7 +25,7 @@
 #include <engine/ShaderFactory.h>
 #include <engine/CommonRenderPasses.h>
 #include <engine/View.h>
-#include <core/math/math.h>
+#include <math/math.h>
 
 #if DONUT_WITH_STATIC_SHADERS
 #if DONUT_WITH_DX11

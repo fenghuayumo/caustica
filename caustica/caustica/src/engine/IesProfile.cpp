@@ -24,7 +24,7 @@
 #include <engine/ShaderFactory.h>
 #include <engine/DescriptorTableManager.h>
 #include <core/vfs/VFS.h>
-#include <core/math/math.h>
+#include <math/math.h>
 #include <core/log.h>
 #include <nvrhi/utils.h>
 #include <sstream>

@@ -26,7 +26,7 @@
 #include <core/string_utils.h>
 #include <ShaderMake/ShaderBlob.h>
 #if DONUT_WITH_AFTERMATH
-#include <app/AftermathCrashDump.h>
+#include <engine/AftermathCrashDump.h>
 #endif
 
 using namespace std;

@@ -12,11 +12,11 @@
 
 #include <engine/BindingCache.h>
 #include <nvrhi/nvrhi.h>
-#include <core/math/math.h>
+#include <math/math.h>
 #include <memory>
 #include <vector>
 
-#include <core/math/math.h>
+#include <math/math.h>
 
 #define NEEAT_BAKER_ONLY 1
 #include <shaders/PathTracer/Lighting/LightingTypes.hlsli>

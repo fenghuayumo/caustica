@@ -15,11 +15,11 @@
 #include <engine/CommonRenderPasses.h>
 #include <engine/TextureCache.h>
 
-#include <app/UserInterfaceUtils.h>
+#include <engine/UserInterfaceUtils.h>
 
 #include <nvrhi/utils.h>
 
-#include <app/imgui_renderer.h>
+#include <engine/imgui_renderer.h>
 
 #include <SampleCommon/SampleCommon.h>
 #include <SampleCommon/ExtendedScene.h>

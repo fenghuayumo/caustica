@@ -10,7 +10,7 @@
 
 #include <render/OpacityMicroMap/OmmBuildQueue.h>
 
-#include <core/math/math.h>
+#include <math/math.h>
 #include <core/vfs/VFS.h>
 #include <engine/ShaderFactory.h>
 #include <nvrhi/common/misc.h>

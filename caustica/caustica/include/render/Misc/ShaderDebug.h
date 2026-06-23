@@ -12,7 +12,7 @@
 
 #include <nvrhi/nvrhi.h>
 #include <memory>
-#include <core/math/math.h>
+#include <math/math.h>
 
 #include <shaders/Libraries/ShaderDebug/ShaderDebug.hlsl>
 

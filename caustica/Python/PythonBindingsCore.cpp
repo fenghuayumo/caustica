@@ -30,7 +30,7 @@
 #include <engine/SceneTypes.h>
 #include <engine/SceneGraph.h>
 #include <core/log.h>
-#include <core/math/math.h>
+#include <math/math.h>
 
 #include <stdexcept>
 #include <cmath>

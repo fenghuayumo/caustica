@@ -16,7 +16,7 @@
 
 #include <nvrhi/utils.h>
 
-#include <app/imgui_renderer.h>
+#include <engine/imgui_renderer.h>
 
 #include <SampleCommon/SampleCommon.h>
 

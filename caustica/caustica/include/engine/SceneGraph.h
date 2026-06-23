@@ -24,7 +24,7 @@
 
 #include <engine/SceneTypes.h>
 #include <engine/KeyframeAnimation.h>
-#include <core/math/math.h>
+#include <math/math.h>
 #include <memory>
 #include <unordered_map>
 #include <utility>

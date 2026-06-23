@@ -12,8 +12,8 @@
 
 #include <core/log.h>
 #include <core/json.h>
-#include <core/math/math.h>
-#include <app/Camera.h>
+#include <math/math.h>
+#include <engine/Camera.h>
 #include <cmath>
 
 #include <SampleCommon/ExtendedScene.h>

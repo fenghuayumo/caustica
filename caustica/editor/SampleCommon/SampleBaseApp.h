@@ -12,7 +12,7 @@
 
 #include <memory>
 
-#include "app/DeviceManager.h"
+#include "engine/DeviceManager.h"
 #include "core/log.h"
 
 #include "SampleCommon.h"

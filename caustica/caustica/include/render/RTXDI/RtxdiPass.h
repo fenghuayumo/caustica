@@ -11,7 +11,7 @@
 #pragma once
 
 #include <nvrhi/nvrhi.h>
-#include <core/math/math.h>
+#include <math/math.h>
 #include <memory>
 #include <unordered_map>
 #include <vector>

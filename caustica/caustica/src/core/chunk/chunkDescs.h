@@ -22,10 +22,10 @@
 
 #pragma once
 
-#include <core/math/affine.h>
-#include <core/math/basics.h>
-#include <core/math/box.h>
-#include <core/math/vector.h>
+#include <math/affine.h>
+#include <math/basics.h>
+#include <math/box.h>
+#include <math/vector.h>
 
 #include <cstdint>
 

@@ -24,7 +24,7 @@
 #pragma once
 
 #include <engine/BindingCache.h>
-#include <core/math/math.h>
+#include <math/math.h>
 #include <nvrhi/nvrhi.h>
 #include <memory>
 #include <vector>

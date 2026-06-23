@@ -15,7 +15,7 @@
 #include <rtxdi/PT/ReSTIRPT.h>
 #include <rtxdi/LightSampling/RISBufferSegmentAllocator.h>
 
-#include <core/math/math.h>
+#include <math/math.h>
 
 using namespace dm;
 #include <shaders/render/RTXDI/ShaderParameters.h>

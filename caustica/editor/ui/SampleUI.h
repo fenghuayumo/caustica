@@ -10,11 +10,11 @@
 
 #pragma once
 
-#include <core/math/math.h>
+#include <math/math.h>
 #include <engine/Scene.h>
 
-#include <app/imgui_renderer.h>
-#include <app/imgui_console.h>
+#include <engine/imgui_renderer.h>
+#include <engine/imgui_console.h>
 
 #include <render/RTXDI/RtxdiPass.h>
 
@@ -30,7 +30,7 @@ using namespace donut::math;
 #endif
 
 #if DONUT_WITH_STREAMLINE
-#include <app/StreamlineInterface.h>
+#include <engine/StreamlineInterface.h>
 #endif
 
 #include <render/NRD/NrdConfig.h>

@@ -10,7 +10,7 @@
 
 #pragma once
 
-#include <core/math/math.h>
+#include <math/math.h>
 
 struct GaussianSplatEmissionProxy
 {

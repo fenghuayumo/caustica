@@ -13,7 +13,7 @@
 #include <engine/CommonRenderPasses.h>
 #include <render/ProcessingPasses/DenoisingGuidesBaker.h>
 #include <SampleCommon/SampleCommon.h>
-#include <app/imgui_renderer.h>
+#include <engine/imgui_renderer.h>
 
 using namespace donut::math;
 

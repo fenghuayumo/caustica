@@ -22,7 +22,7 @@
 
 #pragma once
 
-#include <core/math/math.h>
+#include <math/math.h>
 #include <engine/DescriptorTableManager.h>
 #include <shaders/light_types.h>
 #include <nvrhi/nvrhi.h>

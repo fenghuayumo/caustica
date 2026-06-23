@@ -13,7 +13,7 @@
 #include <shaders/PathTracer/Config.h>
 //#include <SampleUI.h>
 
-#include <app/Camera.h>
+#include <engine/Camera.h>
 
 #include "GameModel.h"
 #include "GameProps.h"

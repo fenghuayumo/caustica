@@ -14,7 +14,7 @@
 #include <nvrhi/nvrhi.h>
 #include <engine/ShaderFactory.h>
 #include <engine/CommonRenderPasses.h>
-#include <core/math/math.h>
+#include <math/math.h>
 #include <memory>
 
 using namespace donut::math;

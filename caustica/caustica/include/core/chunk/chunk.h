@@ -22,7 +22,7 @@
 
 #pragma once
 
-#include <core/math/math.h>
+#include <math/math.h>
 #include <core/vfs/VFS.h>
 
 #include <memory>

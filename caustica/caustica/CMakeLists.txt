@@ -5,15 +5,18 @@
 
 file(GLOB caustica_engine_core_src
     include/core/chunk/*.h
-    include/core/math/*.h
     include/core/vfs/TarFile.h
     include/core/vfs/VFS.h
     include/core/*.h
     src/core/chunk/*.cpp
-    src/core/math/*.cpp
     src/core/vfs/TarFile.cpp
     src/core/vfs/VFS.cpp
     src/core/*.cpp
+)
+
+file(GLOB caustica_engine_math_src
+    include/math/*.h
+    src/math/*.cpp
 )
 
 file(GLOB caustica_engine_engine_src
@@ -21,12 +24,6 @@ file(GLOB caustica_engine_engine_src
     src/engine/*.cpp
     src/engine/*.c
     src/engine/*.h
-)
-
-file(GLOB caustica_engine_app_src
-    LIST_DIRECTORIES false
-    include/app/*.h
-    src/app/*.cpp
 )
 
 file(GLOB caustica_engine_render_src
@@ -45,26 +42,26 @@ if (WIN32)
 endif()
 
 if (DONUT_WITH_STREAMLINE)
-    list(APPEND caustica_engine_app_src
-        src/app/streamline/StreamlineIntegration.cpp
-        src/app/streamline/StreamlineIntegration.h
+    list(APPEND caustica_engine_engine_src
+        src/engine/streamline/StreamlineIntegration.cpp
+        src/engine/streamline/StreamlineIntegration.h
     )
 endif()
 
 if (DONUT_WITH_DX11)
-    list(APPEND caustica_engine_app_src src/app/dx11/DeviceManager_DX11.cpp)
+    list(APPEND caustica_engine_engine_src src/engine/dx11/DeviceManager_DX11.cpp)
 endif()
 
 if (DONUT_WITH_DX12)
-    list(APPEND caustica_engine_app_src src/app/dx12/DeviceManager_DX12.cpp)
+    list(APPEND caustica_engine_engine_src src/engine/dx12/DeviceManager_DX12.cpp)
 endif()
 
 if (DONUT_WITH_VULKAN)
-    list(APPEND caustica_engine_app_src src/app/vulkan/DeviceManager_VK.cpp)
+    list(APPEND caustica_engine_engine_src src/engine/vulkan/DeviceManager_VK.cpp)
 endif()
 
 if (DONUT_WITH_AFTERMATH)
-    list(APPEND caustica_engine_app_src src/app/aftermath/AftermathCrashDump.cpp)
+    list(APPEND caustica_engine_engine_src src/engine/aftermath/AftermathCrashDump.cpp)
 endif()
 
 if (MSVC)
@@ -73,8 +70,8 @@ endif()
 
 add_library(causticaEngine STATIC
     ${caustica_engine_core_src}
+    ${caustica_engine_math_src}
     ${caustica_engine_engine_src}
-    ${caustica_engine_app_src}
     ${caustica_engine_render_src}
 )
 
@@ -83,7 +80,7 @@ target_include_directories(causticaEngine
         "${CMAKE_CURRENT_SOURCE_DIR}"
         "${CMAKE_CURRENT_SOURCE_DIR}/include"
     PRIVATE
-        "$<$<BOOL:${DONUT_WITH_STREAMLINE}>:${CMAKE_CURRENT_SOURCE_DIR}/src/app/streamline>"
+        "$<$<BOOL:${DONUT_WITH_STREAMLINE}>:${CMAKE_CURRENT_SOURCE_DIR}/src/engine/streamline>"
 )
 
 target_link_libraries(causticaEngine
@@ -204,7 +201,7 @@ endif()
 set_target_properties(causticaEngine PROPERTIES FOLDER "caustica/caustica")
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
     ${caustica_engine_core_src}
+    ${caustica_engine_math_src}
     ${caustica_engine_engine_src}
-    ${caustica_engine_app_src}
     ${caustica_engine_render_src}
 )

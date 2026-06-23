@@ -12,7 +12,7 @@
 #include "ShaderCompilerUtils.h"
 #include "ShaderPackFileSystem.h"
 
-#include <app/ApplicationBase.h>
+#include <engine/ApplicationBase.h>
 
 #include <render/Materials/MaterialsBaker.h>
 #include "ExtendedScene.h"
