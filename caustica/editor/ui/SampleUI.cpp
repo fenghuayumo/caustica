@@ -653,7 +653,8 @@ SampleUI::~SampleUI()
 
 bool SampleUI::MousePosUpdate(double xpos, double ypos)
 {
-    return ImGui_Renderer::MousePosUpdate(xpos, ypos);
+    (void)xpos; (void)ypos;
+    return false;
 }
 
 std::string TrimTogglable(const std::string text)

@@ -33,6 +33,7 @@
 #include <rhi/nvrhi.h>
 #include <core/log.h>
 #include <backend/SwapChain.h>
+#include <engine/IRenderPass.h>
 
 #include <list>
 #include <functional>
@@ -178,8 +179,6 @@ namespace caustica
 #endif
     };
 
-    class IRenderPass;
-
     struct AdapterInfo
     {
         typedef std::array<uint8_t, 16> UUID;
@@ -231,16 +230,6 @@ namespace caustica
         void AddRenderPassToBack(IRenderPass *pController);
         void RemoveRenderPass(IRenderPass *pController);
 
-        // TODO: Move to Application when old Application is refactored
-        void RunMessageLoop();
-
-        // Step exactly one frame: poll events, animate, render, present.
-        // Useful for hosts that want to drive the render loop themselves
-        // (e.g. Python extension modules running headless).  Returns the
-        // result of AnimateRenderPresent().
-        bool RunSingleFrame();
-        bool RunSingleFrame(double fixedElapsedTimeSeconds);
-
         // returns the size of the window in screen coordinates
         void GetWindowDimensions(int& width, int& height);
         // returns the screen coordinate to pixel coordinate scale factor
@@ -260,7 +249,6 @@ namespace caustica
         // set to true if running on NV GPU
         bool m_IsNvidia = false;
         RenderPassManager* m_PassManager = nullptr;  // Renderer layer: pass management
-        Application* m_AppLoop = nullptr;          // Engine layer: message loop delegate
         std::list<IRenderPass *> m_vRenderPasses;  // TODO: migrate to m_PassManager
         // timestamp in seconds for the previous frame
         double m_PreviousFrameTimestamp = 0.0;
@@ -303,7 +291,6 @@ namespace caustica
         void Animate(double elapsedTime, bool windowIsFocused);
         void Render();
         void UpdateAverageFrameTime(double elapsedTime);
-        bool AnimateRenderPresent(std::optional<double> elapsedTimeOverride = std::nullopt);
         // device-specific methods
         virtual bool CreateInstanceInternal() = 0;
         virtual bool CreateDevice() = 0;
@@ -373,8 +360,8 @@ namespace caustica
         virtual void GetEnabledVulkanDeviceExtensions(std::vector<std::string>& extensions) const { }
         virtual void GetEnabledVulkanLayers(std::vector<std::string>& layers) const { }
 
-        // GetFrameIndex cannot be used inside of these callbacks, hence the additional passing of frameID
-        // Refer to AnimateRenderPresent implementation for more details
+        // GetFrameIndex cannot be used inside of these callbacks, hence the additional passing of frameID.
+        // Frame lifecycle is now driven by Application (engine/Application.h).
         struct PipelineCallbacks {
             std::function<void(GpuDevice&, uint32_t)> beforeFrame = nullptr;
             std::function<void(GpuDevice&, uint32_t)> beforeAnimate = nullptr;
@@ -400,49 +387,4 @@ namespace caustica
 #endif
     };
 
-    class IRenderPass
-    {
-    private:
-        GpuDevice* m_GpuDevice;
-
-    public:
-        explicit IRenderPass(GpuDevice* deviceManager)
-            : m_GpuDevice(deviceManager)
-        { }
-
-        virtual ~IRenderPass() = default;
-
-        virtual void SetLatewarpOptions() { }
-        virtual bool ShouldAnimateUnfocused() { return false; }
-        virtual bool ShouldRenderUnfocused() { return false; }
-        
-        // If this function returns 'true', and the device manager has a depth buffer
-        // (DeviceCreationParameters::depthBufferFormat != UNKNOWN), the Render(...) function will be called
-        // with a framebuffer that has a depth attachment.
-        // Otherwise, the framebuffer will only have a color attachment - which is useful for UI rendering.
-        virtual bool SupportsDepthBuffer() { return true; }
-
-        virtual void Render(nvrhi::IFramebuffer* framebuffer) { }
-        virtual void Animate(float fElapsedTimeSeconds) { }
-        virtual void BackBufferResizing() { }
-        virtual void BackBufferResized(const uint32_t width, const uint32_t height, const uint32_t sampleCount) { }
-
-        // Called before Animate() when a DPI change was detected
-        virtual void DisplayScaleChanged(float scaleX, float scaleY) { }
-
-        // all of these pass in GLFW constants as arguments
-        // see http://www.glfw.org/docs/latest/input.html
-        // return value is true if the event was consumed by this render pass, false if it should be passed on
-        virtual bool KeyboardUpdate(int key, int scancode, int action, int mods) { return false; }
-        virtual bool KeyboardCharInput(unsigned int unicode, int mods) { return false; }
-        virtual bool MousePosUpdate(double xpos, double ypos) { return false; }
-        virtual bool MouseScrollUpdate(double xoffset, double yoffset) { return false; }
-        virtual bool MouseButtonUpdate(int button, int action, int mods) { return false; }
-        virtual bool JoystickButtonUpdate(int button, bool pressed) { return false; }
-        virtual bool JoystickAxisUpdate(int axis, float value) { return false; }
-
-        [[nodiscard]] GpuDevice* GetGpuDevice() const { return m_GpuDevice; }
-        [[nodiscard]] nvrhi::IDevice* GetDevice() const { return m_GpuDevice->GetDevice(); }
-        [[nodiscard]] uint32_t GetFrameIndex() const { return m_GpuDevice->GetFrameIndex(); }
-    };
 }

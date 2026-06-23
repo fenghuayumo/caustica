@@ -518,7 +518,7 @@ protected:
 private:
     void buildDeltaTreeViz();
 
-    virtual bool MousePosUpdate(double xpos, double ypos) override;
+    virtual bool MousePosUpdate(double xpos, double ypos);
     virtual void DisplayScaleChanged(float scaleX, float scaleY) override { m_currentScale = scaleX; assert( scaleX == scaleY ); }
     virtual void Animate(float elapsedTimeSeconds) override;
 

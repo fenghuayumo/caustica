@@ -469,7 +469,9 @@ bool RenderSession::InitDevice()
         }
     }
 
-    m_deviceManager->m_callbacks.beforePresent =
+    m_AppLoop = std::make_unique<caustica::Application>(m_deviceManager.get());
+
+    m_AppLoop->beforePresent =
         [this](caustica::GpuDevice& manager, uint32_t) {
             m_lastRenderedBackBufferIndex = manager.GetCurrentBackBufferIndex();
         };
@@ -553,6 +555,7 @@ void RenderSession::Shutdown()
 
     m_renderer.reset();
     m_shaderFactory.reset();
+    m_AppLoop.reset();
 
     if (m_deviceManager)
     {
@@ -602,10 +605,8 @@ bool RenderSession::Step(float dt)
         return false;
 
     const bool frameOk = dt >= 0.0f
-        ? m_deviceManager->RunSingleFrame(double(dt))
-        : (m_config.headless
-            ? m_deviceManager->RunSingleFrame(c_HeadlessFrameTimeSeconds)
-            : m_deviceManager->RunSingleFrame());
+        ? m_AppLoop->stepFrame(double(dt))
+        : m_AppLoop->stepFrame(m_config.headless ? c_HeadlessFrameTimeSeconds : -1.0);
 
     if (!frameOk)
         return false;

@@ -126,10 +126,10 @@ public:
     virtual bool                            LoadScene(std::shared_ptr<caustica::IFileSystem> fs, const std::filesystem::path& sceneFileName) override;
     virtual void                            SceneLoaded() override;
     virtual bool                            ShouldRenderUnfocused() override;
-    virtual bool                            KeyboardUpdate(int key, int scancode, int action, int mods) override;
-    virtual bool                            MousePosUpdate(double xpos, double ypos) override;
-    virtual bool                            MouseButtonUpdate(int button, int action, int mods) override;
-    virtual bool                            MouseScrollUpdate(double xoffset, double yoffset) override;
+    virtual bool                            KeyboardUpdate(int key, int scancode, int action, int mods);
+    virtual bool                            MousePosUpdate(double xpos, double ypos);
+    virtual bool                            MouseButtonUpdate(int button, int action, int mods);
+    virtual bool                            MouseScrollUpdate(double xoffset, double yoffset);
     virtual void                            Animate(float fElapsedTimeSeconds) override;
 
     void                                    FillPTPipelineGlobalMacros(std::vector<caustica::ShaderMacro> & macros);
