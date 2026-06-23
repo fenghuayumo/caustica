@@ -1,13 +1,3 @@
-/*
-* Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
-*
-* NVIDIA CORPORATION and its licensors retain all intellectual property
-* and proprietary rights in and to this software, related documentation
-* and any modifications thereto.  Any use, reproduction, disclosure or
-* distribution of this software and related documentation without an express
-* license agreement from NVIDIA CORPORATION is strictly prohibited.
-*/
-
 /** Implementation of the xoshiro128** 32-bit all-purpose, rock-solid generator
     written in 2018 by David Blackman and Sebastiano Vigna (vigna@acm.org).
     The state is 128 bits and the period (2^128)-1. It has a jump function that

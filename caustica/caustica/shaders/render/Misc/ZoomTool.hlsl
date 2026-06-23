@@ -1,19 +1,3 @@
-/*
-* Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
-*
-* NVIDIA CORPORATION and its licensors retain all intellectual property
-* and proprietary rights in and to this software, related documentation
-* and any modifications thereto.  Any use, reproduction, disclosure or
-* distribution of this software and related documentation without an express
-* license agreement from NVIDIA CORPORATION is strictly prohibited.
-*/
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// See https://github.com/fstrugar/XeGTAO/blob/master/Source/Rendering/engine/shaders/vaHelperTools.hlsl
-// Copyright (C) 2016-2021, Intel Corporation, 
-// SPDX-License-Identifier: MIT, Author(s):  Filip Strugar (filip.strugar@intel.com)
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #ifndef __ZOOM_TOOL_HLSL__
 #define __ZOOM_TOOL_HLSL__
 

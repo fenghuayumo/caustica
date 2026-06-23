@@ -1,17 +1,4 @@
 #
-# Copyright (c) 2014-2026, NVIDIA CORPORATION. All rights reserved.
-#
-# NVIDIA CORPORATION and its licensors retain all intellectual property
-# and proprietary rights in and to this software, related documentation
-# and any modifications thereto. Any use, reproduction, disclosure or
-# distribution of this software and related documentation without an express
-# license agreement from NVIDIA CORPORATION is strictly prohibited.
-
-# Engine RHI backend: internal rendering hardware interface library.
-# Derived from NVRHI, now absorbed into the engine source tree.
-# Headers are at caustica/caustica/include/backend/rhi/
-# Sources are here at caustica/caustica/src/backend/rhi/
-
 set(RHI_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/caustica/caustica/include/backend/rhi")
 
 include(CMakeDependentOption)

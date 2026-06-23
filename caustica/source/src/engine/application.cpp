@@ -1,6 +1,3 @@
-/*
-* Copyright (c) 2025, NVIDIA CORPORATION. All rights reserved.
-*/
 
 #include "engine/application.h"
 #include "engine/input.h"

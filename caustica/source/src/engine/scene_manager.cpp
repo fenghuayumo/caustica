@@ -1,7 +1,3 @@
-/*
-* Copyright (c) 2025, NVIDIA CORPORATION. All rights reserved.
-*/
-
 #include "engine/scene_manager.h"
 
 // Include the complete existing Scene/SceneGraph types only here

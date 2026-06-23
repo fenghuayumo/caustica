@@ -1,7 +1,3 @@
-/*
-* Copyright (c) 2025, NVIDIA CORPORATION. All rights reserved.
-*/
-
 #pragma once
 
 #include <memory>

@@ -1,15 +1,5 @@
 #pragma once
 //
-// Copyright (c) 2025, NVIDIA CORPORATION. All rights reserved.
-//
-// NVIDIA CORPORATION and its licensors retain all intellectual property
-// and proprietary rights in and to this software, related documentation
-// and any modifications thereto. Any use, reproduction, disclosure or
-// distribution of this software and related documentation without an express
-// license agreement from NVIDIA CORPORATION is strictly prohibited.
-//
-
-//
 // This module allows for a Korg nanoKontrol 2 USB MIDI controller to be used to tweak in-game variables.
 // The Korg nanoKontrol 2 is a low cost device with buttons and sliders.  In many cases, tweaking using
 // this device can be much more direct and much easier than using ImGUI.

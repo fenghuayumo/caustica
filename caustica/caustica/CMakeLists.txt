@@ -1,12 +1,3 @@
-# Copyright (c) 2014-2026, NVIDIA CORPORATION. All rights reserved.
-#
-# Localized engine runtime sources used by caustica. This target intentionally
-# excludes render/ToneMappingPasses because caustica owns its tonemapper.
-
-# ---------------------------------------------------------------------------
-# 4-Layer Architecture (Phase A+B)
-# source/include/ + source/src/ organized by: platform / core / engine
-# ---------------------------------------------------------------------------
 add_subdirectory(../source ${CMAKE_BINARY_DIR}/caustica/source)
 # ---------------------------------------------------------------------------
 

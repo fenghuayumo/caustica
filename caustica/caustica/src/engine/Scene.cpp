@@ -1,17 +1,3 @@
-/*
-License for JsonCpp
-
-JsonCpp is Public Domain
-
-The JsonCpp library's source code, including accompanying documentation, 
-tests and demonstration applications, are licensed under the following
-conditions...
-
-Baptiste Lepilleur and The JsonCpp Authors explicitly disclaim copyright in all 
-jurisdictions which recognize such a disclaimer. In such jurisdictions, 
-this software is released into the Public Domain.
-*/
-
 #include <engine/Scene.h>
 #include <engine/GltfImporter.h>
 #include <engine/ThreadPool.h>

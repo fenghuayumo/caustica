@@ -1,13 +1,3 @@
-/*
-* Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
-*
-* NVIDIA CORPORATION and its licensors retain all intellectual property
-* and proprietary rights in and to this software, related documentation
-* and any modifications thereto.  Any use, reproduction, disclosure or
-* distribution of this software and related documentation without an express
-* license agreement from NVIDIA CORPORATION is strictly prohibited.
-*/
-
 #ifndef __NOISE_AND_SEQUENCES_HLSLI__ // using instead of "#pragma once" due to https://github.com/microsoft/DirectXShaderCompiler/issues/3943
 #define __NOISE_AND_SEQUENCES_HLSLI__
 
@@ -19,40 +9,6 @@
 // don't forget to initialize storage, i.e.
 // StructuredBuffer<uint> g_precomputedSobol : register( t42 );
 // #define SOBOL_PRECOMPUTED_BUFFER g_precomputedSobol
-
-
-// *************************************************************************************************************************************
-// Some of the noise and LD sampling functions in this file originate from:
-// https://github.com/GameTechDev/XeGTAO/blob/master/Source/Rendering/engine/shaders/vaNoise.hlsl, 
-// Original license provided below:
-// *************************************************************************************************************************************
-// MIT License
-// 
-// Copyright (C) 2016-2021, Intel Corporation 
-// 
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-// 
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
-// 
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-// SOFTWARE.
-// *************************************************************************************************************************************
-// Quasi-random sequence based on "Practical Hash-based Owen Scrambling", Brent Burley 2020, https://jcgt.org/published/0009/04/01/paper.pdf
-// with shader implementation borrowing from Andrew Helmer's Shadertoy implementation (https://www.reddit.com/r/GraphicsProgramming/comments/l1go2r/owenscrambled_sobol_02_sequences_shadertoy/)
-// *************************************************************************************************************************************
-
-
 // *************************************************************************************************************************************
 // Note: this will turn 0 into 0! if that's a problem do Hash32( x+constant ) - HashCombine does something similar already
 inline uint Hash32( uint x )

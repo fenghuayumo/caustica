@@ -1,13 +1,3 @@
-/*
-* Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
-*
-* NVIDIA CORPORATION and its licensors retain all intellectual property
-* and proprietary rights in and to this software, related documentation
-* and any modifications thereto.  Any use, reproduction, disclosure or
-* distribution of this software and related documentation without an express
-* license agreement from NVIDIA CORPORATION is strictly prohibited.
-*/
-
 #ifndef __MATH_CONSTANTS_HLSLI__ // using instead of "#pragma once" due to https://github.com/microsoft/DirectXShaderCompiler/issues/3943
 #define __MATH_CONSTANTS_HLSLI__
 
@@ -101,7 +91,7 @@
 #define HLF_RADIX           2
 #define HLF_TRUE_MIN        5.960464477539063e-08F  // min positive value
 
-// Because sample values must be strictly less than 1, it’s useful to define a constant, OneMinusEpsilon, that represents the largest 
+// Because sample values must be strictly less than 1, itï¿½s useful to define a constant, OneMinusEpsilon, that represents the largest 
 // representable floating-point constant that is less than 1. (https://www.pbr-book.org/3ed-2018/Sampling_and_Reconstruction/Sampling_Interface)
 static const double         cDoubleOneMinusEpsilon = 0x1.fffffffffffffp-1;
 static const float          cFloatOneMinusEpsilon = 0x1.fffffep-1;
