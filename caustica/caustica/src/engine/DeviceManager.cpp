@@ -48,6 +48,7 @@ freely, subject to the following restrictions:
 */
 
 #include <engine/DeviceManager.h>
+#include <platform/window.h>     // New 4-layer Window abstraction
 #include <math/math.h>
 #include <core/log.h>
 #include <rhi/utils.h>
@@ -412,6 +413,66 @@ bool DeviceManager::CreateWindowDeviceAndSwapChain(const DeviceCreationParameter
     m_DeviceParams.backBufferHeight = 0;
 
     UpdateWindowSize();
+
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// 4-layer architecture bridge:
+// Create GPU device + swapchain using a pre-existing Window from the platform layer.
+// This allows the new Application to own the Window independently of DeviceManager.
+// ---------------------------------------------------------------------------
+bool DeviceManager::CreateDeviceAndSwapChain(const DeviceCreationParameters& params, Window* window)
+{
+    if (!window || !window->hasInitialised())
+    {
+        caustica::error("CreateDeviceAndSwapChain: Window must be created first");
+        return false;
+    }
+
+    m_DeviceParams           = params;
+    m_DeviceParams.headlessDevice = false;
+    m_RequestedVSync         = params.vsyncEnabled;
+
+    // Get the native GLFW window handle from the platform Window
+    GLFWwindow* nativeWindow = static_cast<GLFWwindow*>(window->getNativeHandle());
+    if (!nativeWindow)
+    {
+        caustica::error("CreateDeviceAndSwapChain: Window has no native GLFW handle");
+        return false;
+    }
+
+    // Use the existing GLFW window instead of creating one
+    m_Window = nativeWindow;
+    m_WindowTitle = window->getTitle();
+
+    // Register this DeviceManager for GLFW callbacks
+    glfwSetWindowUserPointer(m_Window, this);
+
+    // Keep existing GLFW callbacks but chain with Window's event callback
+    glfwSetWindowCloseCallback(m_Window, WindowCloseCallback_GLFW);
+    glfwSetWindowFocusCallback(m_Window, WindowFocusCallback_GLFW);
+    glfwSetWindowIconifyCallback(m_Window, WindowIconifyCallback_GLFW);
+    glfwSetKeyCallback(m_Window, KeyCallback_GLFW);
+    glfwSetCharModsCallback(m_Window, CharModsCallback_GLFW);
+    glfwSetCursorPosCallback(m_Window, MousePosCallback_GLFW);
+    glfwSetMouseButtonCallback(m_Window, MouseButtonCallback_GLFW);
+    glfwSetScrollCallback(m_Window, MouseScrollCallback_GLFW);
+
+    // Create GPU device and swapchain using the existing native window
+    if (!CreateDevice())
+        return false;
+
+    if (!CreateSwapChain())
+        return false;
+
+    // Reset back buffer state to enforce resize event
+    m_DeviceParams.backBufferWidth  = 0;
+    m_DeviceParams.backBufferHeight = 0;
+    UpdateWindowSize();
+
+    caustica::info("CreateDeviceAndSwapChain: Device ready with platform Window [%ux%u]",
+        window->getWidth(), window->getHeight());
 
     return true;
 }

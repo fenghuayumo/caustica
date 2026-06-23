@@ -14,6 +14,7 @@ list(FILTER shaders EXCLUDE REGEX "/caustica/(include|src|backend)/")
 list(FILTER shared_sources EXCLUDE REGEX "/caustica/(include|src|shaders|backend)/")
 list(FILTER shared_sources EXCLUDE REGEX "/editor/")
 list(FILTER shared_sources EXCLUDE REGEX "/Python/")
+list(FILTER shared_sources EXCLUDE REGEX "/source/")
 
 set(rtxpt_render_module_sources "")
 foreach(rtxpt_render_module

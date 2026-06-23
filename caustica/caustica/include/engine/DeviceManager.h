@@ -252,6 +252,12 @@ namespace caustica
         bool CreateHeadlessDevice(const DeviceCreationParameters& params);
         bool CreateWindowDeviceAndSwapChain(const DeviceCreationParameters& params, const char* windowTitle);
 
+        // New 4-layer architecture bridge:
+        // Create device + swapchain using a pre-existing Window from the platform layer.
+        // The Window must already be created (hasInitialised() == true) and its
+        // native handle will be used for swapchain creation.
+        bool CreateDeviceAndSwapChain(const DeviceCreationParameters& params, class Window* window);
+
         // Initializes device-independent objects (DXGI factory, Vulkan instnace).
         // Calling CreateInstance() is required before EnumerateAdapters(), but optional if you don't use EnumerateAdapters().
         // Note: if you call CreateInstance before Create*Device*(), the values in InstanceParameters must match those

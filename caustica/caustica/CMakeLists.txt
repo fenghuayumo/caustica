@@ -3,6 +3,13 @@
 # Localized engine runtime sources used by caustica. This target intentionally
 # excludes render/ToneMappingPasses because caustica owns its tonemapper.
 
+# ---------------------------------------------------------------------------
+# 4-Layer Architecture (Phase A+B)
+# source/include/ + source/src/ organized by: platform / core / engine
+# ---------------------------------------------------------------------------
+add_subdirectory(../source ${CMAKE_BINARY_DIR}/caustica/source)
+# ---------------------------------------------------------------------------
+
 file(GLOB caustica_engine_core_src
     include/core/chunk/*.h
     include/core/vfs/TarFile.h
@@ -79,6 +86,7 @@ target_include_directories(causticaEngine
     PUBLIC
         "${CMAKE_CURRENT_SOURCE_DIR}"
         "${CMAKE_CURRENT_SOURCE_DIR}/include"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../source/include"   # New 4-layer platform/core/engine headers
     PRIVATE
         "$<$<BOOL:${DONUT_WITH_STREAMLINE}>:${CMAKE_CURRENT_SOURCE_DIR}/src/engine/streamline>"
 )
