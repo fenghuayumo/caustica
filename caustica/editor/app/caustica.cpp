@@ -1217,6 +1217,9 @@ bool Sample::KeyboardUpdate(int key, int scancode, int action, int mods)
 
 bool Sample::MousePosUpdate(double xpos, double ypos)
 {
+    if (ImGui::GetIO().WantCaptureMouse)
+        return false;
+
     if (!(m_sampleGame && m_sampleGame->CameraActive()))
         m_camera.MousePosUpdate(xpos, ypos);
     if (m_sampleGame)   m_sampleGame->MousePosUpdate(xpos /** upscalingScale.x*/, ypos /** upscalingScale.y*/);
@@ -1235,7 +1238,10 @@ bool Sample::MousePosUpdate(double xpos, double ypos)
 
 bool Sample::MouseButtonUpdate(int button, int action, int mods)
 {
-    if (m_zoomTool)     
+    if (ImGui::GetIO().WantCaptureMouse)
+        return false;
+
+    if (m_zoomTool)
         if (m_zoomTool->MouseButtonUpdate(button, action, mods))
             return true;
 
@@ -1262,6 +1268,13 @@ bool Sample::MouseButtonUpdate(int button, int action, int mods)
 
 bool Sample::MouseScrollUpdate(double xoffset, double yoffset)
 {
+    // Always forward scroll to ImGui (event-driven, can't poll)
+    ImGuiIO& io = ImGui::GetIO();
+    io.AddMouseWheelEvent((float)xoffset, (float)yoffset);
+
+    if (io.WantCaptureMouse)
+        return true; // ImGui consumed it, don't forward to camera
+
     if (!(m_sampleGame && m_sampleGame->CameraActive()))
     {
         //m_camera.MouseScrollUpdate(xoffset, yoffset);

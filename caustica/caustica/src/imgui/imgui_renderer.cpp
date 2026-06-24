@@ -252,6 +252,23 @@ void ImGui_Renderer::Animate(float elapsedTimeSeconds)
     io.DeltaTime = elapsedTimeSeconds;
     io.MouseDrawCursor = false;
 
+    // Forward mouse input to ImGui (keyboard is handled via GLFW callbacks)
+    GLFWwindow* glfwWindow = GetGpuDevice()->GetWindow();
+    if (glfwWindow)
+    {
+        ImGui_ImplGlfw_UpdateKeyModifiers(io, glfwWindow);
+
+        double mouseX, mouseY;
+        glfwGetCursorPos(glfwWindow, &mouseX, &mouseY);
+        io.AddMousePosEvent((float)mouseX, (float)mouseY);
+
+        for (int i = 0; i < ImGuiMouseButton_COUNT; i++)
+            io.AddMouseButtonEvent(i, glfwGetMouseButton(glfwWindow, i) == GLFW_PRESS);
+
+        // Scroll wheel is event-based; we poll the cached value
+        // (ImGui clears the wheel delta each frame, so polling is safe)
+    }
+
     ImGui::NewFrame();
 
     m_imguiFrameOpened = true;
