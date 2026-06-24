@@ -2,7 +2,7 @@
 #include "SampleCommon.h"
 #include <render/Misc/picosha2.h>
 
-#include <engine/SceneRender.h>
+#include <render/SceneRender.h>
 #include <backend/ShaderUtils.h>
 #include <core/log.h>
 

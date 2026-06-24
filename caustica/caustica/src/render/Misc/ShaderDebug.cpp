@@ -1,8 +1,8 @@
 #include <render/Misc/ShaderDebug.h>
 
 #include <assets/loader/ShaderFactory.h>
-#include <engine/CommonRenderPasses.h>
-#include <engine/View.h>
+#include <render/CommonRenderPasses.h>
+#include <render/View.h>
 #include <core/log.h>
 #include <SampleCommon/SampleCommon.h>
 

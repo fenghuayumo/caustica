@@ -115,17 +115,7 @@ list(APPEND caustica_engine_engine_src
     src/engine/Application.cpp
 )
 
-# Engine layer: IRenderPass (render pass interface, extracted from GpuDevice)
-list(APPEND caustica_engine_engine_src
-    include/engine/IRenderPass.h
-    src/engine/IRenderPass.cpp
-)
-
-# Renderer layer: pass management
-list(APPEND caustica_engine_engine_src
-    include/render/RenderPassManager.h
-    src/render/RenderPassManager.cpp
-)
+# Render passes and infrastructure are now in caustica_engine_render_src (GLOB)
 
 add_library(causticaEngine STATIC
     ${caustica_engine_core_src}

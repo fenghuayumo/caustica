@@ -1,8 +1,8 @@
 #pragma once
 
 #include <scene/SceneGraph.h>
-#include <engine/ShadowMap.h>
-#include <engine/View.h>
+#include <render/ShadowMap.h>
+#include <render/View.h>
 #include <rhi/nvrhi.h>
 #include <memory>
 

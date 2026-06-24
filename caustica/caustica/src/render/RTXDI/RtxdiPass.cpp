@@ -5,8 +5,8 @@
 #include <render/RTXDI/RtxdiResources.h>
 #include <render/RTXDI/PrepareLightsPass.h>
 #include <assets/loader/ShaderFactory.h>
-#include <engine/CommonRenderPasses.h>
-#include <engine/View.h>
+#include <render/CommonRenderPasses.h>
+#include <render/View.h>
 #include <render/RTXDI/GeneratePdfMipsPass.h>
 #include <render/Lighting/Distant/EnvMapBaker.h>
 #include <render/Lighting/Distant/EnvMapImportanceSamplingBaker.h>

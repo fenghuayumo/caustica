@@ -1,11 +1,11 @@
 #include <render/ForwardShadingPass.h>
 #include <render/DrawStrategy.h>
-#include <engine/FramebufferFactory.h>
+#include <render/FramebufferFactory.h>
 #include <assets/loader/ShaderFactory.h>
-#include <engine/ShadowMap.h>
+#include <render/ShadowMap.h>
 #include <scene/SceneTypes.h>
-#include <engine/CommonRenderPasses.h>
-#include <engine/MaterialBindingCache.h>
+#include <render/CommonRenderPasses.h>
+#include <render/MaterialBindingCache.h>
 #include <core/log.h>
 #include <rhi/utils.h>
 #include <utility>

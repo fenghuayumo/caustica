@@ -1,5 +1,5 @@
 #include <scene/SceneGraph.h>
-#include <engine/ShadowMap.h>
+#include <render/ShadowMap.h>
 #include <core/json.h>
 #include <json/json-forwards.h>
 

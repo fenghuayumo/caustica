@@ -1,8 +1,8 @@
 #include <render/BloomPass.h>
-#include <engine/FramebufferFactory.h>
+#include <render/FramebufferFactory.h>
 #include <assets/loader/ShaderFactory.h>
-#include <engine/CommonRenderPasses.h>
-#include <engine/View.h>
+#include <render/CommonRenderPasses.h>
+#include <render/View.h>
 #include <utility>
 
 #if DONUT_WITH_STATIC_SHADERS

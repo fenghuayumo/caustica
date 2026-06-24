@@ -4,7 +4,7 @@
 #include <scene/Scene.h>
 
 #include <assets/loader/ShaderFactory.h>
-#include <engine/CommonRenderPasses.h>
+#include <render/CommonRenderPasses.h>
 #include <core/log.h>
 #include <rhi/utils.h>
 

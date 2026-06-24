@@ -2,9 +2,9 @@
 #include <render/DrawStrategy.h>
 #include <assets/loader/ShaderFactory.h>
 #include <scene/SceneTypes.h>
-#include <engine/CommonRenderPasses.h>
-#include <engine/View.h>
-#include <engine/MaterialBindingCache.h>
+#include <render/CommonRenderPasses.h>
+#include <render/View.h>
+#include <render/MaterialBindingCache.h>
 #include <rhi/utils.h>
 #include <utility>
 

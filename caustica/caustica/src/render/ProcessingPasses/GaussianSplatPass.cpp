@@ -4,9 +4,9 @@
 #include <SampleCommon/RenderTargets.h>
 
 #include <core/log.h>
-#include <engine/FramebufferFactory.h>
+#include <render/FramebufferFactory.h>
 #include <assets/loader/ShaderFactory.h>
-#include <engine/View.h>
+#include <render/View.h>
 #include <shaders/view_cb.h>
 #include <rhi/utils.h>
 

@@ -2,7 +2,7 @@
 
 #include <core/log.h>
 #include <engine/AftermathCrashDump.h>
-#include "engine/SceneRender.h"
+#include "render/SceneRender.h"
 #include <core/path_utils.h>
 
 #include <GFSDK_Aftermath_GpuCrashDump.h>

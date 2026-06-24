@@ -1,7 +1,7 @@
 #pragma once
 
 #include <math/math.h>
-#include <engine/DescriptorTableManager.h>
+#include <render/DescriptorTableManager.h>
 #include <shaders/light_types.h>
 #include <rhi/nvrhi.h>
 #include <memory>

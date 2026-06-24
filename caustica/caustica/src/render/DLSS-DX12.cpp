@@ -5,7 +5,7 @@
 #include <nvsdk_ngx_helpers.h>
 
 #include <render/DLSS.h>
-#include <engine/View.h>
+#include <render/View.h>
 #include <core/log.h>
 
 using namespace caustica::render;

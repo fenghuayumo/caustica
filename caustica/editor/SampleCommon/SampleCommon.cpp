@@ -2,7 +2,7 @@
 #include <core/log.h>
 
 #include <core/json.h>
-#include <engine/SceneRender.h>
+#include <render/SceneRender.h>
 #include <core/path_utils.h>
 #include <scene/SceneTypes.h>
 #include <json/json.h>

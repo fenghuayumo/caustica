@@ -1,4 +1,4 @@
-#include "engine/IRenderPass.h"
+#include "render/IRenderPass.h"
 #include "backend/GpuDevice.h"
 
 namespace caustica

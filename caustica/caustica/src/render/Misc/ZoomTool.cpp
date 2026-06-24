@@ -5,7 +5,7 @@
 
 #include <rhi/utils.h>
 #include <assets/loader/ShaderFactory.h>
-#include <engine/CommonRenderPasses.h>
+#include <render/CommonRenderPasses.h>
 #include <render/Misc/ZoomTool.h>
 #include <SampleCommon/SampleCommon.h>
 #include <engine/imgui_renderer.h>

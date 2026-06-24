@@ -1,6 +1,6 @@
 #include <render/GBuffer.h>
-#include <engine/CommonRenderPasses.h>
-#include <engine/FramebufferFactory.h>
+#include <render/CommonRenderPasses.h>
+#include <render/FramebufferFactory.h>
 #include <rhi/utils.h>
 
 using namespace caustica::math;

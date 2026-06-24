@@ -1,7 +1,7 @@
-#include <engine/SceneRender.h>
+#include <render/SceneRender.h>
 #include <scene/Scene.h>
 #include <assets/cache/TextureCache.h>
-#include <engine/CommonRenderPasses.h>
+#include <render/CommonRenderPasses.h>
 #include <core/vfs/VFS.h>
 
 using namespace caustica;

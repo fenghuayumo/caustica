@@ -6,7 +6,7 @@
 #include <nvsdk_ngx_helpers_vk.h>
 
 #include <render/DLSS.h>
-#include <engine/View.h>
+#include <render/View.h>
 #include <core/log.h>
 #include <rhi/vulkan.h>
 

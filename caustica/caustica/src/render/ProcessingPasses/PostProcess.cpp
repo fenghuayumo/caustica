@@ -1,7 +1,7 @@
 #include <render/ProcessingPasses/PostProcess.h>
 
-#include <engine/FramebufferFactory.h>
-#include <engine/CommonRenderPasses.h>
+#include <render/FramebufferFactory.h>
+#include <render/CommonRenderPasses.h>
 #include <render/Misc/ShaderDebug.h>
 
 using namespace caustica::math;

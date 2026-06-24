@@ -1,8 +1,8 @@
 #include <render/Lighting/LightsBaker.h>
 
 #include <assets/loader/ShaderFactory.h>
-#include <engine/FramebufferFactory.h>
-#include <engine/CommonRenderPasses.h>
+#include <render/FramebufferFactory.h>
+#include <render/CommonRenderPasses.h>
 #include <assets/cache/TextureCache.h>
 
 #include <engine/UserInterfaceUtils.h>

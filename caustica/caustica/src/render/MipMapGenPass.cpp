@@ -1,6 +1,6 @@
 #include <render/MipMapGenPass.h>
 #include <assets/loader/ShaderFactory.h>
-#include <engine/CommonRenderPasses.h>
+#include <render/CommonRenderPasses.h>
 
 #if DONUT_WITH_STATIC_SHADERS
 #if DONUT_WITH_DX11

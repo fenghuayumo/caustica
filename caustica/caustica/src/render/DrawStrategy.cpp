@@ -1,7 +1,7 @@
 #include <render/DrawStrategy.h>
 #include <render/GeometryPasses.h>
 #include <scene/SceneGraph.h>
-#include <engine/View.h>
+#include <render/View.h>
 
 using namespace caustica::math;
 using namespace caustica;

@@ -8,7 +8,7 @@
 #include "LocalConfig.h"
 #include "ShaderPackFileSystem.h"
 
-#include <engine/SceneRender.h>
+#include <render/SceneRender.h>
 #include <backend/ShaderUtils.h>
 #include <core/path_utils.h>
 #include <platform/cmdline_utils.h>

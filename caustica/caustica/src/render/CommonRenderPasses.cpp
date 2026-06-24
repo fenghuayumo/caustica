@@ -1,6 +1,6 @@
-#include <engine/CommonRenderPasses.h>
+#include <render/CommonRenderPasses.h>
 #include <assets/loader/ShaderFactory.h>
-#include <engine/BindingCache.h>
+#include <render/BindingCache.h>
 
 #if DONUT_WITH_STATIC_SHADERS
 #if DONUT_WITH_DX11

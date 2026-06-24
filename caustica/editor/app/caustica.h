@@ -6,12 +6,12 @@
 #include "SampleCommon/CommandLine.h"
 #include "SampleUI.h"
 
-#include <engine/SceneRender.h>
+#include <render/SceneRender.h>
 #include <platform/Input.h>
 #include <core/vfs/VFS.h>
 #include <render/BloomPass.h>
 #include <scene/camera/Camera.h>
-#include <engine/CommonRenderPasses.h>
+#include <render/CommonRenderPasses.h>
 #if RTXPT_WITH_NATIVE_DLSS
 #include <render/DLSS.h>
 #endif

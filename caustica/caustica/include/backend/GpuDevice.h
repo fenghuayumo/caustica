@@ -33,7 +33,7 @@
 #include <rhi/nvrhi.h>
 #include <core/log.h>
 #include <backend/SwapChain.h>
-#include <engine/IRenderPass.h>
+#include <render/IRenderPass.h>
 
 #include <list>
 #include <functional>

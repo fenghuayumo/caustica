@@ -1,5 +1,5 @@
 #include <engine/MediaFileSystem.h>
-#include <engine/SceneRender.h>
+#include <render/SceneRender.h>
 #include <scene/scene_utils.h>
 #include <core/log.h>
 #include <core/string_utils.h>

@@ -1,9 +1,9 @@
 #include <assets/loader/ShaderFactory.h>
-#include <engine/CommonRenderPasses.h>
-#include <engine/View.h>
+#include <render/CommonRenderPasses.h>
+#include <render/View.h>
 #include <sstream>
 #include <assert.h>
-#include <engine/FramebufferFactory.h>
+#include <render/FramebufferFactory.h>
 #include <core/log.h>
 
 using namespace caustica::math;

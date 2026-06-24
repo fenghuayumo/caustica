@@ -1,10 +1,10 @@
 #include <render/SkyPass.h>
 #include <render/DrawStrategy.h>
-#include <engine/FramebufferFactory.h>
+#include <render/FramebufferFactory.h>
 #include <assets/loader/ShaderFactory.h>
-#include <engine/ShadowMap.h>
-#include <engine/CommonRenderPasses.h>
-#include <engine/View.h>
+#include <render/ShadowMap.h>
+#include <render/CommonRenderPasses.h>
+#include <render/View.h>
 
 #if DONUT_WITH_STATIC_SHADERS
 #if DONUT_WITH_DX11
