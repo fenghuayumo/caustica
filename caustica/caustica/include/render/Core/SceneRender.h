@@ -55,6 +55,8 @@ public:
 
     std::shared_ptr<CommonRenderPasses> GetCommonPasses() const;
 
+    std::shared_ptr<TextureCache> GetTextureCache() const { return m_TextureCache; }
+
 protected:
     std::shared_ptr<TextureCache>        m_TextureCache;
     std::shared_ptr<CommonRenderPasses>  m_CommonPasses;

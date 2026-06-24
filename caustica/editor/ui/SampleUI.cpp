@@ -1,5 +1,5 @@
 #include "ui/ui_macros.h"
-#include "caustica.h"
+#include "PathTracerApp.h"
 #include "SampleCommon/ImGuiManager.h"
 #include "SampleCommon/SampleBaseApp.h"
 
@@ -599,7 +599,7 @@ void InitializeSampleUIDataFromCommandLine(SampleUIData& ui, const CommandLineOp
     ui.EnableBloom &= !cmdLine.DisablePostProcessFilters;
 }
 
-SampleUI::SampleUI(GpuDevice* deviceManager, SampleBaseApp & baseApp, Sample& app, SampleUIData& ui, bool NVAPI_SERSupported, const CommandLineOptions& cmdLine)
+SampleUI::SampleUI(GpuDevice* deviceManager, SampleBaseApp & baseApp, PathTracerApp& app, SampleUIData& ui, bool NVAPI_SERSupported, const CommandLineOptions& cmdLine)
         : ImGui_Renderer(deviceManager)
         , m_baseApp(baseApp)
         , m_app(app)
@@ -2341,7 +2341,7 @@ void SampleUI::buildUI(void)
 
             const DebugFeedbackStruct& feedback = m_app.GetFeedbackData();
             if (ImGui::InputInt2("Debug pixel", (int*)&m_ui.DebugPixel.x))
-                m_app.SetUIPick();
+                m_app.GetEditorUIState().requestMaterialPick();
 
             ImGui::Checkbox("Continuous feedback", &m_ui.ContinuousDebugFeedback);
 
@@ -2372,7 +2372,7 @@ void SampleUI::buildUI(void)
                 if (ImGui::Checkbox("Show delta tree window", &m_ui.ShowDeltaTree) && m_ui.ShowDeltaTree)
                 {
                     m_ui.ShowInspector = false; // no space for both
-                    m_app.SetUIPick();
+                    m_app.GetEditorUIState().requestMaterialPick();
                 }
             }
 #else
@@ -2875,7 +2875,7 @@ void SampleUI::buildDeltaTreeViz()
         UITreeNode *                parent = nullptr;
         std::vector<UITreeNode *>   children;
 
-        void Init(const DeltaTreeVizPathVertex& deltaVertex, Sample & app, const ImVec2 & nodeSize, const ImVec2 & nodePadding, const ImVec2 & topLeft)
+        void Init(const DeltaTreeVizPathVertex& deltaVertex, PathTracerApp & app, const ImVec2 & nodeSize, const ImVec2 & nodePadding, const ImVec2 & topLeft)
         {   app;
             this->deltaVertex = deltaVertex;
             selected = false;

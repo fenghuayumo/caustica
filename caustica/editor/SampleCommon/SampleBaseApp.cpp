@@ -16,7 +16,7 @@
 #if CAUSTICA_WITH_NATIVE_DLSS
 #include <render/Passes/Geometry/DLSS.h>
 #endif
-#include "caustica.h"
+#include "PathTracerApp.h"
 
 #include <GLFW/glfw3.h>
 #include <platform/glfw_window.h>

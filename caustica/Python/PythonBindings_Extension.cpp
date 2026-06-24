@@ -14,7 +14,7 @@
 #include <nanobind/stl/tuple.h>
 #include <nanobind/stl/optional.h>
 
-#include "caustica.h"
+#include "PathTracerApp.h"
 #include <SampleUI.h>
 
 #include <scene/Scene.h>
@@ -29,13 +29,13 @@ namespace
 {
     // Tracks the most recently created Renderer instance so module-level
     // helpers like `caustica.app()` and `caustica.settings()` keep working.
-    Sample* g_currentExtensionSample = nullptr;
+    PathTracerApp* g_currentExtensionApp = nullptr;
 
-    Sample& RequireCurrentSample()
+    PathTracerApp& RequireCurrentApp()
     {
-        if (!g_currentExtensionSample)
+        if (!g_currentExtensionApp)
             throw std::runtime_error("caustica: no Renderer is currently active. Create one via caustica.Renderer(...)");
-        return *g_currentExtensionSample;
+        return *g_currentExtensionApp;
     }
 
     caustica::math::float3 ToFloat3(const nb::object& src)
@@ -58,7 +58,7 @@ namespace
 
     // Mirrors the helper used by Scene.bounds in the shared core bindings.
     // Returns the C++ Scene bounds, or std::nullopt when no scene is loaded.
-    std::optional<caustica::math::box3> CurrentSceneBoundingBox(Sample* app)
+    std::optional<caustica::math::box3> CurrentSceneBoundingBox(PathTracerApp* app)
     {
         if (!app)
             return std::nullopt;
@@ -94,10 +94,10 @@ public:
         cfg.accumulationTarget = accumulationTarget;
 
         m_session = std::make_unique<RenderSession>(cfg);
-        m_owned   = m_session->GetSample() != nullptr;
+        m_owned   = m_session->GetPathTracerApp() != nullptr;
         if (!m_owned)
             throw std::runtime_error("caustica.Renderer: failed to initialize the renderer (see log for details)");
-        g_currentExtensionSample = m_session->GetSample();
+        g_currentExtensionApp = m_session->GetPathTracerApp();
     }
 
     ~PyRenderer()
@@ -109,8 +109,8 @@ public:
     {
         if (m_session)
         {
-            if (g_currentExtensionSample == m_session->GetSample())
-                g_currentExtensionSample = nullptr;
+            if (g_currentExtensionApp == m_session->GetPathTracerApp())
+                g_currentExtensionApp = nullptr;
             m_session.reset();
             m_owned = false;
         }
@@ -121,8 +121,8 @@ public:
     }
 
     bool LoadGaussianSplats(const std::string& fileName, bool convertRdfToRub) {
-        return m_session && m_session->GetSample()
-            ? m_session->GetSample()->LoadGaussianSplatFile(fileName, convertRdfToRub)
+        return m_session && m_session->GetPathTracerApp()
+            ? m_session->GetPathTracerApp()->LoadGaussianSplatFile(fileName, convertRdfToRub)
             : false;
     }
 
@@ -148,7 +148,7 @@ public:
     }
 
     bool LoadMeshFile(const std::string& fileName) {
-        Sample* app = GetApp();
+        PathTracerApp* app = GetApp();
         return app ? app->LoadMeshFile(fileName) : false;
     }
 
@@ -160,11 +160,11 @@ public:
         if (m_session) m_session->SetCameraIntrinsics(fx, fy, cx, cy, width, height);
     }
 
-    Sample* GetApp() {
-        return m_session ? m_session->GetSample() : nullptr;
+    PathTracerApp* GetApp() {
+        return m_session ? m_session->GetPathTracerApp() : nullptr;
     }
 
-    bool IsValid() const { return m_session && m_session->GetSample() != nullptr; }
+    bool IsValid() const { return m_session && m_session->GetPathTracerApp() != nullptr; }
 
 private:
     std::unique_ptr<RenderSession> m_session;
@@ -287,13 +287,13 @@ NB_MODULE(caustica, m)
              "Diagonal extent (max - min) of `scene_bounds`, or ``None`` for an empty scene.")
 
         .def_prop_ro("app",
-             [](PyRenderer& self) -> Sample* { return self.GetApp(); },
+             [](PyRenderer& self) -> PathTracerApp* { return self.GetApp(); },
              nb::rv_policy::reference,
              "Access the underlying Sample instance to use the shared bindings.")
 
         .def_prop_ro("settings",
              [](PyRenderer& self) -> SampleUIData* {
-                 Sample* app = self.GetApp();
+                 PathTracerApp* app = self.GetApp();
                  return app ? &app->GetUIData() : nullptr;
              },
              nb::rv_policy::reference,
@@ -306,12 +306,12 @@ NB_MODULE(caustica, m)
              return false;
         }, nb::arg().none(), nb::arg().none(), nb::arg().none());
 
-    m.def("app", []() -> Sample* { return &RequireCurrentSample(); },
+    m.def("app", []() -> PathTracerApp* { return &RequireCurrentApp(); },
           nb::rv_policy::reference,
           "Return the Sample owned by the most recently created Renderer.");
 
     m.def("settings", []() -> SampleUIData* {
-            Sample* app = RequireCurrentSample();
+            PathTracerApp* app = RequireCurrentApp();
             return &app->GetUIData();
         },
           nb::rv_policy::reference,

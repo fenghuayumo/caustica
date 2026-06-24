@@ -5,13 +5,13 @@
 
 #pragma once
 
-#include "caustica.h"
+#include "PathTracerApp.h"
 #include <render/Core/PTPipelineBaker.h>
 
-class AdvancedPathTracer : public Sample
+class AdvancedPathTracer : public PathTracerApp
 {
 public:
-    using Sample::Sample;
+    using PathTracerApp::PathTracerApp;
 
     void SampleRenderCode(nvrhi::IFramebuffer* framebuffer, nvrhi::CommandListHandle commandList, const SampleConstants& constants) override
     {

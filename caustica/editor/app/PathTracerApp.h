@@ -16,7 +16,6 @@
 #include "SampleUI.h"
 
 #include <render/Core/SceneRender.h>
-#include <platform/Input.h>
 #include <core/vfs/VFS.h>
 #include <render/Core/RenderCore.h>
 #include <render/Passes/Geometry/BloomPass.h>
@@ -59,10 +58,13 @@ class PythonScripting;
 #endif
 class GaussianSplatPass;
 class Renderer;
+class PathTracerInputController;
+class PathTracingRenderer;
 
-class PathTracerApp : public caustica::SceneRender, public caustica::IInputHandler
+class PathTracerApp : public caustica::SceneRender
 {
     friend class Renderer;
+    friend class PathTracingRenderer;
 
     // static constexpr uint32_t c_PathTracerVariants   = 6; // see shaders.cfg and CreatePTPipeline for details on variants
 
@@ -97,8 +99,6 @@ public:
     void                                    UpdateSubInstanceContents();
     void                                    UploadSubInstanceData(nvrhi::ICommandList* commandList);
     
-    void                                    SetUIPick()                             { m_pick = true; }
-
     std::shared_ptr<caustica::Material> FindMaterial( int materialID ) const;
     std::shared_ptr<caustica::SceneGraphNode> FindNodeByInstanceIndex(int instanceIndex) const;
 
@@ -150,22 +150,6 @@ public:
     virtual bool                            LoadScene(std::shared_ptr<caustica::IFileSystem> fs, const std::filesystem::path& sceneFileName) override;
     virtual void                            SceneLoaded() override;
     virtual bool                            ShouldRenderUnfocused() override;
-    // Legacy input methods (called by IInputHandler overrides below)
-    virtual bool                            KeyboardUpdate(int key, int scancode, int action, int mods);
-    virtual bool                            MousePosUpdate(double xpos, double ypos);
-    virtual bool                            MouseButtonUpdate(int button, int action, int mods);
-    virtual bool                            MouseScrollUpdate(double xoffset, double yoffset);
-
-    // IInputHandler overrides (registered with Input layer)
-    bool onKeyEvent(int key, int scancode, int action, int mods) override
-        { return KeyboardUpdate(key, scancode, action, mods); }
-    bool onMouseMoveEvent(double xpos, double ypos) override
-        { return MousePosUpdate(xpos, ypos); }
-    bool onMouseButtonEvent(int button, int action, int mods) override
-        { return MouseButtonUpdate(button, action, mods); }
-    bool onMouseScrollEvent(double xoffset, double yoffset) override
-        { return MouseScrollUpdate(xoffset, yoffset); }
-
     virtual void                            Animate(float fElapsedTimeSeconds) override;
 
     void                                    FillPTPipelineGlobalMacros(std::vector<caustica::ShaderMacro> & macros);
@@ -178,13 +162,7 @@ public:
     void                                    RecreateAccelStructs(nvrhi::ICommandList* commandList);
     void                                    RequestMeshAccelRebuild(const std::shared_ptr<caustica::MeshInfo>& mesh);
     void                                    BackBufferResizing() override;
-    void                                    CreateRenderPasses(bool& exposureResetRequired, nvrhi::CommandListHandle initializeCommandList);
-    void                                    PreUpdatePathTracing(bool resetAccum, nvrhi::CommandListHandle commandList);
-    void                                    PostUpdatePathTracing();
-    void                                    UpdatePathTracerConstants( PathTracerConstants & constants, const PathTracerCameraData & cameraData );
-    void                                    RtxdiSetupFrame(nvrhi::IFramebuffer* framebuffer, PathTracerCameraData cameraData, uint2 renderDims);
-
-    // Extendable sample interface
+    void                                    Render(nvrhi::IFramebuffer* framebuffer) override;
     virtual bool                            NeedsRasterPrecompute() { return false; } // TODO: do this in a nicer way, no time now
     virtual void                            SampleRenderCode(nvrhi::IFramebuffer* framebuffer, nvrhi::CommandListHandle commandList, const SampleConstants& constants) = 0; // TODO: Rename this
     virtual void                            CreateRTPipelines() = 0;
@@ -193,18 +171,9 @@ public:
 
     void                                    Denoise(nvrhi::IFramebuffer* framebuffer);
     void                                    PathTrace(nvrhi::IFramebuffer* framebuffer, const SampleConstants & constants);
-    void                                    PreRender();
-    void                                    StreamlinePreRender();
-#if CAUSTICA_WITH_NATIVE_DLSS
-    void                                    NativeDLSSPreRender();
-#endif
-    void                                    Render(nvrhi::IFramebuffer* framebuffer) override;
     void                                    PostProcessAA(nvrhi::IFramebuffer* framebuffer, bool reset);
 
-    void                                    PreUpdateLighting(nvrhi::CommandListHandle commandList, bool& needNewBindings);     // this can (re)allocate buffers depending on scene changes
-    void                                    UpdateLighting(nvrhi::CommandListHandle commandList);                               // this will process and fill up all lighting buffers
-
-    dm::float2                     ComputeCameraJitter( uint frameIndex );
+    dm::float2                              ComputeCameraJitter(uint frameIndex);
 
     std::string                             GetResolutionInfo() const;
     std::string                             GetFPSInfo() const              { return m_fpsInfo; }
@@ -294,23 +263,13 @@ private:
 
     void                                    UpdateCameraFromScene( const std::shared_ptr<caustica::PerspectiveCamera> & sceneCamera );
     void                                    UpdateViews( nvrhi::IFramebuffer* framebuffer );
-    void                                    DenoisedScreenshot( nvrhi::ITexture * framebufferTexture ) const;
-    void                                    ResetReferenceOIDN();
-    void                                    ApplyReferenceOIDN();
-    void                                    PostProcessPreToneMapping(nvrhi::ICommandList* commandList, const caustica::ICompositeView& compositeView);
-    void                                    PostProcessPostToneMapping(nvrhi::ICommandList* commandList, const caustica::ICompositeView& compositeView);
     void                                    LoadGaussianSplatsFromScene();
     bool                                    AttachGaussianSplatToScene(const std::filesystem::path& fileName, bool convertRdfToRub);
     void                                    PrepareGaussianSplatPass(GaussianSplatPass& pass);
     void                                    UpdateGaussianSplatUIState();
     uint32_t                                GetTotalGaussianSplatCount() const;
-    void                                    RenderGaussianSplats(bool renderToOutputColor);
-    void                                    AccumulateGaussianSplats(const caustica::IView& splatView);
     void                                    BuildGaussianSplatEmissionProxyList();
     void                                    RefreshEnvironmentMapMediaList();
-#if CAUSTICA_WITH_NATIVE_DLSS
-    bool                                    EvaluateNativeDLSS(bool reset);
-#endif
 
 private:
     struct GaussianSplatSceneObject
@@ -398,9 +357,7 @@ private:
     nvrhi::GraphicsPipelineHandle               m_linesPipeline;
     nvrhi::BindingLayoutHandle                  m_linesBindingLayout;
     nvrhi::BindingSetHandle                     m_linesBindingSet;
-    uint2                                       m_pickPosition = 0u;
-    bool                                        m_pick = false;         // right-click: pixel debug + material and instance picking
-    bool                                        m_pickInstance = false;  // instance picking for Inspector
+
     DebugFeedbackStruct                         m_feedbackData;
 
     DeltaTreeVizPathVertex                      m_debugDeltaPathTree[cDeltaTreeVizMaxVertices];
@@ -454,6 +411,9 @@ private:
     ProgressBar                                 m_progressInitializingRenderer;
 
     std::unique_ptr<class ZoomTool>             m_zoomTool;
+
+    std::unique_ptr<PathTracerInputController>  m_inputController;
+    std::unique_ptr<PathTracingRenderer>      m_pathTracingRenderer;
 
     bool                                        m_asyncLoadingInProgress = false;
     bool                                        m_accumulationCompleted = false;

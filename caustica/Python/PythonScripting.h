@@ -6,7 +6,7 @@
 // the environment map, the path-tracer settings, the camera, etc.
 //
 // The interpreter lives on the same thread as the renderer and runs
-// scripts queued up via QueueScriptFile/QueueScriptString. The Sample
+// scripts queued up via QueueScriptFile/QueueScriptString. The PathTracerApp
 // drains the queue once per frame, after the scene is fully loaded, so
 // that the Python code observes a consistent view of the scene graph.
 
@@ -18,12 +18,12 @@
 #include <string>
 #include <vector>
 
-class Sample;
+class PathTracerApp;
 
 class PythonScripting
 {
 public:
-    explicit PythonScripting(Sample& app);
+    explicit PythonScripting(PathTracerApp& app);
     ~PythonScripting();
 
     // Non-copyable / non-movable: owns the embedded CPython runtime.
@@ -45,7 +45,7 @@ public:
     void QueueScriptString(std::string code, std::string label = "<inline>");
 
     // Run any queued scripts on the calling thread. Must be called from the
-    // main thread (between renders), after Sample::SceneLoaded() has run.
+    // main thread (between renders), after PathTracerApp::SceneLoaded() has run.
     void ProcessPendingScripts();
 
     // Returns the most recent stdout/stderr output captured from Python.
@@ -65,7 +65,7 @@ private:
 
     bool RunPendingLocked(const PendingScript& script);
 
-    Sample&                         m_app;
+    PathTracerApp&                  m_app;
     bool                            m_initialized = false;
 
     std::mutex                      m_mutex;

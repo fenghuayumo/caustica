@@ -42,6 +42,7 @@
 namespace caustica
 {
     class Input;              // Platform layer: input dispatch
+    class IInputHandler;      // Platform layer: input handler interface
     class Window;             // Platform layer: window abstraction
     class RenderPassManager;  // Renderer layer: pass management
     class Application;            // Engine layer: message loop
@@ -225,6 +226,9 @@ namespace caustica
         void AddRenderPassToFront(IRenderPass *pController);
         void AddRenderPassToBack(IRenderPass *pController);
         void RemoveRenderPass(IRenderPass *pController);
+
+        void RegisterInputHandler(IInputHandler* handler);
+        void UnregisterInputHandler(IInputHandler* handler);
 
         // returns the size of the window in screen coordinates
         void GetWindowDimensions(int& width, int& height);

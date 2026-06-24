@@ -264,6 +264,17 @@ void GpuDevice::RemoveRenderPass(IRenderPass *pRenderPass)
     if (m_Input) { if (auto* h = dynamic_cast<IInputHandler*>(pRenderPass)) m_Input->unregisterHandler(h); }
 }
 
+void GpuDevice::RegisterInputHandler(IInputHandler* handler)
+{
+    if (!m_Input) m_Input = new Input();
+    m_Input->registerHandler(handler);
+}
+
+void GpuDevice::UnregisterInputHandler(IInputHandler* handler)
+{
+    if (m_Input) m_Input->unregisterHandler(handler);
+}
+
 void GpuDevice::BackBufferResizing()
 {
     m_SwapChain.framebuffers.clear();

@@ -3,7 +3,7 @@
 
 #include <string>
 #include <SampleUI.h>
-#include "caustica.h"
+#include "PathTracerApp.h"
 #include <core/file_utils.h>
 #include <core/format.h>
 #include <core/path_utils.h>
@@ -23,7 +23,7 @@
 using namespace caustica;
 using namespace caustica;
 
-CaptureScriptManager::CaptureScriptManager(Sample & sample, SampleUIData & sampleUI, const CommandLineOptions & cmdLine)
+CaptureScriptManager::CaptureScriptManager(PathTracerApp & sample, SampleUIData & sampleUI, const CommandLineOptions & cmdLine)
     : m_app(sample), m_ui(sampleUI), m_cmdLine(cmdLine)
 {
     if (m_cmdLine.capturePath != "")

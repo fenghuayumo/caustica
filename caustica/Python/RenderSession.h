@@ -35,7 +35,7 @@
 #include <wrl/client.h>
 #endif
 
-class Sample;
+class PathTracerApp;
 class AdvancedPathTracer;
 namespace caustica { class ShaderFactory; }
 
@@ -105,8 +105,8 @@ public:
     void SetCameraFOV(float verticalFovDegrees);
     void SetCameraIntrinsics(float fx, float fy, float cx, float cy, float width, float height);
 
-    Sample*       GetSample()       { return reinterpret_cast<Sample*>(m_renderer.get()); }
-    const Sample* GetSample() const { return reinterpret_cast<const Sample*>(m_renderer.get()); }
+    PathTracerApp*       GetPathTracerApp()       { return m_renderer.get(); }
+    const PathTracerApp* GetPathTracerApp() const { return m_renderer.get(); }
 
     SampleUIData& GetSampleUIData() { return m_sampleUIData; }
     const SampleUIData& GetSampleUIData() const { return m_sampleUIData; }

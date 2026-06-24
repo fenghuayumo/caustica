@@ -49,7 +49,7 @@ class ImGuiManager;
 class SampleUI : public caustica::ImGui_Renderer
 {
 public:
-    SampleUI(caustica::GpuDevice* deviceManager, class SampleBaseApp & baseApp, class Sample & app, SampleUIData& ui, bool NVAPI_SERSupported, const struct CommandLineOptions& cmdLine);
+    SampleUI(caustica::GpuDevice* deviceManager, class SampleBaseApp & baseApp, class PathTracerApp & app, SampleUIData& ui, bool NVAPI_SERSupported, const struct CommandLineOptions& cmdLine);
     virtual ~SampleUI();
 protected:
     virtual void buildUI(void) override;
@@ -71,7 +71,7 @@ private:
 
 private:
     class SampleBaseApp& m_baseApp;
-    class Sample& m_app;
+    class PathTracerApp& m_app;
 
     int                         m_currentFontScaleIndex = -1;
     float                       m_currentScale = 1.0f;

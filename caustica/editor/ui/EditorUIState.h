@@ -47,5 +47,14 @@ struct EditorUIState
     bool                                SelectedGaussianSplat = false;
 
     std::vector<std::string>            PendingDroppedFiles;                            // files dropped via drag-and-drop, consumed by Sample each frame
+
+    // Editor picking (input layer writes, renderer reads and clears after resolve).
+    dm::uint2                           PickPosition                            = { 0, 0 };
+    bool                                PickMaterialRequested                     = false;
+    bool                                PickInstanceRequested                     = false;
+
+    void requestMaterialPick() { PickMaterialRequested = true; }
+    bool hasActivePickRequest() const { return PickMaterialRequested || PickInstanceRequested; }
+    void clearPickRequests() { PickMaterialRequested = false; PickInstanceRequested = false; }
 };
 

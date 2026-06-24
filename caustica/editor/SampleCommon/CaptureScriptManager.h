@@ -5,14 +5,14 @@
 
 #include <imgui/imgui_renderer.h>
 
-class Sample;
+class PathTracerApp;
 class SampleUIData;
 struct CommandLineOptions;
 
 class CaptureScriptManager
 {
 public:
-	CaptureScriptManager(Sample & sample, SampleUIData & sampleUI, const CommandLineOptions & cmdLine);
+	CaptureScriptManager(PathTracerApp & sample, SampleUIData & sampleUI, const CommandLineOptions & cmdLine);
 	~CaptureScriptManager();
 
     bool ScriptProgressUI();
@@ -29,7 +29,7 @@ public:
 
 
 private:
-    Sample &                    m_app;
+    PathTracerApp &                    m_app;
     SampleUIData &              m_ui;
     const CommandLineOptions &  m_cmdLine;
     

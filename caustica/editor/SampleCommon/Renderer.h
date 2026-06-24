@@ -8,7 +8,7 @@
 #include <math/math.h>
 #include <render/Core/CameraController.h>
 
-class Sample;
+class PathTracerApp;
 #include <scene/SceneGraph.h>  // for GaussianSplat
 class GaussianSplatPass;
 struct SampleConstants;
@@ -26,7 +26,7 @@ class Renderer
 public:
     using RenderCodeFn = std::function<void(nvrhi::IFramebuffer*, nvrhi::CommandListHandle, const SampleConstants&)>;
 
-    explicit Renderer(Sample& owner);
+    explicit Renderer(PathTracerApp& owner);
     ~Renderer();
 
     // Callbacks
@@ -54,10 +54,10 @@ public:
     float getAvgTimePerFrame() const;
     void debugDrawLine(dm::float3 start, dm::float3 stop, dm::float4 col1, dm::float4 col2);
 
-    Sample& owner() { return m_owner; }
+    PathTracerApp& owner() { return m_owner; }
 
 private:
     [[nodiscard]] caustica::CameraUpdateParams makeCameraUpdateParams() const;
 
-    Sample& m_owner;
+    PathTracerApp& m_owner;
 };

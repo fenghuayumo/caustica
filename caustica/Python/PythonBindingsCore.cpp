@@ -9,7 +9,7 @@
 #include <nanobind/stl/optional.h>
 #include <nanobind/operators.h>
 
-#include "caustica.h"
+#include "PathTracerApp.h"
 #include <SampleUI.h>
 #include <scene/Scene.h>
 #include <render/Passes/Lighting/MaterialsBaker.h>
@@ -43,7 +43,7 @@ using caustica::math::double4;
 
 // Singleton consumed by embed mode (set by PythonScripting before Py_Initialize).
 // In extension mode this stays nullptr - Renderer manages its own Sample.
-Sample* g_pythonSampleSingleton = nullptr;
+PathTracerApp* g_pythonPathTracerAppSingleton = nullptr;
 
 // Distinct C++ enum types so nanobind can register them as separate Python
 // enums (nb::enum_<T> requires T to be unique across the module).  All map
@@ -1264,101 +1264,101 @@ void RegisterCoreBindings(nb::module_& m)
         ;
 
     // --- Sample (top-level renderer access) -------------------------------
-    nb::class_<Sample>(m, "Sample",
+    nb::class_<PathTracerApp>(m, "Sample",
         "caustica renderer instance. In embed mode use caustica.app(); in extension\n"
         "mode use Renderer.app to retrieve the underlying instance.")
-        .def_prop_ro("settings", [](Sample& self) -> SampleUIData* {
+        .def_prop_ro("settings", [](PathTracerApp& self) -> SampleUIData* {
                 return &self.GetUIData();
             }, nb::rv_policy::reference,
             "Live `Settings` mirror of the current UI state.")
-        .def_prop_ro("scene", [](Sample& self) {
+        .def_prop_ro("scene", [](PathTracerApp& self) {
                 return self.GetScene();
             }, "Current loaded `Scene`, or None before a scene is available.")
 
-        .def_prop_ro("scene_name",  [](Sample& self) { return self.GetCurrentSceneName(); })
-        .def_prop_ro("available_scenes", [](Sample& self) { return self.GetAvailableScenes(); })
+        .def_prop_ro("scene_name",  [](PathTracerApp& self) { return self.GetCurrentSceneName(); })
+        .def_prop_ro("available_scenes", [](PathTracerApp& self) { return self.GetAvailableScenes(); })
 
-        .def("get_scene", [](Sample& self) {
+        .def("get_scene", [](PathTracerApp& self) {
                 return self.GetScene();
             }, "Return the current loaded Scene, matching the C++ GetScene() entry point.")
 
-        .def("set_scene", [](Sample& self, const std::string& name, bool forceReload)
+        .def("set_scene", [](PathTracerApp& self, const std::string& name, bool forceReload)
             {
                 self.SetCurrentScene(name, forceReload);
             },
             nb::arg("scene_name"), nb::arg("force_reload") = false,
             "Switch to a different scene file from caustica.Sample.available_scenes.")
 
-        .def("load_gaussian_splats", [](Sample& self, const std::string& fileName, bool convertRdfToRub)
+        .def("load_gaussian_splats", [](PathTracerApp& self, const std::string& fileName, bool convertRdfToRub)
             {
                 return self.LoadGaussianSplatFile(fileName, convertRdfToRub);
             },
             nb::arg("file_name"), nb::arg("convert_rdf_to_rub") = true,
             "Load a 3DGS .ply file and rasterize it over the current scene.")
 
-        .def("load_mesh_file", [](Sample& self, const std::string& fileName)
+        .def("load_mesh_file", [](PathTracerApp& self, const std::string& fileName)
             {
                 return self.LoadMeshFile(fileName);
             },
             nb::arg("file_name"),
             "Append a mesh file (.gltf, .glb, or .obj) to the current scene.")
 
-        .def_prop_ro("gaussian_splat_count", [](Sample& self) { return self.GetGaussianSplatCount(); })
-        .def_prop_ro("gaussian_splat_object_count", [](Sample& self) { return self.GetGaussianSplatObjectCount(); })
-        .def_prop_ro("gaussian_splat_file_name", [](Sample& self) { return self.GetGaussianSplatFileName(); })
+        .def_prop_ro("gaussian_splat_count", [](PathTracerApp& self) { return self.GetGaussianSplatCount(); })
+        .def_prop_ro("gaussian_splat_object_count", [](PathTracerApp& self) { return self.GetGaussianSplatObjectCount(); })
+        .def_prop_ro("gaussian_splat_file_name", [](PathTracerApp& self) { return self.GetGaussianSplatFileName(); })
 
-        .def("get_materials", [](Sample& self) {
+        .def("get_materials", [](PathTracerApp& self) {
                 return GetSceneMaterials(SceneGraphFromScene(self.GetScene()));
             }, "Compatibility alias for `sample.scene.get_materials()`.")
 
-        .def("find_material", [](Sample& self, const std::string& name) -> std::shared_ptr<PTMaterial> {
+        .def("find_material", [](PathTracerApp& self, const std::string& name) -> std::shared_ptr<PTMaterial> {
                 return FindSceneMaterial(SceneGraphFromScene(self.GetScene()), name);
             }, nb::arg("name"), "Compatibility alias for `sample.scene.find_material(name)`.")
 
-        .def("find_material_by_id", [](Sample& self, int materialId) -> std::shared_ptr<PTMaterial> {
+        .def("find_material_by_id", [](PathTracerApp& self, int materialId) -> std::shared_ptr<PTMaterial> {
                 return FindSceneMaterialById(SceneGraphFromScene(self.GetScene()), materialId);
             }, nb::arg("material_id"), "Compatibility alias for `sample.scene.find_material_by_id(material_id)`.")
 
-        .def("get_lights", [](Sample& self) {
+        .def("get_lights", [](PathTracerApp& self) {
                 return GetSceneLights(SceneGraphFromScene(self.GetScene()));
             }, "Compatibility alias for `sample.scene.get_lights()`.")
 
-        .def("get_scene_bounds", [](Sample& self) {
+        .def("get_scene_bounds", [](PathTracerApp& self) {
                 return SceneBoundsTuple(SceneBoundsFromScene(self.GetScene()));
             },
             "Compatibility alias for `sample.scene.get_scene_bounds()`.")
 
-        .def_prop_ro("scene_bounds", [](Sample& self) {
+        .def_prop_ro("scene_bounds", [](PathTracerApp& self) {
                 return SceneBoundsTuple(SceneBoundsFromScene(self.GetScene()));
             },
             "Shortcut for `sample.scene.bounds`. Returns the world-space\n"
             "((min.xyz), (max.xyz)) AABB or `None` if no scene is loaded.")
-        .def_prop_ro("scene_bounds_center", [](Sample& self) {
+        .def_prop_ro("scene_bounds_center", [](PathTracerApp& self) {
                 return SceneBoundsCenter(SceneBoundsFromScene(self.GetScene()));
             }, "Shortcut for `sample.scene.bounds_center` (or `None`).")
-        .def_prop_ro("scene_bounds_size", [](Sample& self) {
+        .def_prop_ro("scene_bounds_size", [](PathTracerApp& self) {
                 return SceneBoundsSize(SceneBoundsFromScene(self.GetScene()));
             }, "Shortcut for `sample.scene.bounds_size` (or `None`).")
 
-        .def("find_light", [](Sample& self, const std::string& name) -> std::shared_ptr<Light> {
+        .def("find_light", [](PathTracerApp& self, const std::string& name) -> std::shared_ptr<Light> {
                 return FindSceneLight(SceneGraphFromScene(self.GetScene()), name);
             }, nb::arg("name"), "Compatibility alias for `sample.scene.find_light(name)`.")
-        .def("find_node", [](Sample& self, const std::string& path) -> std::shared_ptr<SceneGraphNode> {
+        .def("find_node", [](PathTracerApp& self, const std::string& path) -> std::shared_ptr<SceneGraphNode> {
                 return FindSceneNode(SceneGraphFromScene(self.GetScene()), path);
             }, nb::arg("path"), "Compatibility alias for `sample.scene.find_node(path)`.")
 
-        .def("get_meshes", [](Sample& self) {
+        .def("get_meshes", [](PathTracerApp& self) {
                 return GetSceneMeshes(SceneGraphFromScene(self.GetScene()));
             }, "Compatibility alias for `sample.scene.get_meshes()`.")
-        .def("find_mesh", [](Sample& self, const std::string& name) -> std::shared_ptr<MeshInfo> {
+        .def("find_mesh", [](PathTracerApp& self, const std::string& name) -> std::shared_ptr<MeshInfo> {
                 return FindSceneMesh(SceneGraphFromScene(self.GetScene()), name);
             }, nb::arg("name"), "Compatibility alias for `sample.scene.find_mesh(name)`.")
-        .def("get_mesh_vertices", [](Sample& self, const std::shared_ptr<MeshInfo>& mesh) {
+        .def("get_mesh_vertices", [](PathTracerApp& self, const std::shared_ptr<MeshInfo>& mesh) {
                 return Float3VectorToList(self.GetMeshVertices(mesh));
             }, nb::arg("mesh"),
             "Return unique mesh positions as a list of (x, y, z) tuples in object space.")
         .def("set_mesh_vertices",
-            [](Sample& self, const std::shared_ptr<MeshInfo>& mesh, nb::object vertices,
+            [](PathTracerApp& self, const std::shared_ptr<MeshInfo>& mesh, nb::object vertices,
                bool recomputeNormals, bool rebuildAccelerationStructure) {
                 self.SetMeshVertices(mesh, ToFloat3Vector(vertices), recomputeNormals, rebuildAccelerationStructure);
             },
@@ -1367,7 +1367,7 @@ void RegisterCoreBindings(nb::module_& m)
             "Replace all unique object-space positions for a mesh and refresh GPU buffers.\n"
             "Updates are propagated to all render vertices split by normals or UVs.")
         .def("deform_mesh",
-            [](Sample& self, const std::shared_ptr<MeshInfo>& mesh, nb::object callback,
+            [](PathTracerApp& self, const std::shared_ptr<MeshInfo>& mesh, nb::object callback,
                bool recomputeNormals, bool rebuildAccelerationStructure) {
                 std::vector<float3> vertices = self.GetMeshVertices(mesh);
                 for (size_t i = 0; i < vertices.size(); ++i)
@@ -1383,17 +1383,17 @@ void RegisterCoreBindings(nb::module_& m)
             nb::arg("rebuild_acceleration_structure") = true,
             "Apply a Python callback to each unique vertex. callback(index, (x,y,z))\n"
             "may return a replacement triple, or None to keep the vertex unchanged.")
-        .def("get_mesh_vertices_world", [](Sample& self, const std::shared_ptr<MeshInfo>& mesh) {
+        .def("get_mesh_vertices_world", [](PathTracerApp& self, const std::shared_ptr<MeshInfo>& mesh) {
                 return Float3VectorToList(self.GetMeshVerticesWorld(mesh));
             }, nb::arg("mesh"),
             "Return unique mesh positions as a list of (x, y, z) tuples in world space.\n"
             "The mesh must have exactly one scene instance; pass a SceneNode for instanced meshes.")
-        .def("get_mesh_vertices_world", [](Sample& self, const std::shared_ptr<SceneGraphNode>& node) {
+        .def("get_mesh_vertices_world", [](PathTracerApp& self, const std::shared_ptr<SceneGraphNode>& node) {
                 return Float3VectorToList(self.GetMeshVerticesWorld(node));
             }, nb::arg("node"),
             "Return unique vertex positions for this mesh node as world-space (x, y, z) tuples.")
         .def("set_mesh_vertices_world",
-            [](Sample& self, const std::shared_ptr<MeshInfo>& mesh, nb::object vertices,
+            [](PathTracerApp& self, const std::shared_ptr<MeshInfo>& mesh, nb::object vertices,
                bool recomputeNormals, bool rebuildAccelerationStructure) {
                 self.SetMeshVerticesWorld(mesh, ToFloat3Vector(vertices), recomputeNormals, rebuildAccelerationStructure);
             },
@@ -1402,7 +1402,7 @@ void RegisterCoreBindings(nb::module_& m)
             "Replace all unique positions using world-space coordinates. The mesh must have\n"
             "exactly one scene instance; pass a SceneNode for instanced meshes.")
         .def("set_mesh_vertices_world",
-            [](Sample& self, const std::shared_ptr<SceneGraphNode>& node, nb::object vertices,
+            [](PathTracerApp& self, const std::shared_ptr<SceneGraphNode>& node, nb::object vertices,
                bool recomputeNormals, bool rebuildAccelerationStructure) {
                 self.SetMeshVerticesWorld(node, ToFloat3Vector(vertices), recomputeNormals, rebuildAccelerationStructure);
             },
@@ -1410,7 +1410,7 @@ void RegisterCoreBindings(nb::module_& m)
             nb::arg("rebuild_acceleration_structure") = true,
             "Replace all unique positions for this mesh node using world-space coordinates.")
         .def("deform_mesh_world",
-            [](Sample& self, const std::shared_ptr<MeshInfo>& mesh, nb::object callback,
+            [](PathTracerApp& self, const std::shared_ptr<MeshInfo>& mesh, nb::object callback,
                bool recomputeNormals, bool rebuildAccelerationStructure) {
                 std::vector<float3> vertices = self.GetMeshVerticesWorld(mesh);
                 for (size_t i = 0; i < vertices.size(); ++i)
@@ -1427,7 +1427,7 @@ void RegisterCoreBindings(nb::module_& m)
             "Apply a Python callback to unique world-space vertices. callback(index, (x,y,z))\n"
             "may return a replacement world-space triple, or None to keep the vertex unchanged.")
         .def("deform_mesh_world",
-            [](Sample& self, const std::shared_ptr<SceneGraphNode>& node, nb::object callback,
+            [](PathTracerApp& self, const std::shared_ptr<SceneGraphNode>& node, nb::object callback,
                bool recomputeNormals, bool rebuildAccelerationStructure) {
                 std::vector<float3> vertices = self.GetMeshVerticesWorld(node);
                 for (size_t i = 0; i < vertices.size(); ++i)
@@ -1443,42 +1443,42 @@ void RegisterCoreBindings(nb::module_& m)
             nb::arg("rebuild_acceleration_structure") = true,
             "Apply a Python callback to this mesh node's unique world-space vertices.")
 
-        .def("set_environment_map", [](Sample& self, const std::string& path) {
+        .def("set_environment_map", [](PathTracerApp& self, const std::string& path) {
                 self.SetEnvMapOverrideSource(path);
             }, nb::arg("path"))
 
-        .def("get_camera_pos_dir_up", [](Sample& self) {
+        .def("get_camera_pos_dir_up", [](PathTracerApp& self) {
                 return self.GetCurrentCameraPosDirUp();
             }, "Returns a comma-separated string of pos.xyz, dir.xyz, up.xyz.")
 
-        .def("set_camera_pos_dir_up", [](Sample& self, const std::string& v) {
+        .def("set_camera_pos_dir_up", [](PathTracerApp& self, const std::string& v) {
                 return self.SetCurrentCameraPosDirUp(v);
             }, nb::arg("pos_dir_up"))
 
-        .def("set_camera_fov", [](Sample& self, float fov) { self.SetCameraVerticalFOV(caustica::math::radians(fov)); },
+        .def("set_camera_fov", [](PathTracerApp& self, float fov) { self.SetCameraVerticalFOV(caustica::math::radians(fov)); },
             nb::arg("vertical_fov_degrees"))
 
         .def("set_camera_intrinsics",
-            [](Sample& self, float fx, float fy, float cx, float cy, float width, float height) {
+            [](PathTracerApp& self, float fx, float fy, float cx, float cy, float width, float height) {
                 self.SetCameraIntrinsics(fx, fy, cx, cy, width, height);
             },
             nb::arg("fx"), nb::arg("fy"), nb::arg("cx"), nb::arg("cy"), nb::arg("width"), nb::arg("height"))
 
-        .def("get_camera_fov", [](Sample& self) { return self.GetCameraVerticalFOV(); })
+        .def("get_camera_fov", [](PathTracerApp& self) { return self.GetCameraVerticalFOV(); })
 
-        .def("save_current_camera",  [](Sample& self) { self.SaveCurrentCamera(); })
-        .def("load_current_camera",  [](Sample& self) { self.LoadCurrentCamera(); })
+        .def("save_current_camera",  [](PathTracerApp& self) { self.SaveCurrentCamera(); })
+        .def("load_current_camera",  [](PathTracerApp& self) { self.LoadCurrentCamera(); })
 
-        .def("request_shader_reload",  [](Sample& self) { self.GetUIData().ShaderReloadRequested = true; })
-        .def("request_accel_rebuild",  [](Sample& self) { self.GetUIData().AccelerationStructRebuildRequested = true; })
+        .def("request_shader_reload",  [](PathTracerApp& self) { self.GetUIData().ShaderReloadRequested = true; })
+        .def("request_accel_rebuild",  [](PathTracerApp& self) { self.GetUIData().AccelerationStructRebuildRequested = true; })
         .def("request_mesh_accel_rebuild",
-            [](Sample& self, const std::shared_ptr<MeshInfo>& mesh) {
+            [](PathTracerApp& self, const std::shared_ptr<MeshInfo>& mesh) {
                 self.RequestMeshAccelRebuild(mesh);
             },
             nb::arg("mesh"),
             "Request a BLAS rebuild for one dirty mesh without forcing a full scene AS rebuild.")
         .def("request_mesh_accel_rebuild",
-            [](Sample& self, const std::shared_ptr<SceneGraphNode>& node) {
+            [](PathTracerApp& self, const std::shared_ptr<SceneGraphNode>& node) {
                 if (!node)
                     throw std::runtime_error("request_mesh_accel_rebuild: node is null");
                 std::shared_ptr<MeshInfo> mesh = MeshFromNode(*node);
@@ -1488,10 +1488,10 @@ void RegisterCoreBindings(nb::module_& m)
             },
             nb::arg("node"),
             "Request a BLAS rebuild for the mesh attached to one scene node.")
-        .def("reset_accumulation",     [](Sample& self) { self.GetUIData().ResetAccumulation = true; })
-        .def("reset_realtime_caches",  [](Sample& self) { self.GetUIData().ResetRealtimeCaches = true; })
+        .def("reset_accumulation",     [](PathTracerApp& self) { self.GetUIData().ResetAccumulation = true; })
+        .def("reset_realtime_caches",  [](PathTracerApp& self) { self.GetUIData().ResetRealtimeCaches = true; })
 
-        .def("set_realtime_mode", [](Sample& self, bool standaloneDenoiser, int realtimeAA)
+        .def("set_realtime_mode", [](PathTracerApp& self, bool standaloneDenoiser, int realtimeAA)
             {
                 auto& ui = self.GetUIData();
                 if (!ui.RealtimeMode)
@@ -1507,7 +1507,7 @@ void RegisterCoreBindings(nb::module_& m)
             "    standalone_denoiser: enable NRD (no effect with DLSS-RR)\n"
             "    realtime_aa        : 0=Off, 1=TAA, 2=DLSS, 3=DLSS-RR")
 
-        .def("set_reference_mode", [](Sample& self, int spp, bool oidn, int oidnQuality, int oidnPasses, int oidnPrefilter)
+        .def("set_reference_mode", [](PathTracerApp& self, int spp, bool oidn, int oidnQuality, int oidnPasses, int oidnPrefilter)
             {
                 auto& ui = self.GetUIData();
                 if (ui.RealtimeMode)
@@ -1535,9 +1535,9 @@ void RegisterCoreBindings(nb::module_& m)
             "    oidn_prefilter: caustica.OidnPrefilter (0=None, 1=Fast, 2=Accurate)")
 
         .def_prop_ro("accumulation_completed",
-            [](Sample& self) { return self.AccumulationCompleted(); })
+            [](PathTracerApp& self) { return self.AccumulationCompleted(); })
         .def_prop_ro("accumulation_sample_index",
-            [](Sample& self) { return self.GetAccumulationSampleIndex(); })
+            [](PathTracerApp& self) { return self.GetAccumulationSampleIndex(); })
         ;
 }
 

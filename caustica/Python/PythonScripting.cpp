@@ -8,12 +8,12 @@
 #include <nanobind/nanobind.h>
 #include <Python.h>
 
-#include "caustica.h"
+#include "PathTracerApp.h"
 
 namespace nb = nanobind;
 
 // Forward declared in PythonBindings.cpp - registers the caustica module.
-extern Sample* g_pythonSampleSingleton;
+extern PathTracerApp* g_pythonPathTracerAppSingleton;
 
 // Symbol defined by NB_MODULE(caustica, m) inside PythonBindings.cpp - we declare
 // it manually here so we can hand it to PyImport_AppendInittab without pulling
@@ -53,7 +53,7 @@ if not hasattr(sys, "_caustica_capture_stdout"):
 )PY";
 }
 
-PythonScripting::PythonScripting(Sample& app)
+PythonScripting::PythonScripting(PathTracerApp& app)
     : m_app(app)
 {
 }
@@ -75,7 +75,7 @@ PythonScripting::~PythonScripting()
         Py_FinalizeEx();
         m_initialized = false;
     }
-    g_pythonSampleSingleton = nullptr;
+    g_pythonPathTracerAppSingleton = nullptr;
 }
 
 bool PythonScripting::Initialize()
@@ -84,7 +84,7 @@ bool PythonScripting::Initialize()
         return true;
 
     // Make the Sample pointer visible to nanobind bindings before init.
-    g_pythonSampleSingleton = &m_app;
+    g_pythonPathTracerAppSingleton = &m_app;
 
     // Register our embedded module before Py_Initialize so that scripts can
     // immediately `import caustica` without touching sys.path.
@@ -241,7 +241,7 @@ std::string PythonScripting::ConsumeOutputLog()
 
 #include <core/log.h>
 
-PythonScripting::PythonScripting(Sample& app) : m_app(app) {}
+PythonScripting::PythonScripting(PathTracerApp& app) : m_app(app) {}
 PythonScripting::~PythonScripting() {}
 
 bool PythonScripting::Initialize()

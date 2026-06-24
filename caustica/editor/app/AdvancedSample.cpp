@@ -8,7 +8,7 @@
 
 class AdvancedSample : public SampleBaseApp
 {
-    std::unique_ptr<Sample> CreateMainRenderPass(caustica::GpuDevice& deviceManager, const CommandLineOptions& cmdLineOptions, SampleUIData& ui) override
+    std::unique_ptr<PathTracerApp> CreateMainRenderPass(caustica::GpuDevice& deviceManager, const CommandLineOptions& cmdLineOptions, SampleUIData& ui) override
     {
         return std::make_unique<AdvancedPathTracer>(deviceManager, cmdLineOptions, ui);
     }

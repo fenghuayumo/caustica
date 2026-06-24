@@ -1,11 +1,11 @@
 // Shared bindings between the embedded Python (caustica.exe) and the Python
 // extension module (caustica.pyd).  The actual NB_MODULE() definitions live
-// in their respective hosts and only differ in how the running Sample is
+// in their respective hosts and only differ in how the running PathTracerApp is
 // looked up:
 //
 //   - Embed     : module-level `app()` returns the singleton set by the
-//                 Sample constructor (g_pythonSampleSingleton).
-//   - Extension : the `Renderer` class owns its private Sample instance
+//                 PathTracerApp constructor (g_pythonPathTracerAppSingleton).
+//   - Extension : the `Renderer` class owns its private PathTracerApp instance
 //                 and the `app()` accessor returns its current renderer.
 
 #pragma once
@@ -14,7 +14,7 @@
 
 #include <nanobind/nanobind.h>
 
-class Sample;
+class PathTracerApp;
 
 namespace caustica_py
 {
@@ -26,6 +26,6 @@ namespace caustica_py
 
 // Shared singleton pointer used by the embedded mode.  Set by PythonScripting
 // before Py_Initialize and consumed by PythonBindings_Embed.cpp.
-extern Sample* g_pythonSampleSingleton;
+extern PathTracerApp* g_pythonPathTracerAppSingleton;
 
 #endif // CAUSTICA_WITH_PYTHON

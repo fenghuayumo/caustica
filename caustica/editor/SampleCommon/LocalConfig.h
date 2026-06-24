@@ -4,7 +4,7 @@
 
 #include <shaders/PathTracer/Config.h>
 
-class Sample;
+class PathTracerApp;
 struct SampleUIData;
 
 namespace caustica
@@ -17,5 +17,5 @@ struct LocalConfig
     static void        PreferredSceneOverride( std::string & preferredScene );
     static void        PostAppInit(SampleUIData & sampleUI );
     static void        PostMaterialLoad( caustica::Material & material );
-    static void        PostSceneLoad( Sample & sample, SampleUIData & sampleUI );
+    static void        PostSceneLoad( PathTracerApp & sample, SampleUIData & sampleUI );
 };

@@ -1,5 +1,5 @@
 #include "SampleCommon/Renderer.h"
-#include "caustica.h"
+#include "PathTracerApp.h"
 #include <render/Core/CameraController.h>
 #include <render/Passes/PostProcess/ToneMappingPasses.h>
 #include <core/file_utils.h>
@@ -15,7 +15,7 @@
 
 using namespace caustica;
 
-Renderer::Renderer(Sample& owner) : m_owner(owner) {}
+Renderer::Renderer(PathTracerApp& owner) : m_owner(owner) {}
 Renderer::~Renderer() = default;
 
 caustica::CameraUpdateParams Renderer::makeCameraUpdateParams() const

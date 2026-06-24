@@ -17,7 +17,7 @@
 class GameScene
 {
 public:
-    GameScene(class Sample & sample, const CommandLineOptions& cmdLine);
+    GameScene(class PathTracerApp & sample, const CommandLineOptions& cmdLine);
 
     void                    SceneLoaded( const std::shared_ptr<caustica::Scene> & scene, const std::filesystem::path& sceneFilePath, const std::filesystem::path & mediaPath );
     void                    SceneUnloading( );
@@ -67,7 +67,7 @@ private:
     void                    ResetGame( );
 
 private:
-    class Sample &          m_sample;
+    class PathTracerApp &          m_sample;
     std::shared_ptr<caustica::Scene>
                             m_scene = nullptr;
     int                     m_playSpeed = 3;   // speed: 0 - paused, 1 - 0.1x, 2 - 0.5x, 3 - 1.0x, 4 - 2.0x, 5 - 10.0x

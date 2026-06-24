@@ -36,7 +36,7 @@ namespace caustica
 	class ShaderFactory;
 }
 
-class Sample;
+class PathTracerApp;
 class SampleUI;
 
 class SampleBaseApp
@@ -65,7 +65,7 @@ public:
     bool QueryVideoMemoryInfo(uint64_t& outBudget, uint64_t& outCurrentUsage, uint64_t& outAvailableForReservation, uint64_t& outCurrentReservation); // CAUSTICA_ENABLE_VIDEO_MEMORY_INFO for this to work, otherwise return false
 
 private:
-	virtual std::unique_ptr<Sample> CreateMainRenderPass(caustica::GpuDevice& deviceManager, const CommandLineOptions& cmdLineOptions, SampleUIData& ui) = 0;
+	virtual std::unique_ptr<PathTracerApp> CreateMainRenderPass(caustica::GpuDevice& deviceManager, const CommandLineOptions& cmdLineOptions, SampleUIData& ui) = 0;
 
 	// Initialization methods
 	void RegisterLogCallback();
@@ -88,7 +88,7 @@ private:
 	std::unique_ptr<caustica::Window>       m_Window;
 	std::unique_ptr<caustica::Application>      m_AppLoop;
 	std::shared_ptr<caustica::ShaderFactory> m_ShaderFactory;
-	std::unique_ptr<Sample> m_MainSceneRender; // 3d render of the scene. Where Path Tracing happens
+	std::unique_ptr<PathTracerApp> m_MainSceneRender; // 3d render of the scene. Where Path Tracing happens
 	std::unique_ptr<SampleUI> m_UIRender;
 
 #if CAUSTICA_ENABLE_VIDEO_MEMORY_INFO && defined(_WIN32)
