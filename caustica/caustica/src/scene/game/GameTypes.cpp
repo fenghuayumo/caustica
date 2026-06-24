@@ -381,4 +381,16 @@ Json::Value LightController::Write()
 
 }
 
+caustica::SpotLight* LightController::GetSpotLight()
+{
+    if (Node == nullptr)
+        return nullptr;
+    return dynamic_cast<caustica::SpotLight*>(Node->GetLeaf().get());
+}
 
+caustica::PointLight* LightController::GetPointLight()
+{
+    if (Node == nullptr)
+        return nullptr;
+    return dynamic_cast<caustica::PointLight*>(Node->GetLeaf().get());
+}

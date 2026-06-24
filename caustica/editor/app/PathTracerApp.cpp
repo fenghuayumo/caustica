@@ -2498,14 +2498,14 @@ void PathTracerApp::NativeDLSSPreRender()
 
 void PathTracerApp::SetSceneTime( double sceneTime ) 
 { 
-    if (m_sampleGame->IsInitialized())
+    if (m_sampleGame && m_sampleGame->IsInitialized())
         m_sampleGame->SetGameTime(sceneTime);
     m_sceneTime = sceneTime; 
 }
 
 double PathTracerApp::GetSceneTime()
 {
-    if (m_sampleGame->IsInitialized())
+    if (m_sampleGame && m_sampleGame->IsInitialized())
         return m_sampleGame->GetGameTime();
     return m_sceneTime;
 }
