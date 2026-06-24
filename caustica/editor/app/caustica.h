@@ -12,6 +12,7 @@
 #include <render/BloomPass.h>
 #include <scene/camera/Camera.h>
 #include <engine/SceneManager.h>
+#include "SampleCommon/Renderer.h"
 #include <render/CommonRenderPasses.h>
 #if CAUSTICA_WITH_NATIVE_DLSS
 #include <render/DLSS.h>
@@ -47,9 +48,12 @@ class OidnDenoiser;
 class PythonScripting;
 #endif
 class GaussianSplatPass;
+class Renderer;
 
 class Sample : public caustica::SceneRender, public caustica::IInputHandler
 {
+    friend class Renderer;
+
     // static constexpr uint32_t c_PathTracerVariants   = 6; // see shaders.cfg and CreatePTPipeline for details on variants
 
 public:
@@ -309,6 +313,7 @@ private:
 
     // Scene management helper (queries, discovery)
     std::unique_ptr<SceneManager>               m_sceneManager;
+    std::unique_ptr<Renderer>                   m_renderer;
 
     // scene
     std::vector<std::string>                    m_sceneFilesAvailable;

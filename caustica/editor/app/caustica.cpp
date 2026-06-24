@@ -281,11 +281,7 @@ Sample::~Sample()
 
 void Sample::DebugDrawLine( float3 start, float3 stop, float4 col1, float4 col2 )
 {
-    if( int(m_cpuSideDebugLines.size())+2 >= MAX_DEBUG_LINES )
-        return;
-    DebugLineStruct dls = { float4(start, 1), col1 }, dle = { float4(stop, 1), col2 };
-    m_cpuSideDebugLines.push_back(dls);
-    m_cpuSideDebugLines.push_back(dle);
+    m_renderer->debugDrawLine(start, stop, col1, col2);
 }
 
 void Sample::Init(const std::string& preferredScene,
@@ -450,9 +446,7 @@ void Sample::Init(const std::string& preferredScene,
     m_sceneManager = std::make_unique<SceneManager>(
         *GetGpuDevice(), *m_shaderFactory, m_TextureCache, m_DescriptorTable);
 
-    // Create SceneManager for scene discovery and queries
-    m_sceneManager = std::make_unique<SceneManager>(
-        *GetGpuDevice(), *m_shaderFactory, m_TextureCache, m_DescriptorTable);
+    m_renderer = std::make_unique<Renderer>(*this);
 
     memset( &m_feedbackData, 0, sizeof(DebugFeedbackStruct) * 1 );
     memset( &m_debugDeltaPathTree, 0, sizeof(DeltaTreeVizPathVertex) * cDeltaTreeVizMaxVertices );
@@ -966,53 +960,12 @@ bool Sample::LoadScene(std::shared_ptr<caustica::IFileSystem> fs, const std::fil
 
 void Sample::UpdateCameraFromScene( const std::shared_ptr<caustica::PerspectiveCamera> & sceneCamera )
 {
-    dm::affine3 viewToWorld = sceneCamera->GetViewToWorldMatrix();
-    dm::float3 cameraPos = viewToWorld.m_translation;
-    m_camera.LookAt(cameraPos, cameraPos + viewToWorld.m_linear.row2, viewToWorld.m_linear.row1);
-    m_cameraVerticalFOV = sceneCamera->verticalFov;
-    m_cameraZNear = sceneCamera->zNear;
-
-    std::shared_ptr<PerspectiveCameraEx> sceneCameraEx = std::dynamic_pointer_cast<PerspectiveCameraEx>(sceneCamera);
-    if( sceneCameraEx != nullptr )
-    {
-        ToneMappingParameters defaults;
-
-        m_ui.ToneMappingParams.autoExposure = sceneCameraEx->enableAutoExposure.value_or(defaults.autoExposure);
-        m_ui.ToneMappingParams.exposureCompensation = sceneCameraEx->exposureCompensation.value_or(defaults.exposureCompensation);
-        m_ui.ToneMappingParams.exposureValue = sceneCameraEx->exposureValue.value_or(defaults.exposureValue);
-        m_ui.ToneMappingParams.exposureValueMin = sceneCameraEx->exposureValueMin.value_or(defaults.exposureValueMin);
-        m_ui.ToneMappingParams.exposureValueMax = sceneCameraEx->exposureValueMax.value_or(defaults.exposureValueMax);
-    }
+    m_renderer->updateCameraFromScene(sceneCamera);
 }
 
 void Sample::UpdateViews( nvrhi::IFramebuffer* framebuffer )
 {
-    // we currently use TAA for jitter even when it's not used itself
-    if (m_temporalAntiAliasingPass)
-        m_temporalAntiAliasingPass->SetJitter(m_ui.TemporalAntiAliasingJitter);
-
-    nvrhi::Viewport windowViewport(float(m_renderSize.x), float(m_renderSize.y));
-    m_view->SetViewport(windowViewport);
-    float outputAspectRatio = m_displayAspectRatio; //windowViewport.width() / windowViewport.height();    // render and display outputs might not match in case of lower DLSS/etc resolution rounding!
-    const float4x4 projection = m_cameraUseCustomIntrinsics
-        ? MakePinholeIntrinsicsProjection(
-            m_cameraIntrinsics.x,
-            m_cameraIntrinsics.y,
-            m_cameraIntrinsics.z,
-            m_cameraIntrinsics.w,
-            m_cameraIntrinsicsViewport.x,
-            m_cameraIntrinsicsViewport.y,
-            m_cameraZNear)
-        : perspProjD3DStyleReverse(m_cameraVerticalFOV, outputAspectRatio, m_cameraZNear);
-    m_view->SetMatrices(m_camera.GetWorldToViewMatrix(), projection);
-    m_view->SetPixelOffset(ComputeCameraJitter(m_sampleIndex));
-    m_view->UpdateCache();
-    if ((m_frameIndex & 0xFFFFFFFF) == 0)
-    {
-        m_viewPrevious->SetMatrices(m_view->GetViewMatrix(), m_view->GetProjectionMatrix());
-        m_viewPrevious->SetPixelOffset(m_view->GetPixelOffset());
-        m_viewPrevious->UpdateCache();
-    }
+    m_renderer->updateViews(framebuffer);
 }
 
 void Sample::CollectUncompressedTextures()
@@ -1444,139 +1397,47 @@ void Sample::Animate(float fElapsedTimeSeconds)
 
 std::string Sample::GetResolutionInfo() const
 {
-    if (m_renderTargets == nullptr || m_renderTargets->OutputColor == nullptr)
-        return "uninitialized";
-
-    if (dm::all(m_renderSize == m_displaySize))
-        return std::to_string(m_renderSize.x) + "x" + std::to_string(m_renderSize.y);
-    else
-        return std::to_string(m_renderSize.x) + "x" + std::to_string(m_renderSize.y) + "->" + std::to_string(m_displaySize.x) + "x" + std::to_string(m_displaySize.y);
+    return m_renderer->getResolutionInfo();
 }
 
 float Sample::GetAvgTimePerFrame() const
 {
-    if (m_benchFrames == 0)
-        return 0.0f;
-    std::chrono::duration<double> elapsed = (m_benchLast - m_benchStart);
-    return float(elapsed.count() / m_benchFrames);
+    return m_renderer->getAvgTimePerFrame();
 }
 
 std::string Sample::GetCurrentCameraPosDirUp() const
 {
-    auto toString = [](const float3 & val)    { return std::to_string(val.x) + "," + std::to_string(val.y) + "," + std::to_string(val.z); };
-    return toString(m_camera.GetPosition()) + "," + toString(m_camera.GetDir()) + "," + toString(m_camera.GetUp());
+    return m_renderer->getCurrentCameraPosDirUp();
 }
 
 bool Sample::SetCurrentCameraPosDirUp(const std::string & val)
 {
-	if (val=="") 
-        return false;
-    bool ok = true;
-    float3 worldPos, worldDir, worldUp;
-    std::string temp = val;
-    ok &= ParseFloat3Consume( temp, worldPos );
-    ok &= ParseFloat3Consume( temp, worldDir );
-    ok &= ParseFloat3Consume( temp, worldUp );
-    if (ok)
-        m_camera.LookAt( worldPos, worldPos + worldDir, worldUp );
-    return ok;
+    return m_renderer->setCurrentCameraPosDirUp(val);
 }
 
 void Sample::SetCameraVerticalFOV(float cameraFOV)
 {
-    m_cameraVerticalFOV = cameraFOV;
-    m_cameraUseCustomIntrinsics = false;
-    m_ui.ResetAccumulation = true;
-    m_gaussianSplatTemporalReset = true;
+    m_renderer->setCameraVerticalFOV(cameraFOV);
 }
 
 void Sample::SetCameraIntrinsics(float fx, float fy, float cx, float cy, float width, float height)
 {
-    if (fx <= 0.0f || fy <= 0.0f || width <= 0.0f || height <= 0.0f)
-        return;
-
-    m_cameraIntrinsics = dm::float4(fx, fy, cx, cy);
-    m_cameraIntrinsicsViewport = dm::float2(width, height);
-    m_cameraVerticalFOV = 2.0f * std::atan(height / (2.0f * fy));
-    m_cameraUseCustomIntrinsics = true;
-    m_ui.ResetAccumulation = true;
-    m_gaussianSplatTemporalReset = true;
+    m_renderer->setCameraIntrinsics(fx, fy, cx, cy, width, height);
 }
 
 void Sample::ClearCameraIntrinsics()
 {
-    m_cameraUseCustomIntrinsics = false;
-    m_ui.ResetAccumulation = true;
-    m_gaussianSplatTemporalReset = true;
+    m_renderer->clearCameraIntrinsics();
 }
 
 void Sample::SaveCurrentCamera() const
 {
-    float3 worldPos = m_camera.GetPosition();
-    float3 worldDir = m_camera.GetDir();
-    float3 worldUp  = m_camera.GetUp();
-    dm::dquat rotation;
-    dm::affine3 sceneWorldToView = dm::scaling(dm::float3(1.f, 1.f, -1.f)) * dm::inverse(m_camera.GetWorldToViewMatrix()); // see SceneCamera::GetViewToWorldMatrix
-    dm::decomposeAffine<double>( daffine3(sceneWorldToView), nullptr, &rotation, nullptr );
-
-    float4x4 projMatrix = m_view->GetProjectionMatrix();
-    bool rowMajor = true;
-    float tanHalfFOVY = 1.0f / (projMatrix.m_data[1 * 4 + 1]);
-    float fovY = atanf(tanHalfFOVY) * 2.0f;
-
-    bool autoExposure = m_ui.ToneMappingParams.autoExposure;
-    float exposureCompensation = m_ui.ToneMappingParams.exposureCompensation;
-    float exposureValue = m_ui.ToneMappingParams.exposureValue;
-
-    std::ofstream file;
-    file.open(caustica::GetDirectoryWithExecutable( ) / "campos.txt", std::ios_base::out | std::ios_base::trunc );
-    if( file.is_open() )
-    {
-        file << worldPos.x << " " << worldPos.y << " " << worldPos.z << " " << std::endl;
-        file << worldDir.x << " " << worldDir.y << " " << worldDir.z << " " << std::endl;
-        file << worldUp.x  << " " << worldUp.y  << " " << worldUp.z  << " " << std::endl;
-
-        file << std::endl;
-        file << "below is the camera node that can be included into the *.scene.json;" << std::endl;
-        file << "'Cameras' node goes into 'Graph' array" << std::endl;
-        file << std::endl;
-        file << "{"                                                             << std::endl;
-        file << "    \"name\": \"Cameras\","                                    << std::endl;
-        file << "        \"children\" : ["                                      << std::endl;
-        file << "    {"                                                         << std::endl;
-        file << "        \"name\": \"Default\","                                   << std::endl;
-        file << "        \"type\" : \"PerspectiveCameraEx\","                     << std::endl;
-        file << "        \"translation\" : [" << std::to_string(worldPos.x) << ", " << std::to_string(worldPos.y) << ", " << std::to_string(worldPos.z) << "]," << std::endl;
-        file << "        \"rotation\" : [" << std::to_string(rotation.x) << ", " << std::to_string(rotation.y) << ", " << std::to_string(rotation.z) << ", " << std::to_string(rotation.w) << "]," << std::endl;
-        file << "        \"verticalFov\" : " << std::to_string(fovY)            << "," << std::endl;
-        file << "        \"zNear\" : " << std::to_string(m_cameraZNear)         << "," << std::endl;
-        file << "        \"enableAutoExposure\" : " << (autoExposure?"true":"false") << "," << std::endl;
-        file << "        \"exposureCompensation\" : " << std::to_string(exposureCompensation) << "," << std::endl;
-        file << "        \"exposureValue\" : " << std::to_string(exposureValue) << std::endl;
-        file << "    }"                                                         << std::endl;
-        file << "        ]"                                                     << std::endl;
-        file << "},"                                                            << std::endl;
-
-        file.close();
-    }
+    m_renderer->saveCurrentCamera();
 }
 
 void Sample::LoadCurrentCamera()
 {
-    float3 worldPos;
-    float3 worldDir;
-    float3 worldUp;
-
-    std::ifstream file;
-    file.open(caustica::GetDirectoryWithExecutable( ) / "campos.txt", std::ios_base::in);
-    if (file.is_open())
-    {
-        file >> worldPos.x >> std::ws >> worldPos.y >> std::ws >> worldPos.z; file.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-        file >> worldDir.x >> std::ws >> worldDir.y >> std::ws >> worldDir.z; file.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-        file >> worldUp.x  >> std::ws >> worldUp.y  >> std::ws >> worldUp.z; file.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-        file.close();
-        m_camera.LookAt( worldPos, worldPos + worldDir, worldUp );
-    }
+    m_renderer->loadCurrentCamera();
 }
 
 void Sample::FillPTPipelineGlobalMacros(std::vector<caustica::ShaderMacro> & macros)
@@ -1842,10 +1703,8 @@ void Sample::RebuildDirtyMeshAccelStructs(nvrhi::ICommandList* commandList)
 
 void Sample::TransitionMeshBuffersToReadOnly(nvrhi::ICommandList* commandList)
 {
-    // Transition all the buffers to their necessary states before building the BLAS'es to allow BLAS batching
-    for (const auto& skinnedInstance : m_scene->GetSceneGraph()->GetSkinnedMeshInstances())
-        commandList->setBufferState(skinnedInstance->GetMesh()->buffers->vertexBuffer, nvrhi::ResourceStates::ShaderResource);
-    commandList->commitBarriers();
+    m_commandList = commandList;
+    m_renderer->transitionMeshBuffersToReadOnly();
 }
 
 void Sample::UpdateSkinnedBLASs(nvrhi::ICommandList* commandList, uint32_t frameIndex) const
@@ -6088,9 +5947,5 @@ void Sample::DenoisedScreenshot(nvrhi::ITexture * framebufferTexture) const
 
 dm::float2 Sample::ComputeCameraJitter(uint frameIndex)
 {
-    if (!m_ui.RealtimeMode || m_ui.RealtimeAA == 0 || m_temporalAntiAliasingPass == nullptr || m_ui.DbgFreezeRealtimeNoiseSeed)
-        return dm::float2(0,0);
-
-    // we currently use TAA for jitter even when it's not used itself
-    return m_temporalAntiAliasingPass->GetCurrentPixelOffset();
+    return m_renderer->computeCameraJitter(frameIndex);
 }
