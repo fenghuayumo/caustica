@@ -1214,7 +1214,7 @@ std::shared_ptr<PTMaterial> MaterialsBaker::Load(const std::string & modelFileNa
     bool shared = false;
     for (const MaterialFileCandidate& candidate : candidates)
     {
-        if (std::filesystem::exists(candidate.path) && LoadJsonFromFile(candidate.path, rootJ))
+        if (std::filesystem::exists(candidate.path) && caustica::json::LoadFromFile(candidate.path, rootJ))
         {
             actualLoadedFileName = candidate.path.string();
             shared = candidate.sharedWithAllScenes;
@@ -1622,7 +1622,7 @@ bool MaterialsBaker::LoadSingle(PTMaterialBase & material)
     std::filesystem::path inPath = GetMaterialStoragePath(material);
 
     Json::Value rootJ;
-    if ( !LoadJsonFromFile(inPath, rootJ) )
+    if ( !caustica::json::LoadFromFile(inPath, rootJ) )
     {
         caustica::warning("No RTXPT material definition file found '%s'- consider doing Scene->Materials->Advanced->Save All", inPath.string().c_str());
         return false;
@@ -1649,7 +1649,7 @@ bool MaterialsBaker::SaveSingle(PTMaterialBase & material)
 
     material.Write(rootJ);
 
-    // TODO: refactor, replace with SaveJsonToFile
+    // TODO: refactor, replace with caustica::json::SaveToFile
  
     std::ofstream outFile(outPath, std::ios::trunc);
     if (!outFile.is_open())

@@ -212,7 +212,7 @@ namespace
         settings["startingCamera"] = -1;
         root["graph"].append(settings);
 
-        return SaveJsonToString(root);
+        return caustica::json::ToString(root);
     }
 
     std::string PrepareSceneArgument(const std::string& sceneArgument)

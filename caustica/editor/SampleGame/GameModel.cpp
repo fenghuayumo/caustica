@@ -95,9 +95,9 @@ ModelType::ModelType(class GameScene & game, const std::string & name, const Jso
             lightData["name"] >> lightName;
             if (lightName == "" || m_lightsInfos.find(lightName) != m_lightsInfos.end())
             { assert( false && "malformed or repeated light name in .model.json" );  continue; }
-            m_lightsInfos.insert( {lightName, SaveJsonToString(lightData) } );
+            m_lightsInfos.insert( {lightName, caustica::json::ToString(lightData) } );
         }
-        ///m_lightsInfoJson = SaveJsonToString(lights);
+        ///m_lightsInfoJson = caustica::json::ToString(lights);
     }
 
     const std::vector<caustica::SceneImportResult>& models = scene->GetModels();
@@ -164,7 +164,7 @@ void ModelInstance::MapLightControllers( SceneGraphNode* node )
     {
         std::string data = m_modelType->FindLightControllerInfo(node->GetName());
         Json::Value jsonData;
-        if (data != "" && LoadJsonFromString(data, jsonData))
+        if (data != "" && caustica::json::FromString(data, jsonData))
         {
             auto lightController = std::make_shared<LightController>();
             if (!lightController->Read(jsonData))

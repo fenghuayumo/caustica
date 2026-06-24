@@ -183,11 +183,11 @@ void PropBase::Load(const Json::Value& jsonRoot)
 
     Json::Value modelsLightsOverrides = jsonRoot["modelsLightsOverrides"];
     if (!modelsLightsOverrides.empty())
-        m_modelsLightsOverrides = SaveJsonToString(modelsLightsOverrides);
+        m_modelsLightsOverrides = caustica::json::ToString(modelsLightsOverrides);
 
     Json::Value components = jsonRoot["components"];
     if (!components.empty())
-        m_componentsData = SaveJsonToString(components);
+        m_componentsData = caustica::json::ToString(components);
 }
 
 void PropBase::PostLoadSetup()
@@ -195,7 +195,7 @@ void PropBase::PostLoadSetup()
     if (m_modelsLightsOverrides != "")
     {
         Json::Value modelsLightsOverrides;
-        LoadJsonFromString(m_modelsLightsOverrides, modelsLightsOverrides);
+        caustica::json::FromString(m_modelsLightsOverrides, modelsLightsOverrides);
         for( Json::Value & m : modelsLightsOverrides )
         {
             std::string modelName; m["modelInstanceName"] >> modelName;
@@ -223,7 +223,7 @@ void PropBase::PostLoadSetup()
     if (m_componentsData != "")
     {
         Json::Value components;
-        LoadJsonFromString(m_componentsData, components);
+        caustica::json::FromString(m_componentsData, components);
         for (Json::Value& m : components)
         {
             std::shared_ptr<PropComponentBase> comp = PropComponentBase::Create(*this, m);
@@ -247,13 +247,13 @@ Json::Value PropBase::Save()
     if (m_modelsLightsOverrides!="")
     {
         Json::Value outRootNode;
-        if (LoadJsonFromString(m_modelsLightsOverrides, outRootNode))
+        if (caustica::json::FromString(m_modelsLightsOverrides, outRootNode))
             jsonRoot["modelsLightsOverrides"] = outRootNode;
     }
     if (m_componentsData != "")
     {
         Json::Value outRootNode;
-        if (LoadJsonFromString(m_componentsData, outRootNode))
+        if (caustica::json::FromString(m_componentsData, outRootNode))
             jsonRoot["components"] = outRootNode;
     }
     return jsonRoot;
@@ -316,7 +316,7 @@ void PropBase::GUI(float indent, bool & gameCameraAttached, caustica::FirstPerso
         ImGui::Text("Storage: ");
         ImGui::SameLine();
         if (ImGui::Button("Save"))
-            SaveJsonToFile(m_storagePath, Save());
+            caustica::json::SaveToFile(m_storagePath, Save());
 
         if (ImGui::CollapsingHeader("Lights"))
         {
@@ -332,7 +332,7 @@ void PropBase::GUI(float indent, bool & gameCameraAttached, caustica::FirstPerso
         // if (ImGui::Button("Load"))
         // {
         //     Json::Value jread;
-        //     LoadJsonFromFile( m_storagePath, jread );
+        //     caustica::json::LoadFromFile( m_storagePath, jread );
         //     Load(jread);
         //     Reset();
         // }

@@ -90,14 +90,6 @@ private:
 
 constexpr static const int c_SwapchainCount = 3;
 
-// JSON utilities
-namespace Json { class Value; }
-std::vector<std::string> JsonLoadStringVector(const Json::Value& arr);
-bool SaveJsonToFile(const std::filesystem::path& filePath, const Json::Value& rootNode);
-bool LoadJsonFromFile(const std::filesystem::path& filePath, Json::Value& outRootNode);
-std::string SaveJsonToString(const Json::Value& rootNode);
-bool LoadJsonFromString(const std::string& jsonData, Json::Value& outRootNode);
-
 // NVRHI utility
 uint64_t GetEstimatedTextureSize(const nvrhi::TextureDesc& desc);
 

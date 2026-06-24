@@ -147,7 +147,7 @@ void GameScene::SceneLoaded(const std::shared_ptr<caustica::Scene>& scene, const
     EnsureDirectoryExists(m_gameStoragePath / "props");
 
     Json::Value node;
-    bool parsingSuccessful = LoadJsonFromString(gameSettings->GetJsonData(), node);
+    bool parsingSuccessful = caustica::json::FromString(gameSettings->GetJsonData(), node);
     if (!parsingSuccessful) 
     {
         caustica::warning( "Unable to load game settings" );
@@ -166,7 +166,7 @@ void GameScene::SceneLoaded(const std::shared_ptr<caustica::Scene>& scene, const
         fileNoExt.replace_extension();
 
         Json::Value modelRoot;
-        if (!LoadJsonFromFile(modelPath, modelRoot) || modelRoot.empty() || !modelRoot.isObject())
+        if (!caustica::json::LoadFromFile(modelPath, modelRoot) || modelRoot.empty() || !modelRoot.isObject())
             continue;
         m_modelTypes.push_back( std::make_shared<game::ModelType>(*this, fileNoExt.string(), modelRoot) );
     }
@@ -180,7 +180,7 @@ void GameScene::SceneLoaded(const std::shared_ptr<caustica::Scene>& scene, const
         fileNoExt.replace_extension();
 
         Json::Value propRoot;
-        if (!LoadJsonFromFile(propPath, propRoot) || propRoot.empty() || !propRoot.isObject() )
+        if (!caustica::json::LoadFromFile(propPath, propRoot) || propRoot.empty() || !propRoot.isObject() )
             continue;
         
         std::shared_ptr<game::PropBase> newProp = CreatePropFromFile(fileNoExt.string(), propPath, propRoot);
@@ -381,7 +381,7 @@ bool GameScene::DebugGUI(float indent)
             Json::Value rootJ;
             rootJ["animation"] = animsJ;
 
-            SaveJsonToFile(m_gameStoragePath / "EXPORT_POSES.json", rootJ);
+            caustica::json::SaveToFile(m_gameStoragePath / "EXPORT_POSES.json", rootJ);
             m_recordedCameraPoses.clear();
         }
     }
