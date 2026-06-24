@@ -18,6 +18,7 @@
 #include <render/Core/SceneRender.h>
 #include <platform/Input.h>
 #include <core/vfs/VFS.h>
+#include <render/Core/PathTracerApp.h>
 #include <render/Passes/Geometry/BloomPass.h>
 #include <scene/camera/Camera.h>
 #include <engine/SceneManager.h>
@@ -77,13 +78,13 @@ public:
     std::shared_ptr<caustica::ShaderFactory> GetShaderFactory() const          { return m_shaderFactory; }
     std::shared_ptr<caustica::CommonRenderPasses> GetCommonPasses() const      { return m_CommonPasses; }
     nvrhi::ITexture*                       GetLdrColorTexture() const               { return m_renderTargets ? m_renderTargets->LdrColor.Get() : nullptr; }
-    std::shared_ptr<caustica::Scene>   GetScene() const                        { return m_scene; }
-    std::vector<std::string> const &        GetAvailableScenes() const              { return m_sceneFilesAvailable; }
-    std::string                             GetCurrentSceneName() const             { return m_currentSceneName; }
+    std::shared_ptr<caustica::Scene>   GetScene() const                        { return m_sceneManager->getScene(); }
+    std::vector<std::string> const &        GetAvailableScenes() const              { return m_sceneManager->getAvailableScenes(); }
+    std::string                             GetCurrentSceneName() const             { return m_sceneManager->getCurrentSceneName(); }
     const DebugFeedbackStruct &             GetFeedbackData() const                 { return m_feedbackData; }
     const DeltaTreeVizPathVertex *          GetDebugDeltaPathTree() const           { return m_debugDeltaPathTree; }
-    uint                                    GetSceneCameraCount() const             { return (uint)m_scene->GetSceneGraph()->GetCameras().size() + 1; }
-    uint &                                  SelectedCameraIndex()                   { return m_selectedCameraIndex; }   // 0 is default fps free flight, above (if any) will just use current scene camera
+    uint                                    GetSceneCameraCount() const             { return (uint)GetScene()->GetSceneGraph()->GetCameras().size() + 1; }
+    uint &                                  SelectedCameraIndex()                   { return m_renderCore.camera().selectedCameraIndex(); }   // 0 is default fps free flight, above (if any) will just use current scene camera
     const std::unique_ptr<class GameScene> &     GetGame() const                   { return m_sampleGame; }
 
     SampleUIData& GetUIData() { return m_ui; }
@@ -131,7 +132,7 @@ public:
     std::string                             GetCurrentCameraPosDirUp() const;
     bool                                    SetCurrentCameraPosDirUp(const std::string & val);
 
-    float                                   GetCameraVerticalFOV() const            { return m_cameraVerticalFOV; }
+    float                                   GetCameraVerticalFOV() const            { return m_renderCore.camera().verticalFOV(); }
     void                                    SetCameraVerticalFOV(float cameraFOV);
     void                                    SetCameraIntrinsics(float fx, float fy, float cx, float cy, float width, float height);
     void                                    ClearCameraIntrinsics();
@@ -213,8 +214,8 @@ public:
     std::string                             GetFPSInfo() const              { return m_fpsInfo; }
 
     void                                    DebugDrawLine( float3 start, float3 stop, float4 col1, float4 col2 );
-    const caustica::FirstPersonCamera &   GetCurrentCamera( ) const { return m_camera; }
-    const auto &                            GetCurrentView( ) const { return m_view; }
+    const caustica::FirstPersonCamera &   GetCurrentCamera( ) const { return m_renderCore.camera().camera(); }
+    const auto &                            GetCurrentView( ) const { return m_renderCore.camera().view(); }
 
     void                                    SetSceneTime( double sceneTime );
     double                                  GetSceneTime( );
@@ -245,7 +246,7 @@ public:
     const std::unique_ptr<PythonScripting> & GetPythonScripting() const { return m_pythonScripting; }
 #endif
 
-    bool                                    HasAsyncLoadingInProgress() const   { return m_asyncLoadingInProgress || m_ui.ShaderAndACRefreshDelayedRequest > 0; }
+    bool                                    HasAsyncLoadingInProgress() const   { return m_asyncLoadingInProgress || m_editor.ShaderAndACRefreshDelayedRequest > 0; }
 
     bool                                    AccumulationCompleted() const       { return m_accumulationCompleted; }
 
@@ -275,7 +276,7 @@ protected:
     std::shared_ptr<caustica::DescriptorTableManager> m_DescriptorTable;
 
     // QoL accessors for derived samples
-    const caustica::PlanarView& GetView() const { return *m_view; }
+    const caustica::PlanarView& GetView() const { return *m_renderCore.camera().view(); }
     std::shared_ptr<class PTPipelineBaker>  GetRTPipelineBaker() const { return m_ptPipelineBaker; }
     std::shared_ptr<ComputePipelineBaker>   GetComputePipelineBaker() const { return m_computePipelineBaker; }
 
@@ -330,19 +331,14 @@ private:
 
     std::shared_ptr<caustica::RootFileSystem> m_RootFS;
 
-    // Scene management helper (queries, discovery)
+    // Scene management + render orchestrator (engine)
     std::unique_ptr<SceneManager>               m_sceneManager;
+    caustica::PathTracerRenderCore                 m_renderCore;
     std::unique_ptr<Renderer>                   m_renderer;
 
-    // scene
-    std::vector<std::string>                    m_sceneFilesAvailable;
-    std::string                                 m_currentSceneName;
-    std::filesystem::path                       m_currentScenePath;
-    std::string                                 m_inlineSceneJson;
-    std::shared_ptr<caustica::Scene>              m_scene;
+    // scene timing
     double                                      m_sceneTime = 0.;           // if m_ui.LoopLongestAnimation then it loops with longest animation
     float                                       m_lastDeltaTime = 0.0f;
-    uint                                        m_selectedCameraIndex = 0;  // 0 is first person camera, the rest (if any) are scene cameras
 
     // device setup
     std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
@@ -357,10 +353,6 @@ private:
     std::unique_ptr<caustica::render::BloomPass>   m_bloomPass;
     std::unique_ptr<ToneMappingPass>            m_toneMappingPass;
     nvrhi::BufferHandle                         m_constantBuffer;
-
-    std::vector<SubInstanceData>                m_subInstanceData;
-    nvrhi::BufferHandle                         m_subInstanceBuffer;            // per-instance-geometry data, indexed with (InstanceID()+GeometryIndex())
-    uint                                        m_subInstanceCount;
 
     // lighting
     std::string                                 m_envMapLocalPath;
@@ -389,25 +381,6 @@ private:
     std::unique_ptr<AccumulationPass>           m_gaussianSplatAccumulationPass;
     int                                         m_gaussianSplatTemporalSampleIndex = 0;
     bool                                        m_gaussianSplatTemporalReset = true;
-
-    // raytracing basics
-    nvrhi::rt::AccelStructHandle                m_topLevelAS;
-    std::vector<std::shared_ptr<caustica::MeshInfo>> m_meshesPendingAccelRebuild;
-
-    // camera
-    caustica::FirstPersonCamera               m_camera;
-    std::shared_ptr<caustica::PlanarView>  m_view;
-    std::shared_ptr<caustica::PlanarView>  m_viewPrevious;
-    float                                       m_cameraVerticalFOV = 60.0f;
-    float                                       m_cameraZNear = 0.001f;
-    float                                       m_cameraZFar = 100000.0f;
-    bool                                        m_cameraUseCustomIntrinsics = false;
-    dm::float4                                  m_cameraIntrinsics = dm::float4(0.f); // fx, fy, cx, cy
-    dm::float2                                  m_cameraIntrinsicsViewport = dm::float2(0.f);
-    dm::float3                                  m_lastCamPos = { 0,0,0 };
-    dm::float3                                  m_lastCamDir = { 0,0,0 };
-    dm::float3                                  m_lastCamUp = { 0,0,0 };
-
 
     std::chrono::high_resolution_clock::time_point m_benchStart = std::chrono::high_resolution_clock::now();
     std::chrono::high_resolution_clock::time_point m_benchLast = std::chrono::high_resolution_clock::now();

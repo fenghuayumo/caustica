@@ -11,6 +11,7 @@
 namespace caustica
 {
 class GpuDevice;
+class IFileSystem;
 class ShaderFactory;
 class TextureCache;
 class DescriptorTableManager;
@@ -20,15 +21,13 @@ class Material;
 } // namespace caustica
 
 // =============================================================================
-// SceneManager — Engine layer: scene discovery, queries, env map listing.
-//
-// All methods that need scene data take it as parameters — SceneManager does
-// NOT own the scene.  This keeps it safe to use before/during scene loading.
-// Methods are inline to avoid cross-library linker issues during migration.
+// SceneManager — Engine layer: scene discovery, loading, queries, env map listing.
 // =============================================================================
 class SceneManager
 {
 public:
+    static constexpr const char* inlineSceneSentinel() { return "__CAUSTICA_INLINE_SCENE_JSON__"; }
+
     SceneManager(caustica::GpuDevice&                     device,
                  caustica::ShaderFactory&                 shaderFactory,
                  std::shared_ptr<caustica::TextureCache>  textureCache,
@@ -39,6 +38,23 @@ public:
     // --- Scene discovery ---
     void discoverAvailableScenes(const std::filesystem::path& assetsPath);
     const std::vector<std::string>& getAvailableScenes() const { return m_sceneFilesAvailable; }
+
+    // --- Active scene state ---
+    [[nodiscard]] const std::shared_ptr<caustica::Scene>& getScene() const { return m_scene; }
+    [[nodiscard]] const std::string&                      getCurrentSceneName() const { return m_currentSceneName; }
+    [[nodiscard]] const std::filesystem::path&            getCurrentScenePath() const { return m_currentScenePath; }
+    [[nodiscard]] const std::string&                      getInlineSceneJson() const { return m_inlineSceneJson; }
+
+    void clearScene();
+
+    // Resolve path + update active-scene metadata.  Returns false when the switch is a no-op.
+    bool beginSceneSwitch(const std::string& sceneName,
+                          const std::filesystem::path& assetsPath,
+                          bool forceReload);
+
+    // Parse and load scene content from disk or inline JSON.  Returns nullptr on failure.
+    std::shared_ptr<caustica::Scene> loadScene(std::shared_ptr<caustica::IFileSystem> fs,
+                                               const std::filesystem::path&           sceneFileName);
 
     // --- Scene queries (static, take scene as parameter) ---
     static std::shared_ptr<caustica::Material> findMaterial(
@@ -59,6 +75,21 @@ public:
         return instances[instanceIndex]->GetNodeSharedPtr();
     }
 
+    // --- Scene path resolution (does not load) ---
+    struct ResolvedScenePath
+    {
+        std::filesystem::path path;
+        bool                  inlineScene = false;
+        std::string           inlineJson;
+    };
+
+    static ResolvedScenePath resolveScenePath(
+        const std::string&              sceneName,
+        const std::filesystem::path&    assetsPath);
+
+    // GPU-side prep after a scene finishes loading (accel dirty, animation t=0).
+    static void onSceneLoadedGpuPrep(caustica::Scene& scene, bool& accelRebuildRequested);
+
     // --- Environment map listing ---
     static void refreshEnvironmentMapMediaList(
         const std::filesystem::path&              assetsPath,
@@ -78,5 +109,10 @@ private:
     caustica::ShaderFactory&                  m_shaderFactory;
     std::shared_ptr<caustica::TextureCache>   m_textureCache;
     std::shared_ptr<caustica::DescriptorTableManager> m_descriptorTable;
+
     std::vector<std::string>                  m_sceneFilesAvailable;
+    std::shared_ptr<caustica::Scene>          m_scene;
+    std::string                               m_currentSceneName;
+    std::filesystem::path                     m_currentScenePath;
+    std::string                               m_inlineSceneJson;
 };

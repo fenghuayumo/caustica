@@ -2,8 +2,10 @@
 
 #include <backend/GpuDevice.h>
 #include <assets/cache/TextureCache.h>
+#include <render/Core/RenderSceneTypeFactory.h>
 #include <scene/Scene.h>
 #include <scene/SceneGraph.h>
+#include <core/vfs/VFS.h>
 #include <core/log.h>
 
 #include <algorithm>
@@ -16,7 +18,13 @@
 
 namespace
 {
-    constexpr const char* c_InlineSceneSentinel = "__CAUSTICA_INLINE_SCENE_JSON__";
+    bool LooksLikeInlineSceneJson(const std::string& scene)
+    {
+        auto it = std::find_if_not(scene.begin(), scene.end(), [](unsigned char ch) {
+            return std::isspace(ch);
+        });
+        return it != scene.end() && *it == '{';
+    }
 
     bool IsEnvironmentMapMediaFile(const std::filesystem::path& path)
     {
@@ -88,6 +96,103 @@ void SceneManager::discoverAvailableScenes(const std::filesystem::path& assetsPa
     }
 }
 
+// --- Scene path resolution ---
+
+SceneManager::ResolvedScenePath SceneManager::resolveScenePath(
+    const std::string&              sceneName,
+    const std::filesystem::path&    assetsPath)
+{
+    ResolvedScenePath result;
+    if (sceneName.empty())
+        return result;
+
+    const bool inlineScene = LooksLikeInlineSceneJson(sceneName);
+    result.inlineScene = inlineScene;
+    if (inlineScene)
+    {
+        result.inlineJson = sceneName;
+        result.path = std::filesystem::path(SceneManager::inlineSceneSentinel());
+        return result;
+    }
+
+    std::filesystem::path scenePath(sceneName);
+    if (!scenePath.is_absolute() && !std::filesystem::exists(scenePath))
+        scenePath = assetsPath / scenePath;
+    result.path = scenePath;
+    return result;
+}
+
+void SceneManager::onSceneLoadedGpuPrep(caustica::Scene& scene, bool& accelRebuildRequested)
+{
+    accelRebuildRequested = true;
+
+    for (const auto& anim : scene.GetSceneGraph()->GetAnimations())
+        (void)anim->Apply(0.0f);
+}
+
+// --- Active scene state ---
+
+void SceneManager::clearScene()
+{
+    m_scene.reset();
+}
+
+bool SceneManager::beginSceneSwitch(const std::string&           sceneName,
+                                    const std::filesystem::path& assetsPath,
+                                    bool                         forceReload)
+{
+    if (m_currentSceneName == sceneName && !forceReload)
+        return false;
+
+    m_currentSceneName = sceneName;
+
+    const ResolvedScenePath resolved = resolveScenePath(sceneName, assetsPath);
+    if (resolved.inlineScene)
+        m_inlineSceneJson = resolved.inlineJson;
+    else
+        m_inlineSceneJson.clear();
+
+    m_currentScenePath = resolved.path;
+    return true;
+}
+
+std::shared_ptr<caustica::Scene> SceneManager::loadScene(
+    std::shared_ptr<caustica::IFileSystem> fs,
+    const std::filesystem::path&           sceneFileName)
+{
+    auto scene = std::make_shared<caustica::Scene>(
+        m_device.GetDevice(),
+        m_shaderFactory,
+        std::move(fs),
+        m_textureCache,
+        m_descriptorTable,
+        std::make_shared<caustica::render::RenderSceneTypeFactory>());
+
+    if (sceneFileName == std::filesystem::path(inlineSceneSentinel()))
+    {
+        if (scene->LoadFromJsonString(m_inlineSceneJson))
+        {
+            if (scene->GetSceneGraph() && scene->GetSceneGraph()->GetRootNode())
+                scene->ProcessNodesRecursive(scene->GetSceneGraph()->GetRootNode());
+            m_scene = scene;
+            return scene;
+        }
+        m_scene.reset();
+        return nullptr;
+    }
+
+    if (scene->Load(sceneFileName))
+    {
+        if (scene->GetSceneGraph() && scene->GetSceneGraph()->GetRootNode())
+            scene->ProcessNodesRecursive(scene->GetSceneGraph()->GetRootNode());
+        m_scene = scene;
+        return scene;
+    }
+
+    m_scene.reset();
+    return nullptr;
+}
+
 // --- Environment map listing ---
 
 void SceneManager::refreshEnvironmentMapMediaList(
@@ -100,7 +205,7 @@ void SceneManager::refreshEnvironmentMapMediaList(
     outMediaList.clear();
 
     std::filesystem::path sceneDirectory;
-    if (!currentScenePath.empty() && currentScenePath != std::filesystem::path(c_InlineSceneSentinel))
+    if (!currentScenePath.empty() && currentScenePath != std::filesystem::path(SceneManager::inlineSceneSentinel()))
         sceneDirectory = currentScenePath.parent_path();
 
     const std::filesystem::path sceneEnvFolder = sceneDirectory / envMapSubFolder;

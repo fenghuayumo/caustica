@@ -1,5 +1,7 @@
-﻿#include "PathTracerApp.h"
+#include "PathTracerApp.h"
 #include "caustica.h"
+
+#include <render/Core/PathTracerPostProcess.h>
 
 #include <core/path_utils.h>
 #include <scene/scene_utils.h>
@@ -70,8 +72,6 @@
 #endif
 
 using namespace caustica::math;
-using namespace caustica;
-using namespace caustica;
 using namespace caustica;
 using namespace caustica::render;
 
@@ -239,19 +239,20 @@ PathTracerApp::PathTracerApp(caustica::GpuDevice& deviceManager,
     , m_settings(ui)
     , m_editor(ui)
     , m_ui(ui)
+    , m_renderCore(deviceManager.GetDevice())
 {
     m_progressLoading.Start("Initializing...");
     m_progressLoading.Set(50);
 
-    m_camera.SetRotateSpeed(.003f);
+    m_renderCore.camera().camera().SetRotateSpeed(.003f);
 
 #if CAUSTICA_WITH_STREAMLINE
     if (!GetGpuDevice()->GetDeviceParams().headlessDevice)
     {
-        m_ui.IsDLSSSuported = GetGpuDevice()->GetStreamline().IsDLSSAvailable();
-        m_ui.IsDLSSFGSupported = GetGpuDevice()->GetStreamline().IsDLSSGAvailable();
-        m_ui.IsReflexSupported = GetGpuDevice()->GetStreamline().IsReflexAvailable();
-        m_ui.IsDLSSRRSupported = GetGpuDevice()->GetStreamline().IsDLSSRRAvailable();
+        m_settings.IsDLSSSuported = GetGpuDevice()->GetStreamline().IsDLSSAvailable();
+        m_settings.IsDLSSFGSupported = GetGpuDevice()->GetStreamline().IsDLSSGAvailable();
+        m_settings.IsReflexSupported = GetGpuDevice()->GetStreamline().IsReflexAvailable();
+        m_settings.IsDLSSRRSupported = GetGpuDevice()->GetStreamline().IsDLSSRRAvailable();
     }
 #endif
 
@@ -302,11 +303,11 @@ void PathTracerApp::Init(const std::string& preferredScene,
     m_nativeDLSS = caustica::render::DLSS::Create(GetDevice(), *m_shaderFactory, caustica::GetDirectoryWithExecutable().string());
     if (m_nativeDLSS)
     {
-        m_ui.IsDLSSSuported = m_nativeDLSS->IsDlssSupported();
-        m_ui.IsDLSSRRSupported = m_nativeDLSS->IsRayReconstructionSupported();
+        m_settings.IsDLSSSuported = m_nativeDLSS->IsDlssSupported();
+        m_settings.IsDLSSRRSupported = m_nativeDLSS->IsRayReconstructionSupported();
         caustica::info("Native NGX DLSS support: DLSS=%s, DLSS-RR=%s.",
-            m_ui.IsDLSSSuported ? "yes" : "no",
-            m_ui.IsDLSSRRSupported ? "yes" : "no");
+            m_settings.IsDLSSSuported ? "yes" : "no",
+            m_settings.IsDLSSRRSupported ? "yes" : "no");
     }
     else
     {
@@ -314,15 +315,15 @@ void PathTracerApp::Init(const std::string& preferredScene,
     }
 #endif
 
-    m_ui.EnableGaussianSplats = true;
-    m_ui.GaussianSplatDepthTest = m_cmdLine.GaussianSplatDepthTest;
-    m_ui.GaussianSplatScale = m_cmdLine.GaussianSplatScale;
-    m_ui.GaussianSplatAlphaScale = m_cmdLine.GaussianSplatAlphaScale;
-    m_ui.GaussianSplatBrightness = m_cmdLine.GaussianSplatBrightness;
-    m_ui.GaussianSplatAsEmitter = m_cmdLine.GaussianSplatAsEmitter;
-    m_ui.GaussianSplatEmissionIntensity = m_cmdLine.GaussianSplatEmissionIntensity;
-    m_ui.GaussianSplatEmissionMaxProxyCount = m_cmdLine.GaussianSplatEmissionMaxProxyCount;
-    m_ui.GaussianSplatAlphaCullThreshold = m_cmdLine.GaussianSplatAlphaCullThreshold;
+    m_settings.EnableGaussianSplats = true;
+    m_settings.GaussianSplatDepthTest = m_cmdLine.GaussianSplatDepthTest;
+    m_settings.GaussianSplatScale = m_cmdLine.GaussianSplatScale;
+    m_settings.GaussianSplatAlphaScale = m_cmdLine.GaussianSplatAlphaScale;
+    m_settings.GaussianSplatBrightness = m_cmdLine.GaussianSplatBrightness;
+    m_settings.GaussianSplatAsEmitter = m_cmdLine.GaussianSplatAsEmitter;
+    m_settings.GaussianSplatEmissionIntensity = m_cmdLine.GaussianSplatEmissionIntensity;
+    m_settings.GaussianSplatEmissionMaxProxyCount = m_cmdLine.GaussianSplatEmissionMaxProxyCount;
+    m_settings.GaussianSplatAlphaCullThreshold = m_cmdLine.GaussianSplatAlphaCullThreshold;
     
     m_sampleGame = std::make_unique<GameScene>(static_cast<Sample&>(*this), m_cmdLine);
     m_progressLoading.Set(95);
@@ -565,12 +566,13 @@ void PathTracerApp::Init(const std::string& preferredScene,
     // Command list!
     m_commandList = device->createCommandList();
 
+    m_renderCore.initializeRenderPipeline(m_shaderFactory);
+
     if(device->queryFeatureSupport(nvrhi::Feature::RayTracingOpacityMicromap))
         m_ommBaker = std::make_shared<OmmBaker>(device, m_DescriptorTable, m_TextureCache, m_shaderFactory);
 
-    // Get all scenes in "assets" folder 鈥?delegated to SceneManager
+    // Get all scenes in "assets" folder ??delegated to SceneManager
     m_sceneManager->discoverAvailableScenes(GetLocalPath(c_AssetsFolder));
-    m_sceneFilesAvailable = m_sceneManager->getAvailableScenes();
 
     std::string scene;
     if (LooksLikeInlineSceneJson(preferredScene))
@@ -582,7 +584,7 @@ void PathTracerApp::Init(const std::string& preferredScene,
         std::filesystem::path preferredScenePath(preferredScene);
         scene = (!preferredScene.empty() && (preferredScenePath.is_absolute() || std::filesystem::exists(preferredScenePath)))
             ? preferredScene
-            : FindPreferredScene(m_sceneFilesAvailable, preferredScene);
+            : FindPreferredScene(m_sceneManager->getAvailableScenes(), preferredScene);
     }
 
     // Select initial scene
@@ -591,31 +593,19 @@ void PathTracerApp::Init(const std::string& preferredScene,
 
 void PathTracerApp::SetCurrentScene( const std::string & sceneName, bool forceReload )
 {
-    if( m_currentSceneName == sceneName && !forceReload )
+    if (!m_sceneManager->beginSceneSwitch(sceneName, GetLocalPath(c_AssetsFolder), forceReload))
         return;
-    m_currentSceneName = sceneName;
-    m_ui.ResetAccumulation = true;
+
+    m_settings.ResetAccumulation = true;
     SetAsynchronousLoadingEnabled( false );
 
-    const bool inlineScene = LooksLikeInlineSceneJson(sceneName);
-    if (inlineScene)
-        m_inlineSceneJson = sceneName;
-    else
-        m_inlineSceneJson.clear();
-
-    std::filesystem::path scenePath = inlineScene
-        ? std::filesystem::path(c_InlineSceneSentinel)
-        : std::filesystem::path(sceneName);
-    if (!inlineScene && !scenePath.is_absolute() && !std::filesystem::exists(scenePath))
-        scenePath = GetLocalPath(c_AssetsFolder) / scenePath;
-    m_currentScenePath = scenePath;
     m_progressLoading.Stop();
     m_progressLoading.Start("Loading scene...");
-    BeginLoadingScene( std::make_shared<caustica::NativeFileSystem>(), scenePath );
-    if( m_scene == nullptr )
+    BeginLoadingScene( std::make_shared<caustica::NativeFileSystem>(), m_sceneManager->getCurrentScenePath() );
+    if( m_sceneManager->getScene() == nullptr )
     {
         caustica::error( "Unable to load scene '%s'", sceneName.c_str() );
-        m_currentScenePath = std::filesystem::path();
+        m_sceneManager->clearScene();
         m_progressLoading.Stop();
         return;
     }
@@ -626,7 +616,8 @@ bool PathTracerApp::LoadGaussianSplatFile(const std::filesystem::path& fileName,
     return AttachGaussianSplatToScene(fileName, convertRdfToRub);
 }
 
-std::filesystem::path PathTracerApp::ResolveGaussianSplatPath(const GaussianSplat& splat) const
+std::filesystem::path
+PathTracerApp::ResolveGaussianSplatPath(const GaussianSplat& splat) const
 {
     if (splat.path.empty())
         return {};
@@ -635,8 +626,8 @@ std::filesystem::path PathTracerApp::ResolveGaussianSplatPath(const GaussianSpla
     if (splatPath.is_absolute())
         return splatPath;
 
-    const std::filesystem::path sceneFolder = m_currentScenePath.parent_path();
-    if (!sceneFolder.empty() && m_currentScenePath != std::filesystem::path(c_InlineSceneSentinel))
+    const std::filesystem::path sceneFolder = m_sceneManager->getCurrentScenePath().parent_path();
+    if (!sceneFolder.empty() && m_sceneManager->getCurrentScenePath() != std::filesystem::path(SceneManager::inlineSceneSentinel()))
         return sceneFolder / splatPath;
 
     return std::filesystem::absolute(splatPath);
@@ -654,7 +645,8 @@ void PathTracerApp::PrepareGaussianSplatPass(GaussianSplatPass& pass)
     pass.CreatePipeline(*m_renderTargets);
 }
 
-uint32_t PathTracerApp::GetTotalGaussianSplatCount() const
+uint32_t
+PathTracerApp::GetTotalGaussianSplatCount() const
 {
     uint64_t total = 0;
     for (const auto& object : m_gaussianSplatSceneObjects)
@@ -667,8 +659,8 @@ uint32_t PathTracerApp::GetTotalGaussianSplatCount() const
 
 void PathTracerApp::UpdateGaussianSplatUIState()
 {
-    m_ui.GaussianSplatObjectCount = uint32_t(m_gaussianSplatSceneObjects.size());
-    m_ui.GaussianSplatCount = GetTotalGaussianSplatCount();
+    m_editor.GaussianSplatObjectCount = uint32_t(m_gaussianSplatSceneObjects.size());
+    m_editor.GaussianSplatCount = GetTotalGaussianSplatCount();
 
     m_gaussianSplatFileNameSummary.clear();
     if (m_gaussianSplatSceneObjects.size() == 1 && m_gaussianSplatSceneObjects.front().pass != nullptr)
@@ -679,10 +671,10 @@ void PathTracerApp::UpdateGaussianSplatUIState()
     {
         m_gaussianSplatFileNameSummary = std::to_string(m_gaussianSplatSceneObjects.size()) + " scene Gaussian Splat objects";
     }
-    m_ui.GaussianSplatFileName = m_gaussianSplatFileNameSummary;
+    m_editor.GaussianSplatFileName = m_gaussianSplatFileNameSummary;
 
-    if (m_ui.GaussianSplatObjectCount == 0)
-        m_ui.SelectedGaussianSplat = false;
+    if (m_editor.GaussianSplatObjectCount == 0)
+        m_editor.SelectedGaussianSplat = false;
 }
 
 void PathTracerApp::LoadGaussianSplatsFromScene()
@@ -690,13 +682,13 @@ void PathTracerApp::LoadGaussianSplatsFromScene()
     m_gaussianSplatSceneObjects.clear();
     m_gaussianSplatEmissionProxies.clear();
 
-    if (!m_scene || !m_scene->GetSceneGraph() || !m_shaderFactory)
+    if (!m_sceneManager->getScene() || !m_sceneManager->getScene()->GetSceneGraph() || !m_shaderFactory)
     {
         UpdateGaussianSplatUIState();
         return;
     }
 
-    SceneGraphWalker walker(m_scene->GetSceneGraph()->GetRootNode().get());
+    SceneGraphWalker walker(m_sceneManager->getScene()->GetSceneGraph()->GetRootNode().get());
     while (walker)
     {
         auto splat = std::dynamic_pointer_cast<GaussianSplat>(walker->GetLeaf());
@@ -742,7 +734,7 @@ void PathTracerApp::LoadGaussianSplatsFromScene()
 
 bool PathTracerApp::AttachGaussianSplatToScene(const std::filesystem::path& fileName, bool convertRdfToRub)
 {
-    if (!m_scene || !m_scene->GetSceneGraph() || !m_scene->GetSceneGraph()->GetRootNode())
+    if (!m_sceneManager->getScene() || !m_sceneManager->getScene()->GetSceneGraph() || !m_sceneManager->getScene()->GetSceneGraph()->GetRootNode())
     {
         caustica::error("Cannot load Gaussian splats before a scene is loaded.");
         return false;
@@ -783,27 +775,27 @@ bool PathTracerApp::AttachGaussianSplatToScene(const std::filesystem::path& file
     splat->loadedSplatCount = pass->GetSplatCount();
 
     auto node = std::make_shared<SceneGraphNode>();
-    auto sceneGraph = m_scene->GetSceneGraph();
+    auto sceneGraph = m_sceneManager->getScene()->GetSceneGraph();
     auto rootNode = sceneGraph->GetRootNode();
     node->SetName(MakeUniqueChildNodeName(*rootNode, splatPath.filename().string()));
     node->SetLeaf(splat);
 
     constexpr double deg2rad = 3.14159265358979323846 / 180.0;
     node->SetTranslation(dm::double3(
-        double(m_ui.GaussianSplatTranslation.x),
-        double(m_ui.GaussianSplatTranslation.y),
-        double(m_ui.GaussianSplatTranslation.z)));
+        double(m_settings.GaussianSplatTranslation.x),
+        double(m_settings.GaussianSplatTranslation.y),
+        double(m_settings.GaussianSplatTranslation.z)));
     node->SetRotation(dm::rotationQuat(dm::double3(
-        double(m_ui.GaussianSplatRotationEulerDeg.x) * deg2rad,
-        double(m_ui.GaussianSplatRotationEulerDeg.y) * deg2rad,
-        double(m_ui.GaussianSplatRotationEulerDeg.z) * deg2rad)));
+        double(m_settings.GaussianSplatRotationEulerDeg.x) * deg2rad,
+        double(m_settings.GaussianSplatRotationEulerDeg.y) * deg2rad,
+        double(m_settings.GaussianSplatRotationEulerDeg.z) * deg2rad)));
     node->SetScaling(dm::double3(
-        double(m_ui.GaussianSplatObjectScale.x),
-        double(m_ui.GaussianSplatObjectScale.y),
-        double(m_ui.GaussianSplatObjectScale.z)));
+        double(m_settings.GaussianSplatObjectScale.x),
+        double(m_settings.GaussianSplatObjectScale.y),
+        double(m_settings.GaussianSplatObjectScale.z)));
 
     auto attachedNode = sceneGraph->Attach(rootNode, node);
-    m_scene->RefreshSceneGraph(GetFrameIndex());
+    m_sceneManager->getScene()->RefreshSceneGraph(GetFrameIndex());
 
     PrepareGaussianSplatPass(*pass);
 
@@ -813,29 +805,33 @@ bool PathTracerApp::AttachGaussianSplatToScene(const std::filesystem::path& file
     object.pass = std::move(pass);
     m_gaussianSplatSceneObjects.push_back(std::move(object));
 
-    m_ui.EnableGaussianSplats = true;
+    m_settings.EnableGaussianSplats = true;
     UpdateGaussianSplatUIState();
     m_gaussianSplatTemporalReset = true;
     RequestFullRebuild();
     return true;
 }
 
-uint32_t PathTracerApp::GetGaussianSplatCount() const
+uint32_t
+PathTracerApp::GetGaussianSplatCount() const
 {
     return GetTotalGaussianSplatCount();
 }
 
-uint32_t PathTracerApp::GetGaussianSplatObjectCount() const
+uint32_t
+PathTracerApp::GetGaussianSplatObjectCount() const
 {
     return uint32_t(m_gaussianSplatSceneObjects.size());
 }
 
-const std::string& PathTracerApp::GetGaussianSplatFileName() const
+const std::string&
+PathTracerApp::GetGaussianSplatFileName() const
 {
     return m_gaussianSplatFileNameSummary;
 }
 
-PathTracerApp::GaussianSplatSceneObject* PathTracerApp::GetPrimaryGaussianSplatObject()
+PathTracerApp::GaussianSplatSceneObject*
+PathTracerApp::GetPrimaryGaussianSplatObject()
 {
     for (auto& object : m_gaussianSplatSceneObjects)
     {
@@ -845,7 +841,8 @@ PathTracerApp::GaussianSplatSceneObject* PathTracerApp::GetPrimaryGaussianSplatO
     return nullptr;
 }
 
-const PathTracerApp::GaussianSplatSceneObject* PathTracerApp::GetPrimaryGaussianSplatObject() const
+const PathTracerApp::GaussianSplatSceneObject*
+PathTracerApp::GetPrimaryGaussianSplatObject() const
 {
     for (const auto& object : m_gaussianSplatSceneObjects)
     {
@@ -855,7 +852,8 @@ const PathTracerApp::GaussianSplatSceneObject* PathTracerApp::GetPrimaryGaussian
     return nullptr;
 }
 
-float4x4 PathTracerApp::GetGaussianSplatObjectToWorld(const GaussianSplatSceneObject& object) const
+float4x4
+PathTracerApp::GetGaussianSplatObjectToWorld(const GaussianSplatSceneObject& object) const
 {
     auto node = object.node.lock();
     if (node == nullptr)
@@ -871,7 +869,7 @@ void PathTracerApp::BuildGaussianSplatEmissionProxyList()
     if (!IsGaussianSplatEmissionEnabled(m_ui))
         return;
 
-    const uint32_t maxProxyCount = ClampGaussianSplatEmissionProxyCount(m_ui.GaussianSplatEmissionMaxProxyCount);
+    const uint32_t maxProxyCount = ClampGaussianSplatEmissionProxyCount(m_settings.GaussianSplatEmissionMaxProxyCount);
     for (auto& object : m_gaussianSplatSceneObjects)
     {
         if (object.splat == nullptr || !object.splat->enabled || object.pass == nullptr || !object.pass->HasSplats())
@@ -885,11 +883,11 @@ void PathTracerApp::BuildGaussianSplatEmissionProxyList()
 
         object.pass->BuildEmissionProxies(
             remainingProxyCount,
-            m_ui.GaussianSplatScale,
-            uint32_t(std::clamp(m_ui.GaussianSplatRtxKernelDegree, 0, 5)),
-            m_ui.GaussianSplatRtxAdaptiveClamp,
-            m_ui.GaussianSplatTintColor,
-            m_ui.GaussianSplatAlphaCullThreshold);
+            m_settings.GaussianSplatScale,
+            uint32_t(std::clamp(m_settings.GaussianSplatRtxKernelDegree, 0, 5)),
+            m_settings.GaussianSplatRtxAdaptiveClamp,
+            m_settings.GaussianSplatTintColor,
+            m_settings.GaussianSplatAlphaCullThreshold);
 
         auto node = object.node.lock();
         const dm::affine3 objectToWorld = node != nullptr
@@ -915,21 +913,20 @@ void PathTracerApp::BuildGaussianSplatEmissionProxyList()
 
 void PathTracerApp::SceneUnloading( )
 {
-    m_ui.TogglableNodes = nullptr;
+    m_editor.TogglableNodes = nullptr;
     SceneRender::SceneUnloading();
     m_bindingSet = nullptr;
-    m_topLevelAS = nullptr;
-    m_subInstanceBuffer = nullptr;
+    m_renderCore.onSceneUnloading();
     m_bindingCache->Clear( );
     m_lights.clear();
-    m_ui.SelectedMaterial = nullptr;
-    m_ui.SelectedNode = nullptr;
-    m_ui.SelectedGaussianSplat = false;
+    m_editor.SelectedMaterial = nullptr;
+    m_editor.SelectedNode = nullptr;
+    m_editor.SelectedGaussianSplat = false;
     m_gaussianSplatSceneObjects.clear();
     m_gaussianSplatEmissionProxies.clear();
     UpdateGaussianSplatUIState();
     m_gaussianSplatTemporalReset = true;
-    m_ui.EnvironmentMapParams = EnvironmentMapRuntimeParameters();
+    m_settings.EnvironmentMapParams = EnvironmentMapRuntimeParameters();
     m_envMapBaker = nullptr;
     m_lightsBaker = nullptr;
     m_materialsBaker = nullptr;
@@ -949,27 +946,8 @@ void PathTracerApp::SceneUnloading( )
 
 bool PathTracerApp::LoadScene(std::shared_ptr<caustica::IFileSystem> fs, const std::filesystem::path& sceneFileName)
 {
-    m_scene = std::make_shared<caustica::Scene>(GetDevice(), *m_shaderFactory, fs, m_TextureCache, m_DescriptorTable, std::make_shared<caustica::render::RenderSceneTypeFactory>());
     m_progressLoading.Set(10);
-    if (sceneFileName == std::filesystem::path(c_InlineSceneSentinel))
-    {
-        if (m_scene->LoadFromJsonString(m_inlineSceneJson))
-        {
-            if (m_scene->GetSceneGraph() && m_scene->GetSceneGraph()->GetRootNode())
-                m_scene->ProcessNodesRecursive(m_scene->GetSceneGraph()->GetRootNode());
-            return true;
-        }
-        m_scene = nullptr;
-        return false;
-    }
-    if (m_scene->Load(sceneFileName))
-    {
-        if (m_scene->GetSceneGraph() && m_scene->GetSceneGraph()->GetRootNode())
-            m_scene->ProcessNodesRecursive(m_scene->GetSceneGraph()->GetRootNode());
-        return true;
-    }
-    m_scene = nullptr;
-    return false;
+    return m_sceneManager->loadScene(std::move(fs), sceneFileName) != nullptr;
 }
 
 void PathTracerApp::UpdateCameraFromScene( const std::shared_ptr<caustica::PerspectiveCamera> & sceneCamera )
@@ -1009,10 +987,14 @@ void PathTracerApp::CollectUncompressedTextures()
 
 void PathTracerApp::RefreshEnvironmentMapMediaList()
 {
+    const std::filesystem::path currentScenePath = m_sceneManager
+        ? m_sceneManager->getCurrentScenePath()
+        : std::filesystem::path();
+
     SceneManager::refreshEnvironmentMapMediaList(
         GetLocalPath(c_AssetsFolder),
         c_EnvMapSubFolder,
-        m_currentScenePath,
+        currentScenePath,
         m_envMapMediaList,
         m_envMapMediaFolder);
 }
@@ -1025,7 +1007,7 @@ void PathTracerApp::SceneLoaded( )
 
     m_progressLoading.Set(50);
 
-    if (m_sampleGame != nullptr) m_sampleGame->SceneLoaded(m_scene, m_currentScenePath, GetLocalPath(c_AssetsFolder));
+    if (m_sampleGame != nullptr) m_sampleGame->SceneLoaded(m_sceneManager->getScene(), m_sceneManager->getCurrentScenePath(), GetLocalPath(c_AssetsFolder));
 
     m_progressLoading.Set(55);
 
@@ -1034,7 +1016,7 @@ void PathTracerApp::SceneLoaded( )
     m_progressLoading.Set(60);
 
     m_sceneTime = 0.f;
-    m_scene->FinishedLoading( GetFrameIndex( ) );
+    m_sceneManager->getScene()->FinishedLoading( GetFrameIndex( ) );
 
     LoadGaussianSplatsFromScene();
 
@@ -1047,24 +1029,24 @@ void PathTracerApp::SceneLoaded( )
     m_progressLoading.Set(65);
 
 	// Find lights; do this before special cases to avoid duplicates
-	for (auto light : m_scene->GetSceneGraph()->GetLights())
+	for (auto light : m_sceneManager->getScene()->GetSceneGraph()->GetLights())
 	{
 		m_lights.push_back(light);
 	}
 
     // seem like sensible defaults
-    m_ui.ToneMappingParams.exposureCompensation = 2.0f;
-    m_ui.ToneMappingParams.exposureValue = 0.0f;
+    m_settings.ToneMappingParams.exposureCompensation = 2.0f;
+    m_settings.ToneMappingParams.exposureValue = 0.0f;
 
     std::shared_ptr<EnvironmentLight> envLight = FindEnvironmentLight(m_lights);
     m_envMapLocalPath = (envLight==nullptr)?(""):(envLight->path);
-    m_ui.EnvironmentMapParams = EnvironmentMapRuntimeParameters();
+    m_settings.EnvironmentMapParams = EnvironmentMapRuntimeParameters();
     m_envMapOverride = c_EnvMapSceneDefault;
 
-    if (m_ui.TogglableNodes == nullptr)
+    if (m_editor.TogglableNodes == nullptr)
     {
-        m_ui.TogglableNodes = std::make_shared<std::vector<TogglableNode>>();
-        UpdateTogglableNodes(*m_ui.TogglableNodes, GetScene()->GetSceneGraph()->GetRootNode().get()); // UNSAFE - make sure not to keep m_ui.TogglableNodes longer than scenegraph!
+        m_editor.TogglableNodes = std::make_shared<std::vector<TogglableNode>>();
+        UpdateTogglableNodes(*m_editor.TogglableNodes, GetScene()->GetSceneGraph()->GetRootNode().get()); // UNSAFE - make sure not to keep m_editor.TogglableNodes longer than scenegraph!
     }
 
     // clean up invisible lights / markers because they slow things down
@@ -1083,59 +1065,45 @@ void PathTracerApp::SceneLoaded( )
         if (envLight == nullptr)
         {
             envLight = std::make_shared<EnvironmentLight>();
-            m_scene->GetSceneGraph()->AttachLeafNode(m_scene->GetSceneGraph()->GetRootNode(), envLight);
+            m_sceneManager->getScene()->GetSceneGraph()->AttachLeafNode(m_sceneManager->getScene()->GetSceneGraph()->GetRootNode(), envLight);
             m_lights.push_back(envLight);
         }
     }
 
-    // setup camera - just load the last from the scene if available
-    auto cameras = m_scene->GetSceneGraph( )->GetCameras( );
+    auto cameras = m_sceneManager->getScene()->GetSceneGraph( )->GetCameras( );
     auto camScene = (cameras.empty( ))?(nullptr):(std::dynamic_pointer_cast<PerspectiveCamera>(cameras.back()));
-
-    if( camScene == nullptr )
-    {
-        m_camera.LookAt(float3(0.f, 1.8f, 0.f), float3(1.f, 1.55f, 0.f), float3(0, 1, 0));
-        m_cameraVerticalFOV = dm::radians(60.0f);
-        m_cameraZNear = 0.001f;
-    }
+    if (camScene)
+        UpdateCameraFromScene(camScene);
     else
-    {
-        UpdateCameraFromScene( camScene );
-    }
+        m_renderCore.camera().setupDefaultCamera();
 
-    // mark raytracing acceleration structures as dirty
-    m_ui.AccelerationStructRebuildRequested = true;
-    m_subInstanceCount = 0;
+    m_renderCore.onSceneLoaded(*m_sceneManager->getScene(), m_editor.AccelerationStructRebuildRequested);
 
-    // if we don't re-set these, BLAS-es for animated stuff don't get updated
-    for( const auto& anim : m_scene->GetSceneGraph( )->GetAnimations( ) )
-        (void)anim->Apply( 0.0f );
+    // PrintSceneGraph( m_sceneManager->getScene()->GetSceneGraph( )->GetRootNode( ) );
 
-    // PrintSceneGraph( m_scene->GetSceneGraph( )->GetRootNode( ) );
+    m_editor.ShaderReloadRequested = true;  // we have to re-create shader hit table
+    m_settings.EnableAnimations = false;
+    m_settings.RealtimeMode = false;
 
-    m_ui.ShaderReloadRequested = true;  // we have to re-create shader hit table
-    m_ui.EnableAnimations = false;
-    m_ui.RealtimeMode = false;
-
-    std::shared_ptr<SampleSettings> settings = m_scene->GetSampleSettingsNode();
+    std::shared_ptr<SampleSettings> settings = m_sceneManager->getScene()->GetSampleSettingsNode();
     if (settings != nullptr)
     {
-        m_ui.RealtimeMode = settings->realtimeMode.value_or(m_ui.RealtimeMode);
-        m_ui.EnableAnimations = settings->enableAnimations.value_or(m_ui.EnableAnimations);
+        m_settings.RealtimeMode = settings->realtimeMode.value_or(m_settings.RealtimeMode);
+        m_settings.EnableAnimations = settings->enableAnimations.value_or(m_settings.EnableAnimations);
         if (settings->startingCamera.has_value())
-            m_selectedCameraIndex = settings->startingCamera.value()+1; // slot 0 reserved for free flight camera
+            m_renderCore.camera().setSelectedCameraIndex(settings->startingCamera.value()+1); // slot 0 reserved for free flight camera
         if (settings->realtimeFireflyFilter.has_value())
         {
-            m_ui.RealtimeFireflyFilterThreshold = settings->realtimeFireflyFilter.value();
-            m_ui.RealtimeFireflyFilterEnabled = true;
+            m_settings.RealtimeFireflyFilterThreshold = settings->realtimeFireflyFilter.value();
+            m_settings.RealtimeFireflyFilterEnabled = true;
         }
-        m_ui.BounceCount = settings->maxBounces.value_or(m_ui.BounceCount);
-        m_ui.DiffuseBounceCount = settings->maxDiffuseBounces.value_or(m_ui.DiffuseBounceCount);
-        m_ui.TexLODBias = settings->textureMIPBias.value_or(m_ui.TexLODBias);
+        m_settings.BounceCount = settings->maxBounces.value_or(m_settings.BounceCount);
+        m_settings.DiffuseBounceCount = settings->maxDiffuseBounces.value_or(m_settings.DiffuseBounceCount);
+        m_settings.TexLODBias = settings->textureMIPBias.value_or(m_settings.TexLODBias);
     }
 
     if (m_cmdLine.stopAnimations)
-        m_ui.EnableAnimations = false;
+        m_settings.EnableAnimations = false;
 
     m_progressLoading.Set(70);
 
@@ -1146,35 +1114,35 @@ void PathTracerApp::SceneLoaded( )
     if (m_materialsBaker!=nullptr) m_materialsBaker->SceneReloaded();
     if (m_envMapBaker!=nullptr) m_envMapBaker->SceneReloaded();
     if (m_lightsBaker!=nullptr) m_lightsBaker->SceneReloaded();
-    if (m_ommBaker!=nullptr) m_ommBaker->SceneLoaded(*m_scene);
+    if (m_ommBaker!=nullptr) m_ommBaker->SceneLoaded(*m_sceneManager->getScene());
 
     m_progressLoading.Set(100);
 
     if (m_cmdLine.OverrideToRealtimeMode)
-        m_ui.RealtimeMode = true;
+        m_settings.RealtimeMode = true;
     if (m_cmdLine.OverrideToReferenceMode)
-        m_ui.RealtimeMode = false;
+        m_settings.RealtimeMode = false;
     
     if (m_cmdLine.OverrideAutoexposureOff)
     {
-        m_ui.ToneMappingParams.autoExposure = false;
-        m_ui.ToneMappingParams.exposureValue = 0.0f;
+        m_settings.ToneMappingParams.autoExposure = false;
+        m_settings.ToneMappingParams.exposureValue = 0.0f;
     }
     if (m_cmdLine.OverrideExposureOffset != FLT_MAX)
-        m_ui.ToneMappingParams.exposureCompensation = m_cmdLine.OverrideExposureOffset;
+        m_settings.ToneMappingParams.exposureCompensation = m_cmdLine.OverrideExposureOffset;
     if (m_cmdLine.DisableFireflyFilters)
     {
-        m_ui.RealtimeFireflyFilterEnabled = false;
-        m_ui.ReferenceFireflyFilterEnabled = false;
+        m_settings.RealtimeFireflyFilterEnabled = false;
+        m_settings.ReferenceFireflyFilterEnabled = false;
     }
     if (m_cmdLine.DisablePostProcessFilters)
     {
-        m_ui.EnableBloom = false;
+        m_settings.EnableBloom = false;
     }
     if (m_cmdLine.cameraPosDirUp != "")
         SetCurrentCameraPosDirUp(m_cmdLine.cameraPosDirUp);
 
-    m_ui.MaterialVariantIndex = 0;
+    m_settings.MaterialVariantIndex = 0;
 
     m_asyncLoadingInProgress = true;
 
@@ -1201,7 +1169,7 @@ bool PathTracerApp::KeyboardUpdate(int key, int scancode, int action, int mods)
         return true;
 
     if (!(m_sampleGame && m_sampleGame->CameraActive()))
-        m_camera.KeyboardUpdate(key, scancode, action, mods);
+        m_renderCore.camera().camera().KeyboardUpdate(key, scancode, action, mods);
 
     if (m_sampleGame && m_sampleGame->KeyboardUpdate(key, scancode, action, mods))
         return true;
@@ -1209,13 +1177,13 @@ bool PathTracerApp::KeyboardUpdate(int key, int scancode, int action, int mods)
 
     if (key == GLFW_KEY_SPACE && action == GLFW_PRESS && mods != GLFW_MOD_CONTROL && mods != GLFW_MOD_ALT)
     {
-        m_ui.EnableAnimations = !m_ui.EnableAnimations;
+        m_settings.EnableAnimations = !m_settings.EnableAnimations;
         return true;
     }
     if( key == GLFW_KEY_F2 && action == GLFW_PRESS )
-        m_ui.ShowUI = !m_ui.ShowUI;
+        m_editor.ShowUI = !m_editor.ShowUI;
     if( key == GLFW_KEY_R && action == GLFW_PRESS && mods == GLFW_MOD_CONTROL )
-        m_ui.ShaderReloadRequested = true;
+        m_editor.ShaderReloadRequested = true;
 
 #if CAUSTICA_WITH_STREAMLINE
     if (key == GLFW_KEY_F13 && action == GLFW_PRESS)
@@ -1235,7 +1203,7 @@ bool PathTracerApp::MousePosUpdate(double xpos, double ypos)
         return false;
 
     if (!(m_sampleGame && m_sampleGame->CameraActive()))
-        m_camera.MousePosUpdate(xpos, ypos);
+        m_renderCore.camera().camera().MousePosUpdate(xpos, ypos);
     if (m_sampleGame)   m_sampleGame->MousePosUpdate(xpos /** upscalingScale.x*/, ypos /** upscalingScale.y*/);
 
     float2 upscalingScale = float2(1,1);
@@ -1243,7 +1211,7 @@ bool PathTracerApp::MousePosUpdate(double xpos, double ypos)
         upscalingScale = float2(m_renderSize)/float2(m_displaySize);
 
     m_pickPosition = uint2( static_cast<uint>( xpos * upscalingScale.x ), static_cast<uint>( ypos * upscalingScale.y ) );
-    m_ui.MousePos = uint2( static_cast<uint>( xpos * upscalingScale.x ), static_cast<uint>( ypos * upscalingScale.y ) );
+    m_settings.MousePos = uint2( static_cast<uint>( xpos * upscalingScale.x ), static_cast<uint>( ypos * upscalingScale.y ) );
 
     if (m_zoomTool)     m_zoomTool->MousePosUpdate( xpos, ypos );
 
@@ -1260,14 +1228,14 @@ bool PathTracerApp::MouseButtonUpdate(int button, int action, int mods)
             return true;
 
     if (!(m_sampleGame && m_sampleGame->CameraActive()))
-        m_camera.MouseButtonUpdate(button, action, mods);
+        m_renderCore.camera().camera().MouseButtonUpdate(button, action, mods);
     if (m_sampleGame)   m_sampleGame->MouseButtonUpdate(button, action, mods);
 
     if (action == GLFW_PRESS && button == GLFW_MOUSE_BUTTON_2)
     {
         m_pick = true;
         m_pickInstance = true;
-        m_ui.DebugPixel = m_pickPosition;
+        m_settings.DebugPixel = m_pickPosition;
     }
 
 #if CAUSTICA_WITH_STREAMLINE
@@ -1291,16 +1259,16 @@ bool PathTracerApp::MouseScrollUpdate(double xoffset, double yoffset)
 
     if (!(m_sampleGame && m_sampleGame->CameraActive()))
     {
-        //m_camera.MouseScrollUpdate(xoffset, yoffset);
-        m_ui.CameraMoveSpeed *= 1.0f + yoffset*0.1f;
+        //m_renderCore.camera().camera().MouseScrollUpdate(xoffset, yoffset);
+        m_settings.CameraMoveSpeed *= 1.0f + yoffset*0.1f;
     }
     return true;
 }
 
 void PathTracerApp::Animate(float fElapsedTimeSeconds)
 {
-    if (m_ui.ActualFPSLimiter()>0)    // essential for stable video recording
-        fElapsedTimeSeconds = 1.0f / (float)m_ui.ActualFPSLimiter();
+    if (m_settings.ActualFPSLimiter()>0)    // essential for stable video recording
+        fElapsedTimeSeconds = 1.0f / (float)m_settings.ActualFPSLimiter();
 
     m_captureScriptManager->PreAnim(fElapsedTimeSeconds);
 
@@ -1314,21 +1282,21 @@ void PathTracerApp::Animate(float fElapsedTimeSeconds)
 
     m_lastDeltaTime = fElapsedTimeSeconds;
 
-    m_camera.SetMoveSpeed(m_ui.CameraMoveSpeed);
+    m_renderCore.camera().camera().SetMoveSpeed(m_settings.CameraMoveSpeed);
 
-    if( m_ui.ShaderAndACRefreshDelayedRequest > 0 )
+    if( m_editor.ShaderAndACRefreshDelayedRequest > 0 )
     {
-        m_ui.ShaderAndACRefreshDelayedRequest -= fElapsedTimeSeconds;
-        if (m_ui.ShaderAndACRefreshDelayedRequest <= 0 )
+        m_editor.ShaderAndACRefreshDelayedRequest -= fElapsedTimeSeconds;
+        if (m_editor.ShaderAndACRefreshDelayedRequest <= 0 )
         {
-            m_ui.ShaderAndACRefreshDelayedRequest = 0;
-            m_ui.ShaderReloadRequested = true;
-            m_ui.AccelerationStructRebuildRequested = true;
+            m_editor.ShaderAndACRefreshDelayedRequest = 0;
+            m_editor.ShaderReloadRequested = true;
+            m_editor.AccelerationStructRebuildRequested = true;
         }
     }
 
-    const bool enableAnimations = m_ui.EnableAnimations && m_ui.RealtimeMode;
-    const bool enableAnimationUpdate = enableAnimations || m_ui.ResetAccumulation;
+    const bool enableAnimations = m_settings.EnableAnimations && m_settings.RealtimeMode;
+    const bool enableAnimationUpdate = enableAnimations || m_settings.ResetAccumulation;
 
     if (m_sampleGame) m_sampleGame->Tick(fElapsedTimeSeconds, enableAnimations);
 
@@ -1342,7 +1310,7 @@ void PathTracerApp::Animate(float fElapsedTimeSeconds)
         if (m_sampleGame && m_sampleGame->IsInitialized())
             m_sceneTime = m_sampleGame->GetGameTime();
 
-        for (const auto& anim : m_scene->GetSceneGraph()->GetAnimations())
+        for (const auto& anim : m_sceneManager->getScene()->GetSceneGraph()->GetAnimations())
         {
             double cutLeft = 0.0; double cutRight = 0.0;
             // if (anim->GetName() == "Take 001") // special hack for mesh drone anim - TODO: fix properly in future
@@ -1355,43 +1323,35 @@ void PathTracerApp::Animate(float fElapsedTimeSeconds)
         m_sceneTime = 0.0f;
     }
 
-    m_selectedCameraIndex = std::min( m_selectedCameraIndex, GetSceneCameraCount()-1 );
-    if (m_selectedCameraIndex > 0)
+    m_renderCore.camera().selectedCameraIndex() = std::min( m_renderCore.camera().selectedCameraIndex(), GetSceneCameraCount()-1 );
+    if (m_renderCore.camera().selectedCameraIndex() > 0)
     {
-        std::shared_ptr<caustica::PerspectiveCamera> sceneCamera = std::dynamic_pointer_cast<PerspectiveCamera>(m_scene->GetSceneGraph()->GetCameras()[m_selectedCameraIndex-1]);
+        std::shared_ptr<caustica::PerspectiveCamera> sceneCamera = std::dynamic_pointer_cast<PerspectiveCamera>(m_sceneManager->getScene()->GetSceneGraph()->GetCameras()[m_renderCore.camera().selectedCameraIndex()-1]);
         if (sceneCamera != nullptr)
             UpdateCameraFromScene( sceneCamera );
     }
 
-    m_camera.Animate(fElapsedTimeSeconds);
+    m_renderCore.camera().camera().Animate(fElapsedTimeSeconds);
 
-    if (m_sampleGame) m_sampleGame->TickCamera(fElapsedTimeSeconds, m_camera);
+    if (m_sampleGame) m_sampleGame->TickCamera(fElapsedTimeSeconds, m_renderCore.camera().camera());
 
-    if (m_ui.CameraAntiRRSleepJitter>0)
+    if (m_settings.CameraAntiRRSleepJitter>0)
     {
-        float off = 0.05f * ((m_frameIndex%2)?(-m_ui.CameraAntiRRSleepJitter):(m_ui.CameraAntiRRSleepJitter));
+        float off = 0.05f * ((m_frameIndex%2)?(-m_settings.CameraAntiRRSleepJitter):(m_settings.CameraAntiRRSleepJitter));
 
-        float3 dir = m_camera.GetDir();
-        float3 right = normalize(cross(dir, m_camera.GetUp()));
+        float3 dir = m_renderCore.camera().camera().GetDir();
+        float3 right = normalize(cross(dir, m_renderCore.camera().camera().GetUp()));
         affine3 rot = rotation(right, off);
         dir = rot.transformVector(dir);
 
-        m_camera.LookTo( m_camera.GetPosition(), dir, m_camera.GetUp() );
+        m_renderCore.camera().camera().LookTo( m_renderCore.camera().camera().GetPosition(), dir, m_renderCore.camera().camera().GetUp() );
     }
 
-    dm::float3 camPos = m_camera.GetPosition();
-    dm::float3 camDir = m_camera.GetDir();
-    dm::float3 camUp = m_camera.GetUp();
-
-    // if camera moves, reset accumulation
-    if (m_lastCamDir.x != camDir.x || m_lastCamDir.y != camDir.y || m_lastCamDir.z != camDir.z || m_lastCamPos.x != camPos.x || m_lastCamPos.y != camPos.y || m_lastCamPos.z != camPos.z
-        || m_lastCamUp.x != camUp.x || m_lastCamUp.y != camUp.y || m_lastCamUp.z != camUp.z )
+    if (m_renderCore.camera().cameraMovedSinceLastFrame())
     {
-        m_lastCamPos = camPos;
-        m_lastCamDir = camDir;
-        m_lastCamUp = camUp;
-        if( !m_ui.RealtimeMode )
-            m_ui.ResetAccumulation = true;
+        m_renderCore.camera().updateLastCameraState();
+        if( !m_settings.RealtimeMode )
+            m_settings.ResetAccumulation = true;
         m_gaussianSplatTemporalReset = true;
     }
 
@@ -1402,16 +1362,16 @@ void PathTracerApp::Animate(float fElapsedTimeSeconds)
     if (frameTime > 0.0)
     {
 #if CAUSTICA_WITH_STREAMLINE
-        if (m_ui.DLSSFGMultiplier != 1)
-            m_fpsInfo = StringFormat("%.3f ms/%d-frames* (%.1f FPS*) *DLSS-G", frameTime * 1e3, m_ui.DLSSFGMultiplier, m_ui.DLSSFGMultiplier / frameTime);
+        if (m_settings.DLSSFGMultiplier != 1)
+            m_fpsInfo = StringFormat("%.3f ms/%d-frames* (%.1f FPS*) *DLSS-G", frameTime * 1e3, m_settings.DLSSFGMultiplier, m_settings.DLSSFGMultiplier / frameTime);
         else
 #endif
             m_fpsInfo = StringFormat("%.3f ms/frame (%.1f FPS)", frameTime * 1e3, 1.0 / frameTime);
     }
 
     // Window title
-    std::string extraInfo = ", " + m_fpsInfo + ", " + m_currentSceneName + ", " + GetResolutionInfo() + ", (L: " + std::to_string(m_scene->GetSceneGraph()->GetLights().size()) + ", MAT: " + std::to_string(m_scene->GetSceneGraph()->GetMaterials().size())
-        + ", MESH: " + std::to_string(m_scene->GetSceneGraph()->GetMeshes().size()) + ", I: " + std::to_string(m_scene->GetSceneGraph()->GetMeshInstances().size()) + ", SI: " + std::to_string(m_scene->GetSceneGraph()->GetSkinnedMeshInstances().size())
+    std::string extraInfo = ", " + m_fpsInfo + ", " + m_sceneManager->getCurrentSceneName() + ", " + GetResolutionInfo() + ", (L: " + std::to_string(m_sceneManager->getScene()->GetSceneGraph()->GetLights().size()) + ", MAT: " + std::to_string(m_sceneManager->getScene()->GetSceneGraph()->GetMaterials().size())
+        + ", MESH: " + std::to_string(m_sceneManager->getScene()->GetSceneGraph()->GetMeshes().size()) + ", I: " + std::to_string(m_sceneManager->getScene()->GetSceneGraph()->GetMeshInstances().size()) + ", SI: " + std::to_string(m_sceneManager->getScene()->GetSceneGraph()->GetSkinnedMeshInstances().size())
         //+ ", AvgLum: " + std::to_string((m_renderTargets!=nullptr)?(m_renderTargets->AvgLuminanceLastCaptured):(0.0f))
 #if ENABLE_DEBUG_VIZUALISATIONS
         + ", ENABLE_DEBUG_VIZUALISATIONS: 1"
@@ -1473,60 +1433,60 @@ void PathTracerApp::FillPTPipelineGlobalMacros(std::vector<caustica::ShaderMacro
 
     auto device = GetDevice();
     const bool canUseNvapiHitObject =
-        m_ui.NVAPIHitObjectExtension &&
+        m_settings.NVAPIHitObjectExtension &&
         device->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D12 &&
         device->queryFeatureSupport(nvrhi::Feature::HlslExtensionUAV);
     const bool canUseDxHitObject =
-        m_ui.DXHitObjectExtension &&
+        m_settings.DXHitObjectExtension &&
         device->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D12;
 
     assert(!canUseNvapiHitObject || !canUseDxHitObject);
 
-    macros.push_back({ "ENABLE_DEBUG_SURFACE_VIZ",  (m_ui.DebugView != DebugViewType::Disabled)?("1"):("0") });
-    macros.push_back({ "ENABLE_DEBUG_LINES_VIZ",    (m_ui.ShowDebugLines)?("1"):("0") });
+    macros.push_back({ "ENABLE_DEBUG_SURFACE_VIZ",  (m_settings.DebugView != DebugViewType::Disabled)?("1"):("0") });
+    macros.push_back({ "ENABLE_DEBUG_LINES_VIZ",    (m_settings.ShowDebugLines)?("1"):("0") });
 
     macros.push_back({ "USE_NVAPI_HIT_OBJECT_EXTENSION", canUseNvapiHitObject ? "1" : "0" });
-    macros.push_back({ "USE_NVAPI_REORDER_THREADS", (canUseNvapiHitObject && m_ui.NVAPIReorderThreads) ? "1" : "0" });
+    macros.push_back({ "USE_NVAPI_REORDER_THREADS", (canUseNvapiHitObject && m_settings.NVAPIReorderThreads) ? "1" : "0" });
 
     macros.push_back({ "USE_DX_HIT_OBJECT_EXTENSION", canUseDxHitObject ? "1" : "0" });
-    macros.push_back({ "USE_DX_MAYBE_REORDER_THREADS", (canUseDxHitObject && m_ui.DXMaybeReorderThreads) ? "1" : "0" });
+    macros.push_back({ "USE_DX_MAYBE_REORDER_THREADS", (canUseDxHitObject && m_settings.DXMaybeReorderThreads) ? "1" : "0" });
 
-    macros.push_back({ "PT_ENABLE_RUSSIAN_ROULETTE", (m_ui.EnableRussianRoulette) ? ("1") : ("0") });
+    macros.push_back({ "PT_ENABLE_RUSSIAN_ROULETTE", (m_settings.EnableRussianRoulette) ? ("1") : ("0") });
 
-    macros.push_back({ "PT_NEE_ENABLED", (m_ui.UseNEE)?("1"):("0") });
+    macros.push_back({ "PT_NEE_ENABLED", (m_settings.UseNEE)?("1"):("0") });
 
-    macros.push_back({ "PT_USE_RESTIR_DI", (m_ui.ActualUseReSTIRDI()) ? ("1") : ("0") });   // these will match constants.useReSTIRDI but constants are used in other passes too
-    macros.push_back({ "PT_USE_RESTIR_GI", (m_ui.ActualUseReSTIRGI()) ? ("1") : ("0") });   // these will match constants.useReSTIRGI but constants are used in other passes too
-    macros.push_back({ "PT_USE_RESTIR_PT", (m_ui.ActualUseReSTIRPT()) ? ("1") : ("0") });
+    macros.push_back({ "PT_USE_RESTIR_DI", (m_settings.ActualUseReSTIRDI()) ? ("1") : ("0") });   // these will match constants.useReSTIRDI but constants are used in other passes too
+    macros.push_back({ "PT_USE_RESTIR_GI", (m_settings.ActualUseReSTIRGI()) ? ("1") : ("0") });   // these will match constants.useReSTIRGI but constants are used in other passes too
+    macros.push_back({ "PT_USE_RESTIR_PT", (m_settings.ActualUseReSTIRPT()) ? ("1") : ("0") });
     
 
     // minor perf gains but recompile time every time value changed is too annoying 
-    // macros.push_back({ "PT_BOUNCE_COUNT", std::to_string(m_ui.BounceCount) });
-    // macros.push_back({ "PT_DIFFUSE_BOUNCE_COUNT", std::to_string((m_ui.RealtimeMode) ? (m_ui.RealtimeDiffuseBounceCount) : (m_ui.ReferenceDiffuseBounceCount)) });
+    // macros.push_back({ "PT_BOUNCE_COUNT", std::to_string(m_settings.BounceCount) });
+    // macros.push_back({ "PT_DIFFUSE_BOUNCE_COUNT", std::to_string((m_settings.RealtimeMode) ? (m_settings.RealtimeDiffuseBounceCount) : (m_settings.ReferenceDiffuseBounceCount)) });
 
-    macros.push_back({ "CAUSTICA_USE_APPROXIMATE_MIS", (m_ui.ActualUseApproximateMIS()) ? ("1") : ("0") });
+    macros.push_back({ "CAUSTICA_USE_APPROXIMATE_MIS", (m_settings.ActualUseApproximateMIS()) ? ("1") : ("0") });
 
     // It helps performance a lot when these are baked in
-    macros.push_back({ "CAUSTICA_NEE_FULL_SAMPLE_COUNT", std::to_string(m_ui.NEEFullSamples) });
-    uint localCandidateSamples = ComputeCandidateSampleLocalCount(m_ui.ActualNEEAT_LocalToGlobalSampleRatio(), m_ui.NEECandidateSamples);
-    uint globalCandidateSamples = ComputeCandidateSampleGlobalCount(m_ui.ActualNEEAT_LocalToGlobalSampleRatio(), m_ui.NEECandidateSamples);
+    macros.push_back({ "CAUSTICA_NEE_FULL_SAMPLE_COUNT", std::to_string(m_settings.NEEFullSamples) });
+    uint localCandidateSamples = ComputeCandidateSampleLocalCount(m_settings.ActualNEEAT_LocalToGlobalSampleRatio(), m_settings.NEECandidateSamples);
+    uint globalCandidateSamples = ComputeCandidateSampleGlobalCount(m_settings.ActualNEEAT_LocalToGlobalSampleRatio(), m_settings.NEECandidateSamples);
     macros.push_back({ "CAUSTICA_NEE_LOCAL_CANDIDATE_SAMPLE_COUNT", std::to_string(localCandidateSamples) });
     macros.push_back({ "CAUSTICA_NEE_GLOBAL_CANDIDATE_SAMPLE_COUNT", std::to_string(globalCandidateSamples) });
-    macros.push_back({ "CAUSTICA_NEE_TOTAL_CANDIDATE_SAMPLE_COUNT", std::to_string(m_ui.NEECandidateSamples) });
+    macros.push_back({ "CAUSTICA_NEE_TOTAL_CANDIDATE_SAMPLE_COUNT", std::to_string(m_settings.NEECandidateSamples) });
 
-    macros.push_back({ "CAUSTICA_DISABLE_SER_TERMINATION_HINT", (m_ui.DbgDisableSERTerminationHint)?("1"):("0") });
-    macros.push_back({ "CAUSTICA_DISCARD_NON_NEE_LIGHTING", (m_ui.DbgDiscardNonNEELighting) ? ("1") : ("0") });
-    macros.push_back({ "CAUSTICA_DISCARD_NEE_LIGHTING", (m_ui.DbgDiscardNEELighting) ? ("1") : ("0") });
+    macros.push_back({ "CAUSTICA_DISABLE_SER_TERMINATION_HINT", (m_settings.DbgDisableSERTerminationHint)?("1"):("0") });
+    macros.push_back({ "CAUSTICA_DISCARD_NON_NEE_LIGHTING", (m_settings.DbgDiscardNonNEELighting) ? ("1") : ("0") });
+    macros.push_back({ "CAUSTICA_DISCARD_NEE_LIGHTING", (m_settings.DbgDiscardNEELighting) ? ("1") : ("0") });
     
-    macros.push_back({ "CAUSTICA_FIREFLY_FILTER", (m_ui.ActualFireflyFilterEnabled()) ? ("1") : ("0") });
+    macros.push_back({ "CAUSTICA_FIREFLY_FILTER", (m_settings.ActualFireflyFilterEnabled()) ? ("1") : ("0") });
 
-    macros.push_back({ "CAUSTICA_ACTIVE_STABLE_PLANE_COUNT", std::to_string(m_ui.StablePlanesActiveCount) });
+    macros.push_back({ "CAUSTICA_ACTIVE_STABLE_PLANE_COUNT", std::to_string(m_settings.StablePlanesActiveCount) });
 
-    macros.push_back({ "CAUSTICA_NESTED_DIELECTRICS_QUALITY", std::to_string(m_ui.NestedDielectricsQuality) });
+    macros.push_back({ "CAUSTICA_NESTED_DIELECTRICS_QUALITY", std::to_string(m_settings.NestedDielectricsQuality) });
 
-    macros.push_back({ "CAUSTICA_LP_TYPES_USE_16BIT_PRECISION", (m_ui.UseFp16Types) ? ("1") : ("0") });
+    macros.push_back({ "CAUSTICA_LP_TYPES_USE_16BIT_PRECISION", (m_settings.UseFp16Types) ? ("1") : ("0") });
 
-    macros.push_back({ "CAUSTICA_ENABLE_LOW_DISCREPANCY_SAMPLER_FOR_BSDF", (m_ui.EnableLDSamplerForBSDF) ? ("1") : ("0") });
+    macros.push_back({ "CAUSTICA_ENABLE_LOW_DISCREPANCY_SAMPLER_FOR_BSDF", (m_settings.EnableLDSamplerForBSDF) ? ("1") : ("0") });
 
     m_lightsBaker->SetGlobalShaderMacros(macros);
     if (m_ommBaker != nullptr)
@@ -1552,68 +1512,23 @@ bool PathTracerApp::CreatePTPipeline(caustica::ShaderFactory& shaderFactory)
 
 void PathTracerApp::CreateBlases(nvrhi::ICommandList* commandList)
 {
-    for (const std::shared_ptr<MeshInfo>& mesh : m_scene->GetSceneGraph()->GetMeshes())
-    {
-        if (mesh->isSkinPrototype) //buffers->hasAttribute(caustica::VertexAttribute::JointWeights))
-            continue; // skip the skinning prototypes
-
-        bvh::Config cfg = { .excludeTransmissive = m_ui.AS.ExcludeTransmissive };
-
-        nvrhi::rt::AccelStructDesc blasDesc = bvh::GetMeshBlasDesc(cfg , *mesh, nullptr, false);
-        assert((int)blasDesc.bottomLevelGeometries.size() < (1 << 12)); // we can only hold 13 bits for the geometry index in the HitInfo - see GeometryInstanceID in SceneTypes.hlsli
-
-        nvrhi::rt::AccelStructHandle as = GetDevice()->createAccelStruct(blasDesc);
-
-        nvrhi::utils::BuildBottomLevelAccelStruct(commandList, as, blasDesc);
-
-        mesh->accelStruct = as;
-    }
+    caustica::AccelStructBuildSettings settings = { .excludeTransmissive = m_settings.AS.ExcludeTransmissive };
+    m_renderCore.accelStructs().createBlases(commandList, *m_sceneManager->getScene(), settings);
 }
 
 void PathTracerApp::UploadSubInstanceData(nvrhi::ICommandList* commandList)
 {
-    assert(m_subInstanceCount == m_subInstanceData.size());
-    if (m_subInstanceData.empty())
-        return;
-    // upload data to GPU buffer
-    commandList->writeBuffer(m_subInstanceBuffer, m_subInstanceData.data(), m_subInstanceData.size() * sizeof(SubInstanceData));
+    m_renderCore.accelStructs().uploadSubInstanceData(commandList);
 }
 
 void PathTracerApp::CreateTlas(nvrhi::ICommandList* commandList)
 {
-    nvrhi::rt::AccelStructDesc tlasDesc;
-    tlasDesc.isTopLevel = true;
-    tlasDesc.topLevelMaxInstances = std::max<size_t>(1, m_scene->GetSceneGraph()->GetMeshInstances().size());
-    tlasDesc.buildFlags = nvrhi::rt::AccelStructBuildFlags::PreferFastTrace;
-    assert( tlasDesc.topLevelMaxInstances < (1 << 15) ); // we can only hold 16 bits for the identifier in the HitInfo - see GeometryInstanceID in SceneTypes.hlsli
-    m_topLevelAS = GetDevice()->createAccelStruct(tlasDesc);
-
-    // setup subInstances (entry is per geometry per instance) - some of it might require rebuild at runtime in more realistic scenarios
-    {
-        // figure out the required number
-        m_subInstanceCount = 0;
-        for (const auto& instance : m_scene->GetSceneGraph()->GetMeshInstances())
-            m_subInstanceCount += (uint)instance->GetMesh()->geometries.size();
-        // create GPU buffer
-        nvrhi::BufferDesc bufferDesc;
-        bufferDesc.byteSize = sizeof(SubInstanceData) * std::max(1u, m_subInstanceCount);
-        bufferDesc.debugName = "Instances";
-        bufferDesc.structStride = sizeof(SubInstanceData);
-        bufferDesc.canHaveRawViews = false;
-        bufferDesc.canHaveUAVs = true;
-        bufferDesc.isVertexBuffer = false;
-        bufferDesc.initialState = nvrhi::ResourceStates::Common;
-        bufferDesc.keepInitialState = true;
-        m_subInstanceBuffer = GetDevice()->createBuffer(bufferDesc);
-        // figure out the data
-        m_subInstanceData.clear();
-        m_subInstanceData.insert(m_subInstanceData.begin(), m_subInstanceCount, SubInstanceData{ 0 } );
-    }
+    m_renderCore.accelStructs().createTlas(commandList, *m_sceneManager->getScene());
 }
 
 void PathTracerApp::CreateAccelStructs(nvrhi::ICommandList* commandList)
 {
-    if(m_ommBaker) m_ommBaker->CreateOpacityMicromaps(*m_scene);
+    if(m_ommBaker) m_ommBaker->CreateOpacityMicromaps(*m_sceneManager->getScene());
     CreateBlases(commandList);
     CreateTlas(commandList);
     for (auto& object : m_gaussianSplatSceneObjects)
@@ -1624,12 +1539,12 @@ void PathTracerApp::CreateAccelStructs(nvrhi::ICommandList* commandList)
         if (ResolveGaussianSplatShadowMode(m_ui) != GAUSSIAN_SPLAT_SHADOWS_DISABLED)
             object.pass->BuildAccelerationStructures(
                 commandList,
-                m_ui.GaussianSplatUseAABBs,
-                m_ui.GaussianSplatUseTLASInstances,
-                m_ui.GaussianSplatBlasCompaction,
-                m_ui.GaussianSplatScale,
-                uint32_t(std::clamp(m_ui.GaussianSplatRtxKernelDegree, 0, 5)),
-                m_ui.GaussianSplatRtxAdaptiveClamp);
+                m_settings.GaussianSplatUseAABBs,
+                m_settings.GaussianSplatUseTLASInstances,
+                m_settings.GaussianSplatBlasCompaction,
+                m_settings.GaussianSplatScale,
+                uint32_t(std::clamp(m_settings.GaussianSplatRtxKernelDegree, 0, 5)),
+                m_settings.GaussianSplatRtxAdaptiveClamp);
         else
             object.pass->ReleaseAccelerationStructures();
     }
@@ -1637,33 +1552,19 @@ void PathTracerApp::CreateAccelStructs(nvrhi::ICommandList* commandList)
 
 void PathTracerApp::RecreateAccelStructs(nvrhi::ICommandList* commandList)
 {
-    // If the subInstanceData or BLAS build input data changes we trigger a full update here
-    // could be made more efficient by only rebuilding the geometry in question,
-    // or split the BLAS and subInstanceData updates
-    if (m_ui.AccelerationStructRebuildRequested)
+    if (m_editor.AccelerationStructRebuildRequested)
     {
-        m_ui.AccelerationStructRebuildRequested = false;
-        m_ui.ResetAccumulation = true;
+        m_editor.AccelerationStructRebuildRequested = false;
+        m_settings.ResetAccumulation = true;
 
         GetDevice()->waitForIdle();
 
         m_bindingSet = nullptr;
-        m_topLevelAS = nullptr;
+        m_renderCore.accelStructs().releaseGpuResources();
 
-        for (const std::shared_ptr<MeshInfo>& _mesh : m_scene->GetSceneGraph()->GetMeshes())
-        {
-            assert(std::dynamic_pointer_cast<MeshInfoEx>(_mesh) != nullptr);
-            const std::shared_ptr<MeshInfoEx>& mesh = std::static_pointer_cast<MeshInfoEx>(_mesh);
-            mesh->accelStruct = nullptr;
-            mesh->AccelStructOMM = nullptr;
-            mesh->OpacityMicroMaps.clear();
-            mesh->DebugData = nullptr;
-            mesh->DebugDataDirty = true;
-        }
-        m_meshesPendingAccelRebuild.clear();
+        m_renderCore.accelStructs().clearMeshAccelStructs(*m_sceneManager->getScene());
         GetDevice()->runGarbageCollection();
 
-        // raytracing acceleration structures
         commandList->open();
         CreateAccelStructs(commandList);
         commandList->close();
@@ -1677,55 +1578,21 @@ void PathTracerApp::RequestMeshAccelRebuild(const std::shared_ptr<MeshInfo>& mes
     if (!mesh)
         return;
 
-    m_ui.ResetAccumulation = true;
+    m_settings.ResetAccumulation = true;
 
-    if (!m_topLevelAS)
+    if (!m_renderCore.accelStructs().hasTopLevelAS())
     {
-        m_ui.AccelerationStructRebuildRequested = true;
+        m_editor.AccelerationStructRebuildRequested = true;
         return;
     }
 
-    const auto it = std::find(m_meshesPendingAccelRebuild.begin(), m_meshesPendingAccelRebuild.end(), mesh);
-    if (it == m_meshesPendingAccelRebuild.end())
-        m_meshesPendingAccelRebuild.push_back(mesh);
+    m_renderCore.accelStructs().requestMeshRebuild(mesh);
 }
 
 void PathTracerApp::RebuildDirtyMeshAccelStructs(nvrhi::ICommandList* commandList)
 {
-    if (m_meshesPendingAccelRebuild.empty())
-        return;
-
-    std::vector<std::shared_ptr<MeshInfo>> dirtyMeshes;
-    dirtyMeshes.swap(m_meshesPendingAccelRebuild);
-
-    for (const std::shared_ptr<MeshInfo>& mesh : dirtyMeshes)
-    {
-        if (!mesh || mesh->isSkinPrototype)
-            continue;
-
-        if (!mesh->buffers || !mesh->buffers->vertexBuffer || !mesh->buffers->indexBuffer)
-        {
-            m_ui.AccelerationStructRebuildRequested = true;
-            continue;
-        }
-
-        bvh::Config cfg = { .excludeTransmissive = m_ui.AS.ExcludeTransmissive };
-        nvrhi::rt::AccelStructDesc blasDesc = bvh::GetMeshBlasDesc(cfg, *mesh, nullptr, false);
-        blasDesc.buildFlags = nvrhi::rt::AccelStructBuildFlags::PreferFastBuild;
-        assert((int)blasDesc.bottomLevelGeometries.size() < (1 << 12));
-
-        nvrhi::rt::AccelStructHandle as = GetDevice()->createAccelStruct(blasDesc);
-        nvrhi::utils::BuildBottomLevelAccelStruct(commandList, as, blasDesc);
-        mesh->accelStruct = as;
-
-        if (auto meshEx = std::dynamic_pointer_cast<MeshInfoEx>(mesh))
-        {
-            meshEx->AccelStructOMM = nullptr;
-            meshEx->OpacityMicroMaps.clear();
-            meshEx->DebugData = nullptr;
-            meshEx->DebugDataDirty = true;
-        }
-    }
+    caustica::AccelStructBuildSettings settings = { .excludeTransmissive = m_settings.AS.ExcludeTransmissive };
+    m_renderCore.accelStructs().rebuildDirtyMeshes(commandList, *m_sceneManager->getScene(), settings, m_editor.AccelerationStructRebuildRequested);
 }
 
 void PathTracerApp::TransitionMeshBuffersToReadOnly(nvrhi::ICommandList* commandList)
@@ -1736,93 +1603,26 @@ void PathTracerApp::TransitionMeshBuffersToReadOnly(nvrhi::ICommandList* command
 
 void PathTracerApp::UpdateSkinnedBLASs(nvrhi::ICommandList* commandList, uint32_t frameIndex) const
 {
-    commandList->beginMarker("Skinned BLAS Updates");
-
-    // Transition all the buffers to their necessary states before building the BLAS'es to allow BLAS batching
-    for (const auto& skinnedInstance : m_scene->GetSceneGraph()->GetSkinnedMeshInstances())
-    {
-        if (skinnedInstance->GetLastUpdateFrameIndex() < frameIndex)
-            continue;
-
-        commandList->setAccelStructState(skinnedInstance->GetMesh()->accelStruct, nvrhi::ResourceStates::AccelStructWrite);
-        commandList->setBufferState(skinnedInstance->GetMesh()->buffers->vertexBuffer, nvrhi::ResourceStates::AccelStructBuildInput);
-    }
-    commandList->commitBarriers();
-
-    // Now update the BLAS'es
-    for (const auto& skinnedInstance : m_scene->GetSceneGraph()->GetSkinnedMeshInstances())
-    {
-        if (skinnedInstance->GetLastUpdateFrameIndex() < frameIndex)
-            continue;
-
-        bvh::Config cfg = { .excludeTransmissive = m_ui.AS.ExcludeTransmissive };
-
-        nvrhi::rt::AccelStructDesc blasDesc = bvh::GetMeshBlasDesc(cfg, *skinnedInstance->GetMesh(), nullptr, true);
-
-        nvrhi::utils::BuildBottomLevelAccelStruct(commandList, skinnedInstance->GetMesh()->accelStruct, blasDesc);
-    }
-    commandList->endMarker();
+    caustica::AccelStructBuildSettings settings = { .excludeTransmissive = m_settings.AS.ExcludeTransmissive };
+    m_renderCore.accelStructs().updateSkinnedBlases(commandList, *m_sceneManager->getScene(), settings, frameIndex);
 }
 
 void PathTracerApp::BuildTLAS(nvrhi::ICommandList* commandList) const
 {
-    std::vector<nvrhi::rt::InstanceDesc> instances; // TODO: make this a member, avoid allocs :)
-
-    uint subInstanceCount = 0;
-    for (const auto& instance : m_scene->GetSceneGraph()->GetMeshInstances())
+    caustica::AccelStructBuildSettings settings = {
+        .excludeTransmissive = m_settings.AS.ExcludeTransmissive,
+        .forceOpaque         = m_settings.AS.ForceOpaque,
+    };
+    caustica::OmmAccelStructState ommState = {};
+    if (m_ommBaker)
     {
-        const bool ommDebugViewEnabled = m_ommBaker && m_ommBaker->UIData().DebugView != OpacityMicroMapDebugView::Disabled;
-        // ommDebugViewEnabled must do two things: use a BLAS without OMMs and disable all alpha testing.
-        // This may sound a bit counter intuitive, the goal is to intersect micro-triangles marked as transparent without them actually being treated as such.
-
-        const std::shared_ptr<MeshInfoEx>& mesh = std::static_pointer_cast<MeshInfoEx>(instance->GetMesh());
-
-        const bool forceOpaque          = ommDebugViewEnabled || m_ui.AS.ForceOpaque;
-        const bool hasAttachementOMM    = m_ommBaker && mesh->AccelStructOMM.Get() != nullptr;
-        const bool useOmmBLAS           = m_ommBaker && m_ommBaker->UIData().Enable && hasAttachementOMM && !forceOpaque;
-
-        const uint meshSubInstanceCount = (uint)mesh->geometries.size();
-        assert(subInstanceCount == instance->GetGeometryInstanceIndex());
-
-        auto* bottomLevelAS = useOmmBLAS ? mesh->AccelStructOMM.Get() : mesh->accelStruct.Get();
-        if (bottomLevelAS == nullptr)
-        {
-            static bool warnedNullBlas = false;
-            if (!warnedNullBlas)
-            {
-                caustica::warning("BuildTLAS skipped one or more mesh instances with null BLAS to avoid invalid TLAS input.");
-                warnedNullBlas = true;
-            }
-            subInstanceCount += meshSubInstanceCount;
-            continue;
-        }
-
-        nvrhi::rt::InstanceDesc instanceDesc;
-        instanceDesc.bottomLevelAS = bottomLevelAS;
-        instanceDesc.instanceMask = (m_ommBaker && m_ommBaker->UIData().OnlyOMMs && !hasAttachementOMM) ? 0 : 1;
-        instanceDesc.instanceID = instance->GetGeometryInstanceIndex();
-        instanceDesc.instanceContributionToHitGroupIndex = subInstanceCount;
-        instanceDesc.flags = (m_ommBaker && m_ommBaker->UIData().Force2State) ? nvrhi::rt::InstanceFlags::ForceOMM2State : nvrhi::rt::InstanceFlags::None;
-        if (forceOpaque)
-            instanceDesc.flags = (nvrhi::rt::InstanceFlags)((uint32_t)instanceDesc.flags | (uint32_t)nvrhi::rt::InstanceFlags::ForceOpaque);
-
-        subInstanceCount += meshSubInstanceCount;
-
-        auto node = instance->GetNode();
-        assert(node);
-        dm::affineToColumnMajor(node->GetLocalToWorldTransformFloat(), instanceDesc.transform);
-
-        instances.push_back(instanceDesc);
+        const auto& ommUI = m_ommBaker->UIData();
+        ommState.enabled = ommUI.Enable;
+        ommState.force2State = ommUI.Force2State;
+        ommState.onlyOMMs = ommUI.OnlyOMMs;
+        ommState.debugViewEnabled = ommUI.DebugView != OpacityMicroMapDebugView::Disabled;
     }
-    assert (m_subInstanceCount == subInstanceCount);
-
-    commandList->beginMarker("TLAS Update");
-    commandList->buildTopLevelAccelStruct(
-        m_topLevelAS,
-        instances.empty() ? nullptr : instances.data(),
-        instances.size(),
-        nvrhi::rt::AccelStructBuildFlags::AllowEmptyInstances);
-    commandList->endMarker();
+    m_renderCore.accelStructs().buildTlas(commandList, *m_sceneManager->getScene(), settings, ommState, m_ommBaker.get());
 }
 
 
@@ -1843,7 +1643,7 @@ void PathTracerApp::BackBufferResizing()
 // NOTE: we're not yet sure if this is necessary to avoid crash with going in/out of fullscreen and FG
 #if CAUSTICA_WITH_STREAMLINE
     if (!GetGpuDevice()->GetDeviceParams().headlessDevice &&
-        (m_ui.DLSSFGOptions.mode == StreamlineInterface::DLSSGMode::eOn || m_ui.ActualDLSSFGMode() == StreamlineInterface::DLSSGMode::eOn)) 
+        (m_settings.DLSSFGOptions.mode == StreamlineInterface::DLSSGMode::eOn || m_settings.ActualDLSSFGMode() == StreamlineInterface::DLSSGMode::eOn)) 
     {
         GetGpuDevice()->GetStreamline().CleanupDLSS(false);
         GetGpuDevice()->GetStreamline().CleanupDLSSG(false);
@@ -1853,11 +1653,11 @@ void PathTracerApp::BackBufferResizing()
             auto dlssgOptions = StreamlineInterface::DLSSGOptions{};
             StreamlineInterface::DLSSGState state;
             GetGpuDevice()->GetStreamline().GetDLSSGState(state, dlssgOptions);
-            m_ui.DLSSFGMultiplier = state.numFramesActuallyPresented;
-            m_ui.DLSSFGMaxNumFramesToGenerate = state.numFramesToGenerateMax;
+            m_settings.DLSSFGMultiplier = state.numFramesActuallyPresented;
+            m_settings.DLSSFGMaxNumFramesToGenerate = state.numFramesToGenerateMax;
 
             GetGpuDevice()->GetStreamline().SetDLSSGOptions(dlssgOptions);
-            m_ui.DLSSFGOptions = dlssgOptions;
+            m_settings.DLSSFGOptions = dlssgOptions;
         }
     }
 #endif
@@ -1871,7 +1671,7 @@ void PathTracerApp::CreateRenderPasses( bool& exposureResetRequired, nvrhi::Comm
 
     m_shaderDebug = std::make_shared<ShaderDebug>(GetDevice(), initializeCommandList, m_shaderFactory, m_CommonPasses);
 
-    if (m_ui.ActualUseRTXDIPasses())
+    if (m_settings.ActualUseRTXDIPasses())
         m_rtxdiPass = std::make_unique<RtxdiPass>(GetDevice(), m_shaderFactory, m_CommonPasses, m_bindlessLayout);
     else
         m_rtxdiPass = nullptr;
@@ -1907,8 +1707,8 @@ void PathTracerApp::CreateRenderPasses( bool& exposureResetRequired, nvrhi::Comm
     }
 
     // these get re-created every time intentionally, to pick up changes after at-runtime shader recompile
-    m_toneMappingPass = std::make_unique<ToneMappingPass>(GetDevice(), m_shaderFactory, m_CommonPasses, m_renderTargets->LdrFramebuffer, *m_view, m_renderTargets->OutputColor);
-    m_bloomPass = std::make_unique<BloomPass>(GetDevice(), m_shaderFactory, m_CommonPasses, m_renderTargets->ProcessedOutputFramebuffer, *m_view);
+    m_toneMappingPass = std::make_unique<ToneMappingPass>(GetDevice(), m_shaderFactory, m_CommonPasses, m_renderTargets->LdrFramebuffer, *m_renderCore.camera().view(), m_renderTargets->OutputColor);
+    m_bloomPass = std::make_unique<BloomPass>(GetDevice(), m_shaderFactory, m_CommonPasses, m_renderTargets->ProcessedOutputFramebuffer, *m_renderCore.camera().view());
     m_postProcess = std::make_shared<PostProcess>(GetDevice(), m_shaderFactory, m_CommonPasses, m_shaderDebug);
 
     {
@@ -1923,7 +1723,7 @@ void PathTracerApp::CreateRenderPasses( bool& exposureResetRequired, nvrhi::Comm
         taaParams.motionVectorStencilMask = 0; ///*uint32_t motionVectorStencilMask =*/ 0x01;
         taaParams.useCatmullRomFilter = true;
 
-        m_temporalAntiAliasingPass = std::make_unique<TemporalAntiAliasingPass>(GetDevice(), m_shaderFactory, m_CommonPasses, *m_view, taaParams);
+        m_temporalAntiAliasingPass = std::make_unique<TemporalAntiAliasingPass>(GetDevice(), m_shaderFactory, m_CommonPasses, *m_renderCore.camera().view(), taaParams);
     }
 
     if (!CreatePTPipeline(*m_shaderFactory))
@@ -1964,8 +1764,8 @@ void PathTracerApp::PreUpdateLighting(nvrhi::CommandListHandle commandList, bool
     auto preUpdateCube = m_envMapBaker->GetEnvMapCube();
 
     std::filesystem::path sceneDirectory;
-    if (m_currentScenePath != std::filesystem::path(c_InlineSceneSentinel))
-        sceneDirectory = m_currentScenePath.parent_path();
+    if (m_sceneManager->getCurrentScenePath() != std::filesystem::path(SceneManager::inlineSceneSentinel()))
+        sceneDirectory = m_sceneManager->getCurrentScenePath().parent_path();
 
     std::string envMapActualPath = m_envMapLocalPath; 
     if (m_envMapOverride != "" && m_envMapOverride != c_EnvMapSceneDefault)
@@ -1987,7 +1787,7 @@ void PathTracerApp::UpdateLighting(nvrhi::CommandListHandle commandList)
     EMB_DirectionalLight dirLights[EnvMapBaker::c_MaxDirLights];
     uint dirLightCount = 0;
     {   // Find and pre-process directional analytic lights, and convert them to environment map local frame so they remain pointing in correct world direction!
-        float3 rotationInRadians = radians(m_ui.EnvironmentMapParams.RotationXYZ);
+        float3 rotationInRadians = radians(m_settings.EnvironmentMapParams.RotationXYZ);
         affine3 rotationTransform = dm::rotation(rotationInRadians);
         affine3 inverseTransform = inverse(rotationTransform);
         for (int i = 0; i < (int)m_lights.size(); i++)
@@ -2008,27 +1808,27 @@ void PathTracerApp::UpdateLighting(nvrhi::CommandListHandle commandList)
         }
     }
 
-    if (m_envMapBaker->Update(commandList, *m_bindingCache, m_CommonPasses, EnvMapBaker::BakeSettings { .EnvMapRadianceScale = c_envMapRadianceScale }, m_sceneTime, dirLights, dirLightCount, !m_ui.RealtimeMode || !m_ui.EnableAnimations) )
-        m_ui.ResetAccumulation = true;
+    if (m_envMapBaker->Update(commandList, *m_bindingCache, m_CommonPasses, EnvMapBaker::BakeSettings { .EnvMapRadianceScale = c_envMapRadianceScale }, m_sceneTime, dirLights, dirLightCount, !m_settings.RealtimeMode || !m_settings.EnableAnimations) )
+        m_settings.ResetAccumulation = true;
 
     {
         LightsBaker::BakeSettings settings;
-        settings.ImportanceSamplingType = (uint)m_ui.NEEType;
-        settings.CameraPosition = m_camera.GetPosition();
-        settings.CameraDirection = m_camera.GetDir();
-        settings.ViewProjMatrix = m_view->GetViewProjectionMatrix();
-        settings.MouseCursorPos = m_ui.MousePos;
-        settings.GlobalTemporalFeedbackWeight   = m_ui.NEEAT_GlobalTemporalFeedbackWeight;
-        settings.LocalToGlobalSampleRatio       = m_ui.ActualNEEAT_LocalToGlobalSampleRatio();
-        settings.UseApproximateMIS              = m_ui.ActualUseApproximateMIS();
-        settings.DistantVsLocalImportanceScale  = m_ui.NEEAT_Distant_vs_Local_Importance;
-        settings.ResetFeedback = m_ui.ResetAccumulation && !m_ui.RealtimeMode 
+        settings.ImportanceSamplingType = (uint)m_settings.NEEType;
+        settings.CameraPosition = m_renderCore.camera().camera().GetPosition();
+        settings.CameraDirection = m_renderCore.camera().camera().GetDir();
+        settings.ViewProjMatrix = m_renderCore.camera().view()->GetViewProjectionMatrix();
+        settings.MouseCursorPos = m_settings.MousePos;
+        settings.GlobalTemporalFeedbackWeight   = m_settings.NEEAT_GlobalTemporalFeedbackWeight;
+        settings.LocalToGlobalSampleRatio       = m_settings.ActualNEEAT_LocalToGlobalSampleRatio();
+        settings.UseApproximateMIS              = m_settings.ActualUseApproximateMIS();
+        settings.DistantVsLocalImportanceScale  = m_settings.NEEAT_Distant_vs_Local_Importance;
+        settings.ResetFeedback = m_settings.ResetAccumulation && !m_settings.RealtimeMode 
 #if 1
-            || m_ui.ResetRealtimeCaches
+            || m_settings.ResetRealtimeCaches
 #endif
         ;
-        settings.PrevViewportSize = float2( (float)m_viewPrevious->GetViewExtent().width(), (float)m_viewPrevious->GetViewExtent().height() );
-        settings.ViewportSize = float2( (float)m_view->GetViewExtent().width(), (float)m_view->GetViewExtent().height() );
+        settings.PrevViewportSize = float2( (float)m_renderCore.camera().viewPrevious()->GetViewExtent().width(), (float)m_renderCore.camera().viewPrevious()->GetViewExtent().height() );
+        settings.ViewportSize = float2( (float)m_renderCore.camera().view()->GetViewExtent().width(), (float)m_renderCore.camera().view()->GetViewExtent().height() );
         settings.EnvMapParams = LightsBakerEnvMapParams{ .Transform = m_envMapSceneParams.Transform, .InvTransform = m_envMapSceneParams.InvTransform, .ColorMultiplier = m_envMapSceneParams.ColorMultiplier, .Enabled = m_envMapSceneParams.Enabled };
         settings.FrameIndex = m_frameIndex;
 
@@ -2037,28 +1837,28 @@ void PathTracerApp::UpdateLighting(nvrhi::CommandListHandle commandList)
         {
             settings.GaussianSplatEmissionProxies = &m_gaussianSplatEmissionProxies;
             settings.GaussianSplatEmissionObjectToWorld = float4x4::identity();
-            settings.GaussianSplatEmissionIntensity = m_ui.GaussianSplatEmissionIntensity;
+            settings.GaussianSplatEmissionIntensity = m_settings.GaussianSplatEmissionIntensity;
         }
 
-        m_lightsBaker->UpdateBegin(commandList, *m_bindingCache, settings, m_sceneTime, m_scene, m_materialsBaker, m_ommBaker, m_subInstanceBuffer, m_subInstanceData, m_envMapBaker->GetImportanceSampling()->GetRadianceAndImportanceMap());
+        m_lightsBaker->UpdateBegin(commandList, *m_bindingCache, settings, m_sceneTime, m_sceneManager->getScene(), m_materialsBaker, m_ommBaker, m_renderCore.accelStructs().getSubInstanceBuffer(), m_renderCore.accelStructs().getSubInstanceData(), m_envMapBaker->GetImportanceSampling()->GetRadianceAndImportanceMap());
     }
 }
 
 void PathTracerApp::PreUpdatePathTracing( bool resetAccum, nvrhi::CommandListHandle commandList )
 {
-    const bool resetReferenceOidn = !m_ui.RealtimeMode && (resetAccum || m_ui.ResetAccumulation || m_ui.ReferenceOIDNDenoiserChanged);
-    if (resetReferenceOidn || m_ui.ReferenceOIDNDenoiserChanged)
+    const bool resetReferenceOidn = !m_settings.RealtimeMode && (resetAccum || m_settings.ResetAccumulation || m_settings.ReferenceOIDNDenoiserChanged);
+    if (resetReferenceOidn || m_settings.ReferenceOIDNDenoiserChanged)
     {
         ResetReferenceOIDN();
-        m_ui.ReferenceOIDNDenoiserChanged = false;
+        m_settings.ReferenceOIDNDenoiserChanged = false;
     }
 
-    resetAccum |= m_ui.ResetAccumulation;
-    resetAccum |= m_ui.RealtimeMode;
+    resetAccum |= m_settings.ResetAccumulation;
+    resetAccum |= m_settings.RealtimeMode;
 
     if (resetAccum)
     {
-        m_accumulationSampleIndex = (m_ui.AccumulationPreWarmRealtimeCaches)?(-32):(0);
+        m_accumulationSampleIndex = (m_settings.AccumulationPreWarmRealtimeCaches)?(-32):(0);
     }
 #if ENABLE_DEBUG_VIZUALISATIONS
     if (resetAccum)
@@ -2071,31 +1871,31 @@ void PathTracerApp::PreUpdatePathTracing( bool resetAccum, nvrhi::CommandListHan
         m_benchStart = std::chrono::high_resolution_clock::now( );
         m_benchLast = m_benchStart;
         m_benchFrames = 0;
-    } else if( m_accumulationSampleIndex < m_ui.AccumulationTarget )
+    } else if( m_accumulationSampleIndex < m_settings.AccumulationTarget )
     {
         m_benchFrames++;
         m_benchLast = std::chrono::high_resolution_clock::now( );
     }
     m_accumulationCompleted = false;
     // 'min' in non-realtime path here is to keep looping the last sample for debugging purposes!
-    if( !m_ui.RealtimeMode )
+    if( !m_settings.RealtimeMode )
     {
-        m_sampleIndex = (m_accumulationSampleIndex<0)?(m_accumulationSampleIndex+4096):(min(m_accumulationSampleIndex, m_ui.AccumulationTarget - 1));
-        m_accumulationCompleted |= m_accumulationSampleIndex == m_ui.AccumulationTarget - 1;
+        m_sampleIndex = (m_accumulationSampleIndex<0)?(m_accumulationSampleIndex+4096):(min(m_accumulationSampleIndex, m_settings.AccumulationTarget - 1));
+        m_accumulationCompleted |= m_accumulationSampleIndex == m_settings.AccumulationTarget - 1;
     }
     else
-        m_sampleIndex = (!m_ui.DbgFreezeRealtimeNoiseSeed)?( m_frameIndex % 8192 ):0;     // actual sample index
+        m_sampleIndex = (!m_settings.DbgFreezeRealtimeNoiseSeed)?( m_frameIndex % 8192 ):0;     // actual sample index
 }
 
 void PathTracerApp::PostUpdatePathTracing( )
 {
-    m_accumulationSampleIndex = std::min( m_accumulationSampleIndex+1, m_ui.AccumulationTarget );
+    m_accumulationSampleIndex = std::min( m_accumulationSampleIndex+1, m_settings.AccumulationTarget );
 
-    if (m_ui.ActualUseRTXDIPasses())
+    if (m_settings.ActualUseRTXDIPasses())
         m_rtxdiPass->EndFrame();
 
-    m_ui.ResetAccumulation = false;
-    m_ui.ResetRealtimeCaches = false;
+    m_settings.ResetAccumulation = false;
+    m_settings.ResetRealtimeCaches = false;
     m_frameIndex++;
 }
 
@@ -2134,82 +1934,82 @@ void PathTracerApp::UpdatePathTracerConstants( PathTracerConstants & constants, 
 
     constants.camera = cameraData;
     constants.prevCamera = cameraData;
-    if (m_viewPrevious)
-        constants.prevCamera.PosW = m_viewPrevious->GetInverseViewMatrix().m_translation;
+    if (m_renderCore.camera().viewPrevious())
+        constants.prevCamera.PosW = m_renderCore.camera().viewPrevious()->GetInverseViewMatrix().m_translation;
 
-    constants.bounceCount = m_ui.BounceCount;
-    constants.diffuseBounceCount = m_ui.DiffuseBounceCount;
-    constants.perPixelJitterAAScale = (m_ui.RealtimeMode == false && m_ui.AccumulationAA)?(1):( (m_ui.RealtimeMode && m_ui.RealtimeAA == 3)?(m_ui.DLSSRRMicroJitter):(0.0f) );
+    constants.bounceCount = m_settings.BounceCount;
+    constants.diffuseBounceCount = m_settings.DiffuseBounceCount;
+    constants.perPixelJitterAAScale = (m_settings.RealtimeMode == false && m_settings.AccumulationAA)?(1):( (m_settings.RealtimeMode && m_settings.RealtimeAA == 3)?(m_settings.DLSSRRMicroJitter):(0.0f) );
 
     // needed to allow super-resolution to work best
     float dlssBias = -dm::log2f(sqrtf((m_displaySize.x * m_displaySize.y) / float(m_renderSize.x * m_renderSize.y)));
 
-    constants.texLODBias = m_ui.TexLODBias + dlssBias;
-    constants.sampleBaseIndex = m_sampleIndex * m_ui.ActualSamplesPerPixel();
+    constants.texLODBias = m_settings.TexLODBias + dlssBias;
+    constants.sampleBaseIndex = m_sampleIndex * m_settings.ActualSamplesPerPixel();
 
-    //constants.subSampleCount = m_ui.ActualSamplesPerPixel();
-    constants.invSubSampleCount = 1.0f / (float)m_ui.ActualSamplesPerPixel();
+    //constants.subSampleCount = m_settings.ActualSamplesPerPixel();
+    constants.invSubSampleCount = 1.0f / (float)m_settings.ActualSamplesPerPixel();
 
     constants.imageWidth = m_renderSize.x; assert( m_renderSize.x == m_renderTargets->OutputColor->getDesc().width );
     constants.imageHeight = m_renderSize.y; assert( m_renderSize.y == m_renderTargets->OutputColor->getDesc().height );
 
     // this is the dynamic luminance that when passed through current tonemapper with current exposure settings, produces the same 50% gray
-    constants.preExposedGrayLuminance = m_ui.EnableToneMapping?(dm::luminance(m_toneMappingPass->GetPreExposedGray(0))):(1.0f);
+    constants.preExposedGrayLuminance = m_settings.EnableToneMapping?(dm::luminance(m_toneMappingPass->GetPreExposedGray(0))):(1.0f);
 
     const float disabledFF = 0.0f;
-    if (m_ui.RealtimeMode)
-        constants.fireflyFilterThreshold = (m_ui.RealtimeFireflyFilterEnabled)?(m_ui.RealtimeFireflyFilterThreshold*sqrtf(constants.preExposedGrayLuminance)*1e3f):(disabledFF); // it does make sense to make the realtime variant dependent on avg luminance - just didn't have time to try it out yet
+    if (m_settings.RealtimeMode)
+        constants.fireflyFilterThreshold = (m_settings.RealtimeFireflyFilterEnabled)?(m_settings.RealtimeFireflyFilterThreshold*sqrtf(constants.preExposedGrayLuminance)*1e3f):(disabledFF); // it does make sense to make the realtime variant dependent on avg luminance - just didn't have time to try it out yet
     else
-        constants.fireflyFilterThreshold = (m_ui.ReferenceFireflyFilterEnabled)?(m_ui.ReferenceFireflyFilterThreshold*sqrtf(constants.preExposedGrayLuminance)*1e3f):(disabledFF); // making it exposure-adaptive breaks determinism with accumulation (because there's a feedback loop), so that's disabled
-    constants.useReSTIRDI = m_ui.ActualUseReSTIRDI();
-    constants.useReSTIRGI = m_ui.ActualUseReSTIRGI();
-    constants.useReSTIRPT = m_ui.ActualUseReSTIRPT();
-    constants.environmentMapVisibleToCamera = m_ui.EnvironmentMapParams.VisibleToCamera ? 1u : 0u;
-    constants.denoiserRadianceClampK = m_ui.DenoiserRadianceClampK;
-    constants.DLSSRRBrightnessClampK = (m_ui.DLSSRRBrightnessClampK>0)?(m_ui.DLSSRRBrightnessClampK * constants.preExposedGrayLuminance):(0.0f);
+        constants.fireflyFilterThreshold = (m_settings.ReferenceFireflyFilterEnabled)?(m_settings.ReferenceFireflyFilterThreshold*sqrtf(constants.preExposedGrayLuminance)*1e3f):(disabledFF); // making it exposure-adaptive breaks determinism with accumulation (because there's a feedback loop), so that's disabled
+    constants.useReSTIRDI = m_settings.ActualUseReSTIRDI();
+    constants.useReSTIRGI = m_settings.ActualUseReSTIRGI();
+    constants.useReSTIRPT = m_settings.ActualUseReSTIRPT();
+    constants.environmentMapVisibleToCamera = m_settings.EnvironmentMapParams.VisibleToCamera ? 1u : 0u;
+    constants.denoiserRadianceClampK = m_settings.DenoiserRadianceClampK;
+    constants.DLSSRRBrightnessClampK = (m_settings.DLSSRRBrightnessClampK>0)?(m_settings.DLSSRRBrightnessClampK * constants.preExposedGrayLuminance):(0.0f);
 
     // no stable planes by default
-    constants.denoisingEnabled = m_ui.ActualUseStandaloneDenoiser() || m_ui.RealtimeAA == 3;
+    constants.denoisingEnabled = m_settings.ActualUseStandaloneDenoiser() || m_settings.RealtimeAA == 3;
 
-    constants._activeStablePlaneCount           = m_ui.StablePlanesActiveCount;
-    constants.maxStablePlaneVertexDepth         = std::min( std::min( (uint)m_ui.StablePlanesMaxVertexDepth, cStablePlaneMaxVertexIndex ), (uint)m_ui.BounceCount );
-    constants.allowPrimarySurfaceReplacement    = m_ui.AllowPrimarySurfaceReplacement;
-    constants.stablePlanesSplitStopThreshold    = m_ui.StablePlanesSplitStopThreshold;
+    constants._activeStablePlaneCount           = m_settings.StablePlanesActiveCount;
+    constants.maxStablePlaneVertexDepth         = std::min( std::min( (uint)m_settings.StablePlanesMaxVertexDepth, cStablePlaneMaxVertexIndex ), (uint)m_settings.BounceCount );
+    constants.allowPrimarySurfaceReplacement    = m_settings.AllowPrimarySurfaceReplacement;
+    constants.stablePlanesSplitStopThreshold    = m_settings.StablePlanesSplitStopThreshold;
     constants._padding3                         = 0;
-    constants.stablePlanesSuppressPrimaryIndirectSpecularK  = m_ui.StablePlanesSuppressPrimaryIndirectSpecular?m_ui.StablePlanesSuppressPrimaryIndirectSpecularK:0.0f;
-    constants.stablePlanesAntiAliasingFallthrough = m_ui.StablePlanesAntiAliasingFallthrough;
+    constants.stablePlanesSuppressPrimaryIndirectSpecularK  = m_settings.StablePlanesSuppressPrimaryIndirectSpecular?m_settings.StablePlanesSuppressPrimaryIndirectSpecularK:0.0f;
+    constants.stablePlanesAntiAliasingFallthrough = m_settings.StablePlanesAntiAliasingFallthrough;
     constants.frameIndex                        = m_frameIndex & 0xFFFFFFFF; //GetFrameIndex();
     constants.genericTSLineStride               = GenericTSComputeLineStride(constants.imageWidth, constants.imageHeight);
     constants.genericTSPlaneStride              = GenericTSComputePlaneStride(constants.imageWidth, constants.imageHeight);
 
-    constants.NEEEnabled                        = m_ui.UseNEE;
-    constants.NEEType                           = m_ui.NEEType;
-    constants.NEECandidateSamples               = m_ui.NEECandidateSamples;
-    constants.NEEFullSamples                    = m_ui.NEEFullSamples;
+    constants.NEEEnabled                        = m_settings.UseNEE;
+    constants.NEEType                           = m_settings.NEEType;
+    constants.NEECandidateSamples               = m_settings.NEECandidateSamples;
+    constants.NEEFullSamples                    = m_settings.NEEFullSamples;
 
-    constants.EnvironmentMapDiffuseSampleMIPLevel = m_ui.EnvironmentMapDiffuseSampleMIPLevel;
+    constants.EnvironmentMapDiffuseSampleMIPLevel = m_settings.EnvironmentMapDiffuseSampleMIPLevel;
 
 #if CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
     // stochastic texture filtering type and size.
-    // constants.STFUseBlueNoise                   = m_ui.STFUseBlueNoise;
-    constants.STFMagnificationMethod            = GetStfMagnificationMethod(m_ui.STFMagnificationMethod);
-    constants.STFFilterMode                     = GetStfFilterMode(m_ui.STFFilterMode);
-    constants.STFGaussianSigma                  = m_ui.STFGaussianSigma;
+    // constants.STFUseBlueNoise                   = m_settings.STFUseBlueNoise;
+    constants.STFMagnificationMethod            = GetStfMagnificationMethod(m_settings.STFMagnificationMethod);
+    constants.STFFilterMode                     = GetStfFilterMode(m_settings.STFFilterMode);
+    constants.STFGaussianSigma                  = m_settings.STFGaussianSigma;
 #endif
 }
 
 
 void PathTracerApp::RtxdiSetupFrame(nvrhi::IFramebuffer* framebuffer, PathTracerCameraData cameraData, uint2 renderDims)
 {
-    const bool envMapPresent = m_ui.EnvironmentMapParams.Enabled;
+    const bool envMapPresent = m_settings.EnvironmentMapParams.Enabled;
 
     RtxdiBridgeParameters bridgeParameters;
 	bridgeParameters.frameIndex = m_frameIndex & 0xFFFFFFFF;
 	bridgeParameters.frameDims = renderDims;
-	bridgeParameters.cameraPosition = m_camera.GetPosition();
-	bridgeParameters.userSettings = m_ui.RTXDI;
-    bridgeParameters.usingLightSampling = m_ui.ActualUseReSTIRDI();
-    bridgeParameters.usingReGIR = m_ui.ActualUseReSTIRDI();
+	bridgeParameters.cameraPosition = m_renderCore.camera().camera().GetPosition();
+	bridgeParameters.userSettings = m_settings.RTXDI;
+    bridgeParameters.usingLightSampling = m_settings.ActualUseReSTIRDI();
+    bridgeParameters.usingReGIR = m_settings.ActualUseReSTIRDI();
 
     bridgeParameters.userSettings.restirDI.initialSamplingParams.environmentMapImportanceSampling = envMapPresent;
 
@@ -2218,31 +2018,31 @@ void PathTracerApp::RtxdiSetupFrame(nvrhi::IFramebuffer* framebuffer, PathTracer
     {
         bridgeParameters.gaussianSplatEmissionProxies = &m_gaussianSplatEmissionProxies;
         bridgeParameters.gaussianSplatEmissionObjectToWorld = float4x4::identity();
-        bridgeParameters.gaussianSplatEmissionIntensity = m_ui.GaussianSplatEmissionIntensity;
+        bridgeParameters.gaussianSplatEmissionIntensity = m_settings.GaussianSplatEmissionIntensity;
     }
 
-    if( m_ui.ResetRealtimeCaches )
+    if( m_settings.ResetRealtimeCaches )
         m_rtxdiPass->Reset();
 
 	m_rtxdiPass->PrepareResources(m_commandList, *m_renderTargets, envMapPresent ? m_envMapBaker : nullptr, m_envMapSceneParams,
-        m_scene, m_materialsBaker, m_ommBaker, m_subInstanceBuffer, bridgeParameters, m_bindingLayout, m_shaderDebug );
+        m_sceneManager->getScene(), m_materialsBaker, m_ommBaker, m_renderCore.accelStructs().getSubInstanceBuffer(), bridgeParameters, m_bindingLayout, m_shaderDebug );
  }
 
 bool PathTracerApp::ShouldRenderUnfocused()
 {
-    if (m_frameIndex < 16 || m_ui.ResetAccumulation || m_ui.ResetRealtimeCaches || m_captureScriptManager->IsDoingWork() )
+    if (m_frameIndex < 16 || m_settings.ResetAccumulation || m_settings.ResetRealtimeCaches || m_captureScriptManager->IsDoingWork() )
     {
         // Make sure we at least run one render frame to allow expensive resource creation to happen in background, and to allow at least somewhat decent convergence so when user alt-tabs they get a nice image
         return true;
     }
 
-    if (m_ui.RenderWhenOutOfFocus)
+    if (m_editor.RenderWhenOutOfFocus)
     {
         return true;
     }
 
     // Let Reference mode accumulate all frames before pausing
-    return (!m_ui.RealtimeMode && (m_accumulationSampleIndex < m_ui.AccumulationTarget));
+    return (!m_settings.RealtimeMode && (m_accumulationSampleIndex < m_settings.AccumulationTarget));
 }
 
 void PathTracerApp::StreamlinePreRender()
@@ -2254,8 +2054,8 @@ void PathTracerApp::StreamlinePreRender()
     // Setup Reflex
     {
         auto reflexConsts = caustica::StreamlineInterface::ReflexOptions{};
-        reflexConsts.mode = (caustica::StreamlineInterface::ReflexMode) m_ui.ActualReflexMode();
-        reflexConsts.frameLimitUs = m_ui.ReflexCappedFps == 0 ? 0 : int(1000000. / m_ui.ReflexCappedFps);
+        reflexConsts.mode = (caustica::StreamlineInterface::ReflexMode) m_settings.ActualReflexMode();
+        reflexConsts.frameLimitUs = m_settings.ReflexCappedFps == 0 ? 0 : int(1000000. / m_settings.ReflexCappedFps);
         reflexConsts.useMarkersToOptimize = true;
         reflexConsts.virtualKey = VK_F13;
         reflexConsts.idThread = 0; // std::hash<std::thread::id>()(std::this_thread::get_id())
@@ -2264,10 +2064,10 @@ void PathTracerApp::StreamlinePreRender()
         // Need to update StreamlineIntegration with the ability to query reflex state
         caustica::StreamlineInterface::ReflexState reflexState{};
         GetGpuDevice()->GetStreamline().GetReflexState(reflexState);
-        if (m_ui.IsReflexSupported)
+        if (m_settings.IsReflexSupported)
         {
-            m_ui.IsReflexLowLatencyAvailable = reflexState.lowLatencyAvailable;
-            m_ui.IsReflexFlashIndicatorDriverControlled = reflexState.flashIndicatorDriverControlled;
+            m_settings.IsReflexLowLatencyAvailable = reflexState.lowLatencyAvailable;
+            m_settings.IsReflexFlashIndicatorDriverControlled = reflexState.flashIndicatorDriverControlled;
 
             auto report = reflexState.frameReport[63];
             if (reflexState.lowLatencyAvailable && report.gpuRenderEndTime != 0)
@@ -2281,18 +2081,18 @@ void PathTracerApp::StreamlinePreRender()
                 auto osRenderQueueDeltaUs = report.osRenderQueueEndTime - report.osRenderQueueStartTime;
                 auto gpuRenderDeltaUs = report.gpuRenderEndTime - report.gpuRenderStartTime;
 
-                m_ui.ReflexStats = "frameID: " + std::to_string(frameID);
-                m_ui.ReflexStats += "\ntotalGameToRenderLatencyUs: " + std::to_string(totalGameToRenderLatencyUs);
-                m_ui.ReflexStats += "\nsimDeltaUs: " + std::to_string(simDeltaUs);
-                m_ui.ReflexStats += "\nrenderDeltaUs: " + std::to_string(renderDeltaUs);
-                m_ui.ReflexStats += "\npresentDeltaUs: " + std::to_string(presentDeltaUs);
-                m_ui.ReflexStats += "\ndriverDeltaUs: " + std::to_string(driverDeltaUs);
-                m_ui.ReflexStats += "\nosRenderQueueDeltaUs: " + std::to_string(osRenderQueueDeltaUs);
-                m_ui.ReflexStats += "\ngpuRenderDeltaUs: " + std::to_string(gpuRenderDeltaUs);
+                m_settings.ReflexStats = "frameID: " + std::to_string(frameID);
+                m_settings.ReflexStats += "\ntotalGameToRenderLatencyUs: " + std::to_string(totalGameToRenderLatencyUs);
+                m_settings.ReflexStats += "\nsimDeltaUs: " + std::to_string(simDeltaUs);
+                m_settings.ReflexStats += "\nrenderDeltaUs: " + std::to_string(renderDeltaUs);
+                m_settings.ReflexStats += "\npresentDeltaUs: " + std::to_string(presentDeltaUs);
+                m_settings.ReflexStats += "\ndriverDeltaUs: " + std::to_string(driverDeltaUs);
+                m_settings.ReflexStats += "\nosRenderQueueDeltaUs: " + std::to_string(osRenderQueueDeltaUs);
+                m_settings.ReflexStats += "\ngpuRenderDeltaUs: " + std::to_string(gpuRenderDeltaUs);
             }
             else
             {
-                m_ui.ReflexStats = "Latency Report Unavailable";
+                m_settings.ReflexStats = "Latency Report Unavailable";
             }
         }
     }
@@ -2300,78 +2100,78 @@ void PathTracerApp::StreamlinePreRender()
     // DLSS-G Setup
     {
         // If DLSS-G has been turned off, then we tell tell SL to clean it up expressly
-        if (m_ui.DLSSFGOptions.mode == StreamlineInterface::DLSSGMode::eOn && m_ui.ActualDLSSFGMode() == StreamlineInterface::DLSSGMode::eOff) {
+        if (m_settings.DLSSFGOptions.mode == StreamlineInterface::DLSSGMode::eOn && m_settings.ActualDLSSFGMode() == StreamlineInterface::DLSSGMode::eOff) {
             GetGpuDevice()->GetStreamline().CleanupDLSSG(true);
         }
 
         // This is where DLSS-G is toggled On and Off (using dlssgOptions.mode) and where we set DLSS-G parameters.
         auto dlssgOptions = StreamlineInterface::DLSSGOptions{};
-        dlssgOptions.mode = m_ui.ActualDLSSFGMode();
-        dlssgOptions.numFramesToGenerate = m_ui.DLSSFGNumFramesToGenerate;
+        dlssgOptions.mode = m_settings.ActualDLSSFGMode();
+        dlssgOptions.numFramesToGenerate = m_settings.DLSSFGNumFramesToGenerate;
 
         // This is where we query DLSS-G minimum swapchain size
         if (GetGpuDevice()->GetStreamline().IsDLSSGAvailable())
         {
             StreamlineInterface::DLSSGState state;
             GetGpuDevice()->GetStreamline().GetDLSSGState(state, dlssgOptions);
-            m_ui.DLSSFGMultiplier = state.numFramesActuallyPresented;
-            m_ui.DLSSFGMaxNumFramesToGenerate = state.numFramesToGenerateMax;
+            m_settings.DLSSFGMultiplier = state.numFramesActuallyPresented;
+            m_settings.DLSSFGMaxNumFramesToGenerate = state.numFramesToGenerateMax;
 
             GetGpuDevice()->GetStreamline().SetDLSSGOptions(dlssgOptions);
-            m_ui.DLSSFGOptions = dlssgOptions;
+            m_settings.DLSSFGOptions = dlssgOptions;
         }
     }
 
     // Ensure DLSS / DLSS-RR is available
-    if (m_ui.RealtimeAA == 3 && !m_ui.IsDLSSRRSupported)
+    if (m_settings.RealtimeAA == 3 && !m_settings.IsDLSSRRSupported)
     {
         caustica::warning("Requested DLSS-RR mode not available. Switching to DLSS. ");
-        m_ui.RealtimeAA = 2;
+        m_settings.RealtimeAA = 2;
     }
-    if ( m_ui.RealtimeAA == 2 && !m_ui.IsDLSSSuported )
+    if ( m_settings.RealtimeAA == 2 && !m_settings.IsDLSSSuported )
     {
         caustica::warning("Requested DLSS mode not available. Switching to TAA. ");
-        m_ui.RealtimeAA = 1;
+        m_settings.RealtimeAA = 1;
     }
 
     // Setup DLSS
-    const bool changeToDLSSMode = (m_ui.RealtimeAA >= 2 && m_ui.RealtimeAA <= 3) && m_ui.DLSSLastRealtimeAA != m_ui.RealtimeAA;
+    const bool changeToDLSSMode = (m_settings.RealtimeAA >= 2 && m_settings.RealtimeAA <= 3) && m_settings.DLSSLastRealtimeAA != m_settings.RealtimeAA;
     {
         // Reset DLSS vars if we stop using it
-        if (changeToDLSSMode || m_ui.DLSSMode == StreamlineInterface::DLSSMode::eOff)
+        if (changeToDLSSMode || m_settings.DLSSMode == StreamlineInterface::DLSSMode::eOff)
         {
-            m_ui.DLSSLastMode = SampleUIData::DLSSModeDefault;
-            m_ui.DLSSMode = SampleUIData::DLSSModeDefault;
-            m_ui.DLSSLastDisplaySize = { 0,0 };
+            m_settings.DLSSLastMode = SampleUIData::DLSSModeDefault;
+            m_settings.DLSSMode = SampleUIData::DLSSModeDefault;
+            m_settings.DLSSLastDisplaySize = { 0,0 };
         }
 
-        m_ui.DLSSLastRealtimeAA = m_ui.RealtimeAA;
+        m_settings.DLSSLastRealtimeAA = m_settings.RealtimeAA;
 
         // If we are using DLSS set its constants
-        if ((m_ui.RealtimeAA == 2 || m_ui.RealtimeAA == 3) && m_ui.RealtimeMode)
+        if ((m_settings.RealtimeAA == 2 || m_settings.RealtimeAA == 3) && m_settings.RealtimeMode)
         {
             StreamlineInterface::DLSSOptions dlssOptions = {};
-            if (m_ui.IsDLSSSuported)
+            if (m_settings.IsDLSSSuported)
             {
-                dlssOptions.mode = m_ui.DLSSMode;
+                dlssOptions.mode = m_settings.DLSSMode;
                 dlssOptions.outputWidth = m_displaySize.x;
                 dlssOptions.outputHeight = m_displaySize.y;
                 dlssOptions.sharpness = 0; //m_recommendedDLSSSettings.sharpness;    // <- is this no longer valid?
                 dlssOptions.colorBuffersHDR = true;
                 dlssOptions.useAutoExposure = true;     // Optional: provide proper "kBufferTypeExposure" for 0-lag for better precision handling
                 dlssOptions.preset = StreamlineInterface::DLSSPreset::eDefault;
-                // if (m_ui.RealtimeAA < 4) <- docs https://github.com/NVIDIAGameWorks/Streamline/blob/main/docs/ProgrammingGuideDLSS_RR.md#50-provide-dlss--dlss-rr-options seem to imply that these should be set even when DLSS-RR enabled
+                // if (m_settings.RealtimeAA < 4) <- docs https://github.com/NVIDIAGameWorks/Streamline/blob/main/docs/ProgrammingGuideDLSS_RR.md#50-provide-dlss--dlss-rr-options seem to imply that these should be set even when DLSS-RR enabled
                     GetGpuDevice()->GetStreamline().SetDLSSOptions(dlssOptions);
             }
             else
             {
-                assert( false ); // shouldn't happen, code above should have dropped us to "m_ui.RealtimeAA = 1" - check for recent code changes.
+                assert( false ); // shouldn't happen, code above should have dropped us to "m_settings.RealtimeAA = 1" - check for recent code changes.
             }
 
-            if (m_ui.RealtimeAA == 2 || m_ui.RealtimeAA == 3)
+            if (m_settings.RealtimeAA == 2 || m_settings.RealtimeAA == 3)
             {
                 // Check if we need to update the rendertarget size.
-                bool dlssResizeRequired = (m_ui.DLSSMode != m_ui.DLSSLastMode) || (m_displaySize.x != m_ui.DLSSLastDisplaySize.x) || (m_displaySize.y != m_ui.DLSSLastDisplaySize.y);
+                bool dlssResizeRequired = (m_settings.DLSSMode != m_settings.DLSSLastMode) || (m_displaySize.x != m_settings.DLSSLastDisplaySize.x) || (m_displaySize.y != m_settings.DLSSLastDisplaySize.y);
                 if (dlssResizeRequired)
                 {
                     // Only quality, target width and height matter here
@@ -2386,21 +2186,21 @@ void PathTracerApp::StreamlinePreRender()
 
                     if (m_recommendedDLSSSettings.optimalRenderSize.x <= 0 || m_recommendedDLSSSettings.optimalRenderSize.y <= 0)
                     {
-                        m_ui.RealtimeAA = 0;
-                        m_ui.DLSSMode = SampleUIData::DLSSModeDefault;
+                        m_settings.RealtimeAA = 0;
+                        m_settings.DLSSMode = SampleUIData::DLSSModeDefault;
                         m_renderSize = m_displaySize;
                     }
                     else
                     {
-                        m_ui.DLSSLastMode = m_ui.DLSSMode;
-                        m_ui.DLSSLastDisplaySize = m_displaySize;
+                        m_settings.DLSSLastMode = m_settings.DLSSMode;
+                        m_settings.DLSSLastDisplaySize = m_displaySize;
                     }
                 }
 
                 m_renderSize = (uint2)m_recommendedDLSSSettings.optimalRenderSize;
             }
 
-            if (m_ui.RealtimeAA == 3) // DLSS-RR
+            if (m_settings.RealtimeAA == 3) // DLSS-RR
             {
                 StreamlineInterface::DLSSRROptions dlssRROptions = {};
                 dlssRROptions.mode              	= dlssOptions.mode;
@@ -2414,13 +2214,13 @@ void PathTracerApp::StreamlinePreRender()
                 dlssRROptions.indicatorInvertAxisY 	= dlssOptions.indicatorInvertAxisY;
                 dlssRROptions.normalRoughnessMode 	= StreamlineInterface::DLSSRRNormalRoughnessMode::ePacked;
                 dlssRROptions.alphaUpscalingEnabled = false;
-                dlssRROptions.preset                = m_ui.DLSRRPreset;
+                dlssRROptions.preset                = m_settings.DLSRRPreset;
                 m_lastDLSSRROptions = dlssRROptions; // we need to fill them up with view info, but we can only have proper view after it was initialized with correct RT size
             }
         }
         else
         {
-            if (m_ui.IsDLSSSuported)
+            if (m_settings.IsDLSSSuported)
             {
                 StreamlineInterface::DLSSOptions dlssOptions = {};
                 dlssOptions.mode = StreamlineInterface::DLSSMode::eOff;
@@ -2438,7 +2238,7 @@ void PathTracerApp::StreamlinePreRender()
 #if CAUSTICA_WITH_NATIVE_DLSS
 void PathTracerApp::NativeDLSSPreRender()
 {
-    if (!m_ui.RealtimeMode)
+    if (!m_settings.RealtimeMode)
     {
         m_renderSize = m_displaySize;
         return;
@@ -2446,48 +2246,48 @@ void PathTracerApp::NativeDLSSPreRender()
 
     if (m_nativeDLSS)
     {
-        m_ui.IsDLSSSuported = m_nativeDLSS->IsDlssSupported();
-        m_ui.IsDLSSRRSupported = m_nativeDLSS->IsRayReconstructionSupported();
+        m_settings.IsDLSSSuported = m_nativeDLSS->IsDlssSupported();
+        m_settings.IsDLSSRRSupported = m_nativeDLSS->IsRayReconstructionSupported();
     }
 
-    if (m_ui.RealtimeAA == 3 && !m_ui.IsDLSSRRSupported)
+    if (m_settings.RealtimeAA == 3 && !m_settings.IsDLSSRRSupported)
     {
         caustica::warning("Requested DLSS-RR mode not available. Switching to DLSS.");
-        m_ui.RealtimeAA = 2;
+        m_settings.RealtimeAA = 2;
     }
 
-    if (m_ui.RealtimeAA == 2 && !m_ui.IsDLSSSuported)
+    if (m_settings.RealtimeAA == 2 && !m_settings.IsDLSSSuported)
     {
         caustica::warning("Requested DLSS mode not available. Switching to TAA.");
-        m_ui.RealtimeAA = 1;
+        m_settings.RealtimeAA = 1;
     }
 
-    const bool usingDLSS = (m_ui.RealtimeAA == 2 || m_ui.RealtimeAA == 3);
-    const bool changeToDLSSMode = usingDLSS && m_ui.DLSSLastRealtimeAA != m_ui.RealtimeAA;
+    const bool usingDLSS = (m_settings.RealtimeAA == 2 || m_settings.RealtimeAA == 3);
+    const bool changeToDLSSMode = usingDLSS && m_settings.DLSSLastRealtimeAA != m_settings.RealtimeAA;
 
-    if (changeToDLSSMode || m_ui.DLSSMode == SI::DLSSMode::eOff)
+    if (changeToDLSSMode || m_settings.DLSSMode == SI::DLSSMode::eOff)
     {
-        m_ui.DLSSLastMode = SampleUIData::DLSSModeDefault;
-        m_ui.DLSSMode = SampleUIData::DLSSModeDefault;
-        m_ui.DLSSLastDisplaySize = { 0, 0 };
+        m_settings.DLSSLastMode = SampleUIData::DLSSModeDefault;
+        m_settings.DLSSMode = SampleUIData::DLSSModeDefault;
+        m_settings.DLSSLastDisplaySize = { 0, 0 };
     }
 
-    m_ui.DLSSLastRealtimeAA = m_ui.RealtimeAA;
+    m_settings.DLSSLastRealtimeAA = m_settings.RealtimeAA;
 
     if (usingDLSS)
     {
         const bool dlssResizeRequired =
-            (m_ui.DLSSMode != m_ui.DLSSLastMode) ||
-            (m_displaySize.x != m_ui.DLSSLastDisplaySize.x) ||
-            (m_displaySize.y != m_ui.DLSSLastDisplaySize.y);
+            (m_settings.DLSSMode != m_settings.DLSSLastMode) ||
+            (m_displaySize.x != m_settings.DLSSLastDisplaySize.x) ||
+            (m_displaySize.y != m_settings.DLSSLastDisplaySize.y);
 
         if (dlssResizeRequired)
         {
-            m_ui.DLSSLastMode = m_ui.DLSSMode;
-            m_ui.DLSSLastDisplaySize = m_displaySize;
+            m_settings.DLSSLastMode = m_settings.DLSSMode;
+            m_settings.DLSSLastDisplaySize = m_displaySize;
         }
 
-        m_renderSize = GetNativeDLSSRenderSize(m_displaySize, m_ui.DLSSMode);
+        m_renderSize = GetNativeDLSSRenderSize(m_displaySize, m_settings.DLSSMode);
     }
     else
     {
@@ -2514,8 +2314,8 @@ double PathTracerApp::GetSceneTime()
 void PathTracerApp::PreRender()
 {
     // Limit FPS
-    if (m_ui.ActualFPSLimiter() > 0)
-        g_FPSLimiter.FramerateLimit(m_ui.ActualFPSLimiter());
+    if (m_settings.ActualFPSLimiter() > 0)
+        g_FPSLimiter.FramerateLimit(m_settings.ActualFPSLimiter());
 
     korgi::Update();
 
@@ -2541,17 +2341,17 @@ SimpleViewConstants FromPlanarViewConstants(PlanarViewConstants & view)
 
 void PathTracerApp::PostProcessPreToneMapping(nvrhi::ICommandList* commandList, const caustica::ICompositeView& compositeView)
 { // a.k.a. HDR post-process (e.g. bloom goes here)
-    caustica::PlanarView fullscreenView = *m_view;
+    caustica::PlanarView fullscreenView = *m_renderCore.camera().view();
     nvrhi::Viewport windowViewport(float(m_displaySize.x), float(m_displaySize.y));
     fullscreenView.SetViewport(windowViewport);
     fullscreenView.UpdateCache();
 
-    if (m_ui.EnableBloom && m_ui.BloomIntensity > 0.f && m_ui.BloomRadius > 0.f)
+    if (m_settings.EnableBloom && m_settings.BloomIntensity > 0.f && m_settings.BloomRadius > 0.f)
     {
-        m_bloomPass->Render(m_commandList, m_renderTargets->ProcessedOutputFramebuffer, fullscreenView, m_renderTargets->ProcessedOutputColor, m_ui.BloomRadius, m_ui.BloomIntensity);
+        m_bloomPass->Render(m_commandList, m_renderTargets->ProcessedOutputFramebuffer, fullscreenView, m_renderTargets->ProcessedOutputColor, m_settings.BloomRadius, m_settings.BloomIntensity);
     }
 
-    if (m_ui.PostProcessTestPassHDR)
+    if (m_settings.PostProcessTestPassHDR)
     {
         m_commandList->beginMarker("TestRaygenPP_HDR");
 
@@ -2578,7 +2378,7 @@ void PathTracerApp::PostProcessPreToneMapping(nvrhi::ICommandList* commandList, 
 
 void PathTracerApp::PostProcessPostToneMapping(nvrhi::ICommandList* commandList, const caustica::ICompositeView& compositeView)
 { // a.k.a. LDR post-process (e.g. colour filters go here)
-    if (m_ui.PostProcessEdgeDetection)
+    if (m_settings.PostProcessEdgeDetection)
     {
         m_commandList->beginMarker("PPEdgeDetection");
 
@@ -2593,7 +2393,7 @@ void PathTracerApp::PostProcessPostToneMapping(nvrhi::ICommandList* commandList,
         state.bindings = { m_bindingSet, m_DescriptorTable->GetDescriptorTable() };
         m_commandList->setRayTracingState(state);
 
-        SampleMiniConstants miniConstants = { uint4( *reinterpret_cast<uint*>(&m_ui.PostProcessEdgeDetectionThreshold), 0, 0, 0) };
+        SampleMiniConstants miniConstants = { uint4( *reinterpret_cast<uint*>(&m_settings.PostProcessEdgeDetectionThreshold), 0, 0, 0) };
         m_commandList->setPushConstants(&miniConstants, sizeof(miniConstants));
         m_commandList->dispatchRays(args);
 
@@ -2605,43 +2405,43 @@ void PathTracerApp::PostProcessPostToneMapping(nvrhi::ICommandList* commandList,
 
 void PathTracerApp::RenderGaussianSplats(bool renderToOutputColor)
 {
-    if (!m_ui.EnableGaussianSplats || m_gaussianSplatSceneObjects.empty())
+    if (!m_settings.EnableGaussianSplats || m_gaussianSplatSceneObjects.empty())
         return;
 
-    const bool stochasticSplats = m_ui.EnableGaussianSplats && m_ui.GaussianSplatSortingMode == 1;
-    if (stochasticSplats && (m_ui.ResetAccumulation || m_ui.ResetRealtimeCaches || m_gaussianSplatTemporalReset))
+    const bool stochasticSplats = m_settings.EnableGaussianSplats && m_settings.GaussianSplatSortingMode == 1;
+    if (stochasticSplats && (m_settings.ResetAccumulation || m_settings.ResetRealtimeCaches || m_gaussianSplatTemporalReset))
         m_gaussianSplatTemporalSampleIndex = 0;
 
     const uint32_t gaussianSplatShadowMode = ResolveGaussianSplatShadowMode(m_ui);
     GaussianSplatRenderSettings settings;
-    settings.enabled = m_ui.EnableGaussianSplats;
-    settings.depthTest = m_ui.GaussianSplatDepthTest;
-    settings.sortingMode = m_ui.GaussianSplatSortingMode == 1 ? GaussianSplatSortMode::StochasticSplats : GaussianSplatSortMode::GpuSort;
+    settings.enabled = m_settings.EnableGaussianSplats;
+    settings.depthTest = m_settings.GaussianSplatDepthTest;
+    settings.sortingMode = m_settings.GaussianSplatSortingMode == 1 ? GaussianSplatSortMode::StochasticSplats : GaussianSplatSortMode::GpuSort;
     settings.renderTarget = renderToOutputColor ? GaussianSplatRenderTarget::OutputColor : GaussianSplatRenderTarget::ProcessedOutputColor;
-    settings.frustumCulling = static_cast<GaussianSplatFrustumCulling>(dm::clamp(m_ui.GaussianSplatFrustumCulling, 0, 2));
+    settings.frustumCulling = static_cast<GaussianSplatFrustumCulling>(dm::clamp(m_settings.GaussianSplatFrustumCulling, 0, 2));
     settings.projectionMethod = GaussianSplatProjectionMethod::Eigen;
-    settings.shFormat = static_cast<GaussianSplatStorageFormat>(dm::clamp(m_ui.GaussianSplatSHFormat, 0, 2));
-    settings.rgbaFormat = static_cast<GaussianSplatStorageFormat>(dm::clamp(m_ui.GaussianSplatRGBAFormat, 0, 2));
-    settings.screenSizeCulling = m_ui.GaussianSplatScreenSizeCulling;
-    settings.mipSplattingAntialiasing = m_ui.GaussianSplatMipAntialiasing;
-    settings.useAABBs = m_ui.GaussianSplatUseAABBs;
-    settings.useTLASInstances = m_ui.GaussianSplatUseTLASInstances;
-    settings.blasCompaction = m_ui.GaussianSplatBlasCompaction;
-    settings.splatScale = m_ui.GaussianSplatScale;
-    settings.alphaScale = m_ui.GaussianSplatAlphaScale;
-    settings.brightness = m_ui.GaussianSplatBrightness;
-    settings.tintColor = m_ui.GaussianSplatTintColor;
-    settings.alphaCullThreshold = m_ui.GaussianSplatAlphaCullThreshold;
+    settings.shFormat = static_cast<GaussianSplatStorageFormat>(dm::clamp(m_settings.GaussianSplatSHFormat, 0, 2));
+    settings.rgbaFormat = static_cast<GaussianSplatStorageFormat>(dm::clamp(m_settings.GaussianSplatRGBAFormat, 0, 2));
+    settings.screenSizeCulling = m_settings.GaussianSplatScreenSizeCulling;
+    settings.mipSplattingAntialiasing = m_settings.GaussianSplatMipAntialiasing;
+    settings.useAABBs = m_settings.GaussianSplatUseAABBs;
+    settings.useTLASInstances = m_settings.GaussianSplatUseTLASInstances;
+    settings.blasCompaction = m_settings.GaussianSplatBlasCompaction;
+    settings.splatScale = m_settings.GaussianSplatScale;
+    settings.alphaScale = m_settings.GaussianSplatAlphaScale;
+    settings.brightness = m_settings.GaussianSplatBrightness;
+    settings.tintColor = m_settings.GaussianSplatTintColor;
+    settings.alphaCullThreshold = m_settings.GaussianSplatAlphaCullThreshold;
     settings.shadowsEnabled = gaussianSplatShadowMode != GAUSSIAN_SPLAT_SHADOWS_DISABLED;
     settings.shadowMode = gaussianSplatShadowMode;
-    settings.shadowStrength = m_ui.GaussianSplatShadowStrength;
-    settings.shadowRayOffset = m_ui.GaussianSplatRtxParticleShadowOffset;
-    settings.shadowSoftRadius = m_ui.GaussianSplatShadowSoftRadius;
-    settings.shadowSoftSampleCount = ClampGaussianSplatSoftShadowSamples(m_ui.GaussianSplatShadowSoftSampleCount);
+    settings.shadowStrength = m_settings.GaussianSplatShadowStrength;
+    settings.shadowRayOffset = m_settings.GaussianSplatRtxParticleShadowOffset;
+    settings.shadowSoftRadius = m_settings.GaussianSplatShadowSoftRadius;
+    settings.shadowSoftSampleCount = ClampGaussianSplatSoftShadowSamples(m_settings.GaussianSplatShadowSoftSampleCount);
     settings.shadowFrameIndex = uint32_t(m_frameIndex & 0xffffffffu);
-    settings.frustumDilation = m_ui.GaussianSplatFrustumDilation;
-    settings.minPixelCoverage = m_ui.GaussianSplatMinPixelCoverage;
-    if (stochasticSplats && m_ui.RealtimeMode)
+    settings.frustumDilation = m_settings.GaussianSplatFrustumDilation;
+    settings.minPixelCoverage = m_settings.GaussianSplatMinPixelCoverage;
+    if (stochasticSplats && m_settings.RealtimeMode)
         settings.stochasticFrameIndex = uint32_t(m_gaussianSplatTemporalSampleIndex);
     else
         settings.stochasticFrameIndex = uint32_t(m_sampleIndex >= 0
@@ -2659,7 +2459,7 @@ void PathTracerApp::RenderGaussianSplats(bool renderToOutputColor)
         }
     }
 
-    caustica::PlanarView splatView = *m_view;
+    caustica::PlanarView splatView = *m_renderCore.camera().view();
     if (!renderToOutputColor)
     {
         splatView.SetViewport(nvrhi::Viewport(float(m_displaySize.x), float(m_displaySize.y)));
@@ -2674,7 +2474,7 @@ void PathTracerApp::RenderGaussianSplats(bool renderToOutputColor)
             continue;
 
         settings.objectToWorld = GetGaussianSplatObjectToWorld(object);
-        object.pass->Render(m_commandList, splatView, m_topLevelAS.Get(), *m_renderTargets, settings);
+        object.pass->Render(m_commandList, splatView, m_renderCore.accelStructs().getTopLevelAS().Get(), *m_renderTargets, settings);
         renderedAny = true;
     }
 
@@ -2687,7 +2487,7 @@ void PathTracerApp::AccumulateGaussianSplats(const caustica::IView& splatView)
     if (m_gaussianSplatAccumulationPass == nullptr || m_renderTargets == nullptr || m_gaussianSplatCurrentColor == nullptr || m_gaussianSplatAccumulatedColor == nullptr)
         return;
 
-    if (m_ui.ResetAccumulation || m_ui.ResetRealtimeCaches || m_gaussianSplatTemporalReset)
+    if (m_settings.ResetAccumulation || m_settings.ResetRealtimeCaches || m_gaussianSplatTemporalReset)
     {
         m_gaussianSplatTemporalSampleIndex = 0;
         m_gaussianSplatTemporalReset = false;
@@ -2716,7 +2516,7 @@ void PathTracerApp::Render(nvrhi::IFramebuffer* framebuffer)
     m_displaySize = m_renderSize = uint2(fbinfo.width, fbinfo.height);
     float lodBias = 0.f;
 
-    if (m_scene == nullptr)
+    if (m_sceneManager->getScene() == nullptr)
     {
         assert( false ); // TODO: handle separately, just display pink color
         return;
@@ -2736,13 +2536,7 @@ void PathTracerApp::Render(nvrhi::IFramebuffer* framebuffer)
  
     m_displayAspectRatio = m_displaySize.x/(float)m_displaySize.y;
 
-    if (m_view == nullptr)
-    {
-        m_view = std::make_shared<PlanarView>();
-        m_viewPrevious = std::make_shared<PlanarView>();
-        m_viewPrevious->SetViewport(nvrhi::Viewport(float(m_renderSize.x), float(m_renderSize.y)));
-        m_view->SetViewport(nvrhi::Viewport(float(m_renderSize.x), float(m_renderSize.y)));
-    }
+    m_renderCore.camera().ensureViews(m_renderSize);
 
     bool needNewPasses = false;
     if( m_renderTargets == nullptr || m_renderTargets->IsUpdateRequired( m_renderSize, m_displaySize ) )
@@ -2763,12 +2557,12 @@ void PathTracerApp::Render(nvrhi::IFramebuffer* framebuffer)
     }
 
     // Environment map settings
-    if (m_ui.EnvironmentMapParams.Enabled)
+    if (m_settings.EnvironmentMapParams.Enabled)
     {
-        float intensity = m_ui.EnvironmentMapParams.Intensity / c_envMapRadianceScale;
-        m_envMapSceneParams.ColorMultiplier = m_ui.EnvironmentMapParams.TintColor * intensity;
+        float intensity = m_settings.EnvironmentMapParams.Intensity / c_envMapRadianceScale;
+        m_envMapSceneParams.ColorMultiplier = m_settings.EnvironmentMapParams.TintColor * intensity;
 
-        float3 rotationInRadians = dm::radians(m_ui.EnvironmentMapParams.RotationXYZ);
+        float3 rotationInRadians = dm::radians(m_settings.EnvironmentMapParams.RotationXYZ);
         affine3 rotationTransform = dm::rotation(rotationInRadians);
         affine3 inverseTransform = inverse(rotationTransform);
         affineToColumnMajor(rotationTransform, m_envMapSceneParams.Transform);
@@ -2781,22 +2575,22 @@ void PathTracerApp::Render(nvrhi::IFramebuffer* framebuffer)
         m_envMapSceneParams.Enabled = 0;
     }
 
-    if (m_ui.ShaderReloadRequested)
+    if (m_editor.ShaderReloadRequested)
     {
-        m_ui.ShaderReloadRequested = false;
+        m_editor.ShaderReloadRequested = false;
         m_shaderFactory->ClearCache();
         needNewPasses = true;
     }
 
     bool exposureResetRequired = false;
 
-    if (m_ui.NRDModeChanged) // if changing between ReLAX and ReBLUR
+    if (m_settings.NRDModeChanged) // if changing between ReLAX and ReBLUR
     {
         needNewPasses = true;
         for (int i = 0; i < std::size(m_nrd); i++)
             m_nrd[i] = nullptr;
     }
-    if (!m_ui.ActualUseStandaloneDenoiser()) // clean up the memory if not used
+    if (!m_settings.ActualUseStandaloneDenoiser()) // clean up the memory if not used
     {
         for (int i = 0; i < std::size(m_nrd); i++)
             m_nrd[i] = nullptr;
@@ -2820,7 +2614,7 @@ void PathTracerApp::Render(nvrhi::IFramebuffer* framebuffer)
             CreateRTPipelines();
         }
 
-        m_materialsBaker->CreateRenderPassesAndLoadMaterials(m_bindlessLayout, m_CommonPasses, m_scene, m_currentScenePath, GetLocalPath(c_AssetsFolder));
+        m_materialsBaker->CreateRenderPassesAndLoadMaterials(m_bindlessLayout, m_CommonPasses, m_sceneManager->getScene(), m_sceneManager->getCurrentScenePath(), GetLocalPath(c_AssetsFolder));
         m_progressInitializingRenderer.Set(5);
         CollectUncompressedTextures();
         if(m_ommBaker) m_ommBaker->CreateRenderPasses(m_bindlessLayout, m_CommonPasses);
@@ -2833,9 +2627,9 @@ void PathTracerApp::Render(nvrhi::IFramebuffer* framebuffer)
     // Changes to material properties and settings can require a BLAS/TLAS or subInstanceBuffer rebuild (alpha tested/exclusion flags etc); otherwise this is a no-op.
     RecreateAccelStructs(m_commandList);
 
-    if (m_ui.ActualUseRTXDIPasses() && m_rtxdiPass == nullptr )
+    if (m_settings.ActualUseRTXDIPasses() && m_rtxdiPass == nullptr )
         needNewPasses = true; // this will initialize rtxdi passes
-    if (!m_ui.ActualUseRTXDIPasses())
+    if (!m_settings.ActualUseRTXDIPasses())
         m_rtxdiPass = nullptr;
 
     // this will also create or update materials which can trigger the need to update acceleration structures
@@ -2851,7 +2645,7 @@ void PathTracerApp::Render(nvrhi::IFramebuffer* framebuffer)
     }
 
     // this is the point where main ray tracing pipelines will actually get compiled
-    m_ptPipelineBaker->Update(m_scene, (unsigned int)m_subInstanceData.size(), [this](std::vector<caustica::ShaderMacro> & macros){ this->FillPTPipelineGlobalMacros(macros); }, needNewPasses);
+    m_ptPipelineBaker->Update(m_sceneManager->getScene(), (unsigned int)m_renderCore.accelStructs().getSubInstanceData().size(), [this](std::vector<caustica::ShaderMacro> & macros){ this->FillPTPipelineGlobalMacros(macros); }, needNewPasses);
     
     // Update compute shaders (compile if needed)
     if (m_computePipelineBaker)
@@ -2867,30 +2661,30 @@ void PathTracerApp::Render(nvrhi::IFramebuffer* framebuffer)
         // Update camera data used by the path tracer & other systems
         UpdateViews(framebuffer);
         {   // TODO: pull all this to BridgeCamera - sizeX and sizeY are already inputs so we just need to pass projMatrix
-            nvrhi::Viewport viewport = m_view->GetViewport();
-            float2 jitter = m_view->GetPixelOffset();
-            float4x4 projMatrix = m_view->GetProjectionMatrix();
+            nvrhi::Viewport viewport = m_renderCore.camera().view()->GetViewport();
+            float2 jitter = m_renderCore.camera().view()->GetPixelOffset();
+            float4x4 projMatrix = m_renderCore.camera().view()->GetProjectionMatrix();
             float2 viewSize = { viewport.maxX - viewport.minX, viewport.maxY - viewport.minY };
             float outputAspectRatio = m_displayAspectRatio; //windowViewport.width() / windowViewport.height();    // render and display outputs might not match in case of lower DLSS/etc resolution rounding!
             bool rowMajor = true;
             float tanHalfFOVY = 1.0f / ((rowMajor) ? (projMatrix.m_data[1 * 4 + 1]) : (projMatrix.m_data[1 + 1 * 4]));
             float fovY = atanf(tanHalfFOVY) * 2.0f;
-            cameraData = BridgeCamera(uint(viewSize.x), uint(viewSize.y), outputAspectRatio, m_camera.GetPosition(), m_camera.GetDir(), m_camera.GetUp(), fovY, m_cameraZNear, 1e7f, m_ui.CameraFocalDistance, m_ui.CameraAperture, jitter);
+            cameraData = BridgeCamera(uint(viewSize.x), uint(viewSize.y), outputAspectRatio, m_renderCore.camera().camera().GetPosition(), m_renderCore.camera().camera().GetDir(), m_renderCore.camera().camera().GetUp(), fovY, m_renderCore.camera().zNear(), 1e7f, m_settings.CameraFocalDistance, m_settings.CameraAperture, jitter);
         }
 
         if (needNewPasses || needNewBindings || m_bindingSet == nullptr)
             m_shaderDebug->CreateRenderPasses(framebuffer, m_renderTargets->Depth);
 
-        if (m_ui.EnableShaderDebug)
+        if (m_settings.EnableShaderDebug)
         {
-            dm::float4x4 viewProj = m_view->GetViewProjectionMatrix();
+            dm::float4x4 viewProj = m_renderCore.camera().view()->GetViewProjectionMatrix();
             m_shaderDebug->BeginFrame(m_commandList, viewProj);
         }
 
         // NOTE: this refreshes geometry buffers and updates stuff needed by m_ommBaker and m_materialsBaker and others below!
-        m_scene->Refresh(m_commandList, GetFrameIndex());
+        m_sceneManager->getScene()->Refresh(m_commandList, GetFrameIndex());
 
-        if(m_ommBaker) m_ommBaker->BuildOpacityMicromaps(*m_commandList, *m_scene);
+        if(m_ommBaker) m_ommBaker->BuildOpacityMicromaps(*m_commandList, *m_sceneManager->getScene());
         RebuildDirtyMeshAccelStructs(m_commandList);
         UpdateSkinnedBLASs(m_commandList, GetFrameIndex());
         m_commandList->compactBottomLevelAccelStructs(); // Compact acceleration structures that are tagged for compaction and have finished executing the original build
@@ -2898,11 +2692,11 @@ void PathTracerApp::Render(nvrhi::IFramebuffer* framebuffer)
         TransitionMeshBuffersToReadOnly(m_commandList);
         if (m_ommBaker) 
         {
-            m_asyncLoadingInProgress |= m_ommBaker->Update(*m_commandList, *m_scene);
+            m_asyncLoadingInProgress |= m_ommBaker->Update(*m_commandList, *m_sceneManager->getScene());
             m_asyncLoadingInProgress |= m_ommBaker->UIData().BuildsLeftInQueue > 0;
         }
 
-        m_materialsBaker->Update(m_commandList, m_scene, m_subInstanceData);
+        m_materialsBaker->Update(m_commandList, m_sceneManager->getScene(), m_renderCore.accelStructs().getSubInstanceData());
         UploadSubInstanceData(m_commandList); // this is now partial subInstance data, but lights baker update requires it to find materials and create emissive triangle lights
 
         // Update input lighting, environment map, etc.
@@ -2949,7 +2743,7 @@ void PathTracerApp::Render(nvrhi::IFramebuffer* framebuffer)
         m_progressInitializingRenderer.Stop();
     }
 
-    m_toneMappingPass->PreRender(m_ui.ToneMappingParams);
+    m_toneMappingPass->PreRender(m_settings.ToneMappingParams);
 
     PreUpdatePathTracing(needNewPasses, m_commandList);
 
@@ -2958,7 +2752,7 @@ void PathTracerApp::Render(nvrhi::IFramebuffer* framebuffer)
 
     SampleConstants & constants = m_currentConstants; memset(&constants, 0, sizeof(constants));
     SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) }; // accessible but unused in path tracing at the moment
-    if( m_scene == nullptr )
+    if( m_sceneManager->getScene() == nullptr )
     {
         m_commandList->clearTextureFloat( m_renderTargets->OutputColor, nvrhi::AllSubresources, nvrhi::Color( 1, 1, 0, 0 ) );
         m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
@@ -2966,19 +2760,19 @@ void PathTracerApp::Render(nvrhi::IFramebuffer* framebuffer)
     else
     {
         UpdatePathTracerConstants(constants.ptConsts, cameraData);
-        constants.MaterialCount = m_materialsBaker->GetMaterialDataCount(); // m_scene->GetSceneGraph()->GetMaterials().size();
+        constants.MaterialCount = m_materialsBaker->GetMaterialDataCount(); // m_sceneManager->getScene()->GetSceneGraph()->GetMaterials().size();
         const uint32_t gaussianSplatShadowMode = ResolveGaussianSplatShadowMode(m_ui);
         const GaussianSplatSceneObject* primaryGaussianSplat = GetPrimaryGaussianSplatObject();
         GaussianSplatPass* primaryGaussianSplatPass = primaryGaussianSplat != nullptr ? primaryGaussianSplat->pass.get() : nullptr;
-        constants.GaussianSplatShadowCount = (m_ui.EnableGaussianSplats
+        constants.GaussianSplatShadowCount = (m_settings.EnableGaussianSplats
                 && gaussianSplatShadowMode != GAUSSIAN_SPLAT_SHADOWS_DISABLED
                 && primaryGaussianSplatPass != nullptr
                 && primaryGaussianSplatPass->GetTopLevelAS() != nullptr)
             ? primaryGaussianSplatPass->GetSplatCount()
             : 0;
         constants.GaussianSplatShadowsEnabled = constants.GaussianSplatShadowCount > 0 ? 1u : 0u;
-        constants.GaussianSplatShadowScale = m_ui.GaussianSplatScale;
-        constants.GaussianSplatShadowAlphaThreshold = m_ui.GaussianSplatAlphaCullThreshold;
+        constants.GaussianSplatShadowScale = m_settings.GaussianSplatScale;
+        constants.GaussianSplatShadowAlphaThreshold = m_settings.GaussianSplatAlphaCullThreshold;
         constants.GaussianSplatShadowUseTLASInstances =
             (primaryGaussianSplatPass != nullptr && primaryGaussianSplatPass->GetShadowUsesTLASInstances()) ? 1u : 0u;
         constants.GaussianSplatShadowPrimitiveCountPerSplat =
@@ -2986,14 +2780,14 @@ void PathTracerApp::Render(nvrhi::IFramebuffer* framebuffer)
         constants.GaussianSplatShadowMode = constants.GaussianSplatShadowsEnabled != 0
             ? gaussianSplatShadowMode
             : GAUSSIAN_SPLAT_SHADOWS_DISABLED;
-        constants.GaussianSplatShadowSoftRadius = m_ui.GaussianSplatShadowSoftRadius;
-        constants.GaussianSplatShadowSoftSampleCount = ClampGaussianSplatSoftShadowSamples(m_ui.GaussianSplatShadowSoftSampleCount);
+        constants.GaussianSplatShadowSoftRadius = m_settings.GaussianSplatShadowSoftRadius;
+        constants.GaussianSplatShadowSoftSampleCount = ClampGaussianSplatSoftShadowSamples(m_settings.GaussianSplatShadowSoftSampleCount);
         constants.GaussianSplatShadowFrameIndex = uint32_t(m_frameIndex & 0xffffffffu);
-        constants.GaussianSplatShadowRayOffset = m_ui.GaussianSplatRtxParticleShadowOffset;
-        constants.GaussianSplatShadowAlphaScale = m_ui.GaussianSplatAlphaScale;
+        constants.GaussianSplatShadowRayOffset = m_settings.GaussianSplatRtxParticleShadowOffset;
+        constants.GaussianSplatShadowAlphaScale = m_settings.GaussianSplatAlphaScale;
         constants.GaussianSplatShadowKernelMinResponse = kGaussianSplatKernelMinResponse;
-        constants.GaussianSplatShadowKernelDegree = uint32_t(std::clamp(m_ui.GaussianSplatRtxKernelDegree, 0, 5));
-        constants.GaussianSplatShadowAdaptiveClamp = m_ui.GaussianSplatRtxAdaptiveClamp ? 1u : 0u;
+        constants.GaussianSplatShadowKernelDegree = uint32_t(std::clamp(m_settings.GaussianSplatRtxKernelDegree, 0, 5));
+        constants.GaussianSplatShadowAdaptiveClamp = m_settings.GaussianSplatRtxAdaptiveClamp ? 1u : 0u;
         constants.GaussianSplatShadowWorldToObject = primaryGaussianSplat != nullptr
             ? inverse(GetGaussianSplatObjectToWorld(*primaryGaussianSplat))
             : float4x4::identity();
@@ -3001,33 +2795,33 @@ void PathTracerApp::Render(nvrhi::IFramebuffer* framebuffer)
         constants.envMapSceneParams = m_envMapSceneParams;
         constants.envMapImportanceSamplingParams = m_envMapBaker->GetImportanceSampling()->GetShaderParams();
 
-        PlanarViewConstants view;           m_view->FillPlanarViewConstants(view);
-        PlanarViewConstants previousView;   m_viewPrevious->FillPlanarViewConstants(previousView);
+        PlanarViewConstants view;           m_renderCore.camera().view()->FillPlanarViewConstants(view);
+        PlanarViewConstants previousView;   m_renderCore.camera().viewPrevious()->FillPlanarViewConstants(previousView);
         constants.view          = FromPlanarViewConstants(view);
         constants.previousView  = FromPlanarViewConstants(previousView);
 
         constants.debug = {};
-        constants.debug.pick = m_pick || m_pickInstance || m_ui.ContinuousDebugFeedback;
-        constants.debug.pickX = (constants.debug.pick)?(m_ui.DebugPixel.x):(-1);
-        constants.debug.pickY = (constants.debug.pick)?(m_ui.DebugPixel.y):(-1);
-        constants.debug.debugLineScale = (m_ui.ShowDebugLines)?(m_ui.DebugLineScale):(0.0f);
-        constants.debug.showWireframe = m_ui.ShowWireframe;
-        constants.debug.debugViewType = (int)m_ui.DebugView;
-        constants.debug.debugViewStablePlaneIndex = (m_ui.StablePlanesActiveCount==1)?(0):(m_ui.DebugViewStablePlaneIndex);
+        constants.debug.pick = m_pick || m_pickInstance || m_settings.ContinuousDebugFeedback;
+        constants.debug.pickX = (constants.debug.pick)?(m_settings.DebugPixel.x):(-1);
+        constants.debug.pickY = (constants.debug.pick)?(m_settings.DebugPixel.y):(-1);
+        constants.debug.debugLineScale = (m_settings.ShowDebugLines)?(m_settings.DebugLineScale):(0.0f);
+        constants.debug.showWireframe = m_settings.ShowWireframe;
+        constants.debug.debugViewType = (int)m_settings.DebugView;
+        constants.debug.debugViewStablePlaneIndex = (m_settings.StablePlanesActiveCount==1)?(0):(m_settings.DebugViewStablePlaneIndex);
 #if ENABLE_DEBUG_DELTA_TREE_VIZUALISATION
-        constants.debug.exploreDeltaTree = (m_ui.ShowDeltaTree && constants.debug.pick)?(1):(0);
+        constants.debug.exploreDeltaTree = (m_editor.ShowDeltaTree && constants.debug.pick)?(1):(0);
 #else
         constants.debug.exploreDeltaTree = false;
 #endif
         constants.debug.imageWidth = constants.ptConsts.imageWidth;
         constants.debug.imageHeight = constants.ptConsts.imageHeight;
-        constants.debug.mouseX = m_ui.MousePos.x;
-        constants.debug.mouseY = m_ui.MousePos.y;
+        constants.debug.mouseX = m_settings.MousePos.x;
+        constants.debug.mouseY = m_settings.MousePos.y;
         constants.debug.cameraPosW = constants.ptConsts.camera.PosW;
         constants.debug._padding0 = 0;
 
-        constants.denoisingHitParamConsts = { m_ui.ReblurSettings.hitDistanceParameters.A, m_ui.ReblurSettings.hitDistanceParameters.B,
-                                              m_ui.ReblurSettings.hitDistanceParameters.C, m_ui.ReblurSettings.hitDistanceParameters.D };
+        constants.denoisingHitParamConsts = { m_settings.ReblurSettings.hitDistanceParameters.A, m_settings.ReblurSettings.hitDistanceParameters.B,
+                                              m_settings.ReblurSettings.hitDistanceParameters.C, m_settings.ReblurSettings.hitDistanceParameters.D };
 
         // This updates all lighting: distant (environment maps and directional analytic lights) and local (analytic lights and emissive triangle lights)
         // Must go before m_constantBuffer as when saving screenshots it closes and re-opens command list, flushing the volatile constant buffer!
@@ -3038,21 +2832,21 @@ void PathTracerApp::Render(nvrhi::IFramebuffer* framebuffer)
 
         SampleRenderCode(framebuffer, m_commandList, constants);
 
-        const bool stochasticSplats = m_ui.EnableGaussianSplats && m_ui.GaussianSplatSortingMode == 1;
-        const bool stochasticUsesMainTemporal = stochasticSplats && (!m_ui.RealtimeMode || m_ui.RealtimeAA == 1);
+        const bool stochasticSplats = m_settings.EnableGaussianSplats && m_settings.GaussianSplatSortingMode == 1;
+        const bool stochasticUsesMainTemporal = stochasticSplats && (!m_settings.RealtimeMode || m_settings.RealtimeAA == 1);
         if (stochasticUsesMainTemporal)
             RenderGaussianSplats(true);
 
-        PostProcessAA(framebuffer, needNewPasses || m_ui.ResetRealtimeCaches);
+        PostProcessAA(framebuffer, needNewPasses || m_settings.ResetRealtimeCaches);
         ApplyReferenceOIDN();
-        if (m_ui.ReferenceOIDNDenoiser)
+        if (m_settings.ReferenceOIDNDenoiser)
             m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
 
         if (!stochasticUsesMainTemporal)
             RenderGaussianSplats(false);
     }
 
-    caustica::PlanarView fullscreenView = *m_view;
+    caustica::PlanarView fullscreenView = *m_renderCore.camera().view();
     nvrhi::Viewport windowViewport(float(m_displaySize.x), float(m_displaySize.y));
     fullscreenView.SetViewport(windowViewport);
     fullscreenView.UpdateCache();
@@ -3060,7 +2854,7 @@ void PathTracerApp::Render(nvrhi::IFramebuffer* framebuffer)
     PostProcessPreToneMapping(m_commandList, fullscreenView);   // writing to m_renderTargets->ProcessedOutputColor
 
     //Tone Mapping; it will read from m_renderTargets->ProcessedOutputColor and write into m_renderTargets->LdrColor; in case tonemapping is disabled, it's just a passthrough
-    if (m_toneMappingPass->Render(m_commandList, fullscreenView, m_renderTargets->ProcessedOutputColor, m_ui.EnableToneMapping))
+    if (m_toneMappingPass->Render(m_commandList, fullscreenView, m_renderTargets->ProcessedOutputColor, m_settings.EnableToneMapping))
     {
         // first run tonemapper can close & re-open command list - when that happens, we have to re-upload volatile constants
         m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
@@ -3070,7 +2864,7 @@ void PathTracerApp::Render(nvrhi::IFramebuffer* framebuffer)
 
     //m_postProcess->Render(m_commandList, m_renderTargets->LdrColor);
 
-    if (m_ui.EnableShaderDebug)
+    if (m_settings.EnableShaderDebug)
         m_shaderDebug->EndFrameAndOutput(m_commandList, m_renderTargets->LdrFramebuffer->GetFramebuffer(fullscreenView), m_renderTargets->Depth, fbinfo.getViewport());
 
     m_zoomTool->Render(m_commandList, m_renderTargets->LdrColor);
@@ -3079,7 +2873,7 @@ void PathTracerApp::Render(nvrhi::IFramebuffer* framebuffer)
     m_CommonPasses->BlitTexture(m_commandList, framebuffer, m_renderTargets->LdrColor, m_bindingCache.get());
     m_commandList->endMarker();
 
-    if (m_ui.ShowDebugLines == true)
+    if (m_settings.ShowDebugLines == true)
     {
         m_commandList->beginMarker("Debug Lines");
 
@@ -3122,7 +2916,7 @@ void PathTracerApp::Render(nvrhi::IFramebuffer* framebuffer)
     }
     m_cpuSideDebugLines.clear();
 
-    if( m_ui.ContinuousDebugFeedback || m_pick )
+    if( m_settings.ContinuousDebugFeedback || m_pick )
     {
         m_commandList->copyBuffer(m_feedback_Buffer_Cpu, 0, m_feedback_Buffer_Gpu, 0, sizeof(DebugFeedbackStruct) * 1);
         m_commandList->copyBuffer(m_debugLineBufferDisplay, 0, m_debugLineBufferCapture, 0, sizeof(DebugLineStruct) * MAX_DEBUG_LINES );
@@ -3136,7 +2930,7 @@ void PathTracerApp::Render(nvrhi::IFramebuffer* framebuffer)
 	GetDevice()->executeCommandList(m_commandList);
 
     // resolve picking and debug info
-    if (m_ui.ContinuousDebugFeedback || m_pick || m_pickInstance)
+    if (m_settings.ContinuousDebugFeedback || m_pick || m_pickInstance)
     {
         GetDevice()->waitForIdle();
         void* pData = GetDevice()->mapBuffer(m_feedback_Buffer_Cpu, nvrhi::CpuAccessMode::Read);
@@ -3150,13 +2944,13 @@ void PathTracerApp::Render(nvrhi::IFramebuffer* framebuffer)
         GetDevice()->unmapBuffer(m_debugDeltaPathTree_Cpu);
 
         if (m_pick)
-            m_ui.SelectedMaterial = FindMaterial(int(m_feedbackData.pickedMaterialID));
+            m_editor.SelectedMaterial = FindMaterial(int(m_feedbackData.pickedMaterialID));
 
         if (m_pickInstance)
         {
-            m_ui.SelectedNode = FindNodeByInstanceIndex(int(m_feedbackData.pickedInstanceIndex));
-            if (m_ui.SelectedNode != nullptr)
-                m_ui.SelectedGaussianSplat = false;
+            m_editor.SelectedNode = FindNodeByInstanceIndex(int(m_feedbackData.pickedInstanceIndex));
+            if (m_editor.SelectedNode != nullptr)
+                m_editor.SelectedGaussianSplat = false;
         }
 
         m_pick = false;
@@ -3170,17 +2964,17 @@ void PathTracerApp::Render(nvrhi::IFramebuffer* framebuffer)
 
     m_captureScriptManager->PostRender(DumpScreenshot);
 
-    if (m_ui.ExperimentalPhotoModeScreenshot)
+    if (m_editor.ExperimentalPhotoModeScreenshot)
     {
         DenoisedScreenshot( framebufferTexture );
-        m_ui.ExperimentalPhotoModeScreenshot = false;
+        m_editor.ExperimentalPhotoModeScreenshot = false;
     }
 
     if (m_temporalAntiAliasingPass != nullptr)
         m_temporalAntiAliasingPass->AdvanceFrame();
 
-	std::swap(m_view, m_viewPrevious);
-	GetGpuDevice()->SetVsyncEnabled(m_ui.ActualEnableVsync());
+	m_renderCore.camera().swapViews();
+	GetGpuDevice()->SetVsyncEnabled(m_settings.ActualEnableVsync());
 
     PostUpdatePathTracing();
 }
@@ -3188,7 +2982,7 @@ void PathTracerApp::Render(nvrhi::IFramebuffer* framebuffer)
 void PathTracerApp::RecreateBindingSet()
 {
 	// WARNING: this must match the layout of the m_bindingLayout (or switch to CreateBindingSetAndLayout)
-    nvrhi::rt::IAccelStruct* gaussianSplatAS = m_topLevelAS;
+    nvrhi::rt::IAccelStruct* gaussianSplatAS = m_renderCore.accelStructs().getTopLevelAS();
     nvrhi::IBuffer* gaussianSplatBuffer = m_materialsBaker->GetMaterialDataBuffer();
     const GaussianSplatSceneObject* primaryGaussianSplat = GetPrimaryGaussianSplatObject();
     const GaussianSplatPass* primaryGaussianSplatPass = primaryGaussianSplat != nullptr ? primaryGaussianSplat->pass.get() : nullptr;
@@ -3204,10 +2998,10 @@ void PathTracerApp::RecreateBindingSet()
         nvrhi::BindingSetItem::ConstantBuffer(0, m_constantBuffer),
         nvrhi::BindingSetItem::PushConstants(1, sizeof(SampleMiniConstants)),
         //nvrhi::BindingSetItem::ConstantBuffer(2, m_lightsBaker->GetLightingConstants()),
-        nvrhi::BindingSetItem::RayTracingAccelStruct(0, m_topLevelAS),
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(1, m_subInstanceBuffer),
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(2, m_scene->GetInstanceBuffer()),
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(3, m_scene->GetGeometryBuffer()),
+        nvrhi::BindingSetItem::RayTracingAccelStruct(0, m_renderCore.accelStructs().getTopLevelAS()),
+        nvrhi::BindingSetItem::StructuredBuffer_SRV(1, m_renderCore.accelStructs().getSubInstanceBuffer()),
+        nvrhi::BindingSetItem::StructuredBuffer_SRV(2, m_sceneManager->getScene()->GetInstanceBuffer()),
+        nvrhi::BindingSetItem::StructuredBuffer_SRV(3, m_sceneManager->getScene()->GetGeometryBuffer()),
         nvrhi::BindingSetItem::StructuredBuffer_SRV(4, (m_ommBaker)?(m_ommBaker->GetGeometryDebugBuffer()):(m_materialsBaker->GetMaterialDataBuffer().Get()) ),   // YUCK
         nvrhi::BindingSetItem::StructuredBuffer_SRV(5, m_materialsBaker->GetMaterialDataBuffer()),
         nvrhi::BindingSetItem::Texture_SRV(6,  m_renderTargets->LdrColorScratch, nvrhi::Format::SRGBA8_UNORM),
@@ -3313,22 +3107,22 @@ void PathTracerApp::RecreateBindingSet()
 
 std::shared_ptr<caustica::Material> PathTracerApp::FindMaterial(int materialID) const
 {
-    return SceneManager::findMaterial(m_scene, materialID);
+    return SceneManager::findMaterial(m_sceneManager->getScene(), materialID);
 }
 
 std::shared_ptr<caustica::SceneGraphNode> PathTracerApp::FindNodeByInstanceIndex(int instanceIndex) const
 {
-    return SceneManager::findNodeByInstanceIndex(m_scene, instanceIndex);
+    return SceneManager::findNodeByInstanceIndex(m_sceneManager->getScene(), instanceIndex);
 }
 
 
 void PathTracerApp::HandleDroppedFiles()
 {
-    if (m_ui.PendingDroppedFiles.empty())
+    if (m_editor.PendingDroppedFiles.empty())
         return;
 
-    auto files = std::move(m_ui.PendingDroppedFiles);
-    m_ui.PendingDroppedFiles.clear();
+    auto files = std::move(m_editor.PendingDroppedFiles);
+    m_editor.PendingDroppedFiles.clear();
 
     for (const auto& filePath : files)
     {
@@ -3361,7 +3155,7 @@ void PathTracerApp::HandleDroppedFiles()
 
 bool PathTracerApp::LoadMeshFile(const std::filesystem::path& filePath)
 {
-    if (!m_scene || !m_shaderFactory || !m_TextureCache)
+    if (!m_sceneManager->getScene() || !m_shaderFactory || !m_TextureCache)
     {
         caustica::error("Cannot load mesh: scene, shader factory, or texture cache not initialized.");
         return false;
@@ -3399,8 +3193,8 @@ bool PathTracerApp::LoadGltfMeshFile(const std::filesystem::path& filePath)
     caustica::SceneImportResult importResult;
 
     std::filesystem::path sceneDirectory;
-    if (m_currentScenePath != std::filesystem::path(c_InlineSceneSentinel))
-        sceneDirectory = m_currentScenePath.parent_path();
+    if (m_sceneManager->getCurrentScenePath() != std::filesystem::path(SceneManager::inlineSceneSentinel()))
+        sceneDirectory = m_sceneManager->getCurrentScenePath().parent_path();
 
     if (!importer->Load(filePath, *m_TextureCache, stats, nullptr, importResult, sceneDirectory))
     {
@@ -3416,7 +3210,7 @@ bool PathTracerApp::LoadGltfMeshFile(const std::filesystem::path& filePath)
 
     importResult.rootNode->SetName(filePath.stem().string());
 
-    auto importedRoot = m_scene->GetSceneGraph()->Attach(m_scene->GetSceneGraph()->GetRootNode(), importResult.rootNode);
+    auto importedRoot = m_sceneManager->getScene()->GetSceneGraph()->Attach(m_sceneManager->getScene()->GetSceneGraph()->GetRootNode(), importResult.rootNode);
     FinalizeRuntimeSceneMutation(importedRoot);
 
     return true;
@@ -3436,7 +3230,7 @@ bool PathTracerApp::LoadObjMeshFile(const std::filesystem::path& filePath)
     if (!importResult.rootNode)
         return false;
 
-    auto importedRoot = m_scene->GetSceneGraph()->Attach(m_scene->GetSceneGraph()->GetRootNode(), importResult.rootNode);
+    auto importedRoot = m_sceneManager->getScene()->GetSceneGraph()->Attach(m_sceneManager->getScene()->GetSceneGraph()->GetRootNode(), importResult.rootNode);
     FinalizeRuntimeSceneMutation(importedRoot);
 
     return true;
@@ -3463,24 +3257,24 @@ void PathTracerApp::FinalizeRuntimeSceneMutation(const std::shared_ptr<caustica:
         }
     }
 
-    m_scene->FinishedLoading(GetFrameIndex());
+    m_sceneManager->getScene()->FinishedLoading(GetFrameIndex());
 
     if (m_materialsBaker != nullptr)
         m_materialsBaker->SceneReloaded();
     if (m_lightsBaker != nullptr)
         m_lightsBaker->SceneReloaded();
     if (m_ommBaker != nullptr)
-        m_ommBaker->SceneLoaded(*m_scene);
+        m_ommBaker->SceneLoaded(*m_sceneManager->getScene());
 
     RequestFullRebuild();
 }
 
 bool PathTracerApp::DeleteSceneNode(const std::shared_ptr<SceneGraphNode>& node)
 {
-    if (node == nullptr || m_scene == nullptr)
+    if (node == nullptr || m_sceneManager->getScene() == nullptr)
         return false;
 
-    auto sceneGraph = m_scene->GetSceneGraph();
+    auto sceneGraph = m_sceneManager->getScene()->GetSceneGraph();
     if (sceneGraph == nullptr)
         return false;
 
@@ -3508,23 +3302,23 @@ bool PathTracerApp::DeleteSceneNode(const std::shared_ptr<SceneGraphNode>& node)
         m_gaussianSplatSceneObjects.erase(removedSplatBegin, m_gaussianSplatSceneObjects.end());
 
     sceneGraph->Detach(node, true);
-    m_scene->FinishedLoading(GetFrameIndex());
+    m_sceneManager->getScene()->FinishedLoading(GetFrameIndex());
 
     m_lights.clear();
     for (auto light : sceneGraph->GetLights())
         m_lights.push_back(light);
 
-    if (m_ui.TogglableNodes != nullptr)
+    if (m_editor.TogglableNodes != nullptr)
     {
-        m_ui.TogglableNodes->clear();
-        UpdateTogglableNodes(*m_ui.TogglableNodes, rootNode.get());
+        m_editor.TogglableNodes->clear();
+        UpdateTogglableNodes(*m_editor.TogglableNodes, rootNode.get());
     }
 
-    m_ui.SelectedMaterial = nullptr;
-    m_ui.SelectedNode = nullptr;
-    m_ui.InspectorRotationNode.reset();
-    m_ui.InspectorRotationEulerValid = false;
-    m_ui.SelectedGaussianSplat = false;
+    m_editor.SelectedMaterial = nullptr;
+    m_editor.SelectedNode = nullptr;
+    m_editor.InspectorRotationNode.reset();
+    m_editor.InspectorRotationEulerValid = false;
+    m_editor.SelectedGaussianSplat = false;
 
     if (removedGaussianSplat)
     {
@@ -3538,7 +3332,7 @@ bool PathTracerApp::DeleteSceneNode(const std::shared_ptr<SceneGraphNode>& node)
     if (m_lightsBaker != nullptr)
         m_lightsBaker->SceneReloaded();
     if (m_ommBaker != nullptr)
-        m_ommBaker->SceneLoaded(*m_scene);
+        m_ommBaker->SceneLoaded(*m_sceneManager->getScene());
 
     RequestFullRebuild();
     return true;
@@ -3547,10 +3341,10 @@ bool PathTracerApp::DeleteSceneNode(const std::shared_ptr<SceneGraphNode>& node)
 
 void PathTracerApp::RequestFullRebuild()
 {
-    m_ui.AccelerationStructRebuildRequested = true;
-    m_ui.ShaderReloadRequested = true;
-    m_ui.ShaderAndACRefreshDelayedRequest = 0.0f;
-    m_ui.ResetAccumulation = true;
+    m_editor.AccelerationStructRebuildRequested = true;
+    m_editor.ShaderReloadRequested = true;
+    m_editor.ShaderAndACRefreshDelayedRequest = 0.0f;
+    m_settings.ResetAccumulation = true;
     m_bindingSet = nullptr;
     if (m_bindingCache)
         m_bindingCache->Clear();
@@ -3741,16 +3535,16 @@ static std::shared_ptr<SceneGraphNode> FindUniqueMeshInstanceNodeForDeform(
 
 std::vector<float3> PathTracerApp::GetMeshVerticesWorld(const std::shared_ptr<MeshInfo>& mesh)
 {
-    auto node = FindUniqueMeshInstanceNodeForDeform(m_scene, mesh, "GetMeshVerticesWorld");
+    auto node = FindUniqueMeshInstanceNodeForDeform(m_sceneManager->getScene(), mesh, "GetMeshVerticesWorld");
     return GetMeshVerticesWorld(node);
 }
 
 std::vector<float3> PathTracerApp::GetMeshVerticesWorld(const std::shared_ptr<SceneGraphNode>& node)
 {
-    if (!m_scene)
+    if (!m_sceneManager->getScene())
         throw std::runtime_error("GetMeshVerticesWorld: no scene is loaded");
 
-    m_scene->RefreshSceneGraph(GetFrameIndex());
+    m_sceneManager->getScene()->RefreshSceneGraph(GetFrameIndex());
 
     auto mesh = GetMeshFromSceneNodeForDeform(node, "GetMeshVerticesWorld");
     std::vector<float3> vertices = GetMeshVertices(mesh);
@@ -3767,7 +3561,7 @@ void PathTracerApp::SetMeshVerticesWorld(const std::shared_ptr<MeshInfo>& mesh,
                                   bool recomputeNormals,
                                   bool rebuildAccelerationStructure)
 {
-    auto node = FindUniqueMeshInstanceNodeForDeform(m_scene, mesh, "SetMeshVerticesWorld");
+    auto node = FindUniqueMeshInstanceNodeForDeform(m_sceneManager->getScene(), mesh, "SetMeshVerticesWorld");
     SetMeshVerticesWorld(node, vertices, recomputeNormals, rebuildAccelerationStructure);
 }
 
@@ -3776,10 +3570,10 @@ void PathTracerApp::SetMeshVerticesWorld(const std::shared_ptr<SceneGraphNode>& 
                                   bool recomputeNormals,
                                   bool rebuildAccelerationStructure)
 {
-    if (!m_scene)
+    if (!m_sceneManager->getScene())
         throw std::runtime_error("SetMeshVerticesWorld: no scene is loaded");
 
-    m_scene->RefreshSceneGraph(GetFrameIndex());
+    m_sceneManager->getScene()->RefreshSceneGraph(GetFrameIndex());
 
     auto mesh = GetMeshFromSceneNodeForDeform(node, "SetMeshVerticesWorld");
     const affine3 worldToLocal = affine3(inverse(node->GetLocalToWorldTransform()));
@@ -4030,9 +3824,9 @@ void PathTracerApp::SetMeshVertices(const std::shared_ptr<MeshInfo>& mesh,
         }
 
         std::vector<std::shared_ptr<SceneGraphNode>> affectedNodes;
-        if (m_scene && m_scene->GetSceneGraph())
+        if (m_sceneManager->getScene() && m_sceneManager->getScene()->GetSceneGraph())
         {
-            for (const auto& instance : m_scene->GetSceneGraph()->GetMeshInstances())
+            for (const auto& instance : m_sceneManager->getScene()->GetSceneGraph()->GetMeshInstances())
             {
                 if (instance && instance->GetMesh() == mesh)
                 {
@@ -4051,26 +3845,26 @@ void PathTracerApp::SetMeshVertices(const std::shared_ptr<MeshInfo>& mesh,
             }
         }
 
-        if (m_scene)
-            m_scene->FinishedLoading(GetFrameIndex());
+        if (m_sceneManager->getScene())
+            m_sceneManager->getScene()->FinishedLoading(GetFrameIndex());
     }
 
     if (rebuildAccelerationStructure)
         RequestMeshAccelRebuild(mesh);
     else
-        m_ui.ResetAccumulation = true;
+        m_settings.ResetAccumulation = true;
 }
 
 void PathTracerApp::PathTrace(nvrhi::IFramebuffer* framebuffer, const SampleConstants & constants)
 {
     //m_commandList->beginMarker("MainRendering"); <- removed (for now) since added hierarchy reduces readability
 
-    bool useStablePlanes = m_ui.RealtimeMode;
+    bool useStablePlanes = m_settings.RealtimeMode;
 
     nvrhi::rt::State state;
 
     nvrhi::rt::DispatchRaysArguments args;
-    nvrhi::Viewport viewport = m_view->GetViewport();
+    nvrhi::Viewport viewport = m_renderCore.camera().view()->GetViewport();
     uint32_t width = (uint32_t)(viewport.maxX - viewport.minX);
     uint32_t height = (uint32_t)(viewport.maxY - viewport.minY);
     args.width = width;
@@ -4118,7 +3912,7 @@ void PathTracerApp::PathTrace(nvrhi::IFramebuffer* framebuffer, const SampleCons
     }
 
     // In realtime mode, ScreenMotionVectors reference mode ScreenMotionVectors should be 0
-    m_lightsBaker->UpdateEnd(m_commandList, *m_bindingCache, m_scene, m_materialsBaker, m_ommBaker, m_subInstanceBuffer, m_renderTargets->Depth, m_renderTargets->ScreenMotionVectors);  // <- in the future this will provide motion vectors except in case of reference mode
+    m_lightsBaker->UpdateEnd(m_commandList, *m_bindingCache, m_sceneManager->getScene(), m_materialsBaker, m_ommBaker, m_renderCore.accelStructs().getSubInstanceBuffer(), m_renderTargets->Depth, m_renderTargets->ScreenMotionVectors);  // <- in the future this will provide motion vectors except in case of reference mode
 
     {
         RAII_SCOPE( m_commandList->beginMarker("PathTrace");, m_commandList->endMarker(); );
@@ -4126,7 +3920,7 @@ void PathTracerApp::PathTrace(nvrhi::IFramebuffer* framebuffer, const SampleCons
         state.shaderTable = ((useStablePlanes) ? (m_ptPipelineFillStablePlanes) : (m_ptPipelineReference))->GetShaderTable();
         state.bindings = { m_bindingSet, m_DescriptorTable->GetDescriptorTable() };
 
-        for (uint subSampleIndex = 0; subSampleIndex < m_ui.ActualSamplesPerPixel(); subSampleIndex++)
+        for (uint subSampleIndex = 0; subSampleIndex < m_settings.ActualSamplesPerPixel(); subSampleIndex++)
         {
             // required to avoid race conditions in back to back dispatchRays
             m_commandList->setBufferState(m_renderTargets->StablePlanesBuffer, nvrhi::ResourceStates::UnorderedAccess);
@@ -4147,23 +3941,23 @@ void PathTracerApp::PathTrace(nvrhi::IFramebuffer* framebuffer, const SampleCons
 
     // this is a performance optimization where final 2 passes from ReSTIR DI and ReSTIR GI are combined to avoid loading GBuffer twice
     static bool enableFusedDIGIFinal = true;
-    bool useFusedDIGIFinal = m_ui.ActualUseReSTIRDI() && m_ui.ActualUseReSTIRGI() && enableFusedDIGIFinal;
+    bool useFusedDIGIFinal = m_settings.ActualUseReSTIRDI() && m_settings.ActualUseReSTIRGI() && enableFusedDIGIFinal;
 
-    if (m_ui.ActualUseRTXDIPasses())
+    if (m_settings.ActualUseRTXDIPasses())
     {
         RAII_SCOPE( m_commandList->beginMarker("RTXDI");, m_commandList->endMarker(); );
 
         // this does all ReSTIR DI magic including applying the final sample into correct radiance buffer (depending on denoiser state)
-        if (m_ui.ActualUseReSTIRDI())
+        if (m_settings.ActualUseReSTIRDI())
             m_rtxdiPass->Execute(m_commandList, m_bindingSet, useFusedDIGIFinal);
 
-        if (m_ui.ActualUseReSTIRGI())
+        if (m_settings.ActualUseReSTIRGI())
             m_rtxdiPass->ExecuteGI(m_commandList, m_bindingSet, useFusedDIGIFinal);
 
         if (useFusedDIGIFinal)
             m_rtxdiPass->ExecuteFusedDIGIFinal(m_commandList, m_bindingSet);
 
-        if (m_ui.ActualUseReSTIRPT())
+        if (m_settings.ActualUseReSTIRPT())
             m_rtxdiPass->ExecutePT(m_commandList, m_bindingSet);
     }
 
@@ -4173,11 +3967,11 @@ void PathTracerApp::PathTrace(nvrhi::IFramebuffer* framebuffer, const SampleCons
         m_denoisingGuidesBaker->DenoiseSpecHitT(m_commandList, m_bindingSet);
         m_denoisingGuidesBaker->ComputeAvgLayerRadiance(m_commandList, m_bindingSet);
 
-        if (m_ui.DebugView != DebugViewType::Disabled)
-            m_denoisingGuidesBaker->RenderDebugViz(m_commandList, m_ui.DebugView, m_bindingSet);
+        if (m_settings.DebugView != DebugViewType::Disabled)
+            m_denoisingGuidesBaker->RenderDebugViz(m_commandList, m_settings.DebugView, m_bindingSet);
     }
 
-    if (useStablePlanes && (m_ui.DebugView > DebugViewType::Disabled && m_ui.DebugView <= DebugViewType::StablePlane_SpecRadiance || m_ui.DebugView == DebugViewType::StableRadiance) )
+    if (useStablePlanes && (m_settings.DebugView > DebugViewType::Disabled && m_settings.DebugView <= DebugViewType::StablePlane_SpecRadiance || m_settings.DebugView == DebugViewType::StableRadiance) )
     {
         m_commandList->beginMarker("StablePlanesDebugViz");
         nvrhi::TextureDesc tdesc = m_renderTargets->OutputColor->getDesc();
@@ -4189,14 +3983,14 @@ void PathTracerApp::PathTrace(nvrhi::IFramebuffer* framebuffer, const SampleCons
 
 void PathTracerApp::Denoise(nvrhi::IFramebuffer* framebuffer)
 {
-    if( !m_ui.ActualUseStandaloneDenoiser() )
+    if( !m_settings.ActualUseStandaloneDenoiser() )
         return;
 
     for (int i = 0; i < std::size(m_nrd); i++)
     {
         if (m_nrd[i] == nullptr)
         {
-            nrd::Denoiser denoiserMethod = m_ui.NRDMethod == NrdConfig::DenoiserMethod::REBLUR ?
+            nrd::Denoiser denoiserMethod = m_settings.NRDMethod == NrdConfig::DenoiserMethod::REBLUR ?
                 nrd::Denoiser::REBLUR_DIFFUSE_SPECULAR : nrd::Denoiser::RELAX_DIFFUSE_SPECULAR;
 
             m_nrd[i] = std::make_unique<NrdIntegration>(GetDevice(), denoiserMethod);
@@ -4207,13 +4001,13 @@ void PathTracerApp::Denoise(nvrhi::IFramebuffer* framebuffer)
     //const auto& fbinfo = framebuffer->getFramebufferInfo();
     const char* passNames[] = { "Denoising plane 0", "Denoising plane 1", "Denoising plane 2", "Denoising plane 3" }; assert( std::size(m_nrd) <= std::size(passNames) );
 
-    bool nrdUseRelax = m_ui.NRDMethod == NrdConfig::DenoiserMethod::RELAX;
+    bool nrdUseRelax = m_settings.NRDMethod == NrdConfig::DenoiserMethod::RELAX;
     PostProcess::ComputePassType preparePassType = nrdUseRelax ? PostProcess::ComputePassType::RELAXDenoiserPrepareInputs : PostProcess::ComputePassType::REBLURDenoiserPrepareInputs;
     PostProcess::ComputePassType mergePassType = nrdUseRelax ? PostProcess::ComputePassType::RELAXDenoiserFinalMerge : PostProcess::ComputePassType::REBLURDenoiserFinalMerge;
 
-    bool resetHistory = m_ui.ResetRealtimeCaches;
+    bool resetHistory = m_settings.ResetRealtimeCaches;
 
-    int maxPassCount = std::min(m_ui.StablePlanesActiveCount, (int)std::size(m_nrd));
+    int maxPassCount = std::min(m_settings.StablePlanesActiveCount, (int)std::size(m_nrd));
     bool initWithStableRadiance = true;
     for (int pass = maxPassCount-1; pass >= 0; pass--)
     {
@@ -4229,14 +4023,14 @@ void PathTracerApp::Denoise(nvrhi::IFramebuffer* framebuffer)
         m_commandList->endMarker();
 
         const float timeDeltaBetweenFrames = m_cmdLine.noWindow ? 1.f/60.f : -1.f; // if we're rendering without a window we set a fix timeDeltaBetweenFrames to ensure that output is deterministic
-        bool enableValidation = m_ui.DebugView == DebugViewType::StablePlane_DenoiserValidation;
+        bool enableValidation = m_settings.DebugView == DebugViewType::StablePlane_DenoiserValidation;
         if (nrdUseRelax)
         {
-            m_nrd[pass]->RunDenoiserPasses(m_commandList, *m_renderTargets, pass, *m_view, *m_viewPrevious, GetFrameIndex(), m_ui.NRDDisocclusionThreshold, m_ui.NRDDisocclusionThresholdAlternate, m_ui.NRDUseAlternateDisocclusionThresholdMix, timeDeltaBetweenFrames, enableValidation, resetHistory, &m_ui.RelaxSettings);
+            m_nrd[pass]->RunDenoiserPasses(m_commandList, *m_renderTargets, pass, *m_renderCore.camera().view(), *m_renderCore.camera().viewPrevious(), GetFrameIndex(), m_settings.NRDDisocclusionThreshold, m_settings.NRDDisocclusionThresholdAlternate, m_settings.NRDUseAlternateDisocclusionThresholdMix, timeDeltaBetweenFrames, enableValidation, resetHistory, &m_settings.RelaxSettings);
         }
         else
         {
-            m_nrd[pass]->RunDenoiserPasses(m_commandList, *m_renderTargets, pass, *m_view, *m_viewPrevious, GetFrameIndex(), m_ui.NRDDisocclusionThreshold, m_ui.NRDDisocclusionThresholdAlternate, m_ui.NRDUseAlternateDisocclusionThresholdMix, timeDeltaBetweenFrames, enableValidation, resetHistory, &m_ui.ReblurSettings);
+            m_nrd[pass]->RunDenoiserPasses(m_commandList, *m_renderTargets, pass, *m_renderCore.camera().view(), *m_renderCore.camera().viewPrevious(), GetFrameIndex(), m_settings.NRDDisocclusionThreshold, m_settings.NRDDisocclusionThresholdAlternate, m_settings.NRDUseAlternateDisocclusionThresholdMix, timeDeltaBetweenFrames, enableValidation, resetHistory, &m_settings.ReblurSettings);
         }
 
         m_commandList->beginMarker("MergeOutputs");
@@ -4250,10 +4044,10 @@ void PathTracerApp::Denoise(nvrhi::IFramebuffer* framebuffer)
 #if CAUSTICA_WITH_NATIVE_DLSS
 bool PathTracerApp::EvaluateNativeDLSS(bool reset)
 {
-    if (!m_nativeDLSS || !(m_ui.RealtimeAA == 2 || m_ui.RealtimeAA == 3))
+    if (!m_nativeDLSS || !(m_settings.RealtimeAA == 2 || m_settings.RealtimeAA == 3))
         return false;
 
-    const bool useRayReconstruction = m_ui.RealtimeAA == 3;
+    const bool useRayReconstruction = m_settings.RealtimeAA == 3;
     if (useRayReconstruction && !m_nativeDLSS->IsRayReconstructionSupported())
         return false;
     if (!useRayReconstruction && !m_nativeDLSS->IsDlssSupported())
@@ -4293,7 +4087,7 @@ bool PathTracerApp::EvaluateNativeDLSS(bool reset)
     evaluateParams.motionVectorsTexture = m_renderTargets->ScreenMotionVectors;
     evaluateParams.motionVectorScaleX = 1.0f / float(m_renderSize.x);
     evaluateParams.motionVectorScaleY = 1.0f / float(m_renderSize.y);
-    evaluateParams.resetHistory = reset || m_ui.ResetRealtimeCaches;
+    evaluateParams.resetHistory = reset || m_settings.ResetRealtimeCaches;
 
     if (useRayReconstruction)
     {
@@ -4302,7 +4096,7 @@ bool PathTracerApp::EvaluateNativeDLSS(bool reset)
         evaluateParams.normalRoughness = m_renderTargets->RRNormalsAndRoughness;
     }
 
-    const bool evaluated = m_nativeDLSS->Evaluate(m_commandList, evaluateParams, *m_view);
+    const bool evaluated = m_nativeDLSS->Evaluate(m_commandList, evaluateParams, *m_renderCore.camera().view());
     if (evaluated)
     {
         static bool loggedNativeDLSSEvaluation = false;
@@ -4321,207 +4115,70 @@ bool PathTracerApp::EvaluateNativeDLSS(bool reset)
 
 void PathTracerApp::PostProcessAA(nvrhi::IFramebuffer* framebuffer, bool reset)
 {
-    if (m_ui.RealtimeMode)
-    {
-        if (m_ui.RealtimeAA == 0)
-        {
-            // TODO: Remove Redundant copy for non AA case
-            m_commandList->copyTexture(m_renderTargets->ProcessedOutputColor, nvrhi::TextureSlice(), m_renderTargets->OutputColor, nvrhi::TextureSlice());
-        }
-        else if (m_ui.RealtimeAA == 1 && m_temporalAntiAliasingPass != nullptr )
-        {
-            const bool stochasticSplats = m_ui.EnableGaussianSplats && m_ui.GaussianSplatSortingMode == 1;
-            const bool stochasticReset = stochasticSplats && (reset || m_ui.ResetAccumulation || m_ui.ResetRealtimeCaches || m_gaussianSplatTemporalReset);
-            if (stochasticReset)
-                m_gaussianSplatTemporalSampleIndex = 0;
+    (void)framebuffer;
 
-            bool previousViewValid = !reset && !stochasticReset && (GetFrameIndex() != 0);
-            caustica::render::TemporalAntiAliasingParameters taaParams = m_ui.TemporalAntiAliasingParams;
-            if (stochasticSplats)
-            {
-                taaParams.enableHistoryClamping = false;
-                taaParams.useHistoryClampRelax = false;
-                taaParams.newFrameWeight = 1.0f / float(m_gaussianSplatTemporalSampleIndex + 1);
-            }
-
-            m_commandList->beginMarker("TAA");
-
-            m_temporalAntiAliasingPass->TemporalResolve(m_commandList, taaParams, previousViewValid, *m_view, *m_view);
-
-            m_commandList->endMarker();
-
-            if (stochasticSplats)
-            {
-                m_gaussianSplatTemporalSampleIndex = std::min(m_gaussianSplatTemporalSampleIndex + 1, 1024 * 1024);
-                m_gaussianSplatTemporalReset = false;
-            }
-        }
-
+    PostProcessAAParams params{
+        m_settings,
+        m_commandList,
+        m_renderTargets.get(),
+        GetGpuDevice(),
+    };
+    params.renderSize = m_renderSize;
+    params.displaySize = m_displaySize;
+    params.displayAspectRatio = m_displayAspectRatio;
+    params.cameraJitter = ComputeCameraJitter(m_sampleIndex);
+    params.sampleIndex = m_sampleIndex;
+    params.frameIndex = GetFrameIndex();
+    params.reset = reset;
+    params.temporalAAPass = m_temporalAntiAliasingPass.get();
+    params.accumulationPass = m_accumulationPass.get();
+    params.postProcess = m_postProcess.get();
+    params.bindingSet = m_bindingSet;
+    params.bindingLayout = m_bindingLayout;
+    params.constantBuffer = m_constantBuffer;
+    params.accumulationSampleIndex = m_accumulationSampleIndex;
+    params.gaussianSplatTemporalSampleIndex = &m_gaussianSplatTemporalSampleIndex;
+    params.gaussianSplatTemporalReset = &m_gaussianSplatTemporalReset;
 #if CAUSTICA_WITH_STREAMLINE
-        const bool useStreamlineThisFrame = !GetGpuDevice()->GetDeviceParams().headlessDevice;
-        if (useStreamlineThisFrame)
-        {
-        // SET STREAMLINE CONSTANTS
-        {
-            // This section of code updates the streamline constants every frame. Regardless of whether we are utilising the streamline plugins, as long as streamline is in use, we must set its constants.
-            affine3 viewReprojection = m_view->GetChildView(ViewType::PLANAR, 0)->GetInverseViewMatrix() * m_viewPrevious->GetViewMatrix();
-            float4x4 reprojectionMatrix = inverse(m_view->GetProjectionMatrix(false)) * affineToHomogeneous(viewReprojection) * m_viewPrevious->GetProjectionMatrix(false);
-            float outputAspectRatio = m_displayAspectRatio; //windowViewport.width() / windowViewport.height();    // render and display outputs might not match in case of lower DLSS/etc resolution rounding!
-            float4x4 projection = perspProjD3DStyleReverse(dm::radians(m_cameraVerticalFOV), outputAspectRatio, m_cameraZNear);
-
-            //float2 jitterOffset = std::dynamic_pointer_cast<PlanarView, IView>(m_view)->GetPixelOffset();
-            float2 jitterOffset = ComputeCameraJitter(m_sampleIndex);
-
-            StreamlineInterface::Constants slConstants = {};
-            slConstants.cameraAspectRatio = outputAspectRatio;
-            slConstants.cameraFOV = dm::radians(m_cameraVerticalFOV);
-            slConstants.cameraFar = m_cameraZFar;
-            slConstants.cameraMotionIncluded = true;
-            slConstants.cameraNear = m_cameraZNear;
-            slConstants.cameraPinholeOffset = { 0.f, 0.f };
-            slConstants.cameraPos = m_camera.GetPosition();
-            slConstants.cameraFwd = m_camera.GetDir();
-            slConstants.cameraUp = m_camera.GetUp();
-            slConstants.cameraRight = normalize(cross(m_camera.GetDir(), m_camera.GetUp()));
-            slConstants.cameraViewToClip = projection;
-            slConstants.clipToCameraView = inverse(projection);
-            slConstants.clipToPrevClip = reprojectionMatrix;
-            slConstants.depthInverted = m_view->IsReverseDepth() ? true : false;
-            slConstants.jitterOffset = jitterOffset;
-            slConstants.mvecScale = { 1.0f / m_renderSize.x , 1.0f / m_renderSize.y }; // Scale factors used to normalize mvec (to -1,1); engine stores mvec in pixel space
-            slConstants.prevClipToClip = inverse(reprojectionMatrix);
-            slConstants.reset = reset;
-            slConstants.motionVectors3D = false;
-            slConstants.motionVectorsInvalidValue = FLT_MIN;
-
-            GetGpuDevice()->GetStreamline().SetConstants(slConstants);
-
-            if (m_ui.RealtimeAA == 3) // DLSS-RR
-            {
-                // only used if hitT (hit distance) codepath is used
-                m_lastDLSSRROptions.worldToCameraView = dm::affineToHomogeneous(m_view->GetViewMatrix());
-                m_lastDLSSRROptions.cameraViewToWorld = dm::affineToHomogeneous(m_view->GetInverseViewMatrix());
-                
-                GetGpuDevice()->GetStreamline().SetDLSSRROptions(m_lastDLSSRROptions);
-            }
-        }
-
-        m_commandList->commitBarriers();
-
-        // TAG STREAMLINE RESOURCES
-        GetGpuDevice()->GetStreamline().TagResourcesGeneral(m_commandList,
-            m_view->GetChildView(ViewType::PLANAR, 0),
-            m_renderTargets->ScreenMotionVectors,
-            m_renderTargets->Depth,
-            m_renderTargets->PreUIColor);
-
-        // TAG STREAMLINE RESOURCES
-        GetGpuDevice()->GetStreamline().TagResourcesDLSSNIS(m_commandList,
-            m_view->GetChildView(ViewType::PLANAR, 0),
-            m_renderTargets->ProcessedOutputColor,
-            m_renderTargets->OutputColor);
-
-        if (m_ui.RealtimeAA == 2)
-        {
-            RAII_SCOPE(m_commandList->beginMarker("DLSS"); , m_commandList->endMarker(); );
-
-            GetGpuDevice()->GetStreamline().EvaluateDLSS(m_commandList);
-            m_commandList->clearState();
-        }
-        }
-        if (useStreamlineThisFrame && m_ui.RealtimeAA == 3)
-        {
-            RAII_SCOPE(m_commandList->beginMarker("DLSS-RR");, m_commandList->endMarker(); );
-
-            // Direct inputs to denoiser are reused between passes; there's redundant copies but it makes interfacing simpler
-            SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
-            nvrhi::TextureDesc tdesc = m_renderTargets->OutputColor->getDesc();
-            m_commandList->beginMarker("DLSSRR_PrepareInputs");
-            m_postProcess->Apply(m_commandList, PostProcess::ComputePassType::DLSSRRDenoiserPrepareInputs, m_constantBuffer, miniConstants, m_bindingSet, m_bindingLayout, tdesc.width, tdesc.height);
-            m_commandList->endMarker();
-
-            static bool useSpecHitT = false; // it's buggy
-            //if (ImGui::IsKeyPressed(ImGuiKey::ImGuiKey_G))
-            //    gmgkmgk = !gmgkmgk;
-
-#if 0
-            GetGpuDevice()->GetStreamline().TagResourcesDLSSRR(m_commandList,
-                m_view->GetChildView(ViewType::PLANAR, 0),
-                (int2)m_renderSize,
-                (int2)m_displaySize,
-                m_renderTargets->ProcessedOutputColor,  //nvrhi::ITexture* outputColor
-                m_renderTargets->OutputColor,           // nvrhi::ITexture* inputColor
-                m_renderTargets->RRDiffuseAlbedo,
-                m_renderTargets->RRSpecAlbedo,
-                m_renderTargets->RRNormalsAndRoughness,
-                nullptr,
-                (useSpecHitT) ? (m_renderTargets->SpecularHitT) : (nullptr),
-                (useSpecHitT) ? (nullptr) : (m_renderTargets->RRSpecMotionVectors),
-                m_renderTargets->RRTransparencyLayer
-#else
-            GetGpuDevice()->GetStreamline().TagResourcesDLSSRR(m_commandList,
-                m_view->GetChildView(ViewType::PLANAR, 0),
-                (int2)m_renderSize,
-                (int2)m_displaySize,
-                m_renderTargets->OutputColor,           // nvrhi::ITexture* inputColor
-                m_renderTargets->RRDiffuseAlbedo,
-                m_renderTargets->RRSpecAlbedo,
-                m_renderTargets->RRNormalsAndRoughness,
-                nullptr,
-                (useSpecHitT)?(m_renderTargets->SpecularHitT):(nullptr),
-                (useSpecHitT)?(nullptr):(m_renderTargets->RRSpecMotionVectors),
-                m_renderTargets->ProcessedOutputColor   //nvrhi::ITexture* outputColor
-            );
+    params.dlssRROptions = &m_lastDLSSRROptions;
 #endif
 
-            m_commandList->commitBarriers();
-
-            GetGpuDevice()->GetStreamline().EvaluateDLSSRR(m_commandList);
-            m_commandList->clearState();
-        }
-        else if ( !m_ui.ActualUseStandaloneDenoiser() )
-        {
-            // If all denoisers disabled, this is a pass-through that just merges and outputs noisy data
-            SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
-            nvrhi::TextureDesc tdesc = m_renderTargets->OutputColor->getDesc();
-            m_commandList->beginMarker("NoDenoiserFinalMerge");
-            m_postProcess->Apply(m_commandList, PostProcess::ComputePassType::NoDenoiserFinalMerge, m_constantBuffer, miniConstants, m_bindingSet, m_bindingLayout, tdesc.width, tdesc.height);
-            m_commandList->endMarker();
-        }
-#endif
+    m_renderCore.postProcessAA(params);
 
 #if CAUSTICA_WITH_NATIVE_DLSS
+    if (m_settings.RealtimeMode)
+    {
         bool nativeDLSSEvaluated = false;
-        if (m_ui.RealtimeAA == 2 || m_ui.RealtimeAA == 3)
+        if (m_settings.RealtimeAA == 2 || m_settings.RealtimeAA == 3)
             nativeDLSSEvaluated = EvaluateNativeDLSS(reset);
 
-        if (!nativeDLSSEvaluated && (m_ui.RealtimeAA == 2 || m_ui.RealtimeAA == 3))
+        if (!nativeDLSSEvaluated && (m_settings.RealtimeAA == 2 || m_settings.RealtimeAA == 3))
         {
-            if (m_ui.ActualUseStandaloneDenoiser())
+            if (m_settings.ActualUseStandaloneDenoiser())
             {
-                m_commandList->copyTexture(m_renderTargets->ProcessedOutputColor, nvrhi::TextureSlice(), m_renderTargets->OutputColor, nvrhi::TextureSlice());
+                m_commandList->copyTexture(
+                    m_renderTargets->ProcessedOutputColor, nvrhi::TextureSlice(),
+                    m_renderTargets->OutputColor, nvrhi::TextureSlice());
             }
             else
             {
                 SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
                 nvrhi::TextureDesc tdesc = m_renderTargets->OutputColor->getDesc();
                 m_commandList->beginMarker("NoDenoiserFinalMerge");
-                m_postProcess->Apply(m_commandList, PostProcess::ComputePassType::NoDenoiserFinalMerge, m_constantBuffer, miniConstants, m_bindingSet, m_bindingLayout, tdesc.width, tdesc.height);
+                m_postProcess->Apply(
+                    m_commandList,
+                    PostProcess::ComputePassType::NoDenoiserFinalMerge,
+                    m_constantBuffer,
+                    miniConstants,
+                    m_bindingSet,
+                    m_bindingLayout,
+                    tdesc.width,
+                    tdesc.height);
                 m_commandList->endMarker();
             }
         }
+    }
 #endif
-    }
-    else
-    {
-        // Reference mode - run the accumulation pass.
-        // If the sample count has reached the target, just keep copying the accumulated output.
-        // If m_accumulationSampleIndex is negative - that's warm-up, just display.
-        const float accumulationWeight = (m_accumulationSampleIndex < m_ui.AccumulationTarget)?(1.f / float(max(0, m_accumulationSampleIndex) + 1)):(0.0f);
-
-        m_accumulationPass->Render(m_commandList, *m_view, *m_view, accumulationWeight);
-    }
-
 }
 
 static float ReadR11G11B10FloatChannel(uint32_t packed, uint32_t channel)
@@ -4608,11 +4265,11 @@ void PathTracerApp::ResetReferenceOIDN()
 
 void PathTracerApp::ApplyReferenceOIDN()
 {
-    if (m_ui.RealtimeMode || !m_ui.ReferenceOIDNDenoiser || m_renderTargets == nullptr)
+    if (m_settings.RealtimeMode || !m_settings.ReferenceOIDNDenoiser || m_renderTargets == nullptr)
         return;
 
 #if CAUSTICA_WITH_OIDN
-    const bool accumulationReady = m_accumulationCompleted || m_accumulationSampleIndex >= m_ui.AccumulationTarget;
+    const bool accumulationReady = m_accumulationCompleted || m_accumulationSampleIndex >= m_settings.AccumulationTarget;
     if (!accumulationReady)
         return;
 
@@ -4652,10 +4309,10 @@ void PathTracerApp::ApplyReferenceOIDN()
     const uint32_t height = sourceDesc.height;
 
     OidnDenoiser::Options oidnOptions;
-    oidnOptions.UseGPU = m_ui.ReferenceOIDNUseGPU;
-    oidnOptions.GuidePasses = static_cast<OidnDenoiser::Passes>(std::clamp(m_ui.ReferenceOIDNPasses, 0, 2));
-    oidnOptions.GuidePrefilter = static_cast<OidnDenoiser::Prefilter>(std::clamp(m_ui.ReferenceOIDNPrefilter, 0, 2));
-    oidnOptions.FilterQuality = static_cast<OidnDenoiser::Quality>(std::clamp(m_ui.ReferenceOIDNQuality, 0, 2));
+    oidnOptions.UseGPU = m_settings.ReferenceOIDNUseGPU;
+    oidnOptions.GuidePasses = static_cast<OidnDenoiser::Passes>(std::clamp(m_settings.ReferenceOIDNPasses, 0, 2));
+    oidnOptions.GuidePrefilter = static_cast<OidnDenoiser::Prefilter>(std::clamp(m_settings.ReferenceOIDNPrefilter, 0, 2));
+    oidnOptions.FilterQuality = static_cast<OidnDenoiser::Quality>(std::clamp(m_settings.ReferenceOIDNQuality, 0, 2));
 
     const bool requestAlbedoGuide = oidnOptions.GuidePasses == OidnDenoiser::Passes::Albedo || oidnOptions.GuidePasses == OidnDenoiser::Passes::AlbedoNormal;
     const bool requestNormalGuide = oidnOptions.GuidePasses == OidnDenoiser::Passes::AlbedoNormal;

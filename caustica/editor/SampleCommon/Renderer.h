@@ -6,6 +6,7 @@
 #include <memory>
 #include <rhi/nvrhi.h>
 #include <math/math.h>
+#include <render/Core/CameraController.h>
 
 class Sample;
 #include <scene/SceneGraph.h>  // for GaussianSplat
@@ -56,5 +57,7 @@ public:
     Sample& owner() { return m_owner; }
 
 private:
+    [[nodiscard]] caustica::CameraUpdateParams makeCameraUpdateParams() const;
+
     Sample& m_owner;
 };
