@@ -1,5 +1,5 @@
-#include <engine/imgui_console.h>
-#include <engine/imgui_renderer.h>
+#include <imgui/imgui_console.h>
+#include <imgui/imgui_renderer.h>
 
 #include <engine/ConsoleInterpreter.h>
 #include <engine/ConsoleObjects.h>

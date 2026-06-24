@@ -11,7 +11,7 @@
 #include <rhi/utils.h>
 #include <rhi/common/misc.h>
 
-#include <engine/imgui_renderer.h>
+#include <imgui/imgui_renderer.h>
 
 #include <SampleCommon/SampleCommon.h>
 

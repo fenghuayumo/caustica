@@ -4,7 +4,7 @@
 
 #include <rhi/nvrhi.h>
 #include <assets/loader/ShaderFactory.h>
-#include <engine/imgui_nvrhi.h>
+#include <imgui/imgui_nvrhi.h>
 #include <core/log.h>
 
 #if DONUT_WITH_STATIC_SHADERS

@@ -3,8 +3,8 @@
 #include <math/math.h>
 #include <scene/Scene.h>
 
-#include <engine/imgui_renderer.h>
-#include <engine/imgui_console.h>
+#include <imgui/imgui_renderer.h>
+#include <imgui/imgui_console.h>
 
 #include <render/RTXDI/RtxdiPass.h>
 

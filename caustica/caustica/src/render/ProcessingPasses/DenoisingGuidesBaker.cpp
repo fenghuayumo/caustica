@@ -8,7 +8,7 @@
 #include <render/CommonRenderPasses.h>
 #include <render/ProcessingPasses/DenoisingGuidesBaker.h>
 #include <SampleCommon/SampleCommon.h>
-#include <engine/imgui_renderer.h>
+#include <imgui/imgui_renderer.h>
 
 using namespace caustica::math;
 

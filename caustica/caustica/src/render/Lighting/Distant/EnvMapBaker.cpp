@@ -15,7 +15,7 @@
 
 #include <rhi/utils.h>
 
-#include <engine/imgui_renderer.h>
+#include <imgui/imgui_renderer.h>
 #include <core/vfs/VFS.h>
 #include <assets/loader/DDSFile.h>
 
