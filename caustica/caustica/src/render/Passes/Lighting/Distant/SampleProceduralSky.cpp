@@ -13,8 +13,6 @@
 using namespace caustica::math;
 using namespace caustica;
 
-std::filesystem::path GetLocalPath(std::string subfolder);  // defined in caustica.cpp
-
 SampleProceduralSky::SampleProceduralSky( nvrhi::IDevice* device, std::shared_ptr<caustica::TextureCache> textureCache, std::shared_ptr<caustica::CommonRenderPasses> commonPasses, nvrhi::ICommandList* commandList )
     : m_device(device)
     , m_textureCache(textureCache)

@@ -7,7 +7,7 @@
 #include <scene/camera/Camera.h>
 #include <cmath>
 
-#include <SampleCommon/ExtendedScene.h>
+#include <scene/Scene.h>
 
 #include <render/Passes/Debug/Korgi.h>
 #include <SampleCommon/SampleCommon.h>
@@ -74,7 +74,7 @@ ModelType::ModelType(class GameScene & game, const std::string & name, const Jso
     : m_game(game)
 {
     m_valid = false;
-    const std::shared_ptr<ExtendedScene> & scene = game.GetScene();
+    const std::shared_ptr<caustica::Scene> & scene = game.GetScene();
 
     // node["name"] >> m_name;
     m_name = name;
@@ -140,7 +140,7 @@ ModelInstance::ModelInstance( const std::string & name, const std::shared_ptr<Mo
     : m_modelType(modelType)
 {
     assert( modelType != nullptr );
-    const std::shared_ptr<class ExtendedScene> & scene = modelType->GetGame().GetScene();
+    const std::shared_ptr<caustica::Scene>& scene = modelType->GetGame().GetScene();
     m_node = std::make_shared<SceneGraphNode>();
 
     m_node = scene->GetSceneGraph()->Attach(parentNode, m_node);

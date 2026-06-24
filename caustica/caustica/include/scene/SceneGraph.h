@@ -56,6 +56,18 @@ namespace caustica
         SceneGraphLeaf& operator=(const SceneGraphLeaf&&) = delete;
     };
 
+    // Forward declarations for types used by MeshInstance
+    class Light;
+    class IShadowMap;
+
+    // Per-light and per-geometry link into the light sampling system.
+    // Defined here (before MeshInstance) so MeshInstance can use it.
+    struct LightSamplerLink
+    {
+        int IndexOrBase = -1;       // index of the corresponding PolymorphicLight in the light sampler
+        int LastUpdateTag = -1;     // identifier of when IndexOrBase was last updated
+    };
+
     class MeshInstance : public SceneGraphLeaf
     {
     private:
@@ -69,7 +81,10 @@ namespace caustica
     public:
         explicit MeshInstance(std::shared_ptr<MeshInfo> mesh)
             : m_Mesh(std::move(mesh))
-        { }
+        {
+            if (m_Mesh)
+                PerGeometryLightSamplerLinks.resize(m_Mesh->geometries.size(), { -1, -1 });
+        }
 
         [[nodiscard]] const std::shared_ptr<MeshInfo>& GetMesh() const { return m_Mesh; }
         [[nodiscard]] int GetInstanceIndex() const { return m_InstanceIndex; }
@@ -78,6 +93,10 @@ namespace caustica
         [[nodiscard]] std::shared_ptr<SceneGraphLeaf> Clone() override;
         [[nodiscard]] SceneContentFlags GetContentFlags() const override;
         bool SetProperty(const std::string& name, const dm::float4& value) override;
+
+        // Light sampler integration (merged from ExtendedScene/MeshInstanceExtension)
+        std::vector<LightSamplerLink> PerGeometryLightSamplerLinks;
+        std::weak_ptr<Light> ProxiedAnalyticLight;
     };
 
     struct SkinnedMeshJoint
@@ -137,6 +156,13 @@ namespace caustica
         std::optional<float> zFar; // use reverse infinite projection if not specified
         std::optional<float> aspectRatio;
 
+        // Auto-exposure / tone mapping (merged from ExtendedScene/PerspectiveCameraEx)
+        std::optional<bool>  enableAutoExposure;
+        std::optional<float> exposureCompensation;
+        std::optional<float> exposureValue;
+        std::optional<float> exposureValueMin;
+        std::optional<float> exposureValueMax;
+
         [[nodiscard]] std::shared_ptr<SceneGraphLeaf> Clone() override;
         void Load(const Json::Value& node) override;
         bool SetProperty(const std::string& name, const dm::float4& value) override;
@@ -155,14 +181,16 @@ namespace caustica
         bool SetProperty(const std::string& name, const dm::float4& value) override;
     };
 
-    class IShadowMap;
-
     class Light : public SceneGraphLeaf
     {
     public:
         std::shared_ptr<IShadowMap> shadowMap;
         int shadowChannel = -1;
         dm::float3 color = dm::colors::white;
+
+        // Light sampler integration (merged from ExtendedScene/LightExtension)
+        LightSamplerLink LightLink;
+        std::vector<std::string> Proxies;    // proxy mesh node names for light sampling
 
         [[nodiscard]] SceneContentFlags GetContentFlags() const override { return SceneContentFlags::Lights; }
 
@@ -223,6 +251,62 @@ namespace caustica
         void Load(const Json::Value& node) override;
         void Store(Json::Value& node) const override;
         bool SetProperty(const std::string& name, const dm::float4& value) override;
+    };
+
+    // Environment / sky light (merged from ExtendedScene/EnvironmentLight)
+    class EnvironmentLight : public Light
+    {
+    public:
+        dm::float3 radianceScale = dm::float3(1.f);
+        int textureIndex = -1;
+        float rotation = 0.f;
+        std::string path;
+
+        void Load(const Json::Value& node) override;
+        [[nodiscard]] int GetLightType() const override { return LightType_Environment; }
+        [[nodiscard]] std::shared_ptr<SceneGraphLeaf> Clone() override;
+        void FillLightConstants(LightConstants& lightConstants) const override;
+    };
+
+    // Gaussian splat scene leaf (merged from ExtendedScene/GaussianSplat)
+    class GaussianSplat : public SceneGraphLeaf
+    {
+    public:
+        std::string path;
+        std::string resolvedPath;
+        bool convertRdfToRub = true;
+        bool enabled = true;
+        uint32_t loadedSplatCount = 0;
+
+        [[nodiscard]] std::shared_ptr<SceneGraphLeaf> Clone() override;
+        void Load(const Json::Value& node) override;
+    };
+
+    // Scene settings embedded in the scene description (merged from ExtendedScene/SampleSettings)
+    class SampleSettings : public SceneGraphLeaf
+    {
+    public:
+        std::optional<bool>         realtimeMode;
+        std::optional<bool>         enableAnimations;
+        std::optional<int>          startingCamera;
+        std::optional<float>        realtimeFireflyFilter;
+        std::optional<int>          maxBounces;
+        std::optional<int>          maxDiffuseBounces;
+        std::optional<float>        textureMIPBias;
+
+        [[nodiscard]] std::shared_ptr<SceneGraphLeaf> Clone() override;
+        void Load(const Json::Value& node) override;
+    };
+
+    // Game settings embedded in the scene description (merged from ExtendedScene/GameSettings)
+    class GameSettings : public SceneGraphLeaf
+    {
+        std::string jsonData;
+
+    public:
+        [[nodiscard]] std::shared_ptr<SceneGraphLeaf> Clone() override;
+        void Load(const Json::Value& node) override;
+        [[nodiscard]] const std::string& GetJsonData() const { return jsonData; }
     };
     
     class SceneGraphNode final : public std::enable_shared_from_this<SceneGraphNode>
@@ -574,7 +658,7 @@ namespace caustica
         virtual std::shared_ptr<MeshInfo> CreateMesh();
         virtual std::shared_ptr<MeshGeometry> CreateMeshGeometry();
         virtual std::shared_ptr<MeshInstance> CreateMeshInstance(const std::shared_ptr<MeshInfo>& mesh);
-        virtual std::shared_ptr<SkinnedMeshInstance> CreateSkinnedMeshInstance(const std::shared_ptr<SceneTypeFactory> & sceneTypeFactory, const std::shared_ptr<MeshInfo> & prototypeMesh);
+        virtual std::shared_ptr<SkinnedMeshInstance> CreateSkinnedMeshInstance(const std::shared_ptr<SceneTypeFactory>& sceneTypeFactory, const std::shared_ptr<MeshInfo>& prototypeMesh);
     };
 
     void PrintSceneGraph(const std::shared_ptr<SceneGraphNode>& root);

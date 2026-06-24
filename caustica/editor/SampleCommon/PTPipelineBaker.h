@@ -5,6 +5,7 @@
 #include <rhi/nvrhi.h>
 #include <assets/loader/ShaderFactory.h>
 #include <core/ThreadPool.h>
+#include <scene/Scene.h>
 #include <unordered_set>
 
 #include "ShaderCompilerUtils.h"
@@ -108,7 +109,7 @@ public:
     PTPipelineBaker(nvrhi::IDevice* device, std::shared_ptr<class MaterialsBaker> & materialsBaker, nvrhi::BindingLayoutHandle bindingLayout, nvrhi::BindingLayoutHandle bindlessLayout);
     ~PTPipelineBaker();
     
-    void                                Update(const std::shared_ptr<class ExtendedScene> & scene, unsigned int subInstanceCount, const std::function<void(std::vector<caustica::ShaderMacro> & macros)>& globalMacrosGetter, bool forceShaderReload);
+    void                                Update(const std::shared_ptr<caustica::Scene> & scene, unsigned int subInstanceCount, const std::function<void(std::vector<caustica::ShaderMacro> & macros)>& globalMacrosGetter, bool forceShaderReload);
     std::shared_ptr<PTPipelineVariant>  CreateVariant(const std::string & relativeSourcePath, std::vector<caustica::ShaderMacro> variantMacros, const std::string & shortUniqueDebugID, bool rayGenOnly = false );
     void                                ReleaseVariant(std::shared_ptr<PTPipelineVariant> & variant);
     

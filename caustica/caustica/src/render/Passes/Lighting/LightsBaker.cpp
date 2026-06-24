@@ -12,7 +12,7 @@
 #include <imgui/imgui_renderer.h>
 
 #include <SampleCommon/SampleCommon.h>
-#include <SampleCommon/ExtendedScene.h>
+#include <scene/Scene.h>
 
 #include <cmath>
 
@@ -453,7 +453,7 @@ static PolymorphicLightInfoFull ConvertLight( Light & light )
     {
 	    case LightType_Spot: 
         {
-		    auto& spot = dynamic_cast<const SpotLightEx&>(light);
+		    auto& spot = dynamic_cast<const SpotLight&>(light);
 
             if (spot.radius == 0.f)
             {
@@ -518,7 +518,7 @@ static PolymorphicLightInfoFull ConvertLight( Light & light )
 	    } break;
         case LightType_Point: 
         {
-            auto& point = dynamic_cast<const PointLightEx&>(light);
+            auto& point = dynamic_cast<const PointLight&>(light);
      
             if (point.radius == 0.f)
             {
@@ -612,7 +612,7 @@ bool LightsBaker::CollectEnvmapLightPlaceholders(const BakeSettings & settings, 
 // #ifdef _DEBUG
 // #pragma optimize("gt", on)
 // #endif
-bool LightsBaker::CollectAnalyticLightsCPU(const BakeSettings & settings, const std::shared_ptr<ExtendedScene> & scene, LightingControlData & ctrlBuff, std::vector<PolymorphicLightInfo> & outLightBuffer, std::vector<PolymorphicLightInfoEx> & outLightExBuffer, std::vector<uint> & outLightHistoryRemapCurrentToPastBuffer, std::vector<uint> & outLightHistoryRemapPastToCurrent)
+bool LightsBaker::CollectAnalyticLightsCPU(const BakeSettings & settings, const std::shared_ptr<caustica::Scene> & scene, LightingControlData & ctrlBuff, std::vector<PolymorphicLightInfo> & outLightBuffer, std::vector<PolymorphicLightInfoEx> & outLightExBuffer, std::vector<uint> & outLightHistoryRemapCurrentToPastBuffer, std::vector<uint> & outLightHistoryRemapPastToCurrent)
 {
     bool allGood = true;
     const auto & allLights = scene->GetSceneGraph()->GetLights();
@@ -625,7 +625,6 @@ bool LightsBaker::CollectAnalyticLightsCPU(const BakeSettings & settings, const 
             break;
         }
 
-        std::shared_ptr<LightExtension> lightEx = std::dynamic_pointer_cast<LightExtension>(light);
         if (light == nullptr)
             continue; // that's ok, might be directional or environment
 
@@ -633,8 +632,9 @@ bool LightsBaker::CollectAnalyticLightsCPU(const BakeSettings & settings, const 
         {
         case LightType_Spot:
         case LightType_Point:
-        {    
-            LightSamplerLink& pastLink = lightEx->LightLink;
+        {
+            // LightLink now part of base Light class (merged from LightExtension)
+            LightSamplerLink& pastLink = light->LightLink;
             if (pastLink.IndexOrBase != -1 && pastLink.LastUpdateTag != m_lastFrameIndex) // if not used specifically during last frame, 
                 pastLink.IndexOrBase = -1;
             pastLink.LastUpdateTag = settings.FrameIndex;
@@ -730,7 +730,7 @@ bool LightsBaker::CollectGaussianSplatEmissionProxies(
 // #ifdef _DEBUG
 // #pragma optimize("gt", on)
 // #endif
-bool LightsBaker::ProcessEmissiveGeometry( const BakeSettings & settings, const std::shared_ptr<ExtendedScene> & scene, std::vector<SubInstanceData> & subInstanceData, LightingControlData & ctrlBuff, std::vector<struct EmissiveTrianglesProcTask> & tasks )
+bool LightsBaker::ProcessEmissiveGeometry( const BakeSettings & settings, const std::shared_ptr<caustica::Scene> & scene, std::vector<SubInstanceData> & subInstanceData, LightingControlData & ctrlBuff, std::vector<struct EmissiveTrianglesProcTask> & tasks )
 {
     bool allGood = true;
 
@@ -743,16 +743,8 @@ bool LightsBaker::ProcessEmissiveGeometry( const BakeSettings & settings, const 
     const auto& instances = scene->GetSceneGraph()->GetMeshInstances();
     for (const auto& instance : instances)
     {
-        std::vector<LightSamplerLink> * perGeometryLightSamplerLinks = nullptr;
-
-        std::shared_ptr<MeshInstanceExtension> instanceEx = std::dynamic_pointer_cast<MeshInstanceExtension>(instance);
-        if( instanceEx == nullptr )
-        {
-            assert( false && "Something is wrong with types" );
-            continue;
-        }
-        else
-            perGeometryLightSamplerLinks = &(instanceEx->PerGeometryLightSamplerLinks);
+        // PerGeometryLightSamplerLinks now part of base MeshInstance (merged from MeshInstanceExtension)
+        std::vector<LightSamplerLink>* perGeometryLightSamplerLinks = &(instance->PerGeometryLightSamplerLinks);
 
         const auto& mesh = instance->GetMesh();
 
@@ -794,7 +786,6 @@ bool LightsBaker::ProcessEmissiveGeometry( const BakeSettings & settings, const 
                 if (parent != nullptr && parent->GetLeaf() != nullptr && parent->GetLeaf()->GetContentFlags() == SceneContentFlags::Lights )
                 {
                     auto light = std::dynamic_pointer_cast<Light>(parent->GetLeaf());
-                    auto lightEx = std::dynamic_pointer_cast<LightExtension>(parent->GetLeaf());
                     if (light != nullptr && (light->GetLightType() == LightType_Spot || light->GetLightType() == LightType_Point) )
                     {
 #ifdef HASH_LOOKUP_BASED_HISTORIC_LIGHT_SOURCE_MATCHING
@@ -802,10 +793,10 @@ bool LightsBaker::ProcessEmissiveGeometry( const BakeSettings & settings, const 
                         auto entry = m_historyRemapAnalyticLightIndices.find(lightHash);
                         if (entry != m_historyRemapAnalyticLightIndices.end())
                             analyticProxyLightIndex = entry->second;
-                        assert(lightEx->LightLink.LastUpdateTag == settings.FrameIndex && lightEx->LightLink.IndexOrBase == analyticProxyLightIndex);
+                        assert(light->LightLink.LastUpdateTag == settings.FrameIndex && light->LightLink.IndexOrBase == analyticProxyLightIndex);
 #else
-                        if (lightEx->LightLink.LastUpdateTag == settings.FrameIndex)
-                            analyticProxyLightIndex = lightEx->LightLink.IndexOrBase;
+                        if (light->LightLink.LastUpdateTag == settings.FrameIndex)
+                            analyticProxyLightIndex = light->LightLink.IndexOrBase;
 #endif
                     }
                 }
@@ -813,9 +804,13 @@ bool LightsBaker::ProcessEmissiveGeometry( const BakeSettings & settings, const 
                 // this is the second way to set proxy lights - via light marking the nodes
                 if (analyticProxyLightIndex == CAUSTICA_INVALID_LIGHT_INDEX )
                 {
-                    auto proxyLight = instanceEx->ProxiedAnalyticLight.lock();
-                    if (proxyLight != nullptr && proxyLight->LightLink.LastUpdateTag == settings.FrameIndex)
-                        analyticProxyLightIndex = proxyLight->LightLink.IndexOrBase;
+                    // ProxiedAnalyticLight now part of base MeshInstance (merged from MeshInstanceExtension)
+                    if (instance->ProxiedAnalyticLight.lock() != nullptr)
+                    {
+                        auto proxyLight = instance->ProxiedAnalyticLight.lock();
+                        if (proxyLight->LightLink.LastUpdateTag == settings.FrameIndex)
+                            analyticProxyLightIndex = proxyLight->LightLink.IndexOrBase;
+                    }
                 }
             }
 
@@ -901,7 +896,7 @@ bool LightsBaker::TotalLightCountOverflow() const
     return !m_noOverflow;
 }
 
-void LightsBaker::FillBindings(nvrhi::BindingSetDesc& outBindingSetDesc, const std::shared_ptr<ExtendedScene>& scene, std::shared_ptr<class MaterialsBaker> materialsBaker, std::shared_ptr<OmmBaker> ommBaker, nvrhi::BufferHandle subInstanceDataBuffer,
+void LightsBaker::FillBindings(nvrhi::BindingSetDesc& outBindingSetDesc, const std::shared_ptr<caustica::Scene>& scene, std::shared_ptr<class MaterialsBaker> materialsBaker, std::shared_ptr<OmmBaker> ommBaker, nvrhi::BufferHandle subInstanceDataBuffer,
 nvrhi::TextureHandle depthBuffer, nvrhi::TextureHandle motionVectors, nvrhi::TextureHandle envMapProcessed)
 {
     if( depthBuffer == nullptr )
@@ -1031,7 +1026,7 @@ void LightsBaker::UpdateLocalJitter()
     }
 }
 
-void LightsBaker::UpdateBegin(nvrhi::ICommandList* commandList, caustica::BindingCache & bindingCache, const BakeSettings& _settings, double sceneTime, const std::shared_ptr<ExtendedScene>& scene, std::shared_ptr<class MaterialsBaker> materialsBaker, 
+void LightsBaker::UpdateBegin(nvrhi::ICommandList* commandList, caustica::BindingCache & bindingCache, const BakeSettings& _settings, double sceneTime, const std::shared_ptr<caustica::Scene>& scene, std::shared_ptr<class MaterialsBaker> materialsBaker, 
     std::shared_ptr<class OmmBaker> ommBaker, nvrhi::BufferHandle subInstanceDataBuffer, std::vector<SubInstanceData>& subInstanceData, nvrhi::TextureHandle envMapProcessed)
 {
     RAII_SCOPE( commandList->beginMarker("LightingUpdateBegin");, commandList->endMarker(); );
@@ -1400,7 +1395,7 @@ void LightsBaker::UpdateBegin(nvrhi::ICommandList* commandList, caustica::Bindin
 
 #define UAV_BARRIER_m_NEE_AT_LocalSamplingBuffer() { commandList->setBufferState(m_NEE_AT_LocalSamplingBuffer, nvrhi::ResourceStates::UnorderedAccess); }
 
-void LightsBaker::UpdateEnd(nvrhi::ICommandList * commandList, caustica::BindingCache & bindingCache, const std::shared_ptr<ExtendedScene> & scene, std::shared_ptr<class MaterialsBaker> materialsBaker, std::shared_ptr<class OmmBaker> ommBaker, nvrhi::BufferHandle subInstanceDataBuffer, nvrhi::TextureHandle depthBuffer, nvrhi::TextureHandle motionVectors)
+void LightsBaker::UpdateEnd(nvrhi::ICommandList * commandList, caustica::BindingCache & bindingCache, const std::shared_ptr<caustica::Scene> & scene, std::shared_ptr<class MaterialsBaker> materialsBaker, std::shared_ptr<class OmmBaker> ommBaker, nvrhi::BufferHandle subInstanceDataBuffer, nvrhi::TextureHandle depthBuffer, nvrhi::TextureHandle motionVectors)
 {
     RAII_SCOPE(commandList->beginMarker("LightingUpdateEnd");, commandList->endMarker(); );
 

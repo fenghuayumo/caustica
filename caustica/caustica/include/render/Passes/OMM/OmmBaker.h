@@ -26,45 +26,20 @@ namespace caustica
     struct LoadedTexture;
 }
 
-struct MeshGeometryDebugData
-{
-    uint32_t ommArrayDataOffset = 0xFFFFFFFF; // for use by applications
-    uint32_t ommDescBufferOffset = 0xFFFFFFFF; // for use by applications
-    uint32_t ommIndexBufferOffset = 0xFFFFFFFF; // for use by applications
-    nvrhi::Format ommIndexBufferFormat = nvrhi::Format::R32_UINT; // for use by applications
-    uint64_t ommStatsTotalKnown = 0;
-    uint64_t ommStatsTotalUnknown = 0;
-};
+// =============================================================================
+// MeshGeometryEx / MeshInfoEx — Now merged into base types in SceneTypes.h.
+//
+// MeshGeometry now has DebugData (MeshGeometryDebugData).
+// MeshInfo now has AccelStructOMM, OpacityMicroMaps,
+//   DeformationSourcePositionIndices, DebugData, DebugDataDirty.
+//
+// These aliases are kept for backward compatibility.
+// =============================================================================
 
-struct MeshDebugData
-{
-    std::shared_ptr<caustica::DescriptorHandle> ommArrayDataBufferDescriptor;
-    std::shared_ptr<caustica::DescriptorHandle> ommDescBufferDescriptor;
-    std::shared_ptr<caustica::DescriptorHandle> ommIndexBufferDescriptor;
-    nvrhi::BufferHandle ommArrayDataBuffer; // for use by applications
-    nvrhi::BufferHandle ommDescBuffer; // for use by applications
-    nvrhi::BufferHandle ommIndexBuffer; // for use by applications
-};
-
-struct MeshGeometryEx : public caustica::MeshGeometry
-{
-    // (Debug) OMM buffers.
-    MeshGeometryDebugData DebugData;
-
-    virtual ~MeshGeometryEx() = default;
-};
-
-struct MeshInfoEx : public caustica::MeshInfo
-{
-    nvrhi::rt::AccelStructHandle AccelStructOMM; // for use by application
-    std::vector<nvrhi::rt::OpacityMicromapHandle> OpacityMicroMaps; // for use by application
-    std::vector<uint32_t> DeformationSourcePositionIndices; // per render vertex; preserves OBJ v-order for deformation APIs
-
-    std::unique_ptr<MeshDebugData> DebugData;
-    bool DebugDataDirty = true; // set this to true to make Scene update the debug data
-
-    virtual ~MeshInfoEx() = default;
-};
+using MeshGeometryDebugData = caustica::MeshGeometryDebugData;
+using MeshDebugData         = caustica::MeshDebugData;
+using MeshGeometryEx        = caustica::MeshGeometry;
+using MeshInfoEx            = caustica::MeshInfo;
 
 enum class OpacityMicroMapDebugView : uint32_t
 {

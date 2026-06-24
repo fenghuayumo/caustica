@@ -31,7 +31,7 @@ namespace caustica
 }
 
 class ShaderDebug;
-class ExtendedScene;
+#include <scene/Scene.h>
 class MaterialsBaker;
 
 enum class PTMaterialTextureSlot
@@ -248,9 +248,12 @@ struct PTMaterial : public PTMaterialBase
     virtual bool            HasAlphaTest() const override       { return EnableAlphaTesting; }
 };
 
+// Thin wrapper: adds path-tracing material data to the engine Material.
+// PTMaterial lives in the render layer, so this can't be merged into
+// scene/SceneTypes.h without creating a layer dependency violation.
 struct MaterialEx : caustica::Material
 {
-    std::shared_ptr<PTMaterial> PTMaterial;              
+    std::shared_ptr<PTMaterial> ptData;
 };
 
 class MaterialsBaker
@@ -259,10 +262,10 @@ public:
     MaterialsBaker(const std::string & relativeShaderSourcePath, nvrhi::IDevice* device, std::shared_ptr<caustica::TextureCache> textureCache, std::shared_ptr<caustica::ShaderFactory> shaderFactory);
     ~MaterialsBaker();
 
-    void                            CreateRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* bindlessLayout, std::shared_ptr<caustica::CommonRenderPasses> commonPasses, const std::shared_ptr<ExtendedScene>& scene, const std::filesystem::path & sceneFilePath, const std::filesystem::path & mediaPath);
+    void                            CreateRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* bindlessLayout, std::shared_ptr<caustica::CommonRenderPasses> commonPasses, const std::shared_ptr<caustica::Scene>& scene, const std::filesystem::path & sceneFilePath, const std::filesystem::path & mediaPath);
 
     // this update can happen in parallel with any other ray preparatory tracing work - anything from BVH building to laying down denoising layers
-    void                            Update(nvrhi::ICommandList * commandList, const std::shared_ptr<ExtendedScene> & scene, std::vector<SubInstanceData> & subInstanceData);
+    void                            Update(nvrhi::ICommandList * commandList, const std::shared_ptr<caustica::Scene> & scene, std::vector<SubInstanceData> & subInstanceData);
 
     nvrhi::BufferHandle             GetMaterialDataBuffer() const           { return m_materialData; }
     uint                            GetMaterialDataCount() const            { return m_materialsGPU.size(); }

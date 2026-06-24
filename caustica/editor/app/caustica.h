@@ -3,7 +3,7 @@
 #include <shaders/PathTracer/Config.h>
 #include "SampleCommon/SampleCommon.h"
 
-#include "SampleCommon/CommandLine.h"
+#include <core/command_line.h>
 #include "SampleUI.h"
 
 #include <render/Core/SceneRender.h>
@@ -30,7 +30,7 @@
 #include <shaders/SampleConstantBuffer.h>
 #include <render/Passes/PostProcess/AccumulationPass.h>
 #include <render/Passes/Gaussian/GaussianSplatEmissionProxy.h>
-#include "SampleCommon/ExtendedScene.h"
+#include <scene/Scene.h>
 
 #include <render/Passes/Lighting/Distant/EnvMapBaker.h>
 #include <render/Passes/Lighting/LightsBaker.h>
@@ -299,12 +299,12 @@ private:
 private:
     struct GaussianSplatSceneObject
     {
-        std::shared_ptr<GaussianSplat> splat;
+        std::shared_ptr<caustica::GaussianSplat> splat;
         std::weak_ptr<caustica::SceneGraphNode> node;
         std::unique_ptr<GaussianSplatPass> pass;
     };
 
-    std::filesystem::path                       ResolveGaussianSplatPath(const GaussianSplat& splat) const;
+    std::filesystem::path                       ResolveGaussianSplatPath(const caustica::GaussianSplat& splat) const;
     dm::float4x4                       GetGaussianSplatObjectToWorld(const GaussianSplatSceneObject& object) const;
     GaussianSplatSceneObject*                   GetPrimaryGaussianSplatObject();
     const GaussianSplatSceneObject*             GetPrimaryGaussianSplatObject() const;
@@ -320,7 +320,7 @@ private:
     std::string                                 m_currentSceneName;
     std::filesystem::path                       m_currentScenePath;
     std::string                                 m_inlineSceneJson;
-    std::shared_ptr<ExtendedScene>              m_scene;
+    std::shared_ptr<caustica::Scene>              m_scene;
     double                                      m_sceneTime = 0.;           // if m_ui.LoopLongestAnimation then it loops with longest animation
     float                                       m_lastDeltaTime = 0.0f;
     uint                                        m_selectedCameraIndex = 0;  // 0 is first person camera, the rest (if any) are scene cameras

@@ -6,7 +6,7 @@
 #include <scene/camera/Camera.h>
 #include <cmath>
 
-#include <SampleCommon/ExtendedScene.h>
+#include <scene/Scene.h>
 
 #include "caustica.h"
 
@@ -127,7 +127,7 @@ std::shared_ptr<game::PropBase> GameScene::CreatePropFromFile(const std::string&
     return prop;
 }
 
-void GameScene::SceneLoaded(const std::shared_ptr<ExtendedScene>& scene, const std::filesystem::path& sceneFilePath, const std::filesystem::path & mediaPath)
+void GameScene::SceneLoaded(const std::shared_ptr<caustica::Scene>& scene, const std::filesystem::path& sceneFilePath, const std::filesystem::path & mediaPath)
 {
     Deinitialize();
 

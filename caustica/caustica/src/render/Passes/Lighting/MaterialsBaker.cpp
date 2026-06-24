@@ -12,7 +12,7 @@
 #include <imgui/imgui_renderer.h>
 
 #include <SampleCommon/SampleCommon.h>
-#include <SampleCommon/ExtendedScene.h>
+#include <scene/Scene.h>
 
 #include <core/json.h>
 #include <json/json.h>
@@ -133,7 +133,7 @@ std::shared_ptr<PTMaterial> PTMaterial::SafeCast(const std::shared_ptr<Material>
     if (bridgeMaterial == nullptr)
         return nullptr;
     assert(std::dynamic_pointer_cast<MaterialEx>(bridgeMaterial) != nullptr);
-    return std::static_pointer_cast<MaterialEx>(bridgeMaterial)->PTMaterial;
+    return std::static_pointer_cast<MaterialEx>(bridgeMaterial)->ptData;
 }
 
 void PTMaterial::Write(Json::Value& output)
@@ -1355,7 +1355,7 @@ void MaterialsBaker::BakeShaderPermutations()
     }
 }
 
-void MaterialsBaker::CreateRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* bindlessLayout, std::shared_ptr<caustica::CommonRenderPasses> commonPasses, const std::shared_ptr<ExtendedScene>& scene, const std::filesystem::path& sceneFilePath, const std::filesystem::path & mediaPath )
+void MaterialsBaker::CreateRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* bindlessLayout, std::shared_ptr<caustica::CommonRenderPasses> commonPasses, const std::shared_ptr<caustica::Scene>& scene, const std::filesystem::path& sceneFilePath, const std::filesystem::path & mediaPath )
 {
     assert(!mediaPath.empty());
     //m_bindlessLayout = bindlessLayout;
@@ -1410,26 +1410,26 @@ void MaterialsBaker::CreateRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* b
             {
                 if (IsBuiltinModelFileName(material->modelFileName))
                 {
-                    materialEx->PTMaterial = ImportFromEngineMaterial(*material);
+                    materialEx->ptData = ImportFromEngineMaterial(*material);
                 }
                 else
                 {
                     std::shared_ptr<PTMaterial> loaded = Load(material->modelFileName, material->name);
                     if (loaded != nullptr)
                     {
-                        materialEx->PTMaterial = loaded;
+                        materialEx->ptData = loaded;
                     }
                     else // ...and if we didn't find it in our .scene.materials.json, then import from the engine material
                     {
                         std::shared_ptr<PTMaterial> materialPT = ImportFromEngineMaterial(*material);
-                        materialEx->PTMaterial = materialPT;
+                        materialEx->ptData = materialPT;
                         initializedFromEngineCount++;
                     }
                 }
-                materialEx->PTMaterial->EngineMaterialCounterpart = materialEx.get(); // keep the link - only needed if using material animation from the engine
-                materialEx->PTMaterial->RuntimeBaker = this;
+                materialEx->ptData->EngineMaterialCounterpart = materialEx.get(); // keep the link - only needed if using material animation from the engine
+                materialEx->ptData->RuntimeBaker = this;
 
-                std::string keyName = materialEx->PTMaterial->ModelName+"."+materialEx->PTMaterial->Name;
+                std::string keyName = materialEx->ptData->ModelName+"."+materialEx->ptData->Name;
                 auto existing = materialsPTUniqueNames.find(keyName);
                 if (existing != materialsPTUniqueNames.end() )
                 {
@@ -1439,11 +1439,11 @@ void MaterialsBaker::CreateRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* b
                 else
                     materialsPTUniqueNames.insert(keyName);
 
-                m_materials.push_back(materialEx->PTMaterial);
+                m_materials.push_back(materialEx->ptData);
 
                 m_materialsGPU.push_back(PTMaterialData{});
-                materialEx->PTMaterial->GPUDataIndex = uint(m_materialsGPU.size() - 1);
-                materialEx->PTMaterial->GPUDataDirty = true;
+                materialEx->ptData->GPUDataIndex = uint(m_materialsGPU.size() - 1);
+                materialEx->ptData->GPUDataDirty = true;
                 assert(m_materialsGPU.size() <= CAUSTICA_MATERIAL_MAX_COUNT);
             }
         }
@@ -1474,7 +1474,7 @@ void MaterialsBaker::CreateRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* b
 }
 
 // NOTE: this also handles some of the geometry data and mixed geometry&material stuff - it might be a good idea to rethink whether it needs to live outside of material baker
-void UpdateSubInstanceData(SubInstanceData & ret, const std::shared_ptr<ExtendedScene> & scene, const caustica::MeshInstance& meshInstance, const caustica::MeshGeometry& geometry, uint meshGeometryIndex, const PTMaterial& material)
+void UpdateSubInstanceData(SubInstanceData & ret, const std::shared_ptr<caustica::Scene> & scene, const caustica::MeshInstance& meshInstance, const caustica::MeshGeometry& geometry, uint meshGeometryIndex, const PTMaterial& material)
 {
     bool alphaTest = material.HasAlphaTest();
 
@@ -1533,7 +1533,7 @@ void UpdateSubInstanceData(SubInstanceData & ret, const std::shared_ptr<Extended
 
 }
 
-void MaterialsBaker::Update(nvrhi::ICommandList* commandList, const std::shared_ptr<ExtendedScene>& scene, std::vector<SubInstanceData>& subInstanceData)
+void MaterialsBaker::Update(nvrhi::ICommandList* commandList, const std::shared_ptr<caustica::Scene>& scene, std::vector<SubInstanceData>& subInstanceData)
 {
     RAII_SCOPE( commandList->beginMarker("MaterialsBaker");, commandList->endMarker(); );
 

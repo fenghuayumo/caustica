@@ -4,6 +4,7 @@
 //#include <SampleUI.h>
 
 #include <scene/camera/Camera.h>
+#include <scene/Scene.h>
 
 #include "GameModel.h"
 #include "GameProps.h"
@@ -18,7 +19,7 @@ class GameScene
 public:
     GameScene(class Sample & sample, const CommandLineOptions& cmdLine);
 
-    void                    SceneLoaded( const std::shared_ptr<class ExtendedScene> & scene, const std::filesystem::path& sceneFilePath, const std::filesystem::path & mediaPath );
+    void                    SceneLoaded( const std::shared_ptr<caustica::Scene> & scene, const std::filesystem::path& sceneFilePath, const std::filesystem::path & mediaPath );
     void                    SceneUnloading( );
     bool                    DebugGUI(float indent);
     void                    StandaloneGUI(const std::shared_ptr<caustica::PlanarView> & view, const float2 & displaySize);
@@ -42,7 +43,7 @@ public:
     void                    Tick(float deltaTime, bool globalAnimationEnabled); // globalAnimationEnabled will be false if not in reference mode or global scene animations not enabled
     void                    TickCamera(float deltaTime, caustica::FirstPersonCamera & renderCamera);
 
-    const std::shared_ptr<ExtendedScene> &
+    const std::shared_ptr<caustica::Scene> &
                             GetScene() const { return m_scene; }
 
     double                  GetGameTime() const             { return m_gameTime; }
@@ -67,7 +68,7 @@ private:
 
 private:
     class Sample &          m_sample;
-    std::shared_ptr<class ExtendedScene>
+    std::shared_ptr<caustica::Scene>
                             m_scene = nullptr;
     int                     m_playSpeed = 3;   // speed: 0 - paused, 1 - 0.1x, 2 - 0.5x, 3 - 1.0x, 4 - 2.0x, 5 - 10.0x
 

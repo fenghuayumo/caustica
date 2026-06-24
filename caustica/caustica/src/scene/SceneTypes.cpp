@@ -157,6 +157,8 @@ std::shared_ptr<SceneGraphLeaf> SpotLight::Clone()
     copy->range = range;
     copy->innerAngle = innerAngle;
     copy->outerAngle = outerAngle;
+    copy->LightLink = LightLink;
+    copy->Proxies = Proxies;
     return std::static_pointer_cast<SceneGraphLeaf>(copy);
 }
 
@@ -183,6 +185,14 @@ void SpotLight::Load(const Json::Value& node)
     node["outerAngle"] >> outerAngle;
     node["radius"] >> radius;
     node["range"] >> range;
+
+    // Load light-sampler proxy mesh references (merged from LightExtension)
+    if (node.isMember("proxyMeshNodes") && node["proxyMeshNodes"].isArray())
+    {
+        Proxies.reserve(node["proxyMeshNodes"].size());
+        for (const auto& v : node["proxyMeshNodes"])
+            Proxies.push_back(v.asString());
+    }
 }
 
 void SpotLight::Store(Json::Value& node) const
@@ -238,6 +248,8 @@ std::shared_ptr<SceneGraphLeaf> PointLight::Clone()
     copy->intensity = intensity;
     copy->radius = radius;
     copy->range = range;
+    copy->LightLink = LightLink;
+    copy->Proxies = Proxies;
     return std::static_pointer_cast<SceneGraphLeaf>(copy);
 }
 
@@ -259,6 +271,14 @@ void PointLight::Load(const Json::Value& node)
     node["intensity"] >> intensity;
     node["radius"] >> radius;
     node["range"] >> range;
+
+    // Load light-sampler proxy mesh references (merged from LightExtension)
+    if (node.isMember("proxyMeshNodes") && node["proxyMeshNodes"].isArray())
+    {
+        Proxies.reserve(node["proxyMeshNodes"].size());
+        for (const auto& v : node["proxyMeshNodes"])
+            Proxies.push_back(v.asString());
+    }
 }
 
 void PointLight::Store(Json::Value& node) const
@@ -291,6 +311,17 @@ bool PointLight::SetProperty(const std::string& name, const dm::float4& value)
     }
     
     return Light::SetProperty(name, value);
+}
+
+// =============================================================================
+// EnvironmentLight (merged from ExtendedScene)
+// =============================================================================
+
+void EnvironmentLight::FillLightConstants(LightConstants& lightConstants) const
+{
+    Light::FillLightConstants(lightConstants);
+    lightConstants.intensity = 0.0f;
+    lightConstants.color = { 0, 0, 0 };
 }
 
 nvrhi::VertexAttributeDesc caustica::GetVertexAttributeDesc(VertexAttribute attribute, const char* name, uint32_t bufferIndex)

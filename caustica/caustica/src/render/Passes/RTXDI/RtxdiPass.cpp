@@ -10,7 +10,7 @@
 #include <render/Passes/RTXDI/GeneratePdfMipsPass.h>
 #include <render/Passes/Lighting/Distant/EnvMapBaker.h>
 #include <render/Passes/Lighting/Distant/EnvMapImportanceSamplingBaker.h>
-#include <SampleCommon/ExtendedScene.h>
+#include <scene/Scene.h>
 #include <shaders/render/RTXDI/ShaderParameters.h>
 #include <shaders/SampleConstantBuffer.h>
 
@@ -211,7 +211,7 @@ void RtxdiPass::PrepareResources(
     const RenderTargets& renderTargets,
     std::shared_ptr<EnvMapBaker> envMap,
     EnvMapSceneParams envMapSceneParams,
-    const std::shared_ptr<ExtendedScene> scene,
+    const std::shared_ptr<caustica::Scene> scene,
     std::shared_ptr<class MaterialsBaker> materialsBaker,
     std::shared_ptr<class OmmBaker> ommBaker,
     nvrhi::BufferHandle subInstanceDataBuffer,

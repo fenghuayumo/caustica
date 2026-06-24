@@ -7,7 +7,7 @@
 #include <scene/camera/Camera.h>
 #include <cmath>
 
-#include <SampleCommon/ExtendedScene.h>
+#include <scene/Scene.h>
 
 #include <render/Passes/Debug/Korgi.h>
 

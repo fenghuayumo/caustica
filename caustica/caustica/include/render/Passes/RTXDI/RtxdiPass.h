@@ -30,7 +30,7 @@ namespace caustica
 	class PlanarView;
 }
 
-class ExtendedScene;
+#include <scene/Scene.h>
 
 struct RtxdiUserSettings
 {
@@ -112,7 +112,7 @@ public:
         const RenderTargets& renderTargets,
         std::shared_ptr<EnvMapBaker> envMap,
         EnvMapSceneParams envMapSceneParams,
-        const std::shared_ptr<ExtendedScene> scene,
+        const std::shared_ptr<caustica::Scene> scene,
         std::shared_ptr<class MaterialsBaker> materialsBaker,
         std::shared_ptr<class OmmBaker> ommBaker,
         nvrhi::BufferHandle subInstanceDataBuffer,
@@ -153,7 +153,7 @@ private:
 	nvrhi::DeviceHandle m_device; 
 	std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
 	std::shared_ptr<caustica::CommonRenderPasses> m_CommonRenderPasses;
-	std::shared_ptr<ExtendedScene> m_Scene;
+	std::shared_ptr<caustica::Scene> m_Scene;
 	nvrhi::BindingLayoutHandle m_bindingLayout;
 	nvrhi::BindingLayoutHandle m_bindlessLayout;
 	nvrhi::BindingSetHandle m_bindingSet;

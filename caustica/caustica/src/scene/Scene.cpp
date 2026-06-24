@@ -1,5 +1,7 @@
 #include <scene/Scene.h>
 #include <assets/loader/GltfImporter.h>
+#include <assets/loader/ObjImporter.h>
+#include <scene/scene_utils.h>
 #include <core/ThreadPool.h>
 #include <core/json.h>
 #include <core/log.h>
@@ -268,6 +270,7 @@ Scene::Scene(
         m_SceneTypeFactory = std::make_shared<SceneTypeFactory>();
 
     m_GltfImporter = std::make_shared<GltfImporter>(m_fs, m_SceneTypeFactory);
+    m_ObjImporter = std::make_shared<ObjImporter>(m_SceneTypeFactory);
 
     m_EnableBindlessResources = !!m_DescriptorTable;
     m_RayTracingSupported = m_Device->queryFeatureSupport(nvrhi::Feature::RayTracingAccelStruct);
@@ -308,7 +311,7 @@ bool Scene::LoadWithThreadPool(const std::filesystem::path& sceneFileName, Threa
     
     m_SceneGraph = std::make_shared<SceneGraph>();
 
-    if (sceneFileName.extension() == ".gltf" || sceneFileName.extension() == ".glb")
+    if (IsDirectMeshSceneFile(sceneFileName))
     {
         m_textureSearchDirectory = sceneFileName.parent_path();
         ++g_LoadingStats.ObjectsTotal;
@@ -332,7 +335,8 @@ bool Scene::LoadWithThreadPool(const std::filesystem::path& sceneFileName, Threa
         if (!caustica::json::LoadFromFile(*m_fs, sceneFileName, documentRoot))
             return false;
 
-        return LoadJsonDocument(documentRoot, scenePath, threadPool);
+        if (!LoadJsonDocument(documentRoot, scenePath, threadPool))
+            return false;
     }
 
     return true;
@@ -353,7 +357,10 @@ bool Scene::LoadFromJsonString(const std::string& sceneJson, const std::filesyst
         return false;
     }
 
-    return LoadJsonDocument(documentRoot, scenePath, nullptr);
+    if (!LoadJsonDocument(documentRoot, scenePath, nullptr))
+        return false;
+
+    return true;
 }
 
 bool Scene::LoadJsonDocument(Json::Value documentRoot, const std::filesystem::path& scenePath, ThreadPool* threadPool)
@@ -412,6 +419,11 @@ bool Scene::LoadModelFile(
     ThreadPool* threadPool,
     SceneImportResult& result)
 {
+    std::string ext = fileName.extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return char(std::tolower(c)); });
+    if (ext == ".obj")
+        return m_ObjImporter->Load(fileName, *m_TextureCache, g_LoadingStats, threadPool, result, m_textureSearchDirectory);
+
     return m_GltfImporter->Load(fileName, *m_TextureCache, g_LoadingStats, threadPool, result, m_textureSearchDirectory);
 }
 
@@ -1518,4 +1530,56 @@ void Scene::UpdateInstance(const std::shared_ptr<MeshInstance>& instance)
         // For consistency and completeness, this flag is also set for DX12.
         idata.flags |= InstanceFlags_CurveLinearSweptSpheres;
     }
+}
+
+// =============================================================================
+// ProcessNodesRecursive — post-load scene traversal (merged from ExtendedScene)
+// =============================================================================
+
+void Scene::ProcessNodesRecursive(std::shared_ptr<SceneGraphNode> node)
+{
+    if (node->GetLeaf() != nullptr)
+    {
+        // Extract SampleSettings
+        auto sampleSettings = std::dynamic_pointer_cast<SampleSettings>(node->GetLeaf());
+        if (sampleSettings != nullptr)
+        {
+            assert(m_loadedSettings == nullptr);
+            m_loadedSettings = sampleSettings;
+        }
+
+        // Extract GameSettings
+        auto gameSettings = std::dynamic_pointer_cast<GameSettings>(node->GetLeaf());
+        if (gameSettings != nullptr)
+        {
+            assert(m_loadedGameSettings == nullptr);
+            m_loadedGameSettings = gameSettings;
+        }
+
+        // Resolve light proxy mesh links
+        if (node->GetLeaf() != nullptr && node->GetLeaf()->GetContentFlags() == SceneContentFlags::Lights)
+        {
+            auto light = std::dynamic_pointer_cast<Light>(node->GetLeaf());
+            if (light != nullptr &&
+                (light->GetLightType() == LightType_Spot || light->GetLightType() == LightType_Point) &&
+                !light->Proxies.empty())
+            {
+                for (const auto& proxyPath : light->Proxies)
+                {
+                    auto proxyNode = m_SceneGraph->FindNode(proxyPath);
+                    if (proxyNode != nullptr)
+                    {
+                        auto mi = std::dynamic_pointer_cast<MeshInstance>(proxyNode->GetLeaf());
+                        if (mi != nullptr)
+                        {
+                            mi->ProxiedAnalyticLight = light;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    for (int i = static_cast<int>(node->GetNumChildren()) - 1; i >= 0; i--)
+        ProcessNodesRecursive(node->GetChild(i)->shared_from_this());
 }

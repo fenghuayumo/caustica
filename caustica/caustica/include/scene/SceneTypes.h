@@ -280,6 +280,28 @@ namespace caustica
         Count
     };
 
+    // OMM debug buffer data (merged from MeshGeometryEx)
+    struct MeshGeometryDebugData
+    {
+        uint32_t ommArrayDataOffset = 0xFFFFFFFF;
+        uint32_t ommDescBufferOffset = 0xFFFFFFFF;
+        uint32_t ommIndexBufferOffset = 0xFFFFFFFF;
+        nvrhi::Format ommIndexBufferFormat = nvrhi::Format::R32_UINT;
+        uint64_t ommStatsTotalKnown = 0;
+        uint64_t ommStatsTotalUnknown = 0;
+    };
+
+    // Mesh debug data (merged from MeshInfoEx)
+    struct MeshDebugData
+    {
+        std::shared_ptr<DescriptorHandle> ommArrayDataBufferDescriptor;
+        std::shared_ptr<DescriptorHandle> ommDescBufferDescriptor;
+        std::shared_ptr<DescriptorHandle> ommIndexBufferDescriptor;
+        nvrhi::BufferHandle ommArrayDataBuffer;
+        nvrhi::BufferHandle ommDescBuffer;
+        nvrhi::BufferHandle ommIndexBuffer;
+    };
+
     struct MeshGeometry
     {
         std::shared_ptr<Material> material;
@@ -291,6 +313,9 @@ namespace caustica
         int globalGeometryIndex = 0;
 
         MeshGeometryPrimitiveType type = MeshGeometryPrimitiveType::Triangles;
+
+        // OMM debug data (merged from MeshGeometryEx)
+        MeshGeometryDebugData DebugData;
 
         virtual ~MeshGeometry() = default;
     };
@@ -319,8 +344,15 @@ namespace caustica
         uint32_t totalVertices = 0;
         int globalMeshIndex = 0;
         bool isMorphTargetAnimationMesh = false;
-        nvrhi::rt::AccelStructHandle accelStruct; // for use by applications
+        nvrhi::rt::AccelStructHandle accelStruct; // standard BLAS
         bool isSkinPrototype = false;
+
+        // OMM extension fields (merged from MeshInfoEx)
+        nvrhi::rt::AccelStructHandle AccelStructOMM;
+        std::vector<nvrhi::rt::OpacityMicromapHandle> OpacityMicroMaps;
+        std::vector<uint32_t> DeformationSourcePositionIndices; // preserves OBJ v-order for deformation APIs
+        std::unique_ptr<MeshDebugData> DebugData;
+        bool DebugDataDirty = true;
 
         virtual ~MeshInfo() = default;
         bool IsCurve() const

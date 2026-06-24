@@ -58,7 +58,7 @@ void Renderer::updateCameraFromScene(const std::shared_ptr<PerspectiveCamera>& s
     s.m_cameraVerticalFOV = sceneCamera->verticalFov;
     s.m_cameraZNear = sceneCamera->zNear;
 
-    auto sceneCameraEx = std::dynamic_pointer_cast<PerspectiveCameraEx>(sceneCamera);
+    auto sceneCameraEx = std::dynamic_pointer_cast<caustica::PerspectiveCamera>(sceneCamera);
     if (sceneCameraEx != nullptr)
     {
         ToneMappingParameters defaults;

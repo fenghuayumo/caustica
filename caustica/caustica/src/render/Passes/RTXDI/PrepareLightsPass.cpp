@@ -1,6 +1,6 @@
 #include <render/Passes/RTXDI/PrepareLightsPass.h>
 #include <render/Passes/RTXDI/RtxdiResources.h>
-#include <SampleCommon/ExtendedScene.h>
+#include <scene/Scene.h>
 #include <scene/Scene.h>
 
 #include <assets/loader/ShaderFactory.h>
@@ -30,7 +30,7 @@ PrepareLightsPass::PrepareLightsPass(
     nvrhi::IDevice* device, 
     std::shared_ptr<caustica::ShaderFactory> shaderFactory, 
     std::shared_ptr<caustica::CommonRenderPasses> commonPasses,
-    std::shared_ptr<ExtendedScene> scene,
+    std::shared_ptr<caustica::Scene> scene,
     std::shared_ptr<MaterialsBaker> materialsBaker,
     std::shared_ptr<OmmBaker> ommBaker,
 
@@ -84,7 +84,7 @@ PrepareLightsPass::PrepareLightsPass(
 }
 
 
-void PrepareLightsPass::SetScene(std::shared_ptr<ExtendedScene> scene,
+void PrepareLightsPass::SetScene(std::shared_ptr<caustica::Scene> scene,
     std::shared_ptr<EnvMapBaker> environmentMap, EnvMapSceneParams envMapSceneParams)
 {
     m_Scene = scene;

@@ -6,7 +6,6 @@
 #include <backend/ShaderUtils.h>
 
 #include <render/Passes/Lighting/MaterialsBaker.h>
-#include "ExtendedScene.h"
 #include "SampleCommon.h"
 #include <shaders/PathTracer/PathTracerShared.h>
 
@@ -515,7 +514,7 @@ void PTPipelineBaker::EnqueueShaderPermutation(PTPipelineVariant::ShaderPermutat
     m_parallelCompileListAll.push_back(perm);
 }
 
-void PTPipelineBaker::Update(const std::shared_ptr<class ExtendedScene>& scene, unsigned int subInstanceCount, const std::function<void(std::vector<caustica::ShaderMacro>& macros)>& globalMacrosGetter, bool forceShaderReload)
+void PTPipelineBaker::Update(const std::shared_ptr<caustica::Scene>& scene, unsigned int subInstanceCount, const std::function<void(std::vector<caustica::ShaderMacro>& macros)>& globalMacrosGetter, bool forceShaderReload)
 {
     // Auto-reload: poll for source file changes
     if (m_compilerConfig.CanCompile() && !forceShaderReload && !m_variants.empty())
@@ -728,8 +727,7 @@ void PTPipelineBaker::Update(const std::shared_ptr<class ExtendedScene>& scene, 
 #if _WIN32
             if (!HelpersIsNonInteractive())
             {
-                extern HWND HelpersGetActiveWindow();
-                int result = MessageBoxA(HelpersGetActiveWindow(), firstError.c_str(),
+                int result = MessageBoxA((HWND)HelpersGetActiveWindow(), firstError.c_str(),
                     "Shader compile error", MB_RETRYCANCEL | MB_ICONWARNING | MB_SETFOREGROUND | MB_TASKMODAL);
                 retry = result != IDCANCEL;
             }

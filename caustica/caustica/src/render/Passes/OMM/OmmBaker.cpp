@@ -1,4 +1,5 @@
 #include <render/Passes/OMM/OmmBaker.h>
+#include <render/Passes/Lighting/MaterialsBaker.h> // for PTMaterial full definition
 
 #include <assets/loader/ShaderFactory.h>
 #include <render/Core/FramebufferFactory.h>
@@ -104,7 +105,7 @@ void OmmBaker::CreateOpacityMicromaps(const caustica::Scene& scene)
         for (size_t i = 0; i < mesh->geometries.size(); ++i)
         {
             const caustica::MeshGeometry& geometry = *mesh->geometries[i];
-            const auto material = static_cast<const MaterialEx*>(geometry.material.get())->PTMaterial;
+            const auto material = static_cast<const MaterialEx*>(geometry.material.get())->ptData;
             if (material == nullptr)
                 continue;
             if (!(material->EnableBaseTexture && material->BaseTexture.Loaded != nullptr && material->BaseTexture.Loaded->texture != nullptr))

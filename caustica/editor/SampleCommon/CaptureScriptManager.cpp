@@ -4,7 +4,7 @@
 #include <SampleUI.h>
 #include "caustica.h"
 #include "SampleCommon.h"
-#include "CommandLine.h"
+#include <core/command_line.h>
 
 #include <engine/UserInterfaceUtils.h>
 

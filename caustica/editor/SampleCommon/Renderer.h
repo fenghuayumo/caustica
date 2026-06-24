@@ -8,7 +8,7 @@
 #include <math/math.h>
 
 class Sample;
-class GaussianSplat;
+#include <scene/SceneGraph.h>  // for GaussianSplat
 class GaussianSplatPass;
 struct SampleConstants;
 

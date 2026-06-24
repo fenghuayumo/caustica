@@ -1,6 +1,9 @@
 #include "scene/scene_utils.h"
 #include "core/vfs/VFS.h"
+#include "scene/SceneGraph.h"
 
+#include <algorithm>
+#include <cctype>
 #include <deque>
 
 namespace caustica
@@ -10,7 +13,7 @@ std::vector<std::string> FindScenes(IFileSystem& fs,
     const std::filesystem::path& path)
 {
     std::vector<std::string> scenes;
-    std::vector<std::string> sceneExtensions = { ".scene.json", ".gltf", ".glb" };
+    std::vector<std::string> sceneExtensions = { ".scene.json", ".gltf", ".glb", ".obj" };
 
     std::deque<std::filesystem::path> searchList;
     searchList.push_back(path);
@@ -48,6 +51,24 @@ std::string FindPreferredScene(const std::vector<std::string>& available,
             return s;
 
     return available.front();
+}
+
+std::shared_ptr<EnvironmentLight> FindEnvironmentLight(
+    const std::vector<std::shared_ptr<Light>>& lights)
+{
+    for (const auto& light : lights)
+    {
+        if (light->GetLightType() == LightType_Environment)
+            return std::dynamic_pointer_cast<EnvironmentLight>(light);
+    }
+    return nullptr;
+}
+
+bool IsDirectMeshSceneFile(const std::filesystem::path& sceneFileName)
+{
+    std::string ext = sceneFileName.extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return char(std::tolower(c)); });
+    return ext == ".gltf" || ext == ".glb" || ext == ".obj";
 }
 
 } // namespace caustica

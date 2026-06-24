@@ -8,7 +8,7 @@
 #include <platform/window.h>
 
 #include "SampleCommon.h"
-#include "CommandLine.h"
+#include <core/command_line.h>
 
 #define CAUSTICA_ENABLE_VIDEO_MEMORY_INFO 1
 

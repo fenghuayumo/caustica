@@ -18,7 +18,8 @@ namespace caustica
     class Light;
 }
 
-class ExtendedScene;
+#include <scene/Scene.h>
+
 class RenderTargets;
 class RtxdiResources;
 class EnvMapBaker;
@@ -51,7 +52,7 @@ private:
     
     std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
     std::shared_ptr<caustica::CommonRenderPasses> m_commonPasses;
-    std::shared_ptr<ExtendedScene> m_Scene;
+    std::shared_ptr<caustica::Scene> m_Scene;
     std::shared_ptr<class MaterialsBaker> m_materialsBaker;
     std::shared_ptr<class OmmBaker> m_ommBaker;
     nvrhi::BufferHandle m_subInstanceData;
@@ -69,7 +70,7 @@ public:
         nvrhi::IDevice* device,
         std::shared_ptr<caustica::ShaderFactory> shaderFactory,
         std::shared_ptr<caustica::CommonRenderPasses> commonPasses,
-        std::shared_ptr<ExtendedScene> scene,
+        std::shared_ptr<caustica::Scene> scene,
         std::shared_ptr<class MaterialsBaker> materialsBaker,
         std::shared_ptr<class OmmBaker> ommBaker,
         nvrhi::BufferHandle subInstanceData,
@@ -77,7 +78,7 @@ public:
         std::shared_ptr<ShaderDebug> shaderDebug
     );
 
-    void SetScene(std::shared_ptr<ExtendedScene> scene, std::shared_ptr<EnvMapBaker> environmentMap = nullptr, EnvMapSceneParams envMapSceneParams = {} );
+    void SetScene(std::shared_ptr<caustica::Scene> scene, std::shared_ptr<EnvMapBaker> environmentMap = nullptr, EnvMapSceneParams envMapSceneParams = {} );
     void SetGaussianSplatEmissionProxies(const std::vector<GaussianSplatEmissionProxy>* proxies, caustica::math::float4x4 objectToWorld, float emissionIntensity);
     void CreatePipeline();
     void CreateBindingSet(RtxdiResources& resources, const RenderTargets& renderTargets);

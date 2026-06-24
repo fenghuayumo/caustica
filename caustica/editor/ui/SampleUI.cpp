@@ -30,8 +30,6 @@
 using namespace caustica;
 using namespace caustica;
 
-std::filesystem::path GetLocalPath(std::string subfolder);
-
 // Declare SampleUIData as a global, so that we can use the KorgI macros to enable
 // Korg nanoKontrol support
 SampleUIData g_sampleUIData;

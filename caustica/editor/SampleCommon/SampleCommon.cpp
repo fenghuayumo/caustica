@@ -1,109 +1,19 @@
 #include "SampleCommon.h"
-#include <core/log.h>
 
 #include <core/json.h>
-#include <render/Core/SceneRender.h>
-#include <core/path_utils.h>
+#include <core/log.h>
 #include <scene/SceneTypes.h>
+
 #include <json/json.h>
 #include <fstream>
-#include <format>
-#include <charconv>
 
 using namespace caustica::math;
 
-namespace
-{
-    std::mutex g_localPathBaseMutex;
-    std::filesystem::path g_localPathBaseOverride;
-    std::filesystem::path g_runtimeDirectoryOverride;
+// =============================================================================
+// JSON utilities (not yet migrated to base/core/json.h)
+// =============================================================================
 
-    std::filesystem::path GetLocalPathBaseOverride()
-    {
-        std::lock_guard guard(g_localPathBaseMutex);
-        return g_localPathBaseOverride;
-    }
-}
-
-#ifdef _WIN32
-#include <windows.h>
-#include <commctrl.h>
-#endif
-#include <thread>
-#include <atomic>
-#include <regex>
-
-#ifdef _WIN32
-#pragma comment(lib, "Comctl32.lib")
-#endif
-
-bool EnsureDirectoryExists(const std::filesystem::path& dir)
-{
-    if (std::filesystem::exists(dir))
-    {
-        if (!std::filesystem::is_directory(dir))
-        {
-            caustica::error("Attempting ensure directory exists, but path '%s' is a file", dir.string().c_str());
-            return false;
-        }
-        return true;
-    }
-
-    std::filesystem::path pathSoFar;
-    for (const auto& part : std::filesystem::absolute(dir)) 
-    {
-        pathSoFar /= part;
-        if (std::filesystem::exists(pathSoFar))
-        {
-            if (!std::filesystem::is_directory(pathSoFar))
-            {
-                caustica::error("Attempting ensure directory exists, but path '%s' is a file", pathSoFar.string().c_str());
-                return false;
-            }
-        }
-        else
-        {
-            if (!std::filesystem::create_directory(pathSoFar))
-            {
-                caustica::error("Attempting ensure directory exists, but unable to create or access '%s' directory", pathSoFar.string().c_str());
-                return false;
-            }
-        }
-    }
-    return true;
-}
-
-std::vector<std::filesystem::path> EnumerateFilesWithWildcard( const std::filesystem::path& folder, const std::string& wildcard ) 
-{
-    // Convert wildcard to regex: ? -> ., * -> .*
-    std::string regexPattern = "^";
-    for (char c : wildcard) {
-        if (c == '*')      regexPattern += ".*";
-        else if (c == '?') regexPattern += '.';
-        else if (c == '.') regexPattern += "\\.";
-        else               regexPattern += c;
-    }
-    regexPattern += "$";
-    std::regex pattern(regexPattern, std::regex::icase);
-
-    std::vector<std::filesystem::path> result;
-    if (!std::filesystem::exists(folder) || !std::filesystem::is_directory(folder))
-        return result;
-
-    for (const auto& entry : std::filesystem::directory_iterator(folder)) 
-    {
-        if (entry.is_regular_file()) 
-        {
-            if (std::regex_match(entry.path().filename().string(), pattern)) 
-            {
-                result.push_back(entry.path());
-            }
-        }
-    }
-    return result;
-}
-
-bool SaveJsonToFile( const std::filesystem::path & filePath, const class Json::Value & rootNode )
+bool SaveJsonToFile(const std::filesystem::path& filePath, const class Json::Value& rootNode)
 {
     std::ofstream outFile(filePath, std::ios::trunc);
     if (!outFile.is_open())
@@ -118,7 +28,7 @@ bool SaveJsonToFile( const std::filesystem::path & filePath, const class Json::V
     return true;
 }
 
-bool LoadJsonFromFile( const std::filesystem::path & filePath, Json::Value & outRootNode )
+bool LoadJsonFromFile(const std::filesystem::path& filePath, Json::Value& outRootNode)
 {
     std::ifstream inFile;
     inFile.open(filePath);
@@ -134,732 +44,42 @@ bool LoadJsonFromFile( const std::filesystem::path & filePath, Json::Value & out
     }
 
     try { inFile >> outRootNode; }
-    catch (const Json::RuntimeError& e) 
-    { caustica::warning("Caught Json::RuntimeError: %s", e.what()); return false; } 
-    catch (const std::exception& e) 
+    catch (const Json::RuntimeError& e)
+    { caustica::warning("Caught Json::RuntimeError: %s", e.what()); return false; }
+    catch (const std::exception& e)
     { caustica::warning("Caught std::exception: %s", e.what()); return false; }
     return true;
 }
 
-std::string SaveJsonToString( const Json::Value & rootNode )
+std::string SaveJsonToString(const Json::Value& rootNode)
 {
     Json::StreamWriterBuilder writer;
     return Json::writeString(writer, rootNode);
 }
 
-bool LoadJsonFromString(const std::string & jsonData, Json::Value& outRootNode)
+bool LoadJsonFromString(const std::string& jsonData, Json::Value& outRootNode)
 {
     Json::CharReaderBuilder readerBuilder;
     std::string errs;
-
     std::istringstream iss(jsonData);
     return Json::parseFromStream(readerBuilder, iss, &outRootNode, &errs);
 }
 
-struct ProgressBarGlobals
-{
-    bool                    Active          = false;
-    std::string             Title           = "";
-    int                     Value           = 0;
-#ifdef _WIN32
-    HWND                    hMainWindow     = nullptr;
-    HWND                    hProgressBar    = nullptr;
-#endif
-    std::recursive_mutex    Mutex;
-    std::thread             Thread;
-
-};
-
-constexpr int               g_ProgressSlotCount = 8;
-static ProgressBarGlobals   g_ProgressSlots[g_ProgressSlotCount];
-
-static bool                 g_NonInteractive = false;
-
-void HelpersSetNonInteractive()
-{
-    g_NonInteractive = true;
-}
-
-bool HelpersIsNonInteractive()
-{
-    return g_NonInteractive;
-}
-
-#ifdef _WIN32
-static std::atomic<HWND>    g_hActiveParentWindow(NULL);
-void HelpersRegisterActiveWindow()
-{
-    g_hActiveParentWindow.store( GetActiveWindow() );
-    assert( g_hActiveParentWindow.load() != NULL );
-}
-HWND HelpersGetActiveWindow()
-{
-    return g_hActiveParentWindow.load();
-}
-
-LRESULT CALLBACK ProgressWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
-{
-    switch (msg) 
-    {
-    case WM_CREATE:
-    {
-        CREATESTRUCT * cs = reinterpret_cast<CREATESTRUCT*>(lParam);
-        ProgressBarGlobals & slot = *reinterpret_cast<ProgressBarGlobals*>(cs->lpCreateParams);
-        std::lock_guard guard(slot.Mutex);
-        assert (slot.Active); // && g_ProgressSlots[i].hMainWindow == hwnd) <- hwnd doesn't get set until CreateWindowEx finishes
-        RECT clientRect;
-        GetClientRect(hwnd, &clientRect);
-        slot.hProgressBar = CreateWindowEx(0, PROGRESS_CLASS, NULL, WS_CHILD | WS_VISIBLE,
-                    0, 0, clientRect.right, clientRect.bottom, hwnd, NULL, GetModuleHandle(NULL), NULL);
-
-        SendMessage(slot.hProgressBar, PBM_SETRANGE, 0, MAKELPARAM(0, 100));
-        SendMessage(slot.hProgressBar, PBM_SETPOS, 0, 0);
-        return 0;
-    }
-
-    //  in case of resizing main window, something like this keeps progress ctrl proper size:
-    //  case WM_SIZE: { RECT clientRect; GetClientRect(hwnd, &clientRect); MoveWindow(g_hProgressBar, 0, 0, clientRect.right, clientRect.bottom, TRUE); }
-
-    case WM_CLOSE:      DestroyWindow(hwnd);    return 0;
-    case WM_DESTROY:    PostQuitMessage(0);     return 0;
-    }
-    return DefWindowProc(hwnd, msg, wParam, lParam);
-}
-
-void ShowLastError()
-{
-    DWORD err = GetLastError(); wchar_t buf[4096];
-    FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, err, 0, buf, sizeof(buf) / sizeof(wchar_t), NULL);
-    MessageBoxW(NULL, buf, L"LastError", MB_OK | MB_ICONERROR);
-}
-
-#else // _WIN32
-void HelpersRegisterActiveWindow() {}
-#endif
-
-void ShowProgressWindow(int slotIndex)
-{
-#ifdef _WIN32
-    ProgressBarGlobals & slot = g_ProgressSlots[slotIndex];
-
-    const char* wClassName = "ProgressWindowClass";
-    HINSTANCE hInstance = GetModuleHandle(NULL);
-    static std::mutex   registerClassMtx;
-    static bool         registerClassFlag = false;
-    {
-        std::lock_guard<std::mutex> lock(registerClassMtx);
-        if (!registerClassFlag)
-        {
-            INITCOMMONCONTROLSEX icex = { sizeof(INITCOMMONCONTROLSEX), ICC_PROGRESS_CLASS };
-            InitCommonControlsEx(&icex);
-            WNDCLASS wc = {};
-            wc.lpfnWndProc = ProgressWndProc;
-            wc.hInstance = hInstance;
-            wc.lpszClassName = wClassName;
-            wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-
-            if (!RegisterClass(&wc))
-                ShowLastError();
-            registerClassFlag = true;
-        }
-    }
-
-    int width = 600;
-    int height = 100;
-
-    // Default position if no parent
-    int x = CW_USEDEFAULT;
-    int y = CW_USEDEFAULT;
-
-    HWND hParent = g_hActiveParentWindow.load();
-    HWND hwnd = NULL;
-    {
-        std::lock_guard guard(slot.Mutex);
-        if (!slot.Active) // already finished? don't even open the window
-            return;
-
-        if (hParent) 
-        {
-            RECT parentRect;
-            GetWindowRect(hParent, &parentRect);
-
-            x = parentRect.left + (parentRect.right - parentRect.left - width) / 2;
-            y = parentRect.top + (parentRect.bottom - parentRect.top - height*3) / 2;
-            y += height * slotIndex;
-        }
-
-        slot.hMainWindow = CreateWindowEx( WS_EX_TOOLWINDOW, wClassName, slot.Title.c_str(),
-            WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU, x, y, width, height,
-            NULL/*hParent*/, NULL, hInstance, reinterpret_cast<LPVOID>(&slot));
-        // can't use hParent as a parent because that ties our child window to using the main thread's message loop - not sure what the proper solution is here
-
-        if (slot.hMainWindow == NULL)
-        {
-            ShowLastError();
-            assert( false );
-            return;
-        }
-
-        hwnd = slot.hMainWindow;
-    }
-
-    ShowWindow(hwnd, SW_SHOW);
-    UpdateWindow(hwnd);
-
-    while (true) 
-    {
-        MSG msg;
-        while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) 
-        {
-            if (msg.message == WM_QUIT)
-                return;
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
-        }
-
-        {
-            std::lock_guard guard(slot.Mutex);
-            if (!slot.Active)
-                break;
-
-            PostMessage(slot.hProgressBar, PBM_SETPOS, slot.Value, 0);
-        }
-        Sleep(16); // avoid busy-waiting
-    }
-    SendMessage(hwnd, WM_CLOSE, 0, 0);
-#endif
-}
-
-bool IsWindowFullscreen()
-{
-#ifdef _WIN32
-    HWND activeWindow = HelpersGetActiveWindow();
-    // Check if window is valid
-    if (!IsWindow(activeWindow)) return false;
-
-    // Get window rect
-    RECT windowRect;
-    if (!GetWindowRect(activeWindow, &windowRect)) return false;
-
-    // Get the monitor handle the window is on
-    HMONITOR hMonitor = MonitorFromWindow(activeWindow, MONITOR_DEFAULTTONEAREST);
-    if (!hMonitor) return false;
-
-    // Get monitor info
-    MONITORINFO mi = {};
-    mi.cbSize = sizeof(mi);
-    if (!GetMonitorInfo(hMonitor, &mi)) return false;
-
-    RECT monitorRect = mi.rcMonitor;
-
-    // Compare rects
-    return EqualRect(&windowRect, &monitorRect);
-#else
-    return true;
-#endif
-}
-
-int ProgressBarStart(const char * windowText)
-{
-    if (g_NonInteractive)
-        return -1;
-
-    // progress bar currently interfering with fullscreen so disable
-    if (IsWindowFullscreen())
-        return -1;
-
-    for (int i = 0; i < g_ProgressSlotCount; i++)
-    {
-        std::lock_guard guard(g_ProgressSlots[i].Mutex);
-        ProgressBarGlobals & slot = g_ProgressSlots[i];
-        if (!slot.Active)
-        {
-            slot.Active = true;
-            slot.Title = windowText;
-            slot.Value = 0;
-            assert(!slot.Thread.joinable());
-
-            slot.Thread = std::thread(ShowProgressWindow, i);
-            return i;
-        }
-    }
-    return -1;
-}
-
-void ProgressBarStop(int slotIndex)
-{
-    assert( slotIndex >= 0 && slotIndex < g_ProgressSlotCount );
-    std::thread threadToJoin;
-    {
-        ProgressBarGlobals& slot = g_ProgressSlots[slotIndex];
-        std::lock_guard guard(slot.Mutex);
-        
-        slot.Active          = false;
-        slot.Title           = "";
-        slot.Value           = 0;
-#ifdef _WIN32
-        slot.hMainWindow     = nullptr;
-        slot.hProgressBar    = nullptr;
-#endif
-        threadToJoin.swap(slot.Thread);
-    }
-    if (threadToJoin.joinable())
-        threadToJoin.join();
-}
-
-void ProgressBarUpdate(int slotIndex, int percentage)
-{
-    assert(slotIndex >= 0 && slotIndex < g_ProgressSlotCount);
-    {
-        ProgressBarGlobals& slot = g_ProgressSlots[slotIndex];
-        std::lock_guard guard(slot.Mutex);
-        slot.Value = percentage;
-    }
-}
-
-std::filesystem::path ResolveMediaRelativePath(
-    const std::filesystem::path& localPath,
-    std::initializer_list<std::filesystem::path> searchRoots)
-{
-    if (localPath.empty())
-        return {};
-
-    if (localPath.is_absolute())
-        return std::filesystem::absolute(localPath);
-
-    if (std::filesystem::exists(localPath))
-        return std::filesystem::absolute(localPath);
-
-    for (const std::filesystem::path& root : searchRoots)
-    {
-        if (root.empty())
-            continue;
-
-        const std::filesystem::path candidate = root / localPath;
-        if (std::filesystem::exists(candidate))
-            return std::filesystem::absolute(candidate);
-    }
-
-    for (const std::filesystem::path& root : searchRoots)
-    {
-        if (!root.empty())
-            return std::filesystem::absolute(root / localPath);
-    }
-
-    return std::filesystem::absolute(localPath);
-}
-
-std::filesystem::path ResolveSceneMediaPath(
-    const std::filesystem::path& localPath,
-    const std::filesystem::path& sceneDirectory,
-    const std::filesystem::path& mediaPath)
-{
-    const std::filesystem::path assetsRoot = mediaPath.empty()
-        ? GetLocalPath(c_AssetsFolder)
-        : mediaPath;
-    return ResolveMediaRelativePath(localPath, { assetsRoot, sceneDirectory });
-}
-
-std::filesystem::path GetLocalPath(std::string subfolder)
-{
-    static std::filesystem::path oneChoice;
-    // if( oneChoice.empty() )
-    {
-        std::filesystem::path baseOverride = GetLocalPathBaseOverride();
-        std::filesystem::path candidateA = baseOverride.empty()
-            ? caustica::GetDirectoryWithExecutable() / subfolder
-            : baseOverride / subfolder;
-        std::filesystem::path candidateB = baseOverride.empty()
-            ? caustica::GetDirectoryWithExecutable().parent_path() / subfolder
-            : baseOverride.parent_path() / subfolder;
-        if (std::filesystem::exists(candidateA))
-            oneChoice = candidateA;
-        else
-            oneChoice = candidateB;
-    }
-    return oneChoice;
-}
-
-void SetLocalPathBaseOverride(const std::filesystem::path& basePath)
-{
-    std::lock_guard guard(g_localPathBaseMutex);
-    g_localPathBaseOverride = basePath.empty()
-        ? std::filesystem::path()
-        : std::filesystem::absolute(basePath).lexically_normal();
-}
-
-std::filesystem::path GetRuntimeDirectory()
-{
-    std::lock_guard guard(g_localPathBaseMutex);
-    if (!g_runtimeDirectoryOverride.empty())
-        return g_runtimeDirectoryOverride;
-
-    return caustica::GetDirectoryWithExecutable();
-}
-
-void SetRuntimeDirectoryOverride(const std::filesystem::path& runtimeDirectory)
-{
-    std::lock_guard guard(g_localPathBaseMutex);
-    g_runtimeDirectoryOverride = runtimeDirectory.empty()
-        ? std::filesystem::path()
-        : std::filesystem::absolute(runtimeDirectory).lexically_normal();
-}
-
-std::string StringLoadFromFile( const std::filesystem::path & filePath )
-{
-    std::ifstream file(filePath);
-    if (!file) { return ""; }
-
-    std::ostringstream buffer;
-    buffer << file.rdbuf();
-    return buffer.str();
-}
-
-std::tuple<int, std::string, std::string > SystemShell(const std::string & command, bool useCmd, bool blockOnExecution)
-{
-    assert(blockOnExecution); // non blocking not implemented
-
-    int resultValue;
-    std::string resultString;
-    std::string resultErrorString;
-    
-#if defined(_WIN32)
-    SECURITY_ATTRIBUTES sa = { sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
-    HANDLE hReadOut = NULL, hWriteOut = NULL, hReadErr = NULL, hWriteErr = NULL;
-
-    // Create pipes for stdout and stderr
-    CreatePipe(&hReadOut, &hWriteOut, &sa, 0);
-    CreatePipe(&hReadErr, &hWriteErr, &sa, 0);
-
-    // Ensure the read handles are not inherited
-    SetHandleInformation(hReadOut, HANDLE_FLAG_INHERIT, 0);
-    SetHandleInformation(hReadErr, HANDLE_FLAG_INHERIT, 0);
-
-    // useful for debugging
-    bool showConsole = false;
-
-    STARTUPINFOA si = { 0 };
-    PROCESS_INFORMATION pi = { 0 };
-    si.cb = sizeof(si);
-    if (!showConsole)
-    {
-        si.dwFlags = STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW;
-        si.hStdOutput = hWriteOut;
-        si.hStdError = hWriteErr;
-        si.wShowWindow = SW_HIDE;
-    }
-
-    std::string cmd = command;
-    if (useCmd)
-        cmd = "cmd /C \"" + command + "\"";
-    BOOL success = CreateProcessA( NULL, cmd.data(), NULL, &sa, TRUE, showConsole?CREATE_NEW_CONSOLE:CREATE_NO_WINDOW, NULL, NULL, &si, &pi );
-    CloseHandle(hWriteOut);
-    CloseHandle(hWriteErr);
-
-    if (success)
-    {
-        std::string output;
-        char buffer[4096];
-        DWORD bytesRead;
-        int loopCounter = 0;
-
-        while(true)
-        {
-            DWORD waitResult = WaitForSingleObject(pi.hProcess, 50);
-
-            DWORD available = 0;
-
-            // Read stdout
-            while (PeekNamedPipe(hReadOut, NULL, 0, NULL, &available, NULL) && available > 0)
-            {
-                if (ReadFile(hReadOut, buffer, sizeof(buffer) - 1, &bytesRead, NULL) && bytesRead > 0) 
-                {
-                    buffer[bytesRead] = '\0';
-                    resultString += buffer;
-                } else { assert( false ); break; }
-            }
-
-            while (PeekNamedPipe(hReadErr, NULL, 0, NULL, &available, NULL) && available > 0)
-            {
-                if (ReadFile(hReadErr, buffer, sizeof(buffer) - 1, &bytesRead, NULL) && bytesRead > 0) 
-                {
-                    buffer[bytesRead] = '\0';
-                    resultErrorString += buffer;
-                } else { assert( false ); break; }
-            }
-
-            if (waitResult == WAIT_OBJECT_0) 
-                break;
-            
-            loopCounter++;
-        }
-
-        GetExitCodeProcess(pi.hProcess, (DWORD*)&resultValue);
-    }
-
-
-    if (success) 
-    {
-
-        CloseHandle(pi.hProcess);
-        CloseHandle(pi.hThread);
-    }
-    else 
-    {
-        resultErrorString = "CreateProcess failed.";
-        resultValue = 0;
-    }
-
-    CloseHandle(hReadOut);
-    CloseHandle(hReadErr);
-
-#else
-    static std::atomic<int> fileLogIndexStorage(0);
-    int uniqueIndex = fileLogIndexStorage.fetch_add(1);
-
-#ifdef _WIN32
-    DWORD pid = GetCurrentProcessId();
-#else
-    pid_t pid = getpid();
-#endif
-    std::filesystem::path tempLogFile = std::filesystem::temp_directory_path() / StringFormat("CAUSTICA_out_%d_%d.txt", pid, uniqueIndex);
-    std::filesystem::path tempErrLogFile = std::filesystem::temp_directory_path() / StringFormat("CAUSTICA_err_%d_%d.txt", pid, uniqueIndex);
-    std::string startCmd = command + " > \"" + tempLogFile.string() + "\"" + " 2> \"" + tempErrLogFile.string() + "\"";
-
-    resultValue = std::system(startCmd.c_str());
-
-    if (std::filesystem::exists(tempLogFile))
-    {
-        resultString = StringLoadFromFile(tempLogFile);
-        std::filesystem::remove(tempLogFile);
-    }
-    if (std::filesystem::exists(tempErrLogFile))
-    {
-        resultErrorString = StringLoadFromFile(tempErrLogFile);
-        std::filesystem::remove(tempErrLogFile);
-    }
-#endif
-
-    return std::make_tuple(resultValue, resultString, resultErrorString);
-}
-
-namespace fs = std::filesystem;
-
-std::optional<fs::file_time_type> GetLatestModifiedTimeDirectoryRecursive(const fs::path & directory) 
-{
-    std::error_code ec;
-
-    if (!fs::exists(directory, ec) || !fs::is_directory(directory, ec)) 
-    {
-        //caustica::info("Invalid directory or access error: '%s'", directory.string().c_str());
-        return std::nullopt;
-    }
-
-    std::optional<fs::file_time_type> latest_time;
-
-    fs::recursive_directory_iterator dir_it(directory, fs::directory_options::skip_permission_denied, ec);
-    fs::recursive_directory_iterator end_it;
-
-    while (dir_it != end_it && !ec) 
-    {
-        const auto& entry = *dir_it;
-
-        if (entry.is_regular_file(ec)) 
-        {
-            auto ftime = entry.last_write_time(ec);
-            if (!ec) 
-            {
-                if (!latest_time || ftime > *latest_time)
-                    latest_time = ftime;
-            }
-        }
-
-        dir_it.increment(ec); // manually increment to pass error_code
-    }
-
-    if (ec) 
-    {
-        caustica::warning("Invalid directory or access error for '%s', error: ", directory.string().c_str(), ec.message().c_str());
-        return std::nullopt;
-    }
-
-    return latest_time;
-}
-
-std::optional<std::filesystem::file_time_type> GetFileModifiedTime(const std::filesystem::path & file)
-{
-    std::error_code ec;
-
-    if (!fs::exists(file, ec) || !fs::is_regular_file(file, ec))
-    {
-        //caustica::info("File does not exist or is not a regular file: '%s'", file.string().c_str());
-        return std::nullopt;
-    }
-
-    auto ftime = fs::last_write_time(file, ec);
-    if (ec)
-    {
-        caustica::warning("Failed to get last write time for file '%s', error: %s", file.string().c_str(), ec.message().c_str());
-        return std::nullopt;
-    }
-
-    return ftime;
-}
-
-size_t FindSubStringIgnoreCase(const std::string & text, const std::string & subString) 
-{
-    auto toLower = [](char ch) 
-    { 
-        return static_cast<char>(std::tolower(static_cast<unsigned char>(ch))); 
-    };
-
-    if (subString.empty() || text.size() < subString.size())
-        return std::string::npos;
-
-    for (size_t i = 0; i <= text.size() - subString.size(); ++i) {
-        bool match = true;
-        for (size_t j = 0; j < subString.size(); ++j) {
-            if (toLower(text[i + j]) != toLower(subString[j])) {
-                match = false;
-                break;
-            }
-        }
-        if (match)
-            return i;
-    }
-
-    return std::string::npos;
-}
-
-bool EqualsIgnoreCase(const std::string & a, const std::string & b)
-{
-    if (a.size() != b.size())
-        return false;
-    for (size_t i = 0; i < a.size(); ++i)
-    {
-        if (std::tolower((unsigned char)a[i]) != std::tolower((unsigned char)b[i]))
-            return false;
-    }
-    return true;
-}
-
-void FPSLimiter::FramerateLimit(int fpsTarget)
-{
-    std::chrono::high_resolution_clock::time_point   nowTimestamp = std::chrono::high_resolution_clock::now();
-    double deltaTime = std::chrono::duration<double>(nowTimestamp - m_lastTimestamp).count();
-    double targetDeltaTime = 1.0 / (double)fpsTarget;
-    double diffFromTarget = targetDeltaTime - deltaTime + m_prevError;
-    if (diffFromTarget > 0.0f)
-    {
-        size_t sleepInMs = std::min(1000, (int)(diffFromTarget * 1000));
-        std::this_thread::sleep_for(std::chrono::milliseconds(sleepInMs));
-    }
-
-    auto prevTime = m_lastTimestamp;
-    m_lastTimestamp = std::chrono::high_resolution_clock::now();
-    double deltaError = targetDeltaTime - std::chrono::duration<double>(m_lastTimestamp - prevTime).count();
-    m_prevError = deltaError * 0.9 + m_prevError * 0.1;     // dampen the spring-like effect, but still remain accurate to any positive/negative creep induced by our sleep mechanism
-    // clamp error handling to 1 frame length
-    if (m_prevError > targetDeltaTime)
-        m_prevError = targetDeltaTime;
-    if (m_prevError < -targetDeltaTime)
-        m_prevError = -targetDeltaTime;
-    // shift last time by error to compensate
-    m_lastTimestamp += std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::duration<double>(m_prevError));
-}
-
-bool CompressTextures(std::map<std::shared_ptr<caustica::LoadedTexture>, TextureCompressionType> & uncompressedTextures)
-{
-    // if async needed, do something like std::thread([sytemCommand](){ system( sytemCommand.c_str() ); }).detach();
-
-    std::string batchFileName = std::string(getenv("localappdata")) + "\\temp\\caustica_compressor.bat";
-    std::ofstream batchFile(batchFileName, std::ios_base::trunc);
-    if (!batchFile.is_open())
-    {
-        caustica::message(caustica::Severity::Error, "Unable to write %s", batchFileName.c_str());
-        return false;
-    }
-
-    std::string cmdLine;
-
-    // prefix part
-    //cmdLine += "echo off \n";
-    cmdLine += "ECHO: \n";
-    cmdLine += "WHERE nvtt_export \n";
-    //cmdLine += "ECHO WHERE nvtt_export returns %ERRORLEVEL% \n";
-    cmdLine += "IF %ERRORLEVEL% NEQ 0 (goto :error_tool)\n";
-    cmdLine += "ECHO: \n";
-    cmdLine += "ECHO nvtt_export exists in the Path, proceeding with compression (this might take a while!) \n";
-    cmdLine += "ECHO: \n";
-
-    uint i = 0; uint totalCount = (uint)uncompressedTextures.size();
-    for (auto it : uncompressedTextures)
-    {
-        auto texture = it.first;
-        std::string inPath = texture->path;
-        std::string outPath = std::filesystem::path(inPath).replace_extension(".dds").string();
-
-        cmdLine += "ECHO converting texture " + std::to_string(++i) + " " + " out of " + std::to_string(totalCount) + "\n";
-
-        cmdLine += "nvtt_export";
-        cmdLine += " -f 23"; // this sets format BC7
-        cmdLine += " ";
-
-        if (it.second == TextureCompressionType::Normalmap)
-        {
-            // cmdLine += " --normal-filter 1";
-            // cmdLine += " --normalize";
-            cmdLine += " --no-mip-gamma-correct";
-        }
-        else if (it.second == TextureCompressionType::GenericLinear)
-        {
-            cmdLine += " --no-mip-gamma-correct";
-        }
-        else if (it.second == TextureCompressionType::GenericSRGB)
-        {
-            cmdLine += " --mip-gamma-correct";
-        }
-        // cmdLine += " -q 2";  // 2 is production quality, 1 is "normal" (default)
-
-        cmdLine += " -o \"" + outPath;
-        cmdLine += "\" \"" + inPath + "\"\n";
-    }
-    cmdLine += "ECHO:\n";
-    cmdLine += "pause\n";
-    cmdLine += "ECHO on\n";
-    cmdLine += "exit /b 0\n";
-
-    cmdLine += ":error_tool\n";
-    cmdLine += "ECHO !! nvtt_export.exe not found !!\n";
-    cmdLine += "ECHO nvtt_export.exe is part of the https://developer.nvidia.com/nvidia-texture-tools-exporter package - please install\n";
-    cmdLine += "ECHO and add 'C:/Program Files/NVIDIA Corporation/NVIDIA Texture Tools' or equivalent to your PATH and retry!\n";
-    cmdLine += "pause\n";
-    cmdLine += "ECHO on\n";
-    cmdLine += "exit /b 1\n";
-
-    batchFile << cmdLine;
-    batchFile.close();
-
-    std::string startCmd = " \"\" " + batchFileName;
-    std::system(startCmd.c_str());
-
-    //remove(batchFileName.c_str());
-
-    return true; // TODO: check error code
-}
-
-
 std::vector<std::string> JsonLoadStringVector(const Json::Value& arr)
 {
     std::vector<std::string> result;
-    if (arr.isArray()) {
+    if (arr.isArray())
+    {
         result.reserve(arr.size());
-        for (const auto& v : arr) {
+        for (const auto& v : arr)
             result.push_back(v.asString());
-        }
     }
     return result;
 }
+
+// =============================================================================
+// NVRHI utility
+// =============================================================================
 
 uint64_t GetEstimatedTextureSize(const nvrhi::TextureDesc& desc)
 {
@@ -882,70 +102,63 @@ uint64_t GetEstimatedTextureSize(const nvrhi::TextureDesc& desc)
     return pixelsCount / fi.blockSize * fi.bytesPerBlock;
 }
 
-std::string HexString(unsigned int value)
-{
-    return std::format("{:08x}", value);
-}
+// =============================================================================
+// CompressTextures (depends on LoadedTexture from scene layer)
+// =============================================================================
 
-std::string StripNonAsciiAlnum(const std::string & input)
+bool CompressTextures(
+    std::map<std::shared_ptr<caustica::LoadedTexture>, TextureCompressionType>& uncompressedTextures)
 {
-    std::string result;
-    result.reserve(input.size()); // avoid reallocations
-
-    std::copy_if(input.begin(), input.end(), std::back_inserter(result),
-        [ ](unsigned char c)
+    std::string batchFileName = std::string(getenv("localappdata")) +
+        "\\temp\\caustica_compressor.bat";
+    std::ofstream batchFile(batchFileName, std::ios_base::trunc);
+    if (!batchFile.is_open())
     {
-        return std::isalnum(c) && c < 128; // only ASCII letters/digits
-    });
-
-    return result;
-}
-
-static inline void SkipWs(const char*& p, const char* e)
-{
-    while (p < e && std::isspace(static_cast<unsigned char>(*p)))    { ++p; }
-}
-
-bool ParseFloat3Consume(std::string& s, float3 & out)
-{
-    const char* begin = s.data();
-    const char* p = begin;
-    const char* e = begin + s.size();
-
-    for (int i = 0; i < 3; ++i)
-    {
-        SkipWs(p, e);
-
-        if (p == e)
-            return false; // premature end
-
-        float v = 0.0f;
-        auto r = std::from_chars(p, e, v, std::chars_format::general);
-
-        if (r.ec != std::errc{})
-            return false; // invalid or out of range
-
-        p = r.ptr;
-        SkipWs(p, e);
-
-        if (i < 2)
-        {
-            // Require comma between values 0-1 and 1-2
-            if (p == e || *p != ',')
-                return false;
-            ++p; // consume comma
-        }
-
-        out[i] = v;
+        caustica::message(caustica::Severity::Error, "Unable to write %s", batchFileName.c_str());
+        return false;
     }
 
-    // After third float: allow whitespace and optionally one comma (to chain groups)
-    SkipWs(p, e);
-    if (p < e && *p == ',')    
-        ++p;
-    SkipWs(p, e);
+    std::string cmdLine;
+    cmdLine += "ECHO: \n";
+    cmdLine += "WHERE nvtt_export \n";
+    cmdLine += "IF %ERRORLEVEL% NEQ 0 (goto :error_tool)\n";
+    cmdLine += "ECHO: \n";
+    cmdLine += "ECHO nvtt_export exists in the Path, proceeding with compression (this might take a while!) \n";
+    cmdLine += "ECHO: \n";
 
-    // Update the input string to the remainder
-    s.assign(p, static_cast<size_t>(e - p));
+    unsigned int i = 0;
+    unsigned int totalCount = static_cast<unsigned int>(uncompressedTextures.size());
+    for (auto it : uncompressedTextures)
+    {
+        auto texture = it.first;
+        std::string inPath = texture->path;
+        std::string outPath = std::filesystem::path(inPath).replace_extension(".dds").string();
+
+        cmdLine += "ECHO converting texture " + std::to_string(++i) + " "
+            + " out of " + std::to_string(totalCount) + "\n";
+        cmdLine += "nvtt_export -f 23 ";
+
+        if (it.second == TextureCompressionType::Normalmap)
+            cmdLine += " --no-mip-gamma-correct";
+        else if (it.second == TextureCompressionType::GenericLinear)
+            cmdLine += " --no-mip-gamma-correct";
+        else if (it.second == TextureCompressionType::GenericSRGB)
+            cmdLine += " --mip-gamma-correct";
+
+        cmdLine += " -o \"" + outPath + "\" \"" + inPath + "\"\n";
+    }
+
+    cmdLine += "ECHO:\npause\nECHO on\nexit /b 0\n";
+    cmdLine += ":error_tool\n";
+    cmdLine += "ECHO !! nvtt_export.exe not found !!\n";
+    cmdLine += "ECHO nvtt_export.exe is part of https://developer.nvidia.com/nvidia-texture-tools-exporter\n";
+    cmdLine += "ECHO Please install and add to PATH, then retry!\n";
+    cmdLine += "pause\nECHO on\nexit /b 1\n";
+
+    batchFile << cmdLine;
+    batchFile.close();
+
+    std::string startCmd = " \"\" " + batchFileName;
+    std::system(startCmd.c_str());
     return true;
 }

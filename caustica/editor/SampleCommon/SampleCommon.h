@@ -1,144 +1,74 @@
 #pragma once
 
-#include <shaders/PathTracer/Config.h>
+// =============================================================================
+// SampleCommon.h — Compatibility header.
+//
+// Previously contained many utility functions that have been moved to the
+// causticaBase layer (base/core/). This header now includes the new locations
+// and only defines editor/UI-specific helpers that remain in this layer.
+// =============================================================================
 
+// --- Moved to causticaBase (base/core/) ---
+#include <core/file_utils.h>
+#include <core/format.h>
+#include <core/path_utils.h>
+#include <core/progress.h>
+#include <core/Timer.h>
+#include <core/system_utils.h>
+#include <core/command_line.h>
+
+// Bring base/ functions into global namespace for backward compatibility
+using caustica::StringFormat;
+using caustica::HexString;
+using caustica::StripNonAsciiAlnum;
+using caustica::ParseFloat3Consume;
+using caustica::FindSubStringIgnoreCase;
+using caustica::EqualsIgnoreCase;
+using caustica::EnsureDirectoryExists;
+using caustica::EnumerateFilesWithWildcard;
+using caustica::StringLoadFromFile;
+using caustica::GetLatestModifiedTimeDirectoryRecursive;
+using caustica::GetFileModifiedTime;
+using caustica::GetLocalPath;
+using caustica::SetLocalPathBaseOverride;
+using caustica::GetRuntimeDirectory;
+using caustica::SetRuntimeDirectoryOverride;
+using caustica::ResolveMediaRelativePath;
+using caustica::ResolveSceneMediaPath;
+using caustica::IsProceduralSky;
+using caustica::SystemShell;
+using caustica::HelpersRegisterActiveWindow;
+using caustica::HelpersSetNonInteractive;
+using caustica::HelpersIsNonInteractive;
+using caustica::HelpersGetActiveWindow;
+using caustica::c_AssetsFolder;
+using caustica::c_EnvMapProcSky;
+using caustica::c_EnvMapSceneDefault;
+using caustica::ProgressBar;
+using caustica::FPSLimiter;
+
+// --- Editor/UI macros (remain in this layer) ---
 #include <utility>
-#include <filesystem>
-#include <assert.h>
-#include <mutex>
-#include <map>
-#include <optional>
-#include <rhi/nvrhi.h>
-#include <rhi/utils.h>
-#include <math/math.h>
+#include <imgui.h>
 
-
-#define UI_SCOPED_INDENT(indent) RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent); )
-#define UI_SCOPED_DISABLE(cond) RAII_SCOPE(ImGui::BeginDisabled(cond); , ImGui::EndDisabled(); )
-
-#define TOKEN_COMBINE1(X,Y) X##Y  // helper macro
+#define TOKEN_COMBINE1(X,Y) X##Y
 #define TOKEN_COMBINE(X,Y) TOKEN_COMBINE1(X,Y)
 
-////////////////////////////////////////////////////////////////////////////////////////////////
-// Custom generic RAII helper
-template< typename AcquireType, typename FinalizeType >
+template<typename AcquireType, typename FinalizeType>
 class GenericScope
 {
-    FinalizeType            m_finalize;
+    FinalizeType m_finalize;
 public:
     GenericScope(AcquireType&& acquire, FinalizeType&& finalize) : m_finalize(std::move(finalize)) { acquire(); }
     ~GenericScope() { m_finalize(); }
 };
-// Should expand to something like: GenericScope scopevar_1( [ & ]( ) { ImGui::PushID( Scene::Components::TypeName( i ).c_str( ) ); }, [ & ]( ) { ImGui::PopID( ); } );
-#define RAII_SCOPE( enter, leave ) GenericScope TOKEN_COMBINE( _generic_raii_scopevar_, __COUNTER__ ) ( [&](){ enter }, [&](){ leave } );
-// Usage example: RAII_SCOPE( ImGui::PushID( keyID );, ImGui::PopID( ); )
-////////////////////////////////////////////////////////////////////////////////////////////////
 
-namespace caustica
-{
-    struct LoadedTexture;
-}
+#define RAII_SCOPE(enter, leave) GenericScope TOKEN_COMBINE(_generic_raii_scopevar_, __COUNTER__)([&](){ enter }, [&](){ leave });
+#define UI_SCOPED_INDENT(indent) RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent); )
+#define UI_SCOPED_DISABLE(cond)  RAII_SCOPE(ImGui::BeginDisabled(cond); , ImGui::EndDisabled(); )
 
-// can be upgraded for special normalmap type (i.e. DXGI_FORMAT_BC5_UNORM) or single channel masks (i.e. DXGI_FORMAT_BC4_UNORM)
-enum class TextureCompressionType
-{
-    Normalmap,
-    GenericSRGB,        // maps to BC7_UNORM_SRGB
-    GenericLinear,      // maps to BC7_UNORM
-};
-
-constexpr static const char * c_EnvMapProcSky           = "==PROCEDURAL_SKY==";
-constexpr static const char * c_EnvMapProcSky_Morning   = "==PROCEDURAL_SKY_MORNING==";
-constexpr static const char * c_EnvMapProcSky_Midday    = "==PROCEDURAL_SKY_MIDDAY==";
-constexpr static const char * c_EnvMapProcSky_Evening   = "==PROCEDURAL_SKY_EVENING==";
-constexpr static const char * c_EnvMapProcSky_Dawn      = "==PROCEDURAL_SKY_DAWN==";
-constexpr static const char * c_EnvMapProcSky_PitchBlack= "==PROCEDURAL_SKY_PITCHBLACK==";
-constexpr static const char * c_EnvMapSceneDefault      = "==SCENE_DEFAULT==";
-constexpr static const char * c_AssetsFolder            = "Assets";
-constexpr static const char * c_EnvMapSubFolder         = "EnvironmentMaps";
-constexpr static const char * c_MaterialsSubFolder      = "Materials";
-constexpr static const char * c_MaterialsExtension      = ".material.json";
-constexpr static const char * c_SampleGameSubFolder     = "SampleGame";
-
-
-constexpr static const int c_SwapchainCount = 3;
-
-inline bool IsProceduralSky( const char * str )         { if (str == nullptr) return false; for (int i = 0; i < 12; i++ ) if (str[i] != c_EnvMapProcSky[i]) return false; return true; }
-
-bool EnsureDirectoryExists( const std::filesystem::path & dir );
-std::vector<std::filesystem::path> EnumerateFilesWithWildcard( const std::filesystem::path& folder, const std::string& wildcard );
-std::optional<std::filesystem::file_time_type> GetLatestModifiedTimeDirectoryRecursive(const std::filesystem::path & directory);
-std::optional<std::filesystem::file_time_type> GetFileModifiedTime(const std::filesystem::path & file);
-
-namespace Json { class Value; }
-bool        SaveJsonToFile( const std::filesystem::path & filePath, const Json::Value & rootNode );
-bool        LoadJsonFromFile( const std::filesystem::path & filePath, Json::Value & outRootNode );
-std::string SaveJsonToString( const Json::Value & rootNode );
-bool        LoadJsonFromString(const std::string & jsonData, Json::Value& outRootNode);
-//inline Json::Value LoadJsonFromFile(const std::filesystem::path& filePath)                      { Json::Value ret; LoadJsonFromFile(filePath, ret); return ret; }
-//inline Json::Value LoadJsonFromString(const std::string& jsonData)                              { Json::Value ret; LoadJsonFromString(jsonData, ret); return ret; }
-
-std::vector<std::string> JsonLoadStringVector(const Json::Value& arr);
-
-std::string StringLoadFromFile( const std::filesystem::path & filePath );
-
-template<typename ... Args> std::string StringFormat(const std::string& format, Args ... args)
-{
-    int size_s = std::snprintf(nullptr, 0, format.c_str(), args ...) + 1; // Extra space for '\0'
-    if (size_s <= 0) { throw std::runtime_error("Error during formatting."); }
-    auto size = static_cast<size_t>(size_s);
-    std::unique_ptr<char[]> buf(new char[size]);
-    std::snprintf(buf.get(), size, format.c_str(), args ...);
-    return std::string(buf.get(), buf.get() + size - 1); // We don't want the '\0' inside
-}
-
-std::string HexString(unsigned int value);
-std::string StripNonAsciiAlnum(const std::string & input);
-bool ParseFloat3Consume(std::string& s, dm::float3 & out);
-
-// returns std::string::npos if not found
-size_t FindSubStringIgnoreCase(const std::string & text, const std::string & subString);
-bool EqualsIgnoreCase(const std::string & a, const std::string & b);
-
-std::filesystem::path GetLocalPath(std::string subfolder);
-// Resolves a relative media path against the first existing root in searchRoots.
-std::filesystem::path ResolveMediaRelativePath(
-    const std::filesystem::path& localPath,
-    std::initializer_list<std::filesystem::path> searchRoots);
-// Standard RTXPT media lookup: runtime Assets/ first, then the scene JSON parent directory.
-std::filesystem::path ResolveSceneMediaPath(
-    const std::filesystem::path& localPath,
-    const std::filesystem::path& sceneDirectory,
-    const std::filesystem::path& mediaPath = std::filesystem::path());
-void SetLocalPathBaseOverride(const std::filesystem::path& basePath);
-std::filesystem::path GetRuntimeDirectory();
-void SetRuntimeDirectoryOverride(const std::filesystem::path& runtimeDirectory);
-
-bool CompressTextures(std::map<std::shared_ptr<caustica::LoadedTexture>, TextureCompressionType> & uncompressedTextures);
-
-void HelpersRegisterActiveWindow(); // call this from process main thread to grab current main window; this is optional and only used for progress bar to appear centered in the main window
-void HelpersSetNonInteractive();
-bool HelpersIsNonInteractive();
-int  ProgressBarStart(const char * windowText);
-void ProgressBarStop(int slotIndex);
-void ProgressBarUpdate(int slotIndex, int percentage);
-
-class ProgressBar
-{
-public:
-    ProgressBar()                               { }
-    ProgressBar(const char * windowText)        { Start(windowText); }
-    ~ProgressBar()                              { Stop(); }
-
-    bool        Start(const char * windowText)  { std::lock_guard lock(m_mtx); assert( !Active() ); m_slot = ProgressBarStart(windowText); return Active(); }
-    void        Set(int percentage)             { std::lock_guard lock(m_mtx); if (percentage<0) percentage = 0; if (percentage>100) percentage = 100; if (m_slot!=-1) ProgressBarUpdate(m_slot, percentage); }
-    void        Stop()                          { std::lock_guard lock(m_mtx); if (Active()) ProgressBarStop(m_slot); m_slot = -1; }
-    bool        Active() const                  { std::lock_guard lock(m_mtx); return m_slot != -1; }
-
-private:
-    mutable std::recursive_mutex m_mtx;
-    int         m_slot = -1;
-};
+// --- Misc utilities (JSON, NVRHI-dependent) ---
+#include <rhi/nvrhi.h>
 
 class ScopedPerfMarker
 {
@@ -148,27 +78,38 @@ public:
     {
         cmdList->beginMarker(label);
     }
-
     ~ScopedPerfMarker()
     {
         m_cmdList->endMarker();
     }
-
 private:
     nvrhi::CommandListHandle m_cmdList;
 };
 
-// result, outputText, errorText
-std::tuple<int, std::string, std::string > SystemShell(const std::string & command, bool useCmd = false, bool blockOnExecution = true);
+#include <shaders/PathTracer/Config.h>
 
-// Temp helper used to reduce FPS to specified target (i.e.) 30 - useful to avoid overheating the office :) but not intended for precise fps control
-class FPSLimiter
+constexpr static const int c_SwapchainCount = 3;
+
+// JSON utilities
+namespace Json { class Value; }
+std::vector<std::string> JsonLoadStringVector(const Json::Value& arr);
+bool SaveJsonToFile(const std::filesystem::path& filePath, const Json::Value& rootNode);
+bool LoadJsonFromFile(const std::filesystem::path& filePath, Json::Value& outRootNode);
+std::string SaveJsonToString(const Json::Value& rootNode);
+bool LoadJsonFromString(const std::string& jsonData, Json::Value& outRootNode);
+
+// NVRHI utility
+uint64_t GetEstimatedTextureSize(const nvrhi::TextureDesc& desc);
+
+// --- Texture compression (depends on engine types, stays in this layer) ---
+#include <map>
+namespace caustica { struct LoadedTexture; }
+
+enum class TextureCompressionType
 {
-private:
-    std::chrono::high_resolution_clock::time_point m_lastTimestamp = std::chrono::high_resolution_clock::now();
-    double  m_prevError = 0.0;
-public:
-    void    FramerateLimit(int fpsTarget);
+    Normalmap,
+    GenericSRGB,
+    GenericLinear,
 };
 
-uint64_t GetEstimatedTextureSize(const nvrhi::TextureDesc& desc);
+bool CompressTextures(std::map<std::shared_ptr<caustica::LoadedTexture>, TextureCompressionType>& uncompressedTextures);

@@ -27,7 +27,7 @@
 #include <backend/GpuDevice.h>
 #include <engine/Application.h>
 
-#include <SampleCommon/CommandLine.h>
+#include <core/command_line.h>
 
 #if CAUSTICA_WITH_DX12 && defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
 #include <wrl/client.h>

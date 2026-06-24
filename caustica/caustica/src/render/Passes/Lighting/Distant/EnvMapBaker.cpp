@@ -27,9 +27,7 @@
 using namespace caustica::math;
 using namespace caustica;
 
-std::filesystem::path GetLocalPath(std::string subfolder);
-
-static const int    c_BlockCompressionBlockSize = 4; 
+static const int    c_BlockCompressionBlockSize = 4;
 
 EnvMapBaker::EnvMapBaker( nvrhi::IDevice* device, std::shared_ptr<caustica::TextureCache> textureCache, bool enableRasterPrecompute )
     : m_device(device)

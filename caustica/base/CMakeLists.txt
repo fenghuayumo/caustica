@@ -47,6 +47,7 @@ target_include_directories(causticaBase
 target_link_libraries(causticaBase
     PUBLIC
         jsoncpp_static
+        cxxopts
 )
 
 if (MSVC)

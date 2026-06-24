@@ -47,6 +47,7 @@ SkinnedMeshInstance::SkinnedMeshInstance(std::shared_ptr<SceneTypeFactory> scene
     }
 
     m_Mesh = skinnedMesh;
+    PerGeometryLightSamplerLinks.resize(skinnedMesh->geometries.size(), { -1, -1 });
 }
 
 std::shared_ptr<SceneGraphLeaf> SkinnedMeshInstance::Clone()
@@ -68,7 +69,10 @@ std::shared_ptr<SceneGraphLeaf> SkinnedMeshReference::Clone()
 
 std::shared_ptr<SceneGraphLeaf> MeshInstance::Clone()
 {
-    return std::make_shared<MeshInstance>(m_Mesh);
+    auto copy = std::make_shared<MeshInstance>(m_Mesh);
+    copy->PerGeometryLightSamplerLinks = PerGeometryLightSamplerLinks;
+    copy->ProxiedAnalyticLight = ProxiedAnalyticLight;
+    return copy;
 }
 
 SceneContentFlags MeshInstance::GetContentFlags() const
@@ -133,6 +137,11 @@ std::shared_ptr<SceneGraphLeaf> PerspectiveCamera::Clone()
     copy->zFar = zFar;
     copy->verticalFov = verticalFov;
     copy->aspectRatio = aspectRatio;
+    copy->enableAutoExposure = enableAutoExposure;
+    copy->exposureCompensation = exposureCompensation;
+    copy->exposureValue = exposureValue;
+    copy->exposureValueMin = exposureValueMin;
+    copy->exposureValueMax = exposureValueMax;
     return copy;
 }
 
@@ -142,6 +151,11 @@ void PerspectiveCamera::Load(const Json::Value& node)
     node["aspectRatio"] >> aspectRatio;
     node["zNear"] >> zNear;
     node["zFar"] >> zFar;
+    node["enableAutoExposure"] >> enableAutoExposure;
+    node["exposureCompensation"] >> exposureCompensation;
+    node["exposureValue"] >> exposureValue;
+    node["exposureValueMin"] >> exposureValueMin;
+    node["exposureValueMax"] >> exposureValueMax;
 }
 
 bool PerspectiveCamera::SetProperty(const std::string& name, const dm::float4& value)
@@ -1112,27 +1126,132 @@ void SceneGraph::Refresh(uint32_t frameIndex)
     }
 }
 
+// =============================================================================
+// EnvironmentLight (merged from ExtendedScene)
+// =============================================================================
+
+std::shared_ptr<SceneGraphLeaf> EnvironmentLight::Clone()
+{
+    auto copy = std::make_shared<EnvironmentLight>();
+    copy->color = color;
+    copy->radianceScale = radianceScale;
+    copy->textureIndex = textureIndex;
+    copy->rotation = rotation;
+    copy->path = path;
+    copy->LightLink = LightLink;
+    copy->Proxies = Proxies;
+    return std::static_pointer_cast<SceneGraphLeaf>(copy);
+}
+
+void EnvironmentLight::Load(const Json::Value& node)
+{
+    node["radianceScale"] >> radianceScale;
+    node["textureIndex"] >> textureIndex;
+    node["rotation"] >> rotation;
+    node["path"] >> path;
+}
+
+// =============================================================================
+// GaussianSplat (merged from ExtendedScene)
+// =============================================================================
+
+std::shared_ptr<SceneGraphLeaf> GaussianSplat::Clone()
+{
+    auto copy = std::make_shared<GaussianSplat>();
+    copy->path = path;
+    copy->resolvedPath = resolvedPath;
+    copy->convertRdfToRub = convertRdfToRub;
+    copy->enabled = enabled;
+    copy->loadedSplatCount = loadedSplatCount;
+    return copy;
+}
+
+void GaussianSplat::Load(const Json::Value& node)
+{
+    node["path"] >> path;
+    if (path.empty())
+        node["file"] >> path;
+    if (path.empty())
+        node["fileName"] >> path;
+    node["convertRdfToRub"] >> convertRdfToRub;
+    if (!node.isMember("convertRdfToRub") && node.isMember("convertRdfToDonut"))
+        node["convertRdfToDonut"] >> convertRdfToRub;
+    node["enabled"] >> enabled;
+}
+
+// =============================================================================
+// SampleSettings (merged from ExtendedScene)
+// =============================================================================
+
+std::shared_ptr<SceneGraphLeaf> SampleSettings::Clone()
+{
+    auto copy = std::make_shared<SampleSettings>();
+    copy->realtimeMode = realtimeMode;
+    copy->enableAnimations = enableAnimations;
+    copy->startingCamera = startingCamera;
+    copy->realtimeFireflyFilter = realtimeFireflyFilter;
+    copy->maxBounces = maxBounces;
+    copy->maxDiffuseBounces = maxDiffuseBounces;
+    copy->textureMIPBias = textureMIPBias;
+    return copy;
+}
+
+void SampleSettings::Load(const Json::Value& node)
+{
+    node["realtimeMode"] >> realtimeMode;
+    node["enableAnimations"] >> enableAnimations;
+    node["startingCamera"] >> startingCamera;
+    node["realtimeFireflyFilter"] >> realtimeFireflyFilter;
+    node["maxBounces"] >> maxBounces;
+    node["maxDiffuseBounces"] >> maxDiffuseBounces;
+    node["textureMIPBias"] >> textureMIPBias;
+}
+
+// =============================================================================
+// GameSettings (merged from ExtendedScene)
+// =============================================================================
+
+std::shared_ptr<SceneGraphLeaf> GameSettings::Clone()
+{
+    auto copy = std::make_shared<GameSettings>();
+    copy->jsonData = jsonData;
+    return copy;
+}
+
+void GameSettings::Load(const Json::Value& node)
+{
+    Json::StreamWriterBuilder writer;
+    jsonData = Json::writeString(writer, node);
+}
+
+// =============================================================================
+// SceneTypeFactory
+// =============================================================================
+
 std::shared_ptr<SceneGraphLeaf> SceneTypeFactory::CreateLeaf(const std::string& type)
 {
     if (type == "DirectionalLight")
-    {
         return std::make_shared<DirectionalLight>();
-    }
     if (type == "PointLight")
-    {
         return std::make_shared<PointLight>();
-    }
     if (type == "SpotLight")
-    {
         return std::make_shared<SpotLight>();
-    }
-    if (type == "PerspectiveCamera")
-    {
+    if (type == "EnvironmentLight")
+        return std::make_shared<EnvironmentLight>();
+    if (type == "PerspectiveCamera" || type == "PerspectiveCameraEx")
         return std::make_shared<PerspectiveCamera>();
-    }
     if (type == "OrthographicCamera")
-    {
         return std::make_shared<OrthographicCamera>();
+    if (type == "GaussianSplat" || type == "GaussianSplats" || type == "3DGaussianSplat")
+        return std::make_shared<GaussianSplat>();
+    if (type == "SampleSettings")
+        return std::make_shared<SampleSettings>();
+    if (type == "GameSettings")
+        return std::make_shared<GameSettings>();
+    if (type == "MaterialPatch")
+    {
+        // Legacy .scene.json files may reference MaterialPatch — no longer supported.
+        return nullptr;
     }
 
     return nullptr;

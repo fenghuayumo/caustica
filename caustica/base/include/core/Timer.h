@@ -35,4 +35,17 @@ namespace caustica
             return Seconds() * 1e3;
         }
     };
+
+// Simple FPS limiter — sleeps to keep frame rate near target.
+// Not intended for precise frame pacing, but useful for avoiding GPU overheating.
+class FPSLimiter
+{
+public:
+    void FramerateLimit(int fpsTarget);
+
+private:
+    std::chrono::high_resolution_clock::time_point m_lastTimestamp =
+        std::chrono::high_resolution_clock::now();
+    double m_prevError = 0.0;
+};
 }

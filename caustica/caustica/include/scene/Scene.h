@@ -28,6 +28,7 @@ namespace caustica
     class ThreadPool;
     class DescriptorTableManager;
     class GltfImporter;
+    class ObjImporter;
     
     class Scene
     {
@@ -38,6 +39,7 @@ namespace caustica
         std::shared_ptr<DescriptorTableManager> m_DescriptorTable;
         std::shared_ptr<SceneGraph> m_SceneGraph;
         std::shared_ptr<GltfImporter> m_GltfImporter;
+        std::shared_ptr<ObjImporter> m_ObjImporter;
         std::vector<SceneImportResult> m_Models;
         bool m_EnableBindlessResources = false;
         bool m_UseResourceDescriptorHeapBindless = false;
@@ -104,6 +106,10 @@ namespace caustica
         virtual nvrhi::BufferHandle CreateMaterialConstantBuffer(const std::string& debugName);
 
         virtual bool LoadCustomData(Json::Value& rootNode, ThreadPool* threadPool);
+
+        std::shared_ptr<class SampleSettings> m_loadedSettings;
+        std::shared_ptr<class GameSettings>   m_loadedGameSettings;
+
     public:
         virtual ~Scene() = default;
 
@@ -114,7 +120,7 @@ namespace caustica
             std::shared_ptr<TextureCache> textureCache,
             std::shared_ptr<DescriptorTableManager> descriptorTable,
             std::shared_ptr<SceneTypeFactory> sceneTypeFactory);
-        
+
         void FinishedLoading(uint32_t frameIndex);
 
         // Processes animations, transforms, bounding boxes etc.
@@ -142,6 +148,15 @@ namespace caustica
 
         // Can return nullptr if not yet created (by Scene::RefreshBuffers)
         GeometryData* GetGeometryData(const MeshGeometry& geometry) const;
+
+        // Post-load scene graph traversal for light proxy resolution and
+        // settings extraction (merged from ExtendedScene::ProcessNodesRecursive).
+        void ProcessNodesRecursive(std::shared_ptr<SceneGraphNode> node);
+
+        // --- Accessors merged from ExtendedScene ---
+        [[nodiscard]] std::shared_ptr<SampleSettings> GetSampleSettingsNode() const { return m_loadedSettings; }
+        [[nodiscard]] std::shared_ptr<GameSettings>   GetGameSettingsNode() const   { return m_loadedGameSettings; }
+        [[nodiscard]] const std::vector<SceneImportResult>& GetModels() const        { return m_Models; }
 
     };
 }

@@ -11,7 +11,7 @@
 
 #include "caustica.h"
 #include <SampleUI.h>
-#include <SampleCommon/ExtendedScene.h>
+#include <scene/Scene.h>
 #include <render/Passes/Lighting/MaterialsBaker.h>
 #include <render/Passes/Lighting/LightsBaker.h>
 #include <render/Passes/OMM/OmmBaker.h>

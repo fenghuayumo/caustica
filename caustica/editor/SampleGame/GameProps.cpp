@@ -8,9 +8,7 @@
 #include <scene/camera/Camera.h>
 #include <cmath>
 
-#include <SampleCommon/CommandLine.h>
-
-#include <SampleCommon/ExtendedScene.h>
+#include <core/command_line.h>
 
 #include <render/Passes/Debug/Korgi.h>
 #include <SampleCommon/SampleCommon.h>
@@ -31,7 +29,7 @@ using namespace game;
 PropBase::PropBase(GameScene& gameScene, const std::string & name)
     : m_gameScene(gameScene) 
 {
-    const std::shared_ptr<class ExtendedScene>& scene = gameScene.GetScene();
+    const std::shared_ptr<caustica::Scene>& scene = gameScene.GetScene();
     m_node = std::make_shared<SceneGraphNode>();
 
     m_node = scene->GetSceneGraph()->Attach(scene->GetSceneGraph()->GetRootNode(), m_node);

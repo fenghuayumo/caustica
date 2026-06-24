@@ -298,8 +298,7 @@ void ComputePipelineBaker::Update(bool forceReload)
 #if _WIN32
             if (!HelpersIsNonInteractive())
             {
-                extern HWND HelpersGetActiveWindow();
-                int result = MessageBoxA(HelpersGetActiveWindow(), firstError.c_str(),
+                int result = MessageBoxA((HWND)HelpersGetActiveWindow(), firstError.c_str(),
                     "Compute Shader Compile Error", MB_RETRYCANCEL | MB_ICONWARNING | MB_SETFOREGROUND | MB_TASKMODAL);
                 retry = result != IDCANCEL;
             }
