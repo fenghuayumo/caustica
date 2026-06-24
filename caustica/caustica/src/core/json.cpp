@@ -2,6 +2,8 @@
 #include <core/vfs/VFS.h>
 #include <core/log.h>
 #include <json/json-forwards.h>
+#include <fstream>
+#include <sstream>
 
 using namespace caustica::math;
 using namespace caustica;
@@ -373,3 +375,65 @@ void operator<<(Json::Value& node, const char* src)
 {
     node = src;
 }
+
+// --- File/string-based JSON I/O utilities (moved from SampleCommon) ---
+
+bool SaveToFile(const std::filesystem::path& filePath, const Json::Value& rootNode)
+{
+    std::ofstream outFile(filePath, std::ios::trunc);
+    if (!outFile.is_open())
+    {
+        caustica::error("Error saving json to file '%s'", filePath.string().c_str());
+        return false;
+    }
+    Json::StreamWriterBuilder builder;
+    std::unique_ptr<Json::StreamWriter> writer(builder.newStreamWriter());
+    writer->write(rootNode, &outFile);
+    outFile.close();
+    return true;
+}
+
+bool LoadFromFile(const std::filesystem::path& filePath, Json::Value& outRootNode)
+{
+    std::ifstream inFile;
+    inFile.open(filePath);
+    if (!inFile.is_open())
+    {
+        caustica::warning("Error loading json file '%s'", filePath.string().c_str());
+        return false;
+    }
+    try { inFile >> outRootNode; }
+    catch (const Json::RuntimeError& e)
+    { caustica::warning("Json::RuntimeError: %s", e.what()); return false; }
+    catch (const std::exception& e)
+    { caustica::warning("std::exception: %s", e.what()); return false; }
+    return true;
+}
+
+std::string ToString(const Json::Value& rootNode)
+{
+    Json::StreamWriterBuilder writer;
+    return Json::writeString(writer, rootNode);
+}
+
+bool FromString(const std::string& jsonData, Json::Value& outRootNode)
+{
+    Json::CharReaderBuilder readerBuilder;
+    std::string errs;
+    std::istringstream iss(jsonData);
+    return Json::parseFromStream(readerBuilder, iss, &outRootNode, &errs);
+}
+
+std::vector<std::string> ReadStringArray(const Json::Value& arr)
+{
+    std::vector<std::string> result;
+    if (arr.isArray())
+    {
+        result.reserve(arr.size());
+        for (const auto& v : arr)
+            result.push_back(v.asString());
+    }
+    return result;
+}
+
+} // namespace caustica::json
