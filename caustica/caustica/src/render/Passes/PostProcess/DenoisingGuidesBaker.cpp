@@ -16,7 +16,7 @@ using namespace caustica::math;
 
 #include <shaders/PathTracer/PathTracerDebug.hlsli>
 
-#include <SampleCommon/RenderTargets.h>
+#include <render/Core/RenderTargets.h>
 
 #include <shaders/SampleConstantBuffer.h>
 

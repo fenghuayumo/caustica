@@ -1,7 +1,7 @@
 #pragma once
 
 #include <memory>
-#include <SampleCommon/ComputePass.h>
+#include <render/Core/ComputePass.h>
 #include <math/math.h>
 #include <render/Core/BindingCache.h>
 

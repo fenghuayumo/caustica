@@ -34,7 +34,7 @@
 #include "SampleCommon/PTPipelineBaker.h"
 #include "SampleCommon/ComputePipelineBaker.h"
 
-#include "SampleCommon/AccelerationStructureUtil.h"
+#include "render/Core/AccelerationStructureUtil.h"
 
 #include <render/Passes/Lighting/Distant/EnvMapImportanceSamplingBaker.h>
 #include <render/Passes/Lighting/MaterialsBaker.h>

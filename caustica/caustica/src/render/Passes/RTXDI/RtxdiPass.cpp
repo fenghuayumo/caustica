@@ -14,7 +14,7 @@
 #include <shaders/render/RTXDI/ShaderParameters.h>
 #include <shaders/SampleConstantBuffer.h>
 
-#include <SampleCommon/RenderTargets.h>
+#include <render/Core/RenderTargets.h>
 
 using namespace caustica::math;
 using namespace caustica;

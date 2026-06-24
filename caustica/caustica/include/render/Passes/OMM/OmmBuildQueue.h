@@ -2,7 +2,7 @@
 
 #include <scene/SceneTypes.h>
 #include <assets/cache/TextureCache.h>
-#include <SampleCommon/AccelerationStructureUtil.h>
+#include <render/Core/AccelerationStructureUtil.h>
 
 #include <rhi/nvrhi.h>
 #include <omm-gpu-nvrhi.h>

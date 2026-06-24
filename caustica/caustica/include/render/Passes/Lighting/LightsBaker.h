@@ -11,7 +11,7 @@
 #define NEEAT_BAKER_ONLY 1
 #include <shaders/PathTracer/Lighting/LightingTypes.hlsli>
 
-#include <SampleCommon/ComputePass.h>
+#include <render/Core/ComputePass.h>
 
 #include <shaders/SubInstanceData.h>
 #include <render/Passes/Gaussian/GaussianSplatEmissionProxy.h>

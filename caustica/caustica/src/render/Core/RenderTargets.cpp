@@ -2,7 +2,7 @@
 
 #include <shaders/PathTracer/Config.h>
 
-#include "RenderTargets.h"
+#include <render/Core/RenderTargets.h>
 
 #include <render/Core/FramebufferFactory.h>
 

@@ -10,7 +10,7 @@
 #include <math/math.h>
 #include <scene/SceneTypes.h>
 
-#include <SampleCommon/ComputePass.h>
+#include <render/Core/ComputePass.h>
 #include <shaders/SubInstanceData.h>
 #include <shaders/PathTracer/Materials/MaterialPT.h>
 

@@ -25,7 +25,7 @@
 #include <engine/StreamlineInterface.h>
 #endif
 
-#include "SampleCommon/RenderTargets.h"
+#include "render/Core/RenderTargets.h"
 #include <render/Passes/PostProcess/PostProcess.h>
 #include <shaders/SampleConstantBuffer.h>
 #include <render/Passes/PostProcess/AccumulationPass.h>

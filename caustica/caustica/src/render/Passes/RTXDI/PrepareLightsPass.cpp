@@ -16,7 +16,7 @@ using namespace caustica::math;
 #include <shaders/render/RTXDI/ShaderParameters.h>
 #include <render/Passes/Lighting/Distant/EnvMapBaker.h>
 #include <render/Passes/Lighting/Distant/EnvMapImportanceSamplingBaker.h>
-#include <SampleCommon/RenderTargets.h>
+#include <render/Core/RenderTargets.h>
 
 #include <render/Passes/Debug/ShaderDebug.h>
 

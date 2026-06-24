@@ -4,7 +4,7 @@
 
 static_assert(NRD_VERSION_MAJOR >= 4 && NRD_VERSION_MINOR >= 15, "Unsupported NRD version!");
 
-#include <SampleCommon/RenderTargets.h>
+#include <render/Core/RenderTargets.h>
 #include <rhi/utils.h>
 #include <math/math.h>
 #include <render/Core/View.h>

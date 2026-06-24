@@ -1,4 +1,4 @@
-#include "ComputePass.h"
+#include <render/Core/ComputePass.h>
 
 #include <assets/loader/ShaderFactory.h>
 #include <math/math.h>

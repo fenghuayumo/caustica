@@ -1,7 +1,7 @@
 #include <render/Passes/Gaussian/GaussianSplatPass.h>
 
 #include <render/GPUSort/GPUSort.h>
-#include <SampleCommon/RenderTargets.h>
+#include <render/Core/RenderTargets.h>
 
 #include <core/log.h>
 #include <render/Core/FramebufferFactory.h>

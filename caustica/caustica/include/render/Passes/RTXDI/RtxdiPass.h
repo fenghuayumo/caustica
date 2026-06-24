@@ -6,7 +6,7 @@
 #include <unordered_map>
 #include <vector>
 #include <rtxdi/ImportanceSamplingContext.h>
-#include <SampleCommon/ComputePass.h>
+#include <render/Core/ComputePass.h>
 #include "RayTracingPass.h"
 #include "RtxdiResources.h"
 #include "RtxdiApplicationSettings.h"
