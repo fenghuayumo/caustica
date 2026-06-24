@@ -11,6 +11,7 @@
 #include <core/vfs/VFS.h>
 #include <render/BloomPass.h>
 #include <scene/camera/Camera.h>
+#include <engine/SceneManager.h>
 #include <render/CommonRenderPasses.h>
 #if CAUSTICA_WITH_NATIVE_DLSS
 #include <render/DLSS.h>
@@ -305,6 +306,9 @@ private:
     const GaussianSplatSceneObject*             GetPrimaryGaussianSplatObject() const;
 
     std::shared_ptr<caustica::RootFileSystem> m_RootFS;
+
+    // Scene management helper (queries, discovery)
+    std::unique_ptr<SceneManager>               m_sceneManager;
 
     // scene
     std::vector<std::string>                    m_sceneFilesAvailable;

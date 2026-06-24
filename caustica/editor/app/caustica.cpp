@@ -447,6 +447,13 @@ void Sample::Init(const std::string& preferredScene,
     auto nativeFS = std::make_shared<caustica::NativeFileSystem>();
     m_TextureCache = std::make_shared<caustica::TextureCache>(device, nativeFS, m_DescriptorTable);
 
+    m_sceneManager = std::make_unique<SceneManager>(
+        *GetGpuDevice(), *m_shaderFactory, m_TextureCache, m_DescriptorTable);
+
+    // Create SceneManager for scene discovery and queries
+    m_sceneManager = std::make_unique<SceneManager>(
+        *GetGpuDevice(), *m_shaderFactory, m_TextureCache, m_DescriptorTable);
+
     memset( &m_feedbackData, 0, sizeof(DebugFeedbackStruct) * 1 );
     memset( &m_debugDeltaPathTree, 0, sizeof(DeltaTreeVizPathVertex) * cDeltaTreeVizMaxVertices );
 
@@ -561,22 +568,9 @@ void Sample::Init(const std::string& preferredScene,
     if(device->queryFeatureSupport(nvrhi::Feature::RayTracingOpacityMicromap))
         m_ommBaker = std::make_shared<OmmBaker>(device, m_DescriptorTable, m_TextureCache, m_shaderFactory);
 
-    // Get all scenes in "assets" folder
-    const std::string mediaExt = ".scene.json";
-    const std::string jsonExt = ".json";
-    const std::filesystem::path assetsPath = GetLocalPath(c_AssetsFolder);
-    if (std::filesystem::exists(assetsPath) && std::filesystem::is_directory(assetsPath))
-    {
-        for (const auto& file : std::filesystem::directory_iterator(assetsPath))
-        {
-            if (!file.is_regular_file()) continue;
-            std::string fileName = file.path().filename().string();
-            std::string longExt = (fileName.size()<=mediaExt.length())?(""):(fileName.substr(fileName.length()-mediaExt.length()));
-            std::string shortExt = (fileName.size() <= jsonExt.length()) ? ("") : (fileName.substr(fileName.length() - jsonExt.length()));
-            if ( longExt == mediaExt || shortExt == jsonExt )
-                m_sceneFilesAvailable.push_back( file.path().filename().string() );
-        }
-    }
+    // Get all scenes in "assets" folder — delegated to SceneManager
+    m_sceneManager->discoverAvailableScenes(GetLocalPath(c_AssetsFolder));
+    m_sceneFilesAvailable = m_sceneManager->getAvailableScenes();
 
     std::string scene;
     if (LooksLikeInlineSceneJson(preferredScene))
@@ -1046,52 +1040,14 @@ void Sample::CollectUncompressedTextures()
         listUncompressedTextureIfNeeded(textureIT.second.Loaded, textureIT.second.NormalMap);
 }
 
-static bool IsEnvironmentMapMediaFile(const std::filesystem::path& path)
-{
-    if (!path.has_filename())
-        return false;
-    const std::string ext = path.extension().string();
-    return ext == ".exr" || ext == ".hdr" || ext == ".dds";
-}
-
-static void AppendEnvironmentMapsFromFolder(
-    const std::filesystem::path& folder,
-    std::vector<std::filesystem::path>& outList)
-{
-    if (folder.empty() || !std::filesystem::exists(folder))
-        return;
-
-    for (const auto& file : std::filesystem::directory_iterator(folder))
-    {
-        if (!file.is_regular_file() || !IsEnvironmentMapMediaFile(file.path()))
-            continue;
-
-        const std::filesystem::path absolutePath = std::filesystem::absolute(file.path());
-        if (std::find(outList.begin(), outList.end(), absolutePath) == outList.end())
-            outList.push_back(absolutePath);
-    }
-}
-
 void Sample::RefreshEnvironmentMapMediaList()
 {
-    m_envMapMediaList.clear();
-
-    std::filesystem::path sceneDirectory;
-    if (!m_currentScenePath.empty() && m_currentScenePath != std::filesystem::path(c_InlineSceneSentinel))
-        sceneDirectory = m_currentScenePath.parent_path();
-
-    const std::filesystem::path assetsRoot = GetLocalPath(c_AssetsFolder);
-    const std::filesystem::path sceneEnvFolder = sceneDirectory / c_EnvMapSubFolder;
-    const std::filesystem::path assetsEnvFolder = assetsRoot / c_EnvMapSubFolder;
-
-    // Runtime Assets/ first, then scene JSON directory (same as texture / EnvironmentLight.path).
-    AppendEnvironmentMapsFromFolder(assetsEnvFolder, m_envMapMediaList);
-    AppendEnvironmentMapsFromFolder(sceneEnvFolder, m_envMapMediaList);
-
-    if (std::filesystem::exists(assetsEnvFolder))
-        m_envMapMediaFolder = assetsEnvFolder;
-    else
-        m_envMapMediaFolder = sceneEnvFolder;
+    SceneManager::refreshEnvironmentMapMediaList(
+        GetLocalPath(c_AssetsFolder),
+        c_EnvMapSubFolder,
+        m_currentScenePath,
+        m_envMapMediaList,
+        m_envMapMediaFolder);
 }
 
 void Sample::SceneLoaded( )
@@ -3471,23 +3427,12 @@ void Sample::RecreateBindingSet()
 
 std::shared_ptr<caustica::Material> Sample::FindMaterial(int materialID) const
 {
-    // if slow switch to map
-    for (const auto& material : m_scene->GetSceneGraph()->GetMaterials())
-        if (material->materialID == materialID)
-            return material;
-    return nullptr;
+    return SceneManager::findMaterial(m_scene, materialID);
 }
 
 std::shared_ptr<caustica::SceneGraphNode> Sample::FindNodeByInstanceIndex(int instanceIndex) const
 {
-    if (!m_scene || instanceIndex < 0)
-        return nullptr;
-
-    const auto& instances = m_scene->GetSceneGraph()->GetMeshInstances();
-    if (instanceIndex >= static_cast<int>(instances.size()))
-        return nullptr;
-
-    return instances[instanceIndex]->GetNodeSharedPtr();
+    return SceneManager::findNodeByInstanceIndex(m_scene, instanceIndex);
 }
 
 namespace
