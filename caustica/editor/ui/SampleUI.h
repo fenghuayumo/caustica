@@ -508,6 +508,8 @@ extern SampleUIData g_sampleUIData;
 
 void InitializeSampleUIDataFromCommandLine(SampleUIData& ui, const struct CommandLineOptions& cmdLine);
 
+class ImGuiManager;
+
 class SampleUI : public caustica::ImGui_Renderer
 {
 public:
@@ -548,6 +550,8 @@ private:
 
     std::unique_ptr<caustica::ImGui_Console> m_console;
     std::shared_ptr<caustica::Light> m_SelectedLight;
+
+    std::unique_ptr<ImGuiManager> m_imguiManager;
 
     SampleUIData& m_ui;
     nvrhi::CommandListHandle m_commandList;

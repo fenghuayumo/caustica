@@ -1,4 +1,5 @@
 #include "caustica.h"
+#include "SampleCommon/ImGuiManager.h"
 #include "SampleCommon/SampleBaseApp.h"
 
 #include <inttypes.h>
@@ -619,29 +620,19 @@ SampleUI::SampleUI(GpuDevice* deviceManager, SampleBaseApp & baseApp, Sample& ap
 {
     m_commandList = GetDevice()->createCommandList();
 
-    auto nativeFS = std::make_shared<caustica::NativeFileSystem>(); // *(app.GetRootFs())
-
-    // // auto fontPath = GetLocalPath(c_AssetsFolder) / "fonts/OpenSans/OpenSans-Regular.ttf";
-    auto fontPath = GetLocalPath(c_AssetsFolder) / "fonts/DroidSans/DroidSans-Mono.ttf";
-    // float baseFontSize = 15.0f;
-    // 
-    m_defaultFont = this->CreateFontFromFile(*nativeFS, GetLocalPath(c_AssetsFolder) / "fonts/DroidSans/DroidSans-Mono.ttf", 16.0f);
-
-    ImGui::GetIO().IniFilename = nullptr;
+    // ImGui lifecycle management (fonts, context config, extensions)
+    m_imguiManager = std::make_unique<ImGuiManager>(m_ui, cmdLine, NVAPI_SERSupported);
+    m_imguiManager->loadDefaultFont(*this, GetLocalPath(c_AssetsFolder));
 
     // Choose which, if any, hit object extension we can use
-#if CAUSTICA_D3D_AGILITY_SDK_VERSION >= 619
-    m_ui.DXHitObjectExtension = (GetDevice()->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D12);   // 6.9 support guarantees SER
-    m_ui.NVAPIHitObjectExtension &= !m_ui.DXHitObjectExtension && NVAPI_SERSupported;
-#else
-    m_ui.NVAPIHitObjectExtension &= NVAPI_SERSupported;  // no need to check for or attempt using HitObjectExtension if SER not supported
-#endif
+    m_imguiManager->configureExtensions((int)GetDevice()->getGraphicsAPI());
 
+    // Apply command-line overrides to UI defaults
+    m_imguiManager->applyCommandLineDefaults();
 
 #if ENABLE_DEBUG_DELTA_TREE_VIZUALISATION
     m_ImNodesContext = ImNodes::Ez::CreateContext();
 #endif
-    InitializeSampleUIDataFromCommandLine(m_ui, cmdLine);
 }
 
 SampleUI::~SampleUI()
