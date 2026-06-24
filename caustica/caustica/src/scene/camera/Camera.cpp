@@ -1,7 +1,7 @@
 #include <cassert>
 #include <scene/camera/Camera.h>
 #include <scene/SceneGraph.h>
-#include <render/View.h>
+#include <render/Core/View.h>
 
 using namespace caustica::math;
 using namespace caustica;

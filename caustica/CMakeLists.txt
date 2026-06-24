@@ -7,27 +7,7 @@ list(FILTER shared_sources EXCLUDE REGEX "/editor/")
 list(FILTER shared_sources EXCLUDE REGEX "/Python/")
 list(FILTER shared_sources EXCLUDE REGEX "/source/")
 
-set(caustica_render_module_sources "")
-foreach(caustica_render_module
-    GPUSort
-    Lighting
-    Materials
-    Misc
-    NRD
-    OpacityMicroMap
-    ProcessingPasses
-    RTXDI
-    ToneMapper
-)
-    file(GLOB_RECURSE caustica_render_module_files
-        "${CMAKE_CURRENT_SOURCE_DIR}/caustica/include/render/${caustica_render_module}/*.h"
-        "${CMAKE_CURRENT_SOURCE_DIR}/caustica/include/render/${caustica_render_module}/*.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/caustica/src/render/${caustica_render_module}/*.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/caustica/src/render/${caustica_render_module}/*.c"
-    )
-    list(APPEND caustica_render_module_sources ${caustica_render_module_files})
-endforeach()
-list(APPEND shared_sources ${caustica_render_module_sources})
+# All render module sources are now in causticaEngine (see caustica/caustica/CMakeLists.txt)
 
 file(GLOB caustica_python_sources
     "${CMAKE_CURRENT_SOURCE_DIR}/Python/*.cpp"

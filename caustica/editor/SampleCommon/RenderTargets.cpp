@@ -4,7 +4,7 @@
 
 #include "RenderTargets.h"
 
-#include <render/FramebufferFactory.h>
+#include <render/Core/FramebufferFactory.h>
 
 #include <math/math.h>
 using namespace caustica::math;

@@ -1,6 +1,6 @@
 #include <assets/cache/TextureCache.h>
 
-#include <render/CommonRenderPasses.h>
+#include <render/Core/CommonRenderPasses.h>
 #include <engine/ConsoleObjects.h>
 #include <assets/loader/DDSFile.h>
 #include <core/ThreadPool.h>

@@ -10,7 +10,7 @@
 
 #include "caustica.h"
 
-#include <render/Misc/Korgi.h>
+#include <render/Passes/Debug/Korgi.h>
 #include <json/json.h>
 
 using namespace caustica::math;

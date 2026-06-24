@@ -1,0 +1,552 @@
+#include <render/Passes/OMM/OmmBuildQueue.h>
+
+#include <math/math.h>
+#include <core/vfs/VFS.h>
+#include <assets/loader/ShaderFactory.h>
+#include <rhi/common/misc.h>
+#include <rhi/utils.h>
+#include <render/Passes/Lighting/MaterialsBaker.h>
+#include <render/Passes/OMM/OmmBaker.h>
+
+namespace
+{
+    static omm::GpuBakeNvrhi::Input GetBakeInput(omm::GpuBakeNvrhi::Operation op, const caustica::MeshInfo& mesh, const OmmBuildQueue::BuildInput::Geometry& geometry)
+    {
+
+        using namespace caustica::math;
+
+        const caustica::MeshGeometry* meshGeometry = mesh.geometries[geometry.geometryIndexInMesh].get();
+
+        const uint32_t indexOffset = mesh.indexOffset + meshGeometry->indexOffsetInMesh;
+        const uint32_t vertexOffset = (mesh.vertexOffset + meshGeometry->vertexOffsetInMesh);
+
+        PTMaterial & materialPT = *PTMaterial::SafeCast(meshGeometry->material);
+
+        omm::GpuBakeNvrhi::Input params;
+        params.operation = op;
+        params.alphaTexture = materialPT.BaseTexture.Loaded->texture;
+        params.alphaCutoff = materialPT.AlphaCutoff;
+        params.alphaCutoffGreater = geometry.alphaCutoffGT;
+        params.alphaCutoffLessEqual = geometry.alphaCutoffLE;
+        params.bilinearFilter = true;
+        params.enableLevelLineIntersection = geometry.enableLevelLineIntersection;
+        params.sampleMode = nvrhi::SamplerAddressMode::Wrap;
+        params.indexBuffer = mesh.buffers->indexBuffer;
+        params.texCoordBuffer = mesh.buffers->vertexBuffer;
+        params.texCoordBufferOffsetInBytes = (uint)(vertexOffset * sizeof(float2) + mesh.buffers->getVertexBufferRange(caustica::VertexAttribute::TexCoord1).byteOffset);
+        params.texCoordStrideInBytes = sizeof(float2);
+        params.indexBufferOffsetInBytes = size_t(indexOffset) * sizeof(uint32_t);
+        params.numIndices = meshGeometry->numIndices;
+        params.maxSubdivisionLevel = geometry.maxSubdivisionLevel;
+        params.dynamicSubdivisionScale = geometry.dynamicSubdivisionScale;
+        params.format = geometry.format;
+        params.minimalMemoryMode = false;
+        params.enableStats = true;
+        params.force32BitIndices = geometry.force32BitIndices;
+        params.enableSpecialIndices = geometry.enableSpecialIndices;
+        params.computeOnly = geometry.computeOnly;
+        params.enableNsightDebugMode = geometry.enableNsightDebugMode;
+        params.enableTexCoordDeduplication = geometry.enableTexCoordDeduplication;
+        params.maxOutOmmArraySize = geometry.maxOmmArrayDataSizeInMB << 20;
+        
+        return params;
+    }
+
+    enum class BufferConfig
+    {
+        RawUAV,
+        RawUAVAndASBuildInput,
+        Readback
+    };
+
+    static nvrhi::BufferHandle AllocateBuffer(nvrhi::DeviceHandle device, const char* name, size_t byteSize, BufferConfig cfg)
+    {
+        nvrhi::BufferDesc desc;
+        desc.byteSize = byteSize;
+        desc.debugName = name;
+        desc.format = nvrhi::Format::R32_UINT;
+        if (cfg == BufferConfig::RawUAV)
+        {
+            desc.canHaveUAVs = true;
+            desc.canHaveRawViews = true;
+        }
+        else if (cfg == BufferConfig::RawUAVAndASBuildInput)
+        {
+            desc.canHaveUAVs = true;
+            desc.canHaveRawViews = true;
+            desc.isAccelStructBuildInput = true;
+        }
+        else
+        {
+            desc.canHaveUAVs = false;
+            desc.cpuAccess = nvrhi::CpuAccessMode::Read;
+        }
+        return device->createBuffer(desc);
+    }
+
+    static nvrhi::rt::OpacityMicromapDesc GetOpacityMicromapDesc(
+        nvrhi::BufferHandle ommArrayBuffer,
+        size_t ommArrayBufferOffset,
+        nvrhi::BufferHandle ommDescBuffer,
+        size_t ommDescBufferOffset,
+        const std::vector<nvrhi::rt::OpacityMicromapUsageCount>& usageDescs,
+        nvrhi::rt::OpacityMicromapBuildFlags flags)
+    {
+        nvrhi::rt::OpacityMicromapDesc desc;
+        desc.debugName = "OmmArray";
+        desc.flags = flags;
+        desc.counts = usageDescs;
+        desc.inputBuffer = ommArrayBuffer;
+        desc.inputBufferOffset = ommArrayBufferOffset;
+        desc.perOmmDescs = ommDescBuffer;
+        desc.perOmmDescsOffset = ommDescBufferOffset;
+        return desc;
+    }
+
+    struct LinearBufferAllocator
+    {
+        LinearBufferAllocator()
+        {
+        }
+
+        size_t Allocate(size_t sizeInBytes, size_t alignment)
+        {
+            m_offset = nvrhi::align(m_offset, alignment);
+            size_t offset = m_offset;
+            m_offset += sizeInBytes;
+            return offset;
+        }
+
+        nvrhi::BufferHandle CreateBuffer(nvrhi::DeviceHandle device, const char* name, BufferConfig config)
+        {
+            if (m_offset == 0)
+                return nullptr;
+
+            nvrhi::BufferHandle handle = AllocateBuffer(device, name, m_offset, config);
+            m_offset = 0;
+            return handle;
+        }
+
+    private:
+        size_t m_offset = 0;
+    };
+}
+
+OmmBuildQueue::OmmBuildQueue(
+    nvrhi::DeviceHandle& device, 
+    std::shared_ptr<caustica::DescriptorTableManager> descriptorTable, 
+    std::shared_ptr<caustica::ShaderFactory> shaderFactory)
+    : m_device(device)
+    , m_descriptorTable(std::move(descriptorTable))
+    , m_shaderFactory(std::move(shaderFactory))
+{
+    omm::GpuBakeNvrhi::ShaderProvider provider;
+
+    provider.bindingOffsets = nvrhi::VulkanBindingOffsets { .shaderResource = 200, .sampler = 100, .constantBuffer = 300, .unorderedAccess = 400 };
+    //provider.bindingOffsets = nvrhi::VulkanBindingOffsets { .shaderResource = UINT_MAX, .sampler = UINT_MAX, .constantBuffer = UINT_MAX, .unorderedAccess = UINT_MAX }; <- if MR gets accepted
+
+    provider.shaders = [this](nvrhi::ShaderType type, const char* shaderName, const char* shaderEntryName)->nvrhi::ShaderHandle
+    {
+        std::vector<caustica::ShaderMacro> defines = { caustica::ShaderMacro("COMPILER_DXC", "1") };
+        std::string shaderNameStr = std::string("omm/Omm/libraries/omm-lib/shaders/") + shaderName;
+        return m_shaderFactory->CreateShader(shaderNameStr.c_str(), shaderEntryName, &defines, type);
+    };
+
+    omm::GpuBakeNvrhi::MessageCallback messageCb = [](omm::MessageSeverity severity, const char* message) {
+        caustica::info("[OMM SDK]: %d %s", severity, message);
+    };
+
+    // Intialize the the internal baker, which records some buffer updates into a command list
+    nvrhi::CommandListHandle initCommandList = m_device->createCommandList();
+    initCommandList->open();
+    m_baker = std::make_unique<omm::GpuBakeNvrhi>(m_device, initCommandList, false /*debug*/, &provider, messageCb);
+
+    // Submit baker init command list
+    initCommandList->close();
+    m_device->executeCommandList(initCommandList);
+    // TODO: Do we really need to wait for device iddle here, or can we just subscribe a query to ensure resources are up by the time we use them?
+    m_device->waitForIdle();
+}
+
+OmmBuildQueue::~OmmBuildQueue()
+{
+}
+
+void OmmBuildQueue::RunSetup(nvrhi::ICommandList& commandList, BuildTask& task)
+{
+    assert(task.state == BuildState::None);
+
+    std::shared_ptr < caustica::MeshInfo > mesh = task.input.mesh;
+
+    LinearBufferAllocator ommIndexBufferAllocator;
+    LinearBufferAllocator ommDescBufferAllocator;
+    LinearBufferAllocator ommDescArrayHistogramBufferAllocator;
+    LinearBufferAllocator ommIndexArrayHistogramBufferAllocator;
+    LinearBufferAllocator ommPostBuildInfoBufferAllocator;
+    LinearBufferAllocator ommReadbackBufferAllocator;
+
+    std::vector<BufferInfo>& bufferInfos = task.bufferInfos;
+
+    for (const OmmBuildQueue::BuildInput::Geometry& geom : task.input.geometries)
+    {
+        omm::GpuBakeNvrhi::Input input = GetBakeInput(omm::GpuBakeNvrhi::Operation::Setup, *mesh.get(), geom);
+
+        omm::GpuBakeNvrhi::PreDispatchInfo setupInfo;
+        m_baker->GetPreDispatchInfo(input, setupInfo);
+
+        BufferInfo info;
+        info.ommIndexFormat                         = setupInfo.ommIndexFormat;
+        info.ommIndexCount                          = setupInfo.ommIndexCount;
+        info.ommIndexOffset                         = ommIndexBufferAllocator.Allocate(setupInfo.ommIndexBufferSize, 256);
+        info.ommDescArrayOffset                     = ommDescBufferAllocator.Allocate(setupInfo.ommDescBufferSize, 256);
+        info.ommDescArrayHistogramOffset            = ommDescArrayHistogramBufferAllocator.Allocate(setupInfo.ommDescArrayHistogramSize, 256);
+        info.ommDescArrayHistogramSize              = setupInfo.ommDescArrayHistogramSize;
+        info.ommDescArrayHistogramReadbackOffset    = ommReadbackBufferAllocator.Allocate(setupInfo.ommDescArrayHistogramSize, 256);
+        info.ommIndexHistogramOffset                = ommIndexArrayHistogramBufferAllocator.Allocate(setupInfo.ommIndexHistogramSize, 256);
+        info.ommIndexHistogramSize                  = setupInfo.ommIndexHistogramSize;
+        info.ommIndexHistogramReadbackOffset        = ommReadbackBufferAllocator.Allocate(setupInfo.ommIndexHistogramSize, 256);
+        info.ommPostDispatchInfoOffset              = ommPostBuildInfoBufferAllocator.Allocate(setupInfo.ommPostDispatchInfoBufferSize, 256);
+        info.ommPostDispatchInfoReadbackOffset      = ommReadbackBufferAllocator.Allocate(setupInfo.ommPostDispatchInfoBufferSize, 256);
+        info.ommArrayDataOffset                     = 0xFFFFFFFF; // Not yet known
+
+        bufferInfos.push_back(info);
+    }
+
+    Buffers& buffers = task.buffers;
+    buffers.ommIndexBuffer                  = ommIndexBufferAllocator.CreateBuffer(m_device, "OmmIndexBuffer", BufferConfig::RawUAVAndASBuildInput);
+    buffers.ommDescBuffer                   = ommDescBufferAllocator.CreateBuffer(m_device, "OmmDescBuffer", BufferConfig::RawUAVAndASBuildInput);
+    buffers.ommDescArrayHistogramBuffer     = ommDescArrayHistogramBufferAllocator.CreateBuffer(m_device, "OmmDescArrayHistogramBuffer", BufferConfig::RawUAV);
+    buffers.ommIndexArrayHistogramBuffer    = ommIndexArrayHistogramBufferAllocator.CreateBuffer(m_device, "OmmIndexArrayHistogramBuffer", BufferConfig::RawUAV);
+    buffers.ommPostDispatchInfoBuffer       = ommPostBuildInfoBufferAllocator.CreateBuffer(m_device, "OmmPostBuildInfoBuffer", BufferConfig::RawUAV);
+    buffers.ommReadbackBuffer               = ommReadbackBufferAllocator.CreateBuffer(m_device, "OmmGenericReadbackBuffer", BufferConfig::Readback);
+
+    commandList.beginTrackingBufferState(buffers.ommIndexBuffer, nvrhi::ResourceStates::Common);
+    commandList.beginTrackingBufferState(buffers.ommDescBuffer, nvrhi::ResourceStates::Common);
+    commandList.beginTrackingBufferState(buffers.ommDescArrayHistogramBuffer, nvrhi::ResourceStates::Common);
+    commandList.beginTrackingBufferState(buffers.ommIndexArrayHistogramBuffer, nvrhi::ResourceStates::Common);
+    commandList.beginTrackingBufferState(buffers.ommPostDispatchInfoBuffer, nvrhi::ResourceStates::Common);
+    commandList.beginTrackingBufferState(buffers.ommReadbackBuffer, nvrhi::ResourceStates::Common);
+
+    // Dispatch all setup tasks.
+    for (uint32_t i = 0; i < task.input.geometries.size(); ++i)
+    {
+        const BufferInfo& bufferInfo = bufferInfos[i];
+        const OmmBuildQueue::BuildInput::Geometry& geom = task.input.geometries[i];
+
+        omm::GpuBakeNvrhi::Input input              = GetBakeInput(omm::GpuBakeNvrhi::Operation::Setup, *mesh.get(), geom);
+
+        omm::GpuBakeNvrhi::Buffers output;
+        output.ommDescBuffer                        = buffers.ommDescBuffer;
+        output.ommDescBufferOffset                  = (uint32_t)bufferInfo.ommDescArrayOffset;
+        output.ommIndexBuffer                       = buffers.ommIndexBuffer;
+        output.ommIndexBufferOffset                 = (uint32_t)bufferInfo.ommIndexOffset;
+        output.ommDescArrayHistogramBuffer          = buffers.ommDescArrayHistogramBuffer;
+        output.ommDescArrayHistogramBufferOffset    = (uint32_t)bufferInfo.ommDescArrayHistogramOffset;
+        output.ommIndexHistogramBuffer              = buffers.ommIndexArrayHistogramBuffer;
+        output.ommIndexHistogramBufferOffset        = (uint32_t)bufferInfo.ommIndexHistogramOffset;
+        output.ommPostDispatchInfoBuffer            = buffers.ommPostDispatchInfoBuffer;
+        output.ommPostDispatchInfoBufferOffset      = (uint32_t)bufferInfo.ommPostDispatchInfoOffset;
+
+        m_baker->Dispatch(&commandList, input, output);
+
+        omm::GpuBakeNvrhi::PreDispatchInfo setupInfo;
+        m_baker->GetPreDispatchInfo(input, setupInfo);
+
+        commandList.copyBuffer(buffers.ommReadbackBuffer, bufferInfo.ommDescArrayHistogramReadbackOffset,  buffers.ommDescArrayHistogramBuffer,  bufferInfo.ommDescArrayHistogramOffset,      setupInfo.ommDescArrayHistogramSize);
+        commandList.copyBuffer(buffers.ommReadbackBuffer, bufferInfo.ommIndexHistogramReadbackOffset,  buffers.ommIndexArrayHistogramBuffer, bufferInfo.ommIndexHistogramOffset, setupInfo.ommIndexHistogramSize);
+        commandList.copyBuffer(buffers.ommReadbackBuffer, bufferInfo.ommPostDispatchInfoReadbackOffset,   buffers.ommPostDispatchInfoBuffer,       bufferInfo.ommPostDispatchInfoOffset,  setupInfo.ommPostDispatchInfoBufferSize);
+    }
+
+    task.state = BuildState::Setup;
+}
+
+void OmmBuildQueue::AllocateOMMArrayDataBuffer(BuildTask& task)
+{
+    LinearBufferAllocator ommArrayDataBufferAllocator;
+    
+    void* pReadbackData = m_device->mapBuffer(task.buffers.ommReadbackBuffer, nvrhi::CpuAccessMode::Read);
+    for (uint32_t i = 0; i < task.input.geometries.size(); ++i)
+    {
+        BufferInfo& bufferInfo = task.bufferInfos[i];
+            
+        m_baker->ReadUsageDescBuffer((uint8_t*)pReadbackData + bufferInfo.ommDescArrayHistogramReadbackOffset, bufferInfo.ommDescArrayHistogramSize, bufferInfo.ommArrayHistogram);
+            
+        m_baker->ReadUsageDescBuffer((uint8_t*)pReadbackData + bufferInfo.ommIndexHistogramReadbackOffset, bufferInfo.ommIndexHistogramSize, bufferInfo.ommIndexHistogram);
+
+        omm::GpuBakeNvrhi::PostDispatchInfo postDispatchInfo;
+        m_baker->ReadPostDispatchInfo((uint8_t*)pReadbackData + bufferInfo.ommPostDispatchInfoReadbackOffset, sizeof(postDispatchInfo), postDispatchInfo);
+        size_t ommArrayDataOffset = ommArrayDataBufferAllocator.Allocate(postDispatchInfo.ommArrayBufferSize, 256);
+
+        if ((ommArrayDataOffset) > std::numeric_limits<uint32_t>::max())
+        {
+            assert(false && "OH OH. Exceeding 4gb of ommArrayData");
+        }
+
+        bufferInfo.ommArrayDataOffset = (uint32_t)ommArrayDataOffset;
+    }
+    m_device->unmapBuffer(task.buffers.ommReadbackBuffer);
+
+    task.buffers.ommArrayDataBuffer = ommArrayDataBufferAllocator.CreateBuffer(m_device, "OmmArrayBuffer", BufferConfig::RawUAVAndASBuildInput);
+}
+
+void OmmBuildQueue::BakeOmmArrayData(nvrhi::ICommandList& commandList, BuildTask& task)
+{
+    commandList.beginTrackingBufferState(task.buffers.ommIndexBuffer, nvrhi::ResourceStates::Common);
+    commandList.beginTrackingBufferState(task.buffers.ommDescBuffer, nvrhi::ResourceStates::Common);
+    commandList.beginTrackingBufferState(task.buffers.ommDescArrayHistogramBuffer, nvrhi::ResourceStates::Common);
+    commandList.beginTrackingBufferState(task.buffers.ommIndexArrayHistogramBuffer, nvrhi::ResourceStates::Common);
+    commandList.beginTrackingBufferState(task.buffers.ommPostDispatchInfoBuffer, nvrhi::ResourceStates::Common);
+    commandList.beginTrackingBufferState(task.buffers.ommArrayDataBuffer, nvrhi::ResourceStates::Common);
+
+    commandList.clearBufferUInt(task.buffers.ommArrayDataBuffer, 0);
+
+    std::shared_ptr < caustica::MeshInfo > mesh = task.input.mesh;
+
+    for (uint32_t i = 0; i < task.input.geometries.size(); ++i)
+    {
+        const BufferInfo& bufferInfo = task.bufferInfos[i];
+        const OmmBuildQueue::BuildInput::Geometry& geom = task.input.geometries[i];
+
+        omm::GpuBakeNvrhi::Input input = GetBakeInput(omm::GpuBakeNvrhi::Operation::Bake, *mesh.get(), geom);
+
+        omm::GpuBakeNvrhi::Buffers output;
+        output.ommArrayBuffer = task.buffers.ommArrayDataBuffer;
+        output.ommArrayBufferOffset = (uint32_t)bufferInfo.ommArrayDataOffset;
+        output.ommDescBuffer = task.buffers.ommDescBuffer;
+        output.ommDescBufferOffset = (uint32_t)bufferInfo.ommDescArrayOffset;
+        output.ommIndexBuffer = task.buffers.ommIndexBuffer;
+        output.ommIndexBufferOffset = (uint32_t)bufferInfo.ommIndexOffset;
+        output.ommDescArrayHistogramBuffer = task.buffers.ommDescArrayHistogramBuffer;
+        output.ommDescArrayHistogramBufferOffset = (uint32_t)bufferInfo.ommDescArrayHistogramOffset;
+        output.ommIndexHistogramBuffer = task.buffers.ommIndexArrayHistogramBuffer;
+        output.ommIndexHistogramBufferOffset = (uint32_t)bufferInfo.ommIndexHistogramOffset;
+        output.ommPostDispatchInfoBuffer = task.buffers.ommPostDispatchInfoBuffer;
+        output.ommPostDispatchInfoBufferOffset = (uint32_t)bufferInfo.ommPostDispatchInfoOffset;
+
+        m_baker->Dispatch(&commandList, input, output);
+
+        omm::GpuBakeNvrhi::PreDispatchInfo setupInfo;
+        m_baker->GetPreDispatchInfo(input, setupInfo);
+
+        commandList.copyBuffer(task.buffers.ommReadbackBuffer, bufferInfo.ommPostDispatchInfoReadbackOffset, task.buffers.ommPostDispatchInfoBuffer, bufferInfo.ommPostDispatchInfoOffset, setupInfo.ommPostDispatchInfoBufferSize);
+    }
+}
+
+std::vector<bvh::OmmAttachment> OmmBuildQueue::BuildOMMAttachments(nvrhi::ICommandList& commandList, BuildTask& task)
+{
+    std::vector<bvh::OmmAttachment> ommAttachment;
+    ommAttachment.resize(task.input.mesh->geometries.size());
+
+    // Build the OMM Arrays
+    for (uint32_t i = 0; i < task.input.geometries.size(); ++i)
+    {
+        const OmmBuildQueue::BuildInput::Geometry& geom = task.input.geometries[i];
+
+        const BufferInfo& bufferInfo = task.bufferInfos[i];
+
+        nvrhi::rt::OpacityMicromapDesc desc = GetOpacityMicromapDesc(
+            task.buffers.ommArrayDataBuffer, bufferInfo.ommArrayDataOffset,
+            task.buffers.ommDescBuffer, bufferInfo.ommDescArrayOffset,
+            bufferInfo.ommArrayHistogram, geom.flags);
+
+        nvrhi::rt::OpacityMicromapHandle ommBuffer = m_device->createOpacityMicromap(desc);
+
+        std::static_pointer_cast<MeshInfoEx>(task.input.mesh)->OpacityMicroMaps.push_back(ommBuffer);
+
+        commandList.buildOpacityMicromap(ommBuffer, desc);
+
+        ommAttachment[geom.geometryIndexInMesh] =
+        {
+            .ommBuffer = ommBuffer,
+            .ommIndexFormat = bufferInfo.ommIndexFormat,
+            .ommIndexHistogram = bufferInfo.ommIndexHistogram,
+            .ommIndexBuffer = task.buffers.ommIndexBuffer,
+            .ommIndexBufferOffset = (uint32_t)bufferInfo.ommIndexOffset,
+            .ommArrayDataBuffer = task.buffers.ommArrayDataBuffer,
+            .ommArrayDataBufferOffset = (uint32_t)bufferInfo.ommArrayDataOffset
+        };
+    }
+
+    return ommAttachment;
+}
+
+void OmmBuildQueue::BuildBLASWithOMM(nvrhi::ICommandList& commandList, BuildTask& task, const std::vector<bvh::OmmAttachment>& ommAttachment)
+{
+    nvrhi::rt::AccelStructDesc blasDesc = bvh::GetMeshBlasDesc(task.input.bvhCfg , *task.input.mesh, ommAttachment.data(), false);
+    // The spec says instance Id is only 24 bits, and we already take 16 for the instance index, so we only have 8 bits for the geometry.
+    // On the other side, we could completely skip this and just use DXR 1.1's GeometryIndex() directly in the shader.
+    assert((int)blasDesc.bottomLevelGeometries.size() < (1 << 8)); // we can only hold 8 bits for the geometry index in the HitInfo - see GeometryInstanceID in SceneTypes.hlsli
+    nvrhi::rt::AccelStructHandle as = m_device->createAccelStruct(blasDesc);
+    nvrhi::utils::BuildBottomLevelAccelStruct(&commandList, as, blasDesc);
+        
+    // Store results
+    std::static_pointer_cast<MeshInfoEx>(task.input.mesh)->AccelStructOMM = as;
+}
+
+void OmmBuildQueue::RunBakeAndBuild(nvrhi::ICommandList& commandList, BuildTask& task)
+{
+    assert(task.state == BuildState::None || task.state == BuildState::Setup);
+
+    AllocateOMMArrayDataBuffer(task);
+
+    BakeOmmArrayData(commandList, task); // Dispatch the bake which will fill the ommArrayData
+
+    std::vector<bvh::OmmAttachment> ommAttachment = BuildOMMAttachments(commandList, task);
+
+    BuildBLASWithOMM(commandList, task, ommAttachment); // Build a BLAS with OMM Attached.
+
+    task.state = BuildState::BakeAndBuild;
+}
+
+void OmmBuildQueue::SubmitAndSubscribeQuery(nvrhi::ICommandList& commandList)
+{
+    // Need to submit the command list for the event query to be relevant. Ideally, we would have the query point to the next fence value instead of the last submitted one, or we would defer query set up to happen on command list submission.
+    commandList.close();
+    m_device->executeCommandList(&commandList, nvrhi::CommandQueue::Graphics);
+    commandList.open();
+
+    // Subscribe to this submission
+    m_device->setEventQuery(m_InFlightQuery, nvrhi::CommandQueue::Graphics);
+}
+
+void OmmBuildQueue::Finalize(nvrhi::ICommandList& commandList, BuildTask& task)
+{
+    std::unique_ptr<MeshDebugData> debugData = std::make_unique<MeshDebugData>();
+    debugData->ommArrayDataBuffer = task.buffers.ommArrayDataBuffer;
+    debugData->ommDescBuffer = task.buffers.ommDescBuffer;
+    debugData->ommIndexBuffer = task.buffers.ommIndexBuffer;
+
+    debugData->ommArrayDataBufferDescriptor =
+        std::make_shared<caustica::DescriptorHandle>(m_descriptorTable->CreateDescriptorHandle(nvrhi::BindingSetItem::RawBuffer_SRV(0, task.buffers.ommArrayDataBuffer)));
+    debugData->ommDescBufferDescriptor =
+        std::make_shared<caustica::DescriptorHandle>(m_descriptorTable->CreateDescriptorHandle(nvrhi::BindingSetItem::RawBuffer_SRV(0, task.buffers.ommDescBuffer)));
+    debugData->ommIndexBufferDescriptor =
+        std::make_shared<caustica::DescriptorHandle>(m_descriptorTable->CreateDescriptorHandle(nvrhi::BindingSetItem::RawBuffer_SRV(0, task.buffers.ommIndexBuffer)));
+
+    auto mesh = std::static_pointer_cast<MeshInfoEx>(task.input.mesh);
+    assert(!mesh->DebugData);
+    mesh->DebugData = std::move(debugData);
+    mesh->DebugDataDirty = true;
+
+    void* pReadbackData = m_device->mapBuffer(task.buffers.ommReadbackBuffer, nvrhi::CpuAccessMode::Read);
+    for (uint32_t i = 0; i < task.input.geometries.size(); ++i)
+    {
+        // Get debug info
+        BufferInfo& bufferInfo = task.bufferInfos[i];
+        omm::GpuBakeNvrhi::PostDispatchInfo postDispatchInfo;
+        m_baker->ReadPostDispatchInfo((uint8_t*)pReadbackData + bufferInfo.ommPostDispatchInfoReadbackOffset, sizeof(postDispatchInfo), postDispatchInfo);
+
+        const OmmBuildQueue::BuildInput::Geometry& geom = task.input.geometries[i];
+        MeshGeometryEx* meshGeometry = static_cast<MeshGeometryEx*>(task.input.mesh->geometries[geom.geometryIndexInMesh].get());
+
+        meshGeometry->DebugData.ommArrayDataOffset = (uint32_t)bufferInfo.ommArrayDataOffset;
+        meshGeometry->DebugData.ommDescBufferOffset = (uint32_t)bufferInfo.ommDescArrayOffset;
+        meshGeometry->DebugData.ommIndexBufferOffset = (uint32_t)bufferInfo.ommIndexOffset;
+        meshGeometry->DebugData.ommIndexBufferFormat = bufferInfo.ommIndexFormat;
+        meshGeometry->DebugData.ommStatsTotalKnown = postDispatchInfo.ommTotalOpaqueCount + postDispatchInfo.ommTotalTransparentCount;
+        meshGeometry->DebugData.ommStatsTotalUnknown = postDispatchInfo.ommTotalUnknownCount;
+    }
+    m_device->unmapBuffer(task.buffers.ommReadbackBuffer);
+
+    task.buffers.ommReadbackBuffer = nullptr;
+    m_baker->Clear();
+}
+
+void OmmBuildQueue::BuildTask::Reset()
+{
+    bufferInfos.clear();
+}
+
+void OmmBuildQueue::ConsumeOneTask(nvrhi::ICommandList& commandList, BuildState taskState)
+{
+    for (auto& task : m_pending)
+    {
+        if (task.state == taskState)
+        {
+            bool finished = ExecuteTask(commandList, task);
+            if (finished)
+            {
+                // Remove the task from the queue
+                task.Reset(); // No need to swap the whole BufferInfo vector just to pop it
+                std::swap(m_pending.back(), task);
+                m_pending.pop_back();
+            }
+
+            return;
+        }
+    }
+}
+
+bool OmmBuildQueue::ExecuteTask(nvrhi::ICommandList& commandList, BuildTask& task)
+{
+    switch (task.state)
+    {
+    case BuildState::None:
+    {
+        RunSetup(commandList, task);
+        break;
+    }
+    case BuildState::Setup:
+    {
+        RunBakeAndBuild(commandList, task);
+        break;
+    }
+    case BuildState::BakeAndBuild:
+    {
+        Finalize(commandList, task);
+        return true;
+    }
+    default:
+    {
+        assert(false);
+        break;
+    }
+    }
+
+    return false;
+}
+
+bool OmmBuildQueue::ReadyToRecordWork()
+{
+    if (!m_InFlightQuery)
+    {
+        // Create a query to check for command list completion
+        m_InFlightQuery = m_device->createEventQuery();
+        return true;
+    }
+
+    if (m_device->pollEventQuery(m_InFlightQuery))
+    {
+        return true;
+    }
+
+    return false;
+}
+
+void OmmBuildQueue::Update(nvrhi::ICommandList& commandList)
+{
+    if (ReadyToRecordWork() && !m_pending.empty())
+    {
+        // Work backwards from the final state to avoid consuming consecutive states of the same task in a single frame.
+        ConsumeOneTask(commandList, BuildState::BakeAndBuild);
+        ConsumeOneTask(commandList, BuildState::Setup);
+        ConsumeOneTask(commandList, BuildState::None);
+
+        SubmitAndSubscribeQuery(commandList);
+    }
+}
+
+void OmmBuildQueue::QueueBuild(const BuildInput& input)
+{
+    m_pending.push_back(input);
+}
+
+uint32_t OmmBuildQueue::NumPendingBuilds() const
+{
+    return (uint32_t)m_pending.size();
+}
+
+void OmmBuildQueue::CancelPendingBuilds()
+{
+    m_pending.clear();
+}

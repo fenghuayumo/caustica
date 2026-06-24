@@ -2,10 +2,10 @@
 #include "ShaderCompilerUtils.h"
 #include "ShaderPackFileSystem.h"
 
-#include <render/SceneRender.h>
+#include <render/Core/SceneRender.h>
 #include <backend/ShaderUtils.h>
 
-#include <render/Materials/MaterialsBaker.h>
+#include <render/Passes/Lighting/MaterialsBaker.h>
 #include "ExtendedScene.h"
 #include "SampleCommon.h"
 #include <shaders/PathTracer/PathTracerShared.h>

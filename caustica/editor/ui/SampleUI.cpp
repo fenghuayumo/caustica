@@ -10,15 +10,15 @@
 #include <scene/SceneGraph.h>
 #include <iterator>
 #include <imgui_internal.h>
-#include <render/Materials/MaterialsBaker.h>
+#include <render/Passes/Lighting/MaterialsBaker.h>
 
-#include <render/ToneMapper/ToneMappingPasses.h>
-#include <render/Misc/Korgi.h>
+#include <render/Passes/PostProcess/ToneMappingPasses.h>
+#include <render/Passes/Debug/Korgi.h>
 
-#include <render/OpacityMicroMap/OmmBaker.h>
+#include <render/Passes/OMM/OmmBaker.h>
 
 #include "SampleGame/GameScene.h"
-#include <render/Misc/ZoomTool.h>
+#include <render/Passes/Debug/ZoomTool.h>
 
 #include "SampleCommon/CaptureScriptManager.h"
 #include "Python/PythonScripting.h"

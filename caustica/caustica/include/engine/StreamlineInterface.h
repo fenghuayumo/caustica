@@ -1,7 +1,7 @@
 #pragma once
 
 // Caustica engine Streamline interface
-#include <render/View.h>
+#include <render/Core/View.h>
 #include <math/math.h>
 #include <rhi/nvrhi.h>
 

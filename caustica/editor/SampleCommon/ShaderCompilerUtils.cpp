@@ -1,8 +1,8 @@
 #include "ShaderCompilerUtils.h"
 #include "SampleCommon.h"
-#include <render/Misc/picosha2.h>
+#include <render/Passes/Debug/picosha2.h>
 
-#include <render/SceneRender.h>
+#include <render/Core/SceneRender.h>
 #include <backend/ShaderUtils.h>
 #include <core/log.h>
 

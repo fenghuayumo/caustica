@@ -9,8 +9,8 @@
 using namespace caustica::math;
 #include <shaders/light_cb.h>
 
-#include <render/Materials/MaterialsBaker.h>
-#include <render/OpacityMicroMap/OmmBaker.h>
+#include <render/Passes/Lighting/MaterialsBaker.h>
+#include <render/Passes/OMM/OmmBaker.h>
 
 #include "SampleCommon.h"
 #include "LocalConfig.h"

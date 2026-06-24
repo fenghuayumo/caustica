@@ -12,7 +12,7 @@
 
 #include <SampleCommon/ExtendedScene.h>
 
-#include <render/Misc/Korgi.h>
+#include <render/Passes/Debug/Korgi.h>
 #include <SampleCommon/SampleCommon.h>
 #include <json/json.h>
 

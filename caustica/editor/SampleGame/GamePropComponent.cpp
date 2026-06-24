@@ -7,10 +7,10 @@
 #include <core/json.h>
 #include <math/math.h>
 #include <scene/camera/Camera.h>
-#include <render/View.h>
+#include <render/Core/View.h>
 #include <cmath>
 
-#include <render/Misc/Korgi.h>
+#include <render/Passes/Debug/Korgi.h>
 
 using namespace caustica::math;
 using namespace caustica;

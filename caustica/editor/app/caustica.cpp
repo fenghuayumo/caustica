@@ -2,12 +2,12 @@
 
 #include <core/path_utils.h>
 #include <scene/scene_utils.h>
-#include <render/FramebufferFactory.h>
+#include <render/Core/FramebufferFactory.h>
 #include <assets/loader/ShaderFactory.h>
-#include <render/CommonRenderPasses.h>
+#include <render/Core/CommonRenderPasses.h>
 #include <assets/cache/TextureCache.h>
-#include <render/BindingCache.h>
-#include <render/View.h>
+#include <render/Core/BindingCache.h>
+#include <render/Core/View.h>
 #include <backend/GpuDevice.h>
 #include <core/log.h>
 #include <core/json.h>
@@ -36,23 +36,23 @@
 
 #include "SampleCommon/AccelerationStructureUtil.h"
 
-#include <render/Lighting/Distant/EnvMapImportanceSamplingBaker.h>
-#include <render/Materials/MaterialsBaker.h>
+#include <render/Passes/Lighting/Distant/EnvMapImportanceSamplingBaker.h>
+#include <render/Passes/Lighting/MaterialsBaker.h>
 
-#include <render/OpacityMicroMap/OmmBaker.h>
+#include <render/Passes/OMM/OmmBaker.h>
 
 #include "SampleCommon/LocalConfig.h"
 #include "SampleCommon/SampleBaseApp.h"
 #include "SampleCommon/CaptureScriptManager.h"
-#include <render/Misc/Korgi.h>
+#include <render/Passes/Debug/Korgi.h>
 
 #include <render/GPUSort/GPUSort.h>
 
-#include <render/Misc/ZoomTool.h>
+#include <render/Passes/Debug/ZoomTool.h>
 
-#include <render/ProcessingPasses/DenoisingGuidesBaker.h>
-#include <render/ProcessingPasses/OidnDenoiser.h>
-#include <render/ProcessingPasses/GaussianSplatPass.h>
+#include <render/Passes/PostProcess/DenoisingGuidesBaker.h>
+#include <render/Passes/Denoisers/OidnDenoiser.h>
+#include <render/Passes/Gaussian/GaussianSplatPass.h>
 
 #include <assets/loader/GltfImporter.h>
 #include <scene/SceneGraph.h>

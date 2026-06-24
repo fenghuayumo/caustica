@@ -3,7 +3,7 @@
 #include "SampleCommon.h"
 #include "ShaderPackFileSystem.h"
 
-#include <render/SceneRender.h>
+#include <render/Core/SceneRender.h>
 #include <backend/ShaderUtils.h>
 #include <core/log.h>
 #include <core/vfs/VFS.h>

@@ -6,36 +6,36 @@
 #include "SampleCommon/CommandLine.h"
 #include "SampleUI.h"
 
-#include <render/SceneRender.h>
+#include <render/Core/SceneRender.h>
 #include <platform/Input.h>
 #include <core/vfs/VFS.h>
-#include <render/BloomPass.h>
+#include <render/Passes/Geometry/BloomPass.h>
 #include <scene/camera/Camera.h>
 #include <engine/SceneManager.h>
 #include "SampleCommon/Renderer.h"
-#include <render/CommonRenderPasses.h>
+#include <render/Core/CommonRenderPasses.h>
 #if CAUSTICA_WITH_NATIVE_DLSS
-#include <render/DLSS.h>
+#include <render/Passes/Geometry/DLSS.h>
 #endif
 
-#include <render/RTXDI/RtxdiPass.h>
-#include <render/NRD/NrdIntegration.h>
+#include <render/Passes/RTXDI/RtxdiPass.h>
+#include <render/Passes/Denoisers/NrdIntegration.h>
 //#include "PathTracer/StablePlanes.hlsli"
 #if CAUSTICA_WITH_STREAMLINE
 #include <engine/StreamlineInterface.h>
 #endif
 
 #include "SampleCommon/RenderTargets.h"
-#include <render/ProcessingPasses/PostProcess.h>
+#include <render/Passes/PostProcess/PostProcess.h>
 #include <shaders/SampleConstantBuffer.h>
-#include <render/ProcessingPasses/AccumulationPass.h>
-#include <render/ProcessingPasses/GaussianSplatEmissionProxy.h>
+#include <render/Passes/PostProcess/AccumulationPass.h>
+#include <render/Passes/Gaussian/GaussianSplatEmissionProxy.h>
 #include "SampleCommon/ExtendedScene.h"
 
-#include <render/Lighting/Distant/EnvMapBaker.h>
-#include <render/Lighting/LightsBaker.h>
+#include <render/Passes/Lighting/Distant/EnvMapBaker.h>
+#include <render/Passes/Lighting/LightsBaker.h>
 
-#include <render/Misc/ShaderDebug.h>
+#include <render/Passes/Debug/ShaderDebug.h>
 
 #include <map>
 

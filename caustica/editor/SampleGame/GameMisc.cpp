@@ -9,7 +9,7 @@
 
 #include <SampleCommon/ExtendedScene.h>
 
-#include <render/Misc/Korgi.h>
+#include <render/Passes/Debug/Korgi.h>
 
 #include <fstream>
 #include <iostream>

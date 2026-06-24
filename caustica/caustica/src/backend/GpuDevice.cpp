@@ -2,7 +2,7 @@
 #include <platform/Input.h>      // Platform layer: input dispatch
 #include <platform/window.h>     // Platform layer: Window abstraction
 #include <platform/glfw_window.h>// Platform layer: GLFW window
-#include <render/RenderPassManager.h>  // Renderer layer: pass management
+#include <render/Core/RenderPassManager.h>  // Renderer layer: pass management
 #include <math/math.h>
 #include <core/log.h>
 #include <rhi/utils.h>

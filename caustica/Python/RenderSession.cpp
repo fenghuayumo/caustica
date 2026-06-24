@@ -15,10 +15,10 @@
 #include <core/vfs/VFS.h>
 #include <assets/loader/ShaderFactory.h>
 #include <assets/cache/TextureCache.h>
-#include <render/CommonRenderPasses.h>
+#include <render/Core/CommonRenderPasses.h>
 #include <engine/UserInterfaceUtils.h>
 #if CAUSTICA_WITH_NATIVE_DLSS
-#include <render/DLSS.h>
+#include <render/Passes/Geometry/DLSS.h>
 #endif
 
 #include <GLFW/glfw3.h>

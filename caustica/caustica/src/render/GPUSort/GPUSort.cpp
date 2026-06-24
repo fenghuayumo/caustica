@@ -1,8 +1,8 @@
 #include <render/GPUSort/GPUSort.h>
 
 #include <assets/loader/ShaderFactory.h>
-#include <render/FramebufferFactory.h>
-#include <render/CommonRenderPasses.h>
+#include <render/Core/FramebufferFactory.h>
+#include <render/Core/CommonRenderPasses.h>
 #include <assets/cache/TextureCache.h>
 
 //#include <engine/UserInterfaceUtils.h>
@@ -10,7 +10,7 @@
 #include <rhi/utils.h>
 
 #include <SampleCommon/SampleCommon.h>
-#include <render/Misc/ShaderDebug.h>
+#include <render/Passes/Debug/ShaderDebug.h>
 
 #define FFX_CPP
 #include <shaders/render/GPUSort/FFX_ParallelSort.h>

@@ -47,13 +47,29 @@ file(GLOB caustica_engine_assets_src
     src/assets/cache/*.cpp
 )
 
-file(GLOB caustica_engine_render_src
-    LIST_DIRECTORIES false
-    include/render/*.h
-    src/render/*.cpp
+# Render layer: Core infrastructure, GPU utilities, and all Passes
+file(GLOB caustica_engine_render_core_src
+    include/render/Core/*.h
+    src/render/Core/*.cpp
 )
 
-list(FILTER caustica_engine_render_src EXCLUDE REGEX ".*/ToneMappingPasses\\.(h|cpp)$")
+file(GLOB caustica_engine_render_gpusort_src
+    include/render/GPUSort/*.h
+    src/render/GPUSort/*.cpp
+)
+
+file(GLOB_RECURSE caustica_engine_render_passes_src
+    include/render/Passes/*.h
+    include/render/Passes/*.hpp
+    src/render/Passes/*.cpp
+    src/render/Passes/*.c
+)
+
+set(caustica_engine_render_src
+    ${caustica_engine_render_core_src}
+    ${caustica_engine_render_gpusort_src}
+    ${caustica_engine_render_passes_src}
+)
 
 if (CAUSTICA_WITH_STREAMLINE)
     list(APPEND caustica_engine_engine_src
@@ -135,6 +151,12 @@ target_include_directories(causticaEngine
         "${CMAKE_CURRENT_SOURCE_DIR}/include"
     PRIVATE
         "$<$<BOOL:${CAUSTICA_WITH_STREAMLINE}>:${CMAKE_CURRENT_SOURCE_DIR}/src/engine/streamline>"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../editor"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../editor/ui"
+        "${CMAKE_SOURCE_DIR}/External/Nrd/Include"
+        "${CMAKE_SOURCE_DIR}/External/Rtxdi/Include"
+        "${CMAKE_SOURCE_DIR}/External/Omm/libraries/omm-gpu-nvrhi"
+        "${CMAKE_SOURCE_DIR}/External/Omm/libraries/omm-lib/include"
 )
 
 target_link_libraries(causticaEngine

@@ -5,7 +5,7 @@
 #include <rhi/utils.h>
 #include <rhi/common/misc.h>
 #include <memory>
-#include <render/GBuffer.h>
+#include <render/Core/GBuffer.h>
 
 #include <shaders/PathTracer/Config.h>
 

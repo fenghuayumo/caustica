@@ -3,18 +3,18 @@
 #include <algorithm>
 #include <cctype>
 #include <string>
-#include <render/Misc/Korgi.h>
+#include <render/Passes/Debug/Korgi.h>
 #include <SampleUI.h>
 #include "LocalConfig.h"
 #include "ShaderPackFileSystem.h"
 
-#include <render/SceneRender.h>
+#include <render/Core/SceneRender.h>
 #include <backend/ShaderUtils.h>
 #include <core/path_utils.h>
 #include <platform/cmdline_utils.h>
 #include <core/log.h>
 #if CAUSTICA_WITH_NATIVE_DLSS
-#include <render/DLSS.h>
+#include <render/Passes/Geometry/DLSS.h>
 #endif
 #include "caustica.h"
 
