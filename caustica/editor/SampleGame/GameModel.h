@@ -5,7 +5,7 @@
 //#include <SampleUI.h>
 #include "GameMisc.h"
 
-#include <engine/Camera.h>
+#include <scene/camera/Camera.h>
 
 #include <map>
 

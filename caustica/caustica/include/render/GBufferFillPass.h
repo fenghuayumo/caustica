@@ -1,7 +1,7 @@
 #pragma once
 
 #include <engine/View.h>
-#include <engine/SceneTypes.h>
+#include <scene/SceneTypes.h>
 #include <render/GeometryPasses.h>
 #include <memory>
 #include <mutex>

@@ -1,4 +1,4 @@
-#include <engine/SceneTypes.h>
+#include <scene/SceneTypes.h>
 
 using namespace caustica::math;
 #include <shaders/material_cb.h>

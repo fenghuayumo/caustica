@@ -6,7 +6,7 @@
 #include <assets/cache/TextureCache.h>
 
 #include <engine/UserInterfaceUtils.h>
-#include <engine/Scene.h>
+#include <scene/Scene.h>
 
 #include <rhi/utils.h>
 #include <rhi/common/misc.h>

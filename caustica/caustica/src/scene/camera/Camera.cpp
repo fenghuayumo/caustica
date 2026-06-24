@@ -1,6 +1,6 @@
 #include <cassert>
-#include <engine/Camera.h>
-#include <engine/SceneGraph.h>
+#include <scene/camera/Camera.h>
+#include <scene/SceneGraph.h>
 #include <engine/View.h>
 
 using namespace caustica::math;

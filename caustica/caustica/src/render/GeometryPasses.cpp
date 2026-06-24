@@ -1,5 +1,5 @@
 #include <render/GeometryPasses.h>
-#include <engine/SceneGraph.h>
+#include <scene/SceneGraph.h>
 #include <engine/FramebufferFactory.h>
 #include <render/DrawStrategy.h>
 

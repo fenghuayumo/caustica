@@ -1,7 +1,7 @@
 #include <render/RTXDI/PrepareLightsPass.h>
 #include <render/RTXDI/RtxdiResources.h>
 #include <SampleCommon/ExtendedScene.h>
-#include <engine/Scene.h>
+#include <scene/Scene.h>
 
 #include <assets/loader/ShaderFactory.h>
 #include <engine/CommonRenderPasses.h>

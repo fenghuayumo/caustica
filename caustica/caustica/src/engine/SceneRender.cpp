@@ -1,5 +1,5 @@
 #include <engine/SceneRender.h>
-#include <engine/Scene.h>
+#include <scene/Scene.h>
 #include <assets/cache/TextureCache.h>
 #include <engine/CommonRenderPasses.h>
 #include <core/vfs/VFS.h>

@@ -5,8 +5,8 @@
 
 #include <engine/UserInterfaceUtils.h>
 #include <core/vfs/VFS.h>
-#include <engine/SceneTypes.h>
-#include <engine/SceneGraph.h>
+#include <scene/SceneTypes.h>
+#include <scene/SceneGraph.h>
 #include <iterator>
 #include <imgui_internal.h>
 #include <render/Materials/MaterialsBaker.h>

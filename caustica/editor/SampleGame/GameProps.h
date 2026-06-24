@@ -5,7 +5,7 @@
 #include <SampleUI.h>
 
 // #include <core/vfs/VFS.h>
-#include <engine/Camera.h>
+#include <scene/camera/Camera.h>
 
 #include "GameModel.h"
 

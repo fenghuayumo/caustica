@@ -6,7 +6,7 @@
 #include <core/log.h>
 #include <core/json.h>
 #include <math/math.h>
-#include <engine/Camera.h>
+#include <scene/camera/Camera.h>
 #include <engine/View.h>
 #include <cmath>
 

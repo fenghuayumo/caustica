@@ -1,6 +1,6 @@
 #pragma once
 
-#include <engine/SceneTypes.h>
+#include <scene/SceneTypes.h>
 #include <core/log.h>
 
 #include <rhi/nvrhi.h>

@@ -4,7 +4,7 @@
 #include <core/json.h>
 #include <engine/SceneRender.h>
 #include <core/path_utils.h>
-#include <engine/SceneTypes.h>
+#include <scene/SceneTypes.h>
 #include <json/json.h>
 #include <fstream>
 #include <format>

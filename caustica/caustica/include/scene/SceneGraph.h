@@ -1,6 +1,6 @@
 #pragma once
 
-#include <engine/SceneTypes.h>
+#include <scene/SceneTypes.h>
 #include <engine/KeyframeAnimation.h>
 #include <math/math.h>
 #include <memory>

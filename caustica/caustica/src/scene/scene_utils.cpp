@@ -1,4 +1,4 @@
-#include "engine/scene_utils.h"
+#include "scene/scene_utils.h"
 #include "core/vfs/VFS.h"
 
 #include <deque>

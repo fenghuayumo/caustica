@@ -1,6 +1,6 @@
 #pragma once
 
-#include <engine/Scene.h>
+#include <scene/Scene.h>
 #include <string.h>
 
 constexpr int LightType_Environment = 1000;

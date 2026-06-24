@@ -1,6 +1,6 @@
 #include <engine/MediaFileSystem.h>
 #include <engine/SceneRender.h>
-#include <engine/scene_utils.h>
+#include <scene/scene_utils.h>
 #include <core/log.h>
 #include <core/string_utils.h>
 #include <core/vfs/TarFile.h>

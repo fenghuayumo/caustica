@@ -23,6 +23,14 @@ file(GLOB caustica_engine_engine_src
     src/engine/*.h
 )
 
+# Scene layer: ECS, scene graph, scene types, camera (DIVSHOT-style architecture)
+file(GLOB caustica_engine_scene_src
+    include/scene/*.h
+    src/scene/*.cpp
+    include/scene/camera/*.h
+    src/scene/camera/*.cpp
+)
+
 # Asset layer: loading, caching (DIVSHOT-style 4-layer architecture)
 file(GLOB caustica_engine_assets_src
     include/assets/loader/*.h
@@ -122,6 +130,7 @@ list(APPEND caustica_engine_engine_src
 add_library(causticaEngine STATIC
     ${caustica_engine_core_src}
     ${caustica_engine_math_src}
+    ${caustica_engine_scene_src}
     ${caustica_engine_engine_src}
     ${caustica_engine_assets_src}
     ${caustica_engine_render_src}
@@ -257,6 +266,7 @@ set_target_properties(causticaEngine PROPERTIES FOLDER "caustica/caustica")
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
     ${caustica_engine_core_src}
     ${caustica_engine_math_src}
+    ${caustica_engine_scene_src}
     ${caustica_engine_engine_src}
     ${caustica_engine_render_src}
 )

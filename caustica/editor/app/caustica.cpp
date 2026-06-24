@@ -1,7 +1,7 @@
 #include "caustica.h"
 
 #include <core/path_utils.h>
-#include <engine/scene_utils.h>
+#include <scene/scene_utils.h>
 #include <engine/FramebufferFactory.h>
 #include <assets/loader/ShaderFactory.h>
 #include <engine/CommonRenderPasses.h>
@@ -55,7 +55,7 @@
 #include <render/ProcessingPasses/GaussianSplatPass.h>
 
 #include <assets/loader/GltfImporter.h>
-#include <engine/SceneGraph.h>
+#include <scene/SceneGraph.h>
 
 #include <stb_image.h>
 #include <stb_image_write.h>

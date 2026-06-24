@@ -25,7 +25,7 @@ namespace caustica
 // Loading is delegated to SceneLoader.  Subclasses implement LoadScene() to
 // perform the actual work (parsing glTF/JSON, creating GPU resources, etc.).
 //
-// Scene discovery utilities live in engine/scene_utils.h.
+// Scene discovery utilities live in scene/scene_utils.h.
 // Path utilities live in core/path_utils.h.
 // =============================================================================
 class SceneRender : public IRenderPass

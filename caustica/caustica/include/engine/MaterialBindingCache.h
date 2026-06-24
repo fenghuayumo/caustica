@@ -1,6 +1,6 @@
 #pragma once
 
-#include <engine/SceneTypes.h>
+#include <scene/SceneTypes.h>
 #include <rhi/nvrhi.h>
 #include <unordered_map>
 #include <mutex>

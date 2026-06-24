@@ -1,5 +1,5 @@
 #include <render/JointsRenderPass.h>
-#include <engine/Scene.h>
+#include <scene/Scene.h>
 #include <assets/loader/ShaderFactory.h>
 #include <math/math.h>
 #include <rhi/utils.h>

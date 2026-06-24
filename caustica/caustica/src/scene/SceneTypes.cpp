@@ -1,4 +1,4 @@
-#include <engine/SceneGraph.h>
+#include <scene/SceneGraph.h>
 #include <engine/ShadowMap.h>
 #include <core/json.h>
 #include <json/json-forwards.h>

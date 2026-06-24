@@ -1,7 +1,7 @@
 #pragma once
 
 #include <math/math.h>
-#include <engine/Scene.h>
+#include <scene/Scene.h>
 
 #include <engine/imgui_renderer.h>
 #include <engine/imgui_console.h>

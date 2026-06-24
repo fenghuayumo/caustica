@@ -1,4 +1,4 @@
-#include <engine/SceneGraph.h>
+#include <scene/SceneGraph.h>
 #include <core/log.h>
 #include <core/json.h>
 #include <sstream>

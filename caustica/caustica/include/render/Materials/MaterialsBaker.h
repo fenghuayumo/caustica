@@ -8,7 +8,7 @@
 #include <engine/BindingCache.h>
 #include <rhi/nvrhi.h>
 #include <math/math.h>
-#include <engine/SceneTypes.h>
+#include <scene/SceneTypes.h>
 
 #include <SampleCommon/ComputePass.h>
 #include <shaders/SubInstanceData.h>

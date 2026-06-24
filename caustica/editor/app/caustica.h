@@ -10,7 +10,7 @@
 #include <platform/Input.h>
 #include <core/vfs/VFS.h>
 #include <render/BloomPass.h>
-#include <engine/Camera.h>
+#include <scene/camera/Camera.h>
 #include <engine/CommonRenderPasses.h>
 #if RTXPT_WITH_NATIVE_DLSS
 #include <render/DLSS.h>

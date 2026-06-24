@@ -1,5 +1,5 @@
 #include <engine/UserInterfaceUtils.h>
-#include <engine/SceneGraph.h>
+#include <scene/SceneGraph.h>
 #include <core/log.h>
 #include <core/string_utils.h>
 

@@ -4,7 +4,7 @@
 //#include "../SampleCommon.h"
 #include <SampleUI.h>
 
-#include <engine/Camera.h>
+#include <scene/camera/Camera.h>
 
 namespace caustica
 {

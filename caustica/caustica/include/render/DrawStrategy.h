@@ -1,6 +1,6 @@
 #pragma once
 
-#include <engine/SceneGraph.h>
+#include <scene/SceneGraph.h>
 #include <memory>
 #include <vector>
 

@@ -16,9 +16,9 @@
 #include <render/Lighting/LightsBaker.h>
 #include <render/OpacityMicroMap/OmmBaker.h>
 
-#include <engine/Scene.h>
-#include <engine/SceneTypes.h>
-#include <engine/SceneGraph.h>
+#include <scene/Scene.h>
+#include <scene/SceneTypes.h>
+#include <scene/SceneGraph.h>
 #include <core/log.h>
 #include <math/math.h>
 

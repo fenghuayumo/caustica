@@ -17,7 +17,7 @@
 #include "caustica.h"
 #include <SampleUI.h>
 
-#include <engine/Scene.h>
+#include <scene/Scene.h>
 #include <math/box.h>
 #include <math/math.h>
 

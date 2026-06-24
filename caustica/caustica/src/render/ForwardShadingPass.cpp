@@ -3,7 +3,7 @@
 #include <engine/FramebufferFactory.h>
 #include <assets/loader/ShaderFactory.h>
 #include <engine/ShadowMap.h>
-#include <engine/SceneTypes.h>
+#include <scene/SceneTypes.h>
 #include <engine/CommonRenderPasses.h>
 #include <engine/MaterialBindingCache.h>
 #include <core/log.h>

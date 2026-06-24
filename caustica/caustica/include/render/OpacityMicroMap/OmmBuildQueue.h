@@ -1,6 +1,6 @@
 #pragma once
 
-#include <engine/SceneTypes.h>
+#include <scene/SceneTypes.h>
 #include <assets/cache/TextureCache.h>
 #include <SampleCommon/AccelerationStructureUtil.h>
 

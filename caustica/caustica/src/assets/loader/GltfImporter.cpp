@@ -3,7 +3,7 @@
 
 #include <assets/loader/GltfImporter.h>
 #include <assets/cache/TextureCache.h>
-#include <engine/SceneGraph.h>
+#include <scene/SceneGraph.h>
 #include <core/vfs/VFS.h>
 #include <core/log.h>
 

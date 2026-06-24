@@ -1,4 +1,4 @@
-#include <engine/Scene.h>
+#include <scene/Scene.h>
 #include <assets/loader/GltfImporter.h>
 #include <core/ThreadPool.h>
 #include <core/json.h>

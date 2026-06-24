@@ -1,6 +1,6 @@
 #include <render/DrawStrategy.h>
 #include <render/GeometryPasses.h>
-#include <engine/SceneGraph.h>
+#include <scene/SceneGraph.h>
 #include <engine/View.h>
 
 using namespace caustica::math;

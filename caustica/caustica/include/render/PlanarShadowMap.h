@@ -1,6 +1,6 @@
 #pragma once
 
-#include <engine/SceneGraph.h>
+#include <scene/SceneGraph.h>
 #include <engine/ShadowMap.h>
 #include <engine/View.h>
 #include <rhi/nvrhi.h>
