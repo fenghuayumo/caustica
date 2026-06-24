@@ -389,9 +389,9 @@ void GlfwWindow::glfwWindowIconifyCallback(GLFWwindow* window, int iconified)
 
 void GlfwWindow::glfwDropCallback(GLFWwindow* window, int count, const char** paths)
 {
-    (void)window;
-    (void)count;
-    (void)paths;
+    auto* self = static_cast<GlfwWindow*>(glfwGetWindowUserPointer(window));
+    if (self && self->m_FileDropCallback)
+        self->m_FileDropCallback(count, paths);
 }
 
 void GlfwWindow::glfwWindowPosCallback(GLFWwindow* window, int xpos, int ypos)

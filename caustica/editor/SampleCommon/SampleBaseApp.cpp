@@ -246,18 +246,16 @@ SampleBaseApp::InitReturnCodes SampleBaseApp::Init(int argc, const char* const* 
         InitializeSampleUIDataFromCommandLine(m_sampleUIData, m_CmdLine);
     }
 
-    // Register GLFW drag-and-drop callback
-    if (!m_CmdLine.noWindow && m_GpuDevice->GetWindow())
+    // Register file drag-and-drop without touching GLFW's window user pointer —
+    // GlfwWindow stores that pointer and all other callbacks depend on it.
+    if (!m_CmdLine.noWindow && m_GpuDevice->GetPlatformWindow())
     {
-        glfwSetWindowUserPointer(m_GpuDevice->GetWindow(), this);
-        glfwSetDropCallback(m_GpuDevice->GetWindow(), [](GLFWwindow* window, int count, const char** paths)
-        {
-            auto* app = static_cast<SampleBaseApp*>(glfwGetWindowUserPointer(window));
-            if (!app)
-                return;
-            for (int i = 0; i < count; i++)
-                app->GetSampleUIData().PendingDroppedFiles.emplace_back(paths[i]);
-        });
+        m_GpuDevice->GetPlatformWindow()->setFileDropCallback(
+            [this](int count, const char** paths)
+            {
+                for (int i = 0; i < count; ++i)
+                    m_sampleUIData.PendingDroppedFiles.emplace_back(paths[i]);
+            });
     }
 
     LocalConfig::PostAppInit(m_sampleUIData);

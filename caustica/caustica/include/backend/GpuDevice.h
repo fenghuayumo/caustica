@@ -311,6 +311,7 @@ namespace caustica
         virtual void ReportLiveObjects() {}
 
         [[nodiscard]] GLFWwindow* GetWindow() const { return m_Window; }
+        [[nodiscard]] Window* GetPlatformWindow() const { return m_WindowPtr; }
 
         // When window is owned externally (new 4-layer Window), call this
         // before Shutdown() to prevent double-free of the GLFW window.

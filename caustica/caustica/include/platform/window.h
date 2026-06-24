@@ -55,6 +55,7 @@ class Window
 {
 public:
     using EventCallbackFn = std::function<void(Event&)>;
+    using FileDropCallbackFn = std::function<void(int count, const char** paths)>;
 
     // Factory
     static Window* create(const WindowDesc& desc);
@@ -98,6 +99,9 @@ public:
     // --- Event callback (set by Application) ---
     virtual void setEventCallback(const EventCallbackFn& callback) = 0;
 
+    // --- File drag-and-drop (GLFW-backed windows only) ---
+    void setFileDropCallback(FileDropCallbackFn callback) { m_FileDropCallback = std::move(callback); }
+
     // --- Window events (called from GLFW callbacks, override to hook) ---
     virtual void onClose()             {}
     virtual void onFocusChanged(bool focused);
@@ -128,6 +132,7 @@ protected:
     float m_DPIScaleY  = 1.0f;
     float m_PosX       = 0.0f;
     float m_PosY       = 0.0f;
+    FileDropCallbackFn m_FileDropCallback;
 };
 
 } // namespace caustica

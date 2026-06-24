@@ -79,6 +79,8 @@ file(GLOB caustica_engine_scene_src
     src/scene/*.cpp
     include/scene/camera/*.h
     src/scene/camera/*.cpp
+    include/scene/game/*.h
+    src/scene/game/*.cpp
 )
 
 # Audio layer: audio engine and cache
