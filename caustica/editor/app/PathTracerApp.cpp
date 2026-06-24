@@ -2,6 +2,7 @@
 #include "caustica.h"
 
 #include <render/Core/PathTracerPostProcess.h>
+#include <render/Core/PathTracerSceneGeometry.h>
 
 #include <core/path_utils.h>
 #include <scene/scene_utils.h>
@@ -109,14 +110,14 @@ namespace
 {
     constexpr float kGaussianSplatKernelMinResponse = 0.0113f;
 
-    uint32_t ResolveGaussianSplatShadowMode(const SampleUIData& ui)
+    uint32_t ResolveGaussianSplatShadowMode(const PathTracerSettings& settings)
     {
-        if (!ui.GaussianSplatShadows && ui.GaussianSplatShadowsMode == GAUSSIAN_SPLAT_SHADOWS_DISABLED)
+        if (!settings.GaussianSplatShadows && settings.GaussianSplatShadowsMode == GAUSSIAN_SPLAT_SHADOWS_DISABLED)
             return GAUSSIAN_SPLAT_SHADOWS_DISABLED;
 
-        const int requestedMode = ui.GaussianSplatShadowsMode == GAUSSIAN_SPLAT_SHADOWS_DISABLED
+        const int requestedMode = settings.GaussianSplatShadowsMode == GAUSSIAN_SPLAT_SHADOWS_DISABLED
             ? GAUSSIAN_SPLAT_SHADOWS_HARD
-            : ui.GaussianSplatShadowsMode;
+            : settings.GaussianSplatShadowsMode;
         return uint32_t(std::clamp(requestedMode, GAUSSIAN_SPLAT_SHADOWS_HARD, GAUSSIAN_SPLAT_SHADOWS_SOFT));
     }
 
@@ -1536,7 +1537,7 @@ void PathTracerApp::CreateAccelStructs(nvrhi::ICommandList* commandList)
         if (object.splat == nullptr || !object.splat->enabled || object.pass == nullptr || !object.pass->HasSplats())
             continue;
 
-        if (ResolveGaussianSplatShadowMode(m_ui) != GAUSSIAN_SPLAT_SHADOWS_DISABLED)
+        if (ResolveGaussianSplatShadowMode(m_settings) != GAUSSIAN_SPLAT_SHADOWS_DISABLED)
             object.pass->BuildAccelerationStructures(
                 commandList,
                 m_settings.GaussianSplatUseAABBs,
@@ -2412,7 +2413,7 @@ void PathTracerApp::RenderGaussianSplats(bool renderToOutputColor)
     if (stochasticSplats && (m_settings.ResetAccumulation || m_settings.ResetRealtimeCaches || m_gaussianSplatTemporalReset))
         m_gaussianSplatTemporalSampleIndex = 0;
 
-    const uint32_t gaussianSplatShadowMode = ResolveGaussianSplatShadowMode(m_ui);
+    const uint32_t gaussianSplatShadowMode = ResolveGaussianSplatShadowMode(m_settings);
     GaussianSplatRenderSettings settings;
     settings.enabled = m_settings.EnableGaussianSplats;
     settings.depthTest = m_settings.GaussianSplatDepthTest;
@@ -2681,23 +2682,18 @@ void PathTracerApp::Render(nvrhi::IFramebuffer* framebuffer)
             m_shaderDebug->BeginFrame(m_commandList, viewProj);
         }
 
-        // NOTE: this refreshes geometry buffers and updates stuff needed by m_ommBaker and m_materialsBaker and others below!
-        m_sceneManager->getScene()->Refresh(m_commandList, GetFrameIndex());
-
-        if(m_ommBaker) m_ommBaker->BuildOpacityMicromaps(*m_commandList, *m_sceneManager->getScene());
-        RebuildDirtyMeshAccelStructs(m_commandList);
-        UpdateSkinnedBLASs(m_commandList, GetFrameIndex());
-        m_commandList->compactBottomLevelAccelStructs(); // Compact acceleration structures that are tagged for compaction and have finished executing the original build
-        BuildTLAS(m_commandList);
-        TransitionMeshBuffersToReadOnly(m_commandList);
-        if (m_ommBaker) 
-        {
-            m_asyncLoadingInProgress |= m_ommBaker->Update(*m_commandList, *m_sceneManager->getScene());
-            m_asyncLoadingInProgress |= m_ommBaker->UIData().BuildsLeftInQueue > 0;
-        }
-
-        m_materialsBaker->Update(m_commandList, m_sceneManager->getScene(), m_renderCore.accelStructs().getSubInstanceData());
-        UploadSubInstanceData(m_commandList); // this is now partial subInstance data, but lights baker update requires it to find materials and create emissive triangle lights
+        // Scene refresh, accel structs, materials (partial sub-instance upload for lighting).
+        UpdateSceneGeometryParams geoParams{
+            m_settings,
+            m_editor.AccelerationStructRebuildRequested,
+            m_sceneManager->getScene(),
+            m_commandList,
+        };
+        geoParams.materialsBaker = m_materialsBaker.get();
+        geoParams.ommBaker = m_ommBaker.get();
+        geoParams.frameIndex = GetFrameIndex();
+        geoParams.asyncLoadingInProgress = &m_asyncLoadingInProgress;
+        m_renderCore.updateSceneGeometry(geoParams);
 
         // Update input lighting, environment map, etc.
         PreUpdateLighting(m_commandList, needNewBindings);
@@ -2761,7 +2757,7 @@ void PathTracerApp::Render(nvrhi::IFramebuffer* framebuffer)
     {
         UpdatePathTracerConstants(constants.ptConsts, cameraData);
         constants.MaterialCount = m_materialsBaker->GetMaterialDataCount(); // m_sceneManager->getScene()->GetSceneGraph()->GetMaterials().size();
-        const uint32_t gaussianSplatShadowMode = ResolveGaussianSplatShadowMode(m_ui);
+        const uint32_t gaussianSplatShadowMode = ResolveGaussianSplatShadowMode(m_settings);
         const GaussianSplatSceneObject* primaryGaussianSplat = GetPrimaryGaussianSplatObject();
         GaussianSplatPass* primaryGaussianSplatPass = primaryGaussianSplat != nullptr ? primaryGaussianSplat->pass.get() : nullptr;
         constants.GaussianSplatShadowCount = (m_settings.EnableGaussianSplats

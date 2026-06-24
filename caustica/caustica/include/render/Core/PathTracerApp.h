@@ -5,6 +5,7 @@
 #include <render/Core/RenderPipeline.h>
 
 #include <render/Core/PathTracerPostProcess.h>
+#include <render/Core/PathTracerSceneGeometry.h>
 
 #include <memory>
 
@@ -33,6 +34,7 @@ public:
     void onSceneUnloading();
 
     void postProcessAA(PostProcessAAParams& params);
+    void updateSceneGeometry(UpdateSceneGeometryParams& params);
 
 private:
     nvrhi::IDevice* m_device = nullptr;
