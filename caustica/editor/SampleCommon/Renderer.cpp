@@ -1,5 +1,6 @@
 #include "SampleCommon/Renderer.h"
 #include "PathTracerApp.h"
+#include "render/PathTracingRenderer.h"
 #include <render/Core/CameraController.h>
 #include <render/Passes/PostProcess/ToneMappingPasses.h>
 #include <core/file_utils.h>
@@ -21,16 +22,17 @@ Renderer::~Renderer() = default;
 caustica::CameraUpdateParams Renderer::makeCameraUpdateParams() const
 {
     auto& s = m_owner;
+    auto& r = *s.m_pathTracingRenderer;
     CameraUpdateParams params;
-    params.renderSize = s.GetRenderSize();
-    params.displayAspectRatio = s.m_displayAspectRatio;
-    params.sampleIndex = s.m_sampleIndex;
-    params.frameIndex = s.m_frameIndex;
+    params.renderSize = r.getRenderSize();
+    params.displayAspectRatio = r.getDisplayAspectRatio();
+    params.sampleIndex = r.getSampleIndex();
+    params.frameIndex = r.getFrameIndex();
     params.realtimeMode = s.m_settings.RealtimeMode;
     params.realtimeAA = s.m_settings.RealtimeAA;
     params.dbgFreezeRealtimeNoiseSeed = s.m_settings.DbgFreezeRealtimeNoiseSeed;
     params.temporalAAJitter = s.m_settings.TemporalAntiAliasingJitter;
-    params.temporalAAPass = s.m_temporalAntiAliasingPass.get();
+    params.temporalAAPass = r.getTemporalAntiAliasingPass();
     return params;
 }
 
@@ -102,21 +104,21 @@ void Renderer::setCameraVerticalFOV(float fov)
 {
     m_owner.m_renderCore.camera().setVerticalFOV(fov);
     m_owner.m_settings.ResetAccumulation = true;
-    m_owner.m_gaussianSplatTemporalReset = true;
+    m_owner.m_pathTracingRenderer->setGaussianSplatTemporalReset(true);
 }
 
 void Renderer::setCameraIntrinsics(float fx, float fy, float cx, float cy, float w, float h)
 {
     m_owner.m_renderCore.camera().setIntrinsics(fx, fy, cx, cy, w, h);
     m_owner.m_settings.ResetAccumulation = true;
-    m_owner.m_gaussianSplatTemporalReset = true;
+    m_owner.m_pathTracingRenderer->setGaussianSplatTemporalReset(true);
 }
 
 void Renderer::clearCameraIntrinsics()
 {
     m_owner.m_renderCore.camera().clearIntrinsics();
     m_owner.m_settings.ResetAccumulation = true;
-    m_owner.m_gaussianSplatTemporalReset = true;
+    m_owner.m_pathTracingRenderer->setGaussianSplatTemporalReset(true);
 }
 
 // =============================================================================
@@ -126,10 +128,11 @@ void Renderer::clearCameraIntrinsics()
 void Renderer::transitionMeshBuffersToReadOnly()
 {
     auto& s = m_owner;
+    auto commandList = s.m_pathTracingRenderer->getCommandList();
     for (const auto& skinnedInstance : s.GetScene()->GetSceneGraph()->GetSkinnedMeshInstances())
-        s.m_commandList->setBufferState(skinnedInstance->GetMesh()->buffers->vertexBuffer,
+        commandList->setBufferState(skinnedInstance->GetMesh()->buffers->vertexBuffer,
             nvrhi::ResourceStates::ShaderResource);
-    s.m_commandList->commitBarriers();
+    commandList->commitBarriers();
 }
 
 // =============================================================================
@@ -138,14 +141,17 @@ void Renderer::transitionMeshBuffersToReadOnly()
 
 std::string Renderer::getResolutionInfo() const
 {
-    auto& s = m_owner;
-    if (s.m_renderTargets == nullptr || s.m_renderTargets->OutputColor == nullptr)
+    auto& r = *m_owner.m_pathTracingRenderer;
+    const auto* targets = r.getRenderTargets();
+    if (targets == nullptr || targets->OutputColor == nullptr)
         return "uninitialized";
-    if (dm::all(s.m_renderSize == s.m_displaySize))
-        return std::to_string(s.m_renderSize.x) + "x" + std::to_string(s.m_renderSize.y);
+    const auto renderSize = r.getRenderSize();
+    const auto displaySize = r.getDisplaySize();
+    if (dm::all(renderSize == displaySize))
+        return std::to_string(renderSize.x) + "x" + std::to_string(renderSize.y);
     else
-        return std::to_string(s.m_renderSize.x) + "x" + std::to_string(s.m_renderSize.y)
-            + "->" + std::to_string(s.m_displaySize.x) + "x" + std::to_string(s.m_displaySize.y);
+        return std::to_string(renderSize.x) + "x" + std::to_string(renderSize.y)
+            + "->" + std::to_string(displaySize.x) + "x" + std::to_string(displaySize.y);
 }
 
 float Renderer::getAvgTimePerFrame() const
@@ -158,10 +164,10 @@ float Renderer::getAvgTimePerFrame() const
 
 void Renderer::debugDrawLine(dm::float3 start, dm::float3 stop, dm::float4 col1, dm::float4 col2)
 {
-    auto& s = m_owner;
-    if (int(s.m_cpuSideDebugLines.size()) + 2 >= MAX_DEBUG_LINES) return;
+    auto& lines = m_owner.m_pathTracingRenderer->getCpuSideDebugLines();
+    if (int(lines.size()) + 2 >= MAX_DEBUG_LINES) return;
     DebugLineStruct dls = { dm::float4(start, 1), col1 };
     DebugLineStruct dle = { dm::float4(stop, 1), col2 };
-    s.m_cpuSideDebugLines.push_back(dls);
-    s.m_cpuSideDebugLines.push_back(dle);
+    lines.push_back(dls);
+    lines.push_back(dle);
 }

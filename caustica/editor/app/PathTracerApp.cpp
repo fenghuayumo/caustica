@@ -305,21 +305,12 @@ void PathTracerApp::Init(const std::string& preferredScene,
     m_CommonPasses = std::make_shared<caustica::CommonRenderPasses>(GetDevice(), m_shaderFactory);
     m_bindingCache = std::make_unique<caustica::BindingCache>(GetDevice());
 
-#if CAUSTICA_WITH_NATIVE_DLSS
-    m_nativeDLSS = caustica::render::DLSS::Create(GetDevice(), *m_shaderFactory, caustica::GetDirectoryWithExecutable().string());
-    if (m_nativeDLSS)
-    {
-        m_settings.IsDLSSSuported = m_nativeDLSS->IsDlssSupported();
-        m_settings.IsDLSSRRSupported = m_nativeDLSS->IsRayReconstructionSupported();
-        caustica::info("Native NGX DLSS support: DLSS=%s, DLSS-RR=%s.",
-            m_settings.IsDLSSSuported ? "yes" : "no",
-            m_settings.IsDLSSRRSupported ? "yes" : "no");
-    }
-    else
-    {
-        caustica::warning("Native NGX DLSS object was not created.");
-    }
-#endif
+    m_pathTracingRenderer = std::make_unique<PathTracingRenderer>(*this);
+    m_pathTracingRenderer->createBindingLayouts();
+
+    m_DescriptorTable = std::make_shared<caustica::DescriptorTableManager>(GetDevice(), m_pathTracingRenderer->getBindlessLayout());
+
+    m_pathTracingRenderer->createDeviceResources();
 
     m_settings.EnableGaussianSplats = true;
     m_settings.GaussianSplatDepthTest = m_cmdLine.GaussianSplatDepthTest;
@@ -334,248 +325,18 @@ void PathTracerApp::Init(const std::string& preferredScene,
     m_sampleGame = std::make_unique<GameScene>(*this, m_cmdLine);
     m_progressLoading.Set(95);
 
-    nvrhi::BindlessLayoutDesc bindlessLayoutDesc;
-    bindlessLayoutDesc.visibility = nvrhi::ShaderType::All;
-    bindlessLayoutDesc.firstSlot = 0;
-    bindlessLayoutDesc.maxCapacity = 1024;
-    bindlessLayoutDesc.registerSpaces = {
-        nvrhi::BindingLayoutItem::RawBuffer_SRV(1),
-        nvrhi::BindingLayoutItem::Texture_SRV(2)
-    };
-    auto device = GetDevice();
-    m_bindlessLayout = device->createBindlessLayout(bindlessLayoutDesc);
-
-    nvrhi::BindingLayoutDesc globalBindingLayoutDesc;
-    globalBindingLayoutDesc.visibility = nvrhi::ShaderType::All;
-    globalBindingLayoutDesc.bindings = {
-        nvrhi::BindingLayoutItem::VolatileConstantBuffer(0),
-        nvrhi::BindingLayoutItem::PushConstants(1, sizeof(SampleMiniConstants)),
-        nvrhi::BindingLayoutItem::RayTracingAccelStruct(0),
-        nvrhi::BindingLayoutItem::StructuredBuffer_SRV(1),
-        nvrhi::BindingLayoutItem::StructuredBuffer_SRV(2),
-        nvrhi::BindingLayoutItem::StructuredBuffer_SRV(3),
-        nvrhi::BindingLayoutItem::StructuredBuffer_SRV(4),
-        nvrhi::BindingLayoutItem::StructuredBuffer_SRV(5),
-        nvrhi::BindingLayoutItem::Texture_SRV(6),               // t_LdrColorScratch
-        nvrhi::BindingLayoutItem::RayTracingAccelStruct(7),     // GaussianSplatBVH
-        nvrhi::BindingLayoutItem::StructuredBuffer_SRV(8),      // t_GaussianShadowSplats
-        nvrhi::BindingLayoutItem::Texture_SRV(10),              // t_EnvironmentMap
-        nvrhi::BindingLayoutItem::Texture_SRV(11),              // t_EnvironmentMapImportanceMap        <- TODO: remove this, no longer used
-        nvrhi::BindingLayoutItem::StructuredBuffer_SRV(12),     // t_LightsCB
-        nvrhi::BindingLayoutItem::StructuredBuffer_SRV(13),     // t_Lights
-        nvrhi::BindingLayoutItem::StructuredBuffer_SRV(14),     // t_LightsEx
-        nvrhi::BindingLayoutItem::TypedBuffer_SRV(15),          // t_LightProxyCounters
-        nvrhi::BindingLayoutItem::TypedBuffer_SRV(16),          // t_LightProxyIndices
-        nvrhi::BindingLayoutItem::TypedBuffer_SRV(17),          // t_LightLocalSamplingBuffer
-        nvrhi::BindingLayoutItem::Texture_SRV(18),              // t_EnvLookupMap
-        nvrhi::BindingLayoutItem::Texture_UAV(20),              // u_LightFeedbackTotalWeight
-        nvrhi::BindingLayoutItem::Texture_UAV(21),              // u_LightFeedbackCandidates
-        nvrhi::BindingLayoutItem::Sampler(0),
-        nvrhi::BindingLayoutItem::Sampler(1),
-        nvrhi::BindingLayoutItem::Sampler(2),
-        nvrhi::BindingLayoutItem::Texture_UAV(0),           // u_OutputColor
-        nvrhi::BindingLayoutItem::Texture_UAV(1),           // u_ProcessedOutputColor
-        nvrhi::BindingLayoutItem::Texture_UAV(2),           // u_PostTonemapOutputColor
-        nvrhi::BindingLayoutItem::Texture_UAV(4),           // u_Throughput
-        nvrhi::BindingLayoutItem::Texture_UAV(5),           // u_MotionVectors
-        nvrhi::BindingLayoutItem::Texture_UAV(6),           // u_Depth
-        nvrhi::BindingLayoutItem::Texture_UAV(7),           // u_SpecularHitT
-        nvrhi::BindingLayoutItem::Texture_UAV(8),           // u_ScratchFloat1
-        // denoising slots go from 30-39
-        //nvrhi::BindingLayoutItem::StructuredBuffer_UAV(30), // denoiser 'control buffer' (might be removed, might be reused)
-        nvrhi::BindingLayoutItem::Texture_UAV(31),          // RWTexture2D<float>  u_DenoiserViewspaceZ
-        nvrhi::BindingLayoutItem::Texture_UAV(32),          // RWTexture2D<float4> u_DenoiserMotionVectors
-        nvrhi::BindingLayoutItem::Texture_UAV(33),          // RWTexture2D<float4> u_DenoiserNormalRoughness
-        nvrhi::BindingLayoutItem::Texture_UAV(34),          // RWTexture2D<float4> u_DenoiserDiffRadianceHitDist
-        nvrhi::BindingLayoutItem::Texture_UAV(35),          // RWTexture2D<float4> u_DenoiserSpecRadianceHitDist
-        nvrhi::BindingLayoutItem::Texture_UAV(36),          // RWTexture2D<float4> u_DenoiserDisocclusionThresholdMix
-        nvrhi::BindingLayoutItem::Texture_UAV(37),          // RWTexture2D<float4> u_CombinedHistoryClampRelax
-        // debugging slots go from 50-59
-        nvrhi::BindingLayoutItem::StructuredBuffer_UAV(51),
-        nvrhi::BindingLayoutItem::StructuredBuffer_UAV(52),
-        nvrhi::BindingLayoutItem::StructuredBuffer_UAV(53),
-        nvrhi::BindingLayoutItem::StructuredBuffer_UAV(54),
-        // ReSTIR GI
-        nvrhi::BindingLayoutItem::Texture_UAV(60),          // u_SecondarySurfacePositionNormal
-        nvrhi::BindingLayoutItem::Texture_UAV(61),          // u_SecondarySurfaceRadiance
-
-        nvrhi::BindingLayoutItem::Texture_UAV(70),          // u_RRDiffuseAlbedo
-        nvrhi::BindingLayoutItem::Texture_UAV(71),          // u_RRSpecAlbedo
-        nvrhi::BindingLayoutItem::Texture_UAV(72),          // u_RRNormalsAndRoughness
-        nvrhi::BindingLayoutItem::Texture_UAV(73),          // u_RRSpecMotionVectors
-        nvrhi::BindingLayoutItem::Texture_UAV(74),          // u_RRTransparencyLayer
-        nvrhi::BindingLayoutItem::Texture_UAV(75),          // u_DenoisingAvgLayerRadiance
-
-        nvrhi::BindingLayoutItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX),
-        nvrhi::BindingLayoutItem::Texture_UAV(SHADER_DEBUG_VIZ_TEXTURE_UAV_INDEX)
-    };
-
-    // NV HLSL extensions - DX12 only - we should probably expose some form of GetNvapiIsInitialized instead
-    if (device->queryFeatureSupport(nvrhi::Feature::HlslExtensionUAV))
-    {
-        globalBindingLayoutDesc.bindings.push_back(
-            nvrhi::BindingLayoutItem::TypedBuffer_UAV(NV_SHADER_EXTN_SLOT_NUM));
-    }
-
-    // stable planes buffers -- must be last because these items are appended to the BindingSetDesc after the main list
-    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_UAV(40));
-    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::StructuredBuffer_UAV(42));
-    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_UAV(44));
-    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::StructuredBuffer_UAV(45));
-
-    // GBuffer
-    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_UAV(100));
-    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_UAV(101));
-    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_UAV(102));
-    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_UAV(103));
-    
-    // Local cubemap UAV (for RT pass)
-    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_UAV(10));   // u_LocalCubemap
-
-    // Reflection system textures
-    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_SRV(80));   // t_LocalCubemapGGX
-    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_SRV(81));   // t_DiffuseIrradianceCube
-    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_SRV(82));   // t_SSRBlurChain
-    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_SRV(83));   // t_BRDFLUT
-    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_SRV(84));   // t_DepthHierarchy
-    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::VolatileConstantBuffer(10)); // ReflectionConstants
-    // SSRConstants removed - SSR now uses push constants instead of constant buffer
-    
-    // SSR result UAV (depth hierarchy UAVs u80-84 are in a dedicated binding set)
-    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_UAV(85));   // u_SSRResult
-
-    // Ambient occlusion output consumed by deferred lighting
-    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_SRV(86));   // t_GTAOOutput
-    // Previous frame depth (for temporal reprojection / disocclusion detection)
-    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_SRV(87));   // t_PrevDepth
-
-    m_bindingLayout = device->createBindingLayout(globalBindingLayoutDesc);
-
-    m_DescriptorTable = std::make_shared<caustica::DescriptorTableManager>(device, m_bindlessLayout);
-
     auto nativeFS = std::make_shared<caustica::NativeFileSystem>();
-    m_TextureCache = std::make_shared<caustica::TextureCache>(device, nativeFS, m_DescriptorTable);
+    m_TextureCache = std::make_shared<caustica::TextureCache>(GetDevice(), nativeFS, m_DescriptorTable);
 
     m_sceneManager = std::make_unique<SceneManager>(
         *GetGpuDevice(), *m_shaderFactory, m_TextureCache, m_DescriptorTable);
 
     m_renderer = std::make_unique<Renderer>(*this);
 
-    memset( &m_feedbackData, 0, sizeof(DebugFeedbackStruct) * 1 );
-    memset( &m_debugDeltaPathTree, 0, sizeof(DeltaTreeVizPathVertex) * cDeltaTreeVizMaxVertices );
-
-    //Draw lines from the feedback buffer - this is old and should all be replaced by ShaderDebug
-    {
-        std::vector<ShaderMacro> drawLinesMacro = { ShaderMacro("DRAW_LINES_SHADERS_OLD", "1") };
-        m_linesVertexShader = m_shaderFactory->CreateShader("caustica/shaders/render/Misc/DebugLines.hlsl", "main_vs", &drawLinesMacro, nvrhi::ShaderType::Vertex);
-        m_linesPixelShader = m_shaderFactory->CreateShader("caustica/shaders/render/Misc/DebugLines.hlsl", "main_ps", &drawLinesMacro, nvrhi::ShaderType::Pixel);
-
-        nvrhi::VertexAttributeDesc attributes[] = {
-            nvrhi::VertexAttributeDesc()
-                .setName("POSITION")
-                .setFormat(nvrhi::Format::RGBA32_FLOAT)
-                .setOffset(0)
-                .setElementStride(sizeof(DebugLineStruct)),
-                nvrhi::VertexAttributeDesc()
-                .setName("COLOR")
-                .setFormat(nvrhi::Format::RGBA32_FLOAT)
-                .setOffset(offsetof(DebugLineStruct, col))
-                .setElementStride(sizeof(DebugLineStruct)),
-        };
-        m_linesInputLayout = device->createInputLayout(attributes, uint32_t(std::size(attributes)), m_linesVertexShader);
-
-        nvrhi::BindingLayoutDesc linesBindingLayoutDesc;
-        linesBindingLayoutDesc.visibility = nvrhi::ShaderType::All;
-        linesBindingLayoutDesc.bindings = {
-            nvrhi::BindingLayoutItem::VolatileConstantBuffer(0),
-            nvrhi::BindingLayoutItem::Texture_SRV(0)
-        };
-
-        m_linesBindingLayout = device->createBindingLayout(linesBindingLayoutDesc);
-
-        // debug stuff!
-        {
-            nvrhi::BufferDesc bufferDesc;
-            bufferDesc.byteSize = sizeof(DebugFeedbackStruct) * 1;
-            bufferDesc.isConstantBuffer = false;
-            bufferDesc.isVolatile = false;
-            bufferDesc.canHaveUAVs = true;
-            bufferDesc.cpuAccess = nvrhi::CpuAccessMode::None;
-            bufferDesc.maxVersions = caustica::c_MaxRenderPassConstantBufferVersions;
-            bufferDesc.structStride = sizeof(DebugFeedbackStruct);
-            bufferDesc.keepInitialState = true;
-            bufferDesc.initialState = nvrhi::ResourceStates::Common;
-            bufferDesc.debugName = "Feedback_Buffer_Gpu";
-            m_feedback_Buffer_Gpu = device->createBuffer(bufferDesc);
-
-            bufferDesc.canHaveUAVs = false;
-            bufferDesc.cpuAccess = nvrhi::CpuAccessMode::Read;
-            bufferDesc.structStride = 0;
-            bufferDesc.keepInitialState = false;
-            bufferDesc.initialState = nvrhi::ResourceStates::Unknown;
-            bufferDesc.debugName = "Feedback_Buffer_Cpu";
-            m_feedback_Buffer_Cpu = device->createBuffer(bufferDesc);
-
-            bufferDesc.byteSize = sizeof(DebugLineStruct) * MAX_DEBUG_LINES;
-            bufferDesc.isVertexBuffer = true;
-            bufferDesc.isConstantBuffer = false;
-            bufferDesc.isVolatile = false;
-            bufferDesc.canHaveUAVs = true;
-            bufferDesc.cpuAccess = nvrhi::CpuAccessMode::None;
-            bufferDesc.structStride = sizeof(DebugLineStruct);
-            bufferDesc.keepInitialState = true;
-            bufferDesc.initialState = nvrhi::ResourceStates::Common;
-            bufferDesc.debugName = "DebugLinesCapture";
-            m_debugLineBufferCapture    = device->createBuffer(bufferDesc);
-            bufferDesc.debugName = "DebugLinesDisplay";
-            m_debugLineBufferDisplay    = device->createBuffer(bufferDesc);
-
-            bufferDesc.byteSize = sizeof(DeltaTreeVizPathVertex) * cDeltaTreeVizMaxVertices;
-            bufferDesc.isConstantBuffer = false;
-            bufferDesc.isVolatile = false;
-            bufferDesc.canHaveUAVs = true;
-            bufferDesc.cpuAccess = nvrhi::CpuAccessMode::None;
-            bufferDesc.maxVersions = caustica::c_MaxRenderPassConstantBufferVersions;
-            bufferDesc.structStride = sizeof(DeltaTreeVizPathVertex);
-            bufferDesc.keepInitialState = true;
-            bufferDesc.initialState = nvrhi::ResourceStates::Common;
-            bufferDesc.debugName = "Feedback_PathDecomp_Gpu";
-            m_debugDeltaPathTree_Gpu = device->createBuffer(bufferDesc);
-
-            bufferDesc.canHaveUAVs = false;
-            bufferDesc.cpuAccess = nvrhi::CpuAccessMode::Read;
-            bufferDesc.structStride = 0;
-            bufferDesc.keepInitialState = false;
-            bufferDesc.initialState = nvrhi::ResourceStates::Unknown;
-            bufferDesc.debugName = "Feedback_PathDecomp_Cpu";
-            m_debugDeltaPathTree_Cpu = device->createBuffer(bufferDesc);
-
-
-            bufferDesc.byteSize = sizeof(PathPayload) * cDeltaTreeVizMaxStackSize;
-            bufferDesc.isConstantBuffer = false;
-            bufferDesc.isVolatile = false;
-            bufferDesc.canHaveUAVs = true;
-            bufferDesc.cpuAccess = nvrhi::CpuAccessMode::None;
-            bufferDesc.maxVersions = caustica::c_MaxRenderPassConstantBufferVersions;
-            bufferDesc.structStride = sizeof(PathPayload);
-            bufferDesc.keepInitialState = true;
-            bufferDesc.initialState = nvrhi::ResourceStates::Common;
-            bufferDesc.debugName = "DebugDeltaPathTreeSearchStack";
-            m_debugDeltaPathTreeSearchStack = device->createBuffer(bufferDesc);
-        }
-    }
-
-    // Main constant buffer
-    m_constantBuffer = device->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(
-        sizeof(SampleConstants), "SampleConstants", caustica::c_MaxRenderPassConstantBufferVersions*2));	// *2 because in some cases we update twice per frame
-
-    // Command list!
-    m_commandList = device->createCommandList();
-
     m_renderCore.initializeRenderPipeline(m_shaderFactory);
 
-    if(device->queryFeatureSupport(nvrhi::Feature::RayTracingOpacityMicromap))
-        m_ommBaker = std::make_shared<OmmBaker>(device, m_DescriptorTable, m_TextureCache, m_shaderFactory);
+    if (GetDevice()->queryFeatureSupport(nvrhi::Feature::RayTracingOpacityMicromap))
+        m_ommBaker = std::make_shared<OmmBaker>(GetDevice(), m_DescriptorTable, m_TextureCache, m_shaderFactory);
 
     // Get all scenes in "assets" folder ??delegated to SceneManager
     m_sceneManager->discoverAvailableScenes(GetLocalPath(c_AssetsFolder));
@@ -604,14 +365,12 @@ void PathTracerApp::Init(const std::string& preferredScene,
         .sampleGame = m_sampleGame.get(),
         .getZoomTool = [this]() { return m_zoomTool.get(); },
         .getUpscalingScale = [this]() -> dm::float2 {
-            if (m_renderTargets == nullptr)
+            if (m_pathTracingRenderer->getRenderTargets() == nullptr)
                 return dm::float2(1.0f, 1.0f);
-            return dm::float2(m_renderSize) / dm::float2(m_displaySize);
+            return dm::float2(m_pathTracingRenderer->getRenderSize()) / dm::float2(m_pathTracingRenderer->getDisplaySize());
         },
     });
     GetGpuDevice()->RegisterInputHandler(m_inputController.get());
-
-    m_pathTracingRenderer = std::make_unique<PathTracingRenderer>(*this);
 }
 
 void PathTracerApp::SetCurrentScene( const std::string & sceneName, bool forceReload )
@@ -658,14 +417,16 @@ PathTracerApp::ResolveGaussianSplatPath(const GaussianSplat& splat) const
 
 void PathTracerApp::PrepareGaussianSplatPass(GaussianSplatPass& pass)
 {
-    if (m_renderTargets == nullptr || m_shaderDebug == nullptr)
+    auto* renderTargets = m_pathTracingRenderer->getRenderTargets();
+    auto shaderDebug = m_pathTracingRenderer->getShaderDebug();
+    if (renderTargets == nullptr || shaderDebug == nullptr)
         return;
 
     if (m_gpuSort == nullptr)
         m_gpuSort = std::make_shared<GPUSort>(GetDevice(), m_shaderFactory);
-    m_gpuSort->CreateRenderPasses(m_CommonPasses, m_shaderDebug);
+    m_gpuSort->CreateRenderPasses(m_CommonPasses, shaderDebug);
     pass.SetGpuSort(m_gpuSort);
-    pass.CreatePipeline(*m_renderTargets);
+    pass.CreatePipeline(*renderTargets);
 }
 
 uint32_t
@@ -752,7 +513,7 @@ void PathTracerApp::LoadGaussianSplatsFromScene()
     }
 
     UpdateGaussianSplatUIState();
-    m_gaussianSplatTemporalReset = true;
+    m_pathTracingRenderer->setGaussianSplatTemporalReset(true);
 }
 
 bool PathTracerApp::AttachGaussianSplatToScene(const std::filesystem::path& fileName, bool convertRdfToRub)
@@ -830,7 +591,7 @@ bool PathTracerApp::AttachGaussianSplatToScene(const std::filesystem::path& file
 
     m_settings.EnableGaussianSplats = true;
     UpdateGaussianSplatUIState();
-    m_gaussianSplatTemporalReset = true;
+    m_pathTracingRenderer->setGaussianSplatTemporalReset(true);
     RequestFullRebuild();
     return true;
 }
@@ -938,7 +699,8 @@ void PathTracerApp::SceneUnloading( )
 {
     m_editor.TogglableNodes = nullptr;
     SceneRender::SceneUnloading();
-    m_bindingSet = nullptr;
+    if (m_pathTracingRenderer)
+        m_pathTracingRenderer->onSceneUnloading();
     m_renderCore.onSceneUnloading();
     m_bindingCache->Clear( );
     m_lights.clear();
@@ -948,20 +710,16 @@ void PathTracerApp::SceneUnloading( )
     m_gaussianSplatSceneObjects.clear();
     m_gaussianSplatEmissionProxies.clear();
     UpdateGaussianSplatUIState();
-    m_gaussianSplatTemporalReset = true;
     m_settings.EnvironmentMapParams = EnvironmentMapRuntimeParameters();
     m_envMapBaker = nullptr;
     m_lightsBaker = nullptr;
     m_materialsBaker = nullptr;
     m_gpuSort = nullptr;
     m_uncompressedTextures.clear();
-    if (m_rtxdiPass != nullptr) 
-	    m_rtxdiPass->Reset();
     if (m_ommBaker != nullptr)
         m_ommBaker->SceneUnloading();
 
     DestroyRTPipelines();
-    m_ptPipelineBaker = nullptr;
     m_computePipelineBaker = nullptr;
 
     if (m_sampleGame!=nullptr) m_sampleGame->SceneUnloading();
@@ -1024,7 +782,8 @@ void PathTracerApp::RefreshEnvironmentMapMediaList()
 
 void PathTracerApp::SceneLoaded( )
 {
-    m_frameIndex = 0;
+    if (m_pathTracingRenderer)
+        m_pathTracingRenderer->resetFrameIndex();
 
     RefreshEnvironmentMapMediaList();
 
@@ -1221,8 +980,8 @@ void PathTracerApp::Animate(float fElapsedTimeSeconds)
 
     if (m_sampleGame) m_sampleGame->Tick(fElapsedTimeSeconds, enableAnimations);
 
-    if (m_toneMappingPass)
-        m_toneMappingPass->AdvanceFrame(fElapsedTimeSeconds);
+    if (auto* toneMappingPass = m_pathTracingRenderer->getToneMappingPass())
+        toneMappingPass->AdvanceFrame(fElapsedTimeSeconds);
 
     if (IsSceneLoaded() && enableAnimationUpdate)
     {
@@ -1258,7 +1017,7 @@ void PathTracerApp::Animate(float fElapsedTimeSeconds)
 
     if (m_settings.CameraAntiRRSleepJitter>0)
     {
-        float off = 0.05f * ((m_frameIndex%2)?(-m_settings.CameraAntiRRSleepJitter):(m_settings.CameraAntiRRSleepJitter));
+        float off = 0.05f * ((m_pathTracingRenderer->getFrameIndex()%2)?(-m_settings.CameraAntiRRSleepJitter):(m_settings.CameraAntiRRSleepJitter));
 
         float3 dir = m_renderCore.camera().camera().GetDir();
         float3 right = normalize(cross(dir, m_renderCore.camera().camera().GetUp()));
@@ -1273,7 +1032,7 @@ void PathTracerApp::Animate(float fElapsedTimeSeconds)
         m_renderCore.camera().updateLastCameraState();
         if( !m_settings.RealtimeMode )
             m_settings.ResetAccumulation = true;
-        m_gaussianSplatTemporalReset = true;
+        m_pathTracingRenderer->setGaussianSplatTemporalReset(true);
     }
 
     m_captureScriptManager->PostAnim();
@@ -1416,19 +1175,9 @@ void PathTracerApp::FillPTPipelineGlobalMacros(std::vector<caustica::ShaderMacro
 
 extern HitGroupInfo ComputeSubInstanceHitGroupInfo(const PTMaterial& material);
 
-bool PathTracerApp::CreatePTPipeline(caustica::ShaderFactory& shaderFactory)
+bool PathTracerApp::CreatePTPipeline(caustica::ShaderFactory& /*shaderFactory*/)
 {
-    {
-        std::vector<caustica::ShaderMacro> shaderMacros;
-		// shaderMacros.push_back(caustica::ShaderMacro({ "USE_RTXDI", "0" }));
-        m_exportVBufferCS = m_shaderFactory->CreateShader("caustica/shaders/render/ProcessingPasses/ExportVisibilityBuffer.hlsl", "main", &shaderMacros, nvrhi::ShaderType::Compute);
-        nvrhi::ComputePipelineDesc pipelineDesc;
-		pipelineDesc.bindingLayouts = { m_bindingLayout, m_bindlessLayout };
-		pipelineDesc.CS = m_exportVBufferCS;
-        m_exportVBufferPSO = GetDevice()->createComputePipeline(pipelineDesc);
-    }
-
-    return true;
+    return m_pathTracingRenderer->createPTPipeline();
 }
 
 void PathTracerApp::CreateBlases(nvrhi::ICommandList* commandList)
@@ -1480,7 +1229,7 @@ void PathTracerApp::RecreateAccelStructs(nvrhi::ICommandList* commandList)
 
         GetDevice()->waitForIdle();
 
-        m_bindingSet = nullptr;
+        m_pathTracingRenderer->invalidateBindingSet();
         m_renderCore.accelStructs().releaseGpuResources();
 
         m_renderCore.accelStructs().clearMeshAccelStructs(*m_sceneManager->getScene());
@@ -1542,7 +1291,7 @@ void PathTracerApp::SetEnvMapOverrideSource(const std::string& envMapOverride)
 
 bool PathTracerApp::ShouldRenderUnfocused()
 {
-    if (m_frameIndex < 16 || m_settings.ResetAccumulation || m_settings.ResetRealtimeCaches || m_captureScriptManager->IsDoingWork() )
+    if (m_pathTracingRenderer->getFrameIndex() < 16 || m_settings.ResetAccumulation || m_settings.ResetRealtimeCaches || m_captureScriptManager->IsDoingWork() )
     {
         // Make sure we at least run one render frame to allow expensive resource creation to happen in background, and to allow at least somewhat decent convergence so when user alt-tabs they get a nice image
         return true;
@@ -1554,7 +1303,7 @@ bool PathTracerApp::ShouldRenderUnfocused()
     }
 
     // Let Reference mode accumulate all frames before pausing
-    return (!m_settings.RealtimeMode && (m_accumulationSampleIndex < m_settings.AccumulationTarget));
+    return (!m_settings.RealtimeMode && (m_pathTracingRenderer->getAccumulationSampleIndex() < m_settings.AccumulationTarget));
 }
 
 void PathTracerApp::SetSceneTime( double sceneTime ) 
@@ -1811,7 +1560,7 @@ bool PathTracerApp::DeleteSceneNode(const std::shared_ptr<SceneGraphNode>& node)
     {
         UpdateGaussianSplatUIState();
         m_gaussianSplatEmissionProxies.clear();
-        m_gaussianSplatTemporalReset = true;
+        m_pathTracingRenderer->setGaussianSplatTemporalReset(true);
     }
 
     if (m_materialsBaker != nullptr)
@@ -1832,7 +1581,7 @@ void PathTracerApp::RequestFullRebuild()
     m_editor.ShaderReloadRequested = true;
     m_editor.ShaderAndACRefreshDelayedRequest = 0.0f;
     m_settings.ResetAccumulation = true;
-    m_bindingSet = nullptr;
+    m_pathTracingRenderer->invalidateBindingSet();
     if (m_bindingCache)
         m_bindingCache->Clear();
 }
@@ -2446,4 +2195,76 @@ static void ReadRGBA16Float3Staging(nvrhi::IDevice* device, nvrhi::IStagingTextu
 dm::float2 PathTracerApp::ComputeCameraJitter(uint frameIndex)
 {
     return m_renderer->computeCameraJitter(frameIndex);
+}
+
+nvrhi::ITexture* PathTracerApp::GetLdrColorTexture() const
+{
+    const auto* targets = m_pathTracingRenderer ? m_pathTracingRenderer->getRenderTargets() : nullptr;
+    return targets ? targets->LdrColor.Get() : nullptr;
+}
+
+const DebugFeedbackStruct& PathTracerApp::GetFeedbackData() const
+{
+    return m_pathTracingRenderer->getFeedbackData();
+}
+
+const DeltaTreeVizPathVertex* PathTracerApp::GetDebugDeltaPathTree() const
+{
+    return m_pathTracingRenderer->getDebugDeltaPathTree();
+}
+
+int PathTracerApp::GetAccumulationSampleIndex() const
+{
+    return m_pathTracingRenderer ? m_pathTracingRenderer->getAccumulationSampleIndex() : 0;
+}
+
+uint2 PathTracerApp::GetRenderSize() const
+{
+    return m_pathTracingRenderer ? m_pathTracingRenderer->getRenderSize() : uint2{0, 0};
+}
+
+uint2 PathTracerApp::GetDisplaySize() const
+{
+    return m_pathTracingRenderer ? m_pathTracingRenderer->getDisplaySize() : uint2{0, 0};
+}
+
+bool PathTracerApp::AccumulationCompleted() const
+{
+    return m_pathTracingRenderer && m_pathTracingRenderer->getAccumulationCompleted();
+}
+
+void PathTracerApp::InvalidateBindingSet()
+{
+    if (m_pathTracingRenderer)
+        m_pathTracingRenderer->invalidateBindingSet();
+}
+
+std::shared_ptr<PTPipelineBaker> PathTracerApp::GetRTPipelineBaker() const
+{
+    return m_pathTracingRenderer ? m_pathTracingRenderer->getPTPipelineBaker() : nullptr;
+}
+
+std::shared_ptr<PTPipelineVariant>& PathTracerApp::PtPipelineReference()
+{
+    return m_pathTracingRenderer->ptPipelineReference();
+}
+
+std::shared_ptr<PTPipelineVariant>& PathTracerApp::PtPipelineBuildStablePlanes()
+{
+    return m_pathTracingRenderer->ptPipelineBuildStablePlanes();
+}
+
+std::shared_ptr<PTPipelineVariant>& PathTracerApp::PtPipelineFillStablePlanes()
+{
+    return m_pathTracingRenderer->ptPipelineFillStablePlanes();
+}
+
+std::shared_ptr<PTPipelineVariant>& PathTracerApp::PtPipelineTestRaygenPPHDR()
+{
+    return m_pathTracingRenderer->ptPipelineTestRaygenPPHDR();
+}
+
+std::shared_ptr<PTPipelineVariant>& PathTracerApp::PtPipelineEdgeDetection()
+{
+    return m_pathTracingRenderer->ptPipelineEdgeDetection();
 }

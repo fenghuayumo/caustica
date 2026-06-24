@@ -58,12 +58,12 @@ class PythonScripting;
 #endif
 class GaussianSplatPass;
 class Renderer;
-class PathTracerInputController;
 class PathTracingRenderer;
 
 class PathTracerApp : public caustica::SceneRender
 {
     friend class Renderer;
+    friend class PathTracerInputController;
     friend class PathTracingRenderer;
 
     // static constexpr uint32_t c_PathTracerVariants   = 6; // see shaders.cfg and CreatePTPipeline for details on variants
@@ -79,12 +79,12 @@ public:
     //std::shared_ptr<caustica::IFileSystem> GetRootFs() const                      { return m_RootFS; }
     std::shared_ptr<caustica::ShaderFactory> GetShaderFactory() const          { return m_shaderFactory; }
     std::shared_ptr<caustica::CommonRenderPasses> GetCommonPasses() const      { return m_CommonPasses; }
-    nvrhi::ITexture*                       GetLdrColorTexture() const               { return m_renderTargets ? m_renderTargets->LdrColor.Get() : nullptr; }
+    nvrhi::ITexture*                       GetLdrColorTexture() const;
     std::shared_ptr<caustica::Scene>   GetScene() const                        { return m_sceneManager->getScene(); }
     std::vector<std::string> const &        GetAvailableScenes() const              { return m_sceneManager->getAvailableScenes(); }
     std::string                             GetCurrentSceneName() const             { return m_sceneManager->getCurrentSceneName(); }
-    const DebugFeedbackStruct &             GetFeedbackData() const                 { return m_feedbackData; }
-    const DeltaTreeVizPathVertex *          GetDebugDeltaPathTree() const           { return m_debugDeltaPathTree; }
+    const DebugFeedbackStruct &             GetFeedbackData() const;
+    const DeltaTreeVizPathVertex *          GetDebugDeltaPathTree() const;
     uint                                    GetSceneCameraCount() const             { return (uint)GetScene()->GetSceneGraph()->GetCameras().size() + 1; }
     uint &                                  SelectedCameraIndex()                   { return m_renderCore.camera().selectedCameraIndex(); }   // 0 is default fps free flight, above (if any) will just use current scene camera
     const std::unique_ptr<class GameScene> &     GetGame() const                   { return m_sampleGame; }
@@ -200,10 +200,10 @@ public:
 
     GLFWwindow *                            GetGLFWWindow() const { return GetGpuDevice()->GetWindow(); }
 
-    int                                     GetAccumulationSampleIndex() const { return m_accumulationSampleIndex; }
+    int                                     GetAccumulationSampleIndex() const;
 
-    uint2                                   GetRenderSize() const               { return m_renderSize;  } // native render resolution
-    uint2                                   GetDisplaySize() const              { return m_displaySize; } // final output resolution
+    uint2                                   GetRenderSize() const;
+    uint2                                   GetDisplaySize() const;
 
     const std::unique_ptr<CaptureScriptManager> & GetCaptureScriptManager() const { return m_captureScriptManager; }
 
@@ -213,7 +213,7 @@ public:
 
     bool                                    HasAsyncLoadingInProgress() const   { return m_asyncLoadingInProgress || m_editor.ShaderAndACRefreshDelayedRequest > 0; }
 
-    bool                                    AccumulationCompleted() const       { return m_accumulationCompleted; }
+    bool                                    AccumulationCompleted() const;
 
 protected:
     // Called when render targets have been recreated (e.g. after window resize)
@@ -225,38 +225,31 @@ protected:
     
     // Invalidates the binding set, forcing recreation on next frame
     // Call this from derived classes when custom bindings need to be updated
-    void InvalidateBindingSet() { m_bindingSet = nullptr; }
+    void InvalidateBindingSet();
     void RecreateBindingSet();
     
     // Path tracing settings (render) and editor UI state are distinct slices of SampleUIData.
     PathTracerSettings& m_settings;
     EditorUIState& m_editor;
     SampleUIData& m_ui;
-    std::unique_ptr<RtxdiPass>                  m_rtxdiPass;
-    std::unique_ptr<RenderTargets>              m_renderTargets;
-    nvrhi::BindingLayoutHandle                  m_bindingLayout;
-    nvrhi::BindingLayoutHandle                  m_bindlessLayout;
-    nvrhi::BindingSetHandle                     m_bindingSet;
-
-    std::shared_ptr<caustica::DescriptorTableManager> m_DescriptorTable;
-
-    // QoL accessors for derived samples
-    const caustica::PlanarView& GetView() const { return *m_renderCore.camera().view(); }
-    std::shared_ptr<class PTPipelineBaker>  GetRTPipelineBaker() const { return m_ptPipelineBaker; }
-    std::shared_ptr<ComputePipelineBaker>   GetComputePipelineBaker() const { return m_computePipelineBaker; }
-
-    // TODO: These are specific to the advanced sample. Should move them there
-    std::shared_ptr<class PTPipelineVariant>    m_ptPipelineReference;
-    std::shared_ptr<class PTPipelineVariant>    m_ptPipelineBuildStablePlanes;
-    std::shared_ptr<class PTPipelineVariant>    m_ptPipelineFillStablePlanes;
-
-    std::shared_ptr<class PTPipelineVariant>    m_ptPipelineTestRaygenPPHDR;
-    std::shared_ptr<class PTPipelineVariant>    m_ptPipelineEdgeDetection;
 
     std::unique_ptr<CaptureScriptManager>       m_captureScriptManager;
 #if CAUSTICA_WITH_PYTHON
     std::unique_ptr<PythonScripting>            m_pythonScripting;
 #endif
+
+    std::unique_ptr<PathTracingRenderer>        m_pathTracingRenderer;
+
+    // QoL accessors for derived samples (delegate to PathTracingRenderer)
+    const caustica::PlanarView& GetView() const { return *m_renderCore.camera().view(); }
+    std::shared_ptr<class PTPipelineBaker>  GetRTPipelineBaker() const;
+    std::shared_ptr<ComputePipelineBaker>   GetComputePipelineBaker() const { return m_computePipelineBaker; }
+
+    std::shared_ptr<class PTPipelineVariant>& PtPipelineReference();
+    std::shared_ptr<class PTPipelineVariant>& PtPipelineBuildStablePlanes();
+    std::shared_ptr<class PTPipelineVariant>& PtPipelineFillStablePlanes();
+    std::shared_ptr<class PTPipelineVariant>& PtPipelineTestRaygenPPHDR();
+    std::shared_ptr<class PTPipelineVariant>& PtPipelineEdgeDetection();
 
 private:
     struct GaussianSplatSceneObject;
@@ -299,15 +292,7 @@ private:
     std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
     std::shared_ptr<caustica::CommonRenderPasses> m_CommonPasses;
     std::unique_ptr<caustica::BindingCache> m_bindingCache;
-    nvrhi::CommandListHandle                    m_commandList;
-
-    std::unique_ptr<caustica::render::TemporalAntiAliasingPass> m_temporalAntiAliasingPass;
-
-    // rendering
-    std::vector <std::shared_ptr<caustica::Light>> m_lights;
-    std::unique_ptr<caustica::render::BloomPass>   m_bloomPass;
-    std::unique_ptr<ToneMappingPass>            m_toneMappingPass;
-    nvrhi::BufferHandle                         m_constantBuffer;
+    std::shared_ptr<caustica::DescriptorTableManager> m_DescriptorTable;
 
     // lighting
     std::string                                 m_envMapLocalPath;
@@ -322,7 +307,6 @@ private:
     std::shared_ptr<LightsBaker>                m_lightsBaker;
     std::shared_ptr<class MaterialsBaker>       m_materialsBaker;
     std::shared_ptr<class OmmBaker>             m_ommBaker;
-    std::shared_ptr<class PTPipelineBaker>      m_ptPipelineBaker;
     std::shared_ptr<ComputePipelineBaker>       m_computePipelineBaker;
 
     // utility
@@ -331,76 +315,13 @@ private:
     std::vector<GaussianSplatEmissionProxy>     m_gaussianSplatEmissionProxies;
     std::string                                 m_gaussianSplatFileNameSummary;
     bool                                        m_initialGaussianSplatAttached = false;
-    nvrhi::TextureHandle                        m_gaussianSplatCurrentColor;
-    nvrhi::TextureHandle                        m_gaussianSplatAccumulatedColor;
-    std::unique_ptr<AccumulationPass>           m_gaussianSplatAccumulationPass;
-    int                                         m_gaussianSplatTemporalSampleIndex = 0;
-    bool                                        m_gaussianSplatTemporalReset = true;
 
     std::chrono::high_resolution_clock::time_point m_benchStart = std::chrono::high_resolution_clock::now();
     std::chrono::high_resolution_clock::time_point m_benchLast = std::chrono::high_resolution_clock::now();
     int                                         m_benchFrames = 0;
 
-    std::shared_ptr<PostProcess>                m_postProcess;
-
-    //Debugging and debug viz
-    nvrhi::BufferHandle                         m_feedback_Buffer_Gpu;
-    nvrhi::BufferHandle                         m_feedback_Buffer_Cpu;
-    nvrhi::BufferHandle                         m_debugLineBufferCapture;
-    nvrhi::BufferHandle                         m_debugLineBufferDisplay;
-    nvrhi::ShaderHandle                         m_linesVertexShader;
-    nvrhi::ShaderHandle                         m_linesPixelShader;
-
-    std::vector<DebugLineStruct>                m_cpuSideDebugLines;
-
-    nvrhi::InputLayoutHandle                    m_linesInputLayout;
-    nvrhi::GraphicsPipelineHandle               m_linesPipeline;
-    nvrhi::BindingLayoutHandle                  m_linesBindingLayout;
-    nvrhi::BindingSetHandle                     m_linesBindingSet;
-
-    DebugFeedbackStruct                         m_feedbackData;
-
-    DeltaTreeVizPathVertex                      m_debugDeltaPathTree[cDeltaTreeVizMaxVertices];
-    nvrhi::BufferHandle                         m_debugDeltaPathTree_Gpu;
-    nvrhi::BufferHandle                         m_debugDeltaPathTree_Cpu;
-    nvrhi::BufferHandle                         m_debugDeltaPathTreeSearchStack;
-
-    // The command line settings are here
-    const CommandLineOptions&                   m_cmdLine;
-
-    // path tracing
-    int                                         m_accumulationSampleIndex = 0;  // accumulated so far in the past, so if 0 this is the first.
-
-    uint64_t                                    m_frameIndex = 0;
-    uint                                        m_sampleIndex = 0;            // per-frame sampling index; same as m_accumulationSampleIndex in accumulation mode, otherwise in realtime based on frameIndex%something 
-    SampleConstants                             m_currentConstants = {};
-
-    std::unique_ptr<NrdIntegration>             m_nrd[cStablePlaneCount];       // reminder: when switching between ReLAX/ReBLUR, change settings, reset these to 0 and they'll get re-created in CreateRenderPasses!
-    std::unique_ptr<AccumulationPass>           m_accumulationPass;
-    std::unique_ptr<OidnDenoiser>               m_oidnDenoiser;
-    nvrhi::TextureHandle                        m_oidnDenoisedOutput;
-    bool                                        m_oidnDenoisedOutputValid = false;
-    bool                                        m_oidnDenoiserFailed = false;
-    std::shared_ptr<ShaderDebug>                m_shaderDebug;
-
-    std::shared_ptr<DenoisingGuidesBaker>       m_denoisingGuidesBaker;
-
-    nvrhi::ShaderHandle                         m_exportVBufferCS;
-    nvrhi::ComputePipelineHandle                m_exportVBufferPSO;
-
     // texture compression: used but not compressed textures
     std::map<std::shared_ptr<caustica::LoadedTexture>, TextureCompressionType> m_uncompressedTextures;
-
-#if CAUSTICA_WITH_STREAMLINE
-    caustica::StreamlineInterface::DLSSSettings   m_recommendedDLSSSettings = {};
-    caustica::StreamlineInterface::DLSSRROptions  m_lastDLSSRROptions;
-#endif
-#if CAUSTICA_WITH_NATIVE_DLSS
-    std::unique_ptr<caustica::render::DLSS>     m_nativeDLSS;
-#endif
-    uint2                                       m_renderSize;   // native render resolution
-    uint2                                       m_displaySize;  // final output resolution
-    float                                       m_displayAspectRatio = 1.0f;
 
     std::string                                 m_fpsInfo;
     bool                                        m_windowIsInFocus = true;
@@ -413,9 +334,13 @@ private:
     std::unique_ptr<class ZoomTool>             m_zoomTool;
 
     std::unique_ptr<PathTracerInputController>  m_inputController;
-    std::unique_ptr<PathTracingRenderer>      m_pathTracingRenderer;
 
     bool                                        m_asyncLoadingInProgress = false;
-    bool                                        m_accumulationCompleted = false;
+
+    // The command line settings are here
+    const CommandLineOptions&                   m_cmdLine;
+
+    // rendering (scene lights list used by lighting update)
+    std::vector<std::shared_ptr<caustica::Light>> m_lights;
 };
 

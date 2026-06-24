@@ -6,6 +6,7 @@
 #pragma once
 
 #include "PathTracerApp.h"
+#include "render/PathTracingRenderer.h"
 #include <render/Core/PTPipelineBaker.h>
 
 class AdvancedPathTracer : public PathTracerApp
@@ -15,8 +16,9 @@ public:
 
     void SampleRenderCode(nvrhi::IFramebuffer* framebuffer, nvrhi::CommandListHandle commandList, const SampleConstants& constants) override
     {
+        auto& r = *m_pathTracingRenderer;
         if (m_ui.ActualUseRTXDIPasses())
-            m_rtxdiPass->BeginFrame(commandList, *m_renderTargets, m_bindingLayout, m_bindingSet);
+            r.getRtxdiPass()->BeginFrame(commandList, *r.getRenderTargets(), r.getBindingLayout(), r.getBindingSet());
 
         PathTrace(framebuffer, constants);
 
@@ -28,21 +30,20 @@ public:
         auto pipelineBaker = GetRTPipelineBaker();
         using SM = caustica::ShaderMacro;
 
-        // these don't actually compile any shaders - this happens later in m_ptPipelineBaker->Update
-        m_ptPipelineReference         = pipelineBaker->CreateVariant("PathTracerSample.hlsl", { SM("PATH_TRACER_MODE", "PATH_TRACER_MODE_REFERENCE") }, "REF");
-        m_ptPipelineBuildStablePlanes = pipelineBaker->CreateVariant("PathTracerSample.hlsl", { SM("PATH_TRACER_MODE", "PATH_TRACER_MODE_BUILD_STABLE_PLANES") }, "BUILD");
-        m_ptPipelineFillStablePlanes  = pipelineBaker->CreateVariant("PathTracerSample.hlsl", { SM("PATH_TRACER_MODE", "PATH_TRACER_MODE_FILL_STABLE_PLANES") }, "FILL");
-        m_ptPipelineTestRaygenPPHDR   = pipelineBaker->CreateVariant("TestRaygenPP.hlsl", { SM("PP_TEST_HDR", "1") }, "TESTRG", true);
-        m_ptPipelineEdgeDetection     = pipelineBaker->CreateVariant("TestRaygenPP.hlsl", { SM("PP_EDGE_DETECTION", "1") }, "EDGY", true);
+        PtPipelineReference()         = pipelineBaker->CreateVariant("PathTracerSample.hlsl", { SM("PATH_TRACER_MODE", "PATH_TRACER_MODE_REFERENCE") }, "REF");
+        PtPipelineBuildStablePlanes() = pipelineBaker->CreateVariant("PathTracerSample.hlsl", { SM("PATH_TRACER_MODE", "PATH_TRACER_MODE_BUILD_STABLE_PLANES") }, "BUILD");
+        PtPipelineFillStablePlanes()  = pipelineBaker->CreateVariant("PathTracerSample.hlsl", { SM("PATH_TRACER_MODE", "PATH_TRACER_MODE_FILL_STABLE_PLANES") }, "FILL");
+        PtPipelineTestRaygenPPHDR()   = pipelineBaker->CreateVariant("TestRaygenPP.hlsl", { SM("PP_TEST_HDR", "1") }, "TESTRG", true);
+        PtPipelineEdgeDetection()     = pipelineBaker->CreateVariant("TestRaygenPP.hlsl", { SM("PP_EDGE_DETECTION", "1") }, "EDGY", true);
     }
 
     void DestroyRTPipelines() override
     {
-        m_ptPipelineReference         = nullptr;
-        m_ptPipelineBuildStablePlanes = nullptr;
-        m_ptPipelineFillStablePlanes  = nullptr;
-        m_ptPipelineTestRaygenPPHDR   = nullptr;
-        m_ptPipelineEdgeDetection     = nullptr;
+        PtPipelineReference()         = nullptr;
+        PtPipelineBuildStablePlanes() = nullptr;
+        PtPipelineFillStablePlanes()  = nullptr;
+        PtPipelineTestRaygenPPHDR()   = nullptr;
+        PtPipelineEdgeDetection()     = nullptr;
     }
 
     std::string GetMaterialSpecializationShader() const override

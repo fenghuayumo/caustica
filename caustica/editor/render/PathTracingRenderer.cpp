@@ -1,6 +1,5 @@
 #include "render/PathTracingRenderer.h"
 #include "PathTracerApp.h"
-#include "PathTracerApp.h"
 
 #include <render/Core/PostProcessAA.h>
 #include <render/Core/SceneGeometryUpdate.h>
@@ -18,6 +17,7 @@
 #include <render/Passes/PostProcess/DenoisingGuidesBaker.h>
 #include <render/Passes/Denoisers/OidnDenoiser.h>
 #include <render/Passes/Gaussian/GaussianSplatPass.h>
+#include <assets/loader/ShaderFactory.h>
 #include <render/GPUSort/GPUSort.h>
 #include <backend/GpuDevice.h>
 #include <core/path_utils.h>
@@ -25,6 +25,8 @@
 #include <assets/cache/TextureCache.h>
 #include <render/Core/PathTracerSettings.h>
 #include <math/float.h>
+#include <math/math.h>
+#include <shaders/SampleConstantBuffer.h>
 #include <shaders/view_cb.h>
 #include <rhi/utils.h>
 
@@ -106,17 +108,272 @@ PathTracingRenderer::PathTracingRenderer(PathTracerApp& app)
 {
 }
 
+void PathTracingRenderer::createBindingLayouts()
+{
+    nvrhi::BindlessLayoutDesc bindlessLayoutDesc;
+    bindlessLayoutDesc.visibility = nvrhi::ShaderType::All;
+    bindlessLayoutDesc.firstSlot = 0;
+    bindlessLayoutDesc.maxCapacity = 1024;
+    bindlessLayoutDesc.registerSpaces = {
+        nvrhi::BindingLayoutItem::RawBuffer_SRV(1),
+        nvrhi::BindingLayoutItem::Texture_SRV(2)
+    };
+    auto device = m_app.GetDevice();
+    m_bindlessLayout = device->createBindlessLayout(bindlessLayoutDesc);
+
+    nvrhi::BindingLayoutDesc globalBindingLayoutDesc;
+    globalBindingLayoutDesc.visibility = nvrhi::ShaderType::All;
+    globalBindingLayoutDesc.bindings = {
+        nvrhi::BindingLayoutItem::VolatileConstantBuffer(0),
+        nvrhi::BindingLayoutItem::PushConstants(1, sizeof(SampleMiniConstants)),
+        nvrhi::BindingLayoutItem::RayTracingAccelStruct(0),
+        nvrhi::BindingLayoutItem::StructuredBuffer_SRV(1),
+        nvrhi::BindingLayoutItem::StructuredBuffer_SRV(2),
+        nvrhi::BindingLayoutItem::StructuredBuffer_SRV(3),
+        nvrhi::BindingLayoutItem::StructuredBuffer_SRV(4),
+        nvrhi::BindingLayoutItem::StructuredBuffer_SRV(5),
+        nvrhi::BindingLayoutItem::Texture_SRV(6),
+        nvrhi::BindingLayoutItem::RayTracingAccelStruct(7),
+        nvrhi::BindingLayoutItem::StructuredBuffer_SRV(8),
+        nvrhi::BindingLayoutItem::Texture_SRV(10),
+        nvrhi::BindingLayoutItem::Texture_SRV(11),
+        nvrhi::BindingLayoutItem::StructuredBuffer_SRV(12),
+        nvrhi::BindingLayoutItem::StructuredBuffer_SRV(13),
+        nvrhi::BindingLayoutItem::StructuredBuffer_SRV(14),
+        nvrhi::BindingLayoutItem::TypedBuffer_SRV(15),
+        nvrhi::BindingLayoutItem::TypedBuffer_SRV(16),
+        nvrhi::BindingLayoutItem::TypedBuffer_SRV(17),
+        nvrhi::BindingLayoutItem::Texture_SRV(18),
+        nvrhi::BindingLayoutItem::Texture_UAV(20),
+        nvrhi::BindingLayoutItem::Texture_UAV(21),
+        nvrhi::BindingLayoutItem::Sampler(0),
+        nvrhi::BindingLayoutItem::Sampler(1),
+        nvrhi::BindingLayoutItem::Sampler(2),
+        nvrhi::BindingLayoutItem::Texture_UAV(0),
+        nvrhi::BindingLayoutItem::Texture_UAV(1),
+        nvrhi::BindingLayoutItem::Texture_UAV(2),
+        nvrhi::BindingLayoutItem::Texture_UAV(4),
+        nvrhi::BindingLayoutItem::Texture_UAV(5),
+        nvrhi::BindingLayoutItem::Texture_UAV(6),
+        nvrhi::BindingLayoutItem::Texture_UAV(7),
+        nvrhi::BindingLayoutItem::Texture_UAV(8),
+        nvrhi::BindingLayoutItem::Texture_UAV(31),
+        nvrhi::BindingLayoutItem::Texture_UAV(32),
+        nvrhi::BindingLayoutItem::Texture_UAV(33),
+        nvrhi::BindingLayoutItem::Texture_UAV(34),
+        nvrhi::BindingLayoutItem::Texture_UAV(35),
+        nvrhi::BindingLayoutItem::Texture_UAV(36),
+        nvrhi::BindingLayoutItem::Texture_UAV(37),
+        nvrhi::BindingLayoutItem::StructuredBuffer_UAV(51),
+        nvrhi::BindingLayoutItem::StructuredBuffer_UAV(52),
+        nvrhi::BindingLayoutItem::StructuredBuffer_UAV(53),
+        nvrhi::BindingLayoutItem::StructuredBuffer_UAV(54),
+        nvrhi::BindingLayoutItem::Texture_UAV(60),
+        nvrhi::BindingLayoutItem::Texture_UAV(61),
+        nvrhi::BindingLayoutItem::Texture_UAV(70),
+        nvrhi::BindingLayoutItem::Texture_UAV(71),
+        nvrhi::BindingLayoutItem::Texture_UAV(72),
+        nvrhi::BindingLayoutItem::Texture_UAV(73),
+        nvrhi::BindingLayoutItem::Texture_UAV(74),
+        nvrhi::BindingLayoutItem::Texture_UAV(75),
+        nvrhi::BindingLayoutItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX),
+        nvrhi::BindingLayoutItem::Texture_UAV(SHADER_DEBUG_VIZ_TEXTURE_UAV_INDEX)
+    };
+
+    if (device->queryFeatureSupport(nvrhi::Feature::HlslExtensionUAV))
+    {
+        globalBindingLayoutDesc.bindings.push_back(
+            nvrhi::BindingLayoutItem::TypedBuffer_UAV(NV_SHADER_EXTN_SLOT_NUM));
+    }
+
+    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_UAV(40));
+    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::StructuredBuffer_UAV(42));
+    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_UAV(44));
+    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::StructuredBuffer_UAV(45));
+
+    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_UAV(100));
+    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_UAV(101));
+    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_UAV(102));
+    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_UAV(103));
+    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_UAV(10));
+    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_SRV(80));
+    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_SRV(81));
+    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_SRV(82));
+    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_SRV(83));
+    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_SRV(84));
+    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::VolatileConstantBuffer(10));
+    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_UAV(85));
+    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_SRV(86));
+    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_SRV(87));
+
+    m_bindingLayout = device->createBindingLayout(globalBindingLayoutDesc);
+}
+
+void PathTracingRenderer::createDeviceResources()
+{
+    auto device = m_app.GetDevice();
+
+#if CAUSTICA_WITH_NATIVE_DLSS
+    m_nativeDLSS = caustica::render::DLSS::Create(device, *m_app.m_shaderFactory, caustica::GetDirectoryWithExecutable().string());
+    if (m_nativeDLSS)
+    {
+        m_app.m_settings.IsDLSSSuported = m_nativeDLSS->IsDlssSupported();
+        m_app.m_settings.IsDLSSRRSupported = m_nativeDLSS->IsRayReconstructionSupported();
+        caustica::info("Native NGX DLSS support: DLSS=%s, DLSS-RR=%s.",
+            m_app.m_settings.IsDLSSSuported ? "yes" : "no",
+            m_app.m_settings.IsDLSSRRSupported ? "yes" : "no");
+    }
+    else
+    {
+        caustica::warning("Native NGX DLSS object was not created.");
+    }
+#endif
+
+    memset(&m_feedbackData, 0, sizeof(DebugFeedbackStruct) * 1);
+    memset(&m_debugDeltaPathTree, 0, sizeof(DeltaTreeVizPathVertex) * cDeltaTreeVizMaxVertices);
+
+    {
+        std::vector<ShaderMacro> drawLinesMacro = { ShaderMacro("DRAW_LINES_SHADERS_OLD", "1") };
+        m_linesVertexShader = m_app.m_shaderFactory->CreateShader("caustica/shaders/render/Misc/DebugLines.hlsl", "main_vs", &drawLinesMacro, nvrhi::ShaderType::Vertex);
+        m_linesPixelShader = m_app.m_shaderFactory->CreateShader("caustica/shaders/render/Misc/DebugLines.hlsl", "main_ps", &drawLinesMacro, nvrhi::ShaderType::Pixel);
+
+        nvrhi::VertexAttributeDesc attributes[] = {
+            nvrhi::VertexAttributeDesc()
+                .setName("POSITION")
+                .setFormat(nvrhi::Format::RGBA32_FLOAT)
+                .setOffset(0)
+                .setElementStride(sizeof(DebugLineStruct)),
+            nvrhi::VertexAttributeDesc()
+                .setName("COLOR")
+                .setFormat(nvrhi::Format::RGBA32_FLOAT)
+                .setOffset(offsetof(DebugLineStruct, col))
+                .setElementStride(sizeof(DebugLineStruct)),
+        };
+        m_linesInputLayout = device->createInputLayout(attributes, uint32_t(std::size(attributes)), m_linesVertexShader);
+
+        nvrhi::BindingLayoutDesc linesBindingLayoutDesc;
+        linesBindingLayoutDesc.visibility = nvrhi::ShaderType::All;
+        linesBindingLayoutDesc.bindings = {
+            nvrhi::BindingLayoutItem::VolatileConstantBuffer(0),
+            nvrhi::BindingLayoutItem::Texture_SRV(0)
+        };
+        m_linesBindingLayout = device->createBindingLayout(linesBindingLayoutDesc);
+
+        nvrhi::BufferDesc bufferDesc;
+        bufferDesc.byteSize = sizeof(DebugFeedbackStruct) * 1;
+        bufferDesc.isConstantBuffer = false;
+        bufferDesc.isVolatile = false;
+        bufferDesc.canHaveUAVs = true;
+        bufferDesc.cpuAccess = nvrhi::CpuAccessMode::None;
+        bufferDesc.maxVersions = caustica::c_MaxRenderPassConstantBufferVersions;
+        bufferDesc.structStride = sizeof(DebugFeedbackStruct);
+        bufferDesc.keepInitialState = true;
+        bufferDesc.initialState = nvrhi::ResourceStates::Common;
+        bufferDesc.debugName = "Feedback_Buffer_Gpu";
+        m_feedback_Buffer_Gpu = device->createBuffer(bufferDesc);
+
+        bufferDesc.canHaveUAVs = false;
+        bufferDesc.cpuAccess = nvrhi::CpuAccessMode::Read;
+        bufferDesc.structStride = 0;
+        bufferDesc.keepInitialState = false;
+        bufferDesc.initialState = nvrhi::ResourceStates::Unknown;
+        bufferDesc.debugName = "Feedback_Buffer_Cpu";
+        m_feedback_Buffer_Cpu = device->createBuffer(bufferDesc);
+
+        bufferDesc.byteSize = sizeof(DebugLineStruct) * MAX_DEBUG_LINES;
+        bufferDesc.isVertexBuffer = true;
+        bufferDesc.isConstantBuffer = false;
+        bufferDesc.isVolatile = false;
+        bufferDesc.canHaveUAVs = true;
+        bufferDesc.cpuAccess = nvrhi::CpuAccessMode::None;
+        bufferDesc.structStride = sizeof(DebugLineStruct);
+        bufferDesc.keepInitialState = true;
+        bufferDesc.initialState = nvrhi::ResourceStates::Common;
+        bufferDesc.debugName = "DebugLinesCapture";
+        m_debugLineBufferCapture = device->createBuffer(bufferDesc);
+        bufferDesc.debugName = "DebugLinesDisplay";
+        m_debugLineBufferDisplay = device->createBuffer(bufferDesc);
+
+        bufferDesc.byteSize = sizeof(DeltaTreeVizPathVertex) * cDeltaTreeVizMaxVertices;
+        bufferDesc.isConstantBuffer = false;
+        bufferDesc.isVolatile = false;
+        bufferDesc.canHaveUAVs = true;
+        bufferDesc.cpuAccess = nvrhi::CpuAccessMode::None;
+        bufferDesc.maxVersions = caustica::c_MaxRenderPassConstantBufferVersions;
+        bufferDesc.structStride = sizeof(DeltaTreeVizPathVertex);
+        bufferDesc.keepInitialState = true;
+        bufferDesc.initialState = nvrhi::ResourceStates::Common;
+        bufferDesc.debugName = "Feedback_PathDecomp_Gpu";
+        m_debugDeltaPathTree_Gpu = device->createBuffer(bufferDesc);
+
+        bufferDesc.canHaveUAVs = false;
+        bufferDesc.cpuAccess = nvrhi::CpuAccessMode::Read;
+        bufferDesc.structStride = 0;
+        bufferDesc.keepInitialState = false;
+        bufferDesc.initialState = nvrhi::ResourceStates::Unknown;
+        bufferDesc.debugName = "Feedback_PathDecomp_Cpu";
+        m_debugDeltaPathTree_Cpu = device->createBuffer(bufferDesc);
+
+        bufferDesc.byteSize = sizeof(PathPayload) * cDeltaTreeVizMaxStackSize;
+        bufferDesc.isConstantBuffer = false;
+        bufferDesc.isVolatile = false;
+        bufferDesc.canHaveUAVs = true;
+        bufferDesc.cpuAccess = nvrhi::CpuAccessMode::None;
+        bufferDesc.maxVersions = caustica::c_MaxRenderPassConstantBufferVersions;
+        bufferDesc.structStride = sizeof(PathPayload);
+        bufferDesc.keepInitialState = true;
+        bufferDesc.initialState = nvrhi::ResourceStates::Common;
+        bufferDesc.debugName = "DebugDeltaPathTreeSearchStack";
+        m_debugDeltaPathTreeSearchStack = device->createBuffer(bufferDesc);
+    }
+
+    m_constantBuffer = device->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(
+        sizeof(SampleConstants), "SampleConstants", caustica::c_MaxRenderPassConstantBufferVersions * 2));
+
+    m_commandList = device->createCommandList();
+}
+
+bool PathTracingRenderer::createPTPipeline()
+{
+    std::vector<caustica::ShaderMacro> shaderMacros;
+    m_exportVBufferCS = m_app.m_shaderFactory->CreateShader(
+        "caustica/shaders/render/ProcessingPasses/ExportVisibilityBuffer.hlsl", "main", &shaderMacros, nvrhi::ShaderType::Compute);
+    nvrhi::ComputePipelineDesc pipelineDesc;
+    pipelineDesc.bindingLayouts = { m_bindingLayout, m_bindlessLayout };
+    pipelineDesc.CS = m_exportVBufferCS;
+    m_exportVBufferPSO = m_app.GetDevice()->createComputePipeline(pipelineDesc);
+    return true;
+}
+
+void PathTracingRenderer::onSceneUnloading()
+{
+    m_bindingSet = nullptr;
+    m_gaussianSplatTemporalReset = true;
+    if (m_rtxdiPass != nullptr)
+        m_rtxdiPass->Reset();
+    m_ptPipelineBaker = nullptr;
+    m_ptPipelineReference = nullptr;
+    m_ptPipelineBuildStablePlanes = nullptr;
+    m_ptPipelineFillStablePlanes = nullptr;
+    m_ptPipelineTestRaygenPPHDR = nullptr;
+    m_ptPipelineEdgeDetection = nullptr;
+}
+
+void PathTracingRenderer::resetFrameIndex()
+{
+    m_frameIndex = 0;
+}
 void PathTracingRenderer::onBackBufferResizing()
 {
     m_app.GetDevice()->waitForIdle();
     m_app.GetDevice()->runGarbageCollection();
     m_app.m_bindingCache->Clear();
-    m_app.m_renderTargets = nullptr;
-    m_app.m_linesPipeline = nullptr; // the pipeline is based on the framebuffer so needs a reset
-    for (int i=0; i < std::size(m_app.m_nrd); i++ )
-        m_app.m_nrd[i] = nullptr;
-    if (m_app.m_rtxdiPass)
-        m_app.m_rtxdiPass->Reset();
+    m_renderTargets = nullptr;
+    m_linesPipeline = nullptr; // the pipeline is based on the framebuffer so needs a reset
+    for (int i=0; i < std::size(m_nrd); i++ )
+        m_nrd[i] = nullptr;
+    if (m_rtxdiPass)
+        m_rtxdiPass->Reset();
 
 // NOTE: we're not yet sure if this is necessary to avoid crash with going in/out of fullscreen and FG
 #if CAUSTICA_WITH_STREAMLINE
@@ -162,21 +419,21 @@ void PathTracingRenderer::createRenderPasses( bool& exposureResetRequired, nvrhi
 {
     m_app.m_bindingCache->Clear();
 
-    const uint2 screenResolution = {m_app.m_renderTargets->OutputColor->getDesc().width, m_app.m_renderTargets->OutputColor->getDesc().height};
+    const uint2 screenResolution = {m_renderTargets->OutputColor->getDesc().width, m_renderTargets->OutputColor->getDesc().height};
 
-    m_app.m_shaderDebug = std::make_shared<ShaderDebug>(m_app.GetDevice(), initializeCommandList, m_app.m_shaderFactory, m_app.m_CommonPasses);
+    m_shaderDebug = std::make_shared<ShaderDebug>(m_app.GetDevice(), initializeCommandList, m_app.m_shaderFactory, m_app.m_CommonPasses);
 
     if (m_app.m_settings.ActualUseRTXDIPasses())
-        m_app.m_rtxdiPass = std::make_unique<RtxdiPass>(m_app.GetDevice(), m_app.m_shaderFactory, m_app.m_CommonPasses, m_app.m_bindlessLayout);
+        m_rtxdiPass = std::make_unique<RtxdiPass>(m_app.GetDevice(), m_app.m_shaderFactory, m_app.m_CommonPasses, m_bindlessLayout);
     else
-        m_app.m_rtxdiPass = nullptr;
+        m_rtxdiPass = nullptr;
 
-    m_app.m_accumulationPass = std::make_unique<AccumulationPass>(m_app.GetDevice(), m_app.m_shaderFactory);
-    m_app.m_accumulationPass->CreatePipeline();
-    m_app.m_accumulationPass->CreateBindingSet(m_app.m_renderTargets->OutputColor, m_app.m_renderTargets->AccumulatedRadiance, m_app.m_renderTargets->ProcessedOutputColor);
+    m_accumulationPass = std::make_unique<AccumulationPass>(m_app.GetDevice(), m_app.m_shaderFactory);
+    m_accumulationPass->CreatePipeline();
+    m_accumulationPass->CreateBindingSet(m_renderTargets->OutputColor, m_renderTargets->AccumulatedRadiance, m_renderTargets->ProcessedOutputColor);
 
     {
-        nvrhi::TextureDesc gaussianCurrentDesc = m_app.m_renderTargets->ProcessedOutputColor->getDesc();
+        nvrhi::TextureDesc gaussianCurrentDesc = m_renderTargets->ProcessedOutputColor->getDesc();
         gaussianCurrentDesc.debugName = "GaussianSplatTemporalCurrentColor";
         gaussianCurrentDesc.isUAV = false;
         gaussianCurrentDesc.isRenderTarget = false;
@@ -184,53 +441,53 @@ void PathTracingRenderer::createRenderPasses( bool& exposureResetRequired, nvrhi
         gaussianCurrentDesc.clearValue = nvrhi::Color(0.0f);
         gaussianCurrentDesc.initialState = nvrhi::ResourceStates::ShaderResource;
         gaussianCurrentDesc.keepInitialState = true;
-        m_app.m_gaussianSplatCurrentColor = m_app.GetDevice()->createTexture(gaussianCurrentDesc);
+        m_gaussianSplatCurrentColor = m_app.GetDevice()->createTexture(gaussianCurrentDesc);
 
-        nvrhi::TextureDesc gaussianAccumDesc = m_app.m_renderTargets->ProcessedOutputColor->getDesc();
+        nvrhi::TextureDesc gaussianAccumDesc = m_renderTargets->ProcessedOutputColor->getDesc();
         gaussianAccumDesc.debugName = "GaussianSplatTemporalAccumulatedColor";
         gaussianAccumDesc.format = nvrhi::Format::RGBA32_FLOAT;
         gaussianAccumDesc.isUAV = true;
         gaussianAccumDesc.isRenderTarget = true;
         gaussianAccumDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
         gaussianAccumDesc.keepInitialState = true;
-        m_app.m_gaussianSplatAccumulatedColor = m_app.GetDevice()->createTexture(gaussianAccumDesc);
+        m_gaussianSplatAccumulatedColor = m_app.GetDevice()->createTexture(gaussianAccumDesc);
 
-        m_app.m_gaussianSplatAccumulationPass = std::make_unique<AccumulationPass>(m_app.GetDevice(), m_app.m_shaderFactory);
-        m_app.m_gaussianSplatAccumulationPass->CreatePipeline();
-        m_app.m_gaussianSplatAccumulationPass->CreateBindingSet(m_app.m_gaussianSplatCurrentColor, m_app.m_gaussianSplatAccumulatedColor, m_app.m_renderTargets->ProcessedOutputColor);
-        m_app.m_gaussianSplatTemporalReset = true;
+        m_gaussianSplatAccumulationPass = std::make_unique<AccumulationPass>(m_app.GetDevice(), m_app.m_shaderFactory);
+        m_gaussianSplatAccumulationPass->CreatePipeline();
+        m_gaussianSplatAccumulationPass->CreateBindingSet(m_gaussianSplatCurrentColor, m_gaussianSplatAccumulatedColor, m_renderTargets->ProcessedOutputColor);
+        m_gaussianSplatTemporalReset = true;
     }
 
     // these get re-created every time intentionally, to pick up changes after at-runtime shader recompile
-    m_app.m_toneMappingPass = std::make_unique<ToneMappingPass>(m_app.GetDevice(), m_app.m_shaderFactory, m_app.m_CommonPasses, m_app.m_renderTargets->LdrFramebuffer, *m_app.m_renderCore.camera().view(), m_app.m_renderTargets->OutputColor);
-    m_app.m_bloomPass = std::make_unique<BloomPass>(m_app.GetDevice(), m_app.m_shaderFactory, m_app.m_CommonPasses, m_app.m_renderTargets->ProcessedOutputFramebuffer, *m_app.m_renderCore.camera().view());
-    m_app.m_postProcess = std::make_shared<PostProcess>(m_app.GetDevice(), m_app.m_shaderFactory, m_app.m_CommonPasses, m_app.m_shaderDebug);
+    m_toneMappingPass = std::make_unique<ToneMappingPass>(m_app.GetDevice(), m_app.m_shaderFactory, m_app.m_CommonPasses, m_renderTargets->LdrFramebuffer, *m_app.m_renderCore.camera().view(), m_renderTargets->OutputColor);
+    m_bloomPass = std::make_unique<BloomPass>(m_app.GetDevice(), m_app.m_shaderFactory, m_app.m_CommonPasses, m_renderTargets->ProcessedOutputFramebuffer, *m_app.m_renderCore.camera().view());
+    m_postProcess = std::make_shared<PostProcess>(m_app.GetDevice(), m_app.m_shaderFactory, m_app.m_CommonPasses, m_shaderDebug);
 
     {
         TemporalAntiAliasingPass::CreateParameters taaParams;
-        taaParams.sourceDepth = m_app.m_renderTargets->Depth;
-        taaParams.motionVectors = m_app.m_renderTargets->ScreenMotionVectors;
-        taaParams.unresolvedColor = m_app.m_renderTargets->OutputColor;
-        taaParams.resolvedColor = m_app.m_renderTargets->ProcessedOutputColor;
-        taaParams.feedback1 = m_app.m_renderTargets->TemporalFeedback1;
-        taaParams.feedback2 = m_app.m_renderTargets->TemporalFeedback2;
-        taaParams.historyClampRelax = m_app.m_renderTargets->CombinedHistoryClampRelax;
+        taaParams.sourceDepth = m_renderTargets->Depth;
+        taaParams.motionVectors = m_renderTargets->ScreenMotionVectors;
+        taaParams.unresolvedColor = m_renderTargets->OutputColor;
+        taaParams.resolvedColor = m_renderTargets->ProcessedOutputColor;
+        taaParams.feedback1 = m_renderTargets->TemporalFeedback1;
+        taaParams.feedback2 = m_renderTargets->TemporalFeedback2;
+        taaParams.historyClampRelax = m_renderTargets->CombinedHistoryClampRelax;
         taaParams.motionVectorStencilMask = 0; ///*uint32_t motionVectorStencilMask =*/ 0x01;
         taaParams.useCatmullRomFilter = true;
 
-        m_app.m_temporalAntiAliasingPass = std::make_unique<TemporalAntiAliasingPass>(m_app.GetDevice(), m_app.m_shaderFactory, m_app.m_CommonPasses, *m_app.m_renderCore.camera().view(), taaParams);
+        m_temporalAntiAliasingPass = std::make_unique<TemporalAntiAliasingPass>(m_app.GetDevice(), m_app.m_shaderFactory, m_app.m_CommonPasses, *m_app.m_renderCore.camera().view(), taaParams);
     }
 
-    if (!m_app.CreatePTPipeline(*m_app.m_shaderFactory))
+    if (!createPTPipeline())
         { assert(false); }
 
     if (m_app.m_envMapBaker == nullptr)
         m_app.m_envMapBaker = std::make_shared<EnvMapBaker>(m_app.GetDevice(), m_app.GetTextureCache(), m_app.NeedsRasterPrecompute());
     if (m_app.m_lightsBaker == nullptr)
         m_app.m_lightsBaker = std::make_shared<LightsBaker>(m_app.GetDevice());
-    m_app.m_envMapBaker->CreateRenderPasses(m_app.m_shaderDebug, m_app.m_shaderFactory, m_app.m_computePipelineBaker);
+    m_app.m_envMapBaker->CreateRenderPasses(m_shaderDebug, m_app.m_shaderFactory, m_app.m_computePipelineBaker);
     m_app.m_envMapBaker->GenerateBRDFLUT(initializeCommandList.Get(), *m_app.m_bindingCache);  // One-time BRDF LUT generation
-    m_app.m_lightsBaker->CreateRenderPasses(m_app.m_shaderFactory, m_app.m_bindlessLayout, m_app.m_CommonPasses, m_app.m_shaderDebug, screenResolution, m_app.m_envMapBaker->GetImportanceSampling()->GetImportanceMapResolution());
+    m_app.m_lightsBaker->CreateRenderPasses(m_app.m_shaderFactory, m_bindlessLayout, m_app.m_CommonPasses, m_shaderDebug, screenResolution, m_app.m_envMapBaker->GetImportanceSampling()->GetImportanceMapResolution());
 
     if (!m_app.m_gaussianSplatSceneObjects.empty())
     {
@@ -241,7 +498,7 @@ void PathTracingRenderer::createRenderPasses( bool& exposureResetRequired, nvrhi
         }
     }
 
-    m_app.m_denoisingGuidesBaker = std::make_shared<DenoisingGuidesBaker>(m_app.GetDevice(), m_app.m_shaderFactory, m_app.m_renderTargets, m_app.m_shaderDebug, m_app.m_bindingLayout);
+    m_denoisingGuidesBaker = std::make_shared<DenoisingGuidesBaker>(m_app.GetDevice(), m_app.m_shaderFactory, m_renderTargets, m_shaderDebug, m_bindingLayout);
 }
 void PathTracingRenderer::preUpdateLighting(nvrhi::CommandListHandle commandList, bool& needNewBindings)
 {
@@ -283,7 +540,7 @@ void PathTracingRenderer::updateLighting(nvrhi::CommandListHandle commandList)
         m_app.m_ommBaker,
         m_app.m_envMapSceneParams,
         m_app.m_sceneTime,
-        m_app.m_frameIndex,
+        m_frameIndex,
         c_envMapRadianceScale,
     };
     if (!m_app.m_gaussianSplatEmissionProxies.empty())
@@ -304,44 +561,44 @@ void PathTracingRenderer::preUpdatePathTracing( bool resetAccum, nvrhi::CommandL
 
     if (resetAccum)
     {
-        m_app.m_accumulationSampleIndex = (m_app.m_settings.AccumulationPreWarmRealtimeCaches)?(-32):(0);
+        m_accumulationSampleIndex = (m_app.m_settings.AccumulationPreWarmRealtimeCaches)?(-32):(0);
     }
 #if ENABLE_DEBUG_VIZUALISATIONS
     if (resetAccum)
-        m_app.m_shaderDebug->ClearDebugVizTexture(commandList);
+        m_shaderDebug->ClearDebugVizTexture(commandList);
 #endif
 
     // profile perf - only makes sense with high accumulation sample counts; only start counting after n-th after it stabilizes
-    if( m_app.m_accumulationSampleIndex < 16 )
+    if( m_accumulationSampleIndex < 16 )
     {
         m_app.m_benchStart = std::chrono::high_resolution_clock::now( );
         m_app.m_benchLast = m_app.m_benchStart;
         m_app.m_benchFrames = 0;
-    } else if( m_app.m_accumulationSampleIndex < m_app.m_settings.AccumulationTarget )
+    } else if( m_accumulationSampleIndex < m_app.m_settings.AccumulationTarget )
     {
         m_app.m_benchFrames++;
         m_app.m_benchLast = std::chrono::high_resolution_clock::now( );
     }
-    m_app.m_accumulationCompleted = false;
+    m_accumulationCompleted = false;
     // 'min' in non-realtime path here is to keep looping the last sample for debugging purposes!
     if( !m_app.m_settings.RealtimeMode )
     {
-        m_app.m_sampleIndex = (m_app.m_accumulationSampleIndex<0)?(m_app.m_accumulationSampleIndex+4096):(min(m_app.m_accumulationSampleIndex, m_app.m_settings.AccumulationTarget - 1));
-        m_app.m_accumulationCompleted |= m_app.m_accumulationSampleIndex == m_app.m_settings.AccumulationTarget - 1;
+        m_sampleIndex = (m_accumulationSampleIndex<0)?(m_accumulationSampleIndex+4096):(min(m_accumulationSampleIndex, m_app.m_settings.AccumulationTarget - 1));
+        m_accumulationCompleted |= m_accumulationSampleIndex == m_app.m_settings.AccumulationTarget - 1;
     }
     else
-        m_app.m_sampleIndex = (!m_app.m_settings.DbgFreezeRealtimeNoiseSeed)?( m_app.m_frameIndex % 8192 ):0;     // actual sample index
+        m_sampleIndex = (!m_app.m_settings.DbgFreezeRealtimeNoiseSeed)?( m_frameIndex % 8192 ):0;     // actual sample index
 }
 void PathTracingRenderer::postUpdatePathTracing( )
 {
-    m_app.m_accumulationSampleIndex = std::min( m_app.m_accumulationSampleIndex+1, m_app.m_settings.AccumulationTarget );
+    m_accumulationSampleIndex = std::min( m_accumulationSampleIndex+1, m_app.m_settings.AccumulationTarget );
 
     if (m_app.m_settings.ActualUseRTXDIPasses())
-        m_app.m_rtxdiPass->EndFrame();
+        m_rtxdiPass->EndFrame();
 
     m_app.m_settings.ResetAccumulation = false;
     m_app.m_settings.ResetRealtimeCaches = false;
-    m_app.m_frameIndex++;
+    m_frameIndex++;
 }
 void PathTracingRenderer::updatePathTracerConstants( PathTracerConstants & constants, const PathTracerCameraData & cameraData )
 {
@@ -386,19 +643,19 @@ void PathTracingRenderer::updatePathTracerConstants( PathTracerConstants & const
     constants.perPixelJitterAAScale = (m_app.m_settings.RealtimeMode == false && m_app.m_settings.AccumulationAA)?(1):( (m_app.m_settings.RealtimeMode && m_app.m_settings.RealtimeAA == 3)?(m_app.m_settings.DLSSRRMicroJitter):(0.0f) );
 
     // needed to allow super-resolution to work best
-    float dlssBias = -dm::log2f(sqrtf((m_app.m_displaySize.x * m_app.m_displaySize.y) / float(m_app.m_renderSize.x * m_app.m_renderSize.y)));
+    float dlssBias = -dm::log2f(sqrtf((m_displaySize.x * m_displaySize.y) / float(m_renderSize.x * m_renderSize.y)));
 
     constants.texLODBias = m_app.m_settings.TexLODBias + dlssBias;
-    constants.sampleBaseIndex = m_app.m_sampleIndex * m_app.m_settings.ActualSamplesPerPixel();
+    constants.sampleBaseIndex = m_sampleIndex * m_app.m_settings.ActualSamplesPerPixel();
 
     //constants.subSampleCount = m_app.m_settings.ActualSamplesPerPixel();
     constants.invSubSampleCount = 1.0f / (float)m_app.m_settings.ActualSamplesPerPixel();
 
-    constants.imageWidth = m_app.m_renderSize.x; assert( m_app.m_renderSize.x == m_app.m_renderTargets->OutputColor->getDesc().width );
-    constants.imageHeight = m_app.m_renderSize.y; assert( m_app.m_renderSize.y == m_app.m_renderTargets->OutputColor->getDesc().height );
+    constants.imageWidth = m_renderSize.x; assert( m_renderSize.x == m_renderTargets->OutputColor->getDesc().width );
+    constants.imageHeight = m_renderSize.y; assert( m_renderSize.y == m_renderTargets->OutputColor->getDesc().height );
 
     // this is the dynamic luminance that when passed through current tonemapper with current exposure settings, produces the same 50% gray
-    constants.preExposedGrayLuminance = m_app.m_settings.EnableToneMapping?(dm::luminance(m_app.m_toneMappingPass->GetPreExposedGray(0))):(1.0f);
+    constants.preExposedGrayLuminance = m_app.m_settings.EnableToneMapping?(dm::luminance(m_toneMappingPass->GetPreExposedGray(0))):(1.0f);
 
     const float disabledFF = 0.0f;
     if (m_app.m_settings.RealtimeMode)
@@ -422,7 +679,7 @@ void PathTracingRenderer::updatePathTracerConstants( PathTracerConstants & const
     constants._padding3                         = 0;
     constants.stablePlanesSuppressPrimaryIndirectSpecularK  = m_app.m_settings.StablePlanesSuppressPrimaryIndirectSpecular?m_app.m_settings.StablePlanesSuppressPrimaryIndirectSpecularK:0.0f;
     constants.stablePlanesAntiAliasingFallthrough = m_app.m_settings.StablePlanesAntiAliasingFallthrough;
-    constants.frameIndex                        = m_app.m_frameIndex & 0xFFFFFFFF; //m_app.GetFrameIndex();
+    constants.frameIndex                        = m_frameIndex & 0xFFFFFFFF; //m_app.GetFrameIndex();
     constants.genericTSLineStride               = GenericTSComputeLineStride(constants.imageWidth, constants.imageHeight);
     constants.genericTSPlaneStride              = GenericTSComputePlaneStride(constants.imageWidth, constants.imageHeight);
 
@@ -446,7 +703,7 @@ void PathTracingRenderer::rtxdiSetupFrame(nvrhi::IFramebuffer* framebuffer, Path
     const bool envMapPresent = m_app.m_settings.EnvironmentMapParams.Enabled;
 
     RtxdiBridgeParameters bridgeParameters;
-	bridgeParameters.frameIndex = m_app.m_frameIndex & 0xFFFFFFFF;
+	bridgeParameters.frameIndex = m_frameIndex & 0xFFFFFFFF;
 	bridgeParameters.frameDims = renderDims;
 	bridgeParameters.cameraPosition = m_app.m_renderCore.camera().camera().GetPosition();
 	bridgeParameters.userSettings = m_app.m_settings.RTXDI;
@@ -464,10 +721,10 @@ void PathTracingRenderer::rtxdiSetupFrame(nvrhi::IFramebuffer* framebuffer, Path
     }
 
     if( m_app.m_settings.ResetRealtimeCaches )
-        m_app.m_rtxdiPass->Reset();
+        m_rtxdiPass->Reset();
 
-	m_app.m_rtxdiPass->PrepareResources(m_app.m_commandList, *m_app.m_renderTargets, envMapPresent ? m_app.m_envMapBaker : nullptr, m_app.m_envMapSceneParams,
-        m_app.m_sceneManager->getScene(), m_app.m_materialsBaker, m_app.m_ommBaker, m_app.m_renderCore.accelStructs().getSubInstanceBuffer(), bridgeParameters, m_app.m_bindingLayout, m_app.m_shaderDebug );
+	m_rtxdiPass->PrepareResources(m_commandList, *m_renderTargets, envMapPresent ? m_app.m_envMapBaker : nullptr, m_app.m_envMapSceneParams,
+        m_app.m_sceneManager->getScene(), m_app.m_materialsBaker, m_app.m_ommBaker, m_app.m_renderCore.accelStructs().getSubInstanceBuffer(), bridgeParameters, m_bindingLayout, m_shaderDebug );
  }
 #if CAUSTICA_WITH_STREAMLINE
 void PathTracingRenderer::streamlinePreRender()
@@ -579,9 +836,9 @@ void PathTracingRenderer::streamlinePreRender()
             if (m_app.m_settings.IsDLSSSuported)
             {
                 dlssOptions.mode = m_app.m_settings.DLSSMode;
-                dlssOptions.outputWidth = m_app.m_displaySize.x;
-                dlssOptions.outputHeight = m_app.m_displaySize.y;
-                dlssOptions.sharpness = 0; //m_app.m_recommendedDLSSSettings.sharpness;    // <- is this no longer valid?
+                dlssOptions.outputWidth = m_displaySize.x;
+                dlssOptions.outputHeight = m_displaySize.y;
+                dlssOptions.sharpness = 0; //m_recommendedDLSSSettings.sharpness;    // <- is this no longer valid?
                 dlssOptions.colorBuffersHDR = true;
                 dlssOptions.useAutoExposure = true;     // Optional: provide proper "kBufferTypeExposure" for 0-lag for better precision handling
                 dlssOptions.preset = StreamlineInterface::DLSSPreset::eDefault;
@@ -596,33 +853,33 @@ void PathTracingRenderer::streamlinePreRender()
             if (m_app.m_settings.RealtimeAA == 2 || m_app.m_settings.RealtimeAA == 3)
             {
                 // Check if we need to update the rendertarget size.
-                bool dlssResizeRequired = (m_app.m_settings.DLSSMode != m_app.m_settings.DLSSLastMode) || (m_app.m_displaySize.x != m_app.m_settings.DLSSLastDisplaySize.x) || (m_app.m_displaySize.y != m_app.m_settings.DLSSLastDisplaySize.y);
+                bool dlssResizeRequired = (m_app.m_settings.DLSSMode != m_app.m_settings.DLSSLastMode) || (m_displaySize.x != m_app.m_settings.DLSSLastDisplaySize.x) || (m_displaySize.y != m_app.m_settings.DLSSLastDisplaySize.y);
                 if (dlssResizeRequired)
                 {
                     // Only quality, target width and height matter here
-                    m_app.GetGpuDevice()->GetStreamline().QueryDLSSOptimalSettings(dlssOptions, m_app.m_recommendedDLSSSettings);
+                    m_app.GetGpuDevice()->GetStreamline().QueryDLSSOptimalSettings(dlssOptions, m_recommendedDLSSSettings);
 
                     // this is an example on how to override defaults - overriding default 2/3 to higher res 3/4
                     if (dlssOptions.mode == SI::DLSSMode::eMaxQuality)
                     {
-                        m_app.m_recommendedDLSSSettings.optimalRenderSize.x = dm::clamp((int)(dlssOptions.outputWidth * 3 / 4 + 0.5f), m_app.m_recommendedDLSSSettings.minRenderSize.x, m_app.m_recommendedDLSSSettings.maxRenderSize.x);
-                        m_app.m_recommendedDLSSSettings.optimalRenderSize.y = dm::clamp((int)(dlssOptions.outputHeight * 3 / 4 + 0.5f), m_app.m_recommendedDLSSSettings.minRenderSize.y, m_app.m_recommendedDLSSSettings.maxRenderSize.y);
+                        m_recommendedDLSSSettings.optimalRenderSize.x = dm::clamp((int)(dlssOptions.outputWidth * 3 / 4 + 0.5f), m_recommendedDLSSSettings.minRenderSize.x, m_recommendedDLSSSettings.maxRenderSize.x);
+                        m_recommendedDLSSSettings.optimalRenderSize.y = dm::clamp((int)(dlssOptions.outputHeight * 3 / 4 + 0.5f), m_recommendedDLSSSettings.minRenderSize.y, m_recommendedDLSSSettings.maxRenderSize.y);
                     }
 
-                    if (m_app.m_recommendedDLSSSettings.optimalRenderSize.x <= 0 || m_app.m_recommendedDLSSSettings.optimalRenderSize.y <= 0)
+                    if (m_recommendedDLSSSettings.optimalRenderSize.x <= 0 || m_recommendedDLSSSettings.optimalRenderSize.y <= 0)
                     {
                         m_app.m_settings.RealtimeAA = 0;
                         m_app.m_settings.DLSSMode = SampleUIData::DLSSModeDefault;
-                        m_app.m_renderSize = m_app.m_displaySize;
+                        m_renderSize = m_displaySize;
                     }
                     else
                     {
                         m_app.m_settings.DLSSLastMode = m_app.m_settings.DLSSMode;
-                        m_app.m_settings.DLSSLastDisplaySize = m_app.m_displaySize;
+                        m_app.m_settings.DLSSLastDisplaySize = m_displaySize;
                     }
                 }
 
-                m_app.m_renderSize = (uint2)m_app.m_recommendedDLSSSettings.optimalRenderSize;
+                m_renderSize = (uint2)m_recommendedDLSSSettings.optimalRenderSize;
             }
 
             if (m_app.m_settings.RealtimeAA == 3) // DLSS-RR
@@ -640,7 +897,7 @@ void PathTracingRenderer::streamlinePreRender()
                 dlssRROptions.normalRoughnessMode 	= StreamlineInterface::DLSSRRNormalRoughnessMode::ePacked;
                 dlssRROptions.alphaUpscalingEnabled = false;
                 dlssRROptions.preset                = m_app.m_settings.DLSRRPreset;
-                m_app.m_lastDLSSRROptions = dlssRROptions; // we need to fill them up with view info, but we can only have proper view after it was initialized with correct RT size
+                m_lastDLSSRROptions = dlssRROptions; // we need to fill them up with view info, but we can only have proper view after it was initialized with correct RT size
             }
         }
         else
@@ -652,7 +909,7 @@ void PathTracingRenderer::streamlinePreRender()
                 m_app.GetGpuDevice()->GetStreamline().SetDLSSOptions(dlssOptions);
             }
 
-            m_app.m_renderSize = m_app.m_displaySize;
+            m_renderSize = m_displaySize;
         }
     }
 #else
@@ -665,14 +922,14 @@ void PathTracingRenderer::nativeDLSSPreRender()
 {
     if (!m_app.m_settings.RealtimeMode)
     {
-        m_app.m_renderSize = m_app.m_displaySize;
+        m_renderSize = m_displaySize;
         return;
     }
 
-    if (m_app.m_nativeDLSS)
+    if (m_nativeDLSS)
     {
-        m_app.m_settings.IsDLSSSuported = m_app.m_nativeDLSS->IsDlssSupported();
-        m_app.m_settings.IsDLSSRRSupported = m_app.m_nativeDLSS->IsRayReconstructionSupported();
+        m_app.m_settings.IsDLSSSuported = m_nativeDLSS->IsDlssSupported();
+        m_app.m_settings.IsDLSSRRSupported = m_nativeDLSS->IsRayReconstructionSupported();
     }
 
     if (m_app.m_settings.RealtimeAA == 3 && !m_app.m_settings.IsDLSSRRSupported)
@@ -703,20 +960,20 @@ void PathTracingRenderer::nativeDLSSPreRender()
     {
         const bool dlssResizeRequired =
             (m_app.m_settings.DLSSMode != m_app.m_settings.DLSSLastMode) ||
-            (m_app.m_displaySize.x != m_app.m_settings.DLSSLastDisplaySize.x) ||
-            (m_app.m_displaySize.y != m_app.m_settings.DLSSLastDisplaySize.y);
+            (m_displaySize.x != m_app.m_settings.DLSSLastDisplaySize.x) ||
+            (m_displaySize.y != m_app.m_settings.DLSSLastDisplaySize.y);
 
         if (dlssResizeRequired)
         {
             m_app.m_settings.DLSSLastMode = m_app.m_settings.DLSSMode;
-            m_app.m_settings.DLSSLastDisplaySize = m_app.m_displaySize;
+            m_app.m_settings.DLSSLastDisplaySize = m_displaySize;
         }
 
-        m_app.m_renderSize = GetNativeDLSSRenderSize(m_app.m_displaySize, m_app.m_settings.DLSSMode);
+        m_renderSize = GetNativeDLSSRenderSize(m_displaySize, m_app.m_settings.DLSSMode);
     }
     else
     {
-        m_app.m_renderSize = m_app.m_displaySize;
+        m_renderSize = m_displaySize;
     }
 }
 #endif
@@ -737,9 +994,9 @@ void PathTracingRenderer::postProcessPreToneMapping(nvrhi::ICommandList* command
     HdrPostProcessParams hdrParams{
         m_app.m_settings,
         commandList,
-        m_app.m_renderTargets.get(),
-        m_app.m_displaySize,
-        m_app.m_bloomPass.get(),
+        m_renderTargets.get(),
+        m_displaySize,
+        m_bloomPass.get(),
     };
     m_app.m_renderCore.hdrPostProcess(hdrParams);
 
@@ -747,22 +1004,22 @@ void PathTracingRenderer::postProcessPreToneMapping(nvrhi::ICommandList* command
     {
         commandList->beginMarker("TestRaygenPP_HDR");
 
-        commandList->setTextureState(m_app.m_renderTargets->ProcessedOutputColor, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+        commandList->setTextureState(m_renderTargets->ProcessedOutputColor, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
 
         nvrhi::rt::DispatchRaysArguments args;
-        args.width = m_app.m_displaySize.x;
-        args.height = m_app.m_displaySize.y;
+        args.width = m_displaySize.x;
+        args.height = m_displaySize.y;
 
         nvrhi::rt::State state;
-        state.shaderTable = m_app.m_ptPipelineTestRaygenPPHDR->GetShaderTable();
-        state.bindings = { m_app.m_bindingSet, m_app.m_DescriptorTable->GetDescriptorTable() };
+        state.shaderTable = m_ptPipelineTestRaygenPPHDR->GetShaderTable();
+        state.bindings = { m_bindingSet, m_app.m_DescriptorTable->GetDescriptorTable() };
         commandList->setRayTracingState(state);
 
         SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
         commandList->setPushConstants(&miniConstants, sizeof(miniConstants));
         commandList->dispatchRays(args);
 
-        commandList->setTextureState(m_app.m_renderTargets->ProcessedOutputColor, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+        commandList->setTextureState(m_renderTargets->ProcessedOutputColor, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
 
         commandList->endMarker();
     }
@@ -771,26 +1028,26 @@ void PathTracingRenderer::postProcessPostToneMapping(nvrhi::ICommandList* comman
 { // a.k.a. LDR post-process (e.g. colour filters go here)
     if (m_app.m_settings.PostProcessEdgeDetection)
     {
-        m_app.m_commandList->beginMarker("PPEdgeDetection");
+        m_commandList->beginMarker("PPEdgeDetection");
 
-        m_app.m_commandList->copyTexture(m_app.m_renderTargets->LdrColorScratch, nvrhi::TextureSlice(), m_app.m_renderTargets->LdrColor, nvrhi::TextureSlice());
+        m_commandList->copyTexture(m_renderTargets->LdrColorScratch, nvrhi::TextureSlice(), m_renderTargets->LdrColor, nvrhi::TextureSlice());
 
         nvrhi::rt::DispatchRaysArguments args;
-        args.width  = m_app.m_displaySize.x;
-        args.height = m_app.m_displaySize.y;
+        args.width  = m_displaySize.x;
+        args.height = m_displaySize.y;
 
         nvrhi::rt::State state;
-        state.shaderTable = m_app.m_ptPipelineEdgeDetection->GetShaderTable();
-        state.bindings = { m_app.m_bindingSet, m_app.m_DescriptorTable->GetDescriptorTable() };
-        m_app.m_commandList->setRayTracingState(state);
+        state.shaderTable = m_ptPipelineEdgeDetection->GetShaderTable();
+        state.bindings = { m_bindingSet, m_app.m_DescriptorTable->GetDescriptorTable() };
+        m_commandList->setRayTracingState(state);
 
         SampleMiniConstants miniConstants = { uint4( *reinterpret_cast<uint*>(&m_app.m_settings.PostProcessEdgeDetectionThreshold), 0, 0, 0) };
-        m_app.m_commandList->setPushConstants(&miniConstants, sizeof(miniConstants));
-        m_app.m_commandList->dispatchRays(args);
+        m_commandList->setPushConstants(&miniConstants, sizeof(miniConstants));
+        m_commandList->dispatchRays(args);
 
-        m_app.m_commandList->setTextureState(m_app.m_renderTargets->LdrColor, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+        m_commandList->setTextureState(m_renderTargets->LdrColor, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
 
-        m_app.m_commandList->endMarker();
+        m_commandList->endMarker();
     }
 }
 void PathTracingRenderer::renderGaussianSplats(bool renderToOutputColor)
@@ -799,8 +1056,8 @@ void PathTracingRenderer::renderGaussianSplats(bool renderToOutputColor)
         return;
 
     const bool stochasticSplats = m_app.m_settings.EnableGaussianSplats && m_app.m_settings.GaussianSplatSortingMode == 1;
-    if (stochasticSplats && (m_app.m_settings.ResetAccumulation || m_app.m_settings.ResetRealtimeCaches || m_app.m_gaussianSplatTemporalReset))
-        m_app.m_gaussianSplatTemporalSampleIndex = 0;
+    if (stochasticSplats && (m_app.m_settings.ResetAccumulation || m_app.m_settings.ResetRealtimeCaches || m_gaussianSplatTemporalReset))
+        m_gaussianSplatTemporalSampleIndex = 0;
 
     const uint32_t gaussianSplatShadowMode = ResolveGaussianSplatShadowMode(m_app.m_settings);
     GaussianSplatRenderSettings settings;
@@ -828,15 +1085,15 @@ void PathTracingRenderer::renderGaussianSplats(bool renderToOutputColor)
     settings.shadowRayOffset = m_app.m_settings.GaussianSplatRtxParticleShadowOffset;
     settings.shadowSoftRadius = m_app.m_settings.GaussianSplatShadowSoftRadius;
     settings.shadowSoftSampleCount = ClampGaussianSplatSoftShadowSamples(m_app.m_settings.GaussianSplatShadowSoftSampleCount);
-    settings.shadowFrameIndex = uint32_t(m_app.m_frameIndex & 0xffffffffu);
+    settings.shadowFrameIndex = uint32_t(m_frameIndex & 0xffffffffu);
     settings.frustumDilation = m_app.m_settings.GaussianSplatFrustumDilation;
     settings.minPixelCoverage = m_app.m_settings.GaussianSplatMinPixelCoverage;
     if (stochasticSplats && m_app.m_settings.RealtimeMode)
-        settings.stochasticFrameIndex = uint32_t(m_app.m_gaussianSplatTemporalSampleIndex);
+        settings.stochasticFrameIndex = uint32_t(m_gaussianSplatTemporalSampleIndex);
     else
-        settings.stochasticFrameIndex = uint32_t(m_app.m_sampleIndex >= 0
-            ? uint32_t(m_app.m_sampleIndex)
-            : uint32_t(m_app.m_frameIndex & 0xffffffffu));
+        settings.stochasticFrameIndex = uint32_t(m_sampleIndex >= 0
+            ? uint32_t(m_sampleIndex)
+            : uint32_t(m_frameIndex & 0xffffffffu));
     for (const auto& light : m_app.m_lights)
     {
         std::shared_ptr<DirectionalLight> dirLight = std::dynamic_pointer_cast<DirectionalLight>(light);
@@ -852,7 +1109,7 @@ void PathTracingRenderer::renderGaussianSplats(bool renderToOutputColor)
     caustica::PlanarView splatView = *m_app.m_renderCore.camera().view();
     if (!renderToOutputColor)
     {
-        splatView.SetViewport(nvrhi::Viewport(float(m_app.m_displaySize.x), float(m_app.m_displaySize.y)));
+        splatView.SetViewport(nvrhi::Viewport(float(m_displaySize.x), float(m_displaySize.y)));
         splatView.SetPixelOffset(dm::float2::zero());
     }
     splatView.UpdateCache();
@@ -864,7 +1121,7 @@ void PathTracingRenderer::renderGaussianSplats(bool renderToOutputColor)
             continue;
 
         settings.objectToWorld = m_app.GetGaussianSplatObjectToWorld(object);
-        object.pass->Render(m_app.m_commandList, splatView, m_app.m_renderCore.accelStructs().getTopLevelAS().Get(), *m_app.m_renderTargets, settings);
+        object.pass->Render(m_commandList, splatView, m_app.m_renderCore.accelStructs().getTopLevelAS().Get(), *m_renderTargets, settings);
         renderedAny = true;
     }
 
@@ -873,35 +1130,35 @@ void PathTracingRenderer::renderGaussianSplats(bool renderToOutputColor)
 }
 void PathTracingRenderer::accumulateGaussianSplats(const caustica::IView& splatView)
 {
-    if (m_app.m_gaussianSplatAccumulationPass == nullptr || m_app.m_renderTargets == nullptr || m_app.m_gaussianSplatCurrentColor == nullptr || m_app.m_gaussianSplatAccumulatedColor == nullptr)
+    if (m_gaussianSplatAccumulationPass == nullptr || m_renderTargets == nullptr || m_gaussianSplatCurrentColor == nullptr || m_gaussianSplatAccumulatedColor == nullptr)
         return;
 
-    if (m_app.m_settings.ResetAccumulation || m_app.m_settings.ResetRealtimeCaches || m_app.m_gaussianSplatTemporalReset)
+    if (m_app.m_settings.ResetAccumulation || m_app.m_settings.ResetRealtimeCaches || m_gaussianSplatTemporalReset)
     {
-        m_app.m_gaussianSplatTemporalSampleIndex = 0;
-        m_app.m_gaussianSplatTemporalReset = false;
+        m_gaussianSplatTemporalSampleIndex = 0;
+        m_gaussianSplatTemporalReset = false;
     }
 
-    const float accumulationWeight = 1.0f / float(m_app.m_gaussianSplatTemporalSampleIndex + 1);
+    const float accumulationWeight = 1.0f / float(m_gaussianSplatTemporalSampleIndex + 1);
 
-    m_app.m_commandList->setTextureState(m_app.m_renderTargets->ProcessedOutputColor, nvrhi::AllSubresources, nvrhi::ResourceStates::CopySource);
-    m_app.m_commandList->setTextureState(m_app.m_gaussianSplatCurrentColor, nvrhi::AllSubresources, nvrhi::ResourceStates::CopyDest);
-    m_app.m_commandList->commitBarriers();
-    m_app.m_commandList->copyTexture(m_app.m_gaussianSplatCurrentColor, nvrhi::TextureSlice(), m_app.m_renderTargets->ProcessedOutputColor, nvrhi::TextureSlice());
+    m_commandList->setTextureState(m_renderTargets->ProcessedOutputColor, nvrhi::AllSubresources, nvrhi::ResourceStates::CopySource);
+    m_commandList->setTextureState(m_gaussianSplatCurrentColor, nvrhi::AllSubresources, nvrhi::ResourceStates::CopyDest);
+    m_commandList->commitBarriers();
+    m_commandList->copyTexture(m_gaussianSplatCurrentColor, nvrhi::TextureSlice(), m_renderTargets->ProcessedOutputColor, nvrhi::TextureSlice());
 
-    m_app.m_commandList->setTextureState(m_app.m_gaussianSplatCurrentColor, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-    m_app.m_commandList->setTextureState(m_app.m_gaussianSplatAccumulatedColor, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
-    m_app.m_commandList->setTextureState(m_app.m_renderTargets->ProcessedOutputColor, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
-    m_app.m_commandList->commitBarriers();
+    m_commandList->setTextureState(m_gaussianSplatCurrentColor, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+    m_commandList->setTextureState(m_gaussianSplatAccumulatedColor, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+    m_commandList->setTextureState(m_renderTargets->ProcessedOutputColor, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+    m_commandList->commitBarriers();
 
-    m_app.m_gaussianSplatAccumulationPass->Render(m_app.m_commandList, splatView, splatView, accumulationWeight);
+    m_gaussianSplatAccumulationPass->Render(m_commandList, splatView, splatView, accumulationWeight);
 
-    m_app.m_gaussianSplatTemporalSampleIndex = std::min(m_app.m_gaussianSplatTemporalSampleIndex + 1, 1024 * 1024);
+    m_gaussianSplatTemporalSampleIndex = std::min(m_gaussianSplatTemporalSampleIndex + 1, 1024 * 1024);
 }
 void PathTracingRenderer::render(nvrhi::IFramebuffer* framebuffer)
 {
     const auto& fbinfo = framebuffer->getFramebufferInfo();
-    m_app.m_displaySize = m_app.m_renderSize = uint2(fbinfo.width, fbinfo.height);
+    m_displaySize = m_renderSize = uint2(fbinfo.width, fbinfo.height);
     float lodBias = 0.f;
 
     preRender();
@@ -914,23 +1171,23 @@ void PathTracingRenderer::render(nvrhi::IFramebuffer* framebuffer)
 #endif
 
  
-    m_app.m_displayAspectRatio = m_app.m_displaySize.x/(float)m_app.m_displaySize.y;
+    m_displayAspectRatio = m_displaySize.x/(float)m_displaySize.y;
 
-    m_app.m_renderCore.camera().ensureViews(m_app.m_renderSize);
+    m_app.m_renderCore.camera().ensureViews(m_renderSize);
 
     bool needNewPasses = false;
-    if( m_app.m_renderTargets == nullptr || m_app.m_renderTargets->IsUpdateRequired( m_app.m_renderSize, m_app.m_displaySize ) )
+    if( m_renderTargets == nullptr || m_renderTargets->IsUpdateRequired( m_renderSize, m_displaySize ) )
     {
         m_app.GetDevice()->waitForIdle();
         m_app.GetDevice()->runGarbageCollection();
-        for (int i = 0; i < std::size(m_app.m_nrd); i++)
-            m_app.m_nrd[i] = nullptr;
-        m_app.m_renderTargets = nullptr;
-        m_app.m_oidnDenoisedOutput = nullptr;
+        for (int i = 0; i < std::size(m_nrd); i++)
+            m_nrd[i] = nullptr;
+        m_renderTargets = nullptr;
+        m_oidnDenoisedOutput = nullptr;
         resetReferenceOIDN();
         m_app.m_bindingCache->Clear( );
-        m_app.m_renderTargets = std::make_unique<RenderTargets>( );
-        m_app.m_renderTargets->Init(m_app.GetDevice(), m_app.m_renderSize, m_app.m_displaySize, true, true, c_SwapchainCount);
+        m_renderTargets = std::make_unique<RenderTargets>( );
+        m_renderTargets->Init(m_app.GetDevice(), m_renderSize, m_displaySize, true, true, c_SwapchainCount);
 
         needNewPasses = true;
         m_app.OnRenderTargetsRecreated();
@@ -951,13 +1208,13 @@ void PathTracingRenderer::render(nvrhi::IFramebuffer* framebuffer)
     if (m_app.m_settings.NRDModeChanged) // if changing between ReLAX and ReBLUR
     {
         needNewPasses = true;
-        for (int i = 0; i < std::size(m_app.m_nrd); i++)
-            m_app.m_nrd[i] = nullptr;
+        for (int i = 0; i < std::size(m_nrd); i++)
+            m_nrd[i] = nullptr;
     }
     if (!m_app.m_settings.ActualUseStandaloneDenoiser()) // clean up the memory if not used
     {
-        for (int i = 0; i < std::size(m_app.m_nrd); i++)
-            m_app.m_nrd[i] = nullptr;
+        for (int i = 0; i < std::size(m_nrd); i++)
+            m_nrd[i] = nullptr;
     }
 
     // Acceleration structures need some material info, whilst other passes need acceleration structures, so first set up materials if needed
@@ -968,9 +1225,9 @@ void PathTracingRenderer::render(nvrhi::IFramebuffer* framebuffer)
         if (m_app.m_materialsBaker == nullptr)
         {
             m_app.m_materialsBaker = std::make_shared<MaterialsBaker>(m_app.GetMaterialSpecializationShader(), m_app.GetDevice(), m_app.GetTextureCache(), m_app.m_shaderFactory);
-            assert( m_app.m_ptPipelineBaker == nullptr ); // there should be no cases where materials baker is null but ptPipelineBaker isn't
+            assert( m_ptPipelineBaker == nullptr ); // there should be no cases where materials baker is null but ptPipelineBaker isn't
             
-            m_app.m_ptPipelineBaker = std::make_shared<PTPipelineBaker>(m_app.GetDevice(), m_app.m_materialsBaker, m_app.m_bindingLayout, m_app.m_bindlessLayout);
+            m_ptPipelineBaker = std::make_shared<PTPipelineBaker>(m_app.GetDevice(), m_app.m_materialsBaker, m_bindingLayout, m_bindlessLayout);
             
             std::vector<std::filesystem::path> additionalShaderPaths;
             m_app.m_computePipelineBaker = std::make_shared<ComputePipelineBaker>(m_app.GetDevice(), additionalShaderPaths);
@@ -978,10 +1235,10 @@ void PathTracingRenderer::render(nvrhi::IFramebuffer* framebuffer)
             m_app.CreateRTPipelines();
         }
 
-        m_app.m_materialsBaker->CreateRenderPassesAndLoadMaterials(m_app.m_bindlessLayout, m_app.m_CommonPasses, m_app.m_sceneManager->getScene(), m_app.m_sceneManager->getCurrentScenePath(), GetLocalPath(c_AssetsFolder));
+        m_app.m_materialsBaker->CreateRenderPassesAndLoadMaterials(m_bindlessLayout, m_app.m_CommonPasses, m_app.m_sceneManager->getScene(), m_app.m_sceneManager->getCurrentScenePath(), GetLocalPath(c_AssetsFolder));
         m_app.m_progressInitializingRenderer.Set(5);
         m_app.CollectUncompressedTextures();
-        if(m_app.m_ommBaker) m_app.m_ommBaker->CreateRenderPasses(m_app.m_bindlessLayout, m_app.m_CommonPasses);
+        if(m_app.m_ommBaker) m_app.m_ommBaker->CreateRenderPasses(m_bindlessLayout, m_app.m_CommonPasses);
         m_app.m_progressInitializingRenderer.Set(20);
 
         if (m_app.m_zoomTool == nullptr)
@@ -989,27 +1246,27 @@ void PathTracingRenderer::render(nvrhi::IFramebuffer* framebuffer)
     }
 
     // Changes to material properties and settings can require a BLAS/TLAS or subInstanceBuffer rebuild (alpha tested/exclusion flags etc); otherwise this is a no-op.
-    m_app.RecreateAccelStructs(m_app.m_commandList);
+    m_app.RecreateAccelStructs(m_commandList);
 
-    if (m_app.m_settings.ActualUseRTXDIPasses() && m_app.m_rtxdiPass == nullptr )
+    if (m_app.m_settings.ActualUseRTXDIPasses() && m_rtxdiPass == nullptr )
         needNewPasses = true; // this will initialize rtxdi passes
     if (!m_app.m_settings.ActualUseRTXDIPasses())
-        m_app.m_rtxdiPass = nullptr;
+        m_rtxdiPass = nullptr;
 
     // this will also create or update materials which can trigger the need to update acceleration structures
     if (needNewPasses)
     {
         m_app.m_progressInitializingRenderer.Set(40);
         m_app.GetDevice()->waitForIdle();    // some subsystems have resources that could still be in use and might be deleted - make sure that's safe
-        m_app.m_commandList->open();
-        createRenderPasses(exposureResetRequired, m_app.m_commandList);
-        m_app.m_commandList->close();
-        m_app.GetDevice()->executeCommandList(m_app.m_commandList);
+        m_commandList->open();
+        createRenderPasses(exposureResetRequired, m_commandList);
+        m_commandList->close();
+        m_app.GetDevice()->executeCommandList(m_commandList);
         m_app.m_progressInitializingRenderer.Set(70);
     }
 
     // this is the point where main ray tracing pipelines will actually get compiled
-    m_app.m_ptPipelineBaker->Update(m_app.m_sceneManager->getScene(), (unsigned int)m_app.m_renderCore.accelStructs().getSubInstanceData().size(), [this](std::vector<caustica::ShaderMacro> & macros){ m_app.FillPTPipelineGlobalMacros(macros); }, needNewPasses);
+    m_ptPipelineBaker->Update(m_app.m_sceneManager->getScene(), (unsigned int)m_app.m_renderCore.accelStructs().getSubInstanceData().size(), [this](std::vector<caustica::ShaderMacro> & macros){ m_app.FillPTPipelineGlobalMacros(macros); }, needNewPasses);
     
     // Update compute shaders (compile if needed)
     if (m_app.m_computePipelineBaker)
@@ -1017,7 +1274,7 @@ void PathTracingRenderer::render(nvrhi::IFramebuffer* framebuffer)
     
     m_app.m_progressInitializingRenderer.Set(90);
 
-    m_app.m_commandList->open();
+    m_commandList->open();
 
     bool needNewBindings = false;
     PathTracerCameraData cameraData;
@@ -1029,20 +1286,20 @@ void PathTracingRenderer::render(nvrhi::IFramebuffer* framebuffer)
             float2 jitter = m_app.m_renderCore.camera().view()->GetPixelOffset();
             float4x4 projMatrix = m_app.m_renderCore.camera().view()->GetProjectionMatrix();
             float2 viewSize = { viewport.maxX - viewport.minX, viewport.maxY - viewport.minY };
-            float outputAspectRatio = m_app.m_displayAspectRatio; //windowViewport.width() / windowViewport.height();    // render and display outputs might not match in case of lower DLSS/etc resolution rounding!
+            float outputAspectRatio = m_displayAspectRatio; //windowViewport.width() / windowViewport.height();    // render and display outputs might not match in case of lower DLSS/etc resolution rounding!
             bool rowMajor = true;
             float tanHalfFOVY = 1.0f / ((rowMajor) ? (projMatrix.m_data[1 * 4 + 1]) : (projMatrix.m_data[1 + 1 * 4]));
             float fovY = atanf(tanHalfFOVY) * 2.0f;
             cameraData = BridgeCamera(uint(viewSize.x), uint(viewSize.y), outputAspectRatio, m_app.m_renderCore.camera().camera().GetPosition(), m_app.m_renderCore.camera().camera().GetDir(), m_app.m_renderCore.camera().camera().GetUp(), fovY, m_app.m_renderCore.camera().zNear(), 1e7f, m_app.m_settings.CameraFocalDistance, m_app.m_settings.CameraAperture, jitter);
         }
 
-        if (needNewPasses || needNewBindings || m_app.m_bindingSet == nullptr)
-            m_app.m_shaderDebug->CreateRenderPasses(framebuffer, m_app.m_renderTargets->Depth);
+        if (needNewPasses || needNewBindings || m_bindingSet == nullptr)
+            m_shaderDebug->CreateRenderPasses(framebuffer, m_renderTargets->Depth);
 
         if (m_app.m_settings.EnableShaderDebug)
         {
             dm::float4x4 viewProj = m_app.m_renderCore.camera().view()->GetViewProjectionMatrix();
-            m_app.m_shaderDebug->BeginFrame(m_app.m_commandList, viewProj);
+            m_shaderDebug->BeginFrame(m_commandList, viewProj);
         }
 
         // Scene refresh, accel structs, materials (partial sub-instance upload for lighting).
@@ -1050,7 +1307,7 @@ void PathTracingRenderer::render(nvrhi::IFramebuffer* framebuffer)
             m_app.m_settings,
             m_app.m_editor.AccelerationStructRebuildRequested,
             m_app.m_sceneManager->getScene(),
-            m_app.m_commandList,
+            m_commandList,
         };
         geoParams.materialsBaker = m_app.m_materialsBaker.get();
         geoParams.ommBaker = m_app.m_ommBaker.get();
@@ -1059,21 +1316,21 @@ void PathTracingRenderer::render(nvrhi::IFramebuffer* framebuffer)
         m_app.m_renderCore.updateSceneGeometry(geoParams);
 
         // Update input lighting, environment map, etc.
-        preUpdateLighting(m_app.m_commandList, needNewBindings);
+        preUpdateLighting(m_commandList, needNewBindings);
 
         // Early init for RTXDI
-        if (m_app.m_rtxdiPass != nullptr) 
+        if (m_rtxdiPass != nullptr) 
         {
-            if (needNewPasses || needNewBindings || m_app.m_bindingSet == nullptr)
-                m_app.m_rtxdiPass->Reset();
-            rtxdiSetupFrame(framebuffer, cameraData, m_app.m_renderSize);
+            if (needNewPasses || needNewBindings || m_bindingSet == nullptr)
+                m_rtxdiPass->Reset();
+            rtxdiSetupFrame(framebuffer, cameraData, m_renderSize);
         }
     }
 
-	if( needNewPasses || needNewBindings || m_app.m_bindingSet == nullptr )
+	if( needNewPasses || needNewBindings || m_bindingSet == nullptr )
     {
         m_app.m_progressInitializingRenderer.Set(95);
-        RAII_SCOPE( m_app.m_commandList->close(); m_app.GetDevice()->executeCommandList(m_app.m_commandList);, m_app.m_commandList->open(););
+        RAII_SCOPE( m_commandList->close(); m_app.GetDevice()->executeCommandList(m_commandList);, m_commandList->open(););
 
         recreateBindingSet();
 
@@ -1082,39 +1339,39 @@ void PathTracingRenderer::render(nvrhi::IFramebuffer* framebuffer)
         {
             nvrhi::BindingSetDesc lineBindingSetDesc;
             lineBindingSetDesc.bindings = {
-                nvrhi::BindingSetItem::ConstantBuffer(0, m_app.m_constantBuffer),
-                nvrhi::BindingSetItem::Texture_SRV(0, m_app.m_renderTargets->Depth)
+                nvrhi::BindingSetItem::ConstantBuffer(0, m_constantBuffer),
+                nvrhi::BindingSetItem::Texture_SRV(0, m_renderTargets->Depth)
             };
-            m_app.m_linesBindingSet = m_app.GetDevice()->createBindingSet(lineBindingSetDesc, m_app.m_linesBindingLayout);
+            m_linesBindingSet = m_app.GetDevice()->createBindingSet(lineBindingSetDesc, m_linesBindingLayout);
 
             nvrhi::GraphicsPipelineDesc psoDesc;
-            psoDesc.VS = m_app.m_linesVertexShader;
-            psoDesc.PS = m_app.m_linesPixelShader;
-            psoDesc.inputLayout = m_app.m_linesInputLayout;
-            psoDesc.bindingLayouts = { m_app.m_linesBindingLayout };
+            psoDesc.VS = m_linesVertexShader;
+            psoDesc.PS = m_linesPixelShader;
+            psoDesc.inputLayout = m_linesInputLayout;
+            psoDesc.bindingLayouts = { m_linesBindingLayout };
             psoDesc.primType = nvrhi::PrimitiveType::LineList;
             psoDesc.renderState.depthStencilState.depthTestEnable = false;
             psoDesc.renderState.blendState.targets[0].enableBlend().setSrcBlend(nvrhi::BlendFactor::SrcAlpha)
                 .setDestBlend(nvrhi::BlendFactor::InvSrcAlpha).setSrcBlendAlpha(nvrhi::BlendFactor::Zero).setDestBlendAlpha(nvrhi::BlendFactor::One);
 
-            m_app.m_linesPipeline = m_app.GetDevice()->createGraphicsPipeline(psoDesc, framebuffer);
+            m_linesPipeline = m_app.GetDevice()->createGraphicsPipeline(psoDesc, framebuffer);
         }
         m_app.m_progressInitializingRenderer.Stop();
     }
 
-    m_app.m_toneMappingPass->PreRender(m_app.m_settings.ToneMappingParams);
+    m_toneMappingPass->PreRender(m_app.m_settings.ToneMappingParams);
 
-    preUpdatePathTracing(needNewPasses, m_app.m_commandList);
+    preUpdatePathTracing(needNewPasses, m_commandList);
 
     // I suppose we need to clear depth for right-click picking at least
-    m_app.m_renderTargets->Clear( m_app.m_commandList );
+    m_renderTargets->Clear( m_commandList );
 
-    SampleConstants & constants = m_app.m_currentConstants; memset(&constants, 0, sizeof(constants));
+    SampleConstants & constants = m_currentConstants; memset(&constants, 0, sizeof(constants));
     SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) }; // accessible but unused in path tracing at the moment
     if( m_app.m_sceneManager->getScene() == nullptr )
     {
-        m_app.m_commandList->clearTextureFloat( m_app.m_renderTargets->OutputColor, nvrhi::AllSubresources, nvrhi::Color( 1, 1, 0, 0 ) );
-        m_app.m_commandList->writeBuffer(m_app.m_constantBuffer, &constants, sizeof(constants));
+        m_commandList->clearTextureFloat( m_renderTargets->OutputColor, nvrhi::AllSubresources, nvrhi::Color( 1, 1, 0, 0 ) );
+        m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
     }
     else
     {
@@ -1141,7 +1398,7 @@ void PathTracingRenderer::render(nvrhi::IFramebuffer* framebuffer)
             : GAUSSIAN_SPLAT_SHADOWS_DISABLED;
         constants.GaussianSplatShadowSoftRadius = m_app.m_settings.GaussianSplatShadowSoftRadius;
         constants.GaussianSplatShadowSoftSampleCount = ClampGaussianSplatSoftShadowSamples(m_app.m_settings.GaussianSplatShadowSoftSampleCount);
-        constants.GaussianSplatShadowFrameIndex = uint32_t(m_app.m_frameIndex & 0xffffffffu);
+        constants.GaussianSplatShadowFrameIndex = uint32_t(m_frameIndex & 0xffffffffu);
         constants.GaussianSplatShadowRayOffset = m_app.m_settings.GaussianSplatRtxParticleShadowOffset;
         constants.GaussianSplatShadowAlphaScale = m_app.m_settings.GaussianSplatAlphaScale;
         constants.GaussianSplatShadowKernelMinResponse = kGaussianSplatKernelMinResponse;
@@ -1183,13 +1440,13 @@ void PathTracingRenderer::render(nvrhi::IFramebuffer* framebuffer)
                                               m_app.m_settings.ReblurSettings.hitDistanceParameters.C, m_app.m_settings.ReblurSettings.hitDistanceParameters.D };
 
         // This updates all lighting: distant (environment maps and directional analytic lights) and local (analytic lights and emissive triangle lights)
-        // Must go before m_app.m_constantBuffer as when saving screenshots it closes and re-opens command list, flushing the volatile constant buffer!
-        updateLighting(m_app.m_commandList);
-        m_app.UploadSubInstanceData(m_app.m_commandList); // this is now full subInstance data
+        // Must go before m_constantBuffer as when saving screenshots it closes and re-opens command list, flushing the volatile constant buffer!
+        updateLighting(m_commandList);
+        m_app.UploadSubInstanceData(m_commandList); // this is now full subInstance data
 
-        m_app.m_commandList->writeBuffer(m_app.m_constantBuffer, &constants, sizeof(constants));
+        m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
 
-        m_app.SampleRenderCode(framebuffer, m_app.m_commandList, constants);
+        m_app.SampleRenderCode(framebuffer, m_commandList, constants);
 
         const bool stochasticSplats = m_app.m_settings.EnableGaussianSplats && m_app.m_settings.GaussianSplatSortingMode == 1;
         const bool stochasticUsesMainTemporal = stochasticSplats && (!m_app.m_settings.RealtimeMode || m_app.m_settings.RealtimeAA == 1);
@@ -1199,115 +1456,115 @@ void PathTracingRenderer::render(nvrhi::IFramebuffer* framebuffer)
         postProcessAA(framebuffer, needNewPasses || m_app.m_settings.ResetRealtimeCaches);
         applyReferenceOIDN();
         if (m_app.m_settings.ReferenceOIDNDenoiser)
-            m_app.m_commandList->writeBuffer(m_app.m_constantBuffer, &constants, sizeof(constants));
+            m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
 
         if (!stochasticUsesMainTemporal)
             renderGaussianSplats(false);
     }
 
     caustica::PlanarView fullscreenView = *m_app.m_renderCore.camera().view();
-    nvrhi::Viewport windowViewport(float(m_app.m_displaySize.x), float(m_app.m_displaySize.y));
+    nvrhi::Viewport windowViewport(float(m_displaySize.x), float(m_displaySize.y));
     fullscreenView.SetViewport(windowViewport);
     fullscreenView.UpdateCache();
 
-    postProcessPreToneMapping(m_app.m_commandList, fullscreenView);   // writing to m_app.m_renderTargets->ProcessedOutputColor
+    postProcessPreToneMapping(m_commandList, fullscreenView);   // writing to m_renderTargets->ProcessedOutputColor
 
-    //Tone Mapping; it will read from m_app.m_renderTargets->ProcessedOutputColor and write into m_app.m_renderTargets->LdrColor; in case tonemapping is disabled, it's just a passthrough
-    if (m_app.m_toneMappingPass->Render(m_app.m_commandList, fullscreenView, m_app.m_renderTargets->ProcessedOutputColor, m_app.m_settings.EnableToneMapping))
+    //Tone Mapping; it will read from m_renderTargets->ProcessedOutputColor and write into m_renderTargets->LdrColor; in case tonemapping is disabled, it's just a passthrough
+    if (m_toneMappingPass->Render(m_commandList, fullscreenView, m_renderTargets->ProcessedOutputColor, m_app.m_settings.EnableToneMapping))
     {
         // first run tonemapper can close & re-open command list - when that happens, we have to re-upload volatile constants
-        m_app.m_commandList->writeBuffer(m_app.m_constantBuffer, &constants, sizeof(constants));
+        m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
     }
 
-    postProcessPostToneMapping(m_app.m_commandList, fullscreenView);  // writing to m_app.m_renderTargets->LdrColor
+    postProcessPostToneMapping(m_commandList, fullscreenView);  // writing to m_renderTargets->LdrColor
 
-    //m_app.m_postProcess->Render(m_app.m_commandList, m_app.m_renderTargets->LdrColor);
+    //m_postProcess->Render(m_commandList, m_renderTargets->LdrColor);
 
     if (m_app.m_settings.EnableShaderDebug)
-        m_app.m_shaderDebug->EndFrameAndOutput(m_app.m_commandList, m_app.m_renderTargets->LdrFramebuffer->GetFramebuffer(fullscreenView), m_app.m_renderTargets->Depth, fbinfo.getViewport());
+        m_shaderDebug->EndFrameAndOutput(m_commandList, m_renderTargets->LdrFramebuffer->GetFramebuffer(fullscreenView), m_renderTargets->Depth, fbinfo.getViewport());
 
-    m_app.m_zoomTool->Render(m_app.m_commandList, m_app.m_renderTargets->LdrColor);
+    m_app.m_zoomTool->Render(m_commandList, m_renderTargets->LdrColor);
 
-    m_app.m_commandList->beginMarker("Blit");
-    m_app.m_CommonPasses->BlitTexture(m_app.m_commandList, framebuffer, m_app.m_renderTargets->LdrColor, m_app.m_bindingCache.get());
-    m_app.m_commandList->endMarker();
+    m_commandList->beginMarker("Blit");
+    m_app.m_CommonPasses->BlitTexture(m_commandList, framebuffer, m_renderTargets->LdrColor, m_app.m_bindingCache.get());
+    m_commandList->endMarker();
 
     if (m_app.m_settings.ShowDebugLines == true)
     {
-        m_app.m_commandList->beginMarker("Debug Lines");
+        m_commandList->beginMarker("Debug Lines");
 
         // this draws the debug lines - should be the only actual rasterization around :)
         {
             nvrhi::GraphicsState state;
-            state.bindings = { m_app.m_linesBindingSet };
-            state.vertexBuffers = { {m_app.m_debugLineBufferDisplay, 0, 0} };
-            state.pipeline = m_app.m_linesPipeline;
+            state.bindings = { m_linesBindingSet };
+            state.vertexBuffers = { {m_debugLineBufferDisplay, 0, 0} };
+            state.pipeline = m_linesPipeline;
             state.framebuffer = framebuffer;
             state.viewport.addViewportAndScissorRect(fbinfo.getViewport());
 
-            m_app.m_commandList->setGraphicsState(state);
+            m_commandList->setGraphicsState(state);
 
             nvrhi::DrawArguments args;
-            args.vertexCount = m_app.m_feedbackData.lineVertexCount;
-            m_app.m_commandList->draw(args);
+            args.vertexCount = m_feedbackData.lineVertexCount;
+            m_commandList->draw(args);
         }
 
-        if (m_app.m_cpuSideDebugLines.size() > 0)
+        if (m_cpuSideDebugLines.size() > 0)
         {
-            // using m_app.m_debugLineBufferCapture for direct drawing here
-            m_app.m_commandList->writeBuffer( m_app.m_debugLineBufferCapture, m_app.m_cpuSideDebugLines.data(), sizeof(DebugLineStruct) * m_app.m_cpuSideDebugLines.size() );
+            // using m_debugLineBufferCapture for direct drawing here
+            m_commandList->writeBuffer( m_debugLineBufferCapture, m_cpuSideDebugLines.data(), sizeof(DebugLineStruct) * m_cpuSideDebugLines.size() );
 
             nvrhi::GraphicsState state;
-            state.bindings = { m_app.m_linesBindingSet };
-            state.vertexBuffers = { {m_app.m_debugLineBufferCapture, 0, 0} };
-            state.pipeline = m_app.m_linesPipeline;
+            state.bindings = { m_linesBindingSet };
+            state.vertexBuffers = { {m_debugLineBufferCapture, 0, 0} };
+            state.pipeline = m_linesPipeline;
             state.framebuffer = framebuffer;
             state.viewport.addViewportAndScissorRect(fbinfo.getViewport());
 
-            m_app.m_commandList->setGraphicsState(state);
+            m_commandList->setGraphicsState(state);
 
             nvrhi::DrawArguments args;
-            args.vertexCount = (uint32_t)m_app.m_cpuSideDebugLines.size();
-            m_app.m_commandList->draw(args);
+            args.vertexCount = (uint32_t)m_cpuSideDebugLines.size();
+            m_commandList->draw(args);
         }
 
-        m_app.m_commandList->endMarker();
+        m_commandList->endMarker();
     }
-    m_app.m_cpuSideDebugLines.clear();
+    m_cpuSideDebugLines.clear();
 
     if( m_app.m_settings.ContinuousDebugFeedback || m_app.m_editor.PickMaterialRequested )
     {
-        m_app.m_commandList->copyBuffer(m_app.m_feedback_Buffer_Cpu, 0, m_app.m_feedback_Buffer_Gpu, 0, sizeof(DebugFeedbackStruct) * 1);
-        m_app.m_commandList->copyBuffer(m_app.m_debugLineBufferDisplay, 0, m_app.m_debugLineBufferCapture, 0, sizeof(DebugLineStruct) * MAX_DEBUG_LINES );
-        m_app.m_commandList->copyBuffer(m_app.m_debugDeltaPathTree_Cpu, 0, m_app.m_debugDeltaPathTree_Gpu, 0, sizeof(DeltaTreeVizPathVertex) * cDeltaTreeVizMaxVertices);
+        m_commandList->copyBuffer(m_feedback_Buffer_Cpu, 0, m_feedback_Buffer_Gpu, 0, sizeof(DebugFeedbackStruct) * 1);
+        m_commandList->copyBuffer(m_debugLineBufferDisplay, 0, m_debugLineBufferCapture, 0, sizeof(DebugLineStruct) * MAX_DEBUG_LINES );
+        m_commandList->copyBuffer(m_debugDeltaPathTree_Cpu, 0, m_debugDeltaPathTree_Gpu, 0, sizeof(DeltaTreeVizPathVertex) * cDeltaTreeVizMaxVertices);
 	}
 
     nvrhi::ITexture* framebufferTexture = framebuffer->getDesc().colorAttachments[0].texture;
 
 
-	m_app.m_commandList->close();
-	m_app.GetDevice()->executeCommandList(m_app.m_commandList);
+	m_commandList->close();
+	m_app.GetDevice()->executeCommandList(m_commandList);
 
     // resolve picking and debug info
     if (m_app.m_settings.ContinuousDebugFeedback || m_app.m_editor.hasActivePickRequest())
     {
         m_app.GetDevice()->waitForIdle();
-        void* pData = m_app.GetDevice()->mapBuffer(m_app.m_feedback_Buffer_Cpu, nvrhi::CpuAccessMode::Read);
+        void* pData = m_app.GetDevice()->mapBuffer(m_feedback_Buffer_Cpu, nvrhi::CpuAccessMode::Read);
         assert(pData);
-        memcpy(&m_app.m_feedbackData, pData, sizeof(DebugFeedbackStruct)* 1);
-        m_app.GetDevice()->unmapBuffer(m_app.m_feedback_Buffer_Cpu);
+        memcpy(&m_feedbackData, pData, sizeof(DebugFeedbackStruct)* 1);
+        m_app.GetDevice()->unmapBuffer(m_feedback_Buffer_Cpu);
 
-        pData = m_app.GetDevice()->mapBuffer(m_app.m_debugDeltaPathTree_Cpu, nvrhi::CpuAccessMode::Read);
+        pData = m_app.GetDevice()->mapBuffer(m_debugDeltaPathTree_Cpu, nvrhi::CpuAccessMode::Read);
         assert(pData);
-        memcpy(&m_app.m_debugDeltaPathTree, pData, sizeof(DeltaTreeVizPathVertex) * cDeltaTreeVizMaxVertices);
-        m_app.GetDevice()->unmapBuffer(m_app.m_debugDeltaPathTree_Cpu);
+        memcpy(&m_debugDeltaPathTree, pData, sizeof(DeltaTreeVizPathVertex) * cDeltaTreeVizMaxVertices);
+        m_app.GetDevice()->unmapBuffer(m_debugDeltaPathTree_Cpu);
 
         if (m_app.m_editor.PickMaterialRequested)
-            m_app.m_editor.SelectedMaterial = m_app.FindMaterial(int(m_app.m_feedbackData.pickedMaterialID));
+            m_app.m_editor.SelectedMaterial = m_app.FindMaterial(int(m_feedbackData.pickedMaterialID));
 
         if (m_app.m_editor.PickInstanceRequested)
         {
-            m_app.m_editor.SelectedNode = m_app.FindNodeByInstanceIndex(int(m_app.m_feedbackData.pickedInstanceIndex));
+            m_app.m_editor.SelectedNode = m_app.FindNodeByInstanceIndex(int(m_feedbackData.pickedInstanceIndex));
             if (m_app.m_editor.SelectedNode != nullptr)
                 m_app.m_editor.SelectedGaussianSplat = false;
         }
@@ -1327,8 +1584,8 @@ void PathTracingRenderer::render(nvrhi::IFramebuffer* framebuffer)
         m_app.m_editor.ExperimentalPhotoModeScreenshot = false;
     }
 
-    if (m_app.m_temporalAntiAliasingPass != nullptr)
-        m_app.m_temporalAntiAliasingPass->AdvanceFrame();
+    if (m_temporalAntiAliasingPass != nullptr)
+        m_temporalAntiAliasingPass->AdvanceFrame();
 
 	m_app.m_renderCore.camera().swapViews();
 	m_app.GetGpuDevice()->SetVsyncEnabled(m_app.m_settings.ActualEnableVsync());
@@ -1337,7 +1594,7 @@ void PathTracingRenderer::render(nvrhi::IFramebuffer* framebuffer)
 }
 void PathTracingRenderer::recreateBindingSet()
 {
-	// WARNING: this must match the layout of the m_app.m_bindingLayout (or switch to CreateBindingSetAndLayout)
+	// WARNING: this must match the layout of the m_bindingLayout (or switch to CreateBindingSetAndLayout)
     nvrhi::rt::IAccelStruct* gaussianSplatAS = m_app.m_renderCore.accelStructs().getTopLevelAS();
     nvrhi::IBuffer* gaussianSplatBuffer = m_app.m_materialsBaker->GetMaterialDataBuffer();
     const auto* primaryGaussianSplat = m_app.GetPrimaryGaussianSplatObject();
@@ -1351,7 +1608,7 @@ void PathTracingRenderer::recreateBindingSet()
     // Fixed resources that do not change between binding sets
     nvrhi::BindingSetDesc bindingSetDescBase;
     bindingSetDescBase.bindings = {
-        nvrhi::BindingSetItem::ConstantBuffer(0, m_app.m_constantBuffer),
+        nvrhi::BindingSetItem::ConstantBuffer(0, m_constantBuffer),
         nvrhi::BindingSetItem::PushConstants(1, sizeof(SampleMiniConstants)),
         //nvrhi::BindingSetItem::ConstantBuffer(2, m_app.m_lightsBaker->GetLightingConstants()),
         nvrhi::BindingSetItem::RayTracingAccelStruct(0, m_app.m_renderCore.accelStructs().getTopLevelAS()),
@@ -1360,7 +1617,7 @@ void PathTracingRenderer::recreateBindingSet()
         nvrhi::BindingSetItem::StructuredBuffer_SRV(3, m_app.m_sceneManager->getScene()->GetGeometryBuffer()),
         nvrhi::BindingSetItem::StructuredBuffer_SRV(4, (m_app.m_ommBaker)?(m_app.m_ommBaker->GetGeometryDebugBuffer()):(m_app.m_materialsBaker->GetMaterialDataBuffer().Get()) ),   // YUCK
         nvrhi::BindingSetItem::StructuredBuffer_SRV(5, m_app.m_materialsBaker->GetMaterialDataBuffer()),
-        nvrhi::BindingSetItem::Texture_SRV(6,  m_app.m_renderTargets->LdrColorScratch, nvrhi::Format::SRGBA8_UNORM),
+        nvrhi::BindingSetItem::Texture_SRV(6,  m_renderTargets->LdrColorScratch, nvrhi::Format::SRGBA8_UNORM),
         nvrhi::BindingSetItem::RayTracingAccelStruct(7, gaussianSplatAS),
         nvrhi::BindingSetItem::StructuredBuffer_SRV(8, gaussianSplatBuffer),
         nvrhi::BindingSetItem::Texture_SRV(10, m_app.m_envMapBaker->GetEnvMapCube()), //m_app.m_EnvironmentMap->IsEnvMapLoaded() ? m_app.m_EnvironmentMap->GetEnvironmentMap() : m_app.m_CommonPasses->m_BlackTexture),
@@ -1378,44 +1635,44 @@ void PathTracingRenderer::recreateBindingSet()
         nvrhi::BindingSetItem::Sampler(0, m_app.m_CommonPasses->m_AnisotropicWrapSampler),
         nvrhi::BindingSetItem::Sampler(1, m_app.m_envMapBaker->GetEnvMapCubeSampler()),
         nvrhi::BindingSetItem::Sampler(2, m_app.m_envMapBaker->GetImportanceSampling()->GetImportanceMapSampler()),
-        nvrhi::BindingSetItem::Texture_UAV(0, m_app.m_renderTargets->OutputColor),
-        nvrhi::BindingSetItem::Texture_UAV(1, m_app.m_renderTargets->ProcessedOutputColor),
-        nvrhi::BindingSetItem::Texture_UAV(2, m_app.m_renderTargets->LdrColor, nvrhi::Format::RGBA8_UNORM),
-        nvrhi::BindingSetItem::Texture_UAV(4, m_app.m_renderTargets->Throughput),
-        nvrhi::BindingSetItem::Texture_UAV(5, m_app.m_renderTargets->ScreenMotionVectors),
-        nvrhi::BindingSetItem::Texture_UAV(6, m_app.m_renderTargets->Depth),
-        nvrhi::BindingSetItem::Texture_UAV(7, m_app.m_renderTargets->SpecularHitT), 
-        nvrhi::BindingSetItem::Texture_UAV(8, m_app.m_renderTargets->ScratchFloat1), 
-        nvrhi::BindingSetItem::Texture_UAV(31, m_app.m_renderTargets->DenoiserViewspaceZ),
-        nvrhi::BindingSetItem::Texture_UAV(32, m_app.m_renderTargets->DenoiserMotionVectors),
-        nvrhi::BindingSetItem::Texture_UAV(33, m_app.m_renderTargets->DenoiserNormalRoughness),
-        nvrhi::BindingSetItem::Texture_UAV(34, m_app.m_renderTargets->DenoiserDiffRadianceHitDist),
-        nvrhi::BindingSetItem::Texture_UAV(35, m_app.m_renderTargets->DenoiserSpecRadianceHitDist),
-        nvrhi::BindingSetItem::Texture_UAV(36, m_app.m_renderTargets->DenoiserDisocclusionThresholdMix),
-        nvrhi::BindingSetItem::Texture_UAV(37, m_app.m_renderTargets->CombinedHistoryClampRelax),
-        nvrhi::BindingSetItem::StructuredBuffer_UAV(51, m_app.m_feedback_Buffer_Gpu),
-        nvrhi::BindingSetItem::StructuredBuffer_UAV(52, m_app.m_debugLineBufferCapture),
-        nvrhi::BindingSetItem::StructuredBuffer_UAV(53, m_app.m_debugDeltaPathTree_Gpu),
-        nvrhi::BindingSetItem::StructuredBuffer_UAV(54, m_app.m_debugDeltaPathTreeSearchStack),
-        nvrhi::BindingSetItem::Texture_UAV(60, m_app.m_renderTargets->SecondarySurfacePositionNormal),
-        nvrhi::BindingSetItem::Texture_UAV(61, m_app.m_renderTargets->SecondarySurfaceRadiance),
-        nvrhi::BindingSetItem::Texture_UAV(70, m_app.m_renderTargets->RRDiffuseAlbedo),
-        nvrhi::BindingSetItem::Texture_UAV(71, m_app.m_renderTargets->RRSpecAlbedo),
-        nvrhi::BindingSetItem::Texture_UAV(72, m_app.m_renderTargets->RRNormalsAndRoughness),
-        nvrhi::BindingSetItem::Texture_UAV(73, m_app.m_renderTargets->RRSpecMotionVectors),
-        nvrhi::BindingSetItem::Texture_UAV(74, (m_app.m_renderTargets->RRTransparencyLayer!=nullptr)?m_app.m_renderTargets->RRTransparencyLayer:m_app.m_renderTargets->RRSpecMotionVectors),
-        nvrhi::BindingSetItem::Texture_UAV(75, m_app.m_renderTargets->DenoiserAvgLayerRadianceHalfRes),
+        nvrhi::BindingSetItem::Texture_UAV(0, m_renderTargets->OutputColor),
+        nvrhi::BindingSetItem::Texture_UAV(1, m_renderTargets->ProcessedOutputColor),
+        nvrhi::BindingSetItem::Texture_UAV(2, m_renderTargets->LdrColor, nvrhi::Format::RGBA8_UNORM),
+        nvrhi::BindingSetItem::Texture_UAV(4, m_renderTargets->Throughput),
+        nvrhi::BindingSetItem::Texture_UAV(5, m_renderTargets->ScreenMotionVectors),
+        nvrhi::BindingSetItem::Texture_UAV(6, m_renderTargets->Depth),
+        nvrhi::BindingSetItem::Texture_UAV(7, m_renderTargets->SpecularHitT), 
+        nvrhi::BindingSetItem::Texture_UAV(8, m_renderTargets->ScratchFloat1), 
+        nvrhi::BindingSetItem::Texture_UAV(31, m_renderTargets->DenoiserViewspaceZ),
+        nvrhi::BindingSetItem::Texture_UAV(32, m_renderTargets->DenoiserMotionVectors),
+        nvrhi::BindingSetItem::Texture_UAV(33, m_renderTargets->DenoiserNormalRoughness),
+        nvrhi::BindingSetItem::Texture_UAV(34, m_renderTargets->DenoiserDiffRadianceHitDist),
+        nvrhi::BindingSetItem::Texture_UAV(35, m_renderTargets->DenoiserSpecRadianceHitDist),
+        nvrhi::BindingSetItem::Texture_UAV(36, m_renderTargets->DenoiserDisocclusionThresholdMix),
+        nvrhi::BindingSetItem::Texture_UAV(37, m_renderTargets->CombinedHistoryClampRelax),
+        nvrhi::BindingSetItem::StructuredBuffer_UAV(51, m_feedback_Buffer_Gpu),
+        nvrhi::BindingSetItem::StructuredBuffer_UAV(52, m_debugLineBufferCapture),
+        nvrhi::BindingSetItem::StructuredBuffer_UAV(53, m_debugDeltaPathTree_Gpu),
+        nvrhi::BindingSetItem::StructuredBuffer_UAV(54, m_debugDeltaPathTreeSearchStack),
+        nvrhi::BindingSetItem::Texture_UAV(60, m_renderTargets->SecondarySurfacePositionNormal),
+        nvrhi::BindingSetItem::Texture_UAV(61, m_renderTargets->SecondarySurfaceRadiance),
+        nvrhi::BindingSetItem::Texture_UAV(70, m_renderTargets->RRDiffuseAlbedo),
+        nvrhi::BindingSetItem::Texture_UAV(71, m_renderTargets->RRSpecAlbedo),
+        nvrhi::BindingSetItem::Texture_UAV(72, m_renderTargets->RRNormalsAndRoughness),
+        nvrhi::BindingSetItem::Texture_UAV(73, m_renderTargets->RRSpecMotionVectors),
+        nvrhi::BindingSetItem::Texture_UAV(74, (m_renderTargets->RRTransparencyLayer!=nullptr)?m_renderTargets->RRTransparencyLayer:m_renderTargets->RRSpecMotionVectors),
+        nvrhi::BindingSetItem::Texture_UAV(75, m_renderTargets->DenoiserAvgLayerRadianceHalfRes),
 
         ///***
-        nvrhi::BindingSetItem::Texture_UAV(100, m_app.m_renderTargets->BaseColor),
-        nvrhi::BindingSetItem::Texture_UAV(101, m_app.m_renderTargets->SpecNormal),
-        nvrhi::BindingSetItem::Texture_UAV(102, m_app.m_renderTargets->RoughnessMetal),
-        nvrhi::BindingSetItem::Texture_UAV(103, m_app.m_renderTargets->MaterialInfo),
-        nvrhi::BindingSetItem::Texture_UAV(10, m_app.m_renderTargets->LocalCubemap),  // u_LocalCubemap for RT pass
+        nvrhi::BindingSetItem::Texture_UAV(100, m_renderTargets->BaseColor),
+        nvrhi::BindingSetItem::Texture_UAV(101, m_renderTargets->SpecNormal),
+        nvrhi::BindingSetItem::Texture_UAV(102, m_renderTargets->RoughnessMetal),
+        nvrhi::BindingSetItem::Texture_UAV(103, m_renderTargets->MaterialInfo),
+        nvrhi::BindingSetItem::Texture_UAV(10, m_renderTargets->LocalCubemap),  // u_LocalCubemap for RT pass
         ///***
 
-        nvrhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_app.m_shaderDebug->GetGPUWriteBuffer()),
-        nvrhi::BindingSetItem::Texture_UAV(SHADER_DEBUG_VIZ_TEXTURE_UAV_INDEX, m_app.m_shaderDebug->GetDebugVizTexture())
+        nvrhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->GetGPUWriteBuffer()),
+        nvrhi::BindingSetItem::Texture_UAV(SHADER_DEBUG_VIZ_TEXTURE_UAV_INDEX, m_shaderDebug->GetDebugVizTexture())
     };
 
     // NV HLSL extensions - DX12 only - we should probably expose some form of GetNvapiIsInitialized instead
@@ -1431,10 +1688,10 @@ void PathTracingRenderer::recreateBindingSet()
 
         bindingSetDesc.bindings = bindingSetDescBase.bindings;
 
-        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_UAV(40, m_app.m_renderTargets->StablePlanesHeader));
-        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::StructuredBuffer_UAV(42, m_app.m_renderTargets->StablePlanesBuffer));
-        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_UAV(44, m_app.m_renderTargets->StableRadiance));
-        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::StructuredBuffer_UAV(45, m_app.m_renderTargets->SurfaceDataBuffer));
+        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_UAV(40, m_renderTargets->StablePlanesHeader));
+        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::StructuredBuffer_UAV(42, m_renderTargets->StablePlanesBuffer));
+        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_UAV(44, m_renderTargets->StableRadiance));
+        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::StructuredBuffer_UAV(45, m_renderTargets->SurfaceDataBuffer));
 
         // Reflection system bindings (t80-t83, b3)
         // Derived classes can override AddCustomBindings to provide actual textures
@@ -1444,10 +1701,10 @@ void PathTracingRenderer::recreateBindingSet()
         bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(82, m_app.m_CommonPasses->m_BlackTexture));  // t_SSRBlurChain
         bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(83, (m_app.m_envMapBaker->GetBRDFLUT()!=nullptr)?m_app.m_envMapBaker->GetBRDFLUT():m_app.m_CommonPasses->m_BlackTexture ));  // t_BRDFLUT
         bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(84, m_app.m_CommonPasses->m_BlackTexture));  // t_DepthHierarchy placeholder
-        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::ConstantBuffer(10, m_app.m_constantBuffer)); // ReflectionConstants (reuse main constant buffer as placeholder)
+        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::ConstantBuffer(10, m_constantBuffer)); // ReflectionConstants (reuse main constant buffer as placeholder)
         
         // SSR result UAV placeholder
-        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_UAV(85, m_app.m_renderTargets->Depth));   // u_SSRResult placeholder
+        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_UAV(85, m_renderTargets->Depth));   // u_SSRResult placeholder
 
         // GTAO output (default to white = no occlusion; overridden by AddCustomBindings)
         bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(86, m_app.m_CommonPasses->m_WhiteTexture));  // t_GTAOOutput placeholder
@@ -1457,12 +1714,12 @@ void PathTracingRenderer::recreateBindingSet()
         // Allow derived classes to customize bindings (e.g., add reflection textures, GTAO output)
         m_app.AddCustomBindings(bindingSetDesc);
 
-        m_app.m_bindingSet = m_app.GetDevice()->createBindingSet(bindingSetDesc, m_app.m_bindingLayout);
+        m_bindingSet = m_app.GetDevice()->createBindingSet(bindingSetDesc, m_bindingLayout);
     }
 }
 void PathTracingRenderer::pathTrace(nvrhi::IFramebuffer* framebuffer, const SampleConstants & constants)
 {
-    //m_app.m_commandList->beginMarker("MainRendering"); <- removed (for now) since added hierarchy reduces readability
+    //m_commandList->beginMarker("MainRendering"); <- removed (for now) since added hierarchy reduces readability
 
     bool useStablePlanes = m_app.m_settings.RealtimeMode;
 
@@ -1481,34 +1738,34 @@ void PathTracingRenderer::pathTrace(nvrhi::IFramebuffer* framebuffer, const Samp
     if (useStablePlanes)
     {
         {
-            RAII_SCOPE(m_app.m_commandList->beginMarker("PathTracePrePass"); , m_app.m_commandList->endMarker(); );
+            RAII_SCOPE(m_commandList->beginMarker("PathTracePrePass"); , m_commandList->endMarker(); );
 
-            m_app.m_commandList->setTextureState(m_app.m_renderTargets->Depth, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
-            m_app.m_commandList->setTextureState(m_app.m_renderTargets->ScreenMotionVectors, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
-            m_app.m_commandList->setTextureState(m_app.m_renderTargets->Throughput, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
-            m_app.m_commandList->setTextureState(m_app.m_renderTargets->SpecularHitT, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
-            state.shaderTable = m_app.m_ptPipelineBuildStablePlanes->GetShaderTable();
-            state.bindings = { m_app.m_bindingSet, m_app.m_DescriptorTable->GetDescriptorTable() };
-            m_app.m_commandList->setRayTracingState(state);
-            m_app.m_commandList->setPushConstants(&miniConstants, sizeof(miniConstants));
-            m_app.m_commandList->dispatchRays(args);
-            m_app.m_commandList->setBufferState(m_app.m_renderTargets->StablePlanesBuffer, nvrhi::ResourceStates::UnorderedAccess);
-            m_app.m_commandList->setTextureState(m_app.m_renderTargets->Depth, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
-            m_app.m_commandList->setTextureState(m_app.m_renderTargets->ScreenMotionVectors, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
-            m_app.m_commandList->setTextureState(m_app.m_renderTargets->Throughput, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+            m_commandList->setTextureState(m_renderTargets->Depth, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+            m_commandList->setTextureState(m_renderTargets->ScreenMotionVectors, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+            m_commandList->setTextureState(m_renderTargets->Throughput, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+            m_commandList->setTextureState(m_renderTargets->SpecularHitT, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+            state.shaderTable = m_ptPipelineBuildStablePlanes->GetShaderTable();
+            state.bindings = { m_bindingSet, m_app.m_DescriptorTable->GetDescriptorTable() };
+            m_commandList->setRayTracingState(state);
+            m_commandList->setPushConstants(&miniConstants, sizeof(miniConstants));
+            m_commandList->dispatchRays(args);
+            m_commandList->setBufferState(m_renderTargets->StablePlanesBuffer, nvrhi::ResourceStates::UnorderedAccess);
+            m_commandList->setTextureState(m_renderTargets->Depth, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+            m_commandList->setTextureState(m_renderTargets->ScreenMotionVectors, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+            m_commandList->setTextureState(m_renderTargets->Throughput, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
         }
 
         {
-            RAII_SCOPE(m_app.m_commandList->beginMarker("VBufferExport"); , m_app.m_commandList->endMarker(); );
+            RAII_SCOPE(m_commandList->beginMarker("VBufferExport"); , m_commandList->endMarker(); );
 
             nvrhi::ComputeState state;
-		    state.bindings = { m_app.m_bindingSet, m_app.m_DescriptorTable->GetDescriptorTable() };
-            state.pipeline = m_app.m_exportVBufferPSO;
-            m_app.m_commandList->setComputeState(state);
+		    state.bindings = { m_bindingSet, m_app.m_DescriptorTable->GetDescriptorTable() };
+            state.pipeline = m_exportVBufferPSO;
+            m_commandList->setComputeState(state);
 
 		    const dm::uint2 dispatchSize = { (width + NUM_COMPUTE_THREADS_PER_DIM - 1) / NUM_COMPUTE_THREADS_PER_DIM, (height + NUM_COMPUTE_THREADS_PER_DIM - 1) / NUM_COMPUTE_THREADS_PER_DIM };
-            m_app.m_commandList->setPushConstants(&miniConstants, sizeof(miniConstants));
-		    m_app.m_commandList->dispatch(dispatchSize.x, dispatchSize.y);
+            m_commandList->setPushConstants(&miniConstants, sizeof(miniConstants));
+		    m_commandList->dispatch(dispatchSize.x, dispatchSize.y);
         }
     }
     else
@@ -1518,41 +1775,41 @@ void PathTracingRenderer::pathTrace(nvrhi::IFramebuffer* framebuffer, const Samp
 
     // In realtime mode, ScreenMotionVectors reference mode ScreenMotionVectors should be 0
     UpdateLightingEndParams lightingEndParams{
-        m_app.m_commandList,
+        m_commandList,
         m_app.m_lightsBaker.get(),
         m_app.m_bindingCache.get(),
         m_app.m_sceneManager->getScene(),
         m_app.m_materialsBaker,
         m_app.m_ommBaker,
         m_app.m_renderCore.accelStructs().getSubInstanceBuffer(),
-        m_app.m_renderTargets->Depth,
-        m_app.m_renderTargets->ScreenMotionVectors,
+        m_renderTargets->Depth,
+        m_renderTargets->ScreenMotionVectors,
     };
     m_app.m_renderCore.updateLightingEnd(lightingEndParams);
 
     {
-        RAII_SCOPE( m_app.m_commandList->beginMarker("PathTrace");, m_app.m_commandList->endMarker(); );
+        RAII_SCOPE( m_commandList->beginMarker("PathTrace");, m_commandList->endMarker(); );
 
-        state.shaderTable = ((useStablePlanes) ? (m_app.m_ptPipelineFillStablePlanes) : (m_app.m_ptPipelineReference))->GetShaderTable();
-        state.bindings = { m_app.m_bindingSet, m_app.m_DescriptorTable->GetDescriptorTable() };
+        state.shaderTable = ((useStablePlanes) ? (m_ptPipelineFillStablePlanes) : (m_ptPipelineReference))->GetShaderTable();
+        state.bindings = { m_bindingSet, m_app.m_DescriptorTable->GetDescriptorTable() };
 
         for (uint subSampleIndex = 0; subSampleIndex < m_app.m_settings.ActualSamplesPerPixel(); subSampleIndex++)
         {
             // required to avoid race conditions in back to back dispatchRays
-            m_app.m_commandList->setBufferState(m_app.m_renderTargets->StablePlanesBuffer, nvrhi::ResourceStates::UnorderedAccess);
-            m_app.m_commandList->setTextureState(m_app.m_renderTargets->SpecularHitT, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+            m_commandList->setBufferState(m_renderTargets->StablePlanesBuffer, nvrhi::ResourceStates::UnorderedAccess);
+            m_commandList->setTextureState(m_renderTargets->SpecularHitT, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
 
-            m_app.m_commandList->setRayTracingState(state);
+            m_commandList->setRayTracingState(state);
 
             // tell path tracer which subSampleIndex we're processing
             SampleMiniConstants miniConstants = { uint4(subSampleIndex, 0, 0, 0) };//     <- use subSampleIndex to try to figure out why we're losing radiance - is the first one what's left, or the last one?
-            m_app.m_commandList->setPushConstants(&miniConstants, sizeof(miniConstants));
+            m_commandList->setPushConstants(&miniConstants, sizeof(miniConstants));
 
-            m_app.m_commandList->dispatchRays(args);
-            m_app.m_commandList->setTextureState(m_app.m_renderTargets->SpecularHitT, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+            m_commandList->dispatchRays(args);
+            m_commandList->setTextureState(m_renderTargets->SpecularHitT, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
         }
 
-        m_app.m_commandList->setBufferState(m_app.m_renderTargets->StablePlanesBuffer, nvrhi::ResourceStates::UnorderedAccess);
+        m_commandList->setBufferState(m_renderTargets->StablePlanesBuffer, nvrhi::ResourceStates::UnorderedAccess);
     }
 
     // this is a performance optimization where final 2 passes from ReSTIR DI and ReSTIR GI are combined to avoid loading GBuffer twice
@@ -1561,38 +1818,38 @@ void PathTracingRenderer::pathTrace(nvrhi::IFramebuffer* framebuffer, const Samp
 
     if (m_app.m_settings.ActualUseRTXDIPasses())
     {
-        RAII_SCOPE( m_app.m_commandList->beginMarker("RTXDI");, m_app.m_commandList->endMarker(); );
+        RAII_SCOPE( m_commandList->beginMarker("RTXDI");, m_commandList->endMarker(); );
 
         // this does all ReSTIR DI magic including applying the final sample into correct radiance buffer (depending on denoiser state)
         if (m_app.m_settings.ActualUseReSTIRDI())
-            m_app.m_rtxdiPass->Execute(m_app.m_commandList, m_app.m_bindingSet, useFusedDIGIFinal);
+            m_rtxdiPass->Execute(m_commandList, m_bindingSet, useFusedDIGIFinal);
 
         if (m_app.m_settings.ActualUseReSTIRGI())
-            m_app.m_rtxdiPass->ExecuteGI(m_app.m_commandList, m_app.m_bindingSet, useFusedDIGIFinal);
+            m_rtxdiPass->ExecuteGI(m_commandList, m_bindingSet, useFusedDIGIFinal);
 
         if (useFusedDIGIFinal)
-            m_app.m_rtxdiPass->ExecuteFusedDIGIFinal(m_app.m_commandList, m_app.m_bindingSet);
+            m_rtxdiPass->ExecuteFusedDIGIFinal(m_commandList, m_bindingSet);
 
         if (m_app.m_settings.ActualUseReSTIRPT())
-            m_app.m_rtxdiPass->ExecutePT(m_app.m_commandList, m_app.m_bindingSet);
+            m_rtxdiPass->ExecutePT(m_commandList, m_bindingSet);
     }
 
     {
-        RAII_SCOPE(m_app.m_commandList->beginMarker("Denoising Guides Bake"); , m_app.m_commandList->endMarker(); );
+        RAII_SCOPE(m_commandList->beginMarker("Denoising Guides Bake"); , m_commandList->endMarker(); );
 
-        m_app.m_denoisingGuidesBaker->DenoiseSpecHitT(m_app.m_commandList, m_app.m_bindingSet);
-        m_app.m_denoisingGuidesBaker->ComputeAvgLayerRadiance(m_app.m_commandList, m_app.m_bindingSet);
+        m_denoisingGuidesBaker->DenoiseSpecHitT(m_commandList, m_bindingSet);
+        m_denoisingGuidesBaker->ComputeAvgLayerRadiance(m_commandList, m_bindingSet);
 
         if (m_app.m_settings.DebugView != DebugViewType::Disabled)
-            m_app.m_denoisingGuidesBaker->RenderDebugViz(m_app.m_commandList, m_app.m_settings.DebugView, m_app.m_bindingSet);
+            m_denoisingGuidesBaker->RenderDebugViz(m_commandList, m_app.m_settings.DebugView, m_bindingSet);
     }
 
     if (useStablePlanes && (m_app.m_settings.DebugView > DebugViewType::Disabled && m_app.m_settings.DebugView <= DebugViewType::StablePlane_SpecRadiance || m_app.m_settings.DebugView == DebugViewType::StableRadiance) )
     {
-        m_app.m_commandList->beginMarker("StablePlanesDebugViz");
-        nvrhi::TextureDesc tdesc = m_app.m_renderTargets->OutputColor->getDesc();
-        m_app.m_postProcess->Apply(m_app.m_commandList, PostProcess::ComputePassType::StablePlanesDebugViz, m_app.m_constantBuffer, miniConstants, m_app.m_bindingSet, m_app.m_bindingLayout, tdesc.width, tdesc.height);
-        m_app.m_commandList->endMarker();
+        m_commandList->beginMarker("StablePlanesDebugViz");
+        nvrhi::TextureDesc tdesc = m_renderTargets->OutputColor->getDesc();
+        m_postProcess->Apply(m_commandList, PostProcess::ComputePassType::StablePlanesDebugViz, m_constantBuffer, miniConstants, m_bindingSet, m_bindingLayout, tdesc.width, tdesc.height);
+        m_commandList->endMarker();
 
     }
 }
@@ -1601,20 +1858,20 @@ void PathTracingRenderer::denoise(nvrhi::IFramebuffer* framebuffer)
     if( !m_app.m_settings.ActualUseStandaloneDenoiser() )
         return;
 
-    for (int i = 0; i < std::size(m_app.m_nrd); i++)
+    for (int i = 0; i < std::size(m_nrd); i++)
     {
-        if (m_app.m_nrd[i] == nullptr)
+        if (m_nrd[i] == nullptr)
         {
             nrd::Denoiser denoiserMethod = m_app.m_settings.NRDMethod == NrdConfig::DenoiserMethod::REBLUR ?
                 nrd::Denoiser::REBLUR_DIFFUSE_SPECULAR : nrd::Denoiser::RELAX_DIFFUSE_SPECULAR;
 
-            m_app.m_nrd[i] = std::make_unique<NrdIntegration>(m_app.GetDevice(), denoiserMethod);
-            m_app.m_nrd[i]->Initialize(m_app.m_renderSize.x, m_app.m_renderSize.y, *m_app.m_shaderFactory);
+            m_nrd[i] = std::make_unique<NrdIntegration>(m_app.GetDevice(), denoiserMethod);
+            m_nrd[i]->Initialize(m_renderSize.x, m_renderSize.y, *m_app.m_shaderFactory);
         }
     }
 
     //const auto& fbinfo = framebuffer->getFramebufferInfo();
-    const char* passNames[] = { "Denoising plane 0", "Denoising plane 1", "Denoising plane 2", "Denoising plane 3" }; assert( std::size(m_app.m_nrd) <= std::size(passNames) );
+    const char* passNames[] = { "Denoising plane 0", "Denoising plane 1", "Denoising plane 2", "Denoising plane 3" }; assert( std::size(m_nrd) <= std::size(passNames) );
 
     bool nrdUseRelax = m_app.m_settings.NRDMethod == NrdConfig::DenoiserMethod::RELAX;
     PostProcess::ComputePassType preparePassType = nrdUseRelax ? PostProcess::ComputePassType::RELAXDenoiserPrepareInputs : PostProcess::ComputePassType::REBLURDenoiserPrepareInputs;
@@ -1622,95 +1879,95 @@ void PathTracingRenderer::denoise(nvrhi::IFramebuffer* framebuffer)
 
     bool resetHistory = m_app.m_settings.ResetRealtimeCaches;
 
-    int maxPassCount = std::min(m_app.m_settings.StablePlanesActiveCount, (int)std::size(m_app.m_nrd));
+    int maxPassCount = std::min(m_app.m_settings.StablePlanesActiveCount, (int)std::size(m_nrd));
     bool initWithStableRadiance = true;
     for (int pass = maxPassCount-1; pass >= 0; pass--)
     {
-        m_app.m_commandList->beginMarker(passNames[pass]);
+        m_commandList->beginMarker(passNames[pass]);
 
         SampleMiniConstants miniConstants = { uint4((uint)pass, initWithStableRadiance?1:0, 0, 0) };
         initWithStableRadiance = false;
 
         // Direct inputs to denoiser are reused between passes; there's redundant copies but it makes interfacing simpler
-        nvrhi::TextureDesc tdesc = m_app.m_renderTargets->OutputColor->getDesc();
-        m_app.m_commandList->beginMarker("PrepareInputs");
-        m_app.m_postProcess->Apply(m_app.m_commandList, preparePassType, m_app.m_constantBuffer, miniConstants, m_app.m_bindingSet, m_app.m_bindingLayout, tdesc.width, tdesc.height);
-        m_app.m_commandList->endMarker();
+        nvrhi::TextureDesc tdesc = m_renderTargets->OutputColor->getDesc();
+        m_commandList->beginMarker("PrepareInputs");
+        m_postProcess->Apply(m_commandList, preparePassType, m_constantBuffer, miniConstants, m_bindingSet, m_bindingLayout, tdesc.width, tdesc.height);
+        m_commandList->endMarker();
 
         const float timeDeltaBetweenFrames = m_app.m_cmdLine.noWindow ? 1.f/60.f : -1.f; // if we're rendering without a window we set a fix timeDeltaBetweenFrames to ensure that output is deterministic
         bool enableValidation = m_app.m_settings.DebugView == DebugViewType::StablePlane_DenoiserValidation;
         if (nrdUseRelax)
         {
-            m_app.m_nrd[pass]->RunDenoiserPasses(m_app.m_commandList, *m_app.m_renderTargets, pass, *m_app.m_renderCore.camera().view(), *m_app.m_renderCore.camera().viewPrevious(), m_app.GetFrameIndex(), m_app.m_settings.NRDDisocclusionThreshold, m_app.m_settings.NRDDisocclusionThresholdAlternate, m_app.m_settings.NRDUseAlternateDisocclusionThresholdMix, timeDeltaBetweenFrames, enableValidation, resetHistory, &m_app.m_settings.RelaxSettings);
+            m_nrd[pass]->RunDenoiserPasses(m_commandList, *m_renderTargets, pass, *m_app.m_renderCore.camera().view(), *m_app.m_renderCore.camera().viewPrevious(), m_app.GetFrameIndex(), m_app.m_settings.NRDDisocclusionThreshold, m_app.m_settings.NRDDisocclusionThresholdAlternate, m_app.m_settings.NRDUseAlternateDisocclusionThresholdMix, timeDeltaBetweenFrames, enableValidation, resetHistory, &m_app.m_settings.RelaxSettings);
         }
         else
         {
-            m_app.m_nrd[pass]->RunDenoiserPasses(m_app.m_commandList, *m_app.m_renderTargets, pass, *m_app.m_renderCore.camera().view(), *m_app.m_renderCore.camera().viewPrevious(), m_app.GetFrameIndex(), m_app.m_settings.NRDDisocclusionThreshold, m_app.m_settings.NRDDisocclusionThresholdAlternate, m_app.m_settings.NRDUseAlternateDisocclusionThresholdMix, timeDeltaBetweenFrames, enableValidation, resetHistory, &m_app.m_settings.ReblurSettings);
+            m_nrd[pass]->RunDenoiserPasses(m_commandList, *m_renderTargets, pass, *m_app.m_renderCore.camera().view(), *m_app.m_renderCore.camera().viewPrevious(), m_app.GetFrameIndex(), m_app.m_settings.NRDDisocclusionThreshold, m_app.m_settings.NRDDisocclusionThresholdAlternate, m_app.m_settings.NRDUseAlternateDisocclusionThresholdMix, timeDeltaBetweenFrames, enableValidation, resetHistory, &m_app.m_settings.ReblurSettings);
         }
 
-        m_app.m_commandList->beginMarker("MergeOutputs");
-        m_app.m_postProcess->Apply(m_app.m_commandList, mergePassType, pass, m_app.m_constantBuffer, miniConstants, m_app.m_renderTargets->OutputColor, *m_app.m_renderTargets, nullptr);
-        m_app.m_commandList->endMarker();
+        m_commandList->beginMarker("MergeOutputs");
+        m_postProcess->Apply(m_commandList, mergePassType, pass, m_constantBuffer, miniConstants, m_renderTargets->OutputColor, *m_renderTargets, nullptr);
+        m_commandList->endMarker();
 
-        m_app.m_commandList->endMarker();
+        m_commandList->endMarker();
     }
 }
 #if CAUSTICA_WITH_NATIVE_DLSS
 bool PathTracingRenderer::evaluateNativeDLSS(bool reset)
 {
-    if (!m_app.m_nativeDLSS || !(m_app.m_settings.RealtimeAA == 2 || m_app.m_settings.RealtimeAA == 3))
+    if (!m_nativeDLSS || !(m_app.m_settings.RealtimeAA == 2 || m_app.m_settings.RealtimeAA == 3))
         return false;
 
     const bool useRayReconstruction = m_app.m_settings.RealtimeAA == 3;
-    if (useRayReconstruction && !m_app.m_nativeDLSS->IsRayReconstructionSupported())
+    if (useRayReconstruction && !m_nativeDLSS->IsRayReconstructionSupported())
         return false;
-    if (!useRayReconstruction && !m_app.m_nativeDLSS->IsDlssSupported())
+    if (!useRayReconstruction && !m_nativeDLSS->IsDlssSupported())
         return false;
 
     if (useRayReconstruction)
     {
-        RAII_SCOPE(m_app.m_commandList->beginMarker("DLSSRR_PrepareInputs");, m_app.m_commandList->endMarker(););
+        RAII_SCOPE(m_commandList->beginMarker("DLSSRR_PrepareInputs");, m_commandList->endMarker(););
 
         SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
-        nvrhi::TextureDesc tdesc = m_app.m_renderTargets->OutputColor->getDesc();
-        m_app.m_postProcess->Apply(m_app.m_commandList, PostProcess::ComputePassType::DLSSRRDenoiserPrepareInputs,
-            m_app.m_constantBuffer, miniConstants, m_app.m_bindingSet, m_app.m_bindingLayout, tdesc.width, tdesc.height);
+        nvrhi::TextureDesc tdesc = m_renderTargets->OutputColor->getDesc();
+        m_postProcess->Apply(m_commandList, PostProcess::ComputePassType::DLSSRRDenoiserPrepareInputs,
+            m_constantBuffer, miniConstants, m_bindingSet, m_bindingLayout, tdesc.width, tdesc.height);
     }
 
     caustica::render::DLSS::InitParameters initParams;
-    initParams.inputWidth = m_app.m_renderSize.x;
-    initParams.inputHeight = m_app.m_renderSize.y;
-    initParams.outputWidth = m_app.m_displaySize.x;
-    initParams.outputHeight = m_app.m_displaySize.y;
+    initParams.inputWidth = m_renderSize.x;
+    initParams.inputHeight = m_renderSize.y;
+    initParams.outputWidth = m_displaySize.x;
+    initParams.outputHeight = m_displaySize.y;
     initParams.useLinearDepth = false;
     initParams.useAutoExposure = true;
     initParams.useRayReconstruction = useRayReconstruction;
 
-    m_app.m_nativeDLSS->Init(initParams);
+    m_nativeDLSS->Init(initParams);
 
     const bool initialized = useRayReconstruction
-        ? m_app.m_nativeDLSS->IsRayReconstructionInitialized()
-        : m_app.m_nativeDLSS->IsDlssInitialized();
+        ? m_nativeDLSS->IsRayReconstructionInitialized()
+        : m_nativeDLSS->IsDlssInitialized();
     if (!initialized)
         return false;
 
     caustica::render::DLSS::EvaluateParameters evaluateParams;
-    evaluateParams.inputColorTexture = m_app.m_renderTargets->OutputColor;
-    evaluateParams.outputColorTexture = m_app.m_renderTargets->ProcessedOutputColor;
-    evaluateParams.depthTexture = m_app.m_renderTargets->Depth;
-    evaluateParams.motionVectorsTexture = m_app.m_renderTargets->ScreenMotionVectors;
-    evaluateParams.motionVectorScaleX = 1.0f / float(m_app.m_renderSize.x);
-    evaluateParams.motionVectorScaleY = 1.0f / float(m_app.m_renderSize.y);
+    evaluateParams.inputColorTexture = m_renderTargets->OutputColor;
+    evaluateParams.outputColorTexture = m_renderTargets->ProcessedOutputColor;
+    evaluateParams.depthTexture = m_renderTargets->Depth;
+    evaluateParams.motionVectorsTexture = m_renderTargets->ScreenMotionVectors;
+    evaluateParams.motionVectorScaleX = 1.0f / float(m_renderSize.x);
+    evaluateParams.motionVectorScaleY = 1.0f / float(m_renderSize.y);
     evaluateParams.resetHistory = reset || m_app.m_settings.ResetRealtimeCaches;
 
     if (useRayReconstruction)
     {
-        evaluateParams.diffuseAlbedo = m_app.m_renderTargets->RRDiffuseAlbedo;
-        evaluateParams.specularAlbedo = m_app.m_renderTargets->RRSpecAlbedo;
-        evaluateParams.normalRoughness = m_app.m_renderTargets->RRNormalsAndRoughness;
+        evaluateParams.diffuseAlbedo = m_renderTargets->RRDiffuseAlbedo;
+        evaluateParams.specularAlbedo = m_renderTargets->RRSpecAlbedo;
+        evaluateParams.normalRoughness = m_renderTargets->RRNormalsAndRoughness;
     }
 
-    const bool evaluated = m_app.m_nativeDLSS->Evaluate(m_app.m_commandList, evaluateParams, *m_app.m_renderCore.camera().view());
+    const bool evaluated = m_nativeDLSS->Evaluate(m_commandList, evaluateParams, *m_app.m_renderCore.camera().view());
     if (evaluated)
     {
         static bool loggedNativeDLSSEvaluation = false;
@@ -1718,7 +1975,7 @@ bool PathTracingRenderer::evaluateNativeDLSS(bool reset)
         {
             caustica::info("Native NGX %s evaluated successfully at %ux%u -> %ux%u.",
                 useRayReconstruction ? "DLSS-RR" : "DLSS",
-                m_app.m_renderSize.x, m_app.m_renderSize.y, m_app.m_displaySize.x, m_app.m_displaySize.y);
+                m_renderSize.x, m_renderSize.y, m_displaySize.x, m_displaySize.y);
             loggedNativeDLSSEvaluation = true;
         }
     }
@@ -1732,28 +1989,28 @@ void PathTracingRenderer::postProcessAA(nvrhi::IFramebuffer* framebuffer, bool r
 
     PostProcessAAParams params{
         m_app.m_settings,
-        m_app.m_commandList,
-        m_app.m_renderTargets.get(),
+        m_commandList,
+        m_renderTargets.get(),
         m_app.GetGpuDevice(),
     };
-    params.renderSize = m_app.m_renderSize;
-    params.displaySize = m_app.m_displaySize;
-    params.displayAspectRatio = m_app.m_displayAspectRatio;
-    params.cameraJitter = m_app.ComputeCameraJitter(m_app.m_sampleIndex);
-    params.sampleIndex = m_app.m_sampleIndex;
+    params.renderSize = m_renderSize;
+    params.displaySize = m_displaySize;
+    params.displayAspectRatio = m_displayAspectRatio;
+    params.cameraJitter = m_app.ComputeCameraJitter(m_sampleIndex);
+    params.sampleIndex = m_sampleIndex;
     params.frameIndex = m_app.GetFrameIndex();
     params.reset = reset;
-    params.temporalAAPass = m_app.m_temporalAntiAliasingPass.get();
-    params.accumulationPass = m_app.m_accumulationPass.get();
-    params.postProcess = m_app.m_postProcess.get();
-    params.bindingSet = m_app.m_bindingSet;
-    params.bindingLayout = m_app.m_bindingLayout;
-    params.constantBuffer = m_app.m_constantBuffer;
-    params.accumulationSampleIndex = m_app.m_accumulationSampleIndex;
-    params.gaussianSplatTemporalSampleIndex = &m_app.m_gaussianSplatTemporalSampleIndex;
-    params.gaussianSplatTemporalReset = &m_app.m_gaussianSplatTemporalReset;
+    params.temporalAAPass = m_temporalAntiAliasingPass.get();
+    params.accumulationPass = m_accumulationPass.get();
+    params.postProcess = m_postProcess.get();
+    params.bindingSet = m_bindingSet;
+    params.bindingLayout = m_bindingLayout;
+    params.constantBuffer = m_constantBuffer;
+    params.accumulationSampleIndex = m_accumulationSampleIndex;
+    params.gaussianSplatTemporalSampleIndex = &m_gaussianSplatTemporalSampleIndex;
+    params.gaussianSplatTemporalReset = &m_gaussianSplatTemporalReset;
 #if CAUSTICA_WITH_STREAMLINE
-    params.dlssRROptions = &m_app.m_lastDLSSRROptions;
+    params.dlssRROptions = &m_lastDLSSRROptions;
 #endif
 
     m_app.m_renderCore.postProcessAA(params);
@@ -1769,25 +2026,25 @@ void PathTracingRenderer::postProcessAA(nvrhi::IFramebuffer* framebuffer, bool r
         {
             if (m_app.m_settings.ActualUseStandaloneDenoiser())
             {
-                m_app.m_commandList->copyTexture(
-                    m_app.m_renderTargets->ProcessedOutputColor, nvrhi::TextureSlice(),
-                    m_app.m_renderTargets->OutputColor, nvrhi::TextureSlice());
+                m_commandList->copyTexture(
+                    m_renderTargets->ProcessedOutputColor, nvrhi::TextureSlice(),
+                    m_renderTargets->OutputColor, nvrhi::TextureSlice());
             }
             else
             {
                 SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
-                nvrhi::TextureDesc tdesc = m_app.m_renderTargets->OutputColor->getDesc();
-                m_app.m_commandList->beginMarker("NoDenoiserFinalMerge");
-                m_app.m_postProcess->Apply(
-                    m_app.m_commandList,
+                nvrhi::TextureDesc tdesc = m_renderTargets->OutputColor->getDesc();
+                m_commandList->beginMarker("NoDenoiserFinalMerge");
+                m_postProcess->Apply(
+                    m_commandList,
                     PostProcess::ComputePassType::NoDenoiserFinalMerge,
-                    m_app.m_constantBuffer,
+                    m_constantBuffer,
                     miniConstants,
-                    m_app.m_bindingSet,
-                    m_app.m_bindingLayout,
+                    m_bindingSet,
+                    m_bindingLayout,
                     tdesc.width,
                     tdesc.height);
-                m_app.m_commandList->endMarker();
+                m_commandList->endMarker();
             }
         }
     }
@@ -1795,51 +2052,51 @@ void PathTracingRenderer::postProcessAA(nvrhi::IFramebuffer* framebuffer, bool r
 }
 void PathTracingRenderer::resetReferenceOIDN()
 {
-    m_app.m_oidnDenoisedOutputValid = false;
-    m_app.m_oidnDenoiserFailed = false;
+    m_oidnDenoisedOutputValid = false;
+    m_oidnDenoiserFailed = false;
 
-    if (m_app.m_oidnDenoiser)
-        m_app.m_oidnDenoiser->Reset();
+    if (m_oidnDenoiser)
+        m_oidnDenoiser->Reset();
 }
 void PathTracingRenderer::applyReferenceOIDN()
 {
-    if (m_app.m_settings.RealtimeMode || !m_app.m_settings.ReferenceOIDNDenoiser || m_app.m_renderTargets == nullptr)
+    if (m_app.m_settings.RealtimeMode || !m_app.m_settings.ReferenceOIDNDenoiser || m_renderTargets == nullptr)
         return;
 
 #if CAUSTICA_WITH_OIDN
-    const bool accumulationReady = m_app.m_accumulationCompleted || m_app.m_accumulationSampleIndex >= m_app.m_settings.AccumulationTarget;
+    const bool accumulationReady = m_accumulationCompleted || m_accumulationSampleIndex >= m_app.m_settings.AccumulationTarget;
     if (!accumulationReady)
         return;
 
-    if (m_app.m_oidnDenoiserFailed)
+    if (m_oidnDenoiserFailed)
         return;
 
-    const nvrhi::TextureDesc processedDesc = m_app.m_renderTargets->ProcessedOutputColor->getDesc();
-    if (m_app.m_oidnDenoisedOutput == nullptr ||
-        m_app.m_oidnDenoisedOutput->getDesc().width != processedDesc.width ||
-        m_app.m_oidnDenoisedOutput->getDesc().height != processedDesc.height ||
-        m_app.m_oidnDenoisedOutput->getDesc().format != processedDesc.format)
+    const nvrhi::TextureDesc processedDesc = m_renderTargets->ProcessedOutputColor->getDesc();
+    if (m_oidnDenoisedOutput == nullptr ||
+        m_oidnDenoisedOutput->getDesc().width != processedDesc.width ||
+        m_oidnDenoisedOutput->getDesc().height != processedDesc.height ||
+        m_oidnDenoisedOutput->getDesc().format != processedDesc.format)
     {
         nvrhi::TextureDesc oidnOutputDesc = processedDesc;
         oidnOutputDesc.debugName = "ReferenceOIDNDenoisedOutput";
         oidnOutputDesc.initialState = nvrhi::ResourceStates::CopySource;
         oidnOutputDesc.keepInitialState = true;
-        m_app.m_oidnDenoisedOutput = m_app.GetDevice()->createTexture(oidnOutputDesc);
-        m_app.m_oidnDenoisedOutputValid = false;
+        m_oidnDenoisedOutput = m_app.GetDevice()->createTexture(oidnOutputDesc);
+        m_oidnDenoisedOutputValid = false;
     }
 
-    if (m_app.m_oidnDenoisedOutputValid)
+    if (m_oidnDenoisedOutputValid)
     {
-        m_app.m_commandList->copyTexture(m_app.m_renderTargets->ProcessedOutputColor, nvrhi::TextureSlice(), m_app.m_oidnDenoisedOutput, nvrhi::TextureSlice());
+        m_commandList->copyTexture(m_renderTargets->ProcessedOutputColor, nvrhi::TextureSlice(), m_oidnDenoisedOutput, nvrhi::TextureSlice());
         return;
     }
 
-    nvrhi::ITexture* sourceTexture = m_app.m_renderTargets->AccumulatedRadiance;
+    nvrhi::ITexture* sourceTexture = m_renderTargets->AccumulatedRadiance;
     nvrhi::TextureDesc sourceDesc = sourceTexture->getDesc();
     if (sourceDesc.format != nvrhi::Format::RGBA32_FLOAT)
     {
         caustica::warning("OIDN reference denoiser expected RGBA32_FLOAT accumulation buffer, got %s.", nvrhi::utils::FormatToString(sourceDesc.format));
-        m_app.m_oidnDenoiserFailed = true;
+        m_oidnDenoiserFailed = true;
         return;
     }
 
@@ -1857,10 +2114,10 @@ void PathTracingRenderer::applyReferenceOIDN()
     if (requestAlbedoGuide || requestNormalGuide)
     {
         SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
-        nvrhi::TextureDesc tdesc = m_app.m_renderTargets->OutputColor->getDesc();
-        m_app.m_commandList->beginMarker("OIDN_PrepareGuides");
-        m_app.m_postProcess->Apply(m_app.m_commandList, PostProcess::ComputePassType::DLSSRRDenoiserPrepareInputs, m_app.m_constantBuffer, miniConstants, m_app.m_bindingSet, m_app.m_bindingLayout, tdesc.width, tdesc.height);
-        m_app.m_commandList->endMarker();
+        nvrhi::TextureDesc tdesc = m_renderTargets->OutputColor->getDesc();
+        m_commandList->beginMarker("OIDN_PrepareGuides");
+        m_postProcess->Apply(m_commandList, PostProcess::ComputePassType::DLSSRRDenoiserPrepareInputs, m_constantBuffer, miniConstants, m_bindingSet, m_bindingLayout, tdesc.width, tdesc.height);
+        m_commandList->endMarker();
     }
 
     nvrhi::StagingTextureHandle stagingTexture = m_app.GetDevice()->createStagingTexture(
@@ -1869,37 +2126,37 @@ void PathTracingRenderer::applyReferenceOIDN()
     if (stagingTexture == nullptr)
     {
         caustica::warning("OIDN reference denoiser failed to create a staging texture.");
-        m_app.m_oidnDenoiserFailed = true;
+        m_oidnDenoiserFailed = true;
         return;
     }
 
     nvrhi::StagingTextureHandle albedoStagingTexture;
     nvrhi::StagingTextureHandle normalStagingTexture;
-    if (requestAlbedoGuide && m_app.m_renderTargets->RRDiffuseAlbedo != nullptr)
+    if (requestAlbedoGuide && m_renderTargets->RRDiffuseAlbedo != nullptr)
     {
         albedoStagingTexture = m_app.GetDevice()->createStagingTexture(
-            MakeReadbackTextureDesc(m_app.m_renderTargets->RRDiffuseAlbedo->getDesc(), "ReferenceOIDN Albedo Readback"),
+            MakeReadbackTextureDesc(m_renderTargets->RRDiffuseAlbedo->getDesc(), "ReferenceOIDN Albedo Readback"),
             nvrhi::CpuAccessMode::Read);
         if (albedoStagingTexture != nullptr)
-            m_app.m_commandList->copyTexture(albedoStagingTexture, nvrhi::TextureSlice(), m_app.m_renderTargets->RRDiffuseAlbedo, nvrhi::TextureSlice());
+            m_commandList->copyTexture(albedoStagingTexture, nvrhi::TextureSlice(), m_renderTargets->RRDiffuseAlbedo, nvrhi::TextureSlice());
     }
-    if (requestNormalGuide && m_app.m_renderTargets->RRNormalsAndRoughness != nullptr)
+    if (requestNormalGuide && m_renderTargets->RRNormalsAndRoughness != nullptr)
     {
         normalStagingTexture = m_app.GetDevice()->createStagingTexture(
-            MakeReadbackTextureDesc(m_app.m_renderTargets->RRNormalsAndRoughness->getDesc(), "ReferenceOIDN Normal Readback"),
+            MakeReadbackTextureDesc(m_renderTargets->RRNormalsAndRoughness->getDesc(), "ReferenceOIDN Normal Readback"),
             nvrhi::CpuAccessMode::Read);
         if (normalStagingTexture != nullptr)
-            m_app.m_commandList->copyTexture(normalStagingTexture, nvrhi::TextureSlice(), m_app.m_renderTargets->RRNormalsAndRoughness, nvrhi::TextureSlice());
+            m_commandList->copyTexture(normalStagingTexture, nvrhi::TextureSlice(), m_renderTargets->RRNormalsAndRoughness, nvrhi::TextureSlice());
     }
 
-    m_app.m_commandList->copyTexture(stagingTexture, nvrhi::TextureSlice(), sourceTexture, nvrhi::TextureSlice());
-    m_app.m_commandList->close();
-    m_app.GetDevice()->executeCommandList(m_app.m_commandList);
+    m_commandList->copyTexture(stagingTexture, nvrhi::TextureSlice(), sourceTexture, nvrhi::TextureSlice());
+    m_commandList->close();
+    m_app.GetDevice()->executeCommandList(m_commandList);
     if (!m_app.GetDevice()->waitForIdle())
     {
-        m_app.m_commandList->open();
+        m_commandList->open();
         caustica::warning("OIDN reference denoiser readback failed because the GPU device was lost.");
-        m_app.m_oidnDenoiserFailed = true;
+        m_oidnDenoiserFailed = true;
         return;
     }
 
@@ -1907,9 +2164,9 @@ void PathTracingRenderer::applyReferenceOIDN()
     const uint8_t* mappedData = static_cast<const uint8_t*>(m_app.GetDevice()->mapStagingTexture(stagingTexture, nvrhi::TextureSlice(), nvrhi::CpuAccessMode::Read, &rowPitch));
     if (mappedData == nullptr)
     {
-        m_app.m_commandList->open();
+        m_commandList->open();
         caustica::warning("OIDN reference denoiser failed to map the accumulation buffer.");
-        m_app.m_oidnDenoiserFailed = true;
+        m_oidnDenoiserFailed = true;
         return;
     }
 
@@ -1947,18 +2204,18 @@ void PathTracingRenderer::applyReferenceOIDN()
             oidnOptions.NormalRgb = normalRgb.data();
     }
 
-    if (m_app.m_oidnDenoiser == nullptr)
-        m_app.m_oidnDenoiser = std::make_unique<OidnDenoiser>();
+    if (m_oidnDenoiser == nullptr)
+        m_oidnDenoiser = std::make_unique<OidnDenoiser>();
 
     std::vector<float> outputRgb;
-    const bool success = m_app.m_oidnDenoiser->Denoise(inputRgb.data(), width, height, oidnOptions, outputRgb);
+    const bool success = m_oidnDenoiser->Denoise(inputRgb.data(), width, height, oidnOptions, outputRgb);
 
-    m_app.m_commandList->open();
+    m_commandList->open();
 
     if (!success)
     {
-        caustica::warning("OIDN reference denoiser failed: %s", m_app.m_oidnDenoiser->GetLastError().c_str());
-        m_app.m_oidnDenoiserFailed = true;
+        caustica::warning("OIDN reference denoiser failed: %s", m_oidnDenoiser->GetLastError().c_str());
+        m_oidnDenoiserFailed = true;
         return;
     }
 
@@ -1973,17 +2230,17 @@ void PathTracingRenderer::applyReferenceOIDN()
         outputHalf[pixel] = Float32ToFloat16x4(float4(r, g, b, 1.0f));
     }
 
-    m_app.m_commandList->writeTexture(m_app.m_oidnDenoisedOutput, 0, 0, outputHalf.data(), size_t(width) * sizeof(float16_t4));
-    m_app.m_commandList->copyTexture(m_app.m_renderTargets->ProcessedOutputColor, nvrhi::TextureSlice(), m_app.m_oidnDenoisedOutput, nvrhi::TextureSlice());
-    m_app.m_oidnDenoisedOutputValid = true;
+    m_commandList->writeTexture(m_oidnDenoisedOutput, 0, 0, outputHalf.data(), size_t(width) * sizeof(float16_t4));
+    m_commandList->copyTexture(m_renderTargets->ProcessedOutputColor, nvrhi::TextureSlice(), m_oidnDenoisedOutput, nvrhi::TextureSlice());
+    m_oidnDenoisedOutputValid = true;
 
     caustica::info("OIDN reference denoiser completed on %s for %ux%u image.",
-        m_app.m_oidnDenoiser->GetDeviceDescription().c_str(), width, height);
+        m_oidnDenoiser->GetDeviceDescription().c_str(), width, height);
 #else
-    if (!m_app.m_oidnDenoiserFailed)
+    if (!m_oidnDenoiserFailed)
     {
         caustica::warning("OIDN reference denoiser requested, but CAUSTICA_WITH_OIDN is disabled in this build.");
-        m_app.m_oidnDenoiserFailed = true;
+        m_oidnDenoiserFailed = true;
     }
 #endif
 }
