@@ -1,12 +1,18 @@
-#include "ComputePipelineBaker.h"
+#include <render/Core/ComputePipelineBaker.h>
 #include <assets/loader/ShaderCompilerUtils.h>
-#include "SampleCommon.h"
 #include <assets/loader/ShaderPackFileSystem.h>
 
 #include <render/Core/SceneRender.h>
 #include <backend/ShaderUtils.h>
 #include <core/log.h>
 #include <core/vfs/VFS.h>
+#include <core/file_utils.h>
+#include <core/format.h>
+#include <core/path_utils.h>
+#include <core/progress.h>
+#include <core/system_utils.h>
+
+using namespace caustica;
 
 #define COMPUTE_BAKER_ENABLE_MULTITHREADED_COMPILE 1
 #define COMPUTE_BAKER_EMBED_PDBS 0

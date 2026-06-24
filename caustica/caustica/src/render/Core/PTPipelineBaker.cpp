@@ -1,4 +1,4 @@
-#include "PTPipelineBaker.h"
+#include <render/Core/PTPipelineBaker.h>
 #include <assets/loader/ShaderCompilerUtils.h>
 #include <assets/loader/ShaderPackFileSystem.h>
 
@@ -6,8 +6,15 @@
 #include <backend/ShaderUtils.h>
 
 #include <render/Passes/Lighting/MaterialsBaker.h>
-#include "SampleCommon.h"
 #include <shaders/PathTracer/PathTracerShared.h>
+
+#include <core/file_utils.h>
+#include <core/format.h>
+#include <core/path_utils.h>
+#include <core/progress.h>
+#include <core/system_utils.h>
+
+using namespace caustica;
 
 #define BAKER_ENABLE_MULTITHREADED_COMPILE_SHADER 1
 #define BAKER_ENABLE_MULTITHREADED_COMPILE_PSO 1

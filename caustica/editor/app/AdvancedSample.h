@@ -6,7 +6,7 @@
 #pragma once
 
 #include "caustica.h"
-#include "SampleCommon/PTPipelineBaker.h"
+#include <render/Core/PTPipelineBaker.h>
 
 class AdvancedPathTracer : public Sample
 {

@@ -2,7 +2,7 @@
 #include <shaders/render/Lighting/Distant/CubemapProcessing.hlsl>
 
 #include <render/Passes/Lighting/Distant/EnvMapImportanceSamplingBaker.h>
-#include <SampleCommon/ComputePipelineBaker.h>
+#include <render/Core/ComputePipelineBaker.h>
 #include <SampleCommon/SampleCommon.h>
 
 #include <render/Core/BindingCache.h>

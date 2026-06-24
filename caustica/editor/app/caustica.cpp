@@ -32,8 +32,8 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#include "SampleCommon/PTPipelineBaker.h"
-#include "SampleCommon/ComputePipelineBaker.h"
+#include <render/Core/PTPipelineBaker.h>
+#include <render/Core/ComputePipelineBaker.h>
 
 #include "render/Core/AccelerationStructureUtil.h"
 
