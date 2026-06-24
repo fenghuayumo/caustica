@@ -31,17 +31,6 @@
 using namespace caustica;
 using namespace caustica;
 
-// Declare SampleUIData as a global, so that we can use the KorgI macros to enable
-// Korg nanoKontrol support
-SampleUIData g_sampleUIData;
-
-// Declare how the Korg nanoKontrol 2 controls will interact with UI elements
-KORGI_TOGGLE(g_sampleUIData.EnableAnimations, 0, Play )
-
-KORGI_TOGGLE(g_sampleUIData.ToneMappingParams.autoExposure, 0, S1 )
-KORGI_INT_TOGGLE(g_sampleUIData.ToneMappingParams.toneMapOperator, 0, M1, ToneMapperOperator::Linear, ToneMapperOperator::HableUc2)
-KORGI_KNOB(g_sampleUIData.ToneMappingParams.exposureCompensation, 0, Slider1, -8.f, 8.f)
-
 #define RESET_ON_CHANGE(code) do{if (code) m_ui.ResetAccumulation = true;} while(false)
 
 const static ImVec4 warnColor = { 1,0.5f,0.5f,1 };
@@ -367,7 +356,7 @@ static void ApplyPreset(SampleUIData& ui, const PerformancePreset& p)
     ui.ResetAccumulation = true;
 }
 
-void SampleUIData::ApplyRTXDIRestirPreset()
+void PathTracerSettings::ApplyRTXDIRestirPreset()
 {
     if (RTXDIRestirPreset == RTXDIRestirQualityPreset::Custom)
         return;
@@ -523,7 +512,7 @@ void SampleUIData::ApplyRTXDIRestirPreset()
     ResetRealtimeCaches |= wasUsingCheckerboard != enableCheckerboardSampling;
 }
 
-void SampleUIData::ApplyRTXDIRestirPTPreset()
+void PathTracerSettings::ApplyRTXDIRestirPTPreset()
 {
     if (RTXDIRestirPTPreset == RTXDIRestirPTQualityPreset::Custom)
         return;
@@ -628,6 +617,10 @@ SampleUI::SampleUI(GpuDevice* deviceManager, SampleBaseApp & baseApp, Sample& ap
 
     // Apply command-line overrides to UI defaults
     m_imguiManager->applyCommandLineDefaults();
+
+#if KORGI_ENABLED
+    m_korgiBindings = std::make_unique<KorgiBindings>(m_ui);
+#endif
 
 #if ENABLE_DEBUG_DELTA_TREE_VIZUALISATION
     m_ImNodesContext = ImNodes::Ez::CreateContext();

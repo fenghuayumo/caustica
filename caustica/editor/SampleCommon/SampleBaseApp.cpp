@@ -22,7 +22,6 @@
 #include <platform/glfw_window.h>
 #include <platform/window.h>
 
-extern SampleUIData g_sampleUIData;
 extern const char* g_windowTitle;
 
 #if CAUSTICA_D3D12_WITH_NVAPI
@@ -211,7 +210,7 @@ SampleBaseApp::InitReturnCodes SampleBaseApp::Init(int argc, const char* const* 
 
     // -- Register render passes into the engine -- 
     // Create the main render pass. This is where path tracing happens
-    m_MainSceneRender = CreateMainRenderPass(*m_GpuDevice, m_CmdLine);
+    m_MainSceneRender = CreateMainRenderPass(*m_GpuDevice, m_CmdLine, m_sampleUIData);
     m_MainSceneRender->Init(preferredScene, m_ShaderFactory);
     m_GpuDevice->AddRenderPassToBack(m_MainSceneRender.get());
 
@@ -238,26 +237,30 @@ SampleBaseApp::InitReturnCodes SampleBaseApp::Init(int argc, const char* const* 
     // Optionally create the UP render pass. This exposes run time parameter controls.
     if (!m_CmdLine.noWindow)
     {
-        m_UIRender = std::make_unique<SampleUI>(m_GpuDevice.get(), *this, *m_MainSceneRender, g_sampleUIData, IsSERSupported(), m_CmdLine);
+        m_UIRender = std::make_unique<SampleUI>(m_GpuDevice.get(), *this, *m_MainSceneRender, m_sampleUIData, IsSERSupported(), m_CmdLine);
         m_UIRender->Init(m_ShaderFactory);
         m_GpuDevice->AddRenderPassToBack(m_UIRender.get());
     }
     else
     {
-        InitializeSampleUIDataFromCommandLine(g_sampleUIData, m_CmdLine);
+        InitializeSampleUIDataFromCommandLine(m_sampleUIData, m_CmdLine);
     }
 
     // Register GLFW drag-and-drop callback
     if (!m_CmdLine.noWindow && m_GpuDevice->GetWindow())
     {
-        glfwSetDropCallback(m_GpuDevice->GetWindow(), [](GLFWwindow* /*window*/, int count, const char** paths)
+        glfwSetWindowUserPointer(m_GpuDevice->GetWindow(), this);
+        glfwSetDropCallback(m_GpuDevice->GetWindow(), [](GLFWwindow* window, int count, const char** paths)
         {
+            auto* app = static_cast<SampleBaseApp*>(glfwGetWindowUserPointer(window));
+            if (!app)
+                return;
             for (int i = 0; i < count; i++)
-                g_sampleUIData.PendingDroppedFiles.emplace_back(paths[i]);
+                app->GetSampleUIData().PendingDroppedFiles.emplace_back(paths[i]);
         });
     }
 
-    LocalConfig::PostAppInit(g_sampleUIData);
+    LocalConfig::PostAppInit(m_sampleUIData);
 
 #if CAUSTICA_ENABLE_VIDEO_MEMORY_INFO && defined(_WIN32)
     auto device = m_GpuDevice->GetDevice();

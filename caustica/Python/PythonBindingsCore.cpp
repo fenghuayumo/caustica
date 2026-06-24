@@ -1268,10 +1268,7 @@ void RegisterCoreBindings(nb::module_& m)
         "caustica renderer instance. In embed mode use caustica.app(); in extension\n"
         "mode use Renderer.app to retrieve the underlying instance.")
         .def_prop_ro("settings", [](Sample& self) -> SampleUIData* {
-                // SampleUIData is a global g_sampleUIData. Same identity in
-                // embed and extension modes since the linked SampleUI binary
-                // declares the exact same translation-unit-local global.
-                return &g_sampleUIData;
+                return &self.GetUIData();
             }, nb::rv_policy::reference,
             "Live `Settings` mirror of the current UI state.")
         .def_prop_ro("scene", [](Sample& self) {
@@ -1472,8 +1469,8 @@ void RegisterCoreBindings(nb::module_& m)
         .def("save_current_camera",  [](Sample& self) { self.SaveCurrentCamera(); })
         .def("load_current_camera",  [](Sample& self) { self.LoadCurrentCamera(); })
 
-        .def("request_shader_reload",  [](Sample& self) { g_sampleUIData.ShaderReloadRequested = true; })
-        .def("request_accel_rebuild",  [](Sample& self) { g_sampleUIData.AccelerationStructRebuildRequested = true; })
+        .def("request_shader_reload",  [](Sample& self) { self.GetUIData().ShaderReloadRequested = true; })
+        .def("request_accel_rebuild",  [](Sample& self) { self.GetUIData().AccelerationStructRebuildRequested = true; })
         .def("request_mesh_accel_rebuild",
             [](Sample& self, const std::shared_ptr<MeshInfo>& mesh) {
                 self.RequestMeshAccelRebuild(mesh);
@@ -1491,16 +1488,17 @@ void RegisterCoreBindings(nb::module_& m)
             },
             nb::arg("node"),
             "Request a BLAS rebuild for the mesh attached to one scene node.")
-        .def("reset_accumulation",     [](Sample& self) { g_sampleUIData.ResetAccumulation = true; })
-        .def("reset_realtime_caches",  [](Sample& self) { g_sampleUIData.ResetRealtimeCaches = true; })
+        .def("reset_accumulation",     [](Sample& self) { self.GetUIData().ResetAccumulation = true; })
+        .def("reset_realtime_caches",  [](Sample& self) { self.GetUIData().ResetRealtimeCaches = true; })
 
-        .def("set_realtime_mode", [](Sample&, bool standaloneDenoiser, int realtimeAA)
+        .def("set_realtime_mode", [](Sample& self, bool standaloneDenoiser, int realtimeAA)
             {
-                if (!g_sampleUIData.RealtimeMode)
-                    g_sampleUIData.ResetAccumulation = true;
-                g_sampleUIData.RealtimeMode      = true;
-                g_sampleUIData.StandaloneDenoiser = standaloneDenoiser;
-                g_sampleUIData.RealtimeAA         = realtimeAA;
+                auto& ui = self.GetUIData();
+                if (!ui.RealtimeMode)
+                    ui.ResetAccumulation = true;
+                ui.RealtimeMode      = true;
+                ui.StandaloneDenoiser = standaloneDenoiser;
+                ui.RealtimeAA         = realtimeAA;
             },
             nb::arg("standalone_denoiser") = true,
             nb::arg("realtime_aa") = 2 /*DLSS*/,
@@ -1509,18 +1507,19 @@ void RegisterCoreBindings(nb::module_& m)
             "    standalone_denoiser: enable NRD (no effect with DLSS-RR)\n"
             "    realtime_aa        : 0=Off, 1=TAA, 2=DLSS, 3=DLSS-RR")
 
-        .def("set_reference_mode", [](Sample&, int spp, bool oidn, int oidnQuality, int oidnPasses, int oidnPrefilter)
+        .def("set_reference_mode", [](Sample& self, int spp, bool oidn, int oidnQuality, int oidnPasses, int oidnPrefilter)
             {
-                if (g_sampleUIData.RealtimeMode)
-                    g_sampleUIData.ResetAccumulation = true;
-                g_sampleUIData.RealtimeMode             = false;
+                auto& ui = self.GetUIData();
+                if (ui.RealtimeMode)
+                    ui.ResetAccumulation = true;
+                ui.RealtimeMode             = false;
                 if (spp > 0)
-                    g_sampleUIData.AccumulationTarget   = spp;
-                g_sampleUIData.ReferenceOIDNDenoiser    = oidn;
-                g_sampleUIData.ReferenceOIDNQuality     = oidnQuality;
-                g_sampleUIData.ReferenceOIDNPasses      = oidnPasses;
-                g_sampleUIData.ReferenceOIDNPrefilter   = oidnPrefilter;
-                g_sampleUIData.ReferenceOIDNDenoiserChanged = true;
+                    ui.AccumulationTarget   = spp;
+                ui.ReferenceOIDNDenoiser    = oidn;
+                ui.ReferenceOIDNQuality     = oidnQuality;
+                ui.ReferenceOIDNPasses      = oidnPasses;
+                ui.ReferenceOIDNPrefilter   = oidnPrefilter;
+                ui.ReferenceOIDNDenoiserChanged = true;
             },
             nb::arg("spp") = 0,
             nb::arg("oidn") = false,

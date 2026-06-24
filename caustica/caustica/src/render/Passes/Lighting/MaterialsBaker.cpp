@@ -20,7 +20,7 @@
 #include <core/command_line.h>
 #include <core/scope.h>
 #include <render/Core/ScopedPerfMarker.h>
-#include <ui/ui_macros.h>
+#include <imgui/ui_macros.h>
 #include <render/Core/TextureUtils.h>
 #include <scene/Scene.h>
 
@@ -34,8 +34,6 @@
 
 #include <cctype>      // std::tolower
 #include <cstring>
-
-#include <SampleUI.h>
 
 #include <render/Passes/Debug/picosha2.h>
 

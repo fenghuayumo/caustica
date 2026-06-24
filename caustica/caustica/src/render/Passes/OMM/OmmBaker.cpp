@@ -13,6 +13,7 @@
 #include <rhi/common/misc.h>
 
 #include <imgui/imgui_renderer.h>
+#include <imgui/ui_macros.h>
 
 #include <core/file_utils.h>
 #include <core/format.h>
@@ -270,8 +271,6 @@ bool OmmBaker::DebugGUI(float indent, const caustica::Scene& scene)
     
     bool resetAccumulation = false;
     #define RESET_ON_CHANGE(code) do{if (code) resetAccumulation = true;} while(false)
-    #define UI_SCOPED_INDENT(indent) RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent); )
-    #define UI_SCOPED_DISABLE(cond) RAII_SCOPE(ImGui::BeginDisabled(cond); , ImGui::EndDisabled(); )
 
     if (ImGui::Checkbox("Enable", &m_uiData.Enable))
         resetAccumulation = true;

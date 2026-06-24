@@ -69,7 +69,8 @@ public:
     using SceneRender::SceneRender;
 
     Sample(caustica::GpuDevice& deviceManager,
-        const CommandLineOptions& cmdLine);
+        const CommandLineOptions& cmdLine,
+        SampleUIData& ui);
     virtual ~Sample();
 
     //std::shared_ptr<caustica::IFileSystem> GetRootFs() const                      { return m_RootFS; }
@@ -84,6 +85,9 @@ public:
     uint                                    GetSceneCameraCount() const             { return (uint)m_scene->GetSceneGraph()->GetCameras().size() + 1; }
     uint &                                  SelectedCameraIndex()                   { return m_selectedCameraIndex; }   // 0 is default fps free flight, above (if any) will just use current scene camera
     const std::unique_ptr<class GameScene> &     GetGame() const                   { return m_sampleGame; }
+
+    SampleUIData& GetUIData() { return m_ui; }
+    const SampleUIData& GetUIData() const { return m_ui; }
 
     void                                    UpdateSubInstanceContents();
     void                                    UploadSubInstanceData(nvrhi::ICommandList* commandList);

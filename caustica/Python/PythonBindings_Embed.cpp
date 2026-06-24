@@ -36,7 +36,7 @@ NB_MODULE(caustica, m)
           nb::rv_policy::reference,
           "Return the singleton Sample renderer running in this caustica.exe.");
 
-    m.def("settings", []() -> SampleUIData* { return &g_sampleUIData; },
+    m.def("settings", []() -> SampleUIData* { return &RequireSample().GetUIData(); },
           nb::rv_policy::reference,
           "Shortcut for caustica.app().settings.");
 

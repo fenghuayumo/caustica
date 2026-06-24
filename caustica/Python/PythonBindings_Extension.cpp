@@ -292,7 +292,10 @@ NB_MODULE(caustica, m)
              "Access the underlying Sample instance to use the shared bindings.")
 
         .def_prop_ro("settings",
-             [](PyRenderer& self) -> SampleUIData* { return &g_sampleUIData; },
+             [](PyRenderer& self) -> SampleUIData* {
+                 Sample* app = self.GetApp();
+                 return app ? &app->GetUIData() : nullptr;
+             },
              nb::rv_policy::reference,
              "Live `Settings` mirror (same object as caustica.settings()).")
 
@@ -307,7 +310,10 @@ NB_MODULE(caustica, m)
           nb::rv_policy::reference,
           "Return the Sample owned by the most recently created Renderer.");
 
-    m.def("settings", []() -> SampleUIData* { return &g_sampleUIData; },
+    m.def("settings", []() -> SampleUIData* {
+            Sample* app = RequireCurrentSample();
+            return &app->GetUIData();
+        },
           nb::rv_policy::reference,
           "Shortcut for the global Settings (same as Renderer.settings).");
 

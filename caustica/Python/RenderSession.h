@@ -29,6 +29,7 @@
 #include <platform/window.h>
 
 #include <core/command_line.h>
+#include <SampleUI.h>
 
 #if CAUSTICA_WITH_DX12 && defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
 #include <wrl/client.h>
@@ -107,6 +108,9 @@ public:
     Sample*       GetSample()       { return reinterpret_cast<Sample*>(m_renderer.get()); }
     const Sample* GetSample() const { return reinterpret_cast<const Sample*>(m_renderer.get()); }
 
+    SampleUIData& GetSampleUIData() { return m_sampleUIData; }
+    const SampleUIData& GetSampleUIData() const { return m_sampleUIData; }
+
     caustica::GpuDevice* GetGpuDevice() { return m_deviceManager.get(); }
     const Config&              GetConfig() const  { return m_config; }
 
@@ -117,6 +121,7 @@ private:
 
     Config                                          m_config;
     CommandLineOptions                              m_cmdLine;
+    SampleUIData                                    m_sampleUIData;
     std::unique_ptr<caustica::GpuDevice>      m_deviceManager;
     std::unique_ptr<caustica::Window>            m_Window;
     std::unique_ptr<caustica::Application>         m_AppLoop;

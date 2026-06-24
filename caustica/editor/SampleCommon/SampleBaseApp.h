@@ -19,6 +19,8 @@
 #include <render/Core/TextureUtils.h>
 #include <core/command_line.h>
 
+#include <SampleUI.h>
+
 using caustica::FPSLimiter;
 constexpr static const int c_SwapchainCount = 3;
 
@@ -56,11 +58,14 @@ public:
 
 	void RunMainLoop();
 
+	SampleUIData& GetSampleUIData() { return m_sampleUIData; }
+	const SampleUIData& GetSampleUIData() const { return m_sampleUIData; }
+
     bool IsSERSupported() const;
     bool QueryVideoMemoryInfo(uint64_t& outBudget, uint64_t& outCurrentUsage, uint64_t& outAvailableForReservation, uint64_t& outCurrentReservation); // CAUSTICA_ENABLE_VIDEO_MEMORY_INFO for this to work, otherwise return false
 
 private:
-	virtual std::unique_ptr<Sample> CreateMainRenderPass(caustica::GpuDevice& deviceManager, const CommandLineOptions& cmdLineOptions) = 0;
+	virtual std::unique_ptr<Sample> CreateMainRenderPass(caustica::GpuDevice& deviceManager, const CommandLineOptions& cmdLineOptions, SampleUIData& ui) = 0;
 
 	// Initialization methods
 	void RegisterLogCallback();
@@ -76,6 +81,8 @@ private:
 	FPSLimiter m_FPSLimiter;
 
 	CommandLineOptions m_CmdLine;
+
+	SampleUIData m_sampleUIData;
 
 	std::unique_ptr<caustica::GpuDevice> m_GpuDevice;
 	std::unique_ptr<caustica::Window>       m_Window;

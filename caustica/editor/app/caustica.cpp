@@ -231,10 +231,11 @@ const float c_envMapRadianceScale = 1.0f / 4.0f; // used to make input 32bit flo
 static FPSLimiter g_FPSLimiter;
 
 Sample::Sample(caustica::GpuDevice& deviceManager,
-    const CommandLineOptions& cmdLine)
+    const CommandLineOptions& cmdLine,
+    SampleUIData& ui)
     : caustica::SceneRender(&deviceManager )
     , m_cmdLine(cmdLine)
-    , m_ui(g_sampleUIData)
+    , m_ui(ui)
 {
     m_progressLoading.Start("Initializing...");
     m_progressLoading.Set(50);

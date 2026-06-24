@@ -211,8 +211,6 @@ target_include_directories(causticaEngine
         "${CMAKE_CURRENT_SOURCE_DIR}/include"
     PRIVATE
         "$<$<BOOL:${CAUSTICA_WITH_STREAMLINE}>:${CMAKE_CURRENT_SOURCE_DIR}/src/engine/streamline>"
-        "${CMAKE_CURRENT_SOURCE_DIR}/../editor"
-        "${CMAKE_CURRENT_SOURCE_DIR}/../editor/ui"
         "${CMAKE_SOURCE_DIR}/External/Nrd/Include"
         "${CMAKE_SOURCE_DIR}/External/Rtxdi/Include"
         "${CMAKE_SOURCE_DIR}/External/Omm/libraries/omm-gpu-nvrhi"

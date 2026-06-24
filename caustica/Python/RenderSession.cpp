@@ -561,9 +561,9 @@ bool RenderSession::InitRenderer()
     auto device = m_deviceManager->GetDevice();
     m_shaderFactory = std::make_shared<caustica::ShaderFactory>(device, rootFS, "/ShaderPrecompiled");
 
-    m_renderer = std::make_unique<AdvancedPathTracer>(*m_deviceManager, m_cmdLine);
-    InitializeSampleUIDataFromCommandLine(g_sampleUIData, m_cmdLine);
-    LocalConfig::PostAppInit(g_sampleUIData);
+    m_renderer = std::make_unique<AdvancedPathTracer>(*m_deviceManager, m_cmdLine, m_sampleUIData);
+    InitializeSampleUIDataFromCommandLine(m_sampleUIData, m_cmdLine);
+    LocalConfig::PostAppInit(m_sampleUIData);
 
     // Pick whichever scene the user requested (or fall back to the default)
     // default).  This loads the actual scene file asynchronously inside
@@ -675,11 +675,11 @@ int RenderSession::StepUntilAccumulated(int maxFrames)
 
     // Force reference / accumulation mode so we know "done" actually means
     // the SPP target has been reached.
-    g_sampleUIData.ResetAccumulation = true;
+    m_sampleUIData.ResetAccumulation = true;
 
     int target = (maxFrames > 0)
         ? maxFrames
-        : std::max(1, g_sampleUIData.AccumulationTarget + 128);
+        : std::max(1, m_sampleUIData.AccumulationTarget + 128);
 
     int frames = 0;
     while (frames < target)
