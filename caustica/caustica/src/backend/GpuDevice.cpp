@@ -51,72 +51,6 @@ static void ErrorCallback_GLFW(int error, const char *description)
     exit(1);
 }
 
-
-// Window event callbacks for old path (CreateWindowDeviceAndSwapChain).
-// New path uses GlfwWindow which handles these via its own callbacks.
-static void WindowIconifyCallback_GLFW(GLFWwindow* window, int iconified)
-{
-    GpuDevice* mgr = reinterpret_cast<GpuDevice*>(glfwGetWindowUserPointer(window));
-    mgr->m_windowVisible = (iconified == GLFW_FALSE);
-}
-
-static void WindowFocusCallback_GLFW(GLFWwindow* window, int focused)
-{
-    GpuDevice* mgr = reinterpret_cast<GpuDevice*>(glfwGetWindowUserPointer(window));
-    mgr->m_windowIsInFocus = (focused == GLFW_TRUE);
-}
-
-static void WindowRefreshCallback_GLFW(GLFWwindow* /*window*/)
-{
-    // No-op: redraw is driven by the message loop
-}
-
-static void WindowCloseCallback_GLFW(GLFWwindow* /*window*/)
-{
-    // No-op: exit is checked via glfwWindowShouldClose in the message loop
-}
-
-static void WindowPosCallback_GLFW(GLFWwindow* /*window*/, int /*xpos*/, int /*ypos*/)
-{
-    // DPI tracking now handled by GlfwWindow::onMove().
-    // Old path: DPI is tracked via UpdateWindowSize in the message loop.
-}
-
-static void KeyCallback_GLFW(GLFWwindow *window, int key, int scancode, int action, int mods)
-{
-    GpuDevice *manager = reinterpret_cast<GpuDevice *>(glfwGetWindowUserPointer(window));
-    manager->KeyboardUpdate(key, scancode, action, mods);
-}
-
-static void CharModsCallback_GLFW(GLFWwindow *window, unsigned int unicode, int mods)
-{
-    GpuDevice *manager = reinterpret_cast<GpuDevice *>(glfwGetWindowUserPointer(window));
-    manager->KeyboardCharInput(unicode, mods);
-}
-
-static void MousePosCallback_GLFW(GLFWwindow *window, double xpos, double ypos)
-{
-    GpuDevice *manager = reinterpret_cast<GpuDevice *>(glfwGetWindowUserPointer(window));
-    manager->MousePosUpdate(xpos, ypos);
-}
-
-static void MouseButtonCallback_GLFW(GLFWwindow *window, int button, int action, int mods)
-{
-    GpuDevice *manager = reinterpret_cast<GpuDevice *>(glfwGetWindowUserPointer(window));
-    manager->MouseButtonUpdate(button, action, mods);
-}
-
-static void MouseScrollCallback_GLFW(GLFWwindow *window, double xoffset, double yoffset)
-{
-    GpuDevice *manager = reinterpret_cast<GpuDevice *>(glfwGetWindowUserPointer(window));
-    manager->MouseScrollUpdate(xoffset, yoffset);
-}
-
-static void JoystickConnectionCallback_GLFW(int joyId, int connectDisconnect)
-{
-    Input::onJoystickEvent(joyId, connectDisconnect);
-}
-
 static const struct
 {
     nvrhi::Format format;
@@ -209,135 +143,6 @@ bool GpuDevice::CreateHeadlessDevice(const DeviceCreationParameters& params)
     return true;
 }
 
-bool GpuDevice::CreateWindowDeviceAndSwapChain(const DeviceCreationParameters& params, const char *windowTitle)
-{
-    m_DeviceParams = params;
-    m_DeviceParams.headlessDevice = false;
-    m_RequestedVSync = params.vsyncEnabled;
-
-#ifndef _WINDOWS
-    // This is necessary to get correct window decorations on Wayland
-    glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_X11);
-#endif
-
-    if (!CreateInstance(m_DeviceParams))
-        return false;
-
-    glfwSetErrorCallback(ErrorCallback_GLFW);
-
-    glfwDefaultWindowHints();
-
-    bool foundFormat = false;
-    for (const auto& info : formatInfo)
-    {
-        if (info.format == params.swapChainFormat)
-        {
-            glfwWindowHint(GLFW_RED_BITS, info.redBits);
-            glfwWindowHint(GLFW_GREEN_BITS, info.greenBits);
-            glfwWindowHint(GLFW_BLUE_BITS, info.blueBits);
-            glfwWindowHint(GLFW_ALPHA_BITS, info.alphaBits);
-            glfwWindowHint(GLFW_DEPTH_BITS, info.depthBits);
-            glfwWindowHint(GLFW_STENCIL_BITS, info.stencilBits);
-            foundFormat = true;
-            break;
-        }
-    }
-
-    if (!foundFormat)
-    {
-        caustica::error("Unknown format %s (%d) used for the swap chain",
-            nvrhi::getFormatInfo(params.swapChainFormat).name,
-            int(params.swapChainFormat));
-    }
-
-    glfwWindowHint(GLFW_SAMPLES, params.swapChainSampleCount);
-    glfwWindowHint(GLFW_REFRESH_RATE, params.refreshRate);
-    glfwWindowHint(GLFW_SCALE_TO_MONITOR, params.resizeWindowWithDisplayScale);
-
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    
-    glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);   // Ignored for fullscreen
-
-    if (params.startBorderless)
-    {
-        glfwWindowHint(GLFW_DECORATED, GLFW_FALSE); // Borderless window
-    }
-
-    m_Window = glfwCreateWindow(params.backBufferWidth, params.backBufferHeight,
-                                windowTitle ? windowTitle : "",
-                                params.startFullscreen ? glfwGetPrimaryMonitor() : nullptr,
-                                nullptr);
-
-    if (m_Window == nullptr)
-    {
-        return false;
-    }
-
-    if (params.startFullscreen)
-    {
-        glfwSetWindowMonitor(m_Window, glfwGetPrimaryMonitor(), 0, 0,
-            m_DeviceParams.backBufferWidth, m_DeviceParams.backBufferHeight, m_DeviceParams.refreshRate);
-    }
-    else
-    {
-        int fbWidth = 0, fbHeight = 0;
-        glfwGetFramebufferSize(m_Window, &fbWidth, &fbHeight);
-        m_DeviceParams.backBufferWidth = fbWidth;
-        m_DeviceParams.backBufferHeight = fbHeight;
-    }
-
-    if (windowTitle)
-        m_WindowTitle = windowTitle;
-
-    glfwSetWindowUserPointer(m_Window, this);
-
-    if (params.windowPosX != -1 && params.windowPosY != -1)
-    {
-        glfwSetWindowPos(m_Window, params.windowPosX, params.windowPosY);
-    }
-    
-    glfwSetWindowPosCallback(m_Window, WindowPosCallback_GLFW);
-    glfwSetWindowCloseCallback(m_Window, WindowCloseCallback_GLFW);
-    glfwSetWindowRefreshCallback(m_Window, WindowRefreshCallback_GLFW);
-    glfwSetWindowFocusCallback(m_Window, WindowFocusCallback_GLFW);
-    glfwSetWindowIconifyCallback(m_Window, WindowIconifyCallback_GLFW);
-    glfwSetKeyCallback(m_Window, KeyCallback_GLFW);
-    glfwSetCharModsCallback(m_Window, CharModsCallback_GLFW);
-    glfwSetCursorPosCallback(m_Window, MousePosCallback_GLFW);
-    glfwSetMouseButtonCallback(m_Window, MouseButtonCallback_GLFW);
-    glfwSetScrollCallback(m_Window, MouseScrollCallback_GLFW);
-    glfwSetJoystickCallback(JoystickConnectionCallback_GLFW);
-
-    // If there are multiple device managers, then this would be called by each one which isn't necessary
-    // but should not hurt.
-
-    if (!CreateDevice())
-        return false;
-
-    if (!CreateSwapChain())
-        return false;
-
-    glfwShowWindow(m_Window);
-    
-    if (m_DeviceParams.startMaximized)
-    {
-        glfwMaximizeWindow(m_Window);
-    }
-
-    // reset the back buffer size state to enforce a resize event
-    m_DeviceParams.backBufferWidth = 0;
-    m_DeviceParams.backBufferHeight = 0;
-
-    UpdateWindowSize();
-
-    return true;
-}
-
-// ---------------------------------------------------------------------------
-// 4-layer architecture bridge:
-// Create GPU device + swapchain using a pre-existing Window from the platform layer.
-// This allows the new Application to own the Window independently of GpuDevice.
-// ---------------------------------------------------------------------------
 bool GpuDevice::CreateDeviceAndSwapChain(const DeviceCreationParameters& params, Window* window)
 {
     if (!window || !window->hasInitialised())
@@ -699,20 +504,20 @@ caustica::GpuDevice::GpuDevice()
 
 void GpuDevice::UpdateWindowSize()
 {
+    if (!m_Window)
+        return;
+
     int width;
     int height;
     glfwGetWindowSize(m_Window, &width, &height);
 
     if (width == 0 || height == 0)
     {
-        // window is minimized
-        m_windowVisible = false;
+        m_CanPresentSwapChain = false;
         return;
     }
 
-    m_windowVisible = true;
-
-    m_windowIsInFocus = glfwGetWindowAttrib(m_Window, GLFW_FOCUSED) == 1;
+    m_CanPresentSwapChain = true;
 
     if (int(m_DeviceParams.backBufferWidth) != width || 
         int(m_DeviceParams.backBufferHeight) != height ||
@@ -733,27 +538,6 @@ void GpuDevice::UpdateWindowSize()
     m_DeviceParams.vsyncEnabled = m_RequestedVSync;
 }
 
-void GpuDevice::KeyboardUpdate(int key, int scancode, int action, int mods)
-    { if (m_Input) m_Input->onKey(key, scancode, action, mods); }
-void GpuDevice::KeyboardCharInput(unsigned int unicode, int mods)
-    { if (m_Input) m_Input->onChar(unicode, mods); }
-void GpuDevice::MousePosUpdate(double xpos, double ypos)
-{
-    if (!m_DeviceParams.supportExplicitDisplayScaling) { xpos /= m_DPIScaleFactorX; ypos /= m_DPIScaleFactorY; }
-    if (m_Input) m_Input->onMouseMove(xpos, ypos);
-}
-void GpuDevice::MouseButtonUpdate(int button, int action, int mods)
-    { if (m_Input) m_Input->onMouseButton(button, action, mods); }
-void GpuDevice::MouseScrollUpdate(double xoffset, double yoffset)
-    { if (m_Input) m_Input->onMouseScroll(xoffset, yoffset); }
-
-
-
-
-
-
-
-
 void GpuDevice::Shutdown()
 {
 #if CAUSTICA_WITH_STREAMLINE
@@ -768,14 +552,7 @@ void GpuDevice::Shutdown()
 
     DestroyDeviceAndSwapChain();
 
-    // New path: GlfwWindow owns the GLFW window, don't double-destroy
-    if (m_Window && !m_WindowPtr)
-    {
-        glfwDestroyWindow(m_Window);
-        m_Window = nullptr;
-        glfwTerminate();
-    }
-
+    m_Window = nullptr;
     m_WindowPtr = nullptr;
     delete m_Input;
     m_Input = nullptr;

@@ -208,12 +208,8 @@ namespace caustica
         static GpuDevice* Create(nvrhi::GraphicsAPI api);
 
         bool CreateHeadlessDevice(const DeviceCreationParameters& params);
-        bool CreateWindowDeviceAndSwapChain(const DeviceCreationParameters& params, const char* windowTitle);
 
-        // New 4-layer architecture bridge:
         // Create device + swapchain using a pre-existing Window from the platform layer.
-        // The Window must already be created (hasInitialised() == true) and its
-        // native handle will be used for swapchain creation.
         bool CreateDeviceAndSwapChain(const DeviceCreationParameters& params, class Window* window);
 
         // Initializes device-independent objects (DXGI factory, Vulkan instnace).
@@ -242,10 +238,11 @@ namespace caustica
 
         SwapChain m_SwapChain;                     // Backend layer: swapchain state
         DeviceCreationParameters m_DeviceParams;
-        GLFWwindow *m_Window = nullptr;       // Old path: GpuDevice owns the GLFW window
-        Window* m_WindowPtr = nullptr;        // New path: external GlfwWindow
-	    Input* m_Input = nullptr;  // Engine layer: extracted input dispatch
+        GLFWwindow* m_Window = nullptr;       // Borrowed GLFW handle from GlfwWindow
+        Window* m_WindowPtr = nullptr;        // Platform layer window (owns GLFW lifetime)
+	    Input* m_Input = nullptr;
         bool m_EnableRenderDuringWindowMovement = false;
+        bool m_CanPresentSwapChain = true;    // false when the window is minimized
         // set to true if running on NV GPU
         bool m_IsNvidia = false;
         RenderPassManager* m_PassManager = nullptr;  // Renderer layer: pass management
@@ -312,23 +309,6 @@ namespace caustica
         [[nodiscard]] bool IsVsyncEnabled() const { return m_DeviceParams.vsyncEnabled; }
         virtual void SetVsyncEnabled(bool enabled) { m_RequestedVSync = enabled; /* will be processed later */ }
         virtual void ReportLiveObjects() {}
-        // Window state (deprecated - use Window::isFocused/isVisible instead)
-        bool IsWindowFocused() const { return m_windowIsInFocus; }
-        bool IsWindowVisible() const { return m_windowVisible; }
-        void RenderNextFrameWhileUnfocused() { m_RequestedRenderUnfocused = true; }
-
-        // Old-path state: accessed by GLFW callbacks in GpuDevice.cpp.
-        // Remove when old CreateWindowDeviceAndSwapChain path is deleted.
-        bool m_windowVisible = false;
-        bool m_windowIsInFocus = true;
-
-        // Input dispatch (deprecated - use Input class instead)
-        // Called from old-path GLFW callbacks; delegates to Input when available.
-        void KeyboardUpdate(int key, int scancode, int action, int mods);
-        void KeyboardCharInput(unsigned int unicode, int mods);
-        void MousePosUpdate(double xpos, double ypos);
-        void MouseButtonUpdate(int button, int action, int mods);
-        void MouseScrollUpdate(double xoffset, double yoffset);
 
         [[nodiscard]] GLFWwindow* GetWindow() const { return m_Window; }
 

@@ -574,7 +574,7 @@ bool GpuDevice_DX12::Present()
     if (m_DeviceParams.headlessDevice)
         return PresentHeadlessFrame();
 
-    if (!m_windowVisible)
+    if (!m_CanPresentSwapChain)
         return true;
 
     auto bufferIndex = m_SwapChain->GetCurrentBackBufferIndex();

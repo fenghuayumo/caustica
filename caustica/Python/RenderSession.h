@@ -26,6 +26,7 @@
 #include <math/math.h>
 #include <backend/GpuDevice.h>
 #include <engine/Application.h>
+#include <platform/window.h>
 
 #include <core/command_line.h>
 
@@ -117,6 +118,7 @@ private:
     Config                                          m_config;
     CommandLineOptions                              m_cmdLine;
     std::unique_ptr<caustica::GpuDevice>      m_deviceManager;
+    std::unique_ptr<caustica::Window>            m_Window;
     std::unique_ptr<caustica::Application>         m_AppLoop;
     std::shared_ptr<caustica::ShaderFactory>   m_shaderFactory;
     std::unique_ptr<AdvancedPathTracer>             m_renderer;

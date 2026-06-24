@@ -26,22 +26,33 @@ static double GetNow(bool headless)
 Application::Application(GpuDevice* dm, Window* window)
     : m_DM(dm), m_Window(window) {}
 
+bool Application::isWindowVisible() const
+{
+    return m_Window ? m_Window->isVisible() : true;
+}
+
+bool Application::isWindowFocused() const
+{
+    return m_Window ? m_Window->isFocused() : true;
+}
+
+void Application::syncDpiScaleFromWindow()
+{
+    if (!m_Window)
+        return;
+
+    m_DM->m_DPIScaleFactorX = m_Window->getDPIScaleX();
+    m_DM->m_DPIScaleFactorY = m_Window->getDPIScaleY();
+}
+
 void Application::syncWindowState()
 {
-    if (m_Window) {
-        m_Window->onUpdate();
-        updateWindowSize();
-        m_DM->m_windowVisible  = m_Window->isVisible();
-        m_DM->m_windowIsInFocus = m_Window->isFocused();
-        m_DM->m_DPIScaleFactorX = m_Window->getDPIScaleX();
-        m_DM->m_DPIScaleFactorY = m_Window->getDPIScaleY();
-    } else if (m_DM->m_Window) {
-        glfwPollEvents();
-        updateWindowSize();
-    } else {
-        m_DM->m_windowVisible  = true;
-        m_DM->m_windowIsInFocus = true;
-    }
+    if (!m_Window)
+        return;
+
+    m_Window->onUpdate();
+    updateWindowSize();
+    syncDpiScaleFromWindow();
 }
 
 void Application::updateWindowSize()  { m_DM->UpdateWindowSize(); }
@@ -80,7 +91,10 @@ bool Application::runFrame(std::optional<double> elapsedTimeOverride)
     if (!DM.m_DeviceParams.headlessDevice)
         if (DM.m_Input) DM.m_Input->pollJoysticks();
 
-    if (DM.m_windowVisible && (DM.m_windowIsInFocus || shouldRenderUnfocused() || DM.m_RequestedRenderUnfocused))
+    const bool windowVisible = isWindowVisible();
+    const bool windowFocused = isWindowFocused();
+
+    if (windowVisible && (windowFocused || shouldRenderUnfocused() || DM.m_RequestedRenderUnfocused))
     {
         if (DM.m_PrevDPIScaleFactorX != DM.m_DPIScaleFactorX ||
             DM.m_PrevDPIScaleFactorY != DM.m_DPIScaleFactorY) {
@@ -123,7 +137,7 @@ bool Application::runFrame(std::optional<double> elapsedTimeOverride)
             }
         }
     }
-    else if (DM.m_windowVisible) {
+    else if (windowVisible) {
         if (beforeAnimate) beforeAnimate(DM, DM.m_FrameIndex);
         animate(elapsedTime, false);
         if (afterAnimate) afterAnimate(DM, DM.m_FrameIndex);
@@ -145,36 +159,28 @@ void Application::run()
 #if CAUSTICA_WITH_AFTERMATH
     bool dumpingCrash = false;
 #endif
-    if (m_Window) {
-        while (!m_Window->getExit()) {
+    if (!m_Window)
+    {
+        caustica::error("Application::run requires a Window");
+        return;
+    }
+
+    while (!m_Window->getExit()) {
 #if CAUSTICA_WITH_STREAMLINE
-            if (!DM.m_DeviceParams.headlessDevice) StreamlineIntegration::Get().SimStart(DM);
+        if (!DM.m_DeviceParams.headlessDevice) StreamlineIntegration::Get().SimStart(DM);
 #endif
-            if (beforeFrame) beforeFrame(DM, DM.m_FrameIndex);
-            m_Window->onUpdate(); updateWindowSize();
-            DM.m_windowVisible  = m_Window->isVisible();
-            DM.m_windowIsInFocus = m_Window->isFocused();
-            DM.m_DPIScaleFactorX = m_Window->getDPIScaleX();
-            DM.m_DPIScaleFactorY = m_Window->getDPIScaleY();
-            if (!runFrame()) break;
-        }
-    } else {
-        GLFWwindow* w = DM.m_Window;
-        while (w == nullptr || !glfwWindowShouldClose(w)) {
-#if CAUSTICA_WITH_STREAMLINE
-            if (!DM.m_DeviceParams.headlessDevice) StreamlineIntegration::Get().SimStart(DM);
-#endif
-            if (beforeFrame) beforeFrame(DM, DM.m_FrameIndex);
-            if (w) { glfwPollEvents(); updateWindowSize(); }
-            else   { DM.m_windowVisible = true; DM.m_windowIsInFocus = true; }
-            if (!runFrame()) {
+        if (beforeFrame) beforeFrame(DM, DM.m_FrameIndex);
+        m_Window->onUpdate();
+        updateWindowSize();
+        syncDpiScaleFromWindow();
+        if (!runFrame()) {
 #if CAUSTICA_WITH_AFTERMATH
-                dumpingCrash = true;
+            dumpingCrash = true;
 #endif
-                break;
-            }
+            break;
         }
     }
+
     bool ok = DM.GetDevice()->waitForIdle();
 #if CAUSTICA_WITH_AFTERMATH
     dumpingCrash |= !ok;

@@ -45,7 +45,10 @@ public:
 private:
     void syncWindowState();
     void updateWindowSize();
+    void syncDpiScaleFromWindow();
     bool shouldRenderUnfocused() const;
+    bool isWindowVisible() const;
+    bool isWindowFocused() const;
 
     GpuDevice* m_DM;
     Window*        m_Window;
