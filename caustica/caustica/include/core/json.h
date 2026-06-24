@@ -61,6 +61,17 @@ namespace caustica::json
     template<> void Write<dm::double3>(Json::Value& node, const dm::double3& value);
     template<> void Write<dm::double4>(Json::Value& node, const dm::double4& value);
 
+// File-based JSON I/O (uses std::filesystem, not VFS)
+bool SaveToFile(const std::filesystem::path& filePath, const Json::Value& rootNode);
+bool LoadFromFile(const std::filesystem::path& filePath, Json::Value& outRootNode);
+
+// String-based JSON I/O
+std::string ToString(const Json::Value& rootNode);
+bool FromString(const std::string& jsonData, Json::Value& outRootNode);
+
+// Extract string array from JSON array node
+std::vector<std::string> ReadStringArray(const Json::Value& arr);
+
 }
 
 // Overloaded operator for reading data from Json nodes.

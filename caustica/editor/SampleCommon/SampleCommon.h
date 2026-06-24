@@ -4,11 +4,11 @@
 // SampleCommon.h — Compatibility header.
 //
 // Previously contained many utility functions that have been moved to the
-// causticaBase layer (base/core/). This header now includes the new locations
-// and only defines editor/UI-specific helpers that remain in this layer.
+// engine core layer (caustica/caustica/include/core/). This header includes
+// the new locations and only defines editor/UI-specific helpers that remain here.
 // =============================================================================
 
-// --- Moved to causticaBase (base/core/) ---
+// --- Moved to engine core (caustica/caustica/include/core/) ---
 #include <core/file_utils.h>
 #include <core/format.h>
 #include <core/path_utils.h>
