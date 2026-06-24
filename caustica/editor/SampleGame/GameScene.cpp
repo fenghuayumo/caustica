@@ -1,3 +1,4 @@
+#include "ui/ui_macros.h"
 #include "GameScene.h"
 
 #include <core/log.h>

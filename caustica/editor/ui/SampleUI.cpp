@@ -1,3 +1,4 @@
+#include "ui/ui_macros.h"
 #include "caustica.h"
 #include "SampleCommon/ImGuiManager.h"
 #include "SampleCommon/SampleBaseApp.h"

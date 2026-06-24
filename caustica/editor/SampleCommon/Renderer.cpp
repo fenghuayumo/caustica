@@ -1,6 +1,15 @@
 #include "SampleCommon/Renderer.h"
 #include "caustica.h"
-#include "SampleCommon/SampleCommon.h"
+#include <core/file_utils.h>
+#include <core/format.h>
+#include <core/path_utils.h>
+#include <core/progress.h>
+#include <core/Timer.h>
+#include <core/system_utils.h>
+#include <core/command_line.h>
+#include <core/scope.h>
+#include <render/Core/ScopedPerfMarker.h>
+#include <render/Core/TextureUtils.h>
 
 #include <scene/Scene.h>
 #include <scene/SceneGraph.h>

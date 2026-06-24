@@ -378,6 +378,9 @@ void operator<<(Json::Value& node, const char* src)
 
 // --- File/string-based JSON I/O utilities (moved from SampleCommon) ---
 
+namespace caustica::json
+{
+
 bool SaveToFile(const std::filesystem::path& filePath, const Json::Value& rootNode)
 {
     std::ofstream outFile(filePath, std::ios::trunc);
