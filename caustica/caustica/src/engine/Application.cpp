@@ -23,50 +23,101 @@ static double GetNow(bool headless)
     return std::chrono::duration<double>(Clock::now() - start).count();
 }
 
+Application::Application() = default;
+
 Application::Application(GpuDevice* dm, Window* window)
-    : m_DM(dm), m_Window(window) {}
+    : m_ExternalGpuDevice(dm)
+    , m_ExternalWindow(window)
+{
+}
+
+Application::~Application()
+{
+    if (!m_shutdownCalled)
+        shutdown();
+}
+
+bool Application::init(int /*argc*/, const char* const* /*argv*/)
+{
+    return true;
+}
+
+void Application::shutdown()
+{
+    m_shutdownCalled = true;
+}
+
+GpuDevice* Application::getGpuDevice() const { return device(); }
+Window*    Application::getWindow() const    { return window(); }
+
+GpuDevice* Application::device() const
+{
+    return m_GpuDevice ? m_GpuDevice.get() : m_ExternalGpuDevice;
+}
+
+Window* Application::window() const
+{
+    return m_Window ? m_Window.get() : m_ExternalWindow;
+}
 
 bool Application::isWindowVisible() const
 {
-    return m_Window ? m_Window->isVisible() : true;
+    Window* w = window();
+    return w ? w->isVisible() : true;
 }
 
 bool Application::isWindowFocused() const
 {
-    return m_Window ? m_Window->isFocused() : true;
+    Window* w = window();
+    return w ? w->isFocused() : true;
 }
 
 void Application::syncDpiScaleFromWindow()
 {
-    if (!m_Window)
+    Window* w = window();
+    GpuDevice* dm = device();
+    if (!w || !dm)
         return;
 
-    m_DM->m_DPIScaleFactorX = m_Window->getDPIScaleX();
-    m_DM->m_DPIScaleFactorY = m_Window->getDPIScaleY();
+    dm->m_DPIScaleFactorX = w->getDPIScaleX();
+    dm->m_DPIScaleFactorY = w->getDPIScaleY();
 }
 
 void Application::syncWindowState()
 {
-    if (!m_Window)
+    Window* w = window();
+    if (!w)
         return;
 
-    m_Window->onUpdate();
+    w->onUpdate();
     updateWindowSize();
     syncDpiScaleFromWindow();
 }
 
-void Application::updateWindowSize()  { m_DM->UpdateWindowSize(); }
+void Application::updateWindowSize()
+{
+    if (GpuDevice* dm = device())
+        dm->UpdateWindowSize();
+}
 
 bool Application::shouldRenderUnfocused() const
 {
-    for (auto* pass : m_DM->m_vRenderPasses)
+    GpuDevice* dm = device();
+    if (!dm)
+        return false;
+
+    for (auto* pass : dm->m_vRenderPasses)
         if (pass->ShouldRenderUnfocused()) return true;
     return false;
 }
 
 void Application::animate(double elapsedTime, bool windowIsFocused)
 {
-    for (auto* pass : m_DM->m_vRenderPasses) {
+    GpuDevice* dm = device();
+    if (!dm)
+        return;
+
+    for (auto* pass : dm->m_vRenderPasses) {
         if (windowIsFocused || pass->ShouldAnimateUnfocused()) {
             pass->Animate(float(elapsedTime));
             pass->SetLatewarpOptions();
@@ -76,15 +127,23 @@ void Application::animate(double elapsedTime, bool windowIsFocused)
 
 void Application::render()
 {
-    for (auto* pass : m_DM->m_vRenderPasses) {
-        nvrhi::IFramebuffer* fb = m_DM->GetCurrentFramebuffer(pass->SupportsDepthBuffer());
+    GpuDevice* dm = device();
+    if (!dm)
+        return;
+
+    for (auto* pass : dm->m_vRenderPasses) {
+        nvrhi::IFramebuffer* fb = dm->GetCurrentFramebuffer(pass->SupportsDepthBuffer());
         pass->Render(fb);
     }
 }
 
 bool Application::runFrame(std::optional<double> elapsedTimeOverride)
 {
-    auto& DM = *m_DM;  // shorthand for friend access
+    GpuDevice* dm = device();
+    if (!dm)
+        return false;
+
+    auto& DM = *dm;  // shorthand for friend access
     double curTime = GetNow(DM.m_DeviceParams.headlessDevice);
     double elapsedTime = elapsedTimeOverride.value_or(curTime - DM.m_PreviousFrameTimestamp);
 
@@ -153,24 +212,32 @@ bool Application::runFrame(std::optional<double> elapsedTimeOverride)
 
 void Application::run()
 {
-    auto& DM = *m_DM;
-    DM.m_PreviousFrameTimestamp = glfwGetTime();
+    GpuDevice* dm = device();
+    if (!dm)
+    {
+        caustica::error("Application::run requires an initialized GpuDevice");
+        return;
+    }
+
+    dm->m_PreviousFrameTimestamp = glfwGetTime();
 
 #if CAUSTICA_WITH_AFTERMATH
     bool dumpingCrash = false;
 #endif
-    if (!m_Window)
+
+    Window* w = window();
+    if (!w)
     {
         caustica::error("Application::run requires a Window");
         return;
     }
 
-    while (!m_Window->getExit()) {
+    while (!w->getExit()) {
 #if CAUSTICA_WITH_STREAMLINE
-        if (!DM.m_DeviceParams.headlessDevice) StreamlineIntegration::Get().SimStart(DM);
+        if (!dm->m_DeviceParams.headlessDevice) StreamlineIntegration::Get().SimStart(*dm);
 #endif
-        if (beforeFrame) beforeFrame(DM, DM.m_FrameIndex);
-        m_Window->onUpdate();
+        if (beforeFrame) beforeFrame(*dm, dm->m_FrameIndex);
+        w->onUpdate();
         updateWindowSize();
         syncDpiScaleFromWindow();
         if (!runFrame()) {
@@ -181,13 +248,20 @@ void Application::run()
         }
     }
 
-    bool ok = DM.GetDevice()->waitForIdle();
+    bool ok = dm->GetDevice()->waitForIdle();
 #if CAUSTICA_WITH_AFTERMATH
     dumpingCrash |= !ok;
-    if (dumpingCrash && DM.m_DeviceParams.enableAftermath) AftermathCrashDump::WaitForCrashDump();
+    if (dumpingCrash && dm->m_DeviceParams.enableAftermath) AftermathCrashDump::WaitForCrashDump();
 #else
     (void)ok;
 #endif
+
+    shutdown();
+}
+
+bool Application::frame()
+{
+    return stepFrame();
 }
 
 bool Application::stepFrame() { return stepFrame(-1.0); }

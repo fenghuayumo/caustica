@@ -157,33 +157,25 @@ namespace
 
 SampleBaseApp::SampleBaseApp()
 {
-    RegisterLogCallback(); // Register a custom log callback to filter errors
-
-    korgi::Init(); // MIDI Input for parameter control
-
-    // Init graphics API (command line parsed later in Init)
-#if defined(_WIN32)
-    nvrhi::GraphicsAPI api = GetRtxptGraphicsAPIFromCommandLine(__argc, __argv);
-#else
-    nvrhi::GraphicsAPI api = GetRtxptGraphicsAPIFromCommandLine(0, nullptr);
-#endif
-    m_GpuDevice = std::unique_ptr<caustica::GpuDevice>(caustica::GpuDevice::Create(api));
-
-    m_GpuDevice->SetFrameTimeUpdateInterval(1.0f);
+    RegisterLogCallback();
+    korgi::Init();
 }
 
 SampleBaseApp::~SampleBaseApp()
 {
-    if (m_GpuDevice)
-    {
-        m_GpuDevice->ReleaseWindowOwnership();
-        m_GpuDevice->Shutdown();
-    }
     korgi::Shutdown();
 }
 
-SampleBaseApp::InitReturnCodes SampleBaseApp::Init(int argc, const char* const* argv)
+SampleBaseApp::InitReturnCodes SampleBaseApp::startup(int argc, const char* const* argv)
 {
+#if defined(_WIN32)
+    nvrhi::GraphicsAPI api = GetRtxptGraphicsAPIFromCommandLine(argc, argv);
+#else
+    nvrhi::GraphicsAPI api = GetRtxptGraphicsAPIFromCommandLine(0, nullptr);
+#endif
+    m_GpuDevice = std::unique_ptr<caustica::GpuDevice>(caustica::GpuDevice::Create(api));
+    m_GpuDevice->SetFrameTimeUpdateInterval(1.0f);
+
     caustica::DeviceCreationParameters deviceParams = GetDefaultDeviceParams();
 
     std::string preferredScene = "default.json";
@@ -293,10 +285,12 @@ bool SampleBaseApp::QueryVideoMemoryInfo(uint64_t& outBudget, uint64_t& outCurre
 #endif
 }
 
-void SampleBaseApp::End()
+void SampleBaseApp::shutdown()
 {
-    // Destroy resources in reverse creation order
-    if (m_UIRender)
+    if (m_shutdownCalled)
+        return;
+
+    if (m_UIRender && m_GpuDevice)
     {
         m_GpuDevice->RemoveRenderPass(m_UIRender.get());
         m_UIRender.reset();
@@ -315,19 +309,18 @@ void SampleBaseApp::End()
 
     m_ShaderFactory.reset();
 
-    // Engine layer cleanup
-    m_AppLoop.reset();
-
     if (m_GpuDevice)
         m_GpuDevice->ReleaseWindowOwnership();
 
-    // Window must outlive GpuDevice swapchain teardown
     m_Window.reset();
-}
 
-void SampleBaseApp::RunMainLoop()
-{
-    m_AppLoop->run();
+    if (m_GpuDevice)
+    {
+        m_GpuDevice->Shutdown();
+        m_GpuDevice.reset();
+    }
+
+    Application::shutdown();
 }
 
 void SampleBaseApp::RegisterLogCallback()
@@ -531,9 +524,7 @@ bool SampleBaseApp::InitDeviceAndWindow(const caustica::DeviceCreationParameters
             return false;
         }
 
-        // --- Engine layer: message loop ---
-        m_AppLoop = std::make_unique<caustica::Application>(m_GpuDevice.get(), m_Window.get());
-
+        // --- Engine layer: device + window ready for run() ---
         HelpersRegisterActiveWindow();
     }
 

@@ -1,6 +1,7 @@
 #include "AdvancedSample.h"
 #include <SampleCommon/SampleBaseApp.h>
 #include <cstring>
+#include <memory>
 
 #ifdef _WIN32
 #include <engine/SplashScreen.h>
@@ -13,6 +14,11 @@ class AdvancedSample : public SampleBaseApp
         return std::make_unique<AdvancedPathTracer>(deviceManager, cmdLineOptions, ui);
     }
 };
+
+SampleBaseApp* createApplication()
+{
+    return new AdvancedSample();
+}
 
 static bool WantsHeadlessStartup(int argc, const char* const* argv)
 {
@@ -36,21 +42,16 @@ int main(int __argc, const char** __argv)
         splashScreen.Start(L"loading_splash.png");
 #endif
 
-    AdvancedSample example;
+    std::unique_ptr<SampleBaseApp> app(createApplication());
 
-    // Run the sample app
-    const auto status = example.Init(__argc, __argv);
-    
+    const auto status = app->startup(__argc, __argv);
+
 #ifdef _WIN32
     splashScreen.Stop();
 #endif
 
     if (status == SampleBaseApp::InitReturnCodes::Success)
-    {
-        example.RunMainLoop();
+        app->run();
 
-        example.End();
-    }
-    
     return static_cast<int>(status);
 }

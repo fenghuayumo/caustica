@@ -39,11 +39,13 @@ namespace caustica
 class PathTracerApp;
 class SampleUI;
 
-class SampleBaseApp
+// DIVSHOT-style editor application base: extends Application, owns device/window,
+// registers render passes in startup(), driven by run().
+class SampleBaseApp : public caustica::Application
 {
 public:
 	SampleBaseApp();
-	~SampleBaseApp();
+	~SampleBaseApp() override;
 
 	enum class InitReturnCodes
 	{
@@ -53,10 +55,8 @@ public:
 		FailDeviceFeatureSupport
 	};
 
-	InitReturnCodes Init(int argc, const char* const* argv);
-	void End();
-
-	void RunMainLoop();
+	InitReturnCodes startup(int argc, const char* const* argv);
+	void shutdown() override;
 
 	SampleUIData& GetSampleUIData() { return m_sampleUIData; }
 	const SampleUIData& GetSampleUIData() const { return m_sampleUIData; }
@@ -67,7 +67,6 @@ public:
 private:
 	virtual std::unique_ptr<PathTracerApp> CreateMainRenderPass(caustica::GpuDevice& deviceManager, const CommandLineOptions& cmdLineOptions, SampleUIData& ui) = 0;
 
-	// Initialization methods
 	void RegisterLogCallback();
 	void SampleLogCallback(caustica::Severity severity, const char* message);
 	caustica::DeviceCreationParameters GetDefaultDeviceParams() const;
@@ -84,11 +83,8 @@ private:
 
 	SampleUIData m_sampleUIData;
 
-	std::unique_ptr<caustica::GpuDevice> m_GpuDevice;
-	std::unique_ptr<caustica::Window>       m_Window;
-	std::unique_ptr<caustica::Application>      m_AppLoop;
 	std::shared_ptr<caustica::ShaderFactory> m_ShaderFactory;
-	std::unique_ptr<PathTracerApp> m_MainSceneRender; // 3d render of the scene. Where Path Tracing happens
+	std::unique_ptr<PathTracerApp> m_MainSceneRender;
 	std::unique_ptr<SampleUI> m_UIRender;
 
 #if CAUSTICA_ENABLE_VIDEO_MEMORY_INFO && defined(_WIN32)
@@ -97,3 +93,6 @@ private:
 
     void * m_NVAPIValidationHandle = nullptr;
 };
+
+// Defined by the concrete editor exe (AdvancedSample.cpp).
+SampleBaseApp* createApplication();
