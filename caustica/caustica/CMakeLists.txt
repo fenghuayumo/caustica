@@ -31,6 +31,18 @@ file(GLOB caustica_engine_scene_src
     src/scene/camera/*.cpp
 )
 
+# Audio layer: audio engine and cache
+file(GLOB caustica_engine_audio_src
+    include/audio/*.h
+    src/audio/*.cpp
+)
+
+# Animation layer: keyframe animation system
+file(GLOB caustica_engine_animation_src
+    include/animation/*.h
+    src/animation/*.cpp
+)
+
 # Asset layer: loading, caching (DIVSHOT-style 4-layer architecture)
 file(GLOB caustica_engine_assets_src
     include/assets/loader/*.h
@@ -121,6 +133,8 @@ add_library(causticaEngine STATIC
     ${caustica_engine_core_src}
     ${caustica_engine_math_src}
     ${caustica_engine_scene_src}
+    ${caustica_engine_audio_src}
+    ${caustica_engine_animation_src}
     ${caustica_engine_engine_src}
     ${caustica_engine_assets_src}
     ${caustica_engine_render_src}
@@ -257,6 +271,8 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
     ${caustica_engine_core_src}
     ${caustica_engine_math_src}
     ${caustica_engine_scene_src}
+    ${caustica_engine_audio_src}
+    ${caustica_engine_animation_src}
     ${caustica_engine_engine_src}
     ${caustica_engine_render_src}
 )

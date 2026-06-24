@@ -1,5 +1,5 @@
-#include <engine/AudioEngine.h>
-#include <engine/AudioCache.h>
+#include <audio/AudioEngine.h>
+#include <audio/AudioCache.h>
 #include <core/log.h>
 
 #ifdef WIN32

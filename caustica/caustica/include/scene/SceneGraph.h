@@ -1,7 +1,7 @@
 #pragma once
 
 #include <scene/SceneTypes.h>
-#include <engine/KeyframeAnimation.h>
+#include <animation/KeyframeAnimation.h>
 #include <math/math.h>
 #include <memory>
 #include <unordered_map>
