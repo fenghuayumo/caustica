@@ -6,7 +6,7 @@
 #include <render/Passes/Debug/Korgi.h>
 #include <SampleUI.h>
 #include "LocalConfig.h"
-#include "ShaderPackFileSystem.h"
+#include <assets/loader/ShaderPackFileSystem.h>
 
 #include <render/Core/SceneRender.h>
 #include <backend/ShaderUtils.h>
@@ -175,7 +175,11 @@ SampleBaseApp::SampleBaseApp()
 
 SampleBaseApp::~SampleBaseApp()
 {
-    m_GpuDevice->Shutdown(); // Is this explicitly necessary?
+    if (m_GpuDevice)
+    {
+        m_GpuDevice->ReleaseWindowOwnership();
+        m_GpuDevice->Shutdown();
+    }
     korgi::Shutdown();
 }
 
@@ -313,7 +317,10 @@ void SampleBaseApp::End()
     // Engine layer cleanup
     m_AppLoop.reset();
 
-    // Window must outlive GpuDevice (new GlfwWindow path)
+    if (m_GpuDevice)
+        m_GpuDevice->ReleaseWindowOwnership();
+
+    // Window must outlive GpuDevice swapchain teardown
     m_Window.reset();
 }
 

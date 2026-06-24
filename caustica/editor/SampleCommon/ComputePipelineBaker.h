@@ -7,7 +7,7 @@
 #include <core/ThreadPool.h>
 #include <unordered_map>
 
-#include "ShaderCompilerUtils.h"
+#include <assets/loader/ShaderCompilerUtils.h>
 
 namespace caustica
 {

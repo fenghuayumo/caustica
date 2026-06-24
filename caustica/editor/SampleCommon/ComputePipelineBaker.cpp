@@ -1,7 +1,7 @@
 #include "ComputePipelineBaker.h"
-#include "ShaderCompilerUtils.h"
+#include <assets/loader/ShaderCompilerUtils.h>
 #include "SampleCommon.h"
-#include "ShaderPackFileSystem.h"
+#include <assets/loader/ShaderPackFileSystem.h>
 
 #include <render/Core/SceneRender.h>
 #include <backend/ShaderUtils.h>

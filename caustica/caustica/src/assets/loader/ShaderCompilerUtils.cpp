@@ -1,10 +1,14 @@
-#include "ShaderCompilerUtils.h"
-#include "SampleCommon.h"
+#include <assets/loader/ShaderCompilerUtils.h>
+#include <core/file_utils.h>
+#include <core/format.h>
+#include <core/path_utils.h>
 #include <render/Passes/Debug/picosha2.h>
 
 #include <render/Core/SceneRender.h>
 #include <backend/ShaderUtils.h>
 #include <core/log.h>
+
+using namespace caustica;
 
 namespace ShaderCompilerUtils
 {

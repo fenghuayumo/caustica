@@ -1,5 +1,4 @@
-#include "SplashScreen.h"
-#include "SampleCommon.h"
+#include <engine/SplashScreen.h>
 
 
 // SplashScreen.h

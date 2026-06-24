@@ -6,7 +6,7 @@
 #include "caustica.h"
 #include <SampleCommon/LocalConfig.h>
 #include <SampleCommon/SampleCommon.h>
-#include <SampleCommon/ShaderPackFileSystem.h>
+#include <assets/loader/ShaderPackFileSystem.h>
 
 #include <backend/GpuDevice.h>
 #include <backend/ShaderUtils.h>
@@ -17,6 +17,7 @@
 #include <assets/cache/TextureCache.h>
 #include <render/Core/CommonRenderPasses.h>
 #include <engine/UserInterfaceUtils.h>
+#include <platform/glfw_window.h>
 #if CAUSTICA_WITH_NATIVE_DLSS
 #include <render/Passes/Geometry/DLSS.h>
 #endif
@@ -464,14 +465,32 @@ bool RenderSession::InitDevice()
     }
     else
     {
-        if (!m_deviceManager->CreateWindowDeviceAndSwapChain(deviceParams, "caustica_py"))
+        caustica::GlfwWindow::makeDefault();
+
+        caustica::WindowDesc windowDesc;
+        windowDesc.Width = deviceParams.backBufferWidth;
+        windowDesc.Height = deviceParams.backBufferHeight;
+        windowDesc.Title = "caustica_py";
+        windowDesc.RenderAPI = static_cast<int>(api);
+        windowDesc.VSync = deviceParams.vsyncEnabled;
+
+        m_Window.reset(caustica::Window::create(windowDesc));
+        if (!m_Window || !m_Window->hasInitialised())
+        {
+            caustica::error("RenderSession: failed to create platform window");
+            return false;
+        }
+
+        if (!m_deviceManager->CreateDeviceAndSwapChain(deviceParams, m_Window.get()))
         {
             caustica::error("RenderSession: failed to create device and swap chain");
             return false;
         }
     }
 
-    m_AppLoop = std::make_unique<caustica::Application>(m_deviceManager.get());
+    m_AppLoop = std::make_unique<caustica::Application>(
+        m_deviceManager.get(),
+        m_config.headless ? nullptr : m_Window.get());
 
     m_AppLoop->beforePresent =
         [this](caustica::GpuDevice& manager, uint32_t) {
@@ -561,9 +580,12 @@ void RenderSession::Shutdown()
 
     if (m_deviceManager)
     {
+        m_deviceManager->ReleaseWindowOwnership();
         m_deviceManager->Shutdown();
         m_deviceManager.reset();
     }
+
+    m_Window.reset();
     m_initialized = false;
 }
 
@@ -602,8 +624,7 @@ bool RenderSession::Step(float dt)
     if (!m_initialized || !m_deviceManager)
         return false;
 
-    auto window = m_deviceManager->GetWindow();
-    if (window && glfwWindowShouldClose(window))
+    if (m_Window && m_Window->getExit())
         return false;
 
     const bool frameOk = dt >= 0.0f

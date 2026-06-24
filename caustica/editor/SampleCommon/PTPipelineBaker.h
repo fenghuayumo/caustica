@@ -8,7 +8,7 @@
 #include <scene/Scene.h>
 #include <unordered_set>
 
-#include "ShaderCompilerUtils.h"
+#include <assets/loader/ShaderCompilerUtils.h>
 
 namespace caustica
 {

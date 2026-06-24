@@ -3,7 +3,7 @@
 #include <cstring>
 
 #ifdef _WIN32
-#include "SampleCommon/SplashScreen.h"
+#include <engine/SplashScreen.h>
 #endif
 
 class AdvancedSample : public SampleBaseApp

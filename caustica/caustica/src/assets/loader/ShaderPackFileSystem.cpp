@@ -1,4 +1,4 @@
-#include "ShaderPackFileSystem.h"
+#include <assets/loader/ShaderPackFileSystem.h>
 
 #include <core/log.h>
 
