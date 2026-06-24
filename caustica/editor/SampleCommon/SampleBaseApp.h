@@ -10,9 +10,9 @@
 #include "SampleCommon.h"
 #include "CommandLine.h"
 
-#define RTXPT_ENABLE_VIDEO_MEMORY_INFO 1
+#define CAUSTICA_ENABLE_VIDEO_MEMORY_INFO 1
 
-#if RTXPT_ENABLE_VIDEO_MEMORY_INFO && defined(_WIN32)
+#if CAUSTICA_ENABLE_VIDEO_MEMORY_INFO && defined(_WIN32)
 #include <dxgi1_4.h>    // IDXGIAdapter3 (DXGI 1.4)
 #include <wrl/client.h> // Microsoft::WRL::ComPtr
 #endif
@@ -45,7 +45,7 @@ public:
 	void RunMainLoop();
 
     bool IsSERSupported() const;
-    bool QueryVideoMemoryInfo(uint64_t& outBudget, uint64_t& outCurrentUsage, uint64_t& outAvailableForReservation, uint64_t& outCurrentReservation); // RTXPT_ENABLE_VIDEO_MEMORY_INFO for this to work, otherwise return false
+    bool QueryVideoMemoryInfo(uint64_t& outBudget, uint64_t& outCurrentUsage, uint64_t& outAvailableForReservation, uint64_t& outCurrentReservation); // CAUSTICA_ENABLE_VIDEO_MEMORY_INFO for this to work, otherwise return false
 
 private:
 	virtual std::unique_ptr<Sample> CreateMainRenderPass(caustica::GpuDevice& deviceManager, const CommandLineOptions& cmdLineOptions) = 0;
@@ -72,7 +72,7 @@ private:
 	std::unique_ptr<Sample> m_MainSceneRender; // 3d render of the scene. Where Path Tracing happens
 	std::unique_ptr<SampleUI> m_UIRender;
 
-#if RTXPT_ENABLE_VIDEO_MEMORY_INFO && defined(_WIN32)
+#if CAUSTICA_ENABLE_VIDEO_MEMORY_INFO && defined(_WIN32)
     Microsoft::WRL::ComPtr<IDXGIAdapter3>   m_d3dAdapter;
 #endif
 

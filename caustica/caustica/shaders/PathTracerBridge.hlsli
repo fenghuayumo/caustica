@@ -9,16 +9,16 @@
 #include "PathTracer/Lighting/LightSampler.hlsli"
 
 #if NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP
-#define RTXPT_FLAG_ALLOW_OPACITY_MICROMAPS RAYQUERY_FLAG_ALLOW_OPACITY_MICROMAPS
+#define CAUSTICA_FLAG_ALLOW_OPACITY_MICROMAPS RAYQUERY_FLAG_ALLOW_OPACITY_MICROMAPS
 #else
-#define RTXPT_FLAG_ALLOW_OPACITY_MICROMAPS 0
+#define CAUSTICA_FLAG_ALLOW_OPACITY_MICROMAPS 0
 #endif
 
 // SPIR-V RayQuery only supports a single template argument (ray flags).
 #if defined(SPIRV) || defined(TARGET_VULKAN)
-#define RTXPT_RayQuery(rayFlags, ommFlags) RayQuery<rayFlags>
+#define CAUSTICA_RayQuery(rayFlags, ommFlags) RayQuery<rayFlags>
 #else
-#define RTXPT_RayQuery(rayFlags, ommFlags) RayQuery<rayFlags, ommFlags>
+#define CAUSTICA_RayQuery(rayFlags, ommFlags) RayQuery<rayFlags, ommFlags>
 #endif
 
 namespace Bridge
@@ -49,7 +49,7 @@ namespace Bridge
         bool isPrimaryHit,
         bool isTriangleHit,
         float texLODBias
-#if RTXPT_STOCHASTIC_TEXTURE_FILTERING_ENABLE
+#if CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
         ,STF_SamplerState stfSamplerState
 #endif
     );
@@ -92,7 +92,7 @@ namespace Bridge
     // Consider simplifying alpha testing - perhaps splitting it up from the main geometry path, load it with fewer indirections or something like that.
     static float3 traceVisibilityRay(RayDesc ray, const RayCone rayCone, const int pathVertexIndex, DebugContext debug);
 
-    static void traceScatterRay(const PathState path, inout RTXPT_RayQuery(RAY_FLAG_NONE, RTXPT_FLAG_ALLOW_OPACITY_MICROMAPS) rayQuery, const float2 tMinMax, DebugContext debug);
+    static void traceScatterRay(const PathState path, inout CAUSTICA_RayQuery(RAY_FLAG_NONE, CAUSTICA_FLAG_ALLOW_OPACITY_MICROMAPS) rayQuery, const float2 tMinMax, DebugContext debug);
 
 #if PT_USE_RESTIR_GI
     static void StoreSecondarySurfacePositionAndNormal(uint2 pixelCoordinate, float3 worldPos, float3 normal);

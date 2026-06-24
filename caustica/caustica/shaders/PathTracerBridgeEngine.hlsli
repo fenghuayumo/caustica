@@ -361,7 +361,7 @@ MaterialProperties EvaluateSceneMaterialRTXPT(float3 normal, float4 tangent, PTM
         result.opacity *= lpfloat( textures.baseOrDiffuse.a );
     result.opacity = saturate(result.opacity);
 
-#if !defined(RTXPT_MATERIAL_HAS_TRANSMISSION) || RTXPT_MATERIAL_HAS_TRANSMISSION
+#if !defined(CAUSTICA_MATERIAL_HAS_TRANSMISSION) || CAUSTICA_MATERIAL_HAS_TRANSMISSION
     result.transmission = lpfloat( material.TransmissionFactor );
     result.diffuseTransmission = lpfloat( material.DiffuseTransmissionFactor );
     if ((material.Flags & PTMaterialFlags_UseTransmissionTexture) != 0)
@@ -379,8 +379,8 @@ MaterialProperties EvaluateSceneMaterialRTXPT(float3 normal, float4 tangent, PTM
     
     result.shadowNoLFadeout = lpfloat( material.ShadowNoLFadeout );
     
-    #if defined(RTXPT_MATERIAL_USE_NORMAL_TEXTURE)
-        #if RTXPT_MATERIAL_USE_NORMAL_TEXTURE
+    #if defined(CAUSTICA_MATERIAL_USE_NORMAL_TEXTURE)
+        #if CAUSTICA_MATERIAL_USE_NORMAL_TEXTURE
             ApplyNormalMapRTXPT(result, tangent, textures.normal, material.NormalTextureScale);  // there's an incorrect "error X3508: 'ApplyNormalMap': output parameter 'result' not completely initialized" if this line happens before result is fully initialized
         #endif
     #else
@@ -405,8 +405,8 @@ MaterialProperties sampleGeometryMaterialRTXPT(const BridgeGeometrySample gs, ui
         if ((attributes & MatAttr_Emissive) && (material.Flags & PTMaterialFlags_UseEmissiveTexture) != 0)
             textures.emissive = sampleTexture(material.EmissiveTextureIndex, materialSampler, textureSampler, gs.texcoord);
     
-        #if defined(RTXPT_MATERIAL_USE_NORMAL_TEXTURE)
-            #if RTXPT_MATERIAL_USE_NORMAL_TEXTURE
+        #if defined(CAUSTICA_MATERIAL_USE_NORMAL_TEXTURE)
+            #if CAUSTICA_MATERIAL_USE_NORMAL_TEXTURE
                 if (attributes & MatAttr_Normal)
                     textures.normal = sampleTexture(material.NormalTextureIndex, materialSampler, textureSampler, gs.texcoord);
             #endif
@@ -418,7 +418,7 @@ MaterialProperties sampleGeometryMaterialRTXPT(const BridgeGeometrySample gs, ui
         if ((attributes & MatAttr_MetalRough) && (material.Flags & PTMaterialFlags_UseMetalRoughOrSpecularTexture) != 0)
             textures.metalRoughOrSpecular = sampleTexture(material.MetalRoughOrSpecularTextureIndex, materialSampler, textureSampler, gs.texcoord);
 
-#if !defined(RTXPT_MATERIAL_HAS_TRANSMISSION) || RTXPT_MATERIAL_HAS_TRANSMISSION
+#if !defined(CAUSTICA_MATERIAL_HAS_TRANSMISSION) || CAUSTICA_MATERIAL_HAS_TRANSMISSION
         if ((attributes & MatAttr_Transmission) && (material.Flags & PTMaterialFlags_UseTransmissionTexture) != 0)
             textures.transmission = sampleTexture(material.TransmissionTextureIndex, materialSampler, textureSampler, gs.texcoord);
 #endif
@@ -482,8 +482,8 @@ static void surfaceDebugViz(uint2 pixelPos, const PathTracer::SurfaceData surfac
     StandardBSDFData bsdfData = bsdf.data;
 
     uint shaderID = 0xFFFFFFFF;
-    #ifdef RTXPT_SHADER_ID
-    shaderID = RTXPT_SHADER_ID+1;   // 0 will result in black, so start from 1 and leave 0 to represent ubershader
+    #ifdef CAUSTICA_SHADER_ID
+    shaderID = CAUSTICA_SHADER_ID+1;   // 0 will result in black, so start from 1 and leave 0 to represent ubershader
     #endif
 
     switch (g_Const.debug.debugViewType)
@@ -588,14 +588,14 @@ ActiveTextureSampler Bridge::createTextureSampler(
     bool isPrimaryHit,
     bool isTriangleHit,
     float texLODBias
-#if RTXPT_STOCHASTIC_TEXTURE_FILTERING_ENABLE
+#if CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
     ,STF_SamplerState stfSamplerState
 #endif
 )
 {
 #if ACTIVE_LOD_TEXTURE_SAMPLER == LOD_TEXTURE_SAMPLER_EXPLICIT
     return ExplicitLodTextureSampler::make(texLODBias
-#if RTXPT_STOCHASTIC_TEXTURE_FILTERING_ENABLE
+#if CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
         ,stfSamplerState
 #endif
     );
@@ -603,7 +603,7 @@ ActiveTextureSampler Bridge::createTextureSampler(
     float lambda = rayCone.computeLOD(coneTexLODValue, rayDir, normalW, true);
     lambda += texLODBias;
     return ExplicitRayConesLodTextureSampler::make(lambda
-#if RTXPT_STOCHASTIC_TEXTURE_FILTERING_ENABLE
+#if CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
         ,stfSamplerState
 #endif
     );
@@ -645,7 +645,7 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
     // transpose is to go from row_major to column_major; it is likely unnecessary here since both should work the same for this specific function, but leaving in for correctness
     float coneTexLODValue = computeRayConeTriangleLODValue( bridgeGS.vertexPositions, bridgeGS.vertexTexcoords, transpose((float3x3)bridgeGS.instance.transform) );
       
-#if RTXPT_STOCHASTIC_TEXTURE_FILTERING_ENABLE
+#if CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
     STF_SamplerState stfSamplerState;
     float4 u;
     #if 0
@@ -669,7 +669,7 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
     
     // using flat (triangle) normal makes more sense since actual triangle surface is where the textures are sampled on (plus geometry normals are borked in some datasets)
     ActiveTextureSampler textureSampler = createTextureSampler( rayCone, rayDir, coneTexLODValue, bridgeGS.flatNormal/*bridgeGS.geometryNormal*/, isPrimaryHit, true, g_Const.ptConsts.texLODBias
-#if RTXPT_STOCHASTIC_TEXTURE_FILTERING_ENABLE
+#if CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
         ,stfSamplerState
 #endif
     );
@@ -750,7 +750,7 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
     // A.k.a. interiorIoR
     lpfloat matIoR = bridgeMaterial.ior;
 
-#if !defined(RTXPT_MATERIAL_HAS_TRANSMISSION) || RTXPT_MATERIAL_HAS_TRANSMISSION
+#if !defined(CAUSTICA_MATERIAL_HAS_TRANSMISSION) || CAUSTICA_MATERIAL_HAS_TRANSMISSION
     // from https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Khronos/KHR_materials_transmission/README.md#refraction
     // "This microfacet lobe is exactly the same as the specular lobe except sampled along the line of sight through the surface."
     lpfloat     bsdfDataSpecularTransmission = bridgeMaterial.transmission * (1 - bridgeMaterial.metalness);    // (1 - bridgeMaterial.metalness) is from https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Khronos/KHR_materials_transmission/README.md#transparent-metals
@@ -764,7 +764,7 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
 
     /*LobeType*/ uint lobeType = (uint)LobeType::All;
 
-#if defined(RTXPT_MATERIAL_HAS_TRANSMISSION) && !RTXPT_MATERIAL_HAS_TRANSMISSION
+#if defined(CAUSTICA_MATERIAL_HAS_TRANSMISSION) && !CAUSTICA_MATERIAL_HAS_TRANSMISSION
     lobeType &= ~(uint)LobeType::Transmission;//~((uint)LobeType::DiffuseReflection | (uint)LobeType::SpecularReflection | (uint)LobeType::DeltaReflection);
 #endif
 
@@ -801,15 +801,15 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
     // The standard material supports uniform emission over the hemisphere.
     // Note: we only support single sided emissives at the moment; If upgrading, make sure to upgrade NEE codepath as well (i.e. PolymorphicLight.hlsli)
 
-    uint neeTriangleLightIndex = RTXPT_INVALID_LIGHT_INDEX;
-    uint neeAnalyticLightIndex = RTXPT_INVALID_LIGHT_INDEX;
+    uint neeTriangleLightIndex = CAUSTICA_INVALID_LIGHT_INDEX;
+    uint neeAnalyticLightIndex = CAUSTICA_INVALID_LIGHT_INDEX;
 
-#if !defined(RTXPT_MATERIAL_IS_EMISSIVE) || RTXPT_MATERIAL_IS_EMISSIVE
+#if !defined(CAUSTICA_MATERIAL_IS_EMISSIVE) || CAUSTICA_MATERIAL_IS_EMISSIVE
     if (ptShadingData.frontFacing && any(bridgeMaterial.emissiveColor>0))
     {
         ptShadingData.emission = bridgeMaterial.emissiveColor;
 
-#if !RTXPT_USE_APPROXIMATE_MIS
+#if !CAUSTICA_USE_APPROXIMATE_MIS
         uint baseIndex = t_SubInstanceData[subInstanceDataIndex].EmissiveLightMappingOffset;
         if (baseIndex != 0xFFFFFFFF)
             neeTriangleLightIndex = baseIndex + triangleIndex;
@@ -830,7 +830,7 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
     }
 #endif
 
-#if !defined(RTXPT_MATERIAL_IS_ANALYTIC_LIGHT_PROXY) || RTXPT_MATERIAL_IS_ANALYTIC_LIGHT_PROXY
+#if !defined(CAUSTICA_MATERIAL_IS_ANALYTIC_LIGHT_PROXY) || CAUSTICA_MATERIAL_IS_ANALYTIC_LIGHT_PROXY
     if ( (bridgeMaterial.flags & PTMaterialFlags_EnableAsAnalyticLightProxy) != 0 )
         neeAnalyticLightIndex = t_SubInstanceData[subInstanceDataIndex].AnalyticProxyLightIndex;
 #endif
@@ -1025,7 +1025,7 @@ float3 ComputeTransparentShadowSurfaceTransmittance(SubInstanceData subInstanceD
         interfaceTransmittance = sqrt(interfaceTransmittance);
 
     float fresnelF0 = square((material.IoR - 1.0) / max(material.IoR + 1.0, 1e-4));
-    float interfaceOpacity = saturate(max(fresnelF0, RTXPT_TRANSPARENT_SHADOW_INTERFACE_OPACITY) * transmission);
+    float interfaceOpacity = saturate(max(fresnelF0, CAUSTICA_TRANSPARENT_SHADOW_INTERFACE_OPACITY) * transmission);
     interfaceTransmittance *= (1.0 - interfaceOpacity);
 
     return interfaceTransmittance;
@@ -1063,7 +1063,7 @@ bool Bridge::AlphaTestVisibilityRay(uint instanceID, uint instanceIndex, uint ge
 // Consider simplifying alpha testing - perhaps splitting it up from the main geometry path, load it with fewer indirections or something like that.
 float3 Bridge::traceVisibilityRay(RayDesc ray, const RayCone rayCone, const int pathVertexIndex, DebugContext debug)
 {
-    RTXPT_RayQuery(RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, RTXPT_FLAG_ALLOW_OPACITY_MICROMAPS) rayQuery;
+    CAUSTICA_RayQuery(RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, CAUSTICA_FLAG_ALLOW_OPACITY_MICROMAPS) rayQuery;
     rayQuery.TraceRayInline(SceneBVH, RAY_FLAG_NONE, 0xff, ray);
 
     float3 transmittance = float3(1, 1, 1);
@@ -1173,7 +1173,7 @@ float3 Bridge::traceVisibilityRay(RayDesc ray, const RayCone rayCone, const int 
     return transmittance;
 }
 
-void Bridge::traceScatterRay(const PathState path, inout RTXPT_RayQuery(RAY_FLAG_NONE, RTXPT_FLAG_ALLOW_OPACITY_MICROMAPS) rayQuery, const float2 tMinMax, DebugContext debug)
+void Bridge::traceScatterRay(const PathState path, inout CAUSTICA_RayQuery(RAY_FLAG_NONE, CAUSTICA_FLAG_ALLOW_OPACITY_MICROMAPS) rayQuery, const float2 tMinMax, DebugContext debug)
 {
     RayDesc ray = path.getScatterRay().toRayDesc();
     ray.TMin = tMinMax.x;

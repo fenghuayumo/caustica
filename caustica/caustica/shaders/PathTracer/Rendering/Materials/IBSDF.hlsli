@@ -5,8 +5,8 @@
 #include "Microfacet.hlsli"
 #include "LobeType.hlsli"
 
-#ifndef RTXPT_DIFFUSE_SPECULAR_SPLIT
-#define RTXPT_DIFFUSE_SPECULAR_SPLIT 1
+#ifndef CAUSTICA_DIFFUSE_SPECULAR_SPLIT
+#define CAUSTICA_DIFFUSE_SPECULAR_SPLIT 1
 #endif
 
 static const uint       cMaxDeltaLobes      = 3;            // 3 should be enough (reflection, transmission, clearcoat reflection?) - there's a bit of a register use cost allowing for more than needed

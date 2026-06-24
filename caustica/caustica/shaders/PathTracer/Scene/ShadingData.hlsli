@@ -40,12 +40,12 @@ struct ShadingData
 
     // Material data
     MaterialHeader mtl;                 ///< Material header data.      TODO: rename this to ShadingFlags
-    uint        materialID;             ///< Material ID at shading location - equivalent to MaterialPTData buffer index. Can be optimized to uint16 depending on RTXPT_MATERIAL_MAX_COUNT
+    uint        materialID;             ///< Material ID at shading location - equivalent to MaterialPTData buffer index. Can be optimized to uint16 depending on CAUSTICA_MATERIAL_MAX_COUNT
     // lpfloat     opacity;                ///< Opacity value in [0,1]. This is used for alpha testing. Can be optimized to fp16 without any issues.
     lpfloat     IoR;                    ///<move to fp16 and combine with interiorIoR           < Index of refraction for the medium on the front-facing side (i.e. "outside" the material at the hit). Can be optimized to fp16 without any issues.
     lpfloat     shadowNoLFadeout;       ///<move to ShadingFlags if possible           < See corresponding material setting. Can be optimized to fp16 without any issues.
 
-#if !defined(RTXPT_MATERIAL_IS_EMISSIVE) || RTXPT_MATERIAL_IS_EMISSIVE
+#if !defined(CAUSTICA_MATERIAL_IS_EMISSIVE) || CAUSTICA_MATERIAL_IS_EMISSIVE
     lpfloat3    emission;               /// move to SurfaceData and compress
 #endif
 
@@ -68,7 +68,7 @@ struct ShadingData
         // shadingData.opacity = 0;
         shadingData.IoR = 0;
         shadingData.shadowNoLFadeout = 0;
-#if !defined(RTXPT_MATERIAL_IS_EMISSIVE) || RTXPT_MATERIAL_IS_EMISSIVE
+#if !defined(CAUSTICA_MATERIAL_IS_EMISSIVE) || CAUSTICA_MATERIAL_IS_EMISSIVE
         shadingData.emission = 0;
 #endif
         return shadingData;

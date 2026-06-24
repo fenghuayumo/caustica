@@ -54,7 +54,7 @@ GenerateMipsPass::GenerateMipsPass(
 
     std::vector<caustica::ShaderMacro> macros = { { "INPUT_ENVIRONMENT_MAP", sourceEnvironmentMap ? "1" : "0" } };
 
-    nvrhi::ShaderHandle shader = shaderFactory->CreateShader("app/engine/shaders/render/RTXDI/PreprocessEnvironmentMap.hlsl", "main", &macros, nvrhi::ShaderType::Compute);
+    nvrhi::ShaderHandle shader = shaderFactory->CreateShader("caustica/shaders/render/RTXDI/PreprocessEnvironmentMap.hlsl", "main", &macros, nvrhi::ShaderType::Compute);
 
     nvrhi::ComputePipelineDesc pipelineDesc;
     pipelineDesc.bindingLayouts = { bindingLayout };

@@ -133,7 +133,7 @@
 
 			// Pre-load the key values in order to hide some of the read latency
 			uint srcKeys[FFX_PARALLELSORT_ELEMENTS_PER_THREAD];
-#ifdef RTXPT_GPUSORT_FIRST_PASS_INIT_INDICES
+#ifdef CAUSTICA_GPUSORT_FIRST_PASS_INIT_INDICES
 //            if( ShiftBit == 0 ) // first pass, init to 0, 1, ...
             {
 			    srcKeys[0] = SrcBuffer[DataIndex];
@@ -363,7 +363,7 @@
 			
 //#ifdef kRS_ValueCopy
 			uint srcValues[FFX_PARALLELSORT_ELEMENTS_PER_THREAD];
-#ifdef RTXPT_GPUSORT_FIRST_PASS_INIT_INDICES
+#ifdef CAUSTICA_GPUSORT_FIRST_PASS_INIT_INDICES
             //if( ShiftBit == 0 ) // first pass, init to 0, 1, ...
             {
                 srcValues[0] = DataIndex;

@@ -82,11 +82,11 @@
 // RTXDI only - should be pow of 2 when using low discrepancy sampling or the result can be biased; it also must be a multiple of 256 due to compute shader hardcoding
 #define  ENVMAP_PRESAMPLED_COUNT            2048u           // 1024 is ok quality, 4096 is plenty enough but still fits into small enough memory block (32Kb), 2048u is good compromise
 
-#define  RTXPT_STOCHASTIC_TEXTURE_FILTERING_ENABLE 0        // 0 - disable STF; 1 - enable STF
+#define  CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE 0        // 0 - disable STF; 1 - enable STF
 
 // Artistic/diagnostic boost for approximate transparent shadows. Real clear glass only loses a
 // small amount of direct light at each interface, so keep this at 0 for a more physical filter.
-#define  RTXPT_TRANSPARENT_SHADOW_INTERFACE_OPACITY 0.15f
+#define  CAUSTICA_TRANSPARENT_SHADOW_INTERFACE_OPACITY 0.15f
 
 #if NON_PATH_TRACING_PASS || defined(__cplusplus) || (__SHADER_TARGET_MAJOR < 6 || __SHADER_TARGET_MINOR < 6)
     #define PAYLOAD_QUALIFIER

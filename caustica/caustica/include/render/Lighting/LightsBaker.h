@@ -172,20 +172,20 @@ private:
 
     // nvrhi::BufferHandle             m_lightingConstants;                // same content as in control buffer
 
-    nvrhi::BufferHandle             m_lightsBuffer;                     // element count: RTXPT_LIGHTING_MAX_LIGHTS
-    nvrhi::BufferHandle             m_lightsExBuffer;                   // element count: RTXPT_LIGHTING_MAX_LIGHTS
+    nvrhi::BufferHandle             m_lightsBuffer;                     // element count: CAUSTICA_LIGHTING_MAX_LIGHTS
+    nvrhi::BufferHandle             m_lightsExBuffer;                   // element count: CAUSTICA_LIGHTING_MAX_LIGHTS
     nvrhi::BufferHandle             m_scratchBuffer;                    // byte size: LLB_SCRATCH_BUFFER_SIZE
-    nvrhi::BufferHandle             m_scratchList;                      // element count: RTXPT_LIGHTING_MAX_LIGHTS
-    nvrhi::BufferHandle             m_historyRemapCurrentToPastBuffer;  // element count: RTXPT_LIGHTING_MAX_LIGHTS
-    nvrhi::BufferHandle             m_historyRemapPastToCurrentBuffer;  // element count: RTXPT_LIGHTING_MAX_LIGHTS
+    nvrhi::BufferHandle             m_scratchList;                      // element count: CAUSTICA_LIGHTING_MAX_LIGHTS
+    nvrhi::BufferHandle             m_historyRemapCurrentToPastBuffer;  // element count: CAUSTICA_LIGHTING_MAX_LIGHTS
+    nvrhi::BufferHandle             m_historyRemapPastToCurrentBuffer;  // element count: CAUSTICA_LIGHTING_MAX_LIGHTS
 
     nvrhi::BufferHandle             m_controlBufferReadback;        // for showing debug info
     int                             m_framesFromLastReadbackCopy;   // the number of frames that passed since 
     LightingControlData             m_lastReadback;
 
-    nvrhi::BufferHandle             m_lightWeights;                 // element count: 2 * RTXPT_LIGHTING_WEIGHTS_COUNT_HALF
-    nvrhi::BufferHandle             m_perLightProxyCounters;        // element count: RTXPT_LIGHTING_MAX_LIGHTS
-    nvrhi::BufferHandle             m_lightSamplingProxies;         // element count: RTXPT_LIGHTING_MAX_SAMPLING_PROXIES  <- this is the output of the GPUSort and is only used to sort the above 2 arrays
+    nvrhi::BufferHandle             m_lightWeights;                 // element count: 2 * CAUSTICA_LIGHTING_WEIGHTS_COUNT_HALF
+    nvrhi::BufferHandle             m_perLightProxyCounters;        // element count: CAUSTICA_LIGHTING_MAX_LIGHTS
+    nvrhi::BufferHandle             m_lightSamplingProxies;         // element count: CAUSTICA_LIGHTING_MAX_SAMPLING_PROXIES  <- this is the output of the GPUSort and is only used to sort the above 2 arrays
 
     nvrhi::TextureHandle            m_NEE_AT_FeedbackTotalWeight;
     nvrhi::TextureHandle            m_NEE_AT_FeedbackCandidates;
@@ -221,7 +221,7 @@ private:
 
     int                             m_localSamplingBufferWidth          = 0;
     int                             m_localSamplingBufferHeight         = 0;
-    const int                       m_localSamplingBufferDepth          = RTXPT_LIGHTING_LOCAL_PROXY_COUNT;
+    const int                       m_localSamplingBufferDepth          = CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT;
 
     // various buffers are ping-ponged where current and history swap places; this bool is inverted at every Update()
     bool                            m_ping                              = false;
@@ -258,7 +258,7 @@ private:
 
     uint64_t                        m_allocatedVRAM                     = 0;
 
-    //static const uint               s_safeMaxLights                     = RTXPT_LIGHTING_MAX_LIGHTS * 19 / 20;  // 95%  - there's a bug when more than 99.9% allocated that needs catching
+    //static const uint               s_safeMaxLights                     = CAUSTICA_LIGHTING_MAX_LIGHTS * 19 / 20;  // 95%  - there's a bug when more than 99.9% allocated that needs catching
     bool                            m_noOverflow                        = true;
 
     int                             m_verifyBeginHasMatchingEnd         = 0;

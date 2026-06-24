@@ -12,7 +12,7 @@
 #include <render/BloomPass.h>
 #include <scene/camera/Camera.h>
 #include <render/CommonRenderPasses.h>
-#if RTXPT_WITH_NATIVE_DLSS
+#if CAUSTICA_WITH_NATIVE_DLSS
 #include <render/DLSS.h>
 #endif
 
@@ -42,7 +42,7 @@ class CaptureScriptManager;
 class ComputePipelineBaker;
 class ComputeShaderVariant;
 class OidnDenoiser;
-#if RTXPT_WITH_PYTHON
+#if CAUSTICA_WITH_PYTHON
 class PythonScripting;
 #endif
 class GaussianSplatPass;
@@ -176,7 +176,7 @@ public:
     void                                    PathTrace(nvrhi::IFramebuffer* framebuffer, const SampleConstants & constants);
     void                                    PreRender();
     void                                    StreamlinePreRender();
-#if RTXPT_WITH_NATIVE_DLSS
+#if CAUSTICA_WITH_NATIVE_DLSS
     void                                    NativeDLSSPreRender();
 #endif
     void                                    Render(nvrhi::IFramebuffer* framebuffer) override;
@@ -219,7 +219,7 @@ public:
 
     const std::unique_ptr<CaptureScriptManager> & GetCaptureScriptManager() const { return m_captureScriptManager; }
 
-#if RTXPT_WITH_PYTHON
+#if CAUSTICA_WITH_PYTHON
     const std::unique_ptr<PythonScripting> & GetPythonScripting() const { return m_pythonScripting; }
 #endif
 
@@ -264,7 +264,7 @@ protected:
     std::shared_ptr<class PTPipelineVariant>    m_ptPipelineEdgeDetection;
 
     std::unique_ptr<CaptureScriptManager>       m_captureScriptManager;
-#if RTXPT_WITH_PYTHON
+#if CAUSTICA_WITH_PYTHON
     std::unique_ptr<PythonScripting>            m_pythonScripting;
 #endif
 
@@ -287,7 +287,7 @@ private:
     void                                    AccumulateGaussianSplats(const caustica::IView& splatView);
     void                                    BuildGaussianSplatEmissionProxyList();
     void                                    RefreshEnvironmentMapMediaList();
-#if RTXPT_WITH_NATIVE_DLSS
+#if CAUSTICA_WITH_NATIVE_DLSS
     bool                                    EvaluateNativeDLSS(bool reset);
 #endif
 
@@ -441,7 +441,7 @@ private:
     caustica::StreamlineInterface::DLSSSettings   m_recommendedDLSSSettings = {};
     caustica::StreamlineInterface::DLSSRROptions  m_lastDLSSRROptions;
 #endif
-#if RTXPT_WITH_NATIVE_DLSS
+#if CAUSTICA_WITH_NATIVE_DLSS
     std::unique_ptr<caustica::render::DLSS>     m_nativeDLSS;
 #endif
     uint2                                       m_renderSize;   // native render resolution

@@ -25,7 +25,7 @@ using namespace caustica::math;
 
 #include <render/NRD/NrdConfig.h>
 
-#if RTXPT_STOCHASTIC_TEXTURE_FILTERING_ENABLE
+#if CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
 #include "../../external/RtxTf/STFDefinitions.h"
 #endif
 
@@ -147,7 +147,7 @@ struct EnvironmentMapRuntimeParameters
     bool        VisibleToCamera = true;
 };
 
-#if RTXPT_STOCHASTIC_TEXTURE_FILTERING_ENABLE
+#if CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
 enum class StfFilterMode
 {
     Point = 0,
@@ -166,7 +166,7 @@ enum class StfMagnificationMethod
     FineLut3x3,
     Fine4x4
 };
-#endif // RTXPT_STOCHASTIC_TEXTURE_FILTERING_ENABLE
+#endif // CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
 
 struct PerformancePreset
 {
@@ -185,7 +185,7 @@ struct PerformancePreset
     bool        EnableBloom;
     bool        EnableLDSamplerForBSDF;
     float       FireflyThreshold;
-#if RTXPT_WITH_ANY_DLSS
+#if CAUSTICA_WITH_ANY_DLSS
     SI::DLSSMode DLSSMode;
 #endif
 };
@@ -293,11 +293,11 @@ struct SampleUIData
     int                                 NestedDielectricsQuality    = 1;    // 0 - off; 1 - fast; 2 - quality
     bool                                UseFp16Types = true;
     bool                                EnableLDSamplerForBSDF = true;
-#if RTXPT_STOCHASTIC_TEXTURE_FILTERING_ENABLE
+#if CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
     StfFilterMode                       STFFilterMode = StfFilterMode::Linear;
     StfMagnificationMethod              STFMagnificationMethod = StfMagnificationMethod::Default;
     float                               STFGaussianSigma = 0.3f;
-#endif // RTXPT_STOCHASTIC_TEXTURE_FILTERING_ENABLE
+#endif // CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
 
     caustica::render::TemporalAntiAliasingParameters TemporalAntiAliasingParams;
     caustica::render::TemporalAntiAliasingJitter     TemporalAntiAliasingJitter = caustica::render::TemporalAntiAliasingJitter::R2;   // R2 works best with DLSS-RR

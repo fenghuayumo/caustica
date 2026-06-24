@@ -165,7 +165,7 @@ def collect_shader_pack_entries(shader_type: str, dynamic_shaders: str) -> dict[
     entries: dict[str, Path] = {}
     static_roots = {
         "framework": "ShaderPrecompiled/engine",
-        "caustica": "ShaderPrecompiled/app",
+        "caustica": "ShaderPrecompiled/caustica",
         "nrd": "ShaderPrecompiled/nrd",
         "omm": "ShaderPrecompiled/omm",
     }

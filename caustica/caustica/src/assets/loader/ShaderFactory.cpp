@@ -55,7 +55,11 @@ std::shared_ptr<IBlob> ShaderFactory::GetBytecode(const char* fileName, const ch
             adjustedName += "_" + string(entryName);
     }
 
-    std::filesystem::path shaderFilePath = m_basePath / (adjustedName + ".bin");
+    const bool isCausticaShader = caustica::string_utils::starts_with(adjustedName, "caustica/shaders");
+    // shaders.cfg emits blobs under dxil/caustica/shaders/... while VFS mounts dxil at /ShaderPrecompiled/caustica
+    std::filesystem::path shaderFilePath = isCausticaShader
+        ? m_basePath / "caustica" / (adjustedName + ".bin")
+        : m_basePath / (adjustedName + ".bin");
 
     std::shared_ptr<IBlob>& data = m_BytecodeCache[shaderFilePath.generic_string()];
 

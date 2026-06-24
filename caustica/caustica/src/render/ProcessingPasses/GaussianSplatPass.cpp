@@ -1495,19 +1495,19 @@ void GaussianSplatPass::CreatePipeline(const RenderTargets& renderTargets)
     std::vector<caustica::ShaderMacro> rasterShadowMacros = {
         caustica::ShaderMacro({ "GAUSSIAN_SPLAT_HYBRID_SHADOWS", "0" })
     };
-    m_rasterVertexShader = m_shaderFactory->CreateShader("app/engine/shaders/render/ProcessingPasses/GaussianSplatRaster.hlsl", "vs_main", &rasterShadowMacros, nvrhi::ShaderType::Vertex);
-    m_rasterPixelShader = m_shaderFactory->CreateShader("app/engine/shaders/render/ProcessingPasses/GaussianSplatRaster.hlsl", "ps_main", &rasterShadowMacros, nvrhi::ShaderType::Pixel);
+    m_rasterVertexShader = m_shaderFactory->CreateShader("caustica/shaders/render/ProcessingPasses/GaussianSplatRaster.hlsl", "vs_main", &rasterShadowMacros, nvrhi::ShaderType::Vertex);
+    m_rasterPixelShader = m_shaderFactory->CreateShader("caustica/shaders/render/ProcessingPasses/GaussianSplatRaster.hlsl", "ps_main", &rasterShadowMacros, nvrhi::ShaderType::Pixel);
 
     std::vector<caustica::ShaderMacro> hybridShadowMacros = {
         caustica::ShaderMacro({ "GAUSSIAN_SPLAT_HYBRID_SHADOWS", "1" })
     };
-    m_hybridVertexShader = m_shaderFactory->CreateShader("app/engine/shaders/render/ProcessingPasses/GaussianSplatRaster.hlsl", "vs_main", &hybridShadowMacros, nvrhi::ShaderType::Vertex);
-    m_hybridPixelShader = m_shaderFactory->CreateShader("app/engine/shaders/render/ProcessingPasses/GaussianSplatRaster.hlsl", "ps_main", &hybridShadowMacros, nvrhi::ShaderType::Pixel);
+    m_hybridVertexShader = m_shaderFactory->CreateShader("caustica/shaders/render/ProcessingPasses/GaussianSplatRaster.hlsl", "vs_main", &hybridShadowMacros, nvrhi::ShaderType::Vertex);
+    m_hybridPixelShader = m_shaderFactory->CreateShader("caustica/shaders/render/ProcessingPasses/GaussianSplatRaster.hlsl", "ps_main", &hybridShadowMacros, nvrhi::ShaderType::Pixel);
 
     std::vector<caustica::ShaderMacro> sortKeyMacros = {
         caustica::ShaderMacro({ "GAUSSIAN_SPLAT_SORT_KEYS", "1" })
     };
-    m_sortKeyShader = m_shaderFactory->CreateShader("app/engine/shaders/render/ProcessingPasses/GaussianSplatRaster.hlsl", "cs_sort_keys", &sortKeyMacros, nvrhi::ShaderType::Compute);
+    m_sortKeyShader = m_shaderFactory->CreateShader("caustica/shaders/render/ProcessingPasses/GaussianSplatRaster.hlsl", "cs_sort_keys", &sortKeyMacros, nvrhi::ShaderType::Compute);
 
     nvrhi::GraphicsPipelineDesc pipelineDesc;
     pipelineDesc.bindingLayouts = { m_rasterRenderBindingLayout };

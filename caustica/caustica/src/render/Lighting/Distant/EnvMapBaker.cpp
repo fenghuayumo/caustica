@@ -73,9 +73,9 @@ void EnvMapBaker::CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebug, s
     std::vector<caustica::ShaderMacro> shaderMacros;
     //shaderMacros.push_back(caustica::ShaderMacro({              "BLEND_DEBUG_BUFFER", "1" }));
 
-    m_lowResPrePassLayerCS = shaderFactory->CreateShader("app/engine/shaders/render/Lighting/Distant/EnvMapBaker.hlsl", "LowResPrePassLayerCS", &shaderMacros, nvrhi::ShaderType::Compute);
-    m_baseLayerCS = shaderFactory->CreateShader("app/engine/shaders/render/Lighting/Distant/EnvMapBaker.hlsl", "BaseLayerCS", &shaderMacros, nvrhi::ShaderType::Compute);
-    m_MIPReduceCS = shaderFactory->CreateShader("app/engine/shaders/render/Lighting/Distant/EnvMapBaker.hlsl", "MIPReduceCS", &shaderMacros, nvrhi::ShaderType::Compute);
+    m_lowResPrePassLayerCS = shaderFactory->CreateShader("caustica/shaders/render/Lighting/Distant/EnvMapBaker.hlsl", "LowResPrePassLayerCS", &shaderMacros, nvrhi::ShaderType::Compute);
+    m_baseLayerCS = shaderFactory->CreateShader("caustica/shaders/render/Lighting/Distant/EnvMapBaker.hlsl", "BaseLayerCS", &shaderMacros, nvrhi::ShaderType::Compute);
+    m_MIPReduceCS = shaderFactory->CreateShader("caustica/shaders/render/Lighting/Distant/EnvMapBaker.hlsl", "MIPReduceCS", &shaderMacros, nvrhi::ShaderType::Compute);
 
     {
         nvrhi::BindingLayoutDesc layoutDesc;
@@ -155,8 +155,8 @@ void EnvMapBaker::CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebug, s
     {
         std::vector<caustica::ShaderMacro> smQ0 = { caustica::ShaderMacro({ "QUALITY", "0" }) };
         std::vector<caustica::ShaderMacro> smQ1 = { caustica::ShaderMacro({ "QUALITY", "1" }) };
-        m_BC6UCompressLowCS = shaderFactory->CreateShader("app/engine/shaders/render/Lighting/Distant/BC6UCompress.hlsl", "CSMain", &smQ0, nvrhi::ShaderType::Compute);
-        m_BC6UCompressHighCS = shaderFactory->CreateShader("app/engine/shaders/render/Lighting/Distant/BC6UCompress.hlsl", "CSMain", &smQ1, nvrhi::ShaderType::Compute);
+        m_BC6UCompressLowCS = shaderFactory->CreateShader("caustica/shaders/render/Lighting/Distant/BC6UCompress.hlsl", "CSMain", &smQ0, nvrhi::ShaderType::Compute);
+        m_BC6UCompressHighCS = shaderFactory->CreateShader("caustica/shaders/render/Lighting/Distant/BC6UCompress.hlsl", "CSMain", &smQ1, nvrhi::ShaderType::Compute);
 
         nvrhi::BindingLayoutDesc layoutDesc;
         layoutDesc.visibility = nvrhi::ShaderType::Compute;
@@ -178,7 +178,7 @@ void EnvMapBaker::CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebug, s
     // === BRDF LUT Generation ===
     if (m_enableRasterPrecompute)
     {
-        m_brdfLUTCS = shaderFactory->CreateShader("app/engine/shaders/render/Lighting/Distant/BRDFLUTGenerator.hlsl", "main", nullptr, nvrhi::ShaderType::Compute);
+        m_brdfLUTCS = shaderFactory->CreateShader("caustica/shaders/render/Lighting/Distant/BRDFLUTGenerator.hlsl", "main", nullptr, nvrhi::ShaderType::Compute);
         
         nvrhi::BindingLayoutDesc layoutDesc;
         layoutDesc.visibility = nvrhi::ShaderType::Compute;

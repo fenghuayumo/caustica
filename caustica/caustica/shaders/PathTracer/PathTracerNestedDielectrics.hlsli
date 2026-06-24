@@ -37,15 +37,15 @@ namespace PathTracer
     */
     inline bool HandleNestedDielectrics(inout SurfaceData surfaceData, inout PathState path, const WorkingContext workingContext)
     {
-#if RTXPT_NESTED_DIELECTRICS_QUALITY == 1
+#if CAUSTICA_NESTED_DIELECTRICS_QUALITY == 1
     static const uint           kMaxRejectedDielectricHits      = 4;    // Maximum number of rejected hits along a path (PackedCounters::RejectedHits counter, used by nested dielectrics). The path is terminated if the limit is reached to avoid getting stuck in pathological cases.
     #define NESTED_DIELECTRICS_AVOID_TERMINATION 1                      // simply revert back to non-nested dielectrics when we hit the rejected hit limit - we get approx result and there's less code
-#elif RTXPT_NESTED_DIELECTRICS_QUALITY == 2
+#elif CAUSTICA_NESTED_DIELECTRICS_QUALITY == 2
     static const uint           kMaxRejectedDielectricHits      = 16;   // Maximum number of rejected hits along a path (PackedCounters::RejectedHits counter, used by nested dielectrics). The path is terminated if the limit is reached to avoid getting stuck in pathological cases.
     #define NESTED_DIELECTRICS_AVOID_TERMINATION 0
 #endif
 
-#if RTXPT_NESTED_DIELECTRICS_QUALITY > 0 || defined(__INTELLISENSE__)
+#if CAUSTICA_NESTED_DIELECTRICS_QUALITY > 0 || defined(__INTELLISENSE__)
 
         if (surfaceData.shadingData.mtl.isThinSurface())
             return true; 
@@ -98,7 +98,7 @@ namespace PathTracer
         // Compute index of refraction for medium on the outside.
         Bridge::updateOutsideIoR( surfaceData, ComputeOutsideIoR(path.interiorList, surfaceData.shadingData.materialID, surfaceData.shadingData.frontFacing) );
 
-#endif // #if RTXPT_NESTED_DIELECTRICS_QUALITY > 0 || defined(__INTELLISENSE__)
+#endif // #if CAUSTICA_NESTED_DIELECTRICS_QUALITY > 0 || defined(__INTELLISENSE__)
 
         return true;
     }
@@ -107,14 +107,14 @@ namespace PathTracer
     */
     inline void UpdateNestedDielectricsOnScatterTransmission(const ShadingData shadingData, inout PathState path, const WorkingContext workingContext)
     {
-#if RTXPT_NESTED_DIELECTRICS_QUALITY > 0 || defined(__INTELLISENSE__)
+#if CAUSTICA_NESTED_DIELECTRICS_QUALITY > 0 || defined(__INTELLISENSE__)
         if (!shadingData.mtl.isThinSurface())
         {
             uint nestedPriority = shadingData.mtl.getNestedPriority();
             path.interiorList.handleIntersection(shadingData.materialID, nestedPriority, shadingData.frontFacing);
             path.setInsideDielectricVolume(!path.interiorList.isEmpty());
         }
-#endif // #if RTXPT_NESTED_DIELECTRICS_QUALITY > 0 || defined(__INTELLISENSE__)
+#endif // #if CAUSTICA_NESTED_DIELECTRICS_QUALITY > 0 || defined(__INTELLISENSE__)
     }
 
 }

@@ -69,34 +69,34 @@ class BuildPyWithRuntime(_build_py):
 
         super().run()
 
-        assets = env_choice("CAUSTICA_WHEEL_ASSETS", "minimal", {"minimal", "full", "none"}, "RTXPT_WHEEL_ASSETS")
+        assets = env_choice("CAUSTICA_WHEEL_ASSETS", "minimal", {"minimal", "full", "none"}, "CAUSTICA_WHEEL_ASSETS")
         dynamic_shaders = env_choice(
             "CAUSTICA_WHEEL_DYNAMIC_SHADERS",
             "bin",
             {"full", "bin", "none"},
-            "RTXPT_WHEEL_DYNAMIC_SHADERS",
+            "CAUSTICA_WHEEL_DYNAMIC_SHADERS",
         )
         shader_api = env_choice(
             "CAUSTICA_WHEEL_SHADER_API",
             "d3d12" if os.name == "nt" else "vulkan",
             {"d3d12", "vulkan", "both"},
-            "RTXPT_WHEEL_SHADER_API",
+            "CAUSTICA_WHEEL_SHADER_API",
         )
-        shader_pack = env_bool("CAUSTICA_WHEEL_SHADER_PACK", True, "RTXPT_WHEEL_SHADER_PACK")
+        shader_pack = env_bool("CAUSTICA_WHEEL_SHADER_PACK", True, "CAUSTICA_WHEEL_SHADER_PACK")
         if os.name != "nt" and shader_api == "d3d12":
             raise RuntimeError(
                 "CAUSTICA_WHEEL_SHADER_API=d3d12 is only valid on Windows. "
                 "Use CAUSTICA_WHEEL_SHADER_API=vulkan on Linux."
             )
 
-        if env_bool("CAUSTICA_WHEEL_PRECOMPILE_DYNAMIC_SHADERS", legacy_name="RTXPT_WHEEL_PRECOMPILE_DYNAMIC_SHADERS"):
+        if env_bool("CAUSTICA_WHEEL_PRECOMPILE_DYNAMIC_SHADERS", legacy_name="CAUSTICA_WHEEL_PRECOMPILE_DYNAMIC_SHADERS"):
             if dynamic_shaders == "none":
                 print("WARNING: CAUSTICA_WHEEL_PRECOMPILE_DYNAMIC_SHADERS is set while dynamic shader bins are omitted.")
             run_dynamic_shader_precompile(SimpleNamespace(
                 shader_api=shader_api,
-                precompile_modes=os.environ.get("CAUSTICA_WHEEL_PRECOMPILE_MODES", os.environ.get("RTXPT_WHEEL_PRECOMPILE_MODES", "reference,realtime")),
-                precompile_frames=int(os.environ.get("CAUSTICA_WHEEL_PRECOMPILE_FRAMES", os.environ.get("RTXPT_WHEEL_PRECOMPILE_FRAMES", "1"))),
-                precompile_scene=env_list("CAUSTICA_WHEEL_PRECOMPILE_SCENES", "RTXPT_WHEEL_PRECOMPILE_SCENES"),
+                precompile_modes=os.environ.get("CAUSTICA_WHEEL_PRECOMPILE_MODES", os.environ.get("CAUSTICA_WHEEL_PRECOMPILE_MODES", "reference,realtime")),
+                precompile_frames=int(os.environ.get("CAUSTICA_WHEEL_PRECOMPILE_FRAMES", os.environ.get("CAUSTICA_WHEEL_PRECOMPILE_FRAMES", "1"))),
+                precompile_scene=env_list("CAUSTICA_WHEEL_PRECOMPILE_SCENES", "CAUSTICA_WHEEL_PRECOMPILE_SCENES"),
             ))
 
         copy_runtime_files(
@@ -119,7 +119,7 @@ class BuildPyWithRuntime(_build_py):
 
 setup(
     name="caustica",
-    version=os.environ.get("CAUSTICA_WHEEL_VERSION", os.environ.get("RTXPT_WHEEL_VERSION", "0.6.0")),
+    version=os.environ.get("CAUSTICA_WHEEL_VERSION", os.environ.get("CAUSTICA_WHEEL_VERSION", "0.6.0")),
     description="Python bindings for caustica",
     long_description=(ROOT / "py_caustica.md").read_text(encoding="utf-8"),
     long_description_content_type="text/markdown",

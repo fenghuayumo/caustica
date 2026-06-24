@@ -85,8 +85,8 @@ struct PathTracerConstants
 
     uint    GetActiveStablePlaneCount()
     {
-#if defined(RTXPT_ACTIVE_STABLE_PLANE_COUNT)
-        return RTXPT_ACTIVE_STABLE_PLANE_COUNT;
+#if defined(CAUSTICA_ACTIVE_STABLE_PLANE_COUNT)
+        return CAUSTICA_ACTIVE_STABLE_PLANE_COUNT;
 #else
         return _activeStablePlaneCount;
 #endif

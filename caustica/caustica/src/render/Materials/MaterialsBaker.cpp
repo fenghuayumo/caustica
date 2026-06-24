@@ -1284,7 +1284,7 @@ static std::string MacrosToString( const std::vector<caustica::ShaderMacro> & ma
 static void InitializeStableShaderIdentity(MaterialShaderPermutation& msp)
 {
     if (msp.Macros.size() == 1
-        && msp.Macros[0].name == "RTXPT_MATERIAL_PERMUTATIONS_ENABLED"
+        && msp.Macros[0].name == "CAUSTICA_MATERIAL_PERMUTATIONS_ENABLED"
         && msp.Macros[0].definition == "0")
     {
         msp.StableShaderName = "Ubershader";
@@ -1318,7 +1318,7 @@ void MaterialsBaker::BakeShaderPermutations()
 {
     // first generate ubershader variant - that will likely go away in the future
     std::vector<caustica::ShaderMacro> macros;
-    macros.push_back({ "RTXPT_MATERIAL_PERMUTATIONS_ENABLED", "0" });
+    macros.push_back({ "CAUSTICA_MATERIAL_PERMUTATIONS_ENABLED", "0" });
     MaterialShaderPermutation ubershader{ .ShaderFilePath = m_relativeShaderSourcePath, .Macros = macros };
     InitializeStableShaderIdentity(ubershader);
     m_ubershader = std::make_shared<MaterialShaderPermutation>(ubershader);
@@ -1366,7 +1366,7 @@ void MaterialsBaker::CreateRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* b
         bufferDesc.initialState = nvrhi::ResourceStates::ShaderResource;
         bufferDesc.keepInitialState = true;
         bufferDesc.canHaveUAVs = true;
-        bufferDesc.byteSize = sizeof(PTMaterialData) * RTXPT_MATERIAL_MAX_COUNT;
+        bufferDesc.byteSize = sizeof(PTMaterialData) * CAUSTICA_MATERIAL_MAX_COUNT;
         bufferDesc.structStride = sizeof(PTMaterialData);
         bufferDesc.debugName = "PTMaterialDataStorage";
         m_materialData = m_device->createBuffer(bufferDesc);
@@ -1377,7 +1377,7 @@ void MaterialsBaker::CreateRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* b
     {
         m_mediaPath = mediaPath;
         m_sceneDirectory = sceneFilePath.parent_path();
-        if (!sceneFilePath.empty() && sceneFilePath.filename() == "__RTXPT_INLINE_SCENE_JSON__")
+        if (!sceneFilePath.empty() && sceneFilePath.filename() == "__CAUSTICA_INLINE_SCENE_JSON__")
             m_sceneDirectory = std::filesystem::path();
         if (!m_sceneDirectory.empty())
         {
@@ -1444,7 +1444,7 @@ void MaterialsBaker::CreateRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* b
                 m_materialsGPU.push_back(PTMaterialData{});
                 materialEx->PTMaterial->GPUDataIndex = uint(m_materialsGPU.size() - 1);
                 materialEx->PTMaterial->GPUDataDirty = true;
-                assert(m_materialsGPU.size() <= RTXPT_MATERIAL_MAX_COUNT);
+                assert(m_materialsGPU.size() <= CAUSTICA_MATERIAL_MAX_COUNT);
             }
         }
 
@@ -1744,7 +1744,7 @@ bool MaterialsBaker::DebugGUI(float indent)
 MaterialShaderPermutation PTMaterial::ComputeShaderPermutation(const std::string& defaultShaderPath)
 {
     std::vector<caustica::ShaderMacro> macros;
-    macros.push_back({ "RTXPT_MATERIAL_PERMUTATIONS_ENABLED", "1" });
+    macros.push_back({ "CAUSTICA_MATERIAL_PERMUTATIONS_ENABLED", "1" });
 
     PTMaterialData data; FillData(data);
 
@@ -1760,41 +1760,41 @@ MaterialShaderPermutation PTMaterial::ComputeShaderPermutation(const std::string
     //     && (!material.EnableOcclusionRoughnessMetallicTexture || material.OcclusionRoughnessMetallicTexture.Loaded == nullptr)
     //     && (!material.EnableTransmissionTexture || material.TransmissionTexture.Loaded == nullptr);
     
-    // macros.push_back( {"RTXPT_MATERIAL_EXCLUDE_FROM_NEE",   ExcludeFromNEE?"1":"0" } );
+    // macros.push_back( {"CAUSTICA_MATERIAL_EXCLUDE_FROM_NEE",   ExcludeFromNEE?"1":"0" } );
 
 
     // //why is it slower with this instead of faster?
-    // macros.push_back( {"RTXPT_MATERIAL_USE_NORMAL_TEXTURE", ((data.Flags & PTMaterialFlags_UseNormalTexture) != 0)?"1":"0" } );
+    // macros.push_back( {"CAUSTICA_MATERIAL_USE_NORMAL_TEXTURE", ((data.Flags & PTMaterialFlags_UseNormalTexture) != 0)?"1":"0" } );
 
     // there's something wrong here
     // static const float kMinGGXRoughness = 0.08f; // see BxDF.hlsli, kMinGGXAlpha constant: kMinGGXRoughness must match sqrt(kMinGGXAlpha)!
     // bool onlyDeltaLobes = ((hasTransmission && this->TransmissionFactor == 1.0) || (this->Metalness == 1)) && (this->Roughness < kMinGGXRoughness) && (data.Flags & PTMaterialFlags_UseMetalRoughOrSpecularTexture) == 0;
-    // macros.push_back({ "RTXPT_MATERIAL_ONLY_DELTA_LOBES", onlyDeltaLobes ? "1" : "0" });
+    // macros.push_back({ "CAUSTICA_MATERIAL_ONLY_DELTA_LOBES", onlyDeltaLobes ? "1" : "0" });
 
 #if 0 // more variants, more divergence - perf impact is largely scene dependent, sometimes it's better to specialize and sometimes not
-    macros.push_back({ "RTXPT_MATERIAL_THIN_SURFACE", effectiveIsThinSurface ? "1" : "0" });
+    macros.push_back({ "CAUSTICA_MATERIAL_THIN_SURFACE", effectiveIsThinSurface ? "1" : "0" });
 
-    macros.push_back({ "RTXPT_MATERIAL_HAS_TRANSMISSION", EnableTransmission ? "1" : "0" });
+    macros.push_back({ "CAUSTICA_MATERIAL_HAS_TRANSMISSION", EnableTransmission ? "1" : "0" });
 #endif
 
 #if 0
-    macros.push_back({ "RTXPT_MATERIAL_IS_EMISSIVE", isEmissive ? "1" : "0" });
-    macros.push_back({ "RTXPT_MATERIAL_IS_ANALYTIC_LIGHT_PROXY", isAnalyticProxy ? "1" : "0" });
+    macros.push_back({ "CAUSTICA_MATERIAL_IS_EMISSIVE", isEmissive ? "1" : "0" });
+    macros.push_back({ "CAUSTICA_MATERIAL_IS_ANALYTIC_LIGHT_PROXY", isAnalyticProxy ? "1" : "0" });
 #else // bunch them together and only use them disable emissive & analytic paths together
     if (!isEmissive && !isAnalyticProxy)
     {
-        macros.push_back({ "RTXPT_MATERIAL_IS_EMISSIVE", "0" });
-        macros.push_back({ "RTXPT_MATERIAL_IS_ANALYTIC_LIGHT_PROXY", "0" });
+        macros.push_back({ "CAUSTICA_MATERIAL_IS_EMISSIVE", "0" });
+        macros.push_back({ "CAUSTICA_MATERIAL_IS_ANALYTIC_LIGHT_PROXY", "0" });
     }
 #endif 
 
 #if 0 // NUCLEAR OPTION: make every material have its own shader - can be useful for tracking down weird perf issues
-    macros.push_back({ "RTXPT_MATERIAL_UNIQUE_NAME", this->UniqueFullName() });
+    macros.push_back({ "CAUSTICA_MATERIAL_UNIQUE_NAME", this->UniqueFullName() });
 #endif
 
     // next:
-    //     - RTXPT_MATERIAL_NO_ANALYTIC_LIGHT_PROXY
-    //     - RTXPT_MATERIAL_NO_EMISSIVE             : - no need for emissive MIS code at all and a bunch of that stuff
+    //     - CAUSTICA_MATERIAL_NO_ANALYTIC_LIGHT_PROXY
+    //     - CAUSTICA_MATERIAL_NO_EMISSIVE             : - no need for emissive MIS code at all and a bunch of that stuff
     //     - thin surface
 
 

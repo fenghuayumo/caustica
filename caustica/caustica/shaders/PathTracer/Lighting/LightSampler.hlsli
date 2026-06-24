@@ -13,7 +13,7 @@
 #include "../Utils/Sampling/Sampling.hlsli"
 #include "LightingAlgorithms.hlsli"
 
-#define RTXPT_NEE_MIS_HEURISTIC      MISHeuristic::Balance  // MISHeuristic::PowerTwo
+#define CAUSTICA_NEE_MIS_HEURISTIC      MISHeuristic::Balance  // MISHeuristic::PowerTwo
 
 // Note: make sure to check IsEmpty() for case where there are no lights. Sampling when 'IsEmpty( ) == true' will result in undefined behaviour (NaNs and etc.)
 struct LightSampler
@@ -67,7 +67,7 @@ struct LightSampler
         lightSampler.FeedbackCandidates     = feedbackCandidates;
         lightSampler.PixelPos               = (lpuint2)pixelPos;
 
-        uint2 jitteredTilePos = (pixelPos+controlBuffer[0].LocalSamplingTileJitter) / RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE.xx;
+        uint2 jitteredTilePos = (pixelPos+controlBuffer[0].LocalSamplingTileJitter) / CAUSTICA_LIGHTING_SAMPLING_BUFFER_TILE_SIZE.xx;
         lightSampler.LocalSamplingTilePos   = LLSB_ComputeBaseAddress(jitteredTilePos, controlBuffer[0].LocalSamplingResolution);
 
         // // storage for world space sits in somewhere else
@@ -115,7 +115,7 @@ struct LightSampler
 
     uint SampleLocal(const float rnd, out float pdf)
     {
-        uint localProxyCount = RTXPT_LIGHTING_LOCAL_PROXY_COUNT;
+        uint localProxyCount = CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT;
         uint indexInIndex = clamp( uint(rnd * localProxyCount), 0, localProxyCount-1 );    // when rnd guaranteed to be [0, 1), clamp is unnecessary
         
         uint lightIndex; uint proxyCount;
@@ -137,9 +137,9 @@ struct LightSampler
 
     float SampleLocalPDF(uint lightIndex)
     {
-        const uint localProxyCount = RTXPT_LIGHTING_LOCAL_PROXY_COUNT;
+        const uint localProxyCount = CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT;
 
-        uint packedValue = LocalLightBinarySearch( LocalSamplingBuffer, LocalSamplingTilePos, lightIndex, localProxyCount, RTXPT_LIGHTING_LOCAL_PROXY_BINARY_SEARCH_STEPS );
+        uint packedValue = LocalLightBinarySearch( LocalSamplingBuffer, LocalSamplingTilePos, lightIndex, localProxyCount, CAUSTICA_LIGHTING_LOCAL_PROXY_BINARY_SEARCH_STEPS );
 
         #if 0 // validation
         for ( int localIndex = 0; localIndex < localProxyCount; localIndex++ )
@@ -148,7 +148,7 @@ struct LightSampler
             ReadLocal(localIndex, lightIndexR, proxyCountR);
             if( lightIndex == lightIndexR )
             {
-                if( packedValue == RTXPT_INVALID_LIGHT_INDEX )
+                if( packedValue == CAUSTICA_INVALID_LIGHT_INDEX )
                     DebugPrint("Sort validation failed (not found in binary search but exists)");
                 else
                     if( UnpackMiniListLight(packedValue) != lightIndexR )
@@ -161,7 +161,7 @@ struct LightSampler
         }
         #endif
         
-        if ( packedValue == RTXPT_INVALID_LIGHT_INDEX )
+        if ( packedValue == CAUSTICA_INVALID_LIGHT_INDEX )
             return 0.0f;
 
         uint lightIndexR; uint proxyCountR;
@@ -182,7 +182,7 @@ struct LightSampler
         feedbackWeight /= pow( SampleGlobalPDF(lightIndex), 0.65 );
 
         if (IsScreenSpaceCoherent)
-            feedbackWeight *= RTXPT_LIGHTING_SCREEN_SPACE_COHERENT_FEEDBACK_BIAS;
+            feedbackWeight *= CAUSTICA_LIGHTING_SCREEN_SPACE_COHERENT_FEEDBACK_BIAS;
 
         feedbackReservoir.Add( randomValue, lightIndex, feedbackWeight, IsScreenSpaceCoherent );
         feedbackReservoir.CommitToStorage();
@@ -191,7 +191,7 @@ struct LightSampler
     // This should probably just be removed as it only adds complexity to code
     void InsertFeedbackFromBSDF(const uint lightIndex, const float pixelRadianceContributionAvgWithoutBsdfMISWeight, const float bsdfMISWeight, const float randomNumber)
     {
-#if RTXPT_LIGHTING_ENABLE_BSDF_FEEDBACK
+#if CAUSTICA_LIGHTING_ENABLE_BSDF_FEEDBACK
 #if PATH_TRACER_MODE!=PATH_TRACER_MODE_BUILD_STABLE_PLANES  // <- reconsider this
         if( !IsTemporalFeedbackRequired() )
             return;
@@ -258,15 +258,15 @@ struct LightSampler
 
 //    clean up, optimize/tweak, make it part of UI, clean up so there's a ComputeLightVsBSDF_MIS_ForLight_Approx (and counterpart) so the choice is in user code
 
-#define RTXPT_NEEAT_MIS_APPROXIMATION_LIGHTSAMPLER_BIAS 3
+#define CAUSTICA_NEEAT_MIS_APPROXIMATION_LIGHTSAMPLER_BIAS 3
 
     float ComputeLightVsBSDF_MIS_ForLight_Approx(const LightSample lightSample, const uint candidateSampleCount, const uint fullSampleCount, float bsdfPdf)
     {
-        return EvalMIS(RTXPT_NEE_MIS_HEURISTIC, fullSampleCount*candidateSampleCount, RTXPT_NEEAT_MIS_APPROXIMATION_LIGHTSAMPLER_BIAS, 1, lightSample.LightSampleableByBSDF?bsdfPdf:0);
+        return EvalMIS(CAUSTICA_NEE_MIS_HEURISTIC, fullSampleCount*candidateSampleCount, CAUSTICA_NEEAT_MIS_APPROXIMATION_LIGHTSAMPLER_BIAS, 1, lightSample.LightSampleableByBSDF?bsdfPdf:0);
     }
     float ComputeLightVsBSDF_MIS_ForBSDF_Approx(lpfloat bsdfPdf, const uint candidateSampleCount, const uint fullSampleCount)
     {
-        return EvalMIS(RTXPT_NEE_MIS_HEURISTIC, 1, bsdfPdf, fullSampleCount*candidateSampleCount, RTXPT_NEEAT_MIS_APPROXIMATION_LIGHTSAMPLER_BIAS);
+        return EvalMIS(CAUSTICA_NEE_MIS_HEURISTIC, 1, bsdfPdf, fullSampleCount*candidateSampleCount, CAUSTICA_NEEAT_MIS_APPROXIMATION_LIGHTSAMPLER_BIAS);
     }
 
     float ComputeLightVsBSDF_MIS_ForLight(const float3 surfacePosW, const LightSample lightSample, float thisPdf, float otherPdf, float thisCount, float otherCount, const uint candidateSampleCount, const uint fullSampleCount, float bsdfPdf)
@@ -278,7 +278,7 @@ struct LightSampler
         //float lightAvgPdf = (thisPdf*sqrt(thisCount) + otherPdf*sqrt(otherCount))*sqrt(fullSampleCount);
         float lightAvgPdf = (thisPdf + otherPdf)*fullSampleCount;
 
-        float thisMIS = EvalMIS(RTXPT_NEE_MIS_HEURISTIC, 1, lightAvgPdf*solidAnglePdf, 1, lightSample.LightSampleableByBSDF?bsdfPdf:0); // balance seems a lot less noisy than power
+        float thisMIS = EvalMIS(CAUSTICA_NEE_MIS_HEURISTIC, 1, lightAvgPdf*solidAnglePdf, 1, lightSample.LightSampleableByBSDF?bsdfPdf:0); // balance seems a lot less noisy than power
 
         // solidAnglePdf VALIDATION - some hits expected depending on tuning of values
         #if 0
@@ -318,13 +318,13 @@ struct LightSampler
         //float lightAvgPdf = (localPdf*sqrt(localCount) + globalPdf*sqrt(globalCount))*sqrt(fullSampleCount);
         float lightAvgPdf = (localPdf + globalPdf)*fullSampleCount;
 
-        return EvalMIS(RTXPT_NEE_MIS_HEURISTIC, 1, bsdfPdf, 1, lightAvgPdf*solidAnglePdf); // balance seems a lot less noisy than power
+        return EvalMIS(CAUSTICA_NEE_MIS_HEURISTIC, 1, bsdfPdf, 1, lightAvgPdf*solidAnglePdf); // balance seems a lot less noisy than power
     }
 
     float ComputeBSDFMISForEmissiveTriangle(const uint emissiveTriangleLightIndex, lpfloat bsdfPdf, const float3 viewerPosition, const float3 lightSamplePosition, const uint candidateSampleCount, const uint fullSamples)
     {
         // 0 means delta lobe (zero roughness specular) - in that case LightSampling has zero chance of ever selecting a light, only BSDF can, so MIS is 1; no emissive light means missing data - that's fine, also rely on BSDF only
-        if( bsdfPdf == 0 || emissiveTriangleLightIndex == RTXPT_INVALID_LIGHT_INDEX )
+        if( bsdfPdf == 0 || emissiveTriangleLightIndex == CAUSTICA_INVALID_LIGHT_INDEX )
             return 1;
 
         PolymorphicLightInfoFull lightInfo = LoadLight(emissiveTriangleLightIndex);
@@ -338,7 +338,7 @@ struct LightSampler
     {
 #if POLYLIGHT_QT_ENV_ENABLE
         // 0 means delta lobe (zero roughness specular) - in that case LightSampling has zero chance of ever selecting a light, only BSDF can, so MIS is 1; no emissive light means missing data - that's fine, also rely on BSDF only
-        if( bsdfPdf == 0 || environmentQuadLightIndex == RTXPT_INVALID_LIGHT_INDEX )
+        if( bsdfPdf == 0 || environmentQuadLightIndex == CAUSTICA_INVALID_LIGHT_INDEX )
             return 1;
 
         PolymorphicLightInfoFull lightInfo = LoadLight(environmentQuadLightIndex);
@@ -396,12 +396,12 @@ struct LightSampler
         return PolymorphicLightInfoFull::make(infoBase, infoExtended);
     }
 
-#define RTXPT_LIGHTING_NEEAT_ENABLE_WORLDSPACE_LOCAL_LAYER 0
+#define CAUSTICA_LIGHTING_NEEAT_ENABLE_WORLDSPACE_LOCAL_LAYER 0
 
     template<typename T>
     void GetCandidateSampleCounts(const uint totalCandidateSamples, out T localCount, out T globalCount)
     {
-#if RTXPT_LIGHTING_NEEAT_ENABLE_WORLDSPACE_LOCAL_LAYER
+#if CAUSTICA_LIGHTING_NEEAT_ENABLE_WORLDSPACE_LOCAL_LAYER
         localCount = ::ComputeCandidateSampleLocalCount(ControlBuffer[0].LocalToGlobalSampleRatio, totalCandidateSamples);
 #else
         localCount = IsScreenSpaceCoherent?(::ComputeCandidateSampleLocalCount(ControlBuffer[0].LocalToGlobalSampleRatio, totalCandidateSamples)):(0);

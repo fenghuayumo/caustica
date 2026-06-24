@@ -1,6 +1,6 @@
 #include "RenderSession.h"
 
-#if RTXPT_WITH_PYTHON
+#if CAUSTICA_WITH_PYTHON
 
 #include "AdvancedSample.h"
 #include "caustica.h"
@@ -17,7 +17,7 @@
 #include <assets/cache/TextureCache.h>
 #include <render/CommonRenderPasses.h>
 #include <engine/UserInterfaceUtils.h>
-#if RTXPT_WITH_NATIVE_DLSS
+#if CAUSTICA_WITH_NATIVE_DLSS
 #include <render/DLSS.h>
 #endif
 
@@ -226,7 +226,7 @@ namespace
         return sceneArgument;
     }
 
-#if CAUSTICA_WITH_DX12 && defined(RTXPT_D3D_AGILITY_SDK_VERSION)
+#if CAUSTICA_WITH_DX12 && defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
     std::string GetAgilitySDKPath()
     {
         std::string sdkPath = (ResolveRuntimeDirectory() / "D3D12").string();
@@ -263,7 +263,7 @@ namespace
         {
             Microsoft::WRL::ComPtr<ID3D12DeviceFactory> factory;
             hr = sdkConfig1->CreateDeviceFactory(
-                RTXPT_D3D_AGILITY_SDK_VERSION,
+                CAUSTICA_D3D_AGILITY_SDK_VERSION,
                 sdkPath.c_str(),
                 IID_PPV_ARGS(&factory));
 
@@ -290,7 +290,7 @@ namespace
             return nullptr;
         }
 
-        hr = sdkConfig->SetSDKVersion(RTXPT_D3D_AGILITY_SDK_VERSION, sdkPath.c_str());
+        hr = sdkConfig->SetSDKVersion(CAUSTICA_D3D_AGILITY_SDK_VERSION, sdkPath.c_str());
         if (FAILED(hr))
         {
             caustica::warning("RenderSession: ID3D12SDKConfiguration::SetSDKVersion('%s') failed, HRESULT = 0x%08x", sdkPath.c_str(), unsigned(hr));
@@ -324,14 +324,14 @@ namespace
 
         p.supportExplicitDisplayScaling = true;
 
-#if CAUSTICA_WITH_DX12 && defined(RTXPT_D3D_AGILITY_SDK_VERSION)
+#if CAUSTICA_WITH_DX12 && defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
         p.featureLevel = D3D_FEATURE_LEVEL_12_2;
 #elif CAUSTICA_WITH_DX12
         p.featureLevel = D3D_FEATURE_LEVEL_12_1;
 #endif
 
 #if CAUSTICA_WITH_VULKAN
-#if RTXPT_WITH_NATIVE_DLSS
+#if CAUSTICA_WITH_NATIVE_DLSS
         caustica::render::DLSS::GetRequiredVulkanExtensions(
             p.requiredVulkanInstanceExtensions,
             p.requiredVulkanDeviceExtensions);
@@ -371,7 +371,7 @@ namespace
     }
 }
 
-namespace rtxpt_py
+namespace caustica_py
 {
     std::string BuiltinSceneJson(const std::string& builtinModel)
     {
@@ -435,7 +435,7 @@ bool RenderSession::InitDevice()
 {
     nvrhi::GraphicsAPI api = ResolveGraphicsAPI(m_config);
 
-#if CAUSTICA_WITH_DX12 && defined(RTXPT_D3D_AGILITY_SDK_VERSION)
+#if CAUSTICA_WITH_DX12 && defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
     if (api == nvrhi::GraphicsAPI::D3D12)
         m_d3d12DeviceFactory = CreateD3D12AgilityDeviceFactory();
 #endif
@@ -449,7 +449,7 @@ bool RenderSession::InitDevice()
     m_deviceManager->SetFrameTimeUpdateInterval(1.0f);
 
     auto deviceParams = MakeDeviceParams(m_config);
-#if CAUSTICA_WITH_DX12 && defined(RTXPT_D3D_AGILITY_SDK_VERSION)
+#if CAUSTICA_WITH_DX12 && defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
     if (api == nvrhi::GraphicsAPI::D3D12 && m_d3d12DeviceFactory)
         deviceParams.d3d12DeviceFactory = m_d3d12DeviceFactory.Get();
 #endif
@@ -511,7 +511,7 @@ bool RenderSession::InitRenderer()
     auto rootFS = std::make_shared<caustica::RootFileSystem>();
     const std::filesystem::path shaderPackPath = appDirectory / (std::string("caustica.shaders.") + shaderTypeName + ".pack");
     auto shaderPackFS = std::make_shared<ShaderPackFileSystem>(shaderPackPath, "ShaderPrecompiled");
-    const bool shaderPackHasCurrentLayout = shaderPackFS->isOpen() && shaderPackFS->fileExists("app/engine/shaders/render/Misc/DebugLines_main_vs.bin");
+    const bool shaderPackHasCurrentLayout = shaderPackFS->isOpen() && shaderPackFS->fileExists("caustica/caustica/shaders/render/Misc/DebugLines_main_vs.bin");
     if (shaderPackFS->isOpen() && !shaderPackHasCurrentLayout)
     {
         caustica::warning("Shader pack '%s' does not match the current shader layout; falling back to ShaderPrecompiled directories",
@@ -525,7 +525,7 @@ bool RenderSession::InitRenderer()
     else
     {
         rootFS->mount("/ShaderPrecompiled/engine", engineShaderPath);
-        rootFS->mount("/ShaderPrecompiled/app",   appShaderPath);
+        rootFS->mount("/ShaderPrecompiled/caustica", appShaderPath);
         rootFS->mount("/ShaderPrecompiled/nrd",   nrdShaderPath);
         rootFS->mount("/ShaderPrecompiled/omm",   ommShaderPath);
     }
@@ -742,4 +742,4 @@ void RenderSession::SetCameraIntrinsics(float fx, float fy, float cx, float cy, 
         m_renderer->SetCameraIntrinsics(fx, fy, cx, cy, width, height);
 }
 
-#endif // RTXPT_WITH_PYTHON
+#endif // CAUSTICA_WITH_PYTHON

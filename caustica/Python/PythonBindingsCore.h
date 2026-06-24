@@ -10,13 +10,13 @@
 
 #pragma once
 
-#if RTXPT_WITH_PYTHON
+#if CAUSTICA_WITH_PYTHON
 
 #include <nanobind/nanobind.h>
 
 class Sample;
 
-namespace rtxpt_py
+namespace caustica_py
 {
     // Registers Material / Light / Settings / Sample type bindings into `m`.
     // Module-level free functions like `app()` / `settings()` are added by
@@ -28,4 +28,4 @@ namespace rtxpt_py
 // before Py_Initialize and consumed by PythonBindings_Embed.cpp.
 extern Sample* g_pythonSampleSingleton;
 
-#endif // RTXPT_WITH_PYTHON
+#endif // CAUSTICA_WITH_PYTHON

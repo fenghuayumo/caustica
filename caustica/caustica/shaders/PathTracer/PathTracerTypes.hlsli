@@ -48,12 +48,12 @@ namespace PathTracer
         float3          prevPosW;                           // <-- consider storing delta instead of prevPosW and then fp16 might be enough
 #endif
         lpfloat         interiorIoR;    // a.k.a. material IoR
-#if !RTXPT_USE_APPROXIMATE_MIS
-#if !defined(RTXPT_MATERIAL_IS_EMISSIVE) || RTXPT_MATERIAL_IS_EMISSIVE
+#if !CAUSTICA_USE_APPROXIMATE_MIS
+#if !defined(CAUSTICA_MATERIAL_IS_EMISSIVE) || CAUSTICA_MATERIAL_IS_EMISSIVE
         uint            neeTriangleLightIndex;  // 0xFFFFFFFF if none
 #endif
 #endif
-#if !defined(RTXPT_MATERIAL_IS_ANALYTIC_LIGHT_PROXY) || RTXPT_MATERIAL_IS_ANALYTIC_LIGHT_PROXY
+#if !defined(CAUSTICA_MATERIAL_IS_ANALYTIC_LIGHT_PROXY) || CAUSTICA_MATERIAL_IS_ANALYTIC_LIGHT_PROXY
         uint            neeAnalyticLightIndex;  // 0xFFFFFFFF if none
 #endif
         static SurfaceData make( ShadingData shadingData, ActiveBSDF bsdf, 
@@ -69,12 +69,12 @@ namespace PathTracer
             ret.prevPosW                = prevPosW; 
 #endif
             ret.interiorIoR             = interiorIoR; 
-#if !RTXPT_USE_APPROXIMATE_MIS
-#if !defined(RTXPT_MATERIAL_IS_EMISSIVE) || RTXPT_MATERIAL_IS_EMISSIVE
+#if !CAUSTICA_USE_APPROXIMATE_MIS
+#if !defined(CAUSTICA_MATERIAL_IS_EMISSIVE) || CAUSTICA_MATERIAL_IS_EMISSIVE
             ret.neeTriangleLightIndex   = neeTriangleLightIndex;
 #endif
 #endif
-#if !defined(RTXPT_MATERIAL_IS_ANALYTIC_LIGHT_PROXY) || RTXPT_MATERIAL_IS_ANALYTIC_LIGHT_PROXY
+#if !defined(CAUSTICA_MATERIAL_IS_ANALYTIC_LIGHT_PROXY) || CAUSTICA_MATERIAL_IS_ANALYTIC_LIGHT_PROXY
             ret.neeAnalyticLightIndex   = neeAnalyticLightIndex;
 #endif
             return ret; 
@@ -114,8 +114,8 @@ namespace PathTracer
             ret.SkipEmissiveBRDF         = (packed & (1 << 14)) != 0;
 #endif
             ret.LightSamplingIsSSC      = (packed & (1 << 13)) != 0;
-            ret.CandidateSamples        = (packed >> 6) & 0x3F;        // ensured to fit with RTXPT_LIGHTING_MAX_SAMPLE_COUNT
-            ret.FullSamples             = (packed) & 0x3F;             // ensured to fit with RTXPT_LIGHTING_MAX_SAMPLE_COUNT
+            ret.CandidateSamples        = (packed >> 6) & 0x3F;        // ensured to fit with CAUSTICA_LIGHTING_MAX_SAMPLE_COUNT
+            ret.FullSamples             = (packed) & 0x3F;             // ensured to fit with CAUSTICA_LIGHTING_MAX_SAMPLE_COUNT
             return ret;
         }
 
@@ -127,8 +127,8 @@ namespace PathTracer
             packed |= ((SkipEmissiveBRDF?1:0)           << 14);
 #endif
             packed |= ((LightSamplingIsSSC?1:0)    << 13);
-            packed |= (CandidateSamples & 0x3F)        << 6;           // ensured to fit with RTXPT_LIGHTING_MAX_SAMPLE_COUNT
-            packed |= (FullSamples      & 0x3F);                       // ensured to fit with RTXPT_LIGHTING_MAX_SAMPLE_COUNT
+            packed |= (CandidateSamples & 0x3F)        << 6;           // ensured to fit with CAUSTICA_LIGHTING_MAX_SAMPLE_COUNT
+            packed |= (FullSamples      & 0x3F);                       // ensured to fit with CAUSTICA_LIGHTING_MAX_SAMPLE_COUNT
             return packed;
         }
 
@@ -154,12 +154,12 @@ namespace PathTracer
 
     };
 
-#define RTXPT_NEE_RESULT_MANUAL_PACK 1
+#define CAUSTICA_NEE_RESULT_MANUAL_PACK 1
 
     // Output part of the interface to the path tracer - this will likely change over time.
     struct NEEResult
     {
-#if RTXPT_NEE_RESULT_MANUAL_PACK
+#if CAUSTICA_NEE_RESULT_MANUAL_PACK
         uint2       RadianceAndSpecAvgPkg;
 #else
         float4      RadianceAndSpecAvg;             // note: these are also multiplied by path.thp so far
@@ -171,7 +171,7 @@ namespace PathTracer
         static NEEResult empty() 
         { 
             NEEResult ret;
-#if RTXPT_NEE_RESULT_MANUAL_PACK
+#if CAUSTICA_NEE_RESULT_MANUAL_PACK
             ret.RadianceAndSpecAvgPkg = Fp32ToFp16( float4(0,0,0,0) );
 #else
             ret.RadianceAndSpecAvg = float4(0,0,0,0);
@@ -182,14 +182,14 @@ namespace PathTracer
 
         void        AccumulateRadiance( const float3 radiance, const float specAvg )
         {
-#if RTXPT_NEE_RESULT_MANUAL_PACK
+#if CAUSTICA_NEE_RESULT_MANUAL_PACK
             RadianceAndSpecAvgPkg = Fp32ToFp16( Fp16ToFp32(RadianceAndSpecAvgPkg) + float4( radiance, specAvg ) );
 #else
             RadianceAndSpecAvg += float4( radiance, specAvg );
 #endif
         }
 
-#if RTXPT_NEE_RESULT_MANUAL_PACK
+#if CAUSTICA_NEE_RESULT_MANUAL_PACK
         float4      GetRadianceAndSpecAvg() { return Fp16ToFp32(RadianceAndSpecAvgPkg); }
 #else
         float4      GetRadianceAndSpecAvg() { return RadianceAndSpecAvg; }

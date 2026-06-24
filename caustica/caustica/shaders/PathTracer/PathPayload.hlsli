@@ -37,7 +37,7 @@ PathPayload PathPayload::pack(const PathState path)
 #endif
 
     // 3
-#if RTXPT_NESTED_DIELECTRICS_QUALITY > 0
+#if CAUSTICA_NESTED_DIELECTRICS_QUALITY > 0
     p.packed[3].xy = uint2(path.interiorList.slots[0], path.interiorList.slots[1]); // all 32 bits necessary
 #else
     p.packed[3].xy = 0;
@@ -83,7 +83,7 @@ PathState PathPayload::unpack(const PathPayload p)
 #endif
 
     // 3
-#if RTXPT_NESTED_DIELECTRICS_QUALITY > 0
+#if CAUSTICA_NESTED_DIELECTRICS_QUALITY > 0
     path.interiorList.slots[0]  = p.packed[3].x;
     path.interiorList.slots[1]  = p.packed[3].y;
 #endif

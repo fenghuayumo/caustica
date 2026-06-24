@@ -81,7 +81,7 @@ SamplerState s_EnvironmentSampler                           : register(s4 VK_DES
 #define RTXDI_ENVIRONMENT_MAP t_EnvironmentMap
 #define RAB_DISTANT_LIGHT_DISTANCE DISTANT_LIGHT_DISTANCE
 
-#if !defined(RTXPT_RTXDI_RESOURCES_ONLY)
+#if !defined(CAUSTICA_RTXDI_RESOURCES_ONLY)
 
 #include "PolymorphicLightRTXDI.hlsli"
 #include <Rtxdi/Utils/BrdfRaySample.hlsli>
@@ -187,7 +187,7 @@ void AnyHit(inout RayPayload payload : SV_RayPayload, in RayAttributes attrib : 
 RayHitInfo TraceVisibilityRay(RaytracingAccelerationStructure accelStruct, RayDesc ray, bool includeGaussianSplatShadows)
 {
 #if USE_RAY_QUERY
-    RTXPT_RayQuery(RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, RTXPT_FLAG_ALLOW_OPACITY_MICROMAPS) rayQuery;
+    CAUSTICA_RayQuery(RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, CAUSTICA_FLAG_ALLOW_OPACITY_MICROMAPS) rayQuery;
     rayQuery.TraceRayInline(accelStruct, RAY_FLAG_NONE, 0xff, ray);
 
     while (rayQuery.Proceed())
@@ -803,7 +803,7 @@ RAB_RayPayload RAB_TraceNextBounce(RayDesc ray)
     payload.instanceIndex = ~0u;
 
 #if USE_RAY_QUERY
-    RTXPT_RayQuery(RAY_FLAG_NONE, RTXPT_FLAG_ALLOW_OPACITY_MICROMAPS) rayQuery;
+    CAUSTICA_RayQuery(RAY_FLAG_NONE, CAUSTICA_FLAG_ALLOW_OPACITY_MICROMAPS) rayQuery;
     rayQuery.TraceRayInline(SceneBVH, RAY_FLAG_NONE, INSTANCE_MASK_ALL, ray);
 
     while (rayQuery.Proceed())
@@ -1086,6 +1086,6 @@ RAB_Surface RAB_GetMaterial(RAB_Surface currentSurface)
 
 #endif // RTXDI_WITH_RESTIR_GI
 
-#endif // #if !defined(RTXPT_RTXDI_RESOURCES_ONLY)
+#endif // #if !defined(CAUSTICA_RTXDI_RESOURCES_ONLY)
 
 #endif // RTXDI_APPLICATION_BRIDGE_HLSLI

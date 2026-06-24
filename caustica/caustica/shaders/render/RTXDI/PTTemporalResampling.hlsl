@@ -13,7 +13,7 @@
 #include <Rtxdi/PT/BoilingFilter.hlsli>
 #include <Rtxdi/PT/TemporalResampling.hlsli>
 
-float3 RTXPT_RtxdiPT_LoadMotionVector(uint2 pixelPosition)
+float3 CAUSTICA_RtxdiPT_LoadMotionVector(uint2 pixelPosition)
 {
     float3 motionVector = u_MotionVectors[pixelPosition].xyz;
     return convertMotionVectorToPixelSpace(g_Const.view, g_Const.previousView, pixelPosition, motionVector);
@@ -25,7 +25,7 @@ void main(uint2 globalIndex : SV_DispatchThreadID, uint2 localIndex : SV_GroupTh
     RTXDI_PTTemporalResamplingRuntimeParameters runtimeParams = RTXDI_EmptyPTTemporalResamplingRuntimeParameters();
     runtimeParams.pixelPosition = RTXDI_ReservoirPosToPixelPos(globalIndex, g_RtxdiBridgeConst.runtimeParams.activeCheckerboardField);
     runtimeParams.reservoirPosition = RTXDI_PixelPosToReservoirPos(runtimeParams.pixelPosition, g_RtxdiBridgeConst.runtimeParams.activeCheckerboardField);
-    runtimeParams.motionVector = RTXPT_RtxdiPT_LoadMotionVector(runtimeParams.pixelPosition);
+    runtimeParams.motionVector = CAUSTICA_RtxdiPT_LoadMotionVector(runtimeParams.pixelPosition);
     runtimeParams.cameraPos = g_Const.ptConsts.camera.PosW;
     runtimeParams.prevCameraPos = g_Const.ptConsts.prevCamera.PosW;
     runtimeParams.prevPrevCameraPos = g_Const.ptConsts.prevCamera.PosW;

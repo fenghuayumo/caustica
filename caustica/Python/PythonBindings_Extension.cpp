@@ -4,7 +4,7 @@
 //
 //    python -c "import caustica; r = caustica.Renderer(headless=True); ..."
 
-#if RTXPT_WITH_PYTHON
+#if CAUSTICA_WITH_PYTHON
 
 #include "PythonBindingsCore.h"
 #include "RenderSession.h"
@@ -175,7 +175,7 @@ NB_MODULE(caustica, m)
 {
     m.doc() = "caustica Python extension - drive the path-tracer for offline rendering.";
 
-    rtxpt_py::RegisterCoreBindings(m);
+    caustica_py::RegisterCoreBindings(m);
 
     nb::class_<PyRenderer>(m, "Renderer",
         "Standalone path-tracer renderer.  Each instance owns its own GPU\n"
@@ -311,7 +311,7 @@ NB_MODULE(caustica, m)
           nb::rv_policy::reference,
           "Shortcut for the global Settings (same as Renderer.settings).");
 
-    m.def("builtin_scene_json", &rtxpt_py::BuiltinSceneJson,
+    m.def("builtin_scene_json", &caustica_py::BuiltinSceneJson,
           nb::arg("builtin_model") = std::string("plane_cube"),
           "Return a minimal inline scene JSON string for builtin primitive models\n"
           "('plane', 'cube', 'sphere', or 'plane_cube').");
@@ -319,4 +319,4 @@ NB_MODULE(caustica, m)
     m.attr("MODE") = "extension";
 }
 
-#endif // RTXPT_WITH_PYTHON
+#endif // CAUSTICA_WITH_PYTHON

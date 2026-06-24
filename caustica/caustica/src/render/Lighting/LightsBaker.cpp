@@ -86,7 +86,7 @@ void LightsBaker::CreateRenderPasses(std::shared_ptr<caustica::ShaderFactory> sh
     std::vector<caustica::ShaderMacro> shaderMacros;
     //shaderMacros.push_back(caustica::ShaderMacro({              "BLEND_DEBUG_BUFFER", "1" }));
 
-    const char * shaderFile = "app/engine/shaders/render/Lighting/LightsBaker.hlsl";
+    const char * shaderFile = "caustica/shaders/render/Lighting/LightsBaker.hlsl";
         
     {
         nvrhi::BindingLayoutDesc layoutDesc;
@@ -220,12 +220,12 @@ void LightsBaker::CreateRenderPasses(std::shared_ptr<caustica::ShaderFactory> sh
         m_controlBuffer = m_device->createBuffer(bufferDesc);
 
         // Lights buffer
-        bufferDesc.byteSize = sizeof(PolymorphicLightInfo) * RTXPT_LIGHTING_MAX_LIGHTS;
+        bufferDesc.byteSize = sizeof(PolymorphicLightInfo) * CAUSTICA_LIGHTING_MAX_LIGHTS;
         bufferDesc.structStride = sizeof(PolymorphicLightInfo);
         bufferDesc.debugName = "LightsBuffer";
         m_lightsBuffer = m_device->createBuffer(bufferDesc);
         
-        bufferDesc.byteSize = sizeof(PolymorphicLightInfoEx) * RTXPT_LIGHTING_MAX_LIGHTS;
+        bufferDesc.byteSize = sizeof(PolymorphicLightInfoEx) * CAUSTICA_LIGHTING_MAX_LIGHTS;
         bufferDesc.structStride = sizeof(PolymorphicLightInfoEx);
         bufferDesc.debugName = "LightsExBuffer";
         m_lightsExBuffer = m_device->createBuffer(bufferDesc);
@@ -245,7 +245,7 @@ void LightsBaker::CreateRenderPasses(std::shared_ptr<caustica::ShaderFactory> sh
         bufferDesc.canHaveTypedViews = true;
         bufferDesc.canHaveRawViews = false;
         
-        bufferDesc.byteSize = 2 * sizeof(float) * RTXPT_LIGHTING_WEIGHTS_COUNT_HALF;
+        bufferDesc.byteSize = 2 * sizeof(float) * CAUSTICA_LIGHTING_WEIGHTS_COUNT_HALF;
         bufferDesc.format = nvrhi::Format::R32_FLOAT;
         bufferDesc.debugName = "LightsWeights";
         m_lightWeights = m_device->createBuffer(bufferDesc);
@@ -258,9 +258,9 @@ void LightsBaker::CreateRenderPasses(std::shared_ptr<caustica::ShaderFactory> sh
         bufferDesc.debugName = "PerLightProxyCounters";
         m_perLightProxyCounters = m_device->createBuffer(bufferDesc);
         bufferDesc.debugName = "ScratchList";
-        assert( bufferDesc.byteSize / sizeof(uint) >= (RTXPT_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT*2) );    // we need at least 2 times RTXPT_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT for temporary envmap quads stuff
+        assert( bufferDesc.byteSize / sizeof(uint) >= (CAUSTICA_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT*2) );    // we need at least 2 times CAUSTICA_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT for temporary envmap quads stuff
         m_scratchList = m_device->createBuffer(bufferDesc);
-        bufferDesc.byteSize = sizeof(uint) * RTXPT_LIGHTING_MAX_SAMPLING_PROXIES;
+        bufferDesc.byteSize = sizeof(uint) * CAUSTICA_LIGHTING_MAX_SAMPLING_PROXIES;
         bufferDesc.debugName = "LightSamplingProxies";
         m_lightSamplingProxies = m_device->createBuffer(bufferDesc);
 
@@ -312,7 +312,7 @@ void LightsBaker::CreateRenderPasses(std::shared_ptr<caustica::ShaderFactory> sh
         m_NEE_AT_FeedbackTotalWeight = m_device->createTexture(desc);
         desc.debugName = "NEE_AT_FeedbackTotalWeightScratch";
         m_NEE_AT_FeedbackTotalWeightScratch = m_device->createTexture(desc);
-        nvrhi::TextureDesc miniDesc = desc; miniDesc.width = div_ceil(desc.width, RTXPT_NEEAT_EARLY_FEEDBACK_TILE_SIZE); miniDesc.height = div_ceil(desc.height, RTXPT_NEEAT_EARLY_FEEDBACK_TILE_SIZE);
+        nvrhi::TextureDesc miniDesc = desc; miniDesc.width = div_ceil(desc.width, CAUSTICA_NEEAT_EARLY_FEEDBACK_TILE_SIZE); miniDesc.height = div_ceil(desc.height, CAUSTICA_NEEAT_EARLY_FEEDBACK_TILE_SIZE);
         desc.debugName = "NEE_AT_EarlyFeedbackTotalWeightScratch";
         m_NEE_AT_FeedbackTotalWeightBlended = m_device->createTexture(miniDesc);
         m_NEE_AT_FeedbackBufferFilled = false;
@@ -321,16 +321,16 @@ void LightsBaker::CreateRenderPasses(std::shared_ptr<caustica::ShaderFactory> sh
         m_NEE_AT_FeedbackCandidates = m_device->createTexture(desc);
         desc.debugName = "NEE_AT_FeedbackCandidatesScratch";
         m_NEE_AT_FeedbackCandidatesScratch = m_device->createTexture(desc);
-        miniDesc = desc; miniDesc.width = div_ceil(desc.width, RTXPT_NEEAT_EARLY_FEEDBACK_TILE_SIZE); miniDesc.height = div_ceil(desc.height, RTXPT_NEEAT_EARLY_FEEDBACK_TILE_SIZE);
+        miniDesc = desc; miniDesc.width = div_ceil(desc.width, CAUSTICA_NEEAT_EARLY_FEEDBACK_TILE_SIZE); miniDesc.height = div_ceil(desc.height, CAUSTICA_NEEAT_EARLY_FEEDBACK_TILE_SIZE);
         desc.debugName = "NEE_AT_EarlyFeedbackCandidatesScratch";
         m_NEE_AT_FeedbackCandidatesBlended = m_device->createTexture(miniDesc);
 
         {
-            m_localSamplingBufferWidth  = dm::div_ceil(renderResolution.x, RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE);
-            m_localSamplingBufferHeight = dm::div_ceil(renderResolution.y, RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE);
+            m_localSamplingBufferWidth  = dm::div_ceil(renderResolution.x, CAUSTICA_LIGHTING_SAMPLING_BUFFER_TILE_SIZE);
+            m_localSamplingBufferHeight = dm::div_ceil(renderResolution.y, CAUSTICA_LIGHTING_SAMPLING_BUFFER_TILE_SIZE);
             m_localSamplingBufferWidth  += 1;   // add border to accommodate for jitter offset for the local sampling buffers
             m_localSamplingBufferHeight += 1;   // add border to accommodate for jitter offset for the local sampling buffers
-            // m_localSamplingBufferDepth          = RTXPT_LIGHTING_LOCAL_PROXY_COUNT
+            // m_localSamplingBufferDepth          = CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT
             nvrhi::BufferDesc bufferDesc;
             bufferDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
             bufferDesc.keepInitialState = true;
@@ -344,7 +344,7 @@ void LightsBaker::CreateRenderPasses(std::shared_ptr<caustica::ShaderFactory> sh
         }
 
 
-        assert(RTXPT_LIGHTING_SAMPLING_BUFFER_WINDOW_SIZE>=RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE && ((RTXPT_LIGHTING_SAMPLING_BUFFER_WINDOW_SIZE-RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE)%2==0));
+        assert(CAUSTICA_LIGHTING_SAMPLING_BUFFER_WINDOW_SIZE>=CAUSTICA_LIGHTING_SAMPLING_BUFFER_TILE_SIZE && ((CAUSTICA_LIGHTING_SAMPLING_BUFFER_WINDOW_SIZE-CAUSTICA_LIGHTING_SAMPLING_BUFFER_TILE_SIZE)%2==0));
     }
 
     m_allocatedVRAM = 0;
@@ -590,9 +590,9 @@ static PolymorphicLightInfoFull ConvertGaussianSplatEmissionProxy(
 // #endif
 bool LightsBaker::CollectEnvmapLightPlaceholders(const BakeSettings & settings, LightingControlData & ctrlBuff, std::vector<PolymorphicLightInfo> & outLightBuffer, std::vector<PolymorphicLightInfoEx> & outLightExBuffer, std::vector<uint> & outLightHistoryRemapCurrentToPastBuffer, std::vector<uint> & outLightHistoryRemapPastToCurrent)
 {
-    ctrlBuff.EnvmapQuadNodeCount += RTXPT_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT;
-    ctrlBuff.TotalLightCount += RTXPT_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT;
-    assert( ctrlBuff.TotalLightCount < RTXPT_LIGHTING_MAX_LIGHTS );
+    ctrlBuff.EnvmapQuadNodeCount += CAUSTICA_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT;
+    ctrlBuff.TotalLightCount += CAUSTICA_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT;
+    assert( ctrlBuff.TotalLightCount < CAUSTICA_LIGHTING_MAX_LIGHTS );
 
     assert( outLightBuffer.size() == 0 );
     assert( outLightExBuffer.size() == 0 );
@@ -601,12 +601,12 @@ bool LightsBaker::CollectEnvmapLightPlaceholders(const BakeSettings & settings, 
     PolymorphicLightInfo dummy; memset(&dummy, 0, sizeof(dummy));
     PolymorphicLightInfoEx dummyEx; memset(&dummyEx, 0, sizeof(dummyEx));
     dummy.ColorTypeAndFlags = (uint32_t)PolymorphicLightType::kEnvironmentQuad << kPolymorphicLightTypeShift;   // no need to fill this, it will be completely overwritten
-    outLightBuffer.insert( outLightBuffer.end(), RTXPT_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT, dummy );
-    outLightExBuffer.insert( outLightExBuffer.end(), RTXPT_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT, dummyEx );
+    outLightBuffer.insert( outLightBuffer.end(), CAUSTICA_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT, dummy );
+    outLightExBuffer.insert( outLightExBuffer.end(), CAUSTICA_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT, dummyEx );
 
-    outLightHistoryRemapCurrentToPastBuffer.insert(outLightHistoryRemapCurrentToPastBuffer.end(), RTXPT_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT, RTXPT_INVALID_LIGHT_INDEX);
-    outLightHistoryRemapPastToCurrent.insert(outLightHistoryRemapPastToCurrent.end(), ctrlBuff.EnvmapQuadNodeCount, RTXPT_INVALID_LIGHT_INDEX);
-    return ctrlBuff.TotalLightCount < RTXPT_LIGHTING_MAX_LIGHTS;
+    outLightHistoryRemapCurrentToPastBuffer.insert(outLightHistoryRemapCurrentToPastBuffer.end(), CAUSTICA_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT, CAUSTICA_INVALID_LIGHT_INDEX);
+    outLightHistoryRemapPastToCurrent.insert(outLightHistoryRemapPastToCurrent.end(), ctrlBuff.EnvmapQuadNodeCount, CAUSTICA_INVALID_LIGHT_INDEX);
+    return ctrlBuff.TotalLightCount < CAUSTICA_LIGHTING_MAX_LIGHTS;
 }
 
 // #ifdef _DEBUG
@@ -619,7 +619,7 @@ bool LightsBaker::CollectAnalyticLightsCPU(const BakeSettings & settings, const 
 
     for ( auto light : allLights )
     {
-        if (outLightBuffer.size() >= RTXPT_LIGHTING_MAX_LIGHTS)
+        if (outLightBuffer.size() >= CAUSTICA_LIGHTING_MAX_LIGHTS)
         {
             assert(false); // no more room for lights!
             break;
@@ -648,7 +648,7 @@ bool LightsBaker::CollectAnalyticLightsCPU(const BakeSettings & settings, const 
             outLightExBuffer.back().UniqueID = Hash32Combine( uint(lightHash>>32), uint(lightHash&0xFFFFFFFFULL) ); // this is only used for debug view coloring and validation
             
 #ifdef HASH_LOOKUP_BASED_HISTORIC_LIGHT_SOURCE_MATCHING
-            uint historicIndex = RTXPT_INVALID_LIGHT_INDEX;
+            uint historicIndex = CAUSTICA_INVALID_LIGHT_INDEX;
             auto entry = m_historyRemapAnalyticLightIndices.find(lightHash);
             if( entry != m_historyRemapAnalyticLightIndices.end() )
             {
@@ -674,12 +674,12 @@ bool LightsBaker::CollectAnalyticLightsCPU(const BakeSettings & settings, const 
     }
 
     // use current-to-past to create past-to-current: 1st init past-to-current values to invalid; then fill them up for those we can find historic match
-    uint startingLight = (uint)outLightHistoryRemapPastToCurrent.size(); assert( startingLight == RTXPT_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT ); // we know we should have envmap placeholders set up before so do sanity check
-    outLightHistoryRemapPastToCurrent.insert(outLightHistoryRemapPastToCurrent.end(), ctrlBuff.AnalyticLightCount, RTXPT_INVALID_LIGHT_INDEX);
+    uint startingLight = (uint)outLightHistoryRemapPastToCurrent.size(); assert( startingLight == CAUSTICA_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT ); // we know we should have envmap placeholders set up before so do sanity check
+    outLightHistoryRemapPastToCurrent.insert(outLightHistoryRemapPastToCurrent.end(), ctrlBuff.AnalyticLightCount, CAUSTICA_INVALID_LIGHT_INDEX);
     for( uint lightIndex = startingLight; lightIndex < outLightHistoryRemapCurrentToPastBuffer.size(); lightIndex++ )
     {
         uint historicIndex = outLightHistoryRemapCurrentToPastBuffer[lightIndex];
-        if( historicIndex != RTXPT_INVALID_LIGHT_INDEX )
+        if( historicIndex != CAUSTICA_INVALID_LIGHT_INDEX )
             outLightHistoryRemapPastToCurrent[historicIndex] = lightIndex;
     }
 
@@ -703,7 +703,7 @@ bool LightsBaker::CollectGaussianSplatEmissionProxies(
 
     for (uint32_t proxyIndex = 0; proxyIndex < proxies.size(); ++proxyIndex)
     {
-        if (outLightBuffer.size() >= RTXPT_LIGHTING_MAX_LIGHTS)
+        if (outLightBuffer.size() >= CAUSTICA_LIGHTING_MAX_LIGHTS)
         {
             allGood = false;
             break;
@@ -717,8 +717,8 @@ bool LightsBaker::CollectGaussianSplatEmissionProxies(
 
         outLightBuffer.push_back(lightPackedFull.Base);
         outLightExBuffer.push_back(lightPackedFull.Extended);
-        outLightHistoryRemapCurrentToPast.push_back(RTXPT_INVALID_LIGHT_INDEX);
-        outLightHistoryRemapPastToCurrent.push_back(RTXPT_INVALID_LIGHT_INDEX);
+        outLightHistoryRemapCurrentToPast.push_back(CAUSTICA_INVALID_LIGHT_INDEX);
+        outLightHistoryRemapPastToCurrent.push_back(CAUSTICA_INVALID_LIGHT_INDEX);
 
         ctrlBuff.AnalyticLightCount++;
         ctrlBuff.TotalLightCount++;
@@ -786,7 +786,7 @@ bool LightsBaker::ProcessEmissiveGeometry( const BakeSettings & settings, const 
             PTMaterial & materialPT = *PTMaterial::SafeCast(geometry->material);
 
             // this has nothing to do with emissive materials, it's instead a mechanism used to evaluate specific analytic light after hitting this mesh
-            uint analyticProxyLightIndex = RTXPT_INVALID_LIGHT_INDEX;
+            uint analyticProxyLightIndex = CAUSTICA_INVALID_LIGHT_INDEX;
             if (materialPT.EnableAsAnalyticLightProxy)
             {
                 // this is the first way to set proxy lights
@@ -811,7 +811,7 @@ bool LightsBaker::ProcessEmissiveGeometry( const BakeSettings & settings, const 
                 }
 
                 // this is the second way to set proxy lights - via light marking the nodes
-                if (analyticProxyLightIndex == RTXPT_INVALID_LIGHT_INDEX )
+                if (analyticProxyLightIndex == CAUSTICA_INVALID_LIGHT_INDEX )
                 {
                     auto proxyLight = instanceEx->ProxiedAnalyticLight.lock();
                     if (proxyLight != nullptr && proxyLight->LightLink.LastUpdateTag == settings.FrameIndex)
@@ -819,10 +819,10 @@ bool LightsBaker::ProcessEmissiveGeometry( const BakeSettings & settings, const 
                 }
             }
 
-            // now set the convertedLightIndex into subInstanceData - if RTXPT_INVALID_LIGHT_INDEX that's fine, nothing happens
+            // now set the convertedLightIndex into subInstanceData - if CAUSTICA_INVALID_LIGHT_INDEX that's fine, nothing happens
             subInstanceData[subInstanceIndex].AnalyticProxyLightIndex = analyticProxyLightIndex;
 
-            bool overflow = (ctrlBuff.TotalLightCount + (geometry->numIndices / 3) >= RTXPT_LIGHTING_MAX_LIGHTS);
+            bool overflow = (ctrlBuff.TotalLightCount + (geometry->numIndices / 3) >= CAUSTICA_LIGHTING_MAX_LIGHTS);
             allGood &= !overflow;
 
             if (!materialPT.IsEmissive() || materialPT.SkipRender || overflow)
@@ -837,7 +837,7 @@ bool LightsBaker::ProcessEmissiveGeometry( const BakeSettings & settings, const 
             }
 
 #ifdef HASH_LOOKUP_BASED_HISTORIC_LIGHT_SOURCE_MATCHING
-            uint historicBufferOffset = RTXPT_INVALID_LIGHT_INDEX;
+            uint historicBufferOffset = CAUSTICA_INVALID_LIGHT_INDEX;
             auto entry = m_historyRemapEmissiveLightBlockOffsets.find(instanceHash);
             if (entry != m_historyRemapEmissiveLightBlockOffsets.end())
             {
@@ -886,7 +886,7 @@ bool LightsBaker::ProcessEmissiveGeometry( const BakeSettings & settings, const 
                 ctrlBuff.TotalLightCount += taskTriangleCount;
                 ctrlBuff.TriangleLightCount += taskTriangleCount;
 
-                if( historicBufferOffset != RTXPT_INVALID_LIGHT_INDEX )
+                if( historicBufferOffset != CAUSTICA_INVALID_LIGHT_INDEX )
                     historicBufferOffset += taskTriangleCount;
             }
         }
@@ -1027,7 +1027,7 @@ void LightsBaker::UpdateLocalJitter()
         m_localJitterF[0] = fmodf(m_localJitterF[0] + a1, 1.0f);
         m_localJitterF[1] = fmodf(m_localJitterF[1] + a2, 1.0f);
 
-        m_localJitter = dm::clamp(uint2(m_localJitterF * (float)RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE), uint2(0, 0), uint2(RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - 1, RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - 1));
+        m_localJitter = dm::clamp(uint2(m_localJitterF * (float)CAUSTICA_LIGHTING_SAMPLING_BUFFER_TILE_SIZE), uint2(0, 0), uint2(CAUSTICA_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - 1, CAUSTICA_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - 1));
     }
 }
 
@@ -1153,13 +1153,13 @@ void LightsBaker::UpdateBegin(nvrhi::ICommandList* commandList, caustica::Bindin
     // collect all emissive triangles and other geometry specific work - this builds batch jobs on the CPU that are executed on the GPU later, but at the end of this step we know the exact number of added emissive triangles (even though some might be black)
     m_noOverflow &= ProcessEmissiveGeometry(m_currentSettings, scene, subInstanceData, ctrlBuff, *m_scratchTaskBuffer);
     bakerConsts.TriangleLightTaskCount = (int)(*m_scratchTaskBuffer).size();
-    assert( ctrlBuff.EnvmapQuadNodeCount == RTXPT_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT );
-    assert( ctrlBuff.TotalLightCount == ctrlBuff.EnvmapQuadNodeCount + ctrlBuff.AnalyticLightCount + ctrlBuff.TriangleLightCount ); assert(ctrlBuff.TotalLightCount <= RTXPT_LIGHTING_MAX_LIGHTS);
+    assert( ctrlBuff.EnvmapQuadNodeCount == CAUSTICA_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT );
+    assert( ctrlBuff.TotalLightCount == ctrlBuff.EnvmapQuadNodeCount + ctrlBuff.AnalyticLightCount + ctrlBuff.TriangleLightCount ); assert(ctrlBuff.TotalLightCount <= CAUSTICA_LIGHTING_MAX_LIGHTS);
     ctrlBuff.HistoricTotalLightCount = m_historicTotalLightCount;
     m_historicTotalLightCount = ctrlBuff.TotalLightCount;
 
-    bakerConsts.CurrentWeightsBufferOffset  = (m_ping) ? 0 : RTXPT_LIGHTING_WEIGHTS_COUNT_HALF;
-    bakerConsts.HistoricWeightsBufferOffset = (m_ping) ? RTXPT_LIGHTING_WEIGHTS_COUNT_HALF : 0;
+    bakerConsts.CurrentWeightsBufferOffset  = (m_ping) ? 0 : CAUSTICA_LIGHTING_WEIGHTS_COUNT_HALF;
+    bakerConsts.HistoricWeightsBufferOffset = (m_ping) ? CAUSTICA_LIGHTING_WEIGHTS_COUNT_HALF : 0;
 
     // Constant & control buffers must go first
     {
@@ -1200,7 +1200,7 @@ void LightsBaker::UpdateBegin(nvrhi::ICommandList* commandList, caustica::Bindin
         RAII_SCOPE(commandList->beginMarker("EnvLightsBackupPast"); , commandList->endMarker(); );
 
         commandList->setBufferState(m_lightsBuffer, nvrhi::ResourceStates::UnorderedAccess); // very likely unnecessary in practice, but the old lightsBuffer is read in this pass
-        m_envLightsBackupPast.Execute(commandList, div_ceil(RTXPT_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT, LLB_NUM_COMPUTE_THREADS), 1, 1, bindingSet);
+        m_envLightsBackupPast.Execute(commandList, div_ceil(CAUSTICA_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT, LLB_NUM_COMPUTE_THREADS), 1, 1, bindingSet);
     }
 
     // empty emissive and analytic lights get copied over first - they've been fully processed on the CPU
@@ -1231,13 +1231,13 @@ void LightsBaker::UpdateBegin(nvrhi::ICommandList* commandList, caustica::Bindin
 
     {
         RAII_SCOPE(commandList->beginMarker("EnvLightsSubdivideBase");, commandList->endMarker(); );
-        m_envLightsSubdivideBase.Execute(commandList, 1, 1, 1, bindingSet); //the main output goes to scratchBuffer, with RTXPT_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT offset and is consumed by EnvLightsBake
+        m_envLightsSubdivideBase.Execute(commandList, 1, 1, 1, bindingSet); //the main output goes to scratchBuffer, with CAUSTICA_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT offset and is consumed by EnvLightsBake
     }
     
     {
         RAII_SCOPE(commandList->beginMarker("EnvLightsSubdivideBoost"); , commandList->endMarker(); );
         commandList->setBufferState(m_scratchList, nvrhi::ResourceStates::UnorderedAccess);
-        m_envLightsSubdivideBoost.Execute(commandList, RTXPT_NEEAT_ENVMAP_QT_UNBOOSTED_NODE_COUNT, 1, 1, bindingSet); //the main output goes to scratchBuffer, with RTXPT_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT offset and is consumed by EnvLightsBake
+        m_envLightsSubdivideBoost.Execute(commandList, CAUSTICA_NEEAT_ENVMAP_QT_UNBOOSTED_NODE_COUNT, 1, 1, bindingSet); //the main output goes to scratchBuffer, with CAUSTICA_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT offset and is consumed by EnvLightsBake
     }
 
     // We can probably overlap this with EnvLightsSubdivide but I measure no perf benefit
@@ -1257,7 +1257,7 @@ void LightsBaker::UpdateBegin(nvrhi::ICommandList* commandList, caustica::Bindin
         
         commandList->setBufferState(m_lightsBuffer, nvrhi::ResourceStates::UnorderedAccess);
 
-        m_envLightsFillLookupMap.Execute(commandList, RTXPT_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT, 1, 1, bindings );
+        m_envLightsFillLookupMap.Execute(commandList, CAUSTICA_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT, 1, 1, bindings );
         
         commandList->setTextureState(m_envLightLookupMap, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
     }
@@ -1267,7 +1267,7 @@ void LightsBaker::UpdateBegin(nvrhi::ICommandList* commandList, caustica::Bindin
 
         commandList->setBufferState(m_scratchList, nvrhi::ResourceStates::UnorderedAccess);
 
-        m_envLightsMapPastToCurrent.Execute(commandList, div_ceil(RTXPT_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT, LLB_NUM_COMPUTE_THREADS), 1, 1, bindings );
+        m_envLightsMapPastToCurrent.Execute(commandList, div_ceil(CAUSTICA_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT, LLB_NUM_COMPUTE_THREADS), 1, 1, bindings );
 
         commandList->setBufferState(m_scratchList, nvrhi::ResourceStates::UnorderedAccess);
     }
@@ -1365,7 +1365,7 @@ void LightsBaker::UpdateBegin(nvrhi::ICommandList* commandList, caustica::Bindin
 
         commandList->setBufferState(m_controlBuffer, nvrhi::ResourceStates::UnorderedAccess);
 
-        const dm::uint  items = RTXPT_LIGHTING_MAX_SAMPLING_PROXIES; // this one is updated on GPU so it's not correct here so let's just brute force to max, compute shader will skip...
+        const dm::uint  items = CAUSTICA_LIGHTING_MAX_SAMPLING_PROXIES; // this one is updated on GPU so it's not correct here so let's just brute force to max, compute shader will skip...
         const dm::uint  itemsPerGroup = LLB_NUM_COMPUTE_THREADS;
         m_debugDrawLights.Execute(commandList, div_ceil(items, itemsPerGroup), 1, 1, bindingSet);
     }
@@ -1496,7 +1496,7 @@ bool LightsBaker::InfoGUI(float indent)
     if (TotalLightCountOverflow())
     {
         ImGui::TextColored({ 1,0.5f,0.5f,1 }, "!!WARNING - scene light count overflow!!");
-        ImGui::TextColored({ 1,0.5f,0.5f,1 }, "increase RTXPT_LIGHTING_MAX_LIGHTS (%d)", RTXPT_LIGHTING_MAX_LIGHTS);
+        ImGui::TextColored({ 1,0.5f,0.5f,1 }, "increase CAUSTICA_LIGHTING_MAX_LIGHTS (%d)", CAUSTICA_LIGHTING_MAX_LIGHTS);
     }
 
     const char* modes[] = { "Uniform", "Power+", "NEE-AT" };
@@ -1508,7 +1508,7 @@ bool LightsBaker::InfoGUI(float indent)
     ImGui::Text("   emissive tris: %d", m_lastReadback.TriangleLightCount);
     ImGui::Text("   analytic:      %d", m_lastReadback.AnalyticLightCount);
     ImGui::Text("   TOTAL:         %d", m_lastReadback.TotalLightCount);
-    ImGui::Text("(used: %.2f%% of max %d)", (m_lastReadback.TotalLightCount / (float)RTXPT_LIGHTING_MAX_LIGHTS * 100.0f), RTXPT_LIGHTING_MAX_LIGHTS );
+    ImGui::Text("(used: %.2f%% of max %d)", (m_lastReadback.TotalLightCount / (float)CAUSTICA_LIGHTING_MAX_LIGHTS * 100.0f), CAUSTICA_LIGHTING_MAX_LIGHTS );
     ImGui::Text("(proxies: %d, weightsum: %.5f)", m_lastReadback.SamplingProxyCount, m_lastReadback.WeightsSum());
 #if LLB_ENABLE_VALIDATION
     ImGui::Text("Validation:");

@@ -370,7 +370,7 @@ void ComputeShaderVariant::PrepareCompilation(std::filesystem::file_time_type la
     ShaderCompilerUtils::DxcCommandOptions options;
     options.SourceFilePath = srcFullPath;
     options.LogicalSourceFileName = m_shaderSrcFileName;
-#if RTXPT_D3D_AGILITY_SDK_VERSION >= 619
+#if CAUSTICA_D3D_AGILITY_SDK_VERSION >= 619
     options.Profile = ShaderCompilerUtils::ShaderProfile::Compute_6_9;
 #else
     options.Profile = ShaderCompilerUtils::ShaderProfile::Compute_6_6;

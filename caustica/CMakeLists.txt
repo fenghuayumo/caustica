@@ -7,8 +7,8 @@ list(FILTER shared_sources EXCLUDE REGEX "/editor/")
 list(FILTER shared_sources EXCLUDE REGEX "/Python/")
 list(FILTER shared_sources EXCLUDE REGEX "/source/")
 
-set(rtxpt_render_module_sources "")
-foreach(rtxpt_render_module
+set(caustica_render_module_sources "")
+foreach(caustica_render_module
     GPUSort
     Lighting
     Materials
@@ -19,17 +19,17 @@ foreach(rtxpt_render_module
     RTXDI
     ToneMapper
 )
-    file(GLOB_RECURSE rtxpt_render_module_files
-        "${CMAKE_CURRENT_SOURCE_DIR}/caustica/include/render/${rtxpt_render_module}/*.h"
-        "${CMAKE_CURRENT_SOURCE_DIR}/caustica/include/render/${rtxpt_render_module}/*.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/caustica/src/render/${rtxpt_render_module}/*.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/caustica/src/render/${rtxpt_render_module}/*.c"
+    file(GLOB_RECURSE caustica_render_module_files
+        "${CMAKE_CURRENT_SOURCE_DIR}/caustica/include/render/${caustica_render_module}/*.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/caustica/include/render/${caustica_render_module}/*.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/caustica/src/render/${caustica_render_module}/*.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/caustica/src/render/${caustica_render_module}/*.c"
     )
-    list(APPEND rtxpt_render_module_sources ${rtxpt_render_module_files})
+    list(APPEND caustica_render_module_sources ${caustica_render_module_files})
 endforeach()
-list(APPEND shared_sources ${rtxpt_render_module_sources})
+list(APPEND shared_sources ${caustica_render_module_sources})
 
-file(GLOB rtxpt_python_sources
+file(GLOB caustica_python_sources
     "${CMAKE_CURRENT_SOURCE_DIR}/Python/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Python/*.h"
 )
@@ -38,8 +38,8 @@ file(GLOB rtxpt_python_sources
 # embed-mode `caustica` module that lives inside caustica.exe, the other defines
 # the Python extension `caustica.pyd`).  They are added to their respective
 # targets later - never to causticaCore.
-set(rtxpt_python_core_sources ${rtxpt_python_sources})
-list(REMOVE_ITEM rtxpt_python_core_sources
+set(caustica_python_core_sources ${caustica_python_sources})
+list(REMOVE_ITEM caustica_python_core_sources
     "${CMAKE_CURRENT_SOURCE_DIR}/Python/PythonBindings_Embed.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Python/PythonBindings_Extension.cpp"
 )
@@ -81,18 +81,18 @@ if(CAUSTICA_DISTRIBUTION_BUILD)
     string(APPEND shadermake_options " --stripReflection")
 endif()
 
-if(RTXPT_D3D_AGILITY_SDK_VERSION AND (RTXPT_D3D_AGILITY_SDK_VERSION GREATER_EQUAL "619"))
+if(CAUSTICA_D3D_AGILITY_SDK_VERSION AND (CAUSTICA_D3D_AGILITY_SDK_VERSION GREATER_EQUAL "619"))
     string(APPEND shadermake_options " -m 6_9")
 endif()
 
 # SPIR-V builds cannot compile the DX12 OMM shader variants in shaders.cfg.
-set(rtxpt_shader_config_dxil "${CMAKE_CURRENT_SOURCE_DIR}/shaders.cfg")
-set(rtxpt_shader_config_vk "${CMAKE_CURRENT_SOURCE_DIR}/shaders_vk.cfg")
-file(READ "${rtxpt_shader_config_dxil}" rtxpt_shader_config_vk_contents)
-string(REGEX REPLACE "[^\n]*NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP=1[^\n]*\n?" "" rtxpt_shader_config_vk_contents "${rtxpt_shader_config_vk_contents}")
-file(WRITE "${rtxpt_shader_config_vk}" "${rtxpt_shader_config_vk_contents}")
+set(caustica_shader_config_dxil "${CMAKE_CURRENT_SOURCE_DIR}/shaders.cfg")
+set(caustica_shader_config_vk "${CMAKE_CURRENT_SOURCE_DIR}/shaders_vk.cfg")
+file(READ "${caustica_shader_config_dxil}" caustica_shader_config_vk_contents)
+string(REGEX REPLACE "[^\n]*NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP=1[^\n]*\n?" "" caustica_shader_config_vk_contents "${caustica_shader_config_vk_contents}")
+file(WRITE "${caustica_shader_config_vk}" "${caustica_shader_config_vk_contents}")
 
-set(rtxpt_shader_compile_common
+set(caustica_shader_compile_common
     TARGET caustica_shaders
     SOURCES ${shaders}
     FOLDER ${folder}
@@ -100,19 +100,19 @@ set(rtxpt_shader_compile_common
     SHADERMAKE_OPTIONS ${shadermake_options}
 )
 if (WIN32)
-    caustica_compile_shaders(${rtxpt_shader_compile_common}
-        CONFIG ${rtxpt_shader_config_dxil}
+    caustica_compile_shaders(${caustica_shader_compile_common}
+        CONFIG ${caustica_shader_config_dxil}
         DXIL ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderPrecompiled/${project}/dxil
         SHADERMAKE_OPTIONS_DXIL ${SHADERMAKE_OPTIONS_DXIL}
     )
-    caustica_compile_shaders(${rtxpt_shader_compile_common}
-        CONFIG ${rtxpt_shader_config_vk}
+    caustica_compile_shaders(${caustica_shader_compile_common}
+        CONFIG ${caustica_shader_config_vk}
         SPIRV_DXC ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderPrecompiled/${project}/spirv
         SHADERMAKE_OPTIONS_SPIRV ${SHADERMAKE_OPTIONS_SPIRV}
     )
 else()
-    caustica_compile_shaders(${rtxpt_shader_compile_common}
-        CONFIG ${rtxpt_shader_config_vk}
+    caustica_compile_shaders(${caustica_shader_compile_common}
+        CONFIG ${caustica_shader_config_vk}
         SPIRV_DXC ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderPrecompiled/${project}/spirv
         SHADERMAKE_OPTIONS_SPIRV ${SHADERMAKE_OPTIONS_SPIRV}
     )
@@ -190,17 +190,17 @@ add_custom_command(
 endif()
 
 # shader files - main caustica and localized framework shader dependencies
-set(SOURCE_DIR_RTXPT_SHADERS "${PROJECT_SOURCE_DIR}/caustica/caustica/shaders")
-set(DEST_DIR_RTXPT_SHADERS "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Source/caustica/caustica/shaders")
+set(SOURCE_DIR_CAUSTICA_SHADERS "${PROJECT_SOURCE_DIR}/caustica/caustica/shaders")
+set(DEST_DIR_CAUSTICA_SHADERS "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Source/caustica/caustica/shaders")
 # shader files - NVAPI shader dependencies
 set(SOURCE_DIR_NVAPI_SHADERS "${PROJECT_SOURCE_DIR}/External/NVAPI")
 set(DEST_DIR_NVAPI_SHADERS "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Source/External/NVAPI")
 file(GLOB SOURCE_DIR_NVAPI_SHADERS_FILES "${SOURCE_DIR_NVAPI_SHADERS}/nvHLSL*.h" "${SOURCE_DIR_NVAPI_SHADERS}/nvShader*.h")
-#message("SourceDir=${SOURCE_DIR_RTXPT_SHADERS}, DestDir=${DEST_DIR_RTXPT_SHADERS}")
+#message("SourceDir=${SOURCE_DIR_CAUSTICA_SHADERS}, DestDir=${DEST_DIR_CAUSTICA_SHADERS}")
 add_custom_target(ShaderDynamicAssets_CopyAlways
 #    OUTPUT "${DYNSH_COPY3_MARKER}" <- let this run every build; it will only update changed
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${DEST_DIR_RTXPT_SHADERS}
-    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${SOURCE_DIR_RTXPT_SHADERS} ${DEST_DIR_RTXPT_SHADERS}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${DEST_DIR_CAUSTICA_SHADERS}
+    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${SOURCE_DIR_CAUSTICA_SHADERS} ${DEST_DIR_CAUSTICA_SHADERS}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${DEST_DIR_NVAPI_SHADERS}
     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SOURCE_DIR_NVAPI_SHADERS_FILES} ${DEST_DIR_NVAPI_SHADERS}
 #    COMMAND ${CMAKE_COMMAND} -E touch "${DYNSH_COPY3_MARKER}" <- let this run every build; it will only update changed
@@ -246,28 +246,28 @@ target_include_directories(causticaCore PUBLIC
     "../External/Nrd/Include"
     ${CMAKE_SOURCE_DIR}/External/Rtxdi/Include
 )
-target_compile_definitions(causticaCore PUBLIC RTXPT_D3D12_WITH_NVAPI=$<BOOL:${NVRHI_WITH_NVAPI}>)
-target_compile_definitions(causticaCore PUBLIC RTXPT_WITH_OIDN=$<BOOL:${RTXPT_WITH_OIDN}>)
-target_compile_definitions(causticaCore PUBLIC RTXPT_WITH_PYTHON=$<BOOL:${RTXPT_WITH_PYTHON}>)
-target_compile_definitions(causticaCore PUBLIC RTXPT_WITH_NATIVE_DLSS=$<BOOL:${RTXPT_WITH_NATIVE_DLSS}>)
-if (CAUSTICA_WITH_STREAMLINE OR RTXPT_WITH_NATIVE_DLSS)
-    target_compile_definitions(causticaCore PUBLIC RTXPT_WITH_ANY_DLSS=1)
+target_compile_definitions(causticaCore PUBLIC CAUSTICA_D3D12_WITH_NVAPI=$<BOOL:${NVRHI_WITH_NVAPI}>)
+target_compile_definitions(causticaCore PUBLIC CAUSTICA_WITH_OIDN=$<BOOL:${CAUSTICA_WITH_OIDN}>)
+target_compile_definitions(causticaCore PUBLIC CAUSTICA_WITH_PYTHON=$<BOOL:${CAUSTICA_WITH_PYTHON}>)
+target_compile_definitions(causticaCore PUBLIC CAUSTICA_WITH_NATIVE_DLSS=$<BOOL:${CAUSTICA_WITH_NATIVE_DLSS}>)
+if (CAUSTICA_WITH_STREAMLINE OR CAUSTICA_WITH_NATIVE_DLSS)
+    target_compile_definitions(causticaCore PUBLIC CAUSTICA_WITH_ANY_DLSS=1)
 else()
-    target_compile_definitions(causticaCore PUBLIC RTXPT_WITH_ANY_DLSS=0)
+    target_compile_definitions(causticaCore PUBLIC CAUSTICA_WITH_ANY_DLSS=0)
 endif()
-if (RTXPT_WITH_OIDN)
+if (CAUSTICA_WITH_OIDN)
     target_link_libraries(causticaCore PUBLIC OpenImageDenoise)
 endif()
 
 # -------------------------------------------------------------------
 # Embedded Python scripting (nanobind + CPython development library)
 # -------------------------------------------------------------------
-if (RTXPT_WITH_PYTHON AND rtxpt_python_core_sources)
+if (CAUSTICA_WITH_PYTHON AND caustica_python_core_sources)
     # Shared bindings + scripting host go into causticaCore so both the host
     # executable (embed mode) and the standalone Python extension can pull
     # them in.  The NB_MODULE() entry points themselves live in their own
     # translation units which are added later to the matching targets.
-    target_sources(causticaCore PRIVATE ${rtxpt_python_core_sources})
+    target_sources(causticaCore PRIVATE ${caustica_python_core_sources})
 
     # nanobind ships a static helper target named `nanobind-static`.  Link it
     # PUBLIC so the embed-mode entry point (compiled into caustica.exe) can use it.
@@ -281,11 +281,11 @@ if (RTXPT_WITH_PYTHON AND rtxpt_python_core_sources)
     endif()
 
     # Copy a few example python scripts next to the binary at build time
-    file(GLOB rtxpt_python_examples "${CMAKE_CURRENT_SOURCE_DIR}/Python/Examples/*.py")
-    if (rtxpt_python_examples)
+    file(GLOB caustica_python_examples "${CMAKE_CURRENT_SOURCE_DIR}/Python/Examples/*.py")
+    if (caustica_python_examples)
         add_custom_target(causticaPythonExamples ALL
             COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/PythonExamples"
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${rtxpt_python_examples} "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/PythonExamples"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${caustica_python_examples} "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/PythonExamples"
             COMMENT "Copying caustica Python example scripts"
         )
         add_dependencies(causticaCore causticaPythonExamples)
@@ -297,27 +297,27 @@ add_dependencies(causticaCore caustica_shaders nrd_shaders omm_shaders ShaderDyn
 set_target_properties(causticaCore PROPERTIES FOLDER ${folder})
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${shaders})
 # AgilitySDK support for causticaCore
-if (RTXPT_D3D_AGILITY_SDK_PATH AND RTXPT_D3D_AGILITY_SDK_VERSION)
-    if (NOT DEFINED RTXPT_D3D_AGILITY_SDK_VERSION)
-        message(FATAL_ERROR "RTXPT_D3D_AGILITY_SDK_VERSION must be defined when RTXPT_D3D_AGILITY_SDK_PATH is defined")
+if (CAUSTICA_D3D_AGILITY_SDK_PATH AND CAUSTICA_D3D_AGILITY_SDK_VERSION)
+    if (NOT DEFINED CAUSTICA_D3D_AGILITY_SDK_VERSION)
+        message(FATAL_ERROR "CAUSTICA_D3D_AGILITY_SDK_VERSION must be defined when CAUSTICA_D3D_AGILITY_SDK_PATH is defined")
     endif()
-    target_compile_definitions(causticaCore PUBLIC RTXPT_D3D_AGILITY_SDK_VERSION=${RTXPT_D3D_AGILITY_SDK_VERSION})
+    target_compile_definitions(causticaCore PUBLIC CAUSTICA_D3D_AGILITY_SDK_VERSION=${CAUSTICA_D3D_AGILITY_SDK_VERSION})
     target_compile_definitions(causticaCore PRIVATE NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP=$<BOOL:${NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP}>)
-    target_include_directories(causticaCore PRIVATE ${RTXPT_D3D_AGILITY_SDK_PATH}/build/native/include)
+    target_include_directories(causticaCore PRIVATE ${CAUSTICA_D3D_AGILITY_SDK_PATH}/build/native/include)
 endif()
 
-if (RTXPT_WITH_OIDN)
+if (CAUSTICA_WITH_OIDN)
     if (WIN32)
-        file(GLOB RTXPT_OIDN_RUNTIME_LIBS "${RTXPT_OIDN_LIBRARY_DIR}/*.dll")
+        file(GLOB CAUSTICA_OIDN_RUNTIME_LIBS "${CAUSTICA_OIDN_LIBRARY_DIR}/*.dll")
     else()
-        file(GLOB RTXPT_OIDN_RUNTIME_LIBS "${RTXPT_OIDN_LIBRARY_DIR}/*.so*")
+        file(GLOB CAUSTICA_OIDN_RUNTIME_LIBS "${CAUSTICA_OIDN_LIBRARY_DIR}/*.so*")
     endif()
 endif()
 
 # Macro to create sample executables with common settings
 macro(add_caustica_sample TARGET_NAME MAIN_SOURCE)
     set(_extra_sources "")
-    if (RTXPT_WITH_PYTHON)
+    if (CAUSTICA_WITH_PYTHON)
         # Embed-mode NB_MODULE has to live in a target that does NOT also link
         # the Python extension's entry point - hence we attach it to each
         # executable individually instead of causticaCore.
@@ -346,25 +346,25 @@ macro(add_caustica_sample TARGET_NAME MAIN_SOURCE)
         OUTPUT_NAME_RELEASE "${TARGET_NAME}"
     )
 
-    if (RTXPT_WITH_OIDN)
+    if (CAUSTICA_WITH_OIDN)
         add_custom_command(
             TARGET ${TARGET_NAME} POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${RTXPT_OIDN_RUNTIME_LIBS} "$<TARGET_FILE_DIR:${TARGET_NAME}>"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CAUSTICA_OIDN_RUNTIME_LIBS} "$<TARGET_FILE_DIR:${TARGET_NAME}>"
             COMMAND_EXPAND_LISTS
         )
     endif()
     
     # AgilitySDK support for this target
-    if (RTXPT_D3D_AGILITY_SDK_PATH AND RTXPT_D3D_AGILITY_SDK_VERSION)
-        target_compile_definitions(${project} PUBLIC RTXPT_D3D_AGILITY_SDK_VERSION=${RTXPT_D3D_AGILITY_SDK_VERSION})
+    if (CAUSTICA_D3D_AGILITY_SDK_PATH AND CAUSTICA_D3D_AGILITY_SDK_VERSION)
+        target_compile_definitions(${project} PUBLIC CAUSTICA_D3D_AGILITY_SDK_VERSION=${CAUSTICA_D3D_AGILITY_SDK_VERSION})
         add_custom_command(
             TARGET ${project} POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${project}>/D3D12/"
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${RTXPT_D3D_AGILITY_SDK_PATH}/build/native/bin/x64/D3D12Core.dll "$<TARGET_FILE_DIR:${project}>/D3D12/"
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${RTXPT_D3D_AGILITY_SDK_PATH}/build/native/bin/x64/d3d12SDKLayers.dll "$<TARGET_FILE_DIR:${project}>/D3D12/"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CAUSTICA_D3D_AGILITY_SDK_PATH}/build/native/bin/x64/D3D12Core.dll "$<TARGET_FILE_DIR:${project}>/D3D12/"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CAUSTICA_D3D_AGILITY_SDK_PATH}/build/native/bin/x64/d3d12SDKLayers.dll "$<TARGET_FILE_DIR:${project}>/D3D12/"
         )
         target_compile_definitions(${project} PRIVATE NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP=$<BOOL:${NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP}>)
-        target_include_directories(${project} PRIVATE ${RTXPT_D3D_AGILITY_SDK_PATH}/build/native/include)
+        target_include_directories(${project} PRIVATE ${CAUSTICA_D3D_AGILITY_SDK_PATH}/build/native/include)
     endif()
 endmacro()
 
@@ -379,7 +379,7 @@ add_caustica_sample(caustica "${CAUSTICA_EDITOR_ENTRY_SOURCE}")
 #                      scene='bistro-programmer-art.scene.json')
 #   r.step_until_accumulated()
 #   r.save_screenshot('frame.png')
-if (RTXPT_WITH_PYTHON AND TARGET nanobind-static)
+if (CAUSTICA_WITH_PYTHON AND TARGET nanobind-static)
     nanobind_add_module(caustica_py STABLE_ABI
         "${CMAKE_CURRENT_SOURCE_DIR}/Python/PythonBindings_Extension.cpp"
     )
@@ -403,30 +403,30 @@ if (RTXPT_WITH_PYTHON AND TARGET nanobind-static)
     )
 
     target_link_libraries(caustica_py PRIVATE causticaCore)
-    target_compile_definitions(caustica_py PRIVATE RTXPT_BUILDING_EXTENSION=1)
+    target_compile_definitions(caustica_py PRIVATE CAUSTICA_BUILDING_EXTENSION=1)
     if (MSVC)
         target_compile_options(caustica_py PRIVATE /utf-8)
     endif()
 
     add_dependencies(caustica_py caustica_shaders nrd_shaders omm_shaders ShaderDynamicAssets ShaderDynamicAssets_CopyAlways)
 
-    if (RTXPT_WITH_OIDN)
+    if (CAUSTICA_WITH_OIDN)
         add_custom_command(
             TARGET caustica_py POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${RTXPT_OIDN_RUNTIME_LIBS} "$<TARGET_FILE_DIR:caustica_py>"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CAUSTICA_OIDN_RUNTIME_LIBS} "$<TARGET_FILE_DIR:caustica_py>"
             COMMAND_EXPAND_LISTS
         )
     endif()
 
-    if (RTXPT_D3D_AGILITY_SDK_PATH AND RTXPT_D3D_AGILITY_SDK_VERSION)
-        target_compile_definitions(caustica_py PUBLIC RTXPT_D3D_AGILITY_SDK_VERSION=${RTXPT_D3D_AGILITY_SDK_VERSION})
+    if (CAUSTICA_D3D_AGILITY_SDK_PATH AND CAUSTICA_D3D_AGILITY_SDK_VERSION)
+        target_compile_definitions(caustica_py PUBLIC CAUSTICA_D3D_AGILITY_SDK_VERSION=${CAUSTICA_D3D_AGILITY_SDK_VERSION})
         add_custom_command(
             TARGET caustica_py POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:caustica_py>/D3D12/"
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${RTXPT_D3D_AGILITY_SDK_PATH}/build/native/bin/x64/D3D12Core.dll "$<TARGET_FILE_DIR:caustica_py>/D3D12/"
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${RTXPT_D3D_AGILITY_SDK_PATH}/build/native/bin/x64/d3d12SDKLayers.dll "$<TARGET_FILE_DIR:caustica_py>/D3D12/"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CAUSTICA_D3D_AGILITY_SDK_PATH}/build/native/bin/x64/D3D12Core.dll "$<TARGET_FILE_DIR:caustica_py>/D3D12/"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CAUSTICA_D3D_AGILITY_SDK_PATH}/build/native/bin/x64/d3d12SDKLayers.dll "$<TARGET_FILE_DIR:caustica_py>/D3D12/"
         )
         target_compile_definitions(caustica_py PRIVATE NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP=$<BOOL:${NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP}>)
-        target_include_directories(caustica_py PRIVATE ${RTXPT_D3D_AGILITY_SDK_PATH}/build/native/include)
+        target_include_directories(caustica_py PRIVATE ${CAUSTICA_D3D_AGILITY_SDK_PATH}/build/native/include)
     endif()
 endif()

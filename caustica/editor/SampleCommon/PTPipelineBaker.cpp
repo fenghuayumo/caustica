@@ -53,9 +53,9 @@ void PTPipelineVariant::ShaderPermutation::FromMaterialPermutation(const std::st
     for (auto& macro : msp.Macros)
         CombinedAndSpecializedMacros.push_back(macro);
     PermutationName = shortUniqueDebugID + "_" + msp.StableShaderName;
-    CombinedAndSpecializedMacros.push_back( {"RTXPT_MATERIAL_PERMUTATION_NAME", PermutationName } );  // used to rename ClosestHit (and, if any, AnyHit) to something readable in profilers and etc
+    CombinedAndSpecializedMacros.push_back( {"CAUSTICA_MATERIAL_PERMUTATION_NAME", PermutationName } );  // used to rename ClosestHit (and, if any, AnyHit) to something readable in profilers and etc
 
-    CombinedAndSpecializedMacros.push_back( {"RTXPT_SHADER_ID", std::to_string(msp.StableShaderID) } );  // used for stable shader debug coloring
+    CombinedAndSpecializedMacros.push_back( {"CAUSTICA_SHADER_ID", std::to_string(msp.StableShaderID) } );  // used for stable shader debug coloring
 }
 
 void PTPipelineVariant::ShaderPermutation::CompileIfNeeded()
@@ -139,7 +139,7 @@ void PTPipelineVariant::CompileIfNeeded_Enqueue(std::filesystem::file_time_type 
     // no further specializations for these two
     m_raygen.CombinedAndSpecializedMacros = m_combinedMacros;
     m_raygen.PermutationName = m_shortUniqueDebugID + "_raygen";
-    m_raygen.CombinedAndSpecializedMacros.push_back( {"RTXPT_PIPELINE_PERMUTATION_NAME", m_shortUniqueDebugID } );  // used to rename ClosestHit (and, if any, AnyHit) to something readable in profilers and etc
+    m_raygen.CombinedAndSpecializedMacros.push_back( {"CAUSTICA_PIPELINE_PERMUTATION_NAME", m_shortUniqueDebugID } );  // used to rename ClosestHit (and, if any, AnyHit) to something readable in profilers and etc
     
     m_ubershaderMaterial.FromMaterialPermutation( m_shortUniqueDebugID, m_combinedMacros, *baker->GetMaterialsBaker()->GetUbershader() );
 
@@ -199,7 +199,7 @@ void PTPipelineVariant::CompileIfNeeded_Enqueue(std::filesystem::file_time_type 
         //command += " -Gfp";             //  Avoid flow control
         command += " -all_resources_bound";
         hashCommand += " -all_resources_bound";
-#if RTXPT_D3D_AGILITY_SDK_VERSION >= 619
+#if CAUSTICA_D3D_AGILITY_SDK_VERSION >= 619
         command += " -T lib_6_9";
         hashCommand += " -T lib_6_9";
         //command += " -disable-payload-qualifiers";

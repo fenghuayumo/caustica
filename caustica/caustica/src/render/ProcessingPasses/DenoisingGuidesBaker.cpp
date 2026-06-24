@@ -41,9 +41,9 @@ DenoisingGuidesBaker::DenoisingGuidesBaker( nvrhi::IDevice* device, std::shared_
 
     // These need to know about the scene
     pipelineDesc.bindingLayouts = { m_bindingLayout };
-    m_csDenoiseSpecHitT.Init(m_device, *shaderFactory, "app/engine/shaders/render/ProcessingPasses/DenoisingGuidesBaker.hlsl", "DenoiseSpecHitT", std::vector<caustica::ShaderMacro>(), pipelineDesc.bindingLayouts);
-    m_csComputeAvgLayerRadiance.Init(m_device, *shaderFactory, "app/engine/shaders/render/ProcessingPasses/DenoisingGuidesBaker.hlsl", "ComputeAvgLayerRadiance", std::vector<caustica::ShaderMacro>(), pipelineDesc.bindingLayouts);
-    m_csDebugViz.Init(m_device, *shaderFactory, "app/engine/shaders/render/ProcessingPasses/DenoisingGuidesBaker.hlsl", "DebugViz", std::vector<caustica::ShaderMacro>(), pipelineDesc.bindingLayouts);
+    m_csDenoiseSpecHitT.Init(m_device, *shaderFactory, "caustica/shaders/render/ProcessingPasses/DenoisingGuidesBaker.hlsl", "DenoiseSpecHitT", std::vector<caustica::ShaderMacro>(), pipelineDesc.bindingLayouts);
+    m_csComputeAvgLayerRadiance.Init(m_device, *shaderFactory, "caustica/shaders/render/ProcessingPasses/DenoisingGuidesBaker.hlsl", "ComputeAvgLayerRadiance", std::vector<caustica::ShaderMacro>(), pipelineDesc.bindingLayouts);
+    m_csDebugViz.Init(m_device, *shaderFactory, "caustica/shaders/render/ProcessingPasses/DenoisingGuidesBaker.hlsl", "DebugViz", std::vector<caustica::ShaderMacro>(), pipelineDesc.bindingLayouts);
 
     //m_constantBuffer = m_device->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(DenoisingGuidesBakerConstants), "DenoisingGuidesBakerConstants", caustica::c_MaxRenderPassConstantBufferVersions));
 }

@@ -93,7 +93,7 @@ struct /*PAYLOAD_QUALIFIER*/ PathState
 #endif
 
     // 4th 16 bytes
-#if RTXPT_NESTED_DIELECTRICS_QUALITY > 0 || defined(__INTELLISENSE__)
+#if CAUSTICA_NESTED_DIELECTRICS_QUALITY > 0 || defined(__INTELLISENSE__)
     InteriorList interiorList   PAYLOAD_FIELD_RW_ALL;       ///< Interior list. Keeping track of a stack of materials with medium properties. Size depends on INTERIOR_LIST_SLOT_COUNT. 2 slots (8 bytes) by default.
 #endif
     uint        packedCounters  /*PAYLOAD_FIELD_RW_ALL*/;       ///< Packed counters for different types of bounces and etc., see PackedCounters.

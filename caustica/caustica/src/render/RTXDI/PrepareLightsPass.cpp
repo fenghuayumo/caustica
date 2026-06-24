@@ -106,7 +106,7 @@ void PrepareLightsPass::CreatePipeline()
 {
     caustica::debug("Initializing PrepareLightsPass...");
 
-    m_computeShader = m_shaderFactory->CreateShader("app/engine/shaders/render/RTXDI/PrepareLights.hlsl", "main", nullptr, nvrhi::ShaderType::Compute);
+    m_computeShader = m_shaderFactory->CreateShader("caustica/shaders/render/RTXDI/PrepareLights.hlsl", "main", nullptr, nvrhi::ShaderType::Compute);
 
     nvrhi::ComputePipelineDesc pipelineDesc;
     pipelineDesc.bindingLayouts = { m_bindingLayout, m_bindlessLayout };

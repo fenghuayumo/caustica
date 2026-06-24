@@ -16,7 +16,7 @@
 
 #pragma once
 
-#if RTXPT_WITH_PYTHON
+#if CAUSTICA_WITH_PYTHON
 
 #include <memory>
 #include <string>
@@ -29,7 +29,7 @@
 
 #include <SampleCommon/CommandLine.h>
 
-#if CAUSTICA_WITH_DX12 && defined(RTXPT_D3D_AGILITY_SDK_VERSION)
+#if CAUSTICA_WITH_DX12 && defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
 #include <wrl/client.h>
 #endif
 
@@ -37,7 +37,7 @@ class Sample;
 class AdvancedPathTracer;
 namespace caustica { class ShaderFactory; }
 
-namespace rtxpt_py
+namespace caustica_py
 {
     // Returns a minimal scene JSON string that references an RTXPT builtin
     // primitive model ("plane", "cube", "sphere", or "plane_cube").
@@ -120,7 +120,7 @@ private:
     std::unique_ptr<caustica::Application>         m_AppLoop;
     std::shared_ptr<caustica::ShaderFactory>   m_shaderFactory;
     std::unique_ptr<AdvancedPathTracer>             m_renderer;
-#if CAUSTICA_WITH_DX12 && defined(RTXPT_D3D_AGILITY_SDK_VERSION)
+#if CAUSTICA_WITH_DX12 && defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
     Microsoft::WRL::ComPtr<ID3D12DeviceFactory>     m_d3d12DeviceFactory;
 #endif
     bool                                            m_initialized = false;
@@ -128,4 +128,4 @@ private:
     uint32_t                                        m_lastRenderedBackBufferIndex = UINT32_MAX;
 };
 
-#endif // RTXPT_WITH_PYTHON
+#endif // CAUSTICA_WITH_PYTHON

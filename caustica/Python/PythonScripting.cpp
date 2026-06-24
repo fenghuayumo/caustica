@@ -1,6 +1,6 @@
 #include "PythonScripting.h"
 
-#if RTXPT_WITH_PYTHON
+#if CAUSTICA_WITH_PYTHON
 
 #include <core/log.h>
 
@@ -237,7 +237,7 @@ std::string PythonScripting::ConsumeOutputLog()
     return out;
 }
 
-#else // RTXPT_WITH_PYTHON
+#else // CAUSTICA_WITH_PYTHON
 
 #include <core/log.h>
 
@@ -246,7 +246,7 @@ PythonScripting::~PythonScripting() {}
 
 bool PythonScripting::Initialize()
 {
-    caustica::warning("PythonScripting: built without RTXPT_WITH_PYTHON, scripting unavailable");
+    caustica::warning("PythonScripting: built without CAUSTICA_WITH_PYTHON, scripting unavailable");
     return false;
 }
 void        PythonScripting::QueueScriptFile  (const std::filesystem::path&)             {}
@@ -255,4 +255,4 @@ void        PythonScripting::ProcessPendingScripts()                            
 std::string PythonScripting::ConsumeOutputLog ()                                         { return {}; }
 bool        PythonScripting::ExecuteImmediate (const std::string&, const std::string&)   { return false; }
 
-#endif // RTXPT_WITH_PYTHON
+#endif // CAUSTICA_WITH_PYTHON

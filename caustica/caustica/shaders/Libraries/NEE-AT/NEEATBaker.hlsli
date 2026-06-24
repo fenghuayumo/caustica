@@ -11,10 +11,10 @@
 #define LLB_PREPROCESS_BLOCK_SIZE_OUTER 16
 #define LLB_PREPROCESS_BLOCK_SIZE_INNER (LLB_PREPROCESS_BLOCK_SIZE_OUTER-2)
 
-#define RTXPT_LIGHTING_CPJ_BLOCKSIZE    1024
+#define CAUSTICA_LIGHTING_CPJ_BLOCKSIZE    1024
 
 #define LLB_MAX_TRIANGLES_PER_TASK      32
-#define LLB_MAX_PROC_TASKS              (RTXPT_LIGHTING_MAX_LIGHTS / LLB_MAX_TRIANGLES_PER_TASK * 2)
+#define LLB_MAX_PROC_TASKS              (CAUSTICA_LIGHTING_MAX_LIGHTS / LLB_MAX_TRIANGLES_PER_TASK * 2)
 struct EmissiveTrianglesProcTask
 {
     uint InstanceIndex;
@@ -28,7 +28,7 @@ struct EmissiveTrianglesProcTask
 };
 
 #define LLB_MAX_PROXIES_PER_TASK        32
-#define LLB_MAX_PROXY_PROC_TASKS        (RTXPT_LIGHTING_MAX_LIGHTS+(RTXPT_LIGHTING_MAX_SAMPLING_PROXIES+LLB_MAX_PROXIES_PER_TASK-1) / LLB_MAX_PROXIES_PER_TASK)
+#define LLB_MAX_PROXY_PROC_TASKS        (CAUSTICA_LIGHTING_MAX_LIGHTS+(CAUSTICA_LIGHTING_MAX_SAMPLING_PROXIES+LLB_MAX_PROXIES_PER_TASK-1) / LLB_MAX_PROXIES_PER_TASK)
 struct SamplingProxyBuildProcTask
 {
     uint LightIndex; // <- index into u_lightsBuffer
@@ -39,13 +39,13 @@ struct SamplingProxyBuildProcTask
 
 #define LLB_SCRATCH_BUFFER_SIZE         (32*1024*1024) // this is in bytes
 
-// count in float-s; buffer size in bytes should be 2 * sizeof(float) * RTXPT_LIGHTING_WEIGHTS_COUNT_HALF
-#define RTXPT_LIGHTING_WEIGHTS_COUNT_HALF     (RTXPT_LIGHTING_MAX_LIGHTS+1)   // +1 is purely because perLightProxyCounters needs one more to store invalid feedback; "half" is because we need 2x so we can ping-pong with historic
+// count in float-s; buffer size in bytes should be 2 * sizeof(float) * CAUSTICA_LIGHTING_WEIGHTS_COUNT_HALF
+#define CAUSTICA_LIGHTING_WEIGHTS_COUNT_HALF     (CAUSTICA_LIGHTING_MAX_LIGHTS+1)   // +1 is purely because perLightProxyCounters needs one more to store invalid feedback; "half" is because we need 2x so we can ping-pong with historic
 
 #if defined(__cplusplus)
 static_assert( sizeof(EmissiveTrianglesProcTask) * LLB_MAX_PROC_TASKS <= LLB_SCRATCH_BUFFER_SIZE ); // does it fit
 static_assert( sizeof(SamplingProxyBuildProcTask) * LLB_MAX_PROXY_PROC_TASKS <= LLB_SCRATCH_BUFFER_SIZE ); // does it fit
-static_assert( (RTXPT_LIGHTING_MAX_LIGHTS / LLB_MAX_TRIANGLES_PER_TASK * 2) <= LLB_MAX_PROC_TASKS );
+static_assert( (CAUSTICA_LIGHTING_MAX_LIGHTS / LLB_MAX_TRIANGLES_PER_TASK * 2) <= LLB_MAX_PROC_TASKS );
 #endif
 
 

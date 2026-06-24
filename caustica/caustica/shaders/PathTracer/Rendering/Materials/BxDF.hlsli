@@ -698,7 +698,7 @@ struct SpecularReflectionTransmissionMicrofacet// : IBxDF
     }
 };
 
-#define RTXPT_STANDARD_BSDF_DATA_MANUAL_PACK    0       // interesting test, not beneficial (yet!)
+#define CAUSTICA_STANDARD_BSDF_DATA_MANUAL_PACK    0       // interesting test, not beneficial (yet!)
 
 // TODO: Reduce to 52B
 /** BSDF parameters for the standard BSDF.
@@ -706,11 +706,11 @@ struct SpecularReflectionTransmissionMicrofacet// : IBxDF
 */
 struct StandardBSDFData
 {
-#if RTXPT_STANDARD_BSDF_DATA_MANUAL_PACK
+#if CAUSTICA_STANDARD_BSDF_DATA_MANUAL_PACK
     uint2       _diffuse_roughness;
     uint2       _specular_metallic;
     uint2       _transmission_eta;
-#if !defined(RTXPT_MATERIAL_HAS_TRANSMISSION) || RTXPT_MATERIAL_HAS_TRANSMISSION
+#if !defined(CAUSTICA_MATERIAL_HAS_TRANSMISSION) || CAUSTICA_MATERIAL_HAS_TRANSMISSION
     uint        _diffuseTransmission_specularTransmission;
 #endif
 #else
@@ -718,7 +718,7 @@ struct StandardBSDFData
     lpfloat     _roughness;              ///< This is the original roughness, before remapping.
     lpfloat3    _specular;               ///< Specular albedo.
     lpfloat     _metallic;               ///< Metallic parameter, blends between dielectric and conducting BSDFs.
-#if !defined(RTXPT_MATERIAL_HAS_TRANSMISSION) || RTXPT_MATERIAL_HAS_TRANSMISSION
+#if !defined(CAUSTICA_MATERIAL_HAS_TRANSMISSION) || CAUSTICA_MATERIAL_HAS_TRANSMISSION
     lpfloat3    _transmission;           ///< Transmission color.
     lpfloat     _diffuseTransmission;    ///< Diffuse transmission, blends between diffuse reflection and transmission lobes.
     lpfloat     _specularTransmission;   ///< Specular transmission, blends between opaque dielectric BRDF and specular transmissive BSDF.
@@ -735,11 +735,11 @@ struct StandardBSDFData
         lpfloat anisotropy, lpfloat fuzzWeight, lpfloat3 fuzzColor, lpfloat fuzzRoughness )
     {
         StandardBSDFData d;
-#if RTXPT_STANDARD_BSDF_DATA_MANUAL_PACK
+#if CAUSTICA_STANDARD_BSDF_DATA_MANUAL_PACK
         d._diffuse_roughness  = Fp32ToFp16(float4(diffuse, roughness));
         d._specular_metallic  = Fp32ToFp16(float4(specular, metallic));
         d._transmission_eta   = Fp32ToFp16(float4(transmission, eta));
-#if !defined(RTXPT_MATERIAL_HAS_TRANSMISSION) || RTXPT_MATERIAL_HAS_TRANSMISSION
+#if !defined(CAUSTICA_MATERIAL_HAS_TRANSMISSION) || CAUSTICA_MATERIAL_HAS_TRANSMISSION
         d._diffuseTransmission_specularTransmission = Fp32ToFp16(float2(diffuseTransmission, specularTransmission));
 #endif
 #else
@@ -748,7 +748,7 @@ struct StandardBSDFData
         d._roughness = roughness;
         d._metallic = metallic;
         d._eta = eta;
-#if !defined(RTXPT_MATERIAL_HAS_TRANSMISSION) || RTXPT_MATERIAL_HAS_TRANSMISSION
+#if !defined(CAUSTICA_MATERIAL_HAS_TRANSMISSION) || CAUSTICA_MATERIAL_HAS_TRANSMISSION
         d._transmission = transmission;
         d._diffuseTransmission = diffuseTransmission;
         d._specularTransmission = specularTransmission;
@@ -761,13 +761,13 @@ struct StandardBSDFData
         return d;
     }
 
-#if RTXPT_STANDARD_BSDF_DATA_MANUAL_PACK
+#if CAUSTICA_STANDARD_BSDF_DATA_MANUAL_PACK
     lpfloat3    Diffuse             ()  { float4 val = Fp16ToFp32(_diffuse_roughness); return (lpfloat3)val.xyz; }
     lpfloat     Roughness           ()  { float4 val = Fp16ToFp32(_diffuse_roughness); return (lpfloat)val.w; }
     lpfloat3    Specular            ()  { float4 val = Fp16ToFp32(_specular_metallic); return (lpfloat3)val.xyz; }
     lpfloat     Metallic            ()  { float4 val = Fp16ToFp32(_specular_metallic); return (lpfloat)val.w; }
     lpfloat     Eta                 ()  { float4 val = Fp16ToFp32(_transmission_eta); return (lpfloat)val.w; }
-#if !defined(RTXPT_MATERIAL_HAS_TRANSMISSION) || RTXPT_MATERIAL_HAS_TRANSMISSION
+#if !defined(CAUSTICA_MATERIAL_HAS_TRANSMISSION) || CAUSTICA_MATERIAL_HAS_TRANSMISSION
     lpfloat3    Transmission        ()  { float4 val = Fp16ToFp32(_transmission_eta); return (lpfloat3)val.xyz; }
     lpfloat     DiffuseTransmission ()  { return (lpfloat)f16tof32(_diffuseTransmission_specularTransmission & 0xFFFF); }
     lpfloat     SpecularTransmission()  { return (lpfloat)f16tof32(_diffuseTransmission_specularTransmission >> 16); }
@@ -786,7 +786,7 @@ struct StandardBSDFData
     lpfloat3    Specular            ()  { return _specular;             }
     lpfloat     Metallic            ()  { return _metallic;             }
     lpfloat     Eta                 ()  { return _eta;                  }
-#if !defined(RTXPT_MATERIAL_HAS_TRANSMISSION) || RTXPT_MATERIAL_HAS_TRANSMISSION
+#if !defined(CAUSTICA_MATERIAL_HAS_TRANSMISSION) || CAUSTICA_MATERIAL_HAS_TRANSMISSION
     lpfloat3    Transmission        ()  { return _transmission;         }
     lpfloat     DiffuseTransmission ()  { return _diffuseTransmission;  }
     lpfloat     SpecularTransmission()  { return _specularTransmission; }

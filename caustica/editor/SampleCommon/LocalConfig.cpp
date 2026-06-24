@@ -5,24 +5,24 @@
 
 void LocalConfig::PreferredSceneOverride(std::string& preferredScene)
 {
-    if (RTXPT_LOCAL_CONFIG_ID_STRING == "REF_VS_REALTIME")
+    if (CAUSTICA_LOCAL_CONFIG_ID_STRING == "REF_VS_REALTIME")
     {
         preferredScene = "kitchen-with-test-stuff.scene.json";
     }
-    if (RTXPT_LOCAL_CONFIG_ID_STRING == "DENOISER_TUNING")
+    if (CAUSTICA_LOCAL_CONFIG_ID_STRING == "DENOISER_TUNING")
     {
         //preferredScene = "transparent-machines.scene.json";
     }
-    if (RTXPT_LOCAL_CONFIG_ID_STRING == "GENERIC_STABLE_LIGHTS")
+    if (CAUSTICA_LOCAL_CONFIG_ID_STRING == "GENERIC_STABLE_LIGHTS")
     {
         preferredScene = "bistro-programmer-art.scene.json";
         //preferredScene = "kitchen-with-test-stuff.scene.json";
     }
-    if (RTXPT_LOCAL_CONFIG_ID_STRING == "PROC_SKY_TESTING")
+    if (CAUSTICA_LOCAL_CONFIG_ID_STRING == "PROC_SKY_TESTING")
     {
         preferredScene = "programmer-art-proc-sky.scene.json";
     }
-    if (RTXPT_LOCAL_CONFIG_ID_STRING == "ENVMAP_ONLY_TESTING")
+    if (CAUSTICA_LOCAL_CONFIG_ID_STRING == "ENVMAP_ONLY_TESTING")
     {
         preferredScene = "bistro-programmer-art.scene.json";
         // preferredScene = "kitchen.scene.json";
@@ -32,7 +32,7 @@ void LocalConfig::PreferredSceneOverride(std::string& preferredScene)
 
 void LocalConfig::PostAppInit(SampleUIData& sampleUI)
 {
-    if (RTXPT_LOCAL_CONFIG_ID_STRING == "REF_VS_REALTIME")
+    if (CAUSTICA_LOCAL_CONFIG_ID_STRING == "REF_VS_REALTIME")
     {
 #if 0 // test for making reference pixel-identical to realtime
         sampleUI.AccumulationAA = false;
@@ -57,7 +57,7 @@ void LocalConfig::PostAppInit(SampleUIData& sampleUI)
     //  * Stable Planes (set to 1) 
     // ...and increases brute force sampling - useful for denoiser tuning as it removes temporal issues and prevents stable planes from hiding issues.
     // Once denoiser works well, try enabling things one by one (and reducing NEE & global samples back to 1)
-    if (RTXPT_LOCAL_CONFIG_ID_STRING == "DENOISER_TUNING")
+    if (CAUSTICA_LOCAL_CONFIG_ID_STRING == "DENOISER_TUNING")
     {
         sampleUI.RealtimeMode = true;
         sampleUI.UseReSTIRDI = false;           // avoid any temporal issues from DI
@@ -70,7 +70,7 @@ void LocalConfig::PostAppInit(SampleUIData& sampleUI)
         sampleUI.RealtimeAA = 1;
     }
 
-    if (RTXPT_LOCAL_CONFIG_ID_STRING == "ENVMAP_ONLY_TESTING")
+    if (CAUSTICA_LOCAL_CONFIG_ID_STRING == "ENVMAP_ONLY_TESTING")
     {
         sampleUI.UseReSTIRDI = false;
         sampleUI.UseReSTIRGI = false;
@@ -92,7 +92,7 @@ void LocalConfig::PostAppInit(SampleUIData& sampleUI)
         sampleUI.RealtimeMode = false;
     }
 
-    if (RTXPT_LOCAL_CONFIG_ID_STRING == "GENERIC_STABLE_LIGHTS")
+    if (CAUSTICA_LOCAL_CONFIG_ID_STRING == "GENERIC_STABLE_LIGHTS")
     {
 #if 0
         sampleUI.AccumulationTarget = 2048;
@@ -144,7 +144,7 @@ void LocalConfig::PostMaterialLoad(caustica::Material& mat)
     if (mat.domain == MaterialDomain::TransmissiveAlphaTested)  mat.domain = MaterialDomain::AlphaTested;
 #endif
 #if 1 // disable emissive lights - this doesn't work if there's any animation changing brightness
-    if (RTXPT_LOCAL_CONFIG_ID_STRING == "ENVMAP_ONLY_TESTING" /*|| RTXPT_LOCAL_CONFIG_ID_STRING == "GENERIC_STABLE_LIGHTS"*/ )
+    if (CAUSTICA_LOCAL_CONFIG_ID_STRING == "ENVMAP_ONLY_TESTING" /*|| CAUSTICA_LOCAL_CONFIG_ID_STRING == "GENERIC_STABLE_LIGHTS"*/ )
         mat.emissiveIntensity = 0.0f;
 #endif
 }

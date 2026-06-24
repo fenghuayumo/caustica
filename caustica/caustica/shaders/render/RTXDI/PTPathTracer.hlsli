@@ -1,5 +1,5 @@
-#ifndef RTXPT_RESTIR_PT_PATH_TRACER_HLSLI
-#define RTXPT_RESTIR_PT_PATH_TRACER_HLSLI
+#ifndef CAUSTICA_RESTIR_PT_PATH_TRACER_HLSLI
+#define CAUSTICA_RESTIR_PT_PATH_TRACER_HLSLI
 
 #include "../RTXDI/RtxdiApplicationBridge.hlsli"
 
@@ -12,7 +12,7 @@ void RAB_ReconnectionDenoiserCallback(RTXDI_PTReservoir neighborSample, RAB_Surf
 {
 }
 
-RTXDI_BrdfRaySample RTXPT_RtxdiPT_ImportanceSampleBrdf(RAB_Surface surface, inout RTXDI_RandomSamplerState rng)
+RTXDI_BrdfRaySample CAUSTICA_RtxdiPT_ImportanceSampleBrdf(RAB_Surface surface, inout RTXDI_RandomSamplerState rng)
 {
     RTXDI_BrdfRaySample sample = RTXDI_EmptyBrdfRaySample();
     RTXDI_BrdfRaySampleProperties properties = RTXDI_DefaultBrdfRaySampleProperties();
@@ -29,7 +29,7 @@ RTXDI_BrdfRaySample RTXPT_RtxdiPT_ImportanceSampleBrdf(RAB_Surface surface, inou
     return sample;
 }
 
-RayDesc RTXPT_RtxdiPT_SetupContinuationRay(RAB_Surface surface, float3 outDirection)
+RayDesc CAUSTICA_RtxdiPT_SetupContinuationRay(RAB_Surface surface, float3 outDirection)
 {
     RayDesc ray = (RayDesc)0;
     ray.Origin = surface.ComputeNewRayOrigin(dot(outDirection, surface.GetFaceNCorrected()) >= 0.0f);
@@ -39,7 +39,7 @@ RayDesc RTXPT_RtxdiPT_SetupContinuationRay(RAB_Surface surface, float3 outDirect
     return ray;
 }
 
-RAB_Surface RTXPT_RtxdiPT_CollectSurface(PathTracer::SurfaceData surfaceData, float viewDepth)
+RAB_Surface CAUSTICA_RtxdiPT_CollectSurface(PathTracer::SurfaceData surfaceData, float viewDepth)
 {
     const ShadingData shadingData = surfaceData.shadingData;
     const ActiveBSDF bsdf = surfaceData.bsdf;
@@ -62,7 +62,7 @@ RAB_Surface RTXPT_RtxdiPT_CollectSurface(PathTracer::SurfaceData surfaceData, fl
         bsdf.data);
 }
 
-PathTracer::SurfaceData RTXPT_RtxdiPT_LoadSurfaceFromPayload(RAB_RayPayload payload, RayDesc ray, uint bounceDepth)
+PathTracer::SurfaceData CAUSTICA_RtxdiPT_LoadSurfaceFromPayload(RAB_RayPayload payload, RayDesc ray, uint bounceDepth)
 {
     DebugContext debug;
     debug.Init(g_Const.debug, u_FeedbackBuffer, u_DebugLinesBuffer, u_DebugDeltaPathTree, u_DeltaPathSearchStack);
@@ -87,14 +87,14 @@ void RAB_PathTrace(inout RTXDI_PathTracerContext ctx, inout RTXDI_PathTracerRand
     {
         ctx.BeginPathState();
 
-        RTXDI_BrdfRaySample brdfSample = RTXPT_RtxdiPT_ImportanceSampleBrdf(ctx.GetIntersectionSurface(), ptRandContext.replayRandomSamplerState);
+        RTXDI_BrdfRaySample brdfSample = CAUSTICA_RtxdiPT_ImportanceSampleBrdf(ctx.GetIntersectionSurface(), ptRandContext.replayRandomSamplerState);
         ctx.SetBrdfRaySample(brdfSample);
 
         if (!ctx.ValidContinuationRayBrdfOverPdf())
             break;
 
         ctx.MultiplyPathThroughput(ctx.GetContinuationRayBrdfOverPdf());
-        ctx.SetContinuationRay(RTXPT_RtxdiPT_SetupContinuationRay(ctx.GetIntersectionSurface(), brdfSample.OutDirection));
+        ctx.SetContinuationRay(CAUSTICA_RtxdiPT_SetupContinuationRay(ctx.GetIntersectionSurface(), brdfSample.OutDirection));
 
         if (!ctx.AnalyzePathReconnectibilityBeforeTrace())
             break;
@@ -106,8 +106,8 @@ void RAB_PathTrace(inout RTXDI_PathTracerContext ctx, inout RTXDI_PathTracerRand
 
         if (RAB_IsValidHit(payload))
         {
-            PathTracer::SurfaceData hitSurfaceData = RTXPT_RtxdiPT_LoadSurfaceFromPayload(payload, continuationRay, ctx.GetBounceDepth());
-            RAB_Surface hitSurface = RTXPT_RtxdiPT_CollectSurface(hitSurfaceData, RAB_RayPayloadGetCommittedHitT(payload));
+            PathTracer::SurfaceData hitSurfaceData = CAUSTICA_RtxdiPT_LoadSurfaceFromPayload(payload, continuationRay, ctx.GetBounceDepth());
+            RAB_Surface hitSurface = CAUSTICA_RtxdiPT_CollectSurface(hitSurfaceData, RAB_RayPayloadGetCommittedHitT(payload));
 
             if (!RAB_IsSurfaceValid(hitSurface))
                 break;
@@ -142,4 +142,4 @@ void RAB_PathTrace(inout RTXDI_PathTracerContext ctx, inout RTXDI_PathTracerRand
 #include <Rtxdi/PT/HybridShift.hlsli>
 #endif
 
-#endif // RTXPT_RESTIR_PT_PATH_TRACER_HLSLI
+#endif // CAUSTICA_RESTIR_PT_PATH_TRACER_HLSLI

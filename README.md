@@ -56,7 +56,7 @@ GTC presentation [How to Build a Real-time Path Tracer](https://www.nvidia.com/g
 
 ## Known Issues
 
-* By default, Agility SDK 1.619 is enabled and requires DXR 1.2 (Shader Model 6.9). Our current setup can only switch to older shader models at build configuration time, so if your GPU does not support DXR 1.2 with Shader Model 6.9, set RTXPT_D3D_AGILITY_SDK_PATH, RTXPT_D3D_AGILITY_SDK_VERSION and RTXPT_D3D_AGILITY_SDK_VERSION_NAME CMake variables to empty before cleaning the `/bin` folder, re-configuring/re-generating and rebuilding the project.
+* By default, Agility SDK 1.619 is enabled and requires DXR 1.2 (Shader Model 6.9). Our current setup can only switch to older shader models at build configuration time, so if your GPU does not support DXR 1.2 with Shader Model 6.9, set CAUSTICA_D3D_AGILITY_SDK_PATH, CAUSTICA_D3D_AGILITY_SDK_VERSION and CAUSTICA_D3D_AGILITY_SDK_VERSION_NAME CMake variables to empty before cleaning the `/bin` folder, re-configuring/re-generating and rebuilding the project.
 * Enabling Vulkan support requires a couple of manual steps, see [below](#building-vulkan)
 * SER and OMM support on Vulkan is currently work in progress
 * Running Vulkan on AMD GPUs may trigger a TDR during TLAS building in scenes with null TLAS instances
@@ -156,7 +156,7 @@ Due to interaction with various included libraries, Vulkan support is not enable
 
 ## Building Linux / WSL
 
-Linux and WSL builds default to Vulkan and disable Windows-only integrations such as DirectX 12 Agility SDK, NVAPI, and Streamline. DLSS/DLSS-RR uses the native NVIDIA NGX Vulkan path when `RTXPT_WITH_NATIVE_DLSS=ON` (default for Linux Vulkan builds), and OIDN is downloaded from the official x86_64 Linux package when `RTXPT_WITH_OIDN=ON`.
+Linux and WSL builds default to Vulkan and disable Windows-only integrations such as DirectX 12 Agility SDK, NVAPI, and Streamline. DLSS/DLSS-RR uses the native NVIDIA NGX Vulkan path when `CAUSTICA_WITH_NATIVE_DLSS=ON` (default for Linux Vulkan builds), and OIDN is downloaded from the official x86_64 Linux package when `CAUSTICA_WITH_OIDN=ON`.
 
 Recommended WSL setup:
 
@@ -171,18 +171,18 @@ Install the Linux Vulkan SDK and make sure `dxc` is on `PATH` or set `DXC_SPIRV_
 cmake -S . -B build-linux -G Ninja \
   -DCAUSTICA_WITH_VULKAN=ON \
   -DNVRHI_WITH_VULKAN=ON \
-  -DRTXPT_WITH_NATIVE_DLSS=ON \
-  -DRTXPT_WITH_OIDN=ON \
+  -DCAUSTICA_WITH_NATIVE_DLSS=ON \
+  -DCAUSTICA_WITH_OIDN=ON \
   -DDXC_SPIRV_PATH="$VULKAN_SDK/bin/dxc"
 
 cmake --build build-linux --config Release
 ```
 
-On Linux, CMake fetches NVIDIA's DLSS SDK and copies the DLSS/DLSS-RR runtime `.so` files next to the executable. Use `-DRTXPT_WITH_NATIVE_DLSS=OFF` if you need a build without NGX/DLSS. Streamline features that are not part of native NGX DLSS, such as Reflex and DLSS Frame Generation, remain Windows/Streamline-only in this codebase.
+On Linux, CMake fetches NVIDIA's DLSS SDK and copies the DLSS/DLSS-RR runtime `.so` files next to the executable. Use `-DCAUSTICA_WITH_NATIVE_DLSS=OFF` if you need a build without NGX/DLSS. Streamline features that are not part of native NGX DLSS, such as Reflex and DLSS Frame Generation, remain Windows/Streamline-only in this codebase.
  
 
  ## DirectX 12 Agility SDK
- RTX PT optionally integrates [DirectX 12 Agility SDK](https://devblogs.microsoft.com/directx/directx12agility/). If RTXPT_DOWNLOAD_AND_ENABLE_AGILITY_SDK CMake variable is set to TRUE, the version 717-preview will be automatically downloaded via CMake script and required build variables will be set. If different version is required, please set correct RTXPT_D3D_AGILITY_SDK_PATH and RTXPT_D3D_AGILITY_SDK_VERSION.
+ RTX PT optionally integrates [DirectX 12 Agility SDK](https://devblogs.microsoft.com/directx/directx12agility/). If CAUSTICA_DOWNLOAD_AND_ENABLE_AGILITY_SDK CMake variable is set to TRUE, the version 717-preview will be automatically downloaded via CMake script and required build variables will be set. If different version is required, please set correct CAUSTICA_D3D_AGILITY_SDK_PATH and CAUSTICA_D3D_AGILITY_SDK_VERSION.
 
 Version 717-preview enables native DirectX support for [Shader Execution Reordering](https://devblogs.microsoft.com/directx/ser/) and [Opacity Micromaps](https://devblogs.microsoft.com/directx/omm/). For testing this on Nvidia hardware, a preview driver is required and can be downloaded from https://developer.nvidia.com/downloads/shadermodel6-9-preview-driver 
 

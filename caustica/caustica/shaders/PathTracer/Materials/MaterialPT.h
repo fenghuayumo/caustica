@@ -2,7 +2,7 @@
 #define __PATH_TRACER_MATERIAL_H__
 
 /// Max number of materials - could be dynamic but isn't for simplicity
-#define RTXPT_MATERIAL_MAX_COUNT        32768
+#define CAUSTICA_MATERIAL_MAX_COUNT        32768
 
 // using https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_materials_volume#attenuation convention
 struct VolumePTConstants

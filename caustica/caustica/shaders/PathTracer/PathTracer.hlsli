@@ -44,7 +44,7 @@ namespace PathTracer
         
         // path.setCounter(PackedCounters::SubSampleIndex, subSampleIndex);
 
-#if RTXPT_NESTED_DIELECTRICS_QUALITY > 0 || defined(__INTELLISENSE__)
+#if CAUSTICA_NESTED_DIELECTRICS_QUALITY > 0 || defined(__INTELLISENSE__)
         for( uint i = 0; i < INTERIOR_LIST_SLOT_COUNT; i++ )
             path.interiorList.slots[i] = 0;
 #endif
@@ -314,7 +314,7 @@ namespace PathTracer
 #endif
 
 #if PATH_TRACER_MODE!=PATH_TRACER_MODE_BUILD_STABLE_PLANES
-#if RTXPT_FIREFLY_FILTER 
+#if CAUSTICA_FIREFLY_FILTER 
         // if bouncePDF then it's a delta event - expansion angle is 0
         float fireflyFilterK = ComputeNewScatterFireflyFilterK(path.GetFireflyFilterK(), bs.pdf, bs.lobeP);
 #else
@@ -351,11 +351,11 @@ namespace PathTracer
             [unroll] for( int i = 0; i < ActiveBSDF::cRandomNumberCountForSampling; i++ )
                 preGeneratedSamples[i] = sampleNext1D(sampleGenerator);
 #else
-    #if RTXPT_ENABLE_LOW_DISCREPANCY_SAMPLER_FOR_BSDF
+    #if CAUSTICA_ENABLE_LOW_DISCREPANCY_SAMPLER_FOR_BSDF
             [branch] if( path.getCounter(PackedCounters::DiffuseBounces)<DisableLowDiscrepancySamplingAfterDiffuseBounceCount )
                 preGeneratedSamples = SampleGenerator::Generate( ActiveBSDF::cRandomNumberCountForSampling, sgBase, SampleGeneratorEffectSeed::ScatterBSDF );
             else
-    #endif // RTXPT_ENABLE_LOW_DISCREPANCY_SAMPLER_FOR_BSDF
+    #endif // CAUSTICA_ENABLE_LOW_DISCREPANCY_SAMPLER_FOR_BSDF
                 preGeneratedSamples = UniformSampleSequenceGenerator::Generate( ActiveBSDF::cRandomNumberCountForSampling, sgBase, SampleGeneratorEffectSeed::ScatterBSDF );
 #endif
         }
@@ -448,14 +448,14 @@ namespace PathTracer
                 // this is the NEE light sampler configured same as it was at previous vertex (previous vertex's "next event estimation" matches this light "event")
                 LightSampler lightSampler = Bridge::CreateLightSampler( path.GetPixelPos(), misInfo.LightSamplingIsSSC );
 
-#if RTXPT_USE_APPROXIMATE_MIS
+#if CAUSTICA_USE_APPROXIMATE_MIS
                 misWeight = lightSampler.ComputeLightVsBSDF_MIS_ForBSDF_Approx(bsdfScatterPdf, misInfo.CandidateSamples, misInfo.FullSamples);
 #else
                 uint environmentQuadLightIndex = lightSampler.LookupEnvLightByDirection( localDir ); //< figure out light index from the direction! it's guaranteed to be valid
                 misWeight = lightSampler.ComputeBSDFMISForEnvironmentQuad(environmentQuadLightIndex, bsdfScatterPdf, misInfo.CandidateSamples, misInfo.FullSamples);
 #endif
 
-#if RTXPT_LIGHTING_ENABLE_BSDF_FEEDBACK
+#if CAUSTICA_LIGHTING_ENABLE_BSDF_FEEDBACK
                 float simpleRandom = Hash32ToFloat( Hash32Combine( Hash32Combine(Hash32(path.getVertexIndex() + 0x0366FE2F), path.id), Bridge::getSampleIndex() ) );   // note: using unique prime number salt for vertex index
                 lightSampler.InsertFeedbackFromBSDF(environmentQuadLightIndex, Average(path.GetThp()*Le), misWeight, simpleRandom );
 #endif
@@ -467,7 +467,7 @@ namespace PathTracer
         if (path.getVertexIndex() == 1 && workingContext.PtConsts.environmentMapVisibleToCamera == 0)
             environmentEmission = 0;
 
-#if RTXPT_FIREFLY_FILTER && PATH_TRACER_MODE!=PATH_TRACER_MODE_BUILD_STABLE_PLANES
+#if CAUSTICA_FIREFLY_FILTER && PATH_TRACER_MODE!=PATH_TRACER_MODE_BUILD_STABLE_PLANES
             lpfloat baseFFThreshold = (lpfloat)workingContext.PtConsts.fireflyFilterThreshold;
             if( baseFFThreshold != 0 )
                 environmentEmission = FireflyFilter( environmentEmission, baseFFThreshold, path.GetFireflyFilterK() );
@@ -485,7 +485,7 @@ namespace PathTracer
 
         if (any(environmentEmission>0))
         {
-#if RTXPT_DISCARD_NON_NEE_LIGHTING
+#if CAUSTICA_DISCARD_NON_NEE_LIGHTING
             environmentEmission *= 1e-15f;
 #endif
 
@@ -531,7 +531,7 @@ namespace PathTracer
         // Account for volume absorption. Shouldn't this be in the miss shader too? I don't know - I guess depends on whether we want to support open, infinite volumes?
         float volumeAbsorption = 0;   // used for stats
 
-#if RTXPT_NESTED_DIELECTRICS_QUALITY > 0 || defined(__INTELLISENSE__)
+#if CAUSTICA_NESTED_DIELECTRICS_QUALITY > 0 || defined(__INTELLISENSE__)
         if (!path.interiorList.isEmpty())
         {
             const uint materialID = path.interiorList.getTopMaterialID();
@@ -589,7 +589,7 @@ namespace PathTracer
         lpfloat3 surfaceEmission = 0.0;
         NEEBSDFMISInfo misInfo = NEEBSDFMISInfo::Unpack16bit(path.GetPackedMISInfo());
 
-#if !defined(RTXPT_MATERIAL_IS_EMISSIVE) || RTXPT_MATERIAL_IS_EMISSIVE
+#if !defined(CAUSTICA_MATERIAL_IS_EMISSIVE) || CAUSTICA_MATERIAL_IS_EMISSIVE
 
 #if 0        
         if (workingContext.Debug.IsDebugPixel())
@@ -612,13 +612,13 @@ namespace PathTracer
                 // this is the NEE light sampler configured same as it was at previous vertex (previous vertex's "next event estimation" matches this light "event")
                 LightSampler lightSampler = Bridge::CreateLightSampler( path.GetPixelPos(), misInfo.LightSamplingIsSSC );
 
-#if RTXPT_USE_APPROXIMATE_MIS
+#if CAUSTICA_USE_APPROXIMATE_MIS
                 misWeight = lightSampler.ComputeLightVsBSDF_MIS_ForBSDF_Approx(bsdfScatterPdf, misInfo.CandidateSamples, misInfo.FullSamples);
 #else
                 misWeight = lightSampler.ComputeBSDFMISForEmissiveTriangle(surfaceData.neeTriangleLightIndex, bsdfScatterPdf, rayOrigin, shadingData.posW, misInfo.CandidateSamples, misInfo.FullSamples);
 #endif
 
-#if RTXPT_LIGHTING_ENABLE_BSDF_FEEDBACK
+#if CAUSTICA_LIGHTING_ENABLE_BSDF_FEEDBACK
                 float simpleRandom = Hash32ToFloat( Hash32Combine( Hash32Combine(Hash32(path.getVertexIndex() + 0x0367C2C7), path.id), Bridge::getSampleIndex() ) );   // note: using unique prime number salt for vertex index
                 lightSampler.InsertFeedbackFromBSDF(surfaceData.neeTriangleLightIndex, Average(path.GetThp()*surfaceEmission), misWeight, simpleRandom );
 #endif
@@ -627,15 +627,15 @@ namespace PathTracer
             surfaceEmission = lpfloat3(shadingData.emission * misWeight);
         }
 
-#endif // !defined(RTXPT_MATERIAL_IS_EMISSIVE) || RTXPT_MATERIAL_IS_EMISSIVE
+#endif // !defined(CAUSTICA_MATERIAL_IS_EMISSIVE) || CAUSTICA_MATERIAL_IS_EMISSIVE
 
-#if !defined(RTXPT_MATERIAL_IS_ANALYTIC_LIGHT_PROXY) || RTXPT_MATERIAL_IS_ANALYTIC_LIGHT_PROXY
+#if !defined(CAUSTICA_MATERIAL_IS_ANALYTIC_LIGHT_PROXY) || CAUSTICA_MATERIAL_IS_ANALYTIC_LIGHT_PROXY
         if (surfaceData.neeAnalyticLightIndex != 0xFFFFFFFF)
         {
             LightSampler lightSampler = Bridge::CreateLightSampler( path.GetPixelPos(), misInfo.LightSamplingIsSSC );
 
             bool applyMIS = misInfo.LightSamplingEnabled; // we don't want MIS if lighting was disabled - passing bsdfScatterPdf of 0 will disable it
-#if RTXPT_USE_APPROXIMATE_MIS            
+#if CAUSTICA_USE_APPROXIMATE_MIS            
             bool approxMIS = true;
 #else
             bool approxMIS = false;
@@ -644,10 +644,10 @@ namespace PathTracer
         }
 #endif
 
-#if (!defined(RTXPT_MATERIAL_IS_ANALYTIC_LIGHT_PROXY) || RTXPT_MATERIAL_IS_ANALYTIC_LIGHT_PROXY) || (!defined(RTXPT_MATERIAL_IS_EMISSIVE) || RTXPT_MATERIAL_IS_EMISSIVE)
+#if (!defined(CAUSTICA_MATERIAL_IS_ANALYTIC_LIGHT_PROXY) || CAUSTICA_MATERIAL_IS_ANALYTIC_LIGHT_PROXY) || (!defined(CAUSTICA_MATERIAL_IS_EMISSIVE) || CAUSTICA_MATERIAL_IS_EMISSIVE)
         if (any(surfaceEmission>0))
         {
-#if RTXPT_FIREFLY_FILTER && PATH_TRACER_MODE!=PATH_TRACER_MODE_BUILD_STABLE_PLANES
+#if CAUSTICA_FIREFLY_FILTER && PATH_TRACER_MODE!=PATH_TRACER_MODE_BUILD_STABLE_PLANES
             lpfloat baseFFThreshold = (lpfloat)workingContext.PtConsts.fireflyFilterThreshold;
             if( baseFFThreshold != 0 )
                 surfaceEmission = FireflyFilter(surfaceEmission, baseFFThreshold, path.GetFireflyFilterK());
@@ -655,7 +655,7 @@ namespace PathTracer
 
             if (any(surfaceEmission>0))
             {
-#if RTXPT_DISCARD_NON_NEE_LIGHTING
+#if CAUSTICA_DISCARD_NON_NEE_LIGHTING
                 surfaceEmission *= 1e-15f;
 #endif
 
@@ -667,7 +667,7 @@ namespace PathTracer
                 //workingContext.Debug.DrawDebugViz( path.GetPixelPos(), saturate(float4( 0, path.sceneLengthFromDenoisingLayer*1, 0, 1 )) );
             }
         }
-#endif // #if (!defined(RTXPT_MATERIAL_IS_ANALYTIC_LIGHT_PROXY) || RTXPT_MATERIAL_IS_ANALYTIC_LIGHT_PROXY) && (!defined(RTXPT_MATERIAL_IS_EMISSIVE) || RTXPT_MATERIAL_IS_EMISSIVE)
+#endif // #if (!defined(CAUSTICA_MATERIAL_IS_ANALYTIC_LIGHT_PROXY) || CAUSTICA_MATERIAL_IS_ANALYTIC_LIGHT_PROXY) && (!defined(CAUSTICA_MATERIAL_IS_EMISSIVE) || CAUSTICA_MATERIAL_IS_EMISSIVE)
 
         // Terminate after scatter ray on last vertex has been processed. Also terminates here if StablePlanesHandleHit terminated path. Also terminate based on "Russian roulette" if enabled.
         bool pathStopping = path.isTerminatingAtNextBounce();
@@ -723,7 +723,7 @@ namespace PathTracer
         float4 neeRadianceAndSpecAvg = neeResult.GetRadianceAndSpecAvg();
         if ( any(neeRadianceAndSpecAvg>0) )
         {
-#if RTXPT_DISCARD_NEE_LIGHTING
+#if CAUSTICA_DISCARD_NEE_LIGHTING
             neeRadianceAndSpecAvg *= 1e-15f;
 #endif
 

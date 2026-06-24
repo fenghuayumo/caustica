@@ -51,8 +51,8 @@ struct LightsBakerConstants
     float                   ReservoirHistoryDropoff;
     uint                    _padding0;
     
-    uint                    CurrentWeightsBufferOffset;     ///< Used to ping-pong between current and historic weights; it's either 0 or RTXPT_LIGHTING_WEIGHTS_COUNT_HALF
-    uint                    HistoricWeightsBufferOffset;    ///< Used to ping-pong between current and historic weights; it's either 0 or RTXPT_LIGHTING_WEIGHTS_COUNT_HALF
+    uint                    CurrentWeightsBufferOffset;     ///< Used to ping-pong between current and historic weights; it's either 0 or CAUSTICA_LIGHTING_WEIGHTS_COUNT_HALF
+    uint                    HistoricWeightsBufferOffset;    ///< Used to ping-pong between current and historic weights; it's either 0 or CAUSTICA_LIGHTING_WEIGHTS_COUNT_HALF
     uint                    _padding1;
     uint                    _padding2;
 
@@ -67,12 +67,12 @@ STATIC_ASSERT( NEEAT_LIGHTS_BAKER_CONSTANTS_SIZE == sizeof(LightsBakerConstants)
 // Used for building and using light list
 struct LightingControlData
 {
-    uint    TotalLightCount;            ///< Current total count of lights in the light buffer (of PolymorphicLightInfo type, max RTXPT_LIGHTING_MAX_LIGHTS)
+    uint    TotalLightCount;            ///< Current total count of lights in the light buffer (of PolymorphicLightInfo type, max CAUSTICA_LIGHTING_MAX_LIGHTS)
     uint    EnvmapQuadNodeCount;        ///< Number of environment map sampling lights in the light buffer (useful for debugging)
     uint    AnalyticLightCount;         ///< Number of analytic lights in the light buffer (useful for debugging)
     uint    TriangleLightCount;         ///< Number of emissive triangle lights in the light buffer (useful for debugging)
 
-    uint    SamplingProxyCount;         ///< Number of the sampling proxies (max RTXPT_LIGHTING_MAX_SAMPLING_PROXIES)
+    uint    SamplingProxyCount;         ///< Number of the sampling proxies (max CAUSTICA_LIGHTING_MAX_SAMPLING_PROXIES)
     uint    HistoricTotalLightCount;    ///< Previous frame's TotalLightCount (can be 0)
     uint    LastFrameTemporalFeedbackAvailable; ///< We can use last frame's temporal feedback
     uint    LastFrameLocalSamplesAvailable;     ///< We can use last frame's local (tile) lights (effectively same as LastFrameTemporalFeedbackAvailable from previous frame)
@@ -133,12 +133,12 @@ enum class LightingDebugViewType : int
     MaxCount
 };
 
-#define RTXPT_INVALID_LIGHT_INDEX                       0xFFFFFFFF
+#define CAUSTICA_INVALID_LIGHT_INDEX                       0xFFFFFFFF
 
 inline uint ComputeCandidateSampleLocalCount(const float localToGlobalRatio, const uint totalCandidateSamples)
 {
-#ifdef RTXPT_NEE_LOCAL_CANDIDATE_SAMPLE_COUNT
-    return RTXPT_NEE_LOCAL_CANDIDATE_SAMPLE_COUNT;
+#ifdef CAUSTICA_NEE_LOCAL_CANDIDATE_SAMPLE_COUNT
+    return CAUSTICA_NEE_LOCAL_CANDIDATE_SAMPLE_COUNT;
 #else
     return (uint)((float)(totalCandidateSamples-1) * localToGlobalRatio + 0.75f);    // always allow at least 1 global but then even out
 #endif
@@ -146,8 +146,8 @@ inline uint ComputeCandidateSampleLocalCount(const float localToGlobalRatio, con
 
 inline uint ComputeCandidateSampleGlobalCount(const float localToGlobalRatio, const uint totalCandidateSamples)
 {
-#ifdef RTXPT_NEE_GLOBAL_CANDIDATE_SAMPLE_COUNT
-    return RTXPT_NEE_GLOBAL_CANDIDATE_SAMPLE_COUNT;
+#ifdef CAUSTICA_NEE_GLOBAL_CANDIDATE_SAMPLE_COUNT
+    return CAUSTICA_NEE_GLOBAL_CANDIDATE_SAMPLE_COUNT;
 #else
     return totalCandidateSamples - ComputeCandidateSampleLocalCount(localToGlobalRatio, totalCandidateSamples);
 #endif
@@ -166,7 +166,7 @@ uint UnpackMiniListCount(uint value)                                            
 
 inline uint LLSB_ComputeBaseAddress(uint2 tilePos, uint2 localSamplingResolution)
 {
-    return (tilePos.x + (tilePos.y * localSamplingResolution.x)) * RTXPT_LIGHTING_LOCAL_PROXY_COUNT;
+    return (tilePos.x + (tilePos.y * localSamplingResolution.x)) * CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT;
 }
 
 // Weighted Reservoir Sampling helper for storing good lights for later reuse. Since our reuse is entirely statistical, we don't actually keep the weights
@@ -206,7 +206,7 @@ struct LightFeedbackReservoir
     {
         SetTotalWeight(0);
 #if 1 // this is useful for debugging, but should be removed in production
-        SetCandidate(RTXPT_INVALID_LIGHT_INDEX, false);
+        SetCandidate(CAUSTICA_INVALID_LIGHT_INDEX, false);
 #endif
     }
 
@@ -248,13 +248,13 @@ struct LightFeedbackReservoir
 
     void GetCandidate(out uint candidateIndex, out bool candidateIsScreenSpaceCoherent)
     {
-        candidateIndex = RTXPT_INVALID_LIGHT_INDEX;
+        candidateIndex = CAUSTICA_INVALID_LIGHT_INDEX;
         candidateIsScreenSpaceCoherent = false;
         if (IsEmpty())
             return;
 
         candidateIndex = GetCandidateRaw();
-        if (candidateIndex != RTXPT_INVALID_LIGHT_INDEX)
+        if (candidateIndex != CAUSTICA_INVALID_LIGHT_INDEX)
         {
             candidateIsScreenSpaceCoherent = (candidateIndex & LFR_SCREEN_SPACE_COHERENT_FLAG) != 0;
             candidateIndex &= ~LFR_SCREEN_SPACE_COHERENT_FLAG;
@@ -292,7 +292,7 @@ struct LightFeedbackReservoir
         if( otherTotalWeight > 0 )
         {
             uint lightIndex = other.GetCandidateRaw();
-            if (lightIndex != RTXPT_INVALID_LIGHT_INDEX)
+            if (lightIndex != CAUSTICA_INVALID_LIGHT_INDEX)
             {
                 bool candidateIsScreenSpaceCoherent = (lightIndex & LFR_SCREEN_SPACE_COHERENT_FLAG) != 0;
                 lightIndex &= ~LFR_SCREEN_SPACE_COHERENT_FLAG;

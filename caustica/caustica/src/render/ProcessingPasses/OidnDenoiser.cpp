@@ -3,7 +3,7 @@
 #include <cstring>
 #include <utility>
 
-#if RTXPT_WITH_OIDN
+#if CAUSTICA_WITH_OIDN
 #include <OpenImageDenoise/oidn.hpp>
 #endif
 
@@ -12,7 +12,7 @@ struct OidnDenoiser::Impl
     std::string LastError;
     std::string DeviceDescription;
 
-#if RTXPT_WITH_OIDN
+#if CAUSTICA_WITH_OIDN
     oidn::DeviceRef Device;
     oidn::FilterRef Filter;
     oidn::BufferRef ColorBuffer;
@@ -270,7 +270,7 @@ OidnDenoiser::~OidnDenoiser() = default;
 
 bool OidnDenoiser::IsAvailable() const
 {
-#if RTXPT_WITH_OIDN
+#if CAUSTICA_WITH_OIDN
     return true;
 #else
     return false;
@@ -297,7 +297,7 @@ bool OidnDenoiser::Denoise(const float* inputRgb, uint32_t width, uint32_t heigh
         return false;
     }
 
-#if RTXPT_WITH_OIDN
+#if CAUSTICA_WITH_OIDN
     const bool useAlbedo = (options.GuidePasses == Passes::Albedo || options.GuidePasses == Passes::AlbedoNormal) && options.AlbedoRgb != nullptr;
     const bool useNormal = options.GuidePasses == Passes::AlbedoNormal && options.NormalRgb != nullptr;
     const bool prefilterAux = options.GuidePrefilter != Prefilter::None && (useAlbedo || useNormal);
@@ -371,14 +371,14 @@ bool OidnDenoiser::Denoise(const float* inputRgb, uint32_t width, uint32_t heigh
     (void)height;
     (void)options;
     (void)outputRgb;
-    m_impl->LastError = "RTXPT_WITH_OIDN is disabled in this build.";
+    m_impl->LastError = "CAUSTICA_WITH_OIDN is disabled in this build.";
     return false;
 #endif
 }
 
 void OidnDenoiser::Reset()
 {
-#if RTXPT_WITH_OIDN
+#if CAUSTICA_WITH_OIDN
     m_impl->ReleaseBuffers();
 #endif
     m_impl->LastError.clear();

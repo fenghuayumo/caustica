@@ -5,7 +5,7 @@
 #include "../RTXDI/RtxdiApplicationBridge.hlsli"
 #include <Rtxdi/PT/Reservoir.hlsli>
 
-float3 RTXPT_RtxdiPT_SanitizeRadiance(float3 radiance)
+float3 CAUSTICA_RtxdiPT_SanitizeRadiance(float3 radiance)
 {
     if (any(isnan(radiance)) || any(isinf(radiance)) || any(radiance < float3(0.0f, 0.0f, 0.0f)))
         return float3(0.0f, 0.0f, 0.0f);
@@ -30,7 +30,7 @@ bool ReSTIRPTFinalContribution(uint2 reservoirPosition, uint2 pixelPosition, out
         return false;
 
     float3 pathThroughput = Unpack_R11G11B10_FLOAT(u_Throughput[pixelPosition]);
-    float3 radiance = RTXPT_RtxdiPT_SanitizeRadiance(reservoir.TargetFunction * reservoir.WeightSum * pathThroughput);
+    float3 radiance = CAUSTICA_RtxdiPT_SanitizeRadiance(reservoir.TargetFunction * reservoir.WeightSum * pathThroughput);
 
     radianceAndSpecAvg.rgb = radiance;
     radianceAndSpecAvg.a = Average(radiance);

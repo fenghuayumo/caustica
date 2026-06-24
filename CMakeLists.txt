@@ -53,19 +53,19 @@ endif()
 option(CAUSTICA_WITH_DX11 "Enable the DX11 version of the framework runtime code" OFF)
 
 if (WIN32)
-    set(RTXPT_DEFAULT_WITH_DX12 ON)
+    set(CAUSTICA_DEFAULT_WITH_DX12 ON)
 else()
-    set(RTXPT_DEFAULT_WITH_DX12 OFF)
+    set(CAUSTICA_DEFAULT_WITH_DX12 OFF)
 endif()
-option(CAUSTICA_WITH_DX12 "Enable the DX12 version of the framework runtime code" ${RTXPT_DEFAULT_WITH_DX12})
+option(CAUSTICA_WITH_DX12 "Enable the DX12 version of the framework runtime code" ${CAUSTICA_DEFAULT_WITH_DX12})
 
 # Vulkan is required for Linux/WSL builds because the D3D backends are Windows-only.
 if (WIN32)
-    set(RTXPT_DEFAULT_WITH_VULKAN OFF)
+    set(CAUSTICA_DEFAULT_WITH_VULKAN OFF)
 else()
-    set(RTXPT_DEFAULT_WITH_VULKAN ON)
+    set(CAUSTICA_DEFAULT_WITH_VULKAN ON)
 endif()
-option(CAUSTICA_WITH_VULKAN "Enable the Vulkan version of the framework runtime code" ${RTXPT_DEFAULT_WITH_VULKAN})
+option(CAUSTICA_WITH_VULKAN "Enable the Vulkan version of the framework runtime code" ${CAUSTICA_DEFAULT_WITH_VULKAN})
 
 option(CAUSTICA_WITH_NVRHI "Enable NVRHI and related projects" ON)
 option(CAUSTICA_WITH_AFTERMATH "Enable Aftermath crash dump generation with engine runtime code" OFF)
@@ -78,8 +78,8 @@ endif()
 
 set (CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE STRING "" FORCE)
 
-set(RTXPT_LOCAL_CONFIG_ID "NONAME" CACHE STRING "Local user initials for user-specific settings")
-add_definitions( -DRTXPT_LOCAL_CONFIG_ID_STRING=std::string\(\"${RTXPT_LOCAL_CONFIG_ID}\"\) )
+set(CAUSTICA_LOCAL_CONFIG_ID "NONAME" CACHE STRING "Local user initials for user-specific settings")
+add_definitions( -DCAUSTICA_LOCAL_CONFIG_ID_STRING=std::string\(\"${CAUSTICA_LOCAL_CONFIG_ID}\"\) )
 
 #----------------------------------------------------------------------------------------------------------------------
 # Helper to download and unzip a package from a URL
@@ -109,8 +109,8 @@ endfunction()
 #----------------------------------------------------------------------------------------------------------------------
 # Streamline config
 #set(FETCHCONTENT_QUIET OFF) <- use for a lot more detailed info from FetchContent
-set(RTXPT_DEFAULT_WITH_STREAMLINE ON)
-option(CAUSTICA_WITH_STREAMLINE "Enable streamline, separate package required" ${RTXPT_DEFAULT_WITH_STREAMLINE})
+set(CAUSTICA_DEFAULT_WITH_STREAMLINE ON)
+option(CAUSTICA_WITH_STREAMLINE "Enable streamline, separate package required" ${CAUSTICA_DEFAULT_WITH_STREAMLINE})
 if (CAUSTICA_WITH_STREAMLINE AND NOT WIN32)
     message(WARNING "Streamline integration is currently Windows-only in this codebase; disabling CAUSTICA_WITH_STREAMLINE for this platform.")
     set(CAUSTICA_WITH_STREAMLINE OFF CACHE BOOL "Enable streamline, separate package required" FORCE)
@@ -137,17 +137,17 @@ option(STREAMLINE_FEATURE_DIRECTSR  "Include DirectSR dll"          OFF )
 # Native NGX DLSS config
 #
 # Use native NGX DLSS integration by default when Vulkan is available.
-set(RTXPT_DEFAULT_WITH_NATIVE_DLSS ${CAUSTICA_WITH_VULKAN})
-option(RTXPT_WITH_NATIVE_DLSS "Enable native NVIDIA NGX DLSS integration for Vulkan builds without Streamline" ${RTXPT_DEFAULT_WITH_NATIVE_DLSS})
-if (RTXPT_WITH_NATIVE_DLSS AND CAUSTICA_WITH_STREAMLINE)
-    message(WARNING "RTXPT_WITH_NATIVE_DLSS is intended for non-Streamline builds; disabling it because CAUSTICA_WITH_STREAMLINE is enabled.")
-    set(RTXPT_WITH_NATIVE_DLSS OFF CACHE BOOL "Enable native NVIDIA NGX DLSS integration for Vulkan builds without Streamline" FORCE)
+set(CAUSTICA_DEFAULT_WITH_NATIVE_DLSS ${CAUSTICA_WITH_VULKAN})
+option(CAUSTICA_WITH_NATIVE_DLSS "Enable native NVIDIA NGX DLSS integration for Vulkan builds without Streamline" ${CAUSTICA_DEFAULT_WITH_NATIVE_DLSS})
+if (CAUSTICA_WITH_NATIVE_DLSS AND CAUSTICA_WITH_STREAMLINE)
+    message(WARNING "CAUSTICA_WITH_NATIVE_DLSS is intended for non-Streamline builds; disabling it because CAUSTICA_WITH_STREAMLINE is enabled.")
+    set(CAUSTICA_WITH_NATIVE_DLSS OFF CACHE BOOL "Enable native NVIDIA NGX DLSS integration for Vulkan builds without Streamline" FORCE)
 endif()
-if (RTXPT_WITH_NATIVE_DLSS AND NOT CAUSTICA_WITH_VULKAN)
-    message(WARNING "RTXPT_WITH_NATIVE_DLSS requires CAUSTICA_WITH_VULKAN; disabling native DLSS.")
-    set(RTXPT_WITH_NATIVE_DLSS OFF CACHE BOOL "Enable native NVIDIA NGX DLSS integration for Vulkan builds without Streamline" FORCE)
+if (CAUSTICA_WITH_NATIVE_DLSS AND NOT CAUSTICA_WITH_VULKAN)
+    message(WARNING "CAUSTICA_WITH_NATIVE_DLSS requires CAUSTICA_WITH_VULKAN; disabling native DLSS.")
+    set(CAUSTICA_WITH_NATIVE_DLSS OFF CACHE BOOL "Enable native NVIDIA NGX DLSS integration for Vulkan builds without Streamline" FORCE)
 endif()
-set(CAUSTICA_WITH_DLSS ${RTXPT_WITH_NATIVE_DLSS} CACHE BOOL "Enable the NGX DLSS integration used by caustica native DLSS" FORCE)
+set(CAUSTICA_WITH_DLSS ${CAUSTICA_WITH_NATIVE_DLSS} CACHE BOOL "Enable the NGX DLSS integration used by caustica native DLSS" FORCE)
 set(CAUSTICA_DLSS_FETCH_URL "https://github.com/NVIDIA/DLSS.git" CACHE STRING "URL of the DLSS Git repository to fetch from")
 set(CAUSTICA_DLSS_FETCH_TAG "a8ed84e2d1cc1efa7bef63fb9394be6cb06c0d74" CACHE STRING "Git commit hash or tag for DLSS")
 set(CAUSTICA_DLSS_FETCH_DIR "${CMAKE_CURRENT_SOURCE_DIR}/External/DLSS" CACHE STRING "Directory to fetch DLSS to, empty uses build directory default")
@@ -160,18 +160,18 @@ if (WIN32)
     set(DXC_CUSTOM_PATH "${CMAKE_SOURCE_DIR}/External/dxc/build/native/bin/x64/" CACHE STRING "Path to embedded dxc")
 else()
     if (DEFINED DXC_SPIRV_PATH AND DXC_SPIRV_PATH)
-        set(RTXPT_DXC_SPIRV_EXECUTABLE "${DXC_SPIRV_PATH}")
+        set(CAUSTICA_DXC_SPIRV_EXECUTABLE "${DXC_SPIRV_PATH}")
     elseif (DEFINED SHADERMAKE_DXC_VK_PATH AND SHADERMAKE_DXC_VK_PATH)
-        set(RTXPT_DXC_SPIRV_EXECUTABLE "${SHADERMAKE_DXC_VK_PATH}")
+        set(CAUSTICA_DXC_SPIRV_EXECUTABLE "${SHADERMAKE_DXC_VK_PATH}")
     else()
-        find_program(RTXPT_DXC_SPIRV_EXECUTABLE
+        find_program(CAUSTICA_DXC_SPIRV_EXECUTABLE
             NAMES dxc
             HINTS
                 "$ENV{VULKAN_SDK}/bin"
                 "$ENV{VULKAN_SDK}/x86_64/bin"
         )
     endif()
-    if (NOT RTXPT_DXC_SPIRV_EXECUTABLE)
+    if (NOT CAUSTICA_DXC_SPIRV_EXECUTABLE)
         message(FATAL_ERROR "DXC for SPIR-V was not found. Install the Linux Vulkan SDK in WSL, or set DXC_SPIRV_PATH/SHADERMAKE_DXC_VK_PATH to the dxc executable.")
     endif()
     set(DXC_CUSTOM_PATH "" CACHE STRING "Path to embedded dxc")
@@ -180,13 +180,13 @@ endif()
 
 #----------------------------------------------------------------------------------------------------------------------
 # Python scripting via nanobind (embeds CPython into caustica and exposes scene/material/light/ui bindings)
-option(RTXPT_WITH_PYTHON "Enable embedded Python scripting via nanobind (allows customizing materials, lights, etc. from Python scripts)" ON)
-set(RTXPT_PYTHON_MIN_VERSION "3.8" CACHE STRING "Minimum required Python version for embedded scripting")
-set(RTXPT_NANOBIND_GIT_TAG "v2.4.0" CACHE STRING "Git tag/branch of nanobind to fetch")
+option(CAUSTICA_WITH_PYTHON "Enable embedded Python scripting via nanobind (allows customizing materials, lights, etc. from Python scripts)" ON)
+set(CAUSTICA_PYTHON_MIN_VERSION "3.8" CACHE STRING "Minimum required Python version for embedded scripting")
+set(CAUSTICA_NANOBIND_GIT_TAG "v2.4.0" CACHE STRING "Git tag/branch of nanobind to fetch")
 
-if (RTXPT_WITH_PYTHON)
+if (CAUSTICA_WITH_PYTHON)
     # Need both the embedded interpreter (libpython) and the development headers
-    find_package(Python ${RTXPT_PYTHON_MIN_VERSION} COMPONENTS Interpreter Development REQUIRED)
+    find_package(Python ${CAUSTICA_PYTHON_MIN_VERSION} COMPONENTS Interpreter Development REQUIRED)
     message(STATUS "Found Python ${Python_VERSION} at ${Python_EXECUTABLE}")
     message(STATUS "  include dirs : ${Python_INCLUDE_DIRS}")
     message(STATUS "  libraries    : ${Python_LIBRARIES}")
@@ -196,7 +196,7 @@ if (RTXPT_WITH_PYTHON)
         FetchContent_Declare(
             nanobind
             GIT_REPOSITORY https://github.com/wjakob/nanobind.git
-            GIT_TAG        ${RTXPT_NANOBIND_GIT_TAG}
+            GIT_TAG        ${CAUSTICA_NANOBIND_GIT_TAG}
             GIT_SHALLOW    TRUE
         )
         FetchContent_MakeAvailable(nanobind)
@@ -206,43 +206,43 @@ endif()
 
 #----------------------------------------------------------------------------------------------------------------------
 # Intel Open Image Denoise for offline reference-mode denoising
-option(RTXPT_WITH_OIDN "Enable Intel Open Image Denoise for Reference path tracing mode" ON)
-set(RTXPT_OIDN_VERSION "2.4.1" CACHE STRING "Open Image Denoise release version")
+option(CAUSTICA_WITH_OIDN "Enable Intel Open Image Denoise for Reference path tracing mode" ON)
+set(CAUSTICA_OIDN_VERSION "2.4.1" CACHE STRING "Open Image Denoise release version")
 
-if (RTXPT_WITH_OIDN)
+if (CAUSTICA_WITH_OIDN)
     if (WIN32 AND CMAKE_SIZEOF_VOID_P EQUAL 8)
-        set(RTXPT_OIDN_FETCH_DIR "${CMAKE_CURRENT_SOURCE_DIR}/External/OIDN")
-        set(RTXPT_OIDN_PACKAGE_DIR "${RTXPT_OIDN_FETCH_DIR}/oidn-${RTXPT_OIDN_VERSION}.x64.windows")
-        set(RTXPT_OIDN_BIN_DIR "${RTXPT_OIDN_PACKAGE_DIR}/bin" CACHE INTERNAL "Open Image Denoise runtime DLL directory")
-        set(RTXPT_OIDN_LIBRARY_DIR "${RTXPT_OIDN_PACKAGE_DIR}/bin" CACHE INTERNAL "Open Image Denoise runtime library directory")
+        set(CAUSTICA_OIDN_FETCH_DIR "${CMAKE_CURRENT_SOURCE_DIR}/External/OIDN")
+        set(CAUSTICA_OIDN_PACKAGE_DIR "${CAUSTICA_OIDN_FETCH_DIR}/oidn-${CAUSTICA_OIDN_VERSION}.x64.windows")
+        set(CAUSTICA_OIDN_BIN_DIR "${CAUSTICA_OIDN_PACKAGE_DIR}/bin" CACHE INTERNAL "Open Image Denoise runtime DLL directory")
+        set(CAUSTICA_OIDN_LIBRARY_DIR "${CAUSTICA_OIDN_PACKAGE_DIR}/bin" CACHE INTERNAL "Open Image Denoise runtime library directory")
 
         CheckAndDownloadPackage(
             "Open Image Denoise"
-            "v${RTXPT_OIDN_VERSION}.x64.windows"
-            ${RTXPT_OIDN_FETCH_DIR}
-            "https://github.com/RenderKit/oidn/releases/download/v${RTXPT_OIDN_VERSION}/oidn-${RTXPT_OIDN_VERSION}.x64.windows.zip"
+            "v${CAUSTICA_OIDN_VERSION}.x64.windows"
+            ${CAUSTICA_OIDN_FETCH_DIR}
+            "https://github.com/RenderKit/oidn/releases/download/v${CAUSTICA_OIDN_VERSION}/oidn-${CAUSTICA_OIDN_VERSION}.x64.windows.zip"
             "zip")
     elseif (UNIX AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
-        set(RTXPT_OIDN_FETCH_DIR "${CMAKE_CURRENT_SOURCE_DIR}/External/OIDN")
-        set(RTXPT_OIDN_PACKAGE_DIR "${RTXPT_OIDN_FETCH_DIR}/oidn-${RTXPT_OIDN_VERSION}.x86_64.linux")
-        set(RTXPT_OIDN_LIBRARY_DIR "${RTXPT_OIDN_PACKAGE_DIR}/lib" CACHE INTERNAL "Open Image Denoise runtime library directory")
+        set(CAUSTICA_OIDN_FETCH_DIR "${CMAKE_CURRENT_SOURCE_DIR}/External/OIDN")
+        set(CAUSTICA_OIDN_PACKAGE_DIR "${CAUSTICA_OIDN_FETCH_DIR}/oidn-${CAUSTICA_OIDN_VERSION}.x86_64.linux")
+        set(CAUSTICA_OIDN_LIBRARY_DIR "${CAUSTICA_OIDN_PACKAGE_DIR}/lib" CACHE INTERNAL "Open Image Denoise runtime library directory")
 
         CheckAndDownloadPackage(
             "Open Image Denoise"
-            "v${RTXPT_OIDN_VERSION}.x86_64.linux"
-            ${RTXPT_OIDN_FETCH_DIR}
-            "https://github.com/RenderKit/oidn/releases/download/v${RTXPT_OIDN_VERSION}/oidn-${RTXPT_OIDN_VERSION}.x86_64.linux.tar.gz"
+            "v${CAUSTICA_OIDN_VERSION}.x86_64.linux"
+            ${CAUSTICA_OIDN_FETCH_DIR}
+            "https://github.com/RenderKit/oidn/releases/download/v${CAUSTICA_OIDN_VERSION}/oidn-${CAUSTICA_OIDN_VERSION}.x86_64.linux.tar.gz"
             "tar.gz")
     else()
-        message(WARNING "RTXPT_WITH_OIDN is supported for x64 Windows and x86_64 Linux packages; disabling OIDN for this platform.")
-        set(RTXPT_WITH_OIDN OFF CACHE BOOL "Enable Intel Open Image Denoise for Reference path tracing mode" FORCE)
+        message(WARNING "CAUSTICA_WITH_OIDN is supported for x64 Windows and x86_64 Linux packages; disabling OIDN for this platform.")
+        set(CAUSTICA_WITH_OIDN OFF CACHE BOOL "Enable Intel Open Image Denoise for Reference path tracing mode" FORCE)
     endif()
 
-    if (RTXPT_WITH_OIDN)
-        find_package(OpenImageDenoise ${RTXPT_OIDN_VERSION} CONFIG REQUIRED
+    if (CAUSTICA_WITH_OIDN)
+        find_package(OpenImageDenoise ${CAUSTICA_OIDN_VERSION} CONFIG REQUIRED
             PATHS
-                "${RTXPT_OIDN_PACKAGE_DIR}"
-                "${RTXPT_OIDN_PACKAGE_DIR}/lib/cmake/OpenImageDenoise-${RTXPT_OIDN_VERSION}"
+                "${CAUSTICA_OIDN_PACKAGE_DIR}"
+                "${CAUSTICA_OIDN_PACKAGE_DIR}/lib/cmake/OpenImageDenoise-${CAUSTICA_OIDN_VERSION}"
             NO_DEFAULT_PATH)
 
         foreach(_oidn_target OpenImageDenoise OpenImageDenoise_core)
@@ -260,33 +260,33 @@ endif()
 
 #----------------------------------------------------------------------------------------------------------------------
 # Get and unpack the Agility SDK
-set(RTXPT_D3D_AGILITY_SDK_VERSION_NAME "1.619.0" CACHE STRING "Optional Agility SDK version to download")
-set_property(CACHE RTXPT_D3D_AGILITY_SDK_VERSION_NAME PROPERTY STRINGS "1.619.0" "1.717.0-preview" "1.719.0-preview" "")
+set(CAUSTICA_D3D_AGILITY_SDK_VERSION_NAME "1.619.0" CACHE STRING "Optional Agility SDK version to download")
+set_property(CACHE CAUSTICA_D3D_AGILITY_SDK_VERSION_NAME PROPERTY STRINGS "1.619.0" "1.717.0-preview" "1.719.0-preview" "")
 
-if (WIN32 AND RTXPT_D3D_AGILITY_SDK_VERSION_NAME)
+if (WIN32 AND CAUSTICA_D3D_AGILITY_SDK_VERSION_NAME)
     # Extract the numeric SDK version (e.g. "1.717.0-preview" -> "717")
-    string(REGEX MATCH "^[0-9]+\\.([0-9]+)\\." _agility_ver_match "${RTXPT_D3D_AGILITY_SDK_VERSION_NAME}")
+    string(REGEX MATCH "^[0-9]+\\.([0-9]+)\\." _agility_ver_match "${CAUSTICA_D3D_AGILITY_SDK_VERSION_NAME}")
     set(_agility_numeric_ver "${CMAKE_MATCH_1}")
     if (NOT _agility_numeric_ver)
-        message(FATAL_ERROR "Could not extract numeric version from: ${RTXPT_D3D_AGILITY_SDK_VERSION_NAME}")
+        message(FATAL_ERROR "Could not extract numeric version from: ${CAUSTICA_D3D_AGILITY_SDK_VERSION_NAME}")
     endif()
 
-    set(RTXPT_D3D_AGILITY_SDK_PATH ${CMAKE_CURRENT_SOURCE_DIR}/external/AgilitySDK/${RTXPT_D3D_AGILITY_SDK_VERSION_NAME} CACHE STRING "AgilitySDKPath" FORCE)
-    set(RTXPT_D3D_AGILITY_SDK_VERSION "${_agility_numeric_ver}" CACHE STRING "AgilitySDKVersion" FORCE)
-    CheckAndDownloadPackage("Agility SDK" "${RTXPT_D3D_AGILITY_SDK_VERSION_NAME}"
-        ${RTXPT_D3D_AGILITY_SDK_PATH} "https://www.nuget.org/api/v2/package/Microsoft.Direct3D.D3D12/${RTXPT_D3D_AGILITY_SDK_VERSION_NAME}" "zip")
+    set(CAUSTICA_D3D_AGILITY_SDK_PATH ${CMAKE_CURRENT_SOURCE_DIR}/external/AgilitySDK/${CAUSTICA_D3D_AGILITY_SDK_VERSION_NAME} CACHE STRING "AgilitySDKPath" FORCE)
+    set(CAUSTICA_D3D_AGILITY_SDK_VERSION "${_agility_numeric_ver}" CACHE STRING "AgilitySDKVersion" FORCE)
+    CheckAndDownloadPackage("Agility SDK" "${CAUSTICA_D3D_AGILITY_SDK_VERSION_NAME}"
+        ${CAUSTICA_D3D_AGILITY_SDK_PATH} "https://www.nuget.org/api/v2/package/Microsoft.Direct3D.D3D12/${CAUSTICA_D3D_AGILITY_SDK_VERSION_NAME}" "zip")
 else()
-    set(RTXPT_D3D_AGILITY_SDK_PATH "" CACHE STRING "AgilitySDKPath" FORCE)
-    set(RTXPT_D3D_AGILITY_SDK_VERSION "" CACHE STRING "AgilitySDKVersion" FORCE)
+    set(CAUSTICA_D3D_AGILITY_SDK_PATH "" CACHE STRING "AgilitySDKPath" FORCE)
+    set(CAUSTICA_D3D_AGILITY_SDK_VERSION "" CACHE STRING "AgilitySDKVersion" FORCE)
 endif()
 
 #----------------------------------------------------------------------------------------------------------------------
 if (WIN32)
-    set(RTXPT_DEFAULT_WITH_NVAPI ON)
+    set(CAUSTICA_DEFAULT_WITH_NVAPI ON)
 else()
-    set(RTXPT_DEFAULT_WITH_NVAPI OFF)
+    set(CAUSTICA_DEFAULT_WITH_NVAPI OFF)
 endif()
-option(NVRHI_WITH_NVAPI "Include NVAPI support (requires NVAPI SDK)" ${RTXPT_DEFAULT_WITH_NVAPI})
+option(NVRHI_WITH_NVAPI "Include NVAPI support (requires NVAPI SDK)" ${CAUSTICA_DEFAULT_WITH_NVAPI})
 set(NVAPI_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/External/nvapi/" CACHE STRING "Path to NVAPI include headers/shaders" )
 set(NVAPI_LIBRARY "${CMAKE_SOURCE_DIR}/External/nvapi/amd64/nvapi64.lib" CACHE STRING "Path to NVAPI .lib file")
 
@@ -297,7 +297,7 @@ if (WIN32)
 else()
     set(DXC_PATH "" CACHE STRING "Path to embedded dxc file for DX12")
     set(DXC_DXIL_EXECUTABLE "" CACHE STRING "Path to embedded dxc file for DX12")
-    set(DXC_SPIRV_PATH "${RTXPT_DXC_SPIRV_EXECUTABLE}" CACHE STRING "Path to dxc file for SPIRV")
+    set(DXC_SPIRV_PATH "${CAUSTICA_DXC_SPIRV_EXECUTABLE}" CACHE STRING "Path to dxc file for SPIRV")
 endif()
 
 set(SHADERMAKE_FIND_DXC OFF CACHE BOOL  "" FORCE)
@@ -329,7 +329,7 @@ endif()
 add_subdirectory("External")
 
 # Default to using DXR OMMs if we can
-if(NVRHI_WITH_DX12 AND RTXPT_D3D_AGILITY_SDK_VERSION AND (RTXPT_D3D_AGILITY_SDK_VERSION GREATER_EQUAL "619"))
+if(NVRHI_WITH_DX12 AND CAUSTICA_D3D_AGILITY_SDK_VERSION AND (CAUSTICA_D3D_AGILITY_SDK_VERSION GREATER_EQUAL "619"))
     set(NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP ON CACHE BOOL "" FORCE)
 else()
     set(NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP OFF CACHE BOOL "" FORCE)
@@ -345,10 +345,10 @@ endif()
 #----------------------------------------------------------------------------------------------------------------------
 # Alternative way of obtaining assets (we're currently relying on git submodule but this is an option as well)
 #include(FetchContent)
-#set(RTXPT_ASSETS_FETCH_URL "https://gitlab-master.nvidia.com/rtx/path-tracing-sdk-assets")
-#set(RTXPT_ASSETS_FETCH_TAG "main")
-#set(RTXPT_ASSETS_FETCH_DIR "${CMAKE_SOURCE_DIR}/Assets")
-#message(STATUS "Updating assets from " ${RTXPT_ASSETS_FETCH_URL} ", tag " ${RTXPT_ASSETS_FETCH_TAG} ", into folder " ${RTXPT_ASSETS_FETCH_DIR} )
-#FetchContent_Declare(assets_download  GIT_REPOSITORY ${RTXPT_ASSETS_FETCH_URL}  GIT_TAG ${RTXPT_ASSETS_FETCH_TAG}  SOURCE_DIR ${RTXPT_ASSETS_FETCH_DIR}  GIT_PROGRESS TRUE)
+#set(CAUSTICA_ASSETS_FETCH_URL "https://gitlab-master.nvidia.com/rtx/path-tracing-sdk-assets")
+#set(CAUSTICA_ASSETS_FETCH_TAG "main")
+#set(CAUSTICA_ASSETS_FETCH_DIR "${CMAKE_SOURCE_DIR}/Assets")
+#message(STATUS "Updating assets from " ${CAUSTICA_ASSETS_FETCH_URL} ", tag " ${CAUSTICA_ASSETS_FETCH_TAG} ", into folder " ${CAUSTICA_ASSETS_FETCH_DIR} )
+#FetchContent_Declare(assets_download  GIT_REPOSITORY ${CAUSTICA_ASSETS_FETCH_URL}  GIT_TAG ${CAUSTICA_ASSETS_FETCH_TAG}  SOURCE_DIR ${CAUSTICA_ASSETS_FETCH_DIR}  GIT_PROGRESS TRUE)
 #FetchContent_MakeAvailable(assets_download)
 #----------------------------------------------------------------------------------------------------------------------

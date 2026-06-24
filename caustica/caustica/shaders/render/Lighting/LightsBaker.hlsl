@@ -91,7 +91,7 @@ void ResetPastToCurrentHistory( uint lightIndex : SV_DispatchThreadID )
     uint totalCount = max(g_controlInfo.HistoricTotalLightCount, g_controlInfo.TotalLightCount);
     if( lightIndex >= totalCount )
         return;
-    u_historyRemapPastToCurrent[lightIndex] = RTXPT_INVALID_LIGHT_INDEX;
+    u_historyRemapPastToCurrent[lightIndex] = CAUSTICA_INVALID_LIGHT_INDEX;
 }
 
 float DistanceFromFrustum( float3 position )
@@ -127,7 +127,7 @@ float ImportanceBooster( const PolymorphicLightInfoFull packedLightInfo, const u
     if( g_controlInfo.LastFrameTemporalFeedbackAvailable && g_bakerConsts.ImportanceBoostIntensityDelta > 0 ) 
     {
         uint lightIndexHistoric = u_historyRemapCurrentToPast[lightIndex];
-        float historicWeight = (lightIndexHistoric != RTXPT_INVALID_LIGHT_INDEX)?(u_lightWeights[g_bakerConsts.HistoricWeightsBufferOffset + lightIndexHistoric]):(0);
+        float historicWeight = (lightIndexHistoric != CAUSTICA_INVALID_LIGHT_INDEX)?(u_lightWeights[g_bakerConsts.HistoricWeightsBufferOffset + lightIndexHistoric]):(0);
         
         float delta = boostedWeight - historicWeight*1.1; // current threshold is 1.1 - avoids lights that gradually increase in intensity grabbing too much attention 
         if (delta>0)
@@ -231,7 +231,7 @@ EnvironmentQuadLight LoadEnvironmentQuadLight( uint lightIndex )
 [numthreads(LLB_NUM_COMPUTE_THREADS, 1, 1)]       // dispatch is (FEIS_TARGET_QUADTREE_NODE_COUNT, 1, 1)
 void EnvLightsBackupPast( uint lightIndex : SV_DispatchThreadID )
 {
-    if( lightIndex >= RTXPT_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT )
+    if( lightIndex >= CAUSTICA_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT )
         return;
 
     uint value = 0;
@@ -240,18 +240,18 @@ void EnvLightsBackupPast( uint lightIndex : SV_DispatchThreadID )
         EnvironmentQuadLight light = LoadEnvironmentQuadLight(lightIndex);
         value = EQTNodePack(light.NodeDim, light.NodeX, light.NodeY);
     }
-    u_scratchList[lightIndex] = value;        // history is backed up in RTXPT_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT
+    u_scratchList[lightIndex] = value;        // history is backed up in CAUSTICA_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT
 }
 //
 #define ENV_LIGHTS_BAKE_THREADS 128
-#define SUBDIVISION_MAX_NODES max(RTXPT_NEEAT_ENVMAP_QT_UNBOOSTED_NODE_COUNT, RTXPT_NEEAT_ENVMAP_QT_BOOST_NODES_MULT)
+#define SUBDIVISION_MAX_NODES max(CAUSTICA_NEEAT_ENVMAP_QT_UNBOOSTED_NODE_COUNT, CAUSTICA_NEEAT_ENVMAP_QT_BOOST_NODES_MULT)
 groupshared uint    g_nodes[SUBDIVISION_MAX_NODES];
 groupshared uint    g_nodePackedWeights[SUBDIVISION_MAX_NODES];
 groupshared uint    g_findMaxPacked;
 [numthreads(ENV_LIGHTS_BAKE_THREADS, 1, 1)] // note, Dispatch size is (1, 1, 1)
 void EnvLightsSubdivideBase( uint groupThreadID : SV_GroupThreadId )
 {
-    const uint baseNodeCount = RTXPT_NEEAT_ENVMAP_QT_BASE_RESOLUTION*RTXPT_NEEAT_ENVMAP_QT_BASE_RESOLUTION;
+    const uint baseNodeCount = CAUSTICA_NEEAT_ENVMAP_QT_BASE_RESOLUTION*CAUSTICA_NEEAT_ENVMAP_QT_BASE_RESOLUTION;
 
     // Init base nodes
     for( int i = 0; i < (baseNodeCount+ENV_LIGHTS_BAKE_THREADS-1)/ENV_LIGHTS_BAKE_THREADS; i++ )
@@ -260,12 +260,12 @@ void EnvLightsSubdivideBase( uint groupThreadID : SV_GroupThreadId )
 
         if( lightIndex < baseNodeCount )
         {
-            uint nodeDim    = RTXPT_NEEAT_ENVMAP_QT_BASE_RESOLUTION;
-            uint nodeX      = lightIndex / RTXPT_NEEAT_ENVMAP_QT_BASE_RESOLUTION;
-            uint nodeY      = lightIndex % RTXPT_NEEAT_ENVMAP_QT_BASE_RESOLUTION;
+            uint nodeDim    = CAUSTICA_NEEAT_ENVMAP_QT_BASE_RESOLUTION;
+            uint nodeX      = lightIndex / CAUSTICA_NEEAT_ENVMAP_QT_BASE_RESOLUTION;
+            uint nodeY      = lightIndex % CAUSTICA_NEEAT_ENVMAP_QT_BASE_RESOLUTION;
             
             g_nodes[lightIndex]             = EQTNodePack(nodeDim, nodeX, nodeY);
-            g_nodePackedWeights[lightIndex] = EnvironmentComputeWeightForQTBuild(nodeDim, nodeX, nodeY, lightIndex, RTXPT_NEEAT_ENVMAP_QT_BOOST_SUBDIVISION_DPT);
+            g_nodePackedWeights[lightIndex] = EnvironmentComputeWeightForQTBuild(nodeDim, nodeX, nodeY, lightIndex, CAUSTICA_NEEAT_ENVMAP_QT_BOOST_SUBDIVISION_DPT);
         }
     }
     
@@ -275,7 +275,7 @@ void EnvLightsSubdivideBase( uint groupThreadID : SV_GroupThreadId )
     // Quad tree build 
     GroupMemoryBarrierWithGroupSync(); // g_nodes/g_nodeWeights were touched, have to sync
     uint nodeCount = baseNodeCount; // every thread keeps their node count
-    for( int si = 0; si < RTXPT_NEEAT_ENVMAP_QT_SUBDIVISIONS; si++ ) // we know exactly how many subdivisions we'll make
+    for( int si = 0; si < CAUSTICA_NEEAT_ENVMAP_QT_SUBDIVISIONS; si++ ) // we know exactly how many subdivisions we'll make
     {
         // uint nodeCount = baseNodeCount + si * 3; // we could also do this - makes no difference
         // find the max value
@@ -317,7 +317,7 @@ void EnvLightsSubdivideBase( uint groupThreadID : SV_GroupThreadId )
             uint newNodeIndex = (groupThreadID==0)?(globalMaxIndex):(nodeCount+groupThreadID-1);  // reusing the existing node's storage in the first thread, allocating new for remaining 3
 
             g_nodes[newNodeIndex]         = EQTNodePack( nodeDim, nodeX, nodeY );
-            g_nodePackedWeights[newNodeIndex] = EnvironmentComputeWeightForQTBuild(nodeDim, nodeX, nodeY, newNodeIndex, RTXPT_NEEAT_ENVMAP_QT_BOOST_SUBDIVISION_DPT);
+            g_nodePackedWeights[newNodeIndex] = EnvironmentComputeWeightForQTBuild(nodeDim, nodeX, nodeY, newNodeIndex, CAUSTICA_NEEAT_ENVMAP_QT_BOOST_SUBDIVISION_DPT);
         }
 
         GroupMemoryBarrierWithGroupSync(); // since we've just modified g_nodes and g_nodePackedWeights, we must sync up
@@ -325,27 +325,27 @@ void EnvLightsSubdivideBase( uint groupThreadID : SV_GroupThreadId )
     }
 
 #if LLB_ENABLE_VALIDATION
-    if( nodeCount != RTXPT_NEEAT_ENVMAP_QT_UNBOOSTED_NODE_COUNT )
+    if( nodeCount != CAUSTICA_NEEAT_ENVMAP_QT_UNBOOSTED_NODE_COUNT )
         DebugPrint("Node number overflow/underflow");
 #endif
 
-    for( int i = 0; i < (RTXPT_NEEAT_ENVMAP_QT_UNBOOSTED_NODE_COUNT+ENV_LIGHTS_BAKE_THREADS-1)/ENV_LIGHTS_BAKE_THREADS; i++ )
+    for( int i = 0; i < (CAUSTICA_NEEAT_ENVMAP_QT_UNBOOSTED_NODE_COUNT+ENV_LIGHTS_BAKE_THREADS-1)/ENV_LIGHTS_BAKE_THREADS; i++ )
     {
         uint lightIndex = i * ENV_LIGHTS_BAKE_THREADS + groupThreadID;
-        if (lightIndex < RTXPT_NEEAT_ENVMAP_QT_UNBOOSTED_NODE_COUNT)
-            u_scratchList[RTXPT_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT+lightIndex*RTXPT_NEEAT_ENVMAP_QT_BOOST_NODES_MULT] = g_nodes[lightIndex]; // spread out our "seed" nodes with RTXPT_NEEAT_ENVMAP_QT_BOOST_NODES_MULT space between them
+        if (lightIndex < CAUSTICA_NEEAT_ENVMAP_QT_UNBOOSTED_NODE_COUNT)
+            u_scratchList[CAUSTICA_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT+lightIndex*CAUSTICA_NEEAT_ENVMAP_QT_BOOST_NODES_MULT] = g_nodes[lightIndex]; // spread out our "seed" nodes with CAUSTICA_NEEAT_ENVMAP_QT_BOOST_NODES_MULT space between them
     }
 }
 
-[numthreads(ENV_LIGHTS_BAKE_THREADS, 1, 1)] // note, Dispatch size is (RTXPT_NEEAT_ENVMAP_QT_UNBOOSTED_NODE_COUNT, 1, 1)
+[numthreads(ENV_LIGHTS_BAKE_THREADS, 1, 1)] // note, Dispatch size is (CAUSTICA_NEEAT_ENVMAP_QT_UNBOOSTED_NODE_COUNT, 1, 1)
 void EnvLightsSubdivideBoost( uint groupThreadID : SV_GroupThreadId, uint groupID : SV_GroupID )
 {
     const uint baseNodeCount = 1;
 
-    const uint globalNodeBaseIndex     = groupID * RTXPT_NEEAT_ENVMAP_QT_BOOST_NODES_MULT;
+    const uint globalNodeBaseIndex     = groupID * CAUSTICA_NEEAT_ENVMAP_QT_BOOST_NODES_MULT;
 
     // Init base node
-    uint baseNode = u_scratchList[RTXPT_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT + globalNodeBaseIndex];
+    uint baseNode = u_scratchList[CAUSTICA_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT + globalNodeBaseIndex];
     uint nodeDim; uint nodeX; uint nodeY;
     EQTNodeUnpack( baseNode, nodeDim, nodeX, nodeY );
 
@@ -358,7 +358,7 @@ void EnvLightsSubdivideBoost( uint groupThreadID : SV_GroupThreadId, uint groupI
     // Quad tree build 
     GroupMemoryBarrierWithGroupSync(); // g_nodes/g_nodeWeights were touched, have to sync
     uint nodeCount = baseNodeCount; // every thread keeps their node count
-    for( int si = 0; si < RTXPT_NEEAT_ENVMAP_QT_BOOST_SUBDIVISION; si++ ) // we know exactly how many subdivisions we'll make
+    for( int si = 0; si < CAUSTICA_NEEAT_ENVMAP_QT_BOOST_SUBDIVISION; si++ ) // we know exactly how many subdivisions we'll make
     {
         // find the max value
         const uint itemsPerThread = (nodeCount + ENV_LIGHTS_BAKE_THREADS - 1) / ENV_LIGHTS_BAKE_THREADS;
@@ -407,16 +407,16 @@ void EnvLightsSubdivideBoost( uint groupThreadID : SV_GroupThreadId, uint groupI
     }
 
 #if LLB_ENABLE_VALIDATION
-    if( nodeCount != RTXPT_NEEAT_ENVMAP_QT_BOOST_NODES_MULT )
+    if( nodeCount != CAUSTICA_NEEAT_ENVMAP_QT_BOOST_NODES_MULT )
         DebugPrint("Node number overflow/underflow (boost)");
 #endif
 
-    for( int i = 0; i < (RTXPT_NEEAT_ENVMAP_QT_BOOST_NODES_MULT+ENV_LIGHTS_BAKE_THREADS-1)/ENV_LIGHTS_BAKE_THREADS; i++ )
+    for( int i = 0; i < (CAUSTICA_NEEAT_ENVMAP_QT_BOOST_NODES_MULT+ENV_LIGHTS_BAKE_THREADS-1)/ENV_LIGHTS_BAKE_THREADS; i++ )
     {
         uint lightIndex = i * ENV_LIGHTS_BAKE_THREADS + groupThreadID;
-        if (lightIndex < RTXPT_NEEAT_ENVMAP_QT_BOOST_NODES_MULT)
+        if (lightIndex < CAUSTICA_NEEAT_ENVMAP_QT_BOOST_NODES_MULT)
         {
-            // u_scratchList[RTXPT_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT+globalNodeBaseIndex+lightIndex] = g_nodes[lightIndex];
+            // u_scratchList[CAUSTICA_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT+globalNodeBaseIndex+lightIndex] = g_nodes[lightIndex];
 
             // bake in-place!
             uint outLightIndex = globalNodeBaseIndex+lightIndex;
@@ -441,7 +441,7 @@ void EnvLightsSubdivideBoost( uint groupThreadID : SV_GroupThreadId, uint groupI
             u_lightsExBuffer[outLightIndex] = lightFull.Extended;
 
             // figure out our past frame's counterpart if any
-            uint historicIndex = RTXPT_INVALID_LIGHT_INDEX;
+            uint historicIndex = CAUSTICA_INVALID_LIGHT_INDEX;
             if( u_controlBuffer[0].LastFrameTemporalFeedbackAvailable )
             {
                 uint dimScale = g_bakerConsts.EnvMapImportanceMapResolution / envLight.NodeDim;
@@ -462,7 +462,7 @@ void EnvLightsSubdivideBoost( uint groupThreadID : SV_GroupThreadId, uint groupI
 [numthreads(FILL_THREAD_COUNT, FILL_THREAD_COUNT, 1)]
 void EnvLightsFillLookupMap( uint lightIndex : SV_GroupID, uint2 threadID : SV_GroupThreadID )
 {
-    if( lightIndex >= RTXPT_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT )
+    if( lightIndex >= CAUSTICA_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT )
         return;
 
     EnvironmentQuadLight light = LoadEnvironmentQuadLight(lightIndex);
@@ -504,11 +504,11 @@ bool EnvLightNodeIsInside( uint nodeDim_A, uint nodeX_A, uint nodeY_A, uint node
 [numthreads(LLB_NUM_COMPUTE_THREADS, 1, 1)]       // dispatch is (FEIS_TARGET_QUADTREE_NODE_COUNT, 1, 1)
 void EnvLightsMapPastToCurrent( uint historicIndex : SV_DispatchThreadID )
 {
-    if( historicIndex >= RTXPT_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT )
+    if( historicIndex >= CAUSTICA_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT )
         return;
 
 
-    uint presentIndex = RTXPT_INVALID_LIGHT_INDEX;
+    uint presentIndex = CAUSTICA_INVALID_LIGHT_INDEX;
     if( g_controlInfo.LastFrameTemporalFeedbackAvailable )
     {
         uint nodeDim, nodeX, nodeY;
@@ -690,8 +690,8 @@ void BakeEmissiveTriangles( uint dispatchThreadID : SV_DispatchThreadID, uint gr
         u_lightsBuffer[lightIndex] = lightFull.Base;
         u_lightsExBuffer[lightIndex] = lightFull.Extended;
 
-        uint historicIndex = RTXPT_INVALID_LIGHT_INDEX;
-        if( task.HistoricBufferOffset != RTXPT_INVALID_LIGHT_INDEX )
+        uint historicIndex = CAUSTICA_INVALID_LIGHT_INDEX;
+        if( task.HistoricBufferOffset != CAUSTICA_INVALID_LIGHT_INDEX )
         {
             historicIndex = task.HistoricBufferOffset+subIndex;
             u_historyRemapPastToCurrent[historicIndex] = lightIndex;
@@ -734,7 +734,7 @@ float ComputeWeight( const PolymorphicLightInfoFull light )
     //float weight = emissiveFlux; // weight is just emissive flux now - could be scaled by LOD like distance to camera 
     float weight = pow(emissiveFlux, 0.8); // alternative: weight is slightly less that the emissive flux - actually works better in some cases
 
-    if( weight < RTXPT_LIGHTING_MIN_WEIGHT_THRESHOLD )
+    if( weight < CAUSTICA_LIGHTING_MIN_WEIGHT_THRESHOLD )
         weight = 0;
 
     return weight;
@@ -887,7 +887,7 @@ void ComputeProxyCounts( uint dispatchThreadID : SV_DispatchThreadID, uint group
     if( lightIndex >= lightCount )
         return;
 
-    const uint cTotalSamplingProxiesBudget = RTXPT_LIGHTING_SAMPLING_PROXY_RATIO*max( g_controlInfo.TotalLightCount, RTXPT_LIGHTING_MAX_LIGHTS/10 );    // Sampling proxies budget is based on current total lights or 10% of max supported lights, whichever is greater. This allows small number of lights to benefit from better balancing, without adding too much to the overall cost.
+    const uint cTotalSamplingProxiesBudget = CAUSTICA_LIGHTING_SAMPLING_PROXY_RATIO*max( g_controlInfo.TotalLightCount, CAUSTICA_LIGHTING_MAX_LIGHTS/10 );    // Sampling proxies budget is based on current total lights or 10% of max supported lights, whichever is greater. This allows small number of lights to benefit from better balancing, without adding too much to the overall cost.
     const float weightSum = asfloat(g_controlInfo.WeightsSumUINT);
 
     float feedbackWeight = 0;
@@ -913,7 +913,7 @@ void ComputeProxyCounts( uint dispatchThreadID : SV_DispatchThreadID, uint group
         lightSamplingProxies = (g_controlInfo.ImportanceSamplingType==0)?(1):(uint( ceil( (float(cTotalSamplingProxiesBudget-g_controlInfo.TotalLightCount) * lightWeight) / weightSum ) ));
 
     // limit the boost offered by proxies - possibly unnecessary limitation, but would in theory allow us to pack it to 16bits if ever needed
-    lightSamplingProxies = min( lightSamplingProxies, RTXPT_LIGHTING_MAX_SAMPLING_PROXIES_PER_LIGHT-1 );
+    lightSamplingProxies = min( lightSamplingProxies, CAUSTICA_LIGHTING_MAX_SAMPLING_PROXIES_PER_LIGHT-1 );
 
     // store! this is used by sampling
     u_perLightProxyCounters[lightIndex] = lightSamplingProxies;
@@ -1057,20 +1057,20 @@ void ExecuteProxyJobs( uint dispatchThreadID : SV_DispatchThreadID)
 
 uint RemapPastToCurrent(uint historicLightIndex)
 {
-    uint lightIndex = RTXPT_INVALID_LIGHT_INDEX;
-    if (historicLightIndex != RTXPT_INVALID_LIGHT_INDEX)
+    uint lightIndex = CAUSTICA_INVALID_LIGHT_INDEX;
+    if (historicLightIndex != CAUSTICA_INVALID_LIGHT_INDEX)
     {
         // it's essential to bounds-check against g_controlInfo.HistoricTotalLightCount
-        lightIndex = ( historicLightIndex < g_controlInfo.HistoricTotalLightCount )?(u_historyRemapPastToCurrent[historicLightIndex]):(RTXPT_INVALID_LIGHT_INDEX);
+        lightIndex = ( historicLightIndex < g_controlInfo.HistoricTotalLightCount )?(u_historyRemapPastToCurrent[historicLightIndex]):(CAUSTICA_INVALID_LIGHT_INDEX);
 
-        if ( lightIndex != RTXPT_INVALID_LIGHT_INDEX )
+        if ( lightIndex != CAUSTICA_INVALID_LIGHT_INDEX )
         {
             if ( lightIndex >= g_controlInfo.TotalLightCount )
             {
 #if LLB_ENABLE_VALIDATION
                 DebugPrint( "3 - Danger, overflow {0}", lightIndex );
 #endif
-                lightIndex = RTXPT_INVALID_LIGHT_INDEX;
+                lightIndex = CAUSTICA_INVALID_LIGHT_INDEX;
             }
         }
         // else
@@ -1093,7 +1093,7 @@ struct LocalReservoir
         LightFeedbackReservoir res = LightFeedbackReservoir::make( uint2( clamp(pos, int2(0,0), int2(g_bakerConsts.FeedbackResolution.xy)-1.xx) ), u_feedbackTotalWeight, u_feedbackCandidates);
         IndexRaw = res.GetCandidateRaw();
         TotalWeight = res.GetTotalWeight();
-        if (IndexRaw == RTXPT_INVALID_LIGHT_INDEX)
+        if (IndexRaw == CAUSTICA_INVALID_LIGHT_INDEX)
             TotalWeight = 0;
     }
     void    Store(uint2 pos)
@@ -1104,7 +1104,7 @@ struct LocalReservoir
     }
     bool IsScreenSpaceCoherent()
     {
-        if (IndexRaw != RTXPT_INVALID_LIGHT_INDEX)
+        if (IndexRaw != CAUSTICA_INVALID_LIGHT_INDEX)
         {
             return (IndexRaw & LFR_SCREEN_SPACE_COHERENT_FLAG) != 0;
             // return IndexRaw & (~LFR_SCREEN_SPACE_COHERENT_FLAG);
@@ -1135,7 +1135,7 @@ void ProcessFeedbackHistoryPreFilter(uint3 groupId : SV_GroupID, uint3 localId :
         const float kLikenessMultiplier = 128;   // preserves the ratio of ssc vs wsc
         
         bool centerIsSSC = g_tile[localId.y][localId.x].IsScreenSpaceCoherent();
-        bool centerIsNotEmpty = g_tile[localId.y][localId.x].IndexRaw != RTXPT_INVALID_LIGHT_INDEX;
+        bool centerIsNotEmpty = g_tile[localId.y][localId.x].IndexRaw != CAUSTICA_INVALID_LIGHT_INDEX;
 
         LocalReservoir kernel[9];
         float cdf[9];
@@ -1169,7 +1169,7 @@ void ProcessFeedbackHistoryPreFilter(uint3 groupId : SV_GroupID, uint3 localId :
     }
 }
 
-// * update historic indices to current frame indices (and set to RTXPT_INVALID_LIGHT_INDEX invalid ones)
+// * update historic indices to current frame indices (and set to CAUSTICA_INVALID_LIGHT_INDEX invalid ones)
 // * update global per-light counters
 // * strip world space coherent samples from reservoir and process separately
 [numthreads(LLB_NUM_COMPUTE_THREADS_2D, LLB_NUM_COMPUTE_THREADS_2D, 1)] 
@@ -1177,9 +1177,9 @@ void ProcessFeedbackHistoryP0( uint2 dispatchThreadID : SV_DispatchThreadID )
 {
     uint2 pixelPos = dispatchThreadID.xy;
 
-    uint lightIndexAll = RTXPT_INVALID_LIGHT_INDEX; // screen space and world space coherent
+    uint lightIndexAll = CAUSTICA_INVALID_LIGHT_INDEX; // screen space and world space coherent
     float lightIndexAllWeight = 0.0;
-    uint lightIndexWSC = RTXPT_INVALID_LIGHT_INDEX; // world space coherent
+    uint lightIndexWSC = CAUSTICA_INVALID_LIGHT_INDEX; // world space coherent
 
     if( pixelPos.x < g_bakerConsts.FeedbackResolution.x && pixelPos.y < g_bakerConsts.FeedbackResolution.y )
     {
@@ -1195,8 +1195,8 @@ void ProcessFeedbackHistoryP0( uint2 dispatchThreadID : SV_DispatchThreadID )
 
         // map history (last frame's) indices to corresponding current (if any)
         // strip world space coherent and place them in lightIndexWSC for later processing
-        uint dbgLightIndexSSC = RTXPT_INVALID_LIGHT_INDEX; // screen space coherent
-        uint dbgLightIndexWSC = RTXPT_INVALID_LIGHT_INDEX; // world space coherent
+        uint dbgLightIndexSSC = CAUSTICA_INVALID_LIGHT_INDEX; // screen space coherent
+        uint dbgLightIndexWSC = CAUSTICA_INVALID_LIGHT_INDEX; // world space coherent
         if (!historicReservoir.IsEmpty())
         {
             bool stillValid = false;
@@ -1206,13 +1206,13 @@ void ProcessFeedbackHistoryP0( uint2 dispatchThreadID : SV_DispatchThreadID )
 
 #if NEEAT_ENABLE_DEBUG_DRAW
             if (g_bakerConsts.DebugDrawType == (int)LightingDebugViewType::NoHistoryFeedback)
-                DebugPixel(pixelPos.xy, float4(candidateIndex == RTXPT_INVALID_LIGHT_INDEX, candidateIndex != RTXPT_INVALID_LIGHT_INDEX, 0, 1));
+                DebugPixel(pixelPos.xy, float4(candidateIndex == CAUSTICA_INVALID_LIGHT_INDEX, candidateIndex != CAUSTICA_INVALID_LIGHT_INDEX, 0, 1));
 #endif            
 
             lightIndexAll = candidateIndex;
             lightIndexAllWeight = historicReservoir.GetTotalWeight();
                 
-            if (candidateIndex != RTXPT_INVALID_LIGHT_INDEX) // just for debugging
+            if (candidateIndex != CAUSTICA_INVALID_LIGHT_INDEX) // just for debugging
             {
                 if (candidateIsScreenSpaceCoherent) 
                     dbgLightIndexSSC = candidateIndex;
@@ -1223,13 +1223,13 @@ void ProcessFeedbackHistoryP0( uint2 dispatchThreadID : SV_DispatchThreadID )
             if (!candidateIsScreenSpaceCoherent) // strip world space coherent from reservoir and place in separate lightIndexWSC list
             {
                 lightIndexWSC = candidateIndex;
-                candidateIndex = RTXPT_INVALID_LIGHT_INDEX;
+                candidateIndex = CAUSTICA_INVALID_LIGHT_INDEX;
             }
 
             // save only 
             historicReservoir.SetCandidate(candidateIndex, candidateIsScreenSpaceCoherent);
                 
-            if (candidateIndex != RTXPT_INVALID_LIGHT_INDEX)
+            if (candidateIndex != CAUSTICA_INVALID_LIGHT_INDEX)
                 stillValid = true;
 
             if (!stillValid)
@@ -1238,8 +1238,8 @@ void ProcessFeedbackHistoryP0( uint2 dispatchThreadID : SV_DispatchThreadID )
 
         historicReservoir.CommitToStorage();
 
-        bool hasSSC = dbgLightIndexSSC != RTXPT_INVALID_LIGHT_INDEX;
-        bool hasWSC = dbgLightIndexWSC != RTXPT_INVALID_LIGHT_INDEX;
+        bool hasSSC = dbgLightIndexSSC != CAUSTICA_INVALID_LIGHT_INDEX;
+        bool hasWSC = dbgLightIndexWSC != CAUSTICA_INVALID_LIGHT_INDEX;
 
 #if NEEAT_ENABLE_DEBUG_DRAW
         float alpha = 1.0;
@@ -1252,9 +1252,9 @@ void ProcessFeedbackHistoryP0( uint2 dispatchThreadID : SV_DispatchThreadID )
             #if 0
             uint a = historicReservoir.GetCandidateRaw(0);
             uint b = historicReservoir.GetCandidateRaw(1);
-            if (a==RTXPT_INVALID_LIGHT_INDEX)
+            if (a==CAUSTICA_INVALID_LIGHT_INDEX)
                 DebugPixel( pixelPos.xy, float4( 1.0, 0.5, 0.0, 1.0 ) );
-            else if (b==RTXPT_INVALID_LIGHT_INDEX)
+            else if (b==CAUSTICA_INVALID_LIGHT_INDEX)
                 DebugPixel( pixelPos.xy, float4( 0.5, 1.0, 0.0, 1.0 ) );
             else if (a==b)
                 DebugPixel( pixelPos.xy, float4( 0.2, 0.0, 1.0, 1.0 ) );
@@ -1276,12 +1276,12 @@ void ProcessFeedbackHistoryP0( uint2 dispatchThreadID : SV_DispatchThreadID )
         uint lightIndex = lightIndexAll;
 
     #if LLB_ENABLE_VALIDATION
-        if (lightIndex != RTXPT_INVALID_LIGHT_INDEX)
+        if (lightIndex != CAUSTICA_INVALID_LIGHT_INDEX)
             InterlockedAdd( u_controlBuffer[0].ValidFeedbackCount, 1 );
     #endif
 
     #if TARGET_VULKAN // simple verison with no wave intrinsics - for reference & debugging
-        InterlockedAdd( u_perLightProxyCounters[min(lightIndex, g_controlInfo.TotalLightCount)], 1 ); // when lightIndex == RTXPT_INVALID_LIGHT_INDEX, we store "non-valid feedback" in the special last place
+        InterlockedAdd( u_perLightProxyCounters[min(lightIndex, g_controlInfo.TotalLightCount)], 1 ); // when lightIndex == CAUSTICA_INVALID_LIGHT_INDEX, we store "non-valid feedback" in the special last place
     #else // TARGET_D3D12, optimized wave intrinsics variants for dx12 SM 6.5
         // new SM 6.5 version!
         uint4 matchingBitmask = WaveMatch(lightIndex);
@@ -1297,7 +1297,7 @@ void ProcessFeedbackHistoryP0( uint2 dispatchThreadID : SV_DispatchThreadID )
         #endif
         if (weAreFirst)
         {
-            // we use u_perLightProxyCounters[g_controlInfo.TotalLightCount] as the place for NonValidFeedbackCount to avoid storing it separately; when lightIndex == RTXPT_INVALID_LIGHT_INDEX, it's stored there
+            // we use u_perLightProxyCounters[g_controlInfo.TotalLightCount] as the place for NonValidFeedbackCount to avoid storing it separately; when lightIndex == CAUSTICA_INVALID_LIGHT_INDEX, it's stored there
             InterlockedAdd( u_perLightProxyCounters[min(lightIndex, g_controlInfo.TotalLightCount)], matchingCount );
         }
     #endif
@@ -1330,11 +1330,11 @@ uint  LSB_Address( uint2 tilePos, uint index )  { return LLSB_ComputeBaseAddress
 uint SampleLightLocalHistoric(uint2 pixelPos, inout MicroRng sampleGenerator)
 {
     if (!g_controlInfo.LastFrameLocalSamplesAvailable)
-        return RTXPT_INVALID_LIGHT_INDEX;
+        return CAUSTICA_INVALID_LIGHT_INDEX;
 
-    uint2 tilePos = (pixelPos + g_controlInfo.LocalSamplingTileJitterPrev) / RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE;
+    uint2 tilePos = (pixelPos + g_controlInfo.LocalSamplingTileJitterPrev) / CAUSTICA_LIGHTING_SAMPLING_BUFFER_TILE_SIZE;
 
-    uint indexInIndex = sampleGenerator.Next() % RTXPT_LIGHTING_LOCAL_PROXY_COUNT;
+    uint indexInIndex = sampleGenerator.Next() % CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT;
 
     return RemapPastToCurrent(UnpackMiniListLight(u_localSamplingBuffer[ LSB_Address(tilePos.xy, indexInIndex) ]));
 }
@@ -1382,14 +1382,14 @@ void ProcessFeedbackHistoryP1a( uint2 dispatchThreadID : SV_DispatchThreadID )
     if (g_controlInfo.LastFrameTemporalFeedbackAvailable)
     {
         int expandMargin = 1;
-        for( int x = -expandMargin; x < RTXPT_NEEAT_EARLY_FEEDBACK_TILE_SIZE+expandMargin; x++ )
-            for( int y = -expandMargin; y < RTXPT_NEEAT_EARLY_FEEDBACK_TILE_SIZE+expandMargin; y++ )
+        for( int x = -expandMargin; x < CAUSTICA_NEEAT_EARLY_FEEDBACK_TILE_SIZE+expandMargin; x++ )
+            for( int y = -expandMargin; y < CAUSTICA_NEEAT_EARLY_FEEDBACK_TILE_SIZE+expandMargin; y++ )
             {
-                int2 pixelPos = pixelPosLR * RTXPT_NEEAT_EARLY_FEEDBACK_TILE_SIZE + int2(x, y);
+                int2 pixelPos = pixelPosLR * CAUSTICA_NEEAT_EARLY_FEEDBACK_TILE_SIZE + int2(x, y);
                 pixelPos = clamp( int2(pixelPos), int2(0,0), int2(g_bakerConsts.FeedbackResolution) - 1.xx );
 
                 float baseWeight = 1.0;
-                if (x<0 || y<0 || x>=RTXPT_NEEAT_EARLY_FEEDBACK_TILE_SIZE || y >= RTXPT_NEEAT_EARLY_FEEDBACK_TILE_SIZE)
+                if (x<0 || y<0 || x>=CAUSTICA_NEEAT_EARLY_FEEDBACK_TILE_SIZE || y >= CAUSTICA_NEEAT_EARLY_FEEDBACK_TILE_SIZE)
                     baseWeight = g_bakerConsts.ReservoirHistoryDropoff;
             
                 int2 prevPixelPos;
@@ -1407,18 +1407,18 @@ void ProcessFeedbackHistoryP1a( uint2 dispatchThreadID : SV_DispatchThreadID )
     if( g_bakerConsts.DebugDrawType == (int)LightingDebugViewType::LowResBlendedFeedback )
     {
         uint dbgLightIndex; bool isScreenSpaceCoherent;
-        for( int x = 0; x < RTXPT_NEEAT_EARLY_FEEDBACK_TILE_SIZE; x++ )
-            for( int y = 0; y < RTXPT_NEEAT_EARLY_FEEDBACK_TILE_SIZE; y++ )
+        for( int x = 0; x < CAUSTICA_NEEAT_EARLY_FEEDBACK_TILE_SIZE; x++ )
+            for( int y = 0; y < CAUSTICA_NEEAT_EARLY_FEEDBACK_TILE_SIZE; y++ )
             {
-                int2 pixelPos = pixelPosLR * RTXPT_NEEAT_EARLY_FEEDBACK_TILE_SIZE + int2(x, y);
+                int2 pixelPos = pixelPosLR * CAUSTICA_NEEAT_EARLY_FEEDBACK_TILE_SIZE + int2(x, y);
                 reservoirBlended.GetCandidate(dbgLightIndex, isScreenSpaceCoherent);
 
                 #if 0
                 uint a = reservoirBlended.GetCandidateRaw(0);
                 uint b = reservoirBlended.GetCandidateRaw(1);
-                if (a==RTXPT_INVALID_LIGHT_INDEX)
+                if (a==CAUSTICA_INVALID_LIGHT_INDEX)
                     DebugPixel( pixelPos.xy, float4( 1.0, 0.5, 0.0, 1.0 ) );
-                else if (b==RTXPT_INVALID_LIGHT_INDEX)
+                else if (b==CAUSTICA_INVALID_LIGHT_INDEX)
                     DebugPixel( pixelPos.xy, float4( 0.5, 1.0, 0.0, 1.0 ) );
                 else if (a==b)
                     DebugPixel( pixelPos.xy, float4( 0.2, 0.0, 1.0, 1.0 ) );
@@ -1433,7 +1433,7 @@ void ProcessFeedbackHistoryP1a( uint2 dispatchThreadID : SV_DispatchThreadID )
     
     // make sure it reservoirBlended always has valid light indices even when it's empty - simplifies things later on
     uint resLightIndex = reservoirBlended.GetCandidateRaw();
-    if ( resLightIndex == RTXPT_INVALID_LIGHT_INDEX)
+    if ( resLightIndex == CAUSTICA_INVALID_LIGHT_INDEX)
     {
         resLightIndex = SampleLightGlobal(sampleGenerator);
         reservoirBlended.SetCandidateRaw(resLightIndex);
@@ -1479,7 +1479,7 @@ void ProcessFeedbackHistoryP1b( uint2 dispatchThreadID : SV_DispatchThreadID )
 
         // part 1a: this relies on blended feedback to allow for some sharing between neighbours but blended feedback can also be used to pre-warm the cache so it's useful either way
         static const float neighbourWeight = g_bakerConsts.ReservoirHistoryDropoff;
-        int2 srcCoordLR = pixelPos / RTXPT_NEEAT_EARLY_FEEDBACK_TILE_SIZE.xx;
+        int2 srcCoordLR = pixelPos / CAUSTICA_NEEAT_EARLY_FEEDBACK_TILE_SIZE.xx;
         LightFeedbackReservoir reservoirSrc = LightFeedbackReservoir::make(srcCoordLR, u_feedbackTotalWeightBlended, u_feedbackCandidatesBlended);
         if (!reservoirSrc.IsEmpty())
             reservoirTarget.Merge( sampleGenerator.NextFloat(), reservoirSrc, neighbourWeight );
@@ -1487,9 +1487,9 @@ void ProcessFeedbackHistoryP1b( uint2 dispatchThreadID : SV_DispatchThreadID )
         #if 0
         uint a = reservoirTarget.GetCandidateRaw(0);
         uint b = reservoirTarget.GetCandidateRaw(1);
-        if (a==RTXPT_INVALID_LIGHT_INDEX)
+        if (a==CAUSTICA_INVALID_LIGHT_INDEX)
             DebugPixel( pixelPos.xy, float4( 1.0, 0.5, 0.0, 1.0 ) );
-        else if (b==RTXPT_INVALID_LIGHT_INDEX)
+        else if (b==CAUSTICA_INVALID_LIGHT_INDEX)
             DebugPixel( pixelPos.xy, float4( 0.5, 1.0, 0.0, 1.0 ) );
         else if (a==b)
             DebugPixel( pixelPos.xy, float4( 0.2, 0.0, 1.0, 1.0 ) );
@@ -1499,14 +1499,14 @@ void ProcessFeedbackHistoryP1b( uint2 dispatchThreadID : SV_DispatchThreadID )
 
         // part 2: fill up missing data; leave TotalWeight as is (could be 0) to avoid unnecessary reuse later, but TotalWeight is ignored when building local samplers
         uint resLightIndex = reservoirTarget.GetCandidateRaw();
-        if ( resLightIndex == RTXPT_INVALID_LIGHT_INDEX)
+        if ( resLightIndex == CAUSTICA_INVALID_LIGHT_INDEX)
         {
             //DebugPixel( reservoirTarget.PixelPos, float4( 1, 0, 0, 1.0) );
 
             if (reprojectionValid) // there's no point trying to get correct replacement from local historinc sampler if reprojection isn't valid
                 resLightIndex = SampleLightLocalHistoric(prevPixelPos, sampleGenerator);
 
-            if ( resLightIndex == RTXPT_INVALID_LIGHT_INDEX)
+            if ( resLightIndex == CAUSTICA_INVALID_LIGHT_INDEX)
                 resLightIndex = SampleLightGlobal(sampleGenerator);
 
             reservoirTarget.SetCandidateRaw(resLightIndex);
@@ -1520,16 +1520,16 @@ void ProcessFeedbackHistoryP1b( uint2 dispatchThreadID : SV_DispatchThreadID )
 // This fills the local sampling tile buffer (u_localSamplingBuffer) with light indices - it does not find duplicates and sort 
 void FillTile( uint2 tilePos )
 {
-    int margin = (RTXPT_LIGHTING_SAMPLING_BUFFER_WINDOW_SIZE - RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE)/2;
-    int2 cellTopLeft   = tilePos.xy * RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - (int2)g_controlInfo.LocalSamplingTileJitter;
+    int margin = (CAUSTICA_LIGHTING_SAMPLING_BUFFER_WINDOW_SIZE - CAUSTICA_LIGHTING_SAMPLING_BUFFER_TILE_SIZE)/2;
+    int2 cellTopLeft   = tilePos.xy * CAUSTICA_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - (int2)g_controlInfo.LocalSamplingTileJitter;
     int2 windowTopLeft  = (int2)cellTopLeft - margin;
 
     uint currentlyCollectedCount = 0;
 
-    bool debugTile = all( g_bakerConsts.MouseCursorPos >= cellTopLeft ) && all((g_bakerConsts.MouseCursorPos-cellTopLeft) < RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE.xx );
+    bool debugTile = all( g_bakerConsts.MouseCursorPos >= cellTopLeft ) && all((g_bakerConsts.MouseCursorPos-cellTopLeft) < CAUSTICA_LIGHTING_SAMPLING_BUFFER_TILE_SIZE.xx );
 
-    for ( int x = 0; x < RTXPT_LIGHTING_SAMPLING_BUFFER_WINDOW_SIZE; x++ )
-        for ( int y = 0; y < RTXPT_LIGHTING_SAMPLING_BUFFER_WINDOW_SIZE; y++ )
+    for ( int x = 0; x < CAUSTICA_LIGHTING_SAMPLING_BUFFER_WINDOW_SIZE; x++ )
+        for ( int y = 0; y < CAUSTICA_LIGHTING_SAMPLING_BUFFER_WINDOW_SIZE; y++ )
         {
             int2 pixelPos = windowTopLeft + int2(x,y);
             int2 srcCoord = MirrorCoord(pixelPos, g_bakerConsts.FeedbackResolution);
@@ -1539,7 +1539,7 @@ void FillTile( uint2 tilePos )
             uint lightIndex = reservoir.GetCandidateRaw();
 
 #if LLB_ENABLE_VALIDATION
-            if ( lightIndex == RTXPT_INVALID_LIGHT_INDEX )
+            if ( lightIndex == CAUSTICA_INVALID_LIGHT_INDEX )
             {
                 DebugPixel( cellTopLeft, float4(1,0,0,1) );
                 DebugPrint("Bad light read from {0} - missing barrier or etc?", srcCoord);
@@ -1551,9 +1551,9 @@ void FillTile( uint2 tilePos )
 
     MicroRng sampleGenerator = MicroRng::make(tilePos, g_bakerConsts.UpdateCounter, 5);
 
-    const float2 cellCenter = float2(cellTopLeft+RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE*0.5);
-    const float radius = RTXPT_LIGHTING_SAMPLING_BUFFER_WINDOW_SIZE * 4.0f;
-    for ( int i = 0; i < RTXPT_LIGHTING_TOP_UP_SAMPLES; i++ )
+    const float2 cellCenter = float2(cellTopLeft+CAUSTICA_LIGHTING_SAMPLING_BUFFER_TILE_SIZE*0.5);
+    const float radius = CAUSTICA_LIGHTING_SAMPLING_BUFFER_WINDOW_SIZE * 4.0f;
+    for ( int i = 0; i < CAUSTICA_LIGHTING_TOP_UP_SAMPLES; i++ )
     {
         float2 offset = (sampleGenerator.NextFloat2() - 0.5) * radius;
 
@@ -1563,12 +1563,12 @@ void FillTile( uint2 tilePos )
 #if 0 // use actual samples
         LightFeedbackReservoir reservoir = LightFeedbackReservoir::make(srcCoord, u_feedbackTotalWeightScratch, u_feedbackCandidatesScratch);
 #else // use "blended" samples
-        int2 srcCoordLR = srcCoord / RTXPT_NEEAT_EARLY_FEEDBACK_TILE_SIZE.xx;
+        int2 srcCoordLR = srcCoord / CAUSTICA_NEEAT_EARLY_FEEDBACK_TILE_SIZE.xx;
         LightFeedbackReservoir reservoir = LightFeedbackReservoir::make(srcCoordLR, u_feedbackTotalWeightBlended, u_feedbackCandidatesBlended);
 #endif
         uint lightIndex = reservoir.GetCandidateRaw();
 #if LLB_ENABLE_VALIDATION
-        if ( lightIndex == RTXPT_INVALID_LIGHT_INDEX )
+        if ( lightIndex == CAUSTICA_INVALID_LIGHT_INDEX )
         {
             DebugPixel( cellTopLeft, float4(1,0,0,1) );
             DebugPrint("2: Bad light read from {0} - missing barrier or etc?", srcCoord);
@@ -1579,7 +1579,7 @@ void FillTile( uint2 tilePos )
     }
 
 #if LLB_ENABLE_VALIDATION
-    if ( currentlyCollectedCount != RTXPT_LIGHTING_LOCAL_PROXY_COUNT )// || lightIndexB == RTXPT_INVALID_LIGHT_INDEX )
+    if ( currentlyCollectedCount != CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT )// || lightIndexB == CAUSTICA_INVALID_LIGHT_INDEX )
     {
         DebugPixel( cellTopLeft, float4(1,0,0,1) );
         DebugPrint("Wrong number of lights in FillTile {0}, {1} - missing barrier or etc?", tilePos, currentlyCollectedCount);
@@ -1607,22 +1607,22 @@ void ProcessFeedbackHistoryP3a( uint3 dispatchThreadID : SV_DispatchThreadID, ui
     if( tilePos.x >= g_controlInfo.LocalSamplingResolution.x || tilePos.y >= g_controlInfo.LocalSamplingResolution.y*2 )
         return;
 
-    int2 cellTopLeft   = tilePos.xy * RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - (int2)g_controlInfo.LocalSamplingTileJitter;
-    bool debugTile = all( g_bakerConsts.MouseCursorPos >= cellTopLeft ) && all((g_bakerConsts.MouseCursorPos-cellTopLeft) < RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE.xx );
+    int2 cellTopLeft   = tilePos.xy * CAUSTICA_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - (int2)g_controlInfo.LocalSamplingTileJitter;
+    bool debugTile = all( g_bakerConsts.MouseCursorPos >= cellTopLeft ) && all((g_bakerConsts.MouseCursorPos-cellTopLeft) < CAUSTICA_LIGHTING_SAMPLING_BUFFER_TILE_SIZE.xx );
     debugTile = false;
 
 #if 0
     SortedLightList
-    SortedLightLLRBTree<RTXPT_LIGHTING_LOCAL_PROXY_COUNT> container = SortedLightLLRBTree<RTXPT_LIGHTING_LOCAL_PROXY_COUNT>::empty();
+    SortedLightLLRBTree<CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT> container = SortedLightLLRBTree<CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT>::empty();
 #else
-    HashBucketSortTable<RTXPT_LIGHTING_LOCAL_PROXY_COUNT> container = HashBucketSortTable<RTXPT_LIGHTING_LOCAL_PROXY_COUNT>::empty();
+    HashBucketSortTable<CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT> container = HashBucketSortTable<CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT>::empty();
 #endif
 
-    for( uint i = 0; i < RTXPT_LIGHTING_LOCAL_PROXY_COUNT; i++ )
+    for( uint i = 0; i < CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT; i++ )
         container.InsertOrIncCounter( UnpackMiniListLight(u_localSamplingBuffer[ LSB_Address(tilePos, i) ]), debugTile );
 
     int sampleCount = container.Store(u_localSamplingBuffer, tilePos, debugTile);
-    if( sampleCount != RTXPT_LIGHTING_LOCAL_PROXY_COUNT )
+    if( sampleCount != CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT )
         DebugPrint("SampleCount wrong {0}", sampleCount);
 }
 
@@ -1639,7 +1639,7 @@ void ProcessFeedbackHistoryP3b(uint3 dispatchThreadID : SV_DispatchThreadID, uin
 
     bool dbgPrint = dispatchThreadID.y == 0 && dispatchThreadID.z == 0;
     
-    const uint kNumSamplesPerThread = RTXPT_LIGHTING_LOCAL_PROXY_COUNT / WAVE_LANE_COUNT;
+    const uint kNumSamplesPerThread = CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT / WAVE_LANE_COUNT;
     // Load the samples that this thread will deal with
     uint threadLocalSamples[kNumSamplesPerThread];
     for (uint i = 0; i < kNumSamplesPerThread; ++i)
@@ -1739,9 +1739,9 @@ uint InsertOneBit( uint Value, uint OneBitMask )
 }
 //
 // For simplest variant of bitonic sort, list must be power of two - so enforce it
-STATIC_ASSERT( ( RTXPT_LIGHTING_LOCAL_PROXY_COUNT & ( RTXPT_LIGHTING_LOCAL_PROXY_COUNT - 1 ) ) == 0 );
-groupshared uint g_localData[RTXPT_LIGHTING_LOCAL_PROXY_COUNT];
-groupshared uint g_localDataRangeLR[RTXPT_LIGHTING_LOCAL_PROXY_COUNT];
+STATIC_ASSERT( ( CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT & ( CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT - 1 ) ) == 0 );
+groupshared uint g_localData[CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT];
+groupshared uint g_localDataRangeLR[CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT];
 //
 void LastScanAndWriteOut( uint2 tileCoord, uint loc )
 {
@@ -1761,7 +1761,7 @@ void LastScanAndWriteOut( uint2 tileCoord, uint loc )
     u_localSamplingBuffer[ LSB_Address(tileCoord, loc) ] = PackMiniListLightAndCount(lightIndex, count);
 }
 //
-[numthreads(RTXPT_LIGHTING_LOCAL_PROXY_COUNT/2, 1, 1)] // <- we need number of threads that is half of the list size - so we could support up to 2048
+[numthreads(CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT/2, 1, 1)] // <- we need number of threads that is half of the list size - so we could support up to 2048
 void ProcessFeedbackHistoryP3(uint3 groupID : SV_GroupID, uint3 groupThreadID : SV_GroupThreadId)
 {
     const uint threadID = groupThreadID.x;
@@ -1769,13 +1769,13 @@ void ProcessFeedbackHistoryP3(uint3 groupID : SV_GroupID, uint3 groupThreadID : 
 
     // Stage 1: Load to local storage
     g_localData[threadID] = UnpackMiniListLight(u_localSamplingBuffer[LSB_Address(tileCoord, threadID)]);
-    g_localData[threadID + RTXPT_LIGHTING_LOCAL_PROXY_COUNT/2] = UnpackMiniListLight(u_localSamplingBuffer[LSB_Address(tileCoord, threadID + RTXPT_LIGHTING_LOCAL_PROXY_COUNT/2)]);
+    g_localData[threadID + CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT/2] = UnpackMiniListLight(u_localSamplingBuffer[LSB_Address(tileCoord, threadID + CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT/2)]);
 
     GroupMemoryBarrierWithGroupSync();
 
     // Stage 2: bitonic sort
     // This is better unrolled because it reduces ALU and because some architectures can load/store two LDS items in a single instruction as long as their separation is a compile-time constant.
-    [unroll] for (uint k = 2; k <= RTXPT_LIGHTING_LOCAL_PROXY_COUNT; k <<= 1)
+    [unroll] for (uint k = 2; k <= CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT; k <<= 1)
     {
         //[unroll]
         for (uint j = k / 2; j > 0; j /= 2)
@@ -1812,7 +1812,7 @@ void ProcessFeedbackHistoryP3(uint3 groupID : SV_GroupID, uint3 groupThreadID : 
             indexR = indexR+1;
             if (indexL == -1 || g_localData[indexL] != valA)    
                 indexL++;   // if beyond the left end or not same, go back one step
-            if (indexR == RTXPT_LIGHTING_LOCAL_PROXY_COUNT || g_localData[indexR] != valB)    
+            if (indexR == CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT || g_localData[indexR] != valB)    
                 indexR--;   // if beyond the right end or not the same, go step one back
         }
 
@@ -1826,13 +1826,13 @@ void ProcessFeedbackHistoryP3(uint3 groupID : SV_GroupID, uint3 groupThreadID : 
     // Stage 3b: complete duplicate count and write out
     {
         LastScanAndWriteOut( tileCoord, threadID );
-        LastScanAndWriteOut( tileCoord, threadID + RTXPT_LIGHTING_LOCAL_PROXY_COUNT/2 );
+        LastScanAndWriteOut( tileCoord, threadID + CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT/2 );
     }
 
     // debug print
     // if (threadID == 0)
     // {
-    //     for( int i = 0; i < RTXPT_LIGHTING_LOCAL_PROXY_COUNT; i++ )
+    //     for( int i = 0; i < CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT; i++ )
     //     {
     //         uint indexL = g_localDataRangeLR[i] >> 16;
     //         uint indexR = g_localDataRangeLR[i] & 0xFFFF;
@@ -1880,15 +1880,15 @@ void ProcessFeedbackHistoryDebugViz( uint3 dispatchThreadID : SV_DispatchThreadI
         }
     }
 
-    int margin = (RTXPT_LIGHTING_SAMPLING_BUFFER_WINDOW_SIZE - RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE)/2;
-    int2 cellTopLeft   = tilePos.xy * RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - (int2)g_controlInfo.LocalSamplingTileJitter;
+    int margin = (CAUSTICA_LIGHTING_SAMPLING_BUFFER_WINDOW_SIZE - CAUSTICA_LIGHTING_SAMPLING_BUFFER_TILE_SIZE)/2;
+    int2 cellTopLeft   = tilePos.xy * CAUSTICA_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - (int2)g_controlInfo.LocalSamplingTileJitter;
     int2 windowTopLeft  = (int2)cellTopLeft - margin;
 
-    bool debugTile = all( g_bakerConsts.MouseCursorPos >= cellTopLeft ) && all((g_bakerConsts.MouseCursorPos-cellTopLeft) < RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE.xx );
+    bool debugTile = all( g_bakerConsts.MouseCursorPos >= cellTopLeft ) && all((g_bakerConsts.MouseCursorPos-cellTopLeft) < CAUSTICA_LIGHTING_SAMPLING_BUFFER_TILE_SIZE.xx );
     if( debugTile && g_bakerConsts.DebugDrawTileLights )
     {
-        const float maxCount = RTXPT_LIGHTING_LOCAL_PROXY_COUNT;
-        for( int i = 0; i < RTXPT_LIGHTING_LOCAL_PROXY_COUNT; i++ )
+        const float maxCount = CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT;
+        for( int i = 0; i < CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT; i++ )
         {
             uint counter;
             uint lightIndex;
@@ -1909,30 +1909,30 @@ void ProcessFeedbackHistoryDebugViz( uint3 dispatchThreadID : SV_DispatchThreadI
 
             DebugDrawLight(light, alpha);
 
-            DebugLine( float3(windowTopLeft + RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE.xx / 2, FLT_MAX), lightPos, float4(1.0, 1.0, 0, 0.05) );
+            DebugLine( float3(windowTopLeft + CAUSTICA_LIGHTING_SAMPLING_BUFFER_TILE_SIZE.xx / 2, FLT_MAX), lightPos, float4(1.0, 1.0, 0, 0.05) );
         }
     }
 
     float3 heatmapCol = float3(1,0,0);
     if (g_bakerConsts.DebugDrawType == (int)LightingDebugViewType::TileHeatmap )
     {
-        SortedLightList<RTXPT_LIGHTING_LOCAL_PROXY_COUNT> localList = SortedLightList<RTXPT_LIGHTING_LOCAL_PROXY_COUNT>::empty();
-        for( uint i = 0; i < RTXPT_LIGHTING_LOCAL_PROXY_COUNT; i++ )
+        SortedLightList<CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT> localList = SortedLightList<CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT>::empty();
+        for( uint i = 0; i < CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT; i++ )
             localList.InsertOrIncCounter( UnpackMiniListLight(u_localSamplingBuffer[ LSB_Address(tilePos, i) ]) );
 
         int numberOfDifferentLights = localList.Count;
-        heatmapCol = GradientHeatMap( (float(numberOfDifferentLights) / float(RTXPT_LIGHTING_LOCAL_PROXY_COUNT))*1.2f );
+        heatmapCol = GradientHeatMap( (float(numberOfDifferentLights) / float(CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT))*1.2f );
     }
 
     if (g_bakerConsts.DebugDrawTileLights || g_bakerConsts.DebugDrawType == (int)LightingDebugViewType::TileHeatmap)
     {
-        for( int x = 0; x < RTXPT_LIGHTING_SAMPLING_BUFFER_WINDOW_SIZE; x++ )
-            for( int y = 0; y < RTXPT_LIGHTING_SAMPLING_BUFFER_WINDOW_SIZE; y++ )
+        for( int x = 0; x < CAUSTICA_LIGHTING_SAMPLING_BUFFER_WINDOW_SIZE; x++ )
+            for( int y = 0; y < CAUSTICA_LIGHTING_SAMPLING_BUFFER_WINDOW_SIZE; y++ )
             {
                 int2 pixelPos = windowTopLeft + int2(x,y);
                 if( any(pixelPos<int2(0,0)) || any(pixelPos>=int2(g_bakerConsts.FeedbackResolution.x,g_bakerConsts.FeedbackResolution.y)) )
                     continue;
-                bool insideCell = all( pixelPos >= cellTopLeft ) && all( (pixelPos - cellTopLeft) < RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE.xx );
+                bool insideCell = all( pixelPos >= cellTopLeft ) && all( (pixelPos - cellTopLeft) < CAUSTICA_LIGHTING_SAMPLING_BUFFER_TILE_SIZE.xx );
                 if( debugTile )
                     DebugPixel( pixelPos, float4( insideCell, 1, 0, 1 ) );
                 if( !debugTile && (x == margin || y == margin) )
@@ -1943,16 +1943,16 @@ void ProcessFeedbackHistoryDebugViz( uint3 dispatchThreadID : SV_DispatchThreadI
             }
 
         #if 0
-        for( int x = 0; x < RTXPT_LIGHTING_LR_SAMPLING_BUFFER_WINDOW_SIZE; x++ )
-            for( int y = 0; y < RTXPT_LIGHTING_LR_SAMPLING_BUFFER_WINDOW_SIZE; y++ )
+        for( int x = 0; x < CAUSTICA_LIGHTING_LR_SAMPLING_BUFFER_WINDOW_SIZE; x++ )
+            for( int y = 0; y < CAUSTICA_LIGHTING_LR_SAMPLING_BUFFER_WINDOW_SIZE; y++ )
             {
                 int2 lrPixelPos = lrWindowTopLeft + int2(x,y);
                 int2 lrSrcCoord = MirrorCoord(lrPixelPos, g_bakerConsts.LRFeedbackResolution);
 
                 if( debugTile && (x == 0 || y == 0) )
-                    DebugPixel( lrSrcCoord*RTXPT_LIGHTING_LR_SAMPLING_BUFFER_SCALE, float4( 0, 1, 1, 1.0 ) );
-                if( debugTile && ( ((x == (RTXPT_LIGHTING_LR_SAMPLING_BUFFER_WINDOW_SIZE-1)) || (y == (RTXPT_LIGHTING_LR_SAMPLING_BUFFER_WINDOW_SIZE-1) ) ) ) )
-                    DebugPixel( (lrSrcCoord+1)*RTXPT_LIGHTING_LR_SAMPLING_BUFFER_SCALE.xx - 1.xx, float4( 0, 1, 1, 1.0 ) );
+                    DebugPixel( lrSrcCoord*CAUSTICA_LIGHTING_LR_SAMPLING_BUFFER_SCALE, float4( 0, 1, 1, 1.0 ) );
+                if( debugTile && ( ((x == (CAUSTICA_LIGHTING_LR_SAMPLING_BUFFER_WINDOW_SIZE-1)) || (y == (CAUSTICA_LIGHTING_LR_SAMPLING_BUFFER_WINDOW_SIZE-1) ) ) ) )
+                    DebugPixel( (lrSrcCoord+1)*CAUSTICA_LIGHTING_LR_SAMPLING_BUFFER_SCALE.xx - 1.xx, float4( 0, 1, 1, 1.0 ) );
             }
         #endif
     }
@@ -1960,19 +1960,19 @@ void ProcessFeedbackHistoryDebugViz( uint3 dispatchThreadID : SV_DispatchThreadI
 
     if (g_bakerConsts.DebugDrawType == (int)LightingDebugViewType::ValidateCorrectness)
     {
-        uint dataToValidate[RTXPT_LIGHTING_LOCAL_PROXY_COUNT];
-        for( int i = 0 ; i < RTXPT_LIGHTING_LOCAL_PROXY_COUNT; i++ )
+        uint dataToValidate[CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT];
+        for( int i = 0 ; i < CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT; i++ )
             dataToValidate[i] = u_localSamplingBuffer[ LSB_Address(tilePos, i) ];
 
         FillTile(tilePos);  // this fills u_localSamplingBuffer from scratch
 
-        SortedLightList<RTXPT_LIGHTING_LOCAL_PROXY_COUNT> localList = SortedLightList<RTXPT_LIGHTING_LOCAL_PROXY_COUNT>::empty();
-        for( uint i = 0; i < RTXPT_LIGHTING_LOCAL_PROXY_COUNT; i++ )
+        SortedLightList<CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT> localList = SortedLightList<CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT>::empty();
+        for( uint i = 0; i < CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT; i++ )
             localList.InsertOrIncCounter( UnpackMiniListLight(u_localSamplingBuffer[ LSB_Address(tilePos, i) ]) );
         bool allGood = localList.Validate(dataToValidate, debugTile);
 
-        for( int x = 0; x < RTXPT_LIGHTING_SAMPLING_BUFFER_WINDOW_SIZE; x++ )
-            for( int y = 0; y < RTXPT_LIGHTING_SAMPLING_BUFFER_WINDOW_SIZE; y++ )
+        for( int x = 0; x < CAUSTICA_LIGHTING_SAMPLING_BUFFER_WINDOW_SIZE; x++ )
+            for( int y = 0; y < CAUSTICA_LIGHTING_SAMPLING_BUFFER_WINDOW_SIZE; y++ )
             {
                 int2 pixelPos = windowTopLeft + int2(x,y);
                 if( !allGood )
@@ -1982,14 +1982,14 @@ void ProcessFeedbackHistoryDebugViz( uint3 dispatchThreadID : SV_DispatchThreadI
             }
 
         // put back original data in
-        for( int i = 0 ; i < RTXPT_LIGHTING_LOCAL_PROXY_COUNT; i++ )
+        for( int i = 0 ; i < CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT; i++ )
             u_localSamplingBuffer[ LSB_Address(tilePos, i) ] = dataToValidate[i];
     }
 
 #if 0 // validate remapping - note, this validation doesn't work correctly if history<->current mapping isn't 1:1 which can happen with env quad trees if they get rebuilt differently due to different content
     {   // start from current to past
         uint historicIndex = u_historyRemapCurrentToPast[lightIndex];
-        if(historicIndex != RTXPT_INVALID_LIGHT_INDEX)
+        if(historicIndex != CAUSTICA_INVALID_LIGHT_INDEX)
         {
             if( historicIndex >= g_controlInfo.HistoricTotalLightCount )
                 DebugPrint( "1 - out of range at lightIndex {0}, historicIndex {1}", lightIndex, historicIndex );
@@ -2001,7 +2001,7 @@ void ProcessFeedbackHistoryDebugViz( uint3 dispatchThreadID : SV_DispatchThreadI
     }
     {   // start from past to current
         uint recoveredCurrent = u_historyRemapPastToCurrent[lightIndex];
-        if(recoveredCurrent != RTXPT_INVALID_LIGHT_INDEX)
+        if(recoveredCurrent != CAUSTICA_INVALID_LIGHT_INDEX)
         {
             if( recoveredCurrent >= lightCount )
                 DebugPrint( "2 - out of range at lightIndex {0}, recoveredCurrent {1}", lightIndex, recoveredCurrent );

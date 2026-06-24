@@ -49,7 +49,7 @@ struct MaterialHeader
 
     /** Set thin surface flag.
     */
-#ifdef RTXPT_MATERIAL_THIN_SURFACE
+#ifdef CAUSTICA_MATERIAL_THIN_SURFACE
     void setThinSurface(bool thinSurface) { }
 #else
     void setThinSurface(bool thinSurface) { packedData.x = PACK_BITS(1, kThinSurfaceFlagOffset, packedData.x, thinSurface ? 1 : 0); }
@@ -57,8 +57,8 @@ struct MaterialHeader
 
     /** Get thin surface flag.
     */
-#ifdef RTXPT_MATERIAL_THIN_SURFACE
-    bool isThinSurface() { return RTXPT_MATERIAL_THIN_SURFACE; }
+#ifdef CAUSTICA_MATERIAL_THIN_SURFACE
+    bool isThinSurface() { return CAUSTICA_MATERIAL_THIN_SURFACE; }
 #else
     bool isThinSurface() { return packedData.x & (1u << kThinSurfaceFlagOffset); }
 #endif

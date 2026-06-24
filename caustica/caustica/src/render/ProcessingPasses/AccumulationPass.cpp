@@ -34,7 +34,7 @@ AccumulationPass::AccumulationPass(nvrhi::IDevice* device, std::shared_ptr<Shade
 
 void AccumulationPass::CreatePipeline()
 {
-    m_computeShader = m_shaderFactory->CreateShader("app/engine/shaders/render/ProcessingPasses/AccumulationPass.hlsl", "main", nullptr, nvrhi::ShaderType::Compute);
+    m_computeShader = m_shaderFactory->CreateShader("caustica/shaders/render/ProcessingPasses/AccumulationPass.hlsl", "main", nullptr, nvrhi::ShaderType::Compute);
 
     nvrhi::ComputePipelineDesc pipelineDesc;
     pipelineDesc.bindingLayouts = { m_bindingLayout };

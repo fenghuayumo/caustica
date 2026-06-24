@@ -640,7 +640,7 @@ class SortedLightLLRBTree
 
 
 // Expects elements of storageBuffer[tileAddress, x] to be sorted and 'localLightCount' is the depth of storageBuffer.
-// Note: returning value that consists both of key and counter (which needs unpacking to get actual global index); if not found, RTXPT_INVALID_LIGHT_INDEX returned
+// Note: returning value that consists both of key and counter (which needs unpacking to get actual global index); if not found, CAUSTICA_INVALID_LIGHT_INDEX returned
 inline uint LocalLightBinarySearch(Buffer<uint> storageBuffer, const uint tileAddress, const uint globalLightIndexToFind, const uint localLightCount, uniform const uint BINARY_SEARCH_STEPS)
 {
     uint indexLeft = tileAddress; 
@@ -650,7 +650,7 @@ inline uint LocalLightBinarySearch(Buffer<uint> storageBuffer, const uint tileAd
     uint keyLeft  = UnpackMiniListLight(storageBuffer[indexLeft] );
     uint keyRight = UnpackMiniListLight(storageBuffer[indexRight]);
     if (globalLightIndexToFind < keyLeft || globalLightIndexToFind > keyRight)
-        return RTXPT_INVALID_LIGHT_INDEX;
+        return CAUSTICA_INVALID_LIGHT_INDEX;
 #endif
 
     [unroll] for (uint i = 0u; i < BINARY_SEARCH_STEPS; ++i)
@@ -668,7 +668,7 @@ inline uint LocalLightBinarySearch(Buffer<uint> storageBuffer, const uint tileAd
         else 
             return value;
     }
-    return RTXPT_INVALID_LIGHT_INDEX;
+    return CAUSTICA_INVALID_LIGHT_INDEX;
 }
 
 

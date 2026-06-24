@@ -105,7 +105,7 @@ void postProcessHit(inout PathState path, const PathTracer::WorkingContext worki
 void nextHit(inout PathState path, inout float2 tMinMax, const PathTracer::WorkingContext workingContext)
 {
 #if defined(SER_HIT_OBJECT) || defined(__INTELLISENSE__)
-    RTXPT_RayQuery(RAY_FLAG_NONE, RTXPT_FLAG_ALLOW_OPACITY_MICROMAPS) rayQuery;
+    CAUSTICA_RayQuery(RAY_FLAG_NONE, CAUSTICA_FLAG_ALLOW_OPACITY_MICROMAPS) rayQuery;
     Bridge::traceScatterRay(path, rayQuery, tMinMax, workingContext.Debug);   // this outputs ray and rayQuery; if there was a hit, ray.TMax is rayQuery.ComittedRayT
 
     SER_HIT_OBJECT hit;
@@ -129,7 +129,7 @@ void nextHit(inout PathState path, inout float2 tMinMax, const PathTracer::Worki
         uint terminateAtNextBounceBit = path.isTerminatingAtNextBounce();
         //uint inDielectricBounceBit = (path.getCounter(PackedCounters::RejectedHits)>0);
 
-    #if RTXPT_DISABLE_SER_TERMINATION_HINT
+    #if CAUSTICA_DISABLE_SER_TERMINATION_HINT
         SER_REORDER_HIT(hit, 0, 0);
     #else
         SER_REORDER_HIT(hit, terminateAtNextBounceBit, 1);

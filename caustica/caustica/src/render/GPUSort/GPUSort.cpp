@@ -67,9 +67,9 @@ void GPUSort::CreateRenderPasses(std::shared_ptr<caustica::CommonRenderPasses> c
         std::vector<caustica::ShaderMacro> shaderMacros;
 
         if( specialInitIndicesFirstPass )
-            shaderMacros.push_back(caustica::ShaderMacro({ "RTXPT_GPUSORT_FIRST_PASS_INIT_INDICES", "1" }));
+            shaderMacros.push_back(caustica::ShaderMacro({ "CAUSTICA_GPUSORT_FIRST_PASS_INIT_INDICES", "1" }));
 
-        shaderHandle = m_shaderFactory->CreateShader("app/engine/shaders/render/GPUSort/GPUSort.hlsl", name.c_str(), &shaderMacros, nvrhi::ShaderType::Compute);
+        shaderHandle = m_shaderFactory->CreateShader("caustica/shaders/render/GPUSort/GPUSort.hlsl", name.c_str(), &shaderMacros, nvrhi::ShaderType::Compute);
         nvrhi::ComputePipelineDesc pipelineDesc;
         pipelineDesc.bindingLayouts = { (initOnly)?(m_initBindingLayout):(m_commonBindingLayout) };
         pipelineDesc.CS = shaderHandle;
@@ -253,7 +253,7 @@ void GPUSort::Sort(nvrhi::ICommandList * commandList, nvrhi::BufferHandle contro
     bool pong = false;
     for (uint32_t Shift = 0; Shift < bitsNeeded; Shift += FFX_PARALLELSORT_SORT_BITS_PER_PASS)
     {
-        RunCSPass("Count", (Shift==0 && resetIndices)?m_PSOCountIIFP:m_PSOCount, 0, 0 * 4, pong, Shift);        // SEE RTXPT_GPUSORT_FIRST_PASS_INIT_INDICES
+        RunCSPass("Count", (Shift==0 && resetIndices)?m_PSOCountIIFP:m_PSOCount, 0, 0 * 4, pong, Shift);        // SEE CAUSTICA_GPUSORT_FIRST_PASS_INIT_INDICES
         ScratchBarriers();
         RunCSPass("CountReduce", m_PSOCountReduce, 0, 4 * 4, pong, Shift);
         ScratchBarriers();
@@ -261,7 +261,7 @@ void GPUSort::Sort(nvrhi::ICommandList * commandList, nvrhi::BufferHandle contro
         ScratchBarriers();
         RunCSPass("ScanAdd", m_PSOScanAdd, 0, 4 * 4, pong, Shift);
         ScratchBarriers();
-        RunCSPass("Scatter", (Shift==0 && resetIndices)?m_PSOScatterIIFP:m_PSOScatter, 0, 0 * 4, pong, Shift);  // SEE RTXPT_GPUSORT_FIRST_PASS_INIT_INDICES
+        RunCSPass("Scatter", (Shift==0 && resetIndices)?m_PSOScatterIIFP:m_PSOScatter, 0, 0 * 4, pong, Shift);  // SEE CAUSTICA_GPUSORT_FIRST_PASS_INIT_INDICES
         // ScratchBarriers(); not needed because ping pong forces UAV<->SRV transition which adds a barrier
 
         pong = !pong;

@@ -1,4 +1,4 @@
-#if RTXPT_WITH_PYTHON
+#if CAUSTICA_WITH_PYTHON
 
 #include "PythonBindingsCore.h"
 
@@ -457,7 +457,7 @@ namespace
     }
 }
 
-namespace rtxpt_py
+namespace caustica_py
 {
 
 void RegisterCoreBindings(nb::module_& m)
@@ -1542,6 +1542,6 @@ void RegisterCoreBindings(nb::module_& m)
         ;
 }
 
-} // namespace rtxpt_py
+} // namespace caustica_py
 
-#endif // RTXPT_WITH_PYTHON
+#endif // CAUSTICA_WITH_PYTHON

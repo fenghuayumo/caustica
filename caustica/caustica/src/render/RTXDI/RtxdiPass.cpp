@@ -123,18 +123,18 @@ void RtxdiPass::CreatePipelines(nvrhi::BindingLayoutHandle extraBindingLayout /*
 	
 	std::vector<caustica::ShaderMacro> regirMacros = { GetReGirMacro(reGIRParams) };
 
-	m_PresampleLightsPass.Init(m_device, *m_shaderFactory, "app/engine/shaders/render/RTXDI/PresampleLights.hlsl", "main", {}, m_bindingLayout, extraBindingLayout, m_bindlessLayout);
-	m_PresampleEnvMapPass.Init(m_device, *m_shaderFactory, "app/engine/shaders/render/RTXDI/PresampleEnvironmentMap.hlsl", "main", {}, m_bindingLayout, extraBindingLayout, m_bindlessLayout);
+	m_PresampleLightsPass.Init(m_device, *m_shaderFactory, "caustica/shaders/render/RTXDI/PresampleLights.hlsl", "main", {}, m_bindingLayout, extraBindingLayout, m_bindlessLayout);
+	m_PresampleEnvMapPass.Init(m_device, *m_shaderFactory, "caustica/shaders/render/RTXDI/PresampleEnvironmentMap.hlsl", "main", {}, m_bindingLayout, extraBindingLayout, m_bindlessLayout);
 	if (reGIRParams.Mode != rtxdi::ReGIRMode::Disabled)
 	{
-		m_PresampleReGIRPass.Init(m_device, *m_shaderFactory, "app/engine/shaders/render/RTXDI/PresampleReGIR.hlsl", "main", regirMacros, m_bindingLayout, extraBindingLayout, m_bindlessLayout);
+		m_PresampleReGIRPass.Init(m_device, *m_shaderFactory, "caustica/shaders/render/RTXDI/PresampleReGIR.hlsl", "main", regirMacros, m_bindingLayout, extraBindingLayout, m_bindlessLayout);
 	}
 	
-	m_GenerateInitialSamplesPass.Init(m_device, *m_shaderFactory, "app/engine/shaders/render/RTXDI/GenerateInitialSamples.hlsl", 
+	m_GenerateInitialSamplesPass.Init(m_device, *m_shaderFactory, "caustica/shaders/render/RTXDI/GenerateInitialSamples.hlsl", 
 		regirMacros, useRayQuery, RTXDI_SCREEN_SPACE_GROUP_SIZE, m_bindingLayout, extraBindingLayout, m_bindlessLayout);
-	m_SpatialResamplingPass.Init(m_device, *m_shaderFactory, "app/engine/shaders/render/RTXDI/SpatialResampling.hlsl",
+	m_SpatialResamplingPass.Init(m_device, *m_shaderFactory, "caustica/shaders/render/RTXDI/SpatialResampling.hlsl",
 		{}, useRayQuery, RTXDI_SCREEN_SPACE_GROUP_SIZE, m_bindingLayout, extraBindingLayout, m_bindlessLayout);
-	m_TemporalResamplingPass.Init(m_device, *m_shaderFactory, "app/engine/shaders/render/RTXDI/TemporalResampling.hlsl",
+	m_TemporalResamplingPass.Init(m_device, *m_shaderFactory, "caustica/shaders/render/RTXDI/TemporalResampling.hlsl",
 		{}, useRayQuery, RTXDI_SCREEN_SPACE_GROUP_SIZE, m_bindingLayout, extraBindingLayout, m_bindlessLayout);
 	
 	std::vector<caustica::ShaderMacro> finalShadingMacros = { { "USE_RAY_QUERY", "1" } };
@@ -142,24 +142,24 @@ void RtxdiPass::CreatePipelines(nvrhi::BindingLayoutHandle extraBindingLayout /*
 	if (m_device->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D12)
 		finalShadingMacros.push_back({ "NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP", "1" });
 #endif // NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP
-	m_FinalSamplingPass.Init(m_device, *m_shaderFactory, "app/engine/shaders/render/RTXDI/DIFinalShading.hlsl", "main", finalShadingMacros, m_bindingLayout, extraBindingLayout, m_bindlessLayout);
+	m_FinalSamplingPass.Init(m_device, *m_shaderFactory, "caustica/shaders/render/RTXDI/DIFinalShading.hlsl", "main", finalShadingMacros, m_bindingLayout, extraBindingLayout, m_bindlessLayout);
 	
-	m_GISpatialResamplingPass.Init(m_device, *m_shaderFactory, "app/engine/shaders/render/RTXDI/GISpatialResampling.hlsl",
+	m_GISpatialResamplingPass.Init(m_device, *m_shaderFactory, "caustica/shaders/render/RTXDI/GISpatialResampling.hlsl",
 		{}, useRayQuery, RTXDI_SCREEN_SPACE_GROUP_SIZE, m_bindingLayout, extraBindingLayout, m_bindlessLayout);
-	m_GITemporalResamplingPass.Init(m_device, *m_shaderFactory, "app/engine/shaders/render/RTXDI/GITemporalResampling.hlsl",
+	m_GITemporalResamplingPass.Init(m_device, *m_shaderFactory, "caustica/shaders/render/RTXDI/GITemporalResampling.hlsl",
 		{}, useRayQuery, RTXDI_SCREEN_SPACE_GROUP_SIZE, m_bindingLayout, extraBindingLayout, m_bindlessLayout);
-	m_GIFinalShadingPass.Init(m_device, *m_shaderFactory, "app/engine/shaders/render/RTXDI/GIFinalShading.hlsl",
+	m_GIFinalShadingPass.Init(m_device, *m_shaderFactory, "caustica/shaders/render/RTXDI/GIFinalShading.hlsl",
 		{}, useRayQuery, RTXDI_SCREEN_SPACE_GROUP_SIZE, m_bindingLayout, extraBindingLayout, m_bindlessLayout);
-    m_FusedDIGIFinalShadingPass.Init(m_device, *m_shaderFactory, "app/engine/shaders/render/RTXDI/FusedDIGIFinalShading.hlsl",
+    m_FusedDIGIFinalShadingPass.Init(m_device, *m_shaderFactory, "caustica/shaders/render/RTXDI/FusedDIGIFinalShading.hlsl",
         {}, useRayQuery, RTXDI_SCREEN_SPACE_GROUP_SIZE, m_bindingLayout, extraBindingLayout, m_bindlessLayout);
 
-    m_PTGenerateInitialSamplesPass.Init(m_device, *m_shaderFactory, "app/engine/shaders/render/RTXDI/PTGenerateInitialSamples.hlsl",
+    m_PTGenerateInitialSamplesPass.Init(m_device, *m_shaderFactory, "caustica/shaders/render/RTXDI/PTGenerateInitialSamples.hlsl",
         {}, useRayQuery, RTXDI_SCREEN_SPACE_GROUP_SIZE, m_bindingLayout, extraBindingLayout, m_bindlessLayout);
-    m_PTTemporalResamplingPass.Init(m_device, *m_shaderFactory, "app/engine/shaders/render/RTXDI/PTTemporalResampling.hlsl",
+    m_PTTemporalResamplingPass.Init(m_device, *m_shaderFactory, "caustica/shaders/render/RTXDI/PTTemporalResampling.hlsl",
         {}, useRayQuery, RTXDI_SCREEN_SPACE_GROUP_SIZE, m_bindingLayout, extraBindingLayout, m_bindlessLayout);
-    m_PTSpatialResamplingPass.Init(m_device, *m_shaderFactory, "app/engine/shaders/render/RTXDI/PTSpatialResampling.hlsl",
+    m_PTSpatialResamplingPass.Init(m_device, *m_shaderFactory, "caustica/shaders/render/RTXDI/PTSpatialResampling.hlsl",
         {}, useRayQuery, RTXDI_SCREEN_SPACE_GROUP_SIZE, m_bindingLayout, extraBindingLayout, m_bindlessLayout);
-    m_PTFinalShadingPass.Init(m_device, *m_shaderFactory, "app/engine/shaders/render/RTXDI/PTFinalShading.hlsl",
+    m_PTFinalShadingPass.Init(m_device, *m_shaderFactory, "caustica/shaders/render/RTXDI/PTFinalShading.hlsl",
         {}, useRayQuery, RTXDI_SCREEN_SPACE_GROUP_SIZE, m_bindingLayout, extraBindingLayout, m_bindlessLayout);
 }
 

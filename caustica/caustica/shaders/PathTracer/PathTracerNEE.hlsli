@@ -138,7 +138,7 @@ namespace PathTracer
 #if !LATE_WRS_MIS
         float thisPdf, otherPdf;
         lightSampler.ComputeLightSelectionPdfs(pickedSample, localCount, globalCount, thisPdf, otherPdf);
-        float wrsMIS = EvalMIS(RTXPT_NEE_MIS_HEURISTIC, 1, thisPdf, 1, otherPdf);   // these should use thisCount and otherCount which are localCount and globalCount in order matching wrs candidate source
+        float wrsMIS = EvalMIS(CAUSTICA_NEE_MIS_HEURISTIC, 1, thisPdf, 1, otherPdf);   // these should use thisCount and otherCount which are localCount and globalCount in order matching wrs candidate source
         float thisCount = (float)(pickedSample.FromLocalDistribution)?(localCount):(globalCount);
         wrsMIS = wrsMIS / float(thisCount); // * float(candidateSampleCount); cancels with the wrs selection above
 #else
@@ -209,14 +209,14 @@ namespace PathTracer
 #else
             float thisPdf, otherPdf, thisCount, otherCount;
             lightSampler.ComputeLightSelectionPdfs(lightSample, localCount, globalCount, thisPdf, otherPdf, thisCount, otherCount);
-            float wrsMIS = EvalMIS(RTXPT_NEE_MIS_HEURISTIC, 1, thisPdf, 1, otherPdf);   // these would normally use thisCount and otherCount which are localCount and globalCount in order matching wrs candidate source, but we've cancelled out few terms
+            float wrsMIS = EvalMIS(CAUSTICA_NEE_MIS_HEURISTIC, 1, thisPdf, 1, otherPdf);   // these would normally use thisCount and otherCount which are localCount and globalCount in order matching wrs candidate source, but we've cancelled out few terms
             wrsMIS = wrsMIS / float(thisCount); // * float(candidateSampleCount); cancels with the wrs selection above
 #endif
 
             // Outer, light sampling vs path scatter (BSDF) multiple importance sampling is also important but can be approximated which is an user setting
             float scatterPdfForDir = bsdf.evalPdf(shadingData, lightSample.Direction, kUseBSDFSampling);
 
-#if RTXPT_USE_APPROXIMATE_MIS
+#if CAUSTICA_USE_APPROXIMATE_MIS
             float pathMIS = lightSampler.ComputeLightVsBSDF_MIS_ForLight_Approx(lightSample, candidateSampleCount, fullSamples, scatterPdfForDir);
 #else
             float pathMIS = lightSampler.ComputeLightVsBSDF_MIS_ForLight(shadingData.posW, lightSample, thisPdf, otherPdf, thisCount, otherCount, candidateSampleCount, fullSamples, scatterPdfForDir);
@@ -233,7 +233,7 @@ namespace PathTracer
             float radianceAvg = Average(radiance);
             float specAvg = bsdfThp.w * Average(lightSample.Li);
 
-#if RTXPT_FIREFLY_FILTER && PATH_TRACER_MODE!=PATH_TRACER_MODE_BUILD_STABLE_PLANES  // firefly filter has cost - only enable if denoiser REALLY requires it
+#if CAUSTICA_FIREFLY_FILTER && PATH_TRACER_MODE!=PATH_TRACER_MODE_BUILD_STABLE_PLANES  // firefly filter has cost - only enable if denoiser REALLY requires it
             if( workingContext.PtConsts.fireflyFilterThreshold != 0 )
             {
                 const float pdf = lightSample.SelectionPdf * lightSample.SolidAnglePdf;
@@ -255,7 +255,7 @@ namespace PathTracer
             accum.AccumulateRadiance( radiance, specAvg );
             
             // sample feedback for NEE-AT if needed!
-            if( lightSample.LightIndex != RTXPT_INVALID_LIGHT_INDEX && lightSampler.IsTemporalFeedbackRequired() )
+            if( lightSample.LightIndex != CAUSTICA_INVALID_LIGHT_INDEX && lightSampler.IsTemporalFeedbackRequired() )
             {
                 // compute light weigh as in "how much we want this light" - so include path throughput, BSDF and light; 
                 float feedbackWeight = radianceAvg;
@@ -268,8 +268,8 @@ namespace PathTracer
     inline NEEResult HandleNEE_MultipleSamples(const PathState preScatterPath, const ShadingData shadingData, const ActiveBSDF bsdf, 
                                             const LightSampler lightSampler, const uint fullSamples, inout UniformSampleSequenceGenerator sampleGenerator, const WorkingContext workingContext)
     {
-        #ifdef RTXPT_NEE_TOTAL_CANDIDATE_SAMPLE_COUNT
-        const uint candidateSampleCount = RTXPT_NEE_TOTAL_CANDIDATE_SAMPLE_COUNT;
+        #ifdef CAUSTICA_NEE_TOTAL_CANDIDATE_SAMPLE_COUNT
+        const uint candidateSampleCount = CAUSTICA_NEE_TOTAL_CANDIDATE_SAMPLE_COUNT;
         #else
         const uint candidateSampleCount = workingContext.PtConsts.NEECandidateSamples;
         #endif
@@ -297,10 +297,10 @@ namespace PathTracer
         LightSampler lightSampler = Bridge::CreateLightSampler( preScatterPath.GetPixelPos(), preScatterPath.rayCone.getWidth(), preScatterPath.GetSceneLength() );
 
         // There's a cost to having these as a dynamic constant so an option for production code is to hard code
-        #ifdef RTXPT_NEE_FULL_SAMPLE_COUNT
-        const uint fullSamples = RTXPT_NEE_FULL_SAMPLE_COUNT;
+        #ifdef CAUSTICA_NEE_FULL_SAMPLE_COUNT
+        const uint fullSamples = CAUSTICA_NEE_FULL_SAMPLE_COUNT;
         #else
-        const uint fullSamples = min(RTXPT_LIGHTING_MAX_SAMPLE_COUNT, workingContext.PtConsts.NEEFullSamples);
+        const uint fullSamples = min(CAUSTICA_LIGHTING_MAX_SAMPLE_COUNT, workingContext.PtConsts.NEEFullSamples);
         #endif
 
         // Determine if BSDF has non-delta lobes.

@@ -39,7 +39,7 @@ namespace PathTracer
             // newPath.incrementBounces(BounceType::Transmission);
             newPath.setScatterTransmission();
 
-#if RTXPT_NESTED_DIELECTRICS_QUALITY > 0 || defined(__INTELLISENSE__)
+#if CAUSTICA_NESTED_DIELECTRICS_QUALITY > 0 || defined(__INTELLISENSE__)
             // Update interior list and inside volume flag.
             if (!shadingData.mtl.isThinSurface())
             {

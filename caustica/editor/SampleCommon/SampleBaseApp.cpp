@@ -13,7 +13,7 @@
 #include <core/path_utils.h>
 #include <platform/cmdline_utils.h>
 #include <core/log.h>
-#if RTXPT_WITH_NATIVE_DLSS
+#if CAUSTICA_WITH_NATIVE_DLSS
 #include <render/DLSS.h>
 #endif
 #include "caustica.h"
@@ -25,7 +25,7 @@
 extern SampleUIData g_sampleUIData;
 extern const char* g_windowTitle;
 
-#if RTXPT_D3D12_WITH_NVAPI
+#if CAUSTICA_D3D12_WITH_NVAPI
 #include <nvApi.h>
 
 #if 0
@@ -211,7 +211,7 @@ SampleBaseApp::InitReturnCodes SampleBaseApp::Init(int argc, const char* const* 
     m_MainSceneRender->Init(preferredScene, m_ShaderFactory);
     m_GpuDevice->AddRenderPassToBack(m_MainSceneRender.get());
 
-#if CAUSTICA_WITH_DX12 && (RTXPT_D3D_AGILITY_SDK_VERSION >= 619)   // temporary
+#if CAUSTICA_WITH_DX12 && (CAUSTICA_D3D_AGILITY_SDK_VERSION >= 619)   // temporary
     // When using AgilitySDK >= 619, we require shader model 6.9
     if (m_GpuDevice->GetDevice()->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D12)
     {
@@ -255,7 +255,7 @@ SampleBaseApp::InitReturnCodes SampleBaseApp::Init(int argc, const char* const* 
 
     LocalConfig::PostAppInit(g_sampleUIData);
 
-#if RTXPT_ENABLE_VIDEO_MEMORY_INFO && defined(_WIN32)
+#if CAUSTICA_ENABLE_VIDEO_MEMORY_INFO && defined(_WIN32)
     auto device = m_GpuDevice->GetDevice();
     if (device->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D12)
     {
@@ -274,7 +274,7 @@ SampleBaseApp::InitReturnCodes SampleBaseApp::Init(int argc, const char* const* 
 
 bool SampleBaseApp::QueryVideoMemoryInfo(uint64_t& outBudget, uint64_t& outCurrentUsage, uint64_t& outAvailableForReservation, uint64_t& outCurrentReservation)
 {
-#if RTXPT_ENABLE_VIDEO_MEMORY_INFO && defined(_WIN32)
+#if CAUSTICA_ENABLE_VIDEO_MEMORY_INFO && defined(_WIN32)
     DXGI_QUERY_VIDEO_MEMORY_INFO info;
     if (FAILED(m_d3dAdapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &info)))
         return false;
@@ -297,7 +297,7 @@ void SampleBaseApp::End()
         m_UIRender.reset();
     }
 
-#if RTXPT_D3D12_WITH_NVAPI
+#if CAUSTICA_D3D12_WITH_NVAPI
     if (m_NVAPIValidationHandle != nullptr)
     {
         auto nativeObj = m_GpuDevice->GetDevice()->getNativeObject(nvrhi::ObjectTypes::D3D12_Device);
@@ -370,7 +370,7 @@ caustica::DeviceCreationParameters SampleBaseApp::GetDefaultDeviceParams() const
     deviceParams.vsyncEnabled = true;
     deviceParams.enableRayTracingExtensions = true;
 #if CAUSTICA_WITH_DX12
-#if defined(RTXPT_D3D_AGILITY_SDK_VERSION)
+#if defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
     deviceParams.featureLevel = D3D_FEATURE_LEVEL_12_2;
     // TODO: Redefining this isn't needed. Take the ones from AgilitySDK
     static const UUID D3D12ExperimentalShaderModels = { 0x76f5573e, 0xf13a, 0x40f5, {0xb2, 0x97, 0x81, 0xce, 0x9e, 0x18, 0x93, 0x3f} };
@@ -399,7 +399,7 @@ caustica::DeviceCreationParameters SampleBaseApp::GetDefaultDeviceParams() const
 #endif
 
 #if CAUSTICA_WITH_VULKAN
-#if RTXPT_WITH_NATIVE_DLSS
+#if CAUSTICA_WITH_NATIVE_DLSS
     caustica::render::DLSS::GetRequiredVulkanExtensions(
         deviceParams.requiredVulkanInstanceExtensions,
         deviceParams.requiredVulkanDeviceExtensions);
@@ -529,7 +529,7 @@ bool SampleBaseApp::InitDeviceAndWindow(const caustica::DeviceCreationParameters
         HelpersRegisterActiveWindow();
     }
 
-#if 0 && RTXPT_D3D12_WITH_NVAPI
+#if 0 && CAUSTICA_D3D12_WITH_NVAPI
     static bool NVAPI_VALIDATION = false;
     auto device = m_GpuDevice->GetDevice();
     if (NVAPI_VALIDATION && device->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D12)
@@ -575,7 +575,7 @@ void SampleBaseApp::CreateShaderFactory()
     std::shared_ptr<caustica::RootFileSystem> rootFS = std::make_shared<caustica::RootFileSystem>();
     const std::filesystem::path shaderPackPath = appDirectory / (std::string("caustica.shaders.") + shaderTypeName + ".pack");
     auto shaderPackFS = std::make_shared<ShaderPackFileSystem>(shaderPackPath, "ShaderPrecompiled");
-    const bool shaderPackHasCurrentLayout = shaderPackFS->isOpen() && shaderPackFS->fileExists("app/engine/shaders/render/Misc/DebugLines_main_vs.bin");
+    const bool shaderPackHasCurrentLayout = shaderPackFS->isOpen() && shaderPackFS->fileExists("caustica/caustica/shaders/render/Misc/DebugLines_main_vs.bin");
     if (shaderPackFS->isOpen() && !shaderPackHasCurrentLayout)
     {
         caustica::warning("Shader pack '%s' does not match the current shader layout; falling back to ShaderPrecompiled directories",
@@ -589,7 +589,7 @@ void SampleBaseApp::CreateShaderFactory()
     else
     {
         rootFS->mount("/ShaderPrecompiled/engine", engineShaderPath);
-        rootFS->mount("/ShaderPrecompiled/app", appShaderPath);
+        rootFS->mount("/ShaderPrecompiled/caustica", appShaderPath);
         rootFS->mount("/ShaderPrecompiled/nrd", nrdShaderPath);
         rootFS->mount("/ShaderPrecompiled/omm", ommShaderPath);
     }

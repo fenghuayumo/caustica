@@ -622,8 +622,8 @@ std::tuple<int, std::string, std::string > SystemShell(const std::string & comma
 #else
     pid_t pid = getpid();
 #endif
-    std::filesystem::path tempLogFile = std::filesystem::temp_directory_path() / StringFormat("RTXPT_out_%d_%d.txt", pid, uniqueIndex);
-    std::filesystem::path tempErrLogFile = std::filesystem::temp_directory_path() / StringFormat("RTXPT_err_%d_%d.txt", pid, uniqueIndex);
+    std::filesystem::path tempLogFile = std::filesystem::temp_directory_path() / StringFormat("CAUSTICA_out_%d_%d.txt", pid, uniqueIndex);
+    std::filesystem::path tempErrLogFile = std::filesystem::temp_directory_path() / StringFormat("CAUSTICA_err_%d_%d.txt", pid, uniqueIndex);
     std::string startCmd = command + " > \"" + tempLogFile.string() + "\"" + " 2> \"" + tempErrLogFile.string() + "\"";
 
     resultValue = std::system(startCmd.c_str());

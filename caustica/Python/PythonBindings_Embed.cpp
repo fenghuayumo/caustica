@@ -2,7 +2,7 @@
 // CPython interpreter (running inside caustica.exe) will see when scripts run
 // `import caustica`.
 
-#if RTXPT_WITH_PYTHON
+#if CAUSTICA_WITH_PYTHON
 
 #include "PythonBindingsCore.h"
 
@@ -30,7 +30,7 @@ NB_MODULE(caustica, m)
 {
     m.doc() = "caustica embedded Python bindings (in-process scripting host).";
 
-    rtxpt_py::RegisterCoreBindings(m);
+    caustica_py::RegisterCoreBindings(m);
 
     m.def("app", []() -> Sample* { return &RequireSample(); },
           nb::rv_policy::reference,
@@ -43,4 +43,4 @@ NB_MODULE(caustica, m)
     m.attr("MODE") = "embed";
 }
 
-#endif // RTXPT_WITH_PYTHON
+#endif // CAUSTICA_WITH_PYTHON

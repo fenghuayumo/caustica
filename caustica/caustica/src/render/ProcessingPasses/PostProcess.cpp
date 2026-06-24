@@ -49,9 +49,9 @@ PostProcess::PostProcess( nvrhi::IDevice* device, std::shared_ptr<caustica::Shad
             break;
         case(ComputePassType::DummyPlaceholder): shaderMacros.push_back(caustica::ShaderMacro({ "DUMMY_PLACEHOLDER_EFFECT", "1" })); break;
         };
-        m_computeShaders[i] = shaderFactory->CreateShader("app/engine/shaders/render/ProcessingPasses/PostProcess.hlsl", "main", &shaderMacros, nvrhi::ShaderType::Compute);
+        m_computeShaders[i] = shaderFactory->CreateShader("caustica/shaders/render/ProcessingPasses/PostProcess.hlsl", "main", &shaderMacros, nvrhi::ShaderType::Compute);
     }
-    //m_MainCS = shaderFactory->CreateShader("app/engine/shaders/render/ProcessingPasses/PostProcess.hlsl", "main", &std::vector<caustica::ShaderMacro>(1, caustica::ShaderMacro("USE_CS", "1")), nvrhi::ShaderType::Compute);
+    //m_MainCS = shaderFactory->CreateShader("caustica/shaders/render/ProcessingPasses/PostProcess.hlsl", "main", &std::vector<caustica::ShaderMacro>(1, caustica::ShaderMacro("USE_CS", "1")), nvrhi::ShaderType::Compute);
 
     nvrhi::BindingLayoutDesc layoutDesc;
 

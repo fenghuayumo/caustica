@@ -298,27 +298,27 @@ namespace
 static const PerformancePreset s_performancePresets[] = {
     //                                    NEECand  NEEFull  NEEMIS  SPP  Bounce  DiffBnc   TexLOD  NestDiel  EnvMIP  SPActive  PrimRepl  Bloom    LDSampl    FflyTrhld    DLSS (on separate line due to macros)
     { "Ultra Performance",                3,       1,       1,      1,   10,     1,        0.0f,   1,        3,      2,        false,    false,   false,     0.01,
-#if RTXPT_WITH_ANY_DLSS
+#if CAUSTICA_WITH_ANY_DLSS
         SI::DLSSMode::eUltraPerformance,
 #endif
     },
     { "Performance",                      3,       1,       1,      1,   12,     1,       -0.5f,   1,        2,      3,        true,     true,    false,     0.05,
-#if RTXPT_WITH_ANY_DLSS
+#if CAUSTICA_WITH_ANY_DLSS
         SI::DLSSMode::eMaxPerformance,
 #endif
     },
     { "Balanced",                         5,       1,       1,      1,   18,     2,       -1.0f,   1,        2,      3,        true,     true,    true,      0.1,
-#if RTXPT_WITH_ANY_DLSS
+#if CAUSTICA_WITH_ANY_DLSS
         SI::DLSSMode::eBalanced,
 #endif
     },
     { "Quality",                          3,       2,       1,      1,   24,     3,       -1.5f,   1,        2,      3,        true,     true,    true,      0.2,
-#if RTXPT_WITH_ANY_DLSS
+#if CAUSTICA_WITH_ANY_DLSS
         SI::DLSSMode::eMaxQuality,
 #endif
     },
     { "Ultra Quality",                    3,       2,       0,      1,   48,     3,       -1.5f,   2,        1,      3,        true,     true,    true,      1.0,
-#if RTXPT_WITH_ANY_DLSS
+#if CAUSTICA_WITH_ANY_DLSS
         SI::DLSSMode::eDLAA,
 #endif
     },
@@ -334,7 +334,7 @@ static bool MatchesPreset(const SampleUIData& ui, const PerformancePreset& p)
     if (ui.TexLODBias != p.TexLODBias)                                          return false;
     if (ui.NestedDielectricsQuality != p.NestedDielectricsQuality)              return false;
     if (ui.EnvironmentMapDiffuseSampleMIPLevel != p.EnvironmentMapDiffuseSampleMIPLevel) return false;
-#if RTXPT_WITH_ANY_DLSS
+#if CAUSTICA_WITH_ANY_DLSS
     if (ui.DLSSMode != p.DLSSMode)                                              return false;
 #endif
     if (ui.StablePlanesActiveCount != p.StablePlanesActiveCount)                return false;
@@ -356,7 +356,7 @@ static void ApplyPreset(SampleUIData& ui, const PerformancePreset& p)
     ui.TexLODBias = p.TexLODBias;
     ui.NestedDielectricsQuality = p.NestedDielectricsQuality;
     ui.EnvironmentMapDiffuseSampleMIPLevel = p.EnvironmentMapDiffuseSampleMIPLevel;
-#if RTXPT_WITH_ANY_DLSS
+#if CAUSTICA_WITH_ANY_DLSS
     ui.DLSSMode = p.DLSSMode;
 #endif
     ui.StablePlanesActiveCount = p.StablePlanesActiveCount;
@@ -630,7 +630,7 @@ SampleUI::SampleUI(GpuDevice* deviceManager, SampleBaseApp & baseApp, Sample& ap
     ImGui::GetIO().IniFilename = nullptr;
 
     // Choose which, if any, hit object extension we can use
-#if RTXPT_D3D_AGILITY_SDK_VERSION >= 619
+#if CAUSTICA_D3D_AGILITY_SDK_VERSION >= 619
     m_ui.DXHitObjectExtension = (GetDevice()->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D12);   // 6.9 support guarantees SER
     m_ui.NVAPIHitObjectExtension &= !m_ui.DXHitObjectExtension && NVAPI_SERSupported;
 #else
@@ -694,7 +694,7 @@ void SampleUI::Animate(float elapsedTimeSeconds)
     m_showSceneWidgets = dm::clamp(m_showSceneWidgets + elapsedTimeSeconds * 8.0f * ((io.MousePos.y >= 0 && io.MousePos.y < h * 0.1f) ? (1) : (-1)), 0.0f, 1.0f);
 }
 
-#if RTXPT_WITH_ANY_DLSS
+#if CAUSTICA_WITH_ANY_DLSS
 SI::DLSSMode DLSSModeUI(SI::DLSSMode dlssModeCurrent)
 {
     int current = -1;
@@ -952,7 +952,7 @@ void SampleUI::buildUI(void)
                     m_app.GetCaptureScriptManager()->ScriptMainUI(warnColor, categoryColor, indent, m_currentScale);
                 }
 
-#if RTXPT_WITH_PYTHON
+#if CAUSTICA_WITH_PYTHON
                 if (ImGui::CollapsingHeader("Python scripting"))
                 {
                     RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent); );
@@ -1425,7 +1425,7 @@ void SampleUI::buildUI(void)
 
                 if (m_ui.RealtimeMode)
                 {
-#if RTXPT_WITH_ANY_DLSS
+#if CAUSTICA_WITH_ANY_DLSS
                     const bool dlssAvailable = m_ui.IsDLSSSuported;
                     const bool dlssRRAvailable = m_ui.IsDLSSRRSupported; 
 #else
@@ -1464,7 +1464,7 @@ void SampleUI::buildUI(void)
                         "\nIndividual DLSS options available under global `DLSS` options"
                     );
 
-#if RTXPT_WITH_ANY_DLSS
+#if CAUSTICA_WITH_ANY_DLSS
                     if (m_ui.RealtimeAA == 2 || m_ui.RealtimeAA == 3)
                     {
                         RAII_SCOPE(ImGui::Indent(indent); ImGui::PushID("PPDLSSQual");,  ImGui::Unindent(indent); ImGui::PopID(););
@@ -1481,7 +1481,7 @@ void SampleUI::buildUI(void)
                 }
                 else // !m_ui.RealtimeMode
                 {
-#if RTXPT_WITH_OIDN
+#if CAUSTICA_WITH_OIDN
                     bool oidnChanged = false;
                     oidnChanged |= ImGui::Checkbox("Use OIDN denoiser", &m_ui.ReferenceOIDNDenoiser);
                     if (ImGui::IsItemHovered()) ImGui::SetTooltip("Runs Intel Open Image Denoise once after the Reference accumulation target is reached.\nThe denoised HDR result is reused until accumulation is reset.");
@@ -1519,7 +1519,7 @@ void SampleUI::buildUI(void)
                         UI_SCOPED_DISABLE(true);
                         ImGui::Checkbox("Use OIDN denoiser", &oidnDisabled);
                     }
-                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip("OIDN support is disabled in this build. Enable RTXPT_WITH_OIDN in CMake.");
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip("OIDN support is disabled in this build. Enable CAUSTICA_WITH_OIDN in CMake.");
 #endif
 
                     if (ImGui::Button("Photo mode screenshot"))
@@ -1624,10 +1624,10 @@ void SampleUI::buildUI(void)
                                                                               "Out of those %d will be Local and %d will be Global NEE-AT samples", localCandidateSamples, globalCandidateSamples);
                             }
                         }
-                        m_ui.NEECandidateSamples = dm::clamp(m_ui.NEECandidateSamples, 1, RTXPT_LIGHTING_MAX_SAMPLE_COUNT);
+                        m_ui.NEECandidateSamples = dm::clamp(m_ui.NEECandidateSamples, 1, CAUSTICA_LIGHTING_MAX_SAMPLE_COUNT);
 
                         RESET_ON_CHANGE(ImGui::InputInt("Full samples", &m_ui.NEEFullSamples, 1));
-                        m_ui.NEEFullSamples = dm::clamp(m_ui.NEEFullSamples, 0, RTXPT_LIGHTING_MAX_SAMPLE_COUNT);
+                        m_ui.NEEFullSamples = dm::clamp(m_ui.NEEFullSamples, 0, CAUSTICA_LIGHTING_MAX_SAMPLE_COUNT);
                         if (ImGui::IsItemHovered()) ImGui::SetTooltip("This is the number of light samples to shadow test and integrate\nNote: Maximum total number of samples is 63");
 
                         RESET_ON_CHANGE(ImGui::Combo("MIS Type", (int*)&m_ui.NEEMISType, "Full\0ApproxInRealtime\0Approximate\0\0"));
@@ -1669,7 +1669,7 @@ void SampleUI::buildUI(void)
                         m_ui.NVAPIHitObjectExtension = false;
                     }
 
-#if RTXPT_D3D_AGILITY_SDK_VERSION >= 619
+#if CAUSTICA_D3D_AGILITY_SDK_VERSION >= 619
                     if (GetDevice()->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D12)
                     {
                         RESET_ON_CHANGE(ImGui::Checkbox("dx::HitObject codepath", &m_ui.DXHitObjectExtension));
@@ -1690,7 +1690,7 @@ void SampleUI::buildUI(void)
             }
         }
 
-    #if RTXPT_STOCHASTIC_TEXTURE_FILTERING_ENABLE
+    #if CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
         if (ImGui::CollapsingHeader("Stochastic Texture Filtering"))
         {
             bool changed = false;
@@ -1723,7 +1723,7 @@ void SampleUI::buildUI(void)
             ImGui::SliderFloat("Sigma", &m_ui.STFGaussianSigma, 0.f, 100.f, "%.3f", ImGuiSliderFlags_Logarithmic);
             ImGui::EndDisabled();   // m_ui.STFFilterMode
         }
-    #endif // RTXPT_STOCHASTIC_TEXTURE_FILTERING_ENABLE
+    #endif // CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
 
         if (m_ui.RealtimeMode && m_ui.RealtimeAA > 1 && ImGui::CollapsingHeader("DLSS & Reflex settings"))
         {
@@ -1731,7 +1731,7 @@ void SampleUI::buildUI(void)
             {
                 RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent); );
 
-#if RTXPT_WITH_ANY_DLSS
+#if CAUSTICA_WITH_ANY_DLSS
                 if (m_ui.RealtimeAA == 2 || m_ui.RealtimeAA == 3)
                     m_ui.DLSSMode = DLSSModeUI(m_ui.DLSSMode);
     
@@ -3135,7 +3135,7 @@ void TogglableNode::SetSelected(bool selected)
         SceneNode->SetTranslation( {-10000.0,-10000.0,-10000.0} );
 }
 
-#if RTXPT_WITH_PYTHON
+#if CAUSTICA_WITH_PYTHON
 void SampleUI::BuildPythonScriptingUI(float indent)
 {
     auto& scripting = m_app.GetPythonScripting();
@@ -3213,7 +3213,7 @@ void SampleUI::BuildPythonScriptingUI(float indent)
         ImGui::SetScrollHereY(1.0f);
     ImGui::EndChild();
 }
-#endif // RTXPT_WITH_PYTHON
+#endif // CAUSTICA_WITH_PYTHON
 
 void UpdateTogglableNodes(std::vector<TogglableNode>& togglableNodes, caustica::SceneGraphNode* node)
 {

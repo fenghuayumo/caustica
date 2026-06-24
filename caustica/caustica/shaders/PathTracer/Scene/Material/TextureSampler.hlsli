@@ -1,7 +1,7 @@
 #ifndef __TEXTURE_SAMPLER_HLSLI__ // using instead of "#pragma once" due to https://github.com/microsoft/DirectXShaderCompiler/issues/3943
 #define __TEXTURE_SAMPLER_HLSLI__
 
-#if RTXPT_STOCHASTIC_TEXTURE_FILTERING_ENABLE
+#if CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
 #include <Rtxtf/STFSamplerState.hlsli>
 #endif
 
@@ -44,7 +44,7 @@ struct ImplicitLodTextureSampler //: ITextureSampler
 struct ExplicitLodTextureSampler //: ITextureSampler
 {
     float lod; ///< The explicit level of detail to use
-#if RTXPT_STOCHASTIC_TEXTURE_FILTERING_ENABLE
+#if CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
     STF_SamplerState stfSamplerState;  
 
     void __init(float lod, STF_SamplerState stfSamplerState)
@@ -60,7 +60,7 @@ struct ExplicitLodTextureSampler //: ITextureSampler
     {
         return stfSamplerState.Texture2DSampleLevel(texture, materialSampler, texCoord, lod);
     }
-#else // !RTXPT_STOCHASTIC_TEXTURE_FILTERING_ENABLE
+#else // !CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
     void __init(float lod) 
     {
         this.lod = lod;
@@ -74,7 +74,7 @@ struct ExplicitLodTextureSampler //: ITextureSampler
         //if( debugColor ) { uint dummy0, dummy1, mipLevels; t.GetDimensions(0,dummy0,dummy1,mipLevels); return float4( GradientHeatMap( 1.0 - lod / float(mipLevels-1) ), t.SampleLevel(s, uv, lod).a ); };
         return texture.SampleLevel(materialSampler, texCoord, lod);
     }
-#endif  // RTXPT_STOCHASTIC_TEXTURE_FILTERING_ENABLE
+#endif  // CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
 };
 
 /** Texture sampling using an explicit scalar level of detail using ray cones (with texture dimensions
@@ -83,7 +83,7 @@ struct ExplicitLodTextureSampler //: ITextureSampler
 struct ExplicitRayConesLodTextureSampler //: ITextureSampler
 {
     float rayconesLODWithoutTexDims;    ///< this is \Delta_t, which is texture independent, plus the rest of the terms, except the texture size, which is added below
-#if RTXPT_STOCHASTIC_TEXTURE_FILTERING_ENABLE
+#if CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
     STF_SamplerState stfSamplerState;  
 
     void __init(float rayconesLODWithoutTexDims, STF_SamplerState stfSamplerState)
@@ -104,7 +104,7 @@ struct ExplicitRayConesLodTextureSampler //: ITextureSampler
         // if( debugColor ) { uint dummy0, dummy1, mipLevels; texCoord.GetDimensions(0,dummy0,dummy1,mipLevels); return float4( GradientHeatMap( 1.0 - lambda / float(mipLevels-1) ), t.SampleLevel(s, uv, lambda).a ); };
         return stfSamplerState.Texture2DSampleLevel(texture, samplerState, texCoord, lambda);
     }
-#else // !RTXPT_STOCHASTIC_TEXTURE_FILTERING_ENABLE
+#else // !CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
     void __init(float rayconesLODWithoutTexDims)
     {
         this.rayconesLODWithoutTexDims = rayconesLODWithoutTexDims;
@@ -122,7 +122,7 @@ struct ExplicitRayConesLodTextureSampler //: ITextureSampler
         // if( debugColor ) { uint dummy0, dummy1, mipLevels; texCoord.GetDimensions(0,dummy0,dummy1,mipLevels); return float4( GradientHeatMap( 1.0 - lambda / float(mipLevels-1) ), t.SampleLevel(s, uv, lambda).a ); };
         return texture.SampleLevel(samplerState, texCoord, lambda);
     }
-#endif  // RTXPT_STOCHASTIC_TEXTURE_FILTERING_ENABLE
+#endif  // CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
 
     float4 sampleTexture(Texture2D texture, SamplerState samplerState, float2 texCoord)
     {

@@ -10,12 +10,12 @@
 // PTPipelineBaker will assign names to entry points to add more info for debugging/profiling - see BAKER_ENABLE_VERBOSE_FUNCTION_NAMING to disable and make naming uniform
 #define ENTRY_NAME_CONCAT(a, b) a##b
 #define ENTRY_NAME(a, b)    ENTRY_NAME_CONCAT(a, b)
-#define RAYGEN_ENTRY        ENTRY_NAME(RayGen_,RTXPT_PIPELINE_PERMUTATION_NAME)
-#define MISS_ENTRY          ENTRY_NAME(Miss_,RTXPT_PIPELINE_PERMUTATION_NAME)
-#define CLOSESTHIT_ENTRY    ENTRY_NAME(ClosestHit_,RTXPT_MATERIAL_PERMUTATION_NAME)
-#define ANYHIT_ENTRY        ENTRY_NAME(AnyHit_,RTXPT_MATERIAL_PERMUTATION_NAME)
+#define RAYGEN_ENTRY        ENTRY_NAME(RayGen_,CAUSTICA_PIPELINE_PERMUTATION_NAME)
+#define MISS_ENTRY          ENTRY_NAME(Miss_,CAUSTICA_PIPELINE_PERMUTATION_NAME)
+#define CLOSESTHIT_ENTRY    ENTRY_NAME(ClosestHit_,CAUSTICA_MATERIAL_PERMUTATION_NAME)
+#define ANYHIT_ENTRY        ENTRY_NAME(AnyHit_,CAUSTICA_MATERIAL_PERMUTATION_NAME)
 
-#if (RTXPT_LP_TYPES_USE_16BIT_PRECISION != 0)
+#if (CAUSTICA_LP_TYPES_USE_16BIT_PRECISION != 0)
     typedef float16_t       lpfloat; 
     typedef float16_t2      lpfloat2;
     typedef float16_t3      lpfloat3;
@@ -49,7 +49,7 @@ inline float Average(float3 rgb)
     return (rgb.x+rgb.y+rgb.z) / 3.0;
 }
 
-#if (RTXPT_LP_TYPES_USE_16BIT_PRECISION != 0)
+#if (CAUSTICA_LP_TYPES_USE_16BIT_PRECISION != 0)
 inline lpfloat Average(lpfloat3 rgb)
 {
     return (rgb.x+rgb.y+rgb.z) / 3.0;

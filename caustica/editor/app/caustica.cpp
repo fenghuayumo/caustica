@@ -62,7 +62,7 @@
 
 #include "SampleGame/GameScene.h"
 
-#if RTXPT_WITH_PYTHON
+#if CAUSTICA_WITH_PYTHON
 #include "Python/PythonScripting.h"
 #endif
 
@@ -79,7 +79,7 @@ using namespace caustica::render;
 
 namespace
 {
-    constexpr const char* c_InlineSceneSentinel = "__RTXPT_INLINE_SCENE_JSON__";
+    constexpr const char* c_InlineSceneSentinel = "__CAUSTICA_INLINE_SCENE_JSON__";
 
     bool LooksLikeInlineSceneJson(const std::string& scene)
     {
@@ -170,7 +170,7 @@ namespace
             && ui.GaussianSplatEmissionMaxProxyCount > 0;
     }
 
-#if RTXPT_WITH_NATIVE_DLSS
+#if CAUSTICA_WITH_NATIVE_DLSS
     float GetNativeDLSSResolutionScale(SI::DLSSMode mode)
     {
         switch (mode)
@@ -212,12 +212,12 @@ namespace
     }
 }
 
-#if defined(RTXPT_D3D_AGILITY_SDK_VERSION)
+#if defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
 // Required for Agility SDK on Windows 10. Setup 1.c. 2.a.
 // https://devblogs.microsoft.com/directx/gettingstarted-dx12agility/
 extern "C"
 {
-    __declspec(dllexport) extern const UINT D3D12SDKVersion = RTXPT_D3D_AGILITY_SDK_VERSION;
+    __declspec(dllexport) extern const UINT D3D12SDKVersion = CAUSTICA_D3D_AGILITY_SDK_VERSION;
     __declspec(dllexport) extern const char* D3D12SDKPath = ".\\D3D12\\";
 }
 #endif
@@ -260,18 +260,18 @@ Sample::Sample(caustica::GpuDevice& deviceManager,
 
     m_captureScriptManager = std::make_unique<CaptureScriptManager>(*this, m_ui, m_cmdLine);
 
-#if RTXPT_WITH_PYTHON
+#if CAUSTICA_WITH_PYTHON
     // Embedded Python scripting host - we always create the wrapper but the
     // interpreter itself is initialized on demand the first time a script
     // gets queued.  This keeps cold-start overhead at zero when scripting is
-    // unused even if the executable was built with RTXPT_WITH_PYTHON=ON.
+    // unused even if the executable was built with CAUSTICA_WITH_PYTHON=ON.
     m_pythonScripting = std::make_unique<PythonScripting>(*this);
 #endif
 }
 
 Sample::~Sample()
 {
-#if RTXPT_WITH_PYTHON
+#if CAUSTICA_WITH_PYTHON
     // Tear down the Python interpreter first so that any nb::class_<>-bound
     // C++ objects (materials, lights, ...) are released while their owning
     // C++ data is still alive.
@@ -296,7 +296,7 @@ void Sample::Init(const std::string& preferredScene,
     m_CommonPasses = std::make_shared<caustica::CommonRenderPasses>(GetDevice(), m_shaderFactory);
     m_bindingCache = std::make_unique<caustica::BindingCache>(GetDevice());
 
-#if RTXPT_WITH_NATIVE_DLSS
+#if CAUSTICA_WITH_NATIVE_DLSS
     m_nativeDLSS = caustica::render::DLSS::Create(GetDevice(), *m_shaderFactory, caustica::GetDirectoryWithExecutable().string());
     if (m_nativeDLSS)
     {
@@ -453,8 +453,8 @@ void Sample::Init(const std::string& preferredScene,
     //Draw lines from the feedback buffer - this is old and should all be replaced by ShaderDebug
     {
         std::vector<ShaderMacro> drawLinesMacro = { ShaderMacro("DRAW_LINES_SHADERS_OLD", "1") };
-        m_linesVertexShader = m_shaderFactory->CreateShader("app/engine/shaders/render/Misc/DebugLines.hlsl", "main_vs", &drawLinesMacro, nvrhi::ShaderType::Vertex);
-        m_linesPixelShader = m_shaderFactory->CreateShader("app/engine/shaders/render/Misc/DebugLines.hlsl", "main_ps", &drawLinesMacro, nvrhi::ShaderType::Pixel);
+        m_linesVertexShader = m_shaderFactory->CreateShader("caustica/shaders/render/Misc/DebugLines.hlsl", "main_vs", &drawLinesMacro, nvrhi::ShaderType::Vertex);
+        m_linesPixelShader = m_shaderFactory->CreateShader("caustica/shaders/render/Misc/DebugLines.hlsl", "main_ps", &drawLinesMacro, nvrhi::ShaderType::Pixel);
 
         nvrhi::VertexAttributeDesc attributes[] = {
             nvrhi::VertexAttributeDesc()
@@ -1255,7 +1255,7 @@ void Sample::SceneLoaded( )
 
     m_asyncLoadingInProgress = true;
 
-#if RTXPT_WITH_PYTHON
+#if CAUSTICA_WITH_PYTHON
     // Initialize the embedded Python interpreter (lazily) and queue the
     // command-line scripts/expressions so that they execute against a fully
     // populated scene.  Actual execution happens during Animate() below.
@@ -1368,7 +1368,7 @@ void Sample::Animate(float fElapsedTimeSeconds)
 
     m_captureScriptManager->PreAnim(fElapsedTimeSeconds);
 
-#if RTXPT_WITH_PYTHON
+#if CAUSTICA_WITH_PYTHON
     // Drain any pending Python scripts. We do this on the renderer thread so
     // bindings observe a coherent scene state and so they can mutate UI
     // settings before rendering for the current frame happens.
@@ -1660,29 +1660,29 @@ void Sample::FillPTPipelineGlobalMacros(std::vector<caustica::ShaderMacro> & mac
     // macros.push_back({ "PT_BOUNCE_COUNT", std::to_string(m_ui.BounceCount) });
     // macros.push_back({ "PT_DIFFUSE_BOUNCE_COUNT", std::to_string((m_ui.RealtimeMode) ? (m_ui.RealtimeDiffuseBounceCount) : (m_ui.ReferenceDiffuseBounceCount)) });
 
-    macros.push_back({ "RTXPT_USE_APPROXIMATE_MIS", (m_ui.ActualUseApproximateMIS()) ? ("1") : ("0") });
+    macros.push_back({ "CAUSTICA_USE_APPROXIMATE_MIS", (m_ui.ActualUseApproximateMIS()) ? ("1") : ("0") });
 
     // It helps performance a lot when these are baked in
-    macros.push_back({ "RTXPT_NEE_FULL_SAMPLE_COUNT", std::to_string(m_ui.NEEFullSamples) });
+    macros.push_back({ "CAUSTICA_NEE_FULL_SAMPLE_COUNT", std::to_string(m_ui.NEEFullSamples) });
     uint localCandidateSamples = ComputeCandidateSampleLocalCount(m_ui.ActualNEEAT_LocalToGlobalSampleRatio(), m_ui.NEECandidateSamples);
     uint globalCandidateSamples = ComputeCandidateSampleGlobalCount(m_ui.ActualNEEAT_LocalToGlobalSampleRatio(), m_ui.NEECandidateSamples);
-    macros.push_back({ "RTXPT_NEE_LOCAL_CANDIDATE_SAMPLE_COUNT", std::to_string(localCandidateSamples) });
-    macros.push_back({ "RTXPT_NEE_GLOBAL_CANDIDATE_SAMPLE_COUNT", std::to_string(globalCandidateSamples) });
-    macros.push_back({ "RTXPT_NEE_TOTAL_CANDIDATE_SAMPLE_COUNT", std::to_string(m_ui.NEECandidateSamples) });
+    macros.push_back({ "CAUSTICA_NEE_LOCAL_CANDIDATE_SAMPLE_COUNT", std::to_string(localCandidateSamples) });
+    macros.push_back({ "CAUSTICA_NEE_GLOBAL_CANDIDATE_SAMPLE_COUNT", std::to_string(globalCandidateSamples) });
+    macros.push_back({ "CAUSTICA_NEE_TOTAL_CANDIDATE_SAMPLE_COUNT", std::to_string(m_ui.NEECandidateSamples) });
 
-    macros.push_back({ "RTXPT_DISABLE_SER_TERMINATION_HINT", (m_ui.DbgDisableSERTerminationHint)?("1"):("0") });
-    macros.push_back({ "RTXPT_DISCARD_NON_NEE_LIGHTING", (m_ui.DbgDiscardNonNEELighting) ? ("1") : ("0") });
-    macros.push_back({ "RTXPT_DISCARD_NEE_LIGHTING", (m_ui.DbgDiscardNEELighting) ? ("1") : ("0") });
+    macros.push_back({ "CAUSTICA_DISABLE_SER_TERMINATION_HINT", (m_ui.DbgDisableSERTerminationHint)?("1"):("0") });
+    macros.push_back({ "CAUSTICA_DISCARD_NON_NEE_LIGHTING", (m_ui.DbgDiscardNonNEELighting) ? ("1") : ("0") });
+    macros.push_back({ "CAUSTICA_DISCARD_NEE_LIGHTING", (m_ui.DbgDiscardNEELighting) ? ("1") : ("0") });
     
-    macros.push_back({ "RTXPT_FIREFLY_FILTER", (m_ui.ActualFireflyFilterEnabled()) ? ("1") : ("0") });
+    macros.push_back({ "CAUSTICA_FIREFLY_FILTER", (m_ui.ActualFireflyFilterEnabled()) ? ("1") : ("0") });
 
-    macros.push_back({ "RTXPT_ACTIVE_STABLE_PLANE_COUNT", std::to_string(m_ui.StablePlanesActiveCount) });
+    macros.push_back({ "CAUSTICA_ACTIVE_STABLE_PLANE_COUNT", std::to_string(m_ui.StablePlanesActiveCount) });
 
-    macros.push_back({ "RTXPT_NESTED_DIELECTRICS_QUALITY", std::to_string(m_ui.NestedDielectricsQuality) });
+    macros.push_back({ "CAUSTICA_NESTED_DIELECTRICS_QUALITY", std::to_string(m_ui.NestedDielectricsQuality) });
 
-    macros.push_back({ "RTXPT_LP_TYPES_USE_16BIT_PRECISION", (m_ui.UseFp16Types) ? ("1") : ("0") });
+    macros.push_back({ "CAUSTICA_LP_TYPES_USE_16BIT_PRECISION", (m_ui.UseFp16Types) ? ("1") : ("0") });
 
-    macros.push_back({ "RTXPT_ENABLE_LOW_DISCREPANCY_SAMPLER_FOR_BSDF", (m_ui.EnableLDSamplerForBSDF) ? ("1") : ("0") });
+    macros.push_back({ "CAUSTICA_ENABLE_LOW_DISCREPANCY_SAMPLER_FOR_BSDF", (m_ui.EnableLDSamplerForBSDF) ? ("1") : ("0") });
 
     m_lightsBaker->SetGlobalShaderMacros(macros);
     if (m_ommBaker != nullptr)
@@ -1696,7 +1696,7 @@ bool Sample::CreatePTPipeline(caustica::ShaderFactory& shaderFactory)
     {
         std::vector<caustica::ShaderMacro> shaderMacros;
 		// shaderMacros.push_back(caustica::ShaderMacro({ "USE_RTXDI", "0" }));
-        m_exportVBufferCS = m_shaderFactory->CreateShader("app/engine/shaders/render/ProcessingPasses/ExportVisibilityBuffer.hlsl", "main", &shaderMacros, nvrhi::ShaderType::Compute);
+        m_exportVBufferCS = m_shaderFactory->CreateShader("caustica/shaders/render/ProcessingPasses/ExportVisibilityBuffer.hlsl", "main", &shaderMacros, nvrhi::ShaderType::Compute);
         nvrhi::ComputePipelineDesc pipelineDesc;
 		pipelineDesc.bindingLayouts = { m_bindingLayout, m_bindlessLayout };
 		pipelineDesc.CS = m_exportVBufferCS;
@@ -2259,7 +2259,7 @@ void Sample::PostUpdatePathTracing( )
 
 void Sample::UpdatePathTracerConstants( PathTracerConstants & constants, const PathTracerCameraData & cameraData )
 {
-#if RTXPT_STOCHASTIC_TEXTURE_FILTERING_ENABLE
+#if CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
     auto GetStfMagnificationMethod = [](StfMagnificationMethod method)->int {
         switch (method)
         {
@@ -2288,7 +2288,7 @@ void Sample::UpdatePathTracerConstants( PathTracerConstants & constants, const P
             return 0;
         }
     };
-#endif // RTXPT_STOCHASTIC_TEXTURE_FILTERING_ENABLE
+#endif // CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
 
     constants.camera = cameraData;
     constants.prevCamera = cameraData;
@@ -2347,7 +2347,7 @@ void Sample::UpdatePathTracerConstants( PathTracerConstants & constants, const P
 
     constants.EnvironmentMapDiffuseSampleMIPLevel = m_ui.EnvironmentMapDiffuseSampleMIPLevel;
 
-#if RTXPT_STOCHASTIC_TEXTURE_FILTERING_ENABLE
+#if CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
     // stochastic texture filtering type and size.
     // constants.STFUseBlueNoise                   = m_ui.STFUseBlueNoise;
     constants.STFMagnificationMethod            = GetStfMagnificationMethod(m_ui.STFMagnificationMethod);
@@ -2593,7 +2593,7 @@ void Sample::StreamlinePreRender()
 #endif // #if CAUSTICA_WITH_STREAMLINE
 }
 
-#if RTXPT_WITH_NATIVE_DLSS
+#if CAUSTICA_WITH_NATIVE_DLSS
 void Sample::NativeDLSSPreRender()
 {
     if (!m_ui.RealtimeMode)
@@ -2887,7 +2887,7 @@ void Sample::Render(nvrhi::IFramebuffer* framebuffer)
     PreRender();
 
     StreamlinePreRender();
-#if RTXPT_WITH_NATIVE_DLSS
+#if CAUSTICA_WITH_NATIVE_DLSS
     NativeDLSSPreRender();
 #endif
 
@@ -5559,7 +5559,7 @@ void Sample::Denoise(nvrhi::IFramebuffer* framebuffer)
     }
 }
 
-#if RTXPT_WITH_NATIVE_DLSS
+#if CAUSTICA_WITH_NATIVE_DLSS
 bool Sample::EvaluateNativeDLSS(bool reset)
 {
     if (!m_nativeDLSS || !(m_ui.RealtimeAA == 2 || m_ui.RealtimeAA == 3))
@@ -5802,7 +5802,7 @@ void Sample::PostProcessAA(nvrhi::IFramebuffer* framebuffer, bool reset)
         }
 #endif
 
-#if RTXPT_WITH_NATIVE_DLSS
+#if CAUSTICA_WITH_NATIVE_DLSS
         bool nativeDLSSEvaluated = false;
         if (m_ui.RealtimeAA == 2 || m_ui.RealtimeAA == 3)
             nativeDLSSEvaluated = EvaluateNativeDLSS(reset);
@@ -5923,7 +5923,7 @@ void Sample::ApplyReferenceOIDN()
     if (m_ui.RealtimeMode || !m_ui.ReferenceOIDNDenoiser || m_renderTargets == nullptr)
         return;
 
-#if RTXPT_WITH_OIDN
+#if CAUSTICA_WITH_OIDN
     const bool accumulationReady = m_accumulationCompleted || m_accumulationSampleIndex >= m_ui.AccumulationTarget;
     if (!accumulationReady)
         return;
@@ -6099,7 +6099,7 @@ void Sample::ApplyReferenceOIDN()
 #else
     if (!m_oidnDenoiserFailed)
     {
-        caustica::warning("OIDN reference denoiser requested, but RTXPT_WITH_OIDN is disabled in this build.");
+        caustica::warning("OIDN reference denoiser requested, but CAUSTICA_WITH_OIDN is disabled in this build.");
         m_oidnDenoiserFailed = true;
     }
 #endif

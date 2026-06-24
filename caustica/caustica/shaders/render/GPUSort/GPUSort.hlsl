@@ -84,7 +84,7 @@ void Count(uint localID : SV_GroupThreadID, uint groupID : SV_GroupID)
 	FFX_ParallelSort_Count_uint( localID, groupID, /*g_consts*/ConstsUAV[0], g_RootConst.params.x, SrcKeys, ScratchBuffer, SrcIndices );
 }
 
-// FPS FirstPassCount (see RTXPT_GPUSORT_FIRST_PASS_INIT_INDICES)
+// FPS FirstPassCount (see CAUSTICA_GPUSORT_FIRST_PASS_INIT_INDICES)
 [numthreads(FFX_PARALLELSORT_THREADGROUP_SIZE, 1, 1)]
 void CountIIFP(uint localID : SV_GroupThreadID, uint groupID : SV_GroupID)
 {
@@ -126,14 +126,14 @@ void ScanAdd(uint localID : SV_GroupThreadID, uint groupID : SV_GroupID)
 	FFX_ParallelSort_ScanPrefix(consts.NumThreadGroups, localID, groupID, BinOffset, BaseIndex, true, consts, ScratchBuffer, ScratchBuffer, ReducedScratchBuffer);
 }
 
-// FPS Scatter & FirstPassScatter (see RTXPT_GPUSORT_FIRST_PASS_INIT_INDICES)
+// FPS Scatter & FirstPassScatter (see CAUSTICA_GPUSORT_FIRST_PASS_INIT_INDICES)
 [numthreads(FFX_PARALLELSORT_THREADGROUP_SIZE, 1, 1)]
 void Scatter(uint localID : SV_GroupThreadID, uint groupID : SV_GroupID)
 {
 	FFX_ParallelSort_Scatter_uint(localID, groupID, /*g_consts*/ConstsUAV[0], g_RootConst.params.x, SrcKeys, /*DstBuffer,*/ ScratchBuffer, SrcIndices, DstIndices );
 }
 
-// FPS Scatter & FirstPassScatter (see RTXPT_GPUSORT_FIRST_PASS_INIT_INDICES)
+// FPS Scatter & FirstPassScatter (see CAUSTICA_GPUSORT_FIRST_PASS_INIT_INDICES)
 [numthreads(FFX_PARALLELSORT_THREADGROUP_SIZE, 1, 1)]
 void ScatterIIFP(uint localID : SV_GroupThreadID, uint groupID : SV_GroupID)
 {

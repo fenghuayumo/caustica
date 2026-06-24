@@ -34,7 +34,7 @@ ZoomTool::ZoomTool( nvrhi::IDevice* device, std::shared_ptr<caustica::ShaderFact
 
     // These need to know about the scene
     pipelineDesc.bindingLayouts = { m_bindingLayout };
-    m_CSZoomTool.Init(m_device, *shaderFactory, "app/engine/shaders/render/Misc/ZoomTool.hlsl", "main", std::vector<caustica::ShaderMacro>(), pipelineDesc.bindingLayouts);
+    m_CSZoomTool.Init(m_device, *shaderFactory, "caustica/shaders/render/Misc/ZoomTool.hlsl", "main", std::vector<caustica::ShaderMacro>(), pipelineDesc.bindingLayouts);
 
     m_constantBuffer = m_device->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ZoomToolShaderConstants), "ZoomToolShaderConstants", caustica::c_MaxRenderPassConstantBufferVersions));
 }
