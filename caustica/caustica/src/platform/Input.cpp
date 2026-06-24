@@ -1,6 +1,6 @@
 #include "platform/Input.h"
 #include "backend/GpuDevice.h"  // IRenderPass (for legacy compat in JoystickManager)
-#include "math/vector.h"
+#include "math/math.h"
 
 #include <GLFW/glfw3.h>
 #include <algorithm>

@@ -148,7 +148,7 @@ OmmBuildQueue::OmmBuildQueue(
     provider.shaders = [this](nvrhi::ShaderType type, const char* shaderName, const char* shaderEntryName)->nvrhi::ShaderHandle
     {
         std::vector<caustica::ShaderMacro> defines = { caustica::ShaderMacro("COMPILER_DXC", "1") };
-        std::string shaderNameStr = std::string("omm/Omm/libraries/omm-lib/shaders/") + shaderName;
+        std::string shaderNameStr = std::string("Omm/libraries/omm-lib/shaders/") + shaderName;
         return m_shaderFactory->CreateShader(shaderNameStr.c_str(), shaderEntryName, &defines, type);
     };
 

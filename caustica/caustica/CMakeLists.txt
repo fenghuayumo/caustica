@@ -1,26 +1,16 @@
 # ---------------------------------------------------------------------------
 
-file(GLOB caustica_engine_core_src
-    include/core/chunk/*.h
-    include/core/vfs/TarFile.h
-    include/core/vfs/VFS.h
-    include/core/*.h
-    src/core/chunk/*.cpp
-    src/core/vfs/TarFile.cpp
-    src/core/vfs/VFS.cpp
-    src/core/*.cpp
-)
-
-file(GLOB caustica_engine_math_src
-    include/math/*.h
-    src/math/*.cpp
-)
-
 file(GLOB caustica_engine_engine_src
     include/engine/*.h
     src/engine/*.cpp
     src/engine/*.c
     src/engine/*.h
+)
+
+# Core utilities with scene/render dependencies (MediaFileSystem uses FindScenes / SceneRender)
+file(GLOB caustica_engine_core_util_src
+    include/core/MediaFileSystem.h
+    src/core/MediaFileSystem.cpp
 )
 
 # Scene layer: ECS, scene graph, scene types, camera (DIVSHOT-style architecture)
@@ -65,13 +55,6 @@ file(GLOB caustica_engine_render_src
 
 list(FILTER caustica_engine_render_src EXCLUDE REGEX ".*/ToneMappingPasses\\.(h|cpp)$")
 
-if (WIN32)
-    list(APPEND caustica_engine_core_src
-        include/core/vfs/WinResFS.h
-        src/core/vfs/WinResFS.cpp
-    )
-endif()
-
 if (CAUSTICA_WITH_STREAMLINE)
     list(APPEND caustica_engine_engine_src
         src/engine/streamline/StreamlineIntegration.cpp
@@ -102,7 +85,7 @@ if (CAUSTICA_WITH_AFTERMATH)
 endif()
 
 if (MSVC)
-    list(APPEND caustica_engine_core_src caustica.natvis)
+    list(APPEND caustica_engine_engine_src caustica.natvis)
 endif()
 
 # Platform layer (Window abstraction)
@@ -136,8 +119,7 @@ list(APPEND caustica_engine_engine_src
 # Render passes and infrastructure are now in caustica_engine_render_src (GLOB)
 
 add_library(causticaEngine STATIC
-    ${caustica_engine_core_src}
-    ${caustica_engine_math_src}
+    ${caustica_engine_core_util_src}
     ${caustica_engine_scene_src}
     ${caustica_engine_audio_src}
     ${caustica_engine_animation_src}
@@ -157,8 +139,8 @@ target_include_directories(causticaEngine
 
 target_link_libraries(causticaEngine
     PUBLIC
+        causticaBase
         nvrhi
-        jsoncpp_static
         stb
         cgltf
         ShaderMakeBlob
@@ -275,8 +257,7 @@ endif()
 
 set_target_properties(causticaEngine PROPERTIES FOLDER "caustica/caustica")
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
-    ${caustica_engine_core_src}
-    ${caustica_engine_math_src}
+    ${caustica_engine_core_util_src}
     ${caustica_engine_scene_src}
     ${caustica_engine_audio_src}
     ${caustica_engine_animation_src}

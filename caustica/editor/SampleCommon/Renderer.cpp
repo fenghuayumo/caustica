@@ -5,6 +5,7 @@
 #include <scene/Scene.h>
 #include <scene/SceneGraph.h>
 #include <scene/camera/Camera.h>
+#include <render/View.h>
 #include <core/path_utils.h>
 
 #include <fstream>

@@ -327,6 +327,7 @@ if (CAUSTICA_WITH_NVRHI)
 endif()
 
 add_subdirectory("External")
+add_subdirectory(caustica/base)
 
 # Default to using DXR OMMs if we can
 if(NVRHI_WITH_DX12 AND CAUSTICA_D3D_AGILITY_SDK_VERSION AND (CAUSTICA_D3D_AGILITY_SDK_VERSION GREATER_EQUAL "619"))

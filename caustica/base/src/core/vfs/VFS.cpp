@@ -287,7 +287,7 @@ bool RootFileSystem::unmount(const std::filesystem::path& path)
 
     for (size_t index = 0; index < m_MountPoints.size(); index++)
     {
-        if (m_MountPoints[index].first == spath)
+        if (string_utils::strcasecmp(m_MountPoints[index].first, spath))
         {
             m_MountPoints.erase(m_MountPoints.begin() + index);
             return true;
@@ -303,7 +303,7 @@ bool RootFileSystem::findMountPoint(const std::filesystem::path& path, std::file
 
     for (auto it : m_MountPoints)
     {
-        if (spath.find(it.first, 0) == 0 && ((spath.length() == it.first.length()) || (spath[it.first.length()] == '/')))
+        if (string_utils::strcasencmp(spath, it.first, it.first.size()) && ((spath.length() == it.first.length()) || (spath[it.first.length()] == '/')))
         {
             if (pRelativePath)
             {
