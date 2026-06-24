@@ -1,5 +1,5 @@
-#include <render/Core/PathTracerSceneGeometry.h>
-#include <render/Core/PathTracerApp.h>
+#include <render/Core/SceneGeometryUpdate.h>
+#include <render/Core/RenderCore.h>
 #include <render/Core/AccelStructManager.h>
 #include <render/Passes/Lighting/MaterialsBaker.h>
 #include <render/Passes/OMM/OmmBaker.h>
@@ -47,7 +47,7 @@ void transitionSkinnedMeshBuffersToReadOnly(nvrhi::ICommandList* commandList, co
 
 } // namespace
 
-void PathTracerRenderCore::updateSceneGeometry(UpdateSceneGeometryParams& params)
+void RenderCore::updateSceneGeometry(UpdateSceneGeometryParams& params)
 {
     nvrhi::ICommandList* commandList = params.commandList;
     const std::shared_ptr<Scene>& scene = params.scene;

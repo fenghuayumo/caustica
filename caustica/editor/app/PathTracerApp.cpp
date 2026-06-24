@@ -1,8 +1,9 @@
 #include "PathTracerApp.h"
 #include "caustica.h"
 
-#include <render/Core/PathTracerPostProcess.h>
-#include <render/Core/PathTracerSceneGeometry.h>
+#include <render/Core/PostProcessAA.h>
+#include <render/Core/SceneGeometryUpdate.h>
+#include <render/Core/LightingUpdate.h>
 
 #include <core/path_utils.h>
 #include <scene/scene_utils.h>
@@ -1760,89 +1761,51 @@ void PathTracerApp::SetEnvMapOverrideSource(const std::string& envMapOverride)
 
 void PathTracerApp::PreUpdateLighting(nvrhi::CommandListHandle commandList, bool& needNewBindings)
 {
-    RAII_SCOPE(m_commandList->beginMarker("PreUpdateLighting"); , m_commandList->endMarker(); );
-
-    auto preUpdateCube = m_envMapBaker->GetEnvMapCube();
-
     std::filesystem::path sceneDirectory;
     if (m_sceneManager->getCurrentScenePath() != std::filesystem::path(SceneManager::inlineSceneSentinel()))
         sceneDirectory = m_sceneManager->getCurrentScenePath().parent_path();
 
-    std::string envMapActualPath = m_envMapLocalPath; 
+    std::string envMapActualPath = m_envMapLocalPath;
     if (m_envMapOverride != "" && m_envMapOverride != c_EnvMapSceneDefault)
-        envMapActualPath = (IsProceduralSky(m_envMapOverride.c_str()))?(m_envMapOverride):(std::string(c_EnvMapSubFolder) + "/" + m_envMapOverride);
+        envMapActualPath = (IsProceduralSky(m_envMapOverride.c_str())) ? (m_envMapOverride) : (std::string(c_EnvMapSubFolder) + "/" + m_envMapOverride);
 
     if (!envMapActualPath.empty() && !IsProceduralSky(envMapActualPath.c_str()))
         envMapActualPath = ResolveSceneMediaPath(envMapActualPath, sceneDirectory).generic_string();
 
-    m_envMapBaker->PreUpdate(commandList, m_CommonPasses, envMapActualPath, sceneDirectory);
-
-    if (preUpdateCube != m_envMapBaker->GetEnvMapCube())
-        needNewBindings = true;
+    PreUpdateLightingParams params{
+        commandList,
+        needNewBindings,
+        m_envMapBaker.get(),
+        m_CommonPasses,
+        envMapActualPath,
+        sceneDirectory,
+    };
+    m_renderCore.preUpdateLighting(params);
 }
 
 void PathTracerApp::UpdateLighting(nvrhi::CommandListHandle commandList)
 {
-    RAII_SCOPE( m_commandList->beginMarker("UpdateLighting");, m_commandList->endMarker(); );
+    BuildGaussianSplatEmissionProxyList();
 
-    EMB_DirectionalLight dirLights[EnvMapBaker::c_MaxDirLights];
-    uint dirLightCount = 0;
-    {   // Find and pre-process directional analytic lights, and convert them to environment map local frame so they remain pointing in correct world direction!
-        float3 rotationInRadians = radians(m_settings.EnvironmentMapParams.RotationXYZ);
-        affine3 rotationTransform = dm::rotation(rotationInRadians);
-        affine3 inverseTransform = inverse(rotationTransform);
-        for (int i = 0; i < (int)m_lights.size(); i++)
-        {
-            std::shared_ptr<DirectionalLight> dirLight = std::dynamic_pointer_cast<DirectionalLight>(m_lights[i]);
-            if( dirLight != nullptr )
-            {
-                LightConstants light;
-                dirLight->FillLightConstants(light);
-
-                const float minAngularSize = PI_f / (m_envMapBaker->GetTargetCubeResolution()/2.0f);
-                assert( light.angularSizeOrInvRange >= minAngularSize );    // point lights smaller than this cannot be reliably baked into cubemap
-                dirLights[dirLightCount].AngularSize = std::max( light.angularSizeOrInvRange, minAngularSize );
-                dirLights[dirLightCount].ColorIntensity = float4(light.color, light.intensity);
-                dirLights[dirLightCount].Direction = rotationTransform.transformVector(light.direction);
-                dirLightCount++;
-            }
-        }
-    }
-
-    if (m_envMapBaker->Update(commandList, *m_bindingCache, m_CommonPasses, EnvMapBaker::BakeSettings { .EnvMapRadianceScale = c_envMapRadianceScale }, m_sceneTime, dirLights, dirLightCount, !m_settings.RealtimeMode || !m_settings.EnableAnimations) )
-        m_settings.ResetAccumulation = true;
-
-    {
-        LightsBaker::BakeSettings settings;
-        settings.ImportanceSamplingType = (uint)m_settings.NEEType;
-        settings.CameraPosition = m_renderCore.camera().camera().GetPosition();
-        settings.CameraDirection = m_renderCore.camera().camera().GetDir();
-        settings.ViewProjMatrix = m_renderCore.camera().view()->GetViewProjectionMatrix();
-        settings.MouseCursorPos = m_settings.MousePos;
-        settings.GlobalTemporalFeedbackWeight   = m_settings.NEEAT_GlobalTemporalFeedbackWeight;
-        settings.LocalToGlobalSampleRatio       = m_settings.ActualNEEAT_LocalToGlobalSampleRatio();
-        settings.UseApproximateMIS              = m_settings.ActualUseApproximateMIS();
-        settings.DistantVsLocalImportanceScale  = m_settings.NEEAT_Distant_vs_Local_Importance;
-        settings.ResetFeedback = m_settings.ResetAccumulation && !m_settings.RealtimeMode 
-#if 1
-            || m_settings.ResetRealtimeCaches
-#endif
-        ;
-        settings.PrevViewportSize = float2( (float)m_renderCore.camera().viewPrevious()->GetViewExtent().width(), (float)m_renderCore.camera().viewPrevious()->GetViewExtent().height() );
-        settings.ViewportSize = float2( (float)m_renderCore.camera().view()->GetViewExtent().width(), (float)m_renderCore.camera().view()->GetViewExtent().height() );
-        settings.EnvMapParams = LightsBakerEnvMapParams{ .Transform = m_envMapSceneParams.Transform, .InvTransform = m_envMapSceneParams.InvTransform, .ColorMultiplier = m_envMapSceneParams.ColorMultiplier, .Enabled = m_envMapSceneParams.Enabled };
-        settings.FrameIndex = m_frameIndex;
-
-        BuildGaussianSplatEmissionProxyList();
-        if (!m_gaussianSplatEmissionProxies.empty() && IsGaussianSplatEmissionEnabled(m_ui))
-        {
-            settings.GaussianSplatEmissionProxies = &m_gaussianSplatEmissionProxies;
-            settings.GaussianSplatEmissionObjectToWorld = float4x4::identity();
-            settings.GaussianSplatEmissionIntensity = m_settings.GaussianSplatEmissionIntensity;
-        }
-
-        m_lightsBaker->UpdateBegin(commandList, *m_bindingCache, settings, m_sceneTime, m_sceneManager->getScene(), m_materialsBaker, m_ommBaker, m_renderCore.accelStructs().getSubInstanceBuffer(), m_renderCore.accelStructs().getSubInstanceData(), m_envMapBaker->GetImportanceSampling()->GetRadianceAndImportanceMap());
-    }
+    UpdateLightingParams params{
+        m_settings,
+        commandList,
+        m_envMapBaker.get(),
+        m_lightsBaker.get(),
+        m_bindingCache.get(),
+        m_CommonPasses,
+        &m_lights,
+        m_sceneManager->getScene(),
+        m_materialsBaker,
+        m_ommBaker,
+        m_envMapSceneParams,
+        m_sceneTime,
+        m_frameIndex,
+        c_envMapRadianceScale,
+    };
+    if (!m_gaussianSplatEmissionProxies.empty())
+        params.gaussianSplatEmissionProxies = &m_gaussianSplatEmissionProxies;
+    m_renderCore.updateLighting(params);
 }
 
 void PathTracerApp::PreUpdatePathTracing( bool resetAccum, nvrhi::CommandListHandle commandList )

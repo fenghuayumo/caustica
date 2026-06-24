@@ -1,5 +1,5 @@
-#include <render/Core/PathTracerPostProcess.h>
-#include <render/Core/PathTracerApp.h>
+#include <render/Core/PostProcessAA.h>
+#include <render/Core/RenderCore.h>
 #include <render/Core/RenderTargets.h>
 #include <render/Core/View.h>
 #include <render/Passes/Geometry/TemporalAntiAliasingPass.h>
@@ -20,7 +20,7 @@ using namespace caustica::math;
 namespace caustica
 {
 
-void PathTracerRenderCore::postProcessAA(PostProcessAAParams& params)
+void RenderCore::postProcessAA(PostProcessAAParams& params)
 {
     auto& settings = params.settings;
     nvrhi::ICommandList* commandList = params.commandList;

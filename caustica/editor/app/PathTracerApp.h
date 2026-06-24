@@ -18,7 +18,7 @@
 #include <render/Core/SceneRender.h>
 #include <platform/Input.h>
 #include <core/vfs/VFS.h>
-#include <render/Core/PathTracerApp.h>
+#include <render/Core/RenderCore.h>
 #include <render/Passes/Geometry/BloomPass.h>
 #include <scene/camera/Camera.h>
 #include <engine/SceneManager.h>
@@ -333,7 +333,7 @@ private:
 
     // Scene management + render orchestrator (engine)
     std::unique_ptr<SceneManager>               m_sceneManager;
-    caustica::PathTracerRenderCore                 m_renderCore;
+    caustica::RenderCore                           m_renderCore;
     std::unique_ptr<Renderer>                   m_renderer;
 
     // scene timing

@@ -4,8 +4,9 @@
 #include <render/Core/CameraController.h>
 #include <render/Core/RenderPipeline.h>
 
-#include <render/Core/PathTracerPostProcess.h>
-#include <render/Core/PathTracerSceneGeometry.h>
+#include <render/Core/PostProcessAA.h>
+#include <render/Core/SceneGeometryUpdate.h>
+#include <render/Core/LightingUpdate.h>
 
 #include <memory>
 
@@ -14,11 +15,11 @@ namespace caustica
 class Scene;
 class ShaderFactory;
 
-// Engine render orchestrator (editor shell remains global ::PathTracerApp).
-class PathTracerRenderCore
+// Shared render orchestrator (editor sample shell remains global ::PathTracerApp).
+class RenderCore
 {
 public:
-    explicit PathTracerRenderCore(nvrhi::IDevice* device);
+    explicit RenderCore(nvrhi::IDevice* device);
 
     void initializeRenderPipeline(std::shared_ptr<ShaderFactory> shaderFactory);
 
@@ -35,6 +36,8 @@ public:
 
     void postProcessAA(PostProcessAAParams& params);
     void updateSceneGeometry(UpdateSceneGeometryParams& params);
+    void preUpdateLighting(PreUpdateLightingParams& params);
+    void updateLighting(UpdateLightingParams& params);
 
 private:
     nvrhi::IDevice* m_device = nullptr;
