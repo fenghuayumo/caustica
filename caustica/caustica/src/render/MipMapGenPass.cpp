@@ -2,14 +2,14 @@
 #include <assets/loader/ShaderFactory.h>
 #include <render/CommonRenderPasses.h>
 
-#if DONUT_WITH_STATIC_SHADERS
-#if DONUT_WITH_DX11
+#if CAUSTICA_WITH_STATIC_SHADERS
+#if CAUSTICA_WITH_DX11
 #include "compiled_shaders/passes/mipmapgen_cs.dxbc.h"
 #endif
-#if DONUT_WITH_DX12
+#if CAUSTICA_WITH_DX12
 #include "compiled_shaders/passes/mipmapgen_cs.dxil.h"
 #endif
-#if DONUT_WITH_VULKAN
+#if CAUSTICA_WITH_VULKAN
 #include "compiled_shaders/passes/mipmapgen_cs.spirv.h"
 #endif
 #endif
@@ -94,7 +94,7 @@ MipMapGenPass::MipMapGenPass(
 
     std::vector<ShaderMacro> macros = { {"MODE", std::to_string(mode)} };
     m_Shader = shaderFactory->CreateAutoShader(
-        "donut/passes/mipmapgen_cs.hlsl", "main", DONUT_MAKE_PLATFORM_SHADER(g_mipmapgen_cs), &macros, nvrhi::ShaderType::Compute);
+        "caustica/passes/mipmapgen_cs.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_mipmapgen_cs), &macros, nvrhi::ShaderType::Compute);
 
     // Constants
     nvrhi::BufferDesc constantBufferDesc;

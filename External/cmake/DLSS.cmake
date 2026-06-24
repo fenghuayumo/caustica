@@ -43,7 +43,7 @@ elseif (UNIX AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
 
 
 	# Search for the DLSS library files, because the version number is included in the filename,
-	# and we don't know which version was pulled - that's controlled by DONUT_DLSS_FETCH_TAG.
+	# and we don't know which version was pulled - that's controlled by CAUSTICA_DLSS_FETCH_TAG.
 
 	set(dlss_lib_search_path "${dlss_sdk}/lib/${dlss_platform_lin}/rel/libnvidia-ngx-dlss.so.*")
 	file(GLOB dlss_lib_files ${dlss_lib_search_path})
@@ -92,7 +92,7 @@ elseif (UNIX AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
 	add_library(DLSS_RR STATIC IMPORTED)
 
 	# Search for the DLSS_RR library files, because the version number is included in the filename,
-	# and we don't know which version was pulled - that's controlled by DONUT_DLSS_FETCH_TAG.
+	# and we don't know which version was pulled - that's controlled by CAUSTICA_DLSS_FETCH_TAG.
 
 	set(dlss_lib_search_path "${dlss_sdk}/lib/${dlss_platform_lin}/rel/libnvidia-ngx-dlssd.so.*")
 	file(GLOB dlss_lib_files ${dlss_lib_search_path})

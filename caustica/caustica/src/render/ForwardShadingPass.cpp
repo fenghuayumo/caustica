@@ -10,20 +10,20 @@
 #include <rhi/utils.h>
 #include <utility>
 
-#if DONUT_WITH_STATIC_SHADERS
-#if DONUT_WITH_DX11
+#if CAUSTICA_WITH_STATIC_SHADERS
+#if CAUSTICA_WITH_DX11
 #include "compiled_shaders/passes/cubemap_gs.dxbc.h"
 #include "compiled_shaders/passes/forward_ps.dxbc.h"
 #include "compiled_shaders/passes/forward_vs_input_assembler.dxbc.h"
 #include "compiled_shaders/passes/forward_vs_buffer_loads.dxbc.h"
 #endif
-#if DONUT_WITH_DX12
+#if CAUSTICA_WITH_DX12
 #include "compiled_shaders/passes/cubemap_gs.dxil.h"
 #include "compiled_shaders/passes/forward_ps.dxil.h"
 #include "compiled_shaders/passes/forward_vs_input_assembler.dxil.h"
 #include "compiled_shaders/passes/forward_vs_buffer_loads.dxil.h"
 #endif
-#if DONUT_WITH_VULKAN
+#if CAUSTICA_WITH_VULKAN
 #include "compiled_shaders/passes/cubemap_gs.spirv.h"
 #include "compiled_shaders/passes/forward_ps.spirv.h"
 #include "compiled_shaders/passes/forward_vs_input_assembler.spirv.h"
@@ -89,17 +89,17 @@ void ForwardShadingPass::ResetBindingCache()
 
 nvrhi::ShaderHandle ForwardShadingPass::CreateVertexShader(ShaderFactory& shaderFactory, const CreateParameters& params)
 {
-    char const* sourceFileName = "donut/passes/forward_vs.hlsl";
+    char const* sourceFileName = "caustica/passes/forward_vs.hlsl";
 
     if (params.useInputAssembler)
     {
         return shaderFactory.CreateAutoShader(sourceFileName, "input_assembler",
-            DONUT_MAKE_PLATFORM_SHADER(g_forward_vs_input_assembler), nullptr, nvrhi::ShaderType::Vertex);
+            CAUSTICA_MAKE_PLATFORM_SHADER(g_forward_vs_input_assembler), nullptr, nvrhi::ShaderType::Vertex);
     }
     else
     {
         return shaderFactory.CreateAutoShader(sourceFileName, "buffer_loads",
-            DONUT_MAKE_PLATFORM_SHADER(g_forward_vs_buffer_loads), nullptr, nvrhi::ShaderType::Vertex);
+            CAUSTICA_MAKE_PLATFORM_SHADER(g_forward_vs_buffer_loads), nullptr, nvrhi::ShaderType::Vertex);
     }
 }
 
@@ -115,7 +115,7 @@ nvrhi::ShaderHandle ForwardShadingPass::CreateGeometryShader(ShaderFactory& shad
                 nvrhi::FastGeometryShaderFlags::OffsetTargetIndexByViewportIndex))
             .setCoordinateSwizzling(CubemapView::GetCubemapCoordinateSwizzle());
 
-        return shaderFactory.CreateAutoShader("donut/passes/cubemap_gs.hlsl", "main", DONUT_MAKE_PLATFORM_SHADER(g_cubemap_gs), nullptr, desc);
+        return shaderFactory.CreateAutoShader("caustica/passes/cubemap_gs.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_cubemap_gs), nullptr, desc);
     }
 
     return nullptr;
@@ -126,7 +126,7 @@ nvrhi::ShaderHandle ForwardShadingPass::CreatePixelShader(ShaderFactory& shaderF
     std::vector<ShaderMacro> Macros;
     Macros.push_back(ShaderMacro("TRANSMISSIVE_MATERIAL", transmissiveMaterial ? "1" : "0"));
 
-    return shaderFactory.CreateAutoShader("donut/passes/forward_ps.hlsl", "main", DONUT_MAKE_PLATFORM_SHADER(g_forward_ps), &Macros, nvrhi::ShaderType::Pixel);
+    return shaderFactory.CreateAutoShader("caustica/passes/forward_ps.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_forward_ps), &Macros, nvrhi::ShaderType::Pixel);
 }
 
 nvrhi::InputLayoutHandle ForwardShadingPass::CreateInputLayout(nvrhi::IShader* vertexShader, const CreateParameters& params)

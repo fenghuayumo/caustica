@@ -19,7 +19,7 @@
 #include <render/RTXDI/RtxdiPass.h>
 #include <render/NRD/NrdIntegration.h>
 //#include "PathTracer/StablePlanes.hlsli"
-#if DONUT_WITH_STREAMLINE
+#if CAUSTICA_WITH_STREAMLINE
 #include <engine/StreamlineInterface.h>
 #endif
 
@@ -437,7 +437,7 @@ private:
     // texture compression: used but not compressed textures
     std::map<std::shared_ptr<caustica::LoadedTexture>, TextureCompressionType> m_uncompressedTextures;
 
-#if DONUT_WITH_STREAMLINE
+#if CAUSTICA_WITH_STREAMLINE
     caustica::StreamlineInterface::DLSSSettings   m_recommendedDLSSSettings = {};
     caustica::StreamlineInterface::DLSSRROptions  m_lastDLSSRROptions;
 #endif

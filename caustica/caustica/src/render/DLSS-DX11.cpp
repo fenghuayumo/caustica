@@ -1,4 +1,4 @@
-#if DONUT_WITH_DLSS && DONUT_WITH_DX11
+#if CAUSTICA_WITH_DLSS && CAUSTICA_WITH_DX11
 
 #include <nvsdk_ngx.h>
 #include <nvsdk_ngx_helpers.h>

@@ -6,14 +6,14 @@
 #include <render/CommonRenderPasses.h>
 #include <render/View.h>
 
-#if DONUT_WITH_STATIC_SHADERS
-#if DONUT_WITH_DX11
+#if CAUSTICA_WITH_STATIC_SHADERS
+#if CAUSTICA_WITH_DX11
 #include "compiled_shaders/passes/sky_ps.dxbc.h"
 #endif
-#if DONUT_WITH_DX12
+#if CAUSTICA_WITH_DX12
 #include "compiled_shaders/passes/sky_ps.dxil.h"
 #endif
-#if DONUT_WITH_VULKAN
+#if CAUSTICA_WITH_VULKAN
 #include "compiled_shaders/passes/sky_ps.spirv.h"
 #endif
 #endif
@@ -32,7 +32,7 @@ SkyPass::SkyPass(
     const ICompositeView& compositeView)
     : m_FramebufferFactory(framebufferFactory)
 {
-    m_PixelShader = shaderFactory->CreateAutoShader("donut/passes/sky_ps.hlsl", "main", DONUT_MAKE_PLATFORM_SHADER(g_sky_ps), nullptr, nvrhi::ShaderType::Pixel);
+    m_PixelShader = shaderFactory->CreateAutoShader("caustica/passes/sky_ps.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_sky_ps), nullptr, nvrhi::ShaderType::Pixel);
 
     nvrhi::BufferDesc constantBufferDesc;
     constantBufferDesc.byteSize = sizeof(SkyConstants);

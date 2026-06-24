@@ -54,32 +54,32 @@ if (WIN32)
     )
 endif()
 
-if (DONUT_WITH_STREAMLINE)
+if (CAUSTICA_WITH_STREAMLINE)
     list(APPEND caustica_engine_engine_src
         src/engine/streamline/StreamlineIntegration.cpp
         src/engine/streamline/StreamlineIntegration.h
     )
 endif()
 
-if (DONUT_WITH_DX11)
+if (CAUSTICA_WITH_DX11)
     list(APPEND caustica_engine_engine_src
         include/backend/dx11/GpuDevice_DX11.h
         src/backend/dx11/GpuDevice_DX11.cpp)
 endif()
 
-if (DONUT_WITH_DX12)
+if (CAUSTICA_WITH_DX12)
     list(APPEND caustica_engine_engine_src
         include/backend/dx12/GpuDevice_DX12.h
         src/backend/dx12/GpuDevice_DX12.cpp)
 endif()
 
-if (DONUT_WITH_VULKAN)
+if (CAUSTICA_WITH_VULKAN)
     list(APPEND caustica_engine_engine_src
         include/backend/vulkan/GpuDevice_VK.h
         src/backend/vulkan/GpuDevice_VK.cpp)
 endif()
 
-if (DONUT_WITH_AFTERMATH)
+if (CAUSTICA_WITH_AFTERMATH)
     list(APPEND caustica_engine_engine_src src/engine/aftermath/AftermathCrashDump.cpp)
 endif()
 
@@ -141,7 +141,7 @@ target_link_libraries(causticaEngine
         stb
         cgltf
         ShaderMakeBlob
-        glfw
+        glfwCAUSTICA_
         imgui
 )
 
@@ -161,7 +161,7 @@ target_compile_definitions(causticaEngine
     PUBLIC
         DONUT_WITH_DX11=$<BOOL:${DONUT_WITH_DX11}>
         DONUT_WITH_DX12=$<BOOL:${DONUT_WITH_DX12}>
-        DONUT_WITH_VULKAN=$<BOOL:${DONUT_WITH_VULKAN}>
+        DONUT_WITH_VULKAN=$<BOOL:${DONUT_WITH_VULKAN}>CAUSTICA_CAUSTICA_
         DONUT_WITH_STATIC_SHADERS=$<BOOL:${DONUT_WITH_STATIC_SHADERS}>
         DONUT_WITH_AFTERMATH=$<BOOL:${DONUT_WITH_AFTERMATH}>
         DONUT_WITH_STREAMLINE=$<BOOL:${DONUT_WITH_STREAMLINE}>
@@ -169,29 +169,29 @@ target_compile_definitions(causticaEngine
 )
 
 if (DONUT_WITH_AUDIO)
-    target_link_libraries(causticaEngine PUBLIC Xaudio2)
-    target_compile_definitions(causticaEngine PUBLIC DONUT_WITH_AUDIO)
+    targCAUSTICA_k_libraries(causticCAUSTICA_e PUBLIC Xaudio2)
+    targCAUSTICA_pile_definitions(caCAUSTICA_Engine PUBLIC DONUT_WITH_AUDIO)
+endif()CAUSTICA_CAUSTICA_
+CAUSTICA_CAUSTICA_
+if (DONUCAUSTICA__TINYEXR)CAUSTICA_
+    targCAUSTICA_k_libraries(causticaEnginCAUSTICA_IC tinyexr)
+    targCAUSTICA_pile_definitions(caCAUSTICA_Engine PUBLIC DONUT_WITH_TINYEXR)
 endif()
 
-if (DONUT_WITH_TINYEXR)
-    target_link_libraries(causticaEngine PUBLIC tinyexr)
-    target_compile_definitions(causticaEngine PUBLIC DONUT_WITH_TINYEXR)
-endif()
-
-if (DONUT_WITH_STREAMLINE)
+if (CAUSTICA_WITH_STREAMLINE)
     target_link_libraries(causticaEngine PUBLIC streamline)
-
+CAUSTICA_
     if (DONUT_WITH_VULKAN AND TARGET glfw)
         target_compile_definitions(glfw PRIVATE _GLFW_VULKAN_LIBRARY="sl.interposer.dll")
-    endif()
+    CAUSTICA_)
 
-    if (STREAMLINE_FEATURE_DEEPDVC)
+    if (STREAMLINE_FEATURE_DEEPDVC)CAUSTICA_
         target_compile_definitions(causticaEngine PRIVATE STREAMLINE_FEATURE_DEEPDVC)
     endif()
-    if (STREAMLINE_FEATURE_DIRECTSR)
+    CAUSTICA_REAMLINE_FEATURE_DIRECTSR)
         target_compile_definitions(causticaEngine PRIVATE STREAMLINE_FEATURE_DIRECTSR)
     endif()
-    if (STREAMLINE_FEATURE_DLSS_SR)
+    if (CAUSTICA_LINE_FEATURE_DLSS_SR)
         target_compile_definitions(causticaEngine PRIVATE STREAMLINE_FEATURE_DLSS_SR)
     endif()
     if (STREAMLINE_FEATURE_DLSS_FG)
@@ -224,21 +224,21 @@ endif()
 if (DONUT_WITH_DX12)
     if (NOT NVRHI_BUILD_SHARED)
         target_link_libraries(causticaEngine PUBLIC nvrhi_d3d12)
-    endif()
+    CAUSTICA_)
     target_link_libraries(causticaEngine PUBLIC d3d12 dxgi dxguid)
 endif()
 
 if (DONUT_WITH_VULKAN)
     if (NOT NVRHI_BUILD_SHARED)
         target_link_libraries(causticaEngine PUBLIC nvrhi_vk)
-    endif()
+    CAUSTICA_)
 
     if (TARGET Vulkan-Headers)
         target_link_libraries(causticaEngine PUBLIC Vulkan-Headers)
     elseif (TARGET Vulkan::Headers)
         target_link_libraries(causticaEngine PUBLIC Vulkan::Headers)
     endif()
-endif()
+endiCAUSTICA_
 
 if (DONUT_WITH_DLSS AND TARGET DLSS)
     target_link_libraries(causticaEngine PUBLIC DLSS)
@@ -250,11 +250,11 @@ endif()
 
 if (TARGET causticaEngineShaders)
     add_dependencies(causticaEngine causticaEngineShaders)
-endif()
+endiCAUSTICA_
 
 set_target_properties(causticaEngine PROPERTIES FOLDER "caustica/caustica")
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
-    ${caustica_engine_core_src}
+    CAUSTICA_tica_engine_core_src}
     ${caustica_engine_math_src}
     ${caustica_engine_scene_src}
     ${caustica_engine_engine_src}

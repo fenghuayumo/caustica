@@ -1,8 +1,9 @@
-#include <backend/GpuDevice.h>
+#include <engine/GpuDevice.h>
 #include <platform/Input.h>      // Platform layer: input dispatch
 #include <platform/window.h>     // Platform layer: Window abstraction
 #include <platform/glfw_window.h>// Platform layer: GLFW window
 #include <render/RenderPassManager.h>  // Renderer layer: pass management
+#include <engine/Application.h>            // Engine layer: message loop
 #include <math/math.h>
 #include <core/log.h>
 #include <rhi/utils.h>
@@ -10,7 +11,9 @@
 #include <cstdio>
 #include <algorithm>
 #include <iomanip>
+#include <thread>
 #include <sstream>
+#include <chrono>
 
 #if CAUSTICA_WITH_DX11
 #include <d3d11.h>
@@ -44,6 +47,29 @@ using namespace caustica;
 // The joystick interface in glfw is not per-window like the keys, mouse, etc. The joystick callbacks
 // don't take a window arg. So glfw's model is a global joystick shared by all windows. Hence, the equivalent 
 // is a singleton class that all GpuDevice instances can use.
+class JoyStickManager
+{
+public:
+	static JoyStickManager& Singleton()
+	{
+		static JoyStickManager singleton;
+		return singleton;
+	}
+
+	void UpdateAllJoysticks(const std::list<IRenderPass*>& passes);
+	
+	void EraseDisconnectedJoysticks();
+	void EnumerateJoysticks();
+
+	void ConnectJoystick(int id);
+	void DisconnectJoystick(int id);
+
+private:
+	JoyStickManager() {}
+	void UpdateJoystick(int j, const std::list<IRenderPass*>& passes);
+
+	std::list<int> m_JoystickIDs, m_RemovedJoysticks;
+};
 
 static void ErrorCallback_GLFW(int error, const char *description)
 {
@@ -51,6 +77,15 @@ static void ErrorCallback_GLFW(int error, const char *description)
     exit(1);
 }
 
+static double GetGpuDeviceTime(bool headlessDevice)
+{
+    if (!headlessDevice)
+        return glfwGetTime();
+
+    using Clock = std::chrono::steady_clock;
+    static const auto startTime = Clock::now();
+    return std::chrono::duration<double>(Clock::now() - startTime).count();
+}
 
 // Window event callbacks for old path (CreateWindowDeviceAndSwapChain).
 // New path uses GlfwWindow which handles these via its own callbacks.
@@ -114,7 +149,14 @@ static void MouseScrollCallback_GLFW(GLFWwindow *window, double xoffset, double 
 
 static void JoystickConnectionCallback_GLFW(int joyId, int connectDisconnect)
 {
+    // Relay to Input layer (which manages its own joystick list)
     Input::onJoystickEvent(joyId, connectDisconnect);
+
+    // Legacy JoyStickManager kept for backward compat during migration
+    if (connectDisconnect == GLFW_CONNECTED)
+        JoyStickManager::Singleton().ConnectJoystick(joyId);
+    if (connectDisconnect == GLFW_DISCONNECTED)
+        JoyStickManager::Singleton().DisconnectJoystick(joyId);
 }
 
 static const struct
@@ -310,6 +352,7 @@ bool GpuDevice::CreateWindowDeviceAndSwapChain(const DeviceCreationParameters& p
 
     // If there are multiple device managers, then this would be called by each one which isn't necessary
     // but should not hurt.
+    JoyStickManager::Singleton().EnumerateJoysticks();
 
     if (!CreateDevice())
         return false;
@@ -665,6 +708,100 @@ bool GpuDevice::ShouldRenderUnfocused() const
     return false;
 }
 
+bool GpuDevice::RunSingleFrame()
+{
+    if (!m_AppLoop) m_AppLoop = new Application(this, m_WindowPtr);
+    m_AppLoop->beforeFrame = m_callbacks.beforeFrame;
+    return m_AppLoop->stepFrame();
+}
+
+bool GpuDevice::RunSingleFrame(double fixedElapsedTimeSeconds)
+{
+    if (!m_AppLoop) m_AppLoop = new Application(this, m_WindowPtr);
+    m_AppLoop->beforeFrame = m_callbacks.beforeFrame;
+    return m_AppLoop->stepFrame(fixedElapsedTimeSeconds);
+}
+
+void GpuDevice::RunMessageLoop()
+{
+    if (!m_AppLoop) m_AppLoop = new Application(this, m_WindowPtr);
+    m_AppLoop->beforeFrame = m_callbacks.beforeFrame;
+    m_AppLoop->run();
+}
+
+bool GpuDevice::AnimateRenderPresent(std::optional<double> elapsedTimeOverride)
+{
+    // Delegate to Application (engine layer)
+    if (m_AppLoop)
+    {
+        // Sync callbacks from GpuDevice → Application (they live on Application now)
+        m_AppLoop->beforeAnimate  = m_callbacks.beforeAnimate;
+        m_AppLoop->afterAnimate   = m_callbacks.afterAnimate;
+        m_AppLoop->beforeRender   = m_callbacks.beforeRender;
+        m_AppLoop->afterRender    = m_callbacks.afterRender;
+        m_AppLoop->beforePresent  = m_callbacks.beforePresent;
+        m_AppLoop->afterPresent   = m_callbacks.afterPresent;
+        return m_AppLoop->runFrame(elapsedTimeOverride);
+    }
+
+    // Fallback: legacy implementation (should not be reached in new path)
+    double curTime = GetGpuDeviceTime(m_DeviceParams.headlessDevice);
+    double elapsedTime = elapsedTimeOverride.value_or(curTime - m_PreviousFrameTimestamp);
+
+    if (!m_DeviceParams.headlessDevice)
+        if (m_Input) m_Input->pollJoysticks();
+
+    if (m_windowVisible && (m_windowIsInFocus || ShouldRenderUnfocused() || m_RequestedRenderUnfocused))
+    {
+        if (m_PrevDPIScaleFactorX != m_DPIScaleFactorX || m_PrevDPIScaleFactorY != m_DPIScaleFactorY)
+            { DisplayScaleChanged(); m_PrevDPIScaleFactorX = m_DPIScaleFactorX; m_PrevDPIScaleFactorY = m_DPIScaleFactorY; }
+        m_RequestedRenderUnfocused = false;
+        if (m_callbacks.beforeAnimate) m_callbacks.beforeAnimate(*this, m_FrameIndex);
+        Animate(elapsedTime, true);
+#if CAUSTICA_WITH_STREAMLINE
+        if (!m_DeviceParams.headlessDevice) StreamlineIntegration::Get().SimEnd(*this);
+#endif
+        if (m_callbacks.afterAnimate) m_callbacks.afterAnimate(*this, m_FrameIndex);
+        if (m_FrameIndex > 0 || !m_SkipRenderOnFirstFrame)
+        {
+            if (BeginFrame())
+            {
+                uint32_t frameIndex = m_FrameIndex;
+                if (m_SkipRenderOnFirstFrame) frameIndex--;
+#if CAUSTICA_WITH_STREAMLINE
+                if (!m_DeviceParams.headlessDevice) StreamlineIntegration::Get().RenderStart(*this);
+#endif
+                if (m_callbacks.beforeRender) m_callbacks.beforeRender(*this, frameIndex);
+                Render();
+                if (m_callbacks.afterRender) m_callbacks.afterRender(*this, frameIndex);
+#if CAUSTICA_WITH_STREAMLINE
+                if (!m_DeviceParams.headlessDevice) { StreamlineIntegration::Get().RenderEnd(*this); StreamlineIntegration::Get().PresentStart(*this); }
+#endif
+                if (m_callbacks.beforePresent) m_callbacks.beforePresent(*this, frameIndex);
+                bool presentSuccess = Present();
+                if (m_callbacks.afterPresent) m_callbacks.afterPresent(*this, frameIndex);
+#if CAUSTICA_WITH_STREAMLINE
+                if (!m_DeviceParams.headlessDevice) StreamlineIntegration::Get().PresentEnd(*this);
+#endif
+                if (!presentSuccess) return false;
+            }
+        }
+    }
+    else if (m_windowVisible)
+    {
+        if (m_callbacks.beforeAnimate) m_callbacks.beforeAnimate(*this, m_FrameIndex);
+        Animate(elapsedTime, false);
+        if (m_callbacks.afterAnimate) m_callbacks.afterAnimate(*this, m_FrameIndex);
+    }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(0));
+    GetDevice()->runGarbageCollection();
+    UpdateAverageFrameTime(elapsedTime);
+    m_PreviousFrameTimestamp = curTime;
+    ++m_FrameIndex;
+    return true;
+}
+
 void GpuDevice::GetDPIScaleInfo(float& x, float& y) const
 {
     if (m_WindowPtr) { x = m_WindowPtr->getDPIScaleX(); y = m_WindowPtr->getDPIScaleY(); }
@@ -734,25 +871,155 @@ void GpuDevice::UpdateWindowSize()
 }
 
 void GpuDevice::KeyboardUpdate(int key, int scancode, int action, int mods)
-    { if (m_Input) m_Input->onKey(key, scancode, action, mods); }
+{
+    if (m_Input) { m_Input->onKey(key, scancode, action, mods); return; }
+
+    // Fallback: legacy dispatch (removed once Input is always created)
+    if (key == -1) return;
+    for (auto it = m_vRenderPasses.crbegin(); it != m_vRenderPasses.crend(); it++)
+    {
+        if ((*it)->KeyboardUpdate(key, scancode, action, mods)) break;
+    }
+}
+
 void GpuDevice::KeyboardCharInput(unsigned int unicode, int mods)
-    { if (m_Input) m_Input->onChar(unicode, mods); }
+{
+    if (m_Input) { m_Input->onChar(unicode, mods); return; }
+
+    for (auto it = m_vRenderPasses.crbegin(); it != m_vRenderPasses.crend(); it++)
+    {
+        if ((*it)->KeyboardCharInput(unicode, mods)) break;
+    }
+}
+
 void GpuDevice::MousePosUpdate(double xpos, double ypos)
 {
-    if (!m_DeviceParams.supportExplicitDisplayScaling) { xpos /= m_DPIScaleFactorX; ypos /= m_DPIScaleFactorY; }
-    if (m_Input) m_Input->onMouseMove(xpos, ypos);
+    // Apply DPI scaling
+    if (!m_DeviceParams.supportExplicitDisplayScaling)
+    {
+        xpos /= m_DPIScaleFactorX;
+        ypos /= m_DPIScaleFactorY;
+    }
+
+    if (m_Input) { m_Input->onMouseMove(xpos, ypos); return; }
+
+    for (auto it = m_vRenderPasses.crbegin(); it != m_vRenderPasses.crend(); it++)
+    {
+        if ((*it)->MousePosUpdate(xpos, ypos)) break;
+    }
 }
+
 void GpuDevice::MouseButtonUpdate(int button, int action, int mods)
-    { if (m_Input) m_Input->onMouseButton(button, action, mods); }
+{
+    if (m_Input) { m_Input->onMouseButton(button, action, mods); return; }
+
+    for (auto it = m_vRenderPasses.crbegin(); it != m_vRenderPasses.crend(); it++)
+    {
+        if ((*it)->MouseButtonUpdate(button, action, mods)) break;
+    }
+}
+
 void GpuDevice::MouseScrollUpdate(double xoffset, double yoffset)
-    { if (m_Input) m_Input->onMouseScroll(xoffset, yoffset); }
+{
+    if (m_Input) { m_Input->onMouseScroll(xoffset, yoffset); return; }
 
+    for (auto it = m_vRenderPasses.crbegin(); it != m_vRenderPasses.crend(); it++)
+    {
+        if ((*it)->MouseScrollUpdate(xoffset, yoffset)) break;
+    }
+}
 
+void JoyStickManager::EnumerateJoysticks()
+{
+	// The glfw header says nothing about what values to expect for joystick IDs. Empirically, having connected two
+	// simultaneously, glfw just seems to number them starting at 0.
+	for (int i = 0; i != 10; ++i)
+		if (glfwJoystickPresent(i))
+			m_JoystickIDs.push_back(i);
+}
 
+void JoyStickManager::EraseDisconnectedJoysticks()
+{
+	while (!m_RemovedJoysticks.empty())
+	{
+		auto id = m_RemovedJoysticks.back();
+		m_RemovedJoysticks.pop_back();
 
+		auto it = std::find(m_JoystickIDs.begin(), m_JoystickIDs.end(), id);
+		if (it != m_JoystickIDs.end())
+			m_JoystickIDs.erase(it);
+	}
+}
 
+void JoyStickManager::ConnectJoystick(int id)
+{
+	m_JoystickIDs.push_back(id);
+}
 
+void JoyStickManager::DisconnectJoystick(int id)
+{
+	// This fn can be called from inside glfwGetJoystickAxes below (similarly for buttons, I guess).
+	// We can't call m_JoystickIDs.erase() here and now. Save them for later. Forunately, glfw docs
+	// say that you can query a joystick ID that isn't present.
+	m_RemovedJoysticks.push_back(id);
+}
 
+void JoyStickManager::UpdateAllJoysticks(const std::list<IRenderPass*>& passes)
+{
+	for (auto j = m_JoystickIDs.begin(); j != m_JoystickIDs.end(); ++j)
+		UpdateJoystick(*j, passes);
+}
+
+static void ApplyDeadZone(dm::float2& v, const float deadZone = 0.1f)
+{
+    v *= std::max(dm::length(v) - deadZone, 0.f) / (1.f - deadZone);
+}
+
+void JoyStickManager::UpdateJoystick(int j, const std::list<IRenderPass*>& passes)
+{
+    GLFWgamepadstate gamepadState;
+    glfwGetGamepadState(j, &gamepadState);
+
+	float* axisValues = gamepadState.axes;
+
+    auto updateAxis = [&] (int axis, float axisVal)
+    {
+		for (auto it = passes.crbegin(); it != passes.crend(); it++)
+		{
+			bool ret = (*it)->JoystickAxisUpdate(axis, axisVal);
+			if (ret)
+				break;
+		}
+    };
+
+    {
+        dm::float2 v(axisValues[GLFW_GAMEPAD_AXIS_LEFT_X], axisValues[GLFW_GAMEPAD_AXIS_LEFT_Y]);
+        ApplyDeadZone(v);
+        updateAxis(GLFW_GAMEPAD_AXIS_LEFT_X, v.x);
+        updateAxis(GLFW_GAMEPAD_AXIS_LEFT_Y, v.y);
+    }
+
+    {
+        dm::float2 v(axisValues[GLFW_GAMEPAD_AXIS_RIGHT_X], axisValues[GLFW_GAMEPAD_AXIS_RIGHT_Y]);
+        ApplyDeadZone(v);
+        updateAxis(GLFW_GAMEPAD_AXIS_RIGHT_X, v.x);
+        updateAxis(GLFW_GAMEPAD_AXIS_RIGHT_Y, v.y);
+    }
+
+    updateAxis(GLFW_GAMEPAD_AXIS_LEFT_TRIGGER, axisValues[GLFW_GAMEPAD_AXIS_LEFT_TRIGGER]);
+    updateAxis(GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER, axisValues[GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER]);
+
+	for (int b = 0; b != GLFW_GAMEPAD_BUTTON_LAST; ++b)
+	{
+		auto buttonVal = gamepadState.buttons[b];
+		for (auto it = passes.crbegin(); it != passes.crend(); it++)
+		{
+			bool ret = (*it)->JoystickButtonUpdate(b, buttonVal == GLFW_PRESS);
+			if (ret)
+				break;
+		}
+	}
+}
 
 void GpuDevice::Shutdown()
 {
@@ -781,6 +1048,8 @@ void GpuDevice::Shutdown()
     m_Input = nullptr;
     delete m_PassManager;
     m_PassManager = nullptr;
+    delete m_AppLoop;
+    m_AppLoop = nullptr;
 
     m_InstanceCreated = false;
 }

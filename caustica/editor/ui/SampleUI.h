@@ -19,7 +19,7 @@ using namespace caustica::math;
 #include "ImNodesEz.h"
 #endif
 
-#if DONUT_WITH_STREAMLINE
+#if CAUSTICA_WITH_STREAMLINE
 #include <engine/StreamlineInterface.h>
 #endif
 
@@ -34,7 +34,7 @@ namespace caustica
     class SceneGraphNode;
 }
 
-#if DONUT_WITH_STREAMLINE
+#if CAUSTICA_WITH_STREAMLINE
 using SI = caustica::StreamlineInterface;
 #else
 struct StreamlineCompatibilityTypes
@@ -219,14 +219,14 @@ struct SampleUIData
     float                               ActualNEEAT_LocalToGlobalSampleRatio() const { return (NEEType == 2) ? (NEEAT_LocalToGlobalSampleRatio) : (0); }    // make sure we use no local samples when NEE-AT disabled!
     bool                                ActualFireflyFilterEnabled() const { return (RealtimeMode)?RealtimeFireflyFilterEnabled:ReferenceFireflyFilterEnabled; }
 
-#if DONUT_WITH_STREAMLINE
+#if CAUSTICA_WITH_STREAMLINE
     int                                 ActualReflexMode() const { return (RealtimeMode && IsReflexSupported) ? (ReflexMode || (ActualDLSSFGMode()!=SI::DLSSGMode::eOff)) : (SI::ReflexMode::eOff); }
     SI::DLSSGMode                       ActualDLSSFGMode() const { return (RealtimeMode && IsDLSSFGSupported) ? (DLSSFGMode) : (SI::DLSSGMode::eOff); }
 #endif
 
     bool                                ActualUseApproximateMIS() const { return (RealtimeMode)?(NEEMISType!=0):(NEEMISType==2); }
 
-#if DONUT_WITH_STREAMLINE
+#if CAUSTICA_WITH_STREAMLINE
     bool                                ActualEnableVsync() const       { return (ActualDLSSFGMode() != SI::DLSSGMode::eOff) ? (false) : (EnableVsync); }
     int                                 ActualFPSLimiter() const        { return (ActualDLSSFGMode() != SI::DLSSGMode::eOff) ? (0) : (FPSLimiter); }
 #else
@@ -364,7 +364,7 @@ struct SampleUIData
     float                               DLSSLodBiasOverride = 0.f;
     bool                                DLSSAlwaysUseExtents = false;
 
-#if DONUT_WITH_STREAMLINE
+#if CAUSTICA_WITH_STREAMLINE
     // DLSSFG specific parameters
     bool                                IsDLSSFGSupported = false;
     SI::DLSSGMode                       DLSSFGMode = SI::DLSSGMode::eOff;
@@ -405,7 +405,7 @@ struct SampleUIData
 
     bool                                IsDLSSRRSupported = false;
     SI::DLSSRRPreset                    DLSRRPreset = SI::DLSSRRPreset::ePresetE;
-#endif // DONUT_WITH_STREAMLINE
+#endif // CAUSTICA_WITH_STREAMLINE
 
     float                               DLSSRRMicroJitter = 0.1f;
 

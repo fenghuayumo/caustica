@@ -4,9 +4,9 @@
 
 相关实现主要在：
 
-- `External/Donut/src/engine/Scene.cpp`
-- `External/Donut/src/engine/SceneGraph.cpp`
-- `External/Donut/src/engine/SceneTypes.cpp`
+- `External/caustica/src/engine/Scene.cpp`
+- `External/caustica/src/engine/SceneGraph.cpp`
+- `External/caustica/src/engine/SceneTypes.cpp`
 - `Rtxpt/SampleCommon/ExtendedScene.cpp`
 - `Rtxpt/Materials/MaterialsBaker.cpp`
 

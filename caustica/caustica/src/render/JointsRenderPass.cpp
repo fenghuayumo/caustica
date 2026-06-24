@@ -5,16 +5,16 @@
 #include <rhi/utils.h>
 #include <array>
 
-#if DONUT_WITH_STATIC_SHADERS
-#if DONUT_WITH_DX11
+#if CAUSTICA_WITH_STATIC_SHADERS
+#if CAUSTICA_WITH_DX11
 #include "compiled_shaders/passes/joints_main_ps.dxbc.h"
 #include "compiled_shaders/passes/joints_main_vs.dxbc.h"
 #endif
-#if DONUT_WITH_DX12
+#if CAUSTICA_WITH_DX12
 #include "compiled_shaders/passes/joints_main_ps.dxil.h"
 #include "compiled_shaders/passes/joints_main_vs.dxil.h"
 #endif
-#if DONUT_WITH_VULKAN
+#if CAUSTICA_WITH_VULKAN
 #include "compiled_shaders/passes/joints_main_ps.spirv.h"
 #include "compiled_shaders/passes/joints_main_vs.spirv.h"
 #endif
@@ -38,9 +38,9 @@ namespace caustica::render
 
         std::vector<ShaderMacro> macros;
 
-        m_VertexShader = shaderFactory.CreateAutoShader("donut/passes/joints.hlsl", "main_vs", DONUT_MAKE_PLATFORM_SHADER(g_joints_main_vs), &macros, nvrhi::ShaderType::Vertex);
+        m_VertexShader = shaderFactory.CreateAutoShader("caustica/passes/joints.hlsl", "main_vs", CAUSTICA_MAKE_PLATFORM_SHADER(g_joints_main_vs), &macros, nvrhi::ShaderType::Vertex);
 
-        m_PixelShader = shaderFactory.CreateAutoShader("donut/passes/joints.hlsl", "main_ps", DONUT_MAKE_PLATFORM_SHADER(g_joints_main_ps), &macros, nvrhi::ShaderType::Pixel);
+        m_PixelShader = shaderFactory.CreateAutoShader("caustica/passes/joints.hlsl", "main_ps", CAUSTICA_MAKE_PLATFORM_SHADER(g_joints_main_ps), &macros, nvrhi::ShaderType::Pixel);
      
         nvrhi::BindingLayoutDesc bindingLayoutDesc;
         bindingLayoutDesc.visibility = nvrhi::ShaderType::All;

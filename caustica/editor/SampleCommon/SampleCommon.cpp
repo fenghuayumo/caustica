@@ -772,7 +772,7 @@ bool CompressTextures(std::map<std::shared_ptr<caustica::LoadedTexture>, Texture
 {
     // if async needed, do something like std::thread([sytemCommand](){ system( sytemCommand.c_str() ); }).detach();
 
-    std::string batchFileName = std::string(getenv("localappdata")) + "\\temp\\donut_compressor.bat";
+    std::string batchFileName = std::string(getenv("localappdata")) + "\\temp\\CAUSTICA_compressor.bat";
     std::ofstream batchFile(batchFileName, std::ios_base::trunc);
     if (!batchFile.is_open())
     {

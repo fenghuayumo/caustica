@@ -2,20 +2,20 @@
 #include <assets/loader/ShaderFactory.h>
 #include <render/BindingCache.h>
 
-#if DONUT_WITH_STATIC_SHADERS
-#if DONUT_WITH_DX11
+#if CAUSTICA_WITH_STATIC_SHADERS
+#if CAUSTICA_WITH_DX11
 #include "compiled_shaders/fullscreen_vs.dxbc.h"
 #include "compiled_shaders/rect_vs.dxbc.h"
 #include "compiled_shaders/blit_ps.dxbc.h"
 #include "compiled_shaders/sharpen_ps.dxbc.h"
 #endif
-#if DONUT_WITH_DX12
+#if CAUSTICA_WITH_DX12
 #include "compiled_shaders/fullscreen_vs.dxil.h"
 #include "compiled_shaders/rect_vs.dxil.h"
 #include "compiled_shaders/blit_ps.dxil.h"
 #include "compiled_shaders/sharpen_ps.dxil.h"
 #endif
-#if DONUT_WITH_VULKAN
+#if CAUSTICA_WITH_VULKAN
 #include "compiled_shaders/fullscreen_vs.spirv.h"
 #include "compiled_shaders/rect_vs.spirv.h"
 #include "compiled_shaders/blit_ps.spirv.h"
@@ -34,20 +34,20 @@ CommonRenderPasses::CommonRenderPasses(nvrhi::IDevice* device, std::shared_ptr<S
     {
         std::vector<ShaderMacro> VsMacros;
         VsMacros.push_back(ShaderMacro("QUAD_Z", "0"));
-        m_FullscreenVS = shaderFactory->CreateAutoShader("donut/fullscreen_vs", "main", DONUT_MAKE_PLATFORM_SHADER(g_fullscreen_vs), &VsMacros, nvrhi::ShaderType::Vertex);
+        m_FullscreenVS = shaderFactory->CreateAutoShader("caustica/fullscreen_vs", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_fullscreen_vs), &VsMacros, nvrhi::ShaderType::Vertex);
 
         VsMacros[0].definition = "1";
-        m_FullscreenAtOneVS = shaderFactory->CreateAutoShader("donut/fullscreen_vs", "main", DONUT_MAKE_PLATFORM_SHADER(g_fullscreen_vs), &VsMacros, nvrhi::ShaderType::Vertex);
+        m_FullscreenAtOneVS = shaderFactory->CreateAutoShader("caustica/fullscreen_vs", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_fullscreen_vs), &VsMacros, nvrhi::ShaderType::Vertex);
     }
 
-    m_RectVS = shaderFactory->CreateAutoShader("donut/rect_vs", "main", DONUT_MAKE_PLATFORM_SHADER(g_rect_vs), nullptr, nvrhi::ShaderType::Vertex);
+    m_RectVS = shaderFactory->CreateAutoShader("caustica/rect_vs", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_rect_vs), nullptr, nvrhi::ShaderType::Vertex);
 
     std::vector<ShaderMacro> blitMacros = { ShaderMacro("TEXTURE_ARRAY", "0") };
-    m_BlitPS = shaderFactory->CreateAutoShader("donut/blit_ps", "main", DONUT_MAKE_PLATFORM_SHADER(g_blit_ps), &blitMacros, nvrhi::ShaderType::Pixel);
-    m_SharpenPS = shaderFactory->CreateAutoShader("donut/sharpen_ps", "main", DONUT_MAKE_PLATFORM_SHADER(g_sharpen_ps), &blitMacros, nvrhi::ShaderType::Pixel);
+    m_BlitPS = shaderFactory->CreateAutoShader("caustica/blit_ps", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_blit_ps), &blitMacros, nvrhi::ShaderType::Pixel);
+    m_SharpenPS = shaderFactory->CreateAutoShader("caustica/sharpen_ps", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_sharpen_ps), &blitMacros, nvrhi::ShaderType::Pixel);
     blitMacros[0].definition = "1"; // TEXTURE_ARRAY
-    m_BlitArrayPS = shaderFactory->CreateAutoShader("donut/blit_ps", "main", DONUT_MAKE_PLATFORM_SHADER(g_blit_ps), &blitMacros, nvrhi::ShaderType::Pixel);
-    m_SharpenArrayPS = shaderFactory->CreateAutoShader("donut/sharpen_ps", "main", DONUT_MAKE_PLATFORM_SHADER(g_sharpen_ps), &blitMacros, nvrhi::ShaderType::Pixel);
+    m_BlitArrayPS = shaderFactory->CreateAutoShader("caustica/blit_ps", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_blit_ps), &blitMacros, nvrhi::ShaderType::Pixel);
+    m_SharpenArrayPS = shaderFactory->CreateAutoShader("caustica/sharpen_ps", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_sharpen_ps), &blitMacros, nvrhi::ShaderType::Pixel);
     
     auto samplerDesc = nvrhi::SamplerDesc()
         .setAllFilters(false)

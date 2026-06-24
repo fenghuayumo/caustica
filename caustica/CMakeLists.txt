@@ -69,7 +69,7 @@ set(SHADERMAKE_OPTIONS_DXIL "")
 set(SHADERMAKE_OPTIONS_SPIRV "-D NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP=0 -D SPIRV")
 endif()
 
-if(DONUT_WITH_AFTERMATH OR DONUT_EMBED_SHADER_PDBS)
+if(CAUSTICA_WITH_AFTERMATH OR CAUSTICA_EMBED_SHADER_PDBS)
     set(shadermake_options "--embedPDB")
 #else()
 #    set(shadermake_options --PDB)
@@ -100,18 +100,18 @@ set(rtxpt_shader_compile_common
     SHADERMAKE_OPTIONS ${shadermake_options}
 )
 if (WIN32)
-    donut_compile_shaders(${rtxpt_shader_compile_common}
+    CAUSTICA_compile_shaders(${rtxpt_shader_compile_common}
         CONFIG ${rtxpt_shader_config_dxil}
         DXIL ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderPrecompiled/${project}/dxil
         SHADERMAKE_OPTIONS_DXIL ${SHADERMAKE_OPTIONS_DXIL}
     )
-    donut_compile_shaders(${rtxpt_shader_compile_common}
+    CAUSTICA_compile_shaders(${rtxpt_shader_compile_common}
         CONFIG ${rtxpt_shader_config_vk}
         SPIRV_DXC ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderPrecompiled/${project}/spirv
         SHADERMAKE_OPTIONS_SPIRV ${SHADERMAKE_OPTIONS_SPIRV}
     )
 else()
-    donut_compile_shaders(${rtxpt_shader_compile_common}
+    CAUSTICA_compile_shaders(${rtxpt_shader_compile_common}
         CONFIG ${rtxpt_shader_config_vk}
         SPIRV_DXC ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderPrecompiled/${project}/spirv
         SHADERMAKE_OPTIONS_SPIRV ${SHADERMAKE_OPTIONS_SPIRV}
@@ -250,7 +250,7 @@ target_compile_definitions(causticaCore PUBLIC RTXPT_D3D12_WITH_NVAPI=$<BOOL:${N
 target_compile_definitions(causticaCore PUBLIC RTXPT_WITH_OIDN=$<BOOL:${RTXPT_WITH_OIDN}>)
 target_compile_definitions(causticaCore PUBLIC RTXPT_WITH_PYTHON=$<BOOL:${RTXPT_WITH_PYTHON}>)
 target_compile_definitions(causticaCore PUBLIC RTXPT_WITH_NATIVE_DLSS=$<BOOL:${RTXPT_WITH_NATIVE_DLSS}>)
-if (DONUT_WITH_STREAMLINE OR RTXPT_WITH_NATIVE_DLSS)
+if (CAUSTICA_WITH_STREAMLINE OR RTXPT_WITH_NATIVE_DLSS)
     target_compile_definitions(causticaCore PUBLIC RTXPT_WITH_ANY_DLSS=1)
 else()
     target_compile_definitions(causticaCore PUBLIC RTXPT_WITH_ANY_DLSS=0)

@@ -8,18 +8,18 @@
 #include <rhi/utils.h>
 #include <utility>
 
-#if DONUT_WITH_STATIC_SHADERS
-#if DONUT_WITH_DX11
+#if CAUSTICA_WITH_STATIC_SHADERS
+#if CAUSTICA_WITH_DX11
 #include "compiled_shaders/passes/depth_vs_input_assembler.dxbc.h"
 #include "compiled_shaders/passes/depth_vs_buffer_loads.dxbc.h"
 #include "compiled_shaders/passes/depth_ps.dxbc.h"
 #endif
-#if DONUT_WITH_DX12
+#if CAUSTICA_WITH_DX12
 #include "compiled_shaders/passes/depth_vs_input_assembler.dxil.h"
 #include "compiled_shaders/passes/depth_vs_buffer_loads.dxil.h"
 #include "compiled_shaders/passes/depth_ps.dxil.h"
 #endif
-#if DONUT_WITH_VULKAN
+#if CAUSTICA_WITH_VULKAN
 #include "compiled_shaders/passes/depth_vs_input_assembler.spirv.h"
 #include "compiled_shaders/passes/depth_vs_buffer_loads.spirv.h"
 #include "compiled_shaders/passes/depth_ps.spirv.h"
@@ -74,23 +74,23 @@ void DepthPass::ResetBindingCache()
 
 nvrhi::ShaderHandle DepthPass::CreateVertexShader(ShaderFactory& shaderFactory, const CreateParameters& params)
 {
-    char const* sourceFileName = "donut/passes/depth_vs.hlsl";
+    char const* sourceFileName = "caustica/passes/depth_vs.hlsl";
 
     if (params.useInputAssembler)
     {
         return shaderFactory.CreateAutoShader(sourceFileName, "input_assembler",
-            DONUT_MAKE_PLATFORM_SHADER(g_depth_vs_input_assembler), nullptr, nvrhi::ShaderType::Vertex);
+            CAUSTICA_MAKE_PLATFORM_SHADER(g_depth_vs_input_assembler), nullptr, nvrhi::ShaderType::Vertex);
     }
     else
     {
         return shaderFactory.CreateAutoShader(sourceFileName, "buffer_loads",
-            DONUT_MAKE_PLATFORM_SHADER(g_depth_vs_buffer_loads), nullptr, nvrhi::ShaderType::Vertex);
+            CAUSTICA_MAKE_PLATFORM_SHADER(g_depth_vs_buffer_loads), nullptr, nvrhi::ShaderType::Vertex);
     }
 }
 
 nvrhi::ShaderHandle DepthPass::CreatePixelShader(ShaderFactory& shaderFactory, const CreateParameters& params)
 {
-    return shaderFactory.CreateAutoShader("donut/passes/depth_ps.hlsl", "main", DONUT_MAKE_PLATFORM_SHADER(g_depth_ps), nullptr, nvrhi::ShaderType::Pixel);
+    return shaderFactory.CreateAutoShader("caustica/passes/depth_ps.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_depth_ps), nullptr, nvrhi::ShaderType::Pixel);
 }
 
 nvrhi::InputLayoutHandle DepthPass::CreateInputLayout(nvrhi::IShader* vertexShader, const CreateParameters& params)

@@ -1,4 +1,4 @@
-#if DONUT_WITH_STREAMLINE
+#if CAUSTICA_WITH_STREAMLINE
 #include <StreamlineIntegration.h>
 
 #include <sl_consts.h>
@@ -23,15 +23,15 @@
 #include <dxgi.h>
 #include <dxgi1_5.h>
 
-#if DONUT_WITH_DX11
+#if CAUSTICA_WITH_DX11
 #include <d3d11.h>
 #include <rhi/d3d11.h>
 #endif
-#if DONUT_WITH_DX12
+#if CAUSTICA_WITH_DX12
 #include <d3d12.h>
 #include <rhi/d3d12.h>
 #endif
-#if DONUT_WITH_VULKAN
+#if CAUSTICA_WITH_VULKAN
 #ifndef VULKAN_HPP_DISPATCH_LOADER_DYNAMIC
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 #endif
@@ -303,7 +303,7 @@ bool StreamlineIntegration::InitializePreDevice(nvrhi::GraphicsAPI api, int appI
     return true;
 }
 
-#if DONUT_WITH_DX11 || DONUT_WITH_DX12
+#if CAUSTICA_WITH_DX11 || CAUSTICA_WITH_DX12
 bool StreamlineIntegration::SetD3DDevice(IUnknown* nativeDevice)
 {
     bool result = successCheck(slSetD3DDevice(nativeDevice), "slSetD3DDevice");
@@ -315,12 +315,12 @@ bool StreamlineIntegration::SetD3DDevice(IUnknown* nativeDevice)
 }
 #endif
 
-#if DONUT_WITH_DX11 || DONUT_WITH_DX12
+#if CAUSTICA_WITH_DX11 || CAUSTICA_WITH_DX12
 bool StreamlineIntegration::InitializeDeviceDX(nvrhi::IDevice *device, AdapterInfo::LUID *pAdapterIdDx11)
 {
     m_device = device;
 
-#if DONUT_WITH_DX11
+#if CAUSTICA_WITH_DX11
     if (m_api == nvrhi::GraphicsAPI::D3D11 && pAdapterIdDx11)
     {
         assert(pAdapterIdDx11->size() == sizeof(m_d3d11Luid));
@@ -333,7 +333,7 @@ bool StreamlineIntegration::InitializeDeviceDX(nvrhi::IDevice *device, AdapterIn
 }
 #endif
 
-#if DONUT_WITH_DX11 || DONUT_WITH_DX12
+#if CAUSTICA_WITH_DX11 || CAUSTICA_WITH_DX12
 bool StreamlineIntegration::UpgradeInterface(IUnknown*& interfacePointer)
 {
     IUnknown* nativeInterface = interfacePointer;
@@ -349,7 +349,7 @@ bool StreamlineIntegration::UpgradeInterface(IUnknown*& interfacePointer)
 }
 #endif
 
-#if DONUT_WITH_VULKAN
+#if CAUSTICA_WITH_VULKAN
 bool StreamlineIntegration::InitializeDeviceVK(nvrhi::IDevice* device, const VulkanInfo& vulkanInfo)
 {
     m_device = device;
@@ -407,7 +407,7 @@ uint32_t StreamlineIntegration::CheckNumSupportedFeatures(const sl::AdapterInfo 
     return supportedSLFeatureCnt;
 }
 
-#if DONUT_WITH_DX11 || DONUT_WITH_DX12
+#if CAUSTICA_WITH_DX11 || CAUSTICA_WITH_DX12
 uint32_t StreamlineIntegration::FindBestAdapterDX()
 {
     uint32_t foundAdapter = 0;
@@ -472,7 +472,7 @@ uint32_t StreamlineIntegration::FindBestAdapterDX()
 }
 #endif
 
-#if DONUT_WITH_VULKAN
+#if CAUSTICA_WITH_VULKAN
 uint32_t StreamlineIntegration::FindBestAdapterVulkan(const std::vector <vk::PhysicalDevice> &vkDevices)
 {
     uint32_t foundAdapter = 0;
@@ -522,14 +522,14 @@ void StreamlineIntegration::UpdateFeatureAvailable()
 {
     sl::AdapterInfo adapterInfo;
 
-#if DONUT_WITH_DX11
+#if CAUSTICA_WITH_DX11
     if (m_api == nvrhi::GraphicsAPI::D3D11)
     {
         adapterInfo.deviceLUID = (uint8_t*)&m_d3d11Luid;
         adapterInfo.deviceLUIDSizeInBytes = sizeof(LUID);
     }
 #endif
-#if DONUT_WITH_DX12
+#if CAUSTICA_WITH_DX12
     if (m_api == nvrhi::GraphicsAPI::D3D12)
     {
         auto a = ((ID3D12Device*)m_device->getNativeObject(nvrhi::ObjectTypes::D3D12_Device))->GetAdapterLuid();
@@ -537,7 +537,7 @@ void StreamlineIntegration::UpdateFeatureAvailable()
         adapterInfo.deviceLUIDSizeInBytes = sizeof(LUID);
     }
 #endif
-#if DONUT_WITH_VULKAN
+#if CAUSTICA_WITH_VULKAN
     if (m_api == nvrhi::GraphicsAPI::VULKAN)
     {
         adapterInfo.vkPhysicalDevice = m_device->getNativeObject(nvrhi::ObjectTypes::VK_PhysicalDevice);
@@ -1074,7 +1074,7 @@ sl::Resource StreamlineIntegration::AllocateResourceCallback(const sl::ResourceA
 
     if (isBuffer)
     {
-#if DONUT_WITH_DX11
+#if CAUSTICA_WITH_DX11
         if (Get().m_api == nvrhi::GraphicsAPI::D3D11)
         {
             D3D11_BUFFER_DESC* desc = (D3D11_BUFFER_DESC*)resDesc->desc;
@@ -1088,7 +1088,7 @@ sl::Resource StreamlineIntegration::AllocateResourceCallback(const sl::ResourceA
         }
 #endif
 
-#if DONUT_WITH_DX12
+#if CAUSTICA_WITH_DX12
         if (Get().m_api == nvrhi::GraphicsAPI::D3D12)
         {
             D3D12_RESOURCE_DESC* desc = (D3D12_RESOURCE_DESC*)resDesc->desc;
@@ -1105,7 +1105,7 @@ sl::Resource StreamlineIntegration::AllocateResourceCallback(const sl::ResourceA
     }
     else
     {
-#if DONUT_WITH_DX11
+#if CAUSTICA_WITH_DX11
         if (Get().m_api == nvrhi::GraphicsAPI::D3D11)
         {
             D3D11_TEXTURE2D_DESC* desc = (D3D11_TEXTURE2D_DESC*)resDesc->desc;
@@ -1119,7 +1119,7 @@ sl::Resource StreamlineIntegration::AllocateResourceCallback(const sl::ResourceA
         }
 #endif
 
-#if DONUT_WITH_DX12
+#if CAUSTICA_WITH_DX12
         if (Get().m_api == nvrhi::GraphicsAPI::D3D12)
         {
             D3D12_RESOURCE_DESC* desc = (D3D12_RESOURCE_DESC*)resDesc->desc;
@@ -1155,7 +1155,7 @@ void StreamlineIntegration::ReleaseResourceCallback(sl::Resource* resource, void
     }
 };
 
-#if DONUT_WITH_DX12
+#if CAUSTICA_WITH_DX12
 D3D12_RESOURCE_STATES D3D12convertResourceStates(nvrhi::ResourceStates stateBits)
 {
     if (stateBits == nvrhi::ResourceStates::Common)
@@ -1190,7 +1190,7 @@ D3D12_RESOURCE_STATES D3D12convertResourceStates(nvrhi::ResourceStates stateBits
 
 nvrhi::Object StreamlineIntegration::GetNativeCommandList(nvrhi::ICommandList* commandList)
 {
-#if DONUT_WITH_DX11
+#if CAUSTICA_WITH_DX11
     if (m_api == nvrhi::GraphicsAPI::D3D11)
         return m_device->getNativeObject(nvrhi::ObjectTypes::D3D11_DeviceContext);
 #endif
@@ -1201,14 +1201,14 @@ nvrhi::Object StreamlineIntegration::GetNativeCommandList(nvrhi::ICommandList* c
         return nullptr;
     }
 
-#if DONUT_WITH_DX12
+#if CAUSTICA_WITH_DX12
     if (m_api == nvrhi::GraphicsAPI::D3D12)
     {
         return commandList->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList);
     }
 #endif
 
-#if DONUT_WITH_VULKAN
+#if CAUSTICA_WITH_VULKAN
     if (m_api == nvrhi::GraphicsAPI::VULKAN)
     {
         return commandList->getNativeObject(nvrhi::ObjectTypes::VK_CommandBuffer);
@@ -1218,7 +1218,7 @@ nvrhi::Object StreamlineIntegration::GetNativeCommandList(nvrhi::ICommandList* c
     return nullptr;
 }
 
-#if DONUT_WITH_VULKAN
+#if CAUSTICA_WITH_VULKAN
 static inline VkImageLayout toVkImageLayout(nvrhi::ResourceStates stateBits)
 {
     switch (stateBits)
@@ -1259,13 +1259,13 @@ static void GetSLResource(
 
     switch (commandList->getDevice()->getGraphicsAPI())
     {
-#if DONUT_WITH_DX11
+#if CAUSTICA_WITH_DX11
     case nvrhi::GraphicsAPI::D3D11:
         slResource = sl::Resource{ sl::ResourceType::eTex2d, inputTex->getNativeObject(nvrhi::ObjectTypes::D3D11_Resource), 0 };
         break;
 #endif
 
-#if DONUT_WITH_DX12
+#if CAUSTICA_WITH_DX12
     case nvrhi::GraphicsAPI::D3D12:
     {
         uint32_t resourceState = static_cast<uint32_t>(D3D12convertResourceStates(commandList->getTextureSubresourceState(inputTex, 0, 0)));
@@ -1274,7 +1274,7 @@ static void GetSLResource(
     }
 #endif
 
-#if DONUT_WITH_VULKAN
+#if CAUSTICA_WITH_VULKAN
     case nvrhi::GraphicsAPI::VULKAN:
     {
         nvrhi::TextureSubresourceSet subresources = view->GetSubresources();

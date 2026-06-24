@@ -28,7 +28,7 @@ set (NVRHI_DEFAULT_VK_REGISTER_OFFSETS
 # Generates a build target that will compile shaders for a given config file
 # Usage:
 #
-# donut_compile_shaders(TARGET <generated build target name>
+# CAUSTICA_compile_shaders(TARGET <generated build target name>
 #                       CONFIG <shader-config-file>
 #                       SOURCES <list>
 #                       [FOLDER <folder-in-visual-studio-solution>]
@@ -49,7 +49,7 @@ set (NVRHI_DEFAULT_VK_REGISTER_OFFSETS
 #                       [INCLUDES <list>]                   -- include paths
 #                       [IGNORE_INCLUDES <list>])           -- list of included files for ShaderMake to ignore (e.g. c++)
 
-function(donut_compile_shaders)
+function(CAUSTICA_compile_shaders)
     set(options "")
     set(oneValueArgs
         SHADERMAKE_OPTIONS
@@ -83,21 +83,21 @@ function(donut_compile_shaders)
     cmake_parse_arguments(params "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
     if (NOT params_TARGET)
-        message(FATAL_ERROR "donut_compile_shaders: TARGET argument missing")
+        message(FATAL_ERROR "CAUSTICA_compile_shaders: TARGET argument missing")
     endif()
     if (NOT params_CONFIG)
-        message(FATAL_ERROR "donut_compile_shaders: CONFIG argument missing")
+        message(FATAL_ERROR "CAUSTICA_compile_shaders: CONFIG argument missing")
     endif()
     if ((params_DXIL AND params_DXIL_SLANG) OR (params_SPIRV AND params_SPIRV_SLANG))
-        message(FATAL_ERROR "donut_compile_shaders: DXIL and DXIL_SLANG, or SPIRV and SPIRV_SLANG cannot be used together")
+        message(FATAL_ERROR "CAUSTICA_compile_shaders: DXIL and DXIL_SLANG, or SPIRV and SPIRV_SLANG cannot be used together")
     endif()
     if (params_COMPILER_OPTIONS OR params_COMPILER_OPTIONS_DXBC OR
         params_COMPILER_OPTIONS_DXIL OR params_COMPILER_OPTIONS_SPIRV)
-        message(SEND_ERROR "donut_compile_shaders: The COMPILER_OPTIONS[_platform] arguments "
+        message(SEND_ERROR "CAUSTICA_compile_shaders: The COMPILER_OPTIONS[_platform] arguments "
                            "are deprecated, use SHADERMAKE_OPTIONS[_platform] instead")
     endif()
     if (params_RELAXED_INCLUDES)
-        message(SEND_ERROR "donut_compile_shaders: The RELAXED_INCLUDES argument "
+        message(SEND_ERROR "CAUSTICA_compile_shaders: The RELAXED_INCLUDES argument "
                            "is deprecated, use IGNORE_INCLUDES instead")
     endif()
 
@@ -125,7 +125,7 @@ function(donut_compile_shaders)
     elseif(("${params_OUTPUT_FORMAT}" STREQUAL "BINARY") OR ("${params_OUTPUT_FORMAT}" STREQUAL ""))
         set(output_format_arg --binaryBlob --outputExt .bin)
     else()
-        message(FATAL_ERROR "donut_compile_shaders: unsupported OUTPUT_FORMAT = '${params_OUTPUT_FORMAT}'")
+        message(FATAL_ERROR "CAUSTICA_compile_shaders: unsupported OUTPUT_FORMAT = '${params_OUTPUT_FORMAT}'")
     endif()
 
     if (params_PROJECT_NAME)
@@ -144,7 +144,7 @@ function(donut_compile_shaders)
     set(ignore_includes "")
 
     # Loop over each path and append it with '-I ' prefix
-    foreach(include_dir ${DONUT_SHADER_INCLUDE_DIR})
+    foreach(include_dir ${CAUSTICA_SHADER_INCLUDE_DIR})
         set(include_dirs ${include_dirs} -I "${include_dir}")
     endforeach()
     
@@ -156,9 +156,9 @@ function(donut_compile_shaders)
         set(ignore_includes ${ignore_includes} --relaxedInclude "${include_file}")
     endforeach()
 
-    if (params_DXIL AND DONUT_WITH_DX12)
+    if (params_DXIL AND CAUSTICA_WITH_DX12)
         if (NOT EXISTS "${SHADERMAKE_DXC_PATH}")
-            message(FATAL_ERROR "donut_compile_shaders: DXC not found -- please set SHADERMAKE_DXC_PATH to the full path to the DXC binary")
+            message(FATAL_ERROR "CAUSTICA_compile_shaders: DXC not found -- please set SHADERMAKE_DXC_PATH to the full path to the DXC binary")
         endif()
         
         set(compilerCommand ${SHADERMAKE_PATH}
@@ -188,9 +188,9 @@ function(donut_compile_shaders)
         endif()
     endif()
 
-    if (params_DXIL_SLANG AND DONUT_WITH_DX12)
+    if (params_DXIL_SLANG AND CAUSTICA_WITH_DX12)
         if (NOT EXISTS "${SHADERMAKE_SLANG_PATH}")
-            message(FATAL_ERROR "donut_compile_shaders: Slang not found --- please set SHADERMAKE_SLANG_PATH to the full path to the Slang executable")
+            message(FATAL_ERROR "CAUSTICA_compile_shaders: Slang not found --- please set SHADERMAKE_SLANG_PATH to the full path to the Slang executable")
         endif()
         
         set(compilerCommand ${SHADERMAKE_PATH}
@@ -221,9 +221,9 @@ function(donut_compile_shaders)
         endif()
     endif()
 
-    if (params_DXBC AND DONUT_WITH_DX11)
+    if (params_DXBC AND CAUSTICA_WITH_DX11)
         if (NOT EXISTS "${SHADERMAKE_FXC_PATH}")
-            message(FATAL_ERROR "donut_compile_shaders: FXC not found -- please set SHADERMAKE_FXC_PATH to the full path to the FXC binary")
+            message(FATAL_ERROR "CAUSTICA_compile_shaders: FXC not found -- please set SHADERMAKE_FXC_PATH to the full path to the FXC binary")
         endif()
         
         set(compilerCommand ${SHADERMAKE_PATH}
@@ -252,9 +252,9 @@ function(donut_compile_shaders)
         endif()
     endif()
 
-    if (params_SPIRV_DXC AND DONUT_WITH_VULKAN)
+    if (params_SPIRV_DXC AND CAUSTICA_WITH_VULKAN)
         if (NOT EXISTS "${SHADERMAKE_DXC_VK_PATH}")
-            message(FATAL_ERROR "donut_compile_shaders: DXC not found -- please set SHADERMAKE_DXC_VK_PATH to the full path to the DXC binary")
+            message(FATAL_ERROR "CAUSTICA_compile_shaders: DXC not found -- please set SHADERMAKE_DXC_VK_PATH to the full path to the DXC binary")
         endif()
         
         set(compilerCommand ${SHADERMAKE_PATH}
@@ -287,9 +287,9 @@ function(donut_compile_shaders)
         endif()
     endif()
 
-    if (params_SPIRV_SLANG AND DONUT_WITH_VULKAN)
+    if (params_SPIRV_SLANG AND CAUSTICA_WITH_VULKAN)
         if (NOT EXISTS "${SHADERMAKE_SLANG_PATH}")
-            message(FATAL_ERROR "donut_compile_shaders: Slang compiler not found --- please set SHADERMAKE_SLANG_PATH to the full path to the Slang executable")
+            message(FATAL_ERROR "CAUSTICA_compile_shaders: Slang compiler not found --- please set SHADERMAKE_SLANG_PATH to the full path to the Slang executable")
         endif()
         
         set(compilerCommand ${SHADERMAKE_PATH}
@@ -341,12 +341,12 @@ endfunction()
 # with platform-specific extensions: .dxbc.h, .dxil.h, .spirv.h.
 #
 # The BYPRODUCTS_NO_EXT argument lists all generated files without extensions and without base paths.
-# Similar to donut_compile_shaders, the list of byproducts is needed to get correct incremental builds
+# Similar to CAUSTICA_compile_shaders, the list of byproducts is needed to get correct incremental builds
 # when using static (.h) shaders with Ninja build system.
 #
 # Usage:
 #
-# donut_compile_shaders_all_platforms(TARGET <generated build target name>
+# CAUSTICA_compile_shaders_all_platforms(TARGET <generated build target name>
 #                                     CONFIG <shader-config-file>
 #                                     SOURCES <list>
 #                                     OUTPUT_BASE <path>
@@ -362,7 +362,7 @@ endfunction()
 #                                     [INCLUDES <list>]                   -- include paths
 #                                     [IGNORE_INCLUDES <list>])           -- list of included files for ShaderMake to ignore (e.g. c++)
 
-function(donut_compile_shaders_all_platforms)
+function(CAUSTICA_compile_shaders_all_platforms)
     set(options
         SLANG)
     set(oneValueArgs
@@ -390,21 +390,21 @@ function(donut_compile_shaders_all_platforms)
     cmake_parse_arguments(params "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
     if (NOT params_TARGET)
-        message(FATAL_ERROR "donut_compile_shaders_all_platforms: TARGET argument missing")
+        message(FATAL_ERROR "CAUSTICA_compile_shaders_all_platforms: TARGET argument missing")
     endif()
     if (NOT params_CONFIG)
-        message(FATAL_ERROR "donut_compile_shaders_all_platforms: CONFIG argument missing")
+        message(FATAL_ERROR "CAUSTICA_compile_shaders_all_platforms: CONFIG argument missing")
     endif()
     if (NOT params_OUTPUT_BASE)
-        message(FATAL_ERROR "donut_compile_shaders_all_platforms: OUTPUT_BASE argument missing")
+        message(FATAL_ERROR "CAUSTICA_compile_shaders_all_platforms: OUTPUT_BASE argument missing")
     endif()
     if (params_COMPILER_OPTIONS OR params_COMPILER_OPTIONS_DXBC OR
         params_COMPILER_OPTIONS_DXIL OR params_COMPILER_OPTIONS_SPIRV)
-        message(SEND_ERROR "donut_compile_shaders_all_platforms: The COMPILER_OPTIONS[_platform] arguments "
+        message(SEND_ERROR "CAUSTICA_compile_shaders_all_platforms: The COMPILER_OPTIONS[_platform] arguments "
                            "are deprecated, use SHADERMAKE_OPTIONS[_platform] instead")
     endif()
     if (params_RELAXED_INCLUDES)
-        message(SEND_ERROR "donut_compile_shaders_all_platforms: The RELAXED_INCLUDES argument "
+        message(SEND_ERROR "CAUSTICA_compile_shaders_all_platforms: The RELAXED_INCLUDES argument "
                            "is deprecated, use IGNORE_INCLUDES instead")
     endif()
 
@@ -431,7 +431,7 @@ function(donut_compile_shaders_all_platforms)
     endforeach()
     
     if (params_SLANG)
-        donut_compile_shaders(TARGET ${params_TARGET}
+        CAUSTICA_compile_shaders(TARGET ${params_TARGET}
             CONFIG ${params_CONFIG}
             FOLDER ${params_FOLDER}
             DXIL_SLANG ${output_dxil}
@@ -448,7 +448,7 @@ function(donut_compile_shaders_all_platforms)
             BYPRODUCTS_DXIL ${byproducts_dxil}
             BYPRODUCTS_SPIRV ${byproducts_spirv})
     else()
-        donut_compile_shaders(TARGET ${params_TARGET}
+        CAUSTICA_compile_shaders(TARGET ${params_TARGET}
             CONFIG ${params_CONFIG}
             FOLDER ${params_FOLDER}
             DXBC ${output_dxbc}

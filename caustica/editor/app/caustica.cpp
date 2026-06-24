@@ -239,7 +239,7 @@ Sample::Sample(caustica::GpuDevice& deviceManager,
 
     m_camera.SetRotateSpeed(.003f);
 
-#if DONUT_WITH_STREAMLINE
+#if CAUSTICA_WITH_STREAMLINE
     if (!GetGpuDevice()->GetDeviceParams().headlessDevice)
     {
         m_ui.IsDLSSSuported = GetGpuDevice()->GetStreamline().IsDLSSAvailable();
@@ -1294,7 +1294,7 @@ bool Sample::KeyboardUpdate(int key, int scancode, int action, int mods)
     if( key == GLFW_KEY_R && action == GLFW_PRESS && mods == GLFW_MOD_CONTROL )
         m_ui.ShaderReloadRequested = true;
 
-#if DONUT_WITH_STREAMLINE
+#if CAUSTICA_WITH_STREAMLINE
     if (key == GLFW_KEY_F13 && action == GLFW_PRESS)
     {
         // As GLFW abstracts away from Windows messages
@@ -1341,7 +1341,7 @@ bool Sample::MouseButtonUpdate(int button, int action, int mods)
         m_ui.DebugPixel = m_pickPosition;
     }
 
-#if DONUT_WITH_STREAMLINE
+#if CAUSTICA_WITH_STREAMLINE
     if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
     {
          GetGpuDevice()->GetStreamline().ReflexTriggerFlash(GetFrameIndex());
@@ -1465,7 +1465,7 @@ void Sample::Animate(float fElapsedTimeSeconds)
     double frameTime = GetGpuDevice()->GetAverageFrameTimeSeconds();
     if (frameTime > 0.0)
     {
-#if DONUT_WITH_STREAMLINE
+#if CAUSTICA_WITH_STREAMLINE
         if (m_ui.DLSSFGMultiplier != 1)
             m_fpsInfo = StringFormat("%.3f ms/%d-frames* (%.1f FPS*) *DLSS-G", frameTime * 1e3, m_ui.DLSSFGMultiplier, m_ui.DLSSFGMultiplier / frameTime);
         else
@@ -1999,7 +1999,7 @@ void Sample::BackBufferResizing()
         m_rtxdiPass->Reset();
 
 // NOTE: we're not yet sure if this is necessary to avoid crash with going in/out of fullscreen and FG
-#if DONUT_WITH_STREAMLINE
+#if CAUSTICA_WITH_STREAMLINE
     if (!GetGpuDevice()->GetDeviceParams().headlessDevice &&
         (m_ui.DLSSFGOptions.mode == StreamlineInterface::DLSSGMode::eOn || m_ui.ActualDLSSFGMode() == StreamlineInterface::DLSSGMode::eOn)) 
     {
@@ -2405,7 +2405,7 @@ bool Sample::ShouldRenderUnfocused()
 
 void Sample::StreamlinePreRender()
 {
-#if DONUT_WITH_STREAMLINE
+#if CAUSTICA_WITH_STREAMLINE
     if (GetGpuDevice()->GetDeviceParams().headlessDevice)
         return;
 
@@ -2590,7 +2590,7 @@ void Sample::StreamlinePreRender()
     }
 #else
     const bool changeToDLSSMode = false;
-#endif // #if DONUT_WITH_STREAMLINE
+#endif // #if CAUSTICA_WITH_STREAMLINE
 }
 
 #if RTXPT_WITH_NATIVE_DLSS
@@ -5669,7 +5669,7 @@ void Sample::PostProcessAA(nvrhi::IFramebuffer* framebuffer, bool reset)
             }
         }
 
-#if DONUT_WITH_STREAMLINE
+#if CAUSTICA_WITH_STREAMLINE
         const bool useStreamlineThisFrame = !GetGpuDevice()->GetDeviceParams().headlessDevice;
         if (useStreamlineThisFrame)
         {
