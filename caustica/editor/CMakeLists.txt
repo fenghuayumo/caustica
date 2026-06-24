@@ -16,7 +16,7 @@ file(GLOB_RECURSE caustica_editor_sources
 )
 
 # Entry point is compiled into the executable, not causticaCore
-set(caustica_editor_entry_source "${CMAKE_CURRENT_SOURCE_DIR}/app/AdvancedSample.cpp")
+set(caustica_editor_entry_source "${CMAKE_CURRENT_SOURCE_DIR}/app/Main.cpp")
 list(REMOVE_ITEM caustica_editor_sources ${caustica_editor_entry_source})
 
 if (NOT WIN32)

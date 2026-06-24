@@ -17,7 +17,6 @@
 #include <core/scope.h>
 #include <render/Core/ScopedPerfMarker.h>
 #include <render/Core/TextureUtils.h>
-#include <core/command_line.h>
 
 #include <SampleUI.h>
 
@@ -27,27 +26,24 @@ constexpr static const int c_SwapchainCount = 3;
 #define CAUSTICA_ENABLE_VIDEO_MEMORY_INFO 1
 
 #if CAUSTICA_ENABLE_VIDEO_MEMORY_INFO && defined(_WIN32)
-#include <dxgi1_4.h>    // IDXGIAdapter3 (DXGI 1.4)
-#include <wrl/client.h> // Microsoft::WRL::ComPtr
+#include <dxgi1_4.h>
+#include <wrl/client.h>
 #endif
 
-namespace caustica
-{
-	class ShaderFactory;
-}
+namespace caustica { class ShaderFactory; }
 
 class PathTracerApp;
 class SampleUI;
 
-// DIVSHOT-style editor application base: extends Application, owns device/window,
-// registers render passes in startup(), driven by run().
-class SampleBaseApp : public caustica::Application
+// Desktop editor executable 
+// Owns GpuDevice/Window, registers scene + UI render passes, drives run().
+class EditorApplication : public caustica::Application
 {
 public:
-	SampleBaseApp();
-	~SampleBaseApp() override;
+	EditorApplication();
+	~EditorApplication() override;
 
-	enum class InitReturnCodes
+	enum class StartupResult
 	{
 		Success,
 		FailProcessingCommandLine,
@@ -55,18 +51,19 @@ public:
 		FailDeviceFeatureSupport
 	};
 
-	InitReturnCodes startup(int argc, const char* const* argv);
+	StartupResult startup(int argc, const char* const* argv);
 	void shutdown() override;
 
 	SampleUIData& GetSampleUIData() { return m_sampleUIData; }
 	const SampleUIData& GetSampleUIData() const { return m_sampleUIData; }
 
+	PathTracerApp* GetScenePass() { return m_scenePass.get(); }
+	const PathTracerApp* GetScenePass() const { return m_scenePass.get(); }
+
     bool IsSERSupported() const;
-    bool QueryVideoMemoryInfo(uint64_t& outBudget, uint64_t& outCurrentUsage, uint64_t& outAvailableForReservation, uint64_t& outCurrentReservation); // CAUSTICA_ENABLE_VIDEO_MEMORY_INFO for this to work, otherwise return false
+    bool QueryVideoMemoryInfo(uint64_t& outBudget, uint64_t& outCurrentUsage, uint64_t& outAvailableForReservation, uint64_t& outCurrentReservation);
 
 private:
-	virtual std::unique_ptr<PathTracerApp> CreateMainRenderPass(caustica::GpuDevice& deviceManager, const CommandLineOptions& cmdLineOptions, SampleUIData& ui) = 0;
-
 	void RegisterLogCallback();
 	void SampleLogCallback(caustica::Severity severity, const char* message);
 	caustica::DeviceCreationParameters GetDefaultDeviceParams() const;
@@ -78,21 +75,16 @@ private:
 
 	caustica::Callback m_DefaultLogCallback = nullptr;
 	FPSLimiter m_FPSLimiter;
-
 	CommandLineOptions m_CmdLine;
-
 	SampleUIData m_sampleUIData;
 
 	std::shared_ptr<caustica::ShaderFactory> m_ShaderFactory;
-	std::unique_ptr<PathTracerApp> m_MainSceneRender;
-	std::unique_ptr<SampleUI> m_UIRender;
+	std::unique_ptr<PathTracerApp> m_scenePass;
+	std::unique_ptr<SampleUI> m_uiPass;
 
 #if CAUSTICA_ENABLE_VIDEO_MEMORY_INFO && defined(_WIN32)
-    Microsoft::WRL::ComPtr<IDXGIAdapter3>   m_d3dAdapter;
+    Microsoft::WRL::ComPtr<IDXGIAdapter3> m_d3dAdapter;
 #endif
 
-    void * m_NVAPIValidationHandle = nullptr;
+    void* m_NVAPIValidationHandle = nullptr;
 };
-
-// Defined by the concrete editor exe (AdvancedSample.cpp).
-SampleBaseApp* createApplication();

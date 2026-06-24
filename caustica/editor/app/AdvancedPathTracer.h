@@ -1,7 +1,5 @@
-// AdvancedPathTracer is the concrete renderer wired up for the advanced sample
-// (full path tracer + denoiser + RTXDI + ...). It is exposed via this header so
-// the embedded Python interpreter and the Python extension module can both
-// instantiate it in their respective hosts (caustica.exe vs caustica.pyd).
+// Path-tracing pipeline variant: RTXDI + denoiser + reference/stable-planes shader modes.
+// Used by EditorApplication (desktop) and RenderSession (Python/offline).
 
 #pragma once
 
@@ -21,7 +19,6 @@ public:
             r.getRtxdiPass()->BeginFrame(commandList, *r.getRenderTargets(), r.getBindingLayout(), r.getBindingSet());
 
         PathTrace(framebuffer, constants);
-
         Denoise(framebuffer);
     }
 

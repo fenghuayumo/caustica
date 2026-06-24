@@ -1,7 +1,7 @@
 #include "ui/ui_macros.h"
 #include "PathTracerApp.h"
 #include "SampleCommon/ImGuiManager.h"
-#include "SampleCommon/SampleBaseApp.h"
+#include "SampleCommon/EditorApplication.h"
 
 #include <inttypes.h>
 
@@ -599,10 +599,10 @@ void InitializeSampleUIDataFromCommandLine(SampleUIData& ui, const CommandLineOp
     ui.EnableBloom &= !cmdLine.DisablePostProcessFilters;
 }
 
-SampleUI::SampleUI(GpuDevice* deviceManager, SampleBaseApp & baseApp, PathTracerApp& app, SampleUIData& ui, bool NVAPI_SERSupported, const CommandLineOptions& cmdLine)
+SampleUI::SampleUI(GpuDevice* deviceManager, EditorApplication& editor, PathTracerApp& scenePass, SampleUIData& ui, bool NVAPI_SERSupported, const CommandLineOptions& cmdLine)
         : ImGui_Renderer(deviceManager)
-        , m_baseApp(baseApp)
-        , m_app(app)
+        , m_editor(editor)
+        , m_app(scenePass)
         , m_ui(ui)
         , m_NVAPI_SERSupported(NVAPI_SERSupported)
 {
@@ -947,7 +947,7 @@ void SampleUI::buildUI(void)
             if (ImGui::CollapsingHeader("Info")) //, ImGuiTreeNodeFlags_DefaultOpen))
             {
                 uint64_t budget, currentUsage, availableForReservation, currentReservation;
-                if (m_baseApp.QueryVideoMemoryInfo( budget, currentUsage, availableForReservation, currentReservation ) )
+                if (m_editor.QueryVideoMemoryInfo( budget, currentUsage, availableForReservation, currentReservation ) )
                 {
                     ImGui::TextColored(categoryColor, "QueryVideoMemoryInfo:");
                     budget /= 1024*1024; currentUsage /= 1024*1024, availableForReservation /= 1024*1024, currentReservation /= 1024*1024;

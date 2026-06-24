@@ -60,6 +60,8 @@ class GaussianSplatPass;
 class Renderer;
 class PathTracingRenderer;
 
+// Scene editor + main 3D render pass (IRenderPass). Owns scene editing, UI state,
+// and delegates GPU path tracing to PathTracingRenderer.
 class PathTracerApp : public caustica::SceneRender
 {
     friend class Renderer;

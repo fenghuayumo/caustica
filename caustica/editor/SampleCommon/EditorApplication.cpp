@@ -1,4 +1,4 @@
-#include "SampleBaseApp.h"
+#include "EditorApplication.h"
 
 #include <algorithm>
 #include <cctype>
@@ -16,6 +16,7 @@
 #if CAUSTICA_WITH_NATIVE_DLSS
 #include <render/Passes/Geometry/DLSS.h>
 #endif
+#include "AdvancedPathTracer.h"
 #include "PathTracerApp.h"
 
 #include <GLFW/glfw3.h>
@@ -155,18 +156,18 @@ namespace
 }
 
 
-SampleBaseApp::SampleBaseApp()
+EditorApplication::EditorApplication()
 {
     RegisterLogCallback();
     korgi::Init();
 }
 
-SampleBaseApp::~SampleBaseApp()
+EditorApplication::~EditorApplication()
 {
     korgi::Shutdown();
 }
 
-SampleBaseApp::InitReturnCodes SampleBaseApp::startup(int argc, const char* const* argv)
+EditorApplication::StartupResult EditorApplication::startup(int argc, const char* const* argv)
 {
 #if defined(_WIN32)
     nvrhi::GraphicsAPI api = GetRtxptGraphicsAPIFromCommandLine(argc, argv);
@@ -184,27 +185,25 @@ SampleBaseApp::InitReturnCodes SampleBaseApp::startup(int argc, const char* cons
     // Process command line arguments
     if (!ProcessCommandLine(argc, argv, deviceParams, preferredScene))
     {
-        return InitReturnCodes::FailProcessingCommandLine;
+        return StartupResult::FailProcessingCommandLine;
     }
 
     if (!InitDeviceAndWindow(deviceParams))
     {
-        return InitReturnCodes::FailToCreateDevice;
+        return StartupResult::FailToCreateDevice;
     }
 
     // Check API feature support
     if (!CheckDeviceFeatureSupport(deviceParams))
     {
-        return InitReturnCodes::FailDeviceFeatureSupport;
+        return StartupResult::FailDeviceFeatureSupport;
     }
 
     CreateShaderFactory();
 
-    // -- Register render passes into the engine -- 
-    // Create the main render pass. This is where path tracing happens
-    m_MainSceneRender = CreateMainRenderPass(*m_GpuDevice, m_CmdLine, m_sampleUIData);
-    m_MainSceneRender->Init(preferredScene, m_ShaderFactory);
-    m_GpuDevice->AddRenderPassToBack(m_MainSceneRender.get());
+    m_scenePass = std::make_unique<AdvancedPathTracer>(*m_GpuDevice, m_CmdLine, m_sampleUIData);
+    m_scenePass->Init(preferredScene, m_ShaderFactory);
+    m_GpuDevice->AddRenderPassToBack(m_scenePass.get());
 
 #if CAUSTICA_WITH_DX12 && (CAUSTICA_D3D_AGILITY_SDK_VERSION >= 619)   // temporary
     // When using AgilitySDK >= 619, we require shader model 6.9
@@ -221,7 +220,7 @@ SampleBaseApp::InitReturnCodes SampleBaseApp::startup(int argc, const char* cons
         if (shaderModel.HighestShaderModel < D3D_SHADER_MODEL_6_9)
         {
             caustica::fatal("Shader Model 6.9 is required when compiled with Agility SDK 1.619 or newer, but is unsupported on the current device. Please check for newer graphics drivers, or recompile without Agility SDK");
-            return InitReturnCodes::FailToCreateDevice;
+            return StartupResult::FailToCreateDevice;
         }
     }
 #endif
@@ -229,9 +228,9 @@ SampleBaseApp::InitReturnCodes SampleBaseApp::startup(int argc, const char* cons
     // Optionally create the UP render pass. This exposes run time parameter controls.
     if (!m_CmdLine.noWindow)
     {
-        m_UIRender = std::make_unique<SampleUI>(m_GpuDevice.get(), *this, *m_MainSceneRender, m_sampleUIData, IsSERSupported(), m_CmdLine);
-        m_UIRender->Init(m_ShaderFactory);
-        m_GpuDevice->AddRenderPassToBack(m_UIRender.get());
+        m_uiPass = std::make_unique<SampleUI>(m_GpuDevice.get(), *this, *m_scenePass, m_sampleUIData, IsSERSupported(), m_CmdLine);
+        m_uiPass->Init(m_ShaderFactory);
+        m_GpuDevice->AddRenderPassToBack(m_uiPass.get());
     }
     else
     {
@@ -266,10 +265,10 @@ SampleBaseApp::InitReturnCodes SampleBaseApp::startup(int argc, const char* cons
     }
 #endif
 
-    return InitReturnCodes::Success;
+    return StartupResult::Success;
 }
 
-bool SampleBaseApp::QueryVideoMemoryInfo(uint64_t& outBudget, uint64_t& outCurrentUsage, uint64_t& outAvailableForReservation, uint64_t& outCurrentReservation)
+bool EditorApplication::QueryVideoMemoryInfo(uint64_t& outBudget, uint64_t& outCurrentUsage, uint64_t& outAvailableForReservation, uint64_t& outCurrentReservation)
 {
 #if CAUSTICA_ENABLE_VIDEO_MEMORY_INFO && defined(_WIN32)
     DXGI_QUERY_VIDEO_MEMORY_INFO info;
@@ -285,15 +284,15 @@ bool SampleBaseApp::QueryVideoMemoryInfo(uint64_t& outBudget, uint64_t& outCurre
 #endif
 }
 
-void SampleBaseApp::shutdown()
+void EditorApplication::shutdown()
 {
     if (m_shutdownCalled)
         return;
 
-    if (m_UIRender && m_GpuDevice)
+    if (m_uiPass && m_GpuDevice)
     {
-        m_GpuDevice->RemoveRenderPass(m_UIRender.get());
-        m_UIRender.reset();
+        m_GpuDevice->RemoveRenderPass(m_uiPass.get());
+        m_uiPass.reset();
     }
 
 #if CAUSTICA_D3D12_WITH_NVAPI
@@ -304,8 +303,11 @@ void SampleBaseApp::shutdown()
     }
 #endif
 
-    m_GpuDevice->RemoveRenderPass(m_MainSceneRender.get());
-    m_MainSceneRender.reset();
+    if (m_scenePass && m_GpuDevice)
+    {
+        m_GpuDevice->RemoveRenderPass(m_scenePass.get());
+        m_scenePass.reset();
+    }
 
     m_ShaderFactory.reset();
 
@@ -323,7 +325,7 @@ void SampleBaseApp::shutdown()
     Application::shutdown();
 }
 
-void SampleBaseApp::RegisterLogCallback()
+void EditorApplication::RegisterLogCallback()
 {
     // Get the default call back first so we can pass messages through to it.
     m_DefaultLogCallback = caustica::GetCallback();
@@ -335,7 +337,7 @@ void SampleBaseApp::RegisterLogCallback()
         });
 }
 
-void SampleBaseApp::SampleLogCallback(caustica::Severity severity, const char* message)
+void EditorApplication::SampleLogCallback(caustica::Severity severity, const char* message)
 {
     // This lets us demote some of Streamline errors that aren't errors into warnings
     if (severity == caustica::Severity::Error)
@@ -359,7 +361,7 @@ void SampleBaseApp::SampleLogCallback(caustica::Severity severity, const char* m
     m_DefaultLogCallback(severity, message);
 }
 
-caustica::DeviceCreationParameters SampleBaseApp::GetDefaultDeviceParams() const
+caustica::DeviceCreationParameters EditorApplication::GetDefaultDeviceParams() const
 {
     caustica::DeviceCreationParameters deviceParams;
     deviceParams.backBufferWidth = 0;   // initialized from CmdLine
@@ -433,7 +435,7 @@ caustica::DeviceCreationParameters SampleBaseApp::GetDefaultDeviceParams() const
     return deviceParams;
 }
 
-bool SampleBaseApp::ProcessCommandLine(int argc, char const* const* argv,
+bool EditorApplication::ProcessCommandLine(int argc, char const* const* argv,
     caustica::DeviceCreationParameters& deviceParams, std::string& preferredScene)
 {
 #if 1 // use a bit larger window by default if screen large enough
@@ -486,7 +488,7 @@ bool SampleBaseApp::ProcessCommandLine(int argc, char const* const* argv,
     return true;
 }
 
-bool SampleBaseApp::InitDeviceAndWindow(const caustica::DeviceCreationParameters& deviceParams)
+bool EditorApplication::InitDeviceAndWindow(const caustica::DeviceCreationParameters& deviceParams)
 {
     if (m_CmdLine.noWindow)
     {
@@ -544,7 +546,7 @@ bool SampleBaseApp::InitDeviceAndWindow(const caustica::DeviceCreationParameters
     return true;
 }
 
-bool SampleBaseApp::CheckDeviceFeatureSupport(const caustica::DeviceCreationParameters& deviceParams)
+bool EditorApplication::CheckDeviceFeatureSupport(const caustica::DeviceCreationParameters& deviceParams)
 {
     auto device = m_GpuDevice->GetDevice();
     if (!device->queryFeatureSupport(nvrhi::Feature::RayTracingPipeline))
@@ -562,7 +564,7 @@ bool SampleBaseApp::CheckDeviceFeatureSupport(const caustica::DeviceCreationPara
     return true;
 }
 
-void SampleBaseApp::CreateShaderFactory()
+void EditorApplication::CreateShaderFactory()
 {
     const char* shaderTypeName = caustica::GetShaderTypeName(m_GpuDevice->GetGraphicsAPI());
     const std::filesystem::path appDirectory = caustica::GetDirectoryWithExecutable();
@@ -597,7 +599,7 @@ void SampleBaseApp::CreateShaderFactory()
     m_ShaderFactory = std::make_shared<caustica::ShaderFactory>(device, rootFS, "/ShaderPrecompiled");
 }
 
-bool SampleBaseApp::IsSERSupported() const
+bool EditorApplication::IsSERSupported() const
 {
     auto device = m_GpuDevice->GetDevice();
 

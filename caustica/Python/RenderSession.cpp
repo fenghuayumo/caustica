@@ -2,7 +2,8 @@
 
 #if CAUSTICA_WITH_PYTHON
 
-#include "AdvancedSample.h"
+#include "AdvancedPathTracer.h"
+#include "SampleCommon/EditorApplication.h"
 #include "PathTracerApp.h"
 #include <SampleCommon/LocalConfig.h>
 #include <core/file_utils.h>

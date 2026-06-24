@@ -45,11 +45,13 @@ struct SampleUIData : PathTracerSettings, EditorUIState
 void InitializeSampleUIDataFromCommandLine(SampleUIData& ui, const struct CommandLineOptions& cmdLine);
 
 class ImGuiManager;
+class EditorApplication;
+class PathTracerApp;
 
 class SampleUI : public caustica::ImGui_Renderer
 {
 public:
-    SampleUI(caustica::GpuDevice* deviceManager, class SampleBaseApp & baseApp, class PathTracerApp & app, SampleUIData& ui, bool NVAPI_SERSupported, const struct CommandLineOptions& cmdLine);
+    SampleUI(caustica::GpuDevice* deviceManager, EditorApplication& editor, PathTracerApp& scenePass, SampleUIData& ui, bool NVAPI_SERSupported, const struct CommandLineOptions& cmdLine);
     virtual ~SampleUI();
 protected:
     virtual void buildUI(void) override;
@@ -70,7 +72,7 @@ private:
     void BuildPythonScriptingUI(float indent);
 
 private:
-    class SampleBaseApp& m_baseApp;
+    EditorApplication& m_editor;
     class PathTracerApp& m_app;
 
     int                         m_currentFontScaleIndex = -1;

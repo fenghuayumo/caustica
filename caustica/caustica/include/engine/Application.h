@@ -12,9 +12,7 @@ class Window;
 // =============================================================================
 // Application — Engine layer: owns the app lifecycle (DIVSHOT-style).
 //
-// Derived editor apps (SampleBaseApp / AdvancedSample) override init() and
-// shutdown() to create window, device, and render passes. run() drives the
-// message loop and calls shutdown() when the window closes.
+// Derived editor (EditorApplication) calls startup() then run(); shutdown() tears down passes.
 //
 // RenderSession uses the non-owning constructor for manual stepFrame() control.
 // =============================================================================
@@ -25,10 +23,10 @@ public:
     Application(GpuDevice* dm, Window* window = nullptr);
     virtual ~Application();
 
-    // Editor bootstrap (override in SampleBaseApp).
+    // Override in EditorApplication for editor bootstrap.
     virtual bool init(int argc, const char* const* argv);
 
-    // Tear down editor resources (override in SampleBaseApp). Called from run().
+    // Override in EditorApplication. Called from run() when the window closes.
     virtual void shutdown();
 
     GpuDevice* getGpuDevice() const;

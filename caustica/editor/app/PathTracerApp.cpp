@@ -49,7 +49,6 @@
 #include <render/Passes/OMM/OmmBaker.h>
 
 #include "SampleCommon/LocalConfig.h"
-#include "SampleCommon/SampleBaseApp.h"
 #include "SampleCommon/CaptureScriptManager.h"
 #include <render/Passes/Debug/Korgi.h>
 

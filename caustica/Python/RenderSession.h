@@ -1,5 +1,5 @@
-// RenderSession is the offline / extension-mode counterpart to SampleBaseApp.
-// Where SampleBaseApp drives a blocking GLFW message loop, RenderSession
+// RenderSession is the offline / extension-mode counterpart to EditorApplication.
+// Where EditorApplication drives a blocking GLFW message loop, RenderSession
 // initialises the same GpuDevice + AdvancedPathTracer pipeline but lets
 // Python step frames manually and dump the framebuffer to disk.
 //
