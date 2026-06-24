@@ -169,7 +169,7 @@ void GameScene::SceneLoaded(const std::shared_ptr<caustica::Scene>& scene, const
         Json::Value modelRoot;
         if (!caustica::json::LoadFromFile(modelPath, modelRoot) || modelRoot.empty() || !modelRoot.isObject())
             continue;
-        m_modelTypes.push_back( std::make_shared<game::ModelType>(*this, fileNoExt.string(), modelRoot) );
+        m_modelTypes.push_back( std::make_shared<game::ModelType>(*m_scene, fileNoExt.string(), modelRoot) );
     }
 
     auto propFiles = EnumerateFilesWithWildcard(m_gameStoragePath / "props", "*.prop.json");
