@@ -1591,43 +1591,6 @@ void PathTracerApp::RequestMeshAccelRebuild(const std::shared_ptr<MeshInfo>& mes
     m_renderCore.accelStructs().requestMeshRebuild(mesh);
 }
 
-void PathTracerApp::RebuildDirtyMeshAccelStructs(nvrhi::ICommandList* commandList)
-{
-    caustica::AccelStructBuildSettings settings = { .excludeTransmissive = m_settings.AS.ExcludeTransmissive };
-    m_renderCore.accelStructs().rebuildDirtyMeshes(commandList, *m_sceneManager->getScene(), settings, m_editor.AccelerationStructRebuildRequested);
-}
-
-void PathTracerApp::TransitionMeshBuffersToReadOnly(nvrhi::ICommandList* commandList)
-{
-    m_commandList = commandList;
-    m_renderer->transitionMeshBuffersToReadOnly();
-}
-
-void PathTracerApp::UpdateSkinnedBLASs(nvrhi::ICommandList* commandList, uint32_t frameIndex) const
-{
-    caustica::AccelStructBuildSettings settings = { .excludeTransmissive = m_settings.AS.ExcludeTransmissive };
-    m_renderCore.accelStructs().updateSkinnedBlases(commandList, *m_sceneManager->getScene(), settings, frameIndex);
-}
-
-void PathTracerApp::BuildTLAS(nvrhi::ICommandList* commandList) const
-{
-    caustica::AccelStructBuildSettings settings = {
-        .excludeTransmissive = m_settings.AS.ExcludeTransmissive,
-        .forceOpaque         = m_settings.AS.ForceOpaque,
-    };
-    caustica::OmmAccelStructState ommState = {};
-    if (m_ommBaker)
-    {
-        const auto& ommUI = m_ommBaker->UIData();
-        ommState.enabled = ommUI.Enable;
-        ommState.force2State = ommUI.Force2State;
-        ommState.onlyOMMs = ommUI.OnlyOMMs;
-        ommState.debugViewEnabled = ommUI.DebugView != OpacityMicroMapDebugView::Disabled;
-    }
-    m_renderCore.accelStructs().buildTlas(commandList, *m_sceneManager->getScene(), settings, ommState, m_ommBaker.get());
-}
-
-
 void PathTracerApp::BackBufferResizing()
 {
     SceneRender::BackBufferResizing();
@@ -2521,23 +2484,7 @@ void PathTracerApp::Render(nvrhi::IFramebuffer* framebuffer)
     }
 
     // Environment map settings
-    if (m_settings.EnvironmentMapParams.Enabled)
-    {
-        float intensity = m_settings.EnvironmentMapParams.Intensity / c_envMapRadianceScale;
-        m_envMapSceneParams.ColorMultiplier = m_settings.EnvironmentMapParams.TintColor * intensity;
-
-        float3 rotationInRadians = dm::radians(m_settings.EnvironmentMapParams.RotationXYZ);
-        affine3 rotationTransform = dm::rotation(rotationInRadians);
-        affine3 inverseTransform = inverse(rotationTransform);
-        affineToColumnMajor(rotationTransform, m_envMapSceneParams.Transform);
-        affineToColumnMajor(inverseTransform, m_envMapSceneParams.InvTransform);
-        m_envMapSceneParams.Enabled = 1;
-    }
-    else
-    {
-        m_envMapSceneParams.ColorMultiplier = {0,0,0};
-        m_envMapSceneParams.Enabled = 0;
-    }
+    caustica::syncEnvMapSceneParams(m_settings, m_envMapSceneParams, c_envMapRadianceScale);
 
     if (m_editor.ShaderReloadRequested)
     {
@@ -3871,7 +3818,18 @@ void PathTracerApp::PathTrace(nvrhi::IFramebuffer* framebuffer, const SampleCons
     }
 
     // In realtime mode, ScreenMotionVectors reference mode ScreenMotionVectors should be 0
-    m_lightsBaker->UpdateEnd(m_commandList, *m_bindingCache, m_sceneManager->getScene(), m_materialsBaker, m_ommBaker, m_renderCore.accelStructs().getSubInstanceBuffer(), m_renderTargets->Depth, m_renderTargets->ScreenMotionVectors);  // <- in the future this will provide motion vectors except in case of reference mode
+    UpdateLightingEndParams lightingEndParams{
+        m_commandList,
+        m_lightsBaker.get(),
+        m_bindingCache.get(),
+        m_sceneManager->getScene(),
+        m_materialsBaker,
+        m_ommBaker,
+        m_renderCore.accelStructs().getSubInstanceBuffer(),
+        m_renderTargets->Depth,
+        m_renderTargets->ScreenMotionVectors,
+    };
+    m_renderCore.updateLightingEnd(lightingEndParams);
 
     {
         RAII_SCOPE( m_commandList->beginMarker("PathTrace");, m_commandList->endMarker(); );

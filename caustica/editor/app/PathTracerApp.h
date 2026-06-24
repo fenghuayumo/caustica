@@ -177,10 +177,6 @@ public:
     void                                    CreateAccelStructs(nvrhi::ICommandList* commandList);
     void                                    RecreateAccelStructs(nvrhi::ICommandList* commandList);
     void                                    RequestMeshAccelRebuild(const std::shared_ptr<caustica::MeshInfo>& mesh);
-    void                                    RebuildDirtyMeshAccelStructs(nvrhi::ICommandList* commandList);
-    void                                    UpdateSkinnedBLASs(nvrhi::ICommandList* commandList, uint32_t frameIndex) const;
-    void                                    BuildTLAS(nvrhi::ICommandList* commandList) const;
-    void                                    TransitionMeshBuffersToReadOnly(nvrhi::ICommandList* commandList);
     void                                    BackBufferResizing() override;
     void                                    CreateRenderPasses(bool& exposureResetRequired, nvrhi::CommandListHandle initializeCommandList);
     void                                    PreUpdatePathTracing(bool resetAccum, nvrhi::CommandListHandle commandList);

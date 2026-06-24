@@ -38,6 +38,7 @@ public:
     void updateSceneGeometry(UpdateSceneGeometryParams& params);
     void preUpdateLighting(PreUpdateLightingParams& params);
     void updateLighting(UpdateLightingParams& params);
+    void updateLightingEnd(UpdateLightingEndParams& params);
 
 private:
     nvrhi::IDevice* m_device = nullptr;

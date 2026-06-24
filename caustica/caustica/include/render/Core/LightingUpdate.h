@@ -59,4 +59,24 @@ struct UpdateLightingParams
     const std::vector<GaussianSplatEmissionProxy>*   gaussianSplatEmissionProxies = nullptr;
 };
 
+struct UpdateLightingEndParams
+{
+    nvrhi::ICommandList*                           commandList = nullptr;
+    LightsBaker*                                   lightsBaker = nullptr;
+    BindingCache*                                  bindingCache = nullptr;
+
+    const std::shared_ptr<Scene>&                  scene;
+    std::shared_ptr<MaterialsBaker>                materialsBaker;
+    std::shared_ptr<OmmBaker>                        ommBaker;
+
+    nvrhi::BufferHandle                            subInstanceDataBuffer;
+    nvrhi::TextureHandle                           depthBuffer;
+    nvrhi::TextureHandle                           motionVectors;
+};
+
+void syncEnvMapSceneParams(
+    const PathTracerSettings& settings,
+    EnvMapSceneParams& params,
+    float envMapRadianceScale);
+
 } // namespace caustica

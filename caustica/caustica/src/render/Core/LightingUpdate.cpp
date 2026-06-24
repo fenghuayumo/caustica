@@ -150,4 +150,47 @@ void RenderCore::updateLighting(UpdateLightingParams& params)
         params.envMapBaker->GetImportanceSampling()->GetRadianceAndImportanceMap());
 }
 
+void syncEnvMapSceneParams(
+    const PathTracerSettings& settings,
+    EnvMapSceneParams& params,
+    float envMapRadianceScale)
+{
+    if (settings.EnvironmentMapParams.Enabled)
+    {
+        const float intensity = settings.EnvironmentMapParams.Intensity / envMapRadianceScale;
+        params.ColorMultiplier = settings.EnvironmentMapParams.TintColor * intensity;
+
+        const float3 rotationInRadians = radians(settings.EnvironmentMapParams.RotationXYZ);
+        const affine3 rotationTransform = dm::rotation(rotationInRadians);
+        const affine3 inverseTransform = inverse(rotationTransform);
+        affineToColumnMajor(rotationTransform, params.Transform);
+        affineToColumnMajor(inverseTransform, params.InvTransform);
+        params.Enabled = 1;
+    }
+    else
+    {
+        params.ColorMultiplier = { 0, 0, 0 };
+        params.Enabled = 0;
+    }
+}
+
+void RenderCore::updateLightingEnd(UpdateLightingEndParams& params)
+{
+    if (params.commandList == nullptr || params.lightsBaker == nullptr || params.bindingCache == nullptr
+        || !params.scene)
+    {
+        return;
+    }
+
+    params.lightsBaker->UpdateEnd(
+        params.commandList,
+        *params.bindingCache,
+        params.scene,
+        params.materialsBaker,
+        params.ommBaker,
+        params.subInstanceDataBuffer,
+        params.depthBuffer,
+        params.motionVectors);
+}
+
 } // namespace caustica
