@@ -164,7 +164,7 @@ def add_shader_pack_tree(
 def collect_shader_pack_entries(shader_type: str, dynamic_shaders: str) -> dict[str, Path]:
     entries: dict[str, Path] = {}
     static_roots = {
-        "framework": "ShaderPrecompiled/donut",
+        "framework": "ShaderPrecompiled/engine",
         "caustica": "ShaderPrecompiled/app",
         "nrd": "ShaderPrecompiled/nrd",
         "omm": "ShaderPrecompiled/omm",

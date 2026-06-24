@@ -239,7 +239,7 @@ Sample::Sample(caustica::GpuDevice& deviceManager,
 
     m_camera.SetRotateSpeed(.003f);
 
-#if DONUT_WITH_STREAMLINE
+#if CAUSTICA_WITH_STREAMLINE
     if (!GetGpuDevice()->GetDeviceParams().headlessDevice)
     {
         m_ui.IsDLSSSuported = GetGpuDevice()->GetStreamline().IsDLSSAvailable();
@@ -627,9 +627,9 @@ void Sample::SetCurrentScene( const std::string & sceneName, bool forceReload )
     }
 }
 
-bool Sample::LoadGaussianSplatFile(const std::filesystem::path& fileName, bool convertRdfToDonut)
+bool Sample::LoadGaussianSplatFile(const std::filesystem::path& fileName, bool convertRdfToRub)
 {
-    return AttachGaussianSplatToScene(fileName, convertRdfToDonut);
+    return AttachGaussianSplatToScene(fileName, convertRdfToRub);
 }
 
 std::filesystem::path Sample::ResolveGaussianSplatPath(const GaussianSplat& splat) const
@@ -719,7 +719,7 @@ void Sample::LoadGaussianSplatsFromScene()
             else
             {
                 auto pass = std::make_unique<GaussianSplatPass>(GetDevice(), m_shaderFactory);
-                if (pass->LoadFromFile(splatPath, splat->convertRdfToDonut))
+                if (pass->LoadFromFile(splatPath, splat->convertRdfToRub))
                 {
                     splat->resolvedPath = splatPath.string();
                     splat->loadedSplatCount = pass->GetSplatCount();
@@ -746,7 +746,7 @@ void Sample::LoadGaussianSplatsFromScene()
     m_gaussianSplatTemporalReset = true;
 }
 
-bool Sample::AttachGaussianSplatToScene(const std::filesystem::path& fileName, bool convertRdfToDonut)
+bool Sample::AttachGaussianSplatToScene(const std::filesystem::path& fileName, bool convertRdfToRub)
 {
     if (!m_scene || !m_scene->GetSceneGraph() || !m_scene->GetSceneGraph()->GetRootNode())
     {
@@ -770,7 +770,7 @@ bool Sample::AttachGaussianSplatToScene(const std::filesystem::path& fileName, b
     }
 
     auto pass = std::make_unique<GaussianSplatPass>(GetDevice(), m_shaderFactory);
-    if (!pass->LoadFromFile(splatPath, convertRdfToDonut))
+    if (!pass->LoadFromFile(splatPath, convertRdfToRub))
     {
         caustica::error("Failed to load Gaussian Splat file '%s'.", splatPath.string().c_str());
         return false;
@@ -784,7 +784,7 @@ bool Sample::AttachGaussianSplatToScene(const std::filesystem::path& fileName, b
     auto splat = std::make_shared<GaussianSplat>();
     splat->path = splatPath.string();
     splat->resolvedPath = splatPath.string();
-    splat->convertRdfToDonut = convertRdfToDonut;
+    splat->convertRdfToRub = convertRdfToRub;
     splat->enabled = true;
     splat->loadedSplatCount = pass->GetSplatCount();
 
@@ -1118,7 +1118,7 @@ void Sample::SceneLoaded( )
     if (!m_initialGaussianSplatAttached && !m_cmdLine.GaussianSplatFileName.empty())
     {
         m_initialGaussianSplatAttached = true;
-        (void)AttachGaussianSplatToScene(m_cmdLine.GaussianSplatFileName, m_cmdLine.GaussianSplatConvertRdfToDonut);
+        (void)AttachGaussianSplatToScene(m_cmdLine.GaussianSplatFileName, m_cmdLine.GaussianSplatConvertRdfToRub);
     }
 
     m_progressLoading.Set(65);
@@ -1294,7 +1294,7 @@ bool Sample::KeyboardUpdate(int key, int scancode, int action, int mods)
     if( key == GLFW_KEY_R && action == GLFW_PRESS && mods == GLFW_MOD_CONTROL )
         m_ui.ShaderReloadRequested = true;
 
-#if DONUT_WITH_STREAMLINE
+#if CAUSTICA_WITH_STREAMLINE
     if (key == GLFW_KEY_F13 && action == GLFW_PRESS)
     {
         // As GLFW abstracts away from Windows messages
@@ -1341,7 +1341,7 @@ bool Sample::MouseButtonUpdate(int button, int action, int mods)
         m_ui.DebugPixel = m_pickPosition;
     }
 
-#if DONUT_WITH_STREAMLINE
+#if CAUSTICA_WITH_STREAMLINE
     if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
     {
          GetGpuDevice()->GetStreamline().ReflexTriggerFlash(GetFrameIndex());
@@ -1465,7 +1465,7 @@ void Sample::Animate(float fElapsedTimeSeconds)
     double frameTime = GetGpuDevice()->GetAverageFrameTimeSeconds();
     if (frameTime > 0.0)
     {
-#if DONUT_WITH_STREAMLINE
+#if CAUSTICA_WITH_STREAMLINE
         if (m_ui.DLSSFGMultiplier != 1)
             m_fpsInfo = StringFormat("%.3f ms/%d-frames* (%.1f FPS*) *DLSS-G", frameTime * 1e3, m_ui.DLSSFGMultiplier, m_ui.DLSSFGMultiplier / frameTime);
         else
@@ -1999,7 +1999,7 @@ void Sample::BackBufferResizing()
         m_rtxdiPass->Reset();
 
 // NOTE: we're not yet sure if this is necessary to avoid crash with going in/out of fullscreen and FG
-#if DONUT_WITH_STREAMLINE
+#if CAUSTICA_WITH_STREAMLINE
     if (!GetGpuDevice()->GetDeviceParams().headlessDevice &&
         (m_ui.DLSSFGOptions.mode == StreamlineInterface::DLSSGMode::eOn || m_ui.ActualDLSSFGMode() == StreamlineInterface::DLSSGMode::eOn)) 
     {
@@ -2405,7 +2405,7 @@ bool Sample::ShouldRenderUnfocused()
 
 void Sample::StreamlinePreRender()
 {
-#if DONUT_WITH_STREAMLINE
+#if CAUSTICA_WITH_STREAMLINE
     if (GetGpuDevice()->GetDeviceParams().headlessDevice)
         return;
 
@@ -2590,7 +2590,7 @@ void Sample::StreamlinePreRender()
     }
 #else
     const bool changeToDLSSMode = false;
-#endif // #if DONUT_WITH_STREAMLINE
+#endif // #if CAUSTICA_WITH_STREAMLINE
 }
 
 #if RTXPT_WITH_NATIVE_DLSS
@@ -5669,7 +5669,7 @@ void Sample::PostProcessAA(nvrhi::IFramebuffer* framebuffer, bool reset)
             }
         }
 
-#if DONUT_WITH_STREAMLINE
+#if CAUSTICA_WITH_STREAMLINE
         const bool useStreamlineThisFrame = !GetGpuDevice()->GetDeviceParams().headlessDevice;
         if (useStreamlineThisFrame)
         {
@@ -5700,7 +5700,7 @@ void Sample::PostProcessAA(nvrhi::IFramebuffer* framebuffer, bool reset)
             slConstants.clipToPrevClip = reprojectionMatrix;
             slConstants.depthInverted = m_view->IsReverseDepth() ? true : false;
             slConstants.jitterOffset = jitterOffset;
-            slConstants.mvecScale = { 1.0f / m_renderSize.x , 1.0f / m_renderSize.y }; // This are scale factors used to normalize mvec (to -1,1) and donut has mvec in pixel space
+            slConstants.mvecScale = { 1.0f / m_renderSize.x , 1.0f / m_renderSize.y }; // Scale factors used to normalize mvec (to -1,1); engine stores mvec in pixel space
             slConstants.prevClipToClip = inverse(reprojectionMatrix);
             slConstants.reset = reset;
             slConstants.motionVectors3D = false;

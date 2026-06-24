@@ -128,12 +128,12 @@ void PTTexture::InitFromLoadedTexture(std::shared_ptr<caustica::LoadedTexture> &
     Enabled = true;
 }
 
-std::shared_ptr<PTMaterial> PTMaterial::SafeCast(const std::shared_ptr<Material>& donutMaterial)
+std::shared_ptr<PTMaterial> PTMaterial::SafeCast(const std::shared_ptr<Material>& bridgeMaterial)
 {
-    if (donutMaterial == nullptr)
+    if (bridgeMaterial == nullptr)
         return nullptr;
-    assert(std::dynamic_pointer_cast<MaterialEx>(donutMaterial) != nullptr);
-    return std::static_pointer_cast<MaterialEx>(donutMaterial)->PTMaterial;
+    assert(std::dynamic_pointer_cast<MaterialEx>(bridgeMaterial) != nullptr);
+    return std::static_pointer_cast<MaterialEx>(bridgeMaterial)->PTMaterial;
 }
 
 void PTMaterial::Write(Json::Value& output)
@@ -207,7 +207,7 @@ void PTMaterial::Write(Json::Value& output)
 
     STORE_FIELD(IgnoreMeshTangentSpace);
 
-    STORE_FIELD(UseDonutEmissiveIntensity);
+    STORE_FIELD(UseEngineEmissiveIntensity);
 
     STORE_FIELD(SkipRender);
 
@@ -336,7 +336,9 @@ bool PTMaterial::Read(
 
     LOAD_FIELD(IgnoreMeshTangentSpace);
 
-    LOAD_FIELD(UseDonutEmissiveIntensity);
+    LOAD_FIELD(UseEngineEmissiveIntensity);
+    if (!input.isMember("UseEngineEmissiveIntensity") && input.isMember("UseDonutEmissiveIntensity"))
+        input["UseDonutEmissiveIntensity"] >> UseEngineEmissiveIntensity;
 
     LOAD_FIELD(SkipRender);
 
@@ -522,8 +524,8 @@ bool PTMaterial::EditorGUI(MaterialsBaker & baker)
             "an analytic light, the rays falling of this surface will also output radiance from the analytic light.\n"
             "The more closely the object's mesh resembles the analytic light, the more physically correct results will be.\n");
 
-        update |= ImGui::Checkbox("Emissive intensity from Donut", &UseDonutEmissiveIntensity);
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Classic Donut materials can have emissive intensity animation attached; this allows RTXPT to use it\n");
+        update |= ImGui::Checkbox("Emissive intensity from engine material", &UseEngineEmissiveIntensity);
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Engine materials can have emissive intensity animation attached; this allows RTXPT to use it\n");
 
         update |= ImGui::Checkbox("Ignore mesh tangent space", &IgnoreMeshTangentSpace);
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("This will ignore tangent space loaded from the mesh and generate new one - can help issues with normals.");
@@ -785,7 +787,7 @@ static void GetBindlessTextureIndex(const std::shared_ptr<LoadedTexture>& textur
 
 bool PTMaterial::IsEmissive() const
 {
-    return (EmissiveIntensity > 0) && (caustica::math::any(EmissiveColor>0.0f)) || UseDonutEmissiveIntensity;  // UseDonutEmissiveIntensity can animate on/off so just assume we're emissive and pay the cost
+    return (EmissiveIntensity > 0) && (caustica::math::any(EmissiveColor>0.0f)) || UseEngineEmissiveIntensity;  // UseEngineEmissiveIntensity can animate on/off so just assume we're emissive and pay the cost
 }
 
 void PTMaterial::FillData(PTMaterialData & data)
@@ -918,36 +920,36 @@ static bool DefaultTextureNormalMap(PTMaterialTextureSlot slot)
     return slot == PTMaterialTextureSlot::Normal;
 }
 
-static void UpdateDonutMaterialTexture(
+static void UpdateEngineMaterialTexture(
     PTMaterial& material,
     PTMaterialTextureSlot slot,
     const std::shared_ptr<LoadedTexture>& loaded,
     bool enabled)
 {
-    if (material.DonutCounterpart == nullptr)
+    if (material.EngineMaterialCounterpart == nullptr)
         return;
 
     switch (slot)
     {
     case PTMaterialTextureSlot::Base:
-        material.DonutCounterpart->baseOrDiffuseTexture = loaded;
-        material.DonutCounterpart->enableBaseOrDiffuseTexture = enabled;
+        material.EngineMaterialCounterpart->baseOrDiffuseTexture = loaded;
+        material.EngineMaterialCounterpart->enableBaseOrDiffuseTexture = enabled;
         break;
     case PTMaterialTextureSlot::OcclusionRoughnessMetallic:
-        material.DonutCounterpart->metalRoughOrSpecularTexture = loaded;
-        material.DonutCounterpart->enableMetalRoughOrSpecularTexture = enabled;
+        material.EngineMaterialCounterpart->metalRoughOrSpecularTexture = loaded;
+        material.EngineMaterialCounterpart->enableMetalRoughOrSpecularTexture = enabled;
         break;
     case PTMaterialTextureSlot::Normal:
-        material.DonutCounterpart->normalTexture = loaded;
-        material.DonutCounterpart->enableNormalTexture = enabled;
+        material.EngineMaterialCounterpart->normalTexture = loaded;
+        material.EngineMaterialCounterpart->enableNormalTexture = enabled;
         break;
     case PTMaterialTextureSlot::Emissive:
-        material.DonutCounterpart->emissiveTexture = loaded;
-        material.DonutCounterpart->enableEmissiveTexture = enabled;
+        material.EngineMaterialCounterpart->emissiveTexture = loaded;
+        material.EngineMaterialCounterpart->enableEmissiveTexture = enabled;
         break;
     case PTMaterialTextureSlot::Transmission:
-        material.DonutCounterpart->transmissionTexture = loaded;
-        material.DonutCounterpart->enableTransmissionTexture = enabled;
+        material.EngineMaterialCounterpart->transmissionTexture = loaded;
+        material.EngineMaterialCounterpart->enableTransmissionTexture = enabled;
         break;
     default:
         assert(false);
@@ -1027,7 +1029,7 @@ bool MaterialsBaker::SetMaterialTexture(
     }
 
     material.SetTextureEnabled(slot, true);
-    UpdateDonutMaterialTexture(material, slot, texture.Loaded, true);
+    UpdateEngineMaterialTexture(material, slot, texture.Loaded, true);
     material.GPUDataDirty = true;
 
     m_deferredTextureLoadInProgress = true;
@@ -1042,7 +1044,7 @@ void MaterialsBaker::ClearMaterialTexture(PTMaterial& material, PTMaterialTextur
     texture.Enabled = false;
 
     material.SetTextureEnabled(slot, false);
-    UpdateDonutMaterialTexture(material, slot, nullptr, false);
+    UpdateEngineMaterialTexture(material, slot, nullptr, false);
     material.GPUDataDirty = true;
 }
 
@@ -1123,7 +1125,7 @@ static bool IsBuiltinModelFileName(const std::string& modelFileName)
     return normalized.rfind(builtinPrefix, 0) == 0;
 }
 
-std::shared_ptr<PTMaterial> MaterialsBaker::ImportFromDonut(caustica::Material& material)
+std::shared_ptr<PTMaterial> MaterialsBaker::ImportFromEngineMaterial(caustica::Material& material)
 {
     std::shared_ptr<PTMaterial> materialPT = std::make_shared<PTMaterial>();
 
@@ -1392,7 +1394,7 @@ void MaterialsBaker::CreateRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* b
   
         std::unordered_set<std::string> materialsPTUniqueNames;
 
-        int initializedFromDonutCount = 0;
+        int initializedFromEngineCount = 0;
 
         std::shared_ptr<SceneGraph> sceneGraph = scene->GetSceneGraph();
         auto& materials = sceneGraph->GetMaterials();
@@ -1408,7 +1410,7 @@ void MaterialsBaker::CreateRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* b
             {
                 if (IsBuiltinModelFileName(material->modelFileName))
                 {
-                    materialEx->PTMaterial = ImportFromDonut(*material);
+                    materialEx->PTMaterial = ImportFromEngineMaterial(*material);
                 }
                 else
                 {
@@ -1417,14 +1419,14 @@ void MaterialsBaker::CreateRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* b
                     {
                         materialEx->PTMaterial = loaded;
                     }
-                    else // ...and if we didn't find it in our .scene.materials.json, then import from Donut!
+                    else // ...and if we didn't find it in our .scene.materials.json, then import from the engine material
                     {
-                        std::shared_ptr<PTMaterial> materialPT = ImportFromDonut(*material);
+                        std::shared_ptr<PTMaterial> materialPT = ImportFromEngineMaterial(*material);
                         materialEx->PTMaterial = materialPT;
-                        initializedFromDonutCount++;
+                        initializedFromEngineCount++;
                     }
                 }
-                materialEx->PTMaterial->DonutCounterpart = materialEx.get(); // keep the link - only needed if using material animation from Donut
+                materialEx->PTMaterial->EngineMaterialCounterpart = materialEx.get(); // keep the link - only needed if using material animation from the engine
                 materialEx->PTMaterial->RuntimeBaker = this;
 
                 std::string keyName = materialEx->PTMaterial->ModelName+"."+materialEx->PTMaterial->Name;
@@ -1449,8 +1451,8 @@ void MaterialsBaker::CreateRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* b
         // sort by name so when we're saving it's consistent
         std::sort(m_materials.begin(), m_materials.end(), [](const auto & a, const auto & b) { return a->Name < b->Name; } );
 
-        if (initializedFromDonutCount > 0)
-            caustica::warning("There were %d materials not found in RTXPT material materials folder '%s'; consider doing Scene->Materials->Advanced->Save", initializedFromDonutCount, m_materialsPath.string().c_str());
+        if (initializedFromEngineCount > 0)
+            caustica::warning("There were %d materials not found in RTXPT material materials folder '%s'; consider doing Scene->Materials->Advanced->Save", initializedFromEngineCount, m_materialsPath.string().c_str());
 
         m_deferredTextureLoadInProgress = true;
     }
@@ -1540,9 +1542,9 @@ void MaterialsBaker::Update(nvrhi::ICommandList* commandList, const std::shared_
     bool needsUpload = false;
     for (auto& materialPT : m_materials)
     {
-        if (materialPT->UseDonutEmissiveIntensity && materialPT->DonutCounterpart != nullptr && materialPT->EmissiveIntensity != materialPT->DonutCounterpart->emissiveIntensity)
+        if (materialPT->UseEngineEmissiveIntensity && materialPT->EngineMaterialCounterpart != nullptr && materialPT->EmissiveIntensity != materialPT->EngineMaterialCounterpart->emissiveIntensity)
         {
-            materialPT->EmissiveIntensity = materialPT->DonutCounterpart->emissiveIntensity;
+            materialPT->EmissiveIntensity = materialPT->EngineMaterialCounterpart->emissiveIntensity;
             materialPT->GPUDataDirty = true;
         }
 

@@ -1,4 +1,4 @@
-#if DONUT_WITH_DLSS && DONUT_WITH_VULKAN
+#if CAUSTICA_WITH_DLSS && CAUSTICA_WITH_VULKAN
 
 #include <vulkan/vulkan.h>
 #include <nvsdk_ngx_vk.h>

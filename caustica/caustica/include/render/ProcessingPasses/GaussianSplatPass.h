@@ -98,7 +98,7 @@ public:
 
     void SetGpuSort(std::shared_ptr<GPUSort> gpuSort);
 
-    bool LoadFromFile(const std::filesystem::path& fileName, bool convertRdfToDonut);
+    bool LoadFromFile(const std::filesystem::path& fileName, bool convertRdfToRub);
 
     void CreatePipeline(const RenderTargets& renderTargets);
     void BuildAccelerationStructures(

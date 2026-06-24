@@ -550,12 +550,12 @@ namespace
         return std::max<uint64_t>(4, (size + 3u) & ~uint64_t(3u));
     }
 
-    GaussianSplatData ConvertToGpuSplat(const RawGaussianSplat& raw, bool convertRdfToDonut)
+    GaussianSplatData ConvertToGpuSplat(const RawGaussianSplat& raw, bool convertRdfToRub)
     {
         float rotation[4] = { raw.rotation[0], raw.rotation[1], raw.rotation[2], raw.rotation[3] };
         float position[3] = { raw.position[0], raw.position[1], raw.position[2] };
 
-        if (convertRdfToDonut)
+        if (convertRdfToRub)
         {
             position[1] = -position[1];
             position[2] = -position[2];
@@ -612,7 +612,7 @@ namespace
 
     bool LoadPlyFile(
         const std::filesystem::path& fileName,
-        bool convertRdfToDonut,
+        bool convertRdfToRub,
         std::vector<GaussianSplatData>& splats,
         std::vector<float4>& shCoefficients,
         uint32_t& shDegree)
@@ -890,7 +890,7 @@ namespace
                     raw.color[2] = float(values[blueIndex]) / 255.0f;
                 }
 
-                splats.push_back(ConvertToGpuSplat(raw, convertRdfToDonut));
+                splats.push_back(ConvertToGpuSplat(raw, convertRdfToRub));
 
                 std::array<float, GAUSSIAN_SPLAT_SH_FLOAT4_COUNT * 4> packedSh = {};
                 if (shDegree > 0)
@@ -900,7 +900,7 @@ namespace
 
                     for (uint32_t coeff = 0; coeff < coefficientsPerChannel; ++coeff)
                     {
-                        const float coordinateFlip = convertRdfToDonut ? kRdfToRubShFlip[coeff] : 1.0f;
+                        const float coordinateFlip = convertRdfToRub ? kRdfToRubShFlip[coeff] : 1.0f;
                         for (uint32_t rgb = 0; rgb < 3; ++rgb)
                         {
                             const uint32_t sourceCoeff = rgb * coefficientsPerChannel + coeff;
@@ -982,7 +982,7 @@ bool GaussianSplatPass::CanReuseSort(const GaussianSplatConstants& constants) co
         && MatrixEquals(m_cachedSortObjectToWorld, constants.objectToWorld);
 }
 
-bool GaussianSplatPass::LoadFromFile(const std::filesystem::path& fileName, bool convertRdfToDonut)
+bool GaussianSplatPass::LoadFromFile(const std::filesystem::path& fileName, bool convertRdfToRub)
 {
     const std::string extension = ToLower(fileName.extension().string());
     if (extension != ".ply")
@@ -994,7 +994,7 @@ bool GaussianSplatPass::LoadFromFile(const std::filesystem::path& fileName, bool
     std::vector<GaussianSplatData> loadedSplats;
     std::vector<float4> loadedShCoefficients;
     uint32_t loadedShDegree = 0;
-    if (!LoadPlyFile(fileName, convertRdfToDonut, loadedSplats, loadedShCoefficients, loadedShDegree))
+    if (!LoadPlyFile(fileName, convertRdfToRub, loadedSplats, loadedShCoefficients, loadedShDegree))
         return false;
 
     m_splats = std::move(loadedSplats);

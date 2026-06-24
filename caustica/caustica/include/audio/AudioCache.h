@@ -65,7 +65,7 @@ private:
 };
 
 // AudioCache : cache for audio data with synch & async read from 
-// donut caustica::IFileSystem
+// caustica::IFileSystem
 //
 class AudioCache
 {

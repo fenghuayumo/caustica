@@ -154,7 +154,7 @@ scene = r'''
       "name": "Scan",
       "type": "GaussianSplat",
       "path": "D:/ScanVideo/chuan/splats.ply",
-      "convertRdfToDonut": true,
+      "convertRdfToRub": true,
       "translation": [0, 0, 0],
       "scaling": [1, 1, 1]
     }
@@ -177,7 +177,7 @@ while r.step(-1.0):
     pass
 ```
 
-For script-driven workflows, `load_gaussian_splats(path, convert_rdf_to_donut=True)` appends a `GaussianSplat` node to the current scene root. Calling `load_scene(...)` replaces the current scene graph and destroys previously appended splat nodes, so load them again after switching scenes or declare them in the target scene JSON.
+For script-driven workflows, `load_gaussian_splats(path, convert_rdf_to_rub=True)` appends a `GaussianSplat` node to the current scene root. Calling `load_scene(...)` replaces the current scene graph and destroys previously appended splat nodes, so load them again after switching scenes or declare them in the target scene JSON.
 
 ### 3DGS Reference / Realtime Batch Test
 
@@ -227,7 +227,7 @@ python .\caustica\Python\Examples\render_gs_colmap_views.py ^
 
 The script passes full COLMAP pinhole intrinsics (`fx`, `fy`, `cx`, `cy`) through `Renderer.set_camera_intrinsics(...)`. This keeps off-center principal points aligned with gsplat. Use `--symmetric-fov` only when intentionally testing the older vertical-FOV-only path.
 
-When `--convert-rdf-to-donut` is enabled, which is the default, both the PLY loader and the COLMAP camera pose are converted from RDF/COLMAP coordinates into caustica/Donut coordinates. `--mip-antialiasing` is enabled by default and can be disabled with `--no-mip-antialiasing`.
+When `--convert-rdf-to-rub` is enabled, which is the default, both the PLY loader and the COLMAP camera pose are converted from RDF/COLMAP coordinates into caustica engine coordinates. `--mip-antialiasing` is enabled by default and can be disabled with `--no-mip-antialiasing`.
 
 ### Load OBJ Meshes With Materials
 
@@ -520,7 +520,7 @@ caustica.Renderer(
 | --- | --- | --- |
 | `close()` | `None` | Tears down renderer/device. Also called by destructor/context manager. |
 | `load_scene(scene_name, wait_until_ready=True)` | `bool` | Switch scene. |
-| `load_gaussian_splats(file_name, convert_rdf_to_donut=True)` | `bool` | Append a `.ply` 3DGS scene object under the current scene root. |
+| `load_gaussian_splats(file_name, convert_rdf_to_rub=True)` | `bool` | Append a `.ply` 3DGS scene object under the current scene root. |
 | `load_mesh_file(file_name)` | `bool` | Append a `.gltf`, `.glb`, or `.obj` mesh under the current scene root. OBJ imports resolve referenced `.mtl` files and common material textures relative to the OBJ/MTL path. |
 | `get_scene_bounds()` | `tuple | None` | Active scene world-space `((min.xyz), (max.xyz))` AABB from C++ `Scene::GetSceneBounds()`. |
 | `scene_bounds` | `tuple | None` | Property alias for `get_scene_bounds()`. |
@@ -574,7 +574,7 @@ scene = r"""
       "path": "D:/ScanVideo/chuan/splats_a.ply",
       "translation": [0.0, 0.0, 0.0],
       "scaling": 1.0,
-      "convertRdfToDonut": true,
+      "convertRdfToRub": true,
       "enabled": true
     },
     {
@@ -618,7 +618,7 @@ Top-level renderer instance (`Sample`). In extension mode, access it through `re
 | API | Return | Notes |
 | --- | --- | --- |
 | `set_scene(scene_name, force_reload=False)` | `None` | Switch scene. |
-| `load_gaussian_splats(file_name, convert_rdf_to_donut=True)` | `bool` | Append a 3DGS `.ply` node to the current scene. |
+| `load_gaussian_splats(file_name, convert_rdf_to_rub=True)` | `bool` | Append a 3DGS `.ply` node to the current scene. |
 | `load_mesh_file(file_name)` | `bool` | Append a `.gltf`, `.glb`, or `.obj` mesh node to the current scene. OBJ imports resolve referenced `.mtl` files and common material textures relative to the OBJ/MTL path. |
 | `set_environment_map(path)` | `None` | Override scene environment map source. |
 | `get_scene()` | `Scene | None` | Return the current loaded scene. |
@@ -935,7 +935,7 @@ Scene light lookup and per-type light properties.
 
 | Property | Type | Notes |
 | --- | --- | --- |
-| `light_type` | implementation enum/int | Underlying Donut light type. |
+| `light_type` | implementation enum/int | Underlying engine light type. |
 | `name` | `str` | Scene node name. Read-only. |
 | `color` | `(r, g, b)` | Writable. |
 | `position` | `(x, y, z)` | Writable. |
@@ -986,8 +986,8 @@ For common environment tweaks, prefer `settings.environment_map` (see [Settings]
 
 | API | Return | Notes |
 | --- | --- | --- |
-| `Renderer.load_gaussian_splats(file_name, convert_rdf_to_donut=True)` | `bool` | Append a `.ply` 3DGS scene object (extension mode). |
-| `Sample.load_gaussian_splats(file_name, convert_rdf_to_donut=True)` | `bool` | Append a 3DGS `.ply` node to the current scene. |
+| `Renderer.load_gaussian_splats(file_name, convert_rdf_to_rub=True)` | `bool` | Append a `.ply` 3DGS scene object (extension mode). |
+| `Sample.load_gaussian_splats(file_name, convert_rdf_to_rub=True)` | `bool` | Append a 3DGS `.ply` node to the current scene. |
 | Scene JSON `GaussianSplat` node | — | Declare splats in inline or file-based scene JSON. See [Renderer → Inline / Builtin Scenes](#inline--builtin-scenes). |
 
 Read-only status on `Sample` / `Renderer.settings`:
@@ -1320,7 +1320,7 @@ For windowed extension usage:
 - `headless=False` opens a GLFW window.
 - `Renderer.step()` must be called repeatedly to pump events and render frames.
 - Clicking the window close button makes `step()` return `False`.
-- Resize/maximize/minimize are handled by the underlying Donut `DeviceManager` during `step()`.
+- Resize/maximize/minimize are handled by the underlying device manager during `step()`.
 
 ## Existing Examples
 

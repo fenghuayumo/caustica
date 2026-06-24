@@ -1,4 +1,4 @@
-// Partially based on "donut/include/donut/shaders/packing.hlsli"
+// Partially based on the engine shaders/packing.hlsli layout
 
 #ifndef __PACKING_HLSLI__
 #define __PACKING_HLSLI__

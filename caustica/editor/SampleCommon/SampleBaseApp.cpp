@@ -1,4 +1,4 @@
-﻿#include "SampleBaseApp.h"
+#include "SampleBaseApp.h"
 
 #include <algorithm>
 #include <cctype>
@@ -158,7 +158,7 @@ namespace
 
 SampleBaseApp::SampleBaseApp()
 {
-    RegisterDonutCallback(); // Register a custom donut callback to filter errors
+    RegisterLogCallback(); // Register a custom log callback to filter errors
 
     korgi::Init(); // MIDI Input for parameter control
 
@@ -205,13 +205,13 @@ SampleBaseApp::InitReturnCodes SampleBaseApp::Init(int argc, const char* const* 
 
     CreateShaderFactory();
 
-    // -- Register render passes into Donut -- 
+    // -- Register render passes into the engine -- 
     // Create the main render pass. This is where path tracing happens
     m_MainSceneRender = CreateMainRenderPass(*m_GpuDevice, m_CmdLine);
     m_MainSceneRender->Init(preferredScene, m_ShaderFactory);
     m_GpuDevice->AddRenderPassToBack(m_MainSceneRender.get());
 
-#if DONUT_WITH_DX12 && (RTXPT_D3D_AGILITY_SDK_VERSION >= 619)   // temporary
+#if CAUSTICA_WITH_DX12 && (RTXPT_D3D_AGILITY_SDK_VERSION >= 619)   // temporary
     // When using AgilitySDK >= 619, we require shader model 6.9
     if (m_GpuDevice->GetDevice()->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D12)
     {
@@ -322,10 +322,10 @@ void SampleBaseApp::RunMainLoop()
     m_AppLoop->run();
 }
 
-void SampleBaseApp::RegisterDonutCallback()
+void SampleBaseApp::RegisterLogCallback()
 {
     // Get the default call back first so we can pass messages through to it.
-    m_DonutDefaultCallback = caustica::GetCallback();
+    m_DefaultLogCallback = caustica::GetCallback();
 
     // Register our custom callback to intercept and filter streamline errors
     caustica::SetCallback([this](caustica::Severity severity, const char* message)
@@ -354,8 +354,8 @@ void SampleBaseApp::SampleLogCallback(caustica::Severity severity, const char* m
             severity = caustica::Severity::Warning;
     }
 
-    // Pass all other messages to donut's default callback
-    m_DonutDefaultCallback(severity, message);
+    // Pass all other messages to the default log callback
+    m_DefaultLogCallback(severity, message);
 }
 
 caustica::DeviceCreationParameters SampleBaseApp::GetDefaultDeviceParams() const
@@ -369,7 +369,7 @@ caustica::DeviceCreationParameters SampleBaseApp::GetDefaultDeviceParams() const
     deviceParams.startBorderless = false;
     deviceParams.vsyncEnabled = true;
     deviceParams.enableRayTracingExtensions = true;
-#if DONUT_WITH_DX12
+#if CAUSTICA_WITH_DX12
 #if defined(RTXPT_D3D_AGILITY_SDK_VERSION)
     deviceParams.featureLevel = D3D_FEATURE_LEVEL_12_2;
     // TODO: Redefining this isn't needed. Take the ones from AgilitySDK
@@ -390,7 +390,7 @@ caustica::DeviceCreationParameters SampleBaseApp::GetDefaultDeviceParams() const
 #endif
     deviceParams.supportExplicitDisplayScaling = true;
 
-#if DONUT_WITH_STREAMLINE
+#if CAUSTICA_WITH_STREAMLINE
     deviceParams.checkStreamlineSignature = true;   // <- Set to false if you're using a local build of streamline
     deviceParams.streamlineAppId = 231313132;
 #if defined(_DEBUG)
@@ -398,7 +398,7 @@ caustica::DeviceCreationParameters SampleBaseApp::GetDefaultDeviceParams() const
 #endif
 #endif
 
-#if DONUT_WITH_VULKAN
+#if CAUSTICA_WITH_VULKAN
 #if RTXPT_WITH_NATIVE_DLSS
     caustica::render::DLSS::GetRequiredVulkanExtensions(
         deviceParams.requiredVulkanInstanceExtensions,
@@ -588,7 +588,7 @@ void SampleBaseApp::CreateShaderFactory()
     }
     else
     {
-        rootFS->mount("/ShaderPrecompiled/donut", engineShaderPath);
+        rootFS->mount("/ShaderPrecompiled/engine", engineShaderPath);
         rootFS->mount("/ShaderPrecompiled/app", appShaderPath);
         rootFS->mount("/ShaderPrecompiled/nrd", nrdShaderPath);
         rootFS->mount("/ShaderPrecompiled/omm", ommShaderPath);

@@ -100,7 +100,7 @@ struct PTTexture
 // All materials share these base properties and some of them have tight integration with the rest of the renderer
 struct PTMaterialBase
 {
-    caustica::Material * DonutCounterpart = nullptr;
+    caustica::Material * EngineMaterialCounterpart = nullptr;
     MaterialsBaker*          RuntimeBaker = nullptr;
 
     // ModelName + Name is unique identifier for the material; there cannot be two materials with the same ModelName and Name - hopefully.
@@ -213,7 +213,7 @@ struct PTMaterial : public PTMaterialBase
 
     bool                    IgnoreMeshTangentSpace              = false;
 
-    bool                    UseDonutEmissiveIntensity           = false;        // for being able to use Donut animations
+    bool                    UseEngineEmissiveIntensity           = false;        // for being able to use engine material animations
     
     bool                    SkipRender                          = false;        // if 'true', we just skip drawing all geometries with this material; sometimes we can't edit a specific mesh but we can remove it this way; note: it can also be used for hidden emissives
 
@@ -225,7 +225,7 @@ struct PTMaterial : public PTMaterialBase
     bool                    IsTextureEnabled(PTMaterialTextureSlot slot) const;
     void                    SetTextureEnabled(PTMaterialTextureSlot slot, bool enabled);
 
-    static std::shared_ptr<PTMaterial> SafeCast(const std::shared_ptr<caustica::Material>& donutMaterial);
+    static std::shared_ptr<PTMaterial> SafeCast(const std::shared_ptr<caustica::Material>& bridgeMaterial);
 
     static std::shared_ptr<PTMaterial> FromJson(
         Json::Value& input,
@@ -299,7 +299,7 @@ private:
     void                            Clear();
 
     std::shared_ptr<PTMaterial>     Load(const std::string & modelFileName, const std::string& name);
-    std::shared_ptr<PTMaterial>     ImportFromDonut(caustica::Material & material);
+    std::shared_ptr<PTMaterial>     ImportFromEngineMaterial(caustica::Material & material);
     void                            SaveAll();
 
     void                            CompleteDeferredTexturesLoad(nvrhi::ICommandList* commandList);

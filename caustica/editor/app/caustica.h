@@ -19,7 +19,7 @@
 #include <render/RTXDI/RtxdiPass.h>
 #include <render/NRD/NrdIntegration.h>
 //#include "PathTracer/StablePlanes.hlsli"
-#if DONUT_WITH_STREAMLINE
+#if CAUSTICA_WITH_STREAMLINE
 #include <engine/StreamlineInterface.h>
 #endif
 
@@ -118,7 +118,7 @@ public:
 
     void                                    Init(const std::string& preferredScene, const std::shared_ptr<caustica::ShaderFactory>& shaderFactory);
     void                                    SetCurrentScene(const std::string& sceneName, bool forceReload = false);
-    bool                                    LoadGaussianSplatFile(const std::filesystem::path& fileName, bool convertRdfToDonut = true);
+    bool                                    LoadGaussianSplatFile(const std::filesystem::path& fileName, bool convertRdfToRub = true);
     uint32_t                                GetGaussianSplatCount() const;
     uint32_t                                GetGaussianSplatObjectCount() const;
     const std::string&                      GetGaussianSplatFileName() const;
@@ -279,7 +279,7 @@ private:
     void                                    PostProcessPreToneMapping(nvrhi::ICommandList* commandList, const caustica::ICompositeView& compositeView);
     void                                    PostProcessPostToneMapping(nvrhi::ICommandList* commandList, const caustica::ICompositeView& compositeView);
     void                                    LoadGaussianSplatsFromScene();
-    bool                                    AttachGaussianSplatToScene(const std::filesystem::path& fileName, bool convertRdfToDonut);
+    bool                                    AttachGaussianSplatToScene(const std::filesystem::path& fileName, bool convertRdfToRub);
     void                                    PrepareGaussianSplatPass(GaussianSplatPass& pass);
     void                                    UpdateGaussianSplatUIState();
     uint32_t                                GetTotalGaussianSplatCount() const;
@@ -437,7 +437,7 @@ private:
     // texture compression: used but not compressed textures
     std::map<std::shared_ptr<caustica::LoadedTexture>, TextureCompressionType> m_uncompressedTextures;
 
-#if DONUT_WITH_STREAMLINE
+#if CAUSTICA_WITH_STREAMLINE
     caustica::StreamlineInterface::DLSSSettings   m_recommendedDLSSSettings = {};
     caustica::StreamlineInterface::DLSSRROptions  m_lastDLSSRROptions;
 #endif

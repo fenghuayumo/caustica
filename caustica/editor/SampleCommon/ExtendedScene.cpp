@@ -103,7 +103,7 @@ std::shared_ptr<SceneGraphLeaf> GaussianSplat::Clone()
     auto copy = std::make_shared<GaussianSplat>();
     copy->path = path;
     copy->resolvedPath = resolvedPath;
-    copy->convertRdfToDonut = convertRdfToDonut;
+    copy->convertRdfToRub = convertRdfToRub;
     copy->enabled = enabled;
     copy->loadedSplatCount = loadedSplatCount;
     return copy;
@@ -116,7 +116,9 @@ void GaussianSplat::Load(const Json::Value& node)
         node["file"] >> path;
     if (path.empty())
         node["fileName"] >> path;
-    node["convertRdfToDonut"] >> convertRdfToDonut;
+    node["convertRdfToRub"] >> convertRdfToRub;
+    if (!node.isMember("convertRdfToRub") && node.isMember("convertRdfToDonut"))
+        node["convertRdfToDonut"] >> convertRdfToRub;
     node["enabled"] >> enabled;
 }
 

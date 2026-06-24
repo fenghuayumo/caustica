@@ -975,7 +975,7 @@ void RegisterCoreBindings(nb::module_& m)
 
         .def("find_material_by_id", [](Scene& self, int materialId) {
                 return FindSceneMaterialById(self.GetSceneGraph(), materialId);
-            }, nb::arg("material_id"), "Look up a material by Donut material ID.")
+            }, nb::arg("material_id"), "Look up a material by engine material ID.")
 
         .def("get_lights", [](Scene& self) {
                 return GetSceneLights(self.GetSceneGraph());
@@ -1292,11 +1292,11 @@ void RegisterCoreBindings(nb::module_& m)
             nb::arg("scene_name"), nb::arg("force_reload") = false,
             "Switch to a different scene file from caustica.Sample.available_scenes.")
 
-        .def("load_gaussian_splats", [](Sample& self, const std::string& fileName, bool convertRdfToDonut)
+        .def("load_gaussian_splats", [](Sample& self, const std::string& fileName, bool convertRdfToRub)
             {
-                return self.LoadGaussianSplatFile(fileName, convertRdfToDonut);
+                return self.LoadGaussianSplatFile(fileName, convertRdfToRub);
             },
-            nb::arg("file_name"), nb::arg("convert_rdf_to_donut") = true,
+            nb::arg("file_name"), nb::arg("convert_rdf_to_rub") = true,
             "Load a 3DGS .ply file and rasterize it over the current scene.")
 
         .def("load_mesh_file", [](Sample& self, const std::string& fileName)

@@ -12,7 +12,7 @@
 #define NON_PATH_TRACING_PASS 1
 
 #include <shaders/Bindings/ShaderResourceBindings.hlsli>
-#include <shaders/PathTracerBridgeDonut.hlsli>
+#include <shaders/PathTracerBridgeEngine.hlsli>
 #include <shaders/PathTracer/PathTracer.hlsli>
 #include <shaders/PathTracer/Utils/Utils.hlsli>
 
@@ -43,7 +43,7 @@ void main( uint3 dispatchThreadID : SV_DispatchThreadID )
 #define NON_PATH_TRACING_PASS 1
 
 #include <shaders/Bindings/ShaderResourceBindings.hlsli>
-#include <shaders/PathTracerBridgeDonut.hlsli>
+#include <shaders/PathTracerBridgeEngine.hlsli>
 #include <shaders/PathTracer/PathTracer.hlsli>
 #include "../NRD/DenoiserNRD.hlsli"
 
@@ -682,7 +682,7 @@ void main( uint3 dispatchThreadID : SV_DispatchThreadID )
 #if defined(NO_DENOISER_FINAL_MERGE)
 
 #include <shaders/Bindings/ShaderResourceBindings.hlsli>
-#include <shaders/PathTracerBridgeDonut.hlsli>
+#include <shaders/PathTracerBridgeEngine.hlsli>
 
 [numthreads(NUM_COMPUTE_THREADS_PER_DIM, NUM_COMPUTE_THREADS_PER_DIM, 1)]
 void main( uint3 dispatchThreadID : SV_DispatchThreadID )

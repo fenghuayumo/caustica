@@ -18,7 +18,7 @@ RTX Path Tracing is a code sample that strives to embody years of ray tracing an
 
 It is a pure path tracer that does not rely on rasterization. In its main configuration, all light transport is evaluated within a single ray tracing pass, leveraging light-sampling caches for real-time performance. It further employs path-space layer decomposition and guide-buffer generation to support real-time denoising (DLSS-RR) and other techniques.
 
-The base path tracing implementation derives from NVIDIA’s [Falcor Research Path Tracer](https://github.com/NVIDIAGameWorks/Falcor), ported to approachable C++/HLSL [Donut framework](https://github.com/NVIDIAGameWorks/donut). 
+The base path tracing implementation derives from NVIDIA’s [Falcor Research Path Tracer](https://github.com/NVIDIAGameWorks/Falcor), integrated with the Caustica engine runtime. 
 
 GTC presentation [How to Build a Real-time Path Tracer](https://www.nvidia.com/gtc/session-catalog/?tab.catalogallsessionstab=16566177511100015Kus&search.industry=option_1559593201839#/session/1666651593475001NN25) provides a high level introduction to most of the features, although it is pretty much out of date by now.
 
@@ -61,7 +61,7 @@ GTC presentation [How to Build a Real-time Path Tracer](https://www.nvidia.com/g
 * SER and OMM support on Vulkan is currently work in progress
 * Running Vulkan on AMD GPUs may trigger a TDR during TLAS building in scenes with null TLAS instances
 * Enabling debug layer on Vulkan will show a number of warnings and errors - fixes are work in progress
-* We recommend using *NVIDIA Nsight Graphics* graphics for frame capture and analysis. If using other GPU performance tuning and debugging tools such as *PIX on Windows*, it is advisable to disable NVRHI_WITH_NVAPI and DONUT_WITH_STREAMLINE variables in CMake to avoid compatibility issues. Please note: disabling these settings results in lower performance and missing features
+* We recommend using *NVIDIA Nsight Graphics* graphics for frame capture and analysis. If using other GPU performance tuning and debugging tools such as *PIX on Windows*, it is advisable to disable NVRHI_WITH_NVAPI and CAUSTICA_WITH_STREAMLINE variables in CMake to avoid compatibility issues. Please note: disabling these settings results in lower performance and missing features
 * There is a known issue resulting in LIVE_DEVICE DirectX warnings reported at shutdown when Streamline is enabled in Debug builds
 * There is a known issue resulting in black or incorrect transparencies/reflection on some AMD systems with latest drivers; this is most likely a driver error and has been reported
 
@@ -74,7 +74,7 @@ GTC presentation [How to Build a Real-time Path Tracer](https://www.nvidia.com/g
 | /build				| default CMake folder for build files
 | /Assets				| models, textures, scene files  
 | /Docs					| documentation 
-| /External				| external libraries and SDKs, including Donut, Streamline, NRD, RTXDI, and OMM
+| /External				| external libraries and SDKs, including Streamline, NRD, RTXDI, and OMM
 | /Support				| optional command line tools (denoiser, texture compressor, etc)
 | /caustica				| **RTX Path Tracing core; Sample.cpp/.h/.hlsl contain entry points**
 | /caustica/PathTracer		| **Core path tracing shaders**
@@ -151,7 +151,7 @@ python support/python/package_shaders.py --shader-api d3d12
 
 Due to interaction with various included libraries, Vulkan support is not enabled by default on Windows and needs a couple of additional tweaks on the user side; please find the recommended steps below:
  * Install Vulkan SDK (we tested with VulkanSDK-1.3.290.0) and clear CMake cache (if applicable) to make sure the correct dxc.exe path from Vulkan SDK is set for SPIRV compilation
- * Set DONUT_WITH_VULKAN and NVRHI_WITH_VULKAN CMake variables to ON. DXC_SPIRV_PATH should already have automatically picked up the location of the DXC compiler in the Vulkan SDK during config; if not, please set it manually
+ * Set CAUSTICA_WITH_VULKAN and NVRHI_WITH_VULKAN CMake variables to ON. DXC_SPIRV_PATH should already have automatically picked up the location of the DXC compiler in the Vulkan SDK during config; if not, please set it manually
  * To run with Vulkan use `--vk` command line parameter
 
 ## Building Linux / WSL
@@ -169,7 +169,7 @@ Install the Linux Vulkan SDK and make sure `dxc` is on `PATH` or set `DXC_SPIRV_
 
 ```
 cmake -S . -B build-linux -G Ninja \
-  -DDONUT_WITH_VULKAN=ON \
+  -DCAUSTICA_WITH_VULKAN=ON \
   -DNVRHI_WITH_VULKAN=ON \
   -DRTXPT_WITH_NATIVE_DLSS=ON \
   -DRTXPT_WITH_OIDN=ON \
@@ -178,7 +178,7 @@ cmake -S . -B build-linux -G Ninja \
 cmake --build build-linux --config Release
 ```
 
-On Linux, CMake fetches NVIDIA's DLSS SDK through Donut and copies the DLSS/DLSS-RR runtime `.so` files next to the executable. Use `-DRTXPT_WITH_NATIVE_DLSS=OFF` if you need a build without NGX/DLSS. Streamline features that are not part of native NGX DLSS, such as Reflex and DLSS Frame Generation, remain Windows/Streamline-only in this codebase.
+On Linux, CMake fetches NVIDIA's DLSS SDK and copies the DLSS/DLSS-RR runtime `.so` files next to the executable. Use `-DRTXPT_WITH_NATIVE_DLSS=OFF` if you need a build without NGX/DLSS. Streamline features that are not part of native NGX DLSS, such as Reflex and DLSS Frame Generation, remain Windows/Streamline-only in this codebase.
  
 
  ## DirectX 12 Agility SDK

@@ -51,7 +51,7 @@ private:
 	virtual std::unique_ptr<Sample> CreateMainRenderPass(caustica::GpuDevice& deviceManager, const CommandLineOptions& cmdLineOptions) = 0;
 
 	// Initialization methods
-	void RegisterDonutCallback();
+	void RegisterLogCallback();
 	void SampleLogCallback(caustica::Severity severity, const char* message);
 	caustica::DeviceCreationParameters GetDefaultDeviceParams() const;
 	bool ProcessCommandLine(int argc, char const* const* argv,
@@ -60,7 +60,7 @@ private:
 	bool CheckDeviceFeatureSupport(const caustica::DeviceCreationParameters& deviceParams);
 	void CreateShaderFactory();
 
-	caustica::Callback m_DonutDefaultCallback = nullptr;
+	caustica::Callback m_DefaultLogCallback = nullptr;
 	FPSLimiter m_FPSLimiter;
 
 	CommandLineOptions m_CmdLine;

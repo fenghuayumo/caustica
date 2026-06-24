@@ -9,7 +9,7 @@ struct Constants {
 
 DECLARE_PUSH_CONSTANTS(Constants, g_Const, 0, 0);
 
-// Converts the exposure (adapted luminance) value computed by Donut's ToneMappingPass
+// Converts the exposure (adapted luminance) value computed by the engine tone mapping pass
 // into a texture consumable by DLSS.
 
 [numthreads(1, 1, 1)]

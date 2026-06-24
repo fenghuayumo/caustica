@@ -32,7 +32,7 @@
 #include <thread>
 #include <vector>
 
-#if DONUT_WITH_DX12
+#if CAUSTICA_WITH_DX12
 #include <d3d12.h>
 #include <wrl/client.h>
 #endif
@@ -226,7 +226,7 @@ namespace
         return sceneArgument;
     }
 
-#if DONUT_WITH_DX12 && defined(RTXPT_D3D_AGILITY_SDK_VERSION)
+#if CAUSTICA_WITH_DX12 && defined(RTXPT_D3D_AGILITY_SDK_VERSION)
     std::string GetAgilitySDKPath()
     {
         std::string sdkPath = (ResolveRuntimeDirectory() / "D3D12").string();
@@ -324,13 +324,13 @@ namespace
 
         p.supportExplicitDisplayScaling = true;
 
-#if DONUT_WITH_DX12 && defined(RTXPT_D3D_AGILITY_SDK_VERSION)
+#if CAUSTICA_WITH_DX12 && defined(RTXPT_D3D_AGILITY_SDK_VERSION)
         p.featureLevel = D3D_FEATURE_LEVEL_12_2;
-#elif DONUT_WITH_DX12
+#elif CAUSTICA_WITH_DX12
         p.featureLevel = D3D_FEATURE_LEVEL_12_1;
 #endif
 
-#if DONUT_WITH_VULKAN
+#if CAUSTICA_WITH_VULKAN
 #if RTXPT_WITH_NATIVE_DLSS
         caustica::render::DLSS::GetRequiredVulkanExtensions(
             p.requiredVulkanInstanceExtensions,
@@ -345,7 +345,7 @@ namespace
         p.ignoredVulkanValidationMessageLocations.push_back(0x000000005e6e827d);
 #endif
 
-#if DONUT_WITH_STREAMLINE
+#if CAUSTICA_WITH_STREAMLINE
         p.checkStreamlineSignature = true;
         p.streamlineAppId = 231313132;
 #endif
@@ -355,18 +355,18 @@ namespace
 
     nvrhi::GraphicsAPI ResolveGraphicsAPI(const RenderSession::Config& cfg)
     {
-#if DONUT_WITH_DX12 && DONUT_WITH_VULKAN
+#if CAUSTICA_WITH_DX12 && CAUSTICA_WITH_VULKAN
         return cfg.useVulkan ? nvrhi::GraphicsAPI::VULKAN : nvrhi::GraphicsAPI::D3D12;
-#elif DONUT_WITH_VULKAN
+#elif CAUSTICA_WITH_VULKAN
         if (!cfg.useVulkan)
             caustica::warning("RenderSession: DX12 was requested but this build only has Vulkan; using Vulkan.");
         return nvrhi::GraphicsAPI::VULKAN;
-#elif DONUT_WITH_DX12
+#elif CAUSTICA_WITH_DX12
         if (cfg.useVulkan)
             caustica::warning("RenderSession: Vulkan was requested but this build only has DX12; using DX12.");
         return nvrhi::GraphicsAPI::D3D12;
 #else
-        static_assert(DONUT_WITH_DX12 || DONUT_WITH_VULKAN, "RTXPT requires at least one graphics backend");
+        static_assert(CAUSTICA_WITH_DX12 || CAUSTICA_WITH_VULKAN, "RTXPT requires at least one graphics backend");
 #endif
     }
 }
@@ -435,7 +435,7 @@ bool RenderSession::InitDevice()
 {
     nvrhi::GraphicsAPI api = ResolveGraphicsAPI(m_config);
 
-#if DONUT_WITH_DX12 && defined(RTXPT_D3D_AGILITY_SDK_VERSION)
+#if CAUSTICA_WITH_DX12 && defined(RTXPT_D3D_AGILITY_SDK_VERSION)
     if (api == nvrhi::GraphicsAPI::D3D12)
         m_d3d12DeviceFactory = CreateD3D12AgilityDeviceFactory();
 #endif
@@ -449,7 +449,7 @@ bool RenderSession::InitDevice()
     m_deviceManager->SetFrameTimeUpdateInterval(1.0f);
 
     auto deviceParams = MakeDeviceParams(m_config);
-#if DONUT_WITH_DX12 && defined(RTXPT_D3D_AGILITY_SDK_VERSION)
+#if CAUSTICA_WITH_DX12 && defined(RTXPT_D3D_AGILITY_SDK_VERSION)
     if (api == nvrhi::GraphicsAPI::D3D12 && m_d3d12DeviceFactory)
         deviceParams.d3d12DeviceFactory = m_d3d12DeviceFactory.Get();
 #endif
@@ -524,7 +524,7 @@ bool RenderSession::InitRenderer()
     }
     else
     {
-        rootFS->mount("/ShaderPrecompiled/donut", engineShaderPath);
+        rootFS->mount("/ShaderPrecompiled/engine", engineShaderPath);
         rootFS->mount("/ShaderPrecompiled/app",   appShaderPath);
         rootFS->mount("/ShaderPrecompiled/nrd",   nrdShaderPath);
         rootFS->mount("/ShaderPrecompiled/omm",   ommShaderPath);
@@ -537,7 +537,7 @@ bool RenderSession::InitRenderer()
     InitializeSampleUIDataFromCommandLine(g_sampleUIData, m_cmdLine);
     LocalConfig::PostAppInit(g_sampleUIData);
 
-    // Pick whichever scene the user requested (or fall back to the donut
+    // Pick whichever scene the user requested (or fall back to the default)
     // default).  This loads the actual scene file asynchronously inside
     // Sample::Init().
     std::string preferredScene = m_config.scene.empty()

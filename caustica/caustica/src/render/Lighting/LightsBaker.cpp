@@ -43,7 +43,7 @@ LightsBaker::LightsBaker(nvrhi::IDevice* device)
     {
         m_deviceHas32ThreadWaves = (waveLaneCountMinMaxFeatureInfo.minWaveLaneCount == 32) && (waveLaneCountMinMaxFeatureInfo.maxWaveLaneCount == 32);
     }
-#elif DONUT_WITH_DX12
+#elif CAUSTICA_WITH_DX12
     // Native DX12 version to query lane counts
     if (m_device->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D12)
     {

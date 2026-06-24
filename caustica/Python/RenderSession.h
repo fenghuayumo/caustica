@@ -29,7 +29,7 @@
 
 #include <SampleCommon/CommandLine.h>
 
-#if DONUT_WITH_DX12 && defined(RTXPT_D3D_AGILITY_SDK_VERSION)
+#if CAUSTICA_WITH_DX12 && defined(RTXPT_D3D_AGILITY_SDK_VERSION)
 #include <wrl/client.h>
 #endif
 
@@ -52,7 +52,7 @@ public:
         int         width             = 1920;
         int         height            = 1080;
         bool        headless          = true;     // render into offscreen back buffers
-#if DONUT_WITH_DX12
+#if CAUSTICA_WITH_DX12
         bool        useVulkan         = false;    // false => DX12
 #else
         bool        useVulkan         = true;     // Vulkan is the only backend on Linux/WSL
@@ -120,7 +120,7 @@ private:
     std::unique_ptr<caustica::Application>         m_AppLoop;
     std::shared_ptr<caustica::ShaderFactory>   m_shaderFactory;
     std::unique_ptr<AdvancedPathTracer>             m_renderer;
-#if DONUT_WITH_DX12 && defined(RTXPT_D3D_AGILITY_SDK_VERSION)
+#if CAUSTICA_WITH_DX12 && defined(RTXPT_D3D_AGILITY_SDK_VERSION)
     Microsoft::WRL::ComPtr<ID3D12DeviceFactory>     m_d3d12DeviceFactory;
 #endif
     bool                                            m_initialized = false;

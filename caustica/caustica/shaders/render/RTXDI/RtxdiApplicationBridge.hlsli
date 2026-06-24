@@ -47,7 +47,7 @@ between the bridge functions.
 #include "SurfaceData.hlsli"
 #include <shaders/Bindings/ShaderResourceBindings.hlsli>
 #include <shaders/Bindings/ReSTIRBindings.hlsli>
-#include <shaders/PathTracerBridgeDonut.hlsli>
+#include <shaders/PathTracerBridgeEngine.hlsli>
 
 // RTXDI resources
 StructuredBuffer<PolymorphicLightInfoFull> t_LightDataBuffer    : register(t21 VK_DESCRIPTOR_SET(2));

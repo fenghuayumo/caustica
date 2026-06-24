@@ -7,7 +7,7 @@ namespace caustica
     /*
 
     File system interface for Windows module (EXE or DLL) resources.
-    Automatically included into Donut builds for WIN32.
+    Automatically included into Caustica builds for WIN32.
 
     Supports enumerating and reading resources of a given type, "BINARY" by default.
     Resource names are case insensitive, and all resource names are stored in the 

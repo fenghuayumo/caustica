@@ -5,7 +5,7 @@
 
 #include <shaders/Misc/GBufferHelpers.hlsli>
 
-#include <shaders/PathTracerBridgeDonut.hlsli>
+#include <shaders/PathTracerBridgeEngine.hlsli>
 
 #include "ShaderParameters.h"
 #include "HelperFunctions.hlsli"

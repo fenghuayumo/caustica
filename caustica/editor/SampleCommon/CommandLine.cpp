@@ -60,7 +60,7 @@ bool CommandLineOptions::InitFromCommandLine(int _argc, char const* const* _argv
             ("disableFireflyFilters", "Override realtime and reference mode firefly filters to off", value(DisableFireflyFilters))
             ("disablePostProcessFilters", "Disable post-process filters like bloom", value(DisablePostProcessFilters))
             ("scene.splats", "3D Gaussian Splat PLY file to rasterize over the scene", value(GaussianSplatFileName))
-            ("scene.splats.convertRdfToDonut", "Convert original 3DGS right/down/front PLY coordinates to RTXPT right/up/back splat space", value(GaussianSplatConvertRdfToDonut))
+            ("scene.splats.convertRdfToRub", "Convert original 3DGS right/down/front PLY coordinates to RTXPT right/up/back splat space", value(GaussianSplatConvertRdfToRub))
             ("scene.splats.depthTest", "Depth-test rasterized 3DGS against path-traced scene depth", value(GaussianSplatDepthTest))
             ("scene.splats.scale", "Rasterized 3DGS footprint scale", value(GaussianSplatScale))
             ("scene.splats.alphaScale", "Rasterized 3DGS opacity scale", value(GaussianSplatAlphaScale))

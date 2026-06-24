@@ -120,9 +120,9 @@ public:
         return m_session ? m_session->LoadScene(sceneName, wait) : false;
     }
 
-    bool LoadGaussianSplats(const std::string& fileName, bool convertRdfToDonut) {
+    bool LoadGaussianSplats(const std::string& fileName, bool convertRdfToRub) {
         return m_session && m_session->GetSample()
-            ? m_session->GetSample()->LoadGaussianSplatFile(fileName, convertRdfToDonut)
+            ? m_session->GetSample()->LoadGaussianSplatFile(fileName, convertRdfToRub)
             : false;
     }
 
@@ -211,10 +211,10 @@ NB_MODULE(caustica, m)
              "Load a scene by name, builtin primitive reference, or inline scene JSON string.")
 
         .def("load_gaussian_splats",
-             [](PyRenderer& self, const std::string& fileName, bool convertRdfToDonut) {
-                 return self.LoadGaussianSplats(fileName, convertRdfToDonut);
+             [](PyRenderer& self, const std::string& fileName, bool convertRdfToRub) {
+                 return self.LoadGaussianSplats(fileName, convertRdfToRub);
              },
-             nb::arg("file_name"), nb::arg("convert_rdf_to_donut") = true,
+             nb::arg("file_name"), nb::arg("convert_rdf_to_rub") = true,
              "Append a 3DGS .ply file as a GaussianSplat node in the current scene graph.")
 
         .def("load_mesh_file", &PyRenderer::LoadMeshFile,

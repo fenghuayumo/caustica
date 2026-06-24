@@ -7,18 +7,18 @@
 #include <render/View.h>
 #include <rhi/utils.h>
 
-#if DONUT_WITH_STATIC_SHADERS
-#if DONUT_WITH_DX11
+#if CAUSTICA_WITH_STATIC_SHADERS
+#if CAUSTICA_WITH_DX11
 #include "compiled_shaders/passes/ssao_blur_cs.dxbc.h"
 #include "compiled_shaders/passes/ssao_compute_cs.dxbc.h"
 #include "compiled_shaders/passes/ssao_deinterleave_cs.dxbc.h"
 #endif
-#if DONUT_WITH_DX12
+#if CAUSTICA_WITH_DX12
 #include "compiled_shaders/passes/ssao_blur_cs.dxil.h"
 #include "compiled_shaders/passes/ssao_compute_cs.dxil.h"
 #include "compiled_shaders/passes/ssao_deinterleave_cs.dxil.h"
 #endif
-#if DONUT_WITH_VULKAN
+#if CAUSTICA_WITH_VULKAN
 #include "compiled_shaders/passes/ssao_blur_cs.spirv.h"
 #include "compiled_shaders/passes/ssao_compute_cs.spirv.h"
 #include "compiled_shaders/passes/ssao_deinterleave_cs.spirv.h"
@@ -73,7 +73,7 @@ SsaoPass::SsaoPass(
         std::vector<caustica::ShaderMacro> macros = { 
             { "LINEAR_DEPTH", params.inputLinearDepth ? "1" : "0" }
         };
-        m_Deinterleave.Shader = shaderFactory->CreateAutoShader("donut/passes/ssao_deinterleave_cs.hlsl", "main", DONUT_MAKE_PLATFORM_SHADER(g_ssao_deinterleave_cs), &macros, nvrhi::ShaderType::Compute);
+        m_Deinterleave.Shader = shaderFactory->CreateAutoShader("engine/passes/ssao_deinterleave_cs.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_ssao_deinterleave_cs), &macros, nvrhi::ShaderType::Compute);
 
         nvrhi::BindingLayoutDesc DeinterleaveBindings;
         DeinterleaveBindings.visibility = nvrhi::ShaderType::Compute;
@@ -97,7 +97,7 @@ SsaoPass::SsaoPass(
             { "OCT_ENCODED_NORMALS", params.octEncodedNormals ? "1" : "0" },
             { "DIRECTIONAL_OCCLUSION", params.directionalOcclusion ? "1" : "0" }
         };
-        m_Compute.Shader = shaderFactory->CreateAutoShader("donut/passes/ssao_compute_cs.hlsl", "main", DONUT_MAKE_PLATFORM_SHADER(g_ssao_compute_cs), &macros, nvrhi::ShaderType::Compute);
+        m_Compute.Shader = shaderFactory->CreateAutoShader("engine/passes/ssao_compute_cs.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_ssao_compute_cs), &macros, nvrhi::ShaderType::Compute);
 
         nvrhi::BindingLayoutDesc ComputeBindings;
         ComputeBindings.visibility = nvrhi::ShaderType::Compute;
@@ -121,7 +121,7 @@ SsaoPass::SsaoPass(
         std::vector<caustica::ShaderMacro> macros = {
             { "DIRECTIONAL_OCCLUSION", params.directionalOcclusion ? "1" : "0" }
         };
-        m_Blur.Shader = shaderFactory->CreateAutoShader("donut/passes/ssao_blur_cs.hlsl", "main", DONUT_MAKE_PLATFORM_SHADER(g_ssao_blur_cs), &macros, nvrhi::ShaderType::Compute);
+        m_Blur.Shader = shaderFactory->CreateAutoShader("engine/passes/ssao_blur_cs.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_ssao_blur_cs), &macros, nvrhi::ShaderType::Compute);
 
         nvrhi::BindingLayoutDesc BlurBindings;
         BlurBindings.visibility = nvrhi::ShaderType::Compute;

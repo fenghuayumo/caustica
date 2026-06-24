@@ -1,11 +1,11 @@
-#if DONUT_WITH_STREAMLINE
+#if CAUSTICA_WITH_STREAMLINE
 #include <engine/StreamlineInterface.h>
 #include <backend/GpuDevice.h>
 
 // Streamline Core
 #include <sl.h>
 
-#if DONUT_WITH_VULKAN
+#if CAUSTICA_WITH_VULKAN
 #include <vulkan/vulkan.hpp>
 #endif
 
@@ -107,7 +107,7 @@ private:
     nvrhi::GraphicsAPI m_api = nvrhi::GraphicsAPI::D3D12;
     nvrhi::IDevice* m_device = nullptr;
 
-#ifdef DONUT_WITH_DX11
+#ifdef CAUSTICA_WITH_DX11
     LUID m_d3d11Luid = {};
 #endif
 
@@ -142,7 +142,7 @@ public:
     void PresentEnd(GpuDevice& manager) override;
 
     bool InitializePreDevice(nvrhi::GraphicsAPI api, int appId, const bool checkSig = true, const bool enableLog = false);
-#if DONUT_WITH_DX11 || DONUT_WITH_DX12
+#if CAUSTICA_WITH_DX11 || CAUSTICA_WITH_DX12
     bool SetD3DDevice(IUnknown* nativeDevice);
     bool InitializeDeviceDX(nvrhi::IDevice *device, AdapterInfo::LUID* pAdapterIdDx11 = nullptr);
     // In-place slUpgradeInterface of a raw pointer
@@ -167,7 +167,7 @@ public:
 #endif
 
 
-#if DONUT_WITH_VULKAN
+#if CAUSTICA_WITH_VULKAN
     // see sl::VulkanInfo in sl_helpers_vk.h
     struct VulkanInfo
     {
@@ -191,11 +191,11 @@ public:
 
     void Shutdown();
 
-#if DONUT_WITH_DX11 || DONUT_WITH_DX12
+#if CAUSTICA_WITH_DX11 || CAUSTICA_WITH_DX12
     uint32_t FindBestAdapterDX();
 #endif
 
-#if DONUT_WITH_VULKAN
+#if CAUSTICA_WITH_VULKAN
     uint32_t FindBestAdapterVulkan(const std::vector <vk::PhysicalDevice>& vkDevices);
 #endif
 };

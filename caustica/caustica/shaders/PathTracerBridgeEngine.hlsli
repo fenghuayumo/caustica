@@ -1,7 +1,7 @@
-#ifndef __PATH_TRACER_BRIDGE_DONUT_HLSLI__ // using instead of "#pragma once" due to https://github.com/microsoft/DirectXShaderCompiler/issues/3943
-#define __PATH_TRACER_BRIDGE_DONUT_HLSLI__
+#ifndef __PATH_TRACER_BRIDGE_ENGINE_HLSLI__ // using instead of "#pragma once" due to https://github.com/microsoft/DirectXShaderCompiler/issues/3943
+#define __PATH_TRACER_BRIDGE_ENGINE_HLSLI__
 
-// easier if we let Donut do this!
+// Engine scene/material bridge helpers
 #define ENABLE_METAL_ROUGH_RECONSTRUCTION 1
 
 #include "PathTracerBridge.hlsli"
@@ -9,7 +9,7 @@
 
 #include "Misc/OmmDebug.hlsli"
 
-// Donut-specific (native engine - we can include before PathTracer to avoid any collisions)
+// Engine-specific includes (native engine - include before PathTracer to avoid collisions)
 #include <shaders/bindless.h>
 #include <shaders/utils.hlsli>
 #include <shaders/binding_helpers.hlsli>
@@ -34,7 +34,7 @@
 #include "Misc/GBufferHelpers.hlsli"
 #endif
 
-enum DonutGeometryAttributes
+enum BridgeGeometryAttributes
 {
     GeomAttr_Position       = 0x01,
     GeomAttr_TexCoord       = 0x02,
@@ -45,7 +45,7 @@ enum DonutGeometryAttributes
     GeomAttr_All            = 0x1F
 };
 
-struct DonutGeometrySample
+struct BridgeGeometrySample
 {
     InstanceData instance;
 
@@ -140,19 +140,19 @@ float TriangleCurvatureApprox_GradN(float3 vertexPositions[3], float3 vertexNorm
     return curvature;
 }
 
-DonutGeometrySample getGeometryFromHit(
+BridgeGeometrySample getGeometryFromHit(
     uint instanceIndex,
     uint geometryIndex,
     uint triangleIndex,
     float2 rayBarycentrics,
-    DonutGeometryAttributes attributes,
+    BridgeGeometryAttributes attributes,
     StructuredBuffer<InstanceData> instanceBuffer,
     StructuredBuffer<GeometryData> geometryBuffer,
     StructuredBuffer<GeometryDebugData> geometryDebugBuffer,
     float3 rayDirection, 
     DebugContext debug)
 {
-    DonutGeometrySample gs = (DonutGeometrySample)0;
+    BridgeGeometrySample gs = (BridgeGeometrySample)0;
 
     gs.instance = instanceBuffer[instanceIndex];
     gs.geometry = geometryBuffer[gs.instance.firstGeometryIndex + geometryIndex];
@@ -391,7 +391,7 @@ MaterialProperties EvaluateSceneMaterialRTXPT(float3 normal, float4 tangent, PTM
     return result;
 }
 
-MaterialProperties sampleGeometryMaterialRTXPT(const DonutGeometrySample gs, uint materialIndex, const MaterialAttributes attributes, const SamplerState materialSampler, const ActiveTextureSampler textureSampler)
+MaterialProperties sampleGeometryMaterialRTXPT(const BridgeGeometrySample gs, uint materialIndex, const MaterialAttributes attributes, const SamplerState materialSampler, const ActiveTextureSampler textureSampler)
 {
     MaterialTextureSample textures = DefaultMaterialTextures();
 
@@ -427,22 +427,22 @@ MaterialProperties sampleGeometryMaterialRTXPT(const DonutGeometrySample gs, uin
     return EvaluateSceneMaterialRTXPT(gs.geometryNormal, gs.tangent, material, textures);
 }
 
-static OpacityMicroMapDebugInfo loadOmmDebugInfo(const DonutGeometrySample donutGS, const uint triangleIndex, float2 barycentrics)
+static OpacityMicroMapDebugInfo loadOmmDebugInfo(const BridgeGeometrySample bridgeGS, const uint triangleIndex, float2 barycentrics)
 {
     OpacityMicroMapDebugInfo ommDebug = OpacityMicroMapDebugInfo::initDefault();
 
 #if (OMM_DEBUG_VIEW_IN_WORLD || OMM_DEBUG_VIEW_OVERLAY) && !NON_PATH_TRACING_PASS && ENABLE_DEBUG_VIZUALISATIONS
-    if (donutGS.geometryDebug.ommIndexBufferIndex != -1 &&
-        donutGS.geometryDebug.ommIndexBufferOffset != 0xFFFFFFFF)
+    if (bridgeGS.geometryDebug.ommIndexBufferIndex != -1 &&
+        bridgeGS.geometryDebug.ommIndexBufferOffset != 0xFFFFFFFF)
     {
-        ByteAddressBuffer ommIndexBuffer = t_BindlessBuffers[NonUniformResourceIndex(donutGS.geometryDebug.ommIndexBufferIndex)];
-        ByteAddressBuffer ommDescArrayBuffer = t_BindlessBuffers[NonUniformResourceIndex(donutGS.geometryDebug.ommDescArrayBufferIndex)];
-        ByteAddressBuffer ommArrayDataBuffer = t_BindlessBuffers[NonUniformResourceIndex(donutGS.geometryDebug.ommArrayDataBufferIndex)];
+        ByteAddressBuffer ommIndexBuffer = t_BindlessBuffers[NonUniformResourceIndex(bridgeGS.geometryDebug.ommIndexBufferIndex)];
+        ByteAddressBuffer ommDescArrayBuffer = t_BindlessBuffers[NonUniformResourceIndex(bridgeGS.geometryDebug.ommDescArrayBufferIndex)];
+        ByteAddressBuffer ommArrayDataBuffer = t_BindlessBuffers[NonUniformResourceIndex(bridgeGS.geometryDebug.ommArrayDataBufferIndex)];
 
         OpacityMicroMapContext ommContext = OpacityMicroMapContext::make(
-            ommIndexBuffer, donutGS.geometryDebug.ommIndexBufferOffset, donutGS.geometryDebug.ommIndexBuffer16Bit,
-            ommDescArrayBuffer, donutGS.geometryDebug.ommDescArrayBufferOffset,
-            ommArrayDataBuffer, donutGS.geometryDebug.ommArrayDataBufferOffset,
+            ommIndexBuffer, bridgeGS.geometryDebug.ommIndexBufferOffset, bridgeGS.geometryDebug.ommIndexBuffer16Bit,
+            ommDescArrayBuffer, bridgeGS.geometryDebug.ommDescArrayBufferOffset,
+            ommArrayDataBuffer, bridgeGS.geometryDebug.ommArrayDataBufferOffset,
             triangleIndex,
             barycentrics
         );
@@ -625,25 +625,25 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
 {
     const bool isPrimaryHit     = pathVertexIndex == 1;
 
-    DonutGeometryAttributes attributes = GeomAttr_TexCoord | GeomAttr_Position | GeomAttr_Normal | GeomAttr_Tangents;
+    BridgeGeometryAttributes attributes = GeomAttr_TexCoord | GeomAttr_Position | GeomAttr_Normal | GeomAttr_Tangents;
 #if PATH_TRACER_MODE==PATH_TRACER_MODE_BUILD_STABLE_PLANES // otherwise motion vectors not needed
     attributes |= GeomAttr_PrevPosition;
 #endif
 
-    DonutGeometrySample donutGS = getGeometryFromHit( instanceIndex, geometryIndex, triangleIndex, barycentrics, 
+    BridgeGeometrySample bridgeGS = getGeometryFromHit( instanceIndex, geometryIndex, triangleIndex, barycentrics, 
         attributes, t_InstanceData, t_GeometryData, t_GeometryDebugData, rayDir, debug );
 
-    // Convert Donut to RTXPT data! 
+    // Convert engine scene data to RTXPT data! 
 
     // World pos and prev world pos
-    float3 posW     = mul(donutGS.instance.transform, float4(donutGS.objectSpacePosition, 1.0)).xyz;
+    float3 posW     = mul(bridgeGS.instance.transform, float4(bridgeGS.objectSpacePosition, 1.0)).xyz;
 
 #if PATH_TRACER_MODE==PATH_TRACER_MODE_BUILD_STABLE_PLANES // otherwise motion vectors not needed
-    float3 prevPosW = mul(donutGS.instance.prevTransform, float4(donutGS.prevObjectSpacePosition, 1.0)).xyz;
+    float3 prevPosW = mul(bridgeGS.instance.prevTransform, float4(bridgeGS.prevObjectSpacePosition, 1.0)).xyz;
 #endif
 
-    // transpose is to go from Donut row_major to Falcor column_major; it is likely unnecessary here since both should work the same for this specific function, but leaving in for correctness
-    float coneTexLODValue = computeRayConeTriangleLODValue( donutGS.vertexPositions, donutGS.vertexTexcoords, transpose((float3x3)donutGS.instance.transform) );
+    // transpose is to go from row_major to column_major; it is likely unnecessary here since both should work the same for this specific function, but leaving in for correctness
+    float coneTexLODValue = computeRayConeTriangleLODValue( bridgeGS.vertexPositions, bridgeGS.vertexTexcoords, transpose((float3x3)bridgeGS.instance.transform) );
       
 #if RTXPT_STOCHASTIC_TEXTURE_FILTERING_ENABLE
     STF_SamplerState stfSamplerState;
@@ -668,7 +668,7 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
 #endif
     
     // using flat (triangle) normal makes more sense since actual triangle surface is where the textures are sampled on (plus geometry normals are borked in some datasets)
-    ActiveTextureSampler textureSampler = createTextureSampler( rayCone, rayDir, coneTexLODValue, donutGS.flatNormal/*donutGS.geometryNormal*/, isPrimaryHit, true, g_Const.ptConsts.texLODBias
+    ActiveTextureSampler textureSampler = createTextureSampler( rayCone, rayDir, coneTexLODValue, bridgeGS.flatNormal/*bridgeGS.geometryNormal*/, isPrimaryHit, true, g_Const.ptConsts.texLODBias
 #if RTXPT_STOCHASTIC_TEXTURE_FILTERING_ENABLE
         ,stfSamplerState
 #endif
@@ -678,49 +678,49 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
     ShadingData ptShadingData = ShadingData::make();
 
     ptShadingData.posW = posW;
-    //ptShadingData.uv   = lpfloat2(donutGS.texcoord);
+    //ptShadingData.uv   = lpfloat2(bridgeGS.texcoord);
     ptShadingData.V    = -rayDir;
-    ptShadingData.N    = donutGS.geometryNormal;
+    ptShadingData.N    = bridgeGS.geometryNormal;
 
-    uint subInstanceDataIndex = donutGS.instance.firstGeometryInstanceIndex + geometryIndex;
+    uint subInstanceDataIndex = bridgeGS.instance.firstGeometryInstanceIndex + geometryIndex;
 
     uint materialIndex = t_SubInstanceData[subInstanceDataIndex].GlobalGeometryIndex_PTMaterialDataIndex & 0xFFFF;
 
-    // Get donut material (normal map is evaluated here)
-    MaterialProperties donutMaterial = sampleGeometryMaterialRTXPT(donutGS, materialIndex, MatAttr_All, s_MaterialSampler, textureSampler);
+    // Get engine material (normal map is evaluated here)
+    MaterialProperties bridgeMaterial = sampleGeometryMaterialRTXPT(bridgeGS, materialIndex, MatAttr_All, s_MaterialSampler, textureSampler);
 
-    bool ignoreTangent = (donutMaterial.flags & PTMaterialFlags_IgnoreMeshTangentSpace) != 0;
+    bool ignoreTangent = (bridgeMaterial.flags & PTMaterialFlags_IgnoreMeshTangentSpace) != 0;
 
     // after this point we have valid tangent space in ptShadingData.N/.T/.B using geometry (interpolated) normal, but without normalmap yet
-    computeTangentSpace(ptShadingData, donutGS.tangent, ignoreTangent);
+    computeTangentSpace(ptShadingData, bridgeGS.tangent, ignoreTangent);
 
     // Primitive data
-    ptShadingData.faceNCorrected = (donutGS.frontFacing)?(donutGS.flatNormal):(-donutGS.flatNormal);
-    ptShadingData.vertexN = (donutGS.frontFacing)?(donutGS.geometryNormal):(-donutGS.geometryNormal);
-    ptShadingData.frontFacing = donutGS.frontFacing;
+    ptShadingData.faceNCorrected = (bridgeGS.frontFacing)?(bridgeGS.flatNormal):(-bridgeGS.flatNormal);
+    ptShadingData.vertexN = (bridgeGS.frontFacing)?(bridgeGS.geometryNormal):(-bridgeGS.geometryNormal);
+    ptShadingData.frontFacing = bridgeGS.frontFacing;
 
-    ptShadingData.N = (donutGS.frontFacing)?(donutMaterial.shadingNormal):(-donutMaterial.shadingNormal);
+    ptShadingData.N = (bridgeGS.frontFacing)?(bridgeMaterial.shadingNormal):(-bridgeMaterial.shadingNormal);
 
-    // Donut -> Falcor
-    const bool donutMaterialThinSurface = (donutMaterial.flags & PTMaterialFlags_ThinSurface) != 0;
+    // Engine -> RTXPT
+    const bool bridgeMaterialThinSurface = (bridgeMaterial.flags & PTMaterialFlags_ThinSurface) != 0;
     ptShadingData.materialID = materialIndex;
     ptShadingData.mtl = MaterialHeader::make();
-    ptShadingData.mtl.setNestedPriority( min( InteriorList::kMaxNestedPriority, 1 + (uint(donutMaterial.flags) >> PTMaterialFlags_NestedPriorityShift)) );   // priorities are from (1, ... kMaxNestedPriority) because 0 is used to mark empty slots and remapped to kMaxNestedPriority
-    ptShadingData.mtl.setThinSurface( donutMaterialThinSurface );
-    ptShadingData.mtl.setPSDExclude( (donutMaterial.flags & PTMaterialFlags_PSDExclude) != 0 );
-    ptShadingData.mtl.setPSDDominantDeltaLobeP1( (donutMaterial.flags & PTMaterialFlags_PSDDominantDeltaLobeP1Mask) >> PTMaterialFlags_PSDDominantDeltaLobeP1Shift );
+    ptShadingData.mtl.setNestedPriority( min( InteriorList::kMaxNestedPriority, 1 + (uint(bridgeMaterial.flags) >> PTMaterialFlags_NestedPriorityShift)) );   // priorities are from (1, ... kMaxNestedPriority) because 0 is used to mark empty slots and remapped to kMaxNestedPriority
+    ptShadingData.mtl.setThinSurface( bridgeMaterialThinSurface );
+    ptShadingData.mtl.setPSDExclude( (bridgeMaterial.flags & PTMaterialFlags_PSDExclude) != 0 );
+    ptShadingData.mtl.setPSDDominantDeltaLobeP1( (bridgeMaterial.flags & PTMaterialFlags_PSDDominantDeltaLobeP1Mask) >> PTMaterialFlags_PSDDominantDeltaLobeP1Shift );
 
 
     // stopping motion vectors from being calculated behind/beyond this surface
     {
         // types are 0 - Off; 1 - AutoLow; 2 - AutoHigh; 3 - Full
-        const int blockType = ((donutMaterial.flags & PTMaterialFlags_PSDBlockMVsAtSurfaceTypeB0) != 0) + ((donutMaterial.flags & PTMaterialFlags_PSDBlockMVsAtSurfaceTypeB1) != 0) * 2;
+        const int blockType = ((bridgeMaterial.flags & PTMaterialFlags_PSDBlockMVsAtSurfaceTypeB0) != 0) + ((bridgeMaterial.flags & PTMaterialFlags_PSDBlockMVsAtSurfaceTypeB1) != 0) * 2;
         bool blockMVs = (blockType) == 3;
 
         if (blockType == 1 || blockType == 2)
         {
             float projectionTerm = abs(dot(rayDir, -ptShadingData.N/*-ptShadingData.vertexN*//*-ptShadingData.faceNCorrected*/));
-            float pixelCurvature = (donutGS.curvatureWS * rayCone.getWidth()) / max(projectionTerm, 1e-6f);
+            float pixelCurvature = (bridgeGS.curvatureWS * rayCone.getWidth()) / max(projectionTerm, 1e-6f);
             const float threshold = (blockType==1)?(0.03):(0.0005);
             MicroRng rng = MicroRng::make(pixelPos, pathVertexIndex, Bridge::getSampleIndex());
             blockMVs |= pixelCurvature > ((rng.NextFloat()*0.9+0.3)*threshold);
@@ -730,13 +730,13 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
     }
 
     // Helper function to adjust the shading normal to reduce black pixels due to back-facing view direction. Note: This breaks the reciprocity of the BSDF!
-    // This also reorthonormalizes the frame based on the normal map, which is necessary (see `ptShadingData.N = donutMaterial.shadingNormal;` line above)
-    adjustShadingNormal( ptShadingData, donutGS.tangent, true, ignoreTangent );
+    // This also reorthonormalizes the frame based on the normal map, which is necessary (see `ptShadingData.N = bridgeMaterial.shadingNormal;` line above)
+    adjustShadingNormal( ptShadingData, bridgeGS.tangent, true, ignoreTangent );
     // ^^ this should be part of material processing code
 
-    // ptShadingData.opacity = donutMaterial.opacity;
+    // ptShadingData.opacity = bridgeMaterial.opacity;
 
-    ptShadingData.shadowNoLFadeout = donutMaterial.shadowNoLFadeout;
+    ptShadingData.shadowNoLFadeout = bridgeMaterial.shadowNoLFadeout;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Now load the actual BSDF! Equivalent to StandardBSDF::setupBSDF
@@ -748,14 +748,14 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
 
 
     // A.k.a. interiorIoR
-    lpfloat matIoR = donutMaterial.ior;
+    lpfloat matIoR = bridgeMaterial.ior;
 
 #if !defined(RTXPT_MATERIAL_HAS_TRANSMISSION) || RTXPT_MATERIAL_HAS_TRANSMISSION
     // from https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Khronos/KHR_materials_transmission/README.md#refraction
     // "This microfacet lobe is exactly the same as the specular lobe except sampled along the line of sight through the surface."
-    lpfloat     bsdfDataSpecularTransmission = donutMaterial.transmission * (1 - donutMaterial.metalness);    // (1 - donutMaterial.metalness) is from https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Khronos/KHR_materials_transmission/README.md#transparent-metals
-    lpfloat     bsdfDataDiffuseTransmission = donutMaterial.diffuseTransmission * (1 - donutMaterial.metalness);    // (1 - donutMaterial.metalness) is from https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Khronos/KHR_materials_transmission/README.md#transparent-metals
-    lpfloat3    bsdfDataTransmission = donutMaterial.baseColor;
+    lpfloat     bsdfDataSpecularTransmission = bridgeMaterial.transmission * (1 - bridgeMaterial.metalness);    // (1 - bridgeMaterial.metalness) is from https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Khronos/KHR_materials_transmission/README.md#transparent-metals
+    lpfloat     bsdfDataDiffuseTransmission = bridgeMaterial.diffuseTransmission * (1 - bridgeMaterial.metalness);    // (1 - bridgeMaterial.metalness) is from https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Khronos/KHR_materials_transmission/README.md#transparent-metals
+    lpfloat3    bsdfDataTransmission = bridgeMaterial.baseColor;
 #else
     lpfloat     bsdfDataDiffuseTransmission  = 0;
     lpfloat     bsdfDataSpecularTransmission = 0;    
@@ -771,24 +771,24 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
     ptShadingData.mtl.setActiveLobes( lobeType );
 
     // Sample base color.
-    lpfloat3 baseColor = donutMaterial.baseColor;
+    lpfloat3 baseColor = bridgeMaterial.baseColor;
 
     // OMM Debug evaluates the OMM state at a given triangle + hit BC color codes the result for the corresonding state.
-    OpacityMicroMapDebugInfo ommDebug = loadOmmDebugInfo(donutGS, triangleIndex, barycentrics);
+    OpacityMicroMapDebugInfo ommDebug = loadOmmDebugInfo(bridgeGS, triangleIndex, barycentrics);
 #if OMM_DEBUG_VIEW_IN_WORLD && !NON_PATH_TRACING_PASS && ENABLE_DEBUG_VIZUALISATIONS
     if (ommDebug.hasOmmAttachment)
         baseColor = (lpfloat3)ommDebug.opacityStateDebugColor;
 #endif
 
 #if ENABLE_METAL_ROUGH_RECONSTRUCTION == 0
-#error we rely on Donut to do the conversion! for more info on how to do it manually search for MATERIAL_SYSTEM_HAS_SPEC_GLOSS_MATERIALS 
+#error we rely on the engine material system to do the conversion! for more info on how to do it manually search for MATERIAL_SYSTEM_HAS_SPEC_GLOSS_MATERIALS 
 #endif
 
     // G - Roughness; B - Metallic
-    bsdfDataDiffuse = donutMaterial.diffuseAlbedo;
-    bsdfDataSpecular = donutMaterial.specularF0;
-    bsdfDataRoughness = donutMaterial.roughness;
-    bsdfDataMetallic = donutMaterial.metalness;
+    bsdfDataDiffuse = bridgeMaterial.diffuseAlbedo;
+    bsdfDataSpecular = bridgeMaterial.specularF0;
+    bsdfDataRoughness = bridgeMaterial.roughness;
+    bsdfDataMetallic = bridgeMaterial.metalness;
 
     // Assume the default IoR for vacuum on the front-facing side.
     // The renderer may override this for nested dielectrics (see 'handleNestedDielectrics' calling Bridge::updateOutsideIoR)
@@ -805,9 +805,9 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
     uint neeAnalyticLightIndex = RTXPT_INVALID_LIGHT_INDEX;
 
 #if !defined(RTXPT_MATERIAL_IS_EMISSIVE) || RTXPT_MATERIAL_IS_EMISSIVE
-    if (ptShadingData.frontFacing && any(donutMaterial.emissiveColor>0))
+    if (ptShadingData.frontFacing && any(bridgeMaterial.emissiveColor>0))
     {
-        ptShadingData.emission = donutMaterial.emissiveColor;
+        ptShadingData.emission = bridgeMaterial.emissiveColor;
 
 #if !RTXPT_USE_APPROXIMATE_MIS
         uint baseIndex = t_SubInstanceData[subInstanceDataIndex].EmissiveLightMappingOffset;
@@ -821,23 +821,23 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
 
 #if 0
         LightSampler lightSampler = Bridge::CreateLightSampler( debug.pixelPos, false/*doesn't matter in this case*/, false );
-        float3 v0 = mul(donutGS.instance.transform, float4(donutGS.vertexPositions[0], 1)).xyz;
-        float3 v1 = mul(donutGS.instance.transform, float4(donutGS.vertexPositions[1], 1)).xyz;
-        float3 v2 = mul(donutGS.instance.transform, float4(donutGS.vertexPositions[2], 1)).xyz;
-        bool OK = lightSampler.ValidateTriangleLightIndex( neeTriangleLightIndex, v0, v1, v2, donutGS.flatNormal );
+        float3 v0 = mul(bridgeGS.instance.transform, float4(bridgeGS.vertexPositions[0], 1)).xyz;
+        float3 v1 = mul(bridgeGS.instance.transform, float4(bridgeGS.vertexPositions[1], 1)).xyz;
+        float3 v2 = mul(bridgeGS.instance.transform, float4(bridgeGS.vertexPositions[2], 1)).xyz;
+        bool OK = lightSampler.ValidateTriangleLightIndex( neeTriangleLightIndex, v0, v1, v2, bridgeGS.flatNormal );
         debug.DrawDebugViz( float4(1-OK, OK, 0, 1) );
 #endif
     }
 #endif
 
 #if !defined(RTXPT_MATERIAL_IS_ANALYTIC_LIGHT_PROXY) || RTXPT_MATERIAL_IS_ANALYTIC_LIGHT_PROXY
-    if ( (donutMaterial.flags & PTMaterialFlags_EnableAsAnalyticLightProxy) != 0 )
+    if ( (bridgeMaterial.flags & PTMaterialFlags_EnableAsAnalyticLightProxy) != 0 )
         neeAnalyticLightIndex = t_SubInstanceData[subInstanceDataIndex].AnalyticProxyLightIndex;
 #endif
 
     StandardBSDF bsdf = StandardBSDF::make(
         StandardBSDFData::make( bsdfDataDiffuse, bsdfDataSpecular, bsdfDataRoughness, bsdfDataMetallic, bsdfDataEta, bsdfDataTransmission, bsdfDataDiffuseTransmission, bsdfDataSpecularTransmission,
-            donutMaterial.anisotropy, donutMaterial.fuzzWeight, donutMaterial.fuzzColor, donutMaterial.fuzzRoughness ) );
+            bridgeMaterial.anisotropy, bridgeMaterial.fuzzWeight, bridgeMaterial.fuzzColor, bridgeMaterial.fuzzRoughness ) );
 
     // if you think tangent space is broken, test with this (won't make it correctly oriented)
     //ConstructONB( ptShadingData.N, ptShadingData.T, ptShadingData.B );
@@ -1333,4 +1333,4 @@ PathTracer::WorkingContext GetWorkingContext()
 }
 
 
-#endif // __PATH_TRACER_BRIDGE_DONUT_HLSLI__
+#endif // __PATH_TRACER_BRIDGE_ENGINE_HLSLI__

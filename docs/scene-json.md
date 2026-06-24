@@ -4,9 +4,9 @@
 
 相关实现主要在：
 
-- `External/Donut/src/engine/Scene.cpp`
-- `External/Donut/src/engine/SceneGraph.cpp`
-- `External/Donut/src/engine/SceneTypes.cpp`
+- `caustica/caustica/src/scene/Scene.cpp`
+- `caustica/caustica/src/scene/SceneGraph.cpp`
+- `caustica/caustica/src/scene/SceneTypes.cpp`
 - `Rtxpt/SampleCommon/ExtendedScene.cpp`
 - `Rtxpt/Materials/MaterialsBaker.cpp`
 
@@ -40,7 +40,7 @@
       "translation": [1.25, 0.0, 0.0],
       "rotation": [0.0, 0.0, 0.0, 1.0],
       "scaling": [1.0, 1.0, 1.0],
-      "convertRdfToDonut": true,
+      "convertRdfToRub": true,
       "enabled": true
     },
     {
@@ -136,7 +136,7 @@
 - scene 文件中的相对模型路径相对于该 scene JSON 文件所在目录解析。
 - 放在 `Assets/` 下的 scene 通常写 `Models/...`。
 - 绝对路径也可以使用，建议使用 `/`，例如 `D:/ScanVideo/models/foo.glb`。
-- 静态 `models` 加载路径支持 `.gltf`、`.glb` 和 `.obj`。`.gltf/.glb` 使用 Donut glTF importer，`.obj` 使用 RTXPT OBJ importer。
+- 静态 `models` 加载路径支持 `.gltf`、`.glb` 和 `.obj`。`.gltf/.glb` 使用引擎 glTF importer，`.obj` 使用 RTXPT OBJ importer。
 - 如果仍然把 OBJ 转成 GLB，要按 OBJ 的 `(position, texcoord, normal)` 三元组生成顶点，不能只按 position 合并顶点；否则 UV seam 会被破坏，表现为贴图已加载但 atlas 块贴错。OBJ 的 `vt.y` 通常还需要转换为 `1 - v`，与 RTXPT runtime OBJ importer 的行为保持一致。
 
 ## `graph` 节点通用字段
@@ -164,7 +164,7 @@
 
 ## Leaf 类型
 
-`type` 字段会创建具体 leaf。当前 RTXPT 扩展和 Donut 基础类型支持如下。
+`type` 字段会创建具体 leaf。当前 RTXPT 扩展和引擎基础类型支持如下。
 
 | `type` | 含义 |
 | --- | --- |
@@ -344,7 +344,7 @@
   "path": "D:/ScanVideo/chuan/splats_a.ply",
   "translation": [0.0, 0.0, 0.0],
   "scaling": 1.0,
-  "convertRdfToDonut": true,
+  "convertRdfToRub": true,
   "enabled": true
 }
 ```
@@ -354,7 +354,7 @@
 | `path` | string | 3DGS `.ply` 文件路径。 |
 | `file` | string | `path` 的别名。 |
 | `fileName` | string | `path` 的别名。 |
-| `convertRdfToDonut` | bool | 是否把原始 3DGS right/down/front 坐标转换到 RTXPT/Donut 坐标约定。默认 `true`。 |
+| `convertRdfToRub` | bool | 是否把原始 3DGS right/down/front 坐标转换到 RTXPT 引擎坐标约定。默认 `true`。旧字段 `convertRdfToDonut` 仍可读。 |
 | `enabled` | bool | 是否启用该 splat 节点。默认 `true`。 |
 
 路径规则：
@@ -536,7 +536,7 @@ Assets/Materials/default/antman_merged.antman_merged_0.material.json
   "ShadowNoLFadeout": 0.0,
   "EnableAsAnalyticLightProxy": false,
   "IgnoreMeshTangentSpace": false,
-  "UseDonutEmissiveIntensity": false,
+  "UseEngineEmissiveIntensity": false,
   "SkipRender": false
 }
 ```
@@ -582,7 +582,7 @@ Assets/Materials/default/antman_merged.antman_merged_0.material.json
 | `ShadowNoLFadeout` | number | 低细分阴影/法线不一致缓解参数。 |
 | `EnableAsAnalyticLightProxy` | bool | 是否把该材质几何作为 analytic light proxy。 |
 | `IgnoreMeshTangentSpace` | bool | 是否忽略 mesh tangent space。 |
-| `UseDonutEmissiveIntensity` | bool | 是否使用 Donut 材质的 emissive intensity，便于动画驱动。 |
+| `UseEngineEmissiveIntensity` | bool | 是否使用引擎材质的 emissive intensity，便于动画驱动。旧字段 `UseDonutEmissiveIntensity` 仍可读。 |
 | `SkipRender` | bool | 是否跳过该材质几何的渲染。 |
 
 贴图字段格式：

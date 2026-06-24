@@ -70,7 +70,7 @@ def render(args):
         s.gaussian_splat_alpha_cull_threshold = args.gaussian_splat_alpha_cull
         if not renderer.load_gaussian_splats(
             args.gaussian_splat,
-            args.gaussian_splat_convert_rdf_to_donut,
+            args.gaussian_splat_convert_rdf_to_rub,
         ):
             raise RuntimeError(f"Failed to load Gaussian splat: {args.gaussian_splat}")
     s.oidn_enabled = args.oidn
@@ -158,7 +158,7 @@ def main():
                         help="Override a material's base color, e.g. --material-override Floor 0.8 0.6 0.4")
     parser.add_argument("--gaussian-splat", default=None,
                         help="3DGS .ply file to rasterize over the scene.")
-    parser.add_argument("--gaussian-splat-convert-rdf-to-donut",
+    parser.add_argument("--gaussian-splat-convert-rdf-to-rub",
                         action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--gaussian-splat-depth-test",
                         action=argparse.BooleanOptionalAction, default=True)

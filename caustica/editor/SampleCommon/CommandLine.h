@@ -51,7 +51,7 @@ struct CommandLineOptions
     bool DisablePostProcessFilters  = false;
 
     std::string GaussianSplatFileName = "";
-    bool GaussianSplatConvertRdfToDonut = true;
+    bool GaussianSplatConvertRdfToRub = true;
     bool GaussianSplatDepthTest = true;
     float GaussianSplatScale = 1.0f;
     float GaussianSplatAlphaScale = 1.0f;

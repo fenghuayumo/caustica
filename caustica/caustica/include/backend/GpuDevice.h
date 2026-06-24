@@ -1,26 +1,26 @@
 #pragma once
 
-#if DONUT_WITH_DX11 || DONUT_WITH_DX12
+#if CAUSTICA_WITH_DX11 || CAUSTICA_WITH_DX12
 #include <DXGI.h>
 #endif
 
-#if DONUT_WITH_DX11
+#if CAUSTICA_WITH_DX11
 #include <d3d11.h>
 #endif
 
-#if DONUT_WITH_DX12
+#if CAUSTICA_WITH_DX12
 #include <d3d12.h>
 #endif
 
-#if DONUT_WITH_VULKAN
+#if CAUSTICA_WITH_VULKAN
 #include <rhi/vulkan.h>
 #endif
 
-#if DONUT_WITH_AFTERMATH
+#if CAUSTICA_WITH_AFTERMATH
 #include "AftermathCrashDump.h"
 #endif
 
-#if DONUT_WITH_STREAMLINE
+#if CAUSTICA_WITH_STREAMLINE
 #include <engine/StreamlineInterface.h>
 #endif
 
@@ -59,7 +59,7 @@ namespace caustica
         bool enableWarningsAsErrors = false;
         bool enableGPUValidation = false; // Affects only DX12
         bool headlessDevice = false;
-#if DONUT_WITH_AFTERMATH
+#if CAUSTICA_WITH_AFTERMATH
         bool enableAftermath = false;
 #endif
         bool logBufferLifetime = false;
@@ -81,7 +81,7 @@ namespace caustica
         // Severity of the information log messages from the device manager, like the device name or enabled extensions.
         caustica::Severity infoLogSeverity = caustica::Severity::Info;
 
-#if DONUT_WITH_VULKAN
+#if CAUSTICA_WITH_VULKAN
         // Allows overriding the Vulkan library name with something custom, useful for Streamline
         std::string vulkanLibraryName;
         
@@ -91,7 +91,7 @@ namespace caustica
         std::vector<std::string> optionalVulkanLayers;
 #endif
 
-#if DONUT_WITH_STREAMLINE
+#if CAUSTICA_WITH_STREAMLINE
         int streamlineAppId = 1; // default app id
         bool checkStreamlineSignature = true; // check if the streamline dlls are signed
         bool enableStreamlineLog = false;
@@ -148,19 +148,19 @@ namespace caustica
 
         nvrhi::IMessageCallback *messageCallback = nullptr;
 
-#if DONUT_WITH_DX11 || DONUT_WITH_DX12
+#if CAUSTICA_WITH_DX11 || CAUSTICA_WITH_DX12
         DXGI_USAGE swapChainUsage = DXGI_USAGE_SHADER_INPUT | DXGI_USAGE_RENDER_TARGET_OUTPUT;
         D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_11_1;
 #endif
 
-#if DONUT_WITH_DX12
+#if CAUSTICA_WITH_DX12
         // Optional Agility SDK device factory. This is useful for DLL/plugin hosts
         // (for example Python extension modules) where the main executable cannot
         // export D3D12SDKVersion/D3D12SDKPath like a normal standalone app.
         ID3D12DeviceFactory* d3d12DeviceFactory = nullptr;
 #endif
 
-#if DONUT_WITH_VULKAN
+#if CAUSTICA_WITH_VULKAN
         std::vector<std::string> requiredVulkanDeviceExtensions;
         std::vector<std::string> optionalVulkanDeviceExtensions;
         std::vector<size_t> ignoredVulkanValidationMessageLocations = {
@@ -192,10 +192,10 @@ namespace caustica
         std::optional<UUID> uuid;
         std::optional<LUID> luid;
 
-#if DONUT_WITH_DX11 || DONUT_WITH_DX12
+#if CAUSTICA_WITH_DX11 || CAUSTICA_WITH_DX12
         nvrhi::RefCountPtr<IDXGIAdapter> dxgiAdapter;
 #endif
-#if DONUT_WITH_VULKAN
+#if CAUSTICA_WITH_VULKAN
         VkPhysicalDevice vkPhysicalDevice = nullptr;
 #endif
     };
@@ -312,7 +312,7 @@ namespace caustica
         [[nodiscard]] bool IsVsyncEnabled() const { return m_DeviceParams.vsyncEnabled; }
         virtual void SetVsyncEnabled(bool enabled) { m_RequestedVSync = enabled; /* will be processed later */ }
         virtual void ReportLiveObjects() {}
-        // Window state (deprecated — use Window::isFocused/isVisible instead)
+        // Window state (deprecated - use Window::isFocused/isVisible instead)
         bool IsWindowFocused() const { return m_windowIsInFocus; }
         bool IsWindowVisible() const { return m_windowVisible; }
         void RenderNextFrameWhileUnfocused() { m_RequestedRenderUnfocused = true; }
@@ -322,7 +322,7 @@ namespace caustica
         bool m_windowVisible = false;
         bool m_windowIsInFocus = true;
 
-        // Input dispatch (deprecated — use Input class instead)
+        // Input dispatch (deprecated - use Input class instead)
         // Called from old-path GLFW callbacks; delegates to Input when available.
         void KeyboardUpdate(int key, int scancode, int action, int mods);
         void KeyboardCharInput(unsigned int unicode, int mods);
@@ -372,7 +372,7 @@ namespace caustica
             std::function<void(GpuDevice&, uint32_t)> afterPresent = nullptr;
         } m_callbacks;
 
-#if DONUT_WITH_STREAMLINE
+#if CAUSTICA_WITH_STREAMLINE
         static StreamlineInterface& GetStreamline();
 #endif
 
@@ -382,7 +382,7 @@ namespace caustica
         static GpuDevice* CreateVK();
 
         std::string m_WindowTitle;
-#if DONUT_WITH_AFTERMATH
+#if CAUSTICA_WITH_AFTERMATH
         AftermathCrashDump m_AftermathCrashDumper;
 #endif
     };

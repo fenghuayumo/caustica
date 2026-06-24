@@ -10,7 +10,7 @@
 #include <stb_image.h>
 #include <stb_image_write.h>
 
-#ifdef DONUT_WITH_TINYEXR
+#ifdef CAUSTICA_WITH_TINYEXR
 
     #if defined (_MSC_VER)
         #pragma warning(push)
@@ -24,7 +24,7 @@
         #pragma warning(pop)
     #endif
 
-#endif // DONUT_WITH_TINYEXR
+#endif // CAUSTICA_WITH_TINYEXR
 
 #include <algorithm>
 #include <chrono>
@@ -150,7 +150,7 @@ bool TextureCache::FillTextureData(
             return false;
         }
     }
-#ifdef DONUT_WITH_TINYEXR
+#ifdef CAUSTICA_WITH_TINYEXR
     else if (extension == ".exr" || extension == ".EXR" || mimeType == "image/aces")
     {
         float* data = nullptr;
@@ -188,7 +188,7 @@ bool TextureCache::FillTextureData(
             return false;
         }
     }
-#endif // DONUT_WITH_TINYEXR
+#endif // CAUSTICA_WITH_TINYEXR
     else
     {
         int width = 0, height = 0, originalChannels = 0, channels = 0;

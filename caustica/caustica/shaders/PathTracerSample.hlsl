@@ -15,7 +15,7 @@
 #include "Bindings/ReSTIRBindings.hlsli"
 #endif
 
-#include "PathTracerBridgeDonut.hlsli"
+#include "PathTracerBridgeEngine.hlsli"
 #include "PathTracer/PathTracer.hlsli"
 
 // TODO: move this to PathTracer once SER is unified

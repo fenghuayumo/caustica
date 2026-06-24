@@ -169,7 +169,7 @@ static dquat Squad(const dquat& q1, const dquat& q2, const dquat& q3, const dqua
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// adapted from https://github.com/orangeduck/Motion-Matching/blob/main/quat.h - not yet merged with Donut math, which would be useful in future.
+// adapted from https://github.com/orangeduck/Motion-Matching/blob/main/quat.h - not yet merged with engine math, which would be useful in future.
 // see https://theorangeduck.com/page/cubic-interpolation-quaternions, license:
 // MIT License
 // 

@@ -53,7 +53,7 @@ def normalize(v: tuple[float, float, float] | list[float]) -> tuple[float, float
     return (v[0] / length, v[1] / length, v[2] / length)
 
 
-def parse_binary_ply_bounds(ply_path: Path, convert_rdf_to_donut: bool, sample_cap: int) -> tuple[
+def parse_binary_ply_bounds(ply_path: Path, convert_rdf_to_rub: bool, sample_cap: int) -> tuple[
     tuple[float, float, float],
     tuple[float, float, float],
     int,
@@ -135,7 +135,7 @@ def parse_binary_ply_bounds(ply_path: Path, convert_rdf_to_donut: bool, sample_c
             x = read_float(row, "x")
             y = read_float(row, "y")
             z = read_float(row, "z")
-            point = [x, -y, -z] if convert_rdf_to_donut else [x, y, z]
+            point = [x, -y, -z] if convert_rdf_to_rub else [x, y, z]
             for axis in range(3):
                 mins[axis] = min(mins[axis], point[axis])
                 maxs[axis] = max(maxs[axis], point[axis])
@@ -225,8 +225,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--alpha-cull", type=float, default=1.0 / 255.0)
     parser.add_argument("--depth-test", dest="depth_test", action="store_true", default=True)
     parser.add_argument("--no-depth-test", dest="depth_test", action="store_false")
-    parser.add_argument("--rdf-to-donut", dest="rdf_to_donut", action="store_true", default=True)
-    parser.add_argument("--no-rdf-to-donut", dest="rdf_to_donut", action="store_false")
+    parser.add_argument("--rdf-to-rub", dest="rdf_to_rub", action="store_true", default=True)
+    parser.add_argument("--no-rdf-to-rub", dest="rdf_to_rub", action="store_false")
     parser.add_argument("--tonemap", action="store_true", help="Enable tone mapping.")
     parser.add_argument("--bloom", action="store_true", help="Enable bloom.")
     parser.add_argument("--cam-pos", nargs=3, type=float, metavar=("X", "Y", "Z"))
@@ -247,7 +247,7 @@ def main() -> int:
         raise FileNotFoundError(f"PLY not found: {ply_path}")
 
     center, extents, vertex_count = parse_binary_ply_bounds(
-        ply_path, args.rdf_to_donut, args.sample_cap
+        ply_path, args.rdf_to_rub, args.sample_cap
     )
     cam_pos, cam_dir, cam_up = camera_from_bounds(
         center, extents, args.side, args.distance_scale
@@ -290,7 +290,7 @@ def main() -> int:
         settings.enable_tone_mapping = args.tonemap
         settings.enable_bloom = args.bloom
         settings.realtime_aa = caustica.RealtimeAA.Off
-        if not renderer.load_gaussian_splats(str(ply_path), args.rdf_to_donut):
+        if not renderer.load_gaussian_splats(str(ply_path), args.rdf_to_rub):
             raise RuntimeError(f"Failed to load Gaussian splat: {ply_path}")
         renderer.set_camera(cam_pos, cam_dir, cam_up)
         renderer.set_camera_fov(args.fov)

@@ -50,7 +50,7 @@
   - `GaussianSplatBVH : t7` 与 `t_GaussianShadowSplats : t8` 已绑定。
   - 当前 path tracer 只能读 `GaussianSplatData`，还读不到 raster path 使用的 packed RGBA/SH buffer。
 
-- `caustica/Shaders/PathTracerBridgeDonut.hlsli` 和 `caustica/RTXDI/RtxdiApplicationBridge.hlsli`
+- `caustica/Shaders/PathTracerBridgeEngine.hlsli` 和 `caustica/RTXDI/RtxdiApplicationBridge.hlsli`
   - mesh visibility ray 已能额外测试 Gaussian shadow。
   - 这说明 Gaussian AS 已进入 path tracing/RTXDI shader 可见范围，后续加 emission 不需要从零搭桥。
 
@@ -286,7 +286,7 @@ MVP 建议先实现 K-hit composite，调通后加 stochastic 模式作为质量
    - 增加 `HandleGaussianEmissionNEE()`。
    - 用独立开关编译，避免关掉时增加寄存器压力。
 
-4. `PathTracerBridgeDonut.hlsli`
+4. `PathTracerBridgeEngine.hlsli`
    - 如做 scatter hit 路线，需要在 mesh hit 查询旁边加 Gaussian hit 查询和最近 hit 比较。
 
 5. `RtxdiApplicationBridge.hlsli`

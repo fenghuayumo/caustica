@@ -24,7 +24,7 @@ struct DenoisingGuidesBakerConstants
 
 //<<<<<<< HEAD
 //#include <shaders/Bindings/ShaderResourceBindings.hlsli>
-////#include <shaders/PathTracerBridgeDonut.hlsli>
+////#include <shaders/PathTracerBridgeEngine.hlsli>
 ////#include <shaders/PathTracer/PathTracer.hlsli>
 ////#include <shaders/Libraries/ShaderDebug/ShaderDebug.hlsli>
 //=======

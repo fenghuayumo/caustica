@@ -80,7 +80,7 @@ class GaussianSplat : public caustica::SceneGraphLeaf
 public:
     std::string path;
     std::string resolvedPath;
-    bool convertRdfToDonut = true;
+    bool convertRdfToRub = true;
     bool enabled = true;
     uint32_t loadedSplatCount = 0;
 

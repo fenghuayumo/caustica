@@ -5,14 +5,14 @@
 #include <render/View.h>
 #include <math/math.h>
 
-#if DONUT_WITH_STATIC_SHADERS
-#if DONUT_WITH_DX11
+#if CAUSTICA_WITH_STATIC_SHADERS
+#if CAUSTICA_WITH_DX11
 #include "compiled_shaders/passes/environment_map_ps.dxbc.h"
 #endif
-#if DONUT_WITH_DX12
+#if CAUSTICA_WITH_DX12
 #include "compiled_shaders/passes/environment_map_ps.dxil.h"
 #endif
-#if DONUT_WITH_VULKAN
+#if CAUSTICA_WITH_VULKAN
 #include "compiled_shaders/passes/environment_map_ps.spirv.h"
 #endif
 #endif
@@ -40,8 +40,8 @@ EnvironmentMapPass::EnvironmentMapPass(
     std::vector<caustica::ShaderMacro> PSMacros;
     PSMacros.push_back(caustica::ShaderMacro("LATLONG_TEXTURE", isCubeMap ? "0" : "1"));
 
-    m_PixelShader = shaderFactory->CreateAutoShader("donut/passes/environment_map_ps.hlsl", "main", 
-        DONUT_MAKE_PLATFORM_SHADER(g_environment_map_ps), &PSMacros, nvrhi::ShaderType::Pixel);
+    m_PixelShader = shaderFactory->CreateAutoShader("engine/passes/environment_map_ps.hlsl", "main", 
+        CAUSTICA_MAKE_PLATFORM_SHADER(g_environment_map_ps), &PSMacros, nvrhi::ShaderType::Pixel);
 
     nvrhi::BufferDesc constantBufferDesc;
     constantBufferDesc.byteSize = sizeof(SkyConstants);

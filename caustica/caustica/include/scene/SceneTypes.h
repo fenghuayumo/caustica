@@ -77,7 +77,7 @@ namespace caustica
     };
 
     // Describes a swizzle operation that is used to derive a texture view from a potentially multichannel image.
-    // Donut doesn't support multichannel image operations, and swizzle implementation is left up to applications.
+    // The engine doesn't support multichannel image operations, and swizzle implementation is left up to applications.
     struct TextureSwizzle
     {
         // Image to extract channels from

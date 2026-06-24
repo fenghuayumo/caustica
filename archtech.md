@@ -9,7 +9,7 @@
 | `CMakeLists.txt` | 顶层 CMake 工程入口，工程名为 `RTXPathTracing`。 |
 | `caustica/` | 主程序、渲染框架、处理 pass、shader、Python 绑定都在这里。 |
 | `Assets/` | 示例场景、模型、字体、环境贴图等运行时资源。 |
-| `External/` | 第三方依赖，包括 Donut、NVRHI、NRD、RTXDI、OMM、Streamline、DXC 等。 |
+| `External/` | 第三方依赖，包括 NVRHI、NRD、RTXDI、OMM、Streamline、DXC 等。 |
 | `Docs/` | 项目文档。 |
 | `Support/` | 辅助工具和运行支持文件。 |
 | `build/` | CMake/MSBuild 生成目录。 |

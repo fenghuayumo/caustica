@@ -36,33 +36,33 @@ namespace caustica
         size_t size = 0;
     };
 
-    #if DONUT_WITH_DX11 && DONUT_WITH_STATIC_SHADERS
-    #define DONUT_MAKE_DXBC_SHADER(symbol) caustica::StaticShader{symbol,sizeof(symbol)}
+    #if CAUSTICA_WITH_DX11 && CAUSTICA_WITH_STATIC_SHADERS
+    #define CAUSTICA_MAKE_DXBC_SHADER(symbol) caustica::StaticShader{symbol,sizeof(symbol)}
     #else
-    #define DONUT_MAKE_DXBC_SHADER(symbol) caustica::StaticShader()
+    #define CAUSTICA_MAKE_DXBC_SHADER(symbol) caustica::StaticShader()
     #endif
 
-    #if DONUT_WITH_DX12 && DONUT_WITH_STATIC_SHADERS
-    #define DONUT_MAKE_DXIL_SHADER(symbol) caustica::StaticShader{symbol,sizeof(symbol)}
+    #if CAUSTICA_WITH_DX12 && CAUSTICA_WITH_STATIC_SHADERS
+    #define CAUSTICA_MAKE_DXIL_SHADER(symbol) caustica::StaticShader{symbol,sizeof(symbol)}
     #else
-    #define DONUT_MAKE_DXIL_SHADER(symbol) caustica::StaticShader()
+    #define CAUSTICA_MAKE_DXIL_SHADER(symbol) caustica::StaticShader()
     #endif
 
-    #if DONUT_WITH_VULKAN && DONUT_WITH_STATIC_SHADERS
-    #define DONUT_MAKE_SPIRV_SHADER(symbol) caustica::StaticShader{symbol,sizeof(symbol)}
+    #if CAUSTICA_WITH_VULKAN && CAUSTICA_WITH_STATIC_SHADERS
+    #define CAUSTICA_MAKE_SPIRV_SHADER(symbol) caustica::StaticShader{symbol,sizeof(symbol)}
     #else
-    #define DONUT_MAKE_SPIRV_SHADER(symbol) caustica::StaticShader()
+    #define CAUSTICA_MAKE_SPIRV_SHADER(symbol) caustica::StaticShader()
     #endif
 
     // Macro to use with ShaderFactory::CreateStaticPlatformShader.
     // If there are symbols g_MyShader_dxbc, g_MyShader_dxil, g_MyShader_spirv - just use:
-    //      CreateStaticPlatformShader(DONUT_MAKE_PLATFORM_SHADER(g_MyShader), defines, shaderDesc);
+    //      CreateStaticPlatformShader(CAUSTICA_MAKE_PLATFORM_SHADER(g_MyShader), defines, shaderDesc);
     // and all available platforms will be resolved automatically.
-    #define DONUT_MAKE_PLATFORM_SHADER(basename) DONUT_MAKE_DXBC_SHADER(basename##_dxbc), DONUT_MAKE_DXIL_SHADER(basename##_dxil), DONUT_MAKE_SPIRV_SHADER(basename##_spirv)
+    #define CAUSTICA_MAKE_PLATFORM_SHADER(basename) CAUSTICA_MAKE_DXBC_SHADER(basename##_dxbc), CAUSTICA_MAKE_DXIL_SHADER(basename##_dxil), CAUSTICA_MAKE_SPIRV_SHADER(basename##_spirv)
 
-    // Similar to DONUT_MAKE_PLATFORM_SHADER but for libraries - they are not available on DX11/DXBC.
-    //      CreateStaticPlatformShaderLibrary(DONUT_MAKE_PLATFORM_SHADER_LIBRARY(g_MyShaderLibrary), defines);
-    #define DONUT_MAKE_PLATFORM_SHADER_LIBRARY(basename) DONUT_MAKE_DXIL_SHADER(basename##_dxil), DONUT_MAKE_SPIRV_SHADER(basename##_spirv)
+    // Similar to CAUSTICA_MAKE_PLATFORM_SHADER but for libraries - they are not available on DX11/DXBC.
+    //      CreateStaticPlatformShaderLibrary(CAUSTICA_MAKE_PLATFORM_SHADER_LIBRARY(g_MyShaderLibrary), defines);
+    #define CAUSTICA_MAKE_PLATFORM_SHADER_LIBRARY(basename) CAUSTICA_MAKE_DXIL_SHADER(basename##_dxil), CAUSTICA_MAKE_SPIRV_SHADER(basename##_spirv)
 
     class ShaderFactory
     {

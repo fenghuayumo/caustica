@@ -7,7 +7,7 @@
 #include <vector>
 
 /* 
-Donut Virtual File System (VFS) main classes.
+Caustica Virtual File System (VFS) main classes.
 
 The VFS provides read and sometimes write access to entire files stored in a
 real file system, mounted into a virtual tree, stored in archives or resources.

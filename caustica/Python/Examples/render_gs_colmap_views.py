@@ -6,7 +6,7 @@ Default input:
     D:/ProgramCode/Python/demo_gsplat&blender/GS/sparse
 
 The script reads COLMAP cameras/images directly, converts the OpenCV/COLMAP
-camera frame to caustica/Donut when the 3DGS loader uses RDF->Donut conversion,
+camera frame to caustica when the 3DGS loader uses RDF->RUB conversion,
 and saves one PNG per selected COLMAP image.
 """
 
@@ -268,18 +268,18 @@ def colmap_c2w_from_image(image: ColmapImage) -> np.ndarray:
     return np.linalg.inv(colmap_w2c_from_image(image))
 
 
-def caustica_camera_from_colmap(view: RenderView, convert_rdf_to_donut: bool):
+def caustica_camera_from_colmap(view: RenderView, convert_rdf_to_rub: bool):
     """Pose from COLMAP c2w: camera +Z forward, +Y down in OpenCV convention."""
     c2w = view.c2w
     pos = c2w[:3, 3].copy()
     direction = c2w[:3, 2].copy()
     up = -c2w[:3, 1].copy()
 
-    if convert_rdf_to_donut:
-        rdf_to_donut = np.array([1.0, -1.0, -1.0], dtype=np.float64)
-        pos = pos * rdf_to_donut
-        direction = direction * rdf_to_donut
-        up = up * rdf_to_donut
+    if convert_rdf_to_rub:
+        rdf_to_rub = np.array([1.0, -1.0, -1.0], dtype=np.float64)
+        pos = pos * rdf_to_rub
+        direction = direction * rdf_to_rub
+        up = up * rdf_to_rub
 
     return (
         (float(pos[0]), float(pos[1]), float(pos[2])),
@@ -314,11 +314,11 @@ def apply_colmap_view_to_renderer(
     view: RenderView,
     width: int,
     height: int,
-    convert_rdf_to_donut: bool,
+    convert_rdf_to_rub: bool,
     symmetric_fov: bool,
 ) -> dict:
     """Apply COLMAP extrinsics (c2w) + intrinsics (K) to caustica camera."""
-    cam_pos, cam_dir, cam_up = caustica_camera_from_colmap(view, convert_rdf_to_donut)
+    cam_pos, cam_dir, cam_up = caustica_camera_from_colmap(view, convert_rdf_to_rub)
     renderer.set_camera(cam_pos, cam_dir, cam_up)
 
     record: dict = {
@@ -423,7 +423,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--vulkan", action="store_true")
     parser.add_argument("--adapter-index", type=int, default=-1)
     parser.add_argument("--windowed", action="store_true")
-    parser.add_argument("--convert-rdf-to-donut", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--convert-rdf-to-rub", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--depth-test", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--splat-scale", type=float, default=1.0)
     parser.add_argument("--alpha-scale", type=float, default=1.0)
@@ -475,7 +475,7 @@ def main() -> int:
     print(f"[caustica] output     : {out_dir}")
     print(f"[caustica] views      : {len(views)}")
     print(f"[caustica] resolution : {width}x{height}")
-    print(f"[caustica] RDF->Donut : {args.convert_rdf_to_donut}")
+    print(f"[caustica] RDF->RUB : {args.convert_rdf_to_rub}")
     print(f"[caustica] mip AA     : {args.mip_antialiasing}")
     if args.symmetric_fov:
         warn_projection_limits(first)
@@ -512,7 +512,7 @@ def main() -> int:
         settings.gaussian_splat_alpha_scale = args.alpha_scale
         settings.gaussian_splat_brightness = args.brightness
         settings.gaussian_splat_alpha_cull_threshold = args.alpha_cull
-        if not renderer.load_gaussian_splats(str(ply_path), args.convert_rdf_to_donut):
+        if not renderer.load_gaussian_splats(str(ply_path), args.convert_rdf_to_rub):
             raise RuntimeError(f"Failed to load Gaussian splat: {ply_path}")
         settings.enable_tone_mapping = args.tonemap
         settings.enable_bloom = args.bloom
@@ -541,7 +541,7 @@ def main() -> int:
                 view,
                 width,
                 height,
-                args.convert_rdf_to_donut,
+                args.convert_rdf_to_rub,
                 args.symmetric_fov,
             )
             renderer.step_n(max(1, args.frames_per_view))

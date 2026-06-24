@@ -97,7 +97,7 @@ def configure_gaussian_splats(caustica, settings, args: argparse.Namespace) -> N
 
 def configure_camera(renderer, args: argparse.Namespace, ply_path: Path) -> None:
     center, extents, vertex_count = parse_binary_ply_bounds(
-        ply_path, args.rdf_to_donut, args.sample_cap
+        ply_path, args.rdf_to_rub, args.sample_cap
     )
     cam_pos, cam_dir, cam_up = camera_from_bounds(
         center, extents, args.side, args.distance_scale
@@ -130,7 +130,7 @@ def make_renderer(caustica, args: argparse.Namespace, scene: str, ply_path: Path
         realtime=realtime,
         accumulation_target=args.frames,
     )
-    if not renderer.load_gaussian_splats(str(ply_path), args.rdf_to_donut):
+    if not renderer.load_gaussian_splats(str(ply_path), args.rdf_to_rub):
         renderer.close()
         raise RuntimeError(f"Failed to load Gaussian splat: {ply_path}")
     return renderer
@@ -263,8 +263,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--object-scale", nargs=3, type=float, metavar=("X", "Y", "Z"))
     parser.add_argument("--depth-test", dest="depth_test", action="store_true", default=True)
     parser.add_argument("--no-depth-test", dest="depth_test", action="store_false")
-    parser.add_argument("--rdf-to-donut", dest="rdf_to_donut", action="store_true", default=True)
-    parser.add_argument("--no-rdf-to-donut", dest="rdf_to_donut", action="store_false")
+    parser.add_argument("--rdf-to-rub", dest="rdf_to_rub", action="store_true", default=True)
+    parser.add_argument("--no-rdf-to-rub", dest="rdf_to_rub", action="store_false")
 
     parser.add_argument("--mip-antialiasing", action="store_true")
     parser.add_argument("--quantize-normals", dest="quantize_normals", action="store_true", default=True)

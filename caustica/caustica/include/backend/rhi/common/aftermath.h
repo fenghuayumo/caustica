@@ -47,7 +47,7 @@ namespace nvrhi
     // of a requested shader hash
     // There should be one AftermathCrashDumpHelper per nvrhi::IDevice
     // All command lists will register their AftermathMarkerTrackers with the AftermathCrashDumpHelper
-    // Any shader bytecode loading and management code (e.g. donut's ShaderFactory) should register a shader binary lookup callback
+    // Any shader bytecode loading and management code (e.g. caustica's ShaderFactory) should register a shader binary lookup callback
     class AftermathCrashDumpHelper
     {
     public:

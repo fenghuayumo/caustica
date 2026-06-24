@@ -1,6 +1,6 @@
 #pragma once
 
-// Donut
+// Caustica engine Streamline interface
 #include <render/View.h>
 #include <math/math.h>
 #include <rhi/nvrhi.h>

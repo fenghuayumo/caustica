@@ -72,37 +72,37 @@ if (WIN32)
     )
 endif()
 
-if (DONUT_WITH_STREAMLINE)
+if (CAUSTICA_WITH_STREAMLINE)
     list(APPEND caustica_engine_engine_src
         src/engine/streamline/StreamlineIntegration.cpp
         src/engine/streamline/StreamlineIntegration.h
     )
 endif()
 
-if (DONUT_WITH_DX11)
+if (CAUSTICA_WITH_DX11)
     list(APPEND caustica_engine_engine_src
         include/backend/dx11/GpuDevice_DX11.h
         src/backend/dx11/GpuDevice_DX11.cpp)
 endif()
 
-if (DONUT_WITH_DX12)
+if (CAUSTICA_WITH_DX12)
     list(APPEND caustica_engine_engine_src
         include/backend/dx12/GpuDevice_DX12.h
         src/backend/dx12/GpuDevice_DX12.cpp)
 endif()
 
-if (DONUT_WITH_VULKAN)
+if (CAUSTICA_WITH_VULKAN)
     list(APPEND caustica_engine_engine_src
         include/backend/vulkan/GpuDevice_VK.h
         src/backend/vulkan/GpuDevice_VK.cpp)
 endif()
 
-if (DONUT_WITH_AFTERMATH)
+if (CAUSTICA_WITH_AFTERMATH)
     list(APPEND caustica_engine_engine_src src/engine/aftermath/AftermathCrashDump.cpp)
 endif()
 
 if (MSVC)
-    list(APPEND caustica_engine_core_src donut.natvis)
+    list(APPEND caustica_engine_core_src caustica.natvis)
 endif()
 
 # Platform layer (Window abstraction)
@@ -152,7 +152,7 @@ target_include_directories(causticaEngine
         "${CMAKE_CURRENT_SOURCE_DIR}"
         "${CMAKE_CURRENT_SOURCE_DIR}/include"
     PRIVATE
-        "$<$<BOOL:${DONUT_WITH_STREAMLINE}>:${CMAKE_CURRENT_SOURCE_DIR}/src/engine/streamline>"
+        "$<$<BOOL:${CAUSTICA_WITH_STREAMLINE}>:${CMAKE_CURRENT_SOURCE_DIR}/src/engine/streamline>"
 )
 
 target_link_libraries(causticaEngine
@@ -172,7 +172,7 @@ endif()
 
 if (WIN32)
     target_compile_definitions(causticaEngine PUBLIC NOMINMAX _CRT_SECURE_NO_WARNINGS)
-    target_compile_definitions(causticaEngine PRIVATE DONUT_FORCE_DISCRETE_GPU=$<BOOL:${DONUT_FORCE_DISCRETE_GPU}>)
+    target_compile_definitions(causticaEngine PRIVATE CAUSTICA_FORCE_DISCRETE_GPU=$<BOOL:${CAUSTICA_FORCE_DISCRETE_GPU}>)
 endif()
 if (MSVC)
     target_compile_options(causticaEngine PRIVATE /utf-8)
@@ -180,29 +180,29 @@ endif()
 
 target_compile_definitions(causticaEngine
     PUBLIC
-        DONUT_WITH_DX11=$<BOOL:${DONUT_WITH_DX11}>
-        DONUT_WITH_DX12=$<BOOL:${DONUT_WITH_DX12}>
-        DONUT_WITH_VULKAN=$<BOOL:${DONUT_WITH_VULKAN}>
-        DONUT_WITH_STATIC_SHADERS=$<BOOL:${DONUT_WITH_STATIC_SHADERS}>
-        DONUT_WITH_AFTERMATH=$<BOOL:${DONUT_WITH_AFTERMATH}>
-        DONUT_WITH_STREAMLINE=$<BOOL:${DONUT_WITH_STREAMLINE}>
-        DONUT_WITH_DLSS=$<BOOL:${DONUT_WITH_DLSS}>
+        CAUSTICA_WITH_DX11=$<BOOL:${CAUSTICA_WITH_DX11}>
+        CAUSTICA_WITH_DX12=$<BOOL:${CAUSTICA_WITH_DX12}>
+        CAUSTICA_WITH_VULKAN=$<BOOL:${CAUSTICA_WITH_VULKAN}>
+        CAUSTICA_WITH_STATIC_SHADERS=$<BOOL:${CAUSTICA_WITH_STATIC_SHADERS}>
+        CAUSTICA_WITH_AFTERMATH=$<BOOL:${CAUSTICA_WITH_AFTERMATH}>
+        CAUSTICA_WITH_STREAMLINE=$<BOOL:${CAUSTICA_WITH_STREAMLINE}>
+        CAUSTICA_WITH_DLSS=$<BOOL:${CAUSTICA_WITH_DLSS}>
 )
 
-if (DONUT_WITH_AUDIO)
+if (CAUSTICA_WITH_AUDIO)
     target_link_libraries(causticaEngine PUBLIC Xaudio2)
-    target_compile_definitions(causticaEngine PUBLIC DONUT_WITH_AUDIO)
+    target_compile_definitions(causticaEngine PUBLIC CAUSTICA_WITH_AUDIO)
 endif()
 
-if (DONUT_WITH_TINYEXR)
+if (CAUSTICA_WITH_TINYEXR)
     target_link_libraries(causticaEngine PUBLIC tinyexr)
-    target_compile_definitions(causticaEngine PUBLIC DONUT_WITH_TINYEXR)
+    target_compile_definitions(causticaEngine PUBLIC CAUSTICA_WITH_TINYEXR)
 endif()
 
-if (DONUT_WITH_STREAMLINE)
+if (CAUSTICA_WITH_STREAMLINE)
     target_link_libraries(causticaEngine PUBLIC streamline)
 
-    if (DONUT_WITH_VULKAN AND TARGET glfw)
+    if (CAUSTICA_WITH_VULKAN AND TARGET glfw)
         target_compile_definitions(glfw PRIVATE _GLFW_VULKAN_LIBRARY="sl.interposer.dll")
     endif()
 
@@ -235,21 +235,21 @@ if (DONUT_WITH_STREAMLINE)
     endif()
 endif()
 
-if (DONUT_WITH_DX11)
+if (CAUSTICA_WITH_DX11)
     if (NOT NVRHI_BUILD_SHARED)
         target_link_libraries(causticaEngine PUBLIC nvrhi_d3d11)
     endif()
     target_link_libraries(causticaEngine PUBLIC d3d11 dxgi dxguid)
 endif()
 
-if (DONUT_WITH_DX12)
+if (CAUSTICA_WITH_DX12)
     if (NOT NVRHI_BUILD_SHARED)
         target_link_libraries(causticaEngine PUBLIC nvrhi_d3d12)
     endif()
     target_link_libraries(causticaEngine PUBLIC d3d12 dxgi dxguid)
 endif()
 
-if (DONUT_WITH_VULKAN)
+if (CAUSTICA_WITH_VULKAN)
     if (NOT NVRHI_BUILD_SHARED)
         target_link_libraries(causticaEngine PUBLIC nvrhi_vk)
     endif()
@@ -261,11 +261,11 @@ if (DONUT_WITH_VULKAN)
     endif()
 endif()
 
-if (DONUT_WITH_DLSS AND TARGET DLSS)
+if (CAUSTICA_WITH_DLSS AND TARGET DLSS)
     target_link_libraries(causticaEngine PUBLIC DLSS)
 endif()
 
-if (DONUT_WITH_STATIC_SHADERS)
+if (CAUSTICA_WITH_STATIC_SHADERS)
     target_include_directories(causticaEngine PRIVATE "${CAUSTICA_ENGINE_STATIC_SHADERS_DIR}")
 endif()
 

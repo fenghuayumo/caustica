@@ -31,7 +31,7 @@ namespace caustica
 			bool auto_scroll = true;       // automatically keep log output scrolled to the most recent item
 			bool scroll_to_bottom = false; // scoll to botom on console creation, if the log is not empty
 
-			bool capture_log = true;       // captures donut event logs & redirects to the console
+			bool capture_log = true;       // captures engine event logs & redirects to the console
 			bool show_info = false;        // default state of log events filters
 			bool show_warnings = true;
 			bool show_errors = true;
