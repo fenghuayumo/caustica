@@ -3,7 +3,7 @@
 #include <core/log.h>
 #include <core/string_utils.h>
 #include <ShaderMake/ShaderBlob.h>
-#if CAUSTICA_WITH_AFTERMATH
+#if DONUT_WITH_AFTERMATH
 #include <engine/AftermathCrashDump.h>
 #endif
 
@@ -18,7 +18,7 @@ ShaderFactory::ShaderFactory(nvrhi::DeviceHandle rendererInterface,
 	, m_fs(fs)
 	, m_basePath(basePath)
 {
-#if CAUSTICA_WITH_AFTERMATH
+#if DONUT_WITH_AFTERMATH
     if (m_Device->isAftermathEnabled())
         m_Device->getAftermathCrashDumpHelper().registerShaderBinaryLookupCallback(this, std::bind(&ShaderFactory::FindShaderFromHash, this, std::placeholders::_1, std::placeholders::_2));
 #endif
@@ -26,7 +26,7 @@ ShaderFactory::ShaderFactory(nvrhi::DeviceHandle rendererInterface,
 
 ShaderFactory::~ShaderFactory()
 {
-#if CAUSTICA_WITH_AFTERMATH
+#if DONUT_WITH_AFTERMATH
     if (m_Device->isAftermathEnabled())
         m_Device->getAftermathCrashDumpHelper().unRegisterShaderBinaryLookupCallback(this);
 #endif

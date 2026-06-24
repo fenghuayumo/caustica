@@ -7,14 +7,14 @@
 #include <rhi/utils.h>
 #include <sstream>
 
-#if CAUSTICA_WITH_STATIC_SHADERS
-#if CAUSTICA_WITH_DX11
+#if DONUT_WITH_STATIC_SHADERS
+#if DONUT_WITH_DX11
 #include "compiled_shaders/ies_profile_cs.dxbc.h"
 #endif
-#if CAUSTICA_WITH_DX12
+#if DONUT_WITH_DX12
 #include "compiled_shaders/ies_profile_cs.dxil.h"
 #endif
-#if CAUSTICA_WITH_VULKAN
+#if DONUT_WITH_VULKAN
 #include "compiled_shaders/ies_profile_cs.spirv.h"
 #endif
 #endif
@@ -37,7 +37,7 @@ IesProfileLoader::IesProfileLoader(
     };
     m_BindingLayout = device->createBindingLayout(layoutDesc);
 
-    m_ComputeShader = m_ShaderFactory->CreateAutoShader("caustica/ies_profile_cs.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_ies_profile_cs), nullptr, nvrhi::ShaderType::Compute);
+    m_ComputeShader = m_ShaderFactory->CreateAutoShader("donut/ies_profile_cs.hlsl", "main", DONUT_MAKE_PLATFORM_SHADER(g_ies_profile_cs), nullptr, nvrhi::ShaderType::Compute);
 
     nvrhi::ComputePipelineDesc pipelineDesc;
     pipelineDesc.bindingLayouts = { m_BindingLayout };

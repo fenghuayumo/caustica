@@ -3,10 +3,10 @@
 #include "platform/window.h"
 #include "platform/Input.h"
 
-#if CAUSTICA_WITH_STREAMLINE
+#if DONUT_WITH_STREAMLINE
 #include <StreamlineIntegration.h>
 #endif
-#if CAUSTICA_WITH_AFTERMATH
+#if DONUT_WITH_AFTERMATH
 #include "AftermathCrashDump.h"
 #endif
 
@@ -92,7 +92,7 @@ bool Application::runFrame(std::optional<double> elapsedTimeOverride)
 
         if (beforeAnimate) beforeAnimate(DM, DM.m_FrameIndex);
         animate(elapsedTime, true);
-#if CAUSTICA_WITH_STREAMLINE
+#if DONUT_WITH_STREAMLINE
         if (!DM.m_DeviceParams.headlessDevice) StreamlineIntegration::Get().SimEnd(DM);
 #endif
         if (afterAnimate) afterAnimate(DM, DM.m_FrameIndex);
@@ -101,13 +101,13 @@ bool Application::runFrame(std::optional<double> elapsedTimeOverride)
             if (DM.BeginFrame()) {
                 uint32_t fi = DM.m_FrameIndex;
                 if (DM.m_SkipRenderOnFirstFrame) fi--;
-#if CAUSTICA_WITH_STREAMLINE
+#if DONUT_WITH_STREAMLINE
                 if (!DM.m_DeviceParams.headlessDevice) StreamlineIntegration::Get().RenderStart(DM);
 #endif
                 if (beforeRender) beforeRender(DM, fi);
                 render();
                 if (afterRender) afterRender(DM, fi);
-#if CAUSTICA_WITH_STREAMLINE
+#if DONUT_WITH_STREAMLINE
                 if (!DM.m_DeviceParams.headlessDevice) {
                     StreamlineIntegration::Get().RenderEnd(DM);
                     StreamlineIntegration::Get().PresentStart(DM);
@@ -116,7 +116,7 @@ bool Application::runFrame(std::optional<double> elapsedTimeOverride)
                 if (beforePresent) beforePresent(DM, fi);
                 bool ok = DM.Present();
                 if (afterPresent) afterPresent(DM, fi);
-#if CAUSTICA_WITH_STREAMLINE
+#if DONUT_WITH_STREAMLINE
                 if (!DM.m_DeviceParams.headlessDevice) StreamlineIntegration::Get().PresentEnd(DM);
 #endif
                 if (!ok) return false;
@@ -142,12 +142,12 @@ void Application::run()
     auto& DM = *m_DM;
     DM.m_PreviousFrameTimestamp = glfwGetTime();
 
-#if CAUSTICA_WITH_AFTERMATH
+#if DONUT_WITH_AFTERMATH
     bool dumpingCrash = false;
 #endif
     if (m_Window) {
         while (!m_Window->getExit()) {
-#if CAUSTICA_WITH_STREAMLINE
+#if DONUT_WITH_STREAMLINE
             if (!DM.m_DeviceParams.headlessDevice) StreamlineIntegration::Get().SimStart(DM);
 #endif
             if (beforeFrame) beforeFrame(DM, DM.m_FrameIndex);
@@ -161,14 +161,14 @@ void Application::run()
     } else {
         GLFWwindow* w = DM.m_Window;
         while (w == nullptr || !glfwWindowShouldClose(w)) {
-#if CAUSTICA_WITH_STREAMLINE
+#if DONUT_WITH_STREAMLINE
             if (!DM.m_DeviceParams.headlessDevice) StreamlineIntegration::Get().SimStart(DM);
 #endif
             if (beforeFrame) beforeFrame(DM, DM.m_FrameIndex);
             if (w) { glfwPollEvents(); updateWindowSize(); }
             else   { DM.m_windowVisible = true; DM.m_windowIsInFocus = true; }
             if (!runFrame()) {
-#if CAUSTICA_WITH_AFTERMATH
+#if DONUT_WITH_AFTERMATH
                 dumpingCrash = true;
 #endif
                 break;
@@ -176,7 +176,7 @@ void Application::run()
         }
     }
     bool ok = DM.GetDevice()->waitForIdle();
-#if CAUSTICA_WITH_AFTERMATH
+#if DONUT_WITH_AFTERMATH
     dumpingCrash |= !ok;
     if (dumpingCrash && DM.m_DeviceParams.enableAftermath) AftermathCrashDump::WaitForCrashDump();
 #else

@@ -1,6 +1,6 @@
 #pragma once
 
-#if CAUSTICA_WITH_DLSS
+#if DONUT_WITH_DLSS
 
 #include <memory>
 #include <rhi/nvrhi.h>
@@ -102,15 +102,15 @@ namespace caustica::render
 
         void ComputeExposure(nvrhi::ICommandList* commandList, nvrhi::IBuffer* toneMapperExposureBuffer, float exposureScale);
         
-    #if CAUSTICA_WITH_DX11
+    #if DONUT_WITH_DX11
         static std::unique_ptr<DLSS> CreateDX11(nvrhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
             std::string const& directoryWithExecutable, uint32_t applicationID);
     #endif
-    #if CAUSTICA_WITH_DX12
+    #if DONUT_WITH_DX12
         static std::unique_ptr<DLSS> CreateDX12(nvrhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
             std::string const& directoryWithExecutable, uint32_t applicationID);
     #endif
-    #if CAUSTICA_WITH_VULKAN
+    #if DONUT_WITH_VULKAN
         static std::unique_ptr<DLSS> CreateVK(nvrhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
             std::string const& directoryWithExecutable, uint32_t applicationID);
     #endif

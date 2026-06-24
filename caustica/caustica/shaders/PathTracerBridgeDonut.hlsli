@@ -1,5 +1,5 @@
-#ifndef __PATH_TRACER_BRIDGE_CAUSTICA_HLSLI__ // using instead of "#pragma once" due to https://github.com/microsoft/DirectXShaderCompiler/issues/3943
-#define __PATH_TRACER_BRIDGE_CAUSTICA_HLSLI__
+#ifndef __PATH_TRACER_BRIDGE_DONUT_HLSLI__ // using instead of "#pragma once" due to https://github.com/microsoft/DirectXShaderCompiler/issues/3943
+#define __PATH_TRACER_BRIDGE_DONUT_HLSLI__
 
 // easier if we let Donut do this!
 #define ENABLE_METAL_ROUGH_RECONSTRUCTION 1
@@ -1333,4 +1333,4 @@ PathTracer::WorkingContext GetWorkingContext()
 }
 
 
-#endif // __PATH_TRACER_BRIDGE_CAUSTICA_HLSLI__
+#endif // __PATH_TRACER_BRIDGE_DONUT_HLSLI__

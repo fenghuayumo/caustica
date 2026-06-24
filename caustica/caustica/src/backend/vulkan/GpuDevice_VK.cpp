@@ -10,7 +10,7 @@
 #include <rhi/vulkan.h>
 #include <rhi/validation.h>
 
-#if CAUSTICA_WITH_STREAMLINE
+#if DONUT_WITH_STREAMLINE
 #include <StreamlineIntegration.h>
 #endif
 
@@ -416,7 +416,7 @@ bool GpuDevice_VK::pickPhysicalDevice()
     if (!discreteGPUs.empty())
     {
         uint32_t selectedIndex = 0;
-#if CAUSTICA_WITH_STREAMLINE
+#if DONUT_WITH_STREAMLINE
         // Auto select best adapter for streamline features
         if (!m_DeviceParams.headlessDevice && adapterIndex < 0)
             selectedIndex = StreamlineIntegration::Get().FindBestAdapterVulkan(discreteGPUs);
@@ -429,7 +429,7 @@ bool GpuDevice_VK::pickPhysicalDevice()
     if (!otherGPUs.empty())
     {
         uint32_t selectedIndex = 0;
-#if CAUSTICA_WITH_STREAMLINE
+#if DONUT_WITH_STREAMLINE
         // Auto select best adapter for streamline features
         if (!m_DeviceParams.headlessDevice && adapterIndex < 0)
             selectedIndex = StreamlineIntegration::Get().FindBestAdapterVulkan(otherGPUs);
@@ -638,7 +638,7 @@ bool GpuDevice_VK::createDevice()
         .setDynamicRendering(true)
         .setSynchronization2(true)
         .setMaintenance4(true);
-#if CAUSTICA_WITH_AFTERMATH
+#if DONUT_WITH_AFTERMATH
     auto aftermathFeatures = vk::DeviceDiagnosticsConfigCreateInfoNV()
         .setFlags(vk::DeviceDiagnosticsConfigFlagBitsNV::eEnableResourceTracking
             | vk::DeviceDiagnosticsConfigFlagBitsNV::eEnableShaderDebugInfo
@@ -672,7 +672,7 @@ bool GpuDevice_VK::createDevice()
     meshShaderFeatures.multiviewMeshShader = false;
     meshShaderFeatures.primitiveFragmentShadingRateMeshShader = false;
     
-#if CAUSTICA_WITH_AFTERMATH
+#if DONUT_WITH_AFTERMATH
     if (aftermathPhysicalFeatures.diagnosticsConfig && m_DeviceParams.enableAftermath)
         APPEND_EXTENSION(aftermathSupported, aftermathFeatures);
 #endif
@@ -876,7 +876,7 @@ bool GpuDevice_VK::createSwapChain()
 
 bool GpuDevice_VK::CreateInstanceInternal()
 {
-#if CAUSTICA_WITH_STREAMLINE
+#if DONUT_WITH_STREAMLINE
     if (!m_DeviceParams.headlessDevice)
         StreamlineIntegration::Get().InitializePreDevice(nvrhi::GraphicsAPI::VULKAN, m_DeviceParams.streamlineAppId, m_DeviceParams.checkStreamlineSignature, m_DeviceParams.enableStreamlineLog);
 #endif
@@ -887,7 +887,7 @@ bool GpuDevice_VK::CreateInstanceInternal()
         enabledExtensions.layers.insert("VK_LAYER_KHRONOS_validation");
     }
 
-#if CAUSTICA_WITH_STREAMLINE
+#if DONUT_WITH_STREAMLINE
     if (!m_DeviceParams.headlessDevice)
         m_DeviceParams.vulkanLibraryName = "sl.interposer.dll";
 #endif
@@ -1012,7 +1012,7 @@ bool GpuDevice_VK::CreateDevice()
     deviceDesc.deviceExtensions = vecDeviceExt.data();
     deviceDesc.numDeviceExtensions = vecDeviceExt.size();
     deviceDesc.bufferDeviceAddressSupported = m_BufferDeviceAddressSupported;
-#if CAUSTICA_WITH_AFTERMATH
+#if DONUT_WITH_AFTERMATH
     deviceDesc.aftermathEnabled = m_DeviceParams.enableAftermath;
 #endif
     deviceDesc.vulkanLibraryName = m_DeviceParams.vulkanLibraryName;
@@ -1025,7 +1025,7 @@ bool GpuDevice_VK::CreateDevice()
         m_ValidationLayer = nvrhi::validation::createValidationLayer(m_NvrhiDevice);
     }
 
-#if CAUSTICA_WITH_STREAMLINE
+#if DONUT_WITH_STREAMLINE
     if (!m_DeviceParams.headlessDevice)
     {
         StreamlineIntegration::VulkanInfo vulkanInfo;

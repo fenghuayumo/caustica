@@ -15,20 +15,20 @@ include(FetchContent)
 include(cmake/compileshaders.cmake)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
-option(CAUSTICA_WITH_STATIC_SHADERS "Build engine runtime code with statically linked shaders" OFF)
-option(CAUSTICA_WITH_AUDIO "Include Audio features (XAudio2)" OFF)
-option(CAUSTICA_WITH_TINYEXR "Include TinyEXR" ON)
-option(CAUSTICA_WITH_UNIT_TESTS "Donut unit-tests" OFF)
+option(DONUT_WITH_STATIC_SHADERS "Build engine runtime code with statically linked shaders" OFF)
+option(DONUT_WITH_AUDIO "Include Audio features (XAudio2)" OFF)
+option(DONUT_WITH_TINYEXR "Include TinyEXR" ON)
+option(DONUT_WITH_UNIT_TESTS "Donut unit-tests" OFF)
 
 if (WIN32)
-    option(CAUSTICA_FORCE_DISCRETE_GPU "Declare symbols to make the OS run the app on discrete GPU on laptops" OFF)
+    option(DONUT_FORCE_DISCRETE_GPU "Declare symbols to make the OS run the app on discrete GPU on laptops" OFF)
 endif()
 
 set(third_party_folder "Third-Party Libraries")
 
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 
-if (CAUSTICA_WITH_NVRHI AND NOT TARGET imgui)
+if (DONUT_WITH_NVRHI AND NOT TARGET imgui)
     include(imgui.cmake)
     set_target_properties(imgui PROPERTIES FOLDER ${third_party_folder})
 endif()
@@ -51,12 +51,12 @@ if (NOT TARGET cgltf)
     target_include_directories(cgltf INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/cgltf)
 endif()
 
-if (CAUSTICA_WITH_TINYEXR AND NOT TARGET tinyexr)
+if (DONUT_WITH_TINYEXR AND NOT TARGET tinyexr)
     add_library(tinyexr INTERFACE)
     target_include_directories(tinyexr INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/tinyexr)
 endif()
 
-if (CAUSTICA_WITH_NVRHI AND NOT TARGET glfw)
+if (DONUT_WITH_NVRHI AND NOT TARGET glfw)
     option(GLFW_BUILD_EXAMPLES "" OFF)
     option(GLFW_BUILD_TESTS "" OFF)
     option(GLFW_BUILD_DOCS "" OFF)
@@ -67,21 +67,21 @@ if (CAUSTICA_WITH_NVRHI AND NOT TARGET glfw)
 endif()
 
 if (NOT TARGET ShaderMake)
-    option(SHADERMAKE_FIND_FXC "" "${CAUSTICA_WITH_DX11}")
-    if (CAUSTICA_WITH_DX12 OR CAUSTICA_WITH_VULKAN)
+    option(SHADERMAKE_FIND_FXC "" "${DONUT_WITH_DX11}")
+    if (DONUT_WITH_DX12 OR DONUT_WITH_VULKAN)
         option(SHADERMAKE_FIND_DXC "" ON)
     else()
         option(SHADERMAKE_FIND_DXC "" OFF)
     endif()
-    option(SHADERMAKE_FIND_DXC_VK "" "${CAUSTICA_WITH_VULKAN}")
+    option(SHADERMAKE_FIND_DXC_VK "" "${DONUT_WITH_VULKAN}")
 
     add_subdirectory(ShaderMake)
 endif()
 
-if (CAUSTICA_WITH_NVRHI)
+if (DONUT_WITH_NVRHI)
     # NVRHI backend (nvrhi target + causticaRhi wrappers) is now built from
     # caustica/backend, which is added before External in the root CMakeLists.
-    set(CAUSTICA_SHADER_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/caustica/caustica" CACHE PATH "" FORCE)
+    set(DONUT_SHADER_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/caustica/caustica" CACHE PATH "" FORCE)
 
     set(caustica_engine_shader_dir "${CMAKE_SOURCE_DIR}/caustica/caustica/shaders")
     set(caustica_engine_shader_config "${caustica_engine_shader_dir}/EngineShaders.cfg")
@@ -93,15 +93,15 @@ if (CAUSTICA_WITH_NVRHI)
     )
     list(FILTER caustica_engine_shader_sources EXCLUDE REGEX "/passes/tonemapping_ps\\.hlsl$")
 
-    if(CAUSTICA_SHADERS_OUTPUT_DIR AND NOT CAUSTICA_WITH_STATIC_SHADERS)
-        set(caustica_engine_shader_output_base ${CAUSTICA_SHADERS_OUTPUT_DIR})
+    if(DONUT_SHADERS_OUTPUT_DIR AND NOT DONUT_WITH_STATIC_SHADERS)
+        set(caustica_engine_shader_output_base ${DONUT_SHADERS_OUTPUT_DIR})
     else()
         set(CAUSTICA_ENGINE_STATIC_SHADERS_DIR "${CMAKE_BINARY_DIR}/caustica/caustica/shaders" CACHE INTERNAL "")
         set(CAUSTICA_ENGINE_STATIC_SHADERS_DIR "${CAUSTICA_ENGINE_STATIC_SHADERS_DIR}" CACHE INTERNAL "")
         set(caustica_engine_shader_output_base ${CAUSTICA_ENGINE_STATIC_SHADERS_DIR})
     endif()
 
-    if(CAUSTICA_WITH_STATIC_SHADERS)
+    if(DONUT_WITH_STATIC_SHADERS)
         set(caustica_engine_shader_output_format "HEADER")
     else()
         set(caustica_engine_shader_output_format "BINARY")
@@ -147,11 +147,11 @@ if (CAUSTICA_WITH_NVRHI)
         passes/taa_cs
     )
 
-    if(CAUSTICA_WITH_AFTERMATH OR CAUSTICA_EMBED_SHADER_PDBS)
+    if(DONUT_WITH_AFTERMATH OR DONUT_EMBED_SHADER_PDBS)
         set(caustica_engine_shader_options --embedPDB)
     endif()
 
-    CAUSTICA_compile_shaders_all_platforms(
+    donut_compile_shaders_all_platforms(
         TARGET causticaEngineShaders
         PROJECT_NAME "CausticaEngine"
         CONFIG ${caustica_engine_shader_config}
@@ -164,46 +164,46 @@ if (CAUSTICA_WITH_NVRHI)
     )
 endif()
 
-if (CAUSTICA_WITH_DLSS)
-    message(STATUS "Updating DLSS from " ${CAUSTICA_DLSS_FETCH_URL} ", tag " ${CAUSTICA_DLSS_FETCH_TAG} ", into folder " ${CAUSTICA_DLSS_FETCH_DIR} " - please wait!" )
+if (DONUT_WITH_DLSS)
+    message(STATUS "Updating DLSS from " ${DONUT_DLSS_FETCH_URL} ", tag " ${DONUT_DLSS_FETCH_TAG} ", into folder " ${DONUT_DLSS_FETCH_DIR} " - please wait!" )
     FetchContent_Declare(
         DLSS
-        GIT_REPOSITORY ${CAUSTICA_DLSS_FETCH_URL}
-        GIT_TAG ${CAUSTICA_DLSS_FETCH_TAG}
-        SOURCE_DIR ${CAUSTICA_DLSS_FETCH_DIR}
+        GIT_REPOSITORY ${DONUT_DLSS_FETCH_URL}
+        GIT_TAG ${DONUT_DLSS_FETCH_TAG}
+        SOURCE_DIR ${DONUT_DLSS_FETCH_DIR}
     )
     FetchContent_MakeAvailable(DLSS)
 
     include(cmake/DLSS.cmake)
 endif()
 
-if (CAUSTICA_WITH_STREAMLINE)
+if (DONUT_WITH_STREAMLINE)
     if (NOT CMAKE_RUNTIME_OUTPUT_DIRECTORY)
         message(SEND_ERROR "Streamline integration requires that CMAKE_RUNTIME_OUTPUT_DIRECTORY is non-empty.")
     endif()
 
-    if (CAUSTICA_STREAMLINE_FETCH_TAG)
-        message(WARNING "CAUSTICA_STREAMLINE_FETCH_TAG is deprecated. Use CAUSTICA_STREAMLINE_FETCH_SHA256 instead. Tag fetching from the public repo no longer has the binaries.")
+    if (DONUT_STREAMLINE_FETCH_TAG)
+        message(WARNING "DONUT_STREAMLINE_FETCH_TAG is deprecated. Use DONUT_STREAMLINE_FETCH_SHA256 instead. Tag fetching from the public repo no longer has the binaries.")
     endif()
 
-    if ((CAUSTICA_STREAMLINE_FETCH_URL AND NOT CAUSTICA_STREAMLINE_FETCH_SHA256) OR
-        (NOT CAUSTICA_STREAMLINE_FETCH_URL AND CAUSTICA_STREAMLINE_FETCH_SHA256))
-        message(SEND_ERROR "Both CAUSTICA_STREAMLINE_FETCH_URL and CAUSTICA_STREAMLINE_FETCH_SHA256 must be defined together")
+    if ((DONUT_STREAMLINE_FETCH_URL AND NOT DONUT_STREAMLINE_FETCH_SHA256) OR
+        (NOT DONUT_STREAMLINE_FETCH_URL AND DONUT_STREAMLINE_FETCH_SHA256))
+        message(SEND_ERROR "Both DONUT_STREAMLINE_FETCH_URL and DONUT_STREAMLINE_FETCH_SHA256 must be defined together")
     endif()
 
-    if (CAUSTICA_STREAMLINE_FETCH_URL AND CAUSTICA_STREAMLINE_FETCH_SHA256)
-        message(STATUS "Updating Streamline from " ${CAUSTICA_STREAMLINE_FETCH_URL} ", SHA256 " ${CAUSTICA_STREAMLINE_FETCH_SHA256} ", into folder " ${CAUSTICA_STREAMLINE_FETCH_DIR} " - please wait!" )
+    if (DONUT_STREAMLINE_FETCH_URL AND DONUT_STREAMLINE_FETCH_SHA256)
+        message(STATUS "Updating Streamline from " ${DONUT_STREAMLINE_FETCH_URL} ", SHA256 " ${DONUT_STREAMLINE_FETCH_SHA256} ", into folder " ${DONUT_STREAMLINE_FETCH_DIR} " - please wait!" )
         FetchContent_Declare(
             streamline
-            URL ${CAUSTICA_STREAMLINE_FETCH_URL}
-            URL_HASH SHA256=${CAUSTICA_STREAMLINE_FETCH_SHA256}
-            SOURCE_DIR ${CAUSTICA_STREAMLINE_FETCH_DIR}
+            URL ${DONUT_STREAMLINE_FETCH_URL}
+            URL_HASH SHA256=${DONUT_STREAMLINE_FETCH_SHA256}
+            SOURCE_DIR ${DONUT_STREAMLINE_FETCH_DIR}
             DOWNLOAD_EXTRACT_TIMESTAMP TRUE
         )
         FetchContent_MakeAvailable(streamline)
     else()
-        if (CAUSTICA_STREAMLINE_SEARCH_PATHS)
-            set(STREAMLINE_SEARCH_PATHS ${CAUSTICA_STREAMLINE_SEARCH_PATHS})
+        if (DONUT_STREAMLINE_SEARCH_PATHS)
+            set(STREAMLINE_SEARCH_PATHS ${DONUT_STREAMLINE_SEARCH_PATHS})
         endif()
         find_package(STREAMLINE REQUIRED)
 
@@ -330,7 +330,7 @@ if (WIN32)
         DXIL ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderPrecompiled/nrd/dxil
     )
 endif()
-CAUSTICA_compile_shaders(${nrd_shader_compile_args})
+donut_compile_shaders(${nrd_shader_compile_args})
 
 ##########################################################################
 ########################### Opacity Micro-Map SDK ########################
@@ -366,7 +366,7 @@ if (WIN32)
         DXIL ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderPrecompiled/omm/dxil
     )
 endif()
-CAUSTICA_compile_shaders(${omm_shader_compile_args})
+donut_compile_shaders(${omm_shader_compile_args})
 
 ##########################################################################
 ################################ RTXDI SDK ###############################

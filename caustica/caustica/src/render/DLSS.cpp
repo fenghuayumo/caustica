@@ -1,16 +1,16 @@
-#if CAUSTICA_WITH_DLSS
+#if DONUT_WITH_DLSS
 
 #include <render/DLSS.h>
 #include <assets/loader/ShaderFactory.h>
 
-#if CAUSTICA_WITH_STATIC_SHADERS
-#if CAUSTICA_WITH_DX11
+#if DONUT_WITH_STATIC_SHADERS
+#if DONUT_WITH_DX11
 #include "compiled_shaders/passes/dlss_exposure_cs.dxbc.h"
 #endif
-#if CAUSTICA_WITH_DX12
+#if DONUT_WITH_DX12
 #include "compiled_shaders/passes/dlss_exposure_cs.dxil.h"
 #endif
-#if CAUSTICA_WITH_VULKAN
+#if DONUT_WITH_VULKAN
 #include "compiled_shaders/passes/dlss_exposure_cs.spirv.h"
 #endif
 #endif
@@ -20,8 +20,8 @@ using namespace caustica::render;
 DLSS::DLSS(nvrhi::IDevice* device, caustica::ShaderFactory& shaderFactory)
     : m_device(device)
 {
-    m_exposureShader = shaderFactory.CreateAutoShader("caustica/passes/dlss_exposure_cs.hlsl", "main",
-        CAUSTICA_MAKE_PLATFORM_SHADER(g_dlss_exposure_cs), nullptr, nvrhi::ShaderType::Compute);
+    m_exposureShader = shaderFactory.CreateAutoShader("donut/passes/dlss_exposure_cs.hlsl", "main",
+        DONUT_MAKE_PLATFORM_SHADER(g_dlss_exposure_cs), nullptr, nvrhi::ShaderType::Compute);
 
     auto layoutDesc = nvrhi::BindingLayoutDesc()
         .setVisibility(nvrhi::ShaderType::Compute)
@@ -105,19 +105,19 @@ void DLSS::ComputeExposure(nvrhi::ICommandList* commandList, nvrhi::IBuffer* ton
     switch(device->getGraphicsAPI())
     {
     case nvrhi::GraphicsAPI::D3D11:
-        #if CAUSTICA_WITH_DX11
+        #if DONUT_WITH_DX11
         return DLSS::CreateDX11(device, shaderFactory, directoryWithExecutable, applicationID);
         #else
         return nullptr;
         #endif
     case nvrhi::GraphicsAPI::D3D12:
-        #if CAUSTICA_WITH_DX12
+        #if DONUT_WITH_DX12
         return DLSS::CreateDX12(device, shaderFactory, directoryWithExecutable, applicationID);
         #else
         return nullptr;
         #endif
     case nvrhi::GraphicsAPI::VULKAN:
-        #if CAUSTICA_WITH_VULKAN
+        #if DONUT_WITH_VULKAN
         return DLSS::CreateVK(device, shaderFactory, directoryWithExecutable, applicationID);
         #else
         return nullptr;

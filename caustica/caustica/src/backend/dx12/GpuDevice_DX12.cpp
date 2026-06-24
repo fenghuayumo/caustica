@@ -15,7 +15,7 @@
 
 #include <sstream>
 
-#if CAUSTICA_WITH_STREAMLINE
+#if DONUT_WITH_STREAMLINE
 #include <StreamlineIntegration.h>
 #endif
 
@@ -88,7 +88,7 @@ void GpuDevice_DX12::ReportLiveObjects()
 
 bool GpuDevice_DX12::CreateInstanceInternal()
 {
-#if CAUSTICA_WITH_STREAMLINE
+#if DONUT_WITH_STREAMLINE
     StreamlineIntegration::Get().InitializePreDevice(nvrhi::GraphicsAPI::D3D12, m_DeviceParams.streamlineAppId, m_DeviceParams.checkStreamlineSignature, m_DeviceParams.enableStreamlineLog);
 #endif
 
@@ -168,7 +168,7 @@ bool GpuDevice_DX12::CreateDevice()
     
     int adapterIndex = m_DeviceParams.adapterIndex;
 
-#if CAUSTICA_WITH_STREAMLINE
+#if DONUT_WITH_STREAMLINE
     // Auto select best adapter for streamline features
     if (adapterIndex < 0)
         adapterIndex = StreamlineIntegration::Get().FindBestAdapterDX();
@@ -217,7 +217,7 @@ bool GpuDevice_DX12::CreateDevice()
         caustica::error("D3D12 device creation failed, error code = 0x%08x", hr);
         return false;
     }
-#if CAUSTICA_WITH_STREAMLINE
+#if DONUT_WITH_STREAMLINE
     StreamlineIntegration::Get().SetD3DDevice(m_Device12);
 #endif
 
@@ -280,7 +280,7 @@ bool GpuDevice_DX12::CreateDevice()
     deviceDesc.pGraphicsCommandQueue = m_GraphicsQueue;
     deviceDesc.pComputeCommandQueue = m_ComputeQueue;
     deviceDesc.pCopyCommandQueue = m_CopyQueue;
-#if CAUSTICA_WITH_AFTERMATH
+#if DONUT_WITH_AFTERMATH
     deviceDesc.aftermathEnabled = m_DeviceParams.enableAftermath;
 #endif
     deviceDesc.logBufferLifetime = m_DeviceParams.logBufferLifetime;
@@ -293,7 +293,7 @@ bool GpuDevice_DX12::CreateDevice()
         m_NvrhiDevice = m_NvrhiDevice = nvrhi::validation::createValidationLayer(m_NvrhiDevice);
     }
 
-#if CAUSTICA_WITH_STREAMLINE
+#if DONUT_WITH_STREAMLINE
     StreamlineIntegration::Get().InitializeDeviceDX(m_NvrhiDevice);
 #endif
 

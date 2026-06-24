@@ -813,7 +813,7 @@ void SampleUI::BuildUIPerformancePresets()
 
 void SampleUI::DLSSFGSelectorUI()
 {
-#if !CAUSTICA_WITH_STREAMLINE
+#if !DONUT_WITH_STREAMLINE
     return;
 #else
     const char* items[] = { "Off", "2x", "3x", "4x" };
@@ -913,7 +913,7 @@ void SampleUI::buildUI(void)
             }
 
             {
-#if CAUSTICA_WITH_STREAMLINE
+#if DONUT_WITH_STREAMLINE
                 UI_SCOPED_DISABLE(m_ui.ActualDLSSFGMode() != SI::DLSSGMode::eOff);
 #endif
                 ImGui::Checkbox("VSync", &m_ui.EnableVsync);
@@ -1758,7 +1758,7 @@ void SampleUI::buildUI(void)
 
             if (ImGui::CollapsingHeader("Reflex", 0))
             {
-    #if CAUSTICA_WITH_STREAMLINE
+    #if DONUT_WITH_STREAMLINE
                 ImGui::Text("Reflex LowLatency Supported: %s", m_ui.IsReflexSupported && m_ui.IsReflexLowLatencyAvailable ? "yes" : "no");
                 if (m_ui.IsReflexSupported && m_ui.IsReflexLowLatencyAvailable)
                 {
@@ -1804,7 +1804,7 @@ void SampleUI::buildUI(void)
 
             if (ImGui::CollapsingHeader("DLSS-G", 0))
             {
-    #if CAUSTICA_WITH_STREAMLINE
+    #if DONUT_WITH_STREAMLINE
                 ImGui::Text("DLSS-G Supported: %s", m_ui.IsDLSSFGSupported ? "yes" : "no");
                 if (m_ui.IsDLSSFGSupported)
                 {

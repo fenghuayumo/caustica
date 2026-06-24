@@ -104,7 +104,7 @@ void caustica::AftermathCrashDump::WaitForCrashDump(uint32_t maxTimeoutSeconds)
 
 uint64_t caustica::AftermathCrashDump::GetShaderHashForBinary(std::pair<const void*, size_t> shaderBinary, nvrhi::GraphicsAPI api)
 {
-#if CAUSTICA_WITH_VULKAN
+#if DONUT_WITH_VULKAN
     if (api == nvrhi::GraphicsAPI::VULKAN)
     {
         GFSDK_Aftermath_SpirvCode spirv = {};
@@ -115,7 +115,7 @@ uint64_t caustica::AftermathCrashDump::GetShaderHashForBinary(std::pair<const vo
         return hash.hash;
     }
 #endif
-#if CAUSTICA_WITH_DX11 || CAUSTICA_WITH_DX12
+#if DONUT_WITH_DX11 || DONUT_WITH_DX12
     if (api == nvrhi::GraphicsAPI::D3D11 || api == nvrhi::GraphicsAPI::D3D12)
     {
         D3D12_SHADER_BYTECODE dxil = {};
@@ -139,10 +139,10 @@ void caustica::AftermathCrashDump::InitializeAftermathCrashDump(AftermathCrashDu
     }
 
     uint32_t watchedApis = GFSDK_Aftermath_GpuCrashDumpWatchedApiFlags_None;
-#if CAUSTICA_WITH_DX11 || CAUSTICA_WITH_DX12
+#if DONUT_WITH_DX11 || DONUT_WITH_DX12
     watchedApis |= GFSDK_Aftermath_GpuCrashDumpWatchedApiFlags_DX;
 #endif
-#if CAUSTICA_WITH_VULKAN
+#if DONUT_WITH_VULKAN
     watchedApis |= GFSDK_Aftermath_GpuCrashDumpWatchedApiFlags_Vulkan;
 #endif
     uint32_t featureFlags = GFSDK_Aftermath_GpuCrashDumpFeatureFlags_DeferDebugInfoCallbacks;

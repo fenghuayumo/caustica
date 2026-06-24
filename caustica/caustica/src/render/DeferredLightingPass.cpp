@@ -10,14 +10,14 @@
 #include <core/log.h>
 #include <utility>
 
-#if CAUSTICA_WITH_STATIC_SHADERS
-#if CAUSTICA_WITH_DX11
+#if DONUT_WITH_STATIC_SHADERS
+#if DONUT_WITH_DX11
 #include "compiled_shaders/passes/deferred_lighting_cs.dxbc.h"
 #endif
-#if CAUSTICA_WITH_DX12
+#if DONUT_WITH_DX12
 #include "compiled_shaders/passes/deferred_lighting_cs.dxil.h"
 #endif
-#if CAUSTICA_WITH_VULKAN
+#if DONUT_WITH_VULKAN
 #include "compiled_shaders/passes/deferred_lighting_cs.spirv.h"
 #endif
 #endif
@@ -100,7 +100,7 @@ void caustica::render::DeferredLightingPass::Init(const std::shared_ptr<caustica
 
 nvrhi::ShaderHandle DeferredLightingPass::CreateComputeShader(ShaderFactory& shaderFactory)
 {
-    return shaderFactory.CreateAutoShader("caustica/passes/deferred_lighting_cs.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_deferred_lighting_cs), nullptr, nvrhi::ShaderType::Compute);
+    return shaderFactory.CreateAutoShader("donut/passes/deferred_lighting_cs.hlsl", "main", DONUT_MAKE_PLATFORM_SHADER(g_deferred_lighting_cs), nullptr, nvrhi::ShaderType::Compute);
 }
 
 void DeferredLightingPass::Render(

@@ -1,4 +1,4 @@
-// Partially based on "caustica/include/caustica/shaders/packing.hlsli"
+// Partially based on "donut/include/donut/shaders/packing.hlsli"
 
 #ifndef __PACKING_HLSLI__
 #define __PACKING_HLSLI__

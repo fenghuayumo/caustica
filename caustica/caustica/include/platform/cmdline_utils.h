@@ -24,11 +24,11 @@ inline nvrhi::GraphicsAPI GetGraphicsAPIFromCommandLine(int argc, const char* co
             return nvrhi::GraphicsAPI::VULKAN;
     }
 
-#if CAUSTICA_WITH_DX12
+#if DONUT_WITH_DX12
     return nvrhi::GraphicsAPI::D3D12;
-#elif CAUSTICA_WITH_VULKAN
+#elif DONUT_WITH_VULKAN
     return nvrhi::GraphicsAPI::VULKAN;
-#elif CAUSTICA_WITH_DX11
+#elif DONUT_WITH_DX11
     return nvrhi::GraphicsAPI::D3D11;
 #else
     #error "No Graphics API defined"

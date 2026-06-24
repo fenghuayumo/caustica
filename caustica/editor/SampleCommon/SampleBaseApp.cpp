@@ -211,7 +211,7 @@ SampleBaseApp::InitReturnCodes SampleBaseApp::Init(int argc, const char* const* 
     m_MainSceneRender->Init(preferredScene, m_ShaderFactory);
     m_GpuDevice->AddRenderPassToBack(m_MainSceneRender.get());
 
-#if CAUSTICA_WITH_DX12 && (RTXPT_D3D_AGILITY_SDK_VERSION >= 619)   // temporary
+#if DONUT_WITH_DX12 && (RTXPT_D3D_AGILITY_SDK_VERSION >= 619)   // temporary
     // When using AgilitySDK >= 619, we require shader model 6.9
     if (m_GpuDevice->GetDevice()->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D12)
     {
@@ -369,7 +369,7 @@ caustica::DeviceCreationParameters SampleBaseApp::GetDefaultDeviceParams() const
     deviceParams.startBorderless = false;
     deviceParams.vsyncEnabled = true;
     deviceParams.enableRayTracingExtensions = true;
-#if CAUSTICA_WITH_DX12
+#if DONUT_WITH_DX12
 #if defined(RTXPT_D3D_AGILITY_SDK_VERSION)
     deviceParams.featureLevel = D3D_FEATURE_LEVEL_12_2;
     // TODO: Redefining this isn't needed. Take the ones from AgilitySDK
@@ -390,7 +390,7 @@ caustica::DeviceCreationParameters SampleBaseApp::GetDefaultDeviceParams() const
 #endif
     deviceParams.supportExplicitDisplayScaling = true;
 
-#if CAUSTICA_WITH_STREAMLINE
+#if DONUT_WITH_STREAMLINE
     deviceParams.checkStreamlineSignature = true;   // <- Set to false if you're using a local build of streamline
     deviceParams.streamlineAppId = 231313132;
 #if defined(_DEBUG)
@@ -398,7 +398,7 @@ caustica::DeviceCreationParameters SampleBaseApp::GetDefaultDeviceParams() const
 #endif
 #endif
 
-#if CAUSTICA_WITH_VULKAN
+#if DONUT_WITH_VULKAN
 #if RTXPT_WITH_NATIVE_DLSS
     caustica::render::DLSS::GetRequiredVulkanExtensions(
         deviceParams.requiredVulkanInstanceExtensions,

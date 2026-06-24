@@ -12,15 +12,15 @@
 #include <iomanip>
 #include <sstream>
 
-#if CAUSTICA_WITH_DX11
+#if DONUT_WITH_DX11
 #include <d3d11.h>
 #endif
 
-#if CAUSTICA_WITH_DX12
+#if DONUT_WITH_DX12
 #include <d3d12.h>
 #endif
 
-#if CAUSTICA_WITH_STREAMLINE
+#if DONUT_WITH_STREAMLINE
 #include <StreamlineIntegration.h>
 #endif
 
@@ -29,7 +29,7 @@
 #pragma comment(lib, "shcore.lib")
 #endif
 
-#if defined(_WINDOWS) && CAUSTICA_FORCE_DISCRETE_GPU
+#if defined(_WINDOWS) && DONUT_FORCE_DISCRETE_GPU
 extern "C"
 {
     // Declaring this symbol makes the OS run the app on the discrete GPU on NVIDIA Optimus laptops by default
@@ -179,7 +179,7 @@ bool GpuDevice::CreateInstance(const InstanceParameters& params)
             return false;
     }
 
-#if CAUSTICA_WITH_AFTERMATH
+#if DONUT_WITH_AFTERMATH
     if (params.enableAftermath)
     {
         m_AftermathCrashDumper.EnableCrashDumpTracking();
@@ -691,7 +691,7 @@ const DeviceCreationParameters& GpuDevice::GetDeviceParams()
 }
 
 caustica::GpuDevice::GpuDevice()
-#if CAUSTICA_WITH_AFTERMATH
+#if DONUT_WITH_AFTERMATH
     : m_AftermathCrashDumper(*this)
 #endif
 {
@@ -756,7 +756,7 @@ void GpuDevice::MouseScrollUpdate(double xoffset, double yoffset)
 
 void GpuDevice::Shutdown()
 {
-#if CAUSTICA_WITH_STREAMLINE
+#if DONUT_WITH_STREAMLINE
     // Shut down Streamline before destroying swap chain and device.
     StreamlineIntegration::Get().Shutdown();
 #endif
@@ -862,15 +862,15 @@ caustica::GpuDevice* caustica::GpuDevice::Create(nvrhi::GraphicsAPI api)
 {
     switch (api)
     {
-#if CAUSTICA_WITH_DX11
+#if DONUT_WITH_DX11
     case nvrhi::GraphicsAPI::D3D11:
         return CreateD3D11();
 #endif
-#if CAUSTICA_WITH_DX12
+#if DONUT_WITH_DX12
     case nvrhi::GraphicsAPI::D3D12:
         return CreateD3D12();
 #endif
-#if CAUSTICA_WITH_VULKAN
+#if DONUT_WITH_VULKAN
     case nvrhi::GraphicsAPI::VULKAN:
         return CreateVK();
 #endif
@@ -908,7 +908,7 @@ void DefaultMessageCallback::message(nvrhi::MessageSeverity severity, const char
     caustica::message(donutSeverity, "%s", messageText);
 }
 
-#if CAUSTICA_WITH_STREAMLINE
+#if DONUT_WITH_STREAMLINE
 StreamlineInterface& GpuDevice::GetStreamline()
 {
     // StreamlineIntegration doesn't support instances
