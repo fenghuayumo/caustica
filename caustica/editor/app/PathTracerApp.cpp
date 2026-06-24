@@ -2267,22 +2267,23 @@ SimpleViewConstants FromPlanarViewConstants(PlanarViewConstants & view)
 }
 
 void PathTracerApp::PostProcessPreToneMapping(nvrhi::ICommandList* commandList, const caustica::ICompositeView& compositeView)
-{ // a.k.a. HDR post-process (e.g. bloom goes here)
-    caustica::PlanarView fullscreenView = *m_renderCore.camera().view();
-    nvrhi::Viewport windowViewport(float(m_displaySize.x), float(m_displaySize.y));
-    fullscreenView.SetViewport(windowViewport);
-    fullscreenView.UpdateCache();
+{
+    (void)compositeView;
 
-    if (m_settings.EnableBloom && m_settings.BloomIntensity > 0.f && m_settings.BloomRadius > 0.f)
-    {
-        m_bloomPass->Render(m_commandList, m_renderTargets->ProcessedOutputFramebuffer, fullscreenView, m_renderTargets->ProcessedOutputColor, m_settings.BloomRadius, m_settings.BloomIntensity);
-    }
+    HdrPostProcessParams hdrParams{
+        m_settings,
+        commandList,
+        m_renderTargets.get(),
+        m_displaySize,
+        m_bloomPass.get(),
+    };
+    m_renderCore.hdrPostProcess(hdrParams);
 
     if (m_settings.PostProcessTestPassHDR)
     {
-        m_commandList->beginMarker("TestRaygenPP_HDR");
+        commandList->beginMarker("TestRaygenPP_HDR");
 
-        m_commandList->setTextureState(m_renderTargets->ProcessedOutputColor, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+        commandList->setTextureState(m_renderTargets->ProcessedOutputColor, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
 
         nvrhi::rt::DispatchRaysArguments args;
         args.width = m_displaySize.x;
@@ -2291,15 +2292,15 @@ void PathTracerApp::PostProcessPreToneMapping(nvrhi::ICommandList* commandList, 
         nvrhi::rt::State state;
         state.shaderTable = m_ptPipelineTestRaygenPPHDR->GetShaderTable();
         state.bindings = { m_bindingSet, m_DescriptorTable->GetDescriptorTable() };
-        m_commandList->setRayTracingState(state);
+        commandList->setRayTracingState(state);
 
         SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
-        m_commandList->setPushConstants(&miniConstants, sizeof(miniConstants));
-        m_commandList->dispatchRays(args);
+        commandList->setPushConstants(&miniConstants, sizeof(miniConstants));
+        commandList->dispatchRays(args);
 
-        m_commandList->setTextureState(m_renderTargets->ProcessedOutputColor, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+        commandList->setTextureState(m_renderTargets->ProcessedOutputColor, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
 
-        m_commandList->endMarker();
+        commandList->endMarker();
     }
 }
 

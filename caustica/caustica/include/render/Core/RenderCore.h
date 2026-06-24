@@ -5,6 +5,7 @@
 #include <render/Core/RenderPipeline.h>
 
 #include <render/Core/PostProcessAA.h>
+#include <render/Core/HdrPostProcess.h>
 #include <render/Core/SceneGeometryUpdate.h>
 #include <render/Core/LightingUpdate.h>
 
@@ -35,6 +36,7 @@ public:
     void onSceneUnloading();
 
     void postProcessAA(PostProcessAAParams& params);
+    void hdrPostProcess(HdrPostProcessParams& params);
     void updateSceneGeometry(UpdateSceneGeometryParams& params);
     void preUpdateLighting(PreUpdateLightingParams& params);
     void updateLighting(UpdateLightingParams& params);
