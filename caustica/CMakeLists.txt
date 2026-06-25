@@ -217,7 +217,7 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         $<$<CXX_COMPILER_ID:GNU>:-Wno-error=unused-result>
     )
 endif()
-target_link_libraries(causticaCore PUBLIC cxxopts causticaRender)
+target_link_libraries(causticaCore PUBLIC cxxopts causticaRender causticaEngine)
 target_include_directories(causticaCore PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}"
     "${CMAKE_CURRENT_SOURCE_DIR}/editor"
@@ -316,7 +316,7 @@ macro(add_caustica_sample TARGET_NAME MAIN_SOURCE)
     if (MSVC)
         target_compile_options(${TARGET_NAME} PRIVATE /utf-8)
     endif()
-    target_link_libraries(${TARGET_NAME} PRIVATE causticaCore)
+    target_link_libraries(${TARGET_NAME} PRIVATE causticaCore nvrhi)
     add_dependencies(${TARGET_NAME} caustica_shaders nrd_shaders omm_shaders ShaderDynamicAssets ShaderDynamicAssets_CopyAlways)
     set_target_properties(${TARGET_NAME} PROPERTIES 
         FOLDER ${folder}

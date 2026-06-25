@@ -119,6 +119,8 @@ file(GLOB caustica_engine_engine_src
     src/engine/*.c
     src/engine/*.h
 )
+# Material.cpp is now in causticaScene (scene type methods)
+list(FILTER caustica_engine_engine_src EXCLUDE REGEX ".*/Material\\.cpp$")
 
 # Core utilities with scene/render dependencies (MediaFileSystem uses FindScenes)
 file(GLOB caustica_engine_core_util_src
@@ -252,9 +254,29 @@ list(APPEND caustica_engine_engine_src
 # ---------------------------------------------------------------------------
 # causticaScene — Scene data types, camera, animation, game model
 # ---------------------------------------------------------------------------
+# Scene layer: ECS, scene graph, scene types, camera (DIVSHOT-style architecture)
+
+file(GLOB caustica_engine_scene_src
+    include/scene/*.h
+    src/scene/*.cpp
+    include/scene/camera/*.h
+    src/scene/camera/*.cpp
+    include/scene/game/*.h
+    src/scene/game/*.cpp
+)
+
+# Animation layer: keyframe animation system
+file(GLOB caustica_engine_animation_src
+    include/animation/*.h
+    src/animation/*.cpp
+)
+
 add_library(causticaScene STATIC
     ${caustica_engine_scene_src}
     ${caustica_engine_animation_src}
+    # Material.cpp defines Material::FillConstantBuffer and Material::SetProperty
+    # which are scene-type methods needed by Scene.cpp
+    src/engine/Material.cpp
 )
 
 target_include_directories(causticaScene
@@ -265,7 +287,13 @@ target_include_directories(causticaScene
 
 target_link_libraries(causticaScene
     PUBLIC
-        causticaEngine
+        causticaBase
+        causticaEvents
+        nvrhi
+        stb
+        cgltf
+    PRIVATE
+        glfw
 )
 
 if (MSVC)
@@ -279,8 +307,10 @@ endif()
 set_target_properties(causticaScene PROPERTIES FOLDER "caustica/caustica")
 
 # ---------------------------------------------------------------------------
-# causticaRender — Render passes, world renderer, GPU utilities, assets
+# causticaRender — Render passes, world renderer, GPU utilities, assets,
+#                   Scene GPU methods, SceneManager, Scene GPU data types
 # ---------------------------------------------------------------------------
+
 add_library(causticaRender STATIC
     ${caustica_engine_render_src}
     ${caustica_engine_assets_src}
@@ -304,6 +334,11 @@ target_link_libraries(causticaRender
         Rtxdi
         omm-lib
         omm-gpu-nvrhi
+    PRIVATE
+        ShaderMakeBlob
+    PUBLIC
+        glfw
+        imgui
 )
 
 if (MSVC)
@@ -395,6 +430,7 @@ target_include_directories(causticaEngine
 
 target_link_libraries(causticaEngine
     PUBLIC
+        causticaScene
         causticaPlatform
         causticaEvents
         causticaBase

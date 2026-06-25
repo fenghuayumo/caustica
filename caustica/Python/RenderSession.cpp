@@ -35,6 +35,8 @@
 
 #include <GLFW/glfw3.h>
 #include <json/json.h>
+#include <core/json.h>
+#include <platform/glfw_window.h>
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -858,7 +860,7 @@ bool RenderSession::Step(float dt)
         }
     }
 
-    window = m_deviceManager->GetWindow();
+    GLFWwindow* window = m_deviceManager->GetWindow();
     return !window || !glfwWindowShouldClose(window);
 }
 

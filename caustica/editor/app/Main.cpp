@@ -1,5 +1,6 @@
 #include "EditorApplication.h"
 #include <platform/engine/os.h>
+#include <core/JobSystem.h>
 #include <cstring>
 
 #ifdef _WIN32
@@ -22,7 +23,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 int main(int __argc, const char** __argv)
 #endif
 {
-    caustica::OS::initialize();   // must be first — platform layer ready before anything else
+    caustica::OS::initialize();          // must be first — platform layer
+    caustica::JobSystem::Initialize();   // worker threads ready before any loading
 
 #ifdef _WIN32
     SplashScreen splashScreen;
@@ -40,5 +42,6 @@ int main(int __argc, const char** __argv)
     if (status == EditorApplication::StartupResult::Success)
         app.run();
 
+    caustica::JobSystem::Shutdown();
     return static_cast<int>(status);
 }

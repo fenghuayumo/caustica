@@ -288,10 +288,12 @@ bool GpuDevice_DX12::CreateDevice()
 
     m_NvrhiDevice = m_NvrhiDevice = nvrhi::d3d12::createDevice(deviceDesc);
 
+#if NVRHI_WITH_VALIDATION
     if (m_DeviceParams.enableNvrhiValidationLayer)
     {
-        m_NvrhiDevice = m_NvrhiDevice = nvrhi::validation::createValidationLayer(m_NvrhiDevice);
+        m_NvrhiDevice = nvrhi::validation::createValidationLayer(m_NvrhiDevice);
     }
+#endif
 
 #if CAUSTICA_WITH_STREAMLINE
     StreamlineIntegration::Get().InitializeDeviceDX(m_NvrhiDevice);
