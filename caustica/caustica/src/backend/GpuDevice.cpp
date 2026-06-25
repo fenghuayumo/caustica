@@ -1,8 +1,8 @@
 #include <backend/GpuDevice.h>
-#include <platform/Input.h>      // Platform layer: input dispatch
-#include <platform/window.h>     // Platform layer: Window abstraction
-#include <platform/glfw_window.h>// Platform layer: GLFW window
-#include <render/Core/RenderPassManager.h>  // Renderer layer: pass management
+#include <engine/Application.h>
+#include <platform/Input.h>
+#include <platform/window.h>
+#include <platform/glfw_window.h>
 #include <math/math.h>
 #include <core/log.h>
 #include <rhi/utils.h>
@@ -221,49 +221,6 @@ bool GpuDevice::CreateDeviceAndSwapChain(const DeviceCreationParameters& params,
     return true;
 }
 
-void GpuDevice::AddRenderPassToFront(IRenderPass *pRenderPass)
-{
-    m_vRenderPasses.remove(pRenderPass);
-    m_vRenderPasses.push_front(pRenderPass);
-
-    // Delegate to Renderer layer
-    if (!m_PassManager) m_PassManager = new RenderPassManager();
-    m_PassManager->addToFront(pRenderPass,
-        m_DeviceParams.backBufferWidth,
-        m_DeviceParams.backBufferHeight,
-        m_DeviceParams.swapChainSampleCount);
-
-    // Also register with the Input layer (if it implements IInputHandler)
-    if (!m_Input) m_Input = new Input();
-    if (auto* handler = dynamic_cast<IInputHandler*>(pRenderPass))
-        m_Input->registerHandler(handler);
-}
-
-void GpuDevice::AddRenderPassToBack(IRenderPass *pRenderPass)
-{
-    m_vRenderPasses.remove(pRenderPass);
-    m_vRenderPasses.push_back(pRenderPass);
-
-    // Delegate to Renderer layer
-    if (!m_PassManager) m_PassManager = new RenderPassManager();
-    m_PassManager->addToBack(pRenderPass,
-        m_DeviceParams.backBufferWidth,
-        m_DeviceParams.backBufferHeight,
-        m_DeviceParams.swapChainSampleCount);
-
-    // Also register with the Input layer (if it implements IInputHandler)
-    if (!m_Input) m_Input = new Input();
-    if (auto* handler = dynamic_cast<IInputHandler*>(pRenderPass))
-        m_Input->registerHandler(handler);
-}
-
-void GpuDevice::RemoveRenderPass(IRenderPass *pRenderPass)
-{
-    m_vRenderPasses.remove(pRenderPass);
-    if (m_PassManager) m_PassManager->remove(pRenderPass);
-    if (m_Input) { if (auto* h = dynamic_cast<IInputHandler*>(pRenderPass)) m_Input->unregisterHandler(h); }
-}
-
 void GpuDevice::RegisterInputHandler(IInputHandler* handler)
 {
     if (!m_Input) m_Input = new Input();
@@ -280,22 +237,19 @@ void GpuDevice::BackBufferResizing()
     m_SwapChain.framebuffers.clear();
     m_SwapChain.framebuffersWithDepth.clear();
 
-    if (m_PassManager)
-        m_PassManager->notifyResizing();
-    else
-        for (auto it : m_vRenderPasses)
-            it->BackBufferResizing();
+    if (m_frameDriver)
+        m_frameDriver->notifyBackBufferResizing();
 }
 
 void GpuDevice::BackBufferResized()
 {
     CreateDepthBuffer();
 
-    if (m_PassManager)
-        m_PassManager->notifyResized(m_DeviceParams.backBufferWidth, m_DeviceParams.backBufferHeight, m_DeviceParams.swapChainSampleCount);
-    else
-        for(auto it : m_vRenderPasses)
-            it->BackBufferResized(m_DeviceParams.backBufferWidth, m_DeviceParams.backBufferHeight, m_DeviceParams.swapChainSampleCount);
+    if (m_frameDriver)
+        m_frameDriver->notifyBackBufferResized(
+            m_DeviceParams.backBufferWidth,
+            m_DeviceParams.backBufferHeight,
+            m_DeviceParams.swapChainSampleCount);
 
     uint32_t backBufferCount = GetBackBufferCount();
     m_SwapChain.framebuffers.resize(backBufferCount);
@@ -316,14 +270,6 @@ void GpuDevice::BackBufferResized()
         {
             m_SwapChain.framebuffersWithDepth[index] = m_SwapChain.framebuffers[index];
         }
-    }
-}
-
-void GpuDevice::DisplayScaleChanged()
-{
-    for(auto it : m_vRenderPasses)
-    {
-        it->DisplayScaleChanged(m_DPIScaleFactorX, m_DPIScaleFactorY);
     }
 }
 
@@ -436,26 +382,6 @@ uint32_t GpuDevice::GetHeadlessBackBufferCount() const
     return uint32_t(m_HeadlessBackBuffers.size());
 }
 
-void GpuDevice::Animate(double elapsedTime, bool windowIsFocused)
-{
-    for(auto it : m_vRenderPasses)
-    {
-        if (windowIsFocused || it->ShouldAnimateUnfocused())
-        {
-            it->Animate(float(elapsedTime));
-            it->SetLatewarpOptions();
-        }
-    }
-}
-
-void GpuDevice::Render()
-{
-    for (auto it : m_vRenderPasses)
-    {
-        it->Render(GetCurrentFramebuffer(it->SupportsDepthBuffer()));
-    }
-}
-
 void GpuDevice::UpdateAverageFrameTime(double elapsedTime)
 {
     m_FrameTimeSum += elapsedTime;
@@ -467,18 +393,6 @@ void GpuDevice::UpdateAverageFrameTime(double elapsedTime)
         m_NumberOfAccumulatedFrames = 0;
         m_FrameTimeSum = 0.0;
     }
-}
-
-bool GpuDevice::ShouldRenderUnfocused() const
-{
-    for (auto it = m_vRenderPasses.crbegin(); it != m_vRenderPasses.crend(); it++)
-    {
-        bool ret = (*it)->ShouldRenderUnfocused();
-        if (ret)
-            return true;
-    }
-
-    return false;
 }
 
 void GpuDevice::GetDPIScaleInfo(float& x, float& y) const
@@ -567,8 +481,6 @@ void GpuDevice::Shutdown()
     m_WindowPtr = nullptr;
     delete m_Input;
     m_Input = nullptr;
-    delete m_PassManager;
-    m_PassManager = nullptr;
 
     m_InstanceCreated = false;
 }

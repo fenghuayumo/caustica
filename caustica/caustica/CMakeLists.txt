@@ -67,7 +67,7 @@ file(GLOB caustica_engine_engine_src
     src/engine/*.h
 )
 
-# Core utilities with scene/render dependencies (MediaFileSystem uses FindScenes / SceneRender)
+# Core utilities with scene/render dependencies (MediaFileSystem uses FindScenes)
 file(GLOB caustica_engine_core_util_src
     include/core/MediaFileSystem.h
     src/core/MediaFileSystem.cpp

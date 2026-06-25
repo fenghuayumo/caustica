@@ -13,6 +13,7 @@
 #include <render/Core/CommonRenderPasses.h>
 #include <assets/cache/TextureCache.h>
 #include <render/Core/BindingCache.h>
+#include <render/Passes/PostProcess/ToneMappingPasses.h>
 #include <render/Core/View.h>
 #include <render/Core/RenderSceneTypeFactory.h>
 #include <backend/GpuDevice.h>
@@ -236,7 +237,7 @@ FPSLimiter g_FPSLimiter;
 PathTracerApp::PathTracerApp(caustica::GpuDevice& deviceManager,
     const CommandLineOptions& cmdLine,
     SampleUIData& ui)
-    : caustica::SceneRender(&deviceManager )
+    : caustica::RenderContext(&deviceManager)
     , m_cmdLine(cmdLine)
     , m_settings(ui)
     , m_editor(ui)
@@ -259,13 +260,6 @@ PathTracerApp::PathTracerApp(caustica::GpuDevice& deviceManager,
 #endif
 
     RefreshEnvironmentMapMediaList();
-
-    // Wire SceneLoader to the subclass virtual LoadScene().
-    m_Loader.setLoadFunc([this](std::shared_ptr<caustica::IFileSystem> fs,
-                                const std::filesystem::path& path)
-    {
-        return LoadScene(std::move(fs), path);
-    });
 
     m_captureScriptManager = std::make_unique<CaptureScriptManager>(*this, m_ui, m_cmdLine);
 
@@ -293,7 +287,12 @@ PathTracerApp::~PathTracerApp()
 
 void PathTracerApp::DebugDrawLine( float3 start, float3 stop, float4 col1, float4 col2 )
 {
-    m_renderer->debugDrawLine(start, stop, col1, col2);
+    auto& lines = m_pathTracingRenderer->getCpuSideDebugLines();
+    if (int(lines.size()) + 2 >= MAX_DEBUG_LINES) return;
+    DebugLineStruct dls = { float4(start, 1), col1 };
+    DebugLineStruct dle = { float4(stop, 1), col2 };
+    lines.push_back(dls);
+    lines.push_back(dle);
 }
 
 void PathTracerApp::Init(const std::string& preferredScene,
@@ -330,7 +329,9 @@ void PathTracerApp::Init(const std::string& preferredScene,
     m_sceneManager = std::make_unique<SceneManager>(
         *GetGpuDevice(), *m_shaderFactory, m_TextureCache, m_DescriptorTable);
 
-    m_renderer = std::make_unique<Renderer>(*this);
+    m_sceneManager->setLoadingCallbacks(
+        [this]() { SceneLoaded(); },
+        [this]() { SceneUnloading(); });
 
     m_renderCore.initializeRenderPipeline(m_shaderFactory);
 
@@ -378,11 +379,13 @@ void PathTracerApp::SetCurrentScene( const std::string & sceneName, bool forceRe
         return;
 
     m_settings.ResetAccumulation = true;
-    SetAsynchronousLoadingEnabled( false );
+    m_sceneManager->setAsyncLoadingEnabled(false);
 
     m_progressLoading.Stop();
     m_progressLoading.Start("Loading scene...");
-    BeginLoadingScene( std::make_shared<caustica::NativeFileSystem>(), m_sceneManager->getCurrentScenePath() );
+    m_sceneManager->beginLoadingScene(
+        std::make_shared<caustica::NativeFileSystem>(),
+        m_sceneManager->getCurrentScenePath());
     if( m_sceneManager->getScene() == nullptr )
     {
         caustica::error( "Unable to load scene '%s'", sceneName.c_str() );
@@ -697,7 +700,6 @@ void PathTracerApp::BuildGaussianSplatEmissionProxyList()
 void PathTracerApp::SceneUnloading( )
 {
     m_editor.TogglableNodes = nullptr;
-    SceneRender::SceneUnloading();
     if (m_pathTracingRenderer)
         m_pathTracingRenderer->onSceneUnloading();
     m_renderCore.onSceneUnloading();
@@ -724,20 +726,57 @@ void PathTracerApp::SceneUnloading( )
     if (m_sampleGame!=nullptr) m_sampleGame->SceneUnloading();
 }
 
-bool PathTracerApp::LoadScene(std::shared_ptr<caustica::IFileSystem> fs, const std::filesystem::path& sceneFileName)
+bool PathTracerApp::IsSceneLoading() const
 {
-    m_progressLoading.Set(10);
-    return m_sceneManager->loadScene(std::move(fs), sceneFileName) != nullptr;
+    return m_sceneManager && m_sceneManager->isSceneLoading();
+}
+
+bool PathTracerApp::IsSceneLoaded() const
+{
+    return m_sceneManager && m_sceneManager->isSceneLoaded();
 }
 
 void PathTracerApp::UpdateCameraFromScene( const std::shared_ptr<caustica::PerspectiveCamera> & sceneCamera )
 {
-    m_renderer->updateCameraFromScene(sceneCamera);
+    m_renderCore.camera().updateFromSceneCamera(sceneCamera);
+
+    auto sceneCameraEx = std::dynamic_pointer_cast<caustica::PerspectiveCamera>(sceneCamera);
+    if (sceneCameraEx != nullptr)
+    {
+        ToneMappingParameters defaults;
+        m_settings.ToneMappingParams.autoExposure =
+            sceneCameraEx->enableAutoExposure.value_or(defaults.autoExposure);
+        m_settings.ToneMappingParams.exposureCompensation =
+            sceneCameraEx->exposureCompensation.value_or(defaults.exposureCompensation);
+        m_settings.ToneMappingParams.exposureValue =
+            sceneCameraEx->exposureValue.value_or(defaults.exposureValue);
+        m_settings.ToneMappingParams.exposureValueMin =
+            sceneCameraEx->exposureValueMin.value_or(defaults.exposureValueMin);
+        m_settings.ToneMappingParams.exposureValueMax =
+            sceneCameraEx->exposureValueMax.value_or(defaults.exposureValueMax);
+    }
 }
 
 void PathTracerApp::UpdateViews( nvrhi::IFramebuffer* framebuffer )
 {
-    m_renderer->updateViews(framebuffer);
+    (void)framebuffer;
+    m_renderCore.camera().updateViews(makeCameraUpdateParams());
+}
+
+caustica::CameraUpdateParams PathTracerApp::makeCameraUpdateParams() const
+{
+    auto& r = *m_pathTracingRenderer;
+    caustica::CameraUpdateParams params;
+    params.renderSize = r.getRenderSize();
+    params.displayAspectRatio = r.getDisplayAspectRatio();
+    params.sampleIndex = r.getSampleIndex();
+    params.frameIndex = r.getFrameIndex();
+    params.realtimeMode = m_settings.RealtimeMode;
+    params.realtimeAA = m_settings.RealtimeAA;
+    params.dbgFreezeRealtimeNoiseSeed = m_settings.DbgFreezeRealtimeNoiseSeed;
+    params.temporalAAJitter = m_settings.TemporalAntiAliasingJitter;
+    params.temporalAAPass = r.getTemporalAntiAliasingPass();
+    return params;
 }
 
 void PathTracerApp::CollectUncompressedTextures()
@@ -792,7 +831,11 @@ void PathTracerApp::SceneLoaded( )
 
     m_progressLoading.Set(55);
 
-    SceneRender::SceneLoaded( );
+    if (m_TextureCache && m_CommonPasses)
+    {
+        m_TextureCache->ProcessRenderingThreadCommands(*m_CommonPasses, 0.f);
+        m_TextureCache->LoadingFinished();
+    }
 
     m_progressLoading.Set(60);
 
@@ -961,6 +1004,9 @@ void PathTracerApp::Animate(float fElapsedTimeSeconds)
 
     m_lastDeltaTime = fElapsedTimeSeconds;
 
+    if (m_sceneManager)
+        m_sceneManager->updateLoading();
+
     m_renderCore.camera().camera().SetMoveSpeed(m_settings.CameraMoveSpeed);
 
     if( m_editor.ShaderAndACRefreshDelayedRequest > 0 )
@@ -1063,47 +1109,71 @@ void PathTracerApp::Animate(float fElapsedTimeSeconds)
 
 std::string PathTracerApp::GetResolutionInfo() const
 {
-    return m_renderer->getResolutionInfo();
+    auto& r = *m_pathTracingRenderer;
+    const auto* targets = r.getRenderTargets();
+    if (targets == nullptr || targets->OutputColor == nullptr)
+        return "uninitialized";
+    const auto renderSize = r.getRenderSize();
+    const auto displaySize = r.getDisplaySize();
+    if (dm::all(renderSize == displaySize))
+        return std::to_string(renderSize.x) + "x" + std::to_string(renderSize.y);
+    return std::to_string(renderSize.x) + "x" + std::to_string(renderSize.y)
+        + "->" + std::to_string(displaySize.x) + "x" + std::to_string(displaySize.y);
 }
 
 float PathTracerApp::GetAvgTimePerFrame() const
 {
-    return m_renderer->getAvgTimePerFrame();
+    if (m_benchFrames == 0) return 0.0f;
+    std::chrono::duration<double> elapsed = (m_benchLast - m_benchStart);
+    return float(elapsed.count() / m_benchFrames);
 }
 
 std::string PathTracerApp::GetCurrentCameraPosDirUp() const
 {
-    return m_renderer->getCurrentCameraPosDirUp();
+    return m_renderCore.camera().getPosDirUpString();
 }
 
 bool PathTracerApp::SetCurrentCameraPosDirUp(const std::string & val)
 {
-    return m_renderer->setCurrentCameraPosDirUp(val);
+    return m_renderCore.camera().setFromPosDirUpString(val);
 }
 
 void PathTracerApp::SetCameraVerticalFOV(float cameraFOV)
 {
-    m_renderer->setCameraVerticalFOV(cameraFOV);
+    m_renderCore.camera().setVerticalFOV(cameraFOV);
+    m_settings.ResetAccumulation = true;
+    m_pathTracingRenderer->setGaussianSplatTemporalReset(true);
 }
 
 void PathTracerApp::SetCameraIntrinsics(float fx, float fy, float cx, float cy, float width, float height)
 {
-    m_renderer->setCameraIntrinsics(fx, fy, cx, cy, width, height);
+    m_renderCore.camera().setIntrinsics(fx, fy, cx, cy, width, height);
+    m_settings.ResetAccumulation = true;
+    m_pathTracingRenderer->setGaussianSplatTemporalReset(true);
 }
 
 void PathTracerApp::ClearCameraIntrinsics()
 {
-    m_renderer->clearCameraIntrinsics();
+    m_renderCore.camera().clearIntrinsics();
+    m_settings.ResetAccumulation = true;
+    m_pathTracingRenderer->setGaussianSplatTemporalReset(true);
 }
 
 void PathTracerApp::SaveCurrentCamera() const
 {
-    m_renderer->saveCurrentCamera();
+    dm::float4x4 projMatrix = m_renderCore.camera().view()->GetProjectionMatrix();
+    float tanHalfFOVY = 1.0f / (projMatrix.m_data[1 * 4 + 1]);
+    float fovY = atanf(tanHalfFOVY) * 2.0f;
+
+    m_renderCore.camera().saveToFile(
+        GetDirectoryWithExecutable() / "campos.txt",
+        m_renderCore.camera().zNear(),
+        fovY);
 }
 
 void PathTracerApp::LoadCurrentCamera()
 {
-    m_renderer->loadCurrentCamera();
+    m_renderCore.camera().loadFromFile(GetDirectoryWithExecutable() / "campos.txt");
 }
 
 void PathTracerApp::FillPTPipelineGlobalMacros(std::vector<caustica::ShaderMacro> & macros)
@@ -1260,7 +1330,6 @@ void PathTracerApp::RequestMeshAccelRebuild(const std::shared_ptr<MeshInfo>& mes
 
 void PathTracerApp::BackBufferResizing()
 {
-    SceneRender::BackBufferResizing();
     m_pathTracingRenderer->onBackBufferResizing();
 }
 
@@ -2193,7 +2262,8 @@ static void ReadRGBA16Float3Staging(nvrhi::IDevice* device, nvrhi::IStagingTextu
 
 dm::float2 PathTracerApp::ComputeCameraJitter(uint frameIndex)
 {
-    return m_renderer->computeCameraJitter(frameIndex);
+    (void)frameIndex;
+    return m_renderCore.camera().computeJitter(makeCameraUpdateParams());
 }
 
 nvrhi::ITexture* PathTracerApp::GetLdrColorTexture() const

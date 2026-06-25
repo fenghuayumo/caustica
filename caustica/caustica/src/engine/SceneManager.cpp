@@ -67,6 +67,11 @@ SceneManager::SceneManager(caustica::GpuDevice&                     device,
     , m_textureCache(std::move(textureCache))
     , m_descriptorTable(std::move(descriptorTable))
 {
+    m_loader.setLoadFunc([this](std::shared_ptr<caustica::IFileSystem> fs,
+                                const std::filesystem::path& path)
+    {
+        return loadScene(std::move(fs), path) != nullptr;
+    });
 }
 
 SceneManager::~SceneManager() = default;
@@ -191,6 +196,48 @@ std::shared_ptr<caustica::Scene> SceneManager::loadScene(
 
     m_scene.reset();
     return nullptr;
+}
+
+void SceneManager::setAsyncLoadingEnabled(bool enabled)
+{
+    m_loader.setAsyncEnabled(enabled);
+}
+
+void SceneManager::setLoadingCallbacks(std::function<void()> onLoaded,
+                                       std::function<void()> onUnloading)
+{
+    m_loader.onLoaded = std::move(onLoaded);
+    m_loader.onUnloading = std::move(onUnloading);
+}
+
+void SceneManager::beginLoadingScene(std::shared_ptr<caustica::IFileSystem> fs,
+                                     const std::filesystem::path& sceneFileName)
+{
+    if (m_textureCache)
+        m_textureCache->Reset();
+
+    m_device.GetDevice()->waitForIdle();
+    m_device.GetDevice()->runGarbageCollection();
+
+    m_loader.beginLoading(std::move(fs), sceneFileName);
+
+    if (!m_loader.isLoading() && m_loader.isLoaded() && m_loader.onLoaded)
+        m_loader.onLoaded();
+}
+
+void SceneManager::updateLoading()
+{
+    m_loader.update();
+}
+
+bool SceneManager::isSceneLoading() const
+{
+    return m_loader.isLoading();
+}
+
+bool SceneManager::isSceneLoaded() const
+{
+    return m_loader.isLoaded();
 }
 
 // --- Environment map listing ---

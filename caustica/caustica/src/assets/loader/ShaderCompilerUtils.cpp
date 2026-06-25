@@ -4,7 +4,7 @@
 #include <core/path_utils.h>
 #include <render/Passes/Debug/picosha2.h>
 
-#include <render/Core/SceneRender.h>
+#include <backend/GpuDevice.h>
 #include <backend/ShaderUtils.h>
 #include <core/log.h>
 

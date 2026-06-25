@@ -33,9 +33,7 @@
 #include <rhi/nvrhi.h>
 #include <core/log.h>
 #include <backend/SwapChain.h>
-#include <render/Core/IRenderPass.h>
 
-#include <list>
 #include <functional>
 #include <optional>
 
@@ -44,8 +42,7 @@ namespace caustica
     class Input;              // Platform layer: input dispatch
     class IInputHandler;      // Platform layer: input handler interface
     class Window;             // Platform layer: window abstraction
-    class RenderPassManager;  // Renderer layer: pass management
-    class Application;            // Engine layer: message loop
+    class Application;        // Engine layer: frame driver
 
     struct DefaultMessageCallback : public nvrhi::IMessageCallback
     {
@@ -223,12 +220,11 @@ namespace caustica
         // Note: a call to CreateInstance() or Create*Device*() is required before EnumerateAdapters().
         virtual bool EnumerateAdapters(std::vector<AdapterInfo>& outAdapters) = 0;
 
-        void AddRenderPassToFront(IRenderPass *pController);
-        void AddRenderPassToBack(IRenderPass *pController);
-        void RemoveRenderPass(IRenderPass *pController);
-
         void RegisterInputHandler(IInputHandler* handler);
         void UnregisterInputHandler(IInputHandler* handler);
+
+        void setFrameDriver(Application* driver) { m_frameDriver = driver; }
+        [[nodiscard]] Application* getFrameDriver() const { return m_frameDriver; }
 
         // returns the size of the window in screen coordinates
         void GetWindowDimensions(int& width, int& height);
@@ -249,8 +245,7 @@ namespace caustica
         bool m_CanPresentSwapChain = true;    // false when the window is minimized
         // set to true if running on NV GPU
         bool m_IsNvidia = false;
-        RenderPassManager* m_PassManager = nullptr;  // Renderer layer: pass management
-        std::list<IRenderPass *> m_vRenderPasses;  // TODO: migrate to m_PassManager
+        Application* m_frameDriver = nullptr;
         // timestamp in seconds for the previous frame
         double m_PreviousFrameTimestamp = 0.0;
         // current DPI scale info (updated when window moves)
@@ -275,11 +270,8 @@ namespace caustica
         GpuDevice();
 
         void UpdateWindowSize();
-        bool ShouldRenderUnfocused() const;
-
         void BackBufferResizing();
         void BackBufferResized();
-        void DisplayScaleChanged();
         void CreateDepthBuffer();
         bool CreateHeadlessBackBuffers();
         void ReleaseHeadlessBackBuffers();
@@ -289,8 +281,6 @@ namespace caustica
         uint32_t GetCurrentHeadlessBackBufferIndex() const;
         uint32_t GetHeadlessBackBufferCount() const;
 
-        void Animate(double elapsedTime, bool windowIsFocused);
-        void Render();
         void UpdateAverageFrameTime(double elapsedTime);
         // device-specific methods
         virtual bool CreateInstanceInternal() = 0;

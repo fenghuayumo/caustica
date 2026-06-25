@@ -1,14 +1,15 @@
 #include "EditorApplication.h"
 
+#include <imgui/imgui_renderer.h>
+
 #include <algorithm>
 #include <cctype>
 #include <string>
 #include <render/Passes/Debug/Korgi.h>
 #include <SampleUI.h>
-#include "LocalConfig.h"
+#include "SampleCommon/LocalConfig.h"
 #include <assets/loader/ShaderPackFileSystem.h>
 
-#include <render/Core/SceneRender.h>
 #include <backend/ShaderUtils.h>
 #include <core/path_utils.h>
 #include <platform/cmdline_utils.h>
@@ -193,6 +194,8 @@ EditorApplication::StartupResult EditorApplication::startup(int argc, const char
         return StartupResult::FailToCreateDevice;
     }
 
+    bindFrameDriver(m_GpuDevice.get());
+
     // Check API feature support
     if (!CheckDeviceFeatureSupport(deviceParams))
     {
@@ -203,7 +206,7 @@ EditorApplication::StartupResult EditorApplication::startup(int argc, const char
 
     m_scenePass = std::make_unique<AdvancedPathTracer>(*m_GpuDevice, m_CmdLine, m_sampleUIData);
     m_scenePass->Init(preferredScene, m_ShaderFactory);
-    m_GpuDevice->AddRenderPassToBack(m_scenePass.get());
+    syncPassesToBackBuffer();
 
 #if CAUSTICA_WITH_DX12 && (CAUSTICA_D3D_AGILITY_SDK_VERSION >= 619)   // temporary
     // When using AgilitySDK >= 619, we require shader model 6.9
@@ -230,7 +233,7 @@ EditorApplication::StartupResult EditorApplication::startup(int argc, const char
     {
         m_uiPass = std::make_unique<SampleUI>(m_GpuDevice.get(), *this, *m_scenePass, m_sampleUIData, IsSERSupported(), m_CmdLine);
         m_uiPass->Init(m_ShaderFactory);
-        m_GpuDevice->AddRenderPassToBack(m_uiPass.get());
+        syncPassesToBackBuffer();
     }
     else
     {
@@ -289,11 +292,8 @@ void EditorApplication::shutdown()
     if (m_shutdownCalled)
         return;
 
-    if (m_uiPass && m_GpuDevice)
-    {
-        m_GpuDevice->RemoveRenderPass(m_uiPass.get());
-        m_uiPass.reset();
-    }
+    unbindFrameDriver(m_GpuDevice.get());
+    m_uiPass.reset();
 
 #if CAUSTICA_D3D12_WITH_NVAPI
     if (m_NVAPIValidationHandle != nullptr)
@@ -303,11 +303,8 @@ void EditorApplication::shutdown()
     }
 #endif
 
-    if (m_scenePass && m_GpuDevice)
-    {
-        m_GpuDevice->RemoveRenderPass(m_scenePass.get());
+    if (m_scenePass)
         m_scenePass.reset();
-    }
 
     m_ShaderFactory.reset();
 
@@ -608,4 +605,74 @@ bool EditorApplication::IsSERSupported() const
     const bool SERSupported = usingDX12 && deviceSupportsSER && !m_CmdLine.disableSER; // SER Only enabled in DX12 for now
 
     return SERSupported;
+}
+
+void EditorApplication::syncPassesToBackBuffer()
+{
+    if (!m_GpuDevice)
+        return;
+
+    const auto& params = m_GpuDevice->GetDeviceParams();
+    notifyBackBufferResizing();
+    notifyBackBufferResized(params.backBufferWidth, params.backBufferHeight, params.swapChainSampleCount);
+}
+
+void EditorApplication::onUpdate(float elapsedTimeSeconds, bool windowFocused)
+{
+    if (m_scenePass && (windowFocused || m_scenePass->ShouldAnimateUnfocused()))
+    {
+        m_scenePass->Animate(elapsedTimeSeconds);
+        m_scenePass->SetLatewarpOptions();
+    }
+
+    if (m_uiPass && (windowFocused || m_uiPass->ShouldAnimateUnfocused()))
+    {
+        caustica::ImGui_Renderer& ui = *m_uiPass;
+        ui.Animate(elapsedTimeSeconds);
+    }
+}
+
+void EditorApplication::onRender()
+{
+    caustica::GpuDevice* dm = getGpuDevice();
+    if (!dm)
+        return;
+
+    if (m_scenePass)
+        m_scenePass->Render(dm->GetCurrentFramebuffer(m_scenePass->SupportsDepthBuffer()));
+
+    if (m_uiPass)
+        m_uiPass->Render(dm->GetCurrentFramebuffer(m_uiPass->SupportsDepthBuffer()));
+}
+
+void EditorApplication::onBackBufferResizing()
+{
+    if (m_scenePass)
+        m_scenePass->BackBufferResizing();
+    if (m_uiPass)
+        m_uiPass->BackBufferResizing();
+}
+
+void EditorApplication::onBackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount)
+{
+    if (m_scenePass)
+        m_scenePass->BackBufferResized(width, height, sampleCount);
+    if (m_uiPass)
+        m_uiPass->BackBufferResized(width, height, sampleCount);
+}
+
+void EditorApplication::onDisplayScaleChanged(float scaleX, float scaleY)
+{
+    if (m_scenePass)
+        m_scenePass->DisplayScaleChanged(scaleX, scaleY);
+    if (m_uiPass)
+    {
+        caustica::ImGui_Renderer& ui = *m_uiPass;
+        ui.DisplayScaleChanged(scaleX, scaleY);
+    }
+}
+
+bool EditorApplication::shouldRenderWhenUnfocused() const
+{
+    return m_scenePass && m_scenePass->ShouldRenderUnfocused();
 }

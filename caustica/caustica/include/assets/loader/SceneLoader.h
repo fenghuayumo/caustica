@@ -17,7 +17,7 @@ namespace caustica
 // injected via setLoadFunc().  Call update() once per frame to join a
 // finished thread and fire the onLoaded callback.
 //
-// Typical usage from SceneRender:
+// Typical usage from SceneManager / editor app:
 //   m_Loader.setLoadFunc([this](auto fs, auto& path) {
 //       return LoadScene(fs, path);   // subclass virtual
 //   });

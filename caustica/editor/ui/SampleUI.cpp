@@ -1,7 +1,7 @@
 #include "ui/ui_macros.h"
 #include "PathTracerApp.h"
 #include "SampleCommon/ImGuiManager.h"
-#include "SampleCommon/EditorApplication.h"
+#include "EditorApplication.h"
 
 #include <inttypes.h>
 

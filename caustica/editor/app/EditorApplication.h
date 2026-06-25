@@ -36,7 +36,7 @@ class PathTracerApp;
 class SampleUI;
 
 // Desktop editor executable 
-// Owns GpuDevice/Window, registers scene + UI render passes, drives run().
+// Owns GpuDevice/Window, drives scene + UI render passes, runs the message loop.
 class EditorApplication : public caustica::Application
 {
 public:
@@ -63,6 +63,14 @@ public:
     bool IsSERSupported() const;
     bool QueryVideoMemoryInfo(uint64_t& outBudget, uint64_t& outCurrentUsage, uint64_t& outAvailableForReservation, uint64_t& outCurrentReservation);
 
+protected:
+	void onUpdate(float elapsedTimeSeconds, bool windowFocused) override;
+	void onRender() override;
+	void onBackBufferResizing() override;
+	void onBackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount) override;
+	void onDisplayScaleChanged(float scaleX, float scaleY) override;
+	bool shouldRenderWhenUnfocused() const override;
+
 private:
 	void RegisterLogCallback();
 	void SampleLogCallback(caustica::Severity severity, const char* message);
@@ -72,6 +80,7 @@ private:
 	bool InitDeviceAndWindow(const caustica::DeviceCreationParameters& deviceParams);
 	bool CheckDeviceFeatureSupport(const caustica::DeviceCreationParameters& deviceParams);
 	void CreateShaderFactory();
+	void syncPassesToBackBuffer();
 
 	caustica::Callback m_DefaultLogCallback = nullptr;
 	FPSLimiter m_FPSLimiter;

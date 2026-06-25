@@ -15,13 +15,14 @@
 #include <core/command_line.h>
 #include "SampleUI.h"
 
-#include <render/Core/SceneRender.h>
+#include <render/Core/RenderContext.h>
 #include <core/vfs/VFS.h>
 #include <render/Core/RenderCore.h>
+#include <render/Core/CameraController.h>
 #include <render/Passes/Geometry/BloomPass.h>
 #include <scene/camera/Camera.h>
 #include <engine/SceneManager.h>
-#include "SampleCommon/Renderer.h"
+#include <assets/cache/TextureCache.h>
 #include <render/Core/CommonRenderPasses.h>
 #if CAUSTICA_WITH_NATIVE_DLSS
 #include <render/Passes/Geometry/DLSS.h>
@@ -57,30 +58,31 @@ class OidnDenoiser;
 class PythonScripting;
 #endif
 class GaussianSplatPass;
-class Renderer;
 class PathTracingRenderer;
 
-// Scene editor + main 3D render pass (IRenderPass). Owns scene editing, UI state,
+// Scene editor + main 3D render pass. Owns scene editing, UI state,
 // and delegates GPU path tracing to PathTracingRenderer.
-class PathTracerApp : public caustica::SceneRender
+class PathTracerApp : public caustica::RenderContext
 {
-    friend class Renderer;
     friend class PathTracerInputController;
     friend class PathTracingRenderer;
 
-    // static constexpr uint32_t c_PathTracerVariants   = 6; // see shaders.cfg and CreatePTPipeline for details on variants
-
 public:
-    using SceneRender::SceneRender;
-
     PathTracerApp(caustica::GpuDevice& deviceManager,
         const CommandLineOptions& cmdLine,
         SampleUIData& ui);
     virtual ~PathTracerApp();
 
+    void SetLatewarpOptions() { }
+    bool ShouldAnimateUnfocused() { return false; }
+    bool SupportsDepthBuffer() { return true; }
+    void BackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount) { (void)width; (void)height; (void)sampleCount; }
+    void DisplayScaleChanged(float scaleX, float scaleY) { (void)scaleX; (void)scaleY; }
+
     //std::shared_ptr<caustica::IFileSystem> GetRootFs() const                      { return m_RootFS; }
     std::shared_ptr<caustica::ShaderFactory> GetShaderFactory() const          { return m_shaderFactory; }
-    std::shared_ptr<caustica::CommonRenderPasses> GetCommonPasses() const      { return m_CommonPasses; }
+    std::shared_ptr<caustica::CommonRenderPasses> GetCommonPasses() const { return m_CommonPasses; }
+    std::shared_ptr<caustica::TextureCache> GetTextureCache() const { return m_TextureCache; }
     nvrhi::ITexture*                       GetLdrColorTexture() const;
     std::shared_ptr<caustica::Scene>   GetScene() const                        { return m_sceneManager->getScene(); }
     std::vector<std::string> const &        GetAvailableScenes() const              { return m_sceneManager->getAvailableScenes(); }
@@ -143,16 +145,17 @@ public:
 
     void                                    Init(const std::string& preferredScene, const std::shared_ptr<caustica::ShaderFactory>& shaderFactory);
     void                                    SetCurrentScene(const std::string& sceneName, bool forceReload = false);
+    bool                                    IsSceneLoading() const;
+    bool                                    IsSceneLoaded() const;
     bool                                    LoadGaussianSplatFile(const std::filesystem::path& fileName, bool convertRdfToRub = true);
     uint32_t                                GetGaussianSplatCount() const;
     uint32_t                                GetGaussianSplatObjectCount() const;
     const std::string&                      GetGaussianSplatFileName() const;
 
-    virtual void                            SceneUnloading() override;
-    virtual bool                            LoadScene(std::shared_ptr<caustica::IFileSystem> fs, const std::filesystem::path& sceneFileName) override;
-    virtual void                            SceneLoaded() override;
-    virtual bool                            ShouldRenderUnfocused() override;
-    virtual void                            Animate(float fElapsedTimeSeconds) override;
+    virtual void                            SceneUnloading();
+    void                                    SceneLoaded();
+    virtual bool                            ShouldRenderUnfocused();
+    virtual void                            Animate(float fElapsedTimeSeconds);
 
     void                                    FillPTPipelineGlobalMacros(std::vector<caustica::ShaderMacro> & macros);
     bool                                    CreatePTPipeline(caustica::ShaderFactory& shaderFactory);
@@ -163,8 +166,8 @@ public:
     void                                    CreateAccelStructs(nvrhi::ICommandList* commandList);
     void                                    RecreateAccelStructs(nvrhi::ICommandList* commandList);
     void                                    RequestMeshAccelRebuild(const std::shared_ptr<caustica::MeshInfo>& mesh);
-    void                                    BackBufferResizing() override;
-    void                                    Render(nvrhi::IFramebuffer* framebuffer) override;
+    void                                    BackBufferResizing();
+    void                                    Render(nvrhi::IFramebuffer* framebuffer);
     virtual bool                            NeedsRasterPrecompute() { return false; } // TODO: do this in a nicer way, no time now
     virtual void                            SampleRenderCode(nvrhi::IFramebuffer* framebuffer, nvrhi::CommandListHandle commandList, const SampleConstants& constants) = 0; // TODO: Rename this
     virtual void                            CreateRTPipelines() = 0;
@@ -258,6 +261,7 @@ private:
 
     void                                    UpdateCameraFromScene( const std::shared_ptr<caustica::PerspectiveCamera> & sceneCamera );
     void                                    UpdateViews( nvrhi::IFramebuffer* framebuffer );
+    [[nodiscard]] caustica::CameraUpdateParams makeCameraUpdateParams() const;
     void                                    LoadGaussianSplatsFromScene();
     bool                                    AttachGaussianSplatToScene(const std::filesystem::path& fileName, bool convertRdfToRub);
     void                                    PrepareGaussianSplatPass(GaussianSplatPass& pass);
@@ -284,7 +288,6 @@ private:
     // Scene management + render orchestrator (engine)
     std::unique_ptr<SceneManager>               m_sceneManager;
     caustica::RenderCore                           m_renderCore;
-    std::unique_ptr<Renderer>                   m_renderer;
 
     // scene timing
     double                                      m_sceneTime = 0.;           // if m_ui.LoopLongestAnimation then it loops with longest animation
@@ -292,6 +295,7 @@ private:
 
     // device setup
     std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
+    std::shared_ptr<caustica::TextureCache> m_TextureCache;
     std::shared_ptr<caustica::CommonRenderPasses> m_CommonPasses;
     std::unique_ptr<caustica::BindingCache> m_bindingCache;
     std::shared_ptr<caustica::DescriptorTableManager> m_DescriptorTable;

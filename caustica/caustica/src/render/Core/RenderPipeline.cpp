@@ -2,8 +2,6 @@
 #include "render/Core/RenderTargets.h"
 #include "render/Core/CommonRenderPasses.h"
 #include "render/Core/BindingCache.h"
-#include "render/Core/IRenderPass.h"
-#include "assets/cache/TextureCache.h"
 
 #include <cassert>
 
@@ -121,7 +119,7 @@ void RenderPipeline::RecreateBindingSet(const nvrhi::BindingSetDesc& desc,
 // Pass registration
 // ---------------------------------------------------------------------------
 
-void RenderPipeline::RegisterPass(const std::string& name, caustica::IRenderPass* pass)
+void RenderPipeline::RegisterPass(const std::string& name, caustica::IRenderPipelinePass* pass)
 {
     m_passes.push_back({name, pass, nullptr});
 

@@ -2,7 +2,7 @@
 #include <assets/loader/ShaderCompilerUtils.h>
 #include <assets/loader/ShaderPackFileSystem.h>
 
-#include <render/Core/SceneRender.h>
+#include <backend/GpuDevice.h>
 #include <backend/ShaderUtils.h>
 #include <core/log.h>
 #include <core/vfs/VFS.h>

@@ -13,10 +13,21 @@ class CommonRenderPasses;
 class DescriptorTableManager;
 class ShaderFactory;
 struct ExecuteContext;
-class IRenderPass;
+class IRenderPipelinePass;
 } // namespace caustica
 
 class RenderTargets;
+
+namespace caustica
+{
+class IRenderPipelinePass
+{
+public:
+    virtual ~IRenderPipelinePass() = default;
+    virtual void Render(nvrhi::IFramebuffer* framebuffer) = 0;
+    virtual void BackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount) {}
+};
+} // namespace caustica
 
 // =============================================================================
 // RenderPipeline — owns shared rendering resources and manages the ordered
@@ -89,7 +100,7 @@ public:
                                                     dm::uint  sampleCount = 1) const;
 
     // Create (or recreate) all render targets. Destroys any existing targets
-    // and calls IRenderPass::OnResize on every registered pass.
+    // and calls BackBufferResized on every registered pass.
     void CreateRenderTargets(dm::uint2 renderSize,
                              dm::uint2 displaySize,
                              bool      enableMotionVectors,
@@ -117,7 +128,7 @@ public:
     // ========================================================================
 
     // Register a non-owning pass for ordered execution.
-    void RegisterPass(const std::string& name, caustica::IRenderPass* pass);
+    void RegisterPass(const std::string& name, caustica::IRenderPipelinePass* pass);
 
     // Create and register a pass, transferring ownership to the pipeline.
     // The pass type T must be constructable from (nvrhi::IDevice*, Args&&...).
@@ -134,7 +145,7 @@ public:
     void UnregisterPass(const std::string& name);
 
     // Find a registered pass by name and type. Returns nullptr if not found.
-    template<typename T = caustica::IRenderPass>
+    template<typename T = caustica::IRenderPipelinePass>
     T* FindPass(const std::string& name) const
     {
         for (auto& entry : m_passes)
@@ -152,8 +163,7 @@ public:
     // Open the command list for a new frame and reset frame state.
     void BeginFrame();
 
-    // Execute all registered passes in registration order via
-    // IRenderPass::Execute().
+    // Execute all registered passes in registration order.
     void ExecuteAll(nvrhi::IFramebuffer* framebuffer);
 
     // Close the command list and submit it for execution, then advance
@@ -193,12 +203,12 @@ private:
     struct PassEntry
     {
         std::string                       name;
-        caustica::IRenderPass*            pass;      // non-owning pointer
-        std::unique_ptr<caustica::IRenderPass> ownedPtr; // owning (if created via EmplacePass)
+        caustica::IRenderPipelinePass*            pass;
+        std::unique_ptr<caustica::IRenderPipelinePass> ownedPtr;
     };
     std::vector<PassEntry> m_passes;
 
-    // Cached render-target creation parameters for IRenderPass::OnResize
+    // Cached render-target creation parameters for BackBufferResized
     // notifications.
     uint32_t m_lastRTWidth  = 0;
     uint32_t m_lastRTHeight = 0;

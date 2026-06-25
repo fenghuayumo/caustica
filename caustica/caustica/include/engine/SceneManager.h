@@ -1,5 +1,8 @@
 #pragma once
 
+#include <assets/loader/SceneLoader.h>
+
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -55,6 +58,15 @@ public:
     // Parse and load scene content from disk or inline JSON.  Returns nullptr on failure.
     std::shared_ptr<caustica::Scene> loadScene(std::shared_ptr<caustica::IFileSystem> fs,
                                                const std::filesystem::path&           sceneFileName);
+
+    // --- Async/sync loading orchestration (SceneLoader) ---
+    void setAsyncLoadingEnabled(bool enabled);
+    void setLoadingCallbacks(std::function<void()> onLoaded, std::function<void()> onUnloading);
+    void beginLoadingScene(std::shared_ptr<caustica::IFileSystem> fs,
+                           const std::filesystem::path&           sceneFileName);
+    void updateLoading();
+    [[nodiscard]] bool isSceneLoading() const;
+    [[nodiscard]] bool isSceneLoaded() const;
 
     // --- Scene queries (static, take scene as parameter) ---
     static std::shared_ptr<caustica::Material> findMaterial(
@@ -115,4 +127,6 @@ private:
     std::string                               m_currentSceneName;
     std::filesystem::path                     m_currentScenePath;
     std::string                               m_inlineSceneJson;
+
+    caustica::SceneLoader                     m_loader;
 };

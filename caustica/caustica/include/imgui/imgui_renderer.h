@@ -1,6 +1,7 @@
 #pragma once
 
 #include <backend/GpuDevice.h>
+#include <render/Core/RenderContext.h>
 #include <imgui/imgui_nvrhi.h>
 
 #include <filesystem>
@@ -69,8 +70,8 @@ namespace caustica
         ImFont* GetScaledFont() { return m_imFont; }
     };
 
-    // base class to build IRenderPass-based UIs using ImGui through NVRHI
-    class ImGui_Renderer : public IRenderPass
+    // Base class for ImGui UIs rendered through NVRHI.
+    class ImGui_Renderer : public RenderContext
     {
     protected:
 
@@ -104,12 +105,13 @@ namespace caustica
         // Returns the default font.
         std::shared_ptr<RegisteredFont> GetDefaultFont() { return m_defaultFont; }
 
-        virtual void Animate(float elapsedTimeSeconds) override;
-        virtual void Render(nvrhi::IFramebuffer* framebuffer) override;
-        virtual void BackBufferResizing() override;
-        virtual void DisplayScaleChanged(float scaleX, float scaleY) override;
-        virtual bool ShouldAnimateUnfocused() override { return true; }
-        virtual bool SupportsDepthBuffer() override { return false; }
+        virtual void Animate(float elapsedTimeSeconds);
+        virtual void Render(nvrhi::IFramebuffer* framebuffer);
+        virtual void BackBufferResizing();
+        virtual void BackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount) {}
+        virtual void DisplayScaleChanged(float scaleX, float scaleY);
+        virtual bool ShouldAnimateUnfocused() { return true; }
+        virtual bool SupportsDepthBuffer() { return false; }
 
     protected:
         // creates the UI in ImGui, updates internal UI state

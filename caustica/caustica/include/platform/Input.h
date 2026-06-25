@@ -8,8 +8,7 @@ namespace caustica {
 // IInputHandler — Platform layer: interface for objects that receive input
 // events (keyboard, mouse, joystick).
 //
-// Separated from IRenderPass. Render passes that need input implement this
-// in addition to IRenderPass.
+// Separated from render passes. Objects that need input implement this
 // =============================================================================
 class IInputHandler
 {

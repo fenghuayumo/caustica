@@ -31,7 +31,7 @@
 #include <rhi/utils.h>
 
 #include <core/Timer.h>
-#include "SampleCommon/EditorApplication.h"
+#include "EditorApplication.h"
 #include <SampleUI.h>
 #include "SampleCommon/CaptureScriptManager.h"
 #include <shaders/light_cb.h>

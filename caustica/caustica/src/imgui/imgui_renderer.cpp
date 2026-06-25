@@ -6,7 +6,7 @@ using namespace caustica;
 using namespace caustica;
 
 ImGui_Renderer::ImGui_Renderer(GpuDevice *devManager)
-    : IRenderPass(devManager)
+    : RenderContext(devManager)
     , m_supportExplicitDisplayScaling(devManager->GetDeviceParams().supportExplicitDisplayScaling)
 {
     ImGui::CreateContext();

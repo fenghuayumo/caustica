@@ -29,6 +29,7 @@ Application::Application(GpuDevice* dm, Window* window)
     : m_ExternalGpuDevice(dm)
     , m_ExternalWindow(window)
 {
+    bindFrameDriver(dm);
 }
 
 Application::~Application()
@@ -44,6 +45,7 @@ bool Application::init(int /*argc*/, const char* const* /*argv*/)
 
 void Application::shutdown()
 {
+    unbindFrameDriver(device());
     m_shutdownCalled = true;
 }
 
@@ -58,6 +60,33 @@ GpuDevice* Application::device() const
 Window* Application::window() const
 {
     return m_Window ? m_Window.get() : m_ExternalWindow;
+}
+
+void Application::bindFrameDriver(GpuDevice* dm)
+{
+    if (dm)
+        dm->setFrameDriver(this);
+}
+
+void Application::unbindFrameDriver(GpuDevice* dm)
+{
+    if (dm && dm->getFrameDriver() == this)
+        dm->setFrameDriver(nullptr);
+}
+
+void Application::notifyBackBufferResizing()
+{
+    onBackBufferResizing();
+}
+
+void Application::notifyBackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount)
+{
+    onBackBufferResized(width, height, sampleCount);
+}
+
+void Application::notifyDisplayScaleChanged(float scaleX, float scaleY)
+{
+    onDisplayScaleChanged(scaleX, scaleY);
 }
 
 bool Application::isWindowVisible() const
@@ -100,41 +129,14 @@ void Application::updateWindowSize()
         dm->UpdateWindowSize();
 }
 
-bool Application::shouldRenderUnfocused() const
-{
-    GpuDevice* dm = device();
-    if (!dm)
-        return false;
-
-    for (auto* pass : dm->m_vRenderPasses)
-        if (pass->ShouldRenderUnfocused()) return true;
-    return false;
-}
-
 void Application::animate(double elapsedTime, bool windowIsFocused)
 {
-    GpuDevice* dm = device();
-    if (!dm)
-        return;
-
-    for (auto* pass : dm->m_vRenderPasses) {
-        if (windowIsFocused || pass->ShouldAnimateUnfocused()) {
-            pass->Animate(float(elapsedTime));
-            pass->SetLatewarpOptions();
-        }
-    }
+    onUpdate(float(elapsedTime), windowIsFocused);
 }
 
 void Application::render()
 {
-    GpuDevice* dm = device();
-    if (!dm)
-        return;
-
-    for (auto* pass : dm->m_vRenderPasses) {
-        nvrhi::IFramebuffer* fb = dm->GetCurrentFramebuffer(pass->SupportsDepthBuffer());
-        pass->Render(fb);
-    }
+    onRender();
 }
 
 bool Application::runFrame(std::optional<double> elapsedTimeOverride)
@@ -143,7 +145,7 @@ bool Application::runFrame(std::optional<double> elapsedTimeOverride)
     if (!dm)
         return false;
 
-    auto& DM = *dm;  // shorthand for friend access
+    auto& DM = *dm;
     double curTime = GetNow(DM.m_DeviceParams.headlessDevice);
     double elapsedTime = elapsedTimeOverride.value_or(curTime - DM.m_PreviousFrameTimestamp);
 
@@ -153,11 +155,11 @@ bool Application::runFrame(std::optional<double> elapsedTimeOverride)
     const bool windowVisible = isWindowVisible();
     const bool windowFocused = isWindowFocused();
 
-    if (windowVisible && (windowFocused || shouldRenderUnfocused() || DM.m_RequestedRenderUnfocused))
+    if (windowVisible && (windowFocused || shouldRenderWhenUnfocused() || DM.m_RequestedRenderUnfocused))
     {
         if (DM.m_PrevDPIScaleFactorX != DM.m_DPIScaleFactorX ||
             DM.m_PrevDPIScaleFactorY != DM.m_DPIScaleFactorY) {
-            DM.DisplayScaleChanged();
+            notifyDisplayScaleChanged(DM.m_DPIScaleFactorX, DM.m_DPIScaleFactorY);
             DM.m_PrevDPIScaleFactorX = DM.m_DPIScaleFactorX;
             DM.m_PrevDPIScaleFactorY = DM.m_DPIScaleFactorY;
         }
@@ -219,6 +221,7 @@ void Application::run()
         return;
     }
 
+    bindFrameDriver(dm);
     dm->m_PreviousFrameTimestamp = glfwGetTime();
 
 #if CAUSTICA_WITH_AFTERMATH

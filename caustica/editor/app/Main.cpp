@@ -1,4 +1,4 @@
-#include "SampleCommon/EditorApplication.h"
+#include "EditorApplication.h"
 #include <cstring>
 
 #ifdef _WIN32

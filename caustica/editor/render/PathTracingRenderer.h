@@ -82,7 +82,7 @@ public:
     void nativeDLSSPreRender();
 #endif
 
-    // --- Accessors for PathTracerApp / AdvancedPathTracer / Renderer ---
+    // --- Accessors for PathTracerApp / AdvancedPathTracer ---
     RenderTargets* getRenderTargets() { return m_renderTargets.get(); }
     const RenderTargets* getRenderTargets() const { return m_renderTargets.get(); }
 

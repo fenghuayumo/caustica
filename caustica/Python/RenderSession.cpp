@@ -3,7 +3,7 @@
 #if CAUSTICA_WITH_PYTHON
 
 #include "AdvancedPathTracer.h"
-#include "SampleCommon/EditorApplication.h"
+#include "EditorApplication.h"
 #include "PathTracerApp.h"
 #include <SampleCommon/LocalConfig.h>
 #include <core/file_utils.h>
@@ -62,6 +62,71 @@
 namespace
 {
     constexpr double c_HeadlessFrameTimeSeconds = 1.0 / 60.0;
+
+    class PathTracerFrameDriver : public caustica::Application
+    {
+    public:
+        PathTracerFrameDriver(caustica::GpuDevice* dm, caustica::Window* window, PathTracerApp* scene)
+            : caustica::Application(dm, window)
+            , m_scene(scene)
+        { }
+
+        void syncToBackBuffer()
+        {
+            caustica::GpuDevice* dm = getGpuDevice();
+            if (!dm || !m_scene)
+                return;
+
+            const auto& params = dm->GetDeviceParams();
+            notifyBackBufferResizing();
+            notifyBackBufferResized(params.backBufferWidth, params.backBufferHeight, params.swapChainSampleCount);
+        }
+
+    protected:
+        void onUpdate(float elapsedTimeSeconds, bool windowFocused) override
+        {
+            if (m_scene && (windowFocused || m_scene->ShouldAnimateUnfocused()))
+            {
+                m_scene->Animate(elapsedTimeSeconds);
+                m_scene->SetLatewarpOptions();
+            }
+        }
+
+        void onRender() override
+        {
+            caustica::GpuDevice* dm = getGpuDevice();
+            if (!m_scene || !dm)
+                return;
+
+            m_scene->Render(dm->GetCurrentFramebuffer(m_scene->SupportsDepthBuffer()));
+        }
+
+        bool shouldRenderWhenUnfocused() const override
+        {
+            return m_scene && m_scene->ShouldRenderUnfocused();
+        }
+
+        void onBackBufferResizing() override
+        {
+            if (m_scene)
+                m_scene->BackBufferResizing();
+        }
+
+        void onBackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount) override
+        {
+            if (m_scene)
+                m_scene->BackBufferResized(width, height, sampleCount);
+        }
+
+        void onDisplayScaleChanged(float scaleX, float scaleY) override
+        {
+            if (m_scene)
+                m_scene->DisplayScaleChanged(scaleX, scaleY);
+        }
+
+    private:
+        PathTracerApp* m_scene = nullptr;
+    };
 
     void AppendUnique(std::vector<std::string>& values, const std::string& value)
     {
@@ -498,15 +563,6 @@ bool RenderSession::InitDevice()
         }
     }
 
-    m_AppLoop = std::make_unique<caustica::Application>(
-        m_deviceManager.get(),
-        m_config.headless ? nullptr : m_Window.get());
-
-    m_AppLoop->beforePresent =
-        [this](caustica::GpuDevice& manager, uint32_t) {
-            m_lastRenderedBackBufferIndex = manager.GetCurrentBackBufferIndex();
-        };
-
     auto device = m_deviceManager->GetDevice();
     if (!device->queryFeatureSupport(nvrhi::Feature::RayTracingPipeline))
     {
@@ -574,15 +630,25 @@ bool RenderSession::InitRenderer()
         : m_config.scene;
 
     m_renderer->Init(preferredScene, m_shaderFactory);
-    m_deviceManager->AddRenderPassToBack(m_renderer.get());
+
+    auto frameDriver = std::make_unique<PathTracerFrameDriver>(
+        m_deviceManager.get(),
+        m_config.headless ? nullptr : m_Window.get(),
+        m_renderer.get());
+    frameDriver->beforePresent =
+        [this](caustica::GpuDevice& manager, uint32_t) {
+            m_lastRenderedBackBufferIndex = manager.GetCurrentBackBufferIndex();
+        };
+    frameDriver->syncToBackBuffer();
+    m_AppLoop = std::move(frameDriver);
 
     return true;
 }
 
 void RenderSession::Shutdown()
 {
-    if (m_deviceManager && m_renderer)
-        m_deviceManager->RemoveRenderPass(m_renderer.get());
+    if (m_deviceManager)
+        m_deviceManager->setFrameDriver(nullptr);
 
     m_renderer.reset();
     m_shaderFactory.reset();
