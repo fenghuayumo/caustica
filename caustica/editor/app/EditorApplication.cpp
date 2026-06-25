@@ -794,8 +794,8 @@ bool EditorApplication::shouldRenderWhenUnfocused() const
 
 void EditorApplication::onEvent(caustica::Event& event)
 {
-    // 1. Dispatch input events to the scene pass (handles Camera/ZoomTool/shortcuts).
-            onEvent(event);
+    // 1. Dispatch input events to PathTracerApp (handles Camera/ZoomTool/shortcuts).
+    PathTracerApp::onEvent(event);
 
     // 2. Handle window events locally.
     caustica::EventDispatcher dispatcher(event);
