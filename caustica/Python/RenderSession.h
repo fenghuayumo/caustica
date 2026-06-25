@@ -30,7 +30,7 @@
 #include <render/Core/CommonRenderPasses.h>
 #include <render/Core/BindingCache.h>
 #include <render/Core/DescriptorTableManager.h>
-#include <render/WorldRenderer/WorldRendererHost.h>
+#include <render/WorldRenderer/WorldRendererServices.h>
 #include <assets/cache/TextureCache.h>
 
 #include <core/command_line.h>
@@ -125,7 +125,8 @@ private:
     bool InitRenderer();
     void initRenderInfrastructurePhase1();
     void initRenderInfrastructurePhase2(nvrhi::IBindingLayout* bindlessLayout);
-    void syncWorldRendererHost();
+    caustica::render::WorldRendererServices buildWorldRendererServices();
+    void initWorldRenderer(nvrhi::IBindingLayout* bindlessLayout);
     void initSceneServices();
     void Shutdown();
 
@@ -140,7 +141,7 @@ private:
     std::unique_ptr<caustica::BindingCache> m_bindingCache;
     std::shared_ptr<caustica::DescriptorTableManager> m_descriptorTable;
     std::shared_ptr<caustica::TextureCache> m_textureCache;
-    caustica::render::WorldRendererHost m_worldRendererHost;
+    std::unique_ptr<caustica::render::WorldRendererServices> m_worldRendererServices;
     std::unique_ptr<caustica::RenderCore>      m_renderCore;
     std::unique_ptr<SceneManager>            m_sceneManager;
     std::unique_ptr<AdvancedPathTracer>             m_renderer;

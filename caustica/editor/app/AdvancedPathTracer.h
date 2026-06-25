@@ -5,7 +5,7 @@
 
 #include <render/Core/PTPipelineBaker.h>
 #include <render/WorldRenderer/PathTracingWorldRenderer.h>
-#include <render/WorldRenderer/WorldRendererHost.h>
+#include <render/WorldRenderer/WorldRendererServices.h>
 
 #include "PathTracerApp.h"
 

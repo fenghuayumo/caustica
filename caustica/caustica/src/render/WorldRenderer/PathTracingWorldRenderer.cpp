@@ -94,15 +94,15 @@ namespace
 #endif
 }
 
-caustica::render::PathTracingWorldRenderer::PathTracingWorldRenderer(WorldRendererHost& host, IWorldRendererPipelineHooks& hooks)
-    : m_host(host)
+caustica::render::PathTracingWorldRenderer::PathTracingWorldRenderer(WorldRendererServices& services, IWorldRendererPipelineHooks& hooks)
+    : m_services(services)
     , m_hooks(hooks)
 {
 }
 
 caustica::render::PathTracingWorldRenderer::~PathTracingWorldRenderer() = default;
 
-void caustica::render::PathTracingWorldRenderer::createBindingLayouts()
+nvrhi::BindingLayoutHandle caustica::render::PathTracingWorldRenderer::CreateBindlessLayout(nvrhi::IDevice* device)
 {
     nvrhi::BindlessLayoutDesc bindlessLayoutDesc;
     bindlessLayoutDesc.visibility = nvrhi::ShaderType::All;
@@ -112,8 +112,15 @@ void caustica::render::PathTracingWorldRenderer::createBindingLayouts()
         nvrhi::BindingLayoutItem::RawBuffer_SRV(1),
         nvrhi::BindingLayoutItem::Texture_SRV(2)
     };
+    return device->createBindlessLayout(bindlessLayoutDesc);
+}
+
+void caustica::render::PathTracingWorldRenderer::createBindingLayouts(nvrhi::IBindingLayout* precreatedBindless)
+{
     nvrhi::IDevice* const gpuDevice = device();
-    m_bindlessLayout = gpuDevice->createBindlessLayout(bindlessLayoutDesc);
+    m_bindlessLayout = precreatedBindless
+        ? nvrhi::BindingLayoutHandle(precreatedBindless)
+        : CreateBindlessLayout(gpuDevice);
 
     nvrhi::BindingLayoutDesc globalBindingLayoutDesc;
     globalBindingLayoutDesc.visibility = nvrhi::ShaderType::All;
@@ -208,14 +215,14 @@ void caustica::render::PathTracingWorldRenderer::createDeviceResources()
     nvrhi::IDevice* device = this->device();
 
 #if CAUSTICA_WITH_NATIVE_DLSS
-    m_nativeDLSS = caustica::render::DLSS::Create(device, *m_host.shaderFactory, caustica::GetDirectoryWithExecutable().string());
+    m_nativeDLSS = caustica::render::DLSS::Create(device, m_services.shaderFactory, caustica::GetDirectoryWithExecutable().string());
     if (m_nativeDLSS)
     {
-        m_host.settings->IsDLSSSuported = m_nativeDLSS->IsDlssSupported();
-        m_host.settings->IsDLSSRRSupported = m_nativeDLSS->IsRayReconstructionSupported();
+        m_services.settings.IsDLSSSuported = m_nativeDLSS->IsDlssSupported();
+        m_services.settings.IsDLSSRRSupported = m_nativeDLSS->IsRayReconstructionSupported();
         caustica::info("Native NGX DLSS support: DLSS=%s, DLSS-RR=%s.",
-            m_host.settings->IsDLSSSuported ? "yes" : "no",
-            m_host.settings->IsDLSSRRSupported ? "yes" : "no");
+            m_services.settings.IsDLSSSuported ? "yes" : "no",
+            m_services.settings.IsDLSSRRSupported ? "yes" : "no");
     }
     else
     {
@@ -228,8 +235,8 @@ void caustica::render::PathTracingWorldRenderer::createDeviceResources()
 
     {
         std::vector<ShaderMacro> drawLinesMacro = { ShaderMacro("DRAW_LINES_SHADERS_OLD", "1") };
-        m_linesVertexShader = (*m_host.shaderFactory)->CreateShader("caustica/shaders/render/Misc/DebugLines.hlsl", "main_vs", &drawLinesMacro, nvrhi::ShaderType::Vertex);
-        m_linesPixelShader = (*m_host.shaderFactory)->CreateShader("caustica/shaders/render/Misc/DebugLines.hlsl", "main_ps", &drawLinesMacro, nvrhi::ShaderType::Pixel);
+        m_linesVertexShader = m_services.shaderFactory->CreateShader("caustica/shaders/render/Misc/DebugLines.hlsl", "main_vs", &drawLinesMacro, nvrhi::ShaderType::Vertex);
+        m_linesPixelShader = m_services.shaderFactory->CreateShader("caustica/shaders/render/Misc/DebugLines.hlsl", "main_ps", &drawLinesMacro, nvrhi::ShaderType::Pixel);
 
         nvrhi::VertexAttributeDesc attributes[] = {
             nvrhi::VertexAttributeDesc()
@@ -330,7 +337,7 @@ void caustica::render::PathTracingWorldRenderer::createDeviceResources()
 bool caustica::render::PathTracingWorldRenderer::createPTPipeline()
 {
     std::vector<caustica::ShaderMacro> shaderMacros;
-    m_exportVBufferCS = (*m_host.shaderFactory)->CreateShader(
+    m_exportVBufferCS = m_services.shaderFactory->CreateShader(
         "caustica/shaders/render/ProcessingPasses/ExportVisibilityBuffer.hlsl", "main", &shaderMacros, nvrhi::ShaderType::Compute);
     nvrhi::ComputePipelineDesc pipelineDesc;
     pipelineDesc.bindingLayouts = { m_bindingLayout, m_bindlessLayout };
@@ -361,7 +368,7 @@ void caustica::render::PathTracingWorldRenderer::onBackBufferResizing()
 {
     device()->waitForIdle();
     device()->runGarbageCollection();
-    (*m_host.bindingCache)->Clear();
+    m_services.bindingCache.Clear();
     m_renderTargets = nullptr;
     m_linesPipeline = nullptr; // the pipeline is based on the framebuffer so needs a reset
     for (int i=0; i < std::size(m_nrd); i++ )
@@ -371,22 +378,22 @@ void caustica::render::PathTracingWorldRenderer::onBackBufferResizing()
 
 // NOTE: we're not yet sure if this is necessary to avoid crash with going in/out of fullscreen and FG
 #if CAUSTICA_WITH_STREAMLINE
-    if (!m_host.gpuDevice->GetDeviceParams().headlessDevice &&
-        (m_host.settings->DLSSFGOptions.mode == StreamlineInterface::DLSSGMode::eOn || m_host.settings->ActualDLSSFGMode() == StreamlineInterface::DLSSGMode::eOn)) 
+    if (!m_services.gpuDevice.GetDeviceParams().headlessDevice &&
+        (m_services.settings.DLSSFGOptions.mode == StreamlineInterface::DLSSGMode::eOn || m_services.settings.ActualDLSSFGMode() == StreamlineInterface::DLSSGMode::eOn)) 
     {
-        m_host.gpuDevice->GetStreamline().CleanupDLSS(false);
-        m_host.gpuDevice->GetStreamline().CleanupDLSSG(false);
+        m_services.gpuDevice.GetStreamline().CleanupDLSS(false);
+        m_services.gpuDevice.GetStreamline().CleanupDLSSG(false);
 
-        if (m_host.gpuDevice->GetStreamline().IsDLSSGAvailable())
+        if (m_services.gpuDevice.GetStreamline().IsDLSSGAvailable())
         {
             auto dlssgOptions = StreamlineInterface::DLSSGOptions{};
             StreamlineInterface::DLSSGState state;
-            m_host.gpuDevice->GetStreamline().GetDLSSGState(state, dlssgOptions);
-            m_host.settings->DLSSFGMultiplier = state.numFramesActuallyPresented;
-            m_host.settings->DLSSFGMaxNumFramesToGenerate = state.numFramesToGenerateMax;
+            m_services.gpuDevice.GetStreamline().GetDLSSGState(state, dlssgOptions);
+            m_services.settings.DLSSFGMultiplier = state.numFramesActuallyPresented;
+            m_services.settings.DLSSFGMaxNumFramesToGenerate = state.numFramesToGenerateMax;
 
-            m_host.gpuDevice->GetStreamline().SetDLSSGOptions(dlssgOptions);
-            m_host.settings->DLSSFGOptions = dlssgOptions;
+            m_services.gpuDevice.GetStreamline().SetDLSSGOptions(dlssgOptions);
+            m_services.settings.DLSSFGOptions = dlssgOptions;
         }
     }
 #endif
@@ -411,18 +418,18 @@ SimpleViewConstants FromPlanarViewConstants(PlanarViewConstants & view)
 
 void caustica::render::PathTracingWorldRenderer::createRenderPasses( bool& exposureResetRequired, nvrhi::CommandListHandle initializeCommandList )
 {
-    (*m_host.bindingCache)->Clear();
+    m_services.bindingCache.Clear();
 
     const uint2 screenResolution = {m_renderTargets->OutputColor->getDesc().width, m_renderTargets->OutputColor->getDesc().height};
 
-    m_shaderDebug = std::make_shared<ShaderDebug>(device(), initializeCommandList, *m_host.shaderFactory, *m_host.commonPasses);
+    m_shaderDebug = std::make_shared<ShaderDebug>(device(), initializeCommandList, m_services.shaderFactory, m_services.commonPasses);
 
-    if (m_host.settings->ActualUseRTXDIPasses())
-        m_rtxdiPass = std::make_unique<RtxdiPass>(device(), *m_host.shaderFactory, *m_host.commonPasses, m_bindlessLayout);
+    if (m_services.settings.ActualUseRTXDIPasses())
+        m_rtxdiPass = std::make_unique<RtxdiPass>(device(), m_services.shaderFactory, m_services.commonPasses, m_bindlessLayout);
     else
         m_rtxdiPass = nullptr;
 
-    m_accumulationPass = std::make_unique<AccumulationPass>(device(), *m_host.shaderFactory);
+    m_accumulationPass = std::make_unique<AccumulationPass>(device(), m_services.shaderFactory);
     m_accumulationPass->CreatePipeline();
     m_accumulationPass->CreateBindingSet(m_renderTargets->OutputColor, m_renderTargets->AccumulatedRadiance, m_renderTargets->ProcessedOutputColor);
 
@@ -446,16 +453,16 @@ void caustica::render::PathTracingWorldRenderer::createRenderPasses( bool& expos
         gaussianAccumDesc.keepInitialState = true;
         m_gaussianSplatAccumulatedColor = device()->createTexture(gaussianAccumDesc);
 
-        m_gaussianSplatAccumulationPass = std::make_unique<AccumulationPass>(device(), *m_host.shaderFactory);
+        m_gaussianSplatAccumulationPass = std::make_unique<AccumulationPass>(device(), m_services.shaderFactory);
         m_gaussianSplatAccumulationPass->CreatePipeline();
         m_gaussianSplatAccumulationPass->CreateBindingSet(m_gaussianSplatCurrentColor, m_gaussianSplatAccumulatedColor, m_renderTargets->ProcessedOutputColor);
         m_gaussianSplatTemporalReset = true;
     }
 
     // these get re-created every time intentionally, to pick up changes after at-runtime shader recompile
-    m_toneMappingPass = std::make_unique<ToneMappingPass>(device(), *m_host.shaderFactory, *m_host.commonPasses, m_renderTargets->LdrFramebuffer, *m_host.renderCore->camera().view(), m_renderTargets->OutputColor);
-    m_bloomPass = std::make_unique<BloomPass>(device(), *m_host.shaderFactory, *m_host.commonPasses, m_renderTargets->ProcessedOutputFramebuffer, *m_host.renderCore->camera().view());
-    m_postProcess = std::make_shared<PostProcess>(device(), *m_host.shaderFactory, *m_host.commonPasses, m_shaderDebug);
+    m_toneMappingPass = std::make_unique<ToneMappingPass>(device(), m_services.shaderFactory, m_services.commonPasses, m_renderTargets->LdrFramebuffer, *m_services.renderCore.camera().view(), m_renderTargets->OutputColor);
+    m_bloomPass = std::make_unique<BloomPass>(device(), m_services.shaderFactory, m_services.commonPasses, m_renderTargets->ProcessedOutputFramebuffer, *m_services.renderCore.camera().view());
+    m_postProcess = std::make_shared<PostProcess>(device(), m_services.shaderFactory, m_services.commonPasses, m_shaderDebug);
 
     {
         TemporalAntiAliasingPass::CreateParameters taaParams;
@@ -469,33 +476,33 @@ void caustica::render::PathTracingWorldRenderer::createRenderPasses( bool& expos
         taaParams.motionVectorStencilMask = 0; ///*uint32_t motionVectorStencilMask =*/ 0x01;
         taaParams.useCatmullRomFilter = true;
 
-        m_temporalAntiAliasingPass = std::make_unique<TemporalAntiAliasingPass>(device(), *m_host.shaderFactory, *m_host.commonPasses, *m_host.renderCore->camera().view(), taaParams);
+        m_temporalAntiAliasingPass = std::make_unique<TemporalAntiAliasingPass>(device(), m_services.shaderFactory, m_services.commonPasses, *m_services.renderCore.camera().view(), taaParams);
     }
 
     if (!createPTPipeline())
         { assert(false); }
 
-    if (*m_host.envMapBaker == nullptr)
-        *m_host.envMapBaker = std::make_shared<EnvMapBaker>(device(), m_host.textureCache, m_hooks.needsRasterPrecompute());
-    if (*m_host.lightsBaker == nullptr)
-        *m_host.lightsBaker = std::make_shared<LightsBaker>(device());
-    (*m_host.envMapBaker)->CreateRenderPasses(m_shaderDebug, *m_host.shaderFactory, *m_host.computePipelineBaker);
-    (*m_host.envMapBaker)->GenerateBRDFLUT(initializeCommandList.Get(), **m_host.bindingCache);  // One-time BRDF LUT generation
-    (*m_host.lightsBaker)->CreateRenderPasses(*m_host.shaderFactory, m_bindlessLayout, *m_host.commonPasses, m_shaderDebug, screenResolution, (*m_host.envMapBaker)->GetImportanceSampling()->GetImportanceMapResolution());
+    if (m_services.envMapBaker == nullptr)
+        m_services.envMapBaker = std::make_shared<EnvMapBaker>(device(), m_services.textureCache, m_hooks.needsRasterPrecompute());
+    if (m_services.lightsBaker == nullptr)
+        m_services.lightsBaker = std::make_shared<LightsBaker>(device());
+    m_services.envMapBaker->CreateRenderPasses(m_shaderDebug, m_services.shaderFactory, m_services.computePipelineBaker);
+    m_services.envMapBaker->GenerateBRDFLUT(initializeCommandList.Get(), m_services.bindingCache);  // One-time BRDF LUT generation
+    m_services.lightsBaker->CreateRenderPasses(m_services.shaderFactory, m_bindlessLayout, m_services.commonPasses, m_shaderDebug, screenResolution, m_services.envMapBaker->GetImportanceSampling()->GetImportanceMapResolution());
 
     m_hooks.prepareGaussianSplatPasses();
 
-    m_denoisingGuidesBaker = std::make_shared<DenoisingGuidesBaker>(device(), *m_host.shaderFactory, m_renderTargets, m_shaderDebug, m_bindingLayout);
+    m_denoisingGuidesBaker = std::make_shared<DenoisingGuidesBaker>(device(), m_services.shaderFactory, m_renderTargets, m_shaderDebug, m_bindingLayout);
 }
 void caustica::render::PathTracingWorldRenderer::preUpdateLighting(nvrhi::CommandListHandle commandList, bool& needNewBindings)
 {
     std::filesystem::path sceneDirectory;
-    if (m_host.sceneManager->getCurrentScenePath() != std::filesystem::path(SceneManager::inlineSceneSentinel()))
-        sceneDirectory = m_host.sceneManager->getCurrentScenePath().parent_path();
+    if (m_services.sceneManager.getCurrentScenePath() != std::filesystem::path(SceneManager::inlineSceneSentinel()))
+        sceneDirectory = m_services.sceneManager.getCurrentScenePath().parent_path();
 
-    std::string envMapActualPath = *m_host.envMapLocalPath;
-    if (*m_host.envMapOverride != "" && *m_host.envMapOverride != c_EnvMapSceneDefault)
-        envMapActualPath = (IsProceduralSky(m_host.envMapOverride->c_str())) ? (*m_host.envMapOverride) : (std::string(c_EnvMapSubFolder) + "/" + *m_host.envMapOverride);
+    std::string envMapActualPath = m_services.envMapLocalPath;
+    if (m_services.envMapOverride != "" && m_services.envMapOverride != c_EnvMapSceneDefault)
+        envMapActualPath = (IsProceduralSky(m_services.envMapOverride.c_str())) ? (m_services.envMapOverride) : (std::string(c_EnvMapSubFolder) + "/" + m_services.envMapOverride);
 
     if (!envMapActualPath.empty() && !IsProceduralSky(envMapActualPath.c_str()))
         envMapActualPath = ResolveSceneMediaPath(envMapActualPath, sceneDirectory).generic_string();
@@ -503,52 +510,52 @@ void caustica::render::PathTracingWorldRenderer::preUpdateLighting(nvrhi::Comman
     PreUpdateLightingParams params{
         commandList,
         needNewBindings,
-        m_host.envMapBaker->get(),
-        *m_host.commonPasses,
+        m_services.envMapBaker.get(),
+        m_services.commonPasses,
         envMapActualPath,
         sceneDirectory,
     };
-    m_host.renderCore->preUpdateLighting(params);
+    m_services.renderCore.preUpdateLighting(params);
 }
 void caustica::render::PathTracingWorldRenderer::updateLighting(nvrhi::CommandListHandle commandList)
 {
     m_hooks.buildGaussianSplatEmissionProxyList();
 
     UpdateLightingParams params{
-        *m_host.settings,
+        m_services.settings,
         commandList,
-        m_host.envMapBaker->get(),
-        m_host.lightsBaker->get(),
-        m_host.bindingCache->get(),
-        *m_host.commonPasses,
-        m_host.lights,
-        m_host.sceneManager->getScene(),
-        *m_host.materialsBaker,
-        *m_host.ommBaker,
-        *m_host.envMapSceneParams,
-        *m_host.sceneTime,
+        m_services.envMapBaker.get(),
+        m_services.lightsBaker.get(),
+        &m_services.bindingCache,
+        m_services.commonPasses,
+        &m_services.lights,
+        m_services.sceneManager.getScene(),
+        m_services.materialsBaker,
+        m_services.ommBaker,
+        m_services.envMapSceneParams,
+        m_services.sceneTime,
         m_frameIndex,
         c_envMapRadianceScale,
     };
-    if (!m_host.gaussianSplatEmissionProxies->empty())
-        params.gaussianSplatEmissionProxies = m_host.gaussianSplatEmissionProxies;
-    m_host.renderCore->updateLighting(params);
+    if (!m_services.gaussianSplatEmissionProxies.empty())
+        params.gaussianSplatEmissionProxies = &m_services.gaussianSplatEmissionProxies;
+    m_services.renderCore.updateLighting(params);
 }
 void caustica::render::PathTracingWorldRenderer::preUpdatePathTracing( bool resetAccum, nvrhi::CommandListHandle commandList )
 {
-    const bool resetReferenceOidn = !m_host.settings->RealtimeMode && (resetAccum || m_host.settings->ResetAccumulation || m_host.settings->ReferenceOIDNDenoiserChanged);
-    if (resetReferenceOidn || m_host.settings->ReferenceOIDNDenoiserChanged)
+    const bool resetReferenceOidn = !m_services.settings.RealtimeMode && (resetAccum || m_services.settings.ResetAccumulation || m_services.settings.ReferenceOIDNDenoiserChanged);
+    if (resetReferenceOidn || m_services.settings.ReferenceOIDNDenoiserChanged)
     {
         resetReferenceOIDN();
-        m_host.settings->ReferenceOIDNDenoiserChanged = false;
+        m_services.settings.ReferenceOIDNDenoiserChanged = false;
     }
 
-    resetAccum |= m_host.settings->ResetAccumulation;
-    resetAccum |= m_host.settings->RealtimeMode;
+    resetAccum |= m_services.settings.ResetAccumulation;
+    resetAccum |= m_services.settings.RealtimeMode;
 
     if (resetAccum)
     {
-        m_accumulationSampleIndex = (m_host.settings->AccumulationPreWarmRealtimeCaches)?(-32):(0);
+        m_accumulationSampleIndex = (m_services.settings.AccumulationPreWarmRealtimeCaches)?(-32):(0);
     }
 #if ENABLE_DEBUG_VIZUALISATIONS
     if (resetAccum)
@@ -558,33 +565,33 @@ void caustica::render::PathTracingWorldRenderer::preUpdatePathTracing( bool rese
     // profile perf - only makes sense with high accumulation sample counts; only start counting after n-th after it stabilizes
     if( m_accumulationSampleIndex < 16 )
     {
-        *m_host.benchStart = std::chrono::high_resolution_clock::now( );
-        *m_host.benchLast = *m_host.benchStart;
-        *m_host.benchFrames = 0;
-    } else if( m_accumulationSampleIndex < m_host.settings->AccumulationTarget )
+        m_services.benchStart = std::chrono::high_resolution_clock::now( );
+        m_services.benchLast = m_services.benchStart;
+        m_services.benchFrames = 0;
+    } else if( m_accumulationSampleIndex < m_services.settings.AccumulationTarget )
     {
-        *m_host.benchFrames++;
-        *m_host.benchLast = std::chrono::high_resolution_clock::now( );
+        m_services.benchFrames++;
+        m_services.benchLast = std::chrono::high_resolution_clock::now( );
     }
     m_accumulationCompleted = false;
     // 'min' in non-realtime path here is to keep looping the last sample for debugging purposes!
-    if( !m_host.settings->RealtimeMode )
+    if( !m_services.settings.RealtimeMode )
     {
-        m_sampleIndex = (m_accumulationSampleIndex<0)?(m_accumulationSampleIndex+4096):(min(m_accumulationSampleIndex, m_host.settings->AccumulationTarget - 1));
-        m_accumulationCompleted |= m_accumulationSampleIndex == m_host.settings->AccumulationTarget - 1;
+        m_sampleIndex = (m_accumulationSampleIndex<0)?(m_accumulationSampleIndex+4096):(min(m_accumulationSampleIndex, m_services.settings.AccumulationTarget - 1));
+        m_accumulationCompleted |= m_accumulationSampleIndex == m_services.settings.AccumulationTarget - 1;
     }
     else
-        m_sampleIndex = (!m_host.settings->DbgFreezeRealtimeNoiseSeed)?( m_frameIndex % 8192 ):0;     // actual sample index
+        m_sampleIndex = (!m_services.settings.DbgFreezeRealtimeNoiseSeed)?( m_frameIndex % 8192 ):0;     // actual sample index
 }
 void caustica::render::PathTracingWorldRenderer::postUpdatePathTracing( )
 {
-    m_accumulationSampleIndex = std::min( m_accumulationSampleIndex+1, m_host.settings->AccumulationTarget );
+    m_accumulationSampleIndex = std::min( m_accumulationSampleIndex+1, m_services.settings.AccumulationTarget );
 
-    if (m_host.settings->ActualUseRTXDIPasses())
+    if (m_services.settings.ActualUseRTXDIPasses())
         m_rtxdiPass->EndFrame();
 
-    m_host.settings->ResetAccumulation = false;
-    m_host.settings->ResetRealtimeCaches = false;
+    m_services.settings.ResetAccumulation = false;
+    m_services.settings.ResetRealtimeCaches = false;
     m_frameIndex++;
 }
 void caustica::render::PathTracingWorldRenderer::updatePathTracerConstants( PathTracerConstants & constants, const PathTracerCameraData & cameraData )
@@ -622,121 +629,121 @@ void caustica::render::PathTracingWorldRenderer::updatePathTracerConstants( Path
 
     constants.camera = cameraData;
     constants.prevCamera = cameraData;
-    if (m_host.renderCore->camera().viewPrevious())
-        constants.prevCamera.PosW = m_host.renderCore->camera().viewPrevious()->GetInverseViewMatrix().m_translation;
+    if (m_services.renderCore.camera().viewPrevious())
+        constants.prevCamera.PosW = m_services.renderCore.camera().viewPrevious()->GetInverseViewMatrix().m_translation;
 
-    constants.bounceCount = m_host.settings->BounceCount;
-    constants.diffuseBounceCount = m_host.settings->DiffuseBounceCount;
-    constants.perPixelJitterAAScale = (m_host.settings->RealtimeMode == false && m_host.settings->AccumulationAA)?(1):( (m_host.settings->RealtimeMode && m_host.settings->RealtimeAA == 3)?(m_host.settings->DLSSRRMicroJitter):(0.0f) );
+    constants.bounceCount = m_services.settings.BounceCount;
+    constants.diffuseBounceCount = m_services.settings.DiffuseBounceCount;
+    constants.perPixelJitterAAScale = (m_services.settings.RealtimeMode == false && m_services.settings.AccumulationAA)?(1):( (m_services.settings.RealtimeMode && m_services.settings.RealtimeAA == 3)?(m_services.settings.DLSSRRMicroJitter):(0.0f) );
 
     // needed to allow super-resolution to work best
     float dlssBias = -dm::log2f(sqrtf((m_displaySize.x * m_displaySize.y) / float(m_renderSize.x * m_renderSize.y)));
 
-    constants.texLODBias = m_host.settings->TexLODBias + dlssBias;
-    constants.sampleBaseIndex = m_sampleIndex * m_host.settings->ActualSamplesPerPixel();
+    constants.texLODBias = m_services.settings.TexLODBias + dlssBias;
+    constants.sampleBaseIndex = m_sampleIndex * m_services.settings.ActualSamplesPerPixel();
 
-    //constants.subSampleCount = m_host.settings->ActualSamplesPerPixel();
-    constants.invSubSampleCount = 1.0f / (float)m_host.settings->ActualSamplesPerPixel();
+    //constants.subSampleCount = m_services.settings.ActualSamplesPerPixel();
+    constants.invSubSampleCount = 1.0f / (float)m_services.settings.ActualSamplesPerPixel();
 
     constants.imageWidth = m_renderSize.x; assert( m_renderSize.x == m_renderTargets->OutputColor->getDesc().width );
     constants.imageHeight = m_renderSize.y; assert( m_renderSize.y == m_renderTargets->OutputColor->getDesc().height );
 
     // this is the dynamic luminance that when passed through current tonemapper with current exposure settings, produces the same 50% gray
-    constants.preExposedGrayLuminance = m_host.settings->EnableToneMapping?(dm::luminance(m_toneMappingPass->GetPreExposedGray(0))):(1.0f);
+    constants.preExposedGrayLuminance = m_services.settings.EnableToneMapping?(dm::luminance(m_toneMappingPass->GetPreExposedGray(0))):(1.0f);
 
     const float disabledFF = 0.0f;
-    if (m_host.settings->RealtimeMode)
-        constants.fireflyFilterThreshold = (m_host.settings->RealtimeFireflyFilterEnabled)?(m_host.settings->RealtimeFireflyFilterThreshold*sqrtf(constants.preExposedGrayLuminance)*1e3f):(disabledFF); // it does make sense to make the realtime variant dependent on avg luminance - just didn't have time to try it out yet
+    if (m_services.settings.RealtimeMode)
+        constants.fireflyFilterThreshold = (m_services.settings.RealtimeFireflyFilterEnabled)?(m_services.settings.RealtimeFireflyFilterThreshold*sqrtf(constants.preExposedGrayLuminance)*1e3f):(disabledFF); // it does make sense to make the realtime variant dependent on avg luminance - just didn't have time to try it out yet
     else
-        constants.fireflyFilterThreshold = (m_host.settings->ReferenceFireflyFilterEnabled)?(m_host.settings->ReferenceFireflyFilterThreshold*sqrtf(constants.preExposedGrayLuminance)*1e3f):(disabledFF); // making it exposure-adaptive breaks determinism with accumulation (because there's a feedback loop), so that's disabled
-    constants.useReSTIRDI = m_host.settings->ActualUseReSTIRDI();
-    constants.useReSTIRGI = m_host.settings->ActualUseReSTIRGI();
-    constants.useReSTIRPT = m_host.settings->ActualUseReSTIRPT();
-    constants.environmentMapVisibleToCamera = m_host.settings->EnvironmentMapParams.VisibleToCamera ? 1u : 0u;
-    constants.denoiserRadianceClampK = m_host.settings->DenoiserRadianceClampK;
-    constants.DLSSRRBrightnessClampK = (m_host.settings->DLSSRRBrightnessClampK>0)?(m_host.settings->DLSSRRBrightnessClampK * constants.preExposedGrayLuminance):(0.0f);
+        constants.fireflyFilterThreshold = (m_services.settings.ReferenceFireflyFilterEnabled)?(m_services.settings.ReferenceFireflyFilterThreshold*sqrtf(constants.preExposedGrayLuminance)*1e3f):(disabledFF); // making it exposure-adaptive breaks determinism with accumulation (because there's a feedback loop), so that's disabled
+    constants.useReSTIRDI = m_services.settings.ActualUseReSTIRDI();
+    constants.useReSTIRGI = m_services.settings.ActualUseReSTIRGI();
+    constants.useReSTIRPT = m_services.settings.ActualUseReSTIRPT();
+    constants.environmentMapVisibleToCamera = m_services.settings.EnvironmentMapParams.VisibleToCamera ? 1u : 0u;
+    constants.denoiserRadianceClampK = m_services.settings.DenoiserRadianceClampK;
+    constants.DLSSRRBrightnessClampK = (m_services.settings.DLSSRRBrightnessClampK>0)?(m_services.settings.DLSSRRBrightnessClampK * constants.preExposedGrayLuminance):(0.0f);
 
     // no stable planes by default
-    constants.denoisingEnabled = m_host.settings->ActualUseStandaloneDenoiser() || m_host.settings->RealtimeAA == 3;
+    constants.denoisingEnabled = m_services.settings.ActualUseStandaloneDenoiser() || m_services.settings.RealtimeAA == 3;
 
-    constants._activeStablePlaneCount           = m_host.settings->StablePlanesActiveCount;
-    constants.maxStablePlaneVertexDepth         = std::min( std::min( (uint)m_host.settings->StablePlanesMaxVertexDepth, cStablePlaneMaxVertexIndex ), (uint)m_host.settings->BounceCount );
-    constants.allowPrimarySurfaceReplacement    = m_host.settings->AllowPrimarySurfaceReplacement;
-    constants.stablePlanesSplitStopThreshold    = m_host.settings->StablePlanesSplitStopThreshold;
+    constants._activeStablePlaneCount           = m_services.settings.StablePlanesActiveCount;
+    constants.maxStablePlaneVertexDepth         = std::min( std::min( (uint)m_services.settings.StablePlanesMaxVertexDepth, cStablePlaneMaxVertexIndex ), (uint)m_services.settings.BounceCount );
+    constants.allowPrimarySurfaceReplacement    = m_services.settings.AllowPrimarySurfaceReplacement;
+    constants.stablePlanesSplitStopThreshold    = m_services.settings.StablePlanesSplitStopThreshold;
     constants._padding3                         = 0;
-    constants.stablePlanesSuppressPrimaryIndirectSpecularK  = m_host.settings->StablePlanesSuppressPrimaryIndirectSpecular?m_host.settings->StablePlanesSuppressPrimaryIndirectSpecularK:0.0f;
-    constants.stablePlanesAntiAliasingFallthrough = m_host.settings->StablePlanesAntiAliasingFallthrough;
-    constants.frameIndex                        = m_frameIndex & 0xFFFFFFFF; //m_host.gpuDevice->GetFrameIndex();
+    constants.stablePlanesSuppressPrimaryIndirectSpecularK  = m_services.settings.StablePlanesSuppressPrimaryIndirectSpecular?m_services.settings.StablePlanesSuppressPrimaryIndirectSpecularK:0.0f;
+    constants.stablePlanesAntiAliasingFallthrough = m_services.settings.StablePlanesAntiAliasingFallthrough;
+    constants.frameIndex                        = m_frameIndex & 0xFFFFFFFF; //m_services.gpuDevice.GetFrameIndex();
     constants.genericTSLineStride               = GenericTSComputeLineStride(constants.imageWidth, constants.imageHeight);
     constants.genericTSPlaneStride              = GenericTSComputePlaneStride(constants.imageWidth, constants.imageHeight);
 
-    constants.NEEEnabled                        = m_host.settings->UseNEE;
-    constants.NEEType                           = m_host.settings->NEEType;
-    constants.NEECandidateSamples               = m_host.settings->NEECandidateSamples;
-    constants.NEEFullSamples                    = m_host.settings->NEEFullSamples;
+    constants.NEEEnabled                        = m_services.settings.UseNEE;
+    constants.NEEType                           = m_services.settings.NEEType;
+    constants.NEECandidateSamples               = m_services.settings.NEECandidateSamples;
+    constants.NEEFullSamples                    = m_services.settings.NEEFullSamples;
 
-    constants.EnvironmentMapDiffuseSampleMIPLevel = m_host.settings->EnvironmentMapDiffuseSampleMIPLevel;
+    constants.EnvironmentMapDiffuseSampleMIPLevel = m_services.settings.EnvironmentMapDiffuseSampleMIPLevel;
 
 #if CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
     // stochastic texture filtering type and size.
-    // constants.STFUseBlueNoise                   = m_host.settings->STFUseBlueNoise;
-    constants.STFMagnificationMethod            = GetStfMagnificationMethod(m_host.settings->STFMagnificationMethod);
-    constants.STFFilterMode                     = GetStfFilterMode(m_host.settings->STFFilterMode);
-    constants.STFGaussianSigma                  = m_host.settings->STFGaussianSigma;
+    // constants.STFUseBlueNoise                   = m_services.settings.STFUseBlueNoise;
+    constants.STFMagnificationMethod            = GetStfMagnificationMethod(m_services.settings.STFMagnificationMethod);
+    constants.STFFilterMode                     = GetStfFilterMode(m_services.settings.STFFilterMode);
+    constants.STFGaussianSigma                  = m_services.settings.STFGaussianSigma;
 #endif
 }
 void caustica::render::PathTracingWorldRenderer::rtxdiSetupFrame(nvrhi::IFramebuffer* framebuffer, PathTracerCameraData cameraData, uint2 renderDims)
 {
-    const bool envMapPresent = m_host.settings->EnvironmentMapParams.Enabled;
+    const bool envMapPresent = m_services.settings.EnvironmentMapParams.Enabled;
 
     RtxdiBridgeParameters bridgeParameters;
 	bridgeParameters.frameIndex = m_frameIndex & 0xFFFFFFFF;
 	bridgeParameters.frameDims = renderDims;
-	bridgeParameters.cameraPosition = m_host.renderCore->camera().camera().GetPosition();
-	bridgeParameters.userSettings = m_host.settings->RTXDI;
-    bridgeParameters.usingLightSampling = m_host.settings->ActualUseReSTIRDI();
-    bridgeParameters.usingReGIR = m_host.settings->ActualUseReSTIRDI();
+	bridgeParameters.cameraPosition = m_services.renderCore.camera().camera().GetPosition();
+	bridgeParameters.userSettings = m_services.settings.RTXDI;
+    bridgeParameters.usingLightSampling = m_services.settings.ActualUseReSTIRDI();
+    bridgeParameters.usingReGIR = m_services.settings.ActualUseReSTIRDI();
 
     bridgeParameters.userSettings.restirDI.initialSamplingParams.environmentMapImportanceSampling = envMapPresent;
 
     m_hooks.buildGaussianSplatEmissionProxyList();
-    if (!m_host.gaussianSplatEmissionProxies->empty() && m_hooks.isGaussianSplatEmissionEnabled())
+    if (!m_services.gaussianSplatEmissionProxies.empty() && m_hooks.isGaussianSplatEmissionEnabled())
     {
-        bridgeParameters.gaussianSplatEmissionProxies = m_host.gaussianSplatEmissionProxies;
+        bridgeParameters.gaussianSplatEmissionProxies = &m_services.gaussianSplatEmissionProxies;
         bridgeParameters.gaussianSplatEmissionObjectToWorld = float4x4::identity();
-        bridgeParameters.gaussianSplatEmissionIntensity = m_host.settings->GaussianSplatEmissionIntensity;
+        bridgeParameters.gaussianSplatEmissionIntensity = m_services.settings.GaussianSplatEmissionIntensity;
     }
 
-    if( m_host.settings->ResetRealtimeCaches )
+    if( m_services.settings.ResetRealtimeCaches )
         m_rtxdiPass->Reset();
 
-	m_rtxdiPass->PrepareResources(m_commandList, *m_renderTargets, envMapPresent ? *m_host.envMapBaker : nullptr, *m_host.envMapSceneParams,
-        m_host.sceneManager->getScene(), *m_host.materialsBaker, *m_host.ommBaker, m_host.renderCore->accelStructs().getSubInstanceBuffer(), bridgeParameters, m_bindingLayout, m_shaderDebug );
+	m_rtxdiPass->PrepareResources(m_commandList, *m_renderTargets, envMapPresent ? m_services.envMapBaker : nullptr, m_services.envMapSceneParams,
+        m_services.sceneManager.getScene(), m_services.materialsBaker, m_services.ommBaker, m_services.renderCore.accelStructs().getSubInstanceBuffer(), bridgeParameters, m_bindingLayout, m_shaderDebug );
  }
 #if CAUSTICA_WITH_STREAMLINE
 void caustica::render::PathTracingWorldRenderer::streamlinePreRender()
 {
 #if CAUSTICA_WITH_STREAMLINE
-    if (m_host.gpuDevice->GetDeviceParams().headlessDevice)
+    if (m_services.gpuDevice.GetDeviceParams().headlessDevice)
         return;
 
     // Setup Reflex
     {
         auto reflexConsts = caustica::StreamlineInterface::ReflexOptions{};
-        reflexConsts.mode = (caustica::StreamlineInterface::ReflexMode) m_host.settings->ActualReflexMode();
-        reflexConsts.frameLimitUs = m_host.settings->ReflexCappedFps == 0 ? 0 : int(1000000. / m_host.settings->ReflexCappedFps);
+        reflexConsts.mode = (caustica::StreamlineInterface::ReflexMode) m_services.settings.ActualReflexMode();
+        reflexConsts.frameLimitUs = m_services.settings.ReflexCappedFps == 0 ? 0 : int(1000000. / m_services.settings.ReflexCappedFps);
         reflexConsts.useMarkersToOptimize = true;
         reflexConsts.virtualKey = VK_F13;
         reflexConsts.idThread = 0; // std::hash<std::thread::id>()(std::this_thread::get_id())
-        m_host.gpuDevice->GetStreamline().SetReflexConsts(reflexConsts);
+        m_services.gpuDevice.GetStreamline().SetReflexConsts(reflexConsts);
 
         // Need to update StreamlineIntegration with the ability to query reflex state
         caustica::StreamlineInterface::ReflexState reflexState{};
-        m_host.gpuDevice->GetStreamline().GetReflexState(reflexState);
-        if (m_host.settings->IsReflexSupported)
+        m_services.gpuDevice.GetStreamline().GetReflexState(reflexState);
+        if (m_services.settings.IsReflexSupported)
         {
-            m_host.settings->IsReflexLowLatencyAvailable = reflexState.lowLatencyAvailable;
-            m_host.settings->IsReflexFlashIndicatorDriverControlled = reflexState.flashIndicatorDriverControlled;
+            m_services.settings.IsReflexLowLatencyAvailable = reflexState.lowLatencyAvailable;
+            m_services.settings.IsReflexFlashIndicatorDriverControlled = reflexState.flashIndicatorDriverControlled;
 
             auto report = reflexState.frameReport[63];
             if (reflexState.lowLatencyAvailable && report.gpuRenderEndTime != 0)
@@ -750,18 +757,18 @@ void caustica::render::PathTracingWorldRenderer::streamlinePreRender()
                 auto osRenderQueueDeltaUs = report.osRenderQueueEndTime - report.osRenderQueueStartTime;
                 auto gpuRenderDeltaUs = report.gpuRenderEndTime - report.gpuRenderStartTime;
 
-                m_host.settings->ReflexStats = "frameID: " + std::to_string(frameID);
-                m_host.settings->ReflexStats += "\ntotalGameToRenderLatencyUs: " + std::to_string(totalGameToRenderLatencyUs);
-                m_host.settings->ReflexStats += "\nsimDeltaUs: " + std::to_string(simDeltaUs);
-                m_host.settings->ReflexStats += "\nrenderDeltaUs: " + std::to_string(renderDeltaUs);
-                m_host.settings->ReflexStats += "\npresentDeltaUs: " + std::to_string(presentDeltaUs);
-                m_host.settings->ReflexStats += "\ndriverDeltaUs: " + std::to_string(driverDeltaUs);
-                m_host.settings->ReflexStats += "\nosRenderQueueDeltaUs: " + std::to_string(osRenderQueueDeltaUs);
-                m_host.settings->ReflexStats += "\ngpuRenderDeltaUs: " + std::to_string(gpuRenderDeltaUs);
+                m_services.settings.ReflexStats = "frameID: " + std::to_string(frameID);
+                m_services.settings.ReflexStats += "\ntotalGameToRenderLatencyUs: " + std::to_string(totalGameToRenderLatencyUs);
+                m_services.settings.ReflexStats += "\nsimDeltaUs: " + std::to_string(simDeltaUs);
+                m_services.settings.ReflexStats += "\nrenderDeltaUs: " + std::to_string(renderDeltaUs);
+                m_services.settings.ReflexStats += "\npresentDeltaUs: " + std::to_string(presentDeltaUs);
+                m_services.settings.ReflexStats += "\ndriverDeltaUs: " + std::to_string(driverDeltaUs);
+                m_services.settings.ReflexStats += "\nosRenderQueueDeltaUs: " + std::to_string(osRenderQueueDeltaUs);
+                m_services.settings.ReflexStats += "\ngpuRenderDeltaUs: " + std::to_string(gpuRenderDeltaUs);
             }
             else
             {
-                m_host.settings->ReflexStats = "Latency Report Unavailable";
+                m_services.settings.ReflexStats = "Latency Report Unavailable";
             }
         }
     }
@@ -769,82 +776,82 @@ void caustica::render::PathTracingWorldRenderer::streamlinePreRender()
     // DLSS-G Setup
     {
         // If DLSS-G has been turned off, then we tell tell SL to clean it up expressly
-        if (m_host.settings->DLSSFGOptions.mode == StreamlineInterface::DLSSGMode::eOn && m_host.settings->ActualDLSSFGMode() == StreamlineInterface::DLSSGMode::eOff) {
-            m_host.gpuDevice->GetStreamline().CleanupDLSSG(true);
+        if (m_services.settings.DLSSFGOptions.mode == StreamlineInterface::DLSSGMode::eOn && m_services.settings.ActualDLSSFGMode() == StreamlineInterface::DLSSGMode::eOff) {
+            m_services.gpuDevice.GetStreamline().CleanupDLSSG(true);
         }
 
         // This is where DLSS-G is toggled On and Off (using dlssgOptions.mode) and where we set DLSS-G parameters.
         auto dlssgOptions = StreamlineInterface::DLSSGOptions{};
-        dlssgOptions.mode = m_host.settings->ActualDLSSFGMode();
-        dlssgOptions.numFramesToGenerate = m_host.settings->DLSSFGNumFramesToGenerate;
+        dlssgOptions.mode = m_services.settings.ActualDLSSFGMode();
+        dlssgOptions.numFramesToGenerate = m_services.settings.DLSSFGNumFramesToGenerate;
 
         // This is where we query DLSS-G minimum swapchain size
-        if (m_host.gpuDevice->GetStreamline().IsDLSSGAvailable())
+        if (m_services.gpuDevice.GetStreamline().IsDLSSGAvailable())
         {
             StreamlineInterface::DLSSGState state;
-            m_host.gpuDevice->GetStreamline().GetDLSSGState(state, dlssgOptions);
-            m_host.settings->DLSSFGMultiplier = state.numFramesActuallyPresented;
-            m_host.settings->DLSSFGMaxNumFramesToGenerate = state.numFramesToGenerateMax;
+            m_services.gpuDevice.GetStreamline().GetDLSSGState(state, dlssgOptions);
+            m_services.settings.DLSSFGMultiplier = state.numFramesActuallyPresented;
+            m_services.settings.DLSSFGMaxNumFramesToGenerate = state.numFramesToGenerateMax;
 
-            m_host.gpuDevice->GetStreamline().SetDLSSGOptions(dlssgOptions);
-            m_host.settings->DLSSFGOptions = dlssgOptions;
+            m_services.gpuDevice.GetStreamline().SetDLSSGOptions(dlssgOptions);
+            m_services.settings.DLSSFGOptions = dlssgOptions;
         }
     }
 
     // Ensure DLSS / DLSS-RR is available
-    if (m_host.settings->RealtimeAA == 3 && !m_host.settings->IsDLSSRRSupported)
+    if (m_services.settings.RealtimeAA == 3 && !m_services.settings.IsDLSSRRSupported)
     {
         caustica::warning("Requested DLSS-RR mode not available. Switching to DLSS. ");
-        m_host.settings->RealtimeAA = 2;
+        m_services.settings.RealtimeAA = 2;
     }
-    if ( m_host.settings->RealtimeAA == 2 && !m_host.settings->IsDLSSSuported )
+    if ( m_services.settings.RealtimeAA == 2 && !m_services.settings.IsDLSSSuported )
     {
         caustica::warning("Requested DLSS mode not available. Switching to TAA. ");
-        m_host.settings->RealtimeAA = 1;
+        m_services.settings.RealtimeAA = 1;
     }
 
     // Setup DLSS
-    const bool changeToDLSSMode = (m_host.settings->RealtimeAA >= 2 && m_host.settings->RealtimeAA <= 3) && m_host.settings->DLSSLastRealtimeAA != m_host.settings->RealtimeAA;
+    const bool changeToDLSSMode = (m_services.settings.RealtimeAA >= 2 && m_services.settings.RealtimeAA <= 3) && m_services.settings.DLSSLastRealtimeAA != m_services.settings.RealtimeAA;
     {
         // Reset DLSS vars if we stop using it
-        if (changeToDLSSMode || m_host.settings->DLSSMode == StreamlineInterface::DLSSMode::eOff)
+        if (changeToDLSSMode || m_services.settings.DLSSMode == StreamlineInterface::DLSSMode::eOff)
         {
-            m_host.settings->DLSSLastMode = PathTracerSettings::DLSSModeDefault;
-            m_host.settings->DLSSMode = PathTracerSettings::DLSSModeDefault;
-            m_host.settings->DLSSLastDisplaySize = { 0,0 };
+            m_services.settings.DLSSLastMode = PathTracerSettings::DLSSModeDefault;
+            m_services.settings.DLSSMode = PathTracerSettings::DLSSModeDefault;
+            m_services.settings.DLSSLastDisplaySize = { 0,0 };
         }
 
-        m_host.settings->DLSSLastRealtimeAA = m_host.settings->RealtimeAA;
+        m_services.settings.DLSSLastRealtimeAA = m_services.settings.RealtimeAA;
 
         // If we are using DLSS set its constants
-        if ((m_host.settings->RealtimeAA == 2 || m_host.settings->RealtimeAA == 3) && m_host.settings->RealtimeMode)
+        if ((m_services.settings.RealtimeAA == 2 || m_services.settings.RealtimeAA == 3) && m_services.settings.RealtimeMode)
         {
             StreamlineInterface::DLSSOptions dlssOptions = {};
-            if (m_host.settings->IsDLSSSuported)
+            if (m_services.settings.IsDLSSSuported)
             {
-                dlssOptions.mode = m_host.settings->DLSSMode;
+                dlssOptions.mode = m_services.settings.DLSSMode;
                 dlssOptions.outputWidth = m_displaySize.x;
                 dlssOptions.outputHeight = m_displaySize.y;
                 dlssOptions.sharpness = 0; //m_recommendedDLSSSettings.sharpness;    // <- is this no longer valid?
                 dlssOptions.colorBuffersHDR = true;
                 dlssOptions.useAutoExposure = true;     // Optional: provide proper "kBufferTypeExposure" for 0-lag for better precision handling
                 dlssOptions.preset = StreamlineInterface::DLSSPreset::eDefault;
-                // if (m_host.settings->RealtimeAA < 4) <- docs https://github.com/NVIDIAGameWorks/Streamline/blob/main/docs/ProgrammingGuideDLSS_RR.md#50-provide-dlss--dlss-rr-options seem to imply that these should be set even when DLSS-RR enabled
-                    m_host.gpuDevice->GetStreamline().SetDLSSOptions(dlssOptions);
+                // if (m_services.settings.RealtimeAA < 4) <- docs https://github.com/NVIDIAGameWorks/Streamline/blob/main/docs/ProgrammingGuideDLSS_RR.md#50-provide-dlss--dlss-rr-options seem to imply that these should be set even when DLSS-RR enabled
+                    m_services.gpuDevice.GetStreamline().SetDLSSOptions(dlssOptions);
             }
             else
             {
-                assert( false ); // shouldn't happen, code above should have dropped us to "m_host.settings->RealtimeAA = 1" - check for recent code changes.
+                assert( false ); // shouldn't happen, code above should have dropped us to "m_services.settings.RealtimeAA = 1" - check for recent code changes.
             }
 
-            if (m_host.settings->RealtimeAA == 2 || m_host.settings->RealtimeAA == 3)
+            if (m_services.settings.RealtimeAA == 2 || m_services.settings.RealtimeAA == 3)
             {
                 // Check if we need to update the rendertarget size.
-                bool dlssResizeRequired = (m_host.settings->DLSSMode != m_host.settings->DLSSLastMode) || (m_displaySize.x != m_host.settings->DLSSLastDisplaySize.x) || (m_displaySize.y != m_host.settings->DLSSLastDisplaySize.y);
+                bool dlssResizeRequired = (m_services.settings.DLSSMode != m_services.settings.DLSSLastMode) || (m_displaySize.x != m_services.settings.DLSSLastDisplaySize.x) || (m_displaySize.y != m_services.settings.DLSSLastDisplaySize.y);
                 if (dlssResizeRequired)
                 {
                     // Only quality, target width and height matter here
-                    m_host.gpuDevice->GetStreamline().QueryDLSSOptimalSettings(dlssOptions, m_recommendedDLSSSettings);
+                    m_services.gpuDevice.GetStreamline().QueryDLSSOptimalSettings(dlssOptions, m_recommendedDLSSSettings);
 
                     // this is an example on how to override defaults - overriding default 2/3 to higher res 3/4
                     if (dlssOptions.mode == SI::DLSSMode::eMaxQuality)
@@ -855,21 +862,21 @@ void caustica::render::PathTracingWorldRenderer::streamlinePreRender()
 
                     if (m_recommendedDLSSSettings.optimalRenderSize.x <= 0 || m_recommendedDLSSSettings.optimalRenderSize.y <= 0)
                     {
-                        m_host.settings->RealtimeAA = 0;
-                        m_host.settings->DLSSMode = PathTracerSettings::DLSSModeDefault;
+                        m_services.settings.RealtimeAA = 0;
+                        m_services.settings.DLSSMode = PathTracerSettings::DLSSModeDefault;
                         m_renderSize = m_displaySize;
                     }
                     else
                     {
-                        m_host.settings->DLSSLastMode = m_host.settings->DLSSMode;
-                        m_host.settings->DLSSLastDisplaySize = m_displaySize;
+                        m_services.settings.DLSSLastMode = m_services.settings.DLSSMode;
+                        m_services.settings.DLSSLastDisplaySize = m_displaySize;
                     }
                 }
 
                 m_renderSize = (uint2)m_recommendedDLSSSettings.optimalRenderSize;
             }
 
-            if (m_host.settings->RealtimeAA == 3) // DLSS-RR
+            if (m_services.settings.RealtimeAA == 3) // DLSS-RR
             {
                 StreamlineInterface::DLSSRROptions dlssRROptions = {};
                 dlssRROptions.mode              	= dlssOptions.mode;
@@ -883,17 +890,17 @@ void caustica::render::PathTracingWorldRenderer::streamlinePreRender()
                 dlssRROptions.indicatorInvertAxisY 	= dlssOptions.indicatorInvertAxisY;
                 dlssRROptions.normalRoughnessMode 	= StreamlineInterface::DLSSRRNormalRoughnessMode::ePacked;
                 dlssRROptions.alphaUpscalingEnabled = false;
-                dlssRROptions.preset                = m_host.settings->DLSRRPreset;
+                dlssRROptions.preset                = m_services.settings.DLSRRPreset;
                 m_lastDLSSRROptions = dlssRROptions; // we need to fill them up with view info, but we can only have proper view after it was initialized with correct RT size
             }
         }
         else
         {
-            if (m_host.settings->IsDLSSSuported)
+            if (m_services.settings.IsDLSSSuported)
             {
                 StreamlineInterface::DLSSOptions dlssOptions = {};
                 dlssOptions.mode = StreamlineInterface::DLSSMode::eOff;
-                m_host.gpuDevice->GetStreamline().SetDLSSOptions(dlssOptions);
+                m_services.gpuDevice.GetStreamline().SetDLSSOptions(dlssOptions);
             }
 
             m_renderSize = m_displaySize;
@@ -907,7 +914,7 @@ void caustica::render::PathTracingWorldRenderer::streamlinePreRender()
 #if CAUSTICA_WITH_NATIVE_DLSS
 void caustica::render::PathTracingWorldRenderer::nativeDLSSPreRender()
 {
-    if (!m_host.settings->RealtimeMode)
+    if (!m_services.settings.RealtimeMode)
     {
         m_renderSize = m_displaySize;
         return;
@@ -915,48 +922,48 @@ void caustica::render::PathTracingWorldRenderer::nativeDLSSPreRender()
 
     if (m_nativeDLSS)
     {
-        m_host.settings->IsDLSSSuported = m_nativeDLSS->IsDlssSupported();
-        m_host.settings->IsDLSSRRSupported = m_nativeDLSS->IsRayReconstructionSupported();
+        m_services.settings.IsDLSSSuported = m_nativeDLSS->IsDlssSupported();
+        m_services.settings.IsDLSSRRSupported = m_nativeDLSS->IsRayReconstructionSupported();
     }
 
-    if (m_host.settings->RealtimeAA == 3 && !m_host.settings->IsDLSSRRSupported)
+    if (m_services.settings.RealtimeAA == 3 && !m_services.settings.IsDLSSRRSupported)
     {
         caustica::warning("Requested DLSS-RR mode not available. Switching to DLSS.");
-        m_host.settings->RealtimeAA = 2;
+        m_services.settings.RealtimeAA = 2;
     }
 
-    if (m_host.settings->RealtimeAA == 2 && !m_host.settings->IsDLSSSuported)
+    if (m_services.settings.RealtimeAA == 2 && !m_services.settings.IsDLSSSuported)
     {
         caustica::warning("Requested DLSS mode not available. Switching to TAA.");
-        m_host.settings->RealtimeAA = 1;
+        m_services.settings.RealtimeAA = 1;
     }
 
-    const bool usingDLSS = (m_host.settings->RealtimeAA == 2 || m_host.settings->RealtimeAA == 3);
-    const bool changeToDLSSMode = usingDLSS && m_host.settings->DLSSLastRealtimeAA != m_host.settings->RealtimeAA;
+    const bool usingDLSS = (m_services.settings.RealtimeAA == 2 || m_services.settings.RealtimeAA == 3);
+    const bool changeToDLSSMode = usingDLSS && m_services.settings.DLSSLastRealtimeAA != m_services.settings.RealtimeAA;
 
-    if (changeToDLSSMode || m_host.settings->DLSSMode == SI::DLSSMode::eOff)
+    if (changeToDLSSMode || m_services.settings.DLSSMode == SI::DLSSMode::eOff)
     {
-        m_host.settings->DLSSLastMode = PathTracerSettings::DLSSModeDefault;
-        m_host.settings->DLSSMode = PathTracerSettings::DLSSModeDefault;
-        m_host.settings->DLSSLastDisplaySize = { 0, 0 };
+        m_services.settings.DLSSLastMode = PathTracerSettings::DLSSModeDefault;
+        m_services.settings.DLSSMode = PathTracerSettings::DLSSModeDefault;
+        m_services.settings.DLSSLastDisplaySize = { 0, 0 };
     }
 
-    m_host.settings->DLSSLastRealtimeAA = m_host.settings->RealtimeAA;
+    m_services.settings.DLSSLastRealtimeAA = m_services.settings.RealtimeAA;
 
     if (usingDLSS)
     {
         const bool dlssResizeRequired =
-            (m_host.settings->DLSSMode != m_host.settings->DLSSLastMode) ||
-            (m_displaySize.x != m_host.settings->DLSSLastDisplaySize.x) ||
-            (m_displaySize.y != m_host.settings->DLSSLastDisplaySize.y);
+            (m_services.settings.DLSSMode != m_services.settings.DLSSLastMode) ||
+            (m_displaySize.x != m_services.settings.DLSSLastDisplaySize.x) ||
+            (m_displaySize.y != m_services.settings.DLSSLastDisplaySize.y);
 
         if (dlssResizeRequired)
         {
-            m_host.settings->DLSSLastMode = m_host.settings->DLSSMode;
-            m_host.settings->DLSSLastDisplaySize = m_displaySize;
+            m_services.settings.DLSSLastMode = m_services.settings.DLSSMode;
+            m_services.settings.DLSSLastDisplaySize = m_displaySize;
         }
 
-        m_renderSize = GetNativeDLSSRenderSize(m_displaySize, m_host.settings->DLSSMode);
+        m_renderSize = GetNativeDLSSRenderSize(m_displaySize, m_services.settings.DLSSMode);
     }
     else
     {
@@ -967,8 +974,8 @@ void caustica::render::PathTracingWorldRenderer::nativeDLSSPreRender()
 void caustica::render::PathTracingWorldRenderer::preRender()
 {
     // Limit FPS
-    if (m_host.settings->ActualFPSLimiter() > 0)
-        g_FPSLimiter.FramerateLimit(m_host.settings->ActualFPSLimiter());
+    if (m_services.settings.ActualFPSLimiter() > 0)
+        g_FPSLimiter.FramerateLimit(m_services.settings.ActualFPSLimiter());
 
     korgi::Update();
 
@@ -979,15 +986,15 @@ void caustica::render::PathTracingWorldRenderer::postProcessPreToneMapping(nvrhi
     (void)compositeView;
 
     HdrPostProcessParams hdrParams{
-        *m_host.settings,
+        m_services.settings,
         commandList,
         m_renderTargets.get(),
         m_displaySize,
         m_bloomPass.get(),
     };
-    m_host.renderCore->hdrPostProcess(hdrParams);
+    m_services.renderCore.hdrPostProcess(hdrParams);
 
-    if (m_host.settings->PostProcessTestPassHDR)
+    if (m_services.settings.PostProcessTestPassHDR)
     {
         commandList->beginMarker("TestRaygenPP_HDR");
 
@@ -999,7 +1006,7 @@ void caustica::render::PathTracingWorldRenderer::postProcessPreToneMapping(nvrhi
 
         nvrhi::rt::State state;
         state.shaderTable = m_ptPipelineTestRaygenPPHDR->GetShaderTable();
-        state.bindings = { m_bindingSet, (*m_host.descriptorTable)->GetDescriptorTable() };
+        state.bindings = { m_bindingSet, m_services.descriptorTable->GetDescriptorTable() };
         commandList->setRayTracingState(state);
 
         SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
@@ -1013,7 +1020,7 @@ void caustica::render::PathTracingWorldRenderer::postProcessPreToneMapping(nvrhi
 }
 void caustica::render::PathTracingWorldRenderer::postProcessPostToneMapping(nvrhi::ICommandList* commandList, const caustica::ICompositeView& compositeView)
 { // a.k.a. LDR post-process (e.g. colour filters go here)
-    if (m_host.settings->PostProcessEdgeDetection)
+    if (m_services.settings.PostProcessEdgeDetection)
     {
         m_commandList->beginMarker("PPEdgeDetection");
 
@@ -1025,10 +1032,10 @@ void caustica::render::PathTracingWorldRenderer::postProcessPostToneMapping(nvrh
 
         nvrhi::rt::State state;
         state.shaderTable = m_ptPipelineEdgeDetection->GetShaderTable();
-        state.bindings = { m_bindingSet, (*m_host.descriptorTable)->GetDescriptorTable() };
+        state.bindings = { m_bindingSet, m_services.descriptorTable->GetDescriptorTable() };
         m_commandList->setRayTracingState(state);
 
-        SampleMiniConstants miniConstants = { uint4( *reinterpret_cast<uint*>(&m_host.settings->PostProcessEdgeDetectionThreshold), 0, 0, 0) };
+        SampleMiniConstants miniConstants = { uint4( *reinterpret_cast<uint*>(&m_services.settings.PostProcessEdgeDetectionThreshold), 0, 0, 0) };
         m_commandList->setPushConstants(&miniConstants, sizeof(miniConstants));
         m_commandList->dispatchRays(args);
 
@@ -1039,49 +1046,49 @@ void caustica::render::PathTracingWorldRenderer::postProcessPostToneMapping(nvrh
 }
 void caustica::render::PathTracingWorldRenderer::renderGaussianSplats(bool renderToOutputColor)
 {
-    if (!m_host.settings->EnableGaussianSplats || m_hooks.gaussianSplatObjectsEmpty())
+    if (!m_services.settings.EnableGaussianSplats || m_hooks.gaussianSplatObjectsEmpty())
         return;
 
-    const bool stochasticSplats = m_host.settings->EnableGaussianSplats && m_host.settings->GaussianSplatSortingMode == 1;
-    if (stochasticSplats && (m_host.settings->ResetAccumulation || m_host.settings->ResetRealtimeCaches || m_gaussianSplatTemporalReset))
+    const bool stochasticSplats = m_services.settings.EnableGaussianSplats && m_services.settings.GaussianSplatSortingMode == 1;
+    if (stochasticSplats && (m_services.settings.ResetAccumulation || m_services.settings.ResetRealtimeCaches || m_gaussianSplatTemporalReset))
         m_gaussianSplatTemporalSampleIndex = 0;
 
-    const uint32_t gaussianSplatShadowMode = ResolveGaussianSplatShadowMode(*m_host.settings);
+    const uint32_t gaussianSplatShadowMode = ResolveGaussianSplatShadowMode(m_services.settings);
     GaussianSplatRenderSettings settings;
-    settings.enabled = m_host.settings->EnableGaussianSplats;
-    settings.depthTest = m_host.settings->GaussianSplatDepthTest;
-    settings.sortingMode = m_host.settings->GaussianSplatSortingMode == 1 ? GaussianSplatSortMode::StochasticSplats : GaussianSplatSortMode::GpuSort;
+    settings.enabled = m_services.settings.EnableGaussianSplats;
+    settings.depthTest = m_services.settings.GaussianSplatDepthTest;
+    settings.sortingMode = m_services.settings.GaussianSplatSortingMode == 1 ? GaussianSplatSortMode::StochasticSplats : GaussianSplatSortMode::GpuSort;
     settings.renderTarget = renderToOutputColor ? GaussianSplatRenderTarget::OutputColor : GaussianSplatRenderTarget::ProcessedOutputColor;
-    settings.frustumCulling = static_cast<GaussianSplatFrustumCulling>(dm::clamp(m_host.settings->GaussianSplatFrustumCulling, 0, 2));
+    settings.frustumCulling = static_cast<GaussianSplatFrustumCulling>(dm::clamp(m_services.settings.GaussianSplatFrustumCulling, 0, 2));
     settings.projectionMethod = GaussianSplatProjectionMethod::Eigen;
-    settings.shFormat = static_cast<GaussianSplatStorageFormat>(dm::clamp(m_host.settings->GaussianSplatSHFormat, 0, 2));
-    settings.rgbaFormat = static_cast<GaussianSplatStorageFormat>(dm::clamp(m_host.settings->GaussianSplatRGBAFormat, 0, 2));
-    settings.screenSizeCulling = m_host.settings->GaussianSplatScreenSizeCulling;
-    settings.mipSplattingAntialiasing = m_host.settings->GaussianSplatMipAntialiasing;
-    settings.useAABBs = m_host.settings->GaussianSplatUseAABBs;
-    settings.useTLASInstances = m_host.settings->GaussianSplatUseTLASInstances;
-    settings.blasCompaction = m_host.settings->GaussianSplatBlasCompaction;
-    settings.splatScale = m_host.settings->GaussianSplatScale;
-    settings.alphaScale = m_host.settings->GaussianSplatAlphaScale;
-    settings.brightness = m_host.settings->GaussianSplatBrightness;
-    settings.tintColor = m_host.settings->GaussianSplatTintColor;
-    settings.alphaCullThreshold = m_host.settings->GaussianSplatAlphaCullThreshold;
+    settings.shFormat = static_cast<GaussianSplatStorageFormat>(dm::clamp(m_services.settings.GaussianSplatSHFormat, 0, 2));
+    settings.rgbaFormat = static_cast<GaussianSplatStorageFormat>(dm::clamp(m_services.settings.GaussianSplatRGBAFormat, 0, 2));
+    settings.screenSizeCulling = m_services.settings.GaussianSplatScreenSizeCulling;
+    settings.mipSplattingAntialiasing = m_services.settings.GaussianSplatMipAntialiasing;
+    settings.useAABBs = m_services.settings.GaussianSplatUseAABBs;
+    settings.useTLASInstances = m_services.settings.GaussianSplatUseTLASInstances;
+    settings.blasCompaction = m_services.settings.GaussianSplatBlasCompaction;
+    settings.splatScale = m_services.settings.GaussianSplatScale;
+    settings.alphaScale = m_services.settings.GaussianSplatAlphaScale;
+    settings.brightness = m_services.settings.GaussianSplatBrightness;
+    settings.tintColor = m_services.settings.GaussianSplatTintColor;
+    settings.alphaCullThreshold = m_services.settings.GaussianSplatAlphaCullThreshold;
     settings.shadowsEnabled = gaussianSplatShadowMode != GAUSSIAN_SPLAT_SHADOWS_DISABLED;
     settings.shadowMode = gaussianSplatShadowMode;
-    settings.shadowStrength = m_host.settings->GaussianSplatShadowStrength;
-    settings.shadowRayOffset = m_host.settings->GaussianSplatRtxParticleShadowOffset;
-    settings.shadowSoftRadius = m_host.settings->GaussianSplatShadowSoftRadius;
-    settings.shadowSoftSampleCount = ClampGaussianSplatSoftShadowSamples(m_host.settings->GaussianSplatShadowSoftSampleCount);
+    settings.shadowStrength = m_services.settings.GaussianSplatShadowStrength;
+    settings.shadowRayOffset = m_services.settings.GaussianSplatRtxParticleShadowOffset;
+    settings.shadowSoftRadius = m_services.settings.GaussianSplatShadowSoftRadius;
+    settings.shadowSoftSampleCount = ClampGaussianSplatSoftShadowSamples(m_services.settings.GaussianSplatShadowSoftSampleCount);
     settings.shadowFrameIndex = uint32_t(m_frameIndex & 0xffffffffu);
-    settings.frustumDilation = m_host.settings->GaussianSplatFrustumDilation;
-    settings.minPixelCoverage = m_host.settings->GaussianSplatMinPixelCoverage;
-    if (stochasticSplats && m_host.settings->RealtimeMode)
+    settings.frustumDilation = m_services.settings.GaussianSplatFrustumDilation;
+    settings.minPixelCoverage = m_services.settings.GaussianSplatMinPixelCoverage;
+    if (stochasticSplats && m_services.settings.RealtimeMode)
         settings.stochasticFrameIndex = uint32_t(m_gaussianSplatTemporalSampleIndex);
     else
         settings.stochasticFrameIndex = uint32_t(m_sampleIndex >= 0
             ? uint32_t(m_sampleIndex)
             : uint32_t(m_frameIndex & 0xffffffffu));
-    for (const auto& light : *m_host.lights)
+    for (const auto& light : m_services.lights)
     {
         std::shared_ptr<DirectionalLight> dirLight = std::dynamic_pointer_cast<DirectionalLight>(light);
         if (dirLight != nullptr)
@@ -1093,7 +1100,7 @@ void caustica::render::PathTracingWorldRenderer::renderGaussianSplats(bool rende
         }
     }
 
-    caustica::PlanarView splatView = *m_host.renderCore->camera().view();
+    caustica::PlanarView splatView = *m_services.renderCore.camera().view();
     if (!renderToOutputColor)
     {
         splatView.SetViewport(nvrhi::Viewport(float(m_displaySize.x), float(m_displaySize.y)));
@@ -1112,7 +1119,7 @@ void caustica::render::PathTracingWorldRenderer::accumulateGaussianSplats(const 
     if (m_gaussianSplatAccumulationPass == nullptr || m_renderTargets == nullptr || m_gaussianSplatCurrentColor == nullptr || m_gaussianSplatAccumulatedColor == nullptr)
         return;
 
-    if (m_host.settings->ResetAccumulation || m_host.settings->ResetRealtimeCaches || m_gaussianSplatTemporalReset)
+    if (m_services.settings.ResetAccumulation || m_services.settings.ResetRealtimeCaches || m_gaussianSplatTemporalReset)
     {
         m_gaussianSplatTemporalSampleIndex = 0;
         m_gaussianSplatTemporalReset = false;
@@ -1152,7 +1159,7 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
  
     m_displayAspectRatio = m_displaySize.x/(float)m_displaySize.y;
 
-    m_host.renderCore->camera().ensureViews(m_renderSize);
+    m_services.renderCore.camera().ensureViews(m_renderSize);
 
     bool needNewPasses = false;
     if( m_renderTargets == nullptr || m_renderTargets->IsUpdateRequired( m_renderSize, m_displaySize ) )
@@ -1164,7 +1171,7 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
         m_renderTargets = nullptr;
         m_oidnDenoisedOutput = nullptr;
         resetReferenceOIDN();
-        (*m_host.bindingCache)->Clear( );
+        m_services.bindingCache.Clear( );
         m_renderTargets = std::make_unique<RenderTargets>( );
         m_renderTargets->Init(device(), m_renderSize, m_displaySize, true, true, c_SwapchainCount);
 
@@ -1173,23 +1180,23 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
     }
 
     // Environment map settings
-    caustica::syncEnvMapSceneParams(*m_host.settings, *m_host.envMapSceneParams, c_envMapRadianceScale);
+    caustica::syncEnvMapSceneParams(m_services.settings, m_services.envMapSceneParams, c_envMapRadianceScale);
 
     if (m_hooks.consumeShaderReloadRequest())
     {
-        (*m_host.shaderFactory)->ClearCache();
+        m_services.shaderFactory->ClearCache();
         needNewPasses = true;
     }
 
     bool exposureResetRequired = false;
 
-    if (m_host.settings->NRDModeChanged) // if changing between ReLAX and ReBLUR
+    if (m_services.settings.NRDModeChanged) // if changing between ReLAX and ReBLUR
     {
         needNewPasses = true;
         for (int i = 0; i < std::size(m_nrd); i++)
             m_nrd[i] = nullptr;
     }
-    if (!m_host.settings->ActualUseStandaloneDenoiser()) // clean up the memory if not used
+    if (!m_services.settings.ActualUseStandaloneDenoiser()) // clean up the memory if not used
     {
         for (int i = 0; i < std::size(m_nrd); i++)
             m_nrd[i] = nullptr;
@@ -1198,26 +1205,26 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
     // Acceleration structures need some material info, whilst other passes need acceleration structures, so first set up materials if needed
     if (needNewPasses)
     {
-        m_host.progressInitializingRenderer->Start("Initializing renderer...");
+        m_services.progressInitializingRenderer.Start("Initializing renderer...");
 
-        if (*m_host.materialsBaker == nullptr)
+        if (m_services.materialsBaker == nullptr)
         {
-            *m_host.materialsBaker = std::make_shared<MaterialsBaker>(m_hooks.getMaterialSpecializationShader(), device(), m_host.textureCache, *m_host.shaderFactory);
+            m_services.materialsBaker = std::make_shared<MaterialsBaker>(m_hooks.getMaterialSpecializationShader(), device(), m_services.textureCache, m_services.shaderFactory);
             assert( m_ptPipelineBaker == nullptr ); // there should be no cases where materials baker is null but ptPipelineBaker isn't
             
-            m_ptPipelineBaker = std::make_shared<PTPipelineBaker>(device(), *m_host.materialsBaker, m_bindingLayout, m_bindlessLayout);
+            m_ptPipelineBaker = std::make_shared<PTPipelineBaker>(device(), m_services.materialsBaker, m_bindingLayout, m_bindlessLayout);
             
             std::vector<std::filesystem::path> additionalShaderPaths;
-            *m_host.computePipelineBaker = std::make_shared<ComputePipelineBaker>(device(), additionalShaderPaths);
+            m_services.computePipelineBaker = std::make_shared<ComputePipelineBaker>(device(), additionalShaderPaths);
             
             m_hooks.createRTPipelines();
         }
 
-        (*m_host.materialsBaker)->CreateRenderPassesAndLoadMaterials(m_bindlessLayout, *m_host.commonPasses, m_host.sceneManager->getScene(), m_host.sceneManager->getCurrentScenePath(), GetLocalPath(c_AssetsFolder));
-        m_host.progressInitializingRenderer->Set(5);
+        m_services.materialsBaker->CreateRenderPassesAndLoadMaterials(m_bindlessLayout, m_services.commonPasses, m_services.sceneManager.getScene(), m_services.sceneManager.getCurrentScenePath(), GetLocalPath(c_AssetsFolder));
+        m_services.progressInitializingRenderer.Set(5);
         m_hooks.collectUncompressedTextures();
-        if(*m_host.ommBaker) (*m_host.ommBaker)->CreateRenderPasses(m_bindlessLayout, *m_host.commonPasses);
-        m_host.progressInitializingRenderer->Set(20);
+        if(m_services.ommBaker) m_services.ommBaker->CreateRenderPasses(m_bindlessLayout, m_services.commonPasses);
+        m_services.progressInitializingRenderer.Set(20);
 
         (void)m_hooks.getOrCreateZoomTool();
     }
@@ -1225,31 +1232,31 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
     // Changes to material properties and settings can require a BLAS/TLAS or subInstanceBuffer rebuild (alpha tested/exclusion flags etc); otherwise this is a no-op.
     m_hooks.recreateAccelStructs(m_commandList);
 
-    if (m_host.settings->ActualUseRTXDIPasses() && m_rtxdiPass == nullptr )
+    if (m_services.settings.ActualUseRTXDIPasses() && m_rtxdiPass == nullptr )
         needNewPasses = true; // this will initialize rtxdi passes
-    if (!m_host.settings->ActualUseRTXDIPasses())
+    if (!m_services.settings.ActualUseRTXDIPasses())
         m_rtxdiPass = nullptr;
 
     // this will also create or update materials which can trigger the need to update acceleration structures
     if (needNewPasses)
     {
-        m_host.progressInitializingRenderer->Set(40);
+        m_services.progressInitializingRenderer.Set(40);
         device()->waitForIdle();    // some subsystems have resources that could still be in use and might be deleted - make sure that's safe
         m_commandList->open();
         createRenderPasses(exposureResetRequired, m_commandList);
         m_commandList->close();
         device()->executeCommandList(m_commandList);
-        m_host.progressInitializingRenderer->Set(70);
+        m_services.progressInitializingRenderer.Set(70);
     }
 
     // this is the point where main ray tracing pipelines will actually get compiled
-    m_ptPipelineBaker->Update(m_host.sceneManager->getScene(), (unsigned int)m_host.renderCore->accelStructs().getSubInstanceData().size(), [this](std::vector<caustica::ShaderMacro> & macros){ m_hooks.fillPTPipelineGlobalMacros(macros); }, needNewPasses);
+    m_ptPipelineBaker->Update(m_services.sceneManager.getScene(), (unsigned int)m_services.renderCore.accelStructs().getSubInstanceData().size(), [this](std::vector<caustica::ShaderMacro> & macros){ m_hooks.fillPTPipelineGlobalMacros(macros); }, needNewPasses);
     
     // Update compute shaders (compile if needed)
-    if (*m_host.computePipelineBaker)
-        (*m_host.computePipelineBaker)->Update(needNewPasses);
+    if (m_services.computePipelineBaker)
+        m_services.computePipelineBaker->Update(needNewPasses);
     
-    m_host.progressInitializingRenderer->Set(90);
+    m_services.progressInitializingRenderer.Set(90);
 
     m_commandList->open();
 
@@ -1259,38 +1266,38 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
         // Update camera data used by the path tracer & other systems
         m_hooks.updateViews(framebuffer);
         {   // TODO: pull all this to BridgeCamera - sizeX and sizeY are already inputs so we just need to pass projMatrix
-            nvrhi::Viewport viewport = m_host.renderCore->camera().view()->GetViewport();
-            float2 jitter = m_host.renderCore->camera().view()->GetPixelOffset();
-            float4x4 projMatrix = m_host.renderCore->camera().view()->GetProjectionMatrix();
+            nvrhi::Viewport viewport = m_services.renderCore.camera().view()->GetViewport();
+            float2 jitter = m_services.renderCore.camera().view()->GetPixelOffset();
+            float4x4 projMatrix = m_services.renderCore.camera().view()->GetProjectionMatrix();
             float2 viewSize = { viewport.maxX - viewport.minX, viewport.maxY - viewport.minY };
             float outputAspectRatio = m_displayAspectRatio; //windowViewport.width() / windowViewport.height();    // render and display outputs might not match in case of lower DLSS/etc resolution rounding!
             bool rowMajor = true;
             float tanHalfFOVY = 1.0f / ((rowMajor) ? (projMatrix.m_data[1 * 4 + 1]) : (projMatrix.m_data[1 + 1 * 4]));
             float fovY = atanf(tanHalfFOVY) * 2.0f;
-            cameraData = BridgeCamera(uint(viewSize.x), uint(viewSize.y), outputAspectRatio, m_host.renderCore->camera().camera().GetPosition(), m_host.renderCore->camera().camera().GetDir(), m_host.renderCore->camera().camera().GetUp(), fovY, m_host.renderCore->camera().zNear(), 1e7f, m_host.settings->CameraFocalDistance, m_host.settings->CameraAperture, jitter);
+            cameraData = BridgeCamera(uint(viewSize.x), uint(viewSize.y), outputAspectRatio, m_services.renderCore.camera().camera().GetPosition(), m_services.renderCore.camera().camera().GetDir(), m_services.renderCore.camera().camera().GetUp(), fovY, m_services.renderCore.camera().zNear(), 1e7f, m_services.settings.CameraFocalDistance, m_services.settings.CameraAperture, jitter);
         }
 
         if (needNewPasses || needNewBindings || m_bindingSet == nullptr)
             m_shaderDebug->CreateRenderPasses(framebuffer, m_renderTargets->Depth);
 
-        if (m_host.settings->EnableShaderDebug)
+        if (m_services.settings.EnableShaderDebug)
         {
-            dm::float4x4 viewProj = m_host.renderCore->camera().view()->GetViewProjectionMatrix();
+            dm::float4x4 viewProj = m_services.renderCore.camera().view()->GetViewProjectionMatrix();
             m_shaderDebug->BeginFrame(m_commandList, viewProj);
         }
 
         // Scene refresh, accel structs, materials (partial sub-instance upload for lighting).
         UpdateSceneGeometryParams geoParams{
-            *m_host.settings,
+            m_services.settings,
             m_hooks.accelerationStructRebuildRequested(),
-            m_host.sceneManager->getScene(),
+            m_services.sceneManager.getScene(),
             m_commandList,
         };
-        geoParams.materialsBaker = m_host.materialsBaker->get();
-        geoParams.ommBaker = m_host.ommBaker->get();
-        geoParams.frameIndex = m_host.gpuDevice->GetFrameIndex();
-        geoParams.asyncLoadingInProgress = &*m_host.asyncLoadingInProgress;
-        m_host.renderCore->updateSceneGeometry(geoParams);
+        geoParams.materialsBaker = m_services.materialsBaker.get();
+        geoParams.ommBaker = m_services.ommBaker.get();
+        geoParams.frameIndex = m_services.gpuDevice.GetFrameIndex();
+        geoParams.asyncLoadingInProgress = &m_services.asyncLoadingInProgress;
+        m_services.renderCore.updateSceneGeometry(geoParams);
 
         // Update input lighting, environment map, etc.
         preUpdateLighting(m_commandList, needNewBindings);
@@ -1306,12 +1313,12 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
 
 	if( needNewPasses || needNewBindings || m_bindingSet == nullptr )
     {
-        m_host.progressInitializingRenderer->Set(95);
+        m_services.progressInitializingRenderer.Set(95);
         RAII_SCOPE( m_commandList->close(); device()->executeCommandList(m_commandList);, m_commandList->open(););
 
         recreateBindingSet();
 
-        m_host.progressInitializingRenderer->Set(100);
+        m_services.progressInitializingRenderer.Set(100);
 
         {
             nvrhi::BindingSetDesc lineBindingSetDesc;
@@ -1333,10 +1340,10 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
 
             m_linesPipeline = device()->createGraphicsPipeline(psoDesc, framebuffer);
         }
-        m_host.progressInitializingRenderer->Stop();
+        m_services.progressInitializingRenderer.Stop();
     }
 
-    m_toneMappingPass->PreRender(m_host.settings->ToneMappingParams);
+    m_toneMappingPass->PreRender(m_services.settings.ToneMappingParams);
 
     preUpdatePathTracing(needNewPasses, m_commandList);
 
@@ -1345,7 +1352,7 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
 
     SampleConstants & constants = m_currentConstants; memset(&constants, 0, sizeof(constants));
     SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) }; // accessible but unused in path tracing at the moment
-    if( m_host.sceneManager->getScene() == nullptr )
+    if( m_services.sceneManager.getScene() == nullptr )
     {
         m_commandList->clearTextureFloat( m_renderTargets->OutputColor, nvrhi::AllSubresources, nvrhi::Color( 1, 1, 0, 0 ) );
         m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
@@ -1353,19 +1360,19 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
     else
     {
         updatePathTracerConstants(constants.ptConsts, cameraData);
-        constants.MaterialCount = (*m_host.materialsBaker)->GetMaterialDataCount(); // m_host.sceneManager->getScene()->GetSceneGraph()->GetMaterials().size();
-        const uint32_t gaussianSplatShadowMode = ResolveGaussianSplatShadowMode(*m_host.settings);
+        constants.MaterialCount = m_services.materialsBaker->GetMaterialDataCount(); // m_services.sceneManager.getScene()->GetSceneGraph()->GetMaterials().size();
+        const uint32_t gaussianSplatShadowMode = ResolveGaussianSplatShadowMode(m_services.settings);
         const WorldRendererGaussianSplatBinding primaryGaussianBinding = m_hooks.getPrimaryGaussianSplatBinding();
         GaussianSplatPass* primaryGaussianSplatPass = const_cast<GaussianSplatPass*>(primaryGaussianBinding.pass);
-        constants.GaussianSplatShadowCount = (m_host.settings->EnableGaussianSplats
+        constants.GaussianSplatShadowCount = (m_services.settings.EnableGaussianSplats
                 && gaussianSplatShadowMode != GAUSSIAN_SPLAT_SHADOWS_DISABLED
                 && primaryGaussianSplatPass != nullptr
                 && primaryGaussianSplatPass->GetTopLevelAS() != nullptr)
             ? primaryGaussianSplatPass->GetSplatCount()
             : 0;
         constants.GaussianSplatShadowsEnabled = constants.GaussianSplatShadowCount > 0 ? 1u : 0u;
-        constants.GaussianSplatShadowScale = m_host.settings->GaussianSplatScale;
-        constants.GaussianSplatShadowAlphaThreshold = m_host.settings->GaussianSplatAlphaCullThreshold;
+        constants.GaussianSplatShadowScale = m_services.settings.GaussianSplatScale;
+        constants.GaussianSplatShadowAlphaThreshold = m_services.settings.GaussianSplatAlphaCullThreshold;
         constants.GaussianSplatShadowUseTLASInstances =
             (primaryGaussianSplatPass != nullptr && primaryGaussianSplatPass->GetShadowUsesTLASInstances()) ? 1u : 0u;
         constants.GaussianSplatShadowPrimitiveCountPerSplat =
@@ -1373,34 +1380,34 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
         constants.GaussianSplatShadowMode = constants.GaussianSplatShadowsEnabled != 0
             ? gaussianSplatShadowMode
             : GAUSSIAN_SPLAT_SHADOWS_DISABLED;
-        constants.GaussianSplatShadowSoftRadius = m_host.settings->GaussianSplatShadowSoftRadius;
-        constants.GaussianSplatShadowSoftSampleCount = ClampGaussianSplatSoftShadowSamples(m_host.settings->GaussianSplatShadowSoftSampleCount);
+        constants.GaussianSplatShadowSoftRadius = m_services.settings.GaussianSplatShadowSoftRadius;
+        constants.GaussianSplatShadowSoftSampleCount = ClampGaussianSplatSoftShadowSamples(m_services.settings.GaussianSplatShadowSoftSampleCount);
         constants.GaussianSplatShadowFrameIndex = uint32_t(m_frameIndex & 0xffffffffu);
-        constants.GaussianSplatShadowRayOffset = m_host.settings->GaussianSplatRtxParticleShadowOffset;
-        constants.GaussianSplatShadowAlphaScale = m_host.settings->GaussianSplatAlphaScale;
+        constants.GaussianSplatShadowRayOffset = m_services.settings.GaussianSplatRtxParticleShadowOffset;
+        constants.GaussianSplatShadowAlphaScale = m_services.settings.GaussianSplatAlphaScale;
         constants.GaussianSplatShadowKernelMinResponse = kGaussianSplatKernelMinResponse;
-        constants.GaussianSplatShadowKernelDegree = uint32_t(std::clamp(m_host.settings->GaussianSplatRtxKernelDegree, 0, 5));
-        constants.GaussianSplatShadowAdaptiveClamp = m_host.settings->GaussianSplatRtxAdaptiveClamp ? 1u : 0u;
+        constants.GaussianSplatShadowKernelDegree = uint32_t(std::clamp(m_services.settings.GaussianSplatRtxKernelDegree, 0, 5));
+        constants.GaussianSplatShadowAdaptiveClamp = m_services.settings.GaussianSplatRtxAdaptiveClamp ? 1u : 0u;
         constants.GaussianSplatShadowWorldToObject = primaryGaussianBinding.pass != nullptr
             ? inverse(primaryGaussianBinding.objectToWorld)
             : float4x4::identity();
 
-        constants.envMapSceneParams = *m_host.envMapSceneParams;
-        constants.envMapImportanceSamplingParams = (*m_host.envMapBaker)->GetImportanceSampling()->GetShaderParams();
+        constants.envMapSceneParams = m_services.envMapSceneParams;
+        constants.envMapImportanceSamplingParams = m_services.envMapBaker->GetImportanceSampling()->GetShaderParams();
 
-        PlanarViewConstants view;           m_host.renderCore->camera().view()->FillPlanarViewConstants(view);
-        PlanarViewConstants previousView;   m_host.renderCore->camera().viewPrevious()->FillPlanarViewConstants(previousView);
+        PlanarViewConstants view;           m_services.renderCore.camera().view()->FillPlanarViewConstants(view);
+        PlanarViewConstants previousView;   m_services.renderCore.camera().viewPrevious()->FillPlanarViewConstants(previousView);
         constants.view          = FromPlanarViewConstants(view);
         constants.previousView  = FromPlanarViewConstants(previousView);
 
         constants.debug = {};
-        constants.debug.pick = m_hooks.hasActivePickRequest() || m_host.settings->ContinuousDebugFeedback;
-        constants.debug.pickX = (constants.debug.pick)?(m_host.settings->DebugPixel.x):(-1);
-        constants.debug.pickY = (constants.debug.pick)?(m_host.settings->DebugPixel.y):(-1);
-        constants.debug.debugLineScale = (m_host.settings->ShowDebugLines)?(m_host.settings->DebugLineScale):(0.0f);
-        constants.debug.showWireframe = m_host.settings->ShowWireframe;
-        constants.debug.debugViewType = (int)m_host.settings->DebugView;
-        constants.debug.debugViewStablePlaneIndex = (m_host.settings->StablePlanesActiveCount==1)?(0):(m_host.settings->DebugViewStablePlaneIndex);
+        constants.debug.pick = m_hooks.hasActivePickRequest() || m_services.settings.ContinuousDebugFeedback;
+        constants.debug.pickX = (constants.debug.pick)?(m_services.settings.DebugPixel.x):(-1);
+        constants.debug.pickY = (constants.debug.pick)?(m_services.settings.DebugPixel.y):(-1);
+        constants.debug.debugLineScale = (m_services.settings.ShowDebugLines)?(m_services.settings.DebugLineScale):(0.0f);
+        constants.debug.showWireframe = m_services.settings.ShowWireframe;
+        constants.debug.debugViewType = (int)m_services.settings.DebugView;
+        constants.debug.debugViewStablePlaneIndex = (m_services.settings.StablePlanesActiveCount==1)?(0):(m_services.settings.DebugViewStablePlaneIndex);
 #if ENABLE_DEBUG_DELTA_TREE_VIZUALISATION
         constants.debug.exploreDeltaTree = (m_hooks.showDeltaTree() && constants.debug.pick)?(1):(0);
 #else
@@ -1408,13 +1415,13 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
 #endif
         constants.debug.imageWidth = constants.ptConsts.imageWidth;
         constants.debug.imageHeight = constants.ptConsts.imageHeight;
-        constants.debug.mouseX = m_host.settings->MousePos.x;
-        constants.debug.mouseY = m_host.settings->MousePos.y;
+        constants.debug.mouseX = m_services.settings.MousePos.x;
+        constants.debug.mouseY = m_services.settings.MousePos.y;
         constants.debug.cameraPosW = constants.ptConsts.camera.PosW;
         constants.debug._padding0 = 0;
 
-        constants.denoisingHitParamConsts = { m_host.settings->ReblurSettings.hitDistanceParameters.A, m_host.settings->ReblurSettings.hitDistanceParameters.B,
-                                              m_host.settings->ReblurSettings.hitDistanceParameters.C, m_host.settings->ReblurSettings.hitDistanceParameters.D };
+        constants.denoisingHitParamConsts = { m_services.settings.ReblurSettings.hitDistanceParameters.A, m_services.settings.ReblurSettings.hitDistanceParameters.B,
+                                              m_services.settings.ReblurSettings.hitDistanceParameters.C, m_services.settings.ReblurSettings.hitDistanceParameters.D };
 
         // This updates all lighting: distant (environment maps and directional analytic lights) and local (analytic lights and emissive triangle lights)
         // Must go before m_constantBuffer as when saving screenshots it closes and re-opens command list, flushing the volatile constant buffer!
@@ -1425,21 +1432,21 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
 
         m_hooks.sampleRenderCode(framebuffer, m_commandList, constants);
 
-        const bool stochasticSplats = m_host.settings->EnableGaussianSplats && m_host.settings->GaussianSplatSortingMode == 1;
-        const bool stochasticUsesMainTemporal = stochasticSplats && (!m_host.settings->RealtimeMode || m_host.settings->RealtimeAA == 1);
+        const bool stochasticSplats = m_services.settings.EnableGaussianSplats && m_services.settings.GaussianSplatSortingMode == 1;
+        const bool stochasticUsesMainTemporal = stochasticSplats && (!m_services.settings.RealtimeMode || m_services.settings.RealtimeAA == 1);
         if (stochasticUsesMainTemporal)
             renderGaussianSplats(true);
 
-        postProcessAA(framebuffer, needNewPasses || m_host.settings->ResetRealtimeCaches);
+        postProcessAA(framebuffer, needNewPasses || m_services.settings.ResetRealtimeCaches);
         applyReferenceOIDN();
-        if (m_host.settings->ReferenceOIDNDenoiser)
+        if (m_services.settings.ReferenceOIDNDenoiser)
             m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
 
         if (!stochasticUsesMainTemporal)
             renderGaussianSplats(false);
     }
 
-    caustica::PlanarView fullscreenView = *m_host.renderCore->camera().view();
+    caustica::PlanarView fullscreenView = *m_services.renderCore.camera().view();
     nvrhi::Viewport windowViewport(float(m_displaySize.x), float(m_displaySize.y));
     fullscreenView.SetViewport(windowViewport);
     fullscreenView.UpdateCache();
@@ -1447,7 +1454,7 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
     postProcessPreToneMapping(m_commandList, fullscreenView);   // writing to m_renderTargets->ProcessedOutputColor
 
     //Tone Mapping; it will read from m_renderTargets->ProcessedOutputColor and write into m_renderTargets->LdrColor; in case tonemapping is disabled, it's just a passthrough
-    if (m_toneMappingPass->Render(m_commandList, fullscreenView, m_renderTargets->ProcessedOutputColor, m_host.settings->EnableToneMapping))
+    if (m_toneMappingPass->Render(m_commandList, fullscreenView, m_renderTargets->ProcessedOutputColor, m_services.settings.EnableToneMapping))
     {
         // first run tonemapper can close & re-open command list - when that happens, we have to re-upload volatile constants
         m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
@@ -1457,16 +1464,16 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
 
     //m_postProcess->Render(m_commandList, m_renderTargets->LdrColor);
 
-    if (m_host.settings->EnableShaderDebug)
+    if (m_services.settings.EnableShaderDebug)
         m_shaderDebug->EndFrameAndOutput(m_commandList, m_renderTargets->LdrFramebuffer->GetFramebuffer(fullscreenView), m_renderTargets->Depth, fbinfo.getViewport());
 
     m_hooks.getOrCreateZoomTool()->Render(m_commandList, m_renderTargets->LdrColor);
 
     m_commandList->beginMarker("Blit");
-    (*m_host.commonPasses)->BlitTexture(m_commandList, framebuffer, m_renderTargets->LdrColor, m_host.bindingCache->get());
+    (m_services.commonPasses)->BlitTexture(m_commandList, framebuffer, m_renderTargets->LdrColor, &m_services.bindingCache);
     m_commandList->endMarker();
 
-    if (m_host.settings->ShowDebugLines == true)
+    if (m_services.settings.ShowDebugLines == true)
     {
         m_commandList->beginMarker("Debug Lines");
 
@@ -1509,7 +1516,7 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
     }
     m_cpuSideDebugLines.clear();
 
-    if( m_host.settings->ContinuousDebugFeedback || m_hooks.pickMaterialRequested() )
+    if( m_services.settings.ContinuousDebugFeedback || m_hooks.pickMaterialRequested() )
     {
         m_commandList->copyBuffer(m_feedback_Buffer_Cpu, 0, m_feedback_Buffer_Gpu, 0, sizeof(DebugFeedbackStruct) * 1);
         m_commandList->copyBuffer(m_debugLineBufferDisplay, 0, m_debugLineBufferCapture, 0, sizeof(DebugLineStruct) * MAX_DEBUG_LINES );
@@ -1523,7 +1530,7 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
 	device()->executeCommandList(m_commandList);
 
     // resolve picking and debug info
-    if (m_host.settings->ContinuousDebugFeedback || m_hooks.hasActivePickRequest())
+    if (m_services.settings.ContinuousDebugFeedback || m_hooks.hasActivePickRequest())
     {
         device()->waitForIdle();
         void* pData = device()->mapBuffer(m_feedback_Buffer_Cpu, nvrhi::CpuAccessMode::Read);
@@ -1541,7 +1548,7 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
     }
 
     m_hooks.captureScriptPostRender([this, framebufferTexture](const char* fileName) -> bool {
-        return SaveTextureToFile(device(), m_host.commonPasses->get(), framebufferTexture, nvrhi::ResourceStates::Common, fileName);
+        return SaveTextureToFile(device(), m_services.commonPasses.get(), framebufferTexture, nvrhi::ResourceStates::Common, fileName);
     });
 
     if (m_hooks.consumeExperimentalPhotoScreenshot())
@@ -1552,16 +1559,16 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
     if (m_temporalAntiAliasingPass != nullptr)
         m_temporalAntiAliasingPass->AdvanceFrame();
 
-	m_host.renderCore->camera().swapViews();
-	m_host.gpuDevice->SetVsyncEnabled(m_host.settings->ActualEnableVsync());
+	m_services.renderCore.camera().swapViews();
+	m_services.gpuDevice.SetVsyncEnabled(m_services.settings.ActualEnableVsync());
 
     postUpdatePathTracing();
 }
 void caustica::render::PathTracingWorldRenderer::recreateBindingSet()
 {
 	// WARNING: this must match the layout of the m_bindingLayout (or switch to CreateBindingSetAndLayout)
-    nvrhi::rt::IAccelStruct* gaussianSplatAS = m_host.renderCore->accelStructs().getTopLevelAS();
-    nvrhi::IBuffer* gaussianSplatBuffer = (*m_host.materialsBaker)->GetMaterialDataBuffer();
+    nvrhi::rt::IAccelStruct* gaussianSplatAS = m_services.renderCore.accelStructs().getTopLevelAS();
+    nvrhi::IBuffer* gaussianSplatBuffer = m_services.materialsBaker->GetMaterialDataBuffer();
     const WorldRendererGaussianSplatBinding primaryGaussianBinding = m_hooks.getPrimaryGaussianSplatBinding();
     const GaussianSplatPass* primaryGaussianSplatPass = primaryGaussianBinding.pass;
     if (primaryGaussianSplatPass != nullptr && primaryGaussianSplatPass->GetTopLevelAS() != nullptr && primaryGaussianSplatPass->GetSplatBuffer() != nullptr)
@@ -1575,31 +1582,31 @@ void caustica::render::PathTracingWorldRenderer::recreateBindingSet()
     bindingSetDescBase.bindings = {
         nvrhi::BindingSetItem::ConstantBuffer(0, m_constantBuffer),
         nvrhi::BindingSetItem::PushConstants(1, sizeof(SampleMiniConstants)),
-        //nvrhi::BindingSetItem::ConstantBuffer(2, (*m_host.lightsBaker)->GetLightingConstants()),
-        nvrhi::BindingSetItem::RayTracingAccelStruct(0, m_host.renderCore->accelStructs().getTopLevelAS()),
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(1, m_host.renderCore->accelStructs().getSubInstanceBuffer()),
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(2, m_host.sceneManager->getScene()->GetInstanceBuffer()),
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(3, m_host.sceneManager->getScene()->GetGeometryBuffer()),
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(4, (*m_host.ommBaker)?((*m_host.ommBaker)->GetGeometryDebugBuffer()):((*m_host.materialsBaker)->GetMaterialDataBuffer().Get()) ),   // YUCK
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(5, (*m_host.materialsBaker)->GetMaterialDataBuffer()),
+        //nvrhi::BindingSetItem::ConstantBuffer(2, m_services.lightsBaker->GetLightingConstants()),
+        nvrhi::BindingSetItem::RayTracingAccelStruct(0, m_services.renderCore.accelStructs().getTopLevelAS()),
+        nvrhi::BindingSetItem::StructuredBuffer_SRV(1, m_services.renderCore.accelStructs().getSubInstanceBuffer()),
+        nvrhi::BindingSetItem::StructuredBuffer_SRV(2, m_services.sceneManager.getScene()->GetInstanceBuffer()),
+        nvrhi::BindingSetItem::StructuredBuffer_SRV(3, m_services.sceneManager.getScene()->GetGeometryBuffer()),
+        nvrhi::BindingSetItem::StructuredBuffer_SRV(4, m_services.ommBaker ?(m_services.ommBaker->GetGeometryDebugBuffer()):(m_services.materialsBaker->GetMaterialDataBuffer().Get()) ),   // YUCK
+        nvrhi::BindingSetItem::StructuredBuffer_SRV(5, m_services.materialsBaker->GetMaterialDataBuffer()),
         nvrhi::BindingSetItem::Texture_SRV(6,  m_renderTargets->LdrColorScratch, nvrhi::Format::SRGBA8_UNORM),
         nvrhi::BindingSetItem::RayTracingAccelStruct(7, gaussianSplatAS),
         nvrhi::BindingSetItem::StructuredBuffer_SRV(8, gaussianSplatBuffer),
-        nvrhi::BindingSetItem::Texture_SRV(10, (*m_host.envMapBaker)->GetEnvMapCube()), //m_app.m_EnvironmentMap->IsEnvMapLoaded() ? m_app.m_EnvironmentMap->GetEnvironmentMap() : (*m_host.commonPasses)->m_BlackTexture),
-        nvrhi::BindingSetItem::Texture_SRV(11, (*m_host.envMapBaker)->GetImportanceSampling()->GetImportanceMapOnly()), //m_app.m_EnvironmentMap->IsImportanceMapLoaded() ? m_app.m_EnvironmentMap->GetImportanceMap() : (*m_host.commonPasses)->m_BlackTexture),
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(12, (*m_host.lightsBaker)->GetControlBuffer()),
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(13, (*m_host.lightsBaker)->GetLightBuffer()),
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(14, (*m_host.lightsBaker)->GetLightExBuffer()),
-        nvrhi::BindingSetItem::TypedBuffer_SRV(15, (*m_host.lightsBaker)->GetLightProxyCounters()),     // t_tightProxyCounters
-        nvrhi::BindingSetItem::TypedBuffer_SRV(16, (*m_host.lightsBaker)->GetLightSamplingProxies()),   // t_LightProxyIndices
-        nvrhi::BindingSetItem::TypedBuffer_SRV(17, (*m_host.lightsBaker)->GetLocalSamplingBuffer()),    // t_LightLocalSamplingBuffer
-        nvrhi::BindingSetItem::Texture_SRV(18, (*m_host.lightsBaker)->GetEnvLightLookupMap()),          // t_EnvLookupMap
+        nvrhi::BindingSetItem::Texture_SRV(10, m_services.envMapBaker->GetEnvMapCube()), //m_app.m_EnvironmentMap->IsEnvMapLoaded() ? m_app.m_EnvironmentMap->GetEnvironmentMap() : (m_services.commonPasses)->m_BlackTexture),
+        nvrhi::BindingSetItem::Texture_SRV(11, m_services.envMapBaker->GetImportanceSampling()->GetImportanceMapOnly()), //m_app.m_EnvironmentMap->IsImportanceMapLoaded() ? m_app.m_EnvironmentMap->GetImportanceMap() : (m_services.commonPasses)->m_BlackTexture),
+        nvrhi::BindingSetItem::StructuredBuffer_SRV(12, m_services.lightsBaker->GetControlBuffer()),
+        nvrhi::BindingSetItem::StructuredBuffer_SRV(13, m_services.lightsBaker->GetLightBuffer()),
+        nvrhi::BindingSetItem::StructuredBuffer_SRV(14, m_services.lightsBaker->GetLightExBuffer()),
+        nvrhi::BindingSetItem::TypedBuffer_SRV(15, m_services.lightsBaker->GetLightProxyCounters()),     // t_tightProxyCounters
+        nvrhi::BindingSetItem::TypedBuffer_SRV(16, m_services.lightsBaker->GetLightSamplingProxies()),   // t_LightProxyIndices
+        nvrhi::BindingSetItem::TypedBuffer_SRV(17, m_services.lightsBaker->GetLocalSamplingBuffer()),    // t_LightLocalSamplingBuffer
+        nvrhi::BindingSetItem::Texture_SRV(18, m_services.lightsBaker->GetEnvLightLookupMap()),          // t_EnvLookupMap
         //nvrhi::BindingSetItem::TypedBuffer_SRV(19, ),
-        nvrhi::BindingSetItem::Texture_UAV(20, (*m_host.lightsBaker)->GetFeedbackTotalWeight()),        // u_LightFeedbackTotalWeight
-        nvrhi::BindingSetItem::Texture_UAV(21, (*m_host.lightsBaker)->GetFeedbackCandidates()),         // u_LightFeedbackCandidates
-        nvrhi::BindingSetItem::Sampler(0, (*m_host.commonPasses)->m_AnisotropicWrapSampler),
-        nvrhi::BindingSetItem::Sampler(1, (*m_host.envMapBaker)->GetEnvMapCubeSampler()),
-        nvrhi::BindingSetItem::Sampler(2, (*m_host.envMapBaker)->GetImportanceSampling()->GetImportanceMapSampler()),
+        nvrhi::BindingSetItem::Texture_UAV(20, m_services.lightsBaker->GetFeedbackTotalWeight()),        // u_LightFeedbackTotalWeight
+        nvrhi::BindingSetItem::Texture_UAV(21, m_services.lightsBaker->GetFeedbackCandidates()),         // u_LightFeedbackCandidates
+        nvrhi::BindingSetItem::Sampler(0, (m_services.commonPasses)->m_AnisotropicWrapSampler),
+        nvrhi::BindingSetItem::Sampler(1, m_services.envMapBaker->GetEnvMapCubeSampler()),
+        nvrhi::BindingSetItem::Sampler(2, m_services.envMapBaker->GetImportanceSampling()->GetImportanceMapSampler()),
         nvrhi::BindingSetItem::Texture_UAV(0, m_renderTargets->OutputColor),
         nvrhi::BindingSetItem::Texture_UAV(1, m_renderTargets->ProcessedOutputColor),
         nvrhi::BindingSetItem::Texture_UAV(2, m_renderTargets->LdrColor, nvrhi::Format::RGBA8_UNORM),
@@ -1661,20 +1668,20 @@ void caustica::render::PathTracingWorldRenderer::recreateBindingSet()
         // Reflection system bindings (t80-t83, b3)
         // Derived classes can override AddCustomBindings to provide actual textures
         // Default to black texture fallbacks (NVRHI doesn't allow null textures)
-        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(80, (*m_host.commonPasses)->m_BlackCubeMapArray));  // t_LocalCubemapGGX
-        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(81, (*m_host.commonPasses)->m_BlackCubeMapArray));  // t_DiffuseIrradianceCube
-        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(82, (*m_host.commonPasses)->m_BlackTexture));  // t_SSRBlurChain
-        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(83, ((*m_host.envMapBaker)->GetBRDFLUT()!=nullptr)?(*m_host.envMapBaker)->GetBRDFLUT():(*m_host.commonPasses)->m_BlackTexture ));  // t_BRDFLUT
-        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(84, (*m_host.commonPasses)->m_BlackTexture));  // t_DepthHierarchy placeholder
+        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(80, (m_services.commonPasses)->m_BlackCubeMapArray));  // t_LocalCubemapGGX
+        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(81, (m_services.commonPasses)->m_BlackCubeMapArray));  // t_DiffuseIrradianceCube
+        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(82, (m_services.commonPasses)->m_BlackTexture));  // t_SSRBlurChain
+        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(83, (m_services.envMapBaker->GetBRDFLUT()!=nullptr)?m_services.envMapBaker->GetBRDFLUT():(m_services.commonPasses)->m_BlackTexture ));  // t_BRDFLUT
+        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(84, (m_services.commonPasses)->m_BlackTexture));  // t_DepthHierarchy placeholder
         bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::ConstantBuffer(10, m_constantBuffer)); // ReflectionConstants (reuse main constant buffer as placeholder)
         
         // SSR result UAV placeholder
         bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_UAV(85, m_renderTargets->Depth));   // u_SSRResult placeholder
 
         // GTAO output (default to white = no occlusion; overridden by AddCustomBindings)
-        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(86, (*m_host.commonPasses)->m_WhiteTexture));  // t_GTAOOutput placeholder
+        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(86, (m_services.commonPasses)->m_WhiteTexture));  // t_GTAOOutput placeholder
         // Previous frame depth (default to black = zero depth; overridden by AddCustomBindings)
-        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(87, (*m_host.commonPasses)->m_BlackTexture));  // t_PrevDepth placeholder
+        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(87, (m_services.commonPasses)->m_BlackTexture));  // t_PrevDepth placeholder
 
         // Allow derived classes to customize bindings (e.g., add reflection textures, GTAO output)
         m_hooks.addCustomBindings(bindingSetDesc);
@@ -1686,12 +1693,12 @@ void caustica::render::PathTracingWorldRenderer::pathTrace(nvrhi::IFramebuffer* 
 {
     //m_commandList->beginMarker("MainRendering"); <- removed (for now) since added hierarchy reduces readability
 
-    bool useStablePlanes = m_host.settings->RealtimeMode;
+    bool useStablePlanes = m_services.settings.RealtimeMode;
 
     nvrhi::rt::State state;
 
     nvrhi::rt::DispatchRaysArguments args;
-    nvrhi::Viewport viewport = m_host.renderCore->camera().view()->GetViewport();
+    nvrhi::Viewport viewport = m_services.renderCore.camera().view()->GetViewport();
     uint32_t width = (uint32_t)(viewport.maxX - viewport.minX);
     uint32_t height = (uint32_t)(viewport.maxY - viewport.minY);
     args.width = width;
@@ -1710,7 +1717,7 @@ void caustica::render::PathTracingWorldRenderer::pathTrace(nvrhi::IFramebuffer* 
             m_commandList->setTextureState(m_renderTargets->Throughput, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
             m_commandList->setTextureState(m_renderTargets->SpecularHitT, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
             state.shaderTable = m_ptPipelineBuildStablePlanes->GetShaderTable();
-            state.bindings = { m_bindingSet, (*m_host.descriptorTable)->GetDescriptorTable() };
+            state.bindings = { m_bindingSet, m_services.descriptorTable->GetDescriptorTable() };
             m_commandList->setRayTracingState(state);
             m_commandList->setPushConstants(&miniConstants, sizeof(miniConstants));
             m_commandList->dispatchRays(args);
@@ -1724,7 +1731,7 @@ void caustica::render::PathTracingWorldRenderer::pathTrace(nvrhi::IFramebuffer* 
             RAII_SCOPE(m_commandList->beginMarker("VBufferExport"); , m_commandList->endMarker(); );
 
             nvrhi::ComputeState state;
-		    state.bindings = { m_bindingSet, (*m_host.descriptorTable)->GetDescriptorTable() };
+		    state.bindings = { m_bindingSet, m_services.descriptorTable->GetDescriptorTable() };
             state.pipeline = m_exportVBufferPSO;
             m_commandList->setComputeState(state);
 
@@ -1741,24 +1748,24 @@ void caustica::render::PathTracingWorldRenderer::pathTrace(nvrhi::IFramebuffer* 
     // In realtime mode, ScreenMotionVectors reference mode ScreenMotionVectors should be 0
     UpdateLightingEndParams lightingEndParams{
         m_commandList,
-        m_host.lightsBaker->get(),
-        m_host.bindingCache->get(),
-        m_host.sceneManager->getScene(),
-        *m_host.materialsBaker,
-        *m_host.ommBaker,
-        m_host.renderCore->accelStructs().getSubInstanceBuffer(),
+        m_services.lightsBaker.get(),
+        &m_services.bindingCache,
+        m_services.sceneManager.getScene(),
+        m_services.materialsBaker,
+        m_services.ommBaker,
+        m_services.renderCore.accelStructs().getSubInstanceBuffer(),
         m_renderTargets->Depth,
         m_renderTargets->ScreenMotionVectors,
     };
-    m_host.renderCore->updateLightingEnd(lightingEndParams);
+    m_services.renderCore.updateLightingEnd(lightingEndParams);
 
     {
         RAII_SCOPE( m_commandList->beginMarker("PathTrace");, m_commandList->endMarker(); );
 
         state.shaderTable = ((useStablePlanes) ? (m_ptPipelineFillStablePlanes) : (m_ptPipelineReference))->GetShaderTable();
-        state.bindings = { m_bindingSet, (*m_host.descriptorTable)->GetDescriptorTable() };
+        state.bindings = { m_bindingSet, m_services.descriptorTable->GetDescriptorTable() };
 
-        for (uint subSampleIndex = 0; subSampleIndex < m_host.settings->ActualSamplesPerPixel(); subSampleIndex++)
+        for (uint subSampleIndex = 0; subSampleIndex < m_services.settings.ActualSamplesPerPixel(); subSampleIndex++)
         {
             // required to avoid race conditions in back to back dispatchRays
             m_commandList->setBufferState(m_renderTargets->StablePlanesBuffer, nvrhi::ResourceStates::UnorderedAccess);
@@ -1779,23 +1786,23 @@ void caustica::render::PathTracingWorldRenderer::pathTrace(nvrhi::IFramebuffer* 
 
     // this is a performance optimization where final 2 passes from ReSTIR DI and ReSTIR GI are combined to avoid loading GBuffer twice
     static bool enableFusedDIGIFinal = true;
-    bool useFusedDIGIFinal = m_host.settings->ActualUseReSTIRDI() && m_host.settings->ActualUseReSTIRGI() && enableFusedDIGIFinal;
+    bool useFusedDIGIFinal = m_services.settings.ActualUseReSTIRDI() && m_services.settings.ActualUseReSTIRGI() && enableFusedDIGIFinal;
 
-    if (m_host.settings->ActualUseRTXDIPasses())
+    if (m_services.settings.ActualUseRTXDIPasses())
     {
         RAII_SCOPE( m_commandList->beginMarker("RTXDI");, m_commandList->endMarker(); );
 
         // this does all ReSTIR DI magic including applying the final sample into correct radiance buffer (depending on denoiser state)
-        if (m_host.settings->ActualUseReSTIRDI())
+        if (m_services.settings.ActualUseReSTIRDI())
             m_rtxdiPass->Execute(m_commandList, m_bindingSet, useFusedDIGIFinal);
 
-        if (m_host.settings->ActualUseReSTIRGI())
+        if (m_services.settings.ActualUseReSTIRGI())
             m_rtxdiPass->ExecuteGI(m_commandList, m_bindingSet, useFusedDIGIFinal);
 
         if (useFusedDIGIFinal)
             m_rtxdiPass->ExecuteFusedDIGIFinal(m_commandList, m_bindingSet);
 
-        if (m_host.settings->ActualUseReSTIRPT())
+        if (m_services.settings.ActualUseReSTIRPT())
             m_rtxdiPass->ExecutePT(m_commandList, m_bindingSet);
     }
 
@@ -1805,11 +1812,11 @@ void caustica::render::PathTracingWorldRenderer::pathTrace(nvrhi::IFramebuffer* 
         m_denoisingGuidesBaker->DenoiseSpecHitT(m_commandList, m_bindingSet);
         m_denoisingGuidesBaker->ComputeAvgLayerRadiance(m_commandList, m_bindingSet);
 
-        if (m_host.settings->DebugView != DebugViewType::Disabled)
-            m_denoisingGuidesBaker->RenderDebugViz(m_commandList, m_host.settings->DebugView, m_bindingSet);
+        if (m_services.settings.DebugView != DebugViewType::Disabled)
+            m_denoisingGuidesBaker->RenderDebugViz(m_commandList, m_services.settings.DebugView, m_bindingSet);
     }
 
-    if (useStablePlanes && (m_host.settings->DebugView > DebugViewType::Disabled && m_host.settings->DebugView <= DebugViewType::StablePlane_SpecRadiance || m_host.settings->DebugView == DebugViewType::StableRadiance) )
+    if (useStablePlanes && (m_services.settings.DebugView > DebugViewType::Disabled && m_services.settings.DebugView <= DebugViewType::StablePlane_SpecRadiance || m_services.settings.DebugView == DebugViewType::StableRadiance) )
     {
         m_commandList->beginMarker("StablePlanesDebugViz");
         nvrhi::TextureDesc tdesc = m_renderTargets->OutputColor->getDesc();
@@ -1820,31 +1827,31 @@ void caustica::render::PathTracingWorldRenderer::pathTrace(nvrhi::IFramebuffer* 
 }
 void caustica::render::PathTracingWorldRenderer::denoise(nvrhi::IFramebuffer* framebuffer)
 {
-    if( !m_host.settings->ActualUseStandaloneDenoiser() )
+    if( !m_services.settings.ActualUseStandaloneDenoiser() )
         return;
 
     for (int i = 0; i < std::size(m_nrd); i++)
     {
         if (m_nrd[i] == nullptr)
         {
-            nrd::Denoiser denoiserMethod = m_host.settings->NRDMethod == NrdConfig::DenoiserMethod::REBLUR ?
+            nrd::Denoiser denoiserMethod = m_services.settings.NRDMethod == NrdConfig::DenoiserMethod::REBLUR ?
                 nrd::Denoiser::REBLUR_DIFFUSE_SPECULAR : nrd::Denoiser::RELAX_DIFFUSE_SPECULAR;
 
             m_nrd[i] = std::make_unique<NrdIntegration>(device(), denoiserMethod);
-            m_nrd[i]->Initialize(m_renderSize.x, m_renderSize.y, **m_host.shaderFactory);
+            m_nrd[i]->Initialize(m_renderSize.x, m_renderSize.y, *m_services.shaderFactory);
         }
     }
 
     //const auto& fbinfo = framebuffer->getFramebufferInfo();
     const char* passNames[] = { "Denoising plane 0", "Denoising plane 1", "Denoising plane 2", "Denoising plane 3" }; assert( std::size(m_nrd) <= std::size(passNames) );
 
-    bool nrdUseRelax = m_host.settings->NRDMethod == NrdConfig::DenoiserMethod::RELAX;
+    bool nrdUseRelax = m_services.settings.NRDMethod == NrdConfig::DenoiserMethod::RELAX;
     PostProcess::ComputePassType preparePassType = nrdUseRelax ? PostProcess::ComputePassType::RELAXDenoiserPrepareInputs : PostProcess::ComputePassType::REBLURDenoiserPrepareInputs;
     PostProcess::ComputePassType mergePassType = nrdUseRelax ? PostProcess::ComputePassType::RELAXDenoiserFinalMerge : PostProcess::ComputePassType::REBLURDenoiserFinalMerge;
 
-    bool resetHistory = m_host.settings->ResetRealtimeCaches;
+    bool resetHistory = m_services.settings.ResetRealtimeCaches;
 
-    int maxPassCount = std::min(m_host.settings->StablePlanesActiveCount, (int)std::size(m_nrd));
+    int maxPassCount = std::min(m_services.settings.StablePlanesActiveCount, (int)std::size(m_nrd));
     bool initWithStableRadiance = true;
     for (int pass = maxPassCount-1; pass >= 0; pass--)
     {
@@ -1859,15 +1866,15 @@ void caustica::render::PathTracingWorldRenderer::denoise(nvrhi::IFramebuffer* fr
         m_postProcess->Apply(m_commandList, preparePassType, m_constantBuffer, miniConstants, m_bindingSet, m_bindingLayout, tdesc.width, tdesc.height);
         m_commandList->endMarker();
 
-        const float timeDeltaBetweenFrames = m_host.gpuDevice->GetDeviceParams().headlessDevice ? 1.f/60.f : -1.f; // if we're rendering without a window we set a fix timeDeltaBetweenFrames to ensure that output is deterministic
-        bool enableValidation = m_host.settings->DebugView == DebugViewType::StablePlane_DenoiserValidation;
+        const float timeDeltaBetweenFrames = m_services.gpuDevice.GetDeviceParams().headlessDevice ? 1.f/60.f : -1.f; // if we're rendering without a window we set a fix timeDeltaBetweenFrames to ensure that output is deterministic
+        bool enableValidation = m_services.settings.DebugView == DebugViewType::StablePlane_DenoiserValidation;
         if (nrdUseRelax)
         {
-            m_nrd[pass]->RunDenoiserPasses(m_commandList, *m_renderTargets, pass, *m_host.renderCore->camera().view(), *m_host.renderCore->camera().viewPrevious(), m_host.gpuDevice->GetFrameIndex(), m_host.settings->NRDDisocclusionThreshold, m_host.settings->NRDDisocclusionThresholdAlternate, m_host.settings->NRDUseAlternateDisocclusionThresholdMix, timeDeltaBetweenFrames, enableValidation, resetHistory, &m_host.settings->RelaxSettings);
+            m_nrd[pass]->RunDenoiserPasses(m_commandList, *m_renderTargets, pass, *m_services.renderCore.camera().view(), *m_services.renderCore.camera().viewPrevious(), m_services.gpuDevice.GetFrameIndex(), m_services.settings.NRDDisocclusionThreshold, m_services.settings.NRDDisocclusionThresholdAlternate, m_services.settings.NRDUseAlternateDisocclusionThresholdMix, timeDeltaBetweenFrames, enableValidation, resetHistory, &m_services.settings.RelaxSettings);
         }
         else
         {
-            m_nrd[pass]->RunDenoiserPasses(m_commandList, *m_renderTargets, pass, *m_host.renderCore->camera().view(), *m_host.renderCore->camera().viewPrevious(), m_host.gpuDevice->GetFrameIndex(), m_host.settings->NRDDisocclusionThreshold, m_host.settings->NRDDisocclusionThresholdAlternate, m_host.settings->NRDUseAlternateDisocclusionThresholdMix, timeDeltaBetweenFrames, enableValidation, resetHistory, &m_host.settings->ReblurSettings);
+            m_nrd[pass]->RunDenoiserPasses(m_commandList, *m_renderTargets, pass, *m_services.renderCore.camera().view(), *m_services.renderCore.camera().viewPrevious(), m_services.gpuDevice.GetFrameIndex(), m_services.settings.NRDDisocclusionThreshold, m_services.settings.NRDDisocclusionThresholdAlternate, m_services.settings.NRDUseAlternateDisocclusionThresholdMix, timeDeltaBetweenFrames, enableValidation, resetHistory, &m_services.settings.ReblurSettings);
         }
 
         m_commandList->beginMarker("MergeOutputs");
@@ -1880,10 +1887,10 @@ void caustica::render::PathTracingWorldRenderer::denoise(nvrhi::IFramebuffer* fr
 #if CAUSTICA_WITH_NATIVE_DLSS
 bool caustica::render::PathTracingWorldRenderer::evaluateNativeDLSS(bool reset)
 {
-    if (!m_nativeDLSS || !(m_host.settings->RealtimeAA == 2 || m_host.settings->RealtimeAA == 3))
+    if (!m_nativeDLSS || !(m_services.settings.RealtimeAA == 2 || m_services.settings.RealtimeAA == 3))
         return false;
 
-    const bool useRayReconstruction = m_host.settings->RealtimeAA == 3;
+    const bool useRayReconstruction = m_services.settings.RealtimeAA == 3;
     if (useRayReconstruction && !m_nativeDLSS->IsRayReconstructionSupported())
         return false;
     if (!useRayReconstruction && !m_nativeDLSS->IsDlssSupported())
@@ -1923,7 +1930,7 @@ bool caustica::render::PathTracingWorldRenderer::evaluateNativeDLSS(bool reset)
     evaluateParams.motionVectorsTexture = m_renderTargets->ScreenMotionVectors;
     evaluateParams.motionVectorScaleX = 1.0f / float(m_renderSize.x);
     evaluateParams.motionVectorScaleY = 1.0f / float(m_renderSize.y);
-    evaluateParams.resetHistory = reset || m_host.settings->ResetRealtimeCaches;
+    evaluateParams.resetHistory = reset || m_services.settings.ResetRealtimeCaches;
 
     if (useRayReconstruction)
     {
@@ -1932,7 +1939,7 @@ bool caustica::render::PathTracingWorldRenderer::evaluateNativeDLSS(bool reset)
         evaluateParams.normalRoughness = m_renderTargets->RRNormalsAndRoughness;
     }
 
-    const bool evaluated = m_nativeDLSS->Evaluate(m_commandList, evaluateParams, *m_host.renderCore->camera().view());
+    const bool evaluated = m_nativeDLSS->Evaluate(m_commandList, evaluateParams, *m_services.renderCore.camera().view());
     if (evaluated)
     {
         static bool loggedNativeDLSSEvaluation = false;
@@ -1953,17 +1960,17 @@ void caustica::render::PathTracingWorldRenderer::postProcessAA(nvrhi::IFramebuff
     (void)framebuffer;
 
     PostProcessAAParams params{
-        *m_host.settings,
+        m_services.settings,
         m_commandList,
         m_renderTargets.get(),
-        m_host.gpuDevice,
+        &m_services.gpuDevice,
     };
     params.renderSize = m_renderSize;
     params.displaySize = m_displaySize;
     params.displayAspectRatio = m_displayAspectRatio;
     params.cameraJitter = m_hooks.computeCameraJitter(m_sampleIndex);
     params.sampleIndex = m_sampleIndex;
-    params.frameIndex = m_host.gpuDevice->GetFrameIndex();
+    params.frameIndex = m_services.gpuDevice.GetFrameIndex();
     params.reset = reset;
     params.temporalAAPass = m_temporalAntiAliasingPass.get();
     params.accumulationPass = m_accumulationPass.get();
@@ -1978,18 +1985,18 @@ void caustica::render::PathTracingWorldRenderer::postProcessAA(nvrhi::IFramebuff
     params.dlssRROptions = &m_lastDLSSRROptions;
 #endif
 
-    m_host.renderCore->postProcessAA(params);
+    m_services.renderCore.postProcessAA(params);
 
 #if CAUSTICA_WITH_NATIVE_DLSS
-    if (m_host.settings->RealtimeMode)
+    if (m_services.settings.RealtimeMode)
     {
         bool nativeDLSSEvaluated = false;
-        if (m_host.settings->RealtimeAA == 2 || m_host.settings->RealtimeAA == 3)
+        if (m_services.settings.RealtimeAA == 2 || m_services.settings.RealtimeAA == 3)
             nativeDLSSEvaluated = evaluateNativeDLSS(reset);
 
-        if (!nativeDLSSEvaluated && (m_host.settings->RealtimeAA == 2 || m_host.settings->RealtimeAA == 3))
+        if (!nativeDLSSEvaluated && (m_services.settings.RealtimeAA == 2 || m_services.settings.RealtimeAA == 3))
         {
-            if (m_host.settings->ActualUseStandaloneDenoiser())
+            if (m_services.settings.ActualUseStandaloneDenoiser())
             {
                 m_commandList->copyTexture(
                     m_renderTargets->ProcessedOutputColor, nvrhi::TextureSlice(),
@@ -2025,11 +2032,11 @@ void caustica::render::PathTracingWorldRenderer::resetReferenceOIDN()
 }
 void caustica::render::PathTracingWorldRenderer::applyReferenceOIDN()
 {
-    if (m_host.settings->RealtimeMode || !m_host.settings->ReferenceOIDNDenoiser || m_renderTargets == nullptr)
+    if (m_services.settings.RealtimeMode || !m_services.settings.ReferenceOIDNDenoiser || m_renderTargets == nullptr)
         return;
 
 #if CAUSTICA_WITH_OIDN
-    const bool accumulationReady = m_accumulationCompleted || m_accumulationSampleIndex >= m_host.settings->AccumulationTarget;
+    const bool accumulationReady = m_accumulationCompleted || m_accumulationSampleIndex >= m_services.settings.AccumulationTarget;
     if (!accumulationReady)
         return;
 
@@ -2069,10 +2076,10 @@ void caustica::render::PathTracingWorldRenderer::applyReferenceOIDN()
     const uint32_t height = sourceDesc.height;
 
     OidnDenoiser::Options oidnOptions;
-    oidnOptions.UseGPU = m_host.settings->ReferenceOIDNUseGPU;
-    oidnOptions.GuidePasses = static_cast<OidnDenoiser::Passes>(std::clamp(m_host.settings->ReferenceOIDNPasses, 0, 2));
-    oidnOptions.GuidePrefilter = static_cast<OidnDenoiser::Prefilter>(std::clamp(m_host.settings->ReferenceOIDNPrefilter, 0, 2));
-    oidnOptions.FilterQuality = static_cast<OidnDenoiser::Quality>(std::clamp(m_host.settings->ReferenceOIDNQuality, 0, 2));
+    oidnOptions.UseGPU = m_services.settings.ReferenceOIDNUseGPU;
+    oidnOptions.GuidePasses = static_cast<OidnDenoiser::Passes>(std::clamp(m_services.settings.ReferenceOIDNPasses, 0, 2));
+    oidnOptions.GuidePrefilter = static_cast<OidnDenoiser::Prefilter>(std::clamp(m_services.settings.ReferenceOIDNPrefilter, 0, 2));
+    oidnOptions.FilterQuality = static_cast<OidnDenoiser::Quality>(std::clamp(m_services.settings.ReferenceOIDNQuality, 0, 2));
 
     const bool requestAlbedoGuide = oidnOptions.GuidePasses == OidnDenoiser::Passes::Albedo || oidnOptions.GuidePasses == OidnDenoiser::Passes::AlbedoNormal;
     const bool requestNormalGuide = oidnOptions.GuidePasses == OidnDenoiser::Passes::AlbedoNormal;
@@ -2228,7 +2235,7 @@ void caustica::render::PathTracingWorldRenderer::denoisedScreenshot(nvrhi::IText
             return;
         }
 
-        if (!SaveTextureToFile(device(), m_host.commonPasses->get(), framebufferTexture, nvrhi::ResourceStates::Common, noisyImagePath.c_str()))
+        if (!SaveTextureToFile(device(), m_services.commonPasses.get(), framebufferTexture, nvrhi::ResourceStates::Common, noisyImagePath.c_str()))
         { assert(false); return; }
 
         std::string startCmd = "\"" + denoiserPath.string() + "\"" + " -hdr 0 -i \"" + noisyImagePath + "\"" " -o \"" + denoisedImagePath + "\"";

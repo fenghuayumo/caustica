@@ -1,7 +1,7 @@
 #include "PathTracerApp.h"
 #include "input/PathTracerInputController.h"
 #include <render/WorldRenderer/PathTracingWorldRenderer.h>
-#include <render/WorldRenderer/WorldRendererHost.h>
+#include <render/WorldRenderer/WorldRendererServices.h>
 
 #include <render/Core/PostProcessAA.h>
 #include <render/Core/SceneGeometryUpdate.h>
@@ -293,29 +293,6 @@ void PathTracerApp::DebugDrawLine( float3 start, float3 stop, float4 col1, float
     DebugLineStruct dle = { float4(stop, 1), col2 };
     lines.push_back(dls);
     lines.push_back(dle);
-}
-
-void PathTracerApp::SyncWorldRendererHostData(caustica::render::WorldRendererHost& host)
-{
-    host.settings = &m_settings;
-    host.renderCore = m_renderCore;
-    host.sceneManager = m_sceneManager;
-    host.envMapBaker = &m_envMapBaker;
-    host.lightsBaker = &m_lightsBaker;
-    host.materialsBaker = &m_materialsBaker;
-    host.ommBaker = &m_ommBaker;
-    host.computePipelineBaker = &m_computePipelineBaker;
-    host.lights = &m_lights;
-    host.envMapSceneParams = &m_envMapSceneParams;
-    host.envMapLocalPath = &m_envMapLocalPath;
-    host.envMapOverride = &m_envMapOverride;
-    host.sceneTime = &m_sceneTime;
-    host.gaussianSplatEmissionProxies = &m_gaussianSplatEmissionProxies;
-    host.progressInitializingRenderer = &m_progressInitializingRenderer;
-    host.asyncLoadingInProgress = &m_asyncLoadingInProgress;
-    host.benchStart = &m_benchStart;
-    host.benchLast = &m_benchLast;
-    host.benchFrames = &m_benchFrames;
 }
 
 void PathTracerApp::AttachRenderResources(

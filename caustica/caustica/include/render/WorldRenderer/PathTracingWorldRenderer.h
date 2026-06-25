@@ -3,7 +3,7 @@
 #include <math/math.h>
 #include <rhi/nvrhi.h>
 
-#include <render/WorldRenderer/WorldRendererHost.h>
+#include <render/WorldRenderer/WorldRendererServices.h>
 #include <shaders/PathTracer/Config.h>
 #include <shaders/SampleConstantBuffer.h>
 #include <render/Core/RenderTargets.h>
@@ -48,15 +48,16 @@ class DLSS;
 
 // =============================================================================
 // PathTracingWorldRenderer — engine core GPU path-tracing pipeline (DIVSHOT DeferedRenderer role).
-// Owned by EditorApplication; reads scene state via WorldRendererHost + pipeline hooks.
+// Owned by EditorApplication; reads scene state via WorldRendererServices + pipeline hooks.
 // =============================================================================
 class PathTracingWorldRenderer
 {
 public:
-    PathTracingWorldRenderer(WorldRendererHost& host, IWorldRendererPipelineHooks& hooks);
+    PathTracingWorldRenderer(WorldRendererServices& services, IWorldRendererPipelineHooks& hooks);
     ~PathTracingWorldRenderer();
 
-    void createBindingLayouts();
+    static nvrhi::BindingLayoutHandle CreateBindlessLayout(nvrhi::IDevice* device);
+    void createBindingLayouts(nvrhi::IBindingLayout* precreatedBindless = nullptr);
     void createDeviceResources();
     void onBackBufferResizing();
     void preRender();
@@ -125,7 +126,7 @@ public:
 #endif
 
 private:
-    [[nodiscard]] nvrhi::IDevice* device() const { return m_host.gpuDevice->GetDevice(); }
+    [[nodiscard]] nvrhi::IDevice* device() const { return m_services.gpuDevice.GetDevice(); }
 
     void createRenderPasses(bool& exposureResetRequired, nvrhi::CommandListHandle initializeCommandList);
     void preUpdateLighting(nvrhi::CommandListHandle commandList, bool& needNewBindings);
@@ -147,7 +148,7 @@ private:
     bool evaluateNativeDLSS(bool reset);
 #endif
 
-    WorldRendererHost&              m_host;
+    WorldRendererServices&          m_services;
     IWorldRendererPipelineHooks&    m_hooks;
 
     std::unique_ptr<RtxdiPass>                  m_rtxdiPass;

@@ -5,6 +5,7 @@
 #include "AdvancedPathTracer.h"
 #include "EditorApplication.h"
 #include "PathTracerApp.h"
+#include <render/WorldRenderer/PathTracingWorldRenderer.h>
 #include <SampleCommon/LocalConfig.h>
 #include <core/file_utils.h>
 #include <core/format.h>
@@ -624,16 +625,12 @@ bool RenderSession::InitRenderer()
     LocalConfig::PostAppInit(m_sampleUIData);
 
     initRenderInfrastructurePhase1();
-    syncWorldRendererHost();
 
-    m_worldRenderer = std::make_unique<caustica::render::PathTracingWorldRenderer>(
-        m_worldRendererHost, *m_renderer);
-    m_renderer->AttachWorldRenderer(m_worldRenderer.get());
-    m_worldRenderer->createBindingLayouts();
-    initRenderInfrastructurePhase2(m_worldRenderer->getBindlessLayout());
-    syncWorldRendererHost();
+    const nvrhi::BindingLayoutHandle bindlessLayout =
+        caustica::render::PathTracingWorldRenderer::CreateBindlessLayout(m_deviceManager->GetDevice());
+    initRenderInfrastructurePhase2(bindlessLayout);
     initSceneServices();
-    syncWorldRendererHost();
+    initWorldRenderer(bindlessLayout);
 
     // Pick whichever scene the user requested (or fall back to the default).
     // default).  This loads the actual scene file asynchronously inside
@@ -677,16 +674,44 @@ void RenderSession::initRenderInfrastructurePhase2(nvrhi::IBindingLayout* bindle
     m_renderer->AttachRenderResources(m_shaderFactory, m_commonPasses, m_bindingCache.get(), m_descriptorTable, m_textureCache);
 }
 
-void RenderSession::syncWorldRendererHost()
+caustica::render::WorldRendererServices RenderSession::buildWorldRendererServices()
 {
-    m_worldRendererHost.gpuDevice = m_deviceManager.get();
-    m_worldRendererHost.shaderFactory = &m_shaderFactory;
-    m_worldRendererHost.commonPasses = &m_commonPasses;
-    m_worldRendererHost.bindingCache = &m_bindingCache;
-    m_worldRendererHost.textureCache = m_textureCache;
-    m_worldRendererHost.descriptorTable = &m_descriptorTable;
-    if (m_renderer)
-        m_renderer->SyncWorldRendererHostData(m_worldRendererHost);
+    PathTracerApp& editor = *m_renderer;
+    return caustica::render::WorldRendererServices{
+        .gpuDevice = *m_deviceManager,
+        .sceneManager = *m_sceneManager,
+        .renderCore = *m_renderCore,
+        .settings = editor.GetPathTracerSettings(),
+        .shaderFactory = m_shaderFactory,
+        .commonPasses = m_commonPasses,
+        .bindingCache = *m_bindingCache,
+        .textureCache = m_textureCache,
+        .descriptorTable = m_descriptorTable,
+        .envMapBaker = editor.GetEnvMapBaker(),
+        .lightsBaker = editor.GetLightsBaker(),
+        .materialsBaker = editor.GetMaterialsBaker(),
+        .ommBaker = editor.GetOMMBaker(),
+        .computePipelineBaker = editor.GetComputePipelineBaker(),
+        .lights = editor.GetLights(),
+        .envMapSceneParams = editor.GetEnvMapSceneParams(),
+        .envMapLocalPath = editor.GetEnvMapLocalPath(),
+        .envMapOverride = editor.GetEnvMapOverrideSource(),
+        .sceneTime = editor.GetSceneTimeRef(),
+        .gaussianSplatEmissionProxies = editor.GetGaussianSplatEmissionProxies(),
+        .progressInitializingRenderer = editor.GetProgressInitializingRenderer(),
+        .asyncLoadingInProgress = editor.GetAsyncLoadingInProgressRef(),
+        .benchStart = editor.GetBenchStart(),
+        .benchLast = editor.GetBenchLast(),
+        .benchFrames = editor.GetBenchFrames(),
+    };
+}
+
+void RenderSession::initWorldRenderer(nvrhi::IBindingLayout* bindlessLayout)
+{
+    m_worldRendererServices = std::make_unique<caustica::render::WorldRendererServices>(buildWorldRendererServices());
+    m_worldRenderer = std::make_unique<caustica::render::PathTracingWorldRenderer>(*m_worldRendererServices, *m_renderer);
+    m_renderer->AttachWorldRenderer(m_worldRenderer.get());
+    m_worldRenderer->createBindingLayouts(bindlessLayout);
 }
 
 void RenderSession::initSceneServices()

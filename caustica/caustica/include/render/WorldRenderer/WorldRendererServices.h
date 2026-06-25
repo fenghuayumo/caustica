@@ -44,41 +44,40 @@ class ShaderFactory;
 namespace caustica::render
 {
 
-// Mutable scene/render state the world renderer reads each frame (DIVSHOT-style frame host).
-struct WorldRendererHost
+// Strong-typed dependencies wired once by Application at init (DIVSHOT Application owns renderer deps).
+struct WorldRendererServices
 {
-    GpuDevice* gpuDevice = nullptr;
+    GpuDevice& gpuDevice;
+    SceneManager& sceneManager;
+    RenderCore& renderCore;
+    PathTracerSettings& settings;
 
-    PathTracerSettings* settings = nullptr;
-    RenderCore*       renderCore = nullptr;
-    SceneManager*     sceneManager = nullptr;
+    std::shared_ptr<ShaderFactory>& shaderFactory;
+    std::shared_ptr<CommonRenderPasses>& commonPasses;
+    BindingCache& bindingCache;
+    std::shared_ptr<TextureCache>& textureCache;
+    std::shared_ptr<DescriptorTableManager>& descriptorTable;
 
-    std::shared_ptr<caustica::ShaderFactory>*       shaderFactory = nullptr;
-    std::shared_ptr<caustica::CommonRenderPasses>*    commonPasses = nullptr;
-    std::unique_ptr<caustica::BindingCache>*        bindingCache = nullptr;
-    std::shared_ptr<caustica::TextureCache>         textureCache;
-    std::shared_ptr<caustica::DescriptorTableManager>* descriptorTable = nullptr;
+    std::shared_ptr<EnvMapBaker>& envMapBaker;
+    std::shared_ptr<LightsBaker>& lightsBaker;
+    std::shared_ptr<MaterialsBaker>& materialsBaker;
+    std::shared_ptr<OmmBaker>& ommBaker;
+    std::shared_ptr<ComputePipelineBaker>& computePipelineBaker;
 
-    std::shared_ptr<EnvMapBaker>*                     envMapBaker = nullptr;
-    std::shared_ptr<LightsBaker>*                     lightsBaker = nullptr;
-    std::shared_ptr<MaterialsBaker>*                  materialsBaker = nullptr;
-    std::shared_ptr<OmmBaker>*                        ommBaker = nullptr;
-    std::shared_ptr<ComputePipelineBaker>*            computePipelineBaker = nullptr;
+    std::vector<std::shared_ptr<caustica::Light>>& lights;
+    EnvMapSceneParams& envMapSceneParams;
+    std::string& envMapLocalPath;
+    std::string& envMapOverride;
+    double& sceneTime;
 
-    std::vector<std::shared_ptr<caustica::Light>>*  lights = nullptr;
-    EnvMapSceneParams*                                envMapSceneParams = nullptr;
-    std::string*                                      envMapLocalPath = nullptr;
-    std::string*                                      envMapOverride = nullptr;
-    double*                                           sceneTime = nullptr;
+    std::vector<GaussianSplatEmissionProxy>& gaussianSplatEmissionProxies;
 
-    std::vector<GaussianSplatEmissionProxy>*          gaussianSplatEmissionProxies = nullptr;
+    ProgressBar& progressInitializingRenderer;
+    bool& asyncLoadingInProgress;
 
-    ProgressBar* progressInitializingRenderer = nullptr;
-    bool*        asyncLoadingInProgress = nullptr;
-
-    std::chrono::high_resolution_clock::time_point* benchStart = nullptr;
-    std::chrono::high_resolution_clock::time_point* benchLast = nullptr;
-    int* benchFrames = nullptr;
+    std::chrono::high_resolution_clock::time_point& benchStart;
+    std::chrono::high_resolution_clock::time_point& benchLast;
+    int& benchFrames;
 };
 
 // Primary gaussian splat object used for binding set (editor scene owns passes).

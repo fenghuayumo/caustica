@@ -17,9 +17,10 @@
 
 #include <backend/GpuDevice.h>
 
-namespace caustica::render { class PathTracingWorldRenderer; struct WorldRendererHost; }
+namespace caustica::render { class PathTracingWorldRenderer; struct WorldRendererServices; }
 
 #include <functional>
+#include <chrono>
 #include <core/vfs/VFS.h>
 #include <render/Core/RenderCore.h>
 #include <render/Core/CameraController.h>
@@ -161,7 +162,6 @@ public:
 
     void AttachWorldRenderer(caustica::render::PathTracingWorldRenderer* renderer);
     [[nodiscard]] caustica::render::PathTracingWorldRenderer* GetWorldRenderer() const { return m_worldRenderer; }
-    void SyncWorldRendererHostData(caustica::render::WorldRendererHost& host);
 
     void PrepareEditorFrame();
     void                                    SetCurrentScene(const std::string& sceneName, bool forceReload = false);
@@ -202,15 +202,33 @@ public:
     double                                  GetSceneTime( );
 
     bool                                    IsEnvMapLoaded() const      { return true; } // with the new EnvMapBaker it's always present (just black)
-    const std::string &                     GetEnvMapLocalPath()        { return m_envMapLocalPath; }
-    const std::string &                     GetEnvMapOverrideSource()   { return m_envMapOverride; }
+    const std::string &                     GetEnvMapLocalPath() const { return m_envMapLocalPath; }
+    const std::string &                     GetEnvMapOverrideSource() const { return m_envMapOverride; }
     void                                    SetEnvMapOverrideSource(const std::string & envMapOverride);
     const std::vector<std::filesystem::path> & GetEnvMapMediaList()     { return m_envMapMediaList; }
 
-    const std::shared_ptr<EnvMapBaker> &    GetEnvMapBaker() const { return m_envMapBaker; }
-    const std::shared_ptr<LightsBaker> &    GetLightsBaker() const { return m_lightsBaker; }
-    const std::shared_ptr<MaterialsBaker> & GetMaterialsBaker() const { return m_materialsBaker; }
-    const std::shared_ptr<class OmmBaker> & GetOMMBaker() const { return m_ommBaker; }
+    std::shared_ptr<EnvMapBaker>&           GetEnvMapBaker() { return m_envMapBaker; }
+    const std::shared_ptr<EnvMapBaker>&   GetEnvMapBaker() const { return m_envMapBaker; }
+    std::shared_ptr<LightsBaker>&         GetLightsBaker() { return m_lightsBaker; }
+    const std::shared_ptr<LightsBaker>&     GetLightsBaker() const { return m_lightsBaker; }
+    std::shared_ptr<MaterialsBaker>&      GetMaterialsBaker() { return m_materialsBaker; }
+    const std::shared_ptr<MaterialsBaker>&  GetMaterialsBaker() const { return m_materialsBaker; }
+    std::shared_ptr<class OmmBaker>&        GetOMMBaker() { return m_ommBaker; }
+    const std::shared_ptr<class OmmBaker>&    GetOMMBaker() const { return m_ommBaker; }
+    std::shared_ptr<ComputePipelineBaker>&  GetComputePipelineBaker() { return m_computePipelineBaker; }
+    const std::shared_ptr<ComputePipelineBaker>& GetComputePipelineBaker() const { return m_computePipelineBaker; }
+    std::vector<std::shared_ptr<caustica::Light>>& GetLights() { return m_lights; }
+    EnvMapSceneParams&                      GetEnvMapSceneParams() { return m_envMapSceneParams; }
+    const EnvMapSceneParams&                GetEnvMapSceneParams() const { return m_envMapSceneParams; }
+    std::string&                            GetEnvMapLocalPath() { return m_envMapLocalPath; }
+    std::string&                            GetEnvMapOverrideSource() { return m_envMapOverride; }
+    double&                                 GetSceneTimeRef() { return m_sceneTime; }
+    std::vector<GaussianSplatEmissionProxy>& GetGaussianSplatEmissionProxies() { return m_gaussianSplatEmissionProxies; }
+    ProgressBar&                            GetProgressInitializingRenderer() { return m_progressInitializingRenderer; }
+    bool&                                   GetAsyncLoadingInProgressRef() { return m_asyncLoadingInProgress; }
+    std::chrono::high_resolution_clock::time_point& GetBenchStart() { return m_benchStart; }
+    std::chrono::high_resolution_clock::time_point& GetBenchLast() { return m_benchLast; }
+    int&                                    GetBenchFrames() { return m_benchFrames; }
     const std::unique_ptr<class ZoomTool> & GetZoomTool() const { return m_zoomTool; }
     caustica::BindingCache &           GetBindingCache() { return *m_bindingCache; }
 
@@ -272,7 +290,6 @@ protected:
     // QoL accessors for derived samples (delegate to world renderer)
     const caustica::PlanarView& GetView() const;
     std::shared_ptr<class PTPipelineBaker>  GetRTPipelineBaker() const;
-    std::shared_ptr<ComputePipelineBaker>   GetComputePipelineBaker() const { return m_computePipelineBaker; }
 
     std::shared_ptr<class PTPipelineVariant>& PtPipelineReference();
     std::shared_ptr<class PTPipelineVariant>& PtPipelineBuildStablePlanes();
