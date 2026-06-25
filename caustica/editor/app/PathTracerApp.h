@@ -74,10 +74,11 @@ class PathTracerApp : public caustica::render::IWorldRendererPipelineHooks
     struct GaussianSplatSceneObject;
 
 public:
-    PathTracerApp(caustica::GpuDevice& deviceManager,
-        const CommandLineOptions& cmdLine,
+    PathTracerApp(const CommandLineOptions& cmdLine,
         SampleUIData& ui);
     ~PathTracerApp() override;
+
+    void setGpuDevice(caustica::GpuDevice& dm) { m_gpuDevice = &dm; }
 
     void SetLatewarpOptions() { }
     bool ShouldAnimateUnfocused() { return false; }
@@ -164,6 +165,8 @@ public:
     void AttachWorldRenderer(caustica::render::PathTracingWorldRenderer* renderer);
     [[nodiscard]] caustica::render::PathTracingWorldRenderer* GetWorldRenderer() const { return m_worldRenderer; }
 
+    void initStreamlineAndWindow();  // call after setGpuDevice()
+
     void PrepareEditorFrame();
     void                                    SetCurrentScene(const std::string& sceneName, bool forceReload = false);
     bool                                    IsSceneLoading() const;
@@ -177,7 +180,7 @@ public:
 
     virtual void                            SceneUnloading();
     void                                    SceneLoaded();
-    virtual bool                            ShouldRenderUnfocused();
+    virtual bool                            ShouldRenderUnfocused() const;
     virtual void                            Animate(float fElapsedTimeSeconds);
 
     void                                    FillPTPipelineGlobalMacros(std::vector<caustica::ShaderMacro> & macros);
@@ -288,11 +291,11 @@ public:
     const std::unique_ptr<class ZoomTool> & GetZoomTool() const { return m_zoomTool; }
     caustica::BindingCache &           GetBindingCache() { return *m_bindingCache; }
 
-    [[nodiscard]] caustica::GpuDevice& GetGpuDevice() const { return m_gpuDevice; }
-    [[nodiscard]] nvrhi::IDevice* GetDevice() const { return m_gpuDevice.GetDevice(); }
-    [[nodiscard]] uint32_t GetFrameIndex() const { return m_gpuDevice.GetFrameIndex(); }
+    [[nodiscard]] caustica::GpuDevice& GetGpuDevice() const { return *m_gpuDevice; }
+    [[nodiscard]] nvrhi::IDevice* GetDevice() const { return m_gpuDevice->GetDevice(); }
+    [[nodiscard]] uint32_t GetFrameIndex() const { return m_gpuDevice->GetFrameIndex(); }
 
-    GLFWwindow *                            GetGLFWWindow() const { return m_gpuDevice.GetWindow(); }
+    GLFWwindow *                            GetGLFWWindow() const { return m_gpuDevice->GetWindow(); }
 
     int                                     GetAccumulationSampleIndex() const;
 
@@ -374,7 +377,7 @@ private:
 
     std::shared_ptr<caustica::RootFileSystem> m_RootFS;
 
-    caustica::GpuDevice&                        m_gpuDevice;
+    caustica::GpuDevice*                        m_gpuDevice = nullptr;
 
     // Scene / render services (owned by EditorApplication)
     SceneManager*                               m_sceneManager = nullptr;

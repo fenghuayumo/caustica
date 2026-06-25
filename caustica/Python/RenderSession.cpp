@@ -620,7 +620,9 @@ bool RenderSession::InitRenderer()
     auto device = m_deviceManager->GetDevice();
     m_shaderFactory = std::make_shared<caustica::ShaderFactory>(device, rootFS, "/ShaderPrecompiled");
 
-    m_renderer = std::make_unique<PathTracerApp>(*m_deviceManager, m_cmdLine, m_sampleUIData);
+    m_renderer = std::make_unique<PathTracerApp>(m_cmdLine, m_sampleUIData);
+    m_renderer->setGpuDevice(*m_deviceManager);
+    m_renderer->initStreamlineAndWindow();
     InitializeSampleUIDataFromCommandLine(m_sampleUIData, m_cmdLine);
     LocalConfig::PostAppInit(m_sampleUIData);
 

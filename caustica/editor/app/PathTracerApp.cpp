@@ -234,11 +234,9 @@ const float c_envMapRadianceScale = 1.0f / 4.0f;
 
 FPSLimiter g_FPSLimiter;
 
-PathTracerApp::PathTracerApp(caustica::GpuDevice& deviceManager,
-    const CommandLineOptions& cmdLine,
+PathTracerApp::PathTracerApp(const CommandLineOptions& cmdLine,
     SampleUIData& ui)
-    : m_gpuDevice(deviceManager)
-    , m_cmdLine(cmdLine)
+    : m_cmdLine(cmdLine)
     , m_settings(ui)
     , m_editor(ui)
     , m_ui(ui)
@@ -259,7 +257,19 @@ PathTracerApp::PathTracerApp(caustica::GpuDevice& deviceManager,
     RefreshEnvironmentMapMediaList();
 
     m_captureScriptManager = std::make_unique<CaptureScriptManager>(*this, m_ui, m_cmdLine);
+}
 
+void PathTracerApp::initStreamlineAndWindow()
+{
+#if CAUSTICA_WITH_STREAMLINE
+    if (!GetGpuDevice().GetDeviceParams().headlessDevice)
+    {
+        m_settings.IsDLSSSuported = GetGpuDevice().GetStreamline().IsDLSSAvailable();
+        m_settings.IsDLSSFGSupported = GetGpuDevice().GetStreamline().IsDLSSGAvailable();
+        m_settings.IsReflexSupported = GetGpuDevice().GetStreamline().IsReflexAvailable();
+        m_settings.IsDLSSRRSupported = GetGpuDevice().GetStreamline().IsDLSSRRAvailable();
+    }
+#endif
 #if CAUSTICA_WITH_PYTHON
     // Embedded Python scripting host - we always create the wrapper but the
     // interpreter itself is initialized on demand the first time a script
@@ -1414,7 +1424,7 @@ void PathTracerApp::SetEnvMapOverrideSource(const std::string& envMapOverride)
 
 
 
-bool PathTracerApp::ShouldRenderUnfocused()
+bool PathTracerApp::ShouldRenderUnfocused() const
 {
     if (m_worldRenderer->getFrameIndex() < 16 || m_settings.ResetAccumulation || m_settings.ResetRealtimeCaches || m_captureScriptManager->IsDoingWork() )
     {
@@ -2608,7 +2618,7 @@ bool PathTracerApp::onKeyPressed(caustica::KeyPressedEvent& e)
         m_editor.ShaderReloadRequested = true;
 #if CAUSTICA_WITH_STREAMLINE
     if (key == ToGlfwKey(caustica::Key::F13) && action == cGlfwPress)
-        m_gpuDevice.GetStreamline().ReflexTriggerPcPing(m_gpuDevice.GetFrameIndex());
+        m_gpuDevice->GetStreamline().ReflexTriggerPcPing(m_gpuDevice.GetFrameIndex());
 #endif
     return true;
 }
@@ -2663,7 +2673,7 @@ bool PathTracerApp::onMouseButtonPressed(caustica::MouseButtonPressedEvent& e)
     }
 #if CAUSTICA_WITH_STREAMLINE
     if (button == ToGlfwMouse(caustica::Mouse::Left))
-        m_gpuDevice.GetStreamline().ReflexTriggerFlash(m_gpuDevice.GetFrameIndex());
+        m_gpuDevice->GetStreamline().ReflexTriggerFlash(m_gpuDevice.GetFrameIndex());
 #endif
     return true;
 }
