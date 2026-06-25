@@ -199,10 +199,10 @@ endif()
 
 ##########################################################################
 
-# Engine runtime + editor/sample application
-add_subdirectory(caustica)
-add_subdirectory(editor)
-add_library(causticaCore STATIC ${shared_sources} ${CAUSTICA_EDITOR_SOURCES})
+# Engine runtime (caustica.lib) + editor application sources
+add_subdirectory(caustica)       # builds caustica (engine static library)
+add_subdirectory(editor)         # sets CAUSTICA_EDITOR_SOURCES and CAUSTICA_EDITOR_ENTRY_SOURCE
+add_library(causticaCore STATIC ${CAUSTICA_EDITOR_SOURCES})
 if (MSVC)
     target_compile_options(causticaCore PRIVATE /utf-8)
 endif()
@@ -217,7 +217,7 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         $<$<CXX_COMPILER_ID:GNU>:-Wno-error=unused-result>
     )
 endif()
-target_link_libraries(causticaCore PUBLIC cxxopts causticaRender causticaEngine)
+target_link_libraries(causticaCore PUBLIC causticaLib)
 target_include_directories(causticaCore PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}"
     "${CMAKE_CURRENT_SOURCE_DIR}/editor"
