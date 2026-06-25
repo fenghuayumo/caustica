@@ -4,6 +4,7 @@
 #include <assets/AssetHandle.h>
 #include <assets/AssetRegistry.h>
 #include <assets/AssetFileWatcher.h>
+#include <assets/AssetCache.h>
 
 #include <core/JobSystem.h>
 #include <filesystem>
@@ -24,6 +25,7 @@
 namespace caustica
 {
 
+struct TextureData;
 class TextureCache;
 class CommonRenderPasses;
 class ThreadPool;
@@ -31,31 +33,33 @@ class ThreadPool;
 class AssetSystem
 {
 public:
-    // --- Singleton ---
     static AssetSystem& Get();
-    static void Initialize(std::shared_ptr<TextureCache> textureCache);
+    static void Initialize(std::shared_ptr<TextureCache> legacyTextureCache = nullptr);
     static void Shutdown();
 
-    // --- Per-frame update (hot-reload polling) ---
     void Update(uint64_t frameIndex);
 
-    // --- Subsystem access ---
+    // --- Subsystems ---
     AssetRegistry& GetRegistry() { return m_Registry; }
     const AssetRegistry& GetRegistry() const { return m_Registry; }
     AssetFileWatcher& GetFileWatcher() { return m_FileWatcher; }
 
+    // --- Typed CPU caches (DIVSHOT-style) ---
+    AssetCache<TextureData>& GetTextureCache() { return m_TextureCache; }
+
     // --- Hot reload ---
     void EnableHotReload(bool enable);
     [[nodiscard]] bool IsHotReloadEnabled() const { return m_HotReloadEnabled; }
-
-    // Watch a directory for asset changes (e.g. the Assets folder).
     void WatchAssetDirectory(const std::filesystem::path& path);
 
-    // --- Asset loading helpers ---
-    // Register a loaded texture in the registry.
+    // --- Texture helpers ---
     AssetId RegisterTexture(const std::filesystem::path& path);
+    void CacheTexture(const AssetId& id, std::shared_ptr<TextureData> texture) { m_TextureCache.Insert(id, std::move(texture)); }
+    [[nodiscard]] std::shared_ptr<TextureData> FindTexture(const AssetId& id) { return m_TextureCache.Get(id); }
+    [[nodiscard]] std::shared_ptr<TextureData> FindTextureByPath(const std::filesystem::path& path);
+    void SetTextureMemoryBudget(size_t bytes) { m_TextureMemoryBudget = bytes; }
+    void EvictTexturesToBudget();
 
-    // --- Query ---
     [[nodiscard]] bool IsInitialized() const { return m_Initialized; }
 
 private:
@@ -65,9 +69,11 @@ public:
     AssetSystem() = default;
     ~AssetSystem() = default;
 
-    AssetRegistry        m_Registry;
-    AssetFileWatcher     m_FileWatcher;
-    std::shared_ptr<TextureCache> m_TextureCache;
+    AssetRegistry                 m_Registry;
+    AssetFileWatcher              m_FileWatcher;
+    AssetCache<TextureData>       m_TextureCache;
+    std::shared_ptr<TextureCache> m_LegacyTextureCache;
+    size_t                        m_TextureMemoryBudget = 512 * 1024 * 1024;
 
     bool m_Initialized = false;
     bool m_HotReloadEnabled = false;
