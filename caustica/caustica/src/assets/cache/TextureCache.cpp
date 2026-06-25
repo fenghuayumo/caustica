@@ -1,4 +1,5 @@
 #include <assets/cache/TextureCache.h>
+#include <assets/AssetSystem.h>
 
 #include <render/Core/DescriptorTableManager.h>
 #include <render/Core/CommonRenderPasses.h>
@@ -435,6 +436,12 @@ void TextureCache::TextureLoaded(std::shared_ptr<TextureData> texture)
     else
         caustica::message(m_InfoLogSeverity, "Loaded %d x %d, %d bpp: %s (%s)", texture->width, texture->height,
         texture->originalBitsPerPixel, texture->path.c_str(), texture->mimeType.c_str());
+
+    // Register with asset system for hot-reload tracking
+    if (!texture->path.empty())
+    {
+        AssetSystem::Get().RegisterTexture(texture->path);
+    }
 }
 
 std::shared_ptr<LoadedTexture> TextureCache::LoadTextureFromFile(

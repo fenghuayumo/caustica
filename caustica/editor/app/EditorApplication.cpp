@@ -19,6 +19,8 @@
 #include <core/path_utils.h>
 #include <platform/cmdline_utils.h>
 #include <core/log.h>
+#include <assets/AssetSystem.h>
+#include <render/Core/BindlessTable.h>
 #if CAUSTICA_WITH_NATIVE_DLSS
 #include <render/Passes/Geometry/DLSS.h>
 #endif
@@ -336,6 +338,7 @@ void EditorApplication::shutdown()
 
     m_textureCache.reset();
     m_descriptorTable.reset();
+    m_bindlessTable.reset();
     m_bindingCache.reset();
     m_commonPasses.reset();
 
@@ -606,10 +609,17 @@ void EditorApplication::initRenderInfrastructurePhase1()
 void EditorApplication::initRenderInfrastructurePhase2(nvrhi::IBindingLayout* bindlessLayout)
 {
     auto device = m_GpuDevice->GetDevice();
-    m_descriptorTable = std::make_shared<caustica::DescriptorTableManager>(device, bindlessLayout);
+    m_bindlessTable = std::make_unique<caustica::BindlessTable>(device, bindlessLayout);
+    m_descriptorTable = m_bindlessTable->GetDescriptorTableManager();  // alias for compat
 
     auto nativeFS = std::make_shared<caustica::NativeFileSystem>();
     m_textureCache = std::make_shared<caustica::TextureCache>(device, nativeFS, m_descriptorTable);
+
+    // Initialize asset system for hot-reload tracking
+    caustica::AssetSystem::Initialize(m_textureCache);
+    caustica::AssetSystem::Get().EnableHotReload(true);
+    // Watch the assets directory for texture/model changes
+    caustica::AssetSystem::Get().WatchAssetDirectory("Assets");
 
     AttachRenderResources(m_ShaderFactory, m_commonPasses, m_bindingCache.get(), m_descriptorTable, m_textureCache);
 }
@@ -793,6 +803,10 @@ void EditorApplication::onRender()
 
     if (m_uiPass)
         m_uiPass->Render(dm->GetCurrentFramebuffer(m_uiPass->SupportsDepthBuffer()));
+
+    // Flush deferred bindless descriptor frees (end-of-frame GPU sync point)
+    if (m_bindlessTable)
+        m_bindlessTable->FlushDeferredFrees();
 }
 
 void EditorApplication::onBackBufferResizing()
