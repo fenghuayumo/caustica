@@ -107,6 +107,8 @@ namespace caustica
         DescriptorHandle bindlessDescriptor;
         std::string path;
         std::string mimeType;
+        uint64_t assetIdLow = 0;   // AssetId for registry tracking (0 = unregistered)
+        uint64_t assetIdHigh = 0;
 
         // Options to construct the texture from a multichannel image, as provided by the glTF asset
         // through the NV_texture_swizzle extension. Applications should choose one of the options that

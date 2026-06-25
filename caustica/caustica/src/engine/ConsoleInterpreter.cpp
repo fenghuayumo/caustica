@@ -313,8 +313,9 @@ namespace caustica::console
 	inline std::string getTextureInfo(TextureCache::Iterator const& it, size_t& count)
 	{
 		char buff[2048];
+			std::string idStr = it->first.ToString();
 		snprintf(buff, 2048, "%s (%d x %d x %d)\n",
-			it->first.c_str(), it->second->width, it->second->height, it->second->arraySize);
+			idStr.c_str(), it->second->width, it->second->height, it->second->arraySize);
 		++count;
 		return buff;
 	}
@@ -360,7 +361,7 @@ namespace caustica::console
 					{
 						if (rxMatch)
 						{
-							if (std::regex_match(it->first, rx))
+							if (std::regex_match(it->first.ToString(), rx))
 								r.output += getTextureInfo(it, count);
 						}
 						else

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <scene/SceneTypes.h>
+#include <assets/AssetId.h>
 #include <core/log.h>
 
 #include <rhi/nvrhi.h>
@@ -15,6 +16,7 @@ namespace caustica
 {
     class IBlob;
     class IFileSystem;
+    class AssetRegistry;
 }
 
 namespace caustica
@@ -53,7 +55,7 @@ namespace caustica
     protected:
         nvrhi::DeviceHandle m_Device;
         nvrhi::CommandListHandle m_CommandList;
-        std::unordered_map<std::string, std::shared_ptr<TextureData>> m_LoadedTextures;
+        std::unordered_map<AssetId, std::shared_ptr<TextureData>, AssetId::Hash> m_LoadedTextures;
         mutable std::shared_mutex m_LoadedTexturesMutex;
 
         std::queue<std::shared_ptr<TextureData>> m_TexturesToFinalize;
@@ -90,6 +92,9 @@ namespace caustica
         virtual void TextureLoaded(std::shared_ptr<TextureData> texture);
         virtual std::shared_ptr<TextureData> CreateTextureData();
 
+        // Register a texture path with the AssetRegistry and set its AssetId
+        void RegisterTextureAsset(const std::shared_ptr<TextureData>& texture);
+
     public:
         TextureCache(
             nvrhi::IDevice* device,
@@ -100,26 +105,21 @@ namespace caustica
         // Release all cached textures
         void Reset();
 
-        // Synchronous read and decode, synchronous upload and mip generation on a given command list (must be open).
-        // The `passes` argument is optional, and mip generation is disabled if it's NULL.
         virtual std::shared_ptr<LoadedTexture> LoadTextureFromFile(
             const std::filesystem::path& path,
             bool sRGB,
             CommonRenderPasses* passes,
             nvrhi::ICommandList* commandList);
 
-        // Synchronous read and decode, deferred upload and mip generation (in the ProcessRenderingThreadCommands queue).
         virtual std::shared_ptr<LoadedTexture> LoadTextureFromFileDeferred(
             const std::filesystem::path& path,
             bool sRGB);
 
-        // Asynchronous read and decode, deferred upload and mip generation (in the ProcessRenderingThreadCommands queue).
         virtual std::shared_ptr<LoadedTexture> LoadTextureFromFileAsync(
             const std::filesystem::path& path,
             bool sRGB,
             ThreadPool& threadPool);
 
-        // Same as LoadTextureFromFileAsync, but using a memory blob and MIME type instead of file name, and uncached.
         virtual std::shared_ptr<LoadedTexture> LoadTextureFromMemoryAsync(
             const std::shared_ptr<caustica::IBlob>& data,
             const std::string& name,
@@ -127,7 +127,6 @@ namespace caustica
             bool sRGB,
             ThreadPool& threadPool);
 
-        // Same as LoadTextureFromFile, but using a memory blob and MIME type instead of file name, and uncached.
         virtual std::shared_ptr<LoadedTexture> LoadTextureFromMemory(
             const std::shared_ptr<caustica::IBlob>& data,
             const std::string& name,
@@ -136,81 +135,50 @@ namespace caustica
             CommonRenderPasses* passes,
             nvrhi::ICommandList* commandList);
 
-        // Same as LoadTextureFromFileDeferred, but using a memory blob and MIME type instead of file name, and uncached.
         virtual std::shared_ptr<LoadedTexture> LoadTextureFromMemoryDeferred(
             const std::shared_ptr<caustica::IBlob>& data,
             const std::string& name,
             const std::string& mimeType,
             bool sRGB);
-        
-        // Tells if the texture has been loaded from file successfully and its data is available in the texture object.
-        // After the texture is finalized and uploaded to the GPU, the data is no longer available on the CPU,
-        // and this function returns false.
+
         bool IsTextureLoaded(const std::shared_ptr<LoadedTexture>& texture);
-
-        // Tells if the texture has been uploaded to the GPU
         bool IsTextureFinalized(const std::shared_ptr<LoadedTexture>& texture);
-
-        // Removes the texture from cache. The texture must *not* be in the deferred finalization queue when it's unloaded.
-        // Returns true if the texture has been found and removed from the cache, false otherwise.
-        // Note: Any existing handles for the texture remain valid after the texture is unloaded.
-        //       Texture lifetimes are tracked by NVRHI and the texture object is only destroyed when no references exist.
         bool UnloadTexture(const std::shared_ptr<LoadedTexture>& texture);
 
-        // Process a portion of the upload queue, taking up to `timeLimitMilliseconds` CPU time.
-        // If `timeLimitMilliseconds` is 0, processes the entire queue.
-        // Returns true if any textures have been processed.
         bool ProcessRenderingThreadCommands(CommonRenderPasses& passes, float timeLimitMilliseconds);
-
-        // Destroys the internal command list in order to release the upload buffers used in it.
         void LoadingFinished();
-
-        // Set the maximum texture size allowed after load. Larger textures are resized to fit this constraint.
-        // Currently does not affect DDS textures.
         void SetMaxTextureSize(uint32_t size);
-
-        // Enables or disables automatic mip generation for loaded textures.
         void SetGenerateMipmaps(bool generateMipmaps);
-
-        // Sets the Severity of log messages about textures being loaded.
         void SetInfoLogSeverity(caustica::Severity value) { m_InfoLogSeverity = value; }
-
-        // Sets the Severity of log messages about textures that couldn't be loaded.
         void SetErrorLogSeverity(caustica::Severity value) { m_ErrorLogSeverity = value; }
 
         uint32_t GetNumberOfLoadedTextures() { return m_TexturesLoaded.load(); }
         uint32_t GetNumberOfRequestedTextures() { return m_TexturesRequested.load(); }
         uint32_t GetNumberOfFinalizedTextures() { return m_TexturesFinalized; }
 
-		std::shared_ptr<TextureData> GetLoadedTexture(std::filesystem::path const& path);
+        std::shared_ptr<TextureData> GetLoadedTexture(std::filesystem::path const& path);
 
-		// Texture cache traversal
-		// Note: the iterator locks all cache write-accesses for the duration its lifespan !
-		class Iterator
-		{
-		public:
-			typedef std::unordered_map<std::string, std::shared_ptr<TextureData>>::iterator CacheIter;
+        // Iterator API (kept for backward compat — iterates cache by AssetId string key)
+        class Iterator
+        {
+        public:
+            using CacheMap = std::unordered_map<AssetId, std::shared_ptr<TextureData>, AssetId::Hash>;
+            typedef CacheMap::iterator CacheIter;
 
-			Iterator& operator++() { ++m_Iterator; return *this; }
-			
-			friend bool operator==(Iterator const& a, Iterator const& b) { return a.m_Iterator == b.m_Iterator; }
-			friend bool operator!=(Iterator const& a, Iterator const& b) { return !(a == b); }
+            Iterator& operator++() { ++m_Iterator; return *this; }
+            friend bool operator==(Iterator const& a, Iterator const& b) { return a.m_Iterator == b.m_Iterator; }
+            friend bool operator!=(Iterator const& a, Iterator const& b) { return !(a == b); }
+            CacheIter const& operator->() const { return m_Iterator; }
 
-			CacheIter const& operator->() const { return m_Iterator; }
+        private:
+            friend class TextureCache;
+            Iterator(std::shared_mutex& mutex, CacheIter it) : m_Lock(mutex), m_Iterator(it) { }
+            std::shared_lock<std::shared_mutex> m_Lock;
+            CacheIter m_Iterator;
+        };
 
-		private:
-
-			friend class TextureCache;
-			
-			Iterator(std::shared_mutex& mutex, CacheIter it) : m_Lock(mutex), m_Iterator(it) { }
-
-			std::shared_lock<std::shared_mutex> m_Lock;
-			CacheIter m_Iterator;
-		};
-
-		Iterator begin() { return Iterator(m_LoadedTexturesMutex, m_LoadedTextures.begin()); }
-
-		Iterator end() { return Iterator(m_LoadedTexturesMutex, m_LoadedTextures.end()); }
+        Iterator begin() { return Iterator(m_LoadedTexturesMutex, m_LoadedTextures.begin()); }
+        Iterator end()   { return Iterator(m_LoadedTexturesMutex, m_LoadedTextures.end()); }
     };
 
     // Saves the contents of texture's slice 0 mip level 0 into an image file.

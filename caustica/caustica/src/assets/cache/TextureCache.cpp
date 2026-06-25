@@ -84,10 +84,14 @@ TextureCache::~TextureCache()
 
 void TextureCache::Reset()
 {
-	std::lock_guard<std::shared_mutex> guard(m_LoadedTexturesMutex);
+    std::lock_guard<std::shared_mutex> guard(m_LoadedTexturesMutex);
 
-	m_LoadedTextures.clear();
+    // Unregister all textures from the asset registry
+    auto& registry = AssetSystem::Get().GetRegistry();
+    for (auto& [id, texture] : m_LoadedTextures)
+        registry.Unregister(id);
 
+    m_LoadedTextures.clear();
     m_TexturesRequested = 0;
     m_TexturesLoaded = 0;
 }
@@ -97,27 +101,50 @@ void TextureCache::SetGenerateMipmaps(bool generateMipmaps)
     m_GenerateMipmaps = generateMipmaps;
 }
 
+void TextureCache::RegisterTextureAsset(const std::shared_ptr<TextureData>& texture)
+{
+    if (texture->path.empty())
+        return;
+
+    auto& registry = AssetSystem::Get().GetRegistry();
+    AssetId id = registry.Register(texture->path, AssetType::Texture);
+    texture->assetIdLow = id.low;
+    texture->assetIdHigh = id.high;
+    registry.SetState(id, AssetState::Loaded);
+}
+
 bool TextureCache::FindTextureInCache(const std::filesystem::path& path, std::shared_ptr<TextureData>& texture)
 {
     std::lock_guard<std::shared_mutex> guard(m_LoadedTexturesMutex);
 
-    // First see if this texture is already loaded (or being loaded).
+    auto& registry = AssetSystem::Get().GetRegistry();
+    AssetId id = registry.FindByPath(path);
 
-    texture = m_LoadedTextures[path.generic_string()];
-    if (texture)
+    // Check if already cached by AssetId
+    if (id.IsValid())
     {
-        return true;
+        auto it = m_LoadedTextures.find(id);
+        if (it != m_LoadedTextures.end())
+        {
+            texture = it->second;
+            return true;
+        }
     }
 
-    // Allocate a new texture slot for this file name and return it. Load the file later in a thread pool.
-    // LoadTextureFromFileAsync function for a given scene is only called from one thread, so there is no 
-    // chance of loading the same texture twice.
-
+    // Allocate a new texture slot.  LoadTextureFromFileAsync for a given scene
+    // is only called from one thread, so no chance of double-load.
     texture = CreateTextureData();
-    m_LoadedTextures[path.generic_string()] = texture;
+    texture->path = path.generic_string();
+
+    // Register with the asset system to get a stable AssetId
+    if (!id.IsValid())
+        id = registry.Register(path, AssetType::Texture);
+
+    texture->assetIdLow = id.low;
+    texture->assetIdHigh = id.high;
+    m_LoadedTextures[id] = texture;
 
     ++m_TexturesRequested;
-
     return false;
 }
 
@@ -437,11 +464,8 @@ void TextureCache::TextureLoaded(std::shared_ptr<TextureData> texture)
         caustica::message(m_InfoLogSeverity, "Loaded %d x %d, %d bpp: %s (%s)", texture->width, texture->height,
         texture->originalBitsPerPixel, texture->path.c_str(), texture->mimeType.c_str());
 
-    // Register with asset system for hot-reload tracking
-    if (!texture->path.empty())
-    {
-        AssetSystem::Get().RegisterTexture(texture->path);
-    }
+    // Register with asset system (sets AssetId, updates state to Loaded)
+    RegisterTextureAsset(texture);
 }
 
 std::shared_ptr<LoadedTexture> TextureCache::LoadTextureFromFile(
@@ -623,8 +647,12 @@ std::shared_ptr<LoadedTexture> TextureCache::LoadTextureFromMemoryDeferred(
 
 std::shared_ptr<TextureData> TextureCache::GetLoadedTexture(std::filesystem::path const& path)
 {
-	std::lock_guard<std::shared_mutex> guard(m_LoadedTexturesMutex);
-	return m_LoadedTextures[path.generic_string()];
+    std::lock_guard<std::shared_mutex> guard(m_LoadedTexturesMutex);
+    AssetId id = AssetSystem::Get().GetRegistry().FindByPath(path);
+    if (!id.IsValid())
+        return nullptr;
+    auto it = m_LoadedTextures.find(id);
+    return it != m_LoadedTextures.end() ? it->second : nullptr;
 }
 
 bool TextureCache::ProcessRenderingThreadCommands(CommonRenderPasses& passes, float timeLimitMilliseconds)
@@ -879,13 +907,19 @@ namespace caustica
 
     bool TextureCache::UnloadTexture(const std::shared_ptr<LoadedTexture>& texture)
     {
-        const auto& it = m_LoadedTextures.find(texture->path);
+        AssetId id{texture->assetIdLow, texture->assetIdHigh};
+        if (!id.IsValid())
+            return false;
 
+        // Unregister from asset system
+        AssetSystem::Get().GetRegistry().Unregister(id);
+
+        std::lock_guard<std::shared_mutex> guard(m_LoadedTexturesMutex);
+        const auto& it = m_LoadedTextures.find(id);
         if (it == m_LoadedTextures.end())
             return false;
 
         m_LoadedTextures.erase(it);
-
         return true;
     }
 
