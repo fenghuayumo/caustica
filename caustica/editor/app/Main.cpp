@@ -1,6 +1,7 @@
 #include "EditorApplication.h"
 #include <platform/engine/os.h>
 #include <core/JobSystem.h>
+#include <assets/AssetSystem.h>
 #include <cstring>
 
 #ifdef _WIN32
@@ -42,6 +43,7 @@ int main(int __argc, const char** __argv)
     if (status == EditorApplication::StartupResult::Success)
         app.run();
 
+    caustica::AssetSystem::Shutdown();
     caustica::JobSystem::Shutdown();
     return static_cast<int>(status);
 }

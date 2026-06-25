@@ -158,10 +158,23 @@ file(GLOB caustica_engine_imgui_src
 
 # Asset layer: loading, caching (DIVSHOT-style 4-layer architecture)
 file(GLOB caustica_engine_assets_src
+    include/assets/*.h
     include/assets/loader/*.h
     src/assets/loader/*.cpp
     include/assets/cache/*.h
     src/assets/cache/*.cpp
+)
+# New asset pipeline sources (Phase 4)
+file(GLOB caustica_asset_pipeline_src
+    include/assets/AssetId.h
+    include/assets/AssetHandle.h
+    include/assets/AssetRegistry.h
+    include/assets/AssetFileWatcher.h
+    include/assets/AssetSystem.h
+    src/assets/AssetId.cpp
+    src/assets/AssetRegistry.cpp
+    src/assets/AssetFileWatcher.cpp
+    src/assets/AssetSystem.cpp
 )
 
 # Render layer: Core infrastructure, GPU utilities, and all Passes
@@ -314,6 +327,7 @@ set_target_properties(causticaScene PROPERTIES FOLDER "caustica/caustica")
 add_library(causticaRender STATIC
     ${caustica_engine_render_src}
     ${caustica_engine_assets_src}
+    ${caustica_asset_pipeline_src}
 )
 
 target_include_directories(causticaRender
