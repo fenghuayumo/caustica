@@ -217,14 +217,12 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         $<$<CXX_COMPILER_ID:GNU>:-Wno-error=unused-result>
     )
 endif()
-target_link_libraries(causticaCore PUBLIC cxxopts causticaEngine NRD Rtxdi omm-lib omm-gpu-nvrhi)
+target_link_libraries(causticaCore PUBLIC cxxopts causticaRender)
 target_include_directories(causticaCore PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}"
     "${CMAKE_CURRENT_SOURCE_DIR}/editor"
     "${CMAKE_CURRENT_SOURCE_DIR}/editor/app"
     "${CMAKE_CURRENT_SOURCE_DIR}/editor/ui"
-    "../External/Nrd/Include"
-    ${CMAKE_SOURCE_DIR}/External/Rtxdi/Include
 )
 target_compile_definitions(causticaCore PUBLIC CAUSTICA_D3D12_WITH_NVAPI=$<BOOL:${NVRHI_WITH_NVAPI}>)
 target_compile_definitions(causticaCore PUBLIC CAUSTICA_WITH_OIDN=$<BOOL:${CAUSTICA_WITH_OIDN}>)

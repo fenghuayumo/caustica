@@ -1,4 +1,5 @@
 #include "EditorApplication.h"
+#include <platform/engine/os.h>
 #include <cstring>
 
 #ifdef _WIN32
@@ -21,6 +22,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 int main(int __argc, const char** __argv)
 #endif
 {
+    caustica::OS::initialize();   // must be first — platform layer ready before anything else
+
 #ifdef _WIN32
     SplashScreen splashScreen;
     if (!WantsHeadlessStartup(__argc, __argv))

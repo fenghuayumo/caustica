@@ -78,6 +78,38 @@ endif()
 set_target_properties(causticaEvents PROPERTIES FOLDER "caustica/caustica")
 
 # ---------------------------------------------------------------------------
+# causticaPlatform — OS abstraction (executable path, library loading)
+# ---------------------------------------------------------------------------
+
+add_library(causticaPlatform STATIC
+    include/platform/engine/os.h
+)
+
+if (WIN32)
+    target_sources(causticaPlatform PRIVATE src/platform/windows/windows_os.cpp)
+endif()
+
+target_include_directories(causticaPlatform
+    PUBLIC
+        "${CMAKE_CURRENT_SOURCE_DIR}/include"
+)
+
+target_link_libraries(causticaPlatform
+    PUBLIC
+        causticaEvents
+)
+
+if (MSVC)
+    target_compile_options(causticaPlatform PRIVATE /utf-8)
+endif()
+
+if (WIN32)
+    target_compile_definitions(causticaPlatform PUBLIC NOMINMAX _CRT_SECURE_NO_WARNINGS)
+endif()
+
+set_target_properties(causticaPlatform PROPERTIES FOLDER "caustica/caustica")
+
+# ---------------------------------------------------------------------------
 # causticaEngine — Main engine library
 # ---------------------------------------------------------------------------
 
@@ -217,15 +249,140 @@ list(APPEND caustica_engine_engine_src
 
 # Render passes and infrastructure are now in caustica_engine_render_src (GLOB)
 
+# ---------------------------------------------------------------------------
+# causticaScene — Scene data types, camera, animation, game model
+# ---------------------------------------------------------------------------
+add_library(causticaScene STATIC
+    ${caustica_engine_scene_src}
+    ${caustica_engine_animation_src}
+)
+
+target_include_directories(causticaScene
+    PUBLIC
+        "${CMAKE_CURRENT_SOURCE_DIR}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/include"
+)
+
+target_link_libraries(causticaScene
+    PUBLIC
+        causticaEngine
+)
+
+if (MSVC)
+    target_compile_options(causticaScene PRIVATE /utf-8)
+endif()
+
+if (WIN32)
+    target_compile_definitions(causticaScene PUBLIC NOMINMAX _CRT_SECURE_NO_WARNINGS)
+endif()
+
+set_target_properties(causticaScene PROPERTIES FOLDER "caustica/caustica")
+
+# ---------------------------------------------------------------------------
+# causticaRender — Render passes, world renderer, GPU utilities, assets
+# ---------------------------------------------------------------------------
+add_library(causticaRender STATIC
+    ${caustica_engine_render_src}
+    ${caustica_engine_assets_src}
+)
+
+target_include_directories(causticaRender
+    PUBLIC
+        "${CMAKE_CURRENT_SOURCE_DIR}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    PRIVATE
+        "${CMAKE_SOURCE_DIR}/External/Nrd/Include"
+        "${CMAKE_SOURCE_DIR}/External/Rtxdi/Include"
+        "${CMAKE_SOURCE_DIR}/External/Omm/libraries/omm-gpu-nvrhi"
+        "${CMAKE_SOURCE_DIR}/External/Omm/libraries/omm-lib/include"
+)
+
+target_link_libraries(causticaRender
+    PUBLIC
+        causticaScene
+        NRD
+        Rtxdi
+        omm-lib
+        omm-gpu-nvrhi
+)
+
+if (MSVC)
+    target_compile_options(causticaRender PRIVATE /utf-8)
+endif()
+
+if (WIN32)
+    target_compile_definitions(causticaRender PUBLIC NOMINMAX _CRT_SECURE_NO_WARNINGS)
+endif()
+
+if (CAUSTICA_WITH_TINYEXR)
+    target_link_libraries(causticaRender PUBLIC tinyexr)
+    target_compile_definitions(causticaRender PUBLIC CAUSTICA_WITH_TINYEXR)
+endif()
+
+if (CAUSTICA_WITH_OIDN)
+    target_link_libraries(causticaRender PUBLIC OpenImageDenoise)
+endif()
+
+target_compile_definitions(causticaRender
+    PUBLIC
+        CAUSTICA_WITH_DX11=$<BOOL:${CAUSTICA_WITH_DX11}>
+        CAUSTICA_WITH_DX12=$<BOOL:${CAUSTICA_WITH_DX12}>
+        CAUSTICA_WITH_VULKAN=$<BOOL:${CAUSTICA_WITH_VULKAN}>
+        CAUSTICA_WITH_STATIC_SHADERS=$<BOOL:${CAUSTICA_WITH_STATIC_SHADERS}>
+        CAUSTICA_WITH_AFTERMATH=$<BOOL:${CAUSTICA_WITH_AFTERMATH}>
+        CAUSTICA_WITH_STREAMLINE=$<BOOL:${CAUSTICA_WITH_STREAMLINE}>
+        CAUSTICA_WITH_DLSS=$<BOOL:${CAUSTICA_WITH_DLSS}>
+)
+
+if (CAUSTICA_WITH_STREAMLINE)
+    target_link_libraries(causticaRender PUBLIC streamline)
+    if (STREAMLINE_FEATURE_DEEPDVC)
+        target_compile_definitions(causticaRender PRIVATE STREAMLINE_FEATURE_DEEPDVC)
+    endif()
+    if (STREAMLINE_FEATURE_DIRECTSR)
+        target_compile_definitions(causticaRender PRIVATE STREAMLINE_FEATURE_DIRECTSR)
+    endif()
+    if (STREAMLINE_FEATURE_DLSS_SR)
+        target_compile_definitions(causticaRender PRIVATE STREAMLINE_FEATURE_DLSS_SR)
+    endif()
+    if (STREAMLINE_FEATURE_DLSS_FG)
+        target_compile_definitions(causticaRender PRIVATE STREAMLINE_FEATURE_DLSS_FG)
+    endif()
+    if (STREAMLINE_FEATURE_DLSS_RR)
+        target_compile_definitions(causticaRender PRIVATE STREAMLINE_FEATURE_DLSS_RR)
+    endif()
+    if (STREAMLINE_FEATURE_IMGUI)
+        target_compile_definitions(causticaRender PRIVATE STREAMLINE_FEATURE_IMGUI)
+    endif()
+    if (STREAMLINE_FEATURE_NIS)
+        target_compile_definitions(causticaRender PRIVATE STREAMLINE_FEATURE_NIS)
+    endif()
+    if (STREAMLINE_FEATURE_NVPERF)
+        target_compile_definitions(causticaRender PRIVATE STREAMLINE_FEATURE_NVPERF)
+    endif()
+    if (STREAMLINE_FEATURE_REFLEX)
+        target_compile_definitions(causticaRender PRIVATE STREAMLINE_FEATURE_REFLEX)
+    endif()
+endif()
+
+if (CAUSTICA_WITH_DLSS AND TARGET DLSS)
+    target_link_libraries(causticaRender PUBLIC DLSS)
+endif()
+
+if (CAUSTICA_WITH_STATIC_SHADERS)
+    target_include_directories(causticaRender PRIVATE "${CAUSTICA_ENGINE_STATIC_SHADERS_DIR}")
+endif()
+
+set_target_properties(causticaRender PROPERTIES FOLDER "caustica/caustica")
+
+# ---------------------------------------------------------------------------
+# causticaEngine — Core engine (Application, platform, backend, imgui, audio)
+# ---------------------------------------------------------------------------
 add_library(causticaEngine STATIC
     ${caustica_engine_core_util_src}
-    ${caustica_engine_scene_src}
     ${caustica_engine_audio_src}
-    ${caustica_engine_animation_src}
     ${caustica_engine_imgui_src}
     ${caustica_engine_engine_src}
-    ${caustica_engine_assets_src}
-    ${caustica_engine_render_src}
 )
 
 target_include_directories(causticaEngine
@@ -234,14 +391,11 @@ target_include_directories(causticaEngine
         "${CMAKE_CURRENT_SOURCE_DIR}/include"
     PRIVATE
         "$<$<BOOL:${CAUSTICA_WITH_STREAMLINE}>:${CMAKE_CURRENT_SOURCE_DIR}/src/engine/streamline>"
-        "${CMAKE_SOURCE_DIR}/External/Nrd/Include"
-        "${CMAKE_SOURCE_DIR}/External/Rtxdi/Include"
-        "${CMAKE_SOURCE_DIR}/External/Omm/libraries/omm-gpu-nvrhi"
-        "${CMAKE_SOURCE_DIR}/External/Omm/libraries/omm-lib/include"
 )
 
 target_link_libraries(causticaEngine
     PUBLIC
+        causticaPlatform
         causticaEvents
         causticaBase
         nvrhi
