@@ -3,6 +3,7 @@
 #include <math/math.h>
 #include <rhi/nvrhi.h>
 
+#include <render/WorldRenderer/WorldRendererHost.h>
 #include <shaders/PathTracer/Config.h>
 #include <shaders/SampleConstantBuffer.h>
 #include <render/Core/RenderTargets.h>
@@ -15,7 +16,6 @@
 #include <render/Passes/Gaussian/GaussianSplatEmissionProxy.h>
 
 #include <chrono>
-#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -27,14 +27,12 @@
 #include <render/Passes/Geometry/DLSS.h>
 #endif
 
-class PathTracerApp;
 class ComputePipelineBaker;
 class OidnDenoiser;
 class DenoisingGuidesBaker;
 class PTPipelineBaker;
 class PTPipelineVariant;
 class ToneMappingPass;
-struct SampleConstants;
 struct PathTracerCameraData;
 struct PathTracerConstants;
 
@@ -47,17 +45,16 @@ namespace render
 class TemporalAntiAliasingPass;
 class BloomPass;
 class DLSS;
-}
-}
 
 // =============================================================================
-// PathTracingRenderer — owns GPU render pipeline state (Phase 2b).
-// Scene/editor concerns remain on PathTracerApp; this class reads them via m_app.
+// PathTracingWorldRenderer — engine core GPU path-tracing pipeline (DIVSHOT DeferedRenderer role).
+// Owned by EditorApplication; reads scene state via WorldRendererHost + pipeline hooks.
 // =============================================================================
-class PathTracingRenderer
+class PathTracingWorldRenderer
 {
 public:
-    explicit PathTracingRenderer(PathTracerApp& app);
+    PathTracingWorldRenderer(WorldRendererHost& host, IWorldRendererPipelineHooks& hooks);
+    ~PathTracingWorldRenderer();
 
     void createBindingLayouts();
     void createDeviceResources();
@@ -82,7 +79,6 @@ public:
     void nativeDLSSPreRender();
 #endif
 
-    // --- Accessors for PathTracerApp / AdvancedPathTracer ---
     RenderTargets* getRenderTargets() { return m_renderTargets.get(); }
     const RenderTargets* getRenderTargets() const { return m_renderTargets.get(); }
 
@@ -105,7 +101,7 @@ public:
     nvrhi::CommandListHandle getCommandList() const { return m_commandList; }
     nvrhi::BufferHandle getConstantBuffer() const { return m_constantBuffer; }
 
-    caustica::render::TemporalAntiAliasingPass* getTemporalAntiAliasingPass() { return m_temporalAntiAliasingPass.get(); }
+    TemporalAntiAliasingPass* getTemporalAntiAliasingPass() { return m_temporalAntiAliasingPass.get(); }
     ToneMappingPass* getToneMappingPass() { return m_toneMappingPass.get(); }
 
     dm::uint2 getRenderSize() const { return m_renderSize; }
@@ -125,10 +121,12 @@ public:
     void setGaussianSplatTemporalReset(bool v) { m_gaussianSplatTemporalReset = v; }
 
 #if CAUSTICA_WITH_NATIVE_DLSS
-    caustica::render::DLSS* getNativeDLSS() { return m_nativeDLSS.get(); }
+    DLSS* getNativeDLSS() { return m_nativeDLSS.get(); }
 #endif
 
 private:
+    [[nodiscard]] nvrhi::IDevice* device() const { return m_host.gpuDevice->GetDevice(); }
+
     void createRenderPasses(bool& exposureResetRequired, nvrhi::CommandListHandle initializeCommandList);
     void preUpdateLighting(nvrhi::CommandListHandle commandList, bool& needNewBindings);
     void updateLighting(nvrhi::CommandListHandle commandList);
@@ -137,10 +135,10 @@ private:
     void updatePathTracerConstants(PathTracerConstants& constants, const PathTracerCameraData& cameraData);
     void rtxdiSetupFrame(nvrhi::IFramebuffer* framebuffer, PathTracerCameraData cameraData, dm::uint2 renderDims);
 
-    void postProcessPreToneMapping(nvrhi::ICommandList* commandList, const caustica::ICompositeView& compositeView);
-    void postProcessPostToneMapping(nvrhi::ICommandList* commandList, const caustica::ICompositeView& compositeView);
+    void postProcessPreToneMapping(nvrhi::ICommandList* commandList, const ICompositeView& compositeView);
+    void postProcessPostToneMapping(nvrhi::ICommandList* commandList, const ICompositeView& compositeView);
     void renderGaussianSplats(bool renderToOutputColor);
-    void accumulateGaussianSplats(const caustica::IView& splatView);
+    void accumulateGaussianSplats(const IView& splatView);
 
     void resetReferenceOIDN();
     void applyReferenceOIDN();
@@ -149,9 +147,9 @@ private:
     bool evaluateNativeDLSS(bool reset);
 #endif
 
-    PathTracerApp& m_app;
+    WorldRendererHost&              m_host;
+    IWorldRendererPipelineHooks&    m_hooks;
 
-    // --- Owned render resources (migrated from PathTracerApp) ---
     std::unique_ptr<RtxdiPass>                  m_rtxdiPass;
     std::unique_ptr<RenderTargets>              m_renderTargets;
     nvrhi::BindingLayoutHandle                  m_bindingLayout;
@@ -168,10 +166,10 @@ private:
     nvrhi::CommandListHandle                    m_commandList;
     nvrhi::BufferHandle                         m_constantBuffer;
 
-    std::unique_ptr<caustica::render::TemporalAntiAliasingPass> m_temporalAntiAliasingPass;
-    std::unique_ptr<caustica::render::BloomPass>                m_bloomPass;
-    std::unique_ptr<ToneMappingPass>                            m_toneMappingPass;
-    std::shared_ptr<PostProcess>                              m_postProcess;
+    std::unique_ptr<TemporalAntiAliasingPass>    m_temporalAntiAliasingPass;
+    std::unique_ptr<BloomPass>                  m_bloomPass;
+    std::unique_ptr<ToneMappingPass>            m_toneMappingPass;
+    std::shared_ptr<PostProcess>                m_postProcess;
 
     std::unique_ptr<NrdIntegration>             m_nrd[cStablePlaneCount];
     std::unique_ptr<AccumulationPass>           m_accumulationPass;
@@ -191,7 +189,7 @@ private:
     caustica::StreamlineInterface::DLSSRROptions  m_lastDLSSRROptions;
 #endif
 #if CAUSTICA_WITH_NATIVE_DLSS
-    std::unique_ptr<caustica::render::DLSS>     m_nativeDLSS;
+    std::unique_ptr<DLSS>                       m_nativeDLSS;
 #endif
 
     dm::uint2                                   m_renderSize{};
@@ -228,3 +226,6 @@ private:
     nvrhi::BufferHandle                         m_debugDeltaPathTree_Cpu;
     nvrhi::BufferHandle                         m_debugDeltaPathTreeSearchStack;
 };
+
+} // namespace render
+} // namespace caustica

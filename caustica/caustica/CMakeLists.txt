@@ -120,6 +120,11 @@ file(GLOB caustica_engine_render_gpusort_src
     src/render/GPUSort/*.cpp
 )
 
+file(GLOB caustica_engine_world_renderer_src
+    include/render/WorldRenderer/*.h
+    src/render/WorldRenderer/*.cpp
+)
+
 file(GLOB_RECURSE caustica_engine_render_passes_src
     include/render/Passes/*.h
     include/render/Passes/*.hpp
@@ -130,6 +135,7 @@ file(GLOB_RECURSE caustica_engine_render_passes_src
 set(caustica_engine_render_src
     ${caustica_engine_render_core_src}
     ${caustica_engine_render_gpusort_src}
+    ${caustica_engine_world_renderer_src}
     ${caustica_engine_render_passes_src}
 )
 

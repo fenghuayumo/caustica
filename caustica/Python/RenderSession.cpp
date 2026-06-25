@@ -25,7 +25,8 @@
 #include <core/vfs/VFS.h>
 #include <assets/loader/ShaderFactory.h>
 #include <assets/cache/TextureCache.h>
-#include <render/Core/CommonRenderPasses.h>
+#include <render/Core/BindingCache.h>
+#include <core/vfs/VFS.h>
 #include <engine/UserInterfaceUtils.h>
 #include <platform/glfw_window.h>
 #if CAUSTICA_WITH_NATIVE_DLSS
@@ -66,7 +67,7 @@ namespace
     class PathTracerFrameDriver : public caustica::Application
     {
     public:
-        PathTracerFrameDriver(caustica::GpuDevice* dm, caustica::Window* window, PathTracerApp* scene)
+        PathTracerFrameDriver(caustica::GpuDevice* dm, caustica::Window* window, AdvancedPathTracer* scene)
             : caustica::Application(dm, window)
             , m_scene(scene)
         { }
@@ -125,7 +126,7 @@ namespace
         }
 
     private:
-        PathTracerApp* m_scene = nullptr;
+        AdvancedPathTracer* m_scene = nullptr;
     };
 
     void AppendUnique(std::vector<std::string>& values, const std::string& value)
@@ -622,7 +623,19 @@ bool RenderSession::InitRenderer()
     InitializeSampleUIDataFromCommandLine(m_sampleUIData, m_cmdLine);
     LocalConfig::PostAppInit(m_sampleUIData);
 
-    // Pick whichever scene the user requested (or fall back to the default)
+    initRenderInfrastructurePhase1();
+    syncWorldRendererHost();
+
+    m_worldRenderer = std::make_unique<caustica::render::PathTracingWorldRenderer>(
+        m_worldRendererHost, *m_renderer);
+    m_renderer->AttachWorldRenderer(m_worldRenderer.get());
+    m_worldRenderer->createBindingLayouts();
+    initRenderInfrastructurePhase2(m_worldRenderer->getBindlessLayout());
+    syncWorldRendererHost();
+    initSceneServices();
+    syncWorldRendererHost();
+
+    // Pick whichever scene the user requested (or fall back to the default).
     // default).  This loads the actual scene file asynchronously inside
     // Sample::Init().
     std::string preferredScene = m_config.scene.empty()
@@ -645,12 +658,78 @@ bool RenderSession::InitRenderer()
     return true;
 }
 
+void RenderSession::initRenderInfrastructurePhase1()
+{
+    auto device = m_deviceManager->GetDevice();
+    m_commonPasses = std::make_shared<caustica::CommonRenderPasses>(device, m_shaderFactory);
+    m_bindingCache = std::make_unique<caustica::BindingCache>(device);
+    m_renderer->AttachRenderResources(m_shaderFactory, m_commonPasses, m_bindingCache.get(), m_descriptorTable, m_textureCache);
+}
+
+void RenderSession::initRenderInfrastructurePhase2(nvrhi::IBindingLayout* bindlessLayout)
+{
+    auto device = m_deviceManager->GetDevice();
+    m_descriptorTable = std::make_shared<caustica::DescriptorTableManager>(device, bindlessLayout);
+
+    auto nativeFS = std::make_shared<caustica::NativeFileSystem>();
+    m_textureCache = std::make_shared<caustica::TextureCache>(device, nativeFS, m_descriptorTable);
+
+    m_renderer->AttachRenderResources(m_shaderFactory, m_commonPasses, m_bindingCache.get(), m_descriptorTable, m_textureCache);
+}
+
+void RenderSession::syncWorldRendererHost()
+{
+    m_worldRendererHost.gpuDevice = m_deviceManager.get();
+    m_worldRendererHost.shaderFactory = &m_shaderFactory;
+    m_worldRendererHost.commonPasses = &m_commonPasses;
+    m_worldRendererHost.bindingCache = &m_bindingCache;
+    m_worldRendererHost.textureCache = m_textureCache;
+    m_worldRendererHost.descriptorTable = &m_descriptorTable;
+    if (m_renderer)
+        m_renderer->SyncWorldRendererHostData(m_worldRendererHost);
+}
+
+void RenderSession::initSceneServices()
+{
+    m_renderCore = std::make_unique<caustica::RenderCore>(m_deviceManager->GetDevice());
+    m_renderCore->camera().camera().SetRotateSpeed(.003f);
+
+    m_sceneManager = std::make_unique<SceneManager>(
+        *m_deviceManager,
+        *m_shaderFactory,
+        m_textureCache,
+        m_descriptorTable);
+
+    m_renderer->AttachSceneServices(*m_sceneManager, *m_renderCore);
+
+    m_sceneManager->setLoadingCallbacks(
+        [this]()
+        {
+            if (m_renderer)
+                m_renderer->SceneLoaded();
+        },
+        [this]()
+        {
+            if (m_renderer)
+                m_renderer->SceneUnloading();
+        });
+
+    m_renderCore->initializeRenderPipeline(m_shaderFactory);
+}
+
 void RenderSession::Shutdown()
 {
     if (m_deviceManager)
         m_deviceManager->setFrameDriver(nullptr);
 
+    m_worldRenderer.reset();
     m_renderer.reset();
+    m_sceneManager.reset();
+    m_renderCore.reset();
+    m_textureCache.reset();
+    m_descriptorTable.reset();
+    m_bindingCache.reset();
+    m_commonPasses.reset();
     m_shaderFactory.reset();
     m_AppLoop.reset();
 

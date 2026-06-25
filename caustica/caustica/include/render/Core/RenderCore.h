@@ -16,7 +16,7 @@ namespace caustica
 class Scene;
 class ShaderFactory;
 
-// Shared render orchestrator (editor sample shell remains global ::PathTracerApp).
+// Shared render orchestrator (owned by Application / RenderSession).
 class RenderCore
 {
 public:

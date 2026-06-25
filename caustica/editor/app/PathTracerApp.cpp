@@ -1,6 +1,7 @@
 #include "PathTracerApp.h"
 #include "input/PathTracerInputController.h"
-#include "render/PathTracingRenderer.h"
+#include <render/WorldRenderer/PathTracingWorldRenderer.h>
+#include <render/WorldRenderer/WorldRendererHost.h>
 
 #include <render/Core/PostProcessAA.h>
 #include <render/Core/SceneGeometryUpdate.h>
@@ -237,25 +238,22 @@ FPSLimiter g_FPSLimiter;
 PathTracerApp::PathTracerApp(caustica::GpuDevice& deviceManager,
     const CommandLineOptions& cmdLine,
     SampleUIData& ui)
-    : caustica::RenderContext(&deviceManager)
+    : m_gpuDevice(deviceManager)
     , m_cmdLine(cmdLine)
     , m_settings(ui)
     , m_editor(ui)
     , m_ui(ui)
-    , m_renderCore(deviceManager.GetDevice())
 {
     m_progressLoading.Start("Initializing...");
     m_progressLoading.Set(50);
 
-    m_renderCore.camera().camera().SetRotateSpeed(.003f);
-
 #if CAUSTICA_WITH_STREAMLINE
-    if (!GetGpuDevice()->GetDeviceParams().headlessDevice)
+    if (!GetGpuDevice().GetDeviceParams().headlessDevice)
     {
-        m_settings.IsDLSSSuported = GetGpuDevice()->GetStreamline().IsDLSSAvailable();
-        m_settings.IsDLSSFGSupported = GetGpuDevice()->GetStreamline().IsDLSSGAvailable();
-        m_settings.IsReflexSupported = GetGpuDevice()->GetStreamline().IsReflexAvailable();
-        m_settings.IsDLSSRRSupported = GetGpuDevice()->GetStreamline().IsDLSSRRAvailable();
+        m_settings.IsDLSSSuported = GetGpuDevice().GetStreamline().IsDLSSAvailable();
+        m_settings.IsDLSSFGSupported = GetGpuDevice().GetStreamline().IsDLSSGAvailable();
+        m_settings.IsReflexSupported = GetGpuDevice().GetStreamline().IsReflexAvailable();
+        m_settings.IsDLSSRRSupported = GetGpuDevice().GetStreamline().IsDLSSRRAvailable();
     }
 #endif
 
@@ -275,7 +273,7 @@ PathTracerApp::PathTracerApp(caustica::GpuDevice& deviceManager,
 PathTracerApp::~PathTracerApp()
 {
     if (m_inputController)
-        GetGpuDevice()->UnregisterInputHandler(m_inputController.get());
+        GetGpuDevice().UnregisterInputHandler(m_inputController.get());
 
 #if CAUSTICA_WITH_PYTHON
     // Tear down the Python interpreter first so that any nb::class_<>-bound
@@ -287,7 +285,9 @@ PathTracerApp::~PathTracerApp()
 
 void PathTracerApp::DebugDrawLine( float3 start, float3 stop, float4 col1, float4 col2 )
 {
-    auto& lines = m_pathTracingRenderer->getCpuSideDebugLines();
+    if (!m_worldRenderer)
+        return;
+    auto& lines = m_worldRenderer->getCpuSideDebugLines();
     if (int(lines.size()) + 2 >= MAX_DEBUG_LINES) return;
     DebugLineStruct dls = { float4(start, 1), col1 };
     DebugLineStruct dle = { float4(stop, 1), col2 };
@@ -295,20 +295,139 @@ void PathTracerApp::DebugDrawLine( float3 start, float3 stop, float4 col1, float
     lines.push_back(dle);
 }
 
-void PathTracerApp::Init(const std::string& preferredScene,
-    const std::shared_ptr<caustica::ShaderFactory>& shaderFactory)
+void PathTracerApp::SyncWorldRendererHostData(caustica::render::WorldRendererHost& host)
+{
+    host.settings = &m_settings;
+    host.renderCore = m_renderCore;
+    host.sceneManager = m_sceneManager;
+    host.envMapBaker = &m_envMapBaker;
+    host.lightsBaker = &m_lightsBaker;
+    host.materialsBaker = &m_materialsBaker;
+    host.ommBaker = &m_ommBaker;
+    host.computePipelineBaker = &m_computePipelineBaker;
+    host.lights = &m_lights;
+    host.envMapSceneParams = &m_envMapSceneParams;
+    host.envMapLocalPath = &m_envMapLocalPath;
+    host.envMapOverride = &m_envMapOverride;
+    host.sceneTime = &m_sceneTime;
+    host.gaussianSplatEmissionProxies = &m_gaussianSplatEmissionProxies;
+    host.progressInitializingRenderer = &m_progressInitializingRenderer;
+    host.asyncLoadingInProgress = &m_asyncLoadingInProgress;
+    host.benchStart = &m_benchStart;
+    host.benchLast = &m_benchLast;
+    host.benchFrames = &m_benchFrames;
+}
+
+void PathTracerApp::AttachRenderResources(
+    const std::shared_ptr<caustica::ShaderFactory>& shaderFactory,
+    const std::shared_ptr<caustica::CommonRenderPasses>& commonPasses,
+    caustica::BindingCache* bindingCache,
+    const std::shared_ptr<caustica::DescriptorTableManager>& descriptorTable,
+    const std::shared_ptr<caustica::TextureCache>& textureCache)
 {
     m_shaderFactory = shaderFactory;
+    m_CommonPasses = commonPasses;
+    m_bindingCache = bindingCache;
+    m_DescriptorTable = descriptorTable;
+    m_TextureCache = textureCache;
+}
 
-    m_CommonPasses = std::make_shared<caustica::CommonRenderPasses>(GetDevice(), m_shaderFactory);
-    m_bindingCache = std::make_unique<caustica::BindingCache>(GetDevice());
+void PathTracerApp::AttachWorldRenderer(caustica::render::PathTracingWorldRenderer* renderer)
+{
+    m_worldRenderer = renderer;
+}
 
-    m_pathTracingRenderer = std::make_unique<PathTracingRenderer>(*this);
-    m_pathTracingRenderer->createBindingLayouts();
+void PathTracerApp::AttachSceneServices(SceneManager& sceneManager, caustica::RenderCore& renderCore)
+{
+    m_sceneManager = &sceneManager;
+    m_renderCore = &renderCore;
+}
 
-    m_DescriptorTable = std::make_shared<caustica::DescriptorTableManager>(GetDevice(), m_pathTracingRenderer->getBindlessLayout());
+void PathTracerApp::PrepareEditorFrame()
+{
+    m_progressLoading.Stop();
+    m_asyncLoadingInProgress = false;
+    HandleDroppedFiles();
+}
 
-    m_pathTracingRenderer->createDeviceResources();
+std::shared_ptr<caustica::Scene> PathTracerApp::GetScene() const
+{
+    return m_sceneManager ? m_sceneManager->getScene() : nullptr;
+}
+
+const std::vector<std::string>& PathTracerApp::GetAvailableScenes() const
+{
+    static const std::vector<std::string> kEmpty;
+    return m_sceneManager ? m_sceneManager->getAvailableScenes() : kEmpty;
+}
+
+std::string PathTracerApp::GetCurrentSceneName() const
+{
+    return m_sceneManager ? m_sceneManager->getCurrentSceneName() : std::string();
+}
+
+uint PathTracerApp::GetSceneCameraCount() const
+{
+    auto scene = GetScene();
+    if (!scene || !scene->GetSceneGraph())
+        return 1;
+    return (uint)scene->GetSceneGraph()->GetCameras().size() + 1;
+}
+
+uint& PathTracerApp::SelectedCameraIndex()
+{
+    return m_renderCore->camera().selectedCameraIndex();
+}
+
+float PathTracerApp::GetCameraVerticalFOV() const
+{
+    return m_renderCore->camera().verticalFOV();
+}
+
+const caustica::FirstPersonCamera& PathTracerApp::GetCurrentCamera() const
+{
+    return m_renderCore->camera().camera();
+}
+
+const std::shared_ptr<caustica::PlanarView>& PathTracerApp::GetCurrentView() const
+{
+    return m_renderCore->camera().view();
+}
+
+const caustica::PlanarView& PathTracerApp::GetView() const
+{
+    return *m_renderCore->camera().view();
+}
+
+void PathTracerApp::Init(const std::string& preferredScene,
+    const std::shared_ptr<caustica::ShaderFactory>& /*shaderFactory*/)
+{
+    if (!m_shaderFactory || !m_bindingCache)
+    {
+        caustica::fatal("PathTracerApp::Init requires AttachRenderResources");
+        return;
+    }
+
+    if (!m_worldRenderer)
+    {
+        caustica::fatal("PathTracerApp::Init requires AttachWorldRenderer before scene init");
+        return;
+    }
+
+    if (!m_DescriptorTable || !m_TextureCache)
+    {
+        caustica::fatal("PathTracerApp::Init requires descriptor table and texture cache");
+        return;
+    }
+
+    if (!m_worldRenderer->getRenderTargets())
+        m_worldRenderer->createDeviceResources();
+
+    if (!m_sceneManager || !m_renderCore)
+    {
+        caustica::fatal("PathTracerApp::Init requires AttachSceneServices");
+        return;
+    }
 
     m_settings.EnableGaussianSplats = true;
     m_settings.GaussianSplatDepthTest = m_cmdLine.GaussianSplatDepthTest;
@@ -323,22 +442,10 @@ void PathTracerApp::Init(const std::string& preferredScene,
     m_sampleGame = std::make_unique<GameScene>(*this, m_cmdLine);
     m_progressLoading.Set(95);
 
-    auto nativeFS = std::make_shared<caustica::NativeFileSystem>();
-    m_TextureCache = std::make_shared<caustica::TextureCache>(GetDevice(), nativeFS, m_DescriptorTable);
-
-    m_sceneManager = std::make_unique<SceneManager>(
-        *GetGpuDevice(), *m_shaderFactory, m_TextureCache, m_DescriptorTable);
-
-    m_sceneManager->setLoadingCallbacks(
-        [this]() { SceneLoaded(); },
-        [this]() { SceneUnloading(); });
-
-    m_renderCore.initializeRenderPipeline(m_shaderFactory);
-
     if (GetDevice()->queryFeatureSupport(nvrhi::Feature::RayTracingOpacityMicromap))
         m_ommBaker = std::make_shared<OmmBaker>(GetDevice(), m_DescriptorTable, m_TextureCache, m_shaderFactory);
 
-    // Get all scenes in "assets" folder ??delegated to SceneManager
+    // Get all scenes in "assets" folder
     m_sceneManager->discoverAvailableScenes(GetLocalPath(c_AssetsFolder));
 
     std::string scene;
@@ -358,19 +465,19 @@ void PathTracerApp::Init(const std::string& preferredScene,
     SetCurrentScene(scene);
 
     m_inputController = std::make_unique<PathTracerInputController>(PathTracerInputController::Bindings{
-        .gpuDevice = *GetGpuDevice(),
-        .renderCore = m_renderCore,
+        .gpuDevice = GetGpuDevice(),
+        .renderCore = *m_renderCore,
         .settings = m_settings,
         .editor = m_editor,
         .sampleGame = m_sampleGame.get(),
         .getZoomTool = [this]() { return m_zoomTool.get(); },
         .getUpscalingScale = [this]() -> dm::float2 {
-            if (m_pathTracingRenderer->getRenderTargets() == nullptr)
+            if (m_worldRenderer->getRenderTargets() == nullptr)
                 return dm::float2(1.0f, 1.0f);
-            return dm::float2(m_pathTracingRenderer->getRenderSize()) / dm::float2(m_pathTracingRenderer->getDisplaySize());
+            return dm::float2(m_worldRenderer->getRenderSize()) / dm::float2(m_worldRenderer->getDisplaySize());
         },
     });
-    GetGpuDevice()->RegisterInputHandler(m_inputController.get());
+    GetGpuDevice().RegisterInputHandler(m_inputController.get());
 }
 
 void PathTracerApp::SetCurrentScene( const std::string & sceneName, bool forceReload )
@@ -419,8 +526,8 @@ PathTracerApp::ResolveGaussianSplatPath(const GaussianSplat& splat) const
 
 void PathTracerApp::PrepareGaussianSplatPass(GaussianSplatPass& pass)
 {
-    auto* renderTargets = m_pathTracingRenderer->getRenderTargets();
-    auto shaderDebug = m_pathTracingRenderer->getShaderDebug();
+    auto* renderTargets = m_worldRenderer->getRenderTargets();
+    auto shaderDebug = m_worldRenderer->getShaderDebug();
     if (renderTargets == nullptr || shaderDebug == nullptr)
         return;
 
@@ -515,7 +622,7 @@ void PathTracerApp::LoadGaussianSplatsFromScene()
     }
 
     UpdateGaussianSplatUIState();
-    m_pathTracingRenderer->setGaussianSplatTemporalReset(true);
+    m_worldRenderer->setGaussianSplatTemporalReset(true);
 }
 
 bool PathTracerApp::AttachGaussianSplatToScene(const std::filesystem::path& fileName, bool convertRdfToRub)
@@ -593,7 +700,7 @@ bool PathTracerApp::AttachGaussianSplatToScene(const std::filesystem::path& file
 
     m_settings.EnableGaussianSplats = true;
     UpdateGaussianSplatUIState();
-    m_pathTracingRenderer->setGaussianSplatTemporalReset(true);
+    m_worldRenderer->setGaussianSplatTemporalReset(true);
     RequestFullRebuild();
     return true;
 }
@@ -700,9 +807,9 @@ void PathTracerApp::BuildGaussianSplatEmissionProxyList()
 void PathTracerApp::SceneUnloading( )
 {
     m_editor.TogglableNodes = nullptr;
-    if (m_pathTracingRenderer)
-        m_pathTracingRenderer->onSceneUnloading();
-    m_renderCore.onSceneUnloading();
+    if (m_worldRenderer)
+        m_worldRenderer->onSceneUnloading();
+    m_renderCore->onSceneUnloading();
     m_bindingCache->Clear( );
     m_lights.clear();
     m_editor.SelectedMaterial = nullptr;
@@ -738,7 +845,7 @@ bool PathTracerApp::IsSceneLoaded() const
 
 void PathTracerApp::UpdateCameraFromScene( const std::shared_ptr<caustica::PerspectiveCamera> & sceneCamera )
 {
-    m_renderCore.camera().updateFromSceneCamera(sceneCamera);
+    m_renderCore->camera().updateFromSceneCamera(sceneCamera);
 
     auto sceneCameraEx = std::dynamic_pointer_cast<caustica::PerspectiveCamera>(sceneCamera);
     if (sceneCameraEx != nullptr)
@@ -760,12 +867,12 @@ void PathTracerApp::UpdateCameraFromScene( const std::shared_ptr<caustica::Persp
 void PathTracerApp::UpdateViews( nvrhi::IFramebuffer* framebuffer )
 {
     (void)framebuffer;
-    m_renderCore.camera().updateViews(makeCameraUpdateParams());
+    m_renderCore->camera().updateViews(makeCameraUpdateParams());
 }
 
 caustica::CameraUpdateParams PathTracerApp::makeCameraUpdateParams() const
 {
-    auto& r = *m_pathTracingRenderer;
+    auto& r = *m_worldRenderer;
     caustica::CameraUpdateParams params;
     params.renderSize = r.getRenderSize();
     params.displayAspectRatio = r.getDisplayAspectRatio();
@@ -820,8 +927,8 @@ void PathTracerApp::RefreshEnvironmentMapMediaList()
 
 void PathTracerApp::SceneLoaded( )
 {
-    if (m_pathTracingRenderer)
-        m_pathTracingRenderer->resetFrameIndex();
+    if (m_worldRenderer)
+        m_worldRenderer->resetFrameIndex();
 
     RefreshEnvironmentMapMediaList();
 
@@ -899,9 +1006,9 @@ void PathTracerApp::SceneLoaded( )
     if (camScene)
         UpdateCameraFromScene(camScene);
     else
-        m_renderCore.camera().setupDefaultCamera();
+        m_renderCore->camera().setupDefaultCamera();
 
-    m_renderCore.onSceneLoaded(*m_sceneManager->getScene(), m_editor.AccelerationStructRebuildRequested);
+    m_renderCore->onSceneLoaded(*m_sceneManager->getScene(), m_editor.AccelerationStructRebuildRequested);
 
     // PrintSceneGraph( m_sceneManager->getScene()->GetSceneGraph( )->GetRootNode( ) );
 
@@ -915,7 +1022,7 @@ void PathTracerApp::SceneLoaded( )
         m_settings.RealtimeMode = settings->realtimeMode.value_or(m_settings.RealtimeMode);
         m_settings.EnableAnimations = settings->enableAnimations.value_or(m_settings.EnableAnimations);
         if (settings->startingCamera.has_value())
-            m_renderCore.camera().setSelectedCameraIndex(settings->startingCamera.value()+1); // slot 0 reserved for free flight camera
+            m_renderCore->camera().setSelectedCameraIndex(settings->startingCamera.value()+1); // slot 0 reserved for free flight camera
         if (settings->realtimeFireflyFilter.has_value())
         {
             m_settings.RealtimeFireflyFilterThreshold = settings->realtimeFireflyFilter.value();
@@ -1007,7 +1114,7 @@ void PathTracerApp::Animate(float fElapsedTimeSeconds)
     if (m_sceneManager)
         m_sceneManager->updateLoading();
 
-    m_renderCore.camera().camera().SetMoveSpeed(m_settings.CameraMoveSpeed);
+    m_renderCore->camera().camera().SetMoveSpeed(m_settings.CameraMoveSpeed);
 
     if( m_editor.ShaderAndACRefreshDelayedRequest > 0 )
     {
@@ -1025,7 +1132,7 @@ void PathTracerApp::Animate(float fElapsedTimeSeconds)
 
     if (m_sampleGame) m_sampleGame->Tick(fElapsedTimeSeconds, enableAnimations);
 
-    if (auto* toneMappingPass = m_pathTracingRenderer->getToneMappingPass())
+    if (auto* toneMappingPass = m_worldRenderer->getToneMappingPass())
         toneMappingPass->AdvanceFrame(fElapsedTimeSeconds);
 
     if (IsSceneLoaded() && enableAnimationUpdate)
@@ -1048,42 +1155,42 @@ void PathTracerApp::Animate(float fElapsedTimeSeconds)
         m_sceneTime = 0.0f;
     }
 
-    m_renderCore.camera().selectedCameraIndex() = std::min( m_renderCore.camera().selectedCameraIndex(), GetSceneCameraCount()-1 );
-    if (m_renderCore.camera().selectedCameraIndex() > 0)
+    m_renderCore->camera().selectedCameraIndex() = std::min( m_renderCore->camera().selectedCameraIndex(), GetSceneCameraCount()-1 );
+    if (m_renderCore->camera().selectedCameraIndex() > 0)
     {
-        std::shared_ptr<caustica::PerspectiveCamera> sceneCamera = std::dynamic_pointer_cast<PerspectiveCamera>(m_sceneManager->getScene()->GetSceneGraph()->GetCameras()[m_renderCore.camera().selectedCameraIndex()-1]);
+        std::shared_ptr<caustica::PerspectiveCamera> sceneCamera = std::dynamic_pointer_cast<PerspectiveCamera>(m_sceneManager->getScene()->GetSceneGraph()->GetCameras()[m_renderCore->camera().selectedCameraIndex()-1]);
         if (sceneCamera != nullptr)
             UpdateCameraFromScene( sceneCamera );
     }
 
-    m_renderCore.camera().camera().Animate(fElapsedTimeSeconds);
+    m_renderCore->camera().camera().Animate(fElapsedTimeSeconds);
 
-    if (m_sampleGame) m_sampleGame->TickCamera(fElapsedTimeSeconds, m_renderCore.camera().camera());
+    if (m_sampleGame) m_sampleGame->TickCamera(fElapsedTimeSeconds, m_renderCore->camera().camera());
 
     if (m_settings.CameraAntiRRSleepJitter>0)
     {
-        float off = 0.05f * ((m_pathTracingRenderer->getFrameIndex()%2)?(-m_settings.CameraAntiRRSleepJitter):(m_settings.CameraAntiRRSleepJitter));
+        float off = 0.05f * ((m_worldRenderer->getFrameIndex()%2)?(-m_settings.CameraAntiRRSleepJitter):(m_settings.CameraAntiRRSleepJitter));
 
-        float3 dir = m_renderCore.camera().camera().GetDir();
-        float3 right = normalize(cross(dir, m_renderCore.camera().camera().GetUp()));
+        float3 dir = m_renderCore->camera().camera().GetDir();
+        float3 right = normalize(cross(dir, m_renderCore->camera().camera().GetUp()));
         affine3 rot = rotation(right, off);
         dir = rot.transformVector(dir);
 
-        m_renderCore.camera().camera().LookTo( m_renderCore.camera().camera().GetPosition(), dir, m_renderCore.camera().camera().GetUp() );
+        m_renderCore->camera().camera().LookTo( m_renderCore->camera().camera().GetPosition(), dir, m_renderCore->camera().camera().GetUp() );
     }
 
-    if (m_renderCore.camera().cameraMovedSinceLastFrame())
+    if (m_renderCore->camera().cameraMovedSinceLastFrame())
     {
-        m_renderCore.camera().updateLastCameraState();
+        m_renderCore->camera().updateLastCameraState();
         if( !m_settings.RealtimeMode )
             m_settings.ResetAccumulation = true;
-        m_pathTracingRenderer->setGaussianSplatTemporalReset(true);
+        m_worldRenderer->setGaussianSplatTemporalReset(true);
     }
 
     m_captureScriptManager->PostAnim();
 
 
-    double frameTime = GetGpuDevice()->GetAverageFrameTimeSeconds();
+    double frameTime = GetGpuDevice().GetAverageFrameTimeSeconds();
     if (frameTime > 0.0)
     {
 #if CAUSTICA_WITH_STREAMLINE
@@ -1104,12 +1211,12 @@ void PathTracerApp::Animate(float fElapsedTimeSeconds)
         + ")";
 
 
-    GetGpuDevice()->SetInformativeWindowTitle(g_windowTitle, false, extraInfo.c_str());
+    GetGpuDevice().SetInformativeWindowTitle(g_windowTitle, false, extraInfo.c_str());
 }
 
 std::string PathTracerApp::GetResolutionInfo() const
 {
-    auto& r = *m_pathTracingRenderer;
+    auto& r = *m_worldRenderer;
     const auto* targets = r.getRenderTargets();
     if (targets == nullptr || targets->OutputColor == nullptr)
         return "uninitialized";
@@ -1130,50 +1237,50 @@ float PathTracerApp::GetAvgTimePerFrame() const
 
 std::string PathTracerApp::GetCurrentCameraPosDirUp() const
 {
-    return m_renderCore.camera().getPosDirUpString();
+    return m_renderCore->camera().getPosDirUpString();
 }
 
 bool PathTracerApp::SetCurrentCameraPosDirUp(const std::string & val)
 {
-    return m_renderCore.camera().setFromPosDirUpString(val);
+    return m_renderCore->camera().setFromPosDirUpString(val);
 }
 
 void PathTracerApp::SetCameraVerticalFOV(float cameraFOV)
 {
-    m_renderCore.camera().setVerticalFOV(cameraFOV);
+    m_renderCore->camera().setVerticalFOV(cameraFOV);
     m_settings.ResetAccumulation = true;
-    m_pathTracingRenderer->setGaussianSplatTemporalReset(true);
+    m_worldRenderer->setGaussianSplatTemporalReset(true);
 }
 
 void PathTracerApp::SetCameraIntrinsics(float fx, float fy, float cx, float cy, float width, float height)
 {
-    m_renderCore.camera().setIntrinsics(fx, fy, cx, cy, width, height);
+    m_renderCore->camera().setIntrinsics(fx, fy, cx, cy, width, height);
     m_settings.ResetAccumulation = true;
-    m_pathTracingRenderer->setGaussianSplatTemporalReset(true);
+    m_worldRenderer->setGaussianSplatTemporalReset(true);
 }
 
 void PathTracerApp::ClearCameraIntrinsics()
 {
-    m_renderCore.camera().clearIntrinsics();
+    m_renderCore->camera().clearIntrinsics();
     m_settings.ResetAccumulation = true;
-    m_pathTracingRenderer->setGaussianSplatTemporalReset(true);
+    m_worldRenderer->setGaussianSplatTemporalReset(true);
 }
 
 void PathTracerApp::SaveCurrentCamera() const
 {
-    dm::float4x4 projMatrix = m_renderCore.camera().view()->GetProjectionMatrix();
+    dm::float4x4 projMatrix = m_renderCore->camera().view()->GetProjectionMatrix();
     float tanHalfFOVY = 1.0f / (projMatrix.m_data[1 * 4 + 1]);
     float fovY = atanf(tanHalfFOVY) * 2.0f;
 
-    m_renderCore.camera().saveToFile(
+    m_renderCore->camera().saveToFile(
         GetDirectoryWithExecutable() / "campos.txt",
-        m_renderCore.camera().zNear(),
+        m_renderCore->camera().zNear(),
         fovY);
 }
 
 void PathTracerApp::LoadCurrentCamera()
 {
-    m_renderCore.camera().loadFromFile(GetDirectoryWithExecutable() / "campos.txt");
+    m_renderCore->camera().loadFromFile(GetDirectoryWithExecutable() / "campos.txt");
 }
 
 void PathTracerApp::FillPTPipelineGlobalMacros(std::vector<caustica::ShaderMacro> & macros)
@@ -1246,23 +1353,23 @@ extern HitGroupInfo ComputeSubInstanceHitGroupInfo(const PTMaterial& material);
 
 bool PathTracerApp::CreatePTPipeline(caustica::ShaderFactory& /*shaderFactory*/)
 {
-    return m_pathTracingRenderer->createPTPipeline();
+    return m_worldRenderer->createPTPipeline();
 }
 
 void PathTracerApp::CreateBlases(nvrhi::ICommandList* commandList)
 {
     caustica::AccelStructBuildSettings settings = { .excludeTransmissive = m_settings.AS.ExcludeTransmissive };
-    m_renderCore.accelStructs().createBlases(commandList, *m_sceneManager->getScene(), settings);
+    m_renderCore->accelStructs().createBlases(commandList, *m_sceneManager->getScene(), settings);
 }
 
 void PathTracerApp::UploadSubInstanceData(nvrhi::ICommandList* commandList)
 {
-    m_renderCore.accelStructs().uploadSubInstanceData(commandList);
+    m_renderCore->accelStructs().uploadSubInstanceData(commandList);
 }
 
 void PathTracerApp::CreateTlas(nvrhi::ICommandList* commandList)
 {
-    m_renderCore.accelStructs().createTlas(commandList, *m_sceneManager->getScene());
+    m_renderCore->accelStructs().createTlas(commandList, *m_sceneManager->getScene());
 }
 
 void PathTracerApp::CreateAccelStructs(nvrhi::ICommandList* commandList)
@@ -1298,10 +1405,10 @@ void PathTracerApp::RecreateAccelStructs(nvrhi::ICommandList* commandList)
 
         GetDevice()->waitForIdle();
 
-        m_pathTracingRenderer->invalidateBindingSet();
-        m_renderCore.accelStructs().releaseGpuResources();
+        m_worldRenderer->invalidateBindingSet();
+        m_renderCore->accelStructs().releaseGpuResources();
 
-        m_renderCore.accelStructs().clearMeshAccelStructs(*m_sceneManager->getScene());
+        m_renderCore->accelStructs().clearMeshAccelStructs(*m_sceneManager->getScene());
         GetDevice()->runGarbageCollection();
 
         commandList->open();
@@ -1319,22 +1426,14 @@ void PathTracerApp::RequestMeshAccelRebuild(const std::shared_ptr<MeshInfo>& mes
 
     m_settings.ResetAccumulation = true;
 
-    if (!m_renderCore.accelStructs().hasTopLevelAS())
+    if (!m_renderCore->accelStructs().hasTopLevelAS())
     {
         m_editor.AccelerationStructRebuildRequested = true;
         return;
     }
 
-    m_renderCore.accelStructs().requestMeshRebuild(mesh);
+    m_renderCore->accelStructs().requestMeshRebuild(mesh);
 }
-
-void PathTracerApp::BackBufferResizing()
-{
-    m_pathTracingRenderer->onBackBufferResizing();
-}
-
-
-
 
 void PathTracerApp::SetEnvMapOverrideSource(const std::string& envMapOverride) 
 { 
@@ -1359,7 +1458,7 @@ void PathTracerApp::SetEnvMapOverrideSource(const std::string& envMapOverride)
 
 bool PathTracerApp::ShouldRenderUnfocused()
 {
-    if (m_pathTracingRenderer->getFrameIndex() < 16 || m_settings.ResetAccumulation || m_settings.ResetRealtimeCaches || m_captureScriptManager->IsDoingWork() )
+    if (m_worldRenderer->getFrameIndex() < 16 || m_settings.ResetAccumulation || m_settings.ResetRealtimeCaches || m_captureScriptManager->IsDoingWork() )
     {
         // Make sure we at least run one render frame to allow expensive resource creation to happen in background, and to allow at least somewhat decent convergence so when user alt-tabs they get a nice image
         return true;
@@ -1371,7 +1470,7 @@ bool PathTracerApp::ShouldRenderUnfocused()
     }
 
     // Let Reference mode accumulate all frames before pausing
-    return (!m_settings.RealtimeMode && (m_pathTracingRenderer->getAccumulationSampleIndex() < m_settings.AccumulationTarget));
+    return (!m_settings.RealtimeMode && (m_worldRenderer->getAccumulationSampleIndex() < m_settings.AccumulationTarget));
 }
 
 void PathTracerApp::SetSceneTime( double sceneTime ) 
@@ -1388,24 +1487,9 @@ double PathTracerApp::GetSceneTime()
     return m_sceneTime;
 }
 
-
-void PathTracerApp::Render(nvrhi::IFramebuffer* framebuffer)
-{
-    if (m_sceneManager->getScene() == nullptr)
-    {
-        assert(false);
-        return;
-    }
-    m_progressLoading.Stop();
-    m_asyncLoadingInProgress = false;
-    HandleDroppedFiles();
-    m_pathTracingRenderer->render(framebuffer);
-}
-
-
 void PathTracerApp::RecreateBindingSet()
 {
-    m_pathTracingRenderer->recreateBindingSet();
+    m_worldRenderer->recreateBindingSet();
 }
 
 
@@ -1628,7 +1712,7 @@ bool PathTracerApp::DeleteSceneNode(const std::shared_ptr<SceneGraphNode>& node)
     {
         UpdateGaussianSplatUIState();
         m_gaussianSplatEmissionProxies.clear();
-        m_pathTracingRenderer->setGaussianSplatTemporalReset(true);
+        m_worldRenderer->setGaussianSplatTemporalReset(true);
     }
 
     if (m_materialsBaker != nullptr)
@@ -1649,7 +1733,7 @@ void PathTracerApp::RequestFullRebuild()
     m_editor.ShaderReloadRequested = true;
     m_editor.ShaderAndACRefreshDelayedRequest = 0.0f;
     m_settings.ResetAccumulation = true;
-    m_pathTracingRenderer->invalidateBindingSet();
+    m_worldRenderer->invalidateBindingSet();
     if (m_bindingCache)
         m_bindingCache->Clear();
 }
@@ -2159,27 +2243,12 @@ void PathTracerApp::SetMeshVertices(const std::shared_ptr<MeshInfo>& mesh,
         m_settings.ResetAccumulation = true;
 }
 
-void PathTracerApp::PathTrace(nvrhi::IFramebuffer* framebuffer, const SampleConstants& constants)
+ZoomTool* PathTracerApp::GetOrCreateZoomTool()
 {
-    m_pathTracingRenderer->pathTrace(framebuffer, constants);
+    if (m_zoomTool == nullptr)
+        m_zoomTool = std::make_unique<ZoomTool>(GetDevice(), m_shaderFactory);
+    return m_zoomTool.get();
 }
-
-
-void PathTracerApp::Denoise(nvrhi::IFramebuffer* framebuffer)
-{
-    m_pathTracingRenderer->denoise(framebuffer);
-}
-
-
-#if CAUSTICA_WITH_NATIVE_DLSS
-
-#endif
-
-void PathTracerApp::PostProcessAA(nvrhi::IFramebuffer* framebuffer, bool reset)
-{
-    m_pathTracingRenderer->postProcessAA(framebuffer, reset);
-}
-
 
 static float ReadR11G11B10FloatChannel(uint32_t packed, uint32_t channel)
 {
@@ -2263,77 +2332,78 @@ static void ReadRGBA16Float3Staging(nvrhi::IDevice* device, nvrhi::IStagingTextu
 dm::float2 PathTracerApp::ComputeCameraJitter(uint frameIndex)
 {
     (void)frameIndex;
-    return m_renderCore.camera().computeJitter(makeCameraUpdateParams());
+    return m_renderCore->camera().computeJitter(makeCameraUpdateParams());
 }
 
 nvrhi::ITexture* PathTracerApp::GetLdrColorTexture() const
 {
-    const auto* targets = m_pathTracingRenderer ? m_pathTracingRenderer->getRenderTargets() : nullptr;
+    const auto* targets = m_worldRenderer ? m_worldRenderer->getRenderTargets() : nullptr;
     return targets ? targets->LdrColor.Get() : nullptr;
 }
 
 const DebugFeedbackStruct& PathTracerApp::GetFeedbackData() const
 {
-    return m_pathTracingRenderer->getFeedbackData();
+    static const DebugFeedbackStruct kEmpty{};
+    return m_worldRenderer ? m_worldRenderer->getFeedbackData() : kEmpty;
 }
 
 const DeltaTreeVizPathVertex* PathTracerApp::GetDebugDeltaPathTree() const
 {
-    return m_pathTracingRenderer->getDebugDeltaPathTree();
+    return m_worldRenderer ? m_worldRenderer->getDebugDeltaPathTree() : nullptr;
 }
 
 int PathTracerApp::GetAccumulationSampleIndex() const
 {
-    return m_pathTracingRenderer ? m_pathTracingRenderer->getAccumulationSampleIndex() : 0;
+    return m_worldRenderer ? m_worldRenderer->getAccumulationSampleIndex() : 0;
 }
 
 uint2 PathTracerApp::GetRenderSize() const
 {
-    return m_pathTracingRenderer ? m_pathTracingRenderer->getRenderSize() : uint2{0, 0};
+    return m_worldRenderer ? m_worldRenderer->getRenderSize() : uint2{0, 0};
 }
 
 uint2 PathTracerApp::GetDisplaySize() const
 {
-    return m_pathTracingRenderer ? m_pathTracingRenderer->getDisplaySize() : uint2{0, 0};
+    return m_worldRenderer ? m_worldRenderer->getDisplaySize() : uint2{0, 0};
 }
 
 bool PathTracerApp::AccumulationCompleted() const
 {
-    return m_pathTracingRenderer && m_pathTracingRenderer->getAccumulationCompleted();
+    return m_worldRenderer && m_worldRenderer->getAccumulationCompleted();
 }
 
 void PathTracerApp::InvalidateBindingSet()
 {
-    if (m_pathTracingRenderer)
-        m_pathTracingRenderer->invalidateBindingSet();
+    if (m_worldRenderer)
+        m_worldRenderer->invalidateBindingSet();
 }
 
 std::shared_ptr<PTPipelineBaker> PathTracerApp::GetRTPipelineBaker() const
 {
-    return m_pathTracingRenderer ? m_pathTracingRenderer->getPTPipelineBaker() : nullptr;
+    return m_worldRenderer ? m_worldRenderer->getPTPipelineBaker() : nullptr;
 }
 
 std::shared_ptr<PTPipelineVariant>& PathTracerApp::PtPipelineReference()
 {
-    return m_pathTracingRenderer->ptPipelineReference();
+    return m_worldRenderer->ptPipelineReference();
 }
 
 std::shared_ptr<PTPipelineVariant>& PathTracerApp::PtPipelineBuildStablePlanes()
 {
-    return m_pathTracingRenderer->ptPipelineBuildStablePlanes();
+    return m_worldRenderer->ptPipelineBuildStablePlanes();
 }
 
 std::shared_ptr<PTPipelineVariant>& PathTracerApp::PtPipelineFillStablePlanes()
 {
-    return m_pathTracingRenderer->ptPipelineFillStablePlanes();
+    return m_worldRenderer->ptPipelineFillStablePlanes();
 }
 
 std::shared_ptr<PTPipelineVariant>& PathTracerApp::PtPipelineTestRaygenPPHDR()
 {
-    return m_pathTracingRenderer->ptPipelineTestRaygenPPHDR();
+    return m_worldRenderer->ptPipelineTestRaygenPPHDR();
 }
 
 std::shared_ptr<PTPipelineVariant>& PathTracerApp::PtPipelineEdgeDetection()
 {
-    return m_pathTracingRenderer->ptPipelineEdgeDetection();
+    return m_worldRenderer->ptPipelineEdgeDetection();
 }

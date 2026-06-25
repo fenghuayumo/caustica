@@ -24,9 +24,14 @@
 #include <cstdint>
 
 #include <math/math.h>
-#include <backend/GpuDevice.h>
-#include <engine/Application.h>
+#include <engine/SceneManager.h>
+#include <render/Core/RenderCore.h>
 #include <platform/window.h>
+#include <render/Core/CommonRenderPasses.h>
+#include <render/Core/BindingCache.h>
+#include <render/Core/DescriptorTableManager.h>
+#include <render/WorldRenderer/WorldRendererHost.h>
+#include <assets/cache/TextureCache.h>
 
 #include <core/command_line.h>
 #include <SampleUI.h>
@@ -38,6 +43,7 @@
 class PathTracerApp;
 class AdvancedPathTracer;
 namespace caustica { class ShaderFactory; }
+namespace caustica::render { class PathTracingWorldRenderer; }
 
 namespace caustica_py
 {
@@ -117,6 +123,10 @@ public:
 private:
     bool InitDevice();
     bool InitRenderer();
+    void initRenderInfrastructurePhase1();
+    void initRenderInfrastructurePhase2(nvrhi::IBindingLayout* bindlessLayout);
+    void syncWorldRendererHost();
+    void initSceneServices();
     void Shutdown();
 
     Config                                          m_config;
@@ -126,7 +136,15 @@ private:
     std::unique_ptr<caustica::Window>            m_Window;
     std::unique_ptr<caustica::Application>         m_AppLoop;
     std::shared_ptr<caustica::ShaderFactory>   m_shaderFactory;
+    std::shared_ptr<caustica::CommonRenderPasses> m_commonPasses;
+    std::unique_ptr<caustica::BindingCache> m_bindingCache;
+    std::shared_ptr<caustica::DescriptorTableManager> m_descriptorTable;
+    std::shared_ptr<caustica::TextureCache> m_textureCache;
+    caustica::render::WorldRendererHost m_worldRendererHost;
+    std::unique_ptr<caustica::RenderCore>      m_renderCore;
+    std::unique_ptr<SceneManager>            m_sceneManager;
     std::unique_ptr<AdvancedPathTracer>             m_renderer;
+    std::unique_ptr<caustica::render::PathTracingWorldRenderer> m_worldRenderer;
 #if CAUSTICA_WITH_DX12 && defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
     Microsoft::WRL::ComPtr<ID3D12DeviceFactory>     m_d3d12DeviceFactory;
 #endif

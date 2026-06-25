@@ -30,10 +30,18 @@ constexpr static const int c_SwapchainCount = 3;
 #include <wrl/client.h>
 #endif
 
-namespace caustica { class ShaderFactory; }
+#include <engine/SceneManager.h>
+#include <render/Core/RenderCore.h>
+#include <assets/cache/TextureCache.h>
+#include <render/Core/CommonRenderPasses.h>
+#include <render/Core/BindingCache.h>
+#include <render/Core/DescriptorTableManager.h>
+#include <render/WorldRenderer/WorldRendererHost.h>
 
-class PathTracerApp;
-class SampleUI;
+namespace caustica { class ShaderFactory; }
+namespace caustica::render { class PathTracingWorldRenderer; }
+
+#include "AdvancedPathTracer.h"
 
 // Desktop editor executable 
 // Owns GpuDevice/Window, drives scene + UI render passes, runs the message loop.
@@ -60,6 +68,18 @@ public:
 	PathTracerApp* GetScenePass() { return m_scenePass.get(); }
 	const PathTracerApp* GetScenePass() const { return m_scenePass.get(); }
 
+	AdvancedPathTracer* GetAdvancedPathTracer() { return m_scenePass.get(); }
+	const AdvancedPathTracer* GetAdvancedPathTracer() const { return m_scenePass.get(); }
+
+	SceneManager* GetSceneManager() { return m_sceneManager.get(); }
+	const SceneManager* GetSceneManager() const { return m_sceneManager.get(); }
+
+	caustica::RenderCore* GetRenderCore() { return m_renderCore.get(); }
+	const caustica::RenderCore* GetRenderCore() const { return m_renderCore.get(); }
+
+	caustica::render::PathTracingWorldRenderer* GetWorldRenderer() { return m_worldRenderer.get(); }
+	const caustica::render::PathTracingWorldRenderer* GetWorldRenderer() const { return m_worldRenderer.get(); }
+
     bool IsSERSupported() const;
     bool QueryVideoMemoryInfo(uint64_t& outBudget, uint64_t& outCurrentUsage, uint64_t& outAvailableForReservation, uint64_t& outCurrentReservation);
 
@@ -80,6 +100,10 @@ private:
 	bool InitDeviceAndWindow(const caustica::DeviceCreationParameters& deviceParams);
 	bool CheckDeviceFeatureSupport(const caustica::DeviceCreationParameters& deviceParams);
 	void CreateShaderFactory();
+	void initRenderInfrastructurePhase1();
+	void initRenderInfrastructurePhase2(nvrhi::IBindingLayout* bindlessLayout);
+	void syncWorldRendererHost();
+	void initSceneServices();
 	void syncPassesToBackBuffer();
 
 	caustica::Callback m_DefaultLogCallback = nullptr;
@@ -88,7 +112,15 @@ private:
 	SampleUIData m_sampleUIData;
 
 	std::shared_ptr<caustica::ShaderFactory> m_ShaderFactory;
-	std::unique_ptr<PathTracerApp> m_scenePass;
+	std::shared_ptr<caustica::CommonRenderPasses> m_commonPasses;
+	std::unique_ptr<caustica::BindingCache> m_bindingCache;
+	std::shared_ptr<caustica::DescriptorTableManager> m_descriptorTable;
+	std::shared_ptr<caustica::TextureCache> m_textureCache;
+	caustica::render::WorldRendererHost m_worldRendererHost;
+	std::unique_ptr<caustica::RenderCore>      m_renderCore;
+	std::unique_ptr<SceneManager>            m_sceneManager;
+	std::unique_ptr<AdvancedPathTracer>             m_scenePass;
+	std::unique_ptr<caustica::render::PathTracingWorldRenderer> m_worldRenderer;
 	std::unique_ptr<SampleUI> m_uiPass;
 
 #if CAUSTICA_ENABLE_VIDEO_MEMORY_INFO && defined(_WIN32)
