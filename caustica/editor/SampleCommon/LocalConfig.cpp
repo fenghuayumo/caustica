@@ -1,7 +1,7 @@
 #include "LocalConfig.h"
 
 #include <SampleUI.h>
-#include "PathTracerApp.h"
+#include "SceneEditor.h"
 
 void LocalConfig::PreferredSceneOverride(std::string& preferredScene)
 {
@@ -127,7 +127,7 @@ void LocalConfig::PostAppInit(SampleUIData& sampleUI)
 
 }
 
-void LocalConfig::PostSceneLoad(PathTracerApp& sample, SampleUIData& sampleUI)
+void LocalConfig::PostSceneLoad(SceneEditor& sample, SampleUIData& sampleUI)
 {
 }
 

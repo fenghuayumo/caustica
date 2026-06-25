@@ -30,7 +30,7 @@ namespace caustica::render { class PathTracingWorldRenderer; }
 #include <render/Core/CameraController.h>
 #include <render/Passes/Geometry/BloomPass.h>
 #include <scene/camera/Camera.h>
-#include <engine/SceneManager.h>
+#include <scene/SceneManager.h>
 #include <assets/cache/TextureCache.h>
 #include <render/Core/CommonRenderPasses.h>
 #if CAUSTICA_WITH_NATIVE_DLSS
@@ -69,14 +69,14 @@ class PythonScripting;
 class GaussianSplatPass;
 
 // Scene editor shell (mesh edit, Inspector, Capture). GPU path tracing is owned by EditorApplication.
-class PathTracerApp : public caustica::render::IWorldRendererPipelineHooks
+class SceneEditor : public caustica::render::IWorldRendererPipelineHooks
 {
     struct GaussianSplatSceneObject;
 
 public:
-    PathTracerApp(const CommandLineOptions& cmdLine,
+    SceneEditor(const CommandLineOptions& cmdLine,
         SampleUIData& ui);
-    ~PathTracerApp() override;
+    ~SceneEditor() override;
 
     void setGpuDevice(caustica::GpuDevice& dm) { m_gpuDevice = &dm; }
 

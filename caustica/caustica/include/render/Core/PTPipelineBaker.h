@@ -171,7 +171,7 @@ private:
     std::unordered_set<std::string>                 m_shortUniqueDebugIDs;
 
     // this allows sharing of hitGroups between 
-    friend class PathTracerApp;
+    friend class SceneEditor;
     std::vector<HitGroupInfo>                       m_perSubInstanceHitGroup;
     std::unordered_map<int, HitGroupInfo>           m_uniqueHitGroups;
 

@@ -15,7 +15,7 @@
 #include <render/Passes/OMM/OmmBaker.h>
 #include <assets/cache/TextureCache.h>
 #include <render/Core/DescriptorTableManager.h>
-#include <engine/SceneManager.h>
+#include <scene/SceneManager.h>
 
 #include <chrono>
 #include <memory>

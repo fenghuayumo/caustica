@@ -9,7 +9,7 @@
 
 #include <scene/Scene.h>
 
-#include "PathTracerApp.h"
+#include "SceneEditor.h"
 
 #include <render/Passes/Debug/Korgi.h>
 #include <json/json.h>
@@ -54,8 +54,8 @@ namespace
 }
 
 
-GameScene::GameScene(PathTracerApp & sample, const CommandLineOptions& cmdLine)
-    : m_sample(sample), m_cmdLine(cmdLine) // NOTE: at this point, PathTracerApp is being constructed - beware of accessing incompletely constructed object
+GameScene::GameScene(SceneEditor & sample, const CommandLineOptions& cmdLine)
+    : m_sample(sample), m_cmdLine(cmdLine) // NOTE: at this point, SceneEditor is being constructed - beware of accessing incompletely constructed object
 {
 }
 

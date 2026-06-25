@@ -24,7 +24,7 @@
 #include <cstdint>
 
 #include <math/math.h>
-#include <engine/SceneManager.h>
+#include <scene/SceneManager.h>
 #include <render/Core/RenderCore.h>
 #include <platform/window.h>
 #include <render/Core/CommonRenderPasses.h>
@@ -40,7 +40,7 @@
 #include <wrl/client.h>
 #endif
 
-class PathTracerApp;
+class SceneEditor;
 namespace caustica { class ShaderFactory; }
 namespace caustica::render { class PathTracingWorldRenderer; }
 
@@ -110,8 +110,8 @@ public:
     void SetCameraFOV(float verticalFovDegrees);
     void SetCameraIntrinsics(float fx, float fy, float cx, float cy, float width, float height);
 
-    PathTracerApp*       GetPathTracerApp()       { return m_renderer.get(); }
-    const PathTracerApp* GetPathTracerApp() const { return m_renderer.get(); }
+    SceneEditor*       GetSceneEditor()       { return m_renderer.get(); }
+    const SceneEditor* GetSceneEditor() const { return m_renderer.get(); }
 
     SampleUIData& GetSampleUIData() { return m_sampleUIData; }
     const SampleUIData& GetSampleUIData() const { return m_sampleUIData; }
@@ -143,7 +143,7 @@ private:
     std::unique_ptr<caustica::render::WorldRendererServices> m_worldRendererServices;
     std::unique_ptr<caustica::RenderCore>      m_renderCore;
     std::unique_ptr<SceneManager>            m_sceneManager;
-    std::unique_ptr<PathTracerApp>             m_renderer;
+    std::unique_ptr<SceneEditor>             m_renderer;
     std::unique_ptr<caustica::render::PathTracingWorldRenderer> m_worldRenderer;
 #if CAUSTICA_WITH_DX12 && defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
     Microsoft::WRL::ComPtr<ID3D12DeviceFactory>     m_d3d12DeviceFactory;

@@ -31,7 +31,7 @@ struct OmmAccelStructState
 
 // =============================================================================
 // AccelStructManager — BLAS / TLAS lifecycle and sub-instance GPU buffers.
-// Extracted from editor PathTracerApp (Phase C).
+// Extracted from editor SceneEditor (Phase C).
 // =============================================================================
 class AccelStructManager
 {

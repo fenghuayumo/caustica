@@ -1,6 +1,6 @@
 #include <render/Core/RenderCore.h>
 #include <render/Core/RenderPipeline.h>
-#include <engine/SceneManager.h>
+#include <scene/SceneManager.h>
 #include <scene/Scene.h>
 
 namespace caustica

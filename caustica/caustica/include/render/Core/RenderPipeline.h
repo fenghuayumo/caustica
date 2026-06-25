@@ -38,7 +38,7 @@ public:
 // them directly without going through getter chains.
 //
 // Pass registration and ordered execution provide a lightweight alternative
-// to the hardcoded 473-line Render() sequence in PathTracerApp.
+// to the hardcoded 473-line Render() sequence in SceneEditor.
 // =============================================================================
 class RenderPipeline
 {

@@ -22,7 +22,7 @@
 #if CAUSTICA_WITH_NATIVE_DLSS
 #include <render/Passes/Geometry/DLSS.h>
 #endif
-#include "PathTracerApp.h"
+#include "SceneEditor.h"
 #include <render/WorldRenderer/PathTracingWorldRenderer.h>
 
 #include <core/vfs/VFS.h>
@@ -168,7 +168,7 @@ namespace
 EditorApplication::EditorApplication()
     : EditorData()
     , Application()
-    , PathTracerApp(CmdLine, sampleUIData)
+    , SceneEditor(CmdLine, sampleUIData)
 {
     RegisterLogCallback();
     korgi::Init();
@@ -251,7 +251,7 @@ EditorApplication::StartupResult EditorApplication::startup(int argc, const char
     // Optionally create the UP render pass. This exposes run time parameter controls.
     if (!CmdLine.noWindow)
     {
-        m_uiPass = std::make_unique<SampleUI>(m_GpuDevice.get(), *this, *this, sampleUIData, IsSERSupported(), CmdLine);
+        m_uiPass = std::make_unique<SampleUI>(m_GpuDevice.get(), *this, sampleUIData, IsSERSupported(), CmdLine);
         m_uiPass->Init(m_ShaderFactory);
         syncPassesToBackBuffer();
     }
@@ -616,7 +616,7 @@ void EditorApplication::initRenderInfrastructurePhase2(nvrhi::IBindingLayout* bi
 
 caustica::render::WorldRendererServices EditorApplication::buildWorldRendererServices()
 {
-    PathTracerApp& editor = *this;
+    SceneEditor& editor = *this;
     return caustica::render::WorldRendererServices{
         .gpuDevice = *m_GpuDevice,
         .sceneManager = *m_sceneManager,
@@ -794,8 +794,8 @@ bool EditorApplication::shouldRenderWhenUnfocused() const
 
 void EditorApplication::onEvent(caustica::Event& event)
 {
-    // 1. Dispatch input events to PathTracerApp (handles Camera/ZoomTool/shortcuts).
-    PathTracerApp::onEvent(event);
+    // 1. Dispatch input events to SceneEditor (handles Camera/ZoomTool/shortcuts).
+    SceneEditor::onEvent(event);
 
     // 2. Handle window events locally.
     caustica::EventDispatcher dispatcher(event);

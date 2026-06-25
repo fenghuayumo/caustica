@@ -1,4 +1,4 @@
-#include "assets/loader/SceneLoader.h"
+#include "scene/SceneLoader.h"
 
 namespace caustica
 {

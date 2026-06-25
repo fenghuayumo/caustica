@@ -1,6 +1,6 @@
 #pragma once
 
-#include <assets/loader/SceneLoader.h>
+#include <scene/SceneLoader.h>
 
 #include <functional>
 #include <memory>

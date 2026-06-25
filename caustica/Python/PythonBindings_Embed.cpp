@@ -9,7 +9,7 @@
 #include <nanobind/nanobind.h>
 #include <nanobind/stl/string.h>
 
-#include "PathTracerApp.h"
+#include "SceneEditor.h"
 #include <SampleUI.h>
 
 #include <stdexcept>
@@ -18,11 +18,11 @@ namespace nb = nanobind;
 
 namespace
 {
-    PathTracerApp& RequireApp()
+    SceneEditor& RequireApp()
     {
-        if (!g_pythonPathTracerAppSingleton)
-            throw std::runtime_error("caustica: no PathTracerApp instance bound (renderer not initialized?)");
-        return *g_pythonPathTracerAppSingleton;
+        if (!g_pythonSceneEditorSingleton)
+            throw std::runtime_error("caustica: no SceneEditor instance bound (renderer not initialized?)");
+        return *g_pythonSceneEditorSingleton;
     }
 }
 
@@ -32,9 +32,9 @@ NB_MODULE(caustica, m)
 
     caustica_py::RegisterCoreBindings(m);
 
-    m.def("app", []() -> PathTracerApp* { return &RequireApp(); },
+    m.def("app", []() -> SceneEditor* { return &RequireApp(); },
           nb::rv_policy::reference,
-          "Return the singleton PathTracerApp renderer running in this caustica.exe.");
+          "Return the singleton SceneEditor renderer running in this caustica.exe.");
 
     m.def("settings", []() -> SampleUIData* { return &RequireApp().GetUIData(); },
           nb::rv_policy::reference,

@@ -2,23 +2,12 @@
 
 #include <memory>
 
-#include "backend/GpuDevice.h"
 #include "engine/Application.h"
 #include "core/log.h"
-#include <platform/window.h>
-
-#include <core/file_utils.h>
-#include <core/format.h>
-#include <core/path_utils.h>
-#include <core/progress.h>
 #include <core/Timer.h>
-#include <core/system_utils.h>
 #include <core/command_line.h>
-#include <core/scope.h>
-#include <render/Core/ScopedPerfMarker.h>
-#include <render/Core/TextureUtils.h>
 
-#include <SampleUI.h>
+#include "SceneEditor.h"
 
 using caustica::FPSLimiter;
 constexpr static const int c_SwapchainCount = 3;
@@ -30,31 +19,36 @@ constexpr static const int c_SwapchainCount = 3;
 #include <wrl/client.h>
 #endif
 
-#include <engine/SceneManager.h>
-#include <render/Core/RenderCore.h>
-#include <assets/cache/TextureCache.h>
-#include <render/Core/CommonRenderPasses.h>
-#include <render/Core/BindingCache.h>
-#include <render/Core/DescriptorTableManager.h>
-#include <render/WorldRenderer/WorldRendererServices.h>
+// Forward declarations — full definitions only needed in .cpp
+class SampleUI;
+class SceneManager;
+namespace caustica {
+    class GpuDevice;
+    class ShaderFactory;
+    class BindingCache;
+    class CommonRenderPasses;
+    class DescriptorTableManager;
+    class RenderCore;
+    class TextureCache;
+    class Window;
+    struct DeviceCreationParameters;
+    namespace render {
+        class PathTracingWorldRenderer;
+        struct WorldRendererServices;
+    }
+}
 
-namespace caustica { class ShaderFactory; }
-namespace caustica::render { class PathTracingWorldRenderer; }
-
-#include "PathTracerApp.h"
-
-// EditorData holds members that must be initialized before PathTracerApp base.
+// EditorData holds members that must be initialized before SceneEditor base.
 struct EditorData
 {
     CommandLineOptions CmdLine;
     SampleUIData sampleUIData;
 };
 
-// Desktop editor executable — IS-A PathTracerApp + IS-A Application.
-// EditorData base ensures CmdLine/sampleUIData are initialized before PathTracerApp.
+// Desktop editor executable — IS-A SceneEditor + IS-A Application.
 class EditorApplication : private EditorData
                         , public caustica::Application
-                        , public PathTracerApp
+                        , public SceneEditor
 {
 public:
     EditorApplication();
@@ -74,11 +68,10 @@ public:
     SampleUIData& GetSampleUIData() { return sampleUIData; }
     const SampleUIData& GetSampleUIData() const { return sampleUIData; }
 
-    // Backward-compat aliases (EditorApplication IS the app)
-    PathTracerApp* GetScenePass() { return this; }
-    const PathTracerApp* GetScenePass() const { return this; }
-    PathTracerApp* GetAdvancedPathTracer() { return this; }
-    const PathTracerApp* GetAdvancedPathTracer() const { return this; }
+    SceneEditor* GetScenePass() { return this; }
+    const SceneEditor* GetScenePass() const { return this; }
+    SceneEditor* GetAdvancedPathTracer() { return this; }
+    const SceneEditor* GetAdvancedPathTracer() const { return this; }
 
     SceneManager* GetSceneManager() { return m_sceneManager.get(); }
     const SceneManager* GetSceneManager() const { return m_sceneManager.get(); }
@@ -127,7 +120,7 @@ private:
     std::shared_ptr<caustica::TextureCache> m_textureCache;
     std::unique_ptr<caustica::render::WorldRendererServices> m_worldRendererServices;
     std::unique_ptr<caustica::RenderCore>      m_renderCore;
-    std::unique_ptr<SceneManager>            m_sceneManager;
+    std::unique_ptr<SceneManager>              m_sceneManager;
     std::unique_ptr<caustica::render::PathTracingWorldRenderer> m_worldRenderer;
     std::unique_ptr<SampleUI> m_uiPass;
 
