@@ -41,7 +41,6 @@
 #endif
 
 class PathTracerApp;
-class AdvancedPathTracer;
 namespace caustica { class ShaderFactory; }
 namespace caustica::render { class PathTracingWorldRenderer; }
 
@@ -144,7 +143,7 @@ private:
     std::unique_ptr<caustica::render::WorldRendererServices> m_worldRendererServices;
     std::unique_ptr<caustica::RenderCore>      m_renderCore;
     std::unique_ptr<SceneManager>            m_sceneManager;
-    std::unique_ptr<AdvancedPathTracer>             m_renderer;
+    std::unique_ptr<PathTracerApp>             m_renderer;
     std::unique_ptr<caustica::render::PathTracingWorldRenderer> m_worldRenderer;
 #if CAUSTICA_WITH_DX12 && defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
     Microsoft::WRL::ComPtr<ID3D12DeviceFactory>     m_d3d12DeviceFactory;

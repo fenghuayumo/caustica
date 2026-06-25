@@ -22,9 +22,7 @@
 #if CAUSTICA_WITH_NATIVE_DLSS
 #include <render/Passes/Geometry/DLSS.h>
 #endif
-#include "AdvancedPathTracer.h"
 #include "PathTracerApp.h"
-#include "input/PathTracerInputController.h"
 #include <render/WorldRenderer/PathTracingWorldRenderer.h>
 
 #include <core/vfs/VFS.h>
@@ -214,7 +212,7 @@ EditorApplication::StartupResult EditorApplication::startup(int argc, const char
 
     CreateShaderFactory();
 
-    m_scenePass = std::make_unique<AdvancedPathTracer>(*m_GpuDevice, m_CmdLine, m_sampleUIData);
+    m_scenePass = std::make_unique<PathTracerApp>(*m_GpuDevice, m_CmdLine, m_sampleUIData);
     initRenderInfrastructurePhase1();
 
     const nvrhi::BindingLayoutHandle bindlessLayout =
@@ -801,9 +799,9 @@ bool EditorApplication::shouldRenderWhenUnfocused() const
 
 void EditorApplication::onEvent(caustica::Event& event)
 {
-    // 1. Dispatch input events to the input controller.
+    // 1. Dispatch input events to the scene pass (handles Camera/ZoomTool/shortcuts).
     if (m_scenePass)
-        m_scenePass->GetInputController()->onEvent(event);
+        m_scenePass->onEvent(event);
 
     // 2. Handle window events locally.
     caustica::EventDispatcher dispatcher(event);

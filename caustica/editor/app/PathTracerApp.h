@@ -9,15 +9,19 @@
 #include <core/system_utils.h>
 #include <core/command_line.h>
 #include <core/scope.h>
+#include <events/event.h>
+#include <events/key_event.h>
+#include <events/mouse_event.h>
 #include <render/Core/ScopedPerfMarker.h>
 #include <render/Core/TextureUtils.h>
+#include <render/WorldRenderer/WorldRendererServices.h>
 
 #include <core/command_line.h>
 #include "SampleUI.h"
 
 #include <backend/GpuDevice.h>
 
-namespace caustica::render { class PathTracingWorldRenderer; struct WorldRendererServices; }
+namespace caustica::render { class PathTracingWorldRenderer; }
 
 #include <functional>
 #include <chrono>
@@ -65,18 +69,15 @@ class PythonScripting;
 class GaussianSplatPass;
 
 // Scene editor shell (mesh edit, Inspector, Capture). GPU path tracing is owned by EditorApplication.
-class PathTracerApp
+class PathTracerApp : public caustica::render::IWorldRendererPipelineHooks
 {
-    friend class PathTracerInputController;
-    friend class AdvancedPathTracer;
-
     struct GaussianSplatSceneObject;
 
 public:
     PathTracerApp(caustica::GpuDevice& deviceManager,
         const CommandLineOptions& cmdLine,
         SampleUIData& ui);
-    virtual ~PathTracerApp();
+    ~PathTracerApp() override;
 
     void SetLatewarpOptions() { }
     bool ShouldAnimateUnfocused() { return false; }
@@ -191,6 +192,61 @@ public:
 
     dm::float2                              ComputeCameraJitter(uint frameIndex);
 
+    // --- IWorldRendererPipelineHooks ---
+    bool needsRasterPrecompute() override { return false; }
+    std::string getMaterialSpecializationShader() const override;
+    void fillPTPipelineGlobalMacros(std::vector<caustica::ShaderMacro>& macros) override;
+    void sampleRenderCode(nvrhi::IFramebuffer* framebuffer, nvrhi::CommandListHandle commandList, const SampleConstants& constants) override;
+    void addCustomBindings(nvrhi::BindingSetDesc& bindingSetDesc) override;
+    void createRTPipelines() override;
+    void onRenderTargetsRecreated() override;
+    void prepareGaussianSplatPasses() override;
+    void buildGaussianSplatEmissionProxyList() override;
+    bool isGaussianSplatEmissionEnabled() const override;
+    bool gaussianSplatObjectsEmpty() const override;
+    caustica::render::WorldRendererGaussianSplatBinding getPrimaryGaussianSplatBinding() const override;
+    void renderSceneGaussianSplats(nvrhi::ICommandList* commandList,
+                                   const caustica::PlanarView& splatView,
+                                   RenderTargets& renderTargets,
+                                   const GaussianSplatRenderSettings& settings,
+                                   bool& renderedAny) override;
+    void updateViews(nvrhi::IFramebuffer* framebuffer) override;
+    void recreateAccelStructs(nvrhi::ICommandList* commandList) override;
+    void uploadSubInstanceData(nvrhi::ICommandList* commandList) override;
+    void collectUncompressedTextures() override;
+    dm::float2 computeCameraJitter(uint frameIndex) override;
+    bool consumeShaderReloadRequest() override;
+    bool& accelerationStructRebuildRequested() override;
+    bool hasActivePickRequest() const override;
+    bool showDeltaTree() const override;
+    bool pickMaterialRequested() const override;
+    bool pickInstanceRequested() const override;
+    void clearPickRequests() override;
+    void resolvePickFeedback(const DebugFeedbackStruct& feedback) override;
+    bool consumeExperimentalPhotoScreenshot() override;
+    void captureScriptPreRender() override;
+    void captureScriptPostRender(std::function<bool(const char* fileName)> saveTexture) override;
+    class ZoomTool* getOrCreateZoomTool() override;
+
+    // --- Pipeline variant accessors ---
+    std::shared_ptr<class PTPipelineVariant>& PtPipelineReference();
+    std::shared_ptr<class PTPipelineVariant>& PtPipelineBuildStablePlanes();
+    std::shared_ptr<class PTPipelineVariant>& PtPipelineFillStablePlanes();
+    std::shared_ptr<class PTPipelineVariant>& PtPipelineTestRaygenPPHDR();
+    std::shared_ptr<class PTPipelineVariant>& PtPipelineEdgeDetection();
+
+    // Render entry points (formerly on AdvancedPathTracer)
+    void Render(nvrhi::IFramebuffer* framebuffer);
+    void BackBufferResizing();
+    void PathTrace(nvrhi::IFramebuffer* framebuffer, const SampleConstants& constants);
+    void Denoise(nvrhi::IFramebuffer* framebuffer);
+    void PostProcessAA(nvrhi::IFramebuffer* framebuffer, bool reset);
+    std::string GetMaterialSpecializationShader() const;
+    bool NeedsRasterPrecompute() { return false; }
+
+    // --- Input event handling (replaces PathTracerInputController) ---
+    void onEvent(caustica::Event& event);
+
     std::string                             GetResolutionInfo() const;
     std::string                             GetFPSInfo() const              { return m_fpsInfo; }
 
@@ -233,7 +289,6 @@ public:
     caustica::BindingCache &           GetBindingCache() { return *m_bindingCache; }
 
     [[nodiscard]] caustica::GpuDevice& GetGpuDevice() const { return m_gpuDevice; }
-    [[nodiscard]] PathTracerInputController* GetInputController() const { return m_inputController.get(); }
     [[nodiscard]] nvrhi::IDevice* GetDevice() const { return m_gpuDevice.GetDevice(); }
     [[nodiscard]] uint32_t GetFrameIndex() const { return m_gpuDevice.GetFrameIndex(); }
 
@@ -292,12 +347,6 @@ protected:
     const caustica::PlanarView& GetView() const;
     std::shared_ptr<class PTPipelineBaker>  GetRTPipelineBaker() const;
 
-    std::shared_ptr<class PTPipelineVariant>& PtPipelineReference();
-    std::shared_ptr<class PTPipelineVariant>& PtPipelineBuildStablePlanes();
-    std::shared_ptr<class PTPipelineVariant>& PtPipelineFillStablePlanes();
-    std::shared_ptr<class PTPipelineVariant>& PtPipelineTestRaygenPPHDR();
-    std::shared_ptr<class PTPipelineVariant>& PtPipelineEdgeDetection();
-
 private:
     void                                    UpdateCameraFromScene( const std::shared_ptr<caustica::PerspectiveCamera> & sceneCamera );
     void                                    LoadGaussianSplatsFromScene();
@@ -305,6 +354,14 @@ private:
     void                                    UpdateGaussianSplatUIState();
     uint32_t                                GetTotalGaussianSplatCount() const;
     void                                    RefreshEnvironmentMapMediaList();
+
+    // Input event handlers (formerly in PathTracerInputController)
+    bool onKeyPressed(caustica::KeyPressedEvent& e);
+    bool onKeyReleased(caustica::KeyReleasedEvent& e);
+    bool onMouseMoved(caustica::MouseMovedEvent& e);
+    bool onMouseButtonPressed(caustica::MouseButtonPressedEvent& e);
+    bool onMouseButtonReleased(caustica::MouseButtonReleasedEvent& e);
+    bool onMouseScrolled(caustica::MouseScrolledEvent& e);
 
     struct GaussianSplatSceneObject
     {
@@ -372,8 +429,6 @@ private:
     ProgressBar                                 m_progressInitializingRenderer;
 
     std::unique_ptr<class ZoomTool>             m_zoomTool;
-
-    std::unique_ptr<PathTracerInputController>  m_inputController;
 
     bool                                        m_asyncLoadingInProgress = false;
 

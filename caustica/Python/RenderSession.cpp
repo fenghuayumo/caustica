@@ -2,7 +2,7 @@
 
 #if CAUSTICA_WITH_PYTHON
 
-#include "AdvancedPathTracer.h"
+#include "PathTracerApp.h"
 #include "EditorApplication.h"
 #include "PathTracerApp.h"
 #include <render/WorldRenderer/PathTracingWorldRenderer.h>
@@ -68,7 +68,7 @@ namespace
     class PathTracerFrameDriver : public caustica::Application
     {
     public:
-        PathTracerFrameDriver(caustica::GpuDevice* dm, caustica::Window* window, AdvancedPathTracer* scene)
+        PathTracerFrameDriver(caustica::GpuDevice* dm, caustica::Window* window, PathTracerApp* scene)
             : caustica::Application(dm, window)
             , m_scene(scene)
         { }
@@ -127,7 +127,7 @@ namespace
         }
 
     private:
-        AdvancedPathTracer* m_scene = nullptr;
+        PathTracerApp* m_scene = nullptr;
     };
 
     void AppendUnique(std::vector<std::string>& values, const std::string& value)
@@ -620,7 +620,7 @@ bool RenderSession::InitRenderer()
     auto device = m_deviceManager->GetDevice();
     m_shaderFactory = std::make_shared<caustica::ShaderFactory>(device, rootFS, "/ShaderPrecompiled");
 
-    m_renderer = std::make_unique<AdvancedPathTracer>(*m_deviceManager, m_cmdLine, m_sampleUIData);
+    m_renderer = std::make_unique<PathTracerApp>(*m_deviceManager, m_cmdLine, m_sampleUIData);
     InitializeSampleUIDataFromCommandLine(m_sampleUIData, m_cmdLine);
     LocalConfig::PostAppInit(m_sampleUIData);
 

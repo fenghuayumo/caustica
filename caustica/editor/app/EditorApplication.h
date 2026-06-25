@@ -41,7 +41,7 @@ constexpr static const int c_SwapchainCount = 3;
 namespace caustica { class ShaderFactory; }
 namespace caustica::render { class PathTracingWorldRenderer; }
 
-#include "AdvancedPathTracer.h"
+#include "PathTracerApp.h"
 
 // Desktop editor executable 
 // Owns GpuDevice/Window, drives scene + UI render passes, runs the message loop.
@@ -68,8 +68,8 @@ public:
 	PathTracerApp* GetScenePass() { return m_scenePass.get(); }
 	const PathTracerApp* GetScenePass() const { return m_scenePass.get(); }
 
-	AdvancedPathTracer* GetAdvancedPathTracer() { return m_scenePass.get(); }
-	const AdvancedPathTracer* GetAdvancedPathTracer() const { return m_scenePass.get(); }
+	PathTracerApp* GetAdvancedPathTracer() { return m_scenePass.get(); }
+	const PathTracerApp* GetAdvancedPathTracer() const { return m_scenePass.get(); }
 
 	SceneManager* GetSceneManager() { return m_sceneManager.get(); }
 	const SceneManager* GetSceneManager() const { return m_sceneManager.get(); }
@@ -121,7 +121,7 @@ private:
 	std::unique_ptr<caustica::render::WorldRendererServices> m_worldRendererServices;
 	std::unique_ptr<caustica::RenderCore>      m_renderCore;
 	std::unique_ptr<SceneManager>            m_sceneManager;
-	std::unique_ptr<AdvancedPathTracer>             m_scenePass;
+	std::unique_ptr<PathTracerApp>             m_scenePass;
 	std::unique_ptr<caustica::render::PathTracingWorldRenderer> m_worldRenderer;
 	std::unique_ptr<SampleUI> m_uiPass;
 

@@ -1,5 +1,4 @@
 #include "PathTracerApp.h"
-#include "input/PathTracerInputController.h"
 #include <render/WorldRenderer/PathTracingWorldRenderer.h>
 #include <render/WorldRenderer/WorldRendererServices.h>
 
@@ -437,20 +436,6 @@ void PathTracerApp::Init(const std::string& preferredScene,
 
     // Select initial scene
     SetCurrentScene(scene);
-
-    m_inputController = std::make_unique<PathTracerInputController>(PathTracerInputController::Bindings{
-        .gpuDevice = GetGpuDevice(),
-        .renderCore = *m_renderCore,
-        .settings = m_settings,
-        .editor = m_editor,
-        .sampleGame = m_sampleGame.get(),
-        .getZoomTool = [this]() { return m_zoomTool.get(); },
-        .getUpscalingScale = [this]() -> dm::float2 {
-            if (m_worldRenderer->getRenderTargets() == nullptr)
-                return dm::float2(1.0f, 1.0f);
-            return dm::float2(m_worldRenderer->getRenderSize()) / dm::float2(m_worldRenderer->getDisplaySize());
-        },
-    });
 }
 
 void PathTracerApp::SetCurrentScene( const std::string & sceneName, bool forceReload )
@@ -2379,4 +2364,329 @@ std::shared_ptr<PTPipelineVariant>& PathTracerApp::PtPipelineTestRaygenPPHDR()
 std::shared_ptr<PTPipelineVariant>& PathTracerApp::PtPipelineEdgeDetection()
 {
     return m_worldRenderer->ptPipelineEdgeDetection();
+}
+
+// =============================================================================
+// IWorldRendererPipelineHooks (formerly on AdvancedPathTracer)
+// =============================================================================
+
+void PathTracerApp::Render(nvrhi::IFramebuffer* framebuffer)
+{
+    if (GetSceneManager()->getScene() == nullptr)
+    {
+        assert(false);
+        return;
+    }
+    PrepareEditorFrame();
+    GetWorldRenderer()->render(framebuffer);
+}
+
+void PathTracerApp::BackBufferResizing()
+{
+    if (auto* r = GetWorldRenderer())
+        r->onBackBufferResizing();
+}
+
+void PathTracerApp::PathTrace(nvrhi::IFramebuffer* framebuffer, const SampleConstants& constants)
+{
+    GetWorldRenderer()->pathTrace(framebuffer, constants);
+}
+
+void PathTracerApp::Denoise(nvrhi::IFramebuffer* framebuffer)
+{
+    GetWorldRenderer()->denoise(framebuffer);
+}
+
+void PathTracerApp::PostProcessAA(nvrhi::IFramebuffer* framebuffer, bool reset)
+{
+    GetWorldRenderer()->postProcessAA(framebuffer, reset);
+}
+
+std::string PathTracerApp::GetMaterialSpecializationShader() const
+{
+    return "PathTracerMaterialSpecializations.hlsl";
+}
+
+std::string PathTracerApp::getMaterialSpecializationShader() const
+{
+    return GetMaterialSpecializationShader();
+}
+
+void PathTracerApp::fillPTPipelineGlobalMacros(std::vector<caustica::ShaderMacro>& macros)
+{
+    FillPTPipelineGlobalMacros(macros);
+}
+
+void PathTracerApp::sampleRenderCode(nvrhi::IFramebuffer* framebuffer, nvrhi::CommandListHandle commandList, const SampleConstants& constants)
+{
+    auto* r = GetWorldRenderer();
+    if (!r) return;
+    if (m_ui.ActualUseRTXDIPasses())
+        r->getRtxdiPass()->BeginFrame(commandList, *r->getRenderTargets(), r->getBindingLayout(), r->getBindingSet());
+
+    PathTrace(framebuffer, constants);
+    Denoise(framebuffer);
+}
+
+void PathTracerApp::createRTPipelines()
+{
+    auto pipelineBaker = GetRTPipelineBaker();
+    using SM = caustica::ShaderMacro;
+    PtPipelineReference()         = pipelineBaker->CreateVariant("PathTracerSample.hlsl", { SM("PATH_TRACER_MODE", "PATH_TRACER_MODE_REFERENCE") }, "REF");
+    PtPipelineBuildStablePlanes() = pipelineBaker->CreateVariant("PathTracerSample.hlsl", { SM("PATH_TRACER_MODE", "PATH_TRACER_MODE_BUILD_STABLE_PLANES") }, "BUILD");
+    PtPipelineFillStablePlanes()  = pipelineBaker->CreateVariant("PathTracerSample.hlsl", { SM("PATH_TRACER_MODE", "PATH_TRACER_MODE_FILL_STABLE_PLANES") }, "FILL");
+    PtPipelineTestRaygenPPHDR()   = pipelineBaker->CreateVariant("TestRaygenPP.hlsl", { SM("PP_TEST_HDR", "1") }, "TESTRG", true);
+    PtPipelineEdgeDetection()     = pipelineBaker->CreateVariant("TestRaygenPP.hlsl", { SM("PP_EDGE_DETECTION", "1") }, "EDGY", true);
+}
+
+void PathTracerApp::addCustomBindings(nvrhi::BindingSetDesc& bindingSetDesc)
+{
+    AddCustomBindings(bindingSetDesc);
+}
+
+void PathTracerApp::onRenderTargetsRecreated()
+{
+    OnRenderTargetsRecreated();
+}
+
+void PathTracerApp::prepareGaussianSplatPasses()
+{
+    for (auto& object : m_gaussianSplatSceneObjects)
+    {
+        if (object.pass != nullptr && object.pass->HasSplats())
+            PrepareGaussianSplatPass(*object.pass);
+    }
+}
+
+void PathTracerApp::buildGaussianSplatEmissionProxyList()
+{
+    BuildGaussianSplatEmissionProxyList();
+}
+
+bool PathTracerApp::isGaussianSplatEmissionEnabled() const
+{
+    return m_ui.EnableGaussianSplats
+        && m_ui.GaussianSplatAsEmitter
+        && m_ui.GaussianSplatEmissionIntensity > 0.0f
+        && m_ui.GaussianSplatEmissionMaxProxyCount > 0;
+}
+
+bool PathTracerApp::gaussianSplatObjectsEmpty() const
+{
+    return m_gaussianSplatSceneObjects.empty();
+}
+
+caustica::render::WorldRendererGaussianSplatBinding PathTracerApp::getPrimaryGaussianSplatBinding() const
+{
+    caustica::render::WorldRendererGaussianSplatBinding binding;
+    if (const auto* object = GetPrimaryGaussianSplatObject())
+    {
+        binding.pass = object->pass.get();
+        binding.objectToWorld = GetGaussianSplatObjectToWorld(*object);
+    }
+    return binding;
+}
+
+void PathTracerApp::renderSceneGaussianSplats(nvrhi::ICommandList* commandList,
+    const caustica::PlanarView& splatView, RenderTargets& renderTargets,
+    const GaussianSplatRenderSettings& settings, bool& renderedAny)
+{
+    for (auto& object : m_gaussianSplatSceneObjects)
+    {
+        if (object.splat == nullptr || !object.splat->enabled || object.pass == nullptr || !object.pass->HasSplats())
+            continue;
+        GaussianSplatRenderSettings objectSettings = settings;
+        objectSettings.objectToWorld = GetGaussianSplatObjectToWorld(object);
+        object.pass->Render(commandList, splatView, GetRenderCore()->accelStructs().getTopLevelAS().Get(), renderTargets, objectSettings);
+        renderedAny = true;
+    }
+}
+
+void PathTracerApp::updateViews(nvrhi::IFramebuffer* framebuffer) { UpdateViews(framebuffer); }
+void PathTracerApp::recreateAccelStructs(nvrhi::ICommandList* commandList) { RecreateAccelStructs(commandList); }
+void PathTracerApp::uploadSubInstanceData(nvrhi::ICommandList* commandList) { UploadSubInstanceData(commandList); }
+void PathTracerApp::collectUncompressedTextures() { CollectUncompressedTextures(); }
+dm::float2 PathTracerApp::computeCameraJitter(uint frameIndex) { return ComputeCameraJitter(frameIndex); }
+
+bool PathTracerApp::consumeShaderReloadRequest()
+{
+    if (!m_editor.ShaderReloadRequested) return false;
+    m_editor.ShaderReloadRequested = false;
+    return true;
+}
+
+bool& PathTracerApp::accelerationStructRebuildRequested() { return m_editor.AccelerationStructRebuildRequested; }
+bool PathTracerApp::hasActivePickRequest() const { return m_editor.hasActivePickRequest(); }
+bool PathTracerApp::showDeltaTree() const { return m_editor.ShowDeltaTree; }
+bool PathTracerApp::pickMaterialRequested() const { return m_editor.PickMaterialRequested; }
+bool PathTracerApp::pickInstanceRequested() const { return m_editor.PickInstanceRequested; }
+void PathTracerApp::clearPickRequests() { m_editor.clearPickRequests(); }
+
+void PathTracerApp::resolvePickFeedback(const DebugFeedbackStruct& feedback)
+{
+    if (m_editor.PickMaterialRequested)
+        m_editor.SelectedMaterial = FindMaterial(int(feedback.pickedMaterialID));
+    if (m_editor.PickInstanceRequested)
+    {
+        m_editor.SelectedNode = FindNodeByInstanceIndex(int(feedback.pickedInstanceIndex));
+        if (m_editor.SelectedNode != nullptr)
+            m_editor.SelectedGaussianSplat = false;
+    }
+}
+
+bool PathTracerApp::consumeExperimentalPhotoScreenshot()
+{
+    if (!m_editor.ExperimentalPhotoModeScreenshot) return false;
+    m_editor.ExperimentalPhotoModeScreenshot = false;
+    return true;
+}
+
+void PathTracerApp::captureScriptPreRender()
+{
+    if (m_captureScriptManager) m_captureScriptManager->PreRender();
+}
+
+void PathTracerApp::captureScriptPostRender(std::function<bool(const char* fileName)> saveTexture)
+{
+    if (m_captureScriptManager) m_captureScriptManager->PostRender(saveTexture);
+}
+
+ZoomTool* PathTracerApp::getOrCreateZoomTool()
+{
+    return GetOrCreateZoomTool();
+}
+
+// =============================================================================
+// Input event handling (formerly PathTracerInputController)
+// =============================================================================
+
+void PathTracerApp::onEvent(caustica::Event& event)
+{
+    caustica::EventDispatcher dispatcher(event);
+    dispatcher.Dispatch<caustica::KeyPressedEvent>([this](auto& e) { return onKeyPressed(e); });
+    dispatcher.Dispatch<caustica::KeyReleasedEvent>([this](auto& e) { return onKeyReleased(e); });
+    dispatcher.Dispatch<caustica::MouseMovedEvent>([this](auto& e) { return onMouseMoved(e); });
+    dispatcher.Dispatch<caustica::MouseButtonPressedEvent>([this](auto& e) { return onMouseButtonPressed(e); });
+    dispatcher.Dispatch<caustica::MouseButtonReleasedEvent>([this](auto& e) { return onMouseButtonReleased(e); });
+    dispatcher.Dispatch<caustica::MouseScrolledEvent>([this](auto& e) { return onMouseScrolled(e); });
+}
+
+// --- Input handler implementations (merged from PathTracerInputController) ---
+
+namespace {
+inline constexpr int ToGlfwKey(caustica::KeyCode k)   { return static_cast<int>(k); }
+inline constexpr int ToGlfwMouse(caustica::MouseCode m) { return static_cast<int>(m); }
+inline constexpr int ToGlfwMods(caustica::ModifierKey m) { return static_cast<int>(m); }
+inline constexpr int cGlfwPress   = 1;
+inline constexpr int cGlfwRelease = 0;
+inline constexpr int cGlfwRepeat  = 2;
+}
+
+bool PathTracerApp::onKeyPressed(caustica::KeyPressedEvent& e)
+{
+    int key   = ToGlfwKey(e.GetKeyCode());
+    int mods  = ToGlfwMods(e.GetModifiers());
+    int action = e.IsRepeat() ? cGlfwRepeat : cGlfwPress;
+
+    if (m_zoomTool && m_zoomTool->KeyboardUpdate(key, e.GetScancode(), action, mods))
+        return true;
+
+    if (!(m_sampleGame && m_sampleGame->CameraActive()))
+        m_renderCore->camera().camera().KeyboardUpdate(key, e.GetScancode(), action, mods);
+
+    if (m_sampleGame && m_sampleGame->KeyboardUpdate(key, e.GetScancode(), action, mods))
+        return true;
+
+    if (key == ToGlfwKey(caustica::Key::Space) && action == cGlfwPress && mods != ToGlfwMods(caustica::ModifierKey::Control) && mods != ToGlfwMods(caustica::ModifierKey::Alt))
+    {
+        m_settings.EnableAnimations = !m_settings.EnableAnimations;
+        return true;
+    }
+    if (key == ToGlfwKey(caustica::Key::F2) && action == cGlfwPress)
+        m_editor.ShowUI = !m_editor.ShowUI;
+    if (key == ToGlfwKey(caustica::Key::R) && action == cGlfwPress && mods == ToGlfwMods(caustica::ModifierKey::Control))
+        m_editor.ShaderReloadRequested = true;
+#if CAUSTICA_WITH_STREAMLINE
+    if (key == ToGlfwKey(caustica::Key::F13) && action == cGlfwPress)
+        m_gpuDevice.GetStreamline().ReflexTriggerPcPing(m_gpuDevice.GetFrameIndex());
+#endif
+    return true;
+}
+
+bool PathTracerApp::onKeyReleased(caustica::KeyReleasedEvent& e)
+{
+    int key  = ToGlfwKey(e.GetKeyCode());
+    int mods = ToGlfwMods(e.GetModifiers());
+    if (m_zoomTool && m_zoomTool->KeyboardUpdate(key, e.GetScancode(), cGlfwRelease, mods))
+        return true;
+    if (!(m_sampleGame && m_sampleGame->CameraActive()))
+        m_renderCore->camera().camera().KeyboardUpdate(key, e.GetScancode(), cGlfwRelease, mods);
+    if (m_sampleGame && m_sampleGame->KeyboardUpdate(key, e.GetScancode(), cGlfwRelease, mods))
+        return true;
+    return true;
+}
+
+bool PathTracerApp::onMouseMoved(caustica::MouseMovedEvent& e)
+{
+    if (ImGui::GetIO().WantCaptureMouse) return false;
+    if (!(m_sampleGame && m_sampleGame->CameraActive()))
+        m_renderCore->camera().camera().MousePosUpdate(e.GetX(), e.GetY());
+    if (m_sampleGame)
+        m_sampleGame->MousePosUpdate(e.GetX(), e.GetY());
+
+    dm::float2 upscalingScale(1.0f, 1.0f);
+    if (m_worldRenderer && m_worldRenderer->getRenderTargets())
+        upscalingScale = dm::float2(m_worldRenderer->getRenderSize()) / dm::float2(m_worldRenderer->getDisplaySize());
+
+    m_editor.PickPosition = dm::uint2{static_cast<uint>(e.GetX() * upscalingScale.x), static_cast<uint>(e.GetY() * upscalingScale.y)};
+    m_settings.MousePos = m_editor.PickPosition;
+
+    if (m_zoomTool) m_zoomTool->MousePosUpdate(e.GetX(), e.GetY());
+    return true;
+}
+
+bool PathTracerApp::onMouseButtonPressed(caustica::MouseButtonPressedEvent& e)
+{
+    if (ImGui::GetIO().WantCaptureMouse) return false;
+    int button = ToGlfwMouse(e.GetButton());
+    int mods   = ToGlfwMods(e.GetModifiers());
+    if (m_zoomTool && m_zoomTool->MouseButtonUpdate(button, cGlfwPress, mods)) return true;
+    if (!(m_sampleGame && m_sampleGame->CameraActive()))
+        m_renderCore->camera().camera().MouseButtonUpdate(button, cGlfwPress, mods);
+    if (m_sampleGame)
+        m_sampleGame->MouseButtonUpdate(button, cGlfwPress, mods);
+    if (button == ToGlfwMouse(caustica::Mouse::Right))
+    {
+        m_editor.PickMaterialRequested = true;
+        m_editor.PickInstanceRequested = true;
+        m_settings.DebugPixel = m_editor.PickPosition;
+    }
+#if CAUSTICA_WITH_STREAMLINE
+    if (button == ToGlfwMouse(caustica::Mouse::Left))
+        m_gpuDevice.GetStreamline().ReflexTriggerFlash(m_gpuDevice.GetFrameIndex());
+#endif
+    return true;
+}
+
+bool PathTracerApp::onMouseButtonReleased(caustica::MouseButtonReleasedEvent& e)
+{
+    if (ImGui::GetIO().WantCaptureMouse) return false;
+    int button = ToGlfwMouse(e.GetButton());
+    int mods   = ToGlfwMods(e.GetModifiers());
+    if (m_zoomTool && m_zoomTool->MouseButtonUpdate(button, cGlfwRelease, mods)) return true;
+    if (!(m_sampleGame && m_sampleGame->CameraActive()))
+        m_renderCore->camera().camera().MouseButtonUpdate(button, cGlfwRelease, mods);
+    if (m_sampleGame)
+        m_sampleGame->MouseButtonUpdate(button, cGlfwRelease, mods);
+    return true;
+}
+
+bool PathTracerApp::onMouseScrolled(caustica::MouseScrolledEvent& e)
+{
+    ImGuiIO& io = ImGui::GetIO();
+    io.AddMouseWheelEvent(static_cast<float>(e.GetXOffset()), static_cast<float>(e.GetYOffset()));
+    if (io.WantCaptureMouse) return true;
+    if (!(m_sampleGame && m_sampleGame->CameraActive()))
+        m_settings.CameraMoveSpeed *= 1.0f + static_cast<float>(e.GetYOffset()) * 0.1f;
+    return true;
 }
