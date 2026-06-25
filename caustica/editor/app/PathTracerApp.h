@@ -233,6 +233,7 @@ public:
     caustica::BindingCache &           GetBindingCache() { return *m_bindingCache; }
 
     [[nodiscard]] caustica::GpuDevice& GetGpuDevice() const { return m_gpuDevice; }
+    [[nodiscard]] PathTracerInputController* GetInputController() const { return m_inputController.get(); }
     [[nodiscard]] nvrhi::IDevice* GetDevice() const { return m_gpuDevice.GetDevice(); }
     [[nodiscard]] uint32_t GetFrameIndex() const { return m_gpuDevice.GetFrameIndex(); }
 

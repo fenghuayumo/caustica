@@ -1,6 +1,8 @@
 #pragma once
 
-#include <platform/Input.h>
+#include <events/event.h>
+#include <events/key_event.h>
+#include <events/mouse_event.h>
 #include <math/math.h>
 #include <functional>
 
@@ -16,11 +18,13 @@ class RenderCore;
 }
 
 // =============================================================================
-// PathTracerInputController — Editor layer: keyboard/mouse input for the path
-// tracer sample. Handles camera control, editor shortcuts, picking requests,
-// and optional game/zoom-tool overlays. Registered with GpuDevice::Input.
+// PathTracerInputController — Editor layer: receives events via onEvent(Event&)
+// and dispatches keyboard/mouse input to camera, editor shortcuts, picking,
+// and optional game/zoom-tool overlays.
+//
+// Called from EditorApplication::onEvent() — the single event entry point.
 // =============================================================================
-class PathTracerInputController : public caustica::IInputHandler
+class PathTracerInputController
 {
 public:
     struct Bindings
@@ -36,11 +40,16 @@ public:
 
     explicit PathTracerInputController(Bindings bindings);
 
-    bool onKeyEvent(int key, int scancode, int action, int mods) override;
-    bool onMouseMoveEvent(double xpos, double ypos) override;
-    bool onMouseButtonEvent(int button, int action, int mods) override;
-    bool onMouseScrollEvent(double xoffset, double yoffset) override;
+    // Single entry point for all input events.
+    void onEvent(caustica::Event& event);
 
 private:
+    bool onKeyPressed(caustica::KeyPressedEvent& e);
+    bool onKeyReleased(caustica::KeyReleasedEvent& e);
+    bool onMouseMoved(caustica::MouseMovedEvent& e);
+    bool onMouseButtonPressed(caustica::MouseButtonPressedEvent& e);
+    bool onMouseButtonReleased(caustica::MouseButtonReleasedEvent& e);
+    bool onMouseScrolled(caustica::MouseScrolledEvent& e);
+
     Bindings m_bindings;
 };

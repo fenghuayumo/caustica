@@ -272,9 +272,6 @@ PathTracerApp::PathTracerApp(caustica::GpuDevice& deviceManager,
 
 PathTracerApp::~PathTracerApp()
 {
-    if (m_inputController)
-        GetGpuDevice().UnregisterInputHandler(m_inputController.get());
-
 #if CAUSTICA_WITH_PYTHON
     // Tear down the Python interpreter first so that any nb::class_<>-bound
     // C++ objects (materials, lights, ...) are released while their owning
@@ -454,7 +451,6 @@ void PathTracerApp::Init(const std::string& preferredScene,
             return dm::float2(m_worldRenderer->getRenderSize()) / dm::float2(m_worldRenderer->getDisplaySize());
         },
     });
-    GetGpuDevice().RegisterInputHandler(m_inputController.get());
 }
 
 void PathTracerApp::SetCurrentScene( const std::string & sceneName, bool forceReload )

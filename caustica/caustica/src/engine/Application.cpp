@@ -1,8 +1,6 @@
 #include "engine/Application.h"
 #include "backend/GpuDevice.h"
 #include "platform/window.h"
-#include "platform/Input.h"
-
 #if CAUSTICA_WITH_STREAMLINE
 #include <StreamlineIntegration.h>
 #endif
@@ -14,6 +12,50 @@
 #include <thread>
 
 namespace caustica {
+
+// ---------------------------------------------------------------------------
+// Event system
+// ---------------------------------------------------------------------------
+
+void Application::onEvent(Event& event)
+{
+    // Base implementation is a no-op. Derived classes override this to
+    // dispatch events to subsystems via EventDispatcher.
+}
+
+void Application::queueEvent(std::unique_ptr<Event> event)
+{
+    std::lock_guard<std::mutex> lock(m_EventQueueMutex);
+    m_EventQueue.push_back(std::move(event));
+}
+
+void Application::processEventQueue()
+{
+    std::vector<std::unique_ptr<Event>> pending;
+    {
+        std::lock_guard<std::mutex> lock(m_EventQueueMutex);
+        pending.swap(m_EventQueue);
+    }
+    for (auto& e : pending)
+    {
+        if (e)
+            onEvent(*e);
+    }
+}
+
+void Application::onWindowEvent(Event& event)
+{
+    onEvent(event);
+}
+
+void Application::installWindowEventCallback()
+{
+    Window* w = window();
+    if (w)
+    {
+        w->setEventCallback([this](Event& e) { this->onWindowEvent(e); });
+    }
+}
 
 static double GetNow(bool headless)
 {
@@ -141,6 +183,8 @@ void Application::render()
 
 bool Application::runFrame(std::optional<double> elapsedTimeOverride)
 {
+    processEventQueue();
+
     GpuDevice* dm = device();
     if (!dm)
         return false;
@@ -148,9 +192,6 @@ bool Application::runFrame(std::optional<double> elapsedTimeOverride)
     auto& DM = *dm;
     double curTime = GetNow(DM.m_DeviceParams.headlessDevice);
     double elapsedTime = elapsedTimeOverride.value_or(curTime - DM.m_PreviousFrameTimestamp);
-
-    if (!DM.m_DeviceParams.headlessDevice)
-        if (DM.m_Input) DM.m_Input->pollJoysticks();
 
     const bool windowVisible = isWindowVisible();
     const bool windowFocused = isWindowFocused();
@@ -235,7 +276,10 @@ void Application::run()
         return;
     }
 
+    installWindowEventCallback();
+
     while (!w->getExit()) {
+        processEventQueue();
 #if CAUSTICA_WITH_STREAMLINE
         if (!dm->m_DeviceParams.headlessDevice) StreamlineIntegration::Get().SimStart(*dm);
 #endif

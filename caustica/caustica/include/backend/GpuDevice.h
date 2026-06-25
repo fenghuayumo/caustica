@@ -39,8 +39,6 @@
 
 namespace caustica
 {
-    class Input;              // Platform layer: input dispatch
-    class IInputHandler;      // Platform layer: input handler interface
     class Window;             // Platform layer: window abstraction
     class Application;        // Engine layer: frame driver
 
@@ -220,9 +218,6 @@ namespace caustica
         // Note: a call to CreateInstance() or Create*Device*() is required before EnumerateAdapters().
         virtual bool EnumerateAdapters(std::vector<AdapterInfo>& outAdapters) = 0;
 
-        void RegisterInputHandler(IInputHandler* handler);
-        void UnregisterInputHandler(IInputHandler* handler);
-
         void setFrameDriver(Application* driver) { m_frameDriver = driver; }
         [[nodiscard]] Application* getFrameDriver() const { return m_frameDriver; }
 
@@ -240,7 +235,7 @@ namespace caustica
         DeviceCreationParameters m_DeviceParams;
         GLFWwindow* m_Window = nullptr;       // Borrowed GLFW handle from GlfwWindow
         Window* m_WindowPtr = nullptr;        // Platform layer window (owns GLFW lifetime)
-	    Input* m_Input = nullptr;
+
         bool m_EnableRenderDuringWindowMovement = false;
         bool m_CanPresentSwapChain = true;    // false when the window is minimized
         // set to true if running on NV GPU

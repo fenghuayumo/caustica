@@ -1,6 +1,11 @@
 #include "platform/glfw_window.h"
 #include "platform/window.h"
 
+#include <events/event.h>
+#include <events/key_event.h>
+#include <events/mouse_event.h>
+#include <events/application_event.h>
+
 #include <GLFW/glfw3.h>
 #include <cstdio>
 
@@ -12,60 +17,17 @@
 #pragma comment(lib, "Shcore.lib")
 #endif
 
-// Forward declare event types (will be in engine/events/ once Phase B is done)
-// For now we define minimal event structs inline so the window layer compiles standalone.
 namespace caustica
 {
 
-// Minimal event forward declarations (will be moved to engine/events/ in Phase B)
-struct Event
+// GLFW → caustica key/modifier conversion helpers (zero-cost: values match 1:1)
+namespace
 {
-    virtual ~Event() = default;
-    virtual bool handled() const { return m_Handled; }
-    void setHandled(bool h = true) { m_Handled = h; }
-protected:
-    bool m_Handled = false;
-};
-
-struct WindowCloseEvent : Event {};
-struct WindowResizeEvent : Event
-{
-    WindowResizeEvent(int w, int h) : m_Width(w), m_Height(h) {}
-    int getWidth() const  { return m_Width; }
-    int getHeight() const { return m_Height; }
-private:
-    int m_Width, m_Height;
-};
-
-struct KeyEvent : Event
-{
-    KeyEvent(int k, int s, int a, int m) : key(k), scancode(s), action(a), mods(m) {}
-    int key, scancode, action, mods;
-};
-
-struct MouseMoveEvent : Event
-{
-    MouseMoveEvent(double x, double y) : xpos(x), ypos(y) {}
-    double xpos, ypos;
-};
-
-struct MouseButtonEvent : Event
-{
-    MouseButtonEvent(int b, int a, int m) : button(b), action(a), mods(m) {}
-    int button, action, mods;
-};
-
-struct MouseScrollEvent : Event
-{
-    MouseScrollEvent(double x, double y) : xoffset(x), yoffset(y) {}
-    double xoffset, yoffset;
-};
-
-struct CharInputEvent : Event
-{
-    CharInputEvent(unsigned int c) : codepoint(c) {}
-    unsigned int codepoint;
-};
+inline constexpr KeyCode    FromGlfwKey(int glfwKey)    { return static_cast<KeyCode>(glfwKey); }
+inline constexpr MouseCode   FromGlfwMouse(int glfwBtn) { return static_cast<MouseCode>(glfwBtn); }
+inline constexpr KeyAction   FromGlfwAction(int action) { return static_cast<KeyAction>(action); }
+inline constexpr ModifierKey FromGlfwMods(int mods)     { return static_cast<ModifierKey>(mods); }
+} // anonymous namespace
 
 } // namespace caustica
 
@@ -305,9 +267,22 @@ void GlfwWindow::glfwErrorCallback(int error, const char* description)
 void GlfwWindow::glfwKeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
     auto* self = static_cast<GlfwWindow*>(glfwGetWindowUserPointer(window));
-    if (self && self->m_EventCallback)
+    if (!self || !self->m_EventCallback)
+        return;
+
+    auto keyAction  = FromGlfwAction(action);
+    auto keyCode    = FromGlfwKey(key);
+    auto modifiers  = FromGlfwMods(mods);
+
+    if (keyAction == KeyAction::Release)
     {
-        KeyEvent e(key, scancode, action, mods);
+        KeyReleasedEvent e(keyCode, scancode, modifiers);
+        self->m_EventCallback(e);
+    }
+    else
+    {
+        int repeatCount = (keyAction == KeyAction::Repeat) ? 1 : 0;
+        KeyPressedEvent e(keyCode, scancode, repeatCount, modifiers);
         self->m_EventCallback(e);
     }
 }
@@ -317,7 +292,7 @@ void GlfwWindow::glfwCharCallback(GLFWwindow* window, unsigned int codepoint)
     auto* self = static_cast<GlfwWindow*>(glfwGetWindowUserPointer(window));
     if (self && self->m_EventCallback)
     {
-        CharInputEvent e(codepoint);
+        KeyTypedEvent e(codepoint);
         self->m_EventCallback(e);
     }
 }
@@ -327,7 +302,7 @@ void GlfwWindow::glfwCursorPosCallback(GLFWwindow* window, double xpos, double y
     auto* self = static_cast<GlfwWindow*>(glfwGetWindowUserPointer(window));
     if (self && self->m_EventCallback)
     {
-        MouseMoveEvent e(xpos, ypos);
+        MouseMovedEvent e(xpos, ypos);
         self->m_EventCallback(e);
     }
 }
@@ -335,9 +310,20 @@ void GlfwWindow::glfwCursorPosCallback(GLFWwindow* window, double xpos, double y
 void GlfwWindow::glfwMouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
 {
     auto* self = static_cast<GlfwWindow*>(glfwGetWindowUserPointer(window));
-    if (self && self->m_EventCallback)
+    if (!self || !self->m_EventCallback)
+        return;
+
+    auto mouseCode = FromGlfwMouse(button);
+    auto modifiers = FromGlfwMods(mods);
+
+    if (action == GLFW_PRESS)
     {
-        MouseButtonEvent e(button, action, mods);
+        MouseButtonPressedEvent e(mouseCode, modifiers);
+        self->m_EventCallback(e);
+    }
+    else
+    {
+        MouseButtonReleasedEvent e(mouseCode, modifiers);
         self->m_EventCallback(e);
     }
 }
@@ -347,7 +333,7 @@ void GlfwWindow::glfwScrollCallback(GLFWwindow* window, double xoffset, double y
     auto* self = static_cast<GlfwWindow*>(glfwGetWindowUserPointer(window));
     if (self && self->m_EventCallback)
     {
-        MouseScrollEvent e(xoffset, yoffset);
+        MouseScrolledEvent e(xoffset, yoffset);
         self->m_EventCallback(e);
     }
 }
@@ -376,15 +362,39 @@ void GlfwWindow::glfwWindowSizeCallback(GLFWwindow* window, int width, int heigh
 void GlfwWindow::glfwWindowFocusCallback(GLFWwindow* window, int focused)
 {
     auto* self = static_cast<GlfwWindow*>(glfwGetWindowUserPointer(window));
-    if (self)
-        self->onFocusChanged(focused == GLFW_TRUE);
+    if (!self)
+        return;
+
+    self->onFocusChanged(focused == GLFW_TRUE);
+
+    if (self->m_EventCallback)
+    {
+        if (focused == GLFW_TRUE)
+        {
+            WindowFocusEvent e;
+            self->m_EventCallback(e);
+        }
+        else
+        {
+            WindowLostFocusEvent e;
+            self->m_EventCallback(e);
+        }
+    }
 }
 
 void GlfwWindow::glfwWindowIconifyCallback(GLFWwindow* window, int iconified)
 {
     auto* self = static_cast<GlfwWindow*>(glfwGetWindowUserPointer(window));
-    if (self)
-        self->onIconifyChanged(iconified == GLFW_TRUE);
+    if (!self)
+        return;
+
+    self->onIconifyChanged(iconified == GLFW_TRUE);
+
+    if (self->m_EventCallback)
+    {
+        WindowIconifyEvent e(iconified == GLFW_TRUE);
+        self->m_EventCallback(e);
+    }
 }
 
 void GlfwWindow::glfwDropCallback(GLFWwindow* window, int count, const char** paths)
@@ -397,8 +407,16 @@ void GlfwWindow::glfwDropCallback(GLFWwindow* window, int count, const char** pa
 void GlfwWindow::glfwWindowPosCallback(GLFWwindow* window, int xpos, int ypos)
 {
     auto* self = static_cast<GlfwWindow*>(glfwGetWindowUserPointer(window));
-    if (self)
-        self->onMove(xpos, ypos);
+    if (!self)
+        return;
+
+    self->onMove(xpos, ypos);
+
+    if (self->m_EventCallback)
+    {
+        WindowMovedEvent e(xpos, ypos);
+        self->m_EventCallback(e);
+    }
 }
 
 // ---------------------------------------------------------------------------

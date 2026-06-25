@@ -1,5 +1,10 @@
 #include "EditorApplication.h"
 
+#include <events/event.h>
+#include <events/key_event.h>
+#include <events/mouse_event.h>
+#include <events/application_event.h>
+
 #include <imgui/imgui_renderer.h>
 
 #include <algorithm>
@@ -19,6 +24,7 @@
 #endif
 #include "AdvancedPathTracer.h"
 #include "PathTracerApp.h"
+#include "input/PathTracerInputController.h"
 #include <render/WorldRenderer/PathTracingWorldRenderer.h>
 
 #include <core/vfs/VFS.h>
@@ -262,6 +268,11 @@ EditorApplication::StartupResult EditorApplication::startup(int argc, const char
                 for (int i = 0; i < count; ++i)
                     m_sampleUIData.PendingDroppedFiles.emplace_back(paths[i]);
             });
+
+        // Install the Application ↔ Window event bridge so keyboard/mouse/window
+        // events flow through the event system (both for run() and stepFrame() paths).
+        m_GpuDevice->GetPlatformWindow()->setEventCallback(
+            [this](caustica::Event& e) { this->onWindowEvent(e); });
     }
 
     LocalConfig::PostAppInit(m_sampleUIData);
@@ -786,4 +797,20 @@ void EditorApplication::onDisplayScaleChanged(float scaleX, float scaleY)
 bool EditorApplication::shouldRenderWhenUnfocused() const
 {
     return m_scenePass && m_scenePass->ShouldRenderUnfocused();
+}
+
+void EditorApplication::onEvent(caustica::Event& event)
+{
+    // 1. Dispatch input events to the input controller.
+    if (m_scenePass)
+        m_scenePass->GetInputController()->onEvent(event);
+
+    // 2. Handle window events locally.
+    caustica::EventDispatcher dispatcher(event);
+
+    dispatcher.Dispatch<caustica::WindowCloseEvent>([this](caustica::WindowCloseEvent&) {
+        if (m_Window)
+            m_Window->setExit(true);
+        return true;
+    });
 }

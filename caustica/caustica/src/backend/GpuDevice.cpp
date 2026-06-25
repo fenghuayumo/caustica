@@ -1,6 +1,5 @@
 #include <backend/GpuDevice.h>
 #include <engine/Application.h>
-#include <platform/Input.h>
 #include <platform/window.h>
 #include <platform/glfw_window.h>
 #include <math/math.h>
@@ -187,10 +186,8 @@ bool GpuDevice::CreateDeviceAndSwapChain(const DeviceCreationParameters& params,
 
     // GlfwWindow already owns ALL GLFW callbacks (window events, DPI tracking).
     // We do NOT overwrite glfwSetWindowUserPointer or any window callbacks.
-
-    // Install Input (keyboard/mouse) callbacks on the GLFW window.
-    if (!m_Input) m_Input = new Input();
-    m_Input->installCallbacks(glfwHandle);  // Pass GLFWwindow*, not native handle
+    // Input events now flow through the causticaEvents system:
+    //   GlfwWindow → Application::onEvent() → EditorApplication::onEvent().
 
     // DPI tracking is handled by GlfwWindow::onMove(). Sync initial values.
     m_DPIScaleFactorX = window->getDPIScaleX();
@@ -219,17 +216,6 @@ bool GpuDevice::CreateDeviceAndSwapChain(const DeviceCreationParameters& params,
         window->getWidth(), window->getHeight());
 
     return true;
-}
-
-void GpuDevice::RegisterInputHandler(IInputHandler* handler)
-{
-    if (!m_Input) m_Input = new Input();
-    m_Input->registerHandler(handler);
-}
-
-void GpuDevice::UnregisterInputHandler(IInputHandler* handler)
-{
-    if (m_Input) m_Input->unregisterHandler(handler);
 }
 
 void GpuDevice::BackBufferResizing()
@@ -479,8 +465,6 @@ void GpuDevice::Shutdown()
 
     m_Window = nullptr;
     m_WindowPtr = nullptr;
-    delete m_Input;
-    m_Input = nullptr;
 
     m_InstanceCreated = false;
 }

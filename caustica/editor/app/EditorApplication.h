@@ -86,6 +86,7 @@ public:
 protected:
 	void onUpdate(float elapsedTimeSeconds, bool windowFocused) override;
 	void onRender() override;
+	void onEvent(caustica::Event& event) override;
 	void onBackBufferResizing() override;
 	void onBackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount) override;
 	void onDisplayScaleChanged(float scaleX, float scaleY) override;

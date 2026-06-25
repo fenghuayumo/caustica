@@ -57,6 +57,27 @@ endif()
 set_target_properties(causticaBase PROPERTIES FOLDER "caustica/caustica")
 
 # ---------------------------------------------------------------------------
+# causticaEvents — Event system layer (key/mouse/application events, zero dependencies)
+# ---------------------------------------------------------------------------
+
+file(GLOB caustica_events_headers
+    include/events/*.h
+)
+
+add_library(causticaEvents INTERFACE)
+
+target_include_directories(causticaEvents
+    INTERFACE
+        "${CMAKE_CURRENT_SOURCE_DIR}/include"
+)
+
+if (WIN32)
+    target_compile_definitions(causticaEvents INTERFACE NOMINMAX _CRT_SECURE_NO_WARNINGS)
+endif()
+
+set_target_properties(causticaEvents PROPERTIES FOLDER "caustica/caustica")
+
+# ---------------------------------------------------------------------------
 # causticaEngine — Main engine library
 # ---------------------------------------------------------------------------
 
@@ -180,12 +201,6 @@ list(APPEND caustica_engine_engine_src
     src/platform/glfw_window.cpp
 )
 
-# Platform layer: Input dispatch (keyboard/mouse/joystick)
-list(APPEND caustica_engine_engine_src
-    include/platform/Input.h
-    src/platform/Input.cpp
-)
-
 # Backend layer: GpuDevice + SwapChain
 list(APPEND caustica_engine_engine_src
     include/backend/GpuDevice.h
@@ -227,6 +242,7 @@ target_include_directories(causticaEngine
 
 target_link_libraries(causticaEngine
     PUBLIC
+        causticaEvents
         causticaBase
         nvrhi
         stb
