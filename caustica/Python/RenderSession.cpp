@@ -704,13 +704,45 @@ caustica::render::WorldRendererServices RenderSession::buildWorldRendererService
         .benchStart = editor.GetBenchStart(),
         .benchLast = editor.GetBenchLast(),
         .benchFrames = editor.GetBenchFrames(),
+        .hooks = {
+            .needsRasterPrecompute       = [] { return false; },
+            .getMaterialSpecializationShader = [&editor] { return editor.GetMaterialSpecializationShader(); },
+            .fillPTPipelineGlobalMacros     = [&editor](auto& m) { editor.FillPTPipelineGlobalMacros(m); },
+            .sampleRenderCode               = [&editor](auto* fb, auto cl, auto& c) { editor.sampleRenderCode(fb, cl, c); },
+            .addCustomBindings              = [&editor](auto& d) { editor.AddCustomBindings(d); },
+            .createRTPipelines              = [&editor] { editor.createRTPipelines(); },
+            .onRenderTargetsRecreated       = [&editor] { editor.OnRenderTargetsRecreated(); },
+            .prepareGaussianSplatPasses     = [&editor] { editor.prepareGaussianSplatPasses(); },
+            .buildGaussianSplatEmissionProxyList = [&editor] { editor.buildGaussianSplatEmissionProxyList(); },
+            .isGaussianSplatEmissionEnabled = [&editor] { return editor.isGaussianSplatEmissionEnabled(); },
+            .gaussianSplatObjectsEmpty      = [&editor] { return editor.gaussianSplatObjectsEmpty(); },
+            .getPrimaryGaussianSplatBinding = [&editor] { return editor.getPrimaryGaussianSplatBinding(); },
+            .renderSceneGaussianSplats      = [&editor](auto* cl, auto& v, auto& rt, auto& s, bool& r) { editor.renderSceneGaussianSplats(cl, v, rt, s, r); },
+            .updateViews                    = [&editor](auto* fb) { editor.UpdateViews(fb); },
+            .recreateAccelStructs           = [&editor](auto* cl) { editor.RecreateAccelStructs(cl); },
+            .uploadSubInstanceData          = [&editor](auto* cl) { editor.UploadSubInstanceData(cl); },
+            .collectUncompressedTextures    = [&editor] { editor.CollectUncompressedTextures(); },
+            .computeCameraJitter            = [&editor](uint i) { return editor.ComputeCameraJitter(i); },
+            .consumeShaderReloadRequest     = [&editor] { return editor.consumeShaderReloadRequest(); },
+            .accelerationStructRebuildRequested = [&editor]() -> bool& { return editor.accelerationStructRebuildRequested(); },
+            .hasActivePickRequest           = [&editor] { return editor.hasActivePickRequest(); },
+            .showDeltaTree                  = [&editor] { return editor.showDeltaTree(); },
+            .pickMaterialRequested          = [&editor] { return editor.pickMaterialRequested(); },
+            .pickInstanceRequested          = [&editor] { return editor.pickInstanceRequested(); },
+            .clearPickRequests              = [&editor] { editor.clearPickRequests(); },
+            .resolvePickFeedback            = [&editor](auto& f) { editor.resolvePickFeedback(f); },
+            .consumeExperimentalPhotoScreenshot = [&editor] { return editor.consumeExperimentalPhotoScreenshot(); },
+            .captureScriptPreRender         = [&editor] { editor.captureScriptPreRender(); },
+            .captureScriptPostRender        = [&editor](auto fn) { editor.captureScriptPostRender(fn); },
+            .getOrCreateZoomTool            = [&editor] { return editor.getOrCreateZoomTool(); },
+        },
     };
 }
 
 void RenderSession::initWorldRenderer(nvrhi::IBindingLayout* bindlessLayout)
 {
     m_worldRendererServices = std::make_unique<caustica::render::WorldRendererServices>(buildWorldRendererServices());
-    m_worldRenderer = std::make_unique<caustica::render::PathTracingWorldRenderer>(*m_worldRendererServices, *m_renderer);
+    m_worldRenderer = std::make_unique<caustica::render::PathTracingWorldRenderer>(*m_worldRendererServices);
     m_renderer->AttachWorldRenderer(m_worldRenderer.get());
     m_worldRenderer->createBindingLayouts(bindlessLayout);
 }

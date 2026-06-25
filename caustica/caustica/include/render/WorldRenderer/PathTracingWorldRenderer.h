@@ -53,7 +53,7 @@ class DLSS;
 class PathTracingWorldRenderer
 {
 public:
-    PathTracingWorldRenderer(WorldRendererServices& services, IWorldRendererPipelineHooks& hooks);
+    PathTracingWorldRenderer(WorldRendererServices& services);
     ~PathTracingWorldRenderer();
 
     static nvrhi::BindingLayoutHandle CreateBindlessLayout(nvrhi::IDevice* device);
@@ -149,7 +149,6 @@ private:
 #endif
 
     WorldRendererServices&          m_services;
-    IWorldRendererPipelineHooks&    m_hooks;
 
     std::unique_ptr<RtxdiPass>                  m_rtxdiPass;
     std::unique_ptr<RenderTargets>              m_renderTargets;

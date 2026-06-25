@@ -44,6 +44,48 @@ class ShaderFactory;
 namespace caustica::render
 {
 
+// Primary gaussian splat object used for binding set (editor scene owns passes).
+struct WorldRendererGaussianSplatBinding
+{
+    const GaussianSplatPass* pass = nullptr;
+    dm::float4x4             objectToWorld = dm::float4x4::identity();
+};
+
+// Pipeline hooks — callbacks wired by the app during init (DIVSHOT-style).
+struct WorldRendererPipelineHooks
+{
+    std::function<bool()>                                         needsRasterPrecompute;
+    std::function<std::string()>                                  getMaterialSpecializationShader;
+    std::function<void(std::vector<caustica::ShaderMacro>&)>      fillPTPipelineGlobalMacros;
+    std::function<void(nvrhi::IFramebuffer*, nvrhi::CommandListHandle, const SampleConstants&)> sampleRenderCode;
+    std::function<void(nvrhi::BindingSetDesc&)>                   addCustomBindings;
+    std::function<void()>                                         createRTPipelines;
+    std::function<void()>                                         onRenderTargetsRecreated;
+    std::function<void()>                                         prepareGaussianSplatPasses;
+    std::function<void()>                                         buildGaussianSplatEmissionProxyList;
+    std::function<bool()>                                         isGaussianSplatEmissionEnabled;
+    std::function<bool()>                                         gaussianSplatObjectsEmpty;
+    std::function<WorldRendererGaussianSplatBinding()>            getPrimaryGaussianSplatBinding;
+    std::function<void(nvrhi::ICommandList*, const caustica::PlanarView&, RenderTargets&, const GaussianSplatRenderSettings&, bool&)> renderSceneGaussianSplats;
+    std::function<void(nvrhi::IFramebuffer*)>                     updateViews;
+    std::function<void(nvrhi::ICommandList*)>                     recreateAccelStructs;
+    std::function<void(nvrhi::ICommandList*)>                     uploadSubInstanceData;
+    std::function<void()>                                         collectUncompressedTextures;
+    std::function<dm::float2(uint)>                               computeCameraJitter;
+    std::function<bool()>                                         consumeShaderReloadRequest;
+    std::function<bool&()>                                        accelerationStructRebuildRequested;
+    std::function<bool()>                                         hasActivePickRequest;
+    std::function<bool()>                                         showDeltaTree;
+    std::function<bool()>                                         pickMaterialRequested;
+    std::function<bool()>                                         pickInstanceRequested;
+    std::function<void()>                                         clearPickRequests;
+    std::function<void(const DebugFeedbackStruct&)>               resolvePickFeedback;
+    std::function<bool()>                                         consumeExperimentalPhotoScreenshot;
+    std::function<void()>                                         captureScriptPreRender;
+    std::function<void(std::function<bool(const char*)>)>         captureScriptPostRender;
+    std::function<ZoomTool*()>                                    getOrCreateZoomTool;
+};
+
 // Strong-typed dependencies wired once by Application at init (DIVSHOT Application owns renderer deps).
 struct WorldRendererServices
 {
@@ -78,62 +120,8 @@ struct WorldRendererServices
     std::chrono::high_resolution_clock::time_point& benchStart;
     std::chrono::high_resolution_clock::time_point& benchLast;
     int& benchFrames;
-};
 
-// Primary gaussian splat object used for binding set (editor scene owns passes).
-struct WorldRendererGaussianSplatBinding
-{
-    const GaussianSplatPass* pass = nullptr;
-    dm::float4x4             objectToWorld = dm::float4x4::identity();
-};
-
-// Editor + sample pipeline hooks implemented by AdvancedPathTracer.
-class IWorldRendererPipelineHooks
-{
-public:
-    virtual ~IWorldRendererPipelineHooks() = default;
-
-    virtual bool needsRasterPrecompute() = 0;
-    virtual std::string getMaterialSpecializationShader() const = 0;
-    virtual void fillPTPipelineGlobalMacros(std::vector<caustica::ShaderMacro>& macros) = 0;
-    virtual void sampleRenderCode(nvrhi::IFramebuffer* framebuffer,
-                                  nvrhi::CommandListHandle commandList,
-                                  const SampleConstants& constants) = 0;
-    virtual void addCustomBindings(nvrhi::BindingSetDesc& bindingSetDesc) = 0;
-    virtual void createRTPipelines() = 0;
-    virtual void onRenderTargetsRecreated() = 0;
-
-    virtual void prepareGaussianSplatPasses() = 0;
-    virtual void buildGaussianSplatEmissionProxyList() = 0;
-    virtual bool isGaussianSplatEmissionEnabled() const = 0;
-    virtual bool gaussianSplatObjectsEmpty() const = 0;
-    virtual WorldRendererGaussianSplatBinding getPrimaryGaussianSplatBinding() const = 0;
-    virtual void renderSceneGaussianSplats(nvrhi::ICommandList* commandList,
-                                           const caustica::PlanarView& splatView,
-                                           RenderTargets& renderTargets,
-                                           const struct GaussianSplatRenderSettings& settings,
-                                           bool& renderedAny) = 0;
-
-    virtual void updateViews(nvrhi::IFramebuffer* framebuffer) = 0;
-    virtual void recreateAccelStructs(nvrhi::ICommandList* commandList) = 0;
-    virtual void uploadSubInstanceData(nvrhi::ICommandList* commandList) = 0;
-    virtual void collectUncompressedTextures() = 0;
-    virtual dm::float2 computeCameraJitter(uint frameIndex) = 0;
-
-    virtual bool consumeShaderReloadRequest() = 0;
-    virtual bool& accelerationStructRebuildRequested() = 0;
-    virtual bool hasActivePickRequest() const = 0;
-    virtual bool showDeltaTree() const = 0;
-    virtual bool pickMaterialRequested() const = 0;
-    virtual bool pickInstanceRequested() const = 0;
-    virtual void clearPickRequests() = 0;
-    virtual void resolvePickFeedback(const DebugFeedbackStruct& feedback) = 0;
-    virtual bool consumeExperimentalPhotoScreenshot() = 0;
-
-    virtual void captureScriptPreRender() = 0;
-    virtual void captureScriptPostRender(std::function<bool(const char* fileName)> saveTexture) = 0;
-
-    virtual ZoomTool* getOrCreateZoomTool() = 0;
+    WorldRendererPipelineHooks hooks;
 };
 
 } // namespace caustica::render

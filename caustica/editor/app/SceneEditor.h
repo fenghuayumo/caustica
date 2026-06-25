@@ -69,14 +69,14 @@ class PythonScripting;
 class GaussianSplatPass;
 
 // Scene editor shell (mesh edit, Inspector, Capture). GPU path tracing is owned by EditorApplication.
-class SceneEditor : public caustica::render::IWorldRendererPipelineHooks
+class SceneEditor
 {
     struct GaussianSplatSceneObject;
 
 public:
     SceneEditor(const CommandLineOptions& cmdLine,
         SampleUIData& ui);
-    ~SceneEditor() override;
+    ~SceneEditor();
 
     void setGpuDevice(caustica::GpuDevice& dm) { m_gpuDevice = &dm; }
 
@@ -195,41 +195,40 @@ public:
 
     dm::float2                              ComputeCameraJitter(uint frameIndex);
 
-    // --- IWorldRendererPipelineHooks ---
-    bool needsRasterPrecompute() override { return false; }
-    std::string getMaterialSpecializationShader() const override;
-    void fillPTPipelineGlobalMacros(std::vector<caustica::ShaderMacro>& macros) override;
-    void sampleRenderCode(nvrhi::IFramebuffer* framebuffer, nvrhi::CommandListHandle commandList, const SampleConstants& constants) override;
-    void addCustomBindings(nvrhi::BindingSetDesc& bindingSetDesc) override;
-    void createRTPipelines() override;
-    void onRenderTargetsRecreated() override;
-    void prepareGaussianSplatPasses() override;
-    void buildGaussianSplatEmissionProxyList() override;
-    bool isGaussianSplatEmissionEnabled() const override;
-    bool gaussianSplatObjectsEmpty() const override;
-    caustica::render::WorldRendererGaussianSplatBinding getPrimaryGaussianSplatBinding() const override;
+    // --- Pipeline hooks (called via WorldRendererServices::hooks callbacks) ---
+    std::string getMaterialSpecializationShader() const;
+    void fillPTPipelineGlobalMacros(std::vector<caustica::ShaderMacro>& macros);
+    void sampleRenderCode(nvrhi::IFramebuffer* framebuffer, nvrhi::CommandListHandle commandList, const SampleConstants& constants);
+    void addCustomBindings(nvrhi::BindingSetDesc& bindingSetDesc);
+    void createRTPipelines();
+    void onRenderTargetsRecreated();
+    void prepareGaussianSplatPasses();
+    void buildGaussianSplatEmissionProxyList();
+    bool isGaussianSplatEmissionEnabled() const;
+    bool gaussianSplatObjectsEmpty() const;
+    caustica::render::WorldRendererGaussianSplatBinding getPrimaryGaussianSplatBinding() const;
     void renderSceneGaussianSplats(nvrhi::ICommandList* commandList,
                                    const caustica::PlanarView& splatView,
                                    RenderTargets& renderTargets,
                                    const GaussianSplatRenderSettings& settings,
-                                   bool& renderedAny) override;
-    void updateViews(nvrhi::IFramebuffer* framebuffer) override;
-    void recreateAccelStructs(nvrhi::ICommandList* commandList) override;
-    void uploadSubInstanceData(nvrhi::ICommandList* commandList) override;
-    void collectUncompressedTextures() override;
-    dm::float2 computeCameraJitter(uint frameIndex) override;
-    bool consumeShaderReloadRequest() override;
-    bool& accelerationStructRebuildRequested() override;
-    bool hasActivePickRequest() const override;
-    bool showDeltaTree() const override;
-    bool pickMaterialRequested() const override;
-    bool pickInstanceRequested() const override;
-    void clearPickRequests() override;
-    void resolvePickFeedback(const DebugFeedbackStruct& feedback) override;
-    bool consumeExperimentalPhotoScreenshot() override;
-    void captureScriptPreRender() override;
-    void captureScriptPostRender(std::function<bool(const char* fileName)> saveTexture) override;
-    class ZoomTool* getOrCreateZoomTool() override;
+                                   bool& renderedAny);
+    void updateViews(nvrhi::IFramebuffer* framebuffer);
+    void recreateAccelStructs(nvrhi::ICommandList* commandList);
+    void uploadSubInstanceData(nvrhi::ICommandList* commandList);
+    void collectUncompressedTextures();
+    dm::float2 computeCameraJitter(uint frameIndex);
+    bool consumeShaderReloadRequest();
+    bool& accelerationStructRebuildRequested();
+    bool hasActivePickRequest() const;
+    bool showDeltaTree() const;
+    bool pickMaterialRequested() const;
+    bool pickInstanceRequested() const;
+    void clearPickRequests();
+    void resolvePickFeedback(const DebugFeedbackStruct& feedback);
+    bool consumeExperimentalPhotoScreenshot();
+    void captureScriptPreRender();
+    void captureScriptPostRender(std::function<bool(const char* fileName)> saveTexture);
+    class ZoomTool* getOrCreateZoomTool();
 
     // --- Pipeline variant accessors ---
     std::shared_ptr<class PTPipelineVariant>& PtPipelineReference();
@@ -238,7 +237,7 @@ public:
     std::shared_ptr<class PTPipelineVariant>& PtPipelineTestRaygenPPHDR();
     std::shared_ptr<class PTPipelineVariant>& PtPipelineEdgeDetection();
 
-    // Render entry points (formerly on AdvancedPathTracer)
+    // Render entry points
     void Render(nvrhi::IFramebuffer* framebuffer);
     void BackBufferResizing();
     void PathTrace(nvrhi::IFramebuffer* framebuffer, const SampleConstants& constants);
@@ -246,6 +245,13 @@ public:
     void PostProcessAA(nvrhi::IFramebuffer* framebuffer, bool reset);
     std::string GetMaterialSpecializationShader() const;
     bool NeedsRasterPrecompute() { return false; }
+
+    // Hooks (formerly protected, now public for WorldRendererServices callbacks)
+    void OnRenderTargetsRecreated() { }
+    void AddCustomBindings(nvrhi::BindingSetDesc& bindingSetDesc) { }
+    void UpdateViews(nvrhi::IFramebuffer* framebuffer);
+    void PrepareGaussianSplatPass(GaussianSplatPass& pass);
+    void BuildGaussianSplatEmissionProxyList();
 
     // --- Input event handling (replaces PathTracerInputController) ---
     void onEvent(caustica::Event& event);
@@ -313,21 +319,8 @@ public:
     bool                                    AccumulationCompleted() const;
 
 protected:
-    // Called when render targets have been recreated (e.g. after window resize)
-    virtual void OnRenderTargetsRecreated() { }
-
-    // Called during binding set creation to allow derived classes to add custom bindings
-    // The reflection texture slots (t80-t83, b3) have null placeholders by default
-    virtual void AddCustomBindings(nvrhi::BindingSetDesc& bindingSetDesc) { }
-    
-    // Invalidates the binding set, forcing recreation on next frame
-    // Call this from derived classes when custom bindings need to be updated
     void InvalidateBindingSet();
     void RecreateBindingSet();
-
-    void UpdateViews(nvrhi::IFramebuffer* framebuffer);
-    void PrepareGaussianSplatPass(GaussianSplatPass& pass);
-    void BuildGaussianSplatEmissionProxyList();
     [[nodiscard]] caustica::CameraUpdateParams makeCameraUpdateParams() const;
     GaussianSplatSceneObject* GetPrimaryGaussianSplatObject();
     const GaussianSplatSceneObject* GetPrimaryGaussianSplatObject() const;

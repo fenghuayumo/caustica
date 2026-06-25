@@ -94,9 +94,8 @@ namespace
 #endif
 }
 
-caustica::render::PathTracingWorldRenderer::PathTracingWorldRenderer(WorldRendererServices& services, IWorldRendererPipelineHooks& hooks)
+caustica::render::PathTracingWorldRenderer::PathTracingWorldRenderer(WorldRendererServices& services)
     : m_services(services)
-    , m_hooks(hooks)
 {
 }
 
@@ -483,14 +482,14 @@ void caustica::render::PathTracingWorldRenderer::createRenderPasses( bool& expos
         { assert(false); }
 
     if (m_services.envMapBaker == nullptr)
-        m_services.envMapBaker = std::make_shared<EnvMapBaker>(device(), m_services.textureCache, m_hooks.needsRasterPrecompute());
+        m_services.envMapBaker = std::make_shared<EnvMapBaker>(device(), m_services.textureCache, m_services.hooks.needsRasterPrecompute());
     if (m_services.lightsBaker == nullptr)
         m_services.lightsBaker = std::make_shared<LightsBaker>(device());
     m_services.envMapBaker->CreateRenderPasses(m_shaderDebug, m_services.shaderFactory, m_services.computePipelineBaker);
     m_services.envMapBaker->GenerateBRDFLUT(initializeCommandList.Get(), m_services.bindingCache);  // One-time BRDF LUT generation
     m_services.lightsBaker->CreateRenderPasses(m_services.shaderFactory, m_bindlessLayout, m_services.commonPasses, m_shaderDebug, screenResolution, m_services.envMapBaker->GetImportanceSampling()->GetImportanceMapResolution());
 
-    m_hooks.prepareGaussianSplatPasses();
+    m_services.hooks.prepareGaussianSplatPasses();
 
     m_denoisingGuidesBaker = std::make_shared<DenoisingGuidesBaker>(device(), m_services.shaderFactory, m_renderTargets, m_shaderDebug, m_bindingLayout);
 }
@@ -519,7 +518,7 @@ void caustica::render::PathTracingWorldRenderer::preUpdateLighting(nvrhi::Comman
 }
 void caustica::render::PathTracingWorldRenderer::updateLighting(nvrhi::CommandListHandle commandList)
 {
-    m_hooks.buildGaussianSplatEmissionProxyList();
+    m_services.hooks.buildGaussianSplatEmissionProxyList();
 
     UpdateLightingParams params{
         m_services.settings,
@@ -706,8 +705,8 @@ void caustica::render::PathTracingWorldRenderer::rtxdiSetupFrame(nvrhi::IFramebu
 
     bridgeParameters.userSettings.restirDI.initialSamplingParams.environmentMapImportanceSampling = envMapPresent;
 
-    m_hooks.buildGaussianSplatEmissionProxyList();
-    if (!m_services.gaussianSplatEmissionProxies.empty() && m_hooks.isGaussianSplatEmissionEnabled())
+    m_services.hooks.buildGaussianSplatEmissionProxyList();
+    if (!m_services.gaussianSplatEmissionProxies.empty() && m_services.hooks.isGaussianSplatEmissionEnabled())
     {
         bridgeParameters.gaussianSplatEmissionProxies = &m_services.gaussianSplatEmissionProxies;
         bridgeParameters.gaussianSplatEmissionObjectToWorld = float4x4::identity();
@@ -979,7 +978,7 @@ void caustica::render::PathTracingWorldRenderer::preRender()
 
     korgi::Update();
 
-    m_hooks.captureScriptPreRender();
+    m_services.hooks.captureScriptPreRender();
 }
 void caustica::render::PathTracingWorldRenderer::postProcessPreToneMapping(nvrhi::ICommandList* commandList, const caustica::ICompositeView& compositeView)
 {
@@ -1046,7 +1045,7 @@ void caustica::render::PathTracingWorldRenderer::postProcessPostToneMapping(nvrh
 }
 void caustica::render::PathTracingWorldRenderer::renderGaussianSplats(bool renderToOutputColor)
 {
-    if (!m_services.settings.EnableGaussianSplats || m_hooks.gaussianSplatObjectsEmpty())
+    if (!m_services.settings.EnableGaussianSplats || m_services.hooks.gaussianSplatObjectsEmpty())
         return;
 
     const bool stochasticSplats = m_services.settings.EnableGaussianSplats && m_services.settings.GaussianSplatSortingMode == 1;
@@ -1109,7 +1108,7 @@ void caustica::render::PathTracingWorldRenderer::renderGaussianSplats(bool rende
     splatView.UpdateCache();
 
     bool renderedAny = false;
-    m_hooks.renderSceneGaussianSplats(m_commandList, splatView, *m_renderTargets, settings, renderedAny);
+    m_services.hooks.renderSceneGaussianSplats(m_commandList, splatView, *m_renderTargets, settings, renderedAny);
 
     if (renderedAny && stochasticSplats && !renderToOutputColor)
         accumulateGaussianSplats(splatView);
@@ -1176,13 +1175,13 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
         m_renderTargets->Init(device(), m_renderSize, m_displaySize, true, true, c_SwapchainCount);
 
         needNewPasses = true;
-        m_hooks.onRenderTargetsRecreated();
+        m_services.hooks.onRenderTargetsRecreated();
     }
 
     // Environment map settings
     caustica::syncEnvMapSceneParams(m_services.settings, m_services.envMapSceneParams, c_envMapRadianceScale);
 
-    if (m_hooks.consumeShaderReloadRequest())
+    if (m_services.hooks.consumeShaderReloadRequest())
     {
         m_services.shaderFactory->ClearCache();
         needNewPasses = true;
@@ -1209,7 +1208,7 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
 
         if (m_services.materialsBaker == nullptr)
         {
-            m_services.materialsBaker = std::make_shared<MaterialsBaker>(m_hooks.getMaterialSpecializationShader(), device(), m_services.textureCache, m_services.shaderFactory);
+            m_services.materialsBaker = std::make_shared<MaterialsBaker>(m_services.hooks.getMaterialSpecializationShader(), device(), m_services.textureCache, m_services.shaderFactory);
             assert( m_ptPipelineBaker == nullptr ); // there should be no cases where materials baker is null but ptPipelineBaker isn't
             
             m_ptPipelineBaker = std::make_shared<PTPipelineBaker>(device(), m_services.materialsBaker, m_bindingLayout, m_bindlessLayout);
@@ -1217,20 +1216,20 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
             std::vector<std::filesystem::path> additionalShaderPaths;
             m_services.computePipelineBaker = std::make_shared<ComputePipelineBaker>(device(), additionalShaderPaths);
             
-            m_hooks.createRTPipelines();
+            m_services.hooks.createRTPipelines();
         }
 
         m_services.materialsBaker->CreateRenderPassesAndLoadMaterials(m_bindlessLayout, m_services.commonPasses, m_services.sceneManager.getScene(), m_services.sceneManager.getCurrentScenePath(), GetLocalPath(c_AssetsFolder));
         m_services.progressInitializingRenderer.Set(5);
-        m_hooks.collectUncompressedTextures();
+        m_services.hooks.collectUncompressedTextures();
         if(m_services.ommBaker) m_services.ommBaker->CreateRenderPasses(m_bindlessLayout, m_services.commonPasses);
         m_services.progressInitializingRenderer.Set(20);
 
-        (void)m_hooks.getOrCreateZoomTool();
+        (void)m_services.hooks.getOrCreateZoomTool();
     }
 
     // Changes to material properties and settings can require a BLAS/TLAS or subInstanceBuffer rebuild (alpha tested/exclusion flags etc); otherwise this is a no-op.
-    m_hooks.recreateAccelStructs(m_commandList);
+    m_services.hooks.recreateAccelStructs(m_commandList);
 
     if (m_services.settings.ActualUseRTXDIPasses() && m_rtxdiPass == nullptr )
         needNewPasses = true; // this will initialize rtxdi passes
@@ -1250,7 +1249,7 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
     }
 
     // this is the point where main ray tracing pipelines will actually get compiled
-    m_ptPipelineBaker->Update(m_services.sceneManager.getScene(), (unsigned int)m_services.renderCore.accelStructs().getSubInstanceData().size(), [this](std::vector<caustica::ShaderMacro> & macros){ m_hooks.fillPTPipelineGlobalMacros(macros); }, needNewPasses);
+    m_ptPipelineBaker->Update(m_services.sceneManager.getScene(), (unsigned int)m_services.renderCore.accelStructs().getSubInstanceData().size(), [this](std::vector<caustica::ShaderMacro> & macros){ m_services.hooks.fillPTPipelineGlobalMacros(macros); }, needNewPasses);
     
     // Update compute shaders (compile if needed)
     if (m_services.computePipelineBaker)
@@ -1264,7 +1263,7 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
     PathTracerCameraData cameraData;
     {
         // Update camera data used by the path tracer & other systems
-        m_hooks.updateViews(framebuffer);
+        m_services.hooks.updateViews(framebuffer);
         {   // TODO: pull all this to BridgeCamera - sizeX and sizeY are already inputs so we just need to pass projMatrix
             nvrhi::Viewport viewport = m_services.renderCore.camera().view()->GetViewport();
             float2 jitter = m_services.renderCore.camera().view()->GetPixelOffset();
@@ -1289,7 +1288,7 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
         // Scene refresh, accel structs, materials (partial sub-instance upload for lighting).
         UpdateSceneGeometryParams geoParams{
             m_services.settings,
-            m_hooks.accelerationStructRebuildRequested(),
+            m_services.hooks.accelerationStructRebuildRequested(),
             m_services.sceneManager.getScene(),
             m_commandList,
         };
@@ -1362,7 +1361,7 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
         updatePathTracerConstants(constants.ptConsts, cameraData);
         constants.MaterialCount = m_services.materialsBaker->GetMaterialDataCount(); // m_services.sceneManager.getScene()->GetSceneGraph()->GetMaterials().size();
         const uint32_t gaussianSplatShadowMode = ResolveGaussianSplatShadowMode(m_services.settings);
-        const WorldRendererGaussianSplatBinding primaryGaussianBinding = m_hooks.getPrimaryGaussianSplatBinding();
+        const WorldRendererGaussianSplatBinding primaryGaussianBinding = m_services.hooks.getPrimaryGaussianSplatBinding();
         GaussianSplatPass* primaryGaussianSplatPass = const_cast<GaussianSplatPass*>(primaryGaussianBinding.pass);
         constants.GaussianSplatShadowCount = (m_services.settings.EnableGaussianSplats
                 && gaussianSplatShadowMode != GAUSSIAN_SPLAT_SHADOWS_DISABLED
@@ -1401,7 +1400,7 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
         constants.previousView  = FromPlanarViewConstants(previousView);
 
         constants.debug = {};
-        constants.debug.pick = m_hooks.hasActivePickRequest() || m_services.settings.ContinuousDebugFeedback;
+        constants.debug.pick = m_services.hooks.hasActivePickRequest() || m_services.settings.ContinuousDebugFeedback;
         constants.debug.pickX = (constants.debug.pick)?(m_services.settings.DebugPixel.x):(-1);
         constants.debug.pickY = (constants.debug.pick)?(m_services.settings.DebugPixel.y):(-1);
         constants.debug.debugLineScale = (m_services.settings.ShowDebugLines)?(m_services.settings.DebugLineScale):(0.0f);
@@ -1409,7 +1408,7 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
         constants.debug.debugViewType = (int)m_services.settings.DebugView;
         constants.debug.debugViewStablePlaneIndex = (m_services.settings.StablePlanesActiveCount==1)?(0):(m_services.settings.DebugViewStablePlaneIndex);
 #if ENABLE_DEBUG_DELTA_TREE_VIZUALISATION
-        constants.debug.exploreDeltaTree = (m_hooks.showDeltaTree() && constants.debug.pick)?(1):(0);
+        constants.debug.exploreDeltaTree = (m_services.hooks.showDeltaTree() && constants.debug.pick)?(1):(0);
 #else
         constants.debug.exploreDeltaTree = false;
 #endif
@@ -1426,11 +1425,11 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
         // This updates all lighting: distant (environment maps and directional analytic lights) and local (analytic lights and emissive triangle lights)
         // Must go before m_constantBuffer as when saving screenshots it closes and re-opens command list, flushing the volatile constant buffer!
         updateLighting(m_commandList);
-        m_hooks.uploadSubInstanceData(m_commandList); // this is now full subInstance data
+        m_services.hooks.uploadSubInstanceData(m_commandList); // this is now full subInstance data
 
         m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
 
-        m_hooks.sampleRenderCode(framebuffer, m_commandList, constants);
+        m_services.hooks.sampleRenderCode(framebuffer, m_commandList, constants);
 
         const bool stochasticSplats = m_services.settings.EnableGaussianSplats && m_services.settings.GaussianSplatSortingMode == 1;
         const bool stochasticUsesMainTemporal = stochasticSplats && (!m_services.settings.RealtimeMode || m_services.settings.RealtimeAA == 1);
@@ -1467,7 +1466,7 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
     if (m_services.settings.EnableShaderDebug)
         m_shaderDebug->EndFrameAndOutput(m_commandList, m_renderTargets->LdrFramebuffer->GetFramebuffer(fullscreenView), m_renderTargets->Depth, fbinfo.getViewport());
 
-    m_hooks.getOrCreateZoomTool()->Render(m_commandList, m_renderTargets->LdrColor);
+    m_services.hooks.getOrCreateZoomTool()->Render(m_commandList, m_renderTargets->LdrColor);
 
     m_commandList->beginMarker("Blit");
     (m_services.commonPasses)->BlitTexture(m_commandList, framebuffer, m_renderTargets->LdrColor, &m_services.bindingCache);
@@ -1516,7 +1515,7 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
     }
     m_cpuSideDebugLines.clear();
 
-    if( m_services.settings.ContinuousDebugFeedback || m_hooks.pickMaterialRequested() )
+    if( m_services.settings.ContinuousDebugFeedback || m_services.hooks.pickMaterialRequested() )
     {
         m_commandList->copyBuffer(m_feedback_Buffer_Cpu, 0, m_feedback_Buffer_Gpu, 0, sizeof(DebugFeedbackStruct) * 1);
         m_commandList->copyBuffer(m_debugLineBufferDisplay, 0, m_debugLineBufferCapture, 0, sizeof(DebugLineStruct) * MAX_DEBUG_LINES );
@@ -1530,7 +1529,7 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
 	device()->executeCommandList(m_commandList);
 
     // resolve picking and debug info
-    if (m_services.settings.ContinuousDebugFeedback || m_hooks.hasActivePickRequest())
+    if (m_services.settings.ContinuousDebugFeedback || m_services.hooks.hasActivePickRequest())
     {
         device()->waitForIdle();
         void* pData = device()->mapBuffer(m_feedback_Buffer_Cpu, nvrhi::CpuAccessMode::Read);
@@ -1543,15 +1542,15 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
         memcpy(&m_debugDeltaPathTree, pData, sizeof(DeltaTreeVizPathVertex) * cDeltaTreeVizMaxVertices);
         device()->unmapBuffer(m_debugDeltaPathTree_Cpu);
 
-        m_hooks.resolvePickFeedback(m_feedbackData);
-        m_hooks.clearPickRequests();
+        m_services.hooks.resolvePickFeedback(m_feedbackData);
+        m_services.hooks.clearPickRequests();
     }
 
-    m_hooks.captureScriptPostRender([this, framebufferTexture](const char* fileName) -> bool {
+    m_services.hooks.captureScriptPostRender([this, framebufferTexture](const char* fileName) -> bool {
         return SaveTextureToFile(device(), m_services.commonPasses.get(), framebufferTexture, nvrhi::ResourceStates::Common, fileName);
     });
 
-    if (m_hooks.consumeExperimentalPhotoScreenshot())
+    if (m_services.hooks.consumeExperimentalPhotoScreenshot())
     {
         denoisedScreenshot(framebufferTexture);
     }
@@ -1569,7 +1568,7 @@ void caustica::render::PathTracingWorldRenderer::recreateBindingSet()
 	// WARNING: this must match the layout of the m_bindingLayout (or switch to CreateBindingSetAndLayout)
     nvrhi::rt::IAccelStruct* gaussianSplatAS = m_services.renderCore.accelStructs().getTopLevelAS();
     nvrhi::IBuffer* gaussianSplatBuffer = m_services.materialsBaker->GetMaterialDataBuffer();
-    const WorldRendererGaussianSplatBinding primaryGaussianBinding = m_hooks.getPrimaryGaussianSplatBinding();
+    const WorldRendererGaussianSplatBinding primaryGaussianBinding = m_services.hooks.getPrimaryGaussianSplatBinding();
     const GaussianSplatPass* primaryGaussianSplatPass = primaryGaussianBinding.pass;
     if (primaryGaussianSplatPass != nullptr && primaryGaussianSplatPass->GetTopLevelAS() != nullptr && primaryGaussianSplatPass->GetSplatBuffer() != nullptr)
     {
@@ -1684,7 +1683,7 @@ void caustica::render::PathTracingWorldRenderer::recreateBindingSet()
         bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(87, (m_services.commonPasses)->m_BlackTexture));  // t_PrevDepth placeholder
 
         // Allow derived classes to customize bindings (e.g., add reflection textures, GTAO output)
-        m_hooks.addCustomBindings(bindingSetDesc);
+        m_services.hooks.addCustomBindings(bindingSetDesc);
 
         m_bindingSet = device()->createBindingSet(bindingSetDesc, m_bindingLayout);
     }
@@ -1968,7 +1967,7 @@ void caustica::render::PathTracingWorldRenderer::postProcessAA(nvrhi::IFramebuff
     params.renderSize = m_renderSize;
     params.displaySize = m_displaySize;
     params.displayAspectRatio = m_displayAspectRatio;
-    params.cameraJitter = m_hooks.computeCameraJitter(m_sampleIndex);
+    params.cameraJitter = m_services.hooks.computeCameraJitter(m_sampleIndex);
     params.sampleIndex = m_sampleIndex;
     params.frameIndex = m_services.gpuDevice.GetFrameIndex();
     params.reset = reset;
