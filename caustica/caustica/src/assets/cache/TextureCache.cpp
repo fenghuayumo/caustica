@@ -1,5 +1,6 @@
 #include <assets/cache/TextureCache.h>
 
+#include <render/Core/DescriptorTableManager.h>
 #include <render/Core/CommonRenderPasses.h>
 #include <engine/ConsoleObjects.h>
 #include <assets/loader/DDSFile.h>

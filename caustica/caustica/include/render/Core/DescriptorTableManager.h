@@ -1,40 +1,12 @@
 #pragma once
 
+#include <core/DescriptorHandle.h>
 #include <rhi/nvrhi.h>
 #include <unordered_map>
 #include <memory>
 
 namespace caustica
 {
-    class DescriptorTableManager;
-    typedef int DescriptorIndex;
-
-    // Stores a descriptor index in a descriptor table. Releases the descriptor when destroyed.
-    class DescriptorHandle
-    {
-    private:
-        std::weak_ptr<DescriptorTableManager> m_Manager;
-        DescriptorIndex m_DescriptorIndex;
-
-    public:
-        DescriptorHandle();
-        DescriptorHandle(const std::shared_ptr<DescriptorTableManager>& managerPtr, DescriptorIndex index);
-        ~DescriptorHandle();
-        
-        [[nodiscard]] bool IsValid() const { return m_DescriptorIndex >= 0 && !m_Manager.expired(); }
-        [[nodiscard]] DescriptorIndex Get() const { if (m_DescriptorIndex >= 0) assert(!m_Manager.expired()); return m_DescriptorIndex; }
-        
-        // For ResourceDescriptorHeap Index instead of a table relative index
-        // This value is volatile if the descriptor table resizes and needs to be refetched
-        [[nodiscard]] DescriptorIndex GetIndexInHeap() const;
-        void Reset() { m_DescriptorIndex = -1; m_Manager.reset(); }
-
-        // Movable but non-copyable
-        DescriptorHandle(const DescriptorHandle&) = delete;
-        DescriptorHandle(DescriptorHandle&&) = default;
-        DescriptorHandle& operator=(const DescriptorHandle&) = delete;
-        DescriptorHandle& operator=(DescriptorHandle&&) = default;
-    };
 
     class DescriptorTableManager : public std::enable_shared_from_this<DescriptorTableManager>
     {

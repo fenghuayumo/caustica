@@ -1,10 +1,13 @@
 #pragma once
 
 #include <math/math.h>
-#include <render/Core/DescriptorTableManager.h>
+#include <core/DescriptorHandle.h>
 #include <shaders/light_types.h>
 #include <rhi/nvrhi.h>
 #include <memory>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
 struct MaterialConstants;
 struct LightConstants;

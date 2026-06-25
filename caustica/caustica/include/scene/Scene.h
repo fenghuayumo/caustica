@@ -1,6 +1,7 @@
 #pragma once
 
 #include <scene/SceneGraph.h>
+#include <render/Core/DescriptorTableManager.h>
 #include <rhi/nvrhi.h>
 #include <vector>
 #include <memory>
