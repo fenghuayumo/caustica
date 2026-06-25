@@ -50,7 +50,7 @@ namespace caustica
         std::vector<std::vector<TextureSubresourceData>> dataLayout;
     };
 
-    class TextureCache
+    class TextureLoader
     {
     protected:
         nvrhi::DeviceHandle m_Device;
@@ -96,11 +96,11 @@ namespace caustica
         void RegisterTextureAsset(const std::shared_ptr<TextureData>& texture);
 
     public:
-        TextureCache(
+        TextureLoader(
             nvrhi::IDevice* device,
             std::shared_ptr<caustica::IFileSystem> fs,
             std::shared_ptr<DescriptorTableManager> descriptorTable);
-        virtual ~TextureCache();
+        virtual ~TextureLoader();
 
         // Release all cached textures
         void Reset();
@@ -171,7 +171,7 @@ namespace caustica
             CacheIter const& operator->() const { return m_Iterator; }
 
         private:
-            friend class TextureCache;
+            friend class TextureLoader;
             Iterator(std::shared_mutex& mutex, CacheIter it) : m_Lock(mutex), m_Iterator(it) { }
             std::shared_lock<std::shared_mutex> m_Lock;
             CacheIter m_Iterator;

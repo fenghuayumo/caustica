@@ -18,7 +18,7 @@ namespace caustica
 {
     class Scene;
     class FramebufferFactory;
-    class TextureCache;
+    class TextureLoader;
     class TextureHandle;
     class ShaderFactory;
     class CommonRenderPasses;
@@ -95,7 +95,7 @@ class OmmBaker
 public:
     OmmBaker(nvrhi::DeviceHandle device,
         std::shared_ptr<caustica::DescriptorTableManager> descriptorTableManager,
-        std::shared_ptr<caustica::TextureCache> textureCache,
+        std::shared_ptr<caustica::TextureLoader> textureCache,
         std::shared_ptr<caustica::ShaderFactory> shaderFactory);
     ~OmmBaker();
 
@@ -122,7 +122,7 @@ public:
 
 private:
     nvrhi::DeviceHandle             m_device;
-    std::shared_ptr<caustica::TextureCache> m_textureCache;
+    std::shared_ptr<caustica::TextureLoader> m_textureCache;
     std::shared_ptr<caustica::CommonRenderPasses> m_commonPasses;
     std::shared_ptr<caustica::FramebufferFactory> m_framebufferFactory;
     std::shared_ptr<caustica::DescriptorTableManager> m_descriptorTableManager;

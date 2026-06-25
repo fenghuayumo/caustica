@@ -16,7 +16,7 @@ namespace caustica
 class GpuDevice;
 class IFileSystem;
 class ShaderFactory;
-class TextureCache;
+class TextureLoader;
 class DescriptorTableManager;
 class Scene;
 class SceneGraphNode;
@@ -33,7 +33,7 @@ public:
 
     SceneManager(caustica::GpuDevice&                     device,
                  caustica::ShaderFactory&                 shaderFactory,
-                 std::shared_ptr<caustica::TextureCache>  textureCache,
+                 std::shared_ptr<caustica::TextureLoader>  textureCache,
                  std::shared_ptr<caustica::DescriptorTableManager> descriptorTable);
 
     ~SceneManager();
@@ -113,13 +113,13 @@ public:
     // --- Dependencies ---
     caustica::GpuDevice&                      getDevice()        { return m_device; }
     caustica::ShaderFactory&                  getShaderFactory()  { return m_shaderFactory; }
-    std::shared_ptr<caustica::TextureCache>   getTextureCache()   { return m_textureCache; }
+    std::shared_ptr<caustica::TextureLoader>   getTextureLoader()   { return m_textureCache; }
     std::shared_ptr<caustica::DescriptorTableManager> getDescriptorTable() { return m_descriptorTable; }
 
 private:
     caustica::GpuDevice&                      m_device;
     caustica::ShaderFactory&                  m_shaderFactory;
-    std::shared_ptr<caustica::TextureCache>   m_textureCache;
+    std::shared_ptr<caustica::TextureLoader>   m_textureCache;
     std::shared_ptr<caustica::DescriptorTableManager> m_descriptorTable;
 
     std::vector<std::string>                  m_sceneFilesAvailable;

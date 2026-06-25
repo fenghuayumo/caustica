@@ -14,7 +14,7 @@
 // AssetCache<T> — CPU-side typed asset cache with LRU eviction.
 //
 // Each AssetSystem owns typed caches (texture, mesh, material, etc.).
-// This replaces separate TextureCache, MeshCache, etc. with a single
+// This replaces separate TextureLoader, MeshCache, etc. with a single
 // template parameterized by asset type.
 //
 // Features:

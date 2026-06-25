@@ -31,7 +31,7 @@ namespace caustica
 {
     class BindingCache;
     class FramebufferFactory;
-    class TextureCache;
+    class TextureLoader;
     class TextureHandle;
     class ShaderFactory;
     class CommonRenderPasses;
@@ -82,7 +82,7 @@ public:
     
 
 public:
-    EnvMapBaker( nvrhi::IDevice* device, std::shared_ptr<caustica::TextureCache> textureCache, bool enableRasterPrecompute );
+    EnvMapBaker( nvrhi::IDevice* device, std::shared_ptr<caustica::TextureLoader> textureCache, bool enableRasterPrecompute );
     ~EnvMapBaker();
 
     void                            SceneReloaded()                 { m_targetResolution = 0; } // change default target resolution on each scene load
@@ -139,7 +139,7 @@ private:
 
 private:
     nvrhi::DeviceHandle             m_device;
-    std::shared_ptr<caustica::TextureCache> m_textureCache;
+    std::shared_ptr<caustica::TextureLoader> m_textureCache;
     std::shared_ptr<ShaderDebug>    m_shaderDebug;
 
     nvrhi::ShaderHandle             m_lowResPrePassLayerCS;

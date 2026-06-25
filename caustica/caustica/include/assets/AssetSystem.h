@@ -26,7 +26,7 @@ namespace caustica
 {
 
 struct TextureData;
-class TextureCache;
+class TextureLoader;
 class CommonRenderPasses;
 class ThreadPool;
 
@@ -34,7 +34,7 @@ class AssetSystem
 {
 public:
     static AssetSystem& Get();
-    static void Initialize(std::shared_ptr<TextureCache> legacyTextureCache = nullptr);
+    static void Initialize(std::shared_ptr<TextureLoader> legacyTextureLoader = nullptr);
     static void Shutdown();
 
     void Update(uint64_t frameIndex);
@@ -72,7 +72,7 @@ public:
     AssetRegistry                 m_Registry;
     AssetFileWatcher              m_FileWatcher;
     AssetCache<TextureData>       m_TextureCache;
-    std::shared_ptr<TextureCache> m_LegacyTextureCache;
+    std::shared_ptr<TextureLoader> m_LegacyTextureLoader;
     size_t                        m_TextureMemoryBudget = 512 * 1024 * 1024;
 
     bool m_Initialized = false;

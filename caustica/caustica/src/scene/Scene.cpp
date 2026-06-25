@@ -255,12 +255,12 @@ Scene::Scene(
     nvrhi::IDevice* device,
     ShaderFactory& shaderFactory,
     std::shared_ptr<IFileSystem> fs,
-    std::shared_ptr<TextureCache> textureCache,
+    std::shared_ptr<TextureLoader> textureCache,
     std::shared_ptr<DescriptorTableManager> descriptorTable,
     std::shared_ptr<SceneTypeFactory> sceneTypeFactory)
     : m_fs(std::move(fs))
     , m_SceneTypeFactory(std::move(sceneTypeFactory))
-    , m_TextureCache(std::move(textureCache))
+    , m_TextureLoader(std::move(textureCache))
     , m_DescriptorTable(std::move(descriptorTable))
     , m_Device(device)
 {
@@ -422,9 +422,9 @@ bool Scene::LoadModelFile(
     std::string ext = fileName.extension().string();
     std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return char(std::tolower(c)); });
     if (ext == ".obj")
-        return m_ObjImporter->Load(fileName, *m_TextureCache, g_LoadingStats, threadPool, result, m_textureSearchDirectory);
+        return m_ObjImporter->Load(fileName, *m_TextureLoader, g_LoadingStats, threadPool, result, m_textureSearchDirectory);
 
-    return m_GltfImporter->Load(fileName, *m_TextureCache, g_LoadingStats, threadPool, result, m_textureSearchDirectory);
+    return m_GltfImporter->Load(fileName, *m_TextureLoader, g_LoadingStats, threadPool, result, m_textureSearchDirectory);
 }
 
 void Scene::LoadModels(

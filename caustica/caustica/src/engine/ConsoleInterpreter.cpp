@@ -1,7 +1,7 @@
 #include <engine/ConsoleInterpreter.h>
 
 #include <engine/ConsoleObjects.h>
-#include <assets/cache/TextureCache.h>
+#include <assets/loader/TextureLoader.h>
 #include <core/string_utils.h>
 #include <core/log.h>
 
@@ -310,7 +310,7 @@ namespace caustica::console
 	}
 
 
-	inline std::string getTextureInfo(TextureCache::Iterator const& it, size_t& count)
+	inline std::string getTextureInfo(TextureLoader::Iterator const& it, size_t& count)
 	{
 		char buff[2048];
 			std::string idStr = it->first.ToString();
@@ -320,7 +320,7 @@ namespace caustica::console
 		return buff;
 	}
 
-	bool Interpreter::RegisterCommands(std::shared_ptr<TextureCache> textureCache)
+	bool Interpreter::RegisterCommands(std::shared_ptr<TextureLoader> textureCache)
 	{
 		if (!textureCache)
 			return false;
@@ -357,7 +357,7 @@ namespace caustica::console
 					}
 
 					Command::Result r; size_t count = 0;
-					for (auto it = m_TextureCache->begin(); it != m_TextureCache->end(); ++it)
+					for (auto it = m_TextureLoader->begin(); it != m_TextureLoader->end(); ++it)
 					{
 						if (rxMatch)
 						{
@@ -381,7 +381,7 @@ namespace caustica::console
 
 		if (RegisterCommand(cmdDesc))
 		{
-			m_TextureCache = textureCache;
+			m_TextureLoader = textureCache;
 		}
 		return false;
 	}

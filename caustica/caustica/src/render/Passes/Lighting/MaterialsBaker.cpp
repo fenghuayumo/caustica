@@ -3,7 +3,7 @@
 #include <assets/loader/ShaderFactory.h>
 #include <render/Core/FramebufferFactory.h>
 #include <render/Core/CommonRenderPasses.h>
-#include <assets/cache/TextureCache.h>
+#include <assets/loader/TextureLoader.h>
 
 #include <engine/UserInterfaceUtils.h>
 
@@ -245,7 +245,7 @@ void PTMaterial::Write(Json::Value& output)
 bool PTMaterial::Read(
     Json::Value& input,
     const std::filesystem::path& mediaPath,
-    const std::shared_ptr<caustica::TextureCache>& textureCache,
+    const std::shared_ptr<caustica::TextureLoader>& textureCache,
     const std::filesystem::path& sceneDirectory)
 {
     // int version = -1;
@@ -411,7 +411,7 @@ bool PTMaterial::Read(
 std::shared_ptr<PTMaterial> PTMaterial::FromJson(
     Json::Value& input,
     const std::filesystem::path& mediaPath,
-    const std::shared_ptr<caustica::TextureCache>& textureCache,
+    const std::shared_ptr<caustica::TextureLoader>& textureCache,
     const std::string& modelName,
     const std::string& name,
     const std::filesystem::path& sceneDirectory)
@@ -896,7 +896,7 @@ std::filesystem::path MaterialsBaker::GetMaterialStoragePath(PTMaterialBase& mat
     return matPath;
 }
 
-MaterialsBaker::MaterialsBaker(const std::string & relativeShaderSourcePath, nvrhi::IDevice* device, std::shared_ptr<caustica::TextureCache> textureCache, std::shared_ptr<caustica::ShaderFactory> shaderFactory)
+MaterialsBaker::MaterialsBaker(const std::string & relativeShaderSourcePath, nvrhi::IDevice* device, std::shared_ptr<caustica::TextureLoader> textureCache, std::shared_ptr<caustica::ShaderFactory> shaderFactory)
     : m_relativeShaderSourcePath(relativeShaderSourcePath)
     , m_device(device)
     , m_textureCache(textureCache)

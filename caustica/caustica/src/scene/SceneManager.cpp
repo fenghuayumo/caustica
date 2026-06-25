@@ -1,7 +1,7 @@
 #include "scene/SceneManager.h"
 
 #include <backend/GpuDevice.h>
-#include <assets/cache/TextureCache.h>
+#include <assets/loader/TextureLoader.h>
 #include <render/Core/RenderSceneTypeFactory.h>
 #include <scene/Scene.h>
 #include <scene/SceneGraph.h>
@@ -60,7 +60,7 @@ namespace
 
 SceneManager::SceneManager(caustica::GpuDevice&                     device,
                            caustica::ShaderFactory&                 shaderFactory,
-                           std::shared_ptr<caustica::TextureCache>  textureCache,
+                           std::shared_ptr<caustica::TextureLoader>  textureCache,
                            std::shared_ptr<caustica::DescriptorTableManager> descriptorTable)
     : m_device(device)
     , m_shaderFactory(shaderFactory)

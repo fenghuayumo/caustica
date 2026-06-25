@@ -1,5 +1,5 @@
 #include <assets/AssetSystem.h>
-#include <assets/cache/TextureCache.h>
+#include <assets/loader/TextureLoader.h>
 #include <core/log.h>
 
 namespace caustica
@@ -17,10 +17,10 @@ AssetSystem& AssetSystem::Get()
     return *s_Instance;
 }
 
-void AssetSystem::Initialize(std::shared_ptr<TextureCache> legacyTextureCache)
+void AssetSystem::Initialize(std::shared_ptr<TextureLoader> legacyTextureLoader)
 {
     auto& sys = Get();
-    sys.m_LegacyTextureCache = std::move(legacyTextureCache);
+    sys.m_LegacyTextureLoader = std::move(legacyTextureLoader);
     caustica::info("AssetSystem initialized");
 }
 
@@ -30,7 +30,7 @@ void AssetSystem::Shutdown()
     {
         s_Instance->m_FileWatcher.Clear();
         s_Instance->m_TextureCache.Clear();
-        s_Instance->m_LegacyTextureCache.reset();
+        s_Instance->m_LegacyTextureLoader.reset();
         s_Instance.reset();
     }
 }
@@ -82,8 +82,8 @@ std::shared_ptr<TextureData> AssetSystem::FindTextureByPath(const std::filesyste
     if (cached)
         return cached;
     // Fall back to legacy cache
-    if (m_LegacyTextureCache)
-        return m_LegacyTextureCache->GetLoadedTexture(path);
+    if (m_LegacyTextureLoader)
+        return m_LegacyTextureLoader->GetLoadedTexture(path);
     return nullptr;
 }
 

@@ -31,7 +31,7 @@ namespace caustica::render { class PathTracingWorldRenderer; }
 #include <render/Passes/Geometry/BloomPass.h>
 #include <scene/camera/Camera.h>
 #include <scene/SceneManager.h>
-#include <assets/cache/TextureCache.h>
+#include <assets/loader/TextureLoader.h>
 #include <render/Core/CommonRenderPasses.h>
 #if CAUSTICA_WITH_NATIVE_DLSS
 #include <render/Passes/Geometry/DLSS.h>
@@ -89,7 +89,7 @@ public:
     //std::shared_ptr<caustica::IFileSystem> GetRootFs() const                      { return m_RootFS; }
     std::shared_ptr<caustica::ShaderFactory> GetShaderFactory() const          { return m_shaderFactory; }
     std::shared_ptr<caustica::CommonRenderPasses> GetCommonPasses() const { return m_CommonPasses; }
-    std::shared_ptr<caustica::TextureCache> GetTextureCache() const { return m_TextureCache; }
+    std::shared_ptr<caustica::TextureLoader> GetTextureLoader() const { return m_TextureLoader; }
     std::shared_ptr<caustica::DescriptorTableManager> GetDescriptorTable() const { return m_DescriptorTable; }
     SceneManager* GetSceneManager() const { return m_sceneManager; }
     caustica::RenderCore* GetRenderCore() const { return m_renderCore; }
@@ -157,7 +157,7 @@ public:
         const std::shared_ptr<caustica::CommonRenderPasses>& commonPasses,
         caustica::BindingCache* bindingCache,
         const std::shared_ptr<caustica::DescriptorTableManager>& descriptorTable,
-        const std::shared_ptr<caustica::TextureCache>& textureCache);
+        const std::shared_ptr<caustica::TextureLoader>& textureCache);
     void AttachSceneServices(SceneManager& sceneManager, caustica::RenderCore& renderCore);
     void Init(const std::string& preferredScene,
         const std::shared_ptr<caustica::ShaderFactory>& shaderFactory);
@@ -382,7 +382,7 @@ private:
 
     // device setup
     std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
-    std::shared_ptr<caustica::TextureCache> m_TextureCache;
+    std::shared_ptr<caustica::TextureLoader> m_TextureLoader;
     std::shared_ptr<caustica::CommonRenderPasses> m_CommonPasses;
     caustica::BindingCache* m_bindingCache = nullptr;
     std::shared_ptr<caustica::DescriptorTableManager> m_DescriptorTable;

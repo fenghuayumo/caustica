@@ -22,7 +22,7 @@ using namespace caustica::math;
 namespace caustica
 {
     class FramebufferFactory;
-    class TextureCache;
+    class TextureLoader;
     class TextureHandle;
     class ShaderFactory;
     class CommonRenderPasses;
@@ -122,7 +122,7 @@ struct PTMaterialBase
     virtual bool            Read(
                                 Json::Value& output,
                                 const std::filesystem::path& mediaPath,
-                                const std::shared_ptr<caustica::TextureCache>& textureCache,
+                                const std::shared_ptr<caustica::TextureLoader>& textureCache,
                                 const std::filesystem::path& sceneDirectory = std::filesystem::path()) = 0;
 
     virtual bool            HasAlphaTest() const = 0;
@@ -230,7 +230,7 @@ struct PTMaterial : public PTMaterialBase
     static std::shared_ptr<PTMaterial> FromJson(
         Json::Value& input,
         const std::filesystem::path& mediaPath,
-        const std::shared_ptr<caustica::TextureCache>& textureCache,
+        const std::shared_ptr<caustica::TextureLoader>& textureCache,
         const std::string& modelName,
         const std::string& name,
         const std::filesystem::path& sceneDirectory = std::filesystem::path());
@@ -239,7 +239,7 @@ struct PTMaterial : public PTMaterialBase
     virtual bool            Read(
                                 Json::Value& output,
                                 const std::filesystem::path& mediaPath,
-                                const std::shared_ptr<caustica::TextureCache>& textureCache,
+                                const std::shared_ptr<caustica::TextureLoader>& textureCache,
                                 const std::filesystem::path& sceneDirectory = std::filesystem::path()) override;
 
     virtual MaterialShaderPermutation 
@@ -259,7 +259,7 @@ struct MaterialEx : caustica::Material
 class MaterialsBaker
 {
 public:
-    MaterialsBaker(const std::string & relativeShaderSourcePath, nvrhi::IDevice* device, std::shared_ptr<caustica::TextureCache> textureCache, std::shared_ptr<caustica::ShaderFactory> shaderFactory);
+    MaterialsBaker(const std::string & relativeShaderSourcePath, nvrhi::IDevice* device, std::shared_ptr<caustica::TextureLoader> textureCache, std::shared_ptr<caustica::ShaderFactory> shaderFactory);
     ~MaterialsBaker();
 
     void                            CreateRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* bindlessLayout, std::shared_ptr<caustica::CommonRenderPasses> commonPasses, const std::shared_ptr<caustica::Scene>& scene, const std::filesystem::path & sceneFilePath, const std::filesystem::path & mediaPath);
@@ -315,7 +315,7 @@ private:
 private:
     nvrhi::DeviceHandle             m_device;
     std::string                     m_relativeShaderSourcePath;         // this is the path for the shader file containing material specializations for ClosestHit and (if enabled) AnyHit; it is currently 1 for all materials, but could be per-material
-    std::shared_ptr<caustica::TextureCache> m_textureCache;
+    std::shared_ptr<caustica::TextureLoader> m_textureCache;
     std::shared_ptr<caustica::CommonRenderPasses> m_commonPasses;
     std::shared_ptr<caustica::FramebufferFactory> m_framebufferFactory;
     std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;

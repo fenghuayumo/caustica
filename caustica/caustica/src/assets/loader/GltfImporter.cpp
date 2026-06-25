@@ -2,7 +2,7 @@
 #include <cgltf.h>
 
 #include <assets/loader/GltfImporter.h>
-#include <assets/cache/TextureCache.h>
+#include <assets/loader/TextureLoader.h>
 #include <scene/SceneGraph.h>
 #include <core/vfs/VFS.h>
 #include <core/log.h>
@@ -618,7 +618,7 @@ static std::pair<const uint8_t*, size_t> cgltf_buffer_iterator(const cgltf_acces
 
 bool GltfImporter::Load(
     const std::filesystem::path& fileName,
-    TextureCache& textureCache,
+    TextureLoader& textureCache,
     SceneLoadingStats& stats,
     ThreadPool* threadPool,
     SceneImportResult& result,
@@ -832,16 +832,16 @@ bool GltfImporter::Load(
         return loadedTexture;
     };
 
-    std::unordered_map<const cgltf_texture*, std::shared_ptr<LoadedTexture>> gltfTextureCache;
+    std::unordered_map<const cgltf_texture*, std::shared_ptr<LoadedTexture>> gltfTextureLoader;
 
-    auto load_texture = [objects, c_SearchForDds, &gltfTextureCache, &load_image, &load_image_data]
+    auto load_texture = [objects, c_SearchForDds, &gltfTextureLoader, &load_image, &load_image_data]
         (const cgltf_texture* texture, bool sRGB)
     {
         if (!texture)
             return std::shared_ptr<LoadedTexture>(nullptr);
 
-        auto it = gltfTextureCache.find(texture);
-        if (it != gltfTextureCache.end())
+        auto it = gltfTextureLoader.find(texture);
+        if (it != gltfTextureLoader.end())
             return it->second;
 
         cgltf_texture_extensions const extensions = cgltf_parse_texture_extensions(texture, objects);
@@ -897,7 +897,7 @@ bool GltfImporter::Load(
             }
         }
 
-        gltfTextureCache[texture] = loadedTexture;
+        gltfTextureLoader[texture] = loadedTexture;
         return loadedTexture;
     };
 

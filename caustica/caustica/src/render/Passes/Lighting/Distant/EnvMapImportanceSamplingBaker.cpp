@@ -3,7 +3,7 @@
 #include <assets/loader/ShaderFactory.h>
 #include <render/Core/FramebufferFactory.h>
 #include <render/Core/CommonRenderPasses.h>
-#include <assets/cache/TextureCache.h>
+#include <assets/loader/TextureLoader.h>
 #include <render/Passes/Geometry/MipMapGenPass.h>
 
 #include <rhi/utils.h>

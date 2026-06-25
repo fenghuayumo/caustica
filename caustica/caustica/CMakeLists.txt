@@ -161,8 +161,10 @@ file(GLOB caustica_engine_assets_src
     include/assets/*.h
     include/assets/loader/*.h
     src/assets/loader/*.cpp
-    include/assets/cache/*.h
-    src/assets/cache/*.cpp
+    include/assets/loader/TextureLoader.h
+    include/assets/loader/*.h
+    src/assets/loader/TextureLoader.cpp
+    src/assets/loader/*.cpp
 )
 # New asset pipeline sources (Phase 4)
 file(GLOB caustica_asset_pipeline_src

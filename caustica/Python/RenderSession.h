@@ -31,7 +31,7 @@
 #include <render/Core/BindingCache.h>
 #include <render/Core/DescriptorTableManager.h>
 #include <render/WorldRenderer/WorldRendererServices.h>
-#include <assets/cache/TextureCache.h>
+#include <assets/loader/TextureLoader.h>
 
 #include <core/command_line.h>
 #include <SampleUI.h>
@@ -139,7 +139,7 @@ private:
     std::shared_ptr<caustica::CommonRenderPasses> m_commonPasses;
     std::unique_ptr<caustica::BindingCache> m_bindingCache;
     std::shared_ptr<caustica::DescriptorTableManager> m_descriptorTable;
-    std::shared_ptr<caustica::TextureCache> m_textureCache;
+    std::shared_ptr<caustica::TextureLoader> m_textureCache;
     std::unique_ptr<caustica::render::WorldRendererServices> m_worldRendererServices;
     std::unique_ptr<caustica::RenderCore>      m_renderCore;
     std::unique_ptr<SceneManager>            m_sceneManager;

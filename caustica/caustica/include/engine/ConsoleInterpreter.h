@@ -7,7 +7,7 @@
 
 namespace caustica
 {
-	class TextureCache;
+	class TextureLoader;
 
 	namespace console
 	{
@@ -61,11 +61,11 @@ namespace caustica
 			// parse incomplete command line & return auto-completion suggestions
 			std::vector<std::string> Suggest(std::string_view const cmdline, size_t cursor_pos);
 
-			bool RegisterCommands(std::shared_ptr<TextureCache> textureCache);
+			bool RegisterCommands(std::shared_ptr<TextureLoader> textureCache);
 
 		private:
 
-			std::shared_ptr<TextureCache> m_TextureCache;
+			std::shared_ptr<TextureLoader> m_TextureLoader;
 		};
 
 	} // end namespace console

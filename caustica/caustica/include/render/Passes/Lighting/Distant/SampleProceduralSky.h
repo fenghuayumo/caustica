@@ -23,7 +23,7 @@ using namespace caustica::math;
 namespace caustica
 {
     class FramebufferFactory;
-    class TextureCache;
+    class TextureLoader;
     class TextureHandle;
     class ShaderFactory;
     class CommonRenderPasses;
@@ -34,7 +34,7 @@ namespace caustica
 class SampleProceduralSky 
 {
 public:
-    SampleProceduralSky( nvrhi::IDevice* device, std::shared_ptr<caustica::TextureCache> textureCache, std::shared_ptr<caustica::CommonRenderPasses> commonPasses, nvrhi::ICommandList* commandList );
+    SampleProceduralSky( nvrhi::IDevice* device, std::shared_ptr<caustica::TextureLoader> textureCache, std::shared_ptr<caustica::CommonRenderPasses> commonPasses, nvrhi::ICommandList* commandList );
     ~SampleProceduralSky();
 
     nvrhi::TextureHandle            GetTransmittanceTexture() const;
@@ -51,7 +51,7 @@ private:
     double                          m_lastSceneTime = 0.0;
 
     nvrhi::DeviceHandle                             m_device;
-    std::shared_ptr<caustica::TextureCache>    m_textureCache;
+    std::shared_ptr<caustica::TextureLoader>    m_textureCache;
 
     std::shared_ptr<caustica::LoadedTexture>   m_transmittanceTexture;
     std::shared_ptr<caustica::LoadedTexture>   m_scatterringTexture;

@@ -4,7 +4,7 @@
 #include <assets/loader/ShaderFactory.h>
 #include <render/Core/FramebufferFactory.h>
 #include <render/Core/CommonRenderPasses.h>
-#include <assets/cache/TextureCache.h>
+#include <assets/loader/TextureLoader.h>
 
 #include <engine/UserInterfaceUtils.h>
 #include <scene/Scene.h>
@@ -35,7 +35,7 @@ using namespace caustica;
 
 OmmBaker::OmmBaker(nvrhi::DeviceHandle device,
     std::shared_ptr<caustica::DescriptorTableManager> descriptorTableManager,
-    std::shared_ptr<caustica::TextureCache> textureCache,
+    std::shared_ptr<caustica::TextureLoader> textureCache,
     std::shared_ptr<caustica::ShaderFactory> shaderFactory)
     : m_device(device)
     , m_textureCache(std::move(textureCache))

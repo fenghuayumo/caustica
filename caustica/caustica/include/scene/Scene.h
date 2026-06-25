@@ -25,7 +25,7 @@ namespace caustica
 {
     class ShaderFactory;
     struct SceneImportResult;
-    class TextureCache;
+    class TextureLoader;
     class ThreadPool;
     class DescriptorTableManager;
     class GltfImporter;
@@ -36,7 +36,7 @@ namespace caustica
     protected:
         std::shared_ptr<caustica::IFileSystem> m_fs;
         std::shared_ptr<SceneTypeFactory> m_SceneTypeFactory;
-        std::shared_ptr<TextureCache> m_TextureCache;
+        std::shared_ptr<TextureLoader> m_TextureLoader;
         std::shared_ptr<DescriptorTableManager> m_DescriptorTable;
         std::shared_ptr<SceneGraph> m_SceneGraph;
         std::shared_ptr<GltfImporter> m_GltfImporter;
@@ -118,7 +118,7 @@ namespace caustica
             nvrhi::IDevice* device,
             ShaderFactory& shaderFactory,
             std::shared_ptr<caustica::IFileSystem> fs,
-            std::shared_ptr<TextureCache> textureCache,
+            std::shared_ptr<TextureLoader> textureCache,
             std::shared_ptr<DescriptorTableManager> descriptorTable,
             std::shared_ptr<SceneTypeFactory> sceneTypeFactory);
 

@@ -11,7 +11,7 @@
 #include <render/Core/FramebufferFactory.h>
 #include <assets/loader/ShaderFactory.h>
 #include <render/Core/CommonRenderPasses.h>
-#include <assets/cache/TextureCache.h>
+#include <assets/loader/TextureLoader.h>
 #include <render/Core/BindingCache.h>
 #include <render/Passes/PostProcess/ToneMappingPasses.h>
 #include <render/Core/View.h>
@@ -296,13 +296,13 @@ void SceneEditor::AttachRenderResources(
     const std::shared_ptr<caustica::CommonRenderPasses>& commonPasses,
     caustica::BindingCache* bindingCache,
     const std::shared_ptr<caustica::DescriptorTableManager>& descriptorTable,
-    const std::shared_ptr<caustica::TextureCache>& textureCache)
+    const std::shared_ptr<caustica::TextureLoader>& textureCache)
 {
     m_shaderFactory = shaderFactory;
     m_CommonPasses = commonPasses;
     m_bindingCache = bindingCache;
     m_DescriptorTable = descriptorTable;
-    m_TextureCache = textureCache;
+    m_TextureLoader = textureCache;
 }
 
 void SceneEditor::AttachWorldRenderer(caustica::render::PathTracingWorldRenderer* renderer)
@@ -387,7 +387,7 @@ void SceneEditor::Init(const std::string& preferredScene,
         return;
     }
 
-    if (!m_DescriptorTable || !m_TextureCache)
+    if (!m_DescriptorTable || !m_TextureLoader)
     {
         caustica::fatal("SceneEditor::Init requires descriptor table and texture cache");
         return;
@@ -416,7 +416,7 @@ void SceneEditor::Init(const std::string& preferredScene,
     m_progressLoading.Set(95);
 
     if (GetDevice()->queryFeatureSupport(nvrhi::Feature::RayTracingOpacityMicromap))
-        m_ommBaker = std::make_shared<OmmBaker>(GetDevice(), m_DescriptorTable, m_TextureCache, m_shaderFactory);
+        m_ommBaker = std::make_shared<OmmBaker>(GetDevice(), m_DescriptorTable, m_TextureLoader, m_shaderFactory);
 
     // Get all scenes in "assets" folder
     m_sceneManager->discoverAvailableScenes(GetLocalPath(c_AssetsFolder));
@@ -896,10 +896,10 @@ void SceneEditor::SceneLoaded( )
 
     m_progressLoading.Set(55);
 
-    if (m_TextureCache && m_CommonPasses)
+    if (m_TextureLoader && m_CommonPasses)
     {
-        m_TextureCache->ProcessRenderingThreadCommands(*m_CommonPasses, 0.f);
-        m_TextureCache->LoadingFinished();
+        m_TextureLoader->ProcessRenderingThreadCommands(*m_CommonPasses, 0.f);
+        m_TextureLoader->LoadingFinished();
     }
 
     m_progressLoading.Set(60);
@@ -1501,7 +1501,7 @@ void SceneEditor::HandleDroppedFiles()
 
 bool SceneEditor::LoadMeshFile(const std::filesystem::path& filePath)
 {
-    if (!m_sceneManager->getScene() || !m_shaderFactory || !m_TextureCache)
+    if (!m_sceneManager->getScene() || !m_shaderFactory || !m_TextureLoader)
     {
         caustica::error("Cannot load mesh: scene, shader factory, or texture cache not initialized.");
         return false;
@@ -1542,7 +1542,7 @@ bool SceneEditor::LoadGltfMeshFile(const std::filesystem::path& filePath)
     if (m_sceneManager->getCurrentScenePath() != std::filesystem::path(SceneManager::inlineSceneSentinel()))
         sceneDirectory = m_sceneManager->getCurrentScenePath().parent_path();
 
-    if (!importer->Load(filePath, *m_TextureCache, stats, nullptr, importResult, sceneDirectory))
+    if (!importer->Load(filePath, *m_TextureLoader, stats, nullptr, importResult, sceneDirectory))
     {
         caustica::error("GltfImporter failed to load '%s'", filePath.string().c_str());
         return false;
@@ -1570,7 +1570,7 @@ bool SceneEditor::LoadObjMeshFile(const std::filesystem::path& filePath)
 
     caustica::SceneLoadingStats stats;
     SceneImportResult importResult;
-    if (!importer.Load(filePath, *m_TextureCache, stats, nullptr, importResult))
+    if (!importer.Load(filePath, *m_TextureLoader, stats, nullptr, importResult))
         return false;
 
     if (!importResult.rootNode)

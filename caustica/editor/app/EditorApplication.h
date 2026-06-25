@@ -30,7 +30,7 @@ namespace caustica {
     class DescriptorTableManager;
     class BindlessTable;
     class RenderCore;
-    class TextureCache;
+    class TextureLoader;
     class Window;
     struct DeviceCreationParameters;
     namespace render {
@@ -119,7 +119,7 @@ private:
     std::unique_ptr<caustica::BindingCache> m_bindingCache;
     std::shared_ptr<caustica::DescriptorTableManager> m_descriptorTable;
     std::unique_ptr<caustica::BindlessTable> m_bindlessTable;
-    std::shared_ptr<caustica::TextureCache> m_textureCache;
+    std::shared_ptr<caustica::TextureLoader> m_textureCache;
     std::unique_ptr<caustica::render::WorldRendererServices> m_worldRendererServices;
     std::unique_ptr<caustica::RenderCore>      m_renderCore;
     std::unique_ptr<SceneManager>              m_sceneManager;

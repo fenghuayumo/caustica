@@ -23,7 +23,7 @@ namespace { constexpr int c_SwapchainCount = 3; }
 #include <backend/GpuDevice.h>
 #include <core/path_utils.h>
 #include <core/log.h>
-#include <assets/cache/TextureCache.h>
+#include <assets/loader/TextureLoader.h>
 #include <render/Core/PathTracerSettings.h>
 #include <math/float.h>
 #include <math/math.h>

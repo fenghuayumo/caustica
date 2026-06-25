@@ -13,7 +13,7 @@
 #include <render/Passes/Lighting/LightsBaker.h>
 #include <render/Passes/Lighting/MaterialsBaker.h>
 #include <render/Passes/OMM/OmmBaker.h>
-#include <assets/cache/TextureCache.h>
+#include <assets/loader/TextureLoader.h>
 #include <render/Core/DescriptorTableManager.h>
 #include <scene/SceneManager.h>
 
@@ -97,7 +97,7 @@ struct WorldRendererServices
     std::shared_ptr<ShaderFactory>& shaderFactory;
     std::shared_ptr<CommonRenderPasses>& commonPasses;
     BindingCache& bindingCache;
-    std::shared_ptr<TextureCache>& textureCache;
+    std::shared_ptr<TextureLoader>& textureCache;
     std::shared_ptr<DescriptorTableManager>& descriptorTable;
 
     std::shared_ptr<EnvMapBaker>& envMapBaker;

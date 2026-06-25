@@ -24,7 +24,7 @@
 #include <core/path_utils.h>
 #include <core/vfs/VFS.h>
 #include <assets/loader/ShaderFactory.h>
-#include <assets/cache/TextureCache.h>
+#include <assets/loader/TextureLoader.h>
 #include <render/Core/BindingCache.h>
 #include <core/vfs/VFS.h>
 #include <engine/UserInterfaceUtils.h>
@@ -672,7 +672,7 @@ void RenderSession::initRenderInfrastructurePhase2(nvrhi::IBindingLayout* bindle
     m_descriptorTable = std::make_shared<caustica::DescriptorTableManager>(device, bindlessLayout);
 
     auto nativeFS = std::make_shared<caustica::NativeFileSystem>();
-    m_textureCache = std::make_shared<caustica::TextureCache>(device, nativeFS, m_descriptorTable);
+    m_textureCache = std::make_shared<caustica::TextureLoader>(device, nativeFS, m_descriptorTable);
 
     m_renderer->AttachRenderResources(m_shaderFactory, m_commonPasses, m_bindingCache.get(), m_descriptorTable, m_textureCache);
 }

@@ -1,5 +1,5 @@
 #include <assets/loader/ObjImporter.h>
-#include <assets/cache/TextureCache.h>
+#include <assets/loader/TextureLoader.h>
 #include <scene/SceneGraph.h>
 #include <core/log.h>
 #include <core/vfs/VFS.h>
@@ -311,7 +311,7 @@ namespace
     }
 
     std::shared_ptr<LoadedTexture> LoadGeneratedObjTexture(
-        TextureCache& textureCache,
+        TextureLoader& textureCache,
         const std::string& generatedName,
         const std::vector<uint8_t>& rgba,
         uint32_t width,
@@ -691,7 +691,7 @@ namespace
     std::shared_ptr<LoadedTexture> BuildObjMetalRoughTexture(
         const ObjMaterialInfo& material,
         const std::filesystem::path& objFilePath,
-        TextureCache& textureCache)
+        TextureLoader& textureCache)
     {
         if (material.occlusionTexture.empty() && material.roughnessTexture.empty() && material.metalnessTexture.empty())
             return nullptr;
@@ -740,7 +740,7 @@ namespace
     std::shared_ptr<LoadedTexture> BuildObjSpecGlossTexture(
         const ObjMaterialInfo& material,
         const std::filesystem::path& objFilePath,
-        TextureCache& textureCache)
+        TextureLoader& textureCache)
     {
         if (material.specularTexture.empty() && material.glossinessTexture.empty())
             return nullptr;
@@ -798,7 +798,7 @@ namespace
     }
 }
 
-bool ObjImporter::Load(const std::filesystem::path& filePath, TextureCache& textureCache, SceneLoadingStats&, ThreadPool*, SceneImportResult& result, const std::filesystem::path&) const
+bool ObjImporter::Load(const std::filesystem::path& filePath, TextureLoader& textureCache, SceneLoadingStats&, ThreadPool*, SceneImportResult& result, const std::filesystem::path&) const
 {
     std::ifstream file(filePath);
     if (!file)

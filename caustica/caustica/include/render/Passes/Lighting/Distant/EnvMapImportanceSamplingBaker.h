@@ -18,7 +18,7 @@ using namespace caustica::math;
 namespace caustica
 {
     class FramebufferFactory;
-    class TextureCache;
+    class TextureLoader;
     class TextureHandle;
     class ShaderFactory;
     class CommonRenderPasses;

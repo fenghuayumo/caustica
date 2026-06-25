@@ -1,7 +1,7 @@
 #pragma once
 
 #include <scene/SceneTypes.h>
-#include <assets/cache/TextureCache.h>
+#include <assets/loader/TextureLoader.h>
 #include <render/Core/AccelerationStructureUtil.h>
 
 #include <rhi/nvrhi.h>

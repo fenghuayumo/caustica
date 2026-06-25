@@ -2,7 +2,7 @@
 #include <assets/loader/ShaderFactory.h>
 #include <render/Core/FramebufferFactory.h>
 #include <render/Core/CommonRenderPasses.h>
-#include <assets/cache/TextureCache.h>
+#include <assets/loader/TextureLoader.h>
 
 #include <rhi/utils.h>
 
@@ -22,7 +22,7 @@
 using namespace caustica::math;
 using namespace caustica;
 
-SampleProceduralSky::SampleProceduralSky( nvrhi::IDevice* device, std::shared_ptr<caustica::TextureCache> textureCache, std::shared_ptr<caustica::CommonRenderPasses> commonPasses, nvrhi::ICommandList* commandList )
+SampleProceduralSky::SampleProceduralSky( nvrhi::IDevice* device, std::shared_ptr<caustica::TextureLoader> textureCache, std::shared_ptr<caustica::CommonRenderPasses> commonPasses, nvrhi::ICommandList* commandList )
     : m_device(device)
     , m_textureCache(textureCache)
 {

@@ -1,4 +1,4 @@
-#include <assets/cache/TextureCache.h>
+#include <assets/loader/TextureLoader.h>
 #include <assets/AssetSystem.h>
 
 #include <render/Core/DescriptorTableManager.h>
@@ -67,7 +67,7 @@ public:
 };
 
 
-TextureCache::TextureCache(
+TextureLoader::TextureLoader(
     nvrhi::IDevice* device,
     std::shared_ptr<IFileSystem> fs,
     std::shared_ptr<DescriptorTableManager> descriptorTable)
@@ -77,12 +77,12 @@ TextureCache::TextureCache(
 {
 }
 
-TextureCache::~TextureCache()
+TextureLoader::~TextureLoader()
 {
     Reset();
 }
 
-void TextureCache::Reset()
+void TextureLoader::Reset()
 {
     std::lock_guard<std::shared_mutex> guard(m_LoadedTexturesMutex);
 
@@ -96,12 +96,12 @@ void TextureCache::Reset()
     m_TexturesLoaded = 0;
 }
 
-void TextureCache::SetGenerateMipmaps(bool generateMipmaps)
+void TextureLoader::SetGenerateMipmaps(bool generateMipmaps)
 {
     m_GenerateMipmaps = generateMipmaps;
 }
 
-void TextureCache::RegisterTextureAsset(const std::shared_ptr<TextureData>& texture)
+void TextureLoader::RegisterTextureAsset(const std::shared_ptr<TextureData>& texture)
 {
     if (texture->path.empty())
         return;
@@ -113,7 +113,7 @@ void TextureCache::RegisterTextureAsset(const std::shared_ptr<TextureData>& text
     registry.SetState(id, AssetState::Loaded);
 }
 
-bool TextureCache::FindTextureInCache(const std::filesystem::path& path, std::shared_ptr<TextureData>& texture)
+bool TextureLoader::FindTextureInCache(const std::filesystem::path& path, std::shared_ptr<TextureData>& texture)
 {
     std::lock_guard<std::shared_mutex> guard(m_LoadedTexturesMutex);
 
@@ -148,7 +148,7 @@ bool TextureCache::FindTextureInCache(const std::filesystem::path& path, std::sh
     return false;
 }
 
-std::shared_ptr<IBlob> TextureCache::ReadTextureFile(const std::filesystem::path& path) const
+std::shared_ptr<IBlob> TextureLoader::ReadTextureFile(const std::filesystem::path& path) const
 {
     auto fileData = m_fs->readFile(path);
 
@@ -158,12 +158,12 @@ std::shared_ptr<IBlob> TextureCache::ReadTextureFile(const std::filesystem::path
     return fileData;
 }
 
-std::shared_ptr<TextureData> TextureCache::CreateTextureData()
+std::shared_ptr<TextureData> TextureLoader::CreateTextureData()
 {
     return std::make_shared<TextureData>();
 }
 
-bool TextureCache::FillTextureData(
+bool TextureLoader::FillTextureData(
     const std::shared_ptr<caustica::IBlob>& fileData,
     const std::shared_ptr<TextureData>& texture,
     const std::string& extension,
@@ -316,7 +316,7 @@ uint GetMipLevelsNum(uint width, uint height)
     return levelsNum;
 }
 
-void TextureCache::FinalizeTexture(
+void TextureLoader::FinalizeTexture(
     std::shared_ptr<TextureData> texture,
     CommonRenderPasses* passes,
     nvrhi::ICommandList* commandList)
@@ -453,7 +453,7 @@ void TextureCache::FinalizeTexture(
     ++m_TexturesFinalized;
 }
 
-void TextureCache::TextureLoaded(std::shared_ptr<TextureData> texture)
+void TextureLoader::TextureLoaded(std::shared_ptr<TextureData> texture)
 {
     std::lock_guard<std::mutex> guard(m_TexturesToFinalizeMutex);
 
@@ -468,7 +468,7 @@ void TextureCache::TextureLoaded(std::shared_ptr<TextureData> texture)
     RegisterTextureAsset(texture);
 }
 
-std::shared_ptr<LoadedTexture> TextureCache::LoadTextureFromFile(
+std::shared_ptr<LoadedTexture> TextureLoader::LoadTextureFromFile(
     const std::filesystem::path& path,
     bool sRGB,
     CommonRenderPasses* passes,
@@ -498,7 +498,7 @@ std::shared_ptr<LoadedTexture> TextureCache::LoadTextureFromFile(
     return texture;
 }
 
-std::shared_ptr<LoadedTexture> TextureCache::LoadTextureFromFileDeferred(
+std::shared_ptr<LoadedTexture> TextureLoader::LoadTextureFromFileDeferred(
     const std::filesystem::path& path,
     bool sRGB)
 {
@@ -528,7 +528,7 @@ std::shared_ptr<LoadedTexture> TextureCache::LoadTextureFromFileDeferred(
     return texture;
 }
 
-std::shared_ptr<LoadedTexture> TextureCache::LoadTextureFromFileAsync(
+std::shared_ptr<LoadedTexture> TextureLoader::LoadTextureFromFileAsync(
     const std::filesystem::path& path,
     bool sRGB,
     ThreadPool& threadPool)
@@ -562,7 +562,7 @@ std::shared_ptr<LoadedTexture> TextureCache::LoadTextureFromFileAsync(
     return texture;
 }
 
-std::shared_ptr<LoadedTexture> TextureCache::LoadTextureFromMemoryAsync(
+std::shared_ptr<LoadedTexture> TextureLoader::LoadTextureFromMemoryAsync(
     const std::shared_ptr<caustica::IBlob>& data,
     const std::string& name,
     const std::string& mimeType,
@@ -592,7 +592,7 @@ std::shared_ptr<LoadedTexture> TextureCache::LoadTextureFromMemoryAsync(
     return texture;
 }
 
-std::shared_ptr<LoadedTexture> TextureCache::LoadTextureFromMemory(
+std::shared_ptr<LoadedTexture> TextureLoader::LoadTextureFromMemory(
     const std::shared_ptr<caustica::IBlob>& data,
     const std::string& name,
     const std::string& mimeType,
@@ -618,7 +618,7 @@ std::shared_ptr<LoadedTexture> TextureCache::LoadTextureFromMemory(
     return texture;
 }
 
-std::shared_ptr<LoadedTexture> TextureCache::LoadTextureFromMemoryDeferred(
+std::shared_ptr<LoadedTexture> TextureLoader::LoadTextureFromMemoryDeferred(
     const std::shared_ptr<caustica::IBlob>& data,
     const std::string& name,
     const std::string& mimeType,
@@ -645,7 +645,7 @@ std::shared_ptr<LoadedTexture> TextureCache::LoadTextureFromMemoryDeferred(
 }
 
 
-std::shared_ptr<TextureData> TextureCache::GetLoadedTexture(std::filesystem::path const& path)
+std::shared_ptr<TextureData> TextureLoader::GetLoadedTexture(std::filesystem::path const& path)
 {
     std::lock_guard<std::shared_mutex> guard(m_LoadedTexturesMutex);
     AssetId id = AssetSystem::Get().GetRegistry().FindByPath(path);
@@ -655,7 +655,7 @@ std::shared_ptr<TextureData> TextureCache::GetLoadedTexture(std::filesystem::pat
     return it != m_LoadedTextures.end() ? it->second : nullptr;
 }
 
-bool TextureCache::ProcessRenderingThreadCommands(CommonRenderPasses& passes, float timeLimitMilliseconds)
+bool TextureLoader::ProcessRenderingThreadCommands(CommonRenderPasses& passes, float timeLimitMilliseconds)
 {
     using namespace std::chrono;
 
@@ -706,12 +706,12 @@ bool TextureCache::ProcessRenderingThreadCommands(CommonRenderPasses& passes, fl
     return (commandsExecuted > 0);
 }
 
-void TextureCache::LoadingFinished()
+void TextureLoader::LoadingFinished()
 {
     m_CommandList = nullptr;
 }
 
-void TextureCache::SetMaxTextureSize(uint32_t size)
+void TextureLoader::SetMaxTextureSize(uint32_t size)
 {
 	m_MaxTextureSize = size;
 }
@@ -893,19 +893,19 @@ namespace caustica
         return writeSuccess;
     }
 
-    bool TextureCache::IsTextureLoaded(const std::shared_ptr<LoadedTexture>& _texture)
+    bool TextureLoader::IsTextureLoaded(const std::shared_ptr<LoadedTexture>& _texture)
     {
         TextureData* texture = static_cast<TextureData*>(_texture.get());
 
         return texture && texture->data;
     }
 
-    bool TextureCache::IsTextureFinalized(const std::shared_ptr<LoadedTexture>& texture)
+    bool TextureLoader::IsTextureFinalized(const std::shared_ptr<LoadedTexture>& texture)
     {
         return texture->texture != nullptr;
     }
 
-    bool TextureCache::UnloadTexture(const std::shared_ptr<LoadedTexture>& texture)
+    bool TextureLoader::UnloadTexture(const std::shared_ptr<LoadedTexture>& texture)
     {
         AssetId id{texture->assetIdLow, texture->assetIdHigh};
         if (!id.IsValid())

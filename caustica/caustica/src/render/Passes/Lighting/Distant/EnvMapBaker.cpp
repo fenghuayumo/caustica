@@ -18,7 +18,7 @@
 #include <assets/loader/ShaderFactory.h>
 #include <render/Core/FramebufferFactory.h>
 #include <render/Core/CommonRenderPasses.h>
-#include <assets/cache/TextureCache.h>
+#include <assets/loader/TextureLoader.h>
 
 #include <engine/UserInterfaceUtils.h>
 
@@ -38,7 +38,7 @@ using namespace caustica;
 
 static const int    c_BlockCompressionBlockSize = 4;
 
-EnvMapBaker::EnvMapBaker( nvrhi::IDevice* device, std::shared_ptr<caustica::TextureCache> textureCache, bool enableRasterPrecompute )
+EnvMapBaker::EnvMapBaker( nvrhi::IDevice* device, std::shared_ptr<caustica::TextureLoader> textureCache, bool enableRasterPrecompute )
     : m_device(device)
     , m_textureCache(textureCache)
 {
