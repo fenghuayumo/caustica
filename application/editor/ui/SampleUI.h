@@ -27,7 +27,7 @@ using namespace caustica::math;
 #include <render/Passes/Denoisers/NrdConfig.h>
 #include <render/Core/PathTracerSettings.h>
 #include <render/Passes/Debug/Korgi.h>
-#include "EditorUIState.h"
+#include "SampleUIData.h"
 #include <core/command_line.h>
 
 #if CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
@@ -43,13 +43,6 @@ namespace caustica::editor
 {
 
 class SceneEditor;
-
-struct SampleUIData : PathTracerSettings, EditorUIState
-{
-};
-
-void InitializeSampleUIDataFromCommandLine(SampleUIData& ui, const CommandLineOptions& cmdLine);
-
 class ImGuiManager;
 class EditorApplication;
 

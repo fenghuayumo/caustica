@@ -3,6 +3,8 @@
 #if CAUSTICA_WITH_PYTHON
 
 #include "SceneEditor.h"
+#include <render/SceneGaussianSplatPasses.h>
+#include <render/SceneLightingPasses.h>
 #include "EditorApplication.h"
 #include <render/WorldRenderer/PathTracingWorldRenderer.h>
 #include <SampleCommon/LocalConfig.h>
@@ -684,6 +686,8 @@ void RenderSession::initRenderInfrastructurePhase2(nvrhi::IBindingLayout* bindle
 caustica::render::WorldRendererServices RenderSession::buildWorldRendererServices()
 {
     SceneEditor& editor = *m_renderer;
+    SceneLightingPasses& lighting = editor.GetLightingPasses();
+    SceneGaussianSplatPasses& splats = editor.GetGaussianSplatPasses();
     return caustica::render::WorldRendererServices{
         .gpuDevice = *m_deviceManager,
         .sceneManager = *m_sceneManager,
@@ -694,17 +698,17 @@ caustica::render::WorldRendererServices RenderSession::buildWorldRendererService
         .bindingCache = *m_bindingCache,
         .textureCache = m_textureCache,
         .descriptorTable = m_descriptorTable,
-        .envMapBaker = editor.GetEnvMapBaker(),
-        .lightsBaker = editor.GetLightsBaker(),
-        .materialsBaker = editor.GetMaterialsBaker(),
-        .ommBaker = editor.GetOMMBaker(),
-        .computePipelineBaker = editor.GetComputePipelineBaker(),
-        .lights = editor.GetLights(),
-        .envMapSceneParams = editor.GetEnvMapSceneParams(),
-        .envMapLocalPath = editor.GetEnvMapLocalPath(),
-        .envMapOverride = editor.GetEnvMapOverrideSource(),
+        .envMapBaker = lighting.envMapBaker(),
+        .lightsBaker = lighting.lightsBaker(),
+        .materialsBaker = lighting.materialsBaker(),
+        .ommBaker = lighting.ommBaker(),
+        .computePipelineBaker = lighting.computePipelineBaker(),
+        .lights = lighting.lights(),
+        .envMapSceneParams = lighting.envMapSceneParams(),
+        .envMapLocalPath = lighting.envMapLocalPath(),
+        .envMapOverride = lighting.envMapOverride(),
         .sceneTime = editor.GetSceneTimeRef(),
-        .gaussianSplatEmissionProxies = editor.GetGaussianSplatEmissionProxies(),
+        .gaussianSplatEmissionProxies = splats.emissionProxies(),
         .progressInitializingRenderer = editor.GetProgressInitializingRenderer(),
         .asyncLoadingInProgress = editor.GetAsyncLoadingInProgressRef(),
         .benchStart = editor.GetBenchStart(),

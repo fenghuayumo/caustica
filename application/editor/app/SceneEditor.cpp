@@ -1,6 +1,17 @@
 #include "SceneEditor.h"
+
+#include "render/SceneGaussianSplatPasses.h"
+#include "render/SceneLightingPasses.h"
+#include "render/SceneRayTracingResources.h"
+
 #include <render/WorldRenderer/PathTracingWorldRenderer.h>
 #include <render/WorldRenderer/WorldRendererServices.h>
+#include <shaders/PathTracer/PathTracerDebug.hlsli>
+#include <shaders/SampleConstantBuffer.h>
+#include "render/Core/RenderTargets.h"
+#include <render/Passes/Gaussian/GaussianSplatEmissionProxy.h>
+#include <events/key_event.h>
+#include <events/mouse_event.h>
 
 #include <render/Core/PostProcessAA.h>
 #include <render/Core/SceneGeometryUpdate.h>
@@ -273,21 +284,10 @@ const SceneLightingPasses& SceneEditor::GetLightingPasses() const
 const std::string& SceneEditor::GetEnvMapLocalPath() const { return GetLightingPasses().envMapLocalPath(); }
 const std::string& SceneEditor::GetEnvMapOverrideSource() const { return GetLightingPasses().envMapOverride(); }
 const std::vector<std::filesystem::path>& SceneEditor::GetEnvMapMediaList() { return GetLightingPasses().envMapMediaList(); }
-std::shared_ptr<EnvMapBaker>& SceneEditor::GetEnvMapBaker() { return GetLightingPasses().envMapBaker(); }
-const std::shared_ptr<EnvMapBaker>& SceneEditor::GetEnvMapBaker() const { return GetLightingPasses().envMapBaker(); }
-std::shared_ptr<LightsBaker>& SceneEditor::GetLightsBaker() { return GetLightingPasses().lightsBaker(); }
-const std::shared_ptr<LightsBaker>& SceneEditor::GetLightsBaker() const { return GetLightingPasses().lightsBaker(); }
-std::shared_ptr<MaterialsBaker>& SceneEditor::GetMaterialsBaker() { return GetLightingPasses().materialsBaker(); }
-const std::shared_ptr<MaterialsBaker>& SceneEditor::GetMaterialsBaker() const { return GetLightingPasses().materialsBaker(); }
-std::shared_ptr<OmmBaker>& SceneEditor::GetOMMBaker() { return GetLightingPasses().ommBaker(); }
-const std::shared_ptr<OmmBaker>& SceneEditor::GetOMMBaker() const { return GetLightingPasses().ommBaker(); }
-std::shared_ptr<ComputePipelineBaker>& SceneEditor::GetComputePipelineBaker() { return GetLightingPasses().computePipelineBaker(); }
-const std::shared_ptr<ComputePipelineBaker>& SceneEditor::GetComputePipelineBaker() const { return GetLightingPasses().computePipelineBaker(); }
-std::vector<std::shared_ptr<caustica::Light>>& SceneEditor::GetLights() { return GetLightingPasses().lights(); }
-EnvMapSceneParams& SceneEditor::GetEnvMapSceneParams() { return GetLightingPasses().envMapSceneParams(); }
-const EnvMapSceneParams& SceneEditor::GetEnvMapSceneParams() const { return GetLightingPasses().envMapSceneParams(); }
-std::string& SceneEditor::GetEnvMapLocalPath() { return GetLightingPasses().envMapLocalPath(); }
-std::string& SceneEditor::GetEnvMapOverrideSource() { return GetLightingPasses().envMapOverride(); }
+
+std::shared_ptr<caustica::CommonRenderPasses> SceneEditor::GetCommonPasses() const { return m_CommonPasses; }
+std::shared_ptr<caustica::DescriptorTableManager> SceneEditor::GetDescriptorTable() const { return m_DescriptorTable; }
+caustica::BindingCache& SceneEditor::GetBindingCache() { return *m_bindingCache; }
 
 void SceneEditor::AttachRayTracingResources(SceneRayTracingResources& rayTracingResources)
 {
@@ -321,16 +321,6 @@ const SceneGaussianSplatPasses& SceneEditor::GetGaussianSplatPasses() const
 {
     assert(m_gaussianSplatPasses != nullptr && m_gaussianSplatPasses->isAttached());
     return *m_gaussianSplatPasses;
-}
-
-std::vector<GaussianSplatEmissionProxy>& SceneEditor::GetGaussianSplatEmissionProxies()
-{
-    return GetGaussianSplatPasses().emissionProxies();
-}
-
-const std::vector<GaussianSplatEmissionProxy>& SceneEditor::GetGaussianSplatEmissionProxies() const
-{
-    return GetGaussianSplatPasses().emissionProxies();
 }
 
 void SceneEditor::PrepareEditorFrame()

@@ -7,6 +7,7 @@
 #include <core/Timer.h>
 #include <core/command_line.h>
 
+#include "ui/SampleUIData.h"
 #include "SceneEditor.h"
 #include <render/SceneRenderFacade.h>
 

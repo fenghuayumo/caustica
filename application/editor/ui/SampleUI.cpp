@@ -1,5 +1,7 @@
 #include "ui/ui_macros.h"
 #include "SceneEditor.h"
+#include <render/SceneLightingPasses.h>
+#include <render/SceneGaussianSplatPasses.h>
 #include "SampleCommon/ImGuiManager.h"
 #include "EditorApplication.h"
 
@@ -11,6 +13,7 @@
 #include <scene/SceneGraph.h>
 #include <iterator>
 #include <imgui_internal.h>
+#include <assets/loader/ShaderFactory.h>
 #include <render/Passes/Lighting/MaterialsBaker.h>
 
 #include <render/Passes/PostProcess/ToneMappingPasses.h>
@@ -1168,19 +1171,20 @@ void SampleUI::buildUI(void)
                 RESET_ON_CHANGE( ImGui::InputFloat3("Rotation XYZ", (float*)&m_ui.EnvironmentMapParams.RotationXYZ.x) );
                 ImGui::Separator();
 
-                if (m_sceneEditor.GetEnvMapBaker() != nullptr && m_sceneEditor.GetEnvMapBaker()->IsProcedural() && m_sceneEditor.GetEnvMapBaker()->GetProceduralSky() != nullptr) // one frame delay for these settings
+                if (auto& envMapBaker = m_sceneEditor.GetLightingPasses().envMapBaker();
+                    envMapBaker != nullptr && envMapBaker->IsProcedural() && envMapBaker->GetProceduralSky() != nullptr)
                 {
                     ImGui::TextColored(categoryColor, "Procedural Sky settings:");
                     RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent););
-                    m_sceneEditor.GetEnvMapBaker()->GetProceduralSky()->DebugGUI(indent);
+                    envMapBaker->GetProceduralSky()->DebugGUI(indent);
                 }
             }
 
             if (ImGui::CollapsingHeader("Materials"))
             {
                 RAII_SCOPE( ImGui::Indent(indent);, ImGui::Unindent(indent); );
-                if ( m_sceneEditor.GetMaterialsBaker() != nullptr )
-                    m_sceneEditor.GetMaterialsBaker()->DebugGUI(indent);
+                if (auto& materialsBaker = m_sceneEditor.GetLightingPasses().materialsBaker(); materialsBaker != nullptr)
+                    materialsBaker->DebugGUI(indent);
             }
         }
 
@@ -1257,8 +1261,8 @@ void SampleUI::buildUI(void)
 
             {
                 RAII_SCOPE(ImGui::Indent(indent);, ImGui::Unindent(indent););
-                if (m_sceneEditor.GetLightsBaker() != nullptr) // local lights baker can legally be nullptr
-                    m_ui.ResetAccumulation |= m_sceneEditor.GetLightsBaker()->InfoGUI(indent);
+                if (auto& lightsBaker = m_sceneEditor.GetLightingPasses().lightsBaker(); lightsBaker != nullptr)
+                    m_ui.ResetAccumulation |= lightsBaker->InfoGUI(indent);
             }
 
 
@@ -1268,15 +1272,15 @@ void SampleUI::buildUI(void)
                 if (ImGui::CollapsingHeader("Distant lighting (envmap+directional)", 0/*ImGuiTreeNodeFlags_DefaultOpen*/))
                 {
                     RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent););
-                    if (m_sceneEditor.GetEnvMapBaker()!=nullptr) // envmap baker can legally be nullptr
-                        m_ui.ResetAccumulation |= m_sceneEditor.GetEnvMapBaker()->DebugGUI(indent);
+                    if (auto& envMapBaker = m_sceneEditor.GetLightingPasses().envMapBaker(); envMapBaker != nullptr)
+                        m_ui.ResetAccumulation |= envMapBaker->DebugGUI(indent);
                 }
             }
 
             ImGui::TextColored(categoryColor, "Importance sampling:");
             {
                 RAII_SCOPE(ImGui::Indent(indent);, ImGui::Unindent(indent););
-                if (m_sceneEditor.GetLightsBaker() != nullptr) // local lights baker can legally be nullptr
+                if (auto& lightsBaker = m_sceneEditor.GetLightingPasses().lightsBaker(); lightsBaker != nullptr)
                 {
                     if( m_ui.NEEType != 2 )
                     {
@@ -1311,8 +1315,8 @@ void SampleUI::buildUI(void)
                     ImGui::TextColored(categoryColor, "Debugging:");
                     {
                         RAII_SCOPE(ImGui::Indent(indent);, ImGui::Unindent(indent););
-                        if (m_sceneEditor.GetLightsBaker() != nullptr) // local lights baker can legally be nullptr
-                            m_ui.ResetAccumulation |= m_sceneEditor.GetLightsBaker()->DebugGUI(indent);
+                        if (auto& lightsBaker = m_sceneEditor.GetLightingPasses().lightsBaker(); lightsBaker != nullptr)
+                            m_ui.ResetAccumulation |= lightsBaker->DebugGUI(indent);
                     }
                 }
             }
@@ -2159,9 +2163,9 @@ void SampleUI::buildUI(void)
         {
             UI_SCOPED_INDENT(indent);
 
-            if (m_sceneEditor.GetOMMBaker())
+            if (auto& ommBaker = m_sceneEditor.GetLightingPasses().ommBaker(); ommBaker)
             {
-                m_sceneEditor.GetOMMBaker()->DebugGUI(indent, *m_sceneEditor.GetScene());
+                ommBaker->DebugGUI(indent, *m_sceneEditor.GetScene());
             }
             else
                 ImGui::Text("<Opacity Micro-Maps not supported on the current device>");
@@ -2534,7 +2538,7 @@ void SampleUI::buildUI(void)
 
     // Material Editor panel (right-click pick)
     std::shared_ptr<PTMaterial> material = PTMaterial::SafeCast(m_ui.SelectedMaterial);
-    if (material != nullptr && m_sceneEditor.GetMaterialsBaker() != nullptr && m_ui.ShowMaterialEditor)
+    if (material != nullptr && m_sceneEditor.GetLightingPasses().materialsBaker() != nullptr && m_ui.ShowMaterialEditor)
     {
         const bool inspectorVisible = m_ui.SelectedNode != nullptr && m_ui.ShowInspector;
         ImGui::SetNextWindowPos(ImVec2(float(scaledWidth) - 10.f, inspectorVisible ? 350.f : 10.f), ImGuiCond_Appearing, ImVec2(1.f, 0.f));
@@ -2552,7 +2556,7 @@ void SampleUI::buildUI(void)
 
         MaterialShaderPermutationKey mspBefore = MaterialShaderPermutationKey(material->ComputeShaderPermutation(""));
 
-        bool dirty = material->EditorGUI(*m_sceneEditor.GetMaterialsBaker());
+        bool dirty = material->EditorGUI(*m_sceneEditor.GetLightingPasses().materialsBaker());
 
         MaterialShaderPermutationKey mspAfter = MaterialShaderPermutationKey(material->ComputeShaderPermutation(""));
 
@@ -2725,10 +2729,10 @@ void SampleUI::buildUI(void)
                 // bistro dry-wet test
                 std::vector<std::string> pavementList = { "LMBR0000163Cobbl_a1d987f5", "LMBR000016bCobbl_8652c51e", "LMBR0000162Paris_c30c71f1", "LMBR0000162Paris_c30c71f1", "LMBR000016cCobbl_f202ecfa", "LMBR0000161Pavem_e2e87964", "LMBR0000168Cobbl_a5a7f4b4", "LMBR0000160Pavem_613287fe", "LMBR000016aCobbl_e1c68d26" };
                 for (std::string& id : pavementList)
-                    if (auto m = m_sceneEditor.GetMaterialsBaker()->FindByUniqueID(id))
+                    if (auto m = m_sceneEditor.GetLightingPasses().materialsBaker()->FindByUniqueID(id))
                     {
                         if (m_ui.MaterialVariantIndex == 0) // reset to default
-                            m_sceneEditor.GetMaterialsBaker()->LoadSingle(*m);
+                            m_sceneEditor.GetLightingPasses().materialsBaker()->LoadSingle(*m);
                         else
                         {   // make wet-looking
                             m->Roughness = 0.0f;
@@ -2739,10 +2743,10 @@ void SampleUI::buildUI(void)
 
                 std::vector<std::string> emissivesList = { "LMBR0000172Paris_1d83765c" /*bollards*/, "LMBR00000aeGreen_04f5ae02" /*green leaves*/, "LMBR00000afOrang_a907f305" /*yellow leaves*/, "LMBR00000b0Branc_5990161e" /*branches*/ };
                 for (std::string& id : emissivesList)
-                    if (auto m = m_sceneEditor.GetMaterialsBaker()->FindByUniqueID(id))
+                    if (auto m = m_sceneEditor.GetLightingPasses().materialsBaker()->FindByUniqueID(id))
                     {
                         if (m_ui.MaterialVariantIndex == 0 || m_ui.MaterialVariantIndex == 1) // reset to default
-                            m_sceneEditor.GetMaterialsBaker()->LoadSingle(*m);
+                            m_sceneEditor.GetLightingPasses().materialsBaker()->LoadSingle(*m);
                         else
                         {   // silly stuff
                             if (id == "LMBR0000172Paris_1d83765c")

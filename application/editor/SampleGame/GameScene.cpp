@@ -10,6 +10,9 @@
 
 #include <scene/Scene.h>
 
+#include <core/file_utils.h>
+#include <core/path_utils.h>
+#include <core/format.h>
 #include "SceneEditor.h"
 
 #include <render/Passes/Debug/Korgi.h>
