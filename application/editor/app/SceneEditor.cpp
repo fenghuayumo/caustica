@@ -14,7 +14,9 @@
 #include <events/mouse_event.h>
 
 #include <render/Core/PostProcessAA.h>
+#include <assets/loader/RuntimeMeshLoader.h>
 #include <render/Core/SceneMeshEditing.h>
+#include <scene/SceneRuntimeMutation.h>
 #include <render/Core/LightingUpdate.h>
 
 #include <core/path_utils.h>
@@ -45,7 +47,6 @@
 #include <limits>
 #include <sstream>
 #include <stdexcept>
-#include <unordered_set>
 
 #include <render/Core/PTPipelineBaker.h>
 #include <render/Core/ComputePipelineBaker.h>
@@ -66,8 +67,6 @@
 #include <render/Passes/PostProcess/DenoisingGuidesBaker.h>
 #include <render/Passes/Denoisers/OidnDenoiser.h>
 
-#include <assets/loader/GltfImporter.h>
-#include <assets/loader/ObjImporter.h>
 #include <scene/SceneGraph.h>
 
 #include <stb_image.h>
@@ -113,6 +112,25 @@ namespace
             return std::isspace(ch);
         });
         return it != scene.end() && *it == '{';
+    }
+
+    std::filesystem::path RuntimeMeshTextureSearchDirectory(const std::filesystem::path& currentScenePath)
+    {
+        if (currentScenePath.empty() || currentScenePath == std::filesystem::path(c_InlineSceneSentinel))
+            return {};
+
+        return currentScenePath.parent_path();
+    }
+
+    RuntimeMeshLoadParams MakeRuntimeMeshLoadParams(SceneManager* sceneManager, TextureLoader* textureLoader)
+    {
+        return RuntimeMeshLoadParams{
+            .TextureCache = textureLoader,
+            .SceneTypes = std::make_shared<RenderSceneTypeFactory>(),
+            .TextureSearchDirectory = sceneManager
+                ? RuntimeMeshTextureSearchDirectory(sceneManager->getCurrentScenePath())
+                : std::filesystem::path{},
+        };
     }
 }
 
@@ -1066,84 +1084,68 @@ void SceneEditor::HandleDroppedFiles()
 
 bool SceneEditor::LoadMeshFile(const std::filesystem::path& filePath)
 {
-    if (!m_sceneManager->getScene() || !m_shaderFactory || !m_TextureLoader)
-    {
-        caustica::error("Cannot load mesh: scene, shader factory, or texture cache not initialized.");
+    const auto loadResult = caustica::LoadRuntimeMeshFile(
+        MakeRuntimeMeshLoadParams(m_sceneManager, m_TextureLoader.get()),
+        filePath);
+    if (!loadResult)
         return false;
-    }
 
-    std::filesystem::path absPath = filePath;
-    if (!absPath.is_absolute())
-        absPath = std::filesystem::absolute(absPath);
-
-    if (!std::filesystem::exists(absPath))
-    {
-        caustica::error("File does not exist: '%s'", absPath.string().c_str());
+    const auto importedRoot = caustica::AttachRuntimeSceneImport(
+        m_sceneManager ? m_sceneManager->getScene() : nullptr,
+        *loadResult.ImportResult,
+        GetFrameIndex(),
+        RuntimeSceneMutationCallbacks{
+            .PostMaterialLoad = [](caustica::Material& material) { LocalConfig::PostMaterialLoad(material); },
+        });
+    if (!importedRoot)
         return false;
-    }
 
-    std::string ext = absPath.extension().string();
-    std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return char(std::tolower(c)); });
-
-    if (ext == ".gltf" || ext == ".glb")
-        return LoadGltfMeshFile(absPath);
-    if (ext == ".obj")
-        return LoadObjMeshFile(absPath);
-
-    caustica::error("Unsupported mesh file type '%s'.", ext.c_str());
-    return false;
+    FinalizeRuntimeSceneMutation(nullptr);
+    return true;
 }
 
 bool SceneEditor::LoadGltfMeshFile(const std::filesystem::path& filePath)
 {
-    auto fs = std::make_shared<caustica::NativeFileSystem>();
-    auto sceneTypeFactory = std::make_shared<caustica::render::RenderSceneTypeFactory>();
-    auto importer = std::make_shared<caustica::GltfImporter>(fs, sceneTypeFactory);
-
-    caustica::SceneLoadingStats stats;
-    caustica::SceneImportResult importResult;
-
-    std::filesystem::path sceneDirectory;
-    if (m_sceneManager->getCurrentScenePath() != std::filesystem::path(SceneManager::inlineSceneSentinel()))
-        sceneDirectory = m_sceneManager->getCurrentScenePath().parent_path();
-
-    if (!importer->Load(filePath, *m_TextureLoader, stats, nullptr, importResult, sceneDirectory))
-    {
-        caustica::error("GltfImporter failed to load '%s'", filePath.string().c_str());
+    const auto loadResult = caustica::LoadRuntimeGltfMeshFile(
+        MakeRuntimeMeshLoadParams(m_sceneManager, m_TextureLoader.get()),
+        filePath);
+    if (!loadResult)
         return false;
-    }
 
-    if (!importResult.rootNode)
-    {
-        caustica::error("GltfImporter produced no root node for '%s'", filePath.string().c_str());
+    const auto importedRoot = caustica::AttachRuntimeSceneImport(
+        m_sceneManager ? m_sceneManager->getScene() : nullptr,
+        *loadResult.ImportResult,
+        GetFrameIndex(),
+        RuntimeSceneMutationCallbacks{
+            .PostMaterialLoad = [](caustica::Material& material) { LocalConfig::PostMaterialLoad(material); },
+        });
+    if (!importedRoot)
         return false;
-    }
 
-    importResult.rootNode->SetName(filePath.stem().string());
-
-    auto importedRoot = m_sceneManager->getScene()->GetSceneGraph()->Attach(m_sceneManager->getScene()->GetSceneGraph()->GetRootNode(), importResult.rootNode);
-    FinalizeRuntimeSceneMutation(importedRoot);
-
+    FinalizeRuntimeSceneMutation(nullptr);
     return true;
 }
 
 
 bool SceneEditor::LoadObjMeshFile(const std::filesystem::path& filePath)
 {
-    auto sceneTypeFactory = std::make_shared<caustica::render::RenderSceneTypeFactory>();
-    caustica::ObjImporter importer(sceneTypeFactory);
-
-    caustica::SceneLoadingStats stats;
-    SceneImportResult importResult;
-    if (!importer.Load(filePath, *m_TextureLoader, stats, nullptr, importResult))
+    const auto loadResult = caustica::LoadRuntimeObjMeshFile(
+        MakeRuntimeMeshLoadParams(m_sceneManager, m_TextureLoader.get()),
+        filePath);
+    if (!loadResult)
         return false;
 
-    if (!importResult.rootNode)
+    const auto importedRoot = caustica::AttachRuntimeSceneImport(
+        m_sceneManager ? m_sceneManager->getScene() : nullptr,
+        *loadResult.ImportResult,
+        GetFrameIndex(),
+        RuntimeSceneMutationCallbacks{
+            .PostMaterialLoad = [](caustica::Material& material) { LocalConfig::PostMaterialLoad(material); },
+        });
+    if (!importedRoot)
         return false;
 
-    auto importedRoot = m_sceneManager->getScene()->GetSceneGraph()->Attach(m_sceneManager->getScene()->GetSceneGraph()->GetRootNode(), importResult.rootNode);
-    FinalizeRuntimeSceneMutation(importedRoot);
-
+    FinalizeRuntimeSceneMutation(nullptr);
     return true;
 }
 
@@ -1151,24 +1153,14 @@ void SceneEditor::FinalizeRuntimeSceneMutation(const std::shared_ptr<caustica::S
 {
     if (importedRoot)
     {
-        std::unordered_set<caustica::Material*> processedMaterials;
-        SceneGraphWalker walker(importedRoot.get());
-        while (walker)
-        {
-            auto meshInstance = std::dynamic_pointer_cast<MeshInstance>(walker->GetLeaf());
-            if (meshInstance && meshInstance->GetMesh())
-            {
-                for (const auto& geometry : meshInstance->GetMesh()->geometries)
-                {
-                    if (geometry->material && processedMaterials.insert(geometry->material.get()).second)
-                        LocalConfig::PostMaterialLoad(*geometry->material);
-                }
-            }
-            walker.Next(true);
-        }
+        caustica::FinalizeRuntimeSceneMutation(
+            m_sceneManager ? m_sceneManager->getScene() : nullptr,
+            importedRoot,
+            GetFrameIndex(),
+            RuntimeSceneMutationCallbacks{
+                .PostMaterialLoad = [](caustica::Material& material) { LocalConfig::PostMaterialLoad(material); },
+            });
     }
-
-    m_sceneManager->getScene()->FinishedLoading(GetFrameIndex());
 
     GetLightingPasses().notifyBakersSceneReloaded(*m_sceneManager->getScene());
 
@@ -1177,26 +1169,22 @@ void SceneEditor::FinalizeRuntimeSceneMutation(const std::shared_ptr<caustica::S
 
 bool SceneEditor::DeleteSceneNode(const std::shared_ptr<SceneGraphNode>& node)
 {
-    if (node == nullptr || m_sceneManager->getScene() == nullptr)
+    auto scene = m_sceneManager ? m_sceneManager->getScene() : nullptr;
+    auto sceneGraph = scene ? scene->GetSceneGraph() : nullptr;
+    auto rootNode = sceneGraph ? sceneGraph->GetRootNode() : nullptr;
+
+    if (!caustica::DeleteRuntimeSceneNode(DeleteRuntimeSceneNodeParams{
+            .SceneInstance = scene,
+            .Node = node,
+            .Device = GetDevice(),
+            .FrameIndex = GetFrameIndex(),
+            .BeforeDetach = [this](const std::shared_ptr<SceneGraphNode>& deletedNode) {
+                GetGaussianSplatPasses().removeObjectsUnderNode(deletedNode);
+            },
+        }))
+    {
         return false;
-
-    auto sceneGraph = m_sceneManager->getScene()->GetSceneGraph();
-    if (sceneGraph == nullptr)
-        return false;
-
-    auto rootNode = sceneGraph->GetRootNode();
-    if (rootNode == nullptr || node == rootNode)
-        return false;
-
-    if (node->GetGraph() != sceneGraph || node->GetParent() == nullptr)
-        return false;
-
-    GetDevice()->waitForIdle();
-
-    GetGaussianSplatPasses().removeObjectsUnderNode(node);
-
-    sceneGraph->Detach(node, true);
-    m_sceneManager->getScene()->FinishedLoading(GetFrameIndex());
+    }
 
     GetLightingPasses().resyncLightsFromSceneGraph(*sceneGraph);
 
