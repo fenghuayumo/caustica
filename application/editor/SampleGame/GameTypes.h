@@ -1,11 +1,7 @@
 #pragma once
 
 // =============================================================================
-// GameTypes.h — Engine-level game/scene utility types.
-//
-// Moved from editor/SampleGame/GameMisc.h.  These types have no editor
-// dependencies — they are pure engine components for pose animation,
-// light controllers, and screen-space interaction.
+// GameTypes.h — Sample game utility types (application layer).
 // =============================================================================
 
 #include <math/math.h>

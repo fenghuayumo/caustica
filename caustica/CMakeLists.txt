@@ -3,7 +3,7 @@ file(GLOB_RECURSE shaders "*.hlsl" "*.hlsli")
 file(GLOB_RECURSE shared_sources "*.cpp" "*.h" "*.md")
 list(FILTER shaders EXCLUDE REGEX "/caustica/(include|src|backend)/")
 list(FILTER shared_sources EXCLUDE REGEX "/caustica/(include|src|shaders|backend)/")
-list(FILTER shared_sources EXCLUDE REGEX "/editor/")
+list(FILTER shared_sources EXCLUDE REGEX "/application/")
 list(FILTER shared_sources EXCLUDE REGEX "/Python/")
 list(FILTER shared_sources EXCLUDE REGEX "/source/")
 
@@ -17,7 +17,7 @@ file(GLOB caustica_python_sources
 # The two NB_MODULE entry points are mutually exclusive (one defines the
 # embed-mode `caustica` module that lives inside caustica.exe, the other defines
 # the Python extension `caustica.pyd`).  They are added to their respective
-# targets later - never to causticaCore.
+# targets later - never to causticaApp.
 set(caustica_python_core_sources ${caustica_python_sources})
 list(REMOVE_ITEM caustica_python_core_sources
     "${CMAKE_CURRENT_SOURCE_DIR}/Python/PythonBindings_Embed.cpp"
@@ -201,13 +201,13 @@ endif()
 
 # Engine runtime (caustica.lib) + editor application sources
 add_subdirectory(caustica)       # builds caustica (engine static library)
-add_subdirectory(editor)         # sets CAUSTICA_EDITOR_SOURCES and CAUSTICA_EDITOR_ENTRY_SOURCE
-add_library(causticaCore STATIC ${CAUSTICA_EDITOR_SOURCES})
+add_subdirectory(../application/editor application/editor)  # sets CAUSTICA_EDITOR_SOURCES and CAUSTICA_EDITOR_ENTRY_SOURCE
+add_library(causticaApp STATIC ${CAUSTICA_EDITOR_SOURCES})
 if (MSVC)
-    target_compile_options(causticaCore PRIVATE /utf-8)
+    target_compile_options(causticaApp PRIVATE /utf-8)
 endif()
 if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(causticaCore PRIVATE
+    target_compile_options(causticaApp PRIVATE
         -Wno-error=deprecated-declarations
         -Wno-error=changes-meaning
         -Wno-error=attributes
@@ -217,45 +217,46 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         $<$<CXX_COMPILER_ID:GNU>:-Wno-error=unused-result>
     )
 endif()
-target_link_libraries(causticaCore PUBLIC causticaLib)
-target_include_directories(causticaCore PUBLIC
+target_link_libraries(causticaApp PUBLIC causticaLib)
+target_include_directories(causticaApp PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}"
-    "${CMAKE_CURRENT_SOURCE_DIR}/editor"
-    "${CMAKE_CURRENT_SOURCE_DIR}/editor/app"
-    "${CMAKE_CURRENT_SOURCE_DIR}/editor/ui"
+    "${CMAKE_SOURCE_DIR}/application/editor"
+    "${CMAKE_SOURCE_DIR}/application/editor/app"
+    "${CMAKE_SOURCE_DIR}/application/editor/ui"
+    "${CMAKE_SOURCE_DIR}/application/editor/SampleGame"
 )
-target_compile_definitions(causticaCore PUBLIC CAUSTICA_D3D12_WITH_NVAPI=$<BOOL:${NVRHI_WITH_NVAPI}>)
-target_compile_definitions(causticaCore PUBLIC CAUSTICA_WITH_OIDN=$<BOOL:${CAUSTICA_WITH_OIDN}>)
-target_compile_definitions(causticaCore PUBLIC CAUSTICA_WITH_PYTHON=$<BOOL:${CAUSTICA_WITH_PYTHON}>)
-target_compile_definitions(causticaCore PUBLIC CAUSTICA_WITH_NATIVE_DLSS=$<BOOL:${CAUSTICA_WITH_NATIVE_DLSS}>)
+target_compile_definitions(causticaApp PUBLIC CAUSTICA_D3D12_WITH_NVAPI=$<BOOL:${NVRHI_WITH_NVAPI}>)
+target_compile_definitions(causticaApp PUBLIC CAUSTICA_WITH_OIDN=$<BOOL:${CAUSTICA_WITH_OIDN}>)
+target_compile_definitions(causticaApp PUBLIC CAUSTICA_WITH_PYTHON=$<BOOL:${CAUSTICA_WITH_PYTHON}>)
+target_compile_definitions(causticaApp PUBLIC CAUSTICA_WITH_NATIVE_DLSS=$<BOOL:${CAUSTICA_WITH_NATIVE_DLSS}>)
 if (CAUSTICA_WITH_STREAMLINE OR CAUSTICA_WITH_NATIVE_DLSS)
-    target_compile_definitions(causticaCore PUBLIC CAUSTICA_WITH_ANY_DLSS=1)
+    target_compile_definitions(causticaApp PUBLIC CAUSTICA_WITH_ANY_DLSS=1)
 else()
-    target_compile_definitions(causticaCore PUBLIC CAUSTICA_WITH_ANY_DLSS=0)
+    target_compile_definitions(causticaApp PUBLIC CAUSTICA_WITH_ANY_DLSS=0)
 endif()
 if (CAUSTICA_WITH_OIDN)
-    target_link_libraries(causticaCore PUBLIC OpenImageDenoise)
+    target_link_libraries(causticaApp PUBLIC OpenImageDenoise)
 endif()
 
 # -------------------------------------------------------------------
 # Embedded Python scripting (nanobind + CPython development library)
 # -------------------------------------------------------------------
 if (CAUSTICA_WITH_PYTHON AND caustica_python_core_sources)
-    # Shared bindings + scripting host go into causticaCore so both the host
+    # Shared bindings + scripting host go into causticaApp so both the host
     # executable (embed mode) and the standalone Python extension can pull
     # them in.  The NB_MODULE() entry points themselves live in their own
     # translation units which are added later to the matching targets.
-    target_sources(causticaCore PRIVATE ${caustica_python_core_sources})
+    target_sources(causticaApp PRIVATE ${caustica_python_core_sources})
 
     # nanobind ships a static helper target named `nanobind-static`.  Link it
     # PUBLIC so the embed-mode entry point (compiled into caustica.exe) can use it.
     if (NOT TARGET nanobind-static)
         nanobind_build_library(nanobind-static)
     endif()
-    target_link_libraries(causticaCore PUBLIC nanobind-static Python::Python)
-    target_include_directories(causticaCore PUBLIC ${Python_INCLUDE_DIRS})
+    target_link_libraries(causticaApp PUBLIC nanobind-static Python::Python)
+    target_include_directories(causticaApp PUBLIC ${Python_INCLUDE_DIRS})
     if (MSVC)
-        target_compile_options(causticaCore PRIVATE /bigobj)
+        target_compile_options(causticaApp PRIVATE /bigobj)
     endif()
 
     # Copy a few example python scripts next to the binary at build time
@@ -266,22 +267,22 @@ if (CAUSTICA_WITH_PYTHON AND caustica_python_core_sources)
             COMMAND ${CMAKE_COMMAND} -E copy_if_different ${caustica_python_examples} "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/PythonExamples"
             COMMENT "Copying caustica Python example scripts"
         )
-        add_dependencies(causticaCore causticaPythonExamples)
+        add_dependencies(causticaApp causticaPythonExamples)
         set_target_properties(causticaPythonExamples PROPERTIES FOLDER ${folder})
     endif()
 endif()
 
-add_dependencies(causticaCore caustica_shaders nrd_shaders omm_shaders ShaderDynamicAssets ShaderDynamicAssets_CopyAlways)
-set_target_properties(causticaCore PROPERTIES FOLDER ${folder})
+add_dependencies(causticaApp caustica_shaders nrd_shaders omm_shaders ShaderDynamicAssets ShaderDynamicAssets_CopyAlways)
+set_target_properties(causticaApp PROPERTIES FOLDER ${folder})
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${shaders})
-# AgilitySDK support for causticaCore
+# AgilitySDK support for causticaApp
 if (CAUSTICA_D3D_AGILITY_SDK_PATH AND CAUSTICA_D3D_AGILITY_SDK_VERSION)
     if (NOT DEFINED CAUSTICA_D3D_AGILITY_SDK_VERSION)
         message(FATAL_ERROR "CAUSTICA_D3D_AGILITY_SDK_VERSION must be defined when CAUSTICA_D3D_AGILITY_SDK_PATH is defined")
     endif()
-    target_compile_definitions(causticaCore PUBLIC CAUSTICA_D3D_AGILITY_SDK_VERSION=${CAUSTICA_D3D_AGILITY_SDK_VERSION})
-    target_compile_definitions(causticaCore PRIVATE NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP=$<BOOL:${NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP}>)
-    target_include_directories(causticaCore PRIVATE ${CAUSTICA_D3D_AGILITY_SDK_PATH}/build/native/include)
+    target_compile_definitions(causticaApp PUBLIC CAUSTICA_D3D_AGILITY_SDK_VERSION=${CAUSTICA_D3D_AGILITY_SDK_VERSION})
+    target_compile_definitions(causticaApp PRIVATE NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP=$<BOOL:${NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP}>)
+    target_include_directories(causticaApp PRIVATE ${CAUSTICA_D3D_AGILITY_SDK_PATH}/build/native/include)
 endif()
 
 if (CAUSTICA_WITH_OIDN)
@@ -298,7 +299,7 @@ macro(add_caustica_sample TARGET_NAME MAIN_SOURCE)
     if (CAUSTICA_WITH_PYTHON)
         # Embed-mode NB_MODULE has to live in a target that does NOT also link
         # the Python extension's entry point - hence we attach it to each
-        # executable individually instead of causticaCore.
+        # executable individually instead of causticaApp.
         list(APPEND _extra_sources "${CMAKE_CURRENT_SOURCE_DIR}/Python/PythonBindings_Embed.cpp")
     endif()
     add_executable(${TARGET_NAME} WIN32 ${MAIN_SOURCE} ${_extra_sources})
@@ -316,7 +317,7 @@ macro(add_caustica_sample TARGET_NAME MAIN_SOURCE)
     if (MSVC)
         target_compile_options(${TARGET_NAME} PRIVATE /utf-8)
     endif()
-    target_link_libraries(${TARGET_NAME} PRIVATE causticaCore nvrhi)
+    target_link_libraries(${TARGET_NAME} PRIVATE causticaApp nvrhi)
     add_dependencies(${TARGET_NAME} caustica_shaders nrd_shaders omm_shaders ShaderDynamicAssets ShaderDynamicAssets_CopyAlways)
     set_target_properties(${TARGET_NAME} PROPERTIES 
         FOLDER ${folder}
@@ -380,7 +381,7 @@ if (CAUSTICA_WITH_PYTHON AND TARGET nanobind-static)
         RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL     "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
     )
 
-    target_link_libraries(caustica_py PRIVATE causticaCore)
+    target_link_libraries(caustica_py PRIVATE causticaApp)
     target_compile_definitions(caustica_py PRIVATE CAUSTICA_BUILDING_EXTENSION=1)
     if (MSVC)
         target_compile_options(caustica_py PRIVATE /utf-8)

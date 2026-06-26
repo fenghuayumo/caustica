@@ -3,11 +3,14 @@
 #include <memory>
 #include <filesystem>
 
+#include <core/command_line.h>
 #include <imgui/imgui_renderer.h>
+
+namespace caustica::editor
+{
 
 class SceneEditor;
 class SampleUIData;
-struct CommandLineOptions;
 
 class CaptureScriptManager
 {
@@ -62,3 +65,5 @@ private:
     bool                        m_captureSuccess                    = false;
     bool                        m_exitAfterCapture                  = false; // only active if command line parameters used
 };
+
+} // namespace caustica::editor

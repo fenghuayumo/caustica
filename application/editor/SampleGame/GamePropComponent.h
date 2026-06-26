@@ -2,7 +2,7 @@
 
 #include <shaders/PathTracer/Config.h>
 //#include "../SampleCommon.h"
-#include "GameMisc.h"
+#include "GameTypes.h"
 
 namespace caustica
 {

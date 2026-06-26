@@ -40,9 +40,14 @@
 #include <wrl/client.h>
 #endif
 
-class SceneEditor;
 namespace caustica { class ShaderFactory; }
 namespace caustica::render { class PathTracingWorldRenderer; }
+
+namespace caustica::editor
+{
+class SceneEditor;
+struct SampleUIData;
+}
 
 namespace caustica_py
 {
@@ -110,11 +115,11 @@ public:
     void SetCameraFOV(float verticalFovDegrees);
     void SetCameraIntrinsics(float fx, float fy, float cx, float cy, float width, float height);
 
-    SceneEditor*       GetSceneEditor()       { return m_renderer.get(); }
-    const SceneEditor* GetSceneEditor() const { return m_renderer.get(); }
+    caustica::editor::SceneEditor*       GetSceneEditor()       { return m_renderer.get(); }
+    const caustica::editor::SceneEditor* GetSceneEditor() const { return m_renderer.get(); }
 
-    SampleUIData& GetSampleUIData() { return m_sampleUIData; }
-    const SampleUIData& GetSampleUIData() const { return m_sampleUIData; }
+    caustica::editor::SampleUIData& GetSampleUIData() { return m_sampleUIData; }
+    const caustica::editor::SampleUIData& GetSampleUIData() const { return m_sampleUIData; }
 
     caustica::GpuDevice* GetGpuDevice() { return m_deviceManager.get(); }
     const Config&              GetConfig() const  { return m_config; }
@@ -131,7 +136,7 @@ private:
 
     Config                                          m_config;
     CommandLineOptions                              m_cmdLine;
-    SampleUIData                                    m_sampleUIData;
+    caustica::editor::SampleUIData                    m_sampleUIData;
     std::unique_ptr<caustica::GpuDevice>      m_deviceManager;
     std::unique_ptr<caustica::Window>            m_Window;
     std::unique_ptr<caustica::Application>         m_AppLoop;
@@ -143,7 +148,7 @@ private:
     std::unique_ptr<caustica::render::WorldRendererServices> m_worldRendererServices;
     std::unique_ptr<caustica::RenderCore>      m_renderCore;
     std::unique_ptr<SceneManager>            m_sceneManager;
-    std::unique_ptr<SceneEditor>             m_renderer;
+    std::unique_ptr<caustica::editor::SceneEditor>             m_renderer;
     std::unique_ptr<caustica::render::PathTracingWorldRenderer> m_worldRenderer;
 #if CAUSTICA_WITH_DX12 && defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
     Microsoft::WRL::ComPtr<ID3D12DeviceFactory>     m_d3d12DeviceFactory;

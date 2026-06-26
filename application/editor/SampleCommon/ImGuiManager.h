@@ -3,18 +3,22 @@
 #include <memory>
 #include <filesystem>
 
+#include <core/command_line.h>
+
 namespace caustica
 {
 class ShaderFactory;
 class IFileSystem;
 } // namespace caustica
 
-class SampleUIData;
-struct CommandLineOptions;
-
 namespace caustica {
 class ImGui_Renderer;
 }
+
+namespace caustica::editor
+{
+
+class SampleUIData;
 
 // =============================================================================
 // ImGuiManager — ImGui lifecycle helper: fonts, context config, input setup.
@@ -49,3 +53,5 @@ private:
     bool                      m_extensionsConfigured = false;
     bool                      m_cmdLineApplied = false;
 };
+
+} // namespace caustica::editor

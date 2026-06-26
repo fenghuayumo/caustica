@@ -16,6 +16,9 @@
 #include <render/Core/ScopedPerfMarker.h>
 #include <render/Core/TextureUtils.h>
 
+namespace caustica::editor
+{
+
 using namespace caustica;
 
 ImGuiManager::ImGuiManager(SampleUIData&           uiData,
@@ -62,3 +65,5 @@ void ImGuiManager::applyCommandLineDefaults()
 
     InitializeSampleUIDataFromCommandLine(m_uiData, m_cmdLine);
 }
+
+} // namespace caustica::editor

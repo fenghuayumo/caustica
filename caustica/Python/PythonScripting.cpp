@@ -13,7 +13,7 @@
 namespace nb = nanobind;
 
 // Forward declared in PythonBindings.cpp - registers the caustica module.
-extern SceneEditor* g_pythonSceneEditorSingleton;
+extern caustica::editor::SceneEditor* g_pythonSceneEditorSingleton;
 
 // Symbol defined by NB_MODULE(caustica, m) inside PythonBindings.cpp - we declare
 // it manually here so we can hand it to PyImport_AppendInittab without pulling

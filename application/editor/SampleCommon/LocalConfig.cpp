@@ -3,6 +3,9 @@
 #include <SampleUI.h>
 #include "SceneEditor.h"
 
+namespace caustica::editor
+{
+
 void LocalConfig::PreferredSceneOverride(std::string& preferredScene)
 {
     if (CAUSTICA_LOCAL_CONFIG_ID_STRING == "REF_VS_REALTIME")
@@ -148,4 +151,6 @@ void LocalConfig::PostMaterialLoad(caustica::Material& mat)
         mat.emissiveIntensity = 0.0f;
 #endif
 }
+
+} // namespace caustica::editor
 

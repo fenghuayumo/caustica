@@ -265,10 +265,10 @@ void HelpersSetNonInteractive() { g_NonInteractive = true; }
 bool HelpersIsNonInteractive() { return g_NonInteractive; }
 
 #ifdef _WIN32
-void HelpersRegisterActiveWindow()
+void HelpersRegisterActiveWindow(void* nativeWindowHandle)
 {
-    g_hActiveParentWindow.store(GetActiveWindow());
-    assert(g_hActiveParentWindow.load() != NULL);
+    HWND hwnd = nativeWindowHandle ? static_cast<HWND>(nativeWindowHandle) : GetActiveWindow();
+    g_hActiveParentWindow.store(hwnd);
 }
 
 void* HelpersGetActiveWindow()

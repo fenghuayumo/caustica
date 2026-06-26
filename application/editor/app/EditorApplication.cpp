@@ -1,5 +1,7 @@
 #include "EditorApplication.h"
 
+#include <engine/EntryPoint.h>
+
 #include <events/event.h>
 #include <events/key_event.h>
 #include <events/mouse_event.h>
@@ -54,6 +56,9 @@ static void __stdcall myValidationMessageCallback(void* pUserData, NVAPI_D3D12_R
 }
 #endif
 #endif
+
+namespace caustica::editor
+{
 
 namespace
 {
@@ -168,9 +173,8 @@ namespace
 
 
 EditorApplication::EditorApplication()
-    : EditorData()
-    , Application()
-    , SceneEditor(CmdLine, sampleUIData)
+    : Application()
+    , m_sceneEditor(CmdLine, sampleUIData)
 {
     RegisterLogCallback();
     korgi::Init();
@@ -179,6 +183,11 @@ EditorApplication::EditorApplication()
 EditorApplication::~EditorApplication()
 {
     korgi::Shutdown();
+}
+
+bool EditorApplication::init(int argc, const char* const* argv)
+{
+    return startup(argc, argv) == StartupResult::Success;
 }
 
 EditorApplication::StartupResult EditorApplication::startup(int argc, const char* const* argv)
@@ -196,7 +205,6 @@ EditorApplication::StartupResult EditorApplication::startup(int argc, const char
     std::string preferredScene = "default.json";
     LocalConfig::PreferredSceneOverride(preferredScene);
 
-    // Process command line arguments
     if (!ProcessCommandLine(argc, argv, deviceParams, preferredScene))
     {
         return StartupResult::FailProcessingCommandLine;
@@ -209,7 +217,6 @@ EditorApplication::StartupResult EditorApplication::startup(int argc, const char
 
     bindFrameDriver(m_GpuDevice.get());
 
-    // Check API feature support
     if (!CheckDeviceFeatureSupport(deviceParams))
     {
         return StartupResult::FailDeviceFeatureSupport;
@@ -217,8 +224,8 @@ EditorApplication::StartupResult EditorApplication::startup(int argc, const char
 
     CreateShaderFactory();
 
-    setGpuDevice(*m_GpuDevice);
-    initStreamlineAndWindow();
+    m_sceneEditor.setGpuDevice(*m_GpuDevice);
+    m_sceneEditor.initStreamlineAndWindow();
     initRenderInfrastructurePhase1();
 
     const nvrhi::BindingLayoutHandle bindlessLayout =
@@ -227,7 +234,7 @@ EditorApplication::StartupResult EditorApplication::startup(int argc, const char
     initSceneServices();
     initWorldRenderer(bindlessLayout);
 
-    Init(preferredScene, m_ShaderFactory);
+    m_sceneEditor.Init(preferredScene, m_ShaderFactory);
     syncPassesToBackBuffer();
 
 #if CAUSTICA_WITH_DX12 && (CAUSTICA_D3D_AGILITY_SDK_VERSION >= 619)   // temporary
@@ -472,13 +479,19 @@ bool EditorApplication::ProcessCommandLine(int argc, char const* const* argv,
     caustica::DeviceCreationParameters& deviceParams, std::string& preferredScene)
 {
 #if 1 // use a bit larger window by default if screen large enough
-    glfwInit();
-    const auto primMonitor = glfwGetPrimaryMonitor();
-    const GLFWvidmode* mode = (primMonitor != nullptr) ? glfwGetVideoMode(primMonitor) : (nullptr);
-    if (mode->width > 2560 && mode->height > 1440)
+    if (glfwInit())
     {
-        CmdLine.width = 2560;
-        CmdLine.height = 1440;
+        if (GLFWmonitor* primMonitor = glfwGetPrimaryMonitor())
+        {
+            if (const GLFWvidmode* mode = glfwGetVideoMode(primMonitor))
+            {
+                if (mode->width > 2560 && mode->height > 1440)
+                {
+                    CmdLine.width = 2560;
+                    CmdLine.height = 1440;
+                }
+            }
+        }
     }
 #endif
     if (CommandLineWantsConsoleLogging(argc, argv))
@@ -523,6 +536,8 @@ bool EditorApplication::ProcessCommandLine(int argc, char const* const* argv,
 
 bool EditorApplication::InitDeviceAndWindow(const caustica::DeviceCreationParameters& deviceParams)
 {
+    caustica::InvokePreGpuDeviceInitHook();
+
     if (CmdLine.noWindow)
     {
         if (!m_GpuDevice->CreateHeadlessDevice(deviceParams))
@@ -533,7 +548,6 @@ bool EditorApplication::InitDeviceAndWindow(const caustica::DeviceCreationParame
     }
     else
     {
-        // --- Platform layer: create Window via GlfwWindow ---
         caustica::GlfwWindow::makeDefault();
 
         caustica::WindowDesc wDesc;
@@ -552,15 +566,13 @@ bool EditorApplication::InitDeviceAndWindow(const caustica::DeviceCreationParame
             return false;
         }
 
-        // --- Backend layer: GPU device + swapchain via GpuDevice ---
         if (!m_GpuDevice->CreateDeviceAndSwapChain(deviceParams, m_Window.get()))
         {
             caustica::fatal("Cannot initialize a graphics device with the requested parameters");
             return false;
         }
 
-        // --- Engine layer: device + window ready for run() ---
-        HelpersRegisterActiveWindow();
+        HelpersRegisterActiveWindow(m_Window->getNativeHandle());
     }
 
 #if 0 && CAUSTICA_D3D12_WITH_NVAPI
@@ -603,7 +615,7 @@ void EditorApplication::initRenderInfrastructurePhase1()
     m_commonPasses = std::make_shared<caustica::CommonRenderPasses>(device, m_ShaderFactory);
     m_bindingCache = std::make_unique<caustica::BindingCache>(device);
 
-    AttachRenderResources(m_ShaderFactory, m_commonPasses, m_bindingCache.get(), m_descriptorTable, m_textureCache);
+    m_sceneEditor.AttachRenderResources(m_ShaderFactory, m_commonPasses, m_bindingCache.get(), m_descriptorTable, m_textureCache);
 }
 
 void EditorApplication::initRenderInfrastructurePhase2(nvrhi::IBindingLayout* bindlessLayout)
@@ -621,12 +633,12 @@ void EditorApplication::initRenderInfrastructurePhase2(nvrhi::IBindingLayout* bi
     // Watch the assets directory for texture/model changes
     caustica::AssetSystem::Get().WatchAssetDirectory("Assets");
 
-    AttachRenderResources(m_ShaderFactory, m_commonPasses, m_bindingCache.get(), m_descriptorTable, m_textureCache);
+    m_sceneEditor.AttachRenderResources(m_ShaderFactory, m_commonPasses, m_bindingCache.get(), m_descriptorTable, m_textureCache);
 }
 
 caustica::render::WorldRendererServices EditorApplication::buildWorldRendererServices()
 {
-    SceneEditor& e = *this;
+    SceneEditor& e = m_sceneEditor;
     return caustica::render::WorldRendererServices{
         .gpuDevice = *m_GpuDevice,
         .sceneManager = *m_sceneManager,
@@ -692,7 +704,7 @@ void EditorApplication::initWorldRenderer(nvrhi::IBindingLayout* bindlessLayout)
 {
     m_worldRendererServices = std::make_unique<caustica::render::WorldRendererServices>(buildWorldRendererServices());
     m_worldRenderer = std::make_unique<caustica::render::PathTracingWorldRenderer>(*m_worldRendererServices);
-    AttachWorldRenderer(m_worldRenderer.get());
+    m_sceneEditor.AttachWorldRenderer(m_worldRenderer.get());
     m_worldRenderer->createBindingLayouts(bindlessLayout);
 }
 
@@ -707,16 +719,16 @@ void EditorApplication::initSceneServices()
         m_textureCache,
         m_descriptorTable);
 
-    AttachSceneServices(*m_sceneManager, *m_renderCore);
+    m_sceneEditor.AttachSceneServices(*m_sceneManager, *m_renderCore);
 
     m_sceneManager->setLoadingCallbacks(
         [this]()
         {
-                            SceneLoaded();
+            m_sceneEditor.SceneLoaded();
         },
         [this]()
         {
-                            SceneUnloading();
+            m_sceneEditor.SceneUnloading();
         });
 
     m_renderCore->initializeRenderPipeline(m_ShaderFactory);
@@ -780,10 +792,10 @@ void EditorApplication::syncPassesToBackBuffer()
 
 void EditorApplication::onUpdate(float elapsedTimeSeconds, bool windowFocused)
 {
-    if (windowFocused || ShouldAnimateUnfocused())
+    if (windowFocused || m_sceneEditor.ShouldAnimateUnfocused())
     {
-        Animate(elapsedTimeSeconds);
-        SetLatewarpOptions();
+        m_sceneEditor.Animate(elapsedTimeSeconds);
+        m_sceneEditor.SetLatewarpOptions();
     }
 
     if (m_uiPass && (windowFocused || m_uiPass->ShouldAnimateUnfocused()))
@@ -799,7 +811,7 @@ void EditorApplication::onRender()
     if (!dm)
         return;
 
-            Render(dm->GetCurrentFramebuffer(SupportsDepthBuffer()));
+            m_sceneEditor.Render(dm->GetCurrentFramebuffer(m_sceneEditor.SupportsDepthBuffer()));
 
     if (m_uiPass)
         m_uiPass->Render(dm->GetCurrentFramebuffer(m_uiPass->SupportsDepthBuffer()));
@@ -811,21 +823,21 @@ void EditorApplication::onRender()
 
 void EditorApplication::onBackBufferResizing()
 {
-            BackBufferResizing();
+    m_sceneEditor.BackBufferResizing();
     if (m_uiPass)
         m_uiPass->BackBufferResizing();
 }
 
 void EditorApplication::onBackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount)
 {
-            BackBufferResized(width, height, sampleCount);
+    m_sceneEditor.BackBufferResized(width, height, sampleCount);
     if (m_uiPass)
         m_uiPass->BackBufferResized(width, height, sampleCount);
 }
 
 void EditorApplication::onDisplayScaleChanged(float scaleX, float scaleY)
 {
-            DisplayScaleChanged(scaleX, scaleY);
+    m_sceneEditor.DisplayScaleChanged(scaleX, scaleY);
     if (m_uiPass)
     {
         caustica::ImGui_Renderer& ui = *m_uiPass;
@@ -835,13 +847,13 @@ void EditorApplication::onDisplayScaleChanged(float scaleX, float scaleY)
 
 bool EditorApplication::shouldRenderWhenUnfocused() const
 {
-    return ShouldRenderUnfocused();
+    return m_sceneEditor.ShouldRenderUnfocused();
 }
 
 void EditorApplication::onEvent(caustica::Event& event)
 {
     // 1. Dispatch input events to SceneEditor (handles Camera/ZoomTool/shortcuts).
-    SceneEditor::onEvent(event);
+    m_sceneEditor.onEvent(event);
 
     // 2. Handle window events locally.
     caustica::EventDispatcher dispatcher(event);
@@ -852,3 +864,5 @@ void EditorApplication::onEvent(caustica::Event& event)
         return true;
     });
 }
+
+} // namespace caustica::editor

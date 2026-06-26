@@ -5,6 +5,7 @@
 
 #include <scene/camera/Camera.h>
 #include <scene/Scene.h>
+#include <core/command_line.h>
 
 #include "GameModel.h"
 #include "GameProps.h"
@@ -13,11 +14,13 @@
 #define SAMPLE_GAME_DEVELOPER_SETTINGS
 #endif
 
+namespace caustica::editor { class SceneEditor; }
+
 // this is kind of a parallel item to ExtendedScene, but built on top - perhaps a better name is needed; GameStage? GameLevel?
 class GameScene
 {
 public:
-    GameScene(class SceneEditor & sample, const CommandLineOptions& cmdLine);
+    GameScene(caustica::editor::SceneEditor& sample, const CommandLineOptions& cmdLine);
 
     void                    SceneLoaded( const std::shared_ptr<caustica::Scene> & scene, const std::filesystem::path& sceneFilePath, const std::filesystem::path & mediaPath );
     void                    SceneUnloading( );
@@ -67,7 +70,7 @@ private:
     void                    ResetGame( );
 
 private:
-    class SceneEditor &          m_sample;
+    caustica::editor::SceneEditor &          m_sample;
     std::shared_ptr<caustica::Scene>
                             m_scene = nullptr;
     int                     m_playSpeed = 3;   // speed: 0 - paused, 1 - 0.1x, 2 - 0.5x, 3 - 1.0x, 4 - 2.0x, 5 - 10.0x

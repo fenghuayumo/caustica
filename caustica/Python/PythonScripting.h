@@ -18,12 +18,12 @@
 #include <string>
 #include <vector>
 
-class SceneEditor;
+namespace caustica::editor { class SceneEditor; }
 
 class PythonScripting
 {
 public:
-    explicit PythonScripting(SceneEditor& app);
+    explicit PythonScripting(caustica::editor::SceneEditor& app);
     ~PythonScripting();
 
     // Non-copyable / non-movable: owns the embedded CPython runtime.
@@ -65,7 +65,7 @@ private:
 
     bool RunPendingLocked(const PendingScript& script);
 
-    SceneEditor&                  m_app;
+    caustica::editor::SceneEditor&                  m_app;
     bool                            m_initialized = false;
 
     std::mutex                      m_mutex;

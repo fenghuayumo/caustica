@@ -8,6 +8,9 @@
 
 using namespace caustica::math;
 
+namespace caustica::editor
+{
+
 struct TogglableNode
 {
     caustica::SceneGraphNode * SceneNode;
@@ -58,3 +61,4 @@ struct EditorUIState
     void clearPickRequests() { PickMaterialRequested = false; PickInstanceRequested = false; }
 };
 
+} // namespace caustica::editor

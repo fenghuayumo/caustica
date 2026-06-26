@@ -14,7 +14,7 @@
 
 #include <nanobind/nanobind.h>
 
-class SceneEditor;
+namespace caustica::editor { class SceneEditor; }
 
 namespace caustica_py
 {
@@ -26,6 +26,6 @@ namespace caustica_py
 
 // Shared singleton pointer used by the embedded mode.  Set by PythonScripting
 // before Py_Initialize and consumed by PythonBindings_Embed.cpp.
-extern SceneEditor* g_pythonSceneEditorSingleton;
+extern caustica::editor::SceneEditor* g_pythonSceneEditorSingleton;
 
 #endif // CAUSTICA_WITH_PYTHON

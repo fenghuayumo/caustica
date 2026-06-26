@@ -83,6 +83,21 @@ using namespace caustica::render;
 
 #include <thread>
 
+#ifdef _WIN32
+// Use discrete GPU by default on laptops.
+extern "C"
+{
+    // http://developer.download.nvidia.com/devzone/devcenter/gamegraphics/files/OptimusRenderingPolicies.pdf
+    __declspec(dllexport) DWORD NvOptimusEnablement = 1;
+
+    // https://gpuopen.com/learn/amdpowerxpressrequesthighperformance/
+    __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
+}
+#endif
+
+namespace caustica::editor
+{
+
 namespace
 {
     constexpr const char* c_InlineSceneSentinel = "__CAUSTICA_INLINE_SCENE_JSON__";
@@ -95,18 +110,6 @@ namespace
         return it != scene.end() && *it == '{';
     }
 }
-
-#ifdef _WIN32
-// Use discrete GPU by default on laptops.
-extern "C"
-{
-    // http://developer.download.nvidia.com/devzone/devcenter/gamegraphics/files/OptimusRenderingPolicies.pdf
-    __declspec(dllexport) DWORD NvOptimusEnablement = 1;
-
-    // https://gpuopen.com/learn/amdpowerxpressrequesthighperformance/
-    __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
-}
-#endif
 
 namespace
 {
@@ -218,6 +221,8 @@ namespace
     }
 }
 
+} // namespace caustica::editor
+
 #if defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
 // Required for Agility SDK on Windows 10. Setup 1.c. 2.a.
 // https://devblogs.microsoft.com/directx/gettingstarted-dx12agility/
@@ -233,6 +238,9 @@ const char* g_windowTitle = "caustica";
 const float c_envMapRadianceScale = 1.0f / 4.0f;
 
 FPSLimiter g_FPSLimiter;
+
+namespace caustica::editor
+{
 
 SceneEditor::SceneEditor(const CommandLineOptions& cmdLine,
     SampleUIData& ui)
@@ -412,7 +420,7 @@ void SceneEditor::Init(const std::string& preferredScene,
     m_settings.GaussianSplatEmissionMaxProxyCount = m_cmdLine.GaussianSplatEmissionMaxProxyCount;
     m_settings.GaussianSplatAlphaCullThreshold = m_cmdLine.GaussianSplatAlphaCullThreshold;
     
-    m_sampleGame = std::make_unique<GameScene>(*this, m_cmdLine);
+    m_sampleGame = std::make_unique<::GameScene>(*this, m_cmdLine);
     m_progressLoading.Set(95);
 
     if (GetDevice()->queryFeatureSupport(nvrhi::Feature::RayTracingOpacityMicromap))
@@ -2336,32 +2344,32 @@ void SceneEditor::InvalidateBindingSet()
         m_worldRenderer->invalidateBindingSet();
 }
 
-std::shared_ptr<PTPipelineBaker> SceneEditor::GetRTPipelineBaker() const
+std::shared_ptr<::PTPipelineBaker> SceneEditor::GetRTPipelineBaker() const
 {
     return m_worldRenderer ? m_worldRenderer->getPTPipelineBaker() : nullptr;
 }
 
-std::shared_ptr<PTPipelineVariant>& SceneEditor::PtPipelineReference()
+std::shared_ptr<::PTPipelineVariant>& SceneEditor::PtPipelineReference()
 {
     return m_worldRenderer->ptPipelineReference();
 }
 
-std::shared_ptr<PTPipelineVariant>& SceneEditor::PtPipelineBuildStablePlanes()
+std::shared_ptr<::PTPipelineVariant>& SceneEditor::PtPipelineBuildStablePlanes()
 {
     return m_worldRenderer->ptPipelineBuildStablePlanes();
 }
 
-std::shared_ptr<PTPipelineVariant>& SceneEditor::PtPipelineFillStablePlanes()
+std::shared_ptr<::PTPipelineVariant>& SceneEditor::PtPipelineFillStablePlanes()
 {
     return m_worldRenderer->ptPipelineFillStablePlanes();
 }
 
-std::shared_ptr<PTPipelineVariant>& SceneEditor::PtPipelineTestRaygenPPHDR()
+std::shared_ptr<::PTPipelineVariant>& SceneEditor::PtPipelineTestRaygenPPHDR()
 {
     return m_worldRenderer->ptPipelineTestRaygenPPHDR();
 }
 
-std::shared_ptr<PTPipelineVariant>& SceneEditor::PtPipelineEdgeDetection()
+std::shared_ptr<::PTPipelineVariant>& SceneEditor::PtPipelineEdgeDetection()
 {
     return m_worldRenderer->ptPipelineEdgeDetection();
 }
@@ -2690,3 +2698,5 @@ bool SceneEditor::onMouseScrolled(caustica::MouseScrolledEvent& e)
         m_settings.CameraMoveSpeed *= 1.0f + static_cast<float>(e.GetYOffset()) * 0.1f;
     return true;
 }
+
+} // namespace caustica::editor

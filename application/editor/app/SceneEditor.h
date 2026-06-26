@@ -59,7 +59,6 @@ namespace caustica::render { class PathTracingWorldRenderer; }
 #include <map>
 
 class DenoisingGuidesBaker;
-class CaptureScriptManager;
 class ComputePipelineBaker;
 class ComputeShaderVariant;
 class OidnDenoiser;
@@ -67,6 +66,20 @@ class OidnDenoiser;
 class PythonScripting;
 #endif
 class GaussianSplatPass;
+
+class GameScene;
+class PTPipelineVariant;
+class PTPipelineBaker;
+class OmmBaker;
+class MaterialsBaker;
+class ComputePipelineBaker;
+class GPUSort;
+class ZoomTool;
+
+namespace caustica::editor
+{
+
+class CaptureScriptManager;
 
 // Scene editor shell (mesh edit, Inspector, Capture). GPU path tracing is owned by EditorApplication.
 class SceneEditor
@@ -101,7 +114,7 @@ public:
     const DeltaTreeVizPathVertex *          GetDebugDeltaPathTree() const;
     uint                                    GetSceneCameraCount() const;
     uint &                                  SelectedCameraIndex();
-    const std::unique_ptr<class GameScene> &     GetGame() const                   { return m_sampleGame; }
+    const std::unique_ptr<::GameScene> &     GetGame() const                   { return m_sampleGame; }
 
     SampleUIData& GetUIData() { return m_ui; }
     const SampleUIData& GetUIData() const { return m_ui; }
@@ -228,14 +241,14 @@ public:
     bool consumeExperimentalPhotoScreenshot();
     void captureScriptPreRender();
     void captureScriptPostRender(std::function<bool(const char* fileName)> saveTexture);
-    class ZoomTool* getOrCreateZoomTool();
+    ::ZoomTool* getOrCreateZoomTool();
 
     // --- Pipeline variant accessors ---
-    std::shared_ptr<class PTPipelineVariant>& PtPipelineReference();
-    std::shared_ptr<class PTPipelineVariant>& PtPipelineBuildStablePlanes();
-    std::shared_ptr<class PTPipelineVariant>& PtPipelineFillStablePlanes();
-    std::shared_ptr<class PTPipelineVariant>& PtPipelineTestRaygenPPHDR();
-    std::shared_ptr<class PTPipelineVariant>& PtPipelineEdgeDetection();
+    std::shared_ptr<::PTPipelineVariant>& PtPipelineReference();
+    std::shared_ptr<::PTPipelineVariant>& PtPipelineBuildStablePlanes();
+    std::shared_ptr<::PTPipelineVariant>& PtPipelineFillStablePlanes();
+    std::shared_ptr<::PTPipelineVariant>& PtPipelineTestRaygenPPHDR();
+    std::shared_ptr<::PTPipelineVariant>& PtPipelineEdgeDetection();
 
     // Render entry points
     void Render(nvrhi::IFramebuffer* framebuffer);
@@ -278,8 +291,8 @@ public:
     const std::shared_ptr<LightsBaker>&     GetLightsBaker() const { return m_lightsBaker; }
     std::shared_ptr<MaterialsBaker>&      GetMaterialsBaker() { return m_materialsBaker; }
     const std::shared_ptr<MaterialsBaker>&  GetMaterialsBaker() const { return m_materialsBaker; }
-    std::shared_ptr<class OmmBaker>&        GetOMMBaker() { return m_ommBaker; }
-    const std::shared_ptr<class OmmBaker>&    GetOMMBaker() const { return m_ommBaker; }
+    std::shared_ptr<::OmmBaker>&        GetOMMBaker() { return m_ommBaker; }
+    const std::shared_ptr<::OmmBaker>&    GetOMMBaker() const { return m_ommBaker; }
     std::shared_ptr<ComputePipelineBaker>&  GetComputePipelineBaker() { return m_computePipelineBaker; }
     const std::shared_ptr<ComputePipelineBaker>& GetComputePipelineBaker() const { return m_computePipelineBaker; }
     std::vector<std::shared_ptr<caustica::Light>>& GetLights() { return m_lights; }
@@ -294,7 +307,7 @@ public:
     std::chrono::high_resolution_clock::time_point& GetBenchStart() { return m_benchStart; }
     std::chrono::high_resolution_clock::time_point& GetBenchLast() { return m_benchLast; }
     int&                                    GetBenchFrames() { return m_benchFrames; }
-    const std::unique_ptr<class ZoomTool> & GetZoomTool() const { return m_zoomTool; }
+    const std::unique_ptr<::ZoomTool> & GetZoomTool() const { return m_zoomTool; }
     caustica::BindingCache &           GetBindingCache() { return *m_bindingCache; }
 
     [[nodiscard]] caustica::GpuDevice& GetGpuDevice() const { return *m_gpuDevice; }
@@ -325,7 +338,7 @@ protected:
     GaussianSplatSceneObject* GetPrimaryGaussianSplatObject();
     const GaussianSplatSceneObject* GetPrimaryGaussianSplatObject() const;
     dm::float4x4 GetGaussianSplatObjectToWorld(const GaussianSplatSceneObject& object) const;
-    class ZoomTool* GetOrCreateZoomTool();
+    ::ZoomTool* GetOrCreateZoomTool();
 
     // Path tracing settings (render) and editor UI state are distinct slices of SampleUIData.
     PathTracerSettings& m_settings;
@@ -341,7 +354,7 @@ protected:
 
     // QoL accessors for derived samples (delegate to world renderer)
     const caustica::PlanarView& GetView() const;
-    std::shared_ptr<class PTPipelineBaker>  GetRTPipelineBaker() const;
+    std::shared_ptr<::PTPipelineBaker>  GetRTPipelineBaker() const;
 
 private:
     void                                    UpdateCameraFromScene( const std::shared_ptr<caustica::PerspectiveCamera> & sceneCamera );
@@ -398,12 +411,12 @@ private:
     std::shared_ptr<EnvMapBaker>                m_envMapBaker;
     EnvMapSceneParams                           m_envMapSceneParams;
     std::shared_ptr<LightsBaker>                m_lightsBaker;
-    std::shared_ptr<class MaterialsBaker>       m_materialsBaker;
-    std::shared_ptr<class OmmBaker>             m_ommBaker;
-    std::shared_ptr<ComputePipelineBaker>       m_computePipelineBaker;
+    std::shared_ptr<::MaterialsBaker>       m_materialsBaker;
+    std::shared_ptr<::OmmBaker>             m_ommBaker;
+    std::shared_ptr<::ComputePipelineBaker>       m_computePipelineBaker;
 
     // utility
-    std::shared_ptr<class GPUSort>              m_gpuSort;
+    std::shared_ptr<::GPUSort>              m_gpuSort;
     std::vector<GaussianSplatSceneObject>       m_gaussianSplatSceneObjects;
     std::vector<GaussianSplatEmissionProxy>     m_gaussianSplatEmissionProxies;
     std::string                                 m_gaussianSplatFileNameSummary;
@@ -419,12 +432,12 @@ private:
     std::string                                 m_fpsInfo;
     bool                                        m_windowIsInFocus = true;
 
-    std::unique_ptr<class GameScene>            m_sampleGame;
+    std::unique_ptr<::GameScene>            m_sampleGame;
 
     ProgressBar                                 m_progressLoading;
     ProgressBar                                 m_progressInitializingRenderer;
 
-    std::unique_ptr<class ZoomTool>             m_zoomTool;
+    std::unique_ptr<::ZoomTool>             m_zoomTool;
 
     bool                                        m_asyncLoadingInProgress = false;
 
@@ -435,3 +448,4 @@ private:
     std::vector<std::shared_ptr<caustica::Light>> m_lights;
 };
 
+} // namespace caustica::editor

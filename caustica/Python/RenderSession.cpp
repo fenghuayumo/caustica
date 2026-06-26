@@ -46,6 +46,10 @@
 #include <thread>
 #include <vector>
 
+using caustica::editor::SceneEditor;
+using caustica::editor::SampleUIData;
+using caustica::editor::InitializeSampleUIDataFromCommandLine;
+
 #if CAUSTICA_WITH_DX12
 #include <d3d12.h>
 #include <wrl/client.h>

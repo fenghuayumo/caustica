@@ -24,6 +24,8 @@
 #include <stdexcept>
 
 namespace nb = nanobind;
+using caustica::editor::SceneEditor;
+using caustica::editor::SampleUIData;
 
 namespace
 {

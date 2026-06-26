@@ -24,7 +24,7 @@
 | `caustica_shaders` | 由 `caustica/shaders.cfg` 驱动 ShaderMake 编译 HLSL。 |
 | `ShaderDynamicAssets` | 复制动态 shader 编译所需工具。 |
 | `ShaderDynamicAssets_CopyAlways` | 每次构建同步 shader 源到运行目录。 |
-| `causticaCore` | 静态库，包含除可执行入口外的大部分 C++ 实现。 |
+| `causticaApp` | 静态库，编辑器与 Python 应用层（原 `causticaCore`）。 |
 | `caustica` | Windows GUI 可执行程序，入口是 `caustica/AdvancedSample.cpp`。 |
 | `caustica_py` | 可选 Python extension module，启用 `caustica_WITH_PYTHON` 时构建。 |
 
@@ -32,7 +32,7 @@
 
 ```powershell
 cmake --build build --config Release --target caustica
-cmake --build build --config Release --target causticaCore
+cmake --build build --config Release --target causticaApp
 ```
 
 Shader 编译清单在 `caustica/shaders.cfg`。新增 shader entry point 或 macro variant 时，一般需要同步更新这个文件。
@@ -185,7 +185,7 @@ Python 相关代码在 `caustica/Python/`：
 | `RenderSession.*` | 离线/脚本渲染 session 封装。 |
 | `Python/Examples/*.py` | offline 和 interactive 示例。 |
 
-启用 Python 时，CMake 会把共享 binding 放进 `causticaCore`，再分别为 exe embed mode 和 extension mode 添加不同的 `NB_MODULE` entry。
+启用 Python 时，CMake 会把共享 binding 放进 `causticaApp`，再分别为 exe embed mode 和 extension mode 添加不同的 `NB_MODULE` entry。
 
 ## Where To Start For Common Changes
 

@@ -4,13 +4,13 @@
 
 #include <shaders/PathTracer/Config.h>
 
+namespace caustica { class Material; }
+
+namespace caustica::editor
+{
+
 class SceneEditor;
 struct SampleUIData;
-
-namespace caustica
-{
-    struct Material;
-}
 
 struct LocalConfig
 {
@@ -19,3 +19,5 @@ struct LocalConfig
     static void        PostMaterialLoad( caustica::Material & material );
     static void        PostSceneLoad( SceneEditor & sample, SampleUIData & sampleUI );
 };
+
+} // namespace caustica::editor

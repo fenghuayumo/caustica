@@ -20,7 +20,9 @@ constexpr static const int c_SwapchainCount = 3;
 #endif
 
 // Forward declarations — full definitions only needed in .cpp
+namespace caustica::editor {
 class SampleUI;
+}
 class SceneManager;
 namespace caustica {
     class GpuDevice;
@@ -39,17 +41,10 @@ namespace caustica {
     }
 }
 
-// EditorData holds members that must be initialized before SceneEditor base.
-struct EditorData
-{
-    CommandLineOptions CmdLine;
-    SampleUIData sampleUIData;
-};
+namespace caustica::editor {
 
-// Desktop editor executable — IS-A SceneEditor + IS-A Application.
-class EditorApplication : private EditorData
-                        , public caustica::Application
-                        , public SceneEditor
+// Desktop editor — owns Application lifecycle and composes SceneEditor.
+class EditorApplication : public caustica::Application
 {
 public:
     EditorApplication();
@@ -63,16 +58,21 @@ public:
         FailDeviceFeatureSupport
     };
 
-    StartupResult startup(int argc, const char* const* argv);
+    bool init(int argc, const char* const* argv) override;
     void shutdown() override;
+
+    StartupResult startup(int argc, const char* const* argv);
 
     SampleUIData& GetSampleUIData() { return sampleUIData; }
     const SampleUIData& GetSampleUIData() const { return sampleUIData; }
 
-    SceneEditor* GetScenePass() { return this; }
-    const SceneEditor* GetScenePass() const { return this; }
-    SceneEditor* GetAdvancedPathTracer() { return this; }
-    const SceneEditor* GetAdvancedPathTracer() const { return this; }
+    SceneEditor& GetSceneEditor() { return m_sceneEditor; }
+    const SceneEditor& GetSceneEditor() const { return m_sceneEditor; }
+
+    SceneEditor* GetScenePass() { return &m_sceneEditor; }
+    const SceneEditor* GetScenePass() const { return &m_sceneEditor; }
+    SceneEditor* GetAdvancedPathTracer() { return &m_sceneEditor; }
+    const SceneEditor* GetAdvancedPathTracer() const { return &m_sceneEditor; }
 
     SceneManager* GetSceneManager() { return m_sceneManager.get(); }
     const SceneManager* GetSceneManager() const { return m_sceneManager.get(); }
@@ -111,6 +111,10 @@ private:
     void initSceneServices();
     void syncPassesToBackBuffer();
 
+    CommandLineOptions CmdLine;
+    SampleUIData sampleUIData;
+    SceneEditor m_sceneEditor;
+
     caustica::Callback m_DefaultLogCallback = nullptr;
     FPSLimiter m_FPSLimiter;
 
@@ -132,3 +136,5 @@ private:
 
     void* m_NVAPIValidationHandle = nullptr;
 };
+
+} // namespace caustica::editor

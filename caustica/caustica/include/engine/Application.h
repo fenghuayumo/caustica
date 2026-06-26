@@ -24,6 +24,8 @@ class Window;
 // type-safe dispatch to individual handlers.
 //
 // RenderSession uses the non-owning constructor for manual stepFrame() control.
+//
+// Application executables implement createApplication() (see EntryPoint.h).
 // =============================================================================
 class Application
 {

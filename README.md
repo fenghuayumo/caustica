@@ -76,8 +76,10 @@ GTC presentation [How to Build a Real-time Path Tracer](https://www.nvidia.com/g
 | /Docs					| documentation 
 | /External				| external libraries and SDKs, including Streamline, NRD, RTXDI, and OMM
 | /Support				| optional command line tools (denoiser, texture compressor, etc)
-| /caustica				| **RTX Path Tracing core; Sample.cpp/.h/.hlsl contain entry points**
-| /caustica/PathTracer		| **Core path tracing shaders**
+| /caustica				| **Application wrapper**: engine (`caustica/caustica/`), Python bindings, shaders |
+| /application/editor		| **Desktop editor / sample app** — entry point at `app/Main.cpp` |
+| /caustica/caustica		| **Caustica engine** (`caus*` modules) |
+| /caustica/caustica/shaders/PathTracer | **Core path tracing shaders** |
 
 
 ## Build

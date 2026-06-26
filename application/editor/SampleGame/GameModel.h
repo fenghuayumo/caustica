@@ -1,14 +1,10 @@
 #pragma once
 
 // =============================================================================
-// GameModel.h — Engine-level model instance management.
-//
-// Moved from editor/SampleGame/GameModel.h.  ModelInstance is pure engine.
-// ModelType previously depended on GameScene& but only used GetScene() —
-// now stores caustica::Scene& directly.
+// GameModel.h — Sample game model instance management (application layer).
 // =============================================================================
 
-#include <scene/game/GameTypes.h>
+#include "GameTypes.h"
 #include <scene/SceneGraph.h>
 
 #include <map>

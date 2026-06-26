@@ -40,6 +40,8 @@ using caustica::math::float3;
 using caustica::math::float4;
 using caustica::math::double3;
 using caustica::math::double4;
+using caustica::editor::SceneEditor;
+using caustica::editor::SampleUIData;
 
 // Singleton consumed by embed mode (set by PythonScripting before Py_Initialize).
 // In extension mode this stays nullptr - Renderer manages its own Sample.

@@ -33,8 +33,8 @@ private:
 };
 
 // Register the active window handle (for centering progress bars).
-// Call from the main thread after window creation.
-void HelpersRegisterActiveWindow();
+// Pass the platform native handle when available; falls back to GetActiveWindow().
+void HelpersRegisterActiveWindow(void* nativeWindowHandle = nullptr);
 
 // Returns the active window handle (for fullscreen detection, etc.).
 // Windows only — returns NULL on other platforms.

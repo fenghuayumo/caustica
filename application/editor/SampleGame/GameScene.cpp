@@ -3,6 +3,7 @@
 
 #include <core/log.h>
 #include <core/json.h>
+#include <core/format.h>
 #include <math/math.h>
 #include <scene/camera/Camera.h>
 #include <cmath>
@@ -54,7 +55,7 @@ namespace
 }
 
 
-GameScene::GameScene(SceneEditor & sample, const CommandLineOptions& cmdLine)
+GameScene::GameScene(caustica::editor::SceneEditor& sample, const CommandLineOptions& cmdLine)
     : m_sample(sample), m_cmdLine(cmdLine) // NOTE: at this point, SceneEditor is being constructed - beware of accessing incompletely constructed object
 {
 }
@@ -191,7 +192,7 @@ void GameScene::SceneLoaded(const std::shared_ptr<caustica::Scene>& scene, const
 
     if( m_cmdLine.PropCameraAttach != "" )
     {
-        auto it = std::find_if(m_props.begin(), m_props.end(), [this]( const std::shared_ptr<game::PropBase> & prop ) { return EqualsIgnoreCase(prop->GetName(), m_cmdLine.PropCameraAttach); } );
+        auto it = std::find_if(m_props.begin(), m_props.end(), [this]( const std::shared_ptr<game::PropBase> & prop ) { return caustica::EqualsIgnoreCase(prop->GetName(), m_cmdLine.PropCameraAttach); } );
         if (it != m_props.end())
             AttachCamera(*it);
     }

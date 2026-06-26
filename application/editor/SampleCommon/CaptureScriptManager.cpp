@@ -14,11 +14,11 @@
 #include <core/scope.h>
 #include <render/Core/ScopedPerfMarker.h>
 #include <render/Core/TextureUtils.h>
-#include <core/command_line.h>
-
 #include <engine/UserInterfaceUtils.h>
-
 #include <math/math.h>
+
+namespace caustica::editor
+{
 
 using namespace caustica;
 using namespace caustica;
@@ -278,3 +278,5 @@ void CaptureScriptManager::PostRender(const std::function<bool(const char*)>& du
         }
     }
 }
+
+} // namespace caustica::editor

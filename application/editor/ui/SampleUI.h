@@ -28,6 +28,7 @@ using namespace caustica::math;
 #include <render/Core/PathTracerSettings.h>
 #include <render/Passes/Debug/Korgi.h>
 #include "EditorUIState.h"
+#include <core/command_line.h>
 
 #if CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
 #include "../../external/RtxTf/STFDefinitions.h"
@@ -38,11 +39,16 @@ namespace caustica
     class SceneGraphNode;
 }
 
+namespace caustica::editor
+{
+
+class SceneEditor;
+
 struct SampleUIData : PathTracerSettings, EditorUIState
 {
 };
 
-void InitializeSampleUIDataFromCommandLine(SampleUIData& ui, const struct CommandLineOptions& cmdLine);
+void InitializeSampleUIDataFromCommandLine(SampleUIData& ui, const CommandLineOptions& cmdLine);
 
 class ImGuiManager;
 class EditorApplication;
@@ -50,7 +56,7 @@ class EditorApplication;
 class SampleUI : public caustica::ImGui_Renderer
 {
 public:
-    SampleUI(caustica::GpuDevice* deviceManager, EditorApplication& editor, SampleUIData& ui, bool NVAPI_SERSupported, const struct CommandLineOptions& cmdLine);
+    SampleUI(caustica::GpuDevice* deviceManager, EditorApplication& editor, SampleUIData& ui, bool NVAPI_SERSupported, const CommandLineOptions& cmdLine);
     virtual ~SampleUI();
 protected:
     virtual void buildUI(void) override;
@@ -71,7 +77,8 @@ private:
     void BuildPythonScriptingUI(float indent);
 
 private:
-    EditorApplication& m_editor;
+    EditorApplication& m_app;
+    SceneEditor& m_sceneEditor;
 
     int                         m_currentFontScaleIndex = -1;
     float                       m_currentScale = 1.0f;
@@ -118,3 +125,5 @@ private:
 };
 
 void UpdateTogglableNodes(std::vector<TogglableNode>& TogglableNodes, caustica::SceneGraphNode* node);
+
+} // namespace caustica::editor

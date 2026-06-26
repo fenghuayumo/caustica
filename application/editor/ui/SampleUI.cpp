@@ -31,6 +31,9 @@
 using namespace caustica;
 using namespace caustica;
 
+namespace caustica::editor
+{
+
 #define RESET_ON_CHANGE(code) do{if (code) m_ui.ResetAccumulation = true;} while(false)
 
 const static ImVec4 warnColor = { 1,0.5f,0.5f,1 };
@@ -356,6 +359,8 @@ static void ApplyPreset(SampleUIData& ui, const PerformancePreset& p)
     ui.ResetAccumulation = true;
 }
 
+} // namespace caustica::editor
+
 void PathTracerSettings::ApplyRTXDIRestirPreset()
 {
     if (RTXDIRestirPreset == RTXDIRestirQualityPreset::Custom)
@@ -567,6 +572,9 @@ void PathTracerSettings::ApplyRTXDIRestirPTPreset()
     ResetAccumulation = true;
 }
 
+namespace caustica::editor
+{
+
 void InitializeSampleUIDataFromCommandLine(SampleUIData& ui, const CommandLineOptions& cmdLine)
 {
     ui.RelaxSettings = NrdConfig::getDefaultRELAXSettings();
@@ -601,7 +609,8 @@ void InitializeSampleUIDataFromCommandLine(SampleUIData& ui, const CommandLineOp
 
 SampleUI::SampleUI(GpuDevice* deviceManager, EditorApplication& editor, SampleUIData& ui, bool NVAPI_SERSupported, const CommandLineOptions& cmdLine)
         : ImGui_Renderer(deviceManager)
-        , m_editor(editor)
+        , m_app(editor)
+        , m_sceneEditor(editor.GetSceneEditor())
         , m_ui(ui)
         , m_NVAPI_SERSupported(NVAPI_SERSupported)
 {
@@ -709,7 +718,7 @@ SI::DLSSMode DLSSModeUI(SI::DLSSMode dlssModeCurrent)
 bool SampleUI::BuildUIScriptsAndEtc(void)
 {
     bool scriptsActive = false;
-    if (m_editor.GetCaptureScriptManager()->ScriptProgressUI())
+    if (m_sceneEditor.GetCaptureScriptManager()->ScriptProgressUI())
         scriptsActive = true;
 
     if (scriptsActive)
@@ -740,8 +749,8 @@ void SampleUI::BuildUIResolutionPicker()
     };
 
     const GLFWvidmode* monitorMode = glfwGetVideoMode(glfwGetPrimaryMonitor());
-    int currentW = (int)m_editor.GetDisplaySize().x;
-    int currentH = (int)m_editor.GetDisplaySize().y;
+    int currentW = (int)m_sceneEditor.GetDisplaySize().x;
+    int currentH = (int)m_sceneEditor.GetDisplaySize().y;
 
     ImGui::Text("Click to change resolution:");
     ImGui::Separator();
@@ -862,8 +871,8 @@ void SampleUI::buildUI(void)
             
         const float indent = (int)ImGui::GetStyle().IndentSpacing*0.4f;
 
-        ImGui::Text("%s, %s", GetGpuDevice()->GetRendererString(), m_editor.GetResolutionInfo().c_str() );
-        ImGui::Text("%s", m_editor.GetFPSInfo().c_str());
+        ImGui::Text("%s, %s", GetGpuDevice()->GetRendererString(), m_sceneEditor.GetResolutionInfo().c_str() );
+        ImGui::Text("%s", m_sceneEditor.GetFPSInfo().c_str());
 
         if (BuildUIScriptsAndEtc())
         {
@@ -875,7 +884,7 @@ void SampleUI::buildUI(void)
             RAII_SCOPE(ImGui::Indent(indent);, ImGui::Unindent(indent); );
             
             {
-                if (ImGui::Button(StringFormat("Resolution:  %dx%d (click to change)", m_editor.GetDisplaySize().x, m_editor.GetDisplaySize().y, m_editor.GetRenderSize().x, m_editor.GetRenderSize().y).c_str(), { -1, 0 }))
+                if (ImGui::Button(StringFormat("Resolution:  %dx%d (click to change)", m_sceneEditor.GetDisplaySize().x, m_sceneEditor.GetDisplaySize().y, m_sceneEditor.GetRenderSize().x, m_sceneEditor.GetRenderSize().y).c_str(), { -1, 0 }))
                     ImGui::OpenPopup("Resolution Picker");
                 BuildUIResolutionPicker();
             }
@@ -931,7 +940,7 @@ void SampleUI::buildUI(void)
                 {
                     RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent); );
 
-                    m_editor.GetCaptureScriptManager()->ScriptMainUI(warnColor, categoryColor, indent, m_currentScale);
+                    m_sceneEditor.GetCaptureScriptManager()->ScriptMainUI(warnColor, categoryColor, indent, m_currentScale);
                 }
 
 #if CAUSTICA_WITH_PYTHON
@@ -946,7 +955,7 @@ void SampleUI::buildUI(void)
             if (ImGui::CollapsingHeader("Info")) //, ImGuiTreeNodeFlags_DefaultOpen))
             {
                 uint64_t budget, currentUsage, availableForReservation, currentReservation;
-                if (m_editor.QueryVideoMemoryInfo( budget, currentUsage, availableForReservation, currentReservation ) )
+                if (m_app.QueryVideoMemoryInfo( budget, currentUsage, availableForReservation, currentReservation ) )
                 {
                     ImGui::TextColored(categoryColor, "QueryVideoMemoryInfo:");
                     budget /= 1024*1024; currentUsage /= 1024*1024, availableForReservation /= 1024*1024, currentReservation /= 1024*1024;
@@ -960,17 +969,17 @@ void SampleUI::buildUI(void)
         }
 
         {
-            const std::string currentScene = m_editor.GetCurrentSceneName();
+            const std::string currentScene = m_sceneEditor.GetCurrentSceneName();
             RAII_SCOPE(ImGui::PushItemWidth(-60.0f * m_currentScale); , ImGui::PopItemWidth(); );
             RAII_SCOPE(ImGui::PushID("SceneComboID"); , ImGui::PopID(); );
             if (ImGui::BeginCombo("Scene", currentScene.c_str()))
             {
-                const std::vector<std::string>& scenes = m_editor.GetAvailableScenes();
+                const std::vector<std::string>& scenes = m_sceneEditor.GetAvailableScenes();
                 for (const std::string& scene : scenes)
                 {
                     bool is_selected = scene == currentScene;
                     if (ImGui::Selectable(scene.c_str(), is_selected))
-                        m_editor.SetCurrentScene(scene);
+                        m_sceneEditor.SetCurrentScene(scene);
                     if (is_selected)
                         ImGui::SetItemDefaultFocus();
                 }
@@ -981,14 +990,14 @@ void SampleUI::buildUI(void)
         if (ImGui::CollapsingHeader("Scene"/*, ImGuiTreeNodeFlags_DefaultOpen*/))
         {
             RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent); );
-            uint uncompressedTextureCount = (uint)m_editor.GetUncompressedTextures().size();
+            uint uncompressedTextureCount = (uint)m_sceneEditor.GetUncompressedTextures().size();
             if (uncompressedTextureCount > 0)
             {
                 ImGui::TextColored(warnColor, "Scene has %d uncompressed textures", uncompressedTextureCount);
                 if (ImGui::Button("Batch compress with nvtt_export.exe", { -1, 0 }))
-                    if (CompressTextures(m_editor.GetUncompressedTextures()))
+                    if (CompressTextures(m_sceneEditor.GetUncompressedTextures()))
                     {   // reload scene
-                        m_editor.SetCurrentScene(m_editor.GetCurrentSceneName(), true);
+                        m_sceneEditor.SetCurrentScene(m_sceneEditor.GetCurrentSceneName(), true);
                     }
             }
 
@@ -1000,16 +1009,16 @@ void SampleUI::buildUI(void)
             ImGui::SameLine();
             if (ImGui::Button("Reset animation time"))
             {
-                m_editor.SetSceneTime(0);
+                m_sceneEditor.SetSceneTime(0);
                 m_ui.ResetAccumulation = true;
             }
 
-            if (m_editor.GetGame() && m_editor.GetGame()->IsInitialized())
+            if (m_sceneEditor.GetGame() && m_sceneEditor.GetGame()->IsInitialized())
             {
                 if (ImGui::CollapsingHeader("Interactive elements"/*, ImGuiTreeNodeFlags_DefaultOpen*/))
                 {
                     RAII_SCOPE(ImGui::Indent(indent);, ImGui::Unindent(indent); );
-                    m_editor.GetGame()->DebugGUI(indent);
+                    m_sceneEditor.GetGame()->DebugGUI(indent);
                 }
             }
 
@@ -1107,13 +1116,13 @@ void SampleUI::buildUI(void)
                 RESET_ON_CHANGE(ImGui::Checkbox("Enabled", &m_ui.EnvironmentMapParams.Enabled));
                 RESET_ON_CHANGE(ImGui::Checkbox("Visible to Camera", &m_ui.EnvironmentMapParams.VisibleToCamera));
 
-                if (m_editor.GetEnvMapLocalPath() != "==PROCEDURAL_SKY==")
-                    ImGui::TextWrapped("Source: `%s`", m_editor.GetEnvMapLocalPath().c_str());
+                if (m_sceneEditor.GetEnvMapLocalPath() != "==PROCEDURAL_SKY==")
+                    ImGui::TextWrapped("Source: `%s`", m_sceneEditor.GetEnvMapLocalPath().c_str());
                 else
                     ImGui::TextWrapped("Source: Procedural Sky");
 
-                std::string overrideSource = m_editor.GetEnvMapOverrideSource();
-                const std::vector<std::filesystem::path> & envMapMediaList = m_editor.GetEnvMapMediaList();
+                std::string overrideSource = m_sceneEditor.GetEnvMapOverrideSource();
+                const std::vector<std::filesystem::path> & envMapMediaList = m_sceneEditor.GetEnvMapMediaList();
 
                 RAII_SCOPE( ImGui::PushItemWidth(-65.0f*m_currentScale);, ImGui::PopItemWidth(); );
                 if (ImGui::BeginCombo("Override", overrideSource.c_str()))
@@ -1147,10 +1156,10 @@ void SampleUI::buildUI(void)
                     ImGui::EndCombo();
                 }
                 if (ImGui::IsItemHovered()) ImGui::SetTooltip("Overrides scene's default environment map");
-                if (m_editor.GetEnvMapOverrideSource() != overrideSource)
+                if (m_sceneEditor.GetEnvMapOverrideSource() != overrideSource)
                 {
                     m_ui.ResetAccumulation = true;
-                    m_editor.SetEnvMapOverrideSource(overrideSource);
+                    m_sceneEditor.SetEnvMapOverrideSource(overrideSource);
                 }
 
                 ImGui::Separator();
@@ -1159,28 +1168,28 @@ void SampleUI::buildUI(void)
                 RESET_ON_CHANGE( ImGui::InputFloat3("Rotation XYZ", (float*)&m_ui.EnvironmentMapParams.RotationXYZ.x) );
                 ImGui::Separator();
 
-                if (m_editor.GetEnvMapBaker() != nullptr && m_editor.GetEnvMapBaker()->IsProcedural() && m_editor.GetEnvMapBaker()->GetProceduralSky() != nullptr) // one frame delay for these settings
+                if (m_sceneEditor.GetEnvMapBaker() != nullptr && m_sceneEditor.GetEnvMapBaker()->IsProcedural() && m_sceneEditor.GetEnvMapBaker()->GetProceduralSky() != nullptr) // one frame delay for these settings
                 {
                     ImGui::TextColored(categoryColor, "Procedural Sky settings:");
                     RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent););
-                    m_editor.GetEnvMapBaker()->GetProceduralSky()->DebugGUI(indent);
+                    m_sceneEditor.GetEnvMapBaker()->GetProceduralSky()->DebugGUI(indent);
                 }
             }
 
             if (ImGui::CollapsingHeader("Materials"))
             {
                 RAII_SCOPE( ImGui::Indent(indent);, ImGui::Unindent(indent); );
-                if ( m_editor.GetMaterialsBaker() != nullptr )
-                    m_editor.GetMaterialsBaker()->DebugGUI(indent);
+                if ( m_sceneEditor.GetMaterialsBaker() != nullptr )
+                    m_sceneEditor.GetMaterialsBaker()->DebugGUI(indent);
             }
         }
 
-        if (m_editor.GetGame() && m_editor.GetGame()->IsInitialized())
+        if (m_sceneEditor.GetGame() && m_sceneEditor.GetGame()->IsInitialized())
         {
             if (ImGui::CollapsingHeader("Sample Game"/*, ImGuiTreeNodeFlags_DefaultOpen*/))
             {
                 RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent); );
-                m_editor.GetGame()->DebugGUI(indent);
+                m_sceneEditor.GetGame()->DebugGUI(indent);
             }
         }
 
@@ -1188,13 +1197,13 @@ void SampleUI::buildUI(void)
         {
             RAII_SCOPE(ImGui::Indent(indent);, ImGui::Unindent(indent); );
             std::vector<std::string> options; options.push_back("Free flight");
-            for (uint i = 0; i < m_editor.GetSceneCameraCount(); i++)
+            for (uint i = 0; i < m_sceneEditor.GetSceneCameraCount(); i++)
                 options.push_back("Scene cam " + std::to_string(i));
-            uint& currentlySelected = m_editor.SelectedCameraIndex();
-            currentlySelected = std::min(currentlySelected, (uint)m_editor.GetSceneCameraCount() - 1);
+            uint& currentlySelected = m_sceneEditor.SelectedCameraIndex();
+            currentlySelected = std::min(currentlySelected, (uint)m_sceneEditor.GetSceneCameraCount() - 1);
             if (ImGui::BeginCombo("Motion", options[currentlySelected].c_str()))
             {
-                for (uint i = 0; i < m_editor.GetSceneCameraCount(); i++)
+                for (uint i = 0; i < m_sceneEditor.GetSceneCameraCount(); i++)
                 {
                     bool is_selected = i == currentlySelected;
                     if (ImGui::Selectable(options[i].c_str(), is_selected))
@@ -1209,11 +1218,11 @@ void SampleUI::buildUI(void)
             {
                 ImGui::Text("Camera position: "); 
                 RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent); );
-                if (ImGui::Button("Save to file", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) m_editor.SaveCurrentCamera(); ImGui::SameLine();
-                if (ImGui::Button("Load from file", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) m_editor.LoadCurrentCamera();
-                if (ImGui::Button("Save to clipboard", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) ImGui::SetClipboardText(m_editor.GetCurrentCameraPosDirUp().c_str()); ImGui::SameLine();
+                if (ImGui::Button("Save to file", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) m_sceneEditor.SaveCurrentCamera(); ImGui::SameLine();
+                if (ImGui::Button("Load from file", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) m_sceneEditor.LoadCurrentCamera();
+                if (ImGui::Button("Save to clipboard", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) ImGui::SetClipboardText(m_sceneEditor.GetCurrentCameraPosDirUp().c_str()); ImGui::SameLine();
                 const char *cpbrdtxt = ImGui::GetClipboardText();
-                if (ImGui::Button("Load from clipboard", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) m_editor.SetCurrentCameraPosDirUp(cpbrdtxt?cpbrdtxt:"");
+                if (ImGui::Button("Load from clipboard", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) m_sceneEditor.SetCurrentCameraPosDirUp(cpbrdtxt?cpbrdtxt:"");
             }
 
     #if 1
@@ -1224,12 +1233,12 @@ void SampleUI::buildUI(void)
             m_ui.CameraFocalDistance = dm::clamp(m_ui.CameraFocalDistance, 0.001f, 1e16f);
             ImGui::SliderFloat("Keyboard move speed", &m_ui.CameraMoveSpeed, 0.1f, 10.0f);
 
-            float cameraFOV = 2.0f * dm::degrees(m_editor.GetCameraVerticalFOV());
+            float cameraFOV = 2.0f * dm::degrees(m_sceneEditor.GetCameraVerticalFOV());
             if (ImGui::InputFloat("Vertical FOV", &cameraFOV, 0.1f))
             {
                 cameraFOV = dm::clamp(cameraFOV, 1.0f, 360.0f);
                 m_ui.ResetAccumulation = true;
-                m_editor.SetCameraVerticalFOV(dm::radians(cameraFOV / 2.0f));
+                m_sceneEditor.SetCameraVerticalFOV(dm::radians(cameraFOV / 2.0f));
             }
 
             RESET_ON_CHANGE( ImGui::InputFloat("CameraAntiRRSleepJitter", &m_ui.CameraAntiRRSleepJitter, 0.001f ) );
@@ -1248,8 +1257,8 @@ void SampleUI::buildUI(void)
 
             {
                 RAII_SCOPE(ImGui::Indent(indent);, ImGui::Unindent(indent););
-                if (m_editor.GetLightsBaker() != nullptr) // local lights baker can legally be nullptr
-                    m_ui.ResetAccumulation |= m_editor.GetLightsBaker()->InfoGUI(indent);
+                if (m_sceneEditor.GetLightsBaker() != nullptr) // local lights baker can legally be nullptr
+                    m_ui.ResetAccumulation |= m_sceneEditor.GetLightsBaker()->InfoGUI(indent);
             }
 
 
@@ -1259,15 +1268,15 @@ void SampleUI::buildUI(void)
                 if (ImGui::CollapsingHeader("Distant lighting (envmap+directional)", 0/*ImGuiTreeNodeFlags_DefaultOpen*/))
                 {
                     RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent););
-                    if (m_editor.GetEnvMapBaker()!=nullptr) // envmap baker can legally be nullptr
-                        m_ui.ResetAccumulation |= m_editor.GetEnvMapBaker()->DebugGUI(indent);
+                    if (m_sceneEditor.GetEnvMapBaker()!=nullptr) // envmap baker can legally be nullptr
+                        m_ui.ResetAccumulation |= m_sceneEditor.GetEnvMapBaker()->DebugGUI(indent);
                 }
             }
 
             ImGui::TextColored(categoryColor, "Importance sampling:");
             {
                 RAII_SCOPE(ImGui::Indent(indent);, ImGui::Unindent(indent););
-                if (m_editor.GetLightsBaker() != nullptr) // local lights baker can legally be nullptr
+                if (m_sceneEditor.GetLightsBaker() != nullptr) // local lights baker can legally be nullptr
                 {
                     if( m_ui.NEEType != 2 )
                     {
@@ -1302,8 +1311,8 @@ void SampleUI::buildUI(void)
                     ImGui::TextColored(categoryColor, "Debugging:");
                     {
                         RAII_SCOPE(ImGui::Indent(indent);, ImGui::Unindent(indent););
-                        if (m_editor.GetLightsBaker() != nullptr) // local lights baker can legally be nullptr
-                            m_ui.ResetAccumulation |= m_editor.GetLightsBaker()->DebugGUI(indent);
+                        if (m_sceneEditor.GetLightsBaker() != nullptr) // local lights baker can legally be nullptr
+                            m_ui.ResetAccumulation |= m_sceneEditor.GetLightsBaker()->DebugGUI(indent);
                     }
                 }
             }
@@ -1346,8 +1355,8 @@ void SampleUI::buildUI(void)
                     RESET_ON_CHANGE( ImGui::InputInt("Sample count", &m_ui.AccumulationTarget) );
                     m_ui.AccumulationTarget = dm::clamp(m_ui.AccumulationTarget, 1, 4 * 1024 * 1024); // this max is beyond float32 precision threshold; expect some banding creeping in when using more than 500k samples
                     if (ImGui::IsItemHovered()) ImGui::SetTooltip("Number of path samples per pixel to collect");
-                    ImGui::Text("Accumulated samples: %d (out of %d target)", m_editor.GetAccumulationSampleIndex(), m_ui.AccumulationTarget);
-                    ImGui::Text("(avg frame time: %.3fms)", m_editor.GetAvgTimePerFrame() * 1000.0f);
+                    ImGui::Text("Accumulated samples: %d (out of %d target)", m_sceneEditor.GetAccumulationSampleIndex(), m_ui.AccumulationTarget);
+                    ImGui::Text("(avg frame time: %.3fms)", m_sceneEditor.GetAvgTimePerFrame() * 1000.0f);
 
                     RESET_ON_CHANGE(ImGui::Checkbox("Pre-warm real-time caches", &m_ui.AccumulationPreWarmRealtimeCaches));
                     if (ImGui::IsItemHovered()) ImGui::SetTooltip("If enabled, various lighting and etc systems will be pre-warmed before sample 0 is \naccumulated; otherwise they're reset and initial few samples will be lower quality.");
@@ -2150,9 +2159,9 @@ void SampleUI::buildUI(void)
         {
             UI_SCOPED_INDENT(indent);
 
-            if (m_editor.GetOMMBaker())
+            if (m_sceneEditor.GetOMMBaker())
             {
-                m_editor.GetOMMBaker()->DebugGUI(indent, *m_editor.GetScene());
+                m_sceneEditor.GetOMMBaker()->DebugGUI(indent, *m_sceneEditor.GetScene());
             }
             else
                 ImGui::Text("<Opacity Micro-Maps not supported on the current device>");
@@ -2338,9 +2347,9 @@ void SampleUI::buildUI(void)
                 m_ui.DebugViewStablePlaneIndex = dm::clamp(m_ui.DebugViewStablePlaneIndex, -1, (int)m_ui.StablePlanesActiveCount - 1);
             }
 
-            const DebugFeedbackStruct& feedback = m_editor.GetFeedbackData();
+            const DebugFeedbackStruct& feedback = m_sceneEditor.GetFeedbackData();
             if (ImGui::InputInt2("Debug pixel", (int*)&m_ui.DebugPixel.x))
-                m_editor.GetEditorUIState().requestMaterialPick();
+                m_sceneEditor.GetEditorUIState().requestMaterialPick();
 
             ImGui::Checkbox("Continuous feedback", &m_ui.ContinuousDebugFeedback);
 
@@ -2371,7 +2380,7 @@ void SampleUI::buildUI(void)
                 if (ImGui::Checkbox("Show delta tree window", &m_ui.ShowDeltaTree) && m_ui.ShowDeltaTree)
                 {
                     m_ui.ShowInspector = false; // no space for both
-                    m_editor.GetEditorUIState().requestMaterialPick();
+                    m_sceneEditor.GetEditorUIState().requestMaterialPick();
                 }
             }
 #else
@@ -2387,8 +2396,8 @@ void SampleUI::buildUI(void)
             ImGui::TextWrapped("Debug visualization disabled; to enable set ENABLE_DEBUG_VIZUALISATIONS to 1");
 #endif 
 
-            if (m_editor.GetZoomTool() != nullptr && ImGui::CollapsingHeader("Zoom Tool"))
-                m_editor.GetZoomTool()->DebugGUI(indent);
+            if (m_sceneEditor.GetZoomTool() != nullptr && ImGui::CollapsingHeader("Zoom Tool"))
+                m_sceneEditor.GetZoomTool()->DebugGUI(indent);
         }
 
         {
@@ -2525,7 +2534,7 @@ void SampleUI::buildUI(void)
 
     // Material Editor panel (right-click pick)
     std::shared_ptr<PTMaterial> material = PTMaterial::SafeCast(m_ui.SelectedMaterial);
-    if (material != nullptr && m_editor.GetMaterialsBaker() != nullptr && m_ui.ShowMaterialEditor)
+    if (material != nullptr && m_sceneEditor.GetMaterialsBaker() != nullptr && m_ui.ShowMaterialEditor)
     {
         const bool inspectorVisible = m_ui.SelectedNode != nullptr && m_ui.ShowInspector;
         ImGui::SetNextWindowPos(ImVec2(float(scaledWidth) - 10.f, inspectorVisible ? 350.f : 10.f), ImGuiCond_Appearing, ImVec2(1.f, 0.f));
@@ -2543,7 +2552,7 @@ void SampleUI::buildUI(void)
 
         MaterialShaderPermutationKey mspBefore = MaterialShaderPermutationKey(material->ComputeShaderPermutation(""));
 
-        bool dirty = material->EditorGUI(*m_editor.GetMaterialsBaker());
+        bool dirty = material->EditorGUI(*m_sceneEditor.GetMaterialsBaker());
 
         MaterialShaderPermutationKey mspAfter = MaterialShaderPermutationKey(material->ComputeShaderPermutation(""));
 
@@ -2556,7 +2565,7 @@ void SampleUI::buildUI(void)
             wasSkipRender != material->SkipRender ||
             dirty)
         {
-            m_editor.GetScene()->GetSceneGraph()->GetRootNode()->InvalidateContent();
+            m_sceneEditor.GetScene()->GetSceneGraph()->GetRootNode()->InvalidateContent();
             m_ui.ResetAccumulation = 1;
         }
 
@@ -2579,7 +2588,7 @@ void SampleUI::buildUI(void)
         float scaledWindowWidth = scaledWidth - defWindowWidth - 20;
         ImGui::SetNextWindowPos(ImVec2(scaledWidth - float(scaledWindowWidth) - 10, 10.f), ImGuiCond_FirstUseEver);
         ImGui::SetNextWindowSize(ImVec2(scaledWindowWidth, scaledWindowWidth * 0.5f), ImGuiCond_FirstUseEver);
-        const DeltaTreeVizHeader& DeltaTreeVizHeader = m_editor.GetFeedbackData().deltaPathTree;
+        const DeltaTreeVizHeader& DeltaTreeVizHeader = m_sceneEditor.GetFeedbackData().deltaPathTree;
         char windowName[1024];
         snprintf(windowName, sizeof(windowName), "Delta Tree Explorer, pixel (%d, %d), sampleIndex: %d, nodes: %d###DeltaExplorer", DeltaTreeVizHeader.pixelPos.x, DeltaTreeVizHeader.pixelPos.y, DeltaTreeVizHeader.sampleIndex, DeltaTreeVizHeader.nodeCount);
 
@@ -2600,7 +2609,7 @@ void SampleUI::buildUI(void)
         )
     {
 
-        std::string envMapOverrideSource = m_editor.GetEnvMapOverrideSource();
+        std::string envMapOverrideSource = m_sceneEditor.GetEnvMapOverrideSource();
         std::vector<std::string> envOptions;
         envOptions.push_back( c_EnvMapSceneDefault );
         //envOptions.push_back( c_EnvMapProcSky );
@@ -2612,7 +2621,7 @@ void SampleUI::buildUI(void)
         int envOptionsCurrentIndex = -1; for (int i = 0; i < envOptions.size(); i++) if (envOptions[i]==envMapOverrideSource) envOptionsCurrentIndex = i;
 
         std::vector<std::string> materialVariants;
-        if (FindSubStringIgnoreCase(m_editor.GetCurrentSceneName(), "bistro") != std::string::npos)
+        if (FindSubStringIgnoreCase(m_sceneEditor.GetCurrentSceneName(), "bistro") != std::string::npos)
             materialVariants = {"dry", "wet", "silly"};
         int materialVariantIndexPrev = m_ui.MaterialVariantIndex;
 
@@ -2706,20 +2715,20 @@ void SampleUI::buildUI(void)
 
         if (envOptionsCurrentIndex >= 0 && envOptionsCurrentIndex < envOptions.size() && envOptions[envOptionsCurrentIndex] != envMapOverrideSource )
         {
-            m_editor.SetEnvMapOverrideSource(envOptions[envOptionsCurrentIndex]);
+            m_sceneEditor.SetEnvMapOverrideSource(envOptions[envOptionsCurrentIndex]);
         }
 
         if (m_ui.MaterialVariantIndex != materialVariantIndexPrev)
         {
-            if (FindSubStringIgnoreCase(m_editor.GetCurrentSceneName(), "bistro") != std::string::npos)
+            if (FindSubStringIgnoreCase(m_sceneEditor.GetCurrentSceneName(), "bistro") != std::string::npos)
             {
                 // bistro dry-wet test
                 std::vector<std::string> pavementList = { "LMBR0000163Cobbl_a1d987f5", "LMBR000016bCobbl_8652c51e", "LMBR0000162Paris_c30c71f1", "LMBR0000162Paris_c30c71f1", "LMBR000016cCobbl_f202ecfa", "LMBR0000161Pavem_e2e87964", "LMBR0000168Cobbl_a5a7f4b4", "LMBR0000160Pavem_613287fe", "LMBR000016aCobbl_e1c68d26" };
                 for (std::string& id : pavementList)
-                    if (auto m = m_editor.GetMaterialsBaker()->FindByUniqueID(id))
+                    if (auto m = m_sceneEditor.GetMaterialsBaker()->FindByUniqueID(id))
                     {
                         if (m_ui.MaterialVariantIndex == 0) // reset to default
-                            m_editor.GetMaterialsBaker()->LoadSingle(*m);
+                            m_sceneEditor.GetMaterialsBaker()->LoadSingle(*m);
                         else
                         {   // make wet-looking
                             m->Roughness = 0.0f;
@@ -2730,10 +2739,10 @@ void SampleUI::buildUI(void)
 
                 std::vector<std::string> emissivesList = { "LMBR0000172Paris_1d83765c" /*bollards*/, "LMBR00000aeGreen_04f5ae02" /*green leaves*/, "LMBR00000afOrang_a907f305" /*yellow leaves*/, "LMBR00000b0Branc_5990161e" /*branches*/ };
                 for (std::string& id : emissivesList)
-                    if (auto m = m_editor.GetMaterialsBaker()->FindByUniqueID(id))
+                    if (auto m = m_sceneEditor.GetMaterialsBaker()->FindByUniqueID(id))
                     {
                         if (m_ui.MaterialVariantIndex == 0 || m_ui.MaterialVariantIndex == 1) // reset to default
-                            m_editor.GetMaterialsBaker()->LoadSingle(*m);
+                            m_sceneEditor.GetMaterialsBaker()->LoadSingle(*m);
                         else
                         {   // silly stuff
                             if (id == "LMBR0000172Paris_1d83765c")
@@ -2767,7 +2776,7 @@ void SampleUI::buildUI(void)
         ImGui::SetNextWindowSize(ImVec2(defWindowWidth, scaledHeight * 0.45f), ImGuiCond_Appearing);
         RAII_SCOPE(ImGui::Begin("Hierarchy", nullptr, ImGuiWindowFlags_None);, ImGui::End(););
 
-        auto scene = m_editor.GetScene();
+        auto scene = m_sceneEditor.GetScene();
         auto sceneGraph = scene ? scene->GetSceneGraph() : nullptr;
         auto rootNode = sceneGraph ? sceneGraph->GetRootNode() : nullptr;
 
@@ -2791,7 +2800,7 @@ void SampleUI::buildUI(void)
             if (deleteSelectedNode)
             {
                 auto selectedNode = m_ui.SelectedNode;
-                m_editor.DeleteSceneNode(selectedNode);
+                m_sceneEditor.DeleteSceneNode(selectedNode);
             }
         }
         else
@@ -2800,11 +2809,11 @@ void SampleUI::buildUI(void)
         }
     }
 
-    if ( m_editor.GetGame() != nullptr && m_editor.GetGame()->IsInitialized() )
+    if ( m_sceneEditor.GetGame() != nullptr && m_sceneEditor.GetGame()->IsInitialized() )
     {
-        const auto view = m_editor.GetCurrentView();
+        const auto view = m_sceneEditor.GetCurrentView();
         if (view)
-            m_editor.GetGame()->StandaloneGUI(view, float2(m_editor.GetDisplaySize()));
+            m_sceneEditor.GetGame()->StandaloneGUI(view, float2(m_sceneEditor.GetDisplaySize()));
     }
 
     // ImGui::ShowDemoWindow();
@@ -2832,12 +2841,12 @@ void SampleUI::buildDeltaTreeViz()
     //     if ((frameCounter - lastUpdated) > 0)
     //     {
     //         lastUpdated = frameCounter;
-    //         cachedHeader = m_editor.GetFeedbackData().deltaPathTree;
-    //         memcpy( cachedVertices, m_editor.GetDebugDeltaPathTree(), sizeof(DeltaTreeVizPathVertex)*cDeltaTreeVizMaxVertices );
+    //         cachedHeader = m_sceneEditor.GetFeedbackData().deltaPathTree;
+    //         memcpy( cachedVertices, m_sceneEditor.GetDebugDeltaPathTree(), sizeof(DeltaTreeVizPathVertex)*cDeltaTreeVizMaxVertices );
     //     }
     // }
-    const DeltaTreeVizHeader& DeltaTreeVizHeader   = m_editor.GetFeedbackData().deltaPathTree; // cachedHeader;
-    const DeltaTreeVizPathVertex* deltaPathTreeVertices = m_editor.GetDebugDeltaPathTree(); // cachedVertices;
+    const DeltaTreeVizHeader& DeltaTreeVizHeader   = m_sceneEditor.GetFeedbackData().deltaPathTree; // cachedHeader;
+    const DeltaTreeVizPathVertex* deltaPathTreeVertices = m_sceneEditor.GetDebugDeltaPathTree(); // cachedVertices;
     const int nodeCount = DeltaTreeVizHeader.nodeCount;
 
     ImGui::NewLine(); ImGui::NewLine(); ImGui::NewLine(); ImGui::NewLine(); ImGui::NewLine(); ImGui::NewLine(); ImGui::NewLine(); ImGui::NewLine(); ImGui::NewLine(); ImGui::NewLine();
@@ -3005,7 +3014,7 @@ void SampleUI::buildDeltaTreeViz()
             std::string matName = ">>SKY<<";
             if( treeNode.deltaVertex.materialID != 0xFFFFFFFF )
             {
-                treeNode.material = m_editor.FindMaterial((int)treeNode.deltaVertex.materialID);
+                treeNode.material = m_sceneEditor.FindMaterial((int)treeNode.deltaVertex.materialID);
                 if( treeNode.material != nullptr )
                     matName = treeNode.material->name; 
             }
@@ -3053,11 +3062,11 @@ void SampleUI::buildDeltaTreeViz()
             if (isAnyHovered)
             {
                 float3 worldPos = treeNode.deltaVertex.worldPos;
-                float3 viewVec = worldPos - m_editor.GetCurrentCamera().GetPosition();
+                float3 viewVec = worldPos - m_sceneEditor.GetCurrentCamera().GetPosition();
                 float sphereSize = 0.006f + 0.004f * dm::length(viewVec);
                 float step = 0.15f;
                 viewVec = dm::normalize(viewVec);
-                float3 right = dm::cross(viewVec, m_editor.GetCurrentCamera().GetUp());
+                float3 right = dm::cross(viewVec, m_sceneEditor.GetCurrentCamera().GetUp());
                 float3 up = dm::cross(right, viewVec);
                 float3 prev0 = worldPos;
                 float3 prev1 = worldPos;
@@ -3073,11 +3082,11 @@ void SampleUI::buildDeltaTreeViz()
                     float4 col0 = float4(0,0,0,1);
                     if( s > 0.0f )
                     {
-                        m_editor.DebugDrawLine(prev0, sp0, col1, col1); 
-                        m_editor.DebugDrawLine(prev1, sp1, col0, col0); 
-                        m_editor.DebugDrawLine(prev0, sp1, col1, col0);
-                        m_editor.DebugDrawLine(prev2, sp0, col1, col0);
-                        m_editor.DebugDrawLine(prev2, sp2, col1, col1);
+                        m_sceneEditor.DebugDrawLine(prev0, sp0, col1, col1); 
+                        m_sceneEditor.DebugDrawLine(prev1, sp1, col0, col0); 
+                        m_sceneEditor.DebugDrawLine(prev0, sp1, col1, col0);
+                        m_sceneEditor.DebugDrawLine(prev2, sp0, col1, col0);
+                        m_sceneEditor.DebugDrawLine(prev2, sp2, col1, col1);
                     }
                     prev0 = sp0; prev1 = sp1; prev2 = sp2;
                 }
@@ -3120,7 +3129,7 @@ void TogglableNode::SetSelected(bool selected)
 #if CAUSTICA_WITH_PYTHON
 void SampleUI::BuildPythonScriptingUI(float indent)
 {
-    auto& scripting = m_editor.GetPythonScripting();
+    auto& scripting = m_sceneEditor.GetPythonScripting();
     if (!scripting)
     {
         ImGui::TextDisabled("Python scripting host unavailable.");
@@ -3225,3 +3234,5 @@ void UpdateTogglableNodes(std::vector<TogglableNode>& togglableNodes, caustica::
     for (int i = (int)node->GetNumChildren() - 1; i >= 0; i--)
         UpdateTogglableNodes( togglableNodes, node->GetChild(i) );
 }
+
+} // namespace caustica::editor
