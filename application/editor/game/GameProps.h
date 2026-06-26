@@ -1,7 +1,7 @@
 #pragma once
 
 #include <shaders/PathTracer/Config.h>
-//#include "../SampleCommon.h"
+//#include "../common/SampleCommon.h"
 #include <SampleUI.h>
 
 // #include <core/vfs/VFS.h>

@@ -7,7 +7,7 @@
 #include <render/SceneLightingPasses.h>
 #include "EditorApplication.h"
 #include <render/WorldRenderer/PathTracingWorldRenderer.h>
-#include <SampleCommon/LocalConfig.h>
+#include <common/LocalConfig.h>
 #include <core/file_utils.h>
 #include <core/format.h>
 #include <core/path_utils.h>

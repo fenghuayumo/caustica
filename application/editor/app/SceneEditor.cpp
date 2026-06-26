@@ -60,8 +60,8 @@
 
 #include <render/Passes/OMM/OmmBaker.h>
 
-#include "SampleCommon/LocalConfig.h"
-#include "SampleCommon/CaptureScriptManager.h"
+#include "common/LocalConfig.h"
+#include "common/CaptureScriptManager.h"
 #include <render/Passes/Debug/Korgi.h>
 
 #include <render/Passes/Debug/ZoomTool.h>
@@ -76,7 +76,7 @@
 #include <stb_image.h>
 #include <stb_image_write.h>
 
-#include "SampleGame/GameScene.h"
+#include "game/GameScene.h"
 
 #if CAUSTICA_WITH_PYTHON
 #include "Python/PythonScripting.h"

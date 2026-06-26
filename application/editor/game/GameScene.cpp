@@ -30,13 +30,13 @@ using namespace caustica::render;
 
 namespace
 {
-    std::filesystem::path ResolveSampleGameRoot(const std::filesystem::path& sceneFilePath, const std::filesystem::path& mediaPath)
+    std::filesystem::path ResolveGameDataRoot(const std::filesystem::path& sceneFilePath, const std::filesystem::path& mediaPath)
     {
-        const std::filesystem::path sceneDirGamePath = sceneFilePath.parent_path() / c_SampleGameSubFolder;
+        const std::filesystem::path sceneDirGamePath = sceneFilePath.parent_path() / c_GameDataSubFolder;
         if (std::filesystem::exists(sceneDirGamePath))
             return sceneDirGamePath;
 
-        return mediaPath / std::string(c_SampleGameSubFolder);
+        return mediaPath / std::string(c_GameDataSubFolder);
     }
 
     std::filesystem::path ResolveGameStoragePath(const std::filesystem::path& mediaGamePath, const std::filesystem::path& sceneFilePath)
@@ -140,7 +140,7 @@ void GameScene::SceneLoaded(const std::shared_ptr<caustica::Scene>& scene, const
     if (gameSettings == nullptr)
         return;
 
-    const std::filesystem::path mediaGamePath = ResolveSampleGameRoot(sceneFilePath, mediaPath);
+    const std::filesystem::path mediaGamePath = ResolveGameDataRoot(sceneFilePath, mediaPath);
     if (!EnsureDirectoryExists(mediaGamePath))
         { assert(false); return; }
 
@@ -205,7 +205,7 @@ void GameScene::SceneLoaded(const std::shared_ptr<caustica::Scene>& scene, const
         if (!m_modelTypes.empty())
             caustica::warning("GameSettings found model definitions but no props under '%s'", m_gameStoragePath.string().c_str());
         else
-            caustica::warning("GameSettings present but no SampleGame data found under '%s'", m_gameStoragePath.string().c_str());
+            caustica::warning("GameSettings present but no game data found under '%s'", m_gameStoragePath.string().c_str());
         m_modelTypes.clear();
         m_gameStoragePath = std::filesystem::path();
         return;

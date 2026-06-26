@@ -14,7 +14,7 @@
 #include <string>
 #include <render/Passes/Debug/Korgi.h>
 #include <SampleUI.h>
-#include "SampleCommon/LocalConfig.h"
+#include "common/LocalConfig.h"
 #include <assets/loader/ShaderPackFileSystem.h>
 
 #include <backend/ShaderUtils.h>

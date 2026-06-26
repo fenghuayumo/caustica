@@ -59,7 +59,7 @@ inline constexpr const char* c_AssetsFolder        = "Assets";
 inline constexpr const char* c_EnvMapSubFolder     = "EnvironmentMaps";
 inline constexpr const char* c_MaterialsSubFolder  = "Materials";
 inline constexpr const char* c_MaterialsExtension  = ".material.json";
-inline constexpr const char* c_SampleGameSubFolder = "SampleGame";
+inline constexpr const char* c_GameDataSubFolder    = "SampleGame";
 
 // --- Environment map sentinel strings ---
 inline constexpr const char* c_EnvMapProcSky            = "==PROCEDURAL_SKY==";

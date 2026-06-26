@@ -7,10 +7,10 @@ file(GLOB_RECURSE caustica_editor_sources
     "${CMAKE_CURRENT_SOURCE_DIR}/render/*.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/ui/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/ui/*.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/SampleCommon/*.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/SampleCommon/*.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/SampleGame/*.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/SampleGame/*.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/common/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/common/*.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/game/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/game/*.h"
 )
 
 # Entry point is compiled into the executable, not causticaApp
@@ -19,8 +19,8 @@ list(REMOVE_ITEM caustica_editor_sources ${caustica_editor_entry_source})
 
 if (NOT WIN32)
     list(REMOVE_ITEM caustica_editor_sources
-        "${CMAKE_CURRENT_SOURCE_DIR}/SampleCommon/SplashScreen.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/SampleCommon/SplashScreen.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/common/SplashScreen.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/common/SplashScreen.h"
     )
 endif()
 

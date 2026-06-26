@@ -223,7 +223,7 @@ target_include_directories(causticaApp PUBLIC
     "${CMAKE_SOURCE_DIR}/application/editor"
     "${CMAKE_SOURCE_DIR}/application/editor/app"
     "${CMAKE_SOURCE_DIR}/application/editor/ui"
-    "${CMAKE_SOURCE_DIR}/application/editor/SampleGame"
+    "${CMAKE_SOURCE_DIR}/application/editor/game"
 )
 target_compile_definitions(causticaApp PUBLIC CAUSTICA_D3D12_WITH_NVAPI=$<BOOL:${NVRHI_WITH_NVAPI}>)
 target_compile_definitions(causticaApp PUBLIC CAUSTICA_WITH_OIDN=$<BOOL:${CAUSTICA_WITH_OIDN}>)

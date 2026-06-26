@@ -2,7 +2,7 @@
 #include "SceneEditor.h"
 #include <render/SceneLightingPasses.h>
 #include <render/SceneGaussianSplatPasses.h>
-#include "SampleCommon/ImGuiManager.h"
+#include "common/ImGuiManager.h"
 #include "EditorApplication.h"
 
 #include <inttypes.h>
@@ -21,10 +21,10 @@
 
 #include <render/Passes/OMM/OmmBaker.h>
 
-#include "SampleGame/GameScene.h"
+#include "game/GameScene.h"
 #include <render/Passes/Debug/ZoomTool.h>
 
-#include "SampleCommon/CaptureScriptManager.h"
+#include "common/CaptureScriptManager.h"
 #include "Python/PythonScripting.h"
 
 #include <cstdio>

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <shaders/PathTracer/Config.h>
-//#include "../SampleCommon.h"
+//#include "../common/SampleCommon.h"
 #include <scene/GameTypes.h>
 
 namespace caustica

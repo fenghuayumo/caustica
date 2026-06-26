@@ -1,4 +1,4 @@
-#include "SampleCommon/ImGuiManager.h"
+#include "common/ImGuiManager.h"
 
 #include <imgui/imgui_renderer.h>
 #include <core/vfs/VFS.h>
