@@ -53,13 +53,10 @@
 #include "SampleCommon/CaptureScriptManager.h"
 #include <render/Passes/Debug/Korgi.h>
 
-#include <render/GPUSort/GPUSort.h>
-
 #include <render/Passes/Debug/ZoomTool.h>
 
 #include <render/Passes/PostProcess/DenoisingGuidesBaker.h>
 #include <render/Passes/Denoisers/OidnDenoiser.h>
-#include <render/Passes/Gaussian/GaussianSplatPass.h>
 
 #include <assets/loader/GltfImporter.h>
 #include <assets/loader/ObjImporter.h>
@@ -113,72 +110,6 @@ namespace
 
 namespace
 {
-    constexpr float kGaussianSplatKernelMinResponse = 0.0113f;
-
-    uint32_t ResolveGaussianSplatShadowMode(const PathTracerSettings& settings)
-    {
-        if (!settings.GaussianSplatShadows && settings.GaussianSplatShadowsMode == GAUSSIAN_SPLAT_SHADOWS_DISABLED)
-            return GAUSSIAN_SPLAT_SHADOWS_DISABLED;
-
-        const int requestedMode = settings.GaussianSplatShadowsMode == GAUSSIAN_SPLAT_SHADOWS_DISABLED
-            ? GAUSSIAN_SPLAT_SHADOWS_HARD
-            : settings.GaussianSplatShadowsMode;
-        return uint32_t(std::clamp(requestedMode, GAUSSIAN_SPLAT_SHADOWS_HARD, GAUSSIAN_SPLAT_SHADOWS_SOFT));
-    }
-
-    uint32_t ClampGaussianSplatSoftShadowSamples(int sampleCount)
-    {
-        return uint32_t(std::clamp(sampleCount, 1, 16));
-    }
-
-    uint32_t ClampGaussianSplatEmissionProxyCount(int proxyCount)
-    {
-        return uint32_t(std::clamp(proxyCount, 0, 262144));
-    }
-
-    std::string MakeUniqueChildNodeName(const SceneGraphNode& parent, const std::string& desiredName)
-    {
-        const std::string baseName = desiredName.empty() ? "GaussianSplat" : desiredName;
-
-        std::unordered_set<std::string> existingNames;
-        for (size_t childIndex = 0; childIndex < parent.GetNumChildren(); childIndex++)
-            existingNames.insert(parent.GetChild(childIndex)->GetName());
-
-        if (existingNames.find(baseName) == existingNames.end())
-            return baseName;
-
-        for (uint32_t suffix = 2; ; suffix++)
-        {
-            std::string candidate = baseName + " (" + std::to_string(suffix) + ")";
-            if (existingNames.find(candidate) == existingNames.end())
-                return candidate;
-        }
-    }
-
-    bool NodeSubtreeContains(SceneGraphNode* root, SceneGraphNode* candidate)
-    {
-        if (root == nullptr || candidate == nullptr)
-            return false;
-
-        SceneGraphWalker walker(root);
-        while (walker)
-        {
-            if (walker.Get() == candidate)
-                return true;
-            walker.Next(true);
-        }
-
-        return false;
-    }
-
-    bool IsGaussianSplatEmissionEnabled(const SampleUIData& ui)
-    {
-        return ui.EnableGaussianSplats
-            && ui.GaussianSplatAsEmitter
-            && ui.GaussianSplatEmissionIntensity > 0.0f
-            && ui.GaussianSplatEmissionMaxProxyCount > 0;
-    }
-
 #if CAUSTICA_WITH_NATIVE_DLSS
     float GetNativeDLSSResolutionScale(SI::DLSSMode mode)
     {
@@ -252,8 +183,6 @@ SceneEditor::SceneEditor(const CommandLineOptions& cmdLine,
     m_progressLoading.Start("Initializing...");
     m_progressLoading.Set(50);
 
-    RefreshEnvironmentMapMediaList();
-
     m_captureScriptManager = std::make_unique<CaptureScriptManager>(*this, m_ui, m_cmdLine);
 }
 
@@ -322,6 +251,86 @@ void SceneEditor::AttachSceneServices(SceneManager& sceneManager, caustica::Rend
 {
     m_sceneManager = &sceneManager;
     m_renderCore = &renderCore;
+}
+
+void SceneEditor::AttachLightingPasses(SceneLightingPasses& lightingPasses)
+{
+    m_lightingPasses = &lightingPasses;
+}
+
+SceneLightingPasses& SceneEditor::GetLightingPasses()
+{
+    assert(m_lightingPasses != nullptr);
+    return *m_lightingPasses;
+}
+
+const SceneLightingPasses& SceneEditor::GetLightingPasses() const
+{
+    assert(m_lightingPasses != nullptr);
+    return *m_lightingPasses;
+}
+
+const std::string& SceneEditor::GetEnvMapLocalPath() const { return GetLightingPasses().envMapLocalPath(); }
+const std::string& SceneEditor::GetEnvMapOverrideSource() const { return GetLightingPasses().envMapOverride(); }
+const std::vector<std::filesystem::path>& SceneEditor::GetEnvMapMediaList() { return GetLightingPasses().envMapMediaList(); }
+std::shared_ptr<EnvMapBaker>& SceneEditor::GetEnvMapBaker() { return GetLightingPasses().envMapBaker(); }
+const std::shared_ptr<EnvMapBaker>& SceneEditor::GetEnvMapBaker() const { return GetLightingPasses().envMapBaker(); }
+std::shared_ptr<LightsBaker>& SceneEditor::GetLightsBaker() { return GetLightingPasses().lightsBaker(); }
+const std::shared_ptr<LightsBaker>& SceneEditor::GetLightsBaker() const { return GetLightingPasses().lightsBaker(); }
+std::shared_ptr<MaterialsBaker>& SceneEditor::GetMaterialsBaker() { return GetLightingPasses().materialsBaker(); }
+const std::shared_ptr<MaterialsBaker>& SceneEditor::GetMaterialsBaker() const { return GetLightingPasses().materialsBaker(); }
+std::shared_ptr<OmmBaker>& SceneEditor::GetOMMBaker() { return GetLightingPasses().ommBaker(); }
+const std::shared_ptr<OmmBaker>& SceneEditor::GetOMMBaker() const { return GetLightingPasses().ommBaker(); }
+std::shared_ptr<ComputePipelineBaker>& SceneEditor::GetComputePipelineBaker() { return GetLightingPasses().computePipelineBaker(); }
+const std::shared_ptr<ComputePipelineBaker>& SceneEditor::GetComputePipelineBaker() const { return GetLightingPasses().computePipelineBaker(); }
+std::vector<std::shared_ptr<caustica::Light>>& SceneEditor::GetLights() { return GetLightingPasses().lights(); }
+EnvMapSceneParams& SceneEditor::GetEnvMapSceneParams() { return GetLightingPasses().envMapSceneParams(); }
+const EnvMapSceneParams& SceneEditor::GetEnvMapSceneParams() const { return GetLightingPasses().envMapSceneParams(); }
+std::string& SceneEditor::GetEnvMapLocalPath() { return GetLightingPasses().envMapLocalPath(); }
+std::string& SceneEditor::GetEnvMapOverrideSource() { return GetLightingPasses().envMapOverride(); }
+
+void SceneEditor::AttachRayTracingResources(SceneRayTracingResources& rayTracingResources)
+{
+    m_rayTracingResources = &rayTracingResources;
+}
+
+SceneRayTracingResources& SceneEditor::GetRayTracingResources()
+{
+    assert(m_rayTracingResources != nullptr && m_rayTracingResources->isAttached());
+    return *m_rayTracingResources;
+}
+
+const SceneRayTracingResources& SceneEditor::GetRayTracingResources() const
+{
+    assert(m_rayTracingResources != nullptr && m_rayTracingResources->isAttached());
+    return *m_rayTracingResources;
+}
+
+void SceneEditor::AttachGaussianSplatPasses(SceneGaussianSplatPasses& gaussianSplatPasses)
+{
+    m_gaussianSplatPasses = &gaussianSplatPasses;
+}
+
+SceneGaussianSplatPasses& SceneEditor::GetGaussianSplatPasses()
+{
+    assert(m_gaussianSplatPasses != nullptr && m_gaussianSplatPasses->isAttached());
+    return *m_gaussianSplatPasses;
+}
+
+const SceneGaussianSplatPasses& SceneEditor::GetGaussianSplatPasses() const
+{
+    assert(m_gaussianSplatPasses != nullptr && m_gaussianSplatPasses->isAttached());
+    return *m_gaussianSplatPasses;
+}
+
+std::vector<GaussianSplatEmissionProxy>& SceneEditor::GetGaussianSplatEmissionProxies()
+{
+    return GetGaussianSplatPasses().emissionProxies();
+}
+
+const std::vector<GaussianSplatEmissionProxy>& SceneEditor::GetGaussianSplatEmissionProxies() const
+{
+    return GetGaussianSplatPasses().emissionProxies();
 }
 
 void SceneEditor::PrepareEditorFrame()
@@ -424,7 +433,7 @@ void SceneEditor::Init(const std::string& preferredScene,
     m_progressLoading.Set(95);
 
     if (GetDevice()->queryFeatureSupport(nvrhi::Feature::RayTracingOpacityMicromap))
-        m_ommBaker = std::make_shared<OmmBaker>(GetDevice(), m_DescriptorTable, m_TextureLoader, m_shaderFactory);
+        GetLightingPasses().createOmmBakerIfSupported(GetDevice(), m_DescriptorTable, m_TextureLoader, m_shaderFactory);
 
     // Get all scenes in "assets" folder
     m_sceneManager->discoverAvailableScenes(GetLocalPath(c_AssetsFolder));
@@ -470,304 +479,22 @@ void SceneEditor::SetCurrentScene( const std::string & sceneName, bool forceRelo
 
 bool SceneEditor::LoadGaussianSplatFile(const std::filesystem::path& fileName, bool convertRdfToRub)
 {
-    return AttachGaussianSplatToScene(fileName, convertRdfToRub);
+    return GetGaussianSplatPasses().loadFromFile(fileName, convertRdfToRub);
 }
 
-std::filesystem::path
-SceneEditor::ResolveGaussianSplatPath(const GaussianSplat& splat) const
+uint32_t SceneEditor::GetGaussianSplatCount() const
 {
-    if (splat.path.empty())
-        return {};
-
-    std::filesystem::path splatPath = splat.path;
-    if (splatPath.is_absolute())
-        return splatPath;
-
-    const std::filesystem::path sceneFolder = m_sceneManager->getCurrentScenePath().parent_path();
-    if (!sceneFolder.empty() && m_sceneManager->getCurrentScenePath() != std::filesystem::path(SceneManager::inlineSceneSentinel()))
-        return sceneFolder / splatPath;
-
-    return std::filesystem::absolute(splatPath);
+    return GetGaussianSplatPasses().splatCount();
 }
 
-void SceneEditor::PrepareGaussianSplatPass(GaussianSplatPass& pass)
+uint32_t SceneEditor::GetGaussianSplatObjectCount() const
 {
-    auto* renderTargets = m_worldRenderer->getRenderTargets();
-    auto shaderDebug = m_worldRenderer->getShaderDebug();
-    if (renderTargets == nullptr || shaderDebug == nullptr)
-        return;
-
-    if (m_gpuSort == nullptr)
-        m_gpuSort = std::make_shared<GPUSort>(GetDevice(), m_shaderFactory);
-    m_gpuSort->CreateRenderPasses(m_CommonPasses, shaderDebug);
-    pass.SetGpuSort(m_gpuSort);
-    pass.CreatePipeline(*renderTargets);
+    return GetGaussianSplatPasses().objectCount();
 }
 
-uint32_t
-SceneEditor::GetTotalGaussianSplatCount() const
+const std::string& SceneEditor::GetGaussianSplatFileName() const
 {
-    uint64_t total = 0;
-    for (const auto& object : m_gaussianSplatSceneObjects)
-    {
-        if (object.pass != nullptr)
-            total += object.pass->GetSplatCount();
-    }
-    return uint32_t(std::min<uint64_t>(total, std::numeric_limits<uint32_t>::max()));
-}
-
-void SceneEditor::UpdateGaussianSplatUIState()
-{
-    m_editor.GaussianSplatObjectCount = uint32_t(m_gaussianSplatSceneObjects.size());
-    m_editor.GaussianSplatCount = GetTotalGaussianSplatCount();
-
-    m_gaussianSplatFileNameSummary.clear();
-    if (m_gaussianSplatSceneObjects.size() == 1 && m_gaussianSplatSceneObjects.front().pass != nullptr)
-    {
-        m_gaussianSplatFileNameSummary = m_gaussianSplatSceneObjects.front().pass->GetSourceFileName();
-    }
-    else if (!m_gaussianSplatSceneObjects.empty())
-    {
-        m_gaussianSplatFileNameSummary = std::to_string(m_gaussianSplatSceneObjects.size()) + " scene Gaussian Splat objects";
-    }
-    m_editor.GaussianSplatFileName = m_gaussianSplatFileNameSummary;
-
-    if (m_editor.GaussianSplatObjectCount == 0)
-        m_editor.SelectedGaussianSplat = false;
-}
-
-void SceneEditor::LoadGaussianSplatsFromScene()
-{
-    m_gaussianSplatSceneObjects.clear();
-    m_gaussianSplatEmissionProxies.clear();
-
-    if (!m_sceneManager->getScene() || !m_sceneManager->getScene()->GetSceneGraph() || !m_shaderFactory)
-    {
-        UpdateGaussianSplatUIState();
-        return;
-    }
-
-    SceneGraphWalker walker(m_sceneManager->getScene()->GetSceneGraph()->GetRootNode().get());
-    while (walker)
-    {
-        auto splat = std::dynamic_pointer_cast<GaussianSplat>(walker->GetLeaf());
-        if (splat != nullptr)
-        {
-            splat->loadedSplatCount = 0;
-            splat->resolvedPath.clear();
-
-            const std::filesystem::path splatPath = ResolveGaussianSplatPath(*splat);
-            if (splatPath.empty())
-            {
-                caustica::error("Gaussian Splat node '%s' has no path/file field.", walker->GetName().c_str());
-            }
-            else
-            {
-                auto pass = std::make_unique<GaussianSplatPass>(GetDevice(), m_shaderFactory);
-                if (pass->LoadFromFile(splatPath, splat->convertRdfToRub))
-                {
-                    splat->resolvedPath = splatPath.string();
-                    splat->loadedSplatCount = pass->GetSplatCount();
-                    PrepareGaussianSplatPass(*pass);
-
-                    GaussianSplatSceneObject object;
-                    object.splat = splat;
-                    object.node = walker->shared_from_this();
-                    object.pass = std::move(pass);
-                    m_gaussianSplatSceneObjects.push_back(std::move(object));
-                }
-                else
-                {
-                    caustica::error("Failed to load Gaussian Splat node '%s' from '%s'.",
-                        walker->GetName().c_str(), splatPath.string().c_str());
-                }
-            }
-        }
-
-        walker.Next(true);
-    }
-
-    UpdateGaussianSplatUIState();
-    m_worldRenderer->setGaussianSplatTemporalReset(true);
-}
-
-bool SceneEditor::AttachGaussianSplatToScene(const std::filesystem::path& fileName, bool convertRdfToRub)
-{
-    if (!m_sceneManager->getScene() || !m_sceneManager->getScene()->GetSceneGraph() || !m_sceneManager->getScene()->GetSceneGraph()->GetRootNode())
-    {
-        caustica::error("Cannot load Gaussian splats before a scene is loaded.");
-        return false;
-    }
-    if (!m_shaderFactory)
-    {
-        caustica::error("Cannot load Gaussian splats before the shader factory is initialized.");
-        return false;
-    }
-
-    std::filesystem::path splatPath = fileName;
-    if (!splatPath.is_absolute())
-        splatPath = std::filesystem::absolute(splatPath);
-
-    if (!std::filesystem::exists(splatPath))
-    {
-        caustica::error("Gaussian Splat file does not exist: '%s'", splatPath.string().c_str());
-        return false;
-    }
-
-    auto pass = std::make_unique<GaussianSplatPass>(GetDevice(), m_shaderFactory);
-    if (!pass->LoadFromFile(splatPath, convertRdfToRub))
-    {
-        caustica::error("Failed to load Gaussian Splat file '%s'.", splatPath.string().c_str());
-        return false;
-    }
-    if (pass->GetSplatCount() == 0)
-    {
-        caustica::error("Gaussian Splat file '%s' contains no splats.", splatPath.string().c_str());
-        return false;
-    }
-
-    auto splat = std::make_shared<GaussianSplat>();
-    splat->path = splatPath.string();
-    splat->resolvedPath = splatPath.string();
-    splat->convertRdfToRub = convertRdfToRub;
-    splat->enabled = true;
-    splat->loadedSplatCount = pass->GetSplatCount();
-
-    auto node = std::make_shared<SceneGraphNode>();
-    auto sceneGraph = m_sceneManager->getScene()->GetSceneGraph();
-    auto rootNode = sceneGraph->GetRootNode();
-    node->SetName(MakeUniqueChildNodeName(*rootNode, splatPath.filename().string()));
-    node->SetLeaf(splat);
-
-    constexpr double deg2rad = 3.14159265358979323846 / 180.0;
-    node->SetTranslation(dm::double3(
-        double(m_settings.GaussianSplatTranslation.x),
-        double(m_settings.GaussianSplatTranslation.y),
-        double(m_settings.GaussianSplatTranslation.z)));
-    node->SetRotation(dm::rotationQuat(dm::double3(
-        double(m_settings.GaussianSplatRotationEulerDeg.x) * deg2rad,
-        double(m_settings.GaussianSplatRotationEulerDeg.y) * deg2rad,
-        double(m_settings.GaussianSplatRotationEulerDeg.z) * deg2rad)));
-    node->SetScaling(dm::double3(
-        double(m_settings.GaussianSplatObjectScale.x),
-        double(m_settings.GaussianSplatObjectScale.y),
-        double(m_settings.GaussianSplatObjectScale.z)));
-
-    auto attachedNode = sceneGraph->Attach(rootNode, node);
-    m_sceneManager->getScene()->RefreshSceneGraph(GetFrameIndex());
-
-    PrepareGaussianSplatPass(*pass);
-
-    GaussianSplatSceneObject object;
-    object.splat = splat;
-    object.node = attachedNode;
-    object.pass = std::move(pass);
-    m_gaussianSplatSceneObjects.push_back(std::move(object));
-
-    m_settings.EnableGaussianSplats = true;
-    UpdateGaussianSplatUIState();
-    m_worldRenderer->setGaussianSplatTemporalReset(true);
-    RequestFullRebuild();
-    return true;
-}
-
-uint32_t
-SceneEditor::GetGaussianSplatCount() const
-{
-    return GetTotalGaussianSplatCount();
-}
-
-uint32_t
-SceneEditor::GetGaussianSplatObjectCount() const
-{
-    return uint32_t(m_gaussianSplatSceneObjects.size());
-}
-
-const std::string&
-SceneEditor::GetGaussianSplatFileName() const
-{
-    return m_gaussianSplatFileNameSummary;
-}
-
-SceneEditor::GaussianSplatSceneObject*
-SceneEditor::GetPrimaryGaussianSplatObject()
-{
-    for (auto& object : m_gaussianSplatSceneObjects)
-    {
-        if (object.splat != nullptr && object.splat->enabled && object.pass != nullptr && object.pass->HasSplats())
-            return &object;
-    }
-    return nullptr;
-}
-
-const SceneEditor::GaussianSplatSceneObject*
-SceneEditor::GetPrimaryGaussianSplatObject() const
-{
-    for (const auto& object : m_gaussianSplatSceneObjects)
-    {
-        if (object.splat != nullptr && object.splat->enabled && object.pass != nullptr && object.pass->HasSplats())
-            return &object;
-    }
-    return nullptr;
-}
-
-float4x4
-SceneEditor::GetGaussianSplatObjectToWorld(const GaussianSplatSceneObject& object) const
-{
-    auto node = object.node.lock();
-    if (node == nullptr)
-        return float4x4::identity();
-
-    return dm::affineToHomogeneous(node->GetLocalToWorldTransformFloat());
-}
-
-void SceneEditor::BuildGaussianSplatEmissionProxyList()
-{
-    m_gaussianSplatEmissionProxies.clear();
-
-    if (!IsGaussianSplatEmissionEnabled(m_ui))
-        return;
-
-    const uint32_t maxProxyCount = ClampGaussianSplatEmissionProxyCount(m_settings.GaussianSplatEmissionMaxProxyCount);
-    for (auto& object : m_gaussianSplatSceneObjects)
-    {
-        if (object.splat == nullptr || !object.splat->enabled || object.pass == nullptr || !object.pass->HasSplats())
-            continue;
-
-        const uint32_t remainingProxyCount = maxProxyCount > m_gaussianSplatEmissionProxies.size()
-            ? maxProxyCount - uint32_t(m_gaussianSplatEmissionProxies.size())
-            : 0u;
-        if (remainingProxyCount == 0)
-            break;
-
-        object.pass->BuildEmissionProxies(
-            remainingProxyCount,
-            m_settings.GaussianSplatScale,
-            uint32_t(std::clamp(m_settings.GaussianSplatRtxKernelDegree, 0, 5)),
-            m_settings.GaussianSplatRtxAdaptiveClamp,
-            m_settings.GaussianSplatTintColor,
-            m_settings.GaussianSplatAlphaCullThreshold);
-
-        auto node = object.node.lock();
-        const dm::affine3 objectToWorld = node != nullptr
-            ? node->GetLocalToWorldTransformFloat()
-            : dm::affine3::identity();
-
-        const float radiusScale = std::max({
-            length(objectToWorld.transformVector(float3(1.0f, 0.0f, 0.0f))),
-            length(objectToWorld.transformVector(float3(0.0f, 1.0f, 0.0f))),
-            length(objectToWorld.transformVector(float3(0.0f, 0.0f, 1.0f))) });
-
-        const auto& proxies = object.pass->GetEmissionProxies();
-        m_gaussianSplatEmissionProxies.reserve(m_gaussianSplatEmissionProxies.size() + proxies.size());
-        for (const GaussianSplatEmissionProxy& proxy : proxies)
-        {
-            GaussianSplatEmissionProxy transformed = proxy;
-            transformed.center = objectToWorld.transformPoint(proxy.center);
-            transformed.radius = proxy.radius * radiusScale;
-            m_gaussianSplatEmissionProxies.push_back(transformed);
-        }
-    }
+    return GetGaussianSplatPasses().fileNameSummary();
 }
 
 void SceneEditor::SceneUnloading( )
@@ -775,26 +502,20 @@ void SceneEditor::SceneUnloading( )
     m_editor.TogglableNodes = nullptr;
     if (m_worldRenderer)
         m_worldRenderer->onSceneUnloading();
-    m_renderCore->onSceneUnloading();
-    m_bindingCache->Clear( );
-    m_lights.clear();
+    if (m_renderCore)
+        m_renderCore->onSceneUnloading();
+    if (m_bindingCache)
+        m_bindingCache->Clear( );
+    GetLightingPasses().sceneUnloading();
     m_editor.SelectedMaterial = nullptr;
     m_editor.SelectedNode = nullptr;
     m_editor.SelectedGaussianSplat = false;
-    m_gaussianSplatSceneObjects.clear();
-    m_gaussianSplatEmissionProxies.clear();
-    UpdateGaussianSplatUIState();
+    if (m_gaussianSplatPasses && m_gaussianSplatPasses->isAttached())
+        m_gaussianSplatPasses->sceneUnloading();
     m_settings.EnvironmentMapParams = EnvironmentMapRuntimeParameters();
-    m_envMapBaker = nullptr;
-    m_lightsBaker = nullptr;
-    m_materialsBaker = nullptr;
-    m_gpuSort = nullptr;
     m_uncompressedTextures.clear();
-    if (m_ommBaker != nullptr)
-        m_ommBaker->SceneUnloading();
 
     DestroyRTPipelines();
-    m_computePipelineBaker = nullptr;
 
     if (m_sampleGame!=nullptr) m_sampleGame->SceneUnloading();
 }
@@ -873,8 +594,10 @@ void SceneEditor::CollectUncompressedTextures()
             return;
         }
     };
-    for ( auto textureIT : m_materialsBaker->GetUsedTextures() )
-        listUncompressedTextureIfNeeded(textureIT.second.Loaded, textureIT.second.NormalMap);
+    GetLightingPasses().forEachUsedMaterialTexture([&](std::shared_ptr<LoadedTexture> texture, bool normalMap)
+    {
+        listUncompressedTextureIfNeeded(texture, normalMap);
+    });
 }
 
 void SceneEditor::RefreshEnvironmentMapMediaList()
@@ -883,12 +606,9 @@ void SceneEditor::RefreshEnvironmentMapMediaList()
         ? m_sceneManager->getCurrentScenePath()
         : std::filesystem::path();
 
-    SceneManager::refreshEnvironmentMapMediaList(
+    GetLightingPasses().refreshEnvironmentMapMediaList(
         GetLocalPath(c_AssetsFolder),
-        c_EnvMapSubFolder,
-        currentScenePath,
-        m_envMapMediaList,
-        m_envMapMediaFolder);
+        currentScenePath);
 }
 
 void SceneEditor::SceneLoaded( )
@@ -915,56 +635,20 @@ void SceneEditor::SceneLoaded( )
     m_sceneTime = 0.f;
     m_sceneManager->getScene()->FinishedLoading( GetFrameIndex( ) );
 
-    LoadGaussianSplatsFromScene();
-
-    if (!m_initialGaussianSplatAttached && !m_cmdLine.GaussianSplatFileName.empty())
-    {
-        m_initialGaussianSplatAttached = true;
-        (void)AttachGaussianSplatToScene(m_cmdLine.GaussianSplatFileName, m_cmdLine.GaussianSplatConvertRdfToRub);
-    }
+    GetGaussianSplatPasses().onSceneLoaded(m_cmdLine);
 
     m_progressLoading.Set(65);
 
-	// Find lights; do this before special cases to avoid duplicates
-	for (auto light : m_sceneManager->getScene()->GetSceneGraph()->GetLights())
-	{
-		m_lights.push_back(light);
-	}
+    GetLightingPasses().onSceneLoaded(*m_sceneManager->getScene(), m_settings);
 
     // seem like sensible defaults
     m_settings.ToneMappingParams.exposureCompensation = 2.0f;
     m_settings.ToneMappingParams.exposureValue = 0.0f;
 
-    std::shared_ptr<EnvironmentLight> envLight = FindEnvironmentLight(m_lights);
-    m_envMapLocalPath = (envLight==nullptr)?(""):(envLight->path);
-    m_settings.EnvironmentMapParams = EnvironmentMapRuntimeParameters();
-    m_envMapOverride = c_EnvMapSceneDefault;
-
     if (m_editor.TogglableNodes == nullptr)
     {
         m_editor.TogglableNodes = std::make_shared<std::vector<TogglableNode>>();
         UpdateTogglableNodes(*m_editor.TogglableNodes, GetScene()->GetSceneGraph()->GetRootNode().get()); // UNSAFE - make sure not to keep m_editor.TogglableNodes longer than scenegraph!
-    }
-
-    // clean up invisible lights / markers because they slow things down
-    for (int i = (int)m_lights.size() - 1; i >= 0; i--)
-    {
-        LightConstants lc;
-        m_lights[i]->FillLightConstants(lc);
-        if (length(lc.color * lc.intensity) <= 1e-7f)
-            m_lights.erase( m_lights.begin() + i );
-    }
-
-    if( m_envMapLocalPath != "" )
-    {
-        // Make sure that there's an environment light object attached to the scene,
-        // so that RTXDI will pick it up and sample.
-        if (envLight == nullptr)
-        {
-            envLight = std::make_shared<EnvironmentLight>();
-            m_sceneManager->getScene()->GetSceneGraph()->AttachLeafNode(m_sceneManager->getScene()->GetSceneGraph()->GetRootNode(), envLight);
-            m_lights.push_back(envLight);
-        }
     }
 
     auto cameras = m_sceneManager->getScene()->GetSceneGraph( )->GetCameras( );
@@ -1008,10 +692,7 @@ void SceneEditor::SceneLoaded( )
 
     m_progressLoading.Set(90);
 
-    if (m_materialsBaker!=nullptr) m_materialsBaker->SceneReloaded();
-    if (m_envMapBaker!=nullptr) m_envMapBaker->SceneReloaded();
-    if (m_lightsBaker!=nullptr) m_lightsBaker->SceneReloaded();
-    if (m_ommBaker!=nullptr) m_ommBaker->SceneLoaded(*m_sceneManager->getScene());
+    GetLightingPasses().notifyBakersSceneReloaded(*m_sceneManager->getScene());
 
     m_progressLoading.Set(100);
 
@@ -1251,161 +932,49 @@ void SceneEditor::LoadCurrentCamera()
 
 void SceneEditor::FillPTPipelineGlobalMacros(std::vector<caustica::ShaderMacro> & macros)
 {
-    macros.clear();
-
-    auto device = GetDevice();
-    const bool canUseNvapiHitObject =
-        m_settings.NVAPIHitObjectExtension &&
-        device->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D12 &&
-        device->queryFeatureSupport(nvrhi::Feature::HlslExtensionUAV);
-    const bool canUseDxHitObject =
-        m_settings.DXHitObjectExtension &&
-        device->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D12;
-
-    assert(!canUseNvapiHitObject || !canUseDxHitObject);
-
-    macros.push_back({ "ENABLE_DEBUG_SURFACE_VIZ",  (m_settings.DebugView != DebugViewType::Disabled)?("1"):("0") });
-    macros.push_back({ "ENABLE_DEBUG_LINES_VIZ",    (m_settings.ShowDebugLines)?("1"):("0") });
-
-    macros.push_back({ "USE_NVAPI_HIT_OBJECT_EXTENSION", canUseNvapiHitObject ? "1" : "0" });
-    macros.push_back({ "USE_NVAPI_REORDER_THREADS", (canUseNvapiHitObject && m_settings.NVAPIReorderThreads) ? "1" : "0" });
-
-    macros.push_back({ "USE_DX_HIT_OBJECT_EXTENSION", canUseDxHitObject ? "1" : "0" });
-    macros.push_back({ "USE_DX_MAYBE_REORDER_THREADS", (canUseDxHitObject && m_settings.DXMaybeReorderThreads) ? "1" : "0" });
-
-    macros.push_back({ "PT_ENABLE_RUSSIAN_ROULETTE", (m_settings.EnableRussianRoulette) ? ("1") : ("0") });
-
-    macros.push_back({ "PT_NEE_ENABLED", (m_settings.UseNEE)?("1"):("0") });
-
-    macros.push_back({ "PT_USE_RESTIR_DI", (m_settings.ActualUseReSTIRDI()) ? ("1") : ("0") });   // these will match constants.useReSTIRDI but constants are used in other passes too
-    macros.push_back({ "PT_USE_RESTIR_GI", (m_settings.ActualUseReSTIRGI()) ? ("1") : ("0") });   // these will match constants.useReSTIRGI but constants are used in other passes too
-    macros.push_back({ "PT_USE_RESTIR_PT", (m_settings.ActualUseReSTIRPT()) ? ("1") : ("0") });
-    
-
-    // minor perf gains but recompile time every time value changed is too annoying 
-    // macros.push_back({ "PT_BOUNCE_COUNT", std::to_string(m_settings.BounceCount) });
-    // macros.push_back({ "PT_DIFFUSE_BOUNCE_COUNT", std::to_string((m_settings.RealtimeMode) ? (m_settings.RealtimeDiffuseBounceCount) : (m_settings.ReferenceDiffuseBounceCount)) });
-
-    macros.push_back({ "CAUSTICA_USE_APPROXIMATE_MIS", (m_settings.ActualUseApproximateMIS()) ? ("1") : ("0") });
-
-    // It helps performance a lot when these are baked in
-    macros.push_back({ "CAUSTICA_NEE_FULL_SAMPLE_COUNT", std::to_string(m_settings.NEEFullSamples) });
-    uint localCandidateSamples = ComputeCandidateSampleLocalCount(m_settings.ActualNEEAT_LocalToGlobalSampleRatio(), m_settings.NEECandidateSamples);
-    uint globalCandidateSamples = ComputeCandidateSampleGlobalCount(m_settings.ActualNEEAT_LocalToGlobalSampleRatio(), m_settings.NEECandidateSamples);
-    macros.push_back({ "CAUSTICA_NEE_LOCAL_CANDIDATE_SAMPLE_COUNT", std::to_string(localCandidateSamples) });
-    macros.push_back({ "CAUSTICA_NEE_GLOBAL_CANDIDATE_SAMPLE_COUNT", std::to_string(globalCandidateSamples) });
-    macros.push_back({ "CAUSTICA_NEE_TOTAL_CANDIDATE_SAMPLE_COUNT", std::to_string(m_settings.NEECandidateSamples) });
-
-    macros.push_back({ "CAUSTICA_DISABLE_SER_TERMINATION_HINT", (m_settings.DbgDisableSERTerminationHint)?("1"):("0") });
-    macros.push_back({ "CAUSTICA_DISCARD_NON_NEE_LIGHTING", (m_settings.DbgDiscardNonNEELighting) ? ("1") : ("0") });
-    macros.push_back({ "CAUSTICA_DISCARD_NEE_LIGHTING", (m_settings.DbgDiscardNEELighting) ? ("1") : ("0") });
-    
-    macros.push_back({ "CAUSTICA_FIREFLY_FILTER", (m_settings.ActualFireflyFilterEnabled()) ? ("1") : ("0") });
-
-    macros.push_back({ "CAUSTICA_ACTIVE_STABLE_PLANE_COUNT", std::to_string(m_settings.StablePlanesActiveCount) });
-
-    macros.push_back({ "CAUSTICA_NESTED_DIELECTRICS_QUALITY", std::to_string(m_settings.NestedDielectricsQuality) });
-
-    macros.push_back({ "CAUSTICA_LP_TYPES_USE_16BIT_PRECISION", (m_settings.UseFp16Types) ? ("1") : ("0") });
-
-    macros.push_back({ "CAUSTICA_ENABLE_LOW_DISCREPANCY_SAMPLER_FOR_BSDF", (m_settings.EnableLDSamplerForBSDF) ? ("1") : ("0") });
-
-    m_lightsBaker->SetGlobalShaderMacros(macros);
-    if (m_ommBaker != nullptr)
-        m_ommBaker->SetGlobalShaderMacros(macros);
+    GetRayTracingResources().fillPTPipelineGlobalMacros(macros);
 }
 
 extern HitGroupInfo ComputeSubInstanceHitGroupInfo(const PTMaterial& material);
 
 bool SceneEditor::CreatePTPipeline(caustica::ShaderFactory& /*shaderFactory*/)
 {
-    return m_worldRenderer->createPTPipeline();
+    return GetRayTracingResources().createPTPipeline();
 }
 
 void SceneEditor::CreateBlases(nvrhi::ICommandList* commandList)
 {
-    caustica::AccelStructBuildSettings settings = { .excludeTransmissive = m_settings.AS.ExcludeTransmissive };
-    m_renderCore->accelStructs().createBlases(commandList, *m_sceneManager->getScene(), settings);
+    GetRayTracingResources().createBlases(commandList);
 }
 
 void SceneEditor::UploadSubInstanceData(nvrhi::ICommandList* commandList)
 {
-    m_renderCore->accelStructs().uploadSubInstanceData(commandList);
+    GetRayTracingResources().uploadSubInstanceData(commandList);
 }
 
 void SceneEditor::CreateTlas(nvrhi::ICommandList* commandList)
 {
-    m_renderCore->accelStructs().createTlas(commandList, *m_sceneManager->getScene());
+    GetRayTracingResources().createTlas(commandList);
 }
 
 void SceneEditor::CreateAccelStructs(nvrhi::ICommandList* commandList)
 {
-    if(m_ommBaker) m_ommBaker->CreateOpacityMicromaps(*m_sceneManager->getScene());
-    CreateBlases(commandList);
-    CreateTlas(commandList);
-    for (auto& object : m_gaussianSplatSceneObjects)
-    {
-        if (object.splat == nullptr || !object.splat->enabled || object.pass == nullptr || !object.pass->HasSplats())
-            continue;
-
-        if (ResolveGaussianSplatShadowMode(m_settings) != GAUSSIAN_SPLAT_SHADOWS_DISABLED)
-            object.pass->BuildAccelerationStructures(
-                commandList,
-                m_settings.GaussianSplatUseAABBs,
-                m_settings.GaussianSplatUseTLASInstances,
-                m_settings.GaussianSplatBlasCompaction,
-                m_settings.GaussianSplatScale,
-                uint32_t(std::clamp(m_settings.GaussianSplatRtxKernelDegree, 0, 5)),
-                m_settings.GaussianSplatRtxAdaptiveClamp);
-        else
-            object.pass->ReleaseAccelerationStructures();
-    }
+    GetRayTracingResources().createAccelStructs(commandList);
 }
 
 void SceneEditor::RecreateAccelStructs(nvrhi::ICommandList* commandList)
 {
-    if (m_editor.AccelerationStructRebuildRequested)
-    {
-        m_editor.AccelerationStructRebuildRequested = false;
-        m_settings.ResetAccumulation = true;
-
-        GetDevice()->waitForIdle();
-
-        m_worldRenderer->invalidateBindingSet();
-        m_renderCore->accelStructs().releaseGpuResources();
-
-        m_renderCore->accelStructs().clearMeshAccelStructs(*m_sceneManager->getScene());
-        GetDevice()->runGarbageCollection();
-
-        commandList->open();
-        CreateAccelStructs(commandList);
-        commandList->close();
-        GetDevice()->executeCommandList(commandList);
-        GetDevice()->waitForIdle();
-    }
+    GetRayTracingResources().recreateAccelStructs(commandList);
 }
 
 void SceneEditor::RequestMeshAccelRebuild(const std::shared_ptr<MeshInfo>& mesh)
 {
-    if (!mesh)
-        return;
-
-    m_settings.ResetAccumulation = true;
-
-    if (!m_renderCore->accelStructs().hasTopLevelAS())
-    {
-        m_editor.AccelerationStructRebuildRequested = true;
-        return;
-    }
-
-    m_renderCore->accelStructs().requestMeshRebuild(mesh);
+    GetRayTracingResources().requestMeshAccelRebuild(mesh);
 }
 
-void SceneEditor::SetEnvMapOverrideSource(const std::string& envMapOverride) 
-{ 
-    if (m_envMapOverride != envMapOverride && m_envMapBaker != nullptr)
-        m_envMapBaker->SetTargetCubeResolution(0);  // reset resolution just to avoid getting crazy with procedural sky as it's very slow
-    m_envMapOverride = envMapOverride; 
+void SceneEditor::SetEnvMapOverrideSource(const std::string& envMapOverride)
+{
+    GetLightingPasses().setEnvMapOverrideSource(envMapOverride);
 }
 
 
@@ -1455,7 +1024,7 @@ double SceneEditor::GetSceneTime()
 
 void SceneEditor::RecreateBindingSet()
 {
-    m_worldRenderer->recreateBindingSet();
+    GetRayTracingResources().recreateBindingSet();
 }
 
 
@@ -1613,12 +1182,7 @@ void SceneEditor::FinalizeRuntimeSceneMutation(const std::shared_ptr<caustica::S
 
     m_sceneManager->getScene()->FinishedLoading(GetFrameIndex());
 
-    if (m_materialsBaker != nullptr)
-        m_materialsBaker->SceneReloaded();
-    if (m_lightsBaker != nullptr)
-        m_lightsBaker->SceneReloaded();
-    if (m_ommBaker != nullptr)
-        m_ommBaker->SceneLoaded(*m_sceneManager->getScene());
+    GetLightingPasses().notifyBakersSceneReloaded(*m_sceneManager->getScene());
 
     RequestFullRebuild();
 }
@@ -1641,26 +1205,12 @@ bool SceneEditor::DeleteSceneNode(const std::shared_ptr<SceneGraphNode>& node)
 
     GetDevice()->waitForIdle();
 
-    bool removedGaussianSplat = false;
-    auto removedSplatBegin = std::remove_if(
-        m_gaussianSplatSceneObjects.begin(),
-        m_gaussianSplatSceneObjects.end(),
-        [&node, &removedGaussianSplat](const GaussianSplatSceneObject& object)
-        {
-            auto objectNode = object.node.lock();
-            const bool remove = objectNode != nullptr && NodeSubtreeContains(node.get(), objectNode.get());
-            removedGaussianSplat = removedGaussianSplat || remove;
-            return remove;
-        });
-    if (removedSplatBegin != m_gaussianSplatSceneObjects.end())
-        m_gaussianSplatSceneObjects.erase(removedSplatBegin, m_gaussianSplatSceneObjects.end());
+    GetGaussianSplatPasses().removeObjectsUnderNode(node);
 
     sceneGraph->Detach(node, true);
     m_sceneManager->getScene()->FinishedLoading(GetFrameIndex());
 
-    m_lights.clear();
-    for (auto light : sceneGraph->GetLights())
-        m_lights.push_back(light);
+    GetLightingPasses().resyncLightsFromSceneGraph(*sceneGraph);
 
     if (m_editor.TogglableNodes != nullptr)
     {
@@ -1674,19 +1224,7 @@ bool SceneEditor::DeleteSceneNode(const std::shared_ptr<SceneGraphNode>& node)
     m_editor.InspectorRotationEulerValid = false;
     m_editor.SelectedGaussianSplat = false;
 
-    if (removedGaussianSplat)
-    {
-        UpdateGaussianSplatUIState();
-        m_gaussianSplatEmissionProxies.clear();
-        m_worldRenderer->setGaussianSplatTemporalReset(true);
-    }
-
-    if (m_materialsBaker != nullptr)
-        m_materialsBaker->SceneReloaded();
-    if (m_lightsBaker != nullptr)
-        m_lightsBaker->SceneReloaded();
-    if (m_ommBaker != nullptr)
-        m_ommBaker->SceneLoaded(*m_sceneManager->getScene());
+    GetLightingPasses().notifyBakersSceneReloaded(*m_sceneManager->getScene());
 
     RequestFullRebuild();
     return true;
@@ -1695,13 +1233,7 @@ bool SceneEditor::DeleteSceneNode(const std::shared_ptr<SceneGraphNode>& node)
 
 void SceneEditor::RequestFullRebuild()
 {
-    m_editor.AccelerationStructRebuildRequested = true;
-    m_editor.ShaderReloadRequested = true;
-    m_editor.ShaderAndACRefreshDelayedRequest = 0.0f;
-    m_settings.ResetAccumulation = true;
-    m_worldRenderer->invalidateBindingSet();
-    if (m_bindingCache)
-        m_bindingCache->Clear();
+    GetRayTracingResources().requestFullRebuild();
 }
 
 struct UniquePositionMapForDeform
@@ -2340,38 +1872,37 @@ bool SceneEditor::AccumulationCompleted() const
 
 void SceneEditor::InvalidateBindingSet()
 {
-    if (m_worldRenderer)
-        m_worldRenderer->invalidateBindingSet();
+    GetRayTracingResources().invalidateBindingSet();
 }
 
 std::shared_ptr<::PTPipelineBaker> SceneEditor::GetRTPipelineBaker() const
 {
-    return m_worldRenderer ? m_worldRenderer->getPTPipelineBaker() : nullptr;
+    return GetRayTracingResources().getPipelineBaker();
 }
 
 std::shared_ptr<::PTPipelineVariant>& SceneEditor::PtPipelineReference()
 {
-    return m_worldRenderer->ptPipelineReference();
+    return GetRayTracingResources().pipelineReference();
 }
 
 std::shared_ptr<::PTPipelineVariant>& SceneEditor::PtPipelineBuildStablePlanes()
 {
-    return m_worldRenderer->ptPipelineBuildStablePlanes();
+    return GetRayTracingResources().pipelineBuildStablePlanes();
 }
 
 std::shared_ptr<::PTPipelineVariant>& SceneEditor::PtPipelineFillStablePlanes()
 {
-    return m_worldRenderer->ptPipelineFillStablePlanes();
+    return GetRayTracingResources().pipelineFillStablePlanes();
 }
 
 std::shared_ptr<::PTPipelineVariant>& SceneEditor::PtPipelineTestRaygenPPHDR()
 {
-    return m_worldRenderer->ptPipelineTestRaygenPPHDR();
+    return GetRayTracingResources().pipelineTestRaygenPPHDR();
 }
 
 std::shared_ptr<::PTPipelineVariant>& SceneEditor::PtPipelineEdgeDetection()
 {
-    return m_worldRenderer->ptPipelineEdgeDetection();
+    return GetRayTracingResources().pipelineEdgeDetection();
 }
 
 // =============================================================================
@@ -2422,29 +1953,17 @@ std::string SceneEditor::getMaterialSpecializationShader() const
 
 void SceneEditor::fillPTPipelineGlobalMacros(std::vector<caustica::ShaderMacro>& macros)
 {
-    FillPTPipelineGlobalMacros(macros);
+    GetRayTracingResources().fillPTPipelineGlobalMacros(macros);
 }
 
 void SceneEditor::sampleRenderCode(nvrhi::IFramebuffer* framebuffer, nvrhi::CommandListHandle commandList, const SampleConstants& constants)
 {
-    auto* r = GetWorldRenderer();
-    if (!r) return;
-    if (m_ui.ActualUseRTXDIPasses())
-        r->getRtxdiPass()->BeginFrame(commandList, *r->getRenderTargets(), r->getBindingLayout(), r->getBindingSet());
-
-    PathTrace(framebuffer, constants);
-    Denoise(framebuffer);
+    GetRayTracingResources().sampleRenderCode(framebuffer, commandList, constants);
 }
 
 void SceneEditor::createRTPipelines()
 {
-    auto pipelineBaker = GetRTPipelineBaker();
-    using SM = caustica::ShaderMacro;
-    PtPipelineReference()         = pipelineBaker->CreateVariant("PathTracerSample.hlsl", { SM("PATH_TRACER_MODE", "PATH_TRACER_MODE_REFERENCE") }, "REF");
-    PtPipelineBuildStablePlanes() = pipelineBaker->CreateVariant("PathTracerSample.hlsl", { SM("PATH_TRACER_MODE", "PATH_TRACER_MODE_BUILD_STABLE_PLANES") }, "BUILD");
-    PtPipelineFillStablePlanes()  = pipelineBaker->CreateVariant("PathTracerSample.hlsl", { SM("PATH_TRACER_MODE", "PATH_TRACER_MODE_FILL_STABLE_PLANES") }, "FILL");
-    PtPipelineTestRaygenPPHDR()   = pipelineBaker->CreateVariant("TestRaygenPP.hlsl", { SM("PP_TEST_HDR", "1") }, "TESTRG", true);
-    PtPipelineEdgeDetection()     = pipelineBaker->CreateVariant("TestRaygenPP.hlsl", { SM("PP_EDGE_DETECTION", "1") }, "EDGY", true);
+    GetRayTracingResources().createRTPipelines();
 }
 
 void SceneEditor::addCustomBindings(nvrhi::BindingSetDesc& bindingSetDesc)
@@ -2459,55 +1978,34 @@ void SceneEditor::onRenderTargetsRecreated()
 
 void SceneEditor::prepareGaussianSplatPasses()
 {
-    for (auto& object : m_gaussianSplatSceneObjects)
-    {
-        if (object.pass != nullptr && object.pass->HasSplats())
-            PrepareGaussianSplatPass(*object.pass);
-    }
+    GetGaussianSplatPasses().preparePasses();
 }
 
 void SceneEditor::buildGaussianSplatEmissionProxyList()
 {
-    BuildGaussianSplatEmissionProxyList();
+    GetGaussianSplatPasses().buildEmissionProxyList();
 }
 
 bool SceneEditor::isGaussianSplatEmissionEnabled() const
 {
-    return m_ui.EnableGaussianSplats
-        && m_ui.GaussianSplatAsEmitter
-        && m_ui.GaussianSplatEmissionIntensity > 0.0f
-        && m_ui.GaussianSplatEmissionMaxProxyCount > 0;
+    return GetGaussianSplatPasses().isEmissionEnabled();
 }
 
 bool SceneEditor::gaussianSplatObjectsEmpty() const
 {
-    return m_gaussianSplatSceneObjects.empty();
+    return GetGaussianSplatPasses().objectsEmpty();
 }
 
 caustica::render::WorldRendererGaussianSplatBinding SceneEditor::getPrimaryGaussianSplatBinding() const
 {
-    caustica::render::WorldRendererGaussianSplatBinding binding;
-    if (const auto* object = GetPrimaryGaussianSplatObject())
-    {
-        binding.pass = object->pass.get();
-        binding.objectToWorld = GetGaussianSplatObjectToWorld(*object);
-    }
-    return binding;
+    return GetGaussianSplatPasses().getPrimaryBinding();
 }
 
 void SceneEditor::renderSceneGaussianSplats(nvrhi::ICommandList* commandList,
     const caustica::PlanarView& splatView, RenderTargets& renderTargets,
     const GaussianSplatRenderSettings& settings, bool& renderedAny)
 {
-    for (auto& object : m_gaussianSplatSceneObjects)
-    {
-        if (object.splat == nullptr || !object.splat->enabled || object.pass == nullptr || !object.pass->HasSplats())
-            continue;
-        GaussianSplatRenderSettings objectSettings = settings;
-        objectSettings.objectToWorld = GetGaussianSplatObjectToWorld(object);
-        object.pass->Render(commandList, splatView, GetRenderCore()->accelStructs().getTopLevelAS().Get(), renderTargets, objectSettings);
-        renderedAny = true;
-    }
+    GetGaussianSplatPasses().renderSceneGaussianSplats(commandList, splatView, renderTargets, settings, renderedAny);
 }
 
 void SceneEditor::updateViews(nvrhi::IFramebuffer* framebuffer) { UpdateViews(framebuffer); }
@@ -2518,12 +2016,10 @@ dm::float2 SceneEditor::computeCameraJitter(uint frameIndex) { return ComputeCam
 
 bool SceneEditor::consumeShaderReloadRequest()
 {
-    if (!m_editor.ShaderReloadRequested) return false;
-    m_editor.ShaderReloadRequested = false;
-    return true;
+    return GetRayTracingResources().consumeShaderReloadRequest();
 }
 
-bool& SceneEditor::accelerationStructRebuildRequested() { return m_editor.AccelerationStructRebuildRequested; }
+bool& SceneEditor::accelerationStructRebuildRequested() { return GetRayTracingResources().accelerationStructRebuildRequested(); }
 bool SceneEditor::hasActivePickRequest() const { return m_editor.hasActivePickRequest(); }
 bool SceneEditor::showDeltaTree() const { return m_editor.ShowDeltaTree; }
 bool SceneEditor::pickMaterialRequested() const { return m_editor.PickMaterialRequested; }

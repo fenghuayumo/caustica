@@ -8,6 +8,7 @@
 #include <core/command_line.h>
 
 #include "SceneEditor.h"
+#include <render/SceneRenderFacade.h>
 
 using caustica::FPSLimiter;
 constexpr static const int c_SwapchainCount = 3;
@@ -68,6 +69,14 @@ public:
 
     SceneEditor& GetSceneEditor() { return m_sceneEditor; }
     const SceneEditor& GetSceneEditor() const { return m_sceneEditor; }
+    SceneRenderFacade& GetSceneRenderFacade() { return m_sceneRenderFacade; }
+    const SceneRenderFacade& GetSceneRenderFacade() const { return m_sceneRenderFacade; }
+    SceneLightingPasses& GetLightingPasses() { return m_sceneRenderFacade.lightingPasses(); }
+    const SceneLightingPasses& GetLightingPasses() const { return m_sceneRenderFacade.lightingPasses(); }
+    SceneRayTracingResources& GetRayTracingResources() { return m_sceneRenderFacade.rayTracingResources(); }
+    const SceneRayTracingResources& GetRayTracingResources() const { return m_sceneRenderFacade.rayTracingResources(); }
+    SceneGaussianSplatPasses& GetGaussianSplatPasses() { return m_sceneRenderFacade.gaussianSplatPasses(); }
+    const SceneGaussianSplatPasses& GetGaussianSplatPasses() const { return m_sceneRenderFacade.gaussianSplatPasses(); }
 
     SceneEditor* GetScenePass() { return &m_sceneEditor; }
     const SceneEditor* GetScenePass() const { return &m_sceneEditor; }
@@ -113,6 +122,7 @@ private:
 
     CommandLineOptions CmdLine;
     SampleUIData sampleUIData;
+    SceneRenderFacade m_sceneRenderFacade;
     SceneEditor m_sceneEditor;
 
     caustica::Callback m_DefaultLogCallback = nullptr;

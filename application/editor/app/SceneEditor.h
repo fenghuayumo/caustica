@@ -48,11 +48,11 @@ namespace caustica::render { class PathTracingWorldRenderer; }
 #include <render/Passes/PostProcess/PostProcess.h>
 #include <shaders/SampleConstantBuffer.h>
 #include <render/Passes/PostProcess/AccumulationPass.h>
-#include <render/Passes/Gaussian/GaussianSplatEmissionProxy.h>
 #include <scene/Scene.h>
 
-#include <render/Passes/Lighting/Distant/EnvMapBaker.h>
-#include <render/Passes/Lighting/LightsBaker.h>
+#include <render/SceneLightingPasses.h>
+#include <render/SceneRayTracingResources.h>
+#include <render/SceneGaussianSplatPasses.h>
 
 #include <render/Passes/Debug/ShaderDebug.h>
 
@@ -65,15 +65,12 @@ class OidnDenoiser;
 #if CAUSTICA_WITH_PYTHON
 class PythonScripting;
 #endif
-class GaussianSplatPass;
-
 class GameScene;
 class PTPipelineVariant;
 class PTPipelineBaker;
 class OmmBaker;
 class MaterialsBaker;
 class ComputePipelineBaker;
-class GPUSort;
 class ZoomTool;
 
 namespace caustica::editor
@@ -84,8 +81,6 @@ class CaptureScriptManager;
 // Scene editor shell (mesh edit, Inspector, Capture). GPU path tracing is owned by EditorApplication.
 class SceneEditor
 {
-    struct GaussianSplatSceneObject;
-
 public:
     SceneEditor(const CommandLineOptions& cmdLine,
         SampleUIData& ui);
@@ -172,6 +167,15 @@ public:
         const std::shared_ptr<caustica::DescriptorTableManager>& descriptorTable,
         const std::shared_ptr<caustica::TextureLoader>& textureCache);
     void AttachSceneServices(SceneManager& sceneManager, caustica::RenderCore& renderCore);
+    void AttachLightingPasses(SceneLightingPasses& lightingPasses);
+    SceneLightingPasses& GetLightingPasses();
+    const SceneLightingPasses& GetLightingPasses() const;
+    void AttachRayTracingResources(SceneRayTracingResources& rayTracingResources);
+    SceneRayTracingResources& GetRayTracingResources();
+    const SceneRayTracingResources& GetRayTracingResources() const;
+    void AttachGaussianSplatPasses(SceneGaussianSplatPasses& gaussianSplatPasses);
+    SceneGaussianSplatPasses& GetGaussianSplatPasses();
+    const SceneGaussianSplatPasses& GetGaussianSplatPasses() const;
     void Init(const std::string& preferredScene,
         const std::shared_ptr<caustica::ShaderFactory>& shaderFactory);
 
@@ -263,8 +267,6 @@ public:
     void OnRenderTargetsRecreated() { }
     void AddCustomBindings(nvrhi::BindingSetDesc& bindingSetDesc) { }
     void UpdateViews(nvrhi::IFramebuffer* framebuffer);
-    void PrepareGaussianSplatPass(GaussianSplatPass& pass);
-    void BuildGaussianSplatEmissionProxyList();
 
     // --- Input event handling (replaces PathTracerInputController) ---
     void onEvent(caustica::Event& event);
@@ -280,28 +282,29 @@ public:
     double                                  GetSceneTime( );
 
     bool                                    IsEnvMapLoaded() const      { return true; } // with the new EnvMapBaker it's always present (just black)
-    const std::string &                     GetEnvMapLocalPath() const { return m_envMapLocalPath; }
-    const std::string &                     GetEnvMapOverrideSource() const { return m_envMapOverride; }
+    const std::string &                     GetEnvMapLocalPath() const;
+    const std::string &                     GetEnvMapOverrideSource() const;
     void                                    SetEnvMapOverrideSource(const std::string & envMapOverride);
-    const std::vector<std::filesystem::path> & GetEnvMapMediaList()     { return m_envMapMediaList; }
+    const std::vector<std::filesystem::path> & GetEnvMapMediaList();
 
-    std::shared_ptr<EnvMapBaker>&           GetEnvMapBaker() { return m_envMapBaker; }
-    const std::shared_ptr<EnvMapBaker>&   GetEnvMapBaker() const { return m_envMapBaker; }
-    std::shared_ptr<LightsBaker>&         GetLightsBaker() { return m_lightsBaker; }
-    const std::shared_ptr<LightsBaker>&     GetLightsBaker() const { return m_lightsBaker; }
-    std::shared_ptr<MaterialsBaker>&      GetMaterialsBaker() { return m_materialsBaker; }
-    const std::shared_ptr<MaterialsBaker>&  GetMaterialsBaker() const { return m_materialsBaker; }
-    std::shared_ptr<::OmmBaker>&        GetOMMBaker() { return m_ommBaker; }
-    const std::shared_ptr<::OmmBaker>&    GetOMMBaker() const { return m_ommBaker; }
-    std::shared_ptr<ComputePipelineBaker>&  GetComputePipelineBaker() { return m_computePipelineBaker; }
-    const std::shared_ptr<ComputePipelineBaker>& GetComputePipelineBaker() const { return m_computePipelineBaker; }
-    std::vector<std::shared_ptr<caustica::Light>>& GetLights() { return m_lights; }
-    EnvMapSceneParams&                      GetEnvMapSceneParams() { return m_envMapSceneParams; }
-    const EnvMapSceneParams&                GetEnvMapSceneParams() const { return m_envMapSceneParams; }
-    std::string&                            GetEnvMapLocalPath() { return m_envMapLocalPath; }
-    std::string&                            GetEnvMapOverrideSource() { return m_envMapOverride; }
+    std::shared_ptr<EnvMapBaker>&           GetEnvMapBaker();
+    const std::shared_ptr<EnvMapBaker>&   GetEnvMapBaker() const;
+    std::shared_ptr<LightsBaker>&         GetLightsBaker();
+    const std::shared_ptr<LightsBaker>&     GetLightsBaker() const;
+    std::shared_ptr<MaterialsBaker>&      GetMaterialsBaker();
+    const std::shared_ptr<MaterialsBaker>&  GetMaterialsBaker() const;
+    std::shared_ptr<::OmmBaker>&        GetOMMBaker();
+    const std::shared_ptr<::OmmBaker>&    GetOMMBaker() const;
+    std::shared_ptr<ComputePipelineBaker>&  GetComputePipelineBaker();
+    const std::shared_ptr<ComputePipelineBaker>& GetComputePipelineBaker() const;
+    std::vector<std::shared_ptr<caustica::Light>>& GetLights();
+    EnvMapSceneParams&                      GetEnvMapSceneParams();
+    const EnvMapSceneParams&                GetEnvMapSceneParams() const;
+    std::string&                            GetEnvMapLocalPath();
+    std::string&                            GetEnvMapOverrideSource();
     double&                                 GetSceneTimeRef() { return m_sceneTime; }
-    std::vector<GaussianSplatEmissionProxy>& GetGaussianSplatEmissionProxies() { return m_gaussianSplatEmissionProxies; }
+    std::vector<GaussianSplatEmissionProxy>& GetGaussianSplatEmissionProxies();
+    const std::vector<GaussianSplatEmissionProxy>& GetGaussianSplatEmissionProxies() const;
     ProgressBar&                            GetProgressInitializingRenderer() { return m_progressInitializingRenderer; }
     bool&                                   GetAsyncLoadingInProgressRef() { return m_asyncLoadingInProgress; }
     std::chrono::high_resolution_clock::time_point& GetBenchStart() { return m_benchStart; }
@@ -335,9 +338,6 @@ protected:
     void InvalidateBindingSet();
     void RecreateBindingSet();
     [[nodiscard]] caustica::CameraUpdateParams makeCameraUpdateParams() const;
-    GaussianSplatSceneObject* GetPrimaryGaussianSplatObject();
-    const GaussianSplatSceneObject* GetPrimaryGaussianSplatObject() const;
-    dm::float4x4 GetGaussianSplatObjectToWorld(const GaussianSplatSceneObject& object) const;
     ::ZoomTool* GetOrCreateZoomTool();
 
     // Path tracing settings (render) and editor UI state are distinct slices of SampleUIData.
@@ -358,10 +358,6 @@ protected:
 
 private:
     void                                    UpdateCameraFromScene( const std::shared_ptr<caustica::PerspectiveCamera> & sceneCamera );
-    void                                    LoadGaussianSplatsFromScene();
-    bool                                    AttachGaussianSplatToScene(const std::filesystem::path& fileName, bool convertRdfToRub);
-    void                                    UpdateGaussianSplatUIState();
-    uint32_t                                GetTotalGaussianSplatCount() const;
     void                                    RefreshEnvironmentMapMediaList();
 
     // Input event handlers (formerly in PathTracerInputController)
@@ -371,15 +367,6 @@ private:
     bool onMouseButtonPressed(caustica::MouseButtonPressedEvent& e);
     bool onMouseButtonReleased(caustica::MouseButtonReleasedEvent& e);
     bool onMouseScrolled(caustica::MouseScrolledEvent& e);
-
-    struct GaussianSplatSceneObject
-    {
-        std::shared_ptr<caustica::GaussianSplat> splat;
-        std::weak_ptr<caustica::SceneGraphNode> node;
-        std::unique_ptr<GaussianSplatPass> pass;
-    };
-
-    std::filesystem::path                       ResolveGaussianSplatPath(const caustica::GaussianSplat& splat) const;
 
     std::shared_ptr<caustica::RootFileSystem> m_RootFS;
 
@@ -400,27 +387,9 @@ private:
     caustica::BindingCache* m_bindingCache = nullptr;
     std::shared_ptr<caustica::DescriptorTableManager> m_DescriptorTable;
 
-    // lighting
-    std::string                                 m_envMapLocalPath;
-    
-    std::filesystem::path                       m_envMapMediaFolder;
-    std::vector<std::filesystem::path>          m_envMapMediaList;
-
-    std::string                                 m_envMapOverride;
-
-    std::shared_ptr<EnvMapBaker>                m_envMapBaker;
-    EnvMapSceneParams                           m_envMapSceneParams;
-    std::shared_ptr<LightsBaker>                m_lightsBaker;
-    std::shared_ptr<::MaterialsBaker>       m_materialsBaker;
-    std::shared_ptr<::OmmBaker>             m_ommBaker;
-    std::shared_ptr<::ComputePipelineBaker>       m_computePipelineBaker;
-
-    // utility
-    std::shared_ptr<::GPUSort>              m_gpuSort;
-    std::vector<GaussianSplatSceneObject>       m_gaussianSplatSceneObjects;
-    std::vector<GaussianSplatEmissionProxy>     m_gaussianSplatEmissionProxies;
-    std::string                                 m_gaussianSplatFileNameSummary;
-    bool                                        m_initialGaussianSplatAttached = false;
+    SceneLightingPasses*                        m_lightingPasses = nullptr;
+    SceneRayTracingResources*                   m_rayTracingResources = nullptr;
+    SceneGaussianSplatPasses*                   m_gaussianSplatPasses = nullptr;
 
     std::chrono::high_resolution_clock::time_point m_benchStart = std::chrono::high_resolution_clock::now();
     std::chrono::high_resolution_clock::time_point m_benchLast = std::chrono::high_resolution_clock::now();
@@ -444,8 +413,6 @@ private:
     // The command line settings are here
     const CommandLineOptions&                   m_cmdLine;
 
-    // rendering (scene lights list used by lighting update)
-    std::vector<std::shared_ptr<caustica::Light>> m_lights;
 };
 
 } // namespace caustica::editor

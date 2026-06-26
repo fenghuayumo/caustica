@@ -3,6 +3,8 @@
 file(GLOB_RECURSE caustica_editor_sources
     "${CMAKE_CURRENT_SOURCE_DIR}/app/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/app/*.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/render/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/render/*.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/ui/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/ui/*.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/SampleCommon/*.cpp"

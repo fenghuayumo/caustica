@@ -228,11 +228,15 @@ EditorApplication::StartupResult EditorApplication::startup(int argc, const char
     m_sceneEditor.initStreamlineAndWindow();
     initRenderInfrastructurePhase1();
 
+    m_sceneRenderFacade.attachSceneEditor(m_sceneEditor);
+    m_sceneRenderFacade.refreshEnvironmentMapMediaList(GetLocalPath(c_AssetsFolder), std::filesystem::path());
+
     const nvrhi::BindingLayoutHandle bindlessLayout =
         caustica::render::PathTracingWorldRenderer::CreateBindlessLayout(m_GpuDevice->GetDevice());
     initRenderInfrastructurePhase2(bindlessLayout);
     initSceneServices();
     initWorldRenderer(bindlessLayout);
+    assert(m_sceneRenderFacade.isWorldRendererAttached());
 
     m_sceneEditor.Init(preferredScene, m_ShaderFactory);
     syncPassesToBackBuffer();
@@ -638,66 +642,18 @@ void EditorApplication::initRenderInfrastructurePhase2(nvrhi::IBindingLayout* bi
 
 caustica::render::WorldRendererServices EditorApplication::buildWorldRendererServices()
 {
-    SceneEditor& e = m_sceneEditor;
-    return caustica::render::WorldRendererServices{
+    return m_sceneRenderFacade.buildWorldRendererServices(SceneRenderFacadeServicesParams{
         .gpuDevice = *m_GpuDevice,
         .sceneManager = *m_sceneManager,
         .renderCore = *m_renderCore,
-        .settings = e.GetPathTracerSettings(),
+        .settings = m_sceneEditor.GetPathTracerSettings(),
         .shaderFactory = m_ShaderFactory,
         .commonPasses = m_commonPasses,
         .bindingCache = *m_bindingCache,
         .textureCache = m_textureCache,
         .descriptorTable = m_descriptorTable,
-        .envMapBaker = e.GetEnvMapBaker(),
-        .lightsBaker = e.GetLightsBaker(),
-        .materialsBaker = e.GetMaterialsBaker(),
-        .ommBaker = e.GetOMMBaker(),
-        .computePipelineBaker = e.GetComputePipelineBaker(),
-        .lights = e.GetLights(),
-        .envMapSceneParams = e.GetEnvMapSceneParams(),
-        .envMapLocalPath = e.GetEnvMapLocalPath(),
-        .envMapOverride = e.GetEnvMapOverrideSource(),
-        .sceneTime = e.GetSceneTimeRef(),
-        .gaussianSplatEmissionProxies = e.GetGaussianSplatEmissionProxies(),
-        .progressInitializingRenderer = e.GetProgressInitializingRenderer(),
-        .asyncLoadingInProgress = e.GetAsyncLoadingInProgressRef(),
-        .benchStart = e.GetBenchStart(),
-        .benchLast = e.GetBenchLast(),
-        .benchFrames = e.GetBenchFrames(),
-        .hooks = {
-            .needsRasterPrecompute       = [] { return false; },
-            .getMaterialSpecializationShader = [&e] { return e.GetMaterialSpecializationShader(); },
-            .fillPTPipelineGlobalMacros     = [&e](auto& m) { e.FillPTPipelineGlobalMacros(m); },
-            .sampleRenderCode               = [&e](auto* fb, auto cl, auto& c) { e.sampleRenderCode(fb, cl, c); },
-            .addCustomBindings              = [&e](auto& d) { e.AddCustomBindings(d); },
-            .createRTPipelines              = [&e] { e.createRTPipelines(); },
-            .onRenderTargetsRecreated       = [&e] { e.OnRenderTargetsRecreated(); },
-            .prepareGaussianSplatPasses     = [&e] { e.prepareGaussianSplatPasses(); },
-            .buildGaussianSplatEmissionProxyList = [&e] { e.buildGaussianSplatEmissionProxyList(); },
-            .isGaussianSplatEmissionEnabled = [&e] { return e.isGaussianSplatEmissionEnabled(); },
-            .gaussianSplatObjectsEmpty      = [&e] { return e.gaussianSplatObjectsEmpty(); },
-            .getPrimaryGaussianSplatBinding = [&e] { return e.getPrimaryGaussianSplatBinding(); },
-            .renderSceneGaussianSplats      = [&e](auto* cl, auto& v, auto& rt, auto& s, bool& r) { e.renderSceneGaussianSplats(cl, v, rt, s, r); },
-            .updateViews                    = [&e](auto* fb) { e.UpdateViews(fb); },
-            .recreateAccelStructs           = [&e](auto* cl) { e.RecreateAccelStructs(cl); },
-            .uploadSubInstanceData          = [&e](auto* cl) { e.UploadSubInstanceData(cl); },
-            .collectUncompressedTextures    = [&e] { e.CollectUncompressedTextures(); },
-            .computeCameraJitter            = [&e](uint i) { return e.ComputeCameraJitter(i); },
-            .consumeShaderReloadRequest     = [&e] { return e.consumeShaderReloadRequest(); },
-            .accelerationStructRebuildRequested = [&e]() -> bool& { return e.accelerationStructRebuildRequested(); },
-            .hasActivePickRequest           = [&e] { return e.hasActivePickRequest(); },
-            .showDeltaTree                  = [&e] { return e.showDeltaTree(); },
-            .pickMaterialRequested          = [&e] { return e.pickMaterialRequested(); },
-            .pickInstanceRequested          = [&e] { return e.pickInstanceRequested(); },
-            .clearPickRequests              = [&e] { e.clearPickRequests(); },
-            .resolvePickFeedback            = [&e](auto& f) { e.resolvePickFeedback(f); },
-            .consumeExperimentalPhotoScreenshot = [&e] { return e.consumeExperimentalPhotoScreenshot(); },
-            .captureScriptPreRender         = [&e] { e.captureScriptPreRender(); },
-            .captureScriptPostRender        = [&e](auto fn) { e.captureScriptPostRender(fn); },
-            .getOrCreateZoomTool            = [&e] { return e.getOrCreateZoomTool(); },
-        },
-    };
+        .editor = m_sceneEditor,
+    });
 }
 
 void EditorApplication::initWorldRenderer(nvrhi::IBindingLayout* bindlessLayout)
@@ -705,6 +661,18 @@ void EditorApplication::initWorldRenderer(nvrhi::IBindingLayout* bindlessLayout)
     m_worldRendererServices = std::make_unique<caustica::render::WorldRendererServices>(buildWorldRendererServices());
     m_worldRenderer = std::make_unique<caustica::render::PathTracingWorldRenderer>(*m_worldRendererServices);
     m_sceneEditor.AttachWorldRenderer(m_worldRenderer.get());
+
+    m_sceneRenderFacade.initWorldRenderer(
+        *m_GpuDevice,
+        *m_sceneManager,
+        *m_renderCore,
+        *m_worldRenderer,
+        m_sceneEditor.GetPathTracerSettings(),
+        m_sceneEditor.GetEditorUIState(),
+        m_ShaderFactory,
+        m_commonPasses,
+        *m_bindingCache);
+
     m_worldRenderer->createBindingLayouts(bindlessLayout);
 }
 

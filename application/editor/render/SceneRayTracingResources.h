@@ -1,0 +1,97 @@
+#pragma once
+
+#include <render/Core/PathTracerSettings.h>
+#include <rhi/nvrhi.h>
+#include <shaders/SampleConstantBuffer.h>
+
+#include <functional>
+#include <memory>
+#include <vector>
+
+class PTPipelineBaker;
+class PTPipelineVariant;
+
+namespace caustica
+{
+class BindingCache;
+class GpuDevice;
+class MeshInfo;
+class RenderCore;
+class Scene;
+class ShaderFactory;
+} // namespace caustica
+
+namespace caustica::render
+{
+class PathTracingWorldRenderer;
+}
+
+class SceneManager;
+
+namespace caustica::editor
+{
+
+class EditorUIState;
+class SceneLightingPasses;
+
+using AdditionalAccelStructBuilder = std::function<void(nvrhi::ICommandList*)>;
+
+// RT pipeline variants, shader macros, and acceleration-structure lifecycle.
+class SceneRayTracingResources
+{
+public:
+    [[nodiscard]] bool isAttached() const { return m_worldRenderer != nullptr; }
+
+    void attach(caustica::GpuDevice& gpuDevice,
+        SceneManager& sceneManager,
+        caustica::RenderCore& renderCore,
+        caustica::render::PathTracingWorldRenderer& worldRenderer,
+        PathTracerSettings& settings,
+        EditorUIState& editor,
+        SceneLightingPasses& lightingPasses,
+        caustica::BindingCache& bindingCache);
+
+    void setAdditionalAccelStructBuilder(AdditionalAccelStructBuilder builder);
+
+    void fillPTPipelineGlobalMacros(std::vector<caustica::ShaderMacro>& macros);
+    bool createPTPipeline();
+    void createRTPipelines();
+
+    void createBlases(nvrhi::ICommandList* commandList);
+    void createTlas(nvrhi::ICommandList* commandList);
+    void uploadSubInstanceData(nvrhi::ICommandList* commandList);
+    void createAccelStructs(nvrhi::ICommandList* commandList);
+    void recreateAccelStructs(nvrhi::ICommandList* commandList);
+    void requestMeshAccelRebuild(const std::shared_ptr<caustica::MeshInfo>& mesh);
+
+    void requestFullRebuild();
+    void invalidateBindingSet();
+    void recreateBindingSet();
+
+    void sampleRenderCode(nvrhi::IFramebuffer* framebuffer,
+        nvrhi::CommandListHandle commandList,
+        const SampleConstants& constants);
+
+    bool consumeShaderReloadRequest();
+    bool& accelerationStructRebuildRequested();
+
+    std::shared_ptr<PTPipelineBaker> getPipelineBaker() const;
+    std::shared_ptr<PTPipelineVariant>& pipelineReference();
+    std::shared_ptr<PTPipelineVariant>& pipelineBuildStablePlanes();
+    std::shared_ptr<PTPipelineVariant>& pipelineFillStablePlanes();
+    std::shared_ptr<PTPipelineVariant>& pipelineTestRaygenPPHDR();
+    std::shared_ptr<PTPipelineVariant>& pipelineEdgeDetection();
+
+private:
+    caustica::GpuDevice*                        m_gpuDevice = nullptr;
+    SceneManager*                               m_sceneManager = nullptr;
+    caustica::RenderCore*                       m_renderCore = nullptr;
+    caustica::render::PathTracingWorldRenderer* m_worldRenderer = nullptr;
+    PathTracerSettings*                         m_settings = nullptr;
+    EditorUIState*                              m_editor = nullptr;
+    SceneLightingPasses*                        m_lightingPasses = nullptr;
+    caustica::BindingCache*                     m_bindingCache = nullptr;
+    AdditionalAccelStructBuilder                m_additionalAccelStructBuilder;
+};
+
+} // namespace caustica::editor
