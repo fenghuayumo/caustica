@@ -188,6 +188,7 @@ SceneEditor::SceneEditor(const CommandLineOptions& cmdLine,
     SampleUIData& ui)
     : m_cmdLine(cmdLine)
     , m_settings(ui)
+    , m_renderState(ui)
     , m_editor(ui)
     , m_ui(ui)
 {
@@ -648,11 +649,11 @@ void SceneEditor::SceneLoaded( )
     else
         m_renderCore->camera().setupDefaultCamera();
 
-    m_renderCore->onSceneLoaded(*m_sceneManager->getScene(), m_editor.AccelerationStructRebuildRequested);
+    m_renderCore->onSceneLoaded(*m_sceneManager->getScene(), m_renderState.Invalidation.AccelerationStructRebuildRequested);
 
     // PrintSceneGraph( m_sceneManager->getScene()->GetSceneGraph( )->GetRootNode( ) );
 
-    m_editor.ShaderReloadRequested = true;  // we have to re-create shader hit table
+    m_renderState.Invalidation.ShaderReloadRequested = true;  // we have to re-create shader hit table
     m_settings.EnableAnimations = false;
     m_settings.RealtimeMode = false;
 
@@ -753,14 +754,14 @@ void SceneEditor::Animate(float fElapsedTimeSeconds)
 
     m_renderCore->camera().camera().SetMoveSpeed(m_settings.CameraMoveSpeed);
 
-    if( m_editor.ShaderAndACRefreshDelayedRequest > 0 )
+    if( m_renderState.Invalidation.ShaderAndACRefreshDelayedRequest > 0 )
     {
-        m_editor.ShaderAndACRefreshDelayedRequest -= fElapsedTimeSeconds;
-        if (m_editor.ShaderAndACRefreshDelayedRequest <= 0 )
+        m_renderState.Invalidation.ShaderAndACRefreshDelayedRequest -= fElapsedTimeSeconds;
+        if (m_renderState.Invalidation.ShaderAndACRefreshDelayedRequest <= 0 )
         {
-            m_editor.ShaderAndACRefreshDelayedRequest = 0;
-            m_editor.ShaderReloadRequested = true;
-            m_editor.AccelerationStructRebuildRequested = true;
+            m_renderState.Invalidation.ShaderAndACRefreshDelayedRequest = 0;
+            m_renderState.Invalidation.ShaderReloadRequested = true;
+            m_renderState.Invalidation.AccelerationStructRebuildRequested = true;
         }
     }
 
@@ -2010,17 +2011,17 @@ bool SceneEditor::consumeShaderReloadRequest()
 }
 
 bool& SceneEditor::accelerationStructRebuildRequested() { return GetRayTracingResources().accelerationStructRebuildRequested(); }
-bool SceneEditor::hasActivePickRequest() const { return m_editor.hasActivePickRequest(); }
+bool SceneEditor::hasActivePickRequest() const { return m_renderState.Picking.hasActivePickRequest(); }
 bool SceneEditor::showDeltaTree() const { return m_editor.ShowDeltaTree; }
-bool SceneEditor::pickMaterialRequested() const { return m_editor.PickMaterialRequested; }
-bool SceneEditor::pickInstanceRequested() const { return m_editor.PickInstanceRequested; }
-void SceneEditor::clearPickRequests() { m_editor.clearPickRequests(); }
+bool SceneEditor::pickMaterialRequested() const { return m_renderState.Picking.MaterialRequested; }
+bool SceneEditor::pickInstanceRequested() const { return m_renderState.Picking.InstanceRequested; }
+void SceneEditor::clearPickRequests() { m_renderState.Picking.clearPickRequests(); }
 
 void SceneEditor::resolvePickFeedback(const DebugFeedbackStruct& feedback)
 {
-    if (m_editor.PickMaterialRequested)
+    if (m_renderState.Picking.MaterialRequested)
         m_editor.SelectedMaterial = FindMaterial(int(feedback.pickedMaterialID));
-    if (m_editor.PickInstanceRequested)
+    if (m_renderState.Picking.InstanceRequested)
     {
         m_editor.SelectedNode = FindNodeByInstanceIndex(int(feedback.pickedInstanceIndex));
         if (m_editor.SelectedNode != nullptr)
@@ -2099,7 +2100,7 @@ bool SceneEditor::onKeyPressed(caustica::KeyPressedEvent& e)
     if (key == ToGlfwKey(caustica::Key::F2) && action == cGlfwPress)
         m_editor.ShowUI = !m_editor.ShowUI;
     if (key == ToGlfwKey(caustica::Key::R) && action == cGlfwPress && mods == ToGlfwMods(caustica::ModifierKey::Control))
-        m_editor.ShaderReloadRequested = true;
+        m_renderState.Invalidation.ShaderReloadRequested = true;
 #if CAUSTICA_WITH_STREAMLINE
     if (key == ToGlfwKey(caustica::Key::F13) && action == cGlfwPress)
         m_gpuDevice->GetStreamline().ReflexTriggerPcPing(m_gpuDevice->GetFrameIndex());
@@ -2132,8 +2133,8 @@ bool SceneEditor::onMouseMoved(caustica::MouseMovedEvent& e)
     if (m_worldRenderer && m_worldRenderer->getRenderTargets())
         upscalingScale = dm::float2(m_worldRenderer->getRenderSize()) / dm::float2(m_worldRenderer->getDisplaySize());
 
-    m_editor.PickPosition = dm::uint2{static_cast<uint>(e.GetX() * upscalingScale.x), static_cast<uint>(e.GetY() * upscalingScale.y)};
-    m_settings.MousePos = m_editor.PickPosition;
+    m_renderState.Picking.Position = dm::uint2{static_cast<uint>(e.GetX() * upscalingScale.x), static_cast<uint>(e.GetY() * upscalingScale.y)};
+    m_settings.MousePos = m_renderState.Picking.Position;
 
     if (m_zoomTool) m_zoomTool->MousePosUpdate(e.GetX(), e.GetY());
     return true;
@@ -2151,9 +2152,9 @@ bool SceneEditor::onMouseButtonPressed(caustica::MouseButtonPressedEvent& e)
         m_sampleGame->MouseButtonUpdate(button, cGlfwPress, mods);
     if (button == ToGlfwMouse(caustica::Mouse::Right))
     {
-        m_editor.PickMaterialRequested = true;
-        m_editor.PickInstanceRequested = true;
-        m_settings.DebugPixel = m_editor.PickPosition;
+        m_renderState.Picking.MaterialRequested = true;
+        m_renderState.Picking.InstanceRequested = true;
+        m_settings.DebugPixel = m_renderState.Picking.Position;
     }
 #if CAUSTICA_WITH_STREAMLINE
     if (button == ToGlfwMouse(caustica::Mouse::Left))

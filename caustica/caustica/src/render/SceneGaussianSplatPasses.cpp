@@ -12,8 +12,6 @@
 #include <scene/SceneManager.h>
 #include <scene/Scene.h>
 
-#include <render/EditorUIState.h>
-
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -81,7 +79,7 @@ void SceneGaussianSplatPasses::attach(caustica::GpuDevice& gpuDevice,
     caustica::RenderCore& renderCore,
     caustica::render::PathTracingWorldRenderer& worldRenderer,
     PathTracerSettings& settings,
-    EditorUIState& editor,
+    caustica::render::GaussianSplatSceneSummary& summary,
     const std::shared_ptr<caustica::ShaderFactory>& shaderFactory,
     const std::shared_ptr<caustica::CommonRenderPasses>& commonPasses)
 {
@@ -90,7 +88,7 @@ void SceneGaussianSplatPasses::attach(caustica::GpuDevice& gpuDevice,
     m_renderCore = &renderCore;
     m_worldRenderer = &worldRenderer;
     m_settings = &settings;
-    m_editor = &editor;
+    m_summary = &summary;
     m_shaderFactory = shaderFactory;
     m_commonPasses = commonPasses;
 }
@@ -193,18 +191,15 @@ uint32_t SceneGaussianSplatPasses::totalSplatCount() const
 
 void SceneGaussianSplatPasses::updateUIState()
 {
-    m_editor->GaussianSplatObjectCount = uint32_t(m_objects.size());
-    m_editor->GaussianSplatCount = totalSplatCount();
+    m_summary->ObjectCount = uint32_t(m_objects.size());
+    m_summary->SplatCount = totalSplatCount();
 
     m_fileNameSummary.clear();
     if (m_objects.size() == 1 && m_objects.front().pass != nullptr)
         m_fileNameSummary = m_objects.front().pass->GetSourceFileName();
     else if (!m_objects.empty())
         m_fileNameSummary = std::to_string(m_objects.size()) + " scene Gaussian Splat objects";
-    m_editor->GaussianSplatFileName = m_fileNameSummary;
-
-    if (m_editor->GaussianSplatObjectCount == 0)
-        m_editor->SelectedGaussianSplat = false;
+    m_summary->FileName = m_fileNameSummary;
 }
 
 void SceneGaussianSplatPasses::loadFromSceneGraph()

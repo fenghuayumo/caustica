@@ -2,13 +2,14 @@
 
 #include <core/command_line.h>
 #include <render/Core/PathTracerSettings.h>
+#include <render/RenderRuntimeState.h>
 
-#include <render/EditorUIState.h>
+#include "EditorUIState.h"
 
 namespace caustica::editor
 {
 
-struct SampleUIData : PathTracerSettings, EditorUIState
+struct SampleUIData : PathTracerSettings, caustica::render::RenderRuntimeState, EditorUIState
 {
 };
 

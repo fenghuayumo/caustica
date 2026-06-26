@@ -12,8 +12,6 @@
 
 #include <shaders/PathTracer/Lighting/LightingTypes.hlsli>
 
-#include <render/EditorUIState.h>
-
 namespace caustica::editor
 {
 
@@ -22,7 +20,7 @@ void SceneRayTracingResources::attach(caustica::GpuDevice& gpuDevice,
     caustica::RenderCore& renderCore,
     caustica::render::PathTracingWorldRenderer& worldRenderer,
     PathTracerSettings& settings,
-    EditorUIState& editor,
+    caustica::render::RenderInvalidationState& invalidation,
     SceneLightingPasses& lightingPasses,
     caustica::BindingCache& bindingCache)
 {
@@ -31,7 +29,7 @@ void SceneRayTracingResources::attach(caustica::GpuDevice& gpuDevice,
     m_renderCore = &renderCore;
     m_worldRenderer = &worldRenderer;
     m_settings = &settings;
-    m_editor = &editor;
+    m_invalidation = &invalidation;
     m_lightingPasses = &lightingPasses;
     m_bindingCache = &bindingCache;
 }
@@ -136,10 +134,10 @@ void SceneRayTracingResources::createAccelStructs(nvrhi::ICommandList* commandLi
 
 void SceneRayTracingResources::recreateAccelStructs(nvrhi::ICommandList* commandList)
 {
-    if (!m_editor->AccelerationStructRebuildRequested)
+    if (!m_invalidation->AccelerationStructRebuildRequested)
         return;
 
-    m_editor->AccelerationStructRebuildRequested = false;
+    m_invalidation->AccelerationStructRebuildRequested = false;
     m_settings->ResetAccumulation = true;
 
     m_gpuDevice->GetDevice()->waitForIdle();
@@ -165,7 +163,7 @@ void SceneRayTracingResources::requestMeshAccelRebuild(const std::shared_ptr<cau
 
     if (!m_renderCore->accelStructs().hasTopLevelAS())
     {
-        m_editor->AccelerationStructRebuildRequested = true;
+        m_invalidation->AccelerationStructRebuildRequested = true;
         return;
     }
 
@@ -174,9 +172,9 @@ void SceneRayTracingResources::requestMeshAccelRebuild(const std::shared_ptr<cau
 
 void SceneRayTracingResources::requestFullRebuild()
 {
-    m_editor->AccelerationStructRebuildRequested = true;
-    m_editor->ShaderReloadRequested = true;
-    m_editor->ShaderAndACRefreshDelayedRequest = 0.0f;
+    m_invalidation->AccelerationStructRebuildRequested = true;
+    m_invalidation->ShaderReloadRequested = true;
+    m_invalidation->ShaderAndACRefreshDelayedRequest = 0.0f;
     m_settings->ResetAccumulation = true;
     m_worldRenderer->invalidateBindingSet();
     if (m_bindingCache)
@@ -206,15 +204,15 @@ void SceneRayTracingResources::sampleRenderCode(nvrhi::IFramebuffer* framebuffer
 
 bool SceneRayTracingResources::consumeShaderReloadRequest()
 {
-    if (!m_editor->ShaderReloadRequested)
+    if (!m_invalidation->ShaderReloadRequested)
         return false;
-    m_editor->ShaderReloadRequested = false;
+    m_invalidation->ShaderReloadRequested = false;
     return true;
 }
 
 bool& SceneRayTracingResources::accelerationStructRebuildRequested()
 {
-    return m_editor->AccelerationStructRebuildRequested;
+    return m_invalidation->AccelerationStructRebuildRequested;
 }
 
 std::shared_ptr<PTPipelineBaker> SceneRayTracingResources::getPipelineBaker() const

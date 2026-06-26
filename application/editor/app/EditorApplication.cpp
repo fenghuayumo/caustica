@@ -228,15 +228,17 @@ EditorApplication::StartupResult EditorApplication::startup(int argc, const char
     m_sceneEditor.initStreamlineAndWindow();
     initRenderInfrastructurePhase1();
 
-    m_sceneRenderFacade.attachSceneEditor(m_sceneEditor);
-    m_sceneRenderFacade.refreshEnvironmentMapMediaList(GetLocalPath(c_AssetsFolder), std::filesystem::path());
+    m_sceneEditor.AttachLightingPasses(m_lightingPasses);
+    m_sceneEditor.AttachRayTracingResources(m_rayTracingResources);
+    m_sceneEditor.AttachGaussianSplatPasses(m_gaussianSplatPasses);
+    m_lightingPasses.refreshEnvironmentMapMediaList(GetLocalPath(c_AssetsFolder), std::filesystem::path());
 
     const nvrhi::BindingLayoutHandle bindlessLayout =
         caustica::render::PathTracingWorldRenderer::CreateBindlessLayout(m_GpuDevice->GetDevice());
     initRenderInfrastructurePhase2(bindlessLayout);
     initSceneServices();
     initWorldRenderer(bindlessLayout);
-    assert(m_sceneRenderFacade.isWorldRendererAttached());
+    assert(m_rayTracingResources.isAttached() && m_gaussianSplatPasses.isAttached());
 
     m_sceneEditor.Init(preferredScene, m_ShaderFactory);
     syncPassesToBackBuffer();
@@ -640,9 +642,49 @@ void EditorApplication::initRenderInfrastructurePhase2(nvrhi::IBindingLayout* bi
     m_sceneEditor.AttachRenderResources(m_ShaderFactory, m_commonPasses, m_bindingCache.get(), m_descriptorTable, m_textureCache);
 }
 
+caustica::render::WorldRendererPipelineHooks EditorApplication::buildWorldRendererHooks()
+{
+    return caustica::render::WorldRendererPipelineHooks{
+        .needsRasterPrecompute = [] { return false; },
+        .getMaterialSpecializationShader = [this] { return m_sceneEditor.GetMaterialSpecializationShader(); },
+        .fillPTPipelineGlobalMacros = [this](auto& macros) { m_rayTracingResources.fillPTPipelineGlobalMacros(macros); },
+        .sampleRenderCode = [this](auto* framebuffer, auto commandList, auto& constants) {
+            m_rayTracingResources.sampleRenderCode(framebuffer, commandList, constants);
+        },
+        .addCustomBindings = [this](auto& desc) { m_sceneEditor.AddCustomBindings(desc); },
+        .createRTPipelines = [this] { m_rayTracingResources.createRTPipelines(); },
+        .onRenderTargetsRecreated = [this] { m_sceneEditor.OnRenderTargetsRecreated(); },
+        .prepareGaussianSplatPasses = [this] { m_gaussianSplatPasses.preparePasses(); },
+        .buildGaussianSplatEmissionProxyList = [this] { m_gaussianSplatPasses.buildEmissionProxyList(); },
+        .isGaussianSplatEmissionEnabled = [this] { return m_gaussianSplatPasses.isEmissionEnabled(); },
+        .gaussianSplatObjectsEmpty = [this] { return m_gaussianSplatPasses.objectsEmpty(); },
+        .getPrimaryGaussianSplatBinding = [this] { return m_gaussianSplatPasses.getPrimaryBinding(); },
+        .renderSceneGaussianSplats = [this](auto* commandList, auto& view, auto& targets, auto& settings, bool& renderedAny) {
+            m_gaussianSplatPasses.renderSceneGaussianSplats(commandList, view, targets, settings, renderedAny);
+        },
+        .updateViews = [this](auto* framebuffer) { m_sceneEditor.UpdateViews(framebuffer); },
+        .recreateAccelStructs = [this](auto* commandList) { m_rayTracingResources.recreateAccelStructs(commandList); },
+        .uploadSubInstanceData = [this](auto* commandList) { m_rayTracingResources.uploadSubInstanceData(commandList); },
+        .collectUncompressedTextures = [this] { m_sceneEditor.CollectUncompressedTextures(); },
+        .computeCameraJitter = [this](uint frameIndex) { return m_sceneEditor.ComputeCameraJitter(frameIndex); },
+        .consumeShaderReloadRequest = [this] { return m_rayTracingResources.consumeShaderReloadRequest(); },
+        .accelerationStructRebuildRequested = [this]() -> bool& { return m_rayTracingResources.accelerationStructRebuildRequested(); },
+        .hasActivePickRequest = [this] { return m_sceneEditor.hasActivePickRequest(); },
+        .showDeltaTree = [this] { return m_sceneEditor.showDeltaTree(); },
+        .pickMaterialRequested = [this] { return m_sceneEditor.pickMaterialRequested(); },
+        .pickInstanceRequested = [this] { return m_sceneEditor.pickInstanceRequested(); },
+        .clearPickRequests = [this] { m_sceneEditor.clearPickRequests(); },
+        .resolvePickFeedback = [this](auto& feedback) { m_sceneEditor.resolvePickFeedback(feedback); },
+        .consumeExperimentalPhotoScreenshot = [this] { return m_sceneEditor.consumeExperimentalPhotoScreenshot(); },
+        .captureScriptPreRender = [this] { m_sceneEditor.captureScriptPreRender(); },
+        .captureScriptPostRender = [this](auto saveTexture) { m_sceneEditor.captureScriptPostRender(saveTexture); },
+        .getOrCreateZoomTool = [this] { return m_sceneEditor.getOrCreateZoomTool(); },
+    };
+}
+
 caustica::render::WorldRendererServices EditorApplication::buildWorldRendererServices()
 {
-    return m_sceneRenderFacade.buildWorldRendererServices(SceneRenderFacadeServicesParams{
+    return caustica::render::WorldRendererServices{
         .gpuDevice = *m_GpuDevice,
         .sceneManager = *m_sceneManager,
         .renderCore = *m_renderCore,
@@ -652,8 +694,24 @@ caustica::render::WorldRendererServices EditorApplication::buildWorldRendererSer
         .bindingCache = *m_bindingCache,
         .textureCache = m_textureCache,
         .descriptorTable = m_descriptorTable,
-        .editor = m_sceneEditor,
-    });
+        .envMapBaker = m_lightingPasses.envMapBaker(),
+        .lightsBaker = m_lightingPasses.lightsBaker(),
+        .materialsBaker = m_lightingPasses.materialsBaker(),
+        .ommBaker = m_lightingPasses.ommBaker(),
+        .computePipelineBaker = m_lightingPasses.computePipelineBaker(),
+        .lights = m_lightingPasses.lights(),
+        .envMapSceneParams = m_lightingPasses.envMapSceneParams(),
+        .envMapLocalPath = m_lightingPasses.envMapLocalPath(),
+        .envMapOverride = m_lightingPasses.envMapOverride(),
+        .sceneTime = m_sceneEditor.GetSceneTimeRef(),
+        .gaussianSplatEmissionProxies = m_gaussianSplatPasses.emissionProxies(),
+        .progressInitializingRenderer = m_sceneEditor.GetProgressInitializingRenderer(),
+        .asyncLoadingInProgress = m_sceneEditor.GetAsyncLoadingInProgressRef(),
+        .benchStart = m_sceneEditor.GetBenchStart(),
+        .benchLast = m_sceneEditor.GetBenchLast(),
+        .benchFrames = m_sceneEditor.GetBenchFrames(),
+        .hooks = buildWorldRendererHooks(),
+    };
 }
 
 void EditorApplication::initWorldRenderer(nvrhi::IBindingLayout* bindlessLayout)
@@ -662,16 +720,29 @@ void EditorApplication::initWorldRenderer(nvrhi::IBindingLayout* bindlessLayout)
     m_worldRenderer = std::make_unique<caustica::render::PathTracingWorldRenderer>(*m_worldRendererServices);
     m_sceneEditor.AttachWorldRenderer(m_worldRenderer.get());
 
-    m_sceneRenderFacade.initWorldRenderer(
+    m_rayTracingResources.attach(
         *m_GpuDevice,
         *m_sceneManager,
         *m_renderCore,
         *m_worldRenderer,
         m_sceneEditor.GetPathTracerSettings(),
-        m_sceneEditor.GetEditorUIState(),
-        m_ShaderFactory,
-        m_commonPasses,
+        m_sceneEditor.GetRenderRuntimeState().Invalidation,
+        m_lightingPasses,
         *m_bindingCache);
+
+    m_gaussianSplatPasses.attach(
+        *m_GpuDevice,
+        *m_sceneManager,
+        *m_renderCore,
+        *m_worldRenderer,
+        m_sceneEditor.GetPathTracerSettings(),
+        m_sceneEditor.GetRenderRuntimeState().GaussianSplats,
+        m_ShaderFactory,
+        m_commonPasses);
+
+    m_gaussianSplatPasses.setOnRequestFullRebuild([this] { m_rayTracingResources.requestFullRebuild(); });
+    m_rayTracingResources.setAdditionalAccelStructBuilder(
+        [this](nvrhi::ICommandList* commandList) { m_gaussianSplatPasses.buildAccelStructs(commandList); });
 
     m_worldRenderer->createBindingLayouts(bindlessLayout);
 }

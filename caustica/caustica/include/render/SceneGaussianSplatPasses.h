@@ -3,6 +3,7 @@
 #include <render/Core/PathTracerSettings.h>
 #include <render/Passes/Gaussian/GaussianSplatPass.h>
 #include <render/Passes/Gaussian/GaussianSplatEmissionProxy.h>
+#include <render/RenderRuntimeState.h>
 #include <render/WorldRenderer/WorldRendererServices.h>
 
 #include <filesystem>
@@ -35,8 +36,6 @@ struct CommandLineOptions;
 namespace caustica::editor
 {
 
-class EditorUIState;
-
 // Per-scene Gaussian splat passes, emission proxies, and WorldRenderer hooks.
 class SceneGaussianSplatPasses
 {
@@ -55,7 +54,7 @@ public:
         caustica::RenderCore& renderCore,
         caustica::render::PathTracingWorldRenderer& worldRenderer,
         PathTracerSettings& settings,
-        EditorUIState& editor,
+        caustica::render::GaussianSplatSceneSummary& summary,
         const std::shared_ptr<caustica::ShaderFactory>& shaderFactory,
         const std::shared_ptr<caustica::CommonRenderPasses>& commonPasses);
 
@@ -101,7 +100,7 @@ private:
     caustica::RenderCore* m_renderCore = nullptr;
     caustica::render::PathTracingWorldRenderer* m_worldRenderer = nullptr;
     PathTracerSettings* m_settings = nullptr;
-    EditorUIState* m_editor = nullptr;
+    caustica::render::GaussianSplatSceneSummary* m_summary = nullptr;
     std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
     std::shared_ptr<caustica::CommonRenderPasses> m_commonPasses;
 

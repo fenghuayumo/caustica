@@ -9,7 +9,10 @@
 
 #include "ui/SampleUIData.h"
 #include "SceneEditor.h"
-#include <render/SceneRenderFacade.h>
+#include <render/SceneGaussianSplatPasses.h>
+#include <render/SceneLightingPasses.h>
+#include <render/SceneRayTracingResources.h>
+#include <render/WorldRenderer/WorldRendererServices.h>
 
 using caustica::FPSLimiter;
 constexpr static const int c_SwapchainCount = 3;
@@ -70,14 +73,12 @@ public:
 
     SceneEditor& GetSceneEditor() { return m_sceneEditor; }
     const SceneEditor& GetSceneEditor() const { return m_sceneEditor; }
-    SceneRenderFacade& GetSceneRenderFacade() { return m_sceneRenderFacade; }
-    const SceneRenderFacade& GetSceneRenderFacade() const { return m_sceneRenderFacade; }
-    SceneLightingPasses& GetLightingPasses() { return m_sceneRenderFacade.lightingPasses(); }
-    const SceneLightingPasses& GetLightingPasses() const { return m_sceneRenderFacade.lightingPasses(); }
-    SceneRayTracingResources& GetRayTracingResources() { return m_sceneRenderFacade.rayTracingResources(); }
-    const SceneRayTracingResources& GetRayTracingResources() const { return m_sceneRenderFacade.rayTracingResources(); }
-    SceneGaussianSplatPasses& GetGaussianSplatPasses() { return m_sceneRenderFacade.gaussianSplatPasses(); }
-    const SceneGaussianSplatPasses& GetGaussianSplatPasses() const { return m_sceneRenderFacade.gaussianSplatPasses(); }
+    SceneLightingPasses& GetLightingPasses() { return m_lightingPasses; }
+    const SceneLightingPasses& GetLightingPasses() const { return m_lightingPasses; }
+    SceneRayTracingResources& GetRayTracingResources() { return m_rayTracingResources; }
+    const SceneRayTracingResources& GetRayTracingResources() const { return m_rayTracingResources; }
+    SceneGaussianSplatPasses& GetGaussianSplatPasses() { return m_gaussianSplatPasses; }
+    const SceneGaussianSplatPasses& GetGaussianSplatPasses() const { return m_gaussianSplatPasses; }
 
     SceneEditor* GetScenePass() { return &m_sceneEditor; }
     const SceneEditor* GetScenePass() const { return &m_sceneEditor; }
@@ -116,6 +117,7 @@ private:
     void CreateShaderFactory();
     void initRenderInfrastructurePhase1();
     void initRenderInfrastructurePhase2(nvrhi::IBindingLayout* bindlessLayout);
+    caustica::render::WorldRendererPipelineHooks buildWorldRendererHooks();
     caustica::render::WorldRendererServices buildWorldRendererServices();
     void initWorldRenderer(nvrhi::IBindingLayout* bindlessLayout);
     void initSceneServices();
@@ -123,7 +125,9 @@ private:
 
     CommandLineOptions CmdLine;
     SampleUIData sampleUIData;
-    SceneRenderFacade m_sceneRenderFacade;
+    SceneLightingPasses m_lightingPasses;
+    SceneRayTracingResources m_rayTracingResources;
+    SceneGaussianSplatPasses m_gaussianSplatPasses;
     SceneEditor m_sceneEditor;
 
     caustica::Callback m_DefaultLogCallback = nullptr;

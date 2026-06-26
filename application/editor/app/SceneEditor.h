@@ -12,7 +12,7 @@
 #include <scene/SceneManager.h>
 #include <scene/camera/Camera.h>
 
-#include <render/EditorUIState.h>
+#include <render/RenderRuntimeState.h>
 #include "ui/SampleUIData.h"
 
 #include <chrono>
@@ -114,6 +114,8 @@ public:
     const PathTracerSettings& GetPathTracerSettings() const { return m_settings; }
     EditorUIState& GetEditorUIState() { return m_editor; }
     const EditorUIState& GetEditorUIState() const { return m_editor; }
+    caustica::render::RenderRuntimeState& GetRenderRuntimeState() { return m_renderState; }
+    const caustica::render::RenderRuntimeState& GetRenderRuntimeState() const { return m_renderState; }
 
     void                                    UpdateSubInstanceContents();
     void                                    UploadSubInstanceData(nvrhi::ICommandList* commandList);
@@ -308,7 +310,7 @@ public:
     const std::unique_ptr<PythonScripting> & GetPythonScripting() const { return m_pythonScripting; }
 #endif
 
-    bool                                    HasAsyncLoadingInProgress() const   { return m_asyncLoadingInProgress || m_editor.ShaderAndACRefreshDelayedRequest > 0; }
+    bool                                    HasAsyncLoadingInProgress() const   { return m_asyncLoadingInProgress || m_renderState.Invalidation.ShaderAndACRefreshDelayedRequest > 0; }
 
     bool                                    AccumulationCompleted() const;
 
@@ -319,6 +321,7 @@ protected:
     ::ZoomTool* GetOrCreateZoomTool();
 
     PathTracerSettings& m_settings;
+    caustica::render::RenderRuntimeState& m_renderState;
     EditorUIState& m_editor;
     SampleUIData& m_ui;
 

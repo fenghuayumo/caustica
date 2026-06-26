@@ -1,6 +1,7 @@
 #pragma once
 
 #include <render/Core/PathTracerSettings.h>
+#include <render/RenderRuntimeState.h>
 #include <rhi/nvrhi.h>
 #include <shaders/SampleConstantBuffer.h>
 
@@ -31,7 +32,6 @@ class SceneManager;
 namespace caustica::editor
 {
 
-class EditorUIState;
 class SceneLightingPasses;
 
 using AdditionalAccelStructBuilder = std::function<void(nvrhi::ICommandList*)>;
@@ -47,7 +47,7 @@ public:
         caustica::RenderCore& renderCore,
         caustica::render::PathTracingWorldRenderer& worldRenderer,
         PathTracerSettings& settings,
-        EditorUIState& editor,
+        caustica::render::RenderInvalidationState& invalidation,
         SceneLightingPasses& lightingPasses,
         caustica::BindingCache& bindingCache);
 
@@ -88,7 +88,7 @@ private:
     caustica::RenderCore*                       m_renderCore = nullptr;
     caustica::render::PathTracingWorldRenderer* m_worldRenderer = nullptr;
     PathTracerSettings*                         m_settings = nullptr;
-    EditorUIState*                              m_editor = nullptr;
+    caustica::render::RenderInvalidationState*  m_invalidation = nullptr;
     SceneLightingPasses*                        m_lightingPasses = nullptr;
     caustica::BindingCache*                     m_bindingCache = nullptr;
     AdditionalAccelStructBuilder                m_additionalAccelStructBuilder;

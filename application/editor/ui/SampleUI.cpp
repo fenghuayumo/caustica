@@ -72,7 +72,7 @@ namespace
             ui.GaussianSplatShadows = false;
             ui.GaussianSplatShadowsMode = GAUSSIAN_SPLAT_SHADOWS_DISABLED;
         }
-        ui.AccelerationStructRebuildRequested = true;
+        ui.Invalidation.AccelerationStructRebuildRequested = true;
         ui.ResetAccumulation = true;
         return true;
     }
@@ -93,7 +93,7 @@ namespace
         ui.GaussianSplatShadows = shadowMode != GAUSSIAN_SPLAT_SHADOWS_DISABLED;
 
         if (wasEnabled != ui.GaussianSplatShadows)
-            ui.AccelerationStructRebuildRequested = true;
+            ui.Invalidation.AccelerationStructRebuildRequested = true;
         ui.ResetAccumulation = true;
         return true;
     }
@@ -929,7 +929,7 @@ void SampleUI::buildUI(void)
         {
             RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent); );
             if (ImGui::Button("Reload Shaders (requires VS .hlsl->.bin build)"))
-                m_ui.ShaderReloadRequested = true;
+                m_ui.Invalidation.ShaderReloadRequested = true;
 
             ImGui::Checkbox("Render when out of focus", &m_ui.RenderWhenOutOfFocus);
             if (ImGui::IsItemHovered()) 
@@ -1039,7 +1039,7 @@ void SampleUI::buildUI(void)
                 }
             }
 
-            if (m_ui.GaussianSplatCount > 0 && ImGui::CollapsingHeader("3D Gaussian Splats"))
+            if (m_ui.GaussianSplats.SplatCount > 0 && ImGui::CollapsingHeader("3D Gaussian Splats"))
             {
                 RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent); );
 
@@ -1097,7 +1097,7 @@ void SampleUI::buildUI(void)
                     asChanged |= ImGui::Checkbox("Adaptive clamp", &m_ui.GaussianSplatRtxAdaptiveClamp);
                     if (asChanged)
                     {
-                        m_ui.AccelerationStructRebuildRequested = true;
+                        m_ui.Invalidation.AccelerationStructRebuildRequested = true;
                         m_ui.ResetAccumulation = true;
                     }
 
@@ -2191,7 +2191,7 @@ void SampleUI::buildUI(void)
             {
                 if (ImGui::Checkbox("Exclude Transmissive", &m_ui.AS.ExcludeTransmissive))
                 {
-                    m_ui.AccelerationStructRebuildRequested = true;
+                    m_ui.Invalidation.AccelerationStructRebuildRequested = true;
                 }
 
                 if (ImGui::IsItemHovered())
@@ -2353,7 +2353,7 @@ void SampleUI::buildUI(void)
 
             const DebugFeedbackStruct& feedback = m_sceneEditor.GetFeedbackData();
             if (ImGui::InputInt2("Debug pixel", (int*)&m_ui.DebugPixel.x))
-                m_sceneEditor.GetEditorUIState().requestMaterialPick();
+                m_sceneEditor.GetRenderRuntimeState().Picking.requestMaterialPick();
 
             ImGui::Checkbox("Continuous feedback", &m_ui.ContinuousDebugFeedback);
 
@@ -2384,7 +2384,7 @@ void SampleUI::buildUI(void)
                 if (ImGui::Checkbox("Show delta tree window", &m_ui.ShowDeltaTree) && m_ui.ShowDeltaTree)
                 {
                     m_ui.ShowInspector = false; // no space for both
-                    m_sceneEditor.GetEditorUIState().requestMaterialPick();
+                    m_sceneEditor.GetRenderRuntimeState().Picking.requestMaterialPick();
                 }
             }
 #else
@@ -2503,13 +2503,13 @@ void SampleUI::buildUI(void)
             {
                 if (ImGui::Checkbox("Enabled", &gaussianSplat->enabled))
                 {
-                    m_ui.AccelerationStructRebuildRequested = true;
+                    m_ui.Invalidation.AccelerationStructRebuildRequested = true;
                     m_ui.ResetAccumulation = true;
                 }
                 if (ImGui::DragFloat("Footprint Scale", &m_ui.GaussianSplatScale, 0.01f, 0.01f, 10.0f, "%.2f"))
                 {
                     if (ResolveGaussianSplatShadowMode(m_ui) != GAUSSIAN_SPLAT_SHADOWS_DISABLED)
-                        m_ui.AccelerationStructRebuildRequested = true;
+                        m_ui.Invalidation.AccelerationStructRebuildRequested = true;
                     m_ui.ResetAccumulation = true;
                 }
                 RESET_ON_CHANGE(ImGui::DragFloat("Alpha", &m_ui.GaussianSplatAlphaScale, 0.01f, 0.0f, 4.0f, "%.2f"));
@@ -2575,9 +2575,9 @@ void SampleUI::buildUI(void)
 
         if (wasAlphaTestedEnabled != material->EnableAlphaTesting || alphaCutoffBefore != alphaCutoffAfter ||
             wasExcludedFromNEE != material->ExcludeFromNEE || mspBefore != mspAfter || wasSkipRender != material->SkipRender)
-            m_ui.ShaderAndACRefreshDelayedRequest = 1.0f;
+            m_ui.Invalidation.ShaderAndACRefreshDelayedRequest = 1.0f;
 
-        if (m_ui.ShaderAndACRefreshDelayedRequest > 0)
+        if (m_ui.Invalidation.ShaderAndACRefreshDelayedRequest > 0)
             ImGui::TextColored(ImVec4(1, 0.5f, 0.5f, 1), "PLEASE NOTE: shader and AC rebuild scheduled!\nUI might freeze for a bit.");
         else
             ImGui::Text(" ");
@@ -2769,7 +2769,7 @@ void SampleUI::buildUI(void)
                     }
 
                 if (m_ui.MaterialVariantIndex != 1 && materialVariantIndexPrev != 0) // this one doesn't change emissives so no TLAS/BLAS update needed
-                    m_ui.ShaderAndACRefreshDelayedRequest = 0.01f;
+                    m_ui.Invalidation.ShaderAndACRefreshDelayedRequest = 0.01f;
             }
         }
         
@@ -2787,7 +2787,7 @@ void SampleUI::buildUI(void)
         if (sceneGraph && rootNode)
         {
             bool deleteSelectedNode = false;
-            ImGui::Text("Objects: %zu mesh, %u 3DGS", sceneGraph->GetMeshInstances().size(), m_ui.GaussianSplatObjectCount);
+            ImGui::Text("Objects: %zu mesh, %u 3DGS", sceneGraph->GetMeshInstances().size(), m_ui.GaussianSplats.ObjectCount);
             ImGui::Separator();
 
             if (ImGui::TreeNodeEx("Scene", ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_SpanAvailWidth))
