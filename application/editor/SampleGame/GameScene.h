@@ -7,7 +7,7 @@
 #include <scene/Scene.h>
 #include <core/command_line.h>
 
-#include "GameModel.h"
+#include <scene/GameModel.h>
 #include "GameProps.h"
 
 #ifdef _DEBUG

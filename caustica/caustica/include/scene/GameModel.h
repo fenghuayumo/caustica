@@ -1,10 +1,10 @@
 #pragma once
 
 // =============================================================================
-// GameModel.h — Sample game model instance management (application layer).
+// GameModel.h - sample scene model instance management.
 // =============================================================================
 
-#include "GameTypes.h"
+#include <scene/GameTypes.h>
 #include <scene/SceneGraph.h>
 
 #include <map>

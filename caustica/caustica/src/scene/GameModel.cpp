@@ -1,4 +1,4 @@
-#include "GameModel.h"
+#include <scene/GameModel.h>
 #include <core/log.h>
 #include <core/json.h>
 #include <core/format.h>

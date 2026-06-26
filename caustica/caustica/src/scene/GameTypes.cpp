@@ -1,4 +1,4 @@
-#include "GameTypes.h"
+#include <scene/GameTypes.h>
 #include <core/log.h>
 #include <core/json.h>
 #include <math/math.h>

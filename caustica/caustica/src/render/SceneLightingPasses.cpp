@@ -1,4 +1,4 @@
-#include "render/SceneLightingPasses.h"
+#include <render/SceneLightingPasses.h>
 
 #include <assets/loader/ShaderFactory.h>
 #include <core/path_utils.h>

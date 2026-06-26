@@ -5,9 +5,9 @@
 #include <filesystem>
 #include <memory>
 
-#include "render/SceneGaussianSplatPasses.h"
-#include "render/SceneLightingPasses.h"
-#include "render/SceneRayTracingResources.h"
+#include <render/SceneGaussianSplatPasses.h>
+#include <render/SceneLightingPasses.h>
+#include <render/SceneRayTracingResources.h>
 
 namespace caustica
 {

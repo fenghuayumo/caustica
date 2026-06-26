@@ -1,4 +1,4 @@
-#include "render/SceneGaussianSplatPasses.h"
+#include <render/SceneGaussianSplatPasses.h>
 
 #include <render/WorldRenderer/PathTracingWorldRenderer.h>
 #include <render/Passes/Gaussian/GaussianSplatPass.h>
@@ -12,7 +12,7 @@
 #include <scene/SceneManager.h>
 #include <scene/Scene.h>
 
-#include "ui/EditorUIState.h"
+#include <render/EditorUIState.h>
 
 #include <algorithm>
 #include <cmath>

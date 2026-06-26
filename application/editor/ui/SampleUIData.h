@@ -3,7 +3,7 @@
 #include <core/command_line.h>
 #include <render/Core/PathTracerSettings.h>
 
-#include "EditorUIState.h"
+#include <render/EditorUIState.h>
 
 namespace caustica::editor
 {

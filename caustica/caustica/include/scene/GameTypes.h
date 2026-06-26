@@ -1,7 +1,7 @@
 #pragma once
 
 // =============================================================================
-// GameTypes.h — Sample game utility types (application layer).
+// GameTypes.h - sample scene utility types.
 // =============================================================================
 
 #include <math/math.h>

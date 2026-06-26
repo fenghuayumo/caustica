@@ -1,6 +1,6 @@
-#include "render/SceneRayTracingResources.h"
+#include <render/SceneRayTracingResources.h>
 
-#include "render/SceneLightingPasses.h"
+#include <render/SceneLightingPasses.h>
 #include <render/WorldRenderer/PathTracingWorldRenderer.h>
 
 #include <backend/GpuDevice.h>
@@ -12,7 +12,7 @@
 
 #include <shaders/PathTracer/Lighting/LightingTypes.hlsli>
 
-#include "ui/EditorUIState.h"
+#include <render/EditorUIState.h>
 
 namespace caustica::editor
 {

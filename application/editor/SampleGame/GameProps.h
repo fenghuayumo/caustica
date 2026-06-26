@@ -7,7 +7,7 @@
 // #include <core/vfs/VFS.h>
 #include <scene/camera/Camera.h>
 
-#include "GameModel.h"
+#include <scene/GameModel.h>
 
 namespace game
 {

@@ -1,8 +1,8 @@
 #include "SceneEditor.h"
 
-#include "render/SceneGaussianSplatPasses.h"
-#include "render/SceneLightingPasses.h"
-#include "render/SceneRayTracingResources.h"
+#include <render/SceneGaussianSplatPasses.h>
+#include <render/SceneLightingPasses.h>
+#include <render/SceneRayTracingResources.h>
 
 #include <render/WorldRenderer/PathTracingWorldRenderer.h>
 #include <render/WorldRenderer/WorldRendererServices.h>
