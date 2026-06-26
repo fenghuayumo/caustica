@@ -4,6 +4,7 @@
 #include <filesystem>
 
 #include <core/command_line.h>
+#include <engine/CaptureSequencer.h>
 #include <imgui/imgui_renderer.h>
 
 namespace caustica::editor
@@ -28,42 +29,14 @@ public:
     void PreRender();
     void PostRender(const std::function<bool(const char*)>& dumpScreenshotCallback);
 
-    bool IsDoingWork() const    { return m_start || m_active; }
+    bool IsDoingWork() const    { return m_sequencer.IsDoingWork(); }
 
 
 private:
     SceneEditor &                    m_app;
     SampleUIData &              m_ui;
     const CommandLineOptions &  m_cmdLine;
-    
-    std::filesystem::path       m_screenshotFileName;
-
-    // std::string                 m_screenshotSequencePath            = "D:/AnimSequence/";
-    // bool                        m_screenshotSequenceCaptureActive   = false;
-    // int                         m_screenshotSequenceCaptureIndex    = -64; // -x means x warmup frames for recording to stabilize denoiser and other subsystems
-
-    bool                        m_resetAndWarmup                    = false;
-    int                         m_resetAndWarmupFrames              = 64;
-    int                         m_resetAndWarmupCounter             = -1;
-
-    // bool                        m_screenshotMiniSequence            = false;
-    // int                         m_screenshotMiniSequenceFrames      = 5;
-    // int                         m_screenshotMiniSequenceCounter     = -1;
-
-    //bool                        m_sequenceRecorder                  = false;
-    double                      m_sequenceBeginTime                 = 0.0;     // based on sequenceWarmupStart cmdLine parameter 
-    double                      m_sequenceRecordStartTime           = 0.0;
-    double                      m_sequenceDeltaTime                 = 1.0 / 60.0;
-    int                         m_sequenceRecordFrames              = 0;
-    int                         m_sequenceRecordCounter             = -1;
-
-
-    bool                        m_start                             = false;
-    bool                        m_active                            = false;
-    int                         m_type                              = 0;    // 0 - simple screenshot; 1 - advanced sequence
-
-    bool                        m_captureSuccess                    = false;
-    bool                        m_exitAfterCapture                  = false; // only active if command line parameters used
+    caustica::CaptureSequencer  m_sequencer;
 };
 
 } // namespace caustica::editor

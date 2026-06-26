@@ -24,38 +24,8 @@ using namespace caustica;
 using namespace caustica;
 
 CaptureScriptManager::CaptureScriptManager(SceneEditor & sample, SampleUIData & sampleUI, const CommandLineOptions & cmdLine)
-    : m_app(sample), m_ui(sampleUI), m_cmdLine(cmdLine)
+    : m_app(sample), m_ui(sampleUI), m_cmdLine(cmdLine), m_sequencer(cmdLine)
 {
-    if (m_cmdLine.capturePath != "")
-    {
-        m_screenshotFileName = m_cmdLine.capturePath;
-
-        if (m_cmdLine.captureSimple)
-        {
-            m_type = 0;
-            m_start = true;
-            m_resetAndWarmup = true;
-            m_exitAfterCapture = true;
-        }
-
-        if (m_cmdLine.captureSequence && m_cmdLine.sequenceFPS > 0 && m_cmdLine.sequenceFrameCount > 0)
-        {
-            m_type = 1;
-            m_start = true;
-            assert( m_cmdLine.sequenceWarmupStart >= 0 );
-            assert( m_cmdLine.sequenceWarmupStart < m_cmdLine.sequenceRecordStart );
-            assert( m_cmdLine.sequenceFPS >= 1 && m_cmdLine.sequenceFPS <= 1000 );
-            m_sequenceDeltaTime = 1.0 / m_cmdLine.sequenceFPS;
-            m_sequenceBeginTime = m_cmdLine.sequenceWarmupStart;
-            m_sequenceRecordStartTime = m_cmdLine.sequenceRecordStart;
-
-            m_resetAndWarmupFrames = (int)((m_cmdLine.sequenceRecordStart - m_cmdLine.sequenceWarmupStart) / m_sequenceDeltaTime + 1e-6);
-            m_resetAndWarmup = true;
-            m_sequenceRecordFrames = m_cmdLine.sequenceFrameCount;
-            m_exitAfterCapture = true;
-            assert( !m_cmdLine.stopAnimations ); // doesn't really make sense
-        }
-    }
 }
 
 CaptureScriptManager::~CaptureScriptManager()
@@ -64,24 +34,25 @@ CaptureScriptManager::~CaptureScriptManager()
 
 bool CaptureScriptManager::ScriptProgressUI()
 {
-    if (!m_active && !m_start)
+    if (!m_sequencer.IsActive() && !m_sequencer.IsStarting())
         return false;
 
-    if (m_resetAndWarmupCounter > 0)
+    const auto& settings = m_sequencer.Settings();
+    if (m_sequencer.ResetAndWarmupCounter() > 0)
     {
         ImGui::Spacing();
-        ImGui::TextWrapped("Running warm-up: %d out of %d", m_resetAndWarmupCounter, m_resetAndWarmupFrames);
+        ImGui::TextWrapped("Running warm-up: %d out of %d", m_sequencer.ResetAndWarmupCounter(), settings.ResetAndWarmupFrames);
     }
     if (!m_ui.RealtimeMode)
     {
         ImGui::TextWrapped("Accumulation mode, sample %d (out of %d target)", m_app.GetAccumulationSampleIndex(), m_ui.AccumulationTarget);
     }
-    if (m_sequenceRecordCounter > 0)
+    if (m_sequencer.SequenceRecordCounter() > 0)
     {
         ImGui::Spacing();
-        ImGui::TextWrapped("Running sequence export: %d", m_sequenceRecordCounter);
+        ImGui::TextWrapped("Running sequence export: %d", m_sequencer.SequenceRecordCounter());
     }
-    if (m_start)
+    if (m_sequencer.IsStarting())
     {
         ImGui::Spacing();
         ImGui::TextWrapped("Starting (scene loading might still in progress)...");
@@ -92,22 +63,24 @@ bool CaptureScriptManager::ScriptProgressUI()
 
 void CaptureScriptManager::ScriptMainUI(const ImVec4 & warnColor, const ImVec4 & categoryColor, float indent, float currentScale)
 {
-    assert( !m_active && !m_start ); // this point should never be reached if m_active because ScritProgressUI should be up instead
+    assert(!m_sequencer.IsActive() && !m_sequencer.IsStarting()); // this point should never be reached if active because ScriptProgressUI should be up instead
+
+    auto& settings = m_sequencer.Settings();
 
     ImGui::TextColored(categoryColor, "Options");
 
-    if (ImGui::Combo("Capture type", &m_type, "SimpleScreenshot\0SequenceCapture\0Benchmark\00" ))
-        m_type = dm::clamp(m_type, 0, 0 );
+    if (ImGui::Combo("Capture type", &settings.Type, "SimpleScreenshot\0SequenceCapture\0Benchmark\00" ))
+        settings.Type = dm::clamp(settings.Type, 0, 0 );
 
-    if( m_type == 0 )
+    if (settings.Type == 0)
     {
-        ImGui::Checkbox("ResetAndWarmup", &m_resetAndWarmup);
+        ImGui::Checkbox("ResetAndWarmup", &settings.ResetAndWarmup);
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("When 'Save screenshot' is used, all subsystem's temporal histories will first be reset,\nfollowed by a selected number of frames before saving the screenshot.\nIf animation is running, it will keep running - if not, it won't.");
         {
-            UI_SCOPED_DISABLE(!m_resetAndWarmup);
+            UI_SCOPED_DISABLE(!settings.ResetAndWarmup);
             ImGui::SameLine();
             ImGui::PushItemWidth(-90.0f * currentScale);
-            ImGui::InputInt("delay frames", &m_resetAndWarmupFrames); m_resetAndWarmupFrames = dm::clamp(m_resetAndWarmupFrames, 0, 10000);
+            ImGui::InputInt("delay frames", &settings.ResetAndWarmupFrames); settings.ResetAndWarmupFrames = dm::clamp(settings.ResetAndWarmupFrames, 0, 10000);
             ImGui::PopItemWidth();
         }
     }
@@ -130,23 +103,23 @@ void CaptureScriptManager::ScriptMainUI(const ImVec4 & warnColor, const ImVec4 &
     {
         std::string fileName;
         if (FileDialog(false, "PNG files\0*.png\0BMP files\0*.bmp\0All files\0*.*\0\0", fileName))
-            m_screenshotFileName = fileName;
+            settings.ScreenshotFileName = fileName;
     }
 
     {
         RAII_SCOPE(ImGui::Indent(indent);, ImGui::Unindent(indent); );
         RAII_SCOPE(ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x); , ImGui::PopItemWidth(); );
-        std::string pathStr = m_screenshotFileName.string();
+        std::string pathStr = settings.ScreenshotFileName.string();
         ImGui::InputText("##path", (char*)pathStr.c_str(), pathStr.length()+1, /*ImVec2(0, 0),*/ ImGuiInputTextFlags_ReadOnly);
     }
 
     {
-        UI_SCOPED_DISABLE(m_screenshotFileName.empty());
+        UI_SCOPED_DISABLE(settings.ScreenshotFileName.empty());
 
         std::string cmd = "";
-        if (m_type == 0)
+        if (settings.Type == 0)
             cmd += "--captureSimple ";
-        cmd += "--capturePath " + (m_screenshotFileName.empty()?"<error, empty>":m_screenshotFileName.string());
+        cmd += "--capturePath " + (settings.ScreenshotFileName.empty() ? "<error, empty>" : settings.ScreenshotFileName.string());
 
         ImGui::TextColored(categoryColor, "CmdLine, active settings:");
         ImGui::SameLine(w * 0.65f);
@@ -160,7 +133,7 @@ void CaptureScriptManager::ScriptMainUI(const ImVec4 & warnColor, const ImVec4 &
         }
 
         if (ImGui::Button("=== START CAPTURE ===", ImVec2(-FLT_MIN, 0.0f)))
-            m_start = true;
+            m_sequencer.RequestStart();
     }
 
 
@@ -183,7 +156,7 @@ void CaptureScriptManager::ScriptMainUI(const ImVec4 & warnColor, const ImVec4 &
         {
             char windowName[1024];
             snprintf(windowName, sizeof(windowName), "%s/frame_%05d.bmp", m_screenshotSequencePath.c_str(), m_screenshotSequenceCaptureIndex);
-            m_screenshotFileName = windowName;
+            settings.ScreenshotFileName = windowName;
         }
         m_screenshotSequenceCaptureIndex++;
     }
@@ -195,19 +168,10 @@ void CaptureScriptManager::ScriptMainUI(const ImVec4 & warnColor, const ImVec4 &
 
 void CaptureScriptManager::PreAnim(float& fElapsedTimeSeconds)
 {
-    // don't start anything until everything is loaded
-    if (m_app.HasAsyncLoadingInProgress())
-        return;
-
-    if (m_start && !m_screenshotFileName.empty())
-    {
-        m_app.SetSceneTime(m_sequenceBeginTime);
-        m_start = false;
-        m_active = true;
-        m_resetAndWarmupCounter = -1;
-    }
-    if (m_active && m_type == 1)
-        fElapsedTimeSeconds = m_sequenceDeltaTime;
+    m_sequencer.PreAnim(
+        fElapsedTimeSeconds,
+        m_app.HasAsyncLoadingInProgress(),
+        [this](double sceneTime) { m_app.SetSceneTime(sceneTime); });
 }
 
 void CaptureScriptManager::PostAnim()
@@ -217,63 +181,30 @@ void CaptureScriptManager::PostAnim()
 
 void CaptureScriptManager::PreRender()
 {
-    // Update Screenshot counter
-    if (m_active && m_resetAndWarmup)
-    {
-        if (m_resetAndWarmupCounter == -1) // we just started with delay, set it up
-        {
-            m_resetAndWarmupCounter = m_resetAndWarmupFrames;
-            m_ui.ResetRealtimeCaches = true;
-        }
-        if (m_resetAndWarmupCounter)
-            m_ui.ResetAccumulation = true;
-
-        m_resetAndWarmupCounter = std::max(0, m_resetAndWarmupCounter-1);
-    }
+    const CaptureSequencerPreRenderActions actions = m_sequencer.PreRender();
+    m_ui.ResetRealtimeCaches |= actions.ResetRealtimeCaches;
+    m_ui.ResetAccumulation |= actions.ResetAccumulation;
 }
 
 void CaptureScriptManager::PostRender(const std::function<bool(const char*)>& dumpScreenshotCallback)
 {
-    if (m_active && !m_screenshotFileName.empty() && !(m_resetAndWarmup && m_resetAndWarmupCounter > 0) && (m_ui.RealtimeMode || m_app.AccumulationCompleted()) )
+    const CaptureSequencerPostRenderResult result = m_sequencer.PostRender(
+        m_ui.RealtimeMode,
+        m_app.AccumulationCompleted(),
+        m_app.GetSceneTime(),
+        dumpScreenshotCallback);
+
+    if (result.ExitRequested)
     {
-        std::filesystem::path screenshotFile = m_screenshotFileName;
-
-        if (m_type == 1)
+        const std::filesystem::path& capturePath = result.CapturePath;
+        if (result.CaptureSuccess)
         {
-            if (m_app.GetSceneTime() < m_sequenceRecordStartTime) // if not, we're still in warmup - exit
-                return;
-
-            if (m_sequenceRecordCounter == -1) // start sequence if in sequence mode
-                m_sequenceRecordCounter = m_sequenceRecordFrames;
-            assert(m_sequenceRecordCounter > 0);
-
-            std::filesystem::path justName = screenshotFile.filename().stem();
-            std::filesystem::path justExtension = screenshotFile.extension();
-            screenshotFile.remove_filename();
-            screenshotFile /= justName.string() + StringFormat("_%03d", m_sequenceRecordFrames - m_sequenceRecordCounter) + justExtension.string();
-            m_sequenceRecordCounter--;
-        }
-
-        m_captureSuccess = dumpScreenshotCallback(screenshotFile.string().c_str());
-
-        if (m_type == 0 || (m_type == 1 && m_sequenceRecordCounter == 0) || !m_captureSuccess)
-        {
-            m_active = false;
-            m_resetAndWarmupCounter = -1;
-            m_sequenceRecordCounter = -1;
-        }
-    }
-
-    if (m_exitAfterCapture && !m_active && !m_start)
-    {
-        if (m_captureSuccess)
-        {
-            caustica::info("Capture of '%s' finished successfully. Exiting.", m_screenshotFileName.string().c_str());
+            caustica::info("Capture of '%s' finished successfully. Exiting.", capturePath.string().c_str());
             std::exit(0);
         }
         else
         {
-            caustica::fatal("Unable capture '%s'. Exiting.", m_screenshotFileName.string().c_str());
+            caustica::fatal("Unable capture '%s'. Exiting.", capturePath.string().c_str());
             std::exit(1);
         }
     }
