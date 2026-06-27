@@ -14,6 +14,7 @@
 #include <events/mouse_event.h>
 
 #include <render/Core/PostProcessAA.h>
+#include <assets/AssetSystem.h>
 #include <assets/loader/RuntimeMeshLoader.h>
 #include <render/Core/SceneMeshEditing.h>
 #include <scene/SceneRuntimeMutation.h>
@@ -1084,7 +1085,7 @@ void SceneEditor::HandleDroppedFiles()
 
 bool SceneEditor::LoadMeshFile(const std::filesystem::path& filePath)
 {
-    const auto loadResult = caustica::LoadRuntimeMeshFile(
+    const auto loadResult = caustica::AssetSystem::Get().LoadRuntimeMeshFile(
         MakeRuntimeMeshLoadParams(m_sceneManager, m_TextureLoader.get()),
         filePath);
     if (!loadResult)
@@ -1106,7 +1107,7 @@ bool SceneEditor::LoadMeshFile(const std::filesystem::path& filePath)
 
 bool SceneEditor::LoadGltfMeshFile(const std::filesystem::path& filePath)
 {
-    const auto loadResult = caustica::LoadRuntimeGltfMeshFile(
+    const auto loadResult = caustica::AssetSystem::Get().LoadRuntimeGltfMeshFile(
         MakeRuntimeMeshLoadParams(m_sceneManager, m_TextureLoader.get()),
         filePath);
     if (!loadResult)
@@ -1129,7 +1130,7 @@ bool SceneEditor::LoadGltfMeshFile(const std::filesystem::path& filePath)
 
 bool SceneEditor::LoadObjMeshFile(const std::filesystem::path& filePath)
 {
-    const auto loadResult = caustica::LoadRuntimeObjMeshFile(
+    const auto loadResult = caustica::AssetSystem::Get().LoadRuntimeObjMeshFile(
         MakeRuntimeMeshLoadParams(m_sceneManager, m_TextureLoader.get()),
         filePath);
     if (!loadResult)

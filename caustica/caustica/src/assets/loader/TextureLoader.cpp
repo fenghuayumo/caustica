@@ -84,14 +84,15 @@ TextureLoader::~TextureLoader()
 
 void TextureLoader::Reset()
 {
-    std::lock_guard<std::shared_mutex> guard(m_LoadedTexturesMutex);
-
-    // Unregister all textures from the asset registry
+    // The AssetSystem owns the single texture cache; the loader no longer keeps
+    // its own. Unregister every cached texture from the registry, then clear.
     auto& registry = AssetSystem::Get().GetRegistry();
-    for (auto& [id, texture] : m_LoadedTextures)
+    auto& cache = AssetSystem::Get().GetTextureCache();
+    cache.ForEach([&](const AssetId& id, std::shared_ptr<TextureData>, CacheState) {
         registry.Unregister(id);
+    });
 
-    m_LoadedTextures.clear();
+    cache.Clear();
     m_TexturesRequested = 0;
     m_TexturesLoaded = 0;
 }
@@ -115,20 +116,17 @@ void TextureLoader::RegisterTextureAsset(const std::shared_ptr<TextureData>& tex
 
 bool TextureLoader::FindTextureInCache(const std::filesystem::path& path, std::shared_ptr<TextureData>& texture)
 {
-    std::lock_guard<std::shared_mutex> guard(m_LoadedTexturesMutex);
-
     auto& registry = AssetSystem::Get().GetRegistry();
+    auto& cache = AssetSystem::Get().GetTextureCache();
     AssetId id = registry.FindByPath(path);
 
-    // Check if already cached by AssetId
+    // Check if already cached by AssetId (any state — a deferred texture that is
+    // not yet GPU-finalized must still be found here).
     if (id.IsValid())
     {
-        auto it = m_LoadedTextures.find(id);
-        if (it != m_LoadedTextures.end())
-        {
-            texture = it->second;
+        texture = cache.GetAny(id);
+        if (texture)
             return true;
-        }
     }
 
     // Allocate a new texture slot.  LoadTextureFromFileAsync for a given scene
@@ -142,7 +140,7 @@ bool TextureLoader::FindTextureInCache(const std::filesystem::path& path, std::s
 
     texture->assetIdLow = id.low;
     texture->assetIdHigh = id.high;
-    m_LoadedTextures[id] = texture;
+    cache.Insert(id, texture);
 
     ++m_TexturesRequested;
     return false;
@@ -647,12 +645,10 @@ std::shared_ptr<LoadedTexture> TextureLoader::LoadTextureFromMemoryDeferred(
 
 std::shared_ptr<TextureData> TextureLoader::GetLoadedTexture(std::filesystem::path const& path)
 {
-    std::lock_guard<std::shared_mutex> guard(m_LoadedTexturesMutex);
     AssetId id = AssetSystem::Get().GetRegistry().FindByPath(path);
     if (!id.IsValid())
         return nullptr;
-    auto it = m_LoadedTextures.find(id);
-    return it != m_LoadedTextures.end() ? it->second : nullptr;
+    return AssetSystem::Get().GetTextureCache().GetAny(id);
 }
 
 bool TextureLoader::ProcessRenderingThreadCommands(CommonRenderPasses& passes, float timeLimitMilliseconds)
@@ -911,15 +907,13 @@ namespace caustica
         if (!id.IsValid())
             return false;
 
-        // Unregister from asset system
-        AssetSystem::Get().GetRegistry().Unregister(id);
-
-        std::lock_guard<std::shared_mutex> guard(m_LoadedTexturesMutex);
-        const auto& it = m_LoadedTextures.find(id);
-        if (it == m_LoadedTextures.end())
+        auto& cache = AssetSystem::Get().GetTextureCache();
+        if (!cache.GetAny(id))
             return false;
 
-        m_LoadedTextures.erase(it);
+        // Unregister from asset system and remove from the cache
+        AssetSystem::Get().GetRegistry().Unregister(id);
+        cache.Remove(id);
         return true;
     }
 

@@ -2,6 +2,7 @@
 
 #include <engine/ConsoleObjects.h>
 #include <assets/loader/TextureLoader.h>
+#include <assets/AssetSystem.h>
 #include <core/string_utils.h>
 #include <core/log.h>
 
@@ -310,12 +311,12 @@ namespace caustica::console
 	}
 
 
-	inline std::string getTextureInfo(TextureLoader::Iterator const& it, size_t& count)
+	inline std::string getTextureInfo(AssetId const& id, std::shared_ptr<TextureData> const& texture, size_t& count)
 	{
 		char buff[2048];
-			std::string idStr = it->first.ToString();
+		std::string idStr = id.ToString();
 		snprintf(buff, 2048, "%s (%d x %d x %d)\n",
-			idStr.c_str(), it->second->width, it->second->height, it->second->arraySize);
+			idStr.c_str(), texture->width, texture->height, texture->arraySize);
 		++count;
 		return buff;
 	}
@@ -357,16 +358,18 @@ namespace caustica::console
 					}
 
 					Command::Result r; size_t count = 0;
-					for (auto it = m_TextureLoader->begin(); it != m_TextureLoader->end(); ++it)
-					{
-						if (rxMatch)
-						{
-							if (std::regex_match(it->first.ToString(), rx))
-								r.output += getTextureInfo(it, count);
-						}
-						else
-							r.output += getTextureInfo(it, count);
-					}
+					AssetSystem::Get().GetTextureCache().ForEach(
+						[&](AssetId const& id, std::shared_ptr<TextureData> const& texture, CacheState) {
+							if (!texture)
+								return;
+							if (rxMatch)
+							{
+								if (std::regex_match(id.ToString(), rx))
+									r.output += getTextureInfo(id, texture, count);
+							}
+							else
+								r.output += getTextureInfo(id, texture, count);
+						});
 					r.output += std::to_string(count) + " files found.\n";
 					r.status = true;
 					return r;

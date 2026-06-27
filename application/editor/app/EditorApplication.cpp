@@ -631,10 +631,10 @@ void EditorApplication::initRenderInfrastructurePhase2(nvrhi::IBindingLayout* bi
     m_descriptorTable = m_bindlessTable->GetDescriptorTableManager();  // alias for compat
 
     auto nativeFS = std::make_shared<caustica::NativeFileSystem>();
-    m_textureCache = std::make_shared<caustica::TextureLoader>(device, nativeFS, m_descriptorTable);
 
-    // Initialize asset system for hot-reload tracking
-    caustica::AssetSystem::Initialize(m_textureCache);
+    // The asset system owns the texture loader; EditorApplication borrows it.
+    caustica::AssetSystem::Initialize(device, nativeFS, m_descriptorTable);
+    m_textureCache = caustica::AssetSystem::Get().GetTextureLoader();
     caustica::AssetSystem::Get().EnableHotReload(true);
     // Watch the assets directory for texture/model changes
     caustica::AssetSystem::Get().WatchAssetDirectory("Assets");

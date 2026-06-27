@@ -5,6 +5,7 @@
 #include <assets/AssetRegistry.h>
 #include <assets/AssetFileWatcher.h>
 #include <assets/AssetCache.h>
+#include <assets/loader/RuntimeMeshLoader.h>
 
 #include <core/JobSystem.h>
 #include <filesystem>
@@ -16,25 +17,36 @@
 // AssetSystem — facade for the entire asset management pipeline.
 //
 // Usage:
-//   AssetSystem::Initialize(device);
+//   AssetSystem::Initialize(device, fileSystem, descriptorTable);
 //   auto texHandle = AssetSystem::Get().LoadTexture("path/to/tex.dds", true);
 //   AssetSystem::Get().Update(frameIndex);
 //   AssetSystem::Shutdown();
 // =============================================================================
 
+namespace nvrhi { class IDevice; class ICommandList; }
+
 namespace caustica
 {
 
 struct TextureData;
+struct LoadedTexture;
 class TextureLoader;
 class CommonRenderPasses;
 class ThreadPool;
+class IFileSystem;
+class DescriptorTableManager;
 
 class AssetSystem
 {
 public:
     static AssetSystem& Get();
-    static void Initialize(std::shared_ptr<TextureLoader> legacyTextureLoader = nullptr);
+    // Creates and owns the TextureLoader. Upper layers pass the GPU device, the
+    // virtual file system, and the bindless descriptor table; they never
+    // construct or own a loader directly.
+    static void Initialize(
+        nvrhi::IDevice* device,
+        std::shared_ptr<IFileSystem> fileSystem,
+        std::shared_ptr<DescriptorTableManager> descriptorTable);
     static void Shutdown();
 
     void Update(uint64_t frameIndex);
@@ -60,6 +72,40 @@ public:
     void SetTextureMemoryBudget(size_t bytes) { m_TextureMemoryBudget = bytes; }
     void EvictTexturesToBudget();
 
+    // Single entry point for texture loading. Delegates to the owned loader and
+    // records results in m_TextureCache, so callers never touch the loader
+    // directly. The sync LoadTexture() uploads to the GPU immediately; the
+    // Deferred/Async variants queue the upload for ProcessRenderingThreadCommands.
+    [[nodiscard]] std::shared_ptr<LoadedTexture> LoadTexture(
+        const std::filesystem::path& path,
+        bool sRGB,
+        CommonRenderPasses* passes = nullptr,
+        nvrhi::ICommandList* commandList = nullptr);
+    [[nodiscard]] std::shared_ptr<LoadedTexture> LoadTextureDeferred(
+        const std::filesystem::path& path,
+        bool sRGB);
+    [[nodiscard]] std::shared_ptr<LoadedTexture> LoadTextureAsync(
+        const std::filesystem::path& path,
+        bool sRGB,
+        ThreadPool& threadPool);
+
+    // The owned loader. Upper layers should prefer the LoadTexture*/FindTexture
+    // facade above; this is exposed for the import/baker pipelines that still
+    // thread a TextureLoader reference.
+    [[nodiscard]] std::shared_ptr<TextureLoader> GetTextureLoader() { return m_TextureLoader; }
+
+    // --- Runtime mesh import helpers ---
+    AssetId RegisterMesh(const std::filesystem::path& path);
+    [[nodiscard]] RuntimeMeshLoadResult LoadRuntimeMeshFile(
+        const RuntimeMeshLoadParams& params,
+        const std::filesystem::path& path);
+    [[nodiscard]] RuntimeMeshLoadResult LoadRuntimeGltfMeshFile(
+        const RuntimeMeshLoadParams& params,
+        const std::filesystem::path& path);
+    [[nodiscard]] RuntimeMeshLoadResult LoadRuntimeObjMeshFile(
+        const RuntimeMeshLoadParams& params,
+        const std::filesystem::path& path);
+
     [[nodiscard]] bool IsInitialized() const { return m_Initialized; }
 
 private:
@@ -72,7 +118,7 @@ public:
     AssetRegistry                 m_Registry;
     AssetFileWatcher              m_FileWatcher;
     AssetCache<TextureData>       m_TextureCache;
-    std::shared_ptr<TextureLoader> m_LegacyTextureLoader;
+    std::shared_ptr<TextureLoader> m_TextureLoader;
     size_t                        m_TextureMemoryBudget = 512 * 1024 * 1024;
 
     bool m_Initialized = false;

@@ -55,8 +55,6 @@ namespace caustica
     protected:
         nvrhi::DeviceHandle m_Device;
         nvrhi::CommandListHandle m_CommandList;
-        std::unordered_map<AssetId, std::shared_ptr<TextureData>, AssetId::Hash> m_LoadedTextures;
-        mutable std::shared_mutex m_LoadedTexturesMutex;
 
         std::queue<std::shared_ptr<TextureData>> m_TexturesToFinalize;
         std::shared_ptr<DescriptorTableManager> m_DescriptorTable;
@@ -157,28 +155,6 @@ namespace caustica
         uint32_t GetNumberOfFinalizedTextures() { return m_TexturesFinalized; }
 
         std::shared_ptr<TextureData> GetLoadedTexture(std::filesystem::path const& path);
-
-        // Iterator API (kept for backward compat — iterates cache by AssetId string key)
-        class Iterator
-        {
-        public:
-            using CacheMap = std::unordered_map<AssetId, std::shared_ptr<TextureData>, AssetId::Hash>;
-            typedef CacheMap::iterator CacheIter;
-
-            Iterator& operator++() { ++m_Iterator; return *this; }
-            friend bool operator==(Iterator const& a, Iterator const& b) { return a.m_Iterator == b.m_Iterator; }
-            friend bool operator!=(Iterator const& a, Iterator const& b) { return !(a == b); }
-            CacheIter const& operator->() const { return m_Iterator; }
-
-        private:
-            friend class TextureLoader;
-            Iterator(std::shared_mutex& mutex, CacheIter it) : m_Lock(mutex), m_Iterator(it) { }
-            std::shared_lock<std::shared_mutex> m_Lock;
-            CacheIter m_Iterator;
-        };
-
-        Iterator begin() { return Iterator(m_LoadedTexturesMutex, m_LoadedTextures.begin()); }
-        Iterator end()   { return Iterator(m_LoadedTexturesMutex, m_LoadedTextures.end()); }
     };
 
     // Saves the contents of texture's slice 0 mip level 0 into an image file.

@@ -17,10 +17,14 @@ AssetSystem& AssetSystem::Get()
     return *s_Instance;
 }
 
-void AssetSystem::Initialize(std::shared_ptr<TextureLoader> legacyTextureLoader)
+void AssetSystem::Initialize(
+    nvrhi::IDevice* device,
+    std::shared_ptr<IFileSystem> fileSystem,
+    std::shared_ptr<DescriptorTableManager> descriptorTable)
 {
     auto& sys = Get();
-    sys.m_LegacyTextureLoader = std::move(legacyTextureLoader);
+    sys.m_TextureLoader = std::make_shared<TextureLoader>(
+        device, std::move(fileSystem), std::move(descriptorTable));
     caustica::info("AssetSystem initialized");
 }
 
@@ -30,7 +34,7 @@ void AssetSystem::Shutdown()
     {
         s_Instance->m_FileWatcher.Clear();
         s_Instance->m_TextureCache.Clear();
-        s_Instance->m_LegacyTextureLoader.reset();
+        s_Instance->m_TextureLoader.reset();
         s_Instance.reset();
     }
 }
@@ -78,13 +82,7 @@ std::shared_ptr<TextureData> AssetSystem::FindTextureByPath(const std::filesyste
     AssetId id = m_Registry.FindByPath(path);
     if (!id.IsValid())
         return nullptr;
-    auto cached = m_TextureCache.Get(id);
-    if (cached)
-        return cached;
-    // Fall back to legacy cache
-    if (m_LegacyTextureLoader)
-        return m_LegacyTextureLoader->GetLoadedTexture(path);
-    return nullptr;
+    return m_TextureCache.Get(id);
 }
 
 void AssetSystem::EvictTexturesToBudget()
@@ -92,5 +90,75 @@ void AssetSystem::EvictTexturesToBudget()
     m_TextureCache.EvictToBudget(m_TextureMemoryBudget);
 }
 
-} // namespace caustica
+AssetId AssetSystem::RegisterMesh(const std::filesystem::path& path)
+{
+    return m_Registry.Register(path, AssetType::Mesh);
+}
 
+RuntimeMeshLoadResult AssetSystem::LoadRuntimeMeshFile(
+    const RuntimeMeshLoadParams& params,
+    const std::filesystem::path& path)
+{
+    AssetId id = RegisterMesh(path);
+    m_Registry.SetState(id, AssetState::Loading);
+
+    RuntimeMeshLoadResult result = caustica::LoadRuntimeMeshFile(params, path);
+    m_Registry.SetState(id, result ? AssetState::Loaded : AssetState::Failed);
+    return result;
+}
+
+RuntimeMeshLoadResult AssetSystem::LoadRuntimeGltfMeshFile(
+    const RuntimeMeshLoadParams& params,
+    const std::filesystem::path& path)
+{
+    AssetId id = RegisterMesh(path);
+    m_Registry.SetState(id, AssetState::Loading);
+
+    RuntimeMeshLoadResult result = caustica::LoadRuntimeGltfMeshFile(params, path);
+    m_Registry.SetState(id, result ? AssetState::Loaded : AssetState::Failed);
+    return result;
+}
+
+RuntimeMeshLoadResult AssetSystem::LoadRuntimeObjMeshFile(
+    const RuntimeMeshLoadParams& params,
+    const std::filesystem::path& path)
+{
+    AssetId id = RegisterMesh(path);
+    m_Registry.SetState(id, AssetState::Loading);
+
+    RuntimeMeshLoadResult result = caustica::LoadRuntimeObjMeshFile(params, path);
+    m_Registry.SetState(id, result ? AssetState::Loaded : AssetState::Failed);
+    return result;
+}
+
+std::shared_ptr<LoadedTexture> AssetSystem::LoadTexture(
+    const std::filesystem::path& path,
+    bool sRGB,
+    CommonRenderPasses* passes,
+    nvrhi::ICommandList* commandList)
+{
+    if (!m_TextureLoader)
+        return nullptr;
+    return m_TextureLoader->LoadTextureFromFile(path, sRGB, passes, commandList);
+}
+
+std::shared_ptr<LoadedTexture> AssetSystem::LoadTextureDeferred(
+    const std::filesystem::path& path,
+    bool sRGB)
+{
+    if (!m_TextureLoader)
+        return nullptr;
+    return m_TextureLoader->LoadTextureFromFileDeferred(path, sRGB);
+}
+
+std::shared_ptr<LoadedTexture> AssetSystem::LoadTextureAsync(
+    const std::filesystem::path& path,
+    bool sRGB,
+    ThreadPool& threadPool)
+{
+    if (!m_TextureLoader)
+        return nullptr;
+    return m_TextureLoader->LoadTextureFromFileAsync(path, sRGB, threadPool);
+}
+
+} // namespace caustica

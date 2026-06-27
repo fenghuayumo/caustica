@@ -66,6 +66,18 @@ public:
         return GetState(id) == CacheState::Loaded;
     }
 
+    // Get an asset regardless of its cache state (e.g. entries that are still
+    // being finalized on the GPU). Use Get() when the caller requires a fully
+    // loaded asset.
+    [[nodiscard]] std::shared_ptr<AssetType> GetAny(const AssetId& id)
+    {
+        std::shared_lock lock(m_Mutex);
+        auto it = m_Entries.find(id);
+        if (it != m_Entries.end())
+            return it->second.asset;
+        return nullptr;
+    }
+
     // --- Insert / Update ---
     void Insert(const AssetId& id, std::shared_ptr<AssetType> asset)
     {
