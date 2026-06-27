@@ -34,6 +34,13 @@ CameraController::CameraController()
 {
     m_view = std::make_shared<PlanarView>();
     m_viewPrevious = std::make_shared<PlanarView>();
+
+    setupDefaultCamera();
+
+    CameraUpdateParams params;
+    params.renderSize = dm::uint2(1, 1);
+    params.displayAspectRatio = 1.0f;
+    updateViews(params);
 }
 
 void CameraController::ensureViews(dm::uint2 renderSize)

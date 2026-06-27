@@ -29,7 +29,7 @@ struct alignas(64) WorkerState
     std::deque<Job>   localQueue;
     std::mutex        queueMutex;
     std::atomic<bool> wakeFlag{false};
-    bool              running = true;
+    std::atomic<bool> running{true};
 };
 
 // ==========================================================================
@@ -83,33 +83,33 @@ void Initialize(uint32_t numThreads, uint32_t reservedThreads)
     s_Workers.reserve(numThreads);
 
     for (uint32_t i = 0; i < numThreads; ++i)
+        s_Workers.push_back(std::make_unique<WorkerState>());
+
+    for (uint32_t i = 0; i < numThreads; ++i)
     {
-        auto workerPtr = std::make_unique<WorkerState>();
-        WorkerState& worker = *workerPtr;
-        s_Workers.push_back(std::move(workerPtr));
-        worker.thread = std::thread([&worker, i]()
+        WorkerState* worker = s_Workers[i].get();
+        worker->thread = std::thread([worker, i]()
         {
-            while (worker.running)
+            while (worker->running.load(std::memory_order_acquire))
             {
                 // Try to get work from the global pool or steal
                 bool didWork = false;
 
                 // Process local queue
+                Job localJob;
                 {
-                    std::lock_guard<std::mutex> lock(worker.queueMutex);
-                    if (!worker.localQueue.empty())
+                    std::lock_guard<std::mutex> lock(worker->queueMutex);
+                    if (!worker->localQueue.empty())
                     {
-                        Job job = std::move(worker.localQueue.front());
-                        worker.localQueue.pop_front();
+                        localJob = std::move(worker->localQueue.front());
+                        worker->localQueue.pop_front();
                         didWork = true;
-                        // Unlock before executing
-                        {
-                            // Release lock (via scope exit) before calling func
-                        }
-                        if (job.func)
-                            job.func();
-                        continue;
                     }
+                }
+                if (localJob.func)
+                {
+                    localJob.func();
+                    continue;
                 }
 
                 // Try work-stealing from other workers
@@ -119,17 +119,21 @@ void Initialize(uint32_t numThreads, uint32_t reservedThreads)
                     {
                         uint32_t victimIdx = (i + j + 1) % s_NumThreads;
                         WorkerState& victim = *s_Workers[victimIdx];
-                        if (&victim == &worker) continue;
+                        if (&victim == worker) continue;
 
-                        std::lock_guard<std::mutex> lock(victim.queueMutex);
-                        if (!victim.localQueue.empty())
+                        Job stolenJob;
                         {
-                            Job job = std::move(victim.localQueue.back());
-                            victim.localQueue.pop_back();
-                            // Release lock before executing
-                            didWork = true;
-                            if (job.func)
-                                job.func();
+                            std::lock_guard<std::mutex> lock(victim.queueMutex);
+                            if (!victim.localQueue.empty())
+                            {
+                                stolenJob = std::move(victim.localQueue.back());
+                                victim.localQueue.pop_back();
+                                didWork = true;
+                            }
+                        }
+                        if (stolenJob.func)
+                        {
+                            stolenJob.func();
                             break;
                         }
                     }
@@ -160,7 +164,7 @@ void Shutdown()
         return;
 
     for (auto& worker : s_Workers)
-        worker->running = false;
+        worker->running.store(false, std::memory_order_release);
 
     NotifyAll();
 
