@@ -617,46 +617,6 @@ bool EditorApplication::CheckDeviceFeatureSupport(const caustica::DeviceCreation
     return true;
 }
 
-caustica::render::PathTracingHooks EditorApplication::buildPathTracingHooks()
-{
-    return caustica::render::PathTracingHooks{
-        .needsRasterPrecompute = [] { return false; },
-        .getMaterialSpecializationShader = [this] { return m_sceneEditor.GetMaterialSpecializationShader(); },
-        .fillPTPipelineGlobalMacros = [this](auto& macros) { m_rayTracingResources.fillPTPipelineGlobalMacros(macros); },
-        .sampleRenderCode = [this](auto* framebuffer, auto commandList, auto& constants) {
-            m_rayTracingResources.sampleRenderCode(framebuffer, commandList, constants);
-        },
-        .addCustomBindings = [this](auto& desc) { m_sceneEditor.AddCustomBindings(desc); },
-        .createRTPipelines = [this] { m_rayTracingResources.createRTPipelines(); },
-        .onRenderTargetsRecreated = [this] { m_sceneEditor.OnRenderTargetsRecreated(); },
-        .prepareGaussianSplatPasses = [this] { m_gaussianSplatPasses.preparePasses(); },
-        .buildGaussianSplatEmissionProxyList = [this] { m_gaussianSplatPasses.buildEmissionProxyList(); },
-        .isGaussianSplatEmissionEnabled = [this] { return m_gaussianSplatPasses.isEmissionEnabled(); },
-        .gaussianSplatObjectsEmpty = [this] { return m_gaussianSplatPasses.objectsEmpty(); },
-        .getPrimaryGaussianSplatBinding = [this] { return m_gaussianSplatPasses.getPrimaryBinding(); },
-        .renderSceneGaussianSplats = [this](auto* commandList, auto& view, auto& targets, auto& settings, bool& renderedAny) {
-            m_gaussianSplatPasses.renderSceneGaussianSplats(commandList, view, targets, settings, renderedAny);
-        },
-        .updateViews = [this](auto* framebuffer) { m_sceneEditor.UpdateViews(framebuffer); },
-        .recreateAccelStructs = [this](auto* commandList) { m_rayTracingResources.recreateAccelStructs(commandList); },
-        .uploadSubInstanceData = [this](auto* commandList) { m_rayTracingResources.uploadSubInstanceData(commandList); },
-        .collectUncompressedTextures = [this] { m_sceneEditor.CollectUncompressedTextures(); },
-        .computeCameraJitter = [this](uint frameIndex) { return m_sceneEditor.ComputeCameraJitter(frameIndex); },
-        .consumeShaderReloadRequest = [this] { return m_rayTracingResources.consumeShaderReloadRequest(); },
-        .accelerationStructRebuildRequested = [this]() -> bool& { return m_rayTracingResources.accelerationStructRebuildRequested(); },
-        .hasActivePickRequest = [this] { return m_sceneEditor.hasActivePickRequest(); },
-        .showDeltaTree = [this] { return m_sceneEditor.showDeltaTree(); },
-        .pickMaterialRequested = [this] { return m_sceneEditor.pickMaterialRequested(); },
-        .pickInstanceRequested = [this] { return m_sceneEditor.pickInstanceRequested(); },
-        .clearPickRequests = [this] { m_sceneEditor.clearPickRequests(); },
-        .resolvePickFeedback = [this](auto& feedback) { m_sceneEditor.resolvePickFeedback(feedback); },
-        .consumeExperimentalPhotoScreenshot = [this] { return m_sceneEditor.consumeExperimentalPhotoScreenshot(); },
-        .captureScriptPreRender = [this] { m_sceneEditor.captureScriptPreRender(); },
-        .captureScriptPostRender = [this](auto saveTexture) { m_sceneEditor.captureScriptPostRender(saveTexture); },
-        .getOrCreateZoomTool = [this] { return m_sceneEditor.getOrCreateZoomTool(); },
-    };
-}
-
 caustica::render::PathTracingContext EditorApplication::buildPathTracingContext()
 {
     return caustica::render::PathTracingContext{
@@ -664,6 +624,10 @@ caustica::render::PathTracingContext EditorApplication::buildPathTracingContext(
         .sceneManager = *m_engineRenderer->sceneManager(),
         .renderCore = *m_engineRenderer->renderCore(),
         .settings = m_sceneEditor.GetPathTracerSettings(),
+        .runtimeState = m_sceneEditor.GetRenderRuntimeState(),
+        .rayTracing = m_rayTracingResources,
+        .gaussianSplats = m_gaussianSplatPasses,
+        .lighting = m_lightingPasses,
         .shaderFactory = m_engineRenderer->shaderFactoryRef(),
         .commonPasses = m_engineRenderer->commonPassesRef(),
         .bindingCache = *m_engineRenderer->bindingCache(),
@@ -685,7 +649,7 @@ caustica::render::PathTracingContext EditorApplication::buildPathTracingContext(
         .benchStart = m_sceneEditor.GetBenchStart(),
         .benchLast = m_sceneEditor.GetBenchLast(),
         .benchFrames = m_sceneEditor.GetBenchFrames(),
-        .hooks = buildPathTracingHooks(),
+        .frameExtensions = m_frameExtensions,
     };
 }
 

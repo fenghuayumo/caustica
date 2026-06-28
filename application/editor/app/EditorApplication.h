@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <vector>
 
 #include "engine/Application.h"
 #include "core/log.h"
@@ -12,7 +13,8 @@
 #include <render/SceneGaussianSplatPasses.h>
 #include <render/SceneLightingPasses.h>
 #include <render/SceneRayTracingResources.h>
-#include <render/WorldRenderer/PathTracingContext.h>
+#include "SceneEditorFrameExtension.h"
+#include <render/WorldRenderer/PathTracingFrameExtension.h>
 
 using caustica::FPSLimiter;
 constexpr static const int c_SwapchainCount = 3;
@@ -109,7 +111,6 @@ private:
         caustica::DeviceCreationParameters& deviceParams, std::string& preferredScene);
     bool InitDeviceAndWindow(const caustica::DeviceCreationParameters& deviceParams);
     bool CheckDeviceFeatureSupport(const caustica::DeviceCreationParameters& deviceParams);
-    caustica::render::PathTracingHooks buildPathTracingHooks();
     caustica::render::PathTracingContext buildPathTracingContext();
     void syncPassesToBackBuffer();
 
@@ -119,6 +120,8 @@ private:
     SceneRayTracingResources m_rayTracingResources;
     SceneGaussianSplatPasses m_gaussianSplatPasses;
     SceneEditor m_sceneEditor;
+    SceneEditorFrameExtension m_sceneEditorFrameExtension{ m_sceneEditor };
+    std::vector<caustica::render::IPathTracingFrameExtension*> m_frameExtensions{ &m_sceneEditorFrameExtension };
 
     caustica::Callback m_DefaultLogCallback = nullptr;
     FPSLimiter m_FPSLimiter;

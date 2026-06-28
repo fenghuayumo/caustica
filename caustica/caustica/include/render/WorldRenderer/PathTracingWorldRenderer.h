@@ -3,7 +3,9 @@
 #include <math/math.h>
 #include <rhi/nvrhi.h>
 
+#include <render/Core/CameraController.h>
 #include <render/WorldRenderer/PathTracingContext.h>
+#include <render/WorldRenderer/PathTracingFrameExtension.h>
 #include <shaders/PathTracer/Config.h>
 #include <shaders/SampleConstantBuffer.h>
 #include <render/Core/RenderTargets.h>
@@ -47,8 +49,7 @@ class BloomPass;
 class DLSS;
 
 // =============================================================================
-// PathTracingWorldRenderer — core GPU path-tracing pipeline.
-// Reads scene state through PathTracingContext and editor hooks.
+// PathTracingWorldRenderer — GPU path-tracing pipeline driven by PathTracingContext.
 // =============================================================================
 class PathTracingWorldRenderer
 {
@@ -127,6 +128,11 @@ public:
 
 private:
     [[nodiscard]] nvrhi::IDevice* device() const { return m_context.gpuDevice.GetDevice(); }
+
+    [[nodiscard]] CameraUpdateParams makeCameraUpdateParams() const;
+    void syncCameraViews();
+    [[nodiscard]] dm::float2 computeCameraJitter() const;
+    void dispatchFrameExtensions(PathTracingFrameEvent& event) const;
 
     void createRenderPasses(bool& exposureResetRequired, nvrhi::CommandListHandle initializeCommandList);
     void preUpdateLighting(nvrhi::CommandListHandle commandList, bool& needNewBindings);

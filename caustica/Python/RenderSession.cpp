@@ -2,7 +2,7 @@
 
 #if CAUSTICA_WITH_PYTHON
 
-#include "SceneEditor.h"
+#include "SceneEditorFrameExtension.h"
 #include <engine/EngineRenderer.h>
 #include <engine/Application.h>
 #include <render/SceneGaussianSplatPasses.h>
@@ -634,6 +634,9 @@ bool RenderSession::InitRenderer()
         *m_engineRenderer->sceneManager(),
         *m_engineRenderer->renderCore());
 
+    m_sceneEditorFrameExtension = std::make_unique<SceneEditorFrameExtension>(*m_renderer);
+    m_frameExtensions = { m_sceneEditorFrameExtension.get() };
+
     m_engineRenderer->createPathTracer(buildPathTracingContext());
     m_renderer->AttachWorldRenderer(m_engineRenderer->worldRenderer());
     m_engineRenderer->attachScenePasses(*m_deviceManager, caustica::ScenePassAttachment{
@@ -666,47 +669,6 @@ bool RenderSession::InitRenderer()
     return true;
 }
 
-caustica::render::PathTracingHooks RenderSession::buildPathTracingHooks()
-{
-    SceneEditor& editor = *m_renderer;
-    return caustica::render::PathTracingHooks{
-        .needsRasterPrecompute = [] { return false; },
-        .getMaterialSpecializationShader = [&editor] { return editor.GetMaterialSpecializationShader(); },
-        .fillPTPipelineGlobalMacros = [this](auto& macros) { m_rayTracingResources.fillPTPipelineGlobalMacros(macros); },
-        .sampleRenderCode = [this](auto* framebuffer, auto commandList, auto& constants) {
-            m_rayTracingResources.sampleRenderCode(framebuffer, commandList, constants);
-        },
-        .addCustomBindings = [&editor](auto& desc) { editor.AddCustomBindings(desc); },
-        .createRTPipelines = [this] { m_rayTracingResources.createRTPipelines(); },
-        .onRenderTargetsRecreated = [&editor] { editor.OnRenderTargetsRecreated(); },
-        .prepareGaussianSplatPasses = [this] { m_gaussianSplatPasses.preparePasses(); },
-        .buildGaussianSplatEmissionProxyList = [this] { m_gaussianSplatPasses.buildEmissionProxyList(); },
-        .isGaussianSplatEmissionEnabled = [this] { return m_gaussianSplatPasses.isEmissionEnabled(); },
-        .gaussianSplatObjectsEmpty = [this] { return m_gaussianSplatPasses.objectsEmpty(); },
-        .getPrimaryGaussianSplatBinding = [this] { return m_gaussianSplatPasses.getPrimaryBinding(); },
-        .renderSceneGaussianSplats = [this](auto* commandList, auto& view, auto& targets, auto& settings, bool& renderedAny) {
-            m_gaussianSplatPasses.renderSceneGaussianSplats(commandList, view, targets, settings, renderedAny);
-        },
-        .updateViews = [&editor](auto* framebuffer) { editor.UpdateViews(framebuffer); },
-        .recreateAccelStructs = [this](auto* commandList) { m_rayTracingResources.recreateAccelStructs(commandList); },
-        .uploadSubInstanceData = [this](auto* commandList) { m_rayTracingResources.uploadSubInstanceData(commandList); },
-        .collectUncompressedTextures = [&editor] { editor.CollectUncompressedTextures(); },
-        .computeCameraJitter = [&editor](uint frameIndex) { return editor.ComputeCameraJitter(frameIndex); },
-        .consumeShaderReloadRequest = [this] { return m_rayTracingResources.consumeShaderReloadRequest(); },
-        .accelerationStructRebuildRequested = [this]() -> bool& { return m_rayTracingResources.accelerationStructRebuildRequested(); },
-        .hasActivePickRequest = [&editor] { return editor.hasActivePickRequest(); },
-        .showDeltaTree = [&editor] { return editor.showDeltaTree(); },
-        .pickMaterialRequested = [&editor] { return editor.pickMaterialRequested(); },
-        .pickInstanceRequested = [&editor] { return editor.pickInstanceRequested(); },
-        .clearPickRequests = [&editor] { editor.clearPickRequests(); },
-        .resolvePickFeedback = [&editor](auto& feedback) { editor.resolvePickFeedback(feedback); },
-        .consumeExperimentalPhotoScreenshot = [&editor] { return editor.consumeExperimentalPhotoScreenshot(); },
-        .captureScriptPreRender = [&editor] { editor.captureScriptPreRender(); },
-        .captureScriptPostRender = [&editor](auto saveTexture) { editor.captureScriptPostRender(saveTexture); },
-        .getOrCreateZoomTool = [&editor] { return editor.getOrCreateZoomTool(); },
-    };
-}
-
 caustica::render::PathTracingContext RenderSession::buildPathTracingContext()
 {
     SceneEditor& editor = *m_renderer;
@@ -715,6 +677,10 @@ caustica::render::PathTracingContext RenderSession::buildPathTracingContext()
         .sceneManager = *m_engineRenderer->sceneManager(),
         .renderCore = *m_engineRenderer->renderCore(),
         .settings = editor.GetPathTracerSettings(),
+        .runtimeState = editor.GetRenderRuntimeState(),
+        .rayTracing = m_rayTracingResources,
+        .gaussianSplats = m_gaussianSplatPasses,
+        .lighting = m_lightingPasses,
         .shaderFactory = m_engineRenderer->shaderFactoryRef(),
         .commonPasses = m_engineRenderer->commonPassesRef(),
         .bindingCache = *m_engineRenderer->bindingCache(),
@@ -736,7 +702,7 @@ caustica::render::PathTracingContext RenderSession::buildPathTracingContext()
         .benchStart = editor.GetBenchStart(),
         .benchLast = editor.GetBenchLast(),
         .benchFrames = editor.GetBenchFrames(),
-        .hooks = buildPathTracingHooks(),
+        .frameExtensions = m_frameExtensions,
     };
 }
 
@@ -746,6 +712,8 @@ void RenderSession::Shutdown()
         m_deviceManager->setFrameDriver(nullptr);
 
     m_renderer.reset();
+    m_sceneEditorFrameExtension.reset();
+    m_frameExtensions.clear();
     m_engineRenderer.reset();
     m_AppLoop.reset();
 

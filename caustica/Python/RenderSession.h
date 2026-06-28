@@ -28,7 +28,7 @@
 #include <render/SceneGaussianSplatPasses.h>
 #include <render/SceneLightingPasses.h>
 #include <render/SceneRayTracingResources.h>
-#include <render/WorldRenderer/PathTracingContext.h>
+#include <render/WorldRenderer/PathTracingFrameExtension.h>
 
 #include <core/command_line.h>
 #include <EditorUI.h>
@@ -47,6 +47,7 @@ class GpuDevice;
 namespace caustica::editor
 {
 class SceneEditor;
+class SceneEditorFrameExtension;
 struct SampleUIData;
 }
 
@@ -128,7 +129,6 @@ public:
 private:
     bool InitDevice();
     bool InitRenderer();
-    caustica::render::PathTracingHooks buildPathTracingHooks();
     caustica::render::PathTracingContext buildPathTracingContext();
     void Shutdown();
 
@@ -143,6 +143,8 @@ private:
     std::unique_ptr<caustica::Application>         m_AppLoop;
     std::unique_ptr<caustica::EngineRenderer>   m_engineRenderer;
     std::unique_ptr<caustica::editor::SceneEditor>             m_renderer;
+    std::unique_ptr<caustica::editor::SceneEditorFrameExtension> m_sceneEditorFrameExtension;
+    std::vector<caustica::render::IPathTracingFrameExtension*> m_frameExtensions;
 #if CAUSTICA_WITH_DX12 && defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
     Microsoft::WRL::ComPtr<ID3D12DeviceFactory>     m_d3d12DeviceFactory;
 #endif

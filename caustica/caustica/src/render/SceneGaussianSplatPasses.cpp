@@ -453,7 +453,7 @@ caustica::render::GaussianSplatBinding SceneGaussianSplatPasses::getPrimaryBindi
     caustica::render::GaussianSplatBinding binding;
     if (const auto* object = primaryObject())
     {
-        binding.pass = object->pass.get();
+        binding.splatPass = object->pass.get();
         binding.objectToWorld = objectToWorld(*object);
     }
     return binding;

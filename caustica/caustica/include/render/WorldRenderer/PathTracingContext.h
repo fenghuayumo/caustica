@@ -1,11 +1,6 @@
 #pragma once
 
 #include <math/math.h>
-#include <rhi/nvrhi.h>
-#include <shaders/SampleConstantBuffer.h>
-#include <shaders/PathTracer/PathTracerDebug.hlsli>
-
-#include <functional>
 #include <render/Core/PathTracerSettings.h>
 #include <render/Core/RenderCore.h>
 #include <render/Passes/Gaussian/GaussianSplatEmissionProxy.h>
@@ -13,85 +8,61 @@
 #include <render/Passes/Lighting/LightsBaker.h>
 #include <render/Passes/Lighting/MaterialsBaker.h>
 #include <render/Passes/OMM/OmmBaker.h>
+#include <render/RenderRuntimeState.h>
+#include <render/WorldRenderer/PathTracingFrameExtension.h>
 #include <assets/loader/TextureLoader.h>
 #include <render/Core/DescriptorTableManager.h>
 #include <scene/SceneManager.h>
 
 #include <chrono>
 #include <memory>
+#include <span>
 #include <string>
 #include <vector>
 
 #include <backend/GpuDevice.h>
-#include <scene/View.h>
 
-class GaussianSplatPass;
-class RenderTargets;
 class ComputePipelineBaker;
-struct GaussianSplatRenderSettings;
+class GaussianSplatPass;
 struct EnvMapSceneParams;
-class ZoomTool;
 
 namespace caustica
 {
 class BindingCache;
 class CommonRenderPasses;
 class Light;
-class Scene;
 class ShaderFactory;
-} // namespace caustica
 
-namespace caustica::render
+namespace editor
+{
+class SceneGaussianSplatPasses;
+class SceneLightingPasses;
+class SceneRayTracingResources;
+} // namespace editor
+
+namespace render
 {
 
 struct GaussianSplatBinding
 {
-    const GaussianSplatPass* pass = nullptr;
+    const GaussianSplatPass* splatPass = nullptr;
     dm::float4x4             objectToWorld = dm::float4x4::identity();
 };
 
-// Editor / host callbacks wired once at init.
-struct PathTracingHooks
-{
-    std::function<bool()>                                         needsRasterPrecompute;
-    std::function<std::string()>                                  getMaterialSpecializationShader;
-    std::function<void(std::vector<caustica::ShaderMacro>&)>      fillPTPipelineGlobalMacros;
-    std::function<void(nvrhi::IFramebuffer*, nvrhi::CommandListHandle, const SampleConstants&)> sampleRenderCode;
-    std::function<void(nvrhi::BindingSetDesc&)>                   addCustomBindings;
-    std::function<void()>                                         createRTPipelines;
-    std::function<void()>                                         onRenderTargetsRecreated;
-    std::function<void()>                                         prepareGaussianSplatPasses;
-    std::function<void()>                                         buildGaussianSplatEmissionProxyList;
-    std::function<bool()>                                         isGaussianSplatEmissionEnabled;
-    std::function<bool()>                                         gaussianSplatObjectsEmpty;
-    std::function<GaussianSplatBinding()>                         getPrimaryGaussianSplatBinding;
-    std::function<void(nvrhi::ICommandList*, const caustica::PlanarView&, RenderTargets&, const GaussianSplatRenderSettings&, bool&)> renderSceneGaussianSplats;
-    std::function<void(nvrhi::IFramebuffer*)>                     updateViews;
-    std::function<void(nvrhi::ICommandList*)>                     recreateAccelStructs;
-    std::function<void(nvrhi::ICommandList*)>                     uploadSubInstanceData;
-    std::function<void()>                                         collectUncompressedTextures;
-    std::function<dm::float2(uint)>                               computeCameraJitter;
-    std::function<bool()>                                         consumeShaderReloadRequest;
-    std::function<bool&()>                                        accelerationStructRebuildRequested;
-    std::function<bool()>                                         hasActivePickRequest;
-    std::function<bool()>                                         showDeltaTree;
-    std::function<bool()>                                         pickMaterialRequested;
-    std::function<bool()>                                         pickInstanceRequested;
-    std::function<void()>                                         clearPickRequests;
-    std::function<void(const DebugFeedbackStruct&)>               resolvePickFeedback;
-    std::function<bool()>                                         consumeExperimentalPhotoScreenshot;
-    std::function<void()>                                         captureScriptPreRender;
-    std::function<void(std::function<bool(const char*)>)>         captureScriptPostRender;
-    std::function<ZoomTool*()>                                    getOrCreateZoomTool;
-};
-
-// Live references consumed by PathTracingWorldRenderer for one frame loop.
+// References wired once when the path tracer is created. The world renderer reads
+// these every frame; scene passes are invoked directly. Optional editor tooling
+// plugs in through frameExtensions at named pipeline phases.
 struct PathTracingContext
 {
     GpuDevice& gpuDevice;
     SceneManager& sceneManager;
     RenderCore& renderCore;
     PathTracerSettings& settings;
+    RenderRuntimeState& runtimeState;
+
+    editor::SceneRayTracingResources& rayTracing;
+    editor::SceneGaussianSplatPasses& gaussianSplats;
+    editor::SceneLightingPasses& lighting;
 
     std::shared_ptr<ShaderFactory>& shaderFactory;
     std::shared_ptr<CommonRenderPasses>& commonPasses;
@@ -105,7 +76,7 @@ struct PathTracingContext
     std::shared_ptr<OmmBaker>& ommBaker;
     std::shared_ptr<ComputePipelineBaker>& computePipelineBaker;
 
-    std::vector<std::shared_ptr<caustica::Light>>& lights;
+    std::vector<std::shared_ptr<Light>>& lights;
     EnvMapSceneParams& envMapSceneParams;
     std::string& envMapLocalPath;
     std::string& envMapOverride;
@@ -120,7 +91,8 @@ struct PathTracingContext
     std::chrono::high_resolution_clock::time_point& benchLast;
     int& benchFrames;
 
-    PathTracingHooks hooks;
+    std::span<IPathTracingFrameExtension* const> frameExtensions = {};
 };
 
-} // namespace caustica::render
+} // namespace render
+} // namespace caustica
