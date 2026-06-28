@@ -333,50 +333,6 @@ endif()
 caustica_compile_shaders(${nrd_shader_compile_args})
 
 ##########################################################################
-########################### Opacity Micro-Map SDK ########################
-##########################################################################
-
-option(OMM_INTEGRATION_LAYER_NVRHI "" ON)
-option(OMM_ENABLE_PRECOMPILED_SHADERS_DXIL "" OFF)
-option(OMM_ENABLE_PRECOMPILED_SHADERS_SPIRV "" OFF)
-option(OMM_ENABLE_BENCHMARK "" OFF)
-option(OMM_ENABLE_TESTS "" OFF)
-option(OMM_BUILD_VIEWER "" OFF)
-
-set(OMM_PROJECT_FOLDER "Omm")
-add_subdirectory("Omm")
-
-# Let CMake generate the omm_shaders.cfg file 
-util_generate_shader_config_file(
-    "Omm.cfg" 
-    "Omm/libraries/omm-lib/shaders"
-    "-D COMPILER_DXC=1"
-)
-
-# Compile all shaders in omm.cfg
-set(omm_shader_compile_args
-    TARGET omm_shaders
-    CONFIG ${CMAKE_CURRENT_SOURCE_DIR}/Omm.cfg
-    SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/Omm/libraries/omm-lib/include
-    FOLDER "Opacity Micro-Map SDK"
-    SPIRV_DXC ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderPrecompiled/omm/spirv
-)
-if (WIN32)
-    list(APPEND omm_shader_compile_args
-        DXIL ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderPrecompiled/omm/dxil
-    )
-endif()
-caustica_compile_shaders(${omm_shader_compile_args})
-
-##########################################################################
-################################ RTXDI SDK ###############################
-##########################################################################
-
-set(RTXDI_SKIP_SHADER_VALIDATION ON CACHE STRING "Skip RTXDI shader validation")
-
-add_subdirectory("Rtxdi")
-
-##########################################################################
 ################################ cxxopts ###############################
 ##########################################################################
 

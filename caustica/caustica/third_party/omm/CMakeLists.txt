@@ -1,0 +1,27 @@
+set(OMM_LIB_TARGET_NAME omm-lib)
+set(OMM_PROJECT_FOLDER "caustica/third_party")
+
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/libraries/omm-lib/src/version.h" omm_ver_h)
+string(REGEX MATCH "VERSION_MAJOR ([0-9]*)" _ ${omm_ver_h})
+set(OMM_VERSION_MAJOR ${CMAKE_MATCH_1})
+string(REGEX MATCH "VERSION_MINOR ([0-9]*)" _ ${omm_ver_h})
+set(OMM_VERSION_MINOR ${CMAKE_MATCH_1})
+string(REGEX MATCH "VERSION_BUILD ([0-9]*)" _ ${omm_ver_h})
+set(OMM_VERSION_PATCH ${CMAKE_MATCH_1})
+set(PROJECT_VERSION "${OMM_VERSION_MAJOR}.${OMM_VERSION_MINOR}.${OMM_VERSION_PATCH}")
+
+option(OMM_INTEGRATION_LAYER_NVRHI "" ON)
+option(OMM_ENABLE_PRECOMPILED_SHADERS_DXIL "" OFF)
+option(OMM_ENABLE_PRECOMPILED_SHADERS_SPIRV "" OFF)
+option(OMM_ENABLE_BENCHMARK "" OFF)
+option(OMM_ENABLE_TESTS "" OFF)
+option(OMM_BUILD_VIEWER "" OFF)
+set(OMM_STATIC_LIBRARY ON CACHE BOOL "" FORCE)
+set(OMM_LIB_INSTALL OFF CACHE BOOL "" FORCE)
+
+add_subdirectory(external)
+add_subdirectory(libraries/omm-lib)
+
+if (OMM_INTEGRATION_LAYER_NVRHI)
+    add_subdirectory(libraries/omm-gpu-nvrhi)
+endif()

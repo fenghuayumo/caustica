@@ -13,7 +13,7 @@
 #include <render/Passes/Denoisers/NrdConfig.h>
 
 #if CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
-#include "../../external/RtxTf/STFDefinitions.h"
+#include <Rtxtf/STFDefinitions.h>
 #endif
 
 #if CAUSTICA_WITH_STREAMLINE

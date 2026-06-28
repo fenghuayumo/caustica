@@ -45,9 +45,10 @@ set(CAUSTICA_COMMON_INCLUDE_PUBLIC
 
 set(CAUSTICA_COMMON_INCLUDE_PRIVATE
     "${CMAKE_SOURCE_DIR}/External/Nrd/Include"
-    "${CMAKE_SOURCE_DIR}/External/Rtxdi/Include"
-    "${CMAKE_SOURCE_DIR}/External/Omm/libraries/omm-gpu-nvrhi"
-    "${CMAKE_SOURCE_DIR}/External/Omm/libraries/omm-lib/include"
+    "${CMAKE_CURRENT_SOURCE_DIR}/third_party"
+    "${CMAKE_CURRENT_SOURCE_DIR}/third_party/rtxdi/Include"
+    "${CMAKE_CURRENT_SOURCE_DIR}/third_party/omm/libraries/omm-gpu-nvrhi"
+    "${CMAKE_CURRENT_SOURCE_DIR}/third_party/omm/libraries/omm-lib/include"
 )
 
 set(CAUSTICA_COMMON_COMPILE_DEFS
@@ -60,7 +61,6 @@ set(CAUSTICA_COMMON_COMPILE_DEFS
     CAUSTICA_WITH_DLSS=$<BOOL:${CAUSTICA_WITH_DLSS}>
 )
 
-# Helper: apply common settings to a STATIC library target
 function(caus_configure_static TARGET_NAME)
     target_include_directories(${TARGET_NAME}
         PUBLIC  ${CAUSTICA_COMMON_INCLUDE_PUBLIC}
@@ -77,7 +77,6 @@ function(caus_configure_static TARGET_NAME)
     set_target_properties(${TARGET_NAME} PROPERTIES FOLDER "causticaLib/modules")
 endfunction()
 
-# Helper: apply common settings to an INTERFACE library target
 function(caus_configure_interface TARGET_NAME)
     target_include_directories(${TARGET_NAME}
         INTERFACE ${CAUSTICA_COMMON_INCLUDE_PUBLIC}
@@ -89,6 +88,12 @@ function(caus_configure_interface TARGET_NAME)
     endif()
     set_target_properties(${TARGET_NAME} PROPERTIES FOLDER "causticaLib/modules")
 endfunction()
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Third-party render libraries (RTXDI, OMM — vendored in-engine)
+# ═══════════════════════════════════════════════════════════════════════════
+
+add_subdirectory(third_party)
 
 # ═══════════════════════════════════════════════════════════════════════════
 # FOUNDATION LAYER — no dependencies on other caustica modules
@@ -427,3 +432,25 @@ endif()
 if (CAUSTICA_WITH_STATIC_SHADERS)
     target_include_directories(causRender PRIVATE "${CAUSTICA_ENGINE_STATIC_SHADERS_DIR}")
 endif()
+
+# OMM runtime shader compilation (shaders live under third_party/omm)
+util_generate_shader_config_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/omm.cfg"
+    "third_party/omm/libraries/omm-lib/shaders"
+    "-D COMPILER_DXC=1"
+)
+
+set(omm_shader_compile_args
+    TARGET omm_shaders
+    CONFIG ${CMAKE_CURRENT_SOURCE_DIR}/omm.cfg
+    SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/third_party/omm/libraries/omm-lib/include
+    FOLDER "caustica/third_party"
+    SPIRV_DXC ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderPrecompiled/omm/spirv
+)
+if (WIN32)
+    list(APPEND omm_shader_compile_args
+        DXIL ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderPrecompiled/omm/dxil
+    )
+endif()
+caustica_compile_shaders(${omm_shader_compile_args})
+add_dependencies(causRender omm_shaders)

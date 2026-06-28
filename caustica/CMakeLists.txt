@@ -76,7 +76,7 @@ set(caustica_shader_compile_common
     TARGET caustica_shaders
     SOURCES ${shaders}
     FOLDER ${folder}
-    INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/caustica ${CMAKE_SOURCE_DIR}/External/Nrd/Shaders/Include ${CMAKE_SOURCE_DIR}/External/Rtxdi/Include ${CMAKE_SOURCE_DIR}/External
+    INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/caustica ${CMAKE_SOURCE_DIR}/External/Nrd/Shaders/Include ${CMAKE_CURRENT_SOURCE_DIR}/caustica/third_party ${CMAKE_CURRENT_SOURCE_DIR}/caustica/third_party/rtxdi/Include ${CMAKE_SOURCE_DIR}/External
     SHADERMAKE_OPTIONS ${shadermake_options}
 )
 if (WIN32)
