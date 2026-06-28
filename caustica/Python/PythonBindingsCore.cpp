@@ -10,7 +10,7 @@
 #include <nanobind/operators.h>
 
 #include "SceneEditor.h"
-#include <SampleUI.h>
+#include <EditorUI.h>
 #include <scene/Scene.h>
 #include <render/Passes/Lighting/MaterialsBaker.h>
 #include <render/Passes/Lighting/LightsBaker.h>

@@ -1,6 +1,6 @@
 #include "LocalConfig.h"
 
-#include <SampleUI.h>
+#include <EditorUI.h>
 #include "SceneEditor.h"
 
 namespace caustica::editor

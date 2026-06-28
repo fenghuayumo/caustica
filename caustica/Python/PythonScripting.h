@@ -49,7 +49,7 @@ public:
     void ProcessPendingScripts();
 
     // Returns the most recent stdout/stderr output captured from Python.
-    // Cleared each time the UI consumes it, see SampleUI for usage.
+    // Cleared each time the UI consumes it, see EditorUI for usage.
     std::string ConsumeOutputLog();
 
     // Test helper - synchronously execute a string and return success.

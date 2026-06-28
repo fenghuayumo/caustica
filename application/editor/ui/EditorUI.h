@@ -46,11 +46,11 @@ class SceneEditor;
 class ImGuiManager;
 class EditorApplication;
 
-class SampleUI : public caustica::ImGui_Renderer
+class EditorUI : public caustica::ImGui_Renderer
 {
 public:
-    SampleUI(caustica::GpuDevice* deviceManager, EditorApplication& editor, SampleUIData& ui, bool NVAPI_SERSupported, const CommandLineOptions& cmdLine);
-    virtual ~SampleUI();
+    EditorUI(caustica::GpuDevice* deviceManager, EditorApplication& editor, SampleUIData& ui, bool NVAPI_SERSupported, const CommandLineOptions& cmdLine);
+    virtual ~EditorUI();
 protected:
     virtual void buildUI(void) override;
 private:

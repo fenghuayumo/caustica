@@ -26,7 +26,7 @@ constexpr static const int c_SwapchainCount = 3;
 
 // Forward declarations — full definitions only needed in .cpp
 namespace caustica::editor {
-class SampleUI;
+class EditorUI;
 }
 class SceneManager;
 namespace caustica {
@@ -143,7 +143,7 @@ private:
     std::unique_ptr<caustica::RenderCore>      m_renderCore;
     std::unique_ptr<SceneManager>              m_sceneManager;
     std::unique_ptr<caustica::render::PathTracingWorldRenderer> m_worldRenderer;
-    std::unique_ptr<SampleUI> m_uiPass;
+    std::unique_ptr<EditorUI> m_uiPass;
 
 #if CAUSTICA_ENABLE_VIDEO_MEMORY_INFO && defined(_WIN32)
     Microsoft::WRL::ComPtr<IDXGIAdapter3> m_d3dAdapter;

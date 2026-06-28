@@ -15,7 +15,7 @@
 #include <nanobind/stl/optional.h>
 
 #include "SceneEditor.h"
-#include <SampleUI.h>
+#include <EditorUI.h>
 
 #include <scene/Scene.h>
 #include <math/box.h>

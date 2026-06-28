@@ -23,8 +23,8 @@ class SampleUIData;
 // =============================================================================
 // ImGuiManager — ImGui lifecycle helper: fonts, context config, input setup.
 //
-// Extracted from SampleUI constructor.  Handles ImGui initialization concerns
-// so SampleUI can focus on panel definitions.
+// Extracted from EditorUI constructor.  Handles ImGui initialization concerns
+// so EditorUI can focus on panel definitions.
 // =============================================================================
 class ImGuiManager
 {

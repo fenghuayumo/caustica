@@ -1,7 +1,7 @@
 #pragma once
 
 #include <shaders/PathTracer/Config.h>
-//#include <SampleUI.h>
+//#include <EditorUI.h>
 
 #include <scene/camera/Camera.h>
 #include <scene/Scene.h>

@@ -10,7 +10,7 @@
 #include <nanobind/stl/string.h>
 
 #include "SceneEditor.h"
-#include <SampleUI.h>
+#include <EditorUI.h>
 
 #include <stdexcept>
 

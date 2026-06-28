@@ -2,7 +2,7 @@
 
 #include <shaders/PathTracer/Config.h>
 //#include "../common/SampleCommon.h"
-#include <SampleUI.h>
+#include <EditorUI.h>
 
 // #include <core/vfs/VFS.h>
 #include <scene/camera/Camera.h>

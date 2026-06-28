@@ -2,7 +2,7 @@
 #include "CaptureScriptManager.h"
 
 #include <string>
-#include <SampleUI.h>
+#include <EditorUI.h>
 #include "SceneEditor.h"
 #include <core/file_utils.h>
 #include <core/format.h>

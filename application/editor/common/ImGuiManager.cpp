@@ -4,7 +4,7 @@
 #include <core/vfs/VFS.h>
 #include <imgui.h>
 
-#include "SampleUI.h"
+#include "EditorUI.h"
 #include <core/file_utils.h>
 #include <core/format.h>
 #include <core/path_utils.h>

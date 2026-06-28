@@ -610,7 +610,7 @@ void InitializeSampleUIDataFromCommandLine(SampleUIData& ui, const CommandLineOp
     ui.EnableBloom &= !cmdLine.DisablePostProcessFilters;
 }
 
-SampleUI::SampleUI(GpuDevice* deviceManager, EditorApplication& editor, SampleUIData& ui, bool NVAPI_SERSupported, const CommandLineOptions& cmdLine)
+EditorUI::EditorUI(GpuDevice* deviceManager, EditorApplication& editor, SampleUIData& ui, bool NVAPI_SERSupported, const CommandLineOptions& cmdLine)
         : ImGui_Renderer(deviceManager)
         , m_app(editor)
         , m_sceneEditor(editor.GetSceneEditor())
@@ -638,14 +638,14 @@ SampleUI::SampleUI(GpuDevice* deviceManager, EditorApplication& editor, SampleUI
 #endif
 }
 
-SampleUI::~SampleUI()
+EditorUI::~EditorUI()
 {
 #if ENABLE_DEBUG_DELTA_TREE_VIZUALISATION
     ImNodes::Ez::FreeContext(m_ImNodesContext);
 #endif
 }
 
-bool SampleUI::MousePosUpdate(double xpos, double ypos)
+bool EditorUI::MousePosUpdate(double xpos, double ypos)
 {
     (void)xpos; (void)ypos;
     return false;
@@ -677,7 +677,7 @@ std::string TrimSkyDisplayName(std::string text)
     return "unknown";
 }
 
-void SampleUI::Animate(float elapsedTimeSeconds)
+void EditorUI::Animate(float elapsedTimeSeconds)
 {
     caustica::ImGui_Renderer::Animate(elapsedTimeSeconds);
 
@@ -718,7 +718,7 @@ SI::DLSSMode DLSSModeUI(SI::DLSSMode dlssModeCurrent)
 }
 #endif
 
-bool SampleUI::BuildUIScriptsAndEtc(void)
+bool EditorUI::BuildUIScriptsAndEtc(void)
 {
     bool scriptsActive = false;
     if (m_sceneEditor.GetCaptureScriptManager()->ScriptProgressUI())
@@ -730,7 +730,7 @@ bool SampleUI::BuildUIScriptsAndEtc(void)
     return scriptsActive;
 }
 
-void SampleUI::BuildUIResolutionPicker()
+void EditorUI::BuildUIResolutionPicker()
 {
     if (!ImGui::BeginPopupModal("Resolution Picker", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
         return;
@@ -779,7 +779,7 @@ void SampleUI::BuildUIResolutionPicker()
     ImGui::EndPopup();
 }
 
-void SampleUI::BuildUIPerformancePresets()
+void EditorUI::BuildUIPerformancePresets()
 {
     if (!ImGui::BeginPopupModal("Performance Preset", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
         return;
@@ -805,7 +805,7 @@ void SampleUI::BuildUIPerformancePresets()
     ImGui::EndPopup();
 }
 
-void SampleUI::DLSSFGSelectorUI()
+void EditorUI::DLSSFGSelectorUI()
 {
 #if !CAUSTICA_WITH_STREAMLINE
     return;
@@ -842,7 +842,7 @@ void SampleUI::DLSSFGSelectorUI()
 
 
 
-void SampleUI::buildUI(void)
+void EditorUI::buildUI(void)
 {
     if (!m_ui.ShowUI)
         return;
@@ -2823,7 +2823,7 @@ void SampleUI::buildUI(void)
     // ImGui::ShowDemoWindow();
 }
 
-void SampleUI::buildDeltaTreeViz()
+void EditorUI::buildDeltaTreeViz()
 {
 #if ENABLE_DEBUG_DELTA_TREE_VIZUALISATION
     // make tiny scaling
@@ -3131,7 +3131,7 @@ void TogglableNode::SetSelected(bool selected)
 }
 
 #if CAUSTICA_WITH_PYTHON
-void SampleUI::BuildPythonScriptingUI(float indent)
+void EditorUI::BuildPythonScriptingUI(float indent)
 {
     auto& scripting = m_sceneEditor.GetPythonScripting();
     if (!scripting)

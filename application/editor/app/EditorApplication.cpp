@@ -13,7 +13,7 @@
 #include <cctype>
 #include <string>
 #include <render/Passes/Debug/Korgi.h>
-#include <SampleUI.h>
+#include <EditorUI.h>
 #include "common/LocalConfig.h"
 #include <assets/loader/ShaderPackFileSystem.h>
 
@@ -267,7 +267,7 @@ EditorApplication::StartupResult EditorApplication::startup(int argc, const char
     // Optionally create the UP render pass. This exposes run time parameter controls.
     if (!CmdLine.noWindow)
     {
-        m_uiPass = std::make_unique<SampleUI>(m_GpuDevice.get(), *this, sampleUIData, IsSERSupported(), CmdLine);
+        m_uiPass = std::make_unique<EditorUI>(m_GpuDevice.get(), *this, sampleUIData, IsSERSupported(), CmdLine);
         m_uiPass->Init(m_ShaderFactory);
         syncPassesToBackBuffer();
     }

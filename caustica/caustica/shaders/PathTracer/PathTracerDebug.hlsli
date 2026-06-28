@@ -11,7 +11,7 @@
 #endif
 #include "Utils/Utils.hlsli"
 
-// when editing don't forget to edit the UI in SampleUI.cpp (...ImGui::Combo( "Debug view"...)
+// when editing don't forget to edit the UI in EditorUI.cpp (...ImGui::Combo( "Debug view"...)
 enum class DebugViewType : int
 {
     Disabled,
