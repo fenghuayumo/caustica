@@ -3,7 +3,7 @@
 #include <math/math.h>
 #include <rhi/nvrhi.h>
 
-#include <render/WorldRenderer/WorldRendererServices.h>
+#include <render/WorldRenderer/PathTracingContext.h>
 #include <shaders/PathTracer/Config.h>
 #include <shaders/SampleConstantBuffer.h>
 #include <render/Core/RenderTargets.h>
@@ -47,13 +47,13 @@ class BloomPass;
 class DLSS;
 
 // =============================================================================
-// PathTracingWorldRenderer — engine core GPU path-tracing pipeline (DIVSHOT DeferedRenderer role).
-// Owned by EditorApplication; reads scene state via WorldRendererServices + pipeline hooks.
+// PathTracingWorldRenderer — core GPU path-tracing pipeline.
+// Reads scene state through PathTracingContext and editor hooks.
 // =============================================================================
 class PathTracingWorldRenderer
 {
 public:
-    PathTracingWorldRenderer(WorldRendererServices& services);
+    PathTracingWorldRenderer(PathTracingContext& context);
     ~PathTracingWorldRenderer();
 
     static nvrhi::BindingLayoutHandle CreateBindlessLayout(nvrhi::IDevice* device);
@@ -126,7 +126,7 @@ public:
 #endif
 
 private:
-    [[nodiscard]] nvrhi::IDevice* device() const { return m_services.gpuDevice.GetDevice(); }
+    [[nodiscard]] nvrhi::IDevice* device() const { return m_context.gpuDevice.GetDevice(); }
 
     void createRenderPasses(bool& exposureResetRequired, nvrhi::CommandListHandle initializeCommandList);
     void preUpdateLighting(nvrhi::CommandListHandle commandList, bool& needNewBindings);
@@ -148,7 +148,7 @@ private:
     bool evaluateNativeDLSS(bool reset);
 #endif
 
-    WorldRendererServices&          m_services;
+    PathTracingContext&          m_context;
 
     std::unique_ptr<RtxdiPass>                  m_rtxdiPass;
     std::unique_ptr<RenderTargets>              m_renderTargets;

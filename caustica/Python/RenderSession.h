@@ -1,6 +1,6 @@
 // RenderSession is the offline / extension-mode counterpart to EditorApplication.
 // Where EditorApplication drives a blocking GLFW message loop, RenderSession
-// initialises the same GpuDevice + AdvancedPathTracer pipeline but lets
+// initialises the same GpuDevice + EngineRenderer pipeline but lets
 // Python step frames manually and dump the framebuffer to disk.
 //
 // Usage from C++:
@@ -24,14 +24,11 @@
 #include <cstdint>
 
 #include <math/math.h>
-#include <scene/SceneManager.h>
-#include <render/Core/RenderCore.h>
 #include <platform/window.h>
-#include <render/Core/CommonRenderPasses.h>
-#include <render/Core/BindingCache.h>
-#include <render/Core/DescriptorTableManager.h>
-#include <render/WorldRenderer/WorldRendererServices.h>
-#include <assets/loader/TextureLoader.h>
+#include <render/SceneGaussianSplatPasses.h>
+#include <render/SceneLightingPasses.h>
+#include <render/SceneRayTracingResources.h>
+#include <render/WorldRenderer/PathTracingContext.h>
 
 #include <core/command_line.h>
 #include <EditorUI.h>
@@ -40,8 +37,12 @@
 #include <wrl/client.h>
 #endif
 
-namespace caustica { class ShaderFactory; }
-namespace caustica::render { class PathTracingWorldRenderer; }
+namespace caustica
+{
+class Application;
+class EngineRenderer;
+class GpuDevice;
+}
 
 namespace caustica::editor
 {
@@ -127,29 +128,21 @@ public:
 private:
     bool InitDevice();
     bool InitRenderer();
-    void initRenderInfrastructurePhase1();
-    void initRenderInfrastructurePhase2(nvrhi::IBindingLayout* bindlessLayout);
-    caustica::render::WorldRendererServices buildWorldRendererServices();
-    void initWorldRenderer(nvrhi::IBindingLayout* bindlessLayout);
-    void initSceneServices();
+    caustica::render::PathTracingHooks buildPathTracingHooks();
+    caustica::render::PathTracingContext buildPathTracingContext();
     void Shutdown();
 
     Config                                          m_config;
     CommandLineOptions                              m_cmdLine;
     caustica::editor::SampleUIData                    m_sampleUIData;
+    caustica::editor::SceneLightingPasses           m_lightingPasses;
+    caustica::editor::SceneRayTracingResources      m_rayTracingResources;
+    caustica::editor::SceneGaussianSplatPasses      m_gaussianSplatPasses;
     std::unique_ptr<caustica::GpuDevice>      m_deviceManager;
     std::unique_ptr<caustica::Window>            m_Window;
     std::unique_ptr<caustica::Application>         m_AppLoop;
-    std::shared_ptr<caustica::ShaderFactory>   m_shaderFactory;
-    std::shared_ptr<caustica::CommonRenderPasses> m_commonPasses;
-    std::unique_ptr<caustica::BindingCache> m_bindingCache;
-    std::shared_ptr<caustica::DescriptorTableManager> m_descriptorTable;
-    std::shared_ptr<caustica::TextureLoader> m_textureCache;
-    std::unique_ptr<caustica::render::WorldRendererServices> m_worldRendererServices;
-    std::unique_ptr<caustica::RenderCore>      m_renderCore;
-    std::unique_ptr<SceneManager>            m_sceneManager;
+    std::unique_ptr<caustica::EngineRenderer>   m_engineRenderer;
     std::unique_ptr<caustica::editor::SceneEditor>             m_renderer;
-    std::unique_ptr<caustica::render::PathTracingWorldRenderer> m_worldRenderer;
 #if CAUSTICA_WITH_DX12 && defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
     Microsoft::WRL::ComPtr<ID3D12DeviceFactory>     m_d3d12DeviceFactory;
 #endif

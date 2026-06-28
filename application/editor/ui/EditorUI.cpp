@@ -849,30 +849,20 @@ void EditorUI::buildUI(void)
 
     RAII_SCOPE( ImGui::PushFont(m_defaultFont->GetScaledFont());, ImGui::PopFont(); );
 
-    // Ideally we'd want to rework UI scaling so that it is not based on m_currentScale but on ImGui::GetFontSize() so we can freely change fonts
     auto& io = ImGui::GetIO();
-    float scaledWidth = io.DisplaySize.x; 
-    float scaledHeight = io.DisplaySize.y;
-
-    const float defWindowWidth = 335.0f * m_currentScale;
-    const float defItemWidth = defWindowWidth * 0.3f * m_currentScale;
-
-    auto imGuiCheckboxUInt32 = [ & ](const char* label, uint32_t* v)
-    {
-        bool pv = (*v) != 0;
-        bool ret = ImGui::Checkbox(label, &pv);
-        *v = pv ? (1) : (0);
-        return ret;
-    };
+    PanelLayout layout;
+    layout.scaledWidth = io.DisplaySize.x;
+    layout.scaledHeight = io.DisplaySize.y;
+    layout.defWindowWidth = 335.0f * m_currentScale;
+    layout.defItemWidth = layout.defWindowWidth * 0.3f * m_currentScale;
+    layout.indent = (int)ImGui::GetStyle().IndentSpacing * 0.4f;
 
     {
         ImGui::SetNextWindowPos(ImVec2(10.f, 10.f), ImGuiCond_Appearing);
-        ImGui::SetNextWindowSize(ImVec2(defWindowWidth, scaledHeight - 20), ImGuiCond_Appearing);
+        ImGui::SetNextWindowSize(ImVec2(layout.defWindowWidth, layout.scaledHeight - 20), ImGuiCond_Appearing);
 
         RAII_SCOPE( ImGui::Begin("Settings", 0, ImGuiWindowFlags_None /*AlwaysAutoResize*/); , ImGui::End(); );
-        RAII_SCOPE( ImGui::PushItemWidth(defItemWidth); , ImGui::PopItemWidth(); );
-            
-        const float indent = (int)ImGui::GetStyle().IndentSpacing*0.4f;
+        RAII_SCOPE( ImGui::PushItemWidth(layout.defItemWidth); , ImGui::PopItemWidth(); );
 
         ImGui::Text("%s, %s", GetGpuDevice()->GetRendererString(), m_sceneEditor.GetResolutionInfo().c_str() );
         ImGui::Text("%s", m_sceneEditor.GetFPSInfo().c_str());
@@ -882,9 +872,49 @@ void EditorUI::buildUI(void)
             return;
         }
 
+        BuildDisplayPerformancePanel(layout);
+        BuildSystemPanel(layout);
+        BuildSceneComboPanel(layout);
+        BuildScenePanel(layout);
+        BuildSampleGamePanel(layout);
+        BuildCameraPanel(layout);
+        BuildLightingPanel(layout);
+        BuildPathTracerPanel(layout);
+        BuildStochasticTextureFilteringPanel(layout);
+        BuildDLSSReflexPanel(layout);
+        BuildTAAPanel(layout);
+        BuildRTXDIPanel(layout);
+        BuildStablePlanesPanel(layout);
+        BuildStandaloneDenoiserPanel(layout);
+        BuildOpacityMicroMapsPanel(layout);
+        BuildAccelerationStructurePanel(layout);
+        BuildPostProcessPanel(layout);
+        BuildDebuggingPanel(layout);
+        BuildQuickToneMappingBar(layout);
+    }
+
+    BuildInspectorPanel(layout);
+    BuildMaterialEditorPanel(layout);
+    BuildDeltaTreeExplorerPanel(layout);
+    BuildSceneWidgetsPanel(layout);
+    BuildHierarchyPanel(layout);
+    BuildGameStandalonePanel(layout);
+}
+
+
+bool EditorUI::CheckboxUInt32(const char* label, uint32_t* v)
+{
+    bool pv = (*v) != 0;
+    bool ret = ImGui::Checkbox(label, &pv);
+    *v = pv ? (1) : (0);
+    return ret;
+}
+
+void EditorUI::BuildDisplayPerformancePanel(const PanelLayout& layout)
+{
         if (ImGui::CollapsingHeader("Display and performance")) //, ImGuiTreeNodeFlags_DefaultOpen))
         {
-            RAII_SCOPE(ImGui::Indent(indent);, ImGui::Unindent(indent); );
+            RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
             
             {
                 if (ImGui::Button(StringFormat("Resolution:  %dx%d (click to change)", m_sceneEditor.GetDisplaySize().x, m_sceneEditor.GetDisplaySize().y, m_sceneEditor.GetRenderSize().x, m_sceneEditor.GetRenderSize().y).c_str(), { -1, 0 }))
@@ -925,9 +955,14 @@ void EditorUI::buildUI(void)
 
         }
 
+
+}
+
+void EditorUI::BuildSystemPanel(const PanelLayout& layout)
+{
         if (ImGui::CollapsingHeader("System")) //, ImGuiTreeNodeFlags_DefaultOpen))
         {
-            RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent); );
+            RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
             if (ImGui::Button("Reload Shaders (requires VS .hlsl->.bin build)"))
                 m_ui.Invalidation.ShaderReloadRequested = true;
 
@@ -937,20 +972,20 @@ void EditorUI::buildUI(void)
         
         
             {
-                //RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent););
+                //RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent););
 
                 if (ImGui::CollapsingHeader("Capture scripts and tools"))
                 {
-                    RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent); );
+                    RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
 
-                    m_sceneEditor.GetCaptureScriptManager()->ScriptMainUI(warnColor, categoryColor, indent, m_currentScale);
+                    m_sceneEditor.GetCaptureScriptManager()->ScriptMainUI(warnColor, categoryColor, layout.indent, m_currentScale);
                 }
 
 #if CAUSTICA_WITH_PYTHON
                 if (ImGui::CollapsingHeader("Python scripting"))
                 {
-                    RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent); );
-                    BuildPythonScriptingUI(indent);
+                    RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
+                    BuildPythonScriptingUI(layout.indent);
                 }
 #endif
             }
@@ -962,7 +997,7 @@ void EditorUI::buildUI(void)
                 {
                     ImGui::TextColored(categoryColor, "QueryVideoMemoryInfo:");
                     budget /= 1024*1024; currentUsage /= 1024*1024, availableForReservation /= 1024*1024, currentReservation /= 1024*1024;
-                    RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent););
+                    RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent););
                     ImGui::Text("Budget:             %7" PRIu64 "MB", budget );
                     ImGui::Text("CurrentUsage:       %7" PRIu64 "MB", currentUsage);
                     ImGui::Text("AvailableForRes.:   %7" PRIu64 "MB", availableForReservation);
@@ -971,6 +1006,11 @@ void EditorUI::buildUI(void)
             }
         }
 
+
+}
+
+void EditorUI::BuildSceneComboPanel(const PanelLayout& layout)
+{
         {
             const std::string currentScene = m_sceneEditor.GetCurrentSceneName();
             RAII_SCOPE(ImGui::PushItemWidth(-60.0f * m_currentScale); , ImGui::PopItemWidth(); );
@@ -990,9 +1030,14 @@ void EditorUI::buildUI(void)
             }
         }
 
+
+}
+
+void EditorUI::BuildScenePanel(const PanelLayout& layout)
+{
         if (ImGui::CollapsingHeader("Scene"/*, ImGuiTreeNodeFlags_DefaultOpen*/))
         {
-            RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent); );
+            RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
             uint uncompressedTextureCount = (uint)m_sceneEditor.GetUncompressedTextures().size();
             if (uncompressedTextureCount > 0)
             {
@@ -1020,8 +1065,8 @@ void EditorUI::buildUI(void)
             {
                 if (ImGui::CollapsingHeader("Interactive elements"/*, ImGuiTreeNodeFlags_DefaultOpen*/))
                 {
-                    RAII_SCOPE(ImGui::Indent(indent);, ImGui::Unindent(indent); );
-                    m_sceneEditor.GetGame()->DebugGUI(indent);
+                    RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
+                    m_sceneEditor.GetGame()->DebugGUI(layout.indent);
                 }
             }
 
@@ -1041,7 +1086,7 @@ void EditorUI::buildUI(void)
 
             if (m_ui.GaussianSplats.SplatCount > 0 && ImGui::CollapsingHeader("3D Gaussian Splats"))
             {
-                RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent); );
+                RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
 
                 RESET_ON_CHANGE(ImGui::Checkbox("Mesh Depth Test", &m_ui.GaussianSplatDepthTest));
                 GaussianSplatModeCombo(m_ui);
@@ -1049,7 +1094,7 @@ void EditorUI::buildUI(void)
 
                 if (ImGui::CollapsingHeader("Rasterization", ImGuiTreeNodeFlags_DefaultOpen))
                 {
-                    RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent); );
+                    RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
 
                     RESET_ON_CHANGE(GaussianSplatSortingCombo(m_ui));
                     RESET_ON_CHANGE(ImGui::Checkbox("Mip splatting antialiasing", &m_ui.GaussianSplatMipAntialiasing));
@@ -1073,7 +1118,7 @@ void EditorUI::buildUI(void)
 
                 if (ImGui::CollapsingHeader("Emission", ImGuiTreeNodeFlags_DefaultOpen))
                 {
-                    RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent); );
+                    RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
 
                     RESET_ON_CHANGE(ImGui::Checkbox("As Emitter", &m_ui.GaussianSplatAsEmitter));
                     ImGui::BeginDisabled(!m_ui.GaussianSplatAsEmitter);
@@ -1089,7 +1134,7 @@ void EditorUI::buildUI(void)
                 if (ResolveGaussianSplatShadowMode(m_ui) != GAUSSIAN_SPLAT_SHADOWS_DISABLED
                     && ImGui::CollapsingHeader("Ray Tracing", ImGuiTreeNodeFlags_DefaultOpen))
                 {
-                    RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent); );
+                    RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
 
                     bool asChanged = false;
                     asChanged |= GaussianSplatRtxKernelDegreeCombo(m_ui);
@@ -1114,7 +1159,7 @@ void EditorUI::buildUI(void)
 
             if (ImGui::CollapsingHeader("Environment Map"))
             {
-                RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent); );
+                RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
 
                 RESET_ON_CHANGE(ImGui::Checkbox("Enabled", &m_ui.EnvironmentMapParams.Enabled));
                 RESET_ON_CHANGE(ImGui::Checkbox("Visible to Camera", &m_ui.EnvironmentMapParams.VisibleToCamera));
@@ -1175,31 +1220,41 @@ void EditorUI::buildUI(void)
                     envMapBaker != nullptr && envMapBaker->IsProcedural() && envMapBaker->GetProceduralSky() != nullptr)
                 {
                     ImGui::TextColored(categoryColor, "Procedural Sky settings:");
-                    RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent););
-                    envMapBaker->GetProceduralSky()->DebugGUI(indent);
+                    RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent););
+                    envMapBaker->GetProceduralSky()->DebugGUI(layout.indent);
                 }
             }
 
             if (ImGui::CollapsingHeader("Materials"))
             {
-                RAII_SCOPE( ImGui::Indent(indent);, ImGui::Unindent(indent); );
+                RAII_SCOPE( ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
                 if (auto& materialsBaker = m_sceneEditor.GetLightingPasses().materialsBaker(); materialsBaker != nullptr)
-                    materialsBaker->DebugGUI(indent);
+                    materialsBaker->DebugGUI(layout.indent);
             }
         }
 
+
+}
+
+void EditorUI::BuildSampleGamePanel(const PanelLayout& layout)
+{
         if (m_sceneEditor.GetGame() && m_sceneEditor.GetGame()->IsInitialized())
         {
             if (ImGui::CollapsingHeader("Sample Game"/*, ImGuiTreeNodeFlags_DefaultOpen*/))
             {
-                RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent); );
-                m_sceneEditor.GetGame()->DebugGUI(indent);
+                RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
+                m_sceneEditor.GetGame()->DebugGUI(layout.indent);
             }
         }
 
+
+}
+
+void EditorUI::BuildCameraPanel(const PanelLayout& layout)
+{
         if (ImGui::CollapsingHeader("Camera", 0/*ImGuiTreeNodeFlags_DefaultOpen*/))
         {
-            RAII_SCOPE(ImGui::Indent(indent);, ImGui::Unindent(indent); );
+            RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
             std::vector<std::string> options; options.push_back("Free flight");
             for (uint i = 0; i < m_sceneEditor.GetSceneCameraCount(); i++)
                 options.push_back("Scene cam " + std::to_string(i));
@@ -1221,7 +1276,7 @@ void EditorUI::buildUI(void)
             if (currentlySelected == 0)
             {
                 ImGui::Text("Camera position: "); 
-                RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent); );
+                RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
                 if (ImGui::Button("Save to file", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) m_sceneEditor.SaveCurrentCamera(); ImGui::SameLine();
                 if (ImGui::Button("Load from file", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) m_sceneEditor.LoadCurrentCamera();
                 if (ImGui::Button("Save to clipboard", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) ImGui::SetClipboardText(m_sceneEditor.GetCurrentCameraPosDirUp().c_str()); ImGui::SameLine();
@@ -1250,9 +1305,14 @@ void EditorUI::buildUI(void)
     #endif
         }
 
+
+}
+
+void EditorUI::BuildLightingPanel(const PanelLayout& layout)
+{
         if (ImGui::CollapsingHeader("Light pre-processing and sampling", 0/*ImGuiTreeNodeFlags_DefaultOpen*/))
         {
-            RAII_SCOPE(ImGui::Indent(indent);, ImGui::Unindent(indent););
+            RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent););
 
             if (!m_ui.UseNEE )
                 ImGui::TextColored(warnColor, "NOTE: NEE inactive (enable in `Path Tracer -> Next Event Estimation` settings).");
@@ -1260,26 +1320,26 @@ void EditorUI::buildUI(void)
             ImGui::TextColored(categoryColor, "Info and statistics:");
 
             {
-                RAII_SCOPE(ImGui::Indent(indent);, ImGui::Unindent(indent););
+                RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent););
                 if (auto& lightsBaker = m_sceneEditor.GetLightingPasses().lightsBaker(); lightsBaker != nullptr)
-                    m_ui.ResetAccumulation |= lightsBaker->InfoGUI(indent);
+                    m_ui.ResetAccumulation |= lightsBaker->InfoGUI(layout.indent);
             }
 
 
             //ImGui::TextColored(categoryColor, "Distant lighting (envmap+directional):");
             {
-                RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent););
+                RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent););
                 if (ImGui::CollapsingHeader("Distant lighting (envmap+directional)", 0/*ImGuiTreeNodeFlags_DefaultOpen*/))
                 {
-                    RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent););
+                    RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent););
                     if (auto& envMapBaker = m_sceneEditor.GetLightingPasses().envMapBaker(); envMapBaker != nullptr)
-                        m_ui.ResetAccumulation |= envMapBaker->DebugGUI(indent);
+                        m_ui.ResetAccumulation |= envMapBaker->DebugGUI(layout.indent);
                 }
             }
 
             ImGui::TextColored(categoryColor, "Importance sampling:");
             {
-                RAII_SCOPE(ImGui::Indent(indent);, ImGui::Unindent(indent););
+                RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent););
                 if (auto& lightsBaker = m_sceneEditor.GetLightingPasses().lightsBaker(); lightsBaker != nullptr)
                 {
                     if( m_ui.NEEType != 2 )
@@ -1290,7 +1350,7 @@ void EditorUI::buildUI(void)
                     {
                         ImGui::TextColored(categoryColor, "NEE-AT settings:");
                         {
-                            RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent););
+                            RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent););
 
                             RESET_ON_CHANGE(ImGui::SliderFloat("Global feedback weight", &m_ui.NEEAT_GlobalTemporalFeedbackWeight, 0.0f, 0.95f));
                             if (ImGui::IsItemHovered()) ImGui::SetTooltip("How much to rely on last frame's usage statistic as opposed to simple power based sampling.\nSome power based sampling is essential to allow new lights to be considered.");
@@ -1314,17 +1374,22 @@ void EditorUI::buildUI(void)
                 
                     ImGui::TextColored(categoryColor, "Debugging:");
                     {
-                        RAII_SCOPE(ImGui::Indent(indent);, ImGui::Unindent(indent););
+                        RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent););
                         if (auto& lightsBaker = m_sceneEditor.GetLightingPasses().lightsBaker(); lightsBaker != nullptr)
-                            m_ui.ResetAccumulation |= lightsBaker->DebugGUI(indent);
+                            m_ui.ResetAccumulation |= lightsBaker->DebugGUI(layout.indent);
                     }
                 }
             }
         }
 
+
+}
+
+void EditorUI::BuildPathTracerPanel(const PanelLayout& layout)
+{
         if (ImGui::CollapsingHeader("Path Tracer", ImGuiTreeNodeFlags_DefaultOpen))
         {
-            RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent); );
+            RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
 
             int modeIndex = (m_ui.RealtimeMode)?(1):(0);
             if (ImGui::Combo("Mode", &modeIndex, "Reference\0Realtime\0\0"))
@@ -1335,7 +1400,7 @@ void EditorUI::buildUI(void)
 
             ImGui::TextColored(categoryColor, "Setup:");
             {   
-                RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent); );
+                RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
             
                 if (m_ui.RealtimeMode)
                 {
@@ -1384,7 +1449,7 @@ void EditorUI::buildUI(void)
                     if (ImGui::IsItemHovered()) ImGui::SetTooltip("Enable smart firefly filter that clamps max radiance based on probability heuristic.");
                     if (m_ui.RealtimeFireflyFilterEnabled)
                     {
-                        RAII_SCOPE(ImGui::Indent(indent);, ImGui::Unindent(indent); );
+                        RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
                         RESET_ON_CHANGE( ImGui::InputFloat("FF Threshold", &m_ui.RealtimeFireflyFilterThreshold, 0.01f, 0.1f, "%.5f") );
                         m_ui.RealtimeFireflyFilterThreshold = dm::clamp(m_ui.RealtimeFireflyFilterThreshold, 0.00001f, 1000.0f);
                         if (ImGui::IsItemHovered()) ImGui::SetTooltip("Better light importance sampling allows for setting higher firefly filter threshold and conversely.");
@@ -1399,7 +1464,7 @@ void EditorUI::buildUI(void)
                     if (ImGui::IsItemHovered()) ImGui::SetTooltip("Enable smart firefly filter that clamps max radiance based on probability heuristic.\n* when both tonemapping autoexposure and firefly filter are enabled\nin reference mode, results are no longer deterministic!");
                     if (m_ui.ReferenceFireflyFilterEnabled)
                     {
-                        RAII_SCOPE(ImGui::Indent(indent);, ImGui::Unindent(indent); );
+                        RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
                         RESET_ON_CHANGE( ImGui::InputFloat("FF Threshold", &m_ui.ReferenceFireflyFilterThreshold, 0.1f, 0.2f, "%.5f") );
                         m_ui.ReferenceFireflyFilterThreshold = dm::clamp(m_ui.ReferenceFireflyFilterThreshold, 0.01f, 1000.0f);
                     }
@@ -1416,7 +1481,7 @@ void EditorUI::buildUI(void)
 
             ImGui::TextColored(categoryColor, "Post processing:");
             {
-                RAII_SCOPE(ImGui::Indent(indent);, ImGui::Unindent(indent); );
+                RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
 
                 if (m_ui.RealtimeMode)
                 {
@@ -1462,7 +1527,7 @@ void EditorUI::buildUI(void)
 #if CAUSTICA_WITH_ANY_DLSS
                     if (m_ui.RealtimeAA == 2 || m_ui.RealtimeAA == 3)
                     {
-                        RAII_SCOPE(ImGui::Indent(indent); ImGui::PushID("PPDLSSQual");,  ImGui::Unindent(indent); ImGui::PopID(););
+                        RAII_SCOPE(ImGui::Indent(layout.indent); ImGui::PushID("PPDLSSQual");,  ImGui::Unindent(layout.indent); ImGui::PopID(););
                         m_ui.DLSSMode = DLSSModeUI(m_ui.DLSSMode);
                     }
 #endif
@@ -1482,7 +1547,7 @@ void EditorUI::buildUI(void)
                     if (ImGui::IsItemHovered()) ImGui::SetTooltip("Runs Intel Open Image Denoise once after the Reference accumulation target is reached.\nThe denoised HDR result is reused until accumulation is reset.");
 
                     {
-                        RAII_SCOPE(ImGui::Indent(indent);, ImGui::Unindent(indent););
+                        RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent););
                         UI_SCOPED_DISABLE(!m_ui.ReferenceOIDNDenoiser);
 
                         oidnChanged |= ImGui::Checkbox("Use GPU", &m_ui.ReferenceOIDNUseGPU);
@@ -1493,7 +1558,7 @@ void EditorUI::buildUI(void)
                     }
 
                     {
-                        RAII_SCOPE(ImGui::Indent(indent);, ImGui::Unindent(indent););
+                        RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent););
                         UI_SCOPED_DISABLE(!m_ui.ReferenceOIDNDenoiser);
 
                         oidnChanged |= ImGui::Combo("Passes", &m_ui.ReferenceOIDNPasses, "Color Only\0Albedo\0Albedo + Normal\0\0");
@@ -1536,7 +1601,7 @@ void EditorUI::buildUI(void)
 
             ImGui::TextColored(categoryColor, "Light sampling:");
             {
-                RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent); );
+                RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
 
                 if (m_ui.RealtimeMode)
                 {
@@ -1579,7 +1644,7 @@ void EditorUI::buildUI(void)
                     }
                     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip("ReSTIR PT and ReSTIR GI are mutually exclusive.\nReSTIR PT is currently not tuned to work well with DLSS-RR\nUse middle mouse button to enable anyway");
 
-                    ImGui::PushItemWidth(defItemWidth);
+                    ImGui::PushItemWidth(layout.defItemWidth);
                     if (ImGui::Combo("ReSTIR DI/GI Preset", (int*)&m_ui.RTXDIRestirPreset,
                         "(Custom)\0Fast\0Medium\0Unbiased\0Ultra\0Reference\0\0"))
                     {
@@ -1600,7 +1665,7 @@ void EditorUI::buildUI(void)
                 {
                     ImGui::TextColored(categoryColor, "NEE settings: ");
                     {
-                        RAII_SCOPE(ImGui::Indent(indent);, ImGui::Unindent(indent); );
+                        RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
                         RESET_ON_CHANGE(ImGui::Combo("Sampling technique", (int*)&m_ui.NEEType, "Uniform\0Power+\0NEE-AT\0\0"));
                         m_ui.NEEType = dm::clamp(m_ui.NEEType, 0, 2);
                         if (ImGui::IsItemHovered()) ImGui::SetTooltip("Light importance sampling technique to use for NEE.\nNote: Additional NEE-AT settings are exposed in 'Lighting -> NEE-AT' UI section.");
@@ -1651,7 +1716,7 @@ void EditorUI::buildUI(void)
                         if (ImGui::IsItemHovered()) ImGui::SetTooltip("If disabled, traditional TraceRay path is used.\nIf enabled, TraceRayInline->MakeHit->ReorderThread->InvokeHit approach is used!");
                         if (m_ui.NVAPIHitObjectExtension)
                         {
-                            RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent); );
+                            RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
                             ImGui::Checkbox("NVAPI ReorderThreads", &m_ui.NVAPIReorderThreads);
                             if (ImGui::IsItemHovered()) ImGui::SetTooltip("This enables/disables the actual ReorderThread call in the shader.");
                         }
@@ -1670,7 +1735,7 @@ void EditorUI::buildUI(void)
                         RESET_ON_CHANGE(ImGui::Checkbox("dx::HitObject codepath", &m_ui.DXHitObjectExtension));
                         if (m_ui.DXHitObjectExtension)
                         {
-                            RAII_SCOPE(ImGui::Indent(indent);, ImGui::Unindent(indent); );
+                            RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
                             RESET_ON_CHANGE(ImGui::Checkbox("dx::MaybeReorderThreads ", &m_ui.DXMaybeReorderThreads));
                         }
                         if (m_ui.DXHitObjectExtension)
@@ -1684,47 +1749,53 @@ void EditorUI::buildUI(void)
                 }
             }
         }
+}
 
-    #if CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
-        if (ImGui::CollapsingHeader("Stochastic Texture Filtering"))
+void EditorUI::BuildStochasticTextureFilteringPanel(const PanelLayout& layout)
+{
+#if CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
+    if (ImGui::CollapsingHeader("Stochastic Texture Filtering"))
+    {
+        bool changed = false;
+        changed = ImGui::Combo("Magnification Method", (int*)&m_ui.STFMagnificationMethod,
+            "Default\0"
+            "Quad2x2\0"
+            "Fine2x2\0"
+            "FineTemporal2x2\0"
+            "FineAlu3x3\0"
+            "FineLut3x3\0"
+            "Fine4x4\0"
+        );
+        if (changed)
         {
-            bool changed = false;
-            changed = ImGui::Combo("Magnification Method", (int*)&m_ui.STFMagnificationMethod,
-                "Default\0"
-                "Quad2x2\0"
-                "Fine2x2\0"
-                "FineTemporal2x2\0"
-                "FineAlu3x3\0"
-                "FineLut3x3\0"
-                "Fine4x4\0"
-            );
-            if (changed)
-            {
-                caustica::debug("Magnification Method ", static_cast<int>(m_ui.STFMagnificationMethod));
-            }
-
-            changed = ImGui::Combo("Filter Type", (int*)&m_ui.STFFilterMode,
-                "Point\0"
-                "Linear\0"
-                "Cubic\0"
-                "Gaussian\0"
-            );
-            if (changed)
-            {
-                caustica::debug("Filter Type ", static_cast<int>(m_ui.STFFilterMode));
-            }
-
-            ImGui::BeginDisabled(m_ui.STFFilterMode != StfFilterMode::Gaussian);
-            ImGui::SliderFloat("Sigma", &m_ui.STFGaussianSigma, 0.f, 100.f, "%.3f", ImGuiSliderFlags_Logarithmic);
-            ImGui::EndDisabled();   // m_ui.STFFilterMode
+            caustica::debug("Magnification Method ", static_cast<int>(m_ui.STFMagnificationMethod));
         }
-    #endif // CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
 
+        changed = ImGui::Combo("Filter Type", (int*)&m_ui.STFFilterMode,
+            "Point\0"
+            "Linear\0"
+            "Cubic\0"
+            "Gaussian\0"
+        );
+        if (changed)
+        {
+            caustica::debug("Filter Type ", static_cast<int>(m_ui.STFFilterMode));
+        }
+
+        ImGui::BeginDisabled(m_ui.STFFilterMode != StfFilterMode::Gaussian);
+        ImGui::SliderFloat("Sigma", &m_ui.STFGaussianSigma, 0.f, 100.f, "%.3f", ImGuiSliderFlags_Logarithmic);
+        ImGui::EndDisabled();   // m_ui.STFFilterMode
+    }
+#endif
+}
+
+void EditorUI::BuildDLSSReflexPanel(const PanelLayout& layout)
+{
         if (m_ui.RealtimeMode && m_ui.RealtimeAA > 1 && ImGui::CollapsingHeader("DLSS & Reflex settings"))
         {
             ImGui::TextColored(categoryColor, "Anti-aliasing and super-resolution");
             {
-                RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent); );
+                RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
 
 #if CAUSTICA_WITH_ANY_DLSS
                 if (m_ui.RealtimeAA == 2 || m_ui.RealtimeAA == 3)
@@ -1749,7 +1820,7 @@ void EditorUI::buildUI(void)
 
             }
 
-            RAII_SCOPE(ImGui::Indent(indent);, ImGui::Unindent(indent); );
+            RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
 
             if (ImGui::CollapsingHeader("Reflex", 0))
             {
@@ -1785,7 +1856,7 @@ void EditorUI::buildUI(void)
                     ImGui::Checkbox("Show Stats Report", &m_ui.ReflexShowStats);
                     if (m_ui.ReflexShowStats)
                     {
-                        RAII_SCOPE(ImGui::Indent(indent);, ImGui::Unindent(indent); );
+                        RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
                         ImGui::Text(m_ui.ReflexStats.c_str());
                     }
 
@@ -1815,6 +1886,11 @@ void EditorUI::buildUI(void)
             }
         }
 
+
+}
+
+void EditorUI::BuildTAAPanel(const PanelLayout& layout)
+{
         if( m_ui.RealtimeMode && m_ui.RealtimeAA == 1 && ImGui::CollapsingHeader("TAA settings") )
         {
             ImGui::Checkbox("TAA History Clamping", &m_ui.TemporalAntiAliasingParams.enableHistoryClamping);
@@ -1823,6 +1899,11 @@ void EditorUI::buildUI(void)
             ImGui::Combo("AA Camera Jitter", (int*)&m_ui.TemporalAntiAliasingJitter, "MSAA\0Halton\0R2\0White Noise\0");
         }
 
+
+}
+
+void EditorUI::BuildRTXDIPanel(const PanelLayout& layout)
+{
         if ( (m_ui.ActualUseReSTIRDI() || m_ui.ActualUseReSTIRGI() || m_ui.ActualUseReSTIRPT()) && ImGui::CollapsingHeader("RTXDI Settings") )
         {
 #define RTXDI_RESTIR_RESET_ON_CHANGE(code) do { if (code) { m_ui.ResetAccumulation = true; m_ui.RTXDIRestirPreset = RTXDIRestirQualityPreset::Custom; } } while(false)
@@ -1830,11 +1911,11 @@ void EditorUI::buildUI(void)
 
             ImGui::TextColored(categoryColor, "ReGIR");
             {
-                RAII_SCOPE(ImGui::Indent(indent);, ImGui::Unindent(indent); );
+                RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
 
                 if (m_ui.ActualUseReSTIRDI())
                 {
-		            ImGui::PushItemWidth(defItemWidth);
+		            ImGui::PushItemWidth(layout.defItemWidth);
        
 		            RTXDI_RESTIR_RESET_ON_CHANGE(ImGui::InputInt("Number of Build Samples", (int*)&m_ui.RTXDI.regir.regirDynamicParameters.regirNumBuildSamples));
 		            m_ui.RTXDI.regir.regirDynamicParameters.regirNumBuildSamples = dm::clamp(m_ui.RTXDI.regir.regirDynamicParameters.regirNumBuildSamples, 0u, 128u);
@@ -1849,10 +1930,10 @@ void EditorUI::buildUI(void)
 
             ImGui::TextColored(categoryColor, "ReSTIR DI");
             {
-                RAII_SCOPE(ImGui::Indent(indent);, ImGui::Unindent(indent); );
+                RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
                 if( m_ui.ActualUseReSTIRDI() )
                 {
-                    ImGui::PushItemWidth(defItemWidth);
+                    ImGui::PushItemWidth(layout.defItemWidth);
 
                     RTXDI_RESTIR_RESET_ON_CHANGE(ImGui::Combo("Resampling Mode", (int*)&m_ui.RTXDI.restirDI.resamplingMode,
                         "Disabled\0Temporal\0Spatial\0Temporal & Spatial\0Fused\0\0"));
@@ -1874,12 +1955,12 @@ void EditorUI::buildUI(void)
         
                     ImGui::PopItemWidth();
 
-                    ImGui::PushItemWidth(defItemWidth*0.8f);
+                    ImGui::PushItemWidth(layout.defItemWidth*0.8f);
             
                     ImGui::Text("Number of Primary Samples: ");
 
                     {
-                        RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent); );
+                        RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
 
                         RTXDI_RESTIR_RESET_ON_CHANGE(ImGui::InputInt("ReGir", (int*)&m_ui.RTXDI.regir.regirDynamicParameters.regirNumBuildSamples));
                         m_ui.RTXDI.regir.regirDynamicParameters.regirNumBuildSamples = dm::clamp(m_ui.RTXDI.regir.regirDynamicParameters.regirNumBuildSamples, 0u, 32u);
@@ -1892,26 +1973,26 @@ void EditorUI::buildUI(void)
                         RTXDI_RESTIR_RESET_ON_CHANGE(ImGui::InputInt("Environment Light", (int*)&m_ui.RTXDI.restirDI.initialSamplingParams.numPrimaryEnvironmentSamples));
 		                m_ui.RTXDI.restirDI.initialSamplingParams.numPrimaryEnvironmentSamples = dm::clamp(m_ui.RTXDI.restirDI.initialSamplingParams.numPrimaryEnvironmentSamples, 0u, 32u);
                     }
-                    RTXDI_RESTIR_RESET_ON_CHANGE(imGuiCheckboxUInt32("Initial visibility test", &m_ui.RTXDI.restirDI.initialSamplingParams.enableInitialVisibility));
+                    RTXDI_RESTIR_RESET_ON_CHANGE(CheckboxUInt32("Initial visibility test", &m_ui.RTXDI.restirDI.initialSamplingParams.enableInitialVisibility));
     
                     if (ImGui::CollapsingHeader("Fine Tuning"))
                     {
-                        RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent); );
-                        ImGui::PushItemWidth(defItemWidth);
+                        RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
+                        ImGui::PushItemWidth(layout.defItemWidth);
                         RTXDI_RESTIR_RESET_ON_CHANGE(ImGui::SliderFloat("BRDF Cut-off", &m_ui.RTXDI.restirDI.initialSamplingParams.brdfCutoff, 0.0f, 1.0f));
                         ImGui::Separator();
-                        RTXDI_RESTIR_RESET_ON_CHANGE(imGuiCheckboxUInt32("Use Permutation Sampling", &m_ui.RTXDI.restirDI.temporalResamplingParams.enablePermutationSampling));
+                        RTXDI_RESTIR_RESET_ON_CHANGE(CheckboxUInt32("Use Permutation Sampling", &m_ui.RTXDI.restirDI.temporalResamplingParams.enablePermutationSampling));
                         RTXDI_RESTIR_RESET_ON_CHANGE(ImGui::SliderFloat("Temporal Depth Threshold", &m_ui.RTXDI.restirDI.temporalResamplingParams.temporalDepthThreshold, 0.f, 1.f));
                         RTXDI_RESTIR_RESET_ON_CHANGE(ImGui::SliderFloat("Temporal Normal Threshold", &m_ui.RTXDI.restirDI.temporalResamplingParams.temporalNormalThreshold, 0.f, 1.f));
 			            RTXDI_RESTIR_RESET_ON_CHANGE(ImGui::SliderFloat("Boiling Filter Strength", &m_ui.RTXDI.restirDI.temporalResamplingParams.boilingFilterStrength, 0.f, 1.f));
-                        RTXDI_RESTIR_RESET_ON_CHANGE(imGuiCheckboxUInt32("Discard Invisible Temporal Samples", &m_ui.RTXDI.restirDI.temporalResamplingParams.discardInvisibleSamples));
+                        RTXDI_RESTIR_RESET_ON_CHANGE(CheckboxUInt32("Discard Invisible Temporal Samples", &m_ui.RTXDI.restirDI.temporalResamplingParams.discardInvisibleSamples));
                         ImGui::Separator();
                         RTXDI_RESTIR_RESET_ON_CHANGE(ImGui::SliderInt("Spatial Samples", (int*)&m_ui.RTXDI.restirDI.spatialResamplingParams.numSpatialSamples, 0, 8));
 			            RTXDI_RESTIR_RESET_ON_CHANGE(ImGui::SliderInt("Disocclusion Samples", (int*)&m_ui.RTXDI.restirDI.spatialResamplingParams.numDisocclusionBoostSamples, 0, 8));
                         RTXDI_RESTIR_RESET_ON_CHANGE(ImGui::SliderFloat("Spatial Sampling Radius", &m_ui.RTXDI.restirDI.spatialResamplingParams.spatialSamplingRadius, 0.f, 64.f));
                         RTXDI_RESTIR_RESET_ON_CHANGE(ImGui::SliderFloat("Spatial Depth Threshold", &m_ui.RTXDI.restirDI.spatialResamplingParams.spatialDepthThreshold, 0.f, 1.f));
                         RTXDI_RESTIR_RESET_ON_CHANGE(ImGui::SliderFloat("Spatial Normal Threshold", &m_ui.RTXDI.restirDI.spatialResamplingParams.spatialNormalThreshold, 0.f, 1.f));
-			            RTXDI_RESTIR_RESET_ON_CHANGE(imGuiCheckboxUInt32("Discount Naive Samples", &m_ui.RTXDI.restirDI.spatialResamplingParams.discountNaiveSamples));
+			            RTXDI_RESTIR_RESET_ON_CHANGE(CheckboxUInt32("Discount Naive Samples", &m_ui.RTXDI.restirDI.spatialResamplingParams.discountNaiveSamples));
 			            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Prevents samples which are from the current frame or have no reasonable temporal history merged being spread to neighbors");
                         ImGui::Separator();
                         RTXDI_RESTIR_RESET_ON_CHANGE(ImGui::DragFloat("Ray Epsilon", &m_ui.RTXDI.rayEpsilon, 0.0001f, 0.0001f, 0.01f, "%.4f"));
@@ -1926,19 +2007,19 @@ void EditorUI::buildUI(void)
 
             ImGui::TextColored(categoryColor, "ReSTIR GI");
             {
-                RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent); );
+                RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
                 if (m_ui.ActualUseReSTIRGI())
                 {
-                    RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent); );
-                    ImGui::PushItemWidth(defItemWidth);
+                    RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
+                    ImGui::PushItemWidth(layout.defItemWidth);
 		            RTXDI_RESTIR_RESET_ON_CHANGE(ImGui::Combo("Resampling Mode", (int*)&m_ui.RTXDI.restirGI.resamplingMode,
 			            "Disabled\0Temporal\0Spatial\0Temporal & Spatial\0Fused\0\0"));
                     ImGui::TextWrapped("Please note: there's a bug in ReSTIRGIContext::UpdateBufferIndices or similar which breaks 'Disabled' or one or the other sampling modes.");
                     ImGui::Separator();
                     RTXDI_RESTIR_RESET_ON_CHANGE(ImGui::SliderInt("History Length ##GI", (int*)&m_ui.RTXDI.restirGI.temporalResamplingParams.maxHistoryLength, 0, 64));
                     RTXDI_RESTIR_RESET_ON_CHANGE(ImGui::SliderInt("Max Reservoir Age ##GI", (int*)&m_ui.RTXDI.restirGI.temporalResamplingParams.maxReservoirAge, 0, 100));
-                    RTXDI_RESTIR_RESET_ON_CHANGE(imGuiCheckboxUInt32("Permutation Sampling ##GI", &m_ui.RTXDI.restirGI.temporalResamplingParams.enablePermutationSampling));
-                    RTXDI_RESTIR_RESET_ON_CHANGE(imGuiCheckboxUInt32("Fallback Sampling ##GI", &m_ui.RTXDI.restirGI.temporalResamplingParams.enableFallbackSampling));
+                    RTXDI_RESTIR_RESET_ON_CHANGE(CheckboxUInt32("Permutation Sampling ##GI", &m_ui.RTXDI.restirGI.temporalResamplingParams.enablePermutationSampling));
+                    RTXDI_RESTIR_RESET_ON_CHANGE(CheckboxUInt32("Fallback Sampling ##GI", &m_ui.RTXDI.restirGI.temporalResamplingParams.enableFallbackSampling));
                     RTXDI_RESTIR_RESET_ON_CHANGE(ImGui::SliderFloat("Boiling Filter Strength##GI", &m_ui.RTXDI.restirGI.temporalResamplingParams.boilingFilterStrength, 0.f, 1.f));
                     RTXDI_RESTIR_RESET_ON_CHANGE(ImGui::Combo("Temporal Bias Correction ##GI", (int*)&m_ui.RTXDI.restirGI.temporalResamplingParams.temporalBiasCorrectionMode,
                         "Off\0Basic\0Ray Traced\0"));
@@ -1947,8 +2028,8 @@ void EditorUI::buildUI(void)
                     RTXDI_RESTIR_RESET_ON_CHANGE(ImGui::SliderFloat("Spatial Sampling Radius ##GI", &m_ui.RTXDI.restirGI.spatialResamplingParams.spatialSamplingRadius, 1.f, 64.f));
                     RTXDI_RESTIR_RESET_ON_CHANGE(ImGui::Combo("Spatial Bias Correction ##GI", (int*)&m_ui.RTXDI.restirGI.spatialResamplingParams.spatialBiasCorrectionMode, "Off\0Basic\0Ray Traced\0"));
                     ImGui::Separator();
-                    RTXDI_RESTIR_RESET_ON_CHANGE(imGuiCheckboxUInt32("Final Visibility ##GI", &m_ui.RTXDI.restirGI.finalShadingParams.enableFinalVisibility));
-                    RTXDI_RESTIR_RESET_ON_CHANGE(imGuiCheckboxUInt32("Final MIS ##GI", &m_ui.RTXDI.restirGI.finalShadingParams.enableFinalMIS));
+                    RTXDI_RESTIR_RESET_ON_CHANGE(CheckboxUInt32("Final Visibility ##GI", &m_ui.RTXDI.restirGI.finalShadingParams.enableFinalVisibility));
+                    RTXDI_RESTIR_RESET_ON_CHANGE(CheckboxUInt32("Final MIS ##GI", &m_ui.RTXDI.restirGI.finalShadingParams.enableFinalMIS));
 
                     ImGui::PopItemWidth();
                 }
@@ -1956,10 +2037,10 @@ void EditorUI::buildUI(void)
 
             ImGui::TextColored(categoryColor, "ReSTIR PT");
             {
-                RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent); );
+                RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
                 if (m_ui.ActualUseReSTIRPT())
                 {
-                    ImGui::PushItemWidth(defItemWidth);
+                    ImGui::PushItemWidth(layout.defItemWidth);
 
                     RTXDI_RESTIR_PT_RESET_ON_CHANGE(ImGui::Combo("Resampling Mode ##PT", (int*)&m_ui.RTXDI.restirPT.resamplingMode,
                         "Disabled\0Temporal\0Spatial\0Temporal & Spatial\0\0"));
@@ -1982,11 +2063,11 @@ void EditorUI::buildUI(void)
                     ImGui::Separator();
                     RTXDI_RESTIR_PT_RESET_ON_CHANGE(ImGui::SliderInt("History Length ##PT", (int*)&m_ui.RTXDI.restirPT.temporalResamplingParams.maxHistoryLength, 0, 64));
                     RTXDI_RESTIR_PT_RESET_ON_CHANGE(ImGui::SliderInt("Max Reservoir Age ##PT", (int*)&m_ui.RTXDI.restirPT.temporalResamplingParams.maxReservoirAge, 0, 100));
-                    RTXDI_RESTIR_PT_RESET_ON_CHANGE(imGuiCheckboxUInt32("Fallback Sampling ##PT", &m_ui.RTXDI.restirPT.temporalResamplingParams.enableFallbackSampling));
-                    RTXDI_RESTIR_PT_RESET_ON_CHANGE(imGuiCheckboxUInt32("Permutation Sampling ##PT", &m_ui.RTXDI.restirPT.temporalResamplingParams.enablePermutationSampling));
+                    RTXDI_RESTIR_PT_RESET_ON_CHANGE(CheckboxUInt32("Fallback Sampling ##PT", &m_ui.RTXDI.restirPT.temporalResamplingParams.enableFallbackSampling));
+                    RTXDI_RESTIR_PT_RESET_ON_CHANGE(CheckboxUInt32("Permutation Sampling ##PT", &m_ui.RTXDI.restirPT.temporalResamplingParams.enablePermutationSampling));
                     RTXDI_RESTIR_PT_RESET_ON_CHANGE(ImGui::SliderFloat("Temporal Depth Threshold ##PT", &m_ui.RTXDI.restirPT.temporalResamplingParams.depthThreshold, 0.0f, 1.0f));
                     RTXDI_RESTIR_PT_RESET_ON_CHANGE(ImGui::SliderFloat("Temporal Normal Threshold ##PT", &m_ui.RTXDI.restirPT.temporalResamplingParams.normalThreshold, 0.0f, 1.0f));
-                    RTXDI_RESTIR_PT_RESET_ON_CHANGE(imGuiCheckboxUInt32("Boiling Filter ##PT", &m_ui.RTXDI.restirPT.boilingFilterParams.enableBoilingFilter));
+                    RTXDI_RESTIR_PT_RESET_ON_CHANGE(CheckboxUInt32("Boiling Filter ##PT", &m_ui.RTXDI.restirPT.boilingFilterParams.enableBoilingFilter));
                     RTXDI_RESTIR_PT_RESET_ON_CHANGE(ImGui::SliderFloat("Boiling Filter Strength ##PT", &m_ui.RTXDI.restirPT.boilingFilterParams.boilingFilterStrength, 0.0f, 1.0f));
 
                     ImGui::Separator();
@@ -2005,6 +2086,11 @@ void EditorUI::buildUI(void)
 #undef RTXDI_RESTIR_RESET_ON_CHANGE
         }
 
+
+}
+
+void EditorUI::BuildStablePlanesPanel(const PanelLayout& layout)
+{
         if (ImGui::CollapsingHeader("Stable Planes (denoising layers)"))
         {
             if (m_ui.RealtimeMode)
@@ -2031,9 +2117,14 @@ void EditorUI::buildUI(void)
             }
         }
 
+
+}
+
+void EditorUI::BuildStandaloneDenoiserPanel(const PanelLayout& layout)
+{
         if (m_ui.ActualUseStandaloneDenoiser() && ImGui::CollapsingHeader("Standalone Denoiser (NRD)"))
         {
-            RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent); );
+            RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
 
             ImGui::InputFloat("Disocclusion Threshold", &m_ui.NRDDisocclusionThreshold);
             ImGui::Checkbox("Use Alternate Disocclusion Threshold Mix", &m_ui.NRDUseAlternateDisocclusionThresholdMix);
@@ -2159,21 +2250,31 @@ void EditorUI::buildUI(void)
             }
         }
 
+
+}
+
+void EditorUI::BuildOpacityMicroMapsPanel(const PanelLayout& layout)
+{
         if (ImGui::CollapsingHeader("Opacity Micro-Maps"))
         {
-            UI_SCOPED_INDENT(indent);
+            UI_SCOPED_INDENT(layout.indent);
 
             if (auto& ommBaker = m_sceneEditor.GetLightingPasses().ommBaker(); ommBaker)
             {
-                ommBaker->DebugGUI(indent, *m_sceneEditor.GetScene());
+                ommBaker->DebugGUI(layout.indent, *m_sceneEditor.GetScene());
             }
             else
                 ImGui::Text("<Opacity Micro-Maps not supported on the current device>");
         }
 
+
+}
+
+void EditorUI::BuildAccelerationStructurePanel(const PanelLayout& layout)
+{
         if (ImGui::CollapsingHeader("Acceleration Structure"))
         {
-            UI_SCOPED_INDENT(indent);
+            UI_SCOPED_INDENT(layout.indent);
 
             {
                 if (ImGui::Checkbox("Force Opaque", &m_ui.AS.ForceOpaque))
@@ -2199,13 +2300,18 @@ void EditorUI::buildUI(void)
             }
         }
 
+
+}
+
+void EditorUI::BuildPostProcessPanel(const PanelLayout& layout)
+{
         if (ImGui::CollapsingHeader("Post-process"))
         {
-            RAII_SCOPE(ImGui::Indent(indent);, ImGui::Unindent(indent); );
+            RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
 
             if (ImGui::CollapsingHeader("Early (HDR) post-process"))
             {
-                RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent); );
+                RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
                 ImGui::Checkbox("PostProcessTestPass", &m_ui.PostProcessTestPassHDR );
                 
                 ImGui::Separator();
@@ -2220,7 +2326,7 @@ void EditorUI::buildUI(void)
 
             if (ImGui::CollapsingHeader("Tone Mapping"))
             {
-                RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent); );
+                RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
                 ImGui::Checkbox("Enable", &m_ui.EnableToneMapping);
 
                 const std::string currentOperator = tonemapOperatorToString.at(m_ui.ToneMappingParams.toneMapOperator);
@@ -2288,7 +2394,7 @@ void EditorUI::buildUI(void)
 
             if (ImGui::CollapsingHeader("Late (LDR) post-process"))
             {
-                RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent); );
+                RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
 
                 ImGui::Checkbox("EdgeDetection", &m_ui.PostProcessEdgeDetection);
                 ImGui::SliderFloat("EdgeDetectionThreshold", &m_ui.PostProcessEdgeDetectionThreshold, 0.0f, 1.0f );
@@ -2296,16 +2402,21 @@ void EditorUI::buildUI(void)
             }
         }
 
+
+}
+
+void EditorUI::BuildDebuggingPanel(const PanelLayout& layout)
+{
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.8f, 0.5, 1.0f));
         bool debuggingIsOpen = ImGui::CollapsingHeader("Debugging"); //, ImGuiTreeNodeFlags_DefaultOpen ) )
         ImGui::PopStyleColor(1);
         if (debuggingIsOpen)
         {
-            RAII_SCOPE(ImGui::Indent(indent);, ImGui::Unindent(indent); );
+            RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
 
             if (ImGui::CollapsingHeader("Debug switches"))
             {
-                RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent); );
+                RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
 
                 if (m_ui.RealtimeMode)
                 {
@@ -2343,7 +2454,7 @@ void EditorUI::buildUI(void)
             if (m_ui.DebugView >= DebugViewType::StablePlane_VirtualRayLength && m_ui.DebugView <= DebugViewType::StablePlane_DenoiserValidation)
             {
                 m_ui.DebugViewStablePlaneIndex = dm::clamp(m_ui.DebugViewStablePlaneIndex, -1, (int)m_ui.StablePlanesActiveCount - 1);
-                RAII_SCOPE(ImGui::Indent(indent);, ImGui::Unindent(indent); );
+                RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
                 float3 spcolor = (m_ui.DebugViewStablePlaneIndex >= 0) ? (StablePlaneDebugVizColor(m_ui.DebugViewStablePlaneIndex)) : (float3(1, 1, 0)); spcolor = spcolor * 0.7f + float3(0.2f, 0.2f, 0.2f);
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(spcolor.x, spcolor.y, spcolor.z, 1.0f));
                 ImGui::InputInt("Stable Plane index", &m_ui.DebugViewStablePlaneIndex);
@@ -2401,12 +2512,17 @@ void EditorUI::buildUI(void)
 #endif 
 
             if (m_sceneEditor.GetZoomTool() != nullptr && ImGui::CollapsingHeader("Zoom Tool"))
-                m_sceneEditor.GetZoomTool()->DebugGUI(indent);
+                m_sceneEditor.GetZoomTool()->DebugGUI(layout.indent);
         }
 
+
+}
+
+void EditorUI::BuildQuickToneMappingBar(const PanelLayout& layout)
+{
         {
             // quick tonemapping settings
-            ImGui::PushItemWidth(defItemWidth * 0.7f);
+            ImGui::PushItemWidth(layout.defItemWidth * 0.7f);
             const char* tooltipInfo = "Detailed exposure settings are in Tone Mapping section";
             ImGui::PushID("QS");
             ImGui::Checkbox("AutoExposure", &m_ui.ToneMappingParams.autoExposure); if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tooltipInfo);
@@ -2421,15 +2537,18 @@ void EditorUI::buildUI(void)
             ImGui::PopID();
             ImGui::PopItemWidth();
         }
-    }
 
+}
+
+void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
+{
     // Inspector panel: instance Transform + mesh name (right-click pick)
     if (m_ui.SelectedNode != nullptr && m_ui.ShowInspector)
     {
-        ImGui::SetNextWindowPos(ImVec2(float(scaledWidth) - 10.f, 10.f), ImGuiCond_Appearing, ImVec2(1.f, 0.f));
-        ImGui::SetNextWindowSize(ImVec2(defWindowWidth, 0), ImGuiCond_Appearing);
+        ImGui::SetNextWindowPos(ImVec2(float(layout.scaledWidth) - 10.f, 10.f), ImGuiCond_Appearing, ImVec2(1.f, 0.f));
+        ImGui::SetNextWindowSize(ImVec2(layout.defWindowWidth, 0), ImGuiCond_Appearing);
         ImGui::Begin("Inspector");
-        ImGui::PushItemWidth(defItemWidth);
+        ImGui::PushItemWidth(layout.defItemWidth);
 
         auto node = m_ui.SelectedNode;
         ImGui::Text("Node: %s", node->GetName().c_str());
@@ -2536,15 +2655,20 @@ void EditorUI::buildUI(void)
         ImGui::End();
     }
 
+
+}
+
+void EditorUI::BuildMaterialEditorPanel(const PanelLayout& layout)
+{
     // Material Editor panel (right-click pick)
     std::shared_ptr<PTMaterial> material = PTMaterial::SafeCast(m_ui.SelectedMaterial);
     if (material != nullptr && m_sceneEditor.GetLightingPasses().materialsBaker() != nullptr && m_ui.ShowMaterialEditor)
     {
         const bool inspectorVisible = m_ui.SelectedNode != nullptr && m_ui.ShowInspector;
-        ImGui::SetNextWindowPos(ImVec2(float(scaledWidth) - 10.f, inspectorVisible ? 350.f : 10.f), ImGuiCond_Appearing, ImVec2(1.f, 0.f));
-        ImGui::SetNextWindowSize(ImVec2(defWindowWidth, 0), ImGuiCond_Appearing);
+        ImGui::SetNextWindowPos(ImVec2(float(layout.scaledWidth) - 10.f, inspectorVisible ? 350.f : 10.f), ImGuiCond_Appearing, ImVec2(1.f, 0.f));
+        ImGui::SetNextWindowSize(ImVec2(layout.defWindowWidth, 0), ImGuiCond_Appearing);
         ImGui::Begin("Material Editor");
-        ImGui::PushItemWidth(defItemWidth);
+        ImGui::PushItemWidth(layout.defItemWidth);
 
         ImGui::Text("Material %d: %s.%s ", material->GPUDataIndex, material->ModelName.c_str(), material->Name.c_str());
 
@@ -2586,11 +2710,16 @@ void EditorUI::buildUI(void)
         ImGui::End();
     }
 
+
+}
+
+void EditorUI::BuildDeltaTreeExplorerPanel(const PanelLayout& layout)
+{
 #if ENABLE_DEBUG_DELTA_TREE_VIZUALISATION
     if (m_ui.ShowDeltaTree)
     {
-        float scaledWindowWidth = scaledWidth - defWindowWidth - 20;
-        ImGui::SetNextWindowPos(ImVec2(scaledWidth - float(scaledWindowWidth) - 10, 10.f), ImGuiCond_FirstUseEver);
+        float scaledWindowWidth = layout.scaledWidth - layout.defWindowWidth - 20;
+        ImGui::SetNextWindowPos(ImVec2(layout.scaledWidth - float(scaledWindowWidth) - 10, 10.f), ImGuiCond_FirstUseEver);
         ImGui::SetNextWindowSize(ImVec2(scaledWindowWidth, scaledWindowWidth * 0.5f), ImGuiCond_FirstUseEver);
         const DeltaTreeVizHeader& DeltaTreeVizHeader = m_sceneEditor.GetFeedbackData().deltaPathTree;
         char windowName[1024];
@@ -2598,7 +2727,7 @@ void EditorUI::buildUI(void)
 
         if (ImGui::Begin(windowName, nullptr, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse))
         {
-            ImGui::PushItemWidth(defItemWidth);
+            ImGui::PushItemWidth(layout.defItemWidth);
             buildDeltaTreeViz();
             ImGui::PopItemWidth();
         }
@@ -2606,6 +2735,11 @@ void EditorUI::buildUI(void)
     }
 #endif
 
+
+}
+
+void EditorUI::BuildSceneWidgetsPanel(const PanelLayout& layout)
+{
     if (m_showSceneWidgets > 0.0f 
 #if ENABLE_DEBUG_DELTA_TREE_VIZUALISATION
         && !m_ui.ShowDeltaTree
@@ -2679,7 +2813,7 @@ void EditorUI::buildUI(void)
             float buttonWidth = texSizeA.x * 16;
             float windowHeight = texSizeA.y * 3.0f;
             float windowWidth = buttonWidth * buttons.size() + ImGui::GetStyle().ItemSpacing.x * (buttons.size()+1);
-            ImGui::SetNextWindowPos(ImVec2(0.5f * (scaledWidth - windowWidth), 10.0f), ImGuiCond_Always);
+            ImGui::SetNextWindowPos(ImVec2(0.5f * (layout.scaledWidth - windowWidth), 10.0f), ImGuiCond_Always);
             ImGui::SetNextWindowSize(ImVec2(windowWidth, windowHeight), ImGuiCond_Always);
             ImGui::SetNextWindowBgAlpha(0.0f);
             if (ImGui::Begin("Widgets", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoNav))
@@ -2775,9 +2909,14 @@ void EditorUI::buildUI(void)
         
     }
 
+
+}
+
+void EditorUI::BuildHierarchyPanel(const PanelLayout& layout)
+{
     {
-        ImGui::SetNextWindowPos(ImVec2(20.f + defWindowWidth, 10.f), ImGuiCond_Appearing);
-        ImGui::SetNextWindowSize(ImVec2(defWindowWidth, scaledHeight * 0.45f), ImGuiCond_Appearing);
+        ImGui::SetNextWindowPos(ImVec2(20.f + layout.defWindowWidth, 10.f), ImGuiCond_Appearing);
+        ImGui::SetNextWindowSize(ImVec2(layout.defWindowWidth, layout.scaledHeight * 0.45f), ImGuiCond_Appearing);
         RAII_SCOPE(ImGui::Begin("Hierarchy", nullptr, ImGuiWindowFlags_None);, ImGui::End(););
 
         auto scene = m_sceneEditor.GetScene();
@@ -2813,6 +2952,11 @@ void EditorUI::buildUI(void)
         }
     }
 
+
+}
+
+void EditorUI::BuildGameStandalonePanel(const PanelLayout& layout)
+{
     if ( m_sceneEditor.GetGame() != nullptr && m_sceneEditor.GetGame()->IsInitialized() )
     {
         const auto view = m_sceneEditor.GetCurrentView();
@@ -2821,7 +2965,9 @@ void EditorUI::buildUI(void)
     }
 
     // ImGui::ShowDemoWindow();
+
 }
+
 
 void EditorUI::buildDeltaTreeViz()
 {

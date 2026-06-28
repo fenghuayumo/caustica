@@ -4,7 +4,7 @@
 #include <render/Passes/Gaussian/GaussianSplatPass.h>
 #include <render/Passes/Gaussian/GaussianSplatEmissionProxy.h>
 #include <render/RenderRuntimeState.h>
-#include <render/WorldRenderer/WorldRendererServices.h>
+#include <render/WorldRenderer/PathTracingContext.h>
 
 #include <filesystem>
 #include <functional>
@@ -69,7 +69,7 @@ public:
     void buildEmissionProxyList();
     bool isEmissionEnabled() const;
     bool objectsEmpty() const;
-    caustica::render::WorldRendererGaussianSplatBinding getPrimaryBinding() const;
+    caustica::render::GaussianSplatBinding getPrimaryBinding() const;
     void renderSceneGaussianSplats(nvrhi::ICommandList* commandList,
         const caustica::PlanarView& splatView,
         RenderTargets& renderTargets,

@@ -5,7 +5,7 @@
 #include <render/SceneRayTracingResources.h>
 
 #include <render/WorldRenderer/PathTracingWorldRenderer.h>
-#include <render/WorldRenderer/WorldRendererServices.h>
+#include <render/WorldRenderer/PathTracingContext.h>
 #include <shaders/PathTracer/PathTracerDebug.hlsli>
 #include <shaders/SampleConstantBuffer.h>
 #include "render/Core/RenderTargets.h"
@@ -1447,7 +1447,7 @@ std::shared_ptr<::PTPipelineVariant>& SceneEditor::PtPipelineEdgeDetection()
 }
 
 // =============================================================================
-// IWorldRendererPipelineHooks (formerly on AdvancedPathTracer)
+// PathTracingHooks implementations (editor-side)
 // =============================================================================
 
 void SceneEditor::Render(nvrhi::IFramebuffer* framebuffer)
@@ -1537,7 +1537,7 @@ bool SceneEditor::gaussianSplatObjectsEmpty() const
     return GetGaussianSplatPasses().objectsEmpty();
 }
 
-caustica::render::WorldRendererGaussianSplatBinding SceneEditor::getPrimaryGaussianSplatBinding() const
+caustica::render::GaussianSplatBinding SceneEditor::getPrimaryGaussianSplatBinding() const
 {
     return GetGaussianSplatPasses().getPrimaryBinding();
 }

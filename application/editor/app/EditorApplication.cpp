@@ -1,6 +1,7 @@
 #include "EditorApplication.h"
 
 #include <engine/EntryPoint.h>
+#include <engine/EngineRenderer.h>
 
 #include <events/event.h>
 #include <events/key_event.h>
@@ -15,23 +16,15 @@
 #include <render/Passes/Debug/Korgi.h>
 #include <EditorUI.h>
 #include "common/LocalConfig.h"
-#include <assets/loader/ShaderPackFileSystem.h>
-
-#include <backend/ShaderUtils.h>
 #include <core/path_utils.h>
 #include <platform/cmdline_utils.h>
 #include <core/log.h>
-#include <assets/AssetSystem.h>
-#include <render/Core/BindlessTable.h>
 #include <render/Core/RenderSceneTypeFactory.h>
 #if CAUSTICA_WITH_NATIVE_DLSS
 #include <render/Passes/Geometry/DLSS.h>
 #endif
 #include "SceneEditor.h"
 #include <render/WorldRenderer/PathTracingWorldRenderer.h>
-
-#include <core/vfs/VFS.h>
-#include <render/Core/BindingCache.h>
 
 #include <GLFW/glfw3.h>
 #include <platform/glfw_window.h>
@@ -223,25 +216,45 @@ EditorApplication::StartupResult EditorApplication::startup(int argc, const char
         return StartupResult::FailDeviceFeatureSupport;
     }
 
-    CreateShaderFactory();
-
     m_sceneEditor.setGpuDevice(*m_GpuDevice);
     m_sceneEditor.initStreamlineAndWindow();
-    initRenderInfrastructurePhase1();
 
     m_sceneEditor.AttachLightingPasses(m_lightingPasses);
     m_sceneEditor.AttachRayTracingResources(m_rayTracingResources);
     m_sceneEditor.AttachGaussianSplatPasses(m_gaussianSplatPasses);
     m_lightingPasses.refreshEnvironmentMapMediaList(GetLocalPath(c_AssetsFolder), std::filesystem::path());
 
-    const nvrhi::BindingLayoutHandle bindlessLayout =
-        caustica::render::PathTracingWorldRenderer::CreateBindlessLayout(m_GpuDevice->GetDevice());
-    initRenderInfrastructurePhase2(bindlessLayout);
-    initSceneServices();
-    initWorldRenderer(bindlessLayout);
+    m_engineRenderer = std::make_unique<caustica::EngineRenderer>();
+    m_engineRenderer->initialize(*m_GpuDevice,
+        std::make_shared<caustica::render::RenderSceneTypeFactory>(),
+        caustica::EngineSceneCallbacks{
+            .OnSceneLoaded = [this]() { m_sceneEditor.SceneLoaded(); },
+            .OnSceneUnloading = [this]() { m_sceneEditor.SceneUnloading(); },
+        });
+
+    m_sceneEditor.AttachRenderResources(
+        m_engineRenderer->shaderFactory(),
+        m_engineRenderer->commonPasses(),
+        m_engineRenderer->bindingCache(),
+        m_engineRenderer->descriptorTable(),
+        m_engineRenderer->textureLoader());
+    m_sceneEditor.AttachSceneServices(
+        *m_engineRenderer->sceneManager(),
+        *m_engineRenderer->renderCore());
+
+    m_engineRenderer->createPathTracer(buildPathTracingContext());
+    m_sceneEditor.AttachWorldRenderer(m_engineRenderer->worldRenderer());
+    m_engineRenderer->attachScenePasses(*m_GpuDevice, caustica::ScenePassAttachment{
+        .rayTracingResources = m_rayTracingResources,
+        .gaussianSplatPasses = m_gaussianSplatPasses,
+        .lightingPasses = m_lightingPasses,
+        .settings = m_sceneEditor.GetPathTracerSettings(),
+        .invalidation = m_sceneEditor.GetRenderRuntimeState().Invalidation,
+        .gaussianSplatsSummary = m_sceneEditor.GetRenderRuntimeState().GaussianSplats,
+    });
     assert(m_rayTracingResources.isAttached() && m_gaussianSplatPasses.isAttached());
 
-    m_sceneEditor.Init(preferredScene, m_ShaderFactory);
+    m_sceneEditor.Init(preferredScene, m_engineRenderer->shaderFactory());
     syncPassesToBackBuffer();
 
 #if CAUSTICA_WITH_DX12 && (CAUSTICA_D3D_AGILITY_SDK_VERSION >= 619)   // temporary
@@ -268,7 +281,7 @@ EditorApplication::StartupResult EditorApplication::startup(int argc, const char
     if (!CmdLine.noWindow)
     {
         m_uiPass = std::make_unique<EditorUI>(m_GpuDevice.get(), *this, sampleUIData, IsSERSupported(), CmdLine);
-        m_uiPass->Init(m_ShaderFactory);
+        m_uiPass->Init(m_engineRenderer->shaderFactory());
         syncPassesToBackBuffer();
     }
     else
@@ -344,19 +357,7 @@ void EditorApplication::shutdown()
     }
 #endif
 
-    if (m_worldRenderer)
-        m_worldRenderer.reset();
-
-    m_sceneManager.reset();
-    m_renderCore.reset();
-
-    m_textureCache.reset();
-    m_descriptorTable.reset();
-    m_bindlessTable.reset();
-    m_bindingCache.reset();
-    m_commonPasses.reset();
-
-    m_ShaderFactory.reset();
+    m_engineRenderer.reset();
 
     if (m_GpuDevice)
         m_GpuDevice->ReleaseWindowOwnership();
@@ -616,36 +617,9 @@ bool EditorApplication::CheckDeviceFeatureSupport(const caustica::DeviceCreation
     return true;
 }
 
-void EditorApplication::initRenderInfrastructurePhase1()
+caustica::render::PathTracingHooks EditorApplication::buildPathTracingHooks()
 {
-    auto device = m_GpuDevice->GetDevice();
-    m_commonPasses = std::make_shared<caustica::CommonRenderPasses>(device, m_ShaderFactory);
-    m_bindingCache = std::make_unique<caustica::BindingCache>(device);
-
-    m_sceneEditor.AttachRenderResources(m_ShaderFactory, m_commonPasses, m_bindingCache.get(), m_descriptorTable, m_textureCache);
-}
-
-void EditorApplication::initRenderInfrastructurePhase2(nvrhi::IBindingLayout* bindlessLayout)
-{
-    auto device = m_GpuDevice->GetDevice();
-    m_bindlessTable = std::make_unique<caustica::BindlessTable>(device, bindlessLayout);
-    m_descriptorTable = m_bindlessTable->GetDescriptorTableManager();  // alias for compat
-
-    auto nativeFS = std::make_shared<caustica::NativeFileSystem>();
-
-    // The asset system owns the texture loader; EditorApplication borrows it.
-    caustica::AssetSystem::Initialize(device, nativeFS, m_descriptorTable);
-    m_textureCache = caustica::AssetSystem::Get().GetTextureLoader();
-    caustica::AssetSystem::Get().EnableHotReload(true);
-    // Watch the assets directory for texture/model changes
-    caustica::AssetSystem::Get().WatchAssetDirectory("Assets");
-
-    m_sceneEditor.AttachRenderResources(m_ShaderFactory, m_commonPasses, m_bindingCache.get(), m_descriptorTable, m_textureCache);
-}
-
-caustica::render::WorldRendererPipelineHooks EditorApplication::buildWorldRendererHooks()
-{
-    return caustica::render::WorldRendererPipelineHooks{
+    return caustica::render::PathTracingHooks{
         .needsRasterPrecompute = [] { return false; },
         .getMaterialSpecializationShader = [this] { return m_sceneEditor.GetMaterialSpecializationShader(); },
         .fillPTPipelineGlobalMacros = [this](auto& macros) { m_rayTracingResources.fillPTPipelineGlobalMacros(macros); },
@@ -683,18 +657,18 @@ caustica::render::WorldRendererPipelineHooks EditorApplication::buildWorldRender
     };
 }
 
-caustica::render::WorldRendererServices EditorApplication::buildWorldRendererServices()
+caustica::render::PathTracingContext EditorApplication::buildPathTracingContext()
 {
-    return caustica::render::WorldRendererServices{
+    return caustica::render::PathTracingContext{
         .gpuDevice = *m_GpuDevice,
-        .sceneManager = *m_sceneManager,
-        .renderCore = *m_renderCore,
+        .sceneManager = *m_engineRenderer->sceneManager(),
+        .renderCore = *m_engineRenderer->renderCore(),
         .settings = m_sceneEditor.GetPathTracerSettings(),
-        .shaderFactory = m_ShaderFactory,
-        .commonPasses = m_commonPasses,
-        .bindingCache = *m_bindingCache,
-        .textureCache = m_textureCache,
-        .descriptorTable = m_descriptorTable,
+        .shaderFactory = m_engineRenderer->shaderFactoryRef(),
+        .commonPasses = m_engineRenderer->commonPassesRef(),
+        .bindingCache = *m_engineRenderer->bindingCache(),
+        .textureCache = m_engineRenderer->textureLoaderRef(),
+        .descriptorTable = m_engineRenderer->descriptorTableRef(),
         .envMapBaker = m_lightingPasses.envMapBaker(),
         .lightsBaker = m_lightingPasses.lightsBaker(),
         .materialsBaker = m_lightingPasses.materialsBaker(),
@@ -711,103 +685,8 @@ caustica::render::WorldRendererServices EditorApplication::buildWorldRendererSer
         .benchStart = m_sceneEditor.GetBenchStart(),
         .benchLast = m_sceneEditor.GetBenchLast(),
         .benchFrames = m_sceneEditor.GetBenchFrames(),
-        .hooks = buildWorldRendererHooks(),
+        .hooks = buildPathTracingHooks(),
     };
-}
-
-void EditorApplication::initWorldRenderer(nvrhi::IBindingLayout* bindlessLayout)
-{
-    m_worldRendererServices = std::make_unique<caustica::render::WorldRendererServices>(buildWorldRendererServices());
-    m_worldRenderer = std::make_unique<caustica::render::PathTracingWorldRenderer>(*m_worldRendererServices);
-    m_sceneEditor.AttachWorldRenderer(m_worldRenderer.get());
-
-    m_rayTracingResources.attach(
-        *m_GpuDevice,
-        *m_sceneManager,
-        *m_renderCore,
-        *m_worldRenderer,
-        m_sceneEditor.GetPathTracerSettings(),
-        m_sceneEditor.GetRenderRuntimeState().Invalidation,
-        m_lightingPasses,
-        *m_bindingCache);
-
-    m_gaussianSplatPasses.attach(
-        *m_GpuDevice,
-        *m_sceneManager,
-        *m_renderCore,
-        *m_worldRenderer,
-        m_sceneEditor.GetPathTracerSettings(),
-        m_sceneEditor.GetRenderRuntimeState().GaussianSplats,
-        m_ShaderFactory,
-        m_commonPasses);
-
-    m_gaussianSplatPasses.setOnRequestFullRebuild([this] { m_rayTracingResources.requestFullRebuild(); });
-    m_rayTracingResources.setAdditionalAccelStructBuilder(
-        [this](nvrhi::ICommandList* commandList) { m_gaussianSplatPasses.buildAccelStructs(commandList); });
-
-    m_worldRenderer->createBindingLayouts(bindlessLayout);
-}
-
-void EditorApplication::initSceneServices()
-{
-    m_renderCore = std::make_unique<caustica::RenderCore>(m_GpuDevice->GetDevice());
-    m_renderCore->camera().camera().SetRotateSpeed(.003f);
-
-    m_sceneManager = std::make_unique<SceneManager>(
-        *m_GpuDevice,
-        *m_ShaderFactory,
-        m_textureCache,
-        m_descriptorTable,
-        std::make_shared<caustica::render::RenderSceneTypeFactory>());
-
-    m_sceneEditor.AttachSceneServices(*m_sceneManager, *m_renderCore);
-
-    m_sceneManager->setLoadingCallbacks(
-        [this]()
-        {
-            m_sceneEditor.SceneLoaded();
-        },
-        [this]()
-        {
-            m_sceneEditor.SceneUnloading();
-        });
-
-    m_renderCore->initializeRenderPipeline(m_ShaderFactory);
-}
-
-void EditorApplication::CreateShaderFactory()
-{
-    const char* shaderTypeName = caustica::GetShaderTypeName(m_GpuDevice->GetGraphicsAPI());
-    const std::filesystem::path appDirectory = caustica::GetDirectoryWithExecutable();
-    const std::filesystem::path engineShaderPath = appDirectory / "ShaderPrecompiled/engine" / shaderTypeName;
-    const std::filesystem::path appShaderPath = appDirectory / "ShaderPrecompiled/caustica" / shaderTypeName;
-    const std::filesystem::path nrdShaderPath = appDirectory / "ShaderPrecompiled/nrd" / shaderTypeName;
-    const std::filesystem::path ommShaderPath = appDirectory / "ShaderPrecompiled/omm" / shaderTypeName;
-
-    std::shared_ptr<caustica::RootFileSystem> rootFS = std::make_shared<caustica::RootFileSystem>();
-    const std::filesystem::path shaderPackPath = appDirectory / (std::string("caustica.shaders.") + shaderTypeName + ".pack");
-    auto shaderPackFS = std::make_shared<ShaderPackFileSystem>(shaderPackPath, "ShaderPrecompiled");
-    const bool shaderPackHasCurrentLayout = shaderPackFS->isOpen() && shaderPackFS->fileExists("caustica/caustica/shaders/render/Misc/DebugLines_main_vs.bin");
-    if (shaderPackFS->isOpen() && !shaderPackHasCurrentLayout)
-    {
-        caustica::warning("Shader pack '%s' does not match the current shader layout; falling back to ShaderPrecompiled directories",
-            shaderPackPath.string().c_str());
-    }
-
-    if (shaderPackHasCurrentLayout)
-    {
-        rootFS->mount("/ShaderPrecompiled", shaderPackFS);
-    }
-    else
-    {
-        rootFS->mount("/ShaderPrecompiled/engine", engineShaderPath);
-        rootFS->mount("/ShaderPrecompiled/caustica", appShaderPath);
-        rootFS->mount("/ShaderPrecompiled/nrd", nrdShaderPath);
-        rootFS->mount("/ShaderPrecompiled/omm", ommShaderPath);
-    }
-
-    auto device = m_GpuDevice->GetDevice();
-    m_ShaderFactory = std::make_shared<caustica::ShaderFactory>(device, rootFS, "/ShaderPrecompiled");
 }
 
 bool EditorApplication::IsSERSupported() const
@@ -852,14 +731,13 @@ void EditorApplication::onRender()
     if (!dm)
         return;
 
-            m_sceneEditor.Render(dm->GetCurrentFramebuffer(m_sceneEditor.SupportsDepthBuffer()));
+    m_sceneEditor.Render(dm->GetCurrentFramebuffer(m_sceneEditor.SupportsDepthBuffer()));
 
     if (m_uiPass)
         m_uiPass->Render(dm->GetCurrentFramebuffer(m_uiPass->SupportsDepthBuffer()));
 
-    // Flush deferred bindless descriptor frees (end-of-frame GPU sync point)
-    if (m_bindlessTable)
-        m_bindlessTable->FlushDeferredFrees();
+    if (m_engineRenderer)
+        m_engineRenderer->endFrame();
 }
 
 void EditorApplication::onBackBufferResizing()
@@ -904,6 +782,36 @@ void EditorApplication::onEvent(caustica::Event& event)
             m_Window->setExit(true);
         return true;
     });
+}
+
+SceneManager* EditorApplication::GetSceneManager()
+{
+    return m_engineRenderer ? m_engineRenderer->sceneManager() : nullptr;
+}
+
+const SceneManager* EditorApplication::GetSceneManager() const
+{
+    return m_engineRenderer ? m_engineRenderer->sceneManager() : nullptr;
+}
+
+caustica::RenderCore* EditorApplication::GetRenderCore()
+{
+    return m_engineRenderer ? m_engineRenderer->renderCore() : nullptr;
+}
+
+const caustica::RenderCore* EditorApplication::GetRenderCore() const
+{
+    return m_engineRenderer ? m_engineRenderer->renderCore() : nullptr;
+}
+
+caustica::render::PathTracingWorldRenderer* EditorApplication::GetWorldRenderer()
+{
+    return m_engineRenderer ? m_engineRenderer->worldRenderer() : nullptr;
+}
+
+const caustica::render::PathTracingWorldRenderer* EditorApplication::GetWorldRenderer() const
+{
+    return m_engineRenderer ? m_engineRenderer->worldRenderer() : nullptr;
 }
 
 } // namespace caustica::editor

@@ -44,15 +44,14 @@ class ShaderFactory;
 namespace caustica::render
 {
 
-// Primary gaussian splat object used for binding set (editor scene owns passes).
-struct WorldRendererGaussianSplatBinding
+struct GaussianSplatBinding
 {
     const GaussianSplatPass* pass = nullptr;
     dm::float4x4             objectToWorld = dm::float4x4::identity();
 };
 
-// Pipeline hooks - callbacks wired by the app during init (DIVSHOT-style).
-struct WorldRendererPipelineHooks
+// Editor / host callbacks wired once at init.
+struct PathTracingHooks
 {
     std::function<bool()>                                         needsRasterPrecompute;
     std::function<std::string()>                                  getMaterialSpecializationShader;
@@ -65,7 +64,7 @@ struct WorldRendererPipelineHooks
     std::function<void()>                                         buildGaussianSplatEmissionProxyList;
     std::function<bool()>                                         isGaussianSplatEmissionEnabled;
     std::function<bool()>                                         gaussianSplatObjectsEmpty;
-    std::function<WorldRendererGaussianSplatBinding()>            getPrimaryGaussianSplatBinding;
+    std::function<GaussianSplatBinding()>                         getPrimaryGaussianSplatBinding;
     std::function<void(nvrhi::ICommandList*, const caustica::PlanarView&, RenderTargets&, const GaussianSplatRenderSettings&, bool&)> renderSceneGaussianSplats;
     std::function<void(nvrhi::IFramebuffer*)>                     updateViews;
     std::function<void(nvrhi::ICommandList*)>                     recreateAccelStructs;
@@ -86,8 +85,8 @@ struct WorldRendererPipelineHooks
     std::function<ZoomTool*()>                                    getOrCreateZoomTool;
 };
 
-// Strong-typed dependencies wired once by Application at init (DIVSHOT Application owns renderer deps).
-struct WorldRendererServices
+// Live references consumed by PathTracingWorldRenderer for one frame loop.
+struct PathTracingContext
 {
     GpuDevice& gpuDevice;
     SceneManager& sceneManager;
@@ -121,7 +120,7 @@ struct WorldRendererServices
     std::chrono::high_resolution_clock::time_point& benchLast;
     int& benchFrames;
 
-    WorldRendererPipelineHooks hooks;
+    PathTracingHooks hooks;
 };
 
 } // namespace caustica::render

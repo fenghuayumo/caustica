@@ -49,7 +49,7 @@ class RootFileSystem;
 namespace caustica::render
 {
 class PathTracingWorldRenderer;
-struct WorldRendererGaussianSplatBinding;
+struct GaussianSplatBinding;
 } // namespace caustica::render
 
 class RenderTargets;
@@ -211,7 +211,7 @@ public:
 
     dm::float2                              ComputeCameraJitter(uint frameIndex);
 
-    // --- Pipeline hooks (called via WorldRendererServices::hooks callbacks) ---
+    // --- Path tracing hooks (called from PathTracingHooks callbacks) ---
     std::string getMaterialSpecializationShader() const;
     void fillPTPipelineGlobalMacros(std::vector<caustica::ShaderMacro>& macros);
     void sampleRenderCode(nvrhi::IFramebuffer* framebuffer, nvrhi::CommandListHandle commandList, const SampleConstants& constants);
@@ -222,7 +222,7 @@ public:
     void buildGaussianSplatEmissionProxyList();
     bool isGaussianSplatEmissionEnabled() const;
     bool gaussianSplatObjectsEmpty() const;
-    caustica::render::WorldRendererGaussianSplatBinding getPrimaryGaussianSplatBinding() const;
+    caustica::render::GaussianSplatBinding getPrimaryGaussianSplatBinding() const;
     void renderSceneGaussianSplats(nvrhi::ICommandList* commandList,
                                    const caustica::PlanarView& splatView,
                                    RenderTargets& renderTargets,

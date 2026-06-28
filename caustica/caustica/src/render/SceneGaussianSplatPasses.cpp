@@ -448,9 +448,9 @@ bool SceneGaussianSplatPasses::objectsEmpty() const
     return m_objects.empty();
 }
 
-caustica::render::WorldRendererGaussianSplatBinding SceneGaussianSplatPasses::getPrimaryBinding() const
+caustica::render::GaussianSplatBinding SceneGaussianSplatPasses::getPrimaryBinding() const
 {
-    caustica::render::WorldRendererGaussianSplatBinding binding;
+    caustica::render::GaussianSplatBinding binding;
     if (const auto* object = primaryObject())
     {
         binding.pass = object->pass.get();

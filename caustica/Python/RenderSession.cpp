@@ -3,9 +3,11 @@
 #if CAUSTICA_WITH_PYTHON
 
 #include "SceneEditor.h"
+#include <engine/EngineRenderer.h>
+#include <engine/Application.h>
 #include <render/SceneGaussianSplatPasses.h>
 #include <render/SceneLightingPasses.h>
-#include "EditorApplication.h"
+#include <render/Core/RenderSceneTypeFactory.h>
 #include <render/WorldRenderer/PathTracingWorldRenderer.h>
 #include <common/LocalConfig.h>
 #include <core/file_utils.h>
@@ -75,9 +77,10 @@ namespace
     class PathTracerFrameDriver : public caustica::Application
     {
     public:
-        PathTracerFrameDriver(caustica::GpuDevice* dm, caustica::Window* window, SceneEditor* scene)
+        PathTracerFrameDriver(caustica::GpuDevice* dm, caustica::Window* window, SceneEditor* scene, caustica::EngineRenderer* engineRenderer)
             : caustica::Application(dm, window)
             , m_scene(scene)
+            , m_engineRenderer(engineRenderer)
         { }
 
         void syncToBackBuffer()
@@ -108,6 +111,9 @@ namespace
                 return;
 
             m_scene->Render(dm->GetCurrentFramebuffer(m_scene->SupportsDepthBuffer()));
+
+            if (m_engineRenderer)
+                m_engineRenderer->endFrame();
         }
 
         bool shouldRenderWhenUnfocused() const override
@@ -135,6 +141,7 @@ namespace
 
     private:
         SceneEditor* m_scene = nullptr;
+        caustica::EngineRenderer* m_engineRenderer = nullptr;
     };
 
     void AppendUnique(std::vector<std::string>& values, const std::string& value)
@@ -590,70 +597,65 @@ bool RenderSession::InitDevice()
 
 bool RenderSession::InitRenderer()
 {
-    // Shader factory pulls precompiled shaders from the host executable's
-    // ShaderPrecompiled folder - this folder is assumed to live next to the
-    // .pyd / caustica.exe binary.
-    const char* shaderTypeName = caustica::GetShaderTypeName(m_deviceManager->GetGraphicsAPI());
     const std::filesystem::path appDirectory = ResolveRuntimeDirectory();
     SetRuntimeDirectoryOverride(appDirectory);
     SetLocalPathBaseOverride(ResolveResourceRoot(appDirectory));
-    std::filesystem::path engineShaderPath    = appDirectory / "ShaderPrecompiled/engine"    / shaderTypeName;
-    std::filesystem::path appShaderPath       = appDirectory / "ShaderPrecompiled/caustica"  / shaderTypeName;
-    std::filesystem::path nrdShaderPath       = appDirectory / "ShaderPrecompiled/nrd"       / shaderTypeName;
-    std::filesystem::path ommShaderPath       = appDirectory / "ShaderPrecompiled/omm"       / shaderTypeName;
-
-    auto rootFS = std::make_shared<caustica::RootFileSystem>();
-    const std::filesystem::path shaderPackPath = appDirectory / (std::string("caustica.shaders.") + shaderTypeName + ".pack");
-    auto shaderPackFS = std::make_shared<ShaderPackFileSystem>(shaderPackPath, "ShaderPrecompiled");
-    const bool shaderPackHasCurrentLayout = shaderPackFS->isOpen() && shaderPackFS->fileExists("caustica/caustica/shaders/render/Misc/DebugLines_main_vs.bin");
-    if (shaderPackFS->isOpen() && !shaderPackHasCurrentLayout)
-    {
-        caustica::warning("Shader pack '%s' does not match the current shader layout; falling back to ShaderPrecompiled directories",
-            shaderPackPath.string().c_str());
-    }
-
-    if (shaderPackHasCurrentLayout)
-    {
-        rootFS->mount("/ShaderPrecompiled", shaderPackFS);
-    }
-    else
-    {
-        rootFS->mount("/ShaderPrecompiled/engine", engineShaderPath);
-        rootFS->mount("/ShaderPrecompiled/caustica", appShaderPath);
-        rootFS->mount("/ShaderPrecompiled/nrd",   nrdShaderPath);
-        rootFS->mount("/ShaderPrecompiled/omm",   ommShaderPath);
-    }
-
-    auto device = m_deviceManager->GetDevice();
-    m_shaderFactory = std::make_shared<caustica::ShaderFactory>(device, rootFS, "/ShaderPrecompiled");
 
     m_renderer = std::make_unique<SceneEditor>(m_cmdLine, m_sampleUIData);
     m_renderer->setGpuDevice(*m_deviceManager);
     m_renderer->initStreamlineAndWindow();
+    m_renderer->AttachLightingPasses(m_lightingPasses);
+    m_renderer->AttachRayTracingResources(m_rayTracingResources);
+    m_renderer->AttachGaussianSplatPasses(m_gaussianSplatPasses);
     InitializeSampleUIDataFromCommandLine(m_sampleUIData, m_cmdLine);
     LocalConfig::PostAppInit(m_sampleUIData);
 
-    initRenderInfrastructurePhase1();
+    m_engineRenderer = std::make_unique<caustica::EngineRenderer>();
+    m_engineRenderer->initialize(*m_deviceManager,
+        std::make_shared<caustica::render::RenderSceneTypeFactory>(),
+        caustica::EngineSceneCallbacks{
+            .OnSceneLoaded = [this]() {
+                if (m_renderer)
+                    m_renderer->SceneLoaded();
+            },
+            .OnSceneUnloading = [this]() {
+                if (m_renderer)
+                    m_renderer->SceneUnloading();
+            },
+        });
 
-    const nvrhi::BindingLayoutHandle bindlessLayout =
-        caustica::render::PathTracingWorldRenderer::CreateBindlessLayout(m_deviceManager->GetDevice());
-    initRenderInfrastructurePhase2(bindlessLayout);
-    initSceneServices();
-    initWorldRenderer(bindlessLayout);
+    m_renderer->AttachRenderResources(
+        m_engineRenderer->shaderFactory(),
+        m_engineRenderer->commonPasses(),
+        m_engineRenderer->bindingCache(),
+        m_engineRenderer->descriptorTable(),
+        m_engineRenderer->textureLoader());
+    m_renderer->AttachSceneServices(
+        *m_engineRenderer->sceneManager(),
+        *m_engineRenderer->renderCore());
 
-    // Pick whichever scene the user requested (or fall back to the default).
-    // default).  This loads the actual scene file asynchronously inside
-    // Sample::Init().
+    m_engineRenderer->createPathTracer(buildPathTracingContext());
+    m_renderer->AttachWorldRenderer(m_engineRenderer->worldRenderer());
+    m_engineRenderer->attachScenePasses(*m_deviceManager, caustica::ScenePassAttachment{
+        .rayTracingResources = m_rayTracingResources,
+        .gaussianSplatPasses = m_gaussianSplatPasses,
+        .lightingPasses = m_lightingPasses,
+        .settings = m_renderer->GetPathTracerSettings(),
+        .invalidation = m_renderer->GetRenderRuntimeState().Invalidation,
+        .gaussianSplatsSummary = m_renderer->GetRenderRuntimeState().GaussianSplats,
+    });
+
     std::string preferredScene = m_config.scene.empty()
         ? std::string("default.json")
         : m_config.scene;
 
-    m_renderer->Init(preferredScene, m_shaderFactory);
+    m_renderer->Init(preferredScene, m_engineRenderer->shaderFactory());
 
     auto frameDriver = std::make_unique<PathTracerFrameDriver>(
         m_deviceManager.get(),
         m_config.headless ? nullptr : m_Window.get(),
-        m_renderer.get());
+        m_renderer.get(),
+        m_engineRenderer.get());
     frameDriver->beforePresent =
         [this](caustica::GpuDevice& manager, uint32_t) {
             m_lastRenderedBackBufferIndex = manager.GetCurrentBackBufferIndex();
@@ -664,125 +666,78 @@ bool RenderSession::InitRenderer()
     return true;
 }
 
-void RenderSession::initRenderInfrastructurePhase1()
-{
-    auto device = m_deviceManager->GetDevice();
-    m_commonPasses = std::make_shared<caustica::CommonRenderPasses>(device, m_shaderFactory);
-    m_bindingCache = std::make_unique<caustica::BindingCache>(device);
-    m_renderer->AttachRenderResources(m_shaderFactory, m_commonPasses, m_bindingCache.get(), m_descriptorTable, m_textureCache);
-}
-
-void RenderSession::initRenderInfrastructurePhase2(nvrhi::IBindingLayout* bindlessLayout)
-{
-    auto device = m_deviceManager->GetDevice();
-    m_descriptorTable = std::make_shared<caustica::DescriptorTableManager>(device, bindlessLayout);
-
-    auto nativeFS = std::make_shared<caustica::NativeFileSystem>();
-    m_textureCache = std::make_shared<caustica::TextureLoader>(device, nativeFS, m_descriptorTable);
-
-    m_renderer->AttachRenderResources(m_shaderFactory, m_commonPasses, m_bindingCache.get(), m_descriptorTable, m_textureCache);
-}
-
-caustica::render::WorldRendererServices RenderSession::buildWorldRendererServices()
+caustica::render::PathTracingHooks RenderSession::buildPathTracingHooks()
 {
     SceneEditor& editor = *m_renderer;
-    SceneLightingPasses& lighting = editor.GetLightingPasses();
-    SceneGaussianSplatPasses& splats = editor.GetGaussianSplatPasses();
-    return caustica::render::WorldRendererServices{
+    return caustica::render::PathTracingHooks{
+        .needsRasterPrecompute = [] { return false; },
+        .getMaterialSpecializationShader = [&editor] { return editor.GetMaterialSpecializationShader(); },
+        .fillPTPipelineGlobalMacros = [this](auto& macros) { m_rayTracingResources.fillPTPipelineGlobalMacros(macros); },
+        .sampleRenderCode = [this](auto* framebuffer, auto commandList, auto& constants) {
+            m_rayTracingResources.sampleRenderCode(framebuffer, commandList, constants);
+        },
+        .addCustomBindings = [&editor](auto& desc) { editor.AddCustomBindings(desc); },
+        .createRTPipelines = [this] { m_rayTracingResources.createRTPipelines(); },
+        .onRenderTargetsRecreated = [&editor] { editor.OnRenderTargetsRecreated(); },
+        .prepareGaussianSplatPasses = [this] { m_gaussianSplatPasses.preparePasses(); },
+        .buildGaussianSplatEmissionProxyList = [this] { m_gaussianSplatPasses.buildEmissionProxyList(); },
+        .isGaussianSplatEmissionEnabled = [this] { return m_gaussianSplatPasses.isEmissionEnabled(); },
+        .gaussianSplatObjectsEmpty = [this] { return m_gaussianSplatPasses.objectsEmpty(); },
+        .getPrimaryGaussianSplatBinding = [this] { return m_gaussianSplatPasses.getPrimaryBinding(); },
+        .renderSceneGaussianSplats = [this](auto* commandList, auto& view, auto& targets, auto& settings, bool& renderedAny) {
+            m_gaussianSplatPasses.renderSceneGaussianSplats(commandList, view, targets, settings, renderedAny);
+        },
+        .updateViews = [&editor](auto* framebuffer) { editor.UpdateViews(framebuffer); },
+        .recreateAccelStructs = [this](auto* commandList) { m_rayTracingResources.recreateAccelStructs(commandList); },
+        .uploadSubInstanceData = [this](auto* commandList) { m_rayTracingResources.uploadSubInstanceData(commandList); },
+        .collectUncompressedTextures = [&editor] { editor.CollectUncompressedTextures(); },
+        .computeCameraJitter = [&editor](uint frameIndex) { return editor.ComputeCameraJitter(frameIndex); },
+        .consumeShaderReloadRequest = [this] { return m_rayTracingResources.consumeShaderReloadRequest(); },
+        .accelerationStructRebuildRequested = [this]() -> bool& { return m_rayTracingResources.accelerationStructRebuildRequested(); },
+        .hasActivePickRequest = [&editor] { return editor.hasActivePickRequest(); },
+        .showDeltaTree = [&editor] { return editor.showDeltaTree(); },
+        .pickMaterialRequested = [&editor] { return editor.pickMaterialRequested(); },
+        .pickInstanceRequested = [&editor] { return editor.pickInstanceRequested(); },
+        .clearPickRequests = [&editor] { editor.clearPickRequests(); },
+        .resolvePickFeedback = [&editor](auto& feedback) { editor.resolvePickFeedback(feedback); },
+        .consumeExperimentalPhotoScreenshot = [&editor] { return editor.consumeExperimentalPhotoScreenshot(); },
+        .captureScriptPreRender = [&editor] { editor.captureScriptPreRender(); },
+        .captureScriptPostRender = [&editor](auto saveTexture) { editor.captureScriptPostRender(saveTexture); },
+        .getOrCreateZoomTool = [&editor] { return editor.getOrCreateZoomTool(); },
+    };
+}
+
+caustica::render::PathTracingContext RenderSession::buildPathTracingContext()
+{
+    SceneEditor& editor = *m_renderer;
+    return caustica::render::PathTracingContext{
         .gpuDevice = *m_deviceManager,
-        .sceneManager = *m_sceneManager,
-        .renderCore = *m_renderCore,
+        .sceneManager = *m_engineRenderer->sceneManager(),
+        .renderCore = *m_engineRenderer->renderCore(),
         .settings = editor.GetPathTracerSettings(),
-        .shaderFactory = m_shaderFactory,
-        .commonPasses = m_commonPasses,
-        .bindingCache = *m_bindingCache,
-        .textureCache = m_textureCache,
-        .descriptorTable = m_descriptorTable,
-        .envMapBaker = lighting.envMapBaker(),
-        .lightsBaker = lighting.lightsBaker(),
-        .materialsBaker = lighting.materialsBaker(),
-        .ommBaker = lighting.ommBaker(),
-        .computePipelineBaker = lighting.computePipelineBaker(),
-        .lights = lighting.lights(),
-        .envMapSceneParams = lighting.envMapSceneParams(),
-        .envMapLocalPath = lighting.envMapLocalPath(),
-        .envMapOverride = lighting.envMapOverride(),
+        .shaderFactory = m_engineRenderer->shaderFactoryRef(),
+        .commonPasses = m_engineRenderer->commonPassesRef(),
+        .bindingCache = *m_engineRenderer->bindingCache(),
+        .textureCache = m_engineRenderer->textureLoaderRef(),
+        .descriptorTable = m_engineRenderer->descriptorTableRef(),
+        .envMapBaker = m_lightingPasses.envMapBaker(),
+        .lightsBaker = m_lightingPasses.lightsBaker(),
+        .materialsBaker = m_lightingPasses.materialsBaker(),
+        .ommBaker = m_lightingPasses.ommBaker(),
+        .computePipelineBaker = m_lightingPasses.computePipelineBaker(),
+        .lights = m_lightingPasses.lights(),
+        .envMapSceneParams = m_lightingPasses.envMapSceneParams(),
+        .envMapLocalPath = m_lightingPasses.envMapLocalPath(),
+        .envMapOverride = m_lightingPasses.envMapOverride(),
         .sceneTime = editor.GetSceneTimeRef(),
-        .gaussianSplatEmissionProxies = splats.emissionProxies(),
+        .gaussianSplatEmissionProxies = m_gaussianSplatPasses.emissionProxies(),
         .progressInitializingRenderer = editor.GetProgressInitializingRenderer(),
         .asyncLoadingInProgress = editor.GetAsyncLoadingInProgressRef(),
         .benchStart = editor.GetBenchStart(),
         .benchLast = editor.GetBenchLast(),
         .benchFrames = editor.GetBenchFrames(),
-        .hooks = {
-            .needsRasterPrecompute       = [] { return false; },
-            .getMaterialSpecializationShader = [&editor] { return editor.GetMaterialSpecializationShader(); },
-            .fillPTPipelineGlobalMacros     = [&editor](auto& m) { editor.FillPTPipelineGlobalMacros(m); },
-            .sampleRenderCode               = [&editor](auto* fb, auto cl, auto& c) { editor.sampleRenderCode(fb, cl, c); },
-            .addCustomBindings              = [&editor](auto& d) { editor.AddCustomBindings(d); },
-            .createRTPipelines              = [&editor] { editor.createRTPipelines(); },
-            .onRenderTargetsRecreated       = [&editor] { editor.OnRenderTargetsRecreated(); },
-            .prepareGaussianSplatPasses     = [&editor] { editor.prepareGaussianSplatPasses(); },
-            .buildGaussianSplatEmissionProxyList = [&editor] { editor.buildGaussianSplatEmissionProxyList(); },
-            .isGaussianSplatEmissionEnabled = [&editor] { return editor.isGaussianSplatEmissionEnabled(); },
-            .gaussianSplatObjectsEmpty      = [&editor] { return editor.gaussianSplatObjectsEmpty(); },
-            .getPrimaryGaussianSplatBinding = [&editor] { return editor.getPrimaryGaussianSplatBinding(); },
-            .renderSceneGaussianSplats      = [&editor](auto* cl, auto& v, auto& rt, auto& s, bool& r) { editor.renderSceneGaussianSplats(cl, v, rt, s, r); },
-            .updateViews                    = [&editor](auto* fb) { editor.UpdateViews(fb); },
-            .recreateAccelStructs           = [&editor](auto* cl) { editor.RecreateAccelStructs(cl); },
-            .uploadSubInstanceData          = [&editor](auto* cl) { editor.UploadSubInstanceData(cl); },
-            .collectUncompressedTextures    = [&editor] { editor.CollectUncompressedTextures(); },
-            .computeCameraJitter            = [&editor](uint i) { return editor.ComputeCameraJitter(i); },
-            .consumeShaderReloadRequest     = [&editor] { return editor.consumeShaderReloadRequest(); },
-            .accelerationStructRebuildRequested = [&editor]() -> bool& { return editor.accelerationStructRebuildRequested(); },
-            .hasActivePickRequest           = [&editor] { return editor.hasActivePickRequest(); },
-            .showDeltaTree                  = [&editor] { return editor.showDeltaTree(); },
-            .pickMaterialRequested          = [&editor] { return editor.pickMaterialRequested(); },
-            .pickInstanceRequested          = [&editor] { return editor.pickInstanceRequested(); },
-            .clearPickRequests              = [&editor] { editor.clearPickRequests(); },
-            .resolvePickFeedback            = [&editor](auto& f) { editor.resolvePickFeedback(f); },
-            .consumeExperimentalPhotoScreenshot = [&editor] { return editor.consumeExperimentalPhotoScreenshot(); },
-            .captureScriptPreRender         = [&editor] { editor.captureScriptPreRender(); },
-            .captureScriptPostRender        = [&editor](auto fn) { editor.captureScriptPostRender(fn); },
-            .getOrCreateZoomTool            = [&editor] { return editor.getOrCreateZoomTool(); },
-        },
+        .hooks = buildPathTracingHooks(),
     };
-}
-
-void RenderSession::initWorldRenderer(nvrhi::IBindingLayout* bindlessLayout)
-{
-    m_worldRendererServices = std::make_unique<caustica::render::WorldRendererServices>(buildWorldRendererServices());
-    m_worldRenderer = std::make_unique<caustica::render::PathTracingWorldRenderer>(*m_worldRendererServices);
-    m_renderer->AttachWorldRenderer(m_worldRenderer.get());
-    m_worldRenderer->createBindingLayouts(bindlessLayout);
-}
-
-void RenderSession::initSceneServices()
-{
-    m_renderCore = std::make_unique<caustica::RenderCore>(m_deviceManager->GetDevice());
-    m_renderCore->camera().camera().SetRotateSpeed(.003f);
-
-    m_sceneManager = std::make_unique<SceneManager>(
-        *m_deviceManager,
-        *m_shaderFactory,
-        m_textureCache,
-        m_descriptorTable);
-
-    m_renderer->AttachSceneServices(*m_sceneManager, *m_renderCore);
-
-    m_sceneManager->setLoadingCallbacks(
-        [this]()
-        {
-            if (m_renderer)
-                m_renderer->SceneLoaded();
-        },
-        [this]()
-        {
-            if (m_renderer)
-                m_renderer->SceneUnloading();
-        });
-
-    m_renderCore->initializeRenderPipeline(m_shaderFactory);
 }
 
 void RenderSession::Shutdown()
@@ -790,15 +745,8 @@ void RenderSession::Shutdown()
     if (m_deviceManager)
         m_deviceManager->setFrameDriver(nullptr);
 
-    m_worldRenderer.reset();
     m_renderer.reset();
-    m_sceneManager.reset();
-    m_renderCore.reset();
-    m_textureCache.reset();
-    m_descriptorTable.reset();
-    m_bindingCache.reset();
-    m_commonPasses.reset();
-    m_shaderFactory.reset();
+    m_engineRenderer.reset();
     m_AppLoop.reset();
 
     if (m_deviceManager)

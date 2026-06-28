@@ -12,7 +12,7 @@
 #include <render/SceneGaussianSplatPasses.h>
 #include <render/SceneLightingPasses.h>
 #include <render/SceneRayTracingResources.h>
-#include <render/WorldRenderer/WorldRendererServices.h>
+#include <render/WorldRenderer/PathTracingContext.h>
 
 using caustica::FPSLimiter;
 constexpr static const int c_SwapchainCount = 3;
@@ -30,19 +30,14 @@ class EditorUI;
 }
 class SceneManager;
 namespace caustica {
+    class EngineRenderer;
     class GpuDevice;
-    class ShaderFactory;
-    class BindingCache;
-    class CommonRenderPasses;
-    class DescriptorTableManager;
-    class BindlessTable;
     class RenderCore;
-    class TextureLoader;
     class Window;
     struct DeviceCreationParameters;
     namespace render {
         class PathTracingWorldRenderer;
-        struct WorldRendererServices;
+        struct PathTracingContext;
     }
 }
 
@@ -85,14 +80,14 @@ public:
     SceneEditor* GetAdvancedPathTracer() { return &m_sceneEditor; }
     const SceneEditor* GetAdvancedPathTracer() const { return &m_sceneEditor; }
 
-    SceneManager* GetSceneManager() { return m_sceneManager.get(); }
-    const SceneManager* GetSceneManager() const { return m_sceneManager.get(); }
+    SceneManager* GetSceneManager();
+    const SceneManager* GetSceneManager() const;
 
-    caustica::RenderCore* GetRenderCore() { return m_renderCore.get(); }
-    const caustica::RenderCore* GetRenderCore() const { return m_renderCore.get(); }
+    caustica::RenderCore* GetRenderCore();
+    const caustica::RenderCore* GetRenderCore() const;
 
-    caustica::render::PathTracingWorldRenderer* GetWorldRenderer() { return m_worldRenderer.get(); }
-    const caustica::render::PathTracingWorldRenderer* GetWorldRenderer() const { return m_worldRenderer.get(); }
+    caustica::render::PathTracingWorldRenderer* GetWorldRenderer();
+    const caustica::render::PathTracingWorldRenderer* GetWorldRenderer() const;
 
     bool IsSERSupported() const;
     bool QueryVideoMemoryInfo(uint64_t& outBudget, uint64_t& outCurrentUsage, uint64_t& outAvailableForReservation, uint64_t& outCurrentReservation);
@@ -114,13 +109,8 @@ private:
         caustica::DeviceCreationParameters& deviceParams, std::string& preferredScene);
     bool InitDeviceAndWindow(const caustica::DeviceCreationParameters& deviceParams);
     bool CheckDeviceFeatureSupport(const caustica::DeviceCreationParameters& deviceParams);
-    void CreateShaderFactory();
-    void initRenderInfrastructurePhase1();
-    void initRenderInfrastructurePhase2(nvrhi::IBindingLayout* bindlessLayout);
-    caustica::render::WorldRendererPipelineHooks buildWorldRendererHooks();
-    caustica::render::WorldRendererServices buildWorldRendererServices();
-    void initWorldRenderer(nvrhi::IBindingLayout* bindlessLayout);
-    void initSceneServices();
+    caustica::render::PathTracingHooks buildPathTracingHooks();
+    caustica::render::PathTracingContext buildPathTracingContext();
     void syncPassesToBackBuffer();
 
     CommandLineOptions CmdLine;
@@ -133,16 +123,7 @@ private:
     caustica::Callback m_DefaultLogCallback = nullptr;
     FPSLimiter m_FPSLimiter;
 
-    std::shared_ptr<caustica::ShaderFactory> m_ShaderFactory;
-    std::shared_ptr<caustica::CommonRenderPasses> m_commonPasses;
-    std::unique_ptr<caustica::BindingCache> m_bindingCache;
-    std::shared_ptr<caustica::DescriptorTableManager> m_descriptorTable;
-    std::unique_ptr<caustica::BindlessTable> m_bindlessTable;
-    std::shared_ptr<caustica::TextureLoader> m_textureCache;
-    std::unique_ptr<caustica::render::WorldRendererServices> m_worldRendererServices;
-    std::unique_ptr<caustica::RenderCore>      m_renderCore;
-    std::unique_ptr<SceneManager>              m_sceneManager;
-    std::unique_ptr<caustica::render::PathTracingWorldRenderer> m_worldRenderer;
+    std::unique_ptr<caustica::EngineRenderer> m_engineRenderer;
     std::unique_ptr<EditorUI> m_uiPass;
 
 #if CAUSTICA_ENABLE_VIDEO_MEMORY_INFO && defined(_WIN32)

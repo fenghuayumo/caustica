@@ -69,6 +69,46 @@ private:
 private:
     void BuildPythonScriptingUI(float indent);
 
+    // --- Panel layout context (computed once per frame in buildUI, passed to each panel) ---
+    struct PanelLayout
+    {
+        float indent = 0.f;
+        float defItemWidth = 0.f;
+        float defWindowWidth = 0.f;
+        float scaledWidth = 0.f;
+        float scaledHeight = 0.f;
+    };
+
+    bool CheckboxUInt32(const char* label, uint32_t* v);
+
+    // Settings window collapsing-header panels
+    void BuildDisplayPerformancePanel(const PanelLayout& layout);
+    void BuildSystemPanel(const PanelLayout& layout);
+    void BuildSceneComboPanel(const PanelLayout& layout);
+    void BuildScenePanel(const PanelLayout& layout);
+    void BuildSampleGamePanel(const PanelLayout& layout);
+    void BuildCameraPanel(const PanelLayout& layout);
+    void BuildLightingPanel(const PanelLayout& layout);
+    void BuildPathTracerPanel(const PanelLayout& layout);
+    void BuildStochasticTextureFilteringPanel(const PanelLayout& layout);
+    void BuildDLSSReflexPanel(const PanelLayout& layout);
+    void BuildTAAPanel(const PanelLayout& layout);
+    void BuildRTXDIPanel(const PanelLayout& layout);
+    void BuildStablePlanesPanel(const PanelLayout& layout);
+    void BuildStandaloneDenoiserPanel(const PanelLayout& layout);
+    void BuildOpacityMicroMapsPanel(const PanelLayout& layout);
+    void BuildAccelerationStructurePanel(const PanelLayout& layout);
+    void BuildPostProcessPanel(const PanelLayout& layout);
+    void BuildDebuggingPanel(const PanelLayout& layout);
+    void BuildQuickToneMappingBar(const PanelLayout& layout);
+    // Standalone windows / overlays
+    void BuildInspectorPanel(const PanelLayout& layout);
+    void BuildMaterialEditorPanel(const PanelLayout& layout);
+    void BuildDeltaTreeExplorerPanel(const PanelLayout& layout);
+    void BuildSceneWidgetsPanel(const PanelLayout& layout);
+    void BuildHierarchyPanel(const PanelLayout& layout);
+    void BuildGameStandalonePanel(const PanelLayout& layout);
+
 private:
     EditorApplication& m_app;
     SceneEditor& m_sceneEditor;
