@@ -209,42 +209,12 @@ public:
     void                                    RecreateAccelStructs(nvrhi::ICommandList* commandList);
     void                                    RequestMeshAccelRebuild(const std::shared_ptr<caustica::MeshInfo>& mesh);
 
-    dm::float2                              ComputeCameraJitter(uint frameIndex);
-
-    // --- Path tracing hooks (called from PathTracingHooks callbacks) ---
-    std::string getMaterialSpecializationShader() const;
-    void fillPTPipelineGlobalMacros(std::vector<caustica::ShaderMacro>& macros);
-    void sampleRenderCode(nvrhi::IFramebuffer* framebuffer, nvrhi::CommandListHandle commandList, const SampleConstants& constants);
-    void addCustomBindings(nvrhi::BindingSetDesc& bindingSetDesc);
-    void createRTPipelines();
-    void onRenderTargetsRecreated();
-    void prepareGaussianSplatPasses();
-    void buildGaussianSplatEmissionProxyList();
-    bool isGaussianSplatEmissionEnabled() const;
-    bool gaussianSplatObjectsEmpty() const;
-    caustica::render::GaussianSplatBinding getPrimaryGaussianSplatBinding() const;
-    void renderSceneGaussianSplats(nvrhi::ICommandList* commandList,
-                                   const caustica::PlanarView& splatView,
-                                   RenderTargets& renderTargets,
-                                   const GaussianSplatRenderSettings& settings,
-                                   bool& renderedAny);
-    void updateViews(nvrhi::IFramebuffer* framebuffer);
-    void recreateAccelStructs(nvrhi::ICommandList* commandList);
-    void uploadSubInstanceData(nvrhi::ICommandList* commandList);
-    void collectUncompressedTextures();
-    dm::float2 computeCameraJitter(uint frameIndex);
-    bool consumeShaderReloadRequest();
-    bool& accelerationStructRebuildRequested();
-    bool hasActivePickRequest() const;
-    bool showDeltaTree() const;
-    bool pickMaterialRequested() const;
-    bool pickInstanceRequested() const;
-    void clearPickRequests();
-    void resolvePickFeedback(const DebugFeedbackStruct& feedback);
-    bool consumeExperimentalPhotoScreenshot();
-    void captureScriptPreRender();
-    void captureScriptPostRender(std::function<bool(const char* fileName)> saveTexture);
-    ::ZoomTool* getOrCreateZoomTool();
+    bool                                    ShowDeltaTree() const;
+    void                                    ResolvePickFeedback(const DebugFeedbackStruct& feedback);
+    bool                                    ConsumeExperimentalPhotoScreenshot();
+    void                                    CaptureScriptPreRender();
+    void                                    CaptureScriptPostRender(std::function<bool(const char* fileName)> saveTexture);
+    ::ZoomTool*                             GetOrCreateZoomTool();
 
     // --- Pipeline variant accessors ---
     std::shared_ptr<::PTPipelineVariant>& PtPipelineReference();
@@ -259,12 +229,9 @@ public:
     void PathTrace(nvrhi::IFramebuffer* framebuffer, const SampleConstants& constants);
     void Denoise(nvrhi::IFramebuffer* framebuffer);
     void PostProcessAA(nvrhi::IFramebuffer* framebuffer, bool reset);
-    std::string GetMaterialSpecializationShader() const;
-    bool NeedsRasterPrecompute() { return false; }
 
     void OnRenderTargetsRecreated() { }
     void AddCustomBindings(nvrhi::BindingSetDesc& bindingSetDesc) { }
-    void UpdateViews(nvrhi::IFramebuffer* framebuffer);
 
     void onEvent(caustica::Event& event);
 
@@ -317,8 +284,6 @@ public:
 protected:
     void InvalidateBindingSet();
     void RecreateBindingSet();
-    [[nodiscard]] caustica::CameraUpdateParams makeCameraUpdateParams() const;
-    ::ZoomTool* GetOrCreateZoomTool();
 
     PathTracerSettings& m_settings;
     caustica::render::RenderRuntimeState& m_renderState;

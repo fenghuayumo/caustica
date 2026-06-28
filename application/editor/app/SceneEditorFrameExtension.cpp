@@ -17,38 +17,38 @@ void SceneEditorFrameExtension::onFrameEvent(render::PathTracingFrameEvent& even
     switch (event.framePhase)
     {
     case render::PathTracingFramePhase::PreRender:
-        m_sceneEditor.captureScriptPreRender();
+        m_sceneEditor.CaptureScriptPreRender();
         break;
 
     case render::PathTracingFramePhase::RenderTargetsRecreated:
-        m_sceneEditor.onRenderTargetsRecreated();
+        m_sceneEditor.OnRenderTargetsRecreated();
         break;
 
     case render::PathTracingFramePhase::IdleMaintenance:
-        m_sceneEditor.collectUncompressedTextures();
+        m_sceneEditor.CollectUncompressedTextures();
         break;
 
     case render::PathTracingFramePhase::BeforePathTrace:
         if (event.pathTraceDebug)
-            event.pathTraceDebug->exploreDeltaTree = m_sceneEditor.showDeltaTree();
+            event.pathTraceDebug->exploreDeltaTree = m_sceneEditor.ShowDeltaTree();
         break;
 
     case render::PathTracingFramePhase::PopulateBindingSet:
         if (event.bindingSetDesc)
-            m_sceneEditor.addCustomBindings(*event.bindingSetDesc);
+            m_sceneEditor.AddCustomBindings(*event.bindingSetDesc);
         break;
 
     case render::PathTracingFramePhase::BeforeFinalBlit:
         if (event.commandList && event.ldrColor)
         {
-            if (ZoomTool* zoom = m_sceneEditor.getOrCreateZoomTool())
+            if (ZoomTool* zoom = m_sceneEditor.GetOrCreateZoomTool())
                 zoom->Render(event.commandList, event.ldrColor);
         }
         break;
 
     case render::PathTracingFramePhase::AfterPickResolved:
         if (event.pickFeedback)
-            m_sceneEditor.resolvePickFeedback(*event.pickFeedback);
+            m_sceneEditor.ResolvePickFeedback(*event.pickFeedback);
         break;
 
     case render::PathTracingFramePhase::PostRender:
@@ -56,12 +56,12 @@ void SceneEditorFrameExtension::onFrameEvent(render::PathTracingFrameEvent& even
         {
             if (event.postRender->saveFramebuffer)
             {
-                m_sceneEditor.captureScriptPostRender(
+                m_sceneEditor.CaptureScriptPostRender(
                     [save = event.postRender->saveFramebuffer](const char* fileName) {
                         return (*save)(fileName);
                     });
             }
-            if (m_sceneEditor.consumeExperimentalPhotoScreenshot())
+            if (m_sceneEditor.ConsumeExperimentalPhotoScreenshot())
                 event.postRender->experimentalScreenshotRequested = true;
         }
         break;

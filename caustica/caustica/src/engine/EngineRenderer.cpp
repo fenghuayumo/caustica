@@ -13,6 +13,7 @@
 #include <render/Core/CommonRenderPasses.h>
 #include <render/Core/RenderCore.h>
 #include <render/SceneGaussianSplatPasses.h>
+#include <render/SceneLightingPasses.h>
 #include <render/SceneRayTracingResources.h>
 #include <render/WorldRenderer/PathTracingWorldRenderer.h>
 #include <render/WorldRenderer/PathTracingContext.h>
@@ -66,42 +67,78 @@ bool EngineRenderer::initialize(GpuDevice& gpuDevice,
     return true;
 }
 
-void EngineRenderer::createPathTracer(render::PathTracingContext context)
+void EngineRenderer::createPathTracer(const PathTracerSessionParams& session)
 {
-    m_pathTracingContext = std::make_unique<render::PathTracingContext>(std::move(context));
+    auto& lighting = session.lighting;
+
+    m_pathTracingContext = std::make_unique<render::PathTracingContext>(render::PathTracingContext{
+        .gpuDevice = session.gpuDevice,
+        .sceneManager = *m_sceneManager,
+        .renderCore = *m_renderCore,
+        .settings = session.settings,
+        .runtimeState = session.runtimeState,
+        .rayTracing = session.rayTracing,
+        .gaussianSplats = session.gaussianSplats,
+        .lighting = session.lighting,
+        .shaderFactory = m_shaderFactory,
+        .commonPasses = m_commonPasses,
+        .bindingCache = *m_bindingCache,
+        .textureCache = m_textureCache,
+        .descriptorTable = m_descriptorTable,
+        .envMapBaker = lighting.envMapBaker(),
+        .lightsBaker = lighting.lightsBaker(),
+        .materialsBaker = lighting.materialsBaker(),
+        .ommBaker = lighting.ommBaker(),
+        .computePipelineBaker = lighting.computePipelineBaker(),
+        .lights = lighting.lights(),
+        .envMapSceneParams = lighting.envMapSceneParams(),
+        .envMapLocalPath = lighting.envMapLocalPath(),
+        .envMapOverride = lighting.envMapOverride(),
+        .sceneTime = session.sceneTime,
+        .gaussianSplatEmissionProxies = session.gaussianSplatEmissionProxies,
+        .progressInitializingRenderer = session.progressInitializingRenderer,
+        .asyncLoadingInProgress = session.asyncLoadingInProgress,
+        .benchStart = session.benchStart,
+        .benchLast = session.benchLast,
+        .benchFrames = session.benchFrames,
+        .frameExtensions = session.frameExtensions,
+    });
+
     m_worldRenderer = std::make_unique<render::PathTracingWorldRenderer>(*m_pathTracingContext);
     m_worldRenderer->createBindingLayouts(m_bindlessLayout);
+
+    attachScenePasses(session);
 }
 
-void EngineRenderer::attachScenePasses(GpuDevice& gpuDevice, const ScenePassAttachment& passes)
+void EngineRenderer::attachScenePasses(const PathTracerSessionParams& session)
 {
     assert(m_worldRenderer != nullptr);
 
-    passes.rayTracingResources.attach(
-        gpuDevice,
+    session.rayTracing.attach(
+        session.gpuDevice,
         *m_sceneManager,
         *m_renderCore,
         *m_worldRenderer,
-        passes.settings,
-        passes.invalidation,
-        passes.lightingPasses,
+        session.settings,
+        session.runtimeState.Invalidation,
+        session.lighting,
         *m_bindingCache);
 
-    passes.gaussianSplatPasses.attach(
-        gpuDevice,
+    session.gaussianSplats.attach(
+        session.gpuDevice,
         *m_sceneManager,
         *m_renderCore,
         *m_worldRenderer,
-        passes.settings,
-        passes.gaussianSplatsSummary,
+        session.settings,
+        session.runtimeState.GaussianSplats,
         m_shaderFactory,
         m_commonPasses);
 
-    passes.gaussianSplatPasses.setOnRequestFullRebuild(
-        [&rayTracing = passes.rayTracingResources]() { rayTracing.requestFullRebuild(); });
+    session.gaussianSplats.setOnRequestFullRebuild(
+        [&rayTracing = session.rayTracing]() { rayTracing.requestFullRebuild(); });
 
-    passes.rayTracingResources.setAdditionalAccelStructBuilder(
-        [&gaussianSplats = passes.gaussianSplatPasses](nvrhi::ICommandList* commandList) {
+    session.rayTracing.setAdditionalAccelStructBuilder(
+        [&gaussianSplats = session.gaussianSplats](nvrhi::ICommandList* commandList) {
             gaussianSplats.buildAccelStructs(commandList);
         });
 }

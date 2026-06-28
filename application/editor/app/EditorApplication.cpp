@@ -242,16 +242,23 @@ EditorApplication::StartupResult EditorApplication::startup(int argc, const char
         *m_engineRenderer->sceneManager(),
         *m_engineRenderer->renderCore());
 
-    m_engineRenderer->createPathTracer(buildPathTracingContext());
-    m_sceneEditor.AttachWorldRenderer(m_engineRenderer->worldRenderer());
-    m_engineRenderer->attachScenePasses(*m_GpuDevice, caustica::ScenePassAttachment{
-        .rayTracingResources = m_rayTracingResources,
-        .gaussianSplatPasses = m_gaussianSplatPasses,
-        .lightingPasses = m_lightingPasses,
+    m_engineRenderer->createPathTracer(caustica::PathTracerSessionParams{
+        .gpuDevice = *m_GpuDevice,
         .settings = m_sceneEditor.GetPathTracerSettings(),
-        .invalidation = m_sceneEditor.GetRenderRuntimeState().Invalidation,
-        .gaussianSplatsSummary = m_sceneEditor.GetRenderRuntimeState().GaussianSplats,
+        .runtimeState = m_sceneEditor.GetRenderRuntimeState(),
+        .rayTracing = m_rayTracingResources,
+        .gaussianSplats = m_gaussianSplatPasses,
+        .lighting = m_lightingPasses,
+        .sceneTime = m_sceneEditor.GetSceneTimeRef(),
+        .gaussianSplatEmissionProxies = m_gaussianSplatPasses.emissionProxies(),
+        .progressInitializingRenderer = m_sceneEditor.GetProgressInitializingRenderer(),
+        .asyncLoadingInProgress = m_sceneEditor.GetAsyncLoadingInProgressRef(),
+        .benchStart = m_sceneEditor.GetBenchStart(),
+        .benchLast = m_sceneEditor.GetBenchLast(),
+        .benchFrames = m_sceneEditor.GetBenchFrames(),
+        .frameExtensions = m_frameExtensions,
     });
+    m_sceneEditor.AttachWorldRenderer(m_engineRenderer->worldRenderer());
     assert(m_rayTracingResources.isAttached() && m_gaussianSplatPasses.isAttached());
 
     m_sceneEditor.Init(preferredScene, m_engineRenderer->shaderFactory());
@@ -615,42 +622,6 @@ bool EditorApplication::CheckDeviceFeatureSupport(const caustica::DeviceCreation
     }
 
     return true;
-}
-
-caustica::render::PathTracingContext EditorApplication::buildPathTracingContext()
-{
-    return caustica::render::PathTracingContext{
-        .gpuDevice = *m_GpuDevice,
-        .sceneManager = *m_engineRenderer->sceneManager(),
-        .renderCore = *m_engineRenderer->renderCore(),
-        .settings = m_sceneEditor.GetPathTracerSettings(),
-        .runtimeState = m_sceneEditor.GetRenderRuntimeState(),
-        .rayTracing = m_rayTracingResources,
-        .gaussianSplats = m_gaussianSplatPasses,
-        .lighting = m_lightingPasses,
-        .shaderFactory = m_engineRenderer->shaderFactoryRef(),
-        .commonPasses = m_engineRenderer->commonPassesRef(),
-        .bindingCache = *m_engineRenderer->bindingCache(),
-        .textureCache = m_engineRenderer->textureLoaderRef(),
-        .descriptorTable = m_engineRenderer->descriptorTableRef(),
-        .envMapBaker = m_lightingPasses.envMapBaker(),
-        .lightsBaker = m_lightingPasses.lightsBaker(),
-        .materialsBaker = m_lightingPasses.materialsBaker(),
-        .ommBaker = m_lightingPasses.ommBaker(),
-        .computePipelineBaker = m_lightingPasses.computePipelineBaker(),
-        .lights = m_lightingPasses.lights(),
-        .envMapSceneParams = m_lightingPasses.envMapSceneParams(),
-        .envMapLocalPath = m_lightingPasses.envMapLocalPath(),
-        .envMapOverride = m_lightingPasses.envMapOverride(),
-        .sceneTime = m_sceneEditor.GetSceneTimeRef(),
-        .gaussianSplatEmissionProxies = m_gaussianSplatPasses.emissionProxies(),
-        .progressInitializingRenderer = m_sceneEditor.GetProgressInitializingRenderer(),
-        .asyncLoadingInProgress = m_sceneEditor.GetAsyncLoadingInProgressRef(),
-        .benchStart = m_sceneEditor.GetBenchStart(),
-        .benchLast = m_sceneEditor.GetBenchLast(),
-        .benchFrames = m_sceneEditor.GetBenchFrames(),
-        .frameExtensions = m_frameExtensions,
-    };
 }
 
 bool EditorApplication::IsSERSupported() const

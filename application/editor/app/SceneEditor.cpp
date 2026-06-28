@@ -558,28 +558,6 @@ void SceneEditor::UpdateCameraFromScene( const std::shared_ptr<caustica::Perspec
     }
 }
 
-void SceneEditor::UpdateViews( nvrhi::IFramebuffer* framebuffer )
-{
-    (void)framebuffer;
-    m_renderCore->camera().updateViews(makeCameraUpdateParams());
-}
-
-caustica::CameraUpdateParams SceneEditor::makeCameraUpdateParams() const
-{
-    auto& r = *m_worldRenderer;
-    caustica::CameraUpdateParams params;
-    params.renderSize = r.getRenderSize();
-    params.displayAspectRatio = r.getDisplayAspectRatio();
-    params.sampleIndex = r.getSampleIndex();
-    params.frameIndex = r.getFrameIndex();
-    params.realtimeMode = m_settings.RealtimeMode;
-    params.realtimeAA = m_settings.RealtimeAA;
-    params.dbgFreezeRealtimeNoiseSeed = m_settings.DbgFreezeRealtimeNoiseSeed;
-    params.temporalAAJitter = m_settings.TemporalAntiAliasingJitter;
-    params.temporalAAPass = r.getTemporalAntiAliasingPass();
-    return params;
-}
-
 void SceneEditor::CollectUncompressedTextures()
 {
     // Make a list of uncompressed textures
@@ -1362,18 +1340,6 @@ static void ReadRGBA16Float3Staging(nvrhi::IDevice* device, nvrhi::IStagingTextu
     device->unmapStagingTexture(stagingTexture);
 }
 
-
-
-
-
-
-
-dm::float2 SceneEditor::ComputeCameraJitter(uint frameIndex)
-{
-    (void)frameIndex;
-    return m_renderCore->camera().computeJitter(makeCameraUpdateParams());
-}
-
 nvrhi::ITexture* SceneEditor::GetLdrColorTexture() const
 {
     const auto* targets = m_worldRenderer ? m_worldRenderer->getRenderTargets() : nullptr;
@@ -1447,7 +1413,7 @@ std::shared_ptr<::PTPipelineVariant>& SceneEditor::PtPipelineEdgeDetection()
 }
 
 // =============================================================================
-// PathTracingHooks implementations (editor-side)
+// Render entry points
 // =============================================================================
 
 void SceneEditor::Render(nvrhi::IFramebuffer* framebuffer)
@@ -1482,92 +1448,12 @@ void SceneEditor::PostProcessAA(nvrhi::IFramebuffer* framebuffer, bool reset)
     GetWorldRenderer()->postProcessAA(framebuffer, reset);
 }
 
-std::string SceneEditor::GetMaterialSpecializationShader() const
+bool SceneEditor::ShowDeltaTree() const
 {
-    return "PathTracerMaterialSpecializations.hlsl";
+    return m_editor.ShowDeltaTree;
 }
 
-std::string SceneEditor::getMaterialSpecializationShader() const
-{
-    return GetMaterialSpecializationShader();
-}
-
-void SceneEditor::fillPTPipelineGlobalMacros(std::vector<caustica::ShaderMacro>& macros)
-{
-    GetRayTracingResources().fillPTPipelineGlobalMacros(macros);
-}
-
-void SceneEditor::sampleRenderCode(nvrhi::IFramebuffer* framebuffer, nvrhi::CommandListHandle commandList, const SampleConstants& constants)
-{
-    GetRayTracingResources().sampleRenderCode(framebuffer, commandList, constants);
-}
-
-void SceneEditor::createRTPipelines()
-{
-    GetRayTracingResources().createRTPipelines();
-}
-
-void SceneEditor::addCustomBindings(nvrhi::BindingSetDesc& bindingSetDesc)
-{
-    AddCustomBindings(bindingSetDesc);
-}
-
-void SceneEditor::onRenderTargetsRecreated()
-{
-    OnRenderTargetsRecreated();
-}
-
-void SceneEditor::prepareGaussianSplatPasses()
-{
-    GetGaussianSplatPasses().preparePasses();
-}
-
-void SceneEditor::buildGaussianSplatEmissionProxyList()
-{
-    GetGaussianSplatPasses().buildEmissionProxyList();
-}
-
-bool SceneEditor::isGaussianSplatEmissionEnabled() const
-{
-    return GetGaussianSplatPasses().isEmissionEnabled();
-}
-
-bool SceneEditor::gaussianSplatObjectsEmpty() const
-{
-    return GetGaussianSplatPasses().objectsEmpty();
-}
-
-caustica::render::GaussianSplatBinding SceneEditor::getPrimaryGaussianSplatBinding() const
-{
-    return GetGaussianSplatPasses().getPrimaryBinding();
-}
-
-void SceneEditor::renderSceneGaussianSplats(nvrhi::ICommandList* commandList,
-    const caustica::PlanarView& splatView, RenderTargets& renderTargets,
-    const GaussianSplatRenderSettings& settings, bool& renderedAny)
-{
-    GetGaussianSplatPasses().renderSceneGaussianSplats(commandList, splatView, renderTargets, settings, renderedAny);
-}
-
-void SceneEditor::updateViews(nvrhi::IFramebuffer* framebuffer) { UpdateViews(framebuffer); }
-void SceneEditor::recreateAccelStructs(nvrhi::ICommandList* commandList) { RecreateAccelStructs(commandList); }
-void SceneEditor::uploadSubInstanceData(nvrhi::ICommandList* commandList) { UploadSubInstanceData(commandList); }
-void SceneEditor::collectUncompressedTextures() { CollectUncompressedTextures(); }
-dm::float2 SceneEditor::computeCameraJitter(uint frameIndex) { return ComputeCameraJitter(frameIndex); }
-
-bool SceneEditor::consumeShaderReloadRequest()
-{
-    return GetRayTracingResources().consumeShaderReloadRequest();
-}
-
-bool& SceneEditor::accelerationStructRebuildRequested() { return GetRayTracingResources().accelerationStructRebuildRequested(); }
-bool SceneEditor::hasActivePickRequest() const { return m_renderState.Picking.hasActivePickRequest(); }
-bool SceneEditor::showDeltaTree() const { return m_editor.ShowDeltaTree; }
-bool SceneEditor::pickMaterialRequested() const { return m_renderState.Picking.MaterialRequested; }
-bool SceneEditor::pickInstanceRequested() const { return m_renderState.Picking.InstanceRequested; }
-void SceneEditor::clearPickRequests() { m_renderState.Picking.clearPickRequests(); }
-
-void SceneEditor::resolvePickFeedback(const DebugFeedbackStruct& feedback)
+void SceneEditor::ResolvePickFeedback(const DebugFeedbackStruct& feedback)
 {
     if (m_renderState.Picking.MaterialRequested)
         m_editor.SelectedMaterial = FindMaterial(int(feedback.pickedMaterialID));
@@ -1579,26 +1465,24 @@ void SceneEditor::resolvePickFeedback(const DebugFeedbackStruct& feedback)
     }
 }
 
-bool SceneEditor::consumeExperimentalPhotoScreenshot()
+bool SceneEditor::ConsumeExperimentalPhotoScreenshot()
 {
-    if (!m_editor.ExperimentalPhotoModeScreenshot) return false;
+    if (!m_editor.ExperimentalPhotoModeScreenshot)
+        return false;
     m_editor.ExperimentalPhotoModeScreenshot = false;
     return true;
 }
 
-void SceneEditor::captureScriptPreRender()
+void SceneEditor::CaptureScriptPreRender()
 {
-    if (m_captureScriptManager) m_captureScriptManager->PreRender();
+    if (m_captureScriptManager)
+        m_captureScriptManager->PreRender();
 }
 
-void SceneEditor::captureScriptPostRender(std::function<bool(const char* fileName)> saveTexture)
+void SceneEditor::CaptureScriptPostRender(std::function<bool(const char* fileName)> saveTexture)
 {
-    if (m_captureScriptManager) m_captureScriptManager->PostRender(saveTexture);
-}
-
-ZoomTool* SceneEditor::getOrCreateZoomTool()
-{
-    return GetOrCreateZoomTool();
+    if (m_captureScriptManager)
+        m_captureScriptManager->PostRender(saveTexture);
 }
 
 // =============================================================================

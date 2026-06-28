@@ -111,7 +111,6 @@ private:
         caustica::DeviceCreationParameters& deviceParams, std::string& preferredScene);
     bool InitDeviceAndWindow(const caustica::DeviceCreationParameters& deviceParams);
     bool CheckDeviceFeatureSupport(const caustica::DeviceCreationParameters& deviceParams);
-    caustica::render::PathTracingContext buildPathTracingContext();
     void syncPassesToBackBuffer();
 
     CommandLineOptions CmdLine;

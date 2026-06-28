@@ -1,11 +1,15 @@
 #pragma once
 
+#include <chrono>
 #include <functional>
 #include <memory>
+#include <span>
+#include <vector>
 
 #include <rhi/nvrhi.h>
 #include <render/Core/PathTracerSettings.h>
-#include <render/RenderRuntimeState.h>
+#include <render/WorldRenderer/PathTracingContext.h>
+#include <render/WorldRenderer/PathTracingFrameExtension.h>
 
 class SceneManager;
 
@@ -17,6 +21,7 @@ class BindlessTable;
 class CommonRenderPasses;
 class DescriptorTableManager;
 class GpuDevice;
+class ProgressBar;
 class RenderCore;
 class SceneTypeFactory;
 class ShaderFactory;
@@ -32,7 +37,6 @@ class SceneRayTracingResources;
 namespace render
 {
 class PathTracingWorldRenderer;
-struct PathTracingContext;
 } // namespace render
 
 struct EngineSceneCallbacks
@@ -41,14 +45,28 @@ struct EngineSceneCallbacks
     std::function<void()> OnSceneUnloading;
 };
 
-struct ScenePassAttachment
+// Per-session inputs for creating the path tracer; app layer only passes scene/editor state.
+struct PathTracerSessionParams
 {
-    editor::SceneRayTracingResources& rayTracingResources;
-    editor::SceneGaussianSplatPasses& gaussianSplatPasses;
-    editor::SceneLightingPasses& lightingPasses;
+    GpuDevice& gpuDevice;
     PathTracerSettings& settings;
-    render::RenderInvalidationState& invalidation;
-    render::GaussianSplatSceneSummary& gaussianSplatsSummary;
+    render::RenderRuntimeState& runtimeState;
+
+    editor::SceneRayTracingResources& rayTracing;
+    editor::SceneGaussianSplatPasses& gaussianSplats;
+    editor::SceneLightingPasses& lighting;
+
+    double& sceneTime;
+    std::vector<GaussianSplatEmissionProxy>& gaussianSplatEmissionProxies;
+
+    ProgressBar& progressInitializingRenderer;
+    bool& asyncLoadingInProgress;
+
+    std::chrono::high_resolution_clock::time_point& benchStart;
+    std::chrono::high_resolution_clock::time_point& benchLast;
+    int& benchFrames;
+
+    std::span<render::IPathTracingFrameExtension* const> frameExtensions = {};
 };
 
 // Owns shared GPU infrastructure and the path-tracing world renderer.
@@ -65,8 +83,7 @@ public:
         std::shared_ptr<SceneTypeFactory> sceneTypeFactory,
         EngineSceneCallbacks sceneCallbacks = {});
 
-    void createPathTracer(render::PathTracingContext context);
-    void attachScenePasses(GpuDevice& gpuDevice, const ScenePassAttachment& passes);
+    void createPathTracer(const PathTracerSessionParams& session);
 
     void shutdown();
     void endFrame();
@@ -88,6 +105,7 @@ public:
 
 private:
     void createShaderFactory(GpuDevice& gpuDevice);
+    void attachScenePasses(const PathTracerSessionParams& session);
 
     nvrhi::BindingLayoutHandle m_bindlessLayout;
     std::shared_ptr<ShaderFactory> m_shaderFactory;

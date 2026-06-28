@@ -29,6 +29,7 @@
 #include <render/SceneLightingPasses.h>
 #include <render/SceneRayTracingResources.h>
 #include <render/WorldRenderer/PathTracingFrameExtension.h>
+#include <engine/EngineRenderer.h>
 
 #include <core/command_line.h>
 #include <EditorUI.h>
@@ -129,7 +130,6 @@ public:
 private:
     bool InitDevice();
     bool InitRenderer();
-    caustica::render::PathTracingContext buildPathTracingContext();
     void Shutdown();
 
     Config                                          m_config;
