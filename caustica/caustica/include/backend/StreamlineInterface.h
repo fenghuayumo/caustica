@@ -1,13 +1,15 @@
 #pragma once
 
-// Caustica engine Streamline interface
-#include <render/Core/View.h>
+// Streamline SDK integration surface (DLSS / Reflex / DLSS-FG / NIS / DeepDVC).
+// Owned by the backend layer; implemented by StreamlineIntegration in engine/.
 #include <math/math.h>
 #include <rhi/nvrhi.h>
 
-namespace caustica 
+namespace caustica
 {
+
 class GpuDevice;
+class IView;
 
 class StreamlineInterface
 {
@@ -327,14 +329,14 @@ public:
 
     virtual void TagResourcesGeneral(
         nvrhi::ICommandList* commandList,
-        const caustica::IView* view,
+        const IView* view,
         nvrhi::ITexture* motionVectors,
         nvrhi::ITexture* depth,
         nvrhi::ITexture* finalColorHudless) = 0;
 
     virtual void TagResourcesDLSSNIS(
         nvrhi::ICommandList* commandList,
-        const caustica::IView* view,
+        const IView* view,
         nvrhi::ITexture* output,
         nvrhi::ITexture* input) = 0;
 
@@ -345,7 +347,7 @@ public:
 
     virtual void TagResourcesDeepDVC(
         nvrhi::ICommandList* commandList,
-        const caustica::IView* view,
+        const IView* view,
         nvrhi::ITexture* output) = 0;
 
     virtual void UnTagResourcesDeepDVC() = 0;
@@ -357,7 +359,7 @@ public:
 	//   documentation for more detail.
     virtual void TagResourcesDLSSRR(
         nvrhi::ICommandList* commandList,
-        const caustica::IView* view,
+        const IView* view,
         dm::int2 renderSize,
         dm::int2 displaySize,
         nvrhi::ITexture* inputColor,
@@ -377,6 +379,5 @@ public:
     virtual void PresentStart(GpuDevice& manager) = 0;
     virtual void PresentEnd(GpuDevice& manager) = 0;
 };
-
 
 } // namespace caustica

@@ -23,7 +23,7 @@
 #include <vector>
 
 #include <backend/GpuDevice.h>
-#include <render/Core/View.h>
+#include <scene/View.h>
 
 class GaussianSplatPass;
 class RenderTargets;
@@ -51,7 +51,7 @@ struct WorldRendererGaussianSplatBinding
     dm::float4x4             objectToWorld = dm::float4x4::identity();
 };
 
-// Pipeline hooks — callbacks wired by the app during init (DIVSHOT-style).
+// Pipeline hooks - callbacks wired by the app during init (DIVSHOT-style).
 struct WorldRendererPipelineHooks
 {
     std::function<bool()>                                         needsRasterPrecompute;

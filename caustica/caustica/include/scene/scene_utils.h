@@ -1,5 +1,7 @@
 #pragma once
 
+#include <core/scene_discovery.h>
+
 #include <filesystem>
 #include <memory>
 #include <string>
@@ -12,10 +14,7 @@ class IFileSystem;
 class Light;
 class EnvironmentLight;
 
-// Searches 'path' (and direct subdirectories) for scene files
-// (.scene.json, .gltf, .glb, .obj).
-std::vector<std::string> FindScenes(IFileSystem& fs,
-    const std::filesystem::path& path);
+// Scene discovery: FindScenes() lives in core/scene_discovery.h (included above).
 
 // Returns true for mesh files that can be loaded directly as a scene.
 bool IsDirectMeshSceneFile(const std::filesystem::path& sceneFileName);

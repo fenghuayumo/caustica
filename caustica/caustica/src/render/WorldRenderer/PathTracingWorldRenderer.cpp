@@ -8,7 +8,7 @@ namespace { constexpr int c_SwapchainCount = 3; }
 #include <render/Core/PTPipelineBaker.h>
 #include <render/Core/ComputePipelineBaker.h>
 #include <render/Core/BindingCache.h>
-#include <render/Core/View.h>
+#include <scene/View.h>
 #include <render/Core/FramebufferFactory.h>
 #include <render/Core/AccelerationStructureUtil.h>
 #include <render/Passes/Lighting/Distant/EnvMapImportanceSamplingBaker.h>
@@ -36,7 +36,7 @@ namespace { constexpr int c_SwapchainCount = 3; }
 #include <render/Passes/Debug/Korgi.h>
 
 #if CAUSTICA_WITH_STREAMLINE
-#include <engine/StreamlineInterface.h>
+#include <backend/StreamlineInterface.h>
 #endif
 #if CAUSTICA_WITH_NATIVE_DLSS
 #include <render/Passes/Geometry/DLSS.h>

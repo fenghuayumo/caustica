@@ -24,7 +24,7 @@ using namespace caustica;
 IesProfileLoader::IesProfileLoader(
     nvrhi::IDevice* device, 
     std::shared_ptr<ShaderFactory> shaderFactory, 
-    std::shared_ptr<DescriptorTableManager> descriptorTableManager)
+    std::shared_ptr<IDescriptorTableManager> descriptorTableManager)
     : m_Device(device)
     , m_ShaderFactory(shaderFactory)
     , m_DescriptorTableManager(descriptorTableManager)

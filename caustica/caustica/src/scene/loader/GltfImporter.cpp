@@ -1,7 +1,7 @@
 #define CGLTF_IMPLEMENTATION
 #include <cgltf.h>
 
-#include <assets/loader/GltfImporter.h>
+#include <scene/loader/GltfImporter.h>
 #include <assets/loader/TextureLoader.h>
 #include <scene/SceneGraph.h>
 #include <core/vfs/VFS.h>

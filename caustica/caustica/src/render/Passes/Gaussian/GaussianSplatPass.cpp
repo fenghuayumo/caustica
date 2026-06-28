@@ -6,7 +6,7 @@
 #include <core/log.h>
 #include <render/Core/FramebufferFactory.h>
 #include <assets/loader/ShaderFactory.h>
-#include <render/Core/View.h>
+#include <scene/View.h>
 #include <shaders/view_cb.h>
 #include <rhi/utils.h>
 

@@ -5,7 +5,7 @@
 #include <math/math.h>
 
 #if CAUSTICA_WITH_STREAMLINE
-#include <engine/StreamlineInterface.h>
+#include <backend/StreamlineInterface.h>
 #endif
 
 class RenderTargets;

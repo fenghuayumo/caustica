@@ -7,7 +7,7 @@ static_assert(NRD_VERSION_MAJOR >= 4 && NRD_VERSION_MINOR >= 15, "Unsupported NR
 #include <render/Core/RenderTargets.h>
 #include <rhi/utils.h>
 #include <math/math.h>
-#include <render/Core/View.h>
+#include <scene/View.h>
 #include <assets/loader/ShaderFactory.h>
 #include <sstream>
 #include <core/log.h>

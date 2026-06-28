@@ -1,5 +1,6 @@
 #pragma once
 
+#include <backend/IDescriptorTableManager.h>
 #include <rhi/nvrhi.h>
 #include <memory>
 #include <filesystem>
@@ -12,7 +13,7 @@ namespace caustica
 namespace caustica
 {
     class ShaderFactory;
-    class DescriptorTableManager;
+    class IDescriptorTableManager;
 
     struct IesProfile
     {
@@ -30,13 +31,13 @@ namespace caustica
         nvrhi::BindingLayoutHandle m_BindingLayout;
 
         std::shared_ptr<caustica::ShaderFactory> m_ShaderFactory;
-        std::shared_ptr<caustica::DescriptorTableManager> m_DescriptorTableManager;
+        std::shared_ptr<caustica::IDescriptorTableManager> m_DescriptorTableManager;
 
     public:
         IesProfileLoader(
             nvrhi::IDevice* device,
             std::shared_ptr<caustica::ShaderFactory> shaderFactory,
-            std::shared_ptr<caustica::DescriptorTableManager> descriptorTableManager);
+            std::shared_ptr<caustica::IDescriptorTableManager> descriptorTableManager);
 
         std::shared_ptr<IesProfile> LoadIesProfile(caustica::IFileSystem& fs, const std::filesystem::path& path);
 

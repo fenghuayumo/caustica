@@ -2,7 +2,7 @@
 #include <render/Core/FramebufferFactory.h>
 #include <assets/loader/ShaderFactory.h>
 #include <render/Core/CommonRenderPasses.h>
-#include <render/Core/View.h>
+#include <scene/View.h>
 
 #if CAUSTICA_WITH_STATIC_SHADERS
 #if CAUSTICA_WITH_DX11

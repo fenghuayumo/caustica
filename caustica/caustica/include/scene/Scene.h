@@ -1,7 +1,7 @@
 #pragma once
 
 #include <scene/SceneGraph.h>
-#include <render/Core/DescriptorTableManager.h>
+#include <backend/IDescriptorTableManager.h>
 #include <rhi/nvrhi.h>
 #include <vector>
 #include <memory>
@@ -27,7 +27,6 @@ namespace caustica
     struct SceneImportResult;
     class TextureLoader;
     class ThreadPool;
-    class DescriptorTableManager;
     class GltfImporter;
     class ObjImporter;
     
@@ -37,7 +36,7 @@ namespace caustica
         std::shared_ptr<caustica::IFileSystem> m_fs;
         std::shared_ptr<SceneTypeFactory> m_SceneTypeFactory;
         std::shared_ptr<TextureLoader> m_TextureLoader;
-        std::shared_ptr<DescriptorTableManager> m_DescriptorTable;
+        std::shared_ptr<IDescriptorTableManager> m_DescriptorTable;
         std::shared_ptr<SceneGraph> m_SceneGraph;
         std::shared_ptr<GltfImporter> m_GltfImporter;
         std::shared_ptr<ObjImporter> m_ObjImporter;
@@ -119,7 +118,7 @@ namespace caustica
             ShaderFactory& shaderFactory,
             std::shared_ptr<caustica::IFileSystem> fs,
             std::shared_ptr<TextureLoader> textureCache,
-            std::shared_ptr<DescriptorTableManager> descriptorTable,
+            std::shared_ptr<IDescriptorTableManager> descriptorTable,
             std::shared_ptr<SceneTypeFactory> sceneTypeFactory);
 
         void FinishedLoading(uint32_t frameIndex);

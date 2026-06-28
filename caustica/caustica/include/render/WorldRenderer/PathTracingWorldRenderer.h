@@ -21,7 +21,7 @@
 #include <vector>
 
 #if CAUSTICA_WITH_STREAMLINE
-#include <engine/StreamlineInterface.h>
+#include <backend/StreamlineInterface.h>
 #endif
 #if CAUSTICA_WITH_NATIVE_DLSS
 #include <render/Passes/Geometry/DLSS.h>

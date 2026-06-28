@@ -21,7 +21,7 @@ using namespace caustica::math;
 #endif
 
 #if CAUSTICA_WITH_STREAMLINE
-#include <engine/StreamlineInterface.h>
+#include <backend/StreamlineInterface.h>
 #endif
 
 #include <render/Passes/Denoisers/NrdConfig.h>

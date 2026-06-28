@@ -5,7 +5,7 @@
 #include <render/Core/CommonRenderPasses.h>
 #include <assets/loader/TextureLoader.h>
 
-#include <engine/UserInterfaceUtils.h>
+#include <core/scope.h>
 
 #include <rhi/utils.h>
 

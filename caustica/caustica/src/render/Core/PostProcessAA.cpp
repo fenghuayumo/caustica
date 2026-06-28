@@ -1,7 +1,7 @@
 #include <render/Core/PostProcessAA.h>
 #include <render/Core/RenderCore.h>
 #include <render/Core/RenderTargets.h>
-#include <render/Core/View.h>
+#include <scene/View.h>
 #include <render/Passes/Geometry/TemporalAntiAliasingPass.h>
 #include <render/Passes/PostProcess/AccumulationPass.h>
 #include <render/Passes/PostProcess/PostProcess.h>
@@ -10,7 +10,7 @@
 #include <shaders/SampleConstantBuffer.h>
 
 #if CAUSTICA_WITH_STREAMLINE
-#include <engine/StreamlineInterface.h>
+#include <backend/StreamlineInterface.h>
 #endif
 
 #include <algorithm>

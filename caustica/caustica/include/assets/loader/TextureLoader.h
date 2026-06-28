@@ -1,7 +1,8 @@
 #pragma once
 
-#include <scene/SceneTypes.h>
+#include <assets/LoadedTexture.h>
 #include <assets/AssetId.h>
+#include <backend/IDescriptorTableManager.h>
 #include <core/log.h>
 
 #include <rhi/nvrhi.h>
@@ -57,7 +58,7 @@ namespace caustica
         nvrhi::CommandListHandle m_CommandList;
 
         std::queue<std::shared_ptr<TextureData>> m_TexturesToFinalize;
-        std::shared_ptr<DescriptorTableManager> m_DescriptorTable;
+        std::shared_ptr<IDescriptorTableManager> m_DescriptorTable;
         std::mutex m_TexturesToFinalizeMutex;
 
         std::shared_ptr<caustica::IFileSystem> m_fs;
@@ -97,7 +98,7 @@ namespace caustica
         TextureLoader(
             nvrhi::IDevice* device,
             std::shared_ptr<caustica::IFileSystem> fs,
-            std::shared_ptr<DescriptorTableManager> descriptorTable);
+            std::shared_ptr<IDescriptorTableManager> descriptorTable);
         virtual ~TextureLoader();
 
         // Release all cached textures

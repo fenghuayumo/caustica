@@ -112,7 +112,7 @@ void Application::bindFrameDriver(GpuDevice* dm)
 
 void Application::unbindFrameDriver(GpuDevice* dm)
 {
-    if (dm && dm->getFrameDriver() == this)
+    if (dm && dm->getFrameDriver() == static_cast<IGpuFrameDriver*>(this))
         dm->setFrameDriver(nullptr);
 }
 

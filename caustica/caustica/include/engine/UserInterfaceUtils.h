@@ -1,6 +1,7 @@
 #pragma once
 
 #include <math/math.h>
+#include <platform/file_dialog.h>
 #include <string>
 
 namespace caustica
@@ -14,9 +15,6 @@ namespace caustica
 
 namespace caustica
 {
-    bool FileDialog(bool bOpen, const char* pFilters, std::string& fileName);
-    bool FolderDialog(const char* pTitle, const char* pDefaultFolder, std::string& outFolderName);
-    
     bool MaterialEditor(Material* material, bool allowMaterialDomainChanges);
 
     bool LightEditor_Directional(DirectionalLight& light);

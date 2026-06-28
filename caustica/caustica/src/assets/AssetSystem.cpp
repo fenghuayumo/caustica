@@ -20,7 +20,7 @@ AssetSystem& AssetSystem::Get()
 void AssetSystem::Initialize(
     nvrhi::IDevice* device,
     std::shared_ptr<IFileSystem> fileSystem,
-    std::shared_ptr<DescriptorTableManager> descriptorTable)
+    std::shared_ptr<IDescriptorTableManager> descriptorTable)
 {
     auto& sys = Get();
     sys.m_TextureLoader = std::make_shared<TextureLoader>(
@@ -93,42 +93,6 @@ void AssetSystem::EvictTexturesToBudget()
 AssetId AssetSystem::RegisterMesh(const std::filesystem::path& path)
 {
     return m_Registry.Register(path, AssetType::Mesh);
-}
-
-RuntimeMeshLoadResult AssetSystem::LoadRuntimeMeshFile(
-    const RuntimeMeshLoadParams& params,
-    const std::filesystem::path& path)
-{
-    AssetId id = RegisterMesh(path);
-    m_Registry.SetState(id, AssetState::Loading);
-
-    RuntimeMeshLoadResult result = caustica::LoadRuntimeMeshFile(params, path);
-    m_Registry.SetState(id, result ? AssetState::Loaded : AssetState::Failed);
-    return result;
-}
-
-RuntimeMeshLoadResult AssetSystem::LoadRuntimeGltfMeshFile(
-    const RuntimeMeshLoadParams& params,
-    const std::filesystem::path& path)
-{
-    AssetId id = RegisterMesh(path);
-    m_Registry.SetState(id, AssetState::Loading);
-
-    RuntimeMeshLoadResult result = caustica::LoadRuntimeGltfMeshFile(params, path);
-    m_Registry.SetState(id, result ? AssetState::Loaded : AssetState::Failed);
-    return result;
-}
-
-RuntimeMeshLoadResult AssetSystem::LoadRuntimeObjMeshFile(
-    const RuntimeMeshLoadParams& params,
-    const std::filesystem::path& path)
-{
-    AssetId id = RegisterMesh(path);
-    m_Registry.SetState(id, AssetState::Loading);
-
-    RuntimeMeshLoadResult result = caustica::LoadRuntimeObjMeshFile(params, path);
-    m_Registry.SetState(id, result ? AssetState::Loaded : AssetState::Failed);
-    return result;
 }
 
 std::shared_ptr<LoadedTexture> AssetSystem::LoadTexture(

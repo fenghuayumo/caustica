@@ -3,7 +3,6 @@
 
 #include <render/Core/DescriptorTableManager.h>
 #include <render/Core/CommonRenderPasses.h>
-#include <engine/ConsoleObjects.h>
 #include <assets/loader/DDSFile.h>
 #include <core/ThreadPool.h>
 #include <core/vfs/VFS.h>
@@ -70,7 +69,7 @@ public:
 TextureLoader::TextureLoader(
     nvrhi::IDevice* device,
     std::shared_ptr<IFileSystem> fs,
-    std::shared_ptr<DescriptorTableManager> descriptorTable)
+    std::shared_ptr<IDescriptorTableManager> descriptorTable)
     : m_Device(device)
     , m_DescriptorTable(std::move(descriptorTable))
     , m_fs(std::move(fs))

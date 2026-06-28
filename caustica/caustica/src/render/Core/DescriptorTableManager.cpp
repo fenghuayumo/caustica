@@ -1,11 +1,13 @@
 #include <render/Core/DescriptorTableManager.h>
+#include <core/DescriptorHandle.h>
+#include <backend/IDescriptorTableManager.h>
 
 caustica::DescriptorHandle::DescriptorHandle()
     : m_DescriptorIndex(-1)
 {
 }
 
-caustica::DescriptorHandle::DescriptorHandle(const std::shared_ptr<DescriptorTableManager>& managerPtr, DescriptorIndex index)
+caustica::DescriptorHandle::DescriptorHandle(const std::shared_ptr<IDescriptorTableManager>& managerPtr, DescriptorIndex index)
     : m_Manager(managerPtr)
     , m_DescriptorIndex(index)
 {
@@ -27,7 +29,7 @@ caustica::DescriptorIndex caustica::DescriptorHandle::GetIndexInHeap() const
     if (m_DescriptorIndex >= 0)
     {
         assert(!m_Manager.expired());
-        if (std::shared_ptr<DescriptorTableManager> manager = m_Manager.lock())
+        if (std::shared_ptr<IDescriptorTableManager> manager = m_Manager.lock())
         {
             return manager->GetDescriptorTable()->getFirstDescriptorIndexInHeap() + m_DescriptorIndex;
         }

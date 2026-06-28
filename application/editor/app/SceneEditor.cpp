@@ -15,7 +15,7 @@
 
 #include <render/Core/PostProcessAA.h>
 #include <assets/AssetSystem.h>
-#include <assets/loader/RuntimeMeshLoader.h>
+#include <scene/loader/RuntimeMeshLoader.h>
 #include <render/Core/SceneMeshEditing.h>
 #include <scene/SceneRuntimeMutation.h>
 #include <render/Core/LightingUpdate.h>

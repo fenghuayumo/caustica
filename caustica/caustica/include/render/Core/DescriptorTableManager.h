@@ -1,6 +1,7 @@
 #pragma once
 
 #include <core/DescriptorHandle.h>
+#include <backend/IDescriptorTableManager.h>
 #include <rhi/nvrhi.h>
 #include <unordered_map>
 #include <memory>
@@ -8,7 +9,7 @@
 namespace caustica
 {
 
-    class DescriptorTableManager : public std::enable_shared_from_this<DescriptorTableManager>
+    class DescriptorTableManager : public IDescriptorTableManager, public std::enable_shared_from_this<DescriptorTableManager>
     {
     protected:
         // Custom hasher that doesn't look at the binding slot
@@ -52,11 +53,11 @@ namespace caustica
         DescriptorTableManager(nvrhi::IDevice* device, nvrhi::IBindingLayout* layout);
         ~DescriptorTableManager();
         
-        nvrhi::IDescriptorTable* GetDescriptorTable() const { return m_DescriptorTable; }
+        nvrhi::IDescriptorTable* GetDescriptorTable() const override { return m_DescriptorTable; }
 
-        DescriptorIndex CreateDescriptor(nvrhi::BindingSetItem item);
-        DescriptorHandle CreateDescriptorHandle(nvrhi::BindingSetItem item);
+        DescriptorIndex CreateDescriptor(nvrhi::BindingSetItem item) override;
+        DescriptorHandle CreateDescriptorHandle(nvrhi::BindingSetItem item) override;
         nvrhi::BindingSetItem GetDescriptor(DescriptorIndex index);
-        void ReleaseDescriptor(DescriptorIndex index);
+        void ReleaseDescriptor(DescriptorIndex index) override;
     };
 }

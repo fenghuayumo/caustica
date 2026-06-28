@@ -1,7 +1,7 @@
-#include <assets/loader/RuntimeMeshLoader.h>
+#include <scene/loader/RuntimeMeshLoader.h>
 
-#include <assets/loader/GltfImporter.h>
-#include <assets/loader/ObjImporter.h>
+#include <scene/loader/GltfImporter.h>
+#include <scene/loader/ObjImporter.h>
 #include <assets/loader/TextureLoader.h>
 #include <core/log.h>
 #include <core/vfs/VFS.h>

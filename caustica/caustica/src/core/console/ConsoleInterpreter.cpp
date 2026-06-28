@@ -1,8 +1,5 @@
-#include <engine/ConsoleInterpreter.h>
-
-#include <engine/ConsoleObjects.h>
-#include <assets/loader/TextureLoader.h>
-#include <assets/AssetSystem.h>
+#include <core/console/ConsoleInterpreter.h>
+#include <core/console/ConsoleObjects.h>
 #include <core/string_utils.h>
 #include <core/log.h>
 
@@ -310,82 +307,4 @@ namespace caustica::console
 		initialized = true;
 	}
 
-
-	inline std::string getTextureInfo(AssetId const& id, std::shared_ptr<TextureData> const& texture, size_t& count)
-	{
-		char buff[2048];
-		std::string idStr = id.ToString();
-		snprintf(buff, 2048, "%s (%d x %d x %d)\n",
-			idStr.c_str(), texture->width, texture->height, texture->arraySize);
-		++count;
-		return buff;
-	}
-
-	bool Interpreter::RegisterCommands(std::shared_ptr<TextureLoader> textureCache)
-	{
-		if (!textureCache)
-			return false;
-
-		static char const* usage =
-			"usage: \n"
-			"  texture_cache --list [regex pattern]\n"
-			"    returns the descriptions of textures in the cache matching the regex.\n";
-		using namespace console;
-
-		CommandDesc cmdDesc = {
-
-			// name
-			"texture_cache",
-
-			// description
-			usage,
-
-			// on exec
-			[&](Command::Args const& args) -> Command::Result {
-
-				if ((args.size() >= 2) && (args[1] == "--list"))
-				{
-					bool rxMatch = false;
-					std::regex rx;
-					if (args.size() >= 3)
-					{
-						try { rx = args[2].data(); rxMatch = true; }
-						catch (std::regex_error const& err)
-						{
-							caustica::error(err.what());
-							return { false };
-						}
-					}
-
-					Command::Result r; size_t count = 0;
-					AssetSystem::Get().GetTextureCache().ForEach(
-						[&](AssetId const& id, std::shared_ptr<TextureData> const& texture, CacheState) {
-							if (!texture)
-								return;
-							if (rxMatch)
-							{
-								if (std::regex_match(id.ToString(), rx))
-									r.output += getTextureInfo(id, texture, count);
-							}
-							else
-								r.output += getTextureInfo(id, texture, count);
-						});
-					r.output += std::to_string(count) + " files found.\n";
-					r.status = true;
-					return r;
-				}
-				return { true, usage };
-			},
-
-			// on suggest
-			//[](std::string_view cmdline, size_t cursor_pos) -> std::vector<std::string> {
-			//}
-		};
-
-		if (RegisterCommand(cmdDesc))
-		{
-			m_TextureLoader = textureCache;
-		}
-		return false;
-	}
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <core/DescriptorHandle.h>
+#include <render/Core/DescriptorTableManager.h>
 #include <rhi/nvrhi.h>
 
 #include <atomic>
@@ -10,7 +11,7 @@
 #include <vector>
 
 // =============================================================================
-// BindlessHandle<Tag> — type-safe, generation-tracked bindless descriptor index.
+// BindlessHandle<Tag> - type-safe, generation-tracked bindless descriptor index.
 //
 // Encodes a 20-bit index and 12-bit generation counter into a uint32_t.
 // The generation is bumped on free, so stale handles fail validation.
@@ -55,7 +56,7 @@ using BindlessBufferH   = BindlessHandle<BindlessBufferTag>;
 using BindlessSamplerH  = BindlessHandle<BindlessSamplerTag>;
 
 // =============================================================================
-// BindlessTable — O(1) descriptor allocation with generation tracking and
+// BindlessTable - O(1) descriptor allocation with generation tracking and
 // deferred (frame-delayed) frees.
 //
 // Wraps the existing DescriptorTableManager with:

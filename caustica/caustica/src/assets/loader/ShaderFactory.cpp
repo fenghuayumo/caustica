@@ -4,7 +4,7 @@
 #include <core/string_utils.h>
 #include <ShaderMake/ShaderBlob.h>
 #if CAUSTICA_WITH_AFTERMATH
-#include <engine/AftermathCrashDump.h>
+#include <backend/AftermathCrashDump.h>
 #endif
 
 using namespace std;

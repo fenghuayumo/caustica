@@ -1,4 +1,4 @@
-#include <assets/loader/ObjImporter.h>
+#include <scene/loader/ObjImporter.h>
 #include <assets/loader/TextureLoader.h>
 #include <scene/SceneGraph.h>
 #include <core/log.h>

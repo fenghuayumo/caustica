@@ -6,7 +6,7 @@
 #include <render/Passes/RTXDI/PrepareLightsPass.h>
 #include <assets/loader/ShaderFactory.h>
 #include <render/Core/CommonRenderPasses.h>
-#include <render/Core/View.h>
+#include <scene/View.h>
 #include <render/Passes/RTXDI/GeneratePdfMipsPass.h>
 #include <render/Passes/Lighting/Distant/EnvMapBaker.h>
 #include <render/Passes/Lighting/Distant/EnvMapImportanceSamplingBaker.h>

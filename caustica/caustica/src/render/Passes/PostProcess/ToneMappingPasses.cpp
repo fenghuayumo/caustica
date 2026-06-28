@@ -1,6 +1,6 @@
 #include <assets/loader/ShaderFactory.h>
 #include <render/Core/CommonRenderPasses.h>
-#include <render/Core/View.h>
+#include <scene/View.h>
 #include <sstream>
 #include <assert.h>
 #include <render/Core/FramebufferFactory.h>

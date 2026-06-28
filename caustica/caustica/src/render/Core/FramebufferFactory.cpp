@@ -1,5 +1,5 @@
 #include <render/Core/FramebufferFactory.h>
-#include <render/Core/View.h>
+#include <scene/View.h>
 
 using namespace caustica;
 

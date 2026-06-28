@@ -1,6 +1,6 @@
 #pragma once
 
-#include <render/Core/View.h>
+#include <scene/View.h>
 #include <scene/SceneTypes.h>
 #include <render/Core/GeometryPasses.h>
 #include <memory>

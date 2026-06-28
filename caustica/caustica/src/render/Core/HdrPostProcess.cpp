@@ -1,7 +1,7 @@
 #include <render/Core/HdrPostProcess.h>
 #include <render/Core/RenderCore.h>
 #include <render/Core/RenderTargets.h>
-#include <render/Core/View.h>
+#include <scene/View.h>
 #include <render/Passes/Geometry/BloomPass.h>
 
 namespace caustica

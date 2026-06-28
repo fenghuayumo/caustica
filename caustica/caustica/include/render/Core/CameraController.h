@@ -1,7 +1,7 @@
 #pragma once
 
 #include <scene/camera/Camera.h>
-#include <render/Core/View.h>
+#include <scene/View.h>
 #include <render/Passes/Geometry/TemporalAntiAliasingPass.h>
 
 #include <cstdint>
@@ -28,7 +28,7 @@ struct CameraUpdateParams
 };
 
 // =============================================================================
-// CameraController — first-person camera, planar views, and scene-camera import.
+// CameraController - first-person camera, planar views, and scene-camera import.
 // Extracted from editor Renderer (Phase C).
 // =============================================================================
 class CameraController

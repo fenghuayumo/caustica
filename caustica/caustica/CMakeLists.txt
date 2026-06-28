@@ -113,10 +113,12 @@ file(GLOB caus_core_sources src/core/*.cpp)
 file(GLOB_RECURSE caus_core_sub_headers
     include/core/chunk/*.h
     include/core/vfs/*.h
+    include/core/console/*.h
 )
 file(GLOB_RECURSE caus_core_sub_sources
     src/core/chunk/*.cpp
     src/core/vfs/*.cpp
+    src/core/console/*.cpp
 )
 list(APPEND caus_core_headers ${caus_core_sub_headers})
 list(APPEND caus_core_sources ${caus_core_sub_sources})
@@ -266,7 +268,7 @@ file(GLOB caus_imgui_sources src/imgui/*.cpp)
 add_library(causImgui STATIC ${caus_imgui_headers} ${caus_imgui_sources})
 caus_configure_static(causImgui)
 target_link_libraries(causImgui
-    PUBLIC causCore causBackend
+    PUBLIC causCore causBackend causAssets
     PUBLIC imgui
 )
 
@@ -299,9 +301,11 @@ file(GLOB caus_scene_headers include/scene/*.h)
 file(GLOB caus_scene_sources src/scene/*.cpp)
 file(GLOB_RECURSE caus_scene_sub_headers
     include/scene/camera/*.h
+    include/scene/loader/*.h
 )
 file(GLOB_RECURSE caus_scene_sub_sources
     src/scene/camera/*.cpp
+    src/scene/loader/*.cpp
 )
 list(APPEND caus_scene_headers ${caus_scene_sub_headers})
 list(APPEND caus_scene_sources ${caus_scene_sub_sources})

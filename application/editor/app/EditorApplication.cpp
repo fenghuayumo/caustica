@@ -23,6 +23,7 @@
 #include <core/log.h>
 #include <assets/AssetSystem.h>
 #include <render/Core/BindlessTable.h>
+#include <render/Core/RenderSceneTypeFactory.h>
 #if CAUSTICA_WITH_NATIVE_DLSS
 #include <render/Passes/Geometry/DLSS.h>
 #endif
@@ -756,7 +757,8 @@ void EditorApplication::initSceneServices()
         *m_GpuDevice,
         *m_ShaderFactory,
         m_textureCache,
-        m_descriptorTable);
+        m_descriptorTable,
+        std::make_shared<caustica::render::RenderSceneTypeFactory>());
 
     m_sceneEditor.AttachSceneServices(*m_sceneManager, *m_renderCore);
 

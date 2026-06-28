@@ -5,7 +5,7 @@
 #include <assets/AssetRegistry.h>
 #include <assets/AssetFileWatcher.h>
 #include <assets/AssetCache.h>
-#include <assets/loader/RuntimeMeshLoader.h>
+#include <assets/RuntimeMeshLoadTypes.h>
 
 #include <core/JobSystem.h>
 #include <filesystem>
@@ -14,9 +14,8 @@
 #include <string>
 
 // =============================================================================
-// AssetSystem — facade for the entire asset management pipeline.
-//
-// Usage:
+// AssetSystem facade for the entire asset management pipeline.
+//// Usage:
 //   AssetSystem::Initialize(device, fileSystem, descriptorTable);
 //   auto texHandle = AssetSystem::Get().LoadTexture("path/to/tex.dds", true);
 //   AssetSystem::Get().Update(frameIndex);
@@ -34,7 +33,7 @@ class TextureLoader;
 class CommonRenderPasses;
 class ThreadPool;
 class IFileSystem;
-class DescriptorTableManager;
+class IDescriptorTableManager;
 
 class AssetSystem
 {
@@ -46,7 +45,7 @@ public:
     static void Initialize(
         nvrhi::IDevice* device,
         std::shared_ptr<IFileSystem> fileSystem,
-        std::shared_ptr<DescriptorTableManager> descriptorTable);
+        std::shared_ptr<IDescriptorTableManager> descriptorTable);
     static void Shutdown();
 
     void Update(uint64_t frameIndex);

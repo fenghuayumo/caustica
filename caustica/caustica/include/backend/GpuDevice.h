@@ -17,11 +17,11 @@
 #endif
 
 #if CAUSTICA_WITH_AFTERMATH
-#include "AftermathCrashDump.h"
+#include <backend/AftermathCrashDump.h>
 #endif
 
 #if CAUSTICA_WITH_STREAMLINE
-#include <engine/StreamlineInterface.h>
+#include <backend/StreamlineInterface.h>
 #endif
 
 #define GLFW_INCLUDE_NONE // Do not include any OpenGL headers
@@ -32,6 +32,7 @@
 #include <GLFW/glfw3native.h>
 #include <rhi/nvrhi.h>
 #include <core/log.h>
+#include <backend/GpuFrameDriver.h>
 #include <backend/SwapChain.h>
 
 #include <functional>
@@ -39,8 +40,8 @@
 
 namespace caustica
 {
-    class Window;             // Platform layer: window abstraction
-    class Application;        // Engine layer: frame driver
+    class Window; // Platform layer: window abstraction
+    class Application; // Engine layer: frame driver (friend — accesses protected state)
 
     struct DefaultMessageCallback : public nvrhi::IMessageCallback
     {
@@ -218,8 +219,8 @@ namespace caustica
         // Note: a call to CreateInstance() or Create*Device*() is required before EnumerateAdapters().
         virtual bool EnumerateAdapters(std::vector<AdapterInfo>& outAdapters) = 0;
 
-        void setFrameDriver(Application* driver) { m_frameDriver = driver; }
-        [[nodiscard]] Application* getFrameDriver() const { return m_frameDriver; }
+        void setFrameDriver(IGpuFrameDriver* driver) { m_frameDriver = driver; }
+        [[nodiscard]] IGpuFrameDriver* getFrameDriver() const { return m_frameDriver; }
 
         // returns the size of the window in screen coordinates
         void GetWindowDimensions(int& width, int& height);
@@ -240,7 +241,7 @@ namespace caustica
         bool m_CanPresentSwapChain = true;    // false when the window is minimized
         // set to true if running on NV GPU
         bool m_IsNvidia = false;
-        Application* m_frameDriver = nullptr;
+        IGpuFrameDriver* m_frameDriver = nullptr;
         // timestamp in seconds for the previous frame
         double m_PreviousFrameTimestamp = 0.0;
         // current DPI scale info (updated when window moves)
@@ -331,7 +332,7 @@ namespace caustica
         virtual void GetEnabledVulkanLayers(std::vector<std::string>& layers) const { }
 
         // GetFrameIndex cannot be used inside of these callbacks, hence the additional passing of frameID.
-        // Frame lifecycle is now driven by Application (engine/Application.h).
+        // Frame lifecycle callbacks; typically wired by the IGpuFrameDriver owner (engine Application).
         struct PipelineCallbacks {
             std::function<void(GpuDevice&, uint32_t)> beforeFrame = nullptr;
             std::function<void(GpuDevice&, uint32_t)> beforeAnimate = nullptr;

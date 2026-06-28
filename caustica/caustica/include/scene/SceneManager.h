@@ -21,6 +21,8 @@ class DescriptorTableManager;
 class Scene;
 class SceneGraphNode;
 class Material;
+class SceneTypeFactory;
+class IDescriptorTableManager;
 } // namespace caustica
 
 // =============================================================================
@@ -34,7 +36,8 @@ public:
     SceneManager(caustica::GpuDevice&                     device,
                  caustica::ShaderFactory&                 shaderFactory,
                  std::shared_ptr<caustica::TextureLoader>  textureCache,
-                 std::shared_ptr<caustica::DescriptorTableManager> descriptorTable);
+                 std::shared_ptr<caustica::IDescriptorTableManager> descriptorTable,
+                 std::shared_ptr<caustica::SceneTypeFactory> sceneTypeFactory = nullptr);
 
     ~SceneManager();
 
@@ -114,13 +117,14 @@ public:
     caustica::GpuDevice&                      getDevice()        { return m_device; }
     caustica::ShaderFactory&                  getShaderFactory()  { return m_shaderFactory; }
     std::shared_ptr<caustica::TextureLoader>   getTextureLoader()   { return m_textureCache; }
-    std::shared_ptr<caustica::DescriptorTableManager> getDescriptorTable() { return m_descriptorTable; }
+    std::shared_ptr<caustica::IDescriptorTableManager> getDescriptorTable() { return m_descriptorTable; }
 
 private:
     caustica::GpuDevice&                      m_device;
     caustica::ShaderFactory&                  m_shaderFactory;
     std::shared_ptr<caustica::TextureLoader>   m_textureCache;
-    std::shared_ptr<caustica::DescriptorTableManager> m_descriptorTable;
+    std::shared_ptr<caustica::IDescriptorTableManager> m_descriptorTable;
+    std::shared_ptr<caustica::SceneTypeFactory>       m_sceneTypeFactory;
 
     std::vector<std::string>                  m_sceneFilesAvailable;
     std::shared_ptr<caustica::Scene>          m_scene;

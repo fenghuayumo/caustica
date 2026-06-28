@@ -2,7 +2,7 @@
 
 #include <scene/SceneGraph.h>
 #include <render/Core/ShadowMap.h>
-#include <render/Core/View.h>
+#include <scene/View.h>
 #include <rhi/nvrhi.h>
 #include <memory>
 

@@ -1,8 +1,8 @@
 #include <imgui/imgui_console.h>
 #include <imgui/imgui_renderer.h>
 
-#include <engine/ConsoleInterpreter.h>
-#include <engine/ConsoleObjects.h>
+#include <core/console/ConsoleInterpreter.h>
+#include <core/console/ConsoleObjects.h>
 #include <core/string_utils.h>
 
 #include <cstdarg>

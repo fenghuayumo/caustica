@@ -1,6 +1,7 @@
 #if CAUSTICA_WITH_STREAMLINE
 #include <StreamlineIntegration.h>
 
+#include <scene/View.h>
 #include <sl_consts.h>
 #include <sl_hooks.h>
 #include <sl_version.h>

@@ -1,7 +1,7 @@
 #include <render/Passes/PostProcess/AccumulationPass.h>
 
 #include <assets/loader/ShaderFactory.h>
-#include <render/Core/View.h>
+#include <scene/View.h>
 #include <core/log.h>
 
 using namespace caustica::math;

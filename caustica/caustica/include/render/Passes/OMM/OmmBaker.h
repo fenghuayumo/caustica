@@ -6,6 +6,7 @@
 #include <vector>
 
 #include <render/Core/BindingCache.h>
+#include <render/Core/DescriptorTableManager.h>
 #include <rhi/nvrhi.h>
 #include <math/math.h>
 #include <scene/SceneTypes.h>

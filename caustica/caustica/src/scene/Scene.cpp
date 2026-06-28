@@ -1,6 +1,6 @@
 #include <scene/Scene.h>
-#include <assets/loader/GltfImporter.h>
-#include <assets/loader/ObjImporter.h>
+#include <scene/loader/GltfImporter.h>
+#include <scene/loader/ObjImporter.h>
 #include <scene/scene_utils.h>
 #include <core/ThreadPool.h>
 #include <core/json.h>
@@ -256,7 +256,7 @@ Scene::Scene(
     ShaderFactory& shaderFactory,
     std::shared_ptr<IFileSystem> fs,
     std::shared_ptr<TextureLoader> textureCache,
-    std::shared_ptr<DescriptorTableManager> descriptorTable,
+    std::shared_ptr<IDescriptorTableManager> descriptorTable,
     std::shared_ptr<SceneTypeFactory> sceneTypeFactory)
     : m_fs(std::move(fs))
     , m_SceneTypeFactory(std::move(sceneTypeFactory))
@@ -1533,7 +1533,7 @@ void Scene::UpdateInstance(const std::shared_ptr<MeshInstance>& instance)
 }
 
 // =============================================================================
-// ProcessNodesRecursive — post-load scene traversal (merged from ExtendedScene)
+// ProcessNodesRecursive - post-load scene traversal (merged from ExtendedScene)
 // =============================================================================
 
 void Scene::ProcessNodesRecursive(std::shared_ptr<SceneGraphNode> node)

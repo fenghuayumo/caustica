@@ -14,18 +14,18 @@
 namespace caustica
 {
 
-class DescriptorTableManager;
+class IDescriptorTableManager;
 typedef int DescriptorIndex;
 
 class DescriptorHandle
 {
 private:
-    std::weak_ptr<DescriptorTableManager> m_Manager;
+    std::weak_ptr<IDescriptorTableManager> m_Manager;
     DescriptorIndex m_DescriptorIndex;
 
 public:
     DescriptorHandle();
-    DescriptorHandle(const std::shared_ptr<DescriptorTableManager>& managerPtr, DescriptorIndex index);
+    DescriptorHandle(const std::shared_ptr<IDescriptorTableManager>& managerPtr, DescriptorIndex index);
     ~DescriptorHandle();
 
     [[nodiscard]] bool IsValid() const { return m_DescriptorIndex >= 0 && !m_Manager.expired(); }

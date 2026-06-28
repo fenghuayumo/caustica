@@ -1,5 +1,4 @@
 #include <backend/GpuDevice.h>
-#include <engine/Application.h>
 #include <platform/window.h>
 #include <platform/glfw_window.h>
 #include <math/math.h>

@@ -4,7 +4,7 @@
 #include <nvsdk_ngx_helpers.h>
 
 #include <render/Passes/Geometry/DLSS.h>
-#include <render/Core/View.h>
+#include <scene/View.h>
 #include <core/log.h>
 
 using namespace caustica::render;

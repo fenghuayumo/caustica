@@ -1,4 +1,4 @@
-#include <render/Core/View.h>
+#include <scene/View.h>
 #include <algorithm>
 
 using namespace caustica::math;

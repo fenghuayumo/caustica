@@ -26,14 +26,4 @@ struct RuntimeMeshLoadResult
     explicit operator bool() const { return Success && ImportResult != nullptr; }
 };
 
-RuntimeMeshLoadResult LoadRuntimeMeshFile(
-    const RuntimeMeshLoadParams& params,
-    const std::filesystem::path& filePath);
-RuntimeMeshLoadResult LoadRuntimeGltfMeshFile(
-    const RuntimeMeshLoadParams& params,
-    const std::filesystem::path& filePath);
-RuntimeMeshLoadResult LoadRuntimeObjMeshFile(
-    const RuntimeMeshLoadParams& params,
-    const std::filesystem::path& filePath);
-
 } // namespace caustica

@@ -6,7 +6,7 @@
 #include <render/Core/ShadowMap.h>
 #include <scene/SceneTypes.h>
 #include <render/Core/CommonRenderPasses.h>
-#include <render/Core/View.h>
+#include <scene/View.h>
 #include <core/log.h>
 #include <utility>
 

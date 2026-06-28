@@ -1,6 +1,6 @@
 #pragma once
 
-#include <render/Core/View.h>
+#include <scene/View.h>
 #include <rhi/nvrhi.h>
 
 #include <memory>

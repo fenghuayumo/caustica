@@ -2,7 +2,7 @@
 
 #include <assets/loader/ShaderFactory.h>
 #include <render/Core/CommonRenderPasses.h>
-#include <render/Core/View.h>
+#include <scene/View.h>
 #include <core/log.h>
 #include <core/file_utils.h>
 #include <core/format.h>

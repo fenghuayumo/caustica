@@ -1,5 +1,6 @@
 #pragma once
 
+#include <backend/GpuFrameDriver.h>
 #include <events/event.h>
 
 #include <functional>
@@ -27,7 +28,7 @@ class Window;
 //
 // Application executables implement createApplication() (see EntryPoint.h).
 // =============================================================================
-class Application
+class Application : public IGpuFrameDriver
 {
 public:
     Application();
@@ -59,9 +60,10 @@ public:
     FrameCallback beforePresent;
     FrameCallback afterPresent;
 
-    // GpuDevice back-buffer lifecycle callbacks (called when this app is the frame driver).
-    void notifyBackBufferResizing();
-    void notifyBackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount);
+    // IGpuFrameDriver — invoked by GpuDevice during swap-chain resize.
+    void notifyBackBufferResizing() override;
+    void notifyBackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount) override;
+
     void notifyDisplayScaleChanged(float scaleX, float scaleY);
 
     // --- Event system (DIVSHOT-style) ---

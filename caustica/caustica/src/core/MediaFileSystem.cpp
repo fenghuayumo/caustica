@@ -1,6 +1,5 @@
 #include <core/MediaFileSystem.h>
-#include <core/log.h>
-#include <scene/scene_utils.h>
+#include <core/scene_discovery.h>
 #include <core/log.h>
 #include <core/string_utils.h>
 #include <core/vfs/TarFile.h>

@@ -20,7 +20,8 @@
 #include <render/Core/CommonRenderPasses.h>
 #include <assets/loader/TextureLoader.h>
 
-#include <engine/UserInterfaceUtils.h>
+#include <platform/file_dialog.h>
+#include <core/scope.h>
 
 #include <rhi/utils.h>
 

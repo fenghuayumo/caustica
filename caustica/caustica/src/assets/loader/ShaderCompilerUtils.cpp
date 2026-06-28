@@ -2,7 +2,7 @@
 #include <core/file_utils.h>
 #include <core/format.h>
 #include <core/path_utils.h>
-#include <render/Passes/Debug/picosha2.h>
+#include <core/picosha2.h>
 
 #include <backend/GpuDevice.h>
 #include <backend/ShaderUtils.h>

@@ -17,7 +17,7 @@
 #endif
 
 #if CAUSTICA_WITH_STREAMLINE
-#include <engine/StreamlineInterface.h>
+#include <backend/StreamlineInterface.h>
 using SI = caustica::StreamlineInterface;
 #else
 struct StreamlineCompatibilityTypes

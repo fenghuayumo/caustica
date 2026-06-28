@@ -3,7 +3,7 @@
 #include <assets/loader/ShaderFactory.h>
 #include <scene/SceneTypes.h>
 #include <render/Core/CommonRenderPasses.h>
-#include <render/Core/View.h>
+#include <scene/View.h>
 #include <render/Core/MaterialBindingCache.h>
 #include <rhi/utils.h>
 #include <utility>

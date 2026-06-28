@@ -1,5 +1,5 @@
 #if CAUSTICA_WITH_STREAMLINE
-#include <engine/StreamlineInterface.h>
+#include <backend/StreamlineInterface.h>
 #include <backend/GpuDevice.h>
 
 // Streamline Core

@@ -2,7 +2,7 @@
 
 #include <backend/GpuDevice.h>
 #include <assets/loader/TextureLoader.h>
-#include <render/Core/RenderSceneTypeFactory.h>
+#include <scene/SceneGraph.h>
 #include <scene/Scene.h>
 #include <scene/SceneGraph.h>
 #include <core/vfs/VFS.h>
@@ -61,11 +61,14 @@ namespace
 SceneManager::SceneManager(caustica::GpuDevice&                     device,
                            caustica::ShaderFactory&                 shaderFactory,
                            std::shared_ptr<caustica::TextureLoader>  textureCache,
-                           std::shared_ptr<caustica::DescriptorTableManager> descriptorTable)
+                           std::shared_ptr<caustica::IDescriptorTableManager> descriptorTable,
+                           std::shared_ptr<caustica::SceneTypeFactory> sceneTypeFactory)
     : m_device(device)
     , m_shaderFactory(shaderFactory)
     , m_textureCache(std::move(textureCache))
     , m_descriptorTable(std::move(descriptorTable))
+    , m_sceneTypeFactory(sceneTypeFactory ? std::move(sceneTypeFactory)
+                                          : std::make_shared<caustica::SceneTypeFactory>())
 {
     m_loader.setLoadFunc([this](std::shared_ptr<caustica::IFileSystem> fs,
                                 const std::filesystem::path& path)
@@ -171,7 +174,7 @@ std::shared_ptr<caustica::Scene> SceneManager::loadScene(
         std::move(fs),
         m_textureCache,
         m_descriptorTable,
-        std::make_shared<caustica::render::RenderSceneTypeFactory>());
+        m_sceneTypeFactory);
 
     if (sceneFileName == std::filesystem::path(inlineSceneSentinel()))
     {
