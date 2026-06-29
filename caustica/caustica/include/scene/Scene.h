@@ -124,7 +124,7 @@ namespace caustica
         [[nodiscard]] const std::vector<ecs::Entity>& GetSkinnedMeshInstances() const;
         [[nodiscard]] const std::vector<ecs::Entity>& GetLightEntities() const;
         [[nodiscard]] const std::vector<ecs::Entity>& GetCameraEntities() const;
-        [[nodiscard]] const std::vector<std::shared_ptr<SceneAnimation>>& GetAnimations() const;
+        [[nodiscard]] const std::vector<ecs::Entity>& GetAnimationEntities() const;
 
         void AttachLightToRoot(const std::shared_ptr<Light>& light);
         void AttachLightToRoot(scene::LightComponent component, const std::string& name = {});

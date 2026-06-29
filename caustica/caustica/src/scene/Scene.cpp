@@ -3,6 +3,7 @@
 #include <scene/SceneLightAccess.h>
 #include <scene/SceneObjects.h>
 #include <scene/SceneAnimation.h>
+#include <scene/SceneAnimationAccess.h>
 #include <scene/loader/GltfImporter.h>
 #include <scene/loader/ObjImporter.h>
 #include <scene/scene_utils.h>
@@ -322,12 +323,12 @@ const std::vector<ecs::Entity>& Scene::GetCameraEntities() const
     return s_empty;
 }
 
-const std::vector<std::shared_ptr<SceneAnimation>>& Scene::GetAnimations() const
+const std::vector<ecs::Entity>& Scene::GetAnimationEntities() const
 {
     if (m_EntityWorld)
-        return m_EntityWorld->GetAnimations();
+        return m_EntityWorld->GetAnimationEntities();
 
-    static const std::vector<std::shared_ptr<SceneAnimation>> s_empty;
+    static const std::vector<ecs::Entity> s_empty;
     return s_empty;
 }
 
@@ -816,11 +817,12 @@ void Scene::LoadAnimations(const Json::Value& nodeList)
 
     for (const auto& animationNode : nodeList)
     {
-        const auto& animation = std::make_shared<SceneAnimation>();
+        scene::AnimationComponent component;
+        std::string animationName;
 
         const auto& nameNode = animationNode["name"];
         if (nameNode.isString())
-            animation->name = nameNode.asString();
+            animationName = nameNode.asString();
 
         const auto& channelsNode = animationNode["channels"];
         if (channelsNode.isArray())
@@ -847,13 +849,13 @@ void Scene::LoadAnimations(const Json::Value& nodeList)
                         sampler->SetInterpolationMode(animation::InterpolationMode::CatmullRomSpline);
                     else
                         caustica::warning("Unknown interpolation mode '%s' specified for animation '%s' channel %d.",
-                            modeNode.asCString(), animation->name.c_str(), channelIndex);
+                            modeNode.asCString(), animationName.c_str(), channelIndex);
                 }
                 else
                 {
                     sampler->SetInterpolationMode(animation::InterpolationMode::Step);
                     caustica::warning("Interpolation mode is not specified for animation '%s' channel %d, using step.",
-                        animation->name.c_str(), channelIndex);
+                        animationName.c_str(), channelIndex);
                 }
 
                 const auto& attributeNode = channelSrc["attribute"];
@@ -872,7 +874,7 @@ void Scene::LoadAnimations(const Json::Value& nodeList)
                 else
                 {
                     caustica::warning("Attribute is not specified for animation '%s' channel %d, ignoring.",
-                        animation->name.c_str(), channelIndex);
+                        animationName.c_str(), channelIndex);
                     continue;
                 }
 
@@ -885,7 +887,7 @@ void Scene::LoadAnimations(const Json::Value& nodeList)
                     if (!timeNode.isNumeric())
                     {
                         caustica::warning("Invalid keyframe %d in animation '%s' channel %d.",
-                            keyframeIndex, animation->name.c_str(), channelIndex);
+                            keyframeIndex, animationName.c_str(), channelIndex);
                         continue;
                     }
 
@@ -898,13 +900,13 @@ void Scene::LoadAnimations(const Json::Value& nodeList)
                     sampler->AddKeyframe(keyframe);
                 }
 
-                auto processTarget = [this, &animation, &sampler, attribute, &attributeNode, channelIndex](const Json::Value& targetNode)
-                {
+                auto processTarget = [this, &component, &sampler, attribute, &attributeNode, channelIndex, &animationName](
+                                         const Json::Value& targetNode) {
                     if (!targetNode.isString())
                     {
                         if (!targetNode.isNull())
                             caustica::warning("Target specification for animation '%s' channel %d is not a string.",
-                                animation->name.c_str(), channelIndex);
+                                animationName.c_str(), channelIndex);
                         return;
                     }
 
@@ -925,14 +927,17 @@ void Scene::LoadAnimations(const Json::Value& nodeList)
 
                         if (material)
                         {
-                            auto channel = std::make_shared<SceneAnimationChannel>(sampler, material);
-                            channel->SetLeafPropertyName(attributeNode.asString());
-                            animation->AddChannel(channel);
+                            scene::AnimationChannelData channelData;
+                            channelData.sampler = sampler;
+                            channelData.targetMaterial = material;
+                            channelData.attribute = AnimationAttribute::LeafProperty;
+                            channelData.leafPropertyName = attributeNode.asString();
+                            scene::AddAnimationChannel(component, std::move(channelData));
                         }
                         else
                         {
                             caustica::warning("Target material '%s' for animation '%s' channel %d not found.",
-                                targetName.c_str(), animation->name.c_str(), channelIndex);
+                                targetName.c_str(), animationName.c_str(), channelIndex);
                         }
                     }
                     else
@@ -940,15 +945,18 @@ void Scene::LoadAnimations(const Json::Value& nodeList)
                         ecs::Entity target = m_EntityWorld->findEntity(targetNode.asString());
                         if (ecs::isValid(target))
                         {
-                            auto channel = std::make_shared<SceneAnimationChannel>(sampler, target, attribute);
+                            scene::AnimationChannelData channelData;
+                            channelData.sampler = sampler;
+                            channelData.targetEntity = target;
+                            channelData.attribute = attribute;
                             if (attribute == AnimationAttribute::LeafProperty)
-                                channel->SetLeafPropertyName(attributeNode.asString());
-                            animation->AddChannel(channel);
+                                channelData.leafPropertyName = attributeNode.asString();
+                            scene::AddAnimationChannel(component, std::move(channelData));
                         }
                         else
                         {
                             caustica::warning("Target entity '%s' for animation '%s' channel %d not found.",
-                                targetNode.asCString(), animation->name.c_str(), channelIndex);
+                                targetNode.asCString(), animationName.c_str(), channelIndex);
                         }
                     }
                 };
@@ -964,18 +972,18 @@ void Scene::LoadAnimations(const Json::Value& nodeList)
             }
         }
 
-        if (!animation->GetChannels().empty())
+        if (!component.channels.empty())
         {
             if (!ecs::isValid(animationContainer))
                 animationContainer = m_EntityWorld->createEntity("Animations", m_EntityWorld->root());
 
-            ecs::Entity animEntity = m_EntityWorld->createEntity(animation->name, animationContainer);
-            m_EntityWorld->setAnimation(animEntity, animation);
+            ecs::Entity animEntity = m_EntityWorld->createEntity(animationName, animationContainer);
+            m_EntityWorld->setAnimation(animEntity, std::move(component));
         }
         else
         {
             caustica::warning("Animation '%s' processed with no valid channels, ignoring.",
-                animation->name.c_str());
+                animationName.c_str());
         }
     }
 }

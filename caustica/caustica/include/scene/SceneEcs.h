@@ -198,9 +198,19 @@ struct CameraComponent
     CameraData data;
 };
 
+struct AnimationChannelData
+{
+    std::shared_ptr<caustica::animation::Sampler> sampler;
+    ecs::Entity targetEntity = ecs::NullEntity;
+    std::shared_ptr<caustica::Material> targetMaterial;
+    caustica::AnimationAttribute attribute = caustica::AnimationAttribute::Undefined;
+    std::string leafPropertyName;
+};
+
 struct AnimationComponent
 {
-    std::shared_ptr<SceneAnimation> animation;
+    std::vector<AnimationChannelData> channels;
+    float duration = 0.f;
 };
 
 struct GaussianSplatComponent
@@ -255,6 +265,7 @@ public:
     void setLight(ecs::Entity entity, const std::shared_ptr<Light>& light);
     void setCamera(ecs::Entity entity, CameraComponent component);
     void setCamera(ecs::Entity entity, const std::shared_ptr<SceneCamera>& camera);
+    void setAnimation(ecs::Entity entity, AnimationComponent component);
     void setAnimation(ecs::Entity entity, const std::shared_ptr<SceneAnimation>& animation);
     void setGaussianSplat(ecs::Entity entity, const std::shared_ptr<GaussianSplat>& splat);
     void setSampleSettings(ecs::Entity entity, const std::shared_ptr<SampleSettings>& settings);

@@ -22,6 +22,7 @@
 
 #include <core/path_utils.h>
 #include <scene/scene_utils.h>
+#include <scene/SceneAnimationAccess.h>
 #include <render/Core/FramebufferFactory.h>
 #include <assets/loader/ShaderFactory.h>
 #include <render/Core/CommonRenderPasses.h>
@@ -577,13 +578,21 @@ void SceneEditor::Animate(float fElapsedTimeSeconds)
 
         {
             auto* ew = m_sceneManager->getScene()->GetEntityWorld();
-            for (const auto& anim : m_sceneManager->getScene()->GetAnimations())
+            if (ew)
             {
-                double cutLeft = 0.0; double cutRight = 0.0;
-                // if (anim->GetName() == "Take 001") // special hack for mesh drone anim - TODO: fix properly in future
-                // { cutLeft = 0.333; cutRight = 0.0; }
-                if (ew)
-                    anim->Apply((float)fmod(m_sceneTime+cutLeft, anim->GetDuration()-cutLeft-cutRight), *ew);
+                auto& world = ew->world();
+                for (ecs::Entity animEntity : m_sceneManager->getScene()->GetAnimationEntities())
+                {
+                    auto* animation = scene::TryGetAnimation(world, animEntity);
+                    if (!animation || animation->channels.empty())
+                        continue;
+
+                    double cutLeft = 0.0;
+                    double cutRight = 0.0;
+                    const float duration = scene::GetAnimationDuration(*animation);
+                    const float animTime = (float)fmod(m_sceneTime + cutLeft, duration - cutLeft - cutRight);
+                    (void)scene::ApplyAnimation(*animation, animTime, *ew);
+                }
             }
         }
     }

@@ -113,15 +113,15 @@ void SceneResources::UnregisterCameraEntity(ecs::Entity entity)
         m_CameraEntities.erase(it);
 }
 
-void SceneResources::RegisterLeaf(const std::shared_ptr<SceneAnimation>& leaf)
+void SceneResources::RegisterAnimationEntity(ecs::Entity entity)
 {
-    if (leaf)
-        m_Animations.push_back(leaf);
+    if (ecs::isValid(entity))
+        m_AnimationEntities.push_back(entity);
 }
 
-void SceneResources::UnregisterLeaf(const std::shared_ptr<SceneAnimation>& leaf)
+void SceneResources::UnregisterAnimationEntity(ecs::Entity entity)
 {
-    auto it = std::find(m_Animations.begin(), m_Animations.end(), leaf);
-    if (it != m_Animations.end())
-        m_Animations.erase(it);
+    auto it = std::find(m_AnimationEntities.begin(), m_AnimationEntities.end(), entity);
+    if (it != m_AnimationEntities.end())
+        m_AnimationEntities.erase(it);
 }

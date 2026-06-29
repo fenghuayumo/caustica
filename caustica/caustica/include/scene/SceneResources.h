@@ -37,7 +37,10 @@ namespace caustica
         [[nodiscard]] const std::vector<ecs::Entity>& GetSkinnedMeshInstanceEntities() const { return m_SkinnedMeshInstanceEntities; }
         [[nodiscard]] const std::vector<ecs::Entity>& GetLightEntities() const { return m_LightEntities; }
         [[nodiscard]] const std::vector<ecs::Entity>& GetCameraEntities() const { return m_CameraEntities; }
-        [[nodiscard]] const std::vector<std::shared_ptr<SceneAnimation>>&      GetAnimations()           const { return m_Animations; }
+        [[nodiscard]] const std::vector<ecs::Entity>& GetAnimationEntities() const { return m_AnimationEntities; }
+
+        void RegisterAnimationEntity(ecs::Entity entity);
+        void UnregisterAnimationEntity(ecs::Entity entity);
 
         void RegisterLightEntity(ecs::Entity entity);
         void UnregisterLightEntity(ecs::Entity entity);
@@ -47,10 +50,6 @@ namespace caustica
         // Typed Register/Unregister. Derived classes may override to extend tracking.
         void RegisterMeshInstanceEntity(ecs::Entity entity, const std::shared_ptr<MeshInfo>& mesh, bool skinned);
         void UnregisterMeshInstanceEntity(ecs::Entity entity, const std::shared_ptr<MeshInfo>& mesh, bool skinned);
-
-        virtual void RegisterLeaf(const std::shared_ptr<SceneAnimation>& leaf);
-
-        virtual void UnregisterLeaf(const std::shared_ptr<SceneAnimation>& leaf);
 
         SceneResources(const SceneResources&) = delete;
         SceneResources& operator=(const SceneResources&) = delete;
@@ -65,7 +64,7 @@ namespace caustica
         std::vector<ecs::Entity> m_SkinnedMeshInstanceEntities;
         std::vector<ecs::Entity> m_LightEntities;
         std::vector<ecs::Entity> m_CameraEntities;
-        std::vector<std::shared_ptr<SceneAnimation>>      m_Animations;
+        std::vector<ecs::Entity> m_AnimationEntities;
     };
 
 } // namespace caustica

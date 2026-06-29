@@ -1,5 +1,6 @@
 #include <scene/SceneEcs.h>
 #include <scene/SceneAnimation.h>
+#include <scene/SceneAnimationAccess.h>
 #include <scene/SceneCameraAccess.h>
 #include <scene/SceneLightAccess.h>
 #include <scene/SceneMeshAccess.h>
@@ -198,7 +199,7 @@ void SceneEntityWorld::clear()
     m_SkinnedMeshInstanceEntities.clear();
     m_LightEntities.clear();
     m_CameraEntities.clear();
-    m_Animations.clear();
+    m_AnimationEntities.clear();
     m_structureDirty = true;
     m_transformDirty = true;
     m_previousTransformDirty = false;
@@ -300,8 +301,11 @@ void SceneEntityWorld::assignGlobalResourceIndices()
 
 void SceneEntityWorld::applyAnimations(float time)
 {
-    for (const auto& animation : m_Animations)
-        animation->Apply(time, *this);
+    for (ecs::Entity entity : m_AnimationEntities)
+    {
+        if (auto* animation = m_world.get<AnimationComponent>(entity))
+            (void)ApplyAnimation(*animation, time, *this);
+    }
     markTransformDirty();
 }
 
@@ -341,11 +345,8 @@ void SceneEntityWorld::unregisterEntityLeaves(ecs::Entity entity)
         UnregisterCameraEntity(entity);
     if (m_world.has<LightComponent>(entity))
         UnregisterLightEntity(entity);
-    if (auto* animation = m_world.get<AnimationComponent>(entity))
-    {
-        if (animation->animation)
-            UnregisterLeaf(animation->animation);
-    }
+    if (m_world.has<AnimationComponent>(entity))
+        UnregisterAnimationEntity(entity);
 }
 
 void SceneEntityWorld::destroyEntity(ecs::Entity entity)
@@ -505,11 +506,8 @@ void SceneEntityWorld::updateLeafContentAndBounds(ecs::Entity entity)
         leafContent = GetCameraContentFlags();
     else if (m_world.has<LightComponent>(entity))
         leafContent = GetLightContentFlags();
-    else if (auto* animation = m_world.get<AnimationComponent>(entity))
-    {
-        if (animation->animation)
-            leafContent = animation->animation->GetContentFlags();
-    }
+    else if (m_world.has<AnimationComponent>(entity))
+        leafContent = GetAnimationContentFlags();
 
     m_world.emplace<LocalBoundsComponent>(entity, LocalBoundsComponent{ localBounds });
     m_world.emplace<SceneContentComponent>(entity, SceneContentComponent{
@@ -592,14 +590,21 @@ void SceneEntityWorld::setCamera(ecs::Entity entity, const std::shared_ptr<Scene
     setCamera(entity, std::move(component));
 }
 
+void SceneEntityWorld::setAnimation(ecs::Entity entity, AnimationComponent component)
+{
+    m_world.emplace<AnimationComponent>(entity, std::move(component));
+    RegisterAnimationEntity(entity);
+    updateLeafContentAndBounds(entity);
+    markStructureDirty();
+}
+
 void SceneEntityWorld::setAnimation(ecs::Entity entity, const std::shared_ptr<SceneAnimation>& animation)
 {
     if (!animation)
         return;
-    m_world.emplace<AnimationComponent>(entity, AnimationComponent{ animation });
-    RegisterLeaf(animation);
-    updateLeafContentAndBounds(entity);
-    markStructureDirty();
+    AnimationComponent component;
+    InitializeAnimationComponent(component, animation);
+    setAnimation(entity, std::move(component));
 }
 
 void SceneEntityWorld::setGaussianSplat(ecs::Entity entity, const std::shared_ptr<GaussianSplat>& splat)
@@ -660,11 +665,8 @@ ecs::Entity SceneEntityWorld::importSubtree(ecs::Entity parent, const SceneEntit
                 RegisterLightEntity(dstEntity);
             if (m_world.has<CameraComponent>(dstEntity))
                 RegisterCameraEntity(dstEntity);
-            if (auto* animation = m_world.get<AnimationComponent>(dstEntity))
-            {
-                if (animation->animation)
-                    RegisterLeaf(animation->animation);
-            }
+            if (m_world.has<AnimationComponent>(dstEntity))
+                RegisterAnimationEntity(dstEntity);
 
             if (const auto* children = source.m_world.get<ChildrenComponent>(srcEntity))
             {
@@ -702,17 +704,20 @@ ecs::Entity SceneEntityWorld::importSubtree(ecs::Entity parent, const SceneEntit
             mesh.proxiedAnalyticLight = it->second;
     });
 
-    for (const auto& animation : m_Animations)
+    for (ecs::Entity animEntity : m_AnimationEntities)
     {
-        for (const auto& channel : animation->GetChannels())
+        auto* animation = m_world.get<AnimationComponent>(animEntity);
+        if (!animation)
+            continue;
+
+        for (auto& channel : animation->channels)
         {
-            ecs::Entity target = channel->GetTargetEntity();
-            if (ecs::isValid(target))
-            {
-                auto it = entityMap.find(target);
-                if (it != entityMap.end())
-                    channel->SetTargetEntity(it->second);
-            }
+            if (!ecs::isValid(channel.targetEntity))
+                continue;
+
+            auto it = entityMap.find(channel.targetEntity);
+            if (it != entityMap.end())
+                channel.targetEntity = it->second;
         }
     }
 
