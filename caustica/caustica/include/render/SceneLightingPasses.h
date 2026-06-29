@@ -29,7 +29,7 @@ class ShaderFactory;
 namespace caustica::render
 {
 
-// Scene-scoped lighting prep: GPU caches/builders, analytic lights, and env-map selection.
+// Scene-scoped lighting: GPU caches/builders, analytic lights, and env-map selection.
 class SceneLightingPasses
 {
 public:
@@ -69,9 +69,9 @@ public:
     void sceneUnloading();
     void onSceneLoaded(caustica::Scene& scene, PathTracerSettings& settings);
     void resyncLightsFromSceneGraph(SceneGraph& sceneGraph);
-    void notifyScenePrepReloaded(caustica::Scene& scene);
+    void notifySceneReloaded(caustica::Scene& scene);
 
-    void applyScenePrepShaderMacros(std::vector<caustica::ShaderMacro>& macros);
+    void applyShaderMacros(std::vector<caustica::ShaderMacro>& macros);
     void createOpacityMicromaps(caustica::Scene& scene);
 
     void forEachUsedMaterialTexture(
@@ -92,7 +92,5 @@ private:
 
     std::vector<std::shared_ptr<caustica::Light>> m_lights;
 };
-
-using SceneLightingPrep = SceneLightingPasses;
 
 } // namespace caustica::render

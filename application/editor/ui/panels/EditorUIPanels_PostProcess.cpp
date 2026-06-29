@@ -37,7 +37,7 @@ void EditorUI::BuildOpacityMicroMapsPanel(const PanelLayout& layout)
         {
             UI_SCOPED_INDENT(layout.indent);
 
-            if (auto& opacityMicromapBuilder = m_sceneEditor.GetLightingPrep().opacityMaps(); opacityMicromapBuilder)
+            if (auto& opacityMicromapBuilder = m_sceneEditor.GetLightingPasses().opacityMaps(); opacityMicromapBuilder)
             {
                 opacityMicromapBuilder->DebugGUI(layout.indent, *m_sceneEditor.GetScene());
             }

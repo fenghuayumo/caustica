@@ -93,7 +93,7 @@ void SceneLightingPasses::resyncLightsFromSceneGraph(SceneGraph& sceneGraph)
         m_lights.push_back(light);
 }
 
-void SceneLightingPasses::notifyScenePrepReloaded(caustica::Scene& scene)
+void SceneLightingPasses::notifySceneReloaded(caustica::Scene& scene)
 {
     if (m_materials != nullptr)
         m_materials->SceneReloaded();
@@ -105,7 +105,7 @@ void SceneLightingPasses::notifyScenePrepReloaded(caustica::Scene& scene)
         m_opacityMaps->SceneLoaded(scene);
 }
 
-void SceneLightingPasses::applyScenePrepShaderMacros(std::vector<caustica::ShaderMacro>& macros)
+void SceneLightingPasses::applyShaderMacros(std::vector<caustica::ShaderMacro>& macros)
 {
     if (m_lightSampling != nullptr)
         m_lightSampling->SetGlobalShaderMacros(macros);

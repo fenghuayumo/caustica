@@ -88,7 +88,7 @@ void SceneRayTracingResources::fillPTPipelineGlobalMacros(std::vector<caustica::
     macros.push_back({ "CAUSTICA_LP_TYPES_USE_16BIT_PRECISION", (m_settings->UseFp16Types) ? ("1") : ("0") });
     macros.push_back({ "CAUSTICA_ENABLE_LOW_DISCREPANCY_SAMPLER_FOR_BSDF", (m_settings->EnableLDSamplerForBSDF) ? ("1") : ("0") });
 
-    m_lightingPasses->applyScenePrepShaderMacros(macros);
+    m_lightingPasses->applyShaderMacros(macros);
 }
 
 bool SceneRayTracingResources::createPTPipeline()
