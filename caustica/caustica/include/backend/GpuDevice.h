@@ -230,6 +230,13 @@ namespace caustica
 
     struct GpuDeviceCreateResult;
 
+    struct BackBufferInfo
+    {
+        uint32_t width = 0;
+        uint32_t height = 0;
+        uint32_t sampleCount = 1;
+    };
+
     class GpuDevice
     {
         friend class Application;
@@ -332,11 +339,13 @@ namespace caustica
         [[nodiscard]] virtual const char *GetRendererString() const = 0;
         [[nodiscard]] virtual nvrhi::GraphicsAPI GetGraphicsAPI() const = 0;
 
-        const DeviceCreationParameters& GetDeviceParams();
+        [[nodiscard]] BackBufferInfo GetBackBufferInfo() const;
         [[nodiscard]] double GetAverageFrameTimeSeconds() const { return m_AverageFrameTime; }
         [[nodiscard]] double GetPreviousFrameTimestamp() const { return m_PreviousFrameTimestamp; }
         void SetFrameTimeUpdateInterval(double seconds) { m_AverageTimeUpdateInterval = seconds; }
+        [[nodiscard]] bool IsHeadless() const { return m_DeviceParams.headlessDevice; }
         [[nodiscard]] bool IsVsyncEnabled() const { return m_DeviceParams.vsyncEnabled; }
+        [[nodiscard]] bool SupportsExplicitDisplayScaling() const { return m_DeviceParams.supportExplicitDisplayScaling; }
         virtual void SetVsyncEnabled(bool enabled) { m_RequestedVSync = enabled; /* will be processed later */ }
         virtual void ReportLiveObjects() {}
 

@@ -2,12 +2,10 @@
 #include <core/vfs/VFS.h>
 
 using namespace caustica;
-using namespace caustica;
-using namespace caustica;
 
 ImGui_Renderer::ImGui_Renderer(GpuDevice *devManager)
     : RenderContext(devManager)
-    , m_supportExplicitDisplayScaling(devManager->GetDeviceParams().supportExplicitDisplayScaling)
+    , m_supportExplicitDisplayScaling(devManager->SupportsExplicitDisplayScaling())
 {
     ImGui::CreateContext();
 

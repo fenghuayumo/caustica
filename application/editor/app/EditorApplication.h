@@ -94,6 +94,8 @@ private:
     void SampleLogCallback(caustica::Severity severity, const char* message);
     bool ProcessCommandLine(int argc, char const* const* argv,
         caustica::GpuDeviceCreateDesc& createDesc, std::string& preferredScene);
+    bool InitializeGpuDevice(int argc, const char* const* argv,
+        caustica::GpuDeviceCreateDesc& createDesc);
     void syncPassesToBackBuffer();
 
     CommandLineOptions CmdLine;

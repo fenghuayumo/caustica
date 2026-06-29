@@ -201,6 +201,12 @@ bool GpuDevice_VK::createInstance()
     return true;
 }
 
+bool GpuDevice_VK::ShouldIgnoreValidationMessageLocation(size_t location) const
+{
+    const auto& ignored = m_DeviceParams.ignoredVulkanValidationMessageLocations;
+    return std::find(ignored.begin(), ignored.end(), location) != ignored.end();
+}
+
 static VKAPI_ATTR VkBool32 VKAPI_CALL vulkanDebugCallback(
     vk::DebugReportFlagsEXT flags,
     vk::DebugReportObjectTypeEXT objType,
@@ -215,9 +221,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL vulkanDebugCallback(
 
     if (manager)
     {
-        const auto& ignored = manager->GetDeviceParams().ignoredVulkanValidationMessageLocations;
-        const auto found = std::find(ignored.begin(), ignored.end(), location);
-        if (found != ignored.end())
+        if (manager->ShouldIgnoreValidationMessageLocation(location))
             return VK_FALSE;
     }
 

@@ -216,7 +216,7 @@ SceneEditor::SceneEditor(const CommandLineOptions& cmdLine,
 void SceneEditor::initStreamlineAndWindow()
 {
 #if CAUSTICA_WITH_STREAMLINE
-    if (!GetGpuDevice().GetDeviceParams().headlessDevice)
+    if (!GetGpuDevice().IsHeadless())
     {
         m_settings.IsDLSSSuported = GetGpuDevice().GetStreamline().IsDLSSAvailable();
         m_settings.IsDLSSFGSupported = GetGpuDevice().GetStreamline().IsDLSSGAvailable();

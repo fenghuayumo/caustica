@@ -89,9 +89,9 @@ namespace
             if (!dm || !m_scene)
                 return;
 
-            const auto& params = dm->GetDeviceParams();
+            const caustica::BackBufferInfo backBuffer = dm->GetBackBufferInfo();
             notifyBackBufferResizing();
-            notifyBackBufferResized(params.backBufferWidth, params.backBufferHeight, params.swapChainSampleCount);
+            notifyBackBufferResized(backBuffer.width, backBuffer.height, backBuffer.sampleCount);
         }
 
     protected:

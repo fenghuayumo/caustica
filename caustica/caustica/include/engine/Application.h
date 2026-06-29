@@ -94,6 +94,7 @@ protected:
 
     // Called by the window event callback; wires GlfwWindow → Application.
     void onWindowEvent(Event& event);
+    void installWindowEventCallback();
 
     std::unique_ptr<GpuDevice> m_GpuDevice;
     std::unique_ptr<Window>    m_Window;
@@ -106,7 +107,6 @@ private:
     void syncDpiScaleFromWindow();
     bool isWindowVisible() const;
     bool isWindowFocused() const;
-    void installWindowEventCallback();
 
     GpuDevice* device() const;
     Window*    window() const;

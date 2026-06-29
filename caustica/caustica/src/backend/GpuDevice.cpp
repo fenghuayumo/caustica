@@ -383,9 +383,13 @@ void GpuDevice::GetWindowDimensions(int& width, int& height)
     }
 }
 
-const DeviceCreationParameters& GpuDevice::GetDeviceParams()
+BackBufferInfo GpuDevice::GetBackBufferInfo() const
 {
-    return m_DeviceParams;
+    return BackBufferInfo{
+        m_DeviceParams.backBufferWidth,
+        m_DeviceParams.backBufferHeight,
+        m_DeviceParams.swapChainSampleCount
+    };
 }
 
 bool GpuDevice::ValidatePathTracerRequirements() const

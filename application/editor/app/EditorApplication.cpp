@@ -1,5 +1,6 @@
 #include "EditorApplication.h"
 
+#include <engine/cmdline_utils.h>
 #include <engine/EntryPoint.h>
 #include <engine/EngineRenderer.h>
 #include <backend/GpuDevice.h>
@@ -23,6 +24,8 @@
 
 #include <GLFW/glfw3.h>
 #include <platform/window.h>
+
+#include <utility>
 
 extern const char* g_windowTitle;
 
@@ -86,7 +89,7 @@ EditorApplication::StartupResult EditorApplication::startup(int argc, const char
     createDesc.headless = CmdLine.noWindow;
     createDesc.windowTitle = g_windowTitle ? g_windowTitle : "caustica";
 
-    if (!initializeGraphics(argc, argv, createDesc))
+    if (!InitializeGpuDevice(argc, argv, createDesc))
     {
         return StartupResult::FailToCreateDevice;
     }
@@ -250,6 +253,27 @@ bool EditorApplication::ProcessCommandLine(int argc, char const* const* argv,
     return true;
 }
 
+bool EditorApplication::InitializeGpuDevice(int argc, const char* const* argv,
+    caustica::GpuDeviceCreateDesc& createDesc)
+{
+    caustica::InvokePreGpuDeviceInitHook();
+
+    createDesc.api = caustica::ResolveGraphicsAPIFromCommandLine(argc, argv);
+    if (createDesc.headless)
+        createDesc.vsyncEnabled = false;
+
+    caustica::GpuDeviceCreateResult graphics = caustica::GpuDevice::CreateInitialized(createDesc);
+    if (!graphics.gpuDevice)
+        return false;
+
+    m_GpuDevice = std::move(graphics.gpuDevice);
+    m_Window = std::move(graphics.window);
+
+    bindFrameDriver(m_GpuDevice.get());
+    installWindowEventCallback();
+    return true;
+}
+
 bool EditorApplication::IsSERSupported() const
 {
     return m_GpuDevice && m_GpuDevice->SupportsShaderExecutionReordering() && !CmdLine.disableSER;
@@ -260,9 +284,9 @@ void EditorApplication::syncPassesToBackBuffer()
     if (!m_GpuDevice)
         return;
 
-    const auto& params = m_GpuDevice->GetDeviceParams();
+    const caustica::BackBufferInfo backBuffer = m_GpuDevice->GetBackBufferInfo();
     notifyBackBufferResizing();
-    notifyBackBufferResized(params.backBufferWidth, params.backBufferHeight, params.swapChainSampleCount);
+    notifyBackBufferResized(backBuffer.width, backBuffer.height, backBuffer.sampleCount);
 }
 
 void EditorApplication::onUpdate(float elapsedTimeSeconds, bool windowFocused)

@@ -32,7 +32,7 @@ public:
     }
 
     bool EnumerateAdapters(std::vector<caustica::AdapterInfo>& outAdapters) override;
-    const caustica::DeviceCreationParameters& GetDeviceParams() const { return m_DeviceParams; };
+    [[nodiscard]] bool ShouldIgnoreValidationMessageLocation(size_t location) const;
 
 protected:
     bool CreateInstanceInternal() override;

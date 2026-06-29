@@ -68,7 +68,7 @@ void RenderCore::postProcessAA(PostProcessAAParams& params)
 
 #if CAUSTICA_WITH_STREAMLINE
         const bool useStreamlineThisFrame = params.gpuDevice != nullptr
-            && !params.gpuDevice->GetDeviceParams().headlessDevice;
+            && !params.gpuDevice->IsHeadless();
         if (useStreamlineThisFrame)
         {
             {

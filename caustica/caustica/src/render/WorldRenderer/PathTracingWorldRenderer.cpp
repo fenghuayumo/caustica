@@ -379,7 +379,7 @@ void caustica::render::PathTracingWorldRenderer::onBackBufferResizing()
 
 // NOTE: we're not yet sure if this is necessary to avoid crash with going in/out of fullscreen and FG
 #if CAUSTICA_WITH_STREAMLINE
-    if (!m_context.gpuDevice.GetDeviceParams().headlessDevice &&
+    if (!m_context.gpuDevice.IsHeadless() &&
         (m_context.settings.DLSSFGOptions.mode == StreamlineInterface::DLSSGMode::eOn || m_context.settings.ActualDLSSFGMode() == StreamlineInterface::DLSSGMode::eOn)) 
     {
         m_context.gpuDevice.GetStreamline().CleanupDLSS(false);
@@ -725,7 +725,7 @@ void caustica::render::PathTracingWorldRenderer::rtxdiSetupFrame(nvrhi::IFramebu
 void caustica::render::PathTracingWorldRenderer::streamlinePreRender()
 {
 #if CAUSTICA_WITH_STREAMLINE
-    if (m_context.gpuDevice.GetDeviceParams().headlessDevice)
+    if (m_context.gpuDevice.IsHeadless())
         return;
 
     // Setup Reflex
@@ -1911,7 +1911,7 @@ void caustica::render::PathTracingWorldRenderer::denoise(nvrhi::IFramebuffer* fr
         m_postProcess->Apply(m_commandList, preparePassType, m_constantBuffer, miniConstants, m_bindingSet, m_bindingLayout, tdesc.width, tdesc.height);
         m_commandList->endMarker();
 
-        const float timeDeltaBetweenFrames = m_context.gpuDevice.GetDeviceParams().headlessDevice ? 1.f/60.f : -1.f; // if we're rendering without a window we set a fix timeDeltaBetweenFrames to ensure that output is deterministic
+        const float timeDeltaBetweenFrames = m_context.gpuDevice.IsHeadless() ? 1.f/60.f : -1.f; // if we're rendering without a window we set a fix timeDeltaBetweenFrames to ensure that output is deterministic
         bool enableValidation = m_context.settings.DebugView == DebugViewType::StablePlane_DenoiserValidation;
         if (nrdUseRelax)
         {
