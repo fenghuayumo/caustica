@@ -44,7 +44,7 @@ void EditorUI::BuildLightingPanel(const PanelLayout& layout)
 
             {
                 RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent););
-                if (auto& lightSamplingCache = m_sceneEditor.GetLightingPasses().lightSamplingCache(); lightSamplingCache != nullptr)
+                if (auto& lightSamplingCache = m_sceneEditor.GetLightingPrep().lightSampling(); lightSamplingCache != nullptr)
                     m_ui.ResetAccumulation |= lightSamplingCache->InfoGUI(layout.indent);
             }
 
@@ -55,7 +55,7 @@ void EditorUI::BuildLightingPanel(const PanelLayout& layout)
                 if (ImGui::CollapsingHeader("Distant lighting (envmap+directional)", 0/*ImGuiTreeNodeFlags_DefaultOpen*/))
                 {
                     RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent););
-                    if (auto& envMapProcessor = m_sceneEditor.GetLightingPasses().envMapProcessor(); envMapProcessor != nullptr)
+                    if (auto& envMapProcessor = m_sceneEditor.GetLightingPrep().environment(); envMapProcessor != nullptr)
                         m_ui.ResetAccumulation |= envMapProcessor->DebugGUI(layout.indent);
                 }
             }
@@ -63,7 +63,7 @@ void EditorUI::BuildLightingPanel(const PanelLayout& layout)
             ImGui::TextColored(categoryColor, "Importance sampling:");
             {
                 RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent););
-                if (auto& lightSamplingCache = m_sceneEditor.GetLightingPasses().lightSamplingCache(); lightSamplingCache != nullptr)
+                if (auto& lightSamplingCache = m_sceneEditor.GetLightingPrep().lightSampling(); lightSamplingCache != nullptr)
                 {
                     if( m_ui.NEEType != 2 )
                     {
@@ -98,7 +98,7 @@ void EditorUI::BuildLightingPanel(const PanelLayout& layout)
                     ImGui::TextColored(categoryColor, "Debugging:");
                     {
                         RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent););
-                        if (auto& lightSamplingCache = m_sceneEditor.GetLightingPasses().lightSamplingCache(); lightSamplingCache != nullptr)
+                        if (auto& lightSamplingCache = m_sceneEditor.GetLightingPrep().lightSampling(); lightSamplingCache != nullptr)
                             m_ui.ResetAccumulation |= lightSamplingCache->DebugGUI(layout.indent);
                     }
                 }

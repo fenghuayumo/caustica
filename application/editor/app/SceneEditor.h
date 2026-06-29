@@ -171,6 +171,8 @@ public:
     void AttachLightingPasses(caustica::render::SceneLightingPasses& lightingPasses);
     caustica::render::SceneLightingPasses& GetLightingPasses();
     const caustica::render::SceneLightingPasses& GetLightingPasses() const;
+    caustica::render::SceneLightingPasses& GetLightingPrep() { return GetLightingPasses(); }
+    const caustica::render::SceneLightingPasses& GetLightingPrep() const { return GetLightingPasses(); }
     void AttachRayTracingResources(caustica::render::SceneRayTracingResources& rayTracingResources);
     caustica::render::SceneRayTracingResources& GetRayTracingResources();
     const caustica::render::SceneRayTracingResources& GetRayTracingResources() const;

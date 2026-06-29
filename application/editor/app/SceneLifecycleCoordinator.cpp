@@ -213,7 +213,7 @@ void SceneLifecycleCoordinator::onSceneLoaded()
     m_ctx.progressLoading->Set(90);
 
     if (m_ctx.lightingPasses)
-        m_ctx.lightingPasses->notifyGpuCachesSceneReloaded(*m_ctx.sceneManager->getScene());
+        m_ctx.lightingPasses->notifyScenePrepReloaded(*m_ctx.sceneManager->getScene());
 
     m_ctx.progressLoading->Set(100);
 

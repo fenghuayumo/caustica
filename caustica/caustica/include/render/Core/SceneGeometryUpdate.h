@@ -20,8 +20,8 @@ struct UpdateSceneGeometryParams
 
     const std::shared_ptr<Scene>&    scene;
     nvrhi::ICommandList*             commandList = nullptr;
-    MaterialGpuCache*                  materialGpuCache = nullptr;
-    OpacityMicromapBuilder*                        opacityMicromapBuilder = nullptr;
+    MaterialGpuCache*                materials = nullptr;
+    OpacityMicromapBuilder*          opacityMaps = nullptr;
     uint64_t                         frameIndex = 0;
 
     // OR-ed when OMM async builds are still in flight.

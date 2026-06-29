@@ -35,23 +35,23 @@ bool gaussianSplatEmissionEnabled(const PathTracerSettings& settings)
 void RenderCore::preUpdateLighting(PreUpdateLightingParams& params)
 {
     nvrhi::ICommandList* commandList = params.commandList;
-    if (commandList == nullptr || params.envMapProcessor == nullptr)
+    if (commandList == nullptr || params.environment == nullptr)
         return;
 
     RAII_SCOPE(commandList->beginMarker("PreUpdateLighting");, commandList->endMarker(););
 
-    nvrhi::TextureHandle preUpdateCube = params.envMapProcessor->GetEnvMapCube();
-    params.envMapProcessor->PreUpdate(
+    nvrhi::TextureHandle preUpdateCube = params.environment->GetEnvMapCube();
+    params.environment->PreUpdate(
         commandList, params.commonPasses, params.envMapActualPath, params.sceneDirectory);
 
-    if (preUpdateCube != params.envMapProcessor->GetEnvMapCube())
+    if (preUpdateCube != params.environment->GetEnvMapCube())
         params.needNewBindings = true;
 }
 
 void RenderCore::updateLighting(UpdateLightingParams& params)
 {
     nvrhi::ICommandList* commandList = params.commandList;
-    if (commandList == nullptr || params.envMapProcessor == nullptr || params.lightSamplingCache == nullptr
+    if (commandList == nullptr || params.environment == nullptr || params.lightSampling == nullptr
         || params.bindingCache == nullptr || params.lights == nullptr || !params.scene)
     {
         return;
@@ -73,7 +73,7 @@ void RenderCore::updateLighting(UpdateLightingParams& params)
             LightConstants lightConstants;
             dirLight->FillLightConstants(lightConstants);
 
-            const float minAngularSize = PI_f / (params.envMapProcessor->GetTargetCubeResolution() / 2.0f);
+            const float minAngularSize = PI_f / (params.environment->GetTargetCubeResolution() / 2.0f);
             assert(lightConstants.angularSizeOrInvRange >= minAngularSize);
 
             dirLights[dirLightCount].AngularSize =
@@ -86,7 +86,7 @@ void RenderCore::updateLighting(UpdateLightingParams& params)
         }
     }
 
-    if (params.envMapProcessor->Update(
+    if (params.environment->Update(
             commandList,
             *params.bindingCache,
             params.commonPasses,
@@ -137,17 +137,17 @@ void RenderCore::updateLighting(UpdateLightingParams& params)
         settings.GaussianSplatEmissionIntensity = params.settings.GaussianSplatEmissionIntensity;
     }
 
-    params.lightSamplingCache->UpdateBegin(
+    params.lightSampling->UpdateBegin(
         commandList,
         *params.bindingCache,
         settings,
         params.sceneTime,
         params.scene,
-        params.materialGpuCache,
-        params.opacityMicromapBuilder,
+        params.materials,
+        params.opacityMaps,
         m_accelStructs.getSubInstanceBuffer(),
         m_accelStructs.getSubInstanceData(),
-        params.envMapProcessor->GetImportanceSampling()->GetRadianceAndImportanceMap());
+        params.environment->GetImportanceSampling()->GetRadianceAndImportanceMap());
 }
 
 void syncEnvMapSceneParams(
@@ -176,18 +176,18 @@ void syncEnvMapSceneParams(
 
 void RenderCore::updateLightingEnd(UpdateLightingEndParams& params)
 {
-    if (params.commandList == nullptr || params.lightSamplingCache == nullptr || params.bindingCache == nullptr
+    if (params.commandList == nullptr || params.lightSampling == nullptr || params.bindingCache == nullptr
         || !params.scene)
     {
         return;
     }
 
-    params.lightSamplingCache->UpdateEnd(
+    params.lightSampling->UpdateEnd(
         params.commandList,
         *params.bindingCache,
         params.scene,
-        params.materialGpuCache,
-        params.opacityMicromapBuilder,
+        params.materials,
+        params.opacityMaps,
         params.subInstanceDataBuffer,
         params.depthBuffer,
         params.motionVectors);

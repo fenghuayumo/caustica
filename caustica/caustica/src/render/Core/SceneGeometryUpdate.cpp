@@ -56,8 +56,8 @@ void RenderCore::updateSceneGeometry(UpdateSceneGeometryParams& params)
 
     scene->Refresh(commandList, static_cast<uint32_t>(params.frameIndex));
 
-    if (params.opacityMicromapBuilder != nullptr)
-        params.opacityMicromapBuilder->BuildOpacityMicromaps(*commandList, *scene);
+    if (params.opacityMaps != nullptr)
+        params.opacityMaps->BuildOpacityMicromaps(*commandList, *scene);
 
     const AccelStructBuildSettings rebuildSettings = makeAccelBuildSettings(params.settings, false);
     m_accelStructs.rebuildDirtyMeshes(
@@ -70,25 +70,25 @@ void RenderCore::updateSceneGeometry(UpdateSceneGeometryParams& params)
 
     const AccelStructBuildSettings tlasSettings = makeAccelBuildSettings(params.settings, true);
     m_accelStructs.buildTlas(
-        commandList, *scene, tlasSettings, makeOmmAccelState(params.opacityMicromapBuilder), params.opacityMicromapBuilder);
+        commandList, *scene, tlasSettings, makeOmmAccelState(params.opacityMaps), params.opacityMaps);
 
     transitionSkinnedMeshBuffersToReadOnly(commandList, *scene);
 
-    if (params.opacityMicromapBuilder != nullptr)
+    if (params.opacityMaps != nullptr)
     {
         if (params.asyncLoadingInProgress != nullptr)
         {
-            *params.asyncLoadingInProgress |= params.opacityMicromapBuilder->Update(*commandList, *scene);
-            *params.asyncLoadingInProgress |= params.opacityMicromapBuilder->UIData().BuildsLeftInQueue > 0;
+            *params.asyncLoadingInProgress |= params.opacityMaps->Update(*commandList, *scene);
+            *params.asyncLoadingInProgress |= params.opacityMaps->UIData().BuildsLeftInQueue > 0;
         }
         else
         {
-            (void)params.opacityMicromapBuilder->Update(*commandList, *scene);
+            (void)params.opacityMaps->Update(*commandList, *scene);
         }
     }
 
-    if (params.materialGpuCache != nullptr)
-        params.materialGpuCache->Update(commandList, scene, m_accelStructs.getSubInstanceData());
+    if (params.materials != nullptr)
+        params.materials->Update(commandList, scene, m_accelStructs.getSubInstanceData());
 
     m_accelStructs.uploadSubInstanceData(commandList);
 }

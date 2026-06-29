@@ -432,7 +432,7 @@ void SceneEditor::Init(const std::string& preferredScene,
     m_progressLoading.Set(95);
 
     if (GetDevice()->queryFeatureSupport(nvrhi::Feature::RayTracingOpacityMicromap))
-        GetLightingPasses().createOpacityMicromapBuilderIfSupported(GetDevice(), m_DescriptorTable, m_TextureLoader, m_shaderFactory);
+        GetLightingPasses().createOpacityMapsIfSupported(GetDevice(), m_DescriptorTable, m_TextureLoader, m_shaderFactory);
 
     // Get all scenes in "assets" folder
     m_sceneManager->discoverAvailableScenes(GetLocalPath(c_AssetsFolder));

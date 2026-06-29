@@ -29,20 +29,20 @@ class ShaderFactory;
 namespace caustica::render
 {
 
-// Scene lighting state: GPU cache owners, light list, and environment map selection.
+// Scene-scoped lighting prep: GPU caches/builders, analytic lights, and env-map selection.
 class SceneLightingPasses
 {
 public:
-    std::shared_ptr<EnvMapProcessor>& envMapProcessor() { return m_envMapProcessor; }
-    const std::shared_ptr<EnvMapProcessor>& envMapProcessor() const { return m_envMapProcessor; }
-    std::shared_ptr<LightSamplingCache>& lightSamplingCache() { return m_lightSamplingCache; }
-    const std::shared_ptr<LightSamplingCache>& lightSamplingCache() const { return m_lightSamplingCache; }
-    std::shared_ptr<MaterialGpuCache>& materialGpuCache() { return m_materialGpuCache; }
-    const std::shared_ptr<MaterialGpuCache>& materialGpuCache() const { return m_materialGpuCache; }
-    std::shared_ptr<OpacityMicromapBuilder>& opacityMicromapBuilder() { return m_opacityMicromapBuilder; }
-    const std::shared_ptr<OpacityMicromapBuilder>& opacityMicromapBuilder() const { return m_opacityMicromapBuilder; }
-    std::shared_ptr<ComputePipelineRegistry>& computePipelineRegistry() { return m_computePipelineRegistry; }
-    const std::shared_ptr<ComputePipelineRegistry>& computePipelineRegistry() const { return m_computePipelineRegistry; }
+    std::shared_ptr<MaterialGpuCache>& materials() { return m_materials; }
+    const std::shared_ptr<MaterialGpuCache>& materials() const { return m_materials; }
+    std::shared_ptr<LightSamplingCache>& lightSampling() { return m_lightSampling; }
+    const std::shared_ptr<LightSamplingCache>& lightSampling() const { return m_lightSampling; }
+    std::shared_ptr<EnvMapProcessor>& environment() { return m_environment; }
+    const std::shared_ptr<EnvMapProcessor>& environment() const { return m_environment; }
+    std::shared_ptr<OpacityMicromapBuilder>& opacityMaps() { return m_opacityMaps; }
+    const std::shared_ptr<OpacityMicromapBuilder>& opacityMaps() const { return m_opacityMaps; }
+    std::shared_ptr<ComputePipelineRegistry>& computePipelines() { return m_computePipelines; }
+    const std::shared_ptr<ComputePipelineRegistry>& computePipelines() const { return m_computePipelines; }
 
     std::vector<std::shared_ptr<caustica::Light>>& lights() { return m_lights; }
     const std::vector<std::shared_ptr<caustica::Light>>& lights() const { return m_lights; }
@@ -61,7 +61,7 @@ public:
         const std::filesystem::path& currentScenePath);
     void setEnvMapOverrideSource(const std::string& envMapOverride);
 
-    void createOpacityMicromapBuilderIfSupported(nvrhi::IDevice* device,
+    void createOpacityMapsIfSupported(nvrhi::IDevice* device,
         const std::shared_ptr<caustica::DescriptorTableManager>& descriptorTable,
         const std::shared_ptr<caustica::TextureLoader>& textureLoader,
         const std::shared_ptr<caustica::ShaderFactory>& shaderFactory);
@@ -69,9 +69,9 @@ public:
     void sceneUnloading();
     void onSceneLoaded(caustica::Scene& scene, PathTracerSettings& settings);
     void resyncLightsFromSceneGraph(SceneGraph& sceneGraph);
-    void notifyGpuCachesSceneReloaded(caustica::Scene& scene);
+    void notifyScenePrepReloaded(caustica::Scene& scene);
 
-    void applyGpuCacheShaderMacros(std::vector<caustica::ShaderMacro>& macros);
+    void applyScenePrepShaderMacros(std::vector<caustica::ShaderMacro>& macros);
     void createOpacityMicromaps(caustica::Scene& scene);
 
     void forEachUsedMaterialTexture(
@@ -83,14 +83,16 @@ private:
     std::vector<std::filesystem::path>          m_envMapMediaList;
     std::string                                 m_envMapOverride;
 
-    std::shared_ptr<EnvMapProcessor>                m_envMapProcessor;
+    std::shared_ptr<EnvMapProcessor>            m_environment;
     EnvMapSceneParams                           m_envMapSceneParams;
-    std::shared_ptr<LightSamplingCache>                m_lightSamplingCache;
-    std::shared_ptr<MaterialGpuCache>             m_materialGpuCache;
-    std::shared_ptr<OpacityMicromapBuilder>                     m_opacityMicromapBuilder;
-    std::shared_ptr<ComputePipelineRegistry>       m_computePipelineRegistry;
+    std::shared_ptr<LightSamplingCache>         m_lightSampling;
+    std::shared_ptr<MaterialGpuCache>           m_materials;
+    std::shared_ptr<OpacityMicromapBuilder>     m_opacityMaps;
+    std::shared_ptr<ComputePipelineRegistry>    m_computePipelines;
 
     std::vector<std::shared_ptr<caustica::Light>> m_lights;
 };
+
+using SceneLightingPrep = SceneLightingPasses;
 
 } // namespace caustica::render

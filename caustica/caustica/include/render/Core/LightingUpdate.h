@@ -28,7 +28,7 @@ struct PreUpdateLightingParams
     nvrhi::ICommandList*                         commandList = nullptr;
     bool&                                          needNewBindings;
 
-    EnvMapProcessor*                                   envMapProcessor = nullptr;
+    EnvMapProcessor*                             environment = nullptr;
     std::shared_ptr<CommonRenderPasses>            commonPasses;
 
     std::string                                    envMapActualPath;
@@ -40,15 +40,15 @@ struct UpdateLightingParams
     PathTracerSettings&                            settings;
 
     nvrhi::ICommandList*                           commandList = nullptr;
-    EnvMapProcessor*                                   envMapProcessor = nullptr;
-    LightSamplingCache*                                   lightSamplingCache = nullptr;
+    EnvMapProcessor*                             environment = nullptr;
+    LightSamplingCache*                          lightSampling = nullptr;
     BindingCache*                                  bindingCache = nullptr;
     std::shared_ptr<CommonRenderPasses>            commonPasses;
 
     const std::vector<std::shared_ptr<Light>>*     lights = nullptr;
     const std::shared_ptr<Scene>&                  scene;
-    std::shared_ptr<MaterialGpuCache>                materialGpuCache;
-    std::shared_ptr<OpacityMicromapBuilder>                        opacityMicromapBuilder;
+    std::shared_ptr<MaterialGpuCache>              materials;
+    std::shared_ptr<OpacityMicromapBuilder>        opacityMaps;
 
     EnvMapSceneParams&                             envMapSceneParams;
     double                                         sceneTime = 0.0;
@@ -62,12 +62,12 @@ struct UpdateLightingParams
 struct UpdateLightingEndParams
 {
     nvrhi::ICommandList*                           commandList = nullptr;
-    LightSamplingCache*                                   lightSamplingCache = nullptr;
+    LightSamplingCache*                          lightSampling = nullptr;
     BindingCache*                                  bindingCache = nullptr;
 
     const std::shared_ptr<Scene>&                  scene;
-    std::shared_ptr<MaterialGpuCache>                materialGpuCache;
-    std::shared_ptr<OpacityMicromapBuilder>                        opacityMicromapBuilder;
+    std::shared_ptr<MaterialGpuCache>              materials;
+    std::shared_ptr<OpacityMicromapBuilder>        opacityMaps;
 
     nvrhi::BufferHandle                            subInstanceDataBuffer;
     nvrhi::TextureHandle                           depthBuffer;
