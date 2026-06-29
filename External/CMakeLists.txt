@@ -51,6 +51,13 @@ if (NOT TARGET cgltf)
     target_include_directories(cgltf INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/cgltf)
 endif()
 
+if (NOT TARGET EnTT::EnTT)
+    option(ENTT_INCLUDE_HEADERS "Add all EnTT headers to the EnTT target." OFF)
+    option(ENTT_INCLUDE_NATVIS "Add EnTT natvis files to the EnTT target." OFF)
+    add_subdirectory(entt)
+    set_target_properties(EnTT PROPERTIES FOLDER ${third_party_folder})
+endif()
+
 if (CAUSTICA_WITH_TINYEXR AND NOT TARGET tinyexr)
     add_library(tinyexr INTERFACE)
     target_include_directories(tinyexr INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/tinyexr)

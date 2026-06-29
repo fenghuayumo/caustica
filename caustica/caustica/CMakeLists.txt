@@ -160,6 +160,12 @@ add_library(causAnimation STATIC ${caus_animation_headers} ${caus_animation_sour
 caus_configure_static(causAnimation)
 target_link_libraries(causAnimation PUBLIC causCore causMath)
 
+file(GLOB_RECURSE caus_ecs_headers include/ecs/*.h)
+
+add_library(causEcs INTERFACE ${caus_ecs_headers})
+caus_configure_interface(causEcs)
+target_link_libraries(causEcs INTERFACE causCore causMath EnTT::EnTT)
+
 # ── causAudio ─────────────────────────────────────────────────────────────
 # Audio engine. Depends only on math. Optional: XAudio2 on Windows.
 
@@ -322,7 +328,7 @@ list(APPEND caus_scene_sources ${caus_scene_sub_sources})
 add_library(causScene STATIC ${caus_scene_headers} ${caus_scene_sources})
 caus_configure_static(causScene)
 target_link_libraries(causScene
-    PUBLIC causCore causMath causAnimation causAssets causBackend
+    PUBLIC causCore causMath causAnimation causEcs causAssets causBackend
 )
 
 # ── causRender ────────────────────────────────────────────────────────────
@@ -408,6 +414,7 @@ target_link_libraries(causticaLib INTERFACE
     causCore
     causEvents
     causAnimation
+    causEcs
     causAudio
     causPlatform
     causBackend

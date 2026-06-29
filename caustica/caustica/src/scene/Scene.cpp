@@ -265,6 +265,7 @@ Scene::Scene(
     , m_Device(device)
 {
     m_Resources = std::make_shared<Resources>();
+    m_EntityWorld = std::make_unique<scene::SceneEntityWorld>();
 
     if (!m_SceneTypeFactory)
         m_SceneTypeFactory = std::make_shared<SceneTypeFactory>();
@@ -339,6 +340,9 @@ bool Scene::LoadWithThreadPool(const std::filesystem::path& sceneFileName, Threa
             return false;
     }
 
+    if (m_EntityWorld)
+        m_EntityWorld->rebuildFromSceneGraph(m_SceneGraph);
+
     return true;
 }
 
@@ -359,6 +363,9 @@ bool Scene::LoadFromJsonString(const std::string& sceneJson, const std::filesyst
 
     if (!LoadJsonDocument(documentRoot, scenePath, nullptr))
         return false;
+
+    if (m_EntityWorld)
+        m_EntityWorld->rebuildFromSceneGraph(m_SceneGraph);
 
     return true;
 }
@@ -884,6 +891,14 @@ void Scene::RefreshSceneGraph(uint32_t frameIndex)
     m_SceneStructureChanged = m_SceneGraph->HasPendingStructureChanges();
     m_SceneTransformsChanged = m_SceneGraph->HasPendingTransformChanges();
     m_SceneGraph->Refresh(frameIndex);
+
+    if (m_EntityWorld)
+    {
+        if (m_SceneStructureChanged || !ecs::isValid(m_EntityWorld->root()))
+            m_EntityWorld->rebuildFromSceneGraph(m_SceneGraph);
+        else if (m_SceneTransformsChanged)
+            m_EntityWorld->syncTransformsFromSceneGraph(m_SceneGraph);
+    }
 }
 
 void Scene::RefreshBuffers(nvrhi::ICommandList* commandList, uint32_t frameIndex)
@@ -1536,50 +1551,44 @@ void Scene::UpdateInstance(const std::shared_ptr<MeshInstance>& instance)
 // ProcessNodesRecursive - post-load scene traversal (merged from ExtendedScene)
 // =============================================================================
 
-void Scene::ProcessNodesRecursive(std::shared_ptr<SceneGraphNode> node)
+void Scene::ProcessNodesRecursive(std::shared_ptr<SceneGraphNode> /*node*/)
 {
-    if (node->GetLeaf() != nullptr)
+    if (!m_EntityWorld || !ecs::isValid(m_EntityWorld->root()))
+        return;
+
+    auto& world = m_EntityWorld->world();
+
+    world.each<scene::SampleSettingsComponent>([this](ecs::Entity, scene::SampleSettingsComponent& component)
     {
-        // Extract SampleSettings
-        auto sampleSettings = std::dynamic_pointer_cast<SampleSettings>(node->GetLeaf());
-        if (sampleSettings != nullptr)
+        assert(m_loadedSettings == nullptr || m_loadedSettings == component.settings);
+        m_loadedSettings = component.settings;
+    });
+
+    world.each<scene::GameSettingsComponent>([this](ecs::Entity, scene::GameSettingsComponent& component)
+    {
+        assert(m_loadedGameSettings == nullptr || m_loadedGameSettings == component.settings);
+        m_loadedGameSettings = component.settings;
+    });
+
+    world.each<scene::LightComponent>([this](ecs::Entity, scene::LightComponent& component)
+    {
+        const auto& light = component.light;
+        if (light == nullptr ||
+            (light->GetLightType() != LightType_Spot && light->GetLightType() != LightType_Point) ||
+            light->Proxies.empty())
         {
-            assert(m_loadedSettings == nullptr);
-            m_loadedSettings = sampleSettings;
+            return;
         }
 
-        // Extract GameSettings
-        auto gameSettings = std::dynamic_pointer_cast<GameSettings>(node->GetLeaf());
-        if (gameSettings != nullptr)
+        for (const auto& proxyPath : light->Proxies)
         {
-            assert(m_loadedGameSettings == nullptr);
-            m_loadedGameSettings = gameSettings;
-        }
-
-        // Resolve light proxy mesh links
-        if (node->GetLeaf() != nullptr && node->GetLeaf()->GetContentFlags() == SceneContentFlags::Lights)
-        {
-            auto light = std::dynamic_pointer_cast<Light>(node->GetLeaf());
-            if (light != nullptr &&
-                (light->GetLightType() == LightType_Spot || light->GetLightType() == LightType_Point) &&
-                !light->Proxies.empty())
+            auto proxyNode = m_SceneGraph->FindNode(proxyPath);
+            if (proxyNode != nullptr)
             {
-                for (const auto& proxyPath : light->Proxies)
-                {
-                    auto proxyNode = m_SceneGraph->FindNode(proxyPath);
-                    if (proxyNode != nullptr)
-                    {
-                        auto mi = std::dynamic_pointer_cast<MeshInstance>(proxyNode->GetLeaf());
-                        if (mi != nullptr)
-                        {
-                            mi->ProxiedAnalyticLight = light;
-                        }
-                    }
-                }
+                auto mi = std::dynamic_pointer_cast<MeshInstance>(proxyNode->GetLeaf());
+                if (mi != nullptr)
+                    mi->ProxiedAnalyticLight = light;
             }
         }
-    }
-
-    for (int i = static_cast<int>(node->GetNumChildren()) - 1; i >= 0; i--)
-        ProcessNodesRecursive(node->GetChild(i)->shared_from_this());
+    });
 }

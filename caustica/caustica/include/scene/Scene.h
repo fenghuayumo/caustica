@@ -1,6 +1,7 @@
 #pragma once
 
 #include <scene/SceneGraph.h>
+#include <scene/SceneEcs.h>
 #include <backend/IDescriptorTableManager.h>
 #include <rhi/nvrhi.h>
 #include <vector>
@@ -38,6 +39,7 @@ namespace caustica
         std::shared_ptr<TextureLoader> m_TextureLoader;
         std::shared_ptr<IDescriptorTableManager> m_DescriptorTable;
         std::shared_ptr<SceneGraph> m_SceneGraph;
+        std::unique_ptr<scene::SceneEntityWorld> m_EntityWorld;
         std::shared_ptr<GltfImporter> m_GltfImporter;
         std::shared_ptr<ObjImporter> m_ObjImporter;
         std::vector<SceneImportResult> m_Models;
@@ -140,6 +142,7 @@ namespace caustica
         static const SceneLoadingStats& GetLoadingStats();
 
         [[nodiscard]] std::shared_ptr<SceneGraph> GetSceneGraph() const { return m_SceneGraph; }
+        [[nodiscard]] scene::SceneEntityWorld* GetEntityWorld() const { return m_EntityWorld.get(); }
         [[nodiscard]] dm::box3 GetSceneBounds() const;
         [[nodiscard]] nvrhi::IDescriptorTable* GetDescriptorTable() const { return m_DescriptorTable ? m_DescriptorTable->GetDescriptorTable() : nullptr; }
         [[nodiscard]] nvrhi::IBuffer* GetMaterialBuffer() const { return m_MaterialBuffer; }
