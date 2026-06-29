@@ -749,16 +749,15 @@ bool LightSamplingCache::ProcessEmissiveGeometry( const UpdateSettings & setting
     assert( ctrlBuff.TotalLightCount == (ctrlBuff.AnalyticLightCount+ctrlBuff.EnvmapQuadNodeCount) );
 
     uint subInstanceIndex = 0;
-    bool overflowAbort = false;
 
-    if (auto* entityWorld = scene->GetEntityWorld())
+    auto* entityWorld = scene->GetEntityWorld();
+    const auto& instances = scene->GetMeshInstances();
+    for (const auto& instancePtr : instances)
     {
-        auto& world = entityWorld->world();
-        world.each<scene::MeshInstanceComponent>([&](ecs::Entity entity, scene::MeshInstanceComponent& mc)
-        {
-            MeshInstance* instance = mc.instance.get();
-            // PerGeometryLightSamplerLinks now part of base MeshInstance (merged from MeshInstanceExtension)
-            std::vector<LightSamplerLink>* perGeometryLightSamplerLinks = &(instance->PerGeometryLightSamplerLinks);
+        MeshInstance* instance = instancePtr.get();
+        const ecs::Entity entity = instance->ownerEntity;
+        // PerGeometryLightSamplerLinks now part of base MeshInstance (merged from MeshInstanceExtension)
+        std::vector<LightSamplerLink>* perGeometryLightSamplerLinks = &(instance->PerGeometryLightSamplerLinks);
 
         const auto& mesh = instance->GetMesh();
 
@@ -773,7 +772,7 @@ bool LightSamplingCache::ProcessEmissiveGeometry( const UpdateSettings & setting
         {
             // MeshInstanceEx constructor should have initialized this
             assert(false);
-            return;
+            continue;
         }
 
         for (size_t geometryIndex = 0; geometryIndex < mesh->geometries.size(); ++geometryIndex, subInstanceIndex++)
@@ -797,11 +796,15 @@ bool LightSamplingCache::ProcessEmissiveGeometry( const UpdateSettings & setting
             {
                 // this is the first way to set proxy lights
                 std::shared_ptr<Light> light;
-                if (const auto* parentComp = world.get<scene::ParentComponent>(entity);
-                    parentComp && ecs::isValid(parentComp->parent))
+                if (entityWorld && ecs::isValid(entity))
                 {
-                    if (auto* lc = world.get<scene::LightComponent>(parentComp->parent))
-                        light = lc->light;
+                    const auto& world = entityWorld->world();
+                    if (const auto* parentComp = world.get<scene::ParentComponent>(entity);
+                        parentComp && ecs::isValid(parentComp->parent))
+                    {
+                        if (auto* lc = world.get<scene::LightComponent>(parentComp->parent))
+                            light = lc->light;
+                    }
                 }
 
                 if (light != nullptr && (light->GetLightType() == LightType_Spot || light->GetLightType() == LightType_Point) )
@@ -891,8 +894,7 @@ bool LightSamplingCache::ProcessEmissiveGeometry( const UpdateSettings & setting
                 if( tasks.size() >= LLB_MAX_PROC_TASKS )
                 {
                     assert( false && "Emissive triangle task buffer too small" );
-                    overflowAbort = true;
-                    return;
+                    return false;
                 }
 
                 remainingTriangles -= taskTriangleCount;
@@ -903,11 +905,7 @@ bool LightSamplingCache::ProcessEmissiveGeometry( const UpdateSettings & setting
                     historicBufferOffset += taskTriangleCount;
             }
         }
-        });
     }
-
-    if (overflowAbort)
-        return false;
 
     assert( subInstanceData.size() == subInstanceIndex );
     return allGood;

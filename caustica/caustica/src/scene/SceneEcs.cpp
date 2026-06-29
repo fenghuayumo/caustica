@@ -196,6 +196,7 @@ void SceneEntityWorld::clear()
     m_Animations.clear();
     m_structureDirty = true;
     m_transformDirty = true;
+    m_previousTransformDirty = false;
 }
 
 void SceneEntityWorld::markStructureDirty()
@@ -219,7 +220,7 @@ void SceneEntityWorld::refresh(uint32_t frameIndex)
     const bool structureDirty = m_structureDirty;
     const bool transformDirty = m_transformDirty;
 
-    refreshHierarchy(PreviousTransformPolicy::PreserveExisting);
+    refreshHierarchy(PreviousTransformPolicy::CaptureCurrent);
 
     m_world.each<LightComponent, GlobalTransformComponent>(
         [](ecs::Entity entity, LightComponent& lightComponent, GlobalTransformComponent& global) {
@@ -254,6 +255,7 @@ void SceneEntityWorld::refresh(uint32_t frameIndex)
 
     m_structureDirty = false;
     m_transformDirty = false;
+    m_previousTransformDirty = structureDirty || transformDirty;
 }
 
 void SceneEntityWorld::assignGlobalResourceIndices()

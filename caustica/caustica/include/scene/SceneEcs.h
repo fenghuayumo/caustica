@@ -199,7 +199,7 @@ public:
     [[nodiscard]] bool entitySubtreeContains(ecs::Entity root, ecs::Entity candidate) const;
 
     [[nodiscard]] bool hasPendingStructureChanges() const { return m_structureDirty; }
-    [[nodiscard]] bool hasPendingTransformChanges() const { return m_transformDirty; }
+    [[nodiscard]] bool hasPendingTransformChanges() const { return m_transformDirty || m_previousTransformDirty; }
 
 private:
     void unregisterEntityLeaves(ecs::Entity entity);
@@ -212,6 +212,7 @@ private:
     std::unordered_map<std::string, ecs::Entity> m_pathToEntity;
     bool m_structureDirty = true;
     bool m_transformDirty = true;
+    bool m_previousTransformDirty = false;
     static inline const std::vector<ecs::Entity> s_emptyChildren{};
 };
 

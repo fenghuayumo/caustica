@@ -5,6 +5,7 @@
 #include <scene/Scene.h>
 #include <scene/ResourceTracker.h>
 #include <scene/SceneEcs.h>
+#include <ecs/Entity.h>
 #include <core/log.h>
 #include <rhi/utils.h>
 
@@ -47,18 +48,13 @@ void AccelStructManager::createTlas(nvrhi::ICommandList* commandList, const Scen
     tlasDesc.buildFlags = nvrhi::rt::AccelStructBuildFlags::PreferFastTrace;
 
     m_subInstanceCount = 0;
-    size_t meshInstanceCount = 0;
-    if (auto* entityWorld = scene.GetEntityWorld())
+    const auto& meshInstances = scene.GetMeshInstances();
+    for (const auto& instance : meshInstances)
     {
-        auto& world = entityWorld->world();
-        world.each<scene::MeshInstanceComponent>([&](ecs::Entity, scene::MeshInstanceComponent& mc)
-        {
-            ++meshInstanceCount;
-            m_subInstanceCount += static_cast<uint32_t>(mc.instance->GetMesh()->geometries.size());
-        });
+        m_subInstanceCount += static_cast<uint32_t>(instance->GetMesh()->geometries.size());
     }
 
-    tlasDesc.topLevelMaxInstances = std::max<size_t>(1, meshInstanceCount);
+    tlasDesc.topLevelMaxInstances = std::max<size_t>(1, meshInstances.size());
     assert(tlasDesc.topLevelMaxInstances < (1 << 15));
     m_topLevelAS = m_device->createAccelStruct(tlasDesc);
 
@@ -199,49 +195,51 @@ void AccelStructManager::buildTlas(nvrhi::ICommandList*            commandList,
     std::vector<nvrhi::rt::InstanceDesc> instances;
 
     uint subInstanceCount = 0;
-    if (auto* entityWorld = scene.GetEntityWorld())
+    const auto* entityWorld = scene.GetEntityWorld();
+    const auto& meshInstances = scene.GetMeshInstances();
+    for (const auto& instancePtr : meshInstances)
     {
-        auto& world = entityWorld->world();
-        world.each<scene::MeshInstanceComponent, scene::GlobalTransformComponent>(
-            [&](ecs::Entity, scene::MeshInstanceComponent& mc, scene::GlobalTransformComponent& gtx)
+        auto* instance = instancePtr.get();
+        const std::shared_ptr<MeshInfo>& mesh = instance->GetMesh();
+
+        const bool hasAttachementOMM = opacityMicromapBuilder && mesh->AccelStructOMM.Get() != nullptr;
+        const bool useOmmBLAS = ommState.enabled && hasAttachementOMM && !settings.forceOpaque && !ommState.debugViewEnabled;
+
+        const uint32_t meshSubInstanceCount = (uint32_t)mesh->geometries.size();
+        assert(subInstanceCount == instance->GetGeometryInstanceIndex());
+
+        auto* bottomLevelAS = useOmmBLAS ? mesh->AccelStructOMM.Get() : mesh->accelStruct.Get();
+        if (bottomLevelAS == nullptr)
         {
-            auto* instance = mc.instance.get();
-            const std::shared_ptr<MeshInfo>& mesh = instance->GetMesh();
-
-            const bool hasAttachementOMM = opacityMicromapBuilder && mesh->AccelStructOMM.Get() != nullptr;
-            const bool useOmmBLAS = ommState.enabled && hasAttachementOMM && !settings.forceOpaque && !ommState.debugViewEnabled;
-
-            const uint32_t meshSubInstanceCount = (uint32_t)mesh->geometries.size();
-            assert(subInstanceCount == instance->GetGeometryInstanceIndex());
-
-            auto* bottomLevelAS = useOmmBLAS ? mesh->AccelStructOMM.Get() : mesh->accelStruct.Get();
-            if (bottomLevelAS == nullptr)
+            static bool warnedNullBlas = false;
+            if (!warnedNullBlas)
             {
-                static bool warnedNullBlas = false;
-                if (!warnedNullBlas)
-                {
-                    warning("BuildTLAS skipped one or more mesh instances with null BLAS to avoid invalid TLAS input.");
-                    warnedNullBlas = true;
-                }
-                subInstanceCount += meshSubInstanceCount;
-                return;
+                warning("BuildTLAS skipped one or more mesh instances with null BLAS to avoid invalid TLAS input.");
+                warnedNullBlas = true;
             }
-
-            nvrhi::rt::InstanceDesc instanceDesc;
-            instanceDesc.bottomLevelAS = bottomLevelAS;
-            instanceDesc.instanceMask = (ommState.onlyOMMs && !hasAttachementOMM) ? 0 : 1;
-            instanceDesc.instanceID = instance->GetGeometryInstanceIndex();
-            instanceDesc.instanceContributionToHitGroupIndex = subInstanceCount;
-            instanceDesc.flags = ommState.force2State ? nvrhi::rt::InstanceFlags::ForceOMM2State : nvrhi::rt::InstanceFlags::None;
-            if (settings.forceOpaque || ommState.debugViewEnabled)
-                instanceDesc.flags = (nvrhi::rt::InstanceFlags)((uint32_t)instanceDesc.flags | (uint32_t)nvrhi::rt::InstanceFlags::ForceOpaque);
-
             subInstanceCount += meshSubInstanceCount;
+            continue;
+        }
 
-            dm::affineToColumnMajor(gtx.transformFloat, instanceDesc.transform);
+        nvrhi::rt::InstanceDesc instanceDesc;
+        instanceDesc.bottomLevelAS = bottomLevelAS;
+        instanceDesc.instanceMask = (ommState.onlyOMMs && !hasAttachementOMM) ? 0 : 1;
+        instanceDesc.instanceID = instance->GetGeometryInstanceIndex();
+        instanceDesc.instanceContributionToHitGroupIndex = subInstanceCount;
+        instanceDesc.flags = ommState.force2State ? nvrhi::rt::InstanceFlags::ForceOMM2State : nvrhi::rt::InstanceFlags::None;
+        if (settings.forceOpaque || ommState.debugViewEnabled)
+            instanceDesc.flags = (nvrhi::rt::InstanceFlags)((uint32_t)instanceDesc.flags | (uint32_t)nvrhi::rt::InstanceFlags::ForceOpaque);
 
-            instances.push_back(instanceDesc);
-        });
+        subInstanceCount += meshSubInstanceCount;
+
+        dm::affineToColumnMajor(dm::affine3::identity(), instanceDesc.transform);
+        if (entityWorld && ecs::isValid(instance->ownerEntity))
+        {
+            if (const auto* global = entityWorld->world().get<scene::GlobalTransformComponent>(instance->ownerEntity))
+                dm::affineToColumnMajor(global->transformFloat, instanceDesc.transform);
+        }
+
+        instances.push_back(instanceDesc);
     }
     assert(m_subInstanceCount == subInstanceCount);
 
