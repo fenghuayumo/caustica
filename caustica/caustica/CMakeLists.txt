@@ -273,6 +273,12 @@ if (CAUSTICA_WITH_VULKAN)
         target_link_libraries(causBackend PUBLIC Vulkan::Headers)
     endif()
 endif()
+if (CAUSTICA_WITH_STREAMLINE)
+    target_link_libraries(causBackend PUBLIC streamline)
+    target_include_directories(causBackend PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/engine/streamline"
+    )
+endif()
 
 # ── causImgui ─────────────────────────────────────────────────────────────
 # Dear ImGui integration (nvrhi backend, console, renderer).

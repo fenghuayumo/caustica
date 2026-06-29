@@ -729,6 +729,12 @@ void caustica::render::PathTracingWorldRenderer::streamlinePreRender()
     if (m_context.gpuDevice.IsHeadless())
         return;
 
+    auto& streamline = m_context.gpuDevice.GetStreamline();
+    m_context.settings.IsDLSSSuported = streamline.IsDLSSAvailable();
+    m_context.settings.IsDLSSRRSupported = streamline.IsDLSSRRAvailable();
+    m_context.settings.IsDLSSFGSupported = streamline.IsDLSSGAvailable();
+    m_context.settings.IsReflexSupported = streamline.IsReflexAvailable();
+
     // Setup Reflex
     {
         auto reflexConsts = caustica::StreamlineInterface::ReflexOptions{};
@@ -737,11 +743,11 @@ void caustica::render::PathTracingWorldRenderer::streamlinePreRender()
         reflexConsts.useMarkersToOptimize = true;
         reflexConsts.virtualKey = VK_F13;
         reflexConsts.idThread = 0; // std::hash<std::thread::id>()(std::this_thread::get_id())
-        m_context.gpuDevice.GetStreamline().SetReflexConsts(reflexConsts);
+        streamline.SetReflexConsts(reflexConsts);
 
         // Need to update StreamlineIntegration with the ability to query reflex state
         caustica::StreamlineInterface::ReflexState reflexState{};
-        m_context.gpuDevice.GetStreamline().GetReflexState(reflexState);
+        streamline.GetReflexState(reflexState);
         if (m_context.settings.IsReflexSupported)
         {
             m_context.settings.IsReflexLowLatencyAvailable = reflexState.lowLatencyAvailable;
@@ -779,7 +785,7 @@ void caustica::render::PathTracingWorldRenderer::streamlinePreRender()
     {
         // If DLSS-G has been turned off, then we tell tell SL to clean it up expressly
         if (m_context.settings.DLSSFGOptions.mode == StreamlineInterface::DLSSGMode::eOn && m_context.settings.ActualDLSSFGMode() == StreamlineInterface::DLSSGMode::eOff) {
-            m_context.gpuDevice.GetStreamline().CleanupDLSSG(true);
+            streamline.CleanupDLSSG(true);
         }
 
         // This is where DLSS-G is toggled On and Off (using dlssgOptions.mode) and where we set DLSS-G parameters.
@@ -788,14 +794,14 @@ void caustica::render::PathTracingWorldRenderer::streamlinePreRender()
         dlssgOptions.numFramesToGenerate = m_context.settings.DLSSFGNumFramesToGenerate;
 
         // This is where we query DLSS-G minimum swapchain size
-        if (m_context.gpuDevice.GetStreamline().IsDLSSGAvailable())
+        if (m_context.settings.IsDLSSFGSupported)
         {
             StreamlineInterface::DLSSGState state;
-            m_context.gpuDevice.GetStreamline().GetDLSSGState(state, dlssgOptions);
+            streamline.GetDLSSGState(state, dlssgOptions);
             m_context.settings.DLSSFGMultiplier = state.numFramesActuallyPresented;
             m_context.settings.DLSSFGMaxNumFramesToGenerate = state.numFramesToGenerateMax;
 
-            m_context.gpuDevice.GetStreamline().SetDLSSGOptions(dlssgOptions);
+            streamline.SetDLSSGOptions(dlssgOptions);
             m_context.settings.DLSSFGOptions = dlssgOptions;
         }
     }
@@ -839,7 +845,7 @@ void caustica::render::PathTracingWorldRenderer::streamlinePreRender()
                 dlssOptions.useAutoExposure = true;     // Optional: provide proper "kBufferTypeExposure" for 0-lag for better precision handling
                 dlssOptions.preset = StreamlineInterface::DLSSPreset::eDefault;
                 // if (m_context.settings.RealtimeAA < 4) <- docs https://github.com/NVIDIAGameWorks/Streamline/blob/main/docs/ProgrammingGuideDLSS_RR.md#50-provide-dlss--dlss-rr-options seem to imply that these should be set even when DLSS-RR enabled
-                    m_context.gpuDevice.GetStreamline().SetDLSSOptions(dlssOptions);
+                    streamline.SetDLSSOptions(dlssOptions);
             }
             else
             {
@@ -853,7 +859,7 @@ void caustica::render::PathTracingWorldRenderer::streamlinePreRender()
                 if (dlssResizeRequired)
                 {
                     // Only quality, target width and height matter here
-                    m_context.gpuDevice.GetStreamline().QueryDLSSOptimalSettings(dlssOptions, m_recommendedDLSSSettings);
+                    streamline.QueryDLSSOptimalSettings(dlssOptions, m_recommendedDLSSSettings);
 
                     // this is an example on how to override defaults - overriding default 2/3 to higher res 3/4
                     if (dlssOptions.mode == SI::DLSSMode::eMaxQuality)
@@ -902,7 +908,7 @@ void caustica::render::PathTracingWorldRenderer::streamlinePreRender()
             {
                 StreamlineInterface::DLSSOptions dlssOptions = {};
                 dlssOptions.mode = StreamlineInterface::DLSSMode::eOff;
-                m_context.gpuDevice.GetStreamline().SetDLSSOptions(dlssOptions);
+                streamline.SetDLSSOptions(dlssOptions);
             }
 
             m_renderSize = m_displaySize;

@@ -198,7 +198,12 @@ if (CAUSTICA_WITH_STREAMLINE)
         message(SEND_ERROR "Both CAUSTICA_STREAMLINE_FETCH_URL and CAUSTICA_STREAMLINE_FETCH_SHA256 must be defined together")
     endif()
 
-    if (CAUSTICA_STREAMLINE_FETCH_URL AND CAUSTICA_STREAMLINE_FETCH_SHA256)
+    if (CAUSTICA_STREAMLINE_FETCH_DIR
+        AND EXISTS "${CAUSTICA_STREAMLINE_FETCH_DIR}/CMakeLists.txt"
+        AND EXISTS "${CAUSTICA_STREAMLINE_FETCH_DIR}/include/sl.h")
+        message(STATUS "Using local Streamline SDK from ${CAUSTICA_STREAMLINE_FETCH_DIR}")
+        add_subdirectory("${CAUSTICA_STREAMLINE_FETCH_DIR}" "${CMAKE_BINARY_DIR}/streamline")
+    elseif (CAUSTICA_STREAMLINE_FETCH_URL AND CAUSTICA_STREAMLINE_FETCH_SHA256)
         message(STATUS "Updating Streamline from " ${CAUSTICA_STREAMLINE_FETCH_URL} ", SHA256 " ${CAUSTICA_STREAMLINE_FETCH_SHA256} ", into folder " ${CAUSTICA_STREAMLINE_FETCH_DIR} " - please wait!" )
         FetchContent_Declare(
             streamline
