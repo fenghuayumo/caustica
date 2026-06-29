@@ -150,7 +150,7 @@ const std::vector<uint32_t>* GetMeshSourcePositionIndices(
     return &mesh->DeformationSourcePositionIndices;
 }
 
-std::shared_ptr<MeshInstance> GetMeshFromEntity(
+std::shared_ptr<MeshInfo> GetMeshInfoFromEntity(
     const scene::SceneEntityWorld& entityWorld,
     ecs::Entity entity,
     const char* caller)
@@ -159,10 +159,10 @@ std::shared_ptr<MeshInstance> GetMeshFromEntity(
         throw std::runtime_error(std::string(caller) + ": entity is invalid");
 
     const auto* meshComponent = entityWorld.world().get<scene::MeshInstanceComponent>(entity);
-    if (!meshComponent || !meshComponent->instance || !meshComponent->instance->GetMesh())
+    if (!meshComponent || !meshComponent->mesh)
         throw std::runtime_error(std::string(caller) + ": entity is not a mesh instance");
 
-    return meshComponent->instance;
+    return meshComponent->mesh;
 }
 
 ecs::Entity FindUniqueMeshInstanceEntity(
@@ -178,16 +178,17 @@ ecs::Entity FindUniqueMeshInstanceEntity(
     ecs::Entity result = ecs::NullEntity;
     size_t instanceCount = 0;
 
-    for (const auto& instance : scene->GetMeshInstances())
+    for (const ecs::Entity instanceEntity : scene->GetMeshInstances())
     {
-        if (!instance || instance->GetMesh() != mesh)
+        if (!scene->GetEntityWorld())
             continue;
 
-        if (ecs::isValid(instance->ownerEntity))
-        {
-            result = instance->ownerEntity;
-            ++instanceCount;
-        }
+        const auto* meshComp = scene->GetEntityWorld()->world().get<scene::MeshInstanceComponent>(instanceEntity);
+        if (!meshComp || meshComp->mesh != mesh)
+            continue;
+
+        result = instanceEntity;
+        ++instanceCount;
     }
 
     if (instanceCount == 0)
@@ -435,8 +436,7 @@ std::vector<dm::float3> GetMeshVerticesWorld(
     if (!entityWorld)
         throw std::runtime_error("GetMeshVerticesWorld: scene has no entity world");
 
-    auto meshInstance = GetMeshFromEntity(*entityWorld, entity, "GetMeshVerticesWorld");
-    auto mesh = meshInstance->GetMesh();
+    auto mesh = GetMeshInfoFromEntity(*entityWorld, entity, "GetMeshVerticesWorld");
     std::vector<float3> vertices = GetMeshVertices(mesh);
 
     const affine3 localToWorld = GetEntityTransformFloat(*entityWorld, entity);
@@ -517,8 +517,7 @@ void SetMeshVerticesWorld(
     if (!entityWorld)
         throw std::runtime_error("SetMeshVerticesWorld: scene has no entity world");
 
-    auto meshInstance = GetMeshFromEntity(*entityWorld, entity, "SetMeshVerticesWorld");
-    auto mesh = meshInstance->GetMesh();
+    auto mesh = GetMeshInfoFromEntity(*entityWorld, entity, "SetMeshVerticesWorld");
     const affine3 worldToLocal = affine3(inverse(dm::daffine3(GetEntityTransformFloat(*entityWorld, entity))));
 
     std::vector<float3> objectVertices;

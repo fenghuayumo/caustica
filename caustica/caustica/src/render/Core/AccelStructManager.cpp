@@ -49,9 +49,14 @@ void AccelStructManager::createTlas(nvrhi::ICommandList* commandList, const Scen
 
     m_subInstanceCount = 0;
     const auto& meshInstances = scene.GetMeshInstances();
-    for (const auto& instance : meshInstances)
+    const auto* entityWorld = scene.GetEntityWorld();
+    for (const ecs::Entity entity : meshInstances)
     {
-        m_subInstanceCount += static_cast<uint32_t>(instance->GetMesh()->geometries.size());
+        if (!entityWorld)
+            continue;
+        const auto* meshComp = entityWorld->world().get<scene::MeshInstanceComponent>(entity);
+        if (meshComp && meshComp->mesh)
+            m_subInstanceCount += static_cast<uint32_t>(meshComp->mesh->geometries.size());
     }
 
     tlasDesc.topLevelMaxInstances = std::max<size_t>(1, meshInstances.size());
@@ -156,14 +161,13 @@ void AccelStructManager::updateSkinnedBlases(nvrhi::ICommandList*            com
     if (auto* entityWorld = scene.GetEntityWorld())
     {
         auto& world = entityWorld->world();
-        world.each<scene::SkinnedMeshInstanceComponent>([&](ecs::Entity, scene::SkinnedMeshInstanceComponent& sc)
+        world.each<scene::SkinnedMeshComponent, scene::MeshInstanceComponent>([&](ecs::Entity, scene::SkinnedMeshComponent& skinned, scene::MeshInstanceComponent& meshComp)
         {
-            const auto& skinnedInstance = sc.instance;
-            if (skinnedInstance->GetLastUpdateFrameIndex() < frameIndex)
+            if (skinned.lastUpdateFrameIndex < frameIndex || !meshComp.mesh)
                 return;
 
-            commandList->setAccelStructState(skinnedInstance->GetMesh()->accelStruct, nvrhi::ResourceStates::AccelStructWrite);
-            commandList->setBufferState(skinnedInstance->GetMesh()->buffers->vertexBuffer,
+            commandList->setAccelStructState(meshComp.mesh->accelStruct, nvrhi::ResourceStates::AccelStructWrite);
+            commandList->setBufferState(meshComp.mesh->buffers->vertexBuffer,
                                         nvrhi::ResourceStates::AccelStructBuildInput);
         });
     }
@@ -172,15 +176,14 @@ void AccelStructManager::updateSkinnedBlases(nvrhi::ICommandList*            com
     if (auto* entityWorld = scene.GetEntityWorld())
     {
         auto& world = entityWorld->world();
-        world.each<scene::SkinnedMeshInstanceComponent>([&](ecs::Entity, scene::SkinnedMeshInstanceComponent& sc)
+        world.each<scene::SkinnedMeshComponent, scene::MeshInstanceComponent>([&](ecs::Entity, scene::SkinnedMeshComponent& skinned, scene::MeshInstanceComponent& meshComp)
         {
-            const auto& skinnedInstance = sc.instance;
-            if (skinnedInstance->GetLastUpdateFrameIndex() < frameIndex)
+            if (skinned.lastUpdateFrameIndex < frameIndex || !meshComp.mesh)
                 return;
 
             bvh::Config cfg = { .excludeTransmissive = settings.excludeTransmissive };
-            nvrhi::rt::AccelStructDesc blasDesc = bvh::GetMeshBlasDesc(cfg, *skinnedInstance->GetMesh(), nullptr, true);
-            nvrhi::utils::BuildBottomLevelAccelStruct(commandList, skinnedInstance->GetMesh()->accelStruct, blasDesc);
+            nvrhi::rt::AccelStructDesc blasDesc = bvh::GetMeshBlasDesc(cfg, *meshComp.mesh, nullptr, true);
+            nvrhi::utils::BuildBottomLevelAccelStruct(commandList, meshComp.mesh->accelStruct, blasDesc);
         });
     }
     commandList->endMarker();
@@ -197,16 +200,22 @@ void AccelStructManager::buildTlas(nvrhi::ICommandList*            commandList,
     uint subInstanceCount = 0;
     const auto* entityWorld = scene.GetEntityWorld();
     const auto& meshInstances = scene.GetMeshInstances();
-    for (const auto& instancePtr : meshInstances)
+    for (const ecs::Entity entity : meshInstances)
     {
-        auto* instance = instancePtr.get();
-        const std::shared_ptr<MeshInfo>& mesh = instance->GetMesh();
+        if (!entityWorld)
+            continue;
+
+        const auto* meshComp = entityWorld->world().get<scene::MeshInstanceComponent>(entity);
+        if (!meshComp || !meshComp->mesh)
+            continue;
+
+        const std::shared_ptr<MeshInfo>& mesh = meshComp->mesh;
 
         const bool hasAttachementOMM = opacityMicromapBuilder && mesh->AccelStructOMM.Get() != nullptr;
         const bool useOmmBLAS = ommState.enabled && hasAttachementOMM && !settings.forceOpaque && !ommState.debugViewEnabled;
 
         const uint32_t meshSubInstanceCount = (uint32_t)mesh->geometries.size();
-        assert(subInstanceCount == instance->GetGeometryInstanceIndex());
+        assert(subInstanceCount == meshComp->geometryInstanceIndex);
 
         auto* bottomLevelAS = useOmmBLAS ? mesh->AccelStructOMM.Get() : mesh->accelStruct.Get();
         if (bottomLevelAS == nullptr)
@@ -224,7 +233,7 @@ void AccelStructManager::buildTlas(nvrhi::ICommandList*            commandList,
         nvrhi::rt::InstanceDesc instanceDesc;
         instanceDesc.bottomLevelAS = bottomLevelAS;
         instanceDesc.instanceMask = (ommState.onlyOMMs && !hasAttachementOMM) ? 0 : 1;
-        instanceDesc.instanceID = instance->GetGeometryInstanceIndex();
+        instanceDesc.instanceID = meshComp->geometryInstanceIndex;
         instanceDesc.instanceContributionToHitGroupIndex = subInstanceCount;
         instanceDesc.flags = ommState.force2State ? nvrhi::rt::InstanceFlags::ForceOMM2State : nvrhi::rt::InstanceFlags::None;
         if (settings.forceOpaque || ommState.debugViewEnabled)
@@ -233,9 +242,9 @@ void AccelStructManager::buildTlas(nvrhi::ICommandList*            commandList,
         subInstanceCount += meshSubInstanceCount;
 
         dm::affineToColumnMajor(dm::affine3::identity(), instanceDesc.transform);
-        if (entityWorld && ecs::isValid(instance->ownerEntity))
+        if (entityWorld && ecs::isValid(entity))
         {
-            if (const auto* global = entityWorld->world().get<scene::GlobalTransformComponent>(instance->ownerEntity))
+            if (const auto* global = entityWorld->world().get<scene::GlobalTransformComponent>(entity))
                 dm::affineToColumnMajor(global->transformFloat, instanceDesc.transform);
         }
 

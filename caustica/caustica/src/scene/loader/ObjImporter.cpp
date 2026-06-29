@@ -1149,7 +1149,7 @@ bool ObjImporter::Load(const std::filesystem::path& filePath, TextureLoader& tex
 
     result.entityWorld = std::make_shared<scene::SceneEntityWorld>();
     ecs::Entity rootEntity = result.entityWorld->createEntity(filePath.stem().string());
-    result.entityWorld->setMeshInstance(rootEntity, m_SceneTypeFactory->CreateMeshInstance(mesh));
+    result.entityWorld->setMeshInstance(rootEntity, mesh);
     result.entityWorld->rebuildPathsFromRoot();
     result.rootEntity = rootEntity;
     return true;

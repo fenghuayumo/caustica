@@ -34,10 +34,10 @@ static int CompareDrawItemsOpaque(const DrawItem* a, const DrawItem* b)
     if (a->buffers != b->buffers)
         return a->buffers < b->buffers;
 
-    if (a->mesh != b->mesh)
-        return a->mesh < b->mesh;
+    if (a->meshEntity != b->meshEntity)
+        return a->meshEntity < b->meshEntity;
 
-    return a->instance < b->instance;
+    return a->instanceIndex < b->instanceIndex;
 }
 
 void InstancedOpaqueDrawStrategy::PrepareForView(const caustica::Scene& scene, const caustica::IView& view)
@@ -54,7 +54,7 @@ void InstancedOpaqueDrawStrategy::PrepareForView(const caustica::Scene& scene, c
         auto& world = entityWorld->world();
         world.each<scene::MeshInstanceComponent, scene::GlobalTransformComponent,
                    scene::BoundsComponent, scene::SceneContentComponent>(
-            [&](ecs::Entity, scene::MeshInstanceComponent& mc,
+            [&](ecs::Entity entity, scene::MeshInstanceComponent& mc,
                 scene::GlobalTransformComponent& gtx, scene::BoundsComponent& bounds,
                 scene::SceneContentComponent& content)
         {
@@ -64,11 +64,10 @@ void InstancedOpaqueDrawStrategy::PrepareForView(const caustica::Scene& scene, c
             if (!m_ViewFrustum.intersectsWith(bounds.globalBounds))
                 return;
 
-            auto meshInstance = dynamic_cast<MeshInstance*>(mc.instance.get());
-            if (!meshInstance)
+            if (!mc.mesh)
                 return;
 
-            const caustica::MeshInfo* mesh = meshInstance->GetMesh().get();
+            const caustica::MeshInfo* mesh = mc.mesh.get();
 
             for (const auto& geometry : mesh->geometries)
             {
@@ -84,7 +83,8 @@ void InstancedOpaqueDrawStrategy::PrepareForView(const caustica::Scene& scene, c
                 }
 
                 DrawItem& item = m_Items.emplace_back();
-                item.instance = meshInstance;
+                item.meshEntity = entity;
+                item.instanceIndex = mc.instanceIndex;
                 item.mesh = mesh;
                 item.geometry = geometry.get();
                 item.material = geometry->material.get();
@@ -116,7 +116,7 @@ const DrawItem* InstancedOpaqueDrawStrategy::GetNextItem()
 
 static int CompareDrawItemsTransparent(const DrawItem* a, const DrawItem* b)
 {
-    if (a->instance == b->instance)
+    if (a->meshEntity == b->meshEntity)
         return a->cullMode > b->cullMode;
 
     return a->distanceToCamera > b->distanceToCamera;
@@ -139,7 +139,7 @@ void TransparentDrawStrategy::PrepareForView(const caustica::Scene& scene, const
         auto& world = entityWorld->world();
         world.each<scene::MeshInstanceComponent, scene::GlobalTransformComponent,
                    scene::BoundsComponent, scene::SceneContentComponent>(
-            [&](ecs::Entity, scene::MeshInstanceComponent& mc,
+            [&](ecs::Entity entity, scene::MeshInstanceComponent& mc,
                 scene::GlobalTransformComponent& gtx, scene::BoundsComponent& bounds,
                 scene::SceneContentComponent& content)
         {
@@ -149,11 +149,10 @@ void TransparentDrawStrategy::PrepareForView(const caustica::Scene& scene, const
             if (!viewFrustum.intersectsWith(bounds.globalBounds))
                 return;
 
-            auto meshInstance = dynamic_cast<MeshInstance*>(mc.instance.get());
-            if (!meshInstance)
+            if (!mc.mesh)
                 return;
 
-            const caustica::MeshInfo* mesh = meshInstance->GetMesh().get();
+            const caustica::MeshInfo* mesh = mc.mesh.get();
             for (const auto& geometry : mesh->geometries)
             {
                 const auto& material = geometry->material;
@@ -173,7 +172,8 @@ void TransparentDrawStrategy::PrepareForView(const caustica::Scene& scene, const
                 }
 
                 DrawItem item{};
-                item.instance = meshInstance;
+                item.meshEntity = entity;
+                item.instanceIndex = mc.instanceIndex;
                 item.mesh = mesh;
                 item.geometry = geometry.get();
                 item.material = geometry->material.get();

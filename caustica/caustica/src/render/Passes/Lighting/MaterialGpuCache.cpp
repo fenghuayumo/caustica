@@ -23,6 +23,7 @@
 #include <imgui/ui_macros.h>
 #include <render/Core/TextureUtils.h>
 #include <scene/Scene.h>
+#include <scene/SceneEcs.h>
 
 #include <core/json.h>
 #include <json/json.h>
@@ -1481,7 +1482,7 @@ void MaterialGpuCache::CreateRenderPassesAndLoadMaterials(nvrhi::IBindingLayout*
 }
 
 // NOTE: this also handles some of the geometry data and mixed geometry&material stuff - it might be a good idea to rethink whether it needs to live outside of material baker
-void UpdateSubInstanceData(SubInstanceData & ret, const std::shared_ptr<caustica::Scene> & scene, const caustica::MeshInstance& meshInstance, const caustica::MeshGeometry& geometry, uint meshGeometryIndex, const PTMaterial& material)
+void UpdateSubInstanceData(SubInstanceData & ret, const std::shared_ptr<caustica::Scene> & scene, const std::shared_ptr<MeshInfo>& mesh, const caustica::MeshGeometry& geometry, uint meshGeometryIndex, const PTMaterial& material)
 {
     bool alphaTest = material.HasAlphaTest();
 
@@ -1492,13 +1493,13 @@ void UpdateSubInstanceData(SubInstanceData & ret, const std::shared_ptr<caustica
 
     float alphaCutoff = 0.0;
 
-    const std::shared_ptr<MeshInfo>& mesh = meshInstance.GetMesh();
+    const std::shared_ptr<MeshInfo>& meshRef = mesh;
     ret.FlagsAndAlphaInfo = 0;
     if (alphaTest)
     {
         ret.FlagsAndAlphaInfo |= SubInstanceData::Flags_AlphaTested;
 
-        assert(mesh->buffers->hasAttribute(VertexAttribute::TexCoord1));
+        assert(meshRef->buffers->hasAttribute(VertexAttribute::TexCoord1));
         assert(material.EnableBaseTexture && material.BaseTexture.Loaded != nullptr); // disable alpha testing if this happens to be possible
         // ret.AlphaCutoff = material.alphaCutoff;
         alphaCutoff = material.AlphaCutoff;
@@ -1517,7 +1518,7 @@ void UpdateSubInstanceData(SubInstanceData & ret, const std::shared_ptr<caustica
     if (material.ExcludeFromNEE)
         ret.FlagsAndAlphaInfo |= SubInstanceData::Flags_ExcludeFromNEE;
 
-    uint globalGeometryIndex = mesh->geometries[0]->globalGeometryIndex + meshGeometryIndex;
+    uint globalGeometryIndex = meshRef->geometries[0]->globalGeometryIndex + meshGeometryIndex;
     uint globalMaterialIndex = material.GPUDataIndex;
     ret.GlobalGeometryIndex_PTMaterialDataIndex = (globalGeometryIndex << 16) | globalMaterialIndex;
 
@@ -1572,10 +1573,16 @@ void MaterialGpuCache::Update(nvrhi::ICommandList* commandList, const std::share
     // NOTE: this also handles some of the geometry data and mixed geometry&material stuff - it might be a good idea to rethink whether it needs to live outside of material baker
     uint subInstanceIndex = 0;
     const auto& instances = scene->GetMeshInstances();
-    for (const auto& instance : instances)
+    auto* entityWorld = scene->GetEntityWorld();
+    for (const ecs::Entity entity : instances)
     {
-        const auto& mesh = instance->GetMesh();
-        uint32_t firstGeometryInstanceIndex = instance->GetGeometryInstanceIndex();
+        if (!entityWorld)
+            continue;
+        const auto* meshComp = entityWorld->world().get<scene::MeshInstanceComponent>(entity);
+        if (!meshComp || !meshComp->mesh)
+            continue;
+
+        const auto& mesh = meshComp->mesh;
         for (size_t geometryIndex = 0; geometryIndex < mesh->geometries.size(); ++geometryIndex, subInstanceIndex++)
         {
             const auto& geometry = mesh->geometries[geometryIndex];
@@ -1583,7 +1590,7 @@ void MaterialGpuCache::Update(nvrhi::ICommandList* commandList, const std::share
             std::shared_ptr<PTMaterial> materialPT = PTMaterial::SafeCast(geometry->material);
             assert(materialPT != nullptr && "Unknown error - should never have happened" );
 
-            UpdateSubInstanceData(subInstanceData[subInstanceIndex], scene, *instance, *geometry, geometryIndex, *materialPT);
+            UpdateSubInstanceData(subInstanceData[subInstanceIndex], scene, mesh, *geometry, geometryIndex, *materialPT);
         }
     }
 }

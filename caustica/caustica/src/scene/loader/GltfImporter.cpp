@@ -1773,7 +1773,7 @@ bool GltfImporter::Load(
         {
             auto found = meshMap.find(src->mesh);
             if (found != meshMap.end())
-                world.setMeshInstance(dst, m_SceneTypeFactory->CreateMeshInstance(found->second));
+                world.setMeshInstance(dst, found->second);
         }
 
         if (src->camera)
@@ -1849,22 +1849,28 @@ bool GltfImporter::Load(
         std::shared_ptr<MeshInfo> prototypeMesh = found->second;
         assert(prototypeMesh->isSkinPrototype);
 
-        auto skinnedInstance = m_SceneTypeFactory->CreateSkinnedMeshInstance(m_SceneTypeFactory, prototypeMesh);
-        skinnedInstance->joints.resize(src->skin->joints_count);
+        auto dstIt = nodeMap.find(src);
+        if (dstIt == nodeMap.end())
+            continue;
+
+        const ecs::Entity skinnedEntity = dstIt->second;
+        world.setSkinnedMeshInstance(skinnedEntity, *m_SceneTypeFactory, prototypeMesh);
+
+        auto* skinned = world.world().get<scene::SkinnedMeshComponent>(skinnedEntity);
+        if (!skinned)
+            continue;
+
+        skinned->joints.resize(src->skin->joints_count);
 
         for (size_t joint_idx = 0; joint_idx < src->skin->joints_count; joint_idx++)
         {
-            SkinnedMeshJoint& joint = skinnedInstance->joints[joint_idx];
+            SkinnedMeshJoint& joint = skinned->joints[joint_idx];
             cgltf_accessor_read_float(src->skin->inverse_bind_matrices, joint_idx, joint.inverseBindMatrix.m_data, 16);
             joint.jointEntity = nodeMap[src->skin->joints[joint_idx]];
 
             if (!world.world().has<scene::SkinnedMeshReferenceComponent>(joint.jointEntity))
-                world.setSkinnedMeshReference(joint.jointEntity, std::make_shared<SkinnedMeshReference>(skinnedInstance));
+                world.setSkinnedMeshReference(joint.jointEntity, skinnedEntity);
         }
-
-        auto dstIt = nodeMap.find(src);
-        if (dstIt != nodeMap.end())
-            world.setSkinnedMeshInstance(dstIt->second, skinnedInstance);
     }
 
     result.rootEntity = root;

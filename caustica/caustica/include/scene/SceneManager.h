@@ -77,7 +77,7 @@ public:
         if (!scene || instanceIndex < 0) return caustica::ecs::NullEntity;
         const auto& instances = scene->GetMeshInstances();
         if (instanceIndex >= static_cast<int>(instances.size())) return caustica::ecs::NullEntity;
-        return instances[instanceIndex]->ownerEntity;
+        return instances[instanceIndex];
     }
 
     struct ResolvedScenePath

@@ -3,8 +3,10 @@
 #include <ecs/Entity.h>
 #include <ecs/World.h>
 #include <math/math.h>
+#include <rhi/nvrhi.h>
 #include <scene/SceneContent.h>
 #include <scene/SceneResources.h>
+#include <scene/SceneTypes.h>
 
 #include <memory>
 #include <filesystem>
@@ -14,15 +16,14 @@
 
 namespace caustica
 {
-class MeshInstance;
-class SkinnedMeshInstance;
-class SkinnedMeshReference;
 class Light;
 class SceneCamera;
 class SceneAnimation;
 class GaussianSplat;
 class SampleSettings;
 class GameSettings;
+class SceneTypeFactory;
+struct SkinnedMeshJoint;
 }
 
 namespace caustica::scene
@@ -98,17 +99,30 @@ struct HierarchyDirtyComponent
 
 struct MeshInstanceComponent
 {
-    std::shared_ptr<MeshInstance> instance;
+    std::shared_ptr<MeshInfo> mesh;
+    int instanceIndex = -1;
+    int geometryInstanceIndex = -1;
+    std::vector<LightSamplerLink> perGeometryLightSamplerLinks;
+    ecs::Entity proxiedAnalyticLight = ecs::NullEntity;
 };
 
-struct SkinnedMeshInstanceComponent
+struct SkinnedMeshComponent
 {
-    std::shared_ptr<SkinnedMeshInstance> instance;
+    std::shared_ptr<MeshInfo> prototypeMesh;
+    std::vector<SkinnedMeshJoint> joints;
+    uint32_t lastUpdateFrameIndex = 0;
+};
+
+struct SkinnedMeshGpuComponent
+{
+    nvrhi::BufferHandle jointBuffer;
+    nvrhi::BindingSetHandle skinningBindingSet;
+    bool skinningInitialized = false;
 };
 
 struct SkinnedMeshReferenceComponent
 {
-    std::shared_ptr<SkinnedMeshReference> reference;
+    ecs::Entity skinnedMeshEntity = ecs::NullEntity;
 };
 
 struct LightComponent
@@ -171,9 +185,9 @@ public:
     void setPath(ecs::Entity entity, const std::filesystem::path& path);
     void rebuildPathsFromRoot();
 
-    void setMeshInstance(ecs::Entity entity, const std::shared_ptr<MeshInstance>& instance);
-    void setSkinnedMeshInstance(ecs::Entity entity, const std::shared_ptr<SkinnedMeshInstance>& instance);
-    void setSkinnedMeshReference(ecs::Entity entity, const std::shared_ptr<SkinnedMeshReference>& reference);
+    void setMeshInstance(ecs::Entity entity, const std::shared_ptr<MeshInfo>& mesh);
+    void setSkinnedMeshInstance(ecs::Entity entity, SceneTypeFactory& factory, const std::shared_ptr<MeshInfo>& prototypeMesh);
+    void setSkinnedMeshReference(ecs::Entity entity, ecs::Entity skinnedMeshEntity);
     void setLight(ecs::Entity entity, const std::shared_ptr<Light>& light);
     void setCamera(ecs::Entity entity, const std::shared_ptr<SceneCamera>& camera);
     void setAnimation(ecs::Entity entity, const std::shared_ptr<SceneAnimation>& animation);
@@ -186,6 +200,7 @@ public:
 
     void applyAnimations(float time);
     void assignGlobalResourceIndices();
+    void refreshInstanceIndices();
 
     [[nodiscard]] ecs::World& world() { return m_world; }
     [[nodiscard]] const ecs::World& world() const { return m_world; }

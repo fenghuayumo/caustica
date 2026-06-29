@@ -753,25 +753,23 @@ bool LightSamplingCache::ProcessEmissiveGeometry( const UpdateSettings & setting
 
     auto* entityWorld = scene->GetEntityWorld();
     const auto& instances = scene->GetMeshInstances();
-    for (const auto& instancePtr : instances)
+    for (const ecs::Entity entity : instances)
     {
-        MeshInstance* instance = instancePtr.get();
-        const ecs::Entity entity = instance->ownerEntity;
-        // PerGeometryLightSamplerLinks now part of base MeshInstance (merged from MeshInstanceExtension)
-        std::vector<LightSamplerLink>* perGeometryLightSamplerLinks = &(instance->PerGeometryLightSamplerLinks);
+        if (!entityWorld)
+            continue;
 
-        const auto& mesh = instance->GetMesh();
+        auto& world = entityWorld->world();
+        auto* meshComp = world.get<scene::MeshInstanceComponent>(entity);
+        if (!meshComp || !meshComp->mesh)
+            continue;
 
-        // auto boundingBox = instance->GetGlobalBoundingBox();
-        // ComputeBounds( ctrlBuff, boundingBox.m_mins );
-        // ComputeBounds( ctrlBuff, boundingBox.m_maxs );
+        std::vector<LightSamplerLink>& perGeometryLightSamplerLinks = meshComp->perGeometryLightSamplerLinks;
+        const auto& mesh = meshComp->mesh;
 
-        //assert(instance->GetGeometryInstanceIndex() < geometryInstanceToLight.size());
-        uint32_t firstGeometryInstanceIndex = instance->GetGeometryInstanceIndex();
+        uint32_t firstGeometryInstanceIndex = meshComp->geometryInstanceIndex;
 
-        if( (*perGeometryLightSamplerLinks).size() != mesh->geometries.size() )
+        if (perGeometryLightSamplerLinks.size() != mesh->geometries.size())
         {
-            // MeshInstanceEx constructor should have initialized this
             assert(false);
             continue;
         }
@@ -780,13 +778,13 @@ bool LightSamplingCache::ProcessEmissiveGeometry( const UpdateSettings & setting
         {
             const auto& geometry = mesh->geometries[geometryIndex];
 
-            LightSamplerLink & pastLink = (*perGeometryLightSamplerLinks)[geometryIndex];
+            LightSamplerLink & pastLink = perGeometryLightSamplerLinks[geometryIndex];
             if (pastLink.IndexOrBase != -1 && pastLink.LastUpdateTag != m_lastFrameIndex ) // if not used specifically during last frame, 
                 pastLink.IndexOrBase = -1;
             pastLink.LastUpdateTag = settings.FrameIndex;
                 
             size_t instanceHash = 0;
-            nvrhi::hash_combine(instanceHash, instance);
+            nvrhi::hash_combine(instanceHash, static_cast<uint32_t>(entity));
             nvrhi::hash_combine(instanceHash, geometryIndex);
 
             PTMaterial & materialPT = *PTMaterial::SafeCast(geometry->material);
@@ -797,9 +795,8 @@ bool LightSamplingCache::ProcessEmissiveGeometry( const UpdateSettings & setting
             {
                 // this is the first way to set proxy lights
                 std::shared_ptr<Light> light;
-                if (entityWorld && ecs::isValid(entity))
+                if (ecs::isValid(entity))
                 {
-                    const auto& world = entityWorld->world();
                     if (const auto* parentComp = world.get<scene::ParentComponent>(entity);
                         parentComp && ecs::isValid(parentComp->parent))
                     {
@@ -825,12 +822,14 @@ bool LightSamplingCache::ProcessEmissiveGeometry( const UpdateSettings & setting
                 // this is the second way to set proxy lights - via light marking the nodes
                 if (analyticProxyLightIndex == CAUSTICA_INVALID_LIGHT_INDEX )
                 {
-                    // ProxiedAnalyticLight now part of base MeshInstance (merged from MeshInstanceExtension)
-                    if (instance->ProxiedAnalyticLight.lock() != nullptr)
+                    if (ecs::isValid(meshComp->proxiedAnalyticLight))
                     {
-                        auto proxyLight = instance->ProxiedAnalyticLight.lock();
-                        if (proxyLight->LightLink.LastUpdateTag == settings.FrameIndex)
-                            analyticProxyLightIndex = proxyLight->LightLink.IndexOrBase;
+                        if (auto* lc = world.get<scene::LightComponent>(meshComp->proxiedAnalyticLight))
+                        {
+                            if (const auto& proxyLight = lc->light;
+                                proxyLight && proxyLight->LightLink.LastUpdateTag == settings.FrameIndex)
+                                analyticProxyLightIndex = proxyLight->LightLink.IndexOrBase;
+                        }
                     }
                 }
             }
@@ -881,7 +880,7 @@ bool LightSamplingCache::ProcessEmissiveGeometry( const UpdateSettings & setting
             {
                 EmissiveTrianglesProcTask task;
 
-                task.InstanceIndex      = instance->GetInstanceIndex();
+                task.InstanceIndex      = meshComp->instanceIndex;
                 task.GeometryIndex      = (uint)geometryIndex;
                 task.TriangleIndexFrom  = triangleFrom;
                 int taskTriangleCount   = std::min( remainingTriangles, LLB_MAX_TRIANGLES_PER_TASK );

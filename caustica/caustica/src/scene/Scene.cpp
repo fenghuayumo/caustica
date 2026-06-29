@@ -285,21 +285,21 @@ size_t Scene::GetGeometryInstancesCount() const
     return m_EntityWorld ? m_EntityWorld->GetGeometryInstancesCount() : 0;
 }
 
-const std::vector<std::shared_ptr<MeshInstance>>& Scene::GetMeshInstances() const
+const std::vector<ecs::Entity>& Scene::GetMeshInstances() const
 {
     if (m_EntityWorld)
-        return m_EntityWorld->GetMeshInstances();
+        return m_EntityWorld->GetMeshInstanceEntities();
 
-    static const std::vector<std::shared_ptr<MeshInstance>> s_empty;
+    static const std::vector<ecs::Entity> s_empty;
     return s_empty;
 }
 
-const std::vector<std::shared_ptr<SkinnedMeshInstance>>& Scene::GetSkinnedMeshInstances() const
+const std::vector<ecs::Entity>& Scene::GetSkinnedMeshInstances() const
 {
     if (m_EntityWorld)
-        return m_EntityWorld->GetSkinnedMeshInstances();
+        return m_EntityWorld->GetSkinnedMeshInstanceEntities();
 
-    static const std::vector<std::shared_ptr<SkinnedMeshInstance>> s_empty;
+    static const std::vector<ecs::Entity> s_empty;
     return s_empty;
 }
 
@@ -604,12 +604,9 @@ SceneImportResult Scene::LoadBuiltinModel(const std::string& builtinName)
         mesh->geometries.push_back(geometry);
     }
 
-    auto meshInstance = m_SceneTypeFactory->CreateMeshInstance(mesh);
-    meshInstance->name = mesh->name;
-
     result.entityWorld = std::make_shared<scene::SceneEntityWorld>();
     ecs::Entity rootEntity = result.entityWorld->createEntity(mesh->name);
-    result.entityWorld->setMeshInstance(rootEntity, meshInstance);
+    result.entityWorld->setMeshInstance(rootEntity, mesh);
     result.entityWorld->rebuildPathsFromRoot();
     result.rootEntity = rootEntity;
     return result;
@@ -1020,7 +1017,7 @@ void Scene::ProcessNodesRecursive()
         m_loadedGameSettings = component.settings;
     });
 
-    world.each<scene::LightComponent>([this, &world](ecs::Entity, scene::LightComponent& component)
+    world.each<scene::LightComponent>([this, &world](ecs::Entity lightEntity, scene::LightComponent& component)
     {
         const auto& light = component.light;
         if (light == nullptr ||
@@ -1039,8 +1036,8 @@ void Scene::ProcessNodesRecursive()
             if (ecs::isValid(proxyEntity))
             {
                 auto* mesh = world.get<scene::MeshInstanceComponent>(proxyEntity);
-                if (mesh && mesh->instance)
-                    mesh->instance->ProxiedAnalyticLight = light;
+                if (mesh)
+                    mesh->proxiedAnalyticLight = lightEntity;
             }
         }
     });

@@ -107,7 +107,7 @@ void caustica::render::RenderView(
             args.instanceCount = 1;
             args.startVertexLocation = item->mesh->vertexOffset + item->geometry->vertexOffsetInMesh;
             args.startIndexLocation = item->mesh->indexOffset + item->geometry->indexOffsetInMesh;
-            args.startInstanceLocation = item->instance->GetInstanceIndex();
+            args.startInstanceLocation = item->instanceIndex;
 
             if (currentDraw.instanceCount > 0 && 
                 currentDraw.startIndexLocation == args.startIndexLocation && 

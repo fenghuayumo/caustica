@@ -1,5 +1,6 @@
 #pragma once
 
+#include <ecs/Entity.h>
 #include <scene/View.h>
 #include <rhi/nvrhi.h>
 
@@ -8,7 +9,6 @@ namespace caustica
     class Scene;
     struct MeshInfo;
     struct MeshGeometry;
-    class MeshInstance;
     struct Material;
     struct BufferGroup;
     class FramebufferFactory;
@@ -20,7 +20,8 @@ namespace caustica::render
 
     struct DrawItem
     {
-        const caustica::MeshInstance* instance;
+        ecs::Entity meshEntity = ecs::NullEntity;
+        int instanceIndex = -1;
         const caustica::MeshInfo* mesh;
         const caustica::MeshGeometry* geometry;
         const caustica::Material* material;

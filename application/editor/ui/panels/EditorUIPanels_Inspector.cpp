@@ -48,8 +48,8 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
         ImGui::Text("Node: %s", entityName.c_str());
 
         auto* meshComp = ew->world().tryGet<caustica::scene::MeshInstanceComponent>(entity);
-        if (meshComp && meshComp->instance && meshComp->instance->GetMesh())
-            ImGui::Text("Mesh: %s", meshComp->instance->GetMesh()->name.c_str());
+        if (meshComp && meshComp->mesh)
+            ImGui::Text("Mesh: %s", meshComp->mesh->name.c_str());
         auto* splatComp = ew->world().tryGet<caustica::scene::GaussianSplatComponent>(entity);
         const auto& gaussianSplat = splatComp ? splatComp->splat : nullptr;
         if (gaussianSplat)

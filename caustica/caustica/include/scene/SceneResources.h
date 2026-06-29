@@ -3,6 +3,7 @@
 #include <scene/SceneObjects.h>
 #include <scene/SceneAnimation.h>
 #include <scene/ResourceTracker.h>
+#include <ecs/Entity.h>
 #include <functional>
 #include <memory>
 #include <vector>
@@ -32,23 +33,23 @@ namespace caustica
         [[nodiscard]] size_t GetMaxGeometryCountPerMesh()                          const { return m_MaxGeometryCountPerMesh; }
         [[nodiscard]] size_t GetGeometryInstancesCount()                           const { return m_GeometryInstancesCount; }
 
-        [[nodiscard]] const std::vector<std::shared_ptr<MeshInstance>>&        GetMeshInstances()        const { return m_MeshInstances; }
-        [[nodiscard]] const std::vector<std::shared_ptr<SkinnedMeshInstance>>& GetSkinnedMeshInstances() const { return m_SkinnedMeshInstances; }
+        [[nodiscard]] const std::vector<ecs::Entity>& GetMeshInstanceEntities() const { return m_MeshInstanceEntities; }
+        [[nodiscard]] const std::vector<ecs::Entity>& GetSkinnedMeshInstanceEntities() const { return m_SkinnedMeshInstanceEntities; }
         [[nodiscard]] const std::vector<std::shared_ptr<Light>>&               GetLights()               const { return m_Lights; }
         [[nodiscard]] const std::vector<std::shared_ptr<SceneCamera>>&         GetCameras()              const { return m_Cameras; }
         [[nodiscard]] const std::vector<std::shared_ptr<SceneAnimation>>&      GetAnimations()           const { return m_Animations; }
 
-        // Recalculates m_GeometryInstancesCount and per-instance index caches.
-        // Call after all structural changes (adds/removes) are complete.
-        void RefreshInstanceIndices();
+        // Recalculates m_GeometryInstancesCount and per-entity instance index caches.
+        // Implemented by SceneEntityWorld because indices live on ECS components.
 
         // Typed Register/Unregister. Derived classes may override to extend tracking.
-        virtual void RegisterLeaf(const std::shared_ptr<MeshInstance>& leaf);
+        void RegisterMeshInstanceEntity(ecs::Entity entity, const std::shared_ptr<MeshInfo>& mesh, bool skinned);
+        void UnregisterMeshInstanceEntity(ecs::Entity entity, const std::shared_ptr<MeshInfo>& mesh, bool skinned);
+
         virtual void RegisterLeaf(const std::shared_ptr<SceneCamera>& leaf);
         virtual void RegisterLeaf(const std::shared_ptr<Light>& leaf);
         virtual void RegisterLeaf(const std::shared_ptr<SceneAnimation>& leaf);
 
-        virtual void UnregisterLeaf(const std::shared_ptr<MeshInstance>& leaf);
         virtual void UnregisterLeaf(const std::shared_ptr<SceneCamera>& leaf);
         virtual void UnregisterLeaf(const std::shared_ptr<Light>& leaf);
         virtual void UnregisterLeaf(const std::shared_ptr<SceneAnimation>& leaf);
@@ -62,8 +63,8 @@ namespace caustica
         size_t m_GeometryCount = 0;
         size_t m_MaxGeometryCountPerMesh = 0;
         size_t m_GeometryInstancesCount = 0;
-        std::vector<std::shared_ptr<MeshInstance>>        m_MeshInstances;
-        std::vector<std::shared_ptr<SkinnedMeshInstance>> m_SkinnedMeshInstances;
+        std::vector<ecs::Entity> m_MeshInstanceEntities;
+        std::vector<ecs::Entity> m_SkinnedMeshInstanceEntities;
         std::vector<std::shared_ptr<Light>>               m_Lights;
         std::vector<std::shared_ptr<SceneCamera>>         m_Cameras;
         std::vector<std::shared_ptr<SceneAnimation>>      m_Animations;

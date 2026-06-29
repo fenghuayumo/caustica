@@ -96,12 +96,16 @@ namespace caustica::render
         const auto& skinnedInstances = scene.GetSkinnedMeshInstances();
 
         uint32_t vertexId = 0;
-        for (const auto& skinnedInstance : skinnedInstances)
+        for (const ecs::Entity entity : skinnedInstances)
         {
-            if (!ecs::isValid(skinnedInstance->ownerEntity))
+            if (!ecs::isValid(entity))
                 continue;
 
-            const auto* ownerGlobal = world.get<scene::GlobalTransformComponent>(skinnedInstance->ownerEntity);
+            const auto* skinned = world.get<scene::SkinnedMeshComponent>(entity);
+            if (!skinned)
+                continue;
+
+            const auto* ownerGlobal = world.get<scene::GlobalTransformComponent>(entity);
             if (!ownerGlobal)
                 continue;
 
@@ -109,14 +113,14 @@ namespace caustica::render
 
             daffine3 worldToRoot = inverse(daffine3(localToWorldTransform));
 
-            uint32_t njoints = (uint32_t)skinnedInstance->joints.size();
+            uint32_t njoints = (uint32_t)skinned->joints.size();
 
             Vertex a = { float3(), blue };
             Vertex b = { float3(), blue };
 
             for (size_t i = 0; i < njoints; i++)
             {
-                const SkinnedMeshJoint& joint = skinnedInstance->joints[i];
+                const SkinnedMeshJoint& joint = skinned->joints[i];
 
                 if (!ecs::isValid(joint.jointEntity))
                     continue;
@@ -169,8 +173,15 @@ namespace caustica::render
         if (m_Vertices.empty())
         {
             size_t totalJoints = 0;
-            for (const auto& skinnedInstance : skinnedInstances)
-                totalJoints += skinnedInstance->joints.size();
+            if (const auto* entityWorld = scene.GetEntityWorld())
+            {
+                const auto& world = entityWorld->world();
+                for (const ecs::Entity entity : skinnedInstances)
+                {
+                    if (const auto* skinned = world.get<scene::SkinnedMeshComponent>(entity))
+                        totalJoints += skinned->joints.size();
+                }
+            }
             
             size_t numVertices = totalJoints * 2;
             

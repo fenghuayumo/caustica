@@ -120,8 +120,8 @@ namespace caustica
         [[nodiscard]] size_t GetMaxGeometryCountPerMesh() const;
         [[nodiscard]] size_t GetGeometryInstancesCount() const;
 
-        [[nodiscard]] const std::vector<std::shared_ptr<MeshInstance>>& GetMeshInstances() const;
-        [[nodiscard]] const std::vector<std::shared_ptr<SkinnedMeshInstance>>& GetSkinnedMeshInstances() const;
+        [[nodiscard]] const std::vector<ecs::Entity>& GetMeshInstances() const;
+        [[nodiscard]] const std::vector<ecs::Entity>& GetSkinnedMeshInstances() const;
         [[nodiscard]] const std::vector<std::shared_ptr<Light>>& GetLights() const;
         [[nodiscard]] const std::vector<std::shared_ptr<SceneCamera>>& GetCameras() const;
         [[nodiscard]] const std::vector<std::shared_ptr<SceneAnimation>>& GetAnimations() const;

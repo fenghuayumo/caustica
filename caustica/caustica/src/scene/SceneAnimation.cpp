@@ -1,5 +1,6 @@
 #include <scene/SceneAnimation.h>
 #include <scene/SceneEcs.h>
+#include <scene/SceneMeshAccess.h>
 #include <core/log.h>
 
 using namespace caustica;
@@ -68,9 +69,9 @@ bool SceneAnimationChannel::Apply(float time, scene::SceneEntityWorld& world) co
         {
             // Look up a MeshInstanceComponent on the target entity and forward to SetProperty.
             auto* meshComp = world.world().get<scene::MeshInstanceComponent>(m_TargetEntity);
-            if (meshComp && meshComp->instance)
+            if (meshComp && meshComp->mesh)
             {
-                if (!meshComp->instance->SetProperty(m_LeafPropertyName, value))
+                if (!SetMeshProperty(*meshComp->mesh, m_LeafPropertyName, value))
                 {
                     caustica::warning("Cannot set property '%s' on mesh instance: the instance doesn't support this property.",
                         m_LeafPropertyName.c_str());

@@ -51,10 +51,10 @@ void FinalizeRuntimeSceneMutation(
         std::unordered_set<Material*> processedMaterials;
         ForEachEntityInSubtree(*scene->GetEntityWorld(), importedRoot, [&](ecs::Entity entity) {
             auto* meshComp = scene->GetEntityWorld()->world().get<scene::MeshInstanceComponent>(entity);
-            if (!meshComp || !meshComp->instance || !meshComp->instance->GetMesh())
+            if (!meshComp || !meshComp->mesh)
                 return;
 
-            for (const auto& geometry : meshComp->instance->GetMesh()->geometries)
+            for (const auto& geometry : meshComp->mesh->geometries)
             {
                 if (geometry->material && processedMaterials.insert(geometry->material.get()).second)
                     callbacks.PostMaterialLoad(*geometry->material);

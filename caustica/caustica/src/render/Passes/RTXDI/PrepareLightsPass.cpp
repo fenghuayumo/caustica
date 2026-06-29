@@ -2,6 +2,7 @@
 #include <render/SceneGpuResources.h>
 #include <render/Passes/RTXDI/RtxdiResources.h>
 #include <scene/Scene.h>
+#include <scene/SceneEcs.h>
 
 #include <assets/loader/ShaderFactory.h>
 #include <render/Core/CommonRenderPasses.h>
@@ -155,9 +156,16 @@ void PrepareLightsPass::CountLightsInScene(uint32_t& numEmissiveMeshes, uint32_t
     numEmissiveTriangles = 0;
 
     const auto& instances = m_Scene->GetMeshInstances();
-    for (const auto& instance : instances)
+    auto* entityWorld = m_Scene->GetEntityWorld();
+    for (const ecs::Entity entity : instances)
     {
-        for (const auto& geometry : instance->GetMesh()->geometries)
+        if (!entityWorld)
+            continue;
+        const auto* meshComp = entityWorld->world().get<scene::MeshInstanceComponent>(entity);
+        if (!meshComp || !meshComp->mesh)
+            continue;
+
+        for (const auto& geometry : meshComp->mesh->geometries)
         {
             PTMaterial & materialPT = *PTMaterial::SafeCast(geometry->material);
             if (materialPT.IsEmissive())
@@ -443,19 +451,26 @@ RTXDI_LightBufferParameters PrepareLightsPass::Process(nvrhi::ICommandList* comm
     std::vector<uint32_t> geometryInstanceToLight(m_Scene->GetGeometryInstancesCount(), RTXDI_INVALID_LIGHT_INDEX);
 
     const auto& instances = m_Scene->GetMeshInstances();
-    for (const auto& instance : instances)
+    auto* entityWorld = m_Scene->GetEntityWorld();
+    for (const ecs::Entity entity : instances)
     {
-        const auto& mesh = instance->GetMesh();
+        if (!entityWorld)
+            continue;
+        const auto* meshComp = entityWorld->world().get<scene::MeshInstanceComponent>(entity);
+        if (!meshComp || !meshComp->mesh)
+            continue;
 
-        assert(instance->GetGeometryInstanceIndex() < geometryInstanceToLight.size());
-        uint32_t firstGeometryInstanceIndex = instance->GetGeometryInstanceIndex();
+        const auto& mesh = meshComp->mesh;
+
+        assert(meshComp->geometryInstanceIndex < geometryInstanceToLight.size());
+        uint32_t firstGeometryInstanceIndex = meshComp->geometryInstanceIndex;
 
         for (size_t geometryIndex = 0; geometryIndex < mesh->geometries.size(); ++geometryIndex)
         {
             const auto& geometry = mesh->geometries[geometryIndex];
 
             size_t instanceHash = 0;
-            nvrhi::hash_combine(instanceHash, instance.get());
+            nvrhi::hash_combine(instanceHash, static_cast<uint32_t>(entity));
             nvrhi::hash_combine(instanceHash, geometryIndex);
 
             PTMaterial & materialPT = *PTMaterial::SafeCast(geometry->material);
@@ -474,7 +489,7 @@ RTXDI_LightBufferParameters PrepareLightsPass::Process(nvrhi::ICommandList* comm
             assert(geometryIndex < 0xfff);
 
             PrepareLightsTask task;
-            task.instanceAndGeometryIndex = (instance->GetInstanceIndex() << 12) | uint32_t(geometryIndex & 0xfff);
+            task.instanceAndGeometryIndex = (meshComp->instanceIndex << 12) | uint32_t(geometryIndex & 0xfff);
             task.lightBufferOffset = lightBufferOffset;
             task.triangleCount = geometry->numIndices / 3;
             task.previousLightBufferOffset = (pOffset != m_InstanceLightBufferOffsets.end()) ? int(pOffset->second) : -1;

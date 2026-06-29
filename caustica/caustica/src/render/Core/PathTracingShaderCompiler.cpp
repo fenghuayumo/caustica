@@ -6,6 +6,7 @@
 #include <backend/ShaderUtils.h>
 
 #include <render/Passes/Lighting/MaterialGpuCache.h>
+#include <scene/SceneEcs.h>
 #include <shaders/PathTracer/PathTracerShared.h>
 
 #include <core/file_utils.h>
@@ -574,11 +575,16 @@ void PathTracingShaderCompiler::Update(const std::shared_ptr<caustica::Scene>& s
         // Note: these map 1-1 to m_subInstanceData, and are used to (see '->addHitGroup' below) build 1-1 mapped hit groups 
         m_perSubInstanceHitGroup.clear();
         m_perSubInstanceHitGroup.reserve(subInstanceCount);
-        for (const auto& instance : scene->GetMeshInstances())
+        for (const ecs::Entity entity : scene->GetMeshInstances())
         {
-            uint instanceID = (uint)m_perSubInstanceHitGroup.size();
-            for (int gi = 0; gi < instance->GetMesh()->geometries.size(); gi++)
-                m_perSubInstanceHitGroup.push_back(ComputeSubInstanceHitGroupInfo(*GetMaterialGpuCache(), *PTMaterial::SafeCast(instance->GetMesh()->geometries[gi]->material)));
+            if (!scene->GetEntityWorld())
+                continue;
+            const auto* meshComp = scene->GetEntityWorld()->world().get<scene::MeshInstanceComponent>(entity);
+            if (!meshComp || !meshComp->mesh)
+                continue;
+
+            for (int gi = 0; gi < meshComp->mesh->geometries.size(); gi++)
+                m_perSubInstanceHitGroup.push_back(ComputeSubInstanceHitGroupInfo(*GetMaterialGpuCache(), *PTMaterial::SafeCast(meshComp->mesh->geometries[gi]->material)));
         }
         assert(m_perSubInstanceHitGroup.size() == subInstanceCount);
 

@@ -40,10 +40,12 @@ void transitionSkinnedMeshBuffersToReadOnly(nvrhi::ICommandList* commandList, co
     if (auto* entityWorld = scene.GetEntityWorld())
     {
         auto& world = entityWorld->world();
-        world.each<scene::SkinnedMeshInstanceComponent>([&](ecs::Entity, scene::SkinnedMeshInstanceComponent& sc)
+        world.each<scene::SkinnedMeshComponent, scene::MeshInstanceComponent>([&](ecs::Entity, scene::SkinnedMeshComponent&, scene::MeshInstanceComponent& meshComp)
         {
+            if (!meshComp.mesh || !meshComp.mesh->buffers)
+                return;
             commandList->setBufferState(
-                sc.instance->GetMesh()->buffers->vertexBuffer,
+                meshComp.mesh->buffers->vertexBuffer,
                 nvrhi::ResourceStates::ShaderResource);
         });
     }

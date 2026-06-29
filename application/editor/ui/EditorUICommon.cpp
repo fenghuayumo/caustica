@@ -41,7 +41,7 @@ namespace
     {
         if (entity == ecs::NullEntity) return false;
         auto* comp = ew.world().tryGet<caustica::scene::MeshInstanceComponent>(entity);
-        return comp != nullptr && comp->instance != nullptr;
+        return comp != nullptr && comp->mesh != nullptr;
     }
 
     bool IsGaussianSplatEntity(caustica::scene::SceneEntityWorld& ew, ecs::Entity entity)
@@ -217,8 +217,8 @@ void BuildHierarchyNodeUI(EditorUIData& ui, caustica::Scene& scene, ecs::Entity 
         if (isMeshEntity)
         {
             auto* comp = ew->world().tryGet<caustica::scene::MeshInstanceComponent>(entity);
-            if (comp && comp->instance && comp->instance->GetMesh())
-                label += "  (" + comp->instance->GetMesh()->name + ")";
+            if (comp && comp->mesh)
+                label += "  (" + comp->mesh->name + ")";
         }
         else if (isGaussianSplatEntity)
         {

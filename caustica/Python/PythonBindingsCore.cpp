@@ -333,7 +333,7 @@ namespace
             return nullptr;
 
         const auto* meshComponent = entityWorld->world().get<scene::MeshInstanceComponent>(pyEntity.entity);
-        return meshComponent && meshComponent->instance ? meshComponent->instance->GetMesh() : nullptr;
+        return meshComponent && meshComponent->mesh ? meshComponent->mesh : nullptr;
     }
 
     ecs::Entity EntityHandleFromPyNode(const std::shared_ptr<PySceneEntity>& node)
