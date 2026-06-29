@@ -221,39 +221,96 @@ void SceneEntityWorld::refreshHierarchy(PreviousTransformPolicy previousPolicy)
     UpdateHierarchy(m_world, previousPolicy);
 }
 
+void SceneEntityWorld::ensureScheduleBuilt()
+{
+    if (m_scheduleBuilt)
+        return;
+    m_scheduleBuilt = true;
+
+    // "Hierarchy" runs first and produces GlobalTransformComponent for everything below it.
+    m_schedule.addSet("Hierarchy");
+    m_schedule.addSystem("Hierarchy", "RefreshHierarchy",
+        [this](ecs::World& world, const ecs::ScheduleContext& ctx) { systemRefreshHierarchy(world, ctx); });
+
+    // "PostHierarchy" runs in registration order; FinalizeFrameFlags must stay last.
+    m_schedule.addSet("PostHierarchy");
+    m_schedule.addSystem("PostHierarchy", "UpdateGaussianSplatTransforms",
+        [this](ecs::World& world, const ecs::ScheduleContext& ctx) { systemUpdateGaussianSplatTransforms(world, ctx); });
+    m_schedule.addSystem("PostHierarchy", "MarkDirtySkinnedMeshes",
+        [this](ecs::World& world, const ecs::ScheduleContext& ctx) { systemMarkDirtySkinnedMeshes(world, ctx); });
+    m_schedule.addSystem("PostHierarchy", "RefreshInstanceIndices",
+        [this](ecs::World& world, const ecs::ScheduleContext& ctx) { systemRefreshInstanceIndices(world, ctx); });
+    m_schedule.addSystem("PostHierarchy", "AssignGlobalResourceIndices",
+        [this](ecs::World& world, const ecs::ScheduleContext& ctx) { systemAssignGlobalResourceIndices(world, ctx); });
+    m_schedule.addSystem("PostHierarchy", "FinalizeFrameFlags",
+        [this](ecs::World& world, const ecs::ScheduleContext& ctx) { systemFinalizeFrameFlags(world, ctx); });
+}
+
 void SceneEntityWorld::refresh(uint32_t frameIndex)
 {
-    const bool structureDirty = m_structureDirty;
-    const bool transformDirty = m_transformDirty;
+    ensureScheduleBuilt();
 
+    // Snapshot the coarse dirty flags for the duration of this frame's systems. No system
+    // mutates these flags mid-run; the snapshot preserves the original local-variable
+    // semantics and stays robust if a future system marks dirty.
+    m_frameStructureDirty = m_structureDirty;
+    m_frameTransformDirty = m_transformDirty;
+
+    ecs::ScheduleContext ctx{};
+    ctx.frameIndex = frameIndex;
+    m_schedule.run(m_world, ctx);
+}
+
+void SceneEntityWorld::systemRefreshHierarchy(ecs::World& /*world*/, const ecs::ScheduleContext& /*ctx*/)
+{
     refreshHierarchy(PreviousTransformPolicy::CaptureCurrent);
+}
 
-    m_world.each<GaussianSplatComponent, GlobalTransformComponent>(
+void SceneEntityWorld::systemUpdateGaussianSplatTransforms(ecs::World& world, const ecs::ScheduleContext& /*ctx*/)
+{
+    world.each<GaussianSplatComponent, GlobalTransformComponent>(
         [](ecs::Entity entity, GaussianSplatComponent& splatComponent, GlobalTransformComponent& global) {
             splatComponent.splat->ownerEntity = entity;
             splatComponent.splat->cachedGlobalTransform = global.transform;
         });
+}
 
-    if (transformDirty || structureDirty)
-    {
-        m_world.each<SkinnedMeshReferenceComponent, TransformDirtyComponent>(
-            [frameIndex, &world = m_world](ecs::Entity, SkinnedMeshReferenceComponent& ref, TransformDirtyComponent&) {
-                if (!ecs::isValid(ref.skinnedMeshEntity))
-                    return;
-                if (auto* skinned = world.get<SkinnedMeshComponent>(ref.skinnedMeshEntity))
-                    skinned->lastUpdateFrameIndex = frameIndex;
-            });
-    }
+void SceneEntityWorld::systemMarkDirtySkinnedMeshes(ecs::World& world, const ecs::ScheduleContext& ctx)
+{
+    if (!(m_frameTransformDirty || m_frameStructureDirty))
+        return;
 
-    if (structureDirty)
-    {
-        refreshInstanceIndices();
-        assignGlobalResourceIndices();
-    }
+    const uint32_t frameIndex = ctx.frameIndex;
+    world.each<SkinnedMeshReferenceComponent, TransformDirtyComponent>(
+        [frameIndex, &world](ecs::Entity, SkinnedMeshReferenceComponent& ref, TransformDirtyComponent&) {
+            if (!ecs::isValid(ref.skinnedMeshEntity))
+                return;
+            if (auto* skinned = world.get<SkinnedMeshComponent>(ref.skinnedMeshEntity))
+                skinned->lastUpdateFrameIndex = frameIndex;
+        });
+}
 
+void SceneEntityWorld::systemRefreshInstanceIndices(ecs::World& /*world*/, const ecs::ScheduleContext& /*ctx*/)
+{
+    if (!m_frameStructureDirty)
+        return;
+
+    refreshInstanceIndices();
+}
+
+void SceneEntityWorld::systemAssignGlobalResourceIndices(ecs::World& /*world*/, const ecs::ScheduleContext& /*ctx*/)
+{
+    if (!m_frameStructureDirty)
+        return;
+
+    assignGlobalResourceIndices();
+}
+
+void SceneEntityWorld::systemFinalizeFrameFlags(ecs::World& /*world*/, const ecs::ScheduleContext& /*ctx*/)
+{
     m_structureDirty = false;
     m_transformDirty = false;
-    m_previousTransformDirty = structureDirty || transformDirty;
+    m_previousTransformDirty = m_frameStructureDirty || m_frameTransformDirty;
 }
 
 void SceneEntityWorld::refreshInstanceIndices()

@@ -2,6 +2,7 @@
 
 #include <ecs/World.h>
 
+#include <cstdint>
 #include <functional>
 #include <string>
 #include <utility>
@@ -13,6 +14,7 @@ namespace caustica::ecs
 struct ScheduleContext
 {
     float deltaTimeSeconds = 0.0f;
+    uint32_t frameIndex = 0;
 };
 
 class Schedule
