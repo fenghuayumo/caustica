@@ -16,7 +16,7 @@
 
 namespace nb = nanobind;
 using caustica::editor::SceneEditor;
-using caustica::editor::SampleUIData;
+using caustica::editor::EditorUIData;
 
 namespace
 {
@@ -38,7 +38,7 @@ NB_MODULE(caustica, m)
           nb::rv_policy::reference,
           "Return the singleton SceneEditor renderer running in this caustica.exe.");
 
-    m.def("settings", []() -> SampleUIData* { return &RequireApp().GetUIData(); },
+    m.def("settings", []() -> EditorUIData* { return &RequireApp().GetUIData(); },
           nb::rv_policy::reference,
           "Shortcut for caustica.app().settings.");
 

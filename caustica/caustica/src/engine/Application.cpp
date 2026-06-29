@@ -1,5 +1,7 @@
 #include "engine/Application.h"
+#include "engine/EntryPoint.h"
 #include "backend/GpuDevice.h"
+#include "engine/cmdline_utils.h"
 #include "platform/window.h"
 #if CAUSTICA_WITH_STREAMLINE
 #include <StreamlineIntegration.h>
@@ -89,6 +91,31 @@ void Application::shutdown()
 {
     unbindFrameDriver(device());
     m_shutdownCalled = true;
+}
+
+bool Application::initializeGraphics(const GpuDeviceCreateDesc& desc)
+{
+    GpuDeviceCreateResult result = GpuDevice::CreateInitialized(desc);
+    if (!result.gpuDevice)
+        return false;
+
+    m_GpuDevice = std::move(result.gpuDevice);
+    m_Window = std::move(result.window);
+
+    bindFrameDriver(m_GpuDevice.get());
+    installWindowEventCallback();
+    return true;
+}
+
+bool Application::initializeGraphics(int argc, const char* const* argv, GpuDeviceCreateDesc& desc)
+{
+    InvokePreGpuDeviceInitHook();
+
+    desc.api = ResolveGraphicsAPIFromCommandLine(argc, argv);
+    if (desc.headless)
+        desc.vsyncEnabled = false;
+
+    return initializeGraphics(desc);
 }
 
 GpuDevice* Application::getGpuDevice() const { return device(); }

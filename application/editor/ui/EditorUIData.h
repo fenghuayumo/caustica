@@ -8,10 +8,10 @@
 namespace caustica::editor
 {
 
-struct SampleUIData : caustica::render::RenderSessionState, EditorUIState
+struct EditorUIData : caustica::render::RenderSessionState, EditorUIState
 {
 };
 
-void InitializeSampleUIDataFromCommandLine(SampleUIData& ui, const CommandLineOptions& cmdLine);
+void InitializeEditorUIDataFromCommandLine(EditorUIData& ui, const CommandLineOptions& cmdLine);
 
 } // namespace caustica::editor

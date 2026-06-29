@@ -61,7 +61,7 @@ GTC presentation [How to Build a Real-time Path Tracer](https://www.nvidia.com/g
 * SER and OMM support on Vulkan is currently work in progress
 * Running Vulkan on AMD GPUs may trigger a TDR during TLAS building in scenes with null TLAS instances
 * Enabling debug layer on Vulkan will show a number of warnings and errors - fixes are work in progress
-* We recommend using *NVIDIA Nsight Graphics* graphics for frame capture and analysis. If using other GPU performance tuning and debugging tools such as *PIX on Windows*, it is advisable to disable NVRHI_WITH_NVAPI and CAUSTICA_WITH_STREAMLINE variables in CMake to avoid compatibility issues. Please note: disabling these settings results in lower performance and missing features
+* We recommend using *NVIDIA Nsight Graphics* graphics for frame capture and analysis. If using other GPU performance tuning and debugging tools such as *PIX on Windows*, it is advisable to disable RHI_WITH_NVAPI and CAUSTICA_WITH_STREAMLINE variables in CMake to avoid compatibility issues. Please note: disabling these settings results in lower performance and missing features
 * There is a known issue resulting in LIVE_DEVICE DirectX warnings reported at shutdown when Streamline is enabled in Debug builds
 * There is a known issue resulting in black or incorrect transparencies/reflection on some AMD systems with latest drivers; this is most likely a driver error and has been reported
 
@@ -153,7 +153,7 @@ python support/python/package_shaders.py --shader-api d3d12
 
 Due to interaction with various included libraries, Vulkan support is not enabled by default on Windows and needs a couple of additional tweaks on the user side; please find the recommended steps below:
  * Install Vulkan SDK (we tested with VulkanSDK-1.3.290.0) and clear CMake cache (if applicable) to make sure the correct dxc.exe path from Vulkan SDK is set for SPIRV compilation
- * Set CAUSTICA_WITH_VULKAN and NVRHI_WITH_VULKAN CMake variables to ON. DXC_SPIRV_PATH should already have automatically picked up the location of the DXC compiler in the Vulkan SDK during config; if not, please set it manually
+ * Set CAUSTICA_WITH_VULKAN and RHI_WITH_VULKAN CMake variables to ON. DXC_SPIRV_PATH should already have automatically picked up the location of the DXC compiler in the Vulkan SDK during config; if not, please set it manually
  * To run with Vulkan use `--vk` command line parameter
 
 ## Building Linux / WSL
@@ -172,7 +172,7 @@ Install the Linux Vulkan SDK and make sure `dxc` is on `PATH` or set `DXC_SPIRV_
 ```
 cmake -S . -B build-linux -G Ninja \
   -DCAUSTICA_WITH_VULKAN=ON \
-  -DNVRHI_WITH_VULKAN=ON \
+  -DRHI_WITH_VULKAN=ON \
   -DCAUSTICA_WITH_NATIVE_DLSS=ON \
   -DCAUSTICA_WITH_OIDN=ON \
   -DDXC_SPIRV_PATH="$VULKAN_SDK/bin/dxc"

@@ -178,16 +178,6 @@ namespace
 
 } // namespace caustica::editor
 
-#if defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
-// Required for Agility SDK on Windows 10. Setup 1.c. 2.a.
-// https://devblogs.microsoft.com/directx/gettingstarted-dx12agility/
-extern "C"
-{
-    __declspec(dllexport) extern const UINT D3D12SDKVersion = CAUSTICA_D3D_AGILITY_SDK_VERSION;
-    __declspec(dllexport) extern const char* D3D12SDKPath = ".\\D3D12\\";
-}
-#endif
-
 const char* g_windowTitle = "caustica";
 
 const float c_envMapRadianceScale = 1.0f / 4.0f;
@@ -216,11 +206,11 @@ SceneEditor::SceneEditor(const CommandLineOptions& cmdLine,
 }
 
 SceneEditor::SceneEditor(const CommandLineOptions& cmdLine,
-    SampleUIData& ui,
+    EditorUIData& ui,
     caustica::render::SessionDiagnostics& diagnostics)
     : SceneEditor(cmdLine, static_cast<caustica::render::RenderSessionState&>(ui), static_cast<EditorUIState&>(ui), diagnostics)
 {
-    m_sampleUi = &ui;
+    m_editorUi = &ui;
 }
 
 void SceneEditor::initStreamlineAndWindow()

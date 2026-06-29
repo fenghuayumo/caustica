@@ -4,6 +4,7 @@
 
 #include <backend/GpuDevice.h>
 #include <backend/dx11/GpuDevice_DX11.h>
+#include <backend/DxgiVideoMemory.h>
 #include <core/log.h>
 
 #include <Windows.h>
@@ -387,6 +388,11 @@ void GpuDevice_DX11::Shutdown()
     {
         ReportLiveObjects();
     }
+}
+
+bool GpuDevice_DX11::QueryVideoMemoryInfo(caustica::VideoMemoryInfo& out) const
+{
+    return caustica::QueryDxgiAdapterVideoMemory(m_DxgiAdapter, out);
 }
 
 bool GpuDevice_DX11::Present()

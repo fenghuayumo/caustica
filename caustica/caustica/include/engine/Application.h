@@ -1,5 +1,6 @@
 #pragma once
 
+#include <backend/GpuDevice.h>
 #include <backend/GpuFrameDriver.h>
 #include <events/event.h>
 
@@ -37,6 +38,10 @@ public:
 
     virtual bool init(int argc, const char* const* argv);
     virtual void shutdown();
+
+    // Creates GpuDevice, optional Window, and swap chain; wires frame driver + window events.
+    bool initializeGraphics(const GpuDeviceCreateDesc& desc);
+    bool initializeGraphics(int argc, const char* const* argv, GpuDeviceCreateDesc& desc);
 
     GpuDevice* getGpuDevice() const;
     Window*    getWindow() const;

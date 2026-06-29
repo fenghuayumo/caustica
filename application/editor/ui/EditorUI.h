@@ -27,7 +27,7 @@ using namespace caustica::math;
 #include <render/Passes/Denoisers/NrdConfig.h>
 #include <render/Core/PathTracerSettings.h>
 #include <render/Passes/Debug/Korgi.h>
-#include "SampleUIData.h"
+#include "EditorUIData.h"
 #include <core/command_line.h>
 
 #if CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
@@ -49,7 +49,7 @@ class EditorApplication;
 class EditorUI : public caustica::ImGui_Renderer
 {
 public:
-    EditorUI(caustica::GpuDevice* deviceManager, EditorApplication& editor, SampleUIData& ui, bool NVAPI_SERSupported, const CommandLineOptions& cmdLine);
+    EditorUI(caustica::GpuDevice* deviceManager, EditorApplication& editor, EditorUIData& ui, bool NVAPI_SERSupported, const CommandLineOptions& cmdLine);
     virtual ~EditorUI();
 protected:
     virtual void buildUI(void) override;
@@ -129,7 +129,7 @@ private:
 
     std::unique_ptr<ImGuiManager> m_imguiManager;
 
-    SampleUIData& m_ui;
+    EditorUIData& m_ui;
     nvrhi::CommandListHandle m_commandList;
 
     const bool m_NVAPI_SERSupported;
@@ -142,7 +142,7 @@ private:
         korgi::Button toneMapOperator;
         korgi::Knob   exposureCompensation;
 
-        explicit KorgiBindings(SampleUIData& ui)
+        explicit KorgiBindings(EditorUIData& ui)
             : play(0, korgi::Control::Play, korgi::ButtonMode::BoolToggle, &ui.EnableAnimations)
             , autoExposure(0, korgi::Control::S1, korgi::ButtonMode::BoolToggle, &ui.ToneMappingParams.autoExposure)
             , toneMapOperator(0, korgi::Control::M1, (int*)&ui.ToneMappingParams.toneMapOperator, int(ToneMapperOperator::Linear), int(ToneMapperOperator::HableUc2))

@@ -54,6 +54,7 @@ public:
     bool BeginFrame() override;
     void ReportLiveObjects() override;
     bool EnumerateAdapters(std::vector<caustica::AdapterInfo>& outAdapters) override;
+    [[nodiscard]] bool QueryVideoMemoryInfo(caustica::VideoMemoryInfo& out) const override;
 
     [[nodiscard]] nvrhi::GraphicsAPI GetGraphicsAPI() const override
     {

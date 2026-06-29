@@ -36,7 +36,9 @@
 #include <backend/SwapChain.h>
 
 #include <functional>
+#include <memory>
 #include <optional>
+#include <string>
 
 namespace caustica
 {
@@ -119,6 +121,7 @@ namespace caustica
         bool enableNvrhiValidationLayer = false;
         bool vsyncEnabled = false;
         bool enableRayTracingExtensions = false; // for vulkan
+        bool requirePathTracerFeatures = true;   // Ray tracing pipeline + ray query
         bool enableComputeQueue = false;
         bool enableCopyQueue = false;
 
@@ -176,6 +179,14 @@ namespace caustica
 #endif
     };
 
+    struct VideoMemoryInfo
+    {
+        uint64_t budget = 0;
+        uint64_t currentUsage = 0;
+        uint64_t availableForReservation = 0;
+        uint64_t currentReservation = 0;
+    };
+
     struct AdapterInfo
     {
         typedef std::array<uint8_t, 16> UUID;
@@ -197,26 +208,48 @@ namespace caustica
 #endif
     };
 
+    struct GpuDeviceCreateDesc
+    {
+        nvrhi::GraphicsAPI api = nvrhi::GraphicsAPI::D3D12;
+        bool headless = false;
+        std::string windowTitle = "caustica";
+
+        uint32_t backBufferWidth = 1280;
+        uint32_t backBufferHeight = 720;
+        uint32_t swapChainBufferCount = 0; // 0 = engine default (triple buffering)
+        bool startFullscreen = false;
+        bool startBorderless = false;
+        bool vsyncEnabled = true;
+        int adapterIndex = -1;
+        bool enableDebug = false;
+
+#if CAUSTICA_WITH_DX12
+        ID3D12DeviceFactory* d3d12DeviceFactory = nullptr;
+#endif
+    };
+
+    struct GpuDeviceCreateResult;
+
     class GpuDevice
     {
         friend class Application;
 
     public:
-        static GpuDevice* Create(nvrhi::GraphicsAPI api);
+        // Application entry: creates GpuDevice (+ optional Window/swap chain or headless buffers).
+        static GpuDeviceCreateResult CreateInitialized(const GpuDeviceCreateDesc& desc);
 
-        bool CreateHeadlessDevice(const DeviceCreationParameters& params);
-
-        // Create device + swapchain using a pre-existing Window from the platform layer.
-        bool CreateDeviceAndSwapChain(const DeviceCreationParameters& params, class Window* window);
+        [[nodiscard]] bool SupportsRayTracingPipeline() const;
+        [[nodiscard]] bool SupportsRayQuery() const;
+        [[nodiscard]] bool SupportsShaderExecutionReordering() const;
 
         // Initializes device-independent objects (DXGI factory, Vulkan instnace).
         // Calling CreateInstance() is required before EnumerateAdapters(), but optional if you don't use EnumerateAdapters().
-        // Note: if you call CreateInstance before Create*Device*(), the values in InstanceParameters must match those
+        // Note: if you call CreateInstance before device initialization, the values in InstanceParameters must match those
         // in DeviceCreationParameters passed to the device call.
         bool CreateInstance(const InstanceParameters& params);
 
         // Enumerates adapters or physical devices present in the system.
-        // Note: a call to CreateInstance() or Create*Device*() is required before EnumerateAdapters().
+        // Note: a call to CreateInstance() or CreateInitialized() is required before EnumerateAdapters().
         virtual bool EnumerateAdapters(std::vector<AdapterInfo>& outAdapters) = 0;
 
         void setFrameDriver(IGpuFrameDriver* driver) { m_frameDriver = driver; }
@@ -265,6 +298,11 @@ namespace caustica
 
         GpuDevice();
 
+        static GpuDevice* Create(nvrhi::GraphicsAPI api);
+        bool InitializeGraphicsDevice(const DeviceCreationParameters& params);
+        bool InitializeWindowSwapChain(class Window* window);
+        bool InitializeHeadlessGraphics(const DeviceCreationParameters& params);
+
         void UpdateWindowSize();
         void BackBufferResizing();
         void BackBufferResized();
@@ -282,10 +320,12 @@ namespace caustica
         virtual bool CreateInstanceInternal() = 0;
         virtual bool CreateDevice() = 0;
         virtual bool CreateSwapChain() = 0;
+        bool ValidatePathTracerRequirements() const;
         virtual void DestroyDeviceAndSwapChain() = 0;
         virtual void ResizeSwapChain() = 0;
         virtual bool BeginFrame() = 0;
         virtual bool Present() = 0;
+        virtual void PrepareShutdown() {}
 
     public:
         [[nodiscard]] virtual nvrhi::IDevice *GetDevice() const = 0;
@@ -299,6 +339,11 @@ namespace caustica
         [[nodiscard]] bool IsVsyncEnabled() const { return m_DeviceParams.vsyncEnabled; }
         virtual void SetVsyncEnabled(bool enabled) { m_RequestedVSync = enabled; /* will be processed later */ }
         virtual void ReportLiveObjects() {}
+
+        [[nodiscard]] virtual bool QueryVideoMemoryInfo(VideoMemoryInfo& out) const;
+
+        [[nodiscard]] bool IsD3D12() const { return GetGraphicsAPI() == nvrhi::GraphicsAPI::D3D12; }
+        [[nodiscard]] bool IsVulkan() const { return GetGraphicsAPI() == nvrhi::GraphicsAPI::VULKAN; }
 
         [[nodiscard]] GLFWwindow* GetWindow() const { return m_Window; }
         [[nodiscard]] Window* GetPlatformWindow() const { return m_WindowPtr; }
@@ -356,6 +401,12 @@ namespace caustica
 #if CAUSTICA_WITH_AFTERMATH
         AftermathCrashDump m_AftermathCrashDumper;
 #endif
+    };
+
+    struct GpuDeviceCreateResult
+    {
+        std::unique_ptr<GpuDevice> gpuDevice;
+        std::unique_ptr<Window> window;
     };
 
 }

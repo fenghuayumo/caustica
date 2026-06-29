@@ -6,6 +6,7 @@
 #include "PathTracerSessionBootstrap.h"
 #include <engine/EngineRenderer.h>
 #include <engine/Application.h>
+#include <backend/GpuDevice.h>
 #include <render/SceneGaussianSplatPasses.h>
 #include <render/SceneLightingPasses.h>
 #include <render/WorldRenderer/PathTracingWorldRenderer.h>
@@ -393,57 +394,6 @@ namespace
     }
 #endif
 
-    caustica::DeviceCreationParameters MakeDeviceParams(const RenderSession::Config& cfg)
-    {
-        caustica::DeviceCreationParameters p;
-        p.backBufferWidth        = cfg.width;
-        p.backBufferHeight       = cfg.height;
-        p.swapChainSampleCount   = 1;
-        p.swapChainBufferCount   = c_SwapchainCount;
-        p.startFullscreen        = false;
-        p.startBorderless        = false;
-        p.vsyncEnabled           = false;       // headless => no need for vsync
-        p.enableRayTracingExtensions = true;
-        p.adapterIndex           = cfg.adapterIndex;
-        p.headlessDevice         = cfg.headless;
-
-        if (cfg.debug)
-        {
-            p.enableDebugRuntime         = true;
-            p.enableNvrhiValidationLayer = true;
-        }
-
-        p.supportExplicitDisplayScaling = true;
-
-#if CAUSTICA_WITH_DX12 && defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
-        p.featureLevel = D3D_FEATURE_LEVEL_12_2;
-#elif CAUSTICA_WITH_DX12
-        p.featureLevel = D3D_FEATURE_LEVEL_12_1;
-#endif
-
-#if CAUSTICA_WITH_VULKAN
-#if CAUSTICA_WITH_NATIVE_DLSS
-        caustica::render::DLSS::GetRequiredVulkanExtensions(
-            p.requiredVulkanInstanceExtensions,
-            p.requiredVulkanDeviceExtensions);
-#endif
-        AppendUnique(p.requiredVulkanDeviceExtensions, "VK_KHR_buffer_device_address");
-        AppendUnique(p.requiredVulkanDeviceExtensions, "VK_KHR_format_feature_flags2");
-        p.ignoredVulkanValidationMessageLocations.push_back(0x0000000023e43bb7);
-        p.ignoredVulkanValidationMessageLocations.push_back(0x000000000609a13b);
-        p.ignoredVulkanValidationMessageLocations.push_back(0x00000000c5a3822a);
-        p.ignoredVulkanValidationMessageLocations.push_back(0x00000000591f70f2);
-        p.ignoredVulkanValidationMessageLocations.push_back(0x000000005e6e827d);
-#endif
-
-#if CAUSTICA_WITH_STREAMLINE
-        p.checkStreamlineSignature = true;
-        p.streamlineAppId = 231313132;
-#endif
-
-        return p;
-    }
-
     nvrhi::GraphicsAPI ResolveGraphicsAPI(const RenderSession::Config& cfg)
     {
 #if CAUSTICA_WITH_DX12 && CAUSTICA_WITH_VULKAN
@@ -531,66 +481,28 @@ bool RenderSession::InitDevice()
         m_d3d12DeviceFactory = CreateD3D12AgilityDeviceFactory();
 #endif
 
-    m_deviceManager.reset(caustica::GpuDevice::Create(api));
-    if (!m_deviceManager)
-    {
-        caustica::error("RenderSession: GpuDevice::Create returned null");
-        return false;
-    }
-    m_deviceManager->SetFrameTimeUpdateInterval(1.0f);
+    caustica::GpuDeviceCreateDesc createDesc{};
+    createDesc.api = api;
+    createDesc.headless = m_config.headless;
+    createDesc.windowTitle = "caustica_py";
+    createDesc.backBufferWidth = m_config.width;
+    createDesc.backBufferHeight = m_config.height;
+    createDesc.adapterIndex = m_config.adapterIndex;
+    createDesc.enableDebug = m_config.debug;
+    if (m_config.headless)
+        createDesc.vsyncEnabled = false;
 
-    auto deviceParams = MakeDeviceParams(m_config);
 #if CAUSTICA_WITH_DX12 && defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
     if (api == nvrhi::GraphicsAPI::D3D12 && m_d3d12DeviceFactory)
-        deviceParams.d3d12DeviceFactory = m_d3d12DeviceFactory.Get();
+        createDesc.d3d12DeviceFactory = m_d3d12DeviceFactory.Get();
 #endif
 
-    if (m_config.headless)
-    {
-        if (!m_deviceManager->CreateHeadlessDevice(deviceParams))
-        {
-            caustica::error("RenderSession: failed to create headless device and offscreen back buffers");
-            return false;
-        }
-    }
-    else
-    {
-        caustica::GlfwWindow::makeDefault();
-
-        caustica::WindowDesc windowDesc;
-        windowDesc.Width = deviceParams.backBufferWidth;
-        windowDesc.Height = deviceParams.backBufferHeight;
-        windowDesc.Title = "caustica_py";
-        windowDesc.RenderAPI = static_cast<int>(api);
-        windowDesc.VSync = deviceParams.vsyncEnabled;
-
-        m_Window.reset(caustica::Window::create(windowDesc));
-        if (!m_Window || !m_Window->hasInitialised())
-        {
-            caustica::error("RenderSession: failed to create platform window");
-            return false;
-        }
-
-        if (!m_deviceManager->CreateDeviceAndSwapChain(deviceParams, m_Window.get()))
-        {
-            caustica::error("RenderSession: failed to create device and swap chain");
-            return false;
-        }
-    }
-
-    auto device = m_deviceManager->GetDevice();
-    if (!device->queryFeatureSupport(nvrhi::Feature::RayTracingPipeline))
-    {
-        caustica::error("RenderSession: the graphics device does not support Ray Tracing Pipelines");
+    caustica::GpuDeviceCreateResult graphicsResult = caustica::GpuDevice::CreateInitialized(createDesc);
+    if (!graphicsResult.gpuDevice)
         return false;
-    }
 
-    if (!device->queryFeatureSupport(nvrhi::Feature::RayQuery))
-    {
-        caustica::error("RenderSession: the graphics device does not support Ray Queries");
-        return false;
-    }
-
+    m_deviceManager = std::move(graphicsResult.gpuDevice);
+    m_Window = std::move(graphicsResult.window);
     return true;
 }
 

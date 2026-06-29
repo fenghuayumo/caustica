@@ -42,7 +42,7 @@ using caustica::math::float4;
 using caustica::math::double3;
 using caustica::math::double4;
 using caustica::editor::SceneEditor;
-using caustica::editor::SampleUIData;
+using caustica::editor::EditorUIData;
 using caustica::render::RenderSessionState;
 
 // Singleton consumed by embed mode (set by PythonScripting before Py_Initialize).
@@ -1266,9 +1266,9 @@ void RegisterCoreBindings(nb::module_& m)
                 "EnvironmentMapParams structure (intensity, tint, rotation, enabled, visible_to_camera).")
         ;
 
-    nb::class_<SampleUIData, RenderSessionState>(m, "EditorSettings",
+    nb::class_<EditorUIData, RenderSessionState>(m, "EditorSettings",
         "Desktop-editor settings that extend `Settings` with ImGui view state.")
-        .def_rw("show_ui", &SampleUIData::ShowUI);
+        .def_rw("show_ui", &EditorUIData::ShowUI);
 
     // --- Sample (top-level renderer access) -------------------------------
     nb::class_<SceneEditor>(m, "Sample",

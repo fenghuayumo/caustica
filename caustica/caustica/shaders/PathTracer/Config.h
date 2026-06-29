@@ -23,7 +23,7 @@
 // ********************************************************************************************************************************************
 // ********************************************************************************************************************************************
 
-#define MAX_BOUNCE_COUNT                        96      // max value that SampleUIData::BounceCount can be set to - technically max value should be 255 with existing bounce counters
+#define MAX_BOUNCE_COUNT                        96      // max value that EditorUIData::BounceCount can be set to - technically max value should be 255 with existing bounce counters
 
 // In Falcor these macros get programmatically defined in Scene.cpp, getSceneDefines
 

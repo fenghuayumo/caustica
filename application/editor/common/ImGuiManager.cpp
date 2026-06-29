@@ -21,7 +21,7 @@ namespace caustica::editor
 
 using namespace caustica;
 
-ImGuiManager::ImGuiManager(SampleUIData&           uiData,
+ImGuiManager::ImGuiManager(EditorUIData&           uiData,
                            const CommandLineOptions& cmdLine,
                            bool                    nvapiSERSupported)
     : m_uiData(uiData)
@@ -63,7 +63,7 @@ void ImGuiManager::applyCommandLineDefaults()
         return;
     m_cmdLineApplied = true;
 
-    InitializeSampleUIDataFromCommandLine(m_uiData, m_cmdLine);
+    InitializeEditorUIDataFromCommandLine(m_uiData, m_cmdLine);
 }
 
 } // namespace caustica::editor

@@ -44,7 +44,7 @@ const static ImVec4 categoryColor = { 0.5f,1.0f,0.7f,1 };
 
 namespace
 {
-    int ResolveGaussianSplatShadowMode(const SampleUIData& ui)
+    int ResolveGaussianSplatShadowMode(const EditorUIData& ui)
     {
         if (!ui.GaussianSplatShadows && ui.GaussianSplatShadowsMode == GAUSSIAN_SPLAT_SHADOWS_DISABLED)
             return GAUSSIAN_SPLAT_SHADOWS_DISABLED;
@@ -55,7 +55,7 @@ namespace
         return dm::clamp(requestedMode, GAUSSIAN_SPLAT_SHADOWS_HARD, GAUSSIAN_SPLAT_SHADOWS_SOFT);
     }
 
-    bool GaussianSplatModeCombo(SampleUIData& ui)
+    bool GaussianSplatModeCombo(EditorUIData& ui)
     {
         int renderingMode = ResolveGaussianSplatShadowMode(ui) != GAUSSIAN_SPLAT_SHADOWS_DISABLED ? 1 : 0;
         if (!ImGui::Combo("Rendering Mode", &renderingMode, "Raster 3DGS (VS)\0Hybrid 3DGS + 3DGRT\0\0"))
@@ -77,7 +77,7 @@ namespace
         return true;
     }
 
-    bool GaussianSplatShadowsModeCombo(SampleUIData& ui)
+    bool GaussianSplatShadowsModeCombo(EditorUIData& ui)
     {
         const bool wasEnabled = ResolveGaussianSplatShadowMode(ui) != GAUSSIAN_SPLAT_SHADOWS_DISABLED;
         int shadowMode = ResolveGaussianSplatShadowMode(ui);
@@ -98,7 +98,7 @@ namespace
         return true;
     }
 
-    bool GaussianSplatSortingCombo(SampleUIData& ui)
+    bool GaussianSplatSortingCombo(EditorUIData& ui)
     {
         const bool changed = ImGui::Combo("Sorting Method", &ui.GaussianSplatSortingMode, "GPU sort\0Stochastic Splats\0\0");
         ui.GaussianSplatSortingMode = dm::clamp(ui.GaussianSplatSortingMode, 0, 1);
@@ -116,7 +116,7 @@ namespace
         return changed;
     }
 
-    bool GaussianSplatFTBCombo(SampleUIData& ui)
+    bool GaussianSplatFTBCombo(EditorUIData& ui)
     {
         const bool changed = ImGui::Combo("FTB Sync Mode", &ui.GaussianSplatFTBSyncMode, "Disabled (fast)\0Interlock\0\0");
         ui.GaussianSplatFTBSyncMode = dm::clamp(ui.GaussianSplatFTBSyncMode, 0, 1);
@@ -125,7 +125,7 @@ namespace
         return changed;
     }
 
-    bool GaussianSplatRtxKernelDegreeCombo(SampleUIData& ui)
+    bool GaussianSplatRtxKernelDegreeCombo(EditorUIData& ui)
     {
         const bool changed = ImGui::Combo("Kernel degree", &ui.GaussianSplatRtxKernelDegree,
             "0 (Linear)\0"
@@ -140,7 +140,7 @@ namespace
         return changed;
     }
 
-    bool GaussianSplatRtxParticleFormatCombo(SampleUIData& ui)
+    bool GaussianSplatRtxParticleFormatCombo(EditorUIData& ui)
     {
         int particleFormat = ui.GaussianSplatUseAABBs ? 1 : 0;
         const bool changed = ImGui::Combo("Particles format", &particleFormat, "Icosahedron\0AABB + parametric\0\0");
@@ -185,7 +185,7 @@ namespace
         return false;
     }
 
-    void BuildHierarchyNodeUI(SampleUIData& ui, caustica::SceneGraphNode* node)
+    void BuildHierarchyNodeUI(EditorUIData& ui, caustica::SceneGraphNode* node)
     {
         if (!HasHierarchyEntity(node))
             return;
@@ -318,12 +318,12 @@ static const PerformancePreset s_performancePresets[] = {
 #endif
     },
 };
-static bool MatchesPreset(const SampleUIData& ui, const PerformancePreset& p)
+static bool MatchesPreset(const EditorUIData& ui, const PerformancePreset& p)
 {
     return caustica::render::MatchesPerformancePreset(ui, p);
 }
 
-static void ApplyPreset(SampleUIData& ui, const PerformancePreset& p)
+static void ApplyPreset(EditorUIData& ui, const PerformancePreset& p)
 {
     caustica::render::ApplyPerformancePreset(ui, p);
 }
@@ -544,12 +544,12 @@ void PathTracerSettings::ApplyRTXDIRestirPTPreset()
 namespace caustica::editor
 {
 
-void InitializeSampleUIDataFromCommandLine(SampleUIData& ui, const CommandLineOptions& cmdLine)
+void InitializeEditorUIDataFromCommandLine(EditorUIData& ui, const CommandLineOptions& cmdLine)
 {
     caustica::render::InitializeRenderSessionStateFromCommandLine(ui, cmdLine);
 }
 
-EditorUI::EditorUI(GpuDevice* deviceManager, EditorApplication& editor, SampleUIData& ui, bool NVAPI_SERSupported, const CommandLineOptions& cmdLine)
+EditorUI::EditorUI(GpuDevice* deviceManager, EditorApplication& editor, EditorUIData& ui, bool NVAPI_SERSupported, const CommandLineOptions& cmdLine)
         : ImGui_Renderer(deviceManager)
         , m_app(editor)
         , m_sceneEditor(editor.GetSceneEditor())
@@ -931,13 +931,17 @@ void EditorUI::BuildSystemPanel(const PanelLayout& layout)
 
             if (ImGui::CollapsingHeader("Info")) //, ImGuiTreeNodeFlags_DefaultOpen))
             {
-                uint64_t budget, currentUsage, availableForReservation, currentReservation;
-                if (m_app.QueryVideoMemoryInfo( budget, currentUsage, availableForReservation, currentReservation ) )
+                caustica::VideoMemoryInfo videoMemoryInfo;
+                if (caustica::GpuDevice* gpuDevice = GetGpuDevice();
+                    gpuDevice && gpuDevice->QueryVideoMemoryInfo(videoMemoryInfo))
                 {
-                    ImGui::TextColored(categoryColor, "QueryVideoMemoryInfo:");
-                    budget /= 1024*1024; currentUsage /= 1024*1024, availableForReservation /= 1024*1024, currentReservation /= 1024*1024;
+                    ImGui::TextColored(categoryColor, "Video memory:");
+                    const uint64_t budget = videoMemoryInfo.budget / (1024 * 1024);
+                    const uint64_t currentUsage = videoMemoryInfo.currentUsage / (1024 * 1024);
+                    const uint64_t availableForReservation = videoMemoryInfo.availableForReservation / (1024 * 1024);
+                    const uint64_t currentReservation = videoMemoryInfo.currentReservation / (1024 * 1024);
                     RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent););
-                    ImGui::Text("Budget:             %7" PRIu64 "MB", budget );
+                    ImGui::Text("Budget:             %7" PRIu64 "MB", budget);
                     ImGui::Text("CurrentUsage:       %7" PRIu64 "MB", currentUsage);
                     ImGui::Text("AvailableForRes.:   %7" PRIu64 "MB", availableForReservation);
                     ImGui::Text("CurrentReservation: %7" PRIu64 "MB", currentReservation);

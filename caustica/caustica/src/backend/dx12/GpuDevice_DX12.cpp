@@ -4,7 +4,12 @@
 
 #include <backend/GpuDevice.h>
 #include <backend/dx12/GpuDevice_DX12.h>
+#include <backend/DxgiVideoMemory.h>
 #include <core/log.h>
+
+#if NVRHI_D3D12_WITH_NVAPI
+#include <nvapi.h>
+#endif
 
 #include <Windows.h>
 #include <dxgi1_5.h>
@@ -25,7 +30,26 @@ using namespace caustica;
 
 #define HR_RETURN(hr) if(FAILED(hr)) return false;
 
-
+namespace
+{
+#if defined(CAUSTICA_D3D_AGILITY_SDK_VERSION) && (CAUSTICA_D3D_AGILITY_SDK_VERSION >= 619)
+    bool ValidateAgilityShaderModel(ID3D12Device* device)
+    {
+        D3D12_FEATURE_DATA_SHADER_MODEL shaderModel = { D3D_SHADER_MODEL_6_9 };
+        const HRESULT hr = device->CheckFeatureSupport(
+            D3D12_FEATURE_SHADER_MODEL, &shaderModel, sizeof(shaderModel));
+        if (FAILED(hr) || shaderModel.HighestShaderModel < D3D_SHADER_MODEL_6_9)
+        {
+            caustica::fatal(
+                "Shader Model 6.9 is required when compiled with Agility SDK 1.619 or newer, "
+                "but is unsupported on the current device. Please check for newer graphics drivers, "
+                "or recompile without Agility SDK");
+            return false;
+        }
+        return true;
+    }
+#endif
+} // namespace
 
 static bool IsNvDeviceID(UINT id)
 {
@@ -88,6 +112,19 @@ void GpuDevice_DX12::ReportLiveObjects()
 
 bool GpuDevice_DX12::CreateInstanceInternal()
 {
+#if defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
+    static const UUID D3D12ExperimentalShaderModels = {
+        0x76f5573e, 0xf13a, 0x40f5, {0xb2, 0x97, 0x81, 0xce, 0x9e, 0x18, 0x93, 0x3f}
+    };
+    const HRESULT experimentalHr = D3D12EnableExperimentalFeatures(
+        1, &D3D12ExperimentalShaderModels, nullptr, nullptr);
+    if (FAILED(experimentalHr))
+    {
+        caustica::error("D3D12EnableExperimentalFeatures failed, error code = 0x%08x", experimentalHr);
+        return false;
+    }
+#endif
+
 #if CAUSTICA_WITH_STREAMLINE
     StreamlineIntegration::Get().InitializePreDevice(nvrhi::GraphicsAPI::D3D12, m_DeviceParams.streamlineAppId, m_DeviceParams.checkStreamlineSignature, m_DeviceParams.enableStreamlineLog);
 #endif
@@ -217,6 +254,12 @@ bool GpuDevice_DX12::CreateDevice()
         caustica::error("D3D12 device creation failed, error code = 0x%08x", hr);
         return false;
     }
+
+#if defined(CAUSTICA_D3D_AGILITY_SDK_VERSION) && (CAUSTICA_D3D_AGILITY_SDK_VERSION >= 619)
+    if (!ValidateAgilityShaderModel(m_Device12))
+        return false;
+#endif
+
 #if CAUSTICA_WITH_STREAMLINE
     StreamlineIntegration::Get().SetD3DDevice(m_Device12);
 #endif
@@ -593,6 +636,14 @@ bool GpuDevice_DX12::Present()
     return SUCCEEDED(result);
 }
 
+void GpuDevice_DX12::PrepareShutdown()
+{
+#if NVRHI_D3D12_WITH_NVAPI
+    if (m_Device12)
+        NvAPI_D3D12_FlushRaytracingValidationMessages(m_Device12.Get());
+#endif
+}
+
 void GpuDevice_DX12::Shutdown()
 {
     GpuDevice::Shutdown();
@@ -604,6 +655,11 @@ void GpuDevice_DX12::Shutdown()
     {
         ReportLiveObjects();
     }
+}
+
+bool GpuDevice_DX12::QueryVideoMemoryInfo(caustica::VideoMemoryInfo& out) const
+{
+    return caustica::QueryDxgiAdapterVideoMemory(m_DxgiAdapter, out);
 }
 
 GpuDevice *GpuDevice::CreateD3D12(void)

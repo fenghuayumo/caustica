@@ -8,7 +8,7 @@
 #include <core/Timer.h>
 #include <core/command_line.h>
 
-#include "ui/SampleUIData.h"
+#include "ui/EditorUIData.h"
 #include "SceneEditor.h"
 #include <render/SceneGaussianSplatPasses.h>
 #include <render/SceneLightingPasses.h>
@@ -18,14 +18,6 @@
 #include <render/WorldRenderer/PathTracingFrameExtension.h>
 
 using caustica::FPSLimiter;
-constexpr static const int c_SwapchainCount = 3;
-
-#define CAUSTICA_ENABLE_VIDEO_MEMORY_INFO 1
-
-#if CAUSTICA_ENABLE_VIDEO_MEMORY_INFO && defined(_WIN32)
-#include <dxgi1_4.h>
-#include <wrl/client.h>
-#endif
 
 // Forward declarations — full definitions only needed in .cpp
 namespace caustica::editor {
@@ -37,7 +29,7 @@ namespace caustica {
     class GpuDevice;
     class RenderCore;
     class Window;
-    struct DeviceCreationParameters;
+    struct GpuDeviceCreateDesc;
     namespace render {
         class PathTracingWorldRenderer;
     }
@@ -65,8 +57,8 @@ public:
 
     StartupResult startup(int argc, const char* const* argv);
 
-    SampleUIData& GetSampleUIData() { return sampleUIData; }
-    const SampleUIData& GetSampleUIData() const { return sampleUIData; }
+    EditorUIData& GetEditorUIData() { return m_editorUIData; }
+    const EditorUIData& GetEditorUIData() const { return m_editorUIData; }
 
     SceneEditor& GetSceneEditor() { return m_sceneEditor; }
     const SceneEditor& GetSceneEditor() const { return m_sceneEditor; }
@@ -87,7 +79,6 @@ public:
     const caustica::render::PathTracingWorldRenderer* GetWorldRenderer() const;
 
     bool IsSERSupported() const;
-    bool QueryVideoMemoryInfo(uint64_t& outBudget, uint64_t& outCurrentUsage, uint64_t& outAvailableForReservation, uint64_t& outCurrentReservation);
 
 protected:
     void onUpdate(float elapsedTimeSeconds, bool windowFocused) override;
@@ -101,15 +92,12 @@ protected:
 private:
     void RegisterLogCallback();
     void SampleLogCallback(caustica::Severity severity, const char* message);
-    caustica::DeviceCreationParameters GetDefaultDeviceParams() const;
     bool ProcessCommandLine(int argc, char const* const* argv,
-        caustica::DeviceCreationParameters& deviceParams, std::string& preferredScene);
-    bool InitDeviceAndWindow(const caustica::DeviceCreationParameters& deviceParams);
-    bool CheckDeviceFeatureSupport(const caustica::DeviceCreationParameters& deviceParams);
+        caustica::GpuDeviceCreateDesc& createDesc, std::string& preferredScene);
     void syncPassesToBackBuffer();
 
     CommandLineOptions CmdLine;
-    SampleUIData sampleUIData;
+    EditorUIData m_editorUIData;
     caustica::render::SessionDiagnostics m_sessionDiagnostics;
     caustica::render::SceneLightingPasses m_lightingPasses;
     caustica::render::SceneRayTracingResources m_rayTracingResources;
@@ -123,12 +111,6 @@ private:
 
     std::unique_ptr<caustica::EngineRenderer> m_engineRenderer;
     std::unique_ptr<EditorUI> m_uiPass;
-
-#if CAUSTICA_ENABLE_VIDEO_MEMORY_INFO && defined(_WIN32)
-    Microsoft::WRL::ComPtr<IDXGIAdapter3> m_d3dAdapter;
-#endif
-
-    void* m_NVAPIValidationHandle = nullptr;
 };
 
 } // namespace caustica::editor

@@ -19,7 +19,7 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-set (NVRHI_DEFAULT_VK_REGISTER_OFFSETS
+set (RHI_DEFAULT_VK_REGISTER_OFFSETS
     --tRegShift 0
     --sRegShift 128
     --bRegShift 256
@@ -267,7 +267,7 @@ function(caustica_compile_shaders)
            -D SPIRV
            -D TARGET_VULKAN
            --compiler "${SHADERMAKE_DXC_VK_PATH}"
-           ${NVRHI_DEFAULT_VK_REGISTER_OFFSETS}
+           ${RHI_DEFAULT_VK_REGISTER_OFFSETS}
            --vulkanVersion ${VULKAN_VERSION}
            --shaderModel ${params_SHADER_MODEL}
            ${project_name_arg})
@@ -303,7 +303,7 @@ function(caustica_compile_shaders)
            -D TARGET_VULKAN
            --compiler "${SHADERMAKE_SLANG_PATH}"
            --slang
-           ${NVRHI_DEFAULT_VK_REGISTER_OFFSETS}
+           ${RHI_DEFAULT_VK_REGISTER_OFFSETS}
            --vulkanVersion ${VULKAN_VERSION}
            --shaderModel ${params_SHADER_MODEL}
            ${project_name_arg})

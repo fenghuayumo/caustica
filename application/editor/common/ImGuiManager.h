@@ -18,7 +18,7 @@ class ImGui_Renderer;
 namespace caustica::editor
 {
 
-class SampleUIData;
+class EditorUIData;
 
 // =============================================================================
 // ImGuiManager — ImGui lifecycle helper: fonts, context config, input setup.
@@ -29,7 +29,7 @@ class SampleUIData;
 class ImGuiManager
 {
 public:
-    ImGuiManager(SampleUIData& uiData, const CommandLineOptions& cmdLine,
+    ImGuiManager(EditorUIData& uiData, const CommandLineOptions& cmdLine,
                  bool nvapiSERSupported);
     ~ImGuiManager();
 
@@ -47,7 +47,7 @@ public:
     void applyCommandLineDefaults();
 
 private:
-    SampleUIData&             m_uiData;
+    EditorUIData&             m_uiData;
     const CommandLineOptions& m_cmdLine;
     bool                      m_nvapiSERSupported;
     bool                      m_extensionsConfigured = false;

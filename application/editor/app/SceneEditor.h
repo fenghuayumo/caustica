@@ -16,7 +16,7 @@
 
 #include <render/RenderRuntimeState.h>
 #include <render/SessionDiagnostics.h>
-#include "ui/SampleUIData.h"
+#include "ui/EditorUIData.h"
 #include "EditorInputRouter.h"
 #include <render/RenderSessionState.h>
 
@@ -86,7 +86,7 @@ public:
         caustica::render::RenderSessionState& sessionState,
         EditorUIState& editorState,
         caustica::render::SessionDiagnostics& diagnostics);
-    SceneEditor(const CommandLineOptions& cmdLine, SampleUIData& ui, caustica::render::SessionDiagnostics& diagnostics);
+    SceneEditor(const CommandLineOptions& cmdLine, EditorUIData& ui, caustica::render::SessionDiagnostics& diagnostics);
 
     ~SceneEditor();
 
@@ -114,8 +114,8 @@ public:
     uint &                                  SelectedCameraIndex();
     const std::unique_ptr<::GameScene> &     GetGame() const                   { return m_sampleGame; }
 
-    SampleUIData& GetUIData() { assert(m_sampleUi); return *m_sampleUi; }
-    const SampleUIData& GetUIData() const { assert(m_sampleUi); return *m_sampleUi; }
+    EditorUIData& GetUIData() { assert(m_editorUi); return *m_editorUi; }
+    const EditorUIData& GetUIData() const { assert(m_editorUi); return *m_editorUi; }
     caustica::render::RenderSessionState& GetRenderSessionState() { return m_sessionState; }
     const caustica::render::RenderSessionState& GetRenderSessionState() const { return m_sessionState; }
     PathTracerSettings& GetPathTracerSettings() { return m_settings; }
@@ -272,7 +272,7 @@ protected:
     PathTracerSettings& m_settings;
     caustica::render::RenderRuntimeState& m_renderState;
     EditorUIState& m_editor;
-    SampleUIData* m_sampleUi = nullptr;
+    EditorUIData* m_editorUi = nullptr;
     caustica::render::SessionDiagnostics& m_sessionDiagnostics;
 
     std::unique_ptr<CaptureScriptManager>       m_captureScriptManager;

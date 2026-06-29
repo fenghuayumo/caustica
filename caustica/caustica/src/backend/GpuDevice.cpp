@@ -122,96 +122,79 @@ bool GpuDevice::CreateInstance(const InstanceParameters& params)
     return m_InstanceCreated;
 }
 
-bool GpuDevice::CreateHeadlessDevice(const DeviceCreationParameters& params)
+bool GpuDevice::InitializeHeadlessGraphics(const DeviceCreationParameters& params)
 {
-    m_DeviceParams = params;
-    m_DeviceParams.headlessDevice = true;
+    DeviceCreationParameters headlessParams = params;
+    headlessParams.headlessDevice = true;
 
-    if (!CreateInstance(m_DeviceParams))
-        return false;
-
-    if (!CreateDevice())
+    if (!InitializeGraphicsDevice(headlessParams))
         return false;
 
     if (!CreateHeadlessBackBuffers())
         return false;
 
     BackBufferResized();
+    return true;
+}
+
+bool GpuDevice::InitializeGraphicsDevice(const DeviceCreationParameters& params)
+{
+    m_DeviceParams = params;
+    m_RequestedVSync = params.vsyncEnabled;
+
+    if (!CreateInstance(m_DeviceParams))
+        return false;
+
+    if (!CreateDevice())
+        return false;
+
+    if (m_DeviceParams.requirePathTracerFeatures && !ValidatePathTracerRequirements())
+        return false;
 
     return true;
 }
 
-bool GpuDevice::CreateDeviceAndSwapChain(const DeviceCreationParameters& params, Window* window)
+bool GpuDevice::InitializeWindowSwapChain(Window* window)
 {
     if (!window || !window->hasInitialised())
     {
-        caustica::error("CreateDeviceAndSwapChain: Window must be created first");
+        caustica::error("InitializeWindowSwapChain: Window must be created first");
         return false;
     }
 
-    m_DeviceParams           = params;
     m_DeviceParams.headlessDevice = false;
-    m_RequestedVSync         = params.vsyncEnabled;
 
-    // Must create the GPU instance before creating the device.
-    // CreateInstance is idempotent (checks m_InstanceCreated internally).
-    if (!CreateInstance(m_DeviceParams))
-    {
-        caustica::error("CreateDeviceAndSwapChain: Failed to create GPU instance");
-        return false;
-    }
-
-    // Get the GLFW window handle for GLFW API calls.
-    // IMPORTANT: getNativeHandle() returns the platform HWND (Win32),
-    // NOT a GLFWwindow*. Use GlfwWindow::glfwWindow() for GLFW API.
     GlfwWindow* glfwWin = dynamic_cast<GlfwWindow*>(window);
     if (!glfwWin)
     {
-        caustica::error("CreateDeviceAndSwapChain: Window is not a GlfwWindow");
+        caustica::error("InitializeWindowSwapChain: Window is not a GlfwWindow");
         return false;
     }
 
     GLFWwindow* glfwHandle = glfwWin->glfwWindow();
     if (!glfwHandle)
     {
-        caustica::error("CreateDeviceAndSwapChain: Window has no GLFW handle");
+        caustica::error("InitializeWindowSwapChain: Window has no GLFW handle");
         return false;
     }
 
-    // Store both the Window* (new path) and GLFWwindow* (for legacy code)
     m_WindowPtr = window;
-    m_Window = glfwHandle;  // Actual GLFWwindow*, NOT native handle
+    m_Window = glfwHandle;
     m_WindowTitle = window->getTitle();
 
-    // GlfwWindow already owns ALL GLFW callbacks (window events, DPI tracking).
-    // We do NOT overwrite glfwSetWindowUserPointer or any window callbacks.
-    // Input events now flow through the causticaEvents system:
-    //   GlfwWindow → Application::onEvent() → EditorApplication::onEvent().
-
-    // DPI tracking is handled by GlfwWindow::onMove(). Sync initial values.
     m_DPIScaleFactorX = window->getDPIScaleX();
     m_DPIScaleFactorY = window->getDPIScaleY();
 
-    // Render-during-move: delegate to GlfwWindow
     window->setRenderDuringMove(m_EnableRenderDuringWindowMovement);
 
-    // Create GPU instance, device, and swapchain
-    if (!CreateInstance(m_DeviceParams))
-    {
-        caustica::error("CreateDeviceAndSwapChain: Failed to create GPU instance");
-        return false;
-    }
-    if (!CreateDevice())
-        return false;
     if (!CreateSwapChain())
         return false;
 
-    // Reset back buffer state to enforce resize event
-    m_DeviceParams.backBufferWidth  = 0;
+    m_DeviceParams.backBufferWidth = 0;
     m_DeviceParams.backBufferHeight = 0;
     UpdateWindowSize();
 
-    caustica::info("CreateDeviceAndSwapChain: Device ready with platform Window [%ux%u]",
+    caustica::info("InitializeWindowSwapChain: Device ready with platform Window [%ux%u]",
         window->getWidth(), window->getHeight());
 
     return true;
@@ -405,6 +388,48 @@ const DeviceCreationParameters& GpuDevice::GetDeviceParams()
     return m_DeviceParams;
 }
 
+bool GpuDevice::ValidatePathTracerRequirements() const
+{
+    if (!SupportsRayTracingPipeline())
+    {
+        caustica::fatal("The graphics device does not support Ray Tracing Pipelines");
+        return false;
+    }
+
+    if (!SupportsRayQuery())
+    {
+        caustica::fatal("The graphics device does not support Ray Queries");
+        return false;
+    }
+
+    return true;
+}
+
+bool GpuDevice::SupportsRayTracingPipeline() const
+{
+    nvrhi::IDevice* device = GetDevice();
+    return device && device->queryFeatureSupport(nvrhi::Feature::RayTracingPipeline);
+}
+
+bool GpuDevice::SupportsRayQuery() const
+{
+    nvrhi::IDevice* device = GetDevice();
+    return device && device->queryFeatureSupport(nvrhi::Feature::RayQuery);
+}
+
+bool GpuDevice::SupportsShaderExecutionReordering() const
+{
+    nvrhi::IDevice* device = GetDevice();
+    return device
+        && device->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D12
+        && device->queryFeatureSupport(nvrhi::Feature::ShaderExecutionReordering);
+}
+
+bool GpuDevice::QueryVideoMemoryInfo(VideoMemoryInfo& /*out*/) const
+{
+    return false;
+}
+
 caustica::GpuDevice::GpuDevice()
 #if CAUSTICA_WITH_AFTERMATH
     : m_AftermathCrashDumper(*this)
@@ -454,6 +479,8 @@ void GpuDevice::Shutdown()
     // Shut down Streamline before destroying swap chain and device.
     StreamlineIntegration::Get().Shutdown();
 #endif
+
+    PrepareShutdown();
 
     m_SwapChain.framebuffers.clear();
     m_SwapChain.framebuffersWithDepth.clear();

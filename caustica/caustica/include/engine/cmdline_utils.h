@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstring>
 #include <rhi/nvrhi.h>
 
 namespace caustica
@@ -34,5 +35,8 @@ inline nvrhi::GraphicsAPI GetGraphicsAPIFromCommandLine(int argc, const char* co
     #error "No Graphics API defined"
 #endif
 }
+
+// Extended parser that also accepts --backend= / --api= style overrides.
+nvrhi::GraphicsAPI ResolveGraphicsAPIFromCommandLine(int argc, const char* const* argv);
 
 } // namespace caustica
