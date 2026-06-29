@@ -22,7 +22,7 @@ namespace caustica
 
 class RenderTargets;
 class RtxdiResources;
-class EnvMapBaker;
+class EnvMapProcessor;
 class ShaderDebug;
 
 class PrepareLightsPass
@@ -42,7 +42,7 @@ private:
     nvrhi::BufferHandle m_GeometryInstanceToLightBuffer;
     nvrhi::TextureHandle m_LocalLightPdfTexture;
 
-    std::shared_ptr<EnvMapBaker> m_EnvironmentMap;
+    std::shared_ptr<EnvMapProcessor> m_EnvironmentMap;
     EnvMapSceneParams m_EnvironmentMapSceneParams;
 
     nvrhi::BufferHandle m_constantBuffer;
@@ -53,8 +53,8 @@ private:
     std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
     std::shared_ptr<caustica::CommonRenderPasses> m_commonPasses;
     std::shared_ptr<caustica::Scene> m_Scene;
-    std::shared_ptr<class MaterialsBaker> m_materialsBaker;
-    std::shared_ptr<class OmmBaker> m_ommBaker;
+    std::shared_ptr<class MaterialGpuCache> m_materialGpuCache;
+    std::shared_ptr<class OpacityMicromapBuilder> m_opacityMicromapBuilder;
     nvrhi::BufferHandle m_subInstanceData;
     const std::vector<GaussianSplatEmissionProxy>* m_GaussianSplatEmissionProxies = nullptr;
     caustica::math::float4x4 m_GaussianSplatEmissionObjectToWorld = caustica::math::float4x4::identity();
@@ -71,14 +71,14 @@ public:
         std::shared_ptr<caustica::ShaderFactory> shaderFactory,
         std::shared_ptr<caustica::CommonRenderPasses> commonPasses,
         std::shared_ptr<caustica::Scene> scene,
-        std::shared_ptr<class MaterialsBaker> materialsBaker,
-        std::shared_ptr<class OmmBaker> ommBaker,
+        std::shared_ptr<class MaterialGpuCache> materialGpuCache,
+        std::shared_ptr<class OpacityMicromapBuilder> opacityMicromapBuilder,
         nvrhi::BufferHandle subInstanceData,
         nvrhi::IBindingLayout* bindlessLayout,
         std::shared_ptr<ShaderDebug> shaderDebug
     );
 
-    void SetScene(std::shared_ptr<caustica::Scene> scene, std::shared_ptr<EnvMapBaker> environmentMap = nullptr, EnvMapSceneParams envMapSceneParams = {} );
+    void SetScene(std::shared_ptr<caustica::Scene> scene, std::shared_ptr<EnvMapProcessor> environmentMap = nullptr, EnvMapSceneParams envMapSceneParams = {} );
     void SetGaussianSplatEmissionProxies(const std::vector<GaussianSplatEmissionProxy>* proxies, caustica::math::float4x4 objectToWorld, float emissionIntensity);
     void CreatePipeline();
     void CreateBindingSet(RtxdiResources& resources, const RenderTargets& renderTargets);

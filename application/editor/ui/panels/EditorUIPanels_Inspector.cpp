@@ -13,10 +13,10 @@
 #include <scene/SceneGraph.h>
 #include <imgui_internal.h>
 #include <assets/loader/ShaderFactory.h>
-#include <render/Passes/Lighting/MaterialsBaker.h>
+#include <render/Passes/Lighting/MaterialGpuCache.h>
 #include <render/Passes/PostProcess/ToneMappingPasses.h>
 #include <render/Passes/Debug/Korgi.h>
-#include <render/Passes/OMM/OmmBaker.h>
+#include <render/Passes/OMM/OpacityMicromapBuilder.h>
 #include <game/GameScene.h>
 #include <render/Passes/Debug/ZoomTool.h>
 #include <common/CaptureScriptManager.h>
@@ -153,7 +153,7 @@ void EditorUI::BuildMaterialEditorPanel(const PanelLayout& layout)
 {
     // Material Editor panel (right-click pick)
     std::shared_ptr<PTMaterial> material = PTMaterial::SafeCast(m_ui.SelectedMaterial);
-    if (material != nullptr && m_sceneEditor.GetLightingPasses().materialsBaker() != nullptr && m_ui.ShowMaterialEditor)
+    if (material != nullptr && m_sceneEditor.GetLightingPasses().materialGpuCache() != nullptr && m_ui.ShowMaterialEditor)
     {
         const bool inspectorVisible = m_ui.SelectedNode != nullptr && m_ui.ShowInspector;
         ImGui::SetNextWindowPos(ImVec2(float(layout.scaledWidth) - 10.f, inspectorVisible ? 350.f : 10.f), ImGuiCond_Appearing, ImVec2(1.f, 0.f));
@@ -171,7 +171,7 @@ void EditorUI::BuildMaterialEditorPanel(const PanelLayout& layout)
 
         MaterialShaderPermutationKey mspBefore = MaterialShaderPermutationKey(material->ComputeShaderPermutation(""));
 
-        bool dirty = material->EditorGUI(*m_sceneEditor.GetLightingPasses().materialsBaker());
+        bool dirty = material->EditorGUI(*m_sceneEditor.GetLightingPasses().materialGpuCache());
 
         MaterialShaderPermutationKey mspAfter = MaterialShaderPermutationKey(material->ComputeShaderPermutation(""));
 

@@ -21,7 +21,7 @@ struct SubInstanceData  // could have been called GeometryInstanceData but that'
 
     uint FlagsAndAlphaInfo;                         // includes AlphaCutoff and AlphaTextureIndex
     uint GlobalGeometryIndex_PTMaterialDataIndex;   // index into t_GeometryData and t_GeometryDebugData in higher 16 bits, index in PTMaterial list in lower 16 bits
-    uint EmissiveLightMappingOffset;                // if emissive mesh, index of the first light (see LightsBaker); will be 0xFFFFFFFF if triangles are not emissive!
+    uint EmissiveLightMappingOffset;                // if emissive mesh, index of the first light (see LightSamplingCache); will be 0xFFFFFFFF if triangles are not emissive!
     uint AnalyticProxyLightIndex;                   // if standing in as an analytic light proxy
     
 #if SUBINSTANCEDATA_EXTENDED

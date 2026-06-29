@@ -32,7 +32,7 @@ namespace caustica
 
 class ShaderDebug;
 #include <scene/Scene.h>
-class MaterialsBaker;
+class MaterialGpuCache;
 
 enum class PTMaterialTextureSlot
 {
@@ -101,7 +101,7 @@ struct PTTexture
 struct PTMaterialBase
 {
     caustica::Material * EngineMaterialCounterpart = nullptr;
-    MaterialsBaker*          RuntimeBaker = nullptr;
+    MaterialGpuCache*          RuntimeMaterialGpuCache = nullptr;
 
     // ModelName + Name is unique identifier for the material; there cannot be two materials with the same ModelName and Name - hopefully.
     std::string             Name;
@@ -112,9 +112,9 @@ struct PTMaterialBase
     // base texture? & alpha test - opacity?
     // emissive texture?
 
-    bool                    SharedWithAllScenes                 = true;     // if 'true', will be saved to MaterialsBaker::m_materialsPath; otherwise in MaterialsBaker::m_materialsSceneSpecializedPath
+    bool                    SharedWithAllScenes                 = true;     // if 'true', will be saved to MaterialGpuCache::m_materialsPath; otherwise in MaterialGpuCache::m_materialsSceneSpecializedPath
 
-    // this gets set internally by MaterialsBaker::BakeShaderPermutations - it will be shared with other materials when possible
+    // this gets set internally by MaterialGpuCache::BakeShaderPermutations - it will be shared with other materials when possible
     std::shared_ptr<MaterialShaderPermutation>
                             BakedShaderPermutation;
 
@@ -218,7 +218,7 @@ struct PTMaterial : public PTMaterialBase
     bool                    SkipRender                          = false;        // if 'true', we just skip drawing all geometries with this material; sometimes we can't edit a specific mesh but we can remove it this way; note: it can also be used for hidden emissives
 
     void                    FillData(PTMaterialData & data);
-    bool                    EditorGUI(class MaterialsBaker & baker);
+    bool                    EditorGUI(class MaterialGpuCache & cache);
     bool                    IsEmissive() const;
     PTTexture&              GetTexture(PTMaterialTextureSlot slot);
     const PTTexture&        GetTexture(PTMaterialTextureSlot slot) const;
@@ -256,11 +256,11 @@ struct MaterialEx : caustica::Material
     std::shared_ptr<PTMaterial> ptData;
 };
 
-class MaterialsBaker
+class MaterialGpuCache
 {
 public:
-    MaterialsBaker(const std::string & relativeShaderSourcePath, nvrhi::IDevice* device, std::shared_ptr<caustica::TextureLoader> textureCache, std::shared_ptr<caustica::ShaderFactory> shaderFactory);
-    ~MaterialsBaker();
+    MaterialGpuCache(const std::string & relativeShaderSourcePath, nvrhi::IDevice* device, std::shared_ptr<caustica::TextureLoader> textureCache, std::shared_ptr<caustica::ShaderFactory> shaderFactory);
+    ~MaterialGpuCache();
 
     void                            CreateRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* bindlessLayout, std::shared_ptr<caustica::CommonRenderPasses> commonPasses, const std::shared_ptr<caustica::Scene>& scene, const std::filesystem::path & sceneFilePath, const std::filesystem::path & mediaPath);
 

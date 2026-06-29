@@ -8,16 +8,16 @@ namespace { constexpr int c_SwapchainCount = 3; }
 #include <render/Core/PostProcessAA.h>
 #include <render/Core/SceneGeometryUpdate.h>
 #include <render/Core/LightingUpdate.h>
-#include <render/Core/PTPipelineBaker.h>
-#include <render/Core/ComputePipelineBaker.h>
+#include <render/Core/PathTracingShaderCompiler.h>
+#include <render/Core/ComputePipelineRegistry.h>
 #include <render/Core/BindingCache.h>
 #include <scene/View.h>
 #include <render/Core/FramebufferFactory.h>
 #include <render/Core/AccelerationStructureUtil.h>
-#include <render/Passes/Lighting/Distant/EnvMapImportanceSamplingBaker.h>
-#include <render/Passes/Lighting/MaterialsBaker.h>
-#include <render/Passes/OMM/OmmBaker.h>
-#include <render/Passes/PostProcess/DenoisingGuidesBaker.h>
+#include <render/Passes/Lighting/Distant/EnvMapImportanceSamplingCache.h>
+#include <render/Passes/Lighting/MaterialGpuCache.h>
+#include <render/Passes/OMM/OpacityMicromapBuilder.h>
+#include <render/Passes/PostProcess/DenoisingGuidesPass.h>
 #include <render/Passes/Denoisers/OidnDenoiser.h>
 #include <render/Passes/Gaussian/GaussianSplatPass.h>
 #include <assets/loader/ShaderFactory.h>
@@ -353,7 +353,7 @@ void caustica::render::PathTracingWorldRenderer::onSceneUnloading()
     m_gaussianSplatTemporalReset = true;
     if (m_rtxdiPass != nullptr)
         m_rtxdiPass->Reset();
-    m_ptPipelineBaker = nullptr;
+    m_pathTracingShaderCompiler = nullptr;
     m_ptPipelineReference = nullptr;
     m_ptPipelineBuildStablePlanes = nullptr;
     m_ptPipelineFillStablePlanes = nullptr;
@@ -483,17 +483,17 @@ void caustica::render::PathTracingWorldRenderer::createRenderPasses( bool& expos
     if (!createPTPipeline())
         { assert(false); }
 
-    if (m_context.envMapBaker == nullptr)
-        m_context.envMapBaker = std::make_shared<EnvMapBaker>(device(), m_context.textureCache, false);
-    if (m_context.lightsBaker == nullptr)
-        m_context.lightsBaker = std::make_shared<LightsBaker>(device());
-    m_context.envMapBaker->CreateRenderPasses(m_shaderDebug, m_context.shaderFactory, m_context.computePipelineBaker);
-    m_context.envMapBaker->GenerateBRDFLUT(initializeCommandList.Get(), m_context.bindingCache);  // One-time BRDF LUT generation
-    m_context.lightsBaker->CreateRenderPasses(m_context.shaderFactory, m_bindlessLayout, m_context.commonPasses, m_shaderDebug, screenResolution, m_context.envMapBaker->GetImportanceSampling()->GetImportanceMapResolution());
+    if (m_context.envMapProcessor == nullptr)
+        m_context.envMapProcessor = std::make_shared<EnvMapProcessor>(device(), m_context.textureCache, false);
+    if (m_context.lightSamplingCache == nullptr)
+        m_context.lightSamplingCache = std::make_shared<LightSamplingCache>(device());
+    m_context.envMapProcessor->CreateRenderPasses(m_shaderDebug, m_context.shaderFactory, m_context.computePipelineRegistry);
+    m_context.envMapProcessor->GenerateBRDFLUT(initializeCommandList.Get(), m_context.bindingCache);  // One-time BRDF LUT generation
+    m_context.lightSamplingCache->CreateRenderPasses(m_context.shaderFactory, m_bindlessLayout, m_context.commonPasses, m_shaderDebug, screenResolution, m_context.envMapProcessor->GetImportanceSampling()->GetImportanceMapResolution());
 
     m_context.gaussianSplats.preparePasses();
 
-    m_denoisingGuidesBaker = std::make_shared<DenoisingGuidesBaker>(device(), m_context.shaderFactory, m_renderTargets, m_shaderDebug, m_bindingLayout);
+    m_denoisingGuidesPass = std::make_shared<DenoisingGuidesPass>(device(), m_context.shaderFactory, m_renderTargets, m_shaderDebug, m_bindingLayout);
 }
 void caustica::render::PathTracingWorldRenderer::preUpdateLighting(nvrhi::CommandListHandle commandList, bool& needNewBindings)
 {
@@ -511,7 +511,7 @@ void caustica::render::PathTracingWorldRenderer::preUpdateLighting(nvrhi::Comman
     PreUpdateLightingParams params{
         commandList,
         needNewBindings,
-        m_context.envMapBaker.get(),
+        m_context.envMapProcessor.get(),
         m_context.commonPasses,
         envMapActualPath,
         sceneDirectory,
@@ -525,14 +525,14 @@ void caustica::render::PathTracingWorldRenderer::updateLighting(nvrhi::CommandLi
     UpdateLightingParams params{
         m_context.settings,
         commandList,
-        m_context.envMapBaker.get(),
-        m_context.lightsBaker.get(),
+        m_context.envMapProcessor.get(),
+        m_context.lightSamplingCache.get(),
         &m_context.bindingCache,
         m_context.commonPasses,
         &m_context.lights,
         m_context.sceneManager.getScene(),
-        m_context.materialsBaker,
-        m_context.ommBaker,
+        m_context.materialGpuCache,
+        m_context.opacityMicromapBuilder,
         m_context.envMapSceneParams,
         m_context.sceneTime,
         m_frameIndex,
@@ -718,8 +718,8 @@ void caustica::render::PathTracingWorldRenderer::rtxdiSetupFrame(nvrhi::IFramebu
     if( m_context.settings.ResetRealtimeCaches )
         m_rtxdiPass->Reset();
 
-	m_rtxdiPass->PrepareResources(m_commandList, *m_renderTargets, envMapPresent ? m_context.envMapBaker : nullptr, m_context.envMapSceneParams,
-        m_context.sceneManager.getScene(), m_context.materialsBaker, m_context.ommBaker, m_context.renderCore.accelStructs().getSubInstanceBuffer(), bridgeParameters, m_bindingLayout, m_shaderDebug );
+	m_rtxdiPass->PrepareResources(m_commandList, *m_renderTargets, envMapPresent ? m_context.envMapProcessor : nullptr, m_context.envMapSceneParams,
+        m_context.sceneManager.getScene(), m_context.materialGpuCache, m_context.opacityMicromapBuilder, m_context.renderCore.accelStructs().getSubInstanceBuffer(), bridgeParameters, m_bindingLayout, m_shaderDebug );
  }
 #if CAUSTICA_WITH_STREAMLINE
 void caustica::render::PathTracingWorldRenderer::streamlinePreRender()
@@ -1214,26 +1214,26 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
     {
         m_context.diagnostics.progressInitializingRenderer.Start("Initializing renderer...");
 
-        if (m_context.materialsBaker == nullptr)
+        if (m_context.materialGpuCache == nullptr)
         {
-            m_context.materialsBaker = std::make_shared<MaterialsBaker>(std::string("PathTracerMaterialSpecializations.hlsl"), device(), m_context.textureCache, m_context.shaderFactory);
-            assert( m_ptPipelineBaker == nullptr ); // there should be no cases where materials baker is null but ptPipelineBaker isn't
+            m_context.materialGpuCache = std::make_shared<MaterialGpuCache>(std::string("PathTracerMaterialSpecializations.hlsl"), device(), m_context.textureCache, m_context.shaderFactory);
+            assert( m_pathTracingShaderCompiler == nullptr ); // there should be no cases where materials baker is null but pathTracingShaderCompiler isn't
             
-            m_ptPipelineBaker = std::make_shared<PTPipelineBaker>(device(), m_context.materialsBaker, m_bindingLayout, m_bindlessLayout);
+            m_pathTracingShaderCompiler = std::make_shared<PathTracingShaderCompiler>(device(), m_context.materialGpuCache, m_bindingLayout, m_bindlessLayout);
             
             std::vector<std::filesystem::path> additionalShaderPaths;
-            m_context.computePipelineBaker = std::make_shared<ComputePipelineBaker>(device(), additionalShaderPaths);
+            m_context.computePipelineRegistry = std::make_shared<ComputePipelineRegistry>(device(), additionalShaderPaths);
             
             m_context.rayTracing.createRTPipelines();
         }
 
-        m_context.materialsBaker->CreateRenderPassesAndLoadMaterials(m_bindlessLayout, m_context.commonPasses, m_context.sceneManager.getScene(), m_context.sceneManager.getCurrentScenePath(), GetLocalPath(c_AssetsFolder));
+        m_context.materialGpuCache->CreateRenderPassesAndLoadMaterials(m_bindlessLayout, m_context.commonPasses, m_context.sceneManager.getScene(), m_context.sceneManager.getCurrentScenePath(), GetLocalPath(c_AssetsFolder));
         m_context.diagnostics.progressInitializingRenderer.Set(5);
         {
             PathTracingFrameEvent event{ .framePhase = PathTracingFramePhase::IdleMaintenance };
             dispatchFrameExtensions(event);
         }
-        if(m_context.ommBaker) m_context.ommBaker->CreateRenderPasses(m_bindlessLayout, m_context.commonPasses);
+        if(m_context.opacityMicromapBuilder) m_context.opacityMicromapBuilder->CreateRenderPasses(m_bindlessLayout, m_context.commonPasses);
         m_context.diagnostics.progressInitializingRenderer.Set(20);
     }
 
@@ -1258,11 +1258,11 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
     }
 
     // this is the point where main ray tracing pipelines will actually get compiled
-    m_ptPipelineBaker->Update(m_context.sceneManager.getScene(), (unsigned int)m_context.renderCore.accelStructs().getSubInstanceData().size(), [this](std::vector<caustica::ShaderMacro> & macros){ m_context.rayTracing.fillPTPipelineGlobalMacros(macros); }, needNewPasses);
+    m_pathTracingShaderCompiler->Update(m_context.sceneManager.getScene(), (unsigned int)m_context.renderCore.accelStructs().getSubInstanceData().size(), [this](std::vector<caustica::ShaderMacro> & macros){ m_context.rayTracing.fillPTPipelineGlobalMacros(macros); }, needNewPasses);
     
     // Update compute shaders (compile if needed)
-    if (m_context.computePipelineBaker)
-        m_context.computePipelineBaker->Update(needNewPasses);
+    if (m_context.computePipelineRegistry)
+        m_context.computePipelineRegistry->Update(needNewPasses);
     
     m_context.diagnostics.progressInitializingRenderer.Set(90);
 
@@ -1301,8 +1301,8 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
             m_context.sceneManager.getScene(),
             m_commandList,
         };
-        geoParams.materialsBaker = m_context.materialsBaker.get();
-        geoParams.ommBaker = m_context.ommBaker.get();
+        geoParams.materialGpuCache = m_context.materialGpuCache.get();
+        geoParams.opacityMicromapBuilder = m_context.opacityMicromapBuilder.get();
         geoParams.frameIndex = m_context.gpuDevice.GetFrameIndex();
         geoParams.asyncLoadingInProgress = &m_context.diagnostics.asyncLoadingInProgress;
         m_context.renderCore.updateSceneGeometry(geoParams);
@@ -1368,7 +1368,7 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
     else
     {
         updatePathTracerConstants(constants.ptConsts, cameraData);
-        constants.MaterialCount = m_context.materialsBaker->GetMaterialDataCount(); // m_context.sceneManager.getScene()->GetSceneGraph()->GetMaterials().size();
+        constants.MaterialCount = m_context.materialGpuCache->GetMaterialDataCount(); // m_context.sceneManager.getScene()->GetSceneGraph()->GetMaterials().size();
         const uint32_t gaussianSplatShadowMode = ResolveGaussianSplatShadowMode(m_context.settings);
         const GaussianSplatBinding primaryGaussianBinding = m_context.gaussianSplats.getPrimaryBinding();
         GaussianSplatPass* primaryGaussianSplatPass = const_cast<GaussianSplatPass*>(primaryGaussianBinding.splatPass);
@@ -1401,7 +1401,7 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
             : float4x4::identity();
 
         constants.envMapSceneParams = m_context.envMapSceneParams;
-        constants.envMapImportanceSamplingParams = m_context.envMapBaker->GetImportanceSampling()->GetShaderParams();
+        constants.envMapImportanceSamplingParams = m_context.envMapProcessor->GetImportanceSampling()->GetShaderParams();
 
         PlanarViewConstants view;           m_context.renderCore.camera().view()->FillPlanarViewConstants(view);
         PlanarViewConstants previousView;   m_context.renderCore.camera().viewPrevious()->FillPlanarViewConstants(previousView);
@@ -1608,7 +1608,7 @@ void caustica::render::PathTracingWorldRenderer::recreateBindingSet()
 {
 	// WARNING: this must match the layout of the m_bindingLayout (or switch to CreateBindingSetAndLayout)
     nvrhi::rt::IAccelStruct* gaussianSplatAS = m_context.renderCore.accelStructs().getTopLevelAS();
-    nvrhi::IBuffer* gaussianSplatBuffer = m_context.materialsBaker->GetMaterialDataBuffer();
+    nvrhi::IBuffer* gaussianSplatBuffer = m_context.materialGpuCache->GetMaterialDataBuffer();
     const GaussianSplatBinding primaryGaussianBinding = m_context.gaussianSplats.getPrimaryBinding();
     const GaussianSplatPass* primaryGaussianSplatPass = primaryGaussianBinding.splatPass;
     if (primaryGaussianSplatPass != nullptr && primaryGaussianSplatPass->GetTopLevelAS() != nullptr && primaryGaussianSplatPass->GetSplatBuffer() != nullptr)
@@ -1622,31 +1622,31 @@ void caustica::render::PathTracingWorldRenderer::recreateBindingSet()
     bindingSetDescBase.bindings = {
         nvrhi::BindingSetItem::ConstantBuffer(0, m_constantBuffer),
         nvrhi::BindingSetItem::PushConstants(1, sizeof(SampleMiniConstants)),
-        //nvrhi::BindingSetItem::ConstantBuffer(2, m_context.lightsBaker->GetLightingConstants()),
+        //nvrhi::BindingSetItem::ConstantBuffer(2, m_context.lightSamplingCache->GetLightingConstants()),
         nvrhi::BindingSetItem::RayTracingAccelStruct(0, m_context.renderCore.accelStructs().getTopLevelAS()),
         nvrhi::BindingSetItem::StructuredBuffer_SRV(1, m_context.renderCore.accelStructs().getSubInstanceBuffer()),
         nvrhi::BindingSetItem::StructuredBuffer_SRV(2, m_context.sceneManager.getScene()->GetInstanceBuffer()),
         nvrhi::BindingSetItem::StructuredBuffer_SRV(3, m_context.sceneManager.getScene()->GetGeometryBuffer()),
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(4, m_context.ommBaker ?(m_context.ommBaker->GetGeometryDebugBuffer()):(m_context.materialsBaker->GetMaterialDataBuffer().Get()) ),   // YUCK
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(5, m_context.materialsBaker->GetMaterialDataBuffer()),
+        nvrhi::BindingSetItem::StructuredBuffer_SRV(4, m_context.opacityMicromapBuilder ?(m_context.opacityMicromapBuilder->GetGeometryDebugBuffer()):(m_context.materialGpuCache->GetMaterialDataBuffer().Get()) ),   // YUCK
+        nvrhi::BindingSetItem::StructuredBuffer_SRV(5, m_context.materialGpuCache->GetMaterialDataBuffer()),
         nvrhi::BindingSetItem::Texture_SRV(6,  m_renderTargets->LdrColorScratch, nvrhi::Format::SRGBA8_UNORM),
         nvrhi::BindingSetItem::RayTracingAccelStruct(7, gaussianSplatAS),
         nvrhi::BindingSetItem::StructuredBuffer_SRV(8, gaussianSplatBuffer),
-        nvrhi::BindingSetItem::Texture_SRV(10, m_context.envMapBaker->GetEnvMapCube()), //m_app.m_EnvironmentMap->IsEnvMapLoaded() ? m_app.m_EnvironmentMap->GetEnvironmentMap() : (m_context.commonPasses)->m_BlackTexture),
-        nvrhi::BindingSetItem::Texture_SRV(11, m_context.envMapBaker->GetImportanceSampling()->GetImportanceMapOnly()), //m_app.m_EnvironmentMap->IsImportanceMapLoaded() ? m_app.m_EnvironmentMap->GetImportanceMap() : (m_context.commonPasses)->m_BlackTexture),
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(12, m_context.lightsBaker->GetControlBuffer()),
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(13, m_context.lightsBaker->GetLightBuffer()),
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(14, m_context.lightsBaker->GetLightExBuffer()),
-        nvrhi::BindingSetItem::TypedBuffer_SRV(15, m_context.lightsBaker->GetLightProxyCounters()),     // t_tightProxyCounters
-        nvrhi::BindingSetItem::TypedBuffer_SRV(16, m_context.lightsBaker->GetLightSamplingProxies()),   // t_LightProxyIndices
-        nvrhi::BindingSetItem::TypedBuffer_SRV(17, m_context.lightsBaker->GetLocalSamplingBuffer()),    // t_LightLocalSamplingBuffer
-        nvrhi::BindingSetItem::Texture_SRV(18, m_context.lightsBaker->GetEnvLightLookupMap()),          // t_EnvLookupMap
+        nvrhi::BindingSetItem::Texture_SRV(10, m_context.envMapProcessor->GetEnvMapCube()), //m_app.m_EnvironmentMap->IsEnvMapLoaded() ? m_app.m_EnvironmentMap->GetEnvironmentMap() : (m_context.commonPasses)->m_BlackTexture),
+        nvrhi::BindingSetItem::Texture_SRV(11, m_context.envMapProcessor->GetImportanceSampling()->GetImportanceMapOnly()), //m_app.m_EnvironmentMap->IsImportanceMapLoaded() ? m_app.m_EnvironmentMap->GetImportanceMap() : (m_context.commonPasses)->m_BlackTexture),
+        nvrhi::BindingSetItem::StructuredBuffer_SRV(12, m_context.lightSamplingCache->GetControlBuffer()),
+        nvrhi::BindingSetItem::StructuredBuffer_SRV(13, m_context.lightSamplingCache->GetLightBuffer()),
+        nvrhi::BindingSetItem::StructuredBuffer_SRV(14, m_context.lightSamplingCache->GetLightExBuffer()),
+        nvrhi::BindingSetItem::TypedBuffer_SRV(15, m_context.lightSamplingCache->GetLightProxyCounters()),     // t_tightProxyCounters
+        nvrhi::BindingSetItem::TypedBuffer_SRV(16, m_context.lightSamplingCache->GetLightSamplingProxies()),   // t_LightProxyIndices
+        nvrhi::BindingSetItem::TypedBuffer_SRV(17, m_context.lightSamplingCache->GetLocalSamplingBuffer()),    // t_LightLocalSamplingBuffer
+        nvrhi::BindingSetItem::Texture_SRV(18, m_context.lightSamplingCache->GetEnvLightLookupMap()),          // t_EnvLookupMap
         //nvrhi::BindingSetItem::TypedBuffer_SRV(19, ),
-        nvrhi::BindingSetItem::Texture_UAV(20, m_context.lightsBaker->GetFeedbackTotalWeight()),        // u_LightFeedbackTotalWeight
-        nvrhi::BindingSetItem::Texture_UAV(21, m_context.lightsBaker->GetFeedbackCandidates()),         // u_LightFeedbackCandidates
+        nvrhi::BindingSetItem::Texture_UAV(20, m_context.lightSamplingCache->GetFeedbackTotalWeight()),        // u_LightFeedbackTotalWeight
+        nvrhi::BindingSetItem::Texture_UAV(21, m_context.lightSamplingCache->GetFeedbackCandidates()),         // u_LightFeedbackCandidates
         nvrhi::BindingSetItem::Sampler(0, (m_context.commonPasses)->m_AnisotropicWrapSampler),
-        nvrhi::BindingSetItem::Sampler(1, m_context.envMapBaker->GetEnvMapCubeSampler()),
-        nvrhi::BindingSetItem::Sampler(2, m_context.envMapBaker->GetImportanceSampling()->GetImportanceMapSampler()),
+        nvrhi::BindingSetItem::Sampler(1, m_context.envMapProcessor->GetEnvMapCubeSampler()),
+        nvrhi::BindingSetItem::Sampler(2, m_context.envMapProcessor->GetImportanceSampling()->GetImportanceMapSampler()),
         nvrhi::BindingSetItem::Texture_UAV(0, m_renderTargets->OutputColor),
         nvrhi::BindingSetItem::Texture_UAV(1, m_renderTargets->ProcessedOutputColor),
         nvrhi::BindingSetItem::Texture_UAV(2, m_renderTargets->LdrColor, nvrhi::Format::RGBA8_UNORM),
@@ -1711,7 +1711,7 @@ void caustica::render::PathTracingWorldRenderer::recreateBindingSet()
         bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(80, (m_context.commonPasses)->m_BlackCubeMapArray));  // t_LocalCubemapGGX
         bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(81, (m_context.commonPasses)->m_BlackCubeMapArray));  // t_DiffuseIrradianceCube
         bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(82, (m_context.commonPasses)->m_BlackTexture));  // t_SSRBlurChain
-        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(83, (m_context.envMapBaker->GetBRDFLUT()!=nullptr)?m_context.envMapBaker->GetBRDFLUT():(m_context.commonPasses)->m_BlackTexture ));  // t_BRDFLUT
+        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(83, (m_context.envMapProcessor->GetBRDFLUT()!=nullptr)?m_context.envMapProcessor->GetBRDFLUT():(m_context.commonPasses)->m_BlackTexture ));  // t_BRDFLUT
         bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(84, (m_context.commonPasses)->m_BlackTexture));  // t_DepthHierarchy placeholder
         bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::ConstantBuffer(10, m_constantBuffer)); // ReflectionConstants (reuse main constant buffer as placeholder)
         
@@ -1793,11 +1793,11 @@ void caustica::render::PathTracingWorldRenderer::pathTrace(nvrhi::IFramebuffer* 
     // In realtime mode, ScreenMotionVectors reference mode ScreenMotionVectors should be 0
     UpdateLightingEndParams lightingEndParams{
         m_commandList,
-        m_context.lightsBaker.get(),
+        m_context.lightSamplingCache.get(),
         &m_context.bindingCache,
         m_context.sceneManager.getScene(),
-        m_context.materialsBaker,
-        m_context.ommBaker,
+        m_context.materialGpuCache,
+        m_context.opacityMicromapBuilder,
         m_context.renderCore.accelStructs().getSubInstanceBuffer(),
         m_renderTargets->Depth,
         m_renderTargets->ScreenMotionVectors,
@@ -1854,11 +1854,11 @@ void caustica::render::PathTracingWorldRenderer::pathTrace(nvrhi::IFramebuffer* 
     {
         RAII_SCOPE(m_commandList->beginMarker("Denoising Guides Bake"); , m_commandList->endMarker(); );
 
-        m_denoisingGuidesBaker->DenoiseSpecHitT(m_commandList, m_bindingSet);
-        m_denoisingGuidesBaker->ComputeAvgLayerRadiance(m_commandList, m_bindingSet);
+        m_denoisingGuidesPass->DenoiseSpecHitT(m_commandList, m_bindingSet);
+        m_denoisingGuidesPass->ComputeAvgLayerRadiance(m_commandList, m_bindingSet);
 
         if (m_context.settings.DebugView != DebugViewType::Disabled)
-            m_denoisingGuidesBaker->RenderDebugViz(m_commandList, m_context.settings.DebugView, m_bindingSet);
+            m_denoisingGuidesPass->RenderDebugViz(m_commandList, m_context.settings.DebugView, m_bindingSet);
     }
 
     if (useStablePlanes && (m_context.settings.DebugView > DebugViewType::Disabled && m_context.settings.DebugView <= DebugViewType::StablePlane_SpecRadiance || m_context.settings.DebugView == DebugViewType::StableRadiance) )

@@ -172,7 +172,7 @@ void SceneContentEditor::finalizeRuntimeSceneMutation(const std::shared_ptr<caus
     }
 
     if (auto scene = m_ctx.sceneManager->getScene())
-        m_ctx.lightingPasses->notifyBakersSceneReloaded(*scene);
+        m_ctx.lightingPasses->notifyGpuCachesSceneReloaded(*scene);
 
     requestFullRebuild();
 }
@@ -218,7 +218,7 @@ bool SceneContentEditor::deleteSceneNode(const std::shared_ptr<caustica::SceneGr
     }
 
     if (scene)
-        m_ctx.lightingPasses->notifyBakersSceneReloaded(*scene);
+        m_ctx.lightingPasses->notifyGpuCachesSceneReloaded(*scene);
 
     requestFullRebuild();
     return true;

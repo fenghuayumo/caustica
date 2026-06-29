@@ -5,8 +5,8 @@
 #include <assets/loader/ShaderFactory.h>
 #include <rhi/common/misc.h>
 #include <rhi/utils.h>
-#include <render/Passes/Lighting/MaterialsBaker.h>
-#include <render/Passes/OMM/OmmBaker.h>
+#include <render/Passes/Lighting/MaterialGpuCache.h>
+#include <render/Passes/OMM/OpacityMicromapBuilder.h>
 
 namespace
 {

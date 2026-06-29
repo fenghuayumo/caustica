@@ -9,7 +9,7 @@
 #include <memory>
 #include <vector>
 
-class OmmBaker;
+class OpacityMicromapBuilder;
 
 namespace caustica
 {
@@ -65,7 +65,7 @@ public:
                    const Scene&                    scene,
                    const AccelStructBuildSettings& settings,
                    const OmmAccelStructState&      ommState,
-                   ::OmmBaker*                     ommBaker) const;
+                   ::OpacityMicromapBuilder*                     opacityMicromapBuilder) const;
 
     void releaseGpuResources();
 

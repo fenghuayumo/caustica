@@ -13,10 +13,10 @@
 #include <scene/SceneGraph.h>
 #include <imgui_internal.h>
 #include <assets/loader/ShaderFactory.h>
-#include <render/Passes/Lighting/MaterialsBaker.h>
+#include <render/Passes/Lighting/MaterialGpuCache.h>
 #include <render/Passes/PostProcess/ToneMappingPasses.h>
 #include <render/Passes/Debug/Korgi.h>
-#include <render/Passes/OMM/OmmBaker.h>
+#include <render/Passes/OMM/OpacityMicromapBuilder.h>
 #include <game/GameScene.h>
 #include <render/Passes/Debug/ZoomTool.h>
 #include <common/CaptureScriptManager.h>

@@ -10,7 +10,7 @@ using namespace caustica::math;
 #define ROW_MAJOR row_major
 #endif
 
-struct LightsBakerEnvMapParams
+struct LightSamplingCacheEnvMapParams
 {
     ROW_MAJOR float3x4  Transform;          ///< Local to world transform.
     ROW_MAJOR float3x4  InvTransform;       ///< World to local transform.
@@ -20,7 +20,7 @@ struct LightsBakerEnvMapParams
 
 #define NEEAT_LIGHTS_BAKER_CONSTANTS_SIZE 464
 
-struct LightsBakerConstants
+struct LightSamplingCacheConstants
 {
     float                   DistantVsLocalRelativeImportance;
     uint                    EnvMapImportanceMapMIPCount;
@@ -35,7 +35,7 @@ struct LightsBakerConstants
 
     int                     DebugDrawType;
     uint                    DebugDrawTileLights;
-    uint                    UpdateCounter; ///< LightBaker's own 'frame' counter (gets reset with LightsBaker::BakeSettings::ResetFeedback and gets incremented on every LightSbaker::UpdateFrame(...) and non-first UpdatePreRender after UpdateFrame )
+    uint                    UpdateCounter; ///< Light sampling cache frame counter (reset by LightSamplingCache::UpdateSettings::ResetFeedback)
     uint                    DebugDrawFrustum;
 
     float                   ImportanceBoostIntensityDelta;
@@ -60,9 +60,9 @@ struct LightsBakerConstants
     float4                  FrustumPlanes[6];               ///< Left Right Top Bottom Near Far
     float4                  FrustumCorners[8];              ///< For debugging only
 
-    LightsBakerEnvMapParams EnvMapParams;
+    LightSamplingCacheEnvMapParams EnvMapParams;
 };
-STATIC_ASSERT( NEEAT_LIGHTS_BAKER_CONSTANTS_SIZE == sizeof(LightsBakerConstants) );
+STATIC_ASSERT( NEEAT_LIGHTS_BAKER_CONSTANTS_SIZE == sizeof(LightSamplingCacheConstants) );
 
 // Used for building and using light list
 struct LightingControlData
@@ -77,13 +77,13 @@ struct LightingControlData
     uint    LastFrameTemporalFeedbackAvailable; ///< We can use last frame's temporal feedback
     uint    LastFrameLocalSamplesAvailable;     ///< We can use last frame's local (tile) lights (effectively same as LastFrameTemporalFeedbackAvailable from previous frame)
 
-    uint    ProxyBuildTaskCount;        ///< Only used for building proxies (in LightsBaker.*)
+    uint    ProxyBuildTaskCount;        ///< Only used for building proxies (in LightSamplingCache.*)
     uint    WeightsSumUINT;             ///< Used with interlocked float add - this is actually a float (can be read with 'asfloat')
-    uint    ImportanceSamplingType;     ///< From LightsBaker::BakeSettings - should match global NEEType
+    uint    ImportanceSamplingType;     ///< From LightSamplingCache::UpdateSettings - should match global NEEType
     uint    padding0;                   // float   LightSampling_MIS_Boost;    ///< This is a fixed pdf used for the sampler when doing MIS with main path BSDF
 
     uint    TemporalFeedbackRequired;   ///< Whether the path tracing NEE needs to provide temporal feedback
-    uint    TotalMaxFeedbackCount;      ///< Copy of 'LightsBakerConstants' value, used for debugging
+    uint    TotalMaxFeedbackCount;      ///< Copy of 'LightSamplingCacheConstants' value, used for debugging
     float   GlobalFeedbackUseWeight;
     float   LocalToGlobalSampleRatio;
 
@@ -100,7 +100,7 @@ struct LightingControlData
     uint    padding3;
 
 #if NEEAT_BAKER_ONLY
-    LightsBakerConstants BakerConstants;
+    LightSamplingCacheConstants CacheConstants;
 #else 
     uint    paddingBK[NEEAT_LIGHTS_BAKER_CONSTANTS_SIZE/4];
 #endif
@@ -112,7 +112,7 @@ struct LightingControlData
 #endif
 };
 
-// These should go into LightsBaker.hlsli or similar
+// These should go into LightSamplingCache.hlsli or similar
 enum class LightingDebugViewType : int
 {
     Disabled,

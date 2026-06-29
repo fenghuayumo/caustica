@@ -2,11 +2,11 @@
 #include <render/Core/RenderCore.h>
 #include <render/Core/BindingCache.h>
 #include <render/Core/CommonRenderPasses.h>
-#include <render/Passes/Lighting/Distant/EnvMapBaker.h>
-#include <render/Passes/Lighting/Distant/EnvMapImportanceSamplingBaker.h>
-#include <render/Passes/Lighting/LightsBaker.h>
-#include <render/Passes/Lighting/MaterialsBaker.h>
-#include <render/Passes/OMM/OmmBaker.h>
+#include <render/Passes/Lighting/Distant/EnvMapProcessor.h>
+#include <render/Passes/Lighting/Distant/EnvMapImportanceSamplingCache.h>
+#include <render/Passes/Lighting/LightSamplingCache.h>
+#include <render/Passes/Lighting/MaterialGpuCache.h>
+#include <render/Passes/OMM/OpacityMicromapBuilder.h>
 #include <render/Passes/Gaussian/GaussianSplatEmissionProxy.h>
 #include <scene/Scene.h>
 #include <scene/SceneGraph.h>
@@ -35,23 +35,23 @@ bool gaussianSplatEmissionEnabled(const PathTracerSettings& settings)
 void RenderCore::preUpdateLighting(PreUpdateLightingParams& params)
 {
     nvrhi::ICommandList* commandList = params.commandList;
-    if (commandList == nullptr || params.envMapBaker == nullptr)
+    if (commandList == nullptr || params.envMapProcessor == nullptr)
         return;
 
     RAII_SCOPE(commandList->beginMarker("PreUpdateLighting");, commandList->endMarker(););
 
-    nvrhi::TextureHandle preUpdateCube = params.envMapBaker->GetEnvMapCube();
-    params.envMapBaker->PreUpdate(
+    nvrhi::TextureHandle preUpdateCube = params.envMapProcessor->GetEnvMapCube();
+    params.envMapProcessor->PreUpdate(
         commandList, params.commonPasses, params.envMapActualPath, params.sceneDirectory);
 
-    if (preUpdateCube != params.envMapBaker->GetEnvMapCube())
+    if (preUpdateCube != params.envMapProcessor->GetEnvMapCube())
         params.needNewBindings = true;
 }
 
 void RenderCore::updateLighting(UpdateLightingParams& params)
 {
     nvrhi::ICommandList* commandList = params.commandList;
-    if (commandList == nullptr || params.envMapBaker == nullptr || params.lightsBaker == nullptr
+    if (commandList == nullptr || params.envMapProcessor == nullptr || params.lightSamplingCache == nullptr
         || params.bindingCache == nullptr || params.lights == nullptr || !params.scene)
     {
         return;
@@ -59,7 +59,7 @@ void RenderCore::updateLighting(UpdateLightingParams& params)
 
     RAII_SCOPE(commandList->beginMarker("UpdateLighting");, commandList->endMarker(););
 
-    EMB_DirectionalLight dirLights[EnvMapBaker::c_MaxDirLights];
+    EMB_DirectionalLight dirLights[EnvMapProcessor::c_MaxDirLights];
     uint32_t dirLightCount = 0;
     {
         const float3 rotationInRadians = radians(params.settings.EnvironmentMapParams.RotationXYZ);
@@ -73,7 +73,7 @@ void RenderCore::updateLighting(UpdateLightingParams& params)
             LightConstants lightConstants;
             dirLight->FillLightConstants(lightConstants);
 
-            const float minAngularSize = PI_f / (params.envMapBaker->GetTargetCubeResolution() / 2.0f);
+            const float minAngularSize = PI_f / (params.envMapProcessor->GetTargetCubeResolution() / 2.0f);
             assert(lightConstants.angularSizeOrInvRange >= minAngularSize);
 
             dirLights[dirLightCount].AngularSize =
@@ -86,11 +86,11 @@ void RenderCore::updateLighting(UpdateLightingParams& params)
         }
     }
 
-    if (params.envMapBaker->Update(
+    if (params.envMapProcessor->Update(
             commandList,
             *params.bindingCache,
             params.commonPasses,
-            EnvMapBaker::BakeSettings{ .EnvMapRadianceScale = params.envMapRadianceScale },
+            EnvMapProcessor::UpdateSettings{ .EnvMapRadianceScale = params.envMapRadianceScale },
             params.sceneTime,
             dirLights,
             dirLightCount,
@@ -99,7 +99,7 @@ void RenderCore::updateLighting(UpdateLightingParams& params)
         params.settings.ResetAccumulation = true;
     }
 
-    LightsBaker::BakeSettings settings;
+    LightSamplingCache::UpdateSettings settings;
     settings.ImportanceSamplingType = static_cast<uint>(params.settings.NEEType);
     settings.CameraPosition = m_camera.camera().GetPosition();
     settings.CameraDirection = m_camera.camera().GetDir();
@@ -120,7 +120,7 @@ void RenderCore::updateLighting(UpdateLightingParams& params)
     settings.ViewportSize = float2(
         static_cast<float>(m_camera.view()->GetViewExtent().width()),
         static_cast<float>(m_camera.view()->GetViewExtent().height()));
-    settings.EnvMapParams = LightsBakerEnvMapParams{
+    settings.EnvMapParams = LightSamplingCacheEnvMapParams{
         .Transform = params.envMapSceneParams.Transform,
         .InvTransform = params.envMapSceneParams.InvTransform,
         .ColorMultiplier = params.envMapSceneParams.ColorMultiplier,
@@ -137,17 +137,17 @@ void RenderCore::updateLighting(UpdateLightingParams& params)
         settings.GaussianSplatEmissionIntensity = params.settings.GaussianSplatEmissionIntensity;
     }
 
-    params.lightsBaker->UpdateBegin(
+    params.lightSamplingCache->UpdateBegin(
         commandList,
         *params.bindingCache,
         settings,
         params.sceneTime,
         params.scene,
-        params.materialsBaker,
-        params.ommBaker,
+        params.materialGpuCache,
+        params.opacityMicromapBuilder,
         m_accelStructs.getSubInstanceBuffer(),
         m_accelStructs.getSubInstanceData(),
-        params.envMapBaker->GetImportanceSampling()->GetRadianceAndImportanceMap());
+        params.envMapProcessor->GetImportanceSampling()->GetRadianceAndImportanceMap());
 }
 
 void syncEnvMapSceneParams(
@@ -176,18 +176,18 @@ void syncEnvMapSceneParams(
 
 void RenderCore::updateLightingEnd(UpdateLightingEndParams& params)
 {
-    if (params.commandList == nullptr || params.lightsBaker == nullptr || params.bindingCache == nullptr
+    if (params.commandList == nullptr || params.lightSamplingCache == nullptr || params.bindingCache == nullptr
         || !params.scene)
     {
         return;
     }
 
-    params.lightsBaker->UpdateEnd(
+    params.lightSamplingCache->UpdateEnd(
         params.commandList,
         *params.bindingCache,
         params.scene,
-        params.materialsBaker,
-        params.ommBaker,
+        params.materialGpuCache,
+        params.opacityMicromapBuilder,
         params.subInstanceDataBuffer,
         params.depthBuffer,
         params.motionVectors);

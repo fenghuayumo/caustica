@@ -7,7 +7,7 @@
 // TODO: remove these from here and include directly, only where needed
 #include "Packing.hlsli"
 
-// PTPipelineBaker will assign names to entry points to add more info for debugging/profiling - see BAKER_ENABLE_VERBOSE_FUNCTION_NAMING to disable and make naming uniform
+// PathTracingShaderCompiler will assign names to entry points to add more info for debugging/profiling - see BAKER_ENABLE_VERBOSE_FUNCTION_NAMING to disable and make naming uniform
 #define ENTRY_NAME_CONCAT(a, b) a##b
 #define ENTRY_NAME(a, b)    ENTRY_NAME_CONCAT(a, b)
 #define RAYGEN_ENTRY        ENTRY_NAME(RayGen_,CAUSTICA_PIPELINE_PERMUTATION_NAME)

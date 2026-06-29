@@ -1,8 +1,8 @@
 #include <render/Core/SceneGeometryUpdate.h>
 #include <render/Core/RenderCore.h>
 #include <render/Core/AccelStructManager.h>
-#include <render/Passes/Lighting/MaterialsBaker.h>
-#include <render/Passes/OMM/OmmBaker.h>
+#include <render/Passes/Lighting/MaterialGpuCache.h>
+#include <render/Passes/OMM/OpacityMicromapBuilder.h>
 #include <scene/Scene.h>
 #include <scene/SceneGraph.h>
 
@@ -20,13 +20,13 @@ AccelStructBuildSettings makeAccelBuildSettings(const PathTracerSettings& settin
     return result;
 }
 
-OmmAccelStructState makeOmmAccelState(OmmBaker* ommBaker)
+OmmAccelStructState makeOmmAccelState(OpacityMicromapBuilder* opacityMicromapBuilder)
 {
     OmmAccelStructState ommState = {};
-    if (ommBaker == nullptr)
+    if (opacityMicromapBuilder == nullptr)
         return ommState;
 
-    const auto& ommUI = ommBaker->UIData();
+    const auto& ommUI = opacityMicromapBuilder->UIData();
     ommState.enabled = ommUI.Enable;
     ommState.force2State = ommUI.Force2State;
     ommState.onlyOMMs = ommUI.OnlyOMMs;
@@ -56,8 +56,8 @@ void RenderCore::updateSceneGeometry(UpdateSceneGeometryParams& params)
 
     scene->Refresh(commandList, static_cast<uint32_t>(params.frameIndex));
 
-    if (params.ommBaker != nullptr)
-        params.ommBaker->BuildOpacityMicromaps(*commandList, *scene);
+    if (params.opacityMicromapBuilder != nullptr)
+        params.opacityMicromapBuilder->BuildOpacityMicromaps(*commandList, *scene);
 
     const AccelStructBuildSettings rebuildSettings = makeAccelBuildSettings(params.settings, false);
     m_accelStructs.rebuildDirtyMeshes(
@@ -70,25 +70,25 @@ void RenderCore::updateSceneGeometry(UpdateSceneGeometryParams& params)
 
     const AccelStructBuildSettings tlasSettings = makeAccelBuildSettings(params.settings, true);
     m_accelStructs.buildTlas(
-        commandList, *scene, tlasSettings, makeOmmAccelState(params.ommBaker), params.ommBaker);
+        commandList, *scene, tlasSettings, makeOmmAccelState(params.opacityMicromapBuilder), params.opacityMicromapBuilder);
 
     transitionSkinnedMeshBuffersToReadOnly(commandList, *scene);
 
-    if (params.ommBaker != nullptr)
+    if (params.opacityMicromapBuilder != nullptr)
     {
         if (params.asyncLoadingInProgress != nullptr)
         {
-            *params.asyncLoadingInProgress |= params.ommBaker->Update(*commandList, *scene);
-            *params.asyncLoadingInProgress |= params.ommBaker->UIData().BuildsLeftInQueue > 0;
+            *params.asyncLoadingInProgress |= params.opacityMicromapBuilder->Update(*commandList, *scene);
+            *params.asyncLoadingInProgress |= params.opacityMicromapBuilder->UIData().BuildsLeftInQueue > 0;
         }
         else
         {
-            (void)params.ommBaker->Update(*commandList, *scene);
+            (void)params.opacityMicromapBuilder->Update(*commandList, *scene);
         }
     }
 
-    if (params.materialsBaker != nullptr)
-        params.materialsBaker->Update(commandList, scene, m_accelStructs.getSubInstanceData());
+    if (params.materialGpuCache != nullptr)
+        params.materialGpuCache->Update(commandList, scene, m_accelStructs.getSubInstanceData());
 
     m_accelStructs.uploadSubInstanceData(commandList);
 }

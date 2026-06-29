@@ -91,14 +91,14 @@ struct OpacityMicroMapUIData
     OpacityMicroMapDebugView            DebugView = OpacityMicroMapDebugView::Disabled;
 };
 
-class OmmBaker
+class OpacityMicromapBuilder
 {
 public:
-    OmmBaker(nvrhi::DeviceHandle device,
+    OpacityMicromapBuilder(nvrhi::DeviceHandle device,
         std::shared_ptr<caustica::DescriptorTableManager> descriptorTableManager,
         std::shared_ptr<caustica::TextureLoader> textureCache,
         std::shared_ptr<caustica::ShaderFactory> shaderFactory);
-    ~OmmBaker();
+    ~OpacityMicromapBuilder();
 
     void                            CreateRenderPasses(nvrhi::BindingLayoutHandle bindlessLayout, std::shared_ptr<caustica::CommonRenderPasses> commonPasses);
 

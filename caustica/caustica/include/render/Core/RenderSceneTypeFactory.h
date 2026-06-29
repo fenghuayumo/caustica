@@ -1,7 +1,7 @@
 #pragma once
 
 #include <scene/SceneGraph.h>
-#include <render/Passes/Lighting/MaterialsBaker.h> // for MaterialEx
+#include <render/Passes/Lighting/MaterialGpuCache.h> // for MaterialEx
 
 namespace caustica::render
 {

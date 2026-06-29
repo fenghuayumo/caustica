@@ -5,7 +5,7 @@
 
 #include <backend/GpuDevice.h>
 #include <render/Core/BindingCache.h>
-#include <render/Core/PTPipelineBaker.h>
+#include <render/Core/PathTracingShaderCompiler.h>
 #include <render/Core/RenderCore.h>
 #include <scene/SceneManager.h>
 #include <scene/Scene.h>
@@ -88,7 +88,7 @@ void SceneRayTracingResources::fillPTPipelineGlobalMacros(std::vector<caustica::
     macros.push_back({ "CAUSTICA_LP_TYPES_USE_16BIT_PRECISION", (m_settings->UseFp16Types) ? ("1") : ("0") });
     macros.push_back({ "CAUSTICA_ENABLE_LOW_DISCREPANCY_SAMPLER_FOR_BSDF", (m_settings->EnableLDSamplerForBSDF) ? ("1") : ("0") });
 
-    m_lightingPasses->applyBakerShaderMacros(macros);
+    m_lightingPasses->applyGpuCacheShaderMacros(macros);
 }
 
 bool SceneRayTracingResources::createPTPipeline()
@@ -98,13 +98,13 @@ bool SceneRayTracingResources::createPTPipeline()
 
 void SceneRayTracingResources::createRTPipelines()
 {
-    auto pipelineBaker = getPipelineBaker();
+    auto compiler = pathTracingShaderCompiler();
     using SM = caustica::ShaderMacro;
-    pipelineReference()         = pipelineBaker->CreateVariant("PathTracerSample.hlsl", { SM("PATH_TRACER_MODE", "PATH_TRACER_MODE_REFERENCE") }, "REF");
-    pipelineBuildStablePlanes() = pipelineBaker->CreateVariant("PathTracerSample.hlsl", { SM("PATH_TRACER_MODE", "PATH_TRACER_MODE_BUILD_STABLE_PLANES") }, "BUILD");
-    pipelineFillStablePlanes()  = pipelineBaker->CreateVariant("PathTracerSample.hlsl", { SM("PATH_TRACER_MODE", "PATH_TRACER_MODE_FILL_STABLE_PLANES") }, "FILL");
-    pipelineTestRaygenPPHDR()   = pipelineBaker->CreateVariant("TestRaygenPP.hlsl", { SM("PP_TEST_HDR", "1") }, "TESTRG", true);
-    pipelineEdgeDetection()     = pipelineBaker->CreateVariant("TestRaygenPP.hlsl", { SM("PP_EDGE_DETECTION", "1") }, "EDGY", true);
+    pipelineReference()         = compiler->CreateVariant("PathTracerSample.hlsl", { SM("PATH_TRACER_MODE", "PATH_TRACER_MODE_REFERENCE") }, "REF");
+    pipelineBuildStablePlanes() = compiler->CreateVariant("PathTracerSample.hlsl", { SM("PATH_TRACER_MODE", "PATH_TRACER_MODE_BUILD_STABLE_PLANES") }, "BUILD");
+    pipelineFillStablePlanes()  = compiler->CreateVariant("PathTracerSample.hlsl", { SM("PATH_TRACER_MODE", "PATH_TRACER_MODE_FILL_STABLE_PLANES") }, "FILL");
+    pipelineTestRaygenPPHDR()   = compiler->CreateVariant("TestRaygenPP.hlsl", { SM("PP_TEST_HDR", "1") }, "TESTRG", true);
+    pipelineEdgeDetection()     = compiler->CreateVariant("TestRaygenPP.hlsl", { SM("PP_EDGE_DETECTION", "1") }, "EDGY", true);
 }
 
 void SceneRayTracingResources::createBlases(nvrhi::ICommandList* commandList)
@@ -215,9 +215,9 @@ bool& SceneRayTracingResources::accelerationStructRebuildRequested()
     return m_invalidation->AccelerationStructRebuildRequested;
 }
 
-std::shared_ptr<PTPipelineBaker> SceneRayTracingResources::getPipelineBaker() const
+std::shared_ptr<PathTracingShaderCompiler> SceneRayTracingResources::pathTracingShaderCompiler() const
 {
-    return m_worldRenderer->getPTPipelineBaker();
+    return m_worldRenderer->getPathTracingShaderCompiler();
 }
 
 std::shared_ptr<PTPipelineVariant>& SceneRayTracingResources::pipelineReference()

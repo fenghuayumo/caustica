@@ -8,8 +8,8 @@
 #include <render/Core/CommonRenderPasses.h>
 #include <scene/View.h>
 #include <render/Passes/RTXDI/GeneratePdfMipsPass.h>
-#include <render/Passes/Lighting/Distant/EnvMapBaker.h>
-#include <render/Passes/Lighting/Distant/EnvMapImportanceSamplingBaker.h>
+#include <render/Passes/Lighting/Distant/EnvMapProcessor.h>
+#include <render/Passes/Lighting/Distant/EnvMapImportanceSamplingCache.h>
 #include <scene/Scene.h>
 #include <shaders/render/RTXDI/ShaderParameters.h>
 #include <shaders/SampleConstantBuffer.h>
@@ -209,11 +209,11 @@ void RtxdiPass::Reset()
 void RtxdiPass::PrepareResources(
     nvrhi::CommandListHandle commandList,
     const RenderTargets& renderTargets,
-    std::shared_ptr<EnvMapBaker> envMap,
+    std::shared_ptr<EnvMapProcessor> envMap,
     EnvMapSceneParams envMapSceneParams,
     const std::shared_ptr<caustica::Scene> scene,
-    std::shared_ptr<class MaterialsBaker> materialsBaker,
-    std::shared_ptr<class OmmBaker> ommBaker,
+    std::shared_ptr<class MaterialGpuCache> materialGpuCache,
+    std::shared_ptr<class OpacityMicromapBuilder> opacityMicromapBuilder,
     nvrhi::BufferHandle subInstanceDataBuffer,
     const RtxdiBridgeParameters& bridgeParams,
     const nvrhi::BindingLayoutHandle extraBindingLayout,
@@ -249,7 +249,7 @@ void RtxdiPass::PrepareResources(
 
     if (!m_PrepareLightsPass)
     {
-        m_PrepareLightsPass = std::make_unique<PrepareLightsPass>(m_device, m_shaderFactory, m_CommonRenderPasses, nullptr, materialsBaker, ommBaker, subInstanceDataBuffer, m_bindlessLayout, shaderDebug);
+        m_PrepareLightsPass = std::make_unique<PrepareLightsPass>(m_device, m_shaderFactory, m_CommonRenderPasses, nullptr, materialGpuCache, opacityMicromapBuilder, subInstanceDataBuffer, m_bindlessLayout, shaderDebug);
         m_PrepareLightsPass->CreatePipeline();
     }
 

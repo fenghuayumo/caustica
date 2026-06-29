@@ -16,12 +16,12 @@ namespace caustica
 
 class ComputeShaderVariant;
 
-class ComputePipelineBaker : public std::enable_shared_from_this<ComputePipelineBaker>
+class ComputePipelineRegistry : public std::enable_shared_from_this<ComputePipelineRegistry>
 {
 public:
     // additionalMonitorPaths: extra directories to monitor for hot reload (in addition to the default ShadersPath)
-    ComputePipelineBaker(nvrhi::IDevice* device, const std::vector<std::filesystem::path>& additionalMonitorPaths = {});
-    ~ComputePipelineBaker();
+    ComputePipelineRegistry(nvrhi::IDevice* device, const std::vector<std::filesystem::path>& additionalMonitorPaths = {});
+    ~ComputePipelineRegistry();
 
     // Register a compute shader for hot reload management
     // Returns a variant handle that can be used to get the pipeline
@@ -114,7 +114,7 @@ public:
     const std::string& GetDebugName() const { return m_debugName; }
 
 private:
-    friend class ComputePipelineBaker;
+    friend class ComputePipelineRegistry;
 
     ComputeShaderVariant(
         const std::string& shaderSourcePath,
@@ -122,7 +122,7 @@ private:
         const std::vector<caustica::ShaderMacro>& macros,
         const nvrhi::BindingLayoutVector& bindingLayouts,
         const std::string& debugName,
-        const std::shared_ptr<ComputePipelineBaker>& baker);
+        const std::shared_ptr<ComputePipelineRegistry>& registry);
 
     // Prepare compilation command (does not execute)
     void PrepareCompilation(std::filesystem::file_time_type lastModifiedSourceCode);
@@ -137,8 +137,8 @@ private:
     void ResetPipeline();
 
 private:
-    std::weak_ptr<ComputePipelineBaker> m_baker;
-    std::shared_ptr<ComputePipelineBaker> m_lockedBaker; // temporary lock during update
+    std::weak_ptr<ComputePipelineRegistry> m_registry;
+    std::shared_ptr<ComputePipelineRegistry> m_lockedRegistry; // temporary lock during update
 
     // Shader source info
     std::filesystem::path m_shaderSrcFileName;

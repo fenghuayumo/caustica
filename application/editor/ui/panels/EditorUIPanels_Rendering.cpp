@@ -13,10 +13,10 @@
 #include <scene/SceneGraph.h>
 #include <imgui_internal.h>
 #include <assets/loader/ShaderFactory.h>
-#include <render/Passes/Lighting/MaterialsBaker.h>
+#include <render/Passes/Lighting/MaterialGpuCache.h>
 #include <render/Passes/PostProcess/ToneMappingPasses.h>
 #include <render/Passes/Debug/Korgi.h>
-#include <render/Passes/OMM/OmmBaker.h>
+#include <render/Passes/OMM/OpacityMicromapBuilder.h>
 #include <game/GameScene.h>
 #include <render/Passes/Debug/ZoomTool.h>
 #include <common/CaptureScriptManager.h>
@@ -44,8 +44,8 @@ void EditorUI::BuildLightingPanel(const PanelLayout& layout)
 
             {
                 RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent););
-                if (auto& lightsBaker = m_sceneEditor.GetLightingPasses().lightsBaker(); lightsBaker != nullptr)
-                    m_ui.ResetAccumulation |= lightsBaker->InfoGUI(layout.indent);
+                if (auto& lightSamplingCache = m_sceneEditor.GetLightingPasses().lightSamplingCache(); lightSamplingCache != nullptr)
+                    m_ui.ResetAccumulation |= lightSamplingCache->InfoGUI(layout.indent);
             }
 
 
@@ -55,15 +55,15 @@ void EditorUI::BuildLightingPanel(const PanelLayout& layout)
                 if (ImGui::CollapsingHeader("Distant lighting (envmap+directional)", 0/*ImGuiTreeNodeFlags_DefaultOpen*/))
                 {
                     RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent););
-                    if (auto& envMapBaker = m_sceneEditor.GetLightingPasses().envMapBaker(); envMapBaker != nullptr)
-                        m_ui.ResetAccumulation |= envMapBaker->DebugGUI(layout.indent);
+                    if (auto& envMapProcessor = m_sceneEditor.GetLightingPasses().envMapProcessor(); envMapProcessor != nullptr)
+                        m_ui.ResetAccumulation |= envMapProcessor->DebugGUI(layout.indent);
                 }
             }
 
             ImGui::TextColored(categoryColor, "Importance sampling:");
             {
                 RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent););
-                if (auto& lightsBaker = m_sceneEditor.GetLightingPasses().lightsBaker(); lightsBaker != nullptr)
+                if (auto& lightSamplingCache = m_sceneEditor.GetLightingPasses().lightSamplingCache(); lightSamplingCache != nullptr)
                 {
                     if( m_ui.NEEType != 2 )
                     {
@@ -98,8 +98,8 @@ void EditorUI::BuildLightingPanel(const PanelLayout& layout)
                     ImGui::TextColored(categoryColor, "Debugging:");
                     {
                         RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent););
-                        if (auto& lightsBaker = m_sceneEditor.GetLightingPasses().lightsBaker(); lightsBaker != nullptr)
-                            m_ui.ResetAccumulation |= lightsBaker->DebugGUI(layout.indent);
+                        if (auto& lightSamplingCache = m_sceneEditor.GetLightingPasses().lightSamplingCache(); lightSamplingCache != nullptr)
+                            m_ui.ResetAccumulation |= lightSamplingCache->DebugGUI(layout.indent);
                     }
                 }
             }

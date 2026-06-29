@@ -15,12 +15,12 @@ namespace caustica
 class RenderTargets;
 class ShaderDebug;
 
-class DenoisingGuidesBaker
+class DenoisingGuidesPass
 {
 public:
 
-    DenoisingGuidesBaker( nvrhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory, const std::unique_ptr<RenderTargets> & renderTargets, const std::shared_ptr<ShaderDebug> & shaderDebug, nvrhi::BindingLayoutHandle globalBindingLayout );
-    ~DenoisingGuidesBaker( );
+    DenoisingGuidesPass( nvrhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory, const std::unique_ptr<RenderTargets> & renderTargets, const std::shared_ptr<ShaderDebug> & shaderDebug, nvrhi::BindingLayoutHandle globalBindingLayout );
+    ~DenoisingGuidesPass( );
 
 public:
     void                            DenoiseSpecHitT( nvrhi::ICommandList * commandList, nvrhi::BindingSetHandle bindingSet );

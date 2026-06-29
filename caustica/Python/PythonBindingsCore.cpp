@@ -13,9 +13,9 @@
 #include <render/RenderSessionState.h>
 #include <EditorUI.h>
 #include <scene/Scene.h>
-#include <render/Passes/Lighting/MaterialsBaker.h>
-#include <render/Passes/Lighting/LightsBaker.h>
-#include <render/Passes/OMM/OmmBaker.h>
+#include <render/Passes/Lighting/MaterialGpuCache.h>
+#include <render/Passes/Lighting/LightSamplingCache.h>
+#include <render/Passes/OMM/OpacityMicromapBuilder.h>
 
 #include <scene/Scene.h>
 #include <scene/SceneTypes.h>
@@ -441,10 +441,10 @@ namespace
         std::optional<bool> sRGB = std::nullopt,
         std::optional<bool> normalMap = std::nullopt)
     {
-        if (material.RuntimeBaker == nullptr)
-            throw std::runtime_error("Material is not attached to a live MaterialsBaker. Reload the scene and look up the material again.");
+        if (material.RuntimeMaterialGpuCache == nullptr)
+            throw std::runtime_error("Material is not attached to a live MaterialGpuCache. Reload the scene and look up the material again.");
 
-        return material.RuntimeBaker->SetMaterialTexture(
+        return material.RuntimeMaterialGpuCache->SetMaterialTexture(
             material,
             slot,
             std::filesystem::path(path),
@@ -454,10 +454,10 @@ namespace
 
     void ClearMaterialTextureFromPython(PTMaterial& material, PTMaterialTextureSlot slot)
     {
-        if (material.RuntimeBaker == nullptr)
-            throw std::runtime_error("Material is not attached to a live MaterialsBaker. Reload the scene and look up the material again.");
+        if (material.RuntimeMaterialGpuCache == nullptr)
+            throw std::runtime_error("Material is not attached to a live MaterialGpuCache. Reload the scene and look up the material again.");
 
-        material.RuntimeBaker->ClearMaterialTexture(material, slot);
+        material.RuntimeMaterialGpuCache->ClearMaterialTexture(material, slot);
     }
 }
 

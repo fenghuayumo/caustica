@@ -6,8 +6,8 @@
 #include <cstdint>
 #include <memory>
 
-class MaterialsBaker;
-class OmmBaker;
+class MaterialGpuCache;
+class OpacityMicromapBuilder;
 
 namespace caustica
 {
@@ -20,8 +20,8 @@ struct UpdateSceneGeometryParams
 
     const std::shared_ptr<Scene>&    scene;
     nvrhi::ICommandList*             commandList = nullptr;
-    MaterialsBaker*                  materialsBaker = nullptr;
-    OmmBaker*                        ommBaker = nullptr;
+    MaterialGpuCache*                  materialGpuCache = nullptr;
+    OpacityMicromapBuilder*                        opacityMicromapBuilder = nullptr;
     uint64_t                         frameIndex = 0;
 
     // OR-ed when OMM async builds are still in flight.

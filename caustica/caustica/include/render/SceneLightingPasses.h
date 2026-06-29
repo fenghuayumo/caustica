@@ -1,9 +1,9 @@
 #pragma once
 
-#include <render/Passes/Lighting/Distant/EnvMapBaker.h>
-#include <render/Passes/Lighting/LightsBaker.h>
-#include <render/Passes/Lighting/MaterialsBaker.h>
-#include <render/Passes/OMM/OmmBaker.h>
+#include <render/Passes/Lighting/Distant/EnvMapProcessor.h>
+#include <render/Passes/Lighting/LightSamplingCache.h>
+#include <render/Passes/Lighting/MaterialGpuCache.h>
+#include <render/Passes/OMM/OpacityMicromapBuilder.h>
 
 #include <assets/loader/TextureLoader.h>
 #include <render/Core/DescriptorTableManager.h>
@@ -16,7 +16,7 @@
 #include <string>
 #include <vector>
 
-class ComputePipelineBaker;
+class ComputePipelineRegistry;
 class SceneGraph;
 
 namespace caustica
@@ -29,20 +29,20 @@ class ShaderFactory;
 namespace caustica::render
 {
 
-// Scene lighting state: baker owners, light list, and environment map selection.
+// Scene lighting state: GPU cache owners, light list, and environment map selection.
 class SceneLightingPasses
 {
 public:
-    std::shared_ptr<EnvMapBaker>& envMapBaker() { return m_envMapBaker; }
-    const std::shared_ptr<EnvMapBaker>& envMapBaker() const { return m_envMapBaker; }
-    std::shared_ptr<LightsBaker>& lightsBaker() { return m_lightsBaker; }
-    const std::shared_ptr<LightsBaker>& lightsBaker() const { return m_lightsBaker; }
-    std::shared_ptr<MaterialsBaker>& materialsBaker() { return m_materialsBaker; }
-    const std::shared_ptr<MaterialsBaker>& materialsBaker() const { return m_materialsBaker; }
-    std::shared_ptr<OmmBaker>& ommBaker() { return m_ommBaker; }
-    const std::shared_ptr<OmmBaker>& ommBaker() const { return m_ommBaker; }
-    std::shared_ptr<ComputePipelineBaker>& computePipelineBaker() { return m_computePipelineBaker; }
-    const std::shared_ptr<ComputePipelineBaker>& computePipelineBaker() const { return m_computePipelineBaker; }
+    std::shared_ptr<EnvMapProcessor>& envMapProcessor() { return m_envMapProcessor; }
+    const std::shared_ptr<EnvMapProcessor>& envMapProcessor() const { return m_envMapProcessor; }
+    std::shared_ptr<LightSamplingCache>& lightSamplingCache() { return m_lightSamplingCache; }
+    const std::shared_ptr<LightSamplingCache>& lightSamplingCache() const { return m_lightSamplingCache; }
+    std::shared_ptr<MaterialGpuCache>& materialGpuCache() { return m_materialGpuCache; }
+    const std::shared_ptr<MaterialGpuCache>& materialGpuCache() const { return m_materialGpuCache; }
+    std::shared_ptr<OpacityMicromapBuilder>& opacityMicromapBuilder() { return m_opacityMicromapBuilder; }
+    const std::shared_ptr<OpacityMicromapBuilder>& opacityMicromapBuilder() const { return m_opacityMicromapBuilder; }
+    std::shared_ptr<ComputePipelineRegistry>& computePipelineRegistry() { return m_computePipelineRegistry; }
+    const std::shared_ptr<ComputePipelineRegistry>& computePipelineRegistry() const { return m_computePipelineRegistry; }
 
     std::vector<std::shared_ptr<caustica::Light>>& lights() { return m_lights; }
     const std::vector<std::shared_ptr<caustica::Light>>& lights() const { return m_lights; }
@@ -61,7 +61,7 @@ public:
         const std::filesystem::path& currentScenePath);
     void setEnvMapOverrideSource(const std::string& envMapOverride);
 
-    void createOmmBakerIfSupported(nvrhi::IDevice* device,
+    void createOpacityMicromapBuilderIfSupported(nvrhi::IDevice* device,
         const std::shared_ptr<caustica::DescriptorTableManager>& descriptorTable,
         const std::shared_ptr<caustica::TextureLoader>& textureLoader,
         const std::shared_ptr<caustica::ShaderFactory>& shaderFactory);
@@ -69,9 +69,9 @@ public:
     void sceneUnloading();
     void onSceneLoaded(caustica::Scene& scene, PathTracerSettings& settings);
     void resyncLightsFromSceneGraph(SceneGraph& sceneGraph);
-    void notifyBakersSceneReloaded(caustica::Scene& scene);
+    void notifyGpuCachesSceneReloaded(caustica::Scene& scene);
 
-    void applyBakerShaderMacros(std::vector<caustica::ShaderMacro>& macros);
+    void applyGpuCacheShaderMacros(std::vector<caustica::ShaderMacro>& macros);
     void createOpacityMicromaps(caustica::Scene& scene);
 
     void forEachUsedMaterialTexture(
@@ -83,12 +83,12 @@ private:
     std::vector<std::filesystem::path>          m_envMapMediaList;
     std::string                                 m_envMapOverride;
 
-    std::shared_ptr<EnvMapBaker>                m_envMapBaker;
+    std::shared_ptr<EnvMapProcessor>                m_envMapProcessor;
     EnvMapSceneParams                           m_envMapSceneParams;
-    std::shared_ptr<LightsBaker>                m_lightsBaker;
-    std::shared_ptr<MaterialsBaker>             m_materialsBaker;
-    std::shared_ptr<OmmBaker>                     m_ommBaker;
-    std::shared_ptr<ComputePipelineBaker>       m_computePipelineBaker;
+    std::shared_ptr<LightSamplingCache>                m_lightSamplingCache;
+    std::shared_ptr<MaterialGpuCache>             m_materialGpuCache;
+    std::shared_ptr<OpacityMicromapBuilder>                     m_opacityMicromapBuilder;
+    std::shared_ptr<ComputePipelineRegistry>       m_computePipelineRegistry;
 
     std::vector<std::shared_ptr<caustica::Light>> m_lights;
 };

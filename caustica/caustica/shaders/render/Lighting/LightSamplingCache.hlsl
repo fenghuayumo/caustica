@@ -28,7 +28,7 @@
 #include <shaders/PathTracer/Lighting/LightingAlgorithms.hlsli>
 
 RWStructuredBuffer<LightingControlData>     u_controlBuffer                 : register(u0);
-#define g_bakerConsts u_controlBuffer[0].BakerConstants
+#define g_cacheConsts u_controlBuffer[0].CacheConstants
 #define g_controlInfo u_controlBuffer[0]
 
 RWStructuredBuffer<PolymorphicLightInfo>    u_lightsBuffer                  : register(u1);
@@ -99,7 +99,7 @@ float DistanceFromFrustum( float3 position )
     float distMin = 0;
     for (int i = 0; i < 5; i++ )
     {
-        float dist = dot( position, g_bakerConsts.FrustumPlanes[i].xyz ) - g_bakerConsts.FrustumPlanes[i].w;
+        float dist = dot( position, g_cacheConsts.FrustumPlanes[i].xyz ) - g_cacheConsts.FrustumPlanes[i].w;
         distMin = min( distMin, dist );
     }
     return max( 0, -distMin );
@@ -108,7 +108,7 @@ float DistanceFromFrustum( float3 position )
 float ImportanceBooster( const PolymorphicLightInfoFull packedLightInfo, const uint lightIndex, const float unboostedWeight )
 {
     float boostedWeight = unboostedWeight;
-    if( g_bakerConsts.ImportanceBoostFrustumMul > 0 ) 
+    if( g_cacheConsts.ImportanceBoostFrustumMul > 0 ) 
     {
         float boostK = 0;
         // directional lights have no position, so skip them
@@ -119,20 +119,20 @@ float ImportanceBooster( const PolymorphicLightInfoFull packedLightInfo, const u
         }
         else
         {
-            boostK = saturate(1 - DistanceFromFrustum(packedLightInfo.Base.Center) / max( 1e-5, g_bakerConsts.ImportanceBoostFrustumFadeDistance ));
+            boostK = saturate(1 - DistanceFromFrustum(packedLightInfo.Base.Center) / max( 1e-5, g_cacheConsts.ImportanceBoostFrustumFadeDistance ));
             // ^ these 2 can (and should) be combined in some ratio for really large scenes
         }
-        boostedWeight *= 1 + g_bakerConsts.ImportanceBoostFrustumMul * boostK;
+        boostedWeight *= 1 + g_cacheConsts.ImportanceBoostFrustumMul * boostK;
     }
-    if( g_controlInfo.LastFrameTemporalFeedbackAvailable && g_bakerConsts.ImportanceBoostIntensityDelta > 0 ) 
+    if( g_controlInfo.LastFrameTemporalFeedbackAvailable && g_cacheConsts.ImportanceBoostIntensityDelta > 0 ) 
     {
         uint lightIndexHistoric = u_historyRemapCurrentToPast[lightIndex];
-        float historicWeight = (lightIndexHistoric != CAUSTICA_INVALID_LIGHT_INDEX)?(u_lightWeights[g_bakerConsts.HistoricWeightsBufferOffset + lightIndexHistoric]):(0);
+        float historicWeight = (lightIndexHistoric != CAUSTICA_INVALID_LIGHT_INDEX)?(u_lightWeights[g_cacheConsts.HistoricWeightsBufferOffset + lightIndexHistoric]):(0);
         
         float delta = boostedWeight - historicWeight*1.1; // current threshold is 1.1 - avoids lights that gradually increase in intensity grabbing too much attention 
         if (delta>0)
         {
-            boostedWeight += g_bakerConsts.ImportanceBoostIntensityDelta * delta;
+            boostedWeight += g_cacheConsts.ImportanceBoostIntensityDelta * delta;
         }
     }
 
@@ -157,11 +157,11 @@ float ImportanceBooster( const PolymorphicLightInfoFull packedLightInfo, const u
 float4 EnvironmentComputeRadianceAndWeight( uint dim, uint x, uint y )
 {
     int dimLog2 = firstbithigh(dim); //(uint)log2( (float)dim );
-    uint mipLevel = g_bakerConsts.EnvMapImportanceMapMIPCount - dimLog2 - 1;
+    uint mipLevel = g_cacheConsts.EnvMapImportanceMapMIPCount - dimLog2 - 1;
     float areaMul = 1u << (mipLevel*2); //pow(4.0,mipLevel);
     float4 value = t_envRadianceAndImportanceMap.Load( int3( x, y, mipLevel ) ).rgba;
-    float weight = areaMul * max( 0, value.a * Average(g_bakerConsts.EnvMapParams.ColorMultiplier) * g_bakerConsts.DistantVsLocalRelativeImportance );
-    return float4( value.rgb * g_bakerConsts.EnvMapParams.ColorMultiplier, weight );
+    float weight = areaMul * max( 0, value.a * Average(g_cacheConsts.EnvMapParams.ColorMultiplier) * g_cacheConsts.DistantVsLocalRelativeImportance );
+    return float4( value.rgb * g_cacheConsts.EnvMapParams.ColorMultiplier, weight );
 };
 //
 #define PACK_20F_12UI(_value, _index)   ((min(uint(FastSqrt(_value)*100+0.5), 0x000FFFFF) << 12) | uint(_index))   // 20 bits for value, 12 bits for index (not overflow clamped)
@@ -171,7 +171,7 @@ float4 EnvironmentComputeRadianceAndWeight( uint dim, uint x, uint y )
 uint EnvironmentComputeWeightForQTBuild( uint dim, uint x, uint y, uint lightIndex, uint depthLimit )
 {
     int dimLog2 = firstbithigh(dim);//(uint)log2( (float)dim );
-    uint mipLevel = g_bakerConsts.EnvMapImportanceMapMIPCount - dimLog2 - 1;
+    uint mipLevel = g_cacheConsts.EnvMapImportanceMapMIPCount - dimLog2 - 1;
     float areaMul = 1u << (mipLevel*2); //pow(4.0,mipLevel);
     float radiance = t_envRadianceAndImportanceMap.Load( int3( x, y, mipLevel ) ).w;
     // if (depthLimit!=0)  // tweak subdivision for base layer only
@@ -189,12 +189,12 @@ uint EnvironmentComputeWeightForQTBuild( uint dim, uint x, uint y, uint lightInd
 //
 float3 EnvironmentQuadLight::ToWorld(float3 localDir)  // Transform direction from local to world space.
 {
-    return mul(localDir, (float3x3)g_bakerConsts.EnvMapParams.Transform);
+    return mul(localDir, (float3x3)g_cacheConsts.EnvMapParams.Transform);
 }
 //
 float3 EnvironmentQuadLight::ToLocal(float3 worldDir)  // Transform direction from world to local space.
 {
-    return mul(worldDir, (float3x3)g_bakerConsts.EnvMapParams.InvTransform);
+    return mul(worldDir, (float3x3)g_cacheConsts.EnvMapParams.InvTransform);
 }
 //
 uint EQTNodePack( uint dim, uint x, uint y )
@@ -444,7 +444,7 @@ void EnvLightsSubdivideBoost( uint groupThreadID : SV_GroupThreadId, uint groupI
             uint historicIndex = CAUSTICA_INVALID_LIGHT_INDEX;
             if( u_controlBuffer[0].LastFrameTemporalFeedbackAvailable )
             {
-                uint dimScale = g_bakerConsts.EnvMapImportanceMapResolution / envLight.NodeDim;
+                uint dimScale = g_cacheConsts.EnvMapImportanceMapResolution / envLight.NodeDim;
                 uint cx = envLight.NodeX * dimScale;
                 uint cy = envLight.NodeY * dimScale;
                 historicIndex = u_envLightLookupMap[ uint2(cx, cy) ];   //< Note: at this stage this is still old envLightLookupMap
@@ -472,7 +472,7 @@ void EnvLightsFillLookupMap( uint lightIndex : SV_GroupID, uint2 threadID : SV_G
         DebugPrint("envLight index {0}: ", lightIndex, light.NodeDim, light.NodeX, light.NodeY );
 #endif
 
-    uint dimScale = g_bakerConsts.EnvMapImportanceMapResolution / light.NodeDim; //assert( dimScale >= 1 );
+    uint dimScale = g_cacheConsts.EnvMapImportanceMapResolution / light.NodeDim; //assert( dimScale >= 1 );
     for( uint x = 0; (x+threadID.x) < dimScale; x += FILL_THREAD_COUNT )
         for( uint y = 0; (y+threadID.y) < dimScale; y += FILL_THREAD_COUNT )
         {
@@ -513,7 +513,7 @@ void EnvLightsMapPastToCurrent( uint historicIndex : SV_DispatchThreadID )
     {
         uint nodeDim, nodeX, nodeY;
         EQTNodeUnpack(u_scratchList[historicIndex], nodeDim, nodeX, nodeY);  // Note: these are the old nodes backed up in the first pass; u_scratchList no longer used after this!
-        uint dimScale = g_bakerConsts.EnvMapImportanceMapResolution / nodeDim;
+        uint dimScale = g_cacheConsts.EnvMapImportanceMapResolution / nodeDim;
         uint cx = nodeX * dimScale;
         uint cy = nodeY * dimScale;
         presentIndex = u_envLightLookupMap[ uint2(cx, cy) ];   //< Note: at this stage this is the current envLightLookupMap!
@@ -534,7 +534,7 @@ void EnvLightsMapPastToCurrent( uint historicIndex : SV_DispatchThreadID )
 [numthreads(8*LLB_MAX_TRIANGLES_PER_TASK, 1, 1)]
 void BakeEmissiveTriangles( uint dispatchThreadID : SV_DispatchThreadID, uint groupThreadID : SV_GroupThreadID ) // note, this is adding triangle lights only - analytic lights have been added on the CPU side already
 {
-    if( dispatchThreadID.x/LLB_MAX_TRIANGLES_PER_TASK >= g_bakerConsts.TriangleLightTaskCount )
+    if( dispatchThreadID.x/LLB_MAX_TRIANGLES_PER_TASK >= g_cacheConsts.TriangleLightTaskCount )
         return;
 
     EmissiveTrianglesProcTask task = u_scratchBuffer.Load<EmissiveTrianglesProcTask>((dispatchThreadID.x/LLB_MAX_TRIANGLES_PER_TASK) * sizeof(EmissiveTrianglesProcTask));
@@ -756,7 +756,7 @@ float3 ConvertMotionVectorToPixelSpace( int2 pixelPosition, float3 motionVector)
 {
     float2 currentPixelCenter = float2(pixelPosition.xy) + 0.5;
     float2 previousPosition = currentPixelCenter + motionVector.xy;
-    previousPosition *= g_bakerConsts.PrevOverCurrentViewportSize;
+    previousPosition *= g_cacheConsts.PrevOverCurrentViewportSize;
     motionVector.xy = previousPosition - currentPixelCenter;
     return motionVector;
 }
@@ -766,7 +766,7 @@ void ClearFeedbackHistory( uint2 dispatchThreadID : SV_DispatchThreadID )
 {
     uint2 pixelPos = dispatchThreadID;
 
-    if( pixelPos.x >= g_bakerConsts.FeedbackResolution.x || pixelPos.y >= g_bakerConsts.FeedbackResolution.y )
+    if( pixelPos.x >= g_cacheConsts.FeedbackResolution.x || pixelPos.y >= g_cacheConsts.FeedbackResolution.y )
         return;
 
     u_historyDepth[pixelPos] = t_depthBuffer[pixelPos];
@@ -776,18 +776,18 @@ void ClearFeedbackHistory( uint2 dispatchThreadID : SV_DispatchThreadID )
 #if 1 // retain some of past reservoir info
     if( g_controlInfo.LastFrameTemporalFeedbackAvailable )
     {
-        const float dropOffFactor = g_bakerConsts.ReservoirHistoryDropoff;
+        const float dropOffFactor = g_cacheConsts.ReservoirHistoryDropoff;
         reservoir.CloneFrom( LightFeedbackReservoir::make(pixelPos, u_feedbackTotalWeightScratch, u_feedbackCandidatesScratch), dropOffFactor);
 #if 1 // allow for neighbours to contribute as well
         static const uint c_directNeighbourCount = 4;
         static const int2 c_directNeighbourOffsets[c_directNeighbourCount] = { int2(-1, 0), int2(+1, 0), int2( 0,-1), int2( 0,+1), //int2(-1,-1), int2(+1,-1), int2(-1,+1), int2(+1,+1) 
                                                                             };
 
-        MicroRng sampleGenerator = MicroRng::make( dispatchThreadID.xy, g_bakerConsts.UpdateCounter, 6 );
+        MicroRng sampleGenerator = MicroRng::make( dispatchThreadID.xy, g_cacheConsts.UpdateCounter, 6 );
 
         for( int i = 0; i < c_directNeighbourCount; i++ )
         {
-            int2 srcCoord = clamp( int2(pixelPos)+c_directNeighbourOffsets[i], int2(0,0), int2(g_bakerConsts.FeedbackResolution) - 1.xx );
+            int2 srcCoord = clamp( int2(pixelPos)+c_directNeighbourOffsets[i], int2(0,0), int2(g_cacheConsts.FeedbackResolution) - 1.xx );
             LightFeedbackReservoir reservoirSrc = LightFeedbackReservoir::make(srcCoord, u_feedbackTotalWeightScratch, u_feedbackCandidatesScratch);
             
             if (!reservoirSrc.IsEmpty())
@@ -805,7 +805,7 @@ void ClearFeedbackHistory( uint2 dispatchThreadID : SV_DispatchThreadID )
     reservoir.CommitToStorage();
 
 #if NEEAT_ENABLE_DEBUG_DRAW
-    if( g_bakerConsts.DebugDrawType == (int)LightingDebugViewType::FeedbackAfterClear )
+    if( g_cacheConsts.DebugDrawType == (int)LightingDebugViewType::FeedbackAfterClear )
     {
         LightFeedbackReservoir reservoir = LightFeedbackReservoir::make(pixelPos.xy, u_feedbackTotalWeight, u_feedbackCandidates);
 
@@ -847,7 +847,7 @@ void ComputeWeights( uint dispatchThreadID : SV_DispatchThreadID, uint groupThre
 
         float weight = ComputeWeight(packedLightInfo);
         weight = ImportanceBooster( packedLightInfo, lightIndex, weight );
-        u_lightWeights[ g_bakerConsts.CurrentWeightsBufferOffset + lightIndex ] = weight;
+        u_lightWeights[ g_cacheConsts.CurrentWeightsBufferOffset + lightIndex ] = weight;
         blockWeightSum += weight;
     }
     
@@ -875,7 +875,7 @@ void ComputeProxyCounts( uint dispatchThreadID : SV_DispatchThreadID, uint group
     {
         float testSum = 0;
         for( int lightIndex = 0; lightIndex < g_controlInfo.TotalLightCount; lightIndex ++ )
-            testSum += u_lightWeights[ g_bakerConsts.CurrentWeightsBufferOffset + lightIndex ];
+            testSum += u_lightWeights[ g_cacheConsts.CurrentWeightsBufferOffset + lightIndex ];
 
         if( !RelativelyEqual( g_controlInfo.WeightsSum(), testSum, 1e-4f ) )
             DebugPrint( "Compute weight sum {0}, test: {1}", g_controlInfo.WeightsSum(), testSum );
@@ -903,7 +903,7 @@ void ComputeProxyCounts( uint dispatchThreadID : SV_DispatchThreadID, uint group
     }
 
     // combine computed light weights with historical usage-based feedback weight
-    float lightWeight = u_lightWeights[ g_bakerConsts.CurrentWeightsBufferOffset + lightIndex ];
+    float lightWeight = u_lightWeights[ g_cacheConsts.CurrentWeightsBufferOffset + lightIndex ];
     if (g_controlInfo.LastFrameTemporalFeedbackAvailable) // avoid any NaNs or similar from bad history if not available and buffer not cleared
         lightWeight = lerp( lightWeight, feedbackWeight, g_controlInfo.GlobalFeedbackUseWeight );
 
@@ -1090,7 +1090,7 @@ struct LocalReservoir
     //static LocalReservoir make(uint index, float weight, bool isScreenSpaceCoherent) { LocalReservoir ret; ret.Index = index; ret.Weight = weight; ret.IsScreenSpaceCoherent = isScreenSpaceCoherent; return ret; }
     void    LoadWithBoundsCheck(int2 pos)
     {
-        LightFeedbackReservoir res = LightFeedbackReservoir::make( uint2( clamp(pos, int2(0,0), int2(g_bakerConsts.FeedbackResolution.xy)-1.xx) ), u_feedbackTotalWeight, u_feedbackCandidates);
+        LightFeedbackReservoir res = LightFeedbackReservoir::make( uint2( clamp(pos, int2(0,0), int2(g_cacheConsts.FeedbackResolution.xy)-1.xx) ), u_feedbackTotalWeight, u_feedbackCandidates);
         IndexRaw = res.GetCandidateRaw();
         TotalWeight = res.GetTotalWeight();
         if (IndexRaw == CAUSTICA_INVALID_LIGHT_INDEX)
@@ -1153,7 +1153,7 @@ void ProcessFeedbackHistoryPreFilter(uint3 groupId : SV_GroupID, uint3 localId :
                 kernelCount++;
             }
 
-        MicroRng sampleGenerator = MicroRng::make(texCoord, g_bakerConsts.UpdateCounter, 7);
+        MicroRng sampleGenerator = MicroRng::make(texCoord, g_cacheConsts.UpdateCounter, 7);
         float rnd = sampleGenerator.NextFloat();
         int pick = 8;
         for( int i = 0; i < 8; i++ )
@@ -1181,13 +1181,13 @@ void ProcessFeedbackHistoryP0( uint2 dispatchThreadID : SV_DispatchThreadID )
     float lightIndexAllWeight = 0.0;
     uint lightIndexWSC = CAUSTICA_INVALID_LIGHT_INDEX; // world space coherent
 
-    if( pixelPos.x < g_bakerConsts.FeedbackResolution.x && pixelPos.y < g_bakerConsts.FeedbackResolution.y )
+    if( pixelPos.x < g_cacheConsts.FeedbackResolution.x && pixelPos.y < g_cacheConsts.FeedbackResolution.y )
     {
         LightFeedbackReservoir historicReservoir = LightFeedbackReservoir::make(pixelPos, u_feedbackTotalWeight, u_feedbackCandidates);
 
-        MicroRng sampleGenerator = MicroRng::make(pixelPos, g_bakerConsts.UpdateCounter, 1);
+        MicroRng sampleGenerator = MicroRng::make(pixelPos, g_cacheConsts.UpdateCounter, 1);
 
-        // MicroRng rng = MicroRng::make( pixelPos, g_bakerConsts.UpdateCounter, 2 );
+        // MicroRng rng = MicroRng::make( pixelPos, g_cacheConsts.UpdateCounter, 2 );
         // if( pixelPos.x == 0 )
         //     for( int x = 0; x < 2000; x++ )
         //         //DebugPixel( uint2(x, pixelPos.y), float4( ColorFromHash( sampleGenerator.Next() ), 1 ) );
@@ -1205,7 +1205,7 @@ void ProcessFeedbackHistoryP0( uint2 dispatchThreadID : SV_DispatchThreadID )
             candidateIndex = RemapPastToCurrent(candidateIndex);
 
 #if NEEAT_ENABLE_DEBUG_DRAW
-            if (g_bakerConsts.DebugDrawType == (int)LightingDebugViewType::NoHistoryFeedback)
+            if (g_cacheConsts.DebugDrawType == (int)LightingDebugViewType::NoHistoryFeedback)
                 DebugPixel(pixelPos.xy, float4(candidateIndex == CAUSTICA_INVALID_LIGHT_INDEX, candidateIndex != CAUSTICA_INVALID_LIGHT_INDEX, 0, 1));
 #endif            
 
@@ -1243,11 +1243,11 @@ void ProcessFeedbackHistoryP0( uint2 dispatchThreadID : SV_DispatchThreadID )
 
 #if NEEAT_ENABLE_DEBUG_DRAW
         float alpha = 1.0;
-        if( g_bakerConsts.DebugDrawType == (int)LightingDebugViewType::MissingFeedbackSSC )
+        if( g_cacheConsts.DebugDrawType == (int)LightingDebugViewType::MissingFeedbackSSC )
             DebugPixel( pixelPos.xy, float4( 1 - hasSSC, hasSSC*0.3, 0, alpha) );
-        if( g_bakerConsts.DebugDrawType == (int)LightingDebugViewType::MissingFeedbackWSC )
+        if( g_cacheConsts.DebugDrawType == (int)LightingDebugViewType::MissingFeedbackWSC )
             DebugPixel( pixelPos.xy, float4( 1 - hasWSC, hasWSC*0.3, 0, alpha) );
-        if( g_bakerConsts.DebugDrawType == (int)LightingDebugViewType::FeedbackRawSSC )
+        if( g_cacheConsts.DebugDrawType == (int)LightingDebugViewType::FeedbackRawSSC )
         {
             #if 0
             uint a = historicReservoir.GetCandidateRaw(0);
@@ -1264,7 +1264,7 @@ void ProcessFeedbackHistoryP0( uint2 dispatchThreadID : SV_DispatchThreadID )
             DebugPixel( pixelPos.xy, float4( ColorFromHash(Hash32(dbgLightIndexSSC)), alpha) );
             #endif
         }
-        if( g_bakerConsts.DebugDrawType == (int)LightingDebugViewType::FeedbackRawWSC )
+        if( g_cacheConsts.DebugDrawType == (int)LightingDebugViewType::FeedbackRawWSC )
             DebugPixel( pixelPos.xy, float4( ColorFromHash(Hash32(dbgLightIndexWSC)), alpha) );
 #endif
     }
@@ -1344,17 +1344,17 @@ bool Reproject( int2 pixelPos, out int2 historicPixelPos )
 {
     float3 screenSpaceMotion = ConvertMotionVectorToPixelSpace( pixelPos, t_motionVectors[pixelPos] );
 
-    if( g_bakerConsts.EnableMotionReprojection )
+    if( g_cacheConsts.EnableMotionReprojection )
     {
         historicPixelPos = int2( float2(pixelPos) + screenSpaceMotion.xy + 0.5.xx /*+ (sampleGenerator.NextFloat2()-0.5.xx) * 0.5*/ );
         bool disocclusion = false;
-        if (!(all(historicPixelPos >= 0.xx) && all(historicPixelPos < g_bakerConsts.FeedbackResolution.xy)) )
+        if (!(all(historicPixelPos >= 0.xx) && all(historicPixelPos < g_cacheConsts.FeedbackResolution.xy)) )
             disocclusion = true;
         else
         {
             float historicDepth = u_historyDepth[historicPixelPos];
             float currentDepth = t_depthBuffer[pixelPos];
-            disocclusion |= max( historicDepth / currentDepth, currentDepth / historicDepth ) > g_bakerConsts.DepthDisocclusionThreshold;
+            disocclusion |= max( historicDepth / currentDepth, currentDepth / historicDepth ) > g_cacheConsts.DepthDisocclusionThreshold;
         }
         if (disocclusion)
             historicPixelPos = pixelPos;
@@ -1371,10 +1371,10 @@ void ProcessFeedbackHistoryP1a( uint2 dispatchThreadID : SV_DispatchThreadID )
 {
     int2 pixelPosLR = dispatchThreadID;
 
-    if( dispatchThreadID.x >= g_bakerConsts.FeedbackResolution.x || dispatchThreadID.y >= g_bakerConsts.FeedbackResolution.y )
+    if( dispatchThreadID.x >= g_cacheConsts.FeedbackResolution.x || dispatchThreadID.y >= g_cacheConsts.FeedbackResolution.y )
         return;
 
-    MicroRng sampleGenerator = MicroRng::make(pixelPosLR, g_bakerConsts.UpdateCounter, 3);
+    MicroRng sampleGenerator = MicroRng::make(pixelPosLR, g_cacheConsts.UpdateCounter, 3);
 
     LightFeedbackReservoir reservoirBlended = LightFeedbackReservoir::make(pixelPosLR, u_feedbackTotalWeightBlended, u_feedbackCandidatesBlended);
     reservoirBlended.Clear();
@@ -1386,11 +1386,11 @@ void ProcessFeedbackHistoryP1a( uint2 dispatchThreadID : SV_DispatchThreadID )
             for( int y = -expandMargin; y < CAUSTICA_NEEAT_EARLY_FEEDBACK_TILE_SIZE+expandMargin; y++ )
             {
                 int2 pixelPos = pixelPosLR * CAUSTICA_NEEAT_EARLY_FEEDBACK_TILE_SIZE + int2(x, y);
-                pixelPos = clamp( int2(pixelPos), int2(0,0), int2(g_bakerConsts.FeedbackResolution) - 1.xx );
+                pixelPos = clamp( int2(pixelPos), int2(0,0), int2(g_cacheConsts.FeedbackResolution) - 1.xx );
 
                 float baseWeight = 1.0;
                 if (x<0 || y<0 || x>=CAUSTICA_NEEAT_EARLY_FEEDBACK_TILE_SIZE || y >= CAUSTICA_NEEAT_EARLY_FEEDBACK_TILE_SIZE)
-                    baseWeight = g_bakerConsts.ReservoirHistoryDropoff;
+                    baseWeight = g_cacheConsts.ReservoirHistoryDropoff;
             
                 int2 prevPixelPos;
                 if (Reproject( pixelPos, prevPixelPos ))
@@ -1404,7 +1404,7 @@ void ProcessFeedbackHistoryP1a( uint2 dispatchThreadID : SV_DispatchThreadID )
     }
 
 #if NEEAT_ENABLE_DEBUG_DRAW
-    if( g_bakerConsts.DebugDrawType == (int)LightingDebugViewType::LowResBlendedFeedback )
+    if( g_cacheConsts.DebugDrawType == (int)LightingDebugViewType::LowResBlendedFeedback )
     {
         uint dbgLightIndex; bool isScreenSpaceCoherent;
         for( int x = 0; x < CAUSTICA_NEEAT_EARLY_FEEDBACK_TILE_SIZE; x++ )
@@ -1447,17 +1447,17 @@ void ProcessFeedbackHistoryP1b( uint2 dispatchThreadID : SV_DispatchThreadID )
 {
     int2 pixelPos = dispatchThreadID;
 
-    if( dispatchThreadID.x >= g_bakerConsts.FeedbackResolution.x || dispatchThreadID.y >= g_bakerConsts.FeedbackResolution.y )
+    if( dispatchThreadID.x >= g_cacheConsts.FeedbackResolution.x || dispatchThreadID.y >= g_cacheConsts.FeedbackResolution.y )
         return;
  
-    MicroRng sampleGenerator = MicroRng::make(pixelPos, g_bakerConsts.UpdateCounter, 4);
+    MicroRng sampleGenerator = MicroRng::make(pixelPos, g_cacheConsts.UpdateCounter, 4);
 
     {
         int2 prevPixelPos;
         bool reprojectionValid = Reproject( pixelPos, prevPixelPos );
 
 #if NEEAT_ENABLE_DEBUG_DRAW
-        if (g_bakerConsts.DebugDrawType == (int)LightingDebugViewType::Disocclusion )
+        if (g_cacheConsts.DebugDrawType == (int)LightingDebugViewType::Disocclusion )
             DebugPixel( pixelPos, float4(1-reprojectionValid, reprojectionValid, 0, 1.0 + reprojectionValid*0.5) );
 #endif
         
@@ -1478,7 +1478,7 @@ void ProcessFeedbackHistoryP1b( uint2 dispatchThreadID : SV_DispatchThreadID )
         }
 
         // part 1a: this relies on blended feedback to allow for some sharing between neighbours but blended feedback can also be used to pre-warm the cache so it's useful either way
-        static const float neighbourWeight = g_bakerConsts.ReservoirHistoryDropoff;
+        static const float neighbourWeight = g_cacheConsts.ReservoirHistoryDropoff;
         int2 srcCoordLR = pixelPos / CAUSTICA_NEEAT_EARLY_FEEDBACK_TILE_SIZE.xx;
         LightFeedbackReservoir reservoirSrc = LightFeedbackReservoir::make(srcCoordLR, u_feedbackTotalWeightBlended, u_feedbackCandidatesBlended);
         if (!reservoirSrc.IsEmpty())
@@ -1526,13 +1526,13 @@ void FillTile( uint2 tilePos )
 
     uint currentlyCollectedCount = 0;
 
-    bool debugTile = all( g_bakerConsts.MouseCursorPos >= cellTopLeft ) && all((g_bakerConsts.MouseCursorPos-cellTopLeft) < CAUSTICA_LIGHTING_SAMPLING_BUFFER_TILE_SIZE.xx );
+    bool debugTile = all( g_cacheConsts.MouseCursorPos >= cellTopLeft ) && all((g_cacheConsts.MouseCursorPos-cellTopLeft) < CAUSTICA_LIGHTING_SAMPLING_BUFFER_TILE_SIZE.xx );
 
     for ( int x = 0; x < CAUSTICA_LIGHTING_SAMPLING_BUFFER_WINDOW_SIZE; x++ )
         for ( int y = 0; y < CAUSTICA_LIGHTING_SAMPLING_BUFFER_WINDOW_SIZE; y++ )
         {
             int2 pixelPos = windowTopLeft + int2(x,y);
-            int2 srcCoord = MirrorCoord(pixelPos, g_bakerConsts.FeedbackResolution);
+            int2 srcCoord = MirrorCoord(pixelPos, g_cacheConsts.FeedbackResolution);
 
             LightFeedbackReservoir reservoir = LightFeedbackReservoir::make(srcCoord, u_feedbackTotalWeightScratch, u_feedbackCandidatesScratch);
 
@@ -1549,7 +1549,7 @@ void FillTile( uint2 tilePos )
             u_localSamplingBuffer[ LSB_Address(tilePos, currentlyCollectedCount++) ] = PackMiniListLightAndCount( lightIndex, 1 );
         }
 
-    MicroRng sampleGenerator = MicroRng::make(tilePos, g_bakerConsts.UpdateCounter, 5);
+    MicroRng sampleGenerator = MicroRng::make(tilePos, g_cacheConsts.UpdateCounter, 5);
 
     const float2 cellCenter = float2(cellTopLeft+CAUSTICA_LIGHTING_SAMPLING_BUFFER_TILE_SIZE*0.5);
     const float radius = CAUSTICA_LIGHTING_SAMPLING_BUFFER_WINDOW_SIZE * 4.0f;
@@ -1558,7 +1558,7 @@ void FillTile( uint2 tilePos )
         float2 offset = (sampleGenerator.NextFloat2() - 0.5) * radius;
 
         int2 pixelPos = int2(cellCenter + offset + 0.5.xx);
-        int2 srcCoord = MirrorCoord(pixelPos, g_bakerConsts.FeedbackResolution);
+        int2 srcCoord = MirrorCoord(pixelPos, g_cacheConsts.FeedbackResolution);
 
 #if 0 // use actual samples
         LightFeedbackReservoir reservoir = LightFeedbackReservoir::make(srcCoord, u_feedbackTotalWeightScratch, u_feedbackCandidatesScratch);
@@ -1608,7 +1608,7 @@ void ProcessFeedbackHistoryP3a( uint3 dispatchThreadID : SV_DispatchThreadID, ui
         return;
 
     int2 cellTopLeft   = tilePos.xy * CAUSTICA_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - (int2)g_controlInfo.LocalSamplingTileJitter;
-    bool debugTile = all( g_bakerConsts.MouseCursorPos >= cellTopLeft ) && all((g_bakerConsts.MouseCursorPos-cellTopLeft) < CAUSTICA_LIGHTING_SAMPLING_BUFFER_TILE_SIZE.xx );
+    bool debugTile = all( g_cacheConsts.MouseCursorPos >= cellTopLeft ) && all((g_cacheConsts.MouseCursorPos-cellTopLeft) < CAUSTICA_LIGHTING_SAMPLING_BUFFER_TILE_SIZE.xx );
     debugTile = false;
 
 #if 0
@@ -1869,14 +1869,14 @@ void ProcessFeedbackHistoryDebugViz( uint3 dispatchThreadID : SV_DispatchThreadI
     if ( any(tilePos >= g_controlInfo.LocalSamplingResolution) )
         return;
 
-    if ( g_bakerConsts.DebugDrawFrustum && all(dispatchThreadID.xy==uint2(0,0)) )
+    if ( g_cacheConsts.DebugDrawFrustum && all(dispatchThreadID.xy==uint2(0,0)) )
     {
         for ( int i = 0; i < 4; i++ )
         { 
-            DebugLine( g_bakerConsts.FrustumCorners[i].xyz, g_bakerConsts.FrustumCorners[(i+1)%4].xyz, float4(1, 0, 0, 1) );
-            DebugLine( g_bakerConsts.FrustumCorners[i].xyz, g_bakerConsts.FrustumCorners[i+4].xyz, float4(1, 0, 0, 1) );
-            DebugLine( g_bakerConsts.FrustumCorners[i+4].xyz, g_bakerConsts.FrustumCorners[(i+1)%4+4].xyz, float4(1, 0, 0, 1) );
-            //DebugPrint( "Corner {0}, pos: {1}", i, g_bakerConsts.FrustumCorners[i] );
+            DebugLine( g_cacheConsts.FrustumCorners[i].xyz, g_cacheConsts.FrustumCorners[(i+1)%4].xyz, float4(1, 0, 0, 1) );
+            DebugLine( g_cacheConsts.FrustumCorners[i].xyz, g_cacheConsts.FrustumCorners[i+4].xyz, float4(1, 0, 0, 1) );
+            DebugLine( g_cacheConsts.FrustumCorners[i+4].xyz, g_cacheConsts.FrustumCorners[(i+1)%4+4].xyz, float4(1, 0, 0, 1) );
+            //DebugPrint( "Corner {0}, pos: {1}", i, g_cacheConsts.FrustumCorners[i] );
         }
     }
 
@@ -1884,8 +1884,8 @@ void ProcessFeedbackHistoryDebugViz( uint3 dispatchThreadID : SV_DispatchThreadI
     int2 cellTopLeft   = tilePos.xy * CAUSTICA_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - (int2)g_controlInfo.LocalSamplingTileJitter;
     int2 windowTopLeft  = (int2)cellTopLeft - margin;
 
-    bool debugTile = all( g_bakerConsts.MouseCursorPos >= cellTopLeft ) && all((g_bakerConsts.MouseCursorPos-cellTopLeft) < CAUSTICA_LIGHTING_SAMPLING_BUFFER_TILE_SIZE.xx );
-    if( debugTile && g_bakerConsts.DebugDrawTileLights )
+    bool debugTile = all( g_cacheConsts.MouseCursorPos >= cellTopLeft ) && all((g_cacheConsts.MouseCursorPos-cellTopLeft) < CAUSTICA_LIGHTING_SAMPLING_BUFFER_TILE_SIZE.xx );
+    if( debugTile && g_cacheConsts.DebugDrawTileLights )
     {
         const float maxCount = CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT;
         for( int i = 0; i < CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT; i++ )
@@ -1914,7 +1914,7 @@ void ProcessFeedbackHistoryDebugViz( uint3 dispatchThreadID : SV_DispatchThreadI
     }
 
     float3 heatmapCol = float3(1,0,0);
-    if (g_bakerConsts.DebugDrawType == (int)LightingDebugViewType::TileHeatmap )
+    if (g_cacheConsts.DebugDrawType == (int)LightingDebugViewType::TileHeatmap )
     {
         SortedLightList<CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT> localList = SortedLightList<CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT>::empty();
         for( uint i = 0; i < CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT; i++ )
@@ -1924,13 +1924,13 @@ void ProcessFeedbackHistoryDebugViz( uint3 dispatchThreadID : SV_DispatchThreadI
         heatmapCol = GradientHeatMap( (float(numberOfDifferentLights) / float(CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT))*1.2f );
     }
 
-    if (g_bakerConsts.DebugDrawTileLights || g_bakerConsts.DebugDrawType == (int)LightingDebugViewType::TileHeatmap)
+    if (g_cacheConsts.DebugDrawTileLights || g_cacheConsts.DebugDrawType == (int)LightingDebugViewType::TileHeatmap)
     {
         for( int x = 0; x < CAUSTICA_LIGHTING_SAMPLING_BUFFER_WINDOW_SIZE; x++ )
             for( int y = 0; y < CAUSTICA_LIGHTING_SAMPLING_BUFFER_WINDOW_SIZE; y++ )
             {
                 int2 pixelPos = windowTopLeft + int2(x,y);
-                if( any(pixelPos<int2(0,0)) || any(pixelPos>=int2(g_bakerConsts.FeedbackResolution.x,g_bakerConsts.FeedbackResolution.y)) )
+                if( any(pixelPos<int2(0,0)) || any(pixelPos>=int2(g_cacheConsts.FeedbackResolution.x,g_cacheConsts.FeedbackResolution.y)) )
                     continue;
                 bool insideCell = all( pixelPos >= cellTopLeft ) && all( (pixelPos - cellTopLeft) < CAUSTICA_LIGHTING_SAMPLING_BUFFER_TILE_SIZE.xx );
                 if( debugTile )
@@ -1938,7 +1938,7 @@ void ProcessFeedbackHistoryDebugViz( uint3 dispatchThreadID : SV_DispatchThreadI
                 if( !debugTile && (x == margin || y == margin) )
                     DebugPixel( pixelPos, float4( 0, 0, 1, 0.15 ) );
 
-                if (g_bakerConsts.DebugDrawType == (int)LightingDebugViewType::TileHeatmap )
+                if (g_cacheConsts.DebugDrawType == (int)LightingDebugViewType::TileHeatmap )
                     DebugPixel( pixelPos, float4(heatmapCol, 0.95) );
             }
 
@@ -1947,7 +1947,7 @@ void ProcessFeedbackHistoryDebugViz( uint3 dispatchThreadID : SV_DispatchThreadI
             for( int y = 0; y < CAUSTICA_LIGHTING_LR_SAMPLING_BUFFER_WINDOW_SIZE; y++ )
             {
                 int2 lrPixelPos = lrWindowTopLeft + int2(x,y);
-                int2 lrSrcCoord = MirrorCoord(lrPixelPos, g_bakerConsts.LRFeedbackResolution);
+                int2 lrSrcCoord = MirrorCoord(lrPixelPos, g_cacheConsts.LRFeedbackResolution);
 
                 if( debugTile && (x == 0 || y == 0) )
                     DebugPixel( lrSrcCoord*CAUSTICA_LIGHTING_LR_SAMPLING_BUFFER_SCALE, float4( 0, 1, 1, 1.0 ) );
@@ -1958,7 +1958,7 @@ void ProcessFeedbackHistoryDebugViz( uint3 dispatchThreadID : SV_DispatchThreadI
     }
 
 
-    if (g_bakerConsts.DebugDrawType == (int)LightingDebugViewType::ValidateCorrectness)
+    if (g_cacheConsts.DebugDrawType == (int)LightingDebugViewType::ValidateCorrectness)
     {
         uint dataToValidate[CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT];
         for( int i = 0 ; i < CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT; i++ )

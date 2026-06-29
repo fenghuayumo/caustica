@@ -18,7 +18,7 @@
 class RenderTargets;
 class PrepareLightsPass;
 class GenerateMipsPass;
-class EnvMapBaker;
+class EnvMapProcessor;
 struct ReGirIndirectConstants;
 class ShaderDebug;
 
@@ -110,11 +110,11 @@ public:
     void PrepareResources(
         nvrhi::CommandListHandle commandList,
         const RenderTargets& renderTargets,
-        std::shared_ptr<EnvMapBaker> envMap,
+        std::shared_ptr<EnvMapProcessor> envMap,
         EnvMapSceneParams envMapSceneParams,
         const std::shared_ptr<caustica::Scene> scene,
-        std::shared_ptr<class MaterialsBaker> materialsBaker,
-        std::shared_ptr<class OmmBaker> ommBaker,
+        std::shared_ptr<class MaterialGpuCache> materialGpuCache,
+        std::shared_ptr<class OpacityMicromapBuilder> opacityMicromapBuilder,
         nvrhi::BufferHandle subInstanceDataBuffer,
         const RtxdiBridgeParameters& bridgeParams,
         const nvrhi::BindingLayoutHandle extraBindingLayout,

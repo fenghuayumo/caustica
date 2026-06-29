@@ -1,7 +1,7 @@
 #ifndef __DENOISING_GUIDES_BAKER__
 #define __DENOISING_GUIDES_BAKER__
 
-struct DenoisingGuidesBakerConstants
+struct DenoisingGuidesPassConstants
 {
     uint2           RenderResolution;
     uint2           DisplayResolution;
@@ -38,7 +38,7 @@ RWTexture2D<float>                      u_SpecularHitT                  : regist
 RWTexture2D<float>                      u_ScratchFloat1                 : register(u8);
 //>>>>>>> remotes/origin/dev
 
-VK_PUSH_CONSTANT ConstantBuffer<DenoisingGuidesBakerConstants>  g_denoisingConstants : register(b1);
+VK_PUSH_CONSTANT ConstantBuffer<DenoisingGuidesPassConstants>  g_denoisingConstants : register(b1);
 
 float SpecHitTNeighbourhood( RWTexture2D<float> texSrc, int2 pixelPos )
 {

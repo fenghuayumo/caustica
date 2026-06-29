@@ -1,4 +1,4 @@
-#include <render/Passes/Lighting/MaterialsBaker.h>
+#include <render/Passes/Lighting/MaterialGpuCache.h>
 
 #include <assets/loader/ShaderFactory.h>
 #include <render/Core/FramebufferFactory.h>
@@ -495,7 +495,7 @@ void PTMaterial::SetTextureEnabled(PTMaterialTextureSlot slot, bool enabled)
     }
 }
 
-bool PTMaterial::EditorGUI(MaterialsBaker & baker)
+bool PTMaterial::EditorGUI(MaterialGpuCache & cache)
 {
     bool update = false;
 
@@ -749,18 +749,18 @@ bool PTMaterial::EditorGUI(MaterialsBaker & baker)
         ImGui::Checkbox("Share with all scenes", &SharedWithAllScenes);
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("if checked, material saved to /Assets/Materials/ path and \nshared between all scenes; otherwise it will be saved to \n/Assets/Materials/SceneName specific to current scene");
 
-        auto matPath = baker.GetMaterialStoragePath(*this);
+        auto matPath = cache.GetMaterialStoragePath(*this);
 
         ImGui::TextWrapped("File name: %s", matPath.string().c_str());
 
         if (ImGui::Button("Load"))
         {
-            baker.LoadSingle(*this);
+            cache.LoadSingle(*this);
             update = true;
         }
         ImGui::SameLine();
         if (ImGui::Button("Save"))
-            baker.SaveSingle(*this);
+            cache.SaveSingle(*this);
     }
 
     // mark for update
@@ -884,7 +884,7 @@ void PTMaterial::FillData(PTMaterialData & data)
     data._padding0 = data._padding1 = 42;
 }
 
-std::filesystem::path MaterialsBaker::GetMaterialStoragePath(PTMaterialBase& material)
+std::filesystem::path MaterialGpuCache::GetMaterialStoragePath(PTMaterialBase& material)
 {
     std::filesystem::path matPath = m_materialsPath;
     if (!material.SharedWithAllScenes)
@@ -896,7 +896,7 @@ std::filesystem::path MaterialsBaker::GetMaterialStoragePath(PTMaterialBase& mat
     return matPath;
 }
 
-MaterialsBaker::MaterialsBaker(const std::string & relativeShaderSourcePath, nvrhi::IDevice* device, std::shared_ptr<caustica::TextureLoader> textureCache, std::shared_ptr<caustica::ShaderFactory> shaderFactory)
+MaterialGpuCache::MaterialGpuCache(const std::string & relativeShaderSourcePath, nvrhi::IDevice* device, std::shared_ptr<caustica::TextureLoader> textureCache, std::shared_ptr<caustica::ShaderFactory> shaderFactory)
     : m_relativeShaderSourcePath(relativeShaderSourcePath)
     , m_device(device)
     , m_textureCache(textureCache)
@@ -965,7 +965,7 @@ static void UpdateEngineMaterialTexture(
     }
 }
 
-void MaterialsBaker::RecordTexture(const PTTexture& texture)
+void MaterialGpuCache::RecordTexture(const PTTexture& texture)
 {
     if (texture.Loaded == nullptr)
         return;
@@ -992,7 +992,7 @@ void MaterialsBaker::RecordTexture(const PTTexture& texture)
     }
 }
 
-bool MaterialsBaker::SetMaterialTexture(
+bool MaterialGpuCache::SetMaterialTexture(
     PTMaterial& material,
     PTMaterialTextureSlot slot,
     const std::filesystem::path& localPath,
@@ -1045,7 +1045,7 @@ bool MaterialsBaker::SetMaterialTexture(
     return true;
 }
 
-void MaterialsBaker::ClearMaterialTexture(PTMaterial& material, PTMaterialTextureSlot slot)
+void MaterialGpuCache::ClearMaterialTexture(PTMaterial& material, PTMaterialTextureSlot slot)
 {
     PTTexture& texture = material.GetTexture(slot);
     texture = PTTexture();
@@ -1056,7 +1056,7 @@ void MaterialsBaker::ClearMaterialTexture(PTMaterial& material, PTMaterialTextur
     material.GPUDataDirty = true;
 }
 
-void MaterialsBaker::InitializeUniqueDeterministicName(const std::shared_ptr<PTMaterialBase> & material)
+void MaterialGpuCache::InitializeUniqueDeterministicName(const std::shared_ptr<PTMaterialBase> & material)
 {
     std::string hashBase = material->ModelName + "_" + material->Name;
     uint evenShorterHash = ShortHash(HashMyString(hashBase));
@@ -1078,12 +1078,12 @@ void MaterialsBaker::InitializeUniqueDeterministicName(const std::shared_ptr<PTM
     material->UniqueName = uniqueName;
 }
 
-void MaterialsBaker::Clear() 
+void MaterialGpuCache::Clear() 
 {
     for (auto& material : m_materials)
     {
         if (material)
-            material->RuntimeBaker = nullptr;
+            material->RuntimeMaterialGpuCache = nullptr;
     }
 
     m_materialDataWasReset = true;
@@ -1099,7 +1099,7 @@ void MaterialsBaker::Clear()
     m_uniqueNames.clear();
 }
 
-MaterialsBaker::~MaterialsBaker()
+MaterialGpuCache::~MaterialGpuCache()
 {
     Clear();
 }
@@ -1133,7 +1133,7 @@ static bool IsBuiltinModelFileName(const std::string& modelFileName)
     return normalized.rfind(builtinPrefix, 0) == 0;
 }
 
-std::shared_ptr<PTMaterial> MaterialsBaker::ImportFromEngineMaterial(caustica::Material& material)
+std::shared_ptr<PTMaterial> MaterialGpuCache::ImportFromEngineMaterial(caustica::Material& material)
 {
     std::shared_ptr<PTMaterial> materialPT = std::make_shared<PTMaterial>();
 
@@ -1180,7 +1180,7 @@ std::shared_ptr<PTMaterial> MaterialsBaker::ImportFromEngineMaterial(caustica::M
     return materialPT;
 }
 
-std::shared_ptr<PTMaterial> MaterialsBaker::Load(const std::string & modelFileName, const std::string & name)
+std::shared_ptr<PTMaterial> MaterialGpuCache::Load(const std::string & modelFileName, const std::string & name)
 {
     std::string modelName = ModelNameFromModelFileName(modelFileName);
 
@@ -1247,12 +1247,12 @@ std::shared_ptr<PTMaterial> MaterialsBaker::Load(const std::string & modelFileNa
     return materialPT;
 }
 
-void MaterialsBaker::SceneReloaded()
+void MaterialGpuCache::SceneReloaded()
 {
     Clear();
 }
 
-void MaterialsBaker::CompleteDeferredTexturesLoad(nvrhi::ICommandList* commandList)
+void MaterialGpuCache::CompleteDeferredTexturesLoad(nvrhi::ICommandList* commandList)
 {
     if (m_deferredTextureLoadInProgress)
     {
@@ -1322,7 +1322,7 @@ MaterialShaderPermutationKey::MaterialShaderPermutationKey( const MaterialShader
     Hash = ShortHash(HashMyString(FullKey));
 }
 
-void MaterialsBaker::BakeShaderPermutations()
+void MaterialGpuCache::BakeShaderPermutations()
 {
     // first generate ubershader variant - that will likely go away in the future
     std::vector<caustica::ShaderMacro> macros;
@@ -1363,7 +1363,7 @@ void MaterialsBaker::BakeShaderPermutations()
     }
 }
 
-void MaterialsBaker::CreateRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* bindlessLayout, std::shared_ptr<caustica::CommonRenderPasses> commonPasses, const std::shared_ptr<caustica::Scene>& scene, const std::filesystem::path& sceneFilePath, const std::filesystem::path & mediaPath )
+void MaterialGpuCache::CreateRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* bindlessLayout, std::shared_ptr<caustica::CommonRenderPasses> commonPasses, const std::shared_ptr<caustica::Scene>& scene, const std::filesystem::path& sceneFilePath, const std::filesystem::path & mediaPath )
 {
     assert(!mediaPath.empty());
     //m_bindlessLayout = bindlessLayout;
@@ -1435,7 +1435,7 @@ void MaterialsBaker::CreateRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* b
                     }
                 }
                 materialEx->ptData->EngineMaterialCounterpart = materialEx.get(); // keep the link - only needed if using material animation from the engine
-                materialEx->ptData->RuntimeBaker = this;
+                materialEx->ptData->RuntimeMaterialGpuCache = this;
 
                 std::string keyName = materialEx->ptData->ModelName+"."+materialEx->ptData->Name;
                 auto existing = materialsPTUniqueNames.find(keyName);
@@ -1541,9 +1541,9 @@ void UpdateSubInstanceData(SubInstanceData & ret, const std::shared_ptr<caustica
 
 }
 
-void MaterialsBaker::Update(nvrhi::ICommandList* commandList, const std::shared_ptr<caustica::Scene>& scene, std::vector<SubInstanceData>& subInstanceData)
+void MaterialGpuCache::Update(nvrhi::ICommandList* commandList, const std::shared_ptr<caustica::Scene>& scene, std::vector<SubInstanceData>& subInstanceData)
 {
-    RAII_SCOPE( commandList->beginMarker("MaterialsBaker");, commandList->endMarker(); );
+    RAII_SCOPE( commandList->beginMarker("MaterialGpuCache");, commandList->endMarker(); );
 
     CompleteDeferredTexturesLoad(commandList);
 
@@ -1590,7 +1590,7 @@ void MaterialsBaker::Update(nvrhi::ICommandList* commandList, const std::shared_
 }
 
 /*
-void MaterialsBaker::LoadAll(std::unordered_map<std::string, std::shared_ptr<PTMaterial>>& container)
+void MaterialGpuCache::LoadAll(std::unordered_map<std::string, std::shared_ptr<PTMaterial>>& container)
 {
     std::ifstream inFile(m_sceneMaterialsFilePath);
 
@@ -1625,7 +1625,7 @@ void MaterialsBaker::LoadAll(std::unordered_map<std::string, std::shared_ptr<PTM
     }
 }*/
 
-bool MaterialsBaker::LoadSingle(PTMaterialBase & material)
+bool MaterialGpuCache::LoadSingle(PTMaterialBase & material)
 {
     std::filesystem::path inPath = GetMaterialStoragePath(material);
 
@@ -1640,7 +1640,7 @@ bool MaterialsBaker::LoadSingle(PTMaterialBase & material)
     return material.Read(rootJ, m_mediaPath, m_textureCache, m_sceneDirectory);
 }
 
-bool MaterialsBaker::SaveSingle(PTMaterialBase & material)
+bool MaterialGpuCache::SaveSingle(PTMaterialBase & material)
 {
     if (!EnsureDirectoryExists(m_materialsPath))
         return false;
@@ -1674,7 +1674,7 @@ bool MaterialsBaker::SaveSingle(PTMaterialBase & material)
     return true;
 }
 
-void MaterialsBaker::SaveAll()
+void MaterialGpuCache::SaveAll()
 {
 #if 0
     Json::Value rootJ;
@@ -1703,9 +1703,9 @@ void MaterialsBaker::SaveAll()
 #endif
 }
 
-bool MaterialsBaker::DebugGUI(float indent)
+bool MaterialGpuCache::DebugGUI(float indent)
 {
-    RAII_SCOPE(ImGui::PushID("MaterialsBakerDebugGUI"); , ImGui::PopID(); );
+    RAII_SCOPE(ImGui::PushID("MaterialGpuCacheDebugGUI"); , ImGui::PopID(); );
     
     bool resetAccumulation = false;
     #define IMAGE_QUALITY_OPTION(code) do{if (code) resetAccumulation = true;} while(false)
@@ -1809,7 +1809,7 @@ MaterialShaderPermutation PTMaterial::ComputeShaderPermutation(const std::string
     return MaterialShaderPermutation{ .ShaderFilePath = defaultShaderPath, /*.ClosestHitName = "ClosestHit", .AnyHitName = "AnyHit",*/ .Macros = macros };
 }
 
-std::shared_ptr<PTMaterial> MaterialsBaker::FindByUniqueID(const std::string & name)
+std::shared_ptr<PTMaterial> MaterialGpuCache::FindByUniqueID(const std::string & name)
 {
     for( int i = 0; i < m_materials.size(); i++)
         if (EqualsIgnoreCase(name, m_materials[i]->UniqueFullName()))

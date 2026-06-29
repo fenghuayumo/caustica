@@ -10,13 +10,13 @@
 
 #include <render/Passes/Gaussian/GaussianSplatEmissionProxy.h>
 
-#include <render/Passes/Lighting/Distant/EnvMapBaker.h>
+#include <render/Passes/Lighting/Distant/EnvMapProcessor.h>
 
-#include <render/Passes/Lighting/LightsBaker.h>
+#include <render/Passes/Lighting/LightSamplingCache.h>
 
-#include <render/Passes/Lighting/MaterialsBaker.h>
+#include <render/Passes/Lighting/MaterialGpuCache.h>
 
-#include <render/Passes/OMM/OmmBaker.h>
+#include <render/Passes/OMM/OpacityMicromapBuilder.h>
 
 #include <render/RenderRuntimeState.h>
 
@@ -46,7 +46,7 @@
 
 
 
-class ComputePipelineBaker;
+class ComputePipelineRegistry;
 
 class GaussianSplatPass;
 
@@ -132,15 +132,15 @@ struct PathTracingContext
 
 
 
-    std::shared_ptr<EnvMapBaker>& envMapBaker;
+    std::shared_ptr<EnvMapProcessor>& envMapProcessor;
 
-    std::shared_ptr<LightsBaker>& lightsBaker;
+    std::shared_ptr<LightSamplingCache>& lightSamplingCache;
 
-    std::shared_ptr<MaterialsBaker>& materialsBaker;
+    std::shared_ptr<MaterialGpuCache>& materialGpuCache;
 
-    std::shared_ptr<OmmBaker>& ommBaker;
+    std::shared_ptr<OpacityMicromapBuilder>& opacityMicromapBuilder;
 
-    std::shared_ptr<ComputePipelineBaker>& computePipelineBaker;
+    std::shared_ptr<ComputePipelineRegistry>& computePipelineRegistry;
 
 
 

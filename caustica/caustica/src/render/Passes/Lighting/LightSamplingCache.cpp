@@ -1,4 +1,4 @@
-#include <render/Passes/Lighting/LightsBaker.h>
+#include <render/Passes/Lighting/LightSamplingCache.h>
 
 #include <assets/loader/ShaderFactory.h>
 #include <render/Core/FramebufferFactory.h>
@@ -25,23 +25,23 @@
 
 #include <cmath>
 
-#include <shaders/render/Lighting/LightsBaker.hlsl>
+#include <shaders/render/Lighting/LightSamplingCache.hlsl>
 
 #include <render/Passes/Debug/ShaderDebug.h>
 
 #include <render/GPUSort/GPUSort.h>
 #include <shaders/PathTracer/Utils/NoiseAndSequences.hlsli>
 
-#include <render/Passes/Lighting/Distant/EnvMapBaker.h>
-#include <render/Passes/Lighting/Distant/EnvMapImportanceSamplingBaker.h>
+#include <render/Passes/Lighting/Distant/EnvMapProcessor.h>
+#include <render/Passes/Lighting/Distant/EnvMapImportanceSamplingCache.h>
 
-#include <render/Passes/Lighting/MaterialsBaker.h>
-#include <render/Passes/OMM/OmmBaker.h>
+#include <render/Passes/Lighting/MaterialGpuCache.h>
+#include <render/Passes/OMM/OpacityMicromapBuilder.h>
 
 using namespace caustica::math;
 using namespace caustica;
 
-LightsBaker::LightsBaker(nvrhi::IDevice* device)
+LightSamplingCache::LightSamplingCache(nvrhi::IDevice* device)
     : m_device(device)
 {
     SceneReloaded();
@@ -66,7 +66,7 @@ LightsBaker::LightsBaker(nvrhi::IDevice* device)
 #endif
 }
 
-void LightsBaker::SceneReloaded() 
+void LightSamplingCache::SceneReloaded() 
 { 
     m_NEE_AT_FeedbackBufferFilled = false;
     m_framesFromLastReadbackCopy = -1; 
@@ -83,11 +83,11 @@ void LightsBaker::SceneReloaded()
     memset(&m_currentSettings, 0, sizeof(m_currentSettings));
 }
 
-LightsBaker::~LightsBaker()
+LightSamplingCache::~LightSamplingCache()
 {
 }
 
-void LightsBaker::CreateRenderPasses(std::shared_ptr<caustica::ShaderFactory> shaderFactory, nvrhi::IBindingLayout* bindlessLayout, std::shared_ptr<caustica::CommonRenderPasses> commonPasses, std::shared_ptr<ShaderDebug> shaderDebug, const uint2 renderResolution, const uint envMapProcessedResolution)
+void LightSamplingCache::CreateRenderPasses(std::shared_ptr<caustica::ShaderFactory> shaderFactory, nvrhi::IBindingLayout* bindlessLayout, std::shared_ptr<caustica::CommonRenderPasses> commonPasses, std::shared_ptr<ShaderDebug> shaderDebug, const uint2 renderResolution, const uint envMapProcessedResolution)
 {
     m_commonPasses = commonPasses;
     m_shaderDebug = shaderDebug;
@@ -95,7 +95,7 @@ void LightsBaker::CreateRenderPasses(std::shared_ptr<caustica::ShaderFactory> sh
     std::vector<caustica::ShaderMacro> shaderMacros;
     //shaderMacros.push_back(caustica::ShaderMacro({              "BLEND_DEBUG_BUFFER", "1" }));
 
-    const char * shaderFile = "caustica/shaders/render/Lighting/LightsBaker.hlsl";
+    const char * shaderFile = "caustica/shaders/render/Lighting/LightSamplingCache.hlsl";
         
     {
         nvrhi::BindingLayoutDesc layoutDesc;
@@ -597,7 +597,7 @@ static PolymorphicLightInfoFull ConvertGaussianSplatEmissionProxy(
 // #ifdef _DEBUG
 // #pragma optimize("gt", on)
 // #endif
-bool LightsBaker::CollectEnvmapLightPlaceholders(const BakeSettings & settings, LightingControlData & ctrlBuff, std::vector<PolymorphicLightInfo> & outLightBuffer, std::vector<PolymorphicLightInfoEx> & outLightExBuffer, std::vector<uint> & outLightHistoryRemapCurrentToPastBuffer, std::vector<uint> & outLightHistoryRemapPastToCurrent)
+bool LightSamplingCache::CollectEnvmapLightPlaceholders(const UpdateSettings & settings, LightingControlData & ctrlBuff, std::vector<PolymorphicLightInfo> & outLightBuffer, std::vector<PolymorphicLightInfoEx> & outLightExBuffer, std::vector<uint> & outLightHistoryRemapCurrentToPastBuffer, std::vector<uint> & outLightHistoryRemapPastToCurrent)
 {
     ctrlBuff.EnvmapQuadNodeCount += CAUSTICA_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT;
     ctrlBuff.TotalLightCount += CAUSTICA_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT;
@@ -621,7 +621,7 @@ bool LightsBaker::CollectEnvmapLightPlaceholders(const BakeSettings & settings, 
 // #ifdef _DEBUG
 // #pragma optimize("gt", on)
 // #endif
-bool LightsBaker::CollectAnalyticLightsCPU(const BakeSettings & settings, const std::shared_ptr<caustica::Scene> & scene, LightingControlData & ctrlBuff, std::vector<PolymorphicLightInfo> & outLightBuffer, std::vector<PolymorphicLightInfoEx> & outLightExBuffer, std::vector<uint> & outLightHistoryRemapCurrentToPastBuffer, std::vector<uint> & outLightHistoryRemapPastToCurrent)
+bool LightSamplingCache::CollectAnalyticLightsCPU(const UpdateSettings & settings, const std::shared_ptr<caustica::Scene> & scene, LightingControlData & ctrlBuff, std::vector<PolymorphicLightInfo> & outLightBuffer, std::vector<PolymorphicLightInfoEx> & outLightExBuffer, std::vector<uint> & outLightHistoryRemapCurrentToPastBuffer, std::vector<uint> & outLightHistoryRemapPastToCurrent)
 {
     bool allGood = true;
     const auto & allLights = scene->GetSceneGraph()->GetLights();
@@ -696,8 +696,8 @@ bool LightsBaker::CollectAnalyticLightsCPU(const BakeSettings & settings, const 
     return allGood;
 };
 
-bool LightsBaker::CollectGaussianSplatEmissionProxies(
-    const BakeSettings& settings,
+bool LightSamplingCache::CollectGaussianSplatEmissionProxies(
+    const UpdateSettings& settings,
     LightingControlData& ctrlBuff,
     std::vector<PolymorphicLightInfo>& outLightBuffer,
     std::vector<PolymorphicLightInfoEx>& outLightExBuffer,
@@ -739,7 +739,7 @@ bool LightsBaker::CollectGaussianSplatEmissionProxies(
 // #ifdef _DEBUG
 // #pragma optimize("gt", on)
 // #endif
-bool LightsBaker::ProcessEmissiveGeometry( const BakeSettings & settings, const std::shared_ptr<caustica::Scene> & scene, std::vector<SubInstanceData> & subInstanceData, LightingControlData & ctrlBuff, std::vector<struct EmissiveTrianglesProcTask> & tasks )
+bool LightSamplingCache::ProcessEmissiveGeometry( const UpdateSettings & settings, const std::shared_ptr<caustica::Scene> & scene, std::vector<SubInstanceData> & subInstanceData, LightingControlData & ctrlBuff, std::vector<struct EmissiveTrianglesProcTask> & tasks )
 {
     bool allGood = true;
 
@@ -900,12 +900,12 @@ bool LightsBaker::ProcessEmissiveGeometry( const BakeSettings & settings, const 
     return allGood;
 }
 
-bool LightsBaker::TotalLightCountOverflow() const
+bool LightSamplingCache::TotalLightCountOverflow() const
 {
     return !m_noOverflow;
 }
 
-void LightsBaker::FillBindings(nvrhi::BindingSetDesc& outBindingSetDesc, const std::shared_ptr<caustica::Scene>& scene, std::shared_ptr<class MaterialsBaker> materialsBaker, std::shared_ptr<OmmBaker> ommBaker, nvrhi::BufferHandle subInstanceDataBuffer,
+void LightSamplingCache::FillBindings(nvrhi::BindingSetDesc& outBindingSetDesc, const std::shared_ptr<caustica::Scene>& scene, std::shared_ptr<class MaterialGpuCache> materialGpuCache, std::shared_ptr<OpacityMicromapBuilder> opacityMicromapBuilder, nvrhi::BufferHandle subInstanceDataBuffer,
 nvrhi::TextureHandle depthBuffer, nvrhi::TextureHandle motionVectors, nvrhi::TextureHandle envMapProcessed)
 {
     if( depthBuffer == nullptr )
@@ -948,14 +948,14 @@ nvrhi::TextureHandle depthBuffer, nvrhi::TextureHandle motionVectors, nvrhi::Tex
             nvrhi::BindingSetItem::StructuredBuffer_SRV(1, subInstanceDataBuffer),
             nvrhi::BindingSetItem::StructuredBuffer_SRV(2, scene->GetInstanceBuffer()),
             nvrhi::BindingSetItem::StructuredBuffer_SRV(3, scene->GetGeometryBuffer()),
-            //nvrhi::BindingSetItem::StructuredBuffer_SRV(4, ommBaker->GetGeometryDebugBuffer()),
-            nvrhi::BindingSetItem::StructuredBuffer_SRV(5, materialsBaker->GetMaterialDataBuffer()),
+            //nvrhi::BindingSetItem::StructuredBuffer_SRV(4, opacityMicromapBuilder->GetGeometryDebugBuffer()),
+            nvrhi::BindingSetItem::StructuredBuffer_SRV(5, materialGpuCache->GetMaterialDataBuffer()),
             nvrhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->GetGPUWriteBuffer()),
             nvrhi::BindingSetItem::Texture_UAV(SHADER_DEBUG_VIZ_TEXTURE_UAV_INDEX, m_shaderDebug->GetDebugVizTexture()),
     };
 }
 
-void LightsBaker::UpdateFrustumConsts(LightsBakerConstants & outConsts, const LightsBaker::BakeSettings & settings)
+void LightSamplingCache::UpdateFrustumConsts(LightSamplingCacheConstants & outConsts, const LightSamplingCache::UpdateSettings & settings)
 {
     float4 frustPlanes[6];
 
@@ -1014,7 +1014,7 @@ void LightsBaker::UpdateFrustumConsts(LightsBakerConstants & outConsts, const Li
         outConsts.FrustumCorners[i] = float4(getCorner(i), 0);
 }
 
-void LightsBaker::UpdateLocalJitter()
+void LightSamplingCache::UpdateLocalJitter()
 {
     m_prevLocalJitter = m_localJitter;
     if (!m_dbgDebugDisableJitter)
@@ -1035,8 +1035,8 @@ void LightsBaker::UpdateLocalJitter()
     }
 }
 
-void LightsBaker::UpdateBegin(nvrhi::ICommandList* commandList, caustica::BindingCache & bindingCache, const BakeSettings& _settings, double sceneTime, const std::shared_ptr<caustica::Scene>& scene, std::shared_ptr<class MaterialsBaker> materialsBaker, 
-    std::shared_ptr<class OmmBaker> ommBaker, nvrhi::BufferHandle subInstanceDataBuffer, std::vector<SubInstanceData>& subInstanceData, nvrhi::TextureHandle envMapProcessed)
+void LightSamplingCache::UpdateBegin(nvrhi::ICommandList* commandList, caustica::BindingCache & bindingCache, const UpdateSettings& _settings, double sceneTime, const std::shared_ptr<caustica::Scene>& scene, std::shared_ptr<class MaterialGpuCache> materialGpuCache, 
+    std::shared_ptr<class OpacityMicromapBuilder> opacityMicromapBuilder, nvrhi::BufferHandle subInstanceDataBuffer, std::vector<SubInstanceData>& subInstanceData, nvrhi::TextureHandle envMapProcessed)
 {
     RAII_SCOPE( commandList->beginMarker("LightingUpdateBegin");, commandList->endMarker(); );
     // RAII_SCOPE( commandList->setEnableAutomaticBarriers(false);, commandList->setEnableAutomaticBarriers(true); );
@@ -1079,18 +1079,18 @@ void LightsBaker::UpdateBegin(nvrhi::ICommandList* commandList, caustica::Bindin
 
     // Constants
     LightingControlData ctrlBuff; memset(&ctrlBuff, 0, sizeof(ctrlBuff)); 
-    LightsBakerConstants & bakerConsts = ctrlBuff.BakerConstants;
+    LightSamplingCacheConstants & cacheConsts = ctrlBuff.CacheConstants;
 
-    UpdateFrustumConsts(bakerConsts, m_currentSettings);
+    UpdateFrustumConsts(cacheConsts, m_currentSettings);
 
-    bakerConsts.UpdateCounter = m_updateCounter;
-    bakerConsts.EnableMotionReprojection      = true;
-    bakerConsts.DepthDisocclusionThreshold   = m_depthDisocclusionThreshold;
+    cacheConsts.UpdateCounter = m_updateCounter;
+    cacheConsts.EnableMotionReprojection      = true;
+    cacheConsts.DepthDisocclusionThreshold   = m_depthDisocclusionThreshold;
     ctrlBuff.LocalSamplingTileJitter     = m_localJitter;
     ctrlBuff.LocalSamplingTileJitterPrev = m_prevLocalJitter;
 
     assert( _settings.ViewportSize.x > 0 && _settings.ViewportSize.y > 0 && _settings.PrevViewportSize.x > 0 && _settings.PrevViewportSize.y > 0 );
-    bakerConsts.PrevOverCurrentViewportSize = m_currentSettings.PrevViewportSize / m_currentSettings.ViewportSize;
+    cacheConsts.PrevOverCurrentViewportSize = m_currentSettings.PrevViewportSize / m_currentSettings.ViewportSize;
 
     bool lastFrameFeedbackAvailable = m_NEE_AT_FeedbackBufferFilled && !m_dbgDebugDisableLastFrameFeedback;
     const bool temporalFeedbackRequired = m_currentSettings.ImportanceSamplingType == 2;
@@ -1099,46 +1099,46 @@ void LightsBaker::UpdateBegin(nvrhi::ICommandList* commandList, caustica::Bindin
         if( m_currentSettings.EnvMapParams.Enabled )
         {
             assert( envMapProcessed != nullptr );
-            bakerConsts.EnvMapParams = m_currentSettings.EnvMapParams;
+            cacheConsts.EnvMapParams = m_currentSettings.EnvMapParams;
             const float baseScale = 0.0002f;
-            bakerConsts.DistantVsLocalRelativeImportance = m_currentSettings.DistantVsLocalImportanceScale * baseScale;
+            cacheConsts.DistantVsLocalRelativeImportance = m_currentSettings.DistantVsLocalImportanceScale * baseScale;
 
-            bakerConsts.EnvMapImportanceMapMIPCount = envMapProcessed->getDesc().mipLevels;
-            bakerConsts.EnvMapImportanceMapResolution = envMapProcessed->getDesc().width; assert( envMapProcessed->getDesc().height == bakerConsts.EnvMapImportanceMapResolution );
-            assert(m_envLightLookupMap != nullptr && m_envLightLookupMap->getDesc().width == bakerConsts.EnvMapImportanceMapResolution);
+            cacheConsts.EnvMapImportanceMapMIPCount = envMapProcessed->getDesc().mipLevels;
+            cacheConsts.EnvMapImportanceMapResolution = envMapProcessed->getDesc().width; assert( envMapProcessed->getDesc().height == cacheConsts.EnvMapImportanceMapResolution );
+            assert(m_envLightLookupMap != nullptr && m_envLightLookupMap->getDesc().width == cacheConsts.EnvMapImportanceMapResolution);
         }
         else
         {
-            bakerConsts.DistantVsLocalRelativeImportance = 0.0f;
-            bakerConsts.EnvMapParams = LightsBakerEnvMapParams{ .Transform = float3x4::identity(), .InvTransform = float3x4::identity(), .ColorMultiplier = float3(1,1,1), .Enabled = 0.0f };
-            bakerConsts.EnvMapImportanceMapMIPCount = 0;
-            bakerConsts.EnvMapImportanceMapResolution = 0;
+            cacheConsts.DistantVsLocalRelativeImportance = 0.0f;
+            cacheConsts.EnvMapParams = LightSamplingCacheEnvMapParams{ .Transform = float3x4::identity(), .InvTransform = float3x4::identity(), .ColorMultiplier = float3(1,1,1), .Enabled = 0.0f };
+            cacheConsts.EnvMapImportanceMapMIPCount = 0;
+            cacheConsts.EnvMapImportanceMapResolution = 0;
         }
     }
 
-    bakerConsts.FeedbackResolution          = uint2(m_NEE_AT_FeedbackCandidates->getDesc().width, m_NEE_AT_FeedbackCandidates->getDesc().height);
-    bakerConsts.BlendedFeedbackResolution   = uint2(m_NEE_AT_FeedbackCandidatesBlended->getDesc().width, m_NEE_AT_FeedbackCandidatesBlended->getDesc().height);
-    uint numTotalP0ThreadCount              = div_ceil(bakerConsts.FeedbackResolution.x, LLB_NUM_COMPUTE_THREADS_2D) * div_ceil(bakerConsts.FeedbackResolution.y, LLB_NUM_COMPUTE_THREADS_2D) * LLB_NUM_COMPUTE_THREADS_2D * LLB_NUM_COMPUTE_THREADS_2D;
+    cacheConsts.FeedbackResolution          = uint2(m_NEE_AT_FeedbackCandidates->getDesc().width, m_NEE_AT_FeedbackCandidates->getDesc().height);
+    cacheConsts.BlendedFeedbackResolution   = uint2(m_NEE_AT_FeedbackCandidatesBlended->getDesc().width, m_NEE_AT_FeedbackCandidatesBlended->getDesc().height);
+    uint numTotalP0ThreadCount              = div_ceil(cacheConsts.FeedbackResolution.x, LLB_NUM_COMPUTE_THREADS_2D) * div_ceil(cacheConsts.FeedbackResolution.y, LLB_NUM_COMPUTE_THREADS_2D) * LLB_NUM_COMPUTE_THREADS_2D * LLB_NUM_COMPUTE_THREADS_2D;
     ctrlBuff.TotalMaxFeedbackCount          = (lastFrameFeedbackAvailable)?(numTotalP0ThreadCount):(0);
     ctrlBuff.LocalSamplingResolution        = uint2(m_localSamplingBufferWidth, m_localSamplingBufferHeight);
     ctrlBuff.GlobalFeedbackUseWeight        = (lastFrameFeedbackAvailable) ? (m_currentSettings.GlobalTemporalFeedbackWeight): (0.0f);
     ctrlBuff.LocalToGlobalSampleRatio       = (lastFrameFeedbackAvailable) ? (m_currentSettings.LocalToGlobalSampleRatio) : (0.0f);
-    bakerConsts.ReservoirHistoryDropoff     = m_advSetting_reservoirHistoryDropoff;
+    cacheConsts.ReservoirHistoryDropoff     = m_advSetting_reservoirHistoryDropoff;
     ctrlBuff.ScreenSpaceVsWorldSpaceThreshold = m_advSetting_ScreenSpaceVsWorldSpaceThreshold;
 
     ctrlBuff.ImportanceSamplingType = m_currentSettings.ImportanceSamplingType;
 
     ctrlBuff.TileBufferHeight = ctrlBuff.LocalSamplingResolution.y;
 
-    bakerConsts.DebugDrawType = (int)m_dbgDebugDrawType;
-    bakerConsts.DebugDrawTileLights = m_dbgDebugDrawTileLightConnections;
-    bakerConsts.MouseCursorPos = m_currentSettings.MouseCursorPos;
-    bakerConsts.ImportanceBoostIntensityDelta = m_importanceBoost_IntensityDelta?m_importanceBoost_IntensityDeltaMul:0.0f;
-    bakerConsts.ImportanceBoostFrustumMul = m_importanceBoost_Frustum?m_importanceBoost_FrustumMul:0.0f;
-    bakerConsts.ImportanceBoostFrustumFadeDistance = m_importanceBoost_FrustumFadeDistance;
+    cacheConsts.DebugDrawType = (int)m_dbgDebugDrawType;
+    cacheConsts.DebugDrawTileLights = m_dbgDebugDrawTileLightConnections;
+    cacheConsts.MouseCursorPos = m_currentSettings.MouseCursorPos;
+    cacheConsts.ImportanceBoostIntensityDelta = m_importanceBoost_IntensityDelta?m_importanceBoost_IntensityDeltaMul:0.0f;
+    cacheConsts.ImportanceBoostFrustumMul = m_importanceBoost_Frustum?m_importanceBoost_FrustumMul:0.0f;
+    cacheConsts.ImportanceBoostFrustumFadeDistance = m_importanceBoost_FrustumFadeDistance;
     ctrlBuff.LastFrameTemporalFeedbackAvailable = lastFrameFeedbackAvailable;
-    bakerConsts.SceneCameraPos = m_currentSettings.CameraPosition;
-    bakerConsts.SceneAverageContentsDistance = m_currentSettings.AverageContentsDistance;
+    cacheConsts.SceneCameraPos = m_currentSettings.CameraPosition;
+    cacheConsts.SceneAverageContentsDistance = m_currentSettings.AverageContentsDistance;
     ctrlBuff.LastFrameLocalSamplesAvailable = lastFrameLocalSamplesAvailable && lastFrameFeedbackAvailable;
     ctrlBuff.LastFrameTemporalFeedbackAvailable = lastFrameFeedbackAvailable;
     ctrlBuff.TemporalFeedbackRequired = temporalFeedbackRequired && !m_dbgFreezeUpdates;
@@ -1156,14 +1156,14 @@ void LightsBaker::UpdateBegin(nvrhi::ICommandList* commandList, caustica::Bindin
     m_noOverflow &= CollectGaussianSplatEmissionProxies( m_currentSettings, ctrlBuff, m_scratchLightBuffer, m_scratchLightExBuffer, m_scratchLightHistoryRemapCurrentToPastBuffer, m_scratchLightHistoryRemapPastToCurrentBuffer );
     // collect all emissive triangles and other geometry specific work - this builds batch jobs on the CPU that are executed on the GPU later, but at the end of this step we know the exact number of added emissive triangles (even though some might be black)
     m_noOverflow &= ProcessEmissiveGeometry(m_currentSettings, scene, subInstanceData, ctrlBuff, *m_scratchTaskBuffer);
-    bakerConsts.TriangleLightTaskCount = (int)(*m_scratchTaskBuffer).size();
+    cacheConsts.TriangleLightTaskCount = (int)(*m_scratchTaskBuffer).size();
     assert( ctrlBuff.EnvmapQuadNodeCount == CAUSTICA_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT );
     assert( ctrlBuff.TotalLightCount == ctrlBuff.EnvmapQuadNodeCount + ctrlBuff.AnalyticLightCount + ctrlBuff.TriangleLightCount ); assert(ctrlBuff.TotalLightCount <= CAUSTICA_LIGHTING_MAX_LIGHTS);
     ctrlBuff.HistoricTotalLightCount = m_historicTotalLightCount;
     m_historicTotalLightCount = ctrlBuff.TotalLightCount;
 
-    bakerConsts.CurrentWeightsBufferOffset  = (m_ping) ? 0 : CAUSTICA_LIGHTING_WEIGHTS_COUNT_HALF;
-    bakerConsts.HistoricWeightsBufferOffset = (m_ping) ? CAUSTICA_LIGHTING_WEIGHTS_COUNT_HALF : 0;
+    cacheConsts.CurrentWeightsBufferOffset  = (m_ping) ? 0 : CAUSTICA_LIGHTING_WEIGHTS_COUNT_HALF;
+    cacheConsts.HistoricWeightsBufferOffset = (m_ping) ? CAUSTICA_LIGHTING_WEIGHTS_COUNT_HALF : 0;
 
     // Constant & control buffers must go first
     {
@@ -1178,7 +1178,7 @@ void LightsBaker::UpdateBegin(nvrhi::ICommandList* commandList, caustica::Bindin
 
     // Bindings
     nvrhi::BindingSetDesc bindingSetDesc;
-    FillBindings(bindingSetDesc, scene, materialsBaker, ommBaker, subInstanceDataBuffer, nullptr, nullptr, envMapProcessed);
+    FillBindings(bindingSetDesc, scene, materialGpuCache, opacityMicromapBuilder, subInstanceDataBuffer, nullptr, nullptr, envMapProcessed);
     nvrhi::BindingSetHandle bindingSet = bindingCache.GetOrCreateBindingSet(bindingSetDesc, m_commonBindingLayout);
 
     nvrhi::BindingSetVector bindings = { bindingSet };
@@ -1219,7 +1219,7 @@ void LightsBaker::UpdateBegin(nvrhi::ICommandList* commandList, caustica::Bindin
         commandList->writeBuffer(m_lightsExBuffer, m_scratchLightExBuffer.data(), sizeof(PolymorphicLightInfoEx)* m_scratchLightExBuffer.size());
         commandList->writeBuffer(m_historyRemapCurrentToPastBuffer, m_scratchLightHistoryRemapCurrentToPastBuffer.data(), sizeof(uint) * m_scratchLightHistoryRemapCurrentToPastBuffer.size());
         commandList->writeBuffer(m_historyRemapPastToCurrentBuffer, m_scratchLightHistoryRemapPastToCurrentBuffer.data(), sizeof(uint) * m_scratchLightHistoryRemapPastToCurrentBuffer.size());
-        commandList->writeBuffer(m_scratchBuffer, m_scratchTaskBuffer->data(), sizeof(EmissiveTrianglesProcTask)* bakerConsts.TriangleLightTaskCount);
+        commandList->writeBuffer(m_scratchBuffer, m_scratchTaskBuffer->data(), sizeof(EmissiveTrianglesProcTask)* cacheConsts.TriangleLightTaskCount);
     }
 
     // todo: make sure only those needed are set
@@ -1248,8 +1248,8 @@ void LightsBaker::UpdateBegin(nvrhi::ICommandList* commandList, caustica::Bindin
     {
         RAII_SCOPE(commandList->beginMarker("BakeEmissiveTriangles"); , commandList->endMarker(); );
         
-        if (bakerConsts.TriangleLightTaskCount > 0)
-            m_bakeEmissiveTriangles.Execute(commandList, div_ceil(bakerConsts.TriangleLightTaskCount, 8), 1, 1, bindingsEx);
+        if (cacheConsts.TriangleLightTaskCount > 0)
+            m_bakeEmissiveTriangles.Execute(commandList, div_ceil(cacheConsts.TriangleLightTaskCount, 8), 1, 1, bindingsEx);
 
         commandList->setBufferState(m_lightsBuffer, nvrhi::ResourceStates::UnorderedAccess);
         commandList->setBufferState(m_historyRemapCurrentToPastBuffer, nvrhi::ResourceStates::UnorderedAccess);
@@ -1283,7 +1283,7 @@ void LightsBaker::UpdateBegin(nvrhi::ICommandList* commandList, caustica::Bindin
         {
             RAII_SCOPE(commandList->beginMarker("ProcessFeedbackHistoryPreFilter");, commandList->endMarker(); );
 
-            m_processFeedbackHistoryPreFilter.Execute(commandList, div_ceil(bakerConsts.FeedbackResolution.x, LLB_PREPROCESS_BLOCK_SIZE_INNER), div_ceil(bakerConsts.FeedbackResolution.y, LLB_PREPROCESS_BLOCK_SIZE_INNER), 1, bindings);
+            m_processFeedbackHistoryPreFilter.Execute(commandList, div_ceil(cacheConsts.FeedbackResolution.x, LLB_PREPROCESS_BLOCK_SIZE_INNER), div_ceil(cacheConsts.FeedbackResolution.y, LLB_PREPROCESS_BLOCK_SIZE_INNER), 1, bindings);
             commandList->setTextureState(m_NEE_AT_FeedbackTotalWeight, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
             commandList->setTextureState(m_NEE_AT_FeedbackCandidates, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
         }
@@ -1291,7 +1291,7 @@ void LightsBaker::UpdateBegin(nvrhi::ICommandList* commandList, caustica::Bindin
         {
             RAII_SCOPE(commandList->beginMarker("ProcessFeedbackHistoryP0"); , commandList->endMarker(); );
 
-            m_processFeedbackHistoryP0.Execute(commandList, div_ceil(bakerConsts.FeedbackResolution.x, LLB_NUM_COMPUTE_THREADS_2D), div_ceil(bakerConsts.FeedbackResolution.y, LLB_NUM_COMPUTE_THREADS_2D), 1, bindings );
+            m_processFeedbackHistoryP0.Execute(commandList, div_ceil(cacheConsts.FeedbackResolution.x, LLB_NUM_COMPUTE_THREADS_2D), div_ceil(cacheConsts.FeedbackResolution.y, LLB_NUM_COMPUTE_THREADS_2D), 1, bindings );
 
             commandList->setTextureState(m_NEE_AT_FeedbackTotalWeight, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
             commandList->setTextureState(m_NEE_AT_FeedbackCandidates, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
@@ -1404,7 +1404,7 @@ void LightsBaker::UpdateBegin(nvrhi::ICommandList* commandList, caustica::Bindin
 
 #define UAV_BARRIER_m_NEE_AT_LocalSamplingBuffer() { commandList->setBufferState(m_NEE_AT_LocalSamplingBuffer, nvrhi::ResourceStates::UnorderedAccess); }
 
-void LightsBaker::UpdateEnd(nvrhi::ICommandList * commandList, caustica::BindingCache & bindingCache, const std::shared_ptr<caustica::Scene> & scene, std::shared_ptr<class MaterialsBaker> materialsBaker, std::shared_ptr<class OmmBaker> ommBaker, nvrhi::BufferHandle subInstanceDataBuffer, nvrhi::TextureHandle depthBuffer, nvrhi::TextureHandle motionVectors)
+void LightSamplingCache::UpdateEnd(nvrhi::ICommandList * commandList, caustica::BindingCache & bindingCache, const std::shared_ptr<caustica::Scene> & scene, std::shared_ptr<class MaterialGpuCache> materialGpuCache, std::shared_ptr<class OpacityMicromapBuilder> opacityMicromapBuilder, nvrhi::BufferHandle subInstanceDataBuffer, nvrhi::TextureHandle depthBuffer, nvrhi::TextureHandle motionVectors)
 {
     RAII_SCOPE(commandList->beginMarker("LightingUpdateEnd");, commandList->endMarker(); );
 
@@ -1415,7 +1415,7 @@ void LightsBaker::UpdateEnd(nvrhi::ICommandList * commandList, caustica::Binding
     bool lastFrameFeedbackAvailable = m_NEE_AT_FeedbackBufferFilled;
 
     nvrhi::BindingSetDesc bindingSetDesc;
-    FillBindings(bindingSetDesc, scene, materialsBaker, ommBaker, subInstanceDataBuffer, depthBuffer, motionVectors, nullptr);
+    FillBindings(bindingSetDesc, scene, materialGpuCache, opacityMicromapBuilder, subInstanceDataBuffer, depthBuffer, motionVectors, nullptr);
     nvrhi::BindingSetHandle bindingSet = bindingCache.GetOrCreateBindingSet(bindingSetDesc, m_commonBindingLayout);
     nvrhi::BindingSetVector bindings = { bindingSet };
 
@@ -1429,7 +1429,7 @@ void LightsBaker::UpdateEnd(nvrhi::ICommandList * commandList, caustica::Binding
         commandList->setTextureState(m_NEE_AT_FeedbackTotalWeightScratch, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
         commandList->setTextureState(m_NEE_AT_FeedbackCandidatesScratch, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
 
-        m_processFeedbackHistoryP1a.Execute(commandList, div_ceil(m_currentCtrlBuff.BakerConstants.BlendedFeedbackResolution.x, itemsPerGroup), div_ceil(m_currentCtrlBuff.BakerConstants.BlendedFeedbackResolution.y, itemsPerGroup), 1, bindings);
+        m_processFeedbackHistoryP1a.Execute(commandList, div_ceil(m_currentCtrlBuff.CacheConstants.BlendedFeedbackResolution.x, itemsPerGroup), div_ceil(m_currentCtrlBuff.CacheConstants.BlendedFeedbackResolution.y, itemsPerGroup), 1, bindings);
 
         commandList->setTextureState(m_NEE_AT_FeedbackTotalWeightScratch, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
         commandList->setTextureState(m_NEE_AT_FeedbackCandidatesScratch, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
@@ -1443,7 +1443,7 @@ void LightsBaker::UpdateEnd(nvrhi::ICommandList * commandList, caustica::Binding
         commandList->setTextureState(m_NEE_AT_FeedbackTotalWeight, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
         commandList->setTextureState(m_NEE_AT_FeedbackCandidates, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
 
-        m_processFeedbackHistoryP1b.Execute(commandList, div_ceil(m_currentCtrlBuff.BakerConstants.FeedbackResolution.x, itemsPerGroup), div_ceil(m_currentCtrlBuff.BakerConstants.FeedbackResolution.y, itemsPerGroup), 1, bindings);
+        m_processFeedbackHistoryP1b.Execute(commandList, div_ceil(m_currentCtrlBuff.CacheConstants.FeedbackResolution.x, itemsPerGroup), div_ceil(m_currentCtrlBuff.CacheConstants.FeedbackResolution.y, itemsPerGroup), 1, bindings);
 
         commandList->setTextureState(m_NEE_AT_FeedbackTotalWeightScratch, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
         commandList->setTextureState(m_NEE_AT_FeedbackCandidatesScratch, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
@@ -1461,7 +1461,7 @@ void LightsBaker::UpdateEnd(nvrhi::ICommandList * commandList, caustica::Binding
         UAV_BARRIER_m_NEE_AT_LocalSamplingBuffer();
     }
 
-    if (m_currentCtrlBuff.BakerConstants.DebugDrawTileLights || m_dbgDebugDrawType == LightingDebugViewType::TileHeatmap || m_dbgDebugDrawType == LightingDebugViewType::ValidateCorrectness || m_dbgFreezeFrustumUpdates)
+    if (m_currentCtrlBuff.CacheConstants.DebugDrawTileLights || m_dbgDebugDrawType == LightingDebugViewType::TileHeatmap || m_dbgDebugDrawType == LightingDebugViewType::ValidateCorrectness || m_dbgFreezeFrustumUpdates)
     {
         UAV_BARRIER_m_NEE_AT_LocalSamplingBuffer();
         commandList->commitBarriers();
@@ -1481,7 +1481,7 @@ void LightsBaker::UpdateEnd(nvrhi::ICommandList * commandList, caustica::Binding
         //commandList->setTextureState(m_NEE_AT_FeedbackTotalWeightScratch, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
         //commandList->setTextureState(m_NEE_AT_FeedbackCandidatesScratch, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
 
-        m_clearFeedbackHistory.Execute( commandList, div_ceil(m_currentCtrlBuff.BakerConstants.FeedbackResolution.x, itemsPerGroup), div_ceil(m_currentCtrlBuff.BakerConstants.FeedbackResolution.y, itemsPerGroup), 1, bindings );
+        m_clearFeedbackHistory.Execute( commandList, div_ceil(m_currentCtrlBuff.CacheConstants.FeedbackResolution.x, itemsPerGroup), div_ceil(m_currentCtrlBuff.CacheConstants.FeedbackResolution.y, itemsPerGroup), 1, bindings );
 
         commandList->setTextureState(m_NEE_AT_FeedbackTotalWeight, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
         commandList->setTextureState(m_NEE_AT_FeedbackCandidates, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
@@ -1493,9 +1493,9 @@ void LightsBaker::UpdateEnd(nvrhi::ICommandList * commandList, caustica::Binding
     commandList->commitBarriers();
 }
 
-bool LightsBaker::InfoGUI(float indent)
+bool LightSamplingCache::InfoGUI(float indent)
 {
-    RAII_SCOPE(ImGui::PushID("LightsBakerInfoGUI");, ImGui::PopID(); );
+    RAII_SCOPE(ImGui::PushID("LightSamplingCacheInfoGUI");, ImGui::PopID(); );
 
     if (TotalLightCountOverflow())
     {
@@ -1516,7 +1516,7 @@ bool LightsBaker::InfoGUI(float indent)
     ImGui::Text("(proxies: %d, weightsum: %.5f)", m_lastReadback.SamplingProxyCount, m_lastReadback.WeightsSum());
 #if LLB_ENABLE_VALIDATION
     ImGui::Text("Validation:");
-    float feedbackPerc = m_lastReadback.ValidFeedbackCount / float(m_currentCtrlBuff.BakerConstants.FeedbackResolution.x * m_currentCtrlBuff.BakerConstants.FeedbackResolution.y);
+    float feedbackPerc = m_lastReadback.ValidFeedbackCount / float(m_currentCtrlBuff.CacheConstants.FeedbackResolution.x * m_currentCtrlBuff.CacheConstants.FeedbackResolution.y);
     ImGui::Text(" feedback num: %d (%.3f)", m_lastReadback.ValidFeedbackCount, feedbackPerc);
 #endif
     float allocRam = (float)(double(m_allocatedVRAM)/1024.0/1024.0);
@@ -1525,9 +1525,9 @@ bool LightsBaker::InfoGUI(float indent)
     return false;
 }
 
-bool LightsBaker::DebugGUI(float indent)
+bool LightSamplingCache::DebugGUI(float indent)
 {
-    RAII_SCOPE(ImGui::PushID("LightsBakerDebugGUI"); , ImGui::PopID(); );
+    RAII_SCOPE(ImGui::PushID("LightSamplingCacheDebugGUI"); , ImGui::PopID(); );
 
     bool resetAccumulation = false;
     #define IMAGE_QUALITY_OPTION(code) do{if (code) resetAccumulation = true;} while(false)
@@ -1601,7 +1601,7 @@ bool LightsBaker::DebugGUI(float indent)
     return resetAccumulation;
 }
 
-void LightsBaker::SetGlobalShaderMacros(std::vector<caustica::ShaderMacro> & macros)
+void LightSamplingCache::SetGlobalShaderMacros(std::vector<caustica::ShaderMacro> & macros)
 {
     macros.push_back({ "NEE_AT_SAMPLE_BAKED_ENVIRONMENT", (m_advSetting_SampleBakedEnvironment) ? ("1") : ("0") });
 }

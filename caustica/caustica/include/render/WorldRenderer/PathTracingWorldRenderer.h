@@ -29,10 +29,10 @@
 #include <render/Passes/Geometry/DLSS.h>
 #endif
 
-class ComputePipelineBaker;
+class ComputePipelineRegistry;
 class OidnDenoiser;
-class DenoisingGuidesBaker;
-class PTPipelineBaker;
+class DenoisingGuidesPass;
+class PathTracingShaderCompiler;
 class PTPipelineVariant;
 class ToneMappingPass;
 struct PathTracerCameraData;
@@ -91,7 +91,7 @@ public:
     RtxdiPass* getRtxdiPass() { return m_rtxdiPass.get(); }
     const RtxdiPass* getRtxdiPass() const { return m_rtxdiPass.get(); }
 
-    std::shared_ptr<PTPipelineBaker> getPTPipelineBaker() const { return m_ptPipelineBaker; }
+    std::shared_ptr<PathTracingShaderCompiler> getPathTracingShaderCompiler() const { return m_pathTracingShaderCompiler; }
     std::shared_ptr<ShaderDebug> getShaderDebug() const { return m_shaderDebug; }
 
     std::shared_ptr<PTPipelineVariant>& ptPipelineReference() { return m_ptPipelineReference; }
@@ -167,7 +167,7 @@ private:
     std::shared_ptr<PTPipelineVariant>          m_ptPipelineFillStablePlanes;
     std::shared_ptr<PTPipelineVariant>          m_ptPipelineTestRaygenPPHDR;
     std::shared_ptr<PTPipelineVariant>          m_ptPipelineEdgeDetection;
-    std::shared_ptr<PTPipelineBaker>            m_ptPipelineBaker;
+    std::shared_ptr<PathTracingShaderCompiler>            m_pathTracingShaderCompiler;
 
     nvrhi::CommandListHandle                    m_commandList;
     nvrhi::BufferHandle                         m_constantBuffer;
@@ -185,7 +185,7 @@ private:
     bool                                        m_oidnDenoiserFailed = false;
 
     std::shared_ptr<ShaderDebug>                m_shaderDebug;
-    std::shared_ptr<DenoisingGuidesBaker>       m_denoisingGuidesBaker;
+    std::shared_ptr<DenoisingGuidesPass>       m_denoisingGuidesPass;
 
     nvrhi::ShaderHandle                         m_exportVBufferCS;
     nvrhi::ComputePipelineHandle                m_exportVBufferPSO;

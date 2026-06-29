@@ -1,11 +1,11 @@
-#include <render/Core/PTPipelineBaker.h>
+#include <render/Core/PathTracingShaderCompiler.h>
 #include <assets/loader/ShaderCompilerUtils.h>
 #include <assets/loader/ShaderPackFileSystem.h>
 
 #include <backend/GpuDevice.h>
 #include <backend/ShaderUtils.h>
 
-#include <render/Passes/Lighting/MaterialsBaker.h>
+#include <render/Passes/Lighting/MaterialGpuCache.h>
 #include <shaders/PathTracer/PathTracerShared.h>
 
 #include <core/file_utils.h>
@@ -87,22 +87,22 @@ void PTPipelineVariant::ShaderPermutation::ResetShaderLibrary()
     ShaderLibrary = nullptr;
 }
 
-void PTPipelineVariant::ShaderPermutation::LoadShaderLibraryIfNeeded(PTPipelineBaker & baker)
+void PTPipelineVariant::ShaderPermutation::LoadShaderLibraryIfNeeded(PathTracingShaderCompiler & compiler)
 {
     if (US_compileError != "" || ShaderLibrary != nullptr)
         return;
 
-    std::shared_ptr<caustica::IBlob> data = baker.GetFS()->readFile(("/" + c_PTShaderBinariesRoot + "/" + CompiledFileNameNoExt + ".bin").c_str());
+    std::shared_ptr<caustica::IBlob> data = compiler.GetFS()->readFile(("/" + c_PTShaderBinariesRoot + "/" + CompiledFileNameNoExt + ".bin").c_str());
 
     if (data)
-        ShaderLibrary = baker.GetDevice()->createShaderLibrary(data->data(), data->size());
+        ShaderLibrary = compiler.GetDevice()->createShaderLibrary(data->data(), data->size());
 
     if (!ShaderLibrary)
         US_compileError = StringFormat("ERROR creating ShaderLibrary for file %s", CompiledFullPath.c_str());
 }
 
-PTPipelineVariant::PTPipelineVariant(const std::string & relativeSourcePath, const std::vector<caustica::ShaderMacro> & variantMacros, const std::shared_ptr<PTPipelineBaker>& baker, const std::string & shortUniqueDebugID, bool raygenOnly)
-    : m_macros(variantMacros), m_baker(baker), m_rayGenOnly(raygenOnly)
+PTPipelineVariant::PTPipelineVariant(const std::string & relativeSourcePath, const std::vector<caustica::ShaderMacro> & variantMacros, const std::shared_ptr<PathTracingShaderCompiler>& compiler, const std::string & shortUniqueDebugID, bool raygenOnly)
+    : m_macros(variantMacros), m_compiler(compiler), m_rayGenOnly(raygenOnly)
 {
     m_raygen.SetPath(relativeSourcePath);
 
@@ -115,7 +115,7 @@ PTPipelineVariant::PTPipelineVariant(const std::string & relativeSourcePath, con
         assert( false ); // too big
         m_shortUniqueDebugID = m_shortUniqueDebugID.substr(0, 6);
     }
-    if (!baker->RegisterShortUniqueDebugID(m_shortUniqueDebugID))
+    if (!compiler->RegisterShortUniqueDebugID(m_shortUniqueDebugID))
     {
         assert( false ); // not unique!
     }
@@ -126,7 +126,7 @@ PTPipelineVariant::PTPipelineVariant(const std::string & relativeSourcePath, con
 
 PTPipelineVariant::~PTPipelineVariant()
 {
-    std::shared_ptr<PTPipelineBaker> & baker = m_us_lockedBaker; 
+    std::shared_ptr<PathTracingShaderCompiler> & baker = m_lockedCompiler; 
     if (baker)
         baker->UnregisterShortUniqueDebugID(m_shortUniqueDebugID);
 }
@@ -140,17 +140,17 @@ void PTPipelineVariant::ResetPipeline()
 
 void PTPipelineVariant::CompileIfNeeded_Enqueue(std::filesystem::file_time_type lastModifiedSourceCode)
 {
-    std::shared_ptr<PTPipelineBaker> & baker = m_us_lockedBaker; assert( baker != nullptr );
+    std::shared_ptr<PathTracingShaderCompiler> & baker = m_lockedCompiler; assert( baker != nullptr );
 
     // no further specializations for these two
     m_raygen.CombinedAndSpecializedMacros = m_combinedMacros;
     m_raygen.PermutationName = m_shortUniqueDebugID + "_raygen";
     m_raygen.CombinedAndSpecializedMacros.push_back( {"CAUSTICA_PIPELINE_PERMUTATION_NAME", m_shortUniqueDebugID } );  // used to rename ClosestHit (and, if any, AnyHit) to something readable in profilers and etc
     
-    m_ubershaderMaterial.FromMaterialPermutation( m_shortUniqueDebugID, m_combinedMacros, *baker->GetMaterialsBaker()->GetUbershader() );
+    m_ubershaderMaterial.FromMaterialPermutation( m_shortUniqueDebugID, m_combinedMacros, *baker->GetMaterialGpuCache()->GetUbershader() );
 
     m_specializedPerMaterial.clear();
-    const auto & sourceTable = baker->GetMaterialsBaker()->GetShaderPermutationTable();
+    const auto & sourceTable = baker->GetMaterialGpuCache()->GetShaderPermutationTable();
     m_specializedPerMaterial.resize(sourceTable.size());
     for( int i = 0; i < sourceTable.size(); i++ )
         m_specializedPerMaterial[i].FromMaterialPermutation( m_shortUniqueDebugID, m_combinedMacros, *(sourceTable[i]) );
@@ -333,24 +333,24 @@ void PTPipelineVariant::CompileIfNeeded_Enqueue(std::filesystem::file_time_type 
 
 //void PTPipelineVariant::CompileIfNeeded_Execute()
 //{
-//    std::shared_ptr<PTPipelineBaker>& baker = m_us_lockedBaker; assert(baker != nullptr);
+//    std::shared_ptr<PathTracingShaderCompiler>& baker = m_lockedCompiler; assert(baker != nullptr);
 //}
 
 void PTPipelineVariant::UpdateStart(std::filesystem::file_time_type lastModifiedSourceCode)
 {
-    assert( m_us_lockedBaker == nullptr );
+    assert( m_lockedCompiler == nullptr );
 
-    std::shared_ptr<PTPipelineBaker> & baker = m_us_lockedBaker = m_baker.lock();
-    if (baker == nullptr)
+    std::shared_ptr<PathTracingShaderCompiler> & compiler = m_lockedCompiler = m_compiler.lock();
+    if (compiler == nullptr)
     {
         assert( false );
         return;
     }
 
-    m_combinedMacros.clear(); m_combinedMacros.reserve( m_macros.size() + baker->GetMacros().size() );
+    m_combinedMacros.clear(); m_combinedMacros.reserve( m_macros.size() + compiler->GetMacros().size() );
     for (auto& macro : m_macros)
         m_combinedMacros.push_back(macro);
-    for (auto& macro : baker->GetMacros())
+    for (auto& macro : compiler->GetMacros())
         m_combinedMacros.push_back(macro);
     
     bool foundExportAnyHitDependency = false;
@@ -374,7 +374,7 @@ void PTPipelineVariant::UpdateStart(std::filesystem::file_time_type lastModified
 
 void PTPipelineVariant::UpdateFinalize()
 {
-    std::shared_ptr<PTPipelineBaker> & baker = m_us_lockedBaker; assert( baker != nullptr );
+    std::shared_ptr<PathTracingShaderCompiler> & baker = m_lockedCompiler; assert( baker != nullptr );
 
     // if no changes, no need to re-create pipeline
     if (m_pipeline == nullptr )
@@ -446,13 +446,13 @@ void PTPipelineVariant::UpdateFinalize()
         assert(m_pipeline != nullptr && m_shaderTable != nullptr);
     }
 
-    m_us_lockedBaker = nullptr;
+    m_lockedCompiler = nullptr;
 }
 
 
-PTPipelineBaker::PTPipelineBaker(nvrhi::IDevice* device, std::shared_ptr<MaterialsBaker>& materialsBaker, nvrhi::BindingLayoutHandle bindingLayout, nvrhi::BindingLayoutHandle bindlessLayout)
+PathTracingShaderCompiler::PathTracingShaderCompiler(nvrhi::IDevice* device, std::shared_ptr<MaterialGpuCache>& materialGpuCache, nvrhi::BindingLayoutHandle bindingLayout, nvrhi::BindingLayoutHandle bindlessLayout)
     : m_device(device)
-    , m_materialsBaker(materialsBaker)
+    , m_materialGpuCache(materialGpuCache)
     , m_bindingLayout(bindingLayout)
     , m_bindlessLayout(bindlessLayout)
     , m_enableNVAPIShaderExtension(device->queryFeatureSupport(nvrhi::Feature::HlslExtensionUAV))
@@ -475,7 +475,7 @@ PTPipelineBaker::PTPipelineBaker(nvrhi::IDevice* device, std::shared_ptr<Materia
     }
 }
 
-PTPipelineBaker::~PTPipelineBaker()
+PathTracingShaderCompiler::~PathTracingShaderCompiler()
 {
 }
 
@@ -490,7 +490,7 @@ std::string HitGroupInfo::GetShaderPermutationName() const { return MaterialShad
 
 int HitGroupInfo::GetShaderPermutationIndex() const { return MaterialShaderPermutation->IndexInTable; }
 
-HitGroupInfo ComputeSubInstanceHitGroupInfo(const MaterialsBaker & baker, const PTMaterial& material)
+HitGroupInfo ComputeSubInstanceHitGroupInfo(const MaterialGpuCache & baker, const PTMaterial& material)
 {
     HitGroupInfo info;
 
@@ -510,7 +510,7 @@ static bool macrosEqual(caustica::ShaderMacro& a, caustica::ShaderMacro& b)
     return a.name == b.name && a.definition == b.definition;
 }
 
-void PTPipelineBaker::EnqueueShaderPermutation(PTPipelineVariant::ShaderPermutation* perm)
+void PathTracingShaderCompiler::EnqueueShaderPermutation(PTPipelineVariant::ShaderPermutation* perm)
 {
     if( perm->US_compileCmdLine != "" )
     {   
@@ -521,7 +521,7 @@ void PTPipelineBaker::EnqueueShaderPermutation(PTPipelineVariant::ShaderPermutat
     m_parallelCompileListAll.push_back(perm);
 }
 
-void PTPipelineBaker::Update(const std::shared_ptr<caustica::Scene>& scene, unsigned int subInstanceCount, const std::function<void(std::vector<caustica::ShaderMacro>& macros)>& globalMacrosGetter, bool forceShaderReload)
+void PathTracingShaderCompiler::Update(const std::shared_ptr<caustica::Scene>& scene, unsigned int subInstanceCount, const std::function<void(std::vector<caustica::ShaderMacro>& macros)>& globalMacrosGetter, bool forceShaderReload)
 {
     // Auto-reload: poll for source file changes
     if (m_compilerConfig.CanCompile() && !forceShaderReload && !m_variants.empty())
@@ -578,7 +578,7 @@ void PTPipelineBaker::Update(const std::shared_ptr<caustica::Scene>& scene, unsi
         {
             uint instanceID = (uint)m_perSubInstanceHitGroup.size();
             for (int gi = 0; gi < instance->GetMesh()->geometries.size(); gi++)
-                m_perSubInstanceHitGroup.push_back(ComputeSubInstanceHitGroupInfo(*GetMaterialsBaker(), *PTMaterial::SafeCast(instance->GetMesh()->geometries[gi]->material)));
+                m_perSubInstanceHitGroup.push_back(ComputeSubInstanceHitGroupInfo(*GetMaterialGpuCache(), *PTMaterial::SafeCast(instance->GetMesh()->geometries[gi]->material)));
         }
         assert(m_perSubInstanceHitGroup.size() == subInstanceCount);
 
@@ -743,7 +743,7 @@ void PTPipelineBaker::Update(const std::shared_ptr<caustica::Scene>& scene, unsi
                 break;
 
             for (const std::shared_ptr<PTPipelineVariant>& variant : updateQueue)
-                variant->m_us_lockedBaker = nullptr;
+                variant->m_lockedCompiler = nullptr;
         }
         else
         {
@@ -753,7 +753,7 @@ void PTPipelineBaker::Update(const std::shared_ptr<caustica::Scene>& scene, unsi
     } while (true);
 }
 
-void PTPipelineBaker::ReleaseVariant(std::shared_ptr<PTPipelineVariant>& variant)
+void PathTracingShaderCompiler::ReleaseVariant(std::shared_ptr<PTPipelineVariant>& variant)
 {
     if (variant == nullptr)
         return;
@@ -770,21 +770,21 @@ void PTPipelineBaker::ReleaseVariant(std::shared_ptr<PTPipelineVariant>& variant
     assert(false);
 }
 
-std::shared_ptr<PTPipelineVariant> PTPipelineBaker::CreateVariant(const std::string & relativeSourcePath, std::vector<caustica::ShaderMacro> variantMacros, const std::string & shortUniqueDebugID, bool rayGenOnly)
+std::shared_ptr<PTPipelineVariant> PathTracingShaderCompiler::CreateVariant(const std::string & relativeSourcePath, std::vector<caustica::ShaderMacro> variantMacros, const std::string & shortUniqueDebugID, bool rayGenOnly)
 {
     std::shared_ptr<PTPipelineVariant> variant = std::shared_ptr<PTPipelineVariant>(new PTPipelineVariant(relativeSourcePath, variantMacros, this->shared_from_this(), shortUniqueDebugID, rayGenOnly));
     m_variants.push_back(variant);
     return variant;
 }
 
-bool PTPipelineBaker::RegisterShortUniqueDebugID(const std::string& id)
+bool PathTracingShaderCompiler::RegisterShortUniqueDebugID(const std::string& id)
 {
     auto [it, inserted] = m_shortUniqueDebugIDs.insert(id);
 
     return inserted;
 }
 
-void PTPipelineBaker::UnregisterShortUniqueDebugID(const std::string& id)
+void PathTracingShaderCompiler::UnregisterShortUniqueDebugID(const std::string& id)
 {
     int count = m_shortUniqueDebugIDs.erase(id);
     assert( count > 0 );

@@ -13,7 +13,7 @@ using namespace caustica::math;
 
 #include <shaders/PathTracer/Lighting/LightingTypes.hlsli>
 #include <shaders/PathTracer/Lighting/EnvMap.hlsli>
-#include <shaders/render/Lighting/Distant/EnvMapImportanceSamplingBaker.hlsl>
+#include <shaders/render/Lighting/Distant/EnvMapImportanceSamplingCache.hlsl>
 
 namespace caustica
 {
@@ -30,19 +30,19 @@ namespace caustica::render
 }
 
 // This is used to 
-//  * pre-process importance sampling for a given cubemap source (baked by EnvMapBaker).
+//  * pre-process importance sampling for a given cubemap source (baked by EnvMapProcessor).
 //  * provide all buffers and constants required for importance sampling the environment map.
 // It supports 3+ approaches:
 //  - uniform reference
 //  - classic MIP descent (implementation originates in https://github.com/NVIDIAGameWorks/Falcor)
 //  - presampled lights (use MIP descent to pre-generate a bunch of lights each frame)
-class EnvMapImportanceSamplingBaker
+class EnvMapImportanceSamplingCache
 {
 public:
 
 public:
-    EnvMapImportanceSamplingBaker( nvrhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory );
-    ~EnvMapImportanceSamplingBaker();
+    EnvMapImportanceSamplingCache( nvrhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory );
+    ~EnvMapImportanceSamplingCache();
 
     void                            CreateRenderPasses();
 
@@ -69,7 +69,7 @@ public:
 private:
     void                            CreateImportanceMap();
     void                            GenerateImportanceMap(nvrhi::CommandListHandle commandList, nvrhi::TextureHandle sourceCubemap);
-    void                            FillBakerConsts(EnvMapImportanceSamplingBakerConstants & constants, nvrhi::TextureHandle sourceCubemap, int sampleIndex);
+    void                            FillCacheConsts(EnvMapImportanceSamplingCacheConstants & constants, nvrhi::TextureHandle sourceCubemap, int sampleIndex);
 
 private:
     nvrhi::DeviceHandle             m_device;
@@ -78,7 +78,7 @@ private:
     nvrhi::SamplerHandle            m_pointClampSampler;
     nvrhi::SamplerHandle            m_linearWrapSampler;
 
-    nvrhi::BufferHandle             m_builderConstants;  // EnvMapImportanceSamplingBakerConstants
+    nvrhi::BufferHandle             m_builderConstants;  // EnvMapImportanceSamplingCacheConstants
 
     // MIP hierarchy needed for MIP descent importance sampling approach (always needed)
     nvrhi::TextureHandle            m_importanceMapTexture;

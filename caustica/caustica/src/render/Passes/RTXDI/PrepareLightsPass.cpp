@@ -14,14 +14,14 @@
 
 using namespace caustica::math;
 #include <shaders/render/RTXDI/ShaderParameters.h>
-#include <render/Passes/Lighting/Distant/EnvMapBaker.h>
-#include <render/Passes/Lighting/Distant/EnvMapImportanceSamplingBaker.h>
+#include <render/Passes/Lighting/Distant/EnvMapProcessor.h>
+#include <render/Passes/Lighting/Distant/EnvMapImportanceSamplingCache.h>
 #include <render/Core/RenderTargets.h>
 
 #include <render/Passes/Debug/ShaderDebug.h>
 
-#include <render/Passes/Lighting/MaterialsBaker.h>
-#include <render/Passes/OMM/OmmBaker.h>
+#include <render/Passes/Lighting/MaterialGpuCache.h>
+#include <render/Passes/OMM/OpacityMicromapBuilder.h>
 
 using namespace caustica;
 
@@ -31,8 +31,8 @@ PrepareLightsPass::PrepareLightsPass(
     std::shared_ptr<caustica::ShaderFactory> shaderFactory, 
     std::shared_ptr<caustica::CommonRenderPasses> commonPasses,
     std::shared_ptr<caustica::Scene> scene,
-    std::shared_ptr<MaterialsBaker> materialsBaker,
-    std::shared_ptr<OmmBaker> ommBaker,
+    std::shared_ptr<MaterialGpuCache> materialGpuCache,
+    std::shared_ptr<OpacityMicromapBuilder> opacityMicromapBuilder,
 
     nvrhi::BufferHandle subInstanceData,
     nvrhi::IBindingLayout* bindlessLayout,
@@ -42,8 +42,8 @@ PrepareLightsPass::PrepareLightsPass(
     , m_shaderFactory(std::move(shaderFactory))
     , m_commonPasses(std::move(commonPasses))
     , m_Scene(std::move(scene))
-    , m_materialsBaker(materialsBaker)
-    , m_ommBaker(ommBaker)
+    , m_materialGpuCache(materialGpuCache)
+    , m_opacityMicromapBuilder(opacityMicromapBuilder)
     , m_subInstanceData(subInstanceData)
     , m_shaderDebug(shaderDebug)
 {
@@ -85,7 +85,7 @@ PrepareLightsPass::PrepareLightsPass(
 
 
 void PrepareLightsPass::SetScene(std::shared_ptr<caustica::Scene> scene,
-    std::shared_ptr<EnvMapBaker> environmentMap, EnvMapSceneParams envMapSceneParams)
+    std::shared_ptr<EnvMapProcessor> environmentMap, EnvMapSceneParams envMapSceneParams)
 {
     m_Scene = scene;
     m_EnvironmentMap = environmentMap;
@@ -126,8 +126,8 @@ void PrepareLightsPass::CreateBindingSet(RtxdiResources& resources, const Render
         nvrhi::BindingSetItem::StructuredBuffer_SRV(1, m_subInstanceData),
         nvrhi::BindingSetItem::StructuredBuffer_SRV(2, m_Scene->GetInstanceBuffer()),
         nvrhi::BindingSetItem::StructuredBuffer_SRV(3, m_Scene->GetGeometryBuffer()),
-        //nvrhi::BindingSetItem::StructuredBuffer_SRV(4, (m_ommBaker!=nullptr)?(m_ommBaker->GetGeometryDebugBuffer()):(resources.LightDataBuffer.Get())), // yuck
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(5, m_materialsBaker->GetMaterialDataBuffer()),
+        //nvrhi::BindingSetItem::StructuredBuffer_SRV(4, (m_opacityMicromapBuilder!=nullptr)?(m_opacityMicromapBuilder->GetGeometryDebugBuffer()):(resources.LightDataBuffer.Get())), // yuck
+        nvrhi::BindingSetItem::StructuredBuffer_SRV(5, m_materialGpuCache->GetMaterialDataBuffer()),
         nvrhi::BindingSetItem::Texture_SRV(6, m_EnvironmentMap ? m_EnvironmentMap->GetEnvMapCube() : m_commonPasses->m_BlackCubeMapArray),
         nvrhi::BindingSetItem::Texture_SRV(7, m_EnvironmentMap ? m_EnvironmentMap->GetImportanceSampling()->GetImportanceMapOnly() : m_commonPasses->m_BlackTexture),
         nvrhi::BindingSetItem::StructuredBuffer_SRV(8, resources.PrimitiveLightBuffer),
@@ -238,7 +238,7 @@ static uint16_t fp32ToFp16(float v)
     return (uint16_t)(sign >> 16 | body >> 13) & 0xFFFF;
 }
 
-static bool ConvertLight(const caustica::Light& light, PolymorphicLightInfoFull& polymorphic, bool enableImportanceSampledEnvironmentLight, EnvMapBaker* environmentMap)
+static bool ConvertLight(const caustica::Light& light, PolymorphicLightInfoFull& polymorphic, bool enableImportanceSampledEnvironmentLight, EnvMapProcessor* environmentMap)
 {
     switch (light.GetLightType())
     {

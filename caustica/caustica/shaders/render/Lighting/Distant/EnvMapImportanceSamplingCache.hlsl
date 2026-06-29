@@ -5,7 +5,7 @@
 #define EMISB_IMPORTANCE_MAP_DIM                1024
 #define EMISB_IMPORTANCE_SAMPLES_PER_PIXEL      16          // how many samples of the cubemap to take for one highest resolution importance map texel
 
-struct EnvMapImportanceSamplingBakerConstants
+struct EnvMapImportanceSamplingCacheConstants
 {
     // source info
 	uint                SourceCubeDim;
@@ -31,7 +31,7 @@ struct EnvMapImportanceSamplingBakerConstants
 #include <shaders/PathTracer/Utils/SampleGenerators.hlsli>
 #include <shaders/PathTracer/Utils/Utils.hlsli>
 
-ConstantBuffer<EnvMapImportanceSamplingBakerConstants>  g_BuilderConsts  : register(b0);
+ConstantBuffer<EnvMapImportanceSamplingCacheConstants>  g_BuilderConsts  : register(b0);
 
 SamplerState                            s_PointClamp                : register(s0);
 SamplerState                            s_LinearWrap                : register(s1);

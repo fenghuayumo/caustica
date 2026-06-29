@@ -50,14 +50,14 @@
 #include <stdexcept>
 
 
-#include <render/Core/ComputePipelineBaker.h>
+#include <render/Core/ComputePipelineRegistry.h>
 
 #include "render/Core/AccelerationStructureUtil.h"
 
-#include <render/Passes/Lighting/Distant/EnvMapImportanceSamplingBaker.h>
-#include <render/Passes/Lighting/MaterialsBaker.h>
+#include <render/Passes/Lighting/Distant/EnvMapImportanceSamplingCache.h>
+#include <render/Passes/Lighting/MaterialGpuCache.h>
 
-#include <render/Passes/OMM/OmmBaker.h>
+#include <render/Passes/OMM/OpacityMicromapBuilder.h>
 
 #include "common/LocalConfig.h"
 #include "common/CaptureScriptManager.h"
@@ -65,7 +65,7 @@
 
 #include <render/Passes/Debug/ZoomTool.h>
 
-#include <render/Passes/PostProcess/DenoisingGuidesBaker.h>
+#include <render/Passes/PostProcess/DenoisingGuidesPass.h>
 #include <render/Passes/Denoisers/OidnDenoiser.h>
 
 #include <scene/SceneGraph.h>
@@ -432,7 +432,7 @@ void SceneEditor::Init(const std::string& preferredScene,
     m_progressLoading.Set(95);
 
     if (GetDevice()->queryFeatureSupport(nvrhi::Feature::RayTracingOpacityMicromap))
-        GetLightingPasses().createOmmBakerIfSupported(GetDevice(), m_DescriptorTable, m_TextureLoader, m_shaderFactory);
+        GetLightingPasses().createOpacityMicromapBuilderIfSupported(GetDevice(), m_DescriptorTable, m_TextureLoader, m_shaderFactory);
 
     // Get all scenes in "assets" folder
     m_sceneManager->discoverAvailableScenes(GetLocalPath(c_AssetsFolder));

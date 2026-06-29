@@ -1,5 +1,5 @@
-#include <render/Passes/OMM/OmmBaker.h>
-#include <render/Passes/Lighting/MaterialsBaker.h> // for PTMaterial full definition
+#include <render/Passes/OMM/OpacityMicromapBuilder.h>
+#include <render/Passes/Lighting/MaterialGpuCache.h> // for PTMaterial full definition
 
 #include <assets/loader/ShaderFactory.h>
 #include <render/Core/FramebufferFactory.h>
@@ -33,7 +33,7 @@ using namespace caustica;
 
 #include <shaders/Misc/OmmGeometryDebugData.hlsli>
 
-OmmBaker::OmmBaker(nvrhi::DeviceHandle device,
+OpacityMicromapBuilder::OpacityMicromapBuilder(nvrhi::DeviceHandle device,
     std::shared_ptr<caustica::DescriptorTableManager> descriptorTableManager,
     std::shared_ptr<caustica::TextureLoader> textureCache,
     std::shared_ptr<caustica::ShaderFactory> shaderFactory)
@@ -58,11 +58,11 @@ OmmBaker::OmmBaker(nvrhi::DeviceHandle device,
     m_geometryDebugBuffer = m_device->createBuffer(bufferDesc);
 }
 
-OmmBaker::~OmmBaker()
+OpacityMicromapBuilder::~OpacityMicromapBuilder()
 {
 }
 
-void OmmBaker::SceneLoaded(const caustica::Scene& scene)
+void OpacityMicromapBuilder::SceneLoaded(const caustica::Scene& scene)
 {
     const size_t allocationGranularity = 1024;
     const size_t geometryCount = scene.GetSceneGraph()->GetGeometryCount();
@@ -83,18 +83,18 @@ void OmmBaker::SceneLoaded(const caustica::Scene& scene)
     }
 }
 
-void OmmBaker::SceneUnloading()
+void OpacityMicromapBuilder::SceneUnloading()
 {
     m_ommBuildQueue->CancelPendingBuilds();
 }
 
-void OmmBaker::CreateRenderPasses(nvrhi::BindingLayoutHandle bindlessLayout, std::shared_ptr<caustica::CommonRenderPasses> commonPasses)
+void OpacityMicromapBuilder::CreateRenderPasses(nvrhi::BindingLayoutHandle bindlessLayout, std::shared_ptr<caustica::CommonRenderPasses> commonPasses)
 {
     m_bindlessLayout = std::move(bindlessLayout);
     m_commonPasses = std::move(commonPasses);
 }
 
-void OmmBaker::CreateOpacityMicromaps(const caustica::Scene& scene)
+void OpacityMicromapBuilder::CreateOpacityMicromaps(const caustica::Scene& scene)
 {
     m_ommBuildQueue->CancelPendingBuilds();
 
@@ -153,7 +153,7 @@ void OmmBaker::CreateOpacityMicromaps(const caustica::Scene& scene)
     }
 }
 
-void OmmBaker::DestroyOpacityMicromaps(nvrhi::ICommandList& commandList, const caustica::Scene& scene)
+void OpacityMicromapBuilder::DestroyOpacityMicromaps(nvrhi::ICommandList& commandList, const caustica::Scene& scene)
 {
     commandList.close();
     m_device->executeCommandList(&commandList);
@@ -171,7 +171,7 @@ void OmmBaker::DestroyOpacityMicromaps(nvrhi::ICommandList& commandList, const c
     }
 }
 
-void OmmBaker::BuildOpacityMicromaps(nvrhi::ICommandList& commandList, const caustica::Scene& scene)
+void OpacityMicromapBuilder::BuildOpacityMicromaps(nvrhi::ICommandList& commandList, const caustica::Scene& scene)
 {
     commandList.beginMarker("OMM Updates");
 
@@ -193,12 +193,12 @@ void OmmBaker::BuildOpacityMicromaps(nvrhi::ICommandList& commandList, const cau
     commandList.endMarker();
 }
 
-void OmmBaker::WriteGeometryDebugBuffer(nvrhi::ICommandList& commandList)
+void OpacityMicromapBuilder::WriteGeometryDebugBuffer(nvrhi::ICommandList& commandList)
 {
     commandList.writeBuffer(m_geometryDebugBuffer, m_geometryDebugDataPtr.data(), m_geometryDebugDataPtr.size() * sizeof(GeometryDebugData));
 }
 
-void OmmBaker::UpdateDebugGeometry(const MeshInfo& _mesh)
+void OpacityMicromapBuilder::UpdateDebugGeometry(const MeshInfo& _mesh)
 {
     const MeshInfoEx& mesh = static_cast<const MeshInfoEx&>(_mesh);
     assert(&mesh != nullptr);
@@ -235,9 +235,9 @@ void OmmBaker::UpdateDebugGeometry(const MeshInfo& _mesh)
     }
 }
 
-bool OmmBaker::Update(nvrhi::ICommandList& commandList, const caustica::Scene& scene)
+bool OpacityMicromapBuilder::Update(nvrhi::ICommandList& commandList, const caustica::Scene& scene)
 {
-    RAII_SCOPE( commandList.beginMarker("OmmBaker");, commandList.endMarker(); );
+    RAII_SCOPE( commandList.beginMarker("OpacityMicromapBuilder");, commandList.endMarker(); );
 
     bool anyDirty = false;
     for (auto& _mesh : scene.GetSceneGraph()->GetMeshes())
@@ -257,7 +257,7 @@ bool OmmBaker::Update(nvrhi::ICommandList& commandList, const caustica::Scene& s
     return anyDirty;
 }
 
-void OmmBaker::SetGlobalShaderMacros(std::vector<caustica::ShaderMacro>& macros)
+void OpacityMicromapBuilder::SetGlobalShaderMacros(std::vector<caustica::ShaderMacro>& macros)
 {
     if (m_uiData.DebugView == OpacityMicroMapDebugView::InWorld)
         macros.push_back( { "OMM_DEBUG_VIEW_IN_WORLD", "1" } );
@@ -265,9 +265,9 @@ void OmmBaker::SetGlobalShaderMacros(std::vector<caustica::ShaderMacro>& macros)
         macros.push_back( { "OMM_DEBUG_VIEW_OVERLAY", "1" } );
 }
 
-bool OmmBaker::DebugGUI(float indent, const caustica::Scene& scene)
+bool OpacityMicromapBuilder::DebugGUI(float indent, const caustica::Scene& scene)
 {
-    RAII_SCOPE(ImGui::PushID("OmmBakerDebugGUI"); , ImGui::PopID(); );
+    RAII_SCOPE(ImGui::PushID("OpacityMicromapBuilderDebugGUI"); , ImGui::PopID(); );
     
     bool resetAccumulation = false;
     #define RESET_ON_CHANGE(code) do{if (code) resetAccumulation = true;} while(false)

@@ -9,7 +9,7 @@
 #include <memory>
 #include <vector>
 
-class PTPipelineBaker;
+class PathTracingShaderCompiler;
 class PTPipelineVariant;
 
 namespace caustica
@@ -75,7 +75,7 @@ public:
     bool consumeShaderReloadRequest();
     bool& accelerationStructRebuildRequested();
 
-    std::shared_ptr<PTPipelineBaker> getPipelineBaker() const;
+    std::shared_ptr<PathTracingShaderCompiler> pathTracingShaderCompiler() const;
     std::shared_ptr<PTPipelineVariant>& pipelineReference();
     std::shared_ptr<PTPipelineVariant>& pipelineBuildStablePlanes();
     std::shared_ptr<PTPipelineVariant>& pipelineFillStablePlanes();

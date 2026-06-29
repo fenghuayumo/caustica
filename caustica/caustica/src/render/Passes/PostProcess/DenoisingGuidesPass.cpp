@@ -6,7 +6,7 @@
 #include <rhi/utils.h>
 #include <assets/loader/ShaderFactory.h>
 #include <render/Core/CommonRenderPasses.h>
-#include <render/Passes/PostProcess/DenoisingGuidesBaker.h>
+#include <render/Passes/PostProcess/DenoisingGuidesPass.h>
 #include <core/file_utils.h>
 #include <core/format.h>
 #include <core/path_utils.h>
@@ -21,7 +21,7 @@
 
 using namespace caustica::math;
 
-#include <shaders/render/ProcessingPasses/DenoisingGuidesBaker.hlsl>
+#include <shaders/render/ProcessingPasses/DenoisingGuidesPass.hlsl>
 
 #include <shaders/PathTracer/PathTracerDebug.hlsli>
 
@@ -29,9 +29,9 @@ using namespace caustica::math;
 
 #include <shaders/SampleConstantBuffer.h>
 
-static_assert( sizeof(DenoisingGuidesBakerConstants) == sizeof(SampleMiniConstants) );
+static_assert( sizeof(DenoisingGuidesPassConstants) == sizeof(SampleMiniConstants) );
 
-DenoisingGuidesBaker::DenoisingGuidesBaker( nvrhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory, const std::unique_ptr<RenderTargets> & renderTargets, const std::shared_ptr<ShaderDebug> & shaderDebug, nvrhi::BindingLayoutHandle bindingLayout )
+DenoisingGuidesPass::DenoisingGuidesPass( nvrhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory, const std::unique_ptr<RenderTargets> & renderTargets, const std::shared_ptr<ShaderDebug> & shaderDebug, nvrhi::BindingLayoutHandle bindingLayout )
     : m_device(device)
     , m_bindingCache(device)
     , m_renderTargets(renderTargets)
@@ -50,20 +50,20 @@ DenoisingGuidesBaker::DenoisingGuidesBaker( nvrhi::IDevice* device, std::shared_
 
     // These need to know about the scene
     pipelineDesc.bindingLayouts = { m_bindingLayout };
-    m_csDenoiseSpecHitT.Init(m_device, *shaderFactory, "caustica/shaders/render/ProcessingPasses/DenoisingGuidesBaker.hlsl", "DenoiseSpecHitT", std::vector<caustica::ShaderMacro>(), pipelineDesc.bindingLayouts);
-    m_csComputeAvgLayerRadiance.Init(m_device, *shaderFactory, "caustica/shaders/render/ProcessingPasses/DenoisingGuidesBaker.hlsl", "ComputeAvgLayerRadiance", std::vector<caustica::ShaderMacro>(), pipelineDesc.bindingLayouts);
-    m_csDebugViz.Init(m_device, *shaderFactory, "caustica/shaders/render/ProcessingPasses/DenoisingGuidesBaker.hlsl", "DebugViz", std::vector<caustica::ShaderMacro>(), pipelineDesc.bindingLayouts);
+    m_csDenoiseSpecHitT.Init(m_device, *shaderFactory, "caustica/shaders/render/ProcessingPasses/DenoisingGuidesPass.hlsl", "DenoiseSpecHitT", std::vector<caustica::ShaderMacro>(), pipelineDesc.bindingLayouts);
+    m_csComputeAvgLayerRadiance.Init(m_device, *shaderFactory, "caustica/shaders/render/ProcessingPasses/DenoisingGuidesPass.hlsl", "ComputeAvgLayerRadiance", std::vector<caustica::ShaderMacro>(), pipelineDesc.bindingLayouts);
+    m_csDebugViz.Init(m_device, *shaderFactory, "caustica/shaders/render/ProcessingPasses/DenoisingGuidesPass.hlsl", "DebugViz", std::vector<caustica::ShaderMacro>(), pipelineDesc.bindingLayouts);
 
-    //m_constantBuffer = m_device->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(DenoisingGuidesBakerConstants), "DenoisingGuidesBakerConstants", caustica::c_MaxRenderPassConstantBufferVersions));
+    //m_constantBuffer = m_device->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(DenoisingGuidesPassConstants), "DenoisingGuidesPassConstants", caustica::c_MaxRenderPassConstantBufferVersions));
 }
 
-DenoisingGuidesBaker::~DenoisingGuidesBaker( )
+DenoisingGuidesPass::~DenoisingGuidesPass( )
 {
 }
 
 #pragma optimize("", off)
 
-void DenoisingGuidesBaker::DenoiseSpecHitT(nvrhi::ICommandList* commandList, nvrhi::BindingSetHandle bindingSet)
+void DenoisingGuidesPass::DenoiseSpecHitT(nvrhi::ICommandList* commandList, nvrhi::BindingSetHandle bindingSet)
 {
     RAII_SCOPE(commandList->beginMarker("DenoiseSpecHitT"); , commandList->endMarker(); );
 
@@ -71,23 +71,23 @@ void DenoisingGuidesBaker::DenoiseSpecHitT(nvrhi::ICommandList* commandList, nvr
     int threadGroupCountY = div_ceil(m_renderTargets->RenderSize.y, DGB_2D_THREADGROUP_SIZE);
 
     static int passCount = 1;
-    DenoisingGuidesBakerConstants consts;
+    DenoisingGuidesPassConstants consts;
     for( int pass = 0; pass < passCount; pass++ )
     {
         // ping
         commandList->setTextureState(m_renderTargets->SpecularHitT, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
-        consts = DenoisingGuidesBakerConstants { .RenderResolution = m_renderTargets->RenderSize, .DisplayResolution = m_renderTargets->DisplaySize, .DebugView = (int)0, .Ping = 1 };
+        consts = DenoisingGuidesPassConstants { .RenderResolution = m_renderTargets->RenderSize, .DisplayResolution = m_renderTargets->DisplaySize, .DebugView = (int)0, .Ping = 1 };
         m_csDenoiseSpecHitT.Execute(commandList, threadGroupCountX, threadGroupCountY, 1, bindingSet, nullptr, nullptr, &consts, sizeof(consts));
         // pong
         commandList->setTextureState(m_renderTargets->SpecularHitT, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
         commandList->setTextureState(m_renderTargets->ScratchFloat1, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
-        consts = DenoisingGuidesBakerConstants { .RenderResolution = m_renderTargets->RenderSize, .DisplayResolution = m_renderTargets->DisplaySize, .DebugView = (int)0, .Ping = 0 };
+        consts = DenoisingGuidesPassConstants { .RenderResolution = m_renderTargets->RenderSize, .DisplayResolution = m_renderTargets->DisplaySize, .DebugView = (int)0, .Ping = 0 };
         m_csDenoiseSpecHitT.Execute(commandList, threadGroupCountX, threadGroupCountY, 1, bindingSet, nullptr, nullptr, &consts, sizeof(consts));
     }
     commandList->setTextureState(m_renderTargets->SpecularHitT, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
 }
 
-void DenoisingGuidesBaker::ComputeAvgLayerRadiance(nvrhi::ICommandList* commandList, nvrhi::BindingSetHandle bindingSet)
+void DenoisingGuidesPass::ComputeAvgLayerRadiance(nvrhi::ICommandList* commandList, nvrhi::BindingSetHandle bindingSet)
 {
     RAII_SCOPE(commandList->beginMarker("ComputeAvgLayerRadiance"); , commandList->endMarker(); );
 
@@ -98,19 +98,19 @@ void DenoisingGuidesBaker::ComputeAvgLayerRadiance(nvrhi::ICommandList* commandL
     int threadGroupCountX = div_ceil(halfWidth, DGB_2D_THREADGROUP_SIZE);
     int threadGroupCountY = div_ceil(halfHeight, DGB_2D_THREADGROUP_SIZE);
 
-    DenoisingGuidesBakerConstants consts { .RenderResolution = m_renderTargets->RenderSize, .DisplayResolution = m_renderTargets->DisplaySize, .DebugView = 0, .Ping = 0 };
+    DenoisingGuidesPassConstants consts { .RenderResolution = m_renderTargets->RenderSize, .DisplayResolution = m_renderTargets->DisplaySize, .DebugView = 0, .Ping = 0 };
     m_csComputeAvgLayerRadiance.Execute(commandList, threadGroupCountX, threadGroupCountY, 1, bindingSet, nullptr, nullptr, &consts, sizeof(consts));
 
     commandList->setTextureState(m_renderTargets->DenoiserAvgLayerRadianceHalfRes, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
 }
 
-void DenoisingGuidesBaker::RenderDebugViz( nvrhi::ICommandList * commandList, DebugViewType debugView, nvrhi::BindingSetHandle bindingSet )
+void DenoisingGuidesPass::RenderDebugViz( nvrhi::ICommandList * commandList, DebugViewType debugView, nvrhi::BindingSetHandle bindingSet )
 {
     //if( !m_settings.Enabled )
     //    return;
 
     
-    DenoisingGuidesBakerConstants consts { .RenderResolution = m_renderTargets->RenderSize, .DisplayResolution = m_renderTargets->DisplaySize, .DebugView = (int)debugView } ;
+    DenoisingGuidesPassConstants consts { .RenderResolution = m_renderTargets->RenderSize, .DisplayResolution = m_renderTargets->DisplaySize, .DebugView = (int)debugView } ;
 
     RAII_SCOPE(commandList->beginMarker("DebugViz");, commandList->endMarker(); );
 
@@ -120,7 +120,7 @@ void DenoisingGuidesBaker::RenderDebugViz( nvrhi::ICommandList * commandList, De
     m_csDebugViz.Execute(commandList, threadGroupCountX, threadGroupCountY, 1, bindingSet, nullptr, nullptr, &consts, sizeof(consts) );
 }
 
-bool DenoisingGuidesBaker::DebugGUI(float indent)
+bool DenoisingGuidesPass::DebugGUI(float indent)
 {
     //ImGui::PushItemWidth(120.0f);
 

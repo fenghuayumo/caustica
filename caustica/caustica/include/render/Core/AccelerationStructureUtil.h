@@ -2,7 +2,7 @@
 
 #include <scene/SceneTypes.h>
 #include <rhi/nvrhi.h>
-#include <render/Passes/Lighting/MaterialsBaker.h>
+#include <render/Passes/Lighting/MaterialGpuCache.h>
 
 namespace bvh
 {

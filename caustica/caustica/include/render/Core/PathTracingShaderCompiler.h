@@ -42,12 +42,12 @@ class PTPipelineVariant
         void                                    FromMaterialPermutation(const std::string & shortUniqueDebugID, const std::vector<caustica::ShaderMacro> & macros, const struct MaterialShaderPermutation & msp);
         void                                    CompileIfNeeded();
         void                                    ResetShaderLibrary();
-        void                                    LoadShaderLibraryIfNeeded(class PTPipelineBaker & baker);
+        void                                    LoadShaderLibraryIfNeeded(class PathTracingShaderCompiler & compiler);
     };
 
 private:
-    friend class PTPipelineBaker;
-    PTPipelineVariant(const std::string & relativeSourcePath, const std::vector<caustica::ShaderMacro> & variantMacros, const std::shared_ptr<PTPipelineBaker> & baker, const std::string & shortUniqueDebugID, bool raygenOnly);
+    friend class PathTracingShaderCompiler;
+    PTPipelineVariant(const std::string & relativeSourcePath, const std::vector<caustica::ShaderMacro> & variantMacros, const std::shared_ptr<PathTracingShaderCompiler> & compiler, const std::string & shortUniqueDebugID, bool raygenOnly);
 public:
     ~PTPipelineVariant();
 
@@ -69,17 +69,17 @@ private:
 
 private:
 
-    int64_t                                 m_localVersion = -1;        // if it doesn't match Baker version, we're out of date
+    int64_t                                 m_localVersion = -1;        // if it doesn't match compiler version, we're out of date
     nvrhi::rt::ShaderTableHandle            m_shaderTable;
     nvrhi::rt::PipelineHandle               m_pipeline;
-    std::weak_ptr<class PTPipelineBaker>    m_baker;
+    std::weak_ptr<class PathTracingShaderCompiler>    m_compiler;
     bool                                    m_rayGenOnly;
     bool                                    m_exportAnyHit = false;
     bool                                    m_exportMiss = false;
-    std::shared_ptr<class PTPipelineBaker>  m_us_lockedBaker;
+    std::shared_ptr<class PathTracingShaderCompiler>  m_lockedCompiler;
 
 
-    std::vector<caustica::ShaderMacro> m_macros;                   // global macros (obtained from PTPipelineBaker::GetMacros)
+    std::vector<caustica::ShaderMacro> m_macros;                   // global macros (obtained from PathTracingShaderCompiler::GetMacros)
     std::vector<caustica::ShaderMacro> m_combinedMacros;           // per-PTPipelineVariant macros 
 
 
@@ -88,7 +88,7 @@ private:
     
     // ClosestHit and AnyHit (AnyHit usually baked in and not separate)
     ShaderPermutation                       m_ubershaderMaterial;               // A generic, non-specialized-works-for-all-material (note: this will likely go away in the future)
-    std::vector<ShaderPermutation>          m_specializedPerMaterial;           // See MaterialsBaker's m_shaderPermutationTable
+    std::vector<ShaderPermutation>          m_specializedPerMaterial;           // See MaterialGpuCache's m_shaderPermutationTable
 
     std::string                             m_shortUniqueDebugID;
 };
@@ -103,18 +103,18 @@ struct HitGroupInfo
     int         GetShaderPermutationIndex() const;
 };
 
-class PTPipelineBaker : public std::enable_shared_from_this<PTPipelineBaker>
+class PathTracingShaderCompiler : public std::enable_shared_from_this<PathTracingShaderCompiler>
 {
 public:
-    PTPipelineBaker(nvrhi::IDevice* device, std::shared_ptr<class MaterialsBaker> & materialsBaker, nvrhi::BindingLayoutHandle bindingLayout, nvrhi::BindingLayoutHandle bindlessLayout);
-    ~PTPipelineBaker();
+    PathTracingShaderCompiler(nvrhi::IDevice* device, std::shared_ptr<class MaterialGpuCache> & materialGpuCache, nvrhi::BindingLayoutHandle bindingLayout, nvrhi::BindingLayoutHandle bindlessLayout);
+    ~PathTracingShaderCompiler();
     
     void                                Update(const std::shared_ptr<caustica::Scene> & scene, unsigned int subInstanceCount, const std::function<void(std::vector<caustica::ShaderMacro> & macros)>& globalMacrosGetter, bool forceShaderReload);
     std::shared_ptr<PTPipelineVariant>  CreateVariant(const std::string & relativeSourcePath, std::vector<caustica::ShaderMacro> variantMacros, const std::string & shortUniqueDebugID, bool rayGenOnly = false );
     void                                ReleaseVariant(std::shared_ptr<PTPipelineVariant> & variant);
     
-    const std::shared_ptr<class MaterialsBaker> & 
-                                        GetMaterialsBaker() const           { return m_materialsBaker; }
+    const std::shared_ptr<class MaterialGpuCache> & 
+                                        GetMaterialGpuCache() const           { return m_materialGpuCache; }
 
 private:
     friend class PTPipelineVariant;
@@ -155,7 +155,7 @@ private:
 private:
     nvrhi::DeviceHandle                             m_device;
     std::shared_ptr<caustica::RootFileSystem>     m_shadersFS;
-    std::shared_ptr<class MaterialsBaker> &         m_materialsBaker;
+    std::shared_ptr<class MaterialGpuCache> &         m_materialGpuCache;
     nvrhi::BindingLayoutHandle                      m_bindingLayout;
     nvrhi::BindingLayoutHandle                      m_bindlessLayout;
 

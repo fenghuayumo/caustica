@@ -9,10 +9,10 @@
 #include <string>
 #include <vector>
 
-class EnvMapBaker;
-class LightsBaker;
-class MaterialsBaker;
-class OmmBaker;
+class EnvMapProcessor;
+class LightSamplingCache;
+class MaterialGpuCache;
+class OpacityMicromapBuilder;
 struct EnvMapSceneParams;
 struct GaussianSplatEmissionProxy;
 
@@ -28,7 +28,7 @@ struct PreUpdateLightingParams
     nvrhi::ICommandList*                         commandList = nullptr;
     bool&                                          needNewBindings;
 
-    EnvMapBaker*                                   envMapBaker = nullptr;
+    EnvMapProcessor*                                   envMapProcessor = nullptr;
     std::shared_ptr<CommonRenderPasses>            commonPasses;
 
     std::string                                    envMapActualPath;
@@ -40,15 +40,15 @@ struct UpdateLightingParams
     PathTracerSettings&                            settings;
 
     nvrhi::ICommandList*                           commandList = nullptr;
-    EnvMapBaker*                                   envMapBaker = nullptr;
-    LightsBaker*                                   lightsBaker = nullptr;
+    EnvMapProcessor*                                   envMapProcessor = nullptr;
+    LightSamplingCache*                                   lightSamplingCache = nullptr;
     BindingCache*                                  bindingCache = nullptr;
     std::shared_ptr<CommonRenderPasses>            commonPasses;
 
     const std::vector<std::shared_ptr<Light>>*     lights = nullptr;
     const std::shared_ptr<Scene>&                  scene;
-    std::shared_ptr<MaterialsBaker>                materialsBaker;
-    std::shared_ptr<OmmBaker>                        ommBaker;
+    std::shared_ptr<MaterialGpuCache>                materialGpuCache;
+    std::shared_ptr<OpacityMicromapBuilder>                        opacityMicromapBuilder;
 
     EnvMapSceneParams&                             envMapSceneParams;
     double                                         sceneTime = 0.0;
@@ -62,12 +62,12 @@ struct UpdateLightingParams
 struct UpdateLightingEndParams
 {
     nvrhi::ICommandList*                           commandList = nullptr;
-    LightsBaker*                                   lightsBaker = nullptr;
+    LightSamplingCache*                                   lightSamplingCache = nullptr;
     BindingCache*                                  bindingCache = nullptr;
 
     const std::shared_ptr<Scene>&                  scene;
-    std::shared_ptr<MaterialsBaker>                materialsBaker;
-    std::shared_ptr<OmmBaker>                        ommBaker;
+    std::shared_ptr<MaterialGpuCache>                materialGpuCache;
+    std::shared_ptr<OpacityMicromapBuilder>                        opacityMicromapBuilder;
 
     nvrhi::BufferHandle                            subInstanceDataBuffer;
     nvrhi::TextureHandle                           depthBuffer;

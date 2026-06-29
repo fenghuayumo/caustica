@@ -1,4 +1,4 @@
-#include <render/Core/ComputePipelineBaker.h>
+#include <render/Core/ComputePipelineRegistry.h>
 #include <assets/loader/ShaderCompilerUtils.h>
 #include <assets/loader/ShaderPackFileSystem.h>
 
@@ -14,9 +14,9 @@
 
 using namespace caustica;
 
-#define COMPUTE_BAKER_ENABLE_MULTITHREADED_COMPILE 1
-#define COMPUTE_BAKER_EMBED_PDBS 0
-#define COMPUTE_BAKER_USE_OPTIMIZATIONS 1
+#define COMPUTE_REGISTRY_ENABLE_MULTITHREADED_COMPILE 1
+#define COMPUTE_REGISTRY_EMBED_PDBS 0
+#define COMPUTE_REGISTRY_USE_OPTIMIZATIONS 1
 
 using namespace caustica;
 
@@ -31,10 +31,10 @@ static std::string MakeShaderCacheFileNameNoExt(const std::string& hashHex)
 }
 
 //////////////////////////////////////////////////////////////////////////
-// ComputePipelineBaker implementation
+// ComputePipelineRegistry implementation
 //////////////////////////////////////////////////////////////////////////
 
-ComputePipelineBaker::ComputePipelineBaker(nvrhi::IDevice* device, const std::vector<std::filesystem::path>& additionalMonitorPaths)
+ComputePipelineRegistry::ComputePipelineRegistry(nvrhi::IDevice* device, const std::vector<std::filesystem::path>& additionalMonitorPaths)
     : m_device(device)
 {
     if (!m_compilerConfig.Initialize(device, c_ComputeShaderBinariesRoot))
@@ -60,14 +60,14 @@ ComputePipelineBaker::ComputePipelineBaker(nvrhi::IDevice* device, const std::ve
         m_additionalMonitorPaths.push_back(std::filesystem::absolute(path));
     }
     
-    caustica::info("ComputePipelineBaker initialized (monitoring %d additional paths)", (int)m_additionalMonitorPaths.size());
+    caustica::info("ComputePipelineRegistry initialized (monitoring %d additional paths)", (int)m_additionalMonitorPaths.size());
 }
 
-ComputePipelineBaker::~ComputePipelineBaker()
+ComputePipelineRegistry::~ComputePipelineRegistry()
 {
 }
 
-std::shared_ptr<ComputeShaderVariant> ComputePipelineBaker::CreateVariant(
+std::shared_ptr<ComputeShaderVariant> ComputePipelineRegistry::CreateVariant(
     const std::string& shaderSourcePath,
     const std::string& entryPoint,
     const std::vector<ShaderMacro>& macros,
@@ -80,7 +80,7 @@ std::shared_ptr<ComputeShaderVariant> ComputePipelineBaker::CreateVariant(
     return variant;
 }
 
-void ComputePipelineBaker::ReleaseVariant(std::shared_ptr<ComputeShaderVariant>& variant)
+void ComputePipelineRegistry::ReleaseVariant(std::shared_ptr<ComputeShaderVariant>& variant)
 {
     if (variant == nullptr)
         return;
@@ -97,7 +97,7 @@ void ComputePipelineBaker::ReleaseVariant(std::shared_ptr<ComputeShaderVariant>&
     assert(false); // Variant not found
 }
 
-void ComputePipelineBaker::EnqueueShaderForCompilation(ComputeShaderVariant* variant)
+void ComputePipelineRegistry::EnqueueShaderForCompilation(ComputeShaderVariant* variant)
 {
     if (variant->m_compileCmdLine != "")
     {
@@ -108,7 +108,7 @@ void ComputePipelineBaker::EnqueueShaderForCompilation(ComputeShaderVariant* var
     m_parallelCompileListAll.push_back(variant);
 }
 
-void ComputePipelineBaker::Update(bool forceReload)
+void ComputePipelineRegistry::Update(bool forceReload)
 {
     // Auto-reload: poll for source file changes
     if (m_compilerConfig.CanCompile() && !forceReload && !m_variants.empty())
@@ -221,7 +221,7 @@ void ComputePipelineBaker::Update(bool forceReload)
             {
                 updateQueue.push_back(variant);
                 variant->ResetPipeline();
-                variant->m_lockedBaker = shared_from_this();
+                variant->m_lockedRegistry = shared_from_this();
                 variant->PrepareCompilation(*m_lastUpdatedSourceTimestamp);
                 EnqueueShaderForCompilation(variant.get());
             }
@@ -250,18 +250,18 @@ void ComputePipelineBaker::Update(bool forceReload)
                 continue;
             }
 
-#if COMPUTE_BAKER_ENABLE_MULTITHREADED_COMPILE
+#if COMPUTE_REGISTRY_ENABLE_MULTITHREADED_COMPILE
             m_threadPool.AddTask([this, variant, &progressCompilingShaders, &progressCounterCompleted, progressTotal]() {
 #endif
                 variant->CompileIfNeeded();
                 int completed = progressCounterCompleted.fetch_add(1) + 1;
                 progressCompilingShaders.Set(100 * completed / progressTotal);
-#if COMPUTE_BAKER_ENABLE_MULTITHREADED_COMPILE
+#if COMPUTE_REGISTRY_ENABLE_MULTITHREADED_COMPILE
             });
 #endif
         }
 
-#if COMPUTE_BAKER_ENABLE_MULTITHREADED_COMPILE
+#if COMPUTE_REGISTRY_ENABLE_MULTITHREADED_COMPILE
         m_threadPool.WaitForTasks();
 #endif
 
@@ -294,7 +294,7 @@ void ComputePipelineBaker::Update(bool forceReload)
         {
             if (firstError.empty())
                 variant->m_localVersion = m_version;
-            variant->m_lockedBaker = nullptr;
+            variant->m_lockedRegistry = nullptr;
         }
 
         if (!firstError.empty())
@@ -330,8 +330,8 @@ ComputeShaderVariant::ComputeShaderVariant(
     const std::vector<ShaderMacro>& macros,
     const nvrhi::BindingLayoutVector& bindingLayouts,
     const std::string& debugName,
-    const std::shared_ptr<ComputePipelineBaker>& baker)
-    : m_baker(baker)
+    const std::shared_ptr<ComputePipelineRegistry>& registry)
+    : m_registry(registry)
     , m_shaderSrcFileName(shaderSourcePath)
     , m_entryPoint(entryPoint)
     , m_macros(macros)
@@ -346,10 +346,10 @@ ComputeShaderVariant::~ComputeShaderVariant()
 
 bool ComputeShaderVariant::NeedsUpdate() const
 {
-    auto baker = m_baker.lock();
-    if (!baker)
+    auto registry = m_registry.lock();
+    if (!registry)
         return false;
-    return m_localVersion != baker->GetVersion() || m_pipeline == nullptr;
+    return m_localVersion != registry->GetVersion() || m_pipeline == nullptr;
 }
 
 void ComputeShaderVariant::ResetPipeline()
@@ -361,15 +361,15 @@ void ComputeShaderVariant::ResetPipeline()
 
 void ComputeShaderVariant::PrepareCompilation(std::filesystem::file_time_type lastModifiedSourceCode)
 {
-    auto baker = m_lockedBaker;
-    assert(baker != nullptr);
+    auto registry = m_lockedRegistry;
+    assert(registry != nullptr);
 
     // Clear any previous error
     m_compileError = "";
     m_compileCmdLine = "";
 
     // Build full source path
-    auto srcFullPath = std::filesystem::absolute(baker->GetShadersPath() / m_shaderSrcFileName);
+    auto srcFullPath = std::filesystem::absolute(registry->GetShadersPath() / m_shaderSrcFileName);
 
     // Build DXC command using shared utilities
     ShaderCompilerUtils::DxcCommandOptions options;
@@ -382,15 +382,15 @@ void ComputeShaderVariant::PrepareCompilation(std::filesystem::file_time_type la
 #endif
     options.EntryPoint = m_entryPoint;
     options.EnableDebugInfo = true;
-    options.EmbedPdb = COMPUTE_BAKER_EMBED_PDBS != 0;
-    options.UseOptimizations = COMPUTE_BAKER_USE_OPTIMIZATIONS != 0;
+    options.EmbedPdb = COMPUTE_REGISTRY_EMBED_PDBS != 0;
+    options.UseOptimizations = COMPUTE_REGISTRY_USE_OPTIMIZATIONS != 0;
     options.Enable16BitTypes = true;
     options.WarningsAsErrors = true;
     options.AllResourcesBound = true;
     options.EnableDebugPrint = true;
     options.Macros = m_macros;
 
-    auto cmdResult = ShaderCompilerUtils::BuildDxcCommand(baker->GetCompilerConfig(), options);
+    auto cmdResult = ShaderCompilerUtils::BuildDxcCommand(registry->GetCompilerConfig(), options);
 
     // Check if hash changed
     std::string previousHashHex = m_compiledHashHex;
@@ -402,34 +402,34 @@ void ComputeShaderVariant::PrepareCompilation(std::filesystem::file_time_type la
 
     m_compiledFileNameNoExt = MakeShaderCacheFileNameNoExt(m_compiledHashHex);
     m_compiledFullPath = std::filesystem::absolute(
-        baker->GetShaderBinariesPath() / m_compiledFileNameNoExt).string() + ".bin";
+        registry->GetShaderBinariesPath() / m_compiledFileNameNoExt).string() + ".bin";
     std::string compiledFullPathPdb = std::filesystem::absolute(
-        baker->GetShaderBinariesPath() / m_compiledFileNameNoExt).string() + ".pdb";
+        registry->GetShaderBinariesPath() / m_compiledFileNameNoExt).string() + ".pdb";
     std::string compiledVfsPath = "/" + c_ComputeShaderBinariesRoot + "/" + m_compiledFileNameNoExt + ".bin";
 
     // Check if compiled file is up to date
-    const bool compiledBlobAvailable = baker->GetFS()->fileExists(compiledVfsPath);
+    const bool compiledBlobAvailable = registry->GetFS()->fileExists(compiledVfsPath);
     const bool diskBlobUpToDate = ShaderCompilerUtils::IsCompiledShaderUpToDate(m_compiledFullPath, lastModifiedSourceCode);
-    if (compiledBlobAvailable && (!baker->CanCompileShaders() || diskBlobUpToDate))
+    if (compiledBlobAvailable && (!registry->CanCompileShaders() || diskBlobUpToDate))
     {
-        if (baker->IsVerbose())
+        if (registry->IsVerbose())
             caustica::info("No need to compile compute shader '%s', up-to-date file exists", m_debugName.c_str());
         m_compileCmdLine = "";
     }
-    else if (baker->CanCompileShaders())
+    else if (registry->CanCompileShaders())
     {
         // Need to recompile
         EnsureDirectoryExists(std::filesystem::path(m_compiledFullPath).parent_path());
-        std::string command = baker->GetCompilerConfig().GetCompilerPathQuoted();
+        std::string command = registry->GetCompilerConfig().GetCompilerPathQuoted();
         command += cmdResult.CommandBase;
         
-#if !COMPUTE_BAKER_EMBED_PDBS
-        if (baker->GetCompilerConfig().GraphicsAPI != nvrhi::GraphicsAPI::VULKAN)
+#if !COMPUTE_REGISTRY_EMBED_PDBS
+        if (registry->GetCompilerConfig().GraphicsAPI != nvrhi::GraphicsAPI::VULKAN)
             command += " /Fd \"" + compiledFullPathPdb + "\"";
 #endif
         command += " -Fo \"" + m_compiledFullPath + "\"";
 
-        if (baker->IsVerbose())
+        if (registry->IsVerbose())
             caustica::info("Enqueuing compute shader '%s' for compilation...", m_debugName.c_str());
         
         m_compileCmdLine = command;
@@ -470,12 +470,12 @@ void ComputeShaderVariant::LoadShaderAndCreatePipeline()
     if (!m_compileError.empty() || m_pipeline != nullptr)
         return;
 
-    auto baker = m_lockedBaker;
-    assert(baker != nullptr);
+    auto registry = m_lockedRegistry;
+    assert(registry != nullptr);
 
     // Load the compiled shader blob
     std::string blobPath = "/" + c_ComputeShaderBinariesRoot + "/" + m_compiledFileNameNoExt + ".bin";
-    std::shared_ptr<caustica::IBlob> data = baker->GetFS()->readFile(blobPath.c_str());
+    std::shared_ptr<caustica::IBlob> data = registry->GetFS()->readFile(blobPath.c_str());
 
     if (!data)
     {
@@ -490,7 +490,7 @@ void ComputeShaderVariant::LoadShaderAndCreatePipeline()
     shaderDesc.debugName = m_debugName;
     shaderDesc.entryName = m_entryPoint.c_str();
 
-    m_shader = baker->GetDevice()->createShader(shaderDesc, data->data(), data->size());
+    m_shader = registry->GetDevice()->createShader(shaderDesc, data->data(), data->size());
 
     if (!m_shader)
     {
@@ -503,7 +503,7 @@ void ComputeShaderVariant::LoadShaderAndCreatePipeline()
     pipelineDesc.CS = m_shader;
     pipelineDesc.bindingLayouts = m_bindingLayouts;
 
-    m_pipeline = baker->GetDevice()->createComputePipeline(pipelineDesc);
+    m_pipeline = registry->GetDevice()->createComputePipeline(pipelineDesc);
 
     if (!m_pipeline)
     {

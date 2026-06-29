@@ -13,10 +13,10 @@
 #include <scene/SceneGraph.h>
 #include <imgui_internal.h>
 #include <assets/loader/ShaderFactory.h>
-#include <render/Passes/Lighting/MaterialsBaker.h>
+#include <render/Passes/Lighting/MaterialGpuCache.h>
 #include <render/Passes/PostProcess/ToneMappingPasses.h>
 #include <render/Passes/Debug/Korgi.h>
-#include <render/Passes/OMM/OmmBaker.h>
+#include <render/Passes/OMM/OpacityMicromapBuilder.h>
 #include <game/GameScene.h>
 #include <render/Passes/Debug/ZoomTool.h>
 #include <common/CaptureScriptManager.h>
@@ -37,9 +37,9 @@ void EditorUI::BuildOpacityMicroMapsPanel(const PanelLayout& layout)
         {
             UI_SCOPED_INDENT(layout.indent);
 
-            if (auto& ommBaker = m_sceneEditor.GetLightingPasses().ommBaker(); ommBaker)
+            if (auto& opacityMicromapBuilder = m_sceneEditor.GetLightingPasses().opacityMicromapBuilder(); opacityMicromapBuilder)
             {
-                ommBaker->DebugGUI(layout.indent, *m_sceneEditor.GetScene());
+                opacityMicromapBuilder->DebugGUI(layout.indent, *m_sceneEditor.GetScene());
             }
             else
                 ImGui::Text("<Opacity Micro-Maps not supported on the current device>");

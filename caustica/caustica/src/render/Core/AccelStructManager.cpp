@@ -1,7 +1,7 @@
 #include <render/Core/AccelStructManager.h>
 
 #include <render/Core/AccelerationStructureUtil.h>
-#include <render/Passes/OMM/OmmBaker.h>
+#include <render/Passes/OMM/OpacityMicromapBuilder.h>
 #include <scene/Scene.h>
 #include <scene/SceneGraph.h>
 #include <core/log.h>
@@ -174,7 +174,7 @@ void AccelStructManager::buildTlas(nvrhi::ICommandList*            commandList,
                                    const Scene&                    scene,
                                    const AccelStructBuildSettings& settings,
                                    const OmmAccelStructState&      ommState,
-                                   OmmBaker*                       ommBaker) const
+                                   OpacityMicromapBuilder*                       opacityMicromapBuilder) const
 {
     std::vector<nvrhi::rt::InstanceDesc> instances;
 
@@ -183,7 +183,7 @@ void AccelStructManager::buildTlas(nvrhi::ICommandList*            commandList,
     {
         const std::shared_ptr<MeshInfo>& mesh = instance->GetMesh();
 
-        const bool hasAttachementOMM = ommBaker && mesh->AccelStructOMM.Get() != nullptr;
+        const bool hasAttachementOMM = opacityMicromapBuilder && mesh->AccelStructOMM.Get() != nullptr;
         const bool useOmmBLAS = ommState.enabled && hasAttachementOMM && !settings.forceOpaque && !ommState.debugViewEnabled;
 
         const uint32_t meshSubInstanceCount = (uint32_t)mesh->geometries.size();

@@ -22,7 +22,7 @@
 using namespace caustica::math;
 using namespace caustica;
 
-#include <shaders/render/Lighting/Distant/EnvMapBaker.hlsl>
+#include <shaders/render/Lighting/Distant/EnvMapProcessor.hlsl>
 #include <shaders/render/Lighting/Distant/BRDFLUTGenerator.hlsl>
 
 #include "SampleProceduralSky.h"
@@ -39,17 +39,17 @@ namespace caustica
 }
 
 class ShaderDebug;
-class EnvMapImportanceSamplingBaker;
-class ComputePipelineBaker;
+class EnvMapImportanceSamplingCache;
+class ComputePipelineRegistry;
 class ComputeShaderVariant;
 
 // This is used to bake the cubemap with the given inputs. Inputs can be equirectangular envmap image or procedural sky, and directional lights.
 // There's a low resolution (half by half) pass which can be used to speed up baking - currently only used for procedural sky.
 // Also provides shared cubemap processing functionality (mips, GGX filtering, SH projection) via ProcessCubemap().
-class EnvMapBaker 
+class EnvMapProcessor 
 {
 public:
-    struct BakeSettings
+    struct UpdateSettings
     {
         // Use this if input envmap is FP32 and outside of max FP16 (65504.0, which is the max we support for perf reasons) - you can premultiply with say 1/16 to avoid clamping 
         // and later use envmap sampling Intensity setting of 16 to offset! This will also help with baking in small sharp bright directional lights. Values lower than (roughly) 1/1024 can result in image quality loss.
@@ -82,16 +82,16 @@ public:
     
 
 public:
-    EnvMapBaker( nvrhi::IDevice* device, std::shared_ptr<caustica::TextureLoader> textureCache, bool enableRasterPrecompute );
-    ~EnvMapBaker();
+    EnvMapProcessor( nvrhi::IDevice* device, std::shared_ptr<caustica::TextureLoader> textureCache, bool enableRasterPrecompute );
+    ~EnvMapProcessor();
 
     void                            SceneReloaded()                 { m_targetResolution = 0; } // change default target resolution on each scene load
 
-    void                            CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebug, std::shared_ptr<caustica::ShaderFactory> shaderFactory, std::shared_ptr<ComputePipelineBaker> computePipelineBaker);
+    void                            CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebug, std::shared_ptr<caustica::ShaderFactory> shaderFactory, std::shared_ptr<ComputePipelineRegistry> computePipelineRegistry);
 
     void                            PreUpdate( nvrhi::ICommandList* commandList, std::shared_ptr<caustica::CommonRenderPasses> commonPasses, std::string envMapBackgroundPath, const std::filesystem::path& sceneDirectory = std::filesystem::path() );    // use to update to figure out GetTargetCubeResolution() default cubemap resolution and needed before Update; Ignore return if not needed.
     // Returns 'true' if contents changed; note: directionalLights must be transformed to Environment map local space. 
-    bool                            Update( nvrhi::ICommandList * commandList, caustica::BindingCache & bindingCache, std::shared_ptr<caustica::CommonRenderPasses> commonPasses, const BakeSettings & settings, double sceneTime, EMB_DirectionalLight const * directionalLights, uint directionaLightCount, bool forceInstantUpdate );
+    bool                            Update( nvrhi::ICommandList * commandList, caustica::BindingCache & bindingCache, std::shared_ptr<caustica::CommonRenderPasses> commonPasses, const UpdateSettings & settings, double sceneTime, EMB_DirectionalLight const * directionalLights, uint directionaLightCount, bool forceInstantUpdate );
 
     nvrhi::TextureHandle            GetEnvMapCube() const           { return (m_outputIsCompressed)?(m_cubemapBC6H):(m_cubemap); }
     nvrhi::SamplerHandle            GetEnvMapCubeSampler() const    { return m_linearSampler; }
@@ -107,8 +107,8 @@ public:
     void                            SetTargetCubeResolution(uint res)   { m_targetResolution = res; }
     int                             GetTargetCubeResolution() const;
 
-    const std::shared_ptr<EnvMapImportanceSamplingBaker>
-                                    GetImportanceSampling() const   { return m_importanceSamplingBaker; }
+    const std::shared_ptr<EnvMapImportanceSamplingCache>
+                                    GetImportanceSampling() const   { return m_importanceSamplingCache; }
 
     // BRDF LUT for split-sum IBL approximation (generated once at startup)
     nvrhi::TextureHandle            GetBRDFLUT() const              { return m_brdfLUT; }
@@ -199,8 +199,8 @@ private:
 
     std::string                     m_dbgSaveBaked = "";
 
-    std::shared_ptr<EnvMapImportanceSamplingBaker>
-                                    m_importanceSamplingBaker;
+    std::shared_ptr<EnvMapImportanceSamplingCache>
+                                    m_importanceSamplingCache;
 
     bool                            m_enableRasterPrecompute = false;
 
@@ -212,14 +212,14 @@ private:
     nvrhi::BufferHandle             m_brdfLUTConstantBuffer;
     bool                            m_brdfLUTGenerated = false;
 
-    // GGX pre-filtering for specular IBL - managed by ComputePipelineBaker for hot reload
+    // GGX pre-filtering for specular IBL - managed by ComputePipelineRegistry for hot reload
     std::shared_ptr<ComputeShaderVariant> m_ggxPrefilterVariant;
     nvrhi::BindingLayoutHandle      m_ggxPrefilterBindingLayout;
 
-    // Diffuse irradiance convolution (SH-based) - managed by ComputePipelineBaker for hot reload
+    // Diffuse irradiance convolution (SH-based) - managed by ComputePipelineRegistry for hot reload
     std::shared_ptr<ComputeShaderVariant> m_irradianceConvolveVariant;
     nvrhi::BindingLayoutHandle      m_irradianceConvolveBindingLayout;
 
     // Reference to compute pipeline baker for hot reload support
-    std::shared_ptr<ComputePipelineBaker> m_computePipelineBaker;
+    std::shared_ptr<ComputePipelineRegistry> m_computePipelineRegistry;
 };

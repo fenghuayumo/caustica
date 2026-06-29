@@ -1,8 +1,8 @@
-#include <render/Passes/Lighting/Distant/EnvMapBaker.h>
+#include <render/Passes/Lighting/Distant/EnvMapProcessor.h>
 #include <shaders/render/Lighting/Distant/CubemapProcessing.hlsl>
 
-#include <render/Passes/Lighting/Distant/EnvMapImportanceSamplingBaker.h>
-#include <render/Core/ComputePipelineBaker.h>
+#include <render/Passes/Lighting/Distant/EnvMapImportanceSamplingCache.h>
+#include <render/Core/ComputePipelineRegistry.h>
 #include <core/file_utils.h>
 #include <core/format.h>
 #include <core/path_utils.h>
@@ -39,30 +39,30 @@ using namespace caustica;
 
 static const int    c_BlockCompressionBlockSize = 4;
 
-EnvMapBaker::EnvMapBaker( nvrhi::IDevice* device, std::shared_ptr<caustica::TextureLoader> textureCache, bool enableRasterPrecompute )
+EnvMapProcessor::EnvMapProcessor( nvrhi::IDevice* device, std::shared_ptr<caustica::TextureLoader> textureCache, bool enableRasterPrecompute )
     : m_device(device)
     , m_textureCache(textureCache)
 {
 }
 
-EnvMapBaker::~EnvMapBaker()
+EnvMapProcessor::~EnvMapProcessor()
 {
     UnloadSourceBackgrounds();
 }
 
-void EnvMapBaker::CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebug, std::shared_ptr<caustica::ShaderFactory> shaderFactory, std::shared_ptr<ComputePipelineBaker> computePipelineBaker)
+void EnvMapProcessor::CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebug, std::shared_ptr<caustica::ShaderFactory> shaderFactory, std::shared_ptr<ComputePipelineRegistry> computePipelineRegistry)
 {
-    m_importanceSamplingBaker = nullptr;
+    m_importanceSamplingCache = nullptr;
     m_shaderDebug = shaderDebug;
-    m_computePipelineBaker = computePipelineBaker;
+    m_computePipelineRegistry = computePipelineRegistry;
 
     // Release existing compute shader variants from the baker
-    if (m_computePipelineBaker && m_enableRasterPrecompute)
+    if (m_computePipelineRegistry && m_enableRasterPrecompute)
     {
         if (m_ggxPrefilterVariant)
-            m_computePipelineBaker->ReleaseVariant(m_ggxPrefilterVariant);
+            m_computePipelineRegistry->ReleaseVariant(m_ggxPrefilterVariant);
         if (m_irradianceConvolveVariant)
-            m_computePipelineBaker->ReleaseVariant(m_irradianceConvolveVariant);
+            m_computePipelineRegistry->ReleaseVariant(m_irradianceConvolveVariant);
     }
     m_ggxPrefilterVariant = nullptr;
     m_irradianceConvolveVariant = nullptr;
@@ -81,9 +81,9 @@ void EnvMapBaker::CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebug, s
     std::vector<caustica::ShaderMacro> shaderMacros;
     //shaderMacros.push_back(caustica::ShaderMacro({              "BLEND_DEBUG_BUFFER", "1" }));
 
-    m_lowResPrePassLayerCS = shaderFactory->CreateShader("caustica/shaders/render/Lighting/Distant/EnvMapBaker.hlsl", "LowResPrePassLayerCS", &shaderMacros, nvrhi::ShaderType::Compute);
-    m_baseLayerCS = shaderFactory->CreateShader("caustica/shaders/render/Lighting/Distant/EnvMapBaker.hlsl", "BaseLayerCS", &shaderMacros, nvrhi::ShaderType::Compute);
-    m_MIPReduceCS = shaderFactory->CreateShader("caustica/shaders/render/Lighting/Distant/EnvMapBaker.hlsl", "MIPReduceCS", &shaderMacros, nvrhi::ShaderType::Compute);
+    m_lowResPrePassLayerCS = shaderFactory->CreateShader("caustica/shaders/render/Lighting/Distant/EnvMapProcessor.hlsl", "LowResPrePassLayerCS", &shaderMacros, nvrhi::ShaderType::Compute);
+    m_baseLayerCS = shaderFactory->CreateShader("caustica/shaders/render/Lighting/Distant/EnvMapProcessor.hlsl", "BaseLayerCS", &shaderMacros, nvrhi::ShaderType::Compute);
+    m_MIPReduceCS = shaderFactory->CreateShader("caustica/shaders/render/Lighting/Distant/EnvMapProcessor.hlsl", "MIPReduceCS", &shaderMacros, nvrhi::ShaderType::Compute);
 
     {
         nvrhi::BindingLayoutDesc layoutDesc;
@@ -156,8 +156,8 @@ void EnvMapBaker::CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebug, s
     samplerDesc.setAllFilters(true);
     m_equiRectSampler = m_device->createSampler(samplerDesc);
 
-    m_importanceSamplingBaker = std::make_shared<EnvMapImportanceSamplingBaker>(m_device, shaderFactory);
-    m_importanceSamplingBaker->CreateRenderPasses();
+    m_importanceSamplingCache = std::make_shared<EnvMapImportanceSamplingCache>(m_device, shaderFactory);
+    m_importanceSamplingCache->CreateRenderPasses();
 
     if (m_BC6UCompressionEnabled)
     {
@@ -230,9 +230,9 @@ void EnvMapBaker::CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebug, s
         };
         m_ggxPrefilterBindingLayout = m_device->createBindingLayout(layoutDesc);
                 
-        if (m_computePipelineBaker)
+        if (m_computePipelineRegistry)
         {
-            m_ggxPrefilterVariant = m_computePipelineBaker->CreateVariant(
+            m_ggxPrefilterVariant = m_computePipelineRegistry->CreateVariant(
                 "render/Lighting/Distant/CubemapProcessing.hlsl",  // source path relative to ShadersPath (caustica/caustica/shaders)
                 "GGXPrefilterCS",                               // entry point
                 {},                                             // macros (empty)
@@ -254,9 +254,9 @@ void EnvMapBaker::CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebug, s
         };
         m_irradianceConvolveBindingLayout = m_device->createBindingLayout(layoutDesc);
                 
-        if (m_computePipelineBaker)
+        if (m_computePipelineRegistry)
         {
-            m_irradianceConvolveVariant = m_computePipelineBaker->CreateVariant(
+            m_irradianceConvolveVariant = m_computePipelineRegistry->CreateVariant(
                 "render/Lighting/Distant/CubemapProcessing.hlsl",  // source path relative to ShadersPath (caustica/caustica/shaders)
                 "ConvolveIrradianceCS",                         // entry point
                 {},                                             // macros (empty)
@@ -270,7 +270,7 @@ void EnvMapBaker::CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebug, s
     m_brdfLUTGenerated = false; // Force BRDF LUT regeneration
 }
 
-void EnvMapBaker::UnloadSourceBackgrounds()
+void EnvMapProcessor::UnloadSourceBackgrounds()
 {
     if (m_loadedSourceBackgroundTextureEquirect != nullptr)
         m_textureCache->UnloadTexture(m_loadedSourceBackgroundTextureEquirect);
@@ -281,13 +281,13 @@ void EnvMapBaker::UnloadSourceBackgrounds()
     m_loadedSourceBackgroundPath = "";
 }
 
-void EnvMapBaker::InitBuffers(uint cubeDim)
+void EnvMapProcessor::InitBuffers(uint cubeDim)
 {
     m_cubeDim = cubeDim;
 
     // Main constant buffer
     m_constantBuffer = m_device->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(
-        sizeof(EnvMapBakerConstants), "EnvMapBakerConstants", caustica::c_MaxRenderPassConstantBufferVersions * 5));	// *5 we could be updating few times per frame
+        sizeof(EnvMapProcessorConstants), "EnvMapProcessorConstants", caustica::c_MaxRenderPassConstantBufferVersions * 5));	// *5 we could be updating few times per frame
 
     // Main cubemap texture
     {
@@ -302,7 +302,7 @@ void EnvMapBaker::InitBuffers(uint cubeDim)
         desc.mipLevels = mipLevels;
         desc.format = nvrhi::Format::RGBA16_FLOAT; //(m_device->getGraphicsAPI() == nvrhi::GraphicsAPI::VULKAN)?nvrhi::Format::RGBA32_FLOAT:nvrhi::Format::RGBA16_FLOAT;
         desc.dimension = nvrhi::TextureDimension::TextureCube;
-        desc.debugName = "EnvMapBakerMainCube";
+        desc.debugName = "EnvMapProcessorMainCube";
         desc.isUAV = true;
         desc.sharedResourceFlags = nvrhi::SharedResourceFlags::None;
         desc.initialState = nvrhi::ResourceStates::UnorderedAccess;
@@ -317,7 +317,7 @@ void EnvMapBaker::InitBuffers(uint cubeDim)
 
         desc.width = m_cubeDimLowResDim;
         desc.height = m_cubeDimLowResDim;
-        desc.debugName = "EnvMapBakerMainCubeLowRes";
+        desc.debugName = "EnvMapProcessorMainCubeLowRes";
         desc.mipLevels = 1;
         m_cubemapLowRes = m_device->createTexture(desc);
 
@@ -327,7 +327,7 @@ void EnvMapBaker::InitBuffers(uint cubeDim)
             desc = m_cubemapDesc; // restore original cubemap settings
             desc.format = nvrhi::Format::BC6H_UFLOAT;
             desc.initialState = nvrhi::ResourceStates::CopyDest;
-            desc.debugName = "EnvMapBakerMainCubeBC6H";
+            desc.debugName = "EnvMapProcessorMainCubeBC6H";
             desc.isUAV = false;
             m_cubemapBC6H = m_device->createTexture(desc);
             // BC6H compression resources: compression scratch (UAV target)
@@ -337,7 +337,7 @@ void EnvMapBaker::InitBuffers(uint cubeDim)
             desc.width = m_cubeDim / c_BlockCompressionBlockSize;
             desc.height = m_cubeDim / c_BlockCompressionBlockSize;
             // desc.mipLevels is ensured to be based on "width / c_BlockCompressionBlockSize" - see above 'mipLevels'
-            desc.debugName = "EnvMapBakerMainCubeBC6HScratch";
+            desc.debugName = "EnvMapProcessorMainCubeBC6HScratch";
             m_cubemapBC6HScratch = m_device->createTexture(desc);
         }
     }
@@ -353,13 +353,13 @@ bool isnear(EMB_DirectionalLight const & a, EMB_DirectionalLight const & b)
         dm::all(dm::isnear( a.Direction, b.Direction ));
 }
 
-int EnvMapBaker::GetTargetCubeResolution() const     
+int EnvMapProcessor::GetTargetCubeResolution() const     
 { 
     assert( m_targetResolution != 0 ); // PreUpdate() needs to be called to establish this value early
     return m_targetResolution; 
 }
 
-void EnvMapBaker::PreUpdate(nvrhi::ICommandList* commandList, std::shared_ptr<caustica::CommonRenderPasses> commonPasses, std::string envMapBackgroundPath, const std::filesystem::path& sceneDirectory)
+void EnvMapProcessor::PreUpdate(nvrhi::ICommandList* commandList, std::shared_ptr<caustica::CommonRenderPasses> commonPasses, std::string envMapBackgroundPath, const std::filesystem::path& sceneDirectory)
 {
     if( m_device->getGraphicsAPI() == nvrhi::GraphicsAPI::VULKAN && m_BC6UCompressionEnabled )
     {
@@ -384,7 +384,7 @@ void EnvMapBaker::PreUpdate(nvrhi::ICommandList* commandList, std::shared_ptr<ca
         m_renderPassesDirty = true;
         InitBuffers(m_targetResolution);
     }
-    m_importanceSamplingBaker->PreUpdate(m_cubemap, newBuffers);
+    m_importanceSamplingCache->PreUpdate(m_cubemap, newBuffers);
 
     // Load static (background) environment map or procedural sky if enabled
     if (m_sourceBackgroundPath != m_loadedSourceBackgroundPath)
@@ -422,9 +422,9 @@ void EnvMapBaker::PreUpdate(nvrhi::ICommandList* commandList, std::shared_ptr<ca
         m_proceduralSky = std::make_shared<SampleProceduralSky>(m_device, m_textureCache, commonPasses, commandList);
 }
 
-bool EnvMapBaker::Update(nvrhi::ICommandList* commandList, caustica::BindingCache & bindingCache, std::shared_ptr<caustica::CommonRenderPasses> commonPasses, const BakeSettings & _settings, double sceneTime, EMB_DirectionalLight const * directionalLights, uint directionaLightCount, bool forceInstantUpdate)
+bool EnvMapProcessor::Update(nvrhi::ICommandList* commandList, caustica::BindingCache & bindingCache, std::shared_ptr<caustica::CommonRenderPasses> commonPasses, const UpdateSettings & _settings, double sceneTime, EMB_DirectionalLight const * directionalLights, uint directionaLightCount, bool forceInstantUpdate)
 {
-    BakeSettings settings = _settings;
+    UpdateSettings settings = _settings;
 
     bool contentsChanged = m_dbgForceDynamic || m_renderPassesDirty;
     m_renderPassesDirty = false;
@@ -458,11 +458,11 @@ bool EnvMapBaker::Update(nvrhi::ICommandList* commandList, caustica::BindingCach
     if (!contentsChanged)
         return contentsChanged;
 
-    RAII_SCOPE(commandList->beginMarker("EnvMapBaker"); , commandList->endMarker(); );
+    RAII_SCOPE(commandList->beginMarker("EnvMapProcessor"); , commandList->endMarker(); );
 
     // Constants
     {
-        EnvMapBakerConstants consts; memset(&consts, 0, sizeof(consts));
+        EnvMapProcessorConstants consts; memset(&consts, 0, sizeof(consts));
 
         if (m_proceduralSky != nullptr && proceduralSkyEnabled)
         {
@@ -566,7 +566,7 @@ bool EnvMapBaker::Update(nvrhi::ICommandList* commandList, caustica::BindingCach
     }
 
     {
-        RAII_SCOPE( commandList->beginMarker("EnvMapBakerMIPs");, commandList->endMarker(); );
+        RAII_SCOPE( commandList->beginMarker("EnvMapProcessorMIPs");, commandList->endMarker(); );
 
         // Downsample MIPs - TODO: do it as a 2 or 4 layers at a time for better perf 
         uint mipLevels = m_cubemap->getDesc().mipLevels;
@@ -645,7 +645,7 @@ bool EnvMapBaker::Update(nvrhi::ICommandList* commandList, caustica::BindingCach
     else
         m_outputIsCompressed = false;
 
-    m_importanceSamplingBaker->Update(commandList, m_cubemap);
+    m_importanceSamplingCache->Update(commandList, m_cubemap);
 
     m_versionID++; 
 
@@ -701,7 +701,7 @@ std::string CubeResToString(uint res)
     return resRet;
 }
 
-bool EnvMapBaker::DebugGUI(float indent)
+bool EnvMapProcessor::DebugGUI(float indent)
 {
     bool resetAccumulation = false;
     #define IMAGE_QUALITY_OPTION(code) do{if (code) resetAccumulation = true;} while(false)
@@ -749,7 +749,7 @@ bool EnvMapBaker::DebugGUI(float indent)
     return resetAccumulation;
 }
 
-bool EnvMapBaker::GenerateBRDFLUT(nvrhi::ICommandList* commandList, caustica::BindingCache& bindingCache)
+bool EnvMapProcessor::GenerateBRDFLUT(nvrhi::ICommandList* commandList, caustica::BindingCache& bindingCache)
 {
     if (!m_enableRasterPrecompute || m_brdfLUTGenerated)
         return false;
@@ -783,7 +783,7 @@ bool EnvMapBaker::GenerateBRDFLUT(nvrhi::ICommandList* commandList, caustica::Bi
     return true;
 }
 
-void EnvMapBaker::GGXPrefilterCubemap(nvrhi::ICommandList* commandList, caustica::BindingCache& bindingCache, 
+void EnvMapProcessor::GGXPrefilterCubemap(nvrhi::ICommandList* commandList, caustica::BindingCache& bindingCache, 
     nvrhi::TextureHandle srcCubemap, nvrhi::TextureHandle dstCubemap)
 {
     if (!m_enableRasterPrecompute)
@@ -840,7 +840,7 @@ void EnvMapBaker::GGXPrefilterCubemap(nvrhi::ICommandList* commandList, caustica
     }
 }
 
-void EnvMapBaker::ConvolveDiffuseIrradiance(nvrhi::ICommandList* commandList, caustica::BindingCache& bindingCache,
+void EnvMapProcessor::ConvolveDiffuseIrradiance(nvrhi::ICommandList* commandList, caustica::BindingCache& bindingCache,
     nvrhi::TextureHandle srcCubemap, nvrhi::TextureHandle dstCubemap)
 {
     if (!m_enableRasterPrecompute)
@@ -878,14 +878,14 @@ void EnvMapBaker::ConvolveDiffuseIrradiance(nvrhi::ICommandList* commandList, ca
     commandList->dispatch(1, 1, 6);
 }
 
-void EnvMapBaker::GenerateCubemapMips(nvrhi::ICommandList* commandList, caustica::BindingCache& bindingCache, 
+void EnvMapProcessor::GenerateCubemapMips(nvrhi::ICommandList* commandList, caustica::BindingCache& bindingCache, 
     nvrhi::TextureHandle cubemap)
 {
     // Reuse the existing MIPReduceCS for solid-angle weighted mip generation
     RAII_SCOPE(commandList->beginMarker("GenerateCubemapMips");, commandList->endMarker(););
     
     // Write dummy constants (MIPReduceCS doesn't actually read them, but binding layout requires it)
-    EnvMapBakerConstants dummyConsts = {};
+    EnvMapProcessorConstants dummyConsts = {};
     commandList->writeBuffer(m_constantBuffer, &dummyConsts, sizeof(dummyConsts));
     
     uint mipLevels = cubemap->getDesc().mipLevels;
@@ -919,7 +919,7 @@ void EnvMapBaker::GenerateCubemapMips(nvrhi::ICommandList* commandList, caustica
     }
 }
 
-void EnvMapBaker::ProcessCubemap(
+void EnvMapProcessor::ProcessCubemap(
     nvrhi::ICommandList* commandList,
     caustica::BindingCache& bindingCache,
     nvrhi::TextureHandle sourceCubemap,

@@ -14,7 +14,7 @@ struct EMB_DirectionalLight
     float       AngularSize;
 };
 
-struct EnvMapBakerConstants
+struct EnvMapProcessorConstants
 {
     EMB_DirectionalLight    DirectionalLights[EMB_MAXDIRLIGHTS];
 
@@ -33,7 +33,7 @@ struct EnvMapBakerConstants
 
 #include <shaders/PathTracer/Utils/Math/MathHelpers.hlsli>
 
-ConstantBuffer<EnvMapBakerConstants>    g_Const                     : register(b0);
+ConstantBuffer<EnvMapProcessorConstants>    g_Const                     : register(b0);
 
 RWTexture2DArray<float4>                u_EnvMapCubeFacesDst0       : register(u0);
 RWTexture2DArray<float4>                u_EnvMapCubeFacesDst1       : register(u1);
