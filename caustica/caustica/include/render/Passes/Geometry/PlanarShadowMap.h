@@ -1,6 +1,6 @@
 #pragma once
 
-#include <scene/SceneGraph.h>
+#include <scene/SceneObjects.h>
 #include <render/Core/ShadowMap.h>
 #include <scene/View.h>
 #include <rhi/nvrhi.h>

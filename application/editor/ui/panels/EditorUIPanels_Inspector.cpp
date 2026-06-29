@@ -10,7 +10,7 @@
 #include <engine/UserInterfaceUtils.h>
 #include <core/vfs/VFS.h>
 #include <scene/SceneTypes.h>
-#include <scene/SceneGraph.h>
+#include <scene/SceneEcs.h>
 #include <imgui_internal.h>
 #include <assets/loader/ShaderFactory.h>
 #include <render/Passes/Lighting/MaterialGpuCache.h>
@@ -34,20 +34,24 @@ namespace caustica::editor
 void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
 {
     // Inspector panel: instance Transform + mesh name (right-click pick)
-    if (m_ui.SelectedNode != nullptr && m_ui.ShowInspector)
+    auto scene = m_sceneEditor.GetScene();
+    auto* ew = scene ? scene->GetEntityWorld() : nullptr;
+    if (m_ui.SelectedEntity != ecs::NullEntity && m_ui.ShowInspector && ew)
     {
         ImGui::SetNextWindowPos(ImVec2(float(layout.scaledWidth) - 10.f, 10.f), ImGuiCond_Appearing, ImVec2(1.f, 0.f));
         ImGui::SetNextWindowSize(ImVec2(layout.defWindowWidth, 0), ImGuiCond_Appearing);
         ImGui::Begin("Inspector");
         ImGui::PushItemWidth(layout.defItemWidth);
 
-        auto node = m_ui.SelectedNode;
-        ImGui::Text("Node: %s", node->GetName().c_str());
+        const ecs::Entity entity = m_ui.SelectedEntity;
+        std::string entityName = ew->getEntityName(entity);
+        ImGui::Text("Node: %s", entityName.c_str());
 
-        auto meshInstance = std::dynamic_pointer_cast<caustica::MeshInstance>(node->GetLeaf());
-        if (meshInstance && meshInstance->GetMesh())
-            ImGui::Text("Mesh: %s", meshInstance->GetMesh()->name.c_str());
-        auto gaussianSplat = std::dynamic_pointer_cast<GaussianSplat>(node->GetLeaf());
+        auto* meshComp = ew->world().tryGet<caustica::scene::MeshInstanceComponent>(entity);
+        if (meshComp && meshComp->instance && meshComp->instance->GetMesh())
+            ImGui::Text("Mesh: %s", meshComp->instance->GetMesh()->name.c_str());
+        auto* splatComp = ew->world().tryGet<caustica::scene::GaussianSplatComponent>(entity);
+        const auto& gaussianSplat = splatComp ? splatComp->splat : nullptr;
         if (gaussianSplat)
         {
             ImGui::Text("Type: 3D Gaussian Splats");
@@ -60,23 +64,24 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
 
         if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen))
         {
-            dm::double3 translation = node->GetTranslation();
-            dm::dquat rotation = node->GetRotation();
-            dm::double3 scaling = node->GetScaling();
+            auto* ltc = ew->world().tryGet<caustica::scene::LocalTransformComponent>(entity);
+            dm::double3 translation = ltc ? ltc->translation : dm::double3(0.0);
+            dm::dquat rotation = ltc ? ltc->rotation : dm::dquat::identity();
+            dm::double3 scaling = ltc ? ltc->scaling : dm::double3(1.0);
 
             float pos[3] = { float(translation.x), float(translation.y), float(translation.z) };
             if (ImGui::DragFloat3("Position", pos, 0.01f))
             {
-                node->SetTranslation(dm::double3(pos[0], pos[1], pos[2]));
+                ew->setTranslation(entity, dm::double3(pos[0], pos[1], pos[2]));
                 m_ui.ResetAccumulation = true;
             }
 
             constexpr double deg2rad = 3.14159265358979323846 / 180.0;
 
-            const bool selectedRotationNodeChanged = m_ui.InspectorRotationNode.lock() != node;
-            if (!m_ui.InspectorRotationEulerValid || selectedRotationNodeChanged || !SameRotation(m_ui.InspectorRotationQuat, rotation))
+            const bool selectedRotationEntityChanged = m_ui.InspectorRotationEntity != entity;
+            if (!m_ui.InspectorRotationEulerValid || selectedRotationEntityChanged || !SameRotation(m_ui.InspectorRotationQuat, rotation))
             {
-                m_ui.InspectorRotationNode = node;
+                m_ui.InspectorRotationEntity = entity;
                 m_ui.InspectorRotationQuat = rotation;
                 m_ui.InspectorRotationEulerDeg = QuaternionToEulerDegreesXYZ(rotation);
                 m_ui.InspectorRotationEulerValid = true;
@@ -95,14 +100,14 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
                 m_ui.InspectorRotationEulerDeg = dm::float3(euler[0], euler[1], euler[2]);
                 const dm::dquat newRotation = dm::rotationQuat(dm::double3(euler[0] * deg2rad, euler[1] * deg2rad, euler[2] * deg2rad));
                 m_ui.InspectorRotationQuat = newRotation;
-                node->SetRotation(newRotation);
+                ew->setRotation(entity, newRotation);
                 m_ui.ResetAccumulation = true;
             }
 
             float scl[3] = { float(scaling.x), float(scaling.y), float(scaling.z) };
             if (ImGui::DragFloat3("Scale", scl, 0.01f, 0.001f, 1000.0f))
             {
-                node->SetScaling(dm::double3(scl[0], scl[1], scl[2]));
+                ew->setScaling(entity, dm::double3(scl[0], scl[1], scl[2]));
                 m_ui.ResetAccumulation = true;
             }
         }
@@ -155,7 +160,7 @@ void EditorUI::BuildMaterialEditorPanel(const PanelLayout& layout)
     std::shared_ptr<PTMaterial> material = PTMaterial::SafeCast(m_ui.SelectedMaterial);
     if (material != nullptr && m_sceneEditor.GetLightingPasses().materials() != nullptr && m_ui.ShowMaterialEditor)
     {
-        const bool inspectorVisible = m_ui.SelectedNode != nullptr && m_ui.ShowInspector;
+        const bool inspectorVisible = m_ui.SelectedEntity != ecs::NullEntity && m_ui.ShowInspector;
         ImGui::SetNextWindowPos(ImVec2(float(layout.scaledWidth) - 10.f, inspectorVisible ? 350.f : 10.f), ImGuiCond_Appearing, ImVec2(1.f, 0.f));
         ImGui::SetNextWindowSize(ImVec2(layout.defWindowWidth, 0), ImGuiCond_Appearing);
         ImGui::Begin("Material Editor");
@@ -184,7 +189,8 @@ void EditorUI::BuildMaterialEditorPanel(const PanelLayout& layout)
             wasSkipRender != material->SkipRender ||
             dirty)
         {
-            m_sceneEditor.GetScene()->GetSceneGraph()->GetRootNode()->InvalidateContent();
+            if (auto s = m_sceneEditor.GetScene())
+                s->RefreshSceneWorld(m_sceneEditor.GetFrameIndex());
             m_ui.ResetAccumulation = 1;
         }
 

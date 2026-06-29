@@ -9,6 +9,8 @@
 #include <cmath>
 
 #include <scene/Scene.h>
+#include <scene/SceneEcs.h>
+#include <ecs/Entity.h>
 
 #include <core/file_utils.h>
 #include <core/path_utils.h>
@@ -222,10 +224,6 @@ void GameScene::SceneLoaded(const std::shared_ptr<caustica::Scene>& scene, const
     //     //vehicle.SetAnimOffset(std::rand() / (float)RAND_MAX * 110.0f);
     // }
 
-    // m_cameraNode = scene->GetSceneGraph()->Attach(scene->GetSceneGraph()->GetRootNode(), std::make_shared<SceneGraphNode>());
-    // m_cameraNode->SetName("SampleGameCameraNode");
-    // m_cameraNode->SetLeaf( m_camera = std::make_shared<PerspectiveCameraEx>() );
-    // m_camera->SetName("SampleGameCamera");
 }
 
 void GameScene::SceneUnloading()
@@ -479,9 +477,19 @@ void GameScene::TickCamera(float deltaTime, caustica::FirstPersonCamera & render
             if (attachedProp != nullptr)
             {
                 // transform = attachedObject->GetRootNode()->GetLocalToWorldTransformFloat(); // we can't do this because these have not yet been updated
-                dm::daffine3 transformD = dm::scaling(attachedProp->GetNode()->GetScaling());
-                transformD *= attachedProp->GetNode()->GetRotation().toAffine();
-                transformD *= dm::translation(attachedProp->GetNode()->GetTranslation());
+                auto* ew = attachedProp->EntityWorld();
+                caustica::ecs::Entity propEntity = attachedProp->GetEntity();
+                dm::daffine3 transformD = dm::daffine3::identity();
+                if (ew && propEntity != caustica::ecs::NullEntity)
+                {
+                    auto* ltc = ew->world().tryGet<caustica::scene::LocalTransformComponent>(propEntity);
+                    if (ltc)
+                    {
+                        transformD = dm::scaling(ltc->scaling);
+                        transformD *= ltc->rotation.toAffine();
+                        transformD *= dm::translation(ltc->translation);
+                    }
+                }
                 transform = dm::affine3(transformD);
             }
 

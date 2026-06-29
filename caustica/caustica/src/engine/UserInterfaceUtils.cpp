@@ -1,5 +1,5 @@
 #include <engine/UserInterfaceUtils.h>
-#include <scene/SceneGraph.h>
+#include <scene/SceneObjects.h>
 #include <platform/file_dialog.h>
 #include <core/log.h>
 #include <core/string_utils.h>
@@ -178,7 +178,8 @@ bool caustica::LightEditor_Directional(caustica::DirectionalLight& light)
     double3 direction = light.GetDirection();
     if (AzimuthElevationSliders(direction, true))
     {
-        light.SetDirection(direction);
+        if (ecs::isValid(light.ownerEntity))
+            light.UpdateCachedDirection(direction);
         changed = true;
     }
     changed |= ImGui::ColorEdit3("Color", &light.color.x, ImGuiColorEditFlags_Float);
@@ -202,7 +203,8 @@ bool caustica::LightEditor_Spot(caustica::SpotLight& light)
     double3 direction = light.GetDirection();
     if (AzimuthElevationSliders(direction, false))
     {
-        light.SetDirection(direction);
+        if (ecs::isValid(light.ownerEntity))
+            light.UpdateCachedDirection(direction);
         changed = true;
     }
     changed |= ImGui::SliderFloat("Radius", &light.radius, 0.01f, 1.f, "%.3f", ImGuiSliderFlags_Logarithmic);

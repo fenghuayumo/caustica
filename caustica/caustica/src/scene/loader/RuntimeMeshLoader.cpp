@@ -5,7 +5,8 @@
 #include <assets/loader/TextureLoader.h>
 #include <core/log.h>
 #include <core/vfs/VFS.h>
-#include <scene/SceneGraph.h>
+#include <scene/SceneImport.h>
+#include <scene/SceneEcs.h>
 
 #include <algorithm>
 #include <cctype>
@@ -84,13 +85,14 @@ RuntimeMeshLoadResult LoadRuntimeGltfMeshFile(
         return FailedRuntimeMeshLoad(filePath);
     }
 
-    if (!importResult->rootNode)
+    if (!ecs::isValid(importResult->rootEntity) || !importResult->entityWorld)
     {
-        caustica::error("GltfImporter produced no root node for '%s'", filePath.string().c_str());
+        caustica::error("GltfImporter produced no root entity for '%s'", filePath.string().c_str());
         return FailedRuntimeMeshLoad(filePath);
     }
 
-    importResult->rootNode->SetName(filePath.stem().string());
+    if (auto* name = importResult->entityWorld->world().get<scene::NameComponent>(importResult->rootEntity))
+        name->value = filePath.stem().string();
 
     return RuntimeMeshLoadResult{
         .Success = true,
@@ -113,7 +115,7 @@ RuntimeMeshLoadResult LoadRuntimeObjMeshFile(
     if (!importer.Load(filePath, *params.TextureCache, stats, nullptr, *importResult))
         return FailedRuntimeMeshLoad(filePath);
 
-    if (!importResult->rootNode)
+    if (!ecs::isValid(importResult->rootEntity) || !importResult->entityWorld)
         return FailedRuntimeMeshLoad(filePath);
 
     return RuntimeMeshLoadResult{

@@ -1,7 +1,8 @@
 #include <render/Core/SceneMeshEditing.h>
 
 #include <scene/Scene.h>
-#include <scene/SceneGraph.h>
+#include <scene/SceneEcs.h>
+#include <scene/SceneObjects.h>
 #include <scene/SceneTypes.h>
 
 #include <algorithm>
@@ -148,41 +149,42 @@ const std::vector<uint32_t>* GetMeshSourcePositionIndices(
     return &mesh->DeformationSourcePositionIndices;
 }
 
-std::shared_ptr<MeshInfo> GetMeshFromSceneNode(
-    const std::shared_ptr<SceneGraphNode>& node,
+std::shared_ptr<MeshInstance> GetMeshFromEntity(
+    const scene::SceneEntityWorld& entityWorld,
+    ecs::Entity entity,
     const char* caller)
 {
-    if (!node)
-        throw std::runtime_error(std::string(caller) + ": node is null");
+    if (!ecs::isValid(entity))
+        throw std::runtime_error(std::string(caller) + ": entity is invalid");
 
-    auto meshInstance = std::dynamic_pointer_cast<MeshInstance>(node->GetLeaf());
-    if (!meshInstance || !meshInstance->GetMesh())
-        throw std::runtime_error(std::string(caller) + ": node is not a mesh instance");
+    const auto* meshComponent = entityWorld.world().get<scene::MeshInstanceComponent>(entity);
+    if (!meshComponent || !meshComponent->instance || !meshComponent->instance->GetMesh())
+        throw std::runtime_error(std::string(caller) + ": entity is not a mesh instance");
 
-    return meshInstance->GetMesh();
+    return meshComponent->instance;
 }
 
-std::shared_ptr<SceneGraphNode> FindUniqueMeshInstanceNode(
+ecs::Entity FindUniqueMeshInstanceEntity(
     const std::shared_ptr<Scene>& scene,
     const std::shared_ptr<MeshInfo>& mesh,
     const char* caller)
 {
     if (!mesh)
         throw std::runtime_error(std::string(caller) + ": mesh is null");
-    if (!scene || !scene->GetSceneGraph())
+    if (!scene)
         throw std::runtime_error(std::string(caller) + ": no scene is loaded");
 
-    std::shared_ptr<SceneGraphNode> result;
+    ecs::Entity result = ecs::NullEntity;
     size_t instanceCount = 0;
 
-    for (const auto& instance : scene->GetSceneGraph()->GetMeshInstances())
+    for (const auto& instance : scene->GetMeshInstances())
     {
         if (!instance || instance->GetMesh() != mesh)
             continue;
 
-        if (auto node = instance->GetNodeSharedPtr())
+        if (ecs::isValid(instance->ownerEntity))
         {
-            result = node;
+            result = instance->ownerEntity;
             ++instanceCount;
         }
     }
@@ -190,9 +192,16 @@ std::shared_ptr<SceneGraphNode> FindUniqueMeshInstanceNode(
     if (instanceCount == 0)
         throw std::runtime_error(std::string(caller) + ": mesh has no scene instance");
     if (instanceCount > 1)
-        throw std::runtime_error(std::string(caller) + ": mesh has multiple scene instances; pass a SceneNode instead");
+        throw std::runtime_error(std::string(caller) + ": mesh has multiple scene instances; pass an entity instead");
 
     return result;
+}
+
+dm::affine3 GetEntityTransformFloat(const scene::SceneEntityWorld& entityWorld, ecs::Entity entity)
+{
+    if (const auto* global = entityWorld.world().get<scene::GlobalTransformComponent>(entity))
+        return global->transformFloat;
+    return dm::affine3::identity();
 }
 
 float3 NormalizeOrFallback(const float3& v, const float3& fallback)
@@ -388,28 +397,6 @@ void RebuildSceneMeshBuffersIfNeeded(const std::shared_ptr<MeshInfo>& mesh, cons
         buffers.vertexBufferRanges.fill(nvrhi::BufferRange());
     }
 
-    std::vector<std::shared_ptr<SceneGraphNode>> affectedNodes;
-    if (params.scene && params.scene->GetSceneGraph())
-    {
-        for (const auto& instance : params.scene->GetSceneGraph()->GetMeshInstances())
-        {
-            if (instance && instance->GetMesh() == mesh)
-            {
-                if (auto node = instance->GetNodeSharedPtr())
-                    affectedNodes.push_back(node);
-            }
-        }
-    }
-
-    for (const auto& node : affectedNodes)
-    {
-        if (node && node->GetLeaf())
-        {
-            auto leaf = node->GetLeaf();
-            node->SetLeaf(leaf);
-        }
-    }
-
     if (params.scene)
         params.scene->FinishedLoading(params.frameIndex);
 }
@@ -429,24 +416,29 @@ std::vector<dm::float3> GetMeshVerticesWorld(
     const std::shared_ptr<MeshInfo>& mesh,
     uint32_t frameIndex)
 {
-    auto node = FindUniqueMeshInstanceNode(scene, mesh, "GetMeshVerticesWorld");
-    return GetMeshVerticesWorld(scene, node, frameIndex);
+    auto entity = FindUniqueMeshInstanceEntity(scene, mesh, "GetMeshVerticesWorld");
+    return GetMeshVerticesWorld(scene, entity, frameIndex);
 }
 
 std::vector<dm::float3> GetMeshVerticesWorld(
     const std::shared_ptr<Scene>& scene,
-    const std::shared_ptr<SceneGraphNode>& node,
+    ecs::Entity entity,
     uint32_t frameIndex)
 {
     if (!scene)
         throw std::runtime_error("GetMeshVerticesWorld: no scene is loaded");
 
-    scene->RefreshSceneGraph(frameIndex);
+    scene->RefreshSceneWorld(frameIndex);
 
-    auto mesh = GetMeshFromSceneNode(node, "GetMeshVerticesWorld");
+    const scene::SceneEntityWorld* entityWorld = scene->GetEntityWorld();
+    if (!entityWorld)
+        throw std::runtime_error("GetMeshVerticesWorld: scene has no entity world");
+
+    auto meshInstance = GetMeshFromEntity(*entityWorld, entity, "GetMeshVerticesWorld");
+    auto mesh = meshInstance->GetMesh();
     std::vector<float3> vertices = GetMeshVertices(mesh);
 
-    const affine3 localToWorld = node->GetLocalToWorldTransformFloat();
+    const affine3 localToWorld = GetEntityTransformFloat(*entityWorld, entity);
     for (float3& vertex : vertices)
         vertex = localToWorld.transformPoint(vertex);
 
@@ -511,17 +503,22 @@ void SetMeshVertices(
 }
 
 void SetMeshVerticesWorld(
-    const std::shared_ptr<SceneGraphNode>& node,
+    ecs::Entity entity,
     const std::vector<dm::float3>& vertices,
     const SetSceneMeshVerticesParams& params)
 {
     if (!params.scene)
         throw std::runtime_error("SetMeshVerticesWorld: no scene is loaded");
 
-    params.scene->RefreshSceneGraph(params.frameIndex);
+    params.scene->RefreshSceneWorld(params.frameIndex);
 
-    auto mesh = GetMeshFromSceneNode(node, "SetMeshVerticesWorld");
-    const affine3 worldToLocal = affine3(inverse(node->GetLocalToWorldTransform()));
+    const scene::SceneEntityWorld* entityWorld = params.scene->GetEntityWorld();
+    if (!entityWorld)
+        throw std::runtime_error("SetMeshVerticesWorld: scene has no entity world");
+
+    auto meshInstance = GetMeshFromEntity(*entityWorld, entity, "SetMeshVerticesWorld");
+    auto mesh = meshInstance->GetMesh();
+    const affine3 worldToLocal = affine3(inverse(dm::daffine3(GetEntityTransformFloat(*entityWorld, entity))));
 
     std::vector<float3> objectVertices;
     objectVertices.reserve(vertices.size());
@@ -541,8 +538,8 @@ void SetMeshVerticesWorld(
     const std::vector<dm::float3>& vertices,
     const SetSceneMeshVerticesParams& params)
 {
-    auto node = FindUniqueMeshInstanceNode(params.scene, mesh, "SetMeshVerticesWorld");
-    SetMeshVerticesWorld(node, vertices, params);
+    auto entity = FindUniqueMeshInstanceEntity(params.scene, mesh, "SetMeshVerticesWorld");
+    SetMeshVerticesWorld(entity, vertices, params);
 }
 
 } // namespace caustica

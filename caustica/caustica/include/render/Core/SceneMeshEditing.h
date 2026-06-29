@@ -1,5 +1,6 @@
 #pragma once
 
+#include <ecs/Entity.h>
 #include <math/math.h>
 #include <rhi/nvrhi.h>
 
@@ -12,7 +13,6 @@ namespace caustica
 {
 
 class Scene;
-class SceneGraphNode;
 struct MeshInfo;
 
 struct SetSceneMeshVerticesParams
@@ -33,7 +33,7 @@ std::vector<dm::float3> GetMeshVerticesWorld(
     uint32_t frameIndex);
 std::vector<dm::float3> GetMeshVerticesWorld(
     const std::shared_ptr<Scene>& scene,
-    const std::shared_ptr<SceneGraphNode>& node,
+    ecs::Entity entity,
     uint32_t frameIndex);
 
 void SetMeshVertices(
@@ -41,7 +41,7 @@ void SetMeshVertices(
     const std::vector<dm::float3>& vertices,
     const SetSceneMeshVerticesParams& params);
 void SetMeshVerticesWorld(
-    const std::shared_ptr<SceneGraphNode>& node,
+    ecs::Entity entity,
     const std::vector<dm::float3>& vertices,
     const SetSceneMeshVerticesParams& params);
 void SetMeshVerticesWorld(

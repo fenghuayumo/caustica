@@ -2,10 +2,11 @@
 #include <cgltf.h>
 
 #include <scene/loader/GltfImporter.h>
+#include <scene/SceneImport.h>
 #include <assets/loader/TextureLoader.h>
 #include <scene/SceneEcs.h>
-#include <scene/SceneEcsLegacyAdapter.h>
-#include <scene/SceneGraph.h>
+#include <scene/SceneAnimation.h>
+#include <scene/SceneObjects.h>
 #include <core/vfs/VFS.h>
 #include <core/log.h>
 
@@ -636,7 +637,6 @@ bool GltfImporter::Load(
 
     result.entityWorld.reset();
     result.rootEntity = ecs::NullEntity;
-    result.rootNode.reset();
 
     cgltf_vfs_context vfsContext;
     vfsContext.fs = m_fs;
@@ -1676,14 +1676,14 @@ bool GltfImporter::Load(
         switch(src->type)  // NOLINT(clang-diagnostic-switch-enum)
         {
         case cgltf_light_type_directional: {
-            auto directional = std::dynamic_pointer_cast<DirectionalLight>(m_SceneTypeFactory->CreateLeaf("DirectionalLight"));
+            auto directional = std::static_pointer_cast<DirectionalLight>(m_SceneTypeFactory->CreateLeaf("DirectionalLight"));
             directional->irradiance = src->intensity;
             directional->color = src->color;
             dst = directional;
             break;
         }
         case cgltf_light_type_point: {
-            auto point = std::dynamic_pointer_cast<PointLight>(m_SceneTypeFactory->CreateLeaf("PointLight"));
+            auto point = std::static_pointer_cast<PointLight>(m_SceneTypeFactory->CreateLeaf("PointLight"));
             point->intensity = src->intensity;
             point->color = src->color;
             point->range = src->range;
@@ -1691,7 +1691,7 @@ bool GltfImporter::Load(
             break;
         }
         case cgltf_light_type_spot: {
-            auto spot = std::dynamic_pointer_cast<SpotLight>(m_SceneTypeFactory->CreateLeaf("SpotLight"));
+            auto spot = std::static_pointer_cast<SpotLight>(m_SceneTypeFactory->CreateLeaf("SpotLight"));
             spot->intensity = src->intensity;
             spot->color = src->color;
             spot->range = src->range;
@@ -1710,21 +1710,19 @@ bool GltfImporter::Load(
         }
     }
 
-    // build the scene graph
-    std::shared_ptr<SceneGraph> graph = std::make_shared<SceneGraph>();
-    std::shared_ptr<SceneGraphNode> root = std::make_shared<SceneGraphNode>();
-    std::unordered_map<cgltf_node*, std::shared_ptr<SceneGraphNode>> nodeMap;
+    result.entityWorld = std::make_shared<scene::SceneEntityWorld>();
+    scene::SceneEntityWorld& world = *result.entityWorld;
+    ecs::Entity root = world.createEntity(fileName.filename().generic_string());
+    std::unordered_map<cgltf_node*, ecs::Entity> nodeMap;
     std::vector<cgltf_node*> skinnedNodes;
-    
+
     struct StackItem
     {
-        std::shared_ptr<SceneGraphNode> dstParent;
+        ecs::Entity dstParent = ecs::NullEntity;
         cgltf_node** srcNodes = nullptr;
         size_t srcCount = 0;
     };
     std::vector<StackItem> stack;
-
-    root->SetName(fileName.filename().generic_string());
 
     int unnamedCameraCounter = 1;
 
@@ -1732,21 +1730,24 @@ bool GltfImporter::Load(
     context.dstParent = root;
     context.srcNodes = objects->scene->nodes;
     context.srcCount = objects->scene->nodes_count;
-    
+
+    auto entityHasMesh = [&](ecs::Entity entity) {
+        return world.world().has<scene::MeshInstanceComponent>(entity);
+    };
+
     while (context.srcCount > 0)
     {
         cgltf_node* src = *context.srcNodes;
         ++context.srcNodes;
         --context.srcCount;
 
-        auto dst = std::make_shared<SceneGraphNode>();
-
+        const std::string nodeName = src->name ? src->name : std::string{};
+        ecs::Entity dst = world.createEntity(nodeName, context.dstParent);
         nodeMap[src] = dst;
 
         if (src->has_matrix)
         {
-            // decompose the matrix into TRS
-            affine3 aff = affine3(&src->matrix[0], 
+            affine3 aff = affine3(&src->matrix[0],
                 &src->matrix[4], &src->matrix[8], &src->matrix[12]);
 
             double3 translation;
@@ -1754,88 +1755,67 @@ bool GltfImporter::Load(
             dquat rotation;
 
             decomposeAffine(dm::daffine3(aff), &translation, &rotation, &scaling);
-
-            dst->SetTransform(&translation, &rotation, &scaling);
+            world.setLocalTransform(dst, &translation, &rotation, &scaling);
         }
         else
         {
             if (src->has_scale)
-                dst->SetScaling(dm::double3(dm::float3(src->scale)));
+                world.setScaling(dst, dm::double3(dm::float3(src->scale)));
             if (src->has_rotation)
-                dst->SetRotation(dm::dquat(dm::quat::fromXYZW(src->rotation)));
+                world.setRotation(dst, dm::dquat(dm::quat::fromXYZW(src->rotation)));
             if (src->has_translation)
-                dst->SetTranslation(dm::double3(dm::float3(src->translation)));
+                world.setTranslation(dst, dm::double3(dm::float3(src->translation)));
         }
-
-        if (src->name)
-            dst->SetName(src->name);
-
-        graph->Attach(context.dstParent, dst);
 
         if (src->skin)
-        {
-            // process the skinned nodes later, when the graph is constructed
             skinnedNodes.push_back(src);
-        }
         else if (src->mesh)
         {
             auto found = meshMap.find(src->mesh);
-
             if (found != meshMap.end())
-            {
-                auto leaf = m_SceneTypeFactory->CreateMeshInstance(found->second);
-                dst->SetLeaf(leaf);
-            }
+                world.setMeshInstance(dst, m_SceneTypeFactory->CreateMeshInstance(found->second));
         }
 
         if (src->camera)
         {
             auto found = cameraMap.find(src->camera);
-
             if (found != cameraMap.end())
             {
                 auto camera = found->second;
 
-                if (dst->GetLeaf())
+                if (entityHasMesh(dst))
                 {
-                    auto node = std::make_shared<SceneGraphNode>();
-                    node->SetLeaf(camera);
-                    graph->Attach(dst, node);
+                    ecs::Entity cameraEntity = world.createEntity({}, dst);
+                    world.setCamera(cameraEntity, camera);
+                    dst = cameraEntity;
                 }
                 else
                 {
-                    dst->SetLeaf(camera);
+                    world.setCamera(dst, camera);
                 }
 
                 if (src->camera->name)
-                {
-                    camera->SetName(src->camera->name);
-                }
-                else if (camera->GetName().empty())
-                {
-                    camera->SetName("Camera" + std::to_string(unnamedCameraCounter));
-                    ++unnamedCameraCounter;
-                }
+                    camera->name = src->camera->name;
+                else if (camera->name.empty())
+                    camera->name = "Camera" + std::to_string(unnamedCameraCounter++);
             }
         }
 
         if (src->light)
         {
             auto found = lightMap.find(src->light);
-
             if (found != lightMap.end())
             {
                 auto light = found->second;
 
-                if (dst->GetLeaf())
+                if (entityHasMesh(dst))
                 {
-                    auto node = std::make_shared<SceneGraphNode>();
-                    node->SetLeaf(light);
-                    graph->Attach(dst, node);
+                    ecs::Entity lightEntity = world.createEntity({}, dst);
+                    world.setLight(lightEntity, light);
                 }
                 else
                 {
-                    dst->SetLeaf(light);
+                    world.setLight(dst, light);
                 }
             }
         }
@@ -1849,7 +1829,6 @@ bool GltfImporter::Load(
         }
         else
         {
-            // go up the stack until we find a node where some nodes are left
             while (context.srcCount == 0 && !stack.empty())
             {
                 context = stack.back();
@@ -1863,50 +1842,43 @@ bool GltfImporter::Load(
         assert(src->skin);
         assert(src->mesh);
 
-        std::shared_ptr<MeshInfo> prototypeMesh;
         auto found = meshMap.find(src->mesh);
-        if (found != meshMap.end())
+        if (found == meshMap.end())
+            continue;
+
+        std::shared_ptr<MeshInfo> prototypeMesh = found->second;
+        assert(prototypeMesh->isSkinPrototype);
+
+        auto skinnedInstance = m_SceneTypeFactory->CreateSkinnedMeshInstance(m_SceneTypeFactory, prototypeMesh);
+        skinnedInstance->joints.resize(src->skin->joints_count);
+
+        for (size_t joint_idx = 0; joint_idx < src->skin->joints_count; joint_idx++)
         {
-            prototypeMesh = found->second;
-            assert( prototypeMesh->isSkinPrototype );
+            SkinnedMeshJoint& joint = skinnedInstance->joints[joint_idx];
+            cgltf_accessor_read_float(src->skin->inverse_bind_matrices, joint_idx, joint.inverseBindMatrix.m_data, 16);
+            joint.jointEntity = nodeMap[src->skin->joints[joint_idx]];
 
-            auto skinnedInstance = m_SceneTypeFactory->CreateSkinnedMeshInstance(m_SceneTypeFactory, prototypeMesh);
-            skinnedInstance->joints.resize(src->skin->joints_count);
-
-            for (size_t joint_idx = 0; joint_idx < src->skin->joints_count; joint_idx++)
-            {
-                SkinnedMeshJoint& joint = skinnedInstance->joints[joint_idx];
-                cgltf_accessor_read_float(src->skin->inverse_bind_matrices, joint_idx, joint.inverseBindMatrix.m_data, 16);
-                joint.node = nodeMap[src->skin->joints[joint_idx]];
-
-                auto jointNode = joint.node.lock();
-                if (!jointNode->GetLeaf())
-                {
-                    jointNode->SetLeaf(std::make_shared<SkinnedMeshReference>(skinnedInstance));
-                }
-            }
-
-            auto dst = nodeMap[src];
-            dst->SetLeaf(skinnedInstance);
+            if (!world.world().has<scene::SkinnedMeshReferenceComponent>(joint.jointEntity))
+                world.setSkinnedMeshReference(joint.jointEntity, std::make_shared<SkinnedMeshReference>(skinnedInstance));
         }
+
+        auto dstIt = nodeMap.find(src);
+        if (dstIt != nodeMap.end())
+            world.setSkinnedMeshInstance(dstIt->second, skinnedInstance);
     }
 
-    result.rootNode = root;
+    result.rootEntity = root;
 
-    auto animationContainer = root;
+    ecs::Entity animationContainer = root;
     if (objects->animations_count > 1)
-    {
-        animationContainer = std::make_shared<SceneGraphNode>();
-        animationContainer->SetName("Animations");
-        graph->Attach(root, animationContainer);
-    }
+        animationContainer = world.createEntity("Animations", root);
 
     std::unordered_map<const cgltf_animation_sampler*, std::shared_ptr<animation::Sampler>> animationSamplers;
-    
+
     for (size_t a_idx = 0; a_idx < objects->animations_count; a_idx++)
     {
         const cgltf_animation* srcAnim = &objects->animations[a_idx];
-        auto dstAnim = std::make_shared<SceneGraphAnimation>();
+        auto dstAnim = std::make_shared<SceneAnimation>();
 
         animationSamplers.clear();
 
@@ -1970,51 +1942,48 @@ bool GltfImporter::Load(
         {
             const cgltf_animation_channel* srcChannel = &srcAnim->channels[channel_idx];
 
-            auto dstNode = nodeMap[srcChannel->target_node];
-            if (!dstNode)
+            auto nodeIt = nodeMap.find(srcChannel->target_node);
+            if (nodeIt == nodeMap.end())
                 continue;
+
+            ecs::Entity dstEntity = nodeIt->second;
 
             AnimationAttribute attribute;
             switch (srcChannel->target_path)
             {
-                case cgltf_animation_path_type_translation:
-                    attribute = AnimationAttribute::Translation;
-                    break;
-
-                case cgltf_animation_path_type_rotation:
-                    attribute = AnimationAttribute::Rotation;
-                    break;
-
-                case cgltf_animation_path_type_scale:
-                    attribute = AnimationAttribute::Scaling;
-                    break;
-
-                case cgltf_animation_path_type_weights:
-                case cgltf_animation_path_type_invalid:
-                default:
-                    caustica::warning("Unsupported glTF animation taregt: %d", srcChannel->target_path);
-                    continue;
+            case cgltf_animation_path_type_translation:
+                attribute = AnimationAttribute::Translation;
+                break;
+            case cgltf_animation_path_type_rotation:
+                attribute = AnimationAttribute::Rotation;
+                break;
+            case cgltf_animation_path_type_scale:
+                attribute = AnimationAttribute::Scaling;
+                break;
+            case cgltf_animation_path_type_weights:
+            case cgltf_animation_path_type_invalid:
+            default:
+                caustica::warning("Unsupported glTF animation taregt: %d", srcChannel->target_path);
+                continue;
             }
 
             auto dstSampler = animationSamplers[srcChannel->sampler];
             if (!dstSampler)
                 continue;
 
-            auto dstTrack = std::make_shared<SceneGraphAnimationChannel>(dstSampler, dstNode, attribute);
-            
+            auto dstTrack = std::make_shared<SceneAnimationChannel>(dstSampler, dstEntity, attribute);
             dstAnim->AddChannel(dstTrack);
         }
 
         if (dstAnim->IsVald())
         {
-            auto animationNode = std::make_shared<SceneGraphNode>();
-            animationNode->SetName(dstAnim->GetName());
-            graph->Attach(animationContainer, animationNode);
-            animationNode->SetLeaf(dstAnim);
-            if (srcAnim->name)
-                animationNode->SetName(srcAnim->name);
+            std::string animName = srcAnim->name ? srcAnim->name : std::string{};
+            ecs::Entity animationEntity = world.createEntity(animName, animationContainer);
+            world.setAnimation(animationEntity, dstAnim);
         }
     }
+
+    world.rebuildPathsFromRoot();
 
     if (c_ForceRebuildTangents)
     {
@@ -2026,10 +1995,6 @@ bool GltfImporter::Load(
             m_fs->writeFile(outputFileName, objects->buffers[buffer_idx].data, objects->buffers[buffer_idx].size);
         }
     }
-
-    result.entityWorld = std::make_shared<scene::SceneEntityWorld>();
-    scene::RebuildWorldFromLegacyScene(*result.entityWorld, graph);
-    result.rootEntity = result.entityWorld->root();
 
     cgltf_free(objects);
 

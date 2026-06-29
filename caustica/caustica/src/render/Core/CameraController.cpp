@@ -1,7 +1,7 @@
 #include <render/Core/CameraController.h>
 
 #include <render/Passes/Geometry/TemporalAntiAliasingPass.h>
-#include <scene/SceneGraph.h>
+#include <scene/SceneObjects.h>
 #include <core/file_utils.h>
 #include <core/format.h>
 

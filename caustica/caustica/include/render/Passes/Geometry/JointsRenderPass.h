@@ -9,14 +9,13 @@
 namespace caustica
 {
     class ShaderFactory;
-    class SceneGraph;
+    class Scene;
 }
 
 namespace caustica::render
 {
     // A rasterization pass that draws lines for each joint
-    // of all the animated skeletons in a SceneGraph
-    // (debugging feature)
+    // of all the animated skeletons in a scene (debugging feature)
 
     class JointsRenderPass
     {
@@ -45,7 +44,7 @@ namespace caustica::render
 
         std::vector<Vertex> m_Vertices;
 
-        void UpdateVertices(const caustica::SceneGraph& sceneGraph);
+        void UpdateVertices(const caustica::Scene& scene);
 
     public:
 
@@ -59,6 +58,6 @@ namespace caustica::render
             nvrhi::ICommandList* commandList,
             const caustica::IView* view,
             nvrhi::IFramebuffer* framebuffer,
-            std::shared_ptr<caustica::SceneGraph const> sceneGraph);
+            const caustica::Scene& scene);
     };
 } // end namespace caustica::render

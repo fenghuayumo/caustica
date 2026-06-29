@@ -12,7 +12,8 @@ namespace caustica::editor
 
 struct TogglableNode
 {
-    caustica::SceneGraphNode* SceneNode = nullptr;
+    caustica::ecs::Entity Entity = caustica::ecs::NullEntity;
+    caustica::scene::SceneEntityWorld* EntityWorld = nullptr;
     dm::double3 OriginalTranslation;
     std::string UIName;
 
@@ -34,8 +35,8 @@ struct EditorWindowState
 struct EditorSelectionState
 {
     std::shared_ptr<caustica::Material> SelectedMaterial;
-    std::shared_ptr<caustica::SceneGraphNode> SelectedNode;
-    std::weak_ptr<caustica::SceneGraphNode> InspectorRotationNode;
+    caustica::ecs::Entity SelectedEntity = caustica::ecs::NullEntity;
+    caustica::ecs::Entity InspectorRotationEntity = caustica::ecs::NullEntity;
     dm::dquat InspectorRotationQuat = dm::dquat::identity();
     dm::float3 InspectorRotationEulerDeg = dm::float3(0.0f);
     bool InspectorRotationEulerValid = false;

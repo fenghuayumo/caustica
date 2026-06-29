@@ -53,7 +53,7 @@ if not hasattr(sys, "_caustica_capture_stdout"):
 )PY";
 }
 
-PythonScripting::PythonScripting(SceneEditor& app)
+PythonScripting::PythonScripting(caustica::editor::SceneEditor& app)
     : m_app(app)
 {
 }
@@ -241,7 +241,7 @@ std::string PythonScripting::ConsumeOutputLog()
 
 #include <core/log.h>
 
-PythonScripting::PythonScripting(SceneEditor& app) : m_app(app) {}
+PythonScripting::PythonScripting(caustica::editor::SceneEditor& app) : m_app(app) {}
 PythonScripting::~PythonScripting() {}
 
 bool PythonScripting::Initialize()

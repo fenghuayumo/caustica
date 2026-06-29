@@ -5,7 +5,7 @@
 
 namespace caustica
 {
-    class SceneGraphNode;
+    class Scene;
     struct MeshInfo;
     struct MeshGeometry;
     class MeshInstance;
@@ -59,7 +59,7 @@ namespace caustica::render
         const caustica::ICompositeView* compositeView,
         const caustica::ICompositeView* compositeViewPrev,
         caustica::FramebufferFactory& framebufferFactory,
-        const std::shared_ptr<caustica::SceneGraphNode>& rootNode,
+        const caustica::Scene& scene,
         IDrawStrategy& drawStrategy,
         IGeometryPass& pass,
         GeometryPassContext& passContext,

@@ -1,4 +1,5 @@
-#include <scene/SceneGraph.h>
+#include <scene/SceneObjects.h>
+#include <scene/SceneEcs.h>
 #include <scene/IShadowMap.h>
 #include <core/json.h>
 #include <json/json-forwards.h>
@@ -8,8 +9,13 @@ using namespace caustica::math;
 #include <shaders/bindless.h>
 
 using namespace caustica;
+using namespace caustica::scene;
 
-void Light::FillLightConstants(LightConstants& lightConstants) const
+// =============================================================================
+// Light (base)
+// =============================================================================
+
+void Light::FillLightConstants(LightConstants& lightConstants, const dm::daffine3& /*globalTransform*/) const
 {
     lightConstants.color = color;
     lightConstants.shadowCascades = int4(-1);
@@ -21,94 +27,79 @@ void Light::FillLightConstants(LightConstants& lightConstants) const
         lightConstants.outOfBoundsShadow = 1.f;
 }
 
-bool Light::SetProperty(const std::string& name, const dm::float4& value)
+bool Light::SetProperty(const std::string& propName, const dm::float4& value)
 {
-    if (name == "color")
+    if (propName == "color")
     {
         color = value.xyz();
         return true;
     }
 
-    return SceneGraphLeaf::SetProperty(name, value);
+    return false;
 }
 
-dm::double3 Light::GetPosition() const
+void Light::SetPosition(scene::SceneEntityWorld& world, ecs::Entity entity, const dm::double3& position) const
 {
-    auto node = GetNode();
-    if (!node)
-        return dm::double3::zero();
+    ecs::Entity parentEntity = ecs::NullEntity;
+    if (const auto* parent = world.world().get<scene::ParentComponent>(entity))
+        parentEntity = parent->parent;
 
-    daffine3 localToWorld = node->GetLocalToWorldTransform();
-    return localToWorld.m_translation;
-}
-
-dm::double3 Light::GetDirection() const
-{
-    auto node = GetNode();
-    if (!node)
-        return dm::double3::zero();
-
-    daffine3 localToWorld = node->GetLocalToWorldTransform();
-    return -normalize(double3(localToWorld.m_linear.row2));
-}
-
-void Light::SetPosition(const dm::double3& position) const
-{
-    auto node = GetNode();
-    if (!node)
-    {
-        assert(!"Lights must be attached in order to set their position");
-        return;
-    }
-
-    SceneGraphNode* parent = node->GetParent();
     dm::daffine3 parentToWorld = dm::daffine3::identity();
-    if (parent)
-        parentToWorld = parent->GetLocalToWorldTransform();
+    if (ecs::isValid(parentEntity))
+    {
+        if (const auto* globalTransform = world.world().get<scene::GlobalTransformComponent>(parentEntity))
+            parentToWorld = globalTransform->transform;
+    }
 
     dm::double3 translation = inverse(parentToWorld).transformPoint(position);
-    node->SetTranslation(translation);
+    world.setTranslation(entity, translation);
 }
 
-void Light::SetDirection(const dm::double3& direction) const
+void Light::SetDirection(scene::SceneEntityWorld& world, ecs::Entity entity, const dm::double3& direction) const
 {
-    auto node = GetNode();
-    if (!node)
+    ecs::Entity parentEntity = ecs::NullEntity;
+    if (const auto* parent = world.world().get<scene::ParentComponent>(entity))
+        parentEntity = parent->parent;
+
+    dm::daffine3 parentToWorld = dm::daffine3::identity();
+    if (ecs::isValid(parentEntity))
     {
-        assert(!"Lights must be attached in order to set their direction");
-        return;
+        if (const auto* globalTransform = world.world().get<scene::GlobalTransformComponent>(parentEntity))
+            parentToWorld = globalTransform->transform;
     }
 
-    SceneGraphNode* parent = node->GetParent();
-    dm::daffine3 parentToWorld = dm::daffine3::identity();
-    if (parent)
-        parentToWorld = daffine3(parent->GetLocalToWorldTransform());
-    
     daffine3 worldToLocal = lookatZ(direction);
     daffine3 localToParent = inverse(worldToLocal * parentToWorld);
-    
+
     dquat rotation;
     double3 scaling;
     decomposeAffine<double>(localToParent, nullptr, &rotation, &scaling);
-    
-    node->SetTransform(nullptr, &rotation, &scaling);
+
+    world.setLocalTransform(entity, nullptr, &rotation, &scaling);
 }
 
-std::shared_ptr<SceneGraphLeaf> DirectionalLight::Clone()
+// =============================================================================
+// DirectionalLight
+// =============================================================================
+
+std::shared_ptr<DirectionalLight> DirectionalLight::Clone() const
 {
     auto copy = std::make_shared<DirectionalLight>();
+    copy->name = name;
     copy->color = color;
     copy->irradiance = irradiance;
     copy->angularSize = angularSize;
-    return std::static_pointer_cast<SceneGraphLeaf>(copy);
+    copy->LightLink = LightLink;
+    copy->Proxies = Proxies;
+    return copy;
 }
 
-void DirectionalLight::FillLightConstants(LightConstants& lightConstants) const
+void DirectionalLight::FillLightConstants(LightConstants& lightConstants, const dm::daffine3& globalTransform) const
 {
-    Light::FillLightConstants(lightConstants);
+    Light::FillLightConstants(lightConstants, globalTransform);
 
     lightConstants.lightType = LightType_Directional;
-    lightConstants.direction = float3(normalize(GetDirection()));
+    lightConstants.direction = float3(normalize(GetDirection(globalTransform)));
     float clampedAngularSize = clamp(angularSize, 0.f, 90.f);
     lightConstants.angularSizeOrInvRange = dm::radians(clampedAngularSize);
     lightConstants.intensity = irradiance;
@@ -129,28 +120,23 @@ void DirectionalLight::Store(Json::Value& node) const
     node["angularSize"] << angularSize;
 }
 
-bool DirectionalLight::SetProperty(const std::string& name, const dm::float4& value)
+bool DirectionalLight::SetProperty(const std::string& propName, const dm::float4& value)
 {
-    if (name == "irradiance")
-    {
-        irradiance = value.x;
-        return true;
-    }
-
-    if (name == "angularSize")
-    {
-        angularSize = value.x;
-        return true;
-    }
-
-    return Light::SetProperty(name, value);
+    if (propName == "irradiance")  { irradiance = value.x; return true; }
+    if (propName == "angularSize") { angularSize = value.x; return true; }
+    return Light::SetProperty(propName, value);
 }
+
+// =============================================================================
+// SpotLight
+// =============================================================================
 
 inline float square(const float x) { return x * x; }
 
-std::shared_ptr<SceneGraphLeaf> SpotLight::Clone()
+std::shared_ptr<SpotLight> SpotLight::Clone() const
 {
     auto copy = std::make_shared<SpotLight>();
+    copy->name = name;
     copy->color = color;
     copy->intensity = intensity;
     copy->radius = radius;
@@ -159,16 +145,16 @@ std::shared_ptr<SceneGraphLeaf> SpotLight::Clone()
     copy->outerAngle = outerAngle;
     copy->LightLink = LightLink;
     copy->Proxies = Proxies;
-    return std::static_pointer_cast<SceneGraphLeaf>(copy);
+    return copy;
 }
 
-void SpotLight::FillLightConstants(LightConstants& lightConstants) const
+void SpotLight::FillLightConstants(LightConstants& lightConstants, const dm::daffine3& globalTransform) const
 {
-    Light::FillLightConstants(lightConstants);
+    Light::FillLightConstants(lightConstants, globalTransform);
 
     lightConstants.lightType = LightType_Spot;
-    lightConstants.direction = float3(GetDirection());
-    lightConstants.position = float3(GetPosition());
+    lightConstants.direction = float3(GetDirection(globalTransform));
+    lightConstants.position = float3(GetPosition(globalTransform));
     lightConstants.radius = radius;
     lightConstants.angularSizeOrInvRange = (range <= 0.f) ? 0.f : 1.f / range;
     lightConstants.intensity = intensity;
@@ -186,7 +172,7 @@ void SpotLight::Load(const Json::Value& node)
     node["radius"] >> radius;
     node["range"] >> range;
 
-    // Load light-sampler proxy mesh references (merged from LightExtension)
+    // Load light-sampler proxy mesh references
     if (node.isMember("proxyMeshNodes") && node["proxyMeshNodes"].isArray())
     {
         Proxies.reserve(node["proxyMeshNodes"].size());
@@ -206,59 +192,39 @@ void SpotLight::Store(Json::Value& node) const
     node["range"] << range;
 }
 
-bool SpotLight::SetProperty(const std::string& name, const dm::float4& value)
+bool SpotLight::SetProperty(const std::string& propName, const dm::float4& value)
 {
-    if (name == "intensity")
-    {
-        intensity = value.x;
-        return true;
-    }
-
-    if (name == "radius")
-    {
-        radius = value.x;
-        return true;
-    }
-
-    if (name == "range")
-    {
-        range = value.x;
-        return true;
-    }
-
-    if (name == "innerAngle")
-    {
-        innerAngle = value.x;
-        return true;
-    }
-
-    if (name == "outerAngle")
-    {
-        outerAngle = value.x;
-        return true;
-    }
-
-    return Light::SetProperty(name, value);
+    if (propName == "intensity")   { intensity = value.x; return true; }
+    if (propName == "radius")      { radius = value.x; return true; }
+    if (propName == "range")       { range = value.x; return true; }
+    if (propName == "innerAngle")  { innerAngle = value.x; return true; }
+    if (propName == "outerAngle")  { outerAngle = value.x; return true; }
+    return Light::SetProperty(propName, value);
 }
 
-std::shared_ptr<SceneGraphLeaf> PointLight::Clone()
+// =============================================================================
+// PointLight
+// =============================================================================
+
+std::shared_ptr<PointLight> PointLight::Clone() const
 {
     auto copy = std::make_shared<PointLight>();
+    copy->name = name;
     copy->color = color;
     copy->intensity = intensity;
     copy->radius = radius;
     copy->range = range;
     copy->LightLink = LightLink;
     copy->Proxies = Proxies;
-    return std::static_pointer_cast<SceneGraphLeaf>(copy);
+    return copy;
 }
 
-void PointLight::FillLightConstants(LightConstants& lightConstants) const
+void PointLight::FillLightConstants(LightConstants& lightConstants, const dm::daffine3& globalTransform) const
 {
-    Light::FillLightConstants(lightConstants);
+    Light::FillLightConstants(lightConstants, globalTransform);
 
     lightConstants.lightType = LightType_Point;
-    lightConstants.position = float3(GetPosition());
+    lightConstants.position = float3(GetPosition(globalTransform));
     lightConstants.radius = radius;
     lightConstants.angularSizeOrInvRange = (range <= 0.f) ? 0.f : 1.f / range;
     lightConstants.intensity = intensity;
@@ -272,7 +238,7 @@ void PointLight::Load(const Json::Value& node)
     node["radius"] >> radius;
     node["range"] >> range;
 
-    // Load light-sampler proxy mesh references (merged from LightExtension)
+    // Load light-sampler proxy mesh references
     if (node.isMember("proxyMeshNodes") && node["proxyMeshNodes"].isArray())
     {
         Proxies.reserve(node["proxyMeshNodes"].size());
@@ -290,39 +256,28 @@ void PointLight::Store(Json::Value& node) const
     node["range"] << range;
 }
 
-bool PointLight::SetProperty(const std::string& name, const dm::float4& value)
+bool PointLight::SetProperty(const std::string& propName, const dm::float4& value)
 {
-    if (name == "intensity")
-    {
-        intensity = value.x;
-        return true;
-    }
-
-    if (name == "radius")
-    {
-        radius = value.x;
-        return true;
-    }
-
-    if (name == "range")
-    {
-        range = value.x;
-        return true;
-    }
-    
-    return Light::SetProperty(name, value);
+    if (propName == "intensity") { intensity = value.x; return true; }
+    if (propName == "radius")    { radius = value.x; return true; }
+    if (propName == "range")     { range = value.x; return true; }
+    return Light::SetProperty(propName, value);
 }
 
 // =============================================================================
-// EnvironmentLight (merged from ExtendedScene)
+// EnvironmentLight
 // =============================================================================
 
-void EnvironmentLight::FillLightConstants(LightConstants& lightConstants) const
+void EnvironmentLight::FillLightConstants(LightConstants& lightConstants, const dm::daffine3& globalTransform) const
 {
-    Light::FillLightConstants(lightConstants);
+    Light::FillLightConstants(lightConstants, globalTransform);
     lightConstants.intensity = 0.0f;
     lightConstants.color = { 0, 0, 0 };
 }
+
+// =============================================================================
+// Vertex attribute descriptors and material helpers (unchanged)
+// =============================================================================
 
 nvrhi::VertexAttributeDesc caustica::GetVertexAttributeDesc(VertexAttribute attribute, const char* name, uint32_t bufferIndex)
 {

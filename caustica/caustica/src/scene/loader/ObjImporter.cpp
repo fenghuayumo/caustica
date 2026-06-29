@@ -1,8 +1,8 @@
 #include <scene/loader/ObjImporter.h>
+#include <scene/SceneImport.h>
 #include <assets/loader/TextureLoader.h>
 #include <scene/SceneEcs.h>
-#include <scene/SceneEcsLegacyAdapter.h>
-#include <scene/SceneGraph.h>
+#include <scene/SceneObjects.h>
 #include <core/log.h>
 #include <core/vfs/VFS.h>
 
@@ -1147,16 +1147,11 @@ bool ObjImporter::Load(const std::filesystem::path& filePath, TextureLoader& tex
     mesh->totalVertices = static_cast<uint32_t>(mesh->buffers->positionData.size());
     mesh->totalIndices = static_cast<uint32_t>(mesh->buffers->indexData.size());
 
-    auto importedRoot = std::make_shared<SceneGraphNode>();
-    importedRoot->SetName(filePath.stem().string());
-    importedRoot->SetLeaf(m_SceneTypeFactory->CreateMeshInstance(mesh));
-
-    result.rootNode = importedRoot;
-    auto importGraph = std::make_shared<SceneGraph>();
-    importGraph->SetRootNode(importedRoot);
     result.entityWorld = std::make_shared<scene::SceneEntityWorld>();
-    scene::RebuildWorldFromLegacyScene(*result.entityWorld, importGraph);
-    result.rootEntity = result.entityWorld->root();
+    ecs::Entity rootEntity = result.entityWorld->createEntity(filePath.stem().string());
+    result.entityWorld->setMeshInstance(rootEntity, m_SceneTypeFactory->CreateMeshInstance(mesh));
+    result.entityWorld->rebuildPathsFromRoot();
+    result.rootEntity = rootEntity;
     return true;
 }
 

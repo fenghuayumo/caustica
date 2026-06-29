@@ -90,9 +90,6 @@ private:
 
     bool                    m_lastTickGlobalAnimationEnabled = false;
 
-    // std::shared_ptr<caustica::SceneGraphNode> m_cameraNode;
-    // std::shared_ptr<class PerspectiveCameraEx> m_camera;
-
     std::filesystem::path   m_gameStoragePath;
 
     bool                    m_camRecEnabled = false;

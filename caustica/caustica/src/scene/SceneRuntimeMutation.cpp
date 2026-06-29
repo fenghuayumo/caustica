@@ -1,51 +1,65 @@
 #include <scene/SceneRuntimeMutation.h>
 
 #include <scene/Scene.h>
-#include <scene/SceneGraph.h>
+#include <scene/SceneImport.h>
+#include <scene/SceneObjects.h>
 
 #include <unordered_set>
 
 namespace caustica
 {
 
-std::shared_ptr<SceneGraphNode> AttachRuntimeSceneImport(
+namespace
+{
+void ForEachEntityInSubtree(scene::SceneEntityWorld& world, ecs::Entity root, const auto& fn)
+{
+    if (!ecs::isValid(root))
+        return;
+
+    fn(root);
+
+    for (ecs::Entity child : world.getEntityChildren(root))
+        ForEachEntityInSubtree(world, child, fn);
+}
+} // namespace
+
+ecs::Entity AttachRuntimeSceneImport(
     const std::shared_ptr<Scene>& scene,
     const SceneImportResult& importResult,
     uint32_t frameIndex,
     const RuntimeSceneMutationCallbacks& callbacks)
 {
-    if (!scene || !scene->GetSceneGraph() || !importResult.rootNode)
-        return nullptr;
+    if (!scene || !scene->GetEntityWorld() || !importResult.entityWorld || !ecs::isValid(importResult.rootEntity))
+        return ecs::NullEntity;
 
-    auto sceneGraph = scene->GetSceneGraph();
-    auto importedRoot = sceneGraph->Attach(sceneGraph->GetRootNode(), importResult.rootNode);
+    auto* entityWorld = scene->GetEntityWorld();
+    ecs::Entity importedRoot = entityWorld->importSubtree(
+        entityWorld->root(), *importResult.entityWorld, importResult.rootEntity);
+
     FinalizeRuntimeSceneMutation(scene, importedRoot, frameIndex, callbacks);
     return importedRoot;
 }
 
 void FinalizeRuntimeSceneMutation(
     const std::shared_ptr<Scene>& scene,
-    const std::shared_ptr<SceneGraphNode>& importedRoot,
+    ecs::Entity importedRoot,
     uint32_t frameIndex,
     const RuntimeSceneMutationCallbacks& callbacks)
 {
-    if (importedRoot && callbacks.PostMaterialLoad)
+    if (ecs::isValid(importedRoot) && callbacks.PostMaterialLoad && scene && scene->GetEntityWorld())
     {
-        std::unordered_set<caustica::Material*> processedMaterials;
-        SceneGraphWalker walker(importedRoot.get());
-        while (walker)
-        {
-            auto meshInstance = std::dynamic_pointer_cast<MeshInstance>(walker->GetLeaf());
-            if (meshInstance && meshInstance->GetMesh())
+        std::unordered_set<Material*> processedMaterials;
+        ForEachEntityInSubtree(*scene->GetEntityWorld(), importedRoot, [&](ecs::Entity entity) {
+            auto* meshComp = scene->GetEntityWorld()->world().get<scene::MeshInstanceComponent>(entity);
+            if (!meshComp || !meshComp->instance || !meshComp->instance->GetMesh())
+                return;
+
+            for (const auto& geometry : meshComp->instance->GetMesh()->geometries)
             {
-                for (const auto& geometry : meshInstance->GetMesh()->geometries)
-                {
-                    if (geometry->material && processedMaterials.insert(geometry->material.get()).second)
-                        callbacks.PostMaterialLoad(*geometry->material);
-                }
+                if (geometry->material && processedMaterials.insert(geometry->material.get()).second)
+                    callbacks.PostMaterialLoad(*geometry->material);
             }
-            walker.Next(true);
-        }
+        });
     }
 
     if (scene)
@@ -54,27 +68,24 @@ void FinalizeRuntimeSceneMutation(
 
 bool DeleteRuntimeSceneNode(const DeleteRuntimeSceneNodeParams& params)
 {
-    if (params.Node == nullptr || params.SceneInstance == nullptr)
+    if (!ecs::isValid(params.Entity) || params.SceneInstance == nullptr)
         return false;
 
-    auto sceneGraph = params.SceneInstance->GetSceneGraph();
-    if (sceneGraph == nullptr)
+    auto* entityWorld = params.SceneInstance->GetEntityWorld();
+    if (!entityWorld || !ecs::isValid(entityWorld->root()))
         return false;
 
-    auto rootNode = sceneGraph->GetRootNode();
-    if (rootNode == nullptr || params.Node == rootNode)
-        return false;
-
-    if (params.Node->GetGraph() != sceneGraph || params.Node->GetParent() == nullptr)
+    if (params.Entity == entityWorld->root())
         return false;
 
     if (params.Device)
         params.Device->waitForIdle();
 
     if (params.BeforeDetach)
-        params.BeforeDetach(params.Node);
+        params.BeforeDetach(params.Entity);
 
-    sceneGraph->Detach(params.Node, true);
+    entityWorld->destroyEntity(params.Entity);
+    entityWorld->rebuildPathsFromRoot();
     params.SceneInstance->FinishedLoading(params.FrameIndex);
     return true;
 }

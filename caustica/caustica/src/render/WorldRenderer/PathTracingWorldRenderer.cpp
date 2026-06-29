@@ -1368,7 +1368,7 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
     else
     {
         updatePathTracerConstants(constants.ptConsts, cameraData);
-        constants.MaterialCount = m_context.materials->GetMaterialDataCount(); // m_context.sceneManager.getScene()->GetSceneGraph()->GetMaterials().size();
+        constants.MaterialCount = m_context.materials->GetMaterialDataCount();
         const uint32_t gaussianSplatShadowMode = ResolveGaussianSplatShadowMode(m_context.settings);
         const GaussianSplatBinding primaryGaussianBinding = m_context.gaussianSplats.getPrimaryBinding();
         GaussianSplatPass* primaryGaussianSplatPass = const_cast<GaussianSplatPass*>(primaryGaussianBinding.splatPass);

@@ -1404,8 +1404,7 @@ void MaterialGpuCache::CreateRenderPassesAndLoadMaterials(nvrhi::IBindingLayout*
 
         int initializedFromEngineCount = 0;
 
-        std::shared_ptr<SceneGraph> sceneGraph = scene->GetSceneGraph();
-        auto& materials = sceneGraph->GetMaterials();
+        auto& materials = scene->GetMaterials();
         for (auto& material : materials)
         {
             std::shared_ptr<MaterialEx> materialEx = std::dynamic_pointer_cast<MaterialEx>(material);
@@ -1572,7 +1571,7 @@ void MaterialGpuCache::Update(nvrhi::ICommandList* commandList, const std::share
 
     // NOTE: this also handles some of the geometry data and mixed geometry&material stuff - it might be a good idea to rethink whether it needs to live outside of material baker
     uint subInstanceIndex = 0;
-    const auto& instances = scene->GetSceneGraph()->GetMeshInstances();
+    const auto& instances = scene->GetMeshInstances();
     for (const auto& instance : instances)
     {
         const auto& mesh = instance->GetMesh();

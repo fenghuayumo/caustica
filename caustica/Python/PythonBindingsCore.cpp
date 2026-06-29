@@ -19,7 +19,8 @@
 
 #include <scene/Scene.h>
 #include <scene/SceneTypes.h>
-#include <scene/SceneGraph.h>
+#include <scene/SceneEcs.h>
+#include <ecs/Entity.h>
 #include <core/log.h>
 #include <math/math.h>
 
@@ -179,18 +180,25 @@ namespace
         return double3(x, y, z);
     }
 
-    std::shared_ptr<SceneGraph> SceneGraphFromScene(const std::shared_ptr<Scene>& scene)
+    struct PySceneEntity
     {
-        return scene ? scene->GetSceneGraph() : nullptr;
-    }
+        Scene* scene = nullptr;
+        ecs::Entity entity = ecs::NullEntity;
 
-    std::vector<std::shared_ptr<PTMaterial>> GetSceneMaterials(const std::shared_ptr<SceneGraph>& sceneGraph)
+        [[nodiscard]] scene::SceneEntityWorld* entityWorld() const
+        {
+            return scene ? scene->GetEntityWorld() : nullptr;
+        }
+    };
+
+
+    std::vector<std::shared_ptr<PTMaterial>> GetSceneMaterials(const Scene* scene)
     {
         std::vector<std::shared_ptr<PTMaterial>> result;
-        if (!sceneGraph)
+        if (!scene)
             return result;
 
-        for (const auto& mat : sceneGraph->GetMaterials())
+        for (const auto& mat : scene->GetMaterials())
         {
             if (auto pt = PTMaterial::SafeCast(mat))
                 result.push_back(pt);
@@ -198,12 +206,12 @@ namespace
         return result;
     }
 
-    std::shared_ptr<PTMaterial> FindSceneMaterial(const std::shared_ptr<SceneGraph>& sceneGraph, const std::string& name)
+    std::shared_ptr<PTMaterial> FindSceneMaterial(const Scene* scene, const std::string& name)
     {
-        if (!sceneGraph)
+        if (!scene)
             return nullptr;
 
-        for (const auto& mat : sceneGraph->GetMaterials())
+        for (const auto& mat : scene->GetMaterials())
         {
             auto pt = PTMaterial::SafeCast(mat);
             if (pt && (pt->Name == name || pt->UniqueName == name))
@@ -212,12 +220,12 @@ namespace
         return nullptr;
     }
 
-    std::shared_ptr<PTMaterial> FindSceneMaterialById(const std::shared_ptr<SceneGraph>& sceneGraph, int materialId)
+    std::shared_ptr<PTMaterial> FindSceneMaterialById(const Scene* scene, int materialId)
     {
-        if (!sceneGraph)
+        if (!scene)
             return nullptr;
 
-        for (const auto& mat : sceneGraph->GetMaterials())
+        for (const auto& mat : scene->GetMaterials())
         {
             if (mat && mat->materialID == materialId)
                 return PTMaterial::SafeCast(mat);
@@ -225,79 +233,92 @@ namespace
         return nullptr;
     }
 
-    std::vector<std::shared_ptr<Light>> GetSceneLights(const std::shared_ptr<SceneGraph>& sceneGraph)
+    std::vector<std::shared_ptr<Light>> GetSceneLights(const Scene* scene)
     {
         std::vector<std::shared_ptr<Light>> result;
-        if (!sceneGraph)
+        if (!scene)
             return result;
 
-        for (const auto& light : sceneGraph->GetLights())
+        for (const auto& light : scene->GetLights())
             result.push_back(light);
         return result;
     }
 
-    std::shared_ptr<Light> FindSceneLight(const std::shared_ptr<SceneGraph>& sceneGraph, const std::string& name)
+    std::shared_ptr<Light> FindSceneLight(const Scene* scene, const std::string& name)
     {
-        if (!sceneGraph)
+        if (!scene)
             return nullptr;
 
-        for (const auto& light : sceneGraph->GetLights())
+        const scene::SceneEntityWorld* entityWorld = scene->GetEntityWorld();
+        for (const auto& light : scene->GetLights())
         {
-            if (light && light->GetNode() && light->GetNode()->GetName() == name)
+            if (!light)
+                continue;
+            if (light->name == name)
+                return light;
+            if (entityWorld && ecs::isValid(light->ownerEntity)
+                && entityWorld->getEntityName(light->ownerEntity) == name)
                 return light;
         }
         return nullptr;
     }
 
-    std::shared_ptr<SceneGraphNode> FindSceneNode(const std::shared_ptr<SceneGraph>& sceneGraph, const std::string& path)
+    void WalkEntitiesByName(const scene::SceneEntityWorld& entityWorld, ecs::Entity root, const std::string& name, ecs::Entity& outEntity)
     {
-        if (!sceneGraph || path.empty())
-            return nullptr;
+        if (!ecs::isValid(root) || ecs::isValid(outEntity))
+            return;
 
-        std::filesystem::path query(path);
-        if (query.is_absolute())
-            return sceneGraph->FindNode(query);
-
-        if (auto node = sceneGraph->FindNode(std::filesystem::path("/") / query))
-            return node;
-
-        // Simple name lookup is convenient from Python, especially when the
-        // caller doesn't know the full scene graph path ahead of time.
-        if (query.has_parent_path())
-            return nullptr;
-
-        auto root = sceneGraph->GetRootNode();
-        if (!root)
-            return nullptr;
-
-        SceneGraphWalker walker(root.get());
-        while (walker)
+        if (entityWorld.getEntityName(root) == name)
         {
-            if (walker->GetName() == path)
-                return walker->shared_from_this();
-            walker.Next(true);
+            outEntity = root;
+            return;
         }
 
-        return nullptr;
+        for (ecs::Entity child : entityWorld.getEntityChildren(root))
+            WalkEntitiesByName(entityWorld, child, name, outEntity);
     }
 
-    std::vector<std::shared_ptr<MeshInfo>> GetSceneMeshes(const std::shared_ptr<SceneGraph>& sceneGraph)
+    std::shared_ptr<PySceneEntity> FindSceneEntity(Scene* scene, const std::string& path)
+    {
+        if (!scene || path.empty())
+            return nullptr;
+
+        scene::SceneEntityWorld* entityWorld = scene->GetEntityWorld();
+        if (!entityWorld)
+            return nullptr;
+
+        ecs::Entity entity = ecs::NullEntity;
+        const std::filesystem::path query(path);
+        if (query.is_absolute())
+            entity = entityWorld->findEntity(query);
+        else if (ecs::Entity found = entityWorld->findEntity(std::filesystem::path("/") / query); ecs::isValid(found))
+            entity = found;
+        else if (!query.has_parent_path())
+            WalkEntitiesByName(*entityWorld, entityWorld->root(), path, entity);
+
+        if (!ecs::isValid(entity))
+            return nullptr;
+
+        return std::make_shared<PySceneEntity>(PySceneEntity{ scene, entity });
+    }
+
+    std::vector<std::shared_ptr<MeshInfo>> GetSceneMeshes(const Scene* scene)
     {
         std::vector<std::shared_ptr<MeshInfo>> result;
-        if (!sceneGraph)
+        if (!scene)
             return result;
 
-        for (const auto& mesh : sceneGraph->GetMeshes())
+        for (const auto& mesh : scene->GetMeshes())
             result.push_back(mesh);
         return result;
     }
 
-    std::shared_ptr<MeshInfo> FindSceneMesh(const std::shared_ptr<SceneGraph>& sceneGraph, const std::string& name)
+    std::shared_ptr<MeshInfo> FindSceneMesh(const Scene* scene, const std::string& name)
     {
-        if (!sceneGraph)
+        if (!scene)
             return nullptr;
 
-        for (const auto& mesh : sceneGraph->GetMeshes())
+        for (const auto& mesh : scene->GetMeshes())
         {
             if (mesh && mesh->name == name)
                 return mesh;
@@ -305,10 +326,21 @@ namespace
         return nullptr;
     }
 
-    std::shared_ptr<MeshInfo> MeshFromNode(const SceneGraphNode& node)
+    std::shared_ptr<MeshInfo> MeshFromEntity(const PySceneEntity& pyEntity)
     {
-        auto meshInstance = std::dynamic_pointer_cast<MeshInstance>(node.GetLeaf());
-        return meshInstance ? meshInstance->GetMesh() : nullptr;
+        scene::SceneEntityWorld* entityWorld = pyEntity.entityWorld();
+        if (!entityWorld || !ecs::isValid(pyEntity.entity))
+            return nullptr;
+
+        const auto* meshComponent = entityWorld->world().get<scene::MeshInstanceComponent>(pyEntity.entity);
+        return meshComponent && meshComponent->instance ? meshComponent->instance->GetMesh() : nullptr;
+    }
+
+    ecs::Entity EntityHandleFromPyNode(const std::shared_ptr<PySceneEntity>& node)
+    {
+        if (!node || !ecs::isValid(node->entity))
+            throw std::runtime_error("SceneNode is null or invalid");
+        return node->entity;
     }
 
     std::array<uint32_t, 3> MeshPositionKey(const float3& p)
@@ -872,16 +904,20 @@ void RegisterCoreBindings(nb::module_& m)
             [](Light& self) { return Float3ToTuple(self.color); },
             [](Light& self, nb::object v) { self.color = ToFloat3(v); })
         .def_prop_ro("name", [](Light& self) -> std::string {
-                return self.GetNode() ? self.GetNode()->GetName() : std::string{};
+                return self.name;
             })
         .def_prop_rw("position",
             [](Light& self) { return Double3ToTuple(self.GetPosition()); },
-            [](Light& self, nb::object v) { self.SetPosition(ToDouble3(v)); })
+            [](Light& self, nb::object v) {
+                self.cachedGlobalTransform.m_translation = ToDouble3(v);
+            })
         .def_prop_rw("direction",
             [](Light& self) { return Double3ToTuple(self.GetDirection()); },
-            [](Light& self, nb::object v) { self.SetDirection(ToDouble3(v)); })
+            [](Light& self, nb::object v) {
+                self.UpdateCachedDirection(ToDouble3(v));
+            })
         .def("__repr__", [](Light& self) {
-                std::string n = self.GetNode() ? self.GetNode()->GetName() : "<unnamed>";
+                const std::string& n = self.name.empty() ? std::string("<unnamed>") : self.name;
                 return std::string("<caustica.Light '") + n + "'>";
             });
 
@@ -930,39 +966,86 @@ void RegisterCoreBindings(nb::module_& m)
                     + "' vertices=" + std::to_string(self.totalVertices) + ">";
             });
 
-    nb::class_<SceneGraphNode>(m, "SceneNode",
-        "Scene graph node wrapper for runtime mesh/light/camera transforms.")
-        .def_prop_ro("name", [](SceneGraphNode& self) { return self.GetName(); })
-        .def_prop_ro("path", [](SceneGraphNode& self) { return self.GetPath().generic_string(); })
-        .def_prop_ro("mesh", [](SceneGraphNode& self) {
-                return MeshFromNode(self);
-            }, "Mesh attached to this node, or None when the node is not a mesh instance.")
-        .def_prop_ro("is_mesh", [](SceneGraphNode& self) {
-                return MeshFromNode(self) != nullptr;
+    nb::class_<PySceneEntity>(m, "SceneNode",
+        "ECS scene entity wrapper for runtime mesh/light/camera transforms.")
+        .def_prop_ro("name", [](PySceneEntity& self) {
+                scene::SceneEntityWorld* entityWorld = self.entityWorld();
+                return entityWorld ? entityWorld->getEntityName(self.entity) : std::string{};
+            })
+        .def_prop_ro("path", [](PySceneEntity& self) {
+                scene::SceneEntityWorld* entityWorld = self.entityWorld();
+                return entityWorld ? entityWorld->getEntityPath(self.entity).generic_string() : std::string{};
+            })
+        .def_prop_ro("mesh", [](PySceneEntity& self) {
+                return MeshFromEntity(self);
+            }, "Mesh attached to this entity, or None when it is not a mesh instance.")
+        .def_prop_ro("is_mesh", [](PySceneEntity& self) {
+                return MeshFromEntity(self) != nullptr;
             })
         .def_prop_rw("translation",
-            [](SceneGraphNode& self) { return Double3ToTuple(self.GetTranslation()); },
-            [](SceneGraphNode& self, nb::object v) { self.SetTranslation(ToDouble3(v)); },
+            [](PySceneEntity& self) {
+                scene::SceneEntityWorld* entityWorld = self.entityWorld();
+                if (!entityWorld)
+                    return Double3ToTuple(double3(0.0));
+                const auto* local = entityWorld->world().get<scene::LocalTransformComponent>(self.entity);
+                return Double3ToTuple(local ? local->translation : double3(0.0));
+            },
+            [](PySceneEntity& self, nb::object v) {
+                if (scene::SceneEntityWorld* entityWorld = self.entityWorld())
+                    entityWorld->setTranslation(self.entity, ToDouble3(v));
+            },
             "Local translation in scene space.")
         .def_prop_rw("rotation",
-            [](SceneGraphNode& self) { return DQuatToXYZWTuple(self.GetRotation()); },
-            [](SceneGraphNode& self, nb::object v) { self.SetRotation(ToDQuatXYZW(v)); },
+            [](PySceneEntity& self) {
+                scene::SceneEntityWorld* entityWorld = self.entityWorld();
+                if (!entityWorld)
+                    return DQuatToXYZWTuple(caustica::math::dquat::identity());
+                const auto* local = entityWorld->world().get<scene::LocalTransformComponent>(self.entity);
+                return DQuatToXYZWTuple(local ? local->rotation : caustica::math::dquat::identity());
+            },
+            [](PySceneEntity& self, nb::object v) {
+                if (scene::SceneEntityWorld* entityWorld = self.entityWorld())
+                    entityWorld->setRotation(self.entity, ToDQuatXYZW(v));
+            },
             "Local rotation quaternion as `(x, y, z, w)`.")
         .def_prop_rw("euler",
-            [](SceneGraphNode& self) { return Double3ToTuple(DQuatToEulerRadiansXYZ(self.GetRotation())); },
-            [](SceneGraphNode& self, nb::object v) { self.SetRotation(caustica::math::rotationQuat(ToDouble3(v))); },
-            "Local XYZ Euler rotation in radians. Assigning this updates the node rotation quaternion.")
+            [](PySceneEntity& self) {
+                scene::SceneEntityWorld* entityWorld = self.entityWorld();
+                const auto* local = entityWorld ? entityWorld->world().get<scene::LocalTransformComponent>(self.entity) : nullptr;
+                const caustica::math::dquat rotation = local ? local->rotation : caustica::math::dquat::identity();
+                return Double3ToTuple(DQuatToEulerRadiansXYZ(rotation));
+            },
+            [](PySceneEntity& self, nb::object v) {
+                if (scene::SceneEntityWorld* entityWorld = self.entityWorld())
+                    entityWorld->setRotation(self.entity, caustica::math::rotationQuat(ToDouble3(v)));
+            },
+            "Local XYZ Euler rotation in radians. Assigning this updates the entity rotation quaternion.")
         .def_prop_rw("scaling",
-            [](SceneGraphNode& self) { return Double3ToTuple(self.GetScaling()); },
-            [](SceneGraphNode& self, nb::object v) { self.SetScaling(ToDouble3(v)); },
+            [](PySceneEntity& self) {
+                scene::SceneEntityWorld* entityWorld = self.entityWorld();
+                if (!entityWorld)
+                    return Double3ToTuple(double3(1.0));
+                const auto* local = entityWorld->world().get<scene::LocalTransformComponent>(self.entity);
+                return Double3ToTuple(local ? local->scaling : double3(1.0));
+            },
+            [](PySceneEntity& self, nb::object v) {
+                if (scene::SceneEntityWorld* entityWorld = self.entityWorld())
+                    entityWorld->setScaling(self.entity, ToDouble3(v));
+            },
             "Local non-uniform scaling.")
         .def_prop_ro("bounds",
-            [](SceneGraphNode& self) -> nb::object {
-                return SceneBoundsTuple(ValidSceneBounds(self.GetGlobalBoundingBox()));
+            [](PySceneEntity& self) -> nb::object {
+                scene::SceneEntityWorld* entityWorld = self.entityWorld();
+                if (!entityWorld)
+                    return nb::none();
+                const auto* bounds = entityWorld->world().get<scene::BoundsComponent>(self.entity);
+                return SceneBoundsTuple(ValidSceneBounds(bounds ? bounds->globalBounds : caustica::math::box3::empty()));
             },
-            "World-space `((min.xyz), (max.xyz))` AABB for this node's subgraph.")
-        .def("__repr__", [](SceneGraphNode& self) {
-                return std::string("<caustica.SceneNode '") + self.GetName() + "'>";
+            "World-space `((min.xyz), (max.xyz))` AABB for this entity's subgraph.")
+        .def("__repr__", [](PySceneEntity& self) {
+                scene::SceneEntityWorld* entityWorld = self.entityWorld();
+                const std::string name = entityWorld ? entityWorld->getEntityName(self.entity) : std::string{};
+                return std::string("<caustica.SceneNode '") + name + "'>";
             });
 
     // --- Scene ------------------------------------------------------------
@@ -970,45 +1053,42 @@ void RegisterCoreBindings(nb::module_& m)
         "Loaded caustica scene. Material and light access lives here so Python\n"
         "scripts can follow the same shape as the C++ Sample::GetScene() path.")
         .def("get_materials", [](Scene& self) {
-                return GetSceneMaterials(self.GetSceneGraph());
+                return GetSceneMaterials(&self);
             }, "Return every PTMaterial in this scene.")
 
         .def("find_material", [](Scene& self, const std::string& name) {
-                return FindSceneMaterial(self.GetSceneGraph(), name);
+                return FindSceneMaterial(&self, name);
             }, nb::arg("name"), "Look up a material by Name or UniqueName.")
 
         .def("find_material_by_id", [](Scene& self, int materialId) {
-                return FindSceneMaterialById(self.GetSceneGraph(), materialId);
+                return FindSceneMaterialById(&self, materialId);
             }, nb::arg("material_id"), "Look up a material by engine material ID.")
 
         .def("get_lights", [](Scene& self) {
-                return GetSceneLights(self.GetSceneGraph());
+                return GetSceneLights(&self);
             }, "Return every Light in this scene.")
 
         .def("find_light", [](Scene& self, const std::string& name) {
-                return FindSceneLight(self.GetSceneGraph(), name);
-            }, nb::arg("name"), "Look up a light by scene node name.")
+                return FindSceneLight(&self, name);
+            }, nb::arg("name"), "Look up a light by entity or light name.")
         .def("find_node", [](Scene& self, const std::string& path) {
-                return FindSceneNode(self.GetSceneGraph(), path);
-            }, nb::arg("path"), "Look up a scene graph node by name or path.")
+                return FindSceneEntity(&self, path);
+            }, nb::arg("path"), "Look up a scene entity by name or path.")
         .def("get_meshes", [](Scene& self) {
-                return GetSceneMeshes(self.GetSceneGraph());
+                return GetSceneMeshes(&self);
             }, "Return every Mesh in this scene.")
         .def("find_mesh", [](Scene& self, const std::string& name) {
-                return FindSceneMesh(self.GetSceneGraph(), name);
+                return FindSceneMesh(&self, name);
             }, nb::arg("name"), "Look up a mesh by mesh name.")
 
         .def_prop_ro("material_count", [](Scene& self) {
-                auto sceneGraph = self.GetSceneGraph();
-                return sceneGraph ? GetSceneMaterials(sceneGraph).size() : size_t(0);
+                return GetSceneMaterials(&self).size();
             }, "Number of PTMaterial instances in this scene.")
         .def_prop_ro("mesh_count", [](Scene& self) {
-                auto sceneGraph = self.GetSceneGraph();
-                return sceneGraph ? sceneGraph->GetMeshes().size() : size_t(0);
+                return self.GetMeshes().size();
             }, "Number of meshes in this scene.")
         .def_prop_ro("light_count", [](Scene& self) {
-                auto sceneGraph = self.GetSceneGraph();
-                return sceneGraph ? sceneGraph->GetLights().size() : size_t(0);
+                return self.GetLights().size();
             }, "Number of lights in this scene.")
 
         .def("get_bounds", [](Scene& self) {
@@ -1024,7 +1104,7 @@ void RegisterCoreBindings(nb::module_& m)
                 return SceneBoundsTuple(SceneBoundsFromScene(&self));
             },
             "World-space axis-aligned bounding box that covers every renderable\n"
-            "leaf in the scene graph (mesh instances, lights, splats, ...).\n"
+            "leaf in the scene (mesh instances, lights, splats, ...).\n"
             "Returns ``((min_x, min_y, min_z), (max_x, max_y, max_z))`` or\n"
             "``None`` when the scene is empty / not refreshed yet.\n"
             "The AABB is recomputed by the engine after every scene load and\n"
@@ -1039,9 +1119,8 @@ void RegisterCoreBindings(nb::module_& m)
             "Diagonal extent (max - min) of `Scene.bounds`, or ``None`` for an empty scene.")
 
         .def("__repr__", [](Scene& self) {
-                auto sceneGraph = self.GetSceneGraph();
-                const auto materialCount = sceneGraph ? GetSceneMaterials(sceneGraph).size() : size_t(0);
-                const auto lightCount = sceneGraph ? sceneGraph->GetLights().size() : size_t(0);
+                const auto materialCount = GetSceneMaterials(&self).size();
+                const auto lightCount = self.GetLights().size();
                 return std::string("<caustica.Scene materials=") + std::to_string(materialCount)
                     + " lights=" + std::to_string(lightCount) + ">";
             });
@@ -1191,9 +1270,9 @@ void RegisterCoreBindings(nb::module_& m)
                 s.GaussianSplatObjectScale = ToFloat3(v);
                 s.ResetAccumulation = true;
             })
-        .def_ro("gaussian_splat_count", [](const RenderSessionState& s) { return s.GaussianSplats.SplatCount; })
-        .def_ro("gaussian_splat_object_count", [](const RenderSessionState& s) { return s.GaussianSplats.ObjectCount; })
-        .def_ro("gaussian_splat_file_name", [](const RenderSessionState& s) { return s.GaussianSplats.FileName; })
+        .def_prop_ro("gaussian_splat_count", [](const RenderSessionState& s) { return s.GaussianSplats.SplatCount; })
+        .def_prop_ro("gaussian_splat_object_count", [](const RenderSessionState& s) { return s.GaussianSplats.ObjectCount; })
+        .def_prop_ro("gaussian_splat_file_name", [](const RenderSessionState& s) { return s.GaussianSplats.FileName; })
 
         // --- AA / DLSS / DLSS-RR / DLSS-G / Reflex (realtime only) -------
         .def_rw("realtime_aa",                   &RenderSessionState::RealtimeAA,
@@ -1315,19 +1394,19 @@ void RegisterCoreBindings(nb::module_& m)
         .def_prop_ro("gaussian_splat_file_name", [](SceneEditor& self) { return self.GetGaussianSplatFileName(); })
 
         .def("get_materials", [](SceneEditor& self) {
-                return GetSceneMaterials(SceneGraphFromScene(self.GetScene()));
+                return GetSceneMaterials(self.GetScene().get());
             }, "Compatibility alias for `sample.scene.get_materials()`.")
 
         .def("find_material", [](SceneEditor& self, const std::string& name) -> std::shared_ptr<PTMaterial> {
-                return FindSceneMaterial(SceneGraphFromScene(self.GetScene()), name);
+                return FindSceneMaterial(self.GetScene().get(), name);
             }, nb::arg("name"), "Compatibility alias for `sample.scene.find_material(name)`.")
 
         .def("find_material_by_id", [](SceneEditor& self, int materialId) -> std::shared_ptr<PTMaterial> {
-                return FindSceneMaterialById(SceneGraphFromScene(self.GetScene()), materialId);
+                return FindSceneMaterialById(self.GetScene().get(), materialId);
             }, nb::arg("material_id"), "Compatibility alias for `sample.scene.find_material_by_id(material_id)`.")
 
         .def("get_lights", [](SceneEditor& self) {
-                return GetSceneLights(SceneGraphFromScene(self.GetScene()));
+                return GetSceneLights(self.GetScene().get());
             }, "Compatibility alias for `sample.scene.get_lights()`.")
 
         .def("get_scene_bounds", [](SceneEditor& self) {
@@ -1348,17 +1427,17 @@ void RegisterCoreBindings(nb::module_& m)
             }, "Shortcut for `sample.scene.bounds_size` (or `None`).")
 
         .def("find_light", [](SceneEditor& self, const std::string& name) -> std::shared_ptr<Light> {
-                return FindSceneLight(SceneGraphFromScene(self.GetScene()), name);
+                return FindSceneLight(self.GetScene().get(), name);
             }, nb::arg("name"), "Compatibility alias for `sample.scene.find_light(name)`.")
-        .def("find_node", [](SceneEditor& self, const std::string& path) -> std::shared_ptr<SceneGraphNode> {
-                return FindSceneNode(SceneGraphFromScene(self.GetScene()), path);
+        .def("find_node", [](SceneEditor& self, const std::string& path) -> std::shared_ptr<PySceneEntity> {
+                return FindSceneEntity(self.GetScene().get(), path);
             }, nb::arg("path"), "Compatibility alias for `sample.scene.find_node(path)`.")
 
         .def("get_meshes", [](SceneEditor& self) {
-                return GetSceneMeshes(SceneGraphFromScene(self.GetScene()));
+                return GetSceneMeshes(self.GetScene().get());
             }, "Compatibility alias for `sample.scene.get_meshes()`.")
         .def("find_mesh", [](SceneEditor& self, const std::string& name) -> std::shared_ptr<MeshInfo> {
-                return FindSceneMesh(SceneGraphFromScene(self.GetScene()), name);
+                return FindSceneMesh(self.GetScene().get(), name);
             }, nb::arg("name"), "Compatibility alias for `sample.scene.find_mesh(name)`.")
         .def("get_mesh_vertices", [](SceneEditor& self, const std::shared_ptr<MeshInfo>& mesh) {
                 return Float3VectorToList(self.GetMeshVertices(mesh));
@@ -1395,8 +1474,8 @@ void RegisterCoreBindings(nb::module_& m)
             }, nb::arg("mesh"),
             "Return unique mesh positions as a list of (x, y, z) tuples in world space.\n"
             "The mesh must have exactly one scene instance; pass a SceneNode for instanced meshes.")
-        .def("get_mesh_vertices_world", [](SceneEditor& self, const std::shared_ptr<SceneGraphNode>& node) {
-                return Float3VectorToList(self.GetMeshVerticesWorld(node));
+        .def("get_mesh_vertices_world", [](SceneEditor& self, const std::shared_ptr<PySceneEntity>& node) {
+                return Float3VectorToList(self.GetMeshVerticesWorld(EntityHandleFromPyNode(node)));
             }, nb::arg("node"),
             "Return unique vertex positions for this mesh node as world-space (x, y, z) tuples.")
         .def("set_mesh_vertices_world",
@@ -1409,9 +1488,9 @@ void RegisterCoreBindings(nb::module_& m)
             "Replace all unique positions using world-space coordinates. The mesh must have\n"
             "exactly one scene instance; pass a SceneNode for instanced meshes.")
         .def("set_mesh_vertices_world",
-            [](SceneEditor& self, const std::shared_ptr<SceneGraphNode>& node, nb::object vertices,
+            [](SceneEditor& self, const std::shared_ptr<PySceneEntity>& node, nb::object vertices,
                bool recomputeNormals, bool rebuildAccelerationStructure) {
-                self.SetMeshVerticesWorld(node, ToFloat3Vector(vertices), recomputeNormals, rebuildAccelerationStructure);
+                self.SetMeshVerticesWorld(EntityHandleFromPyNode(node), ToFloat3Vector(vertices), recomputeNormals, rebuildAccelerationStructure);
             },
             nb::arg("node"), nb::arg("vertices"), nb::arg("recompute_normals") = true,
             nb::arg("rebuild_acceleration_structure") = true,
@@ -1434,21 +1513,22 @@ void RegisterCoreBindings(nb::module_& m)
             "Apply a Python callback to unique world-space vertices. callback(index, (x,y,z))\n"
             "may return a replacement world-space triple, or None to keep the vertex unchanged.")
         .def("deform_mesh_world",
-            [](SceneEditor& self, const std::shared_ptr<SceneGraphNode>& node, nb::object callback,
+            [](SceneEditor& self, const std::shared_ptr<PySceneEntity>& node, nb::object callback,
                bool recomputeNormals, bool rebuildAccelerationStructure) {
-                std::vector<float3> vertices = self.GetMeshVerticesWorld(node);
+                const ecs::Entity entity = EntityHandleFromPyNode(node);
+                std::vector<float3> vertices = self.GetMeshVerticesWorld(entity);
                 for (size_t i = 0; i < vertices.size(); ++i)
                 {
                     nb::object updated = callback(i, Float3ToTuple(vertices[i]));
                     if (!updated.is_none())
                         vertices[i] = ToFloat3(updated);
                 }
-                self.SetMeshVerticesWorld(node, vertices, recomputeNormals, rebuildAccelerationStructure);
+                self.SetMeshVerticesWorld(entity, vertices, recomputeNormals, rebuildAccelerationStructure);
                 return vertices.size();
             },
             nb::arg("node"), nb::arg("callback"), nb::arg("recompute_normals") = true,
             nb::arg("rebuild_acceleration_structure") = true,
-            "Apply a Python callback to this mesh node's unique world-space vertices.")
+            "Apply a Python callback to this mesh entity's unique world-space vertices.")
 
         .def("set_environment_map", [](SceneEditor& self, const std::string& path) {
                 self.SetEnvMapOverrideSource(path);
@@ -1476,8 +1556,8 @@ void RegisterCoreBindings(nb::module_& m)
         .def("save_current_camera",  [](SceneEditor& self) { self.SaveCurrentCamera(); })
         .def("load_current_camera",  [](SceneEditor& self) { self.LoadCurrentCamera(); })
 
-        .def("request_shader_reload",  [](SceneEditor& self) { self.GetUIData().ShaderReloadRequested = true; })
-        .def("request_accel_rebuild",  [](SceneEditor& self) { self.GetUIData().AccelerationStructRebuildRequested = true; })
+        .def("request_shader_reload",  [](SceneEditor& self) { self.GetUIData().Invalidation.ShaderReloadRequested = true; })
+        .def("request_accel_rebuild",  [](SceneEditor& self) { self.GetUIData().Invalidation.AccelerationStructRebuildRequested = true; })
         .def("request_mesh_accel_rebuild",
             [](SceneEditor& self, const std::shared_ptr<MeshInfo>& mesh) {
                 self.RequestMeshAccelRebuild(mesh);
@@ -1485,16 +1565,16 @@ void RegisterCoreBindings(nb::module_& m)
             nb::arg("mesh"),
             "Request a BLAS rebuild for one dirty mesh without forcing a full scene AS rebuild.")
         .def("request_mesh_accel_rebuild",
-            [](SceneEditor& self, const std::shared_ptr<SceneGraphNode>& node) {
+            [](SceneEditor& self, const std::shared_ptr<PySceneEntity>& node) {
                 if (!node)
                     throw std::runtime_error("request_mesh_accel_rebuild: node is null");
-                std::shared_ptr<MeshInfo> mesh = MeshFromNode(*node);
+                std::shared_ptr<MeshInfo> mesh = MeshFromEntity(*node);
                 if (!mesh)
-                    throw std::runtime_error("request_mesh_accel_rebuild: node has no mesh");
+                    throw std::runtime_error("request_mesh_accel_rebuild: entity has no mesh");
                 self.RequestMeshAccelRebuild(mesh);
             },
             nb::arg("node"),
-            "Request a BLAS rebuild for the mesh attached to one scene node.")
+            "Request a BLAS rebuild for the mesh attached to one scene entity.")
         .def("reset_accumulation",     [](SceneEditor& self) { self.GetUIData().ResetAccumulation = true; })
         .def("reset_realtime_caches",  [](SceneEditor& self) { self.GetUIData().ResetRealtimeCaches = true; })
 

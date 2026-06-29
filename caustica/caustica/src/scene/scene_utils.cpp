@@ -1,7 +1,7 @@
 #include "scene/scene_utils.h"
 #include <core/scene_discovery.h>
 #include <core/vfs/VFS.h>
-#include "scene/SceneGraph.h"
+#include <scene/SceneObjects.h>
 
 #include <algorithm>
 #include <cctype>

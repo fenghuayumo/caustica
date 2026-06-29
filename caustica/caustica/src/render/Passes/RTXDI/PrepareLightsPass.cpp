@@ -154,7 +154,7 @@ void PrepareLightsPass::CountLightsInScene(uint32_t& numEmissiveMeshes, uint32_t
     numEmissiveMeshes = 0;
     numEmissiveTriangles = 0;
 
-    const auto& instances = m_Scene->GetSceneGraph()->GetMeshInstances();
+    const auto& instances = m_Scene->GetMeshInstances();
     for (const auto& instance : instances)
     {
         for (const auto& geometry : instance->GetMesh()->geometries)
@@ -440,9 +440,9 @@ RTXDI_LightBufferParameters PrepareLightsPass::Process(nvrhi::ICommandList* comm
     std::vector<PrepareLightsTask> tasks;
     std::vector<PolymorphicLightInfoFull> primitiveLightInfos;
     uint32_t lightBufferOffset = 0;
-    std::vector<uint32_t> geometryInstanceToLight(m_Scene->GetSceneGraph()->GetGeometryInstancesCount(), RTXDI_INVALID_LIGHT_INDEX);
+    std::vector<uint32_t> geometryInstanceToLight(m_Scene->GetGeometryInstancesCount(), RTXDI_INVALID_LIGHT_INDEX);
 
-    const auto& instances = m_Scene->GetSceneGraph()->GetMeshInstances();
+    const auto& instances = m_Scene->GetMeshInstances();
     for (const auto& instance : instances)
     {
         const auto& mesh = instance->GetMesh();
@@ -494,7 +494,7 @@ RTXDI_LightBufferParameters PrepareLightsPass::Process(nvrhi::ICommandList* comm
 	lightBufferParams.localLightBufferRegion.firstLightIndex = 0;
 	lightBufferParams.localLightBufferRegion.numLights = lightBufferOffset;
 
-    auto sortedLights = m_Scene->GetSceneGraph()->GetLights();
+    auto sortedLights = m_Scene->GetLights();
     std::sort(sortedLights.begin(), sortedLights.end(), [](const auto& a, const auto& b) 
         { return isInfiniteLight(*a) < isInfiniteLight(*b); });
 

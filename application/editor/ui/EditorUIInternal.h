@@ -7,10 +7,10 @@
 #include <render/Core/PathTracerSettings.h>
 #include <imgui.h>
 #include <math/math.h>
+#include <ecs/Entity.h>
+#include <scene/SceneEcs.h>
 #include <string>
 #include <cstddef>
-
-namespace caustica { class SceneGraphNode; }
 
 namespace caustica::editor
 {
@@ -35,7 +35,7 @@ bool GaussianSplatSortingCombo(EditorUIData& ui);
 bool GaussianSplatFTBCombo(EditorUIData& ui);
 bool GaussianSplatRtxKernelDegreeCombo(EditorUIData& ui);
 bool GaussianSplatRtxParticleFormatCombo(EditorUIData& ui);
-void BuildHierarchyNodeUI(EditorUIData& ui, caustica::SceneGraphNode* node);
+void BuildHierarchyNodeUI(EditorUIData& ui, caustica::Scene& scene, ecs::Entity entity);
 dm::float3 QuaternionToEulerDegreesXYZ(const dm::dquat& rotation);
 bool SameRotation(const dm::dquat& a, const dm::dquat& b);
 

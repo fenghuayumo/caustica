@@ -4,7 +4,7 @@
 #include <render/Passes/Lighting/MaterialGpuCache.h>
 #include <render/Passes/OMM/OpacityMicromapBuilder.h>
 #include <scene/Scene.h>
-#include <scene/SceneGraph.h>
+#include <scene/SceneEcs.h>
 
 namespace caustica
 {
@@ -36,11 +36,15 @@ OmmAccelStructState makeOmmAccelState(OpacityMicromapBuilder* opacityMicromapBui
 
 void transitionSkinnedMeshBuffersToReadOnly(nvrhi::ICommandList* commandList, const Scene& scene)
 {
-    for (const auto& skinnedInstance : scene.GetSceneGraph()->GetSkinnedMeshInstances())
+    if (auto* entityWorld = scene.GetEntityWorld())
     {
-        commandList->setBufferState(
-            skinnedInstance->GetMesh()->buffers->vertexBuffer,
-            nvrhi::ResourceStates::ShaderResource);
+        auto& world = entityWorld->world();
+        world.each<scene::SkinnedMeshInstanceComponent>([&](ecs::Entity, scene::SkinnedMeshInstanceComponent& sc)
+        {
+            commandList->setBufferState(
+                sc.instance->GetMesh()->buffers->vertexBuffer,
+                nvrhi::ResourceStates::ShaderResource);
+        });
     }
     commandList->commitBarriers();
 }

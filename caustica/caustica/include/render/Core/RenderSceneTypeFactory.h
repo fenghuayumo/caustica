@@ -1,6 +1,6 @@
 #pragma once
 
-#include <scene/SceneGraph.h>
+#include <scene/SceneObjects.h>
 #include <render/Passes/Lighting/MaterialGpuCache.h> // for MaterialEx
 
 namespace caustica::render

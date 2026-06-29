@@ -7,6 +7,7 @@
 #include <core/json.h>
 #include <math/math.h>
 #include <scene/camera/Camera.h>
+#include <scene/SceneEcs.h>
 #include <render/Core/View.h>
 #include <cmath>
 
@@ -49,19 +50,24 @@ protected:
         loadData["animTimeStart"] >> m_start;
         loadData["animTimeStop"] >> m_stop;
 
+        auto* ew = m_prop.EntityWorld();
         for (auto & model : m_prop.GetModels())
         {
             for (auto & light : model->GetLights() )
             {
-                auto & node = light->Node;
-                if (node->GetName()=="SpotLeft")
+                if (!ew || light->Entity == caustica::ecs::NullEntity) continue;
+                std::string lightName = ew->getEntityName(light->Entity);
+                auto* ltc = ew->world().tryGet<caustica::scene::LocalTransformComponent>(light->Entity);
+                dquat lightRot = ltc ? ltc->rotation : dquat::identity();
+
+                if (lightName == "SpotLeft")
                 { m_spotLeft = light; m_spotLeftIntensity = light->Intensity; }
-                if (node->GetName() == "SpotRight")
+                if (lightName == "SpotRight")
                 { m_spotRight = light; m_spotRightIntensity = light->Intensity; }
-                if (node->GetName()=="BlobLeft")
-                { m_blobLeft = light; m_blobLeftRot = node->GetRotation(); m_blobLeftIntensity = light->Intensity; }
-                if (node->GetName() == "BlobRight")
-                { m_blobRight = light; m_blobRightRot = node->GetRotation(); m_blobRightIntensity = light->Intensity; }
+                if (lightName == "BlobLeft")
+                { m_blobLeft = light; m_blobLeftRot = lightRot; m_blobLeftIntensity = light->Intensity; }
+                if (lightName == "BlobRight")
+                { m_blobRight = light; m_blobRightRot = lightRot; m_blobRightIntensity = light->Intensity; }
             }
         }
     }
@@ -114,8 +120,14 @@ protected:
             m_blobRight->Intensity = 0.0f;
         }
         dquat rot = rotationQuat<double>( {(double)blobRotAngle, 0, 0} );
-        m_blobLeft->Node->SetRotation( m_blobLeftRot * rot );
-        m_blobRight->Node->SetRotation(m_blobRightRot * rot);
+        auto* ew = m_prop.EntityWorld();
+        if (ew)
+        {
+            if (m_blobLeft->Entity != caustica::ecs::NullEntity)
+                ew->setRotation(m_blobLeft->Entity, m_blobLeftRot * rot);
+            if (m_blobRight->Entity != caustica::ecs::NullEntity)
+                ew->setRotation(m_blobRight->Entity, m_blobRightRot * rot);
+        }
     }
 };
 
@@ -142,7 +154,19 @@ protected:
         if (!view)
             return sel;
 
-        box3 bbox = m_prop.GetNode()->GetGlobalBoundingBox();
+        // Get global bounds from ECS BoundsComponent
+        auto* ew = m_prop.EntityWorld();
+        caustica::ecs::Entity entity = m_prop.GetEntity();
+        box3 bbox = box3::empty();
+        if (ew && entity != caustica::ecs::NullEntity)
+        {
+            auto* boundsComp = ew->world().tryGet<caustica::scene::BoundsComponent>(entity);
+            if (boundsComp)
+                bbox = boundsComp->globalBounds;
+        }
+        if (bbox.isempty())
+            return sel;
+
         float3 bcenter = bbox.center();
         float4x4 viewProj = view->GetViewProjectionMatrix();
 

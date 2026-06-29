@@ -1,11 +1,9 @@
 #pragma once
 
-// =============================================================================
-// GameTypes.h - sample scene utility types.
-// =============================================================================
-
 #include <math/math.h>
-#include <scene/SceneGraph.h>
+#include <ecs/Entity.h>
+#include <scene/SceneObjects.h>
+#include <scene/SceneContent.h>
 
 #include <json/json-forwards.h>
 
@@ -56,7 +54,7 @@ namespace game
 
     struct LightController
     {
-        caustica::SceneGraphNode* Node = nullptr;
+        caustica::ecs::Entity Entity = caustica::ecs::NullEntity;
 
         dm::float3 Color               = dm::float3(1, 1, 1);
         float      Intensity           = 1.0f;

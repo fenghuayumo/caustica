@@ -2,6 +2,7 @@
 
 #include <math/math.h>
 #include <rhi/nvrhi.h>
+#include <ecs/Entity.h>
 
 #include <assets/RuntimeMeshLoadTypes.h>
 
@@ -13,7 +14,6 @@
 
 namespace caustica
 {
-class SceneGraphNode;
 class TextureLoader;
 struct MeshInfo;
 }
@@ -61,13 +61,13 @@ public:
     bool loadMeshFile(const std::filesystem::path& filePath);
     bool loadGltfMeshFile(const std::filesystem::path& filePath);
     bool loadObjMeshFile(const std::filesystem::path& filePath);
-    void finalizeRuntimeSceneMutation(const std::shared_ptr<caustica::SceneGraphNode>& importedRoot);
-    bool deleteSceneNode(const std::shared_ptr<caustica::SceneGraphNode>& node);
+    void finalizeRuntimeSceneMutation(caustica::ecs::Entity importedRoot);
+    bool deleteSceneNode(caustica::ecs::Entity entity);
     void requestFullRebuild();
 
     std::vector<caustica::math::float3> getMeshVertices(const std::shared_ptr<caustica::MeshInfo>& mesh) const;
     std::vector<caustica::math::float3> getMeshVerticesWorld(const std::shared_ptr<caustica::MeshInfo>& mesh) const;
-    std::vector<caustica::math::float3> getMeshVerticesWorld(const std::shared_ptr<caustica::SceneGraphNode>& node) const;
+    std::vector<caustica::math::float3> getMeshVerticesWorld(caustica::ecs::Entity entity) const;
     void setMeshVertices(const std::shared_ptr<caustica::MeshInfo>& mesh,
         const std::vector<caustica::math::float3>& vertices,
         bool recomputeNormals = true,
@@ -76,7 +76,7 @@ public:
         const std::vector<caustica::math::float3>& vertices,
         bool recomputeNormals = true,
         bool rebuildAccelerationStructure = true);
-    void setMeshVerticesWorld(const std::shared_ptr<caustica::SceneGraphNode>& node,
+    void setMeshVerticesWorld(caustica::ecs::Entity entity,
         const std::vector<caustica::math::float3>& vertices,
         bool recomputeNormals = true,
         bool rebuildAccelerationStructure = true);

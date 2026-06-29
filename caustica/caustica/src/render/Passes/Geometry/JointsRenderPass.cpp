@@ -1,5 +1,6 @@
 #include <render/Passes/Geometry/JointsRenderPass.h>
 #include <scene/Scene.h>
+#include <scene/SceneEcs.h>
 #include <assets/loader/ShaderFactory.h>
 #include <math/math.h>
 #include <rhi/utils.h>
@@ -82,17 +83,29 @@ namespace caustica::render
         m_Vertices.clear();
     }
 
-    void caustica::render::JointsRenderPass::UpdateVertices(const caustica::SceneGraph& sceneGraph)
+    void caustica::render::JointsRenderPass::UpdateVertices(const caustica::Scene& scene)
     {
         static const uint32_t blue = vectorToSnorm8(float3(0.f, 0.f, 1.f));
         static const uint32_t red = vectorToSnorm8(float3(1.f, 0.f, 0.f));
 
-        const auto& skinnedInstances = sceneGraph.GetSkinnedMeshInstances();
+        const scene::SceneEntityWorld* entityWorld = scene.GetEntityWorld();
+        if (!entityWorld)
+            return;
+
+        const auto& world = entityWorld->world();
+        const auto& skinnedInstances = scene.GetSkinnedMeshInstances();
 
         uint32_t vertexId = 0;
         for (const auto& skinnedInstance : skinnedInstances)
         {
-            const affine3& localToWorldTransform = skinnedInstance->GetNode()->GetLocalToWorldTransformFloat();
+            if (!ecs::isValid(skinnedInstance->ownerEntity))
+                continue;
+
+            const auto* ownerGlobal = world.get<scene::GlobalTransformComponent>(skinnedInstance->ownerEntity);
+            if (!ownerGlobal)
+                continue;
+
+            const affine3 localToWorldTransform = ownerGlobal->transformFloat;
 
             daffine3 worldToRoot = inverse(daffine3(localToWorldTransform));
 
@@ -105,17 +118,31 @@ namespace caustica::render
             {
                 const SkinnedMeshJoint& joint = skinnedInstance->joints[i];
 
-                auto jointNode = joint.node.lock();
+                if (!ecs::isValid(joint.jointEntity))
+                    continue;
 
-                dm::float4x4 jointMatrix = dm::affineToHomogeneous(dm::affine3(jointNode->GetLocalToWorldTransform() * worldToRoot));
+                const auto* jointGlobal = world.get<scene::GlobalTransformComponent>(joint.jointEntity);
+                if (!jointGlobal)
+                    continue;
+
+                dm::float4x4 jointMatrix = dm::affineToHomogeneous(dm::affine3(jointGlobal->transform * worldToRoot));
 
                 a.position = (float4(0.f, 0.f, 0.f, 1.f) * jointMatrix).xyz();
 
-                if (SceneGraphNode* parentNode = jointNode->GetParent())
-                {
-                    dm::float4x4 parentMatrix = dm::affineToHomogeneous(dm::affine3(parentNode->GetLocalToWorldTransform() * worldToRoot));
+                ecs::Entity parentEntity = ecs::NullEntity;
+                if (const auto* parent = world.get<scene::ParentComponent>(joint.jointEntity))
+                    parentEntity = parent->parent;
 
-                    b.position = (float4(0.f, 0.f, 0.f, 1.f) * parentMatrix).xyz();
+                if (ecs::isValid(parentEntity))
+                {
+                    const auto* parentGlobal = world.get<scene::GlobalTransformComponent>(parentEntity);
+                    if (parentGlobal)
+                    {
+                        dm::float4x4 parentMatrix = dm::affineToHomogeneous(dm::affine3(parentGlobal->transform * worldToRoot));
+                        b.position = (float4(0.f, 0.f, 0.f, 1.f) * parentMatrix).xyz();
+                    }
+                    else
+                        b = Vertex({ float3(0.f, 0.f, 0.f), red });
                 }
                 else
                     b = Vertex({ float3(0.f, 0.f, 0.f), red });
@@ -135,10 +162,9 @@ namespace caustica::render
         nvrhi::ICommandList* commandList, 
         const caustica::IView* view,
         nvrhi::IFramebuffer* framebuffer,
-        std::shared_ptr<caustica::SceneGraph const> sceneGraph)
+        const caustica::Scene& scene)
     {
-      
-        const auto& skinnedInstances = sceneGraph->GetSkinnedMeshInstances();
+        const auto& skinnedInstances = scene.GetSkinnedMeshInstances();
 
         if (m_Vertices.empty())
         {
@@ -162,7 +188,7 @@ namespace caustica::render
         view->FillPlanarViewConstants(constants);   
         commandList->writeBuffer(m_ConstantsBuffer, &constants, sizeof(PlanarViewConstants));
 
-        UpdateVertices(*sceneGraph);
+        UpdateVertices(scene);
 
         commandList->writeBuffer(m_VertexBuffer, m_Vertices.data(), m_Vertices.size() * sizeof(Vertex));
     

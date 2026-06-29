@@ -15,9 +15,7 @@ namespace caustica
     struct SceneLoadingStats;
     class TextureLoader;
     class ThreadPool;
-    class SceneGraphNode;
     class SceneTypeFactory;
-    class SceneGraphAnimation;
 }
 
 namespace caustica

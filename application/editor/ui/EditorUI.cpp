@@ -8,7 +8,7 @@
 #include <render/SceneGaussianSplatPasses.h>
 #include <engine/UserInterfaceUtils.h>
 #include <core/vfs/VFS.h>
-#include <scene/SceneGraph.h>
+#include <scene/Scene.h>
 #include <imgui_internal.h>
 #include <render/Passes/Debug/Korgi.h>
 #include <common/CaptureScriptManager.h>

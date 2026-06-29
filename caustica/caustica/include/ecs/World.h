@@ -53,6 +53,18 @@ public:
     }
 
     template<typename T>
+    T* tryGet(Entity entity)
+    {
+        return m_registry.try_get<T>(entity);
+    }
+
+    template<typename T>
+    const T* tryGet(Entity entity) const
+    {
+        return m_registry.try_get<T>(entity);
+    }
+
+    template<typename T>
     bool has(Entity entity) const
     {
         return m_registry.all_of<T>(entity);

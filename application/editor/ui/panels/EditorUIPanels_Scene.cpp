@@ -10,7 +10,7 @@
 #include <engine/UserInterfaceUtils.h>
 #include <core/vfs/VFS.h>
 #include <scene/SceneTypes.h>
-#include <scene/SceneGraph.h>
+#include <scene/SceneEcs.h>
 #include <imgui_internal.h>
 #include <assets/loader/ShaderFactory.h>
 #include <render/Passes/Lighting/MaterialGpuCache.h>
@@ -338,7 +338,7 @@ void EditorUI::BuildSceneWidgetsPanel(const PanelLayout& layout)
         buttons.push_back(BigButton("Sky: ", &envOptions, &envOptionsCurrentIndex, "For more options see Scene/Environment in the main UI", std::function<std::string(std::string)>(TrimSkyDisplayName) ));
         if (materialVariants.size()>0) buttons.push_back(BigButton("Variant: ", &materialVariants, &m_ui.MaterialVariantIndex, "Material or other scene variants", nullptr));
         for (int i = 0; m_ui.TogglableNodes != nullptr && i < m_ui.TogglableNodes->size(); i++)
-            buttons.push_back(BigButton((*m_ui.TogglableNodes)[i].SceneNode->GetName(), &(*m_ui.TogglableNodes)[i]));
+            buttons.push_back(BigButton((*m_ui.TogglableNodes)[i].UIName, &(*m_ui.TogglableNodes)[i]));
 
         if( buttons.size() > 0 )
         {
@@ -454,30 +454,33 @@ void EditorUI::BuildHierarchyPanel(const PanelLayout& layout)
         RAII_SCOPE(ImGui::Begin("Hierarchy", nullptr, ImGuiWindowFlags_None);, ImGui::End(););
 
         auto scene = m_sceneEditor.GetScene();
-        auto sceneGraph = scene ? scene->GetSceneGraph() : nullptr;
-        auto rootNode = sceneGraph ? sceneGraph->GetRootNode() : nullptr;
+        auto* ew = scene ? scene->GetEntityWorld() : nullptr;
 
-        if (sceneGraph && rootNode)
+        if (ew && ew->root() != ecs::NullEntity)
         {
-            bool deleteSelectedNode = false;
-            ImGui::Text("Objects: %zu mesh, %u 3DGS", sceneGraph->GetMeshInstances().size(), m_ui.GaussianSplats.ObjectCount);
+            bool deleteSelectedEntity = false;
+            ImGui::Text("Objects: %zu mesh, %u 3DGS", scene->GetMeshInstances().size(), m_ui.GaussianSplats.ObjectCount);
             ImGui::Separator();
 
             if (ImGui::TreeNodeEx("Scene", ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_SpanAvailWidth))
             {
-                BuildHierarchyNodeUI(m_ui, rootNode.get());
+                BuildHierarchyNodeUI(m_ui, *scene, ew->root());
                 ImGui::TreePop();
             }
 
             const bool hierarchyFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
-            const bool canDeleteSelected = m_ui.SelectedNode != nullptr && m_ui.SelectedNode->GetParent() != nullptr;
+            const auto* parentComp = (m_ui.SelectedEntity != ecs::NullEntity)
+                ? ew->world().tryGet<caustica::scene::ParentComponent>(m_ui.SelectedEntity)
+                : nullptr;
+            const bool canDeleteSelected = m_ui.SelectedEntity != ecs::NullEntity
+                && parentComp != nullptr
+                && parentComp->parent != ecs::NullEntity;
             if (canDeleteSelected && hierarchyFocused && !ImGui::GetIO().WantTextInput && ImGui::IsKeyPressed(ImGuiKey_Delete))
-                deleteSelectedNode = true;
+                deleteSelectedEntity = true;
 
-            if (deleteSelectedNode)
+            if (deleteSelectedEntity)
             {
-                auto selectedNode = m_ui.SelectedNode;
-                m_sceneEditor.DeleteSceneNode(selectedNode);
+                m_sceneEditor.DeleteSceneNode(m_ui.SelectedEntity);
             }
         }
         else

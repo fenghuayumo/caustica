@@ -22,6 +22,7 @@
 #include <render/Core/ScopedPerfMarker.h>
 #include <render/Core/TextureUtils.h>
 #include <scene/Scene.h>
+#include <scene/SceneEcs.h>
 
 #include <cmath>
 
@@ -624,7 +625,7 @@ bool LightSamplingCache::CollectEnvmapLightPlaceholders(const UpdateSettings & s
 bool LightSamplingCache::CollectAnalyticLightsCPU(const UpdateSettings & settings, const std::shared_ptr<caustica::Scene> & scene, LightingControlData & ctrlBuff, std::vector<PolymorphicLightInfo> & outLightBuffer, std::vector<PolymorphicLightInfoEx> & outLightExBuffer, std::vector<uint> & outLightHistoryRemapCurrentToPastBuffer, std::vector<uint> & outLightHistoryRemapPastToCurrent)
 {
     bool allGood = true;
-    const auto & allLights = scene->GetSceneGraph()->GetLights();
+    const auto & allLights = scene->GetLights();
 
     for ( auto light : allLights )
     {
@@ -748,16 +749,20 @@ bool LightSamplingCache::ProcessEmissiveGeometry( const UpdateSettings & setting
     assert( ctrlBuff.TotalLightCount == (ctrlBuff.AnalyticLightCount+ctrlBuff.EnvmapQuadNodeCount) );
 
     uint subInstanceIndex = 0;
+    bool overflowAbort = false;
 
-    const auto& instances = scene->GetSceneGraph()->GetMeshInstances();
-    for (const auto& instance : instances)
+    if (auto* entityWorld = scene->GetEntityWorld())
     {
-        // PerGeometryLightSamplerLinks now part of base MeshInstance (merged from MeshInstanceExtension)
-        std::vector<LightSamplerLink>* perGeometryLightSamplerLinks = &(instance->PerGeometryLightSamplerLinks);
+        auto& world = entityWorld->world();
+        world.each<scene::MeshInstanceComponent>([&](ecs::Entity entity, scene::MeshInstanceComponent& mc)
+        {
+            MeshInstance* instance = mc.instance.get();
+            // PerGeometryLightSamplerLinks now part of base MeshInstance (merged from MeshInstanceExtension)
+            std::vector<LightSamplerLink>* perGeometryLightSamplerLinks = &(instance->PerGeometryLightSamplerLinks);
 
         const auto& mesh = instance->GetMesh();
 
-        // auto boundingBox = instance->GetNode()->GetGlobalBoundingBox();
+        // auto boundingBox = instance->GetGlobalBoundingBox();
         // ComputeBounds( ctrlBuff, boundingBox.m_mins );
         // ComputeBounds( ctrlBuff, boundingBox.m_maxs );
 
@@ -768,7 +773,7 @@ bool LightSamplingCache::ProcessEmissiveGeometry( const UpdateSettings & setting
         {
             // MeshInstanceEx constructor should have initialized this
             assert(false);
-            continue;
+            return;
         }
 
         for (size_t geometryIndex = 0; geometryIndex < mesh->geometries.size(); ++geometryIndex, subInstanceIndex++)
@@ -781,7 +786,7 @@ bool LightSamplingCache::ProcessEmissiveGeometry( const UpdateSettings & setting
             pastLink.LastUpdateTag = settings.FrameIndex;
                 
             size_t instanceHash = 0;
-            nvrhi::hash_combine(instanceHash, instance.get());
+            nvrhi::hash_combine(instanceHash, instance);
             nvrhi::hash_combine(instanceHash, geometryIndex);
 
             PTMaterial & materialPT = *PTMaterial::SafeCast(geometry->material);
@@ -791,12 +796,16 @@ bool LightSamplingCache::ProcessEmissiveGeometry( const UpdateSettings & setting
             if (materialPT.EnableAsAnalyticLightProxy)
             {
                 // this is the first way to set proxy lights
-                SceneGraphNode * parent = instance->GetNode()->GetParent();
-                if (parent != nullptr && parent->GetLeaf() != nullptr && parent->GetLeaf()->GetContentFlags() == SceneContentFlags::Lights )
+                std::shared_ptr<Light> light;
+                if (const auto* parentComp = world.get<scene::ParentComponent>(entity);
+                    parentComp && ecs::isValid(parentComp->parent))
                 {
-                    auto light = std::dynamic_pointer_cast<Light>(parent->GetLeaf());
-                    if (light != nullptr && (light->GetLightType() == LightType_Spot || light->GetLightType() == LightType_Point) )
-                    {
+                    if (auto* lc = world.get<scene::LightComponent>(parentComp->parent))
+                        light = lc->light;
+                }
+
+                if (light != nullptr && (light->GetLightType() == LightType_Spot || light->GetLightType() == LightType_Point) )
+                {
 #ifdef HASH_LOOKUP_BASED_HISTORIC_LIGHT_SOURCE_MATCHING
                         size_t lightHash = reinterpret_cast<size_t>(light.get());
                         auto entry = m_historyRemapAnalyticLightIndices.find(lightHash);
@@ -807,7 +816,6 @@ bool LightSamplingCache::ProcessEmissiveGeometry( const UpdateSettings & setting
                         if (light->LightLink.LastUpdateTag == settings.FrameIndex)
                             analyticProxyLightIndex = light->LightLink.IndexOrBase;
 #endif
-                    }
                 }
 
                 // this is the second way to set proxy lights - via light marking the nodes
@@ -883,7 +891,8 @@ bool LightSamplingCache::ProcessEmissiveGeometry( const UpdateSettings & setting
                 if( tasks.size() >= LLB_MAX_PROC_TASKS )
                 {
                     assert( false && "Emissive triangle task buffer too small" );
-                    return false;
+                    overflowAbort = true;
+                    return;
                 }
 
                 remainingTriangles -= taskTriangleCount;
@@ -894,7 +903,11 @@ bool LightSamplingCache::ProcessEmissiveGeometry( const UpdateSettings & setting
                     historicBufferOffset += taskTriangleCount;
             }
         }
+        });
     }
+
+    if (overflowAbort)
+        return false;
 
     assert( subInstanceData.size() == subInstanceIndex );
     return allGood;

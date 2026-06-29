@@ -1,5 +1,7 @@
 #include <scene/Scene.h>
-#include <scene/SceneEcsLegacyAdapter.h>
+#include <scene/SceneImport.h>
+#include <scene/SceneObjects.h>
+#include <scene/SceneAnimation.h>
 #include <scene/loader/GltfImporter.h>
 #include <scene/loader/ObjImporter.h>
 #include <scene/scene_utils.h>
@@ -237,12 +239,104 @@ const SceneLoadingStats& Scene::GetLoadingStats()
 
 box3 Scene::GetSceneBounds() const
 {
-    if (!m_SceneGraph || !m_SceneGraph->GetRootNode())
+    if (!m_EntityWorld || !ecs::isValid(m_EntityWorld->root()))
         return box3::empty();
 
-    const box3& bounds = m_SceneGraph->GetRootNode()->GetGlobalBoundingBox();
-    const bool finite = dm::all(dm::isfinite(bounds.m_mins)) && dm::all(dm::isfinite(bounds.m_maxs));
-    return finite ? bounds : box3::empty();
+    const auto* bounds = m_EntityWorld->world().get<scene::BoundsComponent>(m_EntityWorld->root());
+    if (!bounds)
+        return box3::empty();
+
+    const box3& globalBounds = bounds->globalBounds;
+    const bool finite = dm::all(dm::isfinite(globalBounds.m_mins)) && dm::all(dm::isfinite(globalBounds.m_maxs));
+    return finite ? globalBounds : box3::empty();
+}
+
+const ResourceTracker<Material>& Scene::GetMaterials() const
+{
+    if (m_EntityWorld)
+        return m_EntityWorld->GetMaterials();
+
+    static const ResourceTracker<Material> s_empty;
+    return s_empty;
+}
+
+const ResourceTracker<MeshInfo>& Scene::GetMeshes() const
+{
+    if (m_EntityWorld)
+        return m_EntityWorld->GetMeshes();
+
+    static const ResourceTracker<MeshInfo> s_empty;
+    return s_empty;
+}
+
+size_t Scene::GetGeometryCount() const
+{
+    return m_EntityWorld ? m_EntityWorld->GetGeometryCount() : 0;
+}
+
+size_t Scene::GetMaxGeometryCountPerMesh() const
+{
+    return m_EntityWorld ? m_EntityWorld->GetMaxGeometryCountPerMesh() : 0;
+}
+
+size_t Scene::GetGeometryInstancesCount() const
+{
+    return m_EntityWorld ? m_EntityWorld->GetGeometryInstancesCount() : 0;
+}
+
+const std::vector<std::shared_ptr<MeshInstance>>& Scene::GetMeshInstances() const
+{
+    if (m_EntityWorld)
+        return m_EntityWorld->GetMeshInstances();
+
+    static const std::vector<std::shared_ptr<MeshInstance>> s_empty;
+    return s_empty;
+}
+
+const std::vector<std::shared_ptr<SkinnedMeshInstance>>& Scene::GetSkinnedMeshInstances() const
+{
+    if (m_EntityWorld)
+        return m_EntityWorld->GetSkinnedMeshInstances();
+
+    static const std::vector<std::shared_ptr<SkinnedMeshInstance>> s_empty;
+    return s_empty;
+}
+
+const std::vector<std::shared_ptr<Light>>& Scene::GetLights() const
+{
+    if (m_EntityWorld)
+        return m_EntityWorld->GetLights();
+
+    static const std::vector<std::shared_ptr<Light>> s_empty;
+    return s_empty;
+}
+
+const std::vector<std::shared_ptr<SceneCamera>>& Scene::GetCameras() const
+{
+    if (m_EntityWorld)
+        return m_EntityWorld->GetCameras();
+
+    static const std::vector<std::shared_ptr<SceneCamera>> s_empty;
+    return s_empty;
+}
+
+const std::vector<std::shared_ptr<SceneAnimation>>& Scene::GetAnimations() const
+{
+    if (m_EntityWorld)
+        return m_EntityWorld->GetAnimations();
+
+    static const std::vector<std::shared_ptr<SceneAnimation>> s_empty;
+    return s_empty;
+}
+
+void Scene::AttachLightToRoot(const std::shared_ptr<Light>& light)
+{
+    if (!m_EntityWorld || !light || !ecs::isValid(m_EntityWorld->root()))
+        return;
+
+    ecs::Entity entity = m_EntityWorld->createEntity(light->name, m_EntityWorld->root());
+    m_EntityWorld->setLight(entity, light);
+    m_EntityWorld->rebuildPathsFromRoot();
 }
 
 struct Scene::Resources
@@ -310,8 +404,8 @@ bool Scene::LoadWithThreadPool(const std::filesystem::path& sceneFileName, Threa
 {
     g_LoadingStats.ObjectsLoaded = 0;
     g_LoadingStats.ObjectsTotal = 0;
-    
-    m_SceneGraph = std::make_shared<SceneGraph>();
+
+    m_EntityWorld = std::make_unique<scene::SceneEntityWorld>();
 
     if (IsDirectMeshSceneFile(sceneFileName))
     {
@@ -323,11 +417,12 @@ bool Scene::LoadWithThreadPool(const std::filesystem::path& sceneFileName, Threa
         if (threadPool)
             threadPool->WaitForTasks();
 
-        auto modelResult = m_Models[0];
-        if (!modelResult.rootNode)
+        const auto& modelResult = m_Models[0];
+        if (!modelResult.entityWorld || !ecs::isValid(modelResult.rootEntity))
             return false;
 
-        m_SceneGraph->SetRootNode(modelResult.rootNode);
+        m_EntityWorld->importSubtree(ecs::NullEntity, *modelResult.entityWorld, modelResult.rootEntity);
+        m_EntityWorld->rebuildPathsFromRoot();
     }
     else
     {
@@ -341,9 +436,6 @@ bool Scene::LoadWithThreadPool(const std::filesystem::path& sceneFileName, Threa
             return false;
     }
 
-    if (m_EntityWorld)
-        scene::RebuildWorldFromLegacyScene(*m_EntityWorld, m_SceneGraph);
-
     return true;
 }
 
@@ -351,6 +443,8 @@ bool Scene::LoadFromJsonString(const std::string& sceneJson, const std::filesyst
 {
     g_LoadingStats.ObjectsLoaded = 0;
     g_LoadingStats.ObjectsTotal = 0;
+
+    m_EntityWorld = std::make_unique<scene::SceneEntityWorld>();
 
     Json::CharReaderBuilder readerBuilder;
     Json::Value documentRoot;
@@ -362,23 +456,17 @@ bool Scene::LoadFromJsonString(const std::string& sceneJson, const std::filesyst
         return false;
     }
 
-    if (!LoadJsonDocument(documentRoot, scenePath, nullptr))
-        return false;
-
-    if (m_EntityWorld)
-        scene::RebuildWorldFromLegacyScene(*m_EntityWorld, m_SceneGraph);
-
-    return true;
+    return LoadJsonDocument(documentRoot, scenePath, nullptr);
 }
 
 bool Scene::LoadJsonDocument(Json::Value documentRoot, const std::filesystem::path& scenePath, ThreadPool* threadPool)
 {
     m_textureSearchDirectory = scenePath;
-    m_SceneGraph = std::make_shared<SceneGraph>();
 
-    std::shared_ptr<SceneGraphNode> rootNode = std::make_shared<SceneGraphNode>();
-    rootNode->SetName("SceneRoot");
-    m_SceneGraph->SetRootNode(rootNode);
+    if (!m_EntityWorld)
+        m_EntityWorld = std::make_unique<scene::SceneEntityWorld>();
+
+    m_EntityWorld->createEntity("SceneRoot");
 
     if (documentRoot.isObject())
     {
@@ -386,8 +474,9 @@ bool Scene::LoadJsonDocument(Json::Value documentRoot, const std::filesystem::pa
             return false;
 
         LoadModels(documentRoot["models"], scenePath, threadPool);
-        LoadSceneGraph(documentRoot["graph"], rootNode);
+        LoadSceneEntities(documentRoot["graph"], m_EntityWorld->root());
         LoadAnimations(documentRoot["animations"]);
+        m_EntityWorld->rebuildPathsFromRoot();
     }
     else
     {
@@ -487,9 +576,6 @@ SceneImportResult Scene::LoadBuiltinModel(const std::string& builtinName)
     mesh->name = NormalizeBuiltinModelName(builtinName);
     mesh->buffers = buffers;
 
-    auto rootNode = std::make_shared<SceneGraphNode>();
-    rootNode->SetName(mesh->name);
-
     for (const BuiltinMeshData& builtinMesh : builtinMeshes)
     {
         auto material = m_SceneTypeFactory->CreateMaterial();
@@ -525,39 +611,87 @@ SceneImportResult Scene::LoadBuiltinModel(const std::string& builtinName)
     }
 
     auto meshInstance = m_SceneTypeFactory->CreateMeshInstance(mesh);
-    rootNode->SetLeaf(meshInstance);
-    result.rootNode = rootNode;
-    auto importGraph = std::make_shared<SceneGraph>();
-    importGraph->SetRootNode(rootNode);
+    meshInstance->name = mesh->name;
+
     result.entityWorld = std::make_shared<scene::SceneEntityWorld>();
-    scene::RebuildWorldFromLegacyScene(*result.entityWorld, importGraph);
-    result.rootEntity = result.entityWorld->root();
+    ecs::Entity rootEntity = result.entityWorld->createEntity(mesh->name);
+    result.entityWorld->setMeshInstance(rootEntity, meshInstance);
+    result.entityWorld->rebuildPathsFromRoot();
+    result.rootEntity = rootEntity;
     return result;
 }
 
-void Scene::LoadSceneGraph(const Json::Value& nodeList, const std::shared_ptr<SceneGraphNode>& parent)
+void Scene::attachLeafFromJson(ecs::Entity entity, const Json::Value& src)
+{
+    const auto& leafTypeNode = src["type"];
+    if (!leafTypeNode.isString())
+        return;
+
+    const std::string type = leafTypeNode.asString();
+    auto leaf = m_SceneTypeFactory->CreateLeaf(type);
+    if (!leaf)
+    {
+        caustica::warning("Unknown leaf type '%s', skipping.", type.c_str());
+        return;
+    }
+
+    if (type == "DirectionalLight" || type == "PointLight" || type == "SpotLight" || type == "EnvironmentLight")
+    {
+        auto light = std::static_pointer_cast<Light>(leaf);
+        light->Load(src);
+        m_EntityWorld->setLight(entity, light);
+    }
+    else if (type == "PerspectiveCamera" || type == "PerspectiveCameraEx" || type == "OrthographicCamera")
+    {
+        auto camera = std::static_pointer_cast<SceneCamera>(leaf);
+        camera->Load(src);
+        m_EntityWorld->setCamera(entity, camera);
+    }
+    else if (type == "GaussianSplat" || type == "GaussianSplats" || type == "3DGaussianSplat")
+    {
+        auto splat = std::static_pointer_cast<GaussianSplat>(leaf);
+        splat->Load(src);
+        m_EntityWorld->setGaussianSplat(entity, splat);
+    }
+    else if (type == "SampleSettings")
+    {
+        auto settings = std::static_pointer_cast<SampleSettings>(leaf);
+        settings->Load(src);
+        m_EntityWorld->setSampleSettings(entity, settings);
+    }
+    else if (type == "GameSettings")
+    {
+        auto settings = std::static_pointer_cast<GameSettings>(leaf);
+        settings->Load(src);
+        m_EntityWorld->setGameSettings(entity, settings);
+    }
+    else
+    {
+        caustica::warning("Unsupported leaf type '%s' in scene JSON.", type.c_str());
+    }
+}
+
+void Scene::LoadSceneEntities(const Json::Value& nodeList, ecs::Entity parent)
 {
     for (const auto& src : nodeList)
     {
         if (!src.isObject())
         {
-            caustica::warning("Non-object node in the scene graph definition.");
+            caustica::warning("Non-object node in the scene definition.");
             continue;
         }
 
         std::string nodeName;
         const auto& name = src["name"];
         if (name.isString())
-        {
             nodeName = name.asString();
-        }
 
-        std::shared_ptr<SceneGraphNode> customParent = parent;
+        ecs::Entity customParent = parent;
         const auto& parentNode = src["parent"];
         if (parentNode.isString())
         {
-            customParent = m_SceneGraph->FindNode(parentNode.asString());
-            if (!customParent)
+            customParent = m_EntityWorld->findEntity(parentNode.asString());
+            if (!ecs::isValid(customParent))
             {
                 caustica::warning("Custom parent '%s' specified for node '%s' not found, skipping the node.",
                     parentNode.asCString(), nodeName.c_str());
@@ -570,14 +704,14 @@ void Scene::LoadSceneGraph(const Json::Value& nodeList, const std::shared_ptr<Sc
                 nodeName.c_str());
         }
 
-        std::shared_ptr<SceneGraphNode> dst;
+        ecs::Entity entity = ecs::NullEntity;
 
         const auto& modelNode = src["model"];
         if (!modelNode.isNull())
         {
             if (!modelNode.isIntegral())
             {
-                caustica::warning("Model references in the scene graph must be indices into the model array.");
+                caustica::warning("Model references in the scene must be indices into the model array.");
                 continue;
             }
 
@@ -589,28 +723,31 @@ void Scene::LoadSceneGraph(const Json::Value& nodeList, const std::shared_ptr<Sc
             }
 
             const auto& loadedModel = m_Models[modelIndex];
-            if (!loadedModel.rootNode)
-            {
+            if (!loadedModel.entityWorld || !ecs::isValid(loadedModel.rootEntity))
                 continue;
-            }
 
-            dst = loadedModel.rootNode;
+            entity = m_EntityWorld->importSubtree(customParent, *loadedModel.entityWorld, loadedModel.rootEntity);
         }
         else
         {
-            dst = std::make_shared<SceneGraphNode>();
+            entity = m_EntityWorld->createEntity(nodeName, customParent);
         }
 
-        dst = m_SceneGraph->Attach(customParent, dst);
+        if (!ecs::isValid(entity))
+            continue;
 
-        dst->SetName(nodeName);
-        
+        if (!nodeName.empty())
+        {
+            if (auto* nameComp = m_EntityWorld->world().get<scene::NameComponent>(entity))
+                nameComp->value = nodeName;
+        }
+
         const auto& translation = src["translation"];
         if (!translation.isNull())
         {
             double3 value = double3::zero();
             translation >> value;
-            dst->SetTranslation(value);
+            m_EntityWorld->setTranslation(entity, value);
         }
 
         const auto& rotation = src["rotation"];
@@ -618,7 +755,7 @@ void Scene::LoadSceneGraph(const Json::Value& nodeList, const std::shared_ptr<Sc
         {
             double4 value = double4(0.0, 0.0, 0.0, 1.0);
             rotation >> value;
-            dst->SetRotation(dm::dquat::fromXYZW(value));
+            m_EntityWorld->setRotation(entity, dm::dquat::fromXYZW(value));
         }
         else
         {
@@ -627,7 +764,7 @@ void Scene::LoadSceneGraph(const Json::Value& nodeList, const std::shared_ptr<Sc
             {
                 double3 value = double3::zero();
                 euler >> value;
-                dst->SetRotation(rotationQuat(value));
+                m_EntityWorld->setRotation(entity, rotationQuat(value));
             }
         }
 
@@ -636,34 +773,19 @@ void Scene::LoadSceneGraph(const Json::Value& nodeList, const std::shared_ptr<Sc
         {
             double3 value = double3(1.0);
             scaling >> value;
-            dst->SetScaling(value);
+            m_EntityWorld->setScaling(entity, value);
         }
 
         const auto& children = src["children"];
         if (!children.isNull())
-        {
-            LoadSceneGraph(children, dst);
-        }
+            LoadSceneEntities(children, entity);
 
-        const auto& leafTypeNode = src["type"];
-        if (leafTypeNode.isString())
-        {
-            auto leaf = m_SceneTypeFactory->CreateLeaf(leafTypeNode.asString());
-            if (leaf)
-            {
-                dst->SetLeaf(leaf);
-                leaf->Load(src);
-            }
-            else
-            {
-                caustica::warning("Unknown leaf type '%s' for node '%s', skipping.",
-                    leafTypeNode.asCString(), dst->GetName().c_str());
-            }
-        }
-        else if (!leafTypeNode.isNull())
+        if (src["type"].isString())
+            attachLeafFromJson(entity, src);
+        else if (!src["type"].isNull())
         {
             caustica::warning("Leaf type specification for node '%s' is not a string, skipping.",
-                dst->GetName().c_str());
+                nodeName.c_str());
         }
     }
 }
@@ -688,20 +810,15 @@ static dm::float4 ReadUpToFloat4(const Json::Value& node)
 
 void Scene::LoadAnimations(const Json::Value& nodeList)
 {
-    std::shared_ptr<SceneGraphNode> animationContainer;
+    ecs::Entity animationContainer = ecs::NullEntity;
 
     for (const auto& animationNode : nodeList)
     {
-        const auto& animation = std::make_shared<SceneGraphAnimation>();
-
-        const auto& sceneAnimationNode = std::make_shared<SceneGraphNode>();
-        sceneAnimationNode->SetLeaf(animation);
+        const auto& animation = std::make_shared<SceneAnimation>();
 
         const auto& nameNode = animationNode["name"];
         if (nameNode.isString())
-        {
-            animation->SetName(nameNode.asString());
-        }
+            animation->name = nameNode.asString();
 
         const auto& channelsNode = animationNode["channels"];
         if (channelsNode.isArray())
@@ -709,7 +826,6 @@ void Scene::LoadAnimations(const Json::Value& nodeList)
             int channelIndex = -1;
             for (const auto& channelSrc : channelsNode)
             {
-                // Increment the index in the beginning because there are 'continue' statements below
                 ++channelIndex;
 
                 const auto& sampler = std::make_shared<animation::Sampler>();
@@ -728,15 +844,14 @@ void Scene::LoadAnimations(const Json::Value& nodeList)
                     else if (modeNode.asString() == "catmull-rom")
                         sampler->SetInterpolationMode(animation::InterpolationMode::CatmullRomSpline);
                     else
-                        caustica::warning("Unknown interpolation mode '%s' specified for animation '%s' channel %d. "
-                            "Valid interpolation modes are: step, linear, hermite, catmull-rom.",
-                            modeNode.asCString(), animation->GetName().c_str(), channelIndex);
+                        caustica::warning("Unknown interpolation mode '%s' specified for animation '%s' channel %d.",
+                            modeNode.asCString(), animation->name.c_str(), channelIndex);
                 }
                 else
                 {
                     sampler->SetInterpolationMode(animation::InterpolationMode::Step);
                     caustica::warning("Interpolation mode is not specified for animation '%s' channel %d, using step.",
-                        animation->GetName().c_str(), channelIndex);
+                        animation->name.c_str(), channelIndex);
                 }
 
                 const auto& attributeNode = channelSrc["attribute"];
@@ -755,7 +870,7 @@ void Scene::LoadAnimations(const Json::Value& nodeList)
                 else
                 {
                     caustica::warning("Attribute is not specified for animation '%s' channel %d, ignoring.",
-                        animation->GetName().c_str(), channelIndex);
+                        animation->name.c_str(), channelIndex);
                     continue;
                 }
 
@@ -767,8 +882,8 @@ void Scene::LoadAnimations(const Json::Value& nodeList)
                     const auto& timeNode = dataPoint["time"];
                     if (!timeNode.isNumeric())
                     {
-                        caustica::warning("Invalid keyframe %d in animation '%s' channel %d: time is not specified or is not numeric.",
-                            keyframeIndex, animation->GetName().c_str(), channelIndex);
+                        caustica::warning("Invalid keyframe %d in animation '%s' channel %d.",
+                            keyframeIndex, animation->name.c_str(), channelIndex);
                         continue;
                     }
 
@@ -781,95 +896,84 @@ void Scene::LoadAnimations(const Json::Value& nodeList)
                     sampler->AddKeyframe(keyframe);
                 }
 
-                auto processTargetNode = [this, &animation, &sampler, attribute, &attributeNode, channelIndex](const Json::Value& targetNode)
+                auto processTarget = [this, &animation, &sampler, attribute, &attributeNode, channelIndex](const Json::Value& targetNode)
                 {
-                    if (targetNode.isString())
+                    if (!targetNode.isString())
                     {
-                        std::string targetName = targetNode.asString();
-                        if (caustica::string_utils::starts_with(targetName, "material:"))
+                        if (!targetNode.isNull())
+                            caustica::warning("Target specification for animation '%s' channel %d is not a string.",
+                                animation->name.c_str(), channelIndex);
+                        return;
+                    }
+
+                    std::string targetName = targetNode.asString();
+                    if (caustica::string_utils::starts_with(targetName, "material:"))
+                    {
+                        targetName = targetName.substr(9);
+
+                        std::shared_ptr<Material> material;
+                        for (const auto& it : m_EntityWorld->GetMaterials())
                         {
-                            targetName = targetName.substr(9);
+                            if (it->name == targetName)
+                            {
+                                material = it;
+                                break;
+                            }
+                        }
 
-                            std::shared_ptr<Material> material;
-                            for (const auto& it : m_SceneGraph->GetMaterials())
-                            {
-                                if (it->name == targetName)
-                                {
-                                    material = it;
-                                    break;
-                                }
-                            }
-
-                            if (material)
-                            {
-                                const auto& channel = std::make_shared<SceneGraphAnimationChannel>(sampler, material);
-                                channel->SetLeafProperyName(attributeNode.asString());
-                                animation->AddChannel(channel);
-                            }
-                            else
-                            {
-                                caustica::warning("Target material '%s' specified for animation '%s' channel %d not found, ignoring.",
-                                    std::string(targetName).c_str(), animation->GetName().c_str(), channelIndex);
-                            }
+                        if (material)
+                        {
+                            auto channel = std::make_shared<SceneAnimationChannel>(sampler, material);
+                            channel->SetLeafPropertyName(attributeNode.asString());
+                            animation->AddChannel(channel);
                         }
                         else
                         {
-                            const auto& target = m_SceneGraph->FindNode(targetNode.asString());
-                            if (target)
-                            {
-                                const auto& channel = std::make_shared<SceneGraphAnimationChannel>(sampler, target, attribute);
-                                if (attribute == AnimationAttribute::LeafProperty)
-                                    channel->SetLeafProperyName(attributeNode.asString());
-                                animation->AddChannel(channel);
-                            }
-                            else
-                            {
-                                caustica::warning("Target node '%s' specified for animation '%s' channel %d not found, ignoring.",
-                                    targetNode.asCString(), animation->GetName().c_str(), channelIndex);
-                            }
+                            caustica::warning("Target material '%s' for animation '%s' channel %d not found.",
+                                targetName.c_str(), animation->name.c_str(), channelIndex);
                         }
                     }
-                    else if (!targetNode.isNull())
+                    else
                     {
-                        caustica::warning("Target node specification for animation '%s' channel %d is not a string, ignoring.",
-                            animation->GetName().c_str(), channelIndex);
+                        ecs::Entity target = m_EntityWorld->findEntity(targetNode.asString());
+                        if (ecs::isValid(target))
+                        {
+                            auto channel = std::make_shared<SceneAnimationChannel>(sampler, target, attribute);
+                            if (attribute == AnimationAttribute::LeafProperty)
+                                channel->SetLeafPropertyName(attributeNode.asString());
+                            animation->AddChannel(channel);
+                        }
+                        else
+                        {
+                            caustica::warning("Target entity '%s' for animation '%s' channel %d not found.",
+                                targetNode.asCString(), animation->name.c_str(), channelIndex);
+                        }
                     }
                 };
 
                 const auto& targetNode = channelSrc["target"];
                 if (!targetNode.isNull())
+                    processTarget(targetNode);
+                else if (channelSrc["targets"].isArray())
                 {
-                    processTargetNode(targetNode);
-                }
-                else
-                {
-                    const auto& targetsNode = channelSrc["targets"];
-                    if (targetsNode.isArray())
-                    {
-                        for (const auto& targetArrayItem : targetsNode)
-                        {
-                            processTargetNode(targetArrayItem);
-                        }
-                    }
+                    for (const auto& targetArrayItem : channelSrc["targets"])
+                        processTarget(targetArrayItem);
                 }
             }
         }
 
         if (!animation->GetChannels().empty())
         {
-            if (!animationContainer)
-            {
-                animationContainer = std::make_shared<SceneGraphNode>();
-                animationContainer->SetName("Animations");
-                m_SceneGraph->Attach(m_SceneGraph->GetRootNode(), animationContainer);
-            }
-            
-            m_SceneGraph->Attach(animationContainer, sceneAnimationNode);
+            if (!ecs::isValid(animationContainer))
+                animationContainer = m_EntityWorld->createEntity("Animations", m_EntityWorld->root());
+
+            ecs::Entity animEntity = m_EntityWorld->createEntity(animation->name, animationContainer);
+            m_EntityWorld->setAnimation(animEntity, animation);
         }
         else
         {
             caustica::warning("Animation '%s' processed with no valid channels, ignoring.",
-                animation->GetName().c_str());
+                animation->name.c_str());
         }
     }
 }
@@ -892,19 +996,14 @@ void Scene::FinishedLoading(uint32_t frameIndex)
     m_Device->executeCommandList(commandList);
 }
 
-void Scene::RefreshSceneGraph(uint32_t frameIndex)
+void Scene::RefreshSceneWorld(uint32_t frameIndex)
 {
-    m_SceneStructureChanged = m_SceneGraph->HasPendingStructureChanges();
-    m_SceneTransformsChanged = m_SceneGraph->HasPendingTransformChanges();
-    m_SceneGraph->Refresh(frameIndex);
+    if (!m_EntityWorld)
+        return;
 
-    if (m_EntityWorld)
-    {
-        if (m_SceneStructureChanged || !ecs::isValid(m_EntityWorld->root()))
-            scene::RebuildWorldFromLegacyScene(*m_EntityWorld, m_SceneGraph);
-        else if (m_SceneTransformsChanged)
-            scene::SyncWorldFromLegacyScene(*m_EntityWorld, m_SceneGraph);
-    }
+    m_SceneStructureChanged = m_EntityWorld->hasPendingStructureChanges();
+    m_SceneTransformsChanged = m_EntityWorld->hasPendingTransformChanges();
+    m_EntityWorld->refresh(frameIndex);
 }
 
 void Scene::RefreshBuffers(nvrhi::ICommandList* commandList, uint32_t frameIndex)
@@ -917,29 +1016,29 @@ void Scene::RefreshBuffers(nvrhi::ICommandList* commandList, uint32_t frameIndex
     const size_t allocationGranularity = 1024;
     bool arraysAllocated = false;
 
-    if (m_EnableBindlessResources && m_SceneGraph->GetGeometryCount() > m_Resources->geometryData.size())
+    if (m_EnableBindlessResources && m_EntityWorld->GetGeometryCount() > m_Resources->geometryData.size())
     {
-        m_Resources->geometryData.resize(nvrhi::align<size_t>(m_SceneGraph->GetGeometryCount(), allocationGranularity));
+        m_Resources->geometryData.resize(nvrhi::align<size_t>(m_EntityWorld->GetGeometryCount(), allocationGranularity));
         m_GeometryBuffer = CreateGeometryBuffer();
         arraysAllocated = true;
     }
 
-    if (m_SceneGraph->GetMaterials().size() > m_Resources->materialData.size())
+    if (m_EntityWorld->GetMaterials().size() > m_Resources->materialData.size())
     {
-        m_Resources->materialData.resize(nvrhi::align<size_t>(m_SceneGraph->GetMaterials().size(), allocationGranularity));
+        m_Resources->materialData.resize(nvrhi::align<size_t>(m_EntityWorld->GetMaterials().size(), allocationGranularity));
         if (m_EnableBindlessResources)
             m_MaterialBuffer = CreateMaterialBuffer();
         arraysAllocated = true;
     }
 
-    if (m_SceneGraph->GetMeshInstances().size() > m_Resources->instanceData.size())
+    if (m_EntityWorld->GetMeshInstances().size() > m_Resources->instanceData.size())
     {
-        m_Resources->instanceData.resize(nvrhi::align<size_t>(m_SceneGraph->GetMeshInstances().size(), allocationGranularity));
+        m_Resources->instanceData.resize(nvrhi::align<size_t>(m_EntityWorld->GetMeshInstances().size(), allocationGranularity));
         m_InstanceBuffer = CreateInstanceBuffer();
         arraysAllocated = true;
     }
 
-    for (const auto& material : m_SceneGraph->GetMaterials())
+    for (const auto& material : m_EntityWorld->GetMaterials())
     {
         if (material->dirty || m_SceneStructureChanged || arraysAllocated)
             UpdateMaterial(material);
@@ -964,7 +1063,7 @@ void Scene::RefreshBuffers(nvrhi::ICommandList* commandList, uint32_t frameIndex
     if (!m_Resources->geometryData.empty())
     {
         uint32_t geometryResourceIndex = 0;
-        for (const auto& mesh : m_SceneGraph->GetMeshes())
+        for (const auto& mesh : m_EntityWorld->GetMeshes())
         {
             if (arraysAllocated)
             {
@@ -985,7 +1084,7 @@ void Scene::RefreshBuffers(nvrhi::ICommandList* commandList, uint32_t frameIndex
 
     if (m_SceneStructureChanged || arraysAllocated)
     {
-        for (const auto& mesh : m_SceneGraph->GetMeshes())
+        for (const auto& mesh : m_EntityWorld->GetMeshes())
         {
             mesh->buffers->instanceBuffer = m_InstanceBuffer;
 
@@ -999,7 +1098,7 @@ void Scene::RefreshBuffers(nvrhi::ICommandList* commandList, uint32_t frameIndex
 
     if (m_SceneStructureChanged || m_SceneTransformsChanged || arraysAllocated)
     {
-        for (const auto& instance : m_SceneGraph->GetMeshInstances())
+        for (const auto& instance : m_EntityWorld->GetMeshInstances())
         {
             UpdateInstance(instance);
         }
@@ -1020,7 +1119,7 @@ void Scene::UpdateSkinnedMeshes(nvrhi::ICommandList* commandList, uint32_t frame
     bool skinningMarkerPlaced = false;
 
     std::vector<dm::float4x4> jointMatrices;
-    for (const auto& skinnedInstance : m_SceneGraph->GetSkinnedMeshInstances())
+    for (const auto& skinnedInstance : m_EntityWorld->GetSkinnedMeshInstances())
     {
         // Only process the groups that were updated on this or previous frame.
         // Previous frame updates should be processed to copy the current positions to the previous buffer.
@@ -1033,18 +1132,26 @@ void Scene::UpdateSkinnedMeshes(nvrhi::ICommandList* commandList, uint32_t frame
             skinningMarkerPlaced = true;
         }
 
-        const auto& groupName = skinnedInstance->GetName();
+        const auto& groupName = skinnedInstance->name;
         if (!groupName.empty())
             commandList->beginMarker(groupName.c_str());
 
         jointMatrices.resize(skinnedInstance->joints.size());
-        dm::daffine3 worldToRoot = inverse(skinnedInstance->GetNode()->GetLocalToWorldTransform());
+
+        const auto* ownerGlobal = m_EntityWorld->world().get<scene::GlobalTransformComponent>(skinnedInstance->ownerEntity);
+        if (!ownerGlobal)
+            continue;
+
+        dm::daffine3 worldToRoot = inverse(ownerGlobal->transform);
 
         for (size_t i = 0; i < skinnedInstance->joints.size(); i++)
         {
-            auto jointNode = skinnedInstance->joints[i].node.lock();
+            const ecs::Entity jointEntity = skinnedInstance->joints[i].jointEntity;
+            const auto* jointGlobal = m_EntityWorld->world().get<scene::GlobalTransformComponent>(jointEntity);
+            if (!jointGlobal)
+                continue;
 
-            dm::float4x4 jointMatrix = dm::affineToHomogeneous(dm::affine3(jointNode->GetLocalToWorldTransform() * worldToRoot));
+            dm::float4x4 jointMatrix = dm::affineToHomogeneous(dm::affine3(jointGlobal->transform * worldToRoot));
             jointMatrix = skinnedInstance->joints[i].inverseBindMatrix * jointMatrix;
             jointMatrices[i] = jointMatrix;
         }
@@ -1100,7 +1207,7 @@ void Scene::UpdateSkinnedMeshes(nvrhi::ICommandList* commandList, uint32_t frame
 
 void Scene::Refresh(nvrhi::ICommandList* commandList, uint32_t frameIndex)
 {
-    RefreshSceneGraph(frameIndex);
+    RefreshSceneWorld(frameIndex);
     RefreshBuffers(commandList, frameIndex);
 }
 
@@ -1128,7 +1235,7 @@ inline void AppendBufferRange(nvrhi::BufferRange& range, size_t size, uint64_t& 
 
 void Scene::CreateMeshBuffers(nvrhi::ICommandList* commandList)
 {
-    for (const auto& mesh : m_SceneGraph->GetMeshes())
+    for (const auto& mesh : m_EntityWorld->GetMeshes())
     {
         auto buffers = mesh->buffers;
 
@@ -1303,7 +1410,7 @@ void Scene::CreateMeshBuffers(nvrhi::ICommandList* commandList)
         }
     }
 
-    for (const auto& skinnedInstance : m_SceneGraph->GetSkinnedMeshInstances())
+    for (const auto& skinnedInstance : m_EntityWorld->GetSkinnedMeshInstances())
     {
         const auto& skinnedMesh = skinnedInstance->GetMesh();
 
@@ -1526,13 +1633,16 @@ GeometryData* Scene::GetGeometryData(const MeshGeometry& geometry) const
 
 void Scene::UpdateInstance(const std::shared_ptr<MeshInstance>& instance)
 {
-    SceneGraphNode* node = instance->GetNode();
-    if (!node)
+    if (!ecs::isValid(instance->ownerEntity))
+        return;
+
+    const auto* global = m_EntityWorld->world().get<scene::GlobalTransformComponent>(instance->ownerEntity);
+    if (!global)
         return;
 
     InstanceData& idata = m_Resources->instanceData[instance->GetInstanceIndex()];
-    affineToColumnMajor(node->GetLocalToWorldTransformFloat(), idata.transform);
-    affineToColumnMajor(node->GetPrevLocalToWorldTransformFloat(), idata.prevTransform);
+    affineToColumnMajor(global->transformFloat, idata.transform);
+    affineToColumnMajor(global->previousTransformFloat, idata.prevTransform);
 
     const auto& mesh = instance->GetMesh();
     idata.firstGeometryInstanceIndex = instance->GetGeometryInstanceIndex();
@@ -1557,7 +1667,7 @@ void Scene::UpdateInstance(const std::shared_ptr<MeshInstance>& instance)
 // ProcessNodesRecursive - post-load scene traversal (merged from ExtendedScene)
 // =============================================================================
 
-void Scene::ProcessNodesRecursive(std::shared_ptr<SceneGraphNode> /*node*/)
+void Scene::ProcessNodesRecursive()
 {
     if (!m_EntityWorld || !ecs::isValid(m_EntityWorld->root()))
         return;

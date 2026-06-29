@@ -5,6 +5,7 @@
 #include <assets/loader/ShaderFactory.h>
 #include <render/Core/ShadowMap.h>
 #include <scene/SceneTypes.h>
+#include <scene/SceneObjects.h> // Light / shadowMap full definition
 #include <render/Core/CommonRenderPasses.h>
 #include <scene/View.h>
 #include <core/log.h>

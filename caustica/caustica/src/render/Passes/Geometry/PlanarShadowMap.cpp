@@ -53,7 +53,7 @@ PlanarShadowMap::PlanarShadowMap(
 
 bool PlanarShadowMap::SetupWholeSceneDirectionalLightView(const DirectionalLight& light, box3_arg sceneBounds, float fadeRangeWorld)
 {
-    daffine3 viewToWorld = light.GetNode()->GetLocalToWorldTransform();
+    daffine3 viewToWorld = light.cachedGlobalTransform;
     viewToWorld = dm::scaling(dm::double3(1.0, 1.0, -1.0)) * viewToWorld;
     affine3 worldToView = affine3(inverse(viewToWorld));
 
@@ -90,7 +90,7 @@ bool PlanarShadowMap::SetupWholeSceneDirectionalLightView(const DirectionalLight
 
 bool PlanarShadowMap::SetupDynamicDirectionalLightView(const DirectionalLight& light, float3 anchor, float3 halfShadowBoxSize, float3 preViewTranslation, float fadeRangeWorld)
 {
-    daffine3 viewToWorld = light.GetNode()->GetLocalToWorldTransform();
+    daffine3 viewToWorld = light.cachedGlobalTransform;
     // Zero the translation component to ignore where the actual light scene node is located, we only care about direction
     viewToWorld.m_translation = dm::double3(0.0);
     viewToWorld = dm::scaling(dm::double3(1.0, 1.0, -1.0)) * viewToWorld;

@@ -17,7 +17,6 @@
 #include <vector>
 
 class ComputePipelineRegistry;
-class SceneGraph;
 
 namespace caustica
 {
@@ -68,7 +67,7 @@ public:
 
     void sceneUnloading();
     void onSceneLoaded(caustica::Scene& scene, PathTracerSettings& settings);
-    void resyncLightsFromSceneGraph(SceneGraph& sceneGraph);
+    void resyncLightsFromScene(caustica::Scene& scene);
     void notifySceneReloaded(caustica::Scene& scene);
 
     void applyShaderMacros(std::vector<caustica::ShaderMacro>& macros);

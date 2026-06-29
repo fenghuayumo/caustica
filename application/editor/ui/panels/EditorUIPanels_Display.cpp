@@ -10,7 +10,6 @@
 #include <engine/UserInterfaceUtils.h>
 #include <core/vfs/VFS.h>
 #include <scene/SceneTypes.h>
-#include <scene/SceneGraph.h>
 #include <imgui_internal.h>
 #include <assets/loader/ShaderFactory.h>
 #include <render/Passes/Lighting/MaterialGpuCache.h>

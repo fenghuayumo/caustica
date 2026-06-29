@@ -265,9 +265,11 @@ namespace caustica
         // object in the center of the view at the time of the camera switch and use that distance.
         void SwitchToThirdPerson(bool copyView = true, std::optional<float> targetDistance = std::optional<float>());
 
-        // Switches to the provided scene graph camera that must not be a nullptr.
+        // Switches to the provided scene camera that must not be a nullptr.
         // The user-controllable cameras are not affected by this call.
-        void SwitchToSceneCamera(std::shared_ptr<SceneCamera> const& sceneCamera);
+        void SwitchToSceneCamera(
+            std::shared_ptr<SceneCamera> const& sceneCamera,
+            const dm::daffine3& globalTransform = dm::daffine3::identity());
 
         // The following methods direct user input events to the active user camera
         // and return 'true' if such camera is active.
@@ -287,6 +289,7 @@ namespace caustica
         FirstPersonCamera m_FirstPerson;
         ThirdPersonCamera m_ThirdPerson;
         std::shared_ptr<SceneCamera> m_SceneCamera;
+        dm::daffine3 m_SceneCameraGlobalTransform = dm::daffine3::identity();
         bool m_UseFirstPerson = false;
     };
 }

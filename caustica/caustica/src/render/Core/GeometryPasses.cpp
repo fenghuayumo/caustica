@@ -1,5 +1,5 @@
 #include <render/Core/GeometryPasses.h>
-#include <scene/SceneGraph.h>
+#include <scene/Scene.h>
 #include <render/Core/FramebufferFactory.h>
 #include <render/Core/DrawStrategy.h>
 
@@ -131,15 +131,15 @@ void caustica::render::RenderView(
 }
 
 void caustica::render::RenderCompositeView(
-    nvrhi::ICommandList* commandList, 
-    const ICompositeView* compositeView, 
-    const ICompositeView* compositeViewPrev, 
+    nvrhi::ICommandList* commandList,
+    const ICompositeView* compositeView,
+    const ICompositeView* compositeViewPrev,
     FramebufferFactory& framebufferFactory,
-    const std::shared_ptr<caustica::SceneGraphNode>& rootNode,
+    const caustica::Scene& scene,
     IDrawStrategy& drawStrategy,
     IGeometryPass& pass,
     GeometryPassContext& passContext,
-    const char* passEvent, 
+    const char* passEvent,
     bool materialEvents)
 {
     if (passEvent)
@@ -152,7 +152,7 @@ void caustica::render::RenderCompositeView(
         // the views must have the same topology
         assert(compositeView->GetNumChildViews(supportedViewTypes) == compositeViewPrev->GetNumChildViews(supportedViewTypes));
     }
-    
+
     for (uint viewIndex = 0; viewIndex < compositeView->GetNumChildViews(supportedViewTypes); viewIndex++)
     {
         const IView* view = compositeView->GetChildView(supportedViewTypes, viewIndex);
@@ -160,7 +160,7 @@ void caustica::render::RenderCompositeView(
 
         assert(view != nullptr);
 
-        drawStrategy.PrepareForView(rootNode, *view);
+        drawStrategy.PrepareForView(scene, *view);
 
         nvrhi::IFramebuffer* framebuffer = framebufferFactory.GetFramebuffer(*view);
 

@@ -1,6 +1,6 @@
 #include <cassert>
 #include <scene/camera/Camera.h>
-#include <scene/SceneGraph.h>
+#include <scene/SceneObjects.h>
 #include <scene/View.h>
 
 using namespace caustica::math;
@@ -492,7 +492,7 @@ BaseCamera const* SwitchableCamera::GetActiveUserCamera() const
 dm::affine3 SwitchableCamera::GetWorldToViewMatrix() const
 {
     if (m_SceneCamera)
-        return m_SceneCamera->GetWorldToViewMatrix();
+        return m_SceneCamera->GetWorldToViewMatrix(m_SceneCameraGlobalTransform);
 
     return GetActiveUserCamera()->GetWorldToViewMatrix();
 }
@@ -518,7 +518,7 @@ void SwitchableCamera::SwitchToFirstPerson(bool copyView)
     {
         if (m_SceneCamera)
         {
-            dm::affine3 viewToWorld = m_SceneCamera->GetViewToWorldMatrix();
+            dm::affine3 viewToWorld = m_SceneCamera->GetViewToWorldMatrix(m_SceneCameraGlobalTransform);
             m_FirstPerson.LookTo(viewToWorld.m_translation, viewToWorld.m_linear.row2, viewToWorld.m_linear.row1);
         }
         else
@@ -540,7 +540,7 @@ void SwitchableCamera::SwitchToThirdPerson(bool copyView, std::optional<float> t
     {
         if (m_SceneCamera)
         {
-            dm::affine3 viewToWorld = m_SceneCamera->GetViewToWorldMatrix();
+            dm::affine3 viewToWorld = m_SceneCamera->GetViewToWorldMatrix(m_SceneCameraGlobalTransform);
             m_ThirdPerson.LookTo(viewToWorld.m_translation, viewToWorld.m_linear.row2, targetDistance);
         }
         else
@@ -553,11 +553,14 @@ void SwitchableCamera::SwitchToThirdPerson(bool copyView, std::optional<float> t
     m_SceneCamera = nullptr;
 }
 
-void SwitchableCamera::SwitchToSceneCamera(std::shared_ptr<caustica::SceneCamera> const& sceneCamera)
+void SwitchableCamera::SwitchToSceneCamera(
+    std::shared_ptr<caustica::SceneCamera> const& sceneCamera,
+    const dm::daffine3& globalTransform)
 {
     assert(!!sceneCamera);
     
     m_SceneCamera = sceneCamera;
+    m_SceneCameraGlobalTransform = globalTransform;
 }
 
 bool SwitchableCamera::KeyboardUpdate(int key, int scancode, int action, int mods)

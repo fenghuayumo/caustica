@@ -88,7 +88,7 @@ bool CascadedShadowMap::SetupForPlanarView(const DirectionalLight& light, frustu
     float far = 1.f;
     float near = far / exponent;
     
-    daffine3 viewToWorld = light.GetNode()->GetLocalToWorldTransform();
+    daffine3 viewToWorld = light.cachedGlobalTransform;
     viewToWorld = dm::scaling(dm::double3(1.0, 1.0, -1.0)) * viewToWorld;
     affine3 worldToView = affine3(inverse(viewToWorld));
     bool viewModified = false;
@@ -222,7 +222,7 @@ bool CascadedShadowMap::SetupForCubemapView(const DirectionalLight& light, float
 
     float far = maxShadowDistance;
 
-    daffine3 viewToWorld = light.GetNode()->GetLocalToWorldTransform();
+    daffine3 viewToWorld = light.cachedGlobalTransform;
     viewToWorld = dm::scaling(dm::double3(1.0, 1.0, -1.0)) * viewToWorld;
     affine3 worldToView = affine3(inverse(viewToWorld));
     bool viewModified = false;

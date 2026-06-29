@@ -1,5 +1,6 @@
 #pragma once
 
+#include <ecs/Entity.h>
 #include <rhi/nvrhi.h>
 
 #include <cstdint>
@@ -10,9 +11,10 @@ namespace caustica
 {
 
 class Scene;
-class SceneGraphNode;
 struct Material;
 struct SceneImportResult;
+
+namespace scene { class SceneEntityWorld; }
 
 struct RuntimeSceneMutationCallbacks
 {
@@ -22,13 +24,13 @@ struct RuntimeSceneMutationCallbacks
 struct DeleteRuntimeSceneNodeParams
 {
     std::shared_ptr<Scene> SceneInstance;
-    std::shared_ptr<SceneGraphNode> Node;
+    ecs::Entity Entity = ecs::NullEntity;
     nvrhi::IDevice* Device = nullptr;
     uint32_t FrameIndex = 0;
-    std::function<void(const std::shared_ptr<SceneGraphNode>&)> BeforeDetach;
+    std::function<void(ecs::Entity)> BeforeDetach;
 };
 
-std::shared_ptr<SceneGraphNode> AttachRuntimeSceneImport(
+ecs::Entity AttachRuntimeSceneImport(
     const std::shared_ptr<Scene>& scene,
     const SceneImportResult& importResult,
     uint32_t frameIndex,
@@ -36,7 +38,7 @@ std::shared_ptr<SceneGraphNode> AttachRuntimeSceneImport(
 
 void FinalizeRuntimeSceneMutation(
     const std::shared_ptr<Scene>& scene,
-    const std::shared_ptr<SceneGraphNode>& importedRoot,
+    ecs::Entity importedRoot,
     uint32_t frameIndex,
     const RuntimeSceneMutationCallbacks& callbacks = {});
 

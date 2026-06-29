@@ -2,9 +2,7 @@
 
 #include <backend/GpuDevice.h>
 #include <assets/loader/TextureLoader.h>
-#include <scene/SceneGraph.h>
 #include <scene/Scene.h>
-#include <scene/SceneGraph.h>
 #include <core/vfs/VFS.h>
 #include <core/log.h>
 
@@ -134,8 +132,8 @@ void SceneManager::onSceneLoadedGpuPrep(caustica::Scene& scene, bool& accelRebui
 {
     accelRebuildRequested = true;
 
-    for (const auto& anim : scene.GetSceneGraph()->GetAnimations())
-        (void)anim->Apply(0.0f);
+    if (auto* entityWorld = scene.GetEntityWorld())
+        entityWorld->applyAnimations(0.0f);
 }
 
 // --- Active scene state ---
@@ -180,8 +178,7 @@ std::shared_ptr<caustica::Scene> SceneManager::loadScene(
     {
         if (scene->LoadFromJsonString(m_inlineSceneJson))
         {
-            if (scene->GetSceneGraph() && scene->GetSceneGraph()->GetRootNode())
-                scene->ProcessNodesRecursive(scene->GetSceneGraph()->GetRootNode());
+            scene->ProcessNodesRecursive();
             m_scene = scene;
             return scene;
         }
@@ -191,8 +188,7 @@ std::shared_ptr<caustica::Scene> SceneManager::loadScene(
 
     if (scene->Load(sceneFileName))
     {
-        if (scene->GetSceneGraph() && scene->GetSceneGraph()->GetRootNode())
-            scene->ProcessNodesRecursive(scene->GetSceneGraph()->GetRootNode());
+        scene->ProcessNodesRecursive();
         m_scene = scene;
         return scene;
     }

@@ -11,7 +11,9 @@
 #include <render/Core/RenderCore.h>
 #include <render/Core/TextureUtils.h>
 #include <scene/Scene.h>
+#include <scene/SceneEcs.h>
 #include <scene/SceneManager.h>
+#include <ecs/Entity.h>
 #include <scene/camera/Camera.h>
 
 #include <render/RenderRuntimeState.h>
@@ -123,14 +125,14 @@ public:
     const caustica::render::RenderRuntimeState& GetRenderRuntimeState() const { return m_renderState; }
 
     std::shared_ptr<caustica::Material> FindMaterial( int materialID ) const;
-    std::shared_ptr<caustica::SceneGraphNode> FindNodeByInstanceIndex(int instanceIndex) const;
+    caustica::ecs::Entity                   FindEntityByInstanceIndex(int instanceIndex) const;
 
     void                                    HandleDroppedFiles();
     bool                                    LoadMeshFile(const std::filesystem::path& filePath);
     bool                                    LoadGltfMeshFile(const std::filesystem::path& filePath);
     bool                                    LoadObjMeshFile(const std::filesystem::path& filePath);
-    void                                    FinalizeRuntimeSceneMutation(const std::shared_ptr<caustica::SceneGraphNode>& importedRoot);
-    bool                                    DeleteSceneNode(const std::shared_ptr<caustica::SceneGraphNode>& node);
+    void                                    FinalizeRuntimeSceneMutation(caustica::ecs::Entity importedRoot);
+    bool                                    DeleteSceneNode(caustica::ecs::Entity entity);
     void                                    RequestFullRebuild();
     std::vector<dm::float3>        GetMeshVertices(const std::shared_ptr<caustica::MeshInfo>& mesh) const;
     void                                    SetMeshVertices(const std::shared_ptr<caustica::MeshInfo>& mesh,
@@ -138,12 +140,12 @@ public:
                                                             bool recomputeNormals = true,
                                                             bool rebuildAccelerationStructure = true);
     std::vector<dm::float3>        GetMeshVerticesWorld(const std::shared_ptr<caustica::MeshInfo>& mesh);
-    std::vector<dm::float3>        GetMeshVerticesWorld(const std::shared_ptr<caustica::SceneGraphNode>& node);
+    std::vector<dm::float3>        GetMeshVerticesWorld(caustica::ecs::Entity entity);
     void                                    SetMeshVerticesWorld(const std::shared_ptr<caustica::MeshInfo>& mesh,
                                                             const std::vector<dm::float3>& vertices,
                                                             bool recomputeNormals = true,
                                                             bool rebuildAccelerationStructure = true);
-    void                                    SetMeshVerticesWorld(const std::shared_ptr<caustica::SceneGraphNode>& node,
+    void                                    SetMeshVerticesWorld(caustica::ecs::Entity entity,
                                                             const std::vector<dm::float3>& vertices,
                                                             bool recomputeNormals = true,
                                                             bool rebuildAccelerationStructure = true);

@@ -5,7 +5,6 @@
 #include <render/Core/ComputePipelineRegistry.h>
 #include <render/Passes/OMM/OpacityMicromapBuilder.h>
 #include <scene/scene_utils.h>
-#include <scene/SceneGraph.h>
 #include <scene/Scene.h>
 #include <shaders/light_cb.h>
 
@@ -54,12 +53,8 @@ void SceneLightingPasses::sceneUnloading()
 
 void SceneLightingPasses::onSceneLoaded(caustica::Scene& scene, PathTracerSettings& settings)
 {
-    auto sceneGraph = scene.GetSceneGraph();
-    if (sceneGraph == nullptr)
-        return;
-
     m_lights.clear();
-    for (auto light : sceneGraph->GetLights())
+    for (auto light : scene.GetLights())
         m_lights.push_back(light);
 
     std::shared_ptr<EnvironmentLight> envLight = FindEnvironmentLight(m_lights);
@@ -80,16 +75,16 @@ void SceneLightingPasses::onSceneLoaded(caustica::Scene& scene, PathTracerSettin
         if (envLight == nullptr)
         {
             envLight = std::make_shared<EnvironmentLight>();
-            sceneGraph->AttachLeafNode(sceneGraph->GetRootNode(), envLight);
+            scene.AttachLightToRoot(envLight);
             m_lights.push_back(envLight);
         }
     }
 }
 
-void SceneLightingPasses::resyncLightsFromSceneGraph(SceneGraph& sceneGraph)
+void SceneLightingPasses::resyncLightsFromScene(caustica::Scene& scene)
 {
     m_lights.clear();
-    for (auto light : sceneGraph.GetLights())
+    for (auto light : scene.GetLights())
         m_lights.push_back(light);
 }
 

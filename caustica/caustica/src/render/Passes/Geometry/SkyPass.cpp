@@ -5,6 +5,7 @@
 #include <render/Core/ShadowMap.h>
 #include <render/Core/CommonRenderPasses.h>
 #include <scene/View.h>
+#include <scene/SceneObjects.h>
 
 #if CAUSTICA_WITH_STATIC_SHADERS
 #if CAUSTICA_WITH_DX11

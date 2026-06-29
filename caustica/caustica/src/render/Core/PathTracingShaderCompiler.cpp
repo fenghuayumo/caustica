@@ -574,7 +574,7 @@ void PathTracingShaderCompiler::Update(const std::shared_ptr<caustica::Scene>& s
         // Note: these map 1-1 to m_subInstanceData, and are used to (see '->addHitGroup' below) build 1-1 mapped hit groups 
         m_perSubInstanceHitGroup.clear();
         m_perSubInstanceHitGroup.reserve(subInstanceCount);
-        for (const auto& instance : scene->GetSceneGraph()->GetMeshInstances())
+        for (const auto& instance : scene->GetMeshInstances())
         {
             uint instanceID = (uint)m_perSubInstanceHitGroup.size();
             for (int gi = 0; gi < instance->GetMesh()->geometries.size(); gi++)

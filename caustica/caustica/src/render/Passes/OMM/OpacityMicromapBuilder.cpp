@@ -65,8 +65,8 @@ OpacityMicromapBuilder::~OpacityMicromapBuilder()
 void OpacityMicromapBuilder::SceneLoaded(const caustica::Scene& scene)
 {
     const size_t allocationGranularity = 1024;
-    const size_t geometryCount = scene.GetSceneGraph()->GetGeometryCount();
-    if (scene.GetSceneGraph()->GetGeometryCount() > m_geometryDebugDataPtr.size())
+    const size_t geometryCount = scene.GetGeometryCount();
+    if (scene.GetGeometryCount() > m_geometryDebugDataPtr.size())
     {
         m_geometryDebugDataPtr.resize(nvrhi::align<size_t>(geometryCount, allocationGranularity));
         
@@ -102,7 +102,7 @@ void OpacityMicromapBuilder::CreateOpacityMicromaps(const caustica::Scene& scene
     m_uiData.BuildsLeftInQueue = 0;
     m_uiData.BuildsQueued = 0;
 
-    for (auto& mesh : scene.GetSceneGraph()->GetMeshes())
+    for (auto& mesh : scene.GetMeshes())
     {
         if (mesh->isSkinPrototype) //buffers->hasAttribute(caustica::VertexAttribute::JointWeights))
             continue; // skip the skinning prototypes
@@ -160,7 +160,7 @@ void OpacityMicromapBuilder::DestroyOpacityMicromaps(nvrhi::ICommandList& comman
     m_device->waitForIdle();
     commandList.open();
 
-    for (const std::shared_ptr<MeshInfo>& _mesh : scene.GetSceneGraph()->GetMeshes())
+    for (const std::shared_ptr<MeshInfo>& _mesh : scene.GetMeshes())
     {
         assert(std::dynamic_pointer_cast<MeshInfoEx>(_mesh) != nullptr);
         const std::shared_ptr<MeshInfoEx>& mesh = std::static_pointer_cast<MeshInfoEx>(_mesh);
@@ -240,7 +240,7 @@ bool OpacityMicromapBuilder::Update(nvrhi::ICommandList& commandList, const caus
     RAII_SCOPE( commandList.beginMarker("OpacityMicromapBuilder");, commandList.endMarker(); );
 
     bool anyDirty = false;
-    for (auto& _mesh : scene.GetSceneGraph()->GetMeshes())
+    for (auto& _mesh : scene.GetMeshes())
     {
         MeshInfoEx& mesh = static_cast<MeshInfoEx&>(*_mesh);
         assert(&mesh != nullptr);
@@ -446,7 +446,7 @@ bool OpacityMicromapBuilder::DebugGUI(float indent, const caustica::Scene& scene
             {
                 UI_SCOPED_INDENT(indent);
 
-                for (const std::shared_ptr<caustica::MeshInfo>& mesh : scene.GetSceneGraph()->GetMeshes())
+                for (const std::shared_ptr<caustica::MeshInfo>& mesh : scene.GetMeshes())
                 {
                     bool meshHasOmms = false;
                     for (uint32_t i = 0; i < mesh->geometries.size(); ++i)

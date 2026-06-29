@@ -10,7 +10,8 @@
 #include <engine/UserInterfaceUtils.h>
 #include <core/vfs/VFS.h>
 #include <scene/SceneTypes.h>
-#include <scene/SceneGraph.h>
+#include <scene/SceneEcs.h>
+#include <scene/Scene.h>
 #include <imgui_internal.h>
 #include <assets/loader/ShaderFactory.h>
 #include <render/Passes/Lighting/MaterialGpuCache.h>
@@ -36,33 +37,31 @@ const ImVec4 categoryColor = { 0.5f,1.0f,0.7f,1 };
 
 namespace
 {
-    bool IsMeshInstanceNode(caustica::SceneGraphNode* node)
+    bool IsMeshInstanceEntity(caustica::scene::SceneEntityWorld& ew, ecs::Entity entity)
     {
-        return node != nullptr && std::dynamic_pointer_cast<caustica::MeshInstance>(node->GetLeaf()) != nullptr;
+        if (entity == ecs::NullEntity) return false;
+        auto* comp = ew.world().tryGet<caustica::scene::MeshInstanceComponent>(entity);
+        return comp != nullptr && comp->instance != nullptr;
     }
 
-    bool IsGaussianSplatNode(caustica::SceneGraphNode* node)
+    bool IsGaussianSplatEntity(caustica::scene::SceneEntityWorld& ew, ecs::Entity entity)
     {
-        return node != nullptr && std::dynamic_pointer_cast<GaussianSplat>(node->GetLeaf()) != nullptr;
+        if (entity == ecs::NullEntity) return false;
+        auto* comp = ew.world().tryGet<caustica::scene::GaussianSplatComponent>(entity);
+        return comp != nullptr && comp->splat != nullptr;
     }
 
-    bool IsInspectableSceneNode(caustica::SceneGraphNode* node)
+    bool IsInspectableEntity(caustica::scene::SceneEntityWorld& ew, ecs::Entity entity)
     {
-        return IsMeshInstanceNode(node) || IsGaussianSplatNode(node);
+        return IsMeshInstanceEntity(ew, entity) || IsGaussianSplatEntity(ew, entity);
     }
 
-    bool HasHierarchyEntity(caustica::SceneGraphNode* node)
+    bool HasHierarchyEntity(caustica::scene::SceneEntityWorld& ew, ecs::Entity entity)
     {
-        if (IsInspectableSceneNode(node))
-            return true;
-
-        if (node == nullptr)
-            return false;
-
-        for (size_t i = 0; i < node->GetNumChildren(); i++)
-            if (HasHierarchyEntity(node->GetChild(i)))
-                return true;
-
+        if (entity == ecs::NullEntity) return false;
+        if (IsInspectableEntity(ew, entity)) return true;
+        for (ecs::Entity child : ew.getEntityChildren(entity))
+            if (HasHierarchyEntity(ew, child)) return true;
         return false;
     }
 
@@ -186,17 +185,20 @@ int ResolveGaussianSplatShadowMode(const EditorUIData& ui)
         return changed;
     }
 
-void BuildHierarchyNodeUI(EditorUIData& ui, caustica::SceneGraphNode* node)
+void BuildHierarchyNodeUI(EditorUIData& ui, caustica::Scene& scene, ecs::Entity entity)
     {
-        if (!HasHierarchyEntity(node))
-            return;
+        auto* ew = scene.GetEntityWorld();
+        if (!ew || entity == ecs::NullEntity) return;
+        if (!HasHierarchyEntity(*ew, entity)) return;
 
-        const bool isMeshNode = IsMeshInstanceNode(node);
-        const bool isGaussianSplatNode = IsGaussianSplatNode(node);
+        const bool isMeshEntity = IsMeshInstanceEntity(*ew, entity);
+        const bool isGaussianSplatEntity = IsGaussianSplatEntity(*ew, entity);
+        const auto& children = ew->getEntityChildren(entity);
+
         bool hasVisibleChildren = false;
-        for (size_t i = 0; i < node->GetNumChildren(); i++)
+        for (ecs::Entity child : children)
         {
-            if (HasHierarchyEntity(node->GetChild(i)))
+            if (HasHierarchyEntity(*ew, child))
             {
                 hasVisibleChildren = true;
                 break;
@@ -206,41 +208,42 @@ void BuildHierarchyNodeUI(EditorUIData& ui, caustica::SceneGraphNode* node)
         ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth;
         if (!hasVisibleChildren)
             flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
-        if (ui.SelectedNode.get() == node)
+        if (ui.SelectedEntity == entity)
             flags |= ImGuiTreeNodeFlags_Selected;
 
-        std::string nodeName = node->GetName().empty() ? "<unnamed>" : node->GetName();
-        std::string label = isMeshNode ? "[Mesh] " + nodeName : (isGaussianSplatNode ? "[3DGS] " + nodeName : "[Group] " + nodeName);
-        if (isMeshNode)
+        std::string nodeName = ew->getEntityName(entity);
+        if (nodeName.empty()) nodeName = "<unnamed>";
+        std::string label = isMeshEntity ? "[Mesh] " + nodeName : (isGaussianSplatEntity ? "[3DGS] " + nodeName : "[Group] " + nodeName);
+        if (isMeshEntity)
         {
-            auto meshInstance = std::dynamic_pointer_cast<caustica::MeshInstance>(node->GetLeaf());
-            if (meshInstance && meshInstance->GetMesh())
-                label += "  (" + meshInstance->GetMesh()->name + ")";
+            auto* comp = ew->world().tryGet<caustica::scene::MeshInstanceComponent>(entity);
+            if (comp && comp->instance && comp->instance->GetMesh())
+                label += "  (" + comp->instance->GetMesh()->name + ")";
         }
-        else if (isGaussianSplatNode)
+        else if (isGaussianSplatEntity)
         {
-            auto splat = std::dynamic_pointer_cast<GaussianSplat>(node->GetLeaf());
-            if (splat && splat->loadedSplatCount > 0)
-                label += "  (" + std::to_string(splat->loadedSplatCount) + " splats)";
+            auto* comp = ew->world().tryGet<caustica::scene::GaussianSplatComponent>(entity);
+            if (comp && comp->splat && comp->splat->loadedSplatCount > 0)
+                label += "  (" + std::to_string(comp->splat->loadedSplatCount) + " splats)";
         }
 
-        const bool open = ImGui::TreeNodeEx(node, flags, "%s", label.c_str());
+        const bool open = ImGui::TreeNodeEx(reinterpret_cast<void*>(static_cast<uintptr_t>(entity)), flags, "%s", label.c_str());
 
-        if (IsInspectableSceneNode(node) && ImGui::IsItemClicked())
+        if (IsInspectableEntity(*ew, entity) && ImGui::IsItemClicked())
         {
-            ui.SelectedNode = node->shared_from_this();
+            ui.SelectedEntity = entity;
             ui.SelectedGaussianSplat = false;
         }
 
-        if (isMeshNode && ImGui::IsItemHovered())
+        if (isMeshEntity && ImGui::IsItemHovered())
             ImGui::SetTooltip("Mesh instance. Click to open it in Inspector.");
-        if (isGaussianSplatNode && ImGui::IsItemHovered())
+        if (isGaussianSplatEntity && ImGui::IsItemHovered())
             ImGui::SetTooltip("3D Gaussian Splat scene object. Click to open it in Inspector.");
 
         if (open && hasVisibleChildren)
         {
-            for (size_t i = 0; i < node->GetNumChildren(); i++)
-                BuildHierarchyNodeUI(ui, node->GetChild(i));
+            for (ecs::Entity child : children)
+                BuildHierarchyNodeUI(ui, scene, child);
             ImGui::TreePop();
         }
     }
@@ -594,44 +597,55 @@ std::string TrimSkyDisplayName(std::string text)
 
 bool TogglableNode::IsSelected() const
 {
-    return all( SceneNode->GetTranslation() == OriginalTranslation );
+    if (!EntityWorld || Entity == ecs::NullEntity) return false;
+    auto* comp = EntityWorld->world().tryGet<caustica::scene::LocalTransformComponent>(Entity);
+    if (!comp) return false;
+    return all(comp->translation == OriginalTranslation);
 }
 
 void TogglableNode::SetSelected(bool selected)
 {
-    if( selected )
-        SceneNode->SetTranslation( OriginalTranslation );
+    if (!EntityWorld || Entity == ecs::NullEntity) return;
+    if (selected)
+        EntityWorld->setTranslation(Entity, OriginalTranslation);
     else
-        SceneNode->SetTranslation( {-10000.0,-10000.0,-10000.0} );
+        EntityWorld->setTranslation(Entity, {-10000.0, -10000.0, -10000.0});
 }
 
-void UpdateTogglableNodes(std::vector<TogglableNode>& togglableNodes, caustica::SceneGraphNode* node)
+void UpdateTogglableNodes(std::vector<TogglableNode>& togglableNodes, caustica::scene::SceneEntityWorld& entityWorld, ecs::Entity entity)
 {
-    auto addIfTogglable = [ & ](const std::string & token, SceneGraphNode* node) -> TogglableNode *
+    if (entity == ecs::NullEntity) return;
+
+    auto addIfTogglable = [&](const std::string& token, ecs::Entity e) -> TogglableNode*
     {
         const size_t tokenLen = token.length();
-        const std::string name = node->GetName();   const size_t nameLen = name.length();
+        const std::string name = entityWorld.getEntityName(e);
+        const size_t nameLen = name.length();
         if (nameLen > tokenLen && name.substr(nameLen - tokenLen) == token)
         {
             TogglableNode tn;
-            tn.SceneNode = node;
+            tn.Entity = e;
+            tn.EntityWorld = &entityWorld;
             tn.UIName = name.substr(0, nameLen - tokenLen);
-            tn.OriginalTranslation = node->GetTranslation();
+            auto* comp = entityWorld.world().tryGet<caustica::scene::LocalTransformComponent>(e);
+            tn.OriginalTranslation = comp ? comp->translation : dm::double3(0.0);
             togglableNodes.push_back(tn);
             return &togglableNodes.back();
         }
         return nullptr;
     };
-    TogglableNode * justAdded = addIfTogglable("_togglable", node);
-    if (justAdded==nullptr)
+
+    TogglableNode* justAdded = addIfTogglable("_togglable", entity);
+    if (justAdded == nullptr)
     {
-        justAdded = addIfTogglable("_togglable_off", node);
-        if( justAdded != nullptr )
+        justAdded = addIfTogglable("_togglable_off", entity);
+        if (justAdded != nullptr)
             justAdded->SetSelected(false);
     }
 
-    for (int i = (int)node->GetNumChildren() - 1; i >= 0; i--)
-        UpdateTogglableNodes( togglableNodes, node->GetChild(i) );
+    const auto& children = entityWorld.getEntityChildren(entity);
+    for (int i = (int)children.size() - 1; i >= 0; i--)
+        UpdateTogglableNodes(togglableNodes, entityWorld, children[i]);
 }
 
 } // namespace caustica::editor

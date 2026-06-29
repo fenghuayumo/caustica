@@ -18,8 +18,12 @@
         </Expand>
     </Type>
 
-    <Type Name="caustica::SceneGraphNode">
-        <DisplayString>{m_Name}</DisplayString>
+    <Type Name="caustica::scene::NameComponent">
+        <DisplayString>{value}</DisplayString>
+    </Type>
+
+    <Type Name="caustica::ecs::Entity">
+        <DisplayString>entity({(_Entt &amp; entt::entity_mask)})</DisplayString>
     </Type>
 
 </AutoVisualizer>

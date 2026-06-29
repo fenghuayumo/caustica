@@ -3,6 +3,7 @@
 #if CAUSTICA_WITH_PYTHON
 
 #include "SceneEditorFrameExtension.h"
+#include "SceneEditor.h"
 #include "PathTracerSessionHost.h"
 #include "PathTracerFrameDriver.h"
 #include <engine/EngineRenderer.h>
@@ -445,9 +446,9 @@ bool RenderSession::InitRenderer()
     SetRuntimeDirectoryOverride(appDirectory);
     SetLocalPathBaseOverride(ResolveResourceRoot(appDirectory));
 
-    m_renderer = std::make_unique<SceneEditor>(m_cmdLine, m_sessionState, m_editorUIState, m_sessionDiagnostics);
+    m_renderer = std::make_unique<caustica::editor::SceneEditor>(m_cmdLine, m_sessionState, m_editorUIState, m_sessionDiagnostics);
 
-    m_sceneEditorFrameExtension = std::make_unique<SceneEditorFrameExtension>(*m_renderer);
+    m_sceneEditorFrameExtension = std::make_unique<caustica::editor::SceneEditorFrameExtension>(*m_renderer);
     m_frameExtensions = { m_sceneEditorFrameExtension.get() };
 
     std::string preferredScene = m_config.scene.empty()

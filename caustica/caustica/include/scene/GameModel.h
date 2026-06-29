@@ -1,11 +1,7 @@
 #pragma once
 
-// =============================================================================
-// GameModel.h - sample scene model instance management.
-// =============================================================================
-
 #include <scene/GameTypes.h>
-#include <scene/SceneGraph.h>
+#include <ecs/Entity.h>
 
 #include <map>
 #include <memory>
@@ -13,6 +9,8 @@
 #include <vector>
 
 namespace caustica { class Scene; }
+
+namespace caustica::scene { class SceneEntityWorld; }
 
 namespace game
 {
@@ -24,7 +22,8 @@ namespace game
         ModelType(caustica::Scene& scene, const std::string& name, const Json::Value& node);
 
         bool IsValid() const { return m_valid; }
-        const std::shared_ptr<caustica::SceneGraphNode>& GetNode() const { return m_node; }
+        [[nodiscard]] caustica::ecs::Entity GetRootEntity() const { return m_rootEntity; }
+        [[nodiscard]] const std::shared_ptr<caustica::scene::SceneEntityWorld>& GetEntityWorld() const { return m_entityWorld; }
         const std::string& GetModelName() const { return m_name; }
         const Pose& GetModelPose() const { return m_modelPose; }
         caustica::Scene& GetScene() const { return m_scene; }
@@ -36,7 +35,8 @@ namespace game
         bool             m_valid = false;
         std::string      m_name;
         Pose             m_modelPose;
-        std::shared_ptr<caustica::SceneGraphNode> m_node;
+        caustica::ecs::Entity      m_rootEntity = caustica::ecs::NullEntity;
+        std::shared_ptr<caustica::scene::SceneEntityWorld> m_entityWorld;
         std::map<std::string, std::string> m_lightsInfos;
     };
 
@@ -45,11 +45,11 @@ namespace game
     public:
         ModelInstance(const std::string& name,
                       const std::shared_ptr<ModelType>& modelType,
-                      const std::shared_ptr<caustica::SceneGraphNode>& parentNode);
+                      caustica::ecs::Entity parentEntity);
 
-        const std::string& GetInstanceName() const { return m_node->GetName(); }
+        const std::string& GetInstanceName() const { return m_name; }
         const std::string& GetModelName() const { return m_modelType->GetModelName(); }
-        const std::shared_ptr<caustica::SceneGraphNode>& GetRootNode() const { return m_node; }
+        [[nodiscard]] caustica::ecs::Entity GetRootEntity() const { return m_entity; }
 
         void SetTransform(const dm::double3& translation, const dm::dquat& rotation, const dm::double3& scaling);
         void SetTransform(const dm::float3& translation, const dm::quat& rotation, const dm::float3& scaling);
@@ -60,9 +60,10 @@ namespace game
 
     private:
         std::shared_ptr<ModelType> m_modelType;
-        std::shared_ptr<caustica::SceneGraphNode> m_node;
+        caustica::ecs::Entity m_entity = caustica::ecs::NullEntity;
+        std::string m_name;
         std::vector<std::shared_ptr<LightController>> m_lightControllers;
 
-        void MapLightControllers(caustica::SceneGraphNode* node);
+        void MapLightControllers(caustica::ecs::Entity entity);
     };
 }

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <scene/SceneGraph.h>
+#include <scene/SceneObjects.h>
 #include <rhi/nvrhi.h>
 #include <rtxdi/DI/ReSTIRDI.h>
 #include <memory>

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <ecs/Entity.h>
 #include <render/Core/PathTracerSettings.h>
 #include <render/Passes/Gaussian/GaussianSplatPass.h>
 #include <render/Passes/Gaussian/GaussianSplatEmissionProxy.h>
@@ -21,7 +22,6 @@ class CommonRenderPasses;
 class GaussianSplat;
 class GpuDevice;
 class RenderCore;
-class SceneGraphNode;
 class ShaderFactory;
 } // namespace caustica
 
@@ -43,7 +43,7 @@ public:
     struct SceneObject
     {
         std::shared_ptr<caustica::GaussianSplat> splat;
-        std::weak_ptr<caustica::SceneGraphNode> node;
+        ecs::Entity entity = ecs::NullEntity;
         std::unique_ptr<GaussianSplatPass> pass;
     };
 
@@ -63,7 +63,7 @@ public:
     void sceneUnloading();
     void onSceneLoaded(const CommandLineOptions& cmdLine);
     bool loadFromFile(const std::filesystem::path& fileName, bool convertRdfToRub = true);
-    bool removeObjectsUnderNode(const std::shared_ptr<caustica::SceneGraphNode>& node);
+    bool removeObjectsUnderEntity(ecs::Entity rootEntity);
 
     void preparePasses();
     void buildEmissionProxyList();
@@ -87,7 +87,7 @@ public:
 private:
     std::filesystem::path resolveSplatPath(const caustica::GaussianSplat& splat) const;
     void preparePass(GaussianSplatPass& pass);
-    void loadFromSceneGraph();
+    void loadFromSceneEntities();
     bool attachToScene(const std::filesystem::path& fileName, bool convertRdfToRub);
     void updateUIState();
     uint32_t totalSplatCount() const;

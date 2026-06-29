@@ -2,6 +2,7 @@
 
 #include <scene/SceneLoader.h>
 
+#include <ecs/Entity.h>
 #include <functional>
 #include <memory>
 #include <string>
@@ -9,7 +10,6 @@
 #include <filesystem>
 #include <algorithm>
 #include <scene/Scene.h>
-#include <scene/SceneGraph.h>
 
 namespace caustica
 {
@@ -19,15 +19,11 @@ class ShaderFactory;
 class TextureLoader;
 class DescriptorTableManager;
 class Scene;
-class SceneGraphNode;
 class Material;
 class SceneTypeFactory;
 class IDescriptorTableManager;
 } // namespace caustica
 
-// =============================================================================
-// SceneManager — Engine layer: scene discovery, loading, queries, env map listing.
-// =============================================================================
 class SceneManager
 {
 public:
@@ -41,11 +37,9 @@ public:
 
     ~SceneManager();
 
-    // --- Scene discovery ---
     void discoverAvailableScenes(const std::filesystem::path& assetsPath);
     const std::vector<std::string>& getAvailableScenes() const { return m_sceneFilesAvailable; }
 
-    // --- Active scene state ---
     [[nodiscard]] const std::shared_ptr<caustica::Scene>& getScene() const { return m_scene; }
     [[nodiscard]] const std::string&                      getCurrentSceneName() const { return m_currentSceneName; }
     [[nodiscard]] const std::filesystem::path&            getCurrentScenePath() const { return m_currentScenePath; }
@@ -53,16 +47,13 @@ public:
 
     void clearScene();
 
-    // Resolve path + update active-scene metadata.  Returns false when the switch is a no-op.
     bool beginSceneSwitch(const std::string& sceneName,
                           const std::filesystem::path& assetsPath,
                           bool forceReload);
 
-    // Parse and load scene content from disk or inline JSON.  Returns nullptr on failure.
     std::shared_ptr<caustica::Scene> loadScene(std::shared_ptr<caustica::IFileSystem> fs,
                                                const std::filesystem::path&           sceneFileName);
 
-    // --- Async/sync loading orchestration (SceneLoader) ---
     void setAsyncLoadingEnabled(bool enabled);
     void setLoadingCallbacks(std::function<void()> onLoaded, std::function<void()> onUnloading);
     void beginLoadingScene(std::shared_ptr<caustica::IFileSystem> fs,
@@ -71,26 +62,24 @@ public:
     [[nodiscard]] bool isSceneLoading() const;
     [[nodiscard]] bool isSceneLoaded() const;
 
-    // --- Scene queries (static, take scene as parameter) ---
     static std::shared_ptr<caustica::Material> findMaterial(
         const std::shared_ptr<caustica::Scene>& scene, int materialID)
     {
         if (!scene) return nullptr;
-        for (const auto& mat : scene->GetSceneGraph()->GetMaterials())
+        for (const auto& mat : scene->GetMaterials())
             if (mat->materialID == materialID) return mat;
         return nullptr;
     }
 
-    static std::shared_ptr<caustica::SceneGraphNode> findNodeByInstanceIndex(
+    static caustica::ecs::Entity findEntityByInstanceIndex(
         const std::shared_ptr<caustica::Scene>& scene, int instanceIndex)
     {
-        if (!scene || instanceIndex < 0) return nullptr;
-        const auto& instances = scene->GetSceneGraph()->GetMeshInstances();
-        if (instanceIndex >= static_cast<int>(instances.size())) return nullptr;
-        return instances[instanceIndex]->GetNodeSharedPtr();
+        if (!scene || instanceIndex < 0) return caustica::ecs::NullEntity;
+        const auto& instances = scene->GetMeshInstances();
+        if (instanceIndex >= static_cast<int>(instances.size())) return caustica::ecs::NullEntity;
+        return instances[instanceIndex]->ownerEntity;
     }
 
-    // --- Scene path resolution (does not load) ---
     struct ResolvedScenePath
     {
         std::filesystem::path path;
@@ -102,10 +91,8 @@ public:
         const std::string&              sceneName,
         const std::filesystem::path&    assetsPath);
 
-    // GPU-side prep after a scene finishes loading (accel dirty, animation t=0).
     static void onSceneLoadedGpuPrep(caustica::Scene& scene, bool& accelRebuildRequested);
 
-    // --- Environment map listing ---
     static void refreshEnvironmentMapMediaList(
         const std::filesystem::path&              assetsPath,
         const std::filesystem::path&              envMapSubFolder,
@@ -113,7 +100,6 @@ public:
         std::vector<std::filesystem::path>&       outMediaList,
         std::filesystem::path&                    outMediaFolder);
 
-    // --- Dependencies ---
     caustica::GpuDevice&                      getDevice()        { return m_device; }
     caustica::ShaderFactory&                  getShaderFactory()  { return m_shaderFactory; }
     std::shared_ptr<caustica::TextureLoader>   getTextureLoader()   { return m_textureCache; }

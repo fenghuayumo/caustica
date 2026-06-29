@@ -9,6 +9,7 @@
 #include "PythonBindingsCore.h"
 #include "RenderSession.h"
 
+#include <engine/EntryPoint.h>
 #include <nanobind/nanobind.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/tuple.h>
@@ -217,7 +218,7 @@ NB_MODULE(caustica, m)
                  return self.LoadGaussianSplats(fileName, convertRdfToRub);
              },
              nb::arg("file_name"), nb::arg("convert_rdf_to_rub") = true,
-             "Append a 3DGS .ply file as a GaussianSplat node in the current scene graph.")
+             "Append a 3DGS .ply file as a GaussianSplat entity in the current scene.")
 
         .def("load_mesh_file", &PyRenderer::LoadMeshFile,
              nb::arg("file_name"),
@@ -313,8 +314,8 @@ NB_MODULE(caustica, m)
           "Return the Sample owned by the most recently created Renderer.");
 
     m.def("settings", []() -> RenderSessionState* {
-            SceneEditor* app = RequireCurrentApp();
-            return &app->GetRenderSessionState();
+            SceneEditor& app = RequireCurrentApp();
+            return &app.GetRenderSessionState();
         },
           nb::rv_policy::reference,
           "Shortcut for the global Settings (same as Renderer.settings).");
@@ -325,6 +326,12 @@ NB_MODULE(caustica, m)
           "('plane', 'cube', 'sphere', or 'plane_cube').");
 
     m.attr("MODE") = "extension";
+}
+
+// caustica_py links causEngine (EntryPoint) but not the editor executable entry.
+namespace caustica
+{
+Application* createApplication() { return nullptr; }
 }
 
 #endif // CAUSTICA_WITH_PYTHON

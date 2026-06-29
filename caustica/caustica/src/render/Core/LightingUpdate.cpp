@@ -9,7 +9,7 @@
 #include <render/Passes/OMM/OpacityMicromapBuilder.h>
 #include <render/Passes/Gaussian/GaussianSplatEmissionProxy.h>
 #include <scene/Scene.h>
-#include <scene/SceneGraph.h>
+#include <scene/SceneObjects.h>
 #include <core/scope.h>
 #include <shaders/light_cb.h>
 #include <shaders/SampleConstantBuffer.h>

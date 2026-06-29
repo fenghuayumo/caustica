@@ -6,6 +6,8 @@
 #include <core/json.h>
 #include <math/math.h>
 #include <scene/camera/Camera.h>
+#include <scene/SceneEcs.h>
+#include <scene/Scene.h>
 #include <cmath>
 
 #include <core/command_line.h>
@@ -38,23 +40,36 @@ using namespace game;
 PropBase::PropBase(GameScene& gameScene, const std::string & name)
     : m_gameScene(gameScene) 
 {
-    const std::shared_ptr<caustica::Scene>& scene = gameScene.GetScene();
-    m_node = std::make_shared<SceneGraphNode>();
+    auto* ew = EntityWorld();
+    if (ew)
+        m_entity = ew->createEntity(name, ew->root());
+}
 
-    m_node = scene->GetSceneGraph()->Attach(scene->GetSceneGraph()->GetRootNode(), m_node);
-    m_node->SetName(name);
+caustica::scene::SceneEntityWorld* PropBase::EntityWorld() const
+{
+    const auto& scene = m_gameScene.GetScene();
+    return scene ? scene->GetEntityWorld() : nullptr;
+}
+
+std::string PropBase::GetName() const
+{
+    auto* ew = EntityWorld();
+    if (!ew || m_entity == caustica::ecs::NullEntity) return {};
+    return ew->getEntityName(m_entity);
 }
 
 std::shared_ptr<ModelInstance> PropBase::CreateAndAttachModel(const std::shared_ptr<game::ModelType> & modelType, const std::string & instanceName, const dm::float3& translation, const dm::quat& rotation, const dm::float3& scaling )
 {
-    auto ret = std::make_shared<game::ModelInstance>(instanceName, modelType, m_node);
+    auto ret = std::make_shared<game::ModelInstance>(instanceName, modelType, m_entity);
     ret->SetTransform(translation, rotation, scaling);
     return ret;
 }
 
 void PropBase::SetTransform(const dm::double3& translation, const dm::dquat& rotation, const dm::double3& scaling)
 {
-    m_node->SetTransform(&translation, &rotation, &scaling);
+    auto* ew = EntityWorld();
+    if (ew && m_entity != caustica::ecs::NullEntity)
+        ew->setLocalTransform(m_entity, &translation, &rotation, &scaling);
 }
 
 void PropBase::SetTransform(const dm::float3& translation, const dm::quat& rotation, const dm::float3& scaling)
@@ -62,7 +77,9 @@ void PropBase::SetTransform(const dm::float3& translation, const dm::quat& rotat
     dm::double3 transD = dm::double3(translation);
     dm::dquat rotD = dm::dquat(rotation);
     dm::double3 scalD = dm::double3(scaling);
-    m_node->SetTransform(&transD, &rotD, &scalD);
+    auto* ew = EntityWorld();
+    if (ew && m_entity != caustica::ecs::NullEntity)
+        ew->setLocalTransform(m_entity, &transD, &rotD, &scalD);
 }
 
 template<typename T>
@@ -119,27 +136,38 @@ void PropBase::Tick(double gameTime, float deltaTime)
 
         if (forward != 0 || right != 0 || up != 0)
         {
-            double3 trans = m_node->GetTranslation();
-            
+            auto* ew = EntityWorld();
+            if (ew && m_entity != caustica::ecs::NullEntity)
+            {
+                auto* ltc = ew->world().tryGet<caustica::scene::LocalTransformComponent>(m_entity);
+                double3 trans = ltc ? ltc->translation : double3(0.0);
+                
 #if 1 // use rotation 
-            auto rot = quat(m_node->GetRotation()).toAffine();
-            float3 forwardVec   = rot.transformVector(m_referenceForward);
-            float3 upVec        = rot.transformVector(m_referenceUp);
-            float3 rightVec     = rot.transformVector(m_referenceRight);
+                dquat entityRot = ltc ? ltc->rotation : dquat::identity();
+                auto rot = quat(entityRot).toAffine();
+                float3 forwardVec   = rot.transformVector(m_referenceForward);
+                float3 upVec        = rot.transformVector(m_referenceUp);
+                float3 rightVec     = rot.transformVector(m_referenceRight);
 #else
-            float3 forwardVec   = m_referenceForward;
-            float3 upVec        = m_referenceUp;
-            float3 rightVec     = m_referenceRight;
+                float3 forwardVec   = m_referenceForward;
+                float3 upVec        = m_referenceUp;
+                float3 rightVec     = m_referenceRight;
 #endif
 
-            trans += double3( forwardVec * forward + upVec * up + rightVec * right );
-            m_node->SetTranslation(trans);
+                trans += double3( forwardVec * forward + upVec * up + rightVec * right );
+                ew->setTranslation(m_entity, trans);
+            }
         }
         if (rotateAroundForward != 0 || rotateAroundRight != 0 || rotateAroundUp != 0)
         {
-            dquat rot = m_node->GetRotation();
-            rot *= dquat( fixedRotationQuat<float>(m_referenceForward, rotateAroundForward) * fixedRotationQuat<float>(m_referenceUp, rotateAroundUp) * fixedRotationQuat<float>(m_referenceRight, rotateAroundRight) );
-            m_node->SetRotation(rot);
+            auto* ew = EntityWorld();
+            if (ew && m_entity != caustica::ecs::NullEntity)
+            {
+                auto* ltc = ew->world().tryGet<caustica::scene::LocalTransformComponent>(m_entity);
+                dquat rot = ltc ? ltc->rotation : dquat::identity();
+                rot *= dquat( fixedRotationQuat<float>(m_referenceForward, rotateAroundForward) * fixedRotationQuat<float>(m_referenceUp, rotateAroundUp) * fixedRotationQuat<float>(m_referenceRight, rotateAroundRight) );
+                ew->setRotation(m_entity, rot);
+            }
         }
     }
 #endif
@@ -218,7 +246,11 @@ void PropBase::PostLoadSetup()
                 {
                     std::string lightName; lo["name"] >> lightName;
 
-                    auto lit = std::find_if(modelLights.begin(), modelLights.end(), [ &lightName ](auto& light) { return light->Node->GetName() == lightName; });
+                    auto* ew = EntityWorld();
+                    auto lit = std::find_if(modelLights.begin(), modelLights.end(), [&lightName, ew](auto& light) {
+                        return ew && light->Entity != caustica::ecs::NullEntity
+                            && ew->getEntityName(light->Entity) == lightName;
+                    });
                     if (lit != modelLights.end())
                     {
                         (*lit)->Read(lo);
@@ -302,16 +334,24 @@ void PropBase::GUI(float indent, bool & gameCameraAttached, caustica::FirstPerso
         if (ImGui::Button("Move prop to camera pose"))
         {
             auto& pose = m_gameScene.GetLastRenderCameraPose();
-            m_node->SetTransform(&pose.Translation, &pose.Rotation, nullptr/*&pose.Scaling*/);
+            SetTransform(pose.Translation, pose.Rotation, pose.Scaling);
         }
 #endif
     }
 #ifdef SAMPLE_GAME_DEVELOPER_SETTINGS
     if (ImGui::Button("Save current as start pose"))
     {
-        m_startPose.Translation = m_node->GetTranslation();
-        m_startPose.Rotation = m_node->GetRotation();
-        m_startPose.Scaling = m_node->GetScaling();
+        auto* ew = EntityWorld();
+        if (ew && m_entity != caustica::ecs::NullEntity)
+        {
+            auto* ltc = ew->world().tryGet<caustica::scene::LocalTransformComponent>(m_entity);
+            if (ltc)
+            {
+                m_startPose.Translation = ltc->translation;
+                m_startPose.Rotation = ltc->rotation;
+                m_startPose.Scaling = ltc->scaling;
+            }
+        }
     }
     if (m_gameScene.GetCamRecAnimation().size() > 0 && ImGui::Button("Copy current cam animation"))
     {
@@ -334,7 +374,9 @@ void PropBase::GUI(float indent, bool & gameCameraAttached, caustica::FirstPerso
                 for (const auto & light : model->GetLights())
                 {
                     counter++; RAII_SCOPE(ImGui::PushID(counter);, ImGui::PopID(););
-                    ImGui::Checkbox( std::format("Light {} - {}", model->GetInstanceName().c_str(), light->Node->GetName().c_str()).c_str(), &light->Enabled );
+                    auto* ew = EntityWorld();
+                    std::string lightName = (ew && light->Entity != caustica::ecs::NullEntity) ? ew->getEntityName(light->Entity) : "?";
+                    ImGui::Checkbox( std::format("Light {} - {}", model->GetInstanceName().c_str(), lightName.c_str()).c_str(), &light->Enabled );
                 }
         }
         // ImGui::SameLine();

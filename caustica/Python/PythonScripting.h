@@ -8,7 +8,7 @@
 // The interpreter lives on the same thread as the renderer and runs
 // scripts queued up via QueueScriptFile/QueueScriptString. The SceneEditor
 // drains the queue once per frame, after the scene is fully loaded, so
-// that the Python code observes a consistent view of the scene graph.
+// so that the Python code observes a consistent view of the scene.
 
 #pragma once
 

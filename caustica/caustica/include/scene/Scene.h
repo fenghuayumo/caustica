@@ -1,7 +1,9 @@
 #pragma once
 
-#include <scene/SceneGraph.h>
+#include <scene/SceneObjects.h>
+#include <scene/SceneAnimation.h>
 #include <scene/SceneEcs.h>
+#include <scene/SceneImport.h>
 #include <backend/IDescriptorTableManager.h>
 #include <rhi/nvrhi.h>
 #include <vector>
@@ -25,7 +27,6 @@ struct GeometryData;
 namespace caustica
 {
     class ShaderFactory;
-    struct SceneImportResult;
     class TextureLoader;
     class ThreadPool;
     class GltfImporter;
@@ -38,7 +39,6 @@ namespace caustica
         std::shared_ptr<SceneTypeFactory> m_SceneTypeFactory;
         std::shared_ptr<TextureLoader> m_TextureLoader;
         std::shared_ptr<IDescriptorTableManager> m_DescriptorTable;
-        std::shared_ptr<SceneGraph> m_SceneGraph;
         std::unique_ptr<scene::SceneEntityWorld> m_EntityWorld;
         std::shared_ptr<GltfImporter> m_GltfImporter;
         std::shared_ptr<ObjImporter> m_ObjImporter;
@@ -59,10 +59,9 @@ namespace caustica
         bool m_SceneTransformsChanged = false;
         bool m_SceneStructureChanged = false;
 
-        // Parent directory of the loaded scene description (scene JSON or glTF file).
         std::filesystem::path m_textureSearchDirectory;
 
-        struct Resources; // Hide the implementation to avoid including <material_cb.h> and <bindless.h> here
+        struct Resources;
         std::shared_ptr<Resources> m_Resources;
 
         void LoadModelAsync(
@@ -88,7 +87,7 @@ namespace caustica
             const std::filesystem::path& scenePath,
             ThreadPool* threadPool);
 
-        void LoadSceneGraph(const Json::Value& nodeList, const std::shared_ptr<SceneGraphNode>& parent);
+        void LoadSceneEntities(const Json::Value& nodeList, ecs::Entity parent);
         void LoadAnimations(const Json::Value& nodeList);
         
         void UpdateMaterial(const std::shared_ptr<Material>& material);
@@ -112,6 +111,8 @@ namespace caustica
         std::shared_ptr<class SampleSettings> m_loadedSettings;
         std::shared_ptr<class GameSettings>   m_loadedGameSettings;
 
+        void attachLeafFromJson(ecs::Entity entity, const Json::Value& src);
+
     public:
         virtual ~Scene() = default;
 
@@ -125,13 +126,8 @@ namespace caustica
 
         void FinishedLoading(uint32_t frameIndex);
 
-        // Processes animations, transforms, bounding boxes etc.
-        void RefreshSceneGraph(uint32_t frameIndex);
-
-        // Creates missing buffers, uploads vertex buffers, instance data, materials, etc.
+        void RefreshSceneWorld(uint32_t frameIndex);
         void RefreshBuffers(nvrhi::ICommandList* commandList, uint32_t frameIndex);
-
-        // A combination of RefreshSceneGraph and RefreshBuffers
         void Refresh(nvrhi::ICommandList* commandList, uint32_t frameIndex);
 
         bool Load(const std::filesystem::path& jsonFileName);
@@ -141,22 +137,31 @@ namespace caustica
 
         static const SceneLoadingStats& GetLoadingStats();
 
-        [[nodiscard]] std::shared_ptr<SceneGraph> GetSceneGraph() const { return m_SceneGraph; }
         [[nodiscard]] scene::SceneEntityWorld* GetEntityWorld() const { return m_EntityWorld.get(); }
         [[nodiscard]] dm::box3 GetSceneBounds() const;
+
+        [[nodiscard]] const ResourceTracker<Material>& GetMaterials() const;
+        [[nodiscard]] const ResourceTracker<MeshInfo>& GetMeshes() const;
+        [[nodiscard]] size_t GetGeometryCount() const;
+        [[nodiscard]] size_t GetMaxGeometryCountPerMesh() const;
+        [[nodiscard]] size_t GetGeometryInstancesCount() const;
+
+        [[nodiscard]] const std::vector<std::shared_ptr<MeshInstance>>& GetMeshInstances() const;
+        [[nodiscard]] const std::vector<std::shared_ptr<SkinnedMeshInstance>>& GetSkinnedMeshInstances() const;
+        [[nodiscard]] const std::vector<std::shared_ptr<Light>>& GetLights() const;
+        [[nodiscard]] const std::vector<std::shared_ptr<SceneCamera>>& GetCameras() const;
+        [[nodiscard]] const std::vector<std::shared_ptr<SceneAnimation>>& GetAnimations() const;
+
+        void AttachLightToRoot(const std::shared_ptr<Light>& light);
         [[nodiscard]] nvrhi::IDescriptorTable* GetDescriptorTable() const { return m_DescriptorTable ? m_DescriptorTable->GetDescriptorTable() : nullptr; }
         [[nodiscard]] nvrhi::IBuffer* GetMaterialBuffer() const { return m_MaterialBuffer; }
         [[nodiscard]] nvrhi::IBuffer* GetGeometryBuffer() const { return m_GeometryBuffer; }
         [[nodiscard]] nvrhi::IBuffer* GetInstanceBuffer() const { return m_InstanceBuffer; }
 
-        // Can return nullptr if not yet created (by Scene::RefreshBuffers)
         GeometryData* GetGeometryData(const MeshGeometry& geometry) const;
 
-        // Post-load scene graph traversal for light proxy resolution and
-        // settings extraction (merged from ExtendedScene::ProcessNodesRecursive).
-        void ProcessNodesRecursive(std::shared_ptr<SceneGraphNode> node);
+        void ProcessNodesRecursive();
 
-        // --- Accessors merged from ExtendedScene ---
         [[nodiscard]] std::shared_ptr<SampleSettings> GetSampleSettingsNode() const { return m_loadedSettings; }
         [[nodiscard]] std::shared_ptr<GameSettings>   GetGameSettingsNode() const   { return m_loadedGameSettings; }
         [[nodiscard]] const std::vector<SceneImportResult>& GetModels() const        { return m_Models; }

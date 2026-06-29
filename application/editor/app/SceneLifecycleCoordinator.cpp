@@ -13,8 +13,10 @@
 #include <render/SceneLightingPasses.h>
 #include <render/WorldRenderer/PathTracingWorldRenderer.h>
 #include <scene/Scene.h>
+#include <scene/SceneEcs.h>
 #include <scene/camera/Camera.h>
 #include <scene/scene_utils.h>
+#include <ecs/Entity.h>
 
 #include <filesystem>
 
@@ -96,7 +98,9 @@ void SceneLifecycleCoordinator::onSceneUnloading()
     if (m_ctx.editor)
     {
         m_ctx.editor->SelectedMaterial = nullptr;
-        m_ctx.editor->SelectedNode = nullptr;
+        m_ctx.editor->SelectedEntity = caustica::ecs::NullEntity;
+        m_ctx.editor->InspectorRotationEntity = caustica::ecs::NullEntity;
+        m_ctx.editor->InspectorRotationEulerValid = false;
         m_ctx.editor->SelectedGaussianSplat = false;
     }
 
@@ -162,13 +166,16 @@ void SceneLifecycleCoordinator::onSceneLoaded()
 
     if (m_ctx.editor && m_ctx.editor->TogglableNodes == nullptr)
     {
-        m_ctx.editor->TogglableNodes = std::make_shared<std::vector<TogglableNode>>();
-        UpdateTogglableNodes(
-            *m_ctx.editor->TogglableNodes,
-            m_ctx.sceneManager->getScene()->GetSceneGraph()->GetRootNode().get());
+        auto scene = m_ctx.sceneManager->getScene();
+        auto* ew = scene ? scene->GetEntityWorld() : nullptr;
+        if (ew)
+        {
+            m_ctx.editor->TogglableNodes = std::make_shared<std::vector<TogglableNode>>();
+            UpdateTogglableNodes(*m_ctx.editor->TogglableNodes, *ew, ew->root());
+        }
     }
 
-    auto cameras = m_ctx.sceneManager->getScene()->GetSceneGraph()->GetCameras();
+    auto cameras = m_ctx.sceneManager->getScene()->GetCameras();
     auto camScene = cameras.empty() ? nullptr : std::dynamic_pointer_cast<caustica::PerspectiveCamera>(cameras.back());
     if (camScene && m_ctx.cameraController)
         m_ctx.cameraController->syncFromSceneCamera(camScene);

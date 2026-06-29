@@ -8,7 +8,7 @@
 #include <core/command_line.h>
 #include <core/log.h>
 #include <render/Core/RenderCore.h>
-#include <scene/SceneGraph.h>
+#include <scene/SceneEcs.h>
 #include <scene/SceneManager.h>
 #include <scene/Scene.h>
 
@@ -38,13 +38,15 @@ namespace
         return uint32_t(std::clamp(proxyCount, 0, 262144));
     }
 
-    std::string MakeUniqueChildNodeName(const SceneGraphNode& parent, const std::string& desiredName)
+    std::string MakeUniqueChildEntityName(const scene::SceneEntityWorld& entityWorld,
+        ecs::Entity parent,
+        const std::string& desiredName)
     {
         const std::string baseName = desiredName.empty() ? "GaussianSplat" : desiredName;
 
         std::unordered_set<std::string> existingNames;
-        for (size_t childIndex = 0; childIndex < parent.GetNumChildren(); childIndex++)
-            existingNames.insert(parent.GetChild(childIndex)->GetName());
+        for (ecs::Entity child : entityWorld.getEntityChildren(parent))
+            existingNames.insert(entityWorld.getEntityName(child));
 
         if (existingNames.find(baseName) == existingNames.end())
             return baseName;
@@ -55,22 +57,6 @@ namespace
             if (existingNames.find(candidate) == existingNames.end())
                 return candidate;
         }
-    }
-
-    bool NodeSubtreeContains(SceneGraphNode* root, SceneGraphNode* candidate)
-    {
-        if (root == nullptr || candidate == nullptr)
-            return false;
-
-        SceneGraphWalker walker(root);
-        while (walker)
-        {
-            if (walker.Get() == candidate)
-                return true;
-            walker.Next(true);
-        }
-
-        return false;
     }
 }
 
@@ -108,7 +94,7 @@ void SceneGaussianSplatPasses::sceneUnloading()
 
 void SceneGaussianSplatPasses::onSceneLoaded(const CommandLineOptions& cmdLine)
 {
-    loadFromSceneGraph();
+    loadFromSceneEntities();
 
     if (!m_initialCmdLineSplatAttached && !cmdLine.GaussianSplatFileName.empty())
     {
@@ -122,16 +108,25 @@ bool SceneGaussianSplatPasses::loadFromFile(const std::filesystem::path& fileNam
     return attachToScene(fileName, convertRdfToRub);
 }
 
-bool SceneGaussianSplatPasses::removeObjectsUnderNode(const std::shared_ptr<caustica::SceneGraphNode>& node)
+bool SceneGaussianSplatPasses::removeObjectsUnderEntity(ecs::Entity rootEntity)
 {
+    if (!ecs::isValid(rootEntity))
+        return false;
+
+    const scene::SceneEntityWorld* entityWorld = m_sceneManager->getScene()
+        ? m_sceneManager->getScene()->GetEntityWorld()
+        : nullptr;
+    if (!entityWorld)
+        return false;
+
     bool removedGaussianSplat = false;
     auto removedBegin = std::remove_if(
         m_objects.begin(),
         m_objects.end(),
-        [&node, &removedGaussianSplat](const SceneObject& object)
+        [&](const SceneObject& object)
         {
-            auto objectNode = object.node.lock();
-            const bool remove = objectNode != nullptr && NodeSubtreeContains(node.get(), objectNode.get());
+            const bool remove = ecs::isValid(object.entity)
+                && entityWorld->entitySubtreeContains(rootEntity, object.entity);
             removedGaussianSplat = removedGaussianSplat || remove;
             return remove;
         });
@@ -202,56 +197,55 @@ void SceneGaussianSplatPasses::updateUIState()
     m_summary->FileName = m_fileNameSummary;
 }
 
-void SceneGaussianSplatPasses::loadFromSceneGraph()
+void SceneGaussianSplatPasses::loadFromSceneEntities()
 {
     m_objects.clear();
     m_emissionProxies.clear();
 
-    if (!m_sceneManager->getScene() || !m_sceneManager->getScene()->GetSceneGraph() || !m_shaderFactory)
+    if (!m_sceneManager->getScene() || !m_sceneManager->getScene()->GetEntityWorld() || !m_shaderFactory)
     {
         updateUIState();
         return;
     }
 
-    SceneGraphWalker walker(m_sceneManager->getScene()->GetSceneGraph()->GetRootNode().get());
-    while (walker)
-    {
-        auto splat = std::dynamic_pointer_cast<GaussianSplat>(walker->GetLeaf());
-        if (splat != nullptr)
+    auto* entityWorld = m_sceneManager->getScene()->GetEntityWorld();
+    entityWorld->world().each<scene::GaussianSplatComponent>(
+        [&](ecs::Entity entity, scene::GaussianSplatComponent& component)
         {
+            auto splat = component.splat;
+            if (!splat)
+                return;
+
             splat->loadedSplatCount = 0;
             splat->resolvedPath.clear();
 
             const std::filesystem::path splatPath = resolveSplatPath(*splat);
             if (splatPath.empty())
             {
-                caustica::error("Gaussian Splat node '%s' has no path/file field.", walker->GetName().c_str());
+                caustica::error("Gaussian Splat entity '%s' has no path/file field.",
+                    entityWorld->getEntityName(entity).c_str());
+                return;
+            }
+
+            auto pass = std::make_unique<GaussianSplatPass>(m_gpuDevice->GetDevice(), m_shaderFactory);
+            if (pass->LoadFromFile(splatPath, splat->convertRdfToRub))
+            {
+                splat->resolvedPath = splatPath.string();
+                splat->loadedSplatCount = pass->GetSplatCount();
+                preparePass(*pass);
+
+                SceneObject object;
+                object.splat = splat;
+                object.entity = entity;
+                object.pass = std::move(pass);
+                m_objects.push_back(std::move(object));
             }
             else
             {
-                auto pass = std::make_unique<GaussianSplatPass>(m_gpuDevice->GetDevice(), m_shaderFactory);
-                if (pass->LoadFromFile(splatPath, splat->convertRdfToRub))
-                {
-                    splat->resolvedPath = splatPath.string();
-                    splat->loadedSplatCount = pass->GetSplatCount();
-                    preparePass(*pass);
-
-                    SceneObject object;
-                    object.splat = splat;
-                    object.node = walker->shared_from_this();
-                    object.pass = std::move(pass);
-                    m_objects.push_back(std::move(object));
-                }
-                else
-                {
-                    caustica::error("Failed to load Gaussian Splat node '%s' from '%s'.",
-                        walker->GetName().c_str(), splatPath.string().c_str());
-                }
+                caustica::error("Failed to load Gaussian Splat entity '%s' from '%s'.",
+                    entityWorld->getEntityName(entity).c_str(), splatPath.string().c_str());
             }
-        }
-
-        walker.Next(true);
-    }
+        });
 
     updateUIState();
     m_worldRenderer->setGaussianSplatTemporalReset(true);
@@ -259,7 +253,9 @@ void SceneGaussianSplatPasses::loadFromSceneGraph()
 
 bool SceneGaussianSplatPasses::attachToScene(const std::filesystem::path& fileName, bool convertRdfToRub)
 {
-    if (!m_sceneManager->getScene() || !m_sceneManager->getScene()->GetSceneGraph() || !m_sceneManager->getScene()->GetSceneGraph()->GetRootNode())
+    auto scene = m_sceneManager->getScene();
+    auto* entityWorld = scene ? scene->GetEntityWorld() : nullptr;
+    if (!scene || !entityWorld || !ecs::isValid(entityWorld->root()))
     {
         caustica::error("Cannot load Gaussian splats before a scene is loaded.");
         return false;
@@ -299,34 +295,31 @@ bool SceneGaussianSplatPasses::attachToScene(const std::filesystem::path& fileNa
     splat->enabled = true;
     splat->loadedSplatCount = pass->GetSplatCount();
 
-    auto node = std::make_shared<SceneGraphNode>();
-    auto sceneGraph = m_sceneManager->getScene()->GetSceneGraph();
-    auto rootNode = sceneGraph->GetRootNode();
-    node->SetName(MakeUniqueChildNodeName(*rootNode, splatPath.filename().string()));
-    node->SetLeaf(splat);
+    const ecs::Entity parent = entityWorld->root();
+    const std::string entityName = MakeUniqueChildEntityName(*entityWorld, parent, splatPath.filename().string());
+    ecs::Entity entity = entityWorld->createEntity(entityName, parent);
 
     constexpr double deg2rad = 3.14159265358979323846 / 180.0;
-    node->SetTranslation(dm::double3(
+    entityWorld->setTranslation(entity, dm::double3(
         double(m_settings->GaussianSplatTranslation.x),
         double(m_settings->GaussianSplatTranslation.y),
         double(m_settings->GaussianSplatTranslation.z)));
-    node->SetRotation(dm::rotationQuat(dm::double3(
+    entityWorld->setRotation(entity, dm::rotationQuat(dm::double3(
         double(m_settings->GaussianSplatRotationEulerDeg.x) * deg2rad,
         double(m_settings->GaussianSplatRotationEulerDeg.y) * deg2rad,
         double(m_settings->GaussianSplatRotationEulerDeg.z) * deg2rad)));
-    node->SetScaling(dm::double3(
+    entityWorld->setScaling(entity, dm::double3(
         double(m_settings->GaussianSplatObjectScale.x),
         double(m_settings->GaussianSplatObjectScale.y),
         double(m_settings->GaussianSplatObjectScale.z)));
-
-    auto attachedNode = sceneGraph->Attach(rootNode, node);
-    m_sceneManager->getScene()->RefreshSceneGraph(m_gpuDevice->GetFrameIndex());
+    entityWorld->setGaussianSplat(entity, splat);
+    scene->RefreshSceneWorld(m_gpuDevice->GetFrameIndex());
 
     preparePass(*pass);
 
     SceneObject object;
     object.splat = splat;
-    object.node = attachedNode;
+    object.entity = entity;
     object.pass = std::move(pass);
     m_objects.push_back(std::move(object));
 
@@ -370,11 +363,10 @@ const SceneGaussianSplatPasses::SceneObject* SceneGaussianSplatPasses::primaryOb
 
 dm::float4x4 SceneGaussianSplatPasses::objectToWorld(const SceneObject& object) const
 {
-    auto node = object.node.lock();
-    if (node == nullptr)
+    if (!object.splat)
         return dm::float4x4::identity();
 
-    return dm::affineToHomogeneous(node->GetLocalToWorldTransformFloat());
+    return dm::affineToHomogeneous(dm::affine3(object.splat->cachedGlobalTransform));
 }
 
 void SceneGaussianSplatPasses::preparePasses()
@@ -413,10 +405,7 @@ void SceneGaussianSplatPasses::buildEmissionProxyList()
             m_settings->GaussianSplatTintColor,
             m_settings->GaussianSplatAlphaCullThreshold);
 
-        auto node = object.node.lock();
-        const dm::affine3 objectToWorldTransform = node != nullptr
-            ? node->GetLocalToWorldTransformFloat()
-            : dm::affine3::identity();
+        const dm::affine3 objectToWorldTransform = dm::affine3(object.splat->cachedGlobalTransform);
 
         const float radiusScale = std::max({
             length(objectToWorldTransform.transformVector(float3(1.0f, 0.0f, 0.0f))),

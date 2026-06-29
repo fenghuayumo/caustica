@@ -1,19 +1,17 @@
 #pragma once
 
 #include <shaders/PathTracer/Config.h>
-//#include "../common/SampleCommon.h"
 #include <EditorUI.h>
 
-// #include <core/vfs/VFS.h>
 #include <scene/camera/Camera.h>
-
 #include <scene/GameModel.h>
+#include <ecs/Entity.h>
 
 namespace game
 {
     class PropComponentBase;
 
-    // base class for other game
+    // base class for other game props
     class PropBase
     {
     public:
@@ -33,14 +31,15 @@ namespace game
 
         void                    SetStoragePath(const std::filesystem::path& path) { m_storagePath = path; }
         void                    SetAnimOffset(double animOffset)        { m_animOffset = animOffset; }
-        const std::string &     GetName() const                         { return m_node->GetName(); }
-        const std::shared_ptr<caustica::SceneGraphNode> & 
-                                GetNode() const                         { return m_node; }
+        std::string             GetName() const;
+        caustica::ecs::Entity   GetEntity() const                       { return m_entity; }
         const std::vector<std::shared_ptr<ModelInstance>> &
                                 GetModels() const                       { return m_models; }
 
         virtual void            GUI(float indent, bool & gameCameraAttached, caustica::FirstPersonCamera & gameCamera);
         virtual ScreenGUISel    StandaloneGUI(const std::shared_ptr<caustica::PlanarView> & view, const float2 & mousePos, const float2 & displaySize);
+
+        caustica::scene::SceneEntityWorld* EntityWorld() const;
 
     protected:
         std::shared_ptr<ModelInstance> CreateAndAttachModel( const std::shared_ptr<game::ModelType> & modelType, const std::string & instanceName, const dm::float3& translation, const dm::quat& rotation = dm::quat::identity(), const dm::float3& scaling = dm::float3(1,1,1) );
@@ -52,9 +51,6 @@ namespace game
         Pose                        m_startPose;
         
         Pose                        m_defaultCameraPose;
-        // float3                      m_defaultCameraPos  = 0.0f;
-        // float3                      m_defaultCameraDir  = dm::float3(1.f, 0.f, 0.f);
-        // float3                      m_defaultCameraUp   = dm::float3(0.f, 1.f, 0.f);
 
         float3                      m_referenceForward  = dm::float3(1.f, 0.f, 0.f);
         float3                      m_referenceUp       = dm::float3(0.f, 1.f, 0.f);
@@ -70,7 +66,7 @@ namespace game
 
         bool                        m_allowKeyMoveIfSelected = true;
 
-        std::shared_ptr<caustica::SceneGraphNode> m_node;
+        caustica::ecs::Entity       m_entity = caustica::ecs::NullEntity;
 
         std::vector<std::shared_ptr<ModelInstance>>
                                     m_models;

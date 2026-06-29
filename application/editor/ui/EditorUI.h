@@ -34,11 +34,6 @@ using namespace caustica::math;
 #include <Rtxtf/STFDefinitions.h>
 #endif
 
-namespace caustica
-{
-    class SceneGraphNode;
-}
-
 namespace caustica::editor
 {
 
@@ -157,6 +152,6 @@ private:
 #endif
 };
 
-void UpdateTogglableNodes(std::vector<TogglableNode>& TogglableNodes, caustica::SceneGraphNode* node);
+void UpdateTogglableNodes(std::vector<TogglableNode>& togglableNodes, caustica::scene::SceneEntityWorld& entityWorld, ecs::Entity entity);
 
 } // namespace caustica::editor

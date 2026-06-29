@@ -4,6 +4,7 @@
 #include <ecs/World.h>
 #include <math/math.h>
 #include <scene/SceneContent.h>
+#include <scene/SceneResources.h>
 
 #include <memory>
 #include <filesystem>
@@ -15,8 +16,10 @@ namespace caustica
 {
 class MeshInstance;
 class SkinnedMeshInstance;
+class SkinnedMeshReference;
 class Light;
 class SceneCamera;
+class SceneAnimation;
 class GaussianSplat;
 class SampleSettings;
 class GameSettings;
@@ -37,7 +40,7 @@ struct PathComponent
 
 struct ParentComponent
 {
-    ecs::Entity parent;
+    ecs::Entity parent = ecs::NullEntity;
 };
 
 struct ChildrenComponent
@@ -103,6 +106,11 @@ struct SkinnedMeshInstanceComponent
     std::shared_ptr<SkinnedMeshInstance> instance;
 };
 
+struct SkinnedMeshReferenceComponent
+{
+    std::shared_ptr<SkinnedMeshReference> reference;
+};
+
 struct LightComponent
 {
     std::shared_ptr<Light> light;
@@ -111,6 +119,11 @@ struct LightComponent
 struct CameraComponent
 {
     std::shared_ptr<SceneCamera> camera;
+};
+
+struct AnimationComponent
+{
+    std::shared_ptr<SceneAnimation> animation;
 };
 
 struct GaussianSplatComponent
@@ -136,10 +149,12 @@ enum class PreviousTransformPolicy
 
 void UpdateHierarchy(ecs::World& world, PreviousTransformPolicy previousPolicy);
 
-class SceneEntityWorld
+// ECS scene world: entity hierarchy + resource tracking (meshes, lights, cameras, …).
+class SceneEntityWorld : public SceneResources
 {
 public:
     void refreshHierarchy(PreviousTransformPolicy previousPolicy = PreviousTransformPolicy::CaptureCurrent);
+    void refresh(uint32_t frameIndex);
     void clear();
 
     ecs::Entity createEntity(const std::string& name = {}, ecs::Entity parent = ecs::NullEntity);
@@ -154,17 +169,50 @@ public:
     void setRotation(ecs::Entity entity, const dm::dquat& rotation);
     void setScaling(ecs::Entity entity, const dm::double3& scaling);
     void setPath(ecs::Entity entity, const std::filesystem::path& path);
+    void rebuildPathsFromRoot();
+
+    void setMeshInstance(ecs::Entity entity, const std::shared_ptr<MeshInstance>& instance);
+    void setSkinnedMeshInstance(ecs::Entity entity, const std::shared_ptr<SkinnedMeshInstance>& instance);
+    void setSkinnedMeshReference(ecs::Entity entity, const std::shared_ptr<SkinnedMeshReference>& reference);
+    void setLight(ecs::Entity entity, const std::shared_ptr<Light>& light);
+    void setCamera(ecs::Entity entity, const std::shared_ptr<SceneCamera>& camera);
+    void setAnimation(ecs::Entity entity, const std::shared_ptr<SceneAnimation>& animation);
+    void setGaussianSplat(ecs::Entity entity, const std::shared_ptr<GaussianSplat>& splat);
+    void setSampleSettings(ecs::Entity entity, const std::shared_ptr<SampleSettings>& settings);
+    void setGameSettings(ecs::Entity entity, const std::shared_ptr<GameSettings>& settings);
+
+    // Deep-copies a subtree from another world into this one under `parent`.
+    ecs::Entity importSubtree(ecs::Entity parent, const SceneEntityWorld& source, ecs::Entity sourceRoot);
+
+    void applyAnimations(float time);
+    void assignGlobalResourceIndices();
 
     [[nodiscard]] ecs::World& world() { return m_world; }
     [[nodiscard]] const ecs::World& world() const { return m_world; }
 
     [[nodiscard]] ecs::Entity root() const { return m_root; }
     [[nodiscard]] ecs::Entity entityForPath(const std::filesystem::path& path) const;
+    [[nodiscard]] ecs::Entity findEntity(const std::filesystem::path& path, ecs::Entity context = ecs::NullEntity) const;
+    [[nodiscard]] std::filesystem::path getEntityPath(ecs::Entity entity) const;
+    [[nodiscard]] std::string getEntityName(ecs::Entity entity) const;
+    [[nodiscard]] const std::vector<ecs::Entity>& getEntityChildren(ecs::Entity entity) const;
+    [[nodiscard]] bool entitySubtreeContains(ecs::Entity root, ecs::Entity candidate) const;
+
+    [[nodiscard]] bool hasPendingStructureChanges() const { return m_structureDirty; }
+    [[nodiscard]] bool hasPendingTransformChanges() const { return m_transformDirty; }
 
 private:
+    void unregisterEntityLeaves(ecs::Entity entity);
+    void updateLeafContentAndBounds(ecs::Entity entity);
+    void markStructureDirty();
+    void markTransformDirty();
+
     ecs::World m_world;
     ecs::Entity m_root = ecs::NullEntity;
     std::unordered_map<std::string, ecs::Entity> m_pathToEntity;
+    bool m_structureDirty = true;
+    bool m_transformDirty = true;
+    static inline const std::vector<ecs::Entity> s_emptyChildren{};
 };
 
 } // namespace caustica::scene

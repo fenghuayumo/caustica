@@ -68,7 +68,7 @@
 #include <render/Passes/PostProcess/DenoisingGuidesPass.h>
 #include <render/Passes/Denoisers/OidnDenoiser.h>
 
-#include <scene/SceneGraph.h>
+#include <scene/SceneEcs.h>
 
 #include <stb_image.h>
 #include <stb_image_write.h>
@@ -357,9 +357,9 @@ std::string SceneEditor::GetCurrentSceneName() const
 uint SceneEditor::GetSceneCameraCount() const
 {
     auto scene = GetScene();
-    if (!scene || !scene->GetSceneGraph())
+    if (!scene)
         return 1;
-    return (uint)scene->GetSceneGraph()->GetCameras().size() + 1;
+    return (uint)scene->GetCameras().size() + 1;
 }
 
 uint& SceneEditor::SelectedCameraIndex()
@@ -574,12 +574,16 @@ void SceneEditor::Animate(float fElapsedTimeSeconds)
         if (m_sampleGame && m_sampleGame->IsInitialized())
             m_sceneTime = m_sampleGame->GetGameTime();
 
-        for (const auto& anim : m_sceneManager->getScene()->GetSceneGraph()->GetAnimations())
         {
-            double cutLeft = 0.0; double cutRight = 0.0;
-            // if (anim->GetName() == "Take 001") // special hack for mesh drone anim - TODO: fix properly in future
-            // { cutLeft = 0.333; cutRight = 0.0; }
-            anim->Apply((float)fmod(m_sceneTime+cutLeft, anim->GetDuration()-cutLeft-cutRight));
+            auto* ew = m_sceneManager->getScene()->GetEntityWorld();
+            for (const auto& anim : m_sceneManager->getScene()->GetAnimations())
+            {
+                double cutLeft = 0.0; double cutRight = 0.0;
+                // if (anim->GetName() == "Take 001") // special hack for mesh drone anim - TODO: fix properly in future
+                // { cutLeft = 0.333; cutRight = 0.0; }
+                if (ew)
+                    anim->Apply((float)fmod(m_sceneTime+cutLeft, anim->GetDuration()-cutLeft-cutRight), *ew);
+            }
         }
     }
     else
@@ -590,7 +594,7 @@ void SceneEditor::Animate(float fElapsedTimeSeconds)
     m_renderCore->camera().selectedCameraIndex() = std::min( m_renderCore->camera().selectedCameraIndex(), GetSceneCameraCount()-1 );
     if (m_renderCore->camera().selectedCameraIndex() > 0)
     {
-        std::shared_ptr<caustica::PerspectiveCamera> sceneCamera = std::dynamic_pointer_cast<PerspectiveCamera>(m_sceneManager->getScene()->GetSceneGraph()->GetCameras()[m_renderCore->camera().selectedCameraIndex()-1]);
+        std::shared_ptr<caustica::PerspectiveCamera> sceneCamera = std::dynamic_pointer_cast<PerspectiveCamera>(m_sceneManager->getScene()->GetCameras()[m_renderCore->camera().selectedCameraIndex()-1]);
         if (sceneCamera != nullptr)
             m_cameraController.syncFromSceneCamera(sceneCamera);
     }
@@ -634,8 +638,9 @@ void SceneEditor::Animate(float fElapsedTimeSeconds)
     }
 
     // Window title
-    std::string extraInfo = ", " + m_fpsInfo + ", " + m_sceneManager->getCurrentSceneName() + ", " + GetResolutionInfo() + ", (L: " + std::to_string(m_sceneManager->getScene()->GetSceneGraph()->GetLights().size()) + ", MAT: " + std::to_string(m_sceneManager->getScene()->GetSceneGraph()->GetMaterials().size())
-        + ", MESH: " + std::to_string(m_sceneManager->getScene()->GetSceneGraph()->GetMeshes().size()) + ", I: " + std::to_string(m_sceneManager->getScene()->GetSceneGraph()->GetMeshInstances().size()) + ", SI: " + std::to_string(m_sceneManager->getScene()->GetSceneGraph()->GetSkinnedMeshInstances().size())
+    auto& sc = *m_sceneManager->getScene();
+    std::string extraInfo = ", " + m_fpsInfo + ", " + m_sceneManager->getCurrentSceneName() + ", " + GetResolutionInfo() + ", (L: " + std::to_string(sc.GetLights().size()) + ", MAT: " + std::to_string(sc.GetMaterials().size())
+        + ", MESH: " + std::to_string(sc.GetMeshes().size()) + ", I: " + std::to_string(sc.GetMeshInstances().size()) + ", SI: " + std::to_string(sc.GetSkinnedMeshInstances().size())
         //+ ", AvgLum: " + std::to_string((m_renderTargets!=nullptr)?(m_renderTargets->AvgLuminanceLastCaptured):(0.0f))
 #if ENABLE_DEBUG_VIZUALISATIONS
         + ", ENABLE_DEBUG_VIZUALISATIONS: 1"
@@ -762,9 +767,9 @@ std::shared_ptr<caustica::Material> SceneEditor::FindMaterial(int materialID) co
     return SceneManager::findMaterial(m_sceneManager->getScene(), materialID);
 }
 
-std::shared_ptr<caustica::SceneGraphNode> SceneEditor::FindNodeByInstanceIndex(int instanceIndex) const
+caustica::ecs::Entity SceneEditor::FindEntityByInstanceIndex(int instanceIndex) const
 {
-    return SceneManager::findNodeByInstanceIndex(m_sceneManager->getScene(), instanceIndex);
+    return SceneManager::findEntityByInstanceIndex(m_sceneManager->getScene(), instanceIndex);
 }
 
 
@@ -788,14 +793,14 @@ bool SceneEditor::LoadObjMeshFile(const std::filesystem::path& filePath)
     return m_contentEditor.loadObjMeshFile(filePath);
 }
 
-void SceneEditor::FinalizeRuntimeSceneMutation(const std::shared_ptr<caustica::SceneGraphNode>& importedRoot)
+void SceneEditor::FinalizeRuntimeSceneMutation(caustica::ecs::Entity importedRoot)
 {
     m_contentEditor.finalizeRuntimeSceneMutation(importedRoot);
 }
 
-bool SceneEditor::DeleteSceneNode(const std::shared_ptr<SceneGraphNode>& node)
+bool SceneEditor::DeleteSceneNode(caustica::ecs::Entity entity)
 {
-    return m_contentEditor.deleteSceneNode(node);
+    return m_contentEditor.deleteSceneNode(entity);
 }
 
 void SceneEditor::RequestFullRebuild()
@@ -813,9 +818,9 @@ std::vector<float3> SceneEditor::GetMeshVerticesWorld(const std::shared_ptr<Mesh
     return m_contentEditor.getMeshVerticesWorld(mesh);
 }
 
-std::vector<float3> SceneEditor::GetMeshVerticesWorld(const std::shared_ptr<SceneGraphNode>& node)
+std::vector<float3> SceneEditor::GetMeshVerticesWorld(caustica::ecs::Entity entity)
 {
-    return m_contentEditor.getMeshVerticesWorld(node);
+    return m_contentEditor.getMeshVerticesWorld(entity);
 }
 
 void SceneEditor::SetMeshVerticesWorld(const std::shared_ptr<MeshInfo>& mesh,
@@ -826,12 +831,12 @@ void SceneEditor::SetMeshVerticesWorld(const std::shared_ptr<MeshInfo>& mesh,
     m_contentEditor.setMeshVerticesWorld(mesh, vertices, recomputeNormals, rebuildAccelerationStructure);
 }
 
-void SceneEditor::SetMeshVerticesWorld(const std::shared_ptr<SceneGraphNode>& node,
+void SceneEditor::SetMeshVerticesWorld(caustica::ecs::Entity entity,
                                   const std::vector<float3>& vertices,
                                   bool recomputeNormals,
                                   bool rebuildAccelerationStructure)
 {
-    m_contentEditor.setMeshVerticesWorld(node, vertices, recomputeNormals, rebuildAccelerationStructure);
+    m_contentEditor.setMeshVerticesWorld(entity, vertices, recomputeNormals, rebuildAccelerationStructure);
 }
 
 void SceneEditor::SetMeshVertices(const std::shared_ptr<MeshInfo>& mesh,
@@ -991,8 +996,8 @@ void SceneEditor::ResolvePickFeedback(const DebugFeedbackStruct& feedback)
         m_editor.SelectedMaterial = FindMaterial(int(feedback.pickedMaterialID));
     if (m_renderState.Picking.InstanceRequested)
     {
-        m_editor.SelectedNode = FindNodeByInstanceIndex(int(feedback.pickedInstanceIndex));
-        if (m_editor.SelectedNode != nullptr)
+        m_editor.SelectedEntity = FindEntityByInstanceIndex(int(feedback.pickedInstanceIndex));
+        if (m_editor.SelectedEntity != caustica::ecs::NullEntity)
             m_editor.SelectedGaussianSplat = false;
     }
 }

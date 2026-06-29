@@ -10,7 +10,6 @@
 #include <engine/UserInterfaceUtils.h>
 #include <core/vfs/VFS.h>
 #include <scene/SceneTypes.h>
-#include <scene/SceneGraph.h>
 #include <imgui_internal.h>
 #include <assets/loader/ShaderFactory.h>
 #include <render/Passes/Lighting/MaterialGpuCache.h>
@@ -20,6 +19,11 @@
 #include <game/GameScene.h>
 #include <render/Passes/Debug/ZoomTool.h>
 #include <common/CaptureScriptManager.h>
+#include <platform/file_dialog.h>
+
+#if CAUSTICA_WITH_PYTHON
+#include "Python/PythonScripting.h"
+#endif
 
 #include <cmath>
 #include <cstdio>
@@ -147,7 +151,6 @@ void EditorUI::BuildCameraPanel(const PanelLayout& layout)
 }
 
 #if CAUSTICA_WITH_PYTHON
-#include "Python/PythonScripting.h"
 
 void EditorUI::BuildPythonScriptingUI(float indent)
 {
@@ -180,7 +183,7 @@ void EditorUI::BuildPythonScriptingUI(float indent)
     if (ImGui::Button("Browse##PyScript"))
     {
         std::string picked;
-        if (caustica::FileDialog(true, "Python Scripts (*.py)\0*.py\0All\0*.*\0", picked))
+        if (::caustica::FileDialog(true, "Python Scripts (*.py)\0*.py\0All\0*.*\0", picked))
         {
             std::snprintf(pathBuffer, sizeof(pathBuffer), "%s", picked.c_str());
         }

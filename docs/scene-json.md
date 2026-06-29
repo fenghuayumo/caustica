@@ -5,7 +5,8 @@
 相关实现主要在：
 
 - `caustica/caustica/src/scene/Scene.cpp`
-- `caustica/caustica/src/scene/SceneGraph.cpp`
+- `caustica/caustica/src/scene/SceneEcs.cpp`
+- `caustica/caustica/src/scene/SceneObjects.cpp`
 - `caustica/caustica/src/scene/SceneTypes.cpp`
 - `Rtxpt/SampleCommon/ExtendedScene.cpp`
 - `Rtxpt/Materials/MaterialsBaker.cpp`
