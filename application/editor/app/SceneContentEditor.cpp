@@ -6,6 +6,9 @@
 #include <assets/AssetSystem.h>
 #include <assets/RuntimeMeshLoadTypes.h>
 #include <core/log.h>
+#include <render/SceneGaussianSplatPasses.h>
+#include <render/SceneLightingPasses.h>
+#include <render/SceneRayTracingResources.h>
 #include <render/Core/RenderSceneTypeFactory.h>
 #include <render/Core/SceneMeshEditing.h>
 #include <scene/SceneGraph.h>

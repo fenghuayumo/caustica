@@ -14,17 +14,18 @@
 namespace caustica
 {
 class SceneGraphNode;
-class SceneManager;
 class TextureLoader;
 struct MeshInfo;
 }
+
+class SceneManager;
+struct PathTracerSettings;
 
 namespace caustica::render
 {
 class SceneGaussianSplatPasses;
 class SceneLightingPasses;
 class SceneRayTracingResources;
-struct PathTracerSettings;
 }
 
 namespace caustica::editor
@@ -38,9 +39,9 @@ public:
     struct Context
     {
         SceneManager* sceneManager = nullptr;
-        TextureLoader* textureLoader = nullptr;
+        caustica::TextureLoader* textureLoader = nullptr;
         EditorUIState* editor = nullptr;
-        caustica::render::PathTracerSettings* settings = nullptr;
+        PathTracerSettings* settings = nullptr;
         caustica::render::SceneLightingPasses* lightingPasses = nullptr;
         caustica::render::SceneRayTracingResources* rayTracingResources = nullptr;
         caustica::render::SceneGaussianSplatPasses* gaussianSplatPasses = nullptr;

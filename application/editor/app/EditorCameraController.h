@@ -27,7 +27,7 @@ public:
     struct Context
     {
         caustica::RenderCore* renderCore = nullptr;
-        caustica::render::PathTracerSettings* settings = nullptr;
+        PathTracerSettings* settings = nullptr;
         caustica::render::PathTracingWorldRenderer* worldRenderer = nullptr;
     };
 

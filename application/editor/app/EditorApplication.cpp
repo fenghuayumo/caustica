@@ -21,6 +21,7 @@
 #include "PathTracerSessionBootstrap.h"
 #include "EditorStartup.h"
 #include <render/WorldRenderer/PathTracingWorldRenderer.h>
+#include <platform/window.h>
 
 #include <utility>
 
