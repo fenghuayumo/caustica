@@ -182,6 +182,7 @@ SceneEditor::SceneEditor(const CommandLineOptions& cmdLine,
     , m_inputRouter(EditorInputRouter::Context{.session = sessionState, .editor = editorState})
     , m_contentEditor(SceneContentEditor::Context{})
     , m_cameraController(EditorCameraController::Context{})
+    , m_lifecycleCoordinator(SceneLifecycleCoordinator::Context{})
 {
     m_progressLoading.Start("Initializing...");
     m_progressLoading.Set(50);
@@ -427,6 +428,7 @@ void SceneEditor::Init(const std::string& preferredScene,
     m_settings.GaussianSplatAlphaCullThreshold = m_cmdLine.GaussianSplatAlphaCullThreshold;
     
     m_sampleGame = std::make_unique<::GameScene>(*this, m_cmdLine);
+    SyncSubsystemContext();
     m_progressLoading.Set(95);
 
     if (GetDevice()->queryFeatureSupport(nvrhi::Feature::RayTracingOpacityMicromap))
@@ -454,24 +456,7 @@ void SceneEditor::Init(const std::string& preferredScene,
 
 void SceneEditor::SetCurrentScene( const std::string & sceneName, bool forceReload )
 {
-    if (!m_sceneManager->beginSceneSwitch(sceneName, GetLocalPath(c_AssetsFolder), forceReload))
-        return;
-
-    m_settings.ResetAccumulation = true;
-    m_sceneManager->setAsyncLoadingEnabled(false);
-
-    m_progressLoading.Stop();
-    m_progressLoading.Start("Loading scene...");
-    m_sceneManager->beginLoadingScene(
-        std::make_shared<caustica::NativeFileSystem>(),
-        m_sceneManager->getCurrentScenePath());
-    if( m_sceneManager->getScene() == nullptr )
-    {
-        caustica::error( "Unable to load scene '%s'", sceneName.c_str() );
-        m_sceneManager->clearScene();
-        m_progressLoading.Stop();
-        return;
-    }
+    m_lifecycleCoordinator.setCurrentScene(sceneName, forceReload);
 }
 
 bool SceneEditor::LoadGaussianSplatFile(const std::filesystem::path& fileName, bool convertRdfToRub)
@@ -496,23 +481,7 @@ const std::string& SceneEditor::GetGaussianSplatFileName() const
 
 void SceneEditor::SceneUnloading( )
 {
-    m_editor.TogglableNodes = nullptr;
-    if (m_worldRenderer)
-        m_worldRenderer->onSceneUnloading();
-    if (m_renderCore)
-        m_renderCore->onSceneUnloading();
-    if (m_bindingCache)
-        m_bindingCache->Clear( );
-    GetLightingPasses().sceneUnloading();
-    m_editor.SelectedMaterial = nullptr;
-    m_editor.SelectedNode = nullptr;
-    m_editor.SelectedGaussianSplat = false;
-    if (m_gaussianSplatPasses && m_gaussianSplatPasses->isAttached())
-        m_gaussianSplatPasses->sceneUnloading();
-    m_settings.EnvironmentMapParams = EnvironmentMapRuntimeParameters();
-    m_uncompressedTextures.clear();
-
-    if (m_sampleGame!=nullptr) m_sampleGame->SceneUnloading();
+    m_lifecycleCoordinator.onSceneUnloading();
 }
 
 bool SceneEditor::IsSceneLoading() const
@@ -552,145 +521,9 @@ void SceneEditor::CollectUncompressedTextures()
     });
 }
 
-void SceneEditor::RefreshEnvironmentMapMediaList()
-{
-    const std::filesystem::path currentScenePath = m_sceneManager
-        ? m_sceneManager->getCurrentScenePath()
-        : std::filesystem::path();
-
-    GetLightingPasses().refreshEnvironmentMapMediaList(
-        GetLocalPath(c_AssetsFolder),
-        currentScenePath);
-}
-
 void SceneEditor::SceneLoaded( )
 {
-    if (m_worldRenderer)
-        m_worldRenderer->resetFrameIndex();
-
-    RefreshEnvironmentMapMediaList();
-
-    m_progressLoading.Set(50);
-
-    if (m_sampleGame != nullptr) m_sampleGame->SceneLoaded(m_sceneManager->getScene(), m_sceneManager->getCurrentScenePath(), GetLocalPath(c_AssetsFolder));
-
-    m_progressLoading.Set(55);
-
-    if (m_TextureLoader && m_CommonPasses)
-    {
-        m_TextureLoader->ProcessRenderingThreadCommands(*m_CommonPasses, 0.f);
-        m_TextureLoader->LoadingFinished();
-    }
-
-    m_progressLoading.Set(60);
-
-    m_sceneTime = 0.f;
-    m_sceneManager->getScene()->FinishedLoading( GetFrameIndex( ) );
-
-    GetGaussianSplatPasses().onSceneLoaded(m_cmdLine);
-
-    m_progressLoading.Set(65);
-
-    GetLightingPasses().onSceneLoaded(*m_sceneManager->getScene(), m_settings);
-
-    // seem like sensible defaults
-    m_settings.ToneMappingParams.exposureCompensation = 2.0f;
-    m_settings.ToneMappingParams.exposureValue = 0.0f;
-
-    if (m_editor.TogglableNodes == nullptr)
-    {
-        m_editor.TogglableNodes = std::make_shared<std::vector<TogglableNode>>();
-        UpdateTogglableNodes(*m_editor.TogglableNodes, GetScene()->GetSceneGraph()->GetRootNode().get()); // UNSAFE - make sure not to keep m_editor.TogglableNodes longer than scenegraph!
-    }
-
-    auto cameras = m_sceneManager->getScene()->GetSceneGraph( )->GetCameras( );
-    auto camScene = (cameras.empty( ))?(nullptr):(std::dynamic_pointer_cast<PerspectiveCamera>(cameras.back()));
-    if (camScene)
-        m_cameraController.syncFromSceneCamera(camScene);
-    else
-        m_renderCore->camera().setupDefaultCamera();
-
-    m_renderCore->onSceneLoaded(*m_sceneManager->getScene(), m_renderState.Invalidation.AccelerationStructRebuildRequested);
-
-    // PrintSceneGraph( m_sceneManager->getScene()->GetSceneGraph( )->GetRootNode( ) );
-
-    m_renderState.Invalidation.ShaderReloadRequested = true;  // we have to re-create shader hit table
-    m_settings.EnableAnimations = false;
-    m_settings.RealtimeMode = false;
-
-    std::shared_ptr<SampleSettings> settings = m_sceneManager->getScene()->GetSampleSettingsNode();
-    if (settings != nullptr)
-    {
-        m_settings.RealtimeMode = settings->realtimeMode.value_or(m_settings.RealtimeMode);
-        m_settings.EnableAnimations = settings->enableAnimations.value_or(m_settings.EnableAnimations);
-        if (settings->startingCamera.has_value())
-            m_renderCore->camera().setSelectedCameraIndex(settings->startingCamera.value()+1); // slot 0 reserved for free flight camera
-        if (settings->realtimeFireflyFilter.has_value())
-        {
-            m_settings.RealtimeFireflyFilterThreshold = settings->realtimeFireflyFilter.value();
-            m_settings.RealtimeFireflyFilterEnabled = true;
-        }
-        m_settings.BounceCount = settings->maxBounces.value_or(m_settings.BounceCount);
-        m_settings.DiffuseBounceCount = settings->maxDiffuseBounces.value_or(m_settings.DiffuseBounceCount);
-        m_settings.TexLODBias = settings->textureMIPBias.value_or(m_settings.TexLODBias);
-    }
-
-    if (m_cmdLine.stopAnimations)
-        m_settings.EnableAnimations = false;
-
-    m_progressLoading.Set(70);
-
-    LocalConfig::PostSceneLoad(*this, m_sessionState, m_editor);
-
-    m_progressLoading.Set(90);
-
-    GetLightingPasses().notifyBakersSceneReloaded(*m_sceneManager->getScene());
-
-    m_progressLoading.Set(100);
-
-    if (m_cmdLine.OverrideToRealtimeMode)
-        m_settings.RealtimeMode = true;
-    if (m_cmdLine.OverrideToReferenceMode)
-        m_settings.RealtimeMode = false;
-    
-    if (m_cmdLine.OverrideAutoexposureOff)
-    {
-        m_settings.ToneMappingParams.autoExposure = false;
-        m_settings.ToneMappingParams.exposureValue = 0.0f;
-    }
-    if (m_cmdLine.OverrideExposureOffset != FLT_MAX)
-        m_settings.ToneMappingParams.exposureCompensation = m_cmdLine.OverrideExposureOffset;
-    if (m_cmdLine.DisableFireflyFilters)
-    {
-        m_settings.RealtimeFireflyFilterEnabled = false;
-        m_settings.ReferenceFireflyFilterEnabled = false;
-    }
-    if (m_cmdLine.DisablePostProcessFilters)
-    {
-        m_settings.EnableBloom = false;
-    }
-    if (m_cmdLine.cameraPosDirUp != "")
-        SetCurrentCameraPosDirUp(m_cmdLine.cameraPosDirUp);
-
-    m_settings.MaterialVariantIndex = 0;
-
-    m_sessionDiagnostics.asyncLoadingInProgress = true;
-
-#if CAUSTICA_WITH_PYTHON
-    // Initialize the embedded Python interpreter (lazily) and queue the
-    // command-line scripts/expressions so that they execute against a fully
-    // populated scene.  Actual execution happens during Animate() below.
-    if (m_pythonScripting && (!m_cmdLine.pythonScript.empty() || !m_cmdLine.pythonExpr.empty()))
-    {
-        if (m_pythonScripting->Initialize())
-        {
-            if (!m_cmdLine.pythonScript.empty())
-                m_pythonScripting->QueueScriptFile(m_cmdLine.pythonScript);
-            if (!m_cmdLine.pythonExpr.empty())
-                m_pythonScripting->QueueScriptString(m_cmdLine.pythonExpr, "<--pythonExpr>");
-        }
-    }
-#endif
+    m_lifecycleCoordinator.onSceneLoaded();
 }
 
 void SceneEditor::Animate(float fElapsedTimeSeconds)
@@ -1209,6 +1042,35 @@ void SceneEditor::SyncSubsystemContext()
         .renderCore = m_renderCore,
         .settings = &m_settings,
         .worldRenderer = m_worldRenderer,
+    });
+
+    m_lifecycleCoordinator.updateContext(SceneLifecycleCoordinator::Context{
+        .sceneManager = m_sceneManager,
+        .renderCore = m_renderCore,
+        .bindingCache = m_bindingCache,
+        .worldRenderer = m_worldRenderer,
+        .lightingPasses = m_lightingPasses,
+        .gaussianSplatPasses = m_gaussianSplatPasses,
+        .editor = &m_editor,
+        .sessionState = &m_sessionState,
+        .renderState = &m_renderState,
+        .settings = &m_settings,
+        .diagnostics = &m_sessionDiagnostics,
+        .cmdLine = &m_cmdLine,
+        .progressLoading = &m_progressLoading,
+        .textureLoader = m_TextureLoader.get(),
+        .commonPasses = m_CommonPasses.get(),
+        .sampleGame = m_sampleGame.get(),
+        .cameraController = &m_cameraController,
+        .sceneTime = &m_sceneTime,
+        .uncompressedTextures = &m_uncompressedTextures,
+        .frameIndex = [this] { return GetFrameIndex(); },
+        .assetsRoot = [] { return GetLocalPath(c_AssetsFolder); },
+        .postSceneLoad = [this] { LocalConfig::PostSceneLoad(*this, m_sessionState, m_editor); },
+        .setCameraPosDirUp = [this](const std::string& value) { return SetCurrentCameraPosDirUp(value); },
+#if CAUSTICA_WITH_PYTHON
+        .pythonScripting = m_pythonScripting.get(),
+#endif
     });
 }
 

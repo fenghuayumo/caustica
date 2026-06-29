@@ -20,6 +20,7 @@
 #include "EditorInputRouter.h"
 #include "SceneContentEditor.h"
 #include "EditorCameraController.h"
+#include "SceneLifecycleCoordinator.h"
 #include <render/RenderSessionState.h>
 
 #include <chrono>
@@ -275,12 +276,12 @@ protected:
     EditorInputRouter m_inputRouter;
     SceneContentEditor m_contentEditor;
     EditorCameraController m_cameraController;
+    SceneLifecycleCoordinator m_lifecycleCoordinator;
 
     const caustica::PlanarView& GetView() const;
 
 private:
     void                                    SyncSubsystemContext();
-    void                                    RefreshEnvironmentMapMediaList();
     void                                    SyncInputRouterContext();
 
     std::shared_ptr<caustica::RootFileSystem> m_RootFS;
