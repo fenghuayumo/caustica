@@ -11,6 +11,10 @@
 #include <rhi/d3d12.h>
 #include <rhi/validation.h>
 
+#if defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
+#include <wrl/client.h>
+#endif
+
 class GpuDevice_DX12 : public caustica::GpuDevice
 {
 protected:
@@ -36,6 +40,10 @@ protected:
     nvrhi::DeviceHandle                             m_NvrhiDevice;
 
     std::string                                     m_RendererString;
+
+#if defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
+    Microsoft::WRL::ComPtr<ID3D12DeviceFactory>     m_OwnedD3d12DeviceFactory;
+#endif
 
 public:
     std::string GetAdapterName(DXGI_ADAPTER_DESC const& aDesc)

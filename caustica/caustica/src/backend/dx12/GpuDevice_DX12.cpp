@@ -4,6 +4,7 @@
 
 #include <backend/GpuDevice.h>
 #include <backend/dx12/GpuDevice_DX12.h>
+#include <backend/dx12/D3D12AgilityBootstrap.h>
 #include <backend/DxgiVideoMemory.h>
 #include <core/log.h>
 
@@ -113,15 +114,18 @@ void GpuDevice_DX12::ReportLiveObjects()
 bool GpuDevice_DX12::CreateInstanceInternal()
 {
 #if defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
-    static const UUID D3D12ExperimentalShaderModels = {
-        0x76f5573e, 0xf13a, 0x40f5, {0xb2, 0x97, 0x81, 0xce, 0x9e, 0x18, 0x93, 0x3f}
-    };
-    const HRESULT experimentalHr = D3D12EnableExperimentalFeatures(
-        1, &D3D12ExperimentalShaderModels, nullptr, nullptr);
-    if (FAILED(experimentalHr))
+    if (!m_DeviceParams.d3d12DeviceFactory)
     {
-        caustica::error("D3D12EnableExperimentalFeatures failed, error code = 0x%08x", experimentalHr);
-        return false;
+        const dx12::AgilityBootstrapResult bootstrap = dx12::BootstrapAgilitySdk();
+        if (bootstrap.deviceFactory)
+        {
+            m_OwnedD3d12DeviceFactory = bootstrap.deviceFactory;
+            m_DeviceParams.d3d12DeviceFactory = m_OwnedD3d12DeviceFactory.Get();
+        }
+    }
+    else
+    {
+        dx12::EnableExperimentalShaderModels(m_DeviceParams.d3d12DeviceFactory);
     }
 #endif
 

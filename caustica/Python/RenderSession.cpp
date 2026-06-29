@@ -3,7 +3,8 @@
 #if CAUSTICA_WITH_PYTHON
 
 #include "SceneEditorFrameExtension.h"
-#include "PathTracerSessionBootstrap.h"
+#include "PathTracerSessionHost.h"
+#include "PathTracerFrameDriver.h"
 #include <engine/EngineRenderer.h>
 #include <engine/Application.h>
 #include <backend/GpuDevice.h>
@@ -52,7 +53,9 @@
 #include <vector>
 
 using caustica::editor::SceneEditor;
-using caustica::render::InitializeRenderSessionStateFromCommandLine;
+using caustica::editor::PathTracerFrameDriver;
+using caustica::editor::startupPathTracerSessionHost;
+using caustica::editor::PathTracerSessionHostParams;
 
 #if CAUSTICA_WITH_DX12
 #include <d3d12.h>
@@ -73,61 +76,6 @@ using caustica::render::InitializeRenderSessionStateFromCommandLine;
 namespace
 {
     constexpr double c_HeadlessFrameTimeSeconds = 1.0 / 60.0;
-
-    class PathTracerFrameDriver : public caustica::Application
-    {
-    public:
-        PathTracerFrameDriver(caustica::GpuDevice* dm, caustica::Window* window, SceneEditor* scene, caustica::EngineRenderer* engineRenderer)
-            : caustica::Application(dm, window)
-            , m_scene(scene)
-            , m_engineRenderer(engineRenderer)
-        { }
-
-        void syncToBackBuffer()
-        {
-            caustica::GpuDevice* dm = getGpuDevice();
-            if (!dm || !m_scene)
-                return;
-
-            const caustica::BackBufferInfo backBuffer = dm->GetBackBufferInfo();
-            notifyBackBufferResizing();
-            notifyBackBufferResized(backBuffer.width, backBuffer.height, backBuffer.sampleCount);
-        }
-
-    protected:
-        void onUpdate(float elapsedTimeSeconds, bool windowFocused) override
-        {
-            if (m_scene && windowFocused)
-                m_scene->Animate(elapsedTimeSeconds);
-        }
-
-        void onRender() override
-        {
-            caustica::GpuDevice* dm = getGpuDevice();
-            if (!m_scene || !dm)
-                return;
-
-            m_scene->Render(dm->GetCurrentFramebuffer(true));
-
-            if (m_engineRenderer)
-                m_engineRenderer->endFrame();
-        }
-
-        bool shouldRenderWhenUnfocused() const override
-        {
-            return m_scene && m_scene->ShouldRenderUnfocused();
-        }
-
-        void onBackBufferResizing() override
-        {
-            if (m_scene)
-                m_scene->BackBufferResizing();
-        }
-
-    private:
-        SceneEditor* m_scene = nullptr;
-        caustica::EngineRenderer* m_engineRenderer = nullptr;
-    };
 
     void AppendUnique(std::vector<std::string>& values, const std::string& value)
     {
@@ -498,8 +446,6 @@ bool RenderSession::InitRenderer()
     SetLocalPathBaseOverride(ResolveResourceRoot(appDirectory));
 
     m_renderer = std::make_unique<SceneEditor>(m_cmdLine, m_sessionState, m_editorUIState, m_sessionDiagnostics);
-    m_renderer->setGpuDevice(*m_deviceManager);
-    m_renderer->initStreamlineAndWindow();
 
     m_sceneEditorFrameExtension = std::make_unique<SceneEditorFrameExtension>(*m_renderer);
     m_frameExtensions = { m_sceneEditorFrameExtension.get() };
@@ -508,16 +454,16 @@ bool RenderSession::InitRenderer()
         ? std::string("default.json")
         : m_config.scene;
 
-    m_engineRenderer = bootstrapPathTracerSession(PathTracerSessionBootstrapParams{
+    m_engineRenderer = startupPathTracerSessionHost(PathTracerSessionHostParams{
         .gpuDevice = *m_deviceManager,
         .sceneEditor = *m_renderer,
         .diagnostics = m_sessionDiagnostics,
         .frameExtensions = m_frameExtensions,
         .preferredScene = preferredScene,
+        .sessionState = &m_sessionState,
+        .cmdLine = &m_cmdLine,
+        .syncBackBuffer = false,
     });
-
-    InitializeRenderSessionStateFromCommandLine(m_sessionState, m_cmdLine);
-    LocalConfig::PostAppInit(m_sessionState);
 
     auto frameDriver = std::make_unique<PathTracerFrameDriver>(
         m_deviceManager.get(),

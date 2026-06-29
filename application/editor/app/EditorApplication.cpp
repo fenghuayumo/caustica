@@ -18,9 +18,9 @@
 #include <core/path_utils.h>
 #include <core/log.h>
 #include "SceneEditor.h"
-#include "PathTracerSessionBootstrap.h"
+#include "PathTracerSessionHost.h"
 #include "EditorStartup.h"
-#include <render/WorldRenderer/PathTracingWorldRenderer.h>
+#include "EditorSessionHost.h"
 #include <platform/window.h>
 
 #include <utility>
@@ -68,29 +68,23 @@ EditorApplication::StartupResult EditorApplication::startup(int argc, const char
         return StartupResult::FailToCreateDevice;
     }
 
-    m_sceneEditor.setGpuDevice(*m_GpuDevice);
-    m_sceneEditor.initStreamlineAndWindow();
-
-    m_engineRenderer = bootstrapPathTracerSession(PathTracerSessionBootstrapParams{
+    m_engineRenderer = startupPathTracerSessionHost(PathTracerSessionHostParams{
         .gpuDevice = *m_GpuDevice,
         .sceneEditor = m_sceneEditor,
         .diagnostics = m_sessionDiagnostics,
         .frameExtensions = m_frameExtensions,
         .preferredScene = preferredScene,
+        .sessionState = &m_editorUIData,
+        .cmdLine = &CmdLine,
+        .frameDriver = this,
+        .applyCmdLineToSessionState = CmdLine.noWindow,
     });
-    m_engineRenderer->lightingPasses().refreshEnvironmentMapMediaList(
-        GetLocalPath(c_AssetsFolder), std::filesystem::path());
-    syncPassesToBackBuffer();
 
     if (!CmdLine.noWindow)
     {
         m_uiPass = std::make_unique<EditorUI>(m_GpuDevice.get(), *this, m_editorUIData, IsSERSupported(), CmdLine);
         m_uiPass->Init(m_engineRenderer->shaderFactory());
-        syncPassesToBackBuffer();
-    }
-    else
-    {
-        InitializeEditorUIDataFromCommandLine(m_editorUIData, CmdLine);
+        syncPathTracerSessionBackBuffer(*m_GpuDevice, *this);
     }
 
     if (!CmdLine.noWindow && m_GpuDevice->GetPlatformWindow())
@@ -102,8 +96,6 @@ EditorApplication::StartupResult EditorApplication::startup(int argc, const char
                     m_editorUIData.PendingDroppedFiles.emplace_back(paths[i]);
             });
     }
-
-    LocalConfig::PostAppInit(m_editorUIData);
 
     return StartupResult::Success;
 }
@@ -170,12 +162,8 @@ bool EditorApplication::IsSERSupported() const
 
 void EditorApplication::syncPassesToBackBuffer()
 {
-    if (!m_GpuDevice)
-        return;
-
-    const caustica::BackBufferInfo backBuffer = m_GpuDevice->GetBackBufferInfo();
-    notifyBackBufferResizing();
-    notifyBackBufferResized(backBuffer.width, backBuffer.height, backBuffer.sampleCount);
+    if (m_GpuDevice)
+        syncPathTracerSessionBackBuffer(*m_GpuDevice, *this);
 }
 
 void EditorApplication::onUpdate(float elapsedTimeSeconds, bool windowFocused)
