@@ -1,4 +1,5 @@
 #include <render/Passes/Lighting/LightSamplingCache.h>
+#include <render/SceneGpuResources.h>
 
 #include <assets/loader/ShaderFactory.h>
 #include <render/Core/FramebufferFactory.h>
@@ -957,8 +958,8 @@ nvrhi::TextureHandle depthBuffer, nvrhi::TextureHandle motionVectors, nvrhi::Tex
             nvrhi::BindingSetItem::Sampler(1, m_linearSampler),
             nvrhi::BindingSetItem::Sampler(2, m_commonPasses->m_AnisotropicWrapSampler),    // s_MaterialSampler
             nvrhi::BindingSetItem::StructuredBuffer_SRV(1, subInstanceDataBuffer),
-            nvrhi::BindingSetItem::StructuredBuffer_SRV(2, scene->GetInstanceBuffer()),
-            nvrhi::BindingSetItem::StructuredBuffer_SRV(3, scene->GetGeometryBuffer()),
+            nvrhi::BindingSetItem::StructuredBuffer_SRV(2, scene->GetGpuResources().instanceBuffer),
+            nvrhi::BindingSetItem::StructuredBuffer_SRV(3, scene->GetGpuResources().geometryBuffer),
             //nvrhi::BindingSetItem::StructuredBuffer_SRV(4, opacityMicromapBuilder->GetGeometryDebugBuffer()),
             nvrhi::BindingSetItem::StructuredBuffer_SRV(5, materialGpuCache->GetMaterialDataBuffer()),
             nvrhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->GetGPUWriteBuffer()),

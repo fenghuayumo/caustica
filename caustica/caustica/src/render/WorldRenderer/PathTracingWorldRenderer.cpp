@@ -1,6 +1,7 @@
 namespace { constexpr int c_SwapchainCount = 3; }
 
 #include <render/WorldRenderer/PathTracingWorldRenderer.h>
+#include <render/SceneGpuResources.h>
 #include <render/WorldRenderer/PathTracingContext.h>
 #include <render/SceneGaussianSplatPasses.h>
 #include <render/SceneRayTracingResources.h>
@@ -1625,8 +1626,8 @@ void caustica::render::PathTracingWorldRenderer::recreateBindingSet()
         //nvrhi::BindingSetItem::ConstantBuffer(2, m_context.lightSampling->GetLightingConstants()),
         nvrhi::BindingSetItem::RayTracingAccelStruct(0, m_context.renderCore.accelStructs().getTopLevelAS()),
         nvrhi::BindingSetItem::StructuredBuffer_SRV(1, m_context.renderCore.accelStructs().getSubInstanceBuffer()),
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(2, m_context.sceneManager.getScene()->GetInstanceBuffer()),
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(3, m_context.sceneManager.getScene()->GetGeometryBuffer()),
+        nvrhi::BindingSetItem::StructuredBuffer_SRV(2, m_context.sceneManager.getScene()->GetGpuResources().instanceBuffer),
+        nvrhi::BindingSetItem::StructuredBuffer_SRV(3, m_context.sceneManager.getScene()->GetGpuResources().geometryBuffer),
         nvrhi::BindingSetItem::StructuredBuffer_SRV(4, m_context.opacityMaps ?(m_context.opacityMaps->GetGeometryDebugBuffer()):(m_context.materials->GetMaterialDataBuffer().Get()) ),   // YUCK
         nvrhi::BindingSetItem::StructuredBuffer_SRV(5, m_context.materials->GetMaterialDataBuffer()),
         nvrhi::BindingSetItem::Texture_SRV(6,  m_renderTargets->LdrColorScratch, nvrhi::Format::SRGBA8_UNORM),

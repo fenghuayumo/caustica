@@ -1,6 +1,6 @@
 #include <render/Passes/RTXDI/PrepareLightsPass.h>
+#include <render/SceneGpuResources.h>
 #include <render/Passes/RTXDI/RtxdiResources.h>
-#include <scene/Scene.h>
 #include <scene/Scene.h>
 
 #include <assets/loader/ShaderFactory.h>
@@ -124,8 +124,8 @@ void PrepareLightsPass::CreateBindingSet(RtxdiResources& resources, const Render
         nvrhi::BindingSetItem::Texture_UAV(2, resources.LocalLightPdfTexture),
         nvrhi::BindingSetItem::StructuredBuffer_SRV(0, resources.TaskBuffer),
         nvrhi::BindingSetItem::StructuredBuffer_SRV(1, m_subInstanceData),
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(2, m_Scene->GetInstanceBuffer()),
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(3, m_Scene->GetGeometryBuffer()),
+        nvrhi::BindingSetItem::StructuredBuffer_SRV(2, m_Scene->GetGpuResources().instanceBuffer),
+        nvrhi::BindingSetItem::StructuredBuffer_SRV(3, m_Scene->GetGpuResources().geometryBuffer),
         //nvrhi::BindingSetItem::StructuredBuffer_SRV(4, (m_opacityMicromapBuilder!=nullptr)?(m_opacityMicromapBuilder->GetGeometryDebugBuffer()):(resources.LightDataBuffer.Get())), // yuck
         nvrhi::BindingSetItem::StructuredBuffer_SRV(5, m_materialGpuCache->GetMaterialDataBuffer()),
         nvrhi::BindingSetItem::Texture_SRV(6, m_EnvironmentMap ? m_EnvironmentMap->GetEnvMapCube() : m_commonPasses->m_BlackCubeMapArray),

@@ -5,6 +5,7 @@
 #include <scene/loader/GltfImporter.h>
 #include <scene/loader/ObjImporter.h>
 #include <scene/scene_utils.h>
+#include <render/SceneGpuResources.h>
 #include <core/ThreadPool.h>
 #include <core/json.h>
 #include <core/log.h>
@@ -339,13 +340,6 @@ void Scene::AttachLightToRoot(const std::shared_ptr<Light>& light)
     m_EntityWorld->rebuildPathsFromRoot();
 }
 
-struct Scene::Resources
-{
-    std::vector<MaterialConstants> materialData;
-    std::vector<GeometryData> geometryData;
-    std::vector<InstanceData> instanceData;
-};
-
 Scene::Scene(
     nvrhi::IDevice* device,
     ShaderFactory& shaderFactory,
@@ -357,9 +351,9 @@ Scene::Scene(
     , m_SceneTypeFactory(std::move(sceneTypeFactory))
     , m_TextureLoader(std::move(textureCache))
     , m_DescriptorTable(std::move(descriptorTable))
-    , m_Device(device)
 {
-    m_Resources = std::make_shared<Resources>();
+    m_GpuResources = std::make_shared<render::SceneGpuResources>();
+    m_GpuResources->device = device;
     m_EntityWorld = std::make_unique<scene::SceneEntityWorld>();
 
     if (!m_SceneTypeFactory)
@@ -368,10 +362,10 @@ Scene::Scene(
     m_GltfImporter = std::make_shared<GltfImporter>(m_fs, m_SceneTypeFactory);
     m_ObjImporter = std::make_shared<ObjImporter>(m_SceneTypeFactory);
 
-    m_EnableBindlessResources = !!m_DescriptorTable;
-    m_RayTracingSupported = m_Device->queryFeatureSupport(nvrhi::Feature::RayTracingAccelStruct);
+    m_GpuResources->enableBindlessResources = !!m_DescriptorTable;
+    m_GpuResources->rayTracingSupported = m_GpuResources->device->queryFeatureSupport(nvrhi::Feature::RayTracingAccelStruct);
 
-    m_SkinningShader = shaderFactory.CreateAutoShader("engine/skinning_cs", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_skinning_cs), nullptr, nvrhi::ShaderType::Compute);
+    m_GpuResources->skinningShader = shaderFactory.CreateAutoShader("engine/skinning_cs", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_skinning_cs), nullptr, nvrhi::ShaderType::Compute);
 
     {
         nvrhi::BindingLayoutDesc layoutDesc;
@@ -383,14 +377,14 @@ Scene::Scene(
             nvrhi::BindingLayoutItem::RawBuffer_UAV(0)
         };
 
-        m_SkinningBindingLayout = m_Device->createBindingLayout(layoutDesc);
+        m_GpuResources->skinningBindingLayout = m_GpuResources->device->createBindingLayout(layoutDesc);
     }
 
     {
         nvrhi::ComputePipelineDesc pipelineDesc;
-        pipelineDesc.bindingLayouts = { m_SkinningBindingLayout };
-        pipelineDesc.CS = m_SkinningShader;
-        m_SkinningPipeline = m_Device->createComputePipeline(pipelineDesc);
+        pipelineDesc.bindingLayouts = { m_GpuResources->skinningBindingLayout };
+        pipelineDesc.CS = m_GpuResources->skinningShader;
+        m_GpuResources->skinningPipeline = m_GpuResources->device->createComputePipeline(pipelineDesc);
     }
 }
 
@@ -986,14 +980,14 @@ bool Scene::LoadCustomData(Json::Value& rootNode, ThreadPool* threadPool)
 
 void Scene::FinishedLoading(uint32_t frameIndex)
 {
-    nvrhi::CommandListHandle commandList = m_Device->createCommandList();
+    nvrhi::CommandListHandle commandList = m_GpuResources->device->createCommandList();
     commandList->open();
     
     CreateMeshBuffers(commandList);
     Refresh(commandList, frameIndex);
 
     commandList->close();
-    m_Device->executeCommandList(commandList);
+    m_GpuResources->device->executeCommandList(commandList);
 }
 
 void Scene::RefreshSceneWorld(uint32_t frameIndex)
@@ -1016,25 +1010,25 @@ void Scene::RefreshBuffers(nvrhi::ICommandList* commandList, uint32_t frameIndex
     const size_t allocationGranularity = 1024;
     bool arraysAllocated = false;
 
-    if (m_EnableBindlessResources && m_EntityWorld->GetGeometryCount() > m_Resources->geometryData.size())
+    if (m_GpuResources->enableBindlessResources && m_EntityWorld->GetGeometryCount() > m_GpuResources->geometryData.size())
     {
-        m_Resources->geometryData.resize(nvrhi::align<size_t>(m_EntityWorld->GetGeometryCount(), allocationGranularity));
-        m_GeometryBuffer = CreateGeometryBuffer();
+        m_GpuResources->geometryData.resize(nvrhi::align<size_t>(m_EntityWorld->GetGeometryCount(), allocationGranularity));
+        m_GpuResources->geometryBuffer = CreateGeometryBuffer();
         arraysAllocated = true;
     }
 
-    if (m_EntityWorld->GetMaterials().size() > m_Resources->materialData.size())
+    if (m_EntityWorld->GetMaterials().size() > m_GpuResources->materialData.size())
     {
-        m_Resources->materialData.resize(nvrhi::align<size_t>(m_EntityWorld->GetMaterials().size(), allocationGranularity));
-        if (m_EnableBindlessResources)
-            m_MaterialBuffer = CreateMaterialBuffer();
+        m_GpuResources->materialData.resize(nvrhi::align<size_t>(m_EntityWorld->GetMaterials().size(), allocationGranularity));
+        if (m_GpuResources->enableBindlessResources)
+            m_GpuResources->materialBuffer = CreateMaterialBuffer();
         arraysAllocated = true;
     }
 
-    if (m_EntityWorld->GetMeshInstances().size() > m_Resources->instanceData.size())
+    if (m_EntityWorld->GetMeshInstances().size() > m_GpuResources->instanceData.size())
     {
-        m_Resources->instanceData.resize(nvrhi::align<size_t>(m_EntityWorld->GetMeshInstances().size(), allocationGranularity));
-        m_InstanceBuffer = CreateInstanceBuffer();
+        m_GpuResources->instanceData.resize(nvrhi::align<size_t>(m_EntityWorld->GetMeshInstances().size(), allocationGranularity));
+        m_GpuResources->instanceBuffer = CreateInstanceBuffer();
         arraysAllocated = true;
     }
 
@@ -1052,7 +1046,7 @@ void Scene::RefreshBuffers(nvrhi::ICommandList* commandList, uint32_t frameIndex
         if (material->dirty)
         {
             commandList->writeBuffer(material->materialConstants,
-                &m_Resources->materialData[material->materialID],
+                &m_GpuResources->materialData[material->materialID],
                 sizeof(MaterialConstants));
 
             material->dirty = false;
@@ -1060,7 +1054,7 @@ void Scene::RefreshBuffers(nvrhi::ICommandList* commandList, uint32_t frameIndex
         }
     }
 
-    if (!m_Resources->geometryData.empty())
+    if (!m_GpuResources->geometryData.empty())
     {
         uint32_t geometryResourceIndex = 0;
         for (const auto& mesh : m_EntityWorld->GetMeshes())
@@ -1072,7 +1066,7 @@ void Scene::RefreshBuffers(nvrhi::ICommandList* commandList, uint32_t frameIndex
 
             for (const auto& geometry : mesh->geometries)
             {
-                if (geometry->numIndices != m_Resources->geometryData[geometryResourceIndex].numIndices)
+                if (geometry->numIndices != m_GpuResources->geometryData[geometryResourceIndex].numIndices)
                 {
                     arraysAllocated = true;
                     break;
@@ -1086,13 +1080,13 @@ void Scene::RefreshBuffers(nvrhi::ICommandList* commandList, uint32_t frameIndex
     {
         for (const auto& mesh : m_EntityWorld->GetMeshes())
         {
-            mesh->buffers->instanceBuffer = m_InstanceBuffer;
+            mesh->buffers->instanceBuffer = m_GpuResources->instanceBuffer;
 
-            if (m_EnableBindlessResources)
+            if (m_GpuResources->enableBindlessResources)
                 UpdateGeometry(mesh);
         }
 
-        if (m_EnableBindlessResources)
+        if (m_GpuResources->enableBindlessResources)
             WriteGeometryBuffer(commandList);
     }
 
@@ -1106,7 +1100,7 @@ void Scene::RefreshBuffers(nvrhi::ICommandList* commandList, uint32_t frameIndex
         WriteInstanceBuffer(commandList);
     }
 
-    if (m_EnableBindlessResources && (materialsChanged || m_SceneStructureChanged || arraysAllocated))
+    if (m_GpuResources->enableBindlessResources && (materialsChanged || m_SceneStructureChanged || arraysAllocated))
     {
         WriteMaterialBuffer(commandList);
     }
@@ -1159,7 +1153,7 @@ void Scene::UpdateSkinnedMeshes(nvrhi::ICommandList* commandList, uint32_t frame
         commandList->writeBuffer(skinnedInstance->jointBuffer, jointMatrices.data(), jointMatrices.size() * sizeof(float4x4));
 
         nvrhi::ComputeState state;
-        state.pipeline = m_SkinningPipeline;
+        state.pipeline = m_GpuResources->skinningPipeline;
         state.bindings = { skinnedInstance->skinningBindingSet };
         commandList->setComputeState(state);
 
@@ -1251,9 +1245,9 @@ void Scene::CreateMeshBuffers(nvrhi::ICommandList* commandList)
             bufferDesc.canHaveTypedViews = true;
             bufferDesc.canHaveRawViews = true;
             bufferDesc.format = nvrhi::Format::R32_UINT;
-            bufferDesc.isAccelStructBuildInput = m_RayTracingSupported;
+            bufferDesc.isAccelStructBuildInput = m_GpuResources->rayTracingSupported;
 
-            buffers->indexBuffer = m_Device->createBuffer(bufferDesc);
+            buffers->indexBuffer = m_GpuResources->device->createBuffer(bufferDesc);
 
             if (m_DescriptorTable)
             {
@@ -1282,7 +1276,7 @@ void Scene::CreateMeshBuffers(nvrhi::ICommandList* commandList)
             bufferDesc.debugName = "VertexBuffer";
             bufferDesc.canHaveTypedViews = true;
             bufferDesc.canHaveRawViews = true;
-            bufferDesc.isAccelStructBuildInput = m_RayTracingSupported;
+            bufferDesc.isAccelStructBuildInput = m_GpuResources->rayTracingSupported;
 
             nvrhi::ResourceStates state = nvrhi::ResourceStates::VertexBuffer | nvrhi::ResourceStates::ShaderResource;
             if (bufferDesc.isAccelStructBuildInput)
@@ -1345,7 +1339,7 @@ void Scene::CreateMeshBuffers(nvrhi::ICommandList* commandList)
 	            continue;
             }
 
-            buffers->vertexBuffer = m_Device->createBuffer(bufferDesc);
+            buffers->vertexBuffer = m_GpuResources->device->createBuffer(bufferDesc);
             if (m_DescriptorTable)
             {
                 buffers->vertexBufferDescriptor = std::make_shared<DescriptorHandle>(
@@ -1466,11 +1460,11 @@ void Scene::CreateMeshBuffers(nvrhi::ICommandList* commandList)
             bufferDesc.canHaveTypedViews = true;
             bufferDesc.canHaveRawViews = true;
             bufferDesc.canHaveUAVs = true;
-            bufferDesc.isAccelStructBuildInput = m_RayTracingSupported;
+            bufferDesc.isAccelStructBuildInput = m_GpuResources->rayTracingSupported;
             bufferDesc.keepInitialState = true;
             bufferDesc.initialState = nvrhi::ResourceStates::VertexBuffer;
 
-            skinnedBuffers->vertexBuffer = m_Device->createBuffer(bufferDesc);
+            skinnedBuffers->vertexBuffer = m_GpuResources->device->createBuffer(bufferDesc);
 
             if (m_DescriptorTable)
             {
@@ -1487,7 +1481,7 @@ void Scene::CreateMeshBuffers(nvrhi::ICommandList* commandList)
             jointBufferDesc.keepInitialState = true;
             jointBufferDesc.canHaveRawViews = true;
             jointBufferDesc.byteSize = sizeof(dm::float4x4) * skinnedInstance->joints.size();
-            skinnedInstance->jointBuffer = m_Device->createBuffer(jointBufferDesc);
+            skinnedInstance->jointBuffer = m_GpuResources->device->createBuffer(jointBufferDesc);
         }
 
         if (!skinnedInstance->skinningBindingSet)
@@ -1503,7 +1497,7 @@ void Scene::CreateMeshBuffers(nvrhi::ICommandList* commandList)
                 nvrhi::BindingSetItem::RawBuffer_UAV(0, skinnedBuffers->vertexBuffer)
             };
 
-            skinnedInstance->skinningBindingSet = m_Device->createBindingSet(setDesc, m_SkinningBindingLayout);
+            skinnedInstance->skinningBindingSet = m_GpuResources->device->createBindingSet(setDesc, m_GpuResources->skinningBindingLayout);
         }
     }
 }
@@ -1511,7 +1505,7 @@ void Scene::CreateMeshBuffers(nvrhi::ICommandList* commandList)
 nvrhi::BufferHandle Scene::CreateMaterialBuffer()
 {
     nvrhi::BufferDesc bufferDesc;
-    bufferDesc.byteSize = sizeof(MaterialConstants) * m_Resources->materialData.size();
+    bufferDesc.byteSize = sizeof(MaterialConstants) * m_GpuResources->materialData.size();
     bufferDesc.debugName = "BindlessMaterials";
     bufferDesc.structStride = sizeof(MaterialConstants);
     bufferDesc.canHaveRawViews = true;
@@ -1519,13 +1513,13 @@ nvrhi::BufferHandle Scene::CreateMaterialBuffer()
     bufferDesc.initialState = nvrhi::ResourceStates::ShaderResource;
     bufferDesc.keepInitialState = true;
 
-    return m_Device->createBuffer(bufferDesc);
+    return m_GpuResources->device->createBuffer(bufferDesc);
 }
 
 nvrhi::BufferHandle Scene::CreateGeometryBuffer()
 {
     nvrhi::BufferDesc bufferDesc;
-    bufferDesc.byteSize = sizeof(GeometryData) * m_Resources->geometryData.size();
+    bufferDesc.byteSize = sizeof(GeometryData) * m_GpuResources->geometryData.size();
     bufferDesc.debugName = "BindlessGeometry";
     bufferDesc.structStride = sizeof(GeometryData);
     bufferDesc.canHaveRawViews = true;
@@ -1533,17 +1527,17 @@ nvrhi::BufferHandle Scene::CreateGeometryBuffer()
     bufferDesc.initialState = nvrhi::ResourceStates::ShaderResource;
     bufferDesc.keepInitialState = true;
 
-    return m_Device->createBuffer(bufferDesc);
+    return m_GpuResources->device->createBuffer(bufferDesc);
 }
 
 nvrhi::BufferHandle Scene::CreateInstanceBuffer()
 {
     // On DX11, a buffer cannot be both structured and vertex.
     // On other APIs, a structured instance buffer can be used for rasterization.
-    bool const needStructuredBuffer = m_Device->getGraphicsAPI() != nvrhi::GraphicsAPI::D3D11;
+    bool const needStructuredBuffer = m_GpuResources->device->getGraphicsAPI() != nvrhi::GraphicsAPI::D3D11;
 
     nvrhi::BufferDesc bufferDesc;
-    bufferDesc.byteSize = sizeof(InstanceData) * m_Resources->instanceData.size();
+    bufferDesc.byteSize = sizeof(InstanceData) * m_GpuResources->instanceData.size();
     bufferDesc.debugName = "Instances";
     bufferDesc.structStride = needStructuredBuffer ? sizeof(InstanceData) : 0;
     bufferDesc.canHaveRawViews = true;
@@ -1552,7 +1546,7 @@ nvrhi::BufferHandle Scene::CreateInstanceBuffer()
     bufferDesc.initialState = nvrhi::ResourceStates::ShaderResource;
     bufferDesc.keepInitialState = true;
 
-    return m_Device->createBuffer(bufferDesc);
+    return m_GpuResources->device->createBuffer(bufferDesc);
 }
 
 nvrhi::BufferHandle Scene::CreateMaterialConstantBuffer(const std::string& debugName)
@@ -1564,30 +1558,30 @@ nvrhi::BufferHandle Scene::CreateMaterialConstantBuffer(const std::string& debug
     bufferDesc.initialState = nvrhi::ResourceStates::ConstantBuffer;
     bufferDesc.keepInitialState = true;
 
-    return m_Device->createBuffer(bufferDesc);
+    return m_GpuResources->device->createBuffer(bufferDesc);
 }
 
 void Scene::WriteMaterialBuffer(nvrhi::ICommandList* commandList) const
 {
-    commandList->writeBuffer(m_MaterialBuffer, m_Resources->materialData.data(),
-        m_Resources->materialData.size() * sizeof(MaterialConstants));
+    commandList->writeBuffer(m_GpuResources->materialBuffer, m_GpuResources->materialData.data(),
+        m_GpuResources->materialData.size() * sizeof(MaterialConstants));
 }
 
 void Scene::WriteGeometryBuffer(nvrhi::ICommandList* commandList) const
 {
-    commandList->writeBuffer(m_GeometryBuffer, m_Resources->geometryData.data(),
-        m_Resources->geometryData.size() * sizeof(GeometryData));
+    commandList->writeBuffer(m_GpuResources->geometryBuffer, m_GpuResources->geometryData.data(),
+        m_GpuResources->geometryData.size() * sizeof(GeometryData));
 }
 
 void Scene::WriteInstanceBuffer(nvrhi::ICommandList* commandList) const
 {
-    commandList->writeBuffer(m_InstanceBuffer, m_Resources->instanceData.data(), 
-        m_Resources->instanceData.size() * sizeof(InstanceData));
+    commandList->writeBuffer(m_GpuResources->instanceBuffer, m_GpuResources->instanceData.data(), 
+        m_GpuResources->instanceData.size() * sizeof(InstanceData));
 }
 
 void Scene::UpdateMaterial(const std::shared_ptr<Material>& material)
 {
-    material->FillConstantBuffer(m_Resources->materialData[material->materialID], m_UseResourceDescriptorHeapBindless);
+    material->FillConstantBuffer(m_GpuResources->materialData[material->materialID], m_GpuResources->useResourceDescriptorHeapBindless);
 }
 
 void Scene::UpdateGeometry(const std::shared_ptr<MeshInfo>& mesh)
@@ -1598,7 +1592,7 @@ void Scene::UpdateGeometry(const std::shared_ptr<MeshInfo>& mesh)
         uint32_t indexOffset = mesh->indexOffset + geometry->indexOffsetInMesh;
         uint32_t vertexOffset = mesh->vertexOffset + geometry->vertexOffsetInMesh;
 
-        GeometryData& gdata = m_Resources->geometryData[geometry->globalGeometryIndex];
+        GeometryData& gdata = m_GpuResources->geometryData[geometry->globalGeometryIndex];
         gdata.numIndices = geometry->numIndices;
         gdata.numVertices = geometry->numVertices;
         gdata.indexBufferIndex = mesh->buffers->indexBufferDescriptor ? mesh->buffers->indexBufferDescriptor->Get() : -1;
@@ -1624,10 +1618,10 @@ void Scene::UpdateGeometry(const std::shared_ptr<MeshInfo>& mesh)
 
 GeometryData* Scene::GetGeometryData(const MeshGeometry& geometry) const
 {
-    if (m_Resources == nullptr || uint(geometry.globalGeometryIndex) >= m_Resources->geometryData.size() )
+    if (m_GpuResources == nullptr || uint(geometry.globalGeometryIndex) >= m_GpuResources->geometryData.size() )
         return nullptr;
 
-    return &m_Resources->geometryData[geometry.globalGeometryIndex];
+    return &m_GpuResources->geometryData[geometry.globalGeometryIndex];
 }
 
 
@@ -1640,7 +1634,7 @@ void Scene::UpdateInstance(const std::shared_ptr<MeshInstance>& instance)
     if (!global)
         return;
 
-    InstanceData& idata = m_Resources->instanceData[instance->GetInstanceIndex()];
+    InstanceData& idata = m_GpuResources->instanceData[instance->GetInstanceIndex()];
     affineToColumnMajor(global->transformFloat, idata.transform);
     affineToColumnMajor(global->previousTransformFloat, idata.prevTransform);
 

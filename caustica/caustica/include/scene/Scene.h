@@ -31,6 +31,11 @@ namespace caustica
     class ThreadPool;
     class GltfImporter;
     class ObjImporter;
+
+    namespace render
+    {
+        struct SceneGpuResources;
+    }
     
     class Scene
     {
@@ -43,26 +48,13 @@ namespace caustica
         std::shared_ptr<GltfImporter> m_GltfImporter;
         std::shared_ptr<ObjImporter> m_ObjImporter;
         std::vector<SceneImportResult> m_Models;
-        bool m_EnableBindlessResources = false;
-        bool m_UseResourceDescriptorHeapBindless = false;
-        
-        nvrhi::BufferHandle m_MaterialBuffer;
-        nvrhi::BufferHandle m_GeometryBuffer;
-        nvrhi::BufferHandle m_InstanceBuffer;
 
-        nvrhi::DeviceHandle m_Device;
-        nvrhi::ShaderHandle m_SkinningShader;
-        nvrhi::ComputePipelineHandle m_SkinningPipeline;
-        nvrhi::BindingLayoutHandle m_SkinningBindingLayout;
-
-        bool m_RayTracingSupported = false;
         bool m_SceneTransformsChanged = false;
         bool m_SceneStructureChanged = false;
 
         std::filesystem::path m_textureSearchDirectory;
 
-        struct Resources;
-        std::shared_ptr<Resources> m_Resources;
+        std::shared_ptr<render::SceneGpuResources> m_GpuResources;
 
         void LoadModelAsync(
             uint32_t index,
@@ -154,9 +146,8 @@ namespace caustica
 
         void AttachLightToRoot(const std::shared_ptr<Light>& light);
         [[nodiscard]] nvrhi::IDescriptorTable* GetDescriptorTable() const { return m_DescriptorTable ? m_DescriptorTable->GetDescriptorTable() : nullptr; }
-        [[nodiscard]] nvrhi::IBuffer* GetMaterialBuffer() const { return m_MaterialBuffer; }
-        [[nodiscard]] nvrhi::IBuffer* GetGeometryBuffer() const { return m_GeometryBuffer; }
-        [[nodiscard]] nvrhi::IBuffer* GetInstanceBuffer() const { return m_InstanceBuffer; }
+        [[nodiscard]] render::SceneGpuResources& GetGpuResources() { return *m_GpuResources; }
+        [[nodiscard]] const render::SceneGpuResources& GetGpuResources() const { return *m_GpuResources; }
 
         GeometryData* GetGeometryData(const MeshGeometry& geometry) const;
 
