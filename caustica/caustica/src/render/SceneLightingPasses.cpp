@@ -11,7 +11,7 @@
 
 #include <math/math.h>
 
-namespace caustica::editor
+namespace caustica::render
 {
 
 void SceneLightingPasses::refreshEnvironmentMapMediaList(const std::filesystem::path& assetsFolder,
@@ -129,4 +129,4 @@ void SceneLightingPasses::forEachUsedMaterialTexture(
         visitor(textureIT.second.Loaded, textureIT.second.NormalMap);
 }
 
-} // namespace caustica::editor
+} // namespace caustica::render

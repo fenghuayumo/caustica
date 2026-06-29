@@ -19,11 +19,11 @@
 #include <core/path_utils.h>
 #include <platform/cmdline_utils.h>
 #include <core/log.h>
-#include <render/Core/RenderSceneTypeFactory.h>
 #if CAUSTICA_WITH_NATIVE_DLSS
 #include <render/Passes/Geometry/DLSS.h>
 #endif
 #include "SceneEditor.h"
+#include "PathTracerSessionBootstrap.h"
 #include <render/WorldRenderer/PathTracingWorldRenderer.h>
 
 #include <GLFW/glfw3.h>
@@ -168,7 +168,7 @@ namespace
 
 EditorApplication::EditorApplication()
     : Application()
-    , m_sceneEditor(CmdLine, sampleUIData)
+    , m_sceneEditor(CmdLine, sampleUIData, m_sessionDiagnostics)
 {
     RegisterLogCallback();
     korgi::Init();
@@ -222,46 +222,20 @@ EditorApplication::StartupResult EditorApplication::startup(int argc, const char
     m_sceneEditor.AttachLightingPasses(m_lightingPasses);
     m_sceneEditor.AttachRayTracingResources(m_rayTracingResources);
     m_sceneEditor.AttachGaussianSplatPasses(m_gaussianSplatPasses);
-    m_lightingPasses.refreshEnvironmentMapMediaList(GetLocalPath(c_AssetsFolder), std::filesystem::path());
 
-    m_engineRenderer = std::make_unique<caustica::EngineRenderer>();
-    m_engineRenderer->initialize(*m_GpuDevice,
-        std::make_shared<caustica::render::RenderSceneTypeFactory>(),
-        caustica::EngineSceneCallbacks{
-            .OnSceneLoaded = [this]() { m_sceneEditor.SceneLoaded(); },
-            .OnSceneUnloading = [this]() { m_sceneEditor.SceneUnloading(); },
-        });
-
-    m_sceneEditor.AttachRenderResources(
-        m_engineRenderer->shaderFactory(),
-        m_engineRenderer->commonPasses(),
-        m_engineRenderer->bindingCache(),
-        m_engineRenderer->descriptorTable(),
-        m_engineRenderer->textureLoader());
-    m_sceneEditor.AttachSceneServices(
-        *m_engineRenderer->sceneManager(),
-        *m_engineRenderer->renderCore());
-
-    m_engineRenderer->createPathTracer(caustica::PathTracerSessionParams{
+    m_engineRenderer = bootstrapPathTracerSession(PathTracerSessionBootstrapParams{
         .gpuDevice = *m_GpuDevice,
-        .settings = m_sceneEditor.GetPathTracerSettings(),
-        .runtimeState = m_sceneEditor.GetRenderRuntimeState(),
+        .sceneEditor = m_sceneEditor,
+        .lighting = m_lightingPasses,
         .rayTracing = m_rayTracingResources,
         .gaussianSplats = m_gaussianSplatPasses,
-        .lighting = m_lightingPasses,
-        .sceneTime = m_sceneEditor.GetSceneTimeRef(),
-        .gaussianSplatEmissionProxies = m_gaussianSplatPasses.emissionProxies(),
-        .progressInitializingRenderer = m_sceneEditor.GetProgressInitializingRenderer(),
-        .asyncLoadingInProgress = m_sceneEditor.GetAsyncLoadingInProgressRef(),
-        .benchStart = m_sceneEditor.GetBenchStart(),
-        .benchLast = m_sceneEditor.GetBenchLast(),
-        .benchFrames = m_sceneEditor.GetBenchFrames(),
+        .diagnostics = m_sessionDiagnostics,
         .frameExtensions = m_frameExtensions,
+        .preferredScene = preferredScene,
+        .onAfterAttachPasses = [this]() {
+            m_lightingPasses.refreshEnvironmentMapMediaList(GetLocalPath(c_AssetsFolder), std::filesystem::path());
+        },
     });
-    m_sceneEditor.AttachWorldRenderer(m_engineRenderer->worldRenderer());
-    assert(m_rayTracingResources.isAttached() && m_gaussianSplatPasses.isAttached());
-
-    m_sceneEditor.Init(preferredScene, m_engineRenderer->shaderFactory());
     syncPassesToBackBuffer();
 
 #if CAUSTICA_WITH_DX12 && (CAUSTICA_D3D_AGILITY_SDK_VERSION >= 619)   // temporary

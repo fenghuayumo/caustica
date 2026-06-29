@@ -19,8 +19,8 @@ namespace caustica::render
 {
 
 // Fixed pipeline phases where optional host-side extensions may run.
-// New editor features should hook an existing phase or add a new phase here —
-// the engine never references editor types (ZoomTool, capture scripts, etc.).
+// New host features should hook an existing phase or add a new phase here —
+// the engine never references editor application types (ZoomTool, capture scripts, etc.).
 enum class PathTracingFramePhase
 {
     PreRender,

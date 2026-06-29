@@ -13,6 +13,7 @@
 #include <scene/camera/Camera.h>
 
 #include <render/RenderRuntimeState.h>
+#include <render/SessionDiagnostics.h>
 #include "ui/SampleUIData.h"
 
 #include <chrono>
@@ -49,39 +50,35 @@ class RootFileSystem;
 namespace caustica::render
 {
 class PathTracingWorldRenderer;
-struct GaussianSplatBinding;
+class SceneGaussianSplatPasses;
+class SceneLightingPasses;
+class SceneRayTracingResources;
+class SessionDiagnostics;
 } // namespace caustica::render
 
 class RenderTargets;
 class ZoomTool;
 struct DebugFeedbackStruct;
 struct DeltaTreeVizPathVertex;
-struct GaussianSplatRenderSettings;
-struct SampleConstants;
 
 #if CAUSTICA_WITH_PYTHON
 class PythonScripting;
 #endif
 
 class GameScene;
-class PTPipelineBaker;
-class PTPipelineVariant;
 
 namespace caustica::editor
 {
 
 class CaptureScriptManager;
-class SceneGaussianSplatPasses;
-class SceneLightingPasses;
-class SceneRayTracingResources;
 
 using namespace caustica::math;
 
-// Scene editor shell (mesh edit, Inspector, Capture). GPU path tracing is owned by EditorApplication.
+// Scene editor shell (mesh edit, Inspector, Capture). Path tracer is owned by EngineRenderer.
 class SceneEditor
 {
 public:
-    SceneEditor(const CommandLineOptions& cmdLine, SampleUIData& ui);
+    SceneEditor(const CommandLineOptions& cmdLine, SampleUIData& ui, caustica::render::SessionDiagnostics& diagnostics);
     ~SceneEditor();
 
     void setGpuDevice(caustica::GpuDevice& dm) { m_gpuDevice = &dm; }
@@ -117,9 +114,6 @@ public:
     caustica::render::RenderRuntimeState& GetRenderRuntimeState() { return m_renderState; }
     const caustica::render::RenderRuntimeState& GetRenderRuntimeState() const { return m_renderState; }
 
-    void                                    UpdateSubInstanceContents();
-    void                                    UploadSubInstanceData(nvrhi::ICommandList* commandList);
-    
     std::shared_ptr<caustica::Material> FindMaterial( int materialID ) const;
     std::shared_ptr<caustica::SceneGraphNode> FindNodeByInstanceIndex(int instanceIndex) const;
 
@@ -166,15 +160,15 @@ public:
         const std::shared_ptr<caustica::DescriptorTableManager>& descriptorTable,
         const std::shared_ptr<caustica::TextureLoader>& textureCache);
     void AttachSceneServices(SceneManager& sceneManager, caustica::RenderCore& renderCore);
-    void AttachLightingPasses(SceneLightingPasses& lightingPasses);
-    SceneLightingPasses& GetLightingPasses();
-    const SceneLightingPasses& GetLightingPasses() const;
-    void AttachRayTracingResources(SceneRayTracingResources& rayTracingResources);
-    SceneRayTracingResources& GetRayTracingResources();
-    const SceneRayTracingResources& GetRayTracingResources() const;
-    void AttachGaussianSplatPasses(SceneGaussianSplatPasses& gaussianSplatPasses);
-    SceneGaussianSplatPasses& GetGaussianSplatPasses();
-    const SceneGaussianSplatPasses& GetGaussianSplatPasses() const;
+    void AttachLightingPasses(caustica::render::SceneLightingPasses& lightingPasses);
+    caustica::render::SceneLightingPasses& GetLightingPasses();
+    const caustica::render::SceneLightingPasses& GetLightingPasses() const;
+    void AttachRayTracingResources(caustica::render::SceneRayTracingResources& rayTracingResources);
+    caustica::render::SceneRayTracingResources& GetRayTracingResources();
+    const caustica::render::SceneRayTracingResources& GetRayTracingResources() const;
+    void AttachGaussianSplatPasses(caustica::render::SceneGaussianSplatPasses& gaussianSplatPasses);
+    caustica::render::SceneGaussianSplatPasses& GetGaussianSplatPasses();
+    const caustica::render::SceneGaussianSplatPasses& GetGaussianSplatPasses() const;
     void Init(const std::string& preferredScene,
         const std::shared_ptr<caustica::ShaderFactory>& shaderFactory);
 
@@ -199,14 +193,6 @@ public:
     virtual bool                            ShouldRenderUnfocused() const;
     virtual void                            Animate(float fElapsedTimeSeconds);
 
-    void                                    FillPTPipelineGlobalMacros(std::vector<caustica::ShaderMacro> & macros);
-    bool                                    CreatePTPipeline(caustica::ShaderFactory& shaderFactory);
-    void                                    DestroyOpacityMicromaps(nvrhi::ICommandList* commandList);
-    void                                    CreateOpacityMicromaps();
-    void                                    CreateBlases(nvrhi::ICommandList* commandList);
-    void                                    CreateTlas(nvrhi::ICommandList* commandList);
-    void                                    CreateAccelStructs(nvrhi::ICommandList* commandList);
-    void                                    RecreateAccelStructs(nvrhi::ICommandList* commandList);
     void                                    RequestMeshAccelRebuild(const std::shared_ptr<caustica::MeshInfo>& mesh);
 
     bool                                    ShowDeltaTree() const;
@@ -216,19 +202,9 @@ public:
     void                                    CaptureScriptPostRender(std::function<bool(const char* fileName)> saveTexture);
     ::ZoomTool*                             GetOrCreateZoomTool();
 
-    // --- Pipeline variant accessors ---
-    std::shared_ptr<::PTPipelineVariant>& PtPipelineReference();
-    std::shared_ptr<::PTPipelineVariant>& PtPipelineBuildStablePlanes();
-    std::shared_ptr<::PTPipelineVariant>& PtPipelineFillStablePlanes();
-    std::shared_ptr<::PTPipelineVariant>& PtPipelineTestRaygenPPHDR();
-    std::shared_ptr<::PTPipelineVariant>& PtPipelineEdgeDetection();
-
     // Render entry points
     void Render(nvrhi::IFramebuffer* framebuffer);
     void BackBufferResizing();
-    void PathTrace(nvrhi::IFramebuffer* framebuffer, const SampleConstants& constants);
-    void Denoise(nvrhi::IFramebuffer* framebuffer);
-    void PostProcessAA(nvrhi::IFramebuffer* framebuffer, bool reset);
 
     void OnRenderTargetsRecreated() { }
     void AddCustomBindings(nvrhi::BindingSetDesc& bindingSetDesc) { }
@@ -252,11 +228,6 @@ public:
     const std::vector<std::filesystem::path> & GetEnvMapMediaList();
 
     double&                                 GetSceneTimeRef() { return m_sceneTime; }
-    ProgressBar&                            GetProgressInitializingRenderer() { return m_progressInitializingRenderer; }
-    bool&                                   GetAsyncLoadingInProgressRef() { return m_asyncLoadingInProgress; }
-    std::chrono::high_resolution_clock::time_point& GetBenchStart() { return m_benchStart; }
-    std::chrono::high_resolution_clock::time_point& GetBenchLast() { return m_benchLast; }
-    int&                                    GetBenchFrames() { return m_benchFrames; }
     const std::unique_ptr<::ZoomTool> & GetZoomTool() const { return m_zoomTool; }
     caustica::BindingCache &           GetBindingCache();
 
@@ -277,18 +248,20 @@ public:
     const std::unique_ptr<PythonScripting> & GetPythonScripting() const { return m_pythonScripting; }
 #endif
 
-    bool                                    HasAsyncLoadingInProgress() const   { return m_asyncLoadingInProgress || m_renderState.Invalidation.ShaderAndACRefreshDelayedRequest > 0; }
+    bool                                    HasAsyncLoadingInProgress() const
+    {
+        return m_sessionDiagnostics.asyncLoadingInProgress
+            || m_renderState.Invalidation.ShaderAndACRefreshDelayedRequest > 0;
+    }
 
     bool                                    AccumulationCompleted() const;
 
 protected:
-    void InvalidateBindingSet();
-    void RecreateBindingSet();
-
     PathTracerSettings& m_settings;
     caustica::render::RenderRuntimeState& m_renderState;
     EditorUIState& m_editor;
     SampleUIData& m_ui;
+    caustica::render::SessionDiagnostics& m_sessionDiagnostics;
 
     std::unique_ptr<CaptureScriptManager>       m_captureScriptManager;
 #if CAUSTICA_WITH_PYTHON
@@ -298,7 +271,6 @@ protected:
     caustica::render::PathTracingWorldRenderer* m_worldRenderer = nullptr;
 
     const caustica::PlanarView& GetView() const;
-    std::shared_ptr<::PTPipelineBaker>  GetRTPipelineBaker() const;
 
 private:
     void                                    UpdateCameraFromScene( const std::shared_ptr<caustica::PerspectiveCamera> & sceneCamera );
@@ -327,13 +299,9 @@ private:
     caustica::BindingCache* m_bindingCache = nullptr;
     std::shared_ptr<caustica::DescriptorTableManager> m_DescriptorTable;
 
-    SceneLightingPasses*                        m_lightingPasses = nullptr;
-    SceneRayTracingResources*                   m_rayTracingResources = nullptr;
-    SceneGaussianSplatPasses*                   m_gaussianSplatPasses = nullptr;
-
-    std::chrono::high_resolution_clock::time_point m_benchStart = std::chrono::high_resolution_clock::now();
-    std::chrono::high_resolution_clock::time_point m_benchLast = std::chrono::high_resolution_clock::now();
-    int                                         m_benchFrames = 0;
+    caustica::render::SceneLightingPasses*        m_lightingPasses = nullptr;
+    caustica::render::SceneRayTracingResources*   m_rayTracingResources = nullptr;
+    caustica::render::SceneGaussianSplatPasses*   m_gaussianSplatPasses = nullptr;
 
     std::map<std::shared_ptr<caustica::LoadedTexture>, TextureCompressionType> m_uncompressedTextures;
 
@@ -343,11 +311,8 @@ private:
     std::unique_ptr<::GameScene>            m_sampleGame;
 
     ProgressBar                                 m_progressLoading;
-    ProgressBar                                 m_progressInitializingRenderer;
 
     std::unique_ptr<::ZoomTool>             m_zoomTool;
-
-    bool                                        m_asyncLoadingInProgress = false;
 
     const CommandLineOptions&                   m_cmdLine;
 

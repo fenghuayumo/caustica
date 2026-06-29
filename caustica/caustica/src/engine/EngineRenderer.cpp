@@ -79,7 +79,6 @@ void EngineRenderer::createPathTracer(const PathTracerSessionParams& session)
         .runtimeState = session.runtimeState,
         .rayTracing = session.rayTracing,
         .gaussianSplats = session.gaussianSplats,
-        .lighting = session.lighting,
         .shaderFactory = m_shaderFactory,
         .commonPasses = m_commonPasses,
         .bindingCache = *m_bindingCache,
@@ -96,11 +95,7 @@ void EngineRenderer::createPathTracer(const PathTracerSessionParams& session)
         .envMapOverride = lighting.envMapOverride(),
         .sceneTime = session.sceneTime,
         .gaussianSplatEmissionProxies = session.gaussianSplatEmissionProxies,
-        .progressInitializingRenderer = session.progressInitializingRenderer,
-        .asyncLoadingInProgress = session.asyncLoadingInProgress,
-        .benchStart = session.benchStart,
-        .benchLast = session.benchLast,
-        .benchFrames = session.benchFrames,
+        .diagnostics = session.diagnostics,
         .frameExtensions = session.frameExtensions,
     });
 

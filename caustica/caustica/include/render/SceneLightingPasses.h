@@ -26,7 +26,7 @@ class Scene;
 class ShaderFactory;
 } // namespace caustica
 
-namespace caustica::editor
+namespace caustica::render
 {
 
 // Scene lighting state: baker owners, light list, and environment map selection.
@@ -93,4 +93,4 @@ private:
     std::vector<std::shared_ptr<caustica::Light>> m_lights;
 };
 
-} // namespace caustica::editor
+} // namespace caustica::render

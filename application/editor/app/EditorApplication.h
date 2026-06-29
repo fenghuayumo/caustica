@@ -13,6 +13,7 @@
 #include <render/SceneGaussianSplatPasses.h>
 #include <render/SceneLightingPasses.h>
 #include <render/SceneRayTracingResources.h>
+#include <render/SessionDiagnostics.h>
 #include "SceneEditorFrameExtension.h"
 #include <render/WorldRenderer/PathTracingFrameExtension.h>
 
@@ -39,7 +40,6 @@ namespace caustica {
     struct DeviceCreationParameters;
     namespace render {
         class PathTracingWorldRenderer;
-        struct PathTracingContext;
     }
 }
 
@@ -70,17 +70,12 @@ public:
 
     SceneEditor& GetSceneEditor() { return m_sceneEditor; }
     const SceneEditor& GetSceneEditor() const { return m_sceneEditor; }
-    SceneLightingPasses& GetLightingPasses() { return m_lightingPasses; }
-    const SceneLightingPasses& GetLightingPasses() const { return m_lightingPasses; }
-    SceneRayTracingResources& GetRayTracingResources() { return m_rayTracingResources; }
-    const SceneRayTracingResources& GetRayTracingResources() const { return m_rayTracingResources; }
-    SceneGaussianSplatPasses& GetGaussianSplatPasses() { return m_gaussianSplatPasses; }
-    const SceneGaussianSplatPasses& GetGaussianSplatPasses() const { return m_gaussianSplatPasses; }
-
-    SceneEditor* GetScenePass() { return &m_sceneEditor; }
-    const SceneEditor* GetScenePass() const { return &m_sceneEditor; }
-    SceneEditor* GetAdvancedPathTracer() { return &m_sceneEditor; }
-    const SceneEditor* GetAdvancedPathTracer() const { return &m_sceneEditor; }
+    caustica::render::SceneLightingPasses& GetLightingPasses() { return m_lightingPasses; }
+    const caustica::render::SceneLightingPasses& GetLightingPasses() const { return m_lightingPasses; }
+    caustica::render::SceneRayTracingResources& GetRayTracingResources() { return m_rayTracingResources; }
+    const caustica::render::SceneRayTracingResources& GetRayTracingResources() const { return m_rayTracingResources; }
+    caustica::render::SceneGaussianSplatPasses& GetGaussianSplatPasses() { return m_gaussianSplatPasses; }
+    const caustica::render::SceneGaussianSplatPasses& GetGaussianSplatPasses() const { return m_gaussianSplatPasses; }
 
     SceneManager* GetSceneManager();
     const SceneManager* GetSceneManager() const;
@@ -115,9 +110,10 @@ private:
 
     CommandLineOptions CmdLine;
     SampleUIData sampleUIData;
-    SceneLightingPasses m_lightingPasses;
-    SceneRayTracingResources m_rayTracingResources;
-    SceneGaussianSplatPasses m_gaussianSplatPasses;
+    caustica::render::SessionDiagnostics m_sessionDiagnostics;
+    caustica::render::SceneLightingPasses m_lightingPasses;
+    caustica::render::SceneRayTracingResources m_rayTracingResources;
+    caustica::render::SceneGaussianSplatPasses m_gaussianSplatPasses;
     SceneEditor m_sceneEditor;
     SceneEditorFrameExtension m_sceneEditorFrameExtension{ m_sceneEditor };
     std::vector<caustica::render::IPathTracingFrameExtension*> m_frameExtensions{ &m_sceneEditorFrameExtension };

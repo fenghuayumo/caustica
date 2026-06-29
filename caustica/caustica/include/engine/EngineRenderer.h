@@ -1,6 +1,5 @@
 #pragma once
 
-#include <chrono>
 #include <functional>
 #include <memory>
 #include <span>
@@ -8,6 +7,7 @@
 
 #include <rhi/nvrhi.h>
 #include <render/Core/PathTracerSettings.h>
+#include <render/SessionDiagnostics.h>
 #include <render/WorldRenderer/PathTracingContext.h>
 #include <render/WorldRenderer/PathTracingFrameExtension.h>
 
@@ -21,22 +21,17 @@ class BindlessTable;
 class CommonRenderPasses;
 class DescriptorTableManager;
 class GpuDevice;
-class ProgressBar;
 class RenderCore;
 class SceneTypeFactory;
 class ShaderFactory;
 class TextureLoader;
 
-namespace editor
-{
-class SceneGaussianSplatPasses;
-class SceneLightingPasses;
-class SceneRayTracingResources;
-} // namespace editor
-
 namespace render
 {
 class PathTracingWorldRenderer;
+class SceneGaussianSplatPasses;
+class SceneLightingPasses;
+class SceneRayTracingResources;
 } // namespace render
 
 struct EngineSceneCallbacks
@@ -45,26 +40,21 @@ struct EngineSceneCallbacks
     std::function<void()> OnSceneUnloading;
 };
 
-// Per-session inputs for creating the path tracer; app layer only passes scene/editor state.
+// Per-session inputs for creating the path tracer.
 struct PathTracerSessionParams
 {
     GpuDevice& gpuDevice;
     PathTracerSettings& settings;
     render::RenderRuntimeState& runtimeState;
 
-    editor::SceneRayTracingResources& rayTracing;
-    editor::SceneGaussianSplatPasses& gaussianSplats;
-    editor::SceneLightingPasses& lighting;
+    render::SceneRayTracingResources& rayTracing;
+    render::SceneGaussianSplatPasses& gaussianSplats;
+    render::SceneLightingPasses& lighting;
 
     double& sceneTime;
     std::vector<GaussianSplatEmissionProxy>& gaussianSplatEmissionProxies;
 
-    ProgressBar& progressInitializingRenderer;
-    bool& asyncLoadingInProgress;
-
-    std::chrono::high_resolution_clock::time_point& benchStart;
-    std::chrono::high_resolution_clock::time_point& benchLast;
-    int& benchFrames;
+    render::SessionDiagnostics& diagnostics;
 
     std::span<render::IPathTracingFrameExtension* const> frameExtensions = {};
 };

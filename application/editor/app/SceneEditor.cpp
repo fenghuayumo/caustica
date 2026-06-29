@@ -5,15 +5,12 @@
 #include <render/SceneRayTracingResources.h>
 
 #include <render/WorldRenderer/PathTracingWorldRenderer.h>
-#include <render/WorldRenderer/PathTracingContext.h>
 #include <shaders/PathTracer/PathTracerDebug.hlsli>
-#include <shaders/SampleConstantBuffer.h>
 #include "render/Core/RenderTargets.h"
 #include <render/Passes/Gaussian/GaussianSplatEmissionProxy.h>
 #include <events/key_event.h>
 #include <events/mouse_event.h>
 
-#include <render/Core/PostProcessAA.h>
 #include <assets/AssetSystem.h>
 #include <scene/loader/RuntimeMeshLoader.h>
 #include <render/Core/SceneMeshEditing.h>
@@ -49,7 +46,7 @@
 #include <sstream>
 #include <stdexcept>
 
-#include <render/Core/PTPipelineBaker.h>
+
 #include <render/Core/ComputePipelineBaker.h>
 
 #include "render/Core/AccelerationStructureUtil.h"
@@ -201,12 +198,14 @@ namespace caustica::editor
 {
 
 SceneEditor::SceneEditor(const CommandLineOptions& cmdLine,
-    SampleUIData& ui)
+    SampleUIData& ui,
+    caustica::render::SessionDiagnostics& diagnostics)
     : m_cmdLine(cmdLine)
     , m_settings(ui)
     , m_renderState(ui)
     , m_editor(ui)
     , m_ui(ui)
+    , m_sessionDiagnostics(diagnostics)
 {
     m_progressLoading.Start("Initializing...");
     m_progressLoading.Set(50);
@@ -281,18 +280,18 @@ void SceneEditor::AttachSceneServices(SceneManager& sceneManager, caustica::Rend
     m_renderCore = &renderCore;
 }
 
-void SceneEditor::AttachLightingPasses(SceneLightingPasses& lightingPasses)
+void SceneEditor::AttachLightingPasses(caustica::render::SceneLightingPasses& lightingPasses)
 {
     m_lightingPasses = &lightingPasses;
 }
 
-SceneLightingPasses& SceneEditor::GetLightingPasses()
+caustica::render::SceneLightingPasses& SceneEditor::GetLightingPasses()
 {
     assert(m_lightingPasses != nullptr);
     return *m_lightingPasses;
 }
 
-const SceneLightingPasses& SceneEditor::GetLightingPasses() const
+const caustica::render::SceneLightingPasses& SceneEditor::GetLightingPasses() const
 {
     assert(m_lightingPasses != nullptr);
     return *m_lightingPasses;
@@ -306,35 +305,35 @@ std::shared_ptr<caustica::CommonRenderPasses> SceneEditor::GetCommonPasses() con
 std::shared_ptr<caustica::DescriptorTableManager> SceneEditor::GetDescriptorTable() const { return m_DescriptorTable; }
 caustica::BindingCache& SceneEditor::GetBindingCache() { return *m_bindingCache; }
 
-void SceneEditor::AttachRayTracingResources(SceneRayTracingResources& rayTracingResources)
+void SceneEditor::AttachRayTracingResources(caustica::render::SceneRayTracingResources& rayTracingResources)
 {
     m_rayTracingResources = &rayTracingResources;
 }
 
-SceneRayTracingResources& SceneEditor::GetRayTracingResources()
+caustica::render::SceneRayTracingResources& SceneEditor::GetRayTracingResources()
 {
     assert(m_rayTracingResources != nullptr && m_rayTracingResources->isAttached());
     return *m_rayTracingResources;
 }
 
-const SceneRayTracingResources& SceneEditor::GetRayTracingResources() const
+const caustica::render::SceneRayTracingResources& SceneEditor::GetRayTracingResources() const
 {
     assert(m_rayTracingResources != nullptr && m_rayTracingResources->isAttached());
     return *m_rayTracingResources;
 }
 
-void SceneEditor::AttachGaussianSplatPasses(SceneGaussianSplatPasses& gaussianSplatPasses)
+void SceneEditor::AttachGaussianSplatPasses(caustica::render::SceneGaussianSplatPasses& gaussianSplatPasses)
 {
     m_gaussianSplatPasses = &gaussianSplatPasses;
 }
 
-SceneGaussianSplatPasses& SceneEditor::GetGaussianSplatPasses()
+caustica::render::SceneGaussianSplatPasses& SceneEditor::GetGaussianSplatPasses()
 {
     assert(m_gaussianSplatPasses != nullptr && m_gaussianSplatPasses->isAttached());
     return *m_gaussianSplatPasses;
 }
 
-const SceneGaussianSplatPasses& SceneEditor::GetGaussianSplatPasses() const
+const caustica::render::SceneGaussianSplatPasses& SceneEditor::GetGaussianSplatPasses() const
 {
     assert(m_gaussianSplatPasses != nullptr && m_gaussianSplatPasses->isAttached());
     return *m_gaussianSplatPasses;
@@ -343,7 +342,7 @@ const SceneGaussianSplatPasses& SceneEditor::GetGaussianSplatPasses() const
 void SceneEditor::PrepareEditorFrame()
 {
     m_progressLoading.Stop();
-    m_asyncLoadingInProgress = false;
+    m_sessionDiagnostics.asyncLoadingInProgress = false;
     HandleDroppedFiles();
 }
 
@@ -707,7 +706,7 @@ void SceneEditor::SceneLoaded( )
 
     m_settings.MaterialVariantIndex = 0;
 
-    m_asyncLoadingInProgress = true;
+    m_sessionDiagnostics.asyncLoadingInProgress = true;
 
 #if CAUSTICA_WITH_PYTHON
     // Initialize the embedded Python interpreter (lazily) and queue the
@@ -862,9 +861,9 @@ std::string SceneEditor::GetResolutionInfo() const
 
 float SceneEditor::GetAvgTimePerFrame() const
 {
-    if (m_benchFrames == 0) return 0.0f;
-    std::chrono::duration<double> elapsed = (m_benchLast - m_benchStart);
-    return float(elapsed.count() / m_benchFrames);
+    if (m_sessionDiagnostics.benchFrames == 0) return 0.0f;
+    std::chrono::duration<double> elapsed = (m_sessionDiagnostics.benchLast - m_sessionDiagnostics.benchStart);
+    return float(elapsed.count() / m_sessionDiagnostics.benchFrames);
 }
 
 std::string SceneEditor::GetCurrentCameraPosDirUp() const
@@ -913,43 +912,6 @@ void SceneEditor::SaveCurrentCamera() const
 void SceneEditor::LoadCurrentCamera()
 {
     m_renderCore->camera().loadFromFile(GetDirectoryWithExecutable() / "campos.txt");
-}
-
-void SceneEditor::FillPTPipelineGlobalMacros(std::vector<caustica::ShaderMacro> & macros)
-{
-    GetRayTracingResources().fillPTPipelineGlobalMacros(macros);
-}
-
-extern HitGroupInfo ComputeSubInstanceHitGroupInfo(const PTMaterial& material);
-
-bool SceneEditor::CreatePTPipeline(caustica::ShaderFactory& /*shaderFactory*/)
-{
-    return GetRayTracingResources().createPTPipeline();
-}
-
-void SceneEditor::CreateBlases(nvrhi::ICommandList* commandList)
-{
-    GetRayTracingResources().createBlases(commandList);
-}
-
-void SceneEditor::UploadSubInstanceData(nvrhi::ICommandList* commandList)
-{
-    GetRayTracingResources().uploadSubInstanceData(commandList);
-}
-
-void SceneEditor::CreateTlas(nvrhi::ICommandList* commandList)
-{
-    GetRayTracingResources().createTlas(commandList);
-}
-
-void SceneEditor::CreateAccelStructs(nvrhi::ICommandList* commandList)
-{
-    GetRayTracingResources().createAccelStructs(commandList);
-}
-
-void SceneEditor::RecreateAccelStructs(nvrhi::ICommandList* commandList)
-{
-    GetRayTracingResources().recreateAccelStructs(commandList);
 }
 
 void SceneEditor::RequestMeshAccelRebuild(const std::shared_ptr<MeshInfo>& mesh)
@@ -1006,12 +968,6 @@ double SceneEditor::GetSceneTime()
         return m_sampleGame->GetGameTime();
     return m_sceneTime;
 }
-
-void SceneEditor::RecreateBindingSet()
-{
-    GetRayTracingResources().recreateBindingSet();
-}
-
 
 std::shared_ptr<caustica::Material> SceneEditor::FindMaterial(int materialID) const
 {
@@ -1377,41 +1333,6 @@ bool SceneEditor::AccumulationCompleted() const
     return m_worldRenderer && m_worldRenderer->getAccumulationCompleted();
 }
 
-void SceneEditor::InvalidateBindingSet()
-{
-    GetRayTracingResources().invalidateBindingSet();
-}
-
-std::shared_ptr<::PTPipelineBaker> SceneEditor::GetRTPipelineBaker() const
-{
-    return GetRayTracingResources().getPipelineBaker();
-}
-
-std::shared_ptr<::PTPipelineVariant>& SceneEditor::PtPipelineReference()
-{
-    return GetRayTracingResources().pipelineReference();
-}
-
-std::shared_ptr<::PTPipelineVariant>& SceneEditor::PtPipelineBuildStablePlanes()
-{
-    return GetRayTracingResources().pipelineBuildStablePlanes();
-}
-
-std::shared_ptr<::PTPipelineVariant>& SceneEditor::PtPipelineFillStablePlanes()
-{
-    return GetRayTracingResources().pipelineFillStablePlanes();
-}
-
-std::shared_ptr<::PTPipelineVariant>& SceneEditor::PtPipelineTestRaygenPPHDR()
-{
-    return GetRayTracingResources().pipelineTestRaygenPPHDR();
-}
-
-std::shared_ptr<::PTPipelineVariant>& SceneEditor::PtPipelineEdgeDetection()
-{
-    return GetRayTracingResources().pipelineEdgeDetection();
-}
-
 // =============================================================================
 // Render entry points
 // =============================================================================
@@ -1431,21 +1352,6 @@ void SceneEditor::BackBufferResizing()
 {
     if (auto* r = GetWorldRenderer())
         r->onBackBufferResizing();
-}
-
-void SceneEditor::PathTrace(nvrhi::IFramebuffer* framebuffer, const SampleConstants& constants)
-{
-    GetWorldRenderer()->pathTrace(framebuffer, constants);
-}
-
-void SceneEditor::Denoise(nvrhi::IFramebuffer* framebuffer)
-{
-    GetWorldRenderer()->denoise(framebuffer);
-}
-
-void SceneEditor::PostProcessAA(nvrhi::IFramebuffer* framebuffer, bool reset)
-{
-    GetWorldRenderer()->postProcessAA(framebuffer, reset);
 }
 
 bool SceneEditor::ShowDeltaTree() const

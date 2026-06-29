@@ -12,7 +12,7 @@
 
 #include <shaders/PathTracer/Lighting/LightingTypes.hlsli>
 
-namespace caustica::editor
+namespace caustica::render
 {
 
 void SceneRayTracingResources::attach(caustica::GpuDevice& gpuDevice,
@@ -245,4 +245,4 @@ std::shared_ptr<PTPipelineVariant>& SceneRayTracingResources::pipelineEdgeDetect
     return m_worldRenderer->ptPipelineEdgeDetection();
 }
 
-} // namespace caustica::editor
+} // namespace caustica::render

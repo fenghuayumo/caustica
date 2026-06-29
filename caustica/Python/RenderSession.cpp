@@ -3,11 +3,11 @@
 #if CAUSTICA_WITH_PYTHON
 
 #include "SceneEditorFrameExtension.h"
+#include "PathTracerSessionBootstrap.h"
 #include <engine/EngineRenderer.h>
 #include <engine/Application.h>
 #include <render/SceneGaussianSplatPasses.h>
 #include <render/SceneLightingPasses.h>
-#include <render/Core/RenderSceneTypeFactory.h>
 #include <render/WorldRenderer/PathTracingWorldRenderer.h>
 #include <common/LocalConfig.h>
 #include <core/file_utils.h>
@@ -601,65 +601,34 @@ bool RenderSession::InitRenderer()
     SetRuntimeDirectoryOverride(appDirectory);
     SetLocalPathBaseOverride(ResolveResourceRoot(appDirectory));
 
-    m_renderer = std::make_unique<SceneEditor>(m_cmdLine, m_sampleUIData);
+    m_renderer = std::make_unique<SceneEditor>(m_cmdLine, m_sampleUIData, m_sessionDiagnostics);
     m_renderer->setGpuDevice(*m_deviceManager);
     m_renderer->initStreamlineAndWindow();
     m_renderer->AttachLightingPasses(m_lightingPasses);
     m_renderer->AttachRayTracingResources(m_rayTracingResources);
     m_renderer->AttachGaussianSplatPasses(m_gaussianSplatPasses);
-    InitializeSampleUIDataFromCommandLine(m_sampleUIData, m_cmdLine);
-    LocalConfig::PostAppInit(m_sampleUIData);
-
-    m_engineRenderer = std::make_unique<caustica::EngineRenderer>();
-    m_engineRenderer->initialize(*m_deviceManager,
-        std::make_shared<caustica::render::RenderSceneTypeFactory>(),
-        caustica::EngineSceneCallbacks{
-            .OnSceneLoaded = [this]() {
-                if (m_renderer)
-                    m_renderer->SceneLoaded();
-            },
-            .OnSceneUnloading = [this]() {
-                if (m_renderer)
-                    m_renderer->SceneUnloading();
-            },
-        });
-
-    m_renderer->AttachRenderResources(
-        m_engineRenderer->shaderFactory(),
-        m_engineRenderer->commonPasses(),
-        m_engineRenderer->bindingCache(),
-        m_engineRenderer->descriptorTable(),
-        m_engineRenderer->textureLoader());
-    m_renderer->AttachSceneServices(
-        *m_engineRenderer->sceneManager(),
-        *m_engineRenderer->renderCore());
 
     m_sceneEditorFrameExtension = std::make_unique<SceneEditorFrameExtension>(*m_renderer);
     m_frameExtensions = { m_sceneEditorFrameExtension.get() };
-
-    m_engineRenderer->createPathTracer(caustica::PathTracerSessionParams{
-        .gpuDevice = *m_deviceManager,
-        .settings = m_renderer->GetPathTracerSettings(),
-        .runtimeState = m_renderer->GetRenderRuntimeState(),
-        .rayTracing = m_rayTracingResources,
-        .gaussianSplats = m_gaussianSplatPasses,
-        .lighting = m_lightingPasses,
-        .sceneTime = m_renderer->GetSceneTimeRef(),
-        .gaussianSplatEmissionProxies = m_gaussianSplatPasses.emissionProxies(),
-        .progressInitializingRenderer = m_renderer->GetProgressInitializingRenderer(),
-        .asyncLoadingInProgress = m_renderer->GetAsyncLoadingInProgressRef(),
-        .benchStart = m_renderer->GetBenchStart(),
-        .benchLast = m_renderer->GetBenchLast(),
-        .benchFrames = m_renderer->GetBenchFrames(),
-        .frameExtensions = m_frameExtensions,
-    });
-    m_renderer->AttachWorldRenderer(m_engineRenderer->worldRenderer());
 
     std::string preferredScene = m_config.scene.empty()
         ? std::string("default.json")
         : m_config.scene;
 
-    m_renderer->Init(preferredScene, m_engineRenderer->shaderFactory());
+    m_engineRenderer = bootstrapPathTracerSession(PathTracerSessionBootstrapParams{
+        .gpuDevice = *m_deviceManager,
+        .sceneEditor = *m_renderer,
+        .lighting = m_lightingPasses,
+        .rayTracing = m_rayTracingResources,
+        .gaussianSplats = m_gaussianSplatPasses,
+        .diagnostics = m_sessionDiagnostics,
+        .frameExtensions = m_frameExtensions,
+        .preferredScene = preferredScene,
+        .onAfterAttachPasses = [this]() {
+            InitializeSampleUIDataFromCommandLine(m_sampleUIData, m_cmdLine);
+            LocalConfig::PostAppInit(m_sampleUIData);
+        },
+    });
 
     auto frameDriver = std::make_unique<PathTracerFrameDriver>(
         m_deviceManager.get(),

@@ -33,7 +33,7 @@ class PathTracingWorldRenderer;
 class SceneManager;
 struct CommandLineOptions;
 
-namespace caustica::editor
+namespace caustica::render
 {
 
 // Per-scene Gaussian splat passes, emission proxies, and WorldRenderer hooks.
@@ -112,4 +112,4 @@ private:
     std::function<void()> m_onRequestFullRebuild;
 };
 
-} // namespace caustica::editor
+} // namespace caustica::render

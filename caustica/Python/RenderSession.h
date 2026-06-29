@@ -29,6 +29,7 @@
 #include <render/SceneLightingPasses.h>
 #include <render/SceneRayTracingResources.h>
 #include <render/WorldRenderer/PathTracingFrameExtension.h>
+#include <render/SessionDiagnostics.h>
 #include <engine/EngineRenderer.h>
 
 #include <core/command_line.h>
@@ -135,9 +136,10 @@ private:
     Config                                          m_config;
     CommandLineOptions                              m_cmdLine;
     caustica::editor::SampleUIData                    m_sampleUIData;
-    caustica::editor::SceneLightingPasses           m_lightingPasses;
-    caustica::editor::SceneRayTracingResources      m_rayTracingResources;
-    caustica::editor::SceneGaussianSplatPasses      m_gaussianSplatPasses;
+    caustica::render::SessionDiagnostics              m_sessionDiagnostics;
+    caustica::render::SceneLightingPasses           m_lightingPasses;
+    caustica::render::SceneRayTracingResources      m_rayTracingResources;
+    caustica::render::SceneGaussianSplatPasses      m_gaussianSplatPasses;
     std::unique_ptr<caustica::GpuDevice>      m_deviceManager;
     std::unique_ptr<caustica::Window>            m_Window;
     std::unique_ptr<caustica::Application>         m_AppLoop;

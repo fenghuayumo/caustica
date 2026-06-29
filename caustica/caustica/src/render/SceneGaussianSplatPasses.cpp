@@ -17,7 +17,7 @@
 #include <limits>
 #include <unordered_set>
 
-namespace caustica::editor
+namespace caustica::render
 {
 
 namespace
@@ -497,4 +497,4 @@ void SceneGaussianSplatPasses::buildAccelStructs(nvrhi::ICommandList* commandLis
     }
 }
 
-} // namespace caustica::editor
+} // namespace caustica::render

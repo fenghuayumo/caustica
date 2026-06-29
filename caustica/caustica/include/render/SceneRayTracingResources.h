@@ -29,7 +29,7 @@ class PathTracingWorldRenderer;
 
 class SceneManager;
 
-namespace caustica::editor
+namespace caustica::render
 {
 
 class SceneLightingPasses;
@@ -94,4 +94,4 @@ private:
     AdditionalAccelStructBuilder                m_additionalAccelStructBuilder;
 };
 
-} // namespace caustica::editor
+} // namespace caustica::render

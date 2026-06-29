@@ -566,13 +566,13 @@ void caustica::render::PathTracingWorldRenderer::preUpdatePathTracing( bool rese
     // profile perf - only makes sense with high accumulation sample counts; only start counting after n-th after it stabilizes
     if( m_accumulationSampleIndex < 16 )
     {
-        m_context.benchStart = std::chrono::high_resolution_clock::now( );
-        m_context.benchLast = m_context.benchStart;
-        m_context.benchFrames = 0;
+        m_context.diagnostics.benchStart = std::chrono::high_resolution_clock::now( );
+        m_context.diagnostics.benchLast = m_context.diagnostics.benchStart;
+        m_context.diagnostics.benchFrames = 0;
     } else if( m_accumulationSampleIndex < m_context.settings.AccumulationTarget )
     {
-        m_context.benchFrames++;
-        m_context.benchLast = std::chrono::high_resolution_clock::now( );
+        m_context.diagnostics.benchFrames++;
+        m_context.diagnostics.benchLast = std::chrono::high_resolution_clock::now( );
     }
     m_accumulationCompleted = false;
     // 'min' in non-realtime path here is to keep looping the last sample for debugging purposes!
@@ -1212,7 +1212,7 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
     // Acceleration structures need some material info, whilst other passes need acceleration structures, so first set up materials if needed
     if (needNewPasses)
     {
-        m_context.progressInitializingRenderer.Start("Initializing renderer...");
+        m_context.diagnostics.progressInitializingRenderer.Start("Initializing renderer...");
 
         if (m_context.materialsBaker == nullptr)
         {
@@ -1228,13 +1228,13 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
         }
 
         m_context.materialsBaker->CreateRenderPassesAndLoadMaterials(m_bindlessLayout, m_context.commonPasses, m_context.sceneManager.getScene(), m_context.sceneManager.getCurrentScenePath(), GetLocalPath(c_AssetsFolder));
-        m_context.progressInitializingRenderer.Set(5);
+        m_context.diagnostics.progressInitializingRenderer.Set(5);
         {
             PathTracingFrameEvent event{ .framePhase = PathTracingFramePhase::IdleMaintenance };
             dispatchFrameExtensions(event);
         }
         if(m_context.ommBaker) m_context.ommBaker->CreateRenderPasses(m_bindlessLayout, m_context.commonPasses);
-        m_context.progressInitializingRenderer.Set(20);
+        m_context.diagnostics.progressInitializingRenderer.Set(20);
     }
 
     // Changes to material properties and settings can require a BLAS/TLAS or subInstanceBuffer rebuild (alpha tested/exclusion flags etc); otherwise this is a no-op.
@@ -1248,13 +1248,13 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
     // this will also create or update materials which can trigger the need to update acceleration structures
     if (needNewPasses)
     {
-        m_context.progressInitializingRenderer.Set(40);
+        m_context.diagnostics.progressInitializingRenderer.Set(40);
         device()->waitForIdle();    // some subsystems have resources that could still be in use and might be deleted - make sure that's safe
         m_commandList->open();
         createRenderPasses(exposureResetRequired, m_commandList);
         m_commandList->close();
         device()->executeCommandList(m_commandList);
-        m_context.progressInitializingRenderer.Set(70);
+        m_context.diagnostics.progressInitializingRenderer.Set(70);
     }
 
     // this is the point where main ray tracing pipelines will actually get compiled
@@ -1264,7 +1264,7 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
     if (m_context.computePipelineBaker)
         m_context.computePipelineBaker->Update(needNewPasses);
     
-    m_context.progressInitializingRenderer.Set(90);
+    m_context.diagnostics.progressInitializingRenderer.Set(90);
 
     m_commandList->open();
 
@@ -1304,7 +1304,7 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
         geoParams.materialsBaker = m_context.materialsBaker.get();
         geoParams.ommBaker = m_context.ommBaker.get();
         geoParams.frameIndex = m_context.gpuDevice.GetFrameIndex();
-        geoParams.asyncLoadingInProgress = &m_context.asyncLoadingInProgress;
+        geoParams.asyncLoadingInProgress = &m_context.diagnostics.asyncLoadingInProgress;
         m_context.renderCore.updateSceneGeometry(geoParams);
 
         // Update input lighting, environment map, etc.
@@ -1321,12 +1321,12 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
 
 	if( needNewPasses || needNewBindings || m_bindingSet == nullptr )
     {
-        m_context.progressInitializingRenderer.Set(95);
+        m_context.diagnostics.progressInitializingRenderer.Set(95);
         RAII_SCOPE( m_commandList->close(); device()->executeCommandList(m_commandList);, m_commandList->open(););
 
         recreateBindingSet();
 
-        m_context.progressInitializingRenderer.Set(100);
+        m_context.diagnostics.progressInitializingRenderer.Set(100);
 
         {
             nvrhi::BindingSetDesc lineBindingSetDesc;
@@ -1348,7 +1348,7 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
 
             m_linesPipeline = device()->createGraphicsPipeline(psoDesc, framebuffer);
         }
-        m_context.progressInitializingRenderer.Stop();
+        m_context.diagnostics.progressInitializingRenderer.Stop();
     }
 
     m_toneMappingPass->PreRender(m_context.settings.ToneMappingParams);

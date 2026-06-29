@@ -10,8 +10,6 @@
 
 #include <assets/loader/ShaderCompilerUtils.h>
 
-namespace caustica::editor { class SceneEditor; }
-
 namespace caustica
 {
     class RootFileSystem;
@@ -172,8 +170,7 @@ private:
 
     std::unordered_set<std::string>                 m_shortUniqueDebugIDs;
 
-    // this allows sharing of hitGroups between 
-    friend class caustica::editor::SceneEditor;
+    // Hit groups shared between pipeline variants.
     std::vector<HitGroupInfo>                       m_perSubInstanceHitGroup;
     std::unordered_map<int, HitGroupInfo>           m_uniqueHitGroups;
 
