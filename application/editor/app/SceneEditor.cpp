@@ -1,5 +1,8 @@
 #include "SceneEditor.h"
 
+#include "SceneContentEditor.h"
+#include "EditorCameraController.h"
+
 #include <render/SceneGaussianSplatPasses.h>
 #include <render/SceneLightingPasses.h>
 #include <render/SceneRayTracingResources.h>
@@ -102,33 +105,12 @@ namespace caustica::editor
 
 namespace
 {
-    constexpr const char* c_InlineSceneSentinel = "__CAUSTICA_INLINE_SCENE_JSON__";
-
     bool LooksLikeInlineSceneJson(const std::string& scene)
     {
         auto it = std::find_if_not(scene.begin(), scene.end(), [](unsigned char ch) {
             return std::isspace(ch);
         });
         return it != scene.end() && *it == '{';
-    }
-
-    std::filesystem::path RuntimeMeshTextureSearchDirectory(const std::filesystem::path& currentScenePath)
-    {
-        if (currentScenePath.empty() || currentScenePath == std::filesystem::path(c_InlineSceneSentinel))
-            return {};
-
-        return currentScenePath.parent_path();
-    }
-
-    RuntimeMeshLoadParams MakeRuntimeMeshLoadParams(SceneManager* sceneManager, TextureLoader* textureLoader)
-    {
-        return RuntimeMeshLoadParams{
-            .TextureCache = textureLoader,
-            .SceneTypes = std::make_shared<RenderSceneTypeFactory>(),
-            .TextureSearchDirectory = sceneManager
-                ? RuntimeMeshTextureSearchDirectory(sceneManager->getCurrentScenePath())
-                : std::filesystem::path{},
-        };
     }
 }
 
@@ -198,6 +180,8 @@ SceneEditor::SceneEditor(const CommandLineOptions& cmdLine,
     , m_editor(editorState)
     , m_sessionDiagnostics(diagnostics)
     , m_inputRouter(EditorInputRouter::Context{.session = sessionState, .editor = editorState})
+    , m_contentEditor(SceneContentEditor::Context{})
+    , m_cameraController(EditorCameraController::Context{})
 {
     m_progressLoading.Start("Initializing...");
     m_progressLoading.Set(50);
@@ -267,22 +251,26 @@ void SceneEditor::AttachRenderResources(
     m_bindingCache = bindingCache;
     m_DescriptorTable = descriptorTable;
     m_TextureLoader = textureCache;
+    SyncSubsystemContext();
 }
 
 void SceneEditor::AttachWorldRenderer(caustica::render::PathTracingWorldRenderer* renderer)
 {
     m_worldRenderer = renderer;
+    SyncSubsystemContext();
 }
 
 void SceneEditor::AttachSceneServices(SceneManager& sceneManager, caustica::RenderCore& renderCore)
 {
     m_sceneManager = &sceneManager;
     m_renderCore = &renderCore;
+    SyncSubsystemContext();
 }
 
 void SceneEditor::AttachLightingPasses(caustica::render::SceneLightingPasses& lightingPasses)
 {
     m_lightingPasses = &lightingPasses;
+    SyncSubsystemContext();
 }
 
 caustica::render::SceneLightingPasses& SceneEditor::GetLightingPasses()
@@ -308,6 +296,7 @@ caustica::BindingCache& SceneEditor::GetBindingCache() { return *m_bindingCache;
 void SceneEditor::AttachRayTracingResources(caustica::render::SceneRayTracingResources& rayTracingResources)
 {
     m_rayTracingResources = &rayTracingResources;
+    SyncSubsystemContext();
 }
 
 caustica::render::SceneRayTracingResources& SceneEditor::GetRayTracingResources()
@@ -325,6 +314,7 @@ const caustica::render::SceneRayTracingResources& SceneEditor::GetRayTracingReso
 void SceneEditor::AttachGaussianSplatPasses(caustica::render::SceneGaussianSplatPasses& gaussianSplatPasses)
 {
     m_gaussianSplatPasses = &gaussianSplatPasses;
+    SyncSubsystemContext();
 }
 
 caustica::render::SceneGaussianSplatPasses& SceneEditor::GetGaussianSplatPasses()
@@ -343,6 +333,7 @@ void SceneEditor::PrepareEditorFrame()
 {
     m_progressLoading.Stop();
     m_sessionDiagnostics.asyncLoadingInProgress = false;
+    SyncSubsystemContext();
     HandleDroppedFiles();
 }
 
@@ -377,22 +368,22 @@ uint& SceneEditor::SelectedCameraIndex()
 
 float SceneEditor::GetCameraVerticalFOV() const
 {
-    return m_renderCore->camera().verticalFOV();
+    return m_cameraController.getVerticalFOV();
 }
 
 const caustica::FirstPersonCamera& SceneEditor::GetCurrentCamera() const
 {
-    return m_renderCore->camera().camera();
+    return m_cameraController.camera();
 }
 
 const std::shared_ptr<caustica::PlanarView>& SceneEditor::GetCurrentView() const
 {
-    return m_renderCore->camera().view();
+    return m_cameraController.view();
 }
 
 const caustica::PlanarView& SceneEditor::GetView() const
 {
-    return *m_renderCore->camera().view();
+    return *m_cameraController.view();
 }
 
 void SceneEditor::Init(const std::string& preferredScene,
@@ -534,27 +525,6 @@ bool SceneEditor::IsSceneLoaded() const
     return m_sceneManager && m_sceneManager->isSceneLoaded();
 }
 
-void SceneEditor::UpdateCameraFromScene( const std::shared_ptr<caustica::PerspectiveCamera> & sceneCamera )
-{
-    m_renderCore->camera().updateFromSceneCamera(sceneCamera);
-
-    auto sceneCameraEx = std::dynamic_pointer_cast<caustica::PerspectiveCamera>(sceneCamera);
-    if (sceneCameraEx != nullptr)
-    {
-        ToneMappingParameters defaults;
-        m_settings.ToneMappingParams.autoExposure =
-            sceneCameraEx->enableAutoExposure.value_or(defaults.autoExposure);
-        m_settings.ToneMappingParams.exposureCompensation =
-            sceneCameraEx->exposureCompensation.value_or(defaults.exposureCompensation);
-        m_settings.ToneMappingParams.exposureValue =
-            sceneCameraEx->exposureValue.value_or(defaults.exposureValue);
-        m_settings.ToneMappingParams.exposureValueMin =
-            sceneCameraEx->exposureValueMin.value_or(defaults.exposureValueMin);
-        m_settings.ToneMappingParams.exposureValueMax =
-            sceneCameraEx->exposureValueMax.value_or(defaults.exposureValueMax);
-    }
-}
-
 void SceneEditor::CollectUncompressedTextures()
 {
     // Make a list of uncompressed textures
@@ -636,7 +606,7 @@ void SceneEditor::SceneLoaded( )
     auto cameras = m_sceneManager->getScene()->GetSceneGraph( )->GetCameras( );
     auto camScene = (cameras.empty( ))?(nullptr):(std::dynamic_pointer_cast<PerspectiveCamera>(cameras.back()));
     if (camScene)
-        UpdateCameraFromScene(camScene);
+        m_cameraController.syncFromSceneCamera(camScene);
     else
         m_renderCore->camera().setupDefaultCamera();
 
@@ -789,7 +759,7 @@ void SceneEditor::Animate(float fElapsedTimeSeconds)
     {
         std::shared_ptr<caustica::PerspectiveCamera> sceneCamera = std::dynamic_pointer_cast<PerspectiveCamera>(m_sceneManager->getScene()->GetSceneGraph()->GetCameras()[m_renderCore->camera().selectedCameraIndex()-1]);
         if (sceneCamera != nullptr)
-            UpdateCameraFromScene( sceneCamera );
+            m_cameraController.syncFromSceneCamera(sceneCamera);
     }
 
     m_renderCore->camera().camera().Animate(fElapsedTimeSeconds);
@@ -866,50 +836,37 @@ float SceneEditor::GetAvgTimePerFrame() const
 
 std::string SceneEditor::GetCurrentCameraPosDirUp() const
 {
-    return m_renderCore->camera().getPosDirUpString();
+    return m_cameraController.getPosDirUpString();
 }
 
 bool SceneEditor::SetCurrentCameraPosDirUp(const std::string & val)
 {
-    return m_renderCore->camera().setFromPosDirUpString(val);
+    return m_cameraController.setFromPosDirUpString(val);
 }
 
 void SceneEditor::SetCameraVerticalFOV(float cameraFOV)
 {
-    m_renderCore->camera().setVerticalFOV(cameraFOV);
-    m_settings.ResetAccumulation = true;
-    m_worldRenderer->setGaussianSplatTemporalReset(true);
+    m_cameraController.setVerticalFOV(cameraFOV);
 }
 
 void SceneEditor::SetCameraIntrinsics(float fx, float fy, float cx, float cy, float width, float height)
 {
-    m_renderCore->camera().setIntrinsics(fx, fy, cx, cy, width, height);
-    m_settings.ResetAccumulation = true;
-    m_worldRenderer->setGaussianSplatTemporalReset(true);
+    m_cameraController.setIntrinsics(fx, fy, cx, cy, width, height);
 }
 
 void SceneEditor::ClearCameraIntrinsics()
 {
-    m_renderCore->camera().clearIntrinsics();
-    m_settings.ResetAccumulation = true;
-    m_worldRenderer->setGaussianSplatTemporalReset(true);
+    m_cameraController.clearIntrinsics();
 }
 
 void SceneEditor::SaveCurrentCamera() const
 {
-    dm::float4x4 projMatrix = m_renderCore->camera().view()->GetProjectionMatrix();
-    float tanHalfFOVY = 1.0f / (projMatrix.m_data[1 * 4 + 1]);
-    float fovY = atanf(tanHalfFOVY) * 2.0f;
-
-    m_renderCore->camera().saveToFile(
-        GetDirectoryWithExecutable() / "campos.txt",
-        m_renderCore->camera().zNear(),
-        fovY);
+    m_cameraController.saveToFile();
 }
 
 void SceneEditor::LoadCurrentCamera()
 {
-    m_renderCore->camera().loadFromFile(GetDirectoryWithExecutable() / "campos.txt");
+    m_cameraController.loadFromFile();
 }
 
 void SceneEditor::RequestMeshAccelRebuild(const std::shared_ptr<MeshInfo>& mesh)
@@ -980,184 +937,52 @@ std::shared_ptr<caustica::SceneGraphNode> SceneEditor::FindNodeByInstanceIndex(i
 
 void SceneEditor::HandleDroppedFiles()
 {
-    if (m_editor.PendingDroppedFiles.empty())
-        return;
-
-    auto files = std::move(m_editor.PendingDroppedFiles);
-    m_editor.PendingDroppedFiles.clear();
-
-    for (const auto& filePath : files)
-    {
-        std::filesystem::path path(filePath);
-        std::string ext = path.extension().string();
-        std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return char(std::tolower(c)); });
-
-        if (ext == ".ply")
-        {
-            caustica::info("Drag-drop: loading Gaussian Splat file '%s'", filePath.c_str());
-            if (LoadGaussianSplatFile(path))
-                caustica::info("Gaussian Splat loaded successfully: %d splats across %d objects", GetGaussianSplatCount(), GetGaussianSplatObjectCount());
-            else
-                caustica::error("Failed to load Gaussian Splat file '%s'", filePath.c_str());
-        }
-        else if (ext == ".gltf" || ext == ".glb" || ext == ".obj")
-        {
-            caustica::info("Drag-drop: loading mesh file '%s'", filePath.c_str());
-            if (LoadMeshFile(path))
-                caustica::info("Mesh file loaded successfully: '%s'", filePath.c_str());
-            else
-                caustica::error("Failed to load mesh file '%s'", filePath.c_str());
-        }
-        else
-        {
-            caustica::warning("Drag-drop: unsupported file type '%s' (supported: .ply, .gltf, .glb, .obj)", ext.c_str());
-        }
-    }
+    m_contentEditor.handleDroppedFiles(m_editor.PendingDroppedFiles);
 }
 
 bool SceneEditor::LoadMeshFile(const std::filesystem::path& filePath)
 {
-    const auto loadResult = caustica::AssetSystem::Get().LoadRuntimeMeshFile(
-        MakeRuntimeMeshLoadParams(m_sceneManager, m_TextureLoader.get()),
-        filePath);
-    if (!loadResult)
-        return false;
-
-    const auto importedRoot = caustica::AttachRuntimeSceneImport(
-        m_sceneManager ? m_sceneManager->getScene() : nullptr,
-        *loadResult.ImportResult,
-        GetFrameIndex(),
-        RuntimeSceneMutationCallbacks{
-            .PostMaterialLoad = [](caustica::Material& material) { LocalConfig::PostMaterialLoad(material); },
-        });
-    if (!importedRoot)
-        return false;
-
-    FinalizeRuntimeSceneMutation(nullptr);
-    return true;
+    return m_contentEditor.loadMeshFile(filePath);
 }
 
 bool SceneEditor::LoadGltfMeshFile(const std::filesystem::path& filePath)
 {
-    const auto loadResult = caustica::AssetSystem::Get().LoadRuntimeGltfMeshFile(
-        MakeRuntimeMeshLoadParams(m_sceneManager, m_TextureLoader.get()),
-        filePath);
-    if (!loadResult)
-        return false;
-
-    const auto importedRoot = caustica::AttachRuntimeSceneImport(
-        m_sceneManager ? m_sceneManager->getScene() : nullptr,
-        *loadResult.ImportResult,
-        GetFrameIndex(),
-        RuntimeSceneMutationCallbacks{
-            .PostMaterialLoad = [](caustica::Material& material) { LocalConfig::PostMaterialLoad(material); },
-        });
-    if (!importedRoot)
-        return false;
-
-    FinalizeRuntimeSceneMutation(nullptr);
-    return true;
+    return m_contentEditor.loadGltfMeshFile(filePath);
 }
-
 
 bool SceneEditor::LoadObjMeshFile(const std::filesystem::path& filePath)
 {
-    const auto loadResult = caustica::AssetSystem::Get().LoadRuntimeObjMeshFile(
-        MakeRuntimeMeshLoadParams(m_sceneManager, m_TextureLoader.get()),
-        filePath);
-    if (!loadResult)
-        return false;
-
-    const auto importedRoot = caustica::AttachRuntimeSceneImport(
-        m_sceneManager ? m_sceneManager->getScene() : nullptr,
-        *loadResult.ImportResult,
-        GetFrameIndex(),
-        RuntimeSceneMutationCallbacks{
-            .PostMaterialLoad = [](caustica::Material& material) { LocalConfig::PostMaterialLoad(material); },
-        });
-    if (!importedRoot)
-        return false;
-
-    FinalizeRuntimeSceneMutation(nullptr);
-    return true;
+    return m_contentEditor.loadObjMeshFile(filePath);
 }
 
 void SceneEditor::FinalizeRuntimeSceneMutation(const std::shared_ptr<caustica::SceneGraphNode>& importedRoot)
 {
-    if (importedRoot)
-    {
-        caustica::FinalizeRuntimeSceneMutation(
-            m_sceneManager ? m_sceneManager->getScene() : nullptr,
-            importedRoot,
-            GetFrameIndex(),
-            RuntimeSceneMutationCallbacks{
-                .PostMaterialLoad = [](caustica::Material& material) { LocalConfig::PostMaterialLoad(material); },
-            });
-    }
-
-    GetLightingPasses().notifyBakersSceneReloaded(*m_sceneManager->getScene());
-
-    RequestFullRebuild();
+    m_contentEditor.finalizeRuntimeSceneMutation(importedRoot);
 }
 
 bool SceneEditor::DeleteSceneNode(const std::shared_ptr<SceneGraphNode>& node)
 {
-    auto scene = m_sceneManager ? m_sceneManager->getScene() : nullptr;
-    auto sceneGraph = scene ? scene->GetSceneGraph() : nullptr;
-    auto rootNode = sceneGraph ? sceneGraph->GetRootNode() : nullptr;
-
-    if (!caustica::DeleteRuntimeSceneNode(DeleteRuntimeSceneNodeParams{
-            .SceneInstance = scene,
-            .Node = node,
-            .Device = GetDevice(),
-            .FrameIndex = GetFrameIndex(),
-            .BeforeDetach = [this](const std::shared_ptr<SceneGraphNode>& deletedNode) {
-                GetGaussianSplatPasses().removeObjectsUnderNode(deletedNode);
-            },
-        }))
-    {
-        return false;
-    }
-
-    GetLightingPasses().resyncLightsFromSceneGraph(*sceneGraph);
-
-    if (m_editor.TogglableNodes != nullptr)
-    {
-        m_editor.TogglableNodes->clear();
-        UpdateTogglableNodes(*m_editor.TogglableNodes, rootNode.get());
-    }
-
-    m_editor.SelectedMaterial = nullptr;
-    m_editor.SelectedNode = nullptr;
-    m_editor.InspectorRotationNode.reset();
-    m_editor.InspectorRotationEulerValid = false;
-    m_editor.SelectedGaussianSplat = false;
-
-    GetLightingPasses().notifyBakersSceneReloaded(*m_sceneManager->getScene());
-
-    RequestFullRebuild();
-    return true;
+    return m_contentEditor.deleteSceneNode(node);
 }
-
 
 void SceneEditor::RequestFullRebuild()
 {
-    GetRayTracingResources().requestFullRebuild();
+    m_contentEditor.requestFullRebuild();
 }
 
 std::vector<float3> SceneEditor::GetMeshVertices(const std::shared_ptr<MeshInfo>& mesh) const
 {
-    return caustica::GetMeshVertices(mesh);
+    return m_contentEditor.getMeshVertices(mesh);
 }
 
 std::vector<float3> SceneEditor::GetMeshVerticesWorld(const std::shared_ptr<MeshInfo>& mesh)
 {
-    return caustica::GetMeshVerticesWorld(m_sceneManager->getScene(), mesh, GetFrameIndex());
+    return m_contentEditor.getMeshVerticesWorld(mesh);
 }
 
 std::vector<float3> SceneEditor::GetMeshVerticesWorld(const std::shared_ptr<SceneGraphNode>& node)
 {
-    return caustica::GetMeshVerticesWorld(m_sceneManager->getScene(), node, GetFrameIndex());
+    return m_contentEditor.getMeshVerticesWorld(node);
 }
 
 void SceneEditor::SetMeshVerticesWorld(const std::shared_ptr<MeshInfo>& mesh,
@@ -1165,17 +990,7 @@ void SceneEditor::SetMeshVerticesWorld(const std::shared_ptr<MeshInfo>& mesh,
                                   bool recomputeNormals,
                                   bool rebuildAccelerationStructure)
 {
-    caustica::SetMeshVerticesWorld(mesh, vertices, SetSceneMeshVerticesParams{
-        .device = GetDevice(),
-        .scene = m_sceneManager->getScene(),
-        .frameIndex = GetFrameIndex(),
-        .recomputeNormals = recomputeNormals,
-        .rebuildAccelerationStructure = rebuildAccelerationStructure,
-        .resetAccumulation = &m_settings.ResetAccumulation,
-        .requestMeshAccelRebuild = [this](const std::shared_ptr<MeshInfo>& dirtyMesh) {
-            RequestMeshAccelRebuild(dirtyMesh);
-        },
-    });
+    m_contentEditor.setMeshVerticesWorld(mesh, vertices, recomputeNormals, rebuildAccelerationStructure);
 }
 
 void SceneEditor::SetMeshVerticesWorld(const std::shared_ptr<SceneGraphNode>& node,
@@ -1183,17 +998,7 @@ void SceneEditor::SetMeshVerticesWorld(const std::shared_ptr<SceneGraphNode>& no
                                   bool recomputeNormals,
                                   bool rebuildAccelerationStructure)
 {
-    caustica::SetMeshVerticesWorld(node, vertices, SetSceneMeshVerticesParams{
-        .device = GetDevice(),
-        .scene = m_sceneManager->getScene(),
-        .frameIndex = GetFrameIndex(),
-        .recomputeNormals = recomputeNormals,
-        .rebuildAccelerationStructure = rebuildAccelerationStructure,
-        .resetAccumulation = &m_settings.ResetAccumulation,
-        .requestMeshAccelRebuild = [this](const std::shared_ptr<MeshInfo>& dirtyMesh) {
-            RequestMeshAccelRebuild(dirtyMesh);
-        },
-    });
+    m_contentEditor.setMeshVerticesWorld(node, vertices, recomputeNormals, rebuildAccelerationStructure);
 }
 
 void SceneEditor::SetMeshVertices(const std::shared_ptr<MeshInfo>& mesh,
@@ -1201,17 +1006,7 @@ void SceneEditor::SetMeshVertices(const std::shared_ptr<MeshInfo>& mesh,
                              bool recomputeNormals,
                              bool rebuildAccelerationStructure)
 {
-    caustica::SetMeshVertices(mesh, vertices, SetSceneMeshVerticesParams{
-        .device = GetDevice(),
-        .scene = m_sceneManager->getScene(),
-        .frameIndex = GetFrameIndex(),
-        .recomputeNormals = recomputeNormals,
-        .rebuildAccelerationStructure = rebuildAccelerationStructure,
-        .resetAccumulation = &m_settings.ResetAccumulation,
-        .requestMeshAccelRebuild = [this](const std::shared_ptr<MeshInfo>& dirtyMesh) {
-            RequestMeshAccelRebuild(dirtyMesh);
-        },
-    });
+    m_contentEditor.setMeshVertices(mesh, vertices, recomputeNormals, rebuildAccelerationStructure);
 }
 
 ZoomTool* SceneEditor::GetOrCreateZoomTool()
@@ -1390,8 +1185,32 @@ void SceneEditor::CaptureScriptPostRender(std::function<bool(const char* fileNam
 }
 
 // =============================================================================
-// Input event handling
+// Subsystem context + input event handling
 // =============================================================================
+
+void SceneEditor::SyncSubsystemContext()
+{
+    m_contentEditor.updateContext(SceneContentEditor::Context{
+        .sceneManager = m_sceneManager,
+        .textureLoader = m_TextureLoader.get(),
+        .editor = &m_editor,
+        .settings = &m_settings,
+        .lightingPasses = m_lightingPasses,
+        .rayTracingResources = m_rayTracingResources,
+        .gaussianSplatPasses = m_gaussianSplatPasses,
+        .frameIndex = [this] { return GetFrameIndex(); },
+        .device = [this] { return GetDevice(); },
+        .loadGaussianSplat = [this](const std::filesystem::path& path) { return LoadGaussianSplatFile(path); },
+        .gaussianSplatCount = [this] { return GetGaussianSplatCount(); },
+        .gaussianSplatObjectCount = [this] { return GetGaussianSplatObjectCount(); },
+    });
+
+    m_cameraController.updateContext(EditorCameraController::Context{
+        .renderCore = m_renderCore,
+        .settings = &m_settings,
+        .worldRenderer = m_worldRenderer,
+    });
+}
 
 void SceneEditor::SyncInputRouterContext()
 {
@@ -1408,6 +1227,7 @@ void SceneEditor::SyncInputRouterContext()
 
 void SceneEditor::onEvent(caustica::Event& event)
 {
+    SyncSubsystemContext();
     SyncInputRouterContext();
     m_inputRouter.onEvent(event);
 }

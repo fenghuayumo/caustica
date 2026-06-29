@@ -18,6 +18,8 @@
 #include <render/SessionDiagnostics.h>
 #include "ui/EditorUIData.h"
 #include "EditorInputRouter.h"
+#include "SceneContentEditor.h"
+#include "EditorCameraController.h"
 #include <render/RenderSessionState.h>
 
 #include <chrono>
@@ -271,11 +273,13 @@ protected:
 
     caustica::render::PathTracingWorldRenderer* m_worldRenderer = nullptr;
     EditorInputRouter m_inputRouter;
+    SceneContentEditor m_contentEditor;
+    EditorCameraController m_cameraController;
 
     const caustica::PlanarView& GetView() const;
 
 private:
-    void                                    UpdateCameraFromScene( const std::shared_ptr<caustica::PerspectiveCamera> & sceneCamera );
+    void                                    SyncSubsystemContext();
     void                                    RefreshEnvironmentMapMediaList();
     void                                    SyncInputRouterContext();
 
