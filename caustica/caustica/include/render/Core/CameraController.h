@@ -2,6 +2,7 @@
 
 #include <scene/camera/Camera.h>
 #include <scene/View.h>
+#include <scene/SceneEcs.h>
 #include <render/Passes/Geometry/TemporalAntiAliasingPass.h>
 
 #include <cstdint>
@@ -70,6 +71,7 @@ public:
     [[nodiscard]] dm::float2 computeJitter(const CameraUpdateParams& params) const;
 
     void updateFromSceneCamera(const std::shared_ptr<PerspectiveCamera>& sceneCamera);
+    void updateFromSceneCamera(const scene::PerspectiveCameraData& camData, const dm::daffine3& globalTransform);
 
     void updateViews(const CameraUpdateParams& params);
 

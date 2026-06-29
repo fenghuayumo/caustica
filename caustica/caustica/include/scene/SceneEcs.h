@@ -10,8 +10,10 @@
 
 #include <memory>
 #include <filesystem>
+#include <optional>
 #include <string>
 #include <unordered_map>
+#include <variant>
 #include <vector>
 
 namespace caustica
@@ -125,14 +127,75 @@ struct SkinnedMeshReferenceComponent
     ecs::Entity skinnedMeshEntity = ecs::NullEntity;
 };
 
+struct DirectionalLightData
+{
+    float irradiance = 1.f;
+    float angularSize = 0.f;
+    std::vector<std::shared_ptr<caustica::IShadowMap>> perObjectShadows;
+};
+
+struct SpotLightData
+{
+    float intensity = 1.f;
+    float radius = 0.f;
+    float range = 0.f;
+    float innerAngle = 180.f;
+    float outerAngle = 180.f;
+};
+
+struct PointLightData
+{
+    float intensity = 1.f;
+    float radius = 0.f;
+    float range = 0.f;
+};
+
+struct EnvironmentLightData
+{
+    dm::float3 radianceScale = dm::float3(1.f);
+    int textureIndex = -1;
+    float rotation = 0.f;
+    std::string path;
+};
+
+using LightData = std::variant<DirectionalLightData, SpotLightData, PointLightData, EnvironmentLightData>;
+
 struct LightComponent
 {
-    std::shared_ptr<Light> light;
+    std::shared_ptr<caustica::IShadowMap> shadowMap;
+    int shadowChannel = -1;
+    dm::float3 color = dm::colors::white;
+    LightSamplerLink lightLink;
+    std::vector<std::string> proxies;
+    LightData data;
 };
+
+struct PerspectiveCameraData
+{
+    float zNear = 1.f;
+    float verticalFov = 1.f;
+    std::optional<float> zFar;
+    std::optional<float> aspectRatio;
+    std::optional<bool> enableAutoExposure;
+    std::optional<float> exposureCompensation;
+    std::optional<float> exposureValue;
+    std::optional<float> exposureValueMin;
+    std::optional<float> exposureValueMax;
+};
+
+struct OrthographicCameraData
+{
+    float zNear = 0.f;
+    float zFar = 1.f;
+    float xMag = 1.f;
+    float yMag = 1.f;
+};
+
+using CameraData = std::variant<PerspectiveCameraData, OrthographicCameraData>;
 
 struct CameraComponent
 {
-    std::shared_ptr<SceneCamera> camera;
+    CameraData data;
 };
 
 struct AnimationComponent
@@ -188,7 +251,9 @@ public:
     void setMeshInstance(ecs::Entity entity, const std::shared_ptr<MeshInfo>& mesh);
     void setSkinnedMeshInstance(ecs::Entity entity, SceneTypeFactory& factory, const std::shared_ptr<MeshInfo>& prototypeMesh);
     void setSkinnedMeshReference(ecs::Entity entity, ecs::Entity skinnedMeshEntity);
+    void setLight(ecs::Entity entity, LightComponent component);
     void setLight(ecs::Entity entity, const std::shared_ptr<Light>& light);
+    void setCamera(ecs::Entity entity, CameraComponent component);
     void setCamera(ecs::Entity entity, const std::shared_ptr<SceneCamera>& camera);
     void setAnimation(ecs::Entity entity, const std::shared_ptr<SceneAnimation>& animation);
     void setGaussianSplat(ecs::Entity entity, const std::shared_ptr<GaussianSplat>& splat);

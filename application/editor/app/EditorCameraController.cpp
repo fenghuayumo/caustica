@@ -4,6 +4,7 @@
 #include <render/Passes/PostProcess/ToneMappingPasses.h>
 #include <render/WorldRenderer/PathTracingWorldRenderer.h>
 #include <scene/camera/Camera.h>
+#include <scene/SceneCameraAccess.h>
 
 #include <cmath>
 
@@ -123,6 +124,30 @@ void EditorCameraController::syncFromSceneCamera(const std::shared_ptr<caustica:
         sceneCameraEx->exposureValueMin.value_or(defaults.exposureValueMin);
     m_ctx.settings->ToneMappingParams.exposureValueMax =
         sceneCameraEx->exposureValueMax.value_or(defaults.exposureValueMax);
+}
+
+void EditorCameraController::syncFromSceneCamera(
+    const caustica::scene::PerspectiveCameraData& camData,
+    const dm::daffine3& globalTransform)
+{
+    if (!m_ctx.renderCore || !m_ctx.settings)
+        return;
+
+    m_ctx.renderCore->camera().updateFromSceneCamera(camData, globalTransform);
+
+    ToneMappingParameters defaults;
+    m_ctx.settings->ToneMappingParams.autoExposure =
+        camData.enableAutoExposure.value_or(defaults.autoExposure);
+    m_ctx.settings->ToneMappingParams.exposureCompensation =
+        camData.exposureCompensation.value_or(defaults.exposureCompensation);
+    m_ctx.settings->ToneMappingParams.exposureValue =
+        camData.exposureValue.value_or(defaults.exposureValue);
+    m_ctx.settings->ToneMappingParams.exposureValueMin =
+        camData.exposureValueMin.value_or(defaults.exposureValueMin);
+    m_ctx.settings->ToneMappingParams.exposureValueMax =
+        camData.exposureValueMax.value_or(defaults.exposureValueMax);
+
+    markCameraChanged();
 }
 
 } // namespace caustica::editor

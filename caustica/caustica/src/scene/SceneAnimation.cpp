@@ -1,5 +1,6 @@
 #include <scene/SceneAnimation.h>
 #include <scene/SceneEcs.h>
+#include <scene/SceneLightAccess.h>
 #include <scene/SceneMeshAccess.h>
 #include <core/log.h>
 
@@ -80,9 +81,9 @@ bool SceneAnimationChannel::Apply(float time, scene::SceneEntityWorld& world) co
             else
             {
                 auto* lightComp = world.world().get<scene::LightComponent>(m_TargetEntity);
-                if (lightComp && lightComp->light)
+                if (lightComp)
                 {
-                    if (!lightComp->light->SetProperty(m_LeafPropertyName, value))
+                    if (!scene::SetLightProperty(*lightComp, m_LeafPropertyName, value))
                     {
                         caustica::warning("Cannot set property '%s' on light: the light doesn't support this property.",
                             m_LeafPropertyName.c_str());

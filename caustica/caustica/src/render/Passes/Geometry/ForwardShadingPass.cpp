@@ -3,8 +3,11 @@
 #include <render/Core/FramebufferFactory.h>
 #include <assets/loader/ShaderFactory.h>
 #include <render/Core/ShadowMap.h>
+#include <scene/Scene.h>
 #include <scene/SceneTypes.h>
-#include <scene/SceneObjects.h> // Light / shadowMap full definition
+#include <scene/SceneObjects.h>
+#include <scene/SceneEcs.h>
+#include <scene/SceneLightAccess.h>
 #include <render/Core/CommonRenderPasses.h>
 #include <render/Core/MaterialBindingCache.h>
 #include <core/log.h>
@@ -326,20 +329,25 @@ void ForwardShadingPass::SetupView(
 void ForwardShadingPass::PrepareLights(
     Context& context,
     nvrhi::ICommandList* commandList,
-    const std::vector<std::shared_ptr<Light>>& lights,
+    const caustica::Scene& scene,
     dm::float3 ambientColorTop,
     dm::float3 ambientColorBottom,
     const std::vector<std::shared_ptr<LightProbe>>& lightProbes)
 {
     nvrhi::ITexture* shadowMapTexture = nullptr;
     int2 shadowMapTextureSize = 0;
-    for (const auto& light : lights)
+    const auto* ew = scene.GetEntityWorld();
+    if (ew)
     {
-        if (light->shadowMap)
+        for (ecs::Entity entity : scene.GetLightEntities())
         {
-            shadowMapTexture = light->shadowMap->GetTexture();
-            shadowMapTextureSize = light->shadowMap->GetTextureSize();
-            break;
+            const auto* lightComp = ew->world().get<scene::LightComponent>(entity);
+            if (lightComp && lightComp->shadowMap)
+            {
+                shadowMapTexture = lightComp->shadowMap->GetTexture();
+                shadowMapTextureSize = lightComp->shadowMap->GetTextureSize();
+                break;
+            }
         }
     }
 
@@ -381,7 +389,6 @@ void ForwardShadingPass::PrepareLights(
         context.shadingBindingSet = shadingBindings;
     }
 
-
     ForwardShadingLightConstants constants = {};
 
     constants.shadowMapTextureSize = float2(shadowMapTextureSize);
@@ -389,37 +396,46 @@ void ForwardShadingPass::PrepareLights(
 
     int numShadows = 0;
 
-    for (int nLight = 0; nLight < std::min(static_cast<int>(lights.size()), FORWARD_MAX_LIGHTS); nLight++)
+    if (ew)
     {
-        const auto& light = lights[nLight];
-
-        LightConstants& lightConstants = constants.lights[constants.numLights];
-        light->FillLightConstants(lightConstants);
-
-        if (light->shadowMap)
+        const auto& lightEntities = scene.GetLightEntities();
+        const int maxLights = std::min(static_cast<int>(lightEntities.size()), FORWARD_MAX_LIGHTS);
+        for (int nLight = 0; nLight < maxLights; nLight++)
         {
-            for (uint32_t cascade = 0; cascade < light->shadowMap->GetNumberOfCascades(); cascade++)
+            ecs::Entity entity = lightEntities[nLight];
+            const auto* lightComp = ew->world().get<scene::LightComponent>(entity);
+            if (!lightComp) continue;
+            const auto* globalComp = ew->world().get<scene::GlobalTransformComponent>(entity);
+            if (!globalComp) continue;
+
+            LightConstants& lightConstants = constants.lights[constants.numLights];
+            scene::FillLightConstants(*lightComp, globalComp->transform, lightConstants);
+
+            if (lightComp->shadowMap)
             {
-                if (numShadows < FORWARD_MAX_SHADOWS)
+                for (uint32_t cascade = 0; cascade < lightComp->shadowMap->GetNumberOfCascades(); cascade++)
                 {
-                    light->shadowMap->GetCascade(cascade)->FillShadowConstants(constants.shadows[numShadows]);
-                    lightConstants.shadowCascades[cascade] = numShadows;
-                    ++numShadows;
+                    if (numShadows < FORWARD_MAX_SHADOWS)
+                    {
+                        lightComp->shadowMap->GetCascade(cascade)->FillShadowConstants(constants.shadows[numShadows]);
+                        lightConstants.shadowCascades[cascade] = numShadows;
+                        ++numShadows;
+                    }
+                }
+
+                for (uint32_t perObjectShadow = 0; perObjectShadow < lightComp->shadowMap->GetNumberOfPerObjectShadows(); perObjectShadow++)
+                {
+                    if (numShadows < FORWARD_MAX_SHADOWS)
+                    {
+                        lightComp->shadowMap->GetPerObjectShadow(perObjectShadow)->FillShadowConstants(constants.shadows[numShadows]);
+                        lightConstants.perObjectShadows[perObjectShadow] = numShadows;
+                        ++numShadows;
+                    }
                 }
             }
 
-            for (uint32_t perObjectShadow = 0; perObjectShadow < light->shadowMap->GetNumberOfPerObjectShadows(); perObjectShadow++)
-            {
-                if (numShadows < FORWARD_MAX_SHADOWS)
-                {
-                    light->shadowMap->GetPerObjectShadow(perObjectShadow)->FillShadowConstants(constants.shadows[numShadows]);
-                    lightConstants.perObjectShadows[perObjectShadow] = numShadows;
-                    ++numShadows;
-                }
-            }
+            ++constants.numLights;
         }
-
-        ++constants.numLights;
     }
 
     constants.ambientColorTop = float4(ambientColorTop, 0.f);

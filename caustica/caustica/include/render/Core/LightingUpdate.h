@@ -45,7 +45,6 @@ struct UpdateLightingParams
     BindingCache*                                  bindingCache = nullptr;
     std::shared_ptr<CommonRenderPasses>            commonPasses;
 
-    const std::vector<std::shared_ptr<Light>>*     lights = nullptr;
     const std::shared_ptr<Scene>&                  scene;
     std::shared_ptr<MaterialGpuCache>              materials;
     std::shared_ptr<OpacityMicromapBuilder>        opacityMaps;

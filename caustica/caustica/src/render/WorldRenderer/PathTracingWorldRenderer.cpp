@@ -6,6 +6,8 @@ namespace { constexpr int c_SwapchainCount = 3; }
 #include <render/SceneGaussianSplatPasses.h>
 #include <render/SceneRayTracingResources.h>
 
+#include <scene/SceneEcs.h>
+#include <scene/SceneLightAccess.h>
 #include <render/Core/PostProcessAA.h>
 #include <render/Core/SceneGeometryUpdate.h>
 #include <render/Core/LightingUpdate.h>
@@ -530,7 +532,6 @@ void caustica::render::PathTracingWorldRenderer::updateLighting(nvrhi::CommandLi
         m_context.lightSampling.get(),
         &m_context.bindingCache,
         m_context.commonPasses,
-        &m_context.lights,
         m_context.sceneManager.getScene(),
         m_context.materials,
         m_context.opacityMaps,
@@ -1099,15 +1100,27 @@ void caustica::render::PathTracingWorldRenderer::renderGaussianSplats(bool rende
         settings.stochasticFrameIndex = uint32_t(m_sampleIndex >= 0
             ? uint32_t(m_sampleIndex)
             : uint32_t(m_frameIndex & 0xffffffffu));
-    for (const auto& light : m_context.lights)
     {
-        std::shared_ptr<DirectionalLight> dirLight = std::dynamic_pointer_cast<DirectionalLight>(light);
-        if (dirLight != nullptr)
+        auto scene = m_context.sceneManager.getScene();
+        if (scene)
         {
-            LightConstants lightConstants;
-            dirLight->FillLightConstants(lightConstants);
-            settings.shadowDirectionToLight = -lightConstants.direction;
-            break;
+            const auto* ew = scene->GetEntityWorld();
+            if (ew)
+            {
+                for (ecs::Entity entity : scene->GetLightEntities())
+                {
+                    const auto* lightComp = caustica::scene::TryGetLight(ew->world(), entity);
+                    if (!lightComp || !caustica::scene::TryGetDirectionalLightData(*lightComp))
+                        continue;
+                    const auto* globalComp = ew->world().get<caustica::scene::GlobalTransformComponent>(entity);
+                    if (!globalComp)
+                        continue;
+                    LightConstants lightConstants;
+                    caustica::scene::FillLightConstants(*lightComp, globalComp->transform, lightConstants);
+                    settings.shadowDirectionToLight = -lightConstants.direction;
+                    break;
+                }
+            }
         }
     }
 

@@ -91,7 +91,6 @@ void EngineRenderer::createPathTracer(const PathTracerSessionParams& session)
         .materials = lighting.materials(),
         .opacityMaps = lighting.opacityMaps(),
         .computePipelines = lighting.computePipelines(),
-        .lights = lighting.lights(),
         .envMapSceneParams = lighting.envMapSceneParams(),
         .envMapLocalPath = lighting.envMapLocalPath(),
         .envMapOverride = lighting.envMapOverride(),

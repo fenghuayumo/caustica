@@ -1,5 +1,6 @@
 #include <scene/Scene.h>
 #include <scene/SceneImport.h>
+#include <scene/SceneLightAccess.h>
 #include <scene/SceneObjects.h>
 #include <scene/SceneAnimation.h>
 #include <scene/loader/GltfImporter.h>
@@ -303,21 +304,21 @@ const std::vector<ecs::Entity>& Scene::GetSkinnedMeshInstances() const
     return s_empty;
 }
 
-const std::vector<std::shared_ptr<Light>>& Scene::GetLights() const
+const std::vector<ecs::Entity>& Scene::GetLightEntities() const
 {
     if (m_EntityWorld)
-        return m_EntityWorld->GetLights();
+        return m_EntityWorld->GetLightEntities();
 
-    static const std::vector<std::shared_ptr<Light>> s_empty;
+    static const std::vector<ecs::Entity> s_empty;
     return s_empty;
 }
 
-const std::vector<std::shared_ptr<SceneCamera>>& Scene::GetCameras() const
+const std::vector<ecs::Entity>& Scene::GetCameraEntities() const
 {
     if (m_EntityWorld)
-        return m_EntityWorld->GetCameras();
+        return m_EntityWorld->GetCameraEntities();
 
-    static const std::vector<std::shared_ptr<SceneCamera>> s_empty;
+    static const std::vector<ecs::Entity> s_empty;
     return s_empty;
 }
 
@@ -337,6 +338,16 @@ void Scene::AttachLightToRoot(const std::shared_ptr<Light>& light)
 
     ecs::Entity entity = m_EntityWorld->createEntity(light->name, m_EntityWorld->root());
     m_EntityWorld->setLight(entity, light);
+    m_EntityWorld->rebuildPathsFromRoot();
+}
+
+void Scene::AttachLightToRoot(scene::LightComponent component, const std::string& name)
+{
+    if (!m_EntityWorld || !ecs::isValid(m_EntityWorld->root()))
+        return;
+
+    ecs::Entity entity = m_EntityWorld->createEntity(name, m_EntityWorld->root());
+    m_EntityWorld->setLight(entity, std::move(component));
     m_EntityWorld->rebuildPathsFromRoot();
 }
 
@@ -1019,15 +1030,11 @@ void Scene::ProcessNodesRecursive()
 
     world.each<scene::LightComponent>([this, &world](ecs::Entity lightEntity, scene::LightComponent& component)
     {
-        const auto& light = component.light;
-        if (light == nullptr ||
-            (light->GetLightType() != LightType_Spot && light->GetLightType() != LightType_Point) ||
-            light->Proxies.empty())
-        {
+        const int lightType = scene::GetLightType(component);
+        if ((lightType != LightType_Spot && lightType != LightType_Point) || component.proxies.empty())
             return;
-        }
 
-        for (const auto& proxyPath : light->Proxies)
+        for (const auto& proxyPath : component.proxies)
         {
             ecs::Entity proxyEntity = m_EntityWorld->entityForPath(proxyPath);
             if (!ecs::isValid(proxyEntity))

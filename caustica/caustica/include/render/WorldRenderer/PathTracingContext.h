@@ -32,7 +32,6 @@ namespace caustica
 {
 class BindingCache;
 class CommonRenderPasses;
-class Light;
 class ShaderFactory;
 
 namespace render
@@ -72,7 +71,6 @@ struct PathTracingContext
     std::shared_ptr<OpacityMicromapBuilder>& opacityMaps;
     std::shared_ptr<ComputePipelineRegistry>& computePipelines;
 
-    std::vector<std::shared_ptr<Light>>& lights;
     EnvMapSceneParams& envMapSceneParams;
     std::string& envMapLocalPath;
     std::string& envMapOverride;

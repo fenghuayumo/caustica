@@ -3,6 +3,7 @@
 #include <render/Passes/RTXDI/RtxdiResources.h>
 #include <scene/Scene.h>
 #include <scene/SceneEcs.h>
+#include <scene/SceneLightAccess.h>
 
 #include <assets/loader/ShaderFactory.h>
 #include <render/Core/CommonRenderPasses.h>
@@ -246,127 +247,90 @@ static uint16_t fp32ToFp16(float v)
     return (uint16_t)(sign >> 16 | body >> 13) & 0xFFFF;
 }
 
-static bool ConvertLight(const caustica::Light& light, PolymorphicLightInfoFull& polymorphic, bool enableImportanceSampledEnvironmentLight, EnvMapProcessor* environmentMap)
+static bool ConvertLightComponent(
+    const caustica::scene::LightComponent& comp,
+    const dm::daffine3& globalTransform,
+    PolymorphicLightInfoFull& polymorphic,
+    bool enableImportanceSampledEnvironmentLight,
+    EnvMapProcessor* /*environmentMap*/)
 {
-    switch (light.GetLightType())
+    using namespace caustica::scene;
+    switch (GetLightType(comp))
     {
-#if 0 // we're now baking these into the environment map!
-    case LightType_Directional: {
-        auto& directional = static_cast<const caustica::DirectionalLight&>(light);
-        float clampedAngularSize = clamp(directional.angularSize, 0.f, 90.f);
-        float halfAngularSizeRad = 0.5f * dm::radians(clampedAngularSize);
-        float solidAngle = float(2 * dm::PI_d * (1.0 - cos(halfAngularSizeRad)));
-        float3 radiance = directional.color * directional.irradiance / solidAngle;
+    case LightType_Spot: {
+        const auto& spot = std::get<SpotLightData>(comp.data);
+        const float3 lightPos = float3(GetLightPosition(globalTransform));
+        const float3 lightDir = float3(normalize(GetLightDirection(globalTransform)));
 
-        polymorphic.Base.ColorTypeAndFlags = (uint32_t)PolymorphicLightType::kDirectional << kPolymorphicLightTypeShift;
-        packLightColor(radiance, polymorphic);
-        polymorphic.Base.Direction1 = NDirToOctUnorm32(float3(normalize(directional.GetDirection())));
-        // Can't pass cosines of small angles reliably with fp16
-        polymorphic.Base.Scalars = fp32ToFp16(halfAngularSizeRad) | (fp32ToFp16(solidAngle) << 16);
-        return true;
-    }
-#endif
- 
-	case LightType_Spot: {
-		auto& spot = dynamic_cast<const SpotLight&>(light);
-
-        // Sphere lights not supported in the RTXPT currently
         if (spot.radius == 0.f)
         {
-			float3 flux = spot.color * spot.intensity;
-
-			polymorphic.Base.ColorTypeAndFlags = (uint32_t)PolymorphicLightType::kPoint << kPolymorphicLightTypeShift | ((spot.outerAngle < 0)?(kPolymorphicLightShapingUseMinFalloff):(0));
-			packLightColor(flux, polymorphic);
-			polymorphic.Base.Center = float3(spot.GetPosition());
-            polymorphic.Base.Direction1 = NDirToOctUnorm32(float3(normalize(spot.GetDirection())));
+            float3 flux = comp.color * spot.intensity;
+            polymorphic.Base.ColorTypeAndFlags = (uint32_t)PolymorphicLightType::kPoint << kPolymorphicLightTypeShift | ((spot.outerAngle < 0) ? kPolymorphicLightShapingUseMinFalloff : 0);
+            packLightColor(flux, polymorphic);
+            polymorphic.Base.Center = lightPos;
+            polymorphic.Base.Direction1 = NDirToOctUnorm32(lightDir);
             polymorphic.Base.Direction2 = fp32ToFp16(dm::radians(abs(spot.outerAngle)));
-			polymorphic.Base.Direction2 |= fp32ToFp16(dm::radians(spot.innerAngle)) << 16;
+            polymorphic.Base.Direction2 |= fp32ToFp16(dm::radians(spot.innerAngle)) << 16;
         }
         else
         {
-
             float projectedArea = dm::PI_f * square(spot.radius);
-            float3 radiance = spot.color * spot.intensity / projectedArea;
+            float3 radiance = comp.color * spot.intensity / projectedArea;
             float softness = saturate(1.f - spot.innerAngle / abs(spot.outerAngle));
-
-            polymorphic.Base.ColorTypeAndFlags = (uint32_t)PolymorphicLightType::kSphere << kPolymorphicLightTypeShift | ((spot.outerAngle < 0)?(kPolymorphicLightShapingUseMinFalloff):(0));
+            polymorphic.Base.ColorTypeAndFlags = (uint32_t)PolymorphicLightType::kSphere << kPolymorphicLightTypeShift | ((spot.outerAngle < 0) ? kPolymorphicLightShapingUseMinFalloff : 0);
             polymorphic.Base.ColorTypeAndFlags |= kPolymorphicLightShapingEnableBit;
             packLightColor(radiance, polymorphic);
-            polymorphic.Base.Center = float3(spot.GetPosition());
+            polymorphic.Base.Center = lightPos;
             polymorphic.Base.Scalars = fp32ToFp16(spot.radius);
-            polymorphic.Extended.PrimaryAxis = NDirToOctUnorm32(float3(normalize(spot.GetDirection())));
+            polymorphic.Extended.PrimaryAxis = NDirToOctUnorm32(lightDir);
             polymorphic.Extended.CosConeAngleAndSoftness = fp32ToFp16(cosf(dm::radians(abs(spot.outerAngle))));
             polymorphic.Extended.CosConeAngleAndSoftness |= fp32ToFp16(softness) << 16;
         }
-
-		return true;
-	}
-   /* case LightType_Spot: {
-   *    // Spot Light with ies profile
-        auto& spot = static_cast<const SpotLightWithProfile&>(light);
-        float projectedArea = dm::PI_f * square(spot.radius);
-        float3 radiance = spot.color * spot.intensity / projectedArea;
-        float softness = saturate(1.f - spot.innerAngle / abs(spot.outerAngle));
-
-        polymorphic.Base.ColorTypeAndFlags = (uint32_t)PolymorphicLightType::kSphere << kPolymorphicLightTypeShift;
-        polymorphic.Base.ColorTypeAndFlags |= kPolymorphicLightShapingEnableBit;
-        packLightColor(radiance, polymorphic);
-        polymorphic.Base.Center = float3(spot.GetPosition());
-        polymorphic.Base.Scalars = fp32ToFp16(spot.radius);
-        polymorphic.Extended.PrimaryAxis = packNormalizedVector(float3(normalize(spot.GetDirection())));
-        polymorphic.Extended.CosConeAngleAndSoftness = fp32ToFp16(cosf(dm::radians(abs(spot.outerAngle))));
-        polymorphic.Extended.CosConeAngleAndSoftness |= fp32ToFp16(softness) << 16;
-
-        if (spot.profileTextureIndex >= 0)
-        {
-            polymorphic.Extended.iesProfileIndex = spot.profileTextureIndex;
-            polymorphic.Extended.ColorTypeAndFlags |= kPolymorphicLightIesProfileEnableBit;
-        }
-
         return true;
-    }*/
+    }
     case LightType_Point: {
-        auto& point = dynamic_cast<const caustica::PointLight&>(light);
-     
+        const auto& point = std::get<PointLightData>(comp.data);
+        const float3 lightPos = float3(GetLightPosition(globalTransform));
+
         if (point.radius == 0.f)
         {
-            float3 flux = point.color * point.intensity;
-
+            float3 flux = comp.color * point.intensity;
             polymorphic.Base.ColorTypeAndFlags = (uint32_t)PolymorphicLightType::kPoint << kPolymorphicLightTypeShift;
             packLightColor(flux, polymorphic);
-            polymorphic.Base.Center = float3(point.GetPosition());
-            // Set the default values so we can use the same path for spot lights 
+            polymorphic.Base.Center = lightPos;
             polymorphic.Base.Direction2 = fp32ToFp16(dm::PI_f) | fp32ToFp16(0.0f) << 16;
         }
         else
         {
             float projectedArea = dm::PI_f * square(point.radius);
-            float3 radiance = point.color * point.intensity / projectedArea;
-
+            float3 radiance = comp.color * point.intensity / projectedArea;
             polymorphic.Base.ColorTypeAndFlags = (uint32_t)PolymorphicLightType::kSphere << kPolymorphicLightTypeShift;
             packLightColor(radiance, polymorphic);
-            polymorphic.Base.Center = float3(point.GetPosition());
+            polymorphic.Base.Center = lightPos;
             polymorphic.Base.Scalars = fp32ToFp16(point.radius);
         }
 
         return true;
     }
     case LightType_Environment: {
-        // do not add an environment light to the light list if the option is disabled 
-        if (enableImportanceSampledEnvironmentLight)
-        {
-            auto& env = static_cast<const EnvironmentLight&>(light);
-
-            polymorphic.Base.ColorTypeAndFlags = (uint32_t)PolymorphicLightType::kEnvironment << kPolymorphicLightTypeShift;
-        
-            polymorphic.Base.Direction2 = 0;
-
-            return true;
-        }
-        return false;
+        if (!enableImportanceSampledEnvironmentLight)
+            return false;
+        polymorphic.Base.ColorTypeAndFlags = (uint32_t)PolymorphicLightType::kEnvironment << kPolymorphicLightTypeShift;
+        polymorphic.Base.Direction2 = 0;
+        return true;
     }
     default:
         return false;
+    }
+}
+
+static int isInfiniteLightComponent(const caustica::scene::LightComponent& comp)
+{
+    switch (caustica::scene::GetLightType(comp))
+    {
+    case LightType_Directional: return 1;
+    case LightType_Environment: return 2;
+    default: return 0;
     }
 }
 
@@ -424,20 +388,6 @@ static PolymorphicLightInfoFull ConvertGaussianSplatEmissionProxy(
     return polymorphic;
 }
 
-static int isInfiniteLight(const caustica::Light& light)
-{
-    switch (light.GetLightType())
-    {
-    case LightType_Directional:
-        return 1;
-
-    case LightType_Environment:
-        return 2;
-
-    default:
-        return 0;
-    }
-}
 
 RTXDI_LightBufferParameters PrepareLightsPass::Process(nvrhi::ICommandList* commandList)
 {
@@ -509,9 +459,19 @@ RTXDI_LightBufferParameters PrepareLightsPass::Process(nvrhi::ICommandList* comm
 	lightBufferParams.localLightBufferRegion.firstLightIndex = 0;
 	lightBufferParams.localLightBufferRegion.numLights = lightBufferOffset;
 
-    auto sortedLights = m_Scene->GetLights();
-    std::sort(sortedLights.begin(), sortedLights.end(), [](const auto& a, const auto& b) 
-        { return isInfiniteLight(*a) < isInfiniteLight(*b); });
+    const auto& lightEntities = m_Scene->GetLightEntities();
+    auto* lightEntityWorld = m_Scene->GetEntityWorld();
+
+    // Sort entities: finite first (0), directional next (1), environment last (2)
+    std::vector<ecs::Entity> sortedLightEntities = lightEntities;
+    std::sort(sortedLightEntities.begin(), sortedLightEntities.end(),
+        [lightEntityWorld](ecs::Entity a, ecs::Entity b) {
+            if (!lightEntityWorld) return false;
+            const auto* ca = lightEntityWorld->world().get<caustica::scene::LightComponent>(a);
+            const auto* cb = lightEntityWorld->world().get<caustica::scene::LightComponent>(b);
+            return isInfiniteLightComponent(ca ? *ca : caustica::scene::LightComponent{})
+                 < isInfiniteLightComponent(cb ? *cb : caustica::scene::LightComponent{});
+        });
 
     uint32_t numFinitePrimLights = 0;
     uint32_t numInfinitePrimLights = 0;
@@ -543,31 +503,34 @@ RTXDI_LightBufferParameters PrepareLightsPass::Process(nvrhi::ICommandList* comm
         }
     }
 
-    for (const std::shared_ptr<Light>& pLight : sortedLights)
+    for (ecs::Entity entity : sortedLightEntities)
     {
+        if (!lightEntityWorld) continue;
+        const auto* lightComp = lightEntityWorld->world().get<caustica::scene::LightComponent>(entity);
+        if (!lightComp) continue;
+        const auto* globalComp = lightEntityWorld->world().get<caustica::scene::GlobalTransformComponent>(entity);
+        if (!globalComp) continue;
+
         PolymorphicLightInfoFull polymorphicLight = {};
-       
-        if (!ConvertLight(*pLight, polymorphicLight, enableImportanceSampledEnvironmentLight, m_EnvironmentMap.get()))
+        if (!ConvertLightComponent(*lightComp, globalComp->transform, polymorphicLight, enableImportanceSampledEnvironmentLight, m_EnvironmentMap.get()))
             continue;
 
-        // find the previous offset of this instance in the light buffer
-        auto pOffset = m_PrimitiveLightBufferOffsets.find(pLight.get());
+        auto pOffset = m_PrimitiveLightBufferOffsets.find(entity);
 
         PrepareLightsTask task;
         task.instanceAndGeometryIndex = TASK_PRIMITIVE_LIGHT_BIT | uint32_t(primitiveLightInfos.size());
         task.lightBufferOffset = lightBufferOffset;
-        task.triangleCount = 1; // technically zero, but we need to allocate 1 thread in the grid to process this light
+        task.triangleCount = 1;
         task.previousLightBufferOffset = (pOffset != m_PrimitiveLightBufferOffsets.end()) ? pOffset->second : -1;
 
-        // record the current offset of this instance for use on the next frame
-        m_PrimitiveLightBufferOffsets[pLight.get()] = lightBufferOffset;
+        m_PrimitiveLightBufferOffsets[entity] = lightBufferOffset;
 
         lightBufferOffset += task.triangleCount;
 
         tasks.push_back(task);
         primitiveLightInfos.push_back(polymorphicLight);
 
-        if (isInfiniteLight(*pLight))
+        if (isInfiniteLightComponent(*lightComp))
             numInfinitePrimLights++;
         else
             numFinitePrimLights++;

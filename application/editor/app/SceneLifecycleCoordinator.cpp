@@ -15,6 +15,7 @@
 #include <render/WorldRenderer/PathTracingWorldRenderer.h>
 #include <scene/Scene.h>
 #include <scene/SceneEcs.h>
+#include <scene/SceneCameraAccess.h>
 #include <scene/camera/Camera.h>
 #include <scene/scene_utils.h>
 #include <ecs/Entity.h>
@@ -176,12 +177,26 @@ void SceneLifecycleCoordinator::onSceneLoaded()
         }
     }
 
-    auto cameras = m_ctx.sceneManager->getScene()->GetCameras();
-    auto camScene = cameras.empty() ? nullptr : std::dynamic_pointer_cast<caustica::PerspectiveCamera>(cameras.back());
-    if (camScene && m_ctx.cameraController)
-        m_ctx.cameraController->syncFromSceneCamera(camScene);
-    else if (m_ctx.renderCore)
-        m_ctx.renderCore->camera().setupDefaultCamera();
+    {
+        auto scene = m_ctx.sceneManager->getScene();
+        const auto& cameraEntities = scene->GetCameraEntities();
+        const auto* ew = scene->GetEntityWorld();
+        bool syncedCamera = false;
+        if (!cameraEntities.empty() && ew && m_ctx.cameraController)
+        {
+            ecs::Entity camEntity = cameraEntities.back();
+            const auto* camComp = scene::TryGetCamera(ew->world(), camEntity);
+            const auto* persData = camComp ? scene::TryGetPerspectiveCameraData(*camComp) : nullptr;
+            const auto* globalComp = ew->world().get<scene::GlobalTransformComponent>(camEntity);
+            if (persData && globalComp)
+            {
+                m_ctx.cameraController->syncFromSceneCamera(*persData, globalComp->transform);
+                syncedCamera = true;
+            }
+        }
+        if (!syncedCamera && m_ctx.renderCore)
+            m_ctx.renderCore->camera().setupDefaultCamera();
+    }
 
     if (m_ctx.renderCore && m_ctx.renderState)
     {

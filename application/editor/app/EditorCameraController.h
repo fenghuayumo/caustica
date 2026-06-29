@@ -2,6 +2,7 @@
 
 #include <render/Core/CameraController.h>
 #include <render/Core/PathTracerSettings.h>
+#include <scene/SceneEcs.h>
 
 #include <memory>
 #include <string>
@@ -46,6 +47,7 @@ public:
     void loadFromFile();
 
     void syncFromSceneCamera(const std::shared_ptr<caustica::PerspectiveCamera>& sceneCamera);
+    void syncFromSceneCamera(const caustica::scene::PerspectiveCameraData& camData, const dm::daffine3& globalTransform);
 
     const caustica::FirstPersonCamera& camera() const;
     const std::shared_ptr<caustica::PlanarView>& view() const;

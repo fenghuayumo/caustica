@@ -1,5 +1,7 @@
 #include <scene/SceneEcs.h>
 #include <scene/SceneAnimation.h>
+#include <scene/SceneCameraAccess.h>
+#include <scene/SceneLightAccess.h>
 #include <scene/SceneMeshAccess.h>
 
 #include <algorithm>
@@ -194,8 +196,8 @@ void SceneEntityWorld::clear()
     m_GeometryInstancesCount = 0;
     m_MeshInstanceEntities.clear();
     m_SkinnedMeshInstanceEntities.clear();
-    m_Lights.clear();
-    m_Cameras.clear();
+    m_LightEntities.clear();
+    m_CameraEntities.clear();
     m_Animations.clear();
     m_structureDirty = true;
     m_transformDirty = true;
@@ -225,16 +227,6 @@ void SceneEntityWorld::refresh(uint32_t frameIndex)
 
     refreshHierarchy(PreviousTransformPolicy::CaptureCurrent);
 
-    m_world.each<LightComponent, GlobalTransformComponent>(
-        [](ecs::Entity entity, LightComponent& lightComponent, GlobalTransformComponent& global) {
-            lightComponent.light->ownerEntity = entity;
-            lightComponent.light->cachedGlobalTransform = global.transform;
-        });
-    m_world.each<CameraComponent, GlobalTransformComponent>(
-        [](ecs::Entity entity, CameraComponent& cameraComponent, GlobalTransformComponent& global) {
-            cameraComponent.camera->ownerEntity = entity;
-            cameraComponent.camera->cachedGlobalTransform = global.transform;
-        });
     m_world.each<GaussianSplatComponent, GlobalTransformComponent>(
         [](ecs::Entity entity, GaussianSplatComponent& splatComponent, GlobalTransformComponent& global) {
             splatComponent.splat->ownerEntity = entity;
@@ -345,16 +337,10 @@ void SceneEntityWorld::unregisterEntityLeaves(ecs::Entity entity)
     {
         UnregisterMeshInstanceEntity(entity, mesh->mesh, m_world.has<SkinnedMeshComponent>(entity));
     }
-    if (auto* camera = m_world.get<CameraComponent>(entity))
-    {
-        if (camera->camera)
-            UnregisterLeaf(camera->camera);
-    }
-    if (auto* light = m_world.get<LightComponent>(entity))
-    {
-        if (light->light)
-            UnregisterLeaf(light->light);
-    }
+    if (m_world.has<CameraComponent>(entity))
+        UnregisterCameraEntity(entity);
+    if (m_world.has<LightComponent>(entity))
+        UnregisterLightEntity(entity);
     if (auto* animation = m_world.get<AnimationComponent>(entity))
     {
         if (animation->animation)
@@ -515,16 +501,10 @@ void SceneEntityWorld::updateLeafContentAndBounds(ecs::Entity entity)
             localBounds = GetMeshLocalBounds(*mesh->mesh);
         }
     }
-    else if (auto* camera = m_world.get<CameraComponent>(entity))
-    {
-        if (camera->camera)
-            leafContent = camera->camera->GetContentFlags();
-    }
-    else if (auto* light = m_world.get<LightComponent>(entity))
-    {
-        if (light->light)
-            leafContent = light->light->GetContentFlags();
-    }
+    else if (m_world.has<CameraComponent>(entity))
+        leafContent = GetCameraContentFlags();
+    else if (m_world.has<LightComponent>(entity))
+        leafContent = GetLightContentFlags();
     else if (auto* animation = m_world.get<AnimationComponent>(entity))
     {
         if (animation->animation)
@@ -578,13 +558,27 @@ void SceneEntityWorld::setSkinnedMeshReference(ecs::Entity entity, ecs::Entity s
     updateLeafContentAndBounds(entity);
 }
 
+void SceneEntityWorld::setLight(ecs::Entity entity, LightComponent component)
+{
+    m_world.emplace<LightComponent>(entity, std::move(component));
+    RegisterLightEntity(entity);
+    updateLeafContentAndBounds(entity);
+    markStructureDirty();
+}
+
 void SceneEntityWorld::setLight(ecs::Entity entity, const std::shared_ptr<Light>& light)
 {
     if (!light)
         return;
-    light->ownerEntity = entity;
-    m_world.emplace<LightComponent>(entity, LightComponent{ light });
-    RegisterLeaf(light);
+    LightComponent component;
+    InitializeLightComponent(component, light);
+    setLight(entity, std::move(component));
+}
+
+void SceneEntityWorld::setCamera(ecs::Entity entity, CameraComponent component)
+{
+    m_world.emplace<CameraComponent>(entity, std::move(component));
+    RegisterCameraEntity(entity);
     updateLeafContentAndBounds(entity);
     markStructureDirty();
 }
@@ -593,11 +587,9 @@ void SceneEntityWorld::setCamera(ecs::Entity entity, const std::shared_ptr<Scene
 {
     if (!camera)
         return;
-    camera->ownerEntity = entity;
-    m_world.emplace<CameraComponent>(entity, CameraComponent{ camera });
-    RegisterLeaf(camera);
-    updateLeafContentAndBounds(entity);
-    markStructureDirty();
+    CameraComponent component;
+    InitializeCameraComponent(component, camera);
+    setCamera(entity, std::move(component));
 }
 
 void SceneEntityWorld::setAnimation(ecs::Entity entity, const std::shared_ptr<SceneAnimation>& animation)
@@ -664,16 +656,10 @@ ecs::Entity SceneEntityWorld::importSubtree(ecs::Entity parent, const SceneEntit
                         dstEntity, mesh->mesh, m_world.has<SkinnedMeshComponent>(dstEntity));
                 }
             }
-            if (auto* light = m_world.get<LightComponent>(dstEntity))
-            {
-                if (light->light)
-                    RegisterLeaf(light->light);
-            }
-            if (auto* camera = m_world.get<CameraComponent>(dstEntity))
-            {
-                if (camera->camera)
-                    RegisterLeaf(camera->camera);
-            }
+            if (m_world.has<LightComponent>(dstEntity))
+                RegisterLightEntity(dstEntity);
+            if (m_world.has<CameraComponent>(dstEntity))
+                RegisterCameraEntity(dstEntity);
             if (auto* animation = m_world.get<AnimationComponent>(dstEntity))
             {
                 if (animation->animation)

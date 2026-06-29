@@ -263,7 +263,7 @@ void RtxdiPass::PrepareResources(
     bool envMapPresent = envMap != nullptr;
     uint32_t numEmissiveMeshes, numEmissiveTriangles = 0;
     m_PrepareLightsPass->CountLightsInScene(numEmissiveMeshes, numEmissiveTriangles);
-    uint32_t numPrimitiveLights = uint32_t(m_Scene->GetLights().size());
+    uint32_t numPrimitiveLights = uint32_t(m_Scene->GetLightEntities().size());
     if (m_BridgeParameters.gaussianSplatEmissionProxies != nullptr && m_BridgeParameters.gaussianSplatEmissionIntensity > 0.0f)
         numPrimitiveLights += uint32_t(m_BridgeParameters.gaussianSplatEmissionProxies->size());
     uint32_t numGeometryInstances = uint32_t(m_Scene->GetGeometryInstancesCount());

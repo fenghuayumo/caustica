@@ -1,6 +1,7 @@
 #pragma once
 
 #include <scene/SceneObjects.h>
+#include <ecs/Entity.h>
 #include <rhi/nvrhi.h>
 #include <rtxdi/DI/ReSTIRDI.h>
 #include <memory>
@@ -15,7 +16,6 @@ namespace caustica
 {
     class CommonRenderPasses;
     class ShaderFactory;
-    class Light;
 }
 
 #include <scene/Scene.h>
@@ -61,7 +61,7 @@ private:
     float m_GaussianSplatEmissionIntensity = 0.0f;
 
     std::unordered_map<size_t, uint32_t> m_InstanceLightBufferOffsets; // hash(instance*, geometryIndex) -> bufferOffset
-    std::unordered_map<const caustica::Light*, uint32_t> m_PrimitiveLightBufferOffsets;
+    std::unordered_map<caustica::ecs::Entity, uint32_t> m_PrimitiveLightBufferOffsets;
 
     std::shared_ptr<ShaderDebug>   m_shaderDebug;
 

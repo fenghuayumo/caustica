@@ -69,6 +69,7 @@
 #include <render/Passes/Denoisers/OidnDenoiser.h>
 
 #include <scene/SceneEcs.h>
+#include <scene/SceneCameraAccess.h>
 
 #include <stb_image.h>
 #include <stb_image_write.h>
@@ -359,7 +360,7 @@ uint SceneEditor::GetSceneCameraCount() const
     auto scene = GetScene();
     if (!scene)
         return 1;
-    return (uint)scene->GetCameras().size() + 1;
+    return (uint)scene->GetCameraEntities().size() + 1;
 }
 
 uint& SceneEditor::SelectedCameraIndex()
@@ -594,9 +595,21 @@ void SceneEditor::Animate(float fElapsedTimeSeconds)
     m_renderCore->camera().selectedCameraIndex() = std::min( m_renderCore->camera().selectedCameraIndex(), GetSceneCameraCount()-1 );
     if (m_renderCore->camera().selectedCameraIndex() > 0)
     {
-        std::shared_ptr<caustica::PerspectiveCamera> sceneCamera = std::dynamic_pointer_cast<PerspectiveCamera>(m_sceneManager->getScene()->GetCameras()[m_renderCore->camera().selectedCameraIndex()-1]);
-        if (sceneCamera != nullptr)
-            m_cameraController.syncFromSceneCamera(sceneCamera);
+        {
+            auto scene = m_sceneManager->getScene();
+            const auto& cameraEntities = scene->GetCameraEntities();
+            const uint32_t camIdx = m_renderCore->camera().selectedCameraIndex() - 1;
+            const auto* ew = (camIdx < cameraEntities.size()) ? scene->GetEntityWorld() : nullptr;
+            if (ew)
+            {
+                ecs::Entity camEntity = cameraEntities[camIdx];
+                const auto* camComp = scene::TryGetCamera(ew->world(), camEntity);
+                const auto* persData = camComp ? scene::TryGetPerspectiveCameraData(*camComp) : nullptr;
+                const auto* globalComp = ew->world().get<scene::GlobalTransformComponent>(camEntity);
+                if (persData && globalComp)
+                    m_cameraController.syncFromSceneCamera(*persData, globalComp->transform);
+            }
+        }
     }
 
     m_renderCore->camera().camera().Animate(fElapsedTimeSeconds);
@@ -639,7 +652,7 @@ void SceneEditor::Animate(float fElapsedTimeSeconds)
 
     // Window title
     auto& sc = *m_sceneManager->getScene();
-    std::string extraInfo = ", " + m_fpsInfo + ", " + m_sceneManager->getCurrentSceneName() + ", " + GetResolutionInfo() + ", (L: " + std::to_string(sc.GetLights().size()) + ", MAT: " + std::to_string(sc.GetMaterials().size())
+    std::string extraInfo = ", " + m_fpsInfo + ", " + m_sceneManager->getCurrentSceneName() + ", " + GetResolutionInfo() + ", (L: " + std::to_string(sc.GetLightEntities().size()) + ", MAT: " + std::to_string(sc.GetMaterials().size())
         + ", MESH: " + std::to_string(sc.GetMeshes().size()) + ", I: " + std::to_string(sc.GetMeshInstances().size()) + ", SI: " + std::to_string(sc.GetSkinnedMeshInstances().size())
         //+ ", AvgLum: " + std::to_string((m_renderTargets!=nullptr)?(m_renderTargets->AvgLuminanceLastCaptured):(0.0f))
 #if ENABLE_DEBUG_VIZUALISATIONS

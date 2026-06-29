@@ -10,6 +10,8 @@
 #include <render/Passes/Gaussian/GaussianSplatEmissionProxy.h>
 #include <scene/Scene.h>
 #include <scene/SceneObjects.h>
+#include <scene/SceneEcs.h>
+#include <scene/SceneLightAccess.h>
 #include <core/scope.h>
 #include <shaders/light_cb.h>
 #include <shaders/SampleConstantBuffer.h>
@@ -52,7 +54,7 @@ void RenderCore::updateLighting(UpdateLightingParams& params)
 {
     nvrhi::ICommandList* commandList = params.commandList;
     if (commandList == nullptr || params.environment == nullptr || params.lightSampling == nullptr
-        || params.bindingCache == nullptr || params.lights == nullptr || !params.scene)
+        || params.bindingCache == nullptr || !params.scene)
     {
         return;
     }
@@ -64,25 +66,35 @@ void RenderCore::updateLighting(UpdateLightingParams& params)
     {
         const float3 rotationInRadians = radians(params.settings.EnvironmentMapParams.RotationXYZ);
         const affine3 rotationTransform = dm::rotation(rotationInRadians);
-        for (const auto& light : *params.lights)
+        const scene::SceneEntityWorld* ew = params.scene->GetEntityWorld();
+        if (ew)
         {
-            std::shared_ptr<DirectionalLight> dirLight = std::dynamic_pointer_cast<DirectionalLight>(light);
-            if (dirLight == nullptr)
-                continue;
+            for (ecs::Entity entity : params.scene->GetLightEntities())
+            {
+                const auto* lightComp = scene::TryGetLight(ew->world(), entity);
+                if (!lightComp || !scene::TryGetDirectionalLightData(*lightComp))
+                    continue;
+                const auto* globalComp = ew->world().get<scene::GlobalTransformComponent>(entity);
+                if (!globalComp)
+                    continue;
 
-            LightConstants lightConstants;
-            dirLight->FillLightConstants(lightConstants);
+                LightConstants lightConstants;
+                scene::FillLightConstants(*lightComp, globalComp->transform, lightConstants);
 
-            const float minAngularSize = PI_f / (params.environment->GetTargetCubeResolution() / 2.0f);
-            assert(lightConstants.angularSizeOrInvRange >= minAngularSize);
+                if (dirLightCount >= EnvMapProcessor::c_MaxDirLights)
+                    break;
 
-            dirLights[dirLightCount].AngularSize =
-                std::max(lightConstants.angularSizeOrInvRange, minAngularSize);
-            dirLights[dirLightCount].ColorIntensity =
-                float4(lightConstants.color, lightConstants.intensity);
-            dirLights[dirLightCount].Direction =
-                rotationTransform.transformVector(lightConstants.direction);
-            dirLightCount++;
+                const float minAngularSize = PI_f / (params.environment->GetTargetCubeResolution() / 2.0f);
+                assert(lightConstants.angularSizeOrInvRange >= minAngularSize);
+
+                dirLights[dirLightCount].AngularSize =
+                    std::max(lightConstants.angularSizeOrInvRange, minAngularSize);
+                dirLights[dirLightCount].ColorIntensity =
+                    float4(lightConstants.color, lightConstants.intensity);
+                dirLights[dirLightCount].Direction =
+                    rotationTransform.transformVector(lightConstants.direction);
+                dirLightCount++;
+            }
         }
     }
 

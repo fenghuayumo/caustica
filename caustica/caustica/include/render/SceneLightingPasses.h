@@ -6,6 +6,7 @@
 #include <render/Passes/OMM/OpacityMicromapBuilder.h>
 
 #include <assets/loader/TextureLoader.h>
+#include <ecs/Entity.h>
 #include <render/Core/DescriptorTableManager.h>
 #include <render/Core/PathTracerSettings.h>
 #include <scene/SceneManager.h>
@@ -43,8 +44,8 @@ public:
     std::shared_ptr<ComputePipelineRegistry>& computePipelines() { return m_computePipelines; }
     const std::shared_ptr<ComputePipelineRegistry>& computePipelines() const { return m_computePipelines; }
 
-    std::vector<std::shared_ptr<caustica::Light>>& lights() { return m_lights; }
-    const std::vector<std::shared_ptr<caustica::Light>>& lights() const { return m_lights; }
+    std::vector<ecs::Entity>& lightEntities() { return m_lightEntities; }
+    const std::vector<ecs::Entity>& lightEntities() const { return m_lightEntities; }
 
     EnvMapSceneParams& envMapSceneParams() { return m_envMapSceneParams; }
     const EnvMapSceneParams& envMapSceneParams() const { return m_envMapSceneParams; }
@@ -89,7 +90,7 @@ private:
     std::shared_ptr<OpacityMicromapBuilder>     m_opacityMaps;
     std::shared_ptr<ComputePipelineRegistry>    m_computePipelines;
 
-    std::vector<std::shared_ptr<caustica::Light>> m_lights;
+    std::vector<ecs::Entity> m_lightEntities;
 };
 
 } // namespace caustica::render

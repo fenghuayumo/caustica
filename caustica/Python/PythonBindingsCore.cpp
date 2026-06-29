@@ -20,6 +20,7 @@
 #include <scene/Scene.h>
 #include <scene/SceneTypes.h>
 #include <scene/SceneEcs.h>
+#include <scene/SceneLightAccess.h>
 #include <ecs/Entity.h>
 #include <core/log.h>
 #include <math/math.h>
@@ -235,13 +236,8 @@ namespace
 
     std::vector<std::shared_ptr<Light>> GetSceneLights(const Scene* scene)
     {
-        std::vector<std::shared_ptr<Light>> result;
-        if (!scene)
-            return result;
-
-        for (const auto& light : scene->GetLights())
-            result.push_back(light);
-        return result;
+        // Legacy helper: returns empty since lights are now ECS components.
+        return {};
     }
 
     std::shared_ptr<Light> FindSceneLight(const Scene* scene, const std::string& name)
@@ -250,15 +246,16 @@ namespace
             return nullptr;
 
         const scene::SceneEntityWorld* entityWorld = scene->GetEntityWorld();
-        for (const auto& light : scene->GetLights())
+        if (!entityWorld)
+            return nullptr;
+
+        for (ecs::Entity entity : scene->GetLightEntities())
         {
-            if (!light)
-                continue;
-            if (light->name == name)
-                return light;
-            if (entityWorld && ecs::isValid(light->ownerEntity)
-                && entityWorld->getEntityName(light->ownerEntity) == name)
-                return light;
+            if (entityWorld->getEntityName(entity) == name)
+            {
+                // Return a stub - callers should migrate to ECS-based API
+                return nullptr;
+            }
         }
         return nullptr;
     }
@@ -1088,7 +1085,7 @@ void RegisterCoreBindings(nb::module_& m)
                 return self.GetMeshes().size();
             }, "Number of meshes in this scene.")
         .def_prop_ro("light_count", [](Scene& self) {
-                return self.GetLights().size();
+                return self.GetLightEntities().size();
             }, "Number of lights in this scene.")
 
         .def("get_bounds", [](Scene& self) {
@@ -1120,7 +1117,7 @@ void RegisterCoreBindings(nb::module_& m)
 
         .def("__repr__", [](Scene& self) {
                 const auto materialCount = GetSceneMaterials(&self).size();
-                const auto lightCount = self.GetLights().size();
+                const auto lightCount = self.GetLightEntities().size();
                 return std::string("<caustica.Scene materials=") + std::to_string(materialCount)
                     + " lights=" + std::to_string(lightCount) + ">";
             });

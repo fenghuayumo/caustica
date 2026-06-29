@@ -2,6 +2,7 @@
 
 #include <render/Passes/Geometry/TemporalAntiAliasingPass.h>
 #include <scene/SceneObjects.h>
+#include <scene/SceneCameraAccess.h>
 #include <core/file_utils.h>
 #include <core/format.h>
 
@@ -96,6 +97,17 @@ void CameraController::updateFromSceneCamera(const std::shared_ptr<PerspectiveCa
     m_camera.LookAt(cameraPos, cameraPos + viewToWorld.m_linear.row2, viewToWorld.m_linear.row1);
     m_verticalFOV = sceneCamera->verticalFov;
     m_zNear = sceneCamera->zNear;
+}
+
+void CameraController::updateFromSceneCamera(
+    const scene::PerspectiveCameraData& camData,
+    const dm::daffine3& globalTransform)
+{
+    const dm::affine3 viewToWorld = scene::GetCameraViewToWorldMatrix(globalTransform);
+    const dm::float3 cameraPos = viewToWorld.m_translation;
+    m_camera.LookAt(cameraPos, cameraPos + viewToWorld.m_linear.row2, viewToWorld.m_linear.row1);
+    m_verticalFOV = camData.verticalFov;
+    m_zNear = camData.zNear;
 }
 
 void CameraController::updateViews(const CameraUpdateParams& params)

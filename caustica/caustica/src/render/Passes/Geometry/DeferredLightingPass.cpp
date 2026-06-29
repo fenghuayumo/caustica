@@ -4,8 +4,11 @@
 #include <render/Core/FramebufferFactory.h>
 #include <assets/loader/ShaderFactory.h>
 #include <render/Core/ShadowMap.h>
+#include <scene/Scene.h>
 #include <scene/SceneTypes.h>
-#include <scene/SceneObjects.h> // Light / shadowMap full definition
+#include <scene/SceneObjects.h>
+#include <scene/SceneEcs.h>
+#include <scene/SceneLightAccess.h>
 #include <render/Core/CommonRenderPasses.h>
 #include <scene/View.h>
 #include <core/log.h>
@@ -135,61 +138,70 @@ void DeferredLightingPass::Render(
 
     int numShadows = 0;
 
-    if (inputs.lights)
+    if (inputs.scene)
     {
-        for (const auto& light : *inputs.lights)
+        const auto* ew = inputs.scene->GetEntityWorld();
+        if (ew)
         {
-            if (light->shadowMap)
+            for (ecs::Entity entity : inputs.scene->GetLightEntities())
             {
-                if (!shadowMapTexture)
+                const auto* lightComp = ew->world().get<scene::LightComponent>(entity);
+                if (!lightComp) continue;
+                const auto* globalComp = ew->world().get<scene::GlobalTransformComponent>(entity);
+                if (!globalComp) continue;
+
+                if (lightComp->shadowMap)
                 {
-                    shadowMapTexture = light->shadowMap->GetTexture();
-                    deferredConstants.shadowMapTextureSize = float2(light->shadowMap->GetTextureSize());
-                }
-                else
-                {
-                    if (shadowMapTexture != light->shadowMap->GetTexture())
+                    if (!shadowMapTexture)
                     {
-                        caustica::error("All lights submitted to DeferredLightingPass::Render(...) must use the same shadow map textures");
-                        return;
+                        shadowMapTexture = lightComp->shadowMap->GetTexture();
+                        deferredConstants.shadowMapTextureSize = float2(lightComp->shadowMap->GetTextureSize());
                     }
-                }
-            }
-
-            if (deferredConstants.numLights >= DEFERRED_MAX_LIGHTS)
-            {
-                caustica::warning("Maximum number of active lights (%d) exceeded in DeferredLightingPass",
-                    DEFERRED_MAX_LIGHTS);
-                break;
-            }
-
-            LightConstants& lightConstants = deferredConstants.lights[deferredConstants.numLights];
-            light->FillLightConstants(lightConstants);
-
-            if (light->shadowMap)
-            {
-                for (uint32_t cascade = 0; cascade < light->shadowMap->GetNumberOfCascades(); cascade++)
-                {
-                    if (numShadows < DEFERRED_MAX_SHADOWS)
+                    else
                     {
-                        light->shadowMap->GetCascade(cascade)->FillShadowConstants(deferredConstants.shadows[numShadows]);
-                        lightConstants.shadowCascades[cascade] = numShadows;
-                        ++numShadows;
+                        if (shadowMapTexture != lightComp->shadowMap->GetTexture())
+                        {
+                            caustica::error("All lights submitted to DeferredLightingPass::Render(...) must use the same shadow map textures");
+                            return;
+                        }
                     }
                 }
 
-                for (uint32_t perObjectShadow = 0; perObjectShadow < light->shadowMap->GetNumberOfPerObjectShadows(); perObjectShadow++)
+                if (deferredConstants.numLights >= DEFERRED_MAX_LIGHTS)
                 {
-                    if (numShadows < DEFERRED_MAX_SHADOWS)
+                    caustica::warning("Maximum number of active lights (%d) exceeded in DeferredLightingPass",
+                        DEFERRED_MAX_LIGHTS);
+                    break;
+                }
+
+                LightConstants& lightConstants = deferredConstants.lights[deferredConstants.numLights];
+                scene::FillLightConstants(*lightComp, globalComp->transform, lightConstants);
+
+                if (lightComp->shadowMap)
+                {
+                    for (uint32_t cascade = 0; cascade < lightComp->shadowMap->GetNumberOfCascades(); cascade++)
                     {
-                        light->shadowMap->GetPerObjectShadow(perObjectShadow)->FillShadowConstants(deferredConstants.shadows[numShadows]);
-                        lightConstants.perObjectShadows[perObjectShadow] = numShadows;
-                        ++numShadows;
+                        if (numShadows < DEFERRED_MAX_SHADOWS)
+                        {
+                            lightComp->shadowMap->GetCascade(cascade)->FillShadowConstants(deferredConstants.shadows[numShadows]);
+                            lightConstants.shadowCascades[cascade] = numShadows;
+                            ++numShadows;
+                        }
+                    }
+
+                    for (uint32_t perObjectShadow = 0; perObjectShadow < lightComp->shadowMap->GetNumberOfPerObjectShadows(); perObjectShadow++)
+                    {
+                        if (numShadows < DEFERRED_MAX_SHADOWS)
+                        {
+                            lightComp->shadowMap->GetPerObjectShadow(perObjectShadow)->FillShadowConstants(deferredConstants.shadows[numShadows]);
+                            lightConstants.perObjectShadows[perObjectShadow] = numShadows;
+                            ++numShadows;
+                        }
                     }
                 }
-            }
 
-            ++deferredConstants.numLights;
+                ++deferredConstants.numLights;
+            }
         }
     }
 

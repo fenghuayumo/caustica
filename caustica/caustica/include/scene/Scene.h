@@ -122,11 +122,12 @@ namespace caustica
 
         [[nodiscard]] const std::vector<ecs::Entity>& GetMeshInstances() const;
         [[nodiscard]] const std::vector<ecs::Entity>& GetSkinnedMeshInstances() const;
-        [[nodiscard]] const std::vector<std::shared_ptr<Light>>& GetLights() const;
-        [[nodiscard]] const std::vector<std::shared_ptr<SceneCamera>>& GetCameras() const;
+        [[nodiscard]] const std::vector<ecs::Entity>& GetLightEntities() const;
+        [[nodiscard]] const std::vector<ecs::Entity>& GetCameraEntities() const;
         [[nodiscard]] const std::vector<std::shared_ptr<SceneAnimation>>& GetAnimations() const;
 
         void AttachLightToRoot(const std::shared_ptr<Light>& light);
+        void AttachLightToRoot(scene::LightComponent component, const std::string& name = {});
         [[nodiscard]] nvrhi::IDescriptorTable* GetDescriptorTable() const { return m_DescriptorTable ? m_DescriptorTable->GetDescriptorTable() : nullptr; }
         [[nodiscard]] IDescriptorTableManager* GetDescriptorTableManager() const { return m_DescriptorTable.get(); }
         [[nodiscard]] render::SceneGpuResources& GetGpuResources() { return *m_GpuResources; }

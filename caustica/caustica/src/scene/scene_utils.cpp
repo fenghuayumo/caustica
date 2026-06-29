@@ -1,6 +1,8 @@
 #include "scene/scene_utils.h"
 #include <core/scene_discovery.h>
 #include <core/vfs/VFS.h>
+#include <scene/Scene.h>
+#include <scene/SceneLightAccess.h>
 #include <scene/SceneObjects.h>
 
 #include <algorithm>
@@ -23,15 +25,13 @@ std::string FindPreferredScene(const std::vector<std::string>& available,
     return available.front();
 }
 
-std::shared_ptr<EnvironmentLight> FindEnvironmentLight(
-    const std::vector<std::shared_ptr<Light>>& lights)
+ecs::Entity FindEnvironmentLightEntity(const Scene& scene)
 {
-    for (const auto& light : lights)
-    {
-        if (light->GetLightType() == LightType_Environment)
-            return std::dynamic_pointer_cast<EnvironmentLight>(light);
-    }
-    return nullptr;
+    const scene::SceneEntityWorld* entityWorld = scene.GetEntityWorld();
+    if (!entityWorld)
+        return ecs::NullEntity;
+
+    return scene::FindEnvironmentLightEntity(entityWorld->world(), scene.GetLightEntities());
 }
 
 bool IsDirectMeshSceneFile(const std::filesystem::path& sceneFileName)

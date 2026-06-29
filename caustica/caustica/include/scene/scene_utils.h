@@ -1,6 +1,7 @@
 #pragma once
 
 #include <core/scene_discovery.h>
+#include <ecs/Entity.h>
 
 #include <filesystem>
 #include <memory>
@@ -12,7 +13,7 @@ namespace caustica
 
 class IFileSystem;
 class Light;
-class EnvironmentLight;
+class Scene;
 
 // Scene discovery: FindScenes() lives in core/scene_discovery.h (included above).
 
@@ -24,9 +25,8 @@ bool IsDirectMeshSceneFile(const std::filesystem::path& sceneFileName);
 std::string FindPreferredScene(const std::vector<std::string>& available,
     const std::string& preferred);
 
-// Finds the first EnvironmentLight in a list of lights.
-// Returns nullptr if none found.
-std::shared_ptr<EnvironmentLight> FindEnvironmentLight(
-    const std::vector<std::shared_ptr<Light>>& lights);
+// Finds the first environment light entity in a scene.
+// Returns ecs::NullEntity if none found.
+ecs::Entity FindEnvironmentLightEntity(const Scene& scene);
 
 } // namespace caustica

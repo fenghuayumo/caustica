@@ -10,10 +10,10 @@
 namespace caustica
 {
     class ShaderFactory;
-    class Light;
     class CommonRenderPasses;
     class FramebufferFactory;
     class MaterialBindingCache;
+    class Scene;
     struct Material;
     struct LightProbe;
 }
@@ -159,7 +159,7 @@ namespace caustica::render
         virtual void PrepareLights(
             Context& context,
             nvrhi::ICommandList* commandList,
-            const std::vector<std::shared_ptr<caustica::Light>>& lights,
+            const caustica::Scene& scene,
             dm::float3 ambientColorTop,
             dm::float3 ambientColorBottom,
             const std::vector<std::shared_ptr<caustica::LightProbe>>& lightProbes);
