@@ -7,6 +7,7 @@ file(GLOB_RECURSE caustica_editor_sources
     "${CMAKE_CURRENT_SOURCE_DIR}/render/*.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/ui/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/ui/*.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ui/panels/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/common/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/common/*.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/game/*.cpp"
