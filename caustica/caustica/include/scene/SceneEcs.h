@@ -3,13 +3,24 @@
 #include <ecs/Entity.h>
 #include <ecs/World.h>
 #include <math/math.h>
-#include <scene/SceneGraph.h>
+#include <scene/SceneContent.h>
 
 #include <memory>
 #include <filesystem>
 #include <string>
 #include <unordered_map>
 #include <vector>
+
+namespace caustica
+{
+class MeshInstance;
+class SkinnedMeshInstance;
+class Light;
+class SceneCamera;
+class GaussianSplat;
+class SampleSettings;
+class GameSettings;
+}
 
 namespace caustica::scene
 {
@@ -82,13 +93,6 @@ struct HierarchyDirtyComponent
     bool value = true;
 };
 
-// Temporary import adapter while loaders/renderers are migrated away from SceneGraph.
-// Runtime systems should use typed ECS components instead of this legacy link.
-struct LegacySceneNodeComponent
-{
-    std::weak_ptr<SceneGraphNode> node;
-};
-
 struct MeshInstanceComponent
 {
     std::shared_ptr<MeshInstance> instance;
@@ -107,11 +111,6 @@ struct LightComponent
 struct CameraComponent
 {
     std::shared_ptr<SceneCamera> camera;
-};
-
-struct AnimationComponent
-{
-    std::shared_ptr<SceneGraphAnimation> animation;
 };
 
 struct GaussianSplatComponent
@@ -140,8 +139,6 @@ void UpdateHierarchy(ecs::World& world, PreviousTransformPolicy previousPolicy);
 class SceneEntityWorld
 {
 public:
-    void rebuildFromSceneGraph(const std::shared_ptr<SceneGraph>& sceneGraph);
-    void syncTransformsFromSceneGraph(const std::shared_ptr<SceneGraph>& sceneGraph);
     void refreshHierarchy(PreviousTransformPolicy previousPolicy = PreviousTransformPolicy::CaptureCurrent);
     void clear();
 
@@ -156,23 +153,17 @@ public:
     void setTranslation(ecs::Entity entity, const dm::double3& translation);
     void setRotation(ecs::Entity entity, const dm::dquat& rotation);
     void setScaling(ecs::Entity entity, const dm::double3& scaling);
+    void setPath(ecs::Entity entity, const std::filesystem::path& path);
 
     [[nodiscard]] ecs::World& world() { return m_world; }
     [[nodiscard]] const ecs::World& world() const { return m_world; }
 
     [[nodiscard]] ecs::Entity root() const { return m_root; }
-    [[nodiscard]] ecs::Entity entityForNode(const SceneGraphNode* node) const;
     [[nodiscard]] ecs::Entity entityForPath(const std::filesystem::path& path) const;
-    [[nodiscard]] std::shared_ptr<SceneGraphNode> nodeForEntity(ecs::Entity entity) const;
 
 private:
-    ecs::Entity importNode(const std::shared_ptr<SceneGraphNode>& node, ecs::Entity parent);
-    void syncNodeRecursive(const std::shared_ptr<SceneGraphNode>& node);
-    void attachLegacyLeafComponents(ecs::Entity entity, const std::shared_ptr<SceneGraphLeaf>& leaf);
-
     ecs::World m_world;
     ecs::Entity m_root = ecs::NullEntity;
-    std::unordered_map<const SceneGraphNode*, ecs::Entity> m_nodeToEntity;
     std::unordered_map<std::string, ecs::Entity> m_pathToEntity;
 };
 

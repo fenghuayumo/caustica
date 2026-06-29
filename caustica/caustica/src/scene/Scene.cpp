@@ -1,4 +1,5 @@
 #include <scene/Scene.h>
+#include <scene/SceneEcsLegacyAdapter.h>
 #include <scene/loader/GltfImporter.h>
 #include <scene/loader/ObjImporter.h>
 #include <scene/scene_utils.h>
@@ -341,7 +342,7 @@ bool Scene::LoadWithThreadPool(const std::filesystem::path& sceneFileName, Threa
     }
 
     if (m_EntityWorld)
-        m_EntityWorld->rebuildFromSceneGraph(m_SceneGraph);
+        scene::RebuildWorldFromLegacyScene(*m_EntityWorld, m_SceneGraph);
 
     return true;
 }
@@ -365,7 +366,7 @@ bool Scene::LoadFromJsonString(const std::string& sceneJson, const std::filesyst
         return false;
 
     if (m_EntityWorld)
-        m_EntityWorld->rebuildFromSceneGraph(m_SceneGraph);
+        scene::RebuildWorldFromLegacyScene(*m_EntityWorld, m_SceneGraph);
 
     return true;
 }
@@ -526,6 +527,11 @@ SceneImportResult Scene::LoadBuiltinModel(const std::string& builtinName)
     auto meshInstance = m_SceneTypeFactory->CreateMeshInstance(mesh);
     rootNode->SetLeaf(meshInstance);
     result.rootNode = rootNode;
+    auto importGraph = std::make_shared<SceneGraph>();
+    importGraph->SetRootNode(rootNode);
+    result.entityWorld = std::make_shared<scene::SceneEntityWorld>();
+    scene::RebuildWorldFromLegacyScene(*result.entityWorld, importGraph);
+    result.rootEntity = result.entityWorld->root();
     return result;
 }
 
@@ -895,9 +901,9 @@ void Scene::RefreshSceneGraph(uint32_t frameIndex)
     if (m_EntityWorld)
     {
         if (m_SceneStructureChanged || !ecs::isValid(m_EntityWorld->root()))
-            m_EntityWorld->rebuildFromSceneGraph(m_SceneGraph);
+            scene::RebuildWorldFromLegacyScene(*m_EntityWorld, m_SceneGraph);
         else if (m_SceneTransformsChanged)
-            m_EntityWorld->syncTransformsFromSceneGraph(m_SceneGraph);
+            scene::SyncWorldFromLegacyScene(*m_EntityWorld, m_SceneGraph);
     }
 }
 

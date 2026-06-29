@@ -1,5 +1,7 @@
 #pragma once
 
+#include <scene/SceneContent.h>
+#include <scene/SceneImport.h>
 #include <scene/SceneTypes.h>
 #include <animation/KeyframeAnimation.h>
 #include <math/math.h>
@@ -15,17 +17,6 @@ namespace caustica
     class SceneGraph;
     class SceneGraphNode;
     class SceneTypeFactory;
-
-    enum struct SceneContentFlags : uint32_t
-    {
-        None = 0,
-        OpaqueMeshes = 0x01,
-        AlphaTestedMeshes = 0x02,
-        BlendedMeshes = 0x04,
-        Lights = 0x08,
-        Cameras = 0x10,
-        Animations = 0x20
-    };
 
     class SceneGraphLeaf
     {
@@ -405,15 +396,6 @@ namespace caustica
     inline bool operator ==(SceneGraphNode::DirtyFlags a, uint32_t b) { return uint32_t(a) == b; }
     inline bool operator !=(SceneGraphNode::DirtyFlags a, uint32_t b) { return uint32_t(a) != b; }
 
-    inline SceneContentFlags operator | (SceneContentFlags a, SceneContentFlags b) { return SceneContentFlags(uint32_t(a) | uint32_t(b)); }
-    inline SceneContentFlags operator & (SceneContentFlags a, SceneContentFlags b) { return SceneContentFlags(uint32_t(a) & uint32_t(b)); }
-    inline SceneContentFlags operator ~ (SceneContentFlags a) { return SceneContentFlags(~uint32_t(a)); }
-    inline SceneContentFlags operator |= (SceneContentFlags& a, SceneContentFlags b) { a = SceneContentFlags(uint32_t(a) | uint32_t(b)); return a; }
-    inline SceneContentFlags operator &= (SceneContentFlags& a, SceneContentFlags b) { a = SceneContentFlags(uint32_t(a) & uint32_t(b)); return a; }
-    inline bool operator !(SceneContentFlags a) { return uint32_t(a) == 0; }
-    inline bool operator ==(SceneContentFlags a, uint32_t b) { return uint32_t(a) == b; }
-    inline bool operator !=(SceneContentFlags a, uint32_t b) { return uint32_t(a) != b; }
-
     // Scene graph traversal helper. Similar to an iterator, but only goes forward.
     // Create a SceneGraphWalker from a node, and it will go over every node in the sub-tree of that node.
     // On each location, the walker can move either down (deeper) or right (siblings), depending on the needs.
@@ -642,11 +624,6 @@ namespace caustica
         [[nodiscard]] std::shared_ptr<SceneGraphNode> FindNode(const std::filesystem::path& path, SceneGraphNode* context = nullptr) const;
         
         void Refresh(uint32_t frameIndex);
-    };
-
-    struct SceneImportResult
-    {
-        std::shared_ptr<SceneGraphNode> rootNode;
     };
 
     class SceneTypeFactory

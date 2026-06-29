@@ -3,6 +3,8 @@
 
 #include <scene/loader/GltfImporter.h>
 #include <assets/loader/TextureLoader.h>
+#include <scene/SceneEcs.h>
+#include <scene/SceneEcsLegacyAdapter.h>
 #include <scene/SceneGraph.h>
 #include <core/vfs/VFS.h>
 #include <core/log.h>
@@ -632,6 +634,8 @@ bool GltfImporter::Load(
     // even if the DDS is not specified in the glTF file.
     constexpr bool c_SearchForDds = true;
 
+    result.entityWorld.reset();
+    result.rootEntity = ecs::NullEntity;
     result.rootNode.reset();
 
     cgltf_vfs_context vfsContext;
@@ -2022,6 +2026,10 @@ bool GltfImporter::Load(
             m_fs->writeFile(outputFileName, objects->buffers[buffer_idx].data, objects->buffers[buffer_idx].size);
         }
     }
+
+    result.entityWorld = std::make_shared<scene::SceneEntityWorld>();
+    scene::RebuildWorldFromLegacyScene(*result.entityWorld, graph);
+    result.rootEntity = result.entityWorld->root();
 
     cgltf_free(objects);
 
