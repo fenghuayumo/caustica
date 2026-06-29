@@ -1,6 +1,7 @@
 #include <render/Core/SceneGeometryUpdate.h>
 #include <render/Core/RenderCore.h>
 #include <render/Core/AccelStructManager.h>
+#include <render/Core/SceneGpuUpdater.h>
 #include <render/Passes/Lighting/MaterialGpuCache.h>
 #include <render/Passes/OMM/OpacityMicromapBuilder.h>
 #include <scene/Scene.h>
@@ -58,7 +59,7 @@ void RenderCore::updateSceneGeometry(UpdateSceneGeometryParams& params)
     if (scene == nullptr)
         return;
 
-    scene->Refresh(commandList, static_cast<uint32_t>(params.frameIndex));
+    render::SceneGpuUpdater::Refresh(*scene, commandList, static_cast<uint32_t>(params.frameIndex));
 
     if (params.opacityMaps != nullptr)
         params.opacityMaps->BuildOpacityMicromaps(*commandList, *scene);

@@ -63,7 +63,7 @@ void FinalizeRuntimeSceneMutation(
     }
 
     if (scene)
-        scene->FinishedLoading(frameIndex);
+        scene->RefreshSceneWorld(frameIndex);
 }
 
 bool DeleteRuntimeSceneNode(const DeleteRuntimeSceneNodeParams& params)
@@ -86,7 +86,7 @@ bool DeleteRuntimeSceneNode(const DeleteRuntimeSceneNodeParams& params)
 
     entityWorld->destroyEntity(params.Entity);
     entityWorld->rebuildPathsFromRoot();
-    params.SceneInstance->FinishedLoading(params.FrameIndex);
+    params.SceneInstance->RefreshSceneWorld(params.FrameIndex);
     return true;
 }
 

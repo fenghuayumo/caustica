@@ -82,22 +82,6 @@ namespace caustica
         void LoadSceneEntities(const Json::Value& nodeList, ecs::Entity parent);
         void LoadAnimations(const Json::Value& nodeList);
         
-        void UpdateMaterial(const std::shared_ptr<Material>& material);
-        void UpdateGeometry(const std::shared_ptr<MeshInfo>& mesh);
-        void UpdateInstance(const std::shared_ptr<MeshInstance>& instance);
-
-        void UpdateSkinnedMeshes(nvrhi::ICommandList* commandList, uint32_t frameIndex);
-
-        void WriteMaterialBuffer(nvrhi::ICommandList* commandList) const;
-        void WriteGeometryBuffer(nvrhi::ICommandList* commandList) const;
-        void WriteInstanceBuffer(nvrhi::ICommandList* commandList) const;
-
-        virtual void CreateMeshBuffers(nvrhi::ICommandList* commandList);
-        virtual nvrhi::BufferHandle CreateMaterialBuffer();
-        virtual nvrhi::BufferHandle CreateGeometryBuffer();
-        virtual nvrhi::BufferHandle CreateInstanceBuffer();
-        virtual nvrhi::BufferHandle CreateMaterialConstantBuffer(const std::string& debugName);
-
         virtual bool LoadCustomData(Json::Value& rootNode, ThreadPool* threadPool);
 
         std::shared_ptr<class SampleSettings> m_loadedSettings;
@@ -116,11 +100,9 @@ namespace caustica
             std::shared_ptr<IDescriptorTableManager> descriptorTable,
             std::shared_ptr<SceneTypeFactory> sceneTypeFactory);
 
-        void FinishedLoading(uint32_t frameIndex);
-
         void RefreshSceneWorld(uint32_t frameIndex);
-        void RefreshBuffers(nvrhi::ICommandList* commandList, uint32_t frameIndex);
-        void Refresh(nvrhi::ICommandList* commandList, uint32_t frameIndex);
+        [[nodiscard]] bool HasSceneTransformsChanged() const { return m_SceneTransformsChanged; }
+        [[nodiscard]] bool HasSceneStructureChanged() const { return m_SceneStructureChanged; }
 
         bool Load(const std::filesystem::path& jsonFileName);
 
@@ -146,6 +128,7 @@ namespace caustica
 
         void AttachLightToRoot(const std::shared_ptr<Light>& light);
         [[nodiscard]] nvrhi::IDescriptorTable* GetDescriptorTable() const { return m_DescriptorTable ? m_DescriptorTable->GetDescriptorTable() : nullptr; }
+        [[nodiscard]] IDescriptorTableManager* GetDescriptorTableManager() const { return m_DescriptorTable.get(); }
         [[nodiscard]] render::SceneGpuResources& GetGpuResources() { return *m_GpuResources; }
         [[nodiscard]] const render::SceneGpuResources& GetGpuResources() const { return *m_GpuResources; }
 

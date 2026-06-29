@@ -1,4 +1,5 @@
 #include <render/Core/SceneMeshEditing.h>
+#include <render/Core/SceneGpuUpdater.h>
 
 #include <scene/Scene.h>
 #include <scene/SceneEcs.h>
@@ -398,7 +399,7 @@ void RebuildSceneMeshBuffersIfNeeded(const std::shared_ptr<MeshInfo>& mesh, cons
     }
 
     if (params.scene)
-        params.scene->FinishedLoading(params.frameIndex);
+        render::SceneGpuUpdater::RefreshAfterLoad(*params.scene, params.frameIndex);
 }
 
 } // namespace

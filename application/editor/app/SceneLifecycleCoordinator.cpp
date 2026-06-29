@@ -8,6 +8,7 @@
 #include <core/log.h>
 #include <core/path_utils.h>
 #include <core/vfs/VFS.h>
+#include <render/Core/SceneGpuUpdater.h>
 #include <render/Core/PathTracerSettings.h>
 #include <render/SceneGaussianSplatPasses.h>
 #include <render/SceneLightingPasses.h>
@@ -151,7 +152,7 @@ void SceneLifecycleCoordinator::onSceneLoaded()
         *m_ctx.sceneTime = 0.f;
 
     if (m_ctx.frameIndex)
-        m_ctx.sceneManager->getScene()->FinishedLoading(m_ctx.frameIndex());
+        caustica::render::SceneGpuUpdater::RefreshAfterLoad(*m_ctx.sceneManager->getScene(), m_ctx.frameIndex());
 
     if (m_ctx.gaussianSplatPasses && m_ctx.cmdLine)
         m_ctx.gaussianSplatPasses->onSceneLoaded(*m_ctx.cmdLine);
