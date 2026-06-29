@@ -1570,7 +1570,7 @@ void Scene::ProcessNodesRecursive(std::shared_ptr<SceneGraphNode> /*node*/)
         m_loadedGameSettings = component.settings;
     });
 
-    world.each<scene::LightComponent>([this](ecs::Entity, scene::LightComponent& component)
+    world.each<scene::LightComponent>([this, &world](ecs::Entity, scene::LightComponent& component)
     {
         const auto& light = component.light;
         if (light == nullptr ||
@@ -1582,12 +1582,15 @@ void Scene::ProcessNodesRecursive(std::shared_ptr<SceneGraphNode> /*node*/)
 
         for (const auto& proxyPath : light->Proxies)
         {
-            auto proxyNode = m_SceneGraph->FindNode(proxyPath);
-            if (proxyNode != nullptr)
+            ecs::Entity proxyEntity = m_EntityWorld->entityForPath(proxyPath);
+            if (!ecs::isValid(proxyEntity))
+                proxyEntity = m_EntityWorld->entityForPath(std::filesystem::path("/") / proxyPath);
+
+            if (ecs::isValid(proxyEntity))
             {
-                auto mi = std::dynamic_pointer_cast<MeshInstance>(proxyNode->GetLeaf());
-                if (mi != nullptr)
-                    mi->ProxiedAnalyticLight = light;
+                auto* mesh = world.get<scene::MeshInstanceComponent>(proxyEntity);
+                if (mesh && mesh->instance)
+                    mesh->instance->ProxiedAnalyticLight = light;
             }
         }
     });

@@ -6,6 +6,7 @@
 #include <scene/SceneGraph.h>
 
 #include <memory>
+#include <filesystem>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -16,6 +17,11 @@ namespace caustica::scene
 struct NameComponent
 {
     std::string value;
+};
+
+struct PathComponent
+{
+    std::filesystem::path value;
 };
 
 struct ParentComponent
@@ -50,6 +56,11 @@ struct GlobalTransformComponent
     dm::affine3 previousTransformFloat = dm::affine3::identity();
 };
 
+struct LocalBoundsComponent
+{
+    dm::box3 bounds = dm::box3::empty();
+};
+
 struct BoundsComponent
 {
     dm::box3 globalBounds = dm::box3::empty();
@@ -71,15 +82,11 @@ struct HierarchyDirtyComponent
     bool value = true;
 };
 
-struct SceneGraphNodeComponent
+// Temporary import adapter while loaders/renderers are migrated away from SceneGraph.
+// Runtime systems should use typed ECS components instead of this legacy link.
+struct LegacySceneNodeComponent
 {
     std::weak_ptr<SceneGraphNode> node;
-};
-
-struct SceneLeafComponent
-{
-    std::shared_ptr<SceneGraphLeaf> leaf;
-    SceneContentFlags contentFlags = SceneContentFlags::None;
 };
 
 struct MeshInstanceComponent
@@ -122,12 +129,6 @@ struct GameSettingsComponent
     std::shared_ptr<GameSettings> settings;
 };
 
-struct SceneGraphDirtyComponent
-{
-    SceneGraphNode::DirtyFlags flags = SceneGraphNode::DirtyFlags::None;
-    SceneContentFlags subgraphContent = SceneContentFlags::None;
-};
-
 enum class PreviousTransformPolicy
 {
     CaptureCurrent,
@@ -161,16 +162,18 @@ public:
 
     [[nodiscard]] ecs::Entity root() const { return m_root; }
     [[nodiscard]] ecs::Entity entityForNode(const SceneGraphNode* node) const;
+    [[nodiscard]] ecs::Entity entityForPath(const std::filesystem::path& path) const;
     [[nodiscard]] std::shared_ptr<SceneGraphNode> nodeForEntity(ecs::Entity entity) const;
 
 private:
     ecs::Entity importNode(const std::shared_ptr<SceneGraphNode>& node, ecs::Entity parent);
     void syncNodeRecursive(const std::shared_ptr<SceneGraphNode>& node);
-    void attachLeafComponents(ecs::Entity entity, const std::shared_ptr<SceneGraphLeaf>& leaf);
+    void attachLegacyLeafComponents(ecs::Entity entity, const std::shared_ptr<SceneGraphLeaf>& leaf);
 
     ecs::World m_world;
     ecs::Entity m_root = ecs::NullEntity;
     std::unordered_map<const SceneGraphNode*, ecs::Entity> m_nodeToEntity;
+    std::unordered_map<std::string, ecs::Entity> m_pathToEntity;
 };
 
 } // namespace caustica::scene

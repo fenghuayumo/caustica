@@ -36,14 +36,6 @@ GlobalTransformComponent MakeGlobalTransform(const SceneGraphNode& node)
     };
 }
 
-SceneGraphDirtyComponent MakeDirtyComponent(const SceneGraphNode& node)
-{
-    return SceneGraphDirtyComponent{
-        .flags = node.GetDirtyFlags(),
-        .subgraphContent = node.GetSubgraphContentFlags(),
-    };
-}
-
 void RemoveChildReference(ecs::World& world, ecs::Entity parent, ecs::Entity child)
 {
     if (!ecs::isValid(parent))
@@ -73,22 +65,17 @@ bool IsDescendantOf(const ecs::World& world, ecs::Entity candidate, ecs::Entity 
 
 SceneContentFlags GetLeafContent(ecs::World& world, ecs::Entity entity)
 {
-    auto* leaf = world.get<SceneLeafComponent>(entity);
-    if (!leaf || !leaf->leaf)
-        return SceneContentFlags::None;
-
-    leaf->contentFlags = leaf->leaf->GetContentFlags();
-    return leaf->contentFlags;
+    const auto* content = world.get<SceneContentComponent>(entity);
+    return content ? content->leafContent : SceneContentFlags::None;
 }
 
 dm::box3 GetLeafBounds(ecs::World& world, ecs::Entity entity, const dm::affine3& globalTransform)
 {
-    auto* leaf = world.get<SceneLeafComponent>(entity);
-    if (!leaf || !leaf->leaf)
+    const auto* localBounds = world.get<LocalBoundsComponent>(entity);
+    if (!localBounds || localBounds->bounds.isempty())
         return dm::box3::empty();
 
-    const dm::box3 localBounds = leaf->leaf->GetLocalBoundingBox();
-    return localBounds.isempty() ? dm::box3::empty() : localBounds * globalTransform;
+    return localBounds->bounds * globalTransform;
 }
 
 void RefreshEntityHierarchy(
@@ -149,9 +136,6 @@ void RefreshEntityHierarchy(
         .subgraphContent = subgraphContent,
     });
 
-    if (auto* dirty = world.get<SceneGraphDirtyComponent>(entity))
-        dirty->subgraphContent = subgraphContent;
-
     world.remove<TransformDirtyComponent>(entity);
     world.remove<HierarchyDirtyComponent>(entity);
 }
@@ -178,6 +162,7 @@ void SceneEntityWorld::clear()
     m_world.clear();
     m_root = ecs::NullEntity;
     m_nodeToEntity.clear();
+    m_pathToEntity.clear();
 }
 
 void SceneEntityWorld::rebuildFromSceneGraph(const std::shared_ptr<SceneGraph>& sceneGraph)
@@ -222,6 +207,7 @@ ecs::Entity SceneEntityWorld::createEntity(const std::string& name, ecs::Entity 
     m_world.emplace<ChildrenComponent>(entity, ChildrenComponent{});
     m_world.emplace<LocalTransformComponent>(entity, LocalTransformComponent{});
     m_world.emplace<GlobalTransformComponent>(entity, GlobalTransformComponent{});
+    m_world.emplace<LocalBoundsComponent>(entity, LocalBoundsComponent{});
     m_world.emplace<BoundsComponent>(entity, BoundsComponent{});
     m_world.emplace<SceneContentComponent>(entity, SceneContentComponent{});
     m_world.emplace<TransformDirtyComponent>(entity, TransformDirtyComponent{});
@@ -254,10 +240,13 @@ void SceneEntityWorld::destroyEntity(ecs::Entity entity)
     if (auto* parent = m_world.get<ParentComponent>(entity))
         RemoveChildReference(m_world, parent->parent, entity);
 
-    if (auto* node = m_world.get<SceneGraphNodeComponent>(entity))
+    if (auto* node = m_world.get<LegacySceneNodeComponent>(entity))
     {
         if (auto sharedNode = node->node.lock())
+        {
             m_nodeToEntity.erase(sharedNode.get());
+            m_pathToEntity.erase(sharedNode->GetPath().generic_string());
+        }
     }
 
     if (entity == m_root)
@@ -355,26 +344,34 @@ std::shared_ptr<SceneGraphNode> SceneEntityWorld::nodeForEntity(ecs::Entity enti
     if (!ecs::isValid(entity))
         return nullptr;
 
-    const auto* component = m_world.get<SceneGraphNodeComponent>(entity);
+    const auto* component = m_world.get<LegacySceneNodeComponent>(entity);
     return component ? component->node.lock() : nullptr;
+}
+
+ecs::Entity SceneEntityWorld::entityForPath(const std::filesystem::path& path) const
+{
+    auto it = m_pathToEntity.find(path.generic_string());
+    return it == m_pathToEntity.end() ? ecs::NullEntity : it->second;
 }
 
 ecs::Entity SceneEntityWorld::importNode(const std::shared_ptr<SceneGraphNode>& node, ecs::Entity parent)
 {
     ecs::Entity entity = m_world.spawn();
     m_nodeToEntity[node.get()] = entity;
+    m_pathToEntity[node->GetPath().generic_string()] = entity;
 
     m_world.emplace<NameComponent>(entity, NameComponent{ node->GetName() });
+    m_world.emplace<PathComponent>(entity, PathComponent{ node->GetPath() });
     m_world.emplace<ChildrenComponent>(entity, ChildrenComponent{});
     m_world.emplace<LocalTransformComponent>(entity, MakeLocalTransform(*node));
     m_world.emplace<GlobalTransformComponent>(entity, MakeGlobalTransform(*node));
+    m_world.emplace<LocalBoundsComponent>(entity, LocalBoundsComponent{});
     m_world.emplace<BoundsComponent>(entity, BoundsComponent{ node->GetGlobalBoundingBox() });
     m_world.emplace<SceneContentComponent>(entity, SceneContentComponent{
         .leafContent = node->GetLeafContentFlags(),
         .subgraphContent = node->GetSubgraphContentFlags(),
     });
-    m_world.emplace<SceneGraphDirtyComponent>(entity, MakeDirtyComponent(*node));
-    m_world.emplace<SceneGraphNodeComponent>(entity, SceneGraphNodeComponent{ node });
+    m_world.emplace<LegacySceneNodeComponent>(entity, LegacySceneNodeComponent{ node });
 
     if (ecs::isValid(parent))
     {
@@ -383,7 +380,7 @@ ecs::Entity SceneEntityWorld::importNode(const std::shared_ptr<SceneGraphNode>& 
             children->children.push_back(entity);
     }
 
-    attachLeafComponents(entity, node->GetLeaf());
+    attachLegacyLeafComponents(entity, node->GetLeaf());
 
     for (size_t index = 0; index < node->GetNumChildren(); ++index)
         importNode(node->GetChild(index)->shared_from_this(), entity);
@@ -402,6 +399,12 @@ void SceneEntityWorld::syncNodeRecursive(const std::shared_ptr<SceneGraphNode>& 
 
     if (auto* name = m_world.get<NameComponent>(entity))
         name->value = node->GetName();
+    if (auto* path = m_world.get<PathComponent>(entity))
+    {
+        m_pathToEntity.erase(path->value.generic_string());
+        path->value = node->GetPath();
+        m_pathToEntity[path->value.generic_string()] = entity;
+    }
     if (auto* local = m_world.get<LocalTransformComponent>(entity))
         *local = MakeLocalTransform(*node);
     if (auto* global = m_world.get<GlobalTransformComponent>(entity))
@@ -413,9 +416,6 @@ void SceneEntityWorld::syncNodeRecursive(const std::shared_ptr<SceneGraphNode>& 
         content->leafContent = node->GetLeafContentFlags();
         content->subgraphContent = node->GetSubgraphContentFlags();
     }
-    if (auto* dirty = m_world.get<SceneGraphDirtyComponent>(entity))
-        *dirty = MakeDirtyComponent(*node);
-
     const auto* children = m_world.get<ChildrenComponent>(entity);
     if (!children || children->children.size() != node->GetNumChildren())
     {
@@ -427,12 +427,16 @@ void SceneEntityWorld::syncNodeRecursive(const std::shared_ptr<SceneGraphNode>& 
         syncNodeRecursive(node->GetChild(index)->shared_from_this());
 }
 
-void SceneEntityWorld::attachLeafComponents(ecs::Entity entity, const std::shared_ptr<SceneGraphLeaf>& leaf)
+void SceneEntityWorld::attachLegacyLeafComponents(ecs::Entity entity, const std::shared_ptr<SceneGraphLeaf>& leaf)
 {
     if (!leaf)
         return;
 
-    m_world.emplace<SceneLeafComponent>(entity, SceneLeafComponent{ leaf, leaf->GetContentFlags() });
+    m_world.emplace<LocalBoundsComponent>(entity, LocalBoundsComponent{ leaf->GetLocalBoundingBox() });
+    m_world.emplace<SceneContentComponent>(entity, SceneContentComponent{
+        .leafContent = leaf->GetContentFlags(),
+        .subgraphContent = leaf->GetContentFlags(),
+    });
 
     if (auto mesh = std::dynamic_pointer_cast<MeshInstance>(leaf))
         m_world.emplace<MeshInstanceComponent>(entity, MeshInstanceComponent{ mesh });
