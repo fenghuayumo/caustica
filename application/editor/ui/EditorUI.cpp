@@ -320,46 +320,12 @@ static const PerformancePreset s_performancePresets[] = {
 };
 static bool MatchesPreset(const SampleUIData& ui, const PerformancePreset& p)
 {
-    if (ui.NEECandidateSamples != p.NEECandidateSamples)                        return false;
-    if (ui.NEEFullSamples != p.NEEFullSamples)                                  return false;
-    if (ui.NEEMISType != p.NEEMISType)                                          return false;
-    if (ui.RealtimeSamplesPerPixel != p.RealtimeSamplesPerPixel)                return false;
-    if (ui.BounceCount != p.BounceCount)                                        return false;
-    if (ui.DiffuseBounceCount != p.DiffuseBounceCount)                          return false;
-    if (ui.TexLODBias != p.TexLODBias)                                          return false;
-    if (ui.NestedDielectricsQuality != p.NestedDielectricsQuality)              return false;
-    if (ui.EnvironmentMapDiffuseSampleMIPLevel != p.EnvironmentMapDiffuseSampleMIPLevel) return false;
-#if CAUSTICA_WITH_ANY_DLSS
-    if (ui.DLSSMode != p.DLSSMode)                                              return false;
-#endif
-    if (ui.StablePlanesActiveCount != p.StablePlanesActiveCount)                return false;
-    if (ui.AllowPrimarySurfaceReplacement != p.AllowPrimarySurfaceReplacement)  return false;
-    if (ui.EnableBloom != p.EnableBloom)                                        return false;
-    if (ui.EnableLDSamplerForBSDF != p.EnableLDSamplerForBSDF)                  return false;
-    if (ui.RealtimeFireflyFilterThreshold != p.FireflyThreshold)                return false;
-    return true;
+    return caustica::render::MatchesPerformancePreset(ui, p);
 }
 
 static void ApplyPreset(SampleUIData& ui, const PerformancePreset& p)
 {
-    ui.NEECandidateSamples = p.NEECandidateSamples;
-    ui.NEEFullSamples = p.NEEFullSamples;
-    ui.NEEMISType = p.NEEMISType;
-    ui.RealtimeSamplesPerPixel = p.RealtimeSamplesPerPixel;
-    ui.BounceCount = p.BounceCount;
-    ui.DiffuseBounceCount = p.DiffuseBounceCount;
-    ui.TexLODBias = p.TexLODBias;
-    ui.NestedDielectricsQuality = p.NestedDielectricsQuality;
-    ui.EnvironmentMapDiffuseSampleMIPLevel = p.EnvironmentMapDiffuseSampleMIPLevel;
-#if CAUSTICA_WITH_ANY_DLSS
-    ui.DLSSMode = p.DLSSMode;
-#endif
-    ui.StablePlanesActiveCount = p.StablePlanesActiveCount;
-    ui.AllowPrimarySurfaceReplacement = p.AllowPrimarySurfaceReplacement;
-    ui.EnableBloom = p.EnableBloom;
-    ui.EnableLDSamplerForBSDF = p.EnableLDSamplerForBSDF;
-    ui.RealtimeFireflyFilterThreshold = p.FireflyThreshold;
-    ui.ResetAccumulation = true;
+    caustica::render::ApplyPerformancePreset(ui, p);
 }
 
 } // namespace caustica::editor
@@ -580,34 +546,7 @@ namespace caustica::editor
 
 void InitializeSampleUIDataFromCommandLine(SampleUIData& ui, const CommandLineOptions& cmdLine)
 {
-    ui.RelaxSettings = NrdConfig::getDefaultRELAXSettings();
-    ui.ReblurSettings = NrdConfig::getDefaultREBLURSettings();
-
-    ui.TemporalAntiAliasingParams.useHistoryClampRelax = true;
-    ui.ToneMappingParams.toneMapOperator = ToneMapperOperator::HableUc2;
-
-    // Enable by default for now.
-    ui.RTXDI.regir.regirStaticParams.Mode = rtxdi::ReGIRMode::Grid;
-
-    ui.UseNEE                     = cmdLine.UseNEE != 0;
-    ui.NEEType                    = cmdLine.NEEType;
-    ui.UseReSTIRDI                = cmdLine.UseReSTIRDI != 0;
-    ui.UseReSTIRGI                = cmdLine.UseReSTIRGI != 0;
-    ui.UseReSTIRPT                = cmdLine.UseReSTIRPT != 0;
-    if (ui.UseReSTIRPT)
-        ui.UseReSTIRGI = false;
-    ui.RealtimeSamplesPerPixel    = cmdLine.RealtimeSamplesPerPixel;
-    ui.AccumulationTarget         = cmdLine.ReferenceSamplesPerPixel;
-    ui.StandaloneDenoiser         = cmdLine.StandaloneDenoiser != 0;
-    ui.RealtimeAA                 = cmdLine.RealtimeAA;
-
-    ApplyPreset(ui, s_performancePresets[2]);
-    ui.RTXDIRestirPreset = RTXDIRestirQualityPreset::Ultra;
-    ui.ApplyRTXDIRestirPreset();
-    ui.RTXDIRestirPTPreset = RTXDIRestirPTQualityPreset::Ultra;
-    ui.ApplyRTXDIRestirPTPreset();
-
-    ui.EnableBloom &= !cmdLine.DisablePostProcessFilters;
+    caustica::render::InitializeRenderSessionStateFromCommandLine(ui, cmdLine);
 }
 
 EditorUI::EditorUI(GpuDevice* deviceManager, EditorApplication& editor, SampleUIData& ui, bool NVAPI_SERSupported, const CommandLineOptions& cmdLine)

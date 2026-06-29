@@ -198,19 +198,29 @@ namespace caustica::editor
 {
 
 SceneEditor::SceneEditor(const CommandLineOptions& cmdLine,
-    SampleUIData& ui,
+    caustica::render::RenderSessionState& sessionState,
+    EditorUIState& editorState,
     caustica::render::SessionDiagnostics& diagnostics)
     : m_cmdLine(cmdLine)
-    , m_settings(ui)
-    , m_renderState(ui)
-    , m_editor(ui)
-    , m_ui(ui)
+    , m_sessionState(sessionState)
+    , m_settings(sessionState)
+    , m_renderState(sessionState)
+    , m_editor(editorState)
     , m_sessionDiagnostics(diagnostics)
+    , m_inputRouter(EditorInputRouter::Context{.session = sessionState, .editor = editorState})
 {
     m_progressLoading.Start("Initializing...");
     m_progressLoading.Set(50);
 
-    m_captureScriptManager = std::make_unique<CaptureScriptManager>(*this, m_ui, m_cmdLine);
+    m_captureScriptManager = std::make_unique<CaptureScriptManager>(*this, m_sessionState, m_cmdLine);
+}
+
+SceneEditor::SceneEditor(const CommandLineOptions& cmdLine,
+    SampleUIData& ui,
+    caustica::render::SessionDiagnostics& diagnostics)
+    : SceneEditor(cmdLine, static_cast<caustica::render::RenderSessionState&>(ui), static_cast<EditorUIState&>(ui), diagnostics)
+{
+    m_sampleUi = &ui;
 }
 
 void SceneEditor::initStreamlineAndWindow()
@@ -672,7 +682,7 @@ void SceneEditor::SceneLoaded( )
 
     m_progressLoading.Set(70);
 
-    LocalConfig::PostSceneLoad(*this, m_ui);
+    LocalConfig::PostSceneLoad(*this, m_sessionState, m_editor);
 
     m_progressLoading.Set(90);
 
@@ -1392,138 +1402,26 @@ void SceneEditor::CaptureScriptPostRender(std::function<bool(const char* fileNam
 }
 
 // =============================================================================
-// Input event handling (formerly PathTracerInputController)
+// Input event handling
 // =============================================================================
+
+void SceneEditor::SyncInputRouterContext()
+{
+    m_inputRouter.updateContext(EditorInputRouter::Context{
+        .session = m_sessionState,
+        .editor = m_editor,
+        .renderCore = m_renderCore,
+        .gpuDevice = m_gpuDevice,
+        .worldRenderer = m_worldRenderer,
+        .zoomTool = m_zoomTool.get(),
+        .game = m_sampleGame.get(),
+    });
+}
 
 void SceneEditor::onEvent(caustica::Event& event)
 {
-    caustica::EventDispatcher dispatcher(event);
-    dispatcher.Dispatch<caustica::KeyPressedEvent>([this](auto& e) { return onKeyPressed(e); });
-    dispatcher.Dispatch<caustica::KeyReleasedEvent>([this](auto& e) { return onKeyReleased(e); });
-    dispatcher.Dispatch<caustica::MouseMovedEvent>([this](auto& e) { return onMouseMoved(e); });
-    dispatcher.Dispatch<caustica::MouseButtonPressedEvent>([this](auto& e) { return onMouseButtonPressed(e); });
-    dispatcher.Dispatch<caustica::MouseButtonReleasedEvent>([this](auto& e) { return onMouseButtonReleased(e); });
-    dispatcher.Dispatch<caustica::MouseScrolledEvent>([this](auto& e) { return onMouseScrolled(e); });
-}
-
-// --- Input handler implementations (merged from PathTracerInputController) ---
-
-namespace {
-inline constexpr int ToGlfwKey(caustica::KeyCode k)   { return static_cast<int>(k); }
-inline constexpr int ToGlfwMouse(caustica::MouseCode m) { return static_cast<int>(m); }
-inline constexpr int ToGlfwMods(caustica::ModifierKey m) { return static_cast<int>(m); }
-inline constexpr int cGlfwPress   = 1;
-inline constexpr int cGlfwRelease = 0;
-inline constexpr int cGlfwRepeat  = 2;
-}
-
-bool SceneEditor::onKeyPressed(caustica::KeyPressedEvent& e)
-{
-    int key   = ToGlfwKey(e.GetKeyCode());
-    int mods  = ToGlfwMods(e.GetModifiers());
-    int action = e.IsRepeat() ? cGlfwRepeat : cGlfwPress;
-
-    if (m_zoomTool && m_zoomTool->KeyboardUpdate(key, e.GetScancode(), action, mods))
-        return true;
-
-    if (!(m_sampleGame && m_sampleGame->CameraActive()))
-        m_renderCore->camera().camera().KeyboardUpdate(key, e.GetScancode(), action, mods);
-
-    if (m_sampleGame && m_sampleGame->KeyboardUpdate(key, e.GetScancode(), action, mods))
-        return true;
-
-    if (key == ToGlfwKey(caustica::Key::Space) && action == cGlfwPress && mods != ToGlfwMods(caustica::ModifierKey::Control) && mods != ToGlfwMods(caustica::ModifierKey::Alt))
-    {
-        m_settings.EnableAnimations = !m_settings.EnableAnimations;
-        return true;
-    }
-    if (key == ToGlfwKey(caustica::Key::F2) && action == cGlfwPress)
-        m_editor.ShowUI = !m_editor.ShowUI;
-    if (key == ToGlfwKey(caustica::Key::R) && action == cGlfwPress && mods == ToGlfwMods(caustica::ModifierKey::Control))
-        m_renderState.Invalidation.ShaderReloadRequested = true;
-#if CAUSTICA_WITH_STREAMLINE
-    if (key == ToGlfwKey(caustica::Key::F13) && action == cGlfwPress)
-        m_gpuDevice->GetStreamline().ReflexTriggerPcPing(m_gpuDevice->GetFrameIndex());
-#endif
-    return true;
-}
-
-bool SceneEditor::onKeyReleased(caustica::KeyReleasedEvent& e)
-{
-    int key  = ToGlfwKey(e.GetKeyCode());
-    int mods = ToGlfwMods(e.GetModifiers());
-    if (m_zoomTool && m_zoomTool->KeyboardUpdate(key, e.GetScancode(), cGlfwRelease, mods))
-        return true;
-    if (!(m_sampleGame && m_sampleGame->CameraActive()))
-        m_renderCore->camera().camera().KeyboardUpdate(key, e.GetScancode(), cGlfwRelease, mods);
-    if (m_sampleGame && m_sampleGame->KeyboardUpdate(key, e.GetScancode(), cGlfwRelease, mods))
-        return true;
-    return true;
-}
-
-bool SceneEditor::onMouseMoved(caustica::MouseMovedEvent& e)
-{
-    if (ImGui::GetIO().WantCaptureMouse) return false;
-    if (!(m_sampleGame && m_sampleGame->CameraActive()))
-        m_renderCore->camera().camera().MousePosUpdate(e.GetX(), e.GetY());
-    if (m_sampleGame)
-        m_sampleGame->MousePosUpdate(e.GetX(), e.GetY());
-
-    dm::float2 upscalingScale(1.0f, 1.0f);
-    if (m_worldRenderer && m_worldRenderer->getRenderTargets())
-        upscalingScale = dm::float2(m_worldRenderer->getRenderSize()) / dm::float2(m_worldRenderer->getDisplaySize());
-
-    m_renderState.Picking.Position = dm::uint2{static_cast<uint>(e.GetX() * upscalingScale.x), static_cast<uint>(e.GetY() * upscalingScale.y)};
-    m_settings.MousePos = m_renderState.Picking.Position;
-
-    if (m_zoomTool) m_zoomTool->MousePosUpdate(e.GetX(), e.GetY());
-    return true;
-}
-
-bool SceneEditor::onMouseButtonPressed(caustica::MouseButtonPressedEvent& e)
-{
-    if (ImGui::GetIO().WantCaptureMouse) return false;
-    int button = ToGlfwMouse(e.GetButton());
-    int mods   = ToGlfwMods(e.GetModifiers());
-    if (m_zoomTool && m_zoomTool->MouseButtonUpdate(button, cGlfwPress, mods)) return true;
-    if (!(m_sampleGame && m_sampleGame->CameraActive()))
-        m_renderCore->camera().camera().MouseButtonUpdate(button, cGlfwPress, mods);
-    if (m_sampleGame)
-        m_sampleGame->MouseButtonUpdate(button, cGlfwPress, mods);
-    if (button == ToGlfwMouse(caustica::Mouse::Right))
-    {
-        m_renderState.Picking.MaterialRequested = true;
-        m_renderState.Picking.InstanceRequested = true;
-        m_settings.DebugPixel = m_renderState.Picking.Position;
-    }
-#if CAUSTICA_WITH_STREAMLINE
-    if (button == ToGlfwMouse(caustica::Mouse::Left))
-        m_gpuDevice->GetStreamline().ReflexTriggerFlash(m_gpuDevice->GetFrameIndex());
-#endif
-    return true;
-}
-
-bool SceneEditor::onMouseButtonReleased(caustica::MouseButtonReleasedEvent& e)
-{
-    if (ImGui::GetIO().WantCaptureMouse) return false;
-    int button = ToGlfwMouse(e.GetButton());
-    int mods   = ToGlfwMods(e.GetModifiers());
-    if (m_zoomTool && m_zoomTool->MouseButtonUpdate(button, cGlfwRelease, mods)) return true;
-    if (!(m_sampleGame && m_sampleGame->CameraActive()))
-        m_renderCore->camera().camera().MouseButtonUpdate(button, cGlfwRelease, mods);
-    if (m_sampleGame)
-        m_sampleGame->MouseButtonUpdate(button, cGlfwRelease, mods);
-    return true;
-}
-
-bool SceneEditor::onMouseScrolled(caustica::MouseScrolledEvent& e)
-{
-    ImGuiIO& io = ImGui::GetIO();
-    io.AddMouseWheelEvent(static_cast<float>(e.GetXOffset()), static_cast<float>(e.GetYOffset()));
-    if (io.WantCaptureMouse) return true;
-    if (!(m_sampleGame && m_sampleGame->CameraActive()))
-        m_settings.CameraMoveSpeed *= 1.0f + static_cast<float>(e.GetYOffset()) * 0.1f;
-    return true;
+    SyncInputRouterContext();
+    m_inputRouter.onEvent(event);
 }
 
 } // namespace caustica::editor

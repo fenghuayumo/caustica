@@ -10,6 +10,7 @@
 #include <nanobind/operators.h>
 
 #include "SceneEditor.h"
+#include <render/RenderSessionState.h>
 #include <EditorUI.h>
 #include <scene/Scene.h>
 #include <render/Passes/Lighting/MaterialsBaker.h>
@@ -42,6 +43,7 @@ using caustica::math::double3;
 using caustica::math::double4;
 using caustica::editor::SceneEditor;
 using caustica::editor::SampleUIData;
+using caustica::render::RenderSessionState;
 
 // Singleton consumed by embed mode (set by PythonScripting before Py_Initialize).
 // In extension mode this stays nullptr - Renderer manages its own Sample.
@@ -1061,21 +1063,20 @@ void RegisterCoreBindings(nb::module_& m)
             [](EnvironmentMapRuntimeParameters& s) { return !s.VisibleToCamera; },
             [](EnvironmentMapRuntimeParameters& s, bool hide) { s.VisibleToCamera = !hide; });
 
-    nb::class_<SampleUIData>(m, "Settings",
-        "Live UI state of the renderer. Mutating attributes is equivalent\n"
-        "to moving the corresponding ImGui widget.")
-        .def_rw("show_ui",                       &SampleUIData::ShowUI)
-        .def_rw("enable_animations",             &SampleUIData::EnableAnimations)
-        .def_rw("enable_vsync",                  &SampleUIData::EnableVsync)
-        .def_rw("fps_limiter",                   &SampleUIData::FPSLimiter)
+    nb::class_<RenderSessionState>(m, "Settings",
+        "Live renderer session state (path tracer settings and runtime flags).\n"
+        "Mutating attributes is equivalent to moving the corresponding ImGui widget.")
+        .def_rw("enable_animations",             &RenderSessionState::EnableAnimations)
+        .def_rw("enable_vsync",                  &RenderSessionState::EnableVsync)
+        .def_rw("fps_limiter",                   &RenderSessionState::FPSLimiter)
 
         // --- Path tracer top-level mode ----------------------------------
-        .def_rw("realtime_mode",                 &SampleUIData::RealtimeMode,
+        .def_rw("realtime_mode",                 &RenderSessionState::RealtimeMode,
                 "True for realtime mode, False for reference / accumulation mode.\n"
                 "See `Settings.path_tracer_mode` for an enum-flavored version.")
         .def_prop_rw("path_tracer_mode",
-            [](SampleUIData& s) -> int { return s.RealtimeMode ? 0 /*Realtime*/ : 1 /*Reference*/; },
-            [](SampleUIData& s, int mode) {
+            [](RenderSessionState& s) -> int { return s.RealtimeMode ? 0 /*Realtime*/ : 1 /*Reference*/; },
+            [](RenderSessionState& s, int mode) {
                 bool wasRealtime = s.RealtimeMode;
                 s.RealtimeMode = (mode == 0);
                 if (wasRealtime != s.RealtimeMode)
@@ -1084,193 +1085,197 @@ void RegisterCoreBindings(nb::module_& m)
             "Convenience wrapper around `realtime_mode`.\n"
             "Set to caustica.PathTracerMode.Reference or .Realtime.")
 
-        .def_rw("realtime_samples_per_pixel",    &SampleUIData::RealtimeSamplesPerPixel)
-        .def_rw("accumulation_target",           &SampleUIData::AccumulationTarget)
-        .def_rw("reset_accumulation",            &SampleUIData::ResetAccumulation)
-        .def_rw("reset_realtime_caches",         &SampleUIData::ResetRealtimeCaches)
-        .def_rw("accumulation_aa",               &SampleUIData::AccumulationAA)
-        .def_rw("accumulation_prewarm_realtime_caches", &SampleUIData::AccumulationPreWarmRealtimeCaches)
+        .def_rw("realtime_samples_per_pixel",    &RenderSessionState::RealtimeSamplesPerPixel)
+        .def_rw("accumulation_target",           &RenderSessionState::AccumulationTarget)
+        .def_rw("reset_accumulation",            &RenderSessionState::ResetAccumulation)
+        .def_rw("reset_realtime_caches",         &RenderSessionState::ResetRealtimeCaches)
+        .def_rw("accumulation_aa",               &RenderSessionState::AccumulationAA)
+        .def_rw("accumulation_prewarm_realtime_caches", &RenderSessionState::AccumulationPreWarmRealtimeCaches)
 
-        .def_rw("bounce_count",                  &SampleUIData::BounceCount)
-        .def_rw("diffuse_bounce_count",          &SampleUIData::DiffuseBounceCount)
-        .def_rw("enable_russian_roulette",       &SampleUIData::EnableRussianRoulette)
-        .def_rw("texture_lod_bias",              &SampleUIData::TexLODBias)
+        .def_rw("bounce_count",                  &RenderSessionState::BounceCount)
+        .def_rw("diffuse_bounce_count",          &RenderSessionState::DiffuseBounceCount)
+        .def_rw("enable_russian_roulette",       &RenderSessionState::EnableRussianRoulette)
+        .def_rw("texture_lod_bias",              &RenderSessionState::TexLODBias)
 
-        .def_rw("use_nee",                       &SampleUIData::UseNEE)
-        .def_rw("nee_type",                      &SampleUIData::NEEType,
+        .def_rw("use_nee",                       &RenderSessionState::UseNEE)
+        .def_rw("nee_type",                      &RenderSessionState::NEEType,
                 "0 = uniform, 1 = power-based, 2 = NEE-AT")
-        .def_rw("nee_candidate_samples",         &SampleUIData::NEECandidateSamples)
-        .def_rw("nee_full_samples",              &SampleUIData::NEEFullSamples)
-        .def_rw("nee_mis_type",                  &SampleUIData::NEEMISType)
+        .def_rw("nee_candidate_samples",         &RenderSessionState::NEECandidateSamples)
+        .def_rw("nee_full_samples",              &RenderSessionState::NEEFullSamples)
+        .def_rw("nee_mis_type",                  &RenderSessionState::NEEMISType)
 
-        .def_rw("use_restir_di",                 &SampleUIData::UseReSTIRDI)
-        .def_rw("use_restir_gi",                 &SampleUIData::UseReSTIRGI)
-        .def_rw("use_restir_pt",                 &SampleUIData::UseReSTIRPT)
+        .def_rw("use_restir_di",                 &RenderSessionState::UseReSTIRDI)
+        .def_rw("use_restir_gi",                 &RenderSessionState::UseReSTIRGI)
+        .def_rw("use_restir_pt",                 &RenderSessionState::UseReSTIRPT)
 
-        .def_rw("camera_aperture",               &SampleUIData::CameraAperture)
-        .def_rw("camera_focal_distance",         &SampleUIData::CameraFocalDistance)
-        .def_rw("camera_move_speed",             &SampleUIData::CameraMoveSpeed)
+        .def_rw("camera_aperture",               &RenderSessionState::CameraAperture)
+        .def_rw("camera_focal_distance",         &RenderSessionState::CameraFocalDistance)
+        .def_rw("camera_move_speed",             &RenderSessionState::CameraMoveSpeed)
 
-        .def_rw("realtime_firefly_filter_enabled", &SampleUIData::RealtimeFireflyFilterEnabled)
-        .def_rw("realtime_firefly_filter_threshold", &SampleUIData::RealtimeFireflyFilterThreshold)
-        .def_rw("reference_firefly_filter_enabled",  &SampleUIData::ReferenceFireflyFilterEnabled)
-        .def_rw("reference_firefly_filter_threshold",&SampleUIData::ReferenceFireflyFilterThreshold)
+        .def_rw("realtime_firefly_filter_enabled", &RenderSessionState::RealtimeFireflyFilterEnabled)
+        .def_rw("realtime_firefly_filter_threshold", &RenderSessionState::RealtimeFireflyFilterThreshold)
+        .def_rw("reference_firefly_filter_enabled",  &RenderSessionState::ReferenceFireflyFilterEnabled)
+        .def_rw("reference_firefly_filter_threshold",&RenderSessionState::ReferenceFireflyFilterThreshold)
 
-        .def_rw("enable_tone_mapping",           &SampleUIData::EnableToneMapping)
-        .def_rw("enable_bloom",                  &SampleUIData::EnableBloom)
-        .def_rw("bloom_intensity",               &SampleUIData::BloomIntensity)
-        .def_rw("bloom_radius",                  &SampleUIData::BloomRadius)
+        .def_rw("enable_tone_mapping",           &RenderSessionState::EnableToneMapping)
+        .def_rw("enable_bloom",                  &RenderSessionState::EnableBloom)
+        .def_rw("bloom_intensity",               &RenderSessionState::BloomIntensity)
+        .def_rw("bloom_radius",                  &RenderSessionState::BloomRadius)
 
-        .def_rw("enable_gaussian_splats",        &SampleUIData::EnableGaussianSplats)
-        .def_rw("gaussian_splat_depth_test",     &SampleUIData::GaussianSplatDepthTest)
-        .def_rw("gaussian_splat_shadows",        &SampleUIData::GaussianSplatShadows)
-        .def_rw("gaussian_splat_hybrid_shadows", &SampleUIData::GaussianSplatShadows)
-        .def_rw("gaussian_splat_shadows_mode",   &SampleUIData::GaussianSplatShadowsMode,
+        .def_rw("enable_gaussian_splats",        &RenderSessionState::EnableGaussianSplats)
+        .def_rw("gaussian_splat_depth_test",     &RenderSessionState::GaussianSplatDepthTest)
+        .def_rw("gaussian_splat_shadows",        &RenderSessionState::GaussianSplatShadows)
+        .def_rw("gaussian_splat_hybrid_shadows", &RenderSessionState::GaussianSplatShadows)
+        .def_rw("gaussian_splat_shadows_mode",   &RenderSessionState::GaussianSplatShadowsMode,
                 "3DGS shadow mode (caustica.GaussianSplatShadowMode).")
-        .def_rw("gaussian_splat_sorting_mode",   &SampleUIData::GaussianSplatSortingMode,
+        .def_rw("gaussian_splat_sorting_mode",   &RenderSessionState::GaussianSplatSortingMode,
                 "3DGS sort mode (caustica.GaussianSplatSortMode).")
-        .def_rw("gaussian_splat_sh_format",      &SampleUIData::GaussianSplatSHFormat,
+        .def_rw("gaussian_splat_sh_format",      &RenderSessionState::GaussianSplatSHFormat,
                 "3DGS SH storage format (caustica.GaussianSplatStorageFormat).")
-        .def_rw("gaussian_splat_rgba_format",    &SampleUIData::GaussianSplatRGBAFormat,
+        .def_rw("gaussian_splat_rgba_format",    &RenderSessionState::GaussianSplatRGBAFormat,
                 "3DGS RGBA storage format (caustica.GaussianSplatStorageFormat).")
-        .def_rw("gaussian_splat_use_aabbs",      &SampleUIData::GaussianSplatUseAABBs)
-        .def_rw("gaussian_splat_use_tlas_instances", &SampleUIData::GaussianSplatUseTLASInstances)
-        .def_rw("gaussian_splat_blas_compaction", &SampleUIData::GaussianSplatBlasCompaction)
-        .def_rw("gaussian_splat_rtx_kernel_degree", &SampleUIData::GaussianSplatRtxKernelDegree)
-        .def_rw("gaussian_splat_rtx_adaptive_clamp", &SampleUIData::GaussianSplatRtxAdaptiveClamp)
-        .def_rw("gaussian_splat_rtx_alpha_clamp", &SampleUIData::GaussianSplatRtxAlphaClamp)
-        .def_rw("gaussian_splat_rtx_minimum_transmittance", &SampleUIData::GaussianSplatRtxMinimumTransmittance)
-        .def_rw("gaussian_splat_rtx_trace_strategy", &SampleUIData::GaussianSplatRtxTraceStrategy)
-        .def_rw("gaussian_splat_rtx_particle_samples_per_pass", &SampleUIData::GaussianSplatRtxParticleSamplesPerPass)
-        .def_rw("gaussian_splat_rtx_maximum_pass_count", &SampleUIData::GaussianSplatRtxMaximumPassCount)
-        .def_rw("gaussian_splat_rtx_particle_shadow_offset", &SampleUIData::GaussianSplatRtxParticleShadowOffset)
-        .def_rw("gaussian_splat_rtx_particle_shadow_threshold", &SampleUIData::GaussianSplatRtxParticleShadowThreshold)
-        .def_rw("gaussian_splat_rtx_colored_shadow_strength", &SampleUIData::GaussianSplatRtxColoredShadowStrength)
-        .def_rw("gaussian_splat_rtx_mesh_composite_threshold", &SampleUIData::GaussianSplatRtxMeshCompositeThreshold)
-        .def_rw("gaussian_splat_rtx_depth_iso_threshold", &SampleUIData::GaussianSplatRtxDepthIsoThreshold)
-        .def_rw("gaussian_splat_mip_antialiasing", &SampleUIData::GaussianSplatMipAntialiasing)
-        .def_rw("gaussian_splat_quantize_normals", &SampleUIData::GaussianSplatQuantizeNormals)
-        .def_rw("gaussian_splat_ftb_sync_mode", &SampleUIData::GaussianSplatFTBSyncMode,
+        .def_rw("gaussian_splat_use_aabbs",      &RenderSessionState::GaussianSplatUseAABBs)
+        .def_rw("gaussian_splat_use_tlas_instances", &RenderSessionState::GaussianSplatUseTLASInstances)
+        .def_rw("gaussian_splat_blas_compaction", &RenderSessionState::GaussianSplatBlasCompaction)
+        .def_rw("gaussian_splat_rtx_kernel_degree", &RenderSessionState::GaussianSplatRtxKernelDegree)
+        .def_rw("gaussian_splat_rtx_adaptive_clamp", &RenderSessionState::GaussianSplatRtxAdaptiveClamp)
+        .def_rw("gaussian_splat_rtx_alpha_clamp", &RenderSessionState::GaussianSplatRtxAlphaClamp)
+        .def_rw("gaussian_splat_rtx_minimum_transmittance", &RenderSessionState::GaussianSplatRtxMinimumTransmittance)
+        .def_rw("gaussian_splat_rtx_trace_strategy", &RenderSessionState::GaussianSplatRtxTraceStrategy)
+        .def_rw("gaussian_splat_rtx_particle_samples_per_pass", &RenderSessionState::GaussianSplatRtxParticleSamplesPerPass)
+        .def_rw("gaussian_splat_rtx_maximum_pass_count", &RenderSessionState::GaussianSplatRtxMaximumPassCount)
+        .def_rw("gaussian_splat_rtx_particle_shadow_offset", &RenderSessionState::GaussianSplatRtxParticleShadowOffset)
+        .def_rw("gaussian_splat_rtx_particle_shadow_threshold", &RenderSessionState::GaussianSplatRtxParticleShadowThreshold)
+        .def_rw("gaussian_splat_rtx_colored_shadow_strength", &RenderSessionState::GaussianSplatRtxColoredShadowStrength)
+        .def_rw("gaussian_splat_rtx_mesh_composite_threshold", &RenderSessionState::GaussianSplatRtxMeshCompositeThreshold)
+        .def_rw("gaussian_splat_rtx_depth_iso_threshold", &RenderSessionState::GaussianSplatRtxDepthIsoThreshold)
+        .def_rw("gaussian_splat_mip_antialiasing", &RenderSessionState::GaussianSplatMipAntialiasing)
+        .def_rw("gaussian_splat_quantize_normals", &RenderSessionState::GaussianSplatQuantizeNormals)
+        .def_rw("gaussian_splat_ftb_sync_mode", &RenderSessionState::GaussianSplatFTBSyncMode,
                 "3DGS front-to-back synchronization mode (caustica.GaussianSplatFTBSyncMode).")
-        .def_rw("gaussian_splat_depth_iso_threshold", &SampleUIData::GaussianSplatDepthIsoThreshold)
-        .def_rw("gaussian_splat_fragment_shader_barycentric", &SampleUIData::GaussianSplatFragmentShaderBarycentric)
-        .def_rw("gaussian_splat_frustum_culling", &SampleUIData::GaussianSplatFrustumCulling,
+        .def_rw("gaussian_splat_depth_iso_threshold", &RenderSessionState::GaussianSplatDepthIsoThreshold)
+        .def_rw("gaussian_splat_fragment_shader_barycentric", &RenderSessionState::GaussianSplatFragmentShaderBarycentric)
+        .def_rw("gaussian_splat_frustum_culling", &RenderSessionState::GaussianSplatFrustumCulling,
                 "3DGS frustum culling mode (caustica.GaussianSplatFrustumCulling).")
-        .def_rw("gaussian_splat_frustum_dilation", &SampleUIData::GaussianSplatFrustumDilation)
-        .def_rw("gaussian_splat_screen_size_culling", &SampleUIData::GaussianSplatScreenSizeCulling)
-        .def_rw("gaussian_splat_min_pixel_coverage", &SampleUIData::GaussianSplatMinPixelCoverage)
-        .def_rw("gaussian_splat_scale",          &SampleUIData::GaussianSplatScale)
-        .def_rw("gaussian_splat_alpha_scale",    &SampleUIData::GaussianSplatAlphaScale)
-        .def_rw("gaussian_splat_brightness",     &SampleUIData::GaussianSplatBrightness)
+        .def_rw("gaussian_splat_frustum_dilation", &RenderSessionState::GaussianSplatFrustumDilation)
+        .def_rw("gaussian_splat_screen_size_culling", &RenderSessionState::GaussianSplatScreenSizeCulling)
+        .def_rw("gaussian_splat_min_pixel_coverage", &RenderSessionState::GaussianSplatMinPixelCoverage)
+        .def_rw("gaussian_splat_scale",          &RenderSessionState::GaussianSplatScale)
+        .def_rw("gaussian_splat_alpha_scale",    &RenderSessionState::GaussianSplatAlphaScale)
+        .def_rw("gaussian_splat_brightness",     &RenderSessionState::GaussianSplatBrightness)
         .def_prop_rw("gaussian_splat_tint_color",
-            [](SampleUIData& s) { return Float3ToTuple(s.GaussianSplatTintColor); },
-            [](SampleUIData& s, nb::object v) { s.GaussianSplatTintColor = ToFloat3(v); })
-        .def_rw("gaussian_splat_as_emitter",     &SampleUIData::GaussianSplatAsEmitter)
-        .def_rw("gaussian_splat_emission_intensity", &SampleUIData::GaussianSplatEmissionIntensity)
-        .def_rw("gaussian_splat_emission_max_proxy_count", &SampleUIData::GaussianSplatEmissionMaxProxyCount)
-        .def_rw("gaussian_splat_alpha_cull_threshold", &SampleUIData::GaussianSplatAlphaCullThreshold)
-        .def_rw("gaussian_splat_shadow_strength", &SampleUIData::GaussianSplatShadowStrength)
-        .def_rw("gaussian_splat_shadow_soft_radius", &SampleUIData::GaussianSplatShadowSoftRadius)
-        .def_rw("gaussian_splat_shadow_soft_sample_count", &SampleUIData::GaussianSplatShadowSoftSampleCount)
+            [](RenderSessionState& s) { return Float3ToTuple(s.GaussianSplatTintColor); },
+            [](RenderSessionState& s, nb::object v) { s.GaussianSplatTintColor = ToFloat3(v); })
+        .def_rw("gaussian_splat_as_emitter",     &RenderSessionState::GaussianSplatAsEmitter)
+        .def_rw("gaussian_splat_emission_intensity", &RenderSessionState::GaussianSplatEmissionIntensity)
+        .def_rw("gaussian_splat_emission_max_proxy_count", &RenderSessionState::GaussianSplatEmissionMaxProxyCount)
+        .def_rw("gaussian_splat_alpha_cull_threshold", &RenderSessionState::GaussianSplatAlphaCullThreshold)
+        .def_rw("gaussian_splat_shadow_strength", &RenderSessionState::GaussianSplatShadowStrength)
+        .def_rw("gaussian_splat_shadow_soft_radius", &RenderSessionState::GaussianSplatShadowSoftRadius)
+        .def_rw("gaussian_splat_shadow_soft_sample_count", &RenderSessionState::GaussianSplatShadowSoftSampleCount)
         .def_prop_rw("gaussian_splat_translation",
-            [](SampleUIData& s) { return Float3ToTuple(s.GaussianSplatTranslation); },
-            [](SampleUIData& s, nb::object v) {
+            [](RenderSessionState& s) { return Float3ToTuple(s.GaussianSplatTranslation); },
+            [](RenderSessionState& s, nb::object v) {
                 s.GaussianSplatTranslation = ToFloat3(v);
                 s.ResetAccumulation = true;
             })
         .def_prop_rw("gaussian_splat_rotation_euler_deg",
-            [](SampleUIData& s) { return Float3ToTuple(s.GaussianSplatRotationEulerDeg); },
-            [](SampleUIData& s, nb::object v) {
+            [](RenderSessionState& s) { return Float3ToTuple(s.GaussianSplatRotationEulerDeg); },
+            [](RenderSessionState& s, nb::object v) {
                 s.GaussianSplatRotationEulerDeg = ToFloat3(v);
                 s.ResetAccumulation = true;
             })
         .def_prop_rw("gaussian_splat_object_scale",
-            [](SampleUIData& s) { return Float3ToTuple(s.GaussianSplatObjectScale); },
-            [](SampleUIData& s, nb::object v) {
+            [](RenderSessionState& s) { return Float3ToTuple(s.GaussianSplatObjectScale); },
+            [](RenderSessionState& s, nb::object v) {
                 s.GaussianSplatObjectScale = ToFloat3(v);
                 s.ResetAccumulation = true;
             })
-        .def_ro("gaussian_splat_count",          &SampleUIData::GaussianSplatCount)
-        .def_ro("gaussian_splat_object_count",   &SampleUIData::GaussianSplatObjectCount)
-        .def_ro("gaussian_splat_file_name",      &SampleUIData::GaussianSplatFileName)
+        .def_ro("gaussian_splat_count", [](const RenderSessionState& s) { return s.GaussianSplats.SplatCount; })
+        .def_ro("gaussian_splat_object_count", [](const RenderSessionState& s) { return s.GaussianSplats.ObjectCount; })
+        .def_ro("gaussian_splat_file_name", [](const RenderSessionState& s) { return s.GaussianSplats.FileName; })
 
         // --- AA / DLSS / DLSS-RR / DLSS-G / Reflex (realtime only) -------
-        .def_rw("realtime_aa",                   &SampleUIData::RealtimeAA,
+        .def_rw("realtime_aa",                   &RenderSessionState::RealtimeAA,
                 "Realtime AA mode (caustica.RealtimeAA enum):\n"
                 "  0 = Off, 1 = TAA, 2 = DLSS, 3 = DLSS-RR")
 
         // DLSS quality (caustica.DLSSMode enum -> SI::DLSSMode underlying uint32)
         .def_prop_rw("dlss_mode",
-            [](SampleUIData& s) { return int(s.DLSSMode); },
-            [](SampleUIData& s, int v) { s.DLSSMode = SI::DLSSMode(v); },
+            [](RenderSessionState& s) { return int(s.DLSSMode); },
+            [](RenderSessionState& s, int v) { s.DLSSMode = SI::DLSSMode(v); },
             "DLSS quality preset (caustica.DLSSMode).\n"
             "Off, MaxPerformance, Balanced, MaxQuality, UltraPerformance, UltraQuality, DLAA.")
-        .def_rw("dlss_lod_bias_use_override", &SampleUIData::DLSSLodBiasUseOverride)
-        .def_rw("dlss_lod_bias_override",     &SampleUIData::DLSSLodBiasOverride)
-        .def_rw("dlss_always_use_extents",    &SampleUIData::DLSSAlwaysUseExtents)
+        .def_rw("dlss_lod_bias_use_override", &RenderSessionState::DLSSLodBiasUseOverride)
+        .def_rw("dlss_lod_bias_override",     &RenderSessionState::DLSSLodBiasOverride)
+        .def_rw("dlss_always_use_extents",    &RenderSessionState::DLSSAlwaysUseExtents)
 
         // DLSS-G (frame generation)
         .def_prop_rw("dlss_fg_mode",
-            [](SampleUIData& s) { return int(s.DLSSFGMode); },
-            [](SampleUIData& s, int v) { s.DLSSFGMode = SI::DLSSGMode(v); },
+            [](RenderSessionState& s) { return int(s.DLSSFGMode); },
+            [](RenderSessionState& s, int v) { s.DLSSFGMode = SI::DLSSGMode(v); },
             "DLSS frame generation mode (caustica.DLSSFGMode).")
-        .def_rw("dlss_fg_multiplier",            &SampleUIData::DLSSFGMultiplier)
-        .def_rw("dlss_fg_num_frames_to_generate",&SampleUIData::DLSSFGNumFramesToGenerate)
-        .def_rw("dlss_fg_max_num_frames_to_generate",&SampleUIData::DLSSFGMaxNumFramesToGenerate)
+        .def_rw("dlss_fg_multiplier",            &RenderSessionState::DLSSFGMultiplier)
+        .def_rw("dlss_fg_num_frames_to_generate",&RenderSessionState::DLSSFGNumFramesToGenerate)
+        .def_rw("dlss_fg_max_num_frames_to_generate",&RenderSessionState::DLSSFGMaxNumFramesToGenerate)
 
         // DLSS-RR (ray reconstruction)
         .def_prop_rw("dlss_rr_preset",
-            [](SampleUIData& s) { return int(s.DLSRRPreset); },
-            [](SampleUIData& s, int v) { s.DLSRRPreset = SI::DLSSRRPreset(v); },
+            [](RenderSessionState& s) { return int(s.DLSRRPreset); },
+            [](RenderSessionState& s, int v) { s.DLSRRPreset = SI::DLSSRRPreset(v); },
             "DLSS-RR preset (caustica.DLSSRRPreset).")
-        .def_rw("dlss_rr_micro_jitter",          &SampleUIData::DLSSRRMicroJitter)
-        .def_rw("dlss_rr_brightness_clamp_k",    &SampleUIData::DLSSRRBrightnessClampK)
-        .def_rw("disable_restirs_with_dlss_rr",  &SampleUIData::DisableReSTIRsWithDLSSRR)
+        .def_rw("dlss_rr_micro_jitter",          &RenderSessionState::DLSSRRMicroJitter)
+        .def_rw("dlss_rr_brightness_clamp_k",    &RenderSessionState::DLSSRRBrightnessClampK)
+        .def_rw("disable_restirs_with_dlss_rr",  &RenderSessionState::DisableReSTIRsWithDLSSRR)
 
         // Reflex (low latency)
-        .def_rw("reflex_mode",                   &SampleUIData::ReflexMode,
+        .def_rw("reflex_mode",                   &RenderSessionState::ReflexMode,
                 "NVIDIA Reflex mode (caustica.ReflexMode).")
-        .def_rw("reflex_capped_fps",             &SampleUIData::ReflexCappedFps)
+        .def_rw("reflex_capped_fps",             &RenderSessionState::ReflexCappedFps)
 
         // --- Read-only support flags -------------------------------------
-        .def_ro("is_dlss_supported",     &SampleUIData::IsDLSSSuported)
-        .def_ro("is_dlss_fg_supported",  &SampleUIData::IsDLSSFGSupported)
-        .def_ro("is_dlss_rr_supported",  &SampleUIData::IsDLSSRRSupported)
-        .def_ro("is_reflex_supported",   &SampleUIData::IsReflexSupported)
+        .def_ro("is_dlss_supported",     &RenderSessionState::IsDLSSSuported)
+        .def_ro("is_dlss_fg_supported",  &RenderSessionState::IsDLSSFGSupported)
+        .def_ro("is_dlss_rr_supported",  &RenderSessionState::IsDLSSRRSupported)
+        .def_ro("is_reflex_supported",   &RenderSessionState::IsReflexSupported)
 
         // --- Standalone NRD denoiser (realtime, RealtimeAA != DLSS-RR) ---
-        .def_rw("standalone_denoiser",           &SampleUIData::StandaloneDenoiser,
+        .def_rw("standalone_denoiser",           &RenderSessionState::StandaloneDenoiser,
                 "Enable NRD denoiser in realtime mode (no effect with DLSS-RR).")
-        .def_rw("denoiser_radiance_clamp_k",     &SampleUIData::DenoiserRadianceClampK)
+        .def_rw("denoiser_radiance_clamp_k",     &RenderSessionState::DenoiserRadianceClampK)
 
         // --- OIDN reference-mode denoiser --------------------------------
-        .def_rw("oidn_enabled",            &SampleUIData::ReferenceOIDNDenoiser,
+        .def_rw("oidn_enabled",            &RenderSessionState::ReferenceOIDNDenoiser,
                 "(Reference mode) Run Intel Open Image Denoise after accumulation reaches the SPP target.")
-        .def_rw("oidn_use_gpu",            &SampleUIData::ReferenceOIDNUseGPU,
+        .def_rw("oidn_use_gpu",            &RenderSessionState::ReferenceOIDNUseGPU,
                 "Use OIDN GPU device (CUDA/HIP/SYCL) when available, else CPU.")
-        .def_rw("oidn_passes",             &SampleUIData::ReferenceOIDNPasses,
+        .def_rw("oidn_passes",             &RenderSessionState::ReferenceOIDNPasses,
                 "Auxiliary guide passes (caustica.OidnPasses).")
-        .def_rw("oidn_prefilter",          &SampleUIData::ReferenceOIDNPrefilter,
+        .def_rw("oidn_prefilter",          &RenderSessionState::ReferenceOIDNPrefilter,
                 "Prefilter quality for guide passes (caustica.OidnPrefilter).")
-        .def_rw("oidn_quality",            &SampleUIData::ReferenceOIDNQuality,
+        .def_rw("oidn_quality",            &RenderSessionState::ReferenceOIDNQuality,
                 "Beauty filter quality (caustica.OidnQuality).")
-        .def_rw("oidn_changed",            &SampleUIData::ReferenceOIDNDenoiserChanged,
+        .def_rw("oidn_changed",            &RenderSessionState::ReferenceOIDNDenoiserChanged,
                 "Set to True after editing any OIDN parameter to force a redenoise.\n"
                 "Cleared automatically by the renderer.")
-        .def("oidn_apply", [](SampleUIData& s) { s.ReferenceOIDNDenoiserChanged = true; },
+        .def("oidn_apply", [](RenderSessionState& s) { s.ReferenceOIDNDenoiserChanged = true; },
              "Mark OIDN parameters dirty so the next accumulation completion runs the filter again.")
 
-        .def_rw("environment_map",               &SampleUIData::EnvironmentMapParams,
+        .def_rw("environment_map",               &RenderSessionState::EnvironmentMapParams,
                 nb::rv_policy::reference_internal,
                 "EnvironmentMapParams structure (intensity, tint, rotation, enabled, visible_to_camera).")
         ;
+
+    nb::class_<SampleUIData, RenderSessionState>(m, "EditorSettings",
+        "Desktop-editor settings that extend `Settings` with ImGui view state.")
+        .def_rw("show_ui", &SampleUIData::ShowUI);
 
     // --- Sample (top-level renderer access) -------------------------------
     nb::class_<SceneEditor>(m, "Sample",
         "caustica renderer instance. In embed mode use caustica.app(); in extension\n"
         "mode use Renderer.app to retrieve the underlying instance.")
-        .def_prop_ro("settings", [](SceneEditor& self) -> SampleUIData* {
-                return &self.GetUIData();
+        .def_prop_ro("settings", [](SceneEditor& self) -> RenderSessionState* {
+                return &self.GetRenderSessionState();
             }, nb::rv_policy::reference,
             "Live `Settings` mirror of the current UI state.")
         .def_prop_ro("scene", [](SceneEditor& self) {

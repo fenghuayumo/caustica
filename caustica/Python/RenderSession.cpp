@@ -51,8 +51,7 @@
 #include <vector>
 
 using caustica::editor::SceneEditor;
-using caustica::editor::SampleUIData;
-using caustica::editor::InitializeSampleUIDataFromCommandLine;
+using caustica::render::InitializeRenderSessionStateFromCommandLine;
 
 #if CAUSTICA_WITH_DX12
 #include <d3d12.h>
@@ -601,7 +600,7 @@ bool RenderSession::InitRenderer()
     SetRuntimeDirectoryOverride(appDirectory);
     SetLocalPathBaseOverride(ResolveResourceRoot(appDirectory));
 
-    m_renderer = std::make_unique<SceneEditor>(m_cmdLine, m_sampleUIData, m_sessionDiagnostics);
+    m_renderer = std::make_unique<SceneEditor>(m_cmdLine, m_sessionState, m_editorUIState, m_sessionDiagnostics);
     m_renderer->setGpuDevice(*m_deviceManager);
     m_renderer->initStreamlineAndWindow();
     m_renderer->AttachLightingPasses(m_lightingPasses);
@@ -625,8 +624,8 @@ bool RenderSession::InitRenderer()
         .frameExtensions = m_frameExtensions,
         .preferredScene = preferredScene,
         .onAfterAttachPasses = [this]() {
-            InitializeSampleUIDataFromCommandLine(m_sampleUIData, m_cmdLine);
-            LocalConfig::PostAppInit(m_sampleUIData);
+            InitializeRenderSessionStateFromCommandLine(m_sessionState, m_cmdLine);
+            LocalConfig::PostAppInit(m_sessionState);
         },
     });
 
@@ -744,11 +743,11 @@ int RenderSession::StepUntilAccumulated(int maxFrames)
 
     // Force reference / accumulation mode so we know "done" actually means
     // the SPP target has been reached.
-    m_sampleUIData.ResetAccumulation = true;
+    m_sessionState.ResetAccumulation = true;
 
     int target = (maxFrames > 0)
         ? maxFrames
-        : std::max(1, m_sampleUIData.AccumulationTarget + 128);
+        : std::max(1, m_sessionState.AccumulationTarget + 128);
 
     int frames = 0;
     while (frames < target)

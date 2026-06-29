@@ -29,11 +29,12 @@
 #include <render/SceneLightingPasses.h>
 #include <render/SceneRayTracingResources.h>
 #include <render/WorldRenderer/PathTracingFrameExtension.h>
+#include <render/RenderSessionState.h>
 #include <render/SessionDiagnostics.h>
 #include <engine/EngineRenderer.h>
 
 #include <core/command_line.h>
-#include <EditorUI.h>
+#include <EditorUIState.h>
 
 #if CAUSTICA_WITH_DX12 && defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
 #include <wrl/client.h>
@@ -50,7 +51,6 @@ namespace caustica::editor
 {
 class SceneEditor;
 class SceneEditorFrameExtension;
-struct SampleUIData;
 }
 
 namespace caustica_py
@@ -122,8 +122,10 @@ public:
     caustica::editor::SceneEditor*       GetSceneEditor()       { return m_renderer.get(); }
     const caustica::editor::SceneEditor* GetSceneEditor() const { return m_renderer.get(); }
 
-    caustica::editor::SampleUIData& GetSampleUIData() { return m_sampleUIData; }
-    const caustica::editor::SampleUIData& GetSampleUIData() const { return m_sampleUIData; }
+    caustica::render::RenderSessionState& GetRenderSessionState() { return m_sessionState; }
+    const caustica::render::RenderSessionState& GetRenderSessionState() const { return m_sessionState; }
+    caustica::editor::EditorUIState& GetEditorUIState() { return m_editorUIState; }
+    const caustica::editor::EditorUIState& GetEditorUIState() const { return m_editorUIState; }
 
     caustica::GpuDevice* GetGpuDevice() { return m_deviceManager.get(); }
     const Config&              GetConfig() const  { return m_config; }
@@ -135,7 +137,8 @@ private:
 
     Config                                          m_config;
     CommandLineOptions                              m_cmdLine;
-    caustica::editor::SampleUIData                    m_sampleUIData;
+    caustica::render::RenderSessionState            m_sessionState;
+    caustica::editor::EditorUIState                  m_editorUIState;
     caustica::render::SessionDiagnostics              m_sessionDiagnostics;
     caustica::render::SceneLightingPasses           m_lightingPasses;
     caustica::render::SceneRayTracingResources      m_rayTracingResources;

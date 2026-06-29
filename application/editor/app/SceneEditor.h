@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cassert>
+
 #include <backend/GpuDevice.h>
 #include <core/command_line.h>
 #include <core/progress.h>
@@ -15,6 +17,8 @@
 #include <render/RenderRuntimeState.h>
 #include <render/SessionDiagnostics.h>
 #include "ui/SampleUIData.h"
+#include "EditorInputRouter.h"
+#include <render/RenderSessionState.h>
 
 #include <chrono>
 #include <filesystem>
@@ -78,7 +82,12 @@ using namespace caustica::math;
 class SceneEditor
 {
 public:
+    SceneEditor(const CommandLineOptions& cmdLine,
+        caustica::render::RenderSessionState& sessionState,
+        EditorUIState& editorState,
+        caustica::render::SessionDiagnostics& diagnostics);
     SceneEditor(const CommandLineOptions& cmdLine, SampleUIData& ui, caustica::render::SessionDiagnostics& diagnostics);
+
     ~SceneEditor();
 
     void setGpuDevice(caustica::GpuDevice& dm) { m_gpuDevice = &dm; }
@@ -105,8 +114,10 @@ public:
     uint &                                  SelectedCameraIndex();
     const std::unique_ptr<::GameScene> &     GetGame() const                   { return m_sampleGame; }
 
-    SampleUIData& GetUIData() { return m_ui; }
-    const SampleUIData& GetUIData() const { return m_ui; }
+    SampleUIData& GetUIData() { assert(m_sampleUi); return *m_sampleUi; }
+    const SampleUIData& GetUIData() const { assert(m_sampleUi); return *m_sampleUi; }
+    caustica::render::RenderSessionState& GetRenderSessionState() { return m_sessionState; }
+    const caustica::render::RenderSessionState& GetRenderSessionState() const { return m_sessionState; }
     PathTracerSettings& GetPathTracerSettings() { return m_settings; }
     const PathTracerSettings& GetPathTracerSettings() const { return m_settings; }
     EditorUIState& GetEditorUIState() { return m_editor; }
@@ -257,10 +268,11 @@ public:
     bool                                    AccumulationCompleted() const;
 
 protected:
+    caustica::render::RenderSessionState& m_sessionState;
     PathTracerSettings& m_settings;
     caustica::render::RenderRuntimeState& m_renderState;
     EditorUIState& m_editor;
-    SampleUIData& m_ui;
+    SampleUIData* m_sampleUi = nullptr;
     caustica::render::SessionDiagnostics& m_sessionDiagnostics;
 
     std::unique_ptr<CaptureScriptManager>       m_captureScriptManager;
@@ -269,19 +281,14 @@ protected:
 #endif
 
     caustica::render::PathTracingWorldRenderer* m_worldRenderer = nullptr;
+    EditorInputRouter m_inputRouter;
 
     const caustica::PlanarView& GetView() const;
 
 private:
     void                                    UpdateCameraFromScene( const std::shared_ptr<caustica::PerspectiveCamera> & sceneCamera );
     void                                    RefreshEnvironmentMapMediaList();
-
-    bool onKeyPressed(caustica::KeyPressedEvent& e);
-    bool onKeyReleased(caustica::KeyReleasedEvent& e);
-    bool onMouseMoved(caustica::MouseMovedEvent& e);
-    bool onMouseButtonPressed(caustica::MouseButtonPressedEvent& e);
-    bool onMouseButtonReleased(caustica::MouseButtonReleasedEvent& e);
-    bool onMouseScrolled(caustica::MouseScrolledEvent& e);
+    void                                    SyncInputRouterContext();
 
     std::shared_ptr<caustica::RootFileSystem> m_RootFS;
 

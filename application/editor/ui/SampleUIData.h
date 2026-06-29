@@ -1,15 +1,14 @@
 #pragma once
 
 #include <core/command_line.h>
-#include <render/Core/PathTracerSettings.h>
-#include <render/RenderRuntimeState.h>
+#include <render/RenderSessionState.h>
 
 #include "EditorUIState.h"
 
 namespace caustica::editor
 {
 
-struct SampleUIData : PathTracerSettings, caustica::render::RenderRuntimeState, EditorUIState
+struct SampleUIData : caustica::render::RenderSessionState, EditorUIState
 {
 };
 

@@ -33,7 +33,7 @@ void LocalConfig::PreferredSceneOverride(std::string& preferredScene)
     }
 }
 
-void LocalConfig::PostAppInit(SampleUIData& sampleUI)
+void LocalConfig::PostAppInit(caustica::render::RenderSessionState& sampleUI)
 {
     if (CAUSTICA_LOCAL_CONFIG_ID_STRING == "REF_VS_REALTIME")
     {
@@ -85,13 +85,6 @@ void LocalConfig::PostAppInit(SampleUIData& sampleUI)
         sampleUI.EnableAnimations = false;
         sampleUI.ReferenceFireflyFilterEnabled = false;
 
-        for (int i = 0; sampleUI.TogglableNodes != nullptr && i < sampleUI.TogglableNodes->size(); i++)
-        {
-            TogglableNode & node = (*sampleUI.TogglableNodes)[i];
-            if (node.UIName == "Ceiling")
-                node.SetSelected(false);
-        }
-
         sampleUI.RealtimeMode = false;
     }
 
@@ -130,8 +123,19 @@ void LocalConfig::PostAppInit(SampleUIData& sampleUI)
 
 }
 
-void LocalConfig::PostSceneLoad(SceneEditor& sample, SampleUIData& sampleUI)
+void LocalConfig::PostSceneLoad(SceneEditor& sample, caustica::render::RenderSessionState& sampleUI, EditorUIState& editorUI)
 {
+    if (CAUSTICA_LOCAL_CONFIG_ID_STRING == "ENVMAP_ONLY_TESTING")
+    {
+        for (int i = 0; editorUI.TogglableNodes != nullptr && i < editorUI.TogglableNodes->size(); i++)
+        {
+            TogglableNode& node = (*editorUI.TogglableNodes)[i];
+            if (node.UIName == "Ceiling")
+                node.SetSelected(false);
+        }
+    }
+    (void)sample;
+    (void)sampleUI;
 }
 
 void LocalConfig::PostMaterialLoad(caustica::Material& mat)
