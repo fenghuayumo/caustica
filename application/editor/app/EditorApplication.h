@@ -10,9 +10,6 @@
 
 #include "ui/EditorUIData.h"
 #include "SceneEditor.h"
-#include <render/SceneGaussianSplatPasses.h>
-#include <render/SceneLightingPasses.h>
-#include <render/SceneRayTracingResources.h>
 #include <render/SessionDiagnostics.h>
 #include "SceneEditorFrameExtension.h"
 #include <render/WorldRenderer/PathTracingFrameExtension.h>
@@ -62,12 +59,6 @@ public:
 
     SceneEditor& GetSceneEditor() { return m_sceneEditor; }
     const SceneEditor& GetSceneEditor() const { return m_sceneEditor; }
-    caustica::render::SceneLightingPasses& GetLightingPasses() { return m_lightingPasses; }
-    const caustica::render::SceneLightingPasses& GetLightingPasses() const { return m_lightingPasses; }
-    caustica::render::SceneRayTracingResources& GetRayTracingResources() { return m_rayTracingResources; }
-    const caustica::render::SceneRayTracingResources& GetRayTracingResources() const { return m_rayTracingResources; }
-    caustica::render::SceneGaussianSplatPasses& GetGaussianSplatPasses() { return m_gaussianSplatPasses; }
-    const caustica::render::SceneGaussianSplatPasses& GetGaussianSplatPasses() const { return m_gaussianSplatPasses; }
 
     SceneManager* GetSceneManager();
     const SceneManager* GetSceneManager() const;
@@ -92,18 +83,11 @@ protected:
 private:
     void RegisterLogCallback();
     void SampleLogCallback(caustica::Severity severity, const char* message);
-    bool ProcessCommandLine(int argc, char const* const* argv,
-        caustica::GpuDeviceCreateDesc& createDesc, std::string& preferredScene);
-    bool InitializeGpuDevice(int argc, const char* const* argv,
-        caustica::GpuDeviceCreateDesc& createDesc);
     void syncPassesToBackBuffer();
 
     CommandLineOptions CmdLine;
     EditorUIData m_editorUIData;
     caustica::render::SessionDiagnostics m_sessionDiagnostics;
-    caustica::render::SceneLightingPasses m_lightingPasses;
-    caustica::render::SceneRayTracingResources m_rayTracingResources;
-    caustica::render::SceneGaussianSplatPasses m_gaussianSplatPasses;
     SceneEditor m_sceneEditor;
     SceneEditorFrameExtension m_sceneEditorFrameExtension{ m_sceneEditor };
     std::vector<caustica::render::IPathTracingFrameExtension*> m_frameExtensions{ &m_sceneEditorFrameExtension };

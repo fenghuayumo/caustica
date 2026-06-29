@@ -1,6 +1,5 @@
 #include "EditorApplication.h"
 
-#include <engine/cmdline_utils.h>
 #include <engine/EntryPoint.h>
 #include <engine/EngineRenderer.h>
 #include <backend/GpuDevice.h>
@@ -20,10 +19,8 @@
 #include <core/log.h>
 #include "SceneEditor.h"
 #include "PathTracerSessionBootstrap.h"
+#include "EditorStartup.h"
 #include <render/WorldRenderer/PathTracingWorldRenderer.h>
-
-#include <GLFW/glfw3.h>
-#include <platform/window.h>
 
 #include <utility>
 
@@ -31,30 +28,6 @@ extern const char* g_windowTitle;
 
 namespace caustica::editor
 {
-
-namespace
-{
-    bool CommandLineWantsConsoleLogging(int argc, char const* const* argv)
-    {
-        for (int n = 1; n < argc; ++n)
-        {
-            std::string arg = argv[n] ? argv[n] : "";
-            if (arg.rfind("--", 0) == 0)
-                arg.erase(0, 2);
-            else if (!arg.empty() && (arg[0] == '-' || arg[0] == '/'))
-                arg.erase(0, 1);
-
-            const size_t equals = arg.find('=');
-            const std::string key = arg.substr(0, equals);
-            const std::string value = (equals == std::string::npos) ? "" : arg.substr(equals + 1);
-            if ((key == "nowindow" || key == "noninteractive")
-                && (value.empty() || value == "1" || value == "true" || value == "yes" || value == "on"))
-                return true;
-        }
-
-        return false;
-    }
-}
 
 EditorApplication::EditorApplication()
     : Application()
@@ -81,7 +54,7 @@ EditorApplication::StartupResult EditorApplication::startup(int argc, const char
     std::string preferredScene = "default.json";
     LocalConfig::PreferredSceneOverride(preferredScene);
 
-    if (!ProcessCommandLine(argc, argv, createDesc, preferredScene))
+    if (!ProcessEditorStartupCommandLine(argc, argv, CmdLine, createDesc, preferredScene))
     {
         return StartupResult::FailProcessingCommandLine;
     }
@@ -89,7 +62,7 @@ EditorApplication::StartupResult EditorApplication::startup(int argc, const char
     createDesc.headless = CmdLine.noWindow;
     createDesc.windowTitle = g_windowTitle ? g_windowTitle : "caustica";
 
-    if (!InitializeGpuDevice(argc, argv, createDesc))
+    if (!initializeGraphics(argc, argv, createDesc))
     {
         return StartupResult::FailToCreateDevice;
     }
@@ -97,23 +70,15 @@ EditorApplication::StartupResult EditorApplication::startup(int argc, const char
     m_sceneEditor.setGpuDevice(*m_GpuDevice);
     m_sceneEditor.initStreamlineAndWindow();
 
-    m_sceneEditor.AttachLightingPasses(m_lightingPasses);
-    m_sceneEditor.AttachRayTracingResources(m_rayTracingResources);
-    m_sceneEditor.AttachGaussianSplatPasses(m_gaussianSplatPasses);
-
     m_engineRenderer = bootstrapPathTracerSession(PathTracerSessionBootstrapParams{
         .gpuDevice = *m_GpuDevice,
         .sceneEditor = m_sceneEditor,
-        .lighting = m_lightingPasses,
-        .rayTracing = m_rayTracingResources,
-        .gaussianSplats = m_gaussianSplatPasses,
         .diagnostics = m_sessionDiagnostics,
         .frameExtensions = m_frameExtensions,
         .preferredScene = preferredScene,
-        .onAfterAttachPasses = [this]() {
-            m_lightingPasses.refreshEnvironmentMapMediaList(GetLocalPath(c_AssetsFolder), std::filesystem::path());
-        },
     });
+    m_engineRenderer->lightingPasses().refreshEnvironmentMapMediaList(
+        GetLocalPath(c_AssetsFolder), std::filesystem::path());
     syncPassesToBackBuffer();
 
     if (!CmdLine.noWindow)
@@ -197,83 +162,6 @@ void EditorApplication::SampleLogCallback(caustica::Severity severity, const cha
     m_DefaultLogCallback(severity, message);
 }
 
-bool EditorApplication::ProcessCommandLine(int argc, char const* const* argv,
-    caustica::GpuDeviceCreateDesc& createDesc, std::string& preferredScene)
-{
-#if 1
-    if (glfwInit())
-    {
-        if (GLFWmonitor* primMonitor = glfwGetPrimaryMonitor())
-        {
-            if (const GLFWvidmode* mode = glfwGetVideoMode(primMonitor))
-            {
-                if (mode->width > 2560 && mode->height > 1440)
-                {
-                    CmdLine.width = 2560;
-                    CmdLine.height = 1440;
-                }
-            }
-        }
-    }
-#endif
-    if (CommandLineWantsConsoleLogging(argc, argv))
-        caustica::ConsoleApplicationMode();
-
-    if (!CmdLine.InitFromCommandLine(argc, argv))
-    {
-        return false;
-    }
-
-    if (!CmdLine.scene.empty())
-    {
-        preferredScene = CmdLine.scene;
-    }
-
-    if (CmdLine.noWindow)
-        CmdLine.nonInteractive = true;
-
-    if (CmdLine.nonInteractive)
-    {
-        caustica::EnableOutputToMessageBox(false);
-        HelpersSetNonInteractive();
-    }
-    if (CmdLine.noWindow || CmdLine.nonInteractive)
-    {
-        caustica::ConsoleApplicationMode();
-    }
-
-    if (CmdLine.debug)
-        createDesc.enableDebug = true;
-
-    createDesc.backBufferWidth = CmdLine.width;
-    createDesc.backBufferHeight = CmdLine.height;
-    createDesc.startFullscreen = CmdLine.fullscreen;
-    createDesc.adapterIndex = CmdLine.adapterIndex;
-
-    return true;
-}
-
-bool EditorApplication::InitializeGpuDevice(int argc, const char* const* argv,
-    caustica::GpuDeviceCreateDesc& createDesc)
-{
-    caustica::InvokePreGpuDeviceInitHook();
-
-    createDesc.api = caustica::ResolveGraphicsAPIFromCommandLine(argc, argv);
-    if (createDesc.headless)
-        createDesc.vsyncEnabled = false;
-
-    caustica::GpuDeviceCreateResult graphics = caustica::GpuDevice::CreateInitialized(createDesc);
-    if (!graphics.gpuDevice)
-        return false;
-
-    m_GpuDevice = std::move(graphics.gpuDevice);
-    m_Window = std::move(graphics.window);
-
-    bindFrameDriver(m_GpuDevice.get());
-    installWindowEventCallback();
-    return true;
-}
-
 bool EditorApplication::IsSERSupported() const
 {
     return m_GpuDevice && m_GpuDevice->SupportsShaderExecutionReordering() && !CmdLine.disableSER;
@@ -291,11 +179,8 @@ void EditorApplication::syncPassesToBackBuffer()
 
 void EditorApplication::onUpdate(float elapsedTimeSeconds, bool windowFocused)
 {
-    if (windowFocused || m_sceneEditor.ShouldAnimateUnfocused())
-    {
+    if (windowFocused)
         m_sceneEditor.Animate(elapsedTimeSeconds);
-        m_sceneEditor.SetLatewarpOptions();
-    }
 
     if (m_uiPass && (windowFocused || m_uiPass->ShouldAnimateUnfocused()))
     {
@@ -310,7 +195,7 @@ void EditorApplication::onRender()
     if (!dm)
         return;
 
-    m_sceneEditor.Render(dm->GetCurrentFramebuffer(m_sceneEditor.SupportsDepthBuffer()));
+    m_sceneEditor.Render(dm->GetCurrentFramebuffer(true));
 
     if (m_uiPass)
         m_uiPass->Render(dm->GetCurrentFramebuffer(m_uiPass->SupportsDepthBuffer()));
@@ -328,14 +213,12 @@ void EditorApplication::onBackBufferResizing()
 
 void EditorApplication::onBackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount)
 {
-    m_sceneEditor.BackBufferResized(width, height, sampleCount);
     if (m_uiPass)
         m_uiPass->BackBufferResized(width, height, sampleCount);
 }
 
 void EditorApplication::onDisplayScaleChanged(float scaleX, float scaleY)
 {
-    m_sceneEditor.DisplayScaleChanged(scaleX, scaleY);
     if (m_uiPass)
     {
         caustica::ImGui_Renderer& ui = *m_uiPass;

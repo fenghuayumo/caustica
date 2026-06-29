@@ -69,7 +69,9 @@ bool EngineRenderer::initialize(GpuDevice& gpuDevice,
 
 void EngineRenderer::createPathTracer(const PathTracerSessionParams& session)
 {
-    auto& lighting = session.lighting;
+    auto& lighting = m_scenePasses.lighting;
+    auto& rayTracing = m_scenePasses.rayTracing;
+    auto& gaussianSplats = m_scenePasses.gaussianSplats;
 
     m_pathTracingContext = std::make_unique<render::PathTracingContext>(render::PathTracingContext{
         .gpuDevice = session.gpuDevice,
@@ -77,8 +79,8 @@ void EngineRenderer::createPathTracer(const PathTracerSessionParams& session)
         .renderCore = *m_renderCore,
         .settings = session.settings,
         .runtimeState = session.runtimeState,
-        .rayTracing = session.rayTracing,
-        .gaussianSplats = session.gaussianSplats,
+        .rayTracing = rayTracing,
+        .gaussianSplats = gaussianSplats,
         .shaderFactory = m_shaderFactory,
         .commonPasses = m_commonPasses,
         .bindingCache = *m_bindingCache,
@@ -94,7 +96,7 @@ void EngineRenderer::createPathTracer(const PathTracerSessionParams& session)
         .envMapLocalPath = lighting.envMapLocalPath(),
         .envMapOverride = lighting.envMapOverride(),
         .sceneTime = session.sceneTime,
-        .gaussianSplatEmissionProxies = session.gaussianSplatEmissionProxies,
+        .gaussianSplatEmissionProxies = gaussianSplats.emissionProxies(),
         .diagnostics = session.diagnostics,
         .frameExtensions = session.frameExtensions,
     });
@@ -109,17 +111,21 @@ void EngineRenderer::attachScenePasses(const PathTracerSessionParams& session)
 {
     assert(m_worldRenderer != nullptr);
 
-    session.rayTracing.attach(
+    auto& lighting = m_scenePasses.lighting;
+    auto& rayTracing = m_scenePasses.rayTracing;
+    auto& gaussianSplats = m_scenePasses.gaussianSplats;
+
+    rayTracing.attach(
         session.gpuDevice,
         *m_sceneManager,
         *m_renderCore,
         *m_worldRenderer,
         session.settings,
         session.runtimeState.Invalidation,
-        session.lighting,
+        lighting,
         *m_bindingCache);
 
-    session.gaussianSplats.attach(
+    gaussianSplats.attach(
         session.gpuDevice,
         *m_sceneManager,
         *m_renderCore,
@@ -129,11 +135,11 @@ void EngineRenderer::attachScenePasses(const PathTracerSessionParams& session)
         m_shaderFactory,
         m_commonPasses);
 
-    session.gaussianSplats.setOnRequestFullRebuild(
-        [&rayTracing = session.rayTracing]() { rayTracing.requestFullRebuild(); });
+    gaussianSplats.setOnRequestFullRebuild(
+        [&rayTracing]() { rayTracing.requestFullRebuild(); });
 
-    session.rayTracing.setAdditionalAccelStructBuilder(
-        [&gaussianSplats = session.gaussianSplats](nvrhi::ICommandList* commandList) {
+    rayTracing.setAdditionalAccelStructBuilder(
+        [&gaussianSplats](nvrhi::ICommandList* commandList) {
             gaussianSplats.buildAccelStructs(commandList);
         });
 }

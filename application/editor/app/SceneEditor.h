@@ -92,12 +92,6 @@ public:
 
     void setGpuDevice(caustica::GpuDevice& dm) { m_gpuDevice = &dm; }
 
-    void SetLatewarpOptions() { }
-    bool ShouldAnimateUnfocused() { return false; }
-    bool SupportsDepthBuffer() { return true; }
-    void BackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount) { (void)width; (void)height; (void)sampleCount; }
-    void DisplayScaleChanged(float scaleX, float scaleY) { (void)scaleX; (void)scaleY; }
-
     std::shared_ptr<caustica::ShaderFactory> GetShaderFactory() const          { return m_shaderFactory; }
     std::shared_ptr<caustica::CommonRenderPasses> GetCommonPasses() const;
     std::shared_ptr<caustica::TextureLoader> GetTextureLoader() const { return m_TextureLoader; }
@@ -197,12 +191,10 @@ public:
     uint32_t                                GetGaussianSplatObjectCount() const;
     const std::string&                      GetGaussianSplatFileName() const;
 
-    virtual void DestroyRTPipelines() {}
-
-    virtual void                            SceneUnloading();
+    void                                    SceneUnloading();
     void                                    SceneLoaded();
-    virtual bool                            ShouldRenderUnfocused() const;
-    virtual void                            Animate(float fElapsedTimeSeconds);
+    bool                                    ShouldRenderUnfocused() const;
+    void                                    Animate(float fElapsedTimeSeconds);
 
     void                                    RequestMeshAccelRebuild(const std::shared_ptr<caustica::MeshInfo>& mesh);
 
@@ -216,9 +208,6 @@ public:
     // Render entry points
     void Render(nvrhi::IFramebuffer* framebuffer);
     void BackBufferResizing();
-
-    void OnRenderTargetsRecreated() { }
-    void AddCustomBindings(nvrhi::BindingSetDesc& bindingSetDesc) { }
 
     void onEvent(caustica::Event& event);
 

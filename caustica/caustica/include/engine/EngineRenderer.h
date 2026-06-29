@@ -7,6 +7,7 @@
 
 #include <rhi/nvrhi.h>
 #include <render/Core/PathTracerSettings.h>
+#include <render/PathTracerScenePasses.h>
 #include <render/SessionDiagnostics.h>
 #include <render/WorldRenderer/PathTracingContext.h>
 #include <render/WorldRenderer/PathTracingFrameExtension.h>
@@ -29,9 +30,6 @@ class TextureLoader;
 namespace render
 {
 class PathTracingWorldRenderer;
-class SceneGaussianSplatPasses;
-class SceneLightingPasses;
-class SceneRayTracingResources;
 } // namespace render
 
 struct EngineSceneCallbacks
@@ -47,12 +45,7 @@ struct PathTracerSessionParams
     PathTracerSettings& settings;
     render::RenderRuntimeState& runtimeState;
 
-    render::SceneRayTracingResources& rayTracing;
-    render::SceneGaussianSplatPasses& gaussianSplats;
-    render::SceneLightingPasses& lighting;
-
     double& sceneTime;
-    std::vector<GaussianSplatEmissionProxy>& gaussianSplatEmissionProxies;
 
     render::SessionDiagnostics& diagnostics;
 
@@ -93,10 +86,18 @@ public:
     [[nodiscard]] render::PathTracingWorldRenderer* worldRenderer() const { return m_worldRenderer.get(); }
     [[nodiscard]] nvrhi::BindingLayoutHandle bindlessLayout() const { return m_bindlessLayout; }
 
+    [[nodiscard]] render::SceneLightingPasses& lightingPasses() { return m_scenePasses.lighting; }
+    [[nodiscard]] const render::SceneLightingPasses& lightingPasses() const { return m_scenePasses.lighting; }
+    [[nodiscard]] render::SceneRayTracingResources& rayTracingResources() { return m_scenePasses.rayTracing; }
+    [[nodiscard]] const render::SceneRayTracingResources& rayTracingResources() const { return m_scenePasses.rayTracing; }
+    [[nodiscard]] render::SceneGaussianSplatPasses& gaussianSplatPasses() { return m_scenePasses.gaussianSplats; }
+    [[nodiscard]] const render::SceneGaussianSplatPasses& gaussianSplatPasses() const { return m_scenePasses.gaussianSplats; }
+
 private:
     void createShaderFactory(GpuDevice& gpuDevice);
     void attachScenePasses(const PathTracerSessionParams& session);
 
+    render::PathTracerScenePasses m_scenePasses;
     nvrhi::BindingLayoutHandle m_bindlessLayout;
     std::shared_ptr<ShaderFactory> m_shaderFactory;
     std::shared_ptr<CommonRenderPasses> m_commonPasses;

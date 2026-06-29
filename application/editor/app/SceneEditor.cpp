@@ -521,8 +521,6 @@ void SceneEditor::SceneUnloading( )
     m_settings.EnvironmentMapParams = EnvironmentMapRuntimeParameters();
     m_uncompressedTextures.clear();
 
-    DestroyRTPipelines();
-
     if (m_sampleGame!=nullptr) m_sampleGame->SceneUnloading();
 }
 

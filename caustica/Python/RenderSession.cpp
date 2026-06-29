@@ -97,11 +97,8 @@ namespace
     protected:
         void onUpdate(float elapsedTimeSeconds, bool windowFocused) override
         {
-            if (m_scene && (windowFocused || m_scene->ShouldAnimateUnfocused()))
-            {
+            if (m_scene && windowFocused)
                 m_scene->Animate(elapsedTimeSeconds);
-                m_scene->SetLatewarpOptions();
-            }
         }
 
         void onRender() override
@@ -110,7 +107,7 @@ namespace
             if (!m_scene || !dm)
                 return;
 
-            m_scene->Render(dm->GetCurrentFramebuffer(m_scene->SupportsDepthBuffer()));
+            m_scene->Render(dm->GetCurrentFramebuffer(true));
 
             if (m_engineRenderer)
                 m_engineRenderer->endFrame();
@@ -125,18 +122,6 @@ namespace
         {
             if (m_scene)
                 m_scene->BackBufferResizing();
-        }
-
-        void onBackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount) override
-        {
-            if (m_scene)
-                m_scene->BackBufferResized(width, height, sampleCount);
-        }
-
-        void onDisplayScaleChanged(float scaleX, float scaleY) override
-        {
-            if (m_scene)
-                m_scene->DisplayScaleChanged(scaleX, scaleY);
         }
 
     private:
@@ -515,9 +500,6 @@ bool RenderSession::InitRenderer()
     m_renderer = std::make_unique<SceneEditor>(m_cmdLine, m_sessionState, m_editorUIState, m_sessionDiagnostics);
     m_renderer->setGpuDevice(*m_deviceManager);
     m_renderer->initStreamlineAndWindow();
-    m_renderer->AttachLightingPasses(m_lightingPasses);
-    m_renderer->AttachRayTracingResources(m_rayTracingResources);
-    m_renderer->AttachGaussianSplatPasses(m_gaussianSplatPasses);
 
     m_sceneEditorFrameExtension = std::make_unique<SceneEditorFrameExtension>(*m_renderer);
     m_frameExtensions = { m_sceneEditorFrameExtension.get() };
@@ -529,17 +511,13 @@ bool RenderSession::InitRenderer()
     m_engineRenderer = bootstrapPathTracerSession(PathTracerSessionBootstrapParams{
         .gpuDevice = *m_deviceManager,
         .sceneEditor = *m_renderer,
-        .lighting = m_lightingPasses,
-        .rayTracing = m_rayTracingResources,
-        .gaussianSplats = m_gaussianSplatPasses,
         .diagnostics = m_sessionDiagnostics,
         .frameExtensions = m_frameExtensions,
         .preferredScene = preferredScene,
-        .onAfterAttachPasses = [this]() {
-            InitializeRenderSessionStateFromCommandLine(m_sessionState, m_cmdLine);
-            LocalConfig::PostAppInit(m_sessionState);
-        },
     });
+
+    InitializeRenderSessionStateFromCommandLine(m_sessionState, m_cmdLine);
+    LocalConfig::PostAppInit(m_sessionState);
 
     auto frameDriver = std::make_unique<PathTracerFrameDriver>(
         m_deviceManager.get(),

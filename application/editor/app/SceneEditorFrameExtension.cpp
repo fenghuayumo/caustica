@@ -20,10 +20,6 @@ void SceneEditorFrameExtension::onFrameEvent(render::PathTracingFrameEvent& even
         m_sceneEditor.CaptureScriptPreRender();
         break;
 
-    case render::PathTracingFramePhase::RenderTargetsRecreated:
-        m_sceneEditor.OnRenderTargetsRecreated();
-        break;
-
     case render::PathTracingFramePhase::IdleMaintenance:
         m_sceneEditor.CollectUncompressedTextures();
         break;
@@ -31,11 +27,6 @@ void SceneEditorFrameExtension::onFrameEvent(render::PathTracingFrameEvent& even
     case render::PathTracingFramePhase::BeforePathTrace:
         if (event.pathTraceDebug)
             event.pathTraceDebug->exploreDeltaTree = m_sceneEditor.ShowDeltaTree();
-        break;
-
-    case render::PathTracingFramePhase::PopulateBindingSet:
-        if (event.bindingSetDesc)
-            m_sceneEditor.AddCustomBindings(*event.bindingSetDesc);
         break;
 
     case render::PathTracingFramePhase::BeforeFinalBlit:
