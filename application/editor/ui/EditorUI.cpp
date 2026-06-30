@@ -113,7 +113,8 @@ void EditorUI::buildUI(void)
 
         BuildDisplayPerformancePanel(layout);
         BuildSystemPanel(layout);
-        BuildSceneComboPanel(layout);
+        if (BuildSceneComboPanel(layout))
+            return;
         BuildScenePanel(layout);
         BuildSampleGamePanel(layout);
         BuildCameraPanel(layout);

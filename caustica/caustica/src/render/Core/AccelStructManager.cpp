@@ -163,8 +163,14 @@ void AccelStructManager::updateSkinnedBlases(nvrhi::ICommandList*            com
         auto& world = entityWorld->world();
         world.each<scene::SkinnedMeshComponent, scene::MeshInstanceComponent>([&](ecs::Entity, scene::SkinnedMeshComponent& skinned, scene::MeshInstanceComponent& meshComp)
         {
-            if (skinned.lastUpdateFrameIndex < frameIndex || !meshComp.mesh)
+            if (skinned.lastUpdateFrameIndex < frameIndex
+                || !meshComp.mesh
+                || !meshComp.mesh->accelStruct
+                || !meshComp.mesh->buffers
+                || !meshComp.mesh->buffers->vertexBuffer)
+            {
                 return;
+            }
 
             commandList->setAccelStructState(meshComp.mesh->accelStruct, nvrhi::ResourceStates::AccelStructWrite);
             commandList->setBufferState(meshComp.mesh->buffers->vertexBuffer,
@@ -178,8 +184,12 @@ void AccelStructManager::updateSkinnedBlases(nvrhi::ICommandList*            com
         auto& world = entityWorld->world();
         world.each<scene::SkinnedMeshComponent, scene::MeshInstanceComponent>([&](ecs::Entity, scene::SkinnedMeshComponent& skinned, scene::MeshInstanceComponent& meshComp)
         {
-            if (skinned.lastUpdateFrameIndex < frameIndex || !meshComp.mesh)
+            if (skinned.lastUpdateFrameIndex < frameIndex
+                || !meshComp.mesh
+                || !meshComp.mesh->accelStruct)
+            {
                 return;
+            }
 
             bvh::Config cfg = { .excludeTransmissive = settings.excludeTransmissive };
             nvrhi::rt::AccelStructDesc blasDesc = bvh::GetMeshBlasDesc(cfg, *meshComp.mesh, nullptr, true);

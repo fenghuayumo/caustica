@@ -31,28 +31,40 @@ using namespace caustica::editor;
 namespace caustica::editor
 {
 
-void EditorUI::BuildSceneComboPanel(const PanelLayout& layout)
+bool EditorUI::BuildSceneComboPanel(const PanelLayout& layout)
 {
+    bool sceneChangeRequested = false;
+    std::string requestedScene;
+
+    {
+        const std::string currentScene = m_sceneEditor.GetCurrentSceneName();
+        RAII_SCOPE(ImGui::PushItemWidth(-60.0f * m_currentScale); , ImGui::PopItemWidth(); );
+        RAII_SCOPE(ImGui::PushID("SceneComboID"); , ImGui::PopID(); );
+        if (ImGui::BeginCombo("Scene", currentScene.c_str()))
         {
-            const std::string currentScene = m_sceneEditor.GetCurrentSceneName();
-            RAII_SCOPE(ImGui::PushItemWidth(-60.0f * m_currentScale); , ImGui::PopItemWidth(); );
-            RAII_SCOPE(ImGui::PushID("SceneComboID"); , ImGui::PopID(); );
-            if (ImGui::BeginCombo("Scene", currentScene.c_str()))
+            const std::vector<std::string>& scenes = m_sceneEditor.GetAvailableScenes();
+            for (const std::string& scene : scenes)
             {
-                const std::vector<std::string>& scenes = m_sceneEditor.GetAvailableScenes();
-                for (const std::string& scene : scenes)
+                bool is_selected = scene == currentScene;
+                if (ImGui::Selectable(scene.c_str(), is_selected) && !is_selected)
                 {
-                    bool is_selected = scene == currentScene;
-                    if (ImGui::Selectable(scene.c_str(), is_selected))
-                        m_sceneEditor.SetCurrentScene(scene);
-                    if (is_selected)
-                        ImGui::SetItemDefaultFocus();
+                    requestedScene = scene;
+                    sceneChangeRequested = true;
                 }
-                ImGui::EndCombo();
+                if (is_selected)
+                    ImGui::SetItemDefaultFocus();
             }
+            ImGui::EndCombo();
         }
+    }
 
+    if (sceneChangeRequested)
+    {
+        m_sceneEditor.SetCurrentScene(requestedScene);
+        return true;
+    }
 
+    return false;
 }
 
 void EditorUI::BuildScenePanel(const PanelLayout& layout)

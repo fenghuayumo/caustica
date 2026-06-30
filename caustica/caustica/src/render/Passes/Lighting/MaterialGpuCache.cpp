@@ -141,8 +141,10 @@ std::shared_ptr<PTMaterial> PTMaterial::SafeCast(const std::shared_ptr<Material>
 {
     if (bridgeMaterial == nullptr)
         return nullptr;
-    assert(std::dynamic_pointer_cast<MaterialEx>(bridgeMaterial) != nullptr);
-    return std::static_pointer_cast<MaterialEx>(bridgeMaterial)->ptData;
+
+    const std::shared_ptr<MaterialEx> materialEx = std::dynamic_pointer_cast<MaterialEx>(bridgeMaterial);
+    assert(materialEx != nullptr);
+    return materialEx ? materialEx->ptData : nullptr;
 }
 
 void PTMaterial::Write(Json::Value& output)
@@ -1484,6 +1486,9 @@ void MaterialGpuCache::CreateRenderPassesAndLoadMaterials(nvrhi::IBindingLayout*
 // NOTE: this also handles some of the geometry data and mixed geometry&material stuff - it might be a good idea to rethink whether it needs to live outside of material baker
 void UpdateSubInstanceData(SubInstanceData & ret, const std::shared_ptr<caustica::Scene> & scene, const std::shared_ptr<MeshInfo>& mesh, const caustica::MeshGeometry& geometry, uint meshGeometryIndex, const PTMaterial& material)
 {
+    if (!mesh || mesh->geometries.empty() || meshGeometryIndex >= mesh->geometries.size())
+        return;
+
     bool alphaTest = material.HasAlphaTest();
 
     // we need alpha texture for alpha testing to work - disable otherwise
@@ -1517,6 +1522,9 @@ void UpdateSubInstanceData(SubInstanceData & ret, const std::shared_ptr<caustica
 
     if (material.ExcludeFromNEE)
         ret.FlagsAndAlphaInfo |= SubInstanceData::Flags_ExcludeFromNEE;
+
+    if (!meshRef->geometries[0])
+        return;
 
     uint globalGeometryIndex = meshRef->geometries[0]->globalGeometryIndex + meshGeometryIndex;
     uint globalMaterialIndex = material.GPUDataIndex;
@@ -1571,7 +1579,6 @@ void MaterialGpuCache::Update(nvrhi::ICommandList* commandList, const std::share
     }
 
     // NOTE: this also handles some of the geometry data and mixed geometry&material stuff - it might be a good idea to rethink whether it needs to live outside of material baker
-    uint subInstanceIndex = 0;
     const auto& instances = scene->GetMeshInstances();
     auto* entityWorld = scene->GetEntityWorld();
     for (const ecs::Entity entity : instances)
@@ -1583,12 +1590,25 @@ void MaterialGpuCache::Update(nvrhi::ICommandList* commandList, const std::share
             continue;
 
         const auto& mesh = meshComp->mesh;
-        for (size_t geometryIndex = 0; geometryIndex < mesh->geometries.size(); ++geometryIndex, subInstanceIndex++)
+        if (meshComp->geometryInstanceIndex < 0)
+            continue;
+
+        const size_t firstSubInstanceIndex = static_cast<size_t>(meshComp->geometryInstanceIndex);
+        for (size_t geometryIndex = 0; geometryIndex < mesh->geometries.size(); ++geometryIndex)
         {
             const auto& geometry = mesh->geometries[geometryIndex];
+            const size_t subInstanceIndex = firstSubInstanceIndex + geometryIndex;
+            if (!geometry || subInstanceIndex >= subInstanceData.size())
+            {
+                assert(false && "Sub-instance data is out of sync with scene geometry instances");
+                continue;
+            }
+
             assert( geometry->material != nullptr && "No handling for null materials!" );
             std::shared_ptr<PTMaterial> materialPT = PTMaterial::SafeCast(geometry->material);
             assert(materialPT != nullptr && "Unknown error - should never have happened" );
+            if (!materialPT)
+                continue;
 
             UpdateSubInstanceData(subInstanceData[subInstanceIndex], scene, mesh, *geometry, geometryIndex, *materialPT);
         }

@@ -79,7 +79,7 @@ private:
     // Settings window collapsing-header panels
     void BuildDisplayPerformancePanel(const PanelLayout& layout);
     void BuildSystemPanel(const PanelLayout& layout);
-    void BuildSceneComboPanel(const PanelLayout& layout);
+    bool BuildSceneComboPanel(const PanelLayout& layout);
     void BuildScenePanel(const PanelLayout& layout);
     void BuildSampleGamePanel(const PanelLayout& layout);
     void BuildCameraPanel(const PanelLayout& layout);

@@ -43,7 +43,11 @@ namespace nvrhi::d3d12
                 break;
 
             case ResourceType::RayTracingAccelStruct:
-                requireBufferState(checked_cast<AccelStruct*>(binding.resourceHandle)->dataBuffer, ResourceStates::AccelStructRead);
+                if (AccelStruct* as = checked_cast<AccelStruct*>(binding.resourceHandle);
+                    as && as->dataBuffer)
+                {
+                    requireBufferState(as->dataBuffer, ResourceStates::AccelStructRead);
+                }
                 break;
 
             default:
@@ -228,7 +232,7 @@ namespace nvrhi::d3d12
     {
         AccelStruct* as = checked_cast<AccelStruct*>(_as);
 
-        if (as->dataBuffer)
+        if (as && as->dataBuffer)
         {
             m_StateTracker.requireBufferState(as->dataBuffer, stateBits);
             

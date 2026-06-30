@@ -506,6 +506,14 @@ HitGroupInfo ComputeSubInstanceHitGroupInfo(const MaterialGpuCache & baker, cons
     return info;
 }
 
+HitGroupInfo ComputeDefaultSubInstanceHitGroupInfo(const MaterialGpuCache& baker)
+{
+    HitGroupInfo info;
+    info.MaterialShaderPermutation = baker.GetUbershader();
+    info.HasAnyHitShader = false;
+    return info;
+}
+
 static bool macrosEqual(caustica::ShaderMacro& a, caustica::ShaderMacro& b)
 {
     return a.name == b.name && a.definition == b.definition;
@@ -574,7 +582,7 @@ void PathTracingShaderCompiler::Update(const std::shared_ptr<caustica::Scene>& s
     {
         // Note: these map 1-1 to m_subInstanceData, and are used to (see '->addHitGroup' below) build 1-1 mapped hit groups 
         m_perSubInstanceHitGroup.clear();
-        m_perSubInstanceHitGroup.reserve(subInstanceCount);
+        m_perSubInstanceHitGroup.assign(subInstanceCount, ComputeDefaultSubInstanceHitGroupInfo(*GetMaterialGpuCache()));
         for (const ecs::Entity entity : scene->GetMeshInstances())
         {
             if (!scene->GetEntityWorld())
@@ -582,9 +590,22 @@ void PathTracingShaderCompiler::Update(const std::shared_ptr<caustica::Scene>& s
             const auto* meshComp = scene->GetEntityWorld()->world().get<scene::MeshInstanceComponent>(entity);
             if (!meshComp || !meshComp->mesh)
                 continue;
+            if (meshComp->geometryInstanceIndex < 0)
+                continue;
 
-            for (int gi = 0; gi < meshComp->mesh->geometries.size(); gi++)
-                m_perSubInstanceHitGroup.push_back(ComputeSubInstanceHitGroupInfo(*GetMaterialGpuCache(), *PTMaterial::SafeCast(meshComp->mesh->geometries[gi]->material)));
+            const size_t firstSubInstanceIndex = static_cast<size_t>(meshComp->geometryInstanceIndex);
+            for (size_t gi = 0; gi < meshComp->mesh->geometries.size(); gi++)
+            {
+                const size_t subInstanceIndex = firstSubInstanceIndex + gi;
+                if (subInstanceIndex >= m_perSubInstanceHitGroup.size() || !meshComp->mesh->geometries[gi])
+                    continue;
+
+                std::shared_ptr<PTMaterial> materialPT = PTMaterial::SafeCast(meshComp->mesh->geometries[gi]->material);
+                if (!materialPT)
+                    continue;
+
+                m_perSubInstanceHitGroup[subInstanceIndex] = ComputeSubInstanceHitGroupInfo(*GetMaterialGpuCache(), *materialPT);
+            }
         }
         assert(m_perSubInstanceHitGroup.size() == subInstanceCount);
 

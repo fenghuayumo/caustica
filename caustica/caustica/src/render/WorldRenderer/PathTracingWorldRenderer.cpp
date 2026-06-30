@@ -353,6 +353,9 @@ bool caustica::render::PathTracingWorldRenderer::createPTPipeline()
 void caustica::render::PathTracingWorldRenderer::onSceneUnloading()
 {
     m_bindingSet = nullptr;
+    m_context.bindingCache.Clear();
+    if (m_commandList)
+        m_commandList = device()->createCommandList();
     m_gaussianSplatTemporalReset = true;
     if (m_rtxdiPass != nullptr)
         m_rtxdiPass->Reset();

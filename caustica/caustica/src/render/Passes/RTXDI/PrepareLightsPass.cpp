@@ -168,8 +168,11 @@ void PrepareLightsPass::CountLightsInScene(uint32_t& numEmissiveMeshes, uint32_t
 
         for (const auto& geometry : meshComp->mesh->geometries)
         {
-            PTMaterial & materialPT = *PTMaterial::SafeCast(geometry->material);
-            if (materialPT.IsEmissive())
+            if (!geometry)
+                continue;
+
+            std::shared_ptr<PTMaterial> materialPT = PTMaterial::SafeCast(geometry->material);
+            if (materialPT && materialPT->IsEmissive())
             {
                 numEmissiveMeshes += 1;
                 numEmissiveTriangles += geometry->numIndices / 3;
@@ -413,17 +416,28 @@ RTXDI_LightBufferParameters PrepareLightsPass::Process(nvrhi::ICommandList* comm
         const auto& mesh = meshComp->mesh;
 
         assert(meshComp->geometryInstanceIndex < geometryInstanceToLight.size());
+        if (meshComp->geometryInstanceIndex < 0)
+            continue;
         uint32_t firstGeometryInstanceIndex = meshComp->geometryInstanceIndex;
 
         for (size_t geometryIndex = 0; geometryIndex < mesh->geometries.size(); ++geometryIndex)
         {
             const auto& geometry = mesh->geometries[geometryIndex];
+            const size_t geometryInstanceIndex = size_t(firstGeometryInstanceIndex) + geometryIndex;
+            if (!geometry || geometryInstanceIndex >= geometryInstanceToLight.size())
+            {
+                assert(false && "Geometry instance index is out of sync with scene geometry instances");
+                continue;
+            }
 
             size_t instanceHash = 0;
             nvrhi::hash_combine(instanceHash, static_cast<uint32_t>(entity));
             nvrhi::hash_combine(instanceHash, geometryIndex);
 
-            PTMaterial & materialPT = *PTMaterial::SafeCast(geometry->material);
+            std::shared_ptr<PTMaterial> materialPTPtr = PTMaterial::SafeCast(geometry->material);
+            if (!materialPTPtr)
+                continue;
+            PTMaterial & materialPT = *materialPTPtr;
             if (!materialPT.IsEmissive())
             {
                 // remove the info about this instance, just in case it was emissive and now it's not
@@ -431,7 +445,7 @@ RTXDI_LightBufferParameters PrepareLightsPass::Process(nvrhi::ICommandList* comm
                 continue;
             }
 
-            geometryInstanceToLight[firstGeometryInstanceIndex + geometryIndex] = lightBufferOffset;
+            geometryInstanceToLight[geometryInstanceIndex] = lightBufferOffset;
 
             // find the previous offset of this instance in the light buffer
             auto pOffset = m_InstanceLightBufferOffsets.find(instanceHash);

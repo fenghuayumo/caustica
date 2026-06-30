@@ -729,8 +729,6 @@ bool LightSamplingCache::ProcessEmissiveGeometry( const UpdateSettings & setting
 
     assert( ctrlBuff.TotalLightCount == (ctrlBuff.AnalyticLightCount+ctrlBuff.EnvmapQuadNodeCount) );
 
-    uint subInstanceIndex = 0;
-
     auto* entityWorld = scene->GetEntityWorld();
     const auto& instances = scene->GetMeshInstances();
     for (const ecs::Entity entity : instances)
@@ -747,6 +745,8 @@ bool LightSamplingCache::ProcessEmissiveGeometry( const UpdateSettings & setting
         const auto& mesh = meshComp->mesh;
 
         uint32_t firstGeometryInstanceIndex = meshComp->geometryInstanceIndex;
+        if (meshComp->geometryInstanceIndex < 0)
+            continue;
 
         if (perGeometryLightSamplerLinks.size() != mesh->geometries.size())
         {
@@ -754,9 +754,15 @@ bool LightSamplingCache::ProcessEmissiveGeometry( const UpdateSettings & setting
             continue;
         }
 
-        for (size_t geometryIndex = 0; geometryIndex < mesh->geometries.size(); ++geometryIndex, subInstanceIndex++)
+        for (size_t geometryIndex = 0; geometryIndex < mesh->geometries.size(); ++geometryIndex)
         {
             const auto& geometry = mesh->geometries[geometryIndex];
+            const size_t subInstanceIndex = size_t(firstGeometryInstanceIndex) + geometryIndex;
+            if (!geometry || subInstanceIndex >= subInstanceData.size())
+            {
+                assert(false && "Sub-instance data is out of sync with scene geometry instances");
+                continue;
+            }
 
             LightSamplerLink & pastLink = perGeometryLightSamplerLinks[geometryIndex];
             if (pastLink.IndexOrBase != -1 && pastLink.LastUpdateTag != m_lastFrameIndex ) // if not used specifically during last frame, 
@@ -767,7 +773,10 @@ bool LightSamplingCache::ProcessEmissiveGeometry( const UpdateSettings & setting
             nvrhi::hash_combine(instanceHash, static_cast<uint32_t>(entity));
             nvrhi::hash_combine(instanceHash, geometryIndex);
 
-            PTMaterial & materialPT = *PTMaterial::SafeCast(geometry->material);
+            std::shared_ptr<PTMaterial> materialPTPtr = PTMaterial::SafeCast(geometry->material);
+            if (!materialPTPtr)
+                continue;
+            PTMaterial & materialPT = *materialPTPtr;
 
             // this has nothing to do with emissive materials, it's instead a mechanism used to evaluate specific analytic light after hitting this mesh
             uint analyticProxyLightIndex = CAUSTICA_INVALID_LIGHT_INDEX;

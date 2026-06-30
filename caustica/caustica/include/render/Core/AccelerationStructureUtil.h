@@ -32,9 +32,14 @@ namespace bvh
         blasDesc.isTopLevel = false;
         blasDesc.debugName = mesh.name;
 
+        if (!mesh.buffers || !mesh.buffers->indexBuffer || !mesh.buffers->vertexBuffer)
+            return blasDesc;
+
         for (uint32_t geomIt = 0; geomIt < mesh.geometries.size(); ++geomIt)
         {
             const caustica::MeshGeometry* geometry = mesh.geometries[geomIt].get();
+            if (!geometry)
+                continue;
 
             nvrhi::rt::GeometryDesc geometryDesc;
             auto& triangles = geometryDesc.geometryData.triangles;
@@ -48,10 +53,11 @@ namespace bvh
             triangles.vertexStride = sizeof(dm::float3);
             triangles.vertexCount = geometry->numVertices;
 
-            PTMaterial & materialPT = *PTMaterial::SafeCast(geometry->material);
+            std::shared_ptr<PTMaterial> materialPT = PTMaterial::SafeCast(geometry->material);
+            const bool skipRender = materialPT && materialPT->SkipRender;
+            const bool isTransmissive = geometry->material && geometry->material->domain == caustica::MaterialDomain::Transmissive;
 
-            if ( (cfg.excludeTransmissive && geometry->material->domain == caustica::MaterialDomain::Transmissive) 
-                || materialPT.SkipRender )
+            if ((cfg.excludeTransmissive && isTransmissive) || skipRender)
             {
                 constexpr float nan = std::numeric_limits<float>::quiet_NaN();
                 constexpr nvrhi::rt::AffineTransform c_NanTransform = {
@@ -76,7 +82,9 @@ namespace bvh
             geometryDesc.geometryType = nvrhi::rt::GeometryType::Triangles;
             
             // Alpha testing, NEE exclusion, and transparent shadow tinting require custom shader handling.
-            geometryDesc.flags = (materialPT.EnableAlphaTesting || materialPT.ExcludeFromNEE || materialPT.EnableTransmission) ? nvrhi::rt::GeometryFlags::None : nvrhi::rt::GeometryFlags::Opaque;
+            const bool needsCustomShader =
+                materialPT && (materialPT->EnableAlphaTesting || materialPT->ExcludeFromNEE || materialPT->EnableTransmission);
+            geometryDesc.flags = needsCustomShader ? nvrhi::rt::GeometryFlags::None : nvrhi::rt::GeometryFlags::Opaque;
             blasDesc.bottomLevelGeometries.push_back(geometryDesc);
         }
 

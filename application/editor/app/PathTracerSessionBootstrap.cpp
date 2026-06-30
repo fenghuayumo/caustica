@@ -12,11 +12,12 @@ std::unique_ptr<caustica::EngineRenderer> bootstrapPathTracerSession(
     const PathTracerSessionBootstrapParams& params)
 {
     auto engineRenderer = std::make_unique<caustica::EngineRenderer>();
+    SceneEditor* sceneEditor = &params.sceneEditor;
     engineRenderer->initialize(params.gpuDevice,
         std::make_shared<caustica::render::RenderSceneTypeFactory>(),
         caustica::EngineSceneCallbacks{
-            .OnSceneLoaded = [&]() { params.sceneEditor.SceneLoaded(); },
-            .OnSceneUnloading = [&]() { params.sceneEditor.SceneUnloading(); },
+            .OnSceneLoaded = [sceneEditor]() { sceneEditor->SceneLoaded(); },
+            .OnSceneUnloading = [sceneEditor]() { sceneEditor->SceneUnloading(); },
         });
 
     params.sceneEditor.AttachRenderResources(

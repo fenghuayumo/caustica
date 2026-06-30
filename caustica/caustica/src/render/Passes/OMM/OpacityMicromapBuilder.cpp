@@ -114,8 +114,11 @@ void OpacityMicromapBuilder::CreateOpacityMicromaps(const caustica::Scene& scene
 
         for (size_t i = 0; i < mesh->geometries.size(); ++i)
         {
+            if (!mesh->geometries[i])
+                continue;
+
             const caustica::MeshGeometry& geometry = *mesh->geometries[i];
-            const auto material = static_cast<const MaterialEx*>(geometry.material.get())->ptData;
+            const std::shared_ptr<PTMaterial> material = PTMaterial::SafeCast(geometry.material);
             if (material == nullptr)
                 continue;
             if (!(material->EnableBaseTexture && material->BaseTexture.Loaded != nullptr && material->BaseTexture.Loaded->texture != nullptr))
@@ -123,7 +126,7 @@ void OpacityMicromapBuilder::CreateOpacityMicromaps(const caustica::Scene& scene
             if (!material->EnableAlphaTesting)
                 continue;
 
-            std::shared_ptr<TextureData> alphaTexture = m_textureCache->GetLoadedTexture(geometry.material->baseOrDiffuseTexture->path);
+            std::shared_ptr<TextureData> alphaTexture = m_textureCache->GetLoadedTexture(material->BaseTexture.Loaded->path);
 
             OmmBuildQueue::BuildInput::Geometry geom;
             geom.geometryIndexInMesh = i;

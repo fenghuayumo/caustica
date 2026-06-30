@@ -10,22 +10,40 @@
 
 namespace
 {
+    static bool IsValidBakeGeometry(const caustica::MeshInfo& mesh, const OmmBuildQueue::BuildInput::Geometry& geometry)
+    {
+        if (geometry.geometryIndexInMesh < 0 || size_t(geometry.geometryIndexInMesh) >= mesh.geometries.size())
+            return false;
+
+        const std::shared_ptr<caustica::MeshGeometry>& meshGeometry = mesh.geometries[size_t(geometry.geometryIndexInMesh)];
+        if (!meshGeometry)
+            return false;
+
+        const std::shared_ptr<PTMaterial> materialPT = PTMaterial::SafeCast(meshGeometry->material);
+        if (!materialPT || !materialPT->BaseTexture.Loaded || !materialPT->BaseTexture.Loaded->texture)
+            return false;
+
+        return mesh.buffers && mesh.buffers->indexBuffer && mesh.buffers->vertexBuffer;
+    }
+
     static omm::GpuBakeNvrhi::Input GetBakeInput(omm::GpuBakeNvrhi::Operation op, const caustica::MeshInfo& mesh, const OmmBuildQueue::BuildInput::Geometry& geometry)
     {
 
         using namespace caustica::math;
 
-        const caustica::MeshGeometry* meshGeometry = mesh.geometries[geometry.geometryIndexInMesh].get();
+        assert(IsValidBakeGeometry(mesh, geometry));
+
+        const caustica::MeshGeometry* meshGeometry = mesh.geometries[size_t(geometry.geometryIndexInMesh)].get();
 
         const uint32_t indexOffset = mesh.indexOffset + meshGeometry->indexOffsetInMesh;
         const uint32_t vertexOffset = (mesh.vertexOffset + meshGeometry->vertexOffsetInMesh);
 
-        PTMaterial & materialPT = *PTMaterial::SafeCast(meshGeometry->material);
+        std::shared_ptr<PTMaterial> materialPT = PTMaterial::SafeCast(meshGeometry->material);
 
         omm::GpuBakeNvrhi::Input params;
         params.operation = op;
-        params.alphaTexture = materialPT.BaseTexture.Loaded->texture;
-        params.alphaCutoff = materialPT.AlphaCutoff;
+        params.alphaTexture = materialPT->BaseTexture.Loaded->texture;
+        params.alphaCutoff = materialPT->AlphaCutoff;
         params.alphaCutoffGreater = geometry.alphaCutoffGT;
         params.alphaCutoffLessEqual = geometry.alphaCutoffLE;
         params.bilinearFilter = true;
@@ -538,7 +556,19 @@ void OmmBuildQueue::Update(nvrhi::ICommandList& commandList)
 
 void OmmBuildQueue::QueueBuild(const BuildInput& input)
 {
-    m_pending.push_back(input);
+    if (!input.mesh)
+        return;
+
+    BuildInput filteredInput = input;
+    filteredInput.geometries.clear();
+    for (const BuildInput::Geometry& geometry : input.geometries)
+    {
+        if (IsValidBakeGeometry(*input.mesh, geometry))
+            filteredInput.geometries.push_back(geometry);
+    }
+
+    if (!filteredInput.geometries.empty())
+        m_pending.push_back(filteredInput);
 }
 
 uint32_t OmmBuildQueue::NumPendingBuilds() const
