@@ -5,6 +5,8 @@
 #include <scene/SceneLightAccess.h>
 #include <scene/SceneMeshAccess.h>
 
+#include <ecs/ChangeDetection.h>
+
 #include <algorithm>
 #include <functional>
 
@@ -115,14 +117,11 @@ void RefreshEntityHierarchy(
         }
     }
 
-    world.emplace<BoundsComponent>(entity, BoundsComponent{ subgraphBounds });
-    world.emplace<SceneContentComponent>(entity, SceneContentComponent{
+    world.registry().emplace_or_replace<BoundsComponent>(entity, BoundsComponent{ subgraphBounds });
+    world.registry().emplace_or_replace<SceneContentComponent>(entity, SceneContentComponent{
         .leafContent = leafContent,
         .subgraphContent = subgraphContent,
     });
-
-    world.remove<TransformDirtyComponent>(entity);
-    world.remove<HierarchyDirtyComponent>(entity);
 }
 
 void CopyEntityComponents(
@@ -178,10 +177,9 @@ void UpdateHierarchy(ecs::World& world, PreviousTransformPolicy previousPolicy)
         return;
     }
 
-    world.each<LocalTransformComponent, GlobalTransformComponent>(
+    world.each<LocalTransformComponent, GlobalTransformComponent, ecs::Without<ParentComponent>>(
         [&world, previousPolicy](ecs::Entity entity, LocalTransformComponent&, GlobalTransformComponent&) {
-            if (!world.has<ParentComponent>(entity))
-                RefreshEntityHierarchy(world, entity, nullptr, previousPolicy);
+            RefreshEntityHierarchy(world, entity, nullptr, previousPolicy);
         });
 }
 
@@ -203,17 +201,51 @@ void SceneEntityWorld::clear()
     m_structureDirty = true;
     m_transformDirty = true;
     m_previousTransformDirty = false;
+    ensureChangeDetection();
 }
 
-void SceneEntityWorld::markStructureDirty()
+void SceneEntityWorld::ensureChangeDetection()
 {
-    m_structureDirty = true;
-    m_transformDirty = true;
+    m_world.enableChangeDetection();
 }
 
-void SceneEntityWorld::markTransformDirty()
+void SceneEntityWorld::syncDirtyFlagsFromChangeDetection()
 {
-    m_transformDirty = true;
+    const auto* changeDetection = m_world.getResource<ecs::ChangeDetection>();
+    if (!changeDetection)
+        return;
+
+    const auto& registry = m_world.registry();
+
+    if (changeDetection->worldStructureChanged()
+        || changeDetection->anyOfChangedThisFrame<
+            MeshInstanceComponent,
+            SkinnedMeshComponent,
+            LightComponent,
+            CameraComponent,
+            AnimationComponent,
+            GaussianSplatComponent,
+            ParentComponent,
+            ChildrenComponent>(registry)
+        || changeDetection->anyOfAddedThisFrame<
+            MeshInstanceComponent,
+            SkinnedMeshComponent,
+            LightComponent,
+            CameraComponent,
+            AnimationComponent,
+            GaussianSplatComponent,
+            ParentComponent,
+            ChildrenComponent>(registry))
+    {
+        m_structureDirty = true;
+        m_transformDirty = true;
+    }
+
+    if (changeDetection->anyOfChangedThisFrame<LocalTransformComponent, ParentComponent>(registry)
+        || changeDetection->anyOfAddedThisFrame<LocalTransformComponent, ParentComponent>(registry))
+    {
+        m_transformDirty = true;
+    }
 }
 
 void SceneEntityWorld::refreshHierarchy(PreviousTransformPolicy previousPolicy)
@@ -249,10 +281,9 @@ void SceneEntityWorld::ensureScheduleBuilt()
 void SceneEntityWorld::refresh(uint32_t frameIndex)
 {
     ensureScheduleBuilt();
+    ensureChangeDetection();
+    syncDirtyFlagsFromChangeDetection();
 
-    // Snapshot the coarse dirty flags for the duration of this frame's systems. No system
-    // mutates these flags mid-run; the snapshot preserves the original local-variable
-    // semantics and stays robust if a future system marks dirty.
     m_frameStructureDirty = m_structureDirty;
     m_frameTransformDirty = m_transformDirty;
 
@@ -281,8 +312,8 @@ void SceneEntityWorld::systemMarkDirtySkinnedMeshes(ecs::World& world, const ecs
         return;
 
     const uint32_t frameIndex = ctx.frameIndex;
-    world.each<SkinnedMeshReferenceComponent, TransformDirtyComponent>(
-        [frameIndex, &world](ecs::Entity, SkinnedMeshReferenceComponent& ref, TransformDirtyComponent&) {
+    world.each<SkinnedMeshReferenceComponent>(
+        [frameIndex, &world](ecs::Entity, SkinnedMeshReferenceComponent& ref) {
             if (!ecs::isValid(ref.skinnedMeshEntity))
                 return;
             if (auto* skinned = world.get<SkinnedMeshComponent>(ref.skinnedMeshEntity))
@@ -306,11 +337,14 @@ void SceneEntityWorld::systemAssignGlobalResourceIndices(ecs::World& /*world*/, 
     assignGlobalResourceIndices();
 }
 
-void SceneEntityWorld::systemFinalizeFrameFlags(ecs::World& /*world*/, const ecs::ScheduleContext& /*ctx*/)
+void SceneEntityWorld::systemFinalizeFrameFlags(ecs::World& world, const ecs::ScheduleContext& /*ctx*/)
 {
+    m_previousTransformDirty = m_frameStructureDirty || m_frameTransformDirty;
     m_structureDirty = false;
     m_transformDirty = false;
-    m_previousTransformDirty = m_frameStructureDirty || m_frameTransformDirty;
+    world.endChangeFrame();
+    if (auto* changeDetection = world.getResource<ecs::ChangeDetection>())
+        changeDetection->clearWorldStructureChange();
 }
 
 void SceneEntityWorld::refreshInstanceIndices()
@@ -363,11 +397,11 @@ void SceneEntityWorld::applyAnimations(float time)
         if (auto* animation = m_world.get<AnimationComponent>(entity))
             (void)ApplyAnimation(*animation, time, *this);
     }
-    markTransformDirty();
 }
 
 ecs::Entity SceneEntityWorld::createEntity(const std::string& name, ecs::Entity parent)
 {
+    ensureChangeDetection();
     ecs::Entity entity = m_world.spawn();
     m_world.emplace<NameComponent>(entity, NameComponent{ name });
     m_world.emplace<ChildrenComponent>(entity, ChildrenComponent{});
@@ -376,8 +410,6 @@ ecs::Entity SceneEntityWorld::createEntity(const std::string& name, ecs::Entity 
     m_world.emplace<LocalBoundsComponent>(entity, LocalBoundsComponent{});
     m_world.emplace<BoundsComponent>(entity, BoundsComponent{});
     m_world.emplace<SceneContentComponent>(entity, SceneContentComponent{});
-    m_world.emplace<TransformDirtyComponent>(entity, TransformDirtyComponent{});
-    m_world.emplace<HierarchyDirtyComponent>(entity, HierarchyDirtyComponent{});
 
     if (!ecs::isValid(m_root))
     {
@@ -388,7 +420,6 @@ ecs::Entity SceneEntityWorld::createEntity(const std::string& name, ecs::Entity 
     if (ecs::isValid(parent))
         setParent(entity, parent);
 
-    markStructureDirty();
     return entity;
 }
 
@@ -434,7 +465,6 @@ void SceneEntityWorld::destroyEntity(ecs::Entity entity)
     }
 
     m_world.despawn(entity);
-    markStructureDirty();
 }
 
 bool SceneEntityWorld::setParent(ecs::Entity entity, ecs::Entity parent)
@@ -467,8 +497,6 @@ bool SceneEntityWorld::setParent(ecs::Entity entity, ecs::Entity parent)
         m_world.remove<ParentComponent>(entity);
     }
 
-    m_world.emplace<HierarchyDirtyComponent>(entity, HierarchyDirtyComponent{});
-    markStructureDirty();
     return true;
 }
 
@@ -494,8 +522,7 @@ void SceneEntityWorld::setLocalTransform(
 
     local->hasLocalTransform = true;
     local->transform = ComposeLocalTransform(*local);
-    m_world.emplace<TransformDirtyComponent>(entity, TransformDirtyComponent{});
-    markTransformDirty();
+    m_world.notifyComponentChanged<LocalTransformComponent>(entity);
 }
 
 void SceneEntityWorld::setTranslation(ecs::Entity entity, const dm::double3& translation)
@@ -583,7 +610,6 @@ void SceneEntityWorld::setMeshInstance(ecs::Entity entity, const std::shared_ptr
     m_world.emplace<MeshInstanceComponent>(entity, std::move(component));
     RegisterMeshInstanceEntity(entity, mesh, false);
     updateLeafContentAndBounds(entity);
-    markStructureDirty();
 }
 
 void SceneEntityWorld::setSkinnedMeshInstance(
@@ -602,7 +628,6 @@ void SceneEntityWorld::setSkinnedMeshInstance(
 
     RegisterMeshInstanceEntity(entity, skinnedMesh, true);
     updateLeafContentAndBounds(entity);
-    markStructureDirty();
 }
 
 void SceneEntityWorld::setSkinnedMeshReference(ecs::Entity entity, ecs::Entity skinnedMeshEntity)
@@ -618,7 +643,6 @@ void SceneEntityWorld::setLight(ecs::Entity entity, LightComponent component)
     m_world.emplace<LightComponent>(entity, std::move(component));
     RegisterLightEntity(entity);
     updateLeafContentAndBounds(entity);
-    markStructureDirty();
 }
 
 void SceneEntityWorld::setLight(ecs::Entity entity, const std::shared_ptr<Light>& light)
@@ -635,7 +659,6 @@ void SceneEntityWorld::setCamera(ecs::Entity entity, CameraComponent component)
     m_world.emplace<CameraComponent>(entity, std::move(component));
     RegisterCameraEntity(entity);
     updateLeafContentAndBounds(entity);
-    markStructureDirty();
 }
 
 void SceneEntityWorld::setCamera(ecs::Entity entity, const std::shared_ptr<SceneCamera>& camera)
@@ -652,7 +675,6 @@ void SceneEntityWorld::setAnimation(ecs::Entity entity, AnimationComponent compo
     m_world.emplace<AnimationComponent>(entity, std::move(component));
     RegisterAnimationEntity(entity);
     updateLeafContentAndBounds(entity);
-    markStructureDirty();
 }
 
 void SceneEntityWorld::setAnimation(ecs::Entity entity, const std::shared_ptr<SceneAnimation>& animation)
@@ -671,7 +693,6 @@ void SceneEntityWorld::setGaussianSplat(ecs::Entity entity, const std::shared_pt
     splat->ownerEntity = entity;
     m_world.emplace<GaussianSplatComponent>(entity, GaussianSplatComponent{ splat });
     updateLeafContentAndBounds(entity);
-    markStructureDirty();
 }
 
 void SceneEntityWorld::setSampleSettings(ecs::Entity entity, const std::shared_ptr<SampleSettings>& settings)
@@ -779,7 +800,6 @@ ecs::Entity SceneEntityWorld::importSubtree(ecs::Entity parent, const SceneEntit
     }
 
     rebuildPathsFromRoot();
-    markStructureDirty();
     return newRoot;
 }
 

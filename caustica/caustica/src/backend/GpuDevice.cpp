@@ -352,9 +352,16 @@ uint32_t GpuDevice::GetHeadlessBackBufferCount() const
 
 void GpuDevice::UpdateAverageFrameTime(double elapsedTime)
 {
+    if (elapsedTime <= 0.0)
+        return;
+
+    // Seed immediately so UI/window title have a value before the first 0.5s batch.
+    if (m_AverageFrameTime <= 0.0)
+        m_AverageFrameTime = elapsedTime;
+
     m_FrameTimeSum += elapsedTime;
     m_NumberOfAccumulatedFrames += 1;
-    
+
     if (m_FrameTimeSum > m_AverageTimeUpdateInterval && m_NumberOfAccumulatedFrames > 0)
     {
         m_AverageFrameTime = m_FrameTimeSum / double(m_NumberOfAccumulatedFrames);

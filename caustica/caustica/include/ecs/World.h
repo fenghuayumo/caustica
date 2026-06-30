@@ -1,6 +1,8 @@
 #pragma once
 
+#include <ecs/ChangeDetection.h>
 #include <ecs/Entity.h>
+#include <ecs/Query.h>
 
 #include <entt/entity/registry.hpp>
 
@@ -19,8 +21,13 @@ public:
 
     void despawn(Entity entity)
     {
-        if (isAlive(entity))
-            m_registry.destroy(entity);
+        if (!isAlive(entity))
+            return;
+
+        if (auto* changeDetection = getResource<ChangeDetection>())
+            changeDetection->noteStructureChange();
+
+        m_registry.destroy(entity);
     }
 
     [[nodiscard]] bool isAlive(Entity entity) const
@@ -32,12 +39,46 @@ public:
     {
         m_registry.clear();
         m_registry.ctx().clear();
+        m_changeDetectionEnabled = false;
+    }
+
+    void enableChangeDetection()
+    {
+        if (m_changeDetectionEnabled)
+            return;
+
+        insertResource<ChangeDetection>();
+        m_changeDetectionEnabled = true;
+    }
+
+    void endChangeFrame()
+    {
+        if (auto* changeDetection = getResource<ChangeDetection>())
+            changeDetection->endFrame();
+    }
+
+    template<typename T>
+    void notifyComponentChanged(Entity entity)
+    {
+        if (auto* changeDetection = getResource<ChangeDetection>())
+            changeDetection->markChanged<T>(entity, m_registry);
     }
 
     template<typename T, typename... Args>
     T& emplace(Entity entity, Args&&... args)
     {
-        return m_registry.emplace_or_replace<T>(entity, std::forward<Args>(args)...);
+        const bool existed = m_registry.all_of<T>(entity);
+        T& result = m_registry.emplace_or_replace<T>(entity, std::forward<Args>(args)...);
+
+        if (auto* changeDetection = getResource<ChangeDetection>())
+        {
+            if (existed)
+                changeDetection->markChanged<T>(entity, m_registry);
+            else
+                changeDetection->markAdded<T>(entity, m_registry);
+        }
+
+        return result;
     }
 
     template<typename T>
@@ -73,6 +114,12 @@ public:
     template<typename T>
     void remove(Entity entity)
     {
+        if (!m_registry.all_of<T>(entity))
+            return;
+
+        if (auto* changeDetection = getResource<ChangeDetection>())
+            changeDetection->markRemoved<T>(entity, m_registry);
+
         m_registry.remove<T>(entity);
     }
 
@@ -113,19 +160,15 @@ public:
     template<typename First, typename Second, typename... Rest, typename Func>
     void each(Func&& func)
     {
-        m_registry.view<First, Second, Rest...>().each(
-            [&](Entity entity, First& first, Second& second, Rest&... rest) {
-                func(entity, first, second, rest...);
-            });
+        using Desc = detail::query_descriptor<First, Second, Rest...>;
+        detail::each_query<Desc>(m_registry, getResource<ChangeDetection>(), std::forward<Func>(func));
     }
 
     template<typename First, typename Second, typename... Rest, typename Func>
     void each(Func&& func) const
     {
-        m_registry.view<First, Second, Rest...>().each(
-            [&](Entity entity, const First& first, const Second& second, const Rest&... rest) {
-                func(entity, first, second, rest...);
-            });
+        using Desc = detail::query_descriptor<First, Second, Rest...>;
+        detail::each_query_const<Desc>(m_registry, getResource<ChangeDetection>(), std::forward<Func>(func));
     }
 
     [[nodiscard]] entt::registry& registry() { return m_registry; }
@@ -133,6 +176,7 @@ public:
 
 private:
     entt::registry m_registry;
+    bool m_changeDetectionEnabled = false;
 };
 
 } // namespace caustica::ecs

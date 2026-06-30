@@ -90,16 +90,6 @@ struct SceneContentComponent
     SceneContentFlags subgraphContent = SceneContentFlags::None;
 };
 
-struct TransformDirtyComponent
-{
-    bool value = true;
-};
-
-struct HierarchyDirtyComponent
-{
-    bool value = true;
-};
-
 struct MeshInstanceComponent
 {
     std::shared_ptr<MeshInfo> mesh;
@@ -296,8 +286,8 @@ public:
 private:
     void unregisterEntityLeaves(ecs::Entity entity);
     void updateLeafContentAndBounds(ecs::Entity entity);
-    void markStructureDirty();
-    void markTransformDirty();
+    void ensureChangeDetection();
+    void syncDirtyFlagsFromChangeDetection();
 
     // Phase-1 ECS schedule: the CPU scene refresh is a sequence of ordered systems
     // driven by ecs::Schedule. Each systemXxx is one step split out of refresh().

@@ -647,8 +647,9 @@ void SceneEditor::Animate(float fElapsedTimeSeconds)
 
     m_captureScriptManager->PostAnim();
 
-
     double frameTime = GetGpuDevice().GetAverageFrameTimeSeconds();
+    if (frameTime <= 0.0 && fElapsedTimeSeconds > 0.0f)
+        frameTime = static_cast<double>(fElapsedTimeSeconds);
     if (frameTime > 0.0)
     {
 #if CAUSTICA_WITH_STREAMLINE
@@ -659,18 +660,17 @@ void SceneEditor::Animate(float fElapsedTimeSeconds)
             m_fpsInfo = StringFormat("%.3f ms/frame (%.1f FPS)", frameTime * 1e3, 1.0 / frameTime);
     }
 
-    // Window title
-    auto& sc = *m_sceneManager->getScene();
-    std::string extraInfo = ", " + m_fpsInfo + ", " + m_sceneManager->getCurrentSceneName() + ", " + GetResolutionInfo() + ", (L: " + std::to_string(sc.GetLightEntities().size()) + ", MAT: " + std::to_string(sc.GetMaterials().size())
-        + ", MESH: " + std::to_string(sc.GetMeshes().size()) + ", I: " + std::to_string(sc.GetMeshInstances().size()) + ", SI: " + std::to_string(sc.GetSkinnedMeshInstances().size())
-        //+ ", AvgLum: " + std::to_string((m_renderTargets!=nullptr)?(m_renderTargets->AvgLuminanceLastCaptured):(0.0f))
+    if (auto scene = GetScene())
+    {
+        std::string extraInfo = ", " + m_fpsInfo + ", " + m_sceneManager->getCurrentSceneName() + ", " + GetResolutionInfo() + ", (L: " + std::to_string(scene->GetLightEntities().size()) + ", MAT: " + std::to_string(scene->GetMaterials().size())
+            + ", MESH: " + std::to_string(scene->GetMeshes().size()) + ", I: " + std::to_string(scene->GetMeshInstances().size()) + ", SI: " + std::to_string(scene->GetSkinnedMeshInstances().size())
 #if ENABLE_DEBUG_VIZUALISATIONS
-        + ", ENABLE_DEBUG_VIZUALISATIONS: 1"
+            + ", ENABLE_DEBUG_VIZUALISATIONS: 1"
 #endif
-        + ")";
+            + ")";
 
-
-    GetGpuDevice().SetInformativeWindowTitle(g_windowTitle, false, extraInfo.c_str());
+        GetGpuDevice().SetInformativeWindowTitle(g_windowTitle, false, extraInfo.c_str());
+    }
 }
 
 std::string SceneEditor::GetResolutionInfo() const

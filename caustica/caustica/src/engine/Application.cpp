@@ -212,71 +212,76 @@ bool Application::runFrame(std::optional<double> elapsedTimeOverride)
 {
     processEventQueue();
 
-    GpuDevice* dm = device();
-    if (!dm)
+    GpuDevice* gpuDevice = device();
+    if (!gpuDevice)
         return false;
 
-    auto& DM = *dm;
-    double curTime = GetNow(DM.m_DeviceParams.headlessDevice);
-    double elapsedTime = elapsedTimeOverride.value_or(curTime - DM.m_PreviousFrameTimestamp);
+    double curTime = GetNow(gpuDevice->m_DeviceParams.headlessDevice);
+    double elapsedTime = elapsedTimeOverride.value_or(curTime - gpuDevice->m_PreviousFrameTimestamp);
 
     const bool windowVisible = isWindowVisible();
     const bool windowFocused = isWindowFocused();
 
-    if (windowVisible && (windowFocused || shouldRenderWhenUnfocused() || DM.m_RequestedRenderUnfocused))
+    if (windowVisible && (windowFocused || shouldRenderWhenUnfocused() || gpuDevice->m_RequestedRenderUnfocused))
     {
-        if (DM.m_PrevDPIScaleFactorX != DM.m_DPIScaleFactorX ||
-            DM.m_PrevDPIScaleFactorY != DM.m_DPIScaleFactorY) {
-            notifyDisplayScaleChanged(DM.m_DPIScaleFactorX, DM.m_DPIScaleFactorY);
-            DM.m_PrevDPIScaleFactorX = DM.m_DPIScaleFactorX;
-            DM.m_PrevDPIScaleFactorY = DM.m_DPIScaleFactorY;
+        if (gpuDevice->m_PrevDPIScaleFactorX != gpuDevice->m_DPIScaleFactorX ||
+            gpuDevice->m_PrevDPIScaleFactorY != gpuDevice->m_DPIScaleFactorY) {
+            notifyDisplayScaleChanged(gpuDevice->m_DPIScaleFactorX, gpuDevice->m_DPIScaleFactorY);
+            gpuDevice->m_PrevDPIScaleFactorX = gpuDevice->m_DPIScaleFactorX;
+            gpuDevice->m_PrevDPIScaleFactorY = gpuDevice->m_DPIScaleFactorY;
         }
-        DM.m_RequestedRenderUnfocused = false;
+        gpuDevice->m_RequestedRenderUnfocused = false;
 
-        if (beforeAnimate) beforeAnimate(DM, DM.m_FrameIndex);
+        if (beforeAnimate) beforeAnimate(*gpuDevice, gpuDevice->m_FrameIndex);
         animate(elapsedTime, true);
 #if CAUSTICA_WITH_STREAMLINE
-        if (!DM.m_DeviceParams.headlessDevice) StreamlineIntegration::Get().SimEnd(DM);
+        if (!gpuDevice->m_DeviceParams.headlessDevice) StreamlineIntegration::Get().SimEnd(*gpuDevice);
 #endif
-        if (afterAnimate) afterAnimate(DM, DM.m_FrameIndex);
+        if (afterAnimate) afterAnimate(*gpuDevice, gpuDevice->m_FrameIndex);
 
-        if (DM.m_FrameIndex > 0 || !DM.m_SkipRenderOnFirstFrame) {
-            if (DM.BeginFrame()) {
-                uint32_t fi = DM.m_FrameIndex;
-                if (DM.m_SkipRenderOnFirstFrame) fi--;
+        if (gpuDevice->m_FrameIndex > 0 || !gpuDevice->m_SkipRenderOnFirstFrame) {
+            if (gpuDevice->BeginFrame()) {
+                uint32_t fi = gpuDevice->m_FrameIndex;
+                if (gpuDevice->m_SkipRenderOnFirstFrame) fi--;
 #if CAUSTICA_WITH_STREAMLINE
-                if (!DM.m_DeviceParams.headlessDevice) StreamlineIntegration::Get().RenderStart(DM);
+                if (!gpuDevice->m_DeviceParams.headlessDevice) StreamlineIntegration::Get().RenderStart(*gpuDevice);
 #endif
-                if (beforeRender) beforeRender(DM, fi);
+                if (beforeRender) beforeRender(*gpuDevice, fi);
                 render();
-                if (afterRender) afterRender(DM, fi);
+                if (afterRender) afterRender(*gpuDevice, fi);
 #if CAUSTICA_WITH_STREAMLINE
-                if (!DM.m_DeviceParams.headlessDevice) {
-                    StreamlineIntegration::Get().RenderEnd(DM);
-                    StreamlineIntegration::Get().PresentStart(DM);
+                if (!gpuDevice->m_DeviceParams.headlessDevice) {
+                    StreamlineIntegration::Get().RenderEnd(*gpuDevice);
+                    StreamlineIntegration::Get().PresentStart(*gpuDevice);
                 }
 #endif
-                if (beforePresent) beforePresent(DM, fi);
-                bool ok = DM.Present();
-                if (afterPresent) afterPresent(DM, fi);
+                if (beforePresent) beforePresent(*gpuDevice, fi);
+                bool ok = gpuDevice->Present();
+                if (afterPresent) afterPresent(*gpuDevice, fi);
 #if CAUSTICA_WITH_STREAMLINE
-                if (!DM.m_DeviceParams.headlessDevice) StreamlineIntegration::Get().PresentEnd(DM);
+                if (!gpuDevice->m_DeviceParams.headlessDevice) StreamlineIntegration::Get().PresentEnd(*gpuDevice);
 #endif
-                if (!ok) return false;
+                if (!ok)
+                {
+                    gpuDevice->UpdateAverageFrameTime(elapsedTime);
+                    gpuDevice->m_PreviousFrameTimestamp = curTime;
+                    ++gpuDevice->m_FrameIndex;
+                    return false;
+                }
             }
         }
     }
     else if (windowVisible) {
-        if (beforeAnimate) beforeAnimate(DM, DM.m_FrameIndex);
+        if (beforeAnimate) beforeAnimate(*gpuDevice, gpuDevice->m_FrameIndex);
         animate(elapsedTime, false);
-        if (afterAnimate) afterAnimate(DM, DM.m_FrameIndex);
+        if (afterAnimate) afterAnimate(*gpuDevice, gpuDevice->m_FrameIndex);
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(0));
-    DM.GetDevice()->runGarbageCollection();
-    DM.UpdateAverageFrameTime(elapsedTime);
-    DM.m_PreviousFrameTimestamp = curTime;
-    ++DM.m_FrameIndex;
+    gpuDevice->GetDevice()->runGarbageCollection();
+    gpuDevice->UpdateAverageFrameTime(elapsedTime);
+    gpuDevice->m_PreviousFrameTimestamp = curTime;
+    ++gpuDevice->m_FrameIndex;
     return true;
 }
 
