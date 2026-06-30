@@ -650,15 +650,7 @@ void SceneEditor::Animate(float fElapsedTimeSeconds)
     double frameTime = GetGpuDevice().GetAverageFrameTimeSeconds();
     if (frameTime <= 0.0 && fElapsedTimeSeconds > 0.0f)
         frameTime = static_cast<double>(fElapsedTimeSeconds);
-    if (frameTime > 0.0)
-    {
-#if CAUSTICA_WITH_STREAMLINE
-        if (m_settings.DLSSFGMultiplier != 1)
-            m_fpsInfo = StringFormat("%.3f ms/%d-frames* (%.1f FPS*) *DLSS-G", frameTime * 1e3, m_settings.DLSSFGMultiplier, m_settings.DLSSFGMultiplier / frameTime);
-        else
-#endif
-            m_fpsInfo = StringFormat("%.3f ms/frame (%.1f FPS)", frameTime * 1e3, 1.0 / frameTime);
-    }
+    UpdateFpsInfo(frameTime);
 
     if (auto scene = GetScene())
     {
@@ -999,6 +991,32 @@ void SceneEditor::Render(nvrhi::IFramebuffer* framebuffer)
     }
     PrepareEditorFrame();
     GetWorldRenderer()->render(framebuffer);
+
+    double frameTime = GetGpuDevice().GetAverageFrameTimeSeconds();
+    if (frameTime <= 0.0 && m_lastDeltaTime > 0.0f)
+        frameTime = static_cast<double>(m_lastDeltaTime);
+    UpdateFpsInfo(frameTime);
+}
+
+void SceneEditor::UpdateFpsInfo(double frameTimeSeconds)
+{
+    if (frameTimeSeconds <= 0.0)
+        return;
+
+#if CAUSTICA_WITH_STREAMLINE
+    if (m_settings.ActualDLSSFGMode() != SI::DLSSGMode::eOff)
+    {
+        uint32_t presentedFrames = m_settings.DLSSFGMultiplier;
+        if (presentedFrames == 0)
+            presentedFrames = 1u + m_settings.DLSSFGNumFramesToGenerate;
+
+        m_fpsInfo = StringFormat("%.3f ms/%d-frames* (%.1f FPS*) *DLSS-G",
+            frameTimeSeconds * 1e3, presentedFrames, presentedFrames / frameTimeSeconds);
+        return;
+    }
+#endif
+
+    m_fpsInfo = StringFormat("%.3f ms/frame (%.1f FPS)", frameTimeSeconds * 1e3, 1.0 / frameTimeSeconds);
 }
 
 void SceneEditor::BackBufferResizing()

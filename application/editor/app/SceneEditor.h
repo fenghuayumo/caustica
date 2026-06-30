@@ -285,6 +285,7 @@ protected:
 private:
     void                                    SyncSubsystemContext();
     void                                    SyncInputRouterContext();
+    void                                    UpdateFpsInfo(double frameTimeSeconds);
 
     std::shared_ptr<caustica::RootFileSystem> m_RootFS;
 
