@@ -28,6 +28,7 @@ namespace { constexpr int c_SwapchainCount = 3; }
 #include <backend/GpuDevice.h>
 #include <core/path_utils.h>
 #include <core/log.h>
+#include <core/progress.h>
 #include <assets/loader/TextureLoader.h>
 #include <render/Core/PathTracerSettings.h>
 #include <math/float.h>
@@ -564,7 +565,7 @@ void caustica::render::PathTracingWorldRenderer::preUpdatePathTracing( bool rese
         m_accumulationSampleIndex = (m_context.settings.AccumulationPreWarmRealtimeCaches)?(-32):(0);
     }
 #if ENABLE_DEBUG_VIZUALISATIONS
-    if (resetAccum)
+    if (resetAccum && m_shaderDebug)
         m_shaderDebug->ClearDebugVizTexture(commandList);
 #endif
 
@@ -787,18 +788,22 @@ void caustica::render::PathTracingWorldRenderer::streamlinePreRender()
 
     // DLSS-G Setup
     {
+        const auto actualDLSSFGMode = m_context.settings.ActualDLSSFGMode();
+        const bool wasDLSSFGEnabled = m_context.settings.DLSSFGOptions.mode == StreamlineInterface::DLSSGMode::eOn;
+
         // If DLSS-G has been turned off, then we tell tell SL to clean it up expressly
-        if (m_context.settings.DLSSFGOptions.mode == StreamlineInterface::DLSSGMode::eOn && m_context.settings.ActualDLSSFGMode() == StreamlineInterface::DLSSGMode::eOff) {
+        if (wasDLSSFGEnabled && actualDLSSFGMode == StreamlineInterface::DLSSGMode::eOff) {
             streamline.CleanupDLSSG(true);
         }
 
         // This is where DLSS-G is toggled On and Off (using dlssgOptions.mode) and where we set DLSS-G parameters.
         auto dlssgOptions = StreamlineInterface::DLSSGOptions{};
-        dlssgOptions.mode = m_context.settings.ActualDLSSFGMode();
+        dlssgOptions.mode = actualDLSSFGMode;
         dlssgOptions.numFramesToGenerate = m_context.settings.DLSSFGNumFramesToGenerate;
 
         // This is where we query DLSS-G minimum swapchain size
-        if (m_context.settings.IsDLSSFGSupported)
+        if (m_context.settings.IsDLSSFGSupported &&
+            (actualDLSSFGMode != StreamlineInterface::DLSSGMode::eOff || wasDLSSFGEnabled))
         {
             StreamlineInterface::DLSSGState state;
             streamline.GetDLSSGState(state, dlssgOptions);
@@ -806,6 +811,11 @@ void caustica::render::PathTracingWorldRenderer::streamlinePreRender()
             m_context.settings.DLSSFGMaxNumFramesToGenerate = state.numFramesToGenerateMax;
 
             streamline.SetDLSSGOptions(dlssgOptions);
+            m_context.settings.DLSSFGOptions = dlssgOptions;
+        }
+        else
+        {
+            m_context.settings.DLSSFGMultiplier = 1;
             m_context.settings.DLSSFGOptions = dlssgOptions;
         }
     }
@@ -1235,33 +1245,50 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
     // Acceleration structures need some material info, whilst other passes need acceleration structures, so first set up materials if needed
     if (needNewPasses)
     {
+        info("Renderer init: begin");
         m_context.diagnostics.progressInitializingRenderer.Start("Initializing renderer...");
 
         if (m_context.materials == nullptr)
         {
+            info("Renderer init: create material cache begin");
             m_context.materials = std::make_shared<MaterialGpuCache>(std::string("PathTracerMaterialSpecializations.hlsl"), device(), m_context.textureCache, m_context.shaderFactory);
+            info("Renderer init: create material cache end");
             assert( m_pathTracingShaderCompiler == nullptr ); // there should be no cases where materials baker is null but pathTracingShaderCompiler isn't
             
+            info("Renderer init: create path tracing shader compiler begin");
             m_pathTracingShaderCompiler = std::make_shared<PathTracingShaderCompiler>(device(), m_context.materials, m_bindingLayout, m_bindlessLayout);
+            info("Renderer init: create path tracing shader compiler end");
             
             std::vector<std::filesystem::path> additionalShaderPaths;
+            info("Renderer init: create compute pipeline registry begin");
             m_context.computePipelines = std::make_shared<ComputePipelineRegistry>(device(), additionalShaderPaths);
+            info("Renderer init: create compute pipeline registry end");
             
+            info("Renderer init: create RT pipeline variants begin");
             m_context.rayTracing.createRTPipelines();
+            info("Renderer init: create RT pipeline variants end");
         }
 
+        info("Renderer init: material render passes/load begin");
         m_context.materials->CreateRenderPassesAndLoadMaterials(m_bindlessLayout, m_context.commonPasses, m_context.sceneManager.getScene(), m_context.sceneManager.getCurrentScenePath(), GetLocalPath(c_AssetsFolder));
+        info("Renderer init: material render passes/load end");
         m_context.diagnostics.progressInitializingRenderer.Set(5);
         {
+            info("Renderer init: idle maintenance extensions begin");
             PathTracingFrameEvent event{ .framePhase = PathTracingFramePhase::IdleMaintenance };
             dispatchFrameExtensions(event);
+            info("Renderer init: idle maintenance extensions end");
         }
+        info("Renderer init: OMM render passes begin");
         if(m_context.opacityMaps) m_context.opacityMaps->CreateRenderPasses(m_bindlessLayout, m_context.commonPasses);
+        info("Renderer init: OMM render passes end");
         m_context.diagnostics.progressInitializingRenderer.Set(20);
+        info("Renderer init: end");
     }
 
     // Changes to material properties and settings can require a BLAS/TLAS or subInstanceBuffer rebuild (alpha tested/exclusion flags etc); otherwise this is a no-op.
     m_context.rayTracing.recreateAccelStructs(m_commandList);
+    m_commandList = device()->createCommandList();
 
     if (m_context.settings.ActualUseRTXDIPasses() && m_rtxdiPass == nullptr )
         needNewPasses = true; // this will initialize rtxdi passes
@@ -1272,11 +1299,22 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
     if (needNewPasses)
     {
         m_context.diagnostics.progressInitializingRenderer.Set(40);
-        device()->waitForIdle();    // some subsystems have resources that could still be in use and might be deleted - make sure that's safe
+        info("Renderer init: pre-createRenderPasses wait begin");
+        const bool preCreatePassesWaitOk = device()->waitForIdle();    // some subsystems have resources that could still be in use and might be deleted - make sure that's safe
+        info("Renderer init: pre-createRenderPasses wait end, ok=%s", preCreatePassesWaitOk ? "true" : "false");
+        if (!preCreatePassesWaitOk)
+            return;
+        info("Renderer init: createRenderPasses begin");
         m_commandList->open();
         createRenderPasses(exposureResetRequired, m_commandList);
         m_commandList->close();
         device()->executeCommandList(m_commandList);
+        info("Renderer init: createRenderPasses wait begin");
+        const bool createPassesWaitOk = device()->waitForIdle();
+        info("Renderer init: createRenderPasses wait end, ok=%s", createPassesWaitOk ? "true" : "false");
+        if (!createPassesWaitOk)
+            return;
+        info("Renderer init: createRenderPasses end");
         m_context.diagnostics.progressInitializingRenderer.Set(70);
     }
 
@@ -1290,6 +1328,22 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
     m_context.diagnostics.progressInitializingRenderer.Set(90);
 
     m_commandList->open();
+    auto submitInitializationStage = [&](const char* stage) -> bool
+    {
+        if (!needNewPasses)
+            return true;
+
+        m_commandList->close();
+        device()->executeCommandList(m_commandList);
+        const bool waitOk = device()->waitForIdle();
+        if (!waitOk)
+        {
+            caustica::error("Renderer init synchronization failed after %s", stage);
+            return false;
+        }
+        m_commandList->open();
+        return true;
+    };
 
     bool needNewBindings = false;
     PathTracerCameraData cameraData;
@@ -1308,10 +1362,10 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
             cameraData = BridgeCamera(uint(viewSize.x), uint(viewSize.y), outputAspectRatio, m_context.renderCore.camera().camera().GetPosition(), m_context.renderCore.camera().camera().GetDir(), m_context.renderCore.camera().camera().GetUp(), fovY, m_context.renderCore.camera().zNear(), 1e7f, m_context.settings.CameraFocalDistance, m_context.settings.CameraAperture, jitter);
         }
 
-        if (needNewPasses || needNewBindings || m_bindingSet == nullptr)
+        if ((needNewPasses || needNewBindings || m_bindingSet == nullptr) && m_shaderDebug)
             m_shaderDebug->CreateRenderPasses(framebuffer, m_renderTargets->Depth);
 
-        if (m_context.settings.EnableShaderDebug)
+        if (m_context.settings.EnableShaderDebug && m_shaderDebug)
         {
             dm::float4x4 viewProj = m_context.renderCore.camera().view()->GetViewProjectionMatrix();
             m_shaderDebug->BeginFrame(m_commandList, viewProj);
@@ -1329,9 +1383,13 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
         geoParams.frameIndex = m_context.gpuDevice.GetFrameIndex();
         geoParams.asyncLoadingInProgress = &m_context.diagnostics.asyncLoadingInProgress;
         m_context.renderCore.updateSceneGeometry(geoParams);
+        if (!submitInitializationStage("updateSceneGeometry"))
+            return;
 
         // Update input lighting, environment map, etc.
         preUpdateLighting(m_commandList, needNewBindings);
+        if (!submitInitializationStage("preUpdateLighting"))
+            return;
 
         // Early init for RTXDI
         if (m_rtxdiPass != nullptr) 
@@ -1339,13 +1397,16 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
             if (needNewPasses || needNewBindings || m_bindingSet == nullptr)
                 m_rtxdiPass->Reset();
             rtxdiSetupFrame(framebuffer, cameraData, m_renderSize);
+            if (!submitInitializationStage("rtxdiSetupFrame"))
+                return;
         }
     }
 
 	if( needNewPasses || needNewBindings || m_bindingSet == nullptr )
     {
         m_context.diagnostics.progressInitializingRenderer.Set(95);
-        RAII_SCOPE( m_commandList->close(); device()->executeCommandList(m_commandList);, m_commandList->open(););
+        if (!submitInitializationStage("preRecreateBindingSet"))
+            return;
 
         recreateBindingSet();
 
@@ -1380,6 +1441,8 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
 
     // I suppose we need to clear depth for right-click picking at least
     m_renderTargets->Clear( m_commandList );
+    if (!submitInitializationStage("clearRenderTargets"))
+        return;
 
     SampleConstants & constants = m_currentConstants; memset(&constants, 0, sizeof(constants));
     SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) }; // accessible but unused in path tracing at the moment
@@ -1467,10 +1530,15 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
         // Must go before m_constantBuffer as when saving screenshots it closes and re-opens command list, flushing the volatile constant buffer!
         updateLighting(m_commandList);
         m_context.rayTracing.uploadSubInstanceData(m_commandList); // this is now full subInstance data
+        if (!submitInitializationStage("updateLighting"))
+            return;
 
         m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
 
         m_context.rayTracing.sampleRenderCode(framebuffer, m_commandList, constants);
+        if (!submitInitializationStage("sampleRenderCode"))
+            return;
+        m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
 
         const bool stochasticSplats = m_context.settings.EnableGaussianSplats && m_context.settings.GaussianSplatSortingMode == 1;
         const bool stochasticUsesMainTemporal = stochasticSplats && (!m_context.settings.RealtimeMode || m_context.settings.RealtimeAA == 1);
@@ -1484,6 +1552,9 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
 
         if (!stochasticUsesMainTemporal)
             renderGaussianSplats(false);
+        if (!submitInitializationStage("postProcessAA"))
+            return;
+        m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
     }
 
     caustica::PlanarView fullscreenView = *m_context.renderCore.camera().view();
@@ -1501,10 +1572,13 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
     }
 
     postProcessPostToneMapping(m_commandList, fullscreenView);  // writing to m_renderTargets->LdrColor
+    if (!submitInitializationStage("postToneMapping"))
+        return;
+    m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
 
     //m_postProcess->Render(m_commandList, m_renderTargets->LdrColor);
 
-    if (m_context.settings.EnableShaderDebug)
+    if (m_context.settings.EnableShaderDebug && m_shaderDebug)
         m_shaderDebug->EndFrameAndOutput(m_commandList, m_renderTargets->LdrFramebuffer->GetFramebuffer(fullscreenView), m_renderTargets->Depth, fbinfo.getViewport());
 
     {
@@ -1519,6 +1593,9 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
     m_commandList->beginMarker("Blit");
     (m_context.commonPasses)->BlitTexture(m_commandList, framebuffer, m_renderTargets->LdrColor, &m_context.bindingCache);
     m_commandList->endMarker();
+    if (!submitInitializationStage("finalBlit"))
+        return;
+    m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
 
     if (m_context.settings.ShowDebugLines == true)
     {
@@ -1575,6 +1652,15 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
 
 	m_commandList->close();
 	device()->executeCommandList(m_commandList);
+    if (needNewPasses)
+    {
+        const bool finalWaitOk = device()->waitForIdle();
+        if (!finalWaitOk)
+        {
+            caustica::error("Renderer init synchronization failed after final submit");
+            return;
+        }
+    }
 
     // resolve picking and debug info
     if (m_context.settings.ContinuousDebugFeedback || m_context.runtimeState.Picking.hasActivePickRequest())
@@ -1760,7 +1846,6 @@ void caustica::render::PathTracingWorldRenderer::recreateBindingSet()
 void caustica::render::PathTracingWorldRenderer::pathTrace(nvrhi::IFramebuffer* framebuffer, const SampleConstants & constants)
 {
     //m_commandList->beginMarker("MainRendering"); <- removed (for now) since added hierarchy reduces readability
-
     bool useStablePlanes = m_context.settings.RealtimeMode;
 
     nvrhi::rt::State state;

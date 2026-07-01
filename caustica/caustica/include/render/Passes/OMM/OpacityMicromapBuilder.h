@@ -74,7 +74,7 @@ struct OpacityMicroMapUIData
         bool operator == (const BuildState& other) const = default;
     };
 
-    bool                                Enable = true;
+    bool                                Enable = false;
     bool                                Force2State = false;
     bool                                OnlyOMMs = false;
 
@@ -117,6 +117,7 @@ public:
     void                            UpdateDebugGeometry(const caustica::MeshInfo& mesh);
 
     [[nodiscard]] nvrhi::IBuffer*   GetGeometryDebugBuffer() const { return m_geometryDebugBuffer; }
+    [[nodiscard]] bool              ShouldUseRayTracingOpacityMicromaps() const { return m_uiData.Enable; }
 
     void                            SetGlobalShaderMacros(std::vector<caustica::ShaderMacro> & macros);
 

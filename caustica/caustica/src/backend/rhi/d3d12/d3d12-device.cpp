@@ -8,9 +8,140 @@
 
 #include <sstream>
 #include <iomanip>
+#include <atomic>
 
 namespace nvrhi::d3d12
 {
+    static std::string FormatHRESULT(HRESULT hr)
+    {
+        std::ostringstream ss;
+        ss << "0x" << std::hex << std::setw(8) << std::setfill('0') << hr;
+        return ss.str();
+    }
+
+    static const char* BreadcrumbOpToString(D3D12_AUTO_BREADCRUMB_OP op)
+    {
+        switch (op)
+        {
+        case D3D12_AUTO_BREADCRUMB_OP_SETMARKER: return "SetMarker";
+        case D3D12_AUTO_BREADCRUMB_OP_BEGINEVENT: return "BeginEvent";
+        case D3D12_AUTO_BREADCRUMB_OP_ENDEVENT: return "EndEvent";
+        case D3D12_AUTO_BREADCRUMB_OP_DRAWINSTANCED: return "DrawInstanced";
+        case D3D12_AUTO_BREADCRUMB_OP_DRAWINDEXEDINSTANCED: return "DrawIndexedInstanced";
+        case D3D12_AUTO_BREADCRUMB_OP_EXECUTEINDIRECT: return "ExecuteIndirect";
+        case D3D12_AUTO_BREADCRUMB_OP_DISPATCH: return "Dispatch";
+        case D3D12_AUTO_BREADCRUMB_OP_COPYBUFFERREGION: return "CopyBufferRegion";
+        case D3D12_AUTO_BREADCRUMB_OP_COPYTEXTUREREGION: return "CopyTextureRegion";
+        case D3D12_AUTO_BREADCRUMB_OP_COPYRESOURCE: return "CopyResource";
+        case D3D12_AUTO_BREADCRUMB_OP_COPYTILES: return "CopyTiles";
+        case D3D12_AUTO_BREADCRUMB_OP_RESOLVESUBRESOURCE: return "ResolveSubresource";
+        case D3D12_AUTO_BREADCRUMB_OP_CLEARRENDERTARGETVIEW: return "ClearRenderTargetView";
+        case D3D12_AUTO_BREADCRUMB_OP_CLEARUNORDEREDACCESSVIEW: return "ClearUnorderedAccessView";
+        case D3D12_AUTO_BREADCRUMB_OP_CLEARDEPTHSTENCILVIEW: return "ClearDepthStencilView";
+        case D3D12_AUTO_BREADCRUMB_OP_RESOURCEBARRIER: return "ResourceBarrier";
+        case D3D12_AUTO_BREADCRUMB_OP_EXECUTEBUNDLE: return "ExecuteBundle";
+        case D3D12_AUTO_BREADCRUMB_OP_PRESENT: return "Present";
+        case D3D12_AUTO_BREADCRUMB_OP_RESOLVEQUERYDATA: return "ResolveQueryData";
+        case D3D12_AUTO_BREADCRUMB_OP_BEGINSUBMISSION: return "BeginSubmission";
+        case D3D12_AUTO_BREADCRUMB_OP_ENDSUBMISSION: return "EndSubmission";
+        case D3D12_AUTO_BREADCRUMB_OP_DECODEFRAME: return "DecodeFrame";
+        case D3D12_AUTO_BREADCRUMB_OP_PROCESSFRAMES: return "ProcessFrames";
+        case D3D12_AUTO_BREADCRUMB_OP_ATOMICCOPYBUFFERUINT: return "AtomicCopyBufferUINT";
+        case D3D12_AUTO_BREADCRUMB_OP_ATOMICCOPYBUFFERUINT64: return "AtomicCopyBufferUINT64";
+        case D3D12_AUTO_BREADCRUMB_OP_RESOLVESUBRESOURCEREGION: return "ResolveSubresourceRegion";
+        case D3D12_AUTO_BREADCRUMB_OP_WRITEBUFFERIMMEDIATE: return "WriteBufferImmediate";
+        case D3D12_AUTO_BREADCRUMB_OP_DECODEFRAME1: return "DecodeFrame1";
+        case D3D12_AUTO_BREADCRUMB_OP_SETPROTECTEDRESOURCESESSION: return "SetProtectedResourceSession";
+        case D3D12_AUTO_BREADCRUMB_OP_DECODEFRAME2: return "DecodeFrame2";
+        case D3D12_AUTO_BREADCRUMB_OP_PROCESSFRAMES1: return "ProcessFrames1";
+        case D3D12_AUTO_BREADCRUMB_OP_BUILDRAYTRACINGACCELERATIONSTRUCTURE: return "BuildRaytracingAccelerationStructure";
+        case D3D12_AUTO_BREADCRUMB_OP_EMITRAYTRACINGACCELERATIONSTRUCTUREPOSTBUILDINFO: return "EmitRaytracingAccelerationStructurePostbuildInfo";
+        case D3D12_AUTO_BREADCRUMB_OP_COPYRAYTRACINGACCELERATIONSTRUCTURE: return "CopyRaytracingAccelerationStructure";
+        case D3D12_AUTO_BREADCRUMB_OP_DISPATCHRAYS: return "DispatchRays";
+        case D3D12_AUTO_BREADCRUMB_OP_INITIALIZEMETACOMMAND: return "InitializeMetaCommand";
+        case D3D12_AUTO_BREADCRUMB_OP_EXECUTEMETACOMMAND: return "ExecuteMetaCommand";
+        case D3D12_AUTO_BREADCRUMB_OP_ESTIMATEMOTION: return "EstimateMotion";
+        case D3D12_AUTO_BREADCRUMB_OP_RESOLVEMOTIONVECTORHEAP: return "ResolveMotionVectorHeap";
+        case D3D12_AUTO_BREADCRUMB_OP_SETPIPELINESTATE1: return "SetPipelineState1";
+        case D3D12_AUTO_BREADCRUMB_OP_INITIALIZEEXTENSIONCOMMAND: return "InitializeExtensionCommand";
+        case D3D12_AUTO_BREADCRUMB_OP_EXECUTEEXTENSIONCOMMAND: return "ExecuteExtensionCommand";
+        case D3D12_AUTO_BREADCRUMB_OP_DISPATCHMESH: return "DispatchMesh";
+        default: return "Unknown";
+        }
+    }
+
+    static void DumpDredIfAvailable(const Context& context)
+    {
+        static std::atomic_bool dumped = false;
+        if (dumped.exchange(true))
+            return;
+
+        RefCountPtr<ID3D12DeviceRemovedExtendedData1> dred;
+        if (FAILED(context.device->QueryInterface(IID_PPV_ARGS(&dred))) || !dred)
+        {
+            context.error("DRED: ID3D12DeviceRemovedExtendedData1 is unavailable");
+            return;
+        }
+        context.error("DRED: dump begin");
+
+        D3D12_DRED_AUTO_BREADCRUMBS_OUTPUT1 breadcrumbs = {};
+        HRESULT breadcrumbsHr = dred->GetAutoBreadcrumbsOutput1(&breadcrumbs);
+        if (SUCCEEDED(breadcrumbsHr))
+        {
+            if (!breadcrumbs.pHeadAutoBreadcrumbNode)
+                context.error("DRED: no auto breadcrumb nodes");
+            int nodeIndex = 0;
+            for (const D3D12_AUTO_BREADCRUMB_NODE1* node = breadcrumbs.pHeadAutoBreadcrumbNode; node && nodeIndex < 16; node = node->pNext, ++nodeIndex)
+            {
+                const UINT last = node->pLastBreadcrumbValue ? *node->pLastBreadcrumbValue : 0;
+                const UINT opIndex = std::min(last, node->BreadcrumbCount ? node->BreadcrumbCount - 1 : 0);
+                std::ostringstream ss;
+                ss << "DRED breadcrumb[" << nodeIndex << "]: queue="
+                    << (node->pCommandQueueDebugNameA ? node->pCommandQueueDebugNameA : "<unnamed>")
+                    << ", list=" << (node->pCommandListDebugNameA ? node->pCommandListDebugNameA : "<unnamed>")
+                    << ", last=" << last << "/" << node->BreadcrumbCount;
+                if (node->pCommandHistory && node->BreadcrumbCount)
+                    ss << ", op[" << opIndex << "]=" << BreadcrumbOpToString(node->pCommandHistory[opIndex]);
+                context.error(ss.str());
+            }
+        }
+        else
+        {
+            context.error(std::string("DRED: GetAutoBreadcrumbsOutput1 failed, HRESULT = ") + FormatHRESULT(breadcrumbsHr));
+        }
+
+        D3D12_DRED_PAGE_FAULT_OUTPUT1 pageFault = {};
+        HRESULT pageFaultHr = dred->GetPageFaultAllocationOutput1(&pageFault);
+        if (SUCCEEDED(pageFaultHr))
+        {
+            std::ostringstream ss;
+            ss << "DRED page fault VA=0x" << std::hex << pageFault.PageFaultVA;
+            context.error(ss.str());
+
+            int nodeIndex = 0;
+            for (const D3D12_DRED_ALLOCATION_NODE1* node = pageFault.pHeadExistingAllocationNode; node && nodeIndex < 8; node = node->pNext, ++nodeIndex)
+            {
+                std::ostringstream nodeMessage;
+                nodeMessage << "DRED existing allocation[" << nodeIndex << "]: type=" << node->AllocationType
+                    << ", name=" << (node->ObjectNameA ? node->ObjectNameA : "<unnamed>");
+                context.error(nodeMessage.str());
+            }
+
+            nodeIndex = 0;
+            for (const D3D12_DRED_ALLOCATION_NODE1* node = pageFault.pHeadRecentFreedAllocationNode; node && nodeIndex < 8; node = node->pNext, ++nodeIndex)
+            {
+                std::ostringstream nodeMessage;
+                nodeMessage << "DRED recent freed allocation[" << nodeIndex << "]: type=" << node->AllocationType
+                    << ", name=" << (node->ObjectNameA ? node->ObjectNameA : "<unnamed>");
+                context.error(nodeMessage.str());
+            }
+        }
+        else
+        {
+            context.error(std::string("DRED: GetPageFaultAllocationOutput1 failed, HRESULT = ") + FormatHRESULT(pageFaultHr));
+        }
+    }
+
     void Context::error(const std::string& message) const
     {
         messageCallback->message(MessageSeverity::Error, message.c_str());
@@ -312,6 +443,14 @@ namespace nvrhi::d3d12
                 WaitForFence(pQueue->fence, pQueue->lastSubmittedInstance, m_FenceEvent);
             }
         }
+
+        HRESULT hr = m_Context.device->GetDeviceRemovedReason();
+        if (FAILED(hr))
+        {
+            m_Context.error(std::string("Device removed after waitForIdle, reason = ") + FormatHRESULT(hr));
+            DumpDredIfAvailable(m_Context);
+            return false;
+        }
         return true;
     }
     
@@ -426,7 +565,17 @@ namespace nvrhi::d3d12
         HRESULT hr = m_Context.device->GetDeviceRemovedReason();
         if (FAILED(hr))
         {
-            m_Context.messageCallback->message(MessageSeverity::Error, "Device Removed!");
+            std::ostringstream ss;
+            ss << "Device Removed after ExecuteCommandLists, reason = " << FormatHRESULT(hr)
+                << ", queue=" << int(executionQueue)
+                << ", numCommandLists=" << numCommandLists;
+            for (size_t i = 0; i < numCommandLists; i++)
+            {
+                ss << ", cl[" << i << "] nvrhi=0x" << std::hex << reinterpret_cast<uintptr_t>(pCommandLists[i])
+                    << " d3d12=0x" << reinterpret_cast<uintptr_t>(m_CommandListsToExecute[i]);
+            }
+            m_Context.error(ss.str());
+            DumpDredIfAvailable(m_Context);
         }
 
         return pQueue->lastSubmittedInstance;

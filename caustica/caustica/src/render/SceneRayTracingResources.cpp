@@ -4,9 +4,11 @@
 #include <render/WorldRenderer/PathTracingWorldRenderer.h>
 
 #include <backend/GpuDevice.h>
+#include <core/log.h>
 #include <render/Core/BindingCache.h>
 #include <render/Core/PathTracingShaderCompiler.h>
 #include <render/Core/RenderCore.h>
+#include <render/Passes/OMM/OpacityMicromapBuilder.h>
 #include <scene/SceneManager.h>
 #include <scene/Scene.h>
 
@@ -69,6 +71,10 @@ void SceneRayTracingResources::fillPTPipelineGlobalMacros(std::vector<caustica::
     macros.push_back({ "PT_USE_RESTIR_GI", (m_settings->ActualUseReSTIRGI()) ? ("1") : ("0") });
     macros.push_back({ "PT_USE_RESTIR_PT", (m_settings->ActualUseReSTIRPT()) ? ("1") : ("0") });
 
+    const std::shared_ptr<OpacityMicromapBuilder>& opacityMaps = m_lightingPasses->opacityMaps();
+    const bool useOpacityMicromaps = opacityMaps != nullptr && opacityMaps->ShouldUseRayTracingOpacityMicromaps();
+    macros.push_back({ "CAUSTICA_ENABLE_OPACITY_MICROMAPS", useOpacityMicromaps ? "1" : "0" });
+
     macros.push_back({ "CAUSTICA_USE_APPROXIMATE_MIS", (m_settings->ActualUseApproximateMIS()) ? ("1") : ("0") });
 
     macros.push_back({ "CAUSTICA_NEE_FULL_SAMPLE_COUNT", std::to_string(m_settings->NEEFullSamples) });
@@ -101,10 +107,15 @@ void SceneRayTracingResources::createRTPipelines()
     auto compiler = pathTracingShaderCompiler();
     using SM = caustica::ShaderMacro;
     pipelineReference()         = compiler->CreateVariant("PathTracerSample.hlsl", { SM("PATH_TRACER_MODE", "PATH_TRACER_MODE_REFERENCE") }, "REF");
-    pipelineBuildStablePlanes() = compiler->CreateVariant("PathTracerSample.hlsl", { SM("PATH_TRACER_MODE", "PATH_TRACER_MODE_BUILD_STABLE_PLANES") }, "BUILD");
-    pipelineFillStablePlanes()  = compiler->CreateVariant("PathTracerSample.hlsl", { SM("PATH_TRACER_MODE", "PATH_TRACER_MODE_FILL_STABLE_PLANES") }, "FILL");
-    pipelineTestRaygenPPHDR()   = compiler->CreateVariant("TestRaygenPP.hlsl", { SM("PP_TEST_HDR", "1") }, "TESTRG", true);
-    pipelineEdgeDetection()     = compiler->CreateVariant("TestRaygenPP.hlsl", { SM("PP_EDGE_DETECTION", "1") }, "EDGY", true);
+    if (m_settings->RealtimeMode)
+    {
+        pipelineBuildStablePlanes() = compiler->CreateVariant("PathTracerSample.hlsl", { SM("PATH_TRACER_MODE", "PATH_TRACER_MODE_BUILD_STABLE_PLANES") }, "BUILD");
+        pipelineFillStablePlanes()  = compiler->CreateVariant("PathTracerSample.hlsl", { SM("PATH_TRACER_MODE", "PATH_TRACER_MODE_FILL_STABLE_PLANES") }, "FILL");
+    }
+    if (m_settings->PostProcessTestPassHDR)
+        pipelineTestRaygenPPHDR() = compiler->CreateVariant("TestRaygenPP.hlsl", { SM("PP_TEST_HDR", "1") }, "TESTRG", true);
+    if (m_settings->PostProcessEdgeDetection)
+        pipelineEdgeDetection() = compiler->CreateVariant("TestRaygenPP.hlsl", { SM("PP_EDGE_DETECTION", "1") }, "EDGY", true);
 }
 
 void SceneRayTracingResources::createBlases(nvrhi::ICommandList* commandList)
@@ -125,11 +136,21 @@ void SceneRayTracingResources::createTlas(nvrhi::ICommandList* commandList)
 
 void SceneRayTracingResources::createAccelStructs(nvrhi::ICommandList* commandList)
 {
+    info("AS rebuild: createOpacityMicromaps begin");
     m_lightingPasses->createOpacityMicromaps(*m_sceneManager->getScene());
+    info("AS rebuild: createOpacityMicromaps end");
+    info("AS rebuild: createBlases begin");
     createBlases(commandList);
+    info("AS rebuild: createBlases end");
+    info("AS rebuild: createTlas begin");
     createTlas(commandList);
+    info("AS rebuild: createTlas end");
     if (m_additionalAccelStructBuilder)
+    {
+        info("AS rebuild: additional builder begin");
         m_additionalAccelStructBuilder(commandList);
+        info("AS rebuild: additional builder end");
+    }
 }
 
 void SceneRayTracingResources::recreateAccelStructs(nvrhi::ICommandList* commandList)
@@ -140,7 +161,11 @@ void SceneRayTracingResources::recreateAccelStructs(nvrhi::ICommandList* command
     m_invalidation->AccelerationStructRebuildRequested = false;
     m_settings->ResetAccumulation = true;
 
-    m_gpuDevice->GetDevice()->waitForIdle();
+    info("AS rebuild: pre-release wait begin");
+    const bool preReleaseWaitOk = m_gpuDevice->GetDevice()->waitForIdle();
+    info("AS rebuild: pre-release wait end, ok=%s", preReleaseWaitOk ? "true" : "false");
+    if (!preReleaseWaitOk)
+        return;
 
     m_worldRenderer->invalidateBindingSet();
     m_renderCore->accelStructs().releaseGpuResources();
@@ -150,8 +175,11 @@ void SceneRayTracingResources::recreateAccelStructs(nvrhi::ICommandList* command
     commandList->open();
     createAccelStructs(commandList);
     commandList->close();
+    info("AS rebuild: execute command list");
     m_gpuDevice->GetDevice()->executeCommandList(commandList);
-    m_gpuDevice->GetDevice()->waitForIdle();
+    info("AS rebuild: post-build wait begin");
+    const bool postBuildWaitOk = m_gpuDevice->GetDevice()->waitForIdle();
+    info("AS rebuild: post-build wait end, ok=%s", postBuildWaitOk ? "true" : "false");
 }
 
 void SceneRayTracingResources::requestMeshAccelRebuild(const std::shared_ptr<caustica::MeshInfo>& mesh)

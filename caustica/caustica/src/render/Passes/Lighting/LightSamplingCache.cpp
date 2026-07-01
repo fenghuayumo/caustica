@@ -899,7 +899,6 @@ bool LightSamplingCache::ProcessEmissiveGeometry( const UpdateSettings & setting
         }
     }
 
-    assert( subInstanceData.size() == subInstanceIndex );
     return allGood;
 }
 

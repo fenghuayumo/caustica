@@ -10,6 +10,7 @@
 #include <rhi/utils.h>
 
 #include <algorithm>
+#include <unordered_set>
 
 namespace caustica
 {
@@ -23,6 +24,12 @@ void AccelStructManager::createBlases(nvrhi::ICommandList* commandList,
                                       const Scene&         scene,
                                       const AccelStructBuildSettings& settings)
 {
+    uint32_t builtMeshCount = 0;
+    uint32_t builtGeometryCount = 0;
+    uint64_t builtTriangleCount = 0;
+    uint64_t maxMeshTriangleCount = 0;
+    std::string maxMeshName;
+
     for (const std::shared_ptr<MeshInfo>& mesh : scene.GetMeshes())
     {
         if (mesh->isSkinPrototype)
@@ -32,11 +39,35 @@ void AccelStructManager::createBlases(nvrhi::ICommandList* commandList,
 
         nvrhi::rt::AccelStructDesc blasDesc = bvh::GetMeshBlasDesc(cfg, *mesh, nullptr, false);
         assert((int)blasDesc.bottomLevelGeometries.size() < (1 << 12));
+        if (blasDesc.bottomLevelGeometries.empty())
+            continue;
+
+        uint64_t meshTriangleCount = 0;
+        for (const nvrhi::rt::GeometryDesc& geometry : blasDesc.bottomLevelGeometries)
+        {
+            if (geometry.geometryType == nvrhi::rt::GeometryType::Triangles)
+                meshTriangleCount += geometry.geometryData.triangles.indexCount / 3;
+        }
+        builtMeshCount++;
+        builtGeometryCount += static_cast<uint32_t>(blasDesc.bottomLevelGeometries.size());
+        builtTriangleCount += meshTriangleCount;
+        if (meshTriangleCount > maxMeshTriangleCount)
+        {
+            maxMeshTriangleCount = meshTriangleCount;
+            maxMeshName = mesh->name;
+        }
 
         nvrhi::rt::AccelStructHandle as = m_device->createAccelStruct(blasDesc);
         nvrhi::utils::BuildBottomLevelAccelStruct(commandList, as, blasDesc);
         mesh->accelStruct = as;
     }
+
+    info("Queued BLAS builds: meshes=%u, geometries=%u, triangles=%llu, maxMeshTriangles=%llu, maxMesh='%s'",
+        builtMeshCount,
+        builtGeometryCount,
+        static_cast<unsigned long long>(builtTriangleCount),
+        static_cast<unsigned long long>(maxMeshTriangleCount),
+        maxMeshName.c_str());
 }
 
 void AccelStructManager::createTlas(nvrhi::ICommandList* commandList, const Scene& scene)
@@ -139,6 +170,8 @@ void AccelStructManager::rebuildDirtyMeshes(nvrhi::ICommandList*            comm
         nvrhi::rt::AccelStructDesc blasDesc = bvh::GetMeshBlasDesc(cfg, *mesh, nullptr, false);
         blasDesc.buildFlags = nvrhi::rt::AccelStructBuildFlags::PreferFastBuild;
         assert((int)blasDesc.bottomLevelGeometries.size() < (1 << 12));
+        if (blasDesc.bottomLevelGeometries.empty())
+            continue;
 
         nvrhi::rt::AccelStructHandle as = m_device->createAccelStruct(blasDesc);
         nvrhi::utils::BuildBottomLevelAccelStruct(commandList, as, blasDesc);
@@ -157,6 +190,11 @@ void AccelStructManager::updateSkinnedBlases(nvrhi::ICommandList*            com
                                              uint32_t                        frameIndex) const
 {
     commandList->beginMarker("Skinned BLAS Updates");
+    uint32_t skinnedUpdateCount = 0;
+    uint32_t skippedEmptySkinnedUpdateCount = 0;
+    uint32_t skippedDuplicateSkinnedUpdateCount = 0;
+    std::unordered_set<const MeshInfo*> preparedSkinnedMeshes;
+    std::unordered_set<const MeshInfo*> updatedSkinnedMeshes;
 
     if (auto* entityWorld = scene.GetEntityWorld())
     {
@@ -168,6 +206,10 @@ void AccelStructManager::updateSkinnedBlases(nvrhi::ICommandList*            com
                 || !meshComp.mesh->accelStruct
                 || !meshComp.mesh->buffers
                 || !meshComp.mesh->buffers->vertexBuffer)
+            {
+                return;
+            }
+            if (!preparedSkinnedMeshes.insert(meshComp.mesh.get()).second)
             {
                 return;
             }
@@ -190,11 +232,36 @@ void AccelStructManager::updateSkinnedBlases(nvrhi::ICommandList*            com
             {
                 return;
             }
+            if (!updatedSkinnedMeshes.insert(meshComp.mesh.get()).second)
+            {
+                skippedDuplicateSkinnedUpdateCount++;
+                return;
+            }
 
             bvh::Config cfg = { .excludeTransmissive = settings.excludeTransmissive };
             nvrhi::rt::AccelStructDesc blasDesc = bvh::GetMeshBlasDesc(cfg, *meshComp.mesh, nullptr, true);
+            if (blasDesc.bottomLevelGeometries.empty())
+            {
+                skippedEmptySkinnedUpdateCount++;
+                return;
+            }
             nvrhi::utils::BuildBottomLevelAccelStruct(commandList, meshComp.mesh->accelStruct, blasDesc);
+            skinnedUpdateCount++;
         });
+    }
+    if (skippedDuplicateSkinnedUpdateCount > 0)
+    {
+        static bool duplicateSkinnedBlasWarningShown = false;
+        if (!duplicateSkinnedBlasWarningShown)
+        {
+            warning("Skipped %u duplicate skinned BLAS updates; updated %u unique skinned meshes.",
+                skippedDuplicateSkinnedUpdateCount, skinnedUpdateCount);
+            duplicateSkinnedBlasWarningShown = true;
+        }
+    }
+    if (skippedEmptySkinnedUpdateCount > 0)
+    {
+        warning("Skipped %u empty skinned BLAS updates.", skippedEmptySkinnedUpdateCount);
     }
     commandList->endMarker();
 }

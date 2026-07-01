@@ -5,11 +5,13 @@
 #include <scene/SceneEcs.h>
 #include <backend/IDescriptorTableManager.h>
 #include <core/DescriptorHandle.h>
+#include <core/log.h>
 #include <rhi/common/misc.h>
 
 #include <cassert>
 #include <memory>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 using namespace caustica::math;
@@ -418,6 +420,9 @@ void DispatchSkinnedMeshUpdates(Scene& scene, nvrhi::ICommandList* commandList, 
 
     bool skinningMarkerPlaced = false;
     std::vector<dm::float4x4> jointMatrices;
+    std::vector<nvrhi::BufferHandle> skinnedVertexBuffersWritten;
+    std::unordered_set<const MeshInfo*> skinnedMeshesWritten;
+    uint32_t skippedDuplicateSkinnedDispatchCount = 0;
 
     for (const ecs::Entity entity : scene.GetSkinnedMeshInstances())
     {
@@ -429,6 +434,16 @@ void DispatchSkinnedMeshUpdates(Scene& scene, nvrhi::ICommandList* commandList, 
             continue;
 
         if (skinned->lastUpdateFrameIndex + 1 < frameIndex)
+            continue;
+
+        if (!skinnedMeshesWritten.insert(meshComp->mesh.get()).second)
+        {
+            skippedDuplicateSkinnedDispatchCount++;
+            continue;
+        }
+
+        const auto* ownerGlobal = world.get<scene::GlobalTransformComponent>(entity);
+        if (!ownerGlobal)
             continue;
 
         if (!skinningMarkerPlaced)
@@ -443,10 +458,6 @@ void DispatchSkinnedMeshUpdates(Scene& scene, nvrhi::ICommandList* commandList, 
             commandList->beginMarker(groupName.c_str());
 
         jointMatrices.resize(skinned->joints.size());
-
-        const auto* ownerGlobal = world.get<scene::GlobalTransformComponent>(entity);
-        if (!ownerGlobal)
-            continue;
 
         dm::daffine3 worldToRoot = inverse(ownerGlobal->transform);
 
@@ -500,13 +511,32 @@ void DispatchSkinnedMeshUpdates(Scene& scene, nvrhi::ICommandList* commandList, 
         commandList->setPushConstants(&constants, sizeof(constants));
 
         commandList->dispatch(dm::div_ceil(constants.numVertices, 256));
+        skinnedVertexBuffersWritten.push_back(skinnedBuffers->vertexBuffer);
 
         if (!groupName.empty())
             commandList->endMarker();
     }
 
+    if (!skinnedVertexBuffersWritten.empty())
+    {
+        for (const nvrhi::BufferHandle& vertexBuffer : skinnedVertexBuffersWritten)
+            commandList->setBufferState(vertexBuffer, nvrhi::ResourceStates::UnorderedAccess);
+        commandList->commitBarriers();
+    }
+
     if (skinningMarkerPlaced)
         commandList->endMarker();
+
+    if (skippedDuplicateSkinnedDispatchCount > 0)
+    {
+        static bool duplicateSkinnedDispatchWarningShown = false;
+        if (!duplicateSkinnedDispatchWarningShown)
+        {
+            caustica::warning("Skipped %u duplicate skinned mesh dispatches that shared an output mesh.",
+                skippedDuplicateSkinnedDispatchCount);
+            duplicateSkinnedDispatchWarningShown = true;
+        }
+    }
 }
 
 void UpdateGpuSceneBuffers(Scene& scene, nvrhi::ICommandList* commandList, uint32_t frameIndex, bool structureChanged, bool transformsChanged)

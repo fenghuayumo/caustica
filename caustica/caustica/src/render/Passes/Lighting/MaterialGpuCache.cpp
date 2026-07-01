@@ -1259,6 +1259,7 @@ void MaterialGpuCache::CompleteDeferredTexturesLoad(nvrhi::ICommandList* command
 {
     if (m_deferredTextureLoadInProgress)
     {
+        info("MaterialGpuCache: deferred texture flush begin");
         if (commandList != nullptr)
         {
             commandList->close();
@@ -1266,9 +1267,10 @@ void MaterialGpuCache::CompleteDeferredTexturesLoad(nvrhi::ICommandList* command
         }
 
         // In case new textures were loaded, we need to make sure they were uploaded properly
-        m_textureCache->ProcessRenderingThreadCommands(*m_commonPasses, 0.f);
+        const bool texturesFinalized = m_textureCache->ProcessRenderingThreadCommands(*m_commonPasses, 0.f);
         m_textureCache->LoadingFinished();
         m_deferredTextureLoadInProgress = false;
+        info("MaterialGpuCache: deferred texture flush end, ok=%s", texturesFinalized ? "true" : "false");
 
         if (commandList != nullptr)
         {
@@ -1368,6 +1370,7 @@ void MaterialGpuCache::BakeShaderPermutations()
 
 void MaterialGpuCache::CreateRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* bindlessLayout, std::shared_ptr<caustica::CommonRenderPasses> commonPasses, const std::shared_ptr<caustica::Scene>& scene, const std::filesystem::path& sceneFilePath, const std::filesystem::path & mediaPath )
 {
+    info("MaterialGpuCache: CreateRenderPassesAndLoadMaterials begin");
     assert(!mediaPath.empty());
     //m_bindlessLayout = bindlessLayout;
     m_commonPasses = commonPasses;
@@ -1386,6 +1389,7 @@ void MaterialGpuCache::CreateRenderPassesAndLoadMaterials(nvrhi::IBindingLayout*
 
     if (m_mediaPath == "") // first time load all
     {
+        info("MaterialGpuCache: first material load begin");
         m_mediaPath = mediaPath;
         m_sceneDirectory = sceneFilePath.parent_path();
         if (!sceneFilePath.empty() && sceneFilePath.filename() == "__CAUSTICA_INLINE_SCENE_JSON__")
@@ -1465,10 +1469,12 @@ void MaterialGpuCache::CreateRenderPassesAndLoadMaterials(nvrhi::IBindingLayout*
             caustica::warning("There were %d materials not found in RTXPT material materials folder '%s'; consider doing Scene->Materials->Advanced->Save", initializedFromEngineCount, m_materialsPath.string().c_str());
 
         m_deferredTextureLoadInProgress = true;
+        info("MaterialGpuCache: first material load end, materials=%zu", m_materials.size());
     }
 
     CompleteDeferredTexturesLoad(nullptr);
 
+    info("MaterialGpuCache: record material textures begin");
     m_uniqueNames.clear(); // must be done before InitializeUniqueDeterministicName
     for (auto& materialPT : m_materials)
     {
@@ -1480,7 +1486,11 @@ void MaterialGpuCache::CreateRenderPassesAndLoadMaterials(nvrhi::IBindingLayout*
 
         InitializeUniqueDeterministicName(materialPT);
     }
+    info("MaterialGpuCache: record material textures end, uniqueTextures=%zu", m_textures.size());
+    info("MaterialGpuCache: bake shader permutations begin");
     BakeShaderPermutations();
+    info("MaterialGpuCache: bake shader permutations end");
+    info("MaterialGpuCache: CreateRenderPassesAndLoadMaterials end");
 }
 
 // NOTE: this also handles some of the geometry data and mixed geometry&material stuff - it might be a good idea to rethink whether it needs to live outside of material baker

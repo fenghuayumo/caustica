@@ -74,10 +74,6 @@ ShaderDebug::ShaderDebug( nvrhi::IDevice* device, nvrhi::ICommandList* commandLi
 
     memset(m_initHeader.data(), 0, m_initHeader.size());
     reinterpret_cast<ShaderDebugHeader*>(m_initHeader.data())->VertexCountPerInstance = 3;  // needed for indirect draw
-    commandList->writeBuffer(m_bufferGPU, m_initHeader.data(), m_initHeader.size() );
-
-    for (int i = 0; i < c_swapchainCount; i++)
-        commandList->copyBuffer(m_bufferCPU[i], 0, m_bufferGPU, 0, SHADER_DEBUG_BUFFER_IN_BYTES_NO_TRIANGLES );
 }
 
 void ShaderDebug::CreateRenderPasses( nvrhi::IFramebuffer * frameBuffer, nvrhi::TextureHandle depthBuffer )
@@ -186,16 +182,22 @@ void ShaderDebug::EndFrameAndOutput( nvrhi::ICommandList* commandList, nvrhi::IF
 {
     RAII_SCOPE( commandList->beginMarker("ShaderDebug");, commandList->endMarker(); );
 
-    // map and copy CPU side buffer so we can process it (later)
-    void* pData = m_device->mapBuffer(m_bufferCPU[m_currentBufferIndex], nvrhi::CpuAccessMode::Read);
-    memcpy(&m_lastBuffer, pData, SHADER_DEBUG_BUFFER_IN_BYTES_NO_TRIANGLES); assert( m_lastBuffer.size() == SHADER_DEBUG_BUFFER_IN_BYTES_NO_TRIANGLES );
-    m_device->unmapBuffer(m_bufferCPU[m_currentBufferIndex]);
+    const bool hadReadbackHistory = m_hasReadbackHistory;
+    if (hadReadbackHistory)
+    {
+        // map and copy CPU side buffer so we can process it (later)
+        void* pData = m_device->mapBuffer(m_bufferCPU[m_currentBufferIndex], nvrhi::CpuAccessMode::Read);
+        memcpy(&m_lastBuffer, pData, SHADER_DEBUG_BUFFER_IN_BYTES_NO_TRIANGLES); assert( m_lastBuffer.size() == SHADER_DEBUG_BUFFER_IN_BYTES_NO_TRIANGLES );
+        m_device->unmapBuffer(m_bufferCPU[m_currentBufferIndex]);
+    }
 
     // copy latest GPU side buffer 
     commandList->copyBuffer(m_bufferCPU[m_currentBufferIndex], 0, m_bufferGPU, 0, SHADER_DEBUG_BUFFER_IN_BYTES_NO_TRIANGLES );
+    m_hasReadbackHistory = true;
     m_currentBufferIndex = (m_currentBufferIndex+1)%c_swapchainCount;
 
-    OutputLastBufferPrints();
+    if (hadReadbackHistory)
+        OutputLastBufferPrints();
     
     DrawCurrentBufferGeometry(commandList, frameBuffer, depthBuffer, viewport );
 

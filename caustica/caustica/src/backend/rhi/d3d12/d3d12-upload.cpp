@@ -1,6 +1,7 @@
 #include "d3d12-backend.h"
 
 #include <rhi/common/misc.h>
+#include <algorithm>
 #include <sstream>
 
 namespace nvrhi::d3d12
@@ -25,7 +26,7 @@ namespace nvrhi::d3d12
         assert(pQueue);
     }
 
-    std::shared_ptr<BufferChunk> UploadManager::createChunk(size_t size) const
+    std::shared_ptr<BufferChunk> UploadManager::createChunk(size_t size)
     {
         auto chunk = std::make_shared<BufferChunk>();
 
@@ -53,19 +54,34 @@ namespace nvrhi::d3d12
             IID_PPV_ARGS(&chunk->buffer));
 
         if (FAILED(hr))
+        {
+            std::stringstream ss;
+            ss << "CreateCommittedResource failed for "
+                << (m_IsScratchBuffer ? "DXR scratch" : "upload")
+                << " chunk, size=" << size
+                << ", HRESULT=0x" << std::hex << hr;
+            m_Context.error(ss.str());
             return nullptr;
+        }
 
         if (!m_IsScratchBuffer)
         {
             hr = chunk->buffer->Map(0, nullptr, &chunk->cpuVA);
 
             if (FAILED(hr))
+            {
+                std::stringstream ss;
+                ss << "Map failed for upload chunk, size=" << size
+                    << ", HRESULT=0x" << std::hex << hr;
+                m_Context.error(ss.str());
                 return nullptr;
+            }
         }
 
         chunk->bufferSize = size;
         chunk->gpuVA = chunk->buffer->GetGPUVirtualAddress();
         chunk->identifier = uint32_t(m_ChunkPool.size());
+        m_AllocatedMemory += size;
 
         std::wstringstream wss;
         if (m_IsScratchBuffer)
@@ -182,6 +198,22 @@ namespace nvrhi::d3d12
                         return false;
                     }
 
+                    if (VersionGetSubmitted(bestChunk->version))
+                    {
+                        uint64_t latestCompletedInstance = m_Queue->updateLastCompletedInstance();
+                        const uint64_t chunkInstance = VersionGetInstance(bestChunk->version);
+                        if (chunkInstance > latestCompletedInstance)
+                        {
+                            HANDLE waitEvent = CreateEvent(nullptr, false, false, nullptr);
+                            if (!waitEvent)
+                                return false;
+
+                            WaitForFence(m_Queue->fence, chunkInstance, waitEvent);
+                            CloseHandle(waitEvent);
+                            m_Queue->lastCompletedInstance = std::max(m_Queue->lastCompletedInstance, chunkInstance);
+                        }
+                    }
+
                     // Move the found chunk from the pool to the current chunk
                     m_ChunkPool.erase(std::find(m_ChunkPool.begin(), m_ChunkPool.end(), bestChunk));
                     m_CurrentChunk = bestChunk;
@@ -202,6 +234,8 @@ namespace nvrhi::d3d12
             else
             {
                 m_CurrentChunk = createChunk(sizeToAllocate);
+                if (!m_CurrentChunk)
+                    return false;
             }
         }
 
@@ -216,7 +250,10 @@ namespace nvrhi::d3d12
         return true;
     }
 
-    void UploadManager::submitChunks(uint64_t currentVersion, uint64_t submittedVersion)
+    void UploadManager::submitChunks(
+        uint64_t currentVersion,
+        uint64_t submittedVersion,
+        std::vector<std::shared_ptr<BufferChunk>>* referencedChunks)
     {
         if (m_CurrentChunk)
         {
@@ -227,7 +264,11 @@ namespace nvrhi::d3d12
         for (const auto& chunk : m_ChunkPool)
         {
             if (chunk->version == currentVersion)
+            {
                 chunk->version = submittedVersion;
+                if (referencedChunks)
+                    referencedChunks->push_back(chunk);
+            }
         }
     }
 } // namespace nvrhi::d3d12

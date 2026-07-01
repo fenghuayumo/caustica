@@ -3,6 +3,7 @@
 #include <cstdarg>
 #include <iterator>
 #include <mutex>
+#include <utility>
 #if _WIN32
 #include <Windows.h>
 #endif
@@ -64,9 +65,15 @@ namespace caustica
             if (g_OutputToConsole)
             {
                 if (severity == Severity::Error || severity == Severity::Fatal)
+                {
                     fprintf(stderr, "%s\n", buf);
+                    fflush(stderr);
+                }
                 else
+                {
                     fprintf(stdout, "%s\n", buf);
+                    fflush(stdout);
+                }
             }
         }
 
@@ -89,7 +96,7 @@ namespace caustica
 
     void SetCallback(Callback func)
     {
-        g_Callback = func;
+        g_Callback = func ? std::move(func) : Callback(&DefaultCallback);
     }
 
 	Callback GetCallback()
@@ -134,7 +141,7 @@ namespace caustica
         va_start(args, fmt);
         vsnprintf(buffer, std::size(buffer), fmt, args);
 
-        g_Callback(severity, buffer);
+        (g_Callback ? g_Callback : Callback(&DefaultCallback))(severity, buffer);
 
         va_end(args);
     }
@@ -149,7 +156,7 @@ namespace caustica
         va_start(args, fmt);
         vsnprintf(buffer, std::size(buffer), fmt, args);
 
-        g_Callback(Severity::Debug, buffer);
+        (g_Callback ? g_Callback : Callback(&DefaultCallback))(Severity::Debug, buffer);
 
         va_end(args);
     }
@@ -164,7 +171,7 @@ namespace caustica
         va_start(args, fmt);
         vsnprintf(buffer, std::size(buffer), fmt, args);
 
-        g_Callback(Severity::Info, buffer);
+        (g_Callback ? g_Callback : Callback(&DefaultCallback))(Severity::Info, buffer);
 
         va_end(args);
     }
@@ -179,7 +186,7 @@ namespace caustica
         va_start(args, fmt);
         vsnprintf(buffer, std::size(buffer), fmt, args);
 
-        g_Callback(Severity::Warning, buffer);
+        (g_Callback ? g_Callback : Callback(&DefaultCallback))(Severity::Warning, buffer);
 
         va_end(args);
     }
@@ -194,7 +201,7 @@ namespace caustica
         va_start(args, fmt);
         vsnprintf(buffer, std::size(buffer), fmt, args);
 
-        g_Callback(Severity::Error, buffer);
+        (g_Callback ? g_Callback : Callback(&DefaultCallback))(Severity::Error, buffer);
 
         va_end(args);
     }
@@ -206,7 +213,7 @@ namespace caustica
         va_start(args, fmt);
         vsnprintf(buffer, std::size(buffer), fmt, args);
 
-        g_Callback(Severity::Fatal, buffer);
+        (g_Callback ? g_Callback : Callback(&DefaultCallback))(Severity::Fatal, buffer);
 
         va_end(args);
     }

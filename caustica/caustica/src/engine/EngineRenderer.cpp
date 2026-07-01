@@ -170,7 +170,7 @@ void EngineRenderer::shutdown()
 void EngineRenderer::createShaderFactory(GpuDevice& gpuDevice)
 {
     const char* shaderTypeName = GetShaderTypeName(gpuDevice.GetGraphicsAPI());
-    const std::filesystem::path appDirectory = GetDirectoryWithExecutable();
+    const std::filesystem::path appDirectory = GetRuntimeDirectory();
     const std::filesystem::path engineShaderPath = appDirectory / "ShaderPrecompiled/engine" / shaderTypeName;
     const std::filesystem::path appShaderPath = appDirectory / "ShaderPrecompiled/caustica" / shaderTypeName;
     const std::filesystem::path nrdShaderPath = appDirectory / "ShaderPrecompiled/nrd" / shaderTypeName;

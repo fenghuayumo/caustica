@@ -41,6 +41,7 @@ private:
     nvrhi::BindingSetHandle         m_geometryBindingSet;
 
     nvrhi::TextureHandle            m_debugVizOutput;
+    bool                            m_hasReadbackHistory = false;
 
     nvrhi::ShaderHandle             m_blendDebugVizPS;
     nvrhi::GraphicsPipelineHandle   m_blendDebugVizPSO;

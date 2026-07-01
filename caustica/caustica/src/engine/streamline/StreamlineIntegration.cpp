@@ -962,6 +962,8 @@ void StreamlineIntegration::SetDLSSGOptions(const DLSSGOptions& options)
         return;
     }
 
+    WaitForDLSSGInputsProcessing();
+
     sl::DLSSGOptions slOptions;
     slOptions.mode = (sl::DLSSGMode)options.mode;
     slOptions.numFramesToGenerate = options.numFramesToGenerate;
@@ -994,6 +996,8 @@ void StreamlineIntegration::GetDLSSGState(DLSSGState& state, const DLSSGOptions&
         caustica::warning("SL not initialised or DLSSG not available.");
         return;
     }
+
+    WaitForDLSSGInputsProcessing();
 
     sl::DLSSGOptions slOptions;
     slOptions.mode = (sl::DLSSGMode)options.mode;
@@ -1035,6 +1039,10 @@ void StreamlineIntegration::GetDLSSGState(DLSSGState& state, const DLSSGOptions&
     state.bIsVsyncSupportAvailable = slState.bIsVsyncSupportAvailable;
     state.inputsProcessingCompletionFence = slState.inputsProcessingCompletionFence;
     state.lastPresentInputsProcessingCompletionFenceValue = slState.lastPresentInputsProcessingCompletionFenceValue;
+
+    m_dlssgInputsProcessingCompletionFence = slState.inputsProcessingCompletionFence;
+    m_dlssgLastPresentInputsProcessingCompletionFenceValue = slState.lastPresentInputsProcessingCompletionFenceValue;
+    WaitForDLSSGInputsProcessing();
 }
 
 void StreamlineIntegration::CleanupDLSSG(bool wfi)
@@ -1056,9 +1064,54 @@ void StreamlineIntegration::CleanupDLSSG(bool wfi)
         m_device->waitForIdle();
     }
 
+    WaitForDLSSGInputsProcessing();
+
     sl::Result status = slFreeResources(sl::kFeatureDLSS_G, m_viewport);
     // if we've never ran the feature on this viewport, this call may return 'eErrorInvalidParameter'
     assert(status == sl::Result::eOk || status == sl::Result::eErrorInvalidParameter);
+
+    m_dlssgInputsProcessingCompletionFence = nullptr;
+    m_dlssgLastPresentInputsProcessingCompletionFenceValue = 0;
+}
+
+void StreamlineIntegration::WaitForDLSSGInputsProcessing()
+{
+    if (!m_dlssgInputsProcessingCompletionFence || m_dlssgLastPresentInputsProcessingCompletionFenceValue == 0)
+        return;
+
+#if CAUSTICA_WITH_DX12
+    if (m_api == nvrhi::GraphicsAPI::D3D12)
+    {
+        auto* fence = static_cast<ID3D12Fence*>(m_dlssgInputsProcessingCompletionFence);
+        const uint64_t value = m_dlssgLastPresentInputsProcessingCompletionFenceValue;
+        const uint64_t completed = fence->GetCompletedValue();
+        if (completed == UINT64_MAX || completed >= value)
+            return;
+
+        HANDLE event = CreateEvent(nullptr, false, false, nullptr);
+        if (!event)
+        {
+            caustica::warning("DLSS-G input processing fence wait skipped: CreateEvent failed.");
+            return;
+        }
+
+        const HRESULT hr = fence->SetEventOnCompletion(value, event);
+        if (SUCCEEDED(hr))
+        {
+            WaitForSingleObject(event, INFINITE);
+        }
+        else
+        {
+            caustica::warning("DLSS-G input processing fence wait skipped: HRESULT = 0x%08x", hr);
+        }
+
+        CloseHandle(event);
+        return;
+    }
+#endif
+
+    if (m_device)
+        m_device->waitForIdle();
 }
 
 sl::Resource StreamlineIntegration::AllocateResourceCallback(const sl::ResourceAllocationDesc* resDesc, void* device)

@@ -731,12 +731,21 @@ namespace nvrhi::d3d12
 
         // Create the RS object
 
+        HRESULT removedBeforeCreate = m_Context.device->GetDeviceRemovedReason();
         res = m_Context.device->CreateRootSignature(0, rsBlob->GetBufferPointer(), rsBlob->GetBufferSize(), IID_PPV_ARGS(&rootsig->handle));
 
         if (FAILED(res))
         {
             std::stringstream ss;
-            ss << "CreateRootSignature call failed, HRESULT = 0x" << std::hex << std::setw(8) << res;
+            HRESULT removedAfterCreate = m_Context.device->GetDeviceRemovedReason();
+            ss << "CreateRootSignature call failed, HRESULT = 0x" << std::hex << std::setw(8) << res
+                << ", removedBefore = 0x" << std::setw(8) << removedBeforeCreate
+                << ", removedAfter = 0x" << std::setw(8) << removedAfterCreate
+                << ", rootParameters = " << std::dec << rootParameters.size()
+                << ", customParameters = " << numCustomParameters
+                << ", pipelineLayouts = " << pipelineLayouts.size()
+                << ", isLocal = " << (isLocal ? "true" : "false")
+                << ", allowInputLayout = " << (allowInputLayout ? "true" : "false");
             m_Context.error(ss.str());
 
             return nullptr;

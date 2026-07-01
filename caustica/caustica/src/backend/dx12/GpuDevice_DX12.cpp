@@ -206,7 +206,22 @@ bool GpuDevice_DX12::CreateDevice()
         else
             caustica::warning("Cannot enable GPU-based validation, ID3D12Debug3 is not available.");
     }
-    
+
+    {
+        RefCountPtr<ID3D12DeviceRemovedExtendedDataSettings1> dredSettings;
+        HRESULT hr = D3D12GetDebugInterface(IID_PPV_ARGS(&dredSettings));
+
+        if (SUCCEEDED(hr))
+        {
+            dredSettings->SetAutoBreadcrumbsEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
+            dredSettings->SetPageFaultEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
+        }
+        else
+        {
+            caustica::warning("Cannot enable DRED, ID3D12DeviceRemovedExtendedDataSettings1 is not available.");
+        }
+    }
+
     int adapterIndex = m_DeviceParams.adapterIndex;
 
 #if CAUSTICA_WITH_STREAMLINE

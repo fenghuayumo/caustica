@@ -18,7 +18,7 @@
 using namespace caustica;
 
 #define BAKER_ENABLE_MULTITHREADED_COMPILE_SHADER 1
-#define BAKER_ENABLE_MULTITHREADED_COMPILE_PSO 1
+#define BAKER_ENABLE_MULTITHREADED_COMPILE_PSO 0
 
 // this will add pipeline variant's m_shortUniqueDebugID to raygen/miss and m_shortUniqueDebugID + material permutation name to all closesthit and anyhit shaders
 // this is very useful for debugging
@@ -206,17 +206,10 @@ void PTPipelineVariant::CompileIfNeeded_Enqueue(std::filesystem::file_time_type 
         //command += " -Gfp";             //  Avoid flow control
         command += " -all_resources_bound";
         hashCommand += " -all_resources_bound";
-#if CAUSTICA_D3D_AGILITY_SDK_VERSION >= 619
-        command += " -T lib_6_9";
-        hashCommand += " -T lib_6_9";
-        //command += " -disable-payload-qualifiers";
-        //command += " -Vd";
-#else
         command += " -T lib_6_6";
         hashCommand += " -T lib_6_6";
         command += " -enable-payload-qualifiers";
         hashCommand += " -enable-payload-qualifiers";
-#endif
         
         command += " -D ENABLE_DEBUG_PRINT"; // <- some issues with Linux and SPIRV? need to test this; also - test perf implications
         hashCommand += " -D ENABLE_DEBUG_PRINT";
@@ -387,7 +380,15 @@ void PTPipelineVariant::UpdateFinalize()
         pipelineDesc.globalBindingLayouts = { baker->GetBindingLayout(), baker->GetBindlessLayout() };
         pipelineDesc.shaders.push_back({ "", m_raygen.ShaderLibrary->getShader(rayGenName.c_str(), nvrhi::ShaderType::RayGeneration), nullptr });
         pipelineDesc.shaders.push_back({ "", m_raygen.ShaderLibrary->getShader(missName.c_str(), nvrhi::ShaderType::Miss), nullptr });
-        pipelineDesc.allowOpacityMicromaps = true;
+        pipelineDesc.allowOpacityMicromaps = false;
+        for (const auto& macro : m_combinedMacros)
+        {
+            if (macro.name == "CAUSTICA_ENABLE_OPACITY_MICROMAPS")
+            {
+                pipelineDesc.allowOpacityMicromaps = macro.definition == "1";
+                break;
+            }
+        }
         
         if (!m_rayGenOnly)
         for (auto& [_, hitGroupInfo] : baker->GetUniqueHitGroups())
@@ -417,7 +418,16 @@ void PTPipelineVariant::UpdateFinalize()
         pipelineDesc.maxRecursionDepth = 1; // 1 is enough if using inline visibility rays
         
         // NV HLSL extensions - DX12 only - we should probably expose some form of GetNvapiIsInitialized instead
-        if (baker->IsNVAPIShaderExtensionEnabled())
+        bool usesNvapiHitObjectExtension = false;
+        for (const auto& macro : m_combinedMacros)
+        {
+            if (macro.name == "USE_NVAPI_HIT_OBJECT_EXTENSION")
+            {
+                usesNvapiHitObjectExtension = macro.definition == "1";
+                break;
+            }
+        }
+        if (usesNvapiHitObjectExtension && baker->IsNVAPIShaderExtensionEnabled())
             pipelineDesc.hlslExtensionsUAV = NV_SHADER_EXTN_SLOT_NUM;
 
         m_pipeline = baker->GetDevice()->createRayTracingPipeline(pipelineDesc);
@@ -674,7 +684,6 @@ void PathTracingShaderCompiler::Update(const std::shared_ptr<caustica::Scene>& s
         if (m_parallelCompileListUnique.size()>0)
             progressCompilingShaders.Start( StringFormat("Compiling shaders (%d)...", progressTotal).c_str() );
 
-
         for (auto it : m_parallelCompileListUnique)
         {
             PTPipelineVariant::ShaderPermutation* permutation = it.second;
@@ -695,7 +704,7 @@ void PathTracingShaderCompiler::Update(const std::shared_ptr<caustica::Scene>& s
 #endif
         }
 
-        // wait for all to complete
+// wait for all to complete
 #if BAKER_ENABLE_MULTITHREADED_COMPILE_SHADER
         m_threadPool.WaitForTasks();
 #endif
@@ -737,7 +746,7 @@ void PathTracingShaderCompiler::Update(const std::shared_ptr<caustica::Scene>& s
             for (const std::shared_ptr<PTPipelineVariant>& variant : updateQueue)
             {
     #if BAKER_ENABLE_MULTITHREADED_COMPILE_PSO
-                m_threadPool.AddTask([this, &variant, &progressCompilingPSOs, &progressCounterCompleted, progressTotal ](){
+                m_threadPool.AddTask([this, variant, &progressCompilingPSOs, &progressCounterCompleted, progressTotal ](){
     #endif
                 variant->UpdateFinalize();
                 int completed = progressCounterCompleted.fetch_add(1)+1;
@@ -776,7 +785,7 @@ void PathTracingShaderCompiler::Update(const std::shared_ptr<caustica::Scene>& s
         {
             break;
         }
-        
+
     } while (true);
 }
 

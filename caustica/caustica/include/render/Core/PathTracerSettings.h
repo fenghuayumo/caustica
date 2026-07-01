@@ -293,8 +293,8 @@ struct PathTracerSettings
 
     int                                 EnvironmentMapDiffuseSampleMIPLevel = 2;
 
-    bool                                NVAPIHitObjectExtension = true;
-    bool                                NVAPIReorderThreads     = true;
+    bool                                NVAPIHitObjectExtension = false;
+    bool                                NVAPIReorderThreads     = false;
 
     bool                                DXHitObjectExtension    = false;
     bool                                DXMaybeReorderThreads   = true;

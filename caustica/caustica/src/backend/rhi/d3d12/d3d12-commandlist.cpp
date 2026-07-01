@@ -339,8 +339,8 @@ namespace nvrhi::d3d12
         m_StateTracker.commandListSubmitted();
 
         uint64_t submittedVersion = MakeVersion(instance->submittedInstance, m_Desc.queueType, true);
-        m_UploadManager.submitChunks(m_RecordingVersion, submittedVersion);
-        m_DxrScratchManager.submitChunks(m_RecordingVersion, submittedVersion);
+        m_UploadManager.submitChunks(m_RecordingVersion, submittedVersion, &instance->referencedUploadChunks);
+        m_DxrScratchManager.submitChunks(m_RecordingVersion, submittedVersion, &instance->referencedScratchChunks);
         m_RecordingVersion = 0;
         
         return instance;

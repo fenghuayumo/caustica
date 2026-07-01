@@ -1,5 +1,6 @@
 #pragma once
 
+#include <core/log.h>
 #include <scene/SceneTypes.h>
 #include <rhi/nvrhi.h>
 #include <render/Passes/Lighting/MaterialGpuCache.h>
@@ -22,6 +23,80 @@ namespace bvh
         uint32_t ommArrayDataBufferOffset = 0;
     };
 
+    static bool IsValidTriangleGeometryForBlas(const caustica::MeshInfo& mesh, const caustica::MeshGeometry& geometry)
+    {
+        if (geometry.type != caustica::MeshGeometryPrimitiveType::Triangles)
+            return false;
+
+        if (geometry.numIndices == 0 || geometry.numVertices == 0)
+            return false;
+
+        if ((geometry.numIndices % 3) != 0)
+        {
+            caustica::warning("Skipping BLAS geometry '%s': index count %u is not divisible by 3.",
+                mesh.name.c_str(), geometry.numIndices);
+            return false;
+        }
+
+        if (!mesh.buffers || !mesh.buffers->indexBuffer || !mesh.buffers->vertexBuffer)
+            return false;
+
+        const nvrhi::BufferDesc& indexBufferDesc = mesh.buffers->indexBuffer->getDesc();
+        const nvrhi::BufferDesc& vertexBufferDesc = mesh.buffers->vertexBuffer->getDesc();
+        const nvrhi::BufferRange& positionRange = mesh.buffers->getVertexBufferRange(caustica::VertexAttribute::Position);
+
+        if (positionRange.byteSize == 0)
+            return false;
+
+        const uint64_t indexStart = uint64_t(mesh.indexOffset + geometry.indexOffsetInMesh) * sizeof(uint32_t);
+        const uint64_t indexEnd = indexStart + uint64_t(geometry.numIndices) * sizeof(uint32_t);
+        if (indexEnd > indexBufferDesc.byteSize)
+        {
+            caustica::warning("Skipping BLAS geometry '%s': index range [%llu, %llu) exceeds index buffer size %llu.",
+                mesh.name.c_str(),
+                static_cast<unsigned long long>(indexStart),
+                static_cast<unsigned long long>(indexEnd),
+                static_cast<unsigned long long>(indexBufferDesc.byteSize));
+            return false;
+        }
+
+        const uint64_t vertexStart = positionRange.byteOffset
+            + uint64_t(mesh.vertexOffset + geometry.vertexOffsetInMesh) * sizeof(dm::float3);
+        const uint64_t vertexEnd = vertexStart + uint64_t(geometry.numVertices) * sizeof(dm::float3);
+        const uint64_t positionRangeEnd = positionRange.byteOffset + positionRange.byteSize;
+        if (vertexEnd > vertexBufferDesc.byteSize || vertexEnd > positionRangeEnd)
+        {
+            caustica::warning("Skipping BLAS geometry '%s': position range [%llu, %llu) exceeds vertex buffer size %llu or position range end %llu.",
+                mesh.name.c_str(),
+                static_cast<unsigned long long>(vertexStart),
+                static_cast<unsigned long long>(vertexEnd),
+                static_cast<unsigned long long>(vertexBufferDesc.byteSize),
+                static_cast<unsigned long long>(positionRangeEnd));
+            return false;
+        }
+
+        if (!mesh.buffers->indexData.empty())
+        {
+            const uint64_t indexDataStart = uint64_t(mesh.indexOffset + geometry.indexOffsetInMesh);
+            const uint64_t indexDataEnd = indexDataStart + geometry.numIndices;
+            if (indexDataEnd <= mesh.buffers->indexData.size())
+            {
+                uint32_t maxIndex = 0;
+                for (uint64_t indexIt = indexDataStart; indexIt < indexDataEnd; ++indexIt)
+                    maxIndex = std::max(maxIndex, mesh.buffers->indexData[size_t(indexIt)]);
+
+                if (maxIndex >= geometry.numVertices)
+                {
+                    caustica::warning("Skipping BLAS geometry '%s': max index %u exceeds geometry vertex count %u.",
+                        mesh.name.c_str(), maxIndex, geometry.numVertices);
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
     static nvrhi::rt::AccelStructDesc GetMeshBlasDesc(
         const Config& cfg,
         const caustica::MeshInfo& mesh,
@@ -39,6 +114,8 @@ namespace bvh
         {
             const caustica::MeshGeometry* geometry = mesh.geometries[geomIt].get();
             if (!geometry)
+                continue;
+            if (!IsValidTriangleGeometryForBlas(mesh, *geometry))
                 continue;
 
             nvrhi::rt::GeometryDesc geometryDesc;
@@ -59,13 +136,7 @@ namespace bvh
 
             if ((cfg.excludeTransmissive && isTransmissive) || skipRender)
             {
-                constexpr float nan = std::numeric_limits<float>::quiet_NaN();
-                constexpr nvrhi::rt::AffineTransform c_NanTransform = {
-                        nan, nan, nan, nan,
-                        nan, nan, nan, nan,
-                        nan, nan, nan, nan
-                };
-                geometryDesc.setTransform(c_NanTransform);
+                continue;
             }
 
             if (ommAttachment)
@@ -95,7 +166,7 @@ namespace bvh
         }
         else
         {
-            blasDesc.buildFlags = nvrhi::rt::AccelStructBuildFlags::PreferFastTrace | nvrhi::rt::AccelStructBuildFlags::AllowCompaction; // | nvrhi::rt::AccelStructBuildFlags::MinimizeMemory;
+            blasDesc.buildFlags = nvrhi::rt::AccelStructBuildFlags::PreferFastTrace; // | nvrhi::rt::AccelStructBuildFlags::MinimizeMemory;
         }
 
         return blasDesc;

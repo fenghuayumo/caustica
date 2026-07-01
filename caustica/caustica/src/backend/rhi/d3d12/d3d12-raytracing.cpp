@@ -1477,6 +1477,10 @@ namespace nvrhi::d3d12
         {
             std::ostringstream ss;
             ss << "Failed to create a DXR pipeline state object, HRESULT = 0x" << std::hex << std::setw(8) << hr;
+#if NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP
+            ss << ", allowOpacityMicromaps=" << (desc.allowOpacityMicromaps ? "true" : "false")
+                << ", opacityMicromapSupported=" << (m_OpacityMicromapSupported ? "true" : "false");
+#endif
             m_Context.error(ss.str());
             return nullptr;
         }
@@ -1978,6 +1982,7 @@ namespace nvrhi::d3d12
 
         inputs.SetGeometryDescCount((UINT)numGeometries);
         bool hasOMM = false;
+        bool requiresNvapiExtendedBuild = false;
         for (uint32_t i = 0; i < numGeometries; i++)
         {
             const auto& geometryDesc = pGeometries[i];
@@ -1998,10 +2003,19 @@ namespace nvrhi::d3d12
 
             D3D12RaytracingGeometryDesc& geomDesc = inputs.GetGeometryDesc(i);
             fillD3dGeometryDesc(geomDesc, geometryDesc, gpuVA);
-            if (geometryDesc.geometryData.triangles.opacityMicromap != nullptr)
+            if (geometryDesc.geometryType == rt::GeometryType::Triangles
+                && geometryDesc.geometryData.triangles.opacityMicromap != nullptr)
             {
                 hasOMM = true;
+                requiresNvapiExtendedBuild = true;
             }
+#if NVRHI_WITH_NVAPI_LSS
+            if (geometryDesc.geometryType == rt::GeometryType::Spheres
+                || geometryDesc.geometryType == rt::GeometryType::Lss)
+            {
+                requiresNvapiExtendedBuild = true;
+            }
+#endif
         }
 #if NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP
         if (hasOMM)
@@ -2087,7 +2101,8 @@ namespace nvrhi::d3d12
 
 #if NVRHI_WITH_NVAPI_OPACITY_MICROMAP || NVRHI_WITH_NVAPI_LSS
         d3d12::Device* d3d12Device = checked_cast<d3d12::Device*>(m_Device);
-        if (d3d12Device->GetOpacityMicromapSupported() || d3d12Device->GetLinearSweptSpheresSupported())
+        if (requiresNvapiExtendedBuild
+            && (d3d12Device->GetOpacityMicromapSupported() || d3d12Device->GetLinearSweptSpheresSupported()))
         {
             NVAPI_D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC_EX buildDesc = {};
             buildDesc.inputs = inputs.GetAs<NVAPI_D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS_EX>();

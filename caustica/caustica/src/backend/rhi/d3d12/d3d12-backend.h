@@ -709,7 +709,10 @@ namespace nvrhi::d3d12
         bool suballocateBuffer(uint64_t size, ID3D12GraphicsCommandList* pCommandList, ID3D12Resource** pBuffer, size_t* pOffset, void** pCpuVA,
             D3D12_GPU_VIRTUAL_ADDRESS* pGpuVA, uint64_t currentVersion, uint32_t alignment = 256);
 
-        void submitChunks(uint64_t currentVersion, uint64_t submittedVersion);
+        void submitChunks(
+            uint64_t currentVersion,
+            uint64_t submittedVersion,
+            std::vector<std::shared_ptr<BufferChunk>>* referencedChunks = nullptr);
 
     private:
         const Context& m_Context;
@@ -722,7 +725,7 @@ namespace nvrhi::d3d12
         std::list<std::shared_ptr<BufferChunk>> m_ChunkPool;
         std::shared_ptr<BufferChunk> m_CurrentChunk;
 
-        [[nodiscard]] std::shared_ptr<BufferChunk> createChunk(size_t size) const;
+        [[nodiscard]] std::shared_ptr<BufferChunk> createChunk(size_t size);
     };
 
     class OpacityMicromap : public RefCounter<rt::IOpacityMicromap>
@@ -918,6 +921,8 @@ namespace nvrhi::d3d12
         std::vector<RefCountPtr<StagingTexture>> referencedStagingTextures;
         std::vector<RefCountPtr<Buffer>> referencedStagingBuffers;
         std::vector<RefCountPtr<TimerQuery>> referencedTimerQueries;
+        std::vector<std::shared_ptr<BufferChunk>> referencedUploadChunks;
+        std::vector<std::shared_ptr<BufferChunk>> referencedScratchChunks;
 #ifdef NVRHI_WITH_RTXMU
         std::vector<uint64_t> rtxmuBuildIds;
         std::vector<uint64_t> rtxmuCompactionIds;

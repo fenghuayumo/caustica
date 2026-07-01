@@ -295,7 +295,7 @@ void Application::run()
     }
 
     bindFrameDriver(dm);
-    dm->m_PreviousFrameTimestamp = glfwGetTime();
+    dm->m_PreviousFrameTimestamp = GetNow(dm->m_DeviceParams.headlessDevice);
 
 #if CAUSTICA_WITH_AFTERMATH
     bool dumpingCrash = false;
@@ -304,7 +304,35 @@ void Application::run()
     Window* w = window();
     if (!w)
     {
-        caustica::error("Application::run requires a Window");
+        if (!dm->m_DeviceParams.headlessDevice)
+        {
+            caustica::error("Application::run requires a Window");
+            return;
+        }
+
+        constexpr double kHeadlessFrameTimeSeconds = 1.0 / 60.0;
+        while (true)
+        {
+            processEventQueue();
+            if (beforeFrame) beforeFrame(*dm, dm->m_FrameIndex);
+            if (!runFrame(kHeadlessFrameTimeSeconds))
+            {
+#if CAUSTICA_WITH_AFTERMATH
+                dumpingCrash = true;
+#endif
+                break;
+            }
+        }
+
+        bool ok = dm->GetDevice()->waitForIdle();
+#if CAUSTICA_WITH_AFTERMATH
+        dumpingCrash |= !ok;
+        if (dumpingCrash && dm->m_DeviceParams.enableAftermath) AftermathCrashDump::WaitForCrashDump();
+#else
+        (void)ok;
+#endif
+
+        shutdown();
         return;
     }
 

@@ -98,9 +98,16 @@ void OpacityMicromapBuilder::CreateOpacityMicromaps(const caustica::Scene& scene
 {
     m_ommBuildQueue->CancelPendingBuilds();
 
-    m_uiData.ActiveState = m_uiData.DesiredState;
     m_uiData.BuildsLeftInQueue = 0;
     m_uiData.BuildsQueued = 0;
+
+    if (!m_uiData.Enable)
+    {
+        m_uiData.ActiveState.reset();
+        return;
+    }
+
+    m_uiData.ActiveState = m_uiData.DesiredState;
 
     for (auto& mesh : scene.GetMeshes())
     {
@@ -177,6 +184,15 @@ void OpacityMicromapBuilder::DestroyOpacityMicromaps(nvrhi::ICommandList& comman
 void OpacityMicromapBuilder::BuildOpacityMicromaps(nvrhi::ICommandList& commandList, const caustica::Scene& scene)
 {
     commandList.beginMarker("OMM Updates");
+
+    if (!m_uiData.Enable)
+    {
+        m_ommBuildQueue->CancelPendingBuilds();
+        m_uiData.BuildsLeftInQueue = 0;
+        m_uiData.BuildsQueued = 0;
+        commandList.endMarker();
+        return;
+    }
 
     if (m_uiData.TriggerRebuild)
     {

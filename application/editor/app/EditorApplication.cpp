@@ -68,6 +68,21 @@ EditorApplication::StartupResult EditorApplication::startup(int argc, const char
         return StartupResult::FailToCreateDevice;
     }
 
+    const bool automatedRun = CmdLine.nonInteractive || CmdLine.captureSimple || CmdLine.captureSequence;
+    if (automatedRun)
+    {
+        FrameCallback previousAfterPresent = afterPresent;
+        afterPresent = [previousAfterPresent](caustica::GpuDevice& device, uint32_t frameIndex)
+        {
+            if (previousAfterPresent)
+                previousAfterPresent(device, frameIndex);
+
+            const bool waitOk = device.GetDevice()->waitForIdle();
+            if (!waitOk)
+                caustica::error("Automated run frame sync detected device loss after frame %u", frameIndex);
+        };
+    }
+
     m_engineRenderer = startupPathTracerSessionHost(PathTracerSessionHostParams{
         .gpuDevice = *m_GpuDevice,
         .sceneEditor = m_sceneEditor,
@@ -77,7 +92,7 @@ EditorApplication::StartupResult EditorApplication::startup(int argc, const char
         .sessionState = &m_editorUIData,
         .cmdLine = &CmdLine,
         .frameDriver = this,
-        .applyCmdLineToSessionState = CmdLine.noWindow,
+        .applyCmdLineToSessionState = CmdLine.noWindow || automatedRun,
     });
 
     if (!CmdLine.noWindow)
@@ -152,7 +167,8 @@ void EditorApplication::SampleLogCallback(caustica::Severity severity, const cha
             severity = caustica::Severity::Warning;
     }
 
-    m_DefaultLogCallback(severity, message);
+    if (m_DefaultLogCallback)
+        m_DefaultLogCallback(severity, message);
 }
 
 bool EditorApplication::IsSERSupported() const

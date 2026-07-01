@@ -102,6 +102,7 @@ private:
     uint32_t CheckNumSupportedFeatures(const sl::AdapterInfo& adapterInfo);
 
     nvrhi::Object GetNativeCommandList(nvrhi::ICommandList* commandList);
+    void WaitForDLSSGInputsProcessing();
 
     bool m_slInitialized = false;
     nvrhi::GraphicsAPI m_api = nvrhi::GraphicsAPI::D3D12;
@@ -125,6 +126,8 @@ private:
 
     sl::FrameToken* m_currentFrame = nullptr;
     sl::ViewportHandle m_viewport = {0};
+    void* m_dlssgInputsProcessingCompletionFence = nullptr;
+    uint64_t m_dlssgLastPresentInputsProcessingCompletionFenceValue = 0;
 
 public:
     // Interface for device manager
