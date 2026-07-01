@@ -34,7 +34,10 @@ ecs::Entity AttachRuntimeSceneImport(
 
     auto* entityWorld = scene->GetEntityWorld();
     ecs::Entity importedRoot = entityWorld->importSubtree(
-        entityWorld->root(), *importResult.entityWorld, importResult.rootEntity);
+        entityWorld->root(),
+        *importResult.entityWorld,
+        importResult.rootEntity,
+        scene->GetSceneTypeFactory().get());
 
     FinalizeRuntimeSceneMutation(scene, importedRoot, frameIndex, callbacks);
     return importedRoot;

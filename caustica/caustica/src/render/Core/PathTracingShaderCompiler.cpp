@@ -579,7 +579,7 @@ void PathTracingShaderCompiler::Update(const std::shared_ptr<caustica::Scene>& s
 
     std::vector<caustica::ShaderMacro> newMacros;
     globalMacrosGetter(newMacros);
-    if (!std::equal(newMacros.begin(), newMacros.end(), m_macros.begin(), m_macros.end(), macrosEqual))
+    if (newMacros.size() != m_macros.size() || !std::equal(newMacros.begin(), newMacros.end(), m_macros.begin(), macrosEqual))
     {
         needsUpdate = true;
         m_macros = newMacros;
@@ -737,7 +737,8 @@ void PathTracingShaderCompiler::Update(const std::shared_ptr<caustica::Scene>& s
         ProgressBar progressCompilingPSOs;
         progressCounterCompleted = 0;
         progressTotal = (int)updateQueue.size();
-        progressCompilingPSOs.Start( StringFormat("Compiling PSOs (%d)...", progressTotal).c_str() );
+        if (progressTotal > 0)
+            progressCompilingPSOs.Start( StringFormat("Compiling PSOs (%d)...", progressTotal).c_str() );
 
         if (!updateQueue.empty() && firstError == "")
         {

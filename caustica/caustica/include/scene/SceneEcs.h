@@ -263,7 +263,11 @@ public:
     void setGameSettings(ecs::Entity entity, const std::shared_ptr<GameSettings>& settings);
 
     // Deep-copies a subtree from another world into this one under `parent`.
-    ecs::Entity importSubtree(ecs::Entity parent, const SceneEntityWorld& source, ecs::Entity sourceRoot);
+    ecs::Entity importSubtree(
+        ecs::Entity parent,
+        const SceneEntityWorld& source,
+        ecs::Entity sourceRoot,
+        SceneTypeFactory* factory = nullptr);
 
     void applyAnimations(float time);
     void assignGlobalResourceIndices();

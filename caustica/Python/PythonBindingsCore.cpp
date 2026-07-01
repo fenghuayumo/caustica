@@ -1147,7 +1147,18 @@ void RegisterCoreBindings(nb::module_& m)
         .def_rw("fps_limiter",                   &RenderSessionState::FPSLimiter)
 
         // --- Path tracer top-level mode ----------------------------------
-        .def_rw("realtime_mode",                 &RenderSessionState::RealtimeMode,
+        .def_prop_rw("realtime_mode",
+            [](RenderSessionState& s) { return s.RealtimeMode; },
+            [](RenderSessionState& s, bool realtime) {
+                const bool wasRealtime = s.RealtimeMode;
+                s.RealtimeMode = realtime;
+                if (wasRealtime != s.RealtimeMode)
+                {
+                    s.ResetAccumulation = true;
+                    if (s.RealtimeMode)
+                        s.ResetRealtimeCaches = true;
+                }
+            },
                 "True for realtime mode, False for reference / accumulation mode.\n"
                 "See `Settings.path_tracer_mode` for an enum-flavored version.")
         .def_prop_rw("path_tracer_mode",
@@ -1156,7 +1167,11 @@ void RegisterCoreBindings(nb::module_& m)
                 bool wasRealtime = s.RealtimeMode;
                 s.RealtimeMode = (mode == 0);
                 if (wasRealtime != s.RealtimeMode)
+                {
                     s.ResetAccumulation = true;
+                    if (s.RealtimeMode)
+                        s.ResetRealtimeCaches = true;
+                }
             },
             "Convenience wrapper around `realtime_mode`.\n"
             "Set to caustica.PathTracerMode.Reference or .Realtime.")
@@ -1553,8 +1568,8 @@ void RegisterCoreBindings(nb::module_& m)
         .def("save_current_camera",  [](SceneEditor& self) { self.SaveCurrentCamera(); })
         .def("load_current_camera",  [](SceneEditor& self) { self.LoadCurrentCamera(); })
 
-        .def("request_shader_reload",  [](SceneEditor& self) { self.GetUIData().Invalidation.ShaderReloadRequested = true; })
-        .def("request_accel_rebuild",  [](SceneEditor& self) { self.GetUIData().Invalidation.AccelerationStructRebuildRequested = true; })
+        .def("request_shader_reload",  [](SceneEditor& self) { self.GetRenderSessionState().Invalidation.ShaderReloadRequested = true; })
+        .def("request_accel_rebuild",  [](SceneEditor& self) { self.GetRenderSessionState().Invalidation.AccelerationStructRebuildRequested = true; })
         .def("request_mesh_accel_rebuild",
             [](SceneEditor& self, const std::shared_ptr<MeshInfo>& mesh) {
                 self.RequestMeshAccelRebuild(mesh);
@@ -1572,14 +1587,17 @@ void RegisterCoreBindings(nb::module_& m)
             },
             nb::arg("node"),
             "Request a BLAS rebuild for the mesh attached to one scene entity.")
-        .def("reset_accumulation",     [](SceneEditor& self) { self.GetUIData().ResetAccumulation = true; })
-        .def("reset_realtime_caches",  [](SceneEditor& self) { self.GetUIData().ResetRealtimeCaches = true; })
+        .def("reset_accumulation",     [](SceneEditor& self) { self.GetRenderSessionState().ResetAccumulation = true; })
+        .def("reset_realtime_caches",  [](SceneEditor& self) { self.GetRenderSessionState().ResetRealtimeCaches = true; })
 
         .def("set_realtime_mode", [](SceneEditor& self, bool standaloneDenoiser, int realtimeAA)
             {
-                auto& ui = self.GetUIData();
+                auto& ui = self.GetRenderSessionState();
                 if (!ui.RealtimeMode)
+                {
                     ui.ResetAccumulation = true;
+                    ui.ResetRealtimeCaches = true;
+                }
                 ui.RealtimeMode      = true;
                 ui.StandaloneDenoiser = standaloneDenoiser;
                 ui.RealtimeAA         = realtimeAA;
@@ -1593,7 +1611,7 @@ void RegisterCoreBindings(nb::module_& m)
 
         .def("set_reference_mode", [](SceneEditor& self, int spp, bool oidn, int oidnQuality, int oidnPasses, int oidnPrefilter)
             {
-                auto& ui = self.GetUIData();
+                auto& ui = self.GetRenderSessionState();
                 if (ui.RealtimeMode)
                     ui.ResetAccumulation = true;
                 ui.RealtimeMode             = false;

@@ -103,6 +103,7 @@ namespace
 caustica::render::PathTracingWorldRenderer::PathTracingWorldRenderer(PathTracingContext& context)
     : m_context(context)
 {
+    m_lastRealtimeMode = m_context.settings.RealtimeMode;
 }
 
 caustica::render::PathTracingWorldRenderer::~PathTracingWorldRenderer() = default;
@@ -1185,6 +1186,15 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
     float lodBias = 0.f;
 
     preRender();
+
+    const bool realtimeModeChanged = (m_lastRealtimeMode != m_context.settings.RealtimeMode);
+    if (realtimeModeChanged)
+    {
+        m_context.settings.ResetAccumulation = true;
+        if (m_context.settings.RealtimeMode)
+            m_context.settings.ResetRealtimeCaches = true;
+        m_lastRealtimeMode = m_context.settings.RealtimeMode;
+    }
 
 #if CAUSTICA_WITH_STREAMLINE
     streamlinePreRender();

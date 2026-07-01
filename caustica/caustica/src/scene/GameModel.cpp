@@ -113,7 +113,11 @@ ModelInstance::ModelInstance(const std::string& name,
 
     if (modelType->GetEntityWorld() && ecs::isValid(modelType->GetRootEntity()))
     {
-        ecs::Entity importedRoot = world->importSubtree(m_entity, *modelType->GetEntityWorld(), modelType->GetRootEntity());
+        ecs::Entity importedRoot = world->importSubtree(
+            m_entity,
+            *modelType->GetEntityWorld(),
+            modelType->GetRootEntity(),
+            scene.GetSceneTypeFactory().get());
         if (ecs::isValid(importedRoot))
         {
             const Pose& pose = modelType->GetModelPose();

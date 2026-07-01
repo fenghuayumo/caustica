@@ -128,7 +128,8 @@ void CopyEntityComponents(
     ecs::World& dstWorld,
     ecs::Entity dstEntity,
     const ecs::World& srcWorld,
-    ecs::Entity srcEntity)
+    ecs::Entity srcEntity,
+    bool copyMeshComponents = true)
 {
     if (const auto* name = srcWorld.get<NameComponent>(srcEntity))
         dstWorld.emplace<NameComponent>(dstEntity, *name);
@@ -145,12 +146,15 @@ void CopyEntityComponents(
     if (const auto* content = srcWorld.get<SceneContentComponent>(srcEntity))
         dstWorld.emplace<SceneContentComponent>(dstEntity, *content);
 
-    if (const auto* mesh = srcWorld.get<MeshInstanceComponent>(srcEntity))
-        dstWorld.emplace<MeshInstanceComponent>(dstEntity, *mesh);
-    if (const auto* skinned = srcWorld.get<SkinnedMeshComponent>(srcEntity))
-        dstWorld.emplace<SkinnedMeshComponent>(dstEntity, *skinned);
-    if (const auto* skinnedGpu = srcWorld.get<SkinnedMeshGpuComponent>(srcEntity))
-        dstWorld.emplace<SkinnedMeshGpuComponent>(dstEntity, *skinnedGpu);
+    if (copyMeshComponents)
+    {
+        if (const auto* mesh = srcWorld.get<MeshInstanceComponent>(srcEntity))
+            dstWorld.emplace<MeshInstanceComponent>(dstEntity, *mesh);
+        if (const auto* skinned = srcWorld.get<SkinnedMeshComponent>(srcEntity))
+            dstWorld.emplace<SkinnedMeshComponent>(dstEntity, *skinned);
+        if (const auto* skinnedGpu = srcWorld.get<SkinnedMeshGpuComponent>(srcEntity))
+            dstWorld.emplace<SkinnedMeshGpuComponent>(dstEntity, *skinnedGpu);
+    }
     if (const auto* skinRef = srcWorld.get<SkinnedMeshReferenceComponent>(srcEntity))
         dstWorld.emplace<SkinnedMeshReferenceComponent>(dstEntity, *skinRef);
     if (const auto* light = srcWorld.get<LightComponent>(srcEntity))
@@ -711,7 +715,11 @@ void SceneEntityWorld::setGameSettings(ecs::Entity entity, const std::shared_ptr
     updateLeafContentAndBounds(entity);
 }
 
-ecs::Entity SceneEntityWorld::importSubtree(ecs::Entity parent, const SceneEntityWorld& source, ecs::Entity sourceRoot)
+ecs::Entity SceneEntityWorld::importSubtree(
+    ecs::Entity parent,
+    const SceneEntityWorld& source,
+    ecs::Entity sourceRoot,
+    SceneTypeFactory* factory)
 {
     if (!ecs::isValid(sourceRoot))
         return ecs::NullEntity;
@@ -729,14 +737,35 @@ ecs::Entity SceneEntityWorld::importSubtree(ecs::Entity parent, const SceneEntit
             if (srcEntity == sourceRoot)
                 newRoot = dstEntity;
 
-            CopyEntityComponents(m_world, dstEntity, source.m_world, srcEntity);
+            CopyEntityComponents(m_world, dstEntity, source.m_world, srcEntity, false);
 
-            if (auto* mesh = m_world.get<MeshInstanceComponent>(dstEntity))
+            const auto* srcMesh = source.m_world.get<MeshInstanceComponent>(srcEntity);
+            const auto* srcSkinned = source.m_world.get<SkinnedMeshComponent>(srcEntity);
+            if (srcMesh && srcMesh->mesh)
             {
-                if (mesh->mesh)
+                if (srcSkinned && srcSkinned->prototypeMesh && factory)
                 {
-                    RegisterMeshInstanceEntity(
-                        dstEntity, mesh->mesh, m_world.has<SkinnedMeshComponent>(dstEntity));
+                    setSkinnedMeshInstance(dstEntity, *factory, srcSkinned->prototypeMesh);
+
+                    if (auto* dstMesh = m_world.get<MeshInstanceComponent>(dstEntity))
+                    {
+                        std::shared_ptr<MeshInfo> skinnedMesh = dstMesh->mesh;
+                        *dstMesh = *srcMesh;
+                        dstMesh->mesh = std::move(skinnedMesh);
+                    }
+
+                    if (auto* dstSkinned = m_world.get<SkinnedMeshComponent>(dstEntity))
+                        *dstSkinned = *srcSkinned;
+                }
+                else
+                {
+                    m_world.emplace<MeshInstanceComponent>(dstEntity, *srcMesh);
+                    if (srcSkinned)
+                    {
+                        m_world.emplace<SkinnedMeshComponent>(dstEntity, *srcSkinned);
+                        m_world.emplace<SkinnedMeshGpuComponent>(dstEntity, SkinnedMeshGpuComponent{});
+                    }
+                    RegisterMeshInstanceEntity(dstEntity, srcMesh->mesh, srcSkinned != nullptr);
                 }
             }
             if (m_world.has<LightComponent>(dstEntity))

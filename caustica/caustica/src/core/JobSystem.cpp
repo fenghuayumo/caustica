@@ -192,6 +192,12 @@ uint32_t GetThreadCount()
 // ==========================================================================
 void Execute(Context& ctx, std::function<void()> task)
 {
+    if (!s_Initialized || s_NumThreads == 0)
+    {
+        task();
+        return;
+    }
+
     ctx.counter.fetch_add(1, std::memory_order_release);
 
     // Pick a worker round-robin
@@ -219,8 +225,23 @@ void Execute(Context& ctx, std::function<void()> task)
 void Dispatch(Context& ctx, uint32_t jobCount, uint32_t groupSize,
               std::function<void(JobDispatchArgs)> task)
 {
-    if (jobCount == 0 || s_NumThreads == 0)
+    if (jobCount == 0)
         return;
+
+    if (!s_Initialized || s_NumThreads == 0)
+    {
+        for (uint32_t i = 0; i < jobCount; ++i)
+        {
+            JobDispatchArgs args;
+            args.jobIndex = i;
+            args.groupID = 0;
+            args.groupIndex = i;
+            args.isFirstJobInGroup = (i == 0);
+            args.isLastJobInGroup = (i == jobCount - 1);
+            task(args);
+        }
+        return;
+    }
 
     uint32_t groupCount = GetGroupCount(jobCount, groupSize);
     ctx.counter.fetch_add(groupCount, std::memory_order_release);

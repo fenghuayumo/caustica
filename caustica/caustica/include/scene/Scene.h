@@ -112,6 +112,7 @@ namespace caustica
         static const SceneLoadingStats& GetLoadingStats();
 
         [[nodiscard]] scene::SceneEntityWorld* GetEntityWorld() const { return m_EntityWorld.get(); }
+        [[nodiscard]] const std::shared_ptr<SceneTypeFactory>& GetSceneTypeFactory() const { return m_SceneTypeFactory; }
         [[nodiscard]] dm::box3 GetSceneBounds() const;
 
         [[nodiscard]] const ResourceTracker<Material>& GetMaterials() const;

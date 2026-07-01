@@ -207,6 +207,7 @@ private:
     uint                                        m_sampleIndex = 0;
     SampleConstants                             m_currentConstants = {};
     bool                                        m_accumulationCompleted = false;
+    bool                                        m_lastRealtimeMode = true;
 
     nvrhi::TextureHandle                        m_gaussianSplatCurrentColor;
     nvrhi::TextureHandle                        m_gaussianSplatAccumulatedColor;

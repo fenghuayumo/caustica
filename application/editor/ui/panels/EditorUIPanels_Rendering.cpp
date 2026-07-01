@@ -116,8 +116,14 @@ void EditorUI::BuildPathTracerPanel(const PanelLayout& layout)
             int modeIndex = (m_ui.RealtimeMode)?(1):(0);
             if (ImGui::Combo("Mode", &modeIndex, "Reference\0Realtime\0\0"))
             {
+                const bool wasRealtimeMode = m_ui.RealtimeMode;
                 m_ui.RealtimeMode = (modeIndex!=0);
-                m_ui.ResetAccumulation = true;
+                if (wasRealtimeMode != m_ui.RealtimeMode)
+                {
+                    m_ui.ResetAccumulation = true;
+                    if (m_ui.RealtimeMode)
+                        m_ui.ResetRealtimeCaches = true;
+                }
             }
 
             ImGui::TextColored(categoryColor, "Setup:");

@@ -427,7 +427,7 @@ bool Scene::LoadWithThreadPool(const std::filesystem::path& sceneFileName, Threa
         if (!modelResult.entityWorld || !ecs::isValid(modelResult.rootEntity))
             return false;
 
-        m_EntityWorld->importSubtree(ecs::NullEntity, *modelResult.entityWorld, modelResult.rootEntity);
+        m_EntityWorld->importSubtree(ecs::NullEntity, *modelResult.entityWorld, modelResult.rootEntity, m_SceneTypeFactory.get());
         m_EntityWorld->rebuildPathsFromRoot();
     }
     else
@@ -729,7 +729,7 @@ void Scene::LoadSceneEntities(const Json::Value& nodeList, ecs::Entity parent)
             if (!loadedModel.entityWorld || !ecs::isValid(loadedModel.rootEntity))
                 continue;
 
-            entity = m_EntityWorld->importSubtree(customParent, *loadedModel.entityWorld, loadedModel.rootEntity);
+            entity = m_EntityWorld->importSubtree(customParent, *loadedModel.entityWorld, loadedModel.rootEntity, m_SceneTypeFactory.get());
         }
         else
         {
