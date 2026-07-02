@@ -587,12 +587,18 @@ void SceneEditor::Animate(float fElapsedTimeSeconds)
                     if (!animation || animation->channels.empty())
                         continue;
 
+                    const float duration = scene::GetAnimationDuration(*animation);
+                    if (duration <= 0.0f)
+                        continue;
+
                     double cutLeft = 0.0;
                     double cutRight = 0.0;
-                    const float duration = scene::GetAnimationDuration(*animation);
                     const float animTime = (float)fmod(m_sceneTime + cutLeft, duration - cutLeft - cutRight);
                     (void)scene::ApplyAnimation(*animation, animTime, *ew);
                 }
+
+                if (enableAnimations)
+                    ew->refreshHierarchy(scene::PreviousTransformPolicy::CaptureCurrent);
             }
         }
     }

@@ -99,6 +99,7 @@ std::shared_ptr<MeshInfo> CreateSkinnedMeshFromPrototype(
     skinnedMesh->name = prototypeMesh->name;
     skinnedMesh->objectSpaceBounds = prototypeMesh->objectSpaceBounds;
     skinnedMesh->indexOffset = prototypeMesh->indexOffset;
+    skinnedMesh->vertexOffset = 0;
     skinnedMesh->totalVertices = prototypeMesh->totalVertices;
     skinnedMesh->totalIndices = prototypeMesh->totalIndices;
     skinnedMesh->geometries.reserve(prototypeMesh->geometries.size());

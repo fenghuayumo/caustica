@@ -433,7 +433,8 @@ void DispatchSkinnedMeshUpdates(Scene& scene, nvrhi::ICommandList* commandList, 
         if (!skinned || !meshComp || !meshComp->mesh || !skinnedGpu || !skinned->prototypeMesh)
             continue;
 
-        if (skinned->lastUpdateFrameIndex + 1 < frameIndex)
+        if (skinned->lastUpdateFrameIndex != scene::kForceSkinnedMeshUpdateFrameIndex
+            && skinned->lastUpdateFrameIndex + 1 < frameIndex)
             continue;
 
         if (!skinnedMeshesWritten.insert(meshComp->mesh.get()).second)
@@ -511,6 +512,7 @@ void DispatchSkinnedMeshUpdates(Scene& scene, nvrhi::ICommandList* commandList, 
         commandList->setPushConstants(&constants, sizeof(constants));
 
         commandList->dispatch(dm::div_ceil(constants.numVertices, 256));
+        skinned->lastUpdateFrameIndex = frameIndex;
         skinnedVertexBuffersWritten.push_back(skinnedBuffers->vertexBuffer);
 
         if (!groupName.empty())

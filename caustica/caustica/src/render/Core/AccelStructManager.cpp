@@ -201,7 +201,8 @@ void AccelStructManager::updateSkinnedBlases(nvrhi::ICommandList*            com
         auto& world = entityWorld->world();
         world.each<scene::SkinnedMeshComponent, scene::MeshInstanceComponent>([&](ecs::Entity, scene::SkinnedMeshComponent& skinned, scene::MeshInstanceComponent& meshComp)
         {
-            if (skinned.lastUpdateFrameIndex < frameIndex
+            if (skinned.lastUpdateFrameIndex != scene::kForceSkinnedMeshUpdateFrameIndex
+                && skinned.lastUpdateFrameIndex < frameIndex
                 || !meshComp.mesh
                 || !meshComp.mesh->accelStruct
                 || !meshComp.mesh->buffers
@@ -226,7 +227,8 @@ void AccelStructManager::updateSkinnedBlases(nvrhi::ICommandList*            com
         auto& world = entityWorld->world();
         world.each<scene::SkinnedMeshComponent, scene::MeshInstanceComponent>([&](ecs::Entity, scene::SkinnedMeshComponent& skinned, scene::MeshInstanceComponent& meshComp)
         {
-            if (skinned.lastUpdateFrameIndex < frameIndex
+            if (skinned.lastUpdateFrameIndex != scene::kForceSkinnedMeshUpdateFrameIndex
+                && skinned.lastUpdateFrameIndex < frameIndex
                 || !meshComp.mesh
                 || !meshComp.mesh->accelStruct)
             {

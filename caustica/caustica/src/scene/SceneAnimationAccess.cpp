@@ -52,6 +52,23 @@ void RecalculateAnimationDuration(AnimationComponent& component)
     }
 }
 
+namespace
+{
+void MarkSkinnedMeshDirtyForTransformChannel(
+    SceneEntityWorld& world,
+    const AnimationChannelData& channel)
+{
+    if (channel.attribute != AnimationAttribute::Translation
+        && channel.attribute != AnimationAttribute::Rotation
+        && channel.attribute != AnimationAttribute::Scaling)
+    {
+        return;
+    }
+
+    world.markSkinnedMeshDirtyForJoint(channel.targetEntity);
+}
+} // namespace
+
 bool ApplyAnimationChannel(const AnimationChannelData& channel, float time, SceneEntityWorld& world)
 {
     if (channel.attribute != AnimationAttribute::LeafProperty && !ecs::isValid(channel.targetEntity))
@@ -76,6 +93,7 @@ bool ApplyAnimationChannel(const AnimationChannelData& channel, float time, Scen
     {
     case AnimationAttribute::Scaling:
         world.setScaling(channel.targetEntity, dm::double3(value.xyz()));
+        MarkSkinnedMeshDirtyForTransformChannel(world, channel);
         break;
 
     case AnimationAttribute::Rotation: {
@@ -89,12 +107,14 @@ bool ApplyAnimationChannel(const AnimationChannelData& channel, float time, Scen
         {
             quat /= len;
             world.setRotation(channel.targetEntity, quat);
+            MarkSkinnedMeshDirtyForTransformChannel(world, channel);
         }
         break;
     }
 
     case AnimationAttribute::Translation:
         world.setTranslation(channel.targetEntity, dm::double3(value.xyz()));
+        MarkSkinnedMeshDirtyForTransformChannel(world, channel);
         break;
 
     case AnimationAttribute::LeafProperty: {
@@ -148,6 +168,10 @@ bool ApplyAnimation(AnimationComponent& component, float time, SceneEntityWorld&
     bool success = true;
     for (const auto& channel : component.channels)
         success = ApplyAnimationChannel(channel, time, world) && success;
+
+    if (success)
+        world.markTransformDirty();
+
     return success;
 }
 

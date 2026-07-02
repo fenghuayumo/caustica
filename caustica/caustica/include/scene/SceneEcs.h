@@ -9,6 +9,7 @@
 #include <scene/SceneResources.h>
 #include <scene/SceneTypes.h>
 
+#include <cstdint>
 #include <memory>
 #include <filesystem>
 #include <optional>
@@ -98,6 +99,8 @@ struct MeshInstanceComponent
     std::vector<LightSamplerLink> perGeometryLightSamplerLinks;
     ecs::Entity proxiedAnalyticLight = ecs::NullEntity;
 };
+
+inline constexpr uint32_t kForceSkinnedMeshUpdateFrameIndex = UINT32_MAX;
 
 struct SkinnedMeshComponent
 {
@@ -270,6 +273,8 @@ public:
         SceneTypeFactory* factory = nullptr);
 
     void applyAnimations(float time);
+    void markTransformDirty();
+    void markSkinnedMeshDirtyForJoint(ecs::Entity jointEntity);
     void assignGlobalResourceIndices();
     void refreshInstanceIndices();
 
@@ -299,6 +304,7 @@ private:
     void systemRefreshHierarchy(ecs::World& world, const ecs::ScheduleContext& ctx);
     void systemUpdateGaussianSplatTransforms(ecs::World& world, const ecs::ScheduleContext& ctx);
     void systemMarkDirtySkinnedMeshes(ecs::World& world, const ecs::ScheduleContext& ctx);
+    void systemMarkDirtySkinnedMeshesFromChangedJoints(ecs::World& world, const ecs::ScheduleContext& ctx);
     void systemRefreshInstanceIndices(ecs::World& world, const ecs::ScheduleContext& ctx);
     void systemAssignGlobalResourceIndices(ecs::World& world, const ecs::ScheduleContext& ctx);
     void systemFinalizeFrameFlags(ecs::World& world, const ecs::ScheduleContext& ctx);

@@ -272,6 +272,8 @@ void SceneEntityWorld::ensureScheduleBuilt()
     m_schedule.addSet("PostHierarchy");
     m_schedule.addSystem("PostHierarchy", "UpdateGaussianSplatTransforms",
         [this](ecs::World& world, const ecs::ScheduleContext& ctx) { systemUpdateGaussianSplatTransforms(world, ctx); });
+    m_schedule.addSystem("PostHierarchy", "MarkDirtySkinnedMeshesFromChangedJoints",
+        [this](ecs::World& world, const ecs::ScheduleContext& ctx) { systemMarkDirtySkinnedMeshesFromChangedJoints(world, ctx); });
     m_schedule.addSystem("PostHierarchy", "MarkDirtySkinnedMeshes",
         [this](ecs::World& world, const ecs::ScheduleContext& ctx) { systemMarkDirtySkinnedMeshes(world, ctx); });
     m_schedule.addSystem("PostHierarchy", "RefreshInstanceIndices",
@@ -323,6 +325,44 @@ void SceneEntityWorld::systemMarkDirtySkinnedMeshes(ecs::World& world, const ecs
             if (auto* skinned = world.get<SkinnedMeshComponent>(ref.skinnedMeshEntity))
                 skinned->lastUpdateFrameIndex = frameIndex;
         });
+}
+
+void SceneEntityWorld::systemMarkDirtySkinnedMeshesFromChangedJoints(ecs::World& world, const ecs::ScheduleContext& ctx)
+{
+    const auto* changeDetection = m_world.getResource<ecs::ChangeDetection>();
+    if (!changeDetection)
+        return;
+
+    const uint32_t frameIndex = ctx.frameIndex;
+    const auto& registry = m_world.registry();
+
+    world.each<SkinnedMeshReferenceComponent>(
+        [&](ecs::Entity jointEntity, SkinnedMeshReferenceComponent& ref) {
+            if (!changeDetection->isChangedThisFrame<LocalTransformComponent>(jointEntity, registry))
+                return;
+            if (!ecs::isValid(ref.skinnedMeshEntity))
+                return;
+            if (auto* skinned = world.get<SkinnedMeshComponent>(ref.skinnedMeshEntity))
+                skinned->lastUpdateFrameIndex = frameIndex;
+        });
+}
+
+void SceneEntityWorld::markTransformDirty()
+{
+    m_transformDirty = true;
+}
+
+void SceneEntityWorld::markSkinnedMeshDirtyForJoint(ecs::Entity jointEntity)
+{
+    if (!ecs::isValid(jointEntity))
+        return;
+
+    const auto* ref = m_world.get<SkinnedMeshReferenceComponent>(jointEntity);
+    if (!ref || !ecs::isValid(ref->skinnedMeshEntity))
+        return;
+
+    if (auto* skinned = m_world.get<SkinnedMeshComponent>(ref->skinnedMeshEntity))
+        skinned->lastUpdateFrameIndex = kForceSkinnedMeshUpdateFrameIndex;
 }
 
 void SceneEntityWorld::systemRefreshInstanceIndices(ecs::World& /*world*/, const ecs::ScheduleContext& /*ctx*/)
@@ -725,6 +765,8 @@ ecs::Entity SceneEntityWorld::importSubtree(
         return ecs::NullEntity;
 
     std::unordered_map<ecs::Entity, ecs::Entity> entityMap;
+    std::vector<ecs::Entity> importedSkinnedEntities;
+    std::vector<ecs::Entity> importedAnimationEntities;
     ecs::Entity newRoot = ecs::NullEntity;
 
     std::function<void(ecs::Entity, ecs::Entity)> copyRecursive =
@@ -755,15 +797,22 @@ ecs::Entity SceneEntityWorld::importSubtree(
                     }
 
                     if (auto* dstSkinned = m_world.get<SkinnedMeshComponent>(dstEntity))
+                    {
                         *dstSkinned = *srcSkinned;
+                        dstSkinned->lastUpdateFrameIndex = 0;
+                    }
+                    importedSkinnedEntities.push_back(dstEntity);
                 }
                 else
                 {
                     m_world.emplace<MeshInstanceComponent>(dstEntity, *srcMesh);
                     if (srcSkinned)
                     {
-                        m_world.emplace<SkinnedMeshComponent>(dstEntity, *srcSkinned);
+                        SkinnedMeshComponent copiedSkinned = *srcSkinned;
+                        copiedSkinned.lastUpdateFrameIndex = 0;
+                        m_world.emplace<SkinnedMeshComponent>(dstEntity, std::move(copiedSkinned));
                         m_world.emplace<SkinnedMeshGpuComponent>(dstEntity, SkinnedMeshGpuComponent{});
+                        importedSkinnedEntities.push_back(dstEntity);
                     }
                     RegisterMeshInstanceEntity(dstEntity, srcMesh->mesh, srcSkinned != nullptr);
                 }
@@ -773,7 +822,10 @@ ecs::Entity SceneEntityWorld::importSubtree(
             if (m_world.has<CameraComponent>(dstEntity))
                 RegisterCameraEntity(dstEntity);
             if (m_world.has<AnimationComponent>(dstEntity))
+            {
                 RegisterAnimationEntity(dstEntity);
+                importedAnimationEntities.push_back(dstEntity);
+            }
 
             if (const auto* children = source.m_world.get<ChildrenComponent>(srcEntity))
             {
@@ -784,8 +836,15 @@ ecs::Entity SceneEntityWorld::importSubtree(
 
     copyRecursive(sourceRoot, parent);
 
-    m_world.each<SkinnedMeshComponent>([&](ecs::Entity, SkinnedMeshComponent& skinned) {
-        for (auto& joint : skinned.joints)
+    // Only remap joints on skinned meshes created by this import. Remapping all
+    // SkinnedMeshComponents causes entity-id collisions when later models are imported.
+    for (ecs::Entity skinnedEntity : importedSkinnedEntities)
+    {
+        auto* skinned = m_world.get<SkinnedMeshComponent>(skinnedEntity);
+        if (!skinned)
+            continue;
+
+        for (SkinnedMeshJoint& joint : skinned->joints)
         {
             if (!ecs::isValid(joint.jointEntity))
                 continue;
@@ -793,15 +852,18 @@ ecs::Entity SceneEntityWorld::importSubtree(
             if (it != entityMap.end())
                 joint.jointEntity = it->second;
         }
-    });
+    }
 
-    m_world.each<SkinnedMeshReferenceComponent>([&](ecs::Entity, SkinnedMeshReferenceComponent& ref) {
-        if (!ecs::isValid(ref.skinnedMeshEntity))
-            return;
-        auto it = entityMap.find(ref.skinnedMeshEntity);
+    for (const auto& [srcEntity, dstEntity] : entityMap)
+    {
+        (void)srcEntity;
+        auto* ref = m_world.get<SkinnedMeshReferenceComponent>(dstEntity);
+        if (!ref || !ecs::isValid(ref->skinnedMeshEntity))
+            continue;
+        auto it = entityMap.find(ref->skinnedMeshEntity);
         if (it != entityMap.end())
-            ref.skinnedMeshEntity = it->second;
-    });
+            ref->skinnedMeshEntity = it->second;
+    }
 
     m_world.each<MeshInstanceComponent>([&](ecs::Entity entity, MeshInstanceComponent& mesh) {
         if (!ecs::isValid(mesh.proxiedAnalyticLight))
@@ -811,13 +873,15 @@ ecs::Entity SceneEntityWorld::importSubtree(
             mesh.proxiedAnalyticLight = it->second;
     });
 
-    for (ecs::Entity animEntity : m_AnimationEntities)
+    // Only remap animation channels on animations created by this import. Remapping
+    // every AnimationComponent causes entity-id collisions when later models load.
+    for (ecs::Entity animEntity : importedAnimationEntities)
     {
         auto* animation = m_world.get<AnimationComponent>(animEntity);
         if (!animation)
             continue;
 
-        for (auto& channel : animation->channels)
+        for (AnimationChannelData& channel : animation->channels)
         {
             if (!ecs::isValid(channel.targetEntity))
                 continue;
