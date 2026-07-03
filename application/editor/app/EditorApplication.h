@@ -3,9 +3,8 @@
 #include <memory>
 #include <vector>
 
-#include "engine/Application.h"
-#include "engine/Engine.h"
-#include "core/log.h"
+#include <engine/EngineFrameApplication.h>
+#include <core/log.h>
 #include <core/Timer.h>
 #include <core/command_line.h>
 
@@ -20,21 +19,11 @@ using caustica::FPSLimiter;
 namespace caustica::editor {
 class EditorUI;
 }
-class SceneManager;
-namespace caustica {
-    class GpuDevice;
-    class RenderCore;
-    class Window;
-    struct GpuDeviceCreateDesc;
-    namespace render {
-        class PathTracingWorldRenderer;
-    }
-}
 
 namespace caustica::editor {
 
-// Desktop editor — owns Application lifecycle and composes SceneEditor via Engine runtime.
-class EditorApplication : public caustica::Application
+// Desktop editor — thin shell over EngineFrameApplication + editor subsystems.
+class EditorApplication : public caustica::EngineFrameApplication
 {
 public:
     EditorApplication();
@@ -59,32 +48,16 @@ public:
     SceneEditor& GetSceneEditor() { return m_sceneEditor; }
     const SceneEditor& GetSceneEditor() const { return m_sceneEditor; }
 
-    SceneManager* GetSceneManager();
-    const SceneManager* GetSceneManager() const;
-
-    caustica::RenderCore* GetRenderCore();
-    const caustica::RenderCore* GetRenderCore() const;
-
-    caustica::render::PathTracingWorldRenderer* GetWorldRenderer();
-    const caustica::render::PathTracingWorldRenderer* GetWorldRenderer() const;
-
-    bool IsSERSupported() const;
+    caustica::Engine& GetEngine() { return m_engine; }
+    const caustica::Engine& GetEngine() const { return m_engine; }
 
 protected:
-    void onBeginFrame(caustica::GpuDevice& gpuDevice) override;
-    bool skipRenderPhase() const override;
-    void onUpdate(float elapsedTimeSeconds, bool windowFocused) override;
-    void onRender() override;
     void onEvent(caustica::Event& event) override;
-    void onBackBufferResizing() override;
-    void onBackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount) override;
     void onDisplayScaleChanged(float scaleX, float scaleY) override;
-    bool shouldRenderWhenUnfocused() const override;
 
 private:
     void RegisterLogCallback();
     void SampleLogCallback(caustica::Severity severity, const char* message);
-    void syncPassesToBackBuffer();
 
     CommandLineOptions CmdLine;
     EditorUIData m_editorUIData;
@@ -96,8 +69,6 @@ private:
     caustica::Engine m_engine;
     caustica::Callback m_DefaultLogCallback = nullptr;
     FPSLimiter m_FPSLimiter;
-
-    std::unique_ptr<EditorUI> m_uiPass;
 };
 
 } // namespace caustica::editor

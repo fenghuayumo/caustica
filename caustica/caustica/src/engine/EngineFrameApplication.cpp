@@ -38,7 +38,7 @@ void EngineFrameApplication::onUpdate(float elapsedTimeSeconds, bool windowFocus
 void EngineFrameApplication::onRender()
 {
     GpuDevice* gpuDevice = getGpuDevice();
-    if (!m_engine || !gpuDevice)
+    if (!m_engine || !gpuDevice || m_engine->skipRenderPhase())
         return;
 
     m_engine->onRenderScene(*gpuDevice);
@@ -54,6 +54,12 @@ void EngineFrameApplication::onBackBufferResizing()
 {
     if (m_engine)
         m_engine->onBackBufferResizing();
+}
+
+void EngineFrameApplication::onBackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount)
+{
+    if (m_engine)
+        m_engine->onBackBufferResized(width, height, sampleCount);
 }
 
 } // namespace caustica

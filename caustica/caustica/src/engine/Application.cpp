@@ -89,12 +89,23 @@ bool Application::init(int /*argc*/, const char* const* /*argv*/)
 
 void Application::shutdown()
 {
-  if (!m_shutdownCalled)
-  {
+    if (m_shutdownCalled)
+        return;
+
     m_renderThread.stop();
-    unbindFrameDriver(device());
+
+    GpuDevice* dm = device();
+    unbindFrameDriver(dm);
+
+    if (m_GpuDevice)
+    {
+        m_GpuDevice->ReleaseWindowOwnership();
+        m_Window.reset();
+        m_GpuDevice->Shutdown();
+        m_GpuDevice.reset();
+    }
+
     m_shutdownCalled = true;
-  }
 }
 
 bool Application::initializeGraphics(const GpuDeviceCreateDesc& desc)
