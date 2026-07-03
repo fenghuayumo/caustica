@@ -5,6 +5,7 @@
 #include <assets/loader/ShaderPackFileSystem.h>
 #include <backend/GpuDevice.h>
 #include <backend/ShaderUtils.h>
+#include <core/command_line.h>
 #include <core/log.h>
 #include <core/path_utils.h>
 #include <core/vfs/VFS.h>
@@ -12,11 +13,14 @@
 #include <render/Core/BindlessTable.h>
 #include <render/Core/CommonRenderPasses.h>
 #include <render/Core/RenderCore.h>
+#include <render/Core/SceneGpuUpdater.h>
 #include <render/SceneGaussianSplatPasses.h>
 #include <render/SceneLightingPasses.h>
 #include <render/SceneRayTracingResources.h>
 #include <render/WorldRenderer/PathTracingWorldRenderer.h>
 #include <render/WorldRenderer/PathTracingContext.h>
+#include <scene/Scene.h>
+#include <scene/SceneEcs.h>
 #include <scene/SceneManager.h>
 
 namespace caustica
@@ -69,6 +73,13 @@ bool EngineRenderer::initialize(GpuDevice& gpuDevice,
 
 void EngineRenderer::createPathTracer(const PathTracerSessionParams& session)
 {
+    m_gpuDevice = &session.gpuDevice;
+    m_settings = &session.settings;
+    m_runtimeState = &session.runtimeState;
+    m_diagnostics = &session.diagnostics;
+    m_sceneTime = &session.sceneTime;
+    m_cmdLine = session.cmdLine;
+
     auto& lighting = m_scenePasses.lighting;
     auto& rayTracing = m_scenePasses.rayTracing;
     auto& gaussianSplats = m_scenePasses.gaussianSplats;
@@ -149,12 +160,160 @@ void EngineRenderer::endFrame()
         m_bindlessTable->FlushDeferredFrees();
 }
 
+void EngineRenderer::onSceneUnloading()
+{
+    if (m_worldRenderer)
+        m_worldRenderer->onSceneUnloading();
+    if (m_renderCore)
+        m_renderCore->onSceneUnloading();
+    if (m_bindingCache)
+        m_bindingCache->Clear();
+    m_scenePasses.lighting.sceneUnloading();
+    if (m_scenePasses.gaussianSplats.isAttached())
+        m_scenePasses.gaussianSplats.sceneUnloading();
+}
+
+void EngineRenderer::refreshEnvironmentMapMediaList(const std::filesystem::path& assetsRoot,
+    const std::filesystem::path& scenePath)
+{
+    m_scenePasses.lighting.refreshEnvironmentMapMediaList(assetsRoot, scenePath);
+}
+
+void EngineRenderer::applySampleSettingsFromScene()
+{
+    if (!m_settings || !m_sceneManager || !m_renderCore)
+        return;
+
+    const auto scene = m_sceneManager->getScene();
+    if (!scene)
+        return;
+
+    if (std::shared_ptr<SampleSettings> sampleSettings = scene->GetSampleSettingsNode())
+    {
+        m_settings->RealtimeMode = sampleSettings->realtimeMode.value_or(m_settings->RealtimeMode);
+        m_settings->EnableAnimations = sampleSettings->enableAnimations.value_or(m_settings->EnableAnimations);
+        if (sampleSettings->startingCamera.has_value())
+            m_renderCore->camera().setSelectedCameraIndex(sampleSettings->startingCamera.value() + 1);
+        if (sampleSettings->realtimeFireflyFilter.has_value())
+        {
+            m_settings->RealtimeFireflyFilterThreshold = sampleSettings->realtimeFireflyFilter.value();
+            m_settings->RealtimeFireflyFilterEnabled = true;
+        }
+        m_settings->BounceCount = sampleSettings->maxBounces.value_or(m_settings->BounceCount);
+        m_settings->DiffuseBounceCount = sampleSettings->maxDiffuseBounces.value_or(m_settings->DiffuseBounceCount);
+        m_settings->TexLODBias = sampleSettings->textureMIPBias.value_or(m_settings->TexLODBias);
+    }
+}
+
+void EngineRenderer::onSceneLoadedBegin()
+{
+    if (!m_settings || !m_sceneTime)
+        return;
+
+    *m_sceneTime = 0.0;
+    m_settings->EnableAnimations = false;
+    m_settings->RealtimeMode = false;
+
+    applySampleSettingsFromScene();
+
+    if (m_cmdLine && m_cmdLine->stopAnimations)
+        m_settings->EnableAnimations = false;
+
+    if (m_cmdLine)
+    {
+        if (m_cmdLine->OverrideToRealtimeMode)
+            m_settings->RealtimeMode = true;
+        if (m_cmdLine->OverrideToReferenceMode)
+            m_settings->RealtimeMode = false;
+    }
+
+    m_settings->ToneMappingParams.exposureCompensation = 2.0f;
+    m_settings->ToneMappingParams.exposureValue = 0.0f;
+}
+
+void EngineRenderer::onSceneLoadedGpuPrep()
+{
+    if (m_worldRenderer)
+        m_worldRenderer->onSceneLoaded();
+
+    if (m_textureCache && m_commonPasses)
+    {
+        m_textureCache->ProcessRenderingThreadCommands(*m_commonPasses, 0.f);
+        m_textureCache->LoadingFinished();
+    }
+
+    if (m_sceneManager)
+    {
+        if (auto scene = m_sceneManager->getScene())
+        {
+            if (auto* entityWorld = scene->GetEntityWorld())
+            {
+                entityWorld->refreshHierarchy(scene::PreviousTransformPolicy::CaptureCurrent);
+                entityWorld->syncPreviousTransformsFromCurrent();
+            }
+            render::SceneGpuUpdater::RefreshAfterLoad(*scene, 0);
+            m_scenePasses.lighting.notifySceneReloaded(*scene);
+        }
+    }
+}
+
+void EngineRenderer::onSceneLoadedGpuFinish()
+{
+    if (!m_sceneManager || !m_settings || !m_renderCore || !m_runtimeState)
+        return;
+
+    const auto scene = m_sceneManager->getScene();
+    if (!scene)
+        return;
+
+    if (m_cmdLine && m_scenePasses.gaussianSplats.isAttached())
+        m_scenePasses.gaussianSplats.onSceneLoaded(*m_cmdLine);
+
+    m_scenePasses.lighting.onSceneLoaded(*scene, *m_settings);
+
+    m_renderCore->onSceneLoaded(*scene, m_runtimeState->Invalidation.AccelerationStructRebuildRequested);
+    m_runtimeState->Invalidation.ShaderReloadRequested = true;
+
+    m_settings->MaterialVariantIndex = 0;
+
+    if (m_diagnostics)
+        m_diagnostics->asyncLoadingInProgress = true;
+}
+
+void EngineRenderer::applyCmdLinePostLoadOverrides()
+{
+    if (!m_settings || !m_cmdLine)
+        return;
+
+    if (m_cmdLine->OverrideAutoexposureOff)
+    {
+        m_settings->ToneMappingParams.autoExposure = false;
+        m_settings->ToneMappingParams.exposureValue = 0.0f;
+    }
+    if (m_cmdLine->OverrideExposureOffset != FLT_MAX)
+        m_settings->ToneMappingParams.exposureCompensation = m_cmdLine->OverrideExposureOffset;
+    if (m_cmdLine->DisableFireflyFilters)
+    {
+        m_settings->RealtimeFireflyFilterEnabled = false;
+        m_settings->ReferenceFireflyFilterEnabled = false;
+    }
+    if (m_cmdLine->DisablePostProcessFilters)
+        m_settings->EnableBloom = false;
+}
+
 void EngineRenderer::shutdown()
 {
     m_worldRenderer.reset();
     m_pathTracingContext.reset();
     m_sceneManager.reset();
     m_renderCore.reset();
+
+    m_gpuDevice = nullptr;
+    m_settings = nullptr;
+    m_runtimeState = nullptr;
+    m_diagnostics = nullptr;
+    m_sceneTime = nullptr;
+    m_cmdLine = nullptr;
 
     m_textureCache.reset();
     m_descriptorTable.reset();

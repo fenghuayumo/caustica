@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <functional>
 #include <memory>
 #include <span>
@@ -13,6 +14,7 @@
 #include <render/WorldRenderer/PathTracingFrameExtension.h>
 
 class SceneManager;
+struct CommandLineOptions;
 
 namespace caustica
 {
@@ -50,6 +52,8 @@ struct PathTracerSessionParams
     render::SessionDiagnostics& diagnostics;
 
     std::span<render::IPathTracingFrameExtension* const> frameExtensions = {};
+
+    const CommandLineOptions* cmdLine = nullptr;
 };
 
 // Owns shared GPU infrastructure and the path-tracing world renderer.
@@ -70,6 +74,14 @@ public:
 
     void shutdown();
     void endFrame();
+
+    void onSceneUnloading();
+    void refreshEnvironmentMapMediaList(const std::filesystem::path& assetsRoot,
+        const std::filesystem::path& scenePath);
+    void onSceneLoadedBegin();
+    void onSceneLoadedGpuPrep();
+    void onSceneLoadedGpuFinish();
+    void applyCmdLinePostLoadOverrides();
 
     [[nodiscard]] std::shared_ptr<ShaderFactory> shaderFactory() const { return m_shaderFactory; }
     [[nodiscard]] std::shared_ptr<CommonRenderPasses> commonPasses() const { return m_commonPasses; }
@@ -96,6 +108,7 @@ public:
 private:
     void createShaderFactory(GpuDevice& gpuDevice);
     void attachScenePasses(const PathTracerSessionParams& session);
+    void applySampleSettingsFromScene();
 
     render::PathTracerScenePasses m_scenePasses;
     nvrhi::BindingLayoutHandle m_bindlessLayout;
@@ -109,6 +122,13 @@ private:
     std::unique_ptr<SceneManager> m_sceneManager;
     std::unique_ptr<render::PathTracingContext> m_pathTracingContext;
     std::unique_ptr<render::PathTracingWorldRenderer> m_worldRenderer;
+
+    GpuDevice* m_gpuDevice = nullptr;
+    PathTracerSettings* m_settings = nullptr;
+    render::RenderRuntimeState* m_runtimeState = nullptr;
+    render::SessionDiagnostics* m_diagnostics = nullptr;
+    double* m_sceneTime = nullptr;
+    const CommandLineOptions* m_cmdLine = nullptr;
 };
 
 } // namespace caustica

@@ -34,9 +34,14 @@
 #include <backend/GpuDevice.h>
 #include <core/log.h>
 #include <engine/Application.h>
+#include <engine/EngineRenderer.h>
 #include <engine/RenderThread.h>
 #include <core/json.h>
 #include <core/vfs/VFS.h>
+#include <EditorUI.h>
+#include "common/LocalConfig.h"
+#include <scene/SceneCameraAccess.h>
+#include <ecs/Entity.h>
 #include <math/float.h>
 #include <math/math.h>
 #include <shaders/light_cb.h>
@@ -183,10 +188,8 @@ SceneEditor::SceneEditor(const CommandLineOptions& cmdLine,
     , m_renderState(sessionState)
     , m_editor(editorState)
     , m_sessionDiagnostics(diagnostics)
-    , m_inputRouter(EditorInputRouter::Context{.session = sessionState, .editor = editorState})
-    , m_contentEditor(SceneContentEditor::Context{})
-    , m_cameraController(EditorCameraController::Context{})
-    , m_lifecycleCoordinator(SceneLifecycleCoordinator::Context{})
+    , m_inputRouter()
+    , m_contentEditor(*this)
 {
     m_progressLoading.Start("Initializing...");
     m_progressLoading.Set(50);
@@ -234,9 +237,10 @@ SceneEditor::~SceneEditor()
 
 void SceneEditor::DebugDrawLine( float3 start, float3 stop, float4 col1, float4 col2 )
 {
-    if (!m_worldRenderer)
+    auto* worldRenderer = GetWorldRenderer();
+    if (!worldRenderer)
         return;
-    auto& lines = m_worldRenderer->getCpuSideDebugLines();
+    auto& lines = worldRenderer->getCpuSideDebugLines();
     if (int(lines.size()) + 2 >= MAX_DEBUG_LINES) return;
     DebugLineStruct dls = { float4(start, 1), col1 };
     DebugLineStruct dle = { float4(stop, 1), col2 };
@@ -256,26 +260,24 @@ void SceneEditor::AttachRenderResources(
     m_bindingCache = bindingCache;
     m_DescriptorTable = descriptorTable;
     m_TextureLoader = textureCache;
-    SyncSubsystemContext();
 }
 
-void SceneEditor::AttachWorldRenderer(caustica::render::PathTracingWorldRenderer* renderer)
+void SceneEditor::bindEngine(caustica::EngineRenderer& engine)
 {
-    m_worldRenderer = renderer;
-    SyncSubsystemContext();
+    m_engineRenderer = &engine;
+    m_sceneManager = engine.sceneManager();
+    m_renderCore = engine.renderCore();
+    m_lightingPasses = &engine.lightingPasses();
+    m_rayTracingResources = &engine.rayTracingResources();
+    m_gaussianSplatPasses = &engine.gaussianSplatPasses();
+
+    m_cameraController.bind(*m_renderCore, m_settings, engine.worldRenderer());
+    m_inputRouter.bind(*this);
 }
 
-void SceneEditor::AttachSceneServices(SceneManager& sceneManager, caustica::RenderCore& renderCore)
+caustica::render::PathTracingWorldRenderer* SceneEditor::GetWorldRenderer() const
 {
-    m_sceneManager = &sceneManager;
-    m_renderCore = &renderCore;
-    SyncSubsystemContext();
-}
-
-void SceneEditor::AttachLightingPasses(caustica::render::SceneLightingPasses& lightingPasses)
-{
-    m_lightingPasses = &lightingPasses;
-    SyncSubsystemContext();
+    return m_engineRenderer ? m_engineRenderer->worldRenderer() : nullptr;
 }
 
 caustica::render::SceneLightingPasses& SceneEditor::GetLightingPasses()
@@ -298,12 +300,6 @@ std::shared_ptr<caustica::CommonRenderPasses> SceneEditor::GetCommonPasses() con
 std::shared_ptr<caustica::DescriptorTableManager> SceneEditor::GetDescriptorTable() const { return m_DescriptorTable; }
 caustica::BindingCache& SceneEditor::GetBindingCache() { return *m_bindingCache; }
 
-void SceneEditor::AttachRayTracingResources(caustica::render::SceneRayTracingResources& rayTracingResources)
-{
-    m_rayTracingResources = &rayTracingResources;
-    SyncSubsystemContext();
-}
-
 caustica::render::SceneRayTracingResources& SceneEditor::GetRayTracingResources()
 {
     assert(m_rayTracingResources != nullptr && m_rayTracingResources->isAttached());
@@ -314,12 +310,6 @@ const caustica::render::SceneRayTracingResources& SceneEditor::GetRayTracingReso
 {
     assert(m_rayTracingResources != nullptr && m_rayTracingResources->isAttached());
     return *m_rayTracingResources;
-}
-
-void SceneEditor::AttachGaussianSplatPasses(caustica::render::SceneGaussianSplatPasses& gaussianSplatPasses)
-{
-    m_gaussianSplatPasses = &gaussianSplatPasses;
-    SyncSubsystemContext();
 }
 
 caustica::render::SceneGaussianSplatPasses& SceneEditor::GetGaussianSplatPasses()
@@ -338,7 +328,6 @@ void SceneEditor::PrepareEditorFrame()
 {
     m_progressLoading.Stop();
     m_sessionDiagnostics.asyncLoadingInProgress = false;
-    SyncSubsystemContext();
     HandleDroppedFiles();
 }
 
@@ -400,9 +389,16 @@ void SceneEditor::Init(const std::string& preferredScene,
         return;
     }
 
-    if (!m_worldRenderer)
+    if (!m_engineRenderer)
     {
-        caustica::fatal("SceneEditor::Init requires AttachWorldRenderer before scene init");
+        caustica::fatal("SceneEditor::Init requires bindEngine");
+        return;
+    }
+
+    auto* worldRenderer = GetWorldRenderer();
+    if (!worldRenderer)
+    {
+        caustica::fatal("SceneEditor::Init requires a path tracer world renderer");
         return;
     }
 
@@ -412,12 +408,12 @@ void SceneEditor::Init(const std::string& preferredScene,
         return;
     }
 
-    if (!m_worldRenderer->getRenderTargets())
-        m_worldRenderer->createDeviceResources();
+    if (!worldRenderer->getRenderTargets())
+        worldRenderer->createDeviceResources();
 
     if (!m_sceneManager || !m_renderCore)
     {
-        caustica::fatal("SceneEditor::Init requires AttachSceneServices");
+        caustica::fatal("SceneEditor::Init requires bindEngine");
         return;
     }
 
@@ -432,7 +428,6 @@ void SceneEditor::Init(const std::string& preferredScene,
     m_settings.GaussianSplatAlphaCullThreshold = m_cmdLine.GaussianSplatAlphaCullThreshold;
     
     m_sampleGame = std::make_unique<::GameScene>(*this, m_cmdLine);
-    SyncSubsystemContext();
     m_progressLoading.Set(95);
 
     if (GetDevice()->queryFeatureSupport(nvrhi::Feature::RayTracingOpacityMicromap))
@@ -472,9 +467,27 @@ void SceneEditor::SetCurrentScene( const std::string & sceneName, bool forceRelo
 
 void SceneEditor::applySceneSwitch(const std::string& sceneName, bool forceReload)
 {
-    // beginLoadingScene() already waits for render-thread and GPU idle.
-    if (!m_lifecycleCoordinator.setCurrentScene(sceneName, forceReload))
+    if (!m_sceneManager)
         return;
+
+    if (!m_sceneManager->beginSceneSwitch(sceneName, GetLocalPath(c_AssetsFolder), forceReload))
+        return;
+
+    m_settings.ResetAccumulation = true;
+    m_settings.ResetRealtimeCaches = true;
+    m_sceneManager->setAsyncLoadingEnabled(false);
+
+    m_progressLoading.Stop();
+    m_progressLoading.Start("Loading scene...");
+    m_sceneManager->beginLoadingScene(
+        std::make_shared<caustica::NativeFileSystem>(),
+        m_sceneManager->getCurrentScenePath());
+    if (m_sceneManager->getScene() == nullptr)
+    {
+        caustica::error("Unable to load scene '%s'", sceneName.c_str());
+        m_sceneManager->clearScene();
+        m_progressLoading.Stop();
+    }
 }
 
 bool SceneEditor::shouldSkipRender() const
@@ -552,9 +565,138 @@ const std::string& SceneEditor::GetGaussianSplatFileName() const
     return GetGaussianSplatPasses().fileNameSummary();
 }
 
-void SceneEditor::SceneUnloading( )
+void SceneEditor::SceneUnloading()
 {
-    m_lifecycleCoordinator.onSceneUnloading();
+    m_editor.TogglableNodes = nullptr;
+    m_editor.SelectedMaterial = nullptr;
+    m_editor.SelectedEntity = caustica::ecs::NullEntity;
+    m_editor.InspectorRotationEntity = caustica::ecs::NullEntity;
+    m_editor.InspectorRotationEulerValid = false;
+    m_editor.SelectedGaussianSplat = false;
+
+    m_settings.EnvironmentMapParams = EnvironmentMapRuntimeParameters();
+    m_uncompressedTextures.clear();
+
+    if (m_sampleGame != nullptr)
+        m_sampleGame->SceneUnloading();
+
+    runGpuWorkOnRenderThread([this]() {
+        if (m_engineRenderer)
+            m_engineRenderer->onSceneUnloading();
+    });
+}
+
+void SceneEditor::runGpuWorkOnRenderThread(const std::function<void()>& work)
+{
+    if (!work)
+        return;
+    if (m_application)
+        m_application->runGpuWorkOnRenderThread(work);
+    else
+        work();
+}
+
+void SceneEditor::syncCameraFromScene()
+{
+    auto scene = GetScene();
+    if (!scene || !m_renderCore)
+        return;
+
+    const auto& cameraEntities = scene->GetCameraEntities();
+    const auto* ew = scene->GetEntityWorld();
+    bool syncedCamera = false;
+    if (!cameraEntities.empty() && ew)
+    {
+        const uint32_t selectedIndex = m_renderCore->camera().selectedCameraIndex();
+        const uint32_t camIdx = (selectedIndex > 0) ? (selectedIndex - 1)
+            : static_cast<uint32_t>(cameraEntities.size() - 1);
+        if (camIdx < cameraEntities.size())
+        {
+            ecs::Entity camEntity = cameraEntities[camIdx];
+            const auto* camComp = scene::TryGetCamera(ew->world(), camEntity);
+            const auto* persData = camComp ? scene::TryGetPerspectiveCameraData(*camComp) : nullptr;
+            const auto* globalComp = ew->world().get<scene::GlobalTransformComponent>(camEntity);
+            if (persData && globalComp)
+            {
+                m_cameraController.syncFromSceneCamera(*persData, globalComp->transform);
+                syncedCamera = true;
+            }
+        }
+    }
+    if (!syncedCamera)
+        m_renderCore->camera().setupDefaultCamera();
+}
+
+void SceneEditor::SceneLoaded()
+{
+    if (!m_sceneManager || !m_engineRenderer)
+        return;
+
+    const std::filesystem::path assetsRoot = GetLocalPath(c_AssetsFolder);
+    m_engineRenderer->refreshEnvironmentMapMediaList(assetsRoot, m_sceneManager->getCurrentScenePath());
+
+    m_progressLoading.Set(50);
+
+    if (m_sampleGame != nullptr)
+    {
+        m_sampleGame->SceneLoaded(
+            m_sceneManager->getScene(),
+            m_sceneManager->getCurrentScenePath(),
+            assetsRoot);
+    }
+
+    m_progressLoading.Set(55);
+
+    m_engineRenderer->onSceneLoadedBegin();
+
+    if (m_editor.TogglableNodes == nullptr)
+    {
+        auto scene = m_sceneManager->getScene();
+        auto* ew = scene ? scene->GetEntityWorld() : nullptr;
+        if (ew)
+        {
+            m_editor.TogglableNodes = std::make_shared<std::vector<TogglableNode>>();
+            UpdateTogglableNodes(*m_editor.TogglableNodes, *ew, ew->root());
+        }
+    }
+
+    runGpuWorkOnRenderThread([this]() {
+        m_engineRenderer->onSceneLoadedGpuPrep();
+    });
+
+    syncCameraFromScene();
+
+    m_progressLoading.Set(60);
+
+    m_engineRenderer->onSceneLoadedGpuFinish();
+
+    m_progressLoading.Set(70);
+
+    LocalConfig::PostSceneLoad(*this, m_sessionState, m_editor);
+
+    m_progressLoading.Set(90);
+
+    m_engineRenderer->applyCmdLinePostLoadOverrides();
+    if (!m_cmdLine.cameraPosDirUp.empty())
+        SetCurrentCameraPosDirUp(m_cmdLine.cameraPosDirUp);
+
+    m_renderCore->camera().syncPreviousViewFromCurrent();
+
+    m_progressLoading.Set(100);
+
+#if CAUSTICA_WITH_PYTHON
+    if (m_pythonScripting
+        && (!m_cmdLine.pythonScript.empty() || !m_cmdLine.pythonExpr.empty()))
+    {
+        if (m_pythonScripting->Initialize())
+        {
+            if (!m_cmdLine.pythonScript.empty())
+                m_pythonScripting->QueueScriptFile(m_cmdLine.pythonScript);
+            if (!m_cmdLine.pythonExpr.empty())
+                m_pythonScripting->QueueScriptString(m_cmdLine.pythonExpr, "<--pythonExpr>");
+        }
+    }
+#endif
 }
 
 bool SceneEditor::IsSceneLoading() const
@@ -592,11 +734,6 @@ void SceneEditor::CollectUncompressedTextures()
     {
         listUncompressedTextureIfNeeded(texture, normalMap);
     });
-}
-
-void SceneEditor::SceneLoaded( )
-{
-    m_lifecycleCoordinator.onSceneLoaded();
 }
 
 void SceneEditor::Animate(float fElapsedTimeSeconds)
@@ -637,8 +774,11 @@ void SceneEditor::Animate(float fElapsedTimeSeconds)
 
     if (m_sampleGame) m_sampleGame->Tick(fElapsedTimeSeconds, enableAnimations);
 
-    if (auto* toneMappingPass = m_worldRenderer->getToneMappingPass())
-        toneMappingPass->AdvanceFrame(fElapsedTimeSeconds);
+    if (auto* worldRenderer = GetWorldRenderer())
+    {
+        if (auto* toneMappingPass = worldRenderer->getToneMappingPass())
+            toneMappingPass->AdvanceFrame(fElapsedTimeSeconds);
+    }
 
     if (IsSceneLoaded() && enableAnimationUpdate)
     {
@@ -704,7 +844,7 @@ void SceneEditor::Animate(float fElapsedTimeSeconds)
 
     if (m_settings.CameraAntiRRSleepJitter>0)
     {
-        float off = 0.05f * ((m_worldRenderer->getFrameIndex()%2)?(-m_settings.CameraAntiRRSleepJitter):(m_settings.CameraAntiRRSleepJitter));
+        float off = 0.05f * ((GetWorldRenderer()->getFrameIndex()%2)?(-m_settings.CameraAntiRRSleepJitter):(m_settings.CameraAntiRRSleepJitter));
 
         float3 dir = m_renderCore->camera().camera().GetDir();
         float3 right = normalize(cross(dir, m_renderCore->camera().camera().GetUp()));
@@ -719,7 +859,7 @@ void SceneEditor::Animate(float fElapsedTimeSeconds)
         m_renderCore->camera().updateLastCameraState();
         if( !m_settings.RealtimeMode )
             m_settings.ResetAccumulation = true;
-        m_worldRenderer->setGaussianSplatTemporalReset(true);
+        GetWorldRenderer()->setGaussianSplatTemporalReset(true);
     }
 
     if (IsSceneLoaded() && m_sceneManager)
@@ -747,7 +887,7 @@ void SceneEditor::Animate(float fElapsedTimeSeconds)
 
 std::string SceneEditor::GetResolutionInfo() const
 {
-    auto& r = *m_worldRenderer;
+    auto& r = *GetWorldRenderer();
     const auto* targets = r.getRenderTargets();
     if (targets == nullptr || targets->OutputColor == nullptr)
         return "uninitialized";
@@ -827,7 +967,7 @@ void SceneEditor::SetEnvMapOverrideSource(const std::string& envMapOverride)
 
 bool SceneEditor::ShouldRenderUnfocused() const
 {
-    if (m_worldRenderer->getFrameIndex() < 16 || m_settings.ResetAccumulation || m_settings.ResetRealtimeCaches || m_captureScriptManager->IsDoingWork() )
+    if (GetWorldRenderer()->getFrameIndex() < 16 || m_settings.ResetAccumulation || m_settings.ResetRealtimeCaches || m_captureScriptManager->IsDoingWork() )
     {
         // Make sure we at least run one render frame to allow expensive resource creation to happen in background, and to allow at least somewhat decent convergence so when user alt-tabs they get a nice image
         return true;
@@ -839,7 +979,7 @@ bool SceneEditor::ShouldRenderUnfocused() const
     }
 
     // Let Reference mode accumulate all frames before pausing
-    return (!m_settings.RealtimeMode && (m_worldRenderer->getAccumulationSampleIndex() < m_settings.AccumulationTarget));
+    return (!m_settings.RealtimeMode && (GetWorldRenderer()->getAccumulationSampleIndex() < m_settings.AccumulationTarget));
 }
 
 void SceneEditor::SetSceneTime( double sceneTime ) 
@@ -1023,39 +1163,39 @@ static void ReadRGBA16Float3Staging(nvrhi::IDevice* device, nvrhi::IStagingTextu
 
 nvrhi::ITexture* SceneEditor::GetLdrColorTexture() const
 {
-    const auto* targets = m_worldRenderer ? m_worldRenderer->getRenderTargets() : nullptr;
+    const auto* targets = GetWorldRenderer() ? GetWorldRenderer()->getRenderTargets() : nullptr;
     return targets ? targets->LdrColor.Get() : nullptr;
 }
 
 const DebugFeedbackStruct& SceneEditor::GetFeedbackData() const
 {
     static const DebugFeedbackStruct kEmpty{};
-    return m_worldRenderer ? m_worldRenderer->getFeedbackData() : kEmpty;
+    return GetWorldRenderer() ? GetWorldRenderer()->getFeedbackData() : kEmpty;
 }
 
 const DeltaTreeVizPathVertex* SceneEditor::GetDebugDeltaPathTree() const
 {
-    return m_worldRenderer ? m_worldRenderer->getDebugDeltaPathTree() : nullptr;
+    return GetWorldRenderer() ? GetWorldRenderer()->getDebugDeltaPathTree() : nullptr;
 }
 
 int SceneEditor::GetAccumulationSampleIndex() const
 {
-    return m_worldRenderer ? m_worldRenderer->getAccumulationSampleIndex() : 0;
+    return GetWorldRenderer() ? GetWorldRenderer()->getAccumulationSampleIndex() : 0;
 }
 
 uint2 SceneEditor::GetRenderSize() const
 {
-    return m_worldRenderer ? m_worldRenderer->getRenderSize() : uint2{0, 0};
+    return GetWorldRenderer() ? GetWorldRenderer()->getRenderSize() : uint2{0, 0};
 }
 
 uint2 SceneEditor::GetDisplaySize() const
 {
-    return m_worldRenderer ? m_worldRenderer->getDisplaySize() : uint2{0, 0};
+    return GetWorldRenderer() ? GetWorldRenderer()->getDisplaySize() : uint2{0, 0};
 }
 
 bool SceneEditor::AccumulationCompleted() const
 {
-    return m_worldRenderer && m_worldRenderer->getAccumulationCompleted();
+    return GetWorldRenderer() && GetWorldRenderer()->getAccumulationCompleted();
 }
 
 // =============================================================================
@@ -1143,85 +1283,11 @@ void SceneEditor::CaptureScriptPostRender(std::function<bool(const char* fileNam
 }
 
 // =============================================================================
-// Subsystem context + input event handling
+// Input event handling
 // =============================================================================
-
-void SceneEditor::SyncSubsystemContext()
-{
-    m_contentEditor.updateContext(SceneContentEditor::Context{
-        .sceneManager = m_sceneManager,
-        .textureLoader = m_TextureLoader.get(),
-        .editor = &m_editor,
-        .settings = &m_settings,
-        .lightingPasses = m_lightingPasses,
-        .rayTracingResources = m_rayTracingResources,
-        .gaussianSplatPasses = m_gaussianSplatPasses,
-        .frameIndex = [this] { return GetFrameIndex(); },
-        .device = [this] { return GetDevice(); },
-        .loadGaussianSplat = [this](const std::filesystem::path& path) { return LoadGaussianSplatFile(path); },
-        .gaussianSplatCount = [this] { return GetGaussianSplatCount(); },
-        .gaussianSplatObjectCount = [this] { return GetGaussianSplatObjectCount(); },
-    });
-
-    m_cameraController.updateContext(EditorCameraController::Context{
-        .renderCore = m_renderCore,
-        .settings = &m_settings,
-        .worldRenderer = m_worldRenderer,
-    });
-
-    m_lifecycleCoordinator.updateContext(SceneLifecycleCoordinator::Context{
-        .sceneManager = m_sceneManager,
-        .renderCore = m_renderCore,
-        .bindingCache = m_bindingCache,
-        .worldRenderer = m_worldRenderer,
-        .lightingPasses = m_lightingPasses,
-        .gaussianSplatPasses = m_gaussianSplatPasses,
-        .editor = &m_editor,
-        .sessionState = &m_sessionState,
-        .renderState = &m_renderState,
-        .settings = &m_settings,
-        .diagnostics = &m_sessionDiagnostics,
-        .cmdLine = &m_cmdLine,
-        .progressLoading = &m_progressLoading,
-        .textureLoader = m_TextureLoader.get(),
-        .commonPasses = m_CommonPasses.get(),
-        .sampleGame = m_sampleGame.get(),
-        .cameraController = &m_cameraController,
-        .sceneTime = &m_sceneTime,
-        .uncompressedTextures = &m_uncompressedTextures,
-        .frameIndex = [this] { return GetFrameIndex(); },
-        .assetsRoot = [] { return GetLocalPath(c_AssetsFolder); },
-        .postSceneLoad = [this] { LocalConfig::PostSceneLoad(*this, m_sessionState, m_editor); },
-        .setCameraPosDirUp = [this](const std::string& value) { return SetCurrentCameraPosDirUp(value); },
-        .runGpuWorkOnRenderThread = [this](std::function<void()> work) {
-            if (m_application)
-                m_application->runGpuWorkOnRenderThread(work);
-            else if (work)
-                work();
-        },
-#if CAUSTICA_WITH_PYTHON
-        .pythonScripting = m_pythonScripting.get(),
-#endif
-    });
-}
-
-void SceneEditor::SyncInputRouterContext()
-{
-    m_inputRouter.updateContext(EditorInputRouter::Context{
-        .session = m_sessionState,
-        .editor = m_editor,
-        .renderCore = m_renderCore,
-        .gpuDevice = m_gpuDevice,
-        .worldRenderer = m_worldRenderer,
-        .zoomTool = m_zoomTool.get(),
-        .game = m_sampleGame.get(),
-    });
-}
 
 void SceneEditor::onEvent(caustica::Event& event)
 {
-    SyncSubsystemContext();
-    SyncInputRouterContext();
     m_inputRouter.onEvent(event);
 }
 

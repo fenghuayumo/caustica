@@ -25,16 +25,11 @@ namespace caustica::editor
 class EditorCameraController
 {
 public:
-    struct Context
-    {
-        caustica::RenderCore* renderCore = nullptr;
-        PathTracerSettings* settings = nullptr;
-        caustica::render::PathTracingWorldRenderer* worldRenderer = nullptr;
-    };
+    EditorCameraController() = default;
 
-    explicit EditorCameraController(Context context);
-
-    void updateContext(Context context);
+    void bind(caustica::RenderCore& renderCore,
+        PathTracerSettings& settings,
+        caustica::render::PathTracingWorldRenderer* worldRenderer);
 
     float getVerticalFOV() const;
     void setVerticalFOV(float cameraFOV);
@@ -55,7 +50,9 @@ public:
 private:
     void markCameraChanged();
 
-    Context m_ctx;
+    caustica::RenderCore* m_renderCore = nullptr;
+    PathTracerSettings* m_settings = nullptr;
+    caustica::render::PathTracingWorldRenderer* m_worldRenderer = nullptr;
 };
 
 } // namespace caustica::editor

@@ -22,7 +22,6 @@
 #include "EditorInputRouter.h"
 #include "SceneContentEditor.h"
 #include "EditorCameraController.h"
-#include "SceneLifecycleCoordinator.h"
 #include <render/RenderSessionState.h>
 
 #include <chrono>
@@ -43,6 +42,7 @@ class Application;
 class BindingCache;
 class CommonRenderPasses;
 class DescriptorTableManager;
+class EngineRenderer;
 class FirstPersonCamera;
 class Material;
 class MeshInfo;
@@ -172,21 +172,19 @@ public:
         caustica::BindingCache* bindingCache,
         const std::shared_ptr<caustica::DescriptorTableManager>& descriptorTable,
         const std::shared_ptr<caustica::TextureLoader>& textureCache);
-    void AttachSceneServices(SceneManager& sceneManager, caustica::RenderCore& renderCore);
-    void AttachLightingPasses(caustica::render::SceneLightingPasses& lightingPasses);
-    caustica::render::SceneLightingPasses& GetLightingPasses();
-    const caustica::render::SceneLightingPasses& GetLightingPasses() const;
-    void AttachRayTracingResources(caustica::render::SceneRayTracingResources& rayTracingResources);
-    caustica::render::SceneRayTracingResources& GetRayTracingResources();
-    const caustica::render::SceneRayTracingResources& GetRayTracingResources() const;
-    void AttachGaussianSplatPasses(caustica::render::SceneGaussianSplatPasses& gaussianSplatPasses);
-    caustica::render::SceneGaussianSplatPasses& GetGaussianSplatPasses();
-    const caustica::render::SceneGaussianSplatPasses& GetGaussianSplatPasses() const;
+    void bindEngine(caustica::EngineRenderer& engine);
     void Init(const std::string& preferredScene,
         const std::shared_ptr<caustica::ShaderFactory>& shaderFactory);
 
-    void AttachWorldRenderer(caustica::render::PathTracingWorldRenderer* renderer);
-    [[nodiscard]] caustica::render::PathTracingWorldRenderer* GetWorldRenderer() const { return m_worldRenderer; }
+    [[nodiscard]] caustica::EngineRenderer* GetEngineRenderer() const { return m_engineRenderer; }
+
+    caustica::render::SceneLightingPasses& GetLightingPasses();
+    const caustica::render::SceneLightingPasses& GetLightingPasses() const;
+    caustica::render::SceneRayTracingResources& GetRayTracingResources();
+    const caustica::render::SceneRayTracingResources& GetRayTracingResources() const;
+    caustica::render::SceneGaussianSplatPasses& GetGaussianSplatPasses();
+    const caustica::render::SceneGaussianSplatPasses& GetGaussianSplatPasses() const;
+    [[nodiscard]] caustica::render::PathTracingWorldRenderer* GetWorldRenderer() const;
 
     void initStreamlineAndWindow();
 
@@ -269,7 +267,21 @@ public:
 
     bool                                    AccumulationCompleted() const;
 
-protected:
+    const caustica::PlanarView& GetView() const;
+
+private:
+    struct PendingSceneSwitch
+    {
+        std::string sceneName;
+        bool forceReload = false;
+    };
+
+    void applySceneSwitch(const std::string& sceneName, bool forceReload);
+    void                                    tickSceneSwitchTest();
+    void syncCameraFromScene();
+    void runGpuWorkOnRenderThread(const std::function<void()>& work);
+    void                                    UpdateFpsInfo(double frameTimeSeconds);
+
     caustica::render::RenderSessionState& m_sessionState;
     PathTracerSettings& m_settings;
     caustica::render::RenderRuntimeState& m_renderState;
@@ -282,30 +294,14 @@ protected:
     std::unique_ptr<PythonScripting>            m_pythonScripting;
 #endif
 
-    caustica::render::PathTracingWorldRenderer* m_worldRenderer = nullptr;
+    caustica::Application* m_application = nullptr;
+    caustica::EngineRenderer* m_engineRenderer = nullptr;
+
     EditorInputRouter m_inputRouter;
     SceneContentEditor m_contentEditor;
     EditorCameraController m_cameraController;
-    SceneLifecycleCoordinator m_lifecycleCoordinator;
-
-    caustica::Application* m_application = nullptr;
-
-    const caustica::PlanarView& GetView() const;
 
 private:
-    struct PendingSceneSwitch
-    {
-        std::string sceneName;
-        bool forceReload = false;
-    };
-
-    void applySceneSwitch(const std::string& sceneName, bool forceReload);
-    void                                    tickSceneSwitchTest();
-
-    void                                    SyncSubsystemContext();
-    void                                    SyncInputRouterContext();
-    void                                    UpdateFpsInfo(double frameTimeSeconds);
-
     std::shared_ptr<caustica::RootFileSystem> m_RootFS;
 
     caustica::GpuDevice*                        m_gpuDevice = nullptr;

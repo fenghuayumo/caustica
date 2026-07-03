@@ -53,12 +53,6 @@ void EditorSceneSubsystem::initialize(caustica::EngineInitContext& context)
         engineRenderer->bindingCache(),
         engineRenderer->descriptorTable(),
         engineRenderer->textureLoader());
-    sceneEditor.AttachSceneServices(
-        *engineRenderer->sceneManager(),
-        *engineRenderer->renderCore());
-    sceneEditor.AttachLightingPasses(engineRenderer->lightingPasses());
-    sceneEditor.AttachRayTracingResources(engineRenderer->rayTracingResources());
-    sceneEditor.AttachGaussianSplatPasses(engineRenderer->gaussianSplatPasses());
 
     rendering->createPathTracer(caustica::PathTracerSessionParams{
         .gpuDevice = gpuDevice,
@@ -67,9 +61,10 @@ void EditorSceneSubsystem::initialize(caustica::EngineInitContext& context)
         .sceneTime = sceneEditor.GetSceneTimeRef(),
         .diagnostics = m_config.diagnostics,
         .frameExtensions = m_config.frameExtensions,
+        .cmdLine = m_config.cmdLine,
     });
 
-    sceneEditor.AttachWorldRenderer(engineRenderer->worldRenderer());
+    sceneEditor.bindEngine(*engineRenderer);
     assert(engineRenderer->rayTracingResources().isAttached()
         && engineRenderer->gaussianSplatPasses().isAttached());
 

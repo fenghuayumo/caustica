@@ -7,54 +7,23 @@
 #include <assets/RuntimeMeshLoadTypes.h>
 
 #include <filesystem>
-#include <functional>
 #include <memory>
-#include <string>
-#include <vector>
 
 namespace caustica
 {
-class TextureLoader;
 struct MeshInfo;
-}
-
-class SceneManager;
-struct PathTracerSettings;
-
-namespace caustica::render
-{
-class SceneGaussianSplatPasses;
-class SceneLightingPasses;
-class SceneRayTracingResources;
 }
 
 namespace caustica::editor
 {
-class EditorUIState;
+
+class SceneEditor;
 
 // Runtime mesh import, drag-drop handling, and scene-graph mesh editing.
 class SceneContentEditor
 {
 public:
-    struct Context
-    {
-        SceneManager* sceneManager = nullptr;
-        caustica::TextureLoader* textureLoader = nullptr;
-        EditorUIState* editor = nullptr;
-        PathTracerSettings* settings = nullptr;
-        caustica::render::SceneLightingPasses* lightingPasses = nullptr;
-        caustica::render::SceneRayTracingResources* rayTracingResources = nullptr;
-        caustica::render::SceneGaussianSplatPasses* gaussianSplatPasses = nullptr;
-        std::function<uint32_t()> frameIndex;
-        std::function<nvrhi::IDevice*()> device;
-        std::function<bool(const std::filesystem::path&)> loadGaussianSplat;
-        std::function<uint32_t()> gaussianSplatCount;
-        std::function<uint32_t()> gaussianSplatObjectCount;
-    };
-
-    explicit SceneContentEditor(Context context);
-
-    void updateContext(Context context);
+    explicit SceneContentEditor(SceneEditor& sceneEditor);
 
     void handleDroppedFiles(std::vector<std::string>& pendingFiles);
 
@@ -85,7 +54,7 @@ private:
     bool importMeshFile(const std::filesystem::path& filePath,
         caustica::RuntimeMeshLoadResult (*loadFile)(const caustica::RuntimeMeshLoadParams&, const std::filesystem::path&));
 
-    Context m_ctx;
+    SceneEditor& m_sceneEditor;
 };
 
 } // namespace caustica::editor
