@@ -64,6 +64,7 @@ bool SceneLifecycleCoordinator::setCurrentScene(const std::string& sceneName, bo
         return false;
 
     m_ctx.settings->ResetAccumulation = true;
+    m_ctx.settings->ResetRealtimeCaches = true;
     m_ctx.sceneManager->setAsyncLoadingEnabled(false);
 
     m_ctx.progressLoading->Stop();
@@ -121,17 +122,14 @@ void SceneLifecycleCoordinator::onSceneUnloading()
     else
         gpuUnload();
 
-    if (m_ctx.textureLoader)
-        m_ctx.textureLoader->Reset();
+    // Keep cached textures across scene switches; scene passes release GPU bindings on unload.
+    // Clearing the global cache here forced a full disk reload (slow for default.json).
 }
 
 void SceneLifecycleCoordinator::onSceneLoaded()
 {
     if (!m_ctx.sceneManager || !m_ctx.settings || !m_ctx.progressLoading)
         return;
-
-    if (m_ctx.worldRenderer)
-        m_ctx.worldRenderer->resetFrameIndex();
 
     refreshEnvironmentMapMediaList();
 
@@ -147,85 +145,9 @@ void SceneLifecycleCoordinator::onSceneLoaded()
 
     m_ctx.progressLoading->Set(55);
 
-    const auto runGpuWork = [this](const std::function<void()>& work) {
-        if (!work)
-            return;
-        if (m_ctx.runGpuWorkOnRenderThread)
-            m_ctx.runGpuWorkOnRenderThread(work);
-        else
-            work();
-    };
-
-    runGpuWork([&]() {
-        if (m_ctx.textureLoader && m_ctx.commonPasses)
-        {
-            m_ctx.textureLoader->ProcessRenderingThreadCommands(*m_ctx.commonPasses, 0.f);
-            m_ctx.textureLoader->LoadingFinished();
-        }
-
-        if (m_ctx.frameIndex && m_ctx.sceneManager->getScene())
-            caustica::render::SceneGpuUpdater::RefreshAfterLoad(*m_ctx.sceneManager->getScene(), m_ctx.frameIndex());
-
-        if (m_ctx.lightingPasses && m_ctx.sceneManager->getScene())
-            m_ctx.lightingPasses->notifySceneReloaded(*m_ctx.sceneManager->getScene());
-    });
-
-    m_ctx.progressLoading->Set(60);
-
     if (m_ctx.sceneTime)
         *m_ctx.sceneTime = 0.f;
 
-    if (m_ctx.gaussianSplatPasses && m_ctx.cmdLine)
-        m_ctx.gaussianSplatPasses->onSceneLoaded(*m_ctx.cmdLine);
-
-    m_ctx.progressLoading->Set(65);
-
-    if (m_ctx.lightingPasses)
-        m_ctx.lightingPasses->onSceneLoaded(*m_ctx.sceneManager->getScene(), *m_ctx.settings);
-
-    m_ctx.settings->ToneMappingParams.exposureCompensation = 2.0f;
-    m_ctx.settings->ToneMappingParams.exposureValue = 0.0f;
-
-    if (m_ctx.editor && m_ctx.editor->TogglableNodes == nullptr)
-    {
-        auto scene = m_ctx.sceneManager->getScene();
-        auto* ew = scene ? scene->GetEntityWorld() : nullptr;
-        if (ew)
-        {
-            m_ctx.editor->TogglableNodes = std::make_shared<std::vector<TogglableNode>>();
-            UpdateTogglableNodes(*m_ctx.editor->TogglableNodes, *ew, ew->root());
-        }
-    }
-
-    {
-        auto scene = m_ctx.sceneManager->getScene();
-        const auto& cameraEntities = scene->GetCameraEntities();
-        const auto* ew = scene->GetEntityWorld();
-        bool syncedCamera = false;
-        if (!cameraEntities.empty() && ew && m_ctx.cameraController)
-        {
-            ecs::Entity camEntity = cameraEntities.back();
-            const auto* camComp = scene::TryGetCamera(ew->world(), camEntity);
-            const auto* persData = camComp ? scene::TryGetPerspectiveCameraData(*camComp) : nullptr;
-            const auto* globalComp = ew->world().get<scene::GlobalTransformComponent>(camEntity);
-            if (persData && globalComp)
-            {
-                m_ctx.cameraController->syncFromSceneCamera(*persData, globalComp->transform);
-                syncedCamera = true;
-            }
-        }
-        if (!syncedCamera && m_ctx.renderCore)
-            m_ctx.renderCore->camera().setupDefaultCamera();
-    }
-
-    if (m_ctx.renderCore && m_ctx.renderState)
-    {
-        m_ctx.renderCore->onSceneLoaded(
-            *m_ctx.sceneManager->getScene(),
-            m_ctx.renderState->Invalidation.AccelerationStructRebuildRequested);
-
-        m_ctx.renderState->Invalidation.ShaderReloadRequested = true;
-    }
     m_ctx.settings->EnableAnimations = false;
     m_ctx.settings->RealtimeMode = false;
 
@@ -248,6 +170,108 @@ void SceneLifecycleCoordinator::onSceneLoaded()
     if (m_ctx.cmdLine && m_ctx.cmdLine->stopAnimations)
         m_ctx.settings->EnableAnimations = false;
 
+    if (m_ctx.cmdLine)
+    {
+        if (m_ctx.cmdLine->OverrideToRealtimeMode)
+            m_ctx.settings->RealtimeMode = true;
+        if (m_ctx.cmdLine->OverrideToReferenceMode)
+            m_ctx.settings->RealtimeMode = false;
+    }
+
+    const auto runGpuWork = [this](const std::function<void()>& work) {
+        if (!work)
+            return;
+        if (m_ctx.runGpuWorkOnRenderThread)
+            m_ctx.runGpuWorkOnRenderThread(work);
+        else
+            work();
+    };
+
+    m_ctx.settings->ToneMappingParams.exposureCompensation = 2.0f;
+    m_ctx.settings->ToneMappingParams.exposureValue = 0.0f;
+
+    if (m_ctx.editor && m_ctx.editor->TogglableNodes == nullptr)
+    {
+        auto scene = m_ctx.sceneManager->getScene();
+        auto* ew = scene ? scene->GetEntityWorld() : nullptr;
+        if (ew)
+        {
+            m_ctx.editor->TogglableNodes = std::make_shared<std::vector<TogglableNode>>();
+            UpdateTogglableNodes(*m_ctx.editor->TogglableNodes, *ew, ew->root());
+        }
+    }
+
+    runGpuWork([&]() {
+        if (m_ctx.worldRenderer)
+            m_ctx.worldRenderer->onSceneLoaded();
+
+        if (m_ctx.textureLoader && m_ctx.commonPasses)
+        {
+            m_ctx.textureLoader->ProcessRenderingThreadCommands(*m_ctx.commonPasses, 0.f);
+            m_ctx.textureLoader->LoadingFinished();
+        }
+
+        if (auto scene = m_ctx.sceneManager->getScene())
+        {
+            if (auto* ew = scene->GetEntityWorld())
+            {
+                ew->refreshHierarchy(scene::PreviousTransformPolicy::CaptureCurrent);
+                ew->syncPreviousTransformsFromCurrent();
+            }
+            caustica::render::SceneGpuUpdater::RefreshAfterLoad(*scene, 0);
+        }
+
+        if (m_ctx.lightingPasses && m_ctx.sceneManager->getScene())
+            m_ctx.lightingPasses->notifySceneReloaded(*m_ctx.sceneManager->getScene());
+    });
+
+    // Sync camera after hierarchy refresh so GlobalTransform reflects scene graph.
+    {
+        auto scene = m_ctx.sceneManager->getScene();
+        const auto& cameraEntities = scene->GetCameraEntities();
+        const auto* ew = scene->GetEntityWorld();
+        bool syncedCamera = false;
+        if (!cameraEntities.empty() && ew && m_ctx.cameraController && m_ctx.renderCore)
+        {
+            const uint32_t selectedIndex = m_ctx.renderCore->camera().selectedCameraIndex();
+            const uint32_t camIdx = (selectedIndex > 0) ? (selectedIndex - 1)
+                : static_cast<uint32_t>(cameraEntities.size() - 1);
+            if (camIdx < cameraEntities.size())
+            {
+                ecs::Entity camEntity = cameraEntities[camIdx];
+                const auto* camComp = scene::TryGetCamera(ew->world(), camEntity);
+                const auto* persData = camComp ? scene::TryGetPerspectiveCameraData(*camComp) : nullptr;
+                const auto* globalComp = ew->world().get<scene::GlobalTransformComponent>(camEntity);
+                if (persData && globalComp)
+                {
+                    m_ctx.cameraController->syncFromSceneCamera(*persData, globalComp->transform);
+                    syncedCamera = true;
+                }
+            }
+        }
+        if (!syncedCamera && m_ctx.renderCore)
+            m_ctx.renderCore->camera().setupDefaultCamera();
+    }
+
+    m_ctx.progressLoading->Set(60);
+
+    if (m_ctx.gaussianSplatPasses && m_ctx.cmdLine)
+        m_ctx.gaussianSplatPasses->onSceneLoaded(*m_ctx.cmdLine);
+
+    m_ctx.progressLoading->Set(65);
+
+    if (m_ctx.lightingPasses)
+        m_ctx.lightingPasses->onSceneLoaded(*m_ctx.sceneManager->getScene(), *m_ctx.settings);
+
+    if (m_ctx.renderCore && m_ctx.renderState)
+    {
+        m_ctx.renderCore->onSceneLoaded(
+            *m_ctx.sceneManager->getScene(),
+            m_ctx.renderState->Invalidation.AccelerationStructRebuildRequested);
+
+        m_ctx.renderState->Invalidation.ShaderReloadRequested = true;
+    }
+
     m_ctx.progressLoading->Set(70);
 
     if (m_ctx.postSceneLoad)
@@ -257,10 +281,6 @@ void SceneLifecycleCoordinator::onSceneLoaded()
 
     if (m_ctx.cmdLine)
     {
-        if (m_ctx.cmdLine->OverrideToRealtimeMode)
-            m_ctx.settings->RealtimeMode = true;
-        if (m_ctx.cmdLine->OverrideToReferenceMode)
-            m_ctx.settings->RealtimeMode = false;
         if (m_ctx.cmdLine->OverrideAutoexposureOff)
         {
             m_ctx.settings->ToneMappingParams.autoExposure = false;
@@ -283,6 +303,9 @@ void SceneLifecycleCoordinator::onSceneLoaded()
 
     if (m_ctx.diagnostics)
         m_ctx.diagnostics->asyncLoadingInProgress = true;
+
+    if (m_ctx.renderCore)
+        m_ctx.renderCore->camera().syncPreviousViewFromCurrent();
 
     m_ctx.progressLoading->Set(100);
 

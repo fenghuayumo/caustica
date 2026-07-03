@@ -373,6 +373,22 @@ void caustica::render::PathTracingWorldRenderer::resetFrameIndex()
 {
     m_frameIndex = 0;
 }
+
+void caustica::render::PathTracingWorldRenderer::onSceneLoaded()
+{
+    resetFrameIndex();
+    m_accumulationSampleIndex = 0;
+    m_sampleIndex = 0;
+    m_gaussianSplatTemporalReset = true;
+    m_context.settings.ResetAccumulation = true;
+    m_context.settings.ResetRealtimeCaches = true;
+    // Realtime->Realtime switches do not flip RealtimeMode; nudge so framePassSetup resets temporal state.
+    m_lastRealtimeMode = !m_context.settings.RealtimeMode;
+
+    if (m_rtxdiPass)
+        m_rtxdiPass->Reset();
+}
+
 void caustica::render::PathTracingWorldRenderer::onBackBufferResizing()
 {
     device()->waitForIdle();
@@ -1613,7 +1629,7 @@ void caustica::render::PathTracingWorldRenderer::postProcessAA(nvrhi::IFramebuff
     params.displayAspectRatio = m_displayAspectRatio;
     params.cameraJitter = computeCameraJitter();
     params.sampleIndex = m_sampleIndex;
-    params.frameIndex = m_context.gpuDevice.GetFrameIndex();
+    params.frameIndex = static_cast<uint32_t>(m_frameIndex);
     params.reset = reset;
     params.temporalAAPass = m_temporalAntiAliasingPass.get();
     params.accumulationPass = m_accumulationPass.get();
@@ -1901,10 +1917,11 @@ caustica::CameraUpdateParams caustica::render::PathTracingWorldRenderer::makeCam
     params.renderSize = m_renderSize;
     params.displayAspectRatio = m_displayAspectRatio;
     params.sampleIndex = m_sampleIndex;
-    params.frameIndex = m_context.gpuDevice.GetFrameIndex();
+    params.frameIndex = static_cast<uint32_t>(m_frameIndex);
     params.realtimeMode = m_context.settings.RealtimeMode;
     params.realtimeAA = m_context.settings.RealtimeAA;
     params.dbgFreezeRealtimeNoiseSeed = m_context.settings.DbgFreezeRealtimeNoiseSeed;
+    params.syncPreviousView = m_context.settings.ResetAccumulation || m_context.settings.ResetRealtimeCaches;
     params.temporalAAJitter = m_context.settings.TemporalAntiAliasingJitter;
     params.temporalAAPass = m_temporalAntiAliasingPass.get();
     return params;

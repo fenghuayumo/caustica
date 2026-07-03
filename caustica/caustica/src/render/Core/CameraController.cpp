@@ -128,12 +128,21 @@ void CameraController::updateViews(const CameraUpdateParams& params)
     m_view->SetPixelOffset(computeJitter(params));
     m_view->UpdateCache();
 
-    if ((params.frameIndex & 0xFFFFFFFF) == 0)
+    if ((params.frameIndex & 0xFFFFFFFF) == 0 || params.syncPreviousView)
     {
-        m_viewPrevious->SetMatrices(m_view->GetViewMatrix(), m_view->GetProjectionMatrix());
-        m_viewPrevious->SetPixelOffset(m_view->GetPixelOffset());
-        m_viewPrevious->UpdateCache();
+        syncPreviousViewFromCurrent();
     }
+}
+
+void CameraController::syncPreviousViewFromCurrent()
+{
+    if (!m_view || !m_viewPrevious)
+        return;
+
+    m_viewPrevious->SetMatrices(m_view->GetViewMatrix(), m_view->GetProjectionMatrix());
+    m_viewPrevious->SetPixelOffset(m_view->GetPixelOffset());
+    m_viewPrevious->UpdateCache();
+    updateLastCameraState();
 }
 
 void CameraController::saveToFile(const std::filesystem::path& path,

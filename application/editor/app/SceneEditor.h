@@ -194,7 +194,7 @@ public:
 
     void PrepareEditorFrame();
     void                                    beginFrame();
-    [[nodiscard]] bool                      processPendingSceneSwitch();
+    bool processPendingSceneSwitch();
     [[nodiscard]] bool                      shouldSkipRender() const;
     void                                    SetCurrentScene(const std::string& sceneName, bool forceReload = false);
     bool                                    IsSceneLoading() const;
@@ -337,7 +337,6 @@ private:
 
     std::mutex                                  m_pendingSceneSwitchMutex;
     std::optional<PendingSceneSwitch>           m_pendingSceneSwitch;
-    bool                                        m_skipRenderAfterSceneSwitch = false;
 
     int m_sceneSwitchTestFramesUntilSwitch = 0;
     size_t m_sceneSwitchTestSceneIndex = 0;

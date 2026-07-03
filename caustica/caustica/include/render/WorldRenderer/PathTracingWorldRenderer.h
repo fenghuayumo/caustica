@@ -74,6 +74,7 @@ public:
     void postProcessAA(nvrhi::IFramebuffer* framebuffer, bool reset);
     void recreateBindingSet();
     void onSceneUnloading();
+    void onSceneLoaded();
     void invalidateBindingSet() { m_bindingSet = nullptr; }
     void resetFrameIndex();
 

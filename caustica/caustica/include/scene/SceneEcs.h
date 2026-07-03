@@ -241,6 +241,8 @@ class SceneEntityWorld : public SceneResources
 {
 public:
     void refreshHierarchy(PreviousTransformPolicy previousPolicy = PreviousTransformPolicy::CaptureCurrent);
+    // Align previous-frame transforms with current (avoids bogus motion after scene load).
+    void syncPreviousTransformsFromCurrent();
     void refresh(uint32_t frameIndex);
     void clear();
 

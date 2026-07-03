@@ -23,6 +23,7 @@ struct CameraUpdateParams
     bool        realtimeMode        = false;
     int         realtimeAA          = 0;
     bool        dbgFreezeRealtimeNoiseSeed = false;
+    bool        syncPreviousView    = false;
     caustica::render::TemporalAntiAliasingJitter temporalAAJitter =
         caustica::render::TemporalAntiAliasingJitter::R2;
     caustica::render::TemporalAntiAliasingPass* temporalAAPass = nullptr;
@@ -74,6 +75,7 @@ public:
     void updateFromSceneCamera(const scene::PerspectiveCameraData& camData, const dm::daffine3& globalTransform);
 
     void updateViews(const CameraUpdateParams& params);
+    void syncPreviousViewFromCurrent();
 
     void saveToFile(const std::filesystem::path& path, float zNear, float fovYRadians) const;
     void loadFromFile(const std::filesystem::path& path);

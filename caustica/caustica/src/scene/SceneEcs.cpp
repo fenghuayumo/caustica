@@ -271,6 +271,15 @@ void SceneEntityWorld::refreshHierarchy(PreviousTransformPolicy previousPolicy)
     UpdateHierarchy(m_world, previousPolicy);
 }
 
+void SceneEntityWorld::syncPreviousTransformsFromCurrent()
+{
+    m_world.each<GlobalTransformComponent>([](ecs::Entity, GlobalTransformComponent& global) {
+        global.previousTransform = global.transform;
+        global.previousTransformFloat = global.transformFloat;
+    });
+    m_previousTransformDirty = true;
+}
+
 void SceneEntityWorld::ensureScheduleBuilt()
 {
     if (m_scheduleBuilt)

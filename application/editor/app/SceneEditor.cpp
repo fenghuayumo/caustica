@@ -472,29 +472,19 @@ void SceneEditor::SetCurrentScene( const std::string & sceneName, bool forceRelo
 
 void SceneEditor::applySceneSwitch(const std::string& sceneName, bool forceReload)
 {
-    if (m_application)
-    {
-        m_application->waitForDedicatedRenderThreadIdle();
-        if (caustica::GpuDevice* gpuDevice = m_application->getGpuDevice())
-            gpuDevice->waitForRenderThreadIdle();
-    }
-
-    if (m_lifecycleCoordinator.setCurrentScene(sceneName, forceReload))
-        m_skipRenderAfterSceneSwitch = true;
+    // beginLoadingScene() already waits for render-thread and GPU idle.
+    if (!m_lifecycleCoordinator.setCurrentScene(sceneName, forceReload))
+        return;
 }
 
 bool SceneEditor::shouldSkipRender() const
 {
-    if (m_skipRenderAfterSceneSwitch)
-        return true;
     return !m_sceneManager || m_sceneManager->getScene() == nullptr;
 }
 
 void SceneEditor::beginFrame()
 {
-    const bool switched = processPendingSceneSwitch();
-    if (!switched)
-        m_skipRenderAfterSceneSwitch = false;
+    processPendingSceneSwitch();
 }
 
 bool SceneEditor::processPendingSceneSwitch()
