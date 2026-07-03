@@ -3,6 +3,7 @@
 #include <ecs/Entity.h>
 #include <ecs/Schedule.h>
 #include <ecs/World.h>
+#include <ecs/Events.h>
 #include <math/math.h>
 #include <rhi/nvrhi.h>
 #include <scene/SceneContent.h>
@@ -222,6 +223,11 @@ struct GameSettingsComponent
     std::shared_ptr<GameSettings> settings;
 };
 
+struct TransformChangedEvent
+{
+    ecs::Entity entity = ecs::NullEntity;
+};
+
 enum class PreviousTransformPolicy
 {
     CaptureCurrent,
@@ -305,6 +311,8 @@ private:
     void systemUpdateGaussianSplatTransforms(ecs::World& world, const ecs::ScheduleContext& ctx);
     void systemMarkDirtySkinnedMeshes(ecs::World& world, const ecs::ScheduleContext& ctx);
     void systemMarkDirtySkinnedMeshesFromChangedJoints(ecs::World& world, const ecs::ScheduleContext& ctx);
+    void systemRebuildEntityLists(ecs::World& world, const ecs::ScheduleContext& ctx);
+    void systemApplyDeferredCommands(ecs::World& world, const ecs::ScheduleContext& ctx);
     void systemRefreshInstanceIndices(ecs::World& world, const ecs::ScheduleContext& ctx);
     void systemAssignGlobalResourceIndices(ecs::World& world, const ecs::ScheduleContext& ctx);
     void systemFinalizeFrameFlags(ecs::World& world, const ecs::ScheduleContext& ctx);

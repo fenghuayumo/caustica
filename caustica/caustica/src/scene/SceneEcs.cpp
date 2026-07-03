@@ -276,12 +276,22 @@ void SceneEntityWorld::ensureScheduleBuilt()
         [this](ecs::World& world, const ecs::ScheduleContext& ctx) { systemMarkDirtySkinnedMeshesFromChangedJoints(world, ctx); });
     m_schedule.addSystem("PostHierarchy", "MarkDirtySkinnedMeshes",
         [this](ecs::World& world, const ecs::ScheduleContext& ctx) { systemMarkDirtySkinnedMeshes(world, ctx); });
+    m_schedule.addSystem("PostHierarchy", "RebuildEntityLists",
+        [this](ecs::World& world, const ecs::ScheduleContext& ctx) { systemRebuildEntityLists(world, ctx); });
     m_schedule.addSystem("PostHierarchy", "RefreshInstanceIndices",
         [this](ecs::World& world, const ecs::ScheduleContext& ctx) { systemRefreshInstanceIndices(world, ctx); });
     m_schedule.addSystem("PostHierarchy", "AssignGlobalResourceIndices",
         [this](ecs::World& world, const ecs::ScheduleContext& ctx) { systemAssignGlobalResourceIndices(world, ctx); });
+    m_schedule.addSystem("PostHierarchy", "ApplyDeferredCommands",
+        [this](ecs::World& world, const ecs::ScheduleContext& ctx) { systemApplyDeferredCommands(world, ctx); });
     m_schedule.addSystem("PostHierarchy", "FinalizeFrameFlags",
         [this](ecs::World& world, const ecs::ScheduleContext& ctx) { systemFinalizeFrameFlags(world, ctx); });
+
+    m_schedule.before("RefreshHierarchy", "UpdateGaussianSplatTransforms");
+    m_schedule.before("RebuildEntityLists", "RefreshInstanceIndices");
+    m_schedule.before("RefreshInstanceIndices", "AssignGlobalResourceIndices");
+    m_schedule.before("AssignGlobalResourceIndices", "ApplyDeferredCommands");
+    m_schedule.before("ApplyDeferredCommands", "FinalizeFrameFlags");
 }
 
 void SceneEntityWorld::refresh(uint32_t frameIndex)
@@ -329,22 +339,54 @@ void SceneEntityWorld::systemMarkDirtySkinnedMeshes(ecs::World& world, const ecs
 
 void SceneEntityWorld::systemMarkDirtySkinnedMeshesFromChangedJoints(ecs::World& world, const ecs::ScheduleContext& ctx)
 {
-    const auto* changeDetection = m_world.getResource<ecs::ChangeDetection>();
-    if (!changeDetection)
-        return;
-
     const uint32_t frameIndex = ctx.frameIndex;
-    const auto& registry = m_world.registry();
 
-    world.each<SkinnedMeshReferenceComponent>(
-        [&](ecs::Entity jointEntity, SkinnedMeshReferenceComponent& ref) {
-            if (!changeDetection->isChangedThisFrame<LocalTransformComponent>(jointEntity, registry))
-                return;
+    world.each<SkinnedMeshReferenceComponent, ecs::Changed<LocalTransformComponent>>(
+        [&](ecs::Entity, SkinnedMeshReferenceComponent& ref, LocalTransformComponent&) {
             if (!ecs::isValid(ref.skinnedMeshEntity))
                 return;
             if (auto* skinned = world.get<SkinnedMeshComponent>(ref.skinnedMeshEntity))
                 skinned->lastUpdateFrameIndex = frameIndex;
         });
+}
+
+void SceneEntityWorld::systemRebuildEntityLists(ecs::World& world, const ecs::ScheduleContext& /*ctx*/)
+{
+    if (!m_frameStructureDirty)
+        return;
+
+    m_MeshInstanceEntities.clear();
+    m_SkinnedMeshInstanceEntities.clear();
+    m_LightEntities.clear();
+    m_CameraEntities.clear();
+    m_AnimationEntities.clear();
+
+    world.each<MeshInstanceComponent>([this, &world](ecs::Entity entity, MeshInstanceComponent&) {
+        m_MeshInstanceEntities.push_back(entity);
+        if (world.has<SkinnedMeshComponent>(entity))
+            m_SkinnedMeshInstanceEntities.push_back(entity);
+    });
+
+    world.each<LightComponent>([this](ecs::Entity entity, LightComponent&) {
+        m_LightEntities.push_back(entity);
+    });
+
+    world.each<CameraComponent>([this](ecs::Entity entity, CameraComponent&) {
+        m_CameraEntities.push_back(entity);
+    });
+
+    world.each<AnimationComponent>([this](ecs::Entity entity, AnimationComponent&) {
+        m_AnimationEntities.push_back(entity);
+    });
+}
+
+void SceneEntityWorld::systemApplyDeferredCommands(ecs::World& world, const ecs::ScheduleContext& /*ctx*/)
+{
+    if (auto* commands = world.getResource<ecs::CommandQueue>())
+    {
+        if (!commands->empty())
+            commands->apply(world);
+    }
 }
 
 void SceneEntityWorld::markTransformDirty()
@@ -389,6 +431,8 @@ void SceneEntityWorld::systemFinalizeFrameFlags(ecs::World& world, const ecs::Sc
     world.endChangeFrame();
     if (auto* changeDetection = world.getResource<ecs::ChangeDetection>())
         changeDetection->clearWorldStructureChange();
+    if (auto* transformEvents = world.getResource<ecs::Events<TransformChangedEvent>>())
+        transformEvents->clear();
 }
 
 void SceneEntityWorld::refreshInstanceIndices()
@@ -567,6 +611,7 @@ void SceneEntityWorld::setLocalTransform(
     local->hasLocalTransform = true;
     local->transform = ComposeLocalTransform(*local);
     m_world.notifyComponentChanged<LocalTransformComponent>(entity);
+    m_world.events<TransformChangedEvent>().send(TransformChangedEvent{ entity });
 }
 
 void SceneEntityWorld::setTranslation(ecs::Entity entity, const dm::double3& translation)

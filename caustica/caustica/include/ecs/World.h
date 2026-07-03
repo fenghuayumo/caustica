@@ -1,11 +1,15 @@
 #pragma once
 
 #include <ecs/ChangeDetection.h>
+#include <ecs/Commands.h>
 #include <ecs/Entity.h>
+#include <ecs/Events.h>
 #include <ecs/Query.h>
 
 #include <entt/entity/registry.hpp>
 
+#include <functional>
+#include <tuple>
 #include <utility>
 
 namespace caustica::ecs
@@ -141,6 +145,33 @@ public:
         return m_registry.ctx().find<T>();
     }
 
+    CommandQueue& commands()
+    {
+        if (auto* queue = getResource<CommandQueue>())
+            return *queue;
+        return insertResource<CommandQueue>();
+    }
+
+    template<typename E>
+    Events<E>& events()
+    {
+        if (auto* buffer = getResource<Events<E>>())
+            return *buffer;
+        return insertResource<Events<E>>();
+    }
+
+    template<typename E>
+    EventWriter<E> eventWriter()
+    {
+        return EventWriter<E>(&events<E>());
+    }
+
+    template<typename E>
+    EventReader<E> eventReader() const
+    {
+        return EventReader<E>(getResource<Events<E>>());
+    }
+
     template<typename T, typename Func>
     void each(Func&& func)
     {
@@ -178,5 +209,44 @@ private:
     entt::registry m_registry;
     bool m_changeDetectionEnabled = false;
 };
+
+inline void CommandQueue::despawn(Entity entity)
+{
+    push([entity](World& world) { world.despawn(entity); });
+}
+
+template<typename T>
+void CommandQueue::remove(Entity entity)
+{
+    push([entity](World& world) { world.remove<T>(entity); });
+}
+
+inline void CommandQueue::push(std::function<void(World&)> command)
+{
+    m_commands.push_back(std::move(command));
+}
+
+inline void CommandQueue::apply(World& world)
+{
+    for (std::function<void(World&)>& command : m_commands)
+        command(world);
+    m_commands.clear();
+}
+
+inline void CommandQueue::clear()
+{
+    m_commands.clear();
+}
+
+template<typename T, typename... Args>
+void CommandQueue::emplace(Entity entity, Args&&... args)
+{
+    auto bound = std::make_tuple(std::forward<Args>(args)...);
+    push([entity, bound = std::move(bound)](World& world) mutable {
+        std::apply([&](auto&&... forwarded) {
+            world.emplace<T>(entity, std::forward<decltype(forwarded)>(forwarded)...);
+        }, bound);
+    });
+}
 
 } // namespace caustica::ecs
