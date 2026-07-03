@@ -54,9 +54,11 @@ void ExtractSceneRenderData(const SceneEntityWorld& entityWorld, SceneRenderData
         out.lightEntities.push_back(entity);
     });
 
-    world.each<CameraComponent>([&](ecs::Entity entity, const CameraComponent&) {
-        out.cameraEntities.push_back(entity);
-    });
+    for (ecs::Entity entity : entityWorld.cameraEntitiesInRegistrationOrder())
+    {
+        if (world.isAlive(entity) && world.has<CameraComponent>(entity))
+            out.cameraEntities.push_back(entity);
+    }
 
     world.each<AnimationComponent>([&](ecs::Entity entity, const AnimationComponent&) {
         out.animationEntities.push_back(entity);

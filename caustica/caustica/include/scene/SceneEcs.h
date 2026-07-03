@@ -298,7 +298,11 @@ public:
     [[nodiscard]] bool hasPendingStructureChanges() const { return m_structureDirty; }
     [[nodiscard]] bool hasPendingTransformChanges() const { return m_transformDirty || m_previousTransformDirty; }
 
+    [[nodiscard]] const std::vector<ecs::Entity>& cameraEntitiesInRegistrationOrder() const { return m_CameraEntities; }
+
 private:
+    void registerCameraEntity(ecs::Entity entity);
+    void unregisterCameraEntity(ecs::Entity entity);
     void unregisterEntityLeaves(ecs::Entity entity);
     void updateLeafContentAndBounds(ecs::Entity entity);
     void ensureChangeDetection();
@@ -322,6 +326,7 @@ private:
     bool m_frameStructureDirty = false;   // per-frame snapshot of m_structureDirty for systems
     bool m_frameTransformDirty = false;   // per-frame snapshot of m_transformDirty for systems
     ecs::Entity m_root = ecs::NullEntity;
+    std::vector<ecs::Entity> m_CameraEntities;
     std::unordered_map<std::string, ecs::Entity> m_pathToEntity;
     bool m_structureDirty = true;
     bool m_transformDirty = true;

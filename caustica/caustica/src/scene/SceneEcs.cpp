@@ -187,10 +187,29 @@ void UpdateHierarchy(ecs::World& world, PreviousTransformPolicy previousPolicy)
         });
 }
 
+void SceneEntityWorld::registerCameraEntity(ecs::Entity entity)
+{
+    if (!m_world.isAlive(entity) || !m_world.has<CameraComponent>(entity))
+        return;
+
+    if (std::find(m_CameraEntities.begin(), m_CameraEntities.end(), entity) != m_CameraEntities.end())
+        return;
+
+    m_CameraEntities.push_back(entity);
+}
+
+void SceneEntityWorld::unregisterCameraEntity(ecs::Entity entity)
+{
+    const auto it = std::find(m_CameraEntities.begin(), m_CameraEntities.end(), entity);
+    if (it != m_CameraEntities.end())
+        m_CameraEntities.erase(it);
+}
+
 void SceneEntityWorld::clear()
 {
     m_world.clear();
     m_root = ecs::NullEntity;
+    m_CameraEntities.clear();
     m_pathToEntity.clear();
     m_Materials = {};
     m_Meshes = {};
@@ -469,6 +488,9 @@ ecs::Entity SceneEntityWorld::createEntity(const std::string& name, ecs::Entity 
 
 void SceneEntityWorld::unregisterEntityLeaves(ecs::Entity entity)
 {
+    if (m_world.has<CameraComponent>(entity))
+        unregisterCameraEntity(entity);
+
     if (auto* mesh = m_world.get<MeshInstanceComponent>(entity))
         UnregisterMeshInstanceEntity(entity, mesh->mesh, m_world.has<SkinnedMeshComponent>(entity));
 }
@@ -693,6 +715,7 @@ void SceneEntityWorld::setLight(ecs::Entity entity, const std::shared_ptr<Light>
 void SceneEntityWorld::setCamera(ecs::Entity entity, CameraComponent component)
 {
     m_world.emplace<CameraComponent>(entity, std::move(component));
+    registerCameraEntity(entity);
     updateLeafContentAndBounds(entity);
 }
 
@@ -770,6 +793,9 @@ ecs::Entity SceneEntityWorld::importSubtree(
                 newRoot = dstEntity;
 
             CopyEntityComponents(m_world, dstEntity, source.m_world, srcEntity, false);
+
+            if (m_world.has<CameraComponent>(dstEntity))
+                registerCameraEntity(dstEntity);
 
             if (m_world.has<AnimationComponent>(dstEntity))
                 importedAnimationEntities.push_back(dstEntity);
