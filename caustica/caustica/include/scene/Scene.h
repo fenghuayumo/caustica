@@ -3,6 +3,7 @@
 #include <scene/SceneObjects.h>
 #include <scene/SceneAnimation.h>
 #include <scene/SceneEcs.h>
+#include <scene/SceneRenderData.h>
 #include <scene/SceneImport.h>
 #include <backend/IDescriptorTableManager.h>
 #include <rhi/nvrhi.h>
@@ -45,6 +46,7 @@ namespace caustica
         std::shared_ptr<TextureLoader> m_TextureLoader;
         std::shared_ptr<IDescriptorTableManager> m_DescriptorTable;
         std::unique_ptr<scene::SceneEntityWorld> m_EntityWorld;
+        scene::SceneRenderData m_RenderData;
         std::shared_ptr<GltfImporter> m_GltfImporter;
         std::shared_ptr<ObjImporter> m_ObjImporter;
         std::vector<SceneImportResult> m_Models;
@@ -126,6 +128,7 @@ namespace caustica
         [[nodiscard]] const std::vector<ecs::Entity>& GetLightEntities() const;
         [[nodiscard]] const std::vector<ecs::Entity>& GetCameraEntities() const;
         [[nodiscard]] const std::vector<ecs::Entity>& GetAnimationEntities() const;
+        [[nodiscard]] const scene::SceneRenderData& GetRenderData() const { return m_RenderData; }
 
         void AttachLightToRoot(const std::shared_ptr<Light>& light);
         void AttachLightToRoot(scene::LightComponent component, const std::string& name = {});

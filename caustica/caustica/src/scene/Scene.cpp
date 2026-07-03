@@ -1,5 +1,6 @@
 #include <scene/Scene.h>
 #include <scene/SceneImport.h>
+#include <scene/SceneRenderExtract.h>
 #include <scene/SceneLightAccess.h>
 #include <scene/SceneObjects.h>
 #include <scene/SceneAnimation.h>
@@ -289,47 +290,27 @@ size_t Scene::GetGeometryInstancesCount() const
 
 const std::vector<ecs::Entity>& Scene::GetMeshInstances() const
 {
-    if (m_EntityWorld)
-        return m_EntityWorld->GetMeshInstanceEntities();
-
-    static const std::vector<ecs::Entity> s_empty;
-    return s_empty;
+    return m_RenderData.meshInstanceEntities;
 }
 
 const std::vector<ecs::Entity>& Scene::GetSkinnedMeshInstances() const
 {
-    if (m_EntityWorld)
-        return m_EntityWorld->GetSkinnedMeshInstanceEntities();
-
-    static const std::vector<ecs::Entity> s_empty;
-    return s_empty;
+    return m_RenderData.skinnedMeshInstanceEntities;
 }
 
 const std::vector<ecs::Entity>& Scene::GetLightEntities() const
 {
-    if (m_EntityWorld)
-        return m_EntityWorld->GetLightEntities();
-
-    static const std::vector<ecs::Entity> s_empty;
-    return s_empty;
+    return m_RenderData.lightEntities;
 }
 
 const std::vector<ecs::Entity>& Scene::GetCameraEntities() const
 {
-    if (m_EntityWorld)
-        return m_EntityWorld->GetCameraEntities();
-
-    static const std::vector<ecs::Entity> s_empty;
-    return s_empty;
+    return m_RenderData.cameraEntities;
 }
 
 const std::vector<ecs::Entity>& Scene::GetAnimationEntities() const
 {
-    if (m_EntityWorld)
-        return m_EntityWorld->GetAnimationEntities();
-
-    static const std::vector<ecs::Entity> s_empty;
-    return s_empty;
+    return m_RenderData.animationEntities;
 }
 
 void Scene::AttachLightToRoot(const std::shared_ptr<Light>& light)
@@ -1002,6 +983,7 @@ void Scene::RefreshSceneWorld(uint32_t frameIndex)
     m_SceneStructureChanged = m_EntityWorld->hasPendingStructureChanges();
     m_SceneTransformsChanged = m_EntityWorld->hasPendingTransformChanges();
     m_EntityWorld->refresh(frameIndex);
+    scene::ExtractSceneRenderData(*m_EntityWorld, m_RenderData);
 }
 
 GeometryData* Scene::GetGeometryData(const MeshGeometry& geometry) const

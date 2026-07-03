@@ -1,5 +1,4 @@
 #include <render/Passes/Geometry/DepthPass.h>
-#include <render/Core/DrawStrategy.h>
 #include <assets/loader/ShaderFactory.h>
 #include <scene/SceneTypes.h>
 #include <render/Core/CommonRenderPasses.h>

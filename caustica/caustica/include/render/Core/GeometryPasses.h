@@ -1,8 +1,9 @@
 #pragma once
 
-#include <ecs/Entity.h>
+#include <scene/SceneDrawList.h>
 #include <scene/View.h>
 #include <rhi/nvrhi.h>
+#include <span>
 
 namespace caustica
 {
@@ -16,19 +17,10 @@ namespace caustica
 
 namespace caustica::render
 {
-    class IDrawStrategy;
-
-    struct DrawItem
-    {
-        ecs::Entity meshEntity = ecs::NullEntity;
-        int instanceIndex = -1;
-        const caustica::MeshInfo* mesh;
-        const caustica::MeshGeometry* geometry;
-        const caustica::Material* material;
-        const caustica::BufferGroup* buffers;
-        float distanceToCamera;
-        nvrhi::RasterCullMode cullMode;
-    };
+    using DrawCommand = scene::DrawCommand;
+    using DrawItem = DrawCommand;
+    using MeshDrawDomain = scene::MeshDrawDomain;
+    using DrawListBuildOptions = scene::DrawListBuildOptions;
 
     class GeometryPassContext
     {
@@ -50,7 +42,7 @@ namespace caustica::render
         const caustica::IView* view, 
         const caustica::IView* viewPrev, 
         nvrhi::IFramebuffer* framebuffer,
-        IDrawStrategy& drawStrategy,
+        std::span<const DrawCommand> drawCommands,
         IGeometryPass& pass,
         GeometryPassContext& passContext,
         bool materialEvents = false);
@@ -61,9 +53,10 @@ namespace caustica::render
         const caustica::ICompositeView* compositeViewPrev,
         caustica::FramebufferFactory& framebufferFactory,
         const caustica::Scene& scene,
-        IDrawStrategy& drawStrategy,
+        MeshDrawDomain domain,
         IGeometryPass& pass,
         GeometryPassContext& passContext,
+        const DrawListBuildOptions& drawOptions = {},
         const char* passEvent = nullptr,
         bool materialEvents = false);
 }

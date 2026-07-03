@@ -1,7 +1,7 @@
 #include <render/Core/GeometryPasses.h>
 #include <scene/Scene.h>
+#include <scene/SceneDrawList.h>
 #include <render/Core/FramebufferFactory.h>
-#include <render/Core/DrawStrategy.h>
 
 using namespace caustica::math;
 using namespace caustica;
@@ -12,7 +12,7 @@ void caustica::render::RenderView(
     const IView* view, 
     const IView* viewPrev,
     nvrhi::IFramebuffer* framebuffer,
-    IDrawStrategy& drawStrategy,
+    std::span<const DrawCommand> drawCommands,
     IGeometryPass& pass,
     GeometryPassContext& passContext,
     bool materialEvents)
@@ -63,34 +63,29 @@ void caustica::render::RenderView(
         currentDraw.instanceCount = 0;
     };
     
-    while (const DrawItem* item = drawStrategy.GetNextItem())
+    for (const DrawCommand& item : drawCommands)
     {
-        if (item->material == nullptr)
+        if (item.material == nullptr)
             continue;
 
-
-        bool newBuffers = item->buffers != lastBuffers;
-        bool newMaterial = item->material != lastMaterial || item->cullMode != lastCullMode;
+        bool newBuffers = item.buffers != lastBuffers;
+        bool newMaterial = item.material != lastMaterial || item.cullMode != lastCullMode;
 
         if (newBuffers || newMaterial)
-        {
             flushDraw(lastMaterial);
-        }
 
         if (newBuffers)
         {
-            pass.SetupInputBuffers(passContext, item->buffers, graphicsState);
-
-            lastBuffers = item->buffers;
+            pass.SetupInputBuffers(passContext, item.buffers, graphicsState);
+            lastBuffers = item.buffers;
             stateValid = false;
         }
 
         if (newMaterial)
         {
-            drawMaterial = pass.SetupMaterial(passContext, item->material, item->cullMode, graphicsState);
-
-            lastMaterial = item->material;
-            lastCullMode = item->cullMode;
+            drawMaterial = pass.SetupMaterial(passContext, item.material, item.cullMode, graphicsState);
+            lastMaterial = item.material;
+            lastCullMode = item.cullMode;
             stateValid = false;
         }
 
@@ -103,11 +98,11 @@ void caustica::render::RenderView(
             }
 
             nvrhi::DrawArguments args;
-            args.vertexCount = item->geometry->numIndices;
+            args.vertexCount = item.geometry->numIndices;
             args.instanceCount = 1;
-            args.startVertexLocation = item->mesh->vertexOffset + item->geometry->vertexOffsetInMesh;
-            args.startIndexLocation = item->mesh->indexOffset + item->geometry->indexOffsetInMesh;
-            args.startInstanceLocation = item->instanceIndex;
+            args.startVertexLocation = item.mesh->vertexOffset + item.geometry->vertexOffsetInMesh;
+            args.startIndexLocation = item.mesh->indexOffset + item.geometry->indexOffsetInMesh;
+            args.startInstanceLocation = item.instanceIndex;
 
             if (currentDraw.instanceCount > 0 && 
                 currentDraw.startIndexLocation == args.startIndexLocation && 
@@ -117,8 +112,7 @@ void caustica::render::RenderView(
             }
             else
             {
-                flushDraw(item->material);
-
+                flushDraw(item.material);
                 currentDraw = args;
             }
         }
@@ -136,9 +130,10 @@ void caustica::render::RenderCompositeView(
     const ICompositeView* compositeViewPrev,
     FramebufferFactory& framebufferFactory,
     const caustica::Scene& scene,
-    IDrawStrategy& drawStrategy,
+    MeshDrawDomain domain,
     IGeometryPass& pass,
     GeometryPassContext& passContext,
+    const DrawListBuildOptions& drawOptions,
     const char* passEvent,
     bool materialEvents)
 {
@@ -149,9 +144,11 @@ void caustica::render::RenderCompositeView(
 
     if (compositeViewPrev)
     {
-        // the views must have the same topology
         assert(compositeView->GetNumChildViews(supportedViewTypes) == compositeViewPrev->GetNumChildViews(supportedViewTypes));
     }
+
+    const scene::SceneRenderData& renderData = scene.GetRenderData();
+    std::vector<DrawCommand> drawCommands;
 
     for (uint viewIndex = 0; viewIndex < compositeView->GetNumChildViews(supportedViewTypes); viewIndex++)
     {
@@ -160,11 +157,14 @@ void caustica::render::RenderCompositeView(
 
         assert(view != nullptr);
 
-        drawStrategy.PrepareForView(scene, *view);
+        if (domain == MeshDrawDomain::Opaque)
+            scene::BuildOpaqueDrawList(renderData, *view, drawCommands);
+        else
+            scene::BuildTransparentDrawList(renderData, *view, drawCommands, drawOptions);
 
         nvrhi::IFramebuffer* framebuffer = framebufferFactory.GetFramebuffer(*view);
 
-        RenderView(commandList, view, viewPrev, framebuffer, drawStrategy, pass, passContext, materialEvents);
+        RenderView(commandList, view, viewPrev, framebuffer, drawCommands, pass, passContext, materialEvents);
     }
 
     if (passEvent)

@@ -1,6 +1,5 @@
 #include <render/Passes/Geometry/SsaoPass.h>
 #include <render/Core/FramebufferFactory.h>
-#include <render/Core/DrawStrategy.h>
 #include <assets/loader/ShaderFactory.h>
 #include <render/Core/ShadowMap.h>
 #include <render/Core/CommonRenderPasses.h>

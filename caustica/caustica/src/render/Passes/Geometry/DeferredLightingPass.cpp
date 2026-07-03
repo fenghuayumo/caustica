@@ -1,5 +1,4 @@
 #include <render/Passes/Geometry/DeferredLightingPass.h>
-#include <render/Core/DrawStrategy.h>
 #include <render/Core/GBuffer.h>
 #include <render/Core/FramebufferFactory.h>
 #include <assets/loader/ShaderFactory.h>

@@ -1,6 +1,5 @@
 #include <render/Passes/Geometry/CascadedShadowMap.h>
 #include <render/Passes/Geometry/DepthPass.h>
-#include <render/Core/DrawStrategy.h>
 #include <render/Passes/Geometry/PlanarShadowMap.h>
 
 using namespace caustica::math;

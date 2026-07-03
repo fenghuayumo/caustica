@@ -3,9 +3,8 @@
 #include <render/Core/AccelerationStructureUtil.h>
 #include <render/Passes/OMM/OpacityMicromapBuilder.h>
 #include <scene/Scene.h>
+#include <scene/SceneRenderData.h>
 #include <scene/ResourceTracker.h>
-#include <scene/SceneEcs.h>
-#include <ecs/Entity.h>
 #include <core/log.h>
 #include <rhi/utils.h>
 
@@ -79,18 +78,14 @@ void AccelStructManager::createTlas(nvrhi::ICommandList* commandList, const Scen
     tlasDesc.buildFlags = nvrhi::rt::AccelStructBuildFlags::PreferFastTrace;
 
     m_subInstanceCount = 0;
-    const auto& meshInstances = scene.GetMeshInstances();
-    const auto* entityWorld = scene.GetEntityWorld();
-    for (const ecs::Entity entity : meshInstances)
+    const scene::SceneRenderData& renderData = scene.GetRenderData();
+    for (const scene::MeshInstanceRenderProxy& proxy : renderData.meshInstances)
     {
-        if (!entityWorld)
-            continue;
-        const auto* meshComp = entityWorld->world().get<scene::MeshInstanceComponent>(entity);
-        if (meshComp && meshComp->mesh)
-            m_subInstanceCount += static_cast<uint32_t>(meshComp->mesh->geometries.size());
+        if (proxy.meshShared)
+            m_subInstanceCount += static_cast<uint32_t>(proxy.meshShared->geometries.size());
     }
 
-    tlasDesc.topLevelMaxInstances = std::max<size_t>(1, meshInstances.size());
+    tlasDesc.topLevelMaxInstances = std::max<size_t>(1, renderData.meshInstanceEntities.size());
     assert(tlasDesc.topLevelMaxInstances < (1 << 15));
     m_topLevelAS = m_device->createAccelStruct(tlasDesc);
 
@@ -196,60 +191,64 @@ void AccelStructManager::updateSkinnedBlases(nvrhi::ICommandList*            com
     std::unordered_set<const MeshInfo*> preparedSkinnedMeshes;
     std::unordered_set<const MeshInfo*> updatedSkinnedMeshes;
 
-    if (auto* entityWorld = scene.GetEntityWorld())
-    {
-        auto& world = entityWorld->world();
-        world.each<scene::SkinnedMeshComponent, scene::MeshInstanceComponent>([&](ecs::Entity, scene::SkinnedMeshComponent& skinned, scene::MeshInstanceComponent& meshComp)
-        {
-            if (skinned.lastUpdateFrameIndex != scene::kForceSkinnedMeshUpdateFrameIndex
-                && skinned.lastUpdateFrameIndex < frameIndex
-                || !meshComp.mesh
-                || !meshComp.mesh->accelStruct
-                || !meshComp.mesh->buffers
-                || !meshComp.mesh->buffers->vertexBuffer)
-            {
-                return;
-            }
-            if (!preparedSkinnedMeshes.insert(meshComp.mesh.get()).second)
-            {
-                return;
-            }
+    const scene::SceneRenderData& renderData = scene.GetRenderData();
 
-            commandList->setAccelStructState(meshComp.mesh->accelStruct, nvrhi::ResourceStates::AccelStructWrite);
-            commandList->setBufferState(meshComp.mesh->buffers->vertexBuffer,
-                                        nvrhi::ResourceStates::AccelStructBuildInput);
-        });
+    for (const scene::SkinnedMeshRenderProxy& proxy : renderData.skinnedMeshes)
+    {
+        if (!proxy.skinned || !proxy.meshInstance)
+            continue;
+
+        scene::SkinnedMeshComponent& skinned = *proxy.skinned;
+        scene::MeshInstanceComponent& meshComp = *proxy.meshInstance;
+
+        if (skinned.lastUpdateFrameIndex != scene::kForceSkinnedMeshUpdateFrameIndex
+            && skinned.lastUpdateFrameIndex < frameIndex
+            || !meshComp.mesh
+            || !meshComp.mesh->accelStruct
+            || !meshComp.mesh->buffers
+            || !meshComp.mesh->buffers->vertexBuffer)
+        {
+            continue;
+        }
+        if (!preparedSkinnedMeshes.insert(meshComp.mesh.get()).second)
+            continue;
+
+        commandList->setAccelStructState(meshComp.mesh->accelStruct, nvrhi::ResourceStates::AccelStructWrite);
+        commandList->setBufferState(meshComp.mesh->buffers->vertexBuffer,
+                                    nvrhi::ResourceStates::AccelStructBuildInput);
     }
     commandList->commitBarriers();
 
-    if (auto* entityWorld = scene.GetEntityWorld())
+    for (const scene::SkinnedMeshRenderProxy& proxy : renderData.skinnedMeshes)
     {
-        auto& world = entityWorld->world();
-        world.each<scene::SkinnedMeshComponent, scene::MeshInstanceComponent>([&](ecs::Entity, scene::SkinnedMeshComponent& skinned, scene::MeshInstanceComponent& meshComp)
-        {
-            if (skinned.lastUpdateFrameIndex != scene::kForceSkinnedMeshUpdateFrameIndex
-                && skinned.lastUpdateFrameIndex < frameIndex
-                || !meshComp.mesh
-                || !meshComp.mesh->accelStruct)
-            {
-                return;
-            }
-            if (!updatedSkinnedMeshes.insert(meshComp.mesh.get()).second)
-            {
-                skippedDuplicateSkinnedUpdateCount++;
-                return;
-            }
+        if (!proxy.skinned || !proxy.meshInstance)
+            continue;
 
-            bvh::Config cfg = { .excludeTransmissive = settings.excludeTransmissive };
-            nvrhi::rt::AccelStructDesc blasDesc = bvh::GetMeshBlasDesc(cfg, *meshComp.mesh, nullptr, true);
-            if (blasDesc.bottomLevelGeometries.empty())
-            {
-                skippedEmptySkinnedUpdateCount++;
-                return;
-            }
-            nvrhi::utils::BuildBottomLevelAccelStruct(commandList, meshComp.mesh->accelStruct, blasDesc);
-            skinnedUpdateCount++;
-        });
+        scene::SkinnedMeshComponent& skinned = *proxy.skinned;
+        scene::MeshInstanceComponent& meshComp = *proxy.meshInstance;
+
+        if (skinned.lastUpdateFrameIndex != scene::kForceSkinnedMeshUpdateFrameIndex
+            && skinned.lastUpdateFrameIndex < frameIndex
+            || !meshComp.mesh
+            || !meshComp.mesh->accelStruct)
+        {
+            continue;
+        }
+        if (!updatedSkinnedMeshes.insert(meshComp.mesh.get()).second)
+        {
+            skippedDuplicateSkinnedUpdateCount++;
+            continue;
+        }
+
+        bvh::Config cfg = { .excludeTransmissive = settings.excludeTransmissive };
+        nvrhi::rt::AccelStructDesc blasDesc = bvh::GetMeshBlasDesc(cfg, *meshComp.mesh, nullptr, true);
+        if (blasDesc.bottomLevelGeometries.empty())
+        {
+            skippedEmptySkinnedUpdateCount++;
+            continue;
+        }
+        nvrhi::utils::BuildBottomLevelAccelStruct(commandList, meshComp.mesh->accelStruct, blasDesc);
+        skinnedUpdateCount++;
     }
     if (skippedDuplicateSkinnedUpdateCount > 0)
     {
@@ -277,24 +276,19 @@ void AccelStructManager::buildTlas(nvrhi::ICommandList*            commandList,
     std::vector<nvrhi::rt::InstanceDesc> instances;
 
     uint subInstanceCount = 0;
-    const auto* entityWorld = scene.GetEntityWorld();
-    const auto& meshInstances = scene.GetMeshInstances();
-    for (const ecs::Entity entity : meshInstances)
+    const scene::SceneRenderData& renderData = scene.GetRenderData();
+    for (const scene::MeshInstanceRenderProxy& proxy : renderData.meshInstances)
     {
-        if (!entityWorld)
+        if (!proxy.meshShared)
             continue;
 
-        const auto* meshComp = entityWorld->world().get<scene::MeshInstanceComponent>(entity);
-        if (!meshComp || !meshComp->mesh)
-            continue;
-
-        const std::shared_ptr<MeshInfo>& mesh = meshComp->mesh;
+        const std::shared_ptr<MeshInfo>& mesh = proxy.meshShared;
 
         const bool hasAttachementOMM = opacityMicromapBuilder && mesh->AccelStructOMM.Get() != nullptr;
         const bool useOmmBLAS = ommState.enabled && hasAttachementOMM && !settings.forceOpaque && !ommState.debugViewEnabled;
 
         const uint32_t meshSubInstanceCount = (uint32_t)mesh->geometries.size();
-        assert(subInstanceCount == meshComp->geometryInstanceIndex);
+        assert(subInstanceCount == proxy.geometryInstanceIndex);
 
         auto* bottomLevelAS = useOmmBLAS ? mesh->AccelStructOMM.Get() : mesh->accelStruct.Get();
         if (bottomLevelAS == nullptr)
@@ -312,7 +306,7 @@ void AccelStructManager::buildTlas(nvrhi::ICommandList*            commandList,
         nvrhi::rt::InstanceDesc instanceDesc;
         instanceDesc.bottomLevelAS = bottomLevelAS;
         instanceDesc.instanceMask = (ommState.onlyOMMs && !hasAttachementOMM) ? 0 : 1;
-        instanceDesc.instanceID = meshComp->geometryInstanceIndex;
+        instanceDesc.instanceID = proxy.geometryInstanceIndex;
         instanceDesc.instanceContributionToHitGroupIndex = subInstanceCount;
         instanceDesc.flags = ommState.force2State ? nvrhi::rt::InstanceFlags::ForceOMM2State : nvrhi::rt::InstanceFlags::None;
         if (settings.forceOpaque || ommState.debugViewEnabled)
@@ -320,12 +314,7 @@ void AccelStructManager::buildTlas(nvrhi::ICommandList*            commandList,
 
         subInstanceCount += meshSubInstanceCount;
 
-        dm::affineToColumnMajor(dm::affine3::identity(), instanceDesc.transform);
-        if (entityWorld && ecs::isValid(entity))
-        {
-            if (const auto* global = entityWorld->world().get<scene::GlobalTransformComponent>(entity))
-                dm::affineToColumnMajor(global->transformFloat, instanceDesc.transform);
-        }
+        dm::affineToColumnMajor(proxy.transformFloat, instanceDesc.transform);
 
         instances.push_back(instanceDesc);
     }

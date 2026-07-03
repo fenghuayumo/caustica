@@ -197,11 +197,6 @@ void SceneEntityWorld::clear()
     m_GeometryCount = 0;
     m_MaxGeometryCountPerMesh = 0;
     m_GeometryInstancesCount = 0;
-    m_MeshInstanceEntities.clear();
-    m_SkinnedMeshInstanceEntities.clear();
-    m_LightEntities.clear();
-    m_CameraEntities.clear();
-    m_AnimationEntities.clear();
     m_structureDirty = true;
     m_transformDirty = true;
     m_previousTransformDirty = false;
@@ -276,8 +271,6 @@ void SceneEntityWorld::ensureScheduleBuilt()
         [this](ecs::World& world, const ecs::ScheduleContext& ctx) { systemMarkDirtySkinnedMeshesFromChangedJoints(world, ctx); });
     m_schedule.addSystem("PostHierarchy", "MarkDirtySkinnedMeshes",
         [this](ecs::World& world, const ecs::ScheduleContext& ctx) { systemMarkDirtySkinnedMeshes(world, ctx); });
-    m_schedule.addSystem("PostHierarchy", "RebuildEntityLists",
-        [this](ecs::World& world, const ecs::ScheduleContext& ctx) { systemRebuildEntityLists(world, ctx); });
     m_schedule.addSystem("PostHierarchy", "RefreshInstanceIndices",
         [this](ecs::World& world, const ecs::ScheduleContext& ctx) { systemRefreshInstanceIndices(world, ctx); });
     m_schedule.addSystem("PostHierarchy", "AssignGlobalResourceIndices",
@@ -288,7 +281,6 @@ void SceneEntityWorld::ensureScheduleBuilt()
         [this](ecs::World& world, const ecs::ScheduleContext& ctx) { systemFinalizeFrameFlags(world, ctx); });
 
     m_schedule.before("RefreshHierarchy", "UpdateGaussianSplatTransforms");
-    m_schedule.before("RebuildEntityLists", "RefreshInstanceIndices");
     m_schedule.before("RefreshInstanceIndices", "AssignGlobalResourceIndices");
     m_schedule.before("AssignGlobalResourceIndices", "ApplyDeferredCommands");
     m_schedule.before("ApplyDeferredCommands", "FinalizeFrameFlags");
@@ -348,36 +340,6 @@ void SceneEntityWorld::systemMarkDirtySkinnedMeshesFromChangedJoints(ecs::World&
             if (auto* skinned = world.get<SkinnedMeshComponent>(ref.skinnedMeshEntity))
                 skinned->lastUpdateFrameIndex = frameIndex;
         });
-}
-
-void SceneEntityWorld::systemRebuildEntityLists(ecs::World& world, const ecs::ScheduleContext& /*ctx*/)
-{
-    if (!m_frameStructureDirty)
-        return;
-
-    m_MeshInstanceEntities.clear();
-    m_SkinnedMeshInstanceEntities.clear();
-    m_LightEntities.clear();
-    m_CameraEntities.clear();
-    m_AnimationEntities.clear();
-
-    world.each<MeshInstanceComponent>([this, &world](ecs::Entity entity, MeshInstanceComponent&) {
-        m_MeshInstanceEntities.push_back(entity);
-        if (world.has<SkinnedMeshComponent>(entity))
-            m_SkinnedMeshInstanceEntities.push_back(entity);
-    });
-
-    world.each<LightComponent>([this](ecs::Entity entity, LightComponent&) {
-        m_LightEntities.push_back(entity);
-    });
-
-    world.each<CameraComponent>([this](ecs::Entity entity, CameraComponent&) {
-        m_CameraEntities.push_back(entity);
-    });
-
-    world.each<AnimationComponent>([this](ecs::Entity entity, AnimationComponent&) {
-        m_AnimationEntities.push_back(entity);
-    });
 }
 
 void SceneEntityWorld::systemApplyDeferredCommands(ecs::World& world, const ecs::ScheduleContext& /*ctx*/)
@@ -440,17 +402,13 @@ void SceneEntityWorld::refreshInstanceIndices()
     int instanceIndex = 0;
     int geometryInstanceIndex = 0;
 
-    for (ecs::Entity entity : m_MeshInstanceEntities)
+    m_world.each<MeshInstanceComponent>([&](ecs::Entity, MeshInstanceComponent& mesh)
     {
-        auto* mesh = m_world.get<MeshInstanceComponent>(entity);
-        if (!mesh)
-            continue;
-
-        mesh->instanceIndex = instanceIndex++;
-        mesh->geometryInstanceIndex = geometryInstanceIndex;
-        if (mesh->mesh)
-            geometryInstanceIndex += static_cast<int>(mesh->mesh->geometries.size());
-    }
+        mesh.instanceIndex = instanceIndex++;
+        mesh.geometryInstanceIndex = geometryInstanceIndex;
+        if (mesh.mesh)
+            geometryInstanceIndex += static_cast<int>(mesh.mesh->geometries.size());
+    });
 
     m_GeometryInstancesCount = static_cast<size_t>(geometryInstanceIndex);
 }
@@ -480,11 +438,9 @@ void SceneEntityWorld::assignGlobalResourceIndices()
 
 void SceneEntityWorld::applyAnimations(float time)
 {
-    for (ecs::Entity entity : m_AnimationEntities)
-    {
-        if (auto* animation = m_world.get<AnimationComponent>(entity))
-            (void)ApplyAnimation(*animation, time, *this);
-    }
+    m_world.each<AnimationComponent>([&](ecs::Entity, AnimationComponent& animation) {
+        (void)ApplyAnimation(animation, time, *this);
+    });
 }
 
 ecs::Entity SceneEntityWorld::createEntity(const std::string& name, ecs::Entity parent)
@@ -514,15 +470,7 @@ ecs::Entity SceneEntityWorld::createEntity(const std::string& name, ecs::Entity 
 void SceneEntityWorld::unregisterEntityLeaves(ecs::Entity entity)
 {
     if (auto* mesh = m_world.get<MeshInstanceComponent>(entity))
-    {
         UnregisterMeshInstanceEntity(entity, mesh->mesh, m_world.has<SkinnedMeshComponent>(entity));
-    }
-    if (m_world.has<CameraComponent>(entity))
-        UnregisterCameraEntity(entity);
-    if (m_world.has<LightComponent>(entity))
-        UnregisterLightEntity(entity);
-    if (m_world.has<AnimationComponent>(entity))
-        UnregisterAnimationEntity(entity);
 }
 
 void SceneEntityWorld::destroyEntity(ecs::Entity entity)
@@ -730,7 +678,6 @@ void SceneEntityWorld::setSkinnedMeshReference(ecs::Entity entity, ecs::Entity s
 void SceneEntityWorld::setLight(ecs::Entity entity, LightComponent component)
 {
     m_world.emplace<LightComponent>(entity, std::move(component));
-    RegisterLightEntity(entity);
     updateLeafContentAndBounds(entity);
 }
 
@@ -746,7 +693,6 @@ void SceneEntityWorld::setLight(ecs::Entity entity, const std::shared_ptr<Light>
 void SceneEntityWorld::setCamera(ecs::Entity entity, CameraComponent component)
 {
     m_world.emplace<CameraComponent>(entity, std::move(component));
-    RegisterCameraEntity(entity);
     updateLeafContentAndBounds(entity);
 }
 
@@ -762,7 +708,6 @@ void SceneEntityWorld::setCamera(ecs::Entity entity, const std::shared_ptr<Scene
 void SceneEntityWorld::setAnimation(ecs::Entity entity, AnimationComponent component)
 {
     m_world.emplace<AnimationComponent>(entity, std::move(component));
-    RegisterAnimationEntity(entity);
     updateLeafContentAndBounds(entity);
 }
 
@@ -826,6 +771,9 @@ ecs::Entity SceneEntityWorld::importSubtree(
 
             CopyEntityComponents(m_world, dstEntity, source.m_world, srcEntity, false);
 
+            if (m_world.has<AnimationComponent>(dstEntity))
+                importedAnimationEntities.push_back(dstEntity);
+
             const auto* srcMesh = source.m_world.get<MeshInstanceComponent>(srcEntity);
             const auto* srcSkinned = source.m_world.get<SkinnedMeshComponent>(srcEntity);
             if (srcMesh && srcMesh->mesh)
@@ -861,15 +809,6 @@ ecs::Entity SceneEntityWorld::importSubtree(
                     }
                     RegisterMeshInstanceEntity(dstEntity, srcMesh->mesh, srcSkinned != nullptr);
                 }
-            }
-            if (m_world.has<LightComponent>(dstEntity))
-                RegisterLightEntity(dstEntity);
-            if (m_world.has<CameraComponent>(dstEntity))
-                RegisterCameraEntity(dstEntity);
-            if (m_world.has<AnimationComponent>(dstEntity))
-            {
-                RegisterAnimationEntity(dstEntity);
-                importedAnimationEntities.push_back(dstEntity);
             }
 
             if (const auto* children = source.m_world.get<ChildrenComponent>(srcEntity))

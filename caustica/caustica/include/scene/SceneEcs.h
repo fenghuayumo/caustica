@@ -311,7 +311,6 @@ private:
     void systemUpdateGaussianSplatTransforms(ecs::World& world, const ecs::ScheduleContext& ctx);
     void systemMarkDirtySkinnedMeshes(ecs::World& world, const ecs::ScheduleContext& ctx);
     void systemMarkDirtySkinnedMeshesFromChangedJoints(ecs::World& world, const ecs::ScheduleContext& ctx);
-    void systemRebuildEntityLists(ecs::World& world, const ecs::ScheduleContext& ctx);
     void systemApplyDeferredCommands(ecs::World& world, const ecs::ScheduleContext& ctx);
     void systemRefreshInstanceIndices(ecs::World& world, const ecs::ScheduleContext& ctx);
     void systemAssignGlobalResourceIndices(ecs::World& world, const ecs::ScheduleContext& ctx);

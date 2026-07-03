@@ -5,7 +5,7 @@
 using namespace caustica;
 
 void SceneResources::RegisterMeshInstanceEntity(
-    ecs::Entity entity, const std::shared_ptr<MeshInfo>& mesh, bool skinned)
+    ecs::Entity entity, const std::shared_ptr<MeshInfo>& mesh, bool /*skinned*/)
 {
     if (!ecs::isValid(entity) || !mesh)
         return;
@@ -38,13 +38,10 @@ void SceneResources::RegisterMeshInstanceEntity(
     }
 
     m_MaxGeometryCountPerMesh = std::max(m_MaxGeometryCountPerMesh, geometryCount);
-    m_MeshInstanceEntities.push_back(entity);
-    if (skinned)
-        m_SkinnedMeshInstanceEntities.push_back(entity);
 }
 
 void SceneResources::UnregisterMeshInstanceEntity(
-    ecs::Entity entity, const std::shared_ptr<MeshInfo>& mesh, bool skinned)
+    ecs::Entity entity, const std::shared_ptr<MeshInfo>& mesh, bool /*skinned*/)
 {
     if (!ecs::isValid(entity))
         return;
@@ -74,54 +71,4 @@ void SceneResources::UnregisterMeshInstanceEntity(
             }
         }
     }
-
-    auto it = std::find(m_MeshInstanceEntities.begin(), m_MeshInstanceEntities.end(), entity);
-    if (it != m_MeshInstanceEntities.end())
-        m_MeshInstanceEntities.erase(it);
-
-    if (skinned)
-    {
-        auto sit = std::find(m_SkinnedMeshInstanceEntities.begin(), m_SkinnedMeshInstanceEntities.end(), entity);
-        if (sit != m_SkinnedMeshInstanceEntities.end())
-            m_SkinnedMeshInstanceEntities.erase(sit);
-    }
-}
-
-void SceneResources::RegisterLightEntity(ecs::Entity entity)
-{
-    if (ecs::isValid(entity))
-        m_LightEntities.push_back(entity);
-}
-
-void SceneResources::UnregisterLightEntity(ecs::Entity entity)
-{
-    auto it = std::find(m_LightEntities.begin(), m_LightEntities.end(), entity);
-    if (it != m_LightEntities.end())
-        m_LightEntities.erase(it);
-}
-
-void SceneResources::RegisterCameraEntity(ecs::Entity entity)
-{
-    if (ecs::isValid(entity))
-        m_CameraEntities.push_back(entity);
-}
-
-void SceneResources::UnregisterCameraEntity(ecs::Entity entity)
-{
-    auto it = std::find(m_CameraEntities.begin(), m_CameraEntities.end(), entity);
-    if (it != m_CameraEntities.end())
-        m_CameraEntities.erase(it);
-}
-
-void SceneResources::RegisterAnimationEntity(ecs::Entity entity)
-{
-    if (ecs::isValid(entity))
-        m_AnimationEntities.push_back(entity);
-}
-
-void SceneResources::UnregisterAnimationEntity(ecs::Entity entity)
-{
-    auto it = std::find(m_AnimationEntities.begin(), m_AnimationEntities.end(), entity);
-    if (it != m_AnimationEntities.end())
-        m_AnimationEntities.erase(it);
 }

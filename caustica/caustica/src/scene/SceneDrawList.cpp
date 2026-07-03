@@ -1,0 +1,192 @@
+#include <scene/SceneDrawList.h>
+#include <scene/SceneRenderData.h>
+#include <scene/SceneContent.h>
+#include <scene/SceneTypes.h>
+#include <scene/View.h>
+
+#include <algorithm>
+
+using namespace caustica::math;
+
+namespace caustica::scene
+{
+
+namespace
+{
+
+bool CompareOpaqueDrawCommands(const DrawCommand& a, const DrawCommand& b)
+{
+    if (a.material != b.material)
+        return a.material < b.material;
+    if (a.buffers != b.buffers)
+        return a.buffers < b.buffers;
+    if (a.meshEntity != b.meshEntity)
+        return a.meshEntity < b.meshEntity;
+    return a.instanceIndex < b.instanceIndex;
+}
+
+bool CompareTransparentDrawCommands(const DrawCommand& a, const DrawCommand& b)
+{
+    if (a.meshEntity == b.meshEntity)
+        return a.cullMode > b.cullMode;
+    return a.distanceToCamera > b.distanceToCamera;
+}
+
+void AppendOpaqueGeometryCommands(
+    const MeshInstanceRenderProxy& proxy,
+    const dm::frustum& viewFrustum,
+    std::vector<DrawCommand>& out)
+{
+    if (!proxy.mesh)
+        return;
+
+    const caustica::MeshInfo* mesh = proxy.mesh;
+    for (const auto& geometry : mesh->geometries)
+    {
+        const MaterialDomain domain = geometry->material->domain;
+        if (domain != MaterialDomain::Opaque && domain != MaterialDomain::AlphaTested)
+            continue;
+
+        if (mesh->geometries.size() > 1 && !mesh->skinPrototype)
+        {
+            const dm::box3 geometryGlobalBoundingBox = geometry->objectSpaceBounds * proxy.transformFloat;
+            if (!viewFrustum.intersectsWith(geometryGlobalBoundingBox))
+                continue;
+        }
+
+        DrawCommand& item = out.emplace_back();
+        item.meshEntity = proxy.entity;
+        item.instanceIndex = proxy.instanceIndex;
+        item.mesh = mesh;
+        item.geometry = geometry.get();
+        item.material = geometry->material.get();
+        item.buffers = mesh->buffers.get();
+        item.cullMode = item.material->doubleSided ? nvrhi::RasterCullMode::None : nvrhi::RasterCullMode::Back;
+        item.distanceToCamera = 0.f;
+    }
+}
+
+void AppendTransparentGeometryCommands(
+    const MeshInstanceRenderProxy& proxy,
+    const dm::frustum& viewFrustum,
+    const float3& viewOrigin,
+    const DrawListBuildOptions& options,
+    std::vector<DrawCommand>& out)
+{
+    if (!proxy.mesh)
+        return;
+
+    const caustica::MeshInfo* mesh = proxy.mesh;
+    for (const auto& geometry : mesh->geometries)
+    {
+        const auto& material = geometry->material;
+        if (material->domain == MaterialDomain::Opaque || material->domain == MaterialDomain::AlphaTested)
+            continue;
+
+        dm::box3 geometryGlobalBoundingBox;
+        if (mesh->geometries.size() > 1 && mesh->skinPrototype.use_count() != 0)
+        {
+            geometryGlobalBoundingBox = geometry->objectSpaceBounds * proxy.transformFloat;
+            if (!viewFrustum.intersectsWith(geometryGlobalBoundingBox))
+                continue;
+        }
+        else
+        {
+            geometryGlobalBoundingBox = proxy.globalBounds;
+        }
+
+        DrawCommand item{};
+        item.meshEntity = proxy.entity;
+        item.instanceIndex = proxy.instanceIndex;
+        item.mesh = mesh;
+        item.geometry = geometry.get();
+        item.material = material.get();
+        item.buffers = mesh->buffers.get();
+        item.distanceToCamera = length(geometryGlobalBoundingBox.center() - viewOrigin);
+
+        if (material->doubleSided)
+        {
+            if (options.drawDoubleSidedMaterialsSeparately)
+            {
+                item.cullMode = nvrhi::RasterCullMode::Front;
+                out.push_back(item);
+                item.cullMode = nvrhi::RasterCullMode::Back;
+                out.push_back(item);
+            }
+            else
+            {
+                item.cullMode = nvrhi::RasterCullMode::None;
+                out.push_back(item);
+            }
+        }
+        else
+        {
+            item.cullMode = nvrhi::RasterCullMode::Back;
+            out.push_back(item);
+        }
+    }
+}
+
+} // namespace
+
+void BuildOpaqueDrawList(
+    const SceneRenderData& renderData,
+    const caustica::IView& view,
+    std::vector<DrawCommand>& out)
+{
+    out.clear();
+
+    const dm::frustum viewFrustum = view.GetViewFrustum();
+    const auto relevantContentFlags = SceneContentFlags::OpaqueMeshes | SceneContentFlags::AlphaTestedMeshes;
+
+    for (const MeshInstanceRenderProxy& proxy : renderData.meshInstances)
+    {
+        if ((proxy.leafContent & relevantContentFlags) == 0)
+            continue;
+        if (!viewFrustum.intersectsWith(proxy.globalBounds))
+            continue;
+
+        AppendOpaqueGeometryCommands(proxy, viewFrustum, out);
+    }
+
+    if (out.size() > 1)
+        std::sort(out.begin(), out.end(), CompareOpaqueDrawCommands);
+}
+
+void BuildTransparentDrawList(
+    const SceneRenderData& renderData,
+    const caustica::IView& view,
+    std::vector<DrawCommand>& out,
+    const DrawListBuildOptions& options)
+{
+    out.clear();
+
+    const dm::frustum viewFrustum = view.GetViewFrustum();
+    const float3 viewOrigin = view.GetViewOrigin();
+    const auto relevantContentFlags = SceneContentFlags::BlendedMeshes;
+
+    for (const MeshInstanceRenderProxy& proxy : renderData.meshInstances)
+    {
+        if ((proxy.leafContent & relevantContentFlags) == 0)
+            continue;
+        if (!viewFrustum.intersectsWith(proxy.globalBounds))
+            continue;
+
+        AppendTransparentGeometryCommands(proxy, viewFrustum, viewOrigin, options, out);
+    }
+
+    if (out.size() > 1)
+        std::sort(out.begin(), out.end(), CompareTransparentDrawCommands);
+}
+
+void BuildViewDrawLists(
+    const SceneRenderData& renderData,
+    const caustica::IView& view,
+    ViewDrawLists& out,
+    const DrawListBuildOptions& options)
+{
+    BuildOpaqueDrawList(renderData, view, out.opaque);
+    BuildTransparentDrawList(renderData, view, out.transparent, options);
+}
+
+} // namespace caustica::scene
