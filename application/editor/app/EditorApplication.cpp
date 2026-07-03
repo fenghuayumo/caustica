@@ -1,7 +1,7 @@
 #include "EditorApplication.h"
 
 #include <engine/EntryPoint.h>
-#include <engine/EngineRenderer.h>
+#include <engine/RenderingSubsystem.h>
 #include <backend/GpuDevice.h>
 
 #include <events/event.h>
@@ -18,9 +18,8 @@
 #include <core/path_utils.h>
 #include <core/log.h>
 #include "SceneEditor.h"
-#include "PathTracerSessionHost.h"
+#include "EditorRuntime.h"
 #include "EditorStartup.h"
-#include "EditorSessionHost.h"
 #include <platform/window.h>
 
 #include <utility>
@@ -68,7 +67,6 @@ EditorApplication::StartupResult EditorApplication::startup(int argc, const char
         return StartupResult::FailToCreateDevice;
     }
 
-    m_sceneEditor.setApplication(this);
     setUseDedicatedRenderThread(!CmdLine.syncRender);
 
     const bool automatedRun = CmdLine.nonInteractive || CmdLine.captureSimple || CmdLine.captureSequence;
@@ -86,23 +84,34 @@ EditorApplication::StartupResult EditorApplication::startup(int argc, const char
         };
     }
 
-    m_engineRenderer = startupPathTracerSessionHost(PathTracerSessionHostParams{
-        .gpuDevice = *m_GpuDevice,
+    registerEditorRuntime(m_engine, EditorSceneSubsystemConfig{
         .sceneEditor = m_sceneEditor,
         .diagnostics = m_sessionDiagnostics,
         .frameExtensions = m_frameExtensions,
         .preferredScene = preferredScene,
         .sessionState = &m_editorUIData,
         .cmdLine = &CmdLine,
-        .frameDriver = this,
         .applyCmdLineToSessionState = CmdLine.noWindow || automatedRun,
     });
 
+    if (!m_engine.initialize(caustica::EngineInitContext{
+            .gpuDevice = m_GpuDevice.get(),
+            .window = m_Window.get(),
+            .application = this,
+        }))
+    {
+        return StartupResult::FailToCreateDevice;
+    }
+
     if (!CmdLine.noWindow)
     {
-        m_uiPass = std::make_unique<EditorUI>(m_GpuDevice.get(), *this, m_editorUIData, IsSERSupported(), CmdLine);
-        m_uiPass->Init(m_engineRenderer->shaderFactory());
-        syncPathTracerSessionBackBuffer(*m_GpuDevice, *this);
+        auto* rendering = getRenderingSubsystem(m_engine);
+        if (rendering && rendering->renderer())
+        {
+            m_uiPass = std::make_unique<EditorUI>(m_GpuDevice.get(), *this, m_editorUIData, IsSERSupported(), CmdLine);
+            m_uiPass->Init(rendering->renderer()->shaderFactory());
+        }
+        caustica::Engine::syncSwapChain(*m_GpuDevice, *this);
     }
 
     if (!CmdLine.noWindow && m_GpuDevice->GetPlatformWindow())
@@ -127,7 +136,7 @@ void EditorApplication::shutdown()
 
     unbindFrameDriver(m_GpuDevice.get());
     m_uiPass.reset();
-    m_engineRenderer.reset();
+    m_engine.shutdown();
 
     if (m_GpuDevice)
         m_GpuDevice->ReleaseWindowOwnership();
@@ -184,23 +193,22 @@ bool EditorApplication::IsSERSupported() const
 void EditorApplication::syncPassesToBackBuffer()
 {
     if (m_GpuDevice)
-        syncPathTracerSessionBackBuffer(*m_GpuDevice, *this);
+        caustica::Engine::syncSwapChain(*m_GpuDevice, *this);
 }
 
-void EditorApplication::onBeginFrame(caustica::GpuDevice& /*gpuDevice*/)
+void EditorApplication::onBeginFrame(caustica::GpuDevice& gpuDevice)
 {
-    m_sceneEditor.beginFrame();
+    m_engine.onBeginFrame(gpuDevice);
 }
 
 bool EditorApplication::skipRenderPhase() const
 {
-    return m_sceneEditor.shouldSkipRender();
+    return m_engine.skipRenderPhase();
 }
 
 void EditorApplication::onUpdate(float elapsedTimeSeconds, bool windowFocused)
 {
-    if (windowFocused)
-        m_sceneEditor.Animate(elapsedTimeSeconds);
+    m_engine.onUpdate(elapsedTimeSeconds, windowFocused);
 
     if (m_uiPass && (windowFocused || m_uiPass->ShouldAnimateUnfocused()))
     {
@@ -212,21 +220,20 @@ void EditorApplication::onUpdate(float elapsedTimeSeconds, bool windowFocused)
 void EditorApplication::onRender()
 {
     caustica::GpuDevice* dm = getGpuDevice();
-    if (!dm || m_sceneEditor.shouldSkipRender())
+    if (!dm || m_engine.skipRenderPhase())
         return;
 
-    m_sceneEditor.Render(dm->GetCurrentFramebuffer(true));
+    m_engine.onRenderScene(*dm);
 
     if (m_uiPass)
         m_uiPass->Render(dm->GetCurrentFramebuffer(m_uiPass->SupportsDepthBuffer()));
 
-    if (m_engineRenderer)
-        m_engineRenderer->endFrame();
+    m_engine.onRenderEnd(*dm);
 }
 
 void EditorApplication::onBackBufferResizing()
 {
-    m_sceneEditor.BackBufferResizing();
+    m_engine.onBackBufferResizing();
     if (m_uiPass)
         m_uiPass->BackBufferResizing();
 }
@@ -248,7 +255,7 @@ void EditorApplication::onDisplayScaleChanged(float scaleX, float scaleY)
 
 bool EditorApplication::shouldRenderWhenUnfocused() const
 {
-    return m_sceneEditor.ShouldRenderUnfocused();
+    return m_engine.shouldRenderWhenUnfocused();
 }
 
 void EditorApplication::onEvent(caustica::Event& event)
@@ -266,32 +273,44 @@ void EditorApplication::onEvent(caustica::Event& event)
 
 SceneManager* EditorApplication::GetSceneManager()
 {
-    return m_engineRenderer ? m_engineRenderer->sceneManager() : nullptr;
+    if (auto* rendering = getRenderingSubsystem(m_engine))
+        return rendering->renderer() ? rendering->renderer()->sceneManager() : nullptr;
+    return nullptr;
 }
 
 const SceneManager* EditorApplication::GetSceneManager() const
 {
-    return m_engineRenderer ? m_engineRenderer->sceneManager() : nullptr;
+    if (auto* rendering = m_engine.getSubsystem<caustica::RenderingSubsystem>())
+        return rendering->renderer() ? rendering->renderer()->sceneManager() : nullptr;
+    return nullptr;
 }
 
 caustica::RenderCore* EditorApplication::GetRenderCore()
 {
-    return m_engineRenderer ? m_engineRenderer->renderCore() : nullptr;
+    if (auto* rendering = getRenderingSubsystem(m_engine))
+        return rendering->renderer() ? rendering->renderer()->renderCore() : nullptr;
+    return nullptr;
 }
 
 const caustica::RenderCore* EditorApplication::GetRenderCore() const
 {
-    return m_engineRenderer ? m_engineRenderer->renderCore() : nullptr;
+    if (auto* rendering = m_engine.getSubsystem<caustica::RenderingSubsystem>())
+        return rendering->renderer() ? rendering->renderer()->renderCore() : nullptr;
+    return nullptr;
 }
 
 caustica::render::PathTracingWorldRenderer* EditorApplication::GetWorldRenderer()
 {
-    return m_engineRenderer ? m_engineRenderer->worldRenderer() : nullptr;
+    if (auto* rendering = getRenderingSubsystem(m_engine))
+        return rendering->renderer() ? rendering->renderer()->worldRenderer() : nullptr;
+    return nullptr;
 }
 
 const caustica::render::PathTracingWorldRenderer* EditorApplication::GetWorldRenderer() const
 {
-    return m_engineRenderer ? m_engineRenderer->worldRenderer() : nullptr;
+    if (auto* rendering = m_engine.getSubsystem<caustica::RenderingSubsystem>())
+        return rendering->renderer() ? rendering->renderer()->worldRenderer() : nullptr;
+    return nullptr;
 }
 
 } // namespace caustica::editor

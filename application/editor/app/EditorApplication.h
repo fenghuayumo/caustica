@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "engine/Application.h"
+#include "engine/Engine.h"
 #include "core/log.h"
 #include <core/Timer.h>
 #include <core/command_line.h>
@@ -16,13 +17,11 @@
 
 using caustica::FPSLimiter;
 
-// Forward declarations — full definitions only needed in .cpp
 namespace caustica::editor {
 class EditorUI;
 }
 class SceneManager;
 namespace caustica {
-    class EngineRenderer;
     class GpuDevice;
     class RenderCore;
     class Window;
@@ -34,7 +33,7 @@ namespace caustica {
 
 namespace caustica::editor {
 
-// Desktop editor — owns Application lifecycle and composes SceneEditor.
+// Desktop editor — owns Application lifecycle and composes SceneEditor via Engine runtime.
 class EditorApplication : public caustica::Application
 {
 public:
@@ -94,10 +93,10 @@ private:
     SceneEditorFrameExtension m_sceneEditorFrameExtension{ m_sceneEditor };
     std::vector<caustica::render::IPathTracingFrameExtension*> m_frameExtensions{ &m_sceneEditorFrameExtension };
 
+    caustica::Engine m_engine;
     caustica::Callback m_DefaultLogCallback = nullptr;
     FPSLimiter m_FPSLimiter;
 
-    std::unique_ptr<caustica::EngineRenderer> m_engineRenderer;
     std::unique_ptr<EditorUI> m_uiPass;
 };
 

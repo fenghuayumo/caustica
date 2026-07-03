@@ -4,9 +4,8 @@
 
 #include "SceneEditorFrameExtension.h"
 #include "SceneEditor.h"
-#include "PathTracerSessionHost.h"
-#include "PathTracerFrameDriver.h"
-#include <engine/EngineRenderer.h>
+#include "EditorRuntime.h"
+#include <engine/EngineFrameApplication.h>
 #include <engine/Application.h>
 #include <backend/GpuDevice.h>
 #include <render/SceneGaussianSplatPasses.h>
@@ -54,9 +53,8 @@
 #include <vector>
 
 using caustica::editor::SceneEditor;
-using caustica::editor::PathTracerFrameDriver;
-using caustica::editor::startupPathTracerSessionHost;
-using caustica::editor::PathTracerSessionHostParams;
+using caustica::editor::registerEditorRuntime;
+using caustica::editor::EditorSceneSubsystemConfig;
 
 #if CAUSTICA_WITH_DX12
 #include <d3d12.h>
@@ -455,30 +453,38 @@ bool RenderSession::InitRenderer()
         ? std::string("default.json")
         : m_config.scene;
 
-    m_engineRenderer = startupPathTracerSessionHost(PathTracerSessionHostParams{
-        .gpuDevice = *m_deviceManager,
+    m_engine = std::make_unique<caustica::Engine>();
+    registerEditorRuntime(*m_engine, EditorSceneSubsystemConfig{
         .sceneEditor = *m_renderer,
         .diagnostics = m_sessionDiagnostics,
         .frameExtensions = m_frameExtensions,
         .preferredScene = preferredScene,
         .sessionState = &m_sessionState,
         .cmdLine = &m_cmdLine,
-        .syncBackBuffer = false,
+        .applyCmdLineToSessionState = true,
+        .postAppInit = false,
     });
 
-    auto frameDriver = std::make_unique<PathTracerFrameDriver>(
+    m_AppLoop = std::make_unique<caustica::EngineFrameApplication>(
+        m_engine.get(),
         m_deviceManager.get(),
-        m_config.headless ? nullptr : m_Window.get(),
-        m_renderer.get(),
-        m_engineRenderer.get());
-    m_renderer->setApplication(frameDriver.get());
-    frameDriver->setUseDedicatedRenderThread(!m_cmdLine.syncRender && !m_config.headless);
-    frameDriver->beforePresent =
+        m_config.headless ? nullptr : m_Window.get());
+    m_AppLoop->setUseDedicatedRenderThread(!m_cmdLine.syncRender && !m_config.headless);
+    m_AppLoop->beforePresent =
         [this](caustica::GpuDevice& manager, uint32_t) {
             m_lastRenderedBackBufferIndex = manager.GetCurrentBackBufferIndex();
         };
-    frameDriver->syncToBackBuffer();
-    m_AppLoop = std::move(frameDriver);
+
+    if (!m_engine->initialize(caustica::EngineInitContext{
+            .gpuDevice = m_deviceManager.get(),
+            .window = m_config.headless ? nullptr : m_Window.get(),
+            .application = m_AppLoop.get(),
+        }))
+    {
+        return false;
+    }
+
+    m_AppLoop->syncSwapChain();
 
     return true;
 }
@@ -488,11 +494,13 @@ void RenderSession::Shutdown()
     if (m_deviceManager)
         m_deviceManager->setFrameDriver(nullptr);
 
+    m_AppLoop.reset();
     m_renderer.reset();
     m_sceneEditorFrameExtension.reset();
     m_frameExtensions.clear();
-    m_engineRenderer.reset();
-    m_AppLoop.reset();
+    if (m_engine)
+        m_engine->shutdown();
+    m_engine.reset();
 
     if (m_deviceManager)
     {

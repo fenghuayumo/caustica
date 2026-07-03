@@ -28,19 +28,19 @@
 #include <render/WorldRenderer/PathTracingFrameExtension.h>
 #include <render/RenderSessionState.h>
 #include <render/SessionDiagnostics.h>
-#include <engine/EngineRenderer.h>
 
 #include <core/command_line.h>
 #include <EditorUIState.h>
 
 #if CAUSTICA_WITH_DX12 && defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
+#include <d3d12.h>
 #include <wrl/client.h>
 #endif
 
 namespace caustica
 {
-class Application;
-class EngineRenderer;
+class Engine;
+class EngineFrameApplication;
 class GpuDevice;
 }
 
@@ -139,8 +139,8 @@ private:
     caustica::render::SessionDiagnostics              m_sessionDiagnostics;
     std::unique_ptr<caustica::GpuDevice>      m_deviceManager;
     std::unique_ptr<caustica::Window>            m_Window;
-    std::unique_ptr<caustica::Application>         m_AppLoop;
-    std::unique_ptr<caustica::EngineRenderer>   m_engineRenderer;
+    std::unique_ptr<caustica::Engine>              m_engine;
+    std::unique_ptr<caustica::EngineFrameApplication> m_AppLoop;
     std::unique_ptr<caustica::editor::SceneEditor>             m_renderer;
     std::unique_ptr<caustica::editor::SceneEditorFrameExtension> m_sceneEditorFrameExtension;
     std::vector<caustica::render::IPathTracingFrameExtension*> m_frameExtensions;
