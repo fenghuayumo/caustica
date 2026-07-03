@@ -56,6 +56,7 @@ public:
     void fillPTPipelineGlobalMacros(std::vector<caustica::ShaderMacro>& macros);
     bool createPTPipeline();
     void createRTPipelines();
+    void ensureStablePlanePipelines();
 
     void createBlases(nvrhi::ICommandList* commandList);
     void createTlas(nvrhi::ICommandList* commandList);

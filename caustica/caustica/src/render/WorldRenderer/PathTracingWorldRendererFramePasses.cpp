@@ -136,7 +136,10 @@ void caustica::render::PathTracingWorldRenderer::framePassSetup(PathTracingFrame
     {
         m_context.settings.ResetAccumulation = true;
         if (m_context.settings.RealtimeMode)
+        {
             m_context.settings.ResetRealtimeCaches = true;
+            m_context.rayTracing.ensureStablePlanePipelines();
+        }
         m_lastRealtimeMode = m_context.settings.RealtimeMode;
     }
 
@@ -200,50 +203,34 @@ void caustica::render::PathTracingWorldRenderer::framePassRendererInit(PathTraci
 
     if (ctx.needNewPasses)
     {
-        info("Renderer init: begin");
         m_context.diagnostics.progressInitializingRenderer.Start("Initializing renderer...");
 
         if (m_context.materials == nullptr)
         {
-            info("Renderer init: create material cache begin");
             m_context.materials = std::make_shared<MaterialGpuCache>(
                 std::string("PathTracerMaterialSpecializations.hlsl"), device(), m_context.textureCache, m_context.shaderFactory);
-            info("Renderer init: create material cache end");
             assert(m_pathTracingShaderCompiler == nullptr);
 
-            info("Renderer init: create path tracing shader compiler begin");
             m_pathTracingShaderCompiler = std::make_shared<PathTracingShaderCompiler>(
                 device(), m_context.materials, m_bindingLayout, m_bindlessLayout);
-            info("Renderer init: create path tracing shader compiler end");
 
             std::vector<std::filesystem::path> additionalShaderPaths;
-            info("Renderer init: create compute pipeline registry begin");
             m_context.computePipelines = std::make_shared<ComputePipelineRegistry>(device(), additionalShaderPaths);
-            info("Renderer init: create compute pipeline registry end");
 
-            info("Renderer init: create RT pipeline variants begin");
             m_context.rayTracing.createRTPipelines();
-            info("Renderer init: create RT pipeline variants end");
         }
 
-        info("Renderer init: material render passes/load begin");
         m_context.materials->CreateRenderPassesAndLoadMaterials(
             m_bindlessLayout, m_context.commonPasses, m_context.sceneManager.getScene(),
             m_context.sceneManager.getCurrentScenePath(), GetLocalPath(c_AssetsFolder));
-        info("Renderer init: material render passes/load end");
         m_context.diagnostics.progressInitializingRenderer.Set(5);
         {
-            info("Renderer init: idle maintenance extensions begin");
             PathTracingFrameEvent event{ .framePhase = PathTracingFramePhase::IdleMaintenance };
             dispatchFrameExtensions(event);
-            info("Renderer init: idle maintenance extensions end");
         }
-        info("Renderer init: OMM render passes begin");
         if (m_context.opacityMaps)
             m_context.opacityMaps->CreateRenderPasses(m_bindlessLayout, m_context.commonPasses);
-        info("Renderer init: OMM render passes end");
         m_context.diagnostics.progressInitializingRenderer.Set(20);
-        info("Renderer init: end");
     }
 
     m_context.rayTracing.recreateAccelStructs(m_commandList);
@@ -257,28 +244,22 @@ void caustica::render::PathTracingWorldRenderer::framePassRendererInit(PathTraci
     if (ctx.needNewPasses)
     {
         m_context.diagnostics.progressInitializingRenderer.Set(40);
-        info("Renderer init: pre-createRenderPasses wait begin");
         const bool preCreatePassesWaitOk = device()->waitForIdle();
-        info("Renderer init: pre-createRenderPasses wait end, ok=%s", preCreatePassesWaitOk ? "true" : "false");
         if (!preCreatePassesWaitOk)
         {
             ctx.aborted = true;
             return;
         }
-        info("Renderer init: createRenderPasses begin");
         m_commandList->open();
         createRenderPasses(ctx.exposureResetRequired, m_commandList);
         m_commandList->close();
         device()->executeCommandList(m_commandList);
-        info("Renderer init: createRenderPasses wait begin");
         const bool createPassesWaitOk = device()->waitForIdle();
-        info("Renderer init: createRenderPasses wait end, ok=%s", createPassesWaitOk ? "true" : "false");
         if (!createPassesWaitOk)
         {
             ctx.aborted = true;
             return;
         }
-        info("Renderer init: createRenderPasses end");
         m_context.diagnostics.progressInitializingRenderer.Set(70);
     }
 }

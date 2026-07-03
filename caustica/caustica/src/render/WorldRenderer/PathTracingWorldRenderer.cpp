@@ -1193,6 +1193,9 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
 
     ensureFramePipelineBuilt();
     m_framePipeline->executeAll(ctx);
+
+    if (ctx.aborted)
+        postUpdatePathTracing();
 }
 void caustica::render::PathTracingWorldRenderer::recreateBindingSet()
 {
@@ -1343,6 +1346,12 @@ void caustica::render::PathTracingWorldRenderer::pathTrace(nvrhi::IFramebuffer* 
 
     if (useStablePlanes)
     {
+        if (!m_ptPipelineBuildStablePlanes || !m_ptPipelineFillStablePlanes)
+        {
+            m_context.rayTracing.ensureStablePlanePipelines();
+            assert(m_ptPipelineBuildStablePlanes && m_ptPipelineFillStablePlanes);
+        }
+
         {
             RAII_SCOPE(m_commandList->beginMarker("PathTracePrePass"); , m_commandList->endMarker(); );
 
