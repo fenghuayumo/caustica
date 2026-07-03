@@ -6,6 +6,7 @@
 #include <render/Core/CameraController.h>
 #include <render/WorldRenderer/PathTracingContext.h>
 #include <render/WorldRenderer/PathTracingFrameExtension.h>
+#include <render/WorldRenderer/PathTracingFramePipeline.h>
 #include <shaders/PathTracer/Config.h>
 #include <shaders/SampleConstantBuffer.h>
 #include <render/Core/RenderTargets.h>
@@ -17,7 +18,10 @@
 #include <render/Passes/Debug/ShaderDebug.h>
 #include <render/Passes/Gaussian/GaussianSplatEmissionProxy.h>
 
+#include <render/WorldRenderer/PathTracingFrameContext.h>
+
 #include <chrono>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -44,6 +48,7 @@ class ICompositeView;
 class IView;
 namespace render
 {
+class PathTracingFramePipeline;
 class TemporalAntiAliasingPass;
 class BloomPass;
 class DLSS;
@@ -134,6 +139,20 @@ private:
     [[nodiscard]] dm::float2 computeCameraJitter() const;
     void dispatchFrameExtensions(PathTracingFrameEvent& event) const;
 
+    void ensureFramePipelineBuilt();
+    void framePassSetup(PathTracingFrameContext& ctx);
+    void framePassEnsureRenderTargets(PathTracingFrameContext& ctx);
+    void framePassRendererInit(PathTracingFrameContext& ctx);
+    void framePassShaderUpdate(PathTracingFrameContext& ctx);
+    void framePassBeginCommandList(PathTracingFrameContext& ctx);
+    void framePassSceneUpdate(PathTracingFrameContext& ctx);
+    void framePassPathTracePrepare(PathTracingFrameContext& ctx);
+    void framePassPathTrace(PathTracingFrameContext& ctx);
+    void framePassDenoiseAndAA(PathTracingFrameContext& ctx);
+    void framePassToneMapping(PathTracingFrameContext& ctx);
+    void framePassComposite(PathTracingFrameContext& ctx);
+    void framePassFinalize(PathTracingFrameContext& ctx);
+
     void createRenderPasses(bool& exposureResetRequired, nvrhi::CommandListHandle initializeCommandList);
     void preUpdateLighting(nvrhi::CommandListHandle commandList, bool& needNewBindings);
     void updateLighting(nvrhi::CommandListHandle commandList);
@@ -155,6 +174,8 @@ private:
 #endif
 
     PathTracingContext&          m_context;
+
+    std::unique_ptr<PathTracingFramePipeline>   m_framePipeline;
 
     std::unique_ptr<RtxdiPass>                  m_rtxdiPass;
     std::unique_ptr<RenderTargets>              m_renderTargets;
