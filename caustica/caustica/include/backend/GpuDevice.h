@@ -261,6 +261,7 @@ namespace caustica
 
         void setFrameDriver(IGpuFrameDriver* driver) { m_frameDriver = driver; }
         [[nodiscard]] IGpuFrameDriver* getFrameDriver() const { return m_frameDriver; }
+        void waitForRenderThreadIdle();
 
         // returns the size of the window in screen coordinates
         void GetWindowDimensions(int& width, int& height);

@@ -212,9 +212,7 @@ void SceneManager::setLoadingCallbacks(std::function<void()> onLoaded,
 void SceneManager::beginLoadingScene(std::shared_ptr<caustica::IFileSystem> fs,
                                      const std::filesystem::path& sceneFileName)
 {
-    if (m_textureCache)
-        m_textureCache->Reset();
-
+    m_device.waitForRenderThreadIdle();
     m_device.GetDevice()->waitForIdle();
     m_device.GetDevice()->runGarbageCollection();
 
@@ -227,6 +225,12 @@ void SceneManager::beginLoadingScene(std::shared_ptr<caustica::IFileSystem> fs,
 void SceneManager::updateLoading()
 {
     m_loader.update();
+}
+
+void SceneManager::tickSimulation(uint32_t frameIndex)
+{
+    if (m_scene)
+        m_scene->RefreshSceneWorld(frameIndex);
 }
 
 bool SceneManager::isSceneLoading() const

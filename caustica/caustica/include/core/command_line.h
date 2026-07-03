@@ -74,6 +74,10 @@ struct CommandLineOptions
     std::string pythonScript = "";
     std::string pythonExpr = "";
 
+    int sceneSwitchTestInterval = 0;
+    int sceneSwitchTestCount = 0;
+    bool syncRender = false;
+
     CommandLineOptions() = default;
 
     // Parses argc/argv using cxxopts. Returns false on error or --help.

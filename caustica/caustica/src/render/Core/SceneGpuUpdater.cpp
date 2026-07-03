@@ -107,6 +107,9 @@ void WriteInstanceBuffer(nvrhi::ICommandList* commandList, const SceneGpuResourc
 
 void UpdateMaterial(SceneGpuResources& gpu, const std::shared_ptr<Material>& material)
 {
+    if (!material || material->materialID >= gpu.materialData.size())
+        return;
+
     material->FillConstantBuffer(gpu.materialData[material->materialID], gpu.useResourceDescriptorHeapBindless);
 }
 
@@ -157,6 +160,9 @@ void UpdateInstance(Scene& scene, ecs::Entity entity)
         return;
 
     SceneGpuResources& gpu = scene.GetGpuResources();
+    if (meshComp->instanceIndex < 0 || static_cast<size_t>(meshComp->instanceIndex) >= gpu.instanceData.size())
+        return;
+
     InstanceData& idata = gpu.instanceData[meshComp->instanceIndex];
     affineToColumnMajor(global->transformFloat, idata.transform);
     affineToColumnMajor(global->previousTransformFloat, idata.prevTransform);
@@ -587,6 +593,9 @@ void UpdateGpuSceneBuffers(Scene& scene, nvrhi::ICommandList* commandList, uint3
 
         if (material->dirty)
         {
+            if (material->materialID >= gpu.materialData.size())
+                continue;
+
             commandList->writeBuffer(material->materialConstants,
                 &gpu.materialData[material->materialID],
                 sizeof(MaterialConstants));
@@ -604,8 +613,18 @@ void UpdateGpuSceneBuffers(Scene& scene, nvrhi::ICommandList* commandList, uint3
             if (arraysAllocated)
                 break;
 
+            if (!mesh)
+                continue;
+
             for (const auto& geometry : mesh->geometries)
             {
+                if (geometryResourceIndex >= gpu.geometryData.size())
+                {
+                    caustica::error("SceneGpuUpdater: geometry index %u out of range (size=%zu)",
+                        geometryResourceIndex, gpu.geometryData.size());
+                    break;
+                }
+
                 if (geometry->numIndices != gpu.geometryData[geometryResourceIndex].numIndices)
                 {
                     arraysAllocated = true;
@@ -620,6 +639,9 @@ void UpdateGpuSceneBuffers(Scene& scene, nvrhi::ICommandList* commandList, uint3
     {
         for (const auto& mesh : scene.GetMeshes())
         {
+            if (!mesh || !mesh->buffers)
+                continue;
+
             mesh->buffers->instanceBuffer = gpu.instanceBuffer;
 
             if (gpu.enableBindlessResources)
@@ -655,21 +677,31 @@ void SceneGpuUpdater::Refresh(Scene& scene, nvrhi::ICommandList* commandList, ui
     if (entityWorld == nullptr)
         return;
 
-    const bool structureChanged = scene.HasSceneStructureChanged() || entityWorld->hasPendingStructureChanges();
-    const bool transformsChanged = scene.HasSceneTransformsChanged() || entityWorld->hasPendingTransformChanges();
+    if (entityWorld->hasPendingStructureChanges() || entityWorld->hasPendingTransformChanges())
+        scene.RefreshSceneWorld(frameIndex);
 
-    scene.RefreshSceneWorld(frameIndex);
+    scene.PublishRenderSnapshot();
+
+    const bool structureChanged = scene.HasSceneStructureChanged();
+    const bool transformsChanged = scene.HasSceneTransformsChanged();
+
     UpdateGpuSceneBuffers(scene, commandList, frameIndex, structureChanged, transformsChanged);
 }
 
 void SceneGpuUpdater::RefreshAfterLoad(Scene& scene, uint32_t frameIndex)
 {
+    scene.RefreshSceneWorld(frameIndex);
+
     SceneGpuResources& gpu = scene.GetGpuResources();
+    if (!gpu.device->waitForIdle())
+        return;
+
     nvrhi::CommandListHandle commandList = gpu.device->createCommandList();
     commandList->open();
 
     EnsureMeshGpuBuffers(scene, commandList);
-    Refresh(scene, commandList, frameIndex);
+    scene.PublishRenderSnapshot();
+    UpdateGpuSceneBuffers(scene, commandList, frameIndex, /*structureChanged=*/true, /*transformsChanged=*/true);
 
     commandList->close();
     gpu.device->executeCommandList(commandList);

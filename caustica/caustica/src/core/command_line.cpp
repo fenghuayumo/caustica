@@ -75,7 +75,10 @@ bool CommandLineOptions::InitFromCommandLine(int _argc, char const* const* _argv
             ("propShowTags", "Filter props by comma-separated tags", value(PropShowTags))
             ("propCameraAttach", "Attach camera to named prop", value(PropCameraAttach))
             ("pythonScript", "Path to Python script to run after scene load", value(pythonScript))
-            ("pythonExpr", "Inline Python expression to run after scene load", value(pythonExpr));
+            ("pythonExpr", "Inline Python expression to run after scene load", value(pythonExpr))
+            ("sceneSwitchTest", "Auto-switch scenes every N render frames (render-thread path)", value(sceneSwitchTestInterval))
+            ("sceneSwitchTestCount", "Exit after this many auto scene switches (0 = unlimited)", value(sceneSwitchTestCount))
+            ("syncRender", "Run rendering on the main thread (disable async render thread)", value(syncRender));
 
         int argc = _argc;
         char const* const* argv = _argv;

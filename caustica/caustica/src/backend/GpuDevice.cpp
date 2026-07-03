@@ -209,6 +209,12 @@ void GpuDevice::BackBufferResizing()
         m_frameDriver->notifyBackBufferResizing();
 }
 
+void GpuDevice::waitForRenderThreadIdle()
+{
+    if (m_frameDriver)
+        m_frameDriver->waitForRenderThreadIdle();
+}
+
 void GpuDevice::BackBufferResized()
 {
     CreateDepthBuffer();

@@ -26,6 +26,8 @@ public:
     void syncToBackBuffer();
 
 protected:
+    void onBeginFrame(caustica::GpuDevice& gpuDevice) override;
+    bool skipRenderPhase() const override;
     void onUpdate(float elapsedTimeSeconds, bool windowFocused) override;
     void onRender() override;
     bool shouldRenderWhenUnfocused() const override;

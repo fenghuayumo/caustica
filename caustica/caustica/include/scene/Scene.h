@@ -4,6 +4,8 @@
 #include <scene/SceneAnimation.h>
 #include <scene/SceneEcs.h>
 #include <scene/SceneRenderData.h>
+#include <scene/SceneRenderSnapshot.h>
+#include <scene/SceneRenderCommandQueue.h>
 #include <scene/SceneImport.h>
 #include <backend/IDescriptorTableManager.h>
 #include <rhi/nvrhi.h>
@@ -46,7 +48,8 @@ namespace caustica
         std::shared_ptr<TextureLoader> m_TextureLoader;
         std::shared_ptr<IDescriptorTableManager> m_DescriptorTable;
         std::unique_ptr<scene::SceneEntityWorld> m_EntityWorld;
-        scene::SceneRenderData m_RenderData;
+        scene::SceneRenderSnapshot m_RenderSnapshot;
+        scene::SceneRenderCommandQueue m_RenderCommands;
         std::shared_ptr<GltfImporter> m_GltfImporter;
         std::shared_ptr<ObjImporter> m_ObjImporter;
         std::vector<SceneImportResult> m_Models;
@@ -103,6 +106,7 @@ namespace caustica
             std::shared_ptr<SceneTypeFactory> sceneTypeFactory);
 
         void RefreshSceneWorld(uint32_t frameIndex);
+        void PublishRenderSnapshot();
         [[nodiscard]] bool HasSceneTransformsChanged() const { return m_SceneTransformsChanged; }
         [[nodiscard]] bool HasSceneStructureChanged() const { return m_SceneStructureChanged; }
 
@@ -128,7 +132,9 @@ namespace caustica
         [[nodiscard]] const std::vector<ecs::Entity>& GetLightEntities() const;
         [[nodiscard]] const std::vector<ecs::Entity>& GetCameraEntities() const;
         [[nodiscard]] const std::vector<ecs::Entity>& GetAnimationEntities() const;
-        [[nodiscard]] const scene::SceneRenderData& GetRenderData() const { return m_RenderData; }
+        [[nodiscard]] const scene::SceneRenderData& GetRenderData() const { return m_RenderSnapshot.readBuffer(); }
+        [[nodiscard]] scene::SceneRenderCommandQueue& GetRenderCommands() { return m_RenderCommands; }
+        [[nodiscard]] const scene::SceneRenderCommandQueue& GetRenderCommands() const { return m_RenderCommands; }
 
         void AttachLightToRoot(const std::shared_ptr<Light>& light);
         void AttachLightToRoot(scene::LightComponent component, const std::string& name = {});

@@ -69,6 +69,7 @@ public:
         std::function<std::filesystem::path()> assetsRoot;
         std::function<void()> postSceneLoad;
         std::function<bool(const std::string&)> setCameraPosDirUp;
+        std::function<void(std::function<void()>)> runGpuWorkOnRenderThread;
 #if CAUSTICA_WITH_PYTHON
         PythonScripting* pythonScripting = nullptr;
 #endif

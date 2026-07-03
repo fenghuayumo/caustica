@@ -15,6 +15,9 @@ public:
 
     virtual void notifyBackBufferResizing() = 0;
     virtual void notifyBackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount) = 0;
+
+    // Drain the dedicated render thread before GPU teardown (scene unload, etc.).
+    virtual void waitForRenderThreadIdle() {}
 };
 
 } // namespace caustica

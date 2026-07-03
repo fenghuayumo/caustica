@@ -129,6 +129,10 @@ private:
     void* m_dlssgInputsProcessingCompletionFence = nullptr;
     uint64_t m_dlssgLastPresentInputsProcessingCompletionFenceValue = 0;
 
+    void bindRenderFrameToken(void* frameToken);
+    void unbindRenderFrameToken();
+    [[nodiscard]] sl::FrameToken* activeFrameToken() const;
+
 public:
     // Interface for device manager
     static StreamlineIntegration& Get();
@@ -143,6 +147,18 @@ public:
     void RenderEnd(GpuDevice& manager) override;
     void PresentStart(GpuDevice& manager) override;
     void PresentEnd(GpuDevice& manager) override;
+
+    // Captures the Streamline frame token for the current sim frame (call after SimEnd on the main thread).
+    void* getFrameTokenForRender() const { return m_currentFrame; }
+
+    class RenderFrameTokenScope
+    {
+    public:
+        explicit RenderFrameTokenScope(void* frameToken);
+        ~RenderFrameTokenScope();
+        RenderFrameTokenScope(const RenderFrameTokenScope&) = delete;
+        RenderFrameTokenScope& operator=(const RenderFrameTokenScope&) = delete;
+    };
 
     bool InitializePreDevice(nvrhi::GraphicsAPI api, int appId, const bool checkSig = true, const bool enableLog = false);
 #if CAUSTICA_WITH_DX11 || CAUSTICA_WITH_DX12

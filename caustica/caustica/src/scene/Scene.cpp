@@ -290,27 +290,27 @@ size_t Scene::GetGeometryInstancesCount() const
 
 const std::vector<ecs::Entity>& Scene::GetMeshInstances() const
 {
-    return m_RenderData.meshInstanceEntities;
+    return m_RenderSnapshot.readBuffer().meshInstanceEntities;
 }
 
 const std::vector<ecs::Entity>& Scene::GetSkinnedMeshInstances() const
 {
-    return m_RenderData.skinnedMeshInstanceEntities;
+    return m_RenderSnapshot.readBuffer().skinnedMeshInstanceEntities;
 }
 
 const std::vector<ecs::Entity>& Scene::GetLightEntities() const
 {
-    return m_RenderData.lightEntities;
+    return m_RenderSnapshot.readBuffer().lightEntities;
 }
 
 const std::vector<ecs::Entity>& Scene::GetCameraEntities() const
 {
-    return m_RenderData.cameraEntities;
+    return m_RenderSnapshot.readBuffer().cameraEntities;
 }
 
 const std::vector<ecs::Entity>& Scene::GetAnimationEntities() const
 {
-    return m_RenderData.animationEntities;
+    return m_RenderSnapshot.readBuffer().animationEntities;
 }
 
 void Scene::AttachLightToRoot(const std::shared_ptr<Light>& light)
@@ -980,10 +980,21 @@ void Scene::RefreshSceneWorld(uint32_t frameIndex)
     if (!m_EntityWorld)
         return;
 
-    m_SceneStructureChanged = m_EntityWorld->hasPendingStructureChanges();
-    m_SceneTransformsChanged = m_EntityWorld->hasPendingTransformChanges();
+    scene::SceneRenderPublishState& pending = m_RenderSnapshot.pendingState();
+    pending.structureChanged = m_EntityWorld->hasPendingStructureChanges();
+    pending.transformsChanged = m_EntityWorld->hasPendingTransformChanges();
+    pending.frameIndex = frameIndex;
+
     m_EntityWorld->refresh(frameIndex);
-    scene::ExtractSceneRenderData(*m_EntityWorld, m_RenderData);
+    scene::ExtractSceneRenderData(*m_EntityWorld, m_RenderSnapshot.writeBuffer());
+}
+
+void Scene::PublishRenderSnapshot()
+{
+    m_RenderSnapshot.publish();
+    m_SceneStructureChanged = m_RenderSnapshot.publishedState().structureChanged;
+    m_SceneTransformsChanged = m_RenderSnapshot.publishedState().transformsChanged;
+    m_RenderCommands.drain(*this);
 }
 
 GeometryData* Scene::GetGeometryData(const MeshGeometry& geometry) const

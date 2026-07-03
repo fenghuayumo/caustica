@@ -471,6 +471,8 @@ bool RenderSession::InitRenderer()
         m_config.headless ? nullptr : m_Window.get(),
         m_renderer.get(),
         m_engineRenderer.get());
+    m_renderer->setApplication(frameDriver.get());
+    frameDriver->setUseDedicatedRenderThread(!m_cmdLine.syncRender && !m_config.headless);
     frameDriver->beforePresent =
         [this](caustica::GpuDevice& manager, uint32_t) {
             m_lastRenderedBackBufferIndex = manager.GetCurrentBackBufferIndex();

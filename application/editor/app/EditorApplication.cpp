@@ -68,6 +68,9 @@ EditorApplication::StartupResult EditorApplication::startup(int argc, const char
         return StartupResult::FailToCreateDevice;
     }
 
+    m_sceneEditor.setApplication(this);
+    setUseDedicatedRenderThread(!CmdLine.syncRender);
+
     const bool automatedRun = CmdLine.nonInteractive || CmdLine.captureSimple || CmdLine.captureSequence;
     if (automatedRun)
     {
@@ -119,6 +122,8 @@ void EditorApplication::shutdown()
 {
     if (m_shutdownCalled)
         return;
+
+    renderThread().stop();
 
     unbindFrameDriver(m_GpuDevice.get());
     m_uiPass.reset();
@@ -182,6 +187,16 @@ void EditorApplication::syncPassesToBackBuffer()
         syncPathTracerSessionBackBuffer(*m_GpuDevice, *this);
 }
 
+void EditorApplication::onBeginFrame(caustica::GpuDevice& /*gpuDevice*/)
+{
+    m_sceneEditor.beginFrame();
+}
+
+bool EditorApplication::skipRenderPhase() const
+{
+    return m_sceneEditor.shouldSkipRender();
+}
+
 void EditorApplication::onUpdate(float elapsedTimeSeconds, bool windowFocused)
 {
     if (windowFocused)
@@ -197,7 +212,7 @@ void EditorApplication::onUpdate(float elapsedTimeSeconds, bool windowFocused)
 void EditorApplication::onRender()
 {
     caustica::GpuDevice* dm = getGpuDevice();
-    if (!dm)
+    if (!dm || m_sceneEditor.shouldSkipRender())
         return;
 
     m_sceneEditor.Render(dm->GetCurrentFramebuffer(true));

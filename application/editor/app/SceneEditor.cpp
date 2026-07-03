@@ -33,6 +33,8 @@
 #include <render/Core/RenderSceneTypeFactory.h>
 #include <backend/GpuDevice.h>
 #include <core/log.h>
+#include <engine/Application.h>
+#include <engine/RenderThread.h>
 #include <core/json.h>
 #include <core/vfs/VFS.h>
 #include <math/float.h>
@@ -458,7 +460,86 @@ void SceneEditor::Init(const std::string& preferredScene,
 
 void SceneEditor::SetCurrentScene( const std::string & sceneName, bool forceReload )
 {
-    m_lifecycleCoordinator.setCurrentScene(sceneName, forceReload);
+    if (caustica::IsRenderThread())
+    {
+        std::lock_guard lock(m_pendingSceneSwitchMutex);
+        m_pendingSceneSwitch = PendingSceneSwitch{sceneName, forceReload};
+        return;
+    }
+
+    applySceneSwitch(sceneName, forceReload);
+}
+
+void SceneEditor::applySceneSwitch(const std::string& sceneName, bool forceReload)
+{
+    if (m_application)
+    {
+        m_application->waitForDedicatedRenderThreadIdle();
+        if (caustica::GpuDevice* gpuDevice = m_application->getGpuDevice())
+            gpuDevice->waitForRenderThreadIdle();
+    }
+
+    if (m_lifecycleCoordinator.setCurrentScene(sceneName, forceReload))
+        m_skipRenderAfterSceneSwitch = true;
+}
+
+bool SceneEditor::shouldSkipRender() const
+{
+    if (m_skipRenderAfterSceneSwitch)
+        return true;
+    return !m_sceneManager || m_sceneManager->getScene() == nullptr;
+}
+
+void SceneEditor::beginFrame()
+{
+    const bool switched = processPendingSceneSwitch();
+    if (!switched)
+        m_skipRenderAfterSceneSwitch = false;
+}
+
+bool SceneEditor::processPendingSceneSwitch()
+{
+    std::optional<PendingSceneSwitch> pending;
+    {
+        std::lock_guard lock(m_pendingSceneSwitchMutex);
+        pending.swap(m_pendingSceneSwitch);
+    }
+
+    if (!pending)
+        return false;
+
+    applySceneSwitch(pending->sceneName, pending->forceReload);
+    return true;
+}
+
+void SceneEditor::tickSceneSwitchTest()
+{
+    if (m_cmdLine.sceneSwitchTestInterval <= 0 || !m_sceneManager)
+        return;
+
+    if (--m_sceneSwitchTestFramesUntilSwitch > 0)
+        return;
+
+    m_sceneSwitchTestFramesUntilSwitch = m_cmdLine.sceneSwitchTestInterval;
+
+    const std::vector<std::string>& scenes = GetAvailableScenes();
+    if (scenes.size() < 2)
+        return;
+
+    if (m_sceneSwitchTestSceneIndex >= scenes.size())
+        m_sceneSwitchTestSceneIndex = 0;
+
+    const std::string& nextScene = scenes[m_sceneSwitchTestSceneIndex++];
+    caustica::info("SceneSwitchTest: requesting '%s' from render thread", nextScene.c_str());
+    SetCurrentScene(nextScene);
+
+    ++m_sceneSwitchTestSwitchesDone;
+    if (m_cmdLine.sceneSwitchTestCount > 0
+        && m_sceneSwitchTestSwitchesDone >= m_cmdLine.sceneSwitchTestCount
+        && m_application)
+    {
+        m_application->requestExit();
+    }
 }
 
 bool SceneEditor::LoadGaussianSplatFile(const std::filesystem::path& fileName, bool convertRdfToRub)
@@ -650,6 +731,9 @@ void SceneEditor::Animate(float fElapsedTimeSeconds)
             m_settings.ResetAccumulation = true;
         m_worldRenderer->setGaussianSplatTemporalReset(true);
     }
+
+    if (IsSceneLoaded() && m_sceneManager)
+        m_sceneManager->tickSimulation(GetFrameIndex());
 
     m_captureScriptManager->PostAnim();
 
@@ -990,11 +1074,11 @@ bool SceneEditor::AccumulationCompleted() const
 
 void SceneEditor::Render(nvrhi::IFramebuffer* framebuffer)
 {
-    if (GetSceneManager()->getScene() == nullptr)
-    {
-        assert(false);
+    tickSceneSwitchTest();
+
+    if (shouldSkipRender())
         return;
-    }
+
     PrepareEditorFrame();
     GetWorldRenderer()->render(framebuffer);
 
@@ -1119,6 +1203,12 @@ void SceneEditor::SyncSubsystemContext()
         .assetsRoot = [] { return GetLocalPath(c_AssetsFolder); },
         .postSceneLoad = [this] { LocalConfig::PostSceneLoad(*this, m_sessionState, m_editor); },
         .setCameraPosDirUp = [this](const std::string& value) { return SetCurrentCameraPosDirUp(value); },
+        .runGpuWorkOnRenderThread = [this](std::function<void()> work) {
+            if (m_application)
+                m_application->runGpuWorkOnRenderThread(work);
+            else if (work)
+                work();
+        },
 #if CAUSTICA_WITH_PYTHON
         .pythonScripting = m_pythonScripting.get(),
 #endif

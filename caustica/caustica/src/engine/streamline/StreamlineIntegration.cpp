@@ -60,6 +60,38 @@ using namespace caustica;
 namespace caustica 
 {
 
+namespace
+{
+thread_local sl::FrameToken* g_boundRenderFrameToken = nullptr;
+} // namespace
+
+void StreamlineIntegration::bindRenderFrameToken(void* frameToken)
+{
+    g_boundRenderFrameToken = static_cast<sl::FrameToken*>(frameToken);
+}
+
+void StreamlineIntegration::unbindRenderFrameToken()
+{
+    g_boundRenderFrameToken = nullptr;
+}
+
+sl::FrameToken* StreamlineIntegration::activeFrameToken() const
+{
+    if (g_boundRenderFrameToken != nullptr)
+        return g_boundRenderFrameToken;
+    return m_currentFrame;
+}
+
+StreamlineIntegration::RenderFrameTokenScope::RenderFrameTokenScope(void* frameToken)
+{
+    StreamlineIntegration::Get().bindRenderFrameToken(frameToken);
+}
+
+StreamlineIntegration::RenderFrameTokenScope::~RenderFrameTokenScope()
+{
+    StreamlineIntegration::Get().unbindRenderFrameToken();
+}
+
 // Format conversion functions
 static sl::float2 make_sl_float2(const dm::float2& srcF) 
 { 
@@ -656,7 +688,11 @@ void StreamlineIntegration::SetConstants(const Constants& consts)
         return;
     }
 
-    successCheck(slSetConstants(slConstants, *m_currentFrame, m_viewport), "slSetConstants");
+    sl::FrameToken* frameToken = activeFrameToken();
+    if (!frameToken)
+        return;
+
+    successCheck(slSetConstants(slConstants, *frameToken, m_viewport), "slSetConstants");
 }
 
 static sl::DLSSOptions ConvertOptions(const StreamlineIntegration::DLSSOptions& options)
@@ -1552,7 +1588,10 @@ void StreamlineIntegration::EvaluateDLSS(nvrhi::ICommandList* commandList)
 
     sl::ViewportHandle view(m_viewport);
     const sl::BaseStructure* inputs[] = { &view };
-    successCheck(slEvaluateFeature(sl::kFeatureDLSS, *m_currentFrame, inputs, _countof(inputs), nativeCommandList), "slEvaluateFeature_DLSS");
+    sl::FrameToken* frameToken = activeFrameToken();
+    if (!frameToken)
+        return;
+    successCheck(slEvaluateFeature(sl::kFeatureDLSS, *frameToken, inputs, _countof(inputs), nativeCommandList), "slEvaluateFeature_DLSS");
 
     //Our pipeline is very simple so we can simply clear it, but normally state tracking should be implemented.
     commandList->clearState();
@@ -1570,7 +1609,10 @@ void StreamlineIntegration::EvaluateDLSSRR(nvrhi::ICommandList* commandList)
 
     sl::ViewportHandle view(m_viewport);
     const sl::BaseStructure* inputs[] = { &view };
-    successCheck(slEvaluateFeature(sl::kFeatureDLSS_RR, *m_currentFrame, inputs, _countof(inputs), nativeCommandList), "slEvaluateFeature_DLSS_RR");
+    sl::FrameToken* frameToken = activeFrameToken();
+    if (!frameToken)
+        return;
+    successCheck(slEvaluateFeature(sl::kFeatureDLSS_RR, *frameToken, inputs, _countof(inputs), nativeCommandList), "slEvaluateFeature_DLSS_RR");
 
     //Our pipeline is very simple so we can simply clear it, but normally state tracking should be implemented.
     commandList->clearState();
@@ -1588,7 +1630,10 @@ void StreamlineIntegration::EvaluateNIS(nvrhi::ICommandList* commandList)
 
     sl::ViewportHandle view(m_viewport);
     const sl::BaseStructure* inputs[] = { &view };
-    successCheck(slEvaluateFeature(sl::kFeatureNIS, *m_currentFrame, inputs, _countof(inputs), nativeCommandList), "slEvaluateFeature_NIS");
+    sl::FrameToken* frameToken = activeFrameToken();
+    if (!frameToken)
+        return;
+    successCheck(slEvaluateFeature(sl::kFeatureNIS, *frameToken, inputs, _countof(inputs), nativeCommandList), "slEvaluateFeature_NIS");
 
     //Our pipeline is very simple so we can simply clear it, but normally state tracking should be implemented.
     commandList->clearState();
@@ -1605,7 +1650,10 @@ void StreamlineIntegration::EvaluateDeepDVC(nvrhi::ICommandList* commandList)
 
     sl::ViewportHandle view(m_viewport);
     const sl::BaseStructure* inputs[] = { &view };
-    successCheck(slEvaluateFeature(sl::kFeatureDeepDVC, *m_currentFrame, inputs, _countof(inputs), nativeCommandList), "slEvaluateFeature_DeepDVC");
+    sl::FrameToken* frameToken = activeFrameToken();
+    if (!frameToken)
+        return;
+    successCheck(slEvaluateFeature(sl::kFeatureDeepDVC, *frameToken, inputs, _countof(inputs), nativeCommandList), "slEvaluateFeature_DeepDVC");
 
     //Our pipeline is very simple so we can simply clear it, but normally state tracking should be implemented.
     commandList->clearState();
@@ -1711,7 +1759,9 @@ void StreamlineIntegration::RenderStart(GpuDevice& manager)
 {
     if (IsPCLAvailable())
     {
-        successCheck(slPCLSetMarker(sl::PCLMarker::eRenderSubmitStart, *m_currentFrame), "PCL_SubmitStart");
+        sl::FrameToken* frameToken = activeFrameToken();
+        if (frameToken)
+            successCheck(slPCLSetMarker(sl::PCLMarker::eRenderSubmitStart, *frameToken), "PCL_SubmitStart");
     }
 }
 
@@ -1719,7 +1769,9 @@ void StreamlineIntegration::RenderEnd(GpuDevice& manager)
 {
     if (IsPCLAvailable())
     {
-        successCheck(slPCLSetMarker(sl::PCLMarker::eRenderSubmitEnd, *m_currentFrame), "PCL_SubmitEnd");
+        sl::FrameToken* frameToken = activeFrameToken();
+        if (frameToken)
+            successCheck(slPCLSetMarker(sl::PCLMarker::eRenderSubmitEnd, *frameToken), "PCL_SubmitEnd");
     }
 }
 
@@ -1727,7 +1779,9 @@ void StreamlineIntegration::PresentStart(GpuDevice& manager)
 {
     if (IsPCLAvailable())
     {
-        successCheck(slPCLSetMarker(sl::PCLMarker::ePresentStart, *m_currentFrame), "PCL_PresentStart");
+        sl::FrameToken* frameToken = activeFrameToken();
+        if (frameToken)
+            successCheck(slPCLSetMarker(sl::PCLMarker::ePresentStart, *frameToken), "PCL_PresentStart");
     }
 }
 
@@ -1735,20 +1789,26 @@ void StreamlineIntegration::PresentEnd(GpuDevice& manager)
 {
     if (IsPCLAvailable())
     {
-        successCheck(slPCLSetMarker(sl::PCLMarker::ePresentEnd, *m_currentFrame), "PCL_PresentEnd");
+        sl::FrameToken* frameToken = activeFrameToken();
+        if (frameToken)
+            successCheck(slPCLSetMarker(sl::PCLMarker::ePresentEnd, *frameToken), "PCL_PresentEnd");
     }
 }
 
 void StreamlineIntegration::ReflexTriggerFlash(int frameNumber)
 {
-    successCheck(slPCLSetMarker(sl::PCLMarker::eTriggerFlash, *m_currentFrame), "Reflex_Flash");
+    sl::FrameToken* frameToken = activeFrameToken();
+    if (frameToken)
+        successCheck(slPCLSetMarker(sl::PCLMarker::eTriggerFlash, *frameToken), "Reflex_Flash");
 }
 
 void StreamlineIntegration::ReflexTriggerPcPing(int frameNumber)
 {
     if (IsPCLAvailable())
     {
-        successCheck(slPCLSetMarker(sl::PCLMarker::ePCLatencyPing, *m_currentFrame), "PCL_PCPing");
+        sl::FrameToken* frameToken = activeFrameToken();
+        if (frameToken)
+            successCheck(slPCLSetMarker(sl::PCLMarker::ePCLatencyPing, *frameToken), "PCL_PCPing");
     }
 }
 

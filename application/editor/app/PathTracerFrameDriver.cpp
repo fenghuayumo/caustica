@@ -26,6 +26,17 @@ void PathTracerFrameDriver::syncToBackBuffer()
         syncPathTracerSessionBackBuffer(*gpuDevice, *this);
 }
 
+void PathTracerFrameDriver::onBeginFrame(caustica::GpuDevice& /*gpuDevice*/)
+{
+    if (m_sceneEditor)
+        m_sceneEditor->beginFrame();
+}
+
+bool PathTracerFrameDriver::skipRenderPhase() const
+{
+    return m_sceneEditor && m_sceneEditor->shouldSkipRender();
+}
+
 void PathTracerFrameDriver::onUpdate(float elapsedTimeSeconds, bool windowFocused)
 {
     if (m_sceneEditor && windowFocused)
@@ -35,7 +46,7 @@ void PathTracerFrameDriver::onUpdate(float elapsedTimeSeconds, bool windowFocuse
 void PathTracerFrameDriver::onRender()
 {
     caustica::GpuDevice* gpuDevice = getGpuDevice();
-    if (!m_sceneEditor || !gpuDevice)
+    if (!m_sceneEditor || !gpuDevice || m_sceneEditor->shouldSkipRender())
         return;
 
     m_sceneEditor->Render(gpuDevice->GetCurrentFramebuffer(true));

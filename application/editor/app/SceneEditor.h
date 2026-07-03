@@ -30,6 +30,8 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <mutex>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -37,6 +39,7 @@
 
 namespace caustica
 {
+class Application;
 class BindingCache;
 class CommonRenderPasses;
 class DescriptorTableManager;
@@ -187,7 +190,12 @@ public:
 
     void initStreamlineAndWindow();
 
+    void setApplication(caustica::Application* application) { m_application = application; }
+
     void PrepareEditorFrame();
+    void                                    beginFrame();
+    [[nodiscard]] bool                      processPendingSceneSwitch();
+    [[nodiscard]] bool                      shouldSkipRender() const;
     void                                    SetCurrentScene(const std::string& sceneName, bool forceReload = false);
     bool                                    IsSceneLoading() const;
     bool                                    IsSceneLoaded() const;
@@ -280,9 +288,20 @@ protected:
     EditorCameraController m_cameraController;
     SceneLifecycleCoordinator m_lifecycleCoordinator;
 
+    caustica::Application* m_application = nullptr;
+
     const caustica::PlanarView& GetView() const;
 
 private:
+    struct PendingSceneSwitch
+    {
+        std::string sceneName;
+        bool forceReload = false;
+    };
+
+    void applySceneSwitch(const std::string& sceneName, bool forceReload);
+    void                                    tickSceneSwitchTest();
+
     void                                    SyncSubsystemContext();
     void                                    SyncInputRouterContext();
     void                                    UpdateFpsInfo(double frameTimeSeconds);
@@ -315,6 +334,14 @@ private:
     std::unique_ptr<::GameScene>            m_sampleGame;
 
     ProgressBar                                 m_progressLoading;
+
+    std::mutex                                  m_pendingSceneSwitchMutex;
+    std::optional<PendingSceneSwitch>           m_pendingSceneSwitch;
+    bool                                        m_skipRenderAfterSceneSwitch = false;
+
+    int m_sceneSwitchTestFramesUntilSwitch = 0;
+    size_t m_sceneSwitchTestSceneIndex = 0;
+    int m_sceneSwitchTestSwitchesDone = 0;
 
     std::unique_ptr<::ZoomTool>             m_zoomTool;
 

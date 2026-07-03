@@ -85,29 +85,14 @@ bool SceneLifecycleCoordinator::setCurrentScene(const std::string& sceneName, bo
 void SceneLifecycleCoordinator::onSceneUnloading()
 {
     if (m_ctx.editor)
-        m_ctx.editor->TogglableNodes = nullptr;
-
-    if (m_ctx.worldRenderer)
-        m_ctx.worldRenderer->onSceneUnloading();
-    if (m_ctx.renderCore)
-        m_ctx.renderCore->onSceneUnloading();
-    if (m_ctx.bindingCache)
-        m_ctx.bindingCache->Clear();
-
-    if (m_ctx.lightingPasses)
-        m_ctx.lightingPasses->sceneUnloading();
-
-    if (m_ctx.editor)
     {
+        m_ctx.editor->TogglableNodes = nullptr;
         m_ctx.editor->SelectedMaterial = nullptr;
         m_ctx.editor->SelectedEntity = caustica::ecs::NullEntity;
         m_ctx.editor->InspectorRotationEntity = caustica::ecs::NullEntity;
         m_ctx.editor->InspectorRotationEulerValid = false;
         m_ctx.editor->SelectedGaussianSplat = false;
     }
-
-    if (m_ctx.gaussianSplatPasses && m_ctx.gaussianSplatPasses->isAttached())
-        m_ctx.gaussianSplatPasses->sceneUnloading();
 
     if (m_ctx.settings)
         m_ctx.settings->EnvironmentMapParams = EnvironmentMapRuntimeParameters();
@@ -117,6 +102,27 @@ void SceneLifecycleCoordinator::onSceneUnloading()
 
     if (m_ctx.sampleGame != nullptr)
         m_ctx.sampleGame->SceneUnloading();
+
+    const auto gpuUnload = [this]() {
+        if (m_ctx.worldRenderer)
+            m_ctx.worldRenderer->onSceneUnloading();
+        if (m_ctx.renderCore)
+            m_ctx.renderCore->onSceneUnloading();
+        if (m_ctx.bindingCache)
+            m_ctx.bindingCache->Clear();
+        if (m_ctx.lightingPasses)
+            m_ctx.lightingPasses->sceneUnloading();
+        if (m_ctx.gaussianSplatPasses && m_ctx.gaussianSplatPasses->isAttached())
+            m_ctx.gaussianSplatPasses->sceneUnloading();
+    };
+
+    if (m_ctx.runGpuWorkOnRenderThread)
+        m_ctx.runGpuWorkOnRenderThread(gpuUnload);
+    else
+        gpuUnload();
+
+    if (m_ctx.textureLoader)
+        m_ctx.textureLoader->Reset();
 }
 
 void SceneLifecycleCoordinator::onSceneLoaded()
@@ -141,19 +147,33 @@ void SceneLifecycleCoordinator::onSceneLoaded()
 
     m_ctx.progressLoading->Set(55);
 
-    if (m_ctx.textureLoader && m_ctx.commonPasses)
-    {
-        m_ctx.textureLoader->ProcessRenderingThreadCommands(*m_ctx.commonPasses, 0.f);
-        m_ctx.textureLoader->LoadingFinished();
-    }
+    const auto runGpuWork = [this](const std::function<void()>& work) {
+        if (!work)
+            return;
+        if (m_ctx.runGpuWorkOnRenderThread)
+            m_ctx.runGpuWorkOnRenderThread(work);
+        else
+            work();
+    };
+
+    runGpuWork([&]() {
+        if (m_ctx.textureLoader && m_ctx.commonPasses)
+        {
+            m_ctx.textureLoader->ProcessRenderingThreadCommands(*m_ctx.commonPasses, 0.f);
+            m_ctx.textureLoader->LoadingFinished();
+        }
+
+        if (m_ctx.frameIndex && m_ctx.sceneManager->getScene())
+            caustica::render::SceneGpuUpdater::RefreshAfterLoad(*m_ctx.sceneManager->getScene(), m_ctx.frameIndex());
+
+        if (m_ctx.lightingPasses && m_ctx.sceneManager->getScene())
+            m_ctx.lightingPasses->notifySceneReloaded(*m_ctx.sceneManager->getScene());
+    });
 
     m_ctx.progressLoading->Set(60);
 
     if (m_ctx.sceneTime)
         *m_ctx.sceneTime = 0.f;
-
-    if (m_ctx.frameIndex)
-        caustica::render::SceneGpuUpdater::RefreshAfterLoad(*m_ctx.sceneManager->getScene(), m_ctx.frameIndex());
 
     if (m_ctx.gaussianSplatPasses && m_ctx.cmdLine)
         m_ctx.gaussianSplatPasses->onSceneLoaded(*m_ctx.cmdLine);
@@ -235,11 +255,6 @@ void SceneLifecycleCoordinator::onSceneLoaded()
 
     m_ctx.progressLoading->Set(90);
 
-    if (m_ctx.lightingPasses)
-        m_ctx.lightingPasses->notifySceneReloaded(*m_ctx.sceneManager->getScene());
-
-    m_ctx.progressLoading->Set(100);
-
     if (m_ctx.cmdLine)
     {
         if (m_ctx.cmdLine->OverrideToRealtimeMode)
@@ -268,6 +283,8 @@ void SceneLifecycleCoordinator::onSceneLoaded()
 
     if (m_ctx.diagnostics)
         m_ctx.diagnostics->asyncLoadingInProgress = true;
+
+    m_ctx.progressLoading->Set(100);
 
 #if CAUSTICA_WITH_PYTHON
     if (m_ctx.pythonScripting && m_ctx.cmdLine

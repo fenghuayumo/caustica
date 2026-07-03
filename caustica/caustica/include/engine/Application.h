@@ -2,6 +2,7 @@
 
 #include <backend/GpuDevice.h>
 #include <backend/GpuFrameDriver.h>
+#include <engine/RenderThread.h>
 #include <events/event.h>
 
 #include <functional>
@@ -56,6 +57,15 @@ public:
     void animate(double elapsedTime, bool windowIsFocused);
     void render();
 
+    void setUseDedicatedRenderThread(bool enabled) { m_useDedicatedRenderThread = enabled; }
+    [[nodiscard]] bool useDedicatedRenderThread() const { return m_useDedicatedRenderThread; }
+    [[nodiscard]] RenderThread& renderThread() { return m_renderThread; }
+    [[nodiscard]] const RenderThread& renderThread() const { return m_renderThread; }
+
+    void waitForDedicatedRenderThreadIdle();
+    void runGpuWorkOnRenderThread(const std::function<void()>& work);
+    void requestExit();
+
     using FrameCallback = std::function<void(GpuDevice&, uint32_t frameIndex)>;
     FrameCallback beforeFrame;
     FrameCallback beforeAnimate;
@@ -68,6 +78,7 @@ public:
     // IGpuFrameDriver — invoked by GpuDevice during swap-chain resize.
     void notifyBackBufferResizing() override;
     void notifyBackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount) override;
+    void waitForRenderThreadIdle() override;
 
     void notifyDisplayScaleChanged(float scaleX, float scaleY);
 
@@ -82,6 +93,10 @@ public:
     void processEventQueue();
 
 protected:
+    virtual void onBeginFrame(GpuDevice& gpuDevice) {}
+    virtual void onBeforeAnimate(GpuDevice& gpuDevice, uint32_t frameIndex) {}
+    virtual bool skipRenderPhase() const { return false; }
+
     void bindFrameDriver(GpuDevice* dm);
     void unbindFrameDriver(GpuDevice* dm);
 
@@ -108,6 +123,9 @@ private:
     bool isWindowVisible() const;
     bool isWindowFocused() const;
 
+    bool executeRenderPhase(GpuDevice* gpuDevice, double elapsedTime, double curTime, uint32_t frameIndex);
+    void finishFrameWithRenderFailure(GpuDevice* gpuDevice, double elapsedTime, double curTime);
+
     GpuDevice* device() const;
     Window*    window() const;
 
@@ -116,6 +134,10 @@ private:
 
     std::mutex m_EventQueueMutex;
     std::vector<std::unique_ptr<Event>> m_EventQueue;
+
+    RenderThread m_renderThread;
+    bool m_useDedicatedRenderThread = true;
+    bool m_requestExit = false;
 };
 
 } // namespace caustica

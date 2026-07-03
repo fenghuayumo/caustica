@@ -72,6 +72,8 @@ public:
     bool IsSERSupported() const;
 
 protected:
+    void onBeginFrame(caustica::GpuDevice& gpuDevice) override;
+    bool skipRenderPhase() const override;
     void onUpdate(float elapsedTimeSeconds, bool windowFocused) override;
     void onRender() override;
     void onEvent(caustica::Event& event) override;
