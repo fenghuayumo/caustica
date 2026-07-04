@@ -8,7 +8,7 @@
 #include <backend/GpuDevice.h>
 #include <core/command_line.h>
 #include <core/log.h>
-#include <render/Core/RenderCore.h>
+#include <render/Core/AccelStructManager.h>
 #include <scene/SceneEcs.h>
 #include <scene/SceneManager.h>
 #include <scene/Scene.h>
@@ -65,7 +65,7 @@ void SceneGaussianSplatPasses::wireSession(const ScenePassWireParams& params)
 {
     m_gpuDevice = &params.gpuDevice;
     m_sceneManager = &params.sceneManager;
-    m_renderCore = &params.renderCore;
+    m_accelStructs = &params.renderCore.accelStructs();
     m_worldRenderer = &params.worldRenderer;
     m_settings = &params.settings;
     m_summary = &params.gaussianSplatsSummary;
@@ -454,7 +454,7 @@ void SceneGaussianSplatPasses::renderSceneGaussianSplats(nvrhi::ICommandList* co
             continue;
         GaussianSplatRenderSettings objectSettings = settings;
         objectSettings.objectToWorld = objectToWorld(object);
-        object.pass->Render(commandList, splatView, m_renderCore->accelStructs().getTopLevelAS().Get(), renderTargets, objectSettings);
+        object.pass->Render(commandList, splatView, m_accelStructs->getTopLevelAS().Get(), renderTargets, objectSettings);
         renderedAny = true;
     }
 }

@@ -17,7 +17,7 @@ namespace caustica
 class BindingCache;
 class GpuDevice;
 class MeshInfo;
-class RenderCore;
+class AccelStructManager;
 class Scene;
 class ShaderFactory;
 } // namespace caustica
@@ -80,7 +80,7 @@ private:
 
     caustica::GpuDevice*                        m_gpuDevice = nullptr;
     SceneManager*                               m_sceneManager = nullptr;
-    caustica::RenderCore*                       m_renderCore = nullptr;
+    caustica::AccelStructManager*               m_accelStructs = nullptr;
     caustica::render::WorldRenderer* m_worldRenderer = nullptr;
     PathTracerSettings*                         m_settings = nullptr;
     caustica::render::RenderInvalidationState*  m_invalidation = nullptr;

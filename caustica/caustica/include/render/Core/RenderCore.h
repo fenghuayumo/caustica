@@ -17,6 +17,7 @@ class Scene;
 class ShaderFactory;
 
 // Shared render orchestrator owned by GpuRenderSubsystem (accel structs, camera, render pipeline).
+// Scene passes wire AccelStructManager directly; WorldRenderer uses the full RenderCore surface.
 class RenderCore
 {
 public:

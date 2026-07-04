@@ -8,7 +8,7 @@
 #include <core/log.h>
 #include <render/Core/BindingCache.h>
 #include <render/Core/PathTracingShaderCompiler.h>
-#include <render/Core/RenderCore.h>
+#include <render/Core/AccelStructManager.h>
 #include <render/Passes/OMM/OpacityMicromapBuilder.h>
 #include <scene/SceneManager.h>
 #include <scene/Scene.h>
@@ -22,7 +22,7 @@ void SceneRayTracingResources::wireSession(const ScenePassWireParams& params)
 {
     m_gpuDevice = &params.gpuDevice;
     m_sceneManager = &params.sceneManager;
-    m_renderCore = &params.renderCore;
+    m_accelStructs = &params.renderCore.accelStructs();
     m_worldRenderer = &params.worldRenderer;
     m_settings = &params.settings;
     m_invalidation = &params.invalidation;
@@ -130,17 +130,17 @@ void SceneRayTracingResources::ensureStablePlanePipelines()
 void SceneRayTracingResources::createBlases(nvrhi::ICommandList* commandList)
 {
     caustica::AccelStructBuildSettings settings = { .excludeTransmissive = m_settings->AS.ExcludeTransmissive };
-    m_renderCore->accelStructs().createBlases(commandList, *m_sceneManager->getScene(), settings);
+    m_accelStructs->createBlases(commandList, *m_sceneManager->getScene(), settings);
 }
 
 void SceneRayTracingResources::uploadSubInstanceData(nvrhi::ICommandList* commandList)
 {
-    m_renderCore->accelStructs().uploadSubInstanceData(commandList);
+    m_accelStructs->uploadSubInstanceData(commandList);
 }
 
 void SceneRayTracingResources::createTlas(nvrhi::ICommandList* commandList)
 {
-    m_renderCore->accelStructs().createTlas(commandList, *m_sceneManager->getScene());
+    m_accelStructs->createTlas(commandList, *m_sceneManager->getScene());
 }
 
 void SceneRayTracingResources::createAccelStructs(nvrhi::ICommandList* commandList)
@@ -177,8 +177,8 @@ void SceneRayTracingResources::recreateAccelStructs(nvrhi::ICommandList* command
         return;
 
     m_worldRenderer->invalidateBindingSet();
-    m_renderCore->accelStructs().releaseGpuResources();
-    m_renderCore->accelStructs().clearMeshAccelStructs(*m_sceneManager->getScene());
+    m_accelStructs->releaseGpuResources();
+    m_accelStructs->clearMeshAccelStructs(*m_sceneManager->getScene());
     m_gpuDevice->GetDevice()->runGarbageCollection();
 
     commandList->open();
@@ -198,13 +198,13 @@ void SceneRayTracingResources::requestMeshAccelRebuild(const std::shared_ptr<cau
 
     m_settings->ResetAccumulation = true;
 
-    if (!m_renderCore->accelStructs().hasTopLevelAS())
+    if (!m_accelStructs->hasTopLevelAS())
     {
         m_invalidation->AccelerationStructRebuildRequested = true;
         return;
     }
 
-    m_renderCore->accelStructs().requestMeshRebuild(mesh);
+    m_accelStructs->requestMeshRebuild(mesh);
 }
 
 void SceneRayTracingResources::requestFullRebuild()
