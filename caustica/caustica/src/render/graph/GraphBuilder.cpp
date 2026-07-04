@@ -45,29 +45,43 @@ nvrhi::ResourceStates GraphBuilder::accessToState(TextureAccess access)
         return nvrhi::ResourceStates::RenderTarget;
     case TextureAccess::UnorderedAccess:
         return nvrhi::ResourceStates::UnorderedAccess;
+    case TextureAccess::CopySource:
+        return nvrhi::ResourceStates::CopySource;
+    case TextureAccess::CopyDest:
+        return nvrhi::ResourceStates::CopyDest;
     default:
         return nvrhi::ResourceStates::Common;
     }
 }
 
-TextureHandle GraphBuilder::importTexture(nvrhi::ITexture* texture, TextureAccess initialAccess)
+TextureHandle GraphBuilder::importTexture(nvrhi::ITexture* texture, nvrhi::ResourceStates initialState)
 {
     assert(texture);
 
-    TextureHandle handle{ static_cast<uint32_t>(m_textures.size()) };
+    if (const auto existing = m_importIndexByTexture.find(texture); existing != m_importIndexByTexture.end())
+        return TextureHandle{ existing->second };
+
+    const TextureHandle handle{ static_cast<uint32_t>(m_textures.size()) };
     ImportedTexture imported{};
     imported.texture = texture;
-    imported.currentState = accessToState(initialAccess);
+    imported.currentState = initialState;
     m_textures.push_back(imported);
+    m_importIndexByTexture.emplace(texture, handle.index);
     return handle;
 }
 
-void GraphBuilder::addPass(std::string_view name, SetupFn setup, ExecuteFn execute)
+TextureHandle GraphBuilder::importTexture(nvrhi::ITexture* texture, TextureAccess initialAccess)
+{
+    return importTexture(texture, accessToState(initialAccess));
+}
+
+void GraphBuilder::addPass(std::string_view name, SetupFn setup, ExecuteFn execute, bool enabled)
 {
     Pass pass;
     pass.name = std::string(name);
     pass.setup = std::move(setup);
     pass.execute = std::move(execute);
+    pass.enabled = enabled;
 
     if (pass.setup)
     {
@@ -77,6 +91,7 @@ void GraphBuilder::addPass(std::string_view name, SetupFn setup, ExecuteFn execu
         pass.writes = builder.writes();
     }
 
+    m_passNames.push_back(pass.name);
     m_passes.push_back(std::move(pass));
 }
 
@@ -94,12 +109,42 @@ void GraphBuilder::transitionTexture(nvrhi::ICommandList* commandList, TextureHa
     imported.currentState = targetState;
 }
 
+void GraphBuilder::syncPassEndStates(const Pass& pass)
+{
+    for (const auto& [handle, access] : pass.writes)
+    {
+        if (isValid(handle, m_textures.size()))
+            m_textures[handle.index].currentState = accessToState(access);
+    }
+
+    for (const auto& [handle, access] : pass.reads)
+    {
+        if (!isValid(handle, m_textures.size()) || passUsesTextureAsWrite(pass, handle))
+            continue;
+        m_textures[handle.index].currentState = accessToState(access);
+    }
+}
+
+bool GraphBuilder::passUsesTextureAsWrite(const Pass& pass, TextureHandle handle)
+{
+    for (const auto& [writeHandle, access] : pass.writes)
+    {
+        if (writeHandle.index == handle.index)
+            return true;
+        (void)access;
+    }
+    return false;
+}
+
 void GraphBuilder::execute(nvrhi::ICommandList* commandList)
 {
     assert(commandList);
 
     for (const Pass& pass : m_passes)
     {
+        if (!pass.enabled)
+            continue;
+
         commandList->beginMarker(pass.name.c_str());
 
         for (const auto& [handle, access] : pass.reads)
@@ -116,8 +161,18 @@ void GraphBuilder::execute(nvrhi::ICommandList* commandList)
             pass.execute(context);
         }
 
+        syncPassEndStates(pass);
+
         commandList->endMarker();
     }
+}
+
+void GraphBuilder::reset()
+{
+    m_textures.clear();
+    m_passes.clear();
+    m_passNames.clear();
+    m_importIndexByTexture.clear();
 }
 
 nvrhi::ITexture* GraphBuilder::resolveTexture(TextureHandle handle) const
@@ -125,6 +180,13 @@ nvrhi::ITexture* GraphBuilder::resolveTexture(TextureHandle handle) const
     if (!isValid(handle, m_textures.size()))
         return nullptr;
     return m_textures[handle.index].texture;
+}
+
+nvrhi::ResourceStates GraphBuilder::textureState(TextureHandle handle) const
+{
+    if (!isValid(handle, m_textures.size()))
+        return nvrhi::ResourceStates::Common;
+    return m_textures[handle.index].currentState;
 }
 
 } // namespace caustica::rg

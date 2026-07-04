@@ -8,6 +8,11 @@
 #include <utility>
 #include <vector>
 
+namespace caustica::rg
+{
+class GraphBuilder;
+}
+
 namespace caustica::render
 {
 
@@ -60,15 +65,32 @@ public:
         FramePassInsertPoint insertAfter,
         std::function<void(PathTracingFrameContext&)> fn);
 
+    using GraphPassFn = std::function<void(rg::GraphBuilder&, PathTracingFrameContext&)>;
+
+    struct GraphPassRegistration
+    {
+        std::string          name;
+        FramePassInsertPoint insertAfter = FramePassInsertPoint::AfterFinalize;
+        GraphPassFn          fn;
+    };
+
+    void registerGraphPass(std::string name, FramePassInsertPoint insertAfter, GraphPassFn fn);
+
+    void applyGraphPasses(FramePassInsertPoint insertPoint,
+        rg::GraphBuilder& graph,
+        PathTracingFrameContext& context) const;
+
     // Merge pending registrations into `pipeline` (called from WorldRenderer once).
     void applyTo(PathTracingFramePipeline& pipeline) const;
 
     void clear();
 
     [[nodiscard]] size_t registrationCount() const { return m_registrations.size(); }
+    [[nodiscard]] size_t graphPassCount() const { return m_graphPasses.size(); }
 
 private:
     std::vector<PassRegistration> m_registrations;
+    std::vector<GraphPassRegistration> m_graphPasses;
 };
 
 } // namespace caustica::render

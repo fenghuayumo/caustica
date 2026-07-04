@@ -10,7 +10,6 @@ namespace { constexpr int c_SwapchainCount = 3; }
 
 #include <scene/SceneEcs.h>
 #include <scene/SceneLightAccess.h>
-#include <render/Core/HdrPostProcess.h>
 #include <render/Core/PostProcessAA.h>
 #include <render/Core/SceneGeometryUpdate.h>
 #include <render/Core/LightingUpdate.h>
@@ -1022,69 +1021,6 @@ void caustica::render::WorldRenderer::preRender()
         g_FPSLimiter.FramerateLimit(m_context.settings.ActualFPSLimiter());
 
     korgi::Update();
-}
-void caustica::render::WorldRenderer::postProcessPreToneMapping(nvrhi::ICommandList* commandList, const caustica::ICompositeView& compositeView)
-{
-    (void)compositeView;
-
-    HdrPostProcessParams hdrParams{
-        m_context.settings,
-        commandList,
-        m_renderTargets.get(),
-        m_displaySize,
-        m_bloomPass.get(),
-    };
-    caustica::hdrPostProcess(m_context.camera, hdrParams);
-
-    if (m_context.settings.PostProcessTestPassHDR)
-    {
-        commandList->beginMarker("TestRaygenPP_HDR");
-
-        commandList->setTextureState(m_renderTargets->ProcessedOutputColor, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
-
-        nvrhi::rt::DispatchRaysArguments args;
-        args.width = m_displaySize.x;
-        args.height = m_displaySize.y;
-
-        nvrhi::rt::State state;
-        state.shaderTable = m_ptPipelineTestRaygenPPHDR->GetShaderTable();
-        state.bindings = { m_bindingSet, m_context.descriptorTable->GetDescriptorTable() };
-        commandList->setRayTracingState(state);
-
-        SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
-        commandList->setPushConstants(&miniConstants, sizeof(miniConstants));
-        commandList->dispatchRays(args);
-
-        commandList->setTextureState(m_renderTargets->ProcessedOutputColor, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
-
-        commandList->endMarker();
-    }
-}
-void caustica::render::WorldRenderer::postProcessPostToneMapping(nvrhi::ICommandList* commandList, const caustica::ICompositeView& compositeView)
-{ // a.k.a. LDR post-process (e.g. colour filters go here)
-    if (m_context.settings.PostProcessEdgeDetection)
-    {
-        m_commandList->beginMarker("PPEdgeDetection");
-
-        m_commandList->copyTexture(m_renderTargets->LdrColorScratch, nvrhi::TextureSlice(), m_renderTargets->LdrColor, nvrhi::TextureSlice());
-
-        nvrhi::rt::DispatchRaysArguments args;
-        args.width  = m_displaySize.x;
-        args.height = m_displaySize.y;
-
-        nvrhi::rt::State state;
-        state.shaderTable = m_ptPipelineEdgeDetection->GetShaderTable();
-        state.bindings = { m_bindingSet, m_context.descriptorTable->GetDescriptorTable() };
-        m_commandList->setRayTracingState(state);
-
-        SampleMiniConstants miniConstants = { uint4( *reinterpret_cast<uint*>(&m_context.settings.PostProcessEdgeDetectionThreshold), 0, 0, 0) };
-        m_commandList->setPushConstants(&miniConstants, sizeof(miniConstants));
-        m_commandList->dispatchRays(args);
-
-        m_commandList->setTextureState(m_renderTargets->LdrColor, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
-
-        m_commandList->endMarker();
-    }
 }
 void caustica::render::WorldRenderer::renderGaussianSplats(bool renderToOutputColor)
 {

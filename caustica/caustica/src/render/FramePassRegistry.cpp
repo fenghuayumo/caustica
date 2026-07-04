@@ -1,4 +1,5 @@
 #include <render/FramePassRegistry.h>
+#include <render/graph/GraphBuilder.h>
 
 namespace caustica::render
 {
@@ -65,6 +66,27 @@ void FramePassRegistry::registerLambdaPass(std::string name,
     });
 }
 
+void FramePassRegistry::registerGraphPass(std::string name, FramePassInsertPoint insertAfter, GraphPassFn fn)
+{
+    m_graphPasses.push_back(GraphPassRegistration{
+        .name = std::move(name),
+        .insertAfter = insertAfter,
+        .fn = std::move(fn),
+    });
+}
+
+void FramePassRegistry::applyGraphPasses(FramePassInsertPoint insertPoint,
+    rg::GraphBuilder& graph,
+    PathTracingFrameContext& context) const
+{
+    for (const GraphPassRegistration& reg : m_graphPasses)
+    {
+        if (reg.insertAfter != insertPoint || !reg.fn)
+            continue;
+        reg.fn(graph, context);
+    }
+}
+
 void FramePassRegistry::applyTo(PathTracingFramePipeline& pipeline) const
 {
     // Phase 0: append after anchor pass name. Phase 2: ordered insert / Render Graph.
@@ -85,6 +107,7 @@ void FramePassRegistry::applyTo(PathTracingFramePipeline& pipeline) const
 void FramePassRegistry::clear()
 {
     m_registrations.clear();
+    m_graphPasses.clear();
 }
 
 } // namespace caustica::render

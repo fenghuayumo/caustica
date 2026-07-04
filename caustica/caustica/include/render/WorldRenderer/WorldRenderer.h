@@ -162,8 +162,6 @@ private:
     void updatePathTracerConstants(PathTracerConstants& constants, const PathTracerCameraData& cameraData);
     void rtxdiSetupFrame(nvrhi::IFramebuffer* framebuffer, PathTracerCameraData cameraData, dm::uint2 renderDims);
 
-    void postProcessPreToneMapping(nvrhi::ICommandList* commandList, const ICompositeView& compositeView);
-    void postProcessPostToneMapping(nvrhi::ICommandList* commandList, const ICompositeView& compositeView);
     void renderGaussianSplats(bool renderToOutputColor);
     void accumulateGaussianSplats(const IView& splatView);
 

@@ -256,3 +256,30 @@ void BloomPass::Render(
 
     commandList->endMarker(); // "Bloom"
 }
+
+void BloomPass::registerGraphPass(
+    caustica::rg::GraphBuilder& graph,
+    caustica::rg::TextureHandle processedOutputColor,
+    const std::shared_ptr<caustica::FramebufferFactory>& framebufferFactory,
+    const caustica::ICompositeView& compositeView,
+    float sigmaInPixels,
+    float blendFactor,
+    bool enabled)
+{
+    graph.addPass(
+        "Bloom",
+        [&](caustica::rg::PassBuilder& setup) {
+            setup.read(processedOutputColor, caustica::rg::TextureAccess::ShaderResource);
+            setup.write(processedOutputColor, caustica::rg::TextureAccess::RenderTarget);
+        },
+        [this, processedOutputColor, framebufferFactory, &compositeView, sigmaInPixels, blendFactor](caustica::rg::RenderPassContext& ctx) {
+            Render(
+                ctx.commandList(),
+                framebufferFactory,
+                compositeView,
+                ctx.texture(processedOutputColor),
+                sigmaInPixels,
+                blendFactor);
+        },
+        enabled);
+}

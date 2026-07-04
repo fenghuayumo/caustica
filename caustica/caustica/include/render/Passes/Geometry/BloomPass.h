@@ -1,6 +1,7 @@
 #pragma once
 
 #include <render/Core/BindingCache.h>
+#include <render/graph/GraphBuilder.h>
 #include <rhi/nvrhi.h>
 #include <memory>
 #include <unordered_map>
@@ -69,5 +70,14 @@ namespace caustica::render
             nvrhi::ITexture* sourceDestTexture,
             float sigmaInPixels,
             float blendFactor);
+
+        void registerGraphPass(
+            caustica::rg::GraphBuilder& graph,
+            caustica::rg::TextureHandle processedOutputColor,
+            const std::shared_ptr<caustica::FramebufferFactory>& framebufferFactory,
+            const caustica::ICompositeView& compositeView,
+            float sigmaInPixels,
+            float blendFactor,
+            bool enabled);
     };
 }

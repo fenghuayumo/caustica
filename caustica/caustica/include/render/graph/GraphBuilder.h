@@ -6,6 +6,7 @@
 #include <functional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 namespace caustica::rg
@@ -16,6 +17,8 @@ enum class TextureAccess : uint8_t
     ShaderResource,
     RenderTarget,
     UnorderedAccess,
+    CopySource,
+    CopyDest,
 };
 
 struct TextureHandle
@@ -54,22 +57,27 @@ private:
 };
 
 // Minimal render graph: sequential passes with automatic texture barriers.
-// Phase R1 — no pass culling, no transient allocation, import-only resources.
+// Phase R1 — import-only resources, optional pass culling via enabled flag.
 class GraphBuilder
 {
 public:
     using SetupFn = std::function<void(PassBuilder&)>;
     using ExecuteFn = std::function<void(RenderPassContext&)>;
 
+    TextureHandle importTexture(nvrhi::ITexture* texture, nvrhi::ResourceStates initialState);
     TextureHandle importTexture(nvrhi::ITexture* texture, TextureAccess initialAccess = TextureAccess::ShaderResource);
 
-    void addPass(std::string_view name, SetupFn setup, ExecuteFn execute);
+    void addPass(std::string_view name, SetupFn setup, ExecuteFn execute, bool enabled = true);
 
     void execute(nvrhi::ICommandList* commandList);
 
+    void reset();
+
     [[nodiscard]] nvrhi::ITexture* resolveTexture(TextureHandle handle) const;
+    [[nodiscard]] nvrhi::ResourceStates textureState(TextureHandle handle) const;
 
     [[nodiscard]] size_t passCount() const { return m_passes.size(); }
+    [[nodiscard]] const std::vector<std::string>& passNames() const { return m_passNames; }
 
 private:
     friend class RenderPassContext;
@@ -85,6 +93,7 @@ private:
         std::string name;
         SetupFn setup;
         ExecuteFn execute;
+        bool enabled = true;
         std::vector<std::pair<TextureHandle, TextureAccess>> reads;
         std::vector<std::pair<TextureHandle, TextureAccess>> writes;
     };
@@ -92,9 +101,13 @@ private:
     static nvrhi::ResourceStates accessToState(TextureAccess access);
 
     void transitionTexture(nvrhi::ICommandList* commandList, TextureHandle handle, TextureAccess access);
+    void syncPassEndStates(const Pass& pass);
+    static bool passUsesTextureAsWrite(const Pass& pass, TextureHandle handle);
 
     std::vector<ImportedTexture> m_textures;
     std::vector<Pass> m_passes;
+    std::vector<std::string> m_passNames;
+    std::unordered_map<nvrhi::ITexture*, uint32_t> m_importIndexByTexture;
 };
 
 } // namespace caustica::rg

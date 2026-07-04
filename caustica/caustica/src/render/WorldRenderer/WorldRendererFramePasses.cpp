@@ -1,7 +1,8 @@
 namespace { constexpr int c_SwapchainCount = 3; }
 
 #include <render/WorldRenderer/WorldRenderer.h>
-#include <render/graph/GraphBuilder.h>
+#include <render/graph/PostProcessGraph.h>
+#include <render/graph/BlitGraphPass.h>
 #include <rhi/RenderDevice.h>
 #include <render/WorldRenderer/PathTracingFramePipeline.h>
 #include <render/SceneGpuResources.h>
@@ -532,31 +533,30 @@ void caustica::render::WorldRenderer::framePassToneMapping(PathTracingFrameConte
     fullscreenView.SetViewport(windowViewport);
     fullscreenView.UpdateCache();
 
-    postProcessPreToneMapping(m_commandList, fullscreenView);
-
     rg::GraphBuilder graph;
-    const rg::TextureHandle sourceColor = graph.importTexture(
-        m_renderTargets->ProcessedOutputColor,
-        rg::TextureAccess::UnorderedAccess);
-    const rg::TextureHandle outputLdrColor = graph.importTexture(
-        m_renderTargets->LdrColor,
-        rg::TextureAccess::ShaderResource);
 
     bool commandListWasClosed = false;
-    m_toneMappingPass->registerGraphPass(
-        graph,
-        sourceColor,
-        outputLdrColor,
-        fullscreenView,
-        m_context.settings.EnableToneMapping,
-        &commandListWasClosed);
-
+    rg::PostProcessGraphParams ppParams{
+        .graph = graph,
+        .renderTargets = m_renderTargets.get(),
+        .settings = &m_context.settings,
+        .camera = &m_context.camera,
+        .bloomPass = m_bloomPass.get(),
+        .toneMappingPass = m_toneMappingPass.get(),
+        .compositeView = &fullscreenView,
+        .displaySize = m_displaySize,
+        .pathTracingBindingSet = m_bindingSet,
+        .descriptorTable = m_context.descriptorTable ? m_context.descriptorTable->GetDescriptorTable() : nullptr,
+        .testRaygenPpHdrPipeline = m_ptPipelineTestRaygenPPHDR.get(),
+        .edgeDetectionPipeline = m_ptPipelineEdgeDetection.get(),
+        .outCommandListWasClosed = &commandListWasClosed,
+    };
+    rg::buildPostProcessGraph(ppParams);
     graph.execute(m_commandList);
 
     if (commandListWasClosed)
         m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
 
-    postProcessPostToneMapping(m_commandList, fullscreenView);
     abortIfSubmitFailed(ctx, "postToneMapping");
     if (ctx.aborted)
         return;
@@ -578,9 +578,17 @@ void caustica::render::WorldRenderer::framePassComposite(PathTracingFrameContext
     if (m_context.settings.EnableShaderDebug && m_shaderDebug)
         m_shaderDebug->EndFrameAndOutput(m_commandList, m_renderTargets->LdrFramebuffer->GetFramebuffer(fullscreenView), m_renderTargets->Depth, fbinfo.getViewport());
 
-    m_commandList->beginMarker("Blit");
-    m_context.renderDevice.blit().blitTexture(m_commandList, framebuffer, m_renderTargets->LdrColor, &m_context.bindingCache);
-    m_commandList->endMarker();
+    rg::GraphBuilder graph;
+    const rg::TextureHandle ldrColor = graph.importTexture(
+        m_renderTargets->LdrColor,
+        nvrhi::ResourceStates::ShaderResource);
+
+    rg::FinalBlitPassParams blitParams{};
+    blitParams.sourceLdrColor = ldrColor;
+    blitParams.targetFramebuffer = framebuffer;
+    blitParams.bindingCache = &m_context.bindingCache;
+    rg::registerFinalBlitPass(graph, blitParams, m_context.renderDevice.blit());
+    graph.execute(m_commandList);
     abortIfSubmitFailed(ctx, "finalBlit");
     if (ctx.aborted)
         return;
