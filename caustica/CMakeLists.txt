@@ -124,6 +124,7 @@ if (CAUSTICA_PRECOMPILE_PT_SHADERS AND NOT CAUSTICA_DISTRIBUTION_BUILD)
             COMMAND ${Python3_EXECUTABLE}
                 "${CMAKE_SOURCE_DIR}/support/python/precompile_pt_shader_bins.py"
                 --shader-api ${caustica_pt_precompile_api}
+                --global-preset coverage
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
             DEPENDS ShaderDynamicAssets ShaderDynamicAssets_CopyAlways
             COMMENT "Precompiling path-tracing shader bins (DXC hash layout)"

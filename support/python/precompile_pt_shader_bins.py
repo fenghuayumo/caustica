@@ -34,6 +34,18 @@ PIPELINE_VARIANTS = [
         "macros": [("PATH_TRACER_MODE", "PATH_TRACER_MODE_FILL_STABLE_PLANES")],
         "material_source": "PathTracerMaterialSpecializations.hlsl",
     },
+    {
+        "source": "TestRaygenPP.hlsl",
+        "pipeline_id": "TESTRG",
+        "macros": [("PP_TEST_HDR", "1")],
+        "material_source": None,
+    },
+    {
+        "source": "TestRaygenPP.hlsl",
+        "pipeline_id": "EDGY",
+        "macros": [("PP_EDGE_DETECTION", "1")],
+        "material_source": None,
+    },
 ]
 
 TIER_STABLE_NAMES = [
@@ -46,6 +58,12 @@ TIER_STABLE_NAMES = [
     "AlphaTest",
     "DeltaLobes",
 ]
+
+# Matches ComputeCandidateSampleLocalCount(0.65, 5) in LightingTypes.hlsli.
+DEFAULT_NEE_LOCAL_CANDIDATES = 3
+DEFAULT_NEE_GLOBAL_CANDIDATES = 2
+DEFAULT_NEE_TOTAL_CANDIDATES = 5
+DEFAULT_STABLE_PLANE_COUNT = 3
 
 
 def configure_import_path() -> None:
@@ -83,35 +101,83 @@ def tier_macros(tier: int) -> list[tuple[str, str]]:
     return macros
 
 
-def default_global_macros() -> list[tuple[str, str]]:
-    # Reference-mode defaults with conservative feature flags for offline packs.
-    return [
-        ("ENABLE_DEBUG_SURFACE_VIZ", "0"),
-        ("ENABLE_DEBUG_LINES_VIZ", "0"),
-        ("USE_NVAPI_HIT_OBJECT_EXTENSION", "0"),
-        ("USE_NVAPI_REORDER_THREADS", "0"),
-        ("USE_DX_HIT_OBJECT_EXTENSION", "0"),
-        ("USE_DX_MAYBE_REORDER_THREADS", "0"),
-        ("PT_ENABLE_RUSSIAN_ROULETTE", "1"),
-        ("PT_NEE_ENABLED", "1"),
-        ("PT_USE_RESTIR_DI", "0"),
-        ("PT_USE_RESTIR_GI", "0"),
-        ("PT_USE_RESTIR_PT", "0"),
-        ("CAUSTICA_ENABLE_OPACITY_MICROMAPS", "0"),
-        ("CAUSTICA_USE_APPROXIMATE_MIS", "0"),
-        ("CAUSTICA_NEE_FULL_SAMPLE_COUNT", "1"),
-        ("CAUSTICA_NEE_LOCAL_CANDIDATE_SAMPLE_COUNT", "1"),
-        ("CAUSTICA_NEE_GLOBAL_CANDIDATE_SAMPLE_COUNT", "0"),
-        ("CAUSTICA_NEE_TOTAL_CANDIDATE_SAMPLE_COUNT", "1"),
-        ("CAUSTICA_DISABLE_SER_TERMINATION_HINT", "0"),
-        ("CAUSTICA_DISCARD_NON_NEE_LIGHTING", "0"),
-        ("CAUSTICA_DISCARD_NEE_LIGHTING", "0"),
-        ("CAUSTICA_FIREFLY_FILTER", "0"),
-        ("CAUSTICA_ACTIVE_STABLE_PLANE_COUNT", "0"),
-        ("CAUSTICA_NESTED_DIELECTRICS_QUALITY", "0"),
-        ("CAUSTICA_LP_TYPES_USE_16BIT_PRECISION", "0"),
-        ("CAUSTICA_ENABLE_LOW_DISCREPANCY_SAMPLER_FOR_BSDF", "0"),
+def base_global_macro_map() -> dict[str, str]:
+    # Keep in sync with SceneRayTracingResources::fillPTPipelineGlobalMacros defaults.
+    return {
+        "ENABLE_DEBUG_SURFACE_VIZ": "0",
+        "ENABLE_DEBUG_LINES_VIZ": "0",
+        "USE_NVAPI_HIT_OBJECT_EXTENSION": "0",
+        "USE_NVAPI_REORDER_THREADS": "0",
+        "USE_DX_HIT_OBJECT_EXTENSION": "0",
+        "USE_DX_MAYBE_REORDER_THREADS": "0",
+        "PT_ENABLE_RUSSIAN_ROULETTE": "1",
+        "PT_NEE_ENABLED": "1",
+        "PT_USE_RESTIR_DI": "0",
+        "PT_USE_RESTIR_GI": "0",
+        "PT_USE_RESTIR_PT": "0",
+        "CAUSTICA_ENABLE_OPACITY_MICROMAPS": "0",
+        "CAUSTICA_USE_APPROXIMATE_MIS": "1",
+        "CAUSTICA_NEE_FULL_SAMPLE_COUNT": "1",
+        "CAUSTICA_NEE_LOCAL_CANDIDATE_SAMPLE_COUNT": str(DEFAULT_NEE_LOCAL_CANDIDATES),
+        "CAUSTICA_NEE_GLOBAL_CANDIDATE_SAMPLE_COUNT": str(DEFAULT_NEE_GLOBAL_CANDIDATES),
+        "CAUSTICA_NEE_TOTAL_CANDIDATE_SAMPLE_COUNT": str(DEFAULT_NEE_TOTAL_CANDIDATES),
+        "CAUSTICA_DISABLE_SER_TERMINATION_HINT": "0",
+        "CAUSTICA_DISCARD_NON_NEE_LIGHTING": "0",
+        "CAUSTICA_DISCARD_NEE_LIGHTING": "0",
+        "CAUSTICA_FIREFLY_FILTER": "1",
+        "CAUSTICA_ACTIVE_STABLE_PLANE_COUNT": str(DEFAULT_STABLE_PLANE_COUNT),
+        "CAUSTICA_NESTED_DIELECTRICS_QUALITY": "1",
+        "CAUSTICA_LP_TYPES_USE_16BIT_PRECISION": "1",
+        "CAUSTICA_ENABLE_LOW_DISCREPANCY_SAMPLER_FOR_BSDF": "1",
+        "NEE_AT_SAMPLE_BAKED_ENVIRONMENT": "0",
+    }
+
+
+def macro_map_to_list(values: dict[str, str]) -> list[tuple[str, str]]:
+    return sorted(values.items(), key=lambda item: item[0])
+
+
+def global_macro_presets(preset: str) -> list[list[tuple[str, str]]]:
+    base = base_global_macro_map()
+    if preset == "default":
+        return [macro_map_to_list(base)]
+
+    if preset != "coverage":
+        raise ValueError(f"Unknown global macro preset: {preset}")
+
+    coverage_overrides: list[dict[str, str]] = [
+        {},
+        {"PT_USE_RESTIR_DI": "1"},
+        {"PT_USE_RESTIR_GI": "1"},
+        {"PT_USE_RESTIR_PT": "1"},
+        {"CAUSTICA_ENABLE_OPACITY_MICROMAPS": "1"},
+        {"PT_NEE_ENABLED": "0"},
+        {"PT_ENABLE_RUSSIAN_ROULETTE": "0"},
+        {"CAUSTICA_LP_TYPES_USE_16BIT_PRECISION": "0"},
+        {"CAUSTICA_ENABLE_LOW_DISCREPANCY_SAMPLER_FOR_BSDF": "0"},
+        {"CAUSTICA_FIREFLY_FILTER": "0"},
+        {"CAUSTICA_USE_APPROXIMATE_MIS": "0"},
+        {"NEE_AT_SAMPLE_BAKED_ENVIRONMENT": "1"},
+        {
+            "CAUSTICA_NEE_TOTAL_CANDIDATE_SAMPLE_COUNT": "8",
+            "CAUSTICA_NEE_LOCAL_CANDIDATE_SAMPLE_COUNT": "5",
+            "CAUSTICA_NEE_GLOBAL_CANDIDATE_SAMPLE_COUNT": "3",
+        },
+        {"CAUSTICA_ACTIVE_STABLE_PLANE_COUNT": "1"},
+        {"CAUSTICA_NESTED_DIELECTRICS_QUALITY": "2"},
     ]
+
+    presets: list[list[tuple[str, str]]] = []
+    seen: set[tuple[tuple[str, str], ...]] = set()
+    for overrides in coverage_overrides:
+        merged = {**base, **overrides}
+        macro_list = macro_map_to_list(merged)
+        key = tuple(macro_list)
+        if key in seen:
+            continue
+        seen.add(key)
+        presets.append(macro_list)
+    return presets
 
 
 def vulkan_binding_shift_args() -> list[str]:
@@ -253,49 +319,52 @@ def compile_library(
     return out_path
 
 
-def build_jobs() -> list[dict]:
+def build_jobs(global_preset: str) -> list[dict]:
     jobs: list[dict] = []
-    global_macros = default_global_macros()
 
-    for variant in PIPELINE_VARIANTS:
-        pipeline_id = variant["pipeline_id"]
-        pipeline_macros = list(global_macros)
-        pipeline_macros.extend(variant["macros"])
-        pipeline_macros.append(("CAUSTICA_PIPELINE_PERMUTATION_NAME", pipeline_id))
+    for global_macros in global_macro_presets(global_preset):
+        for variant in PIPELINE_VARIANTS:
+            pipeline_id = variant["pipeline_id"]
+            pipeline_macros = list(global_macros)
+            pipeline_macros.extend(variant["macros"])
+            pipeline_macros.append(("CAUSTICA_PIPELINE_PERMUTATION_NAME", pipeline_id))
 
-        jobs.append(
-            {
-                "source": SHADER_ROOT / variant["source"],
-                "logical": variant["source"],
-                "macros": list(pipeline_macros),
-                "label": f"{pipeline_id}_raygen",
-            }
-        )
-
-        material_source = variant["material_source"]
-        for tier, stable_name in enumerate(TIER_STABLE_NAMES):
-            permutation_name = f"{pipeline_id}_{stable_name}"
-            material_macros = list(pipeline_macros)
-            material_macros.extend(tier_macros(tier))
-            material_macros.append(("CAUSTICA_MATERIAL_PERMUTATION_NAME", permutation_name))
-            shader_id = "-1" if tier == 0 else str(tier)
-            material_macros.append(("CAUSTICA_SHADER_ID", shader_id))
             jobs.append(
                 {
-                    "source": SHADER_ROOT / material_source,
-                    "logical": material_source,
-                    "macros": material_macros,
-                    "label": permutation_name,
+                    "source": SHADER_ROOT / variant["source"],
+                    "logical": variant["source"],
+                    "macros": list(pipeline_macros),
+                    "label": f"{pipeline_id}_raygen",
                 }
             )
+
+            material_source = variant.get("material_source")
+            if not material_source:
+                continue
+
+            for tier, stable_name in enumerate(TIER_STABLE_NAMES):
+                permutation_name = f"{pipeline_id}_{stable_name}"
+                material_macros = list(pipeline_macros)
+                material_macros.extend(tier_macros(tier))
+                material_macros.append(("CAUSTICA_MATERIAL_PERMUTATION_NAME", permutation_name))
+                shader_id = "-1" if tier == 0 else str(tier)
+                material_macros.append(("CAUSTICA_SHADER_ID", shader_id))
+                jobs.append(
+                    {
+                        "source": SHADER_ROOT / material_source,
+                        "logical": material_source,
+                        "macros": material_macros,
+                        "label": permutation_name,
+                    }
+                )
     return jobs
 
 
-def precompile(api: str, force: bool) -> int:
+def precompile(api: str, force: bool, global_preset: str = "default") -> int:
     dxc = find_dxc(api)
     compiled = 0
     skipped = 0
-    for job in build_jobs():
+    for job in build_jobs(global_preset):
         digest = hash_hex(build_hash_command(job["logical"], job["macros"], api=api))
         out_path, _ = cache_paths(api, digest)
         if out_path.exists() and not force:
@@ -310,8 +379,23 @@ def precompile(api: str, force: bool) -> int:
             force=force,
         )
         compiled += 1
-    print(f"[caustica] PT shader precompile ({api}): compiled={compiled}, skipped={skipped}")
+    print(
+        f"[caustica] PT shader precompile ({api}, preset={global_preset}): "
+        f"compiled={compiled}, skipped={skipped}"
+    )
     return 0
+
+
+def run_pt_shader_precompile(
+    shader_api: str,
+    *,
+    force: bool = False,
+    global_preset: str = "default",
+) -> None:
+    apis = ["dxil"] if shader_api == "d3d12" else ["spirv"] if shader_api == "vulkan" else ["dxil", "spirv"]
+    api_map = {"dxil": "d3d12", "spirv": "vulkan"}
+    for api_folder in apis:
+        precompile(api_map[api_folder], force, global_preset)
 
 
 def parse_args() -> argparse.Namespace:
@@ -323,16 +407,19 @@ def parse_args() -> argparse.Namespace:
         choices=["d3d12", "vulkan", "both"],
         default="d3d12" if os.name == "nt" else "vulkan",
     )
+    parser.add_argument(
+        "--global-preset",
+        choices=["default", "coverage"],
+        default="default",
+        help="Global macro combinations to precompile. 'coverage' warms common runtime toggles.",
+    )
     parser.add_argument("--force", action="store_true", help="Recompile even if output bins already exist.")
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
-    apis = ["dxil"] if args.shader_api == "d3d12" else ["spirv"] if args.shader_api == "vulkan" else ["dxil", "spirv"]
-    api_map = {"dxil": "d3d12", "spirv": "vulkan"}
-    for api_folder in apis:
-        precompile(api_map[api_folder], args.force)
+    run_pt_shader_precompile(args.shader_api, force=args.force, global_preset=args.global_preset)
     return 0
 
 

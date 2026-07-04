@@ -11,7 +11,7 @@ from setuptools.command.build_py import build_py as _build_py
 
 
 ROOT = Path(__file__).resolve().parent
-SUPPORT_PYTHON = ROOT / "Support" / "python"
+SUPPORT_PYTHON = ROOT / "support" / "python"
 sys.path.insert(0, str(SUPPORT_PYTHON))
 
 from build_wheel import (  # noqa: E402
@@ -20,6 +20,7 @@ from build_wheel import (  # noqa: E402
     copy_runtime_files,
     directory_size,
     run_dynamic_shader_precompile,
+    run_pt_shader_precompile,
 )
 
 
@@ -88,6 +89,18 @@ class BuildPyWithRuntime(_build_py):
                 "CAUSTICA_WHEEL_SHADER_API=d3d12 is only valid on Windows. "
                 "Use CAUSTICA_WHEEL_SHADER_API=vulkan on Linux."
             )
+
+        if env_bool("CAUSTICA_WHEEL_PRECOMPILE_PT_SHADERS", True, "CAUSTICA_WHEEL_PRECOMPILE_PT_SHADERS"):
+            if dynamic_shaders == "none":
+                print("WARNING: CAUSTICA_WHEEL_PRECOMPILE_PT_SHADERS is set while dynamic shader bins are omitted.")
+            run_pt_shader_precompile(SimpleNamespace(
+                shader_api=shader_api,
+                precompile_pt_force=env_bool("CAUSTICA_WHEEL_PRECOMPILE_PT_FORCE", legacy_name="CAUSTICA_WHEEL_PRECOMPILE_PT_FORCE"),
+                precompile_pt_global_preset=os.environ.get(
+                    "CAUSTICA_WHEEL_PRECOMPILE_PT_GLOBAL_PRESET",
+                    os.environ.get("CAUSTICA_WHEEL_PRECOMPILE_PT_GLOBAL_PRESET", "coverage"),
+                ),
+            ))
 
         if env_bool("CAUSTICA_WHEEL_PRECOMPILE_DYNAMIC_SHADERS", legacy_name="CAUSTICA_WHEEL_PRECOMPILE_DYNAMIC_SHADERS"):
             if dynamic_shaders == "none":

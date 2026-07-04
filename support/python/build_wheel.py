@@ -394,7 +394,7 @@ def run_dynamic_shader_precompile(args: argparse.Namespace) -> None:
     for shader_api in shader_apis:
         command = [
             sys.executable,
-            str(ROOT / "Support" / "python" / "precompile_dynamic_shaders.py"),
+            str(ROOT / "support" / "python" / "precompile_dynamic_shaders.py"),
             "--shader-api",
             shader_api,
             "--modes",
@@ -409,6 +409,16 @@ def run_dynamic_shader_precompile(args: argparse.Namespace) -> None:
         for variant in args.precompile_global_variant or []:
             command.extend(["--global-variant", variant])
         subprocess.run(command, check=True, cwd=ROOT)
+
+
+def run_pt_shader_precompile(args: argparse.Namespace) -> None:
+    from precompile_pt_shader_bins import run_pt_shader_precompile as precompile_pt
+
+    precompile_pt(
+        args.shader_api,
+        force=args.precompile_pt_force,
+        global_preset=args.precompile_pt_global_preset,
+    )
 
 
 def parse_args() -> argparse.Namespace:
@@ -498,6 +508,30 @@ def parse_args() -> argparse.Namespace:
             "'use_nee=0,nee_candidate_samples=8'. Repeat for multiple passes."
         ),
     )
+    parser.add_argument(
+        "--precompile-pt-shaders",
+        dest="precompile_pt_shaders",
+        action="store_true",
+        default=True,
+        help="Precompile path-tracing shader libraries into ShaderDynamic/Bin before staging.",
+    )
+    parser.add_argument(
+        "--no-precompile-pt-shaders",
+        dest="precompile_pt_shaders",
+        action="store_false",
+        help="Skip offline path-tracing shader precompile.",
+    )
+    parser.add_argument(
+        "--precompile-pt-global-preset",
+        choices=["default", "coverage"],
+        default="coverage",
+        help="Global macro preset for path-tracing offline precompile.",
+    )
+    parser.add_argument(
+        "--precompile-pt-force",
+        action="store_true",
+        help="Force recompilation of all path-tracing shader bins.",
+    )
     return parser.parse_args()
 
 
@@ -523,6 +557,14 @@ def main() -> int:
     shutil.copytree(PYTHON_PACKAGE_DIR, package_dir)
 
     dynamic_shaders = "none" if getattr(args, "no_dynamic_shader_bin", False) else args.dynamic_shaders
+
+    if args.precompile_pt_shaders:
+        if dynamic_shaders == "none":
+            print(
+                "WARNING: --precompile-pt-shaders used while dynamic shader bins are omitted."
+            )
+        sys.path.insert(0, str(ROOT / "support" / "python"))
+        run_pt_shader_precompile(args)
 
     if args.precompile_dynamic_shaders:
         if dynamic_shaders == "none":
