@@ -111,6 +111,9 @@ file(GLOB_RECURSE caustica_pt_shader_sources
 set_source_files_properties(${caustica_pt_shader_sources} PROPERTIES VS_TOOL_OVERRIDE "None")
 
 option(CAUSTICA_PRECOMPILE_PT_SHADERS "Precompile path-tracing DXC shader bins into ShaderDynamic/Bin" ON)
+option(CAUSTICA_WITH_RUNTIME_SHADER_COMPILATION
+    "Deploy shader sources/DXC beside the executable for runtime DXC compilation (dev only)"
+    OFF)
 if (CAUSTICA_PRECOMPILE_PT_SHADERS AND NOT CAUSTICA_DISTRIBUTION_BUILD)
     find_package(Python3 COMPONENTS Interpreter)
     if (Python3_FOUND)
@@ -119,14 +122,22 @@ if (CAUSTICA_PRECOMPILE_PT_SHADERS AND NOT CAUSTICA_DISTRIBUTION_BUILD)
         else()
             set(caustica_pt_precompile_api vulkan)
         endif()
+        set(caustica_pt_precompile_env ${CMAKE_COMMAND} -E env)
+        if (DXC_DXIL_EXECUTABLE)
+            list(APPEND caustica_pt_precompile_env "SHADERMAKE_DXC_PATH=${DXC_DXIL_EXECUTABLE}")
+        endif()
+        if (DXC_SPIRV_PATH)
+            list(APPEND caustica_pt_precompile_env "SHADERMAKE_DXC_VK_PATH=${DXC_SPIRV_PATH}")
+        endif()
         add_custom_target(causticaPathTracerShaders
             COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Bin"
-            COMMAND ${Python3_EXECUTABLE}
+            COMMAND ${caustica_pt_precompile_env}
+                ${Python3_EXECUTABLE}
                 "${CMAKE_SOURCE_DIR}/support/python/precompile_pt_shader_bins.py"
                 --shader-api ${caustica_pt_precompile_api}
                 --global-preset coverage
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-            DEPENDS ShaderDynamicAssets ShaderDynamicAssets_CopyAlways
+            DEPENDS ShaderDynamicAssets_CopyAlways
             COMMENT "Precompiling path-tracing shader bins (DXC hash layout)"
             SOURCES ${caustica_pt_shader_sources}
         )
@@ -148,13 +159,15 @@ set_target_properties(causticaPathTracerShaders PROPERTIES FOLDER ${folder})
 
 
 ##########################################################################
-################ dynamic shader recompile dependencies ###################
-if (CAUSTICA_DISTRIBUTION_BUILD)
+################ dynamic shader runtime assets ###########################
+# Default (load-only): ship only ShaderDynamic/Bin precompiled libraries.
+# Optional dev mode copies DXC + HLSL sources for runtime recompilation.
+if (CAUSTICA_DISTRIBUTION_BUILD OR NOT CAUSTICA_WITH_RUNTIME_SHADER_COMPILATION)
 add_custom_target(ShaderDynamicAssets_CopyAlways
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Bin"
     COMMAND ${CMAKE_COMMAND} -E rm -rf "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Source"
     COMMAND ${CMAKE_COMMAND} -E rm -rf "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Tools"
-    COMMENT "Pruning runtime shader sources and compiler tools for distribution build"
+    COMMENT "Load-only shader layout: keep ShaderDynamic/Bin, prune sources and DXC tools"
 )
 add_custom_target(ShaderDynamicAssets ALL)
 else()

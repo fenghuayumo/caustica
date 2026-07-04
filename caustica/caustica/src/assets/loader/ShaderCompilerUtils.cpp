@@ -105,6 +105,7 @@ namespace ShaderCompilerUtils
             ShadersPathExternalIncludes2 = std::filesystem::absolute(ShadersPathExternalIncludes2);
         ShaderBinariesPath = std::filesystem::absolute(ShaderBinariesPath);
 
+#if CAUSTICA_WITH_RUNTIME_SHADER_COMPILATION
         RuntimeCompilationAvailable =
             std::filesystem::exists(ShaderCompilerPath) &&
             std::filesystem::exists(ShadersPath);
@@ -126,6 +127,11 @@ namespace ShaderCompilerUtils
                 ShadersPathExternalIncludes1.string().c_str(),
                 ShadersPathExternalIncludes2.string().c_str());
         }
+#else
+        RuntimeCompilationAvailable = false;
+        caustica::info("Runtime shader compilation disabled; loading precompiled shader binaries from '%s'.",
+            ShaderBinariesPath.string().c_str());
+#endif
         caustica::info("Shader binaries output: '%s'", ShaderBinariesPath.string().c_str());
         
         return true;
