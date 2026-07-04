@@ -9,6 +9,8 @@ namespace { constexpr int c_SwapchainCount = 3; }
 #include <scene/SceneLightAccess.h>
 #include <render/Core/SceneGeometryUpdate.h>
 #include <render/Core/LightingUpdate.h>
+#include <render/Core/AccelStructManager.h>
+#include <render/Core/CameraController.h>
 #include <render/Core/PathTracingShaderCompiler.h>
 #include <render/Core/ComputePipelineRegistry.h>
 #include <render/Passes/Lighting/MaterialGpuCache.h>
@@ -152,7 +154,7 @@ void caustica::render::WorldRenderer::framePassSetup(PathTracingFrameContext& ct
     m_displayAspectRatio = m_displaySize.x / float(m_displaySize.y);
     ctx.displayAspectRatio = m_displayAspectRatio;
 
-    m_context.renderCore.camera().ensureViews(m_renderSize);
+    m_context.camera.ensureViews(m_renderSize);
 }
 
 void caustica::render::WorldRenderer::framePassEnsureRenderTargets(PathTracingFrameContext& ctx)
@@ -259,7 +261,7 @@ void caustica::render::WorldRenderer::framePassShaderUpdate(PathTracingFrameCont
 {
     m_pathTracingShaderCompiler->Update(
         m_context.sceneManager.getScene(),
-        static_cast<unsigned int>(m_context.renderCore.accelStructs().getSubInstanceData().size()),
+        static_cast<unsigned int>(m_context.accelStructs.getSubInstanceData().size()),
         [this](std::vector<caustica::ShaderMacro>& macros) { m_context.scenePasses.rayTracing.fillPTPipelineGlobalMacros(macros); },
         ctx.needNewPasses);
 
@@ -295,9 +297,9 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
 
     syncCameraViews();
     {
-        nvrhi::Viewport viewport = m_context.renderCore.camera().view()->GetViewport();
-        float2 jitter = m_context.renderCore.camera().view()->GetPixelOffset();
-        float4x4 projMatrix = m_context.renderCore.camera().view()->GetProjectionMatrix();
+        nvrhi::Viewport viewport = m_context.camera.view()->GetViewport();
+        float2 jitter = m_context.camera.view()->GetPixelOffset();
+        float4x4 projMatrix = m_context.camera.view()->GetProjectionMatrix();
         float2 viewSize = { viewport.maxX - viewport.minX, viewport.maxY - viewport.minY };
         float outputAspectRatio = m_displayAspectRatio;
         bool rowMajor = true;
@@ -305,10 +307,10 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
         float fovY = atanf(tanHalfFOVY) * 2.0f;
         ctx.cameraData = BridgeCamera(
             uint(viewSize.x), uint(viewSize.y), outputAspectRatio,
-            m_context.renderCore.camera().camera().GetPosition(),
-            m_context.renderCore.camera().camera().GetDir(),
-            m_context.renderCore.camera().camera().GetUp(),
-            fovY, m_context.renderCore.camera().zNear(), 1e7f,
+            m_context.camera.camera().GetPosition(),
+            m_context.camera.camera().GetDir(),
+            m_context.camera.camera().GetUp(),
+            fovY, m_context.camera.zNear(), 1e7f,
             m_context.settings.CameraFocalDistance, m_context.settings.CameraAperture, jitter);
     }
 
@@ -317,7 +319,7 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
 
     if (m_context.settings.EnableShaderDebug && m_shaderDebug)
     {
-        dm::float4x4 viewProj = m_context.renderCore.camera().view()->GetViewProjectionMatrix();
+        dm::float4x4 viewProj = m_context.camera.view()->GetViewProjectionMatrix();
         m_shaderDebug->BeginFrame(m_commandList, viewProj);
     }
 
@@ -331,7 +333,7 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
     geoParams.opacityMaps = m_context.scenePasses.lighting.opacityMaps().get();
     geoParams.frameIndex = m_context.gpuDevice.GetFrameIndex();
     geoParams.asyncLoadingInProgress = &m_context.diagnostics.asyncLoadingInProgress;
-    m_context.renderCore.updateSceneGeometry(geoParams);
+    caustica::updateSceneGeometry(m_context.accelStructs, geoParams);
     abortIfSubmitFailed(ctx, "updateSceneGeometry");
     if (ctx.aborted)
         return;
@@ -444,9 +446,9 @@ void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext
     constants.envMapImportanceSamplingParams = m_context.scenePasses.lighting.environment()->GetImportanceSampling()->GetShaderParams();
 
     PlanarViewConstants view;
-    m_context.renderCore.camera().view()->FillPlanarViewConstants(view);
+    m_context.camera.view()->FillPlanarViewConstants(view);
     PlanarViewConstants previousView;
-    m_context.renderCore.camera().viewPrevious()->FillPlanarViewConstants(previousView);
+    m_context.camera.viewPrevious()->FillPlanarViewConstants(previousView);
     constants.view = FromPlanarViewConstants(view);
     constants.previousView = FromPlanarViewConstants(previousView);
 
@@ -523,7 +525,7 @@ void caustica::render::WorldRenderer::framePassToneMapping(PathTracingFrameConte
 {
     SampleConstants& constants = m_currentConstants;
 
-    caustica::PlanarView fullscreenView = *m_context.renderCore.camera().view();
+    caustica::PlanarView fullscreenView = *m_context.camera.view();
     nvrhi::Viewport windowViewport(float(m_displaySize.x), float(m_displaySize.y));
     fullscreenView.SetViewport(windowViewport);
     fullscreenView.UpdateCache();
@@ -547,7 +549,7 @@ void caustica::render::WorldRenderer::framePassComposite(PathTracingFrameContext
     nvrhi::IFramebuffer* framebuffer = ctx.framebuffer;
     const auto& fbinfo = framebuffer->getFramebufferInfo();
 
-    caustica::PlanarView fullscreenView = *m_context.renderCore.camera().view();
+    caustica::PlanarView fullscreenView = *m_context.camera.view();
     nvrhi::Viewport windowViewport(float(m_displaySize.x), float(m_displaySize.y));
     fullscreenView.SetViewport(windowViewport);
     fullscreenView.UpdateCache();
@@ -647,7 +649,7 @@ void caustica::render::WorldRenderer::framePassFinalize(PathTracingFrameContext&
     if (m_temporalAntiAliasingPass != nullptr)
         m_temporalAntiAliasingPass->AdvanceFrame();
 
-    m_context.renderCore.camera().swapViews();
+    m_context.camera.swapViews();
     m_context.gpuDevice.SetVsyncEnabled(m_context.settings.ActualEnableVsync());
 
     postUpdatePathTracing();

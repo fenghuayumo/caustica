@@ -86,7 +86,8 @@ bool GpuRenderSubsystem::initializeSession(const GpuRenderSubsystemInitParams& p
     m_pathTracingContext = std::make_unique<render::PathTracingContext>(render::PathTracingContext{
         .gpuDevice = params.gpuDevice,
         .sceneManager = *m_sceneManager,
-        .renderCore = *m_renderCore,
+        .camera = m_renderCore->camera(),
+        .accelStructs = m_renderCore->accelStructs(),
         .settings = params.settings,
         .runtimeState = params.runtimeState,
         .scenePasses = m_scenePasses,
@@ -105,7 +106,7 @@ bool GpuRenderSubsystem::initializeSession(const GpuRenderSubsystemInitParams& p
     m_scenePasses.wireSession(render::ScenePassWireParams{
         .gpuDevice = params.gpuDevice,
         .sceneManager = *m_sceneManager,
-        .renderCore = *m_renderCore,
+        .accelStructs = m_renderCore->accelStructs(),
         .worldRenderer = *m_worldRenderer,
         .settings = params.settings,
         .invalidation = params.runtimeState.Invalidation,

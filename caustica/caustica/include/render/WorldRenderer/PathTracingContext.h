@@ -3,7 +3,6 @@
 #include <math/math.h>
 
 #include <render/Core/PathTracerSettings.h>
-#include <render/Core/RenderCore.h>
 #include <render/PathTracerScenePasses.h>
 #include <render/RenderRuntimeState.h>
 #include <render/SessionDiagnostics.h>
@@ -18,7 +17,9 @@
 
 namespace caustica
 {
+class AccelStructManager;
 class BindingCache;
+class CameraController;
 class CommonRenderPasses;
 class ShaderFactory;
 
@@ -30,7 +31,8 @@ struct PathTracingContext
 {
     GpuDevice& gpuDevice;
     SceneManager& sceneManager;
-    RenderCore& renderCore;
+    CameraController& camera;
+    AccelStructManager& accelStructs;
     PathTracerSettings& settings;
     RenderRuntimeState& runtimeState;
     PathTracerScenePasses& scenePasses;

@@ -1,5 +1,5 @@
 #include <render/Core/HdrPostProcess.h>
-#include <render/Core/RenderCore.h>
+#include <render/Core/CameraController.h>
 #include <render/Core/RenderTargets.h>
 #include <scene/View.h>
 #include <render/Passes/Geometry/BloomPass.h>
@@ -7,7 +7,7 @@
 namespace caustica
 {
 
-void RenderCore::hdrPostProcess(HdrPostProcessParams& params)
+void hdrPostProcess(CameraController& camera, HdrPostProcessParams& params)
 {
     nvrhi::ICommandList* commandList = params.commandList;
     if (commandList == nullptr || params.renderTargets == nullptr || params.bloomPass == nullptr)
@@ -19,7 +19,7 @@ void RenderCore::hdrPostProcess(HdrPostProcessParams& params)
         return;
     }
 
-    PlanarView fullscreenView = *m_camera.view();
+    PlanarView fullscreenView = *camera.view();
     nvrhi::Viewport windowViewport(float(params.displaySize.x), float(params.displaySize.y));
     fullscreenView.SetViewport(windowViewport);
     fullscreenView.UpdateCache();

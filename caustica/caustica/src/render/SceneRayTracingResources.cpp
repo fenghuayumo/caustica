@@ -22,7 +22,7 @@ void SceneRayTracingResources::wireSession(const ScenePassWireParams& params)
 {
     m_gpuDevice = &params.gpuDevice;
     m_sceneManager = &params.sceneManager;
-    m_accelStructs = &params.renderCore.accelStructs();
+    m_accelStructs = &params.accelStructs;
     m_worldRenderer = &params.worldRenderer;
     m_settings = &params.settings;
     m_invalidation = &params.invalidation;

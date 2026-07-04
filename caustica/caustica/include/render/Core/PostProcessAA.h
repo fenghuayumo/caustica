@@ -14,6 +14,7 @@ class PostProcess;
 
 namespace caustica
 {
+class CameraController;
 class GpuDevice;
 
 namespace render
@@ -53,5 +54,7 @@ struct PostProcessAAParams
     StreamlineInterface::DLSSRROptions*     dlssRROptions = nullptr;
 #endif
 };
+
+void postProcessAA(CameraController& camera, PostProcessAAParams& params);
 
 } // namespace caustica

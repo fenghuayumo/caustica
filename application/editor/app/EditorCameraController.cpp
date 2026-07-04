@@ -1,6 +1,7 @@
 #include "EditorCameraController.h"
 
 #include <core/path_utils.h>
+#include <render/Core/RenderCore.h>
 #include <render/Passes/PostProcess/ToneMappingPasses.h>
 #include <render/WorldRenderer/WorldRenderer.h>
 #include <scene/camera/Camera.h>

@@ -8,10 +8,10 @@
 
 namespace caustica
 {
+class AccelStructManager;
 class BindingCache;
 class CommonRenderPasses;
 class GpuDevice;
-class RenderCore;
 class ShaderFactory;
 } // namespace caustica
 
@@ -33,7 +33,7 @@ struct ScenePassWireParams
 {
     caustica::GpuDevice& gpuDevice;
     SceneManager& sceneManager;
-    caustica::RenderCore& renderCore;
+    caustica::AccelStructManager& accelStructs;
     WorldRenderer& worldRenderer;
     PathTracerSettings& settings;
     RenderInvalidationState& invalidation;

@@ -13,6 +13,7 @@ class BloomPass;
 
 namespace caustica
 {
+class CameraController;
 
 struct HdrPostProcessParams
 {
@@ -23,5 +24,7 @@ struct HdrPostProcessParams
 
     render::BloomPass*               bloomPass = nullptr;
 };
+
+void hdrPostProcess(CameraController& camera, HdrPostProcessParams& params);
 
 } // namespace caustica

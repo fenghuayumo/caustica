@@ -1,5 +1,6 @@
 #include <render/Core/LightingUpdate.h>
-#include <render/Core/RenderCore.h>
+#include <render/Core/AccelStructManager.h>
+#include <render/Core/CameraController.h>
 #include <render/Core/BindingCache.h>
 #include <render/Core/CommonRenderPasses.h>
 #include <render/Passes/Lighting/Distant/EnvMapProcessor.h>
@@ -34,7 +35,7 @@ bool gaussianSplatEmissionEnabled(const PathTracerSettings& settings)
 
 } // namespace
 
-void RenderCore::preUpdateLighting(PreUpdateLightingParams& params)
+void preUpdateLighting(PreUpdateLightingParams& params)
 {
     nvrhi::ICommandList* commandList = params.commandList;
     if (commandList == nullptr || params.environment == nullptr)
@@ -50,7 +51,7 @@ void RenderCore::preUpdateLighting(PreUpdateLightingParams& params)
         params.needNewBindings = true;
 }
 
-void RenderCore::updateLighting(UpdateLightingParams& params)
+void updateLighting(CameraController& camera, AccelStructManager& accelStructs, UpdateLightingParams& params)
 {
     nvrhi::ICommandList* commandList = params.commandList;
     if (commandList == nullptr || params.environment == nullptr || params.lightSampling == nullptr
@@ -113,9 +114,9 @@ void RenderCore::updateLighting(UpdateLightingParams& params)
 
     LightSamplingCache::UpdateSettings settings;
     settings.ImportanceSamplingType = static_cast<uint>(params.settings.NEEType);
-    settings.CameraPosition = m_camera.camera().GetPosition();
-    settings.CameraDirection = m_camera.camera().GetDir();
-    settings.ViewProjMatrix = m_camera.view()->GetViewProjectionMatrix();
+    settings.CameraPosition = camera.camera().GetPosition();
+    settings.CameraDirection = camera.camera().GetDir();
+    settings.ViewProjMatrix = camera.view()->GetViewProjectionMatrix();
     settings.MouseCursorPos = params.settings.MousePos;
     settings.GlobalTemporalFeedbackWeight = params.settings.NEEAT_GlobalTemporalFeedbackWeight;
     settings.LocalToGlobalSampleRatio = params.settings.ActualNEEAT_LocalToGlobalSampleRatio();
@@ -127,11 +128,11 @@ void RenderCore::updateLighting(UpdateLightingParams& params)
 #endif
         ;
     settings.PrevViewportSize = float2(
-        static_cast<float>(m_camera.viewPrevious()->GetViewExtent().width()),
-        static_cast<float>(m_camera.viewPrevious()->GetViewExtent().height()));
+        static_cast<float>(camera.viewPrevious()->GetViewExtent().width()),
+        static_cast<float>(camera.viewPrevious()->GetViewExtent().height()));
     settings.ViewportSize = float2(
-        static_cast<float>(m_camera.view()->GetViewExtent().width()),
-        static_cast<float>(m_camera.view()->GetViewExtent().height()));
+        static_cast<float>(camera.view()->GetViewExtent().width()),
+        static_cast<float>(camera.view()->GetViewExtent().height()));
     settings.EnvMapParams = LightSamplingCacheEnvMapParams{
         .Transform = params.envMapSceneParams.Transform,
         .InvTransform = params.envMapSceneParams.InvTransform,
@@ -157,8 +158,8 @@ void RenderCore::updateLighting(UpdateLightingParams& params)
         params.scene,
         params.materials,
         params.opacityMaps,
-        m_accelStructs.getSubInstanceBuffer(),
-        m_accelStructs.getSubInstanceData(),
+        accelStructs.getSubInstanceBuffer(),
+        accelStructs.getSubInstanceData(),
         params.environment->GetImportanceSampling()->GetRadianceAndImportanceMap());
 }
 
@@ -186,7 +187,7 @@ void syncEnvMapSceneParams(
     }
 }
 
-void RenderCore::updateLightingEnd(UpdateLightingEndParams& params)
+void updateLightingEnd(UpdateLightingEndParams& params)
 {
     if (params.commandList == nullptr || params.lightSampling == nullptr || params.bindingCache == nullptr
         || !params.scene)

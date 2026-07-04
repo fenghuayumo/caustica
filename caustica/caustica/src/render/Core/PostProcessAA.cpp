@@ -1,5 +1,5 @@
 #include <render/Core/PostProcessAA.h>
-#include <render/Core/RenderCore.h>
+#include <render/Core/CameraController.h>
 #include <render/Core/RenderTargets.h>
 #include <scene/View.h>
 #include <render/Passes/Geometry/TemporalAntiAliasingPass.h>
@@ -20,7 +20,7 @@ using namespace caustica::math;
 namespace caustica
 {
 
-void RenderCore::postProcessAA(PostProcessAAParams& params)
+void postProcessAA(CameraController& camera, PostProcessAAParams& params)
 {
     auto& settings = params.settings;
     nvrhi::ICommandList* commandList = params.commandList;
@@ -54,7 +54,7 @@ void RenderCore::postProcessAA(PostProcessAAParams& params)
 
             commandList->beginMarker("TAA");
             params.temporalAAPass->TemporalResolve(
-                commandList, taaParams, previousViewValid, *m_camera.view(), *m_camera.view());
+                commandList, taaParams, previousViewValid, *camera.view(), *camera.view());
             commandList->endMarker();
 
             if (stochasticSplats && params.gaussianSplatTemporalSampleIndex != nullptr
@@ -72,31 +72,31 @@ void RenderCore::postProcessAA(PostProcessAAParams& params)
         if (useStreamlineThisFrame)
         {
             {
-                affine3 viewReprojection = m_camera.view()->GetChildView(ViewType::PLANAR, 0)->GetInverseViewMatrix()
-                    * m_camera.viewPrevious()->GetViewMatrix();
-                float4x4 reprojectionMatrix = inverse(m_camera.view()->GetProjectionMatrix(false))
+                affine3 viewReprojection = camera.view()->GetChildView(ViewType::PLANAR, 0)->GetInverseViewMatrix()
+                    * camera.viewPrevious()->GetViewMatrix();
+                float4x4 reprojectionMatrix = inverse(camera.view()->GetProjectionMatrix(false))
                     * affineToHomogeneous(viewReprojection)
-                    * m_camera.viewPrevious()->GetProjectionMatrix(false);
+                    * camera.viewPrevious()->GetProjectionMatrix(false);
                 const float outputAspectRatio = params.displayAspectRatio;
                 float4x4 projection = perspProjD3DStyleReverse(
-                    dm::radians(m_camera.verticalFOV()), outputAspectRatio, m_camera.zNear());
+                    dm::radians(camera.verticalFOV()), outputAspectRatio, camera.zNear());
 
                 StreamlineInterface::Constants slConstants = {};
                 slConstants.cameraAspectRatio = outputAspectRatio;
-                slConstants.cameraFOV = dm::radians(m_camera.verticalFOV());
-                slConstants.cameraFar = m_camera.zFar();
+                slConstants.cameraFOV = dm::radians(camera.verticalFOV());
+                slConstants.cameraFar = camera.zFar();
                 slConstants.cameraMotionIncluded = true;
-                slConstants.cameraNear = m_camera.zNear();
+                slConstants.cameraNear = camera.zNear();
                 slConstants.cameraPinholeOffset = { 0.f, 0.f };
-                slConstants.cameraPos = m_camera.camera().GetPosition();
-                slConstants.cameraFwd = m_camera.camera().GetDir();
-                slConstants.cameraUp = m_camera.camera().GetUp();
+                slConstants.cameraPos = camera.camera().GetPosition();
+                slConstants.cameraFwd = camera.camera().GetDir();
+                slConstants.cameraUp = camera.camera().GetUp();
                 slConstants.cameraRight = normalize(
-                    cross(m_camera.camera().GetDir(), m_camera.camera().GetUp()));
+                    cross(camera.camera().GetDir(), camera.camera().GetUp()));
                 slConstants.cameraViewToClip = projection;
                 slConstants.clipToCameraView = inverse(projection);
                 slConstants.clipToPrevClip = reprojectionMatrix;
-                slConstants.depthInverted = m_camera.view()->IsReverseDepth();
+                slConstants.depthInverted = camera.view()->IsReverseDepth();
                 slConstants.jitterOffset = params.cameraJitter;
                 slConstants.mvecScale = { 1.0f / params.renderSize.x, 1.0f / params.renderSize.y };
                 slConstants.prevClipToClip = inverse(reprojectionMatrix);
@@ -109,9 +109,9 @@ void RenderCore::postProcessAA(PostProcessAAParams& params)
                 if (settings.RealtimeAA == 3 && params.dlssRROptions != nullptr)
                 {
                     params.dlssRROptions->worldToCameraView =
-                        dm::affineToHomogeneous(m_camera.view()->GetViewMatrix());
+                        dm::affineToHomogeneous(camera.view()->GetViewMatrix());
                     params.dlssRROptions->cameraViewToWorld =
-                        dm::affineToHomogeneous(m_camera.view()->GetInverseViewMatrix());
+                        dm::affineToHomogeneous(camera.view()->GetInverseViewMatrix());
                     params.gpuDevice->GetStreamline().SetDLSSRROptions(*params.dlssRROptions);
                 }
             }
@@ -120,14 +120,14 @@ void RenderCore::postProcessAA(PostProcessAAParams& params)
 
             params.gpuDevice->GetStreamline().TagResourcesGeneral(
                 commandList,
-                m_camera.view()->GetChildView(ViewType::PLANAR, 0),
+                camera.view()->GetChildView(ViewType::PLANAR, 0),
                 renderTargets->ScreenMotionVectors,
                 renderTargets->Depth,
                 renderTargets->PreUIColor);
 
             params.gpuDevice->GetStreamline().TagResourcesDLSSNIS(
                 commandList,
-                m_camera.view()->GetChildView(ViewType::PLANAR, 0),
+                camera.view()->GetChildView(ViewType::PLANAR, 0),
                 renderTargets->ProcessedOutputColor,
                 renderTargets->OutputColor);
 
@@ -160,7 +160,7 @@ void RenderCore::postProcessAA(PostProcessAAParams& params)
             static bool useSpecHitT = false;
             params.gpuDevice->GetStreamline().TagResourcesDLSSRR(
                 commandList,
-                m_camera.view()->GetChildView(ViewType::PLANAR, 0),
+                camera.view()->GetChildView(ViewType::PLANAR, 0),
                 (int2)params.renderSize,
                 (int2)params.displaySize,
                 renderTargets->OutputColor,
@@ -201,7 +201,7 @@ void RenderCore::postProcessAA(PostProcessAAParams& params)
             : (0.0f);
 
         params.accumulationPass->Render(
-            commandList, *m_camera.view(), *m_camera.view(), accumulationWeight);
+            commandList, *camera.view(), *camera.view(), accumulationWeight);
     }
 }
 

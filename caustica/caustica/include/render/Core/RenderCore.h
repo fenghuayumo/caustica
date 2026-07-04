@@ -4,11 +4,6 @@
 #include <render/Core/CameraController.h>
 #include <render/Core/RenderPipeline.h>
 
-#include <render/Core/PostProcessAA.h>
-#include <render/Core/HdrPostProcess.h>
-#include <render/Core/SceneGeometryUpdate.h>
-#include <render/Core/LightingUpdate.h>
-
 #include <memory>
 
 namespace caustica
@@ -17,7 +12,7 @@ class Scene;
 class ShaderFactory;
 
 // Shared render orchestrator owned by GpuRenderSubsystem (accel structs, camera, render pipeline).
-// Scene passes wire AccelStructManager directly; WorldRenderer uses the full RenderCore surface.
+// Scene passes wire AccelStructManager directly; WorldRenderer uses camera + accelStructs via PathTracingContext.
 class RenderCore
 {
 public:
@@ -35,13 +30,6 @@ public:
 
     void onSceneLoaded(Scene& scene, bool& accelRebuildRequested);
     void onSceneUnloading();
-
-    void postProcessAA(PostProcessAAParams& params);
-    void hdrPostProcess(HdrPostProcessParams& params);
-    void updateSceneGeometry(UpdateSceneGeometryParams& params);
-    void preUpdateLighting(PreUpdateLightingParams& params);
-    void updateLighting(UpdateLightingParams& params);
-    void updateLightingEnd(UpdateLightingEndParams& params);
 
 private:
     nvrhi::IDevice* m_device = nullptr;

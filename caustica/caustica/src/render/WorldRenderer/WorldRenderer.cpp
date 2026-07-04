@@ -8,9 +8,12 @@ namespace { constexpr int c_SwapchainCount = 3; }
 
 #include <scene/SceneEcs.h>
 #include <scene/SceneLightAccess.h>
+#include <render/Core/HdrPostProcess.h>
 #include <render/Core/PostProcessAA.h>
 #include <render/Core/SceneGeometryUpdate.h>
 #include <render/Core/LightingUpdate.h>
+#include <render/Core/AccelStructManager.h>
+#include <render/Core/CameraController.h>
 #include <render/Core/PathTracingShaderCompiler.h>
 #include <render/Core/ComputePipelineRegistry.h>
 #include <render/Core/BindingCache.h>
@@ -485,8 +488,8 @@ void caustica::render::WorldRenderer::createRenderPasses( bool& exposureResetReq
     }
 
     // these get re-created every time intentionally, to pick up changes after at-runtime shader recompile
-    m_toneMappingPass = std::make_unique<ToneMappingPass>(device(), m_context.shaderFactory, m_context.commonPasses, m_renderTargets->LdrFramebuffer, *m_context.renderCore.camera().view(), m_renderTargets->OutputColor);
-    m_bloomPass = std::make_unique<BloomPass>(device(), m_context.shaderFactory, m_context.commonPasses, m_renderTargets->ProcessedOutputFramebuffer, *m_context.renderCore.camera().view());
+    m_toneMappingPass = std::make_unique<ToneMappingPass>(device(), m_context.shaderFactory, m_context.commonPasses, m_renderTargets->LdrFramebuffer, *m_context.camera.view(), m_renderTargets->OutputColor);
+    m_bloomPass = std::make_unique<BloomPass>(device(), m_context.shaderFactory, m_context.commonPasses, m_renderTargets->ProcessedOutputFramebuffer, *m_context.camera.view());
     m_postProcess = std::make_shared<PostProcess>(device(), m_context.shaderFactory, m_context.commonPasses, m_shaderDebug);
 
     {
@@ -501,7 +504,7 @@ void caustica::render::WorldRenderer::createRenderPasses( bool& exposureResetReq
         taaParams.motionVectorStencilMask = 0; ///*uint32_t motionVectorStencilMask =*/ 0x01;
         taaParams.useCatmullRomFilter = true;
 
-        m_temporalAntiAliasingPass = std::make_unique<TemporalAntiAliasingPass>(device(), m_context.shaderFactory, m_context.commonPasses, *m_context.renderCore.camera().view(), taaParams);
+        m_temporalAntiAliasingPass = std::make_unique<TemporalAntiAliasingPass>(device(), m_context.shaderFactory, m_context.commonPasses, *m_context.camera.view(), taaParams);
     }
 
     if (!createPTPipeline())
@@ -540,7 +543,7 @@ void caustica::render::WorldRenderer::preUpdateLighting(nvrhi::CommandListHandle
         envMapActualPath,
         sceneDirectory,
     };
-    m_context.renderCore.preUpdateLighting(params);
+    caustica::preUpdateLighting(params);
 }
 void caustica::render::WorldRenderer::updateLighting(nvrhi::CommandListHandle commandList)
 {
@@ -563,7 +566,7 @@ void caustica::render::WorldRenderer::updateLighting(nvrhi::CommandListHandle co
     };
     if (!m_context.scenePasses.gaussianSplats.emissionProxies().empty())
         params.gaussianSplatEmissionProxies = &m_context.scenePasses.gaussianSplats.emissionProxies();
-    m_context.renderCore.updateLighting(params);
+    caustica::updateLighting(m_context.camera, m_context.accelStructs, params);
 }
 void caustica::render::WorldRenderer::preUpdatePathTracing( bool resetAccum, nvrhi::CommandListHandle commandList )
 {
@@ -653,8 +656,8 @@ void caustica::render::WorldRenderer::updatePathTracerConstants( PathTracerConst
 
     constants.camera = cameraData;
     constants.prevCamera = cameraData;
-    if (m_context.renderCore.camera().viewPrevious())
-        constants.prevCamera.PosW = m_context.renderCore.camera().viewPrevious()->GetInverseViewMatrix().m_translation;
+    if (m_context.camera.viewPrevious())
+        constants.prevCamera.PosW = m_context.camera.viewPrevious()->GetInverseViewMatrix().m_translation;
 
     constants.bounceCount = m_context.settings.BounceCount;
     constants.diffuseBounceCount = m_context.settings.DiffuseBounceCount;
@@ -723,7 +726,7 @@ void caustica::render::WorldRenderer::rtxdiSetupFrame(nvrhi::IFramebuffer* frame
     RtxdiBridgeParameters bridgeParameters;
 	bridgeParameters.frameIndex = m_frameIndex & 0xFFFFFFFF;
 	bridgeParameters.frameDims = renderDims;
-	bridgeParameters.cameraPosition = m_context.renderCore.camera().camera().GetPosition();
+	bridgeParameters.cameraPosition = m_context.camera.camera().GetPosition();
 	bridgeParameters.userSettings = m_context.settings.RTXDI;
     bridgeParameters.usingLightSampling = m_context.settings.ActualUseReSTIRDI();
     bridgeParameters.usingReGIR = m_context.settings.ActualUseReSTIRDI();
@@ -742,7 +745,7 @@ void caustica::render::WorldRenderer::rtxdiSetupFrame(nvrhi::IFramebuffer* frame
         m_rtxdiPass->Reset();
 
 	m_rtxdiPass->PrepareResources(m_commandList, *m_renderTargets, envMapPresent ? m_context.scenePasses.lighting.environment() : nullptr, m_context.scenePasses.lighting.envMapSceneParams(),
-        m_context.sceneManager.getScene(), m_context.scenePasses.lighting.materials(), m_context.scenePasses.lighting.opacityMaps(), m_context.renderCore.accelStructs().getSubInstanceBuffer(), bridgeParameters, m_bindingLayout, m_shaderDebug );
+        m_context.sceneManager.getScene(), m_context.scenePasses.lighting.materials(), m_context.scenePasses.lighting.opacityMaps(), m_context.accelStructs.getSubInstanceBuffer(), bridgeParameters, m_bindingLayout, m_shaderDebug );
  }
 #if CAUSTICA_WITH_STREAMLINE
 void caustica::render::WorldRenderer::streamlinePreRender()
@@ -1029,7 +1032,7 @@ void caustica::render::WorldRenderer::postProcessPreToneMapping(nvrhi::ICommandL
         m_displaySize,
         m_bloomPass.get(),
     };
-    m_context.renderCore.hdrPostProcess(hdrParams);
+    caustica::hdrPostProcess(m_context.camera, hdrParams);
 
     if (m_context.settings.PostProcessTestPassHDR)
     {
@@ -1149,7 +1152,7 @@ void caustica::render::WorldRenderer::renderGaussianSplats(bool renderToOutputCo
         }
     }
 
-    caustica::PlanarView splatView = *m_context.renderCore.camera().view();
+    caustica::PlanarView splatView = *m_context.camera.view();
     if (!renderToOutputColor)
     {
         splatView.SetViewport(nvrhi::Viewport(float(m_displaySize.x), float(m_displaySize.y)));
@@ -1211,7 +1214,7 @@ void caustica::render::WorldRenderer::render(nvrhi::IFramebuffer* framebuffer)
 void caustica::render::WorldRenderer::recreateBindingSet()
 {
 	// WARNING: this must match the layout of the m_bindingLayout (or switch to CreateBindingSetAndLayout)
-    nvrhi::rt::IAccelStruct* gaussianSplatAS = m_context.renderCore.accelStructs().getTopLevelAS();
+    nvrhi::rt::IAccelStruct* gaussianSplatAS = m_context.accelStructs.getTopLevelAS();
     nvrhi::IBuffer* gaussianSplatBuffer = m_context.scenePasses.lighting.materials()->GetMaterialDataBuffer();
     const GaussianSplatBinding primaryGaussianBinding = m_context.scenePasses.gaussianSplats.getPrimaryBinding();
     const GaussianSplatPass* primaryGaussianSplatPass = primaryGaussianBinding.splatPass;
@@ -1227,8 +1230,8 @@ void caustica::render::WorldRenderer::recreateBindingSet()
         nvrhi::BindingSetItem::ConstantBuffer(0, m_constantBuffer),
         nvrhi::BindingSetItem::PushConstants(1, sizeof(SampleMiniConstants)),
         //nvrhi::BindingSetItem::ConstantBuffer(2, m_context.scenePasses.lighting.lightSampling()->GetLightingConstants()),
-        nvrhi::BindingSetItem::RayTracingAccelStruct(0, m_context.renderCore.accelStructs().getTopLevelAS()),
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(1, m_context.renderCore.accelStructs().getSubInstanceBuffer()),
+        nvrhi::BindingSetItem::RayTracingAccelStruct(0, m_context.accelStructs.getTopLevelAS()),
+        nvrhi::BindingSetItem::StructuredBuffer_SRV(1, m_context.accelStructs.getSubInstanceBuffer()),
         nvrhi::BindingSetItem::StructuredBuffer_SRV(2, m_context.sceneManager.getScene()->GetGpuResources().instanceBuffer),
         nvrhi::BindingSetItem::StructuredBuffer_SRV(3, m_context.sceneManager.getScene()->GetGpuResources().geometryBuffer),
         nvrhi::BindingSetItem::StructuredBuffer_SRV(4, m_context.scenePasses.lighting.opacityMaps() ?(m_context.scenePasses.lighting.opacityMaps()->GetGeometryDebugBuffer()):(m_context.scenePasses.lighting.materials()->GetMaterialDataBuffer().Get()) ),   // YUCK
@@ -1338,7 +1341,7 @@ void caustica::render::WorldRenderer::pathTrace(nvrhi::IFramebuffer* framebuffer
     nvrhi::rt::State state;
 
     nvrhi::rt::DispatchRaysArguments args;
-    nvrhi::Viewport viewport = m_context.renderCore.camera().view()->GetViewport();
+    nvrhi::Viewport viewport = m_context.camera.view()->GetViewport();
     uint32_t width = (uint32_t)(viewport.maxX - viewport.minX);
     uint32_t height = (uint32_t)(viewport.maxY - viewport.minY);
     args.width = width;
@@ -1399,11 +1402,11 @@ void caustica::render::WorldRenderer::pathTrace(nvrhi::IFramebuffer* framebuffer
         m_context.sceneManager.getScene(),
         m_context.scenePasses.lighting.materials(),
         m_context.scenePasses.lighting.opacityMaps(),
-        m_context.renderCore.accelStructs().getSubInstanceBuffer(),
+        m_context.accelStructs.getSubInstanceBuffer(),
         m_renderTargets->Depth,
         m_renderTargets->ScreenMotionVectors,
     };
-    m_context.renderCore.updateLightingEnd(lightingEndParams);
+    caustica::updateLightingEnd(lightingEndParams);
 
     {
         RAII_SCOPE( m_commandList->beginMarker("PathTrace");, m_commandList->endMarker(); );
@@ -1516,11 +1519,11 @@ void caustica::render::WorldRenderer::denoise(nvrhi::IFramebuffer* framebuffer)
         bool enableValidation = m_context.settings.DebugView == DebugViewType::StablePlane_DenoiserValidation;
         if (nrdUseRelax)
         {
-            m_nrd[pass]->RunDenoiserPasses(m_commandList, *m_renderTargets, pass, *m_context.renderCore.camera().view(), *m_context.renderCore.camera().viewPrevious(), m_context.gpuDevice.GetFrameIndex(), m_context.settings.NRDDisocclusionThreshold, m_context.settings.NRDDisocclusionThresholdAlternate, m_context.settings.NRDUseAlternateDisocclusionThresholdMix, timeDeltaBetweenFrames, enableValidation, resetHistory, &m_context.settings.RelaxSettings);
+            m_nrd[pass]->RunDenoiserPasses(m_commandList, *m_renderTargets, pass, *m_context.camera.view(), *m_context.camera.viewPrevious(), m_context.gpuDevice.GetFrameIndex(), m_context.settings.NRDDisocclusionThreshold, m_context.settings.NRDDisocclusionThresholdAlternate, m_context.settings.NRDUseAlternateDisocclusionThresholdMix, timeDeltaBetweenFrames, enableValidation, resetHistory, &m_context.settings.RelaxSettings);
         }
         else
         {
-            m_nrd[pass]->RunDenoiserPasses(m_commandList, *m_renderTargets, pass, *m_context.renderCore.camera().view(), *m_context.renderCore.camera().viewPrevious(), m_context.gpuDevice.GetFrameIndex(), m_context.settings.NRDDisocclusionThreshold, m_context.settings.NRDDisocclusionThresholdAlternate, m_context.settings.NRDUseAlternateDisocclusionThresholdMix, timeDeltaBetweenFrames, enableValidation, resetHistory, &m_context.settings.ReblurSettings);
+            m_nrd[pass]->RunDenoiserPasses(m_commandList, *m_renderTargets, pass, *m_context.camera.view(), *m_context.camera.viewPrevious(), m_context.gpuDevice.GetFrameIndex(), m_context.settings.NRDDisocclusionThreshold, m_context.settings.NRDDisocclusionThresholdAlternate, m_context.settings.NRDUseAlternateDisocclusionThresholdMix, timeDeltaBetweenFrames, enableValidation, resetHistory, &m_context.settings.ReblurSettings);
         }
 
         m_commandList->beginMarker("MergeOutputs");
@@ -1585,7 +1588,7 @@ bool caustica::render::WorldRenderer::evaluateNativeDLSS(bool reset)
         evaluateParams.normalRoughness = m_renderTargets->RRNormalsAndRoughness;
     }
 
-    const bool evaluated = m_nativeDLSS->Evaluate(m_commandList, evaluateParams, *m_context.renderCore.camera().view());
+    const bool evaluated = m_nativeDLSS->Evaluate(m_commandList, evaluateParams, *m_context.camera.view());
     if (evaluated)
     {
         static bool loggedNativeDLSSEvaluation = false;
@@ -1631,7 +1634,7 @@ void caustica::render::WorldRenderer::postProcessAA(nvrhi::IFramebuffer* framebu
     params.dlssRROptions = &m_lastDLSSRROptions;
 #endif
 
-    m_context.renderCore.postProcessAA(params);
+    caustica::postProcessAA(m_context.camera, params);
 
 #if CAUSTICA_WITH_NATIVE_DLSS
     if (m_context.settings.RealtimeMode)
@@ -1916,10 +1919,10 @@ caustica::CameraUpdateParams caustica::render::WorldRenderer::makeCameraUpdatePa
 
 void caustica::render::WorldRenderer::syncCameraViews()
 {
-    m_context.renderCore.camera().updateViews(makeCameraUpdateParams());
+    m_context.camera.updateViews(makeCameraUpdateParams());
 }
 
 dm::float2 caustica::render::WorldRenderer::computeCameraJitter() const
 {
-    return m_context.renderCore.camera().computeJitter(makeCameraUpdateParams());
+    return m_context.camera.computeJitter(makeCameraUpdateParams());
 }

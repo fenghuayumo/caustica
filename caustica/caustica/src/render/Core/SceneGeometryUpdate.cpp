@@ -1,5 +1,4 @@
 #include <render/Core/SceneGeometryUpdate.h>
-#include <render/Core/RenderCore.h>
 #include <render/Core/AccelStructManager.h>
 #include <render/Core/SceneGpuUpdater.h>
 #include <render/Passes/Lighting/MaterialGpuCache.h>
@@ -50,7 +49,7 @@ void transitionSkinnedMeshBuffersToReadOnly(nvrhi::ICommandList* commandList, co
 
 } // namespace
 
-void RenderCore::updateSceneGeometry(UpdateSceneGeometryParams& params)
+void updateSceneGeometry(AccelStructManager& accelStructs, UpdateSceneGeometryParams& params)
 {
     nvrhi::ICommandList* commandList = params.commandList;
     const std::shared_ptr<Scene>& scene = params.scene;
@@ -63,16 +62,16 @@ void RenderCore::updateSceneGeometry(UpdateSceneGeometryParams& params)
         params.opacityMaps->BuildOpacityMicromaps(*commandList, *scene);
 
     const AccelStructBuildSettings rebuildSettings = makeAccelBuildSettings(params.settings, false);
-    m_accelStructs.rebuildDirtyMeshes(
+    accelStructs.rebuildDirtyMeshes(
         commandList, *scene, rebuildSettings, params.accelStructRebuildRequested);
 
-    m_accelStructs.updateSkinnedBlases(
+    accelStructs.updateSkinnedBlases(
         commandList, *scene, rebuildSettings, static_cast<uint32_t>(params.frameIndex));
 
     commandList->compactBottomLevelAccelStructs();
 
     const AccelStructBuildSettings tlasSettings = makeAccelBuildSettings(params.settings, true);
-    m_accelStructs.buildTlas(
+    accelStructs.buildTlas(
         commandList, *scene, tlasSettings, makeOmmAccelState(params.opacityMaps), params.opacityMaps);
 
     transitionSkinnedMeshBuffersToReadOnly(commandList, *scene);
@@ -91,9 +90,9 @@ void RenderCore::updateSceneGeometry(UpdateSceneGeometryParams& params)
     }
 
     if (params.materials != nullptr)
-        params.materials->Update(commandList, scene, m_accelStructs.getSubInstanceData());
+        params.materials->Update(commandList, scene, accelStructs.getSubInstanceData());
 
-    m_accelStructs.uploadSubInstanceData(commandList);
+    accelStructs.uploadSubInstanceData(commandList);
 }
 
 } // namespace caustica

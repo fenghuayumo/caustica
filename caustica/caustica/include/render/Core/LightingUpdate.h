@@ -18,7 +18,9 @@ struct GaussianSplatEmissionProxy;
 
 namespace caustica
 {
+class AccelStructManager;
 class BindingCache;
+class CameraController;
 class CommonRenderPasses;
 class Light;
 class Scene;
@@ -77,5 +79,14 @@ void syncEnvMapSceneParams(
     const PathTracerSettings& settings,
     EnvMapSceneParams& params,
     float envMapRadianceScale);
+
+void preUpdateLighting(PreUpdateLightingParams& params);
+
+void updateLighting(
+    CameraController& camera,
+    AccelStructManager& accelStructs,
+    UpdateLightingParams& params);
+
+void updateLightingEnd(UpdateLightingEndParams& params);
 
 } // namespace caustica

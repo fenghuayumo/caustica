@@ -11,6 +11,7 @@ class OpacityMicromapBuilder;
 
 namespace caustica
 {
+class AccelStructManager;
 class Scene;
 
 struct UpdateSceneGeometryParams
@@ -27,5 +28,7 @@ struct UpdateSceneGeometryParams
     // OR-ed when OMM async builds are still in flight.
     bool*                            asyncLoadingInProgress = nullptr;
 };
+
+void updateSceneGeometry(AccelStructManager& accelStructs, UpdateSceneGeometryParams& params);
 
 } // namespace caustica
