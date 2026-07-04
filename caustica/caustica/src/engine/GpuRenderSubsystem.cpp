@@ -83,33 +83,19 @@ bool GpuRenderSubsystem::initializeSession(const GpuRenderSubsystemInitParams& p
     m_sceneTime = &params.sceneTime;
     m_cmdLine = params.cmdLine;
 
-    auto& lighting = m_scenePasses.lighting;
-    auto& rayTracing = m_scenePasses.rayTracing;
-    auto& gaussianSplats = m_scenePasses.gaussianSplats;
-
     m_pathTracingContext = std::make_unique<render::PathTracingContext>(render::PathTracingContext{
         .gpuDevice = params.gpuDevice,
         .sceneManager = *m_sceneManager,
         .renderCore = *m_renderCore,
         .settings = params.settings,
         .runtimeState = params.runtimeState,
-        .rayTracing = rayTracing,
-        .gaussianSplats = gaussianSplats,
+        .scenePasses = m_scenePasses,
         .shaderFactory = m_shaderFactory,
         .commonPasses = m_commonPasses,
         .bindingCache = *m_bindingCache,
         .textureCache = m_textureCache,
         .descriptorTable = m_descriptorTable,
-        .environment = lighting.environment(),
-        .lightSampling = lighting.lightSampling(),
-        .materials = lighting.materials(),
-        .opacityMaps = lighting.opacityMaps(),
-        .computePipelines = lighting.computePipelines(),
-        .envMapSceneParams = lighting.envMapSceneParams(),
-        .envMapLocalPath = lighting.envMapLocalPath(),
-        .envMapOverride = lighting.envMapOverride(),
         .sceneTime = params.sceneTime,
-        .gaussianSplatEmissionProxies = gaussianSplats.emissionProxies(),
         .diagnostics = params.diagnostics,
     });
 

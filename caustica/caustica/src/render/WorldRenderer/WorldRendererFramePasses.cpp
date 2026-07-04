@@ -137,7 +137,7 @@ void caustica::render::WorldRenderer::framePassSetup(PathTracingFrameContext& ct
         if (m_context.settings.RealtimeMode)
         {
             m_context.settings.ResetRealtimeCaches = true;
-            m_context.rayTracing.ensureStablePlanePipelines();
+            m_context.scenePasses.rayTracing.ensureStablePlanePipelines();
         }
         m_lastRealtimeMode = m_context.settings.RealtimeMode;
     }
@@ -176,9 +176,9 @@ void caustica::render::WorldRenderer::framePassEnsureRenderTargets(PathTracingFr
 
 void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameContext& ctx)
 {
-    caustica::syncEnvMapSceneParams(m_context.settings, m_context.envMapSceneParams, c_envMapRadianceScale);
+    caustica::syncEnvMapSceneParams(m_context.settings, m_context.scenePasses.lighting.envMapSceneParams(), c_envMapRadianceScale);
 
-    if (m_context.rayTracing.consumeShaderReloadRequest())
+    if (m_context.scenePasses.rayTracing.consumeShaderReloadRequest())
     {
         m_context.shaderFactory->ClearCache();
         ctx.needNewPasses = true;
@@ -200,31 +200,31 @@ void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameCont
     {
         m_context.diagnostics.progressInitializingRenderer.Start("Initializing renderer...");
 
-        if (m_context.materials == nullptr)
+        if (m_context.scenePasses.lighting.materials() == nullptr)
         {
-            m_context.materials = std::make_shared<MaterialGpuCache>(
+            m_context.scenePasses.lighting.materials() = std::make_shared<MaterialGpuCache>(
                 std::string("PathTracerMaterialSpecializations.hlsl"), device(), m_context.textureCache, m_context.shaderFactory);
             assert(m_pathTracingShaderCompiler == nullptr);
 
             m_pathTracingShaderCompiler = std::make_shared<PathTracingShaderCompiler>(
-                device(), m_context.materials, m_bindingLayout, m_bindlessLayout);
+                device(), m_context.scenePasses.lighting.materials(), m_bindingLayout, m_bindlessLayout);
 
             std::vector<std::filesystem::path> additionalShaderPaths;
-            m_context.computePipelines = std::make_shared<ComputePipelineRegistry>(device(), additionalShaderPaths);
+            m_context.scenePasses.lighting.computePipelines() = std::make_shared<ComputePipelineRegistry>(device(), additionalShaderPaths);
 
-            m_context.rayTracing.createRTPipelines();
+            m_context.scenePasses.rayTracing.createRTPipelines();
         }
 
-        m_context.materials->CreateRenderPassesAndLoadMaterials(
+        m_context.scenePasses.lighting.materials()->CreateRenderPassesAndLoadMaterials(
             m_bindlessLayout, m_context.commonPasses, m_context.sceneManager.getScene(),
             m_context.sceneManager.getCurrentScenePath(), GetLocalPath(c_AssetsFolder));
         m_context.diagnostics.progressInitializingRenderer.Set(5);
-        if (m_context.opacityMaps)
-            m_context.opacityMaps->CreateRenderPasses(m_bindlessLayout, m_context.commonPasses);
+        if (m_context.scenePasses.lighting.opacityMaps())
+            m_context.scenePasses.lighting.opacityMaps()->CreateRenderPasses(m_bindlessLayout, m_context.commonPasses);
         m_context.diagnostics.progressInitializingRenderer.Set(20);
     }
 
-    m_context.rayTracing.recreateAccelStructs(m_commandList);
+    m_context.scenePasses.rayTracing.recreateAccelStructs(m_commandList);
     m_commandList = device()->createCommandList();
 
     if (m_context.settings.ActualUseRTXDIPasses() && m_rtxdiPass == nullptr)
@@ -260,11 +260,11 @@ void caustica::render::WorldRenderer::framePassShaderUpdate(PathTracingFrameCont
     m_pathTracingShaderCompiler->Update(
         m_context.sceneManager.getScene(),
         static_cast<unsigned int>(m_context.renderCore.accelStructs().getSubInstanceData().size()),
-        [this](std::vector<caustica::ShaderMacro>& macros) { m_context.rayTracing.fillPTPipelineGlobalMacros(macros); },
+        [this](std::vector<caustica::ShaderMacro>& macros) { m_context.scenePasses.rayTracing.fillPTPipelineGlobalMacros(macros); },
         ctx.needNewPasses);
 
-    if (m_context.computePipelines)
-        m_context.computePipelines->Update(ctx.needNewPasses);
+    if (m_context.scenePasses.lighting.computePipelines())
+        m_context.scenePasses.lighting.computePipelines()->Update(ctx.needNewPasses);
 
     m_context.diagnostics.progressInitializingRenderer.Set(90);
 }
@@ -323,12 +323,12 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
 
     UpdateSceneGeometryParams geoParams{
         m_context.settings,
-        m_context.rayTracing.accelerationStructRebuildRequested(),
+        m_context.scenePasses.rayTracing.accelerationStructRebuildRequested(),
         m_context.sceneManager.getScene(),
         m_commandList,
     };
-    geoParams.materials = m_context.materials.get();
-    geoParams.opacityMaps = m_context.opacityMaps.get();
+    geoParams.materials = m_context.scenePasses.lighting.materials().get();
+    geoParams.opacityMaps = m_context.scenePasses.lighting.opacityMaps().get();
     geoParams.frameIndex = m_context.gpuDevice.GetFrameIndex();
     geoParams.asyncLoadingInProgress = &m_context.diagnostics.asyncLoadingInProgress;
     m_context.renderCore.updateSceneGeometry(geoParams);
@@ -408,9 +408,9 @@ void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext
     }
 
     updatePathTracerConstants(constants.ptConsts, ctx.cameraData);
-    constants.MaterialCount = m_context.materials->GetMaterialDataCount();
+    constants.MaterialCount = m_context.scenePasses.lighting.materials()->GetMaterialDataCount();
     const uint32_t gaussianSplatShadowMode = ResolveGaussianSplatShadowMode(m_context.settings);
-    const GaussianSplatBinding primaryGaussianBinding = m_context.gaussianSplats.getPrimaryBinding();
+    const GaussianSplatBinding primaryGaussianBinding = m_context.scenePasses.gaussianSplats.getPrimaryBinding();
     GaussianSplatPass* primaryGaussianSplatPass = const_cast<GaussianSplatPass*>(primaryGaussianBinding.splatPass);
     constants.GaussianSplatShadowCount = (m_context.settings.EnableGaussianSplats
             && gaussianSplatShadowMode != GAUSSIAN_SPLAT_SHADOWS_DISABLED
@@ -440,8 +440,8 @@ void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext
         ? inverse(primaryGaussianBinding.objectToWorld)
         : float4x4::identity();
 
-    constants.envMapSceneParams = m_context.envMapSceneParams;
-    constants.envMapImportanceSamplingParams = m_context.environment->GetImportanceSampling()->GetShaderParams();
+    constants.envMapSceneParams = m_context.scenePasses.lighting.envMapSceneParams();
+    constants.envMapImportanceSamplingParams = m_context.scenePasses.lighting.environment()->GetImportanceSampling()->GetShaderParams();
 
     PlanarViewConstants view;
     m_context.renderCore.camera().view()->FillPlanarViewConstants(view);
@@ -478,14 +478,14 @@ void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext
     };
 
     updateLighting(m_commandList);
-    m_context.rayTracing.uploadSubInstanceData(m_commandList);
+    m_context.scenePasses.rayTracing.uploadSubInstanceData(m_commandList);
     abortIfSubmitFailed(ctx, "updateLighting");
     if (ctx.aborted)
         return;
 
     m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
 
-    m_context.rayTracing.sampleRenderCode(ctx.framebuffer, m_commandList, constants);
+    m_context.scenePasses.rayTracing.sampleRenderCode(ctx.framebuffer, m_commandList, constants);
     abortIfSubmitFailed(ctx, "sampleRenderCode");
     if (ctx.aborted)
         return;

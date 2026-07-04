@@ -5,7 +5,6 @@
 #include <render/Passes/Gaussian/GaussianSplatPass.h>
 #include <render/Passes/Gaussian/GaussianSplatEmissionProxy.h>
 #include <render/RenderRuntimeState.h>
-#include <render/WorldRenderer/PathTracingContext.h>
 
 #include <filesystem>
 #include <functional>
@@ -36,6 +35,12 @@ struct CommandLineOptions;
 
 namespace caustica::render
 {
+
+struct GaussianSplatBinding
+{
+    const GaussianSplatPass* splatPass = nullptr;
+    dm::float4x4             objectToWorld = dm::float4x4::identity();
+};
 
 // Per-scene Gaussian splat passes, emission proxies, and WorldRenderer hooks.
 class SceneGaussianSplatPasses
