@@ -5,7 +5,7 @@
 #include <imgui/imgui_renderer.h>
 
 #include <engine/Engine.h>
-#include <engine/RenderingSubsystem.h>
+#include <engine/EngineRenderer.h>
 #include <platform/window.h>
 
 namespace caustica::editor
@@ -21,8 +21,8 @@ void EditorUISubsystem::initialize(caustica::EngineInitContext& context)
     if (!context.gpuDevice || !context.window || !context.subsystems || !context.application)
         return;
 
-    auto* rendering = context.subsystems->get<caustica::RenderingSubsystem>();
-    if (!rendering || !rendering->renderer())
+    auto* engineRenderer = context.subsystems->get<caustica::EngineRenderer>();
+    if (!engineRenderer)
         return;
 
     const bool serSupported = context.gpuDevice->SupportsShaderExecutionReordering()
@@ -34,7 +34,7 @@ void EditorUISubsystem::initialize(caustica::EngineInitContext& context)
         m_config.editorUiData,
         serSupported,
         m_config.cmdLine);
-    m_ui->Init(rendering->renderer()->shaderFactory());
+    m_ui->Init(engineRenderer->shaderFactory());
 
     if (caustica::Window* platformWindow = context.gpuDevice->GetPlatformWindow())
     {

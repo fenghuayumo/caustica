@@ -33,10 +33,19 @@ EngineRenderer::~EngineRenderer()
     shutdown();
 }
 
-bool EngineRenderer::initialize(GpuDevice& gpuDevice,
-    std::shared_ptr<SceneTypeFactory> sceneTypeFactory,
-    EngineSceneCallbacks sceneCallbacks)
+void EngineRenderer::initialize(EngineInitContext& /*context*/)
 {
+}
+
+void EngineRenderer::onRenderEnd(GpuDevice& /*gpuDevice*/)
+{
+    endFrame();
+}
+
+bool EngineRenderer::initializeSession(const EngineRendererInitParams& params)
+{
+    GpuDevice& gpuDevice = params.gpuDevice;
+
     createShaderFactory(gpuDevice);
 
     auto* device = gpuDevice.GetDevice();
@@ -61,35 +70,31 @@ bool EngineRenderer::initialize(GpuDevice& gpuDevice,
         *m_shaderFactory,
         m_textureCache,
         m_descriptorTable,
-        std::move(sceneTypeFactory));
+        params.sceneTypeFactory);
 
     m_sceneManager->setLoadingCallbacks(
-        std::move(sceneCallbacks.OnSceneLoaded),
-        std::move(sceneCallbacks.OnSceneUnloading));
+        std::move(params.sceneCallbacks.OnSceneLoaded),
+        std::move(params.sceneCallbacks.OnSceneUnloading));
 
     m_renderCore->initializeRenderPipeline(m_shaderFactory);
-    return true;
-}
 
-void EngineRenderer::createPathTracer(const PathTracerSessionParams& session)
-{
-    m_gpuDevice = &session.gpuDevice;
-    m_settings = &session.settings;
-    m_runtimeState = &session.runtimeState;
-    m_diagnostics = &session.diagnostics;
-    m_sceneTime = &session.sceneTime;
-    m_cmdLine = session.cmdLine;
+    m_gpuDevice = &params.gpuDevice;
+    m_settings = &params.settings;
+    m_runtimeState = &params.runtimeState;
+    m_diagnostics = &params.diagnostics;
+    m_sceneTime = &params.sceneTime;
+    m_cmdLine = params.cmdLine;
 
     auto& lighting = m_scenePasses.lighting;
     auto& rayTracing = m_scenePasses.rayTracing;
     auto& gaussianSplats = m_scenePasses.gaussianSplats;
 
     m_pathTracingContext = std::make_unique<render::PathTracingContext>(render::PathTracingContext{
-        .gpuDevice = session.gpuDevice,
+        .gpuDevice = params.gpuDevice,
         .sceneManager = *m_sceneManager,
         .renderCore = *m_renderCore,
-        .settings = session.settings,
-        .runtimeState = session.runtimeState,
+        .settings = params.settings,
+        .runtimeState = params.runtimeState,
         .rayTracing = rayTracing,
         .gaussianSplats = gaussianSplats,
         .shaderFactory = m_shaderFactory,
@@ -105,19 +110,20 @@ void EngineRenderer::createPathTracer(const PathTracerSessionParams& session)
         .envMapSceneParams = lighting.envMapSceneParams(),
         .envMapLocalPath = lighting.envMapLocalPath(),
         .envMapOverride = lighting.envMapOverride(),
-        .sceneTime = session.sceneTime,
+        .sceneTime = params.sceneTime,
         .gaussianSplatEmissionProxies = gaussianSplats.emissionProxies(),
-        .diagnostics = session.diagnostics,
-        .frameExtensions = session.frameExtensions,
+        .diagnostics = params.diagnostics,
+        .frameExtensions = params.frameExtensions,
     });
 
     m_worldRenderer = std::make_unique<render::PathTracingWorldRenderer>(*m_pathTracingContext);
     m_worldRenderer->createBindingLayouts(m_bindlessLayout);
 
-    attachScenePasses(session);
+    attachScenePasses(params);
+    return true;
 }
 
-void EngineRenderer::attachScenePasses(const PathTracerSessionParams& session)
+void EngineRenderer::attachScenePasses(const EngineRendererInitParams& params)
 {
     assert(m_worldRenderer != nullptr);
 
@@ -126,22 +132,22 @@ void EngineRenderer::attachScenePasses(const PathTracerSessionParams& session)
     auto& gaussianSplats = m_scenePasses.gaussianSplats;
 
     rayTracing.attach(
-        session.gpuDevice,
+        params.gpuDevice,
         *m_sceneManager,
         *m_renderCore,
         *m_worldRenderer,
-        session.settings,
-        session.runtimeState.Invalidation,
+        params.settings,
+        params.runtimeState.Invalidation,
         lighting,
         *m_bindingCache);
 
     gaussianSplats.attach(
-        session.gpuDevice,
+        params.gpuDevice,
         *m_sceneManager,
         *m_renderCore,
         *m_worldRenderer,
-        session.settings,
-        session.runtimeState.GaussianSplats,
+        params.settings,
+        params.runtimeState.GaussianSplats,
         m_shaderFactory,
         m_commonPasses);
 

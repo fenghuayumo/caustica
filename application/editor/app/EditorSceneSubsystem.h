@@ -29,7 +29,7 @@ struct EditorSceneSubsystemConfig
     bool postAppInit = true;
 };
 
-// Wires SceneEditor to RenderingSubsystem and drives scene rendering each frame.
+// Wires SceneEditor to EngineRenderer and drives scene rendering each frame.
 class EditorSceneSubsystem : public caustica::ISubsystem
 {
 public:

@@ -12,6 +12,7 @@
 #include <render/SessionDiagnostics.h>
 #include <render/WorldRenderer/PathTracingContext.h>
 #include <render/WorldRenderer/PathTracingFrameExtension.h>
+#include <engine/ISubsystem.h>
 
 class SceneManager;
 struct CommandLineOptions;
@@ -40,8 +41,8 @@ struct EngineSceneCallbacks
     std::function<void()> OnSceneUnloading;
 };
 
-// Per-session inputs for creating the path tracer.
-struct PathTracerSessionParams
+// Inputs for initializing EngineRenderer (shared GPU infra + path tracer).
+struct EngineRendererInitParams
 {
     GpuDevice& gpuDevice;
     PathTracerSettings& settings;
@@ -54,25 +55,29 @@ struct PathTracerSessionParams
     std::span<render::IPathTracingFrameExtension* const> frameExtensions = {};
 
     const CommandLineOptions* cmdLine = nullptr;
+
+    std::shared_ptr<SceneTypeFactory> sceneTypeFactory;
+    EngineSceneCallbacks sceneCallbacks = {};
 };
 
 // Owns shared GPU infrastructure and the path-tracing world renderer.
-class EngineRenderer
+class EngineRenderer : public ISubsystem
 {
 public:
     EngineRenderer();
-    ~EngineRenderer();
+    ~EngineRenderer() override;
 
     EngineRenderer(const EngineRenderer&) = delete;
     EngineRenderer& operator=(const EngineRenderer&) = delete;
 
-    bool initialize(GpuDevice& gpuDevice,
-        std::shared_ptr<SceneTypeFactory> sceneTypeFactory,
-        EngineSceneCallbacks sceneCallbacks = {});
+    [[nodiscard]] int priority() const override { return 100; }
 
-    void createPathTracer(const PathTracerSessionParams& session);
+    void initialize(EngineInitContext& context) override;
+    void shutdown() override;
+    void onRenderEnd(GpuDevice& gpuDevice) override;
 
-    void shutdown();
+    bool initializeSession(const EngineRendererInitParams& params);
+
     void endFrame();
 
     void onSceneUnloading();
@@ -107,7 +112,7 @@ public:
 
 private:
     void createShaderFactory(GpuDevice& gpuDevice);
-    void attachScenePasses(const PathTracerSessionParams& session);
+    void attachScenePasses(const EngineRendererInitParams& params);
     void applySampleSettingsFromScene();
 
     render::PathTracerScenePasses m_scenePasses;

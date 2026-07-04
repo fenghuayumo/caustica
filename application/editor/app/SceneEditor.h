@@ -167,11 +167,6 @@ public:
 
     float                                   GetAvgTimePerFrame() const;
 
-    void AttachRenderResources(const std::shared_ptr<caustica::ShaderFactory>& shaderFactory,
-        const std::shared_ptr<caustica::CommonRenderPasses>& commonPasses,
-        caustica::BindingCache* bindingCache,
-        const std::shared_ptr<caustica::DescriptorTableManager>& descriptorTable,
-        const std::shared_ptr<caustica::TextureLoader>& textureCache);
     void bindEngine(caustica::EngineRenderer& engine);
     void Init(const std::string& preferredScene,
         const std::shared_ptr<caustica::ShaderFactory>& shaderFactory);
@@ -191,6 +186,7 @@ public:
     void setApplication(caustica::Application* application) { m_application = application; }
 
     void PrepareEditorFrame();
+    void recordFrameTiming(const caustica::GpuDevice& gpuDevice);
     void                                    beginFrame();
     bool processPendingSceneSwitch();
     [[nodiscard]] bool                      shouldSkipRender() const;
@@ -216,8 +212,6 @@ public:
     void                                    CaptureScriptPostRender(std::function<bool(const char* fileName)> saveTexture);
     ::ZoomTool*                             GetOrCreateZoomTool();
 
-    // Render entry points
-    void Render(nvrhi::IFramebuffer* framebuffer);
     void BackBufferResizing();
 
     void onEvent(caustica::Event& event);

@@ -4,11 +4,12 @@
 #include "common/LocalConfig.h"
 
 #include <core/path_utils.h>
-#include <engine/RenderingSubsystem.h>
+#include <engine/EngineRenderer.h>
 #include <engine/SubsystemCollection.h>
 #include <render/Core/RenderSceneTypeFactory.h>
 #include <render/RenderSessionState.h>
 #include <render/SceneLightingPasses.h>
+#include <render/WorldRenderer/PathTracingWorldRenderer.h>
 
 namespace caustica::editor
 {
@@ -23,8 +24,8 @@ void EditorSceneSubsystem::initialize(caustica::EngineInitContext& context)
     if (!context.gpuDevice || !context.subsystems)
         return;
 
-    auto* rendering = context.subsystems->get<caustica::RenderingSubsystem>();
-    if (!rendering)
+    auto* engineRenderer = context.subsystems->get<caustica::EngineRenderer>();
+    if (!engineRenderer)
         return;
 
     SceneEditor& sceneEditor = m_config.sceneEditor;
@@ -36,25 +37,7 @@ void EditorSceneSubsystem::initialize(caustica::EngineInitContext& context)
         sceneEditor.setApplication(context.application);
 
     SceneEditor* sceneEditorPtr = &sceneEditor;
-    rendering->initializeRenderer(gpuDevice,
-        std::make_shared<caustica::render::RenderSceneTypeFactory>(),
-        caustica::EngineSceneCallbacks{
-            .OnSceneLoaded = [sceneEditorPtr]() { sceneEditorPtr->SceneLoaded(); },
-            .OnSceneUnloading = [sceneEditorPtr]() { sceneEditorPtr->SceneUnloading(); },
-        });
-
-    caustica::EngineRenderer* engineRenderer = rendering->renderer();
-    if (!engineRenderer)
-        return;
-
-    sceneEditor.AttachRenderResources(
-        engineRenderer->shaderFactory(),
-        engineRenderer->commonPasses(),
-        engineRenderer->bindingCache(),
-        engineRenderer->descriptorTable(),
-        engineRenderer->textureLoader());
-
-    rendering->createPathTracer(caustica::PathTracerSessionParams{
+    engineRenderer->initializeSession(caustica::EngineRendererInitParams{
         .gpuDevice = gpuDevice,
         .settings = sceneEditor.GetPathTracerSettings(),
         .runtimeState = sceneEditor.GetRenderRuntimeState(),
@@ -62,6 +45,11 @@ void EditorSceneSubsystem::initialize(caustica::EngineInitContext& context)
         .diagnostics = m_config.diagnostics,
         .frameExtensions = m_config.frameExtensions,
         .cmdLine = m_config.cmdLine,
+        .sceneTypeFactory = std::make_shared<caustica::render::RenderSceneTypeFactory>(),
+        .sceneCallbacks = caustica::EngineSceneCallbacks{
+            .OnSceneLoaded = [sceneEditorPtr]() { sceneEditorPtr->SceneLoaded(); },
+            .OnSceneUnloading = [sceneEditorPtr]() { sceneEditorPtr->SceneUnloading(); },
+        },
     });
 
     sceneEditor.bindEngine(*engineRenderer);
@@ -96,10 +84,18 @@ void EditorSceneSubsystem::onUpdate(float elapsedTimeSeconds, bool windowFocused
 
 void EditorSceneSubsystem::onRenderScene(caustica::GpuDevice& gpuDevice)
 {
-    if (m_config.sceneEditor.shouldSkipRender())
+    SceneEditor& editor = m_config.sceneEditor;
+    if (editor.shouldSkipRender())
         return;
 
-    m_config.sceneEditor.Render(gpuDevice.GetCurrentFramebuffer(true));
+    editor.PrepareEditorFrame();
+
+    auto* worldRenderer = editor.GetWorldRenderer();
+    if (!worldRenderer)
+        return;
+
+    worldRenderer->render(gpuDevice.GetCurrentFramebuffer(true));
+    editor.recordFrameTiming(gpuDevice);
 }
 
 void EditorSceneSubsystem::onBackBufferResizing()

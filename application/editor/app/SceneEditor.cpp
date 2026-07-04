@@ -248,23 +248,14 @@ void SceneEditor::DebugDrawLine( float3 start, float3 stop, float4 col1, float4 
     lines.push_back(dle);
 }
 
-void SceneEditor::AttachRenderResources(
-    const std::shared_ptr<caustica::ShaderFactory>& shaderFactory,
-    const std::shared_ptr<caustica::CommonRenderPasses>& commonPasses,
-    caustica::BindingCache* bindingCache,
-    const std::shared_ptr<caustica::DescriptorTableManager>& descriptorTable,
-    const std::shared_ptr<caustica::TextureLoader>& textureCache)
-{
-    m_shaderFactory = shaderFactory;
-    m_CommonPasses = commonPasses;
-    m_bindingCache = bindingCache;
-    m_DescriptorTable = descriptorTable;
-    m_TextureLoader = textureCache;
-}
-
 void SceneEditor::bindEngine(caustica::EngineRenderer& engine)
 {
     m_engineRenderer = &engine;
+    m_shaderFactory = engine.shaderFactory();
+    m_CommonPasses = engine.commonPasses();
+    m_bindingCache = engine.bindingCache();
+    m_DescriptorTable = engine.descriptorTable();
+    m_TextureLoader = engine.textureLoader();
     m_sceneManager = engine.sceneManager();
     m_renderCore = engine.renderCore();
     m_lightingPasses = &engine.lightingPasses();
@@ -385,7 +376,7 @@ void SceneEditor::Init(const std::string& preferredScene,
 {
     if (!m_shaderFactory || !m_bindingCache)
     {
-        caustica::fatal("SceneEditor::Init requires AttachRenderResources");
+        caustica::fatal("SceneEditor::Init requires bindEngine");
         return;
     }
 
@@ -498,6 +489,7 @@ bool SceneEditor::shouldSkipRender() const
 void SceneEditor::beginFrame()
 {
     processPendingSceneSwitch();
+    tickSceneSwitchTest();
 }
 
 bool SceneEditor::processPendingSceneSwitch()
@@ -1198,21 +1190,9 @@ bool SceneEditor::AccumulationCompleted() const
     return GetWorldRenderer() && GetWorldRenderer()->getAccumulationCompleted();
 }
 
-// =============================================================================
-// Render entry points
-// =============================================================================
-
-void SceneEditor::Render(nvrhi::IFramebuffer* framebuffer)
+void SceneEditor::recordFrameTiming(const caustica::GpuDevice& gpuDevice)
 {
-    tickSceneSwitchTest();
-
-    if (shouldSkipRender())
-        return;
-
-    PrepareEditorFrame();
-    GetWorldRenderer()->render(framebuffer);
-
-    double frameTime = GetGpuDevice().GetAverageFrameTimeSeconds();
+    double frameTime = gpuDevice.GetAverageFrameTimeSeconds();
     if (frameTime <= 0.0 && m_lastDeltaTime > 0.0f)
         frameTime = static_cast<double>(m_lastDeltaTime);
     UpdateFpsInfo(frameTime);
