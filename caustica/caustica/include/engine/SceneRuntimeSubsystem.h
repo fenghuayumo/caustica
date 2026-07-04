@@ -46,6 +46,10 @@ public:
     [[nodiscard]] bool shouldRenderWhenUnfocused() const override;
 
 protected:
+    virtual void onInitializePost(EngineInitContext& context);
+    virtual void onBeforeBeginFrame();
+    virtual void prepareSceneFrame();
+
     SceneRuntimeSubsystemConfig m_config;
 };
 

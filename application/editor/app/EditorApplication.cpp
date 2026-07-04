@@ -13,6 +13,7 @@
 #include <core/log.h>
 #include "EditorRuntime.h"
 #include "EditorStartup.h"
+#include <engine/SceneRuntimeSubsystem.h>
 #include <optional>
 #include <string>
 
@@ -74,8 +75,8 @@ EditorApplication::StartupResult EditorApplication::startup(int argc, const char
         };
     }
 
-    const EditorSceneSubsystemConfig sceneConfig{
-        .sceneEditor = m_sceneEditor,
+    const caustica::SceneRuntimeSubsystemConfig sceneConfig{
+        .sceneRuntime = m_sceneEditor,
         .diagnostics = m_sessionDiagnostics,
         .preferredScene = preferredScene,
         .sessionState = &m_editorUIData.session,

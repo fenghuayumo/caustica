@@ -10,6 +10,7 @@
 #include <nanobind/operators.h>
 
 #include "SceneEditor.h"
+#include <engine/SceneRuntime.h>
 #include <render/RenderSessionState.h>
 #include <EditorUI.h>
 #include <scene/Scene.h>
@@ -1361,222 +1362,125 @@ void RegisterCoreBindings(nb::module_& m)
             [](EditorUIData& ui, bool value) { ui.editor.ShowUI = value; });
 
     // --- Sample (top-level renderer access) -------------------------------
-    nb::class_<SceneEditor>(m, "Sample",
+    nb::class_<SceneRuntime>(m, "Sample",
         "caustica renderer instance. In embed mode use caustica.app(); in extension\n"
         "mode use Renderer.app to retrieve the underlying instance.")
-        .def_prop_ro("settings", [](SceneEditor& self) -> PathTracerSettings* {
+        .def_prop_ro("settings", [](SceneRuntime& self) -> PathTracerSettings* {
                 return &self.GetRenderSessionState().settings;
             }, nb::rv_policy::reference,
             "Live `Settings` mirror of the current UI state.")
-        .def_prop_ro("scene", [](SceneEditor& self) {
+        .def_prop_ro("scene", [](SceneRuntime& self) {
                 return self.GetScene();
             }, "Current loaded `Scene`, or None before a scene is available.")
 
-        .def_prop_ro("scene_name",  [](SceneEditor& self) { return self.GetCurrentSceneName(); })
-        .def_prop_ro("available_scenes", [](SceneEditor& self) { return self.GetAvailableScenes(); })
+        .def_prop_ro("scene_name",  [](SceneRuntime& self) { return self.GetCurrentSceneName(); })
+        .def_prop_ro("available_scenes", [](SceneRuntime& self) { return self.GetAvailableScenes(); })
 
-        .def("get_scene", [](SceneEditor& self) {
+        .def("get_scene", [](SceneRuntime& self) {
                 return self.GetScene();
             }, "Return the current loaded Scene, matching the C++ GetScene() entry point.")
 
-        .def("set_scene", [](SceneEditor& self, const std::string& name, bool forceReload)
+        .def("set_scene", [](SceneRuntime& self, const std::string& name, bool forceReload)
             {
                 self.SetCurrentScene(name, forceReload);
             },
             nb::arg("scene_name"), nb::arg("force_reload") = false,
             "Switch to a different scene file from caustica.Sample.available_scenes.")
 
-        .def("load_gaussian_splats", [](SceneEditor& self, const std::string& fileName, bool convertRdfToRub)
+        .def("load_gaussian_splats", [](SceneRuntime& self, const std::string& fileName, bool convertRdfToRub)
             {
                 return self.LoadGaussianSplatFile(fileName, convertRdfToRub);
             },
             nb::arg("file_name"), nb::arg("convert_rdf_to_rub") = true,
             "Load a 3DGS .ply file and rasterize it over the current scene.")
 
-        .def("load_mesh_file", [](SceneEditor& self, const std::string& fileName)
-            {
-                return self.LoadMeshFile(fileName);
-            },
-            nb::arg("file_name"),
-            "Append a mesh file (.gltf, .glb, or .obj) to the current scene.")
+        .def_prop_ro("gaussian_splat_count", [](SceneRuntime& self) { return self.GetGaussianSplatCount(); })
+        .def_prop_ro("gaussian_splat_object_count", [](SceneRuntime& self) { return self.GetGaussianSplatObjectCount(); })
+        .def_prop_ro("gaussian_splat_file_name", [](SceneRuntime& self) { return self.GetGaussianSplatFileName(); })
 
-        .def_prop_ro("gaussian_splat_count", [](SceneEditor& self) { return self.GetGaussianSplatCount(); })
-        .def_prop_ro("gaussian_splat_object_count", [](SceneEditor& self) { return self.GetGaussianSplatObjectCount(); })
-        .def_prop_ro("gaussian_splat_file_name", [](SceneEditor& self) { return self.GetGaussianSplatFileName(); })
-
-        .def("get_materials", [](SceneEditor& self) {
+        .def("get_materials", [](SceneRuntime& self) {
                 return GetSceneMaterials(self.GetScene().get());
             }, "Compatibility alias for `sample.scene.get_materials()`.")
 
-        .def("find_material", [](SceneEditor& self, const std::string& name) -> std::shared_ptr<PTMaterial> {
+        .def("find_material", [](SceneRuntime& self, const std::string& name) -> std::shared_ptr<PTMaterial> {
                 return FindSceneMaterial(self.GetScene().get(), name);
             }, nb::arg("name"), "Compatibility alias for `sample.scene.find_material(name)`.")
 
-        .def("find_material_by_id", [](SceneEditor& self, int materialId) -> std::shared_ptr<PTMaterial> {
+        .def("find_material_by_id", [](SceneRuntime& self, int materialId) -> std::shared_ptr<PTMaterial> {
                 return FindSceneMaterialById(self.GetScene().get(), materialId);
             }, nb::arg("material_id"), "Compatibility alias for `sample.scene.find_material_by_id(material_id)`.")
 
-        .def("get_lights", [](SceneEditor& self) {
+        .def("get_lights", [](SceneRuntime& self) {
                 return GetSceneLights(self.GetScene().get());
             }, "Compatibility alias for `sample.scene.get_lights()`.")
 
-        .def("get_scene_bounds", [](SceneEditor& self) {
+        .def("get_scene_bounds", [](SceneRuntime& self) {
                 return SceneBoundsTuple(SceneBoundsFromScene(self.GetScene()));
             },
             "Compatibility alias for `sample.scene.get_scene_bounds()`.")
 
-        .def_prop_ro("scene_bounds", [](SceneEditor& self) {
+        .def_prop_ro("scene_bounds", [](SceneRuntime& self) {
                 return SceneBoundsTuple(SceneBoundsFromScene(self.GetScene()));
             },
             "Shortcut for `sample.scene.bounds`. Returns the world-space\n"
             "((min.xyz), (max.xyz)) AABB or `None` if no scene is loaded.")
-        .def_prop_ro("scene_bounds_center", [](SceneEditor& self) {
+        .def_prop_ro("scene_bounds_center", [](SceneRuntime& self) {
                 return SceneBoundsCenter(SceneBoundsFromScene(self.GetScene()));
             }, "Shortcut for `sample.scene.bounds_center` (or `None`).")
-        .def_prop_ro("scene_bounds_size", [](SceneEditor& self) {
+        .def_prop_ro("scene_bounds_size", [](SceneRuntime& self) {
                 return SceneBoundsSize(SceneBoundsFromScene(self.GetScene()));
             }, "Shortcut for `sample.scene.bounds_size` (or `None`).")
 
-        .def("find_light", [](SceneEditor& self, const std::string& name) -> std::shared_ptr<Light> {
+        .def("find_light", [](SceneRuntime& self, const std::string& name) -> std::shared_ptr<Light> {
                 return FindSceneLight(self.GetScene().get(), name);
             }, nb::arg("name"), "Compatibility alias for `sample.scene.find_light(name)`.")
-        .def("find_node", [](SceneEditor& self, const std::string& path) -> std::shared_ptr<PySceneEntity> {
+        .def("find_node", [](SceneRuntime& self, const std::string& path) -> std::shared_ptr<PySceneEntity> {
                 return FindSceneEntity(self.GetScene().get(), path);
             }, nb::arg("path"), "Compatibility alias for `sample.scene.find_node(path)`.")
 
-        .def("get_meshes", [](SceneEditor& self) {
+        .def("get_meshes", [](SceneRuntime& self) {
                 return GetSceneMeshes(self.GetScene().get());
             }, "Compatibility alias for `sample.scene.get_meshes()`.")
-        .def("find_mesh", [](SceneEditor& self, const std::string& name) -> std::shared_ptr<MeshInfo> {
+        .def("find_mesh", [](SceneRuntime& self, const std::string& name) -> std::shared_ptr<MeshInfo> {
                 return FindSceneMesh(self.GetScene().get(), name);
             }, nb::arg("name"), "Compatibility alias for `sample.scene.find_mesh(name)`.")
-        .def("get_mesh_vertices", [](SceneEditor& self, const std::shared_ptr<MeshInfo>& mesh) {
-                return Float3VectorToList(self.GetMeshVertices(mesh));
-            }, nb::arg("mesh"),
-            "Return unique mesh positions as a list of (x, y, z) tuples in object space.")
-        .def("set_mesh_vertices",
-            [](SceneEditor& self, const std::shared_ptr<MeshInfo>& mesh, nb::object vertices,
-               bool recomputeNormals, bool rebuildAccelerationStructure) {
-                self.SetMeshVertices(mesh, ToFloat3Vector(vertices), recomputeNormals, rebuildAccelerationStructure);
-            },
-            nb::arg("mesh"), nb::arg("vertices"), nb::arg("recompute_normals") = true,
-            nb::arg("rebuild_acceleration_structure") = true,
-            "Replace all unique object-space positions for a mesh and refresh GPU buffers.\n"
-            "Updates are propagated to all render vertices split by normals or UVs.")
-        .def("deform_mesh",
-            [](SceneEditor& self, const std::shared_ptr<MeshInfo>& mesh, nb::object callback,
-               bool recomputeNormals, bool rebuildAccelerationStructure) {
-                std::vector<float3> vertices = self.GetMeshVertices(mesh);
-                for (size_t i = 0; i < vertices.size(); ++i)
-                {
-                    nb::object updated = callback(i, Float3ToTuple(vertices[i]));
-                    if (!updated.is_none())
-                        vertices[i] = ToFloat3(updated);
-                }
-                self.SetMeshVertices(mesh, vertices, recomputeNormals, rebuildAccelerationStructure);
-                return vertices.size();
-            },
-            nb::arg("mesh"), nb::arg("callback"), nb::arg("recompute_normals") = true,
-            nb::arg("rebuild_acceleration_structure") = true,
-            "Apply a Python callback to each unique vertex. callback(index, (x,y,z))\n"
-            "may return a replacement triple, or None to keep the vertex unchanged.")
-        .def("get_mesh_vertices_world", [](SceneEditor& self, const std::shared_ptr<MeshInfo>& mesh) {
-                return Float3VectorToList(self.GetMeshVerticesWorld(mesh));
-            }, nb::arg("mesh"),
-            "Return unique mesh positions as a list of (x, y, z) tuples in world space.\n"
-            "The mesh must have exactly one scene instance; pass a SceneNode for instanced meshes.")
-        .def("get_mesh_vertices_world", [](SceneEditor& self, const std::shared_ptr<PySceneEntity>& node) {
-                return Float3VectorToList(self.GetMeshVerticesWorld(EntityHandleFromPyNode(node)));
-            }, nb::arg("node"),
-            "Return unique vertex positions for this mesh node as world-space (x, y, z) tuples.")
-        .def("set_mesh_vertices_world",
-            [](SceneEditor& self, const std::shared_ptr<MeshInfo>& mesh, nb::object vertices,
-               bool recomputeNormals, bool rebuildAccelerationStructure) {
-                self.SetMeshVerticesWorld(mesh, ToFloat3Vector(vertices), recomputeNormals, rebuildAccelerationStructure);
-            },
-            nb::arg("mesh"), nb::arg("vertices"), nb::arg("recompute_normals") = true,
-            nb::arg("rebuild_acceleration_structure") = true,
-            "Replace all unique positions using world-space coordinates. The mesh must have\n"
-            "exactly one scene instance; pass a SceneNode for instanced meshes.")
-        .def("set_mesh_vertices_world",
-            [](SceneEditor& self, const std::shared_ptr<PySceneEntity>& node, nb::object vertices,
-               bool recomputeNormals, bool rebuildAccelerationStructure) {
-                self.SetMeshVerticesWorld(EntityHandleFromPyNode(node), ToFloat3Vector(vertices), recomputeNormals, rebuildAccelerationStructure);
-            },
-            nb::arg("node"), nb::arg("vertices"), nb::arg("recompute_normals") = true,
-            nb::arg("rebuild_acceleration_structure") = true,
-            "Replace all unique positions for this mesh node using world-space coordinates.")
-        .def("deform_mesh_world",
-            [](SceneEditor& self, const std::shared_ptr<MeshInfo>& mesh, nb::object callback,
-               bool recomputeNormals, bool rebuildAccelerationStructure) {
-                std::vector<float3> vertices = self.GetMeshVerticesWorld(mesh);
-                for (size_t i = 0; i < vertices.size(); ++i)
-                {
-                    nb::object updated = callback(i, Float3ToTuple(vertices[i]));
-                    if (!updated.is_none())
-                        vertices[i] = ToFloat3(updated);
-                }
-                self.SetMeshVerticesWorld(mesh, vertices, recomputeNormals, rebuildAccelerationStructure);
-                return vertices.size();
-            },
-            nb::arg("mesh"), nb::arg("callback"), nb::arg("recompute_normals") = true,
-            nb::arg("rebuild_acceleration_structure") = true,
-            "Apply a Python callback to unique world-space vertices. callback(index, (x,y,z))\n"
-            "may return a replacement world-space triple, or None to keep the vertex unchanged.")
-        .def("deform_mesh_world",
-            [](SceneEditor& self, const std::shared_ptr<PySceneEntity>& node, nb::object callback,
-               bool recomputeNormals, bool rebuildAccelerationStructure) {
-                const ecs::Entity entity = EntityHandleFromPyNode(node);
-                std::vector<float3> vertices = self.GetMeshVerticesWorld(entity);
-                for (size_t i = 0; i < vertices.size(); ++i)
-                {
-                    nb::object updated = callback(i, Float3ToTuple(vertices[i]));
-                    if (!updated.is_none())
-                        vertices[i] = ToFloat3(updated);
-                }
-                self.SetMeshVerticesWorld(entity, vertices, recomputeNormals, rebuildAccelerationStructure);
-                return vertices.size();
-            },
-            nb::arg("node"), nb::arg("callback"), nb::arg("recompute_normals") = true,
-            nb::arg("rebuild_acceleration_structure") = true,
-            "Apply a Python callback to this mesh entity's unique world-space vertices.")
 
-        .def("set_environment_map", [](SceneEditor& self, const std::string& path) {
+        .def("set_environment_map", [](SceneRuntime& self, const std::string& path) {
                 self.SetEnvMapOverrideSource(path);
             }, nb::arg("path"))
 
-        .def("get_camera_pos_dir_up", [](SceneEditor& self) {
+        .def("get_camera_pos_dir_up", [](SceneRuntime& self) {
                 return self.GetCurrentCameraPosDirUp();
             }, "Returns a comma-separated string of pos.xyz, dir.xyz, up.xyz.")
 
-        .def("set_camera_pos_dir_up", [](SceneEditor& self, const std::string& v) {
+        .def("set_camera_pos_dir_up", [](SceneRuntime& self, const std::string& v) {
                 return self.SetCurrentCameraPosDirUp(v);
             }, nb::arg("pos_dir_up"))
 
-        .def("set_camera_fov", [](SceneEditor& self, float fov) { self.SetCameraVerticalFOV(caustica::math::radians(fov)); },
+        .def("set_camera_fov", [](SceneRuntime& self, float fov) { self.SetCameraVerticalFOV(caustica::math::radians(fov)); },
             nb::arg("vertical_fov_degrees"))
 
         .def("set_camera_intrinsics",
-            [](SceneEditor& self, float fx, float fy, float cx, float cy, float width, float height) {
+            [](SceneRuntime& self, float fx, float fy, float cx, float cy, float width, float height) {
                 self.SetCameraIntrinsics(fx, fy, cx, cy, width, height);
             },
             nb::arg("fx"), nb::arg("fy"), nb::arg("cx"), nb::arg("cy"), nb::arg("width"), nb::arg("height"))
 
-        .def("get_camera_fov", [](SceneEditor& self) { return self.GetCameraVerticalFOV(); })
+        .def("get_camera_fov", [](SceneRuntime& self) { return self.GetCameraVerticalFOV(); })
 
-        .def("save_current_camera",  [](SceneEditor& self) { self.SaveCurrentCamera(); })
-        .def("load_current_camera",  [](SceneEditor& self) { self.LoadCurrentCamera(); })
+        .def("save_current_camera",  [](SceneRuntime& self) { self.SaveCurrentCamera(); })
+        .def("load_current_camera",  [](SceneRuntime& self) { self.LoadCurrentCamera(); })
 
-        .def("request_shader_reload",  [](SceneEditor& self) { self.GetRenderSessionState().runtime.Invalidation.ShaderReloadRequested = true; })
-        .def("request_accel_rebuild",  [](SceneEditor& self) { self.GetRenderSessionState().runtime.Invalidation.AccelerationStructRebuildRequested = true; })
+        .def("request_shader_reload",  [](SceneRuntime& self) { self.GetRenderSessionState().runtime.Invalidation.ShaderReloadRequested = true; })
+        .def("request_accel_rebuild",  [](SceneRuntime& self) { self.GetRenderSessionState().runtime.Invalidation.AccelerationStructRebuildRequested = true; })
         .def("request_mesh_accel_rebuild",
-            [](SceneEditor& self, const std::shared_ptr<MeshInfo>& mesh) {
+            [](SceneRuntime& self, const std::shared_ptr<MeshInfo>& mesh) {
                 self.RequestMeshAccelRebuild(mesh);
             },
             nb::arg("mesh"),
             "Request a BLAS rebuild for one dirty mesh without forcing a full scene AS rebuild.")
         .def("request_mesh_accel_rebuild",
-            [](SceneEditor& self, const std::shared_ptr<PySceneEntity>& node) {
+            [](SceneRuntime& self, const std::shared_ptr<PySceneEntity>& node) {
                 if (!node)
                     throw std::runtime_error("request_mesh_accel_rebuild: node is null");
                 std::shared_ptr<MeshInfo> mesh = MeshFromEntity(*node);
@@ -1586,10 +1490,10 @@ void RegisterCoreBindings(nb::module_& m)
             },
             nb::arg("node"),
             "Request a BLAS rebuild for the mesh attached to one scene entity.")
-        .def("reset_accumulation",     [](SceneEditor& self) { self.GetRenderSessionState().settings.ResetAccumulation = true; })
-        .def("reset_realtime_caches",  [](SceneEditor& self) { self.GetRenderSessionState().settings.ResetRealtimeCaches = true; })
+        .def("reset_accumulation",     [](SceneRuntime& self) { self.GetRenderSessionState().settings.ResetAccumulation = true; })
+        .def("reset_realtime_caches",  [](SceneRuntime& self) { self.GetRenderSessionState().settings.ResetRealtimeCaches = true; })
 
-        .def("set_realtime_mode", [](SceneEditor& self, bool standaloneDenoiser, int realtimeAA)
+        .def("set_realtime_mode", [](SceneRuntime& self, bool standaloneDenoiser, int realtimeAA)
             {
                 PathTracerSettings& settings = self.GetRenderSessionState().settings;
                 if (!settings.RealtimeMode)
@@ -1608,7 +1512,7 @@ void RegisterCoreBindings(nb::module_& m)
             "    standalone_denoiser: enable NRD (no effect with DLSS-RR)\n"
             "    realtime_aa        : 0=Off, 1=TAA, 2=DLSS, 3=DLSS-RR")
 
-        .def("set_reference_mode", [](SceneEditor& self, int spp, bool oidn, int oidnQuality, int oidnPasses, int oidnPrefilter)
+        .def("set_reference_mode", [](SceneRuntime& self, int spp, bool oidn, int oidnQuality, int oidnPasses, int oidnPrefilter)
             {
                 PathTracerSettings& settings = self.GetRenderSessionState().settings;
                 if (settings.RealtimeMode)
@@ -1636,9 +1540,98 @@ void RegisterCoreBindings(nb::module_& m)
             "    oidn_prefilter: caustica.OidnPrefilter (0=None, 1=Fast, 2=Accurate)")
 
         .def_prop_ro("accumulation_completed",
-            [](SceneEditor& self) { return self.AccumulationCompleted(); })
+            [](SceneRuntime& self) { return self.AccumulationCompleted(); })
         .def_prop_ro("accumulation_sample_index",
-            [](SceneEditor& self) { return self.GetAccumulationSampleIndex(); })
+            [](SceneRuntime& self) { return self.GetAccumulationSampleIndex(); })
+        ;
+
+    nb::class_<SceneEditor, SceneRuntime>(m, "EditorSample",
+        "Editor-only Sample extensions (mesh import and vertex deformation).")
+        .def("load_mesh_file", [](SceneEditor& self, const std::string& fileName)
+            {
+                return self.LoadMeshFile(fileName);
+            },
+            nb::arg("file_name"),
+            "Append a mesh file (.gltf, .glb, or .obj) to the current scene.")
+        .def("get_mesh_vertices", [](SceneEditor& self, const std::shared_ptr<MeshInfo>& mesh) {
+                return Float3VectorToList(self.GetMeshVertices(mesh));
+            }, nb::arg("mesh"),
+            "Return unique mesh positions as a list of (x, y, z) tuples in object space.")
+        .def("set_mesh_vertices",
+            [](SceneEditor& self, const std::shared_ptr<MeshInfo>& mesh, nb::object vertices,
+               bool recomputeNormals, bool rebuildAccelerationStructure) {
+                self.SetMeshVertices(mesh, ToFloat3Vector(vertices), recomputeNormals, rebuildAccelerationStructure);
+            },
+            nb::arg("mesh"), nb::arg("vertices"), nb::arg("recompute_normals") = true,
+            nb::arg("rebuild_acceleration_structure") = true,
+            "Replace all unique object-space positions for a mesh and refresh GPU buffers.")
+        .def("deform_mesh",
+            [](SceneEditor& self, const std::shared_ptr<MeshInfo>& mesh, nb::object callback,
+               bool recomputeNormals, bool rebuildAccelerationStructure) {
+                std::vector<float3> vertices = self.GetMeshVertices(mesh);
+                for (size_t i = 0; i < vertices.size(); ++i)
+                {
+                    nb::object updated = callback(i, Float3ToTuple(vertices[i]));
+                    if (!updated.is_none())
+                        vertices[i] = ToFloat3(updated);
+                }
+                self.SetMeshVertices(mesh, vertices, recomputeNormals, rebuildAccelerationStructure);
+                return vertices.size();
+            },
+            nb::arg("mesh"), nb::arg("callback"), nb::arg("recompute_normals") = true,
+            nb::arg("rebuild_acceleration_structure") = true,
+            "Apply a Python callback to each unique vertex.")
+        .def("get_mesh_vertices_world", [](SceneEditor& self, const std::shared_ptr<MeshInfo>& mesh) {
+                return Float3VectorToList(self.GetMeshVerticesWorld(mesh));
+            }, nb::arg("mesh"))
+        .def("get_mesh_vertices_world", [](SceneEditor& self, const std::shared_ptr<PySceneEntity>& node) {
+                return Float3VectorToList(self.GetMeshVerticesWorld(EntityHandleFromPyNode(node)));
+            }, nb::arg("node"))
+        .def("set_mesh_vertices_world",
+            [](SceneEditor& self, const std::shared_ptr<MeshInfo>& mesh, nb::object vertices,
+               bool recomputeNormals, bool rebuildAccelerationStructure) {
+                self.SetMeshVerticesWorld(mesh, ToFloat3Vector(vertices), recomputeNormals, rebuildAccelerationStructure);
+            },
+            nb::arg("mesh"), nb::arg("vertices"), nb::arg("recompute_normals") = true,
+            nb::arg("rebuild_acceleration_structure") = true)
+        .def("set_mesh_vertices_world",
+            [](SceneEditor& self, const std::shared_ptr<PySceneEntity>& node, nb::object vertices,
+               bool recomputeNormals, bool rebuildAccelerationStructure) {
+                self.SetMeshVerticesWorld(EntityHandleFromPyNode(node), ToFloat3Vector(vertices), recomputeNormals, rebuildAccelerationStructure);
+            },
+            nb::arg("node"), nb::arg("vertices"), nb::arg("recompute_normals") = true,
+            nb::arg("rebuild_acceleration_structure") = true)
+        .def("deform_mesh_world",
+            [](SceneEditor& self, const std::shared_ptr<MeshInfo>& mesh, nb::object callback,
+               bool recomputeNormals, bool rebuildAccelerationStructure) {
+                std::vector<float3> vertices = self.GetMeshVerticesWorld(mesh);
+                for (size_t i = 0; i < vertices.size(); ++i)
+                {
+                    nb::object updated = callback(i, Float3ToTuple(vertices[i]));
+                    if (!updated.is_none())
+                        vertices[i] = ToFloat3(updated);
+                }
+                self.SetMeshVerticesWorld(mesh, vertices, recomputeNormals, rebuildAccelerationStructure);
+                return vertices.size();
+            },
+            nb::arg("mesh"), nb::arg("callback"), nb::arg("recompute_normals") = true,
+            nb::arg("rebuild_acceleration_structure") = true)
+        .def("deform_mesh_world",
+            [](SceneEditor& self, const std::shared_ptr<PySceneEntity>& node, nb::object callback,
+               bool recomputeNormals, bool rebuildAccelerationStructure) {
+                const ecs::Entity entity = EntityHandleFromPyNode(node);
+                std::vector<float3> vertices = self.GetMeshVerticesWorld(entity);
+                for (size_t i = 0; i < vertices.size(); ++i)
+                {
+                    nb::object updated = callback(i, Float3ToTuple(vertices[i]));
+                    if (!updated.is_none())
+                        vertices[i] = ToFloat3(updated);
+                }
+                self.SetMeshVerticesWorld(entity, vertices, recomputeNormals, rebuildAccelerationStructure);
+                return vertices.size();
+            },
+            nb::arg("node"), nb::arg("callback"), nb::arg("recompute_normals") = true,
+            nb::arg("rebuild_acceleration_structure") = true)
         ;
 }
 

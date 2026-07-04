@@ -2,15 +2,15 @@
 
 #if CAUSTICA_WITH_PYTHON
 
-#include "SceneEditor.h"
-#include "EditorRuntime.h"
+#include <engine/SceneRuntime.h>
+#include <engine/SceneRuntimeRegistration.h>
 #include <engine/EngineFrameApplication.h>
 #include <engine/Application.h>
+#include "SceneEditor.h"
 #include <backend/GpuDevice.h>
 #include <render/SceneGaussianSplatPasses.h>
 #include <render/SceneLightingPasses.h>
 #include <render/WorldRenderer/WorldRenderer.h>
-#include <common/LocalConfig.h>
 #include <core/file_utils.h>
 #include <core/format.h>
 #include <core/path_utils.h>
@@ -51,10 +51,6 @@
 #include <thread>
 #include <vector>
 
-using caustica::editor::SceneEditor;
-using caustica::editor::registerEditorRuntime;
-using caustica::editor::EditorSceneSubsystemConfig;
-
 #if CAUSTICA_WITH_DX12
 #include <d3d12.h>
 #include <wrl/client.h>
@@ -68,8 +64,6 @@ using caustica::editor::EditorSceneSubsystemConfig;
 #else
 #include <dlfcn.h>
 #endif
-
-
 
 namespace
 {
@@ -443,21 +437,20 @@ bool RenderSession::InitRenderer()
     SetRuntimeDirectoryOverride(appDirectory);
     SetLocalPathBaseOverride(ResolveResourceRoot(appDirectory));
 
-    m_renderer = std::make_unique<caustica::editor::SceneEditor>(m_cmdLine, m_sessionState, m_editorUIState, m_sessionDiagnostics);
+    m_sceneRuntime = std::make_unique<caustica::SceneRuntime>(m_cmdLine, m_sessionState, m_sessionDiagnostics);
 
     std::string preferredScene = m_config.scene.empty()
         ? std::string("default.json")
         : m_config.scene;
 
     m_engine = std::make_unique<caustica::Engine>();
-    registerEditorRuntime(*m_engine, EditorSceneSubsystemConfig{
-        .sceneEditor = *m_renderer,
+    caustica::registerSceneRuntime(*m_engine, caustica::SceneRuntimeSubsystemConfig{
+        .sceneRuntime = *m_sceneRuntime,
         .diagnostics = m_sessionDiagnostics,
         .preferredScene = preferredScene,
         .sessionState = &m_sessionState,
         .cmdLine = &m_cmdLine,
         .applyCmdLineToSessionState = true,
-        .postAppInit = false,
     });
 
     m_AppLoop = std::make_unique<caustica::EngineFrameApplication>(
@@ -490,7 +483,7 @@ void RenderSession::Shutdown()
         m_deviceManager->setFrameDriver(nullptr);
 
     m_AppLoop.reset();
-    m_renderer.reset();
+    m_sceneRuntime.reset();
     if (m_engine)
         m_engine->shutdown();
     m_engine.reset();
@@ -508,10 +501,10 @@ void RenderSession::Shutdown()
 
 bool RenderSession::LoadScene(const std::string& sceneName, bool waitUntilReady)
 {
-    if (!m_initialized || !m_renderer)
+    if (!m_initialized || !m_sceneRuntime)
         return false;
 
-    m_renderer->SetCurrentScene(PrepareSceneArgument(sceneName), /*forceReload=*/true);
+    m_sceneRuntime->SetCurrentScene(PrepareSceneArgument(sceneName), /*forceReload=*/true);
 
     if (waitUntilReady)
         return WaitUntilReady();
@@ -529,7 +522,7 @@ bool RenderSession::WaitUntilReady(int maxFrames)
     for (int i = 0; i < maxFrames; ++i)
     {
         Step(0.0f);
-        if (m_renderer && m_renderer->IsSceneLoaded() && !m_renderer->IsSceneLoading())
+        if (m_sceneRuntime && m_sceneRuntime->IsSceneLoaded() && !m_sceneRuntime->IsSceneLoading())
             return true;
     }
     caustica::warning("RenderSession: scene did not finish loading within %d frames", maxFrames);
@@ -578,7 +571,7 @@ bool RenderSession::StepN(int frames)
 
 int RenderSession::StepUntilAccumulated(int maxFrames)
 {
-    if (!m_initialized || !m_renderer)
+    if (!m_initialized || !m_sceneRuntime)
         return 0;
 
     // Force reference / accumulation mode so we know "done" actually means
@@ -594,7 +587,7 @@ int RenderSession::StepUntilAccumulated(int maxFrames)
     {
         if (!Step()) break;
         ++frames;
-        if (m_renderer->AccumulationCompleted())
+        if (m_sceneRuntime->AccumulationCompleted())
             break;
     }
     return frames;
@@ -602,12 +595,12 @@ int RenderSession::StepUntilAccumulated(int maxFrames)
 
 bool RenderSession::SaveScreenshot(const std::string& outputPath)
 {
-    if (!m_initialized || !m_deviceManager || !m_renderer)
+    if (!m_initialized || !m_deviceManager || !m_sceneRuntime)
         return false;
 
     // Prefer the renderer-owned final LDR target. It is the source of the
     // frame blit, so it does not depend on headless backbuffer rotation.
-    nvrhi::ITexture* tex = m_renderer->GetLdrColorTexture();
+    nvrhi::ITexture* tex = m_sceneRuntime->GetLdrColorTexture();
     nvrhi::ResourceStates state = nvrhi::ResourceStates::ShaderResource;
 
     if (!tex)
@@ -628,7 +621,7 @@ bool RenderSession::SaveScreenshot(const std::string& outputPath)
         return false;
     }
 
-    auto commonPasses = m_renderer->GetCommonPasses();
+    auto commonPasses = m_sceneRuntime->GetCommonPasses();
     if (!commonPasses)
     {
         caustica::error("RenderSession: common passes not initialized yet");
@@ -659,25 +652,35 @@ bool RenderSession::SetCamera(const caustica::math::float3& pos,
                               const caustica::math::float3& dir,
                               const caustica::math::float3& up)
 {
-    if (!m_renderer) return false;
+    if (!m_sceneRuntime) return false;
 
     auto v3 = [](const caustica::math::float3& v) {
         return std::to_string(v.x) + "," + std::to_string(v.y) + "," + std::to_string(v.z);
     };
     std::string s = v3(pos) + "," + v3(dir) + "," + v3(up);
-    return m_renderer->SetCurrentCameraPosDirUp(s);
+    return m_sceneRuntime->SetCurrentCameraPosDirUp(s);
 }
 
 void RenderSession::SetCameraFOV(float verticalFovDegrees)
 {
-    if (m_renderer)
-        m_renderer->SetCameraVerticalFOV(caustica::math::radians(verticalFovDegrees));
+    if (m_sceneRuntime)
+        m_sceneRuntime->SetCameraVerticalFOV(caustica::math::radians(verticalFovDegrees));
 }
 
 void RenderSession::SetCameraIntrinsics(float fx, float fy, float cx, float cy, float width, float height)
 {
-    if (m_renderer)
-        m_renderer->SetCameraIntrinsics(fx, fy, cx, cy, width, height);
+    if (m_sceneRuntime)
+        m_sceneRuntime->SetCameraIntrinsics(fx, fy, cx, cy, width, height);
+}
+
+caustica::editor::SceneEditor* RenderSession::GetSceneEditor()
+{
+    return dynamic_cast<caustica::editor::SceneEditor*>(m_sceneRuntime.get());
+}
+
+const caustica::editor::SceneEditor* RenderSession::GetSceneEditor() const
+{
+    return dynamic_cast<const caustica::editor::SceneEditor*>(m_sceneRuntime.get());
 }
 
 #endif // CAUSTICA_WITH_PYTHON

@@ -16,6 +16,7 @@
 #include <nanobind/stl/optional.h>
 
 #include "SceneEditor.h"
+#include <engine/SceneRuntime.h>
 #include <EditorUI.h>
 
 #include <scene/Scene.h>
@@ -26,15 +27,16 @@
 
 namespace nb = nanobind;
 using caustica::editor::SceneEditor;
+using caustica::SceneRuntime;
 using caustica::render::RenderSessionState;
 
 namespace
 {
     // Tracks the most recently created Renderer instance so module-level
     // helpers like `caustica.app()` and `caustica.settings()` keep working.
-    SceneEditor* g_currentExtensionApp = nullptr;
+    SceneRuntime* g_currentExtensionApp = nullptr;
 
-    SceneEditor& RequireCurrentApp()
+    SceneRuntime& RequireCurrentApp()
     {
         if (!g_currentExtensionApp)
             throw std::runtime_error("caustica: no Renderer is currently active. Create one via caustica.Renderer(...)");
@@ -61,7 +63,7 @@ namespace
 
     // Mirrors the helper used by Scene.bounds in the shared core bindings.
     // Returns the C++ Scene bounds, or std::nullopt when no scene is loaded.
-    std::optional<caustica::math::box3> CurrentSceneBoundingBox(SceneEditor* app)
+    std::optional<caustica::math::box3> CurrentSceneBoundingBox(SceneRuntime* app)
     {
         if (!app)
             return std::nullopt;
@@ -97,10 +99,10 @@ public:
         cfg.accumulationTarget = accumulationTarget;
 
         m_session = std::make_unique<RenderSession>(cfg);
-        m_owned   = m_session->GetSceneEditor() != nullptr;
+        m_owned   = m_session->GetSceneRuntime() != nullptr;
         if (!m_owned)
             throw std::runtime_error("caustica.Renderer: failed to initialize the renderer (see log for details)");
-        g_currentExtensionApp = m_session->GetSceneEditor();
+        g_currentExtensionApp = m_session->GetSceneRuntime();
     }
 
     ~PyRenderer()
@@ -112,7 +114,7 @@ public:
     {
         if (m_session)
         {
-            if (g_currentExtensionApp == m_session->GetSceneEditor())
+            if (g_currentExtensionApp == m_session->GetSceneRuntime())
                 g_currentExtensionApp = nullptr;
             m_session.reset();
             m_owned = false;
@@ -124,8 +126,8 @@ public:
     }
 
     bool LoadGaussianSplats(const std::string& fileName, bool convertRdfToRub) {
-        return m_session && m_session->GetSceneEditor()
-            ? m_session->GetSceneEditor()->LoadGaussianSplatFile(fileName, convertRdfToRub)
+        return m_session && m_session->GetSceneRuntime()
+            ? m_session->GetSceneRuntime()->LoadGaussianSplatFile(fileName, convertRdfToRub)
             : false;
     }
 
@@ -151,8 +153,8 @@ public:
     }
 
     bool LoadMeshFile(const std::string& fileName) {
-        SceneEditor* app = GetApp();
-        return app ? app->LoadMeshFile(fileName) : false;
+        SceneEditor* editor = dynamic_cast<SceneEditor*>(GetApp());
+        return editor ? editor->LoadMeshFile(fileName) : false;
     }
 
     void SetCameraFOV(float fov) {
@@ -163,11 +165,11 @@ public:
         if (m_session) m_session->SetCameraIntrinsics(fx, fy, cx, cy, width, height);
     }
 
-    SceneEditor* GetApp() {
-        return m_session ? m_session->GetSceneEditor() : nullptr;
+    SceneRuntime* GetApp() {
+        return m_session ? m_session->GetSceneRuntime() : nullptr;
     }
 
-    bool IsValid() const { return m_session && m_session->GetSceneEditor() != nullptr; }
+    bool IsValid() const { return m_session && m_session->GetSceneRuntime() != nullptr; }
 
 private:
     std::unique_ptr<RenderSession> m_session;
@@ -290,13 +292,13 @@ NB_MODULE(caustica, m)
              "Diagonal extent (max - min) of `scene_bounds`, or ``None`` for an empty scene.")
 
         .def_prop_ro("app",
-             [](PyRenderer& self) -> SceneEditor* { return self.GetApp(); },
+             [](PyRenderer& self) -> SceneRuntime* { return self.GetApp(); },
              nb::rv_policy::reference,
              "Access the underlying Sample instance to use the shared bindings.")
 
         .def_prop_ro("settings",
              [](PyRenderer& self) -> PathTracerSettings* {
-                 SceneEditor* app = self.GetApp();
+                 SceneRuntime* app = self.GetApp();
                  return app ? &app->GetRenderSessionState().settings : nullptr;
              },
              nb::rv_policy::reference,
@@ -309,12 +311,12 @@ NB_MODULE(caustica, m)
              return false;
         }, nb::arg().none(), nb::arg().none(), nb::arg().none());
 
-    m.def("app", []() -> SceneEditor* { return &RequireCurrentApp(); },
+    m.def("app", []() -> SceneRuntime* { return &RequireCurrentApp(); },
           nb::rv_policy::reference,
           "Return the Sample owned by the most recently created Renderer.");
 
     m.def("settings", []() -> PathTracerSettings* {
-            SceneEditor& app = RequireCurrentApp();
+            SceneRuntime& app = RequireCurrentApp();
             return &app.GetRenderSessionState().settings;
         },
           nb::rv_policy::reference,

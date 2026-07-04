@@ -30,7 +30,6 @@
 #include <render/SessionDiagnostics.h>
 
 #include <core/command_line.h>
-#include <EditorUIState.h>
 
 #if CAUSTICA_WITH_DX12 && defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
 #include <d3d12.h>
@@ -42,6 +41,7 @@ namespace caustica
 class Engine;
 class EngineFrameApplication;
 class GpuDevice;
+class SceneRuntime;
 }
 
 namespace caustica::editor
@@ -115,13 +115,15 @@ public:
     void SetCameraFOV(float verticalFovDegrees);
     void SetCameraIntrinsics(float fx, float fy, float cx, float cy, float width, float height);
 
-    caustica::editor::SceneEditor*       GetSceneEditor()       { return m_renderer.get(); }
-    const caustica::editor::SceneEditor* GetSceneEditor() const { return m_renderer.get(); }
+    caustica::SceneRuntime*       GetSceneRuntime()       { return m_sceneRuntime.get(); }
+    const caustica::SceneRuntime* GetSceneRuntime() const { return m_sceneRuntime.get(); }
+
+    // Legacy alias; nullptr for runtime-only sessions (use GetSceneRuntime()).
+    caustica::editor::SceneEditor*       GetSceneEditor()      ;
+    const caustica::editor::SceneEditor* GetSceneEditor() const;
 
     caustica::render::RenderSessionState& GetRenderSessionState() { return m_sessionState; }
     const caustica::render::RenderSessionState& GetRenderSessionState() const { return m_sessionState; }
-    caustica::editor::EditorUIState& GetEditorUIState() { return m_editorUIState; }
-    const caustica::editor::EditorUIState& GetEditorUIState() const { return m_editorUIState; }
 
     caustica::GpuDevice* GetGpuDevice() { return m_deviceManager.get(); }
     const Config&              GetConfig() const  { return m_config; }
@@ -134,13 +136,12 @@ private:
     Config                                          m_config;
     CommandLineOptions                              m_cmdLine;
     caustica::render::RenderSessionState            m_sessionState;
-    caustica::editor::EditorUIState                  m_editorUIState;
     caustica::render::SessionDiagnostics              m_sessionDiagnostics;
     std::unique_ptr<caustica::GpuDevice>      m_deviceManager;
     std::unique_ptr<caustica::Window>            m_Window;
     std::unique_ptr<caustica::Engine>              m_engine;
     std::unique_ptr<caustica::EngineFrameApplication> m_AppLoop;
-    std::unique_ptr<caustica::editor::SceneEditor>             m_renderer;
+    std::unique_ptr<caustica::SceneRuntime>        m_sceneRuntime;
 #if CAUSTICA_WITH_DX12 && defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
     Microsoft::WRL::ComPtr<ID3D12DeviceFactory>     m_d3d12DeviceFactory;
 #endif

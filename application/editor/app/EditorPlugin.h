@@ -1,6 +1,7 @@
 #pragma once
 
-#include <engine/DefaultRuntimePlugin.h>
+#include <engine/EngineBuilder.h>
+#include <engine/GpuRenderSubsystem.h>
 #include <engine/IEnginePlugin.h>
 
 #include "EditorSceneSubsystem.h"
@@ -10,14 +11,14 @@
 namespace caustica::editor
 {
 
-// Editor stack: DefaultRuntimePlugin + EditorSceneSubsystem (+ optional UI).
+// Editor stack: GpuRenderSubsystem + EditorSceneSubsystem (+ optional UI).
 //
-// Requires SceneEditor : SceneRuntime (Phase 1). sceneConfig.sceneRuntime must
-// reference the same SceneEditor instance passed to EditorSceneSubsystem.
+// sceneConfig.sceneRuntime must reference the same SceneEditor instance wired
+// into EditorSceneSubsystem.
 struct EditorPlugin : IEnginePlugin
 {
     EditorPlugin(SceneRuntimeSubsystemConfig sceneConfig,
-        EditorUISubsystemConfig* uiConfig = nullptr)
+        const EditorUISubsystemConfig* uiConfig = nullptr)
         : sceneConfig(std::move(sceneConfig))
         , uiConfig(uiConfig)
     {
@@ -25,7 +26,7 @@ struct EditorPlugin : IEnginePlugin
 
     void build(EngineBuilder& builder) override
     {
-        builder.addPlugin<DefaultRuntimePlugin>(sceneConfig);
+        builder.emplaceSubsystem<GpuRenderSubsystem>();
 
         auto& sceneEditor = static_cast<SceneEditor&>(sceneConfig.sceneRuntime);
         builder.emplaceSubsystem<EditorSceneSubsystem>(EditorSceneSubsystemConfig{
@@ -43,7 +44,7 @@ struct EditorPlugin : IEnginePlugin
     }
 
     SceneRuntimeSubsystemConfig sceneConfig;
-    EditorUISubsystemConfig* uiConfig = nullptr;
+    const EditorUISubsystemConfig* uiConfig = nullptr;
 };
 
 } // namespace caustica::editor

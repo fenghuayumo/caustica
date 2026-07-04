@@ -1,11 +1,7 @@
 #pragma once
 
 #include <core/command_line.h>
-#include <engine/ISubsystem.h>
-#include <render/RenderSessionState.h>
-#include <render/SessionDiagnostics.h>
-
-#include <string>
+#include <engine/SceneRuntimeSubsystem.h>
 
 namespace caustica::editor
 {
@@ -24,29 +20,26 @@ struct EditorSceneSubsystemConfig
     bool refreshEnvMapMediaList = true;
     bool applyCmdLineToSessionState = true;
     bool postAppInit = true;
+
+    [[nodiscard]] caustica::SceneRuntimeSubsystemConfig toRuntimeConfig() const;
 };
 
-// Wires SceneEditor to GpuRenderSubsystem and drives scene rendering each frame.
-class EditorSceneSubsystem : public caustica::ISubsystem
+// Editor scene driver: extends SceneRuntimeSubsystem with capture scripts and local config.
+class EditorSceneSubsystem : public caustica::SceneRuntimeSubsystem
 {
 public:
     explicit EditorSceneSubsystem(EditorSceneSubsystemConfig config);
 
-    [[nodiscard]] int priority() const override { return 200; }
-
-    void initialize(caustica::EngineInitContext& context) override;
-
-    void onBeginFrame(caustica::GpuDevice& gpuDevice) override;
-    void onUpdate(float elapsedTimeSeconds, bool windowFocused) override;
-    void onRenderScene(caustica::GpuDevice& gpuDevice) override;
-
-    void onBackBufferResizing() override;
-
-    [[nodiscard]] bool skipRenderPhase() const override;
-    [[nodiscard]] bool shouldRenderWhenUnfocused() const override;
+protected:
+    void onInitializePost(caustica::EngineInitContext& context) override;
+    void onBeforeBeginFrame() override;
+    void prepareSceneFrame() override;
 
 private:
-    EditorSceneSubsystemConfig m_config;
+    SceneEditor& sceneEditor() { return m_editorConfig.sceneEditor; }
+    const SceneEditor& sceneEditor() const { return m_editorConfig.sceneEditor; }
+
+    EditorSceneSubsystemConfig m_editorConfig;
 };
 
 } // namespace caustica::editor
