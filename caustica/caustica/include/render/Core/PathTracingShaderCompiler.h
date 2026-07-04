@@ -9,6 +9,7 @@
 #include <unordered_set>
 
 #include <assets/loader/ShaderCompilerUtils.h>
+#include <assets/loader/ShaderKey.h>
 
 namespace caustica
 {
@@ -25,11 +26,11 @@ class PTPipelineVariant
 
         std::vector<caustica::ShaderMacro> CombinedAndSpecializedMacros;   // combined global + variant + per-material-shader-specialized (if any) macros
 
-        std::string                             PermutationName;                // user readable name
+        std::string                             PermutationName;
 
-        std::string                             CompiledHashHex;         // picosha2::k_digest_size
-        std::string                             CompiledFileNameNoExt;
+        caustica::ShaderKey                     CacheKey;
         std::string                             CompiledFullPath;
+        std::string                             PackVfsPath;
 
         std::string                             US_compileCmdLine;
         std::string                             US_compileError;
@@ -37,9 +38,9 @@ class PTPipelineVariant
 
         nvrhi::ShaderLibraryHandle              ShaderLibrary;
 
-
         void                                    SetPath(const std::filesystem::path & path);
         void                                    FromMaterialPermutation(const std::string & shortUniqueDebugID, const std::vector<caustica::ShaderMacro> & macros, const struct MaterialShaderPermutation & msp);
+        void                                    ResolveCacheIdentity(class PathTracingShaderCompiler & compiler, std::filesystem::file_time_type lastModifiedSourceCode);
         void                                    CompileIfNeeded();
         void                                    ResetShaderLibrary();
         void                                    LoadShaderLibraryIfNeeded(class PathTracingShaderCompiler & compiler);
@@ -138,6 +139,7 @@ private:
     bool                                IsVerbose() const                       { return m_verbose; }
     bool                                IsNVAPIShaderExtensionEnabled() const   { return m_enableNVAPIShaderExtension; }
     bool                                CanCompileShaders() const               { return m_compilerConfig.CanCompile(); }
+    bool                                IsLoadOnlyMode() const                  { return !m_compilerConfig.CanCompile(); }
 
     const ShaderCompilerUtils::ShaderCompilerConfig& 
                                         GetCompilerConfig() const           { return m_compilerConfig; }

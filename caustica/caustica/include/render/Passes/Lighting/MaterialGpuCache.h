@@ -5,6 +5,8 @@
 #include <memory>
 #include <optional>
 
+#include <assets/loader/ShaderCompilerUtils.h>
+#include <assets/loader/ShaderKey.h>
 #include <render/Core/BindingCache.h>
 #include <rhi/nvrhi.h>
 #include <math/math.h>
@@ -46,19 +48,20 @@ enum class PTMaterialTextureSlot
 struct MaterialShaderPermutation
 {
     const std::string   ShaderFilePath;
-    // const std::string   ClosestHitName;
-    // const std::string   AnyHitName;
 
     const std::vector<caustica::ShaderMacro> 
                         Macros;
 
     // runtime data
     int                 IndexInTable            = -1;
-    std::string         UniqueMaterialName      = "";               // not deterministic! but useful for debugging anyway
-    std::string         StableShaderName        = "";               // deterministic entry-point suffix derived from shader codegen inputs
-    int                 StableShaderID          = -1;               // deterministic debug ID; -1 keeps ubershader color at 0
+    std::string         UniqueMaterialName      = "";
+    std::string         StableShaderName        = "";
+    int                 StableShaderID          = -1;
+    uint32_t            FeatureTier             = 0;
 
-    //MaterialShaderPermutation(const std::string & shaderFilePath, const std::string & closestHitName, const std::string & anyHitName, const std::vector<std::pair<std::string, std::string>> & macros );
+    [[nodiscard]] caustica::ShaderKey MakeShaderKey(
+        nvrhi::GraphicsAPI api,
+        ShaderCompilerUtils::ShaderProfile profile = ShaderCompilerUtils::ShaderProfile::Library_6_6) const;
 };
 
 struct MaterialShaderPermutationKey

@@ -1,8 +1,8 @@
 namespace { constexpr int c_SwapchainCount = 3; }
 
 #include <render/WorldRenderer/WorldRenderer.h>
-#include <render/graph/PostProcessGraph.h>
-#include <render/graph/BlitGraphPass.h>
+#include <render/Passes/PostProcess/PostProcessGraph.h>
+#include <render/Passes/Composite/BlitGraphPass.h>
 #include <rhi/RenderDevice.h>
 #include <render/WorldRenderer/PathTracingFramePipeline.h>
 #include <render/SceneGpuResources.h>

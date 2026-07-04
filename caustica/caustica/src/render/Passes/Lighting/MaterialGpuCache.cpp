@@ -1,6 +1,8 @@
 #include <render/Passes/Lighting/MaterialGpuCache.h>
+#include <render/Passes/Lighting/MaterialFeatureMask.h>
 
 #include <assets/loader/ShaderFactory.h>
+#include <assets/loader/ShaderKey.h>
 #include <render/Core/FramebufferFactory.h>
 #include <assets/loader/TextureLoader.h>
 
@@ -1295,48 +1297,56 @@ static std::string MacrosToString( const std::vector<caustica::ShaderMacro> & ma
 
 static void InitializeStableShaderIdentity(MaterialShaderPermutation& msp)
 {
-    if (msp.Macros.size() == 1
-        && msp.Macros[0].name == "CAUSTICA_MATERIAL_PERMUTATIONS_ENABLED"
-        && msp.Macros[0].definition == "0")
+    uint32_t tierIndex = 0;
+    for (const auto& macro : msp.Macros)
+    {
+        if (macro.name == "CAUSTICA_MATERIAL_FEATURE_TIER")
+        {
+            tierIndex = static_cast<uint32_t>(std::stoul(macro.definition));
+            break;
+        }
+    }
+
+    msp.FeatureTier = tierIndex;
+
+    if (tierIndex == 0)
     {
         msp.StableShaderName = "Ubershader";
         msp.StableShaderID = -1;
         return;
     }
 
-    const std::string stableKey = msp.ShaderFilePath + ", " + MacrosToString(msp.Macros);
-    const auto hash = HashMyString(stableKey);
-    const std::string hashHex = picosha2::bytes_to_hex_string(hash.begin(), hash.end());
+    msp.StableShaderName = caustica::render::MaterialFeatureTierStableName(tierIndex);
+    msp.StableShaderID = int(tierIndex);
+}
 
-    msp.StableShaderName = "M" + hashHex.substr(0, 16);
-    const uint32_t stableID =
-        (uint32_t(hash[0]) << 24) |
-        (uint32_t(hash[1]) << 16) |
-        (uint32_t(hash[2]) << 8) |
-        uint32_t(hash[3]);
-    msp.StableShaderID = int(stableID & 0x7fffffff);
+caustica::ShaderKey MaterialShaderPermutation::MakeShaderKey(
+    nvrhi::GraphicsAPI api,
+    ShaderCompilerUtils::ShaderProfile profile) const
+{
+    return caustica::MakeShaderLibraryKey(ShaderFilePath, api, Macros, profile);
 }
 
 // MaterialShaderPermutation::MaterialShaderPermutation(const std::string & shaderFilePath, const std::string & closestHitName, const std::string & anyHitName, const std::vector<std::pair<std::string, std::string>> & macros )
 
 
 MaterialShaderPermutationKey::MaterialShaderPermutationKey( const MaterialShaderPermutation & msp )
-    : FullKey( msp.ShaderFilePath + ", " + /*msp.ClosestHitName + ", " + msp.AnyHitName + ", " +*/ MacrosToString(msp.Macros) )
+    : FullKey(msp.ShaderFilePath + ", " + caustica::CanonicalMacroString(msp.Macros))
 {
     Hash = ShortHash(HashMyString(FullKey));
 }
 
 void MaterialGpuCache::BakeShaderPermutations()
 {
-    // first generate ubershader variant - that will likely go away in the future
-    std::vector<caustica::ShaderMacro> macros;
-    macros.push_back({ "CAUSTICA_MATERIAL_PERMUTATIONS_ENABLED", "0" });
-    MaterialShaderPermutation ubershader{ .ShaderFilePath = m_relativeShaderSourcePath, .Macros = macros };
+    MaterialShaderPermutation ubershader{
+        .ShaderFilePath = m_relativeShaderSourcePath,
+        .Macros = caustica::render::BuildMaterialShaderMacros(0),
+    };
     InitializeStableShaderIdentity(ubershader);
     m_ubershader = std::make_shared<MaterialShaderPermutation>(ubershader);
     m_ubershader->UniqueMaterialName = "Ubershader";
 
-    // now generate per-material permutations (some materials will automatically share same permutation)
+    // Map materials to offline-compilable feature tiers (multiple materials can share a tier).
     m_shaderPermutations.clear();
     m_shaderPermutationTable.clear();
     for (auto& materialPT : m_materials)
@@ -1345,7 +1355,7 @@ void MaterialGpuCache::BakeShaderPermutations()
         InitializeStableShaderIdentity(variant);
         MaterialShaderPermutationKey key(variant);
         std::shared_ptr<MaterialShaderPermutation> ptVariant;
-        auto findV = m_shaderPermutations.find(variant);
+        auto findV = m_shaderPermutations.find(key);
         if (findV == m_shaderPermutations.end())
         {
             ptVariant = std::make_shared<MaterialShaderPermutation>(variant);
@@ -1786,62 +1796,12 @@ bool MaterialGpuCache::DebugGUI(float indent)
 
 MaterialShaderPermutation PTMaterial::ComputeShaderPermutation(const std::string& defaultShaderPath)
 {
-    std::vector<caustica::ShaderMacro> macros;
-    macros.push_back({ "CAUSTICA_MATERIAL_PERMUTATIONS_ENABLED", "1" });
-
-    PTMaterialData data; FillData(data);
-
-    // props.AlphaTest = material.EnableAlphaTesting;
-    bool hasTransmission = this->EnableTransmission;
-    bool isEmissive = this->IsEmissive();
-    bool isAnalyticProxy = this->EnableAsAnalyticLightProxy;
-    bool effectiveIsThinSurface = (data.Flags & PTMaterialFlags_ThinSurface) != 0; // this includes non-transmission too which forces thin surface!
-    // props.NoTransmission = !props.HasTransmission;
-    // props.NoTextures = (!material.EnableBaseTexture || material.BaseTexture.Loaded == nullptr)
-    //     && (!material.EnableEmissiveTexture || material.EmissiveTexture.Loaded == nullptr)
-    //     && (!material.EnableNormalTexture || material.NormalTexture.Loaded == nullptr)
-    //     && (!material.EnableOcclusionRoughnessMetallicTexture || material.OcclusionRoughnessMetallicTexture.Loaded == nullptr)
-    //     && (!material.EnableTransmissionTexture || material.TransmissionTexture.Loaded == nullptr);
-    
-    // macros.push_back( {"CAUSTICA_MATERIAL_EXCLUDE_FROM_NEE",   ExcludeFromNEE?"1":"0" } );
-
-
-    // //why is it slower with this instead of faster?
-    // macros.push_back( {"CAUSTICA_MATERIAL_USE_NORMAL_TEXTURE", ((data.Flags & PTMaterialFlags_UseNormalTexture) != 0)?"1":"0" } );
-
-    // there's something wrong here
-    // static const float kMinGGXRoughness = 0.08f; // see BxDF.hlsli, kMinGGXAlpha constant: kMinGGXRoughness must match sqrt(kMinGGXAlpha)!
-    // bool onlyDeltaLobes = ((hasTransmission && this->TransmissionFactor == 1.0) || (this->Metalness == 1)) && (this->Roughness < kMinGGXRoughness) && (data.Flags & PTMaterialFlags_UseMetalRoughOrSpecularTexture) == 0;
-    // macros.push_back({ "CAUSTICA_MATERIAL_ONLY_DELTA_LOBES", onlyDeltaLobes ? "1" : "0" });
-
-#if 0 // more variants, more divergence - perf impact is largely scene dependent, sometimes it's better to specialize and sometimes not
-    macros.push_back({ "CAUSTICA_MATERIAL_THIN_SURFACE", effectiveIsThinSurface ? "1" : "0" });
-
-    macros.push_back({ "CAUSTICA_MATERIAL_HAS_TRANSMISSION", EnableTransmission ? "1" : "0" });
-#endif
-
-#if 0
-    macros.push_back({ "CAUSTICA_MATERIAL_IS_EMISSIVE", isEmissive ? "1" : "0" });
-    macros.push_back({ "CAUSTICA_MATERIAL_IS_ANALYTIC_LIGHT_PROXY", isAnalyticProxy ? "1" : "0" });
-#else // bunch them together and only use them disable emissive & analytic paths together
-    if (!isEmissive && !isAnalyticProxy)
-    {
-        macros.push_back({ "CAUSTICA_MATERIAL_IS_EMISSIVE", "0" });
-        macros.push_back({ "CAUSTICA_MATERIAL_IS_ANALYTIC_LIGHT_PROXY", "0" });
-    }
-#endif 
-
-#if 0 // NUCLEAR OPTION: make every material have its own shader - can be useful for tracking down weird perf issues
-    macros.push_back({ "CAUSTICA_MATERIAL_UNIQUE_NAME", this->UniqueFullName() });
-#endif
-
-    // next:
-    //     - CAUSTICA_MATERIAL_NO_ANALYTIC_LIGHT_PROXY
-    //     - CAUSTICA_MATERIAL_NO_EMISSIVE             : - no need for emissive MIS code at all and a bunch of that stuff
-    //     - thin surface
-
-
-    return MaterialShaderPermutation{ .ShaderFilePath = defaultShaderPath, /*.ClosestHitName = "ClosestHit", .AnyHitName = "AnyHit",*/ .Macros = macros };
+    const caustica::render::MaterialFeatureMask featureMask = caustica::render::ComputeMaterialFeatureMask(*this);
+    const uint32_t tierIndex = caustica::render::MapFeatureMaskToTier(featureMask);
+    return MaterialShaderPermutation{
+        .ShaderFilePath = defaultShaderPath,
+        .Macros = caustica::render::BuildMaterialShaderMacros(tierIndex),
+    };
 }
 
 std::shared_ptr<PTMaterial> MaterialGpuCache::FindByUniqueID(const std::string & name)

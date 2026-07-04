@@ -1,5 +1,7 @@
 #include <render/Core/PathTracingShaderCompiler.h>
+#include <assets/loader/PathTracingShaderBuild.h>
 #include <assets/loader/ShaderCompilerUtils.h>
+#include <assets/loader/ShaderKey.h>
 #include <assets/loader/ShaderPackFileSystem.h>
 
 #include <backend/GpuDevice.h>
@@ -35,14 +37,19 @@ using namespace caustica::math;
 using namespace caustica;
 
 static const std::string c_PTShaderBinariesRoot = "ShaderDynamic/Bin";
+static const std::string c_PTShaderPackMount = "/" + c_PTShaderBinariesRoot;
 
-static std::string MakeShaderCacheFileNameNoExt(const std::string& hashHex)
-{
-    if (hashHex.size() >= 2)
-        return hashHex.substr(0, 2) + "/" + hashHex;
+#if PIPELINE_BAKER_USE_OPTIMIZATIONS
+static constexpr bool c_PTUseOptimizations = true;
+#else
+static constexpr bool c_PTUseOptimizations = false;
+#endif
 
-    return hashHex;
-}
+#if PIPELINE_BAKER_EMBED_PDBS
+static constexpr bool c_PTEmbedPdbs = true;
+#else
+static constexpr bool c_PTEmbedPdbs = false;
+#endif
 
 void PTPipelineVariant::ShaderPermutation::SetPath(const std::filesystem::path & path)
 {
@@ -93,13 +100,90 @@ void PTPipelineVariant::ShaderPermutation::LoadShaderLibraryIfNeeded(PathTracing
     if (US_compileError != "" || ShaderLibrary != nullptr)
         return;
 
-    std::shared_ptr<caustica::IBlob> data = compiler.GetFS()->readFile(("/" + c_PTShaderBinariesRoot + "/" + CompiledFileNameNoExt + ".bin").c_str());
+    std::shared_ptr<caustica::IBlob> data = compiler.GetFS()->readFile(PackVfsPath.c_str());
 
     if (data)
         ShaderLibrary = compiler.GetDevice()->createShaderLibrary(data->data(), data->size());
 
     if (!ShaderLibrary)
-        US_compileError = StringFormat("ERROR creating ShaderLibrary for file %s", CompiledFullPath.c_str());
+    {
+        US_compileError = StringFormat(
+            "Failed to load shader library '%s' (pack path '%s').",
+            CompiledFullPath.c_str(),
+            PackVfsPath.c_str());
+    }
+}
+
+void PTPipelineVariant::ShaderPermutation::ResolveCacheIdentity(
+    PathTracingShaderCompiler& compiler,
+    std::filesystem::file_time_type lastModifiedSourceCode)
+{
+    US_compileError = "";
+    US_compileCmdLine = "";
+
+    const auto srcFullPath = std::filesystem::absolute(compiler.GetShadersPath() / ShaderSrcFileName);
+    const PathTracingShaderBuildInput buildInput{
+        .logicalSourcePath = ShaderSrcFileName,
+        .absoluteSourcePath = srcFullPath,
+        .macros = CombinedAndSpecializedMacros,
+        .useOptimizations = c_PTUseOptimizations,
+        .embedPdbs = c_PTEmbedPdbs,
+    };
+
+    const PathTracingShaderBuildResult buildResult =
+        BuildPathTracingLibraryShader(compiler.GetCompilerConfig(), buildInput);
+
+    const std::string previousHashHex = CacheKey.cacheHashHex;
+    CacheKey = buildResult.key;
+
+    const bool cacheIdentityChanged = previousHashHex != CacheKey.cacheHashHex;
+    if (cacheIdentityChanged)
+        ResetShaderLibrary();
+
+    CompiledFullPath = CacheKey.cacheFilePath(compiler.GetShaderBinariesPath()).string();
+    PackVfsPath = CacheKey.packVfsPath(c_PTShaderPackMount);
+
+    const bool compiledBlobAvailable = compiler.GetFS()->fileExists(PackVfsPath);
+    const bool diskBlobUpToDate = ShaderCompilerUtils::IsCompiledShaderUpToDate(
+        CompiledFullPath,
+        lastModifiedSourceCode);
+
+    if (compiledBlobAvailable && (!compiler.CanCompileShaders() || diskBlobUpToDate))
+    {
+        if (compiler.IsVerbose())
+        {
+            caustica::info(
+                "Using cached shader '%s' (%s)...",
+                PermutationName.c_str(),
+                CacheKey.cacheFileNameNoExt().c_str());
+        }
+        return;
+    }
+
+    if (!compiler.CanCompileShaders())
+    {
+        US_compileError = StringFormat(
+            "Missing precompiled shader '%s' and runtime shader compilation is disabled.",
+            CompiledFullPath.c_str());
+        caustica::error("%s", US_compileError.c_str());
+        return;
+    }
+
+    EnsureDirectoryExists(std::filesystem::path(CompiledFullPath).parent_path());
+
+    const std::filesystem::path pdbPath =
+        compiler.GetDevice()->getGraphicsAPI() == nvrhi::GraphicsAPI::VULKAN || c_PTEmbedPdbs
+        ? std::filesystem::path{}
+        : std::filesystem::path(CompiledFullPath).replace_extension(".pdb");
+
+    US_compileCmdLine = MakePathTracingShaderCompileCommand(
+        compiler.GetCompilerConfig(),
+        buildResult,
+        CompiledFullPath,
+        pdbPath);
+
+    if (compiler.IsVerbose())
+        caustica::info("Enqueuing shader variant of '%s'...", srcFullPath.string().c_str());
 }
 
 PTPipelineVariant::PTPipelineVariant(const std::string & relativeSourcePath, const std::vector<caustica::ShaderMacro> & variantMacros, const std::shared_ptr<PathTracingShaderCompiler>& compiler, const std::string & shortUniqueDebugID, bool raygenOnly)
@@ -166,162 +250,17 @@ void PTPipelineVariant::CompileIfNeeded_Enqueue(std::filesystem::file_time_type 
         for( int i = 0; i < m_specializedPerMaterial.size(); i++ )
             currentList.push_back( &(m_specializedPerMaterial[i]) );
 
-    // start preparing the command - this is shared amongst all permutations
-    const std::string commandBase = "\"" + baker->GetShaderCompilerPath().string() + "\"";
-    const bool isVulkanBackend = baker->GetDevice()->getGraphicsAPI() == nvrhi::GraphicsAPI::VULKAN;
     bool resetPipelineNeeded = false;
     for( ShaderPermutation * permutation : currentList )
     {
-        // must reset any past errors
-        permutation->US_compileError = "";
-
-        // source file
-        auto srcFullPath = std::filesystem::absolute(baker->GetShadersPath() / permutation->ShaderSrcFileName);
-        
-        // see https://simoncoenen.com/blog/programming/graphics/DxcCompiling for switch reference
-        std::string command;
-        std::string hashCommand;
-        command += " \"" + srcFullPath.string() + "\"";
-        hashCommand += " \"" + permutation->ShaderSrcFileName.generic_string() + "\"";
-        command += " -Zi";              //  Enable debug information. Cannot be used together with -Zs  - DXC_ARG_DEBUG
-        hashCommand += " -Zi";
-#if PIPELINE_BAKER_EMBED_PDBS
-        command += " -Qembed_debug";    //  Embed PDB in shader container (must be used with /Zi)
-        hashCommand += " -Qembed_debug";
-#endif
-        command += " -Zsb";             //  Compute Shader Hash considering only output binary
-        hashCommand += " -Zsb";
-#if PIPELINE_BAKER_USE_OPTIMIZATIONS
-        command += " -O3";
-        hashCommand += " -O3";
-#else
-        command += " -Od";
-        hashCommand += " -Od";
-#endif
-        command += " -enable-16bit-types";
-        hashCommand += " -enable-16bit-types";
-        command += " -WX";              //  Warnings are errors
-        hashCommand += " -WX";
-        //command += " -Gfa";             //  Avoid flow control
-        //command += " -Gfp";             //  Avoid flow control
-        command += " -all_resources_bound";
-        hashCommand += " -all_resources_bound";
-        command += " -T lib_6_6";
-        hashCommand += " -T lib_6_6";
-        command += " -enable-payload-qualifiers";
-        hashCommand += " -enable-payload-qualifiers";
-        
-        command += " -D ENABLE_DEBUG_PRINT"; // <- some issues with Linux and SPIRV? need to test this; also - test perf implications
-        hashCommand += " -D ENABLE_DEBUG_PRINT";
-
-        for (auto& macro : permutation->CombinedAndSpecializedMacros)
-        {
-            command += " -D " + macro.name + "=" + macro.definition;
-            hashCommand += " -D " + macro.name + "=" + macro.definition;
-        }
-
-        command += " -I \"" + baker->GetShadersPathExternalIncludes1().string() + "\"";
-        hashCommand += " -I <external1>";
-        if (!baker->GetShadersPathExternalIncludes2().empty())
-            command += " -I \"" + baker->GetShadersPathExternalIncludes2().string() + "\"";
-        hashCommand += " -I <external2>";
-
-        std::string targetMacro = " -D ";
-        if (baker->GetDevice()->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D12)
-        {
-            targetMacro += "TARGET_D3D12";
-        }
-        else if (baker->GetDevice()->getGraphicsAPI() == nvrhi::GraphicsAPI::VULKAN)
-        {
-            targetMacro += "TARGET_VULKAN";
-        }
-        else assert(false);
-
-        command += targetMacro;
-        hashCommand += targetMacro;
-
-        if (baker->GetDevice()->getGraphicsAPI() == nvrhi::GraphicsAPI::VULKAN)
-        {
-            command += " -D SPIRV";
-            command += " -spirv";
-            command += " -fspv-target-env=vulkan1.2";
-            command += " -fspv-extension=SPV_EXT_descriptor_indexing";
-            command += " -fspv-extension=KHR";
-            hashCommand += " -D SPIRV";
-            hashCommand += " -spirv";
-            hashCommand += " -fspv-target-env=vulkan1.2";
-            hashCommand += " -fspv-extension=SPV_EXT_descriptor_indexing";
-            hashCommand += " -fspv-extension=KHR";
-
-            nvrhi::VulkanBindingOffsets cBindingOffsets;
-            for (int i = 0; i < 7; i++)
-            {
-                // TODO: test with 'all' instead of the second %d - should work as well, no loop needed, see docs
-                command += StringFormat(" -fvk-s-shift %d %d", cBindingOffsets.sampler, i);
-                command += StringFormat(" -fvk-t-shift %d %d", cBindingOffsets.shaderResource, i);
-                command += StringFormat(" -fvk-b-shift %d %d", cBindingOffsets.constantBuffer, i);
-                command += StringFormat(" -fvk-u-shift %d %d", cBindingOffsets.unorderedAccess, i);
-                hashCommand += StringFormat(" -fvk-s-shift %d %d", cBindingOffsets.sampler, i);
-                hashCommand += StringFormat(" -fvk-t-shift %d %d", cBindingOffsets.shaderResource, i);
-                hashCommand += StringFormat(" -fvk-b-shift %d %d", cBindingOffsets.constantBuffer, i);
-                hashCommand += StringFormat(" -fvk-u-shift %d %d", cBindingOffsets.unorderedAccess, i);
-            }
-        }
-
-        std::string previousHashHex = permutation->CompiledHashHex;
-
-        // Hash with logical source/include names only, so precompiled binary
-        // filenames stay valid after the Python wheel is installed elsewhere.
-        std::string newHash = ShaderCompilerUtils::ComputeSha256Hex(hashCommand);
-        if (newHash!=permutation->CompiledHashHex)
-        {
-            permutation->CompiledHashHex = newHash;
+        const std::string previousHashHex = permutation->CacheKey.cacheHashHex;
+        permutation->ResolveCacheIdentity(*baker, lastModifiedSourceCode);
+        if (permutation->CacheKey.cacheHashHex != previousHashHex || !permutation->US_compileCmdLine.empty())
             resetPipelineNeeded = true;
-            permutation->ResetShaderLibrary();
-        }
-
-        permutation->CompiledFileNameNoExt = MakeShaderCacheFileNameNoExt(permutation->CompiledHashHex);
-        permutation->CompiledFullPath = std::filesystem::absolute(baker->GetShaderBinariesPath() / permutation->CompiledFileNameNoExt).string() + ".bin";
-        std::string compiledFullPathPdb = std::filesystem::absolute(baker->GetShaderBinariesPath() / permutation->CompiledFileNameNoExt).string() + ".pdb";
-        std::string compiledVfsPath = "/" + c_PTShaderBinariesRoot + "/" + permutation->CompiledFileNameNoExt + ".bin";
-
-        // check if the file with the hash baked in exists and if it's newer than the last modified source (the latest modified file in the whole source directory)
-        const bool compiledBlobAvailable = baker->GetFS()->fileExists(compiledVfsPath);
-        const bool diskBlobUpToDate = ShaderCompilerUtils::IsCompiledShaderUpToDate(permutation->CompiledFullPath, lastModifiedSourceCode);
-        if (compiledBlobAvailable && (!baker->CanCompileShaders() || diskBlobUpToDate))
-        {
-            if (baker->IsVerbose())
-                caustica::info("No need to compile shader variant of '%s', up-to-date file already exists...", srcFullPath.string().c_str());
-            permutation->US_compileCmdLine = "";
-        }
-        else if (baker->CanCompileShaders()) // we need to re-compile!
-        {
-            EnsureDirectoryExists(std::filesystem::path(permutation->CompiledFullPath).parent_path());
-            command = commandBase + command;
-#if !PIPELINE_BAKER_EMBED_PDBS
-            if (!isVulkanBackend)
-                command += " /Fd \"" + compiledFullPathPdb + "\"";
-#endif
-            command += " -Fo \"" + permutation->CompiledFullPath + "\"";
-
-            if (baker->IsVerbose())
-                caustica::info("Enqueuing shader variant of '%s'...", srcFullPath.string().c_str());
-            permutation->US_compileCmdLine = command;
-            resetPipelineNeeded = true;
-            permutation->ResetShaderLibrary();
-        }
-        else
-        {
-            permutation->US_compileCmdLine = "";
-            permutation->US_compileError = StringFormat(
-                "Missing precompiled shader '%s' and runtime shader compilation is disabled.",
-                permutation->CompiledFullPath.c_str());
-            caustica::error("%s", permutation->US_compileError.c_str());
-        }
         baker->EnqueueShaderPermutation(permutation);
     }
 
-    if (resetPipelineNeeded) // at least some need recompile - need to clear current PSO (pipeline)
+    if (resetPipelineNeeded)
         ResetPipeline();
 }
 
@@ -479,10 +418,23 @@ PathTracingShaderCompiler::PathTracingShaderCompiler(nvrhi::IDevice* device, std
     {
         m_shadersFS->mount("/" + c_PTShaderBinariesRoot, shaderPackFS);
         m_compilerConfig.RuntimeCompilationAvailable = false;
+        caustica::info(
+            "PathTracingShaderCompiler: load-only mode using shader pack '%s'.",
+            shaderPackPath.string().c_str());
     }
     else
     {
         m_shadersFS->mount("/" + c_PTShaderBinariesRoot, m_compilerConfig.ShaderBinariesPath);
+        if (m_compilerConfig.CanCompile())
+        {
+            caustica::info("PathTracingShaderCompiler: dev mode — runtime DXC compilation enabled.");
+        }
+        else
+        {
+            caustica::info(
+                "PathTracingShaderCompiler: load-only mode using '%s' (no shader pack or DXC).",
+                m_compilerConfig.ShaderBinariesPath.string().c_str());
+        }
     }
 }
 
@@ -531,9 +483,9 @@ static bool macrosEqual(caustica::ShaderMacro& a, caustica::ShaderMacro& b)
 
 void PathTracingShaderCompiler::EnqueueShaderPermutation(PTPipelineVariant::ShaderPermutation* perm)
 {
-    if( perm->US_compileCmdLine != "" )
-    {   
-        auto [it, inserted] = m_parallelCompileListUnique.try_emplace(perm->CompiledFileNameNoExt, perm);
+    if (perm->US_compileCmdLine != "")
+    {
+        auto [it, inserted] = m_parallelCompileListUnique.try_emplace(perm->CacheKey.cacheFileNameNoExt(), perm);
         if (!inserted)
             perm->US_masterCopy = it->second;
     }
@@ -681,8 +633,10 @@ void PathTracingShaderCompiler::Update(const std::shared_ptr<caustica::Scene>& s
         ProgressBar progressCompilingShaders;
         progressCounterCompleted = 0;
         progressTotal = (int)m_parallelCompileListUnique.size();
-        if (m_parallelCompileListUnique.size()>0)
-            progressCompilingShaders.Start( StringFormat("Compiling shaders (%d)...", progressTotal).c_str() );
+        if (m_parallelCompileListUnique.size() > 0)
+            progressCompilingShaders.Start(StringFormat("Compiling shaders (%d)...", progressTotal).c_str());
+        else if (IsLoadOnlyMode() && !updateQueue.empty())
+            caustica::info("PathTracingShaderCompiler: loading precompiled RT shader libraries...");
 
         for (auto it : m_parallelCompileListUnique)
         {

@@ -1,4 +1,4 @@
-#include <render/graph/PostProcessGraph.h>
+#include <render/Passes/PostProcess/PostProcessGraph.h>
 
 #include <render/Core/CameraController.h>
 #include <render/Core/PathTracingShaderCompiler.h>

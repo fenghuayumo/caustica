@@ -1,4 +1,4 @@
-#include <render/graph/BlitGraphPass.h>
+#include <render/Passes/Composite/BlitGraphPass.h>
 
 #include <cassert>
 

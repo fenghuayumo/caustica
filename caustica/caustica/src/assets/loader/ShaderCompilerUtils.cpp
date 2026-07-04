@@ -1,4 +1,5 @@
 #include <assets/loader/ShaderCompilerUtils.h>
+#include <assets/loader/ShaderKey.h>
 #include <core/file_utils.h>
 #include <core/format.h>
 #include <core/path_utils.h>
@@ -350,6 +351,27 @@ namespace ShaderCompilerUtils
     {
         auto lastModifiedTime = GetFileModifiedTime(compiledFile);
         return lastModifiedTime.has_value() && (*lastModifiedTime) >= lastSourceModified;
+    }
+
+    caustica::ShaderKey MakeShaderKey(
+        const ShaderCompilerConfig& config,
+        const DxcCommandOptions& options)
+    {
+        const std::filesystem::path logicalSource = options.LogicalSourceFileName.empty()
+            ? options.SourceFilePath.filename()
+            : options.LogicalSourceFileName;
+
+        const caustica::ShaderKeyKind kind = IsLibraryProfile(options.Profile)
+            ? caustica::ShaderKeyKind::ShaderLibrary
+            : caustica::ShaderKeyKind::SingleShader;
+
+        return caustica::MakeShaderKey(
+            logicalSource.generic_string(),
+            options.EntryPoint,
+            kind,
+            config.GraphicsAPI,
+            options.Profile,
+            options.Macros);
     }
     
 } // namespace ShaderCompilerUtils

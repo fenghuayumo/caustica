@@ -100,6 +100,53 @@ endif()
 
 
 ##########################################################################
+# Path-tracing libraries (lib_6_6) -> ShaderDynamic/Bin via DXC precompile.
+# ShaderMake cannot compile lib_* profiles; Python script matches runtime DXC hash layout.
+# PathTracerShaders.cfg documents tier permutations (not consumed by ShaderMake).
+set(caustica_pt_shader_dir "${CMAKE_CURRENT_SOURCE_DIR}/caustica/shaders")
+file(GLOB_RECURSE caustica_pt_shader_sources
+    "${caustica_pt_shader_dir}/PathTracer*.hlsl"
+    "${caustica_pt_shader_dir}/PathTracer*.hlsli"
+)
+set_source_files_properties(${caustica_pt_shader_sources} PROPERTIES VS_TOOL_OVERRIDE "None")
+
+option(CAUSTICA_PRECOMPILE_PT_SHADERS "Precompile path-tracing DXC shader bins into ShaderDynamic/Bin" ON)
+if (CAUSTICA_PRECOMPILE_PT_SHADERS AND NOT CAUSTICA_DISTRIBUTION_BUILD)
+    find_package(Python3 COMPONENTS Interpreter)
+    if (Python3_FOUND)
+        if (WIN32)
+            set(caustica_pt_precompile_api both)
+        else()
+            set(caustica_pt_precompile_api vulkan)
+        endif()
+        add_custom_target(causticaPathTracerShaders
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Bin"
+            COMMAND ${Python3_EXECUTABLE}
+                "${CMAKE_SOURCE_DIR}/support/python/precompile_pt_shader_bins.py"
+                --shader-api ${caustica_pt_precompile_api}
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+            DEPENDS ShaderDynamicAssets ShaderDynamicAssets_CopyAlways
+            COMMENT "Precompiling path-tracing shader bins (DXC hash layout)"
+            SOURCES ${caustica_pt_shader_sources}
+        )
+    else()
+        add_custom_target(causticaPathTracerShaders
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Bin"
+            COMMENT "Path-tracing shader precompile skipped (Python3 not found)"
+            SOURCES ${caustica_pt_shader_sources}
+        )
+    endif()
+else()
+    add_custom_target(causticaPathTracerShaders
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Bin"
+        COMMENT "Path-tracing shader precompile disabled"
+        SOURCES ${caustica_pt_shader_sources}
+    )
+endif()
+set_target_properties(causticaPathTracerShaders PROPERTIES FOLDER ${folder})
+
+
+##########################################################################
 ################ dynamic shader recompile dependencies ###################
 if (CAUSTICA_DISTRIBUTION_BUILD)
 add_custom_target(ShaderDynamicAssets_CopyAlways
@@ -272,7 +319,7 @@ if (CAUSTICA_WITH_PYTHON AND caustica_python_core_sources)
     endif()
 endif()
 
-add_dependencies(causticaApp caustica_shaders nrd_shaders omm_shaders ShaderDynamicAssets ShaderDynamicAssets_CopyAlways)
+add_dependencies(causticaApp caustica_shaders nrd_shaders omm_shaders causticaPathTracerShaders ShaderDynamicAssets ShaderDynamicAssets_CopyAlways)
 set_target_properties(causticaApp PROPERTIES FOLDER ${folder})
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${shaders})
 # AgilitySDK support for causticaApp

@@ -1,5 +1,6 @@
 #include <render/Core/ComputePipelineRegistry.h>
 #include <assets/loader/ShaderCompilerUtils.h>
+#include <assets/loader/ShaderKey.h>
 #include <assets/loader/ShaderPackFileSystem.h>
 
 #include <backend/GpuDevice.h>
@@ -21,14 +22,7 @@ using namespace caustica;
 using namespace caustica;
 
 static const std::string c_ComputeShaderBinariesRoot = "ShaderDynamic/Bin";
-
-static std::string MakeShaderCacheFileNameNoExt(const std::string& hashHex)
-{
-    if (hashHex.size() >= 2)
-        return hashHex.substr(0, 2) + "/" + hashHex;
-
-    return hashHex;
-}
+static const std::string c_ComputeShaderPackMount = "/" + c_ComputeShaderBinariesRoot;
 
 //////////////////////////////////////////////////////////////////////////
 // ComputePipelineRegistry implementation
@@ -48,10 +42,17 @@ ComputePipelineRegistry::ComputePipelineRegistry(nvrhi::IDevice* device, const s
     {
         m_shadersFS->mount("/" + c_ComputeShaderBinariesRoot, shaderPackFS);
         m_compilerConfig.RuntimeCompilationAvailable = false;
+        caustica::info(
+            "ComputePipelineRegistry: load-only mode using shader pack '%s'.",
+            shaderPackPath.string().c_str());
     }
     else
     {
         m_shadersFS->mount("/" + c_ComputeShaderBinariesRoot, m_compilerConfig.ShaderBinariesPath);
+        if (m_compilerConfig.CanCompile())
+            caustica::info("ComputePipelineRegistry: dev mode — runtime DXC compilation enabled.");
+        else
+            caustica::info("ComputePipelineRegistry: load-only mode using '%s'.", m_compilerConfig.ShaderBinariesPath.string().c_str());
     }
     
     // Store additional paths to monitor (converted to absolute)
@@ -101,7 +102,7 @@ void ComputePipelineRegistry::EnqueueShaderForCompilation(ComputeShaderVariant* 
 {
     if (variant->m_compileCmdLine != "")
     {
-        auto [it, inserted] = m_parallelCompileListUnique.try_emplace(variant->m_compiledFileNameNoExt, variant);
+        auto [it, inserted] = m_parallelCompileListUnique.try_emplace(variant->m_cacheKey.cacheFileNameNoExt(), variant);
         // If not inserted, it means another variant with the same output already exists
         // (unlikely for compute shaders with unique debug names, but handled for safety)
     }
@@ -391,47 +392,44 @@ void ComputeShaderVariant::PrepareCompilation(std::filesystem::file_time_type la
     options.Macros = m_macros;
 
     auto cmdResult = ShaderCompilerUtils::BuildDxcCommand(registry->GetCompilerConfig(), options);
+    caustica::ShaderKey cacheKey = ShaderCompilerUtils::MakeShaderKey(registry->GetCompilerConfig(), options);
+    cacheKey.cacheHashHex = cmdResult.HashHex;
 
-    // Check if hash changed
-    std::string previousHashHex = m_compiledHashHex;
-    if (cmdResult.HashHex != m_compiledHashHex)
-    {
-        m_compiledHashHex = cmdResult.HashHex;
+    const std::string previousHashHex = m_cacheKey.cacheHashHex;
+    m_cacheKey = std::move(cacheKey);
+    if (m_cacheKey.cacheHashHex != previousHashHex)
         ResetPipeline();
-    }
 
-    m_compiledFileNameNoExt = MakeShaderCacheFileNameNoExt(m_compiledHashHex);
-    m_compiledFullPath = std::filesystem::absolute(
-        registry->GetShaderBinariesPath() / m_compiledFileNameNoExt).string() + ".bin";
-    std::string compiledFullPathPdb = std::filesystem::absolute(
-        registry->GetShaderBinariesPath() / m_compiledFileNameNoExt).string() + ".pdb";
-    std::string compiledVfsPath = "/" + c_ComputeShaderBinariesRoot + "/" + m_compiledFileNameNoExt + ".bin";
+    m_compiledFullPath = m_cacheKey.cacheFilePath(registry->GetShaderBinariesPath()).string();
+    m_packVfsPath = m_cacheKey.packVfsPath(c_ComputeShaderPackMount);
 
-    // Check if compiled file is up to date
-    const bool compiledBlobAvailable = registry->GetFS()->fileExists(compiledVfsPath);
+    const bool compiledBlobAvailable = registry->GetFS()->fileExists(m_packVfsPath);
     const bool diskBlobUpToDate = ShaderCompilerUtils::IsCompiledShaderUpToDate(m_compiledFullPath, lastModifiedSourceCode);
     if (compiledBlobAvailable && (!registry->CanCompileShaders() || diskBlobUpToDate))
     {
         if (registry->IsVerbose())
-            caustica::info("No need to compile compute shader '%s', up-to-date file exists", m_debugName.c_str());
+            caustica::info("Using cached compute shader '%s' (%s)", m_debugName.c_str(), m_cacheKey.cacheFileNameNoExt().c_str());
         m_compileCmdLine = "";
     }
     else if (registry->CanCompileShaders())
     {
-        // Need to recompile
         EnsureDirectoryExists(std::filesystem::path(m_compiledFullPath).parent_path());
         std::string command = registry->GetCompilerConfig().GetCompilerPathQuoted();
         command += cmdResult.CommandBase;
-        
+
 #if !COMPUTE_REGISTRY_EMBED_PDBS
         if (registry->GetCompilerConfig().GraphicsAPI != nvrhi::GraphicsAPI::VULKAN)
-            command += " /Fd \"" + compiledFullPathPdb + "\"";
+        {
+            std::filesystem::path pdbPath = m_compiledFullPath;
+            pdbPath.replace_extension(".pdb");
+            command += " /Fd \"" + pdbPath.string() + "\"";
+        }
 #endif
         command += " -Fo \"" + m_compiledFullPath + "\"";
 
         if (registry->IsVerbose())
             caustica::info("Enqueuing compute shader '%s' for compilation...", m_debugName.c_str());
-        
+
         m_compileCmdLine = command;
         ResetPipeline();
     }
@@ -473,14 +471,14 @@ void ComputeShaderVariant::LoadShaderAndCreatePipeline()
     auto registry = m_lockedRegistry;
     assert(registry != nullptr);
 
-    // Load the compiled shader blob
-    std::string blobPath = "/" + c_ComputeShaderBinariesRoot + "/" + m_compiledFileNameNoExt + ".bin";
-    std::shared_ptr<caustica::IBlob> data = registry->GetFS()->readFile(blobPath.c_str());
+    std::shared_ptr<caustica::IBlob> data = registry->GetFS()->readFile(m_packVfsPath.c_str());
 
     if (!data)
     {
-        m_compileError = StringFormat("ERROR loading compiled compute shader '%s' from '%s'",
-            m_debugName.c_str(), blobPath.c_str());
+        m_compileError = StringFormat(
+            "Failed to load compiled compute shader '%s' (pack path '%s').",
+            m_debugName.c_str(),
+            m_packVfsPath.c_str());
         return;
     }
 

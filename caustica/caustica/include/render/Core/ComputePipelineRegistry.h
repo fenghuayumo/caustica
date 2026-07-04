@@ -8,6 +8,7 @@
 #include <unordered_map>
 
 #include <assets/loader/ShaderCompilerUtils.h>
+#include <assets/loader/ShaderKey.h>
 
 namespace caustica
 {
@@ -43,6 +44,7 @@ public:
     bool IsVerbose() const { return m_verbose; }
     void SetVerbose(bool verbose) { m_verbose = verbose; }
     bool CanCompileShaders() const { return m_compilerConfig.CanCompile(); }
+    bool IsLoadOnlyMode() const { return !m_compilerConfig.CanCompile(); }
 
 private:
     friend class ComputeShaderVariant;
@@ -148,10 +150,10 @@ private:
     std::string m_debugName;
 
     // Compiled shader info
-    std::string m_compiledHashHex;
-    std::string m_compiledFileNameNoExt;
+    caustica::ShaderKey m_cacheKey;
     std::string m_compiledFullPath;
-    std::string m_compileCmdLine;  // empty if no recompile needed
+    std::string m_packVfsPath;
+    std::string m_compileCmdLine;
     std::string m_compileError;
 
     // Pipeline

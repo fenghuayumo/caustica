@@ -1,5 +1,5 @@
 #pragma once
 
-#include <render/graph/BlitGraphPass.h>
+#include <render/Passes/Composite/BlitGraphPass.h>
 #include <render/graph/GraphBuilder.h>
-#include <render/graph/PostProcessGraph.h>
+#include <render/Passes/PostProcess/PostProcessGraph.h>

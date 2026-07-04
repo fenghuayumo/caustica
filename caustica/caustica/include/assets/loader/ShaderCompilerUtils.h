@@ -1,11 +1,17 @@
 #pragma once
 
+#include <assets/loader/ShaderFactory.h>
+
 #include <string>
 #include <vector>
 #include <filesystem>
 #include <optional>
 #include <rhi/nvrhi.h>
-#include <assets/loader/ShaderFactory.h>
+
+namespace caustica
+{
+struct ShaderKey;
+}
 
 namespace ShaderCompilerUtils
 {
@@ -110,5 +116,9 @@ namespace ShaderCompilerUtils
     bool IsCompiledShaderUpToDate(
         const std::filesystem::path& compiledFile,
         std::filesystem::file_time_type lastSourceModified);
-    
+
+    [[nodiscard]] caustica::ShaderKey MakeShaderKey(
+        const ShaderCompilerConfig& config,
+        const DxcCommandOptions& options);
+
 } // namespace ShaderCompilerUtils
