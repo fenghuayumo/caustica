@@ -3,6 +3,7 @@ namespace { constexpr int c_SwapchainCount = 3; }
 #include <render/WorldRenderer/WorldRenderer.h>
 #include <render/SceneGpuResources.h>
 #include <render/WorldRenderer/PathTracingContext.h>
+#include <rhi/RenderDevice.h>
 #include <render/SceneGaussianSplatPasses.h>
 #include <render/SceneRayTracingResources.h>
 
@@ -450,10 +451,10 @@ void caustica::render::WorldRenderer::createRenderPasses( bool& exposureResetReq
 
     const uint2 screenResolution = {m_renderTargets->OutputColor->getDesc().width, m_renderTargets->OutputColor->getDesc().height};
 
-    m_shaderDebug = std::make_shared<ShaderDebug>(device(), initializeCommandList, m_context.shaderFactory, m_context.commonPasses);
+    m_shaderDebug = std::make_shared<ShaderDebug>(device(), initializeCommandList, m_context.shaderFactory, m_context.renderDevice.commonPassesPtr());
 
     if (m_context.settings.ActualUseRTXDIPasses())
-        m_rtxdiPass = std::make_unique<RtxdiPass>(device(), m_context.shaderFactory, m_context.commonPasses, m_bindlessLayout);
+        m_rtxdiPass = std::make_unique<RtxdiPass>(device(), m_context.shaderFactory, m_context.renderDevice.commonPassesPtr(), m_bindlessLayout);
     else
         m_rtxdiPass = nullptr;
 
@@ -488,9 +489,9 @@ void caustica::render::WorldRenderer::createRenderPasses( bool& exposureResetReq
     }
 
     // these get re-created every time intentionally, to pick up changes after at-runtime shader recompile
-    m_toneMappingPass = std::make_unique<ToneMappingPass>(device(), m_context.shaderFactory, m_context.commonPasses, m_renderTargets->LdrFramebuffer, *m_context.camera.view(), m_renderTargets->OutputColor);
-    m_bloomPass = std::make_unique<BloomPass>(device(), m_context.shaderFactory, m_context.commonPasses, m_renderTargets->ProcessedOutputFramebuffer, *m_context.camera.view());
-    m_postProcess = std::make_shared<PostProcess>(device(), m_context.shaderFactory, m_context.commonPasses, m_shaderDebug);
+    m_toneMappingPass = std::make_unique<ToneMappingPass>(device(), m_context.shaderFactory, m_context.renderDevice.commonPassesPtr(), m_renderTargets->LdrFramebuffer, *m_context.camera.view(), m_renderTargets->OutputColor);
+    m_bloomPass = std::make_unique<BloomPass>(device(), m_context.shaderFactory, m_context.renderDevice.commonPassesPtr(), m_renderTargets->ProcessedOutputFramebuffer, *m_context.camera.view());
+    m_postProcess = std::make_shared<PostProcess>(device(), m_context.shaderFactory, m_context.renderDevice.commonPassesPtr(), m_shaderDebug);
 
     {
         TemporalAntiAliasingPass::CreateParameters taaParams;
@@ -504,7 +505,7 @@ void caustica::render::WorldRenderer::createRenderPasses( bool& exposureResetReq
         taaParams.motionVectorStencilMask = 0; ///*uint32_t motionVectorStencilMask =*/ 0x01;
         taaParams.useCatmullRomFilter = true;
 
-        m_temporalAntiAliasingPass = std::make_unique<TemporalAntiAliasingPass>(device(), m_context.shaderFactory, m_context.commonPasses, *m_context.camera.view(), taaParams);
+        m_temporalAntiAliasingPass = std::make_unique<TemporalAntiAliasingPass>(device(), m_context.shaderFactory, m_context.renderDevice.commonPassesPtr(), *m_context.camera.view(), taaParams);
     }
 
     if (!createPTPipeline())
@@ -516,7 +517,7 @@ void caustica::render::WorldRenderer::createRenderPasses( bool& exposureResetReq
         m_context.scenePasses.lighting.lightSampling() = std::make_shared<LightSamplingCache>(device());
     m_context.scenePasses.lighting.environment()->CreateRenderPasses(m_shaderDebug, m_context.shaderFactory, m_context.scenePasses.lighting.computePipelines());
     m_context.scenePasses.lighting.environment()->GenerateBRDFLUT(initializeCommandList.Get(), m_context.bindingCache);  // One-time BRDF LUT generation
-    m_context.scenePasses.lighting.lightSampling()->CreateRenderPasses(m_context.shaderFactory, m_bindlessLayout, m_context.commonPasses, m_shaderDebug, screenResolution, m_context.scenePasses.lighting.environment()->GetImportanceSampling()->GetImportanceMapResolution());
+    m_context.scenePasses.lighting.lightSampling()->CreateRenderPasses(m_context.shaderFactory, m_bindlessLayout, m_context.renderDevice.commonPassesPtr(), m_shaderDebug, screenResolution, m_context.scenePasses.lighting.environment()->GetImportanceSampling()->GetImportanceMapResolution());
 
     m_context.scenePasses.gaussianSplats.preparePasses();
 
@@ -539,7 +540,7 @@ void caustica::render::WorldRenderer::preUpdateLighting(nvrhi::CommandListHandle
         commandList,
         needNewBindings,
         m_context.scenePasses.lighting.environment().get(),
-        m_context.commonPasses,
+        m_context.renderDevice.commonPassesPtr(),
         envMapActualPath,
         sceneDirectory,
     };
@@ -555,7 +556,7 @@ void caustica::render::WorldRenderer::updateLighting(nvrhi::CommandListHandle co
         m_context.scenePasses.lighting.environment().get(),
         m_context.scenePasses.lighting.lightSampling().get(),
         &m_context.bindingCache,
-        m_context.commonPasses,
+        m_context.renderDevice.commonPassesPtr(),
         m_context.sceneManager.getScene(),
         m_context.scenePasses.lighting.materials(),
         m_context.scenePasses.lighting.opacityMaps(),
@@ -1239,8 +1240,8 @@ void caustica::render::WorldRenderer::recreateBindingSet()
         nvrhi::BindingSetItem::Texture_SRV(6,  m_renderTargets->LdrColorScratch, nvrhi::Format::SRGBA8_UNORM),
         nvrhi::BindingSetItem::RayTracingAccelStruct(7, gaussianSplatAS),
         nvrhi::BindingSetItem::StructuredBuffer_SRV(8, gaussianSplatBuffer),
-        nvrhi::BindingSetItem::Texture_SRV(10, m_context.scenePasses.lighting.environment()->GetEnvMapCube()), //m_app.m_EnvironmentMap->IsEnvMapLoaded() ? m_app.m_EnvironmentMap->GetEnvironmentMap() : (m_context.commonPasses)->m_BlackTexture),
-        nvrhi::BindingSetItem::Texture_SRV(11, m_context.scenePasses.lighting.environment()->GetImportanceSampling()->GetImportanceMapOnly()), //m_app.m_EnvironmentMap->IsImportanceMapLoaded() ? m_app.m_EnvironmentMap->GetImportanceMap() : (m_context.commonPasses)->m_BlackTexture),
+        nvrhi::BindingSetItem::Texture_SRV(10, m_context.scenePasses.lighting.environment()->GetEnvMapCube()), //m_app.m_EnvironmentMap->IsEnvMapLoaded() ? m_app.m_EnvironmentMap->GetEnvironmentMap() : (m_context.renderDevice.commonPassesPtr())->m_BlackTexture),
+        nvrhi::BindingSetItem::Texture_SRV(11, m_context.scenePasses.lighting.environment()->GetImportanceSampling()->GetImportanceMapOnly()), //m_app.m_EnvironmentMap->IsImportanceMapLoaded() ? m_app.m_EnvironmentMap->GetImportanceMap() : (m_context.renderDevice.commonPassesPtr())->m_BlackTexture),
         nvrhi::BindingSetItem::StructuredBuffer_SRV(12, m_context.scenePasses.lighting.lightSampling()->GetControlBuffer()),
         nvrhi::BindingSetItem::StructuredBuffer_SRV(13, m_context.scenePasses.lighting.lightSampling()->GetLightBuffer()),
         nvrhi::BindingSetItem::StructuredBuffer_SRV(14, m_context.scenePasses.lighting.lightSampling()->GetLightExBuffer()),
@@ -1251,7 +1252,7 @@ void caustica::render::WorldRenderer::recreateBindingSet()
         //nvrhi::BindingSetItem::TypedBuffer_SRV(19, ),
         nvrhi::BindingSetItem::Texture_UAV(20, m_context.scenePasses.lighting.lightSampling()->GetFeedbackTotalWeight()),        // u_LightFeedbackTotalWeight
         nvrhi::BindingSetItem::Texture_UAV(21, m_context.scenePasses.lighting.lightSampling()->GetFeedbackCandidates()),         // u_LightFeedbackCandidates
-        nvrhi::BindingSetItem::Sampler(0, (m_context.commonPasses)->m_AnisotropicWrapSampler),
+        nvrhi::BindingSetItem::Sampler(0, (m_context.renderDevice.commonPassesPtr())->m_AnisotropicWrapSampler),
         nvrhi::BindingSetItem::Sampler(1, m_context.scenePasses.lighting.environment()->GetEnvMapCubeSampler()),
         nvrhi::BindingSetItem::Sampler(2, m_context.scenePasses.lighting.environment()->GetImportanceSampling()->GetImportanceMapSampler()),
         nvrhi::BindingSetItem::Texture_UAV(0, m_renderTargets->OutputColor),
@@ -1315,20 +1316,20 @@ void caustica::render::WorldRenderer::recreateBindingSet()
         // Reflection system bindings (t80-t83, b3)
         // Derived classes can override AddCustomBindings to provide actual textures
         // Default to black texture fallbacks (NVRHI doesn't allow null textures)
-        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(80, (m_context.commonPasses)->m_BlackCubeMapArray));  // t_LocalCubemapGGX
-        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(81, (m_context.commonPasses)->m_BlackCubeMapArray));  // t_DiffuseIrradianceCube
-        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(82, (m_context.commonPasses)->m_BlackTexture));  // t_SSRBlurChain
-        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(83, (m_context.scenePasses.lighting.environment()->GetBRDFLUT()!=nullptr)?m_context.scenePasses.lighting.environment()->GetBRDFLUT():(m_context.commonPasses)->m_BlackTexture ));  // t_BRDFLUT
-        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(84, (m_context.commonPasses)->m_BlackTexture));  // t_DepthHierarchy placeholder
+        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(80, (m_context.renderDevice.commonPassesPtr())->m_BlackCubeMapArray));  // t_LocalCubemapGGX
+        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(81, (m_context.renderDevice.commonPassesPtr())->m_BlackCubeMapArray));  // t_DiffuseIrradianceCube
+        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(82, (m_context.renderDevice.commonPassesPtr())->m_BlackTexture));  // t_SSRBlurChain
+        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(83, (m_context.scenePasses.lighting.environment()->GetBRDFLUT()!=nullptr)?m_context.scenePasses.lighting.environment()->GetBRDFLUT():(m_context.renderDevice.commonPassesPtr())->m_BlackTexture ));  // t_BRDFLUT
+        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(84, (m_context.renderDevice.commonPassesPtr())->m_BlackTexture));  // t_DepthHierarchy placeholder
         bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::ConstantBuffer(10, m_constantBuffer)); // ReflectionConstants (reuse main constant buffer as placeholder)
         
         // SSR result UAV placeholder
         bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_UAV(85, m_renderTargets->Depth));   // u_SSRResult placeholder
 
         // GTAO output (default to white = no occlusion; overridden by AddCustomBindings)
-        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(86, (m_context.commonPasses)->m_WhiteTexture));  // t_GTAOOutput placeholder
+        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(86, (m_context.renderDevice.commonPassesPtr())->m_WhiteTexture));  // t_GTAOOutput placeholder
         // Previous frame depth (default to black = zero depth; overridden by AddCustomBindings)
-        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(87, (m_context.commonPasses)->m_BlackTexture));  // t_PrevDepth placeholder
+        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(87, (m_context.renderDevice.commonPassesPtr())->m_BlackTexture));  // t_PrevDepth placeholder
 
         m_bindingSet = device()->createBindingSet(bindingSetDesc, m_bindingLayout);
     }
@@ -1884,7 +1885,7 @@ void caustica::render::WorldRenderer::denoisedScreenshot(nvrhi::ITexture * frame
             return;
         }
 
-        if (!SaveTextureToFile(device(), m_context.commonPasses.get(), framebufferTexture, nvrhi::ResourceStates::Common, noisyImagePath.c_str()))
+        if (!SaveTextureToFile(device(), m_context.renderDevice.commonPassesPtr().get(), framebufferTexture, nvrhi::ResourceStates::Common, noisyImagePath.c_str()))
         { assert(false); return; }
 
         std::string startCmd = "\"" + denoiserPath.string() + "\"" + " -hdr 0 -i \"" + noisyImagePath + "\"" " -o \"" + denoisedImagePath + "\"";

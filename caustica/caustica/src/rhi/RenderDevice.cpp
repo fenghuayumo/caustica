@@ -8,7 +8,10 @@ namespace caustica::rhi
 
 RenderDevice::RenderDevice(nvrhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory)
     : m_device(device)
-    , m_commonPasses(std::make_shared<caustica::CommonRenderPasses>(device, std::move(shaderFactory)))
+    , m_builtins(std::make_unique<BuiltinTextures>(device))
+    , m_samplers(std::make_unique<StandardSamplers>(device))
+    , m_blit(std::make_unique<FullscreenBlitPass>(device, shaderFactory, *m_samplers))
+    , m_commonPasses(std::make_shared<caustica::CommonRenderPasses>(*m_builtins, *m_samplers, *m_blit))
 {
 }
 

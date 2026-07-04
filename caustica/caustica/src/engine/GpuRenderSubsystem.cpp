@@ -92,7 +92,7 @@ bool GpuRenderSubsystem::initializeSession(const GpuRenderSubsystemInitParams& p
         .runtimeState = params.runtimeState,
         .scenePasses = m_scenePasses,
         .shaderFactory = m_shaderFactory,
-        .commonPasses = m_commonPasses,
+        .renderDevice = *m_renderDevice,
         .bindingCache = *m_bindingCache,
         .textureCache = m_textureCache,
         .descriptorTable = m_descriptorTable,
@@ -114,7 +114,7 @@ bool GpuRenderSubsystem::initializeSession(const GpuRenderSubsystemInitParams& p
         .lighting = m_scenePasses.lighting,
         .bindingCache = *m_bindingCache,
         .shaderFactory = m_shaderFactory,
-        .commonPasses = m_commonPasses,
+        .renderDevice = *m_renderDevice,
     });
     return true;
 }

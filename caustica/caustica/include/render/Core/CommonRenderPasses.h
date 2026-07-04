@@ -1,102 +1,60 @@
 #pragma once
 
-#include <math/math.h>
+#include <rhi/FullscreenBlitPass.h>
 #include <rhi/nvrhi.h>
-#include <memory>
-#include <unordered_map>
+
+namespace caustica::rhi
+{
+class BuiltinTextures;
+class FullscreenBlitPass;
+class StandardSamplers;
+}
 
 namespace caustica
 {
-    class BindingCache;
-    class ShaderFactory;
 
-    constexpr uint32_t c_MaxRenderPassConstantBufferVersions = 16;
-        
-    enum class BlitSampler
-    {
-        Point,
-        Linear,
-        Sharpen
-    };
+constexpr uint32_t c_MaxRenderPassConstantBufferVersions = 16;
 
-    struct BlitParameters
-    {
-        nvrhi::IFramebuffer* targetFramebuffer = nullptr;
-        nvrhi::Viewport targetViewport;
-        dm::box2 targetBox = dm::box2(0.f, 1.f);
+using BlitSampler = rhi::BlitSampler;
+using BlitParameters = rhi::BlitParameters;
 
-        nvrhi::ITexture* sourceTexture = nullptr;
-        uint32_t sourceArraySlice = 0;
-        uint32_t sourceMip = 0;
-        dm::box2 sourceBox = dm::box2(0.f, 1.f);
-        nvrhi::Format sourceFormat = nvrhi::Format::UNKNOWN;
+// Legacy facade over rhi::BuiltinTextures / StandardSamplers / FullscreenBlitPass.
+// Public members mirror the pre-R0 layout for existing render passes.
+class CommonRenderPasses
+{
+public:
+    CommonRenderPasses(rhi::BuiltinTextures& builtins, rhi::StandardSamplers& samplers, rhi::FullscreenBlitPass& blit);
 
-        BlitSampler sampler = BlitSampler::Linear;
-        nvrhi::BlendState::RenderTarget blendState;
-        nvrhi::Color blendConstantColor = nvrhi::Color(0.f);
-    };
+    void BlitTexture(nvrhi::ICommandList* commandList, const BlitParameters& params, BindingCache* bindingCache = nullptr);
+    void BlitTexture(nvrhi::ICommandList* commandList, nvrhi::IFramebuffer* targetFramebuffer, nvrhi::ITexture* sourceTexture, BindingCache* bindingCache = nullptr);
 
-    class CommonRenderPasses
-    {
-    protected:
-        nvrhi::DeviceHandle m_Device;
+    nvrhi::ShaderHandle m_FullscreenVS;
+    nvrhi::ShaderHandle m_FullscreenAtOneVS;
+    nvrhi::ShaderHandle m_RectVS;
+    nvrhi::ShaderHandle m_BlitPS;
+    nvrhi::ShaderHandle m_BlitArrayPS;
+    nvrhi::ShaderHandle m_SharpenPS;
+    nvrhi::ShaderHandle m_SharpenArrayPS;
 
-        struct PsoCacheKey
-        {
-            nvrhi::FramebufferInfo fbinfo;
-            nvrhi::IShader* shader;
-            nvrhi::BlendState::RenderTarget blendState;
+    nvrhi::TextureHandle m_BlackTexture;
+    nvrhi::TextureHandle m_GrayTexture;
+    nvrhi::TextureHandle m_WhiteTexture;
+    nvrhi::TextureHandle m_BlackTexture2DArray;
+    nvrhi::TextureHandle m_WhiteTexture2DArray;
+    nvrhi::TextureHandle m_BlackCubeMapArray;
+    nvrhi::TextureHandle m_BlackTexture3D;
+    nvrhi::TextureHandle m_BlackDepthStencilTexture;
+    nvrhi::TextureHandle m_BlackDepthStencilTexture2DArray;
 
-            bool operator==(const PsoCacheKey& other) const { return fbinfo == other.fbinfo && shader == other.shader && blendState == other.blendState; }
-            bool operator!=(const PsoCacheKey& other) const { return !(*this == other); }
+    nvrhi::SamplerHandle m_PointClampSampler;
+    nvrhi::SamplerHandle m_LinearClampSampler;
+    nvrhi::SamplerHandle m_LinearWrapSampler;
+    nvrhi::SamplerHandle m_AnisotropicWrapSampler;
 
-            struct Hash
-            {
-                size_t operator ()(const PsoCacheKey& s) const
-                {
-                    size_t hash = 0;
-                    nvrhi::hash_combine(hash, s.fbinfo);
-                    nvrhi::hash_combine(hash, s.shader);
-                    nvrhi::hash_combine(hash, s.blendState);
-                    return hash;
-                }
-            };
-        };
+    nvrhi::BindingLayoutHandle m_BlitBindingLayout;
 
-        std::unordered_map<PsoCacheKey, nvrhi::GraphicsPipelineHandle, PsoCacheKey::Hash> m_BlitPsoCache;
-        
-    public:
-        nvrhi::ShaderHandle m_FullscreenVS;
-        nvrhi::ShaderHandle m_FullscreenAtOneVS;
-        nvrhi::ShaderHandle m_RectVS;
-        nvrhi::ShaderHandle m_BlitPS;
-        nvrhi::ShaderHandle m_BlitArrayPS;
-        nvrhi::ShaderHandle m_SharpenPS;
-        nvrhi::ShaderHandle m_SharpenArrayPS;
-        
-        nvrhi::TextureHandle m_BlackTexture;
-        nvrhi::TextureHandle m_GrayTexture;
-        nvrhi::TextureHandle m_WhiteTexture;
-        nvrhi::TextureHandle m_BlackTexture2DArray;
-        nvrhi::TextureHandle m_WhiteTexture2DArray;
-        nvrhi::TextureHandle m_BlackCubeMapArray;
-        nvrhi::TextureHandle m_BlackTexture3D;
-        nvrhi::TextureHandle m_BlackDepthStencilTexture;
-        nvrhi::TextureHandle m_BlackDepthStencilTexture2DArray;
+private:
+    rhi::FullscreenBlitPass* m_Blit = nullptr;
+};
 
-        nvrhi::SamplerHandle m_PointClampSampler;
-        nvrhi::SamplerHandle m_LinearClampSampler;
-        nvrhi::SamplerHandle m_LinearWrapSampler;
-        nvrhi::SamplerHandle m_AnisotropicWrapSampler;
-
-        nvrhi::BindingLayoutHandle m_BlitBindingLayout;
-        
-        CommonRenderPasses(nvrhi::IDevice* device, std::shared_ptr<ShaderFactory> shaderFactory);
-        
-        void BlitTexture(nvrhi::ICommandList* commandList, const BlitParameters& params, BindingCache* bindingCache = nullptr);
-
-        // Simplified form of BlitTexture that blits the entire source texture, mip 0 slice 0, into the entire target framebuffer using a linear sampler.
-        void BlitTexture(nvrhi::ICommandList* commandList, nvrhi::IFramebuffer* targetFramebuffer, nvrhi::ITexture* sourceTexture, BindingCache* bindingCache = nullptr);
-    };
-
-}
+} // namespace caustica

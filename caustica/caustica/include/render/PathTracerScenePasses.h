@@ -10,9 +10,13 @@ namespace caustica
 {
 class AccelStructManager;
 class BindingCache;
-class CommonRenderPasses;
 class GpuDevice;
 class ShaderFactory;
+
+namespace rhi
+{
+class RenderDevice;
+}
 } // namespace caustica
 
 class SceneManager;
@@ -41,7 +45,7 @@ struct ScenePassWireParams
     SceneLightingPasses& lighting;
     caustica::BindingCache& bindingCache;
     std::shared_ptr<caustica::ShaderFactory>& shaderFactory;
-    std::shared_ptr<caustica::CommonRenderPasses>& commonPasses;
+    caustica::rhi::RenderDevice& renderDevice;
 };
 
 // Scene-scoped render pass bundles owned by GpuRenderSubsystem (not Application hosts).

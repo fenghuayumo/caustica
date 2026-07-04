@@ -1,6 +1,9 @@
 #pragma once
 
+#include <rhi/BuiltinTextures.h>
 #include <rhi/Device.h>
+#include <rhi/FullscreenBlitPass.h>
+#include <rhi/StandardSamplers.h>
 
 #include <memory>
 
@@ -13,12 +16,6 @@ class ShaderFactory;
 namespace caustica::rhi
 {
 
-class BuiltinTextures;
-class StandardSamplers;
-class FullscreenBlitPass;
-
-// R0 entry point: engine-owned GPU utilities (successor to CommonRenderPasses).
-// Phase B1: facade shell delegating to CommonRenderPasses until sub-types are split out.
 class RenderDevice
 {
 public:
@@ -31,18 +28,25 @@ public:
     [[nodiscard]] Device& device() { return m_device; }
     [[nodiscard]] const Device& device() const { return m_device; }
 
+    [[nodiscard]] BuiltinTextures& builtins() { return *m_builtins; }
+    [[nodiscard]] const BuiltinTextures& builtins() const { return *m_builtins; }
+
+    [[nodiscard]] StandardSamplers& samplers() { return *m_samplers; }
+    [[nodiscard]] const StandardSamplers& samplers() const { return *m_samplers; }
+
+    [[nodiscard]] FullscreenBlitPass& blit() { return *m_blit; }
+    [[nodiscard]] const FullscreenBlitPass& blit() const { return *m_blit; }
+
     // Legacy bridge — removed once call sites migrate off CommonRenderPasses.
     [[nodiscard]] caustica::CommonRenderPasses& commonPasses();
     [[nodiscard]] const caustica::CommonRenderPasses& commonPasses() const;
     [[nodiscard]] std::shared_ptr<caustica::CommonRenderPasses> commonPassesPtr() const { return m_commonPasses; }
 
-    // Future R0 splits (return nullptr until implemented):
-    [[nodiscard]] BuiltinTextures* builtins() { return nullptr; }
-    [[nodiscard]] StandardSamplers* samplers() { return nullptr; }
-    [[nodiscard]] FullscreenBlitPass* blit() { return nullptr; }
-
 private:
     Device m_device;
+    std::unique_ptr<BuiltinTextures> m_builtins;
+    std::unique_ptr<StandardSamplers> m_samplers;
+    std::unique_ptr<FullscreenBlitPass> m_blit;
     std::shared_ptr<caustica::CommonRenderPasses> m_commonPasses;
 };
 

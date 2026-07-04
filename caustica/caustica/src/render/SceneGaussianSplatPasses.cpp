@@ -1,5 +1,7 @@
 #include <render/SceneGaussianSplatPasses.h>
 
+#include <rhi/RenderDevice.h>
+
 #include <render/PathTracerScenePasses.h>
 #include <render/WorldRenderer/WorldRenderer.h>
 #include <render/Passes/Gaussian/GaussianSplatPass.h>
@@ -70,7 +72,7 @@ void SceneGaussianSplatPasses::wireSession(const ScenePassWireParams& params)
     m_settings = &params.settings;
     m_summary = &params.gaussianSplatsSummary;
     m_shaderFactory = params.shaderFactory;
-    m_commonPasses = params.commonPasses;
+    m_commonPasses = params.renderDevice.commonPassesPtr();
 }
 
 void SceneGaussianSplatPasses::setOnRequestFullRebuild(std::function<void()> callback)

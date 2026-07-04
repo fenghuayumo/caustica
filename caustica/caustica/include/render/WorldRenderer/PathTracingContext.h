@@ -20,8 +20,12 @@ namespace caustica
 class AccelStructManager;
 class BindingCache;
 class CameraController;
-class CommonRenderPasses;
 class ShaderFactory;
+
+namespace rhi
+{
+class RenderDevice;
+}
 
 namespace render
 {
@@ -38,7 +42,7 @@ struct PathTracingContext
     PathTracerScenePasses& scenePasses;
 
     std::shared_ptr<ShaderFactory>& shaderFactory;
-    std::shared_ptr<CommonRenderPasses>& commonPasses;
+    rhi::RenderDevice& renderDevice;
     BindingCache& bindingCache;
     std::shared_ptr<TextureLoader>& textureCache;
     std::shared_ptr<DescriptorTableManager>& descriptorTable;
