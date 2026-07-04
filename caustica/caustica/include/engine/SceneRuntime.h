@@ -35,8 +35,13 @@ struct DeltaTreeVizPathVertex;
 
 namespace caustica
 {
+
+namespace rhi
+{
+class RenderDevice;
+}
+
 class Application;
-class BindingCache;
 class CommonRenderPasses;
 class DescriptorTableManager;
 class GpuRenderSubsystem;
@@ -73,6 +78,7 @@ public:
     void setApplication(Application* application) { m_application = application; }
 
     std::shared_ptr<ShaderFactory> GetShaderFactory() const { return m_shaderFactory; }
+    [[nodiscard]] rhi::RenderDevice* GetRenderDevice() const;
     std::shared_ptr<CommonRenderPasses> GetCommonPasses() const;
     std::shared_ptr<TextureLoader> GetTextureLoader() const { return m_TextureLoader; }
     std::shared_ptr<DescriptorTableManager> GetDescriptorTable() const;

@@ -6,6 +6,7 @@
 #include <engine/SceneRuntimeRegistration.h>
 #include <engine/EngineFrameApplication.h>
 #include <engine/Application.h>
+#include <rhi/RenderDevice.h>
 #include <backend/GpuDevice.h>
 #include <render/SceneGaussianSplatPasses.h>
 #include <render/SceneLightingPasses.h>
@@ -620,7 +621,14 @@ bool RenderSession::SaveScreenshot(const std::string& outputPath)
         return false;
     }
 
-    auto commonPasses = m_sceneRuntime->GetCommonPasses();
+    auto* renderDevice = m_sceneRuntime->GetRenderDevice();
+    if (!renderDevice)
+    {
+        caustica::error("RenderSession: render device not initialized yet");
+        return false;
+    }
+
+    auto commonPasses = renderDevice->commonPassesPtr();
     if (!commonPasses)
     {
         caustica::error("RenderSession: common passes not initialized yet");

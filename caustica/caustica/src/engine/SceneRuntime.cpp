@@ -25,6 +25,7 @@
 #include <engine/Application.h>
 #include <engine/GpuRenderSubsystem.h>
 #include <engine/RenderThread.h>
+#include <rhi/RenderDevice.h>
 #include <core/vfs/VFS.h>
 #include <ecs/Entity.h>
 #include <math/math.h>
@@ -112,6 +113,11 @@ void SceneRuntime::bindGpuRenderSubsystem(GpuRenderSubsystem& gpuRenderSubsystem
 WorldRenderer* SceneRuntime::GetWorldRenderer() const
 {
     return m_gpuRenderSubsystem ? m_gpuRenderSubsystem->worldRenderer() : nullptr;
+}
+
+rhi::RenderDevice* SceneRuntime::GetRenderDevice() const
+{
+    return m_gpuRenderSubsystem ? &m_gpuRenderSubsystem->renderDevice() : nullptr;
 }
 
 SceneLightingPasses& SceneRuntime::GetLightingPasses()

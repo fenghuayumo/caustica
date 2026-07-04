@@ -20,6 +20,11 @@ struct CommandLineOptions;
 namespace caustica
 {
 
+namespace rhi
+{
+class RenderDevice;
+}
+
 class BindingCache;
 class BindlessTable;
 class CommonRenderPasses;
@@ -86,7 +91,9 @@ public:
     void applyCmdLinePostLoadOverrides();
 
     [[nodiscard]] std::shared_ptr<ShaderFactory> shaderFactory() const { return m_shaderFactory; }
-    [[nodiscard]] std::shared_ptr<CommonRenderPasses> commonPasses() const { return m_commonPasses; }
+    [[nodiscard]] rhi::RenderDevice& renderDevice();
+    [[nodiscard]] const rhi::RenderDevice& renderDevice() const;
+    [[nodiscard]] std::shared_ptr<CommonRenderPasses> commonPasses() const;
     [[nodiscard]] std::shared_ptr<ShaderFactory>& shaderFactoryRef() { return m_shaderFactory; }
     [[nodiscard]] std::shared_ptr<CommonRenderPasses>& commonPassesRef() { return m_commonPasses; }
     [[nodiscard]] std::shared_ptr<TextureLoader>& textureLoaderRef() { return m_textureCache; }
@@ -117,6 +124,7 @@ private:
     render::PathTracerScenePasses m_scenePasses;
     nvrhi::BindingLayoutHandle m_bindlessLayout;
     std::shared_ptr<ShaderFactory> m_shaderFactory;
+    std::unique_ptr<rhi::RenderDevice> m_renderDevice;
     std::shared_ptr<CommonRenderPasses> m_commonPasses;
     std::unique_ptr<BindingCache> m_bindingCache;
     std::unique_ptr<BindlessTable> m_bindlessTable;
