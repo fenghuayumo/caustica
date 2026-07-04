@@ -42,7 +42,7 @@ class Application;
 class BindingCache;
 class CommonRenderPasses;
 class DescriptorTableManager;
-class EngineRenderer;
+class GpuRenderSubsystem;
 class FirstPersonCamera;
 class Material;
 class MeshInfo;
@@ -61,7 +61,7 @@ class RootFileSystem;
 
 namespace caustica::render
 {
-class PathTracingWorldRenderer;
+class WorldRenderer;
 class SceneGaussianSplatPasses;
 class SceneLightingPasses;
 class SceneRayTracingResources;
@@ -86,7 +86,7 @@ class CaptureScriptManager;
 
 using namespace caustica::math;
 
-// Scene editor shell (mesh edit, Inspector, Capture). Path tracer is owned by EngineRenderer.
+// Scene editor shell (mesh edit, Inspector, Capture). Path tracer is owned by GpuRenderSubsystem.
 class SceneEditor
 {
 public:
@@ -167,11 +167,11 @@ public:
 
     float                                   GetAvgTimePerFrame() const;
 
-    void bindEngine(caustica::EngineRenderer& engine);
+    void bindGpuRenderSubsystem(caustica::GpuRenderSubsystem& gpuRenderSubsystem);
     void Init(const std::string& preferredScene,
         const std::shared_ptr<caustica::ShaderFactory>& shaderFactory);
 
-    [[nodiscard]] caustica::EngineRenderer* GetEngineRenderer() const { return m_engineRenderer; }
+    [[nodiscard]] caustica::GpuRenderSubsystem* GetGpuRenderSubsystem() const { return m_gpuRenderSubsystem; }
 
     caustica::render::SceneLightingPasses& GetLightingPasses();
     const caustica::render::SceneLightingPasses& GetLightingPasses() const;
@@ -179,13 +179,14 @@ public:
     const caustica::render::SceneRayTracingResources& GetRayTracingResources() const;
     caustica::render::SceneGaussianSplatPasses& GetGaussianSplatPasses();
     const caustica::render::SceneGaussianSplatPasses& GetGaussianSplatPasses() const;
-    [[nodiscard]] caustica::render::PathTracingWorldRenderer* GetWorldRenderer() const;
+    [[nodiscard]] caustica::render::WorldRenderer* GetWorldRenderer() const;
 
     void initStreamlineAndWindow();
 
     void setApplication(caustica::Application* application) { m_application = application; }
 
     void PrepareEditorFrame();
+    void afterWorldRender(caustica::GpuDevice& gpuDevice);
     void recordFrameTiming(const caustica::GpuDevice& gpuDevice);
     void                                    beginFrame();
     bool processPendingSceneSwitch();
@@ -289,7 +290,7 @@ private:
 #endif
 
     caustica::Application* m_application = nullptr;
-    caustica::EngineRenderer* m_engineRenderer = nullptr;
+    caustica::GpuRenderSubsystem* m_gpuRenderSubsystem = nullptr;
 
     EditorInputRouter m_inputRouter;
     SceneContentEditor m_contentEditor;

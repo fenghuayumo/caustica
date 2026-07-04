@@ -1,12 +1,14 @@
 #include "EditorUISubsystem.h"
 
 #include "EditorApplication.h"
+#include "SceneEditor.h"
 #include <EditorUI.h>
 #include <imgui/imgui_renderer.h>
 
 #include <engine/Engine.h>
-#include <engine/EngineRenderer.h>
+#include <engine/GpuRenderSubsystem.h>
 #include <platform/window.h>
+#include <render/Passes/Debug/ZoomTool.h>
 
 namespace caustica::editor
 {
@@ -21,8 +23,8 @@ void EditorUISubsystem::initialize(caustica::EngineInitContext& context)
     if (!context.gpuDevice || !context.window || !context.subsystems || !context.application)
         return;
 
-    auto* engineRenderer = context.subsystems->get<caustica::EngineRenderer>();
-    if (!engineRenderer)
+    auto* gpuRenderSubsystem = context.subsystems->get<caustica::GpuRenderSubsystem>();
+    if (!gpuRenderSubsystem)
         return;
 
     const bool serSupported = context.gpuDevice->SupportsShaderExecutionReordering()
@@ -34,7 +36,7 @@ void EditorUISubsystem::initialize(caustica::EngineInitContext& context)
         m_config.editorUiData,
         serSupported,
         m_config.cmdLine);
-    m_ui->Init(engineRenderer->shaderFactory());
+    m_ui->Init(gpuRenderSubsystem->shaderFactory());
 
     if (caustica::Window* platformWindow = context.gpuDevice->GetPlatformWindow())
     {
@@ -69,7 +71,21 @@ void EditorUISubsystem::onRenderScene(caustica::GpuDevice& gpuDevice)
     if (!m_ui)
         return;
 
-    m_ui->Render(gpuDevice.GetCurrentFramebuffer(m_ui->SupportsDepthBuffer()));
+    nvrhi::IFramebuffer* framebuffer = gpuDevice.GetCurrentFramebuffer(m_ui->SupportsDepthBuffer());
+    if (ZoomTool* zoom = m_config.sceneEditor.GetOrCreateZoomTool())
+    {
+        if (zoom->Enabled())
+        {
+            nvrhi::ITexture* color = framebuffer->getDesc().colorAttachments[0].texture;
+            nvrhi::CommandListHandle commandList = gpuDevice.GetDevice()->createCommandList();
+            commandList->open();
+            zoom->Render(commandList, color);
+            commandList->close();
+            gpuDevice.GetDevice()->executeCommandList(commandList);
+        }
+    }
+
+    m_ui->Render(framebuffer);
 }
 
 void EditorUISubsystem::onBackBufferResizing()

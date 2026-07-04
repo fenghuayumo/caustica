@@ -7,7 +7,7 @@
 #include <render/SceneLightingPasses.h>
 #include <render/SceneRayTracingResources.h>
 
-#include <render/WorldRenderer/PathTracingWorldRenderer.h>
+#include <render/WorldRenderer/WorldRenderer.h>
 #include <shaders/PathTracer/PathTracerDebug.hlsli>
 #include "render/Core/RenderTargets.h"
 #include <render/Passes/Gaussian/GaussianSplatEmissionProxy.h>
@@ -34,7 +34,7 @@
 #include <backend/GpuDevice.h>
 #include <core/log.h>
 #include <engine/Application.h>
-#include <engine/EngineRenderer.h>
+#include <engine/GpuRenderSubsystem.h>
 #include <engine/RenderThread.h>
 #include <core/json.h>
 #include <core/vfs/VFS.h>
@@ -248,27 +248,27 @@ void SceneEditor::DebugDrawLine( float3 start, float3 stop, float4 col1, float4 
     lines.push_back(dle);
 }
 
-void SceneEditor::bindEngine(caustica::EngineRenderer& engine)
+void SceneEditor::bindGpuRenderSubsystem(caustica::GpuRenderSubsystem& gpuRenderSubsystem)
 {
-    m_engineRenderer = &engine;
-    m_shaderFactory = engine.shaderFactory();
-    m_CommonPasses = engine.commonPasses();
-    m_bindingCache = engine.bindingCache();
-    m_DescriptorTable = engine.descriptorTable();
-    m_TextureLoader = engine.textureLoader();
-    m_sceneManager = engine.sceneManager();
-    m_renderCore = engine.renderCore();
-    m_lightingPasses = &engine.lightingPasses();
-    m_rayTracingResources = &engine.rayTracingResources();
-    m_gaussianSplatPasses = &engine.gaussianSplatPasses();
+    m_gpuRenderSubsystem = &gpuRenderSubsystem;
+    m_shaderFactory = gpuRenderSubsystem.shaderFactory();
+    m_CommonPasses = gpuRenderSubsystem.commonPasses();
+    m_bindingCache = gpuRenderSubsystem.bindingCache();
+    m_DescriptorTable = gpuRenderSubsystem.descriptorTable();
+    m_TextureLoader = gpuRenderSubsystem.textureLoader();
+    m_sceneManager = gpuRenderSubsystem.sceneManager();
+    m_renderCore = gpuRenderSubsystem.renderCore();
+    m_lightingPasses = &gpuRenderSubsystem.lightingPasses();
+    m_rayTracingResources = &gpuRenderSubsystem.rayTracingResources();
+    m_gaussianSplatPasses = &gpuRenderSubsystem.gaussianSplatPasses();
 
-    m_cameraController.bind(*m_renderCore, m_settings, engine.worldRenderer());
+    m_cameraController.bind(*m_renderCore, m_settings, gpuRenderSubsystem.worldRenderer());
     m_inputRouter.bind(*this);
 }
 
-caustica::render::PathTracingWorldRenderer* SceneEditor::GetWorldRenderer() const
+caustica::render::WorldRenderer* SceneEditor::GetWorldRenderer() const
 {
-    return m_engineRenderer ? m_engineRenderer->worldRenderer() : nullptr;
+    return m_gpuRenderSubsystem ? m_gpuRenderSubsystem->worldRenderer() : nullptr;
 }
 
 caustica::render::SceneLightingPasses& SceneEditor::GetLightingPasses()
@@ -320,6 +320,7 @@ void SceneEditor::PrepareEditorFrame()
     m_progressLoading.Stop();
     m_sessionDiagnostics.asyncLoadingInProgress = false;
     HandleDroppedFiles();
+    m_settings.DebugExploreDeltaTree = m_editor.ShowDeltaTree;
 }
 
 std::shared_ptr<caustica::Scene> SceneEditor::GetScene() const
@@ -376,13 +377,13 @@ void SceneEditor::Init(const std::string& preferredScene,
 {
     if (!m_shaderFactory || !m_bindingCache)
     {
-        caustica::fatal("SceneEditor::Init requires bindEngine");
+        caustica::fatal("SceneEditor::Init requires bindGpuRenderSubsystem");
         return;
     }
 
-    if (!m_engineRenderer)
+    if (!m_gpuRenderSubsystem)
     {
-        caustica::fatal("SceneEditor::Init requires bindEngine");
+        caustica::fatal("SceneEditor::Init requires bindGpuRenderSubsystem");
         return;
     }
 
@@ -404,7 +405,7 @@ void SceneEditor::Init(const std::string& preferredScene,
 
     if (!m_sceneManager || !m_renderCore)
     {
-        caustica::fatal("SceneEditor::Init requires bindEngine");
+        caustica::fatal("SceneEditor::Init requires bindGpuRenderSubsystem");
         return;
     }
 
@@ -573,8 +574,8 @@ void SceneEditor::SceneUnloading()
         m_sampleGame->SceneUnloading();
 
     runGpuWorkOnRenderThread([this]() {
-        if (m_engineRenderer)
-            m_engineRenderer->onSceneUnloading();
+        if (m_gpuRenderSubsystem)
+            m_gpuRenderSubsystem->onSceneUnloading();
     });
 }
 
@@ -621,11 +622,11 @@ void SceneEditor::syncCameraFromScene()
 
 void SceneEditor::SceneLoaded()
 {
-    if (!m_sceneManager || !m_engineRenderer)
+    if (!m_sceneManager || !m_gpuRenderSubsystem)
         return;
 
     const std::filesystem::path assetsRoot = GetLocalPath(c_AssetsFolder);
-    m_engineRenderer->refreshEnvironmentMapMediaList(assetsRoot, m_sceneManager->getCurrentScenePath());
+    m_gpuRenderSubsystem->refreshEnvironmentMapMediaList(assetsRoot, m_sceneManager->getCurrentScenePath());
 
     m_progressLoading.Set(50);
 
@@ -639,7 +640,7 @@ void SceneEditor::SceneLoaded()
 
     m_progressLoading.Set(55);
 
-    m_engineRenderer->onSceneLoadedBegin();
+    m_gpuRenderSubsystem->onSceneLoadedBegin();
 
     if (m_editor.TogglableNodes == nullptr)
     {
@@ -653,14 +654,16 @@ void SceneEditor::SceneLoaded()
     }
 
     runGpuWorkOnRenderThread([this]() {
-        m_engineRenderer->onSceneLoadedGpuPrep();
+        m_gpuRenderSubsystem->onSceneLoadedGpuPrep();
     });
 
     syncCameraFromScene();
 
     m_progressLoading.Set(60);
 
-    m_engineRenderer->onSceneLoadedGpuFinish();
+    m_gpuRenderSubsystem->onSceneLoadedGpuFinish();
+
+    CollectUncompressedTextures();
 
     m_progressLoading.Set(70);
 
@@ -668,7 +671,7 @@ void SceneEditor::SceneLoaded()
 
     m_progressLoading.Set(90);
 
-    m_engineRenderer->applyCmdLinePostLoadOverrides();
+    m_gpuRenderSubsystem->applyCmdLinePostLoadOverrides();
     if (!m_cmdLine.cameraPosDirUp.empty())
         SetCurrentCameraPosDirUp(m_cmdLine.cameraPosDirUp);
 
@@ -1217,6 +1220,36 @@ void SceneEditor::UpdateFpsInfo(double frameTimeSeconds)
 #endif
 
     m_fpsInfo = StringFormat("%.3f ms/frame (%.1f FPS)", frameTimeSeconds * 1e3, 1.0 / frameTimeSeconds);
+}
+
+void SceneEditor::afterWorldRender(caustica::GpuDevice& gpuDevice)
+{
+    auto* worldRenderer = GetWorldRenderer();
+    if (!worldRenderer)
+        return;
+
+    if (m_settings.ContinuousDebugFeedback || m_renderState.Picking.hasActivePickRequest())
+    {
+        ResolvePickFeedback(worldRenderer->getFeedbackData());
+        m_renderState.Picking.clearPickRequests();
+    }
+
+    auto saveFramebuffer = [this, &gpuDevice](const char* fileName) -> bool {
+        nvrhi::IFramebuffer* framebuffer = gpuDevice.GetCurrentFramebuffer(true);
+        if (!framebuffer)
+            return false;
+        nvrhi::ITexture* texture = framebuffer->getDesc().colorAttachments[0].texture;
+        return SaveTextureToFile(
+            gpuDevice.GetDevice(), GetCommonPasses().get(), texture, nvrhi::ResourceStates::Common, fileName);
+    };
+    CaptureScriptPostRender(saveFramebuffer);
+
+    if (ConsumeExperimentalPhotoScreenshot())
+    {
+        nvrhi::IFramebuffer* framebuffer = gpuDevice.GetCurrentFramebuffer(true);
+        if (framebuffer)
+            worldRenderer->denoisedScreenshot(framebuffer->getDesc().colorAttachments[0].texture);
+    }
 }
 
 void SceneEditor::BackBufferResizing()

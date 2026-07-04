@@ -2,7 +2,6 @@
 
 #if CAUSTICA_WITH_PYTHON
 
-#include "SceneEditorFrameExtension.h"
 #include "SceneEditor.h"
 #include "EditorRuntime.h"
 #include <engine/EngineFrameApplication.h>
@@ -10,7 +9,7 @@
 #include <backend/GpuDevice.h>
 #include <render/SceneGaussianSplatPasses.h>
 #include <render/SceneLightingPasses.h>
-#include <render/WorldRenderer/PathTracingWorldRenderer.h>
+#include <render/WorldRenderer/WorldRenderer.h>
 #include <common/LocalConfig.h>
 #include <core/file_utils.h>
 #include <core/format.h>
@@ -446,9 +445,6 @@ bool RenderSession::InitRenderer()
 
     m_renderer = std::make_unique<caustica::editor::SceneEditor>(m_cmdLine, m_sessionState, m_editorUIState, m_sessionDiagnostics);
 
-    m_sceneEditorFrameExtension = std::make_unique<caustica::editor::SceneEditorFrameExtension>(*m_renderer);
-    m_framePasses = { m_sceneEditorFrameExtension.get() };
-
     std::string preferredScene = m_config.scene.empty()
         ? std::string("default.json")
         : m_config.scene;
@@ -457,7 +453,6 @@ bool RenderSession::InitRenderer()
     registerEditorRuntime(*m_engine, EditorSceneSubsystemConfig{
         .sceneEditor = *m_renderer,
         .diagnostics = m_sessionDiagnostics,
-        .framePasses = m_framePasses,
         .preferredScene = preferredScene,
         .sessionState = &m_sessionState,
         .cmdLine = &m_cmdLine,
@@ -496,8 +491,6 @@ void RenderSession::Shutdown()
 
     m_AppLoop.reset();
     m_renderer.reset();
-    m_sceneEditorFrameExtension.reset();
-    m_framePasses.clear();
     if (m_engine)
         m_engine->shutdown();
     m_engine.reset();

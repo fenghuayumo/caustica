@@ -265,6 +265,7 @@ struct PathTracerSettings
     caustica::render::TemporalAntiAliasingJitter     TemporalAntiAliasingJitter = caustica::render::TemporalAntiAliasingJitter::R2;   // R2 works best with DLSS-RR
 
     bool                                ContinuousDebugFeedback = false;
+    bool                                DebugExploreDeltaTree = false;
     bool                                ShowDebugLines = false;
     dm::uint2                  DebugPixel = { 0, 0 };
     dm::uint2                  MousePos = { 0, 0 };

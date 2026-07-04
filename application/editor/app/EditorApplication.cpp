@@ -77,7 +77,6 @@ EditorApplication::StartupResult EditorApplication::startup(int argc, const char
     const EditorSceneSubsystemConfig sceneConfig{
         .sceneEditor = m_sceneEditor,
         .diagnostics = m_sessionDiagnostics,
-        .framePasses = m_framePasses,
         .preferredScene = preferredScene,
         .sessionState = &m_editorUIData,
         .cmdLine = &CmdLine,
@@ -88,6 +87,7 @@ EditorApplication::StartupResult EditorApplication::startup(int argc, const char
     {
         registerEditorRuntime(m_engine, sceneConfig, EditorUISubsystemConfig{
             .editorApplication = *this,
+            .sceneEditor = m_sceneEditor,
             .editorUiData = m_editorUIData,
             .cmdLine = CmdLine,
         });

@@ -22,7 +22,7 @@ struct BindingSetDesc;
 namespace caustica::render
 {
 
-class PathTracingWorldRenderer;
+class WorldRenderer;
 
 // Phases where optional host-side frame passes may run.
 enum class PathTracingFramePhase
@@ -40,7 +40,7 @@ enum class PathTracingFramePhase
 // Per-frame mutable state threaded through the path-tracing pass pipeline.
 struct PathTracingFrameContext
 {
-    PathTracingWorldRenderer* renderer = nullptr;
+    WorldRenderer* renderer = nullptr;
     nvrhi::IFramebuffer*      framebuffer = nullptr;
 
     dm::uint2 displaySize{};

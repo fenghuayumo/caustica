@@ -18,7 +18,7 @@ struct EditorSceneSubsystemConfig
 {
     SceneEditor& sceneEditor;
     caustica::render::SessionDiagnostics& diagnostics;
-    std::span<caustica::render::IPathTracingFramePass* const> framePasses;
+    std::span<caustica::render::IPathTracingFramePass* const> framePasses = {};
     std::string preferredScene;
 
     caustica::render::RenderSessionState* sessionState = nullptr;
@@ -29,7 +29,7 @@ struct EditorSceneSubsystemConfig
     bool postAppInit = true;
 };
 
-// Wires SceneEditor to EngineRenderer and drives scene rendering each frame.
+// Wires SceneEditor to GpuRenderSubsystem and drives scene rendering each frame.
 class EditorSceneSubsystem : public caustica::ISubsystem
 {
 public:

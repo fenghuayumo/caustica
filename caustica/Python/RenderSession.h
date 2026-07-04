@@ -1,6 +1,6 @@
 // RenderSession is the offline / extension-mode counterpart to EditorApplication.
 // Where EditorApplication drives a blocking GLFW message loop, RenderSession
-// initialises the same GpuDevice + EngineRenderer pipeline but lets
+// initialises the same GpuDevice + GpuRenderSubsystem pipeline but lets
 // Python step frames manually and dump the framebuffer to disk.
 //
 // Usage from C++:
@@ -47,7 +47,6 @@ class GpuDevice;
 namespace caustica::editor
 {
 class SceneEditor;
-class SceneEditorFrameExtension;
 }
 
 namespace caustica_py
@@ -142,8 +141,6 @@ private:
     std::unique_ptr<caustica::Engine>              m_engine;
     std::unique_ptr<caustica::EngineFrameApplication> m_AppLoop;
     std::unique_ptr<caustica::editor::SceneEditor>             m_renderer;
-    std::unique_ptr<caustica::editor::SceneEditorFrameExtension> m_sceneEditorFrameExtension;
-    std::vector<caustica::render::IPathTracingFramePass*> m_framePasses;
 #if CAUSTICA_WITH_DX12 && defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
     Microsoft::WRL::ComPtr<ID3D12DeviceFactory>     m_d3d12DeviceFactory;
 #endif

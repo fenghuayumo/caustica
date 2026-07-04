@@ -11,10 +11,12 @@ namespace caustica::editor
 class EditorApplication;
 class EditorUI;
 class EditorUIData;
+class SceneEditor;
 
 struct EditorUISubsystemConfig
 {
     EditorApplication& editorApplication;
+    SceneEditor& sceneEditor;
     EditorUIData& editorUiData;
     const CommandLineOptions& cmdLine;
 };

@@ -11,8 +11,6 @@
 #include "ui/EditorUIData.h"
 #include "SceneEditor.h"
 #include <render/SessionDiagnostics.h>
-#include "SceneEditorFrameExtension.h"
-#include <render/WorldRenderer/PathTracingFramePipeline.h>
 
 using caustica::FPSLimiter;
 
@@ -63,8 +61,6 @@ private:
     EditorUIData m_editorUIData;
     caustica::render::SessionDiagnostics m_sessionDiagnostics;
     SceneEditor m_sceneEditor;
-    SceneEditorFrameExtension m_sceneEditorFrameExtension{ m_sceneEditor };
-    std::vector<caustica::render::IPathTracingFramePass*> m_framePasses{ &m_sceneEditorFrameExtension };
 
     caustica::Engine m_engine;
     caustica::Callback m_DefaultLogCallback = nullptr;

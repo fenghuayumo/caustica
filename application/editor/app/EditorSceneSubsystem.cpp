@@ -4,12 +4,12 @@
 #include "common/LocalConfig.h"
 
 #include <core/path_utils.h>
-#include <engine/EngineRenderer.h>
+#include <engine/GpuRenderSubsystem.h>
 #include <engine/SubsystemCollection.h>
 #include <render/Core/RenderSceneTypeFactory.h>
 #include <render/RenderSessionState.h>
 #include <render/SceneLightingPasses.h>
-#include <render/WorldRenderer/PathTracingWorldRenderer.h>
+#include <render/WorldRenderer/WorldRenderer.h>
 
 namespace caustica::editor
 {
@@ -24,8 +24,8 @@ void EditorSceneSubsystem::initialize(caustica::EngineInitContext& context)
     if (!context.gpuDevice || !context.subsystems)
         return;
 
-    auto* engineRenderer = context.subsystems->get<caustica::EngineRenderer>();
-    if (!engineRenderer)
+    auto* gpuRenderSubsystem = context.subsystems->get<caustica::GpuRenderSubsystem>();
+    if (!gpuRenderSubsystem)
         return;
 
     SceneEditor& sceneEditor = m_config.sceneEditor;
@@ -37,7 +37,7 @@ void EditorSceneSubsystem::initialize(caustica::EngineInitContext& context)
         sceneEditor.setApplication(context.application);
 
     SceneEditor* sceneEditorPtr = &sceneEditor;
-    engineRenderer->initializeSession(caustica::EngineRendererInitParams{
+    gpuRenderSubsystem->initializeSession(caustica::GpuRenderSubsystemInitParams{
         .gpuDevice = gpuDevice,
         .settings = sceneEditor.GetPathTracerSettings(),
         .runtimeState = sceneEditor.GetRenderRuntimeState(),
@@ -52,13 +52,13 @@ void EditorSceneSubsystem::initialize(caustica::EngineInitContext& context)
         },
     });
 
-    sceneEditor.bindEngine(*engineRenderer);
+    sceneEditor.bindGpuRenderSubsystem(*gpuRenderSubsystem);
 
-    sceneEditor.Init(m_config.preferredScene, engineRenderer->shaderFactory());
+    sceneEditor.Init(m_config.preferredScene, gpuRenderSubsystem->shaderFactory());
 
     if (m_config.refreshEnvMapMediaList)
     {
-        engineRenderer->lightingPasses().refreshEnvironmentMapMediaList(
+        gpuRenderSubsystem->lightingPasses().refreshEnvironmentMapMediaList(
             GetLocalPath(c_AssetsFolder), std::filesystem::path());
     }
 
@@ -71,6 +71,7 @@ void EditorSceneSubsystem::initialize(caustica::EngineInitContext& context)
 
 void EditorSceneSubsystem::onBeginFrame(caustica::GpuDevice& /*gpuDevice*/)
 {
+    m_config.sceneEditor.CaptureScriptPreRender();
     m_config.sceneEditor.beginFrame();
 }
 
@@ -93,6 +94,7 @@ void EditorSceneSubsystem::onRenderScene(caustica::GpuDevice& gpuDevice)
         return;
 
     worldRenderer->render(gpuDevice.GetCurrentFramebuffer(true));
+    editor.afterWorldRender(gpuDevice);
     editor.recordFrameTiming(gpuDevice);
 }
 
