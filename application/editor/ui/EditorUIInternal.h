@@ -15,7 +15,7 @@
 namespace caustica::editor
 {
 
-#define RESET_ON_CHANGE(code) do{if (code) m_ui.ResetAccumulation = true;} while(false)
+#define RESET_ON_CHANGE(code) do{if (code) m_settings.ResetAccumulation = true;} while(false)
 
 extern const ImVec4 warnColor;
 extern const ImVec4 categoryColor;

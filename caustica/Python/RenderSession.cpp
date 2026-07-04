@@ -583,11 +583,11 @@ int RenderSession::StepUntilAccumulated(int maxFrames)
 
     // Force reference / accumulation mode so we know "done" actually means
     // the SPP target has been reached.
-    m_sessionState.ResetAccumulation = true;
+    m_sessionState.settings.ResetAccumulation = true;
 
     int target = (maxFrames > 0)
         ? maxFrames
-        : std::max(1, m_sessionState.AccumulationTarget + 128);
+        : std::max(1, m_sessionState.settings.AccumulationTarget + 128);
 
     int frames = 0;
     while (frames < target)

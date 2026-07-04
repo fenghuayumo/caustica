@@ -38,19 +38,19 @@ void LocalConfig::PostAppInit(caustica::render::RenderSessionState& sampleUI)
     if (CAUSTICA_LOCAL_CONFIG_ID_STRING == "REF_VS_REALTIME")
     {
 #if 0 // test for making reference pixel-identical to realtime
-        sampleUI.AccumulationAA = false;
-        sampleUI.AccumulationTarget = 4;
-        sampleUI.RealtimeSamplesPerPixel = sampleUI.AccumulationTarget;
-        sampleUI.RealtimeAA = 0;
-        sampleUI.RealtimeDenoiser = false;
-        sampleUI.DbgFreezeRealtimeNoiseSeed = false;
-        sampleUI.StablePlanesActiveCount = 1;
-        sampleUI.AllowPrimarySurfaceReplacement = false;
-        sampleUI.RealtimeDiffuseBounceCount = sampleUI.ReferenceDiffuseBounceCount;
-        sampleUI.RealtimeFireflyFilterEnabled = false;
-        sampleUI.ReferenceFireflyFilterEnabled = false;
-        //sampleUI.EnableRussianRoulette = false;
-        //sampleUI.BounceCount = 1;
+        sampleUI.settings.AccumulationAA = false;
+        sampleUI.settings.AccumulationTarget = 4;
+        sampleUI.settings.RealtimeSamplesPerPixel = sampleUI.settings.AccumulationTarget;
+        sampleUI.settings.RealtimeAA = 0;
+        sampleUI.settings.RealtimeDenoiser = false;
+        sampleUI.settings.DbgFreezeRealtimeNoiseSeed = false;
+        sampleUI.settings.StablePlanesActiveCount = 1;
+        sampleUI.settings.AllowPrimarySurfaceReplacement = false;
+        sampleUI.settings.RealtimeDiffuseBounceCount = sampleUI.settings.ReferenceDiffuseBounceCount;
+        sampleUI.settings.RealtimeFireflyFilterEnabled = false;
+        sampleUI.settings.ReferenceFireflyFilterEnabled = false;
+        //sampleUI.settings.EnableRussianRoulette = false;
+        //sampleUI.settings.BounceCount = 1;
 #endif
     }
 
@@ -62,63 +62,63 @@ void LocalConfig::PostAppInit(caustica::render::RenderSessionState& sampleUI)
     // Once denoiser works well, try enabling things one by one (and reducing NEE & global samples back to 1)
     if (CAUSTICA_LOCAL_CONFIG_ID_STRING == "DENOISER_TUNING")
     {
-        sampleUI.RealtimeMode = true;
-        sampleUI.UseReSTIRDI = false;           // avoid any temporal issues from DI
-        sampleUI.UseReSTIRGI = false;           // avoid any temporal issues from GI
-        sampleUI.UseReSTIRPT = false;           // avoid any temporal issues from PT
-        sampleUI.ToneMappingParams.autoExposure = false;    // for stable before/after image comparisons
-        sampleUI.StablePlanesActiveCount = 1;   // disable SPs - we want as good raw denoising as possible without SPs hiding any issues
-        sampleUI.RealtimeSamplesPerPixel = 2;   // boost global samples
-        sampleUI.NEEType = 1;              // avoid any temporal issues from ReGIR (due to presampling + multiple full local samples)
-        sampleUI.RealtimeAA = 1;
+        sampleUI.settings.RealtimeMode = true;
+        sampleUI.settings.UseReSTIRDI = false;           // avoid any temporal issues from DI
+        sampleUI.settings.UseReSTIRGI = false;           // avoid any temporal issues from GI
+        sampleUI.settings.UseReSTIRPT = false;           // avoid any temporal issues from PT
+        sampleUI.settings.ToneMappingParams.autoExposure = false;    // for stable before/after image comparisons
+        sampleUI.settings.StablePlanesActiveCount = 1;   // disable SPs - we want as good raw denoising as possible without SPs hiding any issues
+        sampleUI.settings.RealtimeSamplesPerPixel = 2;   // boost global samples
+        sampleUI.settings.NEEType = 1;              // avoid any temporal issues from ReGIR (due to presampling + multiple full local samples)
+        sampleUI.settings.RealtimeAA = 1;
     }
 
     if (CAUSTICA_LOCAL_CONFIG_ID_STRING == "ENVMAP_ONLY_TESTING")
     {
-        sampleUI.UseReSTIRDI = false;
-        sampleUI.UseReSTIRGI = false;
-        sampleUI.UseReSTIRPT = false;
-        sampleUI.ToneMappingParams.autoExposure = false;
-        sampleUI.RealtimeAA = 0;
-        sampleUI.StandaloneDenoiser = false;
-        //sampleUI.ToneMappingParams.exposureCompensation = 5.2f;
-        sampleUI.EnableAnimations = false;
-        sampleUI.ReferenceFireflyFilterEnabled = false;
+        sampleUI.settings.UseReSTIRDI = false;
+        sampleUI.settings.UseReSTIRGI = false;
+        sampleUI.settings.UseReSTIRPT = false;
+        sampleUI.settings.ToneMappingParams.autoExposure = false;
+        sampleUI.settings.RealtimeAA = 0;
+        sampleUI.settings.StandaloneDenoiser = false;
+        //sampleUI.settings.ToneMappingParams.exposureCompensation = 5.2f;
+        sampleUI.settings.EnableAnimations = false;
+        sampleUI.settings.ReferenceFireflyFilterEnabled = false;
 
-        sampleUI.RealtimeMode = false;
+        sampleUI.settings.RealtimeMode = false;
     }
 
     if (CAUSTICA_LOCAL_CONFIG_ID_STRING == "GENERIC_STABLE_LIGHTS")
     {
 #if 0
-        sampleUI.AccumulationTarget = 2048;
-        sampleUI.RealtimeMode = false;
-        sampleUI.UseReSTIRDI = false;
-        sampleUI.UseReSTIRGI = false;
-        sampleUI.UseReSTIRPT = false;
-        sampleUI.ToneMappingParams.autoExposure = false;
-        sampleUI.StablePlanesActiveCount = 1;
-        sampleUI.ReferenceFireflyFilterEnabled = false;
-        sampleUI.EnableRussianRoulette = false;
+        sampleUI.settings.AccumulationTarget = 2048;
+        sampleUI.settings.RealtimeMode = false;
+        sampleUI.settings.UseReSTIRDI = false;
+        sampleUI.settings.UseReSTIRGI = false;
+        sampleUI.settings.UseReSTIRPT = false;
+        sampleUI.settings.ToneMappingParams.autoExposure = false;
+        sampleUI.settings.StablePlanesActiveCount = 1;
+        sampleUI.settings.ReferenceFireflyFilterEnabled = false;
+        sampleUI.settings.EnableRussianRoulette = false;
 #else
-        sampleUI.UseReSTIRDI = false;
-        sampleUI.UseReSTIRGI = false;
-        sampleUI.UseReSTIRPT = false;
-        sampleUI.ToneMappingParams.autoExposure = false;
-        sampleUI.RealtimeAA = 0;
-        sampleUI.StandaloneDenoiser = false;
-        sampleUI.ReferenceFireflyFilterEnabled = false; //true;
-        sampleUI.ReferenceFireflyFilterThreshold = 1.0f;
-        sampleUI.RealtimeFireflyFilterEnabled = false; //true;
-        sampleUI.RealtimeFireflyFilterThreshold = 1.0f;
-        sampleUI.DiffuseBounceCount = 2;
-        //sampleUI.DbgFreezeRealtimeNoiseSeed = false;
-        sampleUI.EnableBloom = false;
-        //sampleUI.ToneMappingParams.exposureCompensation = 1.5f;
+        sampleUI.settings.UseReSTIRDI = false;
+        sampleUI.settings.UseReSTIRGI = false;
+        sampleUI.settings.UseReSTIRPT = false;
+        sampleUI.settings.ToneMappingParams.autoExposure = false;
+        sampleUI.settings.RealtimeAA = 0;
+        sampleUI.settings.StandaloneDenoiser = false;
+        sampleUI.settings.ReferenceFireflyFilterEnabled = false; //true;
+        sampleUI.settings.ReferenceFireflyFilterThreshold = 1.0f;
+        sampleUI.settings.RealtimeFireflyFilterEnabled = false; //true;
+        sampleUI.settings.RealtimeFireflyFilterThreshold = 1.0f;
+        sampleUI.settings.DiffuseBounceCount = 2;
+        //sampleUI.settings.DbgFreezeRealtimeNoiseSeed = false;
+        sampleUI.settings.EnableBloom = false;
+        //sampleUI.settings.ToneMappingParams.exposureCompensation = 1.5f;
 #endif
-        //sampleUI.EnvironmentMapParams.Enabled = false;
-        //sampleUI.ToneMappingParams.exposureCompensation = 5.2f;
-        sampleUI.EnableAnimations = false;
+        //sampleUI.settings.EnvironmentMapParams.Enabled = false;
+        //sampleUI.settings.ToneMappingParams.exposureCompensation = 5.2f;
+        sampleUI.settings.EnableAnimations = false;
     }
 
 }

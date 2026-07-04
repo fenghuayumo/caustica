@@ -43,9 +43,9 @@ bool CaptureScriptManager::ScriptProgressUI()
         ImGui::Spacing();
         ImGui::TextWrapped("Running warm-up: %d out of %d", m_sequencer.ResetAndWarmupCounter(), settings.ResetAndWarmupFrames);
     }
-    if (!m_ui.RealtimeMode)
+    if (!m_ui.settings.RealtimeMode)
     {
-        ImGui::TextWrapped("Accumulation mode, sample %d (out of %d target)", m_app.GetAccumulationSampleIndex(), m_ui.AccumulationTarget);
+        ImGui::TextWrapped("Accumulation mode, sample %d (out of %d target)", m_app.GetAccumulationSampleIndex(), m_ui.settings.AccumulationTarget);
     }
     if (m_sequencer.SequenceRecordCounter() > 0)
     {
@@ -143,7 +143,7 @@ void CaptureScriptManager::ScriptMainUI(const ImVec4 & warnColor, const ImVec4 &
     ImGui::Text(" '%s'", m_screenshotSequencePath.c_str());
     if (ImGui::Checkbox("Save animation sequence", &m_screenshotSequenceCaptureActive))
         if (m_screenshotSequenceCaptureActive)
-            m_ui.FPSLimiter = 60;
+            m_ui.settings.FPSLimiter = 60;
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("Example to convert to movie: \nffmpeg -r 60 -i frame_%%05d.bmp -vcodec libx265 -crf 13 -vf scale=1920:1080  outputvideo-1080p-60fps.mp4\n"
         "60 FPS limiter will be automatically enabled for smooth recording!");
     if (!m_screenshotSequenceCaptureActive)
@@ -161,7 +161,7 @@ void CaptureScriptManager::ScriptMainUI(const ImVec4 & warnColor, const ImVec4 &
         m_screenshotSequenceCaptureIndex++;
     }
     // ImGui::Separator();
-    // ImGui::Checkbox("Loop longest animation", &m_ui.LoopLongestAnimation);
+    // ImGui::Checkbox("Loop longest animation", &m_ui.settings.LoopLongestAnimation);
     // if (ImGui::IsItemHovered()) ImGui::SetTooltip("If enabled, only restarts all animations when longest one played out. Otherwise loops them individually (and not in sync)!");
 #endif
 }
@@ -182,14 +182,14 @@ void CaptureScriptManager::PostAnim()
 void CaptureScriptManager::PreRender()
 {
     const CaptureSequencerPreRenderActions actions = m_sequencer.PreRender();
-    m_ui.ResetRealtimeCaches |= actions.ResetRealtimeCaches;
-    m_ui.ResetAccumulation |= actions.ResetAccumulation;
+    m_ui.settings.ResetRealtimeCaches |= actions.ResetRealtimeCaches;
+    m_ui.settings.ResetAccumulation |= actions.ResetAccumulation;
 }
 
 void CaptureScriptManager::PostRender(const std::function<bool(const char*)>& dumpScreenshotCallback)
 {
     const CaptureSequencerPostRenderResult result = m_sequencer.PostRender(
-        m_ui.RealtimeMode,
+        m_ui.settings.RealtimeMode,
         m_app.AccumulationCompleted(),
         m_app.GetSceneTime(),
         dumpScreenshotCallback);

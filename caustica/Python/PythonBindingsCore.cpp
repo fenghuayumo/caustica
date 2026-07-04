@@ -1139,17 +1139,17 @@ void RegisterCoreBindings(nb::module_& m)
             [](EnvironmentMapRuntimeParameters& s) { return !s.VisibleToCamera; },
             [](EnvironmentMapRuntimeParameters& s, bool hide) { s.VisibleToCamera = !hide; });
 
-    nb::class_<RenderSessionState>(m, "Settings",
+    nb::class_<PathTracerSettings>(m, "Settings",
         "Live renderer session state (path tracer settings and runtime flags).\n"
         "Mutating attributes is equivalent to moving the corresponding ImGui widget.")
-        .def_rw("enable_animations",             &RenderSessionState::EnableAnimations)
-        .def_rw("enable_vsync",                  &RenderSessionState::EnableVsync)
-        .def_rw("fps_limiter",                   &RenderSessionState::FPSLimiter)
+        .def_rw("enable_animations",             &PathTracerSettings::EnableAnimations)
+        .def_rw("enable_vsync",                  &PathTracerSettings::EnableVsync)
+        .def_rw("fps_limiter",                   &PathTracerSettings::FPSLimiter)
 
         // --- Path tracer top-level mode ----------------------------------
         .def_prop_rw("realtime_mode",
-            [](RenderSessionState& s) { return s.RealtimeMode; },
-            [](RenderSessionState& s, bool realtime) {
+            [](PathTracerSettings& s) { return s.RealtimeMode; },
+            [](PathTracerSettings& s, bool realtime) {
                 const bool wasRealtime = s.RealtimeMode;
                 s.RealtimeMode = realtime;
                 if (wasRealtime != s.RealtimeMode)
@@ -1162,8 +1162,8 @@ void RegisterCoreBindings(nb::module_& m)
                 "True for realtime mode, False for reference / accumulation mode.\n"
                 "See `Settings.path_tracer_mode` for an enum-flavored version.")
         .def_prop_rw("path_tracer_mode",
-            [](RenderSessionState& s) -> int { return s.RealtimeMode ? 0 /*Realtime*/ : 1 /*Reference*/; },
-            [](RenderSessionState& s, int mode) {
+            [](PathTracerSettings& s) -> int { return s.RealtimeMode ? 0 /*Realtime*/ : 1 /*Reference*/; },
+            [](PathTracerSettings& s, int mode) {
                 bool wasRealtime = s.RealtimeMode;
                 s.RealtimeMode = (mode == 0);
                 if (wasRealtime != s.RealtimeMode)
@@ -1176,197 +1176,196 @@ void RegisterCoreBindings(nb::module_& m)
             "Convenience wrapper around `realtime_mode`.\n"
             "Set to caustica.PathTracerMode.Reference or .Realtime.")
 
-        .def_rw("realtime_samples_per_pixel",    &RenderSessionState::RealtimeSamplesPerPixel)
-        .def_rw("accumulation_target",           &RenderSessionState::AccumulationTarget)
-        .def_rw("reset_accumulation",            &RenderSessionState::ResetAccumulation)
-        .def_rw("reset_realtime_caches",         &RenderSessionState::ResetRealtimeCaches)
-        .def_rw("accumulation_aa",               &RenderSessionState::AccumulationAA)
-        .def_rw("accumulation_prewarm_realtime_caches", &RenderSessionState::AccumulationPreWarmRealtimeCaches)
+        .def_rw("realtime_samples_per_pixel",    &PathTracerSettings::RealtimeSamplesPerPixel)
+        .def_rw("accumulation_target",           &PathTracerSettings::AccumulationTarget)
+        .def_rw("reset_accumulation",            &PathTracerSettings::ResetAccumulation)
+        .def_rw("reset_realtime_caches",         &PathTracerSettings::ResetRealtimeCaches)
+        .def_rw("accumulation_aa",               &PathTracerSettings::AccumulationAA)
+        .def_rw("accumulation_prewarm_realtime_caches", &PathTracerSettings::AccumulationPreWarmRealtimeCaches)
 
-        .def_rw("bounce_count",                  &RenderSessionState::BounceCount)
-        .def_rw("diffuse_bounce_count",          &RenderSessionState::DiffuseBounceCount)
-        .def_rw("enable_russian_roulette",       &RenderSessionState::EnableRussianRoulette)
-        .def_rw("texture_lod_bias",              &RenderSessionState::TexLODBias)
+        .def_rw("bounce_count",                  &PathTracerSettings::BounceCount)
+        .def_rw("diffuse_bounce_count",          &PathTracerSettings::DiffuseBounceCount)
+        .def_rw("enable_russian_roulette",       &PathTracerSettings::EnableRussianRoulette)
+        .def_rw("texture_lod_bias",              &PathTracerSettings::TexLODBias)
 
-        .def_rw("use_nee",                       &RenderSessionState::UseNEE)
-        .def_rw("nee_type",                      &RenderSessionState::NEEType,
+        .def_rw("use_nee",                       &PathTracerSettings::UseNEE)
+        .def_rw("nee_type",                      &PathTracerSettings::NEEType,
                 "0 = uniform, 1 = power-based, 2 = NEE-AT")
-        .def_rw("nee_candidate_samples",         &RenderSessionState::NEECandidateSamples)
-        .def_rw("nee_full_samples",              &RenderSessionState::NEEFullSamples)
-        .def_rw("nee_mis_type",                  &RenderSessionState::NEEMISType)
+        .def_rw("nee_candidate_samples",         &PathTracerSettings::NEECandidateSamples)
+        .def_rw("nee_full_samples",              &PathTracerSettings::NEEFullSamples)
+        .def_rw("nee_mis_type",                  &PathTracerSettings::NEEMISType)
 
-        .def_rw("use_restir_di",                 &RenderSessionState::UseReSTIRDI)
-        .def_rw("use_restir_gi",                 &RenderSessionState::UseReSTIRGI)
-        .def_rw("use_restir_pt",                 &RenderSessionState::UseReSTIRPT)
+        .def_rw("use_restir_di",                 &PathTracerSettings::UseReSTIRDI)
+        .def_rw("use_restir_gi",                 &PathTracerSettings::UseReSTIRGI)
+        .def_rw("use_restir_pt",                 &PathTracerSettings::UseReSTIRPT)
 
-        .def_rw("camera_aperture",               &RenderSessionState::CameraAperture)
-        .def_rw("camera_focal_distance",         &RenderSessionState::CameraFocalDistance)
-        .def_rw("camera_move_speed",             &RenderSessionState::CameraMoveSpeed)
+        .def_rw("camera_aperture",               &PathTracerSettings::CameraAperture)
+        .def_rw("camera_focal_distance",         &PathTracerSettings::CameraFocalDistance)
+        .def_rw("camera_move_speed",             &PathTracerSettings::CameraMoveSpeed)
 
-        .def_rw("realtime_firefly_filter_enabled", &RenderSessionState::RealtimeFireflyFilterEnabled)
-        .def_rw("realtime_firefly_filter_threshold", &RenderSessionState::RealtimeFireflyFilterThreshold)
-        .def_rw("reference_firefly_filter_enabled",  &RenderSessionState::ReferenceFireflyFilterEnabled)
-        .def_rw("reference_firefly_filter_threshold",&RenderSessionState::ReferenceFireflyFilterThreshold)
+        .def_rw("realtime_firefly_filter_enabled", &PathTracerSettings::RealtimeFireflyFilterEnabled)
+        .def_rw("realtime_firefly_filter_threshold", &PathTracerSettings::RealtimeFireflyFilterThreshold)
+        .def_rw("reference_firefly_filter_enabled",  &PathTracerSettings::ReferenceFireflyFilterEnabled)
+        .def_rw("reference_firefly_filter_threshold",&PathTracerSettings::ReferenceFireflyFilterThreshold)
 
-        .def_rw("enable_tone_mapping",           &RenderSessionState::EnableToneMapping)
-        .def_rw("enable_bloom",                  &RenderSessionState::EnableBloom)
-        .def_rw("bloom_intensity",               &RenderSessionState::BloomIntensity)
-        .def_rw("bloom_radius",                  &RenderSessionState::BloomRadius)
+        .def_rw("enable_tone_mapping",           &PathTracerSettings::EnableToneMapping)
+        .def_rw("enable_bloom",                  &PathTracerSettings::EnableBloom)
+        .def_rw("bloom_intensity",               &PathTracerSettings::BloomIntensity)
+        .def_rw("bloom_radius",                  &PathTracerSettings::BloomRadius)
 
-        .def_rw("enable_gaussian_splats",        &RenderSessionState::EnableGaussianSplats)
-        .def_rw("gaussian_splat_depth_test",     &RenderSessionState::GaussianSplatDepthTest)
-        .def_rw("gaussian_splat_shadows",        &RenderSessionState::GaussianSplatShadows)
-        .def_rw("gaussian_splat_hybrid_shadows", &RenderSessionState::GaussianSplatShadows)
-        .def_rw("gaussian_splat_shadows_mode",   &RenderSessionState::GaussianSplatShadowsMode,
+        .def_rw("enable_gaussian_splats",        &PathTracerSettings::EnableGaussianSplats)
+        .def_rw("gaussian_splat_depth_test",     &PathTracerSettings::GaussianSplatDepthTest)
+        .def_rw("gaussian_splat_shadows",        &PathTracerSettings::GaussianSplatShadows)
+        .def_rw("gaussian_splat_hybrid_shadows", &PathTracerSettings::GaussianSplatShadows)
+        .def_rw("gaussian_splat_shadows_mode",   &PathTracerSettings::GaussianSplatShadowsMode,
                 "3DGS shadow mode (caustica.GaussianSplatShadowMode).")
-        .def_rw("gaussian_splat_sorting_mode",   &RenderSessionState::GaussianSplatSortingMode,
+        .def_rw("gaussian_splat_sorting_mode",   &PathTracerSettings::GaussianSplatSortingMode,
                 "3DGS sort mode (caustica.GaussianSplatSortMode).")
-        .def_rw("gaussian_splat_sh_format",      &RenderSessionState::GaussianSplatSHFormat,
+        .def_rw("gaussian_splat_sh_format",      &PathTracerSettings::GaussianSplatSHFormat,
                 "3DGS SH storage format (caustica.GaussianSplatStorageFormat).")
-        .def_rw("gaussian_splat_rgba_format",    &RenderSessionState::GaussianSplatRGBAFormat,
+        .def_rw("gaussian_splat_rgba_format",    &PathTracerSettings::GaussianSplatRGBAFormat,
                 "3DGS RGBA storage format (caustica.GaussianSplatStorageFormat).")
-        .def_rw("gaussian_splat_use_aabbs",      &RenderSessionState::GaussianSplatUseAABBs)
-        .def_rw("gaussian_splat_use_tlas_instances", &RenderSessionState::GaussianSplatUseTLASInstances)
-        .def_rw("gaussian_splat_blas_compaction", &RenderSessionState::GaussianSplatBlasCompaction)
-        .def_rw("gaussian_splat_rtx_kernel_degree", &RenderSessionState::GaussianSplatRtxKernelDegree)
-        .def_rw("gaussian_splat_rtx_adaptive_clamp", &RenderSessionState::GaussianSplatRtxAdaptiveClamp)
-        .def_rw("gaussian_splat_rtx_alpha_clamp", &RenderSessionState::GaussianSplatRtxAlphaClamp)
-        .def_rw("gaussian_splat_rtx_minimum_transmittance", &RenderSessionState::GaussianSplatRtxMinimumTransmittance)
-        .def_rw("gaussian_splat_rtx_trace_strategy", &RenderSessionState::GaussianSplatRtxTraceStrategy)
-        .def_rw("gaussian_splat_rtx_particle_samples_per_pass", &RenderSessionState::GaussianSplatRtxParticleSamplesPerPass)
-        .def_rw("gaussian_splat_rtx_maximum_pass_count", &RenderSessionState::GaussianSplatRtxMaximumPassCount)
-        .def_rw("gaussian_splat_rtx_particle_shadow_offset", &RenderSessionState::GaussianSplatRtxParticleShadowOffset)
-        .def_rw("gaussian_splat_rtx_particle_shadow_threshold", &RenderSessionState::GaussianSplatRtxParticleShadowThreshold)
-        .def_rw("gaussian_splat_rtx_colored_shadow_strength", &RenderSessionState::GaussianSplatRtxColoredShadowStrength)
-        .def_rw("gaussian_splat_rtx_mesh_composite_threshold", &RenderSessionState::GaussianSplatRtxMeshCompositeThreshold)
-        .def_rw("gaussian_splat_rtx_depth_iso_threshold", &RenderSessionState::GaussianSplatRtxDepthIsoThreshold)
-        .def_rw("gaussian_splat_mip_antialiasing", &RenderSessionState::GaussianSplatMipAntialiasing)
-        .def_rw("gaussian_splat_quantize_normals", &RenderSessionState::GaussianSplatQuantizeNormals)
-        .def_rw("gaussian_splat_ftb_sync_mode", &RenderSessionState::GaussianSplatFTBSyncMode,
+        .def_rw("gaussian_splat_use_aabbs",      &PathTracerSettings::GaussianSplatUseAABBs)
+        .def_rw("gaussian_splat_use_tlas_instances", &PathTracerSettings::GaussianSplatUseTLASInstances)
+        .def_rw("gaussian_splat_blas_compaction", &PathTracerSettings::GaussianSplatBlasCompaction)
+        .def_rw("gaussian_splat_rtx_kernel_degree", &PathTracerSettings::GaussianSplatRtxKernelDegree)
+        .def_rw("gaussian_splat_rtx_adaptive_clamp", &PathTracerSettings::GaussianSplatRtxAdaptiveClamp)
+        .def_rw("gaussian_splat_rtx_alpha_clamp", &PathTracerSettings::GaussianSplatRtxAlphaClamp)
+        .def_rw("gaussian_splat_rtx_minimum_transmittance", &PathTracerSettings::GaussianSplatRtxMinimumTransmittance)
+        .def_rw("gaussian_splat_rtx_trace_strategy", &PathTracerSettings::GaussianSplatRtxTraceStrategy)
+        .def_rw("gaussian_splat_rtx_particle_samples_per_pass", &PathTracerSettings::GaussianSplatRtxParticleSamplesPerPass)
+        .def_rw("gaussian_splat_rtx_maximum_pass_count", &PathTracerSettings::GaussianSplatRtxMaximumPassCount)
+        .def_rw("gaussian_splat_rtx_particle_shadow_offset", &PathTracerSettings::GaussianSplatRtxParticleShadowOffset)
+        .def_rw("gaussian_splat_rtx_particle_shadow_threshold", &PathTracerSettings::GaussianSplatRtxParticleShadowThreshold)
+        .def_rw("gaussian_splat_rtx_colored_shadow_strength", &PathTracerSettings::GaussianSplatRtxColoredShadowStrength)
+        .def_rw("gaussian_splat_rtx_mesh_composite_threshold", &PathTracerSettings::GaussianSplatRtxMeshCompositeThreshold)
+        .def_rw("gaussian_splat_rtx_depth_iso_threshold", &PathTracerSettings::GaussianSplatRtxDepthIsoThreshold)
+        .def_rw("gaussian_splat_mip_antialiasing", &PathTracerSettings::GaussianSplatMipAntialiasing)
+        .def_rw("gaussian_splat_quantize_normals", &PathTracerSettings::GaussianSplatQuantizeNormals)
+        .def_rw("gaussian_splat_ftb_sync_mode", &PathTracerSettings::GaussianSplatFTBSyncMode,
                 "3DGS front-to-back synchronization mode (caustica.GaussianSplatFTBSyncMode).")
-        .def_rw("gaussian_splat_depth_iso_threshold", &RenderSessionState::GaussianSplatDepthIsoThreshold)
-        .def_rw("gaussian_splat_fragment_shader_barycentric", &RenderSessionState::GaussianSplatFragmentShaderBarycentric)
-        .def_rw("gaussian_splat_frustum_culling", &RenderSessionState::GaussianSplatFrustumCulling,
+        .def_rw("gaussian_splat_depth_iso_threshold", &PathTracerSettings::GaussianSplatDepthIsoThreshold)
+        .def_rw("gaussian_splat_fragment_shader_barycentric", &PathTracerSettings::GaussianSplatFragmentShaderBarycentric)
+        .def_rw("gaussian_splat_frustum_culling", &PathTracerSettings::GaussianSplatFrustumCulling,
                 "3DGS frustum culling mode (caustica.GaussianSplatFrustumCulling).")
-        .def_rw("gaussian_splat_frustum_dilation", &RenderSessionState::GaussianSplatFrustumDilation)
-        .def_rw("gaussian_splat_screen_size_culling", &RenderSessionState::GaussianSplatScreenSizeCulling)
-        .def_rw("gaussian_splat_min_pixel_coverage", &RenderSessionState::GaussianSplatMinPixelCoverage)
-        .def_rw("gaussian_splat_scale",          &RenderSessionState::GaussianSplatScale)
-        .def_rw("gaussian_splat_alpha_scale",    &RenderSessionState::GaussianSplatAlphaScale)
-        .def_rw("gaussian_splat_brightness",     &RenderSessionState::GaussianSplatBrightness)
+        .def_rw("gaussian_splat_frustum_dilation", &PathTracerSettings::GaussianSplatFrustumDilation)
+        .def_rw("gaussian_splat_screen_size_culling", &PathTracerSettings::GaussianSplatScreenSizeCulling)
+        .def_rw("gaussian_splat_min_pixel_coverage", &PathTracerSettings::GaussianSplatMinPixelCoverage)
+        .def_rw("gaussian_splat_scale",          &PathTracerSettings::GaussianSplatScale)
+        .def_rw("gaussian_splat_alpha_scale",    &PathTracerSettings::GaussianSplatAlphaScale)
+        .def_rw("gaussian_splat_brightness",     &PathTracerSettings::GaussianSplatBrightness)
         .def_prop_rw("gaussian_splat_tint_color",
-            [](RenderSessionState& s) { return Float3ToTuple(s.GaussianSplatTintColor); },
-            [](RenderSessionState& s, nb::object v) { s.GaussianSplatTintColor = ToFloat3(v); })
-        .def_rw("gaussian_splat_as_emitter",     &RenderSessionState::GaussianSplatAsEmitter)
-        .def_rw("gaussian_splat_emission_intensity", &RenderSessionState::GaussianSplatEmissionIntensity)
-        .def_rw("gaussian_splat_emission_max_proxy_count", &RenderSessionState::GaussianSplatEmissionMaxProxyCount)
-        .def_rw("gaussian_splat_alpha_cull_threshold", &RenderSessionState::GaussianSplatAlphaCullThreshold)
-        .def_rw("gaussian_splat_shadow_strength", &RenderSessionState::GaussianSplatShadowStrength)
-        .def_rw("gaussian_splat_shadow_soft_radius", &RenderSessionState::GaussianSplatShadowSoftRadius)
-        .def_rw("gaussian_splat_shadow_soft_sample_count", &RenderSessionState::GaussianSplatShadowSoftSampleCount)
+            [](PathTracerSettings& s) { return Float3ToTuple(s.GaussianSplatTintColor); },
+            [](PathTracerSettings& s, nb::object v) { s.GaussianSplatTintColor = ToFloat3(v); })
+        .def_rw("gaussian_splat_as_emitter",     &PathTracerSettings::GaussianSplatAsEmitter)
+        .def_rw("gaussian_splat_emission_intensity", &PathTracerSettings::GaussianSplatEmissionIntensity)
+        .def_rw("gaussian_splat_emission_max_proxy_count", &PathTracerSettings::GaussianSplatEmissionMaxProxyCount)
+        .def_rw("gaussian_splat_alpha_cull_threshold", &PathTracerSettings::GaussianSplatAlphaCullThreshold)
+        .def_rw("gaussian_splat_shadow_strength", &PathTracerSettings::GaussianSplatShadowStrength)
+        .def_rw("gaussian_splat_shadow_soft_radius", &PathTracerSettings::GaussianSplatShadowSoftRadius)
+        .def_rw("gaussian_splat_shadow_soft_sample_count", &PathTracerSettings::GaussianSplatShadowSoftSampleCount)
         .def_prop_rw("gaussian_splat_translation",
-            [](RenderSessionState& s) { return Float3ToTuple(s.GaussianSplatTranslation); },
-            [](RenderSessionState& s, nb::object v) {
+            [](PathTracerSettings& s) { return Float3ToTuple(s.GaussianSplatTranslation); },
+            [](PathTracerSettings& s, nb::object v) {
                 s.GaussianSplatTranslation = ToFloat3(v);
                 s.ResetAccumulation = true;
             })
         .def_prop_rw("gaussian_splat_rotation_euler_deg",
-            [](RenderSessionState& s) { return Float3ToTuple(s.GaussianSplatRotationEulerDeg); },
-            [](RenderSessionState& s, nb::object v) {
+            [](PathTracerSettings& s) { return Float3ToTuple(s.GaussianSplatRotationEulerDeg); },
+            [](PathTracerSettings& s, nb::object v) {
                 s.GaussianSplatRotationEulerDeg = ToFloat3(v);
                 s.ResetAccumulation = true;
             })
         .def_prop_rw("gaussian_splat_object_scale",
-            [](RenderSessionState& s) { return Float3ToTuple(s.GaussianSplatObjectScale); },
-            [](RenderSessionState& s, nb::object v) {
+            [](PathTracerSettings& s) { return Float3ToTuple(s.GaussianSplatObjectScale); },
+            [](PathTracerSettings& s, nb::object v) {
                 s.GaussianSplatObjectScale = ToFloat3(v);
                 s.ResetAccumulation = true;
             })
-        .def_prop_ro("gaussian_splat_count", [](const RenderSessionState& s) { return s.GaussianSplats.SplatCount; })
-        .def_prop_ro("gaussian_splat_object_count", [](const RenderSessionState& s) { return s.GaussianSplats.ObjectCount; })
-        .def_prop_ro("gaussian_splat_file_name", [](const RenderSessionState& s) { return s.GaussianSplats.FileName; })
 
         // --- AA / DLSS / DLSS-RR / DLSS-G / Reflex (realtime only) -------
-        .def_rw("realtime_aa",                   &RenderSessionState::RealtimeAA,
+        .def_rw("realtime_aa",                   &PathTracerSettings::RealtimeAA,
                 "Realtime AA mode (caustica.RealtimeAA enum):\n"
                 "  0 = Off, 1 = TAA, 2 = DLSS, 3 = DLSS-RR")
 
         // DLSS quality (caustica.DLSSMode enum -> SI::DLSSMode underlying uint32)
         .def_prop_rw("dlss_mode",
-            [](RenderSessionState& s) { return int(s.DLSSMode); },
-            [](RenderSessionState& s, int v) { s.DLSSMode = SI::DLSSMode(v); },
+            [](PathTracerSettings& s) { return int(s.DLSSMode); },
+            [](PathTracerSettings& s, int v) { s.DLSSMode = SI::DLSSMode(v); },
             "DLSS quality preset (caustica.DLSSMode).\n"
             "Off, MaxPerformance, Balanced, MaxQuality, UltraPerformance, UltraQuality, DLAA.")
-        .def_rw("dlss_lod_bias_use_override", &RenderSessionState::DLSSLodBiasUseOverride)
-        .def_rw("dlss_lod_bias_override",     &RenderSessionState::DLSSLodBiasOverride)
-        .def_rw("dlss_always_use_extents",    &RenderSessionState::DLSSAlwaysUseExtents)
+        .def_rw("dlss_lod_bias_use_override", &PathTracerSettings::DLSSLodBiasUseOverride)
+        .def_rw("dlss_lod_bias_override",     &PathTracerSettings::DLSSLodBiasOverride)
+        .def_rw("dlss_always_use_extents",    &PathTracerSettings::DLSSAlwaysUseExtents)
 
         // DLSS-G (frame generation)
         .def_prop_rw("dlss_fg_mode",
-            [](RenderSessionState& s) { return int(s.DLSSFGMode); },
-            [](RenderSessionState& s, int v) { s.DLSSFGMode = SI::DLSSGMode(v); },
+            [](PathTracerSettings& s) { return int(s.DLSSFGMode); },
+            [](PathTracerSettings& s, int v) { s.DLSSFGMode = SI::DLSSGMode(v); },
             "DLSS frame generation mode (caustica.DLSSFGMode).")
-        .def_rw("dlss_fg_multiplier",            &RenderSessionState::DLSSFGMultiplier)
-        .def_rw("dlss_fg_num_frames_to_generate",&RenderSessionState::DLSSFGNumFramesToGenerate)
-        .def_rw("dlss_fg_max_num_frames_to_generate",&RenderSessionState::DLSSFGMaxNumFramesToGenerate)
+        .def_rw("dlss_fg_multiplier",            &PathTracerSettings::DLSSFGMultiplier)
+        .def_rw("dlss_fg_num_frames_to_generate",&PathTracerSettings::DLSSFGNumFramesToGenerate)
+        .def_rw("dlss_fg_max_num_frames_to_generate",&PathTracerSettings::DLSSFGMaxNumFramesToGenerate)
 
         // DLSS-RR (ray reconstruction)
         .def_prop_rw("dlss_rr_preset",
-            [](RenderSessionState& s) { return int(s.DLSRRPreset); },
-            [](RenderSessionState& s, int v) { s.DLSRRPreset = SI::DLSSRRPreset(v); },
+            [](PathTracerSettings& s) { return int(s.DLSRRPreset); },
+            [](PathTracerSettings& s, int v) { s.DLSRRPreset = SI::DLSSRRPreset(v); },
             "DLSS-RR preset (caustica.DLSSRRPreset).")
-        .def_rw("dlss_rr_micro_jitter",          &RenderSessionState::DLSSRRMicroJitter)
-        .def_rw("dlss_rr_brightness_clamp_k",    &RenderSessionState::DLSSRRBrightnessClampK)
-        .def_rw("disable_restirs_with_dlss_rr",  &RenderSessionState::DisableReSTIRsWithDLSSRR)
+        .def_rw("dlss_rr_micro_jitter",          &PathTracerSettings::DLSSRRMicroJitter)
+        .def_rw("dlss_rr_brightness_clamp_k",    &PathTracerSettings::DLSSRRBrightnessClampK)
+        .def_rw("disable_restirs_with_dlss_rr",  &PathTracerSettings::DisableReSTIRsWithDLSSRR)
 
         // Reflex (low latency)
-        .def_rw("reflex_mode",                   &RenderSessionState::ReflexMode,
+        .def_rw("reflex_mode",                   &PathTracerSettings::ReflexMode,
                 "NVIDIA Reflex mode (caustica.ReflexMode).")
-        .def_rw("reflex_capped_fps",             &RenderSessionState::ReflexCappedFps)
+        .def_rw("reflex_capped_fps",             &PathTracerSettings::ReflexCappedFps)
 
         // --- Read-only support flags -------------------------------------
-        .def_ro("is_dlss_supported",     &RenderSessionState::IsDLSSSuported)
-        .def_ro("is_dlss_fg_supported",  &RenderSessionState::IsDLSSFGSupported)
-        .def_ro("is_dlss_rr_supported",  &RenderSessionState::IsDLSSRRSupported)
-        .def_ro("is_reflex_supported",   &RenderSessionState::IsReflexSupported)
+        .def_ro("is_dlss_supported",     &PathTracerSettings::IsDLSSSuported)
+        .def_ro("is_dlss_fg_supported",  &PathTracerSettings::IsDLSSFGSupported)
+        .def_ro("is_dlss_rr_supported",  &PathTracerSettings::IsDLSSRRSupported)
+        .def_ro("is_reflex_supported",   &PathTracerSettings::IsReflexSupported)
 
         // --- Standalone NRD denoiser (realtime, RealtimeAA != DLSS-RR) ---
-        .def_rw("standalone_denoiser",           &RenderSessionState::StandaloneDenoiser,
+        .def_rw("standalone_denoiser",           &PathTracerSettings::StandaloneDenoiser,
                 "Enable NRD denoiser in realtime mode (no effect with DLSS-RR).")
-        .def_rw("denoiser_radiance_clamp_k",     &RenderSessionState::DenoiserRadianceClampK)
+        .def_rw("denoiser_radiance_clamp_k",     &PathTracerSettings::DenoiserRadianceClampK)
 
         // --- OIDN reference-mode denoiser --------------------------------
-        .def_rw("oidn_enabled",            &RenderSessionState::ReferenceOIDNDenoiser,
+        .def_rw("oidn_enabled",            &PathTracerSettings::ReferenceOIDNDenoiser,
                 "(Reference mode) Run Intel Open Image Denoise after accumulation reaches the SPP target.")
-        .def_rw("oidn_use_gpu",            &RenderSessionState::ReferenceOIDNUseGPU,
+        .def_rw("oidn_use_gpu",            &PathTracerSettings::ReferenceOIDNUseGPU,
                 "Use OIDN GPU device (CUDA/HIP/SYCL) when available, else CPU.")
-        .def_rw("oidn_passes",             &RenderSessionState::ReferenceOIDNPasses,
+        .def_rw("oidn_passes",             &PathTracerSettings::ReferenceOIDNPasses,
                 "Auxiliary guide passes (caustica.OidnPasses).")
-        .def_rw("oidn_prefilter",          &RenderSessionState::ReferenceOIDNPrefilter,
+        .def_rw("oidn_prefilter",          &PathTracerSettings::ReferenceOIDNPrefilter,
                 "Prefilter quality for guide passes (caustica.OidnPrefilter).")
-        .def_rw("oidn_quality",            &RenderSessionState::ReferenceOIDNQuality,
+        .def_rw("oidn_quality",            &PathTracerSettings::ReferenceOIDNQuality,
                 "Beauty filter quality (caustica.OidnQuality).")
-        .def_rw("oidn_changed",            &RenderSessionState::ReferenceOIDNDenoiserChanged,
+        .def_rw("oidn_changed",            &PathTracerSettings::ReferenceOIDNDenoiserChanged,
                 "Set to True after editing any OIDN parameter to force a redenoise.\n"
                 "Cleared automatically by the renderer.")
-        .def("oidn_apply", [](RenderSessionState& s) { s.ReferenceOIDNDenoiserChanged = true; },
+        .def("oidn_apply", [](PathTracerSettings& s) { s.ReferenceOIDNDenoiserChanged = true; },
              "Mark OIDN parameters dirty so the next accumulation completion runs the filter again.")
 
-        .def_rw("environment_map",               &RenderSessionState::EnvironmentMapParams,
+        .def_rw("environment_map",               &PathTracerSettings::EnvironmentMapParams,
                 nb::rv_policy::reference_internal,
                 "EnvironmentMapParams structure (intensity, tint, rotation, enabled, visible_to_camera).")
         ;
 
-    nb::class_<EditorUIData, RenderSessionState>(m, "EditorSettings",
+    nb::class_<EditorUIData>(m, "EditorSettings",
         "Desktop-editor settings that extend `Settings` with ImGui view state.")
-        .def_rw("show_ui", &EditorUIData::ShowUI);
+        .def_prop_rw("show_ui",
+            [](EditorUIData& ui) { return ui.editor.ShowUI; },
+            [](EditorUIData& ui, bool value) { ui.editor.ShowUI = value; });
 
     // --- Sample (top-level renderer access) -------------------------------
     nb::class_<SceneEditor>(m, "Sample",
         "caustica renderer instance. In embed mode use caustica.app(); in extension\n"
         "mode use Renderer.app to retrieve the underlying instance.")
-        .def_prop_ro("settings", [](SceneEditor& self) -> RenderSessionState* {
-                return &self.GetRenderSessionState();
+        .def_prop_ro("settings", [](SceneEditor& self) -> PathTracerSettings* {
+                return &self.GetRenderSessionState().settings;
             }, nb::rv_policy::reference,
             "Live `Settings` mirror of the current UI state.")
         .def_prop_ro("scene", [](SceneEditor& self) {
@@ -1568,8 +1567,8 @@ void RegisterCoreBindings(nb::module_& m)
         .def("save_current_camera",  [](SceneEditor& self) { self.SaveCurrentCamera(); })
         .def("load_current_camera",  [](SceneEditor& self) { self.LoadCurrentCamera(); })
 
-        .def("request_shader_reload",  [](SceneEditor& self) { self.GetRenderSessionState().Invalidation.ShaderReloadRequested = true; })
-        .def("request_accel_rebuild",  [](SceneEditor& self) { self.GetRenderSessionState().Invalidation.AccelerationStructRebuildRequested = true; })
+        .def("request_shader_reload",  [](SceneEditor& self) { self.GetRenderSessionState().runtime.Invalidation.ShaderReloadRequested = true; })
+        .def("request_accel_rebuild",  [](SceneEditor& self) { self.GetRenderSessionState().runtime.Invalidation.AccelerationStructRebuildRequested = true; })
         .def("request_mesh_accel_rebuild",
             [](SceneEditor& self, const std::shared_ptr<MeshInfo>& mesh) {
                 self.RequestMeshAccelRebuild(mesh);
@@ -1587,20 +1586,20 @@ void RegisterCoreBindings(nb::module_& m)
             },
             nb::arg("node"),
             "Request a BLAS rebuild for the mesh attached to one scene entity.")
-        .def("reset_accumulation",     [](SceneEditor& self) { self.GetRenderSessionState().ResetAccumulation = true; })
-        .def("reset_realtime_caches",  [](SceneEditor& self) { self.GetRenderSessionState().ResetRealtimeCaches = true; })
+        .def("reset_accumulation",     [](SceneEditor& self) { self.GetRenderSessionState().settings.ResetAccumulation = true; })
+        .def("reset_realtime_caches",  [](SceneEditor& self) { self.GetRenderSessionState().settings.ResetRealtimeCaches = true; })
 
         .def("set_realtime_mode", [](SceneEditor& self, bool standaloneDenoiser, int realtimeAA)
             {
-                auto& ui = self.GetRenderSessionState();
-                if (!ui.RealtimeMode)
+                PathTracerSettings& settings = self.GetRenderSessionState().settings;
+                if (!settings.RealtimeMode)
                 {
-                    ui.ResetAccumulation = true;
-                    ui.ResetRealtimeCaches = true;
+                    settings.ResetAccumulation = true;
+                    settings.ResetRealtimeCaches = true;
                 }
-                ui.RealtimeMode      = true;
-                ui.StandaloneDenoiser = standaloneDenoiser;
-                ui.RealtimeAA         = realtimeAA;
+                settings.RealtimeMode      = true;
+                settings.StandaloneDenoiser = standaloneDenoiser;
+                settings.RealtimeAA         = realtimeAA;
             },
             nb::arg("standalone_denoiser") = true,
             nb::arg("realtime_aa") = 2 /*DLSS*/,
@@ -1611,17 +1610,17 @@ void RegisterCoreBindings(nb::module_& m)
 
         .def("set_reference_mode", [](SceneEditor& self, int spp, bool oidn, int oidnQuality, int oidnPasses, int oidnPrefilter)
             {
-                auto& ui = self.GetRenderSessionState();
-                if (ui.RealtimeMode)
-                    ui.ResetAccumulation = true;
-                ui.RealtimeMode             = false;
+                PathTracerSettings& settings = self.GetRenderSessionState().settings;
+                if (settings.RealtimeMode)
+                    settings.ResetAccumulation = true;
+                settings.RealtimeMode             = false;
                 if (spp > 0)
-                    ui.AccumulationTarget   = spp;
-                ui.ReferenceOIDNDenoiser    = oidn;
-                ui.ReferenceOIDNQuality     = oidnQuality;
-                ui.ReferenceOIDNPasses      = oidnPasses;
-                ui.ReferenceOIDNPrefilter   = oidnPrefilter;
-                ui.ReferenceOIDNDenoiserChanged = true;
+                    settings.AccumulationTarget   = spp;
+                settings.ReferenceOIDNDenoiser    = oidn;
+                settings.ReferenceOIDNQuality     = oidnQuality;
+                settings.ReferenceOIDNPasses      = oidnPasses;
+                settings.ReferenceOIDNPrefilter   = oidnPrefilter;
+                settings.ReferenceOIDNDenoiserChanged = true;
             },
             nb::arg("spp") = 0,
             nb::arg("oidn") = false,

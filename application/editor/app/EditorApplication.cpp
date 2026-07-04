@@ -78,7 +78,7 @@ EditorApplication::StartupResult EditorApplication::startup(int argc, const char
         .sceneEditor = m_sceneEditor,
         .diagnostics = m_sessionDiagnostics,
         .preferredScene = preferredScene,
-        .sessionState = &m_editorUIData,
+        .sessionState = &m_editorUIData.session,
         .cmdLine = &CmdLine,
         .applyCmdLineToSessionState = CmdLine.noWindow || automatedRun,
     };

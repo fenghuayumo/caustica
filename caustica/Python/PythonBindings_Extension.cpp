@@ -295,9 +295,9 @@ NB_MODULE(caustica, m)
              "Access the underlying Sample instance to use the shared bindings.")
 
         .def_prop_ro("settings",
-             [](PyRenderer& self) -> RenderSessionState* {
+             [](PyRenderer& self) -> PathTracerSettings* {
                  SceneEditor* app = self.GetApp();
-                 return app ? &app->GetRenderSessionState() : nullptr;
+                 return app ? &app->GetRenderSessionState().settings : nullptr;
              },
              nb::rv_policy::reference,
              "Live `Settings` mirror (same object as caustica.settings()).")
@@ -313,9 +313,9 @@ NB_MODULE(caustica, m)
           nb::rv_policy::reference,
           "Return the Sample owned by the most recently created Renderer.");
 
-    m.def("settings", []() -> RenderSessionState* {
+    m.def("settings", []() -> PathTracerSettings* {
             SceneEditor& app = RequireCurrentApp();
-            return &app.GetRenderSessionState();
+            return &app.GetRenderSessionState().settings;
         },
           nb::rv_policy::reference,
           "Shortcut for the global Settings (same as Renderer.settings).");

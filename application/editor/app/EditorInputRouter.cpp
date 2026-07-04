@@ -51,14 +51,14 @@ bool onKeyPressed(SceneEditor& sceneEditor, caustica::KeyPressedEvent& e)
         && mods != ToGlfwMods(caustica::ModifierKey::Control)
         && mods != ToGlfwMods(caustica::ModifierKey::Alt))
     {
-        session.EnableAnimations = !session.EnableAnimations;
+        session.settings.EnableAnimations = !session.settings.EnableAnimations;
         return true;
     }
     if (key == ToGlfwKey(caustica::Key::F2) && action == cGlfwPress)
         editor.ShowUI = !editor.ShowUI;
     if (key == ToGlfwKey(caustica::Key::R) && action == cGlfwPress
         && mods == ToGlfwMods(caustica::ModifierKey::Control))
-        session.Invalidation.ShaderReloadRequested = true;
+        session.runtime.Invalidation.ShaderReloadRequested = true;
 #if CAUSTICA_WITH_STREAMLINE
     if (key == ToGlfwKey(caustica::Key::F13) && action == cGlfwPress)
         sceneEditor.GetGpuDevice().GetStreamline().ReflexTriggerPcPing(sceneEditor.GetFrameIndex());
@@ -103,10 +103,10 @@ bool onMouseMoved(SceneEditor& sceneEditor, caustica::MouseMovedEvent& e)
         upscalingScale = dm::float2(worldRenderer->getRenderSize())
             / dm::float2(worldRenderer->getDisplaySize());
 
-    session.Picking.Position = dm::uint2{
+    session.runtime.Picking.Position = dm::uint2{
         static_cast<uint>(e.GetX() * upscalingScale.x),
         static_cast<uint>(e.GetY() * upscalingScale.y)};
-    session.MousePos = session.Picking.Position;
+    session.settings.MousePos = session.runtime.Picking.Position;
 
     auto* zoomTool = sceneEditor.GetZoomTool().get();
     if (zoomTool) zoomTool->MousePosUpdate(e.GetX(), e.GetY());
@@ -132,9 +132,9 @@ bool onMouseButtonPressed(SceneEditor& sceneEditor, caustica::MouseButtonPressed
         game->MouseButtonUpdate(button, cGlfwPress, mods);
     if (button == ToGlfwMouse(caustica::Mouse::Right))
     {
-        session.Picking.MaterialRequested = true;
-        session.Picking.InstanceRequested = true;
-        session.DebugPixel = session.Picking.Position;
+        session.runtime.Picking.MaterialRequested = true;
+        session.runtime.Picking.InstanceRequested = true;
+        session.settings.DebugPixel = session.runtime.Picking.Position;
     }
 #if CAUSTICA_WITH_STREAMLINE
     if (button == ToGlfwMouse(caustica::Mouse::Left))
@@ -170,7 +170,7 @@ bool onMouseScrolled(SceneEditor& sceneEditor, caustica::MouseScrolledEvent& e)
 
     auto* game = sceneEditor.GetGame().get();
     if (!(game && game->CameraActive()))
-        sceneEditor.GetRenderSessionState().CameraMoveSpeed *= 1.0f + static_cast<float>(e.GetYOffset()) * 0.1f;
+        sceneEditor.GetRenderSessionState().settings.CameraMoveSpeed *= 1.0f + static_cast<float>(e.GetYOffset()) * 0.1f;
     return true;
 }
 

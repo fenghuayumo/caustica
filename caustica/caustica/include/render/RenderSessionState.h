@@ -9,8 +9,10 @@ namespace caustica::render
 {
 
 // Host-owned renderer settings and per-frame runtime state (picking, invalidation, splat summary).
-struct RenderSessionState : PathTracerSettings, RenderRuntimeState
+struct RenderSessionState
 {
+    PathTracerSettings settings;
+    RenderRuntimeState runtime;
 };
 
 void ApplyPerformancePreset(PathTracerSettings& settings, const PerformancePreset& preset);

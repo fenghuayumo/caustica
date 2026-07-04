@@ -54,9 +54,9 @@ void EditorUI::BuildAccelerationStructurePanel(const PanelLayout& layout)
             UI_SCOPED_INDENT(layout.indent);
 
             {
-                if (ImGui::Checkbox("Force Opaque", &m_ui.AS.ForceOpaque))
+                if (ImGui::Checkbox("Force Opaque", &m_settings.AS.ForceOpaque))
                 {
-                    m_ui.ResetAccumulation = true;
+                    m_settings.ResetAccumulation = true;
                 }
 
                 if (ImGui::IsItemHovered())
@@ -67,9 +67,9 @@ void EditorUI::BuildAccelerationStructurePanel(const PanelLayout& layout)
             ImGui::Text("Settings below require AS rebuild");
 
             {
-                if (ImGui::Checkbox("Exclude Transmissive", &m_ui.AS.ExcludeTransmissive))
+                if (ImGui::Checkbox("Exclude Transmissive", &m_settings.AS.ExcludeTransmissive))
                 {
-                    m_ui.Invalidation.AccelerationStructRebuildRequested = true;
+                    m_runtime.Invalidation.AccelerationStructRebuildRequested = true;
                 }
 
                 if (ImGui::IsItemHovered())
@@ -89,92 +89,92 @@ void EditorUI::BuildPostProcessPanel(const PanelLayout& layout)
             if (ImGui::CollapsingHeader("Early (HDR) post-process"))
             {
                 RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
-                ImGui::Checkbox("PostProcessTestPass", &m_ui.PostProcessTestPassHDR );
+                ImGui::Checkbox("PostProcessTestPass", &m_settings.PostProcessTestPassHDR );
                 
                 ImGui::Separator();
 
                 if (ImGui::CollapsingHeader("Bloom"))
                 {
-                    ImGui::Checkbox("Enable Bloom", &m_ui.EnableBloom);
-                    ImGui::SliderFloat("Bloom Width (Pixels)", &m_ui.BloomRadius, 0.f, 64.f);
-                    ImGui::SliderFloat("Bloom Intensity", &m_ui.BloomIntensity, 0.f, 0.1f);
+                    ImGui::Checkbox("Enable Bloom", &m_settings.EnableBloom);
+                    ImGui::SliderFloat("Bloom Width (Pixels)", &m_settings.BloomRadius, 0.f, 64.f);
+                    ImGui::SliderFloat("Bloom Intensity", &m_settings.BloomIntensity, 0.f, 0.1f);
                 }
             }
 
             if (ImGui::CollapsingHeader("Tone Mapping"))
             {
                 RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
-                ImGui::Checkbox("Enable", &m_ui.EnableToneMapping);
+                ImGui::Checkbox("Enable", &m_settings.EnableToneMapping);
 
-                const std::string currentOperator = tonemapOperatorToString.at(m_ui.ToneMappingParams.toneMapOperator);
+                const std::string currentOperator = tonemapOperatorToString.at(m_settings.ToneMappingParams.toneMapOperator);
                 if (ImGui::BeginCombo("Operator", currentOperator.c_str()))
                 {
                     for (auto it = tonemapOperatorToString.begin(); it != tonemapOperatorToString.end(); it++)
                     {
-                        bool is_selected = it->first == m_ui.ToneMappingParams.toneMapOperator;
+                        bool is_selected = it->first == m_settings.ToneMappingParams.toneMapOperator;
                         if (ImGui::Selectable(it->second.c_str(), is_selected))
-                            m_ui.ToneMappingParams.toneMapOperator = it->first;
+                            m_settings.ToneMappingParams.toneMapOperator = it->first;
                     }
                     ImGui::EndCombo();
                 }
 
-                ImGui::Checkbox("Auto Exposure", &m_ui.ToneMappingParams.autoExposure);
+                ImGui::Checkbox("Auto Exposure", &m_settings.ToneMappingParams.autoExposure);
 
-                if (m_ui.ToneMappingParams.autoExposure)
+                if (m_settings.ToneMappingParams.autoExposure)
                 {
-                    ImGui::InputFloat("Auto Exposure Min", &m_ui.ToneMappingParams.exposureValueMin);
-                    m_ui.ToneMappingParams.exposureValueMin = dm::min(m_ui.ToneMappingParams.exposureValueMax, m_ui.ToneMappingParams.exposureValueMin);
-                    ImGui::InputFloat("Auto Exposure Max", &m_ui.ToneMappingParams.exposureValueMax);
-                    m_ui.ToneMappingParams.exposureValueMax = dm::max(m_ui.ToneMappingParams.exposureValueMin, m_ui.ToneMappingParams.exposureValueMax);
+                    ImGui::InputFloat("Auto Exposure Min", &m_settings.ToneMappingParams.exposureValueMin);
+                    m_settings.ToneMappingParams.exposureValueMin = dm::min(m_settings.ToneMappingParams.exposureValueMax, m_settings.ToneMappingParams.exposureValueMin);
+                    ImGui::InputFloat("Auto Exposure Max", &m_settings.ToneMappingParams.exposureValueMax);
+                    m_settings.ToneMappingParams.exposureValueMax = dm::max(m_settings.ToneMappingParams.exposureValueMin, m_settings.ToneMappingParams.exposureValueMax);
                 }
 
-                const std::string currentMode = ExposureModeToString.at(m_ui.ToneMappingParams.exposureMode);
+                const std::string currentMode = ExposureModeToString.at(m_settings.ToneMappingParams.exposureMode);
                 if (ImGui::BeginCombo("Exposure Mode", currentMode.c_str()))
                 {
                     for (auto it = ExposureModeToString.begin(); it != ExposureModeToString.end(); it++)
                     {
-                        bool is_selected = it->first == m_ui.ToneMappingParams.exposureMode;
+                        bool is_selected = it->first == m_settings.ToneMappingParams.exposureMode;
                         if (ImGui::Selectable(it->second.c_str(), is_selected))
-                            m_ui.ToneMappingParams.exposureMode = it->first;
+                            m_settings.ToneMappingParams.exposureMode = it->first;
                     }
                     ImGui::EndCombo();
                 }
 
-                ImGui::InputFloat("Exposure Compensation", &m_ui.ToneMappingParams.exposureCompensation);
-                m_ui.ToneMappingParams.exposureCompensation = dm::clamp(m_ui.ToneMappingParams.exposureCompensation, -12.0f, 12.0f);
+                ImGui::InputFloat("Exposure Compensation", &m_settings.ToneMappingParams.exposureCompensation);
+                m_settings.ToneMappingParams.exposureCompensation = dm::clamp(m_settings.ToneMappingParams.exposureCompensation, -12.0f, 12.0f);
 
-                ImGui::InputFloat("Exposure Value", &m_ui.ToneMappingParams.exposureValue);
-                m_ui.ToneMappingParams.exposureValue = dm::clamp(m_ui.ToneMappingParams.exposureValue, dm::log2f(0.1f * 0.1f * 0.1f), dm::log2f(100000.f * 100.f * 100.f));
+                ImGui::InputFloat("Exposure Value", &m_settings.ToneMappingParams.exposureValue);
+                m_settings.ToneMappingParams.exposureValue = dm::clamp(m_settings.ToneMappingParams.exposureValue, dm::log2f(0.1f * 0.1f * 0.1f), dm::log2f(100000.f * 100.f * 100.f));
 
-                ImGui::InputFloat("Film Speed", &m_ui.ToneMappingParams.filmSpeed);
-                m_ui.ToneMappingParams.filmSpeed = dm::clamp(m_ui.ToneMappingParams.filmSpeed, 1.0f, 6400.0f);
+                ImGui::InputFloat("Film Speed", &m_settings.ToneMappingParams.filmSpeed);
+                m_settings.ToneMappingParams.filmSpeed = dm::clamp(m_settings.ToneMappingParams.filmSpeed, 1.0f, 6400.0f);
 
-                ImGui::InputFloat("fNumber", &m_ui.ToneMappingParams.fNumber);
-                m_ui.ToneMappingParams.fNumber = dm::clamp(m_ui.ToneMappingParams.fNumber, 0.1f, 100.0f);
+                ImGui::InputFloat("fNumber", &m_settings.ToneMappingParams.fNumber);
+                m_settings.ToneMappingParams.fNumber = dm::clamp(m_settings.ToneMappingParams.fNumber, 0.1f, 100.0f);
 
-                ImGui::InputFloat("Shutter", &m_ui.ToneMappingParams.shutter);
-                m_ui.ToneMappingParams.shutter = dm::clamp(m_ui.ToneMappingParams.shutter, 0.1f, 10000.0f);
+                ImGui::InputFloat("Shutter", &m_settings.ToneMappingParams.shutter);
+                m_settings.ToneMappingParams.shutter = dm::clamp(m_settings.ToneMappingParams.shutter, 0.1f, 10000.0f);
 
-                ImGui::Checkbox("Enable White Balance", &m_ui.ToneMappingParams.whiteBalance);
+                ImGui::Checkbox("Enable White Balance", &m_settings.ToneMappingParams.whiteBalance);
 
-                ImGui::InputFloat("White Point", &m_ui.ToneMappingParams.whitePoint);
-                m_ui.ToneMappingParams.whitePoint = dm::clamp(m_ui.ToneMappingParams.whitePoint, 1905.0f, 25000.0f);
+                ImGui::InputFloat("White Point", &m_settings.ToneMappingParams.whitePoint);
+                m_settings.ToneMappingParams.whitePoint = dm::clamp(m_settings.ToneMappingParams.whitePoint, 1905.0f, 25000.0f);
 
-                ImGui::InputFloat("White Max Luminance", &m_ui.ToneMappingParams.whiteMaxLuminance);
-                m_ui.ToneMappingParams.whiteMaxLuminance = dm::clamp(m_ui.ToneMappingParams.whiteMaxLuminance, 0.1f, FLT_MAX);
+                ImGui::InputFloat("White Max Luminance", &m_settings.ToneMappingParams.whiteMaxLuminance);
+                m_settings.ToneMappingParams.whiteMaxLuminance = dm::clamp(m_settings.ToneMappingParams.whiteMaxLuminance, 0.1f, FLT_MAX);
 
-                ImGui::InputFloat("White Scale", &m_ui.ToneMappingParams.whiteScale);
-                m_ui.ToneMappingParams.whiteScale = dm::clamp(m_ui.ToneMappingParams.whiteScale, 0.f, 100.f);
+                ImGui::InputFloat("White Scale", &m_settings.ToneMappingParams.whiteScale);
+                m_settings.ToneMappingParams.whiteScale = dm::clamp(m_settings.ToneMappingParams.whiteScale, 0.f, 100.f);
 
-                ImGui::Checkbox("Enable Clamp", &m_ui.ToneMappingParams.clamped);
+                ImGui::Checkbox("Enable Clamp", &m_settings.ToneMappingParams.clamped);
             }
 
             if (ImGui::CollapsingHeader("Late (LDR) post-process"))
             {
                 RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
 
-                ImGui::Checkbox("EdgeDetection", &m_ui.PostProcessEdgeDetection);
-                ImGui::SliderFloat("EdgeDetectionThreshold", &m_ui.PostProcessEdgeDetectionThreshold, 0.0f, 1.0f );
+                ImGui::Checkbox("EdgeDetection", &m_settings.PostProcessEdgeDetection);
+                ImGui::SliderFloat("EdgeDetectionThreshold", &m_settings.PostProcessEdgeDetectionThreshold, 0.0f, 1.0f );
                 ImGui::Separator();
             }
         }
@@ -195,21 +195,21 @@ void EditorUI::BuildDebuggingPanel(const PanelLayout& layout)
             {
                 RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
 
-                if (m_ui.RealtimeMode)
+                if (m_settings.RealtimeMode)
                 {
-                    ImGui::Checkbox("Freeze realtime noise seed", &m_ui.DbgFreezeRealtimeNoiseSeed);
+                    ImGui::Checkbox("Freeze realtime noise seed", &m_settings.DbgFreezeRealtimeNoiseSeed);
                     if (ImGui::IsItemHovered()) ImGui::SetTooltip("Freeze global noise seed will not change per frame. Useful for \ndebugging transient issues hidden by noise, or for before/after comparison");
                 }
-                ImGui::Checkbox("Disable SER path termination hint", &m_ui.DbgDisableSERTerminationHint);
+                ImGui::Checkbox("Disable SER path termination hint", &m_settings.DbgDisableSERTerminationHint);
                 if (ImGui::IsItemHovered()) ImGui::SetTooltip("Disable SER ReorderThread getting receive additional hint about path termination.");
 
-                ImGui::Checkbox("Discard path (non-NEE) lighting", &m_ui.DbgDiscardNonNEELighting);
-                ImGui::Checkbox("Discard NEE lighting", &m_ui.DbgDiscardNEELighting);
+                ImGui::Checkbox("Discard path (non-NEE) lighting", &m_settings.DbgDiscardNonNEELighting);
+                ImGui::Checkbox("Discard NEE lighting", &m_settings.DbgDiscardNEELighting);
             }
 
 
 #if ENABLE_DEBUG_VIZUALISATIONS
-            if (ImGui::Combo("Debug view", (int*)&m_ui.DebugView,
+            if (ImGui::Combo("Debug view", (int*)&m_settings.DebugView,
                 "Disabled\0"
                 "DominantStablePlaneIndex\0StablePlane_VirtualRayLength\0StablePlane_MotionVectors\0"
                 "StablePlane_Normals\0StablePlane_Roughness\0StablePlane_SpecAvg\0StablePlane_DiffBSDFEstimate\0StablePlane_DiffRadiance\0StablePlane_SpecBSDFEstimate\0StablePlane_SpecRadiance\0"
@@ -225,53 +225,53 @@ void EditorUI::BuildDebuggingPanel(const PanelLayout& layout)
                 "ReSTIRDIInitialOutput\0ReSTIRDITemporalOutput\0ReSTIRDISpatialOutput\0ReSTIRDIFinalOutput\0ReSTIRDIFinalContribution\0"
                 "ReGIRIndirectOutput\0"
                 "\0\0"))
-                m_ui.ResetAccumulation = true;
-            m_ui.DebugView = dm::clamp(m_ui.DebugView, (DebugViewType)0, DebugViewType::MaxCount);
+                m_settings.ResetAccumulation = true;
+            m_settings.DebugView = dm::clamp(m_settings.DebugView, (DebugViewType)0, DebugViewType::MaxCount);
 
-            if (m_ui.DebugView >= DebugViewType::StablePlane_VirtualRayLength && m_ui.DebugView <= DebugViewType::StablePlane_DenoiserValidation)
+            if (m_settings.DebugView >= DebugViewType::StablePlane_VirtualRayLength && m_settings.DebugView <= DebugViewType::StablePlane_DenoiserValidation)
             {
-                m_ui.DebugViewStablePlaneIndex = dm::clamp(m_ui.DebugViewStablePlaneIndex, -1, (int)m_ui.StablePlanesActiveCount - 1);
+                m_settings.DebugViewStablePlaneIndex = dm::clamp(m_settings.DebugViewStablePlaneIndex, -1, (int)m_settings.StablePlanesActiveCount - 1);
                 RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
-                float3 spcolor = (m_ui.DebugViewStablePlaneIndex >= 0) ? (StablePlaneDebugVizColor(m_ui.DebugViewStablePlaneIndex)) : (float3(1, 1, 0)); spcolor = spcolor * 0.7f + float3(0.2f, 0.2f, 0.2f);
+                float3 spcolor = (m_settings.DebugViewStablePlaneIndex >= 0) ? (StablePlaneDebugVizColor(m_settings.DebugViewStablePlaneIndex)) : (float3(1, 1, 0)); spcolor = spcolor * 0.7f + float3(0.2f, 0.2f, 0.2f);
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(spcolor.x, spcolor.y, spcolor.z, 1.0f));
-                ImGui::InputInt("Stable Plane index", &m_ui.DebugViewStablePlaneIndex);
+                ImGui::InputInt("Stable Plane index", &m_settings.DebugViewStablePlaneIndex);
                 ImGui::PopStyleColor(1);
-                m_ui.DebugViewStablePlaneIndex = dm::clamp(m_ui.DebugViewStablePlaneIndex, -1, (int)m_ui.StablePlanesActiveCount - 1);
+                m_settings.DebugViewStablePlaneIndex = dm::clamp(m_settings.DebugViewStablePlaneIndex, -1, (int)m_settings.StablePlanesActiveCount - 1);
             }
 
             const DebugFeedbackStruct& feedback = m_sceneEditor.GetFeedbackData();
-            if (ImGui::InputInt2("Debug pixel", (int*)&m_ui.DebugPixel.x))
+            if (ImGui::InputInt2("Debug pixel", (int*)&m_settings.DebugPixel.x))
                 m_sceneEditor.GetRenderRuntimeState().Picking.requestMaterialPick();
 
-            ImGui::Checkbox("Continuous feedback", &m_ui.ContinuousDebugFeedback);
+            ImGui::Checkbox("Continuous feedback", &m_settings.ContinuousDebugFeedback);
 
-            ImGui::Checkbox("Show debug lines", &m_ui.ShowDebugLines);
+            ImGui::Checkbox("Show debug lines", &m_settings.ShowDebugLines);
 
-            if (ImGui::Checkbox("Show inspector", &m_ui.ShowInspector) && m_ui.ShowInspector)
+            if (ImGui::Checkbox("Show inspector", &m_editorUI.ShowInspector) && m_editorUI.ShowInspector)
             {
 #if ENABLE_DEBUG_DELTA_TREE_VIZUALISATION
-                m_ui.ShowDeltaTree = false;
+                m_editorUI.ShowDeltaTree = false;
 #endif
             }
 
-            if (ImGui::Checkbox("Show material editor", &m_ui.ShowMaterialEditor) && m_ui.ShowMaterialEditor)
+            if (ImGui::Checkbox("Show material editor", &m_editorUI.ShowMaterialEditor) && m_editorUI.ShowMaterialEditor)
             {
 #if ENABLE_DEBUG_DELTA_TREE_VIZUALISATION
-                m_ui.ShowDeltaTree = false;
+                m_editorUI.ShowDeltaTree = false;
 #endif
             }
 
 #if ENABLE_DEBUG_DELTA_TREE_VIZUALISATION
-            if (!m_ui.ActualUseStablePlanes())
+            if (!m_settings.ActualUseStablePlanes())
             {
                 ImGui::Text("Enable Stable Planes for delta tree viz!");
-                m_ui.ShowDeltaTree = false;
+                m_editorUI.ShowDeltaTree = false;
             }
             else
             {
-                if (ImGui::Checkbox("Show delta tree window", &m_ui.ShowDeltaTree) && m_ui.ShowDeltaTree)
+                if (ImGui::Checkbox("Show delta tree window", &m_editorUI.ShowDeltaTree) && m_editorUI.ShowDeltaTree)
                 {
-                    m_ui.ShowInspector = false; // no space for both
+                    m_editorUI.ShowInspector = false; // no space for both
                     m_sceneEditor.GetRenderRuntimeState().Picking.requestMaterialPick();
                 }
             }
@@ -283,7 +283,7 @@ void EditorUI::BuildDebuggingPanel(const PanelLayout& layout)
             for (int i = 0; i < MAX_DEBUG_PRINT_SLOTS; i++)
                 ImGui::Text("debugPrint %d: %f, %f, %f, %f", i, feedback.debugPrint[i].x, feedback.debugPrint[i].y, feedback.debugPrint[i].z, feedback.debugPrint[i].w);
             ImGui::Text("Debug line count: %d", feedback.lineVertexCount / 2);
-            ImGui::InputFloat("Debug Line Scale", &m_ui.DebugLineScale);
+            ImGui::InputFloat("Debug Line Scale", &m_settings.DebugLineScale);
 #else
             ImGui::TextWrapped("Debug visualization disabled; to enable set ENABLE_DEBUG_VIZUALISATIONS to 1");
 #endif 
@@ -302,14 +302,14 @@ void EditorUI::BuildQuickToneMappingBar(const PanelLayout& layout)
             ImGui::PushItemWidth(layout.defItemWidth * 0.7f);
             const char* tooltipInfo = "Detailed exposure settings are in Tone Mapping section";
             ImGui::PushID("QS");
-            ImGui::Checkbox("AutoExposure", &m_ui.ToneMappingParams.autoExposure); if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tooltipInfo);
+            ImGui::Checkbox("AutoExposure", &m_settings.ToneMappingParams.autoExposure); if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tooltipInfo);
             ImGui::SameLine();
             ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
             ImGui::SameLine();
-            ImGui::SliderFloat("Brightness", &m_ui.ToneMappingParams.exposureCompensation, -18.0f, 8.0f, "%.2f");  if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tooltipInfo);
+            ImGui::SliderFloat("Brightness", &m_settings.ToneMappingParams.exposureCompensation, -18.0f, 8.0f, "%.2f");  if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tooltipInfo);
             ImGui::SameLine();
             if (ImGui::Button("0"))
-                m_ui.ToneMappingParams.exposureCompensation = 0;
+                m_settings.ToneMappingParams.exposureCompensation = 0;
             if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tooltipInfo);
             ImGui::PopID();
             ImGui::PopItemWidth();

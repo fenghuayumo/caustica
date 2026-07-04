@@ -130,7 +130,7 @@ void EditorUI::DLSSFGSelectorUI()
     {
         for (int itemId = 0; itemId < itemCount; itemId++)
         {
-            UI_SCOPED_DISABLE(itemId > m_ui.DLSSFGMaxNumFramesToGenerate);
+            UI_SCOPED_DISABLE(itemId > m_settings.DLSSFGMaxNumFramesToGenerate);
 
             bool isSelected = (currentItem == itemId);
             if (ImGui::Selectable(items[itemId], isSelected))
@@ -141,13 +141,13 @@ void EditorUI::DLSSFGSelectorUI()
         ImGui::EndCombo();
     }
 
-    m_ui.DLSSFGMode = (currentItem > 0)
+    m_settings.DLSSFGMode = (currentItem > 0)
         ? caustica::StreamlineInterface::DLSSGMode::eOn
         : caustica::StreamlineInterface::DLSSGMode::eOff;
 
-    m_ui.DLSSFGNumFramesToGenerate = (m_ui.DLSSFGMode == caustica::StreamlineInterface::DLSSGMode::eOn) ? currentItem : 1;
+    m_settings.DLSSFGNumFramesToGenerate = (m_settings.DLSSFGMode == caustica::StreamlineInterface::DLSSGMode::eOn) ? currentItem : 1;
 
-    if (!m_ui.RealtimeMode)
+    if (!m_settings.RealtimeMode)
         ImGui::TextColored(warnColor, "Note: DLSS-G is DISABLED in Reference PT mode");
 #endif
 };
@@ -182,19 +182,19 @@ void EditorUI::BuildDisplayPerformancePanel(const PanelLayout& layout)
 
             {
 #if CAUSTICA_WITH_STREAMLINE
-                UI_SCOPED_DISABLE(m_ui.ActualDLSSFGMode() != SI::DLSSGMode::eOff);
+                UI_SCOPED_DISABLE(m_settings.ActualDLSSFGMode() != SI::DLSSGMode::eOff);
 #endif
-                ImGui::Checkbox("VSync", &m_ui.EnableVsync);
-                bool fpsLimiter = m_ui.FPSLimiter != 0;
+                ImGui::Checkbox("VSync", &m_settings.EnableVsync);
+                bool fpsLimiter = m_settings.FPSLimiter != 0;
                 ImGui::SameLine();
                 ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
                 ImGui::SameLine();
                 ImGui::Text("Cap fps to ");
                 ImGui::SameLine();
-                std::array<int, 8> fpsOptions{ 0, /*1,*/ 2, 5, 10, 15, 30, 60, 120 }; auto curr = std::find(fpsOptions.begin(), fpsOptions.end(), m_ui.FPSLimiter);
+                std::array<int, 8> fpsOptions{ 0, /*1,*/ 2, 5, 10, 15, 30, 60, 120 }; auto curr = std::find(fpsOptions.begin(), fpsOptions.end(), m_settings.FPSLimiter);
                 int fpsLimitIndex = (curr != fpsOptions.end()) ? (int(curr - fpsOptions.begin())) : (0);
                 if (ImGui::Combo("##FPSLIMITER", &fpsLimitIndex, "disabled\0" /* " 1 \0" */ " 2 \0 5 \0 10 \0 15 \0 30 \0 60 \0 120 \0\0"))
-                    m_ui.FPSLimiter = fpsOptions[dm::clamp(fpsLimitIndex, 0, (int)fpsOptions.size() - 1)];
+                    m_settings.FPSLimiter = fpsOptions[dm::clamp(fpsLimitIndex, 0, (int)fpsOptions.size() - 1)];
             }
 
         }

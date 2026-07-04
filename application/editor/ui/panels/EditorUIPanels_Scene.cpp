@@ -84,15 +84,15 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
             }
 
             {
-                UI_SCOPED_DISABLE(!m_ui.RealtimeMode);
-                ImGui::Checkbox("Enable animations", &m_ui.EnableAnimations);
+                UI_SCOPED_DISABLE(!m_settings.RealtimeMode);
+                ImGui::Checkbox("Enable animations", &m_settings.EnableAnimations);
                 if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip("Animations are not available in reference mode");
             }
             ImGui::SameLine();
             if (ImGui::Button("Reset animation time"))
             {
                 m_sceneEditor.SetSceneTime(0);
-                m_ui.ResetAccumulation = true;
+                m_settings.ResetAccumulation = true;
             }
 
             if (m_sceneEditor.GetGame() && m_sceneEditor.GetGame()->IsInitialized())
@@ -104,25 +104,25 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
                 }
             }
 
-            if (m_ui.TogglableNodes != nullptr && m_ui.TogglableNodes->size() > 0 && ImGui::CollapsingHeader("Togglables"))
+            if (m_editorUI.TogglableNodes != nullptr && m_editorUI.TogglableNodes->size() > 0 && ImGui::CollapsingHeader("Togglables"))
             {
-                for (int i = 0; i < m_ui.TogglableNodes->size(); i++)
+                for (int i = 0; i < m_editorUI.TogglableNodes->size(); i++)
                 {
-                    auto& node = (*m_ui.TogglableNodes)[i];
+                    auto& node = (*m_editorUI.TogglableNodes)[i];
                     bool selected = node.IsSelected();
                     if (ImGui::Checkbox(node.UIName.c_str(), &selected))
                     {
                         node.SetSelected(selected);
-                        m_ui.ResetAccumulation = true;
+                        m_settings.ResetAccumulation = true;
                     }
                 }
             }
 
-            if (m_ui.GaussianSplats.SplatCount > 0 && ImGui::CollapsingHeader("3D Gaussian Splats"))
+            if (m_runtime.GaussianSplats.SplatCount > 0 && ImGui::CollapsingHeader("3D Gaussian Splats"))
             {
                 RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
 
-                RESET_ON_CHANGE(ImGui::Checkbox("Mesh Depth Test", &m_ui.GaussianSplatDepthTest));
+                RESET_ON_CHANGE(ImGui::Checkbox("Mesh Depth Test", &m_settings.GaussianSplatDepthTest));
                 GaussianSplatModeCombo(m_ui);
                 GaussianSplatShadowsModeCombo(m_ui);
 
@@ -131,22 +131,22 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
                     RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
 
                     RESET_ON_CHANGE(GaussianSplatSortingCombo(m_ui));
-                    RESET_ON_CHANGE(ImGui::Checkbox("Mip splatting antialiasing", &m_ui.GaussianSplatMipAntialiasing));
-                    RESET_ON_CHANGE(ImGui::Checkbox("Quantize Normals", &m_ui.GaussianSplatQuantizeNormals));
+                    RESET_ON_CHANGE(ImGui::Checkbox("Mip splatting antialiasing", &m_settings.GaussianSplatMipAntialiasing));
+                    RESET_ON_CHANGE(ImGui::Checkbox("Quantize Normals", &m_settings.GaussianSplatQuantizeNormals));
                     RESET_ON_CHANGE(GaussianSplatFTBCombo(m_ui));
-                    RESET_ON_CHANGE(ImGui::DragFloat("Depth Iso Threshold", &m_ui.GaussianSplatDepthIsoThreshold, 0.01f, 0.0f, 1.0f, "%.2f"));
-                    RESET_ON_CHANGE(ImGui::Checkbox("Fragment shader barycentric", &m_ui.GaussianSplatFragmentShaderBarycentric));
+                    RESET_ON_CHANGE(ImGui::DragFloat("Depth Iso Threshold", &m_settings.GaussianSplatDepthIsoThreshold, 0.01f, 0.0f, 1.0f, "%.2f"));
+                    RESET_ON_CHANGE(ImGui::Checkbox("Fragment shader barycentric", &m_settings.GaussianSplatFragmentShaderBarycentric));
 
                     ImGui::SeparatorText("Culling");
                     bool cullingChanged = false;
-                    cullingChanged |= ImGui::RadioButton("Disabled", &m_ui.GaussianSplatFrustumCulling, 0);
-                    cullingChanged |= ImGui::RadioButton("At distance stage", &m_ui.GaussianSplatFrustumCulling, 1);
-                    cullingChanged |= ImGui::RadioButton("At raster stage", &m_ui.GaussianSplatFrustumCulling, 2);
+                    cullingChanged |= ImGui::RadioButton("Disabled", &m_settings.GaussianSplatFrustumCulling, 0);
+                    cullingChanged |= ImGui::RadioButton("At distance stage", &m_settings.GaussianSplatFrustumCulling, 1);
+                    cullingChanged |= ImGui::RadioButton("At raster stage", &m_settings.GaussianSplatFrustumCulling, 2);
                     RESET_ON_CHANGE(cullingChanged);
-                    RESET_ON_CHANGE(ImGui::DragFloat("Frustum dilation", &m_ui.GaussianSplatFrustumDilation, 0.01f, 0.0f, 1.0f, "%.2f"));
-                    RESET_ON_CHANGE(ImGui::Checkbox("Screen size culling", &m_ui.GaussianSplatScreenSizeCulling));
-                    ImGui::BeginDisabled(!m_ui.GaussianSplatScreenSizeCulling);
-                    RESET_ON_CHANGE(ImGui::DragFloat("Min pixel coverage", &m_ui.GaussianSplatMinPixelCoverage, 0.1f, 0.1f, 20.0f, "%.2f"));
+                    RESET_ON_CHANGE(ImGui::DragFloat("Frustum dilation", &m_settings.GaussianSplatFrustumDilation, 0.01f, 0.0f, 1.0f, "%.2f"));
+                    RESET_ON_CHANGE(ImGui::Checkbox("Screen size culling", &m_settings.GaussianSplatScreenSizeCulling));
+                    ImGui::BeginDisabled(!m_settings.GaussianSplatScreenSizeCulling);
+                    RESET_ON_CHANGE(ImGui::DragFloat("Min pixel coverage", &m_settings.GaussianSplatMinPixelCoverage, 0.1f, 0.1f, 20.0f, "%.2f"));
                     ImGui::EndDisabled();
                 }
 
@@ -154,13 +154,13 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
                 {
                     RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
 
-                    RESET_ON_CHANGE(ImGui::Checkbox("As Emitter", &m_ui.GaussianSplatAsEmitter));
-                    ImGui::BeginDisabled(!m_ui.GaussianSplatAsEmitter);
-                    RESET_ON_CHANGE(ImGui::DragFloat("Emission Intensity", &m_ui.GaussianSplatEmissionIntensity, 0.01f, 0.0f, 100.0f, "%.2f"));
-                    if (ImGui::InputInt("Emission Proxy Limit", &m_ui.GaussianSplatEmissionMaxProxyCount, 256, 4096))
+                    RESET_ON_CHANGE(ImGui::Checkbox("As Emitter", &m_settings.GaussianSplatAsEmitter));
+                    ImGui::BeginDisabled(!m_settings.GaussianSplatAsEmitter);
+                    RESET_ON_CHANGE(ImGui::DragFloat("Emission Intensity", &m_settings.GaussianSplatEmissionIntensity, 0.01f, 0.0f, 100.0f, "%.2f"));
+                    if (ImGui::InputInt("Emission Proxy Limit", &m_settings.GaussianSplatEmissionMaxProxyCount, 256, 4096))
                     {
-                        m_ui.GaussianSplatEmissionMaxProxyCount = dm::clamp(m_ui.GaussianSplatEmissionMaxProxyCount, 0, 262144);
-                        m_ui.ResetAccumulation = true;
+                        m_settings.GaussianSplatEmissionMaxProxyCount = dm::clamp(m_settings.GaussianSplatEmissionMaxProxyCount, 0, 262144);
+                        m_settings.ResetAccumulation = true;
                     }
                     ImGui::EndDisabled();
                 }
@@ -173,21 +173,21 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
                     bool asChanged = false;
                     asChanged |= GaussianSplatRtxKernelDegreeCombo(m_ui);
                     asChanged |= GaussianSplatRtxParticleFormatCombo(m_ui);
-                    asChanged |= ImGui::Checkbox("Adaptive clamp", &m_ui.GaussianSplatRtxAdaptiveClamp);
+                    asChanged |= ImGui::Checkbox("Adaptive clamp", &m_settings.GaussianSplatRtxAdaptiveClamp);
                     if (asChanged)
                     {
-                        m_ui.Invalidation.AccelerationStructRebuildRequested = true;
-                        m_ui.ResetAccumulation = true;
+                        m_runtime.Invalidation.AccelerationStructRebuildRequested = true;
+                        m_settings.ResetAccumulation = true;
                     }
 
                     if (ResolveGaussianSplatShadowMode(m_ui) == GAUSSIAN_SPLAT_SHADOWS_SOFT)
                     {
-                        RESET_ON_CHANGE(ImGui::DragFloat("Soft shadow radius", &m_ui.GaussianSplatShadowSoftRadius, 0.01f, 0.0f, 0.5f, "%.2f"));
-                        RESET_ON_CHANGE(ImGui::InputInt("Soft shadow samples", &m_ui.GaussianSplatShadowSoftSampleCount, 1, 4));
-                        m_ui.GaussianSplatShadowSoftSampleCount = dm::clamp(m_ui.GaussianSplatShadowSoftSampleCount, 1, 16);
+                        RESET_ON_CHANGE(ImGui::DragFloat("Soft shadow radius", &m_settings.GaussianSplatShadowSoftRadius, 0.01f, 0.0f, 0.5f, "%.2f"));
+                        RESET_ON_CHANGE(ImGui::InputInt("Soft shadow samples", &m_settings.GaussianSplatShadowSoftSampleCount, 1, 4));
+                        m_settings.GaussianSplatShadowSoftSampleCount = dm::clamp(m_settings.GaussianSplatShadowSoftSampleCount, 1, 16);
                     }
 
-                    RESET_ON_CHANGE(ImGui::DragFloat("Ray offset", &m_ui.GaussianSplatRtxParticleShadowOffset, 0.01f, 0.0f, 1.0f, "%.2f"));
+                    RESET_ON_CHANGE(ImGui::DragFloat("Ray offset", &m_settings.GaussianSplatRtxParticleShadowOffset, 0.01f, 0.0f, 1.0f, "%.2f"));
                 }
             }
 
@@ -195,8 +195,8 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
             {
                 RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
 
-                RESET_ON_CHANGE(ImGui::Checkbox("Enabled", &m_ui.EnvironmentMapParams.Enabled));
-                RESET_ON_CHANGE(ImGui::Checkbox("Visible to Camera", &m_ui.EnvironmentMapParams.VisibleToCamera));
+                RESET_ON_CHANGE(ImGui::Checkbox("Enabled", &m_settings.EnvironmentMapParams.Enabled));
+                RESET_ON_CHANGE(ImGui::Checkbox("Visible to Camera", &m_settings.EnvironmentMapParams.VisibleToCamera));
 
                 if (m_sceneEditor.GetEnvMapLocalPath() != "==PROCEDURAL_SKY==")
                     ImGui::TextWrapped("Source: `%s`", m_sceneEditor.GetEnvMapLocalPath().c_str());
@@ -240,14 +240,14 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
                 if (ImGui::IsItemHovered()) ImGui::SetTooltip("Overrides scene's default environment map");
                 if (m_sceneEditor.GetEnvMapOverrideSource() != overrideSource)
                 {
-                    m_ui.ResetAccumulation = true;
+                    m_settings.ResetAccumulation = true;
                     m_sceneEditor.SetEnvMapOverrideSource(overrideSource);
                 }
 
                 ImGui::Separator();
-                RESET_ON_CHANGE( ImGui::InputFloat3("Tint Color", (float*)&m_ui.EnvironmentMapParams.TintColor.x) );
-                RESET_ON_CHANGE( ImGui::InputFloat("Intensity", &m_ui.EnvironmentMapParams.Intensity) );
-                RESET_ON_CHANGE( ImGui::InputFloat3("Rotation XYZ", (float*)&m_ui.EnvironmentMapParams.RotationXYZ.x) );
+                RESET_ON_CHANGE( ImGui::InputFloat3("Tint Color", (float*)&m_settings.EnvironmentMapParams.TintColor.x) );
+                RESET_ON_CHANGE( ImGui::InputFloat("Intensity", &m_settings.EnvironmentMapParams.Intensity) );
+                RESET_ON_CHANGE( ImGui::InputFloat3("Rotation XYZ", (float*)&m_settings.EnvironmentMapParams.RotationXYZ.x) );
                 ImGui::Separator();
 
                 if (auto& envMapProcessor = m_sceneEditor.GetLightingPasses().environment();
@@ -288,7 +288,7 @@ void EditorUI::BuildSceneWidgetsPanel(const PanelLayout& layout)
 {
     if (m_showSceneWidgets > 0.0f 
 #if ENABLE_DEBUG_DELTA_TREE_VIZUALISATION
-        && !m_ui.ShowDeltaTree
+        && !m_editorUI.ShowDeltaTree
 #endif
         )
     {
@@ -307,7 +307,7 @@ void EditorUI::BuildSceneWidgetsPanel(const PanelLayout& layout)
         std::vector<std::string> materialVariants;
         if (FindSubStringIgnoreCase(m_sceneEditor.GetCurrentSceneName(), "bistro") != std::string::npos)
             materialVariants = {"dry", "wet", "silly"};
-        int materialVariantIndexPrev = m_ui.MaterialVariantIndex;
+        int materialVariantIndexPrev = m_settings.MaterialVariantIndex;
 
         // collect toggles
         struct BigButton
@@ -345,12 +345,12 @@ void EditorUI::BuildSceneWidgetsPanel(const PanelLayout& layout)
 
         };
         std::vector<BigButton> buttons;
-        buttons.push_back(BigButton("Animations", m_ui.EnableAnimations, "Animations are not available in reference mode", m_ui.RealtimeMode));
-        buttons.push_back(BigButton("AutoExposure", m_ui.ToneMappingParams.autoExposure ) );
+        buttons.push_back(BigButton("Animations", m_settings.EnableAnimations, "Animations are not available in reference mode", m_settings.RealtimeMode));
+        buttons.push_back(BigButton("AutoExposure", m_settings.ToneMappingParams.autoExposure ) );
         buttons.push_back(BigButton("Sky: ", &envOptions, &envOptionsCurrentIndex, "For more options see Scene/Environment in the main UI", std::function<std::string(std::string)>(TrimSkyDisplayName) ));
-        if (materialVariants.size()>0) buttons.push_back(BigButton("Variant: ", &materialVariants, &m_ui.MaterialVariantIndex, "Material or other scene variants", nullptr));
-        for (int i = 0; m_ui.TogglableNodes != nullptr && i < m_ui.TogglableNodes->size(); i++)
-            buttons.push_back(BigButton((*m_ui.TogglableNodes)[i].UIName, &(*m_ui.TogglableNodes)[i]));
+        if (materialVariants.size()>0) buttons.push_back(BigButton("Variant: ", &materialVariants, &m_settings.MaterialVariantIndex, "Material or other scene variants", nullptr));
+        for (int i = 0; m_editorUI.TogglableNodes != nullptr && i < m_editorUI.TogglableNodes->size(); i++)
+            buttons.push_back(BigButton((*m_editorUI.TogglableNodes)[i].UIName, &(*m_editorUI.TogglableNodes)[i]));
 
         if( buttons.size() > 0 )
         {
@@ -382,7 +382,7 @@ void EditorUI::BuildSceneWidgetsPanel(const PanelLayout& layout)
                     if (ImGui::Button(buttons[i].GetText().c_str(), ImVec2(buttonWidth, texSizeA.y * 2)))
                     {
                         buttons[i].SetSelected(!selected);
-                        m_ui.ResetAccumulation = true;
+                        m_settings.ResetAccumulation = true;
                     }
                     ImGui::PopStyleColor(3);
                     ImGui::PopID();
@@ -402,7 +402,7 @@ void EditorUI::BuildSceneWidgetsPanel(const PanelLayout& layout)
             m_sceneEditor.SetEnvMapOverrideSource(envOptions[envOptionsCurrentIndex]);
         }
 
-        if (m_ui.MaterialVariantIndex != materialVariantIndexPrev)
+        if (m_settings.MaterialVariantIndex != materialVariantIndexPrev)
         {
             if (FindSubStringIgnoreCase(m_sceneEditor.GetCurrentSceneName(), "bistro") != std::string::npos)
             {
@@ -411,7 +411,7 @@ void EditorUI::BuildSceneWidgetsPanel(const PanelLayout& layout)
                 for (std::string& id : pavementList)
                     if (auto m = m_sceneEditor.GetLightingPasses().materials()->FindByUniqueID(id))
                     {
-                        if (m_ui.MaterialVariantIndex == 0) // reset to default
+                        if (m_settings.MaterialVariantIndex == 0) // reset to default
                             m_sceneEditor.GetLightingPasses().materials()->LoadSingle(*m);
                         else
                         {   // make wet-looking
@@ -425,7 +425,7 @@ void EditorUI::BuildSceneWidgetsPanel(const PanelLayout& layout)
                 for (std::string& id : emissivesList)
                     if (auto m = m_sceneEditor.GetLightingPasses().materials()->FindByUniqueID(id))
                     {
-                        if (m_ui.MaterialVariantIndex == 0 || m_ui.MaterialVariantIndex == 1) // reset to default
+                        if (m_settings.MaterialVariantIndex == 0 || m_settings.MaterialVariantIndex == 1) // reset to default
                             m_sceneEditor.GetLightingPasses().materials()->LoadSingle(*m);
                         else
                         {   // silly stuff
@@ -448,8 +448,8 @@ void EditorUI::BuildSceneWidgetsPanel(const PanelLayout& layout)
                         m->GPUDataDirty = true;
                     }
 
-                if (m_ui.MaterialVariantIndex != 1 && materialVariantIndexPrev != 0) // this one doesn't change emissives so no TLAS/BLAS update needed
-                    m_ui.Invalidation.ShaderAndACRefreshDelayedRequest = 0.01f;
+                if (m_settings.MaterialVariantIndex != 1 && materialVariantIndexPrev != 0) // this one doesn't change emissives so no TLAS/BLAS update needed
+                    m_runtime.Invalidation.ShaderAndACRefreshDelayedRequest = 0.01f;
             }
         }
         
@@ -471,7 +471,7 @@ void EditorUI::BuildHierarchyPanel(const PanelLayout& layout)
         if (ew && ew->root() != ecs::NullEntity)
         {
             bool deleteSelectedEntity = false;
-            ImGui::Text("Objects: %zu mesh, %u 3DGS", scene->GetMeshInstances().size(), m_ui.GaussianSplats.ObjectCount);
+            ImGui::Text("Objects: %zu mesh, %u 3DGS", scene->GetMeshInstances().size(), m_runtime.GaussianSplats.ObjectCount);
             ImGui::Separator();
 
             if (ImGui::TreeNodeEx("Scene", ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_SpanAvailWidth))
@@ -481,10 +481,10 @@ void EditorUI::BuildHierarchyPanel(const PanelLayout& layout)
             }
 
             const bool hierarchyFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
-            const auto* parentComp = (m_ui.SelectedEntity != ecs::NullEntity)
-                ? ew->world().tryGet<caustica::scene::ParentComponent>(m_ui.SelectedEntity)
+            const auto* parentComp = (m_editorUI.SelectedEntity != ecs::NullEntity)
+                ? ew->world().tryGet<caustica::scene::ParentComponent>(m_editorUI.SelectedEntity)
                 : nullptr;
-            const bool canDeleteSelected = m_ui.SelectedEntity != ecs::NullEntity
+            const bool canDeleteSelected = m_editorUI.SelectedEntity != ecs::NullEntity
                 && parentComp != nullptr
                 && parentComp->parent != ecs::NullEntity;
             if (canDeleteSelected && hierarchyFocused && !ImGui::GetIO().WantTextInput && ImGui::IsKeyPressed(ImGuiKey_Delete))
@@ -492,7 +492,7 @@ void EditorUI::BuildHierarchyPanel(const PanelLayout& layout)
 
             if (deleteSelectedEntity)
             {
-                m_sceneEditor.DeleteSceneNode(m_ui.SelectedEntity);
+                m_sceneEditor.DeleteSceneNode(m_editorUI.SelectedEntity);
             }
         }
         else

@@ -36,7 +36,7 @@ namespace caustica::editor
 void EditorUI::BuildDeltaTreeExplorerPanel(const PanelLayout& layout)
 {
 #if ENABLE_DEBUG_DELTA_TREE_VIZUALISATION
-    if (m_ui.ShowDeltaTree)
+    if (m_editorUI.ShowDeltaTree)
     {
         float scaledWindowWidth = layout.scaledWidth - layout.defWindowWidth - 20;
         ImGui::SetNextWindowPos(ImVec2(layout.scaledWidth - float(scaledWindowWidth) - 10, 10.f), ImGuiCond_FirstUseEver);

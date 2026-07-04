@@ -44,7 +44,7 @@ void EditorUISubsystem::initialize(caustica::EngineInitContext& context)
             [this](int count, const char** paths)
             {
                 for (int i = 0; i < count; ++i)
-                    m_config.editorUiData.PendingDroppedFiles.emplace_back(paths[i]);
+                    m_config.editorUiData.editor.PendingDroppedFiles.emplace_back(paths[i]);
             });
     }
 

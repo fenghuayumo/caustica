@@ -83,33 +83,35 @@ bool MatchesPerformancePreset(const PathTracerSettings& settings, const Performa
 
 void InitializeRenderSessionStateFromCommandLine(RenderSessionState& state, const CommandLineOptions& cmdLine)
 {
-    state.RelaxSettings = NrdConfig::getDefaultRELAXSettings();
-    state.ReblurSettings = NrdConfig::getDefaultREBLURSettings();
+    PathTracerSettings& settings = state.settings;
 
-    state.TemporalAntiAliasingParams.useHistoryClampRelax = true;
-    state.ToneMappingParams.toneMapOperator = ToneMapperOperator::HableUc2;
+    settings.RelaxSettings = NrdConfig::getDefaultRELAXSettings();
+    settings.ReblurSettings = NrdConfig::getDefaultREBLURSettings();
 
-    state.RTXDI.regir.regirStaticParams.Mode = rtxdi::ReGIRMode::Grid;
+    settings.TemporalAntiAliasingParams.useHistoryClampRelax = true;
+    settings.ToneMappingParams.toneMapOperator = ToneMapperOperator::HableUc2;
 
-    state.UseNEE = cmdLine.UseNEE != 0;
-    state.NEEType = cmdLine.NEEType;
-    state.UseReSTIRDI = cmdLine.UseReSTIRDI != 0;
-    state.UseReSTIRGI = cmdLine.UseReSTIRGI != 0;
-    state.UseReSTIRPT = cmdLine.UseReSTIRPT != 0;
-    if (state.UseReSTIRPT)
-        state.UseReSTIRGI = false;
-    state.RealtimeSamplesPerPixel = cmdLine.RealtimeSamplesPerPixel;
-    state.AccumulationTarget = cmdLine.ReferenceSamplesPerPixel;
-    state.StandaloneDenoiser = cmdLine.StandaloneDenoiser != 0;
-    state.RealtimeAA = cmdLine.RealtimeAA;
+    settings.RTXDI.regir.regirStaticParams.Mode = rtxdi::ReGIRMode::Grid;
 
-    ApplyPerformancePreset(state, kDefaultPerformancePreset);
-    state.RTXDIRestirPreset = RTXDIRestirQualityPreset::Ultra;
-    state.ApplyRTXDIRestirPreset();
-    state.RTXDIRestirPTPreset = RTXDIRestirPTQualityPreset::Ultra;
-    state.ApplyRTXDIRestirPTPreset();
+    settings.UseNEE = cmdLine.UseNEE != 0;
+    settings.NEEType = cmdLine.NEEType;
+    settings.UseReSTIRDI = cmdLine.UseReSTIRDI != 0;
+    settings.UseReSTIRGI = cmdLine.UseReSTIRGI != 0;
+    settings.UseReSTIRPT = cmdLine.UseReSTIRPT != 0;
+    if (settings.UseReSTIRPT)
+        settings.UseReSTIRGI = false;
+    settings.RealtimeSamplesPerPixel = cmdLine.RealtimeSamplesPerPixel;
+    settings.AccumulationTarget = cmdLine.ReferenceSamplesPerPixel;
+    settings.StandaloneDenoiser = cmdLine.StandaloneDenoiser != 0;
+    settings.RealtimeAA = cmdLine.RealtimeAA;
 
-    state.EnableBloom &= !cmdLine.DisablePostProcessFilters;
+    ApplyPerformancePreset(settings, kDefaultPerformancePreset);
+    settings.RTXDIRestirPreset = RTXDIRestirQualityPreset::Ultra;
+    settings.ApplyRTXDIRestirPreset();
+    settings.RTXDIRestirPTPreset = RTXDIRestirPTQualityPreset::Ultra;
+    settings.ApplyRTXDIRestirPTPreset();
+
+    settings.EnableBloom &= !cmdLine.DisablePostProcessFilters;
 }
 
 } // namespace caustica::render

@@ -25,7 +25,7 @@ namespace caustica::editor
 
 void InitializeEditorUIDataFromCommandLine(EditorUIData& ui, const CommandLineOptions& cmdLine)
 {
-    caustica::render::InitializeRenderSessionStateFromCommandLine(ui, cmdLine);
+    caustica::render::InitializeRenderSessionStateFromCommandLine(ui.session, cmdLine);
 }
 
 EditorUI::EditorUI(GpuDevice* deviceManager, EditorApplication& editor, EditorUIData& ui, bool NVAPI_SERSupported, const CommandLineOptions& cmdLine)
@@ -33,6 +33,9 @@ EditorUI::EditorUI(GpuDevice* deviceManager, EditorApplication& editor, EditorUI
         , m_app(editor)
         , m_sceneEditor(editor.GetSceneEditor())
         , m_ui(ui)
+        , m_settings(ui.session.settings)
+        , m_runtime(ui.session.runtime)
+        , m_editorUI(ui.editor)
         , m_NVAPI_SERSupported(NVAPI_SERSupported)
 {
     m_commandList = GetDevice()->createCommandList();
@@ -83,7 +86,7 @@ void EditorUI::Animate(float elapsedTimeSeconds)
 
 void EditorUI::buildUI(void)
 {
-    if (!m_ui.ShowUI)
+    if (!m_editorUI.ShowUI)
         return;
 
     RAII_SCOPE( ImGui::PushFont(m_defaultFont->GetScaledFont());, ImGui::PopFont(); );

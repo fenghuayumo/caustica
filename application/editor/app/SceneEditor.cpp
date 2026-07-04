@@ -184,8 +184,8 @@ SceneEditor::SceneEditor(const CommandLineOptions& cmdLine,
     caustica::render::SessionDiagnostics& diagnostics)
     : m_cmdLine(cmdLine)
     , m_sessionState(sessionState)
-    , m_settings(sessionState)
-    , m_renderState(sessionState)
+    , m_settings(sessionState.settings)
+    , m_renderState(sessionState.runtime)
     , m_editor(editorState)
     , m_sessionDiagnostics(diagnostics)
     , m_inputRouter()
@@ -200,7 +200,7 @@ SceneEditor::SceneEditor(const CommandLineOptions& cmdLine,
 SceneEditor::SceneEditor(const CommandLineOptions& cmdLine,
     EditorUIData& ui,
     caustica::render::SessionDiagnostics& diagnostics)
-    : SceneEditor(cmdLine, static_cast<caustica::render::RenderSessionState&>(ui), static_cast<EditorUIState&>(ui), diagnostics)
+    : SceneEditor(cmdLine, ui.session, ui.editor, diagnostics)
 {
     m_editorUi = &ui;
 }

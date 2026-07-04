@@ -36,14 +36,14 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
     // Inspector panel: instance Transform + mesh name (right-click pick)
     auto scene = m_sceneEditor.GetScene();
     auto* ew = scene ? scene->GetEntityWorld() : nullptr;
-    if (m_ui.SelectedEntity != ecs::NullEntity && m_ui.ShowInspector && ew)
+    if (m_editorUI.SelectedEntity != ecs::NullEntity && m_editorUI.ShowInspector && ew)
     {
         ImGui::SetNextWindowPos(ImVec2(float(layout.scaledWidth) - 10.f, 10.f), ImGuiCond_Appearing, ImVec2(1.f, 0.f));
         ImGui::SetNextWindowSize(ImVec2(layout.defWindowWidth, 0), ImGuiCond_Appearing);
         ImGui::Begin("Inspector");
         ImGui::PushItemWidth(layout.defItemWidth);
 
-        const ecs::Entity entity = m_ui.SelectedEntity;
+        const ecs::Entity entity = m_editorUI.SelectedEntity;
         std::string entityName = ew->getEntityName(entity);
         ImGui::Text("Node: %s", entityName.c_str());
 
@@ -73,42 +73,42 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
             if (ImGui::DragFloat3("Position", pos, 0.01f))
             {
                 ew->setTranslation(entity, dm::double3(pos[0], pos[1], pos[2]));
-                m_ui.ResetAccumulation = true;
+                m_settings.ResetAccumulation = true;
             }
 
             constexpr double deg2rad = 3.14159265358979323846 / 180.0;
 
-            const bool selectedRotationEntityChanged = m_ui.InspectorRotationEntity != entity;
-            if (!m_ui.InspectorRotationEulerValid || selectedRotationEntityChanged || !SameRotation(m_ui.InspectorRotationQuat, rotation))
+            const bool selectedRotationEntityChanged = m_editorUI.InspectorRotationEntity != entity;
+            if (!m_editorUI.InspectorRotationEulerValid || selectedRotationEntityChanged || !SameRotation(m_editorUI.InspectorRotationQuat, rotation))
             {
-                m_ui.InspectorRotationEntity = entity;
-                m_ui.InspectorRotationQuat = rotation;
-                m_ui.InspectorRotationEulerDeg = QuaternionToEulerDegreesXYZ(rotation);
-                m_ui.InspectorRotationEulerValid = true;
+                m_editorUI.InspectorRotationEntity = entity;
+                m_editorUI.InspectorRotationQuat = rotation;
+                m_editorUI.InspectorRotationEulerDeg = QuaternionToEulerDegreesXYZ(rotation);
+                m_editorUI.InspectorRotationEulerValid = true;
             }
 
             float euler[3] = {
-                m_ui.InspectorRotationEulerDeg.x,
-                m_ui.InspectorRotationEulerDeg.y,
-                m_ui.InspectorRotationEulerDeg.z
+                m_editorUI.InspectorRotationEulerDeg.x,
+                m_editorUI.InspectorRotationEulerDeg.y,
+                m_editorUI.InspectorRotationEulerDeg.z
             };
             if (ImGui::DragFloat3("Rotation (deg)", euler, 0.5f, 0.0f, 360.0f, "%.1f"))
             {
                 euler[0] = dm::clamp(euler[0], 0.0f, 360.0f);
                 euler[1] = dm::clamp(euler[1], 0.0f, 360.0f);
                 euler[2] = dm::clamp(euler[2], 0.0f, 360.0f);
-                m_ui.InspectorRotationEulerDeg = dm::float3(euler[0], euler[1], euler[2]);
+                m_editorUI.InspectorRotationEulerDeg = dm::float3(euler[0], euler[1], euler[2]);
                 const dm::dquat newRotation = dm::rotationQuat(dm::double3(euler[0] * deg2rad, euler[1] * deg2rad, euler[2] * deg2rad));
-                m_ui.InspectorRotationQuat = newRotation;
+                m_editorUI.InspectorRotationQuat = newRotation;
                 ew->setRotation(entity, newRotation);
-                m_ui.ResetAccumulation = true;
+                m_settings.ResetAccumulation = true;
             }
 
             float scl[3] = { float(scaling.x), float(scaling.y), float(scaling.z) };
             if (ImGui::DragFloat3("Scale", scl, 0.01f, 0.001f, 1000.0f))
             {
                 ew->setScaling(entity, dm::double3(scl[0], scl[1], scl[2]));
-                m_ui.ResetAccumulation = true;
+                m_settings.ResetAccumulation = true;
             }
         }
 
@@ -118,32 +118,32 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
             {
                 if (ImGui::Checkbox("Enabled", &gaussianSplat->enabled))
                 {
-                    m_ui.Invalidation.AccelerationStructRebuildRequested = true;
-                    m_ui.ResetAccumulation = true;
+                    m_runtime.Invalidation.AccelerationStructRebuildRequested = true;
+                    m_settings.ResetAccumulation = true;
                 }
-                if (ImGui::DragFloat("Footprint Scale", &m_ui.GaussianSplatScale, 0.01f, 0.01f, 10.0f, "%.2f"))
+                if (ImGui::DragFloat("Footprint Scale", &m_settings.GaussianSplatScale, 0.01f, 0.01f, 10.0f, "%.2f"))
                 {
                     if (ResolveGaussianSplatShadowMode(m_ui) != GAUSSIAN_SPLAT_SHADOWS_DISABLED)
-                        m_ui.Invalidation.AccelerationStructRebuildRequested = true;
-                    m_ui.ResetAccumulation = true;
+                        m_runtime.Invalidation.AccelerationStructRebuildRequested = true;
+                    m_settings.ResetAccumulation = true;
                 }
-                RESET_ON_CHANGE(ImGui::DragFloat("Alpha", &m_ui.GaussianSplatAlphaScale, 0.01f, 0.0f, 4.0f, "%.2f"));
-                RESET_ON_CHANGE(ImGui::DragFloat("Brightness", &m_ui.GaussianSplatBrightness, 0.01f, 0.0f, 16.0f, "%.2f"));
-                RESET_ON_CHANGE(ImGui::InputFloat3("Tint Color", (float*)&m_ui.GaussianSplatTintColor.x));
+                RESET_ON_CHANGE(ImGui::DragFloat("Alpha", &m_settings.GaussianSplatAlphaScale, 0.01f, 0.0f, 4.0f, "%.2f"));
+                RESET_ON_CHANGE(ImGui::DragFloat("Brightness", &m_settings.GaussianSplatBrightness, 0.01f, 0.0f, 16.0f, "%.2f"));
+                RESET_ON_CHANGE(ImGui::InputFloat3("Tint Color", (float*)&m_settings.GaussianSplatTintColor.x));
 
-                RESET_ON_CHANGE(ImGui::Checkbox("As Emitter", &m_ui.GaussianSplatAsEmitter));
-                ImGui::BeginDisabled(!m_ui.GaussianSplatAsEmitter);
-                RESET_ON_CHANGE(ImGui::DragFloat("Emission Intensity", &m_ui.GaussianSplatEmissionIntensity, 0.01f, 0.0f, 100.0f, "%.2f"));
-                if (ImGui::InputInt("Emission Proxy Limit", &m_ui.GaussianSplatEmissionMaxProxyCount, 256, 4096))
+                RESET_ON_CHANGE(ImGui::Checkbox("As Emitter", &m_settings.GaussianSplatAsEmitter));
+                ImGui::BeginDisabled(!m_settings.GaussianSplatAsEmitter);
+                RESET_ON_CHANGE(ImGui::DragFloat("Emission Intensity", &m_settings.GaussianSplatEmissionIntensity, 0.01f, 0.0f, 100.0f, "%.2f"));
+                if (ImGui::InputInt("Emission Proxy Limit", &m_settings.GaussianSplatEmissionMaxProxyCount, 256, 4096))
                 {
-                    m_ui.GaussianSplatEmissionMaxProxyCount = dm::clamp(m_ui.GaussianSplatEmissionMaxProxyCount, 0, 262144);
-                    m_ui.ResetAccumulation = true;
+                    m_settings.GaussianSplatEmissionMaxProxyCount = dm::clamp(m_settings.GaussianSplatEmissionMaxProxyCount, 0, 262144);
+                    m_settings.ResetAccumulation = true;
                 }
                 ImGui::EndDisabled();
 
-                RESET_ON_CHANGE(ImGui::DragFloat("Alpha Cull", &m_ui.GaussianSplatAlphaCullThreshold, 0.001f, 0.0f, 0.25f, "%.3f"));
+                RESET_ON_CHANGE(ImGui::DragFloat("Alpha Cull", &m_settings.GaussianSplatAlphaCullThreshold, 0.001f, 0.0f, 0.25f, "%.3f"));
                 if (ResolveGaussianSplatShadowMode(m_ui) != GAUSSIAN_SPLAT_SHADOWS_DISABLED)
-                    RESET_ON_CHANGE(ImGui::DragFloat("Shadow Strength", &m_ui.GaussianSplatShadowStrength, 0.01f, 0.0f, 1.0f, "%.2f"));
+                    RESET_ON_CHANGE(ImGui::DragFloat("Shadow Strength", &m_settings.GaussianSplatShadowStrength, 0.01f, 0.0f, 1.0f, "%.2f"));
             }
         }
 
@@ -157,10 +157,10 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
 void EditorUI::BuildMaterialEditorPanel(const PanelLayout& layout)
 {
     // Material Editor panel (right-click pick)
-    std::shared_ptr<PTMaterial> material = PTMaterial::SafeCast(m_ui.SelectedMaterial);
-    if (material != nullptr && m_sceneEditor.GetLightingPasses().materials() != nullptr && m_ui.ShowMaterialEditor)
+    std::shared_ptr<PTMaterial> material = PTMaterial::SafeCast(m_editorUI.SelectedMaterial);
+    if (material != nullptr && m_sceneEditor.GetLightingPasses().materials() != nullptr && m_editorUI.ShowMaterialEditor)
     {
-        const bool inspectorVisible = m_ui.SelectedEntity != ecs::NullEntity && m_ui.ShowInspector;
+        const bool inspectorVisible = m_editorUI.SelectedEntity != ecs::NullEntity && m_editorUI.ShowInspector;
         ImGui::SetNextWindowPos(ImVec2(float(layout.scaledWidth) - 10.f, inspectorVisible ? 350.f : 10.f), ImGuiCond_Appearing, ImVec2(1.f, 0.f));
         ImGui::SetNextWindowSize(ImVec2(layout.defWindowWidth, 0), ImGuiCond_Appearing);
         ImGui::Begin("Material Editor");
@@ -191,14 +191,14 @@ void EditorUI::BuildMaterialEditorPanel(const PanelLayout& layout)
         {
             if (auto s = m_sceneEditor.GetScene())
                 s->RefreshSceneWorld(m_sceneEditor.GetFrameIndex());
-            m_ui.ResetAccumulation = 1;
+            m_settings.ResetAccumulation = 1;
         }
 
         if (wasAlphaTestedEnabled != material->EnableAlphaTesting || alphaCutoffBefore != alphaCutoffAfter ||
             wasExcludedFromNEE != material->ExcludeFromNEE || mspBefore != mspAfter || wasSkipRender != material->SkipRender)
-            m_ui.Invalidation.ShaderAndACRefreshDelayedRequest = 1.0f;
+            m_runtime.Invalidation.ShaderAndACRefreshDelayedRequest = 1.0f;
 
-        if (m_ui.Invalidation.ShaderAndACRefreshDelayedRequest > 0)
+        if (m_runtime.Invalidation.ShaderAndACRefreshDelayedRequest > 0)
             ImGui::TextColored(ImVec4(1, 0.5f, 0.5f, 1), "PLEASE NOTE: shader and AC rebuild scheduled!\nUI might freeze for a bit.");
         else
             ImGui::Text(" ");

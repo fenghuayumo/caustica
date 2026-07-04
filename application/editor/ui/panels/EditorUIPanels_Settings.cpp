@@ -43,9 +43,9 @@ void EditorUI::BuildSystemPanel(const PanelLayout& layout)
         {
             RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
             if (ImGui::Button("Reload Shaders (requires VS .hlsl->.bin build)"))
-                m_ui.Invalidation.ShaderReloadRequested = true;
+                m_runtime.Invalidation.ShaderReloadRequested = true;
 
-            ImGui::Checkbox("Render when out of focus", &m_ui.RenderWhenOutOfFocus);
+            ImGui::Checkbox("Render when out of focus", &m_editorUI.RenderWhenOutOfFocus);
             if (ImGui::IsItemHovered()) 
                 ImGui::SetTooltip("Render loop will pause when app window is out of focus. Note: Reference mode will accumulate until all frames are done.");
         
@@ -127,23 +127,23 @@ void EditorUI::BuildCameraPanel(const PanelLayout& layout)
             }
 
     #if 1
-            RESET_ON_CHANGE( ImGui::InputFloat("Aperture", &m_ui.CameraAperture, 0.001f, 0.01f, "%.4f") );
-            m_ui.CameraAperture = dm::clamp(m_ui.CameraAperture, 0.0f, 1.0f);
+            RESET_ON_CHANGE( ImGui::InputFloat("Aperture", &m_settings.CameraAperture, 0.001f, 0.01f, "%.4f") );
+            m_settings.CameraAperture = dm::clamp(m_settings.CameraAperture, 0.0f, 1.0f);
 
-            RESET_ON_CHANGE( ImGui::InputFloat("Focal Distance", &m_ui.CameraFocalDistance, 0.1f) );
-            m_ui.CameraFocalDistance = dm::clamp(m_ui.CameraFocalDistance, 0.001f, 1e16f);
-            ImGui::SliderFloat("Keyboard move speed", &m_ui.CameraMoveSpeed, 0.1f, 10.0f);
+            RESET_ON_CHANGE( ImGui::InputFloat("Focal Distance", &m_settings.CameraFocalDistance, 0.1f) );
+            m_settings.CameraFocalDistance = dm::clamp(m_settings.CameraFocalDistance, 0.001f, 1e16f);
+            ImGui::SliderFloat("Keyboard move speed", &m_settings.CameraMoveSpeed, 0.1f, 10.0f);
 
             float cameraFOV = 2.0f * dm::degrees(m_sceneEditor.GetCameraVerticalFOV());
             if (ImGui::InputFloat("Vertical FOV", &cameraFOV, 0.1f))
             {
                 cameraFOV = dm::clamp(cameraFOV, 1.0f, 360.0f);
-                m_ui.ResetAccumulation = true;
+                m_settings.ResetAccumulation = true;
                 m_sceneEditor.SetCameraVerticalFOV(dm::radians(cameraFOV / 2.0f));
             }
 
-            RESET_ON_CHANGE( ImGui::InputFloat("CameraAntiRRSleepJitter", &m_ui.CameraAntiRRSleepJitter, 0.001f ) );
-            m_ui.CameraAntiRRSleepJitter = clamp( m_ui.CameraAntiRRSleepJitter, 0.0f, 1.0f );
+            RESET_ON_CHANGE( ImGui::InputFloat("CameraAntiRRSleepJitter", &m_settings.CameraAntiRRSleepJitter, 0.001f ) );
+            m_settings.CameraAntiRRSleepJitter = clamp( m_settings.CameraAntiRRSleepJitter, 0.0f, 1.0f );
     #endif
         }
 

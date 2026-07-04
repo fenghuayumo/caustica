@@ -16,7 +16,7 @@ namespace caustica
 class Scene;
 class ShaderFactory;
 
-// Shared render orchestrator (owned by Application / RenderSession).
+// Shared render orchestrator owned by GpuRenderSubsystem (accel structs, camera, render pipeline).
 class RenderCore
 {
 public:
