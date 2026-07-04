@@ -43,7 +43,6 @@ void EditorSceneSubsystem::initialize(caustica::EngineInitContext& context)
         .runtimeState = sceneEditor.GetRenderRuntimeState(),
         .sceneTime = sceneEditor.GetSceneTimeRef(),
         .diagnostics = m_config.diagnostics,
-        .framePasses = m_config.framePasses,
         .cmdLine = m_config.cmdLine,
         .sceneTypeFactory = std::make_shared<caustica::render::RenderSceneTypeFactory>(),
         .sceneCallbacks = caustica::EngineSceneCallbacks{

@@ -3,7 +3,6 @@
 #include <filesystem>
 #include <functional>
 #include <memory>
-#include <span>
 #include <vector>
 
 #include <rhi/nvrhi.h>
@@ -11,7 +10,6 @@
 #include <render/PathTracerScenePasses.h>
 #include <render/SessionDiagnostics.h>
 #include <render/WorldRenderer/PathTracingContext.h>
-#include <render/WorldRenderer/PathTracingFramePipeline.h>
 #include <engine/ISubsystem.h>
 
 class SceneManager;
@@ -51,8 +49,6 @@ struct GpuRenderSubsystemInitParams
     double& sceneTime;
 
     render::SessionDiagnostics& diagnostics;
-
-    std::span<render::IPathTracingFramePass* const> framePasses = {};
 
     const CommandLineOptions* cmdLine = nullptr;
 

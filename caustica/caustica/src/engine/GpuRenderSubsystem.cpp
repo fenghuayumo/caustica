@@ -111,7 +111,6 @@ bool GpuRenderSubsystem::initializeSession(const GpuRenderSubsystemInitParams& p
         .sceneTime = params.sceneTime,
         .gaussianSplatEmissionProxies = gaussianSplats.emissionProxies(),
         .diagnostics = params.diagnostics,
-        .framePasses = params.framePasses,
     });
 
     m_worldRenderer = std::make_unique<render::WorldRenderer>(*m_pathTracingContext);

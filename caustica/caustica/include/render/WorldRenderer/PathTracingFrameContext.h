@@ -7,7 +7,6 @@
 #include <functional>
 #include <string>
 
-struct DebugFeedbackStruct;
 struct PathTracerCameraData;
 class RenderTargets;
 
@@ -23,19 +22,6 @@ namespace caustica::render
 {
 
 class WorldRenderer;
-
-// Phases where optional host-side frame passes may run.
-enum class PathTracingFramePhase
-{
-    PreRender,
-    RenderTargetsRecreated,
-    IdleMaintenance,
-    BeforePathTrace,
-    PopulateBindingSet,
-    BeforeFinalBlit,
-    AfterPickResolved,
-    PostRender,
-};
 
 // Per-frame mutable state threaded through the path-tracing pass pipeline.
 struct PathTracingFrameContext
@@ -61,29 +47,11 @@ struct PathTracingFrameContext
     // Flushes the command list during renderer initialization stages.
     std::function<bool(const char* stage)> submitInitializationStage;
 
-    // Active phase when executing optional host-side frame passes.
-    PathTracingFramePhase framePhase = PathTracingFramePhase::PreRender;
-
     nvrhi::ICommandList* commandList = nullptr;
     RenderTargets* renderTargets = nullptr;
     nvrhi::ITexture* ldrColor = nullptr;
 
-    struct PathTraceDebug
-    {
-        bool pickActive = false;
-        bool exploreDeltaTree = false;
-    } pathTraceDebug;
-
     nvrhi::BindingSetDesc* bindingSetDesc = nullptr;
-
-    const DebugFeedbackStruct* pickFeedback = nullptr;
-
-    struct PostRenderData
-    {
-        nvrhi::ITexture* framebufferTexture = nullptr;
-        std::function<bool(const char* fileName)>* saveFramebuffer = nullptr;
-        bool experimentalScreenshotRequested = false;
-    } postRender;
 };
 
 } // namespace caustica::render

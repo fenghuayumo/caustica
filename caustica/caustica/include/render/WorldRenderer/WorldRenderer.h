@@ -139,7 +139,6 @@ private:
     [[nodiscard]] CameraUpdateParams makeCameraUpdateParams() const;
     void syncCameraViews();
     [[nodiscard]] dm::float2 computeCameraJitter() const;
-    void dispatchExternalFramePasses(PathTracingFrameContext& ctx) const;
 
     void ensureFramePipelineBuilt();
     void framePassSetup(PathTracingFrameContext& ctx);

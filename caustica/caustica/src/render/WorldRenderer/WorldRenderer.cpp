@@ -1923,10 +1923,3 @@ dm::float2 caustica::render::WorldRenderer::computeCameraJitter() const
 {
     return m_context.renderCore.camera().computeJitter(makeCameraUpdateParams());
 }
-
-void caustica::render::WorldRenderer::dispatchExternalFramePasses(PathTracingFrameContext& ctx) const
-{
-    for (IPathTracingFramePass* pass : m_context.framePasses)
-        if (pass)
-            pass->execute(ctx);
-}

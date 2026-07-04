@@ -19,10 +19,6 @@ public:
     virtual void execute(PathTracingFrameContext& context) = 0;
 };
 
-// Host-side tooling (editor capture, pick feedback, zoom overlay, etc.) uses the same
-// pass interface as the internal renderer pipeline. Set context.framePhase before execute.
-using IPathTracingFrameExtension = IPathTracingFramePass;
-
 class PathTracingFramePipeline
 {
 public:
