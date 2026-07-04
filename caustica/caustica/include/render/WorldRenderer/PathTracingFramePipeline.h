@@ -36,6 +36,12 @@ public:
     void registerLambdaPass(const std::string& name,
                             std::function<void(PathTracingFrameContext&)> fn);
 
+    // Inserts after the first pass whose name matches anchorName; appends if not found.
+    void insertPassAfter(const std::string& anchorName, const std::string& name, IPathTracingFramePass* pass);
+    void insertLambdaPassAfter(const std::string& anchorName,
+                               const std::string& name,
+                               std::function<void(PathTracingFrameContext&)> fn);
+
     void executeAll(PathTracingFrameContext& context) const;
 
     void clear();

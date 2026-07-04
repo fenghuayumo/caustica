@@ -22,6 +22,11 @@ class BindingCache;
 class CameraController;
 class ShaderFactory;
 
+namespace render
+{
+class FramePassRegistry;
+}
+
 namespace rhi
 {
 class RenderDevice;
@@ -50,6 +55,9 @@ struct PathTracingContext
     double& sceneTime;
 
     SessionDiagnostics& diagnostics;
+
+    // Optional extension registry; wired from EngineBuilder / SceneRuntimeRegistration.
+    FramePassRegistry* framePassRegistry = nullptr;
 };
 
 } // namespace render

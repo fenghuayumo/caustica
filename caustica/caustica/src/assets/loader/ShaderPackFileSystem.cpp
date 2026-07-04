@@ -164,6 +164,33 @@ bool ShaderPackFileSystem::folderExists(const std::filesystem::path&)
     return false;
 }
 
+bool ShaderPackFileSystem::hasDynamicBinLayout(const std::filesystem::path& diskBinApiRoot)
+{
+    if (!m_packFile)
+        return false;
+
+    std::error_code ec;
+    bool foundDiskBin = false;
+    for (const auto& prefixDir : std::filesystem::directory_iterator(diskBinApiRoot, ec))
+    {
+        if (!prefixDir.is_directory())
+            continue;
+
+        for (const auto& binFile : std::filesystem::directory_iterator(prefixDir.path(), ec))
+        {
+            if (binFile.path().extension() != ".bin")
+                continue;
+
+            foundDiskBin = true;
+            const std::filesystem::path vfsRelative =
+                diskBinApiRoot.filename() / prefixDir.path().filename() / binFile.path().filename();
+            return fileExists(vfsRelative);
+        }
+    }
+
+    return !foundDiskBin;
+}
+
 bool ShaderPackFileSystem::fileExists(const std::filesystem::path& name)
 {
     if (!m_packFile)

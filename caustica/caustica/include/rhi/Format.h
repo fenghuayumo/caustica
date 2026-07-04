@@ -43,4 +43,8 @@ struct FormatInfo
 
 [[nodiscard]] FormatInfo getFormatInfo(Format format);
 
+// Maps engine Format to the backend pixel format token (implemented in src/rhi/Format.cpp).
+[[nodiscard]] uint32_t toNativeFormat(Format format);
+[[nodiscard]] Format fromNativeFormat(uint32_t nativeFormat);
+
 } // namespace caustica::rhi

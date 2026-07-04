@@ -40,6 +40,38 @@ void PathTracingFramePipeline::registerLambdaPass(const std::string& name,
     m_passes.push_back({name, raw, std::move(pass)});
 }
 
+void PathTracingFramePipeline::insertPassAfter(const std::string& anchorName,
+                                               const std::string& name,
+                                               IPathTracingFramePass* pass)
+{
+    for (auto it = m_passes.begin(); it != m_passes.end(); ++it)
+    {
+        if (it->name == anchorName)
+        {
+            m_passes.insert(it + 1, {name, pass, nullptr});
+            return;
+        }
+    }
+    m_passes.push_back({name, pass, nullptr});
+}
+
+void PathTracingFramePipeline::insertLambdaPassAfter(const std::string& anchorName,
+                                                     const std::string& name,
+                                                     std::function<void(PathTracingFrameContext&)> fn)
+{
+    auto pass = std::make_unique<LambdaPass>(name, std::move(fn));
+    IPathTracingFramePass* raw = pass.get();
+    for (auto it = m_passes.begin(); it != m_passes.end(); ++it)
+    {
+        if (it->name == anchorName)
+        {
+            m_passes.insert(it + 1, {name, raw, std::move(pass)});
+            return;
+        }
+    }
+    m_passes.push_back({name, raw, std::move(pass)});
+}
+
 void PathTracingFramePipeline::executeAll(PathTracingFrameContext& context) const
 {
     for (const PassEntry& entry : m_passes)

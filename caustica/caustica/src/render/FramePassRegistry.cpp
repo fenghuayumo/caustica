@@ -89,7 +89,6 @@ void FramePassRegistry::applyGraphPasses(FramePassInsertPoint insertPoint,
 
 void FramePassRegistry::applyTo(PathTracingFramePipeline& pipeline) const
 {
-    // Phase 0: append after anchor pass name. Phase 2: ordered insert / Render Graph.
     for (const PassRegistration& reg : m_registrations)
     {
         if (!reg.factory)
@@ -99,8 +98,8 @@ void FramePassRegistry::applyTo(PathTracingFramePipeline& pipeline) const
         if (!pass)
             continue;
 
-        (void)insertPointAnchorName(reg.insertAfter);
-        pipeline.registerPass(reg.name, pass.release()); // TODO: owned registration
+        const char* anchorName = insertPointAnchorName(reg.insertAfter);
+        pipeline.insertPassAfter(anchorName, reg.name, pass.release());
     }
 }
 

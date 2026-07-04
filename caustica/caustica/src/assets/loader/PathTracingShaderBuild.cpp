@@ -1,4 +1,5 @@
 #include <assets/loader/PathTracingShaderBuild.h>
+#include <assets/loader/ShaderBackend.h>
 
 namespace caustica
 {
@@ -24,7 +25,7 @@ PathTracingShaderBuildResult BuildPathTracingLibraryShader(
     result.dxc = ShaderCompilerUtils::BuildDxcCommand(config, options);
     result.key = MakeShaderLibraryKey(
         input.logicalSourcePath.generic_string(),
-        config.GraphicsAPI,
+        shader::fromNvrhiGraphicsApi(config.GraphicsAPI),
         input.macros,
         options.Profile);
     result.key.cacheHashHex = result.dxc.HashHex;

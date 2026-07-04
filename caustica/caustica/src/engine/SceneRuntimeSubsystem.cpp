@@ -2,6 +2,7 @@
 
 #include <engine/GpuRenderSubsystem.h>
 #include <engine/SceneRuntime.h>
+#include <engine/SceneRuntimeRegistration.h>
 #include <engine/SubsystemCollection.h>
 
 #include <core/path_utils.h>
@@ -48,6 +49,7 @@ void SceneRuntimeSubsystem::initialize(EngineInitContext& context)
             .OnSceneLoaded = [sceneRuntimePtr]() { sceneRuntimePtr->SceneLoaded(); },
             .OnSceneUnloading = [sceneRuntimePtr]() { sceneRuntimePtr->SceneUnloading(); },
         },
+        .framePassRegistry = &getGlobalFramePassRegistry(),
     });
 
     sceneRuntime.bindGpuRenderSubsystem(*gpuRenderSubsystem);

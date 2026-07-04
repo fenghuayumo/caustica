@@ -1,4 +1,5 @@
 #include <assets/loader/ShaderFactory.h>
+#include <assets/loader/ShaderCompilerService.h>
 #include <core/vfs/VFS.h>
 #include <core/log.h>
 #include <core/string_utils.h>
@@ -15,6 +16,10 @@ ShaderFactory::ShaderFactory(nvrhi::DeviceHandle rendererInterface,
 	std::shared_ptr<IFileSystem> fs,
 	const std::filesystem::path& basePath)
 	: m_Device(rendererInterface)
+	, m_compilerService(std::make_shared<shader::ShaderCompilerService>(shader::ShaderCompilerService::Config{
+		.fileSystem = fs,
+		.precompiledBasePath = basePath,
+	}))
 	, m_fs(fs)
 	, m_basePath(basePath)
 {
@@ -34,47 +39,12 @@ ShaderFactory::~ShaderFactory()
 
 void ShaderFactory::ClearCache()
 {
-	m_BytecodeCache.clear();
+	m_compilerService->clearBytecodeCache();
 }
 
 std::shared_ptr<IBlob> ShaderFactory::GetBytecode(const char* fileName, const char* entryName)
 {
-    if (!m_fs)
-        return nullptr;
-        
-    if (!entryName)
-        entryName = "main";
-
-    string adjustedName = fileName;
-    {
-        size_t pos = adjustedName.find(".hlsl");
-        if (pos != string::npos)
-            adjustedName.erase(pos, 5);
-
-        if (entryName && strcmp(entryName, "main"))
-            adjustedName += "_" + string(entryName);
-    }
-
-    const bool isCausticaShader = caustica::string_utils::starts_with(adjustedName, "caustica/shaders");
-    // shaders.cfg emits blobs under dxil/caustica/shaders/... while VFS mounts dxil at /ShaderPrecompiled/caustica
-    std::filesystem::path shaderFilePath = isCausticaShader
-        ? m_basePath / "caustica" / (adjustedName + ".bin")
-        : m_basePath / (adjustedName + ".bin");
-
-    std::shared_ptr<IBlob>& data = m_BytecodeCache[shaderFilePath.generic_string()];
-
-    if (data)
-        return data;
-
-    data = m_fs->readFile(shaderFilePath);
-
-    if (!data)
-    {
-        caustica::error("Couldn't read the binary file for shader %s from %s", fileName, shaderFilePath.generic_string().c_str());
-        return nullptr;
-    }
-
-    return data;
+    return m_compilerService->loadPrecompiledBytecode(fileName, entryName);
 }
 
 nvrhi::ShaderHandle ShaderFactory::CreateShader(const char* fileName, const char* entryName, const vector<ShaderMacro>* pDefines, const nvrhi::ShaderDesc& desc)
@@ -234,10 +204,13 @@ nvrhi::ShaderLibraryHandle ShaderFactory::CreateAutoShaderLibrary(const char* fi
 
 std::pair<const void*, size_t> caustica::ShaderFactory::FindShaderFromHash(uint64_t hash, std::function<uint64_t(std::pair<const void*, size_t>, nvrhi::GraphicsAPI)> hashGenerator)
 {
-    for (auto& entry : m_BytecodeCache)
-    {
-        const void* shaderBytes = entry.second->data();
-        size_t shaderSize = entry.second->size();
+    std::pair<const void*, size_t> result{ nullptr, 0 };
+    m_compilerService->forEachCachedBytecode([&](const std::shared_ptr<IBlob>& blob) {
+        if (result.first || !blob)
+            return;
+
+        const void* shaderBytes = blob->data();
+        size_t shaderSize = blob->size();
 
         // the bytecode could contain multiple permutations
         std::vector<std::string> permutations;
@@ -271,7 +244,8 @@ std::pair<const void*, size_t> caustica::ShaderFactory::FindShaderFromHash(uint6
                     uint64_t entryHash = hashGenerator(std::make_pair(permutationBytecode, permutationSize), m_Device->getGraphicsAPI());
                     if (entryHash == hash)
                     {
-                        return std::make_pair(permutationBytecode, permutationSize);
+                        result = std::make_pair(permutationBytecode, permutationSize);
+                        return;
                     }
                 }
             }
@@ -281,9 +255,10 @@ std::pair<const void*, size_t> caustica::ShaderFactory::FindShaderFromHash(uint6
             uint64_t entryHash = hashGenerator(std::make_pair(shaderBytes, shaderSize), m_Device->getGraphicsAPI());
             if (entryHash == hash)
             {
-                return std::make_pair(shaderBytes, shaderSize);
+                result = std::make_pair(shaderBytes, shaderSize);
+                return;
             }
         }
-    }
-    return std::make_pair(nullptr, 0);
+    });
+    return result;
 }

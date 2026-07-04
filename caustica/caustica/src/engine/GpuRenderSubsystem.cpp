@@ -96,6 +96,7 @@ bool GpuRenderSubsystem::initializeSession(const GpuRenderSubsystemInitParams& p
         .descriptorTable = m_descriptorTable,
         .sceneTime = params.sceneTime,
         .diagnostics = params.diagnostics,
+        .framePassRegistry = params.framePassRegistry,
     });
 
     m_worldRenderer = std::make_unique<render::WorldRenderer>(*m_pathTracingContext);
@@ -301,7 +302,8 @@ void GpuRenderSubsystem::createShaderFactory(GpuDevice& gpuDevice)
     const std::filesystem::path shaderPackPath = appDirectory / (std::string("caustica.shaders.") + shaderTypeName + ".pack");
     auto shaderPackFS = std::make_shared<ShaderPackFileSystem>(shaderPackPath, "ShaderPrecompiled");
     const bool shaderPackHasCurrentLayout = shaderPackFS->isOpen()
-        && shaderPackFS->fileExists("caustica/caustica/shaders/render/Misc/DebugLines_main_vs.bin");
+        && shaderPackFS->fileExists("caustica/caustica/shaders/render/Misc/DebugLines_main_vs.bin")
+        && shaderPackFS->fileExists("engine/fullscreen_vs.bin");
 
     if (shaderPackFS->isOpen() && !shaderPackHasCurrentLayout)
     {

@@ -1,4 +1,5 @@
 #include <assets/loader/ShaderCompilerUtils.h>
+#include <assets/loader/ShaderBackend.h>
 #include <assets/loader/ShaderKey.h>
 #include <core/file_utils.h>
 #include <core/format.h>
@@ -369,7 +370,7 @@ namespace ShaderCompilerUtils
             logicalSource.generic_string(),
             options.EntryPoint,
             kind,
-            config.GraphicsAPI,
+            caustica::shader::fromNvrhiGraphicsApi(config.GraphicsAPI),
             options.Profile,
             options.Macros);
     }

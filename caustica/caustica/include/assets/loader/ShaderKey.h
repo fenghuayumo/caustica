@@ -2,6 +2,7 @@
 
 #include <assets/loader/ShaderCompilerUtils.h>
 #include <assets/loader/ShaderFactory.h>
+#include <assets/loader/ShaderBackend.h>
 
 #include <cstdint>
 #include <filesystem>
@@ -24,7 +25,7 @@ struct ShaderKey
     std::string                             sourcePath;
     std::string                             entryPoint;
     ShaderKeyKind                           kind             = ShaderKeyKind::SingleShader;
-    nvrhi::GraphicsAPI                      graphicsAPI      = nvrhi::GraphicsAPI::D3D12;
+    shader::Backend                         backend          = shader::Backend::D3D12;
     ShaderCompilerUtils::ShaderProfile      profile          = ShaderCompilerUtils::ShaderProfile::Library_6_6;
     std::vector<ShaderMacro>                macros;
 
@@ -50,13 +51,13 @@ struct ShaderKey
     std::string_view sourcePath,
     std::string_view entryPoint,
     ShaderKeyKind kind,
-    nvrhi::GraphicsAPI api,
+    shader::Backend backend,
     ShaderCompilerUtils::ShaderProfile profile,
     const std::vector<ShaderMacro>& macros);
 
 [[nodiscard]] ShaderKey MakeShaderLibraryKey(
     std::string_view sourcePath,
-    nvrhi::GraphicsAPI api,
+    shader::Backend backend,
     const std::vector<ShaderMacro>& macros,
     ShaderCompilerUtils::ShaderProfile profile = ShaderCompilerUtils::ShaderProfile::Library_6_6);
 

@@ -414,7 +414,16 @@ PathTracingShaderCompiler::PathTracingShaderCompiler(nvrhi::IDevice* device, std
     const char* shaderTypeName = caustica::GetShaderTypeName(device->getGraphicsAPI());
     const std::filesystem::path shaderPackPath = GetRuntimeDirectory() / (std::string("caustica.shaders.") + shaderTypeName + ".pack");
     auto shaderPackFS = std::make_shared<ShaderPackFileSystem>(shaderPackPath, c_PTShaderBinariesRoot);
-    if (shaderPackFS->isOpen())
+    const bool shaderPackHasDynamicBins = shaderPackFS->hasDynamicBinLayout(m_compilerConfig.ShaderBinariesPath);
+    if (shaderPackFS->isOpen() && !shaderPackHasDynamicBins)
+    {
+        caustica::warning(
+            "Shader pack '%s' does not include ShaderDynamic bins; falling back to '%s'.",
+            shaderPackPath.string().c_str(),
+            m_compilerConfig.ShaderBinariesPath.string().c_str());
+    }
+
+    if (shaderPackHasDynamicBins)
     {
         m_shadersFS->mount("/" + c_PTShaderBinariesRoot, shaderPackFS);
         m_compilerConfig.RuntimeCompilationAvailable = false;

@@ -366,7 +366,7 @@ macro(add_caustica_sample TARGET_NAME MAIN_SOURCE)
         target_compile_options(${TARGET_NAME} PRIVATE /utf-8)
     endif()
     target_link_libraries(${TARGET_NAME} PRIVATE causticaApp nvrhi)
-    add_dependencies(${TARGET_NAME} caustica_shaders nrd_shaders omm_shaders ShaderDynamicAssets ShaderDynamicAssets_CopyAlways)
+    add_dependencies(${TARGET_NAME} caustica_shaders nrd_shaders omm_shaders causticaEngineShaders causticaPathTracerShaders ShaderDynamicAssets ShaderDynamicAssets_CopyAlways)
     set_target_properties(${TARGET_NAME} PROPERTIES 
         FOLDER ${folder}
         OUTPUT_NAME_DEBUG "${TARGET_NAME}D"

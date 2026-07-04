@@ -2,9 +2,13 @@
 #include <render/Core/FramebufferFactory.h>
 #include <assets/loader/ShaderFactory.h>
 #include <render/Core/RenderPassConstants.h>
+#include <rhi/Format.h>
 #include <rhi/RenderDevice.h>
 #include <scene/View.h>
 #include <utility>
+
+#include <cmath>
+#include <memory>
 
 #if CAUSTICA_WITH_STATIC_SHADERS
 #if CAUSTICA_WITH_DX11
@@ -24,6 +28,43 @@ using namespace caustica::math;
 using namespace caustica;
 using namespace caustica::render;
 
+namespace
+{
+    rhi::TextureDesc makeBloomMipDesc(uint32_t width, uint32_t height, rhi::Format format, const char* name)
+    {
+        rhi::TextureDesc desc{};
+        desc.name = name;
+        desc.width = width;
+        desc.height = height;
+        desc.mipLevels = 1;
+        desc.format = format;
+        desc.isRenderTarget = true;
+        return desc;
+    }
+
+    void computeBloomMipSizes(const IView* view,
+        uint32_t& mip1Width, uint32_t& mip1Height, uint32_t& mip2Width, uint32_t& mip2Height)
+    {
+        const nvrhi::Rect viewExtent = view->GetViewExtent();
+        const int viewportWidth = viewExtent.maxX - viewExtent.minX;
+        const int viewportHeight = viewExtent.maxY - viewExtent.minY;
+
+        mip1Width = static_cast<uint32_t>(std::ceil(viewportWidth / 2.f));
+        mip1Height = static_cast<uint32_t>(std::ceil(viewportHeight / 2.f));
+        mip2Width = static_cast<uint32_t>(std::ceil(mip1Width / 2.f));
+        mip2Height = static_cast<uint32_t>(std::ceil(mip1Height / 2.f));
+    }
+
+    rhi::Format bloomColorFormat(const std::shared_ptr<FramebufferFactory>& framebufferFactory,
+        const ICompositeView& compositeView)
+    {
+        const IView* view = compositeView.GetChildView(ViewType::PLANAR, 0);
+        const nvrhi::IFramebuffer* framebuffer = framebufferFactory->GetFramebuffer(*view);
+        const nvrhi::Format nativeFormat = framebuffer->getFramebufferInfo().colorFormats[0];
+        return rhi::fromNativeFormat(static_cast<uint32_t>(nativeFormat));
+    }
+}
+
 BloomPass::BloomPass(
     nvrhi::IDevice* device,
     const std::shared_ptr<ShaderFactory>& shaderFactory,
@@ -33,7 +74,6 @@ BloomPass::BloomPass(
     : m_renderDevice(renderDevice)
     , m_FramebufferFactory(std::move(framebufferFactory))
     , m_Device(device)
-    , m_BindingCache(device)
 {
     m_BloomBlurPixelShader = shaderFactory->CreateAutoShader("engine/passes/bloom_ps.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_bloom_ps), nullptr, nvrhi::ShaderType::Pixel);
 
@@ -57,95 +97,40 @@ BloomPass::BloomPass(
     m_BloomBlurBindingLayout = device->createBindingLayout(layoutDesc);
 
     m_PerViewData.resize(compositeView.GetNumChildViews(ViewType::PLANAR));
-    for (uint viewIndex = 0; viewIndex < compositeView.GetNumChildViews(ViewType::PLANAR); viewIndex++)
-    {
-        const IView* view = compositeView.GetChildView(ViewType::PLANAR, viewIndex);
-        
-        nvrhi::IFramebuffer* sampleFramebuffer = m_FramebufferFactory->GetFramebuffer(*view);
-        PerViewData& perViewData = m_PerViewData[viewIndex];
-
-        nvrhi::Rect viewExtent = view->GetViewExtent();
-        int viewportWidth = viewExtent.maxX - viewExtent.minX;
-        int viewportHeight = viewExtent.maxY - viewExtent.minY;
-
-        // temporary textures for downscaling
-        nvrhi::TextureDesc downscaleTextureDesc;
-        downscaleTextureDesc.format = sampleFramebuffer->getFramebufferInfo().colorFormats[0];
-        downscaleTextureDesc.width = (uint32_t)ceil(viewportWidth / 2.f);
-        downscaleTextureDesc.height = (uint32_t)ceil(viewportHeight / 2.f);
-        downscaleTextureDesc.mipLevels = 1;
-        downscaleTextureDesc.isRenderTarget = true;
-        downscaleTextureDesc.debugName = "bloom src mip1";
-        downscaleTextureDesc.initialState = nvrhi::ResourceStates::ShaderResource;
-        downscaleTextureDesc.keepInitialState = true;
-        perViewData.textureDownscale1 = m_Device->createTexture(downscaleTextureDesc);
-        perViewData.framebufferDownscale1 = m_Device->createFramebuffer(nvrhi::FramebufferDesc()
-            .addColorAttachment(perViewData.textureDownscale1));
-
-        downscaleTextureDesc.debugName = "bloom src mip2";
-        downscaleTextureDesc.width = (uint32_t)ceil(downscaleTextureDesc.width / 2.f);
-        downscaleTextureDesc.height = (uint32_t)ceil(downscaleTextureDesc.height / 2.f);
-        perViewData.textureDownscale2 = m_Device->createTexture(downscaleTextureDesc);
-        perViewData.framebufferDownscale2 = m_Device->createFramebuffer(nvrhi::FramebufferDesc()
-            .addColorAttachment(perViewData.textureDownscale2));
-
-        // intermediate textures for accumulating blur
-        nvrhi::TextureDesc intermediateTextureDesc2;
-        intermediateTextureDesc2.format = downscaleTextureDesc.format;
-        intermediateTextureDesc2.width = downscaleTextureDesc.width;
-        intermediateTextureDesc2.height = downscaleTextureDesc.height;
-        intermediateTextureDesc2.mipLevels = 1;
-        intermediateTextureDesc2.isRenderTarget = true;
-
-        intermediateTextureDesc2.debugName = "bloom accumulation pass1";
-        intermediateTextureDesc2.initialState = nvrhi::ResourceStates::ShaderResource;
-        intermediateTextureDesc2.keepInitialState = true;
-        perViewData.texturePass1Blur = m_Device->createTexture(intermediateTextureDesc2);
-        perViewData.framebufferPass1Blur = m_Device->createFramebuffer(nvrhi::FramebufferDesc()
-            .addColorAttachment(perViewData.texturePass1Blur));
-
-        intermediateTextureDesc2.debugName = "bloom accumulation pass2";
-        perViewData.texturePass2Blur = m_Device->createTexture(intermediateTextureDesc2);
-        perViewData.framebufferPass2Blur = m_Device->createFramebuffer(nvrhi::FramebufferDesc()
-            .addColorAttachment(perViewData.texturePass2Blur));
-
-        nvrhi::GraphicsPipelineDesc graphicsPipelineDesc;
-        graphicsPipelineDesc.primType = nvrhi::PrimitiveType::TriangleStrip;
-        graphicsPipelineDesc.VS = m_renderDevice.blit().fullscreenVS();
-        graphicsPipelineDesc.PS = m_BloomBlurPixelShader;
-        graphicsPipelineDesc.bindingLayouts = { m_BloomBlurBindingLayout };
-        graphicsPipelineDesc.renderState.rasterState.setCullNone();
-        graphicsPipelineDesc.renderState.depthStencilState.depthTestEnable = false;
-        graphicsPipelineDesc.renderState.depthStencilState.stencilEnable = false;
-        perViewData.bloomBlurPso = device->createGraphicsPipeline(graphicsPipelineDesc,
-            perViewData.framebufferPass1Blur->getFramebufferInfo());
-        
-        nvrhi::BindingSetDesc bindingSetDesc;
-        bindingSetDesc.bindings = {
-            nvrhi::BindingSetItem::ConstantBuffer(0, m_BloomHBlurCB),
-            nvrhi::BindingSetItem::Sampler(0, m_renderDevice.samplers().linearClamp()),
-            nvrhi::BindingSetItem::Texture_SRV(0, perViewData.textureDownscale2)
-        };
-        perViewData.bloomBlurBindingSetPass1 = m_Device->createBindingSet(bindingSetDesc, m_BloomBlurBindingLayout);
-
-        bindingSetDesc.bindings = {
-            nvrhi::BindingSetItem::ConstantBuffer(0, m_BloomVBlurCB),
-            nvrhi::BindingSetItem::Sampler(0, m_renderDevice.samplers().linearClamp()),
-            nvrhi::BindingSetItem::Texture_SRV(0, perViewData.texturePass1Blur)
-        };
-        perViewData.bloomBlurBindingSetPass2 = m_Device->createBindingSet(bindingSetDesc, m_BloomBlurBindingLayout);
-    }
 }
 
-void BloomPass::Render(
-	nvrhi::ICommandList* commandList,
+void BloomPass::ensureBlurPso(uint32_t viewIndex, nvrhi::IFramebuffer* framebuffer)
+{
+    PerViewData& perViewData = m_PerViewData[viewIndex];
+    const nvrhi::Format colorFormat = framebuffer->getFramebufferInfo().colorFormats[0];
+    if (perViewData.bloomBlurPso && perViewData.psoColorFormat == colorFormat)
+        return;
+
+    nvrhi::GraphicsPipelineDesc graphicsPipelineDesc;
+    graphicsPipelineDesc.primType = nvrhi::PrimitiveType::TriangleStrip;
+    graphicsPipelineDesc.VS = m_renderDevice.blit().fullscreenVS();
+    graphicsPipelineDesc.PS = m_BloomBlurPixelShader;
+    graphicsPipelineDesc.bindingLayouts = { m_BloomBlurBindingLayout };
+    graphicsPipelineDesc.renderState.rasterState.setCullNone();
+    graphicsPipelineDesc.renderState.depthStencilState.depthTestEnable = false;
+    graphicsPipelineDesc.renderState.depthStencilState.stencilEnable = false;
+    perViewData.bloomBlurPso = m_Device->createGraphicsPipeline(graphicsPipelineDesc, framebuffer->getFramebufferInfo());
+    perViewData.psoColorFormat = colorFormat;
+}
+
+void BloomPass::renderInternal(
+    nvrhi::ICommandList* commandList,
     const std::shared_ptr<FramebufferFactory>& framebufferFactory,
     const ICompositeView& compositeView,
-	nvrhi::ITexture* sourceDestTexture,
+    nvrhi::ITexture* sourceDestTexture,
+    nvrhi::ITexture* textureDownscale1,
+    nvrhi::ITexture* textureDownscale2,
+    nvrhi::ITexture* texturePass1Blur,
+    nvrhi::ITexture* texturePass2Blur,
     float sigmaInPixels,
     float blendFactor)
 {
-    float effectiveSigma = clamp(sigmaInPixels * 0.25f, 1.f, 100.f);
+    const float effectiveSigma = clamp(sigmaInPixels * 0.25f, 1.f, 100.f);
 
     commandList->beginMarker("Bloom");
 
@@ -153,21 +138,47 @@ void BloomPass::Render(
     fullscreenquadargs.instanceCount = 1;
     fullscreenquadargs.vertexCount = 4;
 
+    const nvrhi::FramebufferHandle framebufferDownscale1 = m_Device->createFramebuffer(
+        nvrhi::FramebufferDesc().addColorAttachment(textureDownscale1));
+    const nvrhi::FramebufferHandle framebufferDownscale2 = m_Device->createFramebuffer(
+        nvrhi::FramebufferDesc().addColorAttachment(textureDownscale2));
+    const nvrhi::FramebufferHandle framebufferPass1Blur = m_Device->createFramebuffer(
+        nvrhi::FramebufferDesc().addColorAttachment(texturePass1Blur));
+    const nvrhi::FramebufferHandle framebufferPass2Blur = m_Device->createFramebuffer(
+        nvrhi::FramebufferDesc().addColorAttachment(texturePass2Blur));
+
     for (uint viewIndex = 0; viewIndex < compositeView.GetNumChildViews(ViewType::PLANAR); viewIndex++)
     {
         const IView* view = compositeView.GetChildView(ViewType::PLANAR, viewIndex);
         nvrhi::IFramebuffer* framebuffer = framebufferFactory->GetFramebuffer(*view);
-        PerViewData& perViewData = m_PerViewData[viewIndex];
+        ensureBlurPso(viewIndex, framebufferPass1Blur);
 
         nvrhi::ViewportState viewportState = view->GetViewportState();
         const nvrhi::Rect& scissorRect = viewportState.scissorRects[0];
         const nvrhi::FramebufferInfoEx& fbinfo = framebuffer->getFramebufferInfo();
 
-        // downscale
+        nvrhi::BindingSetDesc bindingSetDescPass1;
+        bindingSetDescPass1.bindings = {
+            nvrhi::BindingSetItem::ConstantBuffer(0, m_BloomHBlurCB),
+            nvrhi::BindingSetItem::Sampler(0, m_renderDevice.samplers().linearClamp()),
+            nvrhi::BindingSetItem::Texture_SRV(0, textureDownscale2),
+        };
+        const nvrhi::BindingSetHandle bloomBlurBindingSetPass1 =
+            m_Device->createBindingSet(bindingSetDescPass1, m_BloomBlurBindingLayout);
+
+        nvrhi::BindingSetDesc bindingSetDescPass2;
+        bindingSetDescPass2.bindings = {
+            nvrhi::BindingSetItem::ConstantBuffer(0, m_BloomVBlurCB),
+            nvrhi::BindingSetItem::Sampler(0, m_renderDevice.samplers().linearClamp()),
+            nvrhi::BindingSetItem::Texture_SRV(0, texturePass1Blur),
+        };
+        const nvrhi::BindingSetHandle bloomBlurBindingSetPass2 =
+            m_Device->createBindingSet(bindingSetDescPass2, m_BloomBlurBindingLayout);
+
         {
             commandList->beginMarker("Downscale");
 
-            dm::box2 uvSrcRect = box2(
+            const dm::box2 uvSrcRect = box2(
                 float2(
                     float(scissorRect.minX) / (float)fbinfo.width,
                     float(scissorRect.minY) / (float)fbinfo.height),
@@ -176,85 +187,128 @@ void BloomPass::Render(
                     float(scissorRect.maxY) / (float)fbinfo.height)
             );
 
-            // half-scale down
-
             rhi::BlitParameters blitParams1;
-            blitParams1.targetFramebuffer = perViewData.framebufferDownscale1;
+            blitParams1.targetFramebuffer = framebufferDownscale1;
             blitParams1.sourceTexture = sourceDestTexture;
             blitParams1.sourceBox = uvSrcRect;
-            m_renderDevice.blit().blitTexture(commandList, blitParams1, &m_BindingCache);
-
-            // half-scale again down to quarter-scale
+            m_renderDevice.blit().blitTexture(commandList, blitParams1, nullptr);
 
             rhi::BlitParameters blitParams2;
-            blitParams2.targetFramebuffer = perViewData.framebufferDownscale2;
-            blitParams2.sourceTexture = perViewData.textureDownscale1;
-            m_renderDevice.blit().blitTexture(commandList, blitParams2, &m_BindingCache);
+            blitParams2.targetFramebuffer = framebufferDownscale2;
+            blitParams2.sourceTexture = textureDownscale1;
+            m_renderDevice.blit().blitTexture(commandList, blitParams2, nullptr);
 
-            commandList->endMarker(); // "Downscale"
+            commandList->endMarker();
         }
 
-        // apply blur
         {
             commandList->beginMarker("Blur");
             nvrhi::Viewport viewport;
 
             nvrhi::GraphicsState state;
-            state.pipeline = perViewData.bloomBlurPso;
-            viewport = nvrhi::Viewport(float(perViewData.texturePass1Blur->getDesc().width), float(perViewData.texturePass1Blur->getDesc().height));
+            state.pipeline = m_PerViewData[viewIndex].bloomBlurPso;
+            viewport = nvrhi::Viewport(float(texturePass1Blur->getDesc().width), float(texturePass1Blur->getDesc().height));
             state.viewport.addViewport(viewport);
             state.viewport.addScissorRect(nvrhi::Rect(viewport));
-            state.framebuffer = perViewData.framebufferPass1Blur;
-            state.bindings = { perViewData.bloomBlurBindingSetPass1 };
+            state.framebuffer = framebufferPass1Blur;
+            state.bindings = { bloomBlurBindingSetPass1 };
 
             BloomConstants bloomHorizonal = {};
-            bloomHorizonal.pixstep.x = 1.f / perViewData.texturePass1Blur->getDesc().width;
+            bloomHorizonal.pixstep.x = 1.f / texturePass1Blur->getDesc().width;
             bloomHorizonal.pixstep.y = 0.f;
             bloomHorizonal.argumentScale = -1.f / (2 * effectiveSigma * effectiveSigma);
             bloomHorizonal.normalizationScale = 1.f / (sqrtf(2 * PI_f) * effectiveSigma);
             bloomHorizonal.numSamples = ::round(effectiveSigma * 4.f);
             BloomConstants bloomVertical = bloomHorizonal;
             bloomVertical.pixstep.x = 0.f;
-            bloomVertical.pixstep.y = 1.f / perViewData.texturePass1Blur->getDesc().height;
+            bloomVertical.pixstep.y = 1.f / texturePass1Blur->getDesc().height;
             commandList->writeBuffer(m_BloomHBlurCB, &bloomHorizonal, sizeof(bloomHorizonal));
             commandList->writeBuffer(m_BloomVBlurCB, &bloomVertical, sizeof(bloomVertical));
 
             commandList->setGraphicsState(state);
-            commandList->draw(fullscreenquadargs); // blur to m_TexturePass1Blur or m_TexturePass3Blur
+            commandList->draw(fullscreenquadargs);
 
-            viewport = nvrhi::Viewport(float(perViewData.texturePass2Blur->getDesc().width), float(perViewData.texturePass2Blur->getDesc().height));
+            viewport = nvrhi::Viewport(float(texturePass2Blur->getDesc().width), float(texturePass2Blur->getDesc().height));
             state.viewport.viewports[0] = viewport;
             state.viewport.scissorRects[0] = nvrhi::Rect(viewport);
-            state.framebuffer = perViewData.framebufferPass2Blur;
-            state.bindings = { perViewData.bloomBlurBindingSetPass2 };
+            state.framebuffer = framebufferPass2Blur;
+            state.bindings = { bloomBlurBindingSetPass2 };
 
             commandList->setGraphicsState(state);
-            commandList->draw(fullscreenquadargs); // blur to m_TexturePass2Blur
+            commandList->draw(fullscreenquadargs);
 
-            commandList->endMarker(); // "Blur"
+            commandList->endMarker();
         }
 
-        // composite
         {
             commandList->beginMarker("Apply");
 
             rhi::BlitParameters blitParams3;
             blitParams3.targetFramebuffer = framebuffer;
             blitParams3.targetViewport = viewportState.viewports[0];
-            blitParams3.sourceTexture = perViewData.texturePass2Blur;
+            blitParams3.sourceTexture = texturePass2Blur;
             blitParams3.blendState.setBlendEnable(true)
                 .setSrcBlend(nvrhi::BlendFactor::ConstantColor)
                 .setDestBlend(nvrhi::BlendFactor::InvConstantColor)
                 .setSrcBlendAlpha(nvrhi::BlendFactor::Zero)
                 .setDestBlendAlpha(nvrhi::BlendFactor::One);
             blitParams3.blendConstantColor = nvrhi::Color(blendFactor);
-            m_renderDevice.blit().blitTexture(commandList, blitParams3, &m_BindingCache);
+            m_renderDevice.blit().blitTexture(commandList, blitParams3, nullptr);
 
-            commandList->endMarker(); // "Apply"
+            commandList->endMarker();
         }
     }
 
-    commandList->endMarker(); // "Bloom"
+    commandList->endMarker();
+}
+
+void BloomPass::Render(
+    nvrhi::ICommandList* commandList,
+    const std::shared_ptr<FramebufferFactory>& framebufferFactory,
+    const ICompositeView& compositeView,
+    nvrhi::ITexture* sourceDestTexture,
+    float sigmaInPixels,
+    float blendFactor)
+{
+    const IView* view = compositeView.GetChildView(ViewType::PLANAR, 0);
+    uint32_t mip1W = 0;
+    uint32_t mip1H = 0;
+    uint32_t mip2W = 0;
+    uint32_t mip2H = 0;
+    const rhi::Format colorFormat = bloomColorFormat(framebufferFactory, compositeView);
+    computeBloomMipSizes(view, mip1W, mip1H, mip2W, mip2H);
+
+    nvrhi::TextureDesc nativeDesc;
+    nativeDesc.format = static_cast<nvrhi::Format>(rhi::toNativeFormat(colorFormat));
+    nativeDesc.width = mip1W;
+    nativeDesc.height = mip1H;
+    nativeDesc.mipLevels = 1;
+    nativeDesc.isRenderTarget = true;
+    nativeDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+    nativeDesc.keepInitialState = true;
+
+    nativeDesc.debugName = "bloom src mip1";
+    const nvrhi::TextureHandle textureDownscale1 = m_Device->createTexture(nativeDesc);
+    nativeDesc.debugName = "bloom src mip2";
+    nativeDesc.width = mip2W;
+    nativeDesc.height = mip2H;
+    const nvrhi::TextureHandle textureDownscale2 = m_Device->createTexture(nativeDesc);
+    nativeDesc.debugName = "bloom accumulation pass1";
+    const nvrhi::TextureHandle texturePass1Blur = m_Device->createTexture(nativeDesc);
+    nativeDesc.debugName = "bloom accumulation pass2";
+    const nvrhi::TextureHandle texturePass2Blur = m_Device->createTexture(nativeDesc);
+
+    renderInternal(
+        commandList,
+        framebufferFactory,
+        compositeView,
+        sourceDestTexture,
+        textureDownscale1,
+        textureDownscale2,
+        texturePass1Blur,
+        texturePass2Blur,
+        sigmaInPixels,
+        blendFactor);
 }
 
 void BloomPass::registerGraphPass(
@@ -266,18 +320,55 @@ void BloomPass::registerGraphPass(
     float blendFactor,
     bool enabled)
 {
+    struct BloomGraphPassData
+    {
+        rg::TextureHandle outputColor{};
+        rg::TextureHandle downscale1{};
+        rg::TextureHandle downscale2{};
+        rg::TextureHandle pass1Blur{};
+        rg::TextureHandle pass2Blur{};
+    };
+
+    auto passData = std::make_shared<BloomGraphPassData>();
+    passData->outputColor = processedOutputColor;
+
     graph.addPass(
         "Bloom",
-        [&](caustica::rg::PassBuilder& setup) {
-            setup.read(processedOutputColor, caustica::rg::TextureAccess::ShaderResource);
-            setup.write(processedOutputColor, caustica::rg::TextureAccess::RenderTarget);
+        [passData, framebufferFactory, &compositeView](caustica::rg::PassBuilder& setup) {
+            const IView* view = compositeView.GetChildView(ViewType::PLANAR, 0);
+            uint32_t mip1W = 0;
+            uint32_t mip1H = 0;
+            uint32_t mip2W = 0;
+            uint32_t mip2H = 0;
+            const rhi::Format colorFormat = bloomColorFormat(framebufferFactory, compositeView);
+            computeBloomMipSizes(view, mip1W, mip1H, mip2W, mip2H);
+
+            passData->downscale1 = setup.createTexture(makeBloomMipDesc(mip1W, mip1H, colorFormat, "bloom src mip1"));
+            passData->downscale2 = setup.createTexture(makeBloomMipDesc(mip2W, mip2H, colorFormat, "bloom src mip2"));
+            passData->pass1Blur = setup.createTexture(makeBloomMipDesc(mip2W, mip2H, colorFormat, "bloom accumulation pass1"));
+            passData->pass2Blur = setup.createTexture(makeBloomMipDesc(mip2W, mip2H, colorFormat, "bloom accumulation pass2"));
+
+            setup.read(passData->outputColor, caustica::rg::TextureAccess::ShaderResource);
+            setup.write(passData->downscale1, caustica::rg::TextureAccess::RenderTarget);
+            setup.read(passData->downscale1, caustica::rg::TextureAccess::ShaderResource);
+            setup.write(passData->downscale2, caustica::rg::TextureAccess::RenderTarget);
+            setup.read(passData->downscale2, caustica::rg::TextureAccess::ShaderResource);
+            setup.write(passData->pass1Blur, caustica::rg::TextureAccess::RenderTarget);
+            setup.read(passData->pass1Blur, caustica::rg::TextureAccess::ShaderResource);
+            setup.write(passData->pass2Blur, caustica::rg::TextureAccess::RenderTarget);
+            setup.read(passData->pass2Blur, caustica::rg::TextureAccess::ShaderResource);
+            setup.write(passData->outputColor, caustica::rg::TextureAccess::RenderTarget);
         },
-        [this, processedOutputColor, framebufferFactory, &compositeView, sigmaInPixels, blendFactor](caustica::rg::RenderPassContext& ctx) {
-            Render(
+        [this, passData, framebufferFactory, &compositeView, sigmaInPixels, blendFactor](caustica::rg::RenderPassContext& ctx) {
+            renderInternal(
                 ctx.commandList(),
                 framebufferFactory,
                 compositeView,
-                ctx.texture(processedOutputColor),
+                ctx.texture(passData->outputColor),
+                ctx.texture(passData->downscale1),
+                ctx.texture(passData->downscale2),
+                ctx.texture(passData->pass1Blur),
+                ctx.texture(passData->pass2Blur),
                 sigmaInPixels,
                 blendFactor);
         },

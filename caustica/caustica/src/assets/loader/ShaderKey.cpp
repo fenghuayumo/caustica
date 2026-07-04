@@ -2,23 +2,13 @@
 
 #include <algorithm>
 #include <sstream>
+#include <vector>
 
 namespace caustica
 {
 
 namespace
 {
-    std::string GraphicsApiToken(nvrhi::GraphicsAPI api)
-    {
-        switch (api)
-        {
-        case nvrhi::GraphicsAPI::D3D11: return "d3d11";
-        case nvrhi::GraphicsAPI::D3D12: return "d3d12";
-        case nvrhi::GraphicsAPI::VULKAN: return "vulkan";
-        default: return "unknown";
-        }
-    }
-
     std::string ProfileToken(ShaderCompilerUtils::ShaderProfile profile)
     {
         switch (profile)
@@ -78,7 +68,7 @@ std::string ShaderKey::computeHashHex() const
 {
     std::ostringstream hashInput;
     hashInput << KindToken(kind) << '|'
-              << GraphicsApiToken(graphicsAPI) << '|'
+              << shader::backendToken(backend) << '|'
               << ProfileToken(profile) << '|'
               << sourcePath << '|'
               << entryPoint << '|'
@@ -119,7 +109,7 @@ std::string ShaderKey::packVfsPath(std::string_view packRoot) const
 bool ShaderKey::operator==(const ShaderKey& other) const
 {
     return kind == other.kind
-        && graphicsAPI == other.graphicsAPI
+        && backend == other.backend
         && profile == other.profile
         && sourcePath == other.sourcePath
         && entryPoint == other.entryPoint
@@ -130,7 +120,7 @@ ShaderKey MakeShaderKey(
     std::string_view sourcePath,
     std::string_view entryPoint,
     ShaderKeyKind kind,
-    nvrhi::GraphicsAPI api,
+    shader::Backend backend,
     ShaderCompilerUtils::ShaderProfile profile,
     const std::vector<ShaderMacro>& macros)
 {
@@ -138,7 +128,7 @@ ShaderKey MakeShaderKey(
     key.sourcePath = std::string(sourcePath);
     key.entryPoint = std::string(entryPoint);
     key.kind = kind;
-    key.graphicsAPI = api;
+    key.backend = backend;
     key.profile = profile;
     key.macros = macros;
     return key;
@@ -146,11 +136,11 @@ ShaderKey MakeShaderKey(
 
 ShaderKey MakeShaderLibraryKey(
     std::string_view sourcePath,
-    nvrhi::GraphicsAPI api,
+    shader::Backend backend,
     const std::vector<ShaderMacro>& macros,
     ShaderCompilerUtils::ShaderProfile profile)
 {
-    return MakeShaderKey(sourcePath, {}, ShaderKeyKind::ShaderLibrary, api, profile, macros);
+    return MakeShaderKey(sourcePath, {}, ShaderKeyKind::ShaderLibrary, backend, profile, macros);
 }
 
 } // namespace caustica

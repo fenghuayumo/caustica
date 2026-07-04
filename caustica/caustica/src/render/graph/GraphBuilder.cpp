@@ -1,6 +1,11 @@
 #include <render/graph/GraphBuilder.h>
 
+#include <rhi/Device.h>
+#include <rhi/Format.h>
+#include <rhi/nvrhi.h>
+
 #include <cassert>
+#include <vector>
 
 namespace caustica::rg
 {
@@ -9,8 +14,13 @@ namespace
 {
     bool isValid(TextureHandle handle, size_t textureCount)
     {
-        return handle.valid() && handle.index < textureCount;
+        return handle.isValid() && handle.index < textureCount;
     }
+}
+
+PassBuilder::PassBuilder(GraphBuilder& graph)
+    : m_graph(&graph)
+{
 }
 
 void PassBuilder::read(TextureHandle texture, TextureAccess access)
@@ -23,10 +33,21 @@ void PassBuilder::write(TextureHandle texture, TextureAccess access)
     m_writes.emplace_back(texture, access);
 }
 
+TextureHandle PassBuilder::createTexture(const rhi::TextureDesc& desc)
+{
+    assert(m_graph);
+    return m_graph->createTexture(desc);
+}
+
 RenderPassContext::RenderPassContext(nvrhi::ICommandList* commandList, const GraphBuilder& graph)
     : m_commandList(commandList)
     , m_graph(&graph)
 {
+}
+
+rhi::CommandList RenderPassContext::rhiCommandList() const
+{
+    return rhi::CommandList(m_commandList);
 }
 
 nvrhi::ITexture* RenderPassContext::texture(TextureHandle handle) const
@@ -54,6 +75,16 @@ nvrhi::ResourceStates GraphBuilder::accessToState(TextureAccess access)
     }
 }
 
+void GraphBuilder::setDevice(nvrhi::IDevice* device)
+{
+    m_device = device;
+}
+
+void GraphBuilder::setDevice(rhi::Device& device)
+{
+    m_device = device.nativeDevice();
+}
+
 TextureHandle GraphBuilder::importTexture(nvrhi::ITexture* texture, nvrhi::ResourceStates initialState)
 {
     assert(texture);
@@ -62,9 +93,10 @@ TextureHandle GraphBuilder::importTexture(nvrhi::ITexture* texture, nvrhi::Resou
         return TextureHandle{ existing->second };
 
     const TextureHandle handle{ static_cast<uint32_t>(m_textures.size()) };
-    ImportedTexture imported{};
+    GraphTexture imported{};
     imported.texture = texture;
     imported.currentState = initialState;
+    imported.lifetime = ResourceLifetime::Imported;
     m_textures.push_back(imported);
     m_importIndexByTexture.emplace(texture, handle.index);
     return handle;
@@ -75,6 +107,38 @@ TextureHandle GraphBuilder::importTexture(nvrhi::ITexture* texture, TextureAcces
     return importTexture(texture, accessToState(initialAccess));
 }
 
+TextureHandle GraphBuilder::createTexture(const rhi::TextureDesc& desc)
+{
+    assert(m_device);
+
+    const rhi::FormatInfo formatInfo = rhi::getFormatInfo(desc.format);
+    nvrhi::TextureDesc nativeDesc;
+    nativeDesc.debugName = desc.name.empty() ? "rg_transient" : desc.name.c_str();
+    nativeDesc.width = desc.width;
+    nativeDesc.height = desc.height;
+    nativeDesc.depth = desc.depth;
+    nativeDesc.mipLevels = desc.mipLevels;
+    nativeDesc.arraySize = desc.arraySize;
+    nativeDesc.format = static_cast<nvrhi::Format>(rhi::toNativeFormat(desc.format));
+    nativeDesc.isRenderTarget = desc.isRenderTarget || formatInfo.isRenderTargetCompatible;
+    nativeDesc.isUAV = desc.isUAV || formatInfo.isUAVCompatible;
+    nativeDesc.isTypeless = desc.isTypeless;
+    nativeDesc.initialState = nvrhi::ResourceStates::Common;
+    nativeDesc.keepInitialState = true;
+
+    nvrhi::TextureHandle owned = m_device->createTexture(nativeDesc);
+    assert(owned);
+
+    const TextureHandle handle{ static_cast<uint32_t>(m_textures.size()) };
+    GraphTexture resource{};
+    resource.texture = owned;
+    resource.currentState = nvrhi::ResourceStates::Common;
+    resource.lifetime = ResourceLifetime::Transient;
+    resource.owned = owned;
+    m_textures.push_back(resource);
+    return handle;
+}
+
 void GraphBuilder::addPass(std::string_view name, SetupFn setup, ExecuteFn execute, bool enabled)
 {
     Pass pass;
@@ -83,9 +147,9 @@ void GraphBuilder::addPass(std::string_view name, SetupFn setup, ExecuteFn execu
     pass.execute = std::move(execute);
     pass.enabled = enabled;
 
-    if (pass.setup)
+    if (pass.enabled && pass.setup)
     {
-        PassBuilder builder;
+        PassBuilder builder(*this);
         pass.setup(builder);
         pass.reads = builder.reads();
         pass.writes = builder.writes();
@@ -93,6 +157,55 @@ void GraphBuilder::addPass(std::string_view name, SetupFn setup, ExecuteFn execu
 
     m_passNames.push_back(pass.name);
     m_passes.push_back(std::move(pass));
+    m_compiled = false;
+}
+
+void GraphBuilder::compile()
+{
+    std::vector<bool> referenced(m_textures.size(), false);
+
+    for (const Pass& pass : m_passes)
+    {
+        if (!pass.enabled)
+            continue;
+
+        for (const auto& [handle, access] : pass.reads)
+        {
+            (void)access;
+            assert(isValid(handle, m_textures.size()) && "RenderGraph pass read references invalid texture handle");
+            referenced[handle.index] = true;
+        }
+        for (const auto& [handle, access] : pass.writes)
+        {
+            (void)access;
+            assert(isValid(handle, m_textures.size()) && "RenderGraph pass write references invalid texture handle");
+            referenced[handle.index] = true;
+        }
+    }
+
+    for (size_t i = 0; i < m_textures.size(); ++i)
+    {
+        GraphTexture& resource = m_textures[i];
+        if (resource.lifetime != ResourceLifetime::Transient || referenced[i])
+            continue;
+
+        resource.owned = nullptr;
+        resource.texture = nullptr;
+    }
+
+    m_compiled = true;
+}
+
+void GraphBuilder::releaseTransientResources()
+{
+    for (GraphTexture& resource : m_textures)
+    {
+        if (resource.lifetime == ResourceLifetime::Transient)
+        {
+            resource.owned = nullptr;
+            resource.texture = nullptr;
+        }
+    }
 }
 
 void GraphBuilder::transitionTexture(nvrhi::ICommandList* commandList, TextureHandle handle, TextureAccess access)
@@ -100,13 +213,13 @@ void GraphBuilder::transitionTexture(nvrhi::ICommandList* commandList, TextureHa
     if (!isValid(handle, m_textures.size()))
         return;
 
-    ImportedTexture& imported = m_textures[handle.index];
+    GraphTexture& resource = m_textures[handle.index];
     const nvrhi::ResourceStates targetState = accessToState(access);
-    if (imported.currentState == targetState)
+    if (resource.currentState == targetState)
         return;
 
-    commandList->setTextureState(imported.texture, nvrhi::AllSubresources, targetState);
-    imported.currentState = targetState;
+    commandList->setTextureState(resource.texture, nvrhi::AllSubresources, targetState);
+    resource.currentState = targetState;
 }
 
 void GraphBuilder::syncPassEndStates(const Pass& pass)
@@ -139,6 +252,8 @@ bool GraphBuilder::passUsesTextureAsWrite(const Pass& pass, TextureHandle handle
 void GraphBuilder::execute(nvrhi::ICommandList* commandList)
 {
     assert(commandList);
+    if (!m_compiled)
+        compile();
 
     for (const Pass& pass : m_passes)
     {
@@ -167,12 +282,19 @@ void GraphBuilder::execute(nvrhi::ICommandList* commandList)
     }
 }
 
+void GraphBuilder::execute(rhi::CommandList& commandList)
+{
+    execute(commandList.nativeCommandList());
+}
+
 void GraphBuilder::reset()
 {
+    releaseTransientResources();
     m_textures.clear();
     m_passes.clear();
     m_passNames.clear();
     m_importIndexByTexture.clear();
+    m_compiled = false;
 }
 
 nvrhi::ITexture* GraphBuilder::resolveTexture(TextureHandle handle) const

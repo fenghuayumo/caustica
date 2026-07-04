@@ -8,11 +8,15 @@
 #include <filesystem>
 #include <functional>
 
-
 namespace caustica
 {
     class IBlob;
     class IFileSystem;
+}
+
+namespace caustica::shader
+{
+class ShaderCompilerService;
 }
 
 namespace caustica
@@ -68,7 +72,7 @@ namespace caustica
     {
     private:
         nvrhi::DeviceHandle m_Device;
-        std::unordered_map<std::string, std::shared_ptr<caustica::IBlob>> m_BytecodeCache;
+        std::shared_ptr<shader::ShaderCompilerService> m_compilerService;
 		std::shared_ptr<caustica::IFileSystem> m_fs;
 		std::filesystem::path m_basePath;
 
@@ -81,6 +85,9 @@ namespace caustica
         virtual ~ShaderFactory();
 
         void ClearCache();
+
+        [[nodiscard]] shader::ShaderCompilerService& compilerService() { return *m_compilerService; }
+        [[nodiscard]] const shader::ShaderCompilerService& compilerService() const { return *m_compilerService; }
 
         std::shared_ptr<caustica::IBlob> GetBytecode(const char* fileName, const char* entryName);
 

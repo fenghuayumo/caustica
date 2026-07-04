@@ -2,7 +2,7 @@
 #include <render/Passes/Lighting/MaterialFeatureMask.h>
 
 #include <assets/loader/ShaderFactory.h>
-#include <assets/loader/ShaderKey.h>
+#include <assets/loader/ShaderBackend.h>
 #include <render/Core/FramebufferFactory.h>
 #include <assets/loader/TextureLoader.h>
 
@@ -1324,7 +1324,7 @@ caustica::ShaderKey MaterialShaderPermutation::MakeShaderKey(
     nvrhi::GraphicsAPI api,
     ShaderCompilerUtils::ShaderProfile profile) const
 {
-    return caustica::MakeShaderLibraryKey(ShaderFilePath, api, Macros, profile);
+    return caustica::MakeShaderLibraryKey(ShaderFilePath, caustica::shader::fromNvrhiGraphicsApi(api), Macros, profile);
 }
 
 // MaterialShaderPermutation::MaterialShaderPermutation(const std::string & shaderFilePath, const std::string & closestHitName, const std::string & anyHitName, const std::vector<std::pair<std::string, std::string>> & macros )

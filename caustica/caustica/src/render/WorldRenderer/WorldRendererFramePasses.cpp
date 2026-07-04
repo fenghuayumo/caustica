@@ -3,6 +3,7 @@ namespace { constexpr int c_SwapchainCount = 3; }
 #include <render/WorldRenderer/WorldRenderer.h>
 #include <render/Passes/PostProcess/PostProcessGraph.h>
 #include <render/Passes/Composite/BlitGraphPass.h>
+#include <render/FramePassRegistry.h>
 #include <rhi/RenderDevice.h>
 #include <render/WorldRenderer/PathTracingFramePipeline.h>
 #include <render/SceneGpuResources.h>
@@ -126,6 +127,9 @@ void caustica::render::WorldRenderer::ensureFramePipelineBuilt()
     m_framePipeline->registerLambdaPass("Finalize", [this](PathTracingFrameContext& ctx) {
         framePassFinalize(ctx);
     });
+
+    if (m_context.framePassRegistry)
+        m_context.framePassRegistry->applyTo(*m_framePipeline);
 }
 
 void caustica::render::WorldRenderer::framePassSetup(PathTracingFrameContext& ctx)
@@ -534,6 +538,7 @@ void caustica::render::WorldRenderer::framePassToneMapping(PathTracingFrameConte
     fullscreenView.UpdateCache();
 
     rg::GraphBuilder graph;
+    graph.setDevice(device());
 
     bool commandListWasClosed = false;
     rg::PostProcessGraphParams ppParams{
@@ -551,7 +556,11 @@ void caustica::render::WorldRenderer::framePassToneMapping(PathTracingFrameConte
         .edgeDetectionPipeline = m_ptPipelineEdgeDetection.get(),
         .outCommandListWasClosed = &commandListWasClosed,
     };
+    if (m_context.framePassRegistry)
+        m_context.framePassRegistry->applyGraphPasses(
+            FramePassInsertPoint::AfterDenoiseAndAA, graph, ctx);
     rg::buildPostProcessGraph(ppParams);
+    graph.compile();
     graph.execute(m_commandList);
 
     if (commandListWasClosed)
@@ -579,6 +588,7 @@ void caustica::render::WorldRenderer::framePassComposite(PathTracingFrameContext
         m_shaderDebug->EndFrameAndOutput(m_commandList, m_renderTargets->LdrFramebuffer->GetFramebuffer(fullscreenView), m_renderTargets->Depth, fbinfo.getViewport());
 
     rg::GraphBuilder graph;
+    graph.setDevice(device());
     const rg::TextureHandle ldrColor = graph.importTexture(
         m_renderTargets->LdrColor,
         nvrhi::ResourceStates::ShaderResource);
@@ -588,6 +598,10 @@ void caustica::render::WorldRenderer::framePassComposite(PathTracingFrameContext
     blitParams.targetFramebuffer = framebuffer;
     blitParams.bindingCache = &m_context.bindingCache;
     rg::registerFinalBlitPass(graph, blitParams, m_context.renderDevice.blit());
+    if (m_context.framePassRegistry)
+        m_context.framePassRegistry->applyGraphPasses(
+            FramePassInsertPoint::AfterToneMapping, graph, ctx);
+    graph.compile();
     graph.execute(m_commandList);
     abortIfSubmitFailed(ctx, "finalBlit");
     if (ctx.aborted)
