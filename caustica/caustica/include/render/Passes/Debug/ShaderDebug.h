@@ -5,12 +5,7 @@
 #include <math/math.h>
 
 #include <shaders/Libraries/ShaderDebug/ShaderDebug.hlsl>
-
-namespace caustica
-{
-    class ShaderFactory;
-    class CommonRenderPasses;
-}
+#include <rhi/RenderDevice.h>
 
 // HOW TO USE
 //
@@ -48,13 +43,13 @@ private:
 
 
     std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
-    std::shared_ptr<caustica::CommonRenderPasses> m_commonPasses;
+    caustica::rhi::RenderDevice& m_renderDevice;
 
     std::array<char, SHADER_DEBUG_HEADER_IN_BYTES>              m_initHeader;
     std::array<char, SHADER_DEBUG_BUFFER_IN_BYTES_NO_TRIANGLES> m_lastBuffer;
 
 public:
-    ShaderDebug( nvrhi::IDevice* device, nvrhi::ICommandList* commandList, std::shared_ptr<caustica::ShaderFactory> shaderFactory, std::shared_ptr<caustica::CommonRenderPasses> commonPasses );
+    ShaderDebug( nvrhi::IDevice* device, nvrhi::ICommandList* commandList, std::shared_ptr<caustica::ShaderFactory> shaderFactory, caustica::rhi::RenderDevice& renderDevice );
 
     void                    CreateRenderPasses( nvrhi::IFramebuffer * frameBuffer, nvrhi::TextureHandle depthBuffer );
 

@@ -1,6 +1,6 @@
 #include <render/Passes/Geometry/PixelReadbackPass.h>
 #include <assets/loader/ShaderFactory.h>
-#include <render/Core/CommonRenderPasses.h>
+#include <render/Core/RenderPassConstants.h>
 
 #if CAUSTICA_WITH_STATIC_SHADERS
 #if CAUSTICA_WITH_DX11

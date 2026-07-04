@@ -9,7 +9,7 @@
 namespace caustica
 {
     class ShaderFactory;
-    class CommonRenderPasses;
+    namespace rhi { class RenderDevice; }
 }
 
 // Compute reduction pass to generate mipmap levels
@@ -42,7 +42,7 @@ namespace caustica::render
         // debug : blits mip-map levels in spiral pattern to 'target'
         // (assumes 'target' texture resolution is high enough...)
         void Display(
-            std::shared_ptr<caustica::CommonRenderPasses> commonPasses,
+            caustica::rhi::RenderDevice& renderDevice,
             nvrhi::ICommandList* commandList, 
             nvrhi::IFramebuffer* target);
 

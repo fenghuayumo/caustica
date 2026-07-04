@@ -5,7 +5,7 @@
 #include <render/Passes/RTXDI/RtxdiResources.h>
 #include <render/Passes/RTXDI/PrepareLightsPass.h>
 #include <assets/loader/ShaderFactory.h>
-#include <render/Core/CommonRenderPasses.h>
+#include <rhi/RenderDevice.h>
 #include <scene/View.h>
 #include <render/Passes/RTXDI/GeneratePdfMipsPass.h>
 #include <render/Passes/Lighting/Distant/EnvMapProcessor.h>
@@ -23,11 +23,11 @@ using namespace caustica::render;
 RtxdiPass::RtxdiPass(
 	nvrhi::IDevice* device,
 	std::shared_ptr<caustica::ShaderFactory> shaderFactory,
-	std::shared_ptr<caustica::CommonRenderPasses> commonRenderPasses,
+	caustica::rhi::RenderDevice& renderDevice,
 	nvrhi::BindingLayoutHandle bindlessLayout) :
 		m_device(device),
 		m_shaderFactory(shaderFactory),
-		m_CommonRenderPasses(commonRenderPasses),
+		m_renderDevice(renderDevice),
 		m_bindlessLayout(bindlessLayout),
 		m_PreviousReservoirIndex(0)
 {
@@ -185,7 +185,7 @@ void RtxdiPass::CreateBindingSet(const RenderTargets& renderTargets)
 			
 			nvrhi::BindingSetItem::ConstantBuffer(5, m_rtxdiConstantBuffer),
 
-			nvrhi::BindingSetItem::Sampler(4, m_CommonRenderPasses->m_LinearWrapSampler)
+			nvrhi::BindingSetItem::Sampler(4, m_renderDevice.samplers().linearWrap())
 		};
 
 		const nvrhi::BindingSetHandle bindingSet = m_device->createBindingSet(bindingSetDesc, m_bindingLayout);
@@ -249,7 +249,7 @@ void RtxdiPass::PrepareResources(
 
     if (!m_PrepareLightsPass)
     {
-        m_PrepareLightsPass = std::make_unique<PrepareLightsPass>(m_device, m_shaderFactory, m_CommonRenderPasses, nullptr, materialGpuCache, opacityMicromapBuilder, subInstanceDataBuffer, m_bindlessLayout, shaderDebug);
+        m_PrepareLightsPass = std::make_unique<PrepareLightsPass>(m_device, m_shaderFactory, m_renderDevice, nullptr, materialGpuCache, opacityMicromapBuilder, subInstanceDataBuffer, m_bindlessLayout, shaderDebug);
         m_PrepareLightsPass->CreatePipeline();
     }
 

@@ -2,7 +2,6 @@
 
 #include <assets/loader/ShaderFactory.h>
 #include <render/Core/FramebufferFactory.h>
-#include <render/Core/CommonRenderPasses.h>
 #include <assets/loader/TextureLoader.h>
 
 //#include <engine/UserInterfaceUtils.h>
@@ -40,9 +39,8 @@ GPUSort::~GPUSort()
 {
 }
 
-void GPUSort::CreateRenderPasses(std::shared_ptr<caustica::CommonRenderPasses> commonPasses, std::shared_ptr<ShaderDebug> shaderDebug)
+void GPUSort::CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebug)
 {
-    m_commonPasses = commonPasses;
     m_shaderDebug = shaderDebug;
 
     {

@@ -42,7 +42,6 @@ class RenderDevice;
 }
 
 class Application;
-class CommonRenderPasses;
 class DescriptorTableManager;
 class GpuRenderSubsystem;
 class FirstPersonCamera;
@@ -79,7 +78,6 @@ public:
 
     std::shared_ptr<ShaderFactory> GetShaderFactory() const { return m_shaderFactory; }
     [[nodiscard]] rhi::RenderDevice* GetRenderDevice() const;
-    std::shared_ptr<CommonRenderPasses> GetCommonPasses() const;
     std::shared_ptr<TextureLoader> GetTextureLoader() const { return m_TextureLoader; }
     std::shared_ptr<DescriptorTableManager> GetDescriptorTable() const;
     SceneManager* GetSceneManager() const { return m_sceneManager; }
@@ -234,7 +232,6 @@ protected:
 
     std::shared_ptr<ShaderFactory> m_shaderFactory;
     std::shared_ptr<TextureLoader> m_TextureLoader;
-    std::shared_ptr<CommonRenderPasses> m_CommonPasses;
     BindingCache* m_bindingCache = nullptr;
     std::shared_ptr<DescriptorTableManager> m_DescriptorTable;
 

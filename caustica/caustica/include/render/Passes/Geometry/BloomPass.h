@@ -5,12 +5,11 @@
 #include <memory>
 #include <unordered_map>
 
+#include <rhi/RenderDevice.h>
 
 namespace caustica
 {
     class ShaderFactory;
-    class ShadowMap;
-    class CommonRenderPasses;
     class FramebufferFactory;
     class ICompositeView;
 }
@@ -20,7 +19,7 @@ namespace caustica::render
     class BloomPass
     {
     private:
-        std::shared_ptr<caustica::CommonRenderPasses> m_CommonPasses;
+        caustica::rhi::RenderDevice& m_renderDevice;
         std::shared_ptr<caustica::FramebufferFactory> m_FramebufferFactory;
 
         nvrhi::DeviceHandle m_Device;
@@ -59,7 +58,7 @@ namespace caustica::render
         BloomPass(
             nvrhi::IDevice* device,
             const std::shared_ptr<caustica::ShaderFactory>& shaderFactory,
-            std::shared_ptr<caustica::CommonRenderPasses> commonPasses,
+            caustica::rhi::RenderDevice& renderDevice,
             std::shared_ptr<caustica::FramebufferFactory> framebufferFactory,
             const caustica::ICompositeView& compositeView);
 

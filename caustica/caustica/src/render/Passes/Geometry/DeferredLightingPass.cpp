@@ -8,7 +8,8 @@
 #include <scene/SceneObjects.h>
 #include <scene/SceneEcs.h>
 #include <scene/SceneLightAccess.h>
-#include <render/Core/CommonRenderPasses.h>
+#include <render/Core/RenderPassConstants.h>
+#include <rhi/RenderDevice.h>
 #include <scene/View.h>
 #include <core/log.h>
 #include <utility>
@@ -42,10 +43,10 @@ void DeferredLightingPass::Inputs::SetGBuffer(const GBufferRenderTargets& target
 
 DeferredLightingPass::DeferredLightingPass(
     nvrhi::IDevice* device,
-    std::shared_ptr<CommonRenderPasses> commonPasses)
+    rhi::RenderDevice& renderDevice)
     : m_Device(device)
     , m_BindingSets(device)
-    , m_CommonPasses(std::move(commonPasses))
+    , m_renderDevice(&renderDevice)
 {
 }
 
@@ -253,24 +254,24 @@ void DeferredLightingPass::Render(
         nvrhi::BindingSetDesc bindingSetDesc;
         bindingSetDesc.bindings = {
             nvrhi::BindingSetItem::ConstantBuffer(0, m_DeferredLightingCB),
-            nvrhi::BindingSetItem::Texture_SRV(0, shadowMapTexture ? shadowMapTexture : m_CommonPasses->m_BlackDepthStencilTexture2DArray.Get()),
-            nvrhi::BindingSetItem::Texture_SRV(1, lightProbeDiffuse ? lightProbeDiffuse : m_CommonPasses->m_BlackCubeMapArray.Get()),
-            nvrhi::BindingSetItem::Texture_SRV(2, lightProbeSpecular ? lightProbeSpecular : m_CommonPasses->m_BlackCubeMapArray.Get()),
-            nvrhi::BindingSetItem::Texture_SRV(3, lightProbeEnvironmentBrdf ? lightProbeEnvironmentBrdf : m_CommonPasses->m_BlackTexture.Get()),
+            nvrhi::BindingSetItem::Texture_SRV(0, shadowMapTexture ? shadowMapTexture : m_renderDevice->builtins().blackDepthStencilTexture2DArray().Get()),
+            nvrhi::BindingSetItem::Texture_SRV(1, lightProbeDiffuse ? lightProbeDiffuse : m_renderDevice->builtins().blackCubeMapArray().Get()),
+            nvrhi::BindingSetItem::Texture_SRV(2, lightProbeSpecular ? lightProbeSpecular : m_renderDevice->builtins().blackCubeMapArray().Get()),
+            nvrhi::BindingSetItem::Texture_SRV(3, lightProbeEnvironmentBrdf ? lightProbeEnvironmentBrdf : m_renderDevice->builtins().blackTexture().Get()),
             nvrhi::BindingSetItem::Texture_SRV(8, inputs.depth, nvrhi::Format::UNKNOWN, viewSubresources),
             nvrhi::BindingSetItem::Texture_SRV(9, inputs.gbufferDiffuse, nvrhi::Format::UNKNOWN, viewSubresources),
             nvrhi::BindingSetItem::Texture_SRV(10, inputs.gbufferSpecular, nvrhi::Format::UNKNOWN, viewSubresources),
             nvrhi::BindingSetItem::Texture_SRV(11, inputs.gbufferNormals, nvrhi::Format::UNKNOWN, viewSubresources),
             nvrhi::BindingSetItem::Texture_SRV(12, inputs.gbufferEmissive, nvrhi::Format::UNKNOWN, viewSubresources),
-            nvrhi::BindingSetItem::Texture_SRV(14, inputs.indirectDiffuse ? inputs.indirectDiffuse : m_CommonPasses->m_BlackTexture.Get(), nvrhi::Format::UNKNOWN, viewSubresources),
-            nvrhi::BindingSetItem::Texture_SRV(15, inputs.indirectSpecular ? inputs.indirectSpecular : m_CommonPasses->m_BlackTexture.Get(), nvrhi::Format::UNKNOWN, viewSubresources),
-            nvrhi::BindingSetItem::Texture_SRV(16, inputs.shadowChannels ? inputs.shadowChannels : m_CommonPasses->m_BlackTexture.Get()),
-            nvrhi::BindingSetItem::Texture_SRV(17, inputs.ambientOcclusion ? inputs.ambientOcclusion : m_CommonPasses->m_WhiteTexture.Get(), nvrhi::Format::UNKNOWN, viewSubresources),
+            nvrhi::BindingSetItem::Texture_SRV(14, inputs.indirectDiffuse ? inputs.indirectDiffuse : m_renderDevice->builtins().blackTexture().Get(), nvrhi::Format::UNKNOWN, viewSubresources),
+            nvrhi::BindingSetItem::Texture_SRV(15, inputs.indirectSpecular ? inputs.indirectSpecular : m_renderDevice->builtins().blackTexture().Get(), nvrhi::Format::UNKNOWN, viewSubresources),
+            nvrhi::BindingSetItem::Texture_SRV(16, inputs.shadowChannels ? inputs.shadowChannels : m_renderDevice->builtins().blackTexture().Get()),
+            nvrhi::BindingSetItem::Texture_SRV(17, inputs.ambientOcclusion ? inputs.ambientOcclusion : m_renderDevice->builtins().whiteTexture().Get(), nvrhi::Format::UNKNOWN, viewSubresources),
             nvrhi::BindingSetItem::Texture_UAV(0, inputs.output, nvrhi::Format::UNKNOWN, viewSubresources),
             nvrhi::BindingSetItem::Sampler(0, m_ShadowSampler),
             nvrhi::BindingSetItem::Sampler(1, m_ShadowSamplerComparison),
-            nvrhi::BindingSetItem::Sampler(2, m_CommonPasses->m_LinearWrapSampler),
-            nvrhi::BindingSetItem::Sampler(3, m_CommonPasses->m_LinearClampSampler)
+            nvrhi::BindingSetItem::Sampler(2, m_renderDevice->samplers().linearWrap()),
+            nvrhi::BindingSetItem::Sampler(3, m_renderDevice->samplers().linearClamp())
         };
 
         nvrhi::BindingSetHandle bindingSet = m_BindingSets.GetOrCreateBindingSet(bindingSetDesc, m_BindingLayout);

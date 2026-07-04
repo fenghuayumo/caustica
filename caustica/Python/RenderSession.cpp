@@ -628,13 +628,6 @@ bool RenderSession::SaveScreenshot(const std::string& outputPath)
         return false;
     }
 
-    auto commonPasses = renderDevice->commonPassesPtr();
-    if (!commonPasses)
-    {
-        caustica::error("RenderSession: common passes not initialized yet");
-        return false;
-    }
-
     // SaveTextureToFile creates its own command list. Wait for the last rendered
     // frame to finish so LdrColor is not still in use by an in-flight submit.
     if (!m_deviceManager->GetDevice()->waitForIdle())
@@ -649,7 +642,7 @@ bool RenderSession::SaveScreenshot(const std::string& outputPath)
 
     return caustica::SaveTextureToFile(
         m_deviceManager->GetDevice(),
-        commonPasses.get(),
+        *renderDevice,
         tex,
         state,
         outputPath.c_str());

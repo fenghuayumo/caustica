@@ -2,7 +2,6 @@
 
 #include <assets/loader/ShaderFactory.h>
 #include <render/Core/FramebufferFactory.h>
-#include <render/Core/CommonRenderPasses.h>
 #include <assets/loader/TextureLoader.h>
 
 #include <core/scope.h>
@@ -1267,7 +1266,7 @@ void MaterialGpuCache::CompleteDeferredTexturesLoad(nvrhi::ICommandList* command
         }
 
         // In case new textures were loaded, we need to make sure they were uploaded properly
-        const bool texturesFinalized = m_textureCache->ProcessRenderingThreadCommands(*m_commonPasses, 0.f);
+        const bool texturesFinalized = m_textureCache->ProcessRenderingThreadCommands(*m_renderDevice, 0.f);
         m_textureCache->LoadingFinished();
         m_deferredTextureLoadInProgress = false;
         info("MaterialGpuCache: deferred texture flush end, ok=%s", texturesFinalized ? "true" : "false");
@@ -1368,12 +1367,12 @@ void MaterialGpuCache::BakeShaderPermutations()
     }
 }
 
-void MaterialGpuCache::CreateRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* bindlessLayout, std::shared_ptr<caustica::CommonRenderPasses> commonPasses, const std::shared_ptr<caustica::Scene>& scene, const std::filesystem::path& sceneFilePath, const std::filesystem::path & mediaPath )
+void MaterialGpuCache::CreateRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* bindlessLayout, caustica::rhi::RenderDevice& renderDevice, const std::shared_ptr<caustica::Scene>& scene, const std::filesystem::path& sceneFilePath, const std::filesystem::path & mediaPath )
 {
     info("MaterialGpuCache: CreateRenderPassesAndLoadMaterials begin");
     assert(!mediaPath.empty());
     //m_bindlessLayout = bindlessLayout;
-    m_commonPasses = commonPasses;
+    m_renderDevice = &renderDevice;
 
     {
         nvrhi::BufferDesc bufferDesc;

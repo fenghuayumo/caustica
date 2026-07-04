@@ -21,7 +21,6 @@ namespace caustica
     class TextureLoader;
     class TextureHandle;
     class ShaderFactory;
-    class CommonRenderPasses;
     struct TextureData;
 }
 namespace caustica::render

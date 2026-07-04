@@ -1,7 +1,7 @@
 #include <render/Passes/Geometry/DepthPass.h>
 #include <assets/loader/ShaderFactory.h>
 #include <scene/SceneTypes.h>
-#include <render/Core/CommonRenderPasses.h>
+#include <rhi/RenderDevice.h>
 #include <scene/View.h>
 #include <render/Core/MaterialBindingCache.h>
 #include <rhi/utils.h>
@@ -34,9 +34,9 @@ using namespace caustica::render;
 
 DepthPass::DepthPass(
     nvrhi::IDevice* device,
-    std::shared_ptr<CommonRenderPasses> commonPasses)
+    rhi::RenderDevice& renderDevice)
     : m_Device(device)
-    , m_CommonPasses(std::move(commonPasses))
+    , m_renderDevice(&renderDevice)
 {
     m_IsDX11 = m_Device->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D11;
 }
@@ -53,7 +53,7 @@ void DepthPass::Init(ShaderFactory& shaderFactory, const CreateParameters& param
     if (params.materialBindings)
         m_MaterialBindings = params.materialBindings;
     else
-        m_MaterialBindings = CreateMaterialBindingCache(*m_CommonPasses);
+        m_MaterialBindings = CreateMaterialBindingCache(*m_renderDevice);
 
     m_DepthCB = m_Device->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(DepthPassConstants),
         "DepthPassConstants", params.numConstantBufferVersions));
@@ -123,12 +123,12 @@ void DepthPass::CreateViewBindings(nvrhi::BindingLayoutHandle& layout, nvrhi::Bi
         .setTrackLiveness(params.trackLiveness)
         .addItem(nvrhi::BindingSetItem::ConstantBuffer(DEPTH_BINDING_VIEW_CONSTANTS, m_DepthCB))
         .addItem(nvrhi::BindingSetItem::Sampler(DEPTH_BINDING_MATERIAL_SAMPLER,
-            m_CommonPasses->m_AnisotropicWrapSampler));
+            m_renderDevice->samplers().anisotropicWrap()));
 
     set = m_Device->createBindingSet(bindingSetDesc, layout);
 }
 
-std::shared_ptr<MaterialBindingCache> DepthPass::CreateMaterialBindingCache(CommonRenderPasses& commonPasses)
+std::shared_ptr<MaterialBindingCache> DepthPass::CreateMaterialBindingCache(rhi::RenderDevice& renderDevice)
 {
     std::vector<MaterialResourceBinding> materialBindings = {
         { MaterialResource::DiffuseTexture, DEPTH_BINDING_MATERIAL_DIFFUSE_TEXTURE },
@@ -142,9 +142,9 @@ std::shared_ptr<MaterialBindingCache> DepthPass::CreateMaterialBindingCache(Comm
         /* registerSpace = */ DEPTH_SPACE_MATERIAL,
         /* registerSpaceIsDescriptorSet = */ true,
         materialBindings,
-        commonPasses.m_AnisotropicWrapSampler,
-        commonPasses.m_GrayTexture,
-        commonPasses.m_BlackTexture);
+        renderDevice.samplers().anisotropicWrap(),
+        renderDevice.builtins().grayTexture(),
+        renderDevice.builtins().blackTexture());
 }
 
 nvrhi::GraphicsPipelineHandle DepthPass::CreateGraphicsPipeline(PipelineKey key,

@@ -2,7 +2,8 @@
 #include <assets/AssetSystem.h>
 
 #include <render/Core/DescriptorTableManager.h>
-#include <render/Core/CommonRenderPasses.h>
+#include <rhi/RenderDevice.h>
+#include <rhi/FullscreenBlitPass.h>
 #include <assets/loader/DDSFile.h>
 #include <core/ThreadPool.h>
 #include <core/vfs/VFS.h>
@@ -315,7 +316,7 @@ uint GetMipLevelsNum(uint width, uint height)
 
 void TextureLoader::FinalizeTexture(
     std::shared_ptr<TextureData> texture,
-    CommonRenderPasses* passes,
+    rhi::RenderDevice* renderDevice,
     nvrhi::ICommandList* commandList)
 {
     assert(texture->data);
@@ -373,7 +374,7 @@ void TextureLoader::FinalizeTexture(
     textureDesc.depth = texture->depth;
     textureDesc.arraySize = texture->arraySize;
     textureDesc.dimension = texture->dimension;
-    textureDesc.mipLevels = m_GenerateMipmaps && texture->isRenderTarget && passes
+    textureDesc.mipLevels = m_GenerateMipmaps && texture->isRenderTarget && renderDevice
         ? GetMipLevelsNum(textureDesc.width, textureDesc.height)
         : texture->mipLevels;
     textureDesc.debugName = texture->path;
@@ -411,7 +412,7 @@ void TextureLoader::FinalizeTexture(
         nvrhi::FramebufferHandle framebuffer = m_Device->createFramebuffer(nvrhi::FramebufferDesc()
             .addColorAttachment(texture->texture));
         
-        passes->BlitTexture(commandList, framebuffer, tempTexture);
+        renderDevice->blit().blitTexture(commandList, framebuffer, tempTexture);
     }
     else
     {
@@ -437,11 +438,11 @@ void TextureLoader::FinalizeTexture(
                 .setArraySlice(0)
                 .setMipLevel(mipLevel)));
         
-        BlitParameters blitParams;
+        rhi::BlitParameters blitParams;
         blitParams.sourceTexture = texture->texture;
         blitParams.sourceMip = mipLevel - 1;
         blitParams.targetFramebuffer = framebuffer;
-        passes->BlitTexture(commandList, blitParams);
+        renderDevice->blit().blitTexture(commandList, blitParams);
     }
 
     commandList->setPermanentTextureState(texture->texture, nvrhi::ResourceStates::ShaderResource);
@@ -468,7 +469,7 @@ void TextureLoader::TextureLoaded(std::shared_ptr<TextureData> texture)
 std::shared_ptr<LoadedTexture> TextureLoader::LoadTextureFromFile(
     const std::filesystem::path& path,
     bool sRGB,
-    CommonRenderPasses* passes,
+    rhi::RenderDevice* renderDevice,
     nvrhi::ICommandList* commandList)
 {
     std::shared_ptr<TextureData> texture;
@@ -486,7 +487,7 @@ std::shared_ptr<LoadedTexture> TextureLoader::LoadTextureFromFile(
         {
             TextureLoaded(texture);
 
-            FinalizeTexture(texture, passes, commandList);
+            FinalizeTexture(texture, renderDevice, commandList);
         }
     }
 
@@ -594,7 +595,7 @@ std::shared_ptr<LoadedTexture> TextureLoader::LoadTextureFromMemory(
     const std::string& name,
     const std::string& mimeType,
     bool sRGB,
-    CommonRenderPasses* passes,
+    rhi::RenderDevice* renderDevice,
     nvrhi::ICommandList* commandList)
 {
     std::shared_ptr<TextureData> texture = CreateTextureData();
@@ -607,7 +608,7 @@ std::shared_ptr<LoadedTexture> TextureLoader::LoadTextureFromMemory(
     {
         TextureLoaded(texture);
 
-        FinalizeTexture(texture, passes, commandList);
+        FinalizeTexture(texture, renderDevice, commandList);
     }
 
     ++m_TexturesLoaded;
@@ -650,7 +651,7 @@ std::shared_ptr<TextureData> TextureLoader::GetLoadedTexture(std::filesystem::pa
     return AssetSystem::Get().GetTextureCache().GetAny(id);
 }
 
-bool TextureLoader::ProcessRenderingThreadCommands(CommonRenderPasses& passes, float timeLimitMilliseconds)
+bool TextureLoader::ProcessRenderingThreadCommands(rhi::RenderDevice& renderDevice, float timeLimitMilliseconds)
 {
     using namespace std::chrono;
 
@@ -690,7 +691,7 @@ bool TextureLoader::ProcessRenderingThreadCommands(CommonRenderPasses& passes, f
 
             m_CommandList->open();
 
-            FinalizeTexture(pTexture, &passes, m_CommandList);
+            FinalizeTexture(pTexture, &renderDevice, m_CommandList);
 
             m_CommandList->close();
             m_Device->executeCommandList(m_CommandList);
@@ -719,7 +720,7 @@ namespace caustica
 {
     bool SaveTextureToFile(
         nvrhi::IDevice* device,
-        CommonRenderPasses* pPasses,
+        rhi::RenderDevice& renderDevice,
         nvrhi::ITexture* texture,
         nvrhi::ResourceStates textureState,
         const char* fileName,
@@ -778,7 +779,7 @@ namespace caustica
             tempTexture = device->createTexture(desc);
             tempFramebuffer = device->createFramebuffer(nvrhi::FramebufferDesc().addColorAttachment(tempTexture));
             
-            pPasses->BlitTexture(commandList, tempFramebuffer, texture);
+            renderDevice.blit().blitTexture(commandList, tempFramebuffer, texture);
         }
 
         // Create a plain staging texture for CPU readback. Do not inherit

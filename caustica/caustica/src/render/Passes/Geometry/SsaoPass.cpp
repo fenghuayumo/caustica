@@ -2,7 +2,8 @@
 #include <render/Core/FramebufferFactory.h>
 #include <assets/loader/ShaderFactory.h>
 #include <render/Core/ShadowMap.h>
-#include <render/Core/CommonRenderPasses.h>
+#include <render/Core/RenderPassConstants.h>
+#include <rhi/RenderDevice.h>
 #include <scene/View.h>
 #include <rhi/utils.h>
 
@@ -37,10 +38,10 @@ using namespace caustica::render;
 SsaoPass::SsaoPass(
     nvrhi::IDevice* device,
     std::shared_ptr<ShaderFactory> shaderFactory,
-    std::shared_ptr<CommonRenderPasses> commonPasses,
+    rhi::RenderDevice& renderDevice,
     const CreateParameters& params)
     : m_Device(device)
-    , m_CommonPasses(commonPasses)
+    , m_renderDevice(&renderDevice)
 {
     nvrhi::BufferDesc constantBufferDesc;
     constantBufferDesc.byteSize = sizeof(SsaoConstants);
@@ -146,11 +147,11 @@ SsaoPass::SsaoPass(
 SsaoPass::SsaoPass(
     nvrhi::IDevice* device,
     std::shared_ptr<ShaderFactory> shaderFactory,
-    std::shared_ptr<CommonRenderPasses> commonPasses,
+    rhi::RenderDevice& renderDevice,
     nvrhi::ITexture* gbufferDepth,
     nvrhi::ITexture* gbufferNormals,
     nvrhi::ITexture* destinationTexture)
-    : SsaoPass(device, shaderFactory, commonPasses, CreateParameters{ dm::int2(gbufferDepth->getDesc().width, gbufferDepth->getDesc().height), false, false, false, 1 })
+    : SsaoPass(device, shaderFactory, renderDevice, CreateParameters{ dm::int2(gbufferDepth->getDesc().width, gbufferDepth->getDesc().height), false, false, false, 1 })
 {
 #ifdef _DEBUG
     const nvrhi::TextureDesc& depthDesc = gbufferDepth->getDesc();
@@ -192,7 +193,7 @@ void SsaoPass::CreateBindingSet(
         nvrhi::BindingSetItem::Texture_SRV(0, m_DeinterleavedDepth),
         nvrhi::BindingSetItem::Texture_SRV(1, m_DeinterleavedOcclusion),
         nvrhi::BindingSetItem::Texture_UAV(0, destinationTexture),
-        nvrhi::BindingSetItem::Sampler(0, m_CommonPasses->m_PointClampSampler)
+        nvrhi::BindingSetItem::Sampler(0, m_renderDevice->samplers().pointClamp())
     };
     m_Blur.BindingSets[bindingSetIndex] = m_Device->createBindingSet(BlurBindings, m_Blur.BindingLayout);
 }

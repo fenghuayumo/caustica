@@ -17,7 +17,8 @@
 #include <render/Core/BindingCache.h>
 #include <assets/loader/ShaderFactory.h>
 #include <render/Core/FramebufferFactory.h>
-#include <render/Core/CommonRenderPasses.h>
+#include <render/Core/RenderPassConstants.h>
+#include <rhi/RenderDevice.h>
 #include <assets/loader/TextureLoader.h>
 
 #include <platform/file_dialog.h>
@@ -359,7 +360,7 @@ int EnvMapProcessor::GetTargetCubeResolution() const
     return m_targetResolution; 
 }
 
-void EnvMapProcessor::PreUpdate(nvrhi::ICommandList* commandList, std::shared_ptr<caustica::CommonRenderPasses> commonPasses, std::string envMapBackgroundPath, const std::filesystem::path& sceneDirectory)
+void EnvMapProcessor::PreUpdate(nvrhi::ICommandList* commandList, caustica::rhi::RenderDevice& renderDevice, std::string envMapBackgroundPath, const std::filesystem::path& sceneDirectory)
 {
     if( m_device->getGraphicsAPI() == nvrhi::GraphicsAPI::VULKAN && m_BC6UCompressionEnabled )
     {
@@ -397,7 +398,7 @@ void EnvMapProcessor::PreUpdate(nvrhi::ICommandList* commandList, std::shared_pt
             const std::filesystem::path fullPath = ResolveSceneMediaPath(
                 m_loadedSourceBackgroundPath,
                 sceneDirectory);
-            m_textureCache->LoadTextureFromFile(fullPath, false, commonPasses.get(), commandList);
+            m_textureCache->LoadTextureFromFile(fullPath, false, &renderDevice, commandList);
             commandList->close();
             m_device->executeCommandList(commandList);
             m_device->waitForIdle();
@@ -419,10 +420,10 @@ void EnvMapProcessor::PreUpdate(nvrhi::ICommandList* commandList, std::shared_pt
     }
 
     if (proceduralSkyEnabled && m_proceduralSky == nullptr)
-        m_proceduralSky = std::make_shared<SampleProceduralSky>(m_device, m_textureCache, commonPasses, commandList);
+        m_proceduralSky = std::make_shared<SampleProceduralSky>(m_device, m_textureCache, renderDevice, commandList);
 }
 
-bool EnvMapProcessor::Update(nvrhi::ICommandList* commandList, caustica::BindingCache & bindingCache, std::shared_ptr<caustica::CommonRenderPasses> commonPasses, const UpdateSettings & _settings, double sceneTime, EMB_DirectionalLight const * directionalLights, uint directionaLightCount, bool forceInstantUpdate)
+bool EnvMapProcessor::Update(nvrhi::ICommandList* commandList, caustica::BindingCache & bindingCache, caustica::rhi::RenderDevice& renderDevice, const UpdateSettings & _settings, double sceneTime, EMB_DirectionalLight const * directionalLights, uint directionaLightCount, bool forceInstantUpdate)
 {
     UpdateSettings settings = _settings;
 
@@ -492,7 +493,7 @@ bool EnvMapProcessor::Update(nvrhi::ICommandList* commandList, caustica::Binding
         1,
         (m_loadedSourceBackgroundTextureCubemap != nullptr)
             ? m_loadedSourceBackgroundTextureCubemap->texture
-            : (nvrhi::TextureHandle)commonPasses->m_BlackCubeMapArray.Get(),
+            : (nvrhi::TextureHandle)renderDevice.builtins().blackCubeMapArray().Get(),
         nvrhi::Format::UNKNOWN,
         nvrhi::AllSubresources,
         nvrhi::TextureDimension::TextureCubeArray);
@@ -502,14 +503,14 @@ bool EnvMapProcessor::Update(nvrhi::ICommandList* commandList, caustica::Binding
             //nvrhi::BindingSetItem::PushConstants(1, sizeof(SampleMiniConstants)),
             nvrhi::BindingSetItem::Texture_UAV(0, m_cubemapLowRes, nvrhi::Format::UNKNOWN, nvrhi::TextureSubresourceSet(0, 1, 0, 6)).setDimension(nvrhi::TextureDimension::Texture2DArray),
             nvrhi::BindingSetItem::Texture_UAV(1, m_cubemap, nvrhi::Format::UNKNOWN, nvrhi::TextureSubresourceSet(1, 1, 0, 6)).setDimension(nvrhi::TextureDimension::Texture2DArray),
-            nvrhi::BindingSetItem::Texture_SRV(0, (m_loadedSourceBackgroundTextureEquirect != nullptr) ? (m_loadedSourceBackgroundTextureEquirect->texture) : ((nvrhi::TextureHandle)commonPasses->m_BlackTexture.Get())),
+            nvrhi::BindingSetItem::Texture_SRV(0, (m_loadedSourceBackgroundTextureEquirect != nullptr) ? (m_loadedSourceBackgroundTextureEquirect->texture) : ((nvrhi::TextureHandle)renderDevice.builtins().blackTexture().Get())),
             sourceCubemapBinding,
-            nvrhi::BindingSetItem::Texture_SRV(2, (nvrhi::TextureHandle)commonPasses->m_BlackCubeMapArray.Get()),
-            nvrhi::BindingSetItem::Texture_SRV(10, (m_proceduralSky != nullptr && proceduralSkyEnabled) ? (m_proceduralSky->GetTransmittanceTexture()) : ((nvrhi::TextureHandle)commonPasses->m_BlackTexture.Get())),
-            nvrhi::BindingSetItem::Texture_SRV(11, (m_proceduralSky != nullptr && proceduralSkyEnabled) ? (m_proceduralSky->GetScatterringTexture()) : ((nvrhi::TextureHandle)commonPasses->m_BlackTexture3D.Get())),
-            nvrhi::BindingSetItem::Texture_SRV(12, (m_proceduralSky != nullptr && proceduralSkyEnabled) ? (m_proceduralSky->GetIrradianceTexture()) : ((nvrhi::TextureHandle)commonPasses->m_BlackTexture.Get())),
-            nvrhi::BindingSetItem::Texture_SRV(13, (m_proceduralSky != nullptr && proceduralSkyEnabled) ? (m_proceduralSky->GetCloudsTexture()) : ((nvrhi::TextureHandle)commonPasses->m_BlackTexture.Get())),
-            nvrhi::BindingSetItem::Texture_SRV(14, (m_proceduralSky != nullptr && proceduralSkyEnabled) ? (m_proceduralSky->GetNoiseTexture()) : ((nvrhi::TextureHandle)commonPasses->m_BlackTexture.Get())),
+            nvrhi::BindingSetItem::Texture_SRV(2, (nvrhi::TextureHandle)renderDevice.builtins().blackCubeMapArray().Get()),
+            nvrhi::BindingSetItem::Texture_SRV(10, (m_proceduralSky != nullptr && proceduralSkyEnabled) ? (m_proceduralSky->GetTransmittanceTexture()) : ((nvrhi::TextureHandle)renderDevice.builtins().blackTexture().Get())),
+            nvrhi::BindingSetItem::Texture_SRV(11, (m_proceduralSky != nullptr && proceduralSkyEnabled) ? (m_proceduralSky->GetScatterringTexture()) : ((nvrhi::TextureHandle)renderDevice.builtins().blackTexture3D().Get())),
+            nvrhi::BindingSetItem::Texture_SRV(12, (m_proceduralSky != nullptr && proceduralSkyEnabled) ? (m_proceduralSky->GetIrradianceTexture()) : ((nvrhi::TextureHandle)renderDevice.builtins().blackTexture().Get())),
+            nvrhi::BindingSetItem::Texture_SRV(13, (m_proceduralSky != nullptr && proceduralSkyEnabled) ? (m_proceduralSky->GetCloudsTexture()) : ((nvrhi::TextureHandle)renderDevice.builtins().blackTexture().Get())),
+            nvrhi::BindingSetItem::Texture_SRV(14, (m_proceduralSky != nullptr && proceduralSkyEnabled) ? (m_proceduralSky->GetNoiseTexture()) : ((nvrhi::TextureHandle)renderDevice.builtins().blackTexture().Get())),
             //nvrhi::BindingSetItem::Texture_UAV(0, m_Cubemap),
             nvrhi::BindingSetItem::Sampler(0, m_pointSampler),
             nvrhi::BindingSetItem::Sampler(1, m_linearSampler),

@@ -342,7 +342,7 @@ target_link_libraries(causScene
 # denoising (NRD / OIDN), RTXDI, Gaussian splatting, GPU sort, debugging.
 
 file(GLOB_RECURSE caus_render_headers include/render/*.h include/rhi/*.h)
-file(GLOB_RECURSE caus_render_sources src/render/*.cpp src/render/*.c src/rhi/*.cpp)
+file(GLOB_RECURSE caus_render_sources src/render/*.cpp src/render/*.c src/render/graph/*.cpp src/rhi/*.cpp)
 
 add_library(causRender STATIC ${caus_render_headers} ${caus_render_sources})
 caus_configure_static(causRender)

@@ -6,10 +6,14 @@
 #include <memory>
 #include <unordered_map>
 
+namespace caustica::rhi
+{
+class RenderDevice;
+}
+
 namespace caustica
 {
     class ShaderFactory;
-    class CommonRenderPasses;
     class FramebufferFactory;
     class ICompositeView;
 }
@@ -36,7 +40,7 @@ namespace caustica::render
         nvrhi::TextureHandle m_EnvironmentBrdfTexture;
         uint32_t m_EnvironmentBrdfTextureSize;
 
-        std::shared_ptr<caustica::CommonRenderPasses> m_CommonPasses;
+        rhi::RenderDevice* m_renderDevice = nullptr;
 
         std::unordered_map<nvrhi::FramebufferInfo, nvrhi::GraphicsPipelineHandle> m_BlitPsoCache;
         std::unordered_map<nvrhi::FramebufferInfo, nvrhi::GraphicsPipelineHandle> m_DiffusePsoCache;
@@ -70,7 +74,7 @@ namespace caustica::render
         LightProbeProcessingPass(
             nvrhi::IDevice* device,
             std::shared_ptr<caustica::ShaderFactory> shaderFactory,
-            std::shared_ptr<caustica::CommonRenderPasses> commonPasses,
+            rhi::RenderDevice& renderDevice,
             uint32_t intermediateTextureSize = 1024,
             nvrhi::Format intermediateTextureFormat = nvrhi::Format::RGBA16_FLOAT
         );

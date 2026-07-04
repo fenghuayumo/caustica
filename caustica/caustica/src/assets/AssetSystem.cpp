@@ -98,12 +98,12 @@ AssetId AssetSystem::RegisterMesh(const std::filesystem::path& path)
 std::shared_ptr<LoadedTexture> AssetSystem::LoadTexture(
     const std::filesystem::path& path,
     bool sRGB,
-    CommonRenderPasses* passes,
+    rhi::RenderDevice* renderDevice,
     nvrhi::ICommandList* commandList)
 {
     if (!m_TextureLoader)
         return nullptr;
-    return m_TextureLoader->LoadTextureFromFile(path, sRGB, passes, commandList);
+    return m_TextureLoader->LoadTextureFromFile(path, sRGB, renderDevice, commandList);
 }
 
 std::shared_ptr<LoadedTexture> AssetSystem::LoadTextureDeferred(

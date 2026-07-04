@@ -1,6 +1,8 @@
 #include <render/Passes/Geometry/MipMapGenPass.h>
 #include <assets/loader/ShaderFactory.h>
-#include <render/Core/CommonRenderPasses.h>
+#include <render/Core/RenderPassConstants.h>
+#include <rhi/RenderDevice.h>
+#include <rhi/FullscreenBlitPass.h>
 
 #if CAUSTICA_WITH_STATIC_SHADERS
 #if CAUSTICA_WITH_DX11
@@ -188,7 +190,7 @@ void MipMapGenPass::Dispatch(nvrhi::ICommandList* commandList, int maxLOD)
 }
 
 
-void MipMapGenPass::Display(std::shared_ptr<caustica::CommonRenderPasses> commonPasses, nvrhi::ICommandList* commandList, nvrhi::IFramebuffer* target)
+void MipMapGenPass::Display(caustica::rhi::RenderDevice& renderDevice, nvrhi::ICommandList* commandList, nvrhi::IFramebuffer* target)
 {
     assert(m_Texture);
     
@@ -201,7 +203,7 @@ void MipMapGenPass::Display(std::shared_ptr<caustica::CommonRenderPasses> common
  
     for (uint level = 0; level < m_Texture->getDesc().mipLevels-1; ++level)
     {
-        BlitParameters blitParams;
+        caustica::rhi::BlitParameters blitParams;
         blitParams.targetFramebuffer = target;
         blitParams.sourceTexture = m_Texture;
         blitParams.sourceMip = level + 1;
@@ -212,7 +214,7 @@ void MipMapGenPass::Display(std::shared_ptr<caustica::CommonRenderPasses> common
             corner.y, 0.f, 1.f
         );
 
-        commonPasses->BlitTexture(commandList, blitParams, &m_BindingCache);
+        renderDevice.blit().blitTexture(commandList, blitParams, &m_BindingCache);
 
         // spiral pattern
         switch (level % 4)

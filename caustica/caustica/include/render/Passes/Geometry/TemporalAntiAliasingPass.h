@@ -4,12 +4,11 @@
 #include <math/math.h>
 #include <rhi/nvrhi.h>
 #include <memory>
+#include <rhi/RenderDevice.h>
 
 namespace caustica
 {
     class ShaderFactory;
-    class ShadowMap;
-    class CommonRenderPasses;
     class FramebufferFactory;
     class ICompositeView;
 }
@@ -40,7 +39,7 @@ namespace caustica::render
     class TemporalAntiAliasingPass
     {
     private:
-        std::shared_ptr<caustica::CommonRenderPasses> m_CommonPasses;
+        caustica::rhi::RenderDevice& m_renderDevice;
 
         nvrhi::ShaderHandle m_MotionVectorPS;
         nvrhi::ShaderHandle m_TemporalAntiAliasingCS;
@@ -84,7 +83,7 @@ namespace caustica::render
         TemporalAntiAliasingPass(
             nvrhi::IDevice* device,
             std::shared_ptr<caustica::ShaderFactory> shaderFactory,
-            std::shared_ptr<caustica::CommonRenderPasses> commonPasses,
+            caustica::rhi::RenderDevice& renderDevice,
             const caustica::ICompositeView& compositeView,
             const CreateParameters& params);
 

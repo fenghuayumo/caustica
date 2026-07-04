@@ -2,7 +2,8 @@
 #include <render/Core/FramebufferFactory.h>
 #include <assets/loader/ShaderFactory.h>
 #include <render/Core/ShadowMap.h>
-#include <render/Core/CommonRenderPasses.h>
+#include <render/Core/RenderPassConstants.h>
+#include <rhi/RenderDevice.h>
 #include <scene/View.h>
 #include <scene/SceneObjects.h>
 
@@ -27,7 +28,7 @@ using namespace caustica::render;
 SkyPass::SkyPass(
     nvrhi::IDevice* device,
     const std::shared_ptr<caustica::ShaderFactory>& shaderFactory,
-    const std::shared_ptr<caustica::CommonRenderPasses>& commonPasses,
+    rhi::RenderDevice& renderDevice,
     const std::shared_ptr<caustica::FramebufferFactory>& framebufferFactory,
     const ICompositeView& compositeView)
     : m_FramebufferFactory(framebufferFactory)
@@ -60,7 +61,7 @@ SkyPass::SkyPass(
 
         nvrhi::GraphicsPipelineDesc pipelineDesc;
         pipelineDesc.primType = nvrhi::PrimitiveType::TriangleStrip;
-        pipelineDesc.VS = sampleView->IsReverseDepth() ? commonPasses->m_FullscreenVS : commonPasses->m_FullscreenAtOneVS;
+        pipelineDesc.VS = sampleView->IsReverseDepth() ? renderDevice.blit().fullscreenVS() : renderDevice.blit().fullscreenAtOneVS();
         pipelineDesc.PS = m_PixelShader;
         pipelineDesc.bindingLayouts = { m_RenderBindingLayout };
 

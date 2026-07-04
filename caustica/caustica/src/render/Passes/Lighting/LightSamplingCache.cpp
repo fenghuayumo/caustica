@@ -3,7 +3,6 @@
 
 #include <assets/loader/ShaderFactory.h>
 #include <render/Core/FramebufferFactory.h>
-#include <render/Core/CommonRenderPasses.h>
 #include <assets/loader/TextureLoader.h>
 
 #include <core/scope.h>
@@ -90,9 +89,9 @@ LightSamplingCache::~LightSamplingCache()
 {
 }
 
-void LightSamplingCache::CreateRenderPasses(std::shared_ptr<caustica::ShaderFactory> shaderFactory, nvrhi::IBindingLayout* bindlessLayout, std::shared_ptr<caustica::CommonRenderPasses> commonPasses, std::shared_ptr<ShaderDebug> shaderDebug, const uint2 renderResolution, const uint envMapProcessedResolution)
+void LightSamplingCache::CreateRenderPasses(std::shared_ptr<caustica::ShaderFactory> shaderFactory, nvrhi::IBindingLayout* bindlessLayout, caustica::rhi::RenderDevice& renderDevice, std::shared_ptr<ShaderDebug> shaderDebug, const uint2 renderResolution, const uint envMapProcessedResolution)
 {
-    m_commonPasses = commonPasses;
+    m_renderDevice = &renderDevice;
     m_shaderDebug = shaderDebug;
 
     std::vector<caustica::ShaderMacro> shaderMacros;
@@ -911,12 +910,12 @@ void LightSamplingCache::FillBindings(nvrhi::BindingSetDesc& outBindingSetDesc, 
 nvrhi::TextureHandle depthBuffer, nvrhi::TextureHandle motionVectors, nvrhi::TextureHandle envMapProcessed)
 {
     if( depthBuffer == nullptr )
-        depthBuffer = ((nvrhi::TextureHandle)m_commonPasses->m_BlackTexture.Get());
+        depthBuffer = ((nvrhi::TextureHandle)m_renderDevice->builtins().blackTexture().Get());
     if (motionVectors == nullptr)
-        motionVectors = ((nvrhi::TextureHandle)m_commonPasses->m_BlackTexture.Get());
+        motionVectors = ((nvrhi::TextureHandle)m_renderDevice->builtins().blackTexture().Get());
     nvrhi::TextureHandle envMapRadianceAndImportanceMap = envMapProcessed;
     if (envMapRadianceAndImportanceMap == nullptr || !m_currentSettings.EnvMapParams.Enabled )
-        envMapRadianceAndImportanceMap = ((nvrhi::TextureHandle)m_commonPasses->m_BlackTexture.Get());
+        envMapRadianceAndImportanceMap = ((nvrhi::TextureHandle)m_renderDevice->builtins().blackTexture().Get());
 
     outBindingSetDesc.bindings = {
             //nvrhi::BindingSetItem::ConstantBuffer(0, m_constantBuffer),
@@ -946,7 +945,7 @@ nvrhi::TextureHandle depthBuffer, nvrhi::TextureHandle motionVectors, nvrhi::Tex
             nvrhi::BindingSetItem::Texture_SRV(12, envMapRadianceAndImportanceMap),
             nvrhi::BindingSetItem::Sampler(0, m_pointSampler),
             nvrhi::BindingSetItem::Sampler(1, m_linearSampler),
-            nvrhi::BindingSetItem::Sampler(2, m_commonPasses->m_AnisotropicWrapSampler),    // s_MaterialSampler
+            nvrhi::BindingSetItem::Sampler(2, m_renderDevice->samplers().anisotropicWrap()),    // s_MaterialSampler
             nvrhi::BindingSetItem::StructuredBuffer_SRV(1, subInstanceDataBuffer),
             nvrhi::BindingSetItem::StructuredBuffer_SRV(2, scene->GetGpuResources().instanceBuffer),
             nvrhi::BindingSetItem::StructuredBuffer_SRV(3, scene->GetGpuResources().geometryBuffer),

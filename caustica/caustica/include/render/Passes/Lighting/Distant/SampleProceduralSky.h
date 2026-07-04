@@ -26,7 +26,7 @@ namespace caustica
     class TextureLoader;
     class TextureHandle;
     class ShaderFactory;
-    class CommonRenderPasses;
+    namespace rhi { class RenderDevice; }
     struct TextureData;
     struct LoadedTexture;
 }
@@ -34,7 +34,7 @@ namespace caustica
 class SampleProceduralSky 
 {
 public:
-    SampleProceduralSky( nvrhi::IDevice* device, std::shared_ptr<caustica::TextureLoader> textureCache, std::shared_ptr<caustica::CommonRenderPasses> commonPasses, nvrhi::ICommandList* commandList );
+    SampleProceduralSky( nvrhi::IDevice* device, std::shared_ptr<caustica::TextureLoader> textureCache, caustica::rhi::RenderDevice& renderDevice, nvrhi::ICommandList* commandList );
     ~SampleProceduralSky();
 
     nvrhi::TextureHandle            GetTransmittanceTexture() const;

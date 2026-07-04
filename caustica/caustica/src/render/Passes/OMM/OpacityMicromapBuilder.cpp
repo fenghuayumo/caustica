@@ -3,7 +3,6 @@
 
 #include <assets/loader/ShaderFactory.h>
 #include <render/Core/FramebufferFactory.h>
-#include <render/Core/CommonRenderPasses.h>
 #include <assets/loader/TextureLoader.h>
 
 #include <core/scope.h>
@@ -88,10 +87,9 @@ void OpacityMicromapBuilder::SceneUnloading()
     m_ommBuildQueue->CancelPendingBuilds();
 }
 
-void OpacityMicromapBuilder::CreateRenderPasses(nvrhi::BindingLayoutHandle bindlessLayout, std::shared_ptr<caustica::CommonRenderPasses> commonPasses)
+void OpacityMicromapBuilder::CreateRenderPasses(nvrhi::BindingLayoutHandle bindlessLayout, caustica::rhi::RenderDevice& /*renderDevice*/)
 {
     m_bindlessLayout = std::move(bindlessLayout);
-    m_commonPasses = std::move(commonPasses);
 }
 
 void OpacityMicromapBuilder::CreateOpacityMicromaps(const caustica::Scene& scene)

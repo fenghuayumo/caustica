@@ -12,7 +12,6 @@
 #include <core/vfs/VFS.h>
 #include <render/Core/BindingCache.h>
 #include <render/Core/BindlessTable.h>
-#include <render/Core/CommonRenderPasses.h>
 #include <render/Core/SceneGpuUpdater.h>
 #include <rhi/RenderDevice.h>
 #include <render/PathTracerScenePasses.h>
@@ -51,7 +50,6 @@ bool GpuRenderSubsystem::initializeSession(const GpuRenderSubsystemInitParams& p
     m_bindlessLayout = render::WorldRenderer::CreateBindlessLayout(device);
 
     m_renderDevice = std::make_unique<rhi::RenderDevice>(device, m_shaderFactory);
-    m_commonPasses = m_renderDevice->commonPassesPtr();
     m_bindingCache = std::make_unique<BindingCache>(device);
     m_bindlessTable = std::make_unique<BindlessTable>(device, m_bindlessLayout);
     m_descriptorTable = m_bindlessTable->GetDescriptorTableManager();
@@ -199,9 +197,9 @@ void GpuRenderSubsystem::onSceneLoadedGpuPrep()
     if (m_worldRenderer)
         m_worldRenderer->onSceneLoaded();
 
-    if (m_textureCache && m_commonPasses)
+    if (m_textureCache && m_renderDevice)
     {
-        m_textureCache->ProcessRenderingThreadCommands(*m_commonPasses, 0.f);
+        m_textureCache->ProcessRenderingThreadCommands(*m_renderDevice, 0.f);
         m_textureCache->LoadingFinished();
     }
 
@@ -284,7 +282,6 @@ void GpuRenderSubsystem::shutdown()
     m_bindlessTable.reset();
     m_bindingCache.reset();
     m_renderDevice.reset();
-    m_commonPasses.reset();
     m_shaderFactory.reset();
     m_bindlessLayout = nullptr;
 
@@ -337,11 +334,6 @@ const rhi::RenderDevice& GpuRenderSubsystem::renderDevice() const
 {
     assert(m_renderDevice != nullptr);
     return *m_renderDevice;
-}
-
-std::shared_ptr<CommonRenderPasses> GpuRenderSubsystem::commonPasses() const
-{
-    return m_commonPasses;
 }
 
 } // namespace caustica

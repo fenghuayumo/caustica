@@ -34,7 +34,7 @@ namespace caustica
     class TextureLoader;
     class TextureHandle;
     class ShaderFactory;
-    class CommonRenderPasses;
+    namespace rhi { class RenderDevice; }
     struct TextureData;
 }
 
@@ -89,9 +89,8 @@ public:
 
     void                            CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebug, std::shared_ptr<caustica::ShaderFactory> shaderFactory, std::shared_ptr<ComputePipelineRegistry> computePipelineRegistry);
 
-    void                            PreUpdate( nvrhi::ICommandList* commandList, std::shared_ptr<caustica::CommonRenderPasses> commonPasses, std::string envMapBackgroundPath, const std::filesystem::path& sceneDirectory = std::filesystem::path() );    // use to update to figure out GetTargetCubeResolution() default cubemap resolution and needed before Update; Ignore return if not needed.
-    // Returns 'true' if contents changed; note: directionalLights must be transformed to Environment map local space. 
-    bool                            Update( nvrhi::ICommandList * commandList, caustica::BindingCache & bindingCache, std::shared_ptr<caustica::CommonRenderPasses> commonPasses, const UpdateSettings & settings, double sceneTime, EMB_DirectionalLight const * directionalLights, uint directionaLightCount, bool forceInstantUpdate );
+    void                            PreUpdate( nvrhi::ICommandList* commandList, caustica::rhi::RenderDevice& renderDevice, std::string envMapBackgroundPath, const std::filesystem::path& sceneDirectory = std::filesystem::path() );
+    bool                            Update( nvrhi::ICommandList * commandList, caustica::BindingCache & bindingCache, caustica::rhi::RenderDevice& renderDevice, const UpdateSettings & settings, double sceneTime, EMB_DirectionalLight const * directionalLights, uint directionaLightCount, bool forceInstantUpdate );
 
     nvrhi::TextureHandle            GetEnvMapCube() const           { return (m_outputIsCompressed)?(m_cubemapBC6H):(m_cubemap); }
     nvrhi::SamplerHandle            GetEnvMapCubeSampler() const    { return m_linearSampler; }

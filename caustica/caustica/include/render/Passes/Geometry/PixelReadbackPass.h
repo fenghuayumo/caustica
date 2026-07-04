@@ -9,7 +9,6 @@
 namespace caustica
 {
     class ShaderFactory;
-    class CommonRenderPasses;
     class FramebufferFactory;
     class ICompositeView;
 }

@@ -18,10 +18,10 @@ struct GaussianSplatRenderSettings;
 namespace caustica
 {
 class AccelStructManager;
-class CommonRenderPasses;
 class GaussianSplat;
 class GpuDevice;
 class ShaderFactory;
+namespace rhi { class RenderDevice; }
 } // namespace caustica
 
 namespace caustica::render
@@ -101,7 +101,7 @@ private:
     PathTracerSettings* m_settings = nullptr;
     caustica::render::GaussianSplatSceneSummary* m_summary = nullptr;
     std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
-    std::shared_ptr<caustica::CommonRenderPasses> m_commonPasses;
+    caustica::rhi::RenderDevice* m_renderDevice = nullptr;
 
     std::shared_ptr<GPUSort> m_gpuSort;
     std::vector<SceneObject> m_objects;

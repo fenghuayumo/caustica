@@ -336,8 +336,11 @@ void SceneEditor::afterWorldRender(caustica::GpuDevice& gpuDevice)
         if (!framebuffer)
             return false;
         nvrhi::ITexture* texture = framebuffer->getDesc().colorAttachments[0].texture;
+        auto* renderDevice = GetRenderDevice();
+        if (!renderDevice)
+            return false;
         return SaveTextureToFile(
-            gpuDevice.GetDevice(), GetCommonPasses().get(), texture, nvrhi::ResourceStates::Common, fileName);
+            gpuDevice.GetDevice(), *renderDevice, texture, nvrhi::ResourceStates::Common, fileName);
     };
     CaptureScriptPostRender(saveFramebuffer);
 

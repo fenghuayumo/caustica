@@ -72,7 +72,7 @@ void SceneGaussianSplatPasses::wireSession(const ScenePassWireParams& params)
     m_settings = &params.settings;
     m_summary = &params.gaussianSplatsSummary;
     m_shaderFactory = params.shaderFactory;
-    m_commonPasses = params.renderDevice.commonPassesPtr();
+    m_renderDevice = &params.renderDevice;
 }
 
 void SceneGaussianSplatPasses::setOnRequestFullRebuild(std::function<void()> callback)
@@ -164,7 +164,7 @@ void SceneGaussianSplatPasses::preparePass(GaussianSplatPass& pass)
 
     if (m_gpuSort == nullptr)
         m_gpuSort = std::make_shared<GPUSort>(m_gpuDevice->GetDevice(), m_shaderFactory);
-    m_gpuSort->CreateRenderPasses(m_commonPasses, shaderDebug);
+    m_gpuSort->CreateRenderPasses(shaderDebug);
     pass.SetGpuSort(m_gpuSort);
     pass.CreatePipeline(*renderTargets);
 }

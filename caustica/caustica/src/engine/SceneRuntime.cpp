@@ -14,7 +14,6 @@
 #include <scene/SceneCameraAccess.h>
 #include <scene/SceneEcs.h>
 #include <assets/loader/ShaderFactory.h>
-#include <render/Core/CommonRenderPasses.h>
 #include <assets/loader/TextureLoader.h>
 #include <render/Core/BindingCache.h>
 #include <render/Core/View.h>
@@ -97,7 +96,6 @@ void SceneRuntime::bindGpuRenderSubsystem(GpuRenderSubsystem& gpuRenderSubsystem
 {
     m_gpuRenderSubsystem = &gpuRenderSubsystem;
     m_shaderFactory = gpuRenderSubsystem.shaderFactory();
-    m_CommonPasses = gpuRenderSubsystem.commonPasses();
     m_bindingCache = gpuRenderSubsystem.bindingCache();
     m_DescriptorTable = gpuRenderSubsystem.descriptorTable();
     m_TextureLoader = gpuRenderSubsystem.textureLoader();
@@ -136,7 +134,6 @@ const std::string& SceneRuntime::GetEnvMapLocalPath() const { return GetLighting
 const std::string& SceneRuntime::GetEnvMapOverrideSource() const { return GetLightingPasses().envMapOverride(); }
 const std::vector<std::filesystem::path>& SceneRuntime::GetEnvMapMediaList() { return GetLightingPasses().envMapMediaList(); }
 
-std::shared_ptr<CommonRenderPasses> SceneRuntime::GetCommonPasses() const { return m_CommonPasses; }
 std::shared_ptr<DescriptorTableManager> SceneRuntime::GetDescriptorTable() const { return m_DescriptorTable; }
 BindingCache& SceneRuntime::GetBindingCache() { return *m_bindingCache; }
 

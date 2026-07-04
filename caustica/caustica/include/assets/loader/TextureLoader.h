@@ -22,8 +22,9 @@ namespace caustica
 
 namespace caustica
 {
-    class CommonRenderPasses;
     class ThreadPool;
+
+namespace rhi { class RenderDevice; }
 
     struct TextureSubresourceData
     {
@@ -85,7 +86,7 @@ namespace caustica
 
         void FinalizeTexture(
             std::shared_ptr<TextureData> texture,
-            CommonRenderPasses* passes,
+            rhi::RenderDevice* renderDevice,
             nvrhi::ICommandList* commandList);
 
         virtual void TextureLoaded(std::shared_ptr<TextureData> texture);
@@ -107,7 +108,7 @@ namespace caustica
         virtual std::shared_ptr<LoadedTexture> LoadTextureFromFile(
             const std::filesystem::path& path,
             bool sRGB,
-            CommonRenderPasses* passes,
+            rhi::RenderDevice* renderDevice,
             nvrhi::ICommandList* commandList);
 
         virtual std::shared_ptr<LoadedTexture> LoadTextureFromFileDeferred(
@@ -131,7 +132,7 @@ namespace caustica
             const std::string& name,
             const std::string& mimeType,
             bool sRGB,
-            CommonRenderPasses* passes,
+            rhi::RenderDevice* renderDevice,
             nvrhi::ICommandList* commandList);
 
         virtual std::shared_ptr<LoadedTexture> LoadTextureFromMemoryDeferred(
@@ -144,7 +145,7 @@ namespace caustica
         bool IsTextureFinalized(const std::shared_ptr<LoadedTexture>& texture);
         bool UnloadTexture(const std::shared_ptr<LoadedTexture>& texture);
 
-        bool ProcessRenderingThreadCommands(CommonRenderPasses& passes, float timeLimitMilliseconds);
+        bool ProcessRenderingThreadCommands(rhi::RenderDevice& renderDevice, float timeLimitMilliseconds);
         void LoadingFinished();
         void SetMaxTextureSize(uint32_t size);
         void SetGenerateMipmaps(bool generateMipmaps);
@@ -165,7 +166,7 @@ namespace caustica
     // Creates and destroys temporary resources internally, so should NOT be called often.
     bool SaveTextureToFile(
         nvrhi::IDevice* device,
-        CommonRenderPasses* pPasses,
+        rhi::RenderDevice& renderDevice,
         nvrhi::ITexture* texture,
         nvrhi::ResourceStates textureState,
         const char* fileName,

@@ -5,11 +5,15 @@
 #include <memory>
 
 
+namespace caustica::rhi
+{
+class RenderDevice;
+}
+
 namespace caustica
 {
     class ShaderFactory;
     class ShadowMap;
-    class CommonRenderPasses;
     class FramebufferFactory;
     class ICompositeView;
     class DirectionalLight;
@@ -48,7 +52,7 @@ namespace caustica::render
         SkyPass(
             nvrhi::IDevice* device,
             const std::shared_ptr<caustica::ShaderFactory>& shaderFactory,
-            const std::shared_ptr<caustica::CommonRenderPasses>& commonPasses,
+            rhi::RenderDevice& renderDevice,
             const std::shared_ptr<caustica::FramebufferFactory>& framebufferFactory,
             const caustica::ICompositeView& compositeView);
 

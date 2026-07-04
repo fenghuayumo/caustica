@@ -1,7 +1,7 @@
 #include <render/Passes/Geometry/LightProbeProcessingPass.h>
 #include <render/Core/FramebufferFactory.h>
 #include <assets/loader/ShaderFactory.h>
-#include <render/Core/CommonRenderPasses.h>
+#include <rhi/RenderDevice.h>
 #include <scene/View.h>
 
 #if CAUSTICA_WITH_STATIC_SHADERS
@@ -39,12 +39,12 @@ using namespace caustica::render;
 LightProbeProcessingPass::LightProbeProcessingPass(
     nvrhi::IDevice* device,
     std::shared_ptr<ShaderFactory> shaderFactory,
-    std::shared_ptr<CommonRenderPasses> commonPasses,
+    rhi::RenderDevice& renderDevice,
     uint32_t intermediateTextureSize,
     nvrhi::Format intermediateTextureFormat)
     : m_Device(device)
     , m_IntermediateTextureSize(intermediateTextureSize)
-    , m_CommonPasses(commonPasses)
+    , m_renderDevice(&renderDevice)
 {
     m_GeometryShader = shaderFactory->CreateAutoShader("engine/passes/light_probe.hlsl", "cubemap_gs", CAUSTICA_MAKE_PLATFORM_SHADER(g_light_probe_cubemap_gs), nullptr, nvrhi::ShaderType::Geometry);
     m_MipPixelShader = shaderFactory->CreateAutoShader("engine/passes/light_probe.hlsl", "mip_ps", CAUSTICA_MAKE_PLATFORM_SHADER(g_light_probe_mip_ps), nullptr, nvrhi::ShaderType::Pixel);
@@ -130,7 +130,7 @@ nvrhi::BindingSetHandle LightProbeProcessingPass::GetCachedBindingSet(nvrhi::ITe
         nvrhi::BindingSetDesc bindingSetDesc;
         bindingSetDesc.bindings = {
             nvrhi::BindingSetItem::ConstantBuffer(0, m_LightProbeCB),
-            nvrhi::BindingSetItem::Sampler(0, m_CommonPasses->m_LinearWrapSampler),
+            nvrhi::BindingSetItem::Sampler(0, m_renderDevice->samplers().linearWrap()),
             nvrhi::BindingSetItem::Texture_SRV(0, texture, nvrhi::Format::UNKNOWN, subresources),
         };
 
@@ -159,7 +159,7 @@ void LightProbeProcessingPass::BlitCubemap(nvrhi::ICommandList* commandList, nvr
     if (!pso)
     {
         nvrhi::GraphicsPipelineDesc psoDesc;
-        psoDesc.VS = m_CommonPasses->m_FullscreenVS;
+        psoDesc.VS = m_renderDevice->blit().fullscreenVS();
         psoDesc.GS = m_GeometryShader;
         psoDesc.PS = m_MipPixelShader;
         psoDesc.bindingLayouts = { m_BindingLayout };
@@ -238,7 +238,7 @@ void LightProbeProcessingPass::RenderDiffuseMap(
     if (!pso)
     {
         nvrhi::GraphicsPipelineDesc psoDesc;
-        psoDesc.VS = m_CommonPasses->m_FullscreenVS;
+        psoDesc.VS = m_renderDevice->blit().fullscreenVS();
         psoDesc.GS = m_GeometryShader;
         psoDesc.PS = m_DiffusePixelShader;
         psoDesc.bindingLayouts = { m_BindingLayout };
@@ -298,7 +298,7 @@ void LightProbeProcessingPass::RenderSpecularMap(nvrhi::ICommandList* commandLis
     if (!pso)
     {
         nvrhi::GraphicsPipelineDesc psoDesc;
-        psoDesc.VS = m_CommonPasses->m_FullscreenVS;
+        psoDesc.VS = m_renderDevice->blit().fullscreenVS();
         psoDesc.GS = m_GeometryShader;
         psoDesc.PS = m_SpecularPixelShader;
         psoDesc.bindingLayouts = { m_BindingLayout };
@@ -345,7 +345,7 @@ void LightProbeProcessingPass::RenderEnvironmentBrdfTexture(nvrhi::ICommandList*
     nvrhi::FramebufferInfo const& framebufferInfo = framebuffer->getFramebufferInfo();
 
     nvrhi::GraphicsPipelineDesc psoDesc;
-    psoDesc.VS = m_CommonPasses->m_FullscreenVS;
+    psoDesc.VS = m_renderDevice->blit().fullscreenVS();
     psoDesc.PS = m_EnvironmentBrdfPixelShader;
     psoDesc.primType = nvrhi::PrimitiveType::TriangleStrip;
     psoDesc.renderState.rasterState.setCullNone();

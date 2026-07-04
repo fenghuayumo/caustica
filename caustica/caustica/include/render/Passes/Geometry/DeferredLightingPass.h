@@ -6,10 +6,14 @@
 #include <unordered_map>
 #include <render/Core/BindingCache.h>
 
+namespace caustica::rhi
+{
+class RenderDevice;
+}
+
 namespace caustica
 {
     class ShaderFactory;
-    class CommonRenderPasses;
     class FramebufferFactory;
     class ICompositeView;
     class IView;
@@ -35,7 +39,7 @@ namespace caustica::render
         nvrhi::BindingLayoutHandle m_BindingLayout;
         caustica::BindingCache m_BindingSets;
 
-        std::shared_ptr<caustica::CommonRenderPasses> m_CommonPasses;
+        rhi::RenderDevice* m_renderDevice = nullptr;
 
     protected:
 
@@ -68,7 +72,7 @@ namespace caustica::render
 
         DeferredLightingPass(
             nvrhi::IDevice* device,
-            std::shared_ptr<caustica::CommonRenderPasses> commonPasses);
+            rhi::RenderDevice& renderDevice);
 
         virtual void Init(const std::shared_ptr<caustica::ShaderFactory>& shaderFactory);
 

@@ -1,7 +1,7 @@
 #include <render/Passes/Geometry/TemporalAntiAliasingPass.h>
 #include <render/Core/FramebufferFactory.h>
 #include <assets/loader/ShaderFactory.h>
-#include <render/Core/CommonRenderPasses.h>
+#include <rhi/RenderDevice.h>
 #include <scene/View.h>
 
 #if CAUSTICA_WITH_STATIC_SHADERS
@@ -33,10 +33,10 @@ using namespace caustica::render;
 TemporalAntiAliasingPass::TemporalAntiAliasingPass(
     nvrhi::IDevice* device,
     std::shared_ptr<ShaderFactory> shaderFactory, 
-    std::shared_ptr<CommonRenderPasses> commonPasses,
+    caustica::rhi::RenderDevice& renderDevice,
     const ICompositeView& compositeView,
     const CreateParameters& params)
-    : m_CommonPasses(commonPasses)
+    : m_renderDevice(renderDevice)
     , m_FrameIndex(0)
     , m_StencilMask(params.motionVectorStencilMask)
     , m_R2Jitter(0.0f, 0.0f)
@@ -128,7 +128,7 @@ TemporalAntiAliasingPass::TemporalAntiAliasingPass(
 
         nvrhi::GraphicsPipelineDesc pipelineDesc;
         pipelineDesc.primType = nvrhi::PrimitiveType::TriangleStrip;
-        pipelineDesc.VS = m_CommonPasses->m_FullscreenVS;
+        pipelineDesc.VS = m_renderDevice.blit().fullscreenVS();
         pipelineDesc.PS = m_MotionVectorPS;
         pipelineDesc.bindingLayouts = { m_MotionVectorsBindingLayout };
 

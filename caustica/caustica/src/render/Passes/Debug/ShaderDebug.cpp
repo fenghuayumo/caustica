@@ -1,7 +1,7 @@
 #include <render/Passes/Debug/ShaderDebug.h>
 
 #include <assets/loader/ShaderFactory.h>
-#include <render/Core/CommonRenderPasses.h>
+#include <rhi/RenderDevice.h>
 #include <scene/View.h>
 #include <core/log.h>
 #include <core/file_utils.h>
@@ -22,10 +22,10 @@
 using namespace caustica::math;
 using namespace caustica;
 
-ShaderDebug::ShaderDebug( nvrhi::IDevice* device, nvrhi::ICommandList* commandList, std::shared_ptr<caustica::ShaderFactory> shaderFactory, std::shared_ptr<caustica::CommonRenderPasses> commonPasses )
+ShaderDebug::ShaderDebug( nvrhi::IDevice* device, nvrhi::ICommandList* commandList, std::shared_ptr<caustica::ShaderFactory> shaderFactory, caustica::rhi::RenderDevice& renderDevice )
     : m_device(device)
     , m_shaderFactory(shaderFactory)
-    , m_commonPasses(commonPasses)
+    , m_renderDevice(renderDevice)
 {
     nvrhi::BufferDesc bufferDesc;
 
@@ -113,7 +113,7 @@ void ShaderDebug::CreateRenderPasses( nvrhi::IFramebuffer * frameBuffer, nvrhi::
         nvrhi::GraphicsPipelineDesc pipelineDesc;
         pipelineDesc.bindingLayouts = { m_geometryBindingLayout };
         pipelineDesc.primType = nvrhi::PrimitiveType::TriangleStrip;
-        pipelineDesc.VS = m_commonPasses->m_FullscreenVS;
+        pipelineDesc.VS = m_renderDevice.blit().fullscreenVS();
         pipelineDesc.PS = m_blendDebugVizPS;
         pipelineDesc.renderState.rasterState.setCullNone();
         pipelineDesc.renderState.depthStencilState.depthTestEnable = false;

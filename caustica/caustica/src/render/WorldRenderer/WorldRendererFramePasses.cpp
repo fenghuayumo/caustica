@@ -1,6 +1,7 @@
 namespace { constexpr int c_SwapchainCount = 3; }
 
 #include <render/WorldRenderer/WorldRenderer.h>
+#include <render/graph/GraphBuilder.h>
 #include <rhi/RenderDevice.h>
 #include <render/WorldRenderer/PathTracingFramePipeline.h>
 #include <render/SceneGpuResources.h>
@@ -219,11 +220,11 @@ void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameCont
         }
 
         m_context.scenePasses.lighting.materials()->CreateRenderPassesAndLoadMaterials(
-            m_bindlessLayout, m_context.renderDevice.commonPassesPtr(), m_context.sceneManager.getScene(),
+            m_bindlessLayout, m_context.renderDevice, m_context.sceneManager.getScene(),
             m_context.sceneManager.getCurrentScenePath(), GetLocalPath(c_AssetsFolder));
         m_context.diagnostics.progressInitializingRenderer.Set(5);
         if (m_context.scenePasses.lighting.opacityMaps())
-            m_context.scenePasses.lighting.opacityMaps()->CreateRenderPasses(m_bindlessLayout, m_context.renderDevice.commonPassesPtr());
+            m_context.scenePasses.lighting.opacityMaps()->CreateRenderPasses(m_bindlessLayout, m_context.renderDevice);
         m_context.diagnostics.progressInitializingRenderer.Set(20);
     }
 
@@ -533,7 +534,26 @@ void caustica::render::WorldRenderer::framePassToneMapping(PathTracingFrameConte
 
     postProcessPreToneMapping(m_commandList, fullscreenView);
 
-    if (m_toneMappingPass->Render(m_commandList, fullscreenView, m_renderTargets->ProcessedOutputColor, m_context.settings.EnableToneMapping))
+    rg::GraphBuilder graph;
+    const rg::TextureHandle sourceColor = graph.importTexture(
+        m_renderTargets->ProcessedOutputColor,
+        rg::TextureAccess::UnorderedAccess);
+    const rg::TextureHandle outputLdrColor = graph.importTexture(
+        m_renderTargets->LdrColor,
+        rg::TextureAccess::ShaderResource);
+
+    bool commandListWasClosed = false;
+    m_toneMappingPass->registerGraphPass(
+        graph,
+        sourceColor,
+        outputLdrColor,
+        fullscreenView,
+        m_context.settings.EnableToneMapping,
+        &commandListWasClosed);
+
+    graph.execute(m_commandList);
+
+    if (commandListWasClosed)
         m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
 
     postProcessPostToneMapping(m_commandList, fullscreenView);
@@ -559,7 +579,7 @@ void caustica::render::WorldRenderer::framePassComposite(PathTracingFrameContext
         m_shaderDebug->EndFrameAndOutput(m_commandList, m_renderTargets->LdrFramebuffer->GetFramebuffer(fullscreenView), m_renderTargets->Depth, fbinfo.getViewport());
 
     m_commandList->beginMarker("Blit");
-    (m_context.renderDevice.commonPassesPtr())->BlitTexture(m_commandList, framebuffer, m_renderTargets->LdrColor, &m_context.bindingCache);
+    m_context.renderDevice.blit().blitTexture(m_commandList, framebuffer, m_renderTargets->LdrColor, &m_context.bindingCache);
     m_commandList->endMarker();
     abortIfSubmitFailed(ctx, "finalBlit");
     if (ctx.aborted)

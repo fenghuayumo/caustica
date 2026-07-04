@@ -4,11 +4,15 @@
 #include <rhi/nvrhi.h>
 #include <memory>
 
+namespace caustica::rhi
+{
+class RenderDevice;
+}
+
 namespace caustica
 {
     class ShaderFactory;
     class ShadowMap;
-    class CommonRenderPasses;
     class FramebufferFactory;
     class ICompositeView;
 }
@@ -49,7 +53,7 @@ namespace caustica::render
         nvrhi::TextureHandle m_DeinterleavedOcclusion;
         dm::float2 m_QuantizedGbufferTextureSize;
                 
-        std::shared_ptr<caustica::CommonRenderPasses> m_CommonPasses;
+        rhi::RenderDevice* m_renderDevice = nullptr;
 
     public:
         struct CreateParameters
@@ -64,13 +68,13 @@ namespace caustica::render
         SsaoPass(
             nvrhi::IDevice* device,
             std::shared_ptr<caustica::ShaderFactory> shaderFactory,
-            std::shared_ptr<caustica::CommonRenderPasses> commonPasses,
+            rhi::RenderDevice& renderDevice,
             const CreateParameters& params);
 
         SsaoPass(
             nvrhi::IDevice* device,
             std::shared_ptr<caustica::ShaderFactory> shaderFactory,
-            std::shared_ptr<caustica::CommonRenderPasses> commonPasses,
+            rhi::RenderDevice& renderDevice,
             nvrhi::ITexture* gbufferDepth,
             nvrhi::ITexture* gbufferNormals,
             nvrhi::ITexture* destinationTexture);

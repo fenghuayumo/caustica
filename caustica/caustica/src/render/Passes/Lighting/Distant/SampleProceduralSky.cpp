@@ -1,7 +1,7 @@
 #include <render/Passes/Lighting/Distant/SampleProceduralSky.h>
 #include <assets/loader/ShaderFactory.h>
 #include <render/Core/FramebufferFactory.h>
-#include <render/Core/CommonRenderPasses.h>
+#include <rhi/RenderDevice.h>
 #include <assets/loader/TextureLoader.h>
 
 #include <rhi/utils.h>
@@ -22,17 +22,17 @@
 using namespace caustica::math;
 using namespace caustica;
 
-SampleProceduralSky::SampleProceduralSky( nvrhi::IDevice* device, std::shared_ptr<caustica::TextureLoader> textureCache, std::shared_ptr<caustica::CommonRenderPasses> commonPasses, nvrhi::ICommandList* commandList )
+SampleProceduralSky::SampleProceduralSky( nvrhi::IDevice* device, std::shared_ptr<caustica::TextureLoader> textureCache, caustica::rhi::RenderDevice& renderDevice, nvrhi::ICommandList* commandList )
     : m_device(device)
     , m_textureCache(textureCache)
 {
     auto path = GetLocalPath(c_AssetsFolder);
 
-    m_transmittanceTexture  = textureCache->LoadTextureFromFile(path.string() + "/StandaloneTextures/q2rtx_env/transmittance_earth.dds", false, commonPasses.get(), commandList);
-    m_scatterringTexture    = textureCache->LoadTextureFromFile(path.string() + "/StandaloneTextures/q2rtx_env/inscatter_earth.dds", false, commonPasses.get(), commandList);
-    m_irradianceTexture     = textureCache->LoadTextureFromFile(path.string() + "/StandaloneTextures/q2rtx_env/irradiance_earth.dds", false, commonPasses.get(), commandList);
-    m_cloudsTexture         = textureCache->LoadTextureFromFile(path.string() + "/StandaloneTextures/q2rtx_env/clouds.dds", false, commonPasses.get(), commandList);
-    m_noiseTexture          = textureCache->LoadTextureFromFile(path.string() + "/StandaloneTextures/RGBANoiseMedium.png", false, commonPasses.get(), commandList);
+    m_transmittanceTexture  = textureCache->LoadTextureFromFile(path.string() + "/StandaloneTextures/q2rtx_env/transmittance_earth.dds", false, &renderDevice, commandList);
+    m_scatterringTexture    = textureCache->LoadTextureFromFile(path.string() + "/StandaloneTextures/q2rtx_env/inscatter_earth.dds", false, &renderDevice, commandList);
+    m_irradianceTexture     = textureCache->LoadTextureFromFile(path.string() + "/StandaloneTextures/q2rtx_env/irradiance_earth.dds", false, &renderDevice, commandList);
+    m_cloudsTexture         = textureCache->LoadTextureFromFile(path.string() + "/StandaloneTextures/q2rtx_env/clouds.dds", false, &renderDevice, commandList);
+    m_noiseTexture          = textureCache->LoadTextureFromFile(path.string() + "/StandaloneTextures/RGBANoiseMedium.png", false, &renderDevice, commandList);
 
     // Make sure the texture is loaded
      commandList->close();

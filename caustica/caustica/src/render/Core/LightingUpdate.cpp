@@ -2,7 +2,6 @@
 #include <render/Core/AccelStructManager.h>
 #include <render/Core/CameraController.h>
 #include <render/Core/BindingCache.h>
-#include <render/Core/CommonRenderPasses.h>
 #include <render/Passes/Lighting/Distant/EnvMapProcessor.h>
 #include <render/Passes/Lighting/Distant/EnvMapImportanceSamplingCache.h>
 #include <render/Passes/Lighting/LightSamplingCache.h>
@@ -45,7 +44,7 @@ void preUpdateLighting(PreUpdateLightingParams& params)
 
     nvrhi::TextureHandle preUpdateCube = params.environment->GetEnvMapCube();
     params.environment->PreUpdate(
-        commandList, params.commonPasses, params.envMapActualPath, params.sceneDirectory);
+        commandList, params.renderDevice, params.envMapActualPath, params.sceneDirectory);
 
     if (preUpdateCube != params.environment->GetEnvMapCube())
         params.needNewBindings = true;
@@ -102,7 +101,7 @@ void updateLighting(CameraController& camera, AccelStructManager& accelStructs, 
     if (params.environment->Update(
             commandList,
             *params.bindingCache,
-            params.commonPasses,
+            params.renderDevice,
             EnvMapProcessor::UpdateSettings{ .EnvMapRadianceScale = params.envMapRadianceScale },
             params.sceneTime,
             dirLights,

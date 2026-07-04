@@ -1,7 +1,8 @@
 #include <render/Passes/Geometry/EnvironmentMapPass.h>
 #include <render/Core/FramebufferFactory.h>
 #include <assets/loader/ShaderFactory.h>
-#include <render/Core/CommonRenderPasses.h>
+#include <render/Core/RenderPassConstants.h>
+#include <rhi/RenderDevice.h>
 #include <scene/View.h>
 #include <math/math.h>
 
@@ -26,11 +27,11 @@ using namespace caustica::render;
 EnvironmentMapPass::EnvironmentMapPass(
     nvrhi::IDevice* device,
     std::shared_ptr<ShaderFactory> shaderFactory,
-    std::shared_ptr<CommonRenderPasses> commonPasses,
+    rhi::RenderDevice& renderDevice,
     std::shared_ptr<FramebufferFactory> framebufferFactory,
     const ICompositeView& compositeView,
     nvrhi::ITexture* environmentMap)
-    : m_CommonPasses(commonPasses)
+    : m_renderDevice(&renderDevice)
     , m_FramebufferFactory(framebufferFactory)
 {
     nvrhi::TextureDimension envMapDimension = environmentMap->getDesc().dimension;
@@ -67,13 +68,13 @@ EnvironmentMapPass::EnvironmentMapPass(
         bindingSetDesc.bindings = {
             nvrhi::BindingSetItem::ConstantBuffer(0, m_SkyCB),
             nvrhi::BindingSetItem::Texture_SRV(0, environmentMap),
-            nvrhi::BindingSetItem::Sampler(0, commonPasses->m_LinearWrapSampler)
+            nvrhi::BindingSetItem::Sampler(0, renderDevice.samplers().linearWrap())
         };
         m_RenderBindingSet = device->createBindingSet(bindingSetDesc, m_RenderBindingLayout);
 
         nvrhi::GraphicsPipelineDesc pipelineDesc;
         pipelineDesc.primType = nvrhi::PrimitiveType::TriangleStrip;
-        pipelineDesc.VS = sampleView->IsReverseDepth() ? m_CommonPasses->m_FullscreenVS : m_CommonPasses->m_FullscreenAtOneVS;
+        pipelineDesc.VS = sampleView->IsReverseDepth() ? m_renderDevice->blit().fullscreenVS() : m_renderDevice->blit().fullscreenAtOneVS();
         pipelineDesc.PS = m_PixelShader;
         pipelineDesc.bindingLayouts = { m_RenderBindingLayout };
 

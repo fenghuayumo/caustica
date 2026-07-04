@@ -3,7 +3,7 @@
 #include <assets/loader/ShaderFactory.h>
 #include <render/Core/ShadowMap.h>
 #include <scene/SceneTypes.h>
-#include <render/Core/CommonRenderPasses.h>
+#include <rhi/RenderDevice.h>
 #include <render/Core/MaterialBindingCache.h>
 #include <core/log.h>
 #include <rhi/utils.h>
@@ -39,9 +39,9 @@ using namespace caustica::math;
 using namespace caustica;
 using namespace caustica::render;
 
-GBufferFillPass::GBufferFillPass(nvrhi::IDevice* device, std::shared_ptr<CommonRenderPasses> commonPasses)
+GBufferFillPass::GBufferFillPass(nvrhi::IDevice* device, rhi::RenderDevice& renderDevice)
     : m_Device(device)
-    , m_CommonPasses(std::move(commonPasses))
+    , m_renderDevice(&renderDevice)
 {
     m_IsDX11 = m_Device->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D11;
 }
@@ -64,7 +64,7 @@ void GBufferFillPass::Init(ShaderFactory& shaderFactory, const CreateParameters&
     if (params.materialBindings)
         m_MaterialBindings = params.materialBindings;
     else
-        m_MaterialBindings = CreateMaterialBindingCache(*m_CommonPasses);
+        m_MaterialBindings = CreateMaterialBindingCache(*m_renderDevice);
 
     m_GBufferCB = m_Device->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(GBufferFillConstants),
         "GBufferFillConstants", params.numConstantBufferVersions));
@@ -177,7 +177,7 @@ void GBufferFillPass::CreateViewBindings(nvrhi::BindingLayoutHandle& layout, nvr
         .setTrackLiveness(params.trackLiveness)
         .addItem(nvrhi::BindingSetItem::ConstantBuffer(GBUFFER_BINDING_VIEW_CONSTANTS, m_GBufferCB))
         .addItem(nvrhi::BindingSetItem::Sampler(GBUFFER_BINDING_MATERIAL_SAMPLER,
-            m_CommonPasses->m_AnisotropicWrapSampler));
+            m_renderDevice->samplers().anisotropicWrap()));
 
     set = m_Device->createBindingSet(bindingSetDesc, layout);
 }
@@ -235,7 +235,7 @@ nvrhi::GraphicsPipelineHandle GBufferFillPass::CreateGraphicsPipeline(PipelineKe
     return m_Device->createGraphicsPipeline(pipelineDesc, framebufferInfo);
 }
 
-std::shared_ptr<MaterialBindingCache> GBufferFillPass::CreateMaterialBindingCache(CommonRenderPasses& commonPasses)
+std::shared_ptr<MaterialBindingCache> GBufferFillPass::CreateMaterialBindingCache(rhi::RenderDevice& renderDevice)
 {
     std::vector<MaterialResourceBinding> materialBindings = {
         { MaterialResource::ConstantBuffer,         GBUFFER_BINDING_MATERIAL_CONSTANTS },
@@ -254,9 +254,9 @@ std::shared_ptr<MaterialBindingCache> GBufferFillPass::CreateMaterialBindingCach
         /* registerSpace = */ GBUFFER_SPACE_MATERIAL,
         /* registerSpaceIsDescriptorSet = */ true,
         materialBindings,
-        commonPasses.m_AnisotropicWrapSampler,
-        commonPasses.m_GrayTexture,
-        commonPasses.m_BlackTexture);
+        renderDevice.samplers().anisotropicWrap(),
+        renderDevice.builtins().grayTexture(),
+        renderDevice.builtins().blackTexture());
 }
 
 ViewType::Enum GBufferFillPass::GetSupportedViewTypes() const

@@ -4,12 +4,13 @@
 #include <memory>
 #include <unordered_map>
 #include <render/Passes/Geometry/MipMapGenPass.h>
+#include <render/graph/GraphBuilder.h>
 #include <shaders/render/ToneMapper/ToneMapping_cb.h>
+#include <rhi/RenderDevice.h>
 
 namespace caustica
 {
     class ShaderFactory;
-    class CommonRenderPasses;
     class FramebufferFactory;
     class ICompositeView;
 }
@@ -104,7 +105,7 @@ private:
     nvrhi::ComputePipelineHandle m_CaptureLumPso;
 #endif
 
-    std::shared_ptr<caustica::CommonRenderPasses> m_commonPasses;
+    caustica::rhi::RenderDevice& m_renderDevice;
     std::shared_ptr<caustica::FramebufferFactory> m_FramebufferFactory;
         
     ExposureMode m_ExposureMode;
@@ -149,7 +150,7 @@ public:
     ToneMappingPass(
         nvrhi::IDevice* device,
         std::shared_ptr<caustica::ShaderFactory> shaderFactory,
-        std::shared_ptr<caustica::CommonRenderPasses> commonPasses,
+        caustica::rhi::RenderDevice& renderDevice,
         std::shared_ptr<caustica::FramebufferFactory> colorFramebufferFactory,
         const caustica::ICompositeView& compositeView,
         nvrhi::TextureHandle sourceTexture
@@ -159,6 +160,15 @@ public:
 
     // note - if enable == false, it still does autoexposure (if enabled) and everything else, but the output is just passthrough
     bool Render( nvrhi::ICommandList* commandList, const caustica::ICompositeView& compositeView, nvrhi::ITexture* sourceTexture, bool enabled );
+
+    // R1 pilot — registers ToneMapping as a render-graph pass with automatic barriers.
+    void registerGraphPass(
+        caustica::rg::GraphBuilder& graph,
+        caustica::rg::TextureHandle sourceColor,
+        caustica::rg::TextureHandle outputLdrColor,
+        const caustica::ICompositeView& compositeView,
+        bool enabled,
+        bool* outCommandListWasClosed = nullptr);
 
 #if TONEMAPPING_AUTOEXPOSURE_CPU
     float3 GetPreExposedGray( uint viewIndex );

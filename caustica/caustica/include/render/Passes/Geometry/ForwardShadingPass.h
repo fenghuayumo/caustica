@@ -7,10 +7,14 @@
 #include <mutex>
 #include <unordered_map>
 
+namespace caustica::rhi
+{
+class RenderDevice;
+}
+
 namespace caustica
 {
     class ShaderFactory;
-    class CommonRenderPasses;
     class FramebufferFactory;
     class MaterialBindingCache;
     class Scene;
@@ -128,7 +132,7 @@ namespace caustica::render
         std::unordered_map<std::pair<nvrhi::ITexture*, nvrhi::ITexture*>, nvrhi::BindingSetHandle> m_ShadingBindingSets;
         std::unordered_map<const caustica::BufferGroup*, nvrhi::BindingSetHandle> m_InputBindingSets;
         
-        std::shared_ptr<caustica::CommonRenderPasses> m_CommonPasses;
+        rhi::RenderDevice* m_renderDevice = nullptr;
         std::shared_ptr<caustica::MaterialBindingCache> m_MaterialBindings;
         
         virtual nvrhi::ShaderHandle CreateVertexShader(caustica::ShaderFactory& shaderFactory, const CreateParameters& params);
@@ -141,14 +145,14 @@ namespace caustica::render
         virtual nvrhi::BindingSetHandle CreateShadingBindingSet(nvrhi::ITexture* shadowMapTexture, nvrhi::ITexture* diffuse, nvrhi::ITexture* specular, nvrhi::ITexture* environmentBrdf);
         virtual nvrhi::BindingLayoutHandle CreateInputBindingLayout();
         virtual nvrhi::BindingSetHandle CreateInputBindingSet(const caustica::BufferGroup* bufferGroup);
-        virtual std::shared_ptr<caustica::MaterialBindingCache> CreateMaterialBindingCache(caustica::CommonRenderPasses& commonPasses);
+        virtual std::shared_ptr<caustica::MaterialBindingCache> CreateMaterialBindingCache(rhi::RenderDevice& renderDevice);
         virtual nvrhi::GraphicsPipelineHandle CreateGraphicsPipeline(ForwardShadingPassPipelineKey const& key, nvrhi::FramebufferInfo const& framebufferInfo);
         nvrhi::BindingSetHandle GetOrCreateInputBindingSet(const caustica::BufferGroup* bufferGroup);
 
     public:
         ForwardShadingPass(
             nvrhi::IDevice* device,
-            std::shared_ptr<caustica::CommonRenderPasses> commonPasses);
+            rhi::RenderDevice& renderDevice);
 
         virtual void Init(
             caustica::ShaderFactory& shaderFactory,

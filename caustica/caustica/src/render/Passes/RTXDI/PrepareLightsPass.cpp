@@ -6,7 +6,7 @@
 #include <scene/SceneLightAccess.h>
 
 #include <assets/loader/ShaderFactory.h>
-#include <render/Core/CommonRenderPasses.h>
+#include <rhi/RenderDevice.h>
 #include <core/log.h>
 #include <rhi/utils.h>
 
@@ -31,7 +31,7 @@ using namespace caustica;
 PrepareLightsPass::PrepareLightsPass(
     nvrhi::IDevice* device, 
     std::shared_ptr<caustica::ShaderFactory> shaderFactory, 
-    std::shared_ptr<caustica::CommonRenderPasses> commonPasses,
+    caustica::rhi::RenderDevice& renderDevice,
     std::shared_ptr<caustica::Scene> scene,
     std::shared_ptr<MaterialGpuCache> materialGpuCache,
     std::shared_ptr<OpacityMicromapBuilder> opacityMicromapBuilder,
@@ -42,7 +42,7 @@ PrepareLightsPass::PrepareLightsPass(
     : m_device(device)
     , m_bindlessLayout(bindlessLayout)
     , m_shaderFactory(std::move(shaderFactory))
-    , m_commonPasses(std::move(commonPasses))
+    , m_renderDevice(renderDevice)
     , m_Scene(std::move(scene))
     , m_materialGpuCache(materialGpuCache)
     , m_opacityMicromapBuilder(opacityMicromapBuilder)
@@ -130,16 +130,16 @@ void PrepareLightsPass::CreateBindingSet(RtxdiResources& resources, const Render
         nvrhi::BindingSetItem::StructuredBuffer_SRV(3, m_Scene->GetGpuResources().geometryBuffer),
         //nvrhi::BindingSetItem::StructuredBuffer_SRV(4, (m_opacityMicromapBuilder!=nullptr)?(m_opacityMicromapBuilder->GetGeometryDebugBuffer()):(resources.LightDataBuffer.Get())), // yuck
         nvrhi::BindingSetItem::StructuredBuffer_SRV(5, m_materialGpuCache->GetMaterialDataBuffer()),
-        nvrhi::BindingSetItem::Texture_SRV(6, m_EnvironmentMap ? m_EnvironmentMap->GetEnvMapCube() : m_commonPasses->m_BlackCubeMapArray),
-        nvrhi::BindingSetItem::Texture_SRV(7, m_EnvironmentMap ? m_EnvironmentMap->GetImportanceSampling()->GetImportanceMapOnly() : m_commonPasses->m_BlackTexture),
+        nvrhi::BindingSetItem::Texture_SRV(6, m_EnvironmentMap ? m_EnvironmentMap->GetEnvMapCube() : m_renderDevice.builtins().blackCubeMapArray()),
+        nvrhi::BindingSetItem::Texture_SRV(7, m_EnvironmentMap ? m_EnvironmentMap->GetImportanceSampling()->GetImportanceMapOnly() : m_renderDevice.builtins().blackTexture()),
         nvrhi::BindingSetItem::StructuredBuffer_SRV(8, resources.PrimitiveLightBuffer),
         nvrhi::BindingSetItem::Texture_UAV(50, m_shaderDebug->GetDebugVizTexture()), // TODO: move to shader debug uav
 
         nvrhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->GetGPUWriteBuffer()),
 
-        nvrhi::BindingSetItem::Sampler(0, m_commonPasses->m_AnisotropicWrapSampler),
-        nvrhi::BindingSetItem::Sampler(1, m_EnvironmentMap ? m_EnvironmentMap->GetEnvMapCubeSampler() : m_commonPasses->m_AnisotropicWrapSampler),
-        nvrhi::BindingSetItem::Sampler(2, m_EnvironmentMap ? m_EnvironmentMap->GetImportanceSampling()->GetImportanceMapSampler() : m_commonPasses->m_AnisotropicWrapSampler)
+        nvrhi::BindingSetItem::Sampler(0, m_renderDevice.samplers().anisotropicWrap()),
+        nvrhi::BindingSetItem::Sampler(1, m_EnvironmentMap ? m_EnvironmentMap->GetEnvMapCubeSampler() : m_renderDevice.samplers().anisotropicWrap()),
+        nvrhi::BindingSetItem::Sampler(2, m_EnvironmentMap ? m_EnvironmentMap->GetImportanceSampling()->GetImportanceMapSampler() : m_renderDevice.samplers().anisotropicWrap())
     };
 
     m_bindingSet = m_device->createBindingSet(bindingSetDesc, m_bindingLayout);

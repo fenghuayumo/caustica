@@ -26,7 +26,7 @@ namespace caustica
     class TextureLoader;
     class TextureHandle;
     class ShaderFactory;
-    class CommonRenderPasses;
+    namespace rhi { class RenderDevice; }
     struct TextureData;
 }
 
@@ -79,7 +79,7 @@ public:
     // Reset scene related stuff
     void                            SceneReloaded();
 
-    void                            CreateRenderPasses(std::shared_ptr<caustica::ShaderFactory> shaderFactory, nvrhi::IBindingLayout* bindlessLayout, std::shared_ptr<caustica::CommonRenderPasses> commonPasses, std::shared_ptr<ShaderDebug> shaderDebug, const uint2 renderResolution, const uint envMapProcessedResolution);
+    void                            CreateRenderPasses(std::shared_ptr<caustica::ShaderFactory> shaderFactory, nvrhi::IBindingLayout* bindlessLayout, caustica::rhi::RenderDevice& renderDevice, std::shared_ptr<ShaderDebug> shaderDebug, const uint2 renderResolution, const uint envMapProcessedResolution);
 
     // Main and only processing stage is split into UpdateBegin/UpdateEnd. These can be called one after the other as soon as screen space motion vectors are available.
     // The split is purely to facilitate any potential async compute.
@@ -128,7 +128,7 @@ private:
 
 private:
     nvrhi::DeviceHandle             m_device;
-    std::shared_ptr<caustica::CommonRenderPasses> m_commonPasses;
+    caustica::rhi::RenderDevice* m_renderDevice = nullptr;
     std::shared_ptr<caustica::FramebufferFactory> m_framebufferFactory;
     std::shared_ptr<ShaderDebug>    m_shaderDebug;
 

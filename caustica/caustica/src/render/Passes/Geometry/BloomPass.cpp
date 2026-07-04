@@ -1,7 +1,8 @@
 #include <render/Passes/Geometry/BloomPass.h>
 #include <render/Core/FramebufferFactory.h>
 #include <assets/loader/ShaderFactory.h>
-#include <render/Core/CommonRenderPasses.h>
+#include <render/Core/RenderPassConstants.h>
+#include <rhi/RenderDevice.h>
 #include <scene/View.h>
 #include <utility>
 
@@ -26,10 +27,10 @@ using namespace caustica::render;
 BloomPass::BloomPass(
     nvrhi::IDevice* device,
     const std::shared_ptr<ShaderFactory>& shaderFactory,
-    std::shared_ptr<CommonRenderPasses> commonPasses,
+    caustica::rhi::RenderDevice& renderDevice,
     std::shared_ptr<FramebufferFactory> framebufferFactory,
     const ICompositeView& compositeView)
-    : m_CommonPasses(std::move(commonPasses))
+    : m_renderDevice(renderDevice)
     , m_FramebufferFactory(std::move(framebufferFactory))
     , m_Device(device)
     , m_BindingCache(device)
@@ -110,7 +111,7 @@ BloomPass::BloomPass(
 
         nvrhi::GraphicsPipelineDesc graphicsPipelineDesc;
         graphicsPipelineDesc.primType = nvrhi::PrimitiveType::TriangleStrip;
-        graphicsPipelineDesc.VS = m_CommonPasses->m_FullscreenVS;
+        graphicsPipelineDesc.VS = m_renderDevice.blit().fullscreenVS();
         graphicsPipelineDesc.PS = m_BloomBlurPixelShader;
         graphicsPipelineDesc.bindingLayouts = { m_BloomBlurBindingLayout };
         graphicsPipelineDesc.renderState.rasterState.setCullNone();
@@ -122,14 +123,14 @@ BloomPass::BloomPass(
         nvrhi::BindingSetDesc bindingSetDesc;
         bindingSetDesc.bindings = {
             nvrhi::BindingSetItem::ConstantBuffer(0, m_BloomHBlurCB),
-            nvrhi::BindingSetItem::Sampler(0, m_CommonPasses->m_LinearClampSampler),
+            nvrhi::BindingSetItem::Sampler(0, m_renderDevice.samplers().linearClamp()),
             nvrhi::BindingSetItem::Texture_SRV(0, perViewData.textureDownscale2)
         };
         perViewData.bloomBlurBindingSetPass1 = m_Device->createBindingSet(bindingSetDesc, m_BloomBlurBindingLayout);
 
         bindingSetDesc.bindings = {
             nvrhi::BindingSetItem::ConstantBuffer(0, m_BloomVBlurCB),
-            nvrhi::BindingSetItem::Sampler(0, m_CommonPasses->m_LinearClampSampler),
+            nvrhi::BindingSetItem::Sampler(0, m_renderDevice.samplers().linearClamp()),
             nvrhi::BindingSetItem::Texture_SRV(0, perViewData.texturePass1Blur)
         };
         perViewData.bloomBlurBindingSetPass2 = m_Device->createBindingSet(bindingSetDesc, m_BloomBlurBindingLayout);
@@ -177,18 +178,18 @@ void BloomPass::Render(
 
             // half-scale down
 
-            BlitParameters blitParams1;
+            rhi::BlitParameters blitParams1;
             blitParams1.targetFramebuffer = perViewData.framebufferDownscale1;
             blitParams1.sourceTexture = sourceDestTexture;
             blitParams1.sourceBox = uvSrcRect;
-            m_CommonPasses->BlitTexture(commandList, blitParams1, &m_BindingCache);
+            m_renderDevice.blit().blitTexture(commandList, blitParams1, &m_BindingCache);
 
             // half-scale again down to quarter-scale
 
-            BlitParameters blitParams2;
+            rhi::BlitParameters blitParams2;
             blitParams2.targetFramebuffer = perViewData.framebufferDownscale2;
             blitParams2.sourceTexture = perViewData.textureDownscale1;
-            m_CommonPasses->BlitTexture(commandList, blitParams2, &m_BindingCache);
+            m_renderDevice.blit().blitTexture(commandList, blitParams2, &m_BindingCache);
 
             commandList->endMarker(); // "Downscale"
         }
@@ -237,7 +238,7 @@ void BloomPass::Render(
         {
             commandList->beginMarker("Apply");
 
-            BlitParameters blitParams3;
+            rhi::BlitParameters blitParams3;
             blitParams3.targetFramebuffer = framebuffer;
             blitParams3.targetViewport = viewportState.viewports[0];
             blitParams3.sourceTexture = perViewData.texturePass2Blur;
@@ -247,7 +248,7 @@ void BloomPass::Render(
                 .setSrcBlendAlpha(nvrhi::BlendFactor::Zero)
                 .setDestBlendAlpha(nvrhi::BlendFactor::One);
             blitParams3.blendConstantColor = nvrhi::Color(blendFactor);
-            m_CommonPasses->BlitTexture(commandList, blitParams3, &m_BindingCache);
+            m_renderDevice.blit().blitTexture(commandList, blitParams3, &m_BindingCache);
 
             commandList->endMarker(); // "Apply"
         }

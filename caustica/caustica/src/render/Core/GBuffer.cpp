@@ -1,5 +1,4 @@
 #include <render/Core/GBuffer.h>
-#include <render/Core/CommonRenderPasses.h>
 #include <render/Core/FramebufferFactory.h>
 #include <rhi/utils.h>
 

@@ -7,7 +7,7 @@
 #include <scene/SceneObjects.h>
 #include <scene/SceneEcs.h>
 #include <scene/SceneLightAccess.h>
-#include <render/Core/CommonRenderPasses.h>
+#include <rhi/RenderDevice.h>
 #include <render/Core/MaterialBindingCache.h>
 #include <core/log.h>
 #include <rhi/utils.h>
@@ -43,9 +43,9 @@ using namespace caustica::render;
 
 ForwardShadingPass::ForwardShadingPass(
     nvrhi::IDevice* device,
-    std::shared_ptr<CommonRenderPasses> commonPasses)
+    rhi::RenderDevice& renderDevice)
     : m_Device(device)
-    , m_CommonPasses(std::move(commonPasses))
+    , m_renderDevice(&renderDevice)
 {
     m_IsDX11 = m_Device->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D11;
 }
@@ -67,7 +67,7 @@ void ForwardShadingPass::Init(ShaderFactory& shaderFactory, const CreateParamete
     if (params.materialBindings)
         m_MaterialBindings = params.materialBindings;
     else
-        m_MaterialBindings = CreateMaterialBindingCache(*m_CommonPasses);
+        m_MaterialBindings = CreateMaterialBindingCache(*m_renderDevice);
 
     auto samplerDesc = nvrhi::SamplerDesc()
         .setAllAddressModes(nvrhi::SamplerAddressMode::Border)
@@ -197,21 +197,21 @@ nvrhi::BindingSetHandle ForwardShadingPass::CreateShadingBindingSet(nvrhi::IText
         .setTrackLiveness(m_TrackLiveness)
         .addItem(nvrhi::BindingSetItem::ConstantBuffer(FORWARD_BINDING_LIGHT_CONSTANTS, m_ForwardLightCB))
         .addItem(nvrhi::BindingSetItem::Texture_SRV(FORWARD_BINDING_SHADOW_MAP_TEXTURE,
-            shadowMapTexture ? shadowMapTexture : m_CommonPasses->m_BlackTexture2DArray.Get()))
+            shadowMapTexture ? shadowMapTexture : m_renderDevice->builtins().blackTexture2DArray().Get()))
         .addItem(nvrhi::BindingSetItem::Texture_SRV(FORWARD_BINDING_DIFFUSE_LIGHT_PROBE_TEXTURE,
-            diffuse ? diffuse : m_CommonPasses->m_BlackCubeMapArray.Get()))
+            diffuse ? diffuse : m_renderDevice->builtins().blackCubeMapArray().Get()))
         .addItem(nvrhi::BindingSetItem::Texture_SRV(FORWARD_BINDING_SPECULAR_LIGHT_PROBE_TEXTURE,
-            specular ? specular : m_CommonPasses->m_BlackCubeMapArray.Get()))
+            specular ? specular : m_renderDevice->builtins().blackCubeMapArray().Get()))
         .addItem(nvrhi::BindingSetItem::Texture_SRV(FORWARD_BINDING_ENVIRONMENT_BRDF_TEXTURE,
-            environmentBrdf ? environmentBrdf : m_CommonPasses->m_BlackTexture.Get()))
+            environmentBrdf ? environmentBrdf : m_renderDevice->builtins().blackTexture().Get()))
         .addItem(nvrhi::BindingSetItem::Sampler(FORWARD_BINDING_MATERIAL_SAMPLER,
-            m_CommonPasses->m_AnisotropicWrapSampler))
+            m_renderDevice->samplers().anisotropicWrap()))
         .addItem(nvrhi::BindingSetItem::Sampler(FORWARD_BINDING_SHADOW_MAP_SAMPLER,
             m_ShadowSampler))
         .addItem(nvrhi::BindingSetItem::Sampler(FORWARD_BINDING_LIGHT_PROBE_SAMPLER,
-            m_CommonPasses->m_LinearWrapSampler))
+            m_renderDevice->samplers().linearWrap()))
         .addItem(nvrhi::BindingSetItem::Sampler(FORWARD_BINDING_ENVIRONMENT_BRDF_SAMPLER,
-            m_CommonPasses->m_LinearClampSampler));
+            m_renderDevice->samplers().linearClamp()));
 
     return m_Device->createBindingSet(bindingSetDesc, m_ShadingBindingLayout);
 }
@@ -284,7 +284,7 @@ nvrhi::GraphicsPipelineHandle ForwardShadingPass::CreateGraphicsPipeline(Forward
     return m_Device->createGraphicsPipeline(pipelineDesc, framebufferInfo);
 }
 
-std::shared_ptr<MaterialBindingCache> ForwardShadingPass::CreateMaterialBindingCache(CommonRenderPasses& commonPasses)
+std::shared_ptr<MaterialBindingCache> ForwardShadingPass::CreateMaterialBindingCache(rhi::RenderDevice& renderDevice)
 {
     std::vector<MaterialResourceBinding> materialBindings = {
         { MaterialResource::ConstantBuffer,         FORWARD_BINDING_MATERIAL_CONSTANTS },
@@ -303,9 +303,9 @@ std::shared_ptr<MaterialBindingCache> ForwardShadingPass::CreateMaterialBindingC
         /* registerSpace = */ FORWARD_SPACE_MATERIAL,
         /* registerSpaceIsDescriptorSet = */ true,
         materialBindings,
-        commonPasses.m_AnisotropicWrapSampler,
-        commonPasses.m_GrayTexture,
-        commonPasses.m_BlackTexture);
+        renderDevice.samplers().anisotropicWrap(),
+        renderDevice.builtins().grayTexture(),
+        renderDevice.builtins().blackTexture());
 }
 
 void ForwardShadingPass::SetupView(

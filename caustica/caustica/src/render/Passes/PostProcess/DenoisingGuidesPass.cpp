@@ -5,7 +5,7 @@
 
 #include <rhi/utils.h>
 #include <assets/loader/ShaderFactory.h>
-#include <render/Core/CommonRenderPasses.h>
+#include <render/Core/RenderPassConstants.h>
 #include <render/Passes/PostProcess/DenoisingGuidesPass.h>
 #include <core/file_utils.h>
 #include <core/format.h>

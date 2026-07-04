@@ -1,5 +1,5 @@
 #include <assets/loader/ShaderFactory.h>
-#include <render/Core/CommonRenderPasses.h>
+#include <rhi/RenderDevice.h>
 #include <scene/View.h>
 #include <sstream>
 #include <assert.h>
@@ -21,12 +21,12 @@ using namespace caustica::render;
 ToneMappingPass::ToneMappingPass(
     nvrhi::IDevice* device,
     std::shared_ptr<caustica::ShaderFactory> shaderFactory,
-    std::shared_ptr<caustica::CommonRenderPasses> commonPasses,
+    caustica::rhi::RenderDevice& renderDevice,
     std::shared_ptr<caustica::FramebufferFactory> colorFramebufferFactory,
     const caustica::ICompositeView& compositeView,
 	nvrhi::TextureHandle sourceTexture)
     : m_device(device)
-    , m_commonPasses(commonPasses)
+    , m_renderDevice(renderDevice)
     , m_FramebufferFactory(colorFramebufferFactory)
 {
     const IView* sampleView = compositeView.GetChildView(ViewType::PLANAR, 0);
@@ -122,7 +122,7 @@ ToneMappingPass::ToneMappingPass(
 
 		nvrhi::GraphicsPipelineDesc pipelineDesc;
 		pipelineDesc.primType = nvrhi::PrimitiveType::TriangleStrip;
-		pipelineDesc.VS = m_commonPasses->m_FullscreenVS;
+		pipelineDesc.VS = m_renderDevice.blit().fullscreenVS();
 		pipelineDesc.PS = m_LuminanceShader;
 		pipelineDesc.bindingLayouts = { m_LuminanceBindingLayout };
 
@@ -161,7 +161,7 @@ ToneMappingPass::ToneMappingPass(
 
         nvrhi::GraphicsPipelineDesc pipelineDesc;
         pipelineDesc.primType = nvrhi::PrimitiveType::TriangleStrip;
-        pipelineDesc.VS = m_commonPasses->m_FullscreenVS;
+        pipelineDesc.VS = m_renderDevice.blit().fullscreenVS();
         pipelineDesc.PS = m_ToneMapShader;
         pipelineDesc.bindingLayouts = { m_ToneMapBindingLayout};
 
@@ -347,6 +347,27 @@ bool ToneMappingPass::Render(
     }
     commandList->endMarker();
     return commandListWasClosed;
+}
+
+void ToneMappingPass::registerGraphPass(
+    caustica::rg::GraphBuilder& graph,
+    caustica::rg::TextureHandle sourceColor,
+    caustica::rg::TextureHandle outputLdrColor,
+    const caustica::ICompositeView& compositeView,
+    bool enabled,
+    bool* outCommandListWasClosed)
+{
+    graph.addPass(
+        "ToneMapping",
+        [&](caustica::rg::PassBuilder& setup) {
+            setup.read(sourceColor, caustica::rg::TextureAccess::ShaderResource);
+            setup.write(outputLdrColor, caustica::rg::TextureAccess::RenderTarget);
+        },
+        [this, sourceColor, &compositeView, enabled, outCommandListWasClosed](caustica::rg::RenderPassContext& ctx) {
+            const bool closed = Render(ctx.commandList(), compositeView, ctx.texture(sourceColor), enabled);
+            if (outCommandListWasClosed)
+                *outCommandListWasClosed = closed;
+        });
 }
 
 void ToneMappingPass::AdvanceFrame(float frameTime)

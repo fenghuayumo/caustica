@@ -14,7 +14,7 @@
 
 namespace caustica
 {
-    class CommonRenderPasses;
+    namespace rhi { class RenderDevice; }
     class ShaderFactory;
 }
 
@@ -51,7 +51,7 @@ private:
     bool m_OddFrame = false;
     
     std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
-    std::shared_ptr<caustica::CommonRenderPasses> m_commonPasses;
+    caustica::rhi::RenderDevice& m_renderDevice;
     std::shared_ptr<caustica::Scene> m_Scene;
     std::shared_ptr<class MaterialGpuCache> m_materialGpuCache;
     std::shared_ptr<class OpacityMicromapBuilder> m_opacityMicromapBuilder;
@@ -69,7 +69,7 @@ public:
     PrepareLightsPass(
         nvrhi::IDevice* device,
         std::shared_ptr<caustica::ShaderFactory> shaderFactory,
-        std::shared_ptr<caustica::CommonRenderPasses> commonPasses,
+        caustica::rhi::RenderDevice& renderDevice,
         std::shared_ptr<caustica::Scene> scene,
         std::shared_ptr<class MaterialGpuCache> materialGpuCache,
         std::shared_ptr<class OpacityMicromapBuilder> opacityMicromapBuilder,

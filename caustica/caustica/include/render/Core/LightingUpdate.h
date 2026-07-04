@@ -21,7 +21,7 @@ namespace caustica
 class AccelStructManager;
 class BindingCache;
 class CameraController;
-class CommonRenderPasses;
+namespace rhi { class RenderDevice; }
 class Light;
 class Scene;
 
@@ -31,7 +31,7 @@ struct PreUpdateLightingParams
     bool&                                          needNewBindings;
 
     EnvMapProcessor*                             environment = nullptr;
-    std::shared_ptr<CommonRenderPasses>            commonPasses;
+    rhi::RenderDevice&                             renderDevice;
 
     std::string                                    envMapActualPath;
     std::filesystem::path                          sceneDirectory;
@@ -45,7 +45,7 @@ struct UpdateLightingParams
     EnvMapProcessor*                             environment = nullptr;
     LightSamplingCache*                          lightSampling = nullptr;
     BindingCache*                                  bindingCache = nullptr;
-    std::shared_ptr<CommonRenderPasses>            commonPasses;
+    rhi::RenderDevice&                             renderDevice;
 
     const std::shared_ptr<Scene>&                  scene;
     std::shared_ptr<MaterialGpuCache>              materials;

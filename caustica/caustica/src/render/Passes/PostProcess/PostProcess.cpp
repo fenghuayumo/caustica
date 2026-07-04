@@ -1,17 +1,17 @@
 #include <render/Passes/PostProcess/PostProcess.h>
 
 #include <render/Core/FramebufferFactory.h>
-#include <render/Core/CommonRenderPasses.h>
+#include <rhi/RenderDevice.h>
 #include <render/Passes/Debug/ShaderDebug.h>
 
 using namespace caustica::math;
 using namespace caustica;
 
 PostProcess::PostProcess( nvrhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory, 
-    std::shared_ptr<caustica::CommonRenderPasses> commonPasses, std::shared_ptr<ShaderDebug> shaderDebug
+    caustica::rhi::RenderDevice& renderDevice, std::shared_ptr<ShaderDebug> shaderDebug
     )
     : m_device(device)
-    , m_commonPasses(commonPasses)
+    , m_renderDevice(renderDevice)
     , m_bindingCache(device)
     , m_shaderDebug(shaderDebug)
 {
@@ -119,13 +119,13 @@ void PostProcess::Apply( nvrhi::ICommandList* commandList, ComputePassType passT
     bindingSetDesc.bindings = {
     		nvrhi::BindingSetItem::ConstantBuffer(0, consts),
             nvrhi::BindingSetItem::PushConstants(1, sizeof(SampleMiniConstants)), 
-            nvrhi::BindingSetItem::Texture_SRV(0, (sourceTexture!=nullptr)?(sourceTexture):(m_commonPasses->m_WhiteTexture.Get())),
+            nvrhi::BindingSetItem::Texture_SRV(0, (sourceTexture!=nullptr)?(sourceTexture):(m_renderDevice.builtins().whiteTexture().Get())),
             nvrhi::BindingSetItem::Texture_UAV(0, workTexture),
     		//nvrhi::BindingSetItem::StructuredBuffer_SRV(1, renderTargets.DenoiserPixelDataBuffer),
             nvrhi::BindingSetItem::Texture_SRV(2, renderTargets.DenoiserOutDiffRadianceHitDist[pass]),
             nvrhi::BindingSetItem::Texture_SRV(3, renderTargets.DenoiserOutSpecRadianceHitDist[pass]),
-            nvrhi::BindingSetItem::Texture_SRV(4, m_commonPasses->m_WhiteTexture.Get()),
-            nvrhi::BindingSetItem::Texture_SRV(5, (renderTargets.DenoiserOutValidation!=nullptr)?(renderTargets.DenoiserOutValidation):((nvrhi::TextureHandle)m_commonPasses->m_WhiteTexture.Get())),
+            nvrhi::BindingSetItem::Texture_SRV(4, m_renderDevice.builtins().whiteTexture().Get()),
+            nvrhi::BindingSetItem::Texture_SRV(5, (renderTargets.DenoiserOutValidation!=nullptr)?(renderTargets.DenoiserOutValidation):((nvrhi::TextureHandle)m_renderDevice.builtins().whiteTexture().Get())),
             nvrhi::BindingSetItem::Texture_SRV(6, renderTargets.DenoiserViewspaceZ),
             nvrhi::BindingSetItem::Texture_SRV(7, renderTargets.DenoiserDisocclusionThresholdMix),
             nvrhi::BindingSetItem::StructuredBuffer_SRV(10, renderTargets.StablePlanesBuffer),

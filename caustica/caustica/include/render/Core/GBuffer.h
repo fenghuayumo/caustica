@@ -6,7 +6,6 @@
 
 namespace caustica
 {
-    class CommonRenderPasses;
     class FramebufferFactory;
 }
 
