@@ -1,0 +1,90 @@
+#include <render/FramePassRegistry.h>
+
+namespace caustica::render
+{
+
+namespace
+{
+    const char* insertPointAnchorName(FramePassInsertPoint point)
+    {
+        switch (point)
+        {
+        case FramePassInsertPoint::BeforeFrameSetup:      return "FrameSetup";
+        case FramePassInsertPoint::AfterFrameSetup:       return "FrameSetup";
+        case FramePassInsertPoint::AfterRenderTargets:    return "RenderTargets";
+        case FramePassInsertPoint::AfterRendererInit:     return "RendererInit";
+        case FramePassInsertPoint::AfterShaderUpdate:     return "ShaderUpdate";
+        case FramePassInsertPoint::AfterBeginCommandList: return "BeginCommandList";
+        case FramePassInsertPoint::AfterSceneUpdate:      return "SceneUpdate";
+        case FramePassInsertPoint::AfterPathTracePrepare: return "PathTracePrepare";
+        case FramePassInsertPoint::AfterPathTrace:        return "PathTrace";
+        case FramePassInsertPoint::AfterDenoiseAndAA:     return "DenoiseAndAA";
+        case FramePassInsertPoint::AfterToneMapping:      return "ToneMapping";
+        case FramePassInsertPoint::AfterComposite:        return "Composite";
+        case FramePassInsertPoint::AfterFinalize:         return "Finalize";
+        }
+        return "Finalize";
+    }
+}
+
+void FramePassRegistry::registerPassFactory(std::string name,
+    FramePassInsertPoint insertAfter,
+    PassFactory factory)
+{
+    m_registrations.push_back(PassRegistration{
+        .name = std::move(name),
+        .insertAfter = insertAfter,
+        .factory = std::move(factory),
+    });
+}
+
+void FramePassRegistry::registerLambdaPass(std::string name,
+    FramePassInsertPoint insertAfter,
+    std::function<void(PathTracingFrameContext&)> fn)
+{
+    registerPassFactory(std::move(name), insertAfter, [passName = std::move(name), fn = std::move(fn)]() mutable {
+        struct LambdaPass final : IPathTracingFramePass
+        {
+            explicit LambdaPass(std::string n, std::function<void(PathTracingFrameContext&)> f)
+                : m_name(std::move(n))
+                , m_fn(std::move(f))
+            {
+            }
+
+            [[nodiscard]] const char* name() const override { return m_name.c_str(); }
+            void execute(PathTracingFrameContext& context) override
+            {
+                if (m_fn)
+                    m_fn(context);
+            }
+
+            std::string m_name;
+            std::function<void(PathTracingFrameContext&)> m_fn;
+        };
+        return std::make_unique<LambdaPass>(std::move(passName), std::move(fn));
+    });
+}
+
+void FramePassRegistry::applyTo(PathTracingFramePipeline& pipeline) const
+{
+    // Phase 0: append after anchor pass name. Phase 2: ordered insert / Render Graph.
+    for (const PassRegistration& reg : m_registrations)
+    {
+        if (!reg.factory)
+            continue;
+
+        auto pass = reg.factory();
+        if (!pass)
+            continue;
+
+        (void)insertPointAnchorName(reg.insertAfter);
+        pipeline.registerPass(reg.name, pass.release()); // TODO: owned registration
+    }
+}
+
+void FramePassRegistry::clear()
+{
+    m_registrations.clear();
+}
+
+} // namespace caustica::render

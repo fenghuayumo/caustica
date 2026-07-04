@@ -1,4 +1,4 @@
-#include "EditorCameraController.h"
+#include <render/Core/SceneCameraController.h>
 
 #include <core/path_utils.h>
 #include <render/Passes/PostProcess/ToneMappingPasses.h>
@@ -8,10 +8,10 @@
 
 #include <cmath>
 
-namespace caustica::editor
+namespace caustica
 {
 
-void EditorCameraController::bind(CameraController& camera,
+void SceneCameraController::bind(CameraController& camera,
     PathTracerSettings& settings,
     caustica::render::WorldRenderer* worldRenderer)
 {
@@ -20,22 +20,22 @@ void EditorCameraController::bind(CameraController& camera,
     m_worldRenderer = worldRenderer;
 }
 
-float EditorCameraController::getVerticalFOV() const
+float SceneCameraController::getVerticalFOV() const
 {
     return m_camera ? m_camera->verticalFOV() : 0.0f;
 }
 
-const caustica::FirstPersonCamera& EditorCameraController::camera() const
+const FirstPersonCamera& SceneCameraController::camera() const
 {
     return m_camera->camera();
 }
 
-const std::shared_ptr<caustica::PlanarView>& EditorCameraController::view() const
+const std::shared_ptr<PlanarView>& SceneCameraController::view() const
 {
     return m_camera->view();
 }
 
-void EditorCameraController::markCameraChanged()
+void SceneCameraController::markCameraChanged()
 {
     if (m_settings)
         m_settings->ResetAccumulation = true;
@@ -43,7 +43,7 @@ void EditorCameraController::markCameraChanged()
         m_worldRenderer->setGaussianSplatTemporalReset(true);
 }
 
-void EditorCameraController::setVerticalFOV(float cameraFOV)
+void SceneCameraController::setVerticalFOV(float cameraFOV)
 {
     if (!m_camera)
         return;
@@ -52,7 +52,7 @@ void EditorCameraController::setVerticalFOV(float cameraFOV)
     markCameraChanged();
 }
 
-void EditorCameraController::setIntrinsics(float fx, float fy, float cx, float cy, float width, float height)
+void SceneCameraController::setIntrinsics(float fx, float fy, float cx, float cy, float width, float height)
 {
     if (!m_camera)
         return;
@@ -61,7 +61,7 @@ void EditorCameraController::setIntrinsics(float fx, float fy, float cx, float c
     markCameraChanged();
 }
 
-void EditorCameraController::clearIntrinsics()
+void SceneCameraController::clearIntrinsics()
 {
     if (!m_camera)
         return;
@@ -70,45 +70,45 @@ void EditorCameraController::clearIntrinsics()
     markCameraChanged();
 }
 
-std::string EditorCameraController::getPosDirUpString() const
+std::string SceneCameraController::getPosDirUpString() const
 {
     return m_camera ? m_camera->getPosDirUpString() : std::string{};
 }
 
-bool EditorCameraController::setFromPosDirUpString(const std::string& value)
+bool SceneCameraController::setFromPosDirUpString(const std::string& value)
 {
     return m_camera && m_camera->setFromPosDirUpString(value);
 }
 
-void EditorCameraController::saveToFile() const
+void SceneCameraController::saveToFile() const
 {
     if (!m_camera)
         return;
 
-    caustica::math::float4x4 projMatrix = m_camera->view()->GetProjectionMatrix();
+    math::float4x4 projMatrix = m_camera->view()->GetProjectionMatrix();
     float tanHalfFOVY = 1.0f / (projMatrix.m_data[1 * 4 + 1]);
     float fovY = atanf(tanHalfFOVY) * 2.0f;
 
     m_camera->saveToFile(
-        caustica::GetDirectoryWithExecutable() / "campos.txt",
+        GetDirectoryWithExecutable() / "campos.txt",
         m_camera->zNear(),
         fovY);
 }
 
-void EditorCameraController::loadFromFile()
+void SceneCameraController::loadFromFile()
 {
     if (m_camera)
-        m_camera->loadFromFile(caustica::GetDirectoryWithExecutable() / "campos.txt");
+        m_camera->loadFromFile(GetDirectoryWithExecutable() / "campos.txt");
 }
 
-void EditorCameraController::syncFromSceneCamera(const std::shared_ptr<caustica::PerspectiveCamera>& sceneCamera)
+void SceneCameraController::syncFromSceneCamera(const std::shared_ptr<PerspectiveCamera>& sceneCamera)
 {
     if (!m_camera || !m_settings)
         return;
 
     m_camera->updateFromSceneCamera(sceneCamera);
 
-    auto sceneCameraEx = std::dynamic_pointer_cast<caustica::PerspectiveCamera>(sceneCamera);
+    auto sceneCameraEx = std::dynamic_pointer_cast<PerspectiveCamera>(sceneCamera);
     if (sceneCameraEx == nullptr)
         return;
 
@@ -125,8 +125,8 @@ void EditorCameraController::syncFromSceneCamera(const std::shared_ptr<caustica:
         sceneCameraEx->exposureValueMax.value_or(defaults.exposureValueMax);
 }
 
-void EditorCameraController::syncFromSceneCamera(
-    const caustica::scene::PerspectiveCameraData& camData,
+void SceneCameraController::syncFromSceneCamera(
+    const scene::PerspectiveCameraData& camData,
     const dm::daffine3& globalTransform)
 {
     if (!m_camera || !m_settings)
@@ -149,4 +149,4 @@ void EditorCameraController::syncFromSceneCamera(
     markCameraChanged();
 }
 
-} // namespace caustica::editor
+} // namespace caustica
