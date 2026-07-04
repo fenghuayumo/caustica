@@ -2,7 +2,7 @@
 
 #include <core/path_utils.h>
 #include <render/Passes/PostProcess/ToneMappingPasses.h>
-#include <render/WorldRenderer/PathTracingWorldRenderer.h>
+#include <render/WorldRenderer/WorldRenderer.h>
 #include <scene/camera/Camera.h>
 #include <scene/SceneCameraAccess.h>
 
@@ -13,7 +13,7 @@ namespace caustica::editor
 
 void EditorCameraController::bind(caustica::RenderCore& renderCore,
     PathTracerSettings& settings,
-    caustica::render::PathTracingWorldRenderer* worldRenderer)
+    caustica::render::WorldRenderer* worldRenderer)
 {
     m_renderCore = &renderCore;
     m_settings = &settings;

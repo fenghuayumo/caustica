@@ -32,7 +32,7 @@ class TextureLoader;
 
 namespace render
 {
-class PathTracingWorldRenderer;
+class WorldRenderer;
 } // namespace render
 
 struct EngineSceneCallbacks
@@ -41,8 +41,8 @@ struct EngineSceneCallbacks
     std::function<void()> OnSceneUnloading;
 };
 
-// Inputs for initializing EngineRenderer (shared GPU infra + path tracer).
-struct EngineRendererInitParams
+// Inputs for initializing GpuRenderSubsystem (shared GPU infra + path tracer).
+struct GpuRenderSubsystemInitParams
 {
     GpuDevice& gpuDevice;
     PathTracerSettings& settings;
@@ -60,15 +60,15 @@ struct EngineRendererInitParams
     EngineSceneCallbacks sceneCallbacks = {};
 };
 
-// Owns shared GPU infrastructure and the path-tracing world renderer.
-class EngineRenderer : public ISubsystem
+// Owns shared GPU infrastructure and the path-tracing WorldRenderer.
+class GpuRenderSubsystem : public ISubsystem
 {
 public:
-    EngineRenderer();
-    ~EngineRenderer() override;
+    GpuRenderSubsystem();
+    ~GpuRenderSubsystem() override;
 
-    EngineRenderer(const EngineRenderer&) = delete;
-    EngineRenderer& operator=(const EngineRenderer&) = delete;
+    GpuRenderSubsystem(const GpuRenderSubsystem&) = delete;
+    GpuRenderSubsystem& operator=(const GpuRenderSubsystem&) = delete;
 
     [[nodiscard]] int priority() const override { return 100; }
 
@@ -76,7 +76,7 @@ public:
     void shutdown() override;
     void onRenderEnd(GpuDevice& gpuDevice) override;
 
-    bool initializeSession(const EngineRendererInitParams& params);
+    bool initializeSession(const GpuRenderSubsystemInitParams& params);
 
     void endFrame();
 
@@ -100,7 +100,7 @@ public:
     [[nodiscard]] std::shared_ptr<TextureLoader> textureLoader() const { return m_textureCache; }
     [[nodiscard]] RenderCore* renderCore() const { return m_renderCore.get(); }
     [[nodiscard]] SceneManager* sceneManager() const { return m_sceneManager.get(); }
-    [[nodiscard]] render::PathTracingWorldRenderer* worldRenderer() const { return m_worldRenderer.get(); }
+    [[nodiscard]] render::WorldRenderer* worldRenderer() const { return m_worldRenderer.get(); }
     [[nodiscard]] nvrhi::BindingLayoutHandle bindlessLayout() const { return m_bindlessLayout; }
 
     [[nodiscard]] render::SceneLightingPasses& lightingPasses() { return m_scenePasses.lighting; }
@@ -125,7 +125,7 @@ private:
     std::unique_ptr<RenderCore> m_renderCore;
     std::unique_ptr<SceneManager> m_sceneManager;
     std::unique_ptr<render::PathTracingContext> m_pathTracingContext;
-    std::unique_ptr<render::PathTracingWorldRenderer> m_worldRenderer;
+    std::unique_ptr<render::WorldRenderer> m_worldRenderer;
 
     GpuDevice* m_gpuDevice = nullptr;
     PathTracerSettings* m_settings = nullptr;

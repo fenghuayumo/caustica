@@ -1,6 +1,6 @@
 namespace { constexpr int c_SwapchainCount = 3; }
 
-#include <render/WorldRenderer/PathTracingWorldRenderer.h>
+#include <render/WorldRenderer/WorldRenderer.h>
 #include <render/SceneGpuResources.h>
 #include <render/WorldRenderer/PathTracingContext.h>
 #include <render/SceneGaussianSplatPasses.h>
@@ -100,15 +100,15 @@ namespace
 #endif
 }
 
-caustica::render::PathTracingWorldRenderer::PathTracingWorldRenderer(PathTracingContext& context)
+caustica::render::WorldRenderer::WorldRenderer(PathTracingContext& context)
     : m_context(context)
 {
     m_lastRealtimeMode = m_context.settings.RealtimeMode;
 }
 
-caustica::render::PathTracingWorldRenderer::~PathTracingWorldRenderer() = default;
+caustica::render::WorldRenderer::~WorldRenderer() = default;
 
-nvrhi::BindingLayoutHandle caustica::render::PathTracingWorldRenderer::CreateBindlessLayout(nvrhi::IDevice* device)
+nvrhi::BindingLayoutHandle caustica::render::WorldRenderer::CreateBindlessLayout(nvrhi::IDevice* device)
 {
     nvrhi::BindlessLayoutDesc bindlessLayoutDesc;
     bindlessLayoutDesc.visibility = nvrhi::ShaderType::All;
@@ -121,7 +121,7 @@ nvrhi::BindingLayoutHandle caustica::render::PathTracingWorldRenderer::CreateBin
     return device->createBindlessLayout(bindlessLayoutDesc);
 }
 
-void caustica::render::PathTracingWorldRenderer::createBindingLayouts(nvrhi::IBindingLayout* precreatedBindless)
+void caustica::render::WorldRenderer::createBindingLayouts(nvrhi::IBindingLayout* precreatedBindless)
 {
     nvrhi::IDevice* const gpuDevice = device();
     m_bindlessLayout = precreatedBindless
@@ -216,7 +216,7 @@ void caustica::render::PathTracingWorldRenderer::createBindingLayouts(nvrhi::IBi
     m_bindingLayout = gpuDevice->createBindingLayout(globalBindingLayoutDesc);
 }
 
-void caustica::render::PathTracingWorldRenderer::createDeviceResources()
+void caustica::render::WorldRenderer::createDeviceResources()
 {
     nvrhi::IDevice* device = this->device();
 
@@ -340,7 +340,7 @@ void caustica::render::PathTracingWorldRenderer::createDeviceResources()
     m_commandList = device->createCommandList();
 }
 
-bool caustica::render::PathTracingWorldRenderer::createPTPipeline()
+bool caustica::render::WorldRenderer::createPTPipeline()
 {
     std::vector<caustica::ShaderMacro> shaderMacros;
     m_exportVBufferCS = m_context.shaderFactory->CreateShader(
@@ -352,7 +352,7 @@ bool caustica::render::PathTracingWorldRenderer::createPTPipeline()
     return true;
 }
 
-void caustica::render::PathTracingWorldRenderer::onSceneUnloading()
+void caustica::render::WorldRenderer::onSceneUnloading()
 {
     m_bindingSet = nullptr;
     m_context.bindingCache.Clear();
@@ -369,12 +369,12 @@ void caustica::render::PathTracingWorldRenderer::onSceneUnloading()
     m_ptPipelineEdgeDetection = nullptr;
 }
 
-void caustica::render::PathTracingWorldRenderer::resetFrameIndex()
+void caustica::render::WorldRenderer::resetFrameIndex()
 {
     m_frameIndex = 0;
 }
 
-void caustica::render::PathTracingWorldRenderer::onSceneLoaded()
+void caustica::render::WorldRenderer::onSceneLoaded()
 {
     resetFrameIndex();
     m_accumulationSampleIndex = 0;
@@ -389,7 +389,7 @@ void caustica::render::PathTracingWorldRenderer::onSceneLoaded()
         m_rtxdiPass->Reset();
 }
 
-void caustica::render::PathTracingWorldRenderer::onBackBufferResizing()
+void caustica::render::WorldRenderer::onBackBufferResizing()
 {
     device()->waitForIdle();
     device()->runGarbageCollection();
@@ -441,7 +441,7 @@ SimpleViewConstants FromPlanarViewConstants(PlanarViewConstants & view)
     return ret;
 }
 
-void caustica::render::PathTracingWorldRenderer::createRenderPasses( bool& exposureResetRequired, nvrhi::CommandListHandle initializeCommandList )
+void caustica::render::WorldRenderer::createRenderPasses( bool& exposureResetRequired, nvrhi::CommandListHandle initializeCommandList )
 {
     m_context.bindingCache.Clear();
 
@@ -519,7 +519,7 @@ void caustica::render::PathTracingWorldRenderer::createRenderPasses( bool& expos
 
     m_denoisingGuidesPass = std::make_shared<DenoisingGuidesPass>(device(), m_context.shaderFactory, m_renderTargets, m_shaderDebug, m_bindingLayout);
 }
-void caustica::render::PathTracingWorldRenderer::preUpdateLighting(nvrhi::CommandListHandle commandList, bool& needNewBindings)
+void caustica::render::WorldRenderer::preUpdateLighting(nvrhi::CommandListHandle commandList, bool& needNewBindings)
 {
     std::filesystem::path sceneDirectory;
     if (m_context.sceneManager.getCurrentScenePath() != std::filesystem::path(SceneManager::inlineSceneSentinel()))
@@ -542,7 +542,7 @@ void caustica::render::PathTracingWorldRenderer::preUpdateLighting(nvrhi::Comman
     };
     m_context.renderCore.preUpdateLighting(params);
 }
-void caustica::render::PathTracingWorldRenderer::updateLighting(nvrhi::CommandListHandle commandList)
+void caustica::render::WorldRenderer::updateLighting(nvrhi::CommandListHandle commandList)
 {
     m_context.gaussianSplats.buildEmissionProxyList();
 
@@ -565,7 +565,7 @@ void caustica::render::PathTracingWorldRenderer::updateLighting(nvrhi::CommandLi
         params.gaussianSplatEmissionProxies = &m_context.gaussianSplatEmissionProxies;
     m_context.renderCore.updateLighting(params);
 }
-void caustica::render::PathTracingWorldRenderer::preUpdatePathTracing( bool resetAccum, nvrhi::CommandListHandle commandList )
+void caustica::render::WorldRenderer::preUpdatePathTracing( bool resetAccum, nvrhi::CommandListHandle commandList )
 {
     const bool resetReferenceOidn = !m_context.settings.RealtimeMode && (resetAccum || m_context.settings.ResetAccumulation || m_context.settings.ReferenceOIDNDenoiserChanged);
     if (resetReferenceOidn || m_context.settings.ReferenceOIDNDenoiserChanged)
@@ -607,7 +607,7 @@ void caustica::render::PathTracingWorldRenderer::preUpdatePathTracing( bool rese
     else
         m_sampleIndex = (!m_context.settings.DbgFreezeRealtimeNoiseSeed)?( m_frameIndex % 8192 ):0;     // actual sample index
 }
-void caustica::render::PathTracingWorldRenderer::postUpdatePathTracing( )
+void caustica::render::WorldRenderer::postUpdatePathTracing( )
 {
     m_accumulationSampleIndex = std::min( m_accumulationSampleIndex+1, m_context.settings.AccumulationTarget );
 
@@ -618,7 +618,7 @@ void caustica::render::PathTracingWorldRenderer::postUpdatePathTracing( )
     m_context.settings.ResetRealtimeCaches = false;
     m_frameIndex++;
 }
-void caustica::render::PathTracingWorldRenderer::updatePathTracerConstants( PathTracerConstants & constants, const PathTracerCameraData & cameraData )
+void caustica::render::WorldRenderer::updatePathTracerConstants( PathTracerConstants & constants, const PathTracerCameraData & cameraData )
 {
 #if CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
     auto GetStfMagnificationMethod = [](StfMagnificationMethod method)->int {
@@ -716,7 +716,7 @@ void caustica::render::PathTracingWorldRenderer::updatePathTracerConstants( Path
     constants.STFGaussianSigma                  = m_context.settings.STFGaussianSigma;
 #endif
 }
-void caustica::render::PathTracingWorldRenderer::rtxdiSetupFrame(nvrhi::IFramebuffer* framebuffer, PathTracerCameraData cameraData, uint2 renderDims)
+void caustica::render::WorldRenderer::rtxdiSetupFrame(nvrhi::IFramebuffer* framebuffer, PathTracerCameraData cameraData, uint2 renderDims)
 {
     const bool envMapPresent = m_context.settings.EnvironmentMapParams.Enabled;
 
@@ -745,7 +745,7 @@ void caustica::render::PathTracingWorldRenderer::rtxdiSetupFrame(nvrhi::IFramebu
         m_context.sceneManager.getScene(), m_context.materials, m_context.opacityMaps, m_context.renderCore.accelStructs().getSubInstanceBuffer(), bridgeParameters, m_bindingLayout, m_shaderDebug );
  }
 #if CAUSTICA_WITH_STREAMLINE
-void caustica::render::PathTracingWorldRenderer::streamlinePreRender()
+void caustica::render::WorldRenderer::streamlinePreRender()
 {
 #if CAUSTICA_WITH_STREAMLINE
     if (m_context.gpuDevice.IsHeadless())
@@ -951,7 +951,7 @@ void caustica::render::PathTracingWorldRenderer::streamlinePreRender()
 }
 #endif
 #if CAUSTICA_WITH_NATIVE_DLSS
-void caustica::render::PathTracingWorldRenderer::nativeDLSSPreRender()
+void caustica::render::WorldRenderer::nativeDLSSPreRender()
 {
     if (!m_context.settings.RealtimeMode)
     {
@@ -1010,7 +1010,7 @@ void caustica::render::PathTracingWorldRenderer::nativeDLSSPreRender()
     }
 }
 #endif
-void caustica::render::PathTracingWorldRenderer::preRender()
+void caustica::render::WorldRenderer::preRender()
 {
     // Limit FPS
     if (m_context.settings.ActualFPSLimiter() > 0)
@@ -1018,7 +1018,7 @@ void caustica::render::PathTracingWorldRenderer::preRender()
 
     korgi::Update();
 }
-void caustica::render::PathTracingWorldRenderer::postProcessPreToneMapping(nvrhi::ICommandList* commandList, const caustica::ICompositeView& compositeView)
+void caustica::render::WorldRenderer::postProcessPreToneMapping(nvrhi::ICommandList* commandList, const caustica::ICompositeView& compositeView)
 {
     (void)compositeView;
 
@@ -1055,7 +1055,7 @@ void caustica::render::PathTracingWorldRenderer::postProcessPreToneMapping(nvrhi
         commandList->endMarker();
     }
 }
-void caustica::render::PathTracingWorldRenderer::postProcessPostToneMapping(nvrhi::ICommandList* commandList, const caustica::ICompositeView& compositeView)
+void caustica::render::WorldRenderer::postProcessPostToneMapping(nvrhi::ICommandList* commandList, const caustica::ICompositeView& compositeView)
 { // a.k.a. LDR post-process (e.g. colour filters go here)
     if (m_context.settings.PostProcessEdgeDetection)
     {
@@ -1081,7 +1081,7 @@ void caustica::render::PathTracingWorldRenderer::postProcessPostToneMapping(nvrh
         m_commandList->endMarker();
     }
 }
-void caustica::render::PathTracingWorldRenderer::renderGaussianSplats(bool renderToOutputColor)
+void caustica::render::WorldRenderer::renderGaussianSplats(bool renderToOutputColor)
 {
     if (!m_context.settings.EnableGaussianSplats || m_context.gaussianSplats.objectsEmpty())
         return;
@@ -1163,7 +1163,7 @@ void caustica::render::PathTracingWorldRenderer::renderGaussianSplats(bool rende
     if (renderedAny && stochasticSplats && !renderToOutputColor)
         accumulateGaussianSplats(splatView);
 }
-void caustica::render::PathTracingWorldRenderer::accumulateGaussianSplats(const caustica::IView& splatView)
+void caustica::render::WorldRenderer::accumulateGaussianSplats(const caustica::IView& splatView)
 {
     if (m_gaussianSplatAccumulationPass == nullptr || m_renderTargets == nullptr || m_gaussianSplatCurrentColor == nullptr || m_gaussianSplatAccumulatedColor == nullptr)
         return;
@@ -1190,7 +1190,7 @@ void caustica::render::PathTracingWorldRenderer::accumulateGaussianSplats(const 
 
     m_gaussianSplatTemporalSampleIndex = std::min(m_gaussianSplatTemporalSampleIndex + 1, 1024 * 1024);
 }
-void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* framebuffer)
+void caustica::render::WorldRenderer::render(nvrhi::IFramebuffer* framebuffer)
 {
     m_displaySize = m_renderSize = uint2(
         framebuffer->getFramebufferInfo().width,
@@ -1208,7 +1208,7 @@ void caustica::render::PathTracingWorldRenderer::render(nvrhi::IFramebuffer* fra
     if (ctx.aborted)
         postUpdatePathTracing();
 }
-void caustica::render::PathTracingWorldRenderer::recreateBindingSet()
+void caustica::render::WorldRenderer::recreateBindingSet()
 {
 	// WARNING: this must match the layout of the m_bindingLayout (or switch to CreateBindingSetAndLayout)
     nvrhi::rt::IAccelStruct* gaussianSplatAS = m_context.renderCore.accelStructs().getTopLevelAS();
@@ -1327,17 +1327,10 @@ void caustica::render::PathTracingWorldRenderer::recreateBindingSet()
         // Previous frame depth (default to black = zero depth; overridden by AddCustomBindings)
         bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(87, (m_context.commonPasses)->m_BlackTexture));  // t_PrevDepth placeholder
 
-        {
-            PathTracingFrameContext hostCtx{};
-            hostCtx.framePhase = PathTracingFramePhase::PopulateBindingSet;
-            hostCtx.bindingSetDesc = &bindingSetDesc;
-            dispatchExternalFramePasses(hostCtx);
-        }
-
         m_bindingSet = device()->createBindingSet(bindingSetDesc, m_bindingLayout);
     }
 }
-void caustica::render::PathTracingWorldRenderer::pathTrace(nvrhi::IFramebuffer* framebuffer, const SampleConstants & constants)
+void caustica::render::WorldRenderer::pathTrace(nvrhi::IFramebuffer* framebuffer, const SampleConstants & constants)
 {
     //m_commandList->beginMarker("MainRendering"); <- removed (for now) since added hierarchy reduces readability
     bool useStablePlanes = m_context.settings.RealtimeMode;
@@ -1478,7 +1471,7 @@ void caustica::render::PathTracingWorldRenderer::pathTrace(nvrhi::IFramebuffer* 
 
     }
 }
-void caustica::render::PathTracingWorldRenderer::denoise(nvrhi::IFramebuffer* framebuffer)
+void caustica::render::WorldRenderer::denoise(nvrhi::IFramebuffer* framebuffer)
 {
     if( !m_context.settings.ActualUseStandaloneDenoiser() )
         return;
@@ -1538,7 +1531,7 @@ void caustica::render::PathTracingWorldRenderer::denoise(nvrhi::IFramebuffer* fr
     }
 }
 #if CAUSTICA_WITH_NATIVE_DLSS
-bool caustica::render::PathTracingWorldRenderer::evaluateNativeDLSS(bool reset)
+bool caustica::render::WorldRenderer::evaluateNativeDLSS(bool reset)
 {
     if (!m_nativeDLSS || !(m_context.settings.RealtimeAA == 2 || m_context.settings.RealtimeAA == 3))
         return false;
@@ -1608,7 +1601,7 @@ bool caustica::render::PathTracingWorldRenderer::evaluateNativeDLSS(bool reset)
     return evaluated;
 }
 #endif
-void caustica::render::PathTracingWorldRenderer::postProcessAA(nvrhi::IFramebuffer* framebuffer, bool reset)
+void caustica::render::WorldRenderer::postProcessAA(nvrhi::IFramebuffer* framebuffer, bool reset)
 {
     (void)framebuffer;
 
@@ -1675,7 +1668,7 @@ void caustica::render::PathTracingWorldRenderer::postProcessAA(nvrhi::IFramebuff
     }
 #endif
 }
-void caustica::render::PathTracingWorldRenderer::resetReferenceOIDN()
+void caustica::render::WorldRenderer::resetReferenceOIDN()
 {
     m_oidnDenoisedOutputValid = false;
     m_oidnDenoiserFailed = false;
@@ -1683,7 +1676,7 @@ void caustica::render::PathTracingWorldRenderer::resetReferenceOIDN()
     if (m_oidnDenoiser)
         m_oidnDenoiser->Reset();
 }
-void caustica::render::PathTracingWorldRenderer::applyReferenceOIDN()
+void caustica::render::WorldRenderer::applyReferenceOIDN()
 {
     if (m_context.settings.RealtimeMode || !m_context.settings.ReferenceOIDNDenoiser || m_renderTargets == nullptr)
         return;
@@ -1869,7 +1862,7 @@ void caustica::render::PathTracingWorldRenderer::applyReferenceOIDN()
     }
 #endif
 }
-void caustica::render::PathTracingWorldRenderer::denoisedScreenshot(nvrhi::ITexture * framebufferTexture) const
+void caustica::render::WorldRenderer::denoisedScreenshot(nvrhi::ITexture * framebufferTexture) const
 {
     std::string noisyImagePath = (caustica::GetDirectoryWithExecutable( ) / "photo.bmp").string();
 
@@ -1905,7 +1898,7 @@ void caustica::render::PathTracingWorldRenderer::denoisedScreenshot(nvrhi::IText
     execute("OIDN");
 }
 
-caustica::CameraUpdateParams caustica::render::PathTracingWorldRenderer::makeCameraUpdateParams() const
+caustica::CameraUpdateParams caustica::render::WorldRenderer::makeCameraUpdateParams() const
 {
     CameraUpdateParams params;
     params.renderSize = m_renderSize;
@@ -1921,17 +1914,17 @@ caustica::CameraUpdateParams caustica::render::PathTracingWorldRenderer::makeCam
     return params;
 }
 
-void caustica::render::PathTracingWorldRenderer::syncCameraViews()
+void caustica::render::WorldRenderer::syncCameraViews()
 {
     m_context.renderCore.camera().updateViews(makeCameraUpdateParams());
 }
 
-dm::float2 caustica::render::PathTracingWorldRenderer::computeCameraJitter() const
+dm::float2 caustica::render::WorldRenderer::computeCameraJitter() const
 {
     return m_context.renderCore.camera().computeJitter(makeCameraUpdateParams());
 }
 
-void caustica::render::PathTracingWorldRenderer::dispatchExternalFramePasses(PathTracingFrameContext& ctx) const
+void caustica::render::WorldRenderer::dispatchExternalFramePasses(PathTracingFrameContext& ctx) const
 {
     for (IPathTracingFramePass* pass : m_context.framePasses)
         if (pass)

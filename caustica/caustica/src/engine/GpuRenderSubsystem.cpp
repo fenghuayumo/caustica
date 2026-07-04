@@ -1,4 +1,4 @@
-#include <engine/EngineRenderer.h>
+#include <engine/GpuRenderSubsystem.h>
 
 #include <assets/AssetSystem.h>
 #include <assets/loader/ShaderFactory.h>
@@ -15,7 +15,7 @@
 #include <render/Core/RenderCore.h>
 #include <render/Core/SceneGpuUpdater.h>
 #include <render/PathTracerScenePasses.h>
-#include <render/WorldRenderer/PathTracingWorldRenderer.h>
+#include <render/WorldRenderer/WorldRenderer.h>
 #include <render/WorldRenderer/PathTracingContext.h>
 #include <scene/Scene.h>
 #include <scene/SceneEcs.h>
@@ -24,30 +24,30 @@
 namespace caustica
 {
 
-EngineRenderer::EngineRenderer() = default;
+GpuRenderSubsystem::GpuRenderSubsystem() = default;
 
-EngineRenderer::~EngineRenderer()
+GpuRenderSubsystem::~GpuRenderSubsystem()
 {
     shutdown();
 }
 
-void EngineRenderer::initialize(EngineInitContext& /*context*/)
+void GpuRenderSubsystem::initialize(EngineInitContext& /*context*/)
 {
 }
 
-void EngineRenderer::onRenderEnd(GpuDevice& /*gpuDevice*/)
+void GpuRenderSubsystem::onRenderEnd(GpuDevice& /*gpuDevice*/)
 {
     endFrame();
 }
 
-bool EngineRenderer::initializeSession(const EngineRendererInitParams& params)
+bool GpuRenderSubsystem::initializeSession(const GpuRenderSubsystemInitParams& params)
 {
     GpuDevice& gpuDevice = params.gpuDevice;
 
     createShaderFactory(gpuDevice);
 
     auto* device = gpuDevice.GetDevice();
-    m_bindlessLayout = render::PathTracingWorldRenderer::CreateBindlessLayout(device);
+    m_bindlessLayout = render::WorldRenderer::CreateBindlessLayout(device);
 
     m_commonPasses = std::make_shared<CommonRenderPasses>(device, m_shaderFactory);
     m_bindingCache = std::make_unique<BindingCache>(device);
@@ -114,7 +114,7 @@ bool EngineRenderer::initializeSession(const EngineRendererInitParams& params)
         .framePasses = params.framePasses,
     });
 
-    m_worldRenderer = std::make_unique<render::PathTracingWorldRenderer>(*m_pathTracingContext);
+    m_worldRenderer = std::make_unique<render::WorldRenderer>(*m_pathTracingContext);
     m_worldRenderer->createBindingLayouts(m_bindlessLayout);
 
     m_scenePasses.wireSession(render::ScenePassWireParams{
@@ -133,13 +133,13 @@ bool EngineRenderer::initializeSession(const EngineRendererInitParams& params)
     return true;
 }
 
-void EngineRenderer::endFrame()
+void GpuRenderSubsystem::endFrame()
 {
     if (m_bindlessTable)
         m_bindlessTable->FlushDeferredFrees();
 }
 
-void EngineRenderer::onSceneUnloading()
+void GpuRenderSubsystem::onSceneUnloading()
 {
     if (m_worldRenderer)
         m_worldRenderer->onSceneUnloading();
@@ -151,13 +151,13 @@ void EngineRenderer::onSceneUnloading()
     m_scenePasses.gaussianSplats.sceneUnloading();
 }
 
-void EngineRenderer::refreshEnvironmentMapMediaList(const std::filesystem::path& assetsRoot,
+void GpuRenderSubsystem::refreshEnvironmentMapMediaList(const std::filesystem::path& assetsRoot,
     const std::filesystem::path& scenePath)
 {
     m_scenePasses.lighting.refreshEnvironmentMapMediaList(assetsRoot, scenePath);
 }
 
-void EngineRenderer::applySampleSettingsFromScene()
+void GpuRenderSubsystem::applySampleSettingsFromScene()
 {
     if (!m_settings || !m_sceneManager || !m_renderCore)
         return;
@@ -183,7 +183,7 @@ void EngineRenderer::applySampleSettingsFromScene()
     }
 }
 
-void EngineRenderer::onSceneLoadedBegin()
+void GpuRenderSubsystem::onSceneLoadedBegin()
 {
     if (!m_settings || !m_sceneTime)
         return;
@@ -209,7 +209,7 @@ void EngineRenderer::onSceneLoadedBegin()
     m_settings->ToneMappingParams.exposureValue = 0.0f;
 }
 
-void EngineRenderer::onSceneLoadedGpuPrep()
+void GpuRenderSubsystem::onSceneLoadedGpuPrep()
 {
     if (m_worldRenderer)
         m_worldRenderer->onSceneLoaded();
@@ -235,7 +235,7 @@ void EngineRenderer::onSceneLoadedGpuPrep()
     }
 }
 
-void EngineRenderer::onSceneLoadedGpuFinish()
+void GpuRenderSubsystem::onSceneLoadedGpuFinish()
 {
     if (!m_sceneManager || !m_settings || !m_renderCore || !m_runtimeState)
         return;
@@ -258,7 +258,7 @@ void EngineRenderer::onSceneLoadedGpuFinish()
         m_diagnostics->asyncLoadingInProgress = true;
 }
 
-void EngineRenderer::applyCmdLinePostLoadOverrides()
+void GpuRenderSubsystem::applyCmdLinePostLoadOverrides()
 {
     if (!m_settings || !m_cmdLine)
         return;
@@ -279,7 +279,7 @@ void EngineRenderer::applyCmdLinePostLoadOverrides()
         m_settings->EnableBloom = false;
 }
 
-void EngineRenderer::shutdown()
+void GpuRenderSubsystem::shutdown()
 {
     m_worldRenderer.reset();
     m_pathTracingContext.reset();
@@ -304,7 +304,7 @@ void EngineRenderer::shutdown()
     AssetSystem::Shutdown();
 }
 
-void EngineRenderer::createShaderFactory(GpuDevice& gpuDevice)
+void GpuRenderSubsystem::createShaderFactory(GpuDevice& gpuDevice)
 {
     const char* shaderTypeName = GetShaderTypeName(gpuDevice.GetGraphicsAPI());
     const std::filesystem::path appDirectory = GetRuntimeDirectory();

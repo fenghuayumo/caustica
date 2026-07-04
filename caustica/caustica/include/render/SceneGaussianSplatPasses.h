@@ -27,7 +27,7 @@ class ShaderFactory;
 
 namespace caustica::render
 {
-class PathTracingWorldRenderer;
+class WorldRenderer;
 struct ScenePassWireParams;
 }
 
@@ -92,7 +92,7 @@ private:
     caustica::GpuDevice* m_gpuDevice = nullptr;
     SceneManager* m_sceneManager = nullptr;
     caustica::RenderCore* m_renderCore = nullptr;
-    caustica::render::PathTracingWorldRenderer* m_worldRenderer = nullptr;
+    caustica::render::WorldRenderer* m_worldRenderer = nullptr;
     PathTracerSettings* m_settings = nullptr;
     caustica::render::GaussianSplatSceneSummary* m_summary = nullptr;
     std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;

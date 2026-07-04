@@ -19,7 +19,7 @@ class SceneManager;
 
 namespace caustica::render
 {
-class PathTracingWorldRenderer;
+class WorldRenderer;
 struct GaussianSplatSceneSummary;
 struct RenderInvalidationState;
 } // namespace caustica::render
@@ -34,7 +34,7 @@ struct ScenePassWireParams
     caustica::GpuDevice& gpuDevice;
     SceneManager& sceneManager;
     caustica::RenderCore& renderCore;
-    PathTracingWorldRenderer& worldRenderer;
+    WorldRenderer& worldRenderer;
     PathTracerSettings& settings;
     RenderInvalidationState& invalidation;
     GaussianSplatSceneSummary& gaussianSplatsSummary;
@@ -44,7 +44,7 @@ struct ScenePassWireParams
     std::shared_ptr<caustica::CommonRenderPasses>& commonPasses;
 };
 
-// Scene-scoped render pass bundles owned by EngineRenderer (not Application hosts).
+// Scene-scoped render pass bundles owned by GpuRenderSubsystem (not Application hosts).
 struct PathTracerScenePasses
 {
     SceneLightingPasses lighting;

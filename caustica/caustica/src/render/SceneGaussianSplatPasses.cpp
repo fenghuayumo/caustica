@@ -1,7 +1,7 @@
 #include <render/SceneGaussianSplatPasses.h>
 
 #include <render/PathTracerScenePasses.h>
-#include <render/WorldRenderer/PathTracingWorldRenderer.h>
+#include <render/WorldRenderer/WorldRenderer.h>
 #include <render/Passes/Gaussian/GaussianSplatPass.h>
 #include <render/GPUSort/GPUSort.h>
 

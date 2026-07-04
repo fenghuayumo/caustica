@@ -15,7 +15,7 @@ class RenderCore;
 
 namespace caustica::render
 {
-class PathTracingWorldRenderer;
+class WorldRenderer;
 }
 
 namespace caustica::editor
@@ -29,7 +29,7 @@ public:
 
     void bind(caustica::RenderCore& renderCore,
         PathTracerSettings& settings,
-        caustica::render::PathTracingWorldRenderer* worldRenderer);
+        caustica::render::WorldRenderer* worldRenderer);
 
     float getVerticalFOV() const;
     void setVerticalFOV(float cameraFOV);
@@ -52,7 +52,7 @@ private:
 
     caustica::RenderCore* m_renderCore = nullptr;
     PathTracerSettings* m_settings = nullptr;
-    caustica::render::PathTracingWorldRenderer* m_worldRenderer = nullptr;
+    caustica::render::WorldRenderer* m_worldRenderer = nullptr;
 };
 
 } // namespace caustica::editor

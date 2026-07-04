@@ -9,7 +9,7 @@
 #include <events/mouse_event.h>
 #include <imgui.h>
 #include <render/RenderSessionState.h>
-#include <render/WorldRenderer/PathTracingWorldRenderer.h>
+#include <render/WorldRenderer/WorldRenderer.h>
 #include "game/GameScene.h"
 #include <render/Passes/Debug/ZoomTool.h>
 

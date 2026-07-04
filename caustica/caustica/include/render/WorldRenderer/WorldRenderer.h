@@ -6,7 +6,6 @@
 #include <render/Core/CameraController.h>
 #include <render/WorldRenderer/PathTracingContext.h>
 #include <render/WorldRenderer/PathTracingFramePipeline.h>
-#include <render/WorldRenderer/PathTracingFramePipeline.h>
 #include <shaders/PathTracer/Config.h>
 #include <shaders/SampleConstantBuffer.h>
 #include <render/Core/RenderTargets.h>
@@ -54,13 +53,13 @@ class BloomPass;
 class DLSS;
 
 // =============================================================================
-// PathTracingWorldRenderer — GPU path-tracing pipeline driven by PathTracingContext.
+// WorldRenderer — GPU path-tracing pipeline driven by PathTracingContext.
 // =============================================================================
-class PathTracingWorldRenderer
+class WorldRenderer
 {
 public:
-    PathTracingWorldRenderer(PathTracingContext& context);
-    ~PathTracingWorldRenderer();
+    WorldRenderer(PathTracingContext& context);
+    ~WorldRenderer();
 
     static nvrhi::BindingLayoutHandle CreateBindlessLayout(nvrhi::IDevice* device);
     void createBindingLayouts(nvrhi::IBindingLayout* precreatedBindless = nullptr);
@@ -132,6 +131,8 @@ public:
     DLSS* getNativeDLSS() { return m_nativeDLSS.get(); }
 #endif
 
+    void denoisedScreenshot(nvrhi::ITexture* framebufferTexture) const;
+
 private:
     [[nodiscard]] nvrhi::IDevice* device() const { return m_context.gpuDevice.GetDevice(); }
 
@@ -169,7 +170,6 @@ private:
 
     void resetReferenceOIDN();
     void applyReferenceOIDN();
-    void denoisedScreenshot(nvrhi::ITexture* framebufferTexture) const;
 #if CAUSTICA_WITH_NATIVE_DLSS
     bool evaluateNativeDLSS(bool reset);
 #endif
