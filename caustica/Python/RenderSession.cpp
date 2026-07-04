@@ -6,7 +6,6 @@
 #include <engine/SceneRuntimeRegistration.h>
 #include <engine/EngineFrameApplication.h>
 #include <engine/Application.h>
-#include "SceneEditor.h"
 #include <backend/GpuDevice.h>
 #include <render/SceneGaussianSplatPasses.h>
 #include <render/SceneLightingPasses.h>
@@ -671,16 +670,6 @@ void RenderSession::SetCameraIntrinsics(float fx, float fy, float cx, float cy, 
 {
     if (m_sceneRuntime)
         m_sceneRuntime->SetCameraIntrinsics(fx, fy, cx, cy, width, height);
-}
-
-caustica::editor::SceneEditor* RenderSession::GetSceneEditor()
-{
-    return dynamic_cast<caustica::editor::SceneEditor*>(m_sceneRuntime.get());
-}
-
-const caustica::editor::SceneEditor* RenderSession::GetSceneEditor() const
-{
-    return dynamic_cast<const caustica::editor::SceneEditor*>(m_sceneRuntime.get());
 }
 
 #endif // CAUSTICA_WITH_PYTHON

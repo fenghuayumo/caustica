@@ -8,29 +8,16 @@
 namespace caustica::editor
 {
 
-caustica::SceneRuntimeSubsystemConfig EditorSceneSubsystemConfig::toRuntimeConfig() const
-{
-    return caustica::SceneRuntimeSubsystemConfig{
-        .sceneRuntime = sceneEditor,
-        .diagnostics = diagnostics,
-        .preferredScene = preferredScene,
-        .sessionState = sessionState,
-        .cmdLine = cmdLine,
-        .refreshEnvMapMediaList = refreshEnvMapMediaList,
-        .applyCmdLineToSessionState = applyCmdLineToSessionState,
-    };
-}
-
 EditorSceneSubsystem::EditorSceneSubsystem(EditorSceneSubsystemConfig config)
-    : SceneRuntimeSubsystem(config.toRuntimeConfig())
-    , m_editorConfig(std::move(config))
+    : SceneRuntimeSubsystem(std::move(config.runtime))
+    , m_postAppInit(config.postAppInit)
 {
 }
 
 void EditorSceneSubsystem::onInitializePost(caustica::EngineInitContext& /*context*/)
 {
-    if (m_editorConfig.sessionState && m_editorConfig.postAppInit)
-        LocalConfig::PostAppInit(*m_editorConfig.sessionState);
+    if (m_config.sessionState && m_postAppInit)
+        LocalConfig::PostAppInit(*m_config.sessionState);
 }
 
 void EditorSceneSubsystem::onBeforeBeginFrame()
@@ -41,6 +28,16 @@ void EditorSceneSubsystem::onBeforeBeginFrame()
 void EditorSceneSubsystem::prepareSceneFrame()
 {
     sceneEditor().PrepareEditorFrame();
+}
+
+SceneEditor& EditorSceneSubsystem::sceneEditor()
+{
+    return static_cast<SceneEditor&>(m_config.sceneRuntime);
+}
+
+const SceneEditor& EditorSceneSubsystem::sceneEditor() const
+{
+    return static_cast<const SceneEditor&>(m_config.sceneRuntime);
 }
 
 } // namespace caustica::editor

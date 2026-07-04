@@ -1,6 +1,5 @@
 #pragma once
 
-#include <core/command_line.h>
 #include <engine/SceneRuntimeSubsystem.h>
 
 namespace caustica::editor
@@ -10,18 +9,8 @@ class SceneEditor;
 
 struct EditorSceneSubsystemConfig
 {
-    SceneEditor& sceneEditor;
-    caustica::render::SessionDiagnostics& diagnostics;
-    std::string preferredScene;
-
-    caustica::render::RenderSessionState* sessionState = nullptr;
-    const CommandLineOptions* cmdLine = nullptr;
-
-    bool refreshEnvMapMediaList = true;
-    bool applyCmdLineToSessionState = true;
+    caustica::SceneRuntimeSubsystemConfig runtime;
     bool postAppInit = true;
-
-    [[nodiscard]] caustica::SceneRuntimeSubsystemConfig toRuntimeConfig() const;
 };
 
 // Editor scene driver: extends SceneRuntimeSubsystem with capture scripts and local config.
@@ -36,10 +25,10 @@ protected:
     void prepareSceneFrame() override;
 
 private:
-    SceneEditor& sceneEditor() { return m_editorConfig.sceneEditor; }
-    const SceneEditor& sceneEditor() const { return m_editorConfig.sceneEditor; }
+    [[nodiscard]] SceneEditor& sceneEditor();
+    [[nodiscard]] const SceneEditor& sceneEditor() const;
 
-    EditorSceneSubsystemConfig m_editorConfig;
+    bool m_postAppInit = true;
 };
 
 } // namespace caustica::editor

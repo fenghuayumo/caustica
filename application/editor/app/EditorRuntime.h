@@ -11,6 +11,7 @@
 namespace caustica::editor
 {
 
+// Convenience entry points mirroring registerSceneRuntime() for the editor stack.
 inline void registerEditorRuntime(caustica::Engine& engine, const caustica::SceneRuntimeSubsystemConfig& sceneConfig)
 {
     caustica::registerEnginePlugins<EditorPlugin>(engine, sceneConfig, static_cast<const EditorUISubsystemConfig*>(nullptr));

@@ -6,15 +6,13 @@
 
 #include "EditorSceneSubsystem.h"
 #include "EditorUISubsystem.h"
-#include "SceneEditor.h"
 
 namespace caustica::editor
 {
 
 // Editor stack: GpuRenderSubsystem + EditorSceneSubsystem (+ optional UI).
 //
-// sceneConfig.sceneRuntime must reference the same SceneEditor instance wired
-// into EditorSceneSubsystem.
+// sceneConfig.sceneRuntime must be a SceneEditor (or derived) instance.
 struct EditorPlugin : IEnginePlugin
 {
     EditorPlugin(SceneRuntimeSubsystemConfig sceneConfig,
@@ -28,15 +26,8 @@ struct EditorPlugin : IEnginePlugin
     {
         builder.emplaceSubsystem<GpuRenderSubsystem>();
 
-        auto& sceneEditor = static_cast<SceneEditor&>(sceneConfig.sceneRuntime);
         builder.emplaceSubsystem<EditorSceneSubsystem>(EditorSceneSubsystemConfig{
-            .sceneEditor = sceneEditor,
-            .diagnostics = sceneConfig.diagnostics,
-            .preferredScene = sceneConfig.preferredScene,
-            .sessionState = sceneConfig.sessionState,
-            .cmdLine = sceneConfig.cmdLine,
-            .refreshEnvMapMediaList = sceneConfig.refreshEnvMapMediaList,
-            .applyCmdLineToSessionState = sceneConfig.applyCmdLineToSessionState,
+            .runtime = sceneConfig,
         });
 
         if (uiConfig)

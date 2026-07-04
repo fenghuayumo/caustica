@@ -44,11 +44,6 @@ class GpuDevice;
 class SceneRuntime;
 }
 
-namespace caustica::editor
-{
-class SceneEditor;
-}
-
 namespace caustica_py
 {
     // Returns a minimal scene JSON string that references an RTXPT builtin
@@ -117,10 +112,6 @@ public:
 
     caustica::SceneRuntime*       GetSceneRuntime()       { return m_sceneRuntime.get(); }
     const caustica::SceneRuntime* GetSceneRuntime() const { return m_sceneRuntime.get(); }
-
-    // Legacy alias; nullptr for runtime-only sessions (use GetSceneRuntime()).
-    caustica::editor::SceneEditor*       GetSceneEditor()      ;
-    const caustica::editor::SceneEditor* GetSceneEditor() const;
 
     caustica::render::RenderSessionState& GetRenderSessionState() { return m_sessionState; }
     const caustica::render::RenderSessionState& GetRenderSessionState() const { return m_sessionState; }
