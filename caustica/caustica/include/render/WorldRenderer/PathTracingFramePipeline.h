@@ -10,13 +10,6 @@
 namespace caustica::render
 {
 
-// =============================================================================
-// PathTracingFramePipeline — ordered pass execution for PathTracingWorldRenderer.
-//
-// Mirrors the RenderPipeline RegisterPass / ExecuteAll pattern so the two can
-// be unified in a later phase. Each pass receives a shared PathTracingFrameContext.
-// =============================================================================
-
 class IPathTracingFramePass
 {
 public:
@@ -25,6 +18,10 @@ public:
     [[nodiscard]] virtual const char* name() const = 0;
     virtual void execute(PathTracingFrameContext& context) = 0;
 };
+
+// Host-side tooling (editor capture, pick feedback, zoom overlay, etc.) uses the same
+// pass interface as the internal renderer pipeline. Set context.framePhase before execute.
+using IPathTracingFrameExtension = IPathTracingFramePass;
 
 class PathTracingFramePipeline
 {

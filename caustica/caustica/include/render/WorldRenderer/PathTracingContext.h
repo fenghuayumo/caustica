@@ -11,7 +11,7 @@
 #include <render/Passes/OMM/OpacityMicromapBuilder.h>
 #include <render/RenderRuntimeState.h>
 #include <render/SessionDiagnostics.h>
-#include <render/WorldRenderer/PathTracingFrameExtension.h>
+#include <render/WorldRenderer/PathTracingFramePipeline.h>
 #include <assets/loader/TextureLoader.h>
 #include <render/Core/DescriptorTableManager.h>
 #include <scene/SceneManager.h>
@@ -47,7 +47,7 @@ struct GaussianSplatBinding
 
 // References wired once when the path tracer is created. The world renderer reads
 // these every frame; scene passes are invoked directly. Optional host tooling
-// plugs in through frameExtensions at named pipeline phases.
+// plugs in through framePasses at named pipeline phases.
 struct PathTracingContext
 {
     GpuDevice& gpuDevice;
@@ -80,7 +80,7 @@ struct PathTracingContext
 
     SessionDiagnostics& diagnostics;
 
-    std::span<IPathTracingFrameExtension* const> frameExtensions = {};
+    std::span<IPathTracingFramePass* const> framePasses = {};
 };
 
 } // namespace render

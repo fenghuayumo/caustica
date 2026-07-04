@@ -1017,11 +1017,6 @@ void caustica::render::PathTracingWorldRenderer::preRender()
         g_FPSLimiter.FramerateLimit(m_context.settings.ActualFPSLimiter());
 
     korgi::Update();
-
-    {
-        PathTracingFrameEvent event{ .framePhase = PathTracingFramePhase::PreRender };
-        dispatchFrameExtensions(event);
-    }
 }
 void caustica::render::PathTracingWorldRenderer::postProcessPreToneMapping(nvrhi::ICommandList* commandList, const caustica::ICompositeView& compositeView)
 {
@@ -1333,11 +1328,10 @@ void caustica::render::PathTracingWorldRenderer::recreateBindingSet()
         bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(87, (m_context.commonPasses)->m_BlackTexture));  // t_PrevDepth placeholder
 
         {
-            PathTracingFrameEvent event{
-                .framePhase = PathTracingFramePhase::PopulateBindingSet,
-                .bindingSetDesc = &bindingSetDesc,
-            };
-            dispatchFrameExtensions(event);
+            PathTracingFrameContext hostCtx{};
+            hostCtx.framePhase = PathTracingFramePhase::PopulateBindingSet;
+            hostCtx.bindingSetDesc = &bindingSetDesc;
+            dispatchExternalFramePasses(hostCtx);
         }
 
         m_bindingSet = device()->createBindingSet(bindingSetDesc, m_bindingLayout);
@@ -1937,9 +1931,9 @@ dm::float2 caustica::render::PathTracingWorldRenderer::computeCameraJitter() con
     return m_context.renderCore.camera().computeJitter(makeCameraUpdateParams());
 }
 
-void caustica::render::PathTracingWorldRenderer::dispatchFrameExtensions(PathTracingFrameEvent& event) const
+void caustica::render::PathTracingWorldRenderer::dispatchExternalFramePasses(PathTracingFrameContext& ctx) const
 {
-    for (IPathTracingFrameExtension* extension : m_context.frameExtensions)
-        if (extension)
-            extension->onFrameEvent(event);
+    for (IPathTracingFramePass* pass : m_context.framePasses)
+        if (pass)
+            pass->execute(ctx);
 }

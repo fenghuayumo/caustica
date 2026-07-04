@@ -4,7 +4,7 @@
 #include <engine/ISubsystem.h>
 #include <render/RenderSessionState.h>
 #include <render/SessionDiagnostics.h>
-#include <render/WorldRenderer/PathTracingFrameExtension.h>
+#include <render/WorldRenderer/PathTracingFramePipeline.h>
 
 #include <span>
 #include <string>
@@ -18,7 +18,7 @@ struct EditorSceneSubsystemConfig
 {
     SceneEditor& sceneEditor;
     caustica::render::SessionDiagnostics& diagnostics;
-    std::span<caustica::render::IPathTracingFrameExtension* const> frameExtensions;
+    std::span<caustica::render::IPathTracingFramePass* const> framePasses;
     std::string preferredScene;
 
     caustica::render::RenderSessionState* sessionState = nullptr;

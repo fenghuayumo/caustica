@@ -447,7 +447,7 @@ bool RenderSession::InitRenderer()
     m_renderer = std::make_unique<caustica::editor::SceneEditor>(m_cmdLine, m_sessionState, m_editorUIState, m_sessionDiagnostics);
 
     m_sceneEditorFrameExtension = std::make_unique<caustica::editor::SceneEditorFrameExtension>(*m_renderer);
-    m_frameExtensions = { m_sceneEditorFrameExtension.get() };
+    m_framePasses = { m_sceneEditorFrameExtension.get() };
 
     std::string preferredScene = m_config.scene.empty()
         ? std::string("default.json")
@@ -457,7 +457,7 @@ bool RenderSession::InitRenderer()
     registerEditorRuntime(*m_engine, EditorSceneSubsystemConfig{
         .sceneEditor = *m_renderer,
         .diagnostics = m_sessionDiagnostics,
-        .frameExtensions = m_frameExtensions,
+        .framePasses = m_framePasses,
         .preferredScene = preferredScene,
         .sessionState = &m_sessionState,
         .cmdLine = &m_cmdLine,
@@ -497,7 +497,7 @@ void RenderSession::Shutdown()
     m_AppLoop.reset();
     m_renderer.reset();
     m_sceneEditorFrameExtension.reset();
-    m_frameExtensions.clear();
+    m_framePasses.clear();
     if (m_engine)
         m_engine->shutdown();
     m_engine.reset();

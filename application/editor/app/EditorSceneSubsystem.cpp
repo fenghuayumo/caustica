@@ -43,7 +43,7 @@ void EditorSceneSubsystem::initialize(caustica::EngineInitContext& context)
         .runtimeState = sceneEditor.GetRenderRuntimeState(),
         .sceneTime = sceneEditor.GetSceneTimeRef(),
         .diagnostics = m_config.diagnostics,
-        .frameExtensions = m_config.frameExtensions,
+        .framePasses = m_config.framePasses,
         .cmdLine = m_config.cmdLine,
         .sceneTypeFactory = std::make_shared<caustica::render::RenderSceneTypeFactory>(),
         .sceneCallbacks = caustica::EngineSceneCallbacks{
@@ -53,8 +53,6 @@ void EditorSceneSubsystem::initialize(caustica::EngineInitContext& context)
     });
 
     sceneEditor.bindEngine(*engineRenderer);
-    assert(engineRenderer->rayTracingResources().isAttached()
-        && engineRenderer->gaussianSplatPasses().isAttached());
 
     sceneEditor.Init(m_config.preferredScene, engineRenderer->shaderFactory());
 

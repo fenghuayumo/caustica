@@ -25,7 +25,7 @@
 
 #include <math/math.h>
 #include <platform/window.h>
-#include <render/WorldRenderer/PathTracingFrameExtension.h>
+#include <render/WorldRenderer/PathTracingFramePipeline.h>
 #include <render/RenderSessionState.h>
 #include <render/SessionDiagnostics.h>
 
@@ -143,7 +143,7 @@ private:
     std::unique_ptr<caustica::EngineFrameApplication> m_AppLoop;
     std::unique_ptr<caustica::editor::SceneEditor>             m_renderer;
     std::unique_ptr<caustica::editor::SceneEditorFrameExtension> m_sceneEditorFrameExtension;
-    std::vector<caustica::render::IPathTracingFrameExtension*> m_frameExtensions;
+    std::vector<caustica::render::IPathTracingFramePass*> m_framePasses;
 #if CAUSTICA_WITH_DX12 && defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
     Microsoft::WRL::ComPtr<ID3D12DeviceFactory>     m_d3d12DeviceFactory;
 #endif

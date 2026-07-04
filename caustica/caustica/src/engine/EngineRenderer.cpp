@@ -14,9 +14,7 @@
 #include <render/Core/CommonRenderPasses.h>
 #include <render/Core/RenderCore.h>
 #include <render/Core/SceneGpuUpdater.h>
-#include <render/SceneGaussianSplatPasses.h>
-#include <render/SceneLightingPasses.h>
-#include <render/SceneRayTracingResources.h>
+#include <render/PathTracerScenePasses.h>
 #include <render/WorldRenderer/PathTracingWorldRenderer.h>
 #include <render/WorldRenderer/PathTracingContext.h>
 #include <scene/Scene.h>
@@ -113,51 +111,26 @@ bool EngineRenderer::initializeSession(const EngineRendererInitParams& params)
         .sceneTime = params.sceneTime,
         .gaussianSplatEmissionProxies = gaussianSplats.emissionProxies(),
         .diagnostics = params.diagnostics,
-        .frameExtensions = params.frameExtensions,
+        .framePasses = params.framePasses,
     });
 
     m_worldRenderer = std::make_unique<render::PathTracingWorldRenderer>(*m_pathTracingContext);
     m_worldRenderer->createBindingLayouts(m_bindlessLayout);
 
-    attachScenePasses(params);
+    m_scenePasses.wireSession(render::ScenePassWireParams{
+        .gpuDevice = params.gpuDevice,
+        .sceneManager = *m_sceneManager,
+        .renderCore = *m_renderCore,
+        .worldRenderer = *m_worldRenderer,
+        .settings = params.settings,
+        .invalidation = params.runtimeState.Invalidation,
+        .gaussianSplatsSummary = params.runtimeState.GaussianSplats,
+        .lighting = m_scenePasses.lighting,
+        .bindingCache = *m_bindingCache,
+        .shaderFactory = m_shaderFactory,
+        .commonPasses = m_commonPasses,
+    });
     return true;
-}
-
-void EngineRenderer::attachScenePasses(const EngineRendererInitParams& params)
-{
-    assert(m_worldRenderer != nullptr);
-
-    auto& lighting = m_scenePasses.lighting;
-    auto& rayTracing = m_scenePasses.rayTracing;
-    auto& gaussianSplats = m_scenePasses.gaussianSplats;
-
-    rayTracing.attach(
-        params.gpuDevice,
-        *m_sceneManager,
-        *m_renderCore,
-        *m_worldRenderer,
-        params.settings,
-        params.runtimeState.Invalidation,
-        lighting,
-        *m_bindingCache);
-
-    gaussianSplats.attach(
-        params.gpuDevice,
-        *m_sceneManager,
-        *m_renderCore,
-        *m_worldRenderer,
-        params.settings,
-        params.runtimeState.GaussianSplats,
-        m_shaderFactory,
-        m_commonPasses);
-
-    gaussianSplats.setOnRequestFullRebuild(
-        [&rayTracing]() { rayTracing.requestFullRebuild(); });
-
-    rayTracing.setAdditionalAccelStructBuilder(
-        [&gaussianSplats](nvrhi::ICommandList* commandList) {
-            gaussianSplats.buildAccelStructs(commandList);
-        });
 }
 
 void EngineRenderer::endFrame()
@@ -175,8 +148,7 @@ void EngineRenderer::onSceneUnloading()
     if (m_bindingCache)
         m_bindingCache->Clear();
     m_scenePasses.lighting.sceneUnloading();
-    if (m_scenePasses.gaussianSplats.isAttached())
-        m_scenePasses.gaussianSplats.sceneUnloading();
+    m_scenePasses.gaussianSplats.sceneUnloading();
 }
 
 void EngineRenderer::refreshEnvironmentMapMediaList(const std::filesystem::path& assetsRoot,
@@ -272,7 +244,7 @@ void EngineRenderer::onSceneLoadedGpuFinish()
     if (!scene)
         return;
 
-    if (m_cmdLine && m_scenePasses.gaussianSplats.isAttached())
+    if (m_cmdLine)
         m_scenePasses.gaussianSplats.onSceneLoaded(*m_cmdLine);
 
     m_scenePasses.lighting.onSceneLoaded(*scene, *m_settings);

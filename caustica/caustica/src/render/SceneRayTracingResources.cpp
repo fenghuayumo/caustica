@@ -1,5 +1,6 @@
 #include <render/SceneRayTracingResources.h>
 
+#include <render/PathTracerScenePasses.h>
 #include <render/SceneLightingPasses.h>
 #include <render/WorldRenderer/PathTracingWorldRenderer.h>
 
@@ -17,23 +18,16 @@
 namespace caustica::render
 {
 
-void SceneRayTracingResources::attach(caustica::GpuDevice& gpuDevice,
-    SceneManager& sceneManager,
-    caustica::RenderCore& renderCore,
-    caustica::render::PathTracingWorldRenderer& worldRenderer,
-    PathTracerSettings& settings,
-    caustica::render::RenderInvalidationState& invalidation,
-    SceneLightingPasses& lightingPasses,
-    caustica::BindingCache& bindingCache)
+void SceneRayTracingResources::wireSession(const ScenePassWireParams& params)
 {
-    m_gpuDevice = &gpuDevice;
-    m_sceneManager = &sceneManager;
-    m_renderCore = &renderCore;
-    m_worldRenderer = &worldRenderer;
-    m_settings = &settings;
-    m_invalidation = &invalidation;
-    m_lightingPasses = &lightingPasses;
-    m_bindingCache = &bindingCache;
+    m_gpuDevice = &params.gpuDevice;
+    m_sceneManager = &params.sceneManager;
+    m_renderCore = &params.renderCore;
+    m_worldRenderer = &params.worldRenderer;
+    m_settings = &params.settings;
+    m_invalidation = &params.invalidation;
+    m_lightingPasses = &params.lighting;
+    m_bindingCache = &params.bindingCache;
 }
 
 void SceneRayTracingResources::setAdditionalAccelStructBuilder(AdditionalAccelStructBuilder builder)

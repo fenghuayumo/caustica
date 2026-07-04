@@ -1,5 +1,6 @@
 #include <render/SceneGaussianSplatPasses.h>
 
+#include <render/PathTracerScenePasses.h>
 #include <render/WorldRenderer/PathTracingWorldRenderer.h>
 #include <render/Passes/Gaussian/GaussianSplatPass.h>
 #include <render/GPUSort/GPUSort.h>
@@ -60,23 +61,16 @@ namespace
     }
 }
 
-void SceneGaussianSplatPasses::attach(caustica::GpuDevice& gpuDevice,
-    SceneManager& sceneManager,
-    caustica::RenderCore& renderCore,
-    caustica::render::PathTracingWorldRenderer& worldRenderer,
-    PathTracerSettings& settings,
-    caustica::render::GaussianSplatSceneSummary& summary,
-    const std::shared_ptr<caustica::ShaderFactory>& shaderFactory,
-    const std::shared_ptr<caustica::CommonRenderPasses>& commonPasses)
+void SceneGaussianSplatPasses::wireSession(const ScenePassWireParams& params)
 {
-    m_gpuDevice = &gpuDevice;
-    m_sceneManager = &sceneManager;
-    m_renderCore = &renderCore;
-    m_worldRenderer = &worldRenderer;
-    m_settings = &settings;
-    m_summary = &summary;
-    m_shaderFactory = shaderFactory;
-    m_commonPasses = commonPasses;
+    m_gpuDevice = &params.gpuDevice;
+    m_sceneManager = &params.sceneManager;
+    m_renderCore = &params.renderCore;
+    m_worldRenderer = &params.worldRenderer;
+    m_settings = &params.settings;
+    m_summary = &params.gaussianSplatsSummary;
+    m_shaderFactory = params.shaderFactory;
+    m_commonPasses = params.commonPasses;
 }
 
 void SceneGaussianSplatPasses::setOnRequestFullRebuild(std::function<void()> callback)

@@ -5,7 +5,7 @@
 
 #include <render/Core/CameraController.h>
 #include <render/WorldRenderer/PathTracingContext.h>
-#include <render/WorldRenderer/PathTracingFrameExtension.h>
+#include <render/WorldRenderer/PathTracingFramePipeline.h>
 #include <render/WorldRenderer/PathTracingFramePipeline.h>
 #include <shaders/PathTracer/Config.h>
 #include <shaders/SampleConstantBuffer.h>
@@ -138,7 +138,7 @@ private:
     [[nodiscard]] CameraUpdateParams makeCameraUpdateParams() const;
     void syncCameraViews();
     [[nodiscard]] dm::float2 computeCameraJitter() const;
-    void dispatchFrameExtensions(PathTracingFrameEvent& event) const;
+    void dispatchExternalFramePasses(PathTracingFrameContext& ctx) const;
 
     void ensureFramePipelineBuilt();
     void framePassSetup(PathTracingFrameContext& ctx);

@@ -11,7 +11,7 @@
 #include <render/PathTracerScenePasses.h>
 #include <render/SessionDiagnostics.h>
 #include <render/WorldRenderer/PathTracingContext.h>
-#include <render/WorldRenderer/PathTracingFrameExtension.h>
+#include <render/WorldRenderer/PathTracingFramePipeline.h>
 #include <engine/ISubsystem.h>
 
 class SceneManager;
@@ -52,7 +52,7 @@ struct EngineRendererInitParams
 
     render::SessionDiagnostics& diagnostics;
 
-    std::span<render::IPathTracingFrameExtension* const> frameExtensions = {};
+    std::span<render::IPathTracingFramePass* const> framePasses = {};
 
     const CommandLineOptions* cmdLine = nullptr;
 
@@ -112,7 +112,6 @@ public:
 
 private:
     void createShaderFactory(GpuDevice& gpuDevice);
-    void attachScenePasses(const EngineRendererInitParams& params);
     void applySampleSettingsFromScene();
 
     render::PathTracerScenePasses m_scenePasses;

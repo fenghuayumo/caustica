@@ -28,6 +28,7 @@ class ShaderFactory;
 namespace caustica::render
 {
 class PathTracingWorldRenderer;
+struct ScenePassWireParams;
 }
 
 class SceneManager;
@@ -39,6 +40,8 @@ namespace caustica::render
 // Per-scene Gaussian splat passes, emission proxies, and WorldRenderer hooks.
 class SceneGaussianSplatPasses
 {
+    friend struct PathTracerScenePasses;
+
 public:
     struct SceneObject
     {
@@ -46,17 +49,6 @@ public:
         ecs::Entity entity = ecs::NullEntity;
         std::unique_ptr<GaussianSplatPass> pass;
     };
-
-    [[nodiscard]] bool isAttached() const { return m_worldRenderer != nullptr; }
-
-    void attach(caustica::GpuDevice& gpuDevice,
-        SceneManager& sceneManager,
-        caustica::RenderCore& renderCore,
-        caustica::render::PathTracingWorldRenderer& worldRenderer,
-        PathTracerSettings& settings,
-        caustica::render::GaussianSplatSceneSummary& summary,
-        const std::shared_ptr<caustica::ShaderFactory>& shaderFactory,
-        const std::shared_ptr<caustica::CommonRenderPasses>& commonPasses);
 
     void setOnRequestFullRebuild(std::function<void()> callback);
 
@@ -85,6 +77,8 @@ public:
     const std::string& fileNameSummary() const { return m_fileNameSummary; }
 
 private:
+    void wireSession(const ScenePassWireParams& params);
+
     std::filesystem::path resolveSplatPath(const caustica::GaussianSplat& splat) const;
     void preparePass(GaussianSplatPass& pass);
     void loadFromSceneEntities();

@@ -1,20 +1,20 @@
 #pragma once
 
-#include <render/WorldRenderer/PathTracingFrameExtension.h>
+#include <render/WorldRenderer/PathTracingFramePipeline.h>
 
 namespace caustica::editor
 {
 
 class SceneEditor;
 
-// Editor-side frame extension: capture scripts, pick feedback, zoom overlay, etc.
-// Keeps editor-only tooling out of the engine renderer.
-class SceneEditorFrameExtension : public render::IPathTracingFrameExtension
+// Editor-side frame pass: capture scripts, pick feedback, zoom overlay, etc.
+class SceneEditorFrameExtension : public render::IPathTracingFramePass
 {
 public:
     explicit SceneEditorFrameExtension(SceneEditor& sceneEditor);
 
-    void onFrameEvent(render::PathTracingFrameEvent& event) override;
+    [[nodiscard]] const char* name() const override { return "SceneEditor"; }
+    void execute(render::PathTracingFrameContext& ctx) override;
 
 private:
     SceneEditor& m_sceneEditor;

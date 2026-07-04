@@ -293,25 +293,25 @@ caustica::BindingCache& SceneEditor::GetBindingCache() { return *m_bindingCache;
 
 caustica::render::SceneRayTracingResources& SceneEditor::GetRayTracingResources()
 {
-    assert(m_rayTracingResources != nullptr && m_rayTracingResources->isAttached());
+    assert(m_rayTracingResources != nullptr);
     return *m_rayTracingResources;
 }
 
 const caustica::render::SceneRayTracingResources& SceneEditor::GetRayTracingResources() const
 {
-    assert(m_rayTracingResources != nullptr && m_rayTracingResources->isAttached());
+    assert(m_rayTracingResources != nullptr);
     return *m_rayTracingResources;
 }
 
 caustica::render::SceneGaussianSplatPasses& SceneEditor::GetGaussianSplatPasses()
 {
-    assert(m_gaussianSplatPasses != nullptr && m_gaussianSplatPasses->isAttached());
+    assert(m_gaussianSplatPasses != nullptr);
     return *m_gaussianSplatPasses;
 }
 
 const caustica::render::SceneGaussianSplatPasses& SceneEditor::GetGaussianSplatPasses() const
 {
-    assert(m_gaussianSplatPasses != nullptr && m_gaussianSplatPasses->isAttached());
+    assert(m_gaussianSplatPasses != nullptr);
     return *m_gaussianSplatPasses;
 }
 

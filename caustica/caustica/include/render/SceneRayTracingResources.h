@@ -33,24 +33,16 @@ namespace caustica::render
 {
 
 class SceneLightingPasses;
+struct ScenePassWireParams;
 
 using AdditionalAccelStructBuilder = std::function<void(nvrhi::ICommandList*)>;
 
 // RT pipeline variants, shader macros, and acceleration-structure lifecycle.
 class SceneRayTracingResources
 {
+    friend struct PathTracerScenePasses;
+
 public:
-    [[nodiscard]] bool isAttached() const { return m_worldRenderer != nullptr; }
-
-    void attach(caustica::GpuDevice& gpuDevice,
-        SceneManager& sceneManager,
-        caustica::RenderCore& renderCore,
-        caustica::render::PathTracingWorldRenderer& worldRenderer,
-        PathTracerSettings& settings,
-        caustica::render::RenderInvalidationState& invalidation,
-        SceneLightingPasses& lightingPasses,
-        caustica::BindingCache& bindingCache);
-
     void setAdditionalAccelStructBuilder(AdditionalAccelStructBuilder builder);
 
     void fillPTPipelineGlobalMacros(std::vector<caustica::ShaderMacro>& macros);
@@ -84,6 +76,8 @@ public:
     std::shared_ptr<PTPipelineVariant>& pipelineEdgeDetection();
 
 private:
+    void wireSession(const ScenePassWireParams& params);
+
     caustica::GpuDevice*                        m_gpuDevice = nullptr;
     SceneManager*                               m_sceneManager = nullptr;
     caustica::RenderCore*                       m_renderCore = nullptr;

@@ -77,7 +77,7 @@ EditorApplication::StartupResult EditorApplication::startup(int argc, const char
     const EditorSceneSubsystemConfig sceneConfig{
         .sceneEditor = m_sceneEditor,
         .diagnostics = m_sessionDiagnostics,
-        .frameExtensions = m_frameExtensions,
+        .framePasses = m_framePasses,
         .preferredScene = preferredScene,
         .sessionState = &m_editorUIData,
         .cmdLine = &CmdLine,

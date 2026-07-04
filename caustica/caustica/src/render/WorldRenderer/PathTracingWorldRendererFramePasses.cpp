@@ -2,7 +2,7 @@ namespace { constexpr int c_SwapchainCount = 3; }
 
 #include <render/WorldRenderer/PathTracingWorldRenderer.h>
 #include <render/WorldRenderer/PathTracingFramePipeline.h>
-#include <render/WorldRenderer/PathTracingFrameExtension.h>
+#include <render/WorldRenderer/PathTracingFramePipeline.h>
 #include <render/SceneGpuResources.h>
 #include <render/SceneGaussianSplatPasses.h>
 #include <render/SceneRayTracingResources.h>
@@ -86,6 +86,10 @@ void caustica::render::PathTracingWorldRenderer::ensureFramePipelineBuilt()
 
     m_framePipeline = std::make_unique<PathTracingFramePipeline>();
 
+    m_framePipeline->registerLambdaPass("Host.PreRender", [this](PathTracingFrameContext& ctx) {
+        ctx.framePhase = PathTracingFramePhase::PreRender;
+        dispatchExternalFramePasses(ctx);
+    });
     m_framePipeline->registerLambdaPass("FrameSetup", [this](PathTracingFrameContext& ctx) {
         framePassSetup(ctx);
     });
@@ -172,10 +176,8 @@ void caustica::render::PathTracingWorldRenderer::framePassEnsureRenderTargets(Pa
         m_renderTargets->Init(device(), m_renderSize, m_displaySize, true, true, c_SwapchainCount);
 
         ctx.needNewPasses = true;
-        {
-            PathTracingFrameEvent event{ .framePhase = PathTracingFramePhase::RenderTargetsRecreated };
-            dispatchFrameExtensions(event);
-        }
+        ctx.framePhase = PathTracingFramePhase::RenderTargetsRecreated;
+        dispatchExternalFramePasses(ctx);
     }
 }
 
@@ -224,10 +226,8 @@ void caustica::render::PathTracingWorldRenderer::framePassRendererInit(PathTraci
             m_bindlessLayout, m_context.commonPasses, m_context.sceneManager.getScene(),
             m_context.sceneManager.getCurrentScenePath(), GetLocalPath(c_AssetsFolder));
         m_context.diagnostics.progressInitializingRenderer.Set(5);
-        {
-            PathTracingFrameEvent event{ .framePhase = PathTracingFramePhase::IdleMaintenance };
-            dispatchFrameExtensions(event);
-        }
+        ctx.framePhase = PathTracingFramePhase::IdleMaintenance;
+        dispatchExternalFramePasses(ctx);
         if (m_context.opacityMaps)
             m_context.opacityMaps->CreateRenderPasses(m_bindlessLayout, m_context.commonPasses);
         m_context.diagnostics.progressInitializingRenderer.Set(20);
@@ -468,16 +468,10 @@ void caustica::render::PathTracingWorldRenderer::framePassPathTrace(PathTracingF
     constants.debug.debugViewType = (int)m_context.settings.DebugView;
     constants.debug.debugViewStablePlaneIndex = (m_context.settings.StablePlanesActiveCount == 1) ? (0) : (m_context.settings.DebugViewStablePlaneIndex);
 #if ENABLE_DEBUG_DELTA_TREE_VIZUALISATION
-    PathTracingFrameEvent::PathTraceDebug pathTraceDebug{};
-    pathTraceDebug.pickActive = constants.debug.pick;
-    {
-        PathTracingFrameEvent event{
-            .framePhase = PathTracingFramePhase::BeforePathTrace,
-            .pathTraceDebug = &pathTraceDebug,
-        };
-        dispatchFrameExtensions(event);
-    }
-    constants.debug.exploreDeltaTree = (pathTraceDebug.exploreDeltaTree && constants.debug.pick) ? 1 : 0;
+    ctx.pathTraceDebug.pickActive = constants.debug.pick;
+    ctx.framePhase = PathTracingFramePhase::BeforePathTrace;
+    dispatchExternalFramePasses(ctx);
+    constants.debug.exploreDeltaTree = (ctx.pathTraceDebug.exploreDeltaTree && constants.debug.pick) ? 1 : 0;
 #else
     constants.debug.exploreDeltaTree = false;
 #endif
@@ -574,12 +568,10 @@ void caustica::render::PathTracingWorldRenderer::framePassComposite(PathTracingF
         m_shaderDebug->EndFrameAndOutput(m_commandList, m_renderTargets->LdrFramebuffer->GetFramebuffer(fullscreenView), m_renderTargets->Depth, fbinfo.getViewport());
 
     {
-        PathTracingFrameEvent event{
-            .framePhase = PathTracingFramePhase::BeforeFinalBlit,
-            .commandList = m_commandList,
-            .ldrColor = m_renderTargets->LdrColor,
-        };
-        dispatchFrameExtensions(event);
+        ctx.framePhase = PathTracingFramePhase::BeforeFinalBlit;
+        ctx.commandList = m_commandList;
+        ctx.ldrColor = m_renderTargets->LdrColor;
+        dispatchExternalFramePasses(ctx);
     }
 
     m_commandList->beginMarker("Blit");
@@ -671,11 +663,9 @@ void caustica::render::PathTracingWorldRenderer::framePassFinalize(PathTracingFr
         device()->unmapBuffer(m_debugDeltaPathTree_Cpu);
 
         {
-            PathTracingFrameEvent event{
-                .framePhase = PathTracingFramePhase::AfterPickResolved,
-                .pickFeedback = &m_feedbackData,
-            };
-            dispatchFrameExtensions(event);
+            ctx.framePhase = PathTracingFramePhase::AfterPickResolved;
+            ctx.pickFeedback = &m_feedbackData;
+            dispatchExternalFramePasses(ctx);
         }
         m_context.runtimeState.Picking.clearPickRequests();
     }
@@ -686,16 +676,11 @@ void caustica::render::PathTracingWorldRenderer::framePassFinalize(PathTracingFr
                 return SaveTextureToFile(
                     device(), m_context.commonPasses.get(), framebufferTexture, nvrhi::ResourceStates::Common, fileName);
             };
-        PathTracingFrameEvent::PostRenderData postRender{
-            .framebufferTexture = framebufferTexture,
-            .saveFramebuffer = &saveFramebuffer,
-        };
-        PathTracingFrameEvent event{
-            .framePhase = PathTracingFramePhase::PostRender,
-            .postRender = &postRender,
-        };
-        dispatchFrameExtensions(event);
-        if (postRender.experimentalScreenshotRequested)
+        ctx.postRender.framebufferTexture = framebufferTexture;
+        ctx.postRender.saveFramebuffer = &saveFramebuffer;
+        ctx.framePhase = PathTracingFramePhase::PostRender;
+        dispatchExternalFramePasses(ctx);
+        if (ctx.postRender.experimentalScreenshotRequested)
             denoisedScreenshot(framebufferTexture);
     }
 
