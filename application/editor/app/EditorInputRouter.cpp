@@ -33,13 +33,13 @@ bool onKeyPressed(SceneEditor& sceneEditor, caustica::KeyPressedEvent& e)
 
     auto* zoomTool = sceneEditor.GetZoomTool().get();
     auto* game = sceneEditor.GetGame().get();
-    auto* renderCore = sceneEditor.GetRenderCore();
+    auto* camera = sceneEditor.GetCameraController();
 
     if (zoomTool && zoomTool->KeyboardUpdate(key, e.GetScancode(), action, mods))
         return true;
 
     if (!(game && game->CameraActive()))
-        renderCore->camera().camera().KeyboardUpdate(key, e.GetScancode(), action, mods);
+        camera->camera().KeyboardUpdate(key, e.GetScancode(), action, mods);
 
     if (game && game->KeyboardUpdate(key, e.GetScancode(), action, mods))
         return true;
@@ -73,12 +73,12 @@ bool onKeyReleased(SceneEditor& sceneEditor, caustica::KeyReleasedEvent& e)
 
     auto* zoomTool = sceneEditor.GetZoomTool().get();
     auto* game = sceneEditor.GetGame().get();
-    auto* renderCore = sceneEditor.GetRenderCore();
+    auto* camera = sceneEditor.GetCameraController();
 
     if (zoomTool && zoomTool->KeyboardUpdate(key, e.GetScancode(), cGlfwRelease, mods))
         return true;
     if (!(game && game->CameraActive()))
-        renderCore->camera().camera().KeyboardUpdate(key, e.GetScancode(), cGlfwRelease, mods);
+        camera->camera().KeyboardUpdate(key, e.GetScancode(), cGlfwRelease, mods);
     if (game && game->KeyboardUpdate(key, e.GetScancode(), cGlfwRelease, mods))
         return true;
     return true;
@@ -89,12 +89,12 @@ bool onMouseMoved(SceneEditor& sceneEditor, caustica::MouseMovedEvent& e)
     if (ImGui::GetIO().WantCaptureMouse) return false;
 
     auto* game = sceneEditor.GetGame().get();
-    auto* renderCore = sceneEditor.GetRenderCore();
+    auto* camera = sceneEditor.GetCameraController();
     auto* worldRenderer = sceneEditor.GetWorldRenderer();
     auto& session = sceneEditor.GetRenderSessionState();
 
     if (!(game && game->CameraActive()))
-        renderCore->camera().camera().MousePosUpdate(e.GetX(), e.GetY());
+        camera->camera().MousePosUpdate(e.GetX(), e.GetY());
     if (game)
         game->MousePosUpdate(e.GetX(), e.GetY());
 
@@ -122,12 +122,12 @@ bool onMouseButtonPressed(SceneEditor& sceneEditor, caustica::MouseButtonPressed
 
     auto* zoomTool = sceneEditor.GetZoomTool().get();
     auto* game = sceneEditor.GetGame().get();
-    auto* renderCore = sceneEditor.GetRenderCore();
+    auto* camera = sceneEditor.GetCameraController();
     auto& session = sceneEditor.GetRenderSessionState();
 
     if (zoomTool && zoomTool->MouseButtonUpdate(button, cGlfwPress, mods)) return true;
     if (!(game && game->CameraActive()))
-        renderCore->camera().camera().MouseButtonUpdate(button, cGlfwPress, mods);
+        camera->camera().MouseButtonUpdate(button, cGlfwPress, mods);
     if (game)
         game->MouseButtonUpdate(button, cGlfwPress, mods);
     if (button == ToGlfwMouse(caustica::Mouse::Right))
@@ -152,11 +152,11 @@ bool onMouseButtonReleased(SceneEditor& sceneEditor, caustica::MouseButtonReleas
 
     auto* zoomTool = sceneEditor.GetZoomTool().get();
     auto* game = sceneEditor.GetGame().get();
-    auto* renderCore = sceneEditor.GetRenderCore();
+    auto* camera = sceneEditor.GetCameraController();
 
     if (zoomTool && zoomTool->MouseButtonUpdate(button, cGlfwRelease, mods)) return true;
     if (!(game && game->CameraActive()))
-        renderCore->camera().camera().MouseButtonUpdate(button, cGlfwRelease, mods);
+        camera->camera().MouseButtonUpdate(button, cGlfwRelease, mods);
     if (game)
         game->MouseButtonUpdate(button, cGlfwRelease, mods);
     return true;

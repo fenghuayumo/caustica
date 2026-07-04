@@ -257,12 +257,12 @@ void SceneEditor::bindGpuRenderSubsystem(caustica::GpuRenderSubsystem& gpuRender
     m_DescriptorTable = gpuRenderSubsystem.descriptorTable();
     m_TextureLoader = gpuRenderSubsystem.textureLoader();
     m_sceneManager = gpuRenderSubsystem.sceneManager();
-    m_renderCore = gpuRenderSubsystem.renderCore();
     m_lightingPasses = &gpuRenderSubsystem.lightingPasses();
     m_rayTracingResources = &gpuRenderSubsystem.rayTracingResources();
     m_gaussianSplatPasses = &gpuRenderSubsystem.gaussianSplatPasses();
 
-    m_cameraController.bind(*m_renderCore, m_settings, gpuRenderSubsystem.worldRenderer());
+    m_camera = &gpuRenderSubsystem.camera();
+    m_cameraController.bind(*m_camera, m_settings, gpuRenderSubsystem.worldRenderer());
     m_inputRouter.bind(*this);
 }
 
@@ -349,7 +349,7 @@ uint SceneEditor::GetSceneCameraCount() const
 
 uint& SceneEditor::SelectedCameraIndex()
 {
-    return m_renderCore->camera().selectedCameraIndex();
+    return m_camera->selectedCameraIndex();
 }
 
 float SceneEditor::GetCameraVerticalFOV() const
@@ -403,7 +403,7 @@ void SceneEditor::Init(const std::string& preferredScene,
     if (!worldRenderer->getRenderTargets())
         worldRenderer->createDeviceResources();
 
-    if (!m_sceneManager || !m_renderCore)
+    if (!m_sceneManager || !m_camera)
     {
         caustica::fatal("SceneEditor::Init requires bindGpuRenderSubsystem");
         return;
@@ -592,7 +592,7 @@ void SceneEditor::runGpuWorkOnRenderThread(const std::function<void()>& work)
 void SceneEditor::syncCameraFromScene()
 {
     auto scene = GetScene();
-    if (!scene || !m_renderCore)
+    if (!scene || !m_camera)
         return;
 
     const auto& cameraEntities = scene->GetCameraEntities();
@@ -600,7 +600,7 @@ void SceneEditor::syncCameraFromScene()
     bool syncedCamera = false;
     if (!cameraEntities.empty() && ew)
     {
-        const uint32_t selectedIndex = m_renderCore->camera().selectedCameraIndex();
+        const uint32_t selectedIndex = m_camera->selectedCameraIndex();
         const uint32_t camIdx = (selectedIndex > 0) ? (selectedIndex - 1)
             : static_cast<uint32_t>(cameraEntities.size() - 1);
         if (camIdx < cameraEntities.size())
@@ -617,7 +617,7 @@ void SceneEditor::syncCameraFromScene()
         }
     }
     if (!syncedCamera)
-        m_renderCore->camera().setupDefaultCamera();
+        m_camera->setupDefaultCamera();
 }
 
 void SceneEditor::SceneLoaded()
@@ -675,7 +675,7 @@ void SceneEditor::SceneLoaded()
     if (!m_cmdLine.cameraPosDirUp.empty())
         SetCurrentCameraPosDirUp(m_cmdLine.cameraPosDirUp);
 
-    m_renderCore->camera().syncPreviousViewFromCurrent();
+    m_camera->syncPreviousViewFromCurrent();
 
     m_progressLoading.Set(100);
 
@@ -751,7 +751,7 @@ void SceneEditor::Animate(float fElapsedTimeSeconds)
     if (m_sceneManager)
         m_sceneManager->updateLoading();
 
-    m_renderCore->camera().camera().SetMoveSpeed(m_settings.CameraMoveSpeed);
+    m_camera->camera().SetMoveSpeed(m_settings.CameraMoveSpeed);
 
     if( m_renderState.Invalidation.ShaderAndACRefreshDelayedRequest > 0 )
     {
@@ -813,13 +813,13 @@ void SceneEditor::Animate(float fElapsedTimeSeconds)
         m_sceneTime = 0.0f;
     }
 
-    m_renderCore->camera().selectedCameraIndex() = std::min( m_renderCore->camera().selectedCameraIndex(), GetSceneCameraCount()-1 );
-    if (m_renderCore->camera().selectedCameraIndex() > 0)
+    m_camera->selectedCameraIndex() = std::min( m_camera->selectedCameraIndex(), GetSceneCameraCount()-1 );
+    if (m_camera->selectedCameraIndex() > 0)
     {
         {
             auto scene = m_sceneManager->getScene();
             const auto& cameraEntities = scene->GetCameraEntities();
-            const uint32_t camIdx = m_renderCore->camera().selectedCameraIndex() - 1;
+            const uint32_t camIdx = m_camera->selectedCameraIndex() - 1;
             const auto* ew = (camIdx < cameraEntities.size()) ? scene->GetEntityWorld() : nullptr;
             if (ew)
             {
@@ -833,25 +833,25 @@ void SceneEditor::Animate(float fElapsedTimeSeconds)
         }
     }
 
-    m_renderCore->camera().camera().Animate(fElapsedTimeSeconds);
+    m_camera->camera().Animate(fElapsedTimeSeconds);
 
-    if (m_sampleGame) m_sampleGame->TickCamera(fElapsedTimeSeconds, m_renderCore->camera().camera());
+    if (m_sampleGame) m_sampleGame->TickCamera(fElapsedTimeSeconds, m_camera->camera());
 
     if (m_settings.CameraAntiRRSleepJitter>0)
     {
         float off = 0.05f * ((GetWorldRenderer()->getFrameIndex()%2)?(-m_settings.CameraAntiRRSleepJitter):(m_settings.CameraAntiRRSleepJitter));
 
-        float3 dir = m_renderCore->camera().camera().GetDir();
-        float3 right = normalize(cross(dir, m_renderCore->camera().camera().GetUp()));
+        float3 dir = m_camera->camera().GetDir();
+        float3 right = normalize(cross(dir, m_camera->camera().GetUp()));
         affine3 rot = rotation(right, off);
         dir = rot.transformVector(dir);
 
-        m_renderCore->camera().camera().LookTo( m_renderCore->camera().camera().GetPosition(), dir, m_renderCore->camera().camera().GetUp() );
+        m_camera->camera().LookTo( m_camera->camera().GetPosition(), dir, m_camera->camera().GetUp() );
     }
 
-    if (m_renderCore->camera().cameraMovedSinceLastFrame())
+    if (m_camera->cameraMovedSinceLastFrame())
     {
-        m_renderCore->camera().updateLastCameraState();
+        m_camera->updateLastCameraState();
         if( !m_settings.RealtimeMode )
             m_settings.ResetAccumulation = true;
         GetWorldRenderer()->setGaussianSplatTemporalReset(true);

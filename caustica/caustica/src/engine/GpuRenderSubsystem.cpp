@@ -12,7 +12,6 @@
 #include <render/Core/BindingCache.h>
 #include <render/Core/BindlessTable.h>
 #include <render/Core/CommonRenderPasses.h>
-#include <render/Core/RenderCore.h>
 #include <render/Core/SceneGpuUpdater.h>
 #include <render/PathTracerScenePasses.h>
 #include <render/WorldRenderer/WorldRenderer.h>
@@ -60,8 +59,8 @@ bool GpuRenderSubsystem::initializeSession(const GpuRenderSubsystemInitParams& p
     AssetSystem::Get().EnableHotReload(true);
     AssetSystem::Get().WatchAssetDirectory("Assets");
 
-    m_renderCore = std::make_unique<RenderCore>(device);
-    m_renderCore->camera().camera().SetRotateSpeed(.003f);
+    m_accelStructs = AccelStructManager(device);
+    m_camera.camera().SetRotateSpeed(.003f);
 
     m_sceneManager = std::make_unique<SceneManager>(
         gpuDevice,
@@ -74,8 +73,6 @@ bool GpuRenderSubsystem::initializeSession(const GpuRenderSubsystemInitParams& p
         std::move(params.sceneCallbacks.OnSceneLoaded),
         std::move(params.sceneCallbacks.OnSceneUnloading));
 
-    m_renderCore->initializeRenderPipeline(m_shaderFactory);
-
     m_gpuDevice = &params.gpuDevice;
     m_settings = &params.settings;
     m_runtimeState = &params.runtimeState;
@@ -86,8 +83,8 @@ bool GpuRenderSubsystem::initializeSession(const GpuRenderSubsystemInitParams& p
     m_pathTracingContext = std::make_unique<render::PathTracingContext>(render::PathTracingContext{
         .gpuDevice = params.gpuDevice,
         .sceneManager = *m_sceneManager,
-        .camera = m_renderCore->camera(),
-        .accelStructs = m_renderCore->accelStructs(),
+        .camera = m_camera,
+        .accelStructs = m_accelStructs,
         .settings = params.settings,
         .runtimeState = params.runtimeState,
         .scenePasses = m_scenePasses,
@@ -106,7 +103,7 @@ bool GpuRenderSubsystem::initializeSession(const GpuRenderSubsystemInitParams& p
     m_scenePasses.wireSession(render::ScenePassWireParams{
         .gpuDevice = params.gpuDevice,
         .sceneManager = *m_sceneManager,
-        .accelStructs = m_renderCore->accelStructs(),
+        .accelStructs = m_accelStructs,
         .worldRenderer = *m_worldRenderer,
         .settings = params.settings,
         .invalidation = params.runtimeState.Invalidation,
@@ -129,8 +126,7 @@ void GpuRenderSubsystem::onSceneUnloading()
 {
     if (m_worldRenderer)
         m_worldRenderer->onSceneUnloading();
-    if (m_renderCore)
-        m_renderCore->onSceneUnloading();
+    m_accelStructs.releaseGpuResources();
     if (m_bindingCache)
         m_bindingCache->Clear();
     m_scenePasses.lighting.sceneUnloading();
@@ -145,7 +141,7 @@ void GpuRenderSubsystem::refreshEnvironmentMapMediaList(const std::filesystem::p
 
 void GpuRenderSubsystem::applySampleSettingsFromScene()
 {
-    if (!m_settings || !m_sceneManager || !m_renderCore)
+    if (!m_settings || !m_sceneManager)
         return;
 
     const auto scene = m_sceneManager->getScene();
@@ -157,7 +153,7 @@ void GpuRenderSubsystem::applySampleSettingsFromScene()
         m_settings->RealtimeMode = sampleSettings->realtimeMode.value_or(m_settings->RealtimeMode);
         m_settings->EnableAnimations = sampleSettings->enableAnimations.value_or(m_settings->EnableAnimations);
         if (sampleSettings->startingCamera.has_value())
-            m_renderCore->camera().setSelectedCameraIndex(sampleSettings->startingCamera.value() + 1);
+            m_camera.setSelectedCameraIndex(sampleSettings->startingCamera.value() + 1);
         if (sampleSettings->realtimeFireflyFilter.has_value())
         {
             m_settings->RealtimeFireflyFilterThreshold = sampleSettings->realtimeFireflyFilter.value();
@@ -223,7 +219,7 @@ void GpuRenderSubsystem::onSceneLoadedGpuPrep()
 
 void GpuRenderSubsystem::onSceneLoadedGpuFinish()
 {
-    if (!m_sceneManager || !m_settings || !m_renderCore || !m_runtimeState)
+    if (!m_sceneManager || !m_settings || !m_runtimeState)
         return;
 
     const auto scene = m_sceneManager->getScene();
@@ -235,7 +231,8 @@ void GpuRenderSubsystem::onSceneLoadedGpuFinish()
 
     m_scenePasses.lighting.onSceneLoaded(*scene, *m_settings);
 
-    m_renderCore->onSceneLoaded(*scene, m_runtimeState->Invalidation.AccelerationStructRebuildRequested);
+    SceneManager::onSceneLoadedGpuPrep(*scene, m_runtimeState->Invalidation.AccelerationStructRebuildRequested);
+    m_accelStructs.resetSubInstanceCount();
     m_runtimeState->Invalidation.ShaderReloadRequested = true;
 
     m_settings->MaterialVariantIndex = 0;
@@ -270,7 +267,7 @@ void GpuRenderSubsystem::shutdown()
     m_worldRenderer.reset();
     m_pathTracingContext.reset();
     m_sceneManager.reset();
-    m_renderCore.reset();
+    m_accelStructs = AccelStructManager{};
 
     m_gpuDevice = nullptr;
     m_settings = nullptr;

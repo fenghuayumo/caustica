@@ -10,7 +10,6 @@
 namespace caustica
 {
 class PerspectiveCamera;
-class RenderCore;
 }
 
 namespace caustica::render
@@ -27,7 +26,7 @@ class EditorCameraController
 public:
     EditorCameraController() = default;
 
-    void bind(caustica::RenderCore& renderCore,
+    void bind(CameraController& camera,
         PathTracerSettings& settings,
         caustica::render::WorldRenderer* worldRenderer);
 
@@ -50,7 +49,7 @@ public:
 private:
     void markCameraChanged();
 
-    caustica::RenderCore* m_renderCore = nullptr;
+    CameraController* m_camera = nullptr;
     PathTracerSettings* m_settings = nullptr;
     caustica::render::WorldRenderer* m_worldRenderer = nullptr;
 };

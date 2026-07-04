@@ -8,7 +8,6 @@
 #include <math/math.h>
 #include <render/Core/CameraController.h>
 #include <render/Core/PathTracerSettings.h>
-#include <render/Core/RenderCore.h>
 #include <render/Core/TextureUtils.h>
 #include <scene/Scene.h>
 #include <scene/SceneEcs.h>
@@ -105,7 +104,7 @@ public:
     std::shared_ptr<caustica::TextureLoader> GetTextureLoader() const { return m_TextureLoader; }
     std::shared_ptr<caustica::DescriptorTableManager> GetDescriptorTable() const;
     SceneManager* GetSceneManager() const { return m_sceneManager; }
-    caustica::RenderCore* GetRenderCore() const { return m_renderCore; }
+    caustica::CameraController* GetCameraController() const { return m_camera; }
     nvrhi::ITexture*                       GetLdrColorTexture() const;
     std::shared_ptr<caustica::Scene>   GetScene() const;
     std::vector<std::string> const &        GetAvailableScenes() const;
@@ -302,7 +301,7 @@ private:
     caustica::GpuDevice*                        m_gpuDevice = nullptr;
 
     SceneManager*                               m_sceneManager = nullptr;
-    caustica::RenderCore*                       m_renderCore = nullptr;
+    caustica::CameraController*                       m_camera = nullptr;
 
     double                                      m_sceneTime = 0.;
     float                                       m_lastDeltaTime = 0.0f;

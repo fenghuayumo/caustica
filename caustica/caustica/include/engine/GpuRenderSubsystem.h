@@ -7,6 +7,8 @@
 
 #include <rhi/nvrhi.h>
 #include <render/Core/PathTracerSettings.h>
+#include <render/Core/CameraController.h>
+#include <render/Core/AccelStructManager.h>
 #include <render/PathTracerScenePasses.h>
 #include <render/SessionDiagnostics.h>
 #include <render/WorldRenderer/PathTracingContext.h>
@@ -23,7 +25,6 @@ class BindlessTable;
 class CommonRenderPasses;
 class DescriptorTableManager;
 class GpuDevice;
-class RenderCore;
 class SceneTypeFactory;
 class ShaderFactory;
 class TextureLoader;
@@ -94,7 +95,10 @@ public:
     [[nodiscard]] std::shared_ptr<DescriptorTableManager> descriptorTable() const { return m_descriptorTable; }
     [[nodiscard]] BindlessTable* bindlessTable() const { return m_bindlessTable.get(); }
     [[nodiscard]] std::shared_ptr<TextureLoader> textureLoader() const { return m_textureCache; }
-    [[nodiscard]] RenderCore* renderCore() const { return m_renderCore.get(); }
+    [[nodiscard]] CameraController& camera() { return m_camera; }
+    [[nodiscard]] const CameraController& camera() const { return m_camera; }
+    [[nodiscard]] AccelStructManager& accelStructs() { return m_accelStructs; }
+    [[nodiscard]] const AccelStructManager& accelStructs() const { return m_accelStructs; }
     [[nodiscard]] SceneManager* sceneManager() const { return m_sceneManager.get(); }
     [[nodiscard]] render::WorldRenderer* worldRenderer() const { return m_worldRenderer.get(); }
     [[nodiscard]] nvrhi::BindingLayoutHandle bindlessLayout() const { return m_bindlessLayout; }
@@ -118,7 +122,8 @@ private:
     std::unique_ptr<BindlessTable> m_bindlessTable;
     std::shared_ptr<DescriptorTableManager> m_descriptorTable;
     std::shared_ptr<TextureLoader> m_textureCache;
-    std::unique_ptr<RenderCore> m_renderCore;
+    CameraController m_camera;
+    AccelStructManager m_accelStructs;
     std::unique_ptr<SceneManager> m_sceneManager;
     std::unique_ptr<render::PathTracingContext> m_pathTracingContext;
     std::unique_ptr<render::WorldRenderer> m_worldRenderer;
