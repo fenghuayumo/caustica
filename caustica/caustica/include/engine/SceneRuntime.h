@@ -191,6 +191,15 @@ public:
 
 protected:
     virtual void onBeforeInitialSceneLoad() {}
+    virtual void onAnimateBegin(float& elapsedTimeSeconds) {}
+    virtual void onAnimateGameTick(float elapsedTimeSeconds, bool enableAnimations) {}
+    virtual void onAnimateUpdateSceneTime(float elapsedTimeSeconds, bool enableAnimations, bool enableAnimationUpdate) {}
+    virtual void onAnimateGameCamera(float elapsedTimeSeconds) {}
+    virtual void onAnimateEnd(float elapsedTimeSeconds) {}
+    virtual void onSceneLoadedEarly() {}
+    virtual void onSceneLoadedBeforeGpuPrep() {}
+    virtual void onSceneLoadedAfterCollectTextures() {}
+    virtual void onSceneLoadedComplete() {}
 
     void applySceneSwitch(const std::string& sceneName, bool forceReload);
     void tickSceneSwitchTest();
