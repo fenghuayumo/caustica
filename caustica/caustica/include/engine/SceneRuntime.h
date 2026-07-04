@@ -116,7 +116,7 @@ public:
 
     float GetAvgTimePerFrame() const;
 
-    void bindGpuRenderSubsystem(GpuRenderSubsystem& gpuRenderSubsystem);
+    virtual void bindGpuRenderSubsystem(GpuRenderSubsystem& gpuRenderSubsystem);
     void Init(const std::string& preferredScene,
         const std::shared_ptr<ShaderFactory>& shaderFactory);
 

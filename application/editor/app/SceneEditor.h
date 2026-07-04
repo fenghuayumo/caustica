@@ -80,7 +80,7 @@ public:
         bool recomputeNormals = true,
         bool rebuildAccelerationStructure = true);
 
-    void bindGpuRenderSubsystem(caustica::GpuRenderSubsystem& gpuRenderSubsystem);
+    void bindGpuRenderSubsystem(caustica::GpuRenderSubsystem& gpuRenderSubsystem) override;
     void Init(const std::string& preferredScene,
         const std::shared_ptr<caustica::ShaderFactory>& shaderFactory);
 
