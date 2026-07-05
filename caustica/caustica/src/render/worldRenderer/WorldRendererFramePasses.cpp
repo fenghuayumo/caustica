@@ -119,6 +119,7 @@ void caustica::render::WorldRenderer::buildFrameGraphPasses(
     graph.reset();
     graph.setDevice(device());
     graph.setRenderTargetPool(&m_renderTargetPool);
+    graph.setRenderBufferPool(&m_renderBufferPool);
 
     ctx.commandListWasClosed = false;
 
@@ -166,6 +167,7 @@ void caustica::render::WorldRenderer::executeFrameRenderGraph(RenderFrameContext
     ctx.graph->compile();
     ctx.graph->execute(m_commandList);
     m_renderTargetPool.endFrame();
+    m_renderBufferPool.endFrame();
 
     if (ctx.commandListWasClosed)
         m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
@@ -233,6 +235,8 @@ void caustica::render::WorldRenderer::framePassEnsureRenderTargets(PathTracingFr
         m_renderTargets->init(device(), m_renderSize, m_displaySize, true, true, c_SwapchainCount);
         m_renderTargetPool.reset();
         m_renderTargetPool.setDevice(device());
+        m_renderBufferPool.reset();
+        m_renderBufferPool.setDevice(device());
 
         ctx.needNewPasses = true;
     }

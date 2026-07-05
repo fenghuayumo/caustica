@@ -7,42 +7,38 @@
 namespace caustica::rg
 {
 
-namespace
-{
-    uint64_t hashCombine(uint64_t seed, uint64_t value)
-    {
-        return seed ^ (value + 0x9e3779b97f4a7c15ull + (seed << 6) + (seed >> 2));
-    }
-}
-
-uint64_t RenderTargetPool::hashDesc(const TextureDesc& desc)
-{
-    uint64_t hash = 0;
-    hash = hashCombine(hash, desc.width);
-    hash = hashCombine(hash, desc.height);
-    hash = hashCombine(hash, desc.depth);
-    hash = hashCombine(hash, desc.mipLevels);
-    hash = hashCombine(hash, desc.arraySize);
-    hash = hashCombine(hash, static_cast<uint64_t>(desc.format));
-    hash = hashCombine(hash, desc.isRenderTarget ? 1u : 0u);
-    hash = hashCombine(hash, desc.isUAV ? 1u : 0u);
-    hash = hashCombine(hash, desc.isTypeless ? 1u : 0u);
-    return hash;
-}
-
 int RenderTargetPool::findFreeSlot(const TextureDesc& desc) const
 {
-    const uint64_t key = hashDesc(desc);
+    const uint64_t exactKey = hashTextureDesc(desc);
     for (int i = 0; i < static_cast<int>(m_textures.size()); ++i)
     {
         const PooledTexture& entry = m_textures[static_cast<size_t>(i)];
         if (entry.inUse)
             continue;
-        if (hashDesc(entry.desc) != key)
-            continue;
-        return i;
+        if (hashTextureDesc(entry.desc) == exactKey)
+            return i;
     }
-    return -1;
+
+    int bestSlot = -1;
+    uint64_t bestArea = UINT64_MAX;
+    const uint64_t requestArea = static_cast<uint64_t>(desc.width) * desc.height * desc.depth;
+
+    for (int i = 0; i < static_cast<int>(m_textures.size()); ++i)
+    {
+        const PooledTexture& entry = m_textures[static_cast<size_t>(i)];
+        if (entry.inUse)
+            continue;
+        if (!textureDescCovers(entry.desc, desc))
+            continue;
+
+        const uint64_t slotArea = static_cast<uint64_t>(entry.desc.width) * entry.desc.height * entry.desc.depth;
+        if (slotArea < bestArea)
+        {
+            bestArea = slotArea;
+            bestSlot = i;
+        }
+    }
+    return bestSlot;
 }
 
 nvrhi::TextureHandle RenderTargetPool::createPooledTexture(const TextureDesc& desc)
@@ -67,7 +63,7 @@ nvrhi::TextureHandle RenderTargetPool::createPooledTexture(const TextureDesc& de
     return m_device->createTexture(nativeDesc);
 }
 
-nvrhi::TextureHandle RenderTargetPool::acquireTexture(const TextureDesc& desc)
+nvrhi::TextureHandle RenderTargetPool::tryAcquireTexture(const TextureDesc& desc)
 {
     assert(m_device);
 
@@ -78,6 +74,16 @@ nvrhi::TextureHandle RenderTargetPool::acquireTexture(const TextureDesc& desc)
         entry.lastUsedFrame = m_frameIndex;
         return entry.handle;
     }
+
+    return nullptr;
+}
+
+nvrhi::TextureHandle RenderTargetPool::acquireTexture(const TextureDesc& desc)
+{
+    assert(m_device);
+
+    if (nvrhi::TextureHandle existing = tryAcquireTexture(desc))
+        return existing;
 
     PooledTexture entry{};
     entry.desc = desc;

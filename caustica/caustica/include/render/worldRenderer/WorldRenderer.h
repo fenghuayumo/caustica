@@ -20,6 +20,7 @@
 #include <render/ecs/RenderScheduleSetup.h>
 #include <render/graph/GraphBuilder.h>
 #include <render/graph/RenderTargetPool.h>
+#include <render/graph/RenderBufferPool.h>
 #include <render/worldRenderer/PathTracingFrameContext.h>
 #include <ecs/Schedule.h>
 #include <ecs/World.h>
@@ -210,6 +211,7 @@ private:
     ecs::World                   m_renderScheduleWorld;
     rg::GraphBuilder             m_frameGraph;
     rg::RenderTargetPool         m_renderTargetPool;
+    rg::RenderBufferPool         m_renderBufferPool;
     RenderFrameContext           m_renderFrameCtx{};
     bool                         m_renderScheduleBuilt = false;
 

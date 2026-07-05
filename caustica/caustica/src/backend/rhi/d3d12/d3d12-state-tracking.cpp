@@ -175,6 +175,36 @@ namespace nvrhi::d3d12
         m_StateTracker.clearBarriers();
     }
 
+    void CommandList::textureAliasingBarrier(ITexture* _before, ITexture* _after)
+    {
+        commitBarriers();
+
+        Texture* before = _before ? checked_cast<Texture*>(_before) : nullptr;
+        Texture* after = _after ? checked_cast<Texture*>(_after) : nullptr;
+
+        D3D12_RESOURCE_BARRIER barrier{};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_ALIASING;
+        barrier.Aliasing.pResourceBefore = before ? before->resource.Get() : nullptr;
+        barrier.Aliasing.pResourceAfter = after ? after->resource.Get() : nullptr;
+
+        m_ActiveCommandList->commandList->ResourceBarrier(1, &barrier);
+    }
+
+    void CommandList::bufferAliasingBarrier(IBuffer* _before, IBuffer* _after)
+    {
+        commitBarriers();
+
+        Buffer* before = _before ? checked_cast<Buffer*>(_before) : nullptr;
+        Buffer* after = _after ? checked_cast<Buffer*>(_after) : nullptr;
+
+        D3D12_RESOURCE_BARRIER barrier{};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_ALIASING;
+        barrier.Aliasing.pResourceBefore = before ? before->resource.Get() : nullptr;
+        barrier.Aliasing.pResourceAfter = after ? after->resource.Get() : nullptr;
+
+        m_ActiveCommandList->commandList->ResourceBarrier(1, &barrier);
+    }
+
     void CommandList::setEnableAutomaticBarriers(bool enable)
     {
         m_EnableAutomaticBarriers = enable;

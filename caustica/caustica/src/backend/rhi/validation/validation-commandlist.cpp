@@ -1031,6 +1031,26 @@ namespace nvrhi::validation
         m_CommandList->setBufferState(buffer, stateBits);
     }
 
+    void CommandListWrapper::textureAliasingBarrier(ITexture* before, ITexture* after)
+    {
+        if (!requireOpenState())
+            return;
+
+        m_CommandList->textureAliasingBarrier(
+            before ? checked_cast<ITexture*>(unwrapResource(before)) : nullptr,
+            after ? checked_cast<ITexture*>(unwrapResource(after)) : nullptr);
+    }
+
+    void CommandListWrapper::bufferAliasingBarrier(IBuffer* before, IBuffer* after)
+    {
+        if (!requireOpenState())
+            return;
+
+        m_CommandList->bufferAliasingBarrier(
+            before ? checked_cast<IBuffer*>(unwrapResource(before)) : nullptr,
+            after ? checked_cast<IBuffer*>(unwrapResource(after)) : nullptr);
+    }
+
     void CommandListWrapper::setAccelStructState(rt::IAccelStruct* as, ResourceStates stateBits)
     {
         if (!requireOpenState())

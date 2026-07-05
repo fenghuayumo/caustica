@@ -1016,6 +1016,8 @@ namespace nvrhi::d3d12
 
         void setTextureState(ITexture* texture, TextureSubresourceSet subresources, ResourceStates stateBits) override;
         void setBufferState(IBuffer* buffer, ResourceStates stateBits) override;
+        void textureAliasingBarrier(ITexture* before, ITexture* after) override;
+        void bufferAliasingBarrier(IBuffer* before, IBuffer* after) override;
         void setAccelStructState(rt::IAccelStruct* as, ResourceStates stateBits) override;
         
         void setPermanentTextureState(ITexture* texture, ResourceStates stateBits) override;

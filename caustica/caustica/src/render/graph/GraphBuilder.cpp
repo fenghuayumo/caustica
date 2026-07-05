@@ -1,8 +1,11 @@
 #include <render/graph/GraphBuilder.h>
+#include <render/graph/RenderBufferPool.h>
 #include <render/graph/RenderTargetPool.h>
+#include <render/graph/TransientResourceAllocator.h>
 
 #include <algorithm>
 #include <cassert>
+#include <climits>
 #include <vector>
 
 namespace caustica::rg
@@ -19,6 +22,7 @@ namespace
     {
         return handle.isValid() && handle.index < bufferCount;
     }
+
 }
 
 PassBuilder::PassBuilder(GraphBuilder& graph)
@@ -124,6 +128,11 @@ nvrhi::ResourceStates GraphBuilder::accessToState(BufferAccess access)
 
 void GraphBuilder::setDevice(nvrhi::IDevice* device)
 {
+    if (m_device != device)
+    {
+        m_transientHeaps.clear();
+        m_transientHeapPool.clear();
+    }
     m_device = device;
 }
 
@@ -182,7 +191,7 @@ BufferHandle GraphBuilder::importBuffer(nvrhi::IBuffer* buffer, BufferAccess ini
     return importBuffer(buffer, accessToState(initialAccess));
 }
 
-nvrhi::TextureHandle GraphBuilder::createNativeTexture(const TextureDesc& desc) const
+nvrhi::TextureHandle GraphBuilder::createNativeTexture(const TextureDesc& desc, bool isVirtual) const
 {
     assert(m_device);
 
@@ -198,6 +207,7 @@ nvrhi::TextureHandle GraphBuilder::createNativeTexture(const TextureDesc& desc) 
     nativeDesc.isRenderTarget = desc.isRenderTarget || formatInfo.isRenderTargetCompatible;
     nativeDesc.isUAV = desc.isUAV || formatInfo.isUAVCompatible;
     nativeDesc.isTypeless = desc.isTypeless;
+    nativeDesc.isVirtual = isVirtual;
     nativeDesc.initialState = nvrhi::ResourceStates::Common;
     nativeDesc.keepInitialState = true;
 
@@ -217,7 +227,7 @@ TextureHandle GraphBuilder::createTexture(const TextureDesc& desc)
     return handle;
 }
 
-nvrhi::BufferHandle GraphBuilder::createNativeBuffer(const BufferDesc& desc) const
+nvrhi::BufferHandle GraphBuilder::createNativeBuffer(const BufferDesc& desc, bool isVirtual) const
 {
     assert(m_device);
 
@@ -233,6 +243,7 @@ nvrhi::BufferHandle GraphBuilder::createNativeBuffer(const BufferDesc& desc) con
     nativeDesc.canHaveRawViews = desc.canHaveRawViews;
     nativeDesc.canHaveTypedViews = desc.canHaveTypedViews;
     nativeDesc.format = nvrhi::caustica::toNvrhiFormat(desc.format);
+    nativeDesc.isVirtual = isVirtual;
     nativeDesc.initialState = nvrhi::ResourceStates::Common;
     nativeDesc.keepInitialState = true;
 
@@ -536,44 +547,90 @@ void GraphBuilder::compile()
         resource.buffer = nullptr;
     }
 
-    allocateTransientResources(referenced, referencedBuffers);
+    std::vector<TransientLifetime> textureLifetimes;
+    std::vector<TransientLifetime> bufferLifetimes;
+    computeTransientLifetimes(textureLifetimes, bufferLifetimes);
+
+    allocateTransientResources(referenced, referencedBuffers, textureLifetimes, bufferLifetimes);
     m_compiled = true;
 }
 
-void GraphBuilder::allocateTransientResources(const std::vector<bool>& referencedTextures, const std::vector<bool>& referencedBuffers)
+void GraphBuilder::computeTransientLifetimes(
+    std::vector<TransientLifetime>& textureLifetimes,
+    std::vector<TransientLifetime>& bufferLifetimes) const
 {
-    assert(m_device);
+    textureLifetimes.assign(m_textures.size(), {});
+    bufferLifetimes.assign(m_buffers.size(), {});
 
-    for (size_t i = 0; i < m_textures.size(); ++i)
+    for (size_t passOrder = 0; passOrder < m_compiledPassOrder.size(); ++passOrder)
     {
-        GraphTexture& resource = m_textures[i];
-        if (resource.lifetime != ResourceLifetime::Transient || resource.texture != nullptr)
-            continue;
-        if (i >= referencedTextures.size() || !referencedTextures[i])
+        const uint32_t passIndex = m_compiledPassOrder[passOrder];
+        if (passIndex >= m_passes.size())
             continue;
 
-        if (m_renderTargetPool)
-            resource.owned = m_renderTargetPool->acquireTexture(resource.desc);
-        else
-            resource.owned = createNativeTexture(resource.desc);
-        assert(resource.owned);
-        resource.texture = resource.owned;
-        resource.currentState = nvrhi::ResourceStates::Common;
+        const Pass& pass = m_passes[passIndex];
+        if (!pass.active)
+            continue;
+
+        const int32_t order = static_cast<int32_t>(passOrder);
+
+        const auto touchTexture = [&](TextureHandle handle) {
+            if (!isValid(handle, m_textures.size()))
+                return;
+            if (m_textures[handle.index].lifetime != ResourceLifetime::Transient)
+                return;
+
+            TransientLifetime& lifetime = textureLifetimes[handle.index];
+            lifetime.firstPassOrder = std::min(lifetime.firstPassOrder, order);
+            lifetime.lastPassOrder = std::max(lifetime.lastPassOrder, order);
+        };
+
+        const auto touchBuffer = [&](BufferHandle handle) {
+            if (!isValid(handle, m_buffers.size()))
+                return;
+            if (m_buffers[handle.index].lifetime != ResourceLifetime::Transient)
+                return;
+
+            TransientLifetime& lifetime = bufferLifetimes[handle.index];
+            lifetime.firstPassOrder = std::min(lifetime.firstPassOrder, order);
+            lifetime.lastPassOrder = std::max(lifetime.lastPassOrder, order);
+        };
+
+        for (const auto& [handle, access] : pass.textureReads)
+        {
+            (void)access;
+            touchTexture(handle);
+        }
+        for (const auto& [handle, access] : pass.textureWrites)
+        {
+            (void)access;
+            touchTexture(handle);
+        }
+        for (const auto& [handle, access] : pass.bufferReads)
+        {
+            (void)access;
+            touchBuffer(handle);
+        }
+        for (const auto& [handle, access] : pass.bufferWrites)
+        {
+            (void)access;
+            touchBuffer(handle);
+        }
     }
+}
 
-    for (size_t i = 0; i < m_buffers.size(); ++i)
-    {
-        GraphBuffer& resource = m_buffers[i];
-        if (resource.lifetime != ResourceLifetime::Transient || resource.buffer != nullptr)
-            continue;
-        if (i >= referencedBuffers.size() || !referencedBuffers[i])
-            continue;
+void GraphBuilder::allocateTransientResources(
+    const std::vector<bool>& referencedTextures,
+    const std::vector<bool>& referencedBuffers,
+    const std::vector<TransientLifetime>& textureLifetimes,
+    const std::vector<TransientLifetime>& bufferLifetimes)
+{
+    m_textureAliasingBarriers.clear();
+    m_bufferAliasingBarriers.clear();
+    m_transientStats = {};
 
-        resource.owned = createNativeBuffer(resource.desc);
-        assert(resource.owned);
-        resource.buffer = resource.owned;
-        resource.currentState = nvrhi::ResourceStates::Common;
-    }
+    TransientResourceAllocator allocator;
+    allocator.allocate(*this, referencedTextures, referencedBuffers, textureLifetimes, bufferLifetimes);
 }
 
 void GraphBuilder::releaseTransientResources()
@@ -595,6 +652,15 @@ void GraphBuilder::releaseTransientResources()
             resource.buffer = nullptr;
         }
     }
+
+    for (nvrhi::HeapHandle& heap : m_transientHeaps)
+    {
+        if (heap)
+            m_transientHeapPool.push_back(heap);
+    }
+    m_transientHeaps.clear();
+    m_textureAliasingBarriers.clear();
+    m_bufferAliasingBarriers.clear();
 }
 
 void GraphBuilder::transitionTexture(nvrhi::ICommandList* commandList, TextureHandle handle, TextureAccess access)
@@ -637,6 +703,52 @@ void GraphBuilder::transitionBuffer(nvrhi::ICommandList* commandList, BufferHand
 
     commandList->setBufferState(resource.buffer, targetState);
     resource.currentState = targetState;
+}
+
+void GraphBuilder::emitTextureAliasingBarrier(nvrhi::ICommandList* commandList, TextureHandle handle)
+{
+    if (!isValid(handle, m_textures.size()))
+        return;
+
+    for (TextureAliasingBarrier& barrier : m_textureAliasingBarriers)
+    {
+        if (barrier.emitted || barrier.after.index != handle.index)
+            continue;
+
+        nvrhi::ITexture* before = isValid(barrier.before, m_textures.size())
+            ? m_textures[barrier.before.index].texture
+            : nullptr;
+        nvrhi::ITexture* after = m_textures[handle.index].texture;
+        if (after)
+        {
+            commandList->textureAliasingBarrier(before, after);
+            ++m_transientStats.aliasingBarrierCount;
+        }
+        barrier.emitted = true;
+    }
+}
+
+void GraphBuilder::emitBufferAliasingBarrier(nvrhi::ICommandList* commandList, BufferHandle handle)
+{
+    if (!isValid(handle, m_buffers.size()))
+        return;
+
+    for (BufferAliasingBarrier& barrier : m_bufferAliasingBarriers)
+    {
+        if (barrier.emitted || barrier.after.index != handle.index)
+            continue;
+
+        nvrhi::IBuffer* before = isValid(barrier.before, m_buffers.size())
+            ? m_buffers[barrier.before.index].buffer
+            : nullptr;
+        nvrhi::IBuffer* after = m_buffers[handle.index].buffer;
+        if (after)
+        {
+            commandList->bufferAliasingBarrier(before, after);
+            ++m_transientStats.aliasingBarrierCount;
+        }
+        barrier.emitted = true;
+    }
 }
 
 void GraphBuilder::syncPassEndStates(const Pass& pass)
@@ -738,6 +850,27 @@ void GraphBuilder::execute(nvrhi::ICommandList* commandList)
         commandList->beginMarker(pass.name.c_str());
 
         for (const auto& [handle, access] : pass.textureReads)
+        {
+            (void)access;
+            emitTextureAliasingBarrier(commandList, handle);
+        }
+        for (const auto& [handle, access] : pass.textureWrites)
+        {
+            (void)access;
+            emitTextureAliasingBarrier(commandList, handle);
+        }
+        for (const auto& [handle, access] : pass.bufferReads)
+        {
+            (void)access;
+            emitBufferAliasingBarrier(commandList, handle);
+        }
+        for (const auto& [handle, access] : pass.bufferWrites)
+        {
+            (void)access;
+            emitBufferAliasingBarrier(commandList, handle);
+        }
+
+        for (const auto& [handle, access] : pass.textureReads)
             transitionTexture(commandList, handle, access);
         for (const auto& [handle, access] : pass.textureWrites)
             transitionTexture(commandList, handle, access);
@@ -773,6 +906,7 @@ void GraphBuilder::reset()
     m_passNames.clear();
     m_importIndexByTexture.clear();
     m_importIndexByBuffer.clear();
+    m_transientStats = {};
     m_compiled = false;
 }
 

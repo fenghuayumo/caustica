@@ -9,7 +9,7 @@
 namespace caustica::rg
 {
 
-// Reuses transient graph textures across frames (UE FRenderTargetPool-style).
+// Reuses transient graph textures across frames; intra-frame aliasing is handled by GraphBuilder.
 class RenderTargetPool
 {
 public:
@@ -17,6 +17,7 @@ public:
     [[nodiscard]] nvrhi::IDevice* device() const { return m_device; }
 
     [[nodiscard]] nvrhi::TextureHandle acquireTexture(const TextureDesc& desc);
+    [[nodiscard]] nvrhi::TextureHandle tryAcquireTexture(const TextureDesc& desc);
     void endFrame();
 
     void reset();
@@ -30,7 +31,6 @@ private:
         bool inUse = false;
     };
 
-    [[nodiscard]] static uint64_t hashDesc(const TextureDesc& desc);
     [[nodiscard]] int findFreeSlot(const TextureDesc& desc) const;
     [[nodiscard]] nvrhi::TextureHandle createPooledTexture(const TextureDesc& desc);
 

@@ -227,7 +227,9 @@ void caustica::render::WorldRenderer::createDeviceResources()
     nvrhi::IDevice* device = this->device();
 
     m_renderTargetPool.setDevice(device);
+    m_renderBufferPool.setDevice(device);
     m_frameGraph.setRenderTargetPool(&m_renderTargetPool);
+    m_frameGraph.setRenderBufferPool(&m_renderBufferPool);
 
 #if CAUSTICA_WITH_NATIVE_DLSS
     m_nativeDLSS = caustica::render::DLSS::Create(device, m_context.shaderFactory, caustica::GetDirectoryWithExecutable().string());

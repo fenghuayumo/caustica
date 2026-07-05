@@ -258,6 +258,44 @@ namespace nvrhi::vulkan
         commitBarriersInternal();
     }
 
+    void CommandList::textureAliasingBarrier(ITexture* before, ITexture* after)
+    {
+        (void)before;
+        (void)after;
+
+        commitBarriers();
+        endRenderPass();
+
+        vk::MemoryBarrier2 memoryBarrier = vk::MemoryBarrier2()
+            .setSrcStageMask(vk::PipelineStageFlagBits2::eAllCommands)
+            .setSrcAccessMask(vk::AccessFlagBits2::eMemoryWrite)
+            .setDstStageMask(vk::PipelineStageFlagBits2::eAllCommands)
+            .setDstAccessMask(vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite);
+
+        vk::DependencyInfo dependencyInfo;
+        dependencyInfo.setMemoryBarriers(memoryBarrier);
+        m_CurrentCmdBuf->cmdBuf.pipelineBarrier2(dependencyInfo);
+    }
+
+    void CommandList::bufferAliasingBarrier(IBuffer* before, IBuffer* after)
+    {
+        (void)before;
+        (void)after;
+
+        commitBarriers();
+        endRenderPass();
+
+        vk::MemoryBarrier2 memoryBarrier = vk::MemoryBarrier2()
+            .setSrcStageMask(vk::PipelineStageFlagBits2::eAllCommands)
+            .setSrcAccessMask(vk::AccessFlagBits2::eMemoryWrite)
+            .setDstStageMask(vk::PipelineStageFlagBits2::eAllCommands)
+            .setDstAccessMask(vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite);
+
+        vk::DependencyInfo dependencyInfo;
+        dependencyInfo.setMemoryBarriers(memoryBarrier);
+        m_CurrentCmdBuf->cmdBuf.pipelineBarrier2(dependencyInfo);
+    }
+
     void CommandList::beginTrackingTextureState(ITexture* _texture, TextureSubresourceSet subresources, ResourceStates stateBits)
     {
         Texture* texture = checked_cast<Texture*>(_texture);

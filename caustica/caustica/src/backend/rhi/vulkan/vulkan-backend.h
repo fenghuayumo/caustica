@@ -1250,6 +1250,8 @@ namespace nvrhi::vulkan
 
         void setTextureState(ITexture* texture, TextureSubresourceSet subresources, ResourceStates stateBits) override;
         void setBufferState(IBuffer* buffer, ResourceStates stateBits) override;
+        void textureAliasingBarrier(ITexture* before, ITexture* after) override;
+        void bufferAliasingBarrier(IBuffer* before, IBuffer* after) override;
         void setAccelStructState(rt::IAccelStruct* _as, ResourceStates stateBits) override;
 
         void setPermanentTextureState(ITexture* texture, ResourceStates stateBits) override;

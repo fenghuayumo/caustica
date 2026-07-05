@@ -3518,6 +3518,14 @@ namespace nvrhi
         // Has no effect on DX11.
         virtual void setBufferState(IBuffer* buffer, ResourceStates stateBits) = 0;
 
+        // Places a memory aliasing barrier between two placed textures that can share the same heap range.
+        // The "before" resource can be null if the prior occupant is unknown. Has no effect on DX11.
+        virtual void textureAliasingBarrier(ITexture* before, ITexture* after) = 0;
+
+        // Places a memory aliasing barrier between two placed buffers that can share the same heap range.
+        // The "before" resource can be null if the prior occupant is unknown. Has no effect on DX11.
+        virtual void bufferAliasingBarrier(IBuffer* before, IBuffer* after) = 0;
+
         // Places the necessary barriers to make sure that the underlying buffer for the acceleration structure is
         // in the given state. See the comment to setTextureState(...) for more information.
         // Has no effect on DX11.
