@@ -1,6 +1,6 @@
 #include <render/passes/geometry/TemporalAntiAliasingPass.h>
 #include <render/core/FramebufferFactory.h>
-#include <render/rhi/ViewRhiConversion.h>
+#include <backend/ViewRhiConversion.h>
 #include <assets/loader/ShaderFactory.h>
 #include <render/core/RenderDevice.h>
 #include <scene/View.h>
@@ -215,7 +215,7 @@ void TemporalAntiAliasingPass::RenderMotionVectors(
         state.pipeline = m_MotionVectorsPso;
         state.framebuffer = m_MotionVectorsFramebufferFactory->getFramebuffer(*view);
         state.bindings = { m_MotionVectorsBindingSet};
-        state.viewport = rhi::toNvrhi(viewportState);
+        state.viewport = toNvrhi(viewportState);
         commandList->setGraphicsState(state);
 
         nvrhi::DrawArguments args;

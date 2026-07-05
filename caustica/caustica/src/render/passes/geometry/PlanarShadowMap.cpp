@@ -1,5 +1,5 @@
 #include <render/passes/geometry/PlanarShadowMap.h>
-#include <render/rhi/ViewRhiConversion.h>
+#include <backend/ViewRhiConversion.h>
 
 using namespace caustica::math;
 #include <shaders/light_cb.h>
@@ -242,5 +242,5 @@ void PlanarShadowMap::FillShadowConstants(struct ShadowConstants& constants) con
 
 void PlanarShadowMap::Clear(nvrhi::ICommandList* commandList)
 {
-    commandList->clearTextureFloat(m_ShadowMapTexture, rhi::toNvrhi(m_View->getSubresources()), nvrhi::Color(1.f));
+    commandList->clearTextureFloat(m_ShadowMapTexture, toNvrhi(m_View->getSubresources()), nvrhi::Color(1.f));
 }

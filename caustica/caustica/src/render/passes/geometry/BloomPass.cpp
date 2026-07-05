@@ -1,6 +1,6 @@
 #include <render/passes/geometry/BloomPass.h>
 #include <render/core/FramebufferFactory.h>
-#include <render/rhi/ViewRhiConversion.h>
+#include <backend/ViewRhiConversion.h>
 #include <assets/loader/ShaderFactory.h>
 #include <render/core/RenderPassConstants.h>
 #include <render/graph/GpuTypes.h>
@@ -154,7 +154,7 @@ void BloomPass::renderInternal(
         nvrhi::IFramebuffer* framebuffer = framebufferFactory->getFramebuffer(*view);
         ensureBlurPso(viewIndex, framebufferPass1Blur);
 
-        nvrhi::ViewportState viewportState = rhi::toNvrhi(view->getViewportState());
+        nvrhi::ViewportState viewportState = toNvrhi(view->getViewportState());
         const nvrhi::Rect& scissorRect = viewportState.scissorRects[0];
         const nvrhi::FramebufferInfoEx& fbinfo = framebuffer->getFramebufferInfo();
 

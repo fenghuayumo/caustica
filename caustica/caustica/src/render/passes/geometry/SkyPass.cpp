@@ -1,6 +1,6 @@
 #include <render/passes/geometry/SkyPass.h>
 #include <render/core/FramebufferFactory.h>
-#include <render/rhi/ViewRhiConversion.h>
+#include <backend/ViewRhiConversion.h>
 #include <assets/loader/ShaderFactory.h>
 #include <render/core/ShadowMap.h>
 #include <render/core/RenderPassConstants.h>
@@ -97,7 +97,7 @@ void SkyPass::Render(
         state.pipeline = m_RenderPso;
         state.framebuffer = m_FramebufferFactory->getFramebuffer(*view);
         state.bindings = { m_RenderBindingSet };
-        state.viewport = rhi::toNvrhi(view->getViewportState());
+        state.viewport = toNvrhi(view->getViewportState());
         
         dm::affine viewToWorld = view->getInverseViewMatrix();
         viewToWorld.m_translation = 0.f;

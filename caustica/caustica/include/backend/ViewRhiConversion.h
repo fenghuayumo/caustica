@@ -3,7 +3,7 @@
 #include <scene/ViewDesc.h>
 #include <rhi/nvrhi.h>
 
-namespace caustica::render::rhi
+namespace caustica
 {
 
 [[nodiscard]] nvrhi::Viewport toNvrhi(const ViewportDesc& viewport);
@@ -11,4 +11,4 @@ namespace caustica::render::rhi
 [[nodiscard]] nvrhi::ViewportState toNvrhi(const ViewportStateDesc& state);
 [[nodiscard]] nvrhi::TextureSubresourceSet toNvrhi(const TextureSubresourceDesc& subresources);
 
-} // namespace caustica::render::rhi
+} // namespace caustica

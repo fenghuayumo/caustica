@@ -1,6 +1,6 @@
 #include <assets/loader/ShaderFactory.h>
 #include <render/core/RenderDevice.h>
-#include <render/rhi/ViewRhiConversion.h>
+#include <backend/ViewRhiConversion.h>
 #include <scene/View.h>
 #include <sstream>
 #include <assert.h>
@@ -308,7 +308,7 @@ bool ToneMappingPass::Render(
         state.pipeline = m_ToneMapPso;
         state.framebuffer = m_FramebufferFactory->getFramebuffer(*view);
         state.bindings = { bindingSet };
-        state.viewport = rhi::toNvrhi(view->getViewportState());
+        state.viewport = toNvrhi(view->getViewportState());
 
         ToneMappingConstants toneMappingConsts = {};
         toneMappingConsts.whiteScale = m_WhiteScale;

@@ -1,5 +1,5 @@
 #include <render/passes/geometry/JointsRenderPass.h>
-#include <render/rhi/ViewRhiConversion.h>
+#include <backend/ViewRhiConversion.h>
 #include <scene/Scene.h>
 #include <scene/SceneEcs.h>
 #include <assets/loader/ShaderFactory.h>
@@ -238,7 +238,7 @@ namespace caustica::render
         state.vertexBuffers = { { m_VertexBuffer, 0, 0 } };
         state.pipeline = m_Pipeline;
         state.framebuffer = framebuffer;
-        state.viewport = rhi::toNvrhi(view->getViewportState());
+        state.viewport = toNvrhi(view->getViewportState());
         state.bindings = { m_BindingSet };
 
         commandList->setGraphicsState(state);

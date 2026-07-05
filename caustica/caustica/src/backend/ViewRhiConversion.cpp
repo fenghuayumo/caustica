@@ -1,6 +1,6 @@
-#include <render/rhi/ViewRhiConversion.h>
+#include <backend/ViewRhiConversion.h>
 
-namespace caustica::render::rhi
+namespace caustica
 {
 
 nvrhi::Viewport toNvrhi(const ViewportDesc& viewport)
@@ -32,4 +32,4 @@ nvrhi::TextureSubresourceSet toNvrhi(const TextureSubresourceDesc& subresources)
         subresources.numArraySlices);
 }
 
-} // namespace caustica::render::rhi
+} // namespace caustica

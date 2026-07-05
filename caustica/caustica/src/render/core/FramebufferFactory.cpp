@@ -1,6 +1,6 @@
 #include <render/core/FramebufferFactory.h>
 #include <scene/View.h>
-#include <render/rhi/ViewRhiConversion.h>
+#include <backend/ViewRhiConversion.h>
 
 using namespace caustica;
 
@@ -28,7 +28,7 @@ nvrhi::IFramebuffer* FramebufferFactory::getFramebuffer(const nvrhi::TextureSubr
 
 nvrhi::IFramebuffer* FramebufferFactory::getFramebuffer(const IView& view)
 {
-    return getFramebuffer(caustica::render::rhi::toNvrhi(view.getSubresources()));
+    return getFramebuffer(caustica::toNvrhi(view.getSubresources()));
 }
 
 nvrhi::FramebufferInfo FramebufferFactory::getFramebufferInfo()
