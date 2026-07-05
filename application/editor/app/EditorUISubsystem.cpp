@@ -1,10 +1,10 @@
 #include "EditorUISubsystem.h"
 
-#include "EditorApplication.h"
 #include "SceneEditor.h"
 #include <EditorUI.h>
 #include <imgui/imgui_renderer.h>
 
+#include <engine/App.h>
 #include <engine/Engine.h>
 #include <engine/GpuRenderSubsystem.h>
 #include <platform/window.h>
@@ -20,7 +20,7 @@ EditorUISubsystem::EditorUISubsystem(EditorUISubsystemConfig config)
 
 void EditorUISubsystem::initialize(caustica::EngineInitContext& context)
 {
-    if (!context.gpuDevice || !context.window || !context.subsystems || !context.application)
+    if (!context.gpuDevice || !context.window || !context.subsystems || !context.app)
         return;
 
     auto* gpuRenderSubsystem = context.subsystems->get<caustica::GpuRenderSubsystem>();
@@ -32,7 +32,7 @@ void EditorUISubsystem::initialize(caustica::EngineInitContext& context)
 
     m_ui = std::make_unique<EditorUI>(
         context.gpuDevice,
-        m_config.editorApplication,
+        m_config.sceneEditor,
         m_config.editorUiData,
         serSupported,
         m_config.cmdLine);
@@ -48,7 +48,7 @@ void EditorUISubsystem::initialize(caustica::EngineInitContext& context)
             });
     }
 
-    caustica::Engine::syncSwapChain(*context.gpuDevice, *context.application);
+    caustica::Engine::syncSwapChain(*context.gpuDevice, *context.app);
 }
 
 void EditorUISubsystem::shutdown()

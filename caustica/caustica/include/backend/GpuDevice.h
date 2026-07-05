@@ -43,7 +43,7 @@
 namespace caustica
 {
     class Window; // Platform layer: window abstraction
-    class Application; // Engine layer: frame driver (friend — accesses protected state)
+    class App; // Engine layer: frame driver (friend — accesses protected state)
 
     struct DefaultMessageCallback : public nvrhi::IMessageCallback
     {
@@ -239,7 +239,7 @@ namespace caustica
 
     class GpuDevice
     {
-        friend class Application;
+        friend class App;
 
     public:
         // Application entry: creates GpuDevice (+ optional Window/swap chain or headless buffers).

@@ -21,7 +21,7 @@
 #include <cassert>
 #include <core/log.h>
 #include <core/Timer.h>
-#include <engine/Application.h>
+#include <engine/App.h>
 #include <engine/GpuRenderSubsystem.h>
 #include <engine/RenderThread.h>
 #include <render/core/RenderDevice.h>
@@ -395,9 +395,9 @@ void SceneRuntime::tickSceneSwitchTest()
     ++m_sceneSwitchTestSwitchesDone;
     if (m_cmdLine.sceneSwitchTestCount > 0
         && m_sceneSwitchTestSwitchesDone >= m_cmdLine.sceneSwitchTestCount
-        && m_application)
+        && m_app)
     {
-        m_application->requestExit();
+        m_app->requestExit();
     }
 }
 
@@ -436,8 +436,8 @@ void SceneRuntime::runGpuWorkOnRenderThread(const std::function<void()>& work)
 {
     if (!work)
         return;
-    if (m_application)
-        m_application->runGpuWorkOnRenderThread(work);
+    if (m_app)
+        m_app->runGpuWorkOnRenderThread(work);
     else
         work();
 }

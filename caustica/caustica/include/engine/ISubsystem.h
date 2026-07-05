@@ -5,7 +5,7 @@
 namespace caustica
 {
 
-class Application;
+class App;
 class GpuDevice;
 class Window;
 
@@ -13,11 +13,11 @@ struct EngineInitContext
 {
     GpuDevice* gpuDevice = nullptr;
     Window* window = nullptr;
-    Application* application = nullptr;
+    App* app = nullptr;
     class SubsystemCollection* subsystems = nullptr;
 };
 
-// Lifecycle unit registered with caustica::Engine. Lower priority initializes first;
+// Lifecycle unit registered with Engine. Lower priority initializes first;
 // shutdown runs in reverse order.
 class ISubsystem
 {

@@ -3,9 +3,8 @@
 #if CAUSTICA_WITH_PYTHON
 
 #include <engine/SceneRuntime.h>
-#include <engine/SceneRuntimeRegistration.h>
-#include <engine/EngineFrameApplication.h>
-#include <engine/Application.h>
+#include <engine/App.h>
+#include <engine/DefaultPlugins.h>
 #include <render/core/RenderDevice.h>
 #include <backend/GpuDevice.h>
 #include <render/SceneGaussianSplatPasses.h>
@@ -443,8 +442,11 @@ bool RenderSession::InitRenderer()
         ? std::string("default.json")
         : m_config.scene;
 
-    m_engine = std::make_unique<caustica::Engine>();
-    caustica::registerSceneRuntime(*m_engine, caustica::SceneRuntimeSubsystemConfig{
+    m_app = std::make_unique<caustica::App>(
+        m_deviceManager.get(),
+        m_config.headless ? nullptr : m_Window.get());
+
+    m_app->addPlugin<caustica::DefaultPlugins>(caustica::SceneRuntimeSubsystemConfig{
         .sceneRuntime = *m_sceneRuntime,
         .diagnostics = m_sessionDiagnostics,
         .preferredScene = preferredScene,
@@ -453,26 +455,16 @@ bool RenderSession::InitRenderer()
         .applyCmdLineToSessionState = true,
     });
 
-    m_AppLoop = std::make_unique<caustica::EngineFrameApplication>(
-        m_engine.get(),
-        m_deviceManager.get(),
-        m_config.headless ? nullptr : m_Window.get());
-    m_AppLoop->setUseDedicatedRenderThread(!m_cmdLine.syncRender && !m_config.headless);
-    m_AppLoop->beforePresent =
+    m_app->setUseDedicatedRenderThread(!m_cmdLine.syncRender && !m_config.headless);
+    m_app->beforePresent =
         [this](caustica::GpuDevice& manager, uint32_t) {
             m_lastRenderedBackBufferIndex = manager.GetCurrentBackBufferIndex();
         };
 
-    if (!m_engine->initialize(caustica::EngineInitContext{
-            .gpuDevice = m_deviceManager.get(),
-            .window = m_config.headless ? nullptr : m_Window.get(),
-            .application = m_AppLoop.get(),
-        }))
-    {
+    if (!m_app->finishStartup())
         return false;
-    }
 
-    m_AppLoop->syncSwapChain();
+    m_app->syncSwapChain();
 
     return true;
 }
@@ -482,11 +474,8 @@ void RenderSession::Shutdown()
     if (m_deviceManager)
         m_deviceManager->setFrameDriver(nullptr);
 
-    m_AppLoop.reset();
+    m_app.reset();
     m_sceneRuntime.reset();
-    if (m_engine)
-        m_engine->shutdown();
-    m_engine.reset();
 
     if (m_deviceManager)
     {
@@ -538,8 +527,8 @@ bool RenderSession::Step(float dt)
         return false;
 
     const bool frameOk = dt >= 0.0f
-        ? m_AppLoop->stepFrame(double(dt))
-        : m_AppLoop->stepFrame(m_config.headless ? c_HeadlessFrameTimeSeconds : -1.0);
+        ? m_app->stepFrame(double(dt))
+        : m_app->stepFrame(m_config.headless ? c_HeadlessFrameTimeSeconds : -1.0);
 
     if (!frameOk)
         return false;

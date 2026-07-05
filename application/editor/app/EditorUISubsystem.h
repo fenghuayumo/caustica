@@ -1,6 +1,7 @@
 #pragma once
 
 #include <core/command_line.h>
+#include <engine/App.h>
 #include <engine/ISubsystem.h>
 
 #include <memory>
@@ -8,20 +9,18 @@
 namespace caustica::editor
 {
 
-class EditorApplication;
 class EditorUI;
 class EditorUIData;
 class SceneEditor;
 
 struct EditorUISubsystemConfig
 {
-    EditorApplication& editorApplication;
+    App& app;
     SceneEditor& sceneEditor;
     EditorUIData& editorUiData;
     const CommandLineOptions& cmdLine;
 };
 
-// Owns ImGui overlay lifecycle for the desktop editor.
 class EditorUISubsystem : public caustica::ISubsystem
 {
 public:

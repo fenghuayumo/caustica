@@ -3,7 +3,6 @@
 
 #include <engine/GpuRenderSubsystem.h>
 #include <engine/SceneRuntime.h>
-#include <engine/SceneRuntimeRegistration.h>
 #include <engine/SubsystemCollection.h>
 
 #include <core/path_utils.h>
@@ -35,8 +34,8 @@ void SceneRuntimeSubsystem::initialize(EngineInitContext& context)
 
     sceneRuntime.setGpuDevice(gpuDevice);
     sceneRuntime.initStreamlineAndWindow();
-    if (context.application)
-        sceneRuntime.setApplication(context.application);
+    if (context.app)
+        sceneRuntime.setApp(context.app);
 
     SceneRuntime* sceneRuntimePtr = &sceneRuntime;
     gpuRenderSubsystem->initializeSession(GpuRenderSubsystemInitParams{

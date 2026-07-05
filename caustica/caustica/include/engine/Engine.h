@@ -8,10 +8,9 @@
 namespace caustica
 {
 
-class Application;
+class App;
 class GpuDevice;
 
-// Unified runtime: owns subsystems and routes Application frame callbacks.
 class Engine
 {
 public:
@@ -47,8 +46,7 @@ public:
     [[nodiscard]] bool skipRenderPhase() const;
     [[nodiscard]] bool shouldRenderWhenUnfocused() const;
 
-    // Notify frame driver that the swap chain matches the current back buffer.
-    static void syncSwapChain(GpuDevice& gpuDevice, Application& frameDriver);
+    static void syncSwapChain(GpuDevice& gpuDevice, App& app);
 
 private:
     SubsystemCollection m_subsystems;

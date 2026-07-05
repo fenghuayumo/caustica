@@ -2,6 +2,9 @@
 
 #include <backend/GpuDevice.h>
 #include <backend/GpuFrameDriver.h>
+#include <engine/Engine.h>
+#include <engine/ISubsystem.h>
+#include <engine/Plugin.h>
 #include <engine/RenderThread.h>
 #include <events/event.h>
 
@@ -9,43 +12,72 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
-namespace caustica {
+namespace caustica
+{
 
 class GpuDevice;
 class Window;
 
-// =============================================================================
-// Application — Engine layer: owns the app lifecycle (DIVSHOT-style).
+// Plugin-driven application: Engine, window/GPU, and frame loop.
 //
-// Derived editor (EditorApplication) calls startup() then run(); shutdown() tears down.
-// Frame update/render is driven through onUpdate/onRender overrides, not a pass list.
-//
-// The event system flows: GLFW → GlfwWindow → EventCallback → Application::onEvent()
-// Override onEvent() to receive all input/window events. Use EventDispatcher for
-// type-safe dispatch to individual handlers.
-//
-// RenderSession uses the non-owning constructor for manual stepFrame() control.
-//
-// Application executables implement createApplication() (see EntryPoint.h).
-// =============================================================================
-class Application : public IGpuFrameDriver
+//   App app;
+//   app.addPlugin<DefaultPlugins>(sceneConfig);
+//   app.initializeGraphics(argc, argv, desc);
+//   app.finishStartup();
+//   app.run();
+class App : public IGpuFrameDriver
 {
 public:
-    Application();
-    Application(GpuDevice* dm, Window* window = nullptr);
-    virtual ~Application();
+    App();
+    App(GpuDevice* gpuDevice, Window* window = nullptr);
+    ~App();
 
-    virtual bool init(int argc, const char* const* argv);
-    virtual void shutdown();
+    template<typename T, typename... Args>
+    App& addPlugin(Args&&... args)
+    {
+        static_assert(std::is_base_of_v<Plugin, T>, "T must derive from Plugin");
+        auto plugin = std::make_unique<T>(std::forward<Args>(args)...);
+        m_pluginRefs.push_back(plugin.get());
+        m_ownedPlugins.push_back(std::move(plugin));
+        m_pluginsBuilt = false;
+        return *this;
+    }
 
-    // Creates GpuDevice, optional Window, and swap chain; wires frame driver + window events.
+    App& addPlugin(Plugin& plugin)
+    {
+        m_pluginRefs.push_back(&plugin);
+        m_pluginsBuilt = false;
+        return *this;
+    }
+
+    template<typename T, typename... Args>
+    T& emplaceSubsystem(Args&&... args)
+    {
+        static_assert(std::is_base_of_v<ISubsystem, T>, "T must derive from ISubsystem");
+        auto subsystem = std::make_unique<T>(std::forward<Args>(args)...);
+        T& ref = *subsystem;
+        m_engine.addSubsystem(std::move(subsystem));
+        return ref;
+    }
+
+    void buildPlugins();
+
     bool initializeGraphics(const GpuDeviceCreateDesc& desc);
     bool initializeGraphics(int argc, const char* const* argv, GpuDeviceCreateDesc& desc);
+    bool finishStartup();
+    void syncSwapChain();
+
+    void shutdown();
 
     GpuDevice* getGpuDevice() const;
-    Window*    getWindow() const;
+    Window* getWindow() const;
+
+    Engine& engine() { return m_engine; }
+    const Engine& engine() const { return m_engine; }
 
     void run();
 
@@ -75,47 +107,51 @@ public:
     FrameCallback beforePresent;
     FrameCallback afterPresent;
 
-    // IGpuFrameDriver — invoked by GpuDevice during swap-chain resize.
+    using EventHandler = std::function<void(Event&)>;
+    void setEventHandler(EventHandler handler) { m_eventHandler = std::move(handler); }
+
+    using DisplayScaleHandler = std::function<void(float, float)>;
+    void setDisplayScaleHandler(DisplayScaleHandler handler) { m_displayScaleHandler = std::move(handler); }
+
+    // IGpuFrameDriver
     void notifyBackBufferResizing() override;
     void notifyBackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount) override;
     void waitForRenderThreadIdle() override;
 
     void notifyDisplayScaleChanged(float scaleX, float scaleY);
 
-    // --- Event system (DIVSHOT-style) ---
-
-    // Override to handle all events. Base implementation queues events; derived
-    // classes should call the base if they don't fully handle an event.
     virtual void onEvent(Event& event);
 
-    // Thread-safe event queue for deferred processing (e.g. between frame phases).
     void queueEvent(std::unique_ptr<Event> event);
     void processEventQueue();
 
 protected:
-    virtual void onBeginFrame(GpuDevice& gpuDevice) {}
+    virtual void onBeginFrame(GpuDevice& gpuDevice);
     virtual void onBeforeAnimate(GpuDevice& gpuDevice, uint32_t frameIndex) {}
-    virtual bool skipRenderPhase() const { return false; }
+    virtual bool skipRenderPhase() const;
 
     void bindFrameDriver(GpuDevice* dm);
     void unbindFrameDriver(GpuDevice* dm);
 
-    virtual void onUpdate(float elapsedTimeSeconds, bool windowFocused) {}
-    virtual void onPrepareRenderScene(GpuDevice& gpuDevice) {}
-    virtual void onRender() {}
-    virtual void onBackBufferResizing() {}
-    virtual void onBackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount) {}
-    virtual void onDisplayScaleChanged(float scaleX, float scaleY) {}
-    virtual bool shouldRenderWhenUnfocused() const { return false; }
+    virtual void onUpdate(float elapsedTimeSeconds, bool windowFocused);
+    virtual void onPrepareRenderScene(GpuDevice& gpuDevice);
+    virtual void onRender();
+    virtual void onBackBufferResizing();
+    virtual void onBackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount);
+    virtual void onDisplayScaleChanged(float scaleX, float scaleY);
+    virtual bool shouldRenderWhenUnfocused() const;
 
-    // Called by the window event callback; wires GlfwWindow → Application.
     void onWindowEvent(Event& event);
     void installWindowEventCallback();
 
+    Engine m_engine;
+
     std::unique_ptr<GpuDevice> m_GpuDevice;
-    std::unique_ptr<Window>    m_Window;
+    std::unique_ptr<Window> m_Window;
 
     bool m_shutdownCalled = false;
+    bool m_pluginsBuilt = false;
+    bool m_engineInitialized = false;
 
 private:
     void syncWindowState();
@@ -126,15 +162,22 @@ private:
 
     bool executeRenderPhase(GpuDevice* gpuDevice, double elapsedTime, double curTime, uint32_t frameIndex);
     void finishFrameWithRenderFailure(GpuDevice* gpuDevice, double elapsedTime, double curTime);
+    void shutdownEngine();
 
     GpuDevice* device() const;
-    Window*    window() const;
+    Window* window() const;
 
     GpuDevice* m_ExternalGpuDevice = nullptr;
-    Window*    m_ExternalWindow    = nullptr;
+    Window* m_ExternalWindow = nullptr;
 
     std::mutex m_EventQueueMutex;
     std::vector<std::unique_ptr<Event>> m_EventQueue;
+
+    std::vector<Plugin*> m_pluginRefs;
+    std::vector<std::unique_ptr<Plugin>> m_ownedPlugins;
+
+    EventHandler m_eventHandler;
+    DisplayScaleHandler m_displayScaleHandler;
 
     RenderThread m_renderThread;
     bool m_useDedicatedRenderThread = true;

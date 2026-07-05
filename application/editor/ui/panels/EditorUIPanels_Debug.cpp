@@ -1,7 +1,7 @@
 #include "ui/EditorUIInternal.h"
 
 #include "SceneEditor.h"
-#include "EditorApplication.h"
+#include "SceneEditor.h"
 #include "common/ImGuiManager.h"
 
 #include <render/core/PathTracerSettings.h>
@@ -164,7 +164,7 @@ void EditorUI::buildDeltaTreeViz()
     for (int i = 0; i < nodeCount; i++)
     {
         UITreeNode & node = treeNodes[i];
-        node.Init(deltaPathTreeVertices[i], m_app, nodeSize, nodePadding, topLeft);
+        node.Init(deltaPathTreeVertices[i], m_sceneEditor, nodeSize, nodePadding, topLeft);
         assert(node.vertexIndex < nodeLevels.size());
         nodeLevels[node.vertexIndex].push_back(&node);
         longestLevelCount = std::max(longestLevelCount, (int)nodeLevels[node.vertexIndex].size());

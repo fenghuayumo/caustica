@@ -1,6 +1,6 @@
 #include <engine/Engine.h>
 
-#include <engine/Application.h>
+#include <engine/App.h>
 #include <backend/GpuDevice.h>
 
 namespace caustica
@@ -85,14 +85,14 @@ bool Engine::shouldRenderWhenUnfocused() const
     return m_subsystems.shouldRenderWhenUnfocused();
 }
 
-void Engine::syncSwapChain(GpuDevice& gpuDevice, Application& frameDriver)
+void Engine::syncSwapChain(GpuDevice& gpuDevice, App& app)
 {
     if (!gpuDevice.GetDevice())
         return;
 
     const BackBufferInfo backBuffer = gpuDevice.GetBackBufferInfo();
-    frameDriver.notifyBackBufferResizing();
-    frameDriver.notifyBackBufferResized(backBuffer.width, backBuffer.height, backBuffer.sampleCount);
+    app.notifyBackBufferResizing();
+    app.notifyBackBufferResized(backBuffer.width, backBuffer.height, backBuffer.sampleCount);
 }
 
 } // namespace caustica

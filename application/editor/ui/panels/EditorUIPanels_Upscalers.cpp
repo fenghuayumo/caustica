@@ -1,7 +1,6 @@
 #include "ui/EditorUIInternal.h"
 
 #include "SceneEditor.h"
-#include "EditorApplication.h"
 #include "common/ImGuiManager.h"
 
 #include <render/core/PathTracerSettings.h>

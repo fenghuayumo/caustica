@@ -1,12 +1,10 @@
-#include "engine/EntryPoint.h"
-#include "engine/Application.h"
+#include <engine/EntryPoint.h>
+#include <engine/App.h>
 
 #include <assets/loader/TextureLoader.h>
 #include <assets/AssetSystem.h>
 #include <core/JobSystem.h>
 #include <platform/engine/os.h>
-
-#include <memory>
 
 #ifdef _WIN32
 #include <objbase.h>
@@ -17,7 +15,7 @@ namespace caustica
 
 namespace
 {
-    ApplicationHook s_preGpuInit = nullptr;
+AppHook s_preGpuInit = nullptr;
 }
 
 void InvokePreGpuDeviceInitHook()
@@ -26,9 +24,7 @@ void InvokePreGpuDeviceInitHook()
         s_preGpuInit();
 }
 
-int runApplication(int argc, const char* const* argv,
-    ApplicationHook preGpuInit,
-    ApplicationHook postInit)
+int runApp(App& app, const std::function<bool(App&)>& startup, AppHook preGpuInit)
 {
     s_preGpuInit = preGpuInit;
 
@@ -40,35 +36,29 @@ int runApplication(int argc, const char* const* argv,
     OS::initialize();
     JobSystem::Initialize();
 
-    std::unique_ptr<Application> app(createApplication());
-    if (!app)
+    if (!startup || !startup(app))
     {
         s_preGpuInit = nullptr;
         JobSystem::Shutdown();
 #ifdef _WIN32
-        if (comNeedsUninit) CoUninitialize();
+        if (comNeedsUninit)
+            CoUninitialize();
 #endif
         return 1;
     }
 
-    const bool started = app->init(argc, argv);
-
     s_preGpuInit = nullptr;
 
-    if (postInit)
-        postInit();
+    app.run();
 
-    if (started)
-        app->run();
-
-    app->shutdown();
     AssetSystem::Shutdown();
     JobSystem::Shutdown();
 
 #ifdef _WIN32
-    if (comNeedsUninit) CoUninitialize();
+    if (comNeedsUninit)
+        CoUninitialize();
 #endif
-    return started ? 0 : 1;
+    return 0;
 }
 
 } // namespace caustica

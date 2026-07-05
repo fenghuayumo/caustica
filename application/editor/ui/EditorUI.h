@@ -39,12 +39,12 @@ namespace caustica::editor
 
 class SceneEditor;
 class ImGuiManager;
-class EditorApplication;
+class SceneEditor;
 
 class EditorUI : public caustica::ImGui_Renderer
 {
 public:
-    EditorUI(caustica::GpuDevice* deviceManager, EditorApplication& editor, EditorUIData& ui, bool NVAPI_SERSupported, const CommandLineOptions& cmdLine);
+    EditorUI(caustica::GpuDevice* deviceManager, SceneEditor& sceneEditor, EditorUIData& ui, bool NVAPI_SERSupported, const CommandLineOptions& cmdLine);
     virtual ~EditorUI();
 protected:
     virtual void buildUI(void) override;
@@ -105,7 +105,6 @@ private:
     void BuildGameStandalonePanel(const PanelLayout& layout);
 
 private:
-    EditorApplication& m_app;
     SceneEditor& m_sceneEditor;
 
     int                         m_currentFontScaleIndex = -1;

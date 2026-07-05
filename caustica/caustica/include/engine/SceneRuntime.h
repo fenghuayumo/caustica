@@ -41,7 +41,7 @@ namespace render
 class RenderDevice;
 }
 
-class Application;
+class App;
 class DescriptorTableManager;
 class GpuRenderSubsystem;
 class FirstPersonCamera;
@@ -75,7 +75,7 @@ public:
     virtual ~SceneRuntime();
 
     void setGpuDevice(GpuDevice& gpuDevice) { m_gpuDevice = &gpuDevice; }
-    void setApplication(Application* application) { m_application = application; }
+    void setApp(App* app) { m_app = app; }
 
     std::shared_ptr<ShaderFactory> GetShaderFactory() const { return m_shaderFactory; }
     [[nodiscard]] caustica::render::RenderDevice* GetRenderDevice() const;
@@ -219,7 +219,7 @@ protected:
     render::RenderRuntimeState& m_renderState;
     render::SessionDiagnostics& m_sessionDiagnostics;
 
-    Application* m_application = nullptr;
+    App* m_app = nullptr;
     GpuRenderSubsystem* m_gpuRenderSubsystem = nullptr;
 
     SceneCameraController m_cameraController;

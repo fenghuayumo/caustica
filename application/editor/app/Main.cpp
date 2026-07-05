@@ -1,8 +1,12 @@
+#include <engine/App.h>
 #include <engine/EntryPoint.h>
-#include "EditorApplication.h"
+
+#include "EditorLaunch.h"
+#include "EditorSession.h"
 
 #include <core/JobSystem.h>
 #include <platform/engine/os.h>
+#include <render/passes/debug/Korgi.h>
 
 #include <cstring>
 
@@ -10,22 +14,12 @@
 #include <engine/SplashScreen.h>
 #endif
 
-namespace caustica
-{
-
-Application* createApplication()
-{
-    return new caustica::editor::EditorApplication();
-}
-
-} // namespace caustica
-
 namespace
 {
 
 bool WantsHeadlessStartup(int argc, const char* const* argv)
 {
-    for (int i = 1; i < argc; i++)
+    for (int i = 1; i < argc; ++i)
     {
         if (std::strcmp(argv[i], "--noWindow") == 0 || std::strcmp(argv[i], "--nonInteractive") == 0)
             return true;
@@ -34,16 +28,12 @@ bool WantsHeadlessStartup(int argc, const char* const* argv)
 }
 
 #ifdef _WIN32
-SplashScreen* g_activeSplash = nullptr;
-
 void StopSplashBeforeGpuInit()
 {
-    if (g_activeSplash)
-    {
-        g_activeSplash->Stop();
-        g_activeSplash = nullptr;
-    }
+    // Splash screen lifetime is managed in WinMain.
 }
+
+SplashScreen* g_activeSplash = nullptr;
 #endif
 
 } // namespace
@@ -65,10 +55,34 @@ int main(int argc, char** argv)
         g_activeSplash = &splashScreen;
     }
 
-    const int exitCode = caustica::runApplication(__argc, (const char**)__argv, StopSplashBeforeGpuInit);
+    auto stopSplash = []() {
+        if (g_activeSplash)
+        {
+            g_activeSplash->Stop();
+            g_activeSplash = nullptr;
+        }
+    };
+
+    caustica::editor::EditorSession session;
+    caustica::App app;
+
+    const int exitCode = caustica::runApp(
+        app,
+        [&](caustica::App& targetApp) {
+            return caustica::editor::startupEditor(targetApp, session, __argc, (const char**)__argv);
+        },
+        stopSplash);
 #else
-    const int exitCode = caustica::runApplication(argc, const_cast<const char* const*>(argv));
+    caustica::editor::EditorSession session;
+    caustica::App app;
+
+    const int exitCode = caustica::runApp(
+        app,
+        [&](caustica::App& targetApp) {
+            return caustica::editor::startupEditor(targetApp, session, argc, const_cast<const char* const*>(argv));
+        });
 #endif
 
+    korgi::Shutdown();
     return exitCode;
 }

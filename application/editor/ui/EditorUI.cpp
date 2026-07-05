@@ -1,7 +1,6 @@
 #include "ui/EditorUIInternal.h"
 
 #include "SceneEditor.h"
-#include "EditorApplication.h"
 #include "common/ImGuiManager.h"
 
 #include <render/SceneLightingPasses.h>
@@ -28,10 +27,9 @@ void InitializeEditorUIDataFromCommandLine(EditorUIData& ui, const CommandLineOp
     caustica::render::InitializeRenderSessionStateFromCommandLine(ui.session, cmdLine);
 }
 
-EditorUI::EditorUI(GpuDevice* deviceManager, EditorApplication& editor, EditorUIData& ui, bool NVAPI_SERSupported, const CommandLineOptions& cmdLine)
+EditorUI::EditorUI(GpuDevice* deviceManager, SceneEditor& sceneEditor, EditorUIData& ui, bool NVAPI_SERSupported, const CommandLineOptions& cmdLine)
         : ImGui_Renderer(deviceManager)
-        , m_app(editor)
-        , m_sceneEditor(editor.GetSceneEditor())
+        , m_sceneEditor(sceneEditor)
         , m_ui(ui)
         , m_settings(ui.session.settings)
         , m_runtime(ui.session.runtime)

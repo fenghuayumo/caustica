@@ -1,25 +1,15 @@
 #pragma once
 
-// =============================================================================
-// EntryPoint — Platform entry helpers (DIVSHOT-style).
-//
-// Application executables implement createApplication() and call runApplication()
-// from their platform entry (WinMain / main).  Splash screens and other
-// app-specific pre/post hooks stay in the application layer.
-// =============================================================================
+#include <functional>
 
 namespace caustica
 {
 
-class Application;
+class App;
 
-Application* createApplication();
+using AppHook = void (*)();
 
-using ApplicationHook = void (*)();
-
-int runApplication(int argc, const char* const* argv,
-    ApplicationHook preGpuInit = nullptr,
-    ApplicationHook postInit = nullptr);
+int runApp(App& app, const std::function<bool(App&)>& startup, AppHook preGpuInit = nullptr);
 
 void InvokePreGpuDeviceInitHook();
 

@@ -330,10 +330,4 @@ NB_MODULE(caustica, m)
     m.attr("MODE") = "extension";
 }
 
-// caustica_py links causEngine (EntryPoint) but not the editor executable entry.
-namespace caustica
-{
-Application* createApplication() { return nullptr; }
-}
-
 #endif // CAUSTICA_WITH_PYTHON

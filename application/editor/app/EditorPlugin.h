@@ -1,8 +1,9 @@
 #pragma once
 
-#include <engine/EngineBuilder.h>
+#include <engine/App.h>
 #include <engine/GpuRenderSubsystem.h>
-#include <engine/IEnginePlugin.h>
+#include <engine/Plugin.h>
+#include <engine/SceneRuntimeSubsystem.h>
 
 #include "EditorSceneSubsystem.h"
 #include "EditorUISubsystem.h"
@@ -10,10 +11,7 @@
 namespace caustica::editor
 {
 
-// Editor stack: GpuRenderSubsystem + EditorSceneSubsystem (+ optional UI).
-//
-// sceneConfig.sceneRuntime must be a SceneEditor (or derived) instance.
-struct EditorPlugin : IEnginePlugin
+struct EditorPlugin : Plugin
 {
     EditorPlugin(SceneRuntimeSubsystemConfig sceneConfig,
         const EditorUISubsystemConfig* uiConfig = nullptr)
@@ -22,16 +20,15 @@ struct EditorPlugin : IEnginePlugin
     {
     }
 
-    void build(EngineBuilder& builder) override
+    void build(App& app) override
     {
-        builder.emplaceSubsystem<GpuRenderSubsystem>();
-
-        builder.emplaceSubsystem<EditorSceneSubsystem>(EditorSceneSubsystemConfig{
+        app.emplaceSubsystem<GpuRenderSubsystem>();
+        app.emplaceSubsystem<EditorSceneSubsystem>(EditorSceneSubsystemConfig{
             .runtime = sceneConfig,
         });
 
         if (uiConfig)
-            builder.emplaceSubsystem<EditorUISubsystem>(*uiConfig);
+            app.emplaceSubsystem<EditorUISubsystem>(*uiConfig);
     }
 
     SceneRuntimeSubsystemConfig sceneConfig;

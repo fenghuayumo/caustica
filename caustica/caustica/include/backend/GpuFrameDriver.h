@@ -6,7 +6,7 @@ namespace caustica
 {
 
 // Callback surface for GpuDevice swap-chain / back-buffer lifecycle events.
-// Implemented by engine::Application (or any other frame owner); keeps backend
+// Implemented by engine::App (frame owner); keeps backend
 // independent of the engine layer.
 class IGpuFrameDriver
 {
