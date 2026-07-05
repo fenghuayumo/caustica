@@ -1,4 +1,5 @@
 #include <render/ecs/RenderSystems.h>
+#include <render/ecs/RenderWorldResources.h>
 #include <render/worldRenderer/WorldRenderer.h>
 
 namespace caustica::render
@@ -7,6 +8,15 @@ namespace caustica::render
 void FrameSetupSystem(WorldRenderer& renderer, RenderFrameContext& ctx)
 {
     renderer.framePassSetup(ctx.frame);
+}
+
+void ExtractFrameViewSystem(ecs::World& world, const ecs::ScheduleContext& /*scheduleContext*/)
+{
+    RenderFrameResource* frame = world.getResource<RenderFrameResource>();
+    if (!frame || !frame->renderer || !frame->context || frame->context->frame.aborted)
+        return;
+
+    frame->renderer->extractFrameView(world);
 }
 
 void EnsureRenderTargetsSystem(WorldRenderer& renderer, RenderFrameContext& ctx)
@@ -49,14 +59,22 @@ void DenoiseAndAASystem(WorldRenderer& renderer, RenderFrameContext& ctx)
     renderer.framePassDenoiseAndAA(ctx.frame);
 }
 
-void BuildPostProcessGraphSystem(WorldRenderer& renderer, RenderFrameContext& ctx)
+void BuildPostProcessGraphSystem(WorldRenderer& renderer, RenderFrameContext& ctx, ecs::World& world)
 {
-    renderer.buildPostProcessGraphPasses(ctx);
+    const ExtractedFrameView* extractedView = world.getResource<ExtractedFrameView>();
+    if (!extractedView)
+        return;
+
+    renderer.buildPostProcessGraphPasses(ctx, *extractedView);
 }
 
-void BuildCompositeGraphSystem(WorldRenderer& renderer, RenderFrameContext& ctx)
+void BuildCompositeGraphSystem(WorldRenderer& renderer, RenderFrameContext& ctx, ecs::World& world)
 {
-    renderer.buildCompositeGraphPasses(ctx);
+    const ExtractedFrameView* extractedView = world.getResource<ExtractedFrameView>();
+    if (!extractedView)
+        return;
+
+    renderer.buildCompositeGraphPasses(ctx, *extractedView);
 }
 
 void ExecuteRenderGraphSystem(WorldRenderer& renderer, RenderFrameContext& ctx)

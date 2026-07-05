@@ -17,6 +17,7 @@ void registerFinalBlitPass(
     assert(targetColor);
 
     const TextureHandle targetColorHandle = graph.importTexture(targetColor, TextureAccess::RenderTarget);
+    graph.extractTexture(targetColorHandle, TextureAccess::RenderTarget);
 
     graph.addPass(
         "Blit",
@@ -29,7 +30,8 @@ void registerFinalBlitPass(
             blitParams.targetFramebuffer = params.targetFramebuffer;
             blitParams.sourceTexture = ctx.texture(params.sourceLdrColor);
             blitPass.blitTexture(ctx.commandList(), blitParams, nullptr);
-        });
+        },
+        PassOptions{ .sideEffect = true });
 }
 
 } // namespace caustica::rg

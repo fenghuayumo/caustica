@@ -2,7 +2,6 @@
 
 #include <render/worldRenderer/PathTracingFrameContext.h>
 #include <render/graph/GraphBuilder.h>
-#include <scene/View.h>
 
 namespace caustica::render
 {
@@ -14,10 +13,6 @@ struct RenderFrameContext
     PathTracingFrameContext frame{};
 
     rg::GraphBuilder* graph = nullptr;
-
-    // Post-process graph passes capture ICompositeView by reference; keep storage
-    // alive until executeFrameRenderGraph() finishes.
-    caustica::PlanarView postProcessCompositeView;
 
     bool graphBuilt = false;
     bool commandListWasClosed = false;

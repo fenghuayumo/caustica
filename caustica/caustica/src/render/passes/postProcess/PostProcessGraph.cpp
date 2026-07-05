@@ -51,7 +51,7 @@ namespace
                 ctx.commandList()->dispatchRays(args);
                 (void)ctx.texture(processedOutputColor);
             },
-            enabled);
+            PassOptions{ .enabled = enabled });
     }
 
     void registerEdgeDetectionPasses(
@@ -74,7 +74,7 @@ namespace
                     ctx.texture(ldrColor),
                     nvrhi::TextureSlice());
             },
-            enabled);
+            PassOptions{ .enabled = enabled });
 
         graph.addPass(
             "PPEdgeDetection",
@@ -99,7 +99,7 @@ namespace
                 ctx.commandList()->setPushConstants(&miniConstants, sizeof(miniConstants));
                 ctx.commandList()->dispatchRays(args);
             },
-            enabled);
+            PassOptions{ .enabled = enabled });
     }
 }
 
@@ -121,6 +121,9 @@ void buildPostProcessGraph(const PostProcessGraphParams& params)
     const TextureHandle ldrColorScratch = graph.importTexture(
         params.renderTargets->ldrColorScratch,
         nvrhi::ResourceStates::Common);
+    graph.extractTexture(processedOutputColor, TextureAccess::UnorderedAccess);
+    graph.extractTexture(ldrColor, TextureAccess::ShaderResource);
+    graph.extractTexture(ldrColorScratch, TextureAccess::ShaderResource);
 
     if (params.bloomPass != nullptr)
     {

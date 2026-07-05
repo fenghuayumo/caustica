@@ -372,5 +372,5 @@ void BloomPass::registerGraphPass(
                 sigmaInPixels,
                 blendFactor);
         },
-        enabled);
+        caustica::rg::PassOptions{ .enabled = enabled });
 }

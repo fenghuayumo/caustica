@@ -1,5 +1,6 @@
 #include <render/ecs/RenderScheduleSetup.h>
 #include <render/ecs/RenderSystems.h>
+#include <render/ecs/RenderWorldResources.h>
 #include <render/FramePassRegistry.h>
 #include <render/worldRenderer/WorldRenderer.h>
 
@@ -8,34 +9,33 @@ namespace caustica::render
 
 namespace
 {
-    void addPrepareSystem(
+    void addRendererSystem(
         ecs::Schedule& schedule,
-        WorldRenderer& renderer,
+        const char* setName,
         const char* name,
         RenderPrepareSystemFn fn)
     {
-        schedule.addSystem("Prepare", name,
-            [&renderer, fn](ecs::World& /*world*/, const ecs::ScheduleContext& /*ctx*/) {
-                RenderFrameContext* frameCtx = renderer.activeRenderFrameContext();
-                if (!frameCtx || frameCtx->frame.aborted)
+        schedule.addSystem(setName, name,
+            [fn](ecs::World& world, const ecs::ScheduleContext& /*ctx*/) {
+                RenderFrameResource* frame = world.getResource<RenderFrameResource>();
+                if (!frame || !frame->renderer || !frame->context || frame->context->frame.aborted)
                     return;
-                fn(renderer, *frameCtx);
+                fn(*frame->renderer, *frame->context);
             });
     }
 
     void addGraphSystem(
         ecs::Schedule& schedule,
-        WorldRenderer& renderer,
         const char* name,
         RenderGraphSystemFn fn)
     {
         schedule.addSystem("BuildGraph", name,
-            [&renderer, fn](ecs::World& /*world*/, const ecs::ScheduleContext& /*ctx*/) {
-                RenderFrameContext* frameCtx = renderer.activeRenderFrameContext();
-                if (!frameCtx || frameCtx->frame.aborted)
+            [fn](ecs::World& world, const ecs::ScheduleContext& /*ctx*/) {
+                RenderFrameResource* frame = world.getResource<RenderFrameResource>();
+                if (!frame || !frame->renderer || !frame->context || frame->context->frame.aborted)
                     return;
-                fn(renderer, *frameCtx);
-                frameCtx->graphBuilt = true;
+                fn(*frame->renderer, *frame->context, world);
+                frame->context->graphBuilt = true;
             });
     }
 }
@@ -46,37 +46,42 @@ void buildDefaultRenderSchedule(
     FramePassRegistry* framePassRegistry)
 {
     schedule
+        .addSet("Extract")
         .addSet("Prepare")
+        .addSet("Queue")
         .addSet("BuildGraph")
         .addSet("ExecuteGraph")
         .addSet("Cleanup");
 
-    addPrepareSystem(schedule, renderer, "FrameSetup", FrameSetupSystem);
-    addPrepareSystem(schedule, renderer, "EnsureRenderTargets", EnsureRenderTargetsSystem);
-    addPrepareSystem(schedule, renderer, "RendererInit", RendererInitSystem);
-    addPrepareSystem(schedule, renderer, "ShaderUpdate", ShaderUpdateSystem);
-    addPrepareSystem(schedule, renderer, "BeginCommandList", BeginCommandListSystem);
-    addPrepareSystem(schedule, renderer, "SceneUpdate", SceneUpdateSystem);
-    addPrepareSystem(schedule, renderer, "PathTracePrepare", PathTracePrepareSystem);
-    addPrepareSystem(schedule, renderer, "PathTrace", PathTraceSystem);
-    addPrepareSystem(schedule, renderer, "DenoiseAndAA", DenoiseAndAASystem);
+    addRendererSystem(schedule, "Extract", "FrameSetup", FrameSetupSystem);
+    schedule.addSystem("Extract", "ExtractFrameView", ExtractFrameViewSystem);
+    addRendererSystem(schedule, "Prepare", "EnsureRenderTargets", EnsureRenderTargetsSystem);
+    addRendererSystem(schedule, "Prepare", "RendererInit", RendererInitSystem);
+    addRendererSystem(schedule, "Prepare", "ShaderUpdate", ShaderUpdateSystem);
+    addRendererSystem(schedule, "Prepare", "BeginCommandList", BeginCommandListSystem);
+    addRendererSystem(schedule, "Prepare", "SceneUpdate", SceneUpdateSystem);
+    addRendererSystem(schedule, "Prepare", "PathTracePrepare", PathTracePrepareSystem);
+    addRendererSystem(schedule, "Prepare", "PathTrace", PathTraceSystem);
+    addRendererSystem(schedule, "Prepare", "DenoiseAndAA", DenoiseAndAASystem);
 
-    addGraphSystem(schedule, renderer, "BuildPostProcessGraph", BuildPostProcessGraphSystem);
-    addGraphSystem(schedule, renderer, "BuildCompositeGraph", BuildCompositeGraphSystem);
+    addGraphSystem(schedule, "BuildPostProcessGraph", BuildPostProcessGraphSystem);
+    addGraphSystem(schedule, "BuildCompositeGraph", BuildCompositeGraphSystem);
 
     schedule.addSystem("ExecuteGraph", "ExecuteRenderGraph",
-        [&renderer](ecs::World& /*world*/, const ecs::ScheduleContext& /*ctx*/) {
-            RenderFrameContext* frameCtx = renderer.activeRenderFrameContext();
-            if (!frameCtx || frameCtx->frame.aborted)
+        [](ecs::World& world, const ecs::ScheduleContext& /*ctx*/) {
+            RenderFrameResource* frame = world.getResource<RenderFrameResource>();
+            if (!frame || !frame->renderer || !frame->context || frame->context->frame.aborted)
                 return;
-            ExecuteRenderGraphSystem(renderer, *frameCtx);
+            ExecuteRenderGraphSystem(*frame->renderer, *frame->context);
         });
 
-    addPrepareSystem(schedule, renderer, "DebugLines", DebugLinesSystem);
-    addPrepareSystem(schedule, renderer, "Finalize", FinalizeSystem);
+    addRendererSystem(schedule, "Cleanup", "DebugLines", DebugLinesSystem);
+    addRendererSystem(schedule, "Cleanup", "Finalize", FinalizeSystem);
 
     schedule
         .before("FrameSetup", "EnsureRenderTargets")
+        .before("FrameSetup", "ExtractFrameView")
+        .before("ExtractFrameView", "EnsureRenderTargets")
         .before("EnsureRenderTargets", "RendererInit")
         .before("RendererInit", "ShaderUpdate")
         .before("ShaderUpdate", "BeginCommandList")

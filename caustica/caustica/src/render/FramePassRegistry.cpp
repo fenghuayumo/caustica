@@ -1,5 +1,6 @@
 #include <render/FramePassRegistry.h>
 #include <render/ecs/RenderFrameContext.h>
+#include <render/ecs/RenderWorldResources.h>
 #include <render/graph/GraphBuilder.h>
 #include <render/worldRenderer/WorldRenderer.h>
 
@@ -120,11 +121,11 @@ void FramePassRegistry::applyToRenderSchedule(ecs::Schedule& schedule, WorldRend
 
         const char* anchorName = renderScheduleAnchorName(reg.insertAfter);
         schedule.addSystem("Prepare", reg.name,
-            [&renderer, rawPass](ecs::World& /*world*/, const ecs::ScheduleContext& /*ctx*/) {
-                RenderFrameContext* frameCtx = renderer.activeRenderFrameContext();
-                if (!frameCtx || frameCtx->frame.aborted || rawPass == nullptr)
+            [rawPass](ecs::World& world, const ecs::ScheduleContext& /*ctx*/) {
+                RenderFrameResource* frame = world.getResource<RenderFrameResource>();
+                if (!frame || !frame->context || frame->context->frame.aborted || rawPass == nullptr)
                     return;
-                rawPass->execute(frameCtx->frame);
+                rawPass->execute(frame->context->frame);
             });
         schedule.after(reg.name, anchorName);
     }

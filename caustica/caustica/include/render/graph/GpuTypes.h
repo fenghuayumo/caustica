@@ -47,6 +47,13 @@ struct BufferDesc
     bool isConstantBuffer = false;
     bool isStructuredBuffer = false;
     uint32_t structuredStride = 0;
+    bool isUAV = false;
+    bool isVertexBuffer = false;
+    bool isIndexBuffer = false;
+    bool isDrawIndirectArgs = false;
+    bool canHaveRawViews = false;
+    bool canHaveTypedViews = false;
+    Format format = Format::Unknown;
 };
 
 struct TextureHandle

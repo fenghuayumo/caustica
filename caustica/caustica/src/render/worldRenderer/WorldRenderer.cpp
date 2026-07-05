@@ -1,6 +1,7 @@
 namespace { constexpr int c_SwapchainCount = 3; }
 
 #include <render/worldRenderer/WorldRenderer.h>
+#include <render/ecs/RenderWorldResources.h>
 #include <render/SceneGpuResources.h>
 #include <render/worldRenderer/PathTracingContext.h>
 #include <render/core/RenderDevice.h>
@@ -1146,7 +1147,10 @@ void caustica::render::WorldRenderer::render(nvrhi::IFramebuffer* framebuffer)
     m_renderFrameCtx.frame.displaySize = m_displaySize;
     m_renderFrameCtx.frame.renderSize = m_renderSize;
     m_renderFrameCtx.graph = &m_frameGraph;
-    m_activeRenderCtx = &m_renderFrameCtx;
+    setRenderWorldResource(m_renderScheduleWorld, RenderFrameResource{
+        .renderer = this,
+        .context = &m_renderFrameCtx,
+    });
 
     const uint32_t renderPhaseFrameIndex = m_context.gpuDevice.GetRenderPhaseFrameIndex();
     std::shared_ptr<Scene> scene = m_context.sceneManager.getScene();
@@ -1159,8 +1163,6 @@ void caustica::render::WorldRenderer::render(nvrhi::IFramebuffer* framebuffer)
 
     if (scene)
         scene->endGpuReadFrame();
-
-    m_activeRenderCtx = nullptr;
 
     if (m_renderFrameCtx.frame.aborted)
         postUpdatePathTracing();

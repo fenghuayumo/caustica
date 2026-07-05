@@ -55,6 +55,7 @@ namespace render
 class TemporalAntiAliasingPass;
 class BloomPass;
 class DLSS;
+struct ExtractedFrameView;
 
 // =============================================================================
 // WorldRenderer — GPU path-tracing pipeline driven by PathTracingContext.
@@ -137,15 +138,15 @@ public:
 
     void denoisedScreenshot(nvrhi::ITexture* framebufferTexture) const;
 
-    void buildPostProcessGraphPasses(RenderFrameContext& ctx);
-    void buildCompositeGraphPasses(RenderFrameContext& ctx);
+    void buildPostProcessGraphPasses(RenderFrameContext& ctx, const ExtractedFrameView& extractedView);
+    void buildCompositeGraphPasses(RenderFrameContext& ctx, const ExtractedFrameView& extractedView);
     void executeFrameRenderGraph(RenderFrameContext& ctx);
 
     void storeFramePassRegistryPass(std::unique_ptr<IPathTracingFramePass> pass);
-    [[nodiscard]] RenderFrameContext* activeRenderFrameContext() { return m_activeRenderCtx; }
 
 private:
     friend void FrameSetupSystem(WorldRenderer&, RenderFrameContext&);
+    friend void ExtractFrameViewSystem(ecs::World&, const ecs::ScheduleContext&);
     friend void EnsureRenderTargetsSystem(WorldRenderer&, RenderFrameContext&);
     friend void RendererInitSystem(WorldRenderer&, RenderFrameContext&);
     friend void ShaderUpdateSystem(WorldRenderer&, RenderFrameContext&);
@@ -154,8 +155,8 @@ private:
     friend void PathTracePrepareSystem(WorldRenderer&, RenderFrameContext&);
     friend void PathTraceSystem(WorldRenderer&, RenderFrameContext&);
     friend void DenoiseAndAASystem(WorldRenderer&, RenderFrameContext&);
-    friend void BuildPostProcessGraphSystem(WorldRenderer&, RenderFrameContext&);
-    friend void BuildCompositeGraphSystem(WorldRenderer&, RenderFrameContext&);
+    friend void BuildPostProcessGraphSystem(WorldRenderer&, RenderFrameContext&, ecs::World&);
+    friend void BuildCompositeGraphSystem(WorldRenderer&, RenderFrameContext&, ecs::World&);
     friend void ExecuteRenderGraphSystem(WorldRenderer&, RenderFrameContext&);
     friend void DebugLinesSystem(WorldRenderer&, RenderFrameContext&);
     friend void FinalizeSystem(WorldRenderer&, RenderFrameContext&);
@@ -167,6 +168,7 @@ private:
     [[nodiscard]] dm::float2 computeCameraJitter() const;
 
     void ensureRenderScheduleBuilt();
+    void extractFrameView(ecs::World& renderWorld);
     void framePassSetup(PathTracingFrameContext& ctx);
     void framePassEnsureRenderTargets(PathTracingFrameContext& ctx);
     void framePassRendererInit(PathTracingFrameContext& ctx);
@@ -202,7 +204,6 @@ private:
     ecs::World                   m_renderScheduleWorld;
     rg::GraphBuilder             m_frameGraph;
     RenderFrameContext           m_renderFrameCtx{};
-    RenderFrameContext*          m_activeRenderCtx = nullptr;
     bool                         m_renderScheduleBuilt = false;
     std::vector<std::unique_ptr<IPathTracingFramePass>> m_framePassRegistryStorage;
 

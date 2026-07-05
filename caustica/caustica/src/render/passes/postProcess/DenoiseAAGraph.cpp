@@ -32,6 +32,8 @@ void buildDenoiseAndAAGraph(const DenoiseAAGraphParams& params)
         const TextureHandle outputColor = graph.importTexture(
             params.renderTargets->outputColor,
             TextureAccess::CopyDest);
+        graph.extractTexture(processedOutput, TextureAccess::UnorderedAccess);
+        graph.extractTexture(outputColor, TextureAccess::UnorderedAccess);
 
         graph.addPass(
             "CopyProcessedToOutput",

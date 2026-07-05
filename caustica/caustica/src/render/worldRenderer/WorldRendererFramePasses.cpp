@@ -5,6 +5,7 @@ namespace { constexpr int c_SwapchainCount = 3; }
 #include <render/passes/composite/BlitGraphPass.h>
 #include <render/worldRenderer/PathTracingFrameContext.h>
 #include <render/ecs/RenderScheduleSetup.h>
+#include <render/ecs/RenderWorldResources.h>
 #include <render/FramePassRegistry.h>
 #include <render/SceneGpuResources.h>
 #include <render/SceneGaussianSplatPasses.h>
@@ -99,7 +100,24 @@ void caustica::render::WorldRenderer::storeFramePassRegistryPass(std::unique_ptr
         m_framePassRegistryStorage.push_back(std::move(pass));
 }
 
-void caustica::render::WorldRenderer::buildPostProcessGraphPasses(RenderFrameContext& ctx)
+void caustica::render::WorldRenderer::extractFrameView(ecs::World& renderWorld)
+{
+    ExtractedFrameView extracted{};
+    extracted.displaySize = m_displaySize;
+    extracted.renderSize = m_renderSize;
+    extracted.displayAspectRatio = m_displayAspectRatio;
+
+    extracted.postProcessView = *m_context.camera.view();
+    nvrhi::Viewport windowViewport(float(m_displaySize.x), float(m_displaySize.y));
+    extracted.postProcessView.setViewport(windowViewport);
+    extracted.postProcessView.updateCache();
+
+    setRenderWorldResource(renderWorld, std::move(extracted));
+}
+
+void caustica::render::WorldRenderer::buildPostProcessGraphPasses(
+    RenderFrameContext& ctx,
+    const ExtractedFrameView& extractedView)
 {
     assert(ctx.graph != nullptr);
 
@@ -109,11 +127,6 @@ void caustica::render::WorldRenderer::buildPostProcessGraphPasses(RenderFrameCon
 
     ctx.commandListWasClosed = false;
 
-    ctx.postProcessCompositeView = *m_context.camera.view();
-    nvrhi::Viewport windowViewport(float(m_displaySize.x), float(m_displaySize.y));
-    ctx.postProcessCompositeView.setViewport(windowViewport);
-    ctx.postProcessCompositeView.updateCache();
-
     rg::PostProcessGraphParams ppParams{
         .graph = graph,
         .renderTargets = m_renderTargets.get(),
@@ -121,8 +134,8 @@ void caustica::render::WorldRenderer::buildPostProcessGraphPasses(RenderFrameCon
         .camera = &m_context.camera,
         .bloomPass = m_bloomPass.get(),
         .toneMappingPass = m_toneMappingPass.get(),
-        .compositeView = &ctx.postProcessCompositeView,
-        .displaySize = m_displaySize,
+        .compositeView = &extractedView.postProcessView,
+        .displaySize = extractedView.displaySize,
         .pathTracingBindingSet = m_bindingSet,
         .descriptorTable = m_context.descriptorTable ? m_context.descriptorTable->getDescriptorTable() : nullptr,
         .testRaygenPpHdrPipeline = m_ptPipelineTestRaygenPPHDR.get(),
@@ -135,7 +148,9 @@ void caustica::render::WorldRenderer::buildPostProcessGraphPasses(RenderFrameCon
     rg::buildPostProcessGraph(ppParams);
 }
 
-void caustica::render::WorldRenderer::buildCompositeGraphPasses(RenderFrameContext& ctx)
+void caustica::render::WorldRenderer::buildCompositeGraphPasses(
+    RenderFrameContext& ctx,
+    const ExtractedFrameView& extractedView)
 {
     assert(ctx.graph != nullptr);
 
@@ -146,7 +161,7 @@ void caustica::render::WorldRenderer::buildCompositeGraphPasses(RenderFrameConte
     {
         m_shaderDebug->EndFrameAndOutput(
             m_commandList,
-            m_renderTargets->ldrFramebuffer->getFramebuffer(ctx.postProcessCompositeView),
+            m_renderTargets->ldrFramebuffer->getFramebuffer(extractedView.postProcessView),
             m_renderTargets->depth,
             fbinfo.getViewport());
     }
