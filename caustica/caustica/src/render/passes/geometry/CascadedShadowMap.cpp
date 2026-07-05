@@ -34,11 +34,11 @@ CascadedShadowMap::CascadedShadowMap(
 	desc.isUAV = isUAV;
     m_ShadowMapTexture = device->createTexture(desc);
 
-    nvrhi::Viewport cascadeViewport = nvrhi::Viewport(float(resolution), float(resolution));
+    const ViewportDesc cascadeViewportDesc{float(resolution), float(resolution)};
 
     for (int cascade = 0; cascade < numCascades; cascade++)
     {
-        std::shared_ptr<PlanarShadowMap> planarShadowMap = std::make_shared<PlanarShadowMap>(device, m_ShadowMapTexture, cascade, cascadeViewport);
+        std::shared_ptr<PlanarShadowMap> planarShadowMap = std::make_shared<PlanarShadowMap>(device, m_ShadowMapTexture, cascade, cascadeViewportDesc);
         m_Cascades.push_back(planarShadowMap);
 
         m_CompositeView.addView(planarShadowMap->getPlanarView());
@@ -48,7 +48,7 @@ CascadedShadowMap::CascadedShadowMap(
 
     for (int object = 0; object < numPerObjectShadows; object++)
     {
-        std::shared_ptr<PlanarShadowMap> planarShadowMap = std::make_shared<PlanarShadowMap>(device, m_ShadowMapTexture, numCascades + object, cascadeViewport);
+        std::shared_ptr<PlanarShadowMap> planarShadowMap = std::make_shared<PlanarShadowMap>(device, m_ShadowMapTexture, numCascades + object, cascadeViewportDesc);
         planarShadowMap->SetFalloffDistance(0.f); // disable falloff on per-object shadows: their bboxes are short by design
 
         m_PerObjectShadows.push_back(planarShadowMap);

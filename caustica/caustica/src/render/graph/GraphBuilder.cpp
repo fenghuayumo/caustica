@@ -1,7 +1,7 @@
 #include <render/graph/GraphBuilder.h>
-#include <render/graph/IRenderPass.h>
 #include <render/graph/RenderTargetPool.h>
 
+#include <algorithm>
 #include <cassert>
 #include <vector>
 
@@ -125,12 +125,6 @@ nvrhi::ResourceStates GraphBuilder::accessToState(BufferAccess access)
 void GraphBuilder::setDevice(nvrhi::IDevice* device)
 {
     m_device = device;
-}
-
-void GraphBuilder::retainRenderPass(std::unique_ptr<IRenderPass> pass)
-{
-    if (pass)
-        m_ownedPasses.push_back(std::move(pass));
 }
 
 size_t GraphBuilder::activePassCount() const
@@ -324,6 +318,8 @@ void GraphBuilder::compile()
     const auto addDependency = [&](uint32_t before, uint32_t after) {
         if (before == after)
             return;
+        if (std::find(outgoing[before].begin(), outgoing[before].end(), after) != outgoing[before].end())
+            return;
 
         outgoing[before].push_back(after);
         incoming[after].push_back(before);
@@ -354,6 +350,8 @@ void GraphBuilder::compile()
             if (!isValid(handle, m_textures.size()))
                 continue;
 
+            if (lastTextureWriter[handle.index] >= 0)
+                addDependency(static_cast<uint32_t>(lastTextureWriter[handle.index]), passIndex);
             lastTextureWriter[handle.index] = static_cast<int32_t>(passIndex);
         }
         for (const auto& [handle, access] : pass.bufferReads)
@@ -373,6 +371,8 @@ void GraphBuilder::compile()
             if (!isValid(handle, m_buffers.size()))
                 continue;
 
+            if (lastBufferWriter[handle.index] >= 0)
+                addDependency(static_cast<uint32_t>(lastBufferWriter[handle.index]), passIndex);
             lastBufferWriter[handle.index] = static_cast<int32_t>(passIndex);
         }
     }
@@ -771,7 +771,6 @@ void GraphBuilder::reset()
     m_passes.clear();
     m_compiledPassOrder.clear();
     m_passNames.clear();
-    m_ownedPasses.clear();
     m_importIndexByTexture.clear();
     m_importIndexByBuffer.clear();
     m_compiled = false;

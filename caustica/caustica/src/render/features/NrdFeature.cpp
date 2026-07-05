@@ -1,8 +1,8 @@
-#include <render/modules/NrdPasses.h>
+#include <render/features/NrdFeature.h>
 
 #include <render/core/RenderTargets.h>
 #include <render/graph/GraphBuilder.h>
-#include <render/modules/RenderModuleContext.h>
+#include <render/features/RenderFeatureContext.h>
 #include <render/worldRenderer/WorldRenderer.h>
 #include <shaders/PathTracer/Config.h>
 
@@ -65,7 +65,7 @@ namespace
     }
 }
 
-void registerNrdPasses(RenderModuleContext ctx)
+void registerNrdFeature(RenderFeatureContext ctx)
 {
     assert(ctx.targetFramebuffer);
     assert(ctx.renderer);

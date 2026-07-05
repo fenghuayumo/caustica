@@ -1,7 +1,6 @@
 #pragma once
 
 #include <render/graph/GpuTypes.h>
-#include <render/graph/IRenderPass.h>
 #include <rhi/nvrhi.h>
 
 #include <cstdint>
@@ -109,8 +108,6 @@ public:
     void setRenderTargetPool(RenderTargetPool* pool) { m_renderTargetPool = pool; }
     [[nodiscard]] RenderTargetPool* renderTargetPool() const { return m_renderTargetPool; }
 
-    void retainRenderPass(std::unique_ptr<IRenderPass> pass);
-
     TextureHandle importTexture(nvrhi::ITexture* texture, nvrhi::ResourceStates initialState);
     TextureHandle importTexture(nvrhi::ITexture* texture, TextureAccess initialAccess = TextureAccess::ShaderResource);
     BufferHandle importBuffer(nvrhi::IBuffer* buffer, nvrhi::ResourceStates initialState);
@@ -209,7 +206,6 @@ private:
     std::vector<Pass> m_passes;
     std::vector<uint32_t> m_compiledPassOrder;
     std::vector<std::string> m_passNames;
-    std::vector<std::unique_ptr<IRenderPass>> m_ownedPasses;
     std::unordered_map<nvrhi::ITexture*, uint32_t> m_importIndexByTexture;
     std::unordered_map<nvrhi::IBuffer*, uint32_t> m_importIndexByBuffer;
 };

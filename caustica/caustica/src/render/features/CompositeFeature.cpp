@@ -1,16 +1,16 @@
-#include <render/modules/CompositePasses.h>
+#include <render/features/CompositeFeature.h>
 
 #include <render/core/FullscreenBlitPass.h>
 #include <render/core/RenderTargets.h>
 #include <render/graph/GraphBuilder.h>
-#include <render/modules/RenderModuleContext.h>
+#include <render/features/RenderFeatureContext.h>
 
 #include <cassert>
 
 namespace caustica::render
 {
 
-void registerCompositePasses(RenderModuleContext ctx)
+void registerCompositeFeature(RenderFeatureContext ctx)
 {
     assert(ctx.targetFramebuffer);
     assert(ctx.bindingCache);

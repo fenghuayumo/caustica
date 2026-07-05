@@ -77,11 +77,6 @@ void PlanarView::setViewport(const ViewportDesc& viewport)
     m_cacheValid = false;
 }
 
-void PlanarView::setVariableRateShadingState(const VariableRateShadingDesc& shadingRateState)
-{
-    m_shadingRateState = shadingRateState;
-}
-
 void PlanarView::setMatrices(const affine3& viewMatrix, const float4x4& projMatrix)
 {
     m_viewMatrix = viewMatrix;
@@ -105,11 +100,6 @@ ViewportStateDesc PlanarView::getViewportState() const
     return ViewportStateDesc()
         .addViewport(m_viewport)
         .addScissorRect(m_scissorRect);
-}
-
-VariableRateShadingDesc PlanarView::getVariableRateShadingState() const
-{
-    return m_shadingRateState;
 }
 
 TextureSubresourceDesc PlanarView::getSubresources() const
@@ -366,12 +356,6 @@ ViewportStateDesc CubemapView::getViewportState() const
     }
 
     return result;
-}
-
-VariableRateShadingDesc CubemapView::getVariableRateShadingState() const
-{
-    // currently don't support VRS with cubemaps
-    return VariableRateShadingDesc{};
 }
 
 bool CubemapView::isBoxVisible(const dm::box3& bbox) const

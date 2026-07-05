@@ -25,7 +25,7 @@ class WorldRenderer;
 struct ExtractedFrameView;
 
 // Pointer-based so graph execute lambdas can capture a copy by value safely.
-struct RenderModuleContext
+struct RenderFeatureContext
 {
     rg::GraphBuilder* graph = nullptr;
     WorldRenderer* renderer = nullptr;

@@ -1,9 +1,5 @@
-﻿#include <render/modules/CompositePasses.h>
-#include <render/modules/DenoiseAAPasses.h>
-#include <render/modules/NrdPasses.h>
-#include <render/modules/PathTracePasses.h>
-#include <render/modules/PostProcessPasses.h>
-#include <render/modules/RenderModuleContext.h>
+#include <render/features/RenderFeature.h>
+#include <render/features/RenderFeatureContext.h>
 
 namespace { constexpr int c_SwapchainCount = 3; }
 
@@ -140,7 +136,7 @@ void caustica::render::WorldRenderer::buildFrameGraphPasses(
 
     const bool aaReset = ctx.frame.needNewPasses || m_context.settings.ResetRealtimeCaches;
 
-    RenderModuleContext moduleCtx{
+    RenderFeatureContext featureCtx{
         .graph = &graph,
         .renderer = this,
         .frame = &ctx.frame,
@@ -158,11 +154,7 @@ void caustica::render::WorldRenderer::buildFrameGraphPasses(
         .gaussianSplatTemporalReset = &m_gaussianSplatTemporalReset,
     };
 
-    registerPathTracePasses(moduleCtx);
-    registerNrdPasses(moduleCtx);
-    registerDenoiseAAPasses(moduleCtx);
-    registerPostProcessPasses(moduleCtx);
-    registerCompositePasses(moduleCtx);
+    registerDefaultGraphFeatures(featureCtx);
 }
 
 void caustica::render::WorldRenderer::executeFrameRenderGraph(RenderFrameContext& ctx)
@@ -467,8 +459,7 @@ void caustica::render::WorldRenderer::framePassPathTracePrepare(PathTracingFrame
         m_toneMappingPass->PreRender(m_context.settings.ToneMappingParams);
     preUpdatePathTracing(ctx.needNewPasses, m_commandList);
 
-    m_renderTargets->clear(m_commandList);
-    abortIfSubmitFailed(ctx, "clearRenderTargets");
+    abortIfSubmitFailed(ctx, "preUpdatePathTracing");
 }
 
 void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext& ctx)

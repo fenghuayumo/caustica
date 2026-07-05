@@ -29,7 +29,7 @@ namespace caustica::render
             nvrhi::IDevice* device,
             nvrhi::ITexture* texture,
             uint32_t arraySlice,
-            const nvrhi::Viewport& viewport);
+            const caustica::ViewportDesc& viewport);
 
         bool SetupWholeSceneDirectionalLightView(
             const caustica::DirectionalLight& light, 

@@ -39,7 +39,7 @@ PlanarShadowMap::PlanarShadowMap(
     nvrhi::IDevice* device, 
     nvrhi::ITexture* texture, 
     uint32_t arraySlice, 
-    const nvrhi::Viewport& viewport)
+    const caustica::ViewportDesc& viewport)
 {
     m_ShadowMapTexture = texture;
     
@@ -48,7 +48,7 @@ PlanarShadowMap::PlanarShadowMap(
     m_ShadowMapSize = float2(viewport.width(), viewport.height());
 
     m_View = std::make_shared<caustica::PlanarView>();
-    m_View->setViewport(rhi::fromNvrhi(viewport));
+    m_View->setViewport(viewport);
     m_View->setArraySlice(arraySlice);
 }
 

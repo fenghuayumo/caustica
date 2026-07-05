@@ -1,8 +1,8 @@
-#include <render/modules/PathTracePasses.h>
+#include <render/features/PathTraceFeature.h>
 
 #include <render/core/RenderTargets.h>
 #include <render/graph/GraphBuilder.h>
-#include <render/modules/RenderModuleContext.h>
+#include <render/features/RenderFeatureContext.h>
 #include <render/passes/rtxdi/RtxdiPass.h>
 #include <render/worldRenderer/WorldRenderer.h>
 
@@ -13,7 +13,7 @@ namespace caustica::render
 
 namespace
 {
-    void declarePathTraceWrites(rg::PassBuilder& setup, const RenderModuleContext& ctx)
+    void declarePathTraceWrites(rg::PassBuilder& setup, const RenderFeatureContext& ctx)
     {
         assert(ctx.renderTargets);
         assert(ctx.graph);
@@ -93,7 +93,7 @@ namespace
     }
 }
 
-void registerPathTracePasses(RenderModuleContext ctx)
+void registerPathTraceFeature(RenderFeatureContext ctx)
 {
     assert(ctx.targetFramebuffer);
     assert(ctx.renderer);

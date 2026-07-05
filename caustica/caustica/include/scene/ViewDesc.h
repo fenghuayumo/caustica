@@ -1,6 +1,5 @@
 #pragma once
 
-#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <vector>
@@ -99,34 +98,6 @@ struct TextureSubresourceDesc
         , numArraySlices(_numArraySlices)
     {
     }
-};
-
-enum class VariableShadingRateDesc : uint8_t
-{
-    Rate1x1,
-    Rate1x2,
-    Rate2x1,
-    Rate2x2,
-    Rate2x4,
-    Rate4x2,
-    Rate4x4,
-};
-
-enum class ShadingRateCombinerDesc : uint8_t
-{
-    Passthrough,
-    Override,
-    Min,
-    Max,
-    ApplyRelative,
-};
-
-struct VariableRateShadingDesc
-{
-    bool enabled = false;
-    VariableShadingRateDesc shadingRate = VariableShadingRateDesc::Rate1x1;
-    ShadingRateCombinerDesc pipelinePrimitiveCombiner = ShadingRateCombinerDesc::Passthrough;
-    ShadingRateCombinerDesc imageCombiner = ShadingRateCombinerDesc::Passthrough;
 };
 
 struct ViewportStateDesc

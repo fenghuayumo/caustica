@@ -39,7 +39,6 @@ namespace caustica
         virtual void fillPlanarViewConstants(PlanarViewConstants& constants) const;
 
         [[nodiscard]] virtual ViewportStateDesc getViewportState() const = 0;
-        [[nodiscard]] virtual VariableRateShadingDesc getVariableRateShadingState() const = 0;
         [[nodiscard]] virtual TextureSubresourceDesc getSubresources() const = 0;
         [[nodiscard]] virtual bool isReverseDepth() const = 0;
         [[nodiscard]] virtual bool isOrthographicProjection() const = 0;
@@ -71,7 +70,6 @@ namespace caustica
         // Directly settable parameters
         ViewportDesc m_viewport;
         ScissorDesc m_scissorRect;
-        VariableRateShadingDesc m_shadingRateState;
         dm::affine3 m_viewMatrix = dm::affine3::identity();
         dm::float4x4 m_projMatrix = dm::float4x4::identity();
         dm::float2 m_pixelOffset = dm::float2::zero();
@@ -96,7 +94,6 @@ namespace caustica
         
     public:
         void setViewport(const ViewportDesc& viewport);
-        void setVariableRateShadingState(const VariableRateShadingDesc& shadingRateState);
         void setMatrices(const dm::affine3& viewMatrix, const dm::float4x4& projMatrix);
         void setPixelOffset(dm::float2 offset);
         void setArraySlice(int arraySlice);
@@ -106,7 +103,6 @@ namespace caustica
         [[nodiscard]] const ScissorDesc& getScissorRect() const { return m_scissorRect; }
 
         [[nodiscard]] ViewportStateDesc getViewportState() const override;
-        [[nodiscard]] VariableRateShadingDesc getVariableRateShadingState() const override;
         [[nodiscard]] TextureSubresourceDesc getSubresources() const override;
         [[nodiscard]] bool isReverseDepth() const override;
         [[nodiscard]] bool isOrthographicProjection() const override;
@@ -161,11 +157,6 @@ namespace caustica
                 merged.scissorRects.push_back(scissor);
 
             return merged;
-        }
-
-        [[nodiscard]] VariableRateShadingDesc getVariableRateShadingState() const override
-        {
-            return leftView.getVariableRateShadingState();
         }
 
         [[nodiscard]] TextureSubresourceDesc getSubresources() const override
@@ -347,7 +338,6 @@ namespace caustica
         [[nodiscard]] dm::box3 getCullingBox() const;
 
         [[nodiscard]] ViewportStateDesc getViewportState() const override;
-        [[nodiscard]] VariableRateShadingDesc getVariableRateShadingState() const override;
         [[nodiscard]] TextureSubresourceDesc getSubresources() const override;
         [[nodiscard]] bool isReverseDepth() const override;
         [[nodiscard]] bool isOrthographicProjection() const override;

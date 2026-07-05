@@ -1,9 +1,9 @@
-#include <render/modules/DenoiseAAPasses.h>
+#include <render/features/DenoiseAAFeature.h>
 
 #include <render/core/CameraController.h>
 #include <render/core/RenderTargets.h>
 #include <render/graph/GraphBuilder.h>
-#include <render/modules/RenderModuleContext.h>
+#include <render/features/RenderFeatureContext.h>
 #include <render/passes/postProcess/AccumulationPass.h>
 #include <render/passes/geometry/TemporalAntiAliasingPass.h>
 #include <render/worldRenderer/WorldRenderer.h>
@@ -62,7 +62,7 @@ namespace
         return !stochasticUsesMainTemporal;
     }
 
-    TemporalAntiAliasingParameters makeTemporalAAParameters(const RenderModuleContext& ctx)
+    TemporalAntiAliasingParameters makeTemporalAAParameters(const RenderFeatureContext& ctx)
     {
         TemporalAntiAliasingParameters taaParams = ctx.settings->TemporalAntiAliasingParams;
 
@@ -77,7 +77,7 @@ namespace
         return taaParams;
     }
 
-    bool computeTemporalFeedbackValid(const RenderModuleContext& ctx)
+    bool computeTemporalFeedbackValid(const RenderFeatureContext& ctx)
     {
         const bool stochasticSplats = ctx.settings->EnableGaussianSplats && ctx.settings->GaussianSplatSortingMode == 1;
         const bool stochasticReset = stochasticSplats && ctx.gaussianSplatTemporalReset != nullptr
@@ -86,7 +86,7 @@ namespace
         return !ctx.aaReset && !stochasticReset && ctx.renderer->getFrameIndex() != 0;
     }
 
-    void prepareDenoiseAAState(RenderModuleContext& ctx)
+    void prepareDenoiseAAState(RenderFeatureContext& ctx)
     {
         if (!ctx.settings->RealtimeMode || ctx.settings->RealtimeAA != 1)
             return;
@@ -102,7 +102,7 @@ namespace
     }
 }
 
-void registerDenoiseAAPasses(RenderModuleContext ctx)
+void registerDenoiseAAFeature(RenderFeatureContext ctx)
 {
     assert(ctx.graph);
     assert(ctx.renderer);

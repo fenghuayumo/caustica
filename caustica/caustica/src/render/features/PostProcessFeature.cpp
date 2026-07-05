@@ -1,10 +1,10 @@
-#include <render/modules/PostProcessPasses.h>
+#include <render/features/PostProcessFeature.h>
 
 #include <render/core/PathTracingShaderCompiler.h>
 #include <render/core/RenderTargets.h>
 #include <render/ecs/RenderWorldResources.h>
 #include <render/graph/GraphBuilder.h>
-#include <render/modules/RenderModuleContext.h>
+#include <render/features/RenderFeatureContext.h>
 #include <render/passes/geometry/BloomPass.h>
 #include <render/passes/postProcess/ToneMappingPasses.h>
 #include <render/worldRenderer/WorldRenderer.h>
@@ -26,7 +26,7 @@ namespace
 
     void registerTestRaygenHdrPass(
         rg::TextureHandle processedOutputColor,
-        RenderModuleContext ctx,
+        RenderFeatureContext ctx,
         bool enabled)
     {
         assert(ctx.graph);
@@ -64,10 +64,10 @@ namespace
             rg::PassOptions{ .enabled = enabled });
     }
 
-    void registerEdgeDetectionPasses(
+    void registerEdgeDetectionGraphPasses(
         rg::TextureHandle ldrColor,
         rg::TextureHandle ldrColorScratch,
-        RenderModuleContext ctx,
+        RenderFeatureContext ctx,
         bool enabled)
     {
         assert(ctx.graph);
@@ -123,7 +123,7 @@ namespace
     }
 }
 
-void registerPostProcessPasses(RenderModuleContext ctx)
+void registerPostProcessFeature(RenderFeatureContext ctx)
 {
     assert(ctx.extractedView);
     assert(ctx.renderer);
@@ -175,7 +175,7 @@ void registerPostProcessPasses(RenderModuleContext ctx)
         ctx.settings->EnableToneMapping,
         ctx.commandListWasClosed);
 
-    registerEdgeDetectionPasses(
+    registerEdgeDetectionGraphPasses(
         ldrColor,
         ldrColorScratch,
         ctx,

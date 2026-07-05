@@ -21,7 +21,6 @@
 #include <render/graph/GraphBuilder.h>
 #include <render/graph/RenderTargetPool.h>
 #include <render/worldRenderer/PathTracingFrameContext.h>
-#include <render/worldRenderer/PathTracingFramePipeline.h>
 #include <ecs/Schedule.h>
 #include <ecs/World.h>
 
