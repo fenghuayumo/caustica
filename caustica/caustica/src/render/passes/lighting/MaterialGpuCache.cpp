@@ -586,112 +586,80 @@ bool PTMaterial::editorGui(MaterialGpuCache & cache)
         }
     };
 
-    bool useOpenPBRLite = IsOpenPBRMaterialModel(materialModel);
-    int materialModelIndex = useOpenPBRLite ? 0 : 1;
-    if (ImGui::Combo("Material Model", &materialModelIndex, "OpenPBR-lite\0RTXPT legacy\0\0"))
+    bool normalizedToOpenPBR = false;
+    if (!IsOpenPBRMaterialModel(materialModel))
     {
-        useOpenPBRLite = (materialModelIndex == 0);
-        materialModel = useOpenPBRLite ? "OpenPBR" : "RTXPT";
-        if (useOpenPBRLite)
-        {
-            useSpecularGlossModel = false;
-            const float* specColor = specularColor.data();
-            if (specColor[0] == 0.f && specColor[1] == 0.f && specColor[2] == 0.f)
-                specularColor = dm::float3(1.f);
-        }
-        update = true;
+        materialModel = "OpenPBR";
+        normalizedToOpenPBR = true;
     }
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("OpenPBR-lite exposes standard material parameter names and maps them onto the RTXPT backend.");
-
-    if (useOpenPBRLite && useSpecularGlossModel)
+    if (useSpecularGlossModel)
     {
         useSpecularGlossModel = false;
+        normalizedToOpenPBR = true;
+    }
+    if (normalizedToOpenPBR)
+    {
+        const float* specColor = specularColor.data();
+        if (specColor[0] == 0.f && specColor[1] == 0.f && specColor[2] == 0.f)
+            specularColor = dm::float3(1.f);
         update = true;
     }
 
-    if (useOpenPBRLite)
+    drawTextureToggle("Use base_color texture", baseTexture, enableBaseTexture);
+
+    update |= ImGui::ColorEdit3(enableBaseTexture ? "base_color factor" : "base_color", baseOrDiffuseColor.data(), ImGuiColorEditFlags_Float);
+    update |= ImGui::SliderFloat("base_weight", &baseWeight, 0.f, 1.f);
+
+    drawTextureToggle("Use base_metalness/specular_roughness texture", occlusionRoughnessMetallicTexture, enableOcclusionRoughnessMetallicTexture);
+
+    update |= ImGui::SliderFloat(enableOcclusionRoughnessMetallicTexture ? "base_metalness factor" : "base_metalness", &metalness, 0.f, 1.f);
+    update |= ImGui::SliderFloat("specular_weight", &specularWeight, 0.f, 2.f);
+    update |= ImGui::ColorEdit3("specular_color", specularColor.data(), ImGuiColorEditFlags_Float);
+    update |= ImGui::SliderFloat(enableOcclusionRoughnessMetallicTexture ? "specular_roughness factor" : "specular_roughness", &roughness, 0.f, 1.f);
+    update |= ImGui::SliderFloat("specular_roughness_anisotropy", &anisotropy, -1.f, 1.f);
+    update |= ImGui::InputFloat("specular_ior", &IoR);
+    if (IoR < 1.0f) { IoR = 1.0f; update = true; }
+
+    update |= ImGui::SliderFloat("fuzz_weight", &fuzzWeight, 0.f, 1.f);
+    update |= ImGui::ColorEdit3("fuzz_color", fuzzColor.data(), ImGuiColorEditFlags_Float);
+    update |= ImGui::SliderFloat("fuzz_roughness", &fuzzRoughness, 0.f, 1.f);
+
+    update |= ImGui::SliderFloat("geometry_opacity", &opacity, 0.f, 1.f);
+    update |= ImGui::Checkbox("geometry_thin_walled", &thinSurface);
+
+    drawTextureToggle("Use transmission_weight texture", transmissionTexture, enableTransmissionTexture);
+
+    float previousTransmissionFactor = transmissionFactor;
+    float previousDiffuseTransmissionFactor = diffuseTransmissionFactor;
+    update |= ImGui::SliderFloat("transmission_weight", &transmissionFactor, 0.f, 1.f);
+    update |= ImGui::SliderFloat("transmission_diffuse_weight", &diffuseTransmissionFactor, 0.f, 1.f);
+
+    bool openPBRTransmissionEnabled = (transmissionFactor > 0.f) || (diffuseTransmissionFactor > 0.f);
+    if (openPBRTransmissionEnabled != enableTransmission)
     {
-        drawTextureToggle("Use base_color texture", baseTexture, enableBaseTexture);
-
-        update |= ImGui::ColorEdit3(enableBaseTexture ? "base_color factor" : "base_color", baseOrDiffuseColor.data(), ImGuiColorEditFlags_Float);
-        update |= ImGui::SliderFloat("base_weight", &baseWeight, 0.f, 1.f);
-
-        drawTextureToggle("Use base_metalness/specular_roughness texture", occlusionRoughnessMetallicTexture, enableOcclusionRoughnessMetallicTexture);
-
-        update |= ImGui::SliderFloat(enableOcclusionRoughnessMetallicTexture ? "base_metalness factor" : "base_metalness", &metalness, 0.f, 1.f);
-        update |= ImGui::SliderFloat("specular_weight", &specularWeight, 0.f, 2.f);
-        update |= ImGui::ColorEdit3("specular_color", specularColor.data(), ImGuiColorEditFlags_Float);
-        update |= ImGui::SliderFloat(enableOcclusionRoughnessMetallicTexture ? "specular_roughness factor" : "specular_roughness", &roughness, 0.f, 1.f);
-        update |= ImGui::SliderFloat("specular_roughness_anisotropy", &anisotropy, -1.f, 1.f);
-        update |= ImGui::InputFloat("specular_ior", &IoR);
-        if (IoR < 1.0f) { IoR = 1.0f; update = true; }
-
-        update |= ImGui::SliderFloat("fuzz_weight", &fuzzWeight, 0.f, 1.f);
-        update |= ImGui::ColorEdit3("fuzz_color", fuzzColor.data(), ImGuiColorEditFlags_Float);
-        update |= ImGui::SliderFloat("fuzz_roughness", &fuzzRoughness, 0.f, 1.f);
-
-        update |= ImGui::SliderFloat("geometry_opacity", &opacity, 0.f, 1.f);
-        update |= ImGui::Checkbox("geometry_thin_walled", &thinSurface);
-
-        drawTextureToggle("Use transmission_weight texture", transmissionTexture, enableTransmissionTexture);
-
-        float previousTransmissionFactor = transmissionFactor;
-        float previousDiffuseTransmissionFactor = diffuseTransmissionFactor;
-        update |= ImGui::SliderFloat("transmission_weight", &transmissionFactor, 0.f, 1.f);
-        update |= ImGui::SliderFloat("transmission_diffuse_weight", &diffuseTransmissionFactor, 0.f, 1.f);
-
-        bool openPBRTransmissionEnabled = (transmissionFactor > 0.f) || (diffuseTransmissionFactor > 0.f);
-        if (openPBRTransmissionEnabled != enableTransmission)
-        {
-            enableTransmission = openPBRTransmissionEnabled;
-            update = true;
-        }
-        if (previousTransmissionFactor != transmissionFactor || previousDiffuseTransmissionFactor != diffuseTransmissionFactor)
-            enableTransmission = openPBRTransmissionEnabled;
-
-        if (enableTransmission && !thinSurface)
-        {
-            update |= ImGui::InputFloat("volume_attenuation_distance", &volumeAttenuationDistance);
-            if (volumeAttenuationDistance < 0.0f) { volumeAttenuationDistance = 0.0f; update = true; }
-            update |= ImGui::ColorEdit3("volume_attenuation_color", volumeAttenuationColor.data(), ImGuiColorEditFlags_Float);
-            update |= ImGui::InputInt("nested_priority", &nestedPriority);
-            if (nestedPriority < 0 || nestedPriority > 14) { nestedPriority = dm::clamp(nestedPriority, 0, 14); update = true; }
-        }
+        enableTransmission = openPBRTransmissionEnabled;
+        update = true;
     }
-    else if (useSpecularGlossModel)
+    if (previousTransmissionFactor != transmissionFactor || previousDiffuseTransmissionFactor != diffuseTransmissionFactor)
+        enableTransmission = openPBRTransmissionEnabled;
+
+    if (enableTransmission && !thinSurface)
     {
-        drawTextureToggle("Use Base (Diffuse) Texture", baseTexture, enableBaseTexture);
-
-        update |= ImGui::ColorEdit3(enableBaseTexture ? "Diffuse Factor" : "Diffuse Color", baseOrDiffuseColor.data(), ImGuiColorEditFlags_Float);
-
-        drawTextureToggle("Use Specular Texture", occlusionRoughnessMetallicTexture, enableOcclusionRoughnessMetallicTexture);
-
-        update |= ImGui::ColorEdit3(enableOcclusionRoughnessMetallicTexture ? "Specular Factor" : "Specular Color", specularColor.data(), ImGuiColorEditFlags_Float);
-
-        float glossiness = 1.0f - roughness;
-        update |= ImGui::SliderFloat(enableOcclusionRoughnessMetallicTexture ? "Glossiness Factor" : "Glossiness", &glossiness, 0.f, 1.f);
-        roughness = 1.0f - glossiness;
-    }
-    else
-    {
-        drawTextureToggle("Use Base (Diffuse) Texture", baseTexture, enableBaseTexture);
-
-        update |= ImGui::ColorEdit3(enableBaseTexture ? "Base Color Factor" : "Base Color", baseOrDiffuseColor.data(), ImGuiColorEditFlags_Float);
-
-        drawTextureToggle("Use Metal-Rough Texture", occlusionRoughnessMetallicTexture, enableOcclusionRoughnessMetallicTexture);
-
-        update |= ImGui::SliderFloat(enableOcclusionRoughnessMetallicTexture ? "metalness Factor" : "metalness", &metalness, 0.f, 1.f);
-        update |= ImGui::SliderFloat(enableOcclusionRoughnessMetallicTexture ? "roughness Factor" : "roughness", &roughness, 0.f, 1.f);
+        update |= ImGui::InputFloat("volume_attenuation_distance", &volumeAttenuationDistance);
+        if (volumeAttenuationDistance < 0.0f) { volumeAttenuationDistance = 0.0f; update = true; }
+        update |= ImGui::ColorEdit3("volume_attenuation_color", volumeAttenuationColor.data(), ImGuiColorEditFlags_Float);
+        update |= ImGui::InputInt("nested_priority", &nestedPriority);
+        if (nestedPriority < 0 || nestedPriority > 14) { nestedPriority = dm::clamp(nestedPriority, 0, 14); update = true; }
     }
 
-    update |= ImGui::Checkbox(useOpenPBRLite ? "geometry_enable_alpha_test" : "Enable Alpha Testing", &enableAlphaTesting);
+    update |= ImGui::Checkbox("geometry_enable_alpha_test", &enableAlphaTesting);
 
     if (enableAlphaTesting && baseTexture.loaded)
     {
-        update |= ImGui::SliderFloat(useOpenPBRLite ? "geometry_alpha_cutoff" : "Alpha Cutoff", &alphaCutoff, 0.f, 1.f);
+        update |= ImGui::SliderFloat("geometry_alpha_cutoff", &alphaCutoff, 0.f, 1.f);
     }
 
-    drawTextureToggle(useOpenPBRLite ? "Use geometry_normal texture" : "Use Normal Texture", normalTexture, enableNormalTexture);
+    drawTextureToggle("Use geometry_normal texture", normalTexture, enableNormalTexture);
 
     if (enableNormalTexture)
     {
@@ -705,44 +673,13 @@ bool PTMaterial::editorGui(MaterialGpuCache & cache)
             update = true;
         }
         ImGui::SameLine();
-        ImGui::Text(useOpenPBRLite ? "geometry_normal_scale" : "Normal Scale");
+        ImGui::Text("geometry_normal_scale");
     }
 
-    drawTextureToggle(useOpenPBRLite ? "Use emission_color texture" : "Use Emissive Texture", emissiveTexture, enableEmissiveTexture);
+    drawTextureToggle("Use emission_color texture", emissiveTexture, enableEmissiveTexture);
 
-    update |= ImGui::ColorEdit3(useOpenPBRLite ? "emission_color" : "Emissive Color", emissiveColor.data(), ImGuiColorEditFlags_Float);
-    update |= ImGui::SliderFloat(useOpenPBRLite ? "emission_luminance" : "Emissive Intensity", &emissiveIntensity, 0.f, 100000.f, "%.3f", ImGuiSliderFlags_Logarithmic);
-
-    if (!useOpenPBRLite)
-    {
-        update |= ImGui::Checkbox("Enable Transmission", &enableTransmission);
-
-        if (enableTransmission)   // transmissive
-        {
-            update |= ImGui::InputFloat("Index of Refraction", &IoR);
-            if (IoR < 1.0f) { IoR = 1.0f; update = true; }
-
-            drawTextureToggle("Use Transmission Texture", transmissionTexture, enableTransmissionTexture);
-
-            update |= ImGui::SliderFloat("Transmission Factor", &transmissionFactor, 0.f, 1.f);
-            update |= ImGui::SliderFloat("Diff Transmission Factor", &diffuseTransmissionFactor, 0.f, 1.f);
-
-            if (!thinSurface)
-            {
-                update |= ImGui::InputFloat("Attenuation Distance", &volumeAttenuationDistance);
-                if (volumeAttenuationDistance < 0.0f) { volumeAttenuationDistance = 0.0f; update = true; }
-
-                update |= ImGui::ColorEdit3("Attenuation Color", volumeAttenuationColor.data(), ImGuiColorEditFlags_Float);
-
-                update |= ImGui::InputInt("Nested Priority", &nestedPriority);
-                if (nestedPriority < 0 || nestedPriority > 14) { nestedPriority = dm::clamp(nestedPriority, 0, 14); update = true; }
-            }
-            else
-            {
-                ImGui::Text("Thin surface transmissive materials have no volume properties");
-            }
-        }
-    }
+    update |= ImGui::ColorEdit3("emission_color", emissiveColor.data(), ImGuiColorEditFlags_Float);
+    update |= ImGui::SliderFloat("emission_luminance", &emissiveIntensity, 0.f, 100000.f, "%.3f", ImGuiSliderFlags_Logarithmic);
 
     if (ImGui::CollapsingHeader("Path Decomposition"))
     {
