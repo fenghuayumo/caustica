@@ -36,7 +36,6 @@ class TextureLoader;
 namespace render
 {
 class WorldRenderer;
-class FramePassRegistry;
 } // namespace render
 
 struct EngineSceneCallbacks
@@ -60,8 +59,6 @@ struct GpuRenderSubsystemInitParams
 
     std::shared_ptr<SceneTypeFactory> sceneTypeFactory;
     EngineSceneCallbacks sceneCallbacks = {};
-
-    render::FramePassRegistry* framePassRegistry = nullptr;
 };
 
 // Owns shared GPU infrastructure and the path-tracing WorldRenderer.

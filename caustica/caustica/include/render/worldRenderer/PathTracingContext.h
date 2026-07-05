@@ -24,7 +24,6 @@ class ShaderFactory;
 
 namespace render
 {
-class FramePassRegistry;
 class RenderDevice;
 
 // Session-scoped references wired once when the path tracer is created.
@@ -47,9 +46,6 @@ struct PathTracingContext
     double& sceneTime;
 
     SessionDiagnostics& diagnostics;
-
-    // Optional extension registry; wired from EngineBuilder / SceneRuntimeRegistration.
-    FramePassRegistry* framePassRegistry = nullptr;
 };
 
 } // namespace render

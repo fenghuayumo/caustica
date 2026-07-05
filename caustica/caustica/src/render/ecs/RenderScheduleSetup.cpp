@@ -1,7 +1,6 @@
 #include <render/ecs/RenderScheduleSetup.h>
 #include <render/ecs/RenderSystems.h>
 #include <render/ecs/RenderWorldResources.h>
-#include <render/FramePassRegistry.h>
 #include <render/worldRenderer/WorldRenderer.h>
 
 namespace caustica::render
@@ -42,8 +41,7 @@ namespace
 
 void buildDefaultRenderSchedule(
     ecs::Schedule& schedule,
-    WorldRenderer& renderer,
-    FramePassRegistry* framePassRegistry)
+    WorldRenderer& /*renderer*/)
 {
     schedule
         .addSet("Extract")
@@ -92,9 +90,6 @@ void buildDefaultRenderSchedule(
         .before("BuildFrameGraph", "ExecuteRenderGraph")
         .before("ExecuteRenderGraph", "DebugLines")
         .before("DebugLines", "Finalize");
-
-    if (framePassRegistry)
-        framePassRegistry->applyToRenderSchedule(schedule, renderer);
 }
 
 } // namespace caustica::render

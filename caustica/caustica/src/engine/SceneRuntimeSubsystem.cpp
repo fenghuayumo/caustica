@@ -50,7 +50,6 @@ void SceneRuntimeSubsystem::initialize(EngineInitContext& context)
             .OnSceneLoaded = [sceneRuntimePtr]() { sceneRuntimePtr->SceneLoaded(); },
             .OnSceneUnloading = [sceneRuntimePtr]() { sceneRuntimePtr->SceneUnloading(); },
         },
-        .framePassRegistry = &getGlobalFramePassRegistry(),
     });
 
     sceneRuntime.bindGpuRenderSubsystem(*gpuRenderSubsystem);

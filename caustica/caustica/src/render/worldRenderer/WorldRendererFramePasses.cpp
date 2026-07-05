@@ -1,13 +1,16 @@
+﻿#include <render/modules/CompositePasses.h>
+#include <render/modules/DenoiseAAPasses.h>
+#include <render/modules/NrdPasses.h>
+#include <render/modules/PathTracePasses.h>
+#include <render/modules/PostProcessPasses.h>
+#include <render/modules/RenderModuleContext.h>
+
 namespace { constexpr int c_SwapchainCount = 3; }
 
 #include <render/worldRenderer/WorldRenderer.h>
-#include <render/graph/FrameGraphBuild.h>
-#include <render/passes/postProcess/PostProcessGraph.h>
-#include <render/passes/composite/BlitGraphPass.h>
 #include <render/worldRenderer/PathTracingFrameContext.h>
 #include <render/ecs/RenderScheduleSetup.h>
 #include <render/ecs/RenderWorldResources.h>
-#include <render/FramePassRegistry.h>
 #include <render/SceneGpuResources.h>
 #include <render/SceneGaussianSplatPasses.h>
 #include <render/SceneRayTracingResources.h>
@@ -91,14 +94,8 @@ void caustica::render::WorldRenderer::ensureRenderScheduleBuilt()
     if (m_renderScheduleBuilt)
         return;
 
-    buildDefaultRenderSchedule(m_renderSchedule, *this, m_context.framePassRegistry);
+    buildDefaultRenderSchedule(m_renderSchedule, *this);
     m_renderScheduleBuilt = true;
-}
-
-void caustica::render::WorldRenderer::storeFramePassRegistryPass(std::unique_ptr<IPathTracingFramePass> pass)
-{
-    if (pass)
-        m_framePassRegistryStorage.push_back(std::move(pass));
 }
 
 void caustica::render::WorldRenderer::extractFrameView(ecs::World& renderWorld)
@@ -143,37 +140,29 @@ void caustica::render::WorldRenderer::buildFrameGraphPasses(
 
     const bool aaReset = ctx.frame.needNewPasses || m_context.settings.ResetRealtimeCaches;
 
-    rg::FrameGraphBuildParams buildParams{
-        .graph = graph,
-        .worldRenderer = this,
+    RenderModuleContext moduleCtx{
+        .graph = &graph,
+        .renderer = this,
+        .frame = &ctx.frame,
         .renderTargets = m_renderTargets.get(),
         .settings = &m_context.settings,
-        .frameContext = &ctx.frame,
-        .framePassRegistry = m_context.framePassRegistry,
-        .targetFramebuffer = framebuffer,
         .sampleConstants = &m_currentConstants,
-        .hasScene = m_context.sceneManager.getScene() != nullptr,
-        .camera = &m_context.camera,
-        .compositeView = &extractedView.postProcessView,
-        .temporalAAPass = m_temporalAntiAliasingPass.get(),
-        .accumulationPass = m_accumulationPass.get(),
-        .frameIndex = m_frameIndex,
-        .accumulationSampleIndex = m_accumulationSampleIndex,
-        .aaReset = aaReset,
-        .gaussianSplatTemporalSampleIndex = &m_gaussianSplatTemporalSampleIndex,
-        .gaussianSplatTemporalReset = &m_gaussianSplatTemporalReset,
-        .bloomPass = m_bloomPass.get(),
-        .toneMappingPass = m_toneMappingPass.get(),
-        .displaySize = extractedView.displaySize,
-        .pathTracingBindingSet = m_bindingSet,
-        .descriptorTable = m_context.descriptorTable ? m_context.descriptorTable->getDescriptorTable() : nullptr,
-        .testRaygenPpHdrPipeline = m_ptPipelineTestRaygenPPHDR.get(),
-        .edgeDetectionPipeline = m_ptPipelineEdgeDetection.get(),
-        .outCommandListWasClosed = &ctx.commandListWasClosed,
+        .targetFramebuffer = framebuffer,
+        .extractedView = &extractedView,
         .bindingCache = &m_context.bindingCache,
         .blitPass = &m_context.renderDevice.blit(),
+        .hasScene = m_context.sceneManager.getScene() != nullptr,
+        .aaReset = aaReset,
+        .commandListWasClosed = &ctx.commandListWasClosed,
+        .gaussianSplatTemporalSampleIndex = &m_gaussianSplatTemporalSampleIndex,
+        .gaussianSplatTemporalReset = &m_gaussianSplatTemporalReset,
     };
-    rg::buildFrameGraph(buildParams);
+
+    registerPathTracePasses(moduleCtx);
+    registerNrdPasses(moduleCtx);
+    registerDenoiseAAPasses(moduleCtx);
+    registerPostProcessPasses(moduleCtx);
+    registerCompositePasses(moduleCtx);
 }
 
 void caustica::render::WorldRenderer::executeFrameRenderGraph(RenderFrameContext& ctx)

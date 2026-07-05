@@ -120,7 +120,12 @@ public:
     nvrhi::BufferHandle getConstantBuffer() const { return m_constantBuffer; }
 
     TemporalAntiAliasingPass* getTemporalAntiAliasingPass() { return m_temporalAntiAliasingPass.get(); }
+    AccumulationPass* getAccumulationPass() { return m_accumulationPass.get(); }
+    BloomPass* getBloomPass() { return m_bloomPass.get(); }
     ToneMappingPass* getToneMappingPass() { return m_toneMappingPass.get(); }
+    CameraController& getCameraController() { return m_context.camera; }
+    PathTracingContext& getPathTracingContext() { return m_context; }
+    const PathTracingContext& getPathTracingContext() const { return m_context; }
 
     dm::uint2 getRenderSize() const { return m_renderSize; }
     dm::uint2 getDisplaySize() const { return m_displaySize; }
@@ -146,8 +151,6 @@ public:
 
     void buildFrameGraphPasses(RenderFrameContext& ctx, const ExtractedFrameView& extractedView);
     void executeFrameRenderGraph(RenderFrameContext& ctx);
-
-    void storeFramePassRegistryPass(std::unique_ptr<IPathTracingFramePass> pass);
 
 private:
     friend void FrameSetupSystem(WorldRenderer&, RenderFrameContext&);
@@ -210,7 +213,6 @@ private:
     rg::RenderTargetPool         m_renderTargetPool;
     RenderFrameContext           m_renderFrameCtx{};
     bool                         m_renderScheduleBuilt = false;
-    std::vector<std::unique_ptr<IPathTracingFramePass>> m_framePassRegistryStorage;
 
     std::unique_ptr<RtxdiPass>                  m_rtxdiPass;
     std::unique_ptr<RenderTargets>              m_renderTargets;

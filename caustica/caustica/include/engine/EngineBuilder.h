@@ -9,11 +9,6 @@
 #include <type_traits>
 #include <utility>
 
-namespace caustica::render
-{
-class FramePassRegistry;
-}
-
 namespace caustica
 {
 
@@ -22,13 +17,10 @@ namespace caustica
 class EngineBuilder
 {
 public:
-    explicit EngineBuilder(Engine& engine, render::FramePassRegistry* framePasses = nullptr);
+    explicit EngineBuilder(Engine& engine);
 
     [[nodiscard]] Engine& engine() { return m_engine; }
     [[nodiscard]] const Engine& engine() const { return m_engine; }
-
-    [[nodiscard]] render::FramePassRegistry* framePasses() { return m_framePasses; }
-    [[nodiscard]] const render::FramePassRegistry* framePasses() const { return m_framePasses; }
 
     // Register a subsystem (same as Engine::addSubsystem, priority from ISubsystem).
     void addSubsystem(std::unique_ptr<ISubsystem> subsystem);
@@ -62,12 +54,10 @@ public:
 
 private:
     Engine& m_engine;
-    render::FramePassRegistry* m_framePasses = nullptr;
 };
 
-inline EngineBuilder::EngineBuilder(Engine& engine, render::FramePassRegistry* framePasses)
+inline EngineBuilder::EngineBuilder(Engine& engine)
     : m_engine(engine)
-    , m_framePasses(framePasses)
 {
 }
 

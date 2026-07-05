@@ -5,12 +5,8 @@
 namespace caustica::render
 {
 
-class FramePassRegistry;
 class WorldRenderer;
 
-void buildDefaultRenderSchedule(
-    ecs::Schedule& schedule,
-    WorldRenderer& renderer,
-    FramePassRegistry* framePassRegistry = nullptr);
+void buildDefaultRenderSchedule(ecs::Schedule& schedule, WorldRenderer& renderer);
 
 } // namespace caustica::render
