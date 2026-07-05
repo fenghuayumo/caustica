@@ -27,8 +27,7 @@ void PathTracePrepareSystem(WorldRenderer& renderer, RenderFrameContext& ctx);
 void PathTraceSystem(WorldRenderer& renderer, RenderFrameContext& ctx);
 void DenoiseAndAASystem(WorldRenderer& renderer, RenderFrameContext& ctx);
 
-void BuildPostProcessGraphSystem(WorldRenderer& renderer, RenderFrameContext& ctx, ecs::World& world);
-void BuildCompositeGraphSystem(WorldRenderer& renderer, RenderFrameContext& ctx, ecs::World& world);
+void BuildFrameGraphSystem(WorldRenderer& renderer, RenderFrameContext& ctx, ecs::World& world);
 void ExecuteRenderGraphSystem(WorldRenderer& renderer, RenderFrameContext& ctx);
 
 void DebugLinesSystem(WorldRenderer& renderer, RenderFrameContext& ctx);

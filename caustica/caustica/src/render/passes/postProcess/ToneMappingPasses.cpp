@@ -185,9 +185,12 @@ void ToneMappingPass::PreRender(const ToneMappingParameters& params)
 bool ToneMappingPass::Render(
     nvrhi::ICommandList* commandList, 
     const caustica::ICompositeView& compositeView,
-    nvrhi::ITexture* sourceTexture, bool enabled)
+    nvrhi::ITexture* sourceTexture,
+    nvrhi::IBuffer* constantsBuffer,
+    bool enabled)
 {
     assert( m_FrameParamsSet ); // forgot to call PreRender before this?
+    assert(constantsBuffer);
     m_FrameParamsSet = false;
 
     bool commandListWasClosed = false; // to track the need to re-create volatile constant buffers
@@ -290,7 +293,7 @@ bool ToneMappingPass::Render(
 		{
 			nvrhi::BindingSetDesc bindingSetDesc;
 			bindingSetDesc.bindings = {
-				nvrhi::BindingSetItem::ConstantBuffer(0, m_ToneMappingCB),
+				nvrhi::BindingSetItem::ConstantBuffer(0, constantsBuffer),
 				nvrhi::BindingSetItem::Texture_SRV(0, sourceTexture),                       //Color texture
 				nvrhi::BindingSetItem::Texture_SRV(1, m_PerView[viewIndex].luminanceTexture),                    //Luminance Texture
 				nvrhi::BindingSetItem::Sampler(0, m_linearSampler),    //Luminance sampler
@@ -336,7 +339,7 @@ bool ToneMappingPass::Render(
 		toneMappingConsts.colorTransform[1] = float4(m_ColorTransform.col(1), 0);
 		toneMappingConsts.colorTransform[2] = float4(m_ColorTransform.col(2), 0);
         toneMappingConsts.enabled = enabled;
-        commandList->writeBuffer(m_ToneMappingCB, &toneMappingConsts, sizeof(ToneMappingConstants));
+        commandList->writeBuffer(constantsBuffer, &toneMappingConsts, sizeof(ToneMappingConstants));
 
         commandList->setGraphicsState(state);
 
@@ -357,14 +360,25 @@ void ToneMappingPass::registerGraphPass(
     bool enabled,
     bool* outCommandListWasClosed)
 {
+    const caustica::rg::BufferHandle constantsBuffer = graph.importBuffer(
+        m_ToneMappingCB,
+        caustica::rg::BufferAccess::ConstantBuffer);
+    graph.extractBuffer(constantsBuffer, caustica::rg::BufferAccess::ConstantBuffer);
+
     graph.addPass(
         "ToneMapping",
-        [&](caustica::rg::PassBuilder& setup) {
+        [&, constantsBuffer](caustica::rg::PassBuilder& setup) {
             setup.read(sourceColor, caustica::rg::TextureAccess::ShaderResource);
+            setup.write(constantsBuffer, caustica::rg::BufferAccess::ConstantBuffer);
             setup.write(outputLdrColor, caustica::rg::TextureAccess::RenderTarget);
         },
-        [this, sourceColor, &compositeView, enabled, outCommandListWasClosed](caustica::rg::RenderPassContext& ctx) {
-            const bool closed = Render(ctx.commandList(), compositeView, ctx.texture(sourceColor), enabled);
+        [this, sourceColor, constantsBuffer, &compositeView, enabled, outCommandListWasClosed](caustica::rg::RenderPassContext& ctx) {
+            const bool closed = Render(
+                ctx.commandList(),
+                compositeView,
+                ctx.texture(sourceColor),
+                ctx.buffer(constantsBuffer),
+                enabled);
             if (outCommandListWasClosed)
                 *outCommandListWasClosed = closed;
         });

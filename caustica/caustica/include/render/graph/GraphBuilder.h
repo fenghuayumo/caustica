@@ -1,15 +1,22 @@
 #pragma once
 
 #include <render/graph/GpuTypes.h>
+#include <render/graph/IRenderPass.h>
 #include <rhi/nvrhi.h>
 
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
+
+namespace caustica::rg
+{
+class RenderTargetPool;
+}
 
 namespace nvrhi
 {
@@ -99,6 +106,10 @@ public:
     using ExecuteFn = std::function<void(RenderPassContext&)>;
 
     void setDevice(nvrhi::IDevice* device);
+    void setRenderTargetPool(RenderTargetPool* pool) { m_renderTargetPool = pool; }
+    [[nodiscard]] RenderTargetPool* renderTargetPool() const { return m_renderTargetPool; }
+
+    void retainRenderPass(std::unique_ptr<IRenderPass> pass);
 
     TextureHandle importTexture(nvrhi::ITexture* texture, nvrhi::ResourceStates initialState);
     TextureHandle importTexture(nvrhi::ITexture* texture, TextureAccess initialAccess = TextureAccess::ShaderResource);
@@ -128,6 +139,8 @@ public:
 
     [[nodiscard]] size_t passCount() const { return m_passes.size(); }
     [[nodiscard]] const std::vector<std::string>& passNames() const { return m_passNames; }
+    [[nodiscard]] const std::vector<uint32_t>& compiledPassOrder() const { return m_compiledPassOrder; }
+    [[nodiscard]] size_t activePassCount() const;
 
 private:
     friend class PassBuilder;
@@ -145,6 +158,7 @@ private:
         nvrhi::ResourceStates currentState = nvrhi::ResourceStates::Common;
         std::optional<nvrhi::ResourceStates> finalState;
         ResourceLifetime lifetime = ResourceLifetime::Imported;
+        TextureDesc desc;
         nvrhi::TextureHandle owned;
     };
 
@@ -154,6 +168,7 @@ private:
         nvrhi::ResourceStates currentState = nvrhi::ResourceStates::Common;
         std::optional<nvrhi::ResourceStates> finalState;
         ResourceLifetime lifetime = ResourceLifetime::Imported;
+        BufferDesc desc;
         nvrhi::BufferHandle owned;
     };
 
@@ -173,6 +188,9 @@ private:
     static nvrhi::ResourceStates accessToState(TextureAccess access);
     static nvrhi::ResourceStates accessToState(BufferAccess access);
 
+    [[nodiscard]] nvrhi::TextureHandle createNativeTexture(const TextureDesc& desc) const;
+    [[nodiscard]] nvrhi::BufferHandle createNativeBuffer(const BufferDesc& desc) const;
+    void allocateTransientResources(const std::vector<bool>& referencedTextures, const std::vector<bool>& referencedBuffers);
     void releaseTransientResources();
     void transitionTexture(nvrhi::ICommandList* commandList, TextureHandle handle, TextureAccess access);
     void transitionTexture(nvrhi::ICommandList* commandList, TextureHandle handle, nvrhi::ResourceStates targetState);
@@ -184,12 +202,14 @@ private:
     void transitionExtractedResources(nvrhi::ICommandList* commandList);
 
     nvrhi::IDevice* m_device = nullptr;
+    RenderTargetPool* m_renderTargetPool = nullptr;
     bool m_compiled = false;
     std::vector<GraphTexture> m_textures;
     std::vector<GraphBuffer> m_buffers;
     std::vector<Pass> m_passes;
     std::vector<uint32_t> m_compiledPassOrder;
     std::vector<std::string> m_passNames;
+    std::vector<std::unique_ptr<IRenderPass>> m_ownedPasses;
     std::unordered_map<nvrhi::ITexture*, uint32_t> m_importIndexByTexture;
     std::unordered_map<nvrhi::IBuffer*, uint32_t> m_importIndexByBuffer;
 };

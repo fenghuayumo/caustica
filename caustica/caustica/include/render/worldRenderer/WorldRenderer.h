@@ -19,6 +19,7 @@
 #include <render/ecs/RenderFrameContext.h>
 #include <render/ecs/RenderScheduleSetup.h>
 #include <render/graph/GraphBuilder.h>
+#include <render/graph/RenderTargetPool.h>
 #include <render/worldRenderer/PathTracingFrameContext.h>
 #include <render/worldRenderer/PathTracingFramePipeline.h>
 #include <ecs/Schedule.h>
@@ -73,8 +74,13 @@ public:
     void preRender();
     void render(nvrhi::IFramebuffer* framebuffer);
 
-    void pathTrace(nvrhi::IFramebuffer* framebuffer, const SampleConstants& constants);
-    void denoise(nvrhi::IFramebuffer* framebuffer);
+    void pathTrace(nvrhi::ICommandList* commandList, nvrhi::IFramebuffer* framebuffer, const SampleConstants& constants);
+    void ensureNrdIntegrations();
+    void denoiseStablePlane(nvrhi::ICommandList* commandList, nvrhi::IFramebuffer* framebuffer, int planeIndex);
+    void denoise(nvrhi::ICommandList* commandList, nvrhi::IFramebuffer* framebuffer);
+    void runDlssUpscale(nvrhi::ICommandList* commandList, bool reset);
+    void runNoDenoiserFinalMerge(nvrhi::ICommandList* commandList);
+    void renderGaussianSplats(nvrhi::ICommandList* commandList, bool renderToOutputColor);
     void postProcessAA(nvrhi::IFramebuffer* framebuffer, bool reset);
     void recreateBindingSet();
     void onSceneUnloading();
@@ -138,8 +144,7 @@ public:
 
     void denoisedScreenshot(nvrhi::ITexture* framebufferTexture) const;
 
-    void buildPostProcessGraphPasses(RenderFrameContext& ctx, const ExtractedFrameView& extractedView);
-    void buildCompositeGraphPasses(RenderFrameContext& ctx, const ExtractedFrameView& extractedView);
+    void buildFrameGraphPasses(RenderFrameContext& ctx, const ExtractedFrameView& extractedView);
     void executeFrameRenderGraph(RenderFrameContext& ctx);
 
     void storeFramePassRegistryPass(std::unique_ptr<IPathTracingFramePass> pass);
@@ -155,8 +160,7 @@ private:
     friend void PathTracePrepareSystem(WorldRenderer&, RenderFrameContext&);
     friend void PathTraceSystem(WorldRenderer&, RenderFrameContext&);
     friend void DenoiseAndAASystem(WorldRenderer&, RenderFrameContext&);
-    friend void BuildPostProcessGraphSystem(WorldRenderer&, RenderFrameContext&, ecs::World&);
-    friend void BuildCompositeGraphSystem(WorldRenderer&, RenderFrameContext&, ecs::World&);
+    friend void BuildFrameGraphSystem(WorldRenderer&, RenderFrameContext&, ecs::World&);
     friend void ExecuteRenderGraphSystem(WorldRenderer&, RenderFrameContext&);
     friend void DebugLinesSystem(WorldRenderer&, RenderFrameContext&);
     friend void FinalizeSystem(WorldRenderer&, RenderFrameContext&);
@@ -203,6 +207,7 @@ private:
     ecs::Schedule                m_renderSchedule;
     ecs::World                   m_renderScheduleWorld;
     rg::GraphBuilder             m_frameGraph;
+    rg::RenderTargetPool         m_renderTargetPool;
     RenderFrameContext           m_renderFrameCtx{};
     bool                         m_renderScheduleBuilt = false;
     std::vector<std::unique_ptr<IPathTracingFramePass>> m_framePassRegistryStorage;
@@ -259,6 +264,7 @@ private:
     SampleConstants                             m_currentConstants = {};
     bool                                        m_accumulationCompleted = false;
     bool                                        m_lastRealtimeMode = true;
+    int                                         m_lastScheduledRealtimeAA = -1;
 
     nvrhi::TextureHandle                        m_gaussianSplatCurrentColor;
     nvrhi::TextureHandle                        m_gaussianSplatAccumulatedColor;

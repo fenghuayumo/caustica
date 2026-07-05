@@ -59,22 +59,13 @@ void DenoiseAndAASystem(WorldRenderer& renderer, RenderFrameContext& ctx)
     renderer.framePassDenoiseAndAA(ctx.frame);
 }
 
-void BuildPostProcessGraphSystem(WorldRenderer& renderer, RenderFrameContext& ctx, ecs::World& world)
+void BuildFrameGraphSystem(WorldRenderer& renderer, RenderFrameContext& ctx, ecs::World& world)
 {
     const ExtractedFrameView* extractedView = world.getResource<ExtractedFrameView>();
     if (!extractedView)
         return;
 
-    renderer.buildPostProcessGraphPasses(ctx, *extractedView);
-}
-
-void BuildCompositeGraphSystem(WorldRenderer& renderer, RenderFrameContext& ctx, ecs::World& world)
-{
-    const ExtractedFrameView* extractedView = world.getResource<ExtractedFrameView>();
-    if (!extractedView)
-        return;
-
-    renderer.buildCompositeGraphPasses(ctx, *extractedView);
+    renderer.buildFrameGraphPasses(ctx, *extractedView);
 }
 
 void ExecuteRenderGraphSystem(WorldRenderer& renderer, RenderFrameContext& ctx)

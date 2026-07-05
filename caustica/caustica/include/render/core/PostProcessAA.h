@@ -57,4 +57,8 @@ struct PostProcessAAParams
 
 void postProcessAA(CameraController& camera, PostProcessAAParams& params);
 
+// Platform-only AA paths (Streamline DLSS / native DLSS). Copy, TAA, and accumulation
+// are handled by the frame graph (buildDenoiseAndAAGraph).
+void postProcessAAPlatform(CameraController& camera, PostProcessAAParams& params);
+
 } // namespace caustica

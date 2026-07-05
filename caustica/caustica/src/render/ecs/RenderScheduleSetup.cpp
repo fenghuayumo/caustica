@@ -64,8 +64,7 @@ void buildDefaultRenderSchedule(
     addRendererSystem(schedule, "Prepare", "PathTrace", PathTraceSystem);
     addRendererSystem(schedule, "Prepare", "DenoiseAndAA", DenoiseAndAASystem);
 
-    addGraphSystem(schedule, "BuildPostProcessGraph", BuildPostProcessGraphSystem);
-    addGraphSystem(schedule, "BuildCompositeGraph", BuildCompositeGraphSystem);
+    addGraphSystem(schedule, "BuildFrameGraph", BuildFrameGraphSystem);
 
     schedule.addSystem("ExecuteGraph", "ExecuteRenderGraph",
         [](ecs::World& world, const ecs::ScheduleContext& /*ctx*/) {
@@ -89,9 +88,8 @@ void buildDefaultRenderSchedule(
         .before("SceneUpdate", "PathTracePrepare")
         .before("PathTracePrepare", "PathTrace")
         .before("PathTrace", "DenoiseAndAA")
-        .before("DenoiseAndAA", "BuildPostProcessGraph")
-        .before("BuildPostProcessGraph", "BuildCompositeGraph")
-        .before("BuildCompositeGraph", "ExecuteRenderGraph")
+        .before("DenoiseAndAA", "BuildFrameGraph")
+        .before("BuildFrameGraph", "ExecuteRenderGraph")
         .before("ExecuteRenderGraph", "DebugLines")
         .before("DebugLines", "Finalize");
 

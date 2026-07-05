@@ -232,11 +232,9 @@ void SceneRayTracingResources::sampleRenderCode(nvrhi::IFramebuffer* framebuffer
     nvrhi::CommandListHandle commandList,
     const SampleConstants& constants)
 {
-    if (m_settings->ActualUseRTXDIPasses())
-        m_worldRenderer->getRtxdiPass()->BeginFrame(commandList, *m_worldRenderer->getRenderTargets(), m_worldRenderer->getBindingLayout(), m_worldRenderer->getBindingSet());
-
-    m_worldRenderer->pathTrace(framebuffer, constants);
-    m_worldRenderer->denoise(framebuffer);
+    (void)framebuffer;
+    (void)commandList;
+    (void)constants;
 }
 
 bool SceneRayTracingResources::consumeShaderReloadRequest()

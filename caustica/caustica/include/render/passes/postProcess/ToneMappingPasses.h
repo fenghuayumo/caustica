@@ -159,7 +159,11 @@ public:
     void PreRender(const ToneMappingParameters& params);
 
     // note - if enable == false, it still does autoexposure (if enabled) and everything else, but the output is just passthrough
-    bool Render( nvrhi::ICommandList* commandList, const caustica::ICompositeView& compositeView, nvrhi::ITexture* sourceTexture, bool enabled );
+    bool Render(nvrhi::ICommandList* commandList,
+        const caustica::ICompositeView& compositeView,
+        nvrhi::ITexture* sourceTexture,
+        nvrhi::IBuffer* constantsBuffer,
+        bool enabled);
 
     // R1 pilot — registers ToneMapping as a render-graph pass with automatic barriers.
     void registerGraphPass(

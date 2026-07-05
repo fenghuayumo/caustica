@@ -1,4 +1,6 @@
 #include <render/graph/GraphBuilder.h>
+#include <render/graph/IRenderPass.h>
+#include <render/graph/RenderTargetPool.h>
 
 #include <cassert>
 #include <vector>
@@ -125,6 +127,23 @@ void GraphBuilder::setDevice(nvrhi::IDevice* device)
     m_device = device;
 }
 
+void GraphBuilder::retainRenderPass(std::unique_ptr<IRenderPass> pass)
+{
+    if (pass)
+        m_ownedPasses.push_back(std::move(pass));
+}
+
+size_t GraphBuilder::activePassCount() const
+{
+    size_t count = 0;
+    for (const Pass& pass : m_passes)
+    {
+        if (pass.active)
+            ++count;
+    }
+    return count;
+}
+
 TextureHandle GraphBuilder::importTexture(nvrhi::ITexture* texture, nvrhi::ResourceStates initialState)
 {
     assert(texture);
@@ -169,7 +188,7 @@ BufferHandle GraphBuilder::importBuffer(nvrhi::IBuffer* buffer, BufferAccess ini
     return importBuffer(buffer, accessToState(initialAccess));
 }
 
-TextureHandle GraphBuilder::createTexture(const TextureDesc& desc)
+nvrhi::TextureHandle GraphBuilder::createNativeTexture(const TextureDesc& desc) const
 {
     assert(m_device);
 
@@ -188,20 +207,23 @@ TextureHandle GraphBuilder::createTexture(const TextureDesc& desc)
     nativeDesc.initialState = nvrhi::ResourceStates::Common;
     nativeDesc.keepInitialState = true;
 
-    nvrhi::TextureHandle owned = m_device->createTexture(nativeDesc);
-    assert(owned);
+    return m_device->createTexture(nativeDesc);
+}
+
+TextureHandle GraphBuilder::createTexture(const TextureDesc& desc)
+{
+    assert(m_device);
 
     const TextureHandle handle{ static_cast<uint32_t>(m_textures.size()) };
     GraphTexture resource{};
-    resource.texture = owned;
     resource.currentState = nvrhi::ResourceStates::Common;
     resource.lifetime = ResourceLifetime::Transient;
-    resource.owned = owned;
+    resource.desc = desc;
     m_textures.push_back(resource);
     return handle;
 }
 
-BufferHandle GraphBuilder::createBuffer(const BufferDesc& desc)
+nvrhi::BufferHandle GraphBuilder::createNativeBuffer(const BufferDesc& desc) const
 {
     assert(m_device);
 
@@ -220,15 +242,18 @@ BufferHandle GraphBuilder::createBuffer(const BufferDesc& desc)
     nativeDesc.initialState = nvrhi::ResourceStates::Common;
     nativeDesc.keepInitialState = true;
 
-    nvrhi::BufferHandle owned = m_device->createBuffer(nativeDesc);
-    assert(owned);
+    return m_device->createBuffer(nativeDesc);
+}
+
+BufferHandle GraphBuilder::createBuffer(const BufferDesc& desc)
+{
+    assert(m_device);
 
     const BufferHandle handle{ static_cast<uint32_t>(m_buffers.size()) };
     GraphBuffer resource{};
-    resource.buffer = owned;
     resource.currentState = nvrhi::ResourceStates::Common;
     resource.lifetime = ResourceLifetime::Transient;
-    resource.owned = owned;
+    resource.desc = desc;
     m_buffers.push_back(resource);
     return handle;
 }
@@ -511,7 +536,44 @@ void GraphBuilder::compile()
         resource.buffer = nullptr;
     }
 
+    allocateTransientResources(referenced, referencedBuffers);
     m_compiled = true;
+}
+
+void GraphBuilder::allocateTransientResources(const std::vector<bool>& referencedTextures, const std::vector<bool>& referencedBuffers)
+{
+    assert(m_device);
+
+    for (size_t i = 0; i < m_textures.size(); ++i)
+    {
+        GraphTexture& resource = m_textures[i];
+        if (resource.lifetime != ResourceLifetime::Transient || resource.texture != nullptr)
+            continue;
+        if (i >= referencedTextures.size() || !referencedTextures[i])
+            continue;
+
+        if (m_renderTargetPool)
+            resource.owned = m_renderTargetPool->acquireTexture(resource.desc);
+        else
+            resource.owned = createNativeTexture(resource.desc);
+        assert(resource.owned);
+        resource.texture = resource.owned;
+        resource.currentState = nvrhi::ResourceStates::Common;
+    }
+
+    for (size_t i = 0; i < m_buffers.size(); ++i)
+    {
+        GraphBuffer& resource = m_buffers[i];
+        if (resource.lifetime != ResourceLifetime::Transient || resource.buffer != nullptr)
+            continue;
+        if (i >= referencedBuffers.size() || !referencedBuffers[i])
+            continue;
+
+        resource.owned = createNativeBuffer(resource.desc);
+        assert(resource.owned);
+        resource.buffer = resource.owned;
+        resource.currentState = nvrhi::ResourceStates::Common;
+    }
 }
 
 void GraphBuilder::releaseTransientResources()
@@ -709,6 +771,7 @@ void GraphBuilder::reset()
     m_passes.clear();
     m_compiledPassOrder.clear();
     m_passNames.clear();
+    m_ownedPasses.clear();
     m_importIndexByTexture.clear();
     m_importIndexByBuffer.clear();
     m_compiled = false;

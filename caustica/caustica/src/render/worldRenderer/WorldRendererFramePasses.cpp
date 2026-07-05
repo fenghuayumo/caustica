@@ -1,6 +1,7 @@
 namespace { constexpr int c_SwapchainCount = 3; }
 
 #include <render/worldRenderer/WorldRenderer.h>
+#include <render/graph/FrameGraphBuild.h>
 #include <render/passes/postProcess/PostProcessGraph.h>
 #include <render/passes/composite/BlitGraphPass.h>
 #include <render/worldRenderer/PathTracingFrameContext.h>
@@ -115,7 +116,7 @@ void caustica::render::WorldRenderer::extractFrameView(ecs::World& renderWorld)
     setRenderWorldResource(renderWorld, std::move(extracted));
 }
 
-void caustica::render::WorldRenderer::buildPostProcessGraphPasses(
+void caustica::render::WorldRenderer::buildFrameGraphPasses(
     RenderFrameContext& ctx,
     const ExtractedFrameView& extractedView)
 {
@@ -124,35 +125,9 @@ void caustica::render::WorldRenderer::buildPostProcessGraphPasses(
     rg::GraphBuilder& graph = *ctx.graph;
     graph.reset();
     graph.setDevice(device());
+    graph.setRenderTargetPool(&m_renderTargetPool);
 
     ctx.commandListWasClosed = false;
-
-    rg::PostProcessGraphParams ppParams{
-        .graph = graph,
-        .renderTargets = m_renderTargets.get(),
-        .settings = &m_context.settings,
-        .camera = &m_context.camera,
-        .bloomPass = m_bloomPass.get(),
-        .toneMappingPass = m_toneMappingPass.get(),
-        .compositeView = &extractedView.postProcessView,
-        .displaySize = extractedView.displaySize,
-        .pathTracingBindingSet = m_bindingSet,
-        .descriptorTable = m_context.descriptorTable ? m_context.descriptorTable->getDescriptorTable() : nullptr,
-        .testRaygenPpHdrPipeline = m_ptPipelineTestRaygenPPHDR.get(),
-        .edgeDetectionPipeline = m_ptPipelineEdgeDetection.get(),
-        .outCommandListWasClosed = &ctx.commandListWasClosed,
-    };
-    if (m_context.framePassRegistry)
-        m_context.framePassRegistry->applyGraphPasses(
-            FramePassInsertPoint::AfterDenoiseAndAA, graph, ctx.frame);
-    rg::buildPostProcessGraph(ppParams);
-}
-
-void caustica::render::WorldRenderer::buildCompositeGraphPasses(
-    RenderFrameContext& ctx,
-    const ExtractedFrameView& extractedView)
-{
-    assert(ctx.graph != nullptr);
 
     nvrhi::IFramebuffer* framebuffer = ctx.frame.framebuffer;
     const auto& fbinfo = framebuffer->getFramebufferInfo();
@@ -166,21 +141,39 @@ void caustica::render::WorldRenderer::buildCompositeGraphPasses(
             fbinfo.getViewport());
     }
 
-    rg::GraphBuilder& graph = *ctx.graph;
-    const rg::TextureHandle ldrColor = graph.importTexture(
-        m_renderTargets->ldrColor,
-        nvrhi::ResourceStates::ShaderResource);
+    const bool aaReset = ctx.frame.needNewPasses || m_context.settings.ResetRealtimeCaches;
 
-    rg::FinalBlitPassParams blitParams{};
-    blitParams.sourceLdrColor = ldrColor;
-    blitParams.targetFramebuffer = framebuffer;
-    blitParams.bindingCache = &m_context.bindingCache;
-    rg::registerFinalBlitPass(graph, blitParams, m_context.renderDevice.blit());
-    if (m_context.framePassRegistry)
-    {
-        m_context.framePassRegistry->applyGraphPasses(
-            FramePassInsertPoint::AfterToneMapping, graph, ctx.frame);
-    }
+    rg::FrameGraphBuildParams buildParams{
+        .graph = graph,
+        .worldRenderer = this,
+        .renderTargets = m_renderTargets.get(),
+        .settings = &m_context.settings,
+        .frameContext = &ctx.frame,
+        .framePassRegistry = m_context.framePassRegistry,
+        .targetFramebuffer = framebuffer,
+        .sampleConstants = &m_currentConstants,
+        .hasScene = m_context.sceneManager.getScene() != nullptr,
+        .camera = &m_context.camera,
+        .compositeView = &extractedView.postProcessView,
+        .temporalAAPass = m_temporalAntiAliasingPass.get(),
+        .accumulationPass = m_accumulationPass.get(),
+        .frameIndex = m_frameIndex,
+        .accumulationSampleIndex = m_accumulationSampleIndex,
+        .aaReset = aaReset,
+        .gaussianSplatTemporalSampleIndex = &m_gaussianSplatTemporalSampleIndex,
+        .gaussianSplatTemporalReset = &m_gaussianSplatTemporalReset,
+        .bloomPass = m_bloomPass.get(),
+        .toneMappingPass = m_toneMappingPass.get(),
+        .displaySize = extractedView.displaySize,
+        .pathTracingBindingSet = m_bindingSet,
+        .descriptorTable = m_context.descriptorTable ? m_context.descriptorTable->getDescriptorTable() : nullptr,
+        .testRaygenPpHdrPipeline = m_ptPipelineTestRaygenPPHDR.get(),
+        .edgeDetectionPipeline = m_ptPipelineEdgeDetection.get(),
+        .outCommandListWasClosed = &ctx.commandListWasClosed,
+        .bindingCache = &m_context.bindingCache,
+        .blitPass = &m_context.renderDevice.blit(),
+    };
+    rg::buildFrameGraph(buildParams);
 }
 
 void caustica::render::WorldRenderer::executeFrameRenderGraph(RenderFrameContext& ctx)
@@ -191,6 +184,7 @@ void caustica::render::WorldRenderer::executeFrameRenderGraph(RenderFrameContext
 
     ctx.graph->compile();
     ctx.graph->execute(m_commandList);
+    m_renderTargetPool.endFrame();
 
     if (ctx.commandListWasClosed)
         m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
@@ -225,6 +219,10 @@ void caustica::render::WorldRenderer::framePassSetup(PathTracingFrameContext& ct
         m_lastRealtimeMode = m_context.settings.RealtimeMode;
     }
 
+    if (m_lastScheduledRealtimeAA >= 0 && m_lastScheduledRealtimeAA != m_context.settings.RealtimeAA)
+        m_context.settings.ResetRealtimeCaches = true;
+    m_lastScheduledRealtimeAA = m_context.settings.RealtimeAA;
+
 #if CAUSTICA_WITH_STREAMLINE
     streamlinePreRender();
 #endif
@@ -252,6 +250,8 @@ void caustica::render::WorldRenderer::framePassEnsureRenderTargets(PathTracingFr
         m_context.bindingCache.clear();
         m_renderTargets = std::make_unique<RenderTargets>();
         m_renderTargets->init(device(), m_renderSize, m_displaySize, true, true, c_SwapchainCount);
+        m_renderTargetPool.reset();
+        m_renderTargetPool.setDevice(device());
 
         ctx.needNewPasses = true;
     }
@@ -494,6 +494,9 @@ void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext
         return;
     }
 
+    if (m_toneMappingPass != nullptr && m_context.settings.EnableToneMapping)
+        m_toneMappingPass->PreRender(m_context.settings.ToneMappingParams);
+
     updatePathTracerConstants(constants.ptConsts, ctx.cameraData);
     constants.MaterialCount = m_context.scenePasses.lighting.materials()->getMaterialDataCount();
     const uint32_t gaussianSplatShadowMode = ResolveGaussianSplatShadowMode(m_context.settings);
@@ -571,13 +574,6 @@ void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext
         return;
 
     m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
-
-    m_context.scenePasses.rayTracing.sampleRenderCode(ctx.framebuffer, m_commandList, constants);
-    abortIfSubmitFailed(ctx, "sampleRenderCode");
-    if (ctx.aborted)
-        return;
-
-    m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
 }
 
 void caustica::render::WorldRenderer::framePassDenoiseAndAA(PathTracingFrameContext& ctx)
@@ -587,19 +583,12 @@ void caustica::render::WorldRenderer::framePassDenoiseAndAA(PathTracingFrameCont
 
     SampleConstants& constants = m_currentConstants;
 
-    const bool stochasticSplats = m_context.settings.EnableGaussianSplats && m_context.settings.GaussianSplatSortingMode == 1;
-    const bool stochasticUsesMainTemporal = stochasticSplats && (!m_context.settings.RealtimeMode || m_context.settings.RealtimeAA == 1);
-    if (stochasticUsesMainTemporal)
-        renderGaussianSplats(true);
-
-    postProcessAA(ctx.framebuffer, ctx.needNewPasses || m_context.settings.ResetRealtimeCaches);
+    // Copy, TAA, DLSS, accumulation, and Gaussian splats run in the frame graph after path trace and NRD.
     applyReferenceOIDN();
     if (m_context.settings.ReferenceOIDNDenoiser)
         m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
 
-    if (!stochasticUsesMainTemporal)
-        renderGaussianSplats(false);
-    abortIfSubmitFailed(ctx, "postProcessAA");
+    abortIfSubmitFailed(ctx, "denoiseAndAA");
     if (ctx.aborted)
         return;
 
