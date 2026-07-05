@@ -1023,9 +1023,12 @@ bool Scene::LoadCustomData(Json::Value& rootNode, ThreadPool* threadPool)
     return true;
 }
 
-void Scene::RefreshSceneWorld(uint32_t frameIndex)
+void Scene::refreshEntityWorldForFrame(uint32_t frameIndex)
 {
     if (!m_EntityWorld)
+        return;
+
+    if (!m_EntityWorld->hasPendingStructureChanges() && !m_EntityWorld->hasPendingTransformChanges())
         return;
 
     scene::SceneRenderPublishState& pending = m_RenderSnapshot.pendingState();
@@ -1034,6 +1037,14 @@ void Scene::RefreshSceneWorld(uint32_t frameIndex)
     pending.frameIndex = frameIndex;
 
     m_EntityWorld->refresh(frameIndex);
+}
+
+void Scene::RefreshSceneWorld(uint32_t frameIndex)
+{
+    refreshEntityWorldForFrame(frameIndex);
+    if (!m_EntityWorld)
+        return;
+
     scene::ExtractSceneRenderData(*m_EntityWorld, m_RenderSnapshot.writeBufferForFrame(frameIndex));
 }
 
@@ -1051,17 +1062,20 @@ void Scene::extractAndPublishRenderSnapshot(uint32_t frameIndex)
     if (!m_EntityWorld)
         return;
 
-    if (m_EntityWorld->hasPendingStructureChanges() || m_EntityWorld->hasPendingTransformChanges())
-        RefreshSceneWorld(frameIndex);
-    else
+    scene::SceneRenderPublishState& pending = m_RenderSnapshot.pendingState();
+    if (pending.frameIndex != frameIndex)
     {
-        scene::SceneRenderPublishState& pending = m_RenderSnapshot.pendingState();
-        pending.structureChanged = false;
-        pending.transformsChanged = false;
-        pending.frameIndex = frameIndex;
-        scene::ExtractSceneRenderData(*m_EntityWorld, m_RenderSnapshot.writeBufferForFrame(frameIndex));
+        if (m_EntityWorld->hasPendingStructureChanges() || m_EntityWorld->hasPendingTransformChanges())
+            refreshEntityWorldForFrame(frameIndex);
+        else
+        {
+            pending.structureChanged = false;
+            pending.transformsChanged = false;
+            pending.frameIndex = frameIndex;
+        }
     }
 
+    scene::ExtractSceneRenderData(*m_EntityWorld, m_RenderSnapshot.writeBufferForFrame(frameIndex));
     PublishRenderSnapshot(frameIndex);
 }
 

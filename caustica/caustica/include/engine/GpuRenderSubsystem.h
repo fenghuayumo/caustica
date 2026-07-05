@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <functional>
 #include <memory>
+#include <string_view>
 #include <vector>
 
 #include <rhi/nvrhi.h>
@@ -72,6 +73,8 @@ public:
     GpuRenderSubsystem& operator=(const GpuRenderSubsystem&) = delete;
 
     [[nodiscard]] int priority() const override { return 100; }
+
+    [[nodiscard]] std::string_view scheduleLabel() const override { return "GpuRender"; }
 
     void initialize(EngineInitContext& context) override;
     void shutdown() override;

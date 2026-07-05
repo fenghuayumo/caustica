@@ -1,6 +1,7 @@
 #include <engine/SubsystemCollection.h>
 
 #include <algorithm>
+#include <functional>
 
 namespace caustica
 {
@@ -131,6 +132,30 @@ bool SubsystemCollection::shouldRenderWhenUnfocused() const
             return true;
     }
     return false;
+}
+
+void SubsystemCollection::forEach(const std::function<void(ISubsystem&)>& fn)
+{
+    if (!fn)
+        return;
+
+    for (const auto& subsystem : m_subsystems)
+    {
+        if (subsystem)
+            fn(*subsystem);
+    }
+}
+
+void SubsystemCollection::forEach(const std::function<void(const ISubsystem&)>& fn) const
+{
+    if (!fn)
+        return;
+
+    for (const auto& subsystem : m_subsystems)
+    {
+        if (subsystem)
+            fn(*subsystem);
+    }
 }
 
 } // namespace caustica

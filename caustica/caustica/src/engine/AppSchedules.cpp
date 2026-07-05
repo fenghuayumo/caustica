@@ -14,6 +14,8 @@ const char* toString(AppSchedule schedule)
     case AppSchedule::PreRender: return "PreRender";
     case AppSchedule::Render: return "Render";
     case AppSchedule::PostRender: return "PostRender";
+    case AppSchedule::RenderScene: return "RenderScene";
+    case AppSchedule::RenderFinalize: return "RenderFinalize";
     default: return "Unknown";
     }
 }

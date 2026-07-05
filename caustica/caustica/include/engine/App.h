@@ -66,6 +66,18 @@ public:
     }
 
     void buildPlugins();
+    void registerDefaultSchedules();
+    void ensurePreUpdateTail();
+    void ensurePostUpdateTail();
+
+    [[nodiscard]] bool subsystemSchedulesRegistered() const { return m_subsystemSchedulesRegistered; }
+    void markSubsystemSchedulesRegistered() { m_subsystemSchedulesRegistered = true; }
+
+    template<typename T>
+    [[nodiscard]] T* getSubsystem() const
+    {
+        return m_engine.getSubsystem<T>();
+    }
 
     App& addSystem(AppSchedule schedule, std::string name, AppSystemFn system);
     void runSchedule(AppSchedule schedule, AppScheduleContext& context);
@@ -158,7 +170,10 @@ protected:
     bool m_shutdownCalled = false;
     bool m_pluginsBuilt = false;
     bool m_engineInitialized = false;
-    bool m_defaultSchedulesBuilt = false;
+    bool m_defaultSchedulesRegistered = false;
+    bool m_subsystemSchedulesRegistered = false;
+    bool m_preUpdateTailRegistered = false;
+    bool m_postUpdateTailRegistered = false;
 
     AppSchedules m_schedules;
 
@@ -172,8 +187,13 @@ private:
     bool executeRenderPhase(GpuDevice* gpuDevice, double elapsedTime, double curTime, uint32_t frameIndex);
     void finishFrameWithRenderFailure(GpuDevice* gpuDevice, double elapsedTime, double curTime);
     void shutdownEngine();
-    void ensureDefaultSchedules();
     void runStartupSchedules();
+
+    void notifyDpiScaleIfChanged(GpuDevice& gpuDevice);
+    bool syncRenderThreadCompletedFrames(AppScheduleContext& context);
+    bool dispatchScheduledRender(AppScheduleContext& context);
+    void finalizeFrameTiming(GpuDevice& gpuDevice, double elapsedTime, double curTime);
+    void runGpuSubsystemSchedules(GpuDevice& gpuDevice, uint32_t frameIndex);
 
     GpuDevice* device() const;
     Window* window() const;

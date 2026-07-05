@@ -1,6 +1,7 @@
 #pragma once
 
 #include <engine/App.h>
+#include <engine/EngineScheduleRegistration.h>
 #include <engine/GpuRenderSubsystem.h>
 #include <engine/Plugin.h>
 #include <engine/SceneRuntimeSubsystem.h>
@@ -29,6 +30,11 @@ struct EditorPlugin : Plugin
 
         if (uiConfig)
             app.emplaceSubsystem<EditorUISubsystem>(*uiConfig);
+    }
+
+    void configureSchedules(App& app) override
+    {
+        registerEngineScheduleBridge(app);
     }
 
     SceneRuntimeSubsystemConfig sceneConfig;

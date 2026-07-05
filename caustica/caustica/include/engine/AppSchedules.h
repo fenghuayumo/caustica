@@ -20,6 +20,8 @@ enum class AppSchedule
     PreRender,
     Render,
     PostRender,
+    RenderScene,
+    RenderFinalize,
 };
 
 [[nodiscard]] const char* toString(AppSchedule schedule);
@@ -32,6 +34,13 @@ struct AppScheduleContext
     uint32_t frameIndex = 0;
     bool windowFocused = true;
     bool windowVisible = true;
+
+    double elapsedTime = 0.0;
+    double currentTime = 0.0;
+
+    bool runUpdate = false;
+    bool runRender = false;
+    bool abortFrame = false;
 };
 
 using AppSystemFn = std::function<void(AppScheduleContext&)>;
@@ -58,7 +67,7 @@ private:
 
     [[nodiscard]] static std::size_t phaseIndex(AppSchedule schedule);
 
-    PhaseSchedule m_phases[7];
+    PhaseSchedule m_phases[9];
 };
 
 } // namespace caustica

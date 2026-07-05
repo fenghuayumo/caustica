@@ -90,6 +90,11 @@ void SceneRuntimeSubsystem::onPrepareRenderScene(GpuDevice& /*gpuDevice*/)
     m_config.sceneRuntime.prepareRenderFrame();
 }
 
+void SceneRuntimeSubsystem::postUpdateSceneEntityWorld(uint32_t frameIndex)
+{
+    m_config.sceneRuntime.postUpdateSceneEntityWorld(frameIndex);
+}
+
 void SceneRuntimeSubsystem::onRenderScene(GpuDevice& gpuDevice)
 {
     SceneRuntime& sceneRuntime = m_config.sceneRuntime;

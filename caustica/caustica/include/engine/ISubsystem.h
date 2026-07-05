@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
+#include <string_view>
 
 namespace caustica
 {
@@ -25,6 +27,8 @@ public:
     virtual ~ISubsystem() = default;
 
     [[nodiscard]] virtual int priority() const { return 0; }
+
+    [[nodiscard]] virtual std::string_view scheduleLabel() const { return "Subsystem"; }
 
     virtual void initialize(EngineInitContext& context) {}
     virtual void shutdown() {}

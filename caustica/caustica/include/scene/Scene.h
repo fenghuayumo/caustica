@@ -111,9 +111,10 @@ namespace caustica
             std::shared_ptr<SceneTypeFactory> sceneTypeFactory);
 
         void RefreshSceneWorld(uint32_t frameIndex);
+        void refreshEntityWorldForFrame(uint32_t frameIndex);
         void PublishRenderSnapshot(uint32_t frameIndex);
 
-        // Main/logic thread: refresh ECS (if dirty), extract, and publish for render thread.
+        // Main/logic thread: extract and publish (ECS refresh runs in App PostUpdate).
         void extractAndPublishRenderSnapshot(uint32_t frameIndex);
 
         // Returns true when extractAndPublishRenderSnapshot already ran for `frameIndex`.

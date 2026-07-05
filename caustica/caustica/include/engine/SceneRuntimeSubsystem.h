@@ -6,6 +6,7 @@
 #include <render/SessionDiagnostics.h>
 
 #include <string>
+#include <string_view>
 
 namespace caustica
 {
@@ -34,12 +35,16 @@ public:
 
     [[nodiscard]] int priority() const override { return 200; }
 
+    [[nodiscard]] std::string_view scheduleLabel() const override { return "SceneRuntime"; }
+
     void initialize(EngineInitContext& context) override;
 
     void onBeginFrame(GpuDevice& gpuDevice) override;
     void onUpdate(float elapsedTimeSeconds, bool windowFocused) override;
     void onPrepareRenderScene(GpuDevice& gpuDevice) override;
     void onRenderScene(GpuDevice& gpuDevice) override;
+
+    void postUpdateSceneEntityWorld(uint32_t frameIndex);
 
     void onBackBufferResizing() override;
 

@@ -176,6 +176,15 @@ void SceneRuntime::prepareRenderFrame()
     scene->extractAndPublishRenderSnapshot(m_gpuDevice->GetPreparedRenderFrameIndex());
 }
 
+void SceneRuntime::postUpdateSceneEntityWorld(uint32_t frameIndex)
+{
+    const std::shared_ptr<Scene> scene = GetScene();
+    if (!scene)
+        return;
+
+    scene->refreshEntityWorldForFrame(frameIndex);
+}
+
 std::shared_ptr<Scene> SceneRuntime::GetScene() const
 {
     return m_sceneManager ? m_sceneManager->getScene() : nullptr;

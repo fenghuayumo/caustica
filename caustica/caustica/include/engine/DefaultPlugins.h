@@ -16,6 +16,7 @@ struct DefaultPlugins : Plugin
     }
 
     void build(App& app) override;
+    void configureSchedules(App& app) override;
 
     SceneRuntimeSubsystemConfig sceneConfig;
 };

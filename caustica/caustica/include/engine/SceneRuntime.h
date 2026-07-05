@@ -135,6 +135,7 @@ public:
     void initStreamlineAndWindow();
 
     void prepareRenderFrame();
+    void postUpdateSceneEntityWorld(uint32_t frameIndex);
     virtual void afterWorldRender(GpuDevice& gpuDevice);
     void recordFrameTiming(const GpuDevice& gpuDevice);
     void beginFrame();

@@ -2,6 +2,7 @@
 
 #include <engine/ISubsystem.h>
 
+#include <functional>
 #include <memory>
 #include <typeindex>
 #include <unordered_map>
@@ -37,6 +38,9 @@ public:
             return nullptr;
         return static_cast<T*>(it->second);
     }
+
+    void forEach(const std::function<void(ISubsystem&)>& fn);
+    void forEach(const std::function<void(const ISubsystem&)>& fn) const;
 
 private:
     std::vector<std::unique_ptr<ISubsystem>> m_subsystems;

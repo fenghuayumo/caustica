@@ -2,6 +2,8 @@
 
 #include <engine/SceneRuntimeSubsystem.h>
 
+#include <string_view>
+
 namespace caustica::editor
 {
 
@@ -18,6 +20,8 @@ class EditorSceneSubsystem : public caustica::SceneRuntimeSubsystem
 {
 public:
     explicit EditorSceneSubsystem(EditorSceneSubsystemConfig config);
+
+    [[nodiscard]] std::string_view scheduleLabel() const override { return "EditorScene"; }
 
 protected:
     void onInitializePost(caustica::EngineInitContext& context) override;

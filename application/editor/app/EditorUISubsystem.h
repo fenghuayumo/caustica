@@ -5,6 +5,7 @@
 #include <engine/ISubsystem.h>
 
 #include <memory>
+#include <string_view>
 
 namespace caustica::editor
 {
@@ -27,6 +28,8 @@ public:
     explicit EditorUISubsystem(EditorUISubsystemConfig config);
 
     [[nodiscard]] int priority() const override { return 250; }
+
+    [[nodiscard]] std::string_view scheduleLabel() const override { return "EditorUI"; }
 
     void initialize(caustica::EngineInitContext& context) override;
     void shutdown() override;
