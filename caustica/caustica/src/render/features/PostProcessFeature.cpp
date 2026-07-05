@@ -2,7 +2,7 @@
 
 #include <render/core/PathTracingShaderCompiler.h>
 #include <render/core/RenderTargets.h>
-#include <render/ecs/RenderWorldResources.h>
+#include <render/features/RenderFeatureContext.h>
 #include <render/graph/GraphBuilder.h>
 #include <render/features/RenderFeatureContext.h>
 #include <render/passes/geometry/BloomPass.h>

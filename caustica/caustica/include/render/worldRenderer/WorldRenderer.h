@@ -17,13 +17,10 @@
 #include <render/passes/gaussian/GaussianSplatEmissionProxy.h>
 
 #include <render/ecs/RenderFrameContext.h>
-#include <render/ecs/RenderScheduleSetup.h>
-#include <render/graph/GraphBuilder.h>
+#include <render/pipeline/RenderPipelineRegistry.h>
 #include <render/graph/RenderTargetPool.h>
 #include <render/graph/RenderBufferPool.h>
 #include <render/worldRenderer/PathTracingFrameContext.h>
-#include <ecs/Schedule.h>
-#include <ecs/World.h>
 
 #include <chrono>
 #include <functional>
@@ -56,7 +53,10 @@ namespace render
 class TemporalAntiAliasingPass;
 class BloomPass;
 class DLSS;
+class RenderGraphRegistry;
+class PathTracingPipelinePlugin;
 struct ExtractedFrameView;
+struct RenderFeatureContext;
 
 // =============================================================================
 // WorldRenderer — GPU path-tracing pipeline driven by PathTracingContext.
@@ -155,24 +155,17 @@ public:
 
     void denoisedScreenshot(nvrhi::ITexture* framebufferTexture) const;
 
-    void buildFrameGraphPasses(RenderFrameContext& ctx, const ExtractedFrameView& extractedView);
+    void buildFrameGraphPasses(RenderFrameContext& ctx, const RenderGraphRegistry& graphRegistry);
     void executeFrameRenderGraph(RenderFrameContext& ctx);
 
+    void addRenderPipelinePlugin(std::unique_ptr<IRenderPipelinePlugin> plugin);
+    void addRenderPipelinePlugin(IRenderPipelinePlugin& plugin);
+    [[nodiscard]] RenderPipelineRegistry& pipelineRegistry() { return m_pipelineRegistry; }
+    [[nodiscard]] const RenderPipelineRegistry& pipelineRegistry() const { return m_pipelineRegistry; }
+
 private:
-    friend void FrameSetupSystem(WorldRenderer&, RenderFrameContext&);
-    friend void ExtractFrameViewSystem(ecs::World&, const ecs::ScheduleContext&);
-    friend void EnsureRenderTargetsSystem(WorldRenderer&, RenderFrameContext&);
-    friend void RendererInitSystem(WorldRenderer&, RenderFrameContext&);
-    friend void ShaderUpdateSystem(WorldRenderer&, RenderFrameContext&);
-    friend void BeginCommandListSystem(WorldRenderer&, RenderFrameContext&);
-    friend void SceneUpdateSystem(WorldRenderer&, RenderFrameContext&);
-    friend void PathTracePrepareSystem(WorldRenderer&, RenderFrameContext&);
-    friend void PathTraceSystem(WorldRenderer&, RenderFrameContext&);
-    friend void DenoiseAndAASystem(WorldRenderer&, RenderFrameContext&);
-    friend void BuildFrameGraphSystem(WorldRenderer&, RenderFrameContext&, ecs::World&);
-    friend void ExecuteRenderGraphSystem(WorldRenderer&, RenderFrameContext&);
-    friend void DebugLinesSystem(WorldRenderer&, RenderFrameContext&);
-    friend void FinalizeSystem(WorldRenderer&, RenderFrameContext&);
+    friend class PathTracingPipelinePlugin;
+    friend class RenderPipelineRegistry;
 
     [[nodiscard]] nvrhi::IDevice* device() const { return m_context.gpuDevice.GetDevice(); }
 
@@ -180,8 +173,9 @@ private:
     void syncCameraViews();
     [[nodiscard]] dm::float2 computeCameraJitter() const;
 
-    void ensureRenderScheduleBuilt();
-    void extractFrameView(ecs::World& renderWorld);
+    void populateRenderFrameContext(nvrhi::IFramebuffer* framebuffer, RenderFrameContext& ctx);
+    void populateFrameView(ExtractedFrameView& view);
+    [[nodiscard]] RenderFeatureContext makeRenderFeatureContext(RenderFrameContext& ctx);
     void framePassSetup(PathTracingFrameContext& ctx);
     void framePassEnsureRenderTargets(PathTracingFrameContext& ctx);
     void framePassRendererInit(PathTracingFrameContext& ctx);
@@ -213,13 +207,11 @@ private:
 
     PathTracingContext&          m_context;
 
-    ecs::Schedule                m_renderSchedule;
-    ecs::World                   m_renderScheduleWorld;
+    RenderPipelineRegistry       m_pipelineRegistry;
     rg::GraphBuilder             m_frameGraph;
     rg::RenderTargetPool         m_renderTargetPool;
     rg::RenderBufferPool         m_renderBufferPool;
     RenderFrameContext           m_renderFrameCtx{};
-    bool                         m_renderScheduleBuilt = false;
 
     std::unique_ptr<RtxdiPass>                  m_rtxdiPass;
     std::unique_ptr<RenderTargets>              m_renderTargets;

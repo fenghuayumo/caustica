@@ -1,6 +1,7 @@
 #pragma once
 
 #include <render/core/PathTracerSettings.h>
+#include <render/ecs/RenderFrameContext.h>
 #include <rhi/nvrhi.h>
 #include <shaders/SampleConstantBuffer.h>
 
@@ -22,7 +23,6 @@ namespace caustica::render
 class FullscreenBlitPass;
 class PathTracingFrameContext;
 class WorldRenderer;
-struct ExtractedFrameView;
 
 // Pointer-based so graph execute lambdas can capture a copy by value safely.
 struct RenderFeatureContext

@@ -11,6 +11,7 @@
 #include <render/RenderSessionState.h>
 #include <render/SceneLightingPasses.h>
 #include <render/worldRenderer/WorldRenderer.h>
+#include <render/pipeline/RenderPipelineRegistry.h>
 
 namespace caustica
 {
@@ -63,6 +64,9 @@ void SceneRuntimeSubsystem::initialize(EngineInitContext& context)
 
     if (m_config.sessionState && m_config.cmdLine && m_config.applyCmdLineToSessionState)
         render::InitializeRenderSessionStateFromCommandLine(*m_config.sessionState, *m_config.cmdLine);
+
+    if (auto* worldRenderer = sceneRuntime.GetWorldRenderer())
+        sceneRuntime.registerRenderPipelinePlugins(worldRenderer->pipelineRegistry());
 
     onInitializePost(context);
 }

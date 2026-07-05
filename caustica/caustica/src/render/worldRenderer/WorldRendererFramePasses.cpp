@@ -1,13 +1,14 @@
 #include <render/features/RenderFeature.h>
 #include <render/features/PathTraceGraphResources.h>
 #include <render/features/RenderFeatureContext.h>
+#include <render/pipeline/RenderGraphRegistry.h>
+#include <render/pipeline/RenderPipelineRegistry.h>
 
 namespace { constexpr int c_SwapchainCount = 3; }
 
 #include <render/worldRenderer/WorldRenderer.h>
 #include <render/worldRenderer/PathTracingFrameContext.h>
-#include <render/ecs/RenderScheduleSetup.h>
-#include <render/ecs/RenderWorldResources.h>
+#include <scene/Scene.h>
 #include <render/SceneGpuResources.h>
 #include <render/SceneGaussianSplatPasses.h>
 #include <render/SceneRayTracingResources.h>
@@ -86,33 +87,76 @@ namespace
     }
 }
 
-void caustica::render::WorldRenderer::ensureRenderScheduleBuilt()
+void caustica::render::WorldRenderer::populateFrameView(ExtractedFrameView& view)
 {
-    if (m_renderScheduleBuilt)
-        return;
+    view.displaySize = m_displaySize;
+    view.renderSize = m_renderSize;
+    view.displayAspectRatio = m_displayAspectRatio;
 
-    buildDefaultRenderSchedule(m_renderSchedule, *this);
-    m_renderScheduleBuilt = true;
+    view.postProcessView = *m_context.camera.view();
+    ViewportDesc windowViewport(float(m_displaySize.x), float(m_displaySize.y));
+    view.postProcessView.setViewport(windowViewport);
+    view.postProcessView.updateCache();
 }
 
-void caustica::render::WorldRenderer::extractFrameView(ecs::World& renderWorld)
+void caustica::render::WorldRenderer::populateRenderFrameContext(
+    nvrhi::IFramebuffer* framebuffer,
+    RenderFrameContext& ctx)
 {
-    ExtractedFrameView extracted{};
-    extracted.displaySize = m_displaySize;
-    extracted.renderSize = m_renderSize;
-    extracted.displayAspectRatio = m_displayAspectRatio;
+    ctx = {};
+    ctx.frame.renderer = this;
+    ctx.frame.framebuffer = framebuffer;
+    ctx.frame.displaySize = m_displaySize;
+    ctx.frame.renderSize = m_renderSize;
+    ctx.graph = &m_frameGraph;
 
-    extracted.postProcessView = *m_context.camera.view();
-    ViewportDesc windowViewport(float(m_displaySize.x), float(m_displaySize.y));
-    extracted.postProcessView.setViewport(windowViewport);
-    extracted.postProcessView.updateCache();
+    populateFrameView(ctx.view);
 
-    setRenderWorldResource(renderWorld, std::move(extracted));
+    if (const std::shared_ptr<Scene> scene = m_context.sceneManager.getScene())
+    {
+        const uint32_t frameIndex = m_context.gpuDevice.GetRenderPhaseFrameIndex();
+        ctx.scene = &scene->GetRenderData();
+        ctx.sceneStructureChanged = scene->HasSceneStructureChanged(frameIndex);
+        ctx.sceneTransformsChanged = scene->HasSceneTransformsChanged(frameIndex);
+    }
+}
+
+RenderFeatureContext caustica::render::WorldRenderer::makeRenderFeatureContext(RenderFrameContext& ctx)
+{
+    const bool aaReset = ctx.frame.needNewPasses || m_context.settings.ResetRealtimeCaches;
+
+    return RenderFeatureContext{
+        .graph = ctx.graph,
+        .renderer = this,
+        .frame = &ctx.frame,
+        .renderTargets = m_renderTargets.get(),
+        .settings = &m_context.settings,
+        .sampleConstants = &m_currentConstants,
+        .targetFramebuffer = ctx.frame.framebuffer,
+        .extractedView = &ctx.view,
+        .bindingCache = &m_context.bindingCache,
+        .blitPass = &m_context.renderDevice.blit(),
+        .hasScene = m_context.sceneManager.getScene() != nullptr,
+        .aaReset = aaReset,
+        .commandListWasClosed = &ctx.commandListWasClosed,
+        .gaussianSplatTemporalSampleIndex = &m_gaussianSplatTemporalSampleIndex,
+        .gaussianSplatTemporalReset = &m_gaussianSplatTemporalReset,
+    };
+}
+
+void caustica::render::WorldRenderer::addRenderPipelinePlugin(std::unique_ptr<IRenderPipelinePlugin> plugin)
+{
+    m_pipelineRegistry.addPlugin(std::move(plugin));
+}
+
+void caustica::render::WorldRenderer::addRenderPipelinePlugin(IRenderPipelinePlugin& plugin)
+{
+    m_pipelineRegistry.addPlugin(plugin);
 }
 
 void caustica::render::WorldRenderer::buildFrameGraphPasses(
     RenderFrameContext& ctx,
-    const ExtractedFrameView& extractedView)
+    const RenderGraphRegistry& graphRegistry)
 {
     assert(ctx.graph != nullptr);
 
@@ -123,6 +167,7 @@ void caustica::render::WorldRenderer::buildFrameGraphPasses(
     graph.setRenderBufferPool(&m_renderBufferPool);
 
     ctx.commandListWasClosed = false;
+    ctx.graphBuilt = true;
 
     nvrhi::IFramebuffer* framebuffer = ctx.frame.framebuffer;
     const auto& fbinfo = framebuffer->getFramebufferInfo();
@@ -131,32 +176,13 @@ void caustica::render::WorldRenderer::buildFrameGraphPasses(
     {
         m_shaderDebug->EndFrameAndOutput(
             m_commandList,
-            m_renderTargets->ldrFramebuffer->getFramebuffer(extractedView.postProcessView),
+            m_renderTargets->ldrFramebuffer->getFramebuffer(ctx.view.postProcessView),
             m_renderTargets->depth,
             fbinfo.getViewport());
     }
 
-    const bool aaReset = ctx.frame.needNewPasses || m_context.settings.ResetRealtimeCaches;
-
-    RenderFeatureContext featureCtx{
-        .graph = &graph,
-        .renderer = this,
-        .frame = &ctx.frame,
-        .renderTargets = m_renderTargets.get(),
-        .settings = &m_context.settings,
-        .sampleConstants = &m_currentConstants,
-        .targetFramebuffer = framebuffer,
-        .extractedView = &extractedView,
-        .bindingCache = &m_context.bindingCache,
-        .blitPass = &m_context.renderDevice.blit(),
-        .hasScene = m_context.sceneManager.getScene() != nullptr,
-        .aaReset = aaReset,
-        .commandListWasClosed = &ctx.commandListWasClosed,
-        .gaussianSplatTemporalSampleIndex = &m_gaussianSplatTemporalSampleIndex,
-        .gaussianSplatTemporalReset = &m_gaussianSplatTemporalReset,
-    };
-
-    registerDefaultGraphFeatures(featureCtx);
+    RenderFeatureContext featureCtx = makeRenderFeatureContext(ctx);
+    graphRegistry.build(featureCtx);
 }
 
 void caustica::render::WorldRenderer::executeFrameRenderGraph(RenderFrameContext& ctx)

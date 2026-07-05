@@ -54,6 +54,7 @@ class TextureLoader;
 
 namespace caustica::render
 {
+class RenderPipelineRegistry;
 class WorldRenderer;
 class SceneGaussianSplatPasses;
 class SceneLightingPasses;
@@ -117,6 +118,7 @@ public:
     float GetAvgTimePerFrame() const;
 
     virtual void bindGpuRenderSubsystem(GpuRenderSubsystem& gpuRenderSubsystem);
+    virtual void registerRenderPipelinePlugins(render::RenderPipelineRegistry& registry) {}
     void Init(const std::string& preferredScene,
         const std::shared_ptr<ShaderFactory>& shaderFactory);
 

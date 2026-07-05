@@ -9,8 +9,9 @@
 
 namespace caustica::scene
 {
-    // Snapshot of scene entities consumed by the render thread / render passes.
-    // Populated once per frame after ECS refresh via ExtractSceneRenderData.
+    // Canonical render-thread scene snapshot (UE-style render resource).
+    // Logic thread: ExtractSceneRenderData → SceneRenderSnapshot.
+    // Render thread: Scene::GetRenderData() or render::tryGetRenderSceneData(renderWorld).
     struct MeshInstanceRenderProxy
     {
         ecs::Entity entity = ecs::NullEntity;
