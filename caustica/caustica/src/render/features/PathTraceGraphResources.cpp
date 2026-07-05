@@ -1,6 +1,9 @@
 #include <render/features/PathTraceGraphResources.h>
 
 #include <render/core/RenderTargets.h>
+#include <render/core/PathTracerSettings.h>
+
+#include <cassert>
 
 namespace caustica::render
 {
@@ -101,15 +104,6 @@ void declareMainPathTraceAccess(rg::PassBuilder& setup, const PathTraceGraphTarg
     setup.write(handles.secondarySurfaceRadiance, rg::TextureAccess::UnorderedAccess);
 }
 
-void declareRtxdiBeginFrameAccess(rg::PassBuilder& /*setup*/, const PathTraceGraphTargets& /*handles*/)
-{
-}
-
-void declareRtxdiExecuteAccess(rg::PassBuilder& setup, const PathTraceGraphTargets& handles)
-{
-    declarePathTraceOutputWrites(setup, handles);
-}
-
 void declareDenoiserPrepareAccess(rg::PassBuilder& setup, const PathTraceGraphTargets& handles)
 {
     setup.write(handles.depth, rg::TextureAccess::UnorderedAccess);
@@ -121,6 +115,46 @@ void declareDenoiserPrepareAccess(rg::PassBuilder& setup, const PathTraceGraphTa
 void declareStablePlanesDebugVizAccess(rg::PassBuilder& setup, const PathTraceGraphTargets& handles)
 {
     declarePathTraceOutputWrites(setup, handles);
+}
+
+bool needsPathTraceLightingEndPass(const PathTracerSettings& settings)
+{
+    return settings.NEEType == 2;
+}
+
+const char* pathTraceLightingEndExecuteAfterPass(const PathTracerSettings& settings)
+{
+    return settings.RealtimeMode ? "VBufferExport" : "FrameClear";
+}
+
+const char* pathTraceMainExecuteAfterPass(const PathTracerSettings& settings)
+{
+    if (needsPathTraceLightingEndPass(settings))
+        return "PathTraceLightingEnd";
+
+    return settings.RealtimeMode ? "VBufferExport" : "FrameClear";
+}
+
+void validateReferencePathTraceGraph(const rg::GraphBuilder& graph, const PathTracerSettings& settings)
+{
+    assert(graph.isCompiled());
+    assert(!settings.RealtimeMode);
+
+    assert(!graph.isPassRegistered("PathTracePrePass"));
+    assert(!graph.isPassRegistered("VBufferExport"));
+
+    if (!settings.ActualUseRTXDIPasses())
+    {
+        assert(!graph.isPassRegistered("RtxdiBeginFrame"));
+        assert(!graph.isPassRegistered("Rtxdi"));
+    }
+
+    assert(graph.isPassActive("MainPathTrace"));
+
+    if (needsPathTraceLightingEndPass(settings))
+        assert(graph.isPassActive("PathTraceLightingEnd"));
+    else
+        assert(!graph.isPassRegistered("PathTraceLightingEnd"));
 }
 
 } // namespace caustica::render

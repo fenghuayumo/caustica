@@ -1,5 +1,6 @@
 #pragma once
 
+#include <render/core/PathTracerSettings.h>
 #include <render/graph/GraphBuilder.h>
 
 class RenderTargets;
@@ -47,9 +48,13 @@ void declarePathTraceLightingEndAccess(rg::PassBuilder& setup, const PathTraceGr
 void declarePathTracePrePassAccess(rg::PassBuilder& setup, const PathTraceGraphTargets& handles);
 void declareVBufferExportAccess(rg::PassBuilder& setup, const PathTraceGraphTargets& handles);
 void declareMainPathTraceAccess(rg::PassBuilder& setup, const PathTraceGraphTargets& handles);
-void declareRtxdiBeginFrameAccess(rg::PassBuilder& setup, const PathTraceGraphTargets& handles);
-void declareRtxdiExecuteAccess(rg::PassBuilder& setup, const PathTraceGraphTargets& handles);
 void declareDenoiserPrepareAccess(rg::PassBuilder& setup, const PathTraceGraphTargets& handles);
 void declareStablePlanesDebugVizAccess(rg::PassBuilder& setup, const PathTraceGraphTargets& handles);
+
+[[nodiscard]] bool needsPathTraceLightingEndPass(const PathTracerSettings& settings);
+[[nodiscard]] const char* pathTraceLightingEndExecuteAfterPass(const PathTracerSettings& settings);
+[[nodiscard]] const char* pathTraceMainExecuteAfterPass(const PathTracerSettings& settings);
+
+void validateReferencePathTraceGraph(const rg::GraphBuilder& graph, const PathTracerSettings& settings);
 
 } // namespace caustica::render

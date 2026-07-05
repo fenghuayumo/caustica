@@ -147,6 +147,32 @@ size_t GraphBuilder::activePassCount() const
     return count;
 }
 
+bool GraphBuilder::isPassRegistered(const std::string_view name) const
+{
+    for (const Pass& pass : m_passes)
+    {
+        if (pass.name == name)
+            return true;
+    }
+    return false;
+}
+
+bool GraphBuilder::isPassActive(const std::string_view name) const
+{
+    assert(m_compiled);
+
+    for (const uint32_t passIndex : m_compiledPassOrder)
+    {
+        if (passIndex >= m_passes.size())
+            continue;
+
+        const Pass& pass = m_passes[passIndex];
+        if (pass.active && pass.name == name)
+            return true;
+    }
+    return false;
+}
+
 TextureHandle GraphBuilder::importTexture(nvrhi::ITexture* texture, nvrhi::ResourceStates initialState)
 {
     assert(texture);
@@ -406,6 +432,23 @@ void GraphBuilder::compile()
             if (lastBufferWriter[i] >= 0)
                 rootPass[static_cast<uint32_t>(lastBufferWriter[i])] = true;
         }
+    }
+
+    for (uint32_t passIndex = 0; passIndex < static_cast<uint32_t>(m_passes.size()); ++passIndex)
+    {
+        const Pass& pass = m_passes[passIndex];
+        if (!pass.options.enabled || pass.options.executeAfter == nullptr)
+            continue;
+
+        const auto predecessor = std::find_if(
+            m_passes.begin(),
+            m_passes.end(),
+            [&](const Pass& candidate) { return candidate.name == pass.options.executeAfter; });
+        if (predecessor == m_passes.end())
+            continue;
+
+        const uint32_t predecessorIndex = static_cast<uint32_t>(std::distance(m_passes.begin(), predecessor));
+        addDependency(predecessorIndex, passIndex);
     }
 
     std::vector<bool> needed(m_passes.size(), false);

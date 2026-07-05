@@ -1,6 +1,7 @@
 #include <render/features/RenderFeature.h>
 
 #include <render/features/PathTraceGraphResources.h>
+#include <render/features/RtxdiGraphResources.h>
 #include <render/features/RenderFeatureContext.h>
 #include <render/graph/GraphBuilder.h>
 #include <render/passes/rtxdi/RtxdiPass.h>
@@ -21,15 +22,22 @@ void registerRtxdiBeginFrameFeature(RenderFeatureContext ctx)
     if (!ctx.hasScene || !ctx.settings->ActualUseRTXDIPasses())
         return;
 
-    const PathTraceGraphTargets handles = importPathTraceGraphTargets(*ctx.graph, *ctx.renderTargets);
+    RtxdiPass* rtxdiPass = ctx.renderer->getRtxdiPass();
+    RtxdiGraphResources rtxdiResources{};
+    if (!tryImportRtxdiGraphResources(*ctx.graph, rtxdiPass, rtxdiResources))
+        return;
+
+    const PathTraceGraphTargets pathTraceTargets = importPathTraceGraphTargets(*ctx.graph, *ctx.renderTargets);
+
+    rg::PassOptions passOptions{};
+    passOptions.executeAfter = "FrameClear";
 
     ctx.graph->addPass(
         "RtxdiBeginFrame",
-        [handles](rg::PassBuilder& setup) {
-            declareRtxdiBeginFrameAccess(setup, handles);
+        [rtxdiResources, pathTraceTargets](rg::PassBuilder& setup) {
+            declareRtxdiBeginFrameAccess(setup, rtxdiResources, pathTraceTargets);
         },
-        [ctx](rg::RenderPassContext& passCtx) {
-            RtxdiPass* rtxdiPass = ctx.renderer->getRtxdiPass();
+        [ctx, rtxdiPass](rg::RenderPassContext& passCtx) {
             if (rtxdiPass == nullptr)
                 return;
 
@@ -39,7 +47,7 @@ void registerRtxdiBeginFrameFeature(RenderFeatureContext ctx)
                 ctx.renderer->getBindingLayout(),
                 ctx.renderer->getBindingSet());
         },
-        rg::PassOptions{ .sideEffect = true });
+        passOptions);
 }
 
 void registerRtxdiExecuteFeature(RenderFeatureContext ctx)
@@ -52,17 +60,25 @@ void registerRtxdiExecuteFeature(RenderFeatureContext ctx)
     if (!ctx.hasScene || !ctx.settings->ActualUseRTXDIPasses())
         return;
 
-    const PathTraceGraphTargets handles = importPathTraceGraphTargets(*ctx.graph, *ctx.renderTargets);
+    RtxdiPass* rtxdiPass = ctx.renderer->getRtxdiPass();
+    RtxdiGraphResources rtxdiResources{};
+    if (!tryImportRtxdiGraphResources(*ctx.graph, rtxdiPass, rtxdiResources))
+        return;
+
+    const PathTraceGraphTargets pathTraceTargets = importPathTraceGraphTargets(*ctx.graph, *ctx.renderTargets);
+
+    rg::PassOptions passOptions{};
+    passOptions.executeAfter = "MainPathTrace";
 
     ctx.graph->addPass(
         "Rtxdi",
-        [handles](rg::PassBuilder& setup) {
-            declareRtxdiExecuteAccess(setup, handles);
+        [rtxdiResources, pathTraceTargets, settings = *ctx.settings](rg::PassBuilder& setup) {
+            declareRtxdiExecuteAccess(setup, rtxdiResources, pathTraceTargets, settings);
         },
         [ctx](rg::RenderPassContext& passCtx) {
             ctx.renderer->executeRtxdi(passCtx.commandList());
         },
-        rg::PassOptions{ .sideEffect = true });
+        passOptions);
 }
 
 } // namespace caustica::render

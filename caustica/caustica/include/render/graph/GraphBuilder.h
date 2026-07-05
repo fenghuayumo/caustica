@@ -58,6 +58,7 @@ struct PassOptions
 {
     bool enabled = true;
     bool sideEffect = false;
+    const char* executeAfter = nullptr;
 };
 
 class PassBuilder
@@ -143,6 +144,8 @@ public:
     [[nodiscard]] const std::vector<uint32_t>& compiledPassOrder() const { return m_compiledPassOrder; }
     [[nodiscard]] const TransientResourceStats& transientResourceStats() const { return m_transientStats; }
     [[nodiscard]] size_t activePassCount() const;
+    [[nodiscard]] bool isPassRegistered(std::string_view name) const;
+    [[nodiscard]] bool isPassActive(std::string_view name) const;
 
 private:
     friend class PassBuilder;

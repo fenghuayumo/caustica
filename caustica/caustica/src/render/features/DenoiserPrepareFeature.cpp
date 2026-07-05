@@ -38,6 +38,9 @@ void registerDenoiserPrepareFeature(RenderFeatureContext ctx)
     const PathTraceGraphTargets handles = importPathTraceGraphTargets(*ctx.graph, *ctx.renderTargets);
     extractPathTraceGraphOutputs(*ctx.graph, handles);
 
+    rg::PassOptions denoiserPassOptions{};
+    denoiserPassOptions.executeAfter = ctx.settings->ActualUseRTXDIPasses() ? "Rtxdi" : "MainPathTrace";
+
     ctx.graph->addPass(
         "DenoiserPrepare",
         [handles](rg::PassBuilder& setup) {
@@ -46,10 +49,13 @@ void registerDenoiserPrepareFeature(RenderFeatureContext ctx)
         [ctx](rg::RenderPassContext& passCtx) {
             ctx.renderer->prepareDenoiserGuides(passCtx.commandList());
         },
-        rg::PassOptions{ .sideEffect = true });
+        denoiserPassOptions);
 
     if (needsStablePlanesDebugViz(*ctx.settings))
     {
+        rg::PassOptions debugVizPassOptions{};
+        debugVizPassOptions.executeAfter = "DenoiserPrepare";
+
         ctx.graph->addPass(
             "StablePlanesDebugViz",
             [handles](rg::PassBuilder& setup) {
@@ -58,7 +64,7 @@ void registerDenoiserPrepareFeature(RenderFeatureContext ctx)
             [ctx](rg::RenderPassContext& passCtx) {
                 ctx.renderer->stablePlanesDebugViz(passCtx.commandList());
             },
-            rg::PassOptions{ .sideEffect = true });
+            debugVizPassOptions);
     }
 }
 

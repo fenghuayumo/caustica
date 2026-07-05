@@ -1,4 +1,5 @@
 #include <render/features/RenderFeature.h>
+#include <render/features/PathTraceGraphResources.h>
 #include <render/features/RenderFeatureContext.h>
 
 namespace { constexpr int c_SwapchainCount = 3; }
@@ -165,6 +166,12 @@ void caustica::render::WorldRenderer::executeFrameRenderGraph(RenderFrameContext
     SampleConstants& constants = m_currentConstants;
 
     ctx.graph->compile();
+
+#ifndef NDEBUG
+    if (!m_context.settings.RealtimeMode)
+        validateReferencePathTraceGraph(*ctx.graph, m_context.settings);
+#endif
+
     ctx.graph->execute(m_commandList);
     m_renderTargetPool.endFrame();
     m_renderBufferPool.endFrame();

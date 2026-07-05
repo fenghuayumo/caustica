@@ -10,28 +10,28 @@
 namespace caustica::render
 {
 
-void registerVBufferExportFeature(RenderFeatureContext ctx)
+void registerPathTraceLightingEndFeature(RenderFeatureContext ctx)
 {
     assert(ctx.graph);
     assert(ctx.renderer);
     assert(ctx.renderTargets);
     assert(ctx.settings);
 
-    if (!ctx.hasScene || !ctx.settings->RealtimeMode)
+    if (!ctx.hasScene || !needsPathTraceLightingEndPass(*ctx.settings))
         return;
 
     const PathTraceGraphTargets handles = importPathTraceGraphTargets(*ctx.graph, *ctx.renderTargets);
 
     rg::PassOptions passOptions{};
-    passOptions.executeAfter = "PathTracePrePass";
+    passOptions.executeAfter = pathTraceLightingEndExecuteAfterPass(*ctx.settings);
 
     ctx.graph->addPass(
-        "VBufferExport",
+        "PathTraceLightingEnd",
         [handles](rg::PassBuilder& setup) {
-            declareVBufferExportAccess(setup, handles);
+            declarePathTraceLightingEndAccess(setup, handles);
         },
         [ctx](rg::RenderPassContext& passCtx) {
-            ctx.renderer->vBufferExport(passCtx.commandList());
+            ctx.renderer->pathTraceLightingEndUpdate(passCtx.commandList());
         },
         passOptions);
 }
