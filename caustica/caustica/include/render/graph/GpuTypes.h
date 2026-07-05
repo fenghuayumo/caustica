@@ -1,49 +1,31 @@
 #pragma once
 
+#include <rhi/caustica/format.h>
+
 #include <cstdint>
 #include <string>
 
 namespace caustica::rg
 {
 
-enum class Format : uint16_t
+using Format = nvrhi::caustica::PixelFormat;
+using FormatInfo = nvrhi::caustica::PixelFormatInfo;
+
+[[nodiscard]] inline FormatInfo getFormatInfo(Format format)
 {
-    Unknown = 0,
+    return nvrhi::caustica::getPixelFormatInfo(format);
+}
 
-    R8_UNORM,
-    RG8_UNORM,
-    RGBA8_UNORM,
-    RGBA8_UNORM_SRGB,
-    BGRA8_UNORM,
-    BGRA8_UNORM_SRGB,
-
-    R16_FLOAT,
-    RG16_FLOAT,
-    RGBA16_FLOAT,
-    R32_FLOAT,
-    RG32_FLOAT,
-    RGBA32_FLOAT,
-
-    R11G11B10_FLOAT,
-    R10G10B10A2_UNORM,
-
-    D24S8,
-    D32_FLOAT,
-};
-
-struct FormatInfo
+// Deprecated aliases kept for existing call sites.
+[[nodiscard]] inline uint32_t toNativeFormat(Format format)
 {
-    bool isDepth = false;
-    bool isStencil = false;
-    bool isSRGB = false;
-    bool isUAVCompatible = false;
-    bool isRenderTargetCompatible = false;
-    uint8_t blockSize = 1;
-};
+    return static_cast<uint32_t>(nvrhi::caustica::toNvrhiFormat(format));
+}
 
-[[nodiscard]] FormatInfo getFormatInfo(Format format);
-[[nodiscard]] uint32_t toNativeFormat(Format format);
-[[nodiscard]] Format fromNativeFormat(uint32_t nativeFormat);
+[[nodiscard]] inline Format fromNativeFormat(uint32_t nativeFormat)
+{
+    return nvrhi::caustica::fromNvrhiFormat(static_cast<nvrhi::Format>(nativeFormat));
+}
 
 struct TextureDesc
 {

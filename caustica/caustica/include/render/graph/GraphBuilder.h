@@ -1,6 +1,5 @@
 #pragma once
 
-#include <render/graph/GpuDeviceAdapter.h>
 #include <render/graph/GpuTypes.h>
 #include <rhi/nvrhi.h>
 
@@ -57,7 +56,6 @@ public:
     RenderPassContext(nvrhi::ICommandList* commandList, const GraphBuilder& graph);
 
     [[nodiscard]] nvrhi::ICommandList* commandList() const { return m_commandList; }
-    [[nodiscard]] CommandList rhiCommandList() const;
     [[nodiscard]] nvrhi::ITexture* texture(TextureHandle handle) const;
 
 private:
@@ -65,8 +63,6 @@ private:
     const GraphBuilder* m_graph = nullptr;
 };
 
-// Render graph: sequential passes with automatic texture barriers.
-// Phase R2 — import + transient resources, compile/execute split.
 class GraphBuilder
 {
 public:
@@ -74,7 +70,6 @@ public:
     using ExecuteFn = std::function<void(RenderPassContext&)>;
 
     void setDevice(nvrhi::IDevice* device);
-    void setDevice(Device& device);
 
     TextureHandle importTexture(nvrhi::ITexture* texture, nvrhi::ResourceStates initialState);
     TextureHandle importTexture(nvrhi::ITexture* texture, TextureAccess initialAccess = TextureAccess::ShaderResource);
@@ -85,7 +80,6 @@ public:
 
     void compile();
     void execute(nvrhi::ICommandList* commandList);
-    void execute(CommandList& commandList);
 
     void reset();
 

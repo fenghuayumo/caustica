@@ -1,6 +1,5 @@
 #include <render/graph/GraphBuilder.h>
 
-#include <render/graph/GpuDeviceAdapter.h>
 #include <render/graph/GpuTypes.h>
 #include <rhi/nvrhi.h>
 
@@ -45,11 +44,6 @@ RenderPassContext::RenderPassContext(nvrhi::ICommandList* commandList, const Gra
 {
 }
 
-CommandList RenderPassContext::rhiCommandList() const
-{
-    return CommandList(m_commandList);
-}
-
 nvrhi::ITexture* RenderPassContext::texture(TextureHandle handle) const
 {
     assert(m_graph);
@@ -78,11 +72,6 @@ nvrhi::ResourceStates GraphBuilder::accessToState(TextureAccess access)
 void GraphBuilder::setDevice(nvrhi::IDevice* device)
 {
     m_device = device;
-}
-
-void GraphBuilder::setDevice(Device& device)
-{
-    m_device = device.nativeDevice();
 }
 
 TextureHandle GraphBuilder::importTexture(nvrhi::ITexture* texture, nvrhi::ResourceStates initialState)
@@ -119,7 +108,7 @@ TextureHandle GraphBuilder::createTexture(const TextureDesc& desc)
     nativeDesc.depth = desc.depth;
     nativeDesc.mipLevels = desc.mipLevels;
     nativeDesc.arraySize = desc.arraySize;
-    nativeDesc.format = static_cast<nvrhi::Format>(toNativeFormat(desc.format));
+    nativeDesc.format = nvrhi::caustica::toNvrhiFormat(desc.format);
     nativeDesc.isRenderTarget = desc.isRenderTarget || formatInfo.isRenderTargetCompatible;
     nativeDesc.isUAV = desc.isUAV || formatInfo.isUAVCompatible;
     nativeDesc.isTypeless = desc.isTypeless;
@@ -280,11 +269,6 @@ void GraphBuilder::execute(nvrhi::ICommandList* commandList)
 
         commandList->endMarker();
     }
-}
-
-void GraphBuilder::execute(CommandList& commandList)
-{
-    execute(commandList.nativeCommandList());
 }
 
 void GraphBuilder::reset()

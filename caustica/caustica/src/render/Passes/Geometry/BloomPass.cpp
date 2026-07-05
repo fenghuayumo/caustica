@@ -279,7 +279,7 @@ void BloomPass::Render(
     computeBloomMipSizes(view, mip1W, mip1H, mip2W, mip2H);
 
     nvrhi::TextureDesc nativeDesc;
-    nativeDesc.format = static_cast<nvrhi::Format>(rg::toNativeFormat(colorFormat));
+    nativeDesc.format = nvrhi::caustica::toNvrhiFormat(colorFormat);
     nativeDesc.width = mip1W;
     nativeDesc.height = mip1H;
     nativeDesc.mipLevels = 1;

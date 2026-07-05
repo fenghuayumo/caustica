@@ -59,6 +59,8 @@ endif()
 set(include_common
     ${RHI_INCLUDE_DIR}/nvrhi.h
     ${RHI_INCLUDE_DIR}/nvrhiHLSL.h
+    ${RHI_INCLUDE_DIR}/caustica.h
+    ${RHI_INCLUDE_DIR}/caustica/format.h
     ${RHI_INCLUDE_DIR}/utils.h
     ${RHI_INCLUDE_DIR}/common/containers.h
     ${RHI_INCLUDE_DIR}/common/misc.h
@@ -67,6 +69,7 @@ set(include_common
 
 set(src_common
     common/format-info.cpp
+    common/caustica-format.cpp
     common/misc.cpp
     common/state-tracking.cpp
     common/state-tracking.h
@@ -186,6 +189,10 @@ target_include_directories(nvrhi PUBLIC
     $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/caustica/caustica/include/backend>)
 
 set_target_properties(nvrhi PROPERTIES FOLDER "caustica/backend")
+
+if (NOT TARGET caustica_rhi)
+    add_library(caustica_rhi ALIAS nvrhi)
+endif()
 
 target_compile_definitions(nvrhi PRIVATE NVRHI_WITH_AFTERMATH=$<BOOL:${NVRHI_WITH_AFTERMATH}>)
 
