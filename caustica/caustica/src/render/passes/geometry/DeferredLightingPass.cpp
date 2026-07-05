@@ -1,4 +1,5 @@
 #include <render/passes/geometry/DeferredLightingPass.h>
+#include <render/rhi/ViewRhiConversion.h>
 #include <render/core/GBuffer.h>
 #include <render/core/FramebufferFactory.h>
 #include <assets/loader/ShaderFactory.h>
@@ -249,7 +250,7 @@ void DeferredLightingPass::Render(
     for (uint viewIndex = 0; viewIndex < compositeView.getNumChildViews(ViewType::PLANAR); viewIndex++)
     {
         const IView* view = compositeView.getChildView(ViewType::PLANAR, viewIndex);
-        auto viewSubresources = view->getSubresources();
+        auto viewSubresources = rhi::toNvrhi(view->getSubresources());
 
         nvrhi::BindingSetDesc bindingSetDesc;
         bindingSetDesc.bindings = {

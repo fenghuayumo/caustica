@@ -1,5 +1,6 @@
 #include <assets/loader/ShaderFactory.h>
 #include <render/core/RenderDevice.h>
+#include <render/rhi/ViewRhiConversion.h>
 #include <scene/View.h>
 #include <sstream>
 #include <assert.h>
@@ -66,7 +67,7 @@ ToneMappingPass::ToneMappingPass(
             nvrhi::IFramebuffer* sampleFrameBuffer = m_FramebufferFactory->getFramebuffer(*view);
             PerViewData& perViewData = m_PerView[viewIndex];
 
-            nvrhi::Rect viewExtent = view->getViewExtent();
+            ScissorDesc viewExtent = view->getViewExtent();
             uint32_t viewportWidth = viewExtent.maxX - viewExtent.minX;
             uint32_t viewportHeight = viewExtent.maxY - viewExtent.minY;
 
@@ -307,7 +308,7 @@ bool ToneMappingPass::Render(
         state.pipeline = m_ToneMapPso;
         state.framebuffer = m_FramebufferFactory->getFramebuffer(*view);
         state.bindings = { bindingSet };
-        state.viewport = view->getViewportState();
+        state.viewport = rhi::toNvrhi(view->getViewportState());
 
         ToneMappingConstants toneMappingConsts = {};
         toneMappingConsts.whiteScale = m_WhiteScale;

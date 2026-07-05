@@ -2,6 +2,7 @@
 #include <StreamlineIntegration.h>
 
 #include <scene/View.h>
+#include <render/rhi/ViewRhiConversion.h>
 #include <sl_consts.h>
 #include <sl_hooks.h>
 #include <sl_version.h>
@@ -1367,7 +1368,7 @@ static void GetSLResource(
 #if CAUSTICA_WITH_VULKAN
     case nvrhi::GraphicsAPI::VULKAN:
     {
-        nvrhi::TextureSubresourceSet subresources = view->getSubresources();
+        nvrhi::TextureSubresourceSet subresources = render::rhi::toNvrhi(view->getSubresources());
         auto const& desc = inputTex->getDesc();
         auto const vkDesc = static_cast<vk::ImageCreateInfo *>(inputTex->getNativeObject(nvrhi::ObjectTypes::VK_ImageCreateInfo));
 

@@ -1,5 +1,6 @@
 #include <render/passes/geometry/ForwardShadingPass.h>
 #include <render/core/FramebufferFactory.h>
+#include <render/rhi/ViewRhiConversion.h>
 #include <assets/loader/ShaderFactory.h>
 #include <render/core/ShadowMap.h>
 #include <scene/Scene.h>
@@ -322,7 +323,7 @@ void ForwardShadingPass::setupView(
 
     context.keyTemplate.frontCounterClockwise = view->isMirrored();
     context.keyTemplate.reverseDepth = view->isReverseDepth();
-    context.keyTemplate.shadingRateState = view->getVariableRateShadingState();
+    context.keyTemplate.shadingRateState = rhi::toNvrhi(view->getVariableRateShadingState());
 }
 
 void ForwardShadingPass::PrepareLights(

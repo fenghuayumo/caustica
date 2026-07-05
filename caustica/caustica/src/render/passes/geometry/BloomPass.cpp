@@ -1,5 +1,6 @@
 #include <render/passes/geometry/BloomPass.h>
 #include <render/core/FramebufferFactory.h>
+#include <render/rhi/ViewRhiConversion.h>
 #include <assets/loader/ShaderFactory.h>
 #include <render/core/RenderPassConstants.h>
 #include <render/graph/GpuTypes.h>
@@ -45,7 +46,7 @@ namespace
     void computeBloomMipSizes(const IView* view,
         uint32_t& mip1Width, uint32_t& mip1Height, uint32_t& mip2Width, uint32_t& mip2Height)
     {
-        const nvrhi::Rect viewExtent = view->getViewExtent();
+        const ScissorDesc viewExtent = view->getViewExtent();
         const int viewportWidth = viewExtent.maxX - viewExtent.minX;
         const int viewportHeight = viewExtent.maxY - viewExtent.minY;
 
@@ -153,7 +154,7 @@ void BloomPass::renderInternal(
         nvrhi::IFramebuffer* framebuffer = framebufferFactory->getFramebuffer(*view);
         ensureBlurPso(viewIndex, framebufferPass1Blur);
 
-        nvrhi::ViewportState viewportState = view->getViewportState();
+        nvrhi::ViewportState viewportState = rhi::toNvrhi(view->getViewportState());
         const nvrhi::Rect& scissorRect = viewportState.scissorRects[0];
         const nvrhi::FramebufferInfoEx& fbinfo = framebuffer->getFramebufferInfo();
 

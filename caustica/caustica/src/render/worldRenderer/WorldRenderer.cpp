@@ -1116,7 +1116,7 @@ void caustica::render::WorldRenderer::renderGaussianSplats(bool renderToOutputCo
     caustica::PlanarView splatView = *m_context.camera.view();
     if (!renderToOutputColor)
     {
-        splatView.setViewport(nvrhi::Viewport(float(m_displaySize.x), float(m_displaySize.y)));
+        splatView.setViewport(ViewportDesc(float(m_displaySize.x), float(m_displaySize.y)));
         splatView.setPixelOffset(dm::float2::zero());
     }
     splatView.updateCache();
@@ -1323,9 +1323,9 @@ void caustica::render::WorldRenderer::pathTrace(nvrhi::ICommandList* commandList
     nvrhi::rt::State state;
 
     nvrhi::rt::DispatchRaysArguments args;
-    nvrhi::Viewport viewport = m_context.camera.view()->getViewport();
-    uint32_t width = (uint32_t)(viewport.maxX - viewport.minX);
-    uint32_t height = (uint32_t)(viewport.maxY - viewport.minY);
+    const ViewportDesc viewport = m_context.camera.view()->getViewport();
+    uint32_t width = (uint32_t)viewport.width();
+    uint32_t height = (uint32_t)viewport.height();
     args.width = width;
     args.height = height;
 

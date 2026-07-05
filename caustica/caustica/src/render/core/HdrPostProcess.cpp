@@ -20,7 +20,7 @@ void hdrPostProcess(CameraController& camera, HdrPostProcessParams& params)
     }
 
     PlanarView fullscreenView = *camera.view();
-    nvrhi::Viewport windowViewport(float(params.displaySize.x), float(params.displaySize.y));
+    ViewportDesc windowViewport(float(params.displaySize.x), float(params.displaySize.y));
     fullscreenView.setViewport(windowViewport);
     fullscreenView.updateCache();
 

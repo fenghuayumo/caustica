@@ -51,7 +51,7 @@ void CameraController::ensureViews(dm::uint2 renderSize)
     if (!m_viewPrevious)
         m_viewPrevious = std::make_shared<PlanarView>();
 
-    const nvrhi::Viewport viewport(float(renderSize.x), float(renderSize.y));
+    const ViewportDesc viewport(float(renderSize.x), float(renderSize.y));
     m_view->setViewport(viewport);
     m_viewPrevious->setViewport(viewport);
 }
@@ -115,7 +115,7 @@ void CameraController::updateViews(const CameraUpdateParams& params)
     if (params.temporalAAPass)
         params.temporalAAPass->SetJitter(params.temporalAAJitter);
 
-    nvrhi::Viewport windowViewport(float(params.renderSize.x), float(params.renderSize.y));
+    ViewportDesc windowViewport(float(params.renderSize.x), float(params.renderSize.y));
     m_view->setViewport(windowViewport);
 
     const dm::float4x4 projection = m_useCustomIntrinsics

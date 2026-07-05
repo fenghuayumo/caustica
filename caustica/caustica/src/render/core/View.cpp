@@ -19,8 +19,8 @@ void IView::fillPlanarViewConstants(PlanarViewConstants& constants) const
     constants.matClipToViewNoOffset = getInverseProjectionMatrix(false);
     constants.matClipToWorldNoOffset = getInverseViewProjectionMatrix(false);
 
-    nvrhi::ViewportState viewportState = getViewportState();
-    const nvrhi::Viewport& viewport = viewportState.viewports[0];
+    const ViewportStateDesc viewportState = getViewportState();
+    const ViewportDesc& viewport = viewportState.viewports[0];
     constants.viewportOrigin = float2(viewport.minX, viewport.minY);
     constants.viewportSize = float2(viewport.width(), viewport.height());
     constants.viewportSizeInv = 1.f / constants.viewportSize;
@@ -70,14 +70,14 @@ void PlanarView::ensureCacheIsValid() const
     assert(m_cacheValid); // Call updateCache() after changing any view parameters
 }
 
-void PlanarView::setViewport(const nvrhi::Viewport& viewport)
+void PlanarView::setViewport(const ViewportDesc& viewport)
 {
     m_viewport = viewport;
-    m_scissorRect = nvrhi::Rect(viewport);
+    m_scissorRect = ScissorDesc(viewport);
     m_cacheValid = false;
 }
 
-void PlanarView::setVariableRateShadingState(const nvrhi::VariableRateShadingState& shadingRateState)
+void PlanarView::setVariableRateShadingState(const VariableRateShadingDesc& shadingRateState)
 {
     m_shadingRateState = shadingRateState;
 }
@@ -100,21 +100,21 @@ void PlanarView::setArraySlice(int arraySlice)
     m_arraySlice = arraySlice;
 }
 
-nvrhi::ViewportState PlanarView::getViewportState() const
+ViewportStateDesc PlanarView::getViewportState() const
 {
-    return nvrhi::ViewportState()
+    return ViewportStateDesc()
         .addViewport(m_viewport)
         .addScissorRect(m_scissorRect);
 }
 
-nvrhi::VariableRateShadingState PlanarView::getVariableRateShadingState() const
+VariableRateShadingDesc PlanarView::getVariableRateShadingState() const
 {
     return m_shadingRateState;
 }
 
-nvrhi::TextureSubresourceSet PlanarView::getSubresources() const
+TextureSubresourceDesc PlanarView::getSubresources() const
 {
-    return nvrhi::TextureSubresourceSet(0, 1, m_arraySlice, 1);
+    return TextureSubresourceDesc(0, 1, m_arraySlice, 1);
 }
 
 bool PlanarView::isReverseDepth() const
@@ -197,7 +197,7 @@ float4x4 PlanarView::getInverseViewProjectionMatrix(bool includeOffset) const
     return includeOffset ? m_viewProjOffsetMatrixInv : m_viewProjMatrixInv;
 }
 
-nvrhi::Rect PlanarView::getViewExtent() const
+ScissorDesc PlanarView::getViewExtent() const
 {
     return m_scissorRect;
 }
@@ -320,7 +320,7 @@ void CubemapView::setArrayViewports(int resolution, int firstArraySlice)
 
     for (int face = 0; face < 6; face++)
     {
-        m_faceViews[face].setViewport(nvrhi::Viewport(float(resolution), float(resolution)));
+        m_faceViews[face].setViewport(ViewportDesc(float(resolution), float(resolution)));
         m_faceViews[face].setArraySlice(face + firstArraySlice);
     }
 }
@@ -355,9 +355,9 @@ box3 CubemapView::getCullingBox() const
     return m_cullingBox;
 }
 
-nvrhi::ViewportState CubemapView::getViewportState() const
+ViewportStateDesc CubemapView::getViewportState() const
 {
-    nvrhi::ViewportState result;
+    ViewportStateDesc result;
 
     for (const auto& faceView : m_faceViews)
     {
@@ -368,10 +368,10 @@ nvrhi::ViewportState CubemapView::getViewportState() const
     return result;
 }
 
-nvrhi::VariableRateShadingState CubemapView::getVariableRateShadingState() const
+VariableRateShadingDesc CubemapView::getVariableRateShadingState() const
 {
     // currently don't support VRS with cubemaps
-    return nvrhi::VariableRateShadingState();
+    return VariableRateShadingDesc{};
 }
 
 bool CubemapView::isBoxVisible(const dm::box3& bbox) const
@@ -389,9 +389,9 @@ bool CubemapView::isMirrored() const
     return false;
 }
 
-nvrhi::TextureSubresourceSet CubemapView::getSubresources() const
+TextureSubresourceDesc CubemapView::getSubresources() const
 {
-    return nvrhi::TextureSubresourceSet(0, 1, m_firstArraySlice, 6);
+    return TextureSubresourceDesc(0, 1, m_firstArraySlice, 6);
 }
 
 bool CubemapView::isReverseDepth() const
@@ -479,7 +479,7 @@ float4x4 CubemapView::getInverseViewProjectionMatrix(bool includeOffset) const
     return m_viewProjMatrixInv;
 }
 
-nvrhi::Rect CubemapView::getViewExtent() const
+ScissorDesc CubemapView::getViewExtent() const
 {
     return m_faceViews[0].getViewExtent();
 }

@@ -1,4 +1,5 @@
 #include <render/passes/geometry/PlanarShadowMap.h>
+#include <render/rhi/ViewRhiConversion.h>
 
 using namespace caustica::math;
 #include <shaders/light_cb.h>
@@ -30,7 +31,7 @@ PlanarShadowMap::PlanarShadowMap(
     m_TextureSize = m_ShadowMapSize;
 
     m_View = std::make_shared<caustica::PlanarView>();
-    m_View->setViewport(nvrhi::Viewport(float(resolution), float(resolution)));
+    m_View->setViewport(ViewportDesc(float(resolution), float(resolution)));
     m_View->setArraySlice(0);
 }
 
@@ -44,10 +45,10 @@ PlanarShadowMap::PlanarShadowMap(
     
     const nvrhi::TextureDesc& textureDesc = m_ShadowMapTexture->getDesc();
     m_TextureSize = float2(static_cast<float>(textureDesc.width), static_cast<float>(textureDesc.height));
-    m_ShadowMapSize = float2(viewport.maxX - viewport.minX, viewport.maxY - viewport.minY);
+    m_ShadowMapSize = float2(viewport.width(), viewport.height());
 
     m_View = std::make_shared<caustica::PlanarView>();
-    m_View->setViewport(viewport);
+    m_View->setViewport(rhi::fromNvrhi(viewport));
     m_View->setArraySlice(arraySlice);
 }
 
@@ -205,8 +206,8 @@ dm::int2 PlanarShadowMap::GetTextureSize() const
 
 dm::box2 PlanarShadowMap::GetUVRange() const
 {
-    nvrhi::ViewportState viewportState = m_View->getViewportState();
-    const nvrhi::Viewport& viewport = viewportState.viewports[0];
+    const ViewportStateDesc viewportState = m_View->getViewportState();
+    const ViewportDesc& viewport = viewportState.viewports[0];
     float2 topLeft = float2(viewport.minX, viewport.minY);
     float2 bottomRight = float2(viewport.maxX, viewport.maxY);
 
@@ -241,5 +242,5 @@ void PlanarShadowMap::FillShadowConstants(struct ShadowConstants& constants) con
 
 void PlanarShadowMap::Clear(nvrhi::ICommandList* commandList)
 {
-    commandList->clearTextureFloat(m_ShadowMapTexture, m_View->getSubresources(), nvrhi::Color(1.f));
+    commandList->clearTextureFloat(m_ShadowMapTexture, rhi::toNvrhi(m_View->getSubresources()), nvrhi::Color(1.f));
 }

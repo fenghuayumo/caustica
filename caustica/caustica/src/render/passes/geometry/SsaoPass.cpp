@@ -216,8 +216,8 @@ void SsaoPass::Render(
 
         const float4x4 projectionMatrix = view->getProjectionMatrix(false);
 
-        nvrhi::Rect viewExtent = view->getViewExtent();
-        nvrhi::Rect quarterResExtent = viewExtent;
+        ScissorDesc viewExtent = view->getViewExtent();
+        ScissorDesc quarterResExtent = viewExtent;
         quarterResExtent.minX /= 4;
         quarterResExtent.minY /= 4;
         quarterResExtent.maxX = (quarterResExtent.maxX + 3) / 4;

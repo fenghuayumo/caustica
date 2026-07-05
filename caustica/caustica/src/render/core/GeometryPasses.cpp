@@ -2,6 +2,7 @@
 #include <scene/Scene.h>
 #include <scene/SceneDrawList.h>
 #include <render/core/FramebufferFactory.h>
+#include <render/rhi/ViewRhiConversion.h>
 
 using namespace caustica::math;
 using namespace caustica;
@@ -30,8 +31,8 @@ void caustica::render::renderView(
 
     nvrhi::GraphicsState graphicsState;
     graphicsState.framebuffer = framebuffer;
-    graphicsState.viewport = view->getViewportState();
-    graphicsState.shadingRateState = view->getVariableRateShadingState();
+    graphicsState.viewport = rhi::toNvrhi(view->getViewportState());
+    graphicsState.shadingRateState = rhi::toNvrhi(view->getVariableRateShadingState());
 
     nvrhi::DrawArguments currentDraw;
     currentDraw.instanceCount = 0;

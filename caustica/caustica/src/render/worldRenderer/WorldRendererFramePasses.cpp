@@ -106,7 +106,7 @@ void caustica::render::WorldRenderer::extractFrameView(ecs::World& renderWorld)
     extracted.displayAspectRatio = m_displayAspectRatio;
 
     extracted.postProcessView = *m_context.camera.view();
-    nvrhi::Viewport windowViewport(float(m_displaySize.x), float(m_displaySize.y));
+    ViewportDesc windowViewport(float(m_displaySize.x), float(m_displaySize.y));
     extracted.postProcessView.setViewport(windowViewport);
     extracted.postProcessView.updateCache();
 
@@ -370,10 +370,10 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
 
     syncCameraViews();
     {
-        nvrhi::Viewport viewport = m_context.camera.view()->getViewport();
+        const ViewportDesc viewport = m_context.camera.view()->getViewport();
         float2 jitter = m_context.camera.view()->getPixelOffset();
         float4x4 projMatrix = m_context.camera.view()->getProjectionMatrix();
-        float2 viewSize = { viewport.maxX - viewport.minX, viewport.maxY - viewport.minY };
+        float2 viewSize = { viewport.width(), viewport.height() };
         float outputAspectRatio = m_displayAspectRatio;
         bool rowMajor = true;
         float tanHalfFOVY = 1.0f / ((rowMajor) ? (projMatrix.m_data[1 * 4 + 1]) : (projMatrix.m_data[1 + 1 * 4]));

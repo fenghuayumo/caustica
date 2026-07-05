@@ -1,5 +1,6 @@
 #include <render/passes/geometry/TemporalAntiAliasingPass.h>
 #include <render/core/FramebufferFactory.h>
+#include <render/rhi/ViewRhiConversion.h>
 #include <assets/loader/ShaderFactory.h>
 #include <render/core/RenderDevice.h>
 #include <scene/View.h>
@@ -195,12 +196,12 @@ void TemporalAntiAliasingPass::RenderMotionVectors(
         const IView* view = compositeView.getChildView(ViewType::PLANAR, viewIndex);
         const IView* viewPrevious = compositeViewPrevious.getChildView(ViewType::PLANAR, viewIndex);
 
-        const nvrhi::ViewportState viewportState = view->getViewportState();
+        const ViewportStateDesc viewportState = view->getViewportState();
         
         // This pass only works for planar, single-viewport views
         assert(viewportState.viewports.size() == 1);
 
-        const nvrhi::Viewport& inputViewport = viewportState.viewports[0];
+        const ViewportDesc& inputViewport = viewportState.viewports[0];
 
         TemporalAntiAliasingConstants taaConstants = {};
         affine3 viewReprojection = inverse(view->getViewMatrix()) * translation(-preViewTranslationDifference) * viewPrevious->getViewMatrix();
@@ -214,7 +215,7 @@ void TemporalAntiAliasingPass::RenderMotionVectors(
         state.pipeline = m_MotionVectorsPso;
         state.framebuffer = m_MotionVectorsFramebufferFactory->getFramebuffer(*view);
         state.bindings = { m_MotionVectorsBindingSet};
-        state.viewport = viewportState;
+        state.viewport = rhi::toNvrhi(viewportState);
         commandList->setGraphicsState(state);
 
         nvrhi::DrawArguments args;
@@ -242,8 +243,8 @@ void TemporalAntiAliasingPass::TemporalResolve(
         const IView* viewInput = compositeViewInput.getChildView(ViewType::PLANAR, viewIndex);
         const IView* viewOutput = compositeViewOutput.getChildView(ViewType::PLANAR, viewIndex);
 
-        const nvrhi::Viewport viewportInput = viewInput->getViewportState().viewports[0];
-        const nvrhi::Viewport viewportOutput = viewOutput->getViewportState().viewports[0];
+        const ViewportDesc viewportInput = viewInput->getViewportState().viewports[0];
+        const ViewportDesc viewportOutput = viewOutput->getViewportState().viewports[0];
         
         TemporalAntiAliasingConstants taaConstants = {};
         taaConstants.inputViewOrigin = float2(viewportInput.minX, viewportInput.minY);

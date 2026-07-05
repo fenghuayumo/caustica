@@ -1,4 +1,5 @@
 #include <render/passes/gaussian/GaussianSplatPass.h>
+#include <render/rhi/ViewRhiConversion.h>
 
 #include <render/gpuSort/GPUSort.h>
 #include <render/core/RenderTargets.h>
@@ -1934,7 +1935,7 @@ void GaussianSplatPass::Render(
     state.pipeline = renderPipeline;
     state.bindings = { renderBindingSet };
     state.framebuffer = framebuffer;
-    state.viewport = view.getViewportState();
+    state.viewport = caustica::render::rhi::toNvrhi(view.getViewportState());
     if (distanceStageCulling)
         state.indirectParams = m_drawIndirectBuffer;
     commandList->setGraphicsState(state);

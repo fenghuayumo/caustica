@@ -1,9 +1,12 @@
 #pragma once
 
 #include <math/math.h>
-#include <rhi/nvrhi.h>
-#include <vector>
+#include <scene/ViewDesc.h>
+
+#include <algorithm>
+#include <cassert>
 #include <memory>
+#include <vector>
 
 struct PlanarViewConstants;
 
@@ -35,9 +38,9 @@ namespace caustica
     public:
         virtual void fillPlanarViewConstants(PlanarViewConstants& constants) const;
 
-        [[nodiscard]] virtual nvrhi::ViewportState getViewportState() const = 0;
-        [[nodiscard]] virtual nvrhi::VariableRateShadingState getVariableRateShadingState() const = 0;
-        [[nodiscard]] virtual nvrhi::TextureSubresourceSet getSubresources() const = 0;
+        [[nodiscard]] virtual ViewportStateDesc getViewportState() const = 0;
+        [[nodiscard]] virtual VariableRateShadingDesc getVariableRateShadingState() const = 0;
+        [[nodiscard]] virtual TextureSubresourceDesc getSubresources() const = 0;
         [[nodiscard]] virtual bool isReverseDepth() const = 0;
         [[nodiscard]] virtual bool isOrthographicProjection() const = 0;
         [[nodiscard]] virtual bool isStereoView() const = 0;
@@ -54,7 +57,7 @@ namespace caustica
         [[nodiscard]] virtual dm::float4x4 getInverseProjectionMatrix(bool includeOffset = true) const = 0;
         [[nodiscard]] virtual dm::float4x4 getViewProjectionMatrix(bool includeOffset = true) const = 0;
         [[nodiscard]] virtual dm::float4x4 getInverseViewProjectionMatrix(bool includeOffset = true) const = 0;
-        [[nodiscard]] virtual nvrhi::Rect getViewExtent() const = 0;
+        [[nodiscard]] virtual ScissorDesc getViewExtent() const = 0;
         [[nodiscard]] virtual dm::float2 getPixelOffset() const = 0;
 
         [[nodiscard]] uint32_t getNumChildViews(ViewType::Enum supportedTypes) const override;
@@ -66,9 +69,9 @@ namespace caustica
     {
     protected:
         // Directly settable parameters
-        nvrhi::Viewport m_viewport;
-        nvrhi::Rect m_scissorRect;
-        nvrhi::VariableRateShadingState m_shadingRateState;
+        ViewportDesc m_viewport;
+        ScissorDesc m_scissorRect;
+        VariableRateShadingDesc m_shadingRateState;
         dm::affine3 m_viewMatrix = dm::affine3::identity();
         dm::float4x4 m_projMatrix = dm::float4x4::identity();
         dm::float2 m_pixelOffset = dm::float2::zero();
@@ -92,19 +95,19 @@ namespace caustica
         void ensureCacheIsValid() const;
         
     public:
-        void setViewport(const nvrhi::Viewport& viewport);
-        void setVariableRateShadingState(const nvrhi::VariableRateShadingState& shadingRateState);
+        void setViewport(const ViewportDesc& viewport);
+        void setVariableRateShadingState(const VariableRateShadingDesc& shadingRateState);
         void setMatrices(const dm::affine3& viewMatrix, const dm::float4x4& projMatrix);
         void setPixelOffset(dm::float2 offset);
         void setArraySlice(int arraySlice);
         void updateCache();
 
-        [[nodiscard]] const nvrhi::Viewport& getViewport() const { return m_viewport; }
-        [[nodiscard]] const nvrhi::Rect& getScissorRect() const { return m_scissorRect; }
+        [[nodiscard]] const ViewportDesc& getViewport() const { return m_viewport; }
+        [[nodiscard]] const ScissorDesc& getScissorRect() const { return m_scissorRect; }
 
-        [[nodiscard]] nvrhi::ViewportState getViewportState() const override;
-        [[nodiscard]] nvrhi::VariableRateShadingState getVariableRateShadingState() const override;
-        [[nodiscard]] nvrhi::TextureSubresourceSet getSubresources() const override;
+        [[nodiscard]] ViewportStateDesc getViewportState() const override;
+        [[nodiscard]] VariableRateShadingDesc getVariableRateShadingState() const override;
+        [[nodiscard]] TextureSubresourceDesc getSubresources() const override;
         [[nodiscard]] bool isReverseDepth() const override;
         [[nodiscard]] bool isOrthographicProjection() const override;
         [[nodiscard]] bool isStereoView() const override;
@@ -121,7 +124,7 @@ namespace caustica
         [[nodiscard]] dm::float4x4 getInverseProjectionMatrix(bool includeOffset = true) const override;
         [[nodiscard]] dm::float4x4 getViewProjectionMatrix(bool includeOffset = true) const override;
         [[nodiscard]] dm::float4x4 getInverseViewProjectionMatrix(bool includeOffset = true) const override;
-        [[nodiscard]] nvrhi::Rect getViewExtent() const override;
+        [[nodiscard]] ScissorDesc getViewExtent() const override;
         [[nodiscard]] dm::float2 getPixelOffset() const override;
     };
 
@@ -147,25 +150,25 @@ namespace caustica
         ChildType leftView;
         ChildType rightView;
 
-        [[nodiscard]] nvrhi::ViewportState getViewportState() const override
+        [[nodiscard]] ViewportStateDesc getViewportState() const override
         {
-            nvrhi::ViewportState left = leftView.getViewportState();
-            nvrhi::ViewportState right = rightView.getViewportState();
+            ViewportStateDesc merged = leftView.getViewportState();
+            const ViewportStateDesc right = rightView.getViewportState();
 
-            for (size_t i = 0; i < right.viewports.size(); i++)
-                left.addViewport(right.viewports[i]);
-            for (size_t i = 0; i < right.scissorRects.size(); i++)
-                left.addScissorRect(right.scissorRects[i]);
+            for (const ViewportDesc& viewport : right.viewports)
+                merged.viewports.push_back(viewport);
+            for (const ScissorDesc& scissor : right.scissorRects)
+                merged.scissorRects.push_back(scissor);
 
-            return left;
+            return merged;
         }
 
-        [[nodiscard]] nvrhi::VariableRateShadingState getVariableRateShadingState() const override
+        [[nodiscard]] VariableRateShadingDesc getVariableRateShadingState() const override
         {
             return leftView.getVariableRateShadingState();
         }
 
-        [[nodiscard]] nvrhi::TextureSubresourceSet getSubresources() const override
+        [[nodiscard]] TextureSubresourceDesc getSubresources() const override
         {
             return leftView.getSubresources(); // TODO: not really...
         }
@@ -272,12 +275,12 @@ namespace caustica
             return dm::float4x4::identity();
         }
 
-        [[nodiscard]] nvrhi::Rect getViewExtent() const override
+        [[nodiscard]] ScissorDesc getViewExtent() const override
         {
-            nvrhi::Rect left = leftView.getViewExtent();
-            nvrhi::Rect right = rightView.getViewExtent();
+            const ScissorDesc left = leftView.getViewExtent();
+            const ScissorDesc right = rightView.getViewExtent();
 
-            return nvrhi::Rect(
+            return ScissorDesc(
                 std::min(left.minX, right.minX),
                 std::max(left.maxX, right.maxX),
                 std::min(left.minY, right.minY),
@@ -343,9 +346,9 @@ namespace caustica
         [[nodiscard]] float getNearPlane() const;
         [[nodiscard]] dm::box3 getCullingBox() const;
 
-        [[nodiscard]] nvrhi::ViewportState getViewportState() const override;
-        [[nodiscard]] nvrhi::VariableRateShadingState getVariableRateShadingState() const override;
-        [[nodiscard]] nvrhi::TextureSubresourceSet getSubresources() const override;
+        [[nodiscard]] ViewportStateDesc getViewportState() const override;
+        [[nodiscard]] VariableRateShadingDesc getVariableRateShadingState() const override;
+        [[nodiscard]] TextureSubresourceDesc getSubresources() const override;
         [[nodiscard]] bool isReverseDepth() const override;
         [[nodiscard]] bool isOrthographicProjection() const override;
         [[nodiscard]] bool isStereoView() const override;
@@ -362,7 +365,7 @@ namespace caustica
         [[nodiscard]] dm::float4x4 getInverseProjectionMatrix(bool includeOffset = true) const override;
         [[nodiscard]] dm::float4x4 getViewProjectionMatrix(bool includeOffset = true) const override;
         [[nodiscard]] dm::float4x4 getInverseViewProjectionMatrix(bool includeOffset = true) const override;
-        [[nodiscard]] nvrhi::Rect getViewExtent() const override;
+        [[nodiscard]] ScissorDesc getViewExtent() const override;
         [[nodiscard]] dm::float2 getPixelOffset() const override;
 
         [[nodiscard]] uint32_t getNumChildViews(ViewType::Enum supportedTypes) const override;
