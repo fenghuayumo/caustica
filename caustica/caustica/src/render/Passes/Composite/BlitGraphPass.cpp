@@ -10,7 +10,7 @@ void registerFinalBlitPass(
     const FinalBlitPassParams& params,
     rhi::FullscreenBlitPass& blitPass)
 {
-    assert(params.sourceLdrColor.valid());
+    assert(params.sourceLdrColor.isValid());
     assert(params.targetFramebuffer);
 
     nvrhi::ITexture* targetColor = params.targetFramebuffer->getDesc().colorAttachments[0].texture;
@@ -28,7 +28,7 @@ void registerFinalBlitPass(
             rhi::BlitParameters blitParams{};
             blitParams.targetFramebuffer = params.targetFramebuffer;
             blitParams.sourceTexture = ctx.texture(params.sourceLdrColor);
-            blitPass.blitTexture(ctx.commandList(), blitParams, params.bindingCache);
+            blitPass.blitTexture(ctx.commandList(), blitParams, nullptr);
         });
 }
 
