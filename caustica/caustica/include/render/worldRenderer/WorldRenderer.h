@@ -74,7 +74,13 @@ public:
     void preRender();
     void render(nvrhi::IFramebuffer* framebuffer);
 
-    void pathTrace(nvrhi::ICommandList* commandList, nvrhi::IFramebuffer* framebuffer, const SampleConstants& constants);
+    void pathTracePrePass(nvrhi::ICommandList* commandList);
+    void vBufferExport(nvrhi::ICommandList* commandList);
+    void pathTraceLightingEndUpdate(nvrhi::ICommandList* commandList);
+    void mainPathTrace(nvrhi::ICommandList* commandList);
+    void executeRtxdi(nvrhi::ICommandList* commandList);
+    void prepareDenoiserGuides(nvrhi::ICommandList* commandList);
+    void stablePlanesDebugViz(nvrhi::ICommandList* commandList);
     void ensureNrdIntegrations();
     void denoiseStablePlane(nvrhi::ICommandList* commandList, nvrhi::IFramebuffer* framebuffer, int planeIndex);
     void denoise(nvrhi::ICommandList* commandList, nvrhi::IFramebuffer* framebuffer);

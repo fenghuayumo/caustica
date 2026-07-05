@@ -1312,75 +1312,69 @@ void caustica::render::WorldRenderer::recreateBindingSet()
         m_bindingSet = device()->createBindingSet(bindingSetDesc, m_bindingLayout);
     }
 }
-void caustica::render::WorldRenderer::pathTrace(nvrhi::ICommandList* commandList, nvrhi::IFramebuffer* framebuffer, const SampleConstants & constants)
+void caustica::render::WorldRenderer::pathTracePrePass(nvrhi::ICommandList* commandList)
 {
     nvrhi::CommandListHandle savedCommandList = m_commandList;
     m_commandList = commandList;
 
-    commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
-
-    //m_commandList->beginMarker("MainRendering"); <- removed (for now) since added hierarchy reduces readability
-    bool useStablePlanes = m_context.settings.RealtimeMode;
+    if (!m_ptPipelineBuildStablePlanes || !m_ptPipelineFillStablePlanes)
+    {
+        m_context.scenePasses.rayTracing.ensureStablePlanePipelines();
+        assert(m_ptPipelineBuildStablePlanes && m_ptPipelineFillStablePlanes);
+    }
 
     nvrhi::rt::State state;
-
     nvrhi::rt::DispatchRaysArguments args;
     const ViewportDesc viewport = m_context.camera.view()->getViewport();
-    uint32_t width = (uint32_t)viewport.width();
-    uint32_t height = (uint32_t)viewport.height();
+    const uint32_t width = static_cast<uint32_t>(viewport.width());
+    const uint32_t height = static_cast<uint32_t>(viewport.height());
     args.width = width;
     args.height = height;
 
-    // default miniConstants
     SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
 
-    if (useStablePlanes)
-    {
-        if (!m_ptPipelineBuildStablePlanes || !m_ptPipelineFillStablePlanes)
-        {
-            m_context.scenePasses.rayTracing.ensureStablePlanePipelines();
-            assert(m_ptPipelineBuildStablePlanes && m_ptPipelineFillStablePlanes);
-        }
+    RAII_SCOPE(m_commandList->beginMarker("PathTracePrePass"); , m_commandList->endMarker(); );
 
-        {
-            RAII_SCOPE(m_commandList->beginMarker("PathTracePrePass"); , m_commandList->endMarker(); );
+    state.shaderTable = m_ptPipelineBuildStablePlanes->getShaderTable();
+    state.bindings = { m_bindingSet, m_context.descriptorTable->getDescriptorTable() };
+    m_commandList->setRayTracingState(state);
+    m_commandList->setPushConstants(&miniConstants, sizeof(miniConstants));
+    m_commandList->dispatchRays(args);
 
-            m_commandList->setTextureState(m_renderTargets->depth, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
-            m_commandList->setTextureState(m_renderTargets->screenMotionVectors, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
-            m_commandList->setTextureState(m_renderTargets->throughput, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
-            m_commandList->setTextureState(m_renderTargets->specularHitT, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
-            state.shaderTable = m_ptPipelineBuildStablePlanes->getShaderTable();
-            state.bindings = { m_bindingSet, m_context.descriptorTable->getDescriptorTable() };
-            m_commandList->setRayTracingState(state);
-            m_commandList->setPushConstants(&miniConstants, sizeof(miniConstants));
-            m_commandList->dispatchRays(args);
-            m_commandList->setBufferState(m_renderTargets->stablePlanesBuffer, nvrhi::ResourceStates::UnorderedAccess);
-            m_commandList->setTextureState(m_renderTargets->depth, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
-            m_commandList->setTextureState(m_renderTargets->screenMotionVectors, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
-            m_commandList->setTextureState(m_renderTargets->throughput, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
-        }
+    m_commandList = savedCommandList;
+}
 
-        {
-            RAII_SCOPE(m_commandList->beginMarker("VBufferExport"); , m_commandList->endMarker(); );
+void caustica::render::WorldRenderer::vBufferExport(nvrhi::ICommandList* commandList)
+{
+    nvrhi::CommandListHandle savedCommandList = m_commandList;
+    m_commandList = commandList;
 
-            nvrhi::ComputeState state;
-		    state.bindings = { m_bindingSet, m_context.descriptorTable->getDescriptorTable() };
-            state.pipeline = m_exportVBufferPSO;
-            m_commandList->setComputeState(state);
+    const ViewportDesc viewport = m_context.camera.view()->getViewport();
+    const uint32_t width = static_cast<uint32_t>(viewport.width());
+    const uint32_t height = static_cast<uint32_t>(viewport.height());
 
-		    const dm::uint2 dispatchSize = { (width + NUM_COMPUTE_THREADS_PER_DIM - 1) / NUM_COMPUTE_THREADS_PER_DIM, (height + NUM_COMPUTE_THREADS_PER_DIM - 1) / NUM_COMPUTE_THREADS_PER_DIM };
-            m_commandList->setPushConstants(&miniConstants, sizeof(miniConstants));
-		    m_commandList->dispatch(dispatchSize.x, dispatchSize.y);
-        }
-    }
-    else
-    {
+    SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
 
-    }
+    RAII_SCOPE(m_commandList->beginMarker("VBufferExport"); , m_commandList->endMarker(); );
 
-    // In realtime mode, ScreenMotionVectors reference mode ScreenMotionVectors should be 0
+    nvrhi::ComputeState state;
+    state.bindings = { m_bindingSet, m_context.descriptorTable->getDescriptorTable() };
+    state.pipeline = m_exportVBufferPSO;
+    m_commandList->setComputeState(state);
+
+    const dm::uint2 dispatchSize = {
+        (width + NUM_COMPUTE_THREADS_PER_DIM - 1) / NUM_COMPUTE_THREADS_PER_DIM,
+        (height + NUM_COMPUTE_THREADS_PER_DIM - 1) / NUM_COMPUTE_THREADS_PER_DIM };
+    m_commandList->setPushConstants(&miniConstants, sizeof(miniConstants));
+    m_commandList->dispatch(dispatchSize.x, dispatchSize.y);
+
+    m_commandList = savedCommandList;
+}
+
+void caustica::render::WorldRenderer::pathTraceLightingEndUpdate(nvrhi::ICommandList* commandList)
+{
     UpdateLightingEndParams lightingEndParams{
-        m_commandList,
+        commandList,
         m_context.scenePasses.lighting.lightSampling().get(),
         &m_context.bindingCache,
         m_context.sceneManager.getScene(),
@@ -1391,72 +1385,104 @@ void caustica::render::WorldRenderer::pathTrace(nvrhi::ICommandList* commandList
         m_renderTargets->screenMotionVectors,
     };
     caustica::updateLightingEnd(lightingEndParams);
+}
 
+void caustica::render::WorldRenderer::mainPathTrace(nvrhi::ICommandList* commandList)
+{
+    nvrhi::CommandListHandle savedCommandList = m_commandList;
+    m_commandList = commandList;
+
+    const bool useStablePlanes = m_context.settings.RealtimeMode;
+
+    nvrhi::rt::State state;
+    nvrhi::rt::DispatchRaysArguments args;
+    const ViewportDesc viewport = m_context.camera.view()->getViewport();
+    const uint32_t width = static_cast<uint32_t>(viewport.width());
+    const uint32_t height = static_cast<uint32_t>(viewport.height());
+    args.width = width;
+    args.height = height;
+
+    RAII_SCOPE(m_commandList->beginMarker("PathTrace");, m_commandList->endMarker(); );
+
+    state.shaderTable = (useStablePlanes ? m_ptPipelineFillStablePlanes : m_ptPipelineReference)->getShaderTable();
+    state.bindings = { m_bindingSet, m_context.descriptorTable->getDescriptorTable() };
+
+    for (uint subSampleIndex = 0; subSampleIndex < m_context.settings.ActualSamplesPerPixel(); subSampleIndex++)
     {
-        RAII_SCOPE( m_commandList->beginMarker("PathTrace");, m_commandList->endMarker(); );
+        m_commandList->setRayTracingState(state);
 
-        state.shaderTable = ((useStablePlanes) ? (m_ptPipelineFillStablePlanes) : (m_ptPipelineReference))->getShaderTable();
-        state.bindings = { m_bindingSet, m_context.descriptorTable->getDescriptorTable() };
+        SampleMiniConstants miniConstants = { uint4(subSampleIndex, 0, 0, 0) };
+        m_commandList->setPushConstants(&miniConstants, sizeof(miniConstants));
 
-        for (uint subSampleIndex = 0; subSampleIndex < m_context.settings.ActualSamplesPerPixel(); subSampleIndex++)
-        {
-            // required to avoid race conditions in back to back dispatchRays
-            m_commandList->setBufferState(m_renderTargets->stablePlanesBuffer, nvrhi::ResourceStates::UnorderedAccess);
-            m_commandList->setTextureState(m_renderTargets->specularHitT, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
-
-            m_commandList->setRayTracingState(state);
-
-            // tell path tracer which subSampleIndex we're processing
-            SampleMiniConstants miniConstants = { uint4(subSampleIndex, 0, 0, 0) };//     <- use subSampleIndex to try to figure out why we're losing radiance - is the first one what's left, or the last one?
-            m_commandList->setPushConstants(&miniConstants, sizeof(miniConstants));
-
-            m_commandList->dispatchRays(args);
-            m_commandList->setTextureState(m_renderTargets->specularHitT, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
-        }
-
-        m_commandList->setBufferState(m_renderTargets->stablePlanesBuffer, nvrhi::ResourceStates::UnorderedAccess);
+        m_commandList->dispatchRays(args);
     }
 
-    // this is a performance optimization where final 2 passes from ReSTIR DI and ReSTIR GI are combined to avoid loading GBuffer twice
+    m_commandList = savedCommandList;
+}
+
+void caustica::render::WorldRenderer::executeRtxdi(nvrhi::ICommandList* commandList)
+{
+    nvrhi::CommandListHandle savedCommandList = m_commandList;
+    m_commandList = commandList;
+
     static bool enableFusedDIGIFinal = true;
-    bool useFusedDIGIFinal = m_context.settings.ActualUseReSTIRDI() && m_context.settings.ActualUseReSTIRGI() && enableFusedDIGIFinal;
+    const bool useFusedDIGIFinal = m_context.settings.ActualUseReSTIRDI()
+        && m_context.settings.ActualUseReSTIRGI()
+        && enableFusedDIGIFinal;
 
-    if (m_context.settings.ActualUseRTXDIPasses())
-    {
-        RAII_SCOPE( m_commandList->beginMarker("RTXDI");, m_commandList->endMarker(); );
+    RAII_SCOPE(m_commandList->beginMarker("RTXDI");, m_commandList->endMarker(); );
 
-        // this does all ReSTIR DI magic including applying the final sample into correct radiance buffer (depending on denoiser state)
-        if (m_context.settings.ActualUseReSTIRDI())
-            m_rtxdiPass->execute(m_commandList, m_bindingSet, useFusedDIGIFinal);
+    if (m_context.settings.ActualUseReSTIRDI())
+        m_rtxdiPass->execute(m_commandList, m_bindingSet, useFusedDIGIFinal);
 
-        if (m_context.settings.ActualUseReSTIRGI())
-            m_rtxdiPass->ExecuteGI(m_commandList, m_bindingSet, useFusedDIGIFinal);
+    if (m_context.settings.ActualUseReSTIRGI())
+        m_rtxdiPass->ExecuteGI(m_commandList, m_bindingSet, useFusedDIGIFinal);
 
-        if (useFusedDIGIFinal)
-            m_rtxdiPass->ExecuteFusedDIGIFinal(m_commandList, m_bindingSet);
+    if (useFusedDIGIFinal)
+        m_rtxdiPass->ExecuteFusedDIGIFinal(m_commandList, m_bindingSet);
 
-        if (m_context.settings.ActualUseReSTIRPT())
-            m_rtxdiPass->ExecutePT(m_commandList, m_bindingSet);
-    }
+    if (m_context.settings.ActualUseReSTIRPT())
+        m_rtxdiPass->ExecutePT(m_commandList, m_bindingSet);
 
-    {
-        RAII_SCOPE(m_commandList->beginMarker("Denoising Guides Bake"); , m_commandList->endMarker(); );
+    m_commandList = savedCommandList;
+}
 
-        m_denoisingGuidesPass->DenoiseSpecHitT(m_commandList, m_bindingSet);
-        m_denoisingGuidesPass->ComputeAvgLayerRadiance(m_commandList, m_bindingSet);
+void caustica::render::WorldRenderer::prepareDenoiserGuides(nvrhi::ICommandList* commandList)
+{
+    nvrhi::CommandListHandle savedCommandList = m_commandList;
+    m_commandList = commandList;
 
-        if (m_context.settings.DebugView != DebugViewType::Disabled)
-            m_denoisingGuidesPass->RenderDebugViz(m_commandList, m_context.settings.DebugView, m_bindingSet);
-    }
+    RAII_SCOPE(m_commandList->beginMarker("Denoising Guides Bake"); , m_commandList->endMarker(); );
 
-    if (useStablePlanes && (m_context.settings.DebugView > DebugViewType::Disabled && m_context.settings.DebugView <= DebugViewType::StablePlane_SpecRadiance || m_context.settings.DebugView == DebugViewType::StableRadiance) )
-    {
-        m_commandList->beginMarker("StablePlanesDebugViz");
-        nvrhi::TextureDesc tdesc = m_renderTargets->outputColor->getDesc();
-        m_postProcess->Apply(m_commandList, PostProcess::ComputePassType::StablePlanesDebugViz, m_constantBuffer, miniConstants, m_bindingSet, m_bindingLayout, tdesc.width, tdesc.height);
-        m_commandList->endMarker();
+    m_denoisingGuidesPass->DenoiseSpecHitT(m_commandList, m_bindingSet);
+    m_denoisingGuidesPass->ComputeAvgLayerRadiance(m_commandList, m_bindingSet);
 
-    }
+    if (m_context.settings.DebugView != DebugViewType::Disabled)
+        m_denoisingGuidesPass->RenderDebugViz(m_commandList, m_context.settings.DebugView, m_bindingSet);
+
+    m_commandList = savedCommandList;
+}
+
+void caustica::render::WorldRenderer::stablePlanesDebugViz(nvrhi::ICommandList* commandList)
+{
+    nvrhi::CommandListHandle savedCommandList = m_commandList;
+    m_commandList = commandList;
+
+    SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
+
+    m_commandList->beginMarker("StablePlanesDebugViz");
+    nvrhi::TextureDesc tdesc = m_renderTargets->outputColor->getDesc();
+    m_postProcess->Apply(
+        m_commandList,
+        PostProcess::ComputePassType::StablePlanesDebugViz,
+        m_constantBuffer,
+        miniConstants,
+        m_bindingSet,
+        m_bindingLayout,
+        tdesc.width,
+        tdesc.height);
+    m_commandList->endMarker();
+
     m_commandList = savedCommandList;
 }
 

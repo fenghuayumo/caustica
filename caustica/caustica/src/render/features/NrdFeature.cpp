@@ -1,4 +1,4 @@
-#include <render/features/NrdFeature.h>
+#include <render/features/RenderFeature.h>
 
 #include <render/core/RenderTargets.h>
 #include <render/graph/GraphBuilder.h>

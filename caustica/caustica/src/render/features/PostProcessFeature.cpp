@@ -1,4 +1,4 @@
-#include <render/features/PostProcessFeature.h>
+#include <render/features/RenderFeature.h>
 
 #include <render/core/PathTracingShaderCompiler.h>
 #include <render/core/RenderTargets.h>

@@ -3,11 +3,6 @@
 #include <render/core/RenderTargets.h>
 #include <render/graph/GraphBuilder.h>
 #include <render/features/RenderFeatureContext.h>
-#include <render/features/CompositeFeature.h>
-#include <render/features/DenoiseAAFeature.h>
-#include <render/features/NrdFeature.h>
-#include <render/features/PathTraceFeature.h>
-#include <render/features/PostProcessFeature.h>
 
 namespace caustica::render
 {
@@ -46,7 +41,13 @@ namespace
 
     constexpr GraphFeatureRegistration kDefaultGraphFeatures[] = {
         { "FrameClear", registerClearFrameTargetsPass },
-        { "PathTrace", registerPathTraceFeature },
+        { "RtxdiBeginFrame", registerRtxdiBeginFrameFeature },
+        { "PathTracePrePass", registerPathTracePrePassFeature },
+        { "VBufferExport", registerVBufferExportFeature },
+        { "PathTraceLightingEnd", registerPathTraceLightingEndFeature },
+        { "MainPathTrace", registerMainPathTraceFeature },
+        { "Rtxdi", registerRtxdiExecuteFeature },
+        { "DenoiserPrepare", registerDenoiserPrepareFeature },
         { "NRD", registerNrdFeature },
         { "DenoiseAA", registerDenoiseAAFeature },
         { "PostProcess", registerPostProcessFeature },

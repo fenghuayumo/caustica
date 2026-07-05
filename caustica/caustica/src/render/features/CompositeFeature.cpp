@@ -1,4 +1,4 @@
-#include <render/features/CompositeFeature.h>
+#include <render/features/RenderFeature.h>
 
 #include <render/core/FullscreenBlitPass.h>
 #include <render/core/RenderTargets.h>

@@ -1,4 +1,4 @@
-#include <render/features/DenoiseAAFeature.h>
+#include <render/features/RenderFeature.h>
 
 #include <render/core/CameraController.h>
 #include <render/core/RenderTargets.h>
