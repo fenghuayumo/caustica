@@ -18,7 +18,7 @@ namespace caustica::render
     class PixelReadbackPass
     {
     private:
-        nvrhi::DeviceHandle m_Device;
+        nvrhi::DeviceHandle m_device;
         nvrhi::ShaderHandle m_Shader;
         nvrhi::ComputePipelineHandle m_Pipeline;
         nvrhi::BindingLayoutHandle m_BindingLayout;

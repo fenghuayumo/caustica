@@ -8,7 +8,7 @@ using namespace caustica::render;
 
 // Resources
 
-void GBufferRenderTargets::Init(
+void GBufferRenderTargets::init(
     nvrhi::IDevice* device,
     uint2 size, 
     uint sampleCount,
@@ -30,20 +30,20 @@ void GBufferRenderTargets::Init(
     desc.mipLevels = 1;
 
     desc.format = nvrhi::Format::SRGBA8_UNORM;
-    desc.debugName = "GBufferDiffuse";
-    GBufferDiffuse = device->createTexture(desc);
+    desc.debugName = "gBufferDiffuse";
+    gBufferDiffuse = device->createTexture(desc);
 
     desc.format = nvrhi::Format::SRGBA8_UNORM;
-    desc.debugName = "GBufferSpecular";
-    GBufferSpecular = device->createTexture(desc);
+    desc.debugName = "gBufferSpecular";
+    gBufferSpecular = device->createTexture(desc);
 
     desc.format = nvrhi::Format::RGBA16_SNORM;
-    desc.debugName = "GBufferNormals";
-    GBufferNormals = device->createTexture(desc);
+    desc.debugName = "gBufferNormals";
+    gBufferNormals = device->createTexture(desc);
 
     desc.format = nvrhi::Format::RGBA16_FLOAT;
-    desc.debugName = "GBufferEmissive";
-    GBufferEmissive = device->createTexture(desc);
+    desc.debugName = "gBufferEmissive";
+    gBufferEmissive = device->createTexture(desc);
 
     const nvrhi::Format depthFormats[] = {
         nvrhi::Format::D24S8,
@@ -61,7 +61,7 @@ void GBufferRenderTargets::Init(
     desc.initialState = nvrhi::ResourceStates::DepthWrite;
     desc.clearValue = useReverseProjection ? nvrhi::Color(0.f) : nvrhi::Color(1.f);
     desc.debugName = "GBufferDepth";
-    Depth = device->createTexture(desc);
+    depth = device->createTexture(desc);
 
     desc.isTypeless = false;
     desc.format = nvrhi::Format::RG16_FLOAT;
@@ -73,34 +73,34 @@ void GBufferRenderTargets::Init(
         desc.width = 1;
         desc.height = 1;
     }
-    MotionVectors = device->createTexture(desc);
+    motionVectors = device->createTexture(desc);
 
-    GBufferFramebuffer = std::make_shared<FramebufferFactory>(device);
-    GBufferFramebuffer->RenderTargets = {
-        GBufferDiffuse,
-        GBufferSpecular,
-        GBufferNormals,
-        GBufferEmissive };
+    gBufferFramebuffer = std::make_shared<FramebufferFactory>(device);
+    gBufferFramebuffer->renderTargets = {
+        gBufferDiffuse,
+        gBufferSpecular,
+        gBufferNormals,
+        gBufferEmissive };
 
     if (enableMotionVectors)
-        GBufferFramebuffer->RenderTargets.push_back(MotionVectors);
+        gBufferFramebuffer->renderTargets.push_back(motionVectors);
 
-    GBufferFramebuffer->DepthTarget = Depth;
+    gBufferFramebuffer->depthTarget = depth;
 
-    m_Size = size;
-    m_SampleCount = sampleCount;
-    m_UseReverseProjection = useReverseProjection;
+    m_size = size;
+    m_sampleCount = sampleCount;
+    m_useReverseProjection = useReverseProjection;
 }
 
-void GBufferRenderTargets::Clear(nvrhi::ICommandList* commandList)
+void GBufferRenderTargets::clear(nvrhi::ICommandList* commandList)
 {
-    const nvrhi::FormatInfo& depthFormatInfo = nvrhi::getFormatInfo(Depth->getDesc().format);
+    const nvrhi::FormatInfo& depthFormatInfo = nvrhi::getFormatInfo(depth->getDesc().format);
 
-    float depthClearValue = m_UseReverseProjection ? 0.f : 1.f;
-    commandList->clearDepthStencilTexture(Depth, nvrhi::AllSubresources, true, depthClearValue, depthFormatInfo.hasStencil, 0);
-    commandList->clearTextureFloat(GBufferDiffuse, nvrhi::AllSubresources, nvrhi::Color(0.f));
-    commandList->clearTextureFloat(GBufferSpecular, nvrhi::AllSubresources, nvrhi::Color(0.f));
-    commandList->clearTextureFloat(GBufferNormals, nvrhi::AllSubresources, nvrhi::Color(0.f));
-    commandList->clearTextureFloat(GBufferEmissive, nvrhi::AllSubresources, nvrhi::Color(0.f));
-    commandList->clearTextureFloat(MotionVectors, nvrhi::AllSubresources, nvrhi::Color(0.f));
+    float depthClearValue = m_useReverseProjection ? 0.f : 1.f;
+    commandList->clearDepthStencilTexture(depth, nvrhi::AllSubresources, true, depthClearValue, depthFormatInfo.hasStencil, 0);
+    commandList->clearTextureFloat(gBufferDiffuse, nvrhi::AllSubresources, nvrhi::Color(0.f));
+    commandList->clearTextureFloat(gBufferSpecular, nvrhi::AllSubresources, nvrhi::Color(0.f));
+    commandList->clearTextureFloat(gBufferNormals, nvrhi::AllSubresources, nvrhi::Color(0.f));
+    commandList->clearTextureFloat(gBufferEmissive, nvrhi::AllSubresources, nvrhi::Color(0.f));
+    commandList->clearTextureFloat(motionVectors, nvrhi::AllSubresources, nvrhi::Color(0.f));
 }

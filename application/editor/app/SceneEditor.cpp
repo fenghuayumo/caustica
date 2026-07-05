@@ -256,22 +256,22 @@ void SceneEditor::RequestFullRebuild()
     m_contentEditor.requestFullRebuild();
 }
 
-std::vector<float3> SceneEditor::GetMeshVertices(const std::shared_ptr<MeshInfo>& mesh) const
+std::vector<float3> SceneEditor::getMeshVertices(const std::shared_ptr<MeshInfo>& mesh) const
 {
     return m_contentEditor.getMeshVertices(mesh);
 }
 
-std::vector<float3> SceneEditor::GetMeshVerticesWorld(const std::shared_ptr<MeshInfo>& mesh)
+std::vector<float3> SceneEditor::getMeshVerticesWorld(const std::shared_ptr<MeshInfo>& mesh)
 {
     return m_contentEditor.getMeshVerticesWorld(mesh);
 }
 
-std::vector<float3> SceneEditor::GetMeshVerticesWorld(caustica::ecs::Entity entity)
+std::vector<float3> SceneEditor::getMeshVerticesWorld(caustica::ecs::Entity entity)
 {
     return m_contentEditor.getMeshVerticesWorld(entity);
 }
 
-void SceneEditor::SetMeshVerticesWorld(const std::shared_ptr<MeshInfo>& mesh,
+void SceneEditor::setMeshVerticesWorld(const std::shared_ptr<MeshInfo>& mesh,
     const std::vector<float3>& vertices,
     bool recomputeNormals,
     bool rebuildAccelerationStructure)
@@ -279,7 +279,7 @@ void SceneEditor::SetMeshVerticesWorld(const std::shared_ptr<MeshInfo>& mesh,
     m_contentEditor.setMeshVerticesWorld(mesh, vertices, recomputeNormals, rebuildAccelerationStructure);
 }
 
-void SceneEditor::SetMeshVerticesWorld(caustica::ecs::Entity entity,
+void SceneEditor::setMeshVerticesWorld(caustica::ecs::Entity entity,
     const std::vector<float3>& vertices,
     bool recomputeNormals,
     bool rebuildAccelerationStructure)
@@ -287,7 +287,7 @@ void SceneEditor::SetMeshVerticesWorld(caustica::ecs::Entity entity,
     m_contentEditor.setMeshVerticesWorld(entity, vertices, recomputeNormals, rebuildAccelerationStructure);
 }
 
-void SceneEditor::SetMeshVertices(const std::shared_ptr<MeshInfo>& mesh,
+void SceneEditor::setMeshVertices(const std::shared_ptr<MeshInfo>& mesh,
     const std::vector<float3>& vertices,
     bool recomputeNormals,
     bool rebuildAccelerationStructure)

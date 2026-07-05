@@ -12,7 +12,7 @@ namespace caustica
 class ComputePass
 {
 public:
-    bool Init(
+    bool init(
         nvrhi::IDevice* device,
         caustica::ShaderFactory& shaderFactory,
         const char* fileName,
@@ -22,7 +22,7 @@ public:
         nvrhi::IBindingLayout* extraBindingLayout = nullptr,
         nvrhi::IBindingLayout* bindlessLayout = nullptr);
 
-    bool Init(
+    bool init(
         nvrhi::IDevice* device,
         caustica::ShaderFactory& shaderFactory,
         const char* fileName,
@@ -30,7 +30,7 @@ public:
         const std::vector<caustica::ShaderMacro>& macros,
         nvrhi::BindingLayoutVector & bindingLayouts );
 
-    void Execute(
+    void execute(
         nvrhi::ICommandList* commandList,
         int width,
         int height,
@@ -41,7 +41,7 @@ public:
         const void* pushConstants = nullptr,
         size_t pushConstantSize = 0);
 
-    void Execute(
+    void execute(
         nvrhi::ICommandList* commandList,
         int width,
         int height,

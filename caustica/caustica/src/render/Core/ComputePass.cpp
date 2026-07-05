@@ -8,7 +8,7 @@
 using namespace caustica;
 
 
-bool ComputePass::Init(
+bool ComputePass::init(
 	nvrhi::IDevice* device, 
 	caustica::ShaderFactory& shaderFactory, 
 	const char* fileName, 
@@ -38,7 +38,7 @@ bool ComputePass::Init(
 	return true;
 }
 
-bool ComputePass::Init(
+bool ComputePass::init(
     nvrhi::IDevice* device,
     caustica::ShaderFactory& shaderFactory,
     const char* fileName,
@@ -62,7 +62,7 @@ bool ComputePass::Init(
 }
 
 
-void ComputePass::Execute(
+void ComputePass::execute(
 	nvrhi::ICommandList* commandList, 
 	int width, 
 	int height, 
@@ -90,7 +90,7 @@ void ComputePass::Execute(
 	commandList->dispatch(width, height, depth);
 }
 
-void ComputePass::Execute(
+void ComputePass::execute(
     nvrhi::ICommandList* commandList,
     int width,
     int height,

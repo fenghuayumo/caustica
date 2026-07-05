@@ -1387,7 +1387,7 @@ void GaussianSplatPass::CreateBindingSets(const RenderTargets& renderTargets, nv
         nvrhi::BindingSetItem::TypedBuffer_SRV(1, m_indexBuffer, nvrhi::Format::R32_UINT),
         nvrhi::BindingSetItem::RawBuffer_SRV(2, m_colorBuffer),
         nvrhi::BindingSetItem::RawBuffer_SRV(3, m_shBuffer),
-        nvrhi::BindingSetItem::Texture_SRV(4, renderTargets.Depth)
+        nvrhi::BindingSetItem::Texture_SRV(4, renderTargets.depth)
     };
     m_rasterRenderBindingSet = m_device->createBindingSet(rasterRenderBindingSetDesc, m_rasterRenderBindingLayout);
 
@@ -1470,19 +1470,19 @@ void GaussianSplatPass::CreateStochasticFramebuffer(const RenderTargets& renderT
         }
 
         const bool framebufferMatches = framebuffer
-            && !framebuffer->RenderTargets.empty()
-            && framebuffer->RenderTargets[0].Get() == colorTarget.Get()
-            && framebuffer->DepthTarget.Get() == depthBuffer.Get();
+            && !framebuffer->renderTargets.empty()
+            && framebuffer->renderTargets[0].Get() == colorTarget.Get()
+            && framebuffer->depthTarget.Get() == depthBuffer.Get();
         if (!framebufferMatches)
         {
             framebuffer = std::make_shared<caustica::FramebufferFactory>(m_device);
-            framebuffer->RenderTargets = { colorTarget };
-            framebuffer->DepthTarget = depthBuffer;
+            framebuffer->renderTargets = { colorTarget };
+            framebuffer->depthTarget = depthBuffer;
         }
     };
 
-    createFramebuffer(renderTargets.OutputColor, m_stochasticDepthBuffer, m_stochasticFramebuffer, "GaussianSplatStochasticDepth");
-    createFramebuffer(renderTargets.ProcessedOutputColor, m_stochasticProcessedDepthBuffer, m_stochasticProcessedFramebuffer, "GaussianSplatStochasticProcessedDepth");
+    createFramebuffer(renderTargets.outputColor, m_stochasticDepthBuffer, m_stochasticFramebuffer, "GaussianSplatStochasticDepth");
+    createFramebuffer(renderTargets.processedOutputColor, m_stochasticProcessedDepthBuffer, m_stochasticProcessedFramebuffer, "GaussianSplatStochasticProcessedDepth");
 }
 
 void GaussianSplatPass::CreatePipeline(const RenderTargets& renderTargets)
@@ -1529,14 +1529,14 @@ void GaussianSplatPass::CreatePipeline(const RenderTargets& renderTargets)
 
     m_rasterRenderPipeline = m_device->createGraphicsPipeline(
         pipelineDesc,
-        renderTargets.ProcessedOutputFramebuffer->GetFramebuffer(nvrhi::AllSubresources));
+        renderTargets.processedOutputFramebuffer->getFramebuffer(nvrhi::AllSubresources));
 
     pipelineDesc.bindingLayouts = { m_hybridRenderBindingLayout };
     pipelineDesc.VS = m_hybridVertexShader;
     pipelineDesc.PS = m_hybridPixelShader;
     m_hybridRenderPipeline = m_device->createGraphicsPipeline(
         pipelineDesc,
-        renderTargets.ProcessedOutputFramebuffer->GetFramebuffer(nvrhi::AllSubresources));
+        renderTargets.processedOutputFramebuffer->getFramebuffer(nvrhi::AllSubresources));
 
     if (m_stochasticFramebuffer)
     {
@@ -1552,14 +1552,14 @@ void GaussianSplatPass::CreatePipeline(const RenderTargets& renderTargets)
         pipelineDesc.PS = m_rasterPixelShader;
         m_stochasticRasterRenderPipeline = m_device->createGraphicsPipeline(
             pipelineDesc,
-            m_stochasticFramebuffer->GetFramebuffer(nvrhi::AllSubresources));
+            m_stochasticFramebuffer->getFramebuffer(nvrhi::AllSubresources));
 
         pipelineDesc.bindingLayouts = { m_hybridRenderBindingLayout };
         pipelineDesc.VS = m_hybridVertexShader;
         pipelineDesc.PS = m_hybridPixelShader;
         m_stochasticHybridRenderPipeline = m_device->createGraphicsPipeline(
             pipelineDesc,
-            m_stochasticFramebuffer->GetFramebuffer(nvrhi::AllSubresources));
+            m_stochasticFramebuffer->getFramebuffer(nvrhi::AllSubresources));
     }
 
     if (m_stochasticProcessedFramebuffer)
@@ -1576,14 +1576,14 @@ void GaussianSplatPass::CreatePipeline(const RenderTargets& renderTargets)
         pipelineDesc.PS = m_rasterPixelShader;
         m_stochasticProcessedRasterRenderPipeline = m_device->createGraphicsPipeline(
             pipelineDesc,
-            m_stochasticProcessedFramebuffer->GetFramebuffer(nvrhi::AllSubresources));
+            m_stochasticProcessedFramebuffer->getFramebuffer(nvrhi::AllSubresources));
 
         pipelineDesc.bindingLayouts = { m_hybridRenderBindingLayout };
         pipelineDesc.VS = m_hybridVertexShader;
         pipelineDesc.PS = m_hybridPixelShader;
         m_stochasticProcessedHybridRenderPipeline = m_device->createGraphicsPipeline(
             pipelineDesc,
-            m_stochasticProcessedFramebuffer->GetFramebuffer(nvrhi::AllSubresources));
+            m_stochasticProcessedFramebuffer->getFramebuffer(nvrhi::AllSubresources));
     }
 
     nvrhi::ComputePipelineDesc computePipelineDesc;
@@ -1848,11 +1848,11 @@ void GaussianSplatPass::Render(
     }
 
     PlanarViewConstants planarView = {};
-    view.FillPlanarViewConstants(planarView);
+    view.fillPlanarViewConstants(planarView);
 
     GaussianSplatConstants constants = {};
     constants.view = FromPlanarViewConstants(planarView);
-    const float3 cameraPosition = view.GetViewOrigin();
+    const float3 cameraPosition = view.getViewOrigin();
     constants.cameraPosition = float4(cameraPosition.x, cameraPosition.y, cameraPosition.z, 1.0f);
     constants.objectToWorld = settings.objectToWorld;
     constants.splatScale = settings.splatScale;
@@ -1906,8 +1906,8 @@ void GaussianSplatPass::Render(
             : m_rasterRenderPipeline;
     }
     nvrhi::IFramebuffer* framebuffer = stochasticSplats
-        ? stochasticFramebuffer->GetFramebuffer(nvrhi::AllSubresources)
-        : renderTargets.ProcessedOutputFramebuffer->GetFramebuffer(nvrhi::AllSubresources);
+        ? stochasticFramebuffer->getFramebuffer(nvrhi::AllSubresources)
+        : renderTargets.processedOutputFramebuffer->getFramebuffer(nvrhi::AllSubresources);
     if (!renderPipeline || !framebuffer)
     {
         commandList->endMarker();
@@ -1917,8 +1917,8 @@ void GaussianSplatPass::Render(
     commandList->setBufferState(m_indexBuffer, nvrhi::ResourceStates::ShaderResource);
     if (distanceStageCulling)
         commandList->setBufferState(m_drawIndirectBuffer, nvrhi::ResourceStates::IndirectArgument);
-    commandList->setTextureState(renderTargets.Depth, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-    nvrhi::TextureHandle colorTarget = stochasticToOutput ? renderTargets.OutputColor : renderTargets.ProcessedOutputColor;
+    commandList->setTextureState(renderTargets.depth, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+    nvrhi::TextureHandle colorTarget = stochasticToOutput ? renderTargets.outputColor : renderTargets.processedOutputColor;
     commandList->setTextureState(colorTarget, nvrhi::AllSubresources, nvrhi::ResourceStates::RenderTarget);
     if (stochasticSplats)
         commandList->setTextureState(stochasticDepthBuffer, nvrhi::AllSubresources, nvrhi::ResourceStates::DepthWrite);
@@ -1934,7 +1934,7 @@ void GaussianSplatPass::Render(
     state.pipeline = renderPipeline;
     state.bindings = { renderBindingSet };
     state.framebuffer = framebuffer;
-    state.viewport = view.GetViewportState();
+    state.viewport = view.getViewportState();
     if (distanceStageCulling)
         state.indirectParams = m_drawIndirectBuffer;
     commandList->setGraphicsState(state);

@@ -23,7 +23,7 @@ namespace caustica::render
     class LightProbeProcessingPass
     {
     private:
-        nvrhi::DeviceHandle m_Device;
+        nvrhi::DeviceHandle m_device;
 
         nvrhi::ShaderHandle m_GeometryShader;
         nvrhi::ShaderHandle m_MipPixelShader;
@@ -63,7 +63,7 @@ namespace caustica::render
             };
         };
 
-        std::unordered_map<TextureSubresourcesKey, nvrhi::FramebufferHandle, TextureSubresourcesKey::Hash> m_FramebufferCache;
+        std::unordered_map<TextureSubresourcesKey, nvrhi::FramebufferHandle, TextureSubresourcesKey::Hash> m_framebufferCache;
         nvrhi::FramebufferHandle GetCachedFramebuffer(nvrhi::ITexture* texture, nvrhi::TextureSubresourceSet subresources);
 
         std::unordered_map<TextureSubresourcesKey, nvrhi::BindingSetHandle, TextureSubresourcesKey::Hash> m_BindingSetCache;

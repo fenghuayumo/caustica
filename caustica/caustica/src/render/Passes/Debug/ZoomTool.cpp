@@ -43,7 +43,7 @@ ZoomTool::ZoomTool( nvrhi::IDevice* device, std::shared_ptr<caustica::ShaderFact
 
     // These need to know about the scene
     pipelineDesc.bindingLayouts = { m_bindingLayout };
-    m_CSZoomTool.Init(m_device, *shaderFactory, "caustica/shaders/render/Misc/ZoomTool.hlsl", "main", std::vector<caustica::ShaderMacro>(), pipelineDesc.bindingLayouts);
+    m_CSZoomTool.init(m_device, *shaderFactory, "caustica/shaders/render/Misc/ZoomTool.hlsl", "main", std::vector<caustica::ShaderMacro>(), pipelineDesc.bindingLayouts);
 
     m_constantBuffer = m_device->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ZoomToolShaderConstants), "ZoomToolShaderConstants", caustica::c_MaxRenderPassConstantBufferVersions));
 }
@@ -100,12 +100,12 @@ void ZoomTool::Render( nvrhi::ICommandList * commandList, nvrhi::TextureHandle c
             nvrhi::BindingSetItem::ConstantBuffer(0, m_constantBuffer),
             nvrhi::BindingSetItem::Texture_UAV(0, colorInOut, nvrhi::Format::RGBA8_UNORM) };
 
-        nvrhi::BindingSetHandle bindingSet = m_bindingCache.GetOrCreateBindingSet(bindingSetDesc, m_bindingLayout);
+        nvrhi::BindingSetHandle bindingSet = m_bindingCache.getOrCreateBindingSet(bindingSetDesc, m_bindingLayout);
 
         int threadGroupCountX = (colorInOut->getDesc().width + 16 - 1) / 16;
         int threadGroupCountY = (colorInOut->getDesc().height + 16 - 1) / 16;
 
-        m_CSZoomTool.Execute(commandList, threadGroupCountX, threadGroupCountY, 1, bindingSet);
+        m_CSZoomTool.execute(commandList, threadGroupCountX, threadGroupCountY, 1, bindingSet);
     }
 }
 

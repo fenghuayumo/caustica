@@ -124,7 +124,7 @@ public:
 		const RenderTargets& renderTargets,
 		const nvrhi::BindingLayoutHandle extraBindingLayout,
 		nvrhi::BindingSetHandle extraBindingSet);
-	void Execute(
+	void execute(
 		nvrhi::CommandListHandle commandList,
 		nvrhi::BindingSetHandle extraBindingSet, bool skipFinal);
 	void ExecuteGI(nvrhi::CommandListHandle commandList,

@@ -85,7 +85,7 @@ void SceneCameraController::saveToFile() const
     if (!m_camera)
         return;
 
-    math::float4x4 projMatrix = m_camera->view()->GetProjectionMatrix();
+    math::float4x4 projMatrix = m_camera->view()->getProjectionMatrix();
     float tanHalfFOVY = 1.0f / (projMatrix.m_data[1 * 4 + 1]);
     float fovY = atanf(tanHalfFOVY) * 2.0f;
 

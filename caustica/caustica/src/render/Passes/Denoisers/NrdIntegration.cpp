@@ -363,16 +363,16 @@ void NrdIntegration::RunDenoiserPasses(
     }
 
     nrd::CommonSettings commonSettings;
-    MatrixToNrd(commonSettings.worldToViewMatrix, dm::affineToHomogeneous(view.GetViewMatrix()));           //MatrixToNrd(commonSettings.worldToViewRotationMatrix, dm::affineToHomogeneous(view.GetViewMatrix()));
-    MatrixToNrd(commonSettings.worldToViewMatrixPrev, dm::affineToHomogeneous(viewPrev.GetViewMatrix()));   //MatrixToNrd(commonSettings.worldToViewRotationMatrixPrev, dm::affineToHomogeneous(viewPrev.GetViewMatrix()));
-    MatrixToNrd(commonSettings.viewToClipMatrix, view.GetProjectionMatrix(false));
-    MatrixToNrd(commonSettings.viewToClipMatrixPrev, viewPrev.GetProjectionMatrix(false));
+    MatrixToNrd(commonSettings.worldToViewMatrix, dm::affineToHomogeneous(view.getViewMatrix()));           //MatrixToNrd(commonSettings.worldToViewRotationMatrix, dm::affineToHomogeneous(view.getViewMatrix()));
+    MatrixToNrd(commonSettings.worldToViewMatrixPrev, dm::affineToHomogeneous(viewPrev.getViewMatrix()));   //MatrixToNrd(commonSettings.worldToViewRotationMatrixPrev, dm::affineToHomogeneous(viewPrev.getViewMatrix()));
+    MatrixToNrd(commonSettings.viewToClipMatrix, view.getProjectionMatrix(false));
+    MatrixToNrd(commonSettings.viewToClipMatrixPrev, viewPrev.getProjectionMatrix(false));
 
-    dm::float2 pixelOffset = view.GetPixelOffset();
-    dm::float2 prevPixelOffset = viewPrev.GetPixelOffset();
+    dm::float2 pixelOffset = view.getPixelOffset();
+    dm::float2 prevPixelOffset = viewPrev.getPixelOffset();
     commonSettings.isMotionVectorInWorldSpace = false;
-    commonSettings.motionVectorScale[0] = (commonSettings.isMotionVectorInWorldSpace)?(1.f):(1.f / view.GetViewExtent().width());
-    commonSettings.motionVectorScale[1] = (commonSettings.isMotionVectorInWorldSpace)?(1.f):(1.f / view.GetViewExtent().height());
+    commonSettings.motionVectorScale[0] = (commonSettings.isMotionVectorInWorldSpace)?(1.f):(1.f / view.getViewExtent().width());
+    commonSettings.motionVectorScale[1] = (commonSettings.isMotionVectorInWorldSpace)?(1.f):(1.f / view.getViewExtent().height());
     commonSettings.motionVectorScale[2] = 1.0f;
     commonSettings.cameraJitter[0] = pixelOffset.x;
     commonSettings.cameraJitter[1] = pixelOffset.y;
@@ -380,14 +380,14 @@ void NrdIntegration::RunDenoiserPasses(
     commonSettings.cameraJitterPrev[1] = prevPixelOffset.y;
     commonSettings.frameIndex = frameIndex;
     commonSettings.denoisingRange = kMaxSceneDistance * 2;   // with various bounces (in non-primary planes or with PSR) the virtual view Z can be much longer, so adding 2x!
-    commonSettings.enableValidation = enableValidation && renderTargets.DenoiserOutValidation != nullptr;
+    commonSettings.enableValidation = enableValidation && renderTargets.denoiserOutValidation != nullptr;
     commonSettings.disocclusionThreshold = disocclusionThreshold;
     commonSettings.disocclusionThresholdAlternate = disocclusionThresholdAlternate;
     commonSettings.isDisocclusionThresholdMixAvailable = useDisocclusionThresholdAlternateMix;
     commonSettings.timeDeltaBetweenFrames = timeDeltaBetweenFrames;
     commonSettings.accumulationMode = (resetHistory)?(nrd::AccumulationMode::CLEAR_AND_RESTART):(nrd::AccumulationMode::CONTINUE);
     
-    auto const& textureDesc = renderTargets.DenoiserNormalRoughness->getDesc();
+    auto const& textureDesc = renderTargets.denoiserNormalRoughness->getDesc();
     commonSettings.resourceSize[0] = textureDesc.width;
     commonSettings.resourceSize[1] = textureDesc.height;
     commonSettings.resourceSizePrev[0] = textureDesc.width;
@@ -444,28 +444,28 @@ void NrdIntegration::RunDenoiserPasses(
                 switch (resource.type)
                 {
                 case nrd::ResourceType::IN_MV:
-                    texture = renderTargets.DenoiserMotionVectors;
+                    texture = renderTargets.denoiserMotionVectors;
                     break;
                 case nrd::ResourceType::IN_NORMAL_ROUGHNESS:
-                    texture = renderTargets.DenoiserNormalRoughness;
+                    texture = renderTargets.denoiserNormalRoughness;
                     break;
                 case nrd::ResourceType::IN_VIEWZ:
-                    texture = renderTargets.DenoiserViewspaceZ;
+                    texture = renderTargets.denoiserViewspaceZ;
                     break;
                 case nrd::ResourceType::IN_SPEC_RADIANCE_HITDIST:
-                    texture = renderTargets.DenoiserSpecRadianceHitDist;
+                    texture = renderTargets.denoiserSpecRadianceHitDist;
                     break;
                 case nrd::ResourceType::IN_DIFF_RADIANCE_HITDIST:
-                    texture = renderTargets.DenoiserDiffRadianceHitDist;
+                    texture = renderTargets.denoiserDiffRadianceHitDist;
                     break;
                 case nrd::ResourceType::OUT_SPEC_RADIANCE_HITDIST:
-                    texture = renderTargets.DenoiserOutSpecRadianceHitDist[pass];
+                    texture = renderTargets.denoiserOutSpecRadianceHitDist[pass];
                     break;
                 case nrd::ResourceType::OUT_DIFF_RADIANCE_HITDIST:
-                    texture = renderTargets.DenoiserOutDiffRadianceHitDist[pass];
+                    texture = renderTargets.denoiserOutDiffRadianceHitDist[pass];
                     break;
                 case nrd::ResourceType::OUT_VALIDATION:
-                    texture = renderTargets.DenoiserOutValidation;
+                    texture = renderTargets.denoiserOutValidation;
                     break;
                 //case nrd::ResourceType::IN_DIFF_HIT:
                 //    texture = renderTargets.DiffuseLighting;
@@ -480,7 +480,7 @@ void NrdIntegration::RunDenoiserPasses(
                 //    texture = renderTargets.DenoisedSpecularLighting;
                 //    break;
                 case nrd::ResourceType::IN_DISOCCLUSION_THRESHOLD_MIX:
-                    texture = renderTargets.DenoiserDisocclusionThresholdMix;
+                    texture = renderTargets.denoiserDisocclusionThresholdMix;
                     break;
                 case nrd::ResourceType::TRANSIENT_POOL:
                     texture = m_transientTextures[resource.indexInPool];
@@ -515,8 +515,8 @@ void NrdIntegration::RunDenoiserPasses(
 
         const NrdPipeline& pipeline = m_pipelines[dispatchDesc.pipelineIndex];
 
-        nvrhi::BindingSetHandle resourcesBindingSet = m_bindingCache.GetOrCreateBindingSet(resourcesSetDesc, pipeline.ResourcesBindingLayout);
-        nvrhi::BindingSetHandle constantsAndSamplersBindingSet = m_bindingCache.GetOrCreateBindingSet(constantsAndSampelrsSetDesc, pipeline.ConstantsAndSamplersBindingLayout);
+        nvrhi::BindingSetHandle resourcesBindingSet = m_bindingCache.getOrCreateBindingSet(resourcesSetDesc, pipeline.ResourcesBindingLayout);
+        nvrhi::BindingSetHandle constantsAndSamplersBindingSet = m_bindingCache.getOrCreateBindingSet(constantsAndSampelrsSetDesc, pipeline.ConstantsAndSamplersBindingLayout);
 
         nvrhi::ComputeState state;
         state.bindings = { resourcesBindingSet, constantsAndSamplersBindingSet };

@@ -77,7 +77,7 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
             {
                 ImGui::TextColored(warnColor, "Scene has %d uncompressed textures", uncompressedTextureCount);
                 if (ImGui::Button("Batch compress with nvtt_export.exe", { -1, 0 }))
-                    if (CompressTextures(m_sceneEditor.GetUncompressedTextures()))
+                    if (compressTextures(m_sceneEditor.GetUncompressedTextures()))
                     {   // reload scene
                         m_sceneEditor.SetCurrentScene(m_sceneEditor.GetCurrentSceneName(), true);
                     }

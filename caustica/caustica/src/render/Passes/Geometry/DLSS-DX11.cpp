@@ -143,10 +143,10 @@ public:
         evalParams.InReset = params.resetHistory;
         evalParams.InMVScaleX = params.motionVectorScaleX;
         evalParams.InMVScaleY = params.motionVectorScaleY;
-        evalParams.InJitterOffsetX = view.GetPixelOffset().x;
-        evalParams.InJitterOffsetY = view.GetPixelOffset().y;
-        evalParams.InRenderSubrectDimensions.Width = view.GetViewExtent().width();
-        evalParams.InRenderSubrectDimensions.Height = view.GetViewExtent().height();
+        evalParams.InJitterOffsetX = view.getPixelOffset().x;
+        evalParams.InJitterOffsetY = view.getPixelOffset().y;
+        evalParams.InRenderSubrectDimensions.Width = view.getViewExtent().width();
+        evalParams.InRenderSubrectDimensions.Height = view.getViewExtent().height();
 
         NVSDK_NGX_Result result = NGX_D3D11_EVALUATE_DLSS_EXT(d3dcontext, m_dlssHandle, m_parameters, &evalParams);
 

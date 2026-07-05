@@ -26,25 +26,25 @@ struct SetSceneMeshVerticesParams
     std::function<void(const std::shared_ptr<MeshInfo>&)> requestMeshAccelRebuild;
 };
 
-std::vector<dm::float3> GetMeshVertices(const std::shared_ptr<MeshInfo>& mesh);
-std::vector<dm::float3> GetMeshVerticesWorld(
+std::vector<dm::float3> getMeshVertices(const std::shared_ptr<MeshInfo>& mesh);
+std::vector<dm::float3> getMeshVerticesWorld(
     const std::shared_ptr<Scene>& scene,
     const std::shared_ptr<MeshInfo>& mesh,
     uint32_t frameIndex);
-std::vector<dm::float3> GetMeshVerticesWorld(
+std::vector<dm::float3> getMeshVerticesWorld(
     const std::shared_ptr<Scene>& scene,
     ecs::Entity entity,
     uint32_t frameIndex);
 
-void SetMeshVertices(
+void setMeshVertices(
     const std::shared_ptr<MeshInfo>& mesh,
     const std::vector<dm::float3>& vertices,
     const SetSceneMeshVerticesParams& params);
-void SetMeshVerticesWorld(
+void setMeshVerticesWorld(
     ecs::Entity entity,
     const std::vector<dm::float3>& vertices,
     const SetSceneMeshVerticesParams& params);
-void SetMeshVerticesWorld(
+void setMeshVerticesWorld(
     const std::shared_ptr<MeshInfo>& mesh,
     const std::vector<dm::float3>& vertices,
     const SetSceneMeshVerticesParams& params);

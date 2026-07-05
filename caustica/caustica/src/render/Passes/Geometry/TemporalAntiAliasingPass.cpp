@@ -124,7 +124,7 @@ TemporalAntiAliasingPass::TemporalAntiAliasingPass(
         m_MotionVectorsBindingSet = device->createBindingSet(bindingSetDesc, m_MotionVectorsBindingLayout);
 
         m_MotionVectorsFramebufferFactory = std::make_unique<FramebufferFactory>(device);
-        m_MotionVectorsFramebufferFactory->RenderTargets = { params.motionVectors };
+        m_MotionVectorsFramebufferFactory->renderTargets = { params.motionVectors };
 
         nvrhi::GraphicsPipelineDesc pipelineDesc;
         pipelineDesc.primType = nvrhi::PrimitiveType::TriangleStrip;
@@ -136,7 +136,7 @@ TemporalAntiAliasingPass::TemporalAntiAliasingPass(
         pipelineDesc.renderState.depthStencilState.depthTestEnable = false;
         pipelineDesc.renderState.depthStencilState.stencilEnable = false;
 
-        nvrhi::FramebufferInfo framebufferInfo = m_MotionVectorsFramebufferFactory->GetFramebufferInfo();
+        nvrhi::FramebufferInfo framebufferInfo = m_MotionVectorsFramebufferFactory->getFramebufferInfo();
 
         m_MotionVectorsPso = device->createGraphicsPipeline(pipelineDesc, framebufferInfo);
     }
@@ -185,17 +185,17 @@ void TemporalAntiAliasingPass::RenderMotionVectors(
     const ICompositeView& compositeViewPrevious,
     dm::float3 preViewTranslationDifference)
 {
-    assert(compositeView.GetNumChildViews(ViewType::PLANAR) == compositeViewPrevious.GetNumChildViews(ViewType::PLANAR));
+    assert(compositeView.getNumChildViews(ViewType::PLANAR) == compositeViewPrevious.getNumChildViews(ViewType::PLANAR));
     assert(m_MotionVectorsPso);
 
-    commandList->beginMarker("MotionVectors");
+    commandList->beginMarker("motionVectors");
 
-    for (uint viewIndex = 0; viewIndex < compositeView.GetNumChildViews(ViewType::PLANAR); viewIndex++)
+    for (uint viewIndex = 0; viewIndex < compositeView.getNumChildViews(ViewType::PLANAR); viewIndex++)
     {
-        const IView* view = compositeView.GetChildView(ViewType::PLANAR, viewIndex);
-        const IView* viewPrevious = compositeViewPrevious.GetChildView(ViewType::PLANAR, viewIndex);
+        const IView* view = compositeView.getChildView(ViewType::PLANAR, viewIndex);
+        const IView* viewPrevious = compositeViewPrevious.getChildView(ViewType::PLANAR, viewIndex);
 
-        const nvrhi::ViewportState viewportState = view->GetViewportState();
+        const nvrhi::ViewportState viewportState = view->getViewportState();
         
         // This pass only works for planar, single-viewport views
         assert(viewportState.viewports.size() == 1);
@@ -203,8 +203,8 @@ void TemporalAntiAliasingPass::RenderMotionVectors(
         const nvrhi::Viewport& inputViewport = viewportState.viewports[0];
 
         TemporalAntiAliasingConstants taaConstants = {};
-        affine3 viewReprojection = inverse(view->GetViewMatrix()) * translation(-preViewTranslationDifference) * viewPrevious->GetViewMatrix();
-        taaConstants.reprojectionMatrix = inverse(view->GetProjectionMatrix(false)) * affineToHomogeneous(viewReprojection) * viewPrevious->GetProjectionMatrix(false);
+        affine3 viewReprojection = inverse(view->getViewMatrix()) * translation(-preViewTranslationDifference) * viewPrevious->getViewMatrix();
+        taaConstants.reprojectionMatrix = inverse(view->getProjectionMatrix(false)) * affineToHomogeneous(viewReprojection) * viewPrevious->getProjectionMatrix(false);
         taaConstants.inputViewOrigin = float2(inputViewport.minX, inputViewport.minY);
         taaConstants.inputViewSize = float2(inputViewport.width(), inputViewport.height());
         taaConstants.stencilMask = m_StencilMask;
@@ -212,7 +212,7 @@ void TemporalAntiAliasingPass::RenderMotionVectors(
 
         nvrhi::GraphicsState state;
         state.pipeline = m_MotionVectorsPso;
-        state.framebuffer = m_MotionVectorsFramebufferFactory->GetFramebuffer(*view);
+        state.framebuffer = m_MotionVectorsFramebufferFactory->getFramebuffer(*view);
         state.bindings = { m_MotionVectorsBindingSet};
         state.viewport = viewportState;
         commandList->setGraphicsState(state);
@@ -233,24 +233,24 @@ void TemporalAntiAliasingPass::TemporalResolve(
     const ICompositeView& compositeViewInput,
     const ICompositeView& compositeViewOutput)
 {
-    assert(compositeViewInput.GetNumChildViews(ViewType::PLANAR) == compositeViewOutput.GetNumChildViews(ViewType::PLANAR));
+    assert(compositeViewInput.getNumChildViews(ViewType::PLANAR) == compositeViewOutput.getNumChildViews(ViewType::PLANAR));
     
     commandList->beginMarker("TemporalAA");
 
-    for (uint viewIndex = 0; viewIndex < compositeViewInput.GetNumChildViews(ViewType::PLANAR); viewIndex++)
+    for (uint viewIndex = 0; viewIndex < compositeViewInput.getNumChildViews(ViewType::PLANAR); viewIndex++)
     {
-        const IView* viewInput = compositeViewInput.GetChildView(ViewType::PLANAR, viewIndex);
-        const IView* viewOutput = compositeViewOutput.GetChildView(ViewType::PLANAR, viewIndex);
+        const IView* viewInput = compositeViewInput.getChildView(ViewType::PLANAR, viewIndex);
+        const IView* viewOutput = compositeViewOutput.getChildView(ViewType::PLANAR, viewIndex);
 
-        const nvrhi::Viewport viewportInput = viewInput->GetViewportState().viewports[0];
-        const nvrhi::Viewport viewportOutput = viewOutput->GetViewportState().viewports[0];
+        const nvrhi::Viewport viewportInput = viewInput->getViewportState().viewports[0];
+        const nvrhi::Viewport viewportOutput = viewOutput->getViewportState().viewports[0];
         
         TemporalAntiAliasingConstants taaConstants = {};
         taaConstants.inputViewOrigin = float2(viewportInput.minX, viewportInput.minY);
         taaConstants.inputViewSize = float2(viewportInput.width(), viewportInput.height());
         taaConstants.outputViewOrigin = float2(viewportOutput.minX, viewportOutput.minY);
         taaConstants.outputViewSize = float2(viewportOutput.width(), viewportOutput.height());
-        taaConstants.inputPixelOffset = viewInput->GetPixelOffset();
+        taaConstants.inputPixelOffset = viewInput->getPixelOffset();
         taaConstants.outputTextureSizeInv = 1.0f / m_ResolvedColorSize;
         taaConstants.inputOverOutputViewSize = taaConstants.inputViewSize / taaConstants.outputViewSize;
         taaConstants.outputOverInputViewSize = taaConstants.outputViewSize / taaConstants.inputViewSize;

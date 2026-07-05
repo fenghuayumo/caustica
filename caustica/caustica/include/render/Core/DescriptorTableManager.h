@@ -41,23 +41,23 @@ namespace caustica
             }
         };
         
-        nvrhi::DeviceHandle m_Device;
-        nvrhi::DescriptorTableHandle m_DescriptorTable;
+        nvrhi::DeviceHandle m_device;
+        nvrhi::DescriptorTableHandle m_descriptorTable;
 
-        std::vector<nvrhi::BindingSetItem> m_Descriptors;
-        std::unordered_map<nvrhi::BindingSetItem, DescriptorIndex, BindingSetItemHasher, BindingSetItemsEqual> m_DescriptorIndexMap;
-        std::vector<bool> m_AllocatedDescriptors;
-        int m_SearchStart = 0;
+        std::vector<nvrhi::BindingSetItem> m_descriptors;
+        std::unordered_map<nvrhi::BindingSetItem, DescriptorIndex, BindingSetItemHasher, BindingSetItemsEqual> m_descriptorIndexMap;
+        std::vector<bool> m_allocatedDescriptors;
+        int m_searchStart = 0;
         
     public:
         DescriptorTableManager(nvrhi::IDevice* device, nvrhi::IBindingLayout* layout);
         ~DescriptorTableManager();
         
-        nvrhi::IDescriptorTable* GetDescriptorTable() const override { return m_DescriptorTable; }
+        nvrhi::IDescriptorTable* getDescriptorTable() const override { return m_descriptorTable; }
 
-        DescriptorIndex CreateDescriptor(nvrhi::BindingSetItem item) override;
-        DescriptorHandle CreateDescriptorHandle(nvrhi::BindingSetItem item) override;
-        nvrhi::BindingSetItem GetDescriptor(DescriptorIndex index);
-        void ReleaseDescriptor(DescriptorIndex index) override;
+        DescriptorIndex createDescriptor(nvrhi::BindingSetItem item) override;
+        DescriptorHandle createDescriptorHandle(nvrhi::BindingSetItem item) override;
+        nvrhi::BindingSetItem getDescriptor(DescriptorIndex index);
+        void releaseDescriptor(DescriptorIndex index) override;
     };
 }

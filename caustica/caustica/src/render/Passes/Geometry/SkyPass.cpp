@@ -43,7 +43,7 @@ SkyPass::SkyPass(
     constantBufferDesc.maxVersions = caustica::c_MaxRenderPassConstantBufferVersions;
     m_SkyCB = device->createBuffer(constantBufferDesc);
 
-    const IView* sampleView = compositeView.GetChildView(ViewType::PLANAR, 0);
+    const IView* sampleView = compositeView.getChildView(ViewType::PLANAR, 0);
 
     {
         nvrhi::BindingLayoutDesc layoutDesc;
@@ -61,7 +61,7 @@ SkyPass::SkyPass(
 
         nvrhi::GraphicsPipelineDesc pipelineDesc;
         pipelineDesc.primType = nvrhi::PrimitiveType::TriangleStrip;
-        pipelineDesc.VS = sampleView->IsReverseDepth() ? renderDevice.blit().fullscreenVS() : renderDevice.blit().fullscreenAtOneVS();
+        pipelineDesc.VS = sampleView->isReverseDepth() ? renderDevice.blit().fullscreenVS() : renderDevice.blit().fullscreenAtOneVS();
         pipelineDesc.PS = m_PixelShader;
         pipelineDesc.bindingLayouts = { m_RenderBindingLayout };
 
@@ -70,11 +70,11 @@ SkyPass::SkyPass(
             .enableDepthTest()
             .disableDepthWrite()
             .disableStencil()
-            .setDepthFunc(sampleView->IsReverseDepth()
+            .setDepthFunc(sampleView->isReverseDepth()
                 ? nvrhi::ComparisonFunc::GreaterOrEqual
                 : nvrhi::ComparisonFunc::LessOrEqual);
 
-        nvrhi::FramebufferInfo framebufferInfo = m_FramebufferFactory->GetFramebufferInfo();
+        nvrhi::FramebufferInfo framebufferInfo = m_FramebufferFactory->getFramebufferInfo();
 
         m_RenderPso = device->createGraphicsPipeline(pipelineDesc, framebufferInfo);
     }
@@ -88,19 +88,19 @@ void SkyPass::Render(
 {
     commandList->beginMarker("Sky");
 
-    for (uint viewIndex = 0; viewIndex < compositeView.GetNumChildViews(ViewType::PLANAR); viewIndex++)
+    for (uint viewIndex = 0; viewIndex < compositeView.getNumChildViews(ViewType::PLANAR); viewIndex++)
     {
-        const IView* view = compositeView.GetChildView(ViewType::PLANAR, viewIndex);
+        const IView* view = compositeView.getChildView(ViewType::PLANAR, viewIndex);
 
         nvrhi::GraphicsState state;
         state.pipeline = m_RenderPso;
-        state.framebuffer = m_FramebufferFactory->GetFramebuffer(*view);
+        state.framebuffer = m_FramebufferFactory->getFramebuffer(*view);
         state.bindings = { m_RenderBindingSet };
-        state.viewport = view->GetViewportState();
+        state.viewport = view->getViewportState();
         
-        dm::affine viewToWorld = view->GetInverseViewMatrix();
+        dm::affine viewToWorld = view->getInverseViewMatrix();
         viewToWorld.m_translation = 0.f;
-        dm::float4x4 clipToTranslatedWorld = view->GetInverseProjectionMatrix(true) * affineToHomogeneous(viewToWorld);
+        dm::float4x4 clipToTranslatedWorld = view->getInverseProjectionMatrix(true) * affineToHomogeneous(viewToWorld);
 
         SkyConstants skyConstants{};
         skyConstants.matClipToTranslatedWorld = clipToTranslatedWorld;

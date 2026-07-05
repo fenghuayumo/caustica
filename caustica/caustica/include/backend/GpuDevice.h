@@ -377,7 +377,7 @@ namespace caustica
         virtual uint32_t GetCurrentBackBufferIndex() = 0;
         virtual uint32_t GetBackBufferCount() = 0;
         nvrhi::IFramebuffer* GetCurrentFramebuffer(bool withDepth = true);
-        nvrhi::IFramebuffer* GetFramebuffer(uint32_t index, bool withDepth = true);
+        nvrhi::IFramebuffer* getFramebuffer(uint32_t index, bool withDepth = true);
         nvrhi::ITexture* GetDepthBuffer() const { return m_SwapChain.depthBuffer; }
 
         virtual void Shutdown();

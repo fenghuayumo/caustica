@@ -514,10 +514,10 @@ void GpuDevice::Shutdown()
 
 nvrhi::IFramebuffer* caustica::GpuDevice::GetCurrentFramebuffer(bool withDepth)
 {
-    return GetFramebuffer(GetCurrentBackBufferIndex(), withDepth);
+    return getFramebuffer(GetCurrentBackBufferIndex(), withDepth);
 }
 
-nvrhi::IFramebuffer* caustica::GpuDevice::GetFramebuffer(uint32_t index, bool withDepth)
+nvrhi::IFramebuffer* caustica::GpuDevice::getFramebuffer(uint32_t index, bool withDepth)
 {
     if (withDepth)
     {

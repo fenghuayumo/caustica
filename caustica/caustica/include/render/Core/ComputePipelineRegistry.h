@@ -26,7 +26,7 @@ public:
 
     // Register a compute shader for hot reload management
     // Returns a variant handle that can be used to get the pipeline
-    std::shared_ptr<ComputeShaderVariant> CreateVariant(
+    std::shared_ptr<ComputeShaderVariant> createVariant(
         const std::string& shaderSourcePath,
         const std::string& entryPoint,
         const std::vector<caustica::ShaderMacro>& macros,
@@ -34,17 +34,17 @@ public:
         const std::string& debugName);
 
     // Release a previously created variant
-    void ReleaseVariant(std::shared_ptr<ComputeShaderVariant>& variant);
+    void releaseVariant(std::shared_ptr<ComputeShaderVariant>& variant);
 
     // Called each frame - checks for changes and recompiles if needed
     // Set forceReload=true to force recompilation of all shaders
-    void Update(bool forceReload = false);
+    void update(bool forceReload = false);
 
     // Access to verbose mode for debugging
-    bool IsVerbose() const { return m_verbose; }
-    void SetVerbose(bool verbose) { m_verbose = verbose; }
-    bool CanCompileShaders() const { return m_compilerConfig.CanCompile(); }
-    bool IsLoadOnlyMode() const { return !m_compilerConfig.CanCompile(); }
+    bool isVerbose() const { return m_verbose; }
+    void setVerbose(bool verbose) { m_verbose = verbose; }
+    bool canCompileShaders() const { return m_compilerConfig.CanCompile(); }
+    bool isLoadOnlyMode() const { return !m_compilerConfig.CanCompile(); }
 
 private:
     friend class ComputeShaderVariant;
@@ -104,16 +104,16 @@ public:
 
     // Get the compiled compute pipeline
     // Returns nullptr if pipeline is not yet compiled or compilation failed
-    nvrhi::ComputePipelineHandle GetPipeline() const { return m_pipeline; }
+    nvrhi::ComputePipelineHandle getPipeline() const { return m_pipeline; }
 
     // Check if the variant needs to be updated (recompiled)
-    bool NeedsUpdate() const;
+    bool needsUpdate() const;
 
     // Get the last compilation error (empty if no error)
-    const std::string& GetCompileError() const { return m_compileError; }
+    const std::string& getCompileError() const { return m_compileError; }
 
     // Get debug name
-    const std::string& GetDebugName() const { return m_debugName; }
+    const std::string& getDebugName() const { return m_debugName; }
 
 private:
     friend class ComputePipelineRegistry;

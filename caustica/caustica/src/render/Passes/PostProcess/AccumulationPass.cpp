@@ -67,8 +67,8 @@ void AccumulationPass::Render(
 {
     commandList->beginMarker("Accumulation");
 
-    const auto sourceViewport = sourceView.GetViewportState().viewports[0];
-    const auto upscaledViewport = upscaledView.GetViewportState().viewports[0];
+    const auto sourceViewport = sourceView.getViewportState().viewports[0];
+    const auto upscaledViewport = upscaledView.getViewportState().viewports[0];
 
     const auto& inputDesc = m_compositedColor->getDesc();
 
@@ -76,7 +76,7 @@ void AccumulationPass::Render(
     constants.inputSize = float2(sourceViewport.width(), sourceViewport.height());
     constants.inputTextureSizeInv = float2(1.f / float(inputDesc.width), 1.f / float(inputDesc.height));
     constants.outputSize = float2(upscaledViewport.width(), upscaledViewport.height());
-    constants.pixelOffset = sourceView.GetPixelOffset();
+    constants.pixelOffset = sourceView.getPixelOffset();
     constants.blendFactor = accumulationWeight;
 
     nvrhi::ComputeState state;
@@ -87,8 +87,8 @@ void AccumulationPass::Render(
     commandList->setPushConstants(&constants, sizeof(constants));
     
     commandList->dispatch(
-        dm::div_ceil(upscaledView.GetViewExtent().width(), 8), 
-        dm::div_ceil(upscaledView.GetViewExtent().height(), 8), 
+        dm::div_ceil(upscaledView.getViewExtent().width(), 8), 
+        dm::div_ceil(upscaledView.getViewExtent().height(), 8), 
         1);
 
     commandList->endMarker();

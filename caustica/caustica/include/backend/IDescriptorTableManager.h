@@ -13,10 +13,10 @@ class IDescriptorTableManager
 public:
     virtual ~IDescriptorTableManager() = default;
 
-    virtual nvrhi::IDescriptorTable* GetDescriptorTable() const = 0;
-    virtual DescriptorIndex CreateDescriptor(nvrhi::BindingSetItem item) = 0;
-    virtual DescriptorHandle CreateDescriptorHandle(nvrhi::BindingSetItem item) = 0;
-    virtual void ReleaseDescriptor(DescriptorIndex index) = 0;
+    virtual nvrhi::IDescriptorTable* getDescriptorTable() const = 0;
+    virtual DescriptorIndex createDescriptor(nvrhi::BindingSetItem item) = 0;
+    virtual DescriptorHandle createDescriptorHandle(nvrhi::BindingSetItem item) = 0;
+    virtual void releaseDescriptor(DescriptorIndex index) = 0;
 };
 
 } // namespace caustica

@@ -1554,13 +1554,13 @@ void RegisterCoreBindings(nb::module_& m)
             nb::arg("file_name"),
             "Append a mesh file (.gltf, .glb, or .obj) to the current scene.")
         .def("get_mesh_vertices", [](SceneEditor& self, const std::shared_ptr<MeshInfo>& mesh) {
-                return Float3VectorToList(self.GetMeshVertices(mesh));
+                return Float3VectorToList(self.getMeshVertices(mesh));
             }, nb::arg("mesh"),
             "Return unique mesh positions as a list of (x, y, z) tuples in object space.")
         .def("set_mesh_vertices",
             [](SceneEditor& self, const std::shared_ptr<MeshInfo>& mesh, nb::object vertices,
                bool recomputeNormals, bool rebuildAccelerationStructure) {
-                self.SetMeshVertices(mesh, ToFloat3Vector(vertices), recomputeNormals, rebuildAccelerationStructure);
+                self.setMeshVertices(mesh, ToFloat3Vector(vertices), recomputeNormals, rebuildAccelerationStructure);
             },
             nb::arg("mesh"), nb::arg("vertices"), nb::arg("recompute_normals") = true,
             nb::arg("rebuild_acceleration_structure") = true,
@@ -1568,50 +1568,50 @@ void RegisterCoreBindings(nb::module_& m)
         .def("deform_mesh",
             [](SceneEditor& self, const std::shared_ptr<MeshInfo>& mesh, nb::object callback,
                bool recomputeNormals, bool rebuildAccelerationStructure) {
-                std::vector<float3> vertices = self.GetMeshVertices(mesh);
+                std::vector<float3> vertices = self.getMeshVertices(mesh);
                 for (size_t i = 0; i < vertices.size(); ++i)
                 {
                     nb::object updated = callback(i, Float3ToTuple(vertices[i]));
                     if (!updated.is_none())
                         vertices[i] = ToFloat3(updated);
                 }
-                self.SetMeshVertices(mesh, vertices, recomputeNormals, rebuildAccelerationStructure);
+                self.setMeshVertices(mesh, vertices, recomputeNormals, rebuildAccelerationStructure);
                 return vertices.size();
             },
             nb::arg("mesh"), nb::arg("callback"), nb::arg("recompute_normals") = true,
             nb::arg("rebuild_acceleration_structure") = true,
             "Apply a Python callback to each unique vertex.")
         .def("get_mesh_vertices_world", [](SceneEditor& self, const std::shared_ptr<MeshInfo>& mesh) {
-                return Float3VectorToList(self.GetMeshVerticesWorld(mesh));
+                return Float3VectorToList(self.getMeshVerticesWorld(mesh));
             }, nb::arg("mesh"))
         .def("get_mesh_vertices_world", [](SceneEditor& self, const std::shared_ptr<PySceneEntity>& node) {
-                return Float3VectorToList(self.GetMeshVerticesWorld(EntityHandleFromPyNode(node)));
+                return Float3VectorToList(self.getMeshVerticesWorld(EntityHandleFromPyNode(node)));
             }, nb::arg("node"))
         .def("set_mesh_vertices_world",
             [](SceneEditor& self, const std::shared_ptr<MeshInfo>& mesh, nb::object vertices,
                bool recomputeNormals, bool rebuildAccelerationStructure) {
-                self.SetMeshVerticesWorld(mesh, ToFloat3Vector(vertices), recomputeNormals, rebuildAccelerationStructure);
+                self.setMeshVerticesWorld(mesh, ToFloat3Vector(vertices), recomputeNormals, rebuildAccelerationStructure);
             },
             nb::arg("mesh"), nb::arg("vertices"), nb::arg("recompute_normals") = true,
             nb::arg("rebuild_acceleration_structure") = true)
         .def("set_mesh_vertices_world",
             [](SceneEditor& self, const std::shared_ptr<PySceneEntity>& node, nb::object vertices,
                bool recomputeNormals, bool rebuildAccelerationStructure) {
-                self.SetMeshVerticesWorld(EntityHandleFromPyNode(node), ToFloat3Vector(vertices), recomputeNormals, rebuildAccelerationStructure);
+                self.setMeshVerticesWorld(EntityHandleFromPyNode(node), ToFloat3Vector(vertices), recomputeNormals, rebuildAccelerationStructure);
             },
             nb::arg("node"), nb::arg("vertices"), nb::arg("recompute_normals") = true,
             nb::arg("rebuild_acceleration_structure") = true)
         .def("deform_mesh_world",
             [](SceneEditor& self, const std::shared_ptr<MeshInfo>& mesh, nb::object callback,
                bool recomputeNormals, bool rebuildAccelerationStructure) {
-                std::vector<float3> vertices = self.GetMeshVerticesWorld(mesh);
+                std::vector<float3> vertices = self.getMeshVerticesWorld(mesh);
                 for (size_t i = 0; i < vertices.size(); ++i)
                 {
                     nb::object updated = callback(i, Float3ToTuple(vertices[i]));
                     if (!updated.is_none())
                         vertices[i] = ToFloat3(updated);
                 }
-                self.SetMeshVerticesWorld(mesh, vertices, recomputeNormals, rebuildAccelerationStructure);
+                self.setMeshVerticesWorld(mesh, vertices, recomputeNormals, rebuildAccelerationStructure);
                 return vertices.size();
             },
             nb::arg("mesh"), nb::arg("callback"), nb::arg("recompute_normals") = true,
@@ -1620,14 +1620,14 @@ void RegisterCoreBindings(nb::module_& m)
             [](SceneEditor& self, const std::shared_ptr<PySceneEntity>& node, nb::object callback,
                bool recomputeNormals, bool rebuildAccelerationStructure) {
                 const ecs::Entity entity = EntityHandleFromPyNode(node);
-                std::vector<float3> vertices = self.GetMeshVerticesWorld(entity);
+                std::vector<float3> vertices = self.getMeshVerticesWorld(entity);
                 for (size_t i = 0; i < vertices.size(); ++i)
                 {
                     nb::object updated = callback(i, Float3ToTuple(vertices[i]));
                     if (!updated.is_none())
                         vertices[i] = ToFloat3(updated);
                 }
-                self.SetMeshVerticesWorld(entity, vertices, recomputeNormals, rebuildAccelerationStructure);
+                self.setMeshVerticesWorld(entity, vertices, recomputeNormals, rebuildAccelerationStructure);
                 return vertices.size();
             },
             nb::arg("node"), nb::arg("callback"), nb::arg("recompute_normals") = true,

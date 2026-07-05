@@ -1,22 +1,24 @@
 #include <render/Core/MaterialBindingCache.h>
+
 #include <core/log.h>
 
-using namespace caustica;
+namespace caustica
+{
 
 MaterialBindingCache::MaterialBindingCache(
-    nvrhi::IDevice* device, 
-    nvrhi::ShaderType shaderType, 
+    nvrhi::IDevice* device,
+    nvrhi::ShaderType shaderType,
     uint32_t registerSpace,
     bool registerSpaceIsDescriptorSet,
     const std::vector<MaterialResourceBinding>& bindings,
     nvrhi::ISampler* sampler,
     nvrhi::ITexture* fallbackTexture,
     bool trackLiveness)
-    : m_Device(device)
-    , m_BindingDesc(bindings)
-    , m_FallbackTexture(fallbackTexture)
-    , m_Sampler(sampler)
-    , m_TrackLiveness(trackLiveness)
+    : m_device(device)
+    , m_bindingDesc(bindings)
+    , m_fallbackTexture(fallbackTexture)
+    , m_sampler(sampler)
+    , m_trackLiveness(trackLiveness)
 {
     nvrhi::BindingLayoutDesc layoutDesc;
     layoutDesc.visibility = shaderType;
@@ -28,7 +30,7 @@ MaterialBindingCache::MaterialBindingCache(
         nvrhi::BindingLayoutItem layoutItem{};
         layoutItem.slot = item.slot;
         layoutItem.size = 1;
-        
+
         switch (item.resource)
         {
         case MaterialResource::ConstantBuffer:
@@ -47,53 +49,53 @@ MaterialBindingCache::MaterialBindingCache(
             layoutItem.type = nvrhi::ResourceType::Sampler;
             break;
         default:
-            caustica::error("MaterialBindingCache: unknown MaterialResource value (%d)", item.resource);
+            error("MaterialBindingCache: unknown MaterialResource value (%d)", item.resource);
             return;
         }
 
         layoutDesc.bindings.push_back(layoutItem);
     }
 
-    m_BindingLayout = m_Device->createBindingLayout(layoutDesc);
+    m_bindingLayout = m_device->createBindingLayout(layoutDesc);
 }
 
-nvrhi::IBindingLayout* caustica::MaterialBindingCache::GetLayout() const
+nvrhi::IBindingLayout* MaterialBindingCache::getLayout() const
 {
-    return m_BindingLayout;
+    return m_bindingLayout;
 }
 
-nvrhi::IBindingSet* caustica::MaterialBindingCache::GetMaterialBindingSet(const Material* material)
+nvrhi::IBindingSet* MaterialBindingCache::getMaterialBindingSet(const Material* material)
 {
-    std::lock_guard<std::mutex> lockGuard(m_Mutex);
+    std::lock_guard<std::mutex> lockGuard(m_mutex);
 
-    nvrhi::BindingSetHandle& bindingSet = m_BindingSets[material];
+    nvrhi::BindingSetHandle& bindingSet = m_bindingSets[material];
 
     if (bindingSet)
         return bindingSet;
 
-    bindingSet = CreateMaterialBindingSet(material);
+    bindingSet = createMaterialBindingSet(material);
 
     return bindingSet;
 }
 
-void caustica::MaterialBindingCache::Clear()
+void MaterialBindingCache::clear()
 {
-    std::lock_guard<std::mutex> lockGuard(m_Mutex);
+    std::lock_guard<std::mutex> lockGuard(m_mutex);
 
-    m_BindingSets.clear();
+    m_bindingSets.clear();
 }
 
-nvrhi::BindingSetItem MaterialBindingCache::GetTextureBindingSetItem(uint32_t slot, const std::shared_ptr<LoadedTexture>& texture) const
+nvrhi::BindingSetItem MaterialBindingCache::getTextureBindingSetItem(uint32_t slot, const std::shared_ptr<LoadedTexture>& texture) const
 {
-    return nvrhi::BindingSetItem::Texture_SRV(slot, texture && texture->texture ? texture->texture.Get() : m_FallbackTexture.Get());
+    return nvrhi::BindingSetItem::Texture_SRV(slot, texture && texture->texture ? texture->texture.Get() : m_fallbackTexture.Get());
 }
 
-nvrhi::BindingSetHandle caustica::MaterialBindingCache::CreateMaterialBindingSet(const Material* material)
+nvrhi::BindingSetHandle MaterialBindingCache::createMaterialBindingSet(const Material* material)
 {
     nvrhi::BindingSetDesc bindingSetDesc;
-    bindingSetDesc.trackLiveness = m_TrackLiveness;
+    bindingSetDesc.trackLiveness = m_trackLiveness;
 
-    for (const auto& item : m_BindingDesc)
+    for (const auto& item : m_bindingDesc)
     {
         nvrhi::BindingSetItem setItem;
 
@@ -101,51 +103,53 @@ nvrhi::BindingSetHandle caustica::MaterialBindingCache::CreateMaterialBindingSet
         {
         case MaterialResource::ConstantBuffer:
             setItem = nvrhi::BindingSetItem::ConstantBuffer(
-                item.slot, 
+                item.slot,
                 material->materialConstants);
             break;
 
         case MaterialResource::Sampler:
             setItem = nvrhi::BindingSetItem::Sampler(
                 item.slot,
-                m_Sampler);
+                m_sampler);
             break;
 
         case MaterialResource::DiffuseTexture:
-            setItem = GetTextureBindingSetItem(item.slot, material->baseOrDiffuseTexture);
+            setItem = getTextureBindingSetItem(item.slot, material->baseOrDiffuseTexture);
             break;
 
         case MaterialResource::SpecularTexture:
-            setItem = GetTextureBindingSetItem(item.slot, material->metalRoughOrSpecularTexture);
+            setItem = getTextureBindingSetItem(item.slot, material->metalRoughOrSpecularTexture);
             break;
 
         case MaterialResource::NormalTexture:
-            setItem = GetTextureBindingSetItem(item.slot, material->normalTexture);
+            setItem = getTextureBindingSetItem(item.slot, material->normalTexture);
             break;
 
         case MaterialResource::EmissiveTexture:
-            setItem = GetTextureBindingSetItem(item.slot, material->emissiveTexture);
+            setItem = getTextureBindingSetItem(item.slot, material->emissiveTexture);
             break;
 
         case MaterialResource::OcclusionTexture:
-            setItem = GetTextureBindingSetItem(item.slot, material->occlusionTexture);
+            setItem = getTextureBindingSetItem(item.slot, material->occlusionTexture);
             break;
 
         case MaterialResource::TransmissionTexture:
-            setItem = GetTextureBindingSetItem(item.slot, material->transmissionTexture);
+            setItem = getTextureBindingSetItem(item.slot, material->transmissionTexture);
             break;
 
         case MaterialResource::OpacityTexture:
-            setItem = GetTextureBindingSetItem(item.slot, material->opacityTexture);
+            setItem = getTextureBindingSetItem(item.slot, material->opacityTexture);
             break;
 
         default:
-            caustica::error("MaterialBindingCache: unknown MaterialResource value (%d)", item.resource);
+            error("MaterialBindingCache: unknown MaterialResource value (%d)", item.resource);
             return nullptr;
         }
 
         bindingSetDesc.bindings.push_back(setItem);
     }
 
-    return m_Device->createBindingSet(bindingSetDesc, m_BindingLayout);
+    return m_device->createBindingSet(bindingSetDesc, m_bindingLayout);
 }
+
+} // namespace caustica

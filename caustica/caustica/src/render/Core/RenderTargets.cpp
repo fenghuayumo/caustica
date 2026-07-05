@@ -21,7 +21,7 @@ using namespace caustica::math;
 using namespace dm;
 using namespace caustica::math;
 
-void RenderTargets::Init(
+void RenderTargets::init(
         nvrhi::IDevice* device,
         dm::uint2 renderSize, 
         dm::uint2 displaySize,
@@ -30,11 +30,11 @@ void RenderTargets::Init(
         int backbufferCount
     )
 {
-    m_UseReverseProjection = useReverseProjection;
-    m_BackbufferCount = backbufferCount;
+    m_useReverseProjection = useReverseProjection;
+    m_backbufferCount = backbufferCount;
     m_device = device;
-    RenderSize = renderSize;
-    DisplaySize = displaySize;
+    this->renderSize = renderSize;
+    this->displaySize = displaySize;
 
     nvrhi::TextureDesc desc;
     desc.width = renderSize.x;
@@ -42,7 +42,7 @@ void RenderTargets::Init(
 
     desc.isVirtual = false; //device->queryFeatureSupport(nvrhi::Feature::VirtualResources); <- codepath not up to date, needs refactoring
 
-    desc.sampleCount = 1; assert(m_SampleCount == 1);
+    desc.sampleCount = 1; assert(m_sampleCount == 1);
     desc.dimension =  nvrhi::TextureDimension::Texture2D;
     desc.keepInitialState = true;
     desc.mipLevels = 1;
@@ -52,10 +52,10 @@ void RenderTargets::Init(
     desc.isUAV = true;
     desc.isRenderTarget = false;
     desc.initialState = nvrhi::ResourceStates::UnorderedAccess;
-    desc.debugName = "Depth";
+    desc.debugName = "depth";
     //desc.clearValue = useReverseProjection ? nvrhi::Color(0.f) : nvrhi::Color(1.f);
     //desc.useClearValue = true;
-    Depth = device->createTexture(desc);
+    depth = device->createTexture(desc);
 
     desc.isTypeless = false;
     desc.isRenderTarget = false;
@@ -64,79 +64,79 @@ void RenderTargets::Init(
     desc.isUAV = true;
     desc.format = nvrhi::Format::RGBA16_FLOAT;	// allow for .z component too
     desc.isRenderTarget = true;
-    desc.debugName = "ScreenMotionVectors";
-    ScreenMotionVectors = device->createTexture(desc);
+    desc.debugName = "screenMotionVectors";
+    screenMotionVectors = device->createTexture(desc);
     desc.isRenderTarget = false;
     desc.format = nvrhi::Format::RGBA16_FLOAT;
-    desc.debugName = "DenoiserMotionVectors";
-    DenoiserMotionVectors = device->createTexture(desc);
+    desc.debugName = "denoiserMotionVectors";
+    denoiserMotionVectors = device->createTexture(desc);
 
     desc.format = nvrhi::Format::R32_UINT;
-    desc.debugName = "Throughput";
-    Throughput = device->createTexture(desc);
+    desc.debugName = "throughput";
+    throughput = device->createTexture(desc);
 
     desc.format = nvrhi::Format::RGBA16_FLOAT;
     desc.debugName = "StableRadianceBuffer";
-    StableRadiance = device->createTexture(desc);
+    stableRadiance = device->createTexture(desc);
     
     desc.format = nvrhi::Format::R32_UINT;
     desc.arraySize = 4;
     desc.dimension = nvrhi::TextureDimension::Texture2DArray;
-    desc.debugName = "StablePlanesHeader";
-    StablePlanesHeader = device->createTexture(desc);
+    desc.debugName = "stablePlanesHeader";
+    stablePlanesHeader = device->createTexture(desc);
     desc.dimension = nvrhi::TextureDimension::Texture2D;
     desc.arraySize = 1;
 
     desc.format = nvrhi::Format::RGBA16_FLOAT;
-    desc.debugName = "DenoiserDiffRadianceHitDist";
-    DenoiserDiffRadianceHitDist = device->createTexture(desc);
-    desc.debugName = "DenoiserOutDiffRadianceHitDist";
+    desc.debugName = "denoiserDiffRadianceHitDist";
+    denoiserDiffRadianceHitDist = device->createTexture(desc);
+    desc.debugName = "denoiserOutDiffRadianceHitDist";
     for (int i = 0; i < cStablePlaneCount; ++i)
-        DenoiserOutDiffRadianceHitDist[i] = device->createTexture(desc);
+        denoiserOutDiffRadianceHitDist[i] = device->createTexture(desc);
 
-    desc.debugName = "DenoiserSpecRadianceHitDist";
-    DenoiserSpecRadianceHitDist = device->createTexture(desc);
-    desc.debugName = "DenoiserOutSpecRadianceHitDist";
+    desc.debugName = "denoiserSpecRadianceHitDist";
+    denoiserSpecRadianceHitDist = device->createTexture(desc);
+    desc.debugName = "denoiserOutSpecRadianceHitDist";
     for (int i = 0; i < cStablePlaneCount; ++i)
-        DenoiserOutSpecRadianceHitDist[i] = device->createTexture(desc);
+        denoiserOutSpecRadianceHitDist[i] = device->createTexture(desc);
 
     desc.format = nvrhi::Format::RGBA16_FLOAT;
     desc.clearValue = nvrhi::Color(0.0f, 0.0f, 0.0f, 0.0f);   // avoid the debug layer warnings... not actually cleared except for debug purposes
 #if ENABLE_DEBUG_VIZUALISATIONS
     desc.format = nvrhi::Format::RGBA8_UNORM;
-    desc.debugName = "DenoiserOutValidation";
-    DenoiserOutValidation = device->createTexture(desc);
+    desc.debugName = "denoiserOutValidation";
+    denoiserOutValidation = device->createTexture(desc);
 #endif
 
     desc.format = nvrhi::Format::R32_FLOAT;
-    desc.debugName = "DenoiserViewspaceZ";
-    DenoiserViewspaceZ = device->createTexture(desc);
+    desc.debugName = "denoiserViewspaceZ";
+    denoiserViewspaceZ = device->createTexture(desc);
 
     desc.format = nvrhi::Format::R10G10B10A2_UNORM;
-    desc.debugName = "DenoiserNormalRoughness";
-    DenoiserNormalRoughness = device->createTexture(desc);
+    desc.debugName = "denoiserNormalRoughness";
+    denoiserNormalRoughness = device->createTexture(desc);
 
     desc.format = nvrhi::Format::RGBA32_FLOAT;
-    desc.debugName = "SecondarySurfacePositionNormal";
-    SecondarySurfacePositionNormal = device->createTexture(desc);
+    desc.debugName = "secondarySurfacePositionNormal";
+    secondarySurfacePositionNormal = device->createTexture(desc);
 
     desc.format = nvrhi::Format::RGBA16_FLOAT;
-    desc.debugName = "SecondarySurfaceRadiance";
-    SecondarySurfaceRadiance = device->createTexture(desc);
+    desc.debugName = "secondarySurfaceRadiance";
+    secondarySurfaceRadiance = device->createTexture(desc);
 
     desc.format = nvrhi::Format::R32_FLOAT;   // currently shaders expect FP32 but could be tweaked to FP16
-    desc.debugName = "SpecularHitT";
-    SpecularHitT = device->createTexture(desc);
+    desc.debugName = "specularHitT";
+    specularHitT = device->createTexture(desc);
 
-    desc.debugName = "ScratchFloat1";
-    ScratchFloat1 = device->createTexture(desc);
+    desc.debugName = "scratchFloat1";
+    scratchFloat1 = device->createTexture(desc);
     
     desc.isUAV = false;
     desc.isRenderTarget = true;
     desc.useClearValue = true;
     desc.clearValue = nvrhi::Color(1.f);
-    desc.sampleCount = m_SampleCount;
-    desc.dimension = m_SampleCount > 1 ? nvrhi::TextureDimension::Texture2DMS : nvrhi::TextureDimension::Texture2D;
+    desc.sampleCount = m_sampleCount;
+    desc.dimension = m_sampleCount > 1 ? nvrhi::TextureDimension::Texture2DMS : nvrhi::TextureDimension::Texture2D;
     desc.keepInitialState = true;
 
     desc.useClearValue = false;
@@ -146,8 +146,8 @@ void RenderTargets::Init(
     desc.isRenderTarget = true;
     desc.format = nvrhi::Format::RGBA32_FLOAT;
     desc.initialState = nvrhi::ResourceStates::RenderTarget;
-    desc.debugName = "AccumulatedRadiance";
-    AccumulatedRadiance = device->createTexture(desc);
+    desc.debugName = "accumulatedRadiance";
+    accumulatedRadiance = device->createTexture(desc);
 
 #if 0
     nvrhi::Format radianceFormat = nvrhi::Format::R11G11B10_FLOAT;
@@ -157,85 +157,85 @@ void RenderTargets::Init(
 
     desc.useClearValue = true;
     desc.format = radianceFormat;  // keep in float for now in case we need 
-    desc.debugName = "OutputColor";
+    desc.debugName = "outputColor";
     desc.clearValue = nvrhi::Color(1.0f, 1.0f, 0.0f, 0.0f);   // avoid the debug layer warnings... not actually cleared except for debug purposes
     desc.isUAV = true;
-    OutputColor = device->createTexture(desc);
+    outputColor = device->createTexture(desc);
 
     desc.format = nvrhi::Format::R8_UNORM;
     desc.isUAV = true;
-    desc.debugName = "DenoiserDisocclusionThresholdMix";
-    DenoiserDisocclusionThresholdMix = device->createTexture(desc);
-    desc.debugName = "CombinedHistoryClampRelax";
-    CombinedHistoryClampRelax = device->createTexture(desc);
+    desc.debugName = "denoiserDisocclusionThresholdMix";
+    denoiserDisocclusionThresholdMix = device->createTexture(desc);
+    desc.debugName = "combinedHistoryClampRelax";
+    combinedHistoryClampRelax = device->createTexture(desc);
 
     // these are used for DLSS-RR - we could overlap with other buffers to save on RAM but we leave as separate for simplicity
     // see https://github.com/NVIDIAGameWorks/Streamline/blob/main/docs/ProgrammingGuideDLSS_RR.md
     desc.format = nvrhi::Format::R11G11B10_FLOAT;       // from docs: "Diffuse component of Reflectance material. Any standard 3-channel format provided at input resolution. The format must be linear, sRGB textures are not supported."
-    desc.debugName = "RRDiffuseAlbedo";
-    RRDiffuseAlbedo = device->createTexture(desc);
-    desc.debugName = "RRSpecAlbedo";
-    RRSpecAlbedo = device->createTexture(desc);
+    desc.debugName = "rrDiffuseAlbedo";
+    rrDiffuseAlbedo = device->createTexture(desc);
+    desc.debugName = "rrSpecAlbedo";
+    rrSpecAlbedo = device->createTexture(desc);
     desc.format = nvrhi::Format::RGBA16_FLOAT;
-    desc.debugName = "RRNormalsAndRoughness";
-    RRNormalsAndRoughness = device->createTexture(desc);
+    desc.debugName = "rrNormalsAndRoughness";
+    rrNormalsAndRoughness = device->createTexture(desc);
     desc.format = nvrhi::Format::RG16_FLOAT;
-    desc.debugName = "RRSpecMotionVectors";
-    RRSpecMotionVectors = device->createTexture(desc);
+    desc.debugName = "rrSpecMotionVectors";
+    rrSpecMotionVectors = device->createTexture(desc);
     desc.format = nvrhi::Format::RGBA16_FLOAT;
-    desc.debugName = "RRTransparencyLayer";
-    // RRTransparencyLayer = device->createTexture(desc); // not currently used
+    desc.debugName = "rrTransparencyLayer";
+    // rrTransparencyLayer = device->createTexture(desc); // not currently used
 
     // GBuffer targets are kept as placeholders for the main path-tracing renderer.
     renderSize.x = 1;
     renderSize.y = 1;
 
-    desc.debugName = "GBufferBaseColor"; // Can reuse RRDiffuseAlbedo?
+    desc.debugName = "GBufferBaseColor"; // Can reuse rrDiffuseAlbedo?
     desc.format = nvrhi::Format::R11G11B10_FLOAT;
-    BaseColor = device->createTexture(desc);
+    baseColor = device->createTexture(desc);
     desc.debugName = "GBufferSpecNormal";
     desc.format = nvrhi::Format::R32_UINT;
-    SpecNormal = device->createTexture(desc);
+    specNormal = device->createTexture(desc);
     desc.debugName = "GBufferRoughnessMetal";
     desc.format = nvrhi::Format::RG16_FLOAT;
-    RoughnessMetal = device->createTexture(desc);
+    roughnessMetal = device->createTexture(desc);
     desc.debugName = "GBufferMaterialInfo";
     desc.format = nvrhi::Format::R32_UINT;
-    MaterialInfo = device->createTexture(desc);
+    materialInfo = device->createTexture(desc);
 
     // !!! NOTE !!! setting desc.width/desc.height to half render size (was render size!)
     desc.width = (renderSize.x + 1) / 2;
     desc.height = (renderSize.y + 1) / 2;
     desc.format = nvrhi::Format::RGBA16_FLOAT;
     desc.debugName = "DenoiserAvgRadianceHalfRes";
-    DenoiserAvgLayerRadianceHalfRes = device->createTexture(desc);
+    denoiserAvgLayerRadianceHalfRes = device->createTexture(desc);
 
     // !!! NOTE !!! setting desc.width/desc.height to display size (was render size!)
     desc.width = displaySize.x;
     desc.height = displaySize.y;
 
     desc.format = radianceFormat;
-    desc.debugName = "ProcessedOutputColor";
-    ProcessedOutputColor = device->createTexture(desc);
+    desc.debugName = "processedOutputColor";
+    processedOutputColor = device->createTexture(desc);
     desc.format = nvrhi::Format::RGBA16_SNORM;
-    desc.debugName = "TemporalFeedback1";
-    TemporalFeedback1 = device->createTexture(desc);
-    desc.debugName = "TemporalFeedback2";
-    TemporalFeedback2 = device->createTexture(desc);
+    desc.debugName = "temporalFeedback1";
+    temporalFeedback1 = device->createTexture(desc);
+    desc.debugName = "temporalFeedback2";
+    temporalFeedback2 = device->createTexture(desc);
 
     desc.format = nvrhi::Format::SRGBA8_UNORM;
     desc.isUAV = true;
     desc.isTypeless = true;
-    desc.debugName = "LdrColor";
-    LdrColor = device->createTexture(desc);
-    desc.debugName = "LdrColorScratch";
-    LdrColorScratch = device->createTexture(desc);
+    desc.debugName = "ldrColor";
+    ldrColor = device->createTexture(desc);
+    desc.debugName = "ldrColorScratch";
+    ldrColorScratch = device->createTexture(desc);
     desc.isTypeless = false;
 
     desc.isUAV = false;
 
-    desc.debugName = "PreUIColor";
-    PreUIColor = device->createTexture(desc);
+    desc.debugName = "preUIColor";
+    preUIColor = device->createTexture(desc);
 
 #if 0
     if (desc.isVirtual)
@@ -244,11 +244,11 @@ void RenderTargets::Init(
         nvrhi::ITexture* const textures[] = {
             //HdrColor,
             //ResolvedColor,
-            //TemporalFeedback1,
-            //TemporalFeedback2,
-            LdrColor,
-            OutputColor,
-            PreUIColor,
+            //temporalFeedback1,
+            //temporalFeedback2,
+            ldrColor,
+            outputColor,
+            preUIColor,
             //AmbientOcclusion
         };
 
@@ -264,7 +264,7 @@ void RenderTargets::Init(
         heapDesc.capacity = heapSize;
         heapDesc.debugName = "RenderTargetHeap";
 
-        Heap = device->createHeap(heapDesc);
+        heap = device->createHeap(heapDesc);
 
         uint64_t offset = 0;
         for (auto texture : textures)
@@ -272,7 +272,7 @@ void RenderTargets::Init(
             nvrhi::MemoryRequirements memReq = device->getTextureMemoryRequirements(texture);
             offset = nvrhi::align(offset, memReq.alignment);
 
-            device->bindTextureMemory(texture, Heap, offset);
+            device->bindTextureMemory(texture, heap, offset);
 
             offset += memReq.size;
         }
@@ -287,14 +287,14 @@ void RenderTargets::Init(
         cubeDesc.height = LocalCubemapSize;
         cubeDesc.depth = 1;
         cubeDesc.arraySize = 6;
-        cubeDesc.mipLevels = GetNumMipLevels(LocalCubemapSize, LocalCubemapSize);
+        cubeDesc.mipLevels = getNumMipLevels(LocalCubemapSize, LocalCubemapSize);
         cubeDesc.format = nvrhi::Format::RGBA16_FLOAT;
         cubeDesc.dimension = nvrhi::TextureDimension::TextureCube;
-        cubeDesc.debugName = "LocalCubemap";
+        cubeDesc.debugName = "localCubemap";
         cubeDesc.isUAV = true;
         cubeDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
         cubeDesc.keepInitialState = true;
-        LocalCubemap = device->createTexture(cubeDesc);
+        localCubemap = device->createTexture(cubeDesc);
         
         // SSR result (screen-sized, with alpha for confidence)
         nvrhi::TextureDesc ssrDesc;
@@ -302,26 +302,26 @@ void RenderTargets::Init(
         ssrDesc.height = renderSize.y;
         ssrDesc.format = nvrhi::Format::RGBA16_FLOAT;
         ssrDesc.dimension = nvrhi::TextureDimension::Texture2D;
-        ssrDesc.debugName = "SSRResult";
+        ssrDesc.debugName = "ssrResult";
         ssrDesc.isUAV = true;
         ssrDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
         ssrDesc.keepInitialState = true;
-        SSRResult = device->createTexture(ssrDesc);
+        ssrResult = device->createTexture(ssrDesc);
         
         // SSR blur mip chain
-        ssrDesc.mipLevels = GetNumMipLevels(renderSize.x, renderSize.y);
-        ssrDesc.debugName = "SSRBlurMipChain";
-        SSRBlurMipChain = device->createTexture(ssrDesc);
+        ssrDesc.mipLevels = getNumMipLevels(renderSize.x, renderSize.y);
+        ssrDesc.debugName = "ssrBlurMipChain";
+        ssrBlurMipChain = device->createTexture(ssrDesc);
     }
 
-    OutputFramebuffer = std::make_shared<caustica::FramebufferFactory>(device);
-    OutputFramebuffer->RenderTargets = { OutputColor };
+    outputFramebuffer = std::make_shared<caustica::FramebufferFactory>(device);
+    outputFramebuffer->renderTargets = { outputColor };
 
-    ProcessedOutputFramebuffer = std::make_shared<caustica::FramebufferFactory>(device);
-    ProcessedOutputFramebuffer->RenderTargets = { ProcessedOutputColor };
+    processedOutputFramebuffer = std::make_shared<caustica::FramebufferFactory>(device);
+    processedOutputFramebuffer->renderTargets = { processedOutputColor };
 
-    LdrFramebuffer = std::make_shared<caustica::FramebufferFactory>(device);
-    LdrFramebuffer->RenderTargets = { LdrColor };
+    ldrFramebuffer = std::make_shared<caustica::FramebufferFactory>(device);
+    ldrFramebuffer->renderTargets = { ldrColor };
 
     { // Stable planes
         nvrhi::BufferDesc bufferDesc;
@@ -334,41 +334,41 @@ void RenderTargets::Init(
         bufferDesc.initialState = nvrhi::ResourceStates::Common;
 
         bufferDesc.structStride = sizeof(StablePlane);
-        bufferDesc.byteSize = sizeof(StablePlane) * GenericTSComputeStorageElementCount(RenderSize.x, RenderSize.y, cStablePlaneCount);
-        bufferDesc.debugName = "StablePlanesBuffer";
-        StablePlanesBuffer = device->createBuffer(bufferDesc);
+        bufferDesc.byteSize = sizeof(StablePlane) * GenericTSComputeStorageElementCount(this->renderSize.x, this->renderSize.y, cStablePlaneCount);
+        bufferDesc.debugName = "stablePlanesBuffer";
+        stablePlanesBuffer = device->createBuffer(bufferDesc);
     }
 
     {
         nvrhi::BufferDesc surfaceBufferDesc;
         surfaceBufferDesc.byteSize = sizeof(PackedPathTracerSurfaceData) * 2 * renderSize.x * renderSize.y; // *2 is for history!
-        surfaceBufferDesc.byteSize = sizeof(PackedPathTracerSurfaceData) * GenericTSComputeStorageElementCount(RenderSize.x, RenderSize.y, 2); // *2 is for history!
+        surfaceBufferDesc.byteSize = sizeof(PackedPathTracerSurfaceData) * GenericTSComputeStorageElementCount(this->renderSize.x, this->renderSize.y, 2); // *2 is for history!
         surfaceBufferDesc.structStride = sizeof(PackedPathTracerSurfaceData);
         surfaceBufferDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
         surfaceBufferDesc.keepInitialState = true;
         surfaceBufferDesc.debugName = "SurfaceData(GBuffer)";
         surfaceBufferDesc.canHaveUAVs = true;
-        SurfaceDataBuffer = device->createBuffer(surfaceBufferDesc);
+        surfaceDataBuffer = device->createBuffer(surfaceBufferDesc);
     }
 }
 
-[[nodiscard]] bool RenderTargets::IsUpdateRequired(dm::uint2 renderSize, dm::uint2 displaySize, dm::uint sampleCount) const
+[[nodiscard]] bool RenderTargets::isUpdateRequired(dm::uint2 renderSize, dm::uint2 displaySize, dm::uint sampleCount) const
 {
-    if (any(RenderSize != renderSize) || any(DisplaySize != displaySize) || m_SampleCount != sampleCount) return true;
+    if (any(renderSize != this->renderSize) || any(displaySize != this->displaySize) || m_sampleCount != sampleCount) return true;
     return false;
 }
 
-void RenderTargets::Clear(nvrhi::ICommandList* commandList) 
+void RenderTargets::clear(nvrhi::ICommandList* commandList) 
 {
-    const nvrhi::FormatInfo& depthFormatInfo = nvrhi::getFormatInfo(Depth->getDesc().format);
+    const nvrhi::FormatInfo& depthFormatInfo = nvrhi::getFormatInfo(depth->getDesc().format);
 
-    float depthClearValue = m_UseReverseProjection ? 0.f : 1.f;
-    commandList->clearTextureFloat(Depth, nvrhi::AllSubresources, nvrhi::Color(depthClearValue));
+    float depthClearValue = m_useReverseProjection ? 0.f : 1.f;
+    commandList->clearTextureFloat(depth, nvrhi::AllSubresources, nvrhi::Color(depthClearValue));
 
-    commandList->clearTextureFloat(CombinedHistoryClampRelax, nvrhi::AllSubresources, nvrhi::Color(0));
+    commandList->clearTextureFloat(combinedHistoryClampRelax, nvrhi::AllSubresources, nvrhi::Color(0));
 }
 
-uint32_t RenderTargets::GetNumMipLevels(uint32_t width, uint32_t height)
+uint32_t RenderTargets::getNumMipLevels(uint32_t width, uint32_t height)
 {
     uint32_t maxDim = std::max(width, height);
     uint32_t levelsNum = 1 + (uint32_t)std::log2((float)maxDim);

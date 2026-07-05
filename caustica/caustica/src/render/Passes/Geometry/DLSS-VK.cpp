@@ -224,13 +224,13 @@ public:
         }
         commandList->commitBarriers();
 
-        m_parameters->Set(NVSDK_NGX_Parameter_Jitter_Offset_X, view.GetPixelOffset().x);
-        m_parameters->Set(NVSDK_NGX_Parameter_Jitter_Offset_Y, view.GetPixelOffset().y);
+        m_parameters->Set(NVSDK_NGX_Parameter_Jitter_Offset_X, view.getPixelOffset().x);
+        m_parameters->Set(NVSDK_NGX_Parameter_Jitter_Offset_Y, view.getPixelOffset().y);
         m_parameters->Set(NVSDK_NGX_Parameter_Reset, params.resetHistory);
         m_parameters->Set(NVSDK_NGX_Parameter_MV_Scale_X, params.motionVectorScaleX);
         m_parameters->Set(NVSDK_NGX_Parameter_MV_Scale_Y, params.motionVectorScaleY);
-        m_parameters->Set(NVSDK_NGX_Parameter_DLSS_Render_Subrect_Dimensions_Width, view.GetViewExtent().width());
-        m_parameters->Set(NVSDK_NGX_Parameter_DLSS_Render_Subrect_Dimensions_Height, view.GetViewExtent().height());
+        m_parameters->Set(NVSDK_NGX_Parameter_DLSS_Render_Subrect_Dimensions_Width, view.getViewExtent().width());
+        m_parameters->Set(NVSDK_NGX_Parameter_DLSS_Render_Subrect_Dimensions_Height, view.getViewExtent().height());
 
         // Common buffers
         m_parameters->Set(NVSDK_NGX_Parameter_Color, &inColorResource);

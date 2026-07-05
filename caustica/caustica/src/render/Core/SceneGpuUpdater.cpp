@@ -208,7 +208,7 @@ void UpdateInstance(Scene& scene, ecs::Entity entity)
 void EnsureMeshGpuBuffers(Scene& scene, nvrhi::ICommandList* commandList)
 {
     SceneGpuResources& gpu = scene.GetGpuResources();
-    IDescriptorTableManager* descriptorTable = scene.GetDescriptorTableManager();
+    IDescriptorTableManager* descriptorTable = scene.getDescriptorTableManager();
 
     for (const auto& mesh : scene.GetMeshes())
     {
@@ -233,7 +233,7 @@ void EnsureMeshGpuBuffers(Scene& scene, nvrhi::ICommandList* commandList)
             if (descriptorTable)
             {
                 buffers->indexBufferDescriptor = std::make_shared<DescriptorHandle>(
-                    descriptorTable->CreateDescriptorHandle(nvrhi::BindingSetItem::RawBuffer_SRV(0, buffers->indexBuffer)));
+                    descriptorTable->createDescriptorHandle(nvrhi::BindingSetItem::RawBuffer_SRV(0, buffers->indexBuffer)));
             }
 
             commandList->beginTrackingBufferState(buffers->indexBuffer, nvrhi::ResourceStates::Common);
@@ -293,7 +293,7 @@ void EnsureMeshGpuBuffers(Scene& scene, nvrhi::ICommandList* commandList)
             if (descriptorTable)
             {
                 buffers->vertexBufferDescriptor = std::make_shared<DescriptorHandle>(
-                    descriptorTable->CreateDescriptorHandle(nvrhi::BindingSetItem::RawBuffer_SRV(0, buffers->vertexBuffer)));
+                    descriptorTable->createDescriptorHandle(nvrhi::BindingSetItem::RawBuffer_SRV(0, buffers->vertexBuffer)));
             }
 
             commandList->beginTrackingBufferState(buffers->vertexBuffer, nvrhi::ResourceStates::Common);
@@ -406,7 +406,7 @@ void EnsureMeshGpuBuffers(Scene& scene, nvrhi::ICommandList* commandList)
             if (descriptorTable)
             {
                 skinnedBuffers->vertexBufferDescriptor = std::make_shared<DescriptorHandle>(
-                    descriptorTable->CreateDescriptorHandle(nvrhi::BindingSetItem::RawBuffer_SRV(0, skinnedBuffers->vertexBuffer)));
+                    descriptorTable->createDescriptorHandle(nvrhi::BindingSetItem::RawBuffer_SRV(0, skinnedBuffers->vertexBuffer)));
             }
         }
 
@@ -690,7 +690,7 @@ void UpdateGpuSceneBuffers(Scene& scene, nvrhi::ICommandList* commandList, uint3
 
 } // namespace
 
-void SceneGpuUpdater::Refresh(Scene& scene, nvrhi::ICommandList* commandList, uint32_t frameIndex)
+void SceneGpuUpdater::refresh(Scene& scene, nvrhi::ICommandList* commandList, uint32_t frameIndex)
 {
     if (commandList == nullptr)
         return;
@@ -704,7 +704,7 @@ void SceneGpuUpdater::Refresh(Scene& scene, nvrhi::ICommandList* commandList, ui
     if (IsRenderThread())
     {
         if (!scene.wasRenderSnapshotExtractedOnLogicThread(frameIndex))
-            caustica::warning("SceneGpuUpdater::Refresh: missing logic-thread extract for frame %u", frameIndex);
+            caustica::warning("SceneGpuUpdater::refresh: missing logic-thread extract for frame %u", frameIndex);
     }
     else if (!scene.wasRenderSnapshotExtractedOnLogicThread(frameIndex))
     {
@@ -721,7 +721,7 @@ void SceneGpuUpdater::Refresh(Scene& scene, nvrhi::ICommandList* commandList, ui
     scene.syncRenderSnapshotGpuIndices(frameIndex);
 }
 
-void SceneGpuUpdater::RefreshAfterLoad(Scene& scene, uint32_t frameIndex)
+void SceneGpuUpdater::refreshAfterLoad(Scene& scene, uint32_t frameIndex)
 {
     scene.RefreshSceneWorld(frameIndex);
     scene.PublishRenderSnapshot(frameIndex);

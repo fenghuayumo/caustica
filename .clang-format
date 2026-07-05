@@ -1,0 +1,42 @@
+---
+# Caustica C++ style — aligned with LLVM Coding Standards
+# https://llvm.org/docs/CodingStandards.html
+#
+# Naming (see LLVM doc):
+#   Types / files:  PascalCase matching primary type (StandardSamplers.h)
+#   Functions:      camelCase, lowercase start (pointClamp)
+#   Members:        m_ + camelCase (project convention; LLVM uses UpperCamelCase)
+#
+# Apply incrementally to touched files only:
+#   git clang-format HEAD
+#
+BasedOnStyle: LLVM
+
+Language: Cpp
+Standard: c++20
+
+# LLVM default is 80; render/GPU code often needs slightly more room.
+ColumnLimit: 100
+
+# LLVM uses 2-space indent; caustica legacy code uses 4 — keep 4 until a dedicated reformat pass.
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+
+IncludeBlocks: Regroup
+SortIncludes: CaseSensitive
+
+# Include order (most specific → least specific), mirroring LLVM subproject rules:
+#   1. main module header (same basename as .cpp)
+#   2. caustica module headers
+#   3. third-party / rhi headers
+#   4. system headers (<...>)
+IncludeCategories:
+  - Regex:           '^<.*\.h>'
+    Priority:        4
+  - Regex:           '^"(render|backend|engine|core|math|scene|assets|platform|events|animation|audio|imgui)/'
+    Priority:        3
+  - Regex:           '^"(rhi|nvrhi|compiled_shaders)/'
+    Priority:        2
+  - Regex:           '.*'
+    Priority:        1

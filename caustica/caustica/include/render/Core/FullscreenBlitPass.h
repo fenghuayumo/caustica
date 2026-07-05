@@ -47,14 +47,14 @@ public:
         std::shared_ptr<caustica::ShaderFactory> shaderFactory,
         const StandardSamplers& samplers);
 
-    nvrhi::ShaderHandle fullscreenVS() const { return m_FullscreenVS; }
-    nvrhi::ShaderHandle fullscreenAtOneVS() const { return m_FullscreenAtOneVS; }
-    nvrhi::ShaderHandle rectVS() const { return m_RectVS; }
-    nvrhi::ShaderHandle blitPS() const { return m_BlitPS; }
-    nvrhi::ShaderHandle blitArrayPS() const { return m_BlitArrayPS; }
-    nvrhi::ShaderHandle sharpenPS() const { return m_SharpenPS; }
-    nvrhi::ShaderHandle sharpenArrayPS() const { return m_SharpenArrayPS; }
-    nvrhi::BindingLayoutHandle blitBindingLayout() const { return m_BlitBindingLayout; }
+    nvrhi::ShaderHandle fullscreenVS() const { return m_fullscreenVS; }
+    nvrhi::ShaderHandle fullscreenAtOneVS() const { return m_fullscreenAtOneVS; }
+    nvrhi::ShaderHandle rectVS() const { return m_rectVS; }
+    nvrhi::ShaderHandle blitPS() const { return m_blitPS; }
+    nvrhi::ShaderHandle blitArrayPS() const { return m_blitArrayPS; }
+    nvrhi::ShaderHandle sharpenPS() const { return m_sharpenPS; }
+    nvrhi::ShaderHandle sharpenArrayPS() const { return m_sharpenArrayPS; }
+    nvrhi::BindingLayoutHandle blitBindingLayout() const { return m_blitBindingLayout; }
 
     void blitTexture(nvrhi::ICommandList* commandList, const BlitParameters& params, caustica::BindingCache* bindingCache = nullptr);
     void blitTexture(nvrhi::ICommandList* commandList,
@@ -87,19 +87,19 @@ private:
         };
     };
 
-    nvrhi::DeviceHandle m_Device;
-    const StandardSamplers* m_Samplers = nullptr;
+    nvrhi::DeviceHandle m_device;
+    const StandardSamplers* m_samplers = nullptr;
 
-    nvrhi::ShaderHandle m_FullscreenVS;
-    nvrhi::ShaderHandle m_FullscreenAtOneVS;
-    nvrhi::ShaderHandle m_RectVS;
-    nvrhi::ShaderHandle m_BlitPS;
-    nvrhi::ShaderHandle m_BlitArrayPS;
-    nvrhi::ShaderHandle m_SharpenPS;
-    nvrhi::ShaderHandle m_SharpenArrayPS;
-    nvrhi::BindingLayoutHandle m_BlitBindingLayout;
+    nvrhi::ShaderHandle m_fullscreenVS;
+    nvrhi::ShaderHandle m_fullscreenAtOneVS;
+    nvrhi::ShaderHandle m_rectVS;
+    nvrhi::ShaderHandle m_blitPS;
+    nvrhi::ShaderHandle m_blitArrayPS;
+    nvrhi::ShaderHandle m_sharpenPS;
+    nvrhi::ShaderHandle m_sharpenArrayPS;
+    nvrhi::BindingLayoutHandle m_blitBindingLayout;
 
-    std::unordered_map<PsoCacheKey, nvrhi::GraphicsPipelineHandle, PsoCacheKey::Hash> m_BlitPsoCache;
+    std::unordered_map<PsoCacheKey, nvrhi::GraphicsPipelineHandle, PsoCacheKey::Hash> m_blitPsoCache;
 };
 
 } // namespace caustica::render

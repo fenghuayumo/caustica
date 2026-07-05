@@ -1,21 +1,22 @@
 #include <render/Core/BindingCache.h>
 
-using namespace caustica;
+namespace caustica
+{
 
-nvrhi::BindingSetHandle BindingCache::GetCachedBindingSet(const nvrhi::BindingSetDesc& desc, nvrhi::IBindingLayout* layout)
+nvrhi::BindingSetHandle BindingCache::getCachedBindingSet(const nvrhi::BindingSetDesc& desc, nvrhi::IBindingLayout* layout)
 {
     size_t hash = 0;
     nvrhi::hash_combine(hash, desc);
     nvrhi::hash_combine(hash, layout);
 
-    m_Mutex.lock_shared();
+    m_mutex.lock_shared();
 
     nvrhi::BindingSetHandle result = nullptr;
-    auto it = m_BindingSets.find(hash);
-    if (it != m_BindingSets.end())
+    auto it = m_bindingSets.find(hash);
+    if (it != m_bindingSets.end())
         result = it->second;
 
-    m_Mutex.unlock_shared();
+    m_mutex.unlock_shared();
 
     if (result)
     {
@@ -26,35 +27,35 @@ nvrhi::BindingSetHandle BindingCache::GetCachedBindingSet(const nvrhi::BindingSe
     return result;
 }
 
-nvrhi::BindingSetHandle BindingCache::GetOrCreateBindingSet(const nvrhi::BindingSetDesc& desc, nvrhi::IBindingLayout* layout)
+nvrhi::BindingSetHandle BindingCache::getOrCreateBindingSet(const nvrhi::BindingSetDesc& desc, nvrhi::IBindingLayout* layout)
 {
     size_t hash = 0;
     nvrhi::hash_combine(hash, desc);
     nvrhi::hash_combine(hash, layout);
 
-    m_Mutex.lock_shared();
+    m_mutex.lock_shared();
 
     nvrhi::BindingSetHandle result;
-    auto it = m_BindingSets.find(hash);
-    if (it != m_BindingSets.end())
+    auto it = m_bindingSets.find(hash);
+    if (it != m_bindingSets.end())
         result = it->second;
-    
-    m_Mutex.unlock_shared();
+
+    m_mutex.unlock_shared();
 
     if (!result)
     {
-        m_Mutex.lock();
+        m_mutex.lock();
 
-        nvrhi::BindingSetHandle& entry = m_BindingSets[hash];
+        nvrhi::BindingSetHandle& entry = m_bindingSets[hash];
         if (!entry)
         {
-            result = m_Device->createBindingSet(desc, layout);
+            result = m_device->createBindingSet(desc, layout);
             entry = result;
         }
         else
             result = entry;
 
-        m_Mutex.unlock();
+        m_mutex.unlock();
     }
 
     if (result)
@@ -66,9 +67,11 @@ nvrhi::BindingSetHandle BindingCache::GetOrCreateBindingSet(const nvrhi::Binding
     return result;
 }
 
-void BindingCache::Clear()
+void BindingCache::clear()
 {
-    m_Mutex.lock();
-    m_BindingSets.clear();
-    m_Mutex.unlock();
+    m_mutex.lock();
+    m_bindingSets.clear();
+    m_mutex.unlock();
 }
+
+} // namespace caustica

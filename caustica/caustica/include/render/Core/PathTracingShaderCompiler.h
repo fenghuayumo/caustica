@@ -111,8 +111,8 @@ public:
     ~PathTracingShaderCompiler();
     
     void                                Update(const std::shared_ptr<caustica::Scene> & scene, unsigned int subInstanceCount, const std::function<void(std::vector<caustica::ShaderMacro> & macros)>& globalMacrosGetter, bool forceShaderReload);
-    std::shared_ptr<PTPipelineVariant>  CreateVariant(const std::string & relativeSourcePath, std::vector<caustica::ShaderMacro> variantMacros, const std::string & shortUniqueDebugID, bool rayGenOnly = false );
-    void                                ReleaseVariant(std::shared_ptr<PTPipelineVariant> & variant);
+    std::shared_ptr<PTPipelineVariant>  createVariant(const std::string & relativeSourcePath, std::vector<caustica::ShaderMacro> variantMacros, const std::string & shortUniqueDebugID, bool rayGenOnly = false );
+    void                                releaseVariant(std::shared_ptr<PTPipelineVariant> & variant);
     
     const std::shared_ptr<class MaterialGpuCache> & 
                                         GetMaterialGpuCache() const           { return m_materialGpuCache; }
@@ -136,10 +136,10 @@ private:
     const std::filesystem::path &       GetShadersPathExternalIncludes1() const { return m_compilerConfig.ShadersPathExternalIncludes1; }
     const std::filesystem::path &       GetShadersPathExternalIncludes2() const { return m_compilerConfig.ShadersPathExternalIncludes2; }
 
-    bool                                IsVerbose() const                       { return m_verbose; }
+    bool                                isVerbose() const                       { return m_verbose; }
     bool                                IsNVAPIShaderExtensionEnabled() const   { return m_enableNVAPIShaderExtension; }
-    bool                                CanCompileShaders() const               { return m_compilerConfig.CanCompile(); }
-    bool                                IsLoadOnlyMode() const                  { return !m_compilerConfig.CanCompile(); }
+    bool                                canCompileShaders() const               { return m_compilerConfig.CanCompile(); }
+    bool                                isLoadOnlyMode() const                  { return !m_compilerConfig.CanCompile(); }
 
     const ShaderCompilerUtils::ShaderCompilerConfig& 
                                         GetCompilerConfig() const           { return m_compilerConfig; }

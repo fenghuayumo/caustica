@@ -3,55 +3,55 @@
 
 using namespace caustica;
 
-nvrhi::IFramebuffer* FramebufferFactory::GetFramebuffer(const nvrhi::TextureSubresourceSet& subresources)
+nvrhi::IFramebuffer* FramebufferFactory::getFramebuffer(const nvrhi::TextureSubresourceSet& subresources)
 {
-    nvrhi::FramebufferHandle& item = m_FramebufferCache[subresources];
+    nvrhi::FramebufferHandle& item = m_framebufferCache[subresources];
 
     if (!item)
     {
         nvrhi::FramebufferDesc desc;
-        for (auto renderTarget : RenderTargets)
+        for (auto renderTarget : renderTargets)
             desc.addColorAttachment(renderTarget, subresources);
 
-        if (DepthTarget)
-            desc.setDepthAttachment(DepthTarget, subresources);
+        if (depthTarget)
+            desc.setDepthAttachment(depthTarget, subresources);
 
-        if (ShadingRateSurface)
-            desc.setShadingRateAttachment(ShadingRateSurface, subresources);
+        if (shadingRateSurface)
+            desc.setShadingRateAttachment(shadingRateSurface, subresources);
 
-        item = m_Device->createFramebuffer(desc);
+        item = m_device->createFramebuffer(desc);
     }
     
     return item;
 }
 
-nvrhi::IFramebuffer* FramebufferFactory::GetFramebuffer(const IView& view)
+nvrhi::IFramebuffer* FramebufferFactory::getFramebuffer(const IView& view)
 {
-    return GetFramebuffer(view.GetSubresources());
+    return getFramebuffer(view.getSubresources());
 }
 
-nvrhi::FramebufferInfo FramebufferFactory::GetFramebufferInfo()
+nvrhi::FramebufferInfo FramebufferFactory::getFramebufferInfo()
 {
     nvrhi::FramebufferInfo info;
 
-    for (auto rt : RenderTargets)
+    for (auto rt : renderTargets)
     {
         info.addColorFormat(rt->getDesc().format);
     }
 
-    if (DepthTarget)
-        info.setDepthFormat(DepthTarget->getDesc().format);
+    if (depthTarget)
+        info.setDepthFormat(depthTarget->getDesc().format);
     
     // Assume all textures have the same sample count
-    if (!RenderTargets.empty())
+    if (!renderTargets.empty())
     {
-        info.setSampleCount(RenderTargets[0]->getDesc().sampleCount);
-        info.setSampleQuality(RenderTargets[0]->getDesc().sampleQuality);
+        info.setSampleCount(renderTargets[0]->getDesc().sampleCount);
+        info.setSampleQuality(renderTargets[0]->getDesc().sampleQuality);
     }
-    else if (DepthTarget)
+    else if (depthTarget)
     {
-        info.setSampleCount(DepthTarget->getDesc().sampleCount);
-        info.setSampleQuality(DepthTarget->getDesc().sampleQuality);
+        info.setSampleCount(depthTarget->getDesc().sampleCount);
+        info.setSampleQuality(depthTarget->getDesc().sampleQuality);
     }
 
     return info;

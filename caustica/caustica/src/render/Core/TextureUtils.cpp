@@ -7,7 +7,7 @@
 #include <fstream>
 #include <string>
 
-bool CompressTextures(
+bool compressTextures(
     std::map<std::shared_ptr<caustica::LoadedTexture>, TextureCompressionType>& uncompressedTextures)
 {
     std::string batchFileName = std::string(getenv("localappdata")) +

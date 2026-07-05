@@ -390,7 +390,7 @@ std::vector<bvh::OmmAttachment> OmmBuildQueue::BuildOMMAttachments(nvrhi::IComma
 
 void OmmBuildQueue::BuildBLASWithOMM(nvrhi::ICommandList& commandList, BuildTask& task, const std::vector<bvh::OmmAttachment>& ommAttachment)
 {
-    nvrhi::rt::AccelStructDesc blasDesc = bvh::GetMeshBlasDesc(task.input.bvhCfg , *task.input.mesh, ommAttachment.data(), false);
+    nvrhi::rt::AccelStructDesc blasDesc = bvh::getMeshBlasDesc(task.input.bvhCfg , *task.input.mesh, ommAttachment.data(), false);
     // The spec says instance Id is only 24 bits, and we already take 16 for the instance index, so we only have 8 bits for the geometry.
     // On the other side, we could completely skip this and just use DXR 1.1's GeometryIndex() directly in the shader.
     assert((int)blasDesc.bottomLevelGeometries.size() < (1 << 8)); // we can only hold 8 bits for the geometry index in the HitInfo - see GeometryInstanceID in SceneTypes.hlsli
@@ -435,11 +435,11 @@ void OmmBuildQueue::Finalize(nvrhi::ICommandList& commandList, BuildTask& task)
     debugData->ommIndexBuffer = task.buffers.ommIndexBuffer;
 
     debugData->ommArrayDataBufferDescriptor =
-        std::make_shared<caustica::DescriptorHandle>(m_descriptorTable->CreateDescriptorHandle(nvrhi::BindingSetItem::RawBuffer_SRV(0, task.buffers.ommArrayDataBuffer)));
+        std::make_shared<caustica::DescriptorHandle>(m_descriptorTable->createDescriptorHandle(nvrhi::BindingSetItem::RawBuffer_SRV(0, task.buffers.ommArrayDataBuffer)));
     debugData->ommDescBufferDescriptor =
-        std::make_shared<caustica::DescriptorHandle>(m_descriptorTable->CreateDescriptorHandle(nvrhi::BindingSetItem::RawBuffer_SRV(0, task.buffers.ommDescBuffer)));
+        std::make_shared<caustica::DescriptorHandle>(m_descriptorTable->createDescriptorHandle(nvrhi::BindingSetItem::RawBuffer_SRV(0, task.buffers.ommDescBuffer)));
     debugData->ommIndexBufferDescriptor =
-        std::make_shared<caustica::DescriptorHandle>(m_descriptorTable->CreateDescriptorHandle(nvrhi::BindingSetItem::RawBuffer_SRV(0, task.buffers.ommIndexBuffer)));
+        std::make_shared<caustica::DescriptorHandle>(m_descriptorTable->createDescriptorHandle(nvrhi::BindingSetItem::RawBuffer_SRV(0, task.buffers.ommIndexBuffer)));
 
     auto mesh = std::static_pointer_cast<MeshInfoEx>(task.input.mesh);
     assert(!mesh->DebugData);

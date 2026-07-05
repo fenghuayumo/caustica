@@ -11,19 +11,19 @@ namespace caustica
     class FramebufferFactory
     {
     private:
-        nvrhi::DeviceHandle m_Device;
-        std::unordered_map<nvrhi::TextureSubresourceSet, nvrhi::FramebufferHandle> m_FramebufferCache;
+        nvrhi::DeviceHandle m_device;
+        std::unordered_map<nvrhi::TextureSubresourceSet, nvrhi::FramebufferHandle> m_framebufferCache;
 
     public:
-        FramebufferFactory(nvrhi::IDevice* device) : m_Device(device) {}
+        FramebufferFactory(nvrhi::IDevice* device) : m_device(device) {}
         virtual ~FramebufferFactory() = default;
 
-        std::vector<nvrhi::TextureHandle> RenderTargets;
-        nvrhi::TextureHandle DepthTarget;
-        nvrhi::TextureHandle ShadingRateSurface;
+        std::vector<nvrhi::TextureHandle> renderTargets;
+        nvrhi::TextureHandle depthTarget;
+        nvrhi::TextureHandle shadingRateSurface;
 
-        virtual nvrhi::IFramebuffer* GetFramebuffer(const nvrhi::TextureSubresourceSet& subresources);
-        nvrhi::IFramebuffer* GetFramebuffer(const IView& view);
-        nvrhi::FramebufferInfo GetFramebufferInfo();
+        virtual nvrhi::IFramebuffer* getFramebuffer(const nvrhi::TextureSubresourceSet& subresources);
+        nvrhi::IFramebuffer* getFramebuffer(const IView& view);
+        nvrhi::FramebufferInfo getFramebufferInfo();
     };
 }

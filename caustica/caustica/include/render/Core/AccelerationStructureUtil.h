@@ -23,7 +23,7 @@ namespace bvh
         uint32_t ommArrayDataBufferOffset = 0;
     };
 
-    static bool IsValidTriangleGeometryForBlas(const caustica::MeshInfo& mesh, const caustica::MeshGeometry& geometry)
+    static bool isValidTriangleGeometryForBlas(const caustica::MeshInfo& mesh, const caustica::MeshGeometry& geometry)
     {
         if (geometry.type != caustica::MeshGeometryPrimitiveType::Triangles)
             return false;
@@ -97,7 +97,7 @@ namespace bvh
         return true;
     }
 
-    static nvrhi::rt::AccelStructDesc GetMeshBlasDesc(
+    static nvrhi::rt::AccelStructDesc getMeshBlasDesc(
         const Config& cfg,
         const caustica::MeshInfo& mesh,
         const OmmAttachment* ommAttachment,
@@ -115,7 +115,7 @@ namespace bvh
             const caustica::MeshGeometry* geometry = mesh.geometries[geomIt].get();
             if (!geometry)
                 continue;
-            if (!IsValidTriangleGeometryForBlas(mesh, *geometry))
+            if (!isValidTriangleGeometryForBlas(mesh, *geometry))
                 continue;
 
             nvrhi::rt::GeometryDesc geometryDesc;

@@ -28,7 +28,7 @@ namespace caustica::render
     class DeferredLightingPass
     {
     private:
-        nvrhi::DeviceHandle m_Device;
+        nvrhi::DeviceHandle m_device;
 
         nvrhi::ShaderHandle m_ComputeShader;
         nvrhi::SamplerHandle m_ShadowSampler;

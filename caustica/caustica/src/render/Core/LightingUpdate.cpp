@@ -115,7 +115,7 @@ void updateLighting(CameraController& camera, AccelStructManager& accelStructs, 
     settings.ImportanceSamplingType = static_cast<uint>(params.settings.NEEType);
     settings.CameraPosition = camera.camera().GetPosition();
     settings.CameraDirection = camera.camera().GetDir();
-    settings.ViewProjMatrix = camera.view()->GetViewProjectionMatrix();
+    settings.ViewProjMatrix = camera.view()->getViewProjectionMatrix();
     settings.MouseCursorPos = params.settings.MousePos;
     settings.GlobalTemporalFeedbackWeight = params.settings.NEEAT_GlobalTemporalFeedbackWeight;
     settings.LocalToGlobalSampleRatio = params.settings.ActualNEEAT_LocalToGlobalSampleRatio();
@@ -127,11 +127,11 @@ void updateLighting(CameraController& camera, AccelStructManager& accelStructs, 
 #endif
         ;
     settings.PrevViewportSize = float2(
-        static_cast<float>(camera.viewPrevious()->GetViewExtent().width()),
-        static_cast<float>(camera.viewPrevious()->GetViewExtent().height()));
+        static_cast<float>(camera.viewPrevious()->getViewExtent().width()),
+        static_cast<float>(camera.viewPrevious()->getViewExtent().height()));
     settings.ViewportSize = float2(
-        static_cast<float>(camera.view()->GetViewExtent().width()),
-        static_cast<float>(camera.view()->GetViewExtent().height()));
+        static_cast<float>(camera.view()->getViewExtent().width()),
+        static_cast<float>(camera.view()->getViewExtent().height()));
     settings.EnvMapParams = LightSamplingCacheEnvMapParams{
         .Transform = params.envMapSceneParams.Transform,
         .InvTransform = params.envMapSceneParams.InvTransform,

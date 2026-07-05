@@ -31,8 +31,8 @@ void postProcessAA(CameraController& camera, PostProcessAAParams& params)
         if (settings.RealtimeAA == 0)
         {
             commandList->copyTexture(
-                renderTargets->ProcessedOutputColor, nvrhi::TextureSlice(),
-                renderTargets->OutputColor, nvrhi::TextureSlice());
+                renderTargets->processedOutputColor, nvrhi::TextureSlice(),
+                renderTargets->outputColor, nvrhi::TextureSlice());
         }
         else if (settings.RealtimeAA == 1 && params.temporalAAPass != nullptr)
         {
@@ -72,11 +72,11 @@ void postProcessAA(CameraController& camera, PostProcessAAParams& params)
         if (useStreamlineThisFrame)
         {
             {
-                affine3 viewReprojection = camera.view()->GetChildView(ViewType::PLANAR, 0)->GetInverseViewMatrix()
-                    * camera.viewPrevious()->GetViewMatrix();
-                float4x4 reprojectionMatrix = inverse(camera.view()->GetProjectionMatrix(false))
+                affine3 viewReprojection = camera.view()->getChildView(ViewType::PLANAR, 0)->getInverseViewMatrix()
+                    * camera.viewPrevious()->getViewMatrix();
+                float4x4 reprojectionMatrix = inverse(camera.view()->getProjectionMatrix(false))
                     * affineToHomogeneous(viewReprojection)
-                    * camera.viewPrevious()->GetProjectionMatrix(false);
+                    * camera.viewPrevious()->getProjectionMatrix(false);
                 const float outputAspectRatio = params.displayAspectRatio;
                 float4x4 projection = perspProjD3DStyleReverse(
                     dm::radians(camera.verticalFOV()), outputAspectRatio, camera.zNear());
@@ -96,7 +96,7 @@ void postProcessAA(CameraController& camera, PostProcessAAParams& params)
                 slConstants.cameraViewToClip = projection;
                 slConstants.clipToCameraView = inverse(projection);
                 slConstants.clipToPrevClip = reprojectionMatrix;
-                slConstants.depthInverted = camera.view()->IsReverseDepth();
+                slConstants.depthInverted = camera.view()->isReverseDepth();
                 slConstants.jitterOffset = params.cameraJitter;
                 slConstants.mvecScale = { 1.0f / params.renderSize.x, 1.0f / params.renderSize.y };
                 slConstants.prevClipToClip = inverse(reprojectionMatrix);
@@ -109,9 +109,9 @@ void postProcessAA(CameraController& camera, PostProcessAAParams& params)
                 if (settings.RealtimeAA == 3 && params.dlssRROptions != nullptr)
                 {
                     params.dlssRROptions->worldToCameraView =
-                        dm::affineToHomogeneous(camera.view()->GetViewMatrix());
+                        dm::affineToHomogeneous(camera.view()->getViewMatrix());
                     params.dlssRROptions->cameraViewToWorld =
-                        dm::affineToHomogeneous(camera.view()->GetInverseViewMatrix());
+                        dm::affineToHomogeneous(camera.view()->getInverseViewMatrix());
                     params.gpuDevice->GetStreamline().SetDLSSRROptions(*params.dlssRROptions);
                 }
             }
@@ -120,16 +120,16 @@ void postProcessAA(CameraController& camera, PostProcessAAParams& params)
 
             params.gpuDevice->GetStreamline().TagResourcesGeneral(
                 commandList,
-                camera.view()->GetChildView(ViewType::PLANAR, 0),
-                renderTargets->ScreenMotionVectors,
-                renderTargets->Depth,
-                renderTargets->PreUIColor);
+                camera.view()->getChildView(ViewType::PLANAR, 0),
+                renderTargets->screenMotionVectors,
+                renderTargets->depth,
+                renderTargets->preUIColor);
 
             params.gpuDevice->GetStreamline().TagResourcesDLSSNIS(
                 commandList,
-                camera.view()->GetChildView(ViewType::PLANAR, 0),
-                renderTargets->ProcessedOutputColor,
-                renderTargets->OutputColor);
+                camera.view()->getChildView(ViewType::PLANAR, 0),
+                renderTargets->processedOutputColor,
+                renderTargets->outputColor);
 
             if (settings.RealtimeAA == 2)
             {
@@ -144,7 +144,7 @@ void postProcessAA(CameraController& camera, PostProcessAAParams& params)
             RAII_SCOPE(commandList->beginMarker("DLSS-RR");, commandList->endMarker(););
 
             SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
-            nvrhi::TextureDesc tdesc = renderTargets->OutputColor->getDesc();
+            nvrhi::TextureDesc tdesc = renderTargets->outputColor->getDesc();
             commandList->beginMarker("DLSSRR_PrepareInputs");
             params.postProcess->Apply(
                 commandList,
@@ -160,17 +160,17 @@ void postProcessAA(CameraController& camera, PostProcessAAParams& params)
             static bool useSpecHitT = false;
             params.gpuDevice->GetStreamline().TagResourcesDLSSRR(
                 commandList,
-                camera.view()->GetChildView(ViewType::PLANAR, 0),
+                camera.view()->getChildView(ViewType::PLANAR, 0),
                 (int2)params.renderSize,
                 (int2)params.displaySize,
-                renderTargets->OutputColor,
-                renderTargets->RRDiffuseAlbedo,
-                renderTargets->RRSpecAlbedo,
-                renderTargets->RRNormalsAndRoughness,
+                renderTargets->outputColor,
+                renderTargets->rrDiffuseAlbedo,
+                renderTargets->rrSpecAlbedo,
+                renderTargets->rrNormalsAndRoughness,
                 nullptr,
-                useSpecHitT ? renderTargets->SpecularHitT : nullptr,
-                useSpecHitT ? nullptr : renderTargets->RRSpecMotionVectors,
-                renderTargets->ProcessedOutputColor);
+                useSpecHitT ? renderTargets->specularHitT : nullptr,
+                useSpecHitT ? nullptr : renderTargets->rrSpecMotionVectors,
+                renderTargets->processedOutputColor);
 
             commandList->commitBarriers();
             params.gpuDevice->GetStreamline().EvaluateDLSSRR(commandList);
@@ -179,7 +179,7 @@ void postProcessAA(CameraController& camera, PostProcessAAParams& params)
         else if (!settings.ActualUseStandaloneDenoiser())
         {
             SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
-            nvrhi::TextureDesc tdesc = renderTargets->OutputColor->getDesc();
+            nvrhi::TextureDesc tdesc = renderTargets->outputColor->getDesc();
             commandList->beginMarker("NoDenoiserFinalMerge");
             params.postProcess->Apply(
                 commandList,

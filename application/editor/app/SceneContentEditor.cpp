@@ -227,17 +227,17 @@ void SceneContentEditor::requestFullRebuild()
 
 std::vector<caustica::math::float3> SceneContentEditor::getMeshVertices(const std::shared_ptr<caustica::MeshInfo>& mesh) const
 {
-    return caustica::GetMeshVertices(mesh);
+    return caustica::getMeshVertices(mesh);
 }
 
 std::vector<caustica::math::float3> SceneContentEditor::getMeshVerticesWorld(const std::shared_ptr<caustica::MeshInfo>& mesh) const
 {
-    return caustica::GetMeshVerticesWorld(m_sceneEditor.GetScene(), mesh, m_sceneEditor.GetFrameIndex());
+    return caustica::getMeshVerticesWorld(m_sceneEditor.GetScene(), mesh, m_sceneEditor.GetFrameIndex());
 }
 
 std::vector<caustica::math::float3> SceneContentEditor::getMeshVerticesWorld(caustica::ecs::Entity entity) const
 {
-    return caustica::GetMeshVerticesWorld(m_sceneEditor.GetScene(), entity, m_sceneEditor.GetFrameIndex());
+    return caustica::getMeshVerticesWorld(m_sceneEditor.GetScene(), entity, m_sceneEditor.GetFrameIndex());
 }
 
 void SceneContentEditor::setMeshVerticesWorld(const std::shared_ptr<caustica::MeshInfo>& mesh,
@@ -248,7 +248,7 @@ void SceneContentEditor::setMeshVerticesWorld(const std::shared_ptr<caustica::Me
     auto params = MakeMeshEditParams(m_sceneEditor);
     params.recomputeNormals = recomputeNormals;
     params.rebuildAccelerationStructure = rebuildAccelerationStructure;
-    caustica::SetMeshVerticesWorld(mesh, vertices, params);
+    caustica::setMeshVerticesWorld(mesh, vertices, params);
 }
 
 void SceneContentEditor::setMeshVerticesWorld(caustica::ecs::Entity entity,
@@ -259,7 +259,7 @@ void SceneContentEditor::setMeshVerticesWorld(caustica::ecs::Entity entity,
     auto params = MakeMeshEditParams(m_sceneEditor);
     params.recomputeNormals = recomputeNormals;
     params.rebuildAccelerationStructure = rebuildAccelerationStructure;
-    caustica::SetMeshVerticesWorld(entity, vertices, params);
+    caustica::setMeshVerticesWorld(entity, vertices, params);
 }
 
 void SceneContentEditor::setMeshVertices(const std::shared_ptr<caustica::MeshInfo>& mesh,
@@ -270,7 +270,7 @@ void SceneContentEditor::setMeshVertices(const std::shared_ptr<caustica::MeshInf
     auto params = MakeMeshEditParams(m_sceneEditor);
     params.recomputeNormals = recomputeNormals;
     params.rebuildAccelerationStructure = rebuildAccelerationStructure;
-    caustica::SetMeshVertices(mesh, vertices, params);
+    caustica::setMeshVertices(mesh, vertices, params);
 }
 
 } // namespace caustica::editor

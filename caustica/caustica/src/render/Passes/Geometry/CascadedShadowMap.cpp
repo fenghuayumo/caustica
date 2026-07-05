@@ -41,7 +41,7 @@ CascadedShadowMap::CascadedShadowMap(
         std::shared_ptr<PlanarShadowMap> planarShadowMap = std::make_shared<PlanarShadowMap>(device, m_ShadowMapTexture, cascade, cascadeViewport);
         m_Cascades.push_back(planarShadowMap);
 
-        m_CompositeView.AddView(planarShadowMap->GetPlanarView());
+        m_CompositeView.addView(planarShadowMap->getPlanarView());
     }
 
     m_NumberOfCascades = 0;
@@ -362,7 +362,7 @@ void CascadedShadowMap::FillShadowConstants(struct ShadowConstants& constants) c
 std::shared_ptr<caustica::PlanarView> caustica::render::CascadedShadowMap::GetCascadeView(uint32_t cascade)
 {
     if (static_cast<int>(cascade) < m_NumberOfCascades)
-        return m_Cascades[cascade]->GetPlanarView();
+        return m_Cascades[cascade]->getPlanarView();
 
     return nullptr;
 }
@@ -370,7 +370,7 @@ std::shared_ptr<caustica::PlanarView> caustica::render::CascadedShadowMap::GetCa
 std::shared_ptr<caustica::PlanarView> caustica::render::CascadedShadowMap::GetPerObjectView(uint32_t object)
 {
     if (object < m_PerObjectShadows.size())
-        return m_PerObjectShadows[object]->GetPlanarView();
+        return m_PerObjectShadows[object]->getPlanarView();
 
     return nullptr;
 }

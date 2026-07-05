@@ -34,17 +34,17 @@ using namespace caustica::render;
 
 void DeferredLightingPass::Inputs::SetGBuffer(const GBufferRenderTargets& targets)
 {
-    depth = targets.Depth;
-    gbufferNormals = targets.GBufferNormals;
-    gbufferDiffuse = targets.GBufferDiffuse;
-    gbufferSpecular = targets.GBufferSpecular;
-    gbufferEmissive = targets.GBufferEmissive;
+    depth = targets.depth;
+    gbufferNormals = targets.gBufferNormals;
+    gbufferDiffuse = targets.gBufferDiffuse;
+    gbufferSpecular = targets.gBufferSpecular;
+    gbufferEmissive = targets.gBufferEmissive;
 }
 
 DeferredLightingPass::DeferredLightingPass(
     nvrhi::IDevice* device,
     caustica::render::RenderDevice& renderDevice)
-    : m_Device(device)
+    : m_device(device)
     , m_BindingSets(device)
     , m_renderDevice(&renderDevice)
 {
@@ -55,10 +55,10 @@ void caustica::render::DeferredLightingPass::Init(const std::shared_ptr<caustica
     auto samplerDesc = nvrhi::SamplerDesc()
         .setAllAddressModes(nvrhi::SamplerAddressMode::Border)
         .setBorderColor(1.0f);
-    m_ShadowSampler = m_Device->createSampler(samplerDesc);
+    m_ShadowSampler = m_device->createSampler(samplerDesc);
 
     samplerDesc.setReductionType(nvrhi::SamplerReductionType::Comparison);
-    m_ShadowSamplerComparison = m_Device->createSampler(samplerDesc);
+    m_ShadowSamplerComparison = m_device->createSampler(samplerDesc);
 
     nvrhi::BufferDesc constantBufferDesc;
     constantBufferDesc.byteSize = sizeof(DeferredLightingConstants);
@@ -66,7 +66,7 @@ void caustica::render::DeferredLightingPass::Init(const std::shared_ptr<caustica
     constantBufferDesc.isConstantBuffer = true;
     constantBufferDesc.isVolatile = true;
     constantBufferDesc.maxVersions = c_MaxRenderPassConstantBufferVersions;
-    m_DeferredLightingCB = m_Device->createBuffer(constantBufferDesc);
+    m_DeferredLightingCB = m_device->createBuffer(constantBufferDesc);
     
     {
         nvrhi::BindingLayoutDesc layoutDesc;
@@ -92,13 +92,13 @@ void caustica::render::DeferredLightingPass::Init(const std::shared_ptr<caustica
             nvrhi::BindingLayoutItem::Sampler(2),
             nvrhi::BindingLayoutItem::Sampler(3)
         };
-        m_BindingLayout = m_Device->createBindingLayout(layoutDesc);
+        m_BindingLayout = m_device->createBindingLayout(layoutDesc);
         
         nvrhi::ComputePipelineDesc pipelineDesc;
         pipelineDesc.CS = CreateComputeShader(*shaderFactory);
         pipelineDesc.bindingLayouts = { m_BindingLayout };
         
-        m_Pso = m_Device->createComputePipeline(pipelineDesc);
+        m_Pso = m_device->createComputePipeline(pipelineDesc);
     }
 }
 
@@ -246,10 +246,10 @@ void DeferredLightingPass::Render(
     }
 
 
-    for (uint viewIndex = 0; viewIndex < compositeView.GetNumChildViews(ViewType::PLANAR); viewIndex++)
+    for (uint viewIndex = 0; viewIndex < compositeView.getNumChildViews(ViewType::PLANAR); viewIndex++)
     {
-        const IView* view = compositeView.GetChildView(ViewType::PLANAR, viewIndex);
-        auto viewSubresources = view->GetSubresources();
+        const IView* view = compositeView.getChildView(ViewType::PLANAR, viewIndex);
+        auto viewSubresources = view->getSubresources();
 
         nvrhi::BindingSetDesc bindingSetDesc;
         bindingSetDesc.bindings = {
@@ -274,9 +274,9 @@ void DeferredLightingPass::Render(
             nvrhi::BindingSetItem::Sampler(3, m_renderDevice->samplers().linearClamp())
         };
 
-        nvrhi::BindingSetHandle bindingSet = m_BindingSets.GetOrCreateBindingSet(bindingSetDesc, m_BindingLayout);
+        nvrhi::BindingSetHandle bindingSet = m_BindingSets.getOrCreateBindingSet(bindingSetDesc, m_BindingLayout);
     
-        view->FillPlanarViewConstants(deferredConstants.view);
+        view->fillPlanarViewConstants(deferredConstants.view);
         commandList->writeBuffer(m_DeferredLightingCB, &deferredConstants, sizeof(deferredConstants));
 
         nvrhi::ComputeState state;
@@ -284,7 +284,7 @@ void DeferredLightingPass::Render(
         state.bindings = { bindingSet };
         commandList->setComputeState(state);
 
-        auto viewExtent = view->GetViewExtent();
+        auto viewExtent = view->getViewExtent();
         commandList->dispatch(
             dm::div_ceil(viewExtent.width(), 16),
             dm::div_ceil(viewExtent.height(), 16));
@@ -295,5 +295,5 @@ void DeferredLightingPass::Render(
 
 void DeferredLightingPass::ResetBindingCache()
 {
-    m_BindingSets.Clear();
+    m_BindingSets.clear();
 }

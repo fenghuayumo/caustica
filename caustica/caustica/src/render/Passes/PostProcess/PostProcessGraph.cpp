@@ -113,13 +113,13 @@ void buildPostProcessGraph(const PostProcessGraphParams& params)
     GraphBuilder& graph = params.graph;
 
     const TextureHandle processedOutputColor = graph.importTexture(
-        params.renderTargets->ProcessedOutputColor,
+        params.renderTargets->processedOutputColor,
         nvrhi::ResourceStates::UnorderedAccess);
     const TextureHandle ldrColor = graph.importTexture(
-        params.renderTargets->LdrColor,
+        params.renderTargets->ldrColor,
         nvrhi::ResourceStates::ShaderResource);
     const TextureHandle ldrColorScratch = graph.importTexture(
-        params.renderTargets->LdrColorScratch,
+        params.renderTargets->ldrColorScratch,
         nvrhi::ResourceStates::Common);
 
     if (params.bloomPass != nullptr)
@@ -127,7 +127,7 @@ void buildPostProcessGraph(const PostProcessGraphParams& params)
         params.bloomPass->registerGraphPass(
             graph,
             processedOutputColor,
-            params.renderTargets->ProcessedOutputFramebuffer,
+            params.renderTargets->processedOutputFramebuffer,
             *params.compositeView,
             params.settings->BloomRadius,
             params.settings->BloomIntensity,

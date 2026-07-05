@@ -100,12 +100,12 @@ void SceneRayTracingResources::createRTPipelines()
 {
     auto compiler = pathTracingShaderCompiler();
     using SM = caustica::ShaderMacro;
-    pipelineReference() = compiler->CreateVariant("PathTracerSample.hlsl", { SM("PATH_TRACER_MODE", "PATH_TRACER_MODE_REFERENCE") }, "REF");
+    pipelineReference() = compiler->createVariant("PathTracerSample.hlsl", { SM("PATH_TRACER_MODE", "PATH_TRACER_MODE_REFERENCE") }, "REF");
     ensureStablePlanePipelines();
     if (m_settings->PostProcessTestPassHDR)
-        pipelineTestRaygenPPHDR() = compiler->CreateVariant("TestRaygenPP.hlsl", { SM("PP_TEST_HDR", "1") }, "TESTRG", true);
+        pipelineTestRaygenPPHDR() = compiler->createVariant("TestRaygenPP.hlsl", { SM("PP_TEST_HDR", "1") }, "TESTRG", true);
     if (m_settings->PostProcessEdgeDetection)
-        pipelineEdgeDetection() = compiler->CreateVariant("TestRaygenPP.hlsl", { SM("PP_EDGE_DETECTION", "1") }, "EDGY", true);
+        pipelineEdgeDetection() = compiler->createVariant("TestRaygenPP.hlsl", { SM("PP_EDGE_DETECTION", "1") }, "EDGY", true);
 }
 
 void SceneRayTracingResources::ensureStablePlanePipelines()
@@ -117,12 +117,12 @@ void SceneRayTracingResources::ensureStablePlanePipelines()
     using SM = caustica::ShaderMacro;
     if (!pipelineBuildStablePlanes())
     {
-        pipelineBuildStablePlanes() = compiler->CreateVariant(
+        pipelineBuildStablePlanes() = compiler->createVariant(
             "PathTracerSample.hlsl", { SM("PATH_TRACER_MODE", "PATH_TRACER_MODE_BUILD_STABLE_PLANES") }, "BUILD");
     }
     if (!pipelineFillStablePlanes())
     {
-        pipelineFillStablePlanes() = compiler->CreateVariant(
+        pipelineFillStablePlanes() = compiler->createVariant(
             "PathTracerSample.hlsl", { SM("PATH_TRACER_MODE", "PATH_TRACER_MODE_FILL_STABLE_PLANES") }, "FILL");
     }
 }
@@ -215,7 +215,7 @@ void SceneRayTracingResources::requestFullRebuild()
     m_settings->ResetAccumulation = true;
     m_worldRenderer->invalidateBindingSet();
     if (m_bindingCache)
-        m_bindingCache->Clear();
+        m_bindingCache->clear();
 }
 
 void SceneRayTracingResources::invalidateBindingSet()

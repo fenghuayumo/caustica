@@ -22,7 +22,7 @@ namespace caustica::render
         caustica::render::RenderDevice& m_renderDevice;
         std::shared_ptr<caustica::FramebufferFactory> m_FramebufferFactory;
 
-        nvrhi::DeviceHandle m_Device;
+        nvrhi::DeviceHandle m_device;
 
         struct PerViewData
         {

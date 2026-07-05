@@ -2,58 +2,62 @@
 
 #include <scene/SceneTypes.h>
 #include <rhi/nvrhi.h>
-#include <unordered_map>
+
 #include <mutex>
+#include <unordered_map>
+#include <vector>
 
 namespace caustica
 {
-    enum class MaterialResource
-    {
-        ConstantBuffer,
-        Sampler,
-        DiffuseTexture,
-        SpecularTexture,
-        NormalTexture,
-        EmissiveTexture,
-        OcclusionTexture,
-        TransmissionTexture,
-        OpacityTexture
-    };
 
-    struct MaterialResourceBinding
-    {
-        MaterialResource resource;
-        uint32_t slot; // type depends on resource
-    };
+enum class MaterialResource
+{
+    ConstantBuffer,
+    Sampler,
+    DiffuseTexture,
+    SpecularTexture,
+    NormalTexture,
+    EmissiveTexture,
+    OcclusionTexture,
+    TransmissionTexture,
+    OpacityTexture
+};
 
-    class MaterialBindingCache
-    {
-    private:
-        nvrhi::DeviceHandle m_Device;
-        nvrhi::BindingLayoutHandle m_BindingLayout;
-        std::unordered_map<const Material*, nvrhi::BindingSetHandle> m_BindingSets;
-        std::vector<MaterialResourceBinding> m_BindingDesc;
-        nvrhi::TextureHandle m_FallbackTexture;
-        nvrhi::SamplerHandle m_Sampler;
-        std::mutex m_Mutex;
-        bool m_TrackLiveness;
+struct MaterialResourceBinding
+{
+    MaterialResource resource;
+    uint32_t slot; // type depends on resource
+};
 
-        nvrhi::BindingSetHandle CreateMaterialBindingSet(const Material* material);
-        nvrhi::BindingSetItem GetTextureBindingSetItem(uint32_t slot, const std::shared_ptr<LoadedTexture>& texture) const;
+class MaterialBindingCache
+{
+public:
+    MaterialBindingCache(
+        nvrhi::IDevice* device,
+        nvrhi::ShaderType shaderType,
+        uint32_t registerSpace,
+        bool registerSpaceIsDescriptorSet,
+        const std::vector<MaterialResourceBinding>& bindings,
+        nvrhi::ISampler* sampler,
+        nvrhi::ITexture* fallbackTexture,
+        bool trackLiveness = true);
 
-    public:
-        MaterialBindingCache(
-            nvrhi::IDevice* device, 
-            nvrhi::ShaderType shaderType, 
-            uint32_t registerSpace,
-            bool registerSpaceIsDescriptorSet,
-            const std::vector<MaterialResourceBinding>& bindings,
-            nvrhi::ISampler* sampler,
-            nvrhi::ITexture* fallbackTexture,
-            bool trackLiveness = true);
+    nvrhi::IBindingLayout* getLayout() const;
+    nvrhi::IBindingSet* getMaterialBindingSet(const Material* material);
+    void clear();
 
-        nvrhi::IBindingLayout* GetLayout() const;
-        nvrhi::IBindingSet* GetMaterialBindingSet(const Material* material);
-        void Clear();
-    };
-}
+private:
+    nvrhi::BindingSetHandle createMaterialBindingSet(const Material* material);
+    nvrhi::BindingSetItem getTextureBindingSetItem(uint32_t slot, const std::shared_ptr<LoadedTexture>& texture) const;
+
+    nvrhi::DeviceHandle m_device;
+    nvrhi::BindingLayoutHandle m_bindingLayout;
+    std::unordered_map<const Material*, nvrhi::BindingSetHandle> m_bindingSets;
+    std::vector<MaterialResourceBinding> m_bindingDesc;
+    nvrhi::TextureHandle m_fallbackTexture;
+    nvrhi::SamplerHandle m_sampler;
+    std::mutex m_mutex;
+    bool m_trackLiveness;
+};
+
+} // namespace caustica

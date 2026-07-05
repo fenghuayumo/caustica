@@ -168,7 +168,7 @@ protected:
             return sel;
 
         float3 bcenter = bbox.center();
-        float4x4 viewProj = view->GetViewProjectionMatrix();
+        float4x4 viewProj = view->getViewProjectionMatrix();
 
         static constexpr float2 invalidPos = float2(FLT_MAX, FLT_MAX);
         auto projectToScreen = [&viewProj, &view, &displaySize](const float3 & worldPos)
@@ -206,7 +206,7 @@ protected:
                 sel.ScreenPos = sCenter;
                 sel.ScreenRadius = sRadius + 10.0f;
                 sel.Selected = true;
-                sel.RangeToCamera = length(bcenter - view->GetViewOrigin());
+                sel.RangeToCamera = length(bcenter - view->getViewOrigin());
             }
         }
         return sel;

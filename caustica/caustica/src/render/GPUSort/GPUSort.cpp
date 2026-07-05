@@ -208,9 +208,9 @@ void GPUSort::Sort(nvrhi::ICommandList * commandList, nvrhi::BufferHandle contro
             nvrhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->GetGPUWriteBuffer()),
     };
 
-    nvrhi::BindingSetHandle bindingSetInit = m_bindingCache.GetOrCreateBindingSet(bindingSetDescInit, m_initBindingLayout);
-    nvrhi::BindingSetHandle bindingSetPing = m_bindingCache.GetOrCreateBindingSet(bindingSetDescPing, m_commonBindingLayout);
-    nvrhi::BindingSetHandle bindingSetPong = m_bindingCache.GetOrCreateBindingSet(bindingSetDescPong, m_commonBindingLayout);
+    nvrhi::BindingSetHandle bindingSetInit = m_bindingCache.getOrCreateBindingSet(bindingSetDescInit, m_initBindingLayout);
+    nvrhi::BindingSetHandle bindingSetPing = m_bindingCache.getOrCreateBindingSet(bindingSetDescPing, m_commonBindingLayout);
+    nvrhi::BindingSetHandle bindingSetPong = m_bindingCache.getOrCreateBindingSet(bindingSetDescPong, m_commonBindingLayout);
 
     auto RunCSPass = [ & ]( const char * markerName, const nvrhi::ComputePipelineHandle & pso, uint dispatchSizeX, uint indirectDispatchArgOffset, bool pong, uint rootConst, bool initOnly = false )
     {

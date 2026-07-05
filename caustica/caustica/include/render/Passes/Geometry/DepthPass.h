@@ -70,7 +70,7 @@ namespace caustica::render
         };
 
     protected:
-        nvrhi::DeviceHandle m_Device;
+        nvrhi::DeviceHandle m_device;
         nvrhi::InputLayoutHandle m_InputLayout;
         nvrhi::ShaderHandle m_VertexShader;
         nvrhi::ShaderHandle m_PixelShader;
@@ -79,7 +79,7 @@ namespace caustica::render
         nvrhi::BufferHandle m_DepthCB;
         nvrhi::BindingSetHandle m_ViewBindingSet;
         nvrhi::GraphicsPipelineHandle m_Pipelines[PipelineKey::Count];
-        std::mutex m_Mutex;
+        std::mutex m_mutex;
 
         int m_DepthBias = 0;
         float m_DepthBiasClamp = 0.f;
@@ -117,11 +117,11 @@ namespace caustica::render
         
         // IGeometryPass implementation
 
-        [[nodiscard]] caustica::ViewType::Enum GetSupportedViewTypes() const override;
-        void SetupView(GeometryPassContext& context, nvrhi::ICommandList* commandList, const caustica::IView* view, const caustica::IView* viewPrev) override;
-        bool SetupMaterial(GeometryPassContext& context, const caustica::Material* material, nvrhi::RasterCullMode cullMode, nvrhi::GraphicsState& state) override;
-        void SetupInputBuffers(GeometryPassContext& context, const caustica::BufferGroup* buffers, nvrhi::GraphicsState& state) override;
-        void SetPushConstants(GeometryPassContext& context, nvrhi::ICommandList* commandList, nvrhi::GraphicsState& state, nvrhi::DrawArguments& args) override;
+        [[nodiscard]] caustica::ViewType::Enum getSupportedViewTypes() const override;
+        void setupView(GeometryPassContext& context, nvrhi::ICommandList* commandList, const caustica::IView* view, const caustica::IView* viewPrev) override;
+        bool setupMaterial(GeometryPassContext& context, const caustica::Material* material, nvrhi::RasterCullMode cullMode, nvrhi::GraphicsState& state) override;
+        void setupInputBuffers(GeometryPassContext& context, const caustica::BufferGroup* buffers, nvrhi::GraphicsState& state) override;
+        void setPushConstants(GeometryPassContext& context, nvrhi::ICommandList* commandList, nvrhi::GraphicsState& state, nvrhi::DrawArguments& args) override;
     };
 
 }

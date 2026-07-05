@@ -111,8 +111,8 @@ void caustica::render::WorldRenderer::buildPostProcessGraphPasses(RenderFrameCon
 
     ctx.postProcessCompositeView = *m_context.camera.view();
     nvrhi::Viewport windowViewport(float(m_displaySize.x), float(m_displaySize.y));
-    ctx.postProcessCompositeView.SetViewport(windowViewport);
-    ctx.postProcessCompositeView.UpdateCache();
+    ctx.postProcessCompositeView.setViewport(windowViewport);
+    ctx.postProcessCompositeView.updateCache();
 
     rg::PostProcessGraphParams ppParams{
         .graph = graph,
@@ -124,7 +124,7 @@ void caustica::render::WorldRenderer::buildPostProcessGraphPasses(RenderFrameCon
         .compositeView = &ctx.postProcessCompositeView,
         .displaySize = m_displaySize,
         .pathTracingBindingSet = m_bindingSet,
-        .descriptorTable = m_context.descriptorTable ? m_context.descriptorTable->GetDescriptorTable() : nullptr,
+        .descriptorTable = m_context.descriptorTable ? m_context.descriptorTable->getDescriptorTable() : nullptr,
         .testRaygenPpHdrPipeline = m_ptPipelineTestRaygenPPHDR.get(),
         .edgeDetectionPipeline = m_ptPipelineEdgeDetection.get(),
         .outCommandListWasClosed = &ctx.commandListWasClosed,
@@ -146,14 +146,14 @@ void caustica::render::WorldRenderer::buildCompositeGraphPasses(RenderFrameConte
     {
         m_shaderDebug->EndFrameAndOutput(
             m_commandList,
-            m_renderTargets->LdrFramebuffer->GetFramebuffer(ctx.postProcessCompositeView),
-            m_renderTargets->Depth,
+            m_renderTargets->ldrFramebuffer->getFramebuffer(ctx.postProcessCompositeView),
+            m_renderTargets->depth,
             fbinfo.getViewport());
     }
 
     rg::GraphBuilder& graph = *ctx.graph;
     const rg::TextureHandle ldrColor = graph.importTexture(
-        m_renderTargets->LdrColor,
+        m_renderTargets->ldrColor,
         nvrhi::ResourceStates::ShaderResource);
 
     rg::FinalBlitPassParams blitParams{};
@@ -225,7 +225,7 @@ void caustica::render::WorldRenderer::framePassSetup(PathTracingFrameContext& ct
 
 void caustica::render::WorldRenderer::framePassEnsureRenderTargets(PathTracingFrameContext& ctx)
 {
-    if (m_renderTargets == nullptr || m_renderTargets->IsUpdateRequired(m_renderSize, m_displaySize))
+    if (m_renderTargets == nullptr || m_renderTargets->isUpdateRequired(m_renderSize, m_displaySize))
     {
         device()->waitForIdle();
         device()->runGarbageCollection();
@@ -234,9 +234,9 @@ void caustica::render::WorldRenderer::framePassEnsureRenderTargets(PathTracingFr
         m_renderTargets = nullptr;
         m_oidnDenoisedOutput = nullptr;
         resetReferenceOIDN();
-        m_context.bindingCache.Clear();
+        m_context.bindingCache.clear();
         m_renderTargets = std::make_unique<RenderTargets>();
-        m_renderTargets->Init(device(), m_renderSize, m_displaySize, true, true, c_SwapchainCount);
+        m_renderTargets->init(device(), m_renderSize, m_displaySize, true, true, c_SwapchainCount);
 
         ctx.needNewPasses = true;
     }
@@ -335,7 +335,7 @@ void caustica::render::WorldRenderer::framePassShaderUpdate(PathTracingFrameCont
         ctx.needNewPasses);
 
     if (m_context.scenePasses.lighting.computePipelines())
-        m_context.scenePasses.lighting.computePipelines()->Update(ctx.needNewPasses);
+        m_context.scenePasses.lighting.computePipelines()->update(ctx.needNewPasses);
 
     m_context.diagnostics.progressInitializingRenderer.Set(90);
 }
@@ -366,9 +366,9 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
 
     syncCameraViews();
     {
-        nvrhi::Viewport viewport = m_context.camera.view()->GetViewport();
-        float2 jitter = m_context.camera.view()->GetPixelOffset();
-        float4x4 projMatrix = m_context.camera.view()->GetProjectionMatrix();
+        nvrhi::Viewport viewport = m_context.camera.view()->getViewport();
+        float2 jitter = m_context.camera.view()->getPixelOffset();
+        float4x4 projMatrix = m_context.camera.view()->getProjectionMatrix();
         float2 viewSize = { viewport.maxX - viewport.minX, viewport.maxY - viewport.minY };
         float outputAspectRatio = m_displayAspectRatio;
         bool rowMajor = true;
@@ -384,11 +384,11 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
     }
 
     if ((ctx.needNewPasses || ctx.needNewBindings || m_bindingSet == nullptr) && m_shaderDebug)
-        m_shaderDebug->CreateRenderPasses(framebuffer, m_renderTargets->Depth);
+        m_shaderDebug->CreateRenderPasses(framebuffer, m_renderTargets->depth);
 
     if (m_context.settings.EnableShaderDebug && m_shaderDebug)
     {
-        dm::float4x4 viewProj = m_context.camera.view()->GetViewProjectionMatrix();
+        dm::float4x4 viewProj = m_context.camera.view()->getViewProjectionMatrix();
         m_shaderDebug->BeginFrame(m_commandList, viewProj);
     }
 
@@ -437,7 +437,7 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
             nvrhi::BindingSetDesc lineBindingSetDesc;
             lineBindingSetDesc.bindings = {
                 nvrhi::BindingSetItem::ConstantBuffer(0, m_constantBuffer),
-                nvrhi::BindingSetItem::Texture_SRV(0, m_renderTargets->Depth)
+                nvrhi::BindingSetItem::Texture_SRV(0, m_renderTargets->depth)
             };
             m_linesBindingSet = device()->createBindingSet(lineBindingSetDesc, m_linesBindingLayout);
 
@@ -463,7 +463,7 @@ void caustica::render::WorldRenderer::framePassPathTracePrepare(PathTracingFrame
         m_toneMappingPass->PreRender(m_context.settings.ToneMappingParams);
     preUpdatePathTracing(ctx.needNewPasses, m_commandList);
 
-    m_renderTargets->Clear(m_commandList);
+    m_renderTargets->clear(m_commandList);
     abortIfSubmitFailed(ctx, "clearRenderTargets");
 }
 
@@ -474,7 +474,7 @@ void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext
 
     if (m_context.sceneManager.getScene() == nullptr)
     {
-        m_commandList->clearTextureFloat(m_renderTargets->OutputColor, nvrhi::AllSubresources, nvrhi::Color(1, 1, 0, 0));
+        m_commandList->clearTextureFloat(m_renderTargets->outputColor, nvrhi::AllSubresources, nvrhi::Color(1, 1, 0, 0));
         m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
         return;
     }
@@ -516,9 +516,9 @@ void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext
     constants.envMapImportanceSamplingParams = m_context.scenePasses.lighting.environment()->GetImportanceSampling()->GetShaderParams();
 
     PlanarViewConstants view;
-    m_context.camera.view()->FillPlanarViewConstants(view);
+    m_context.camera.view()->fillPlanarViewConstants(view);
     PlanarViewConstants previousView;
-    m_context.camera.viewPrevious()->FillPlanarViewConstants(previousView);
+    m_context.camera.viewPrevious()->fillPlanarViewConstants(previousView);
     constants.view = FromPlanarViewConstants(view);
     constants.previousView = FromPlanarViewConstants(previousView);
 

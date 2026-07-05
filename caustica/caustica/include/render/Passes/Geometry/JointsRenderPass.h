@@ -20,7 +20,7 @@ namespace caustica::render
     class JointsRenderPass
     {
     protected:
-        nvrhi::DeviceHandle m_Device;
+        nvrhi::DeviceHandle m_device;
 
         nvrhi::BufferHandle m_VertexBuffer;
         nvrhi::BufferHandle m_ConstantsBuffer;
@@ -54,7 +54,7 @@ namespace caustica::render
 
         void ResetCaches();
 
-        void RenderView(
+        void renderView(
             nvrhi::ICommandList* commandList,
             const caustica::IView* view,
             nvrhi::IFramebuffer* framebuffer,

@@ -50,7 +50,7 @@ namespace caustica::render
         void SetLitOutOfBounds(bool litOutOfBounds);
         void SetFalloffDistance(float distance);
 
-        std::shared_ptr<caustica::PlanarView> GetPlanarView();
+        std::shared_ptr<caustica::PlanarView> getPlanarView();
 
         virtual dm::float4x4 GetWorldToUvzwMatrix() const override;
         virtual const caustica::ICompositeView& GetView() const override;

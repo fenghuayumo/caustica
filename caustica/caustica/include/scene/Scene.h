@@ -157,8 +157,8 @@ namespace caustica
 
         void AttachLightToRoot(const std::shared_ptr<Light>& light);
         void AttachLightToRoot(scene::LightComponent component, const std::string& name = {});
-        [[nodiscard]] nvrhi::IDescriptorTable* GetDescriptorTable() const { return m_DescriptorTable ? m_DescriptorTable->GetDescriptorTable() : nullptr; }
-        [[nodiscard]] IDescriptorTableManager* GetDescriptorTableManager() const { return m_DescriptorTable.get(); }
+        [[nodiscard]] nvrhi::IDescriptorTable* getDescriptorTable() const { return m_DescriptorTable ? m_DescriptorTable->getDescriptorTable() : nullptr; }
+        [[nodiscard]] IDescriptorTableManager* getDescriptorTableManager() const { return m_DescriptorTable.get(); }
         [[nodiscard]] render::SceneGpuResources& GetGpuResources() { return *m_GpuResources; }
         [[nodiscard]] const render::SceneGpuResources& GetGpuResources() const { return *m_GpuResources; }
 

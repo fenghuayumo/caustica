@@ -144,37 +144,37 @@ void LightSamplingCache::CreateRenderPasses(std::shared_ptr<caustica::ShaderFact
 
     // These need to know about the scene
     pipelineDesc.bindingLayouts = { m_commonBindingLayout, bindlessLayout };
-    m_bakeEmissiveTriangles     .Init(m_device, *shaderFactory, shaderFile, "BakeEmissiveTriangles",      shaderMacros, pipelineDesc.bindingLayouts);
+    m_bakeEmissiveTriangles     .init(m_device, *shaderFactory, shaderFile, "BakeEmissiveTriangles",      shaderMacros, pipelineDesc.bindingLayouts);
     
     // these don't need to know anything about the scene
     pipelineDesc.bindingLayouts = { m_commonBindingLayout };
 
-    m_resetPastToCurrentHistory.Init(m_device, *shaderFactory, shaderFile, "ResetPastToCurrentHistory",   shaderMacros, pipelineDesc.bindingLayouts);
+    m_resetPastToCurrentHistory.init(m_device, *shaderFactory, shaderFile, "ResetPastToCurrentHistory",   shaderMacros, pipelineDesc.bindingLayouts);
 
-    m_envLightsBackupPast       .Init(m_device, *shaderFactory, shaderFile, "EnvLightsBackupPast"      ,   shaderMacros, pipelineDesc.bindingLayouts);
-    m_envLightsSubdivideBase    .Init(m_device, *shaderFactory, shaderFile, "EnvLightsSubdivideBase"   ,   shaderMacros, pipelineDesc.bindingLayouts);
-    m_envLightsSubdivideBoost   .Init(m_device, *shaderFactory, shaderFile, "EnvLightsSubdivideBoost"  ,   shaderMacros, pipelineDesc.bindingLayouts);
-    m_envLightsFillLookupMap    .Init(m_device, *shaderFactory, shaderFile, "EnvLightsFillLookupMap"   ,   shaderMacros, pipelineDesc.bindingLayouts);
-    m_envLightsMapPastToCurrent .Init(m_device, *shaderFactory, shaderFile, "EnvLightsMapPastToCurrent",   shaderMacros, pipelineDesc.bindingLayouts);
+    m_envLightsBackupPast       .init(m_device, *shaderFactory, shaderFile, "EnvLightsBackupPast"      ,   shaderMacros, pipelineDesc.bindingLayouts);
+    m_envLightsSubdivideBase    .init(m_device, *shaderFactory, shaderFile, "EnvLightsSubdivideBase"   ,   shaderMacros, pipelineDesc.bindingLayouts);
+    m_envLightsSubdivideBoost   .init(m_device, *shaderFactory, shaderFile, "EnvLightsSubdivideBoost"  ,   shaderMacros, pipelineDesc.bindingLayouts);
+    m_envLightsFillLookupMap    .init(m_device, *shaderFactory, shaderFile, "EnvLightsFillLookupMap"   ,   shaderMacros, pipelineDesc.bindingLayouts);
+    m_envLightsMapPastToCurrent .init(m_device, *shaderFactory, shaderFile, "EnvLightsMapPastToCurrent",   shaderMacros, pipelineDesc.bindingLayouts);
 
-    m_clearFeedbackHistory      .Init(m_device, *shaderFactory, shaderFile, "ClearFeedbackHistory",        shaderMacros, pipelineDesc.bindingLayouts);
+    m_clearFeedbackHistory      .init(m_device, *shaderFactory, shaderFile, "ClearFeedbackHistory",        shaderMacros, pipelineDesc.bindingLayouts);
 
-    m_processFeedbackHistoryP0      .Init(m_device, *shaderFactory, shaderFile, "ProcessFeedbackHistoryP0"        , shaderMacros, pipelineDesc.bindingLayouts);
-    m_processFeedbackHistoryP1a     .Init(m_device, *shaderFactory, shaderFile, "ProcessFeedbackHistoryP1a"       , shaderMacros, pipelineDesc.bindingLayouts);
-    m_processFeedbackHistoryP1b     .Init(m_device, *shaderFactory, shaderFile, "ProcessFeedbackHistoryP1b"       , shaderMacros, pipelineDesc.bindingLayouts);
-    m_processFeedbackHistoryP2      .Init(m_device, *shaderFactory, shaderFile, "ProcessFeedbackHistoryP2"        , shaderMacros, pipelineDesc.bindingLayouts);
-    m_processFeedbackHistoryP3      .Init(m_device, *shaderFactory, shaderFile, "ProcessFeedbackHistoryP3"        , shaderMacros, pipelineDesc.bindingLayouts);
-    m_processFeedbackHistoryDebugViz.Init(m_device, *shaderFactory, shaderFile, "ProcessFeedbackHistoryDebugViz"  , shaderMacros, pipelineDesc.bindingLayouts);
+    m_processFeedbackHistoryP0      .init(m_device, *shaderFactory, shaderFile, "ProcessFeedbackHistoryP0"        , shaderMacros, pipelineDesc.bindingLayouts);
+    m_processFeedbackHistoryP1a     .init(m_device, *shaderFactory, shaderFile, "ProcessFeedbackHistoryP1a"       , shaderMacros, pipelineDesc.bindingLayouts);
+    m_processFeedbackHistoryP1b     .init(m_device, *shaderFactory, shaderFile, "ProcessFeedbackHistoryP1b"       , shaderMacros, pipelineDesc.bindingLayouts);
+    m_processFeedbackHistoryP2      .init(m_device, *shaderFactory, shaderFile, "ProcessFeedbackHistoryP2"        , shaderMacros, pipelineDesc.bindingLayouts);
+    m_processFeedbackHistoryP3      .init(m_device, *shaderFactory, shaderFile, "ProcessFeedbackHistoryP3"        , shaderMacros, pipelineDesc.bindingLayouts);
+    m_processFeedbackHistoryDebugViz.init(m_device, *shaderFactory, shaderFile, "ProcessFeedbackHistoryDebugViz"  , shaderMacros, pipelineDesc.bindingLayouts);
 
-    m_processFeedbackHistoryPreFilter.Init(m_device, *shaderFactory, shaderFile, "ProcessFeedbackHistoryPreFilter", shaderMacros, pipelineDesc.bindingLayouts);
+    m_processFeedbackHistoryPreFilter.init(m_device, *shaderFactory, shaderFile, "ProcessFeedbackHistoryPreFilter", shaderMacros, pipelineDesc.bindingLayouts);
 
-    m_resetLightProxyCounters       .Init(m_device, *shaderFactory, shaderFile, "ResetLightProxyCounters"         , shaderMacros, pipelineDesc.bindingLayouts);
-    m_computeWeights                .Init(m_device, *shaderFactory, shaderFile, "ComputeWeights"                  , shaderMacros, pipelineDesc.bindingLayouts);
-    m_computeProxyCounts            .Init(m_device, *shaderFactory, shaderFile, "ComputeProxyCounts"              , shaderMacros, pipelineDesc.bindingLayouts);
-    m_computeProxyBaselineOffsets   .Init(m_device, *shaderFactory, shaderFile, "ComputeProxyBaselineOffsets"     , shaderMacros, pipelineDesc.bindingLayouts);
-    m_createProxyJobs               .Init(m_device, *shaderFactory, shaderFile, "CreateProxyJobs"                 , shaderMacros, pipelineDesc.bindingLayouts);
-    m_executeProxyJobs              .Init(m_device, *shaderFactory, shaderFile, "ExecuteProxyJobs"                , shaderMacros, pipelineDesc.bindingLayouts);
-    m_debugDrawLights               .Init(m_device, *shaderFactory, shaderFile, "DebugDrawLights"                 , shaderMacros, pipelineDesc.bindingLayouts);
+    m_resetLightProxyCounters       .init(m_device, *shaderFactory, shaderFile, "ResetLightProxyCounters"         , shaderMacros, pipelineDesc.bindingLayouts);
+    m_computeWeights                .init(m_device, *shaderFactory, shaderFile, "ComputeWeights"                  , shaderMacros, pipelineDesc.bindingLayouts);
+    m_computeProxyCounts            .init(m_device, *shaderFactory, shaderFile, "ComputeProxyCounts"              , shaderMacros, pipelineDesc.bindingLayouts);
+    m_computeProxyBaselineOffsets   .init(m_device, *shaderFactory, shaderFile, "ComputeProxyBaselineOffsets"     , shaderMacros, pipelineDesc.bindingLayouts);
+    m_createProxyJobs               .init(m_device, *shaderFactory, shaderFile, "CreateProxyJobs"                 , shaderMacros, pipelineDesc.bindingLayouts);
+    m_executeProxyJobs              .init(m_device, *shaderFactory, shaderFile, "ExecuteProxyJobs"                , shaderMacros, pipelineDesc.bindingLayouts);
+    m_debugDrawLights               .init(m_device, *shaderFactory, shaderFile, "DebugDrawLights"                 , shaderMacros, pipelineDesc.bindingLayouts);
 
     nvrhi::SamplerDesc samplerDesc;
     samplerDesc.setBorderColor(nvrhi::Color(0.f));
@@ -370,14 +370,14 @@ void LightSamplingCache::CreateRenderPasses(std::shared_ptr<caustica::ShaderFact
     m_allocatedVRAM += m_perLightProxyCounters->getDesc().byteSize;
     m_allocatedVRAM += m_lightSamplingProxies->getDesc().byteSize;
     m_allocatedVRAM += m_NEE_AT_LocalSamplingBuffer->getDesc().byteSize;
-    m_allocatedVRAM += GetEstimatedTextureSize(m_NEE_AT_FeedbackTotalWeight->getDesc());
-    m_allocatedVRAM += GetEstimatedTextureSize(m_NEE_AT_FeedbackCandidates->getDesc());
-    m_allocatedVRAM += GetEstimatedTextureSize(m_NEE_AT_FeedbackTotalWeightScratch->getDesc());
-    m_allocatedVRAM += GetEstimatedTextureSize(m_NEE_AT_FeedbackCandidatesScratch->getDesc());
-    m_allocatedVRAM += GetEstimatedTextureSize(m_NEE_AT_FeedbackTotalWeightBlended->getDesc());
-    m_allocatedVRAM += GetEstimatedTextureSize(m_NEE_AT_FeedbackCandidatesBlended->getDesc());
-    m_allocatedVRAM += GetEstimatedTextureSize(m_envLightLookupMap->getDesc());
-    m_allocatedVRAM += GetEstimatedTextureSize(m_NEE_AT_HistoryDepth->getDesc());
+    m_allocatedVRAM += getEstimatedTextureSize(m_NEE_AT_FeedbackTotalWeight->getDesc());
+    m_allocatedVRAM += getEstimatedTextureSize(m_NEE_AT_FeedbackCandidates->getDesc());
+    m_allocatedVRAM += getEstimatedTextureSize(m_NEE_AT_FeedbackTotalWeightScratch->getDesc());
+    m_allocatedVRAM += getEstimatedTextureSize(m_NEE_AT_FeedbackCandidatesScratch->getDesc());
+    m_allocatedVRAM += getEstimatedTextureSize(m_NEE_AT_FeedbackTotalWeightBlended->getDesc());
+    m_allocatedVRAM += getEstimatedTextureSize(m_NEE_AT_FeedbackCandidatesBlended->getDesc());
+    m_allocatedVRAM += getEstimatedTextureSize(m_envLightLookupMap->getDesc());
+    m_allocatedVRAM += getEstimatedTextureSize(m_NEE_AT_HistoryDepth->getDesc());
 
     SceneReloaded();
 }
@@ -1180,10 +1180,10 @@ void LightSamplingCache::UpdateBegin(nvrhi::ICommandList* commandList, caustica:
     // Bindings
     nvrhi::BindingSetDesc bindingSetDesc;
     FillBindings(bindingSetDesc, scene, materialGpuCache, opacityMicromapBuilder, subInstanceDataBuffer, nullptr, nullptr, envMapProcessed);
-    nvrhi::BindingSetHandle bindingSet = bindingCache.GetOrCreateBindingSet(bindingSetDesc, m_commonBindingLayout);
+    nvrhi::BindingSetHandle bindingSet = bindingCache.getOrCreateBindingSet(bindingSetDesc, m_commonBindingLayout);
 
     nvrhi::BindingSetVector bindings = { bindingSet };
-    nvrhi::BindingSetVector bindingsEx = { bindingSet, scene->GetDescriptorTable() };
+    nvrhi::BindingSetVector bindingsEx = { bindingSet, scene->getDescriptorTable() };
 
     {
         // we can do this early although we might have to move it to a later location if doing multiple global updates per frame (unlikely?)
@@ -1191,21 +1191,21 @@ void LightSamplingCache::UpdateBegin(nvrhi::ICommandList* commandList, caustica:
 
         const dm::uint  items = ctrlBuff.TotalLightCount;
         const dm::uint  itemsPerGroup = LLB_NUM_COMPUTE_THREADS;
-        m_resetLightProxyCounters.Execute(commandList, div_ceil(items, itemsPerGroup), 1, 1, bindingSet);
+        m_resetLightProxyCounters.execute(commandList, div_ceil(items, itemsPerGroup), 1, 1, bindingSet);
     }
 
     {
         // this is mostly for correctness/determinism - it will clean everything so any gaps in mapping to previous frame don't result in incorrect mapping
         RAII_SCOPE(commandList->beginMarker("ResetPastToCurrentHistory"); , commandList->endMarker(); );
         commandList->setBufferState(m_historyRemapPastToCurrentBuffer, nvrhi::ResourceStates::UnorderedAccess);
-        m_resetPastToCurrentHistory.Execute(commandList, div_ceil(std::max(ctrlBuff.HistoricTotalLightCount, ctrlBuff.TotalLightCount), LLB_NUM_COMPUTE_THREADS), 1, 1, bindingSet);
+        m_resetPastToCurrentHistory.execute(commandList, div_ceil(std::max(ctrlBuff.HistoricTotalLightCount, ctrlBuff.TotalLightCount), LLB_NUM_COMPUTE_THREADS), 1, 1, bindingSet);
     }
 
     {
         RAII_SCOPE(commandList->beginMarker("EnvLightsBackupPast"); , commandList->endMarker(); );
 
         commandList->setBufferState(m_lightsBuffer, nvrhi::ResourceStates::UnorderedAccess); // very likely unnecessary in practice, but the old lightsBuffer is read in this pass
-        m_envLightsBackupPast.Execute(commandList, div_ceil(CAUSTICA_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT, LLB_NUM_COMPUTE_THREADS), 1, 1, bindingSet);
+        m_envLightsBackupPast.execute(commandList, div_ceil(CAUSTICA_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT, LLB_NUM_COMPUTE_THREADS), 1, 1, bindingSet);
     }
 
     // empty emissive and analytic lights get copied over first - they've been fully processed on the CPU
@@ -1236,13 +1236,13 @@ void LightSamplingCache::UpdateBegin(nvrhi::ICommandList* commandList, caustica:
 
     {
         RAII_SCOPE(commandList->beginMarker("EnvLightsSubdivideBase");, commandList->endMarker(); );
-        m_envLightsSubdivideBase.Execute(commandList, 1, 1, 1, bindingSet); //the main output goes to scratchBuffer, with CAUSTICA_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT offset and is consumed by EnvLightsBake
+        m_envLightsSubdivideBase.execute(commandList, 1, 1, 1, bindingSet); //the main output goes to scratchBuffer, with CAUSTICA_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT offset and is consumed by EnvLightsBake
     }
     
     {
         RAII_SCOPE(commandList->beginMarker("EnvLightsSubdivideBoost"); , commandList->endMarker(); );
         commandList->setBufferState(m_scratchList, nvrhi::ResourceStates::UnorderedAccess);
-        m_envLightsSubdivideBoost.Execute(commandList, CAUSTICA_NEEAT_ENVMAP_QT_UNBOOSTED_NODE_COUNT, 1, 1, bindingSet); //the main output goes to scratchBuffer, with CAUSTICA_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT offset and is consumed by EnvLightsBake
+        m_envLightsSubdivideBoost.execute(commandList, CAUSTICA_NEEAT_ENVMAP_QT_UNBOOSTED_NODE_COUNT, 1, 1, bindingSet); //the main output goes to scratchBuffer, with CAUSTICA_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT offset and is consumed by EnvLightsBake
     }
 
     // We can probably overlap this with EnvLightsSubdivide but I measure no perf benefit
@@ -1250,7 +1250,7 @@ void LightSamplingCache::UpdateBegin(nvrhi::ICommandList* commandList, caustica:
         RAII_SCOPE(commandList->beginMarker("BakeEmissiveTriangles"); , commandList->endMarker(); );
         
         if (cacheConsts.TriangleLightTaskCount > 0)
-            m_bakeEmissiveTriangles.Execute(commandList, div_ceil(cacheConsts.TriangleLightTaskCount, 8), 1, 1, bindingsEx);
+            m_bakeEmissiveTriangles.execute(commandList, div_ceil(cacheConsts.TriangleLightTaskCount, 8), 1, 1, bindingsEx);
 
         commandList->setBufferState(m_lightsBuffer, nvrhi::ResourceStates::UnorderedAccess);
         commandList->setBufferState(m_historyRemapCurrentToPastBuffer, nvrhi::ResourceStates::UnorderedAccess);
@@ -1262,7 +1262,7 @@ void LightSamplingCache::UpdateBegin(nvrhi::ICommandList* commandList, caustica:
         
         commandList->setBufferState(m_lightsBuffer, nvrhi::ResourceStates::UnorderedAccess);
 
-        m_envLightsFillLookupMap.Execute(commandList, CAUSTICA_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT, 1, 1, bindings );
+        m_envLightsFillLookupMap.execute(commandList, CAUSTICA_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT, 1, 1, bindings );
         
         commandList->setTextureState(m_envLightLookupMap, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
     }
@@ -1272,7 +1272,7 @@ void LightSamplingCache::UpdateBegin(nvrhi::ICommandList* commandList, caustica:
 
         commandList->setBufferState(m_scratchList, nvrhi::ResourceStates::UnorderedAccess);
 
-        m_envLightsMapPastToCurrent.Execute(commandList, div_ceil(CAUSTICA_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT, LLB_NUM_COMPUTE_THREADS), 1, 1, bindings );
+        m_envLightsMapPastToCurrent.execute(commandList, div_ceil(CAUSTICA_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT, LLB_NUM_COMPUTE_THREADS), 1, 1, bindings );
 
         commandList->setBufferState(m_scratchList, nvrhi::ResourceStates::UnorderedAccess);
     }
@@ -1284,7 +1284,7 @@ void LightSamplingCache::UpdateBegin(nvrhi::ICommandList* commandList, caustica:
         {
             RAII_SCOPE(commandList->beginMarker("ProcessFeedbackHistoryPreFilter");, commandList->endMarker(); );
 
-            m_processFeedbackHistoryPreFilter.Execute(commandList, div_ceil(cacheConsts.FeedbackResolution.x, LLB_PREPROCESS_BLOCK_SIZE_INNER), div_ceil(cacheConsts.FeedbackResolution.y, LLB_PREPROCESS_BLOCK_SIZE_INNER), 1, bindings);
+            m_processFeedbackHistoryPreFilter.execute(commandList, div_ceil(cacheConsts.FeedbackResolution.x, LLB_PREPROCESS_BLOCK_SIZE_INNER), div_ceil(cacheConsts.FeedbackResolution.y, LLB_PREPROCESS_BLOCK_SIZE_INNER), 1, bindings);
             commandList->setTextureState(m_NEE_AT_FeedbackTotalWeight, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
             commandList->setTextureState(m_NEE_AT_FeedbackCandidates, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
         }
@@ -1292,7 +1292,7 @@ void LightSamplingCache::UpdateBegin(nvrhi::ICommandList* commandList, caustica:
         {
             RAII_SCOPE(commandList->beginMarker("ProcessFeedbackHistoryP0"); , commandList->endMarker(); );
 
-            m_processFeedbackHistoryP0.Execute(commandList, div_ceil(cacheConsts.FeedbackResolution.x, LLB_NUM_COMPUTE_THREADS_2D), div_ceil(cacheConsts.FeedbackResolution.y, LLB_NUM_COMPUTE_THREADS_2D), 1, bindings );
+            m_processFeedbackHistoryP0.execute(commandList, div_ceil(cacheConsts.FeedbackResolution.x, LLB_NUM_COMPUTE_THREADS_2D), div_ceil(cacheConsts.FeedbackResolution.y, LLB_NUM_COMPUTE_THREADS_2D), 1, bindings );
 
             commandList->setTextureState(m_NEE_AT_FeedbackTotalWeight, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
             commandList->setTextureState(m_NEE_AT_FeedbackCandidates, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
@@ -1311,7 +1311,7 @@ void LightSamplingCache::UpdateBegin(nvrhi::ICommandList* commandList, caustica:
         commandList->setBufferState(m_historyRemapPastToCurrentBuffer, nvrhi::ResourceStates::UnorderedAccess);
         commandList->setBufferState(m_lightWeights, nvrhi::ResourceStates::UnorderedAccess);
 
-        m_computeWeights.Execute(commandList, div_ceil(items, itemsPerGroup), 1, 1, bindingSet);
+        m_computeWeights.execute(commandList, div_ceil(items, itemsPerGroup), 1, 1, bindingSet);
 
         commandList->setBufferState(m_lightWeights, nvrhi::ResourceStates::UnorderedAccess);
         commandList->setBufferState(m_controlBuffer, nvrhi::ResourceStates::UnorderedAccess);
@@ -1322,7 +1322,7 @@ void LightSamplingCache::UpdateBegin(nvrhi::ICommandList* commandList, caustica:
 
         const dm::uint  items = ctrlBuff.TotalLightCount;
         const dm::uint  itemsPerGroup = LLB_NUM_COMPUTE_THREADS;
-        m_computeProxyCounts.Execute(commandList, div_ceil(items, itemsPerGroup), 1, 1, bindingSet);
+        m_computeProxyCounts.execute(commandList, div_ceil(items, itemsPerGroup), 1, 1, bindingSet);
 
         commandList->setBufferState(m_perLightProxyCounters, nvrhi::ResourceStates::UnorderedAccess);
         commandList->setBufferState(m_controlBuffer, nvrhi::ResourceStates::UnorderedAccess);
@@ -1336,7 +1336,7 @@ void LightSamplingCache::UpdateBegin(nvrhi::ICommandList* commandList, caustica:
         {
             RAII_SCOPE(commandList->beginMarker("ComputeProxyBaselineOffsets");, commandList->endMarker(); );
 
-            m_computeProxyBaselineOffsets.Execute(commandList, 1, 1, 1, bindingSet);
+            m_computeProxyBaselineOffsets.execute(commandList, 1, 1, 1, bindingSet);
 
             commandList->setBufferState(m_lightSamplingProxies, nvrhi::ResourceStates::UnorderedAccess);
         }
@@ -1346,7 +1346,7 @@ void LightSamplingCache::UpdateBegin(nvrhi::ICommandList* commandList, caustica:
 
             const dm::uint  items = ctrlBuff.TotalLightCount;
             const dm::uint  itemsPerGroup = LLB_NUM_COMPUTE_THREADS;
-            m_createProxyJobs.Execute(commandList, div_ceil(items, itemsPerGroup), 1, 1, bindingSet);
+            m_createProxyJobs.execute(commandList, div_ceil(items, itemsPerGroup), 1, 1, bindingSet);
 
             commandList->setBufferState(m_controlBuffer, nvrhi::ResourceStates::UnorderedAccess);   // because we've written into u_controlBuffer[0].ProxyBuildTaskCount
             commandList->setBufferState(m_scratchBuffer, nvrhi::ResourceStates::UnorderedAccess);   // because this is where jobs are stored
@@ -1359,7 +1359,7 @@ void LightSamplingCache::UpdateBegin(nvrhi::ICommandList* commandList, caustica:
         const dm::uint  items = LLB_MAX_PROXY_PROC_TASKS; // this one is updated on GPU so it's not correct here so let's just brute force to max, compute shader will skip...
         const dm::uint  itemsPerGroup = LLB_NUM_COMPUTE_THREADS;
         const dm::uint  dispatchCountX = div_ceil(items, itemsPerGroup); assert(dispatchCountX<=65535); // more than this triggers EXECUTION WARNING #1296: OVERSIZED_DISPATCH
-        m_executeProxyJobs.Execute(commandList, dispatchCountX, 1, 1, bindingSet);
+        m_executeProxyJobs.execute(commandList, dispatchCountX, 1, 1, bindingSet);
 
         commandList->setBufferState(m_lightSamplingProxies, nvrhi::ResourceStates::UnorderedAccess);    // because we've filled it up
     }
@@ -1372,7 +1372,7 @@ void LightSamplingCache::UpdateBegin(nvrhi::ICommandList* commandList, caustica:
 
         const dm::uint  items = CAUSTICA_LIGHTING_MAX_SAMPLING_PROXIES; // this one is updated on GPU so it's not correct here so let's just brute force to max, compute shader will skip...
         const dm::uint  itemsPerGroup = LLB_NUM_COMPUTE_THREADS;
-        m_debugDrawLights.Execute(commandList, div_ceil(items, itemsPerGroup), 1, 1, bindingSet);
+        m_debugDrawLights.execute(commandList, div_ceil(items, itemsPerGroup), 1, 1, bindingSet);
     }
 
     // for debugging only
@@ -1417,7 +1417,7 @@ void LightSamplingCache::UpdateEnd(nvrhi::ICommandList * commandList, caustica::
 
     nvrhi::BindingSetDesc bindingSetDesc;
     FillBindings(bindingSetDesc, scene, materialGpuCache, opacityMicromapBuilder, subInstanceDataBuffer, depthBuffer, motionVectors, nullptr);
-    nvrhi::BindingSetHandle bindingSet = bindingCache.GetOrCreateBindingSet(bindingSetDesc, m_commonBindingLayout);
+    nvrhi::BindingSetHandle bindingSet = bindingCache.getOrCreateBindingSet(bindingSetDesc, m_commonBindingLayout);
     nvrhi::BindingSetVector bindings = { bindingSet };
 
     const dm::uint  itemsPerGroup = LLB_NUM_COMPUTE_THREADS_2D;
@@ -1430,7 +1430,7 @@ void LightSamplingCache::UpdateEnd(nvrhi::ICommandList * commandList, caustica::
         commandList->setTextureState(m_NEE_AT_FeedbackTotalWeightScratch, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
         commandList->setTextureState(m_NEE_AT_FeedbackCandidatesScratch, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
 
-        m_processFeedbackHistoryP1a.Execute(commandList, div_ceil(m_currentCtrlBuff.CacheConstants.BlendedFeedbackResolution.x, itemsPerGroup), div_ceil(m_currentCtrlBuff.CacheConstants.BlendedFeedbackResolution.y, itemsPerGroup), 1, bindings);
+        m_processFeedbackHistoryP1a.execute(commandList, div_ceil(m_currentCtrlBuff.CacheConstants.BlendedFeedbackResolution.x, itemsPerGroup), div_ceil(m_currentCtrlBuff.CacheConstants.BlendedFeedbackResolution.y, itemsPerGroup), 1, bindings);
 
         commandList->setTextureState(m_NEE_AT_FeedbackTotalWeightScratch, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
         commandList->setTextureState(m_NEE_AT_FeedbackCandidatesScratch, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
@@ -1444,7 +1444,7 @@ void LightSamplingCache::UpdateEnd(nvrhi::ICommandList * commandList, caustica::
         commandList->setTextureState(m_NEE_AT_FeedbackTotalWeight, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
         commandList->setTextureState(m_NEE_AT_FeedbackCandidates, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
 
-        m_processFeedbackHistoryP1b.Execute(commandList, div_ceil(m_currentCtrlBuff.CacheConstants.FeedbackResolution.x, itemsPerGroup), div_ceil(m_currentCtrlBuff.CacheConstants.FeedbackResolution.y, itemsPerGroup), 1, bindings);
+        m_processFeedbackHistoryP1b.execute(commandList, div_ceil(m_currentCtrlBuff.CacheConstants.FeedbackResolution.x, itemsPerGroup), div_ceil(m_currentCtrlBuff.CacheConstants.FeedbackResolution.y, itemsPerGroup), 1, bindings);
 
         commandList->setTextureState(m_NEE_AT_FeedbackTotalWeightScratch, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
         commandList->setTextureState(m_NEE_AT_FeedbackCandidatesScratch, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
@@ -1452,13 +1452,13 @@ void LightSamplingCache::UpdateEnd(nvrhi::ICommandList * commandList, caustica::
 
     {
         RAII_SCOPE(commandList->beginMarker("ProcessFeedbackHistoryP2"); , commandList->endMarker(); );
-        m_processFeedbackHistoryP2.Execute(commandList, div_ceil(m_currentCtrlBuff.LocalSamplingResolution.x, itemsPerGroup), div_ceil(m_currentCtrlBuff.LocalSamplingResolution.y, itemsPerGroup), 1, bindings);
+        m_processFeedbackHistoryP2.execute(commandList, div_ceil(m_currentCtrlBuff.LocalSamplingResolution.x, itemsPerGroup), div_ceil(m_currentCtrlBuff.LocalSamplingResolution.y, itemsPerGroup), 1, bindings);
         UAV_BARRIER_m_NEE_AT_LocalSamplingBuffer();
     }
 
     {
         RAII_SCOPE(commandList->beginMarker("ProcessFeedbackHistoryP3"); , commandList->endMarker(); );
-        m_processFeedbackHistoryP3.Execute(commandList, m_currentCtrlBuff.LocalSamplingResolution.x, m_currentCtrlBuff.LocalSamplingResolution.y, 1, bindings);
+        m_processFeedbackHistoryP3.execute(commandList, m_currentCtrlBuff.LocalSamplingResolution.x, m_currentCtrlBuff.LocalSamplingResolution.y, 1, bindings);
         UAV_BARRIER_m_NEE_AT_LocalSamplingBuffer();
     }
 
@@ -1468,7 +1468,7 @@ void LightSamplingCache::UpdateEnd(nvrhi::ICommandList * commandList, caustica::
         commandList->commitBarriers();
 
         RAII_SCOPE(commandList->beginMarker("ProcessFeedbackHistoryDebugViz"); , commandList->endMarker(); );
-        m_processFeedbackHistoryDebugViz.Execute(commandList, div_ceil(m_currentCtrlBuff.LocalSamplingResolution.x, itemsPerGroup), div_ceil(m_currentCtrlBuff.LocalSamplingResolution.y, itemsPerGroup), 1, bindings);
+        m_processFeedbackHistoryDebugViz.execute(commandList, div_ceil(m_currentCtrlBuff.LocalSamplingResolution.x, itemsPerGroup), div_ceil(m_currentCtrlBuff.LocalSamplingResolution.y, itemsPerGroup), 1, bindings);
 
         UAV_BARRIER_m_NEE_AT_LocalSamplingBuffer();
         commandList->commitBarriers();
@@ -1482,7 +1482,7 @@ void LightSamplingCache::UpdateEnd(nvrhi::ICommandList * commandList, caustica::
         //commandList->setTextureState(m_NEE_AT_FeedbackTotalWeightScratch, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
         //commandList->setTextureState(m_NEE_AT_FeedbackCandidatesScratch, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
 
-        m_clearFeedbackHistory.Execute( commandList, div_ceil(m_currentCtrlBuff.CacheConstants.FeedbackResolution.x, itemsPerGroup), div_ceil(m_currentCtrlBuff.CacheConstants.FeedbackResolution.y, itemsPerGroup), 1, bindings );
+        m_clearFeedbackHistory.execute( commandList, div_ceil(m_currentCtrlBuff.CacheConstants.FeedbackResolution.x, itemsPerGroup), div_ceil(m_currentCtrlBuff.CacheConstants.FeedbackResolution.y, itemsPerGroup), 1, bindings );
 
         commandList->setTextureState(m_NEE_AT_FeedbackTotalWeight, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
         commandList->setTextureState(m_NEE_AT_FeedbackCandidates, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);

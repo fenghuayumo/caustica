@@ -122,19 +122,19 @@ void PostProcess::Apply( nvrhi::ICommandList* commandList, ComputePassType passT
             nvrhi::BindingSetItem::Texture_SRV(0, (sourceTexture!=nullptr)?(sourceTexture):(m_renderDevice.builtins().whiteTexture().Get())),
             nvrhi::BindingSetItem::Texture_UAV(0, workTexture),
     		//nvrhi::BindingSetItem::StructuredBuffer_SRV(1, renderTargets.DenoiserPixelDataBuffer),
-            nvrhi::BindingSetItem::Texture_SRV(2, renderTargets.DenoiserOutDiffRadianceHitDist[pass]),
-            nvrhi::BindingSetItem::Texture_SRV(3, renderTargets.DenoiserOutSpecRadianceHitDist[pass]),
+            nvrhi::BindingSetItem::Texture_SRV(2, renderTargets.denoiserOutDiffRadianceHitDist[pass]),
+            nvrhi::BindingSetItem::Texture_SRV(3, renderTargets.denoiserOutSpecRadianceHitDist[pass]),
             nvrhi::BindingSetItem::Texture_SRV(4, m_renderDevice.builtins().whiteTexture().Get()),
-            nvrhi::BindingSetItem::Texture_SRV(5, (renderTargets.DenoiserOutValidation!=nullptr)?(renderTargets.DenoiserOutValidation):((nvrhi::TextureHandle)m_renderDevice.builtins().whiteTexture().Get())),
-            nvrhi::BindingSetItem::Texture_SRV(6, renderTargets.DenoiserViewspaceZ),
-            nvrhi::BindingSetItem::Texture_SRV(7, renderTargets.DenoiserDisocclusionThresholdMix),
-            nvrhi::BindingSetItem::StructuredBuffer_SRV(10, renderTargets.StablePlanesBuffer),
+            nvrhi::BindingSetItem::Texture_SRV(5, (renderTargets.denoiserOutValidation!=nullptr)?(renderTargets.denoiserOutValidation):((nvrhi::TextureHandle)m_renderDevice.builtins().whiteTexture().Get())),
+            nvrhi::BindingSetItem::Texture_SRV(6, renderTargets.denoiserViewspaceZ),
+            nvrhi::BindingSetItem::Texture_SRV(7, renderTargets.denoiserDisocclusionThresholdMix),
+            nvrhi::BindingSetItem::StructuredBuffer_SRV(10, renderTargets.stablePlanesBuffer),
             nvrhi::BindingSetItem::Sampler(0, (true) ? m_linearSampler : m_pointSampler),
             nvrhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->GetGPUWriteBuffer()),
             nvrhi::BindingSetItem::Texture_UAV(SHADER_DEBUG_VIZ_TEXTURE_UAV_INDEX, m_shaderDebug->GetDebugVizTexture()),
     	};
 
-    nvrhi::BindingSetHandle bindingSet = m_bindingCache.GetOrCreateBindingSet(bindingSetDesc, m_bindingLayoutCS);
+    nvrhi::BindingSetHandle bindingSet = m_bindingCache.getOrCreateBindingSet(bindingSetDesc, m_bindingLayoutCS);
 
     Apply(commandList, passType, consts, miniConsts, bindingSet, m_bindingLayoutCS, workTexture->getDesc().width, workTexture->getDesc().height);
 

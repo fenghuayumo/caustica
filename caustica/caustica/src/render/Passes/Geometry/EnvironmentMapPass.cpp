@@ -52,7 +52,7 @@ EnvironmentMapPass::EnvironmentMapPass(
     constantBufferDesc.maxVersions = caustica::c_MaxRenderPassConstantBufferVersions;
     m_SkyCB = device->createBuffer(constantBufferDesc);
 
-    const IView* sampleView = compositeView.GetChildView(ViewType::PLANAR, 0);
+    const IView* sampleView = compositeView.getChildView(ViewType::PLANAR, 0);
 
     {
         nvrhi::BindingLayoutDesc layoutDesc;
@@ -74,7 +74,7 @@ EnvironmentMapPass::EnvironmentMapPass(
 
         nvrhi::GraphicsPipelineDesc pipelineDesc;
         pipelineDesc.primType = nvrhi::PrimitiveType::TriangleStrip;
-        pipelineDesc.VS = sampleView->IsReverseDepth() ? m_renderDevice->blit().fullscreenVS() : m_renderDevice->blit().fullscreenAtOneVS();
+        pipelineDesc.VS = sampleView->isReverseDepth() ? m_renderDevice->blit().fullscreenVS() : m_renderDevice->blit().fullscreenAtOneVS();
         pipelineDesc.PS = m_PixelShader;
         pipelineDesc.bindingLayouts = { m_RenderBindingLayout };
 
@@ -83,11 +83,11 @@ EnvironmentMapPass::EnvironmentMapPass(
             .enableDepthTest()
             .disableDepthWrite()
             .disableStencil()
-            .setDepthFunc(sampleView->IsReverseDepth()
+            .setDepthFunc(sampleView->isReverseDepth()
                 ? nvrhi::ComparisonFunc::GreaterOrEqual
                 : nvrhi::ComparisonFunc::LessOrEqual);
 
-        m_RenderPso = device->createGraphicsPipeline(pipelineDesc, m_FramebufferFactory->GetFramebufferInfo());
+        m_RenderPso = device->createGraphicsPipeline(pipelineDesc, m_FramebufferFactory->getFramebufferInfo());
     }
 }
 
@@ -97,18 +97,18 @@ void EnvironmentMapPass::Render(
 {
     commandList->beginMarker("Environment Map");
 
-    for (uint viewIndex = 0; viewIndex < compositeView.GetNumChildViews(ViewType::PLANAR); viewIndex++)
+    for (uint viewIndex = 0; viewIndex < compositeView.getNumChildViews(ViewType::PLANAR); viewIndex++)
     {
-        const IView* view = compositeView.GetChildView(ViewType::PLANAR, viewIndex);
+        const IView* view = compositeView.getChildView(ViewType::PLANAR, viewIndex);
 
         nvrhi::GraphicsState state;
         state.pipeline = m_RenderPso;
-        state.framebuffer = m_FramebufferFactory->GetFramebuffer(*view);
+        state.framebuffer = m_FramebufferFactory->getFramebuffer(*view);
         state.bindings = { m_RenderBindingSet };
-        state.viewport = view->GetViewportState();
+        state.viewport = view->getViewportState();
 
         SkyConstants skyConstants = {};
-        skyConstants.matClipToTranslatedWorld = view->GetInverseViewProjectionMatrix() * affineToHomogeneous(translation(-view->GetViewOrigin()));
+        skyConstants.matClipToTranslatedWorld = view->getInverseViewProjectionMatrix() * affineToHomogeneous(translation(-view->getViewOrigin()));
         commandList->writeBuffer(m_SkyCB, &skyConstants, sizeof(skyConstants));
 
         commandList->setGraphicsState(state);

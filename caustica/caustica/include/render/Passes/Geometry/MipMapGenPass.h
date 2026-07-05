@@ -48,7 +48,7 @@ namespace caustica::render
 
     private:
 
-        nvrhi::DeviceHandle m_Device;
+        nvrhi::DeviceHandle m_device;
         nvrhi::ShaderHandle m_Shader;
         nvrhi::TextureHandle m_Texture;
         nvrhi::BufferHandle m_ConstantBuffer;

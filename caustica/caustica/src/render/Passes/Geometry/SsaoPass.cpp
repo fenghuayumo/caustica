@@ -40,7 +40,7 @@ SsaoPass::SsaoPass(
     std::shared_ptr<ShaderFactory> shaderFactory,
     caustica::render::RenderDevice& renderDevice,
     const CreateParameters& params)
-    : m_Device(device)
+    : m_device(device)
     , m_renderDevice(&renderDevice)
 {
     nvrhi::BufferDesc constantBufferDesc;
@@ -82,7 +82,7 @@ SsaoPass::SsaoPass(
             nvrhi::BindingLayoutItem::Texture_SRV(0),
             nvrhi::BindingLayoutItem::Texture_UAV(0),
         };
-        m_Deinterleave.BindingLayout = m_Device->createBindingLayout(DeinterleaveBindings);
+        m_Deinterleave.BindingLayout = m_device->createBindingLayout(DeinterleaveBindings);
 
         nvrhi::ComputePipelineDesc DeinterleavePipelineDesc;
         DeinterleavePipelineDesc.bindingLayouts = { m_Deinterleave.BindingLayout };
@@ -107,7 +107,7 @@ SsaoPass::SsaoPass(
             nvrhi::BindingLayoutItem::Texture_SRV(1),
             nvrhi::BindingLayoutItem::Texture_UAV(0),
         };
-        m_Compute.BindingLayout = m_Device->createBindingLayout(ComputeBindings);
+        m_Compute.BindingLayout = m_device->createBindingLayout(ComputeBindings);
 
         nvrhi::ComputePipelineDesc ComputePipeline;
         ComputePipeline.bindingLayouts = { m_Compute.BindingLayout };
@@ -132,7 +132,7 @@ SsaoPass::SsaoPass(
             nvrhi::BindingLayoutItem::Texture_UAV(0),
             nvrhi::BindingLayoutItem::Sampler(0),
         };
-        m_Blur.BindingLayout = m_Device->createBindingLayout(BlurBindings);
+        m_Blur.BindingLayout = m_device->createBindingLayout(BlurBindings);
 
         nvrhi::ComputePipelineDesc BlurPipeline;
         BlurPipeline.bindingLayouts = { m_Blur.BindingLayout };
@@ -176,7 +176,7 @@ void SsaoPass::CreateBindingSet(
         nvrhi::BindingSetItem::Texture_SRV(0, gbufferDepth),
         nvrhi::BindingSetItem::Texture_UAV(0, m_DeinterleavedDepth)
     };
-    m_Deinterleave.BindingSets[bindingSetIndex] = m_Device->createBindingSet(DeinterleaveBindings, m_Deinterleave.BindingLayout);
+    m_Deinterleave.BindingSets[bindingSetIndex] = m_device->createBindingSet(DeinterleaveBindings, m_Deinterleave.BindingLayout);
     
     nvrhi::BindingSetDesc ComputeBindings;
     ComputeBindings.bindings = {
@@ -185,7 +185,7 @@ void SsaoPass::CreateBindingSet(
         nvrhi::BindingSetItem::Texture_SRV(1, gbufferNormals),
         nvrhi::BindingSetItem::Texture_UAV(0, m_DeinterleavedOcclusion)
     };
-    m_Compute.BindingSets[bindingSetIndex] = m_Device->createBindingSet(ComputeBindings, m_Compute.BindingLayout);
+    m_Compute.BindingSets[bindingSetIndex] = m_device->createBindingSet(ComputeBindings, m_Compute.BindingLayout);
 
     nvrhi::BindingSetDesc BlurBindings;
     BlurBindings.bindings = {
@@ -195,7 +195,7 @@ void SsaoPass::CreateBindingSet(
         nvrhi::BindingSetItem::Texture_UAV(0, destinationTexture),
         nvrhi::BindingSetItem::Sampler(0, m_renderDevice->samplers().pointClamp())
     };
-    m_Blur.BindingSets[bindingSetIndex] = m_Device->createBindingSet(BlurBindings, m_Blur.BindingLayout);
+    m_Blur.BindingSets[bindingSetIndex] = m_device->createBindingSet(BlurBindings, m_Blur.BindingLayout);
 }
 
 void SsaoPass::Render(
@@ -210,13 +210,13 @@ void SsaoPass::Render(
 
     commandList->beginMarker("SSAO");
 
-    for (uint viewIndex = 0; viewIndex < compositeView.GetNumChildViews(ViewType::PLANAR); viewIndex++)
+    for (uint viewIndex = 0; viewIndex < compositeView.getNumChildViews(ViewType::PLANAR); viewIndex++)
     {
-        const IView* view = compositeView.GetChildView(ViewType::PLANAR, viewIndex);
+        const IView* view = compositeView.getChildView(ViewType::PLANAR, viewIndex);
 
-        const float4x4 projectionMatrix = view->GetProjectionMatrix(false);
+        const float4x4 projectionMatrix = view->getProjectionMatrix(false);
 
-        nvrhi::Rect viewExtent = view->GetViewExtent();
+        nvrhi::Rect viewExtent = view->getViewExtent();
         nvrhi::Rect quarterResExtent = viewExtent;
         quarterResExtent.minX /= 4;
         quarterResExtent.minY /= 4;
@@ -224,7 +224,7 @@ void SsaoPass::Render(
         quarterResExtent.maxY = (quarterResExtent.maxY + 3) / 4;
 
         SsaoConstants ssaoConstants = {};
-        view->FillPlanarViewConstants(ssaoConstants.view);
+        view->fillPlanarViewConstants(ssaoConstants.view);
 
         ssaoConstants.clipToView = float2(
             projectionMatrix[2].w / projectionMatrix[0].x,

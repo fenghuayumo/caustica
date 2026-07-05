@@ -123,11 +123,11 @@ void RtxdiPass::CreatePipelines(nvrhi::BindingLayoutHandle extraBindingLayout /*
 	
 	std::vector<caustica::ShaderMacro> regirMacros = { GetReGirMacro(reGIRParams) };
 
-	m_PresampleLightsPass.Init(m_device, *m_shaderFactory, "caustica/shaders/render/RTXDI/PresampleLights.hlsl", "main", {}, m_bindingLayout, extraBindingLayout, m_bindlessLayout);
-	m_PresampleEnvMapPass.Init(m_device, *m_shaderFactory, "caustica/shaders/render/RTXDI/PresampleEnvironmentMap.hlsl", "main", {}, m_bindingLayout, extraBindingLayout, m_bindlessLayout);
+	m_PresampleLightsPass.init(m_device, *m_shaderFactory, "caustica/shaders/render/RTXDI/PresampleLights.hlsl", "main", {}, m_bindingLayout, extraBindingLayout, m_bindlessLayout);
+	m_PresampleEnvMapPass.init(m_device, *m_shaderFactory, "caustica/shaders/render/RTXDI/PresampleEnvironmentMap.hlsl", "main", {}, m_bindingLayout, extraBindingLayout, m_bindlessLayout);
 	if (reGIRParams.Mode != rtxdi::ReGIRMode::Disabled)
 	{
-		m_PresampleReGIRPass.Init(m_device, *m_shaderFactory, "caustica/shaders/render/RTXDI/PresampleReGIR.hlsl", "main", regirMacros, m_bindingLayout, extraBindingLayout, m_bindlessLayout);
+		m_PresampleReGIRPass.init(m_device, *m_shaderFactory, "caustica/shaders/render/RTXDI/PresampleReGIR.hlsl", "main", regirMacros, m_bindingLayout, extraBindingLayout, m_bindlessLayout);
 	}
 	
 	m_GenerateInitialSamplesPass.Init(m_device, *m_shaderFactory, "caustica/shaders/render/RTXDI/GenerateInitialSamples.hlsl", 
@@ -142,7 +142,7 @@ void RtxdiPass::CreatePipelines(nvrhi::BindingLayoutHandle extraBindingLayout /*
 	if (m_device->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D12)
 		finalShadingMacros.push_back({ "NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP", "1" });
 #endif // NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP
-	m_FinalSamplingPass.Init(m_device, *m_shaderFactory, "caustica/shaders/render/RTXDI/DIFinalShading.hlsl", "main", finalShadingMacros, m_bindingLayout, extraBindingLayout, m_bindlessLayout);
+	m_FinalSamplingPass.init(m_device, *m_shaderFactory, "caustica/shaders/render/RTXDI/DIFinalShading.hlsl", "main", finalShadingMacros, m_bindingLayout, extraBindingLayout, m_bindlessLayout);
 	
 	m_GISpatialResamplingPass.Init(m_device, *m_shaderFactory, "caustica/shaders/render/RTXDI/GISpatialResampling.hlsl",
 		{}, useRayQuery, RTXDI_SCREEN_SPACE_GROUP_SIZE, m_bindingLayout, extraBindingLayout, m_bindlessLayout);
@@ -388,7 +388,7 @@ void RtxdiPass::BeginFrame(
 	}
 }
 
-void RtxdiPass::Execute(
+void RtxdiPass::execute(
 	nvrhi::CommandListHandle commandList,
 	nvrhi::BindingSetHandle extraBindingSet,
     bool skipFinal
@@ -642,8 +642,8 @@ void RtxdiPass::ExecuteComputePass(
 	commandList->beginMarker(passName);
     
     SampleMiniConstants unusedPushConstants = { };  // shared bindings require them
-	pass.Execute(commandList, dispatchSize.x, dispatchSize.y, dispatchSize.z, m_bindingSet,
-		extraBindingSet, m_Scene->GetDescriptorTable(), &unusedPushConstants, sizeof(unusedPushConstants));
+	pass.execute(commandList, dispatchSize.x, dispatchSize.y, dispatchSize.z, m_bindingSet,
+		extraBindingSet, m_Scene->getDescriptorTable(), &unusedPushConstants, sizeof(unusedPushConstants));
 
 	commandList->endMarker();
 }
@@ -660,7 +660,7 @@ void RtxdiPass::ExecuteRayTracingPass(
 	
     SampleMiniConstants unusedPushConstants = { };  // shared bindings require them
 	pass.Execute(commandList, dispatchSize.x, dispatchSize.y, m_bindingSet, 
-		extraBindingSet, m_Scene->GetDescriptorTable(), &unusedPushConstants, sizeof(unusedPushConstants));
+		extraBindingSet, m_Scene->getDescriptorTable(), &unusedPushConstants, sizeof(unusedPushConstants));
 
 	commandList->endMarker();
 }

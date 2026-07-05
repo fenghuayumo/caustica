@@ -46,7 +46,7 @@ namespace caustica::render
         SubPass m_Compute;
         SubPass m_Blur;
 
-        nvrhi::DeviceHandle m_Device;
+        nvrhi::DeviceHandle m_device;
         nvrhi::BufferHandle m_ConstantBuffer;
 
         nvrhi::TextureHandle m_DeinterleavedDepth;

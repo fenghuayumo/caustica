@@ -64,18 +64,18 @@ public:
     void FinalizeRuntimeSceneMutation(caustica::ecs::Entity importedRoot);
     bool DeleteSceneNode(caustica::ecs::Entity entity);
     void RequestFullRebuild();
-    std::vector<dm::float3> GetMeshVertices(const std::shared_ptr<caustica::MeshInfo>& mesh) const;
-    void SetMeshVertices(const std::shared_ptr<caustica::MeshInfo>& mesh,
+    std::vector<dm::float3> getMeshVertices(const std::shared_ptr<caustica::MeshInfo>& mesh) const;
+    void setMeshVertices(const std::shared_ptr<caustica::MeshInfo>& mesh,
         const std::vector<dm::float3>& vertices,
         bool recomputeNormals = true,
         bool rebuildAccelerationStructure = true);
-    std::vector<dm::float3> GetMeshVerticesWorld(const std::shared_ptr<caustica::MeshInfo>& mesh);
-    std::vector<dm::float3> GetMeshVerticesWorld(caustica::ecs::Entity entity);
-    void SetMeshVerticesWorld(const std::shared_ptr<caustica::MeshInfo>& mesh,
+    std::vector<dm::float3> getMeshVerticesWorld(const std::shared_ptr<caustica::MeshInfo>& mesh);
+    std::vector<dm::float3> getMeshVerticesWorld(caustica::ecs::Entity entity);
+    void setMeshVerticesWorld(const std::shared_ptr<caustica::MeshInfo>& mesh,
         const std::vector<dm::float3>& vertices,
         bool recomputeNormals = true,
         bool rebuildAccelerationStructure = true);
-    void SetMeshVerticesWorld(caustica::ecs::Entity entity,
+    void setMeshVerticesWorld(caustica::ecs::Entity entity,
         const std::vector<dm::float3>& vertices,
         bool recomputeNormals = true,
         bool rebuildAccelerationStructure = true);

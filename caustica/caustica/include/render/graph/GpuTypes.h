@@ -16,15 +16,14 @@ using FormatInfo = nvrhi::caustica::PixelFormatInfo;
     return nvrhi::caustica::getPixelFormatInfo(format);
 }
 
-// Deprecated aliases kept for existing call sites.
-[[nodiscard]] inline uint32_t toNativeFormat(Format format)
+[[nodiscard]] inline nvrhi::Format toNvrhiFormat(Format format)
 {
-    return static_cast<uint32_t>(nvrhi::caustica::toNvrhiFormat(format));
+    return nvrhi::caustica::toNvrhiFormat(format);
 }
 
-[[nodiscard]] inline Format fromNativeFormat(uint32_t nativeFormat)
+[[nodiscard]] inline Format fromNvrhiFormat(nvrhi::Format nativeFormat)
 {
-    return nvrhi::caustica::fromNvrhiFormat(static_cast<nvrhi::Format>(nativeFormat));
+    return nvrhi::caustica::fromNvrhiFormat(nativeFormat);
 }
 
 struct TextureDesc

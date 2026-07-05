@@ -150,9 +150,9 @@ void PTPipelineVariant::ShaderPermutation::ResolveCacheIdentity(
         CompiledFullPath,
         lastModifiedSourceCode);
 
-    if (compiledBlobAvailable && (!compiler.CanCompileShaders() || diskBlobUpToDate))
+    if (compiledBlobAvailable && (!compiler.canCompileShaders() || diskBlobUpToDate))
     {
-        if (compiler.IsVerbose())
+        if (compiler.isVerbose())
         {
             caustica::info(
                 "Using cached shader '%s' (%s)...",
@@ -162,7 +162,7 @@ void PTPipelineVariant::ShaderPermutation::ResolveCacheIdentity(
         return;
     }
 
-    if (!compiler.CanCompileShaders())
+    if (!compiler.canCompileShaders())
     {
         US_compileError = StringFormat(
             "Missing precompiled shader '%s' and runtime shader compilation is disabled.",
@@ -184,7 +184,7 @@ void PTPipelineVariant::ShaderPermutation::ResolveCacheIdentity(
         CompiledFullPath,
         pdbPath);
 
-    if (compiler.IsVerbose())
+    if (compiler.isVerbose())
         caustica::info("Enqueuing shader variant of '%s'...", srcFullPath.string().c_str());
 }
 
@@ -635,7 +635,7 @@ void PathTracingShaderCompiler::Update(const std::shared_ptr<caustica::Scene>& s
         {
             const std::shared_ptr<PTPipelineVariant>& variant = m_variants[i];
             if (variant.use_count() == 1)
-                assert(false); // dangling Variant - forgotten a call to ReleaseVariant?
+                assert(false); // dangling Variant - forgotten a call to releaseVariant?
             if (variant->GetVersion() != m_version)
             {
                 updateQueue.push_back(variant);
@@ -652,7 +652,7 @@ void PathTracingShaderCompiler::Update(const std::shared_ptr<caustica::Scene>& s
         progressTotal = (int)m_parallelCompileListUnique.size();
         if (m_parallelCompileListUnique.size() > 0)
             progressCompilingShaders.Start(StringFormat("Compiling shaders (%d)...", progressTotal).c_str());
-        else if (IsLoadOnlyMode() && !updateQueue.empty())
+        else if (isLoadOnlyMode() && !updateQueue.empty())
             caustica::info("PathTracingShaderCompiler: loading precompiled RT shader libraries...");
 
         for (auto it : m_parallelCompileListUnique)
@@ -761,7 +761,7 @@ void PathTracingShaderCompiler::Update(const std::shared_ptr<caustica::Scene>& s
     } while (true);
 }
 
-void PathTracingShaderCompiler::ReleaseVariant(std::shared_ptr<PTPipelineVariant>& variant)
+void PathTracingShaderCompiler::releaseVariant(std::shared_ptr<PTPipelineVariant>& variant)
 {
     if (variant == nullptr)
         return;
@@ -778,7 +778,7 @@ void PathTracingShaderCompiler::ReleaseVariant(std::shared_ptr<PTPipelineVariant
     assert(false);
 }
 
-std::shared_ptr<PTPipelineVariant> PathTracingShaderCompiler::CreateVariant(const std::string & relativeSourcePath, std::vector<caustica::ShaderMacro> variantMacros, const std::string & shortUniqueDebugID, bool rayGenOnly)
+std::shared_ptr<PTPipelineVariant> PathTracingShaderCompiler::createVariant(const std::string & relativeSourcePath, std::vector<caustica::ShaderMacro> variantMacros, const std::string & shortUniqueDebugID, bool rayGenOnly)
 {
     std::shared_ptr<PTPipelineVariant> variant = std::shared_ptr<PTPipelineVariant>(new PTPipelineVariant(relativeSourcePath, variantMacros, this->shared_from_this(), shortUniqueDebugID, rayGenOnly));
     m_variants.push_back(variant);

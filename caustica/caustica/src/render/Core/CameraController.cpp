@@ -52,8 +52,8 @@ void CameraController::ensureViews(dm::uint2 renderSize)
         m_viewPrevious = std::make_shared<PlanarView>();
 
     const nvrhi::Viewport viewport(float(renderSize.x), float(renderSize.y));
-    m_view->SetViewport(viewport);
-    m_viewPrevious->SetViewport(viewport);
+    m_view->setViewport(viewport);
+    m_viewPrevious->setViewport(viewport);
 }
 
 void CameraController::swapViews()
@@ -116,7 +116,7 @@ void CameraController::updateViews(const CameraUpdateParams& params)
         params.temporalAAPass->SetJitter(params.temporalAAJitter);
 
     nvrhi::Viewport windowViewport(float(params.renderSize.x), float(params.renderSize.y));
-    m_view->SetViewport(windowViewport);
+    m_view->setViewport(windowViewport);
 
     const dm::float4x4 projection = m_useCustomIntrinsics
         ? MakePinholeIntrinsicsProjection(
@@ -124,9 +124,9 @@ void CameraController::updateViews(const CameraUpdateParams& params)
             m_intrinsicsViewport.x, m_intrinsicsViewport.y, m_zNear)
         : dm::perspProjD3DStyleReverse(m_verticalFOV, params.displayAspectRatio, m_zNear);
 
-    m_view->SetMatrices(m_camera.GetWorldToViewMatrix(), projection);
-    m_view->SetPixelOffset(computeJitter(params));
-    m_view->UpdateCache();
+    m_view->setMatrices(m_camera.GetWorldToViewMatrix(), projection);
+    m_view->setPixelOffset(computeJitter(params));
+    m_view->updateCache();
 
     if ((params.frameIndex & 0xFFFFFFFF) == 0 || params.syncPreviousView)
     {
@@ -139,9 +139,9 @@ void CameraController::syncPreviousViewFromCurrent()
     if (!m_view || !m_viewPrevious)
         return;
 
-    m_viewPrevious->SetMatrices(m_view->GetViewMatrix(), m_view->GetProjectionMatrix());
-    m_viewPrevious->SetPixelOffset(m_view->GetPixelOffset());
-    m_viewPrevious->UpdateCache();
+    m_viewPrevious->setMatrices(m_view->getViewMatrix(), m_view->getProjectionMatrix());
+    m_viewPrevious->setPixelOffset(m_view->getPixelOffset());
+    m_viewPrevious->updateCache();
     updateLastCameraState();
 }
 

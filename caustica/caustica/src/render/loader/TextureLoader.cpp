@@ -384,7 +384,7 @@ void TextureLoader::FinalizeTexture(
     commandList->beginTrackingTextureState(texture->texture, nvrhi::AllSubresources, nvrhi::ResourceStates::Common);
 
     if (m_DescriptorTable)
-        texture->bindlessDescriptor = m_DescriptorTable->CreateDescriptorHandle(nvrhi::BindingSetItem::Texture_SRV(0, texture->texture));
+        texture->bindlessDescriptor = m_DescriptorTable->createDescriptorHandle(nvrhi::BindingSetItem::Texture_SRV(0, texture->texture));
     
     if (scaledWidth != originalWidth || scaledHeight != originalHeight)
     {

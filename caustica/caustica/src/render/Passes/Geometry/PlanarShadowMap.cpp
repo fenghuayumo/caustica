@@ -30,8 +30,8 @@ PlanarShadowMap::PlanarShadowMap(
     m_TextureSize = m_ShadowMapSize;
 
     m_View = std::make_shared<caustica::PlanarView>();
-    m_View->SetViewport(nvrhi::Viewport(float(resolution), float(resolution)));
-    m_View->SetArraySlice(0);
+    m_View->setViewport(nvrhi::Viewport(float(resolution), float(resolution)));
+    m_View->setArraySlice(0);
 }
 
 PlanarShadowMap::PlanarShadowMap(
@@ -47,8 +47,8 @@ PlanarShadowMap::PlanarShadowMap(
     m_ShadowMapSize = float2(viewport.maxX - viewport.minX, viewport.maxY - viewport.minY);
 
     m_View = std::make_shared<caustica::PlanarView>();
-    m_View->SetViewport(viewport);
-    m_View->SetArraySlice(arraySlice);
+    m_View->setViewport(viewport);
+    m_View->setArraySlice(arraySlice);
 }
 
 bool PlanarShadowMap::SetupWholeSceneDirectionalLightView(const DirectionalLight& light, box3_arg sceneBounds, float fadeRangeWorld)
@@ -75,10 +75,10 @@ bool PlanarShadowMap::SetupWholeSceneDirectionalLightView(const DirectionalLight
         -boundsView.m_maxs.z,
         -boundsView.m_mins.z);
 
-    bool viewIsModified = m_View->GetViewMatrix() != worldToView || any(m_View->GetProjectionMatrix(false) != projection);
+    bool viewIsModified = m_View->getViewMatrix() != worldToView || any(m_View->getProjectionMatrix(false) != projection);
 
-    m_View->SetMatrices(worldToView, projection);
-    m_View->UpdateCache();
+    m_View->setMatrices(worldToView, projection);
+    m_View->updateCache();
 
     m_FadeRangeTexels = clamp(
         float2(fadeRangeWorld * m_ShadowMapSize) / boundsView.diagonal().xy(),
@@ -114,10 +114,10 @@ bool PlanarShadowMap::SetupDynamicDirectionalLightView(const DirectionalLight& l
         -halfShadowBoxSize.y, halfShadowBoxSize.y, 
         -halfShadowBoxSize.z, halfShadowBoxSize.z);
 
-    bool viewIsModified = m_View->GetViewMatrix() != worldToView || any(m_View->GetProjectionMatrix(false) != projection);
+    bool viewIsModified = m_View->getViewMatrix() != worldToView || any(m_View->getProjectionMatrix(false) != projection);
 
-    m_View->SetMatrices(worldToView, projection);
-    m_View->UpdateCache();
+    m_View->setMatrices(worldToView, projection);
+    m_View->updateCache();
 
     m_FadeRangeTexels = clamp(
         float2(fadeRangeWorld * m_ShadowMapSize) / (halfShadowBoxSize.xy() * 2.f),
@@ -134,8 +134,8 @@ void PlanarShadowMap::SetupProxyView()
 
     float4x4 projection = orthoProjD3DStyle(-1.f, 1.f, -1.f, 1.f, -1.f, 1.f);
 
-    m_View->SetMatrices(worldToView, projection);
-    m_View->UpdateCache();
+    m_View->setMatrices(worldToView, projection);
+    m_View->updateCache();
 }
 
 void PlanarShadowMap::SetLitOutOfBounds(bool litOutOfBounds)
@@ -148,7 +148,7 @@ void PlanarShadowMap::SetFalloffDistance(float distance)
     m_FalloffDistance = distance;
 }
 
-std::shared_ptr<PlanarView> PlanarShadowMap::GetPlanarView()
+std::shared_ptr<PlanarView> PlanarShadowMap::getPlanarView()
 {
     return m_View;
 }
@@ -164,7 +164,7 @@ dm::float4x4 PlanarShadowMap::GetWorldToUvzwMatrix() const
         0.5f,  0.5f, 0, 1,
     };
 
-    return m_View->GetViewProjectionMatrix() * matClipToUvzw;
+    return m_View->getViewProjectionMatrix() * matClipToUvzw;
 }
 
 const ICompositeView& PlanarShadowMap::GetView() const
@@ -205,7 +205,7 @@ dm::int2 PlanarShadowMap::GetTextureSize() const
 
 dm::box2 PlanarShadowMap::GetUVRange() const
 {
-    nvrhi::ViewportState viewportState = m_View->GetViewportState();
+    nvrhi::ViewportState viewportState = m_View->getViewportState();
     const nvrhi::Viewport& viewport = viewportState.viewports[0];
     float2 topLeft = float2(viewport.minX, viewport.minY);
     float2 bottomRight = float2(viewport.maxX, viewport.maxY);
@@ -228,7 +228,7 @@ bool PlanarShadowMap::IsLitOutOfBounds() const
 void PlanarShadowMap::FillShadowConstants(struct ShadowConstants& constants) const
 {
     constants.matWorldToUvzwShadow = GetWorldToUvzwMatrix();
-    constants.shadowMapArrayIndex = m_View->GetSubresources().baseArraySlice;
+    constants.shadowMapArrayIndex = m_View->getSubresources().baseArraySlice;
     box2 uvRange = GetUVRange();
     float2 fadeUV = GetFadeRangeInTexels() / m_TextureSize;
     constants.shadowMapCenterUV = uvRange.center();
@@ -241,5 +241,5 @@ void PlanarShadowMap::FillShadowConstants(struct ShadowConstants& constants) con
 
 void PlanarShadowMap::Clear(nvrhi::ICommandList* commandList)
 {
-    commandList->clearTextureFloat(m_ShadowMapTexture, m_View->GetSubresources(), nvrhi::Color(1.f));
+    commandList->clearTextureFloat(m_ShadowMapTexture, m_View->getSubresources(), nvrhi::Color(1.f));
 }

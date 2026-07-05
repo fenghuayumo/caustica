@@ -400,44 +400,44 @@ void RebuildSceneMeshBuffersIfNeeded(const std::shared_ptr<MeshInfo>& mesh, cons
     }
 
     if (params.scene)
-        render::SceneGpuUpdater::RefreshAfterLoad(*params.scene, params.frameIndex);
+        render::SceneGpuUpdater::refreshAfterLoad(*params.scene, params.frameIndex);
 }
 
 } // namespace
 
-std::vector<dm::float3> GetMeshVertices(const std::shared_ptr<MeshInfo>& mesh)
+std::vector<dm::float3> getMeshVertices(const std::shared_ptr<MeshInfo>& mesh)
 {
-    std::vector<float3> renderVertices = GetMeshRenderVertices(mesh, "GetMeshVertices");
+    std::vector<float3> renderVertices = GetMeshRenderVertices(mesh, "getMeshVertices");
     return BuildUniquePositionMap(
         renderVertices,
         GetMeshSourcePositionIndices(mesh, renderVertices.size())).uniquePositions;
 }
 
-std::vector<dm::float3> GetMeshVerticesWorld(
+std::vector<dm::float3> getMeshVerticesWorld(
     const std::shared_ptr<Scene>& scene,
     const std::shared_ptr<MeshInfo>& mesh,
     uint32_t frameIndex)
 {
-    auto entity = FindUniqueMeshInstanceEntity(scene, mesh, "GetMeshVerticesWorld");
-    return GetMeshVerticesWorld(scene, entity, frameIndex);
+    auto entity = FindUniqueMeshInstanceEntity(scene, mesh, "getMeshVerticesWorld");
+    return getMeshVerticesWorld(scene, entity, frameIndex);
 }
 
-std::vector<dm::float3> GetMeshVerticesWorld(
+std::vector<dm::float3> getMeshVerticesWorld(
     const std::shared_ptr<Scene>& scene,
     ecs::Entity entity,
     uint32_t frameIndex)
 {
     if (!scene)
-        throw std::runtime_error("GetMeshVerticesWorld: no scene is loaded");
+        throw std::runtime_error("getMeshVerticesWorld: no scene is loaded");
 
     scene->RefreshSceneWorld(frameIndex);
 
     const scene::SceneEntityWorld* entityWorld = scene->GetEntityWorld();
     if (!entityWorld)
-        throw std::runtime_error("GetMeshVerticesWorld: scene has no entity world");
+        throw std::runtime_error("getMeshVerticesWorld: scene has no entity world");
 
-    auto mesh = GetMeshInfoFromEntity(*entityWorld, entity, "GetMeshVerticesWorld");
-    std::vector<float3> vertices = GetMeshVertices(mesh);
+    auto mesh = GetMeshInfoFromEntity(*entityWorld, entity, "getMeshVerticesWorld");
+    std::vector<float3> vertices = getMeshVertices(mesh);
 
     const affine3 localToWorld = GetEntityTransformFloat(*entityWorld, entity);
     for (float3& vertex : vertices)
@@ -446,24 +446,24 @@ std::vector<dm::float3> GetMeshVerticesWorld(
     return vertices;
 }
 
-void SetMeshVertices(
+void setMeshVertices(
     const std::shared_ptr<MeshInfo>& mesh,
     const std::vector<dm::float3>& vertices,
     const SetSceneMeshVerticesParams& params)
 {
     if (!mesh)
-        throw std::runtime_error("SetMeshVertices: mesh is null");
+        throw std::runtime_error("setMeshVertices: mesh is null");
     if (!mesh->buffers)
-        throw std::runtime_error("SetMeshVertices: mesh has no buffer group");
+        throw std::runtime_error("setMeshVertices: mesh has no buffer group");
 
-    std::vector<float3> renderVertices = GetMeshRenderVertices(mesh, "SetMeshVertices");
+    std::vector<float3> renderVertices = GetMeshRenderVertices(mesh, "setMeshVertices");
     UniquePositionMap uniqueMap = BuildUniquePositionMap(
         renderVertices,
         GetMeshSourcePositionIndices(mesh, renderVertices.size()));
     if (vertices.size() != uniqueMap.uniquePositions.size())
     {
         throw std::runtime_error(
-            "SetMeshVertices: vertex count must match get_mesh_vertices(...) length");
+            "setMeshVertices: vertex count must match get_mesh_vertices(...) length");
     }
 
     for (size_t i = 0; i < renderVertices.size(); ++i)
@@ -473,7 +473,7 @@ void SetMeshVertices(
     const size_t begin = size_t(mesh->vertexOffset);
     const size_t end = begin + renderVertices.size();
     if (buffers.positionData.size() < end)
-        throw std::runtime_error("SetMeshVertices: CPU vertex cache is unavailable; reload the scene with the Python deformation build");
+        throw std::runtime_error("setMeshVertices: CPU vertex cache is unavailable; reload the scene with the Python deformation build");
 
     const std::vector<float3> previousRenderVertices(buffers.positionData.begin() + begin, buffers.positionData.begin() + end);
     std::copy(renderVertices.begin(), renderVertices.end(), buffers.positionData.begin() + begin);
@@ -503,21 +503,21 @@ void SetMeshVertices(
     }
 }
 
-void SetMeshVerticesWorld(
+void setMeshVerticesWorld(
     ecs::Entity entity,
     const std::vector<dm::float3>& vertices,
     const SetSceneMeshVerticesParams& params)
 {
     if (!params.scene)
-        throw std::runtime_error("SetMeshVerticesWorld: no scene is loaded");
+        throw std::runtime_error("setMeshVerticesWorld: no scene is loaded");
 
     params.scene->RefreshSceneWorld(params.frameIndex);
 
     const scene::SceneEntityWorld* entityWorld = params.scene->GetEntityWorld();
     if (!entityWorld)
-        throw std::runtime_error("SetMeshVerticesWorld: scene has no entity world");
+        throw std::runtime_error("setMeshVerticesWorld: scene has no entity world");
 
-    auto mesh = GetMeshInfoFromEntity(*entityWorld, entity, "SetMeshVerticesWorld");
+    auto mesh = GetMeshInfoFromEntity(*entityWorld, entity, "setMeshVerticesWorld");
     const affine3 worldToLocal = affine3(inverse(dm::daffine3(GetEntityTransformFloat(*entityWorld, entity))));
 
     std::vector<float3> objectVertices;
@@ -526,20 +526,20 @@ void SetMeshVerticesWorld(
     {
         const float3 objectVertex = worldToLocal.transformPoint(vertex);
         if (!dm::all(dm::isfinite(objectVertex)))
-            throw std::runtime_error("SetMeshVerticesWorld: world-to-object transform produced a non-finite vertex");
+            throw std::runtime_error("setMeshVerticesWorld: world-to-object transform produced a non-finite vertex");
         objectVertices.push_back(objectVertex);
     }
 
-    SetMeshVertices(mesh, objectVertices, params);
+    setMeshVertices(mesh, objectVertices, params);
 }
 
-void SetMeshVerticesWorld(
+void setMeshVerticesWorld(
     const std::shared_ptr<MeshInfo>& mesh,
     const std::vector<dm::float3>& vertices,
     const SetSceneMeshVerticesParams& params)
 {
-    auto entity = FindUniqueMeshInstanceEntity(params.scene, mesh, "SetMeshVerticesWorld");
-    SetMeshVerticesWorld(entity, vertices, params);
+    auto entity = FindUniqueMeshInstanceEntity(params.scene, mesh, "setMeshVerticesWorld");
+    setMeshVerticesWorld(entity, vertices, params);
 }
 
 } // namespace caustica

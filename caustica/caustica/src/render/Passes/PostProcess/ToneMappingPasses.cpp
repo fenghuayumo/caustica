@@ -29,8 +29,8 @@ ToneMappingPass::ToneMappingPass(
     , m_renderDevice(renderDevice)
     , m_FramebufferFactory(colorFramebufferFactory)
 {
-    const IView* sampleView = compositeView.GetChildView(ViewType::PLANAR, 0);
-    nvrhi::IFramebuffer* colorSampleFramebuffer = m_FramebufferFactory->GetFramebuffer(*sampleView);
+    const IView* sampleView = compositeView.getChildView(ViewType::PLANAR, 0);
+    nvrhi::IFramebuffer* colorSampleFramebuffer = m_FramebufferFactory->getFramebuffer(*sampleView);
     {
         m_LuminanceShader = shaderFactory->CreateShader("caustica/shaders/render/ToneMapper/luminance_ps.hlsl", "main", nullptr, nvrhi::ShaderType::Pixel);
         m_ToneMapShader = shaderFactory->CreateShader("caustica/shaders/render/ToneMapper/ToneMapping.hlsl", "main_ps", nullptr, nvrhi::ShaderType::Pixel);
@@ -58,15 +58,15 @@ ToneMappingPass::ToneMappingPass(
 	m_pointSampler = m_device->createSampler(samplerDesc);
 
 
-    m_PerView.resize(compositeView.GetNumChildViews(ViewType::PLANAR));
+    m_PerView.resize(compositeView.getNumChildViews(ViewType::PLANAR));
     {
-        for (uint viewIndex = 0; viewIndex < compositeView.GetNumChildViews(ViewType::PLANAR); viewIndex++)
+        for (uint viewIndex = 0; viewIndex < compositeView.getNumChildViews(ViewType::PLANAR); viewIndex++)
         {
-            const IView* view = compositeView.GetChildView(ViewType::PLANAR, viewIndex);
-            nvrhi::IFramebuffer* sampleFrameBuffer = m_FramebufferFactory->GetFramebuffer(*view);
+            const IView* view = compositeView.getChildView(ViewType::PLANAR, viewIndex);
+            nvrhi::IFramebuffer* sampleFrameBuffer = m_FramebufferFactory->getFramebuffer(*view);
             PerViewData& perViewData = m_PerView[viewIndex];
 
-            nvrhi::Rect viewExtent = view->GetViewExtent();
+            nvrhi::Rect viewExtent = view->getViewExtent();
             uint32_t viewportWidth = viewExtent.maxX - viewExtent.minX;
             uint32_t viewportHeight = viewExtent.maxY - viewExtent.minY;
 
@@ -192,7 +192,7 @@ bool ToneMappingPass::Render(
 
     bool commandListWasClosed = false; // to track the need to re-create volatile constant buffers
 
-    for (uint viewIndex = 0; viewIndex < compositeView.GetNumChildViews(ViewType::PLANAR); viewIndex++)
+    for (uint viewIndex = 0; viewIndex < compositeView.getNumChildViews(ViewType::PLANAR); viewIndex++)
     {
         PerViewData& viewData = m_PerView[viewIndex];
 
@@ -208,7 +208,7 @@ bool ToneMappingPass::Render(
     if(m_AutoExposure) 
     {
 		commandList->beginMarker("Luminance");
-		for (uint viewIndex = 0; viewIndex < compositeView.GetNumChildViews(ViewType::PLANAR); viewIndex++)
+		for (uint viewIndex = 0; viewIndex < compositeView.getNumChildViews(ViewType::PLANAR); viewIndex++)
 		{
             PerViewData & viewData = m_PerView[viewIndex];
 
@@ -223,7 +223,7 @@ bool ToneMappingPass::Render(
 				bindingSet = m_device->createBindingSet(bindingSetDesc, m_LuminanceBindingLayout);
 			}
 
-			const IView* view = compositeView.GetChildView(ViewType::PLANAR, viewIndex);
+			const IView* view = compositeView.getChildView(ViewType::PLANAR, viewIndex);
 
 			nvrhi::GraphicsState state;
 			state.pipeline = m_LuminancePso;
@@ -240,7 +240,7 @@ bool ToneMappingPass::Render(
 			args.vertexCount = 4;
 			commandList->draw(args);    
 
-            GenerateMips(commandList, compositeView.GetNumChildViews(ViewType::PLANAR));
+            GenerateMips(commandList, compositeView.getNumChildViews(ViewType::PLANAR));
 
 #if TONEMAPPING_AUTOEXPOSURE_CPU
             {
@@ -283,7 +283,7 @@ bool ToneMappingPass::Render(
     }
 
     commandList->beginMarker("ToneMapping");
-    for (uint viewIndex = 0; viewIndex < compositeView.GetNumChildViews(ViewType::PLANAR); viewIndex++)
+    for (uint viewIndex = 0; viewIndex < compositeView.getNumChildViews(ViewType::PLANAR); viewIndex++)
     {
 		nvrhi::BindingSetHandle& bindingSet = m_PerView[viewIndex].colorBindingSet;
 		if (!bindingSet)
@@ -298,13 +298,13 @@ bool ToneMappingPass::Render(
 			};
 			bindingSet = m_device->createBindingSet(bindingSetDesc, m_ToneMapBindingLayout);
 		}
-        const IView* view = compositeView.GetChildView(ViewType::PLANAR, viewIndex);
+        const IView* view = compositeView.getChildView(ViewType::PLANAR, viewIndex);
 
         nvrhi::GraphicsState state;
         state.pipeline = m_ToneMapPso;
-        state.framebuffer = m_FramebufferFactory->GetFramebuffer(*view);
+        state.framebuffer = m_FramebufferFactory->getFramebuffer(*view);
         state.bindings = { bindingSet };
-        state.viewport = view->GetViewportState();
+        state.viewport = view->getViewportState();
 
         ToneMappingConstants toneMappingConsts = {};
         toneMappingConsts.whiteScale = m_WhiteScale;

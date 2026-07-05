@@ -27,10 +27,10 @@ void buildDenoiseAndAAGraph(const DenoiseAAGraphParams& params)
     if (needsRealtimeCopyPass(*params.settings))
     {
         const TextureHandle processedOutput = graph.importTexture(
-            params.renderTargets->ProcessedOutputColor,
+            params.renderTargets->processedOutputColor,
             TextureAccess::CopySource);
         const TextureHandle outputColor = graph.importTexture(
-            params.renderTargets->OutputColor,
+            params.renderTargets->outputColor,
             TextureAccess::CopyDest);
 
         graph.addPass(

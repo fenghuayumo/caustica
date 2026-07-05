@@ -343,9 +343,9 @@ void ThirdPersonCamera::SetRotation(float yaw, float pitch)
 
 void ThirdPersonCamera::SetView(const caustica::PlanarView& view)
 {
-    m_ProjectionMatrix = view.GetProjectionMatrix(false);
-    m_InverseProjectionMatrix = view.GetInverseProjectionMatrix(false);
-    auto viewport = view.GetViewport();
+    m_ProjectionMatrix = view.getProjectionMatrix(false);
+    m_InverseProjectionMatrix = view.getInverseProjectionMatrix(false);
+    auto viewport = view.getViewport();
     m_ViewportSize = float2(viewport.width(), viewport.height());
 }
 

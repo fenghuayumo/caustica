@@ -77,7 +77,7 @@ ComputePipelineRegistry::~ComputePipelineRegistry()
 {
 }
 
-std::shared_ptr<ComputeShaderVariant> ComputePipelineRegistry::CreateVariant(
+std::shared_ptr<ComputeShaderVariant> ComputePipelineRegistry::createVariant(
     const std::string& shaderSourcePath,
     const std::string& entryPoint,
     const std::vector<ShaderMacro>& macros,
@@ -90,7 +90,7 @@ std::shared_ptr<ComputeShaderVariant> ComputePipelineRegistry::CreateVariant(
     return variant;
 }
 
-void ComputePipelineRegistry::ReleaseVariant(std::shared_ptr<ComputeShaderVariant>& variant)
+void ComputePipelineRegistry::releaseVariant(std::shared_ptr<ComputeShaderVariant>& variant)
 {
     if (variant == nullptr)
         return;
@@ -118,7 +118,7 @@ void ComputePipelineRegistry::EnqueueShaderForCompilation(ComputeShaderVariant* 
     m_parallelCompileListAll.push_back(variant);
 }
 
-void ComputePipelineRegistry::Update(bool forceReload)
+void ComputePipelineRegistry::update(bool forceReload)
 {
     // Auto-reload: poll for source file changes
     if (m_compilerConfig.CanCompile() && !forceReload && !m_variants.empty())
@@ -173,9 +173,9 @@ void ComputePipelineRegistry::Update(bool forceReload)
     {
         if (variant.use_count() == 1)
         {
-            assert(false); // Dangling variant - forgotten a call to ReleaseVariant?
+            assert(false); // Dangling variant - forgotten a call to releaseVariant?
         }
-        if (variant->NeedsUpdate())
+        if (variant->needsUpdate())
         {
             needsUpdate = true;
             break;
@@ -354,7 +354,7 @@ ComputeShaderVariant::~ComputeShaderVariant()
 {
 }
 
-bool ComputeShaderVariant::NeedsUpdate() const
+bool ComputeShaderVariant::needsUpdate() const
 {
     auto registry = m_registry.lock();
     if (!registry)
@@ -414,13 +414,13 @@ void ComputeShaderVariant::PrepareCompilation(std::filesystem::file_time_type la
 
     const bool compiledBlobAvailable = registry->GetFS()->fileExists(m_packVfsPath);
     const bool diskBlobUpToDate = ShaderCompilerUtils::IsCompiledShaderUpToDate(m_compiledFullPath, lastModifiedSourceCode);
-    if (compiledBlobAvailable && (!registry->CanCompileShaders() || diskBlobUpToDate))
+    if (compiledBlobAvailable && (!registry->canCompileShaders() || diskBlobUpToDate))
     {
-        if (registry->IsVerbose())
+        if (registry->isVerbose())
             caustica::info("Using cached compute shader '%s' (%s)", m_debugName.c_str(), m_cacheKey.cacheFileNameNoExt().c_str());
         m_compileCmdLine = "";
     }
-    else if (registry->CanCompileShaders())
+    else if (registry->canCompileShaders())
     {
         EnsureDirectoryExists(std::filesystem::path(m_compiledFullPath).parent_path());
         std::string command = registry->GetCompilerConfig().GetCompilerPathQuoted();
@@ -436,7 +436,7 @@ void ComputeShaderVariant::PrepareCompilation(std::filesystem::file_time_type la
 #endif
         command += " -Fo \"" + m_compiledFullPath + "\"";
 
-        if (registry->IsVerbose())
+        if (registry->isVerbose())
             caustica::info("Enqueuing compute shader '%s' for compilation...", m_debugName.c_str());
 
         m_compileCmdLine = command;

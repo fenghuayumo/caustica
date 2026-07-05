@@ -574,7 +574,7 @@ RTXDI_LightBufferParameters PrepareLightsPass::Process(nvrhi::ICommandList* comm
 
     nvrhi::ComputeState state;
     state.pipeline = m_computePipeline;
-    state.bindings = { m_bindingSet, m_Scene->GetDescriptorTable() };
+    state.bindings = { m_bindingSet, m_Scene->getDescriptorTable() };
 
     PrepareLightsConstants constants;
     constants.numTasks = uint32_t(tasks.size());

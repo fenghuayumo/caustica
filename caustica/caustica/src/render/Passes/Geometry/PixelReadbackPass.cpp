@@ -27,7 +27,7 @@ PixelReadbackPass::PixelReadbackPass(
     nvrhi::Format format,
     uint32_t arraySlice,
     uint32_t mipLevel)
-    : m_Device(device)
+    : m_device(device)
 {
     const char* formatName = "";
     switch (format)
@@ -51,12 +51,12 @@ PixelReadbackPass::PixelReadbackPass(
     bufferDesc.keepInitialState = true;
     bufferDesc.debugName = "PixelReadbackPass/IntermediateBuffer";
     bufferDesc.canHaveTypedViews = true;
-    m_IntermediateBuffer = m_Device->createBuffer(bufferDesc);
+    m_IntermediateBuffer = m_device->createBuffer(bufferDesc);
 
     bufferDesc.canHaveUAVs = false;
     bufferDesc.cpuAccess = nvrhi::CpuAccessMode::Read;
     bufferDesc.debugName = "PixelReadbackPass/ReadbackBuffer";
-    m_ReadbackBuffer = m_Device->createBuffer(bufferDesc);
+    m_ReadbackBuffer = m_device->createBuffer(bufferDesc);
 
     nvrhi::BufferDesc constantBufferDesc;
     constantBufferDesc.byteSize = sizeof(PixelReadbackConstants);
@@ -64,7 +64,7 @@ PixelReadbackPass::PixelReadbackPass(
     constantBufferDesc.isVolatile = true;
     constantBufferDesc.debugName = "PixelReadbackPass/Constants";
     constantBufferDesc.maxVersions = caustica::c_MaxRenderPassConstantBufferVersions;
-    m_ConstantBuffer = m_Device->createBuffer(constantBufferDesc);
+    m_ConstantBuffer = m_device->createBuffer(constantBufferDesc);
 
     nvrhi::BindingLayoutDesc layoutDesc;
     layoutDesc.visibility = nvrhi::ShaderType::Compute;
@@ -74,7 +74,7 @@ PixelReadbackPass::PixelReadbackPass(
         nvrhi::BindingLayoutItem::TypedBuffer_UAV(0)
     };
 
-    m_BindingLayout = m_Device->createBindingLayout(layoutDesc);
+    m_BindingLayout = m_device->createBindingLayout(layoutDesc);
 
     nvrhi::BindingSetDesc setDesc;
     setDesc.bindings = {
@@ -83,12 +83,12 @@ PixelReadbackPass::PixelReadbackPass(
         nvrhi::BindingSetItem::TypedBuffer_UAV(0, m_IntermediateBuffer)
     };
 
-    m_BindingSet = m_Device->createBindingSet(setDesc, m_BindingLayout);
+    m_BindingSet = m_device->createBindingSet(setDesc, m_BindingLayout);
 
     nvrhi::ComputePipelineDesc pipelineDesc;
     pipelineDesc.bindingLayouts = { m_BindingLayout };
     pipelineDesc.CS = m_Shader;
-    m_Pipeline = m_Device->createComputePipeline(pipelineDesc);
+    m_Pipeline = m_device->createComputePipeline(pipelineDesc);
 }
 
 
@@ -109,33 +109,33 @@ void PixelReadbackPass::Capture(nvrhi::ICommandList* commandList, dm::uint2 pixe
 
 dm::float4 PixelReadbackPass::ReadFloats()
 {
-    void* pData = m_Device->mapBuffer(m_ReadbackBuffer, nvrhi::CpuAccessMode::Read);
+    void* pData = m_device->mapBuffer(m_ReadbackBuffer, nvrhi::CpuAccessMode::Read);
     assert(pData);
 
     float4 values = *static_cast<float4*>(pData);
 
-    m_Device->unmapBuffer(m_ReadbackBuffer);
+    m_device->unmapBuffer(m_ReadbackBuffer);
     return values;
 }
 
 dm::uint4 PixelReadbackPass::ReadUInts()
 {
-    void* pData = m_Device->mapBuffer(m_ReadbackBuffer, nvrhi::CpuAccessMode::Read);
+    void* pData = m_device->mapBuffer(m_ReadbackBuffer, nvrhi::CpuAccessMode::Read);
     assert(pData);
 
     uint4 values = *static_cast<uint4*>(pData);
 
-    m_Device->unmapBuffer(m_ReadbackBuffer);
+    m_device->unmapBuffer(m_ReadbackBuffer);
     return values;
 }
 
 dm::int4 PixelReadbackPass::ReadInts()
 {
-    void* pData = m_Device->mapBuffer(m_ReadbackBuffer, nvrhi::CpuAccessMode::Read);
+    void* pData = m_device->mapBuffer(m_ReadbackBuffer, nvrhi::CpuAccessMode::Read);
     assert(pData);
 
     int4 values = *static_cast<int4*>(pData);
 
-    m_Device->unmapBuffer(m_ReadbackBuffer);
+    m_device->unmapBuffer(m_ReadbackBuffer);
     return values;
 }

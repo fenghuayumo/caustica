@@ -52,7 +52,7 @@ bool GpuRenderSubsystem::initializeSession(const GpuRenderSubsystemInitParams& p
     m_renderDevice = std::make_unique<caustica::render::RenderDevice>(device, m_shaderFactory);
     m_bindingCache = std::make_unique<BindingCache>(device);
     m_bindlessTable = std::make_unique<BindlessTable>(device, m_bindlessLayout);
-    m_descriptorTable = m_bindlessTable->GetDescriptorTableManager();
+    m_descriptorTable = m_bindlessTable->getDescriptorTableManager();
 
     auto nativeFS = std::make_shared<NativeFileSystem>();
     AssetSystem::Initialize(device, nativeFS, m_descriptorTable);
@@ -130,7 +130,7 @@ void GpuRenderSubsystem::onSceneUnloading()
         m_worldRenderer->onSceneUnloading();
     m_accelStructs.releaseGpuResources();
     if (m_bindingCache)
-        m_bindingCache->Clear();
+        m_bindingCache->clear();
     m_scenePasses.lighting.sceneUnloading();
     m_scenePasses.gaussianSplats.sceneUnloading();
 }
@@ -213,7 +213,7 @@ void GpuRenderSubsystem::onSceneLoadedGpuPrep()
                 entityWorld->refreshHierarchy(scene::PreviousTransformPolicy::CaptureCurrent);
                 entityWorld->syncPreviousTransformsFromCurrent();
             }
-            render::SceneGpuUpdater::RefreshAfterLoad(*scene, 0);
+            render::SceneGpuUpdater::refreshAfterLoad(*scene, 0);
             m_scenePasses.lighting.notifySceneReloaded(*scene);
         }
     }

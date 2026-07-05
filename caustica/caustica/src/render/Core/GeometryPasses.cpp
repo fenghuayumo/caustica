@@ -7,7 +7,7 @@ using namespace caustica::math;
 using namespace caustica;
 using namespace caustica::render;
 
-void caustica::render::RenderView(
+void caustica::render::renderView(
     nvrhi::ICommandList* commandList, 
     const IView* view, 
     const IView* viewPrev,
@@ -17,7 +17,7 @@ void caustica::render::RenderView(
     GeometryPassContext& passContext,
     bool materialEvents)
 {
-    pass.SetupView(passContext, commandList, view, viewPrev);
+    pass.setupView(passContext, commandList, view, viewPrev);
 
     const Material* lastMaterial = nullptr;
     const BufferGroup* lastBuffers = nullptr;
@@ -30,8 +30,8 @@ void caustica::render::RenderView(
 
     nvrhi::GraphicsState graphicsState;
     graphicsState.framebuffer = framebuffer;
-    graphicsState.viewport = view->GetViewportState();
-    graphicsState.shadingRateState = view->GetVariableRateShadingState();
+    graphicsState.viewport = view->getViewportState();
+    graphicsState.shadingRateState = view->getVariableRateShadingState();
 
     nvrhi::DrawArguments currentDraw;
     currentDraw.instanceCount = 0;
@@ -57,7 +57,7 @@ void caustica::render::RenderView(
             }
         }
 
-        pass.SetPushConstants(passContext, commandList, graphicsState, currentDraw);
+        pass.setPushConstants(passContext, commandList, graphicsState, currentDraw);
 
         commandList->drawIndexed(currentDraw);
         currentDraw.instanceCount = 0;
@@ -76,14 +76,14 @@ void caustica::render::RenderView(
 
         if (newBuffers)
         {
-            pass.SetupInputBuffers(passContext, item.buffers, graphicsState);
+            pass.setupInputBuffers(passContext, item.buffers, graphicsState);
             lastBuffers = item.buffers;
             stateValid = false;
         }
 
         if (newMaterial)
         {
-            drawMaterial = pass.SetupMaterial(passContext, item.material, item.cullMode, graphicsState);
+            drawMaterial = pass.setupMaterial(passContext, item.material, item.cullMode, graphicsState);
             lastMaterial = item.material;
             lastCullMode = item.cullMode;
             stateValid = false;
@@ -124,7 +124,7 @@ void caustica::render::RenderView(
         commandList->endMarker();
 }
 
-void caustica::render::RenderCompositeView(
+void caustica::render::renderCompositeView(
     nvrhi::ICommandList* commandList,
     const ICompositeView* compositeView,
     const ICompositeView* compositeViewPrev,
@@ -140,20 +140,20 @@ void caustica::render::RenderCompositeView(
     if (passEvent)
         commandList->beginMarker(passEvent);
 
-    ViewType::Enum supportedViewTypes = pass.GetSupportedViewTypes();
+    ViewType::Enum supportedViewTypes = pass.getSupportedViewTypes();
 
     if (compositeViewPrev)
     {
-        assert(compositeView->GetNumChildViews(supportedViewTypes) == compositeViewPrev->GetNumChildViews(supportedViewTypes));
+        assert(compositeView->getNumChildViews(supportedViewTypes) == compositeViewPrev->getNumChildViews(supportedViewTypes));
     }
 
     const scene::SceneRenderData& renderData = scene.GetRenderData();
     std::vector<DrawCommand> drawCommands;
 
-    for (uint viewIndex = 0; viewIndex < compositeView->GetNumChildViews(supportedViewTypes); viewIndex++)
+    for (uint viewIndex = 0; viewIndex < compositeView->getNumChildViews(supportedViewTypes); viewIndex++)
     {
-        const IView* view = compositeView->GetChildView(supportedViewTypes, viewIndex);
-        const IView* viewPrev = compositeViewPrev ? compositeViewPrev->GetChildView(supportedViewTypes, viewIndex) : nullptr;
+        const IView* view = compositeView->getChildView(supportedViewTypes, viewIndex);
+        const IView* viewPrev = compositeViewPrev ? compositeViewPrev->getChildView(supportedViewTypes, viewIndex) : nullptr;
 
         assert(view != nullptr);
 
@@ -162,9 +162,9 @@ void caustica::render::RenderCompositeView(
         else
             scene::BuildTransparentDrawList(renderData, *view, drawCommands, drawOptions);
 
-        nvrhi::IFramebuffer* framebuffer = framebufferFactory.GetFramebuffer(*view);
+        nvrhi::IFramebuffer* framebuffer = framebufferFactory.getFramebuffer(*view);
 
-        RenderView(commandList, view, viewPrev, framebuffer, drawCommands, pass, passContext, materialEvents);
+        renderView(commandList, view, viewPrev, framebuffer, drawCommands, pass, passContext, materialEvents);
     }
 
     if (passEvent)

@@ -36,7 +36,7 @@ void AccelStructManager::createBlases(nvrhi::ICommandList* commandList,
 
         bvh::Config cfg = { .excludeTransmissive = settings.excludeTransmissive };
 
-        nvrhi::rt::AccelStructDesc blasDesc = bvh::GetMeshBlasDesc(cfg, *mesh, nullptr, false);
+        nvrhi::rt::AccelStructDesc blasDesc = bvh::getMeshBlasDesc(cfg, *mesh, nullptr, false);
         assert((int)blasDesc.bottomLevelGeometries.size() < (1 << 12));
         if (blasDesc.bottomLevelGeometries.empty())
             continue;
@@ -162,7 +162,7 @@ void AccelStructManager::rebuildDirtyMeshes(nvrhi::ICommandList*            comm
         }
 
         bvh::Config cfg = { .excludeTransmissive = settings.excludeTransmissive };
-        nvrhi::rt::AccelStructDesc blasDesc = bvh::GetMeshBlasDesc(cfg, *mesh, nullptr, false);
+        nvrhi::rt::AccelStructDesc blasDesc = bvh::getMeshBlasDesc(cfg, *mesh, nullptr, false);
         blasDesc.buildFlags = nvrhi::rt::AccelStructBuildFlags::PreferFastBuild;
         assert((int)blasDesc.bottomLevelGeometries.size() < (1 << 12));
         if (blasDesc.bottomLevelGeometries.empty())
@@ -241,7 +241,7 @@ void AccelStructManager::updateSkinnedBlases(nvrhi::ICommandList*            com
         }
 
         bvh::Config cfg = { .excludeTransmissive = settings.excludeTransmissive };
-        nvrhi::rt::AccelStructDesc blasDesc = bvh::GetMeshBlasDesc(cfg, *meshComp.mesh, nullptr, true);
+        nvrhi::rt::AccelStructDesc blasDesc = bvh::getMeshBlasDesc(cfg, *meshComp.mesh, nullptr, true);
         if (blasDesc.bottomLevelGeometries.empty())
         {
             skippedEmptySkinnedUpdateCount++;

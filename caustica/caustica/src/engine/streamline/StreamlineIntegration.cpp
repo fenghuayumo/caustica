@@ -1367,7 +1367,7 @@ static void GetSLResource(
 #if CAUSTICA_WITH_VULKAN
     case nvrhi::GraphicsAPI::VULKAN:
     {
-        nvrhi::TextureSubresourceSet subresources = view->GetSubresources();
+        nvrhi::TextureSubresourceSet subresources = view->getSubresources();
         auto const& desc = inputTex->getDesc();
         auto const vkDesc = static_cast<vk::ImageCreateInfo *>(inputTex->getNativeObject(nvrhi::ObjectTypes::VK_ImageCreateInfo));
 

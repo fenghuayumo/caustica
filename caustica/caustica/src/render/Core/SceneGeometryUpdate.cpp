@@ -56,7 +56,7 @@ void updateSceneGeometry(AccelStructManager& accelStructs, UpdateSceneGeometryPa
     if (scene == nullptr)
         return;
 
-    render::SceneGpuUpdater::Refresh(*scene, commandList, static_cast<uint32_t>(params.frameIndex));
+    render::SceneGpuUpdater::refresh(*scene, commandList, static_cast<uint32_t>(params.frameIndex));
 
     if (params.opacityMaps != nullptr)
         params.opacityMaps->BuildOpacityMicromaps(*commandList, *scene);

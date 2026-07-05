@@ -40,10 +40,10 @@ using namespace caustica;
 using namespace caustica::render;
 
 GBufferFillPass::GBufferFillPass(nvrhi::IDevice* device, caustica::render::RenderDevice& renderDevice)
-    : m_Device(device)
+    : m_device(device)
     , m_renderDevice(&renderDevice)
 {
-    m_IsDX11 = m_Device->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D11;
+    m_IsDX11 = m_device->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D11;
 }
 
 void GBufferFillPass::Init(ShaderFactory& shaderFactory, const CreateParameters& params)
@@ -66,7 +66,7 @@ void GBufferFillPass::Init(ShaderFactory& shaderFactory, const CreateParameters&
     else
         m_MaterialBindings = CreateMaterialBindingCache(*m_renderDevice);
 
-    m_GBufferCB = m_Device->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(GBufferFillConstants),
+    m_GBufferCB = m_device->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(GBufferFillConstants),
         "GBufferFillConstants", params.numConstantBufferVersions));
 
     CreateViewBindings(m_ViewBindingLayout, m_ViewBindings, params);
@@ -79,7 +79,7 @@ void GBufferFillPass::Init(ShaderFactory& shaderFactory, const CreateParameters&
 
 void GBufferFillPass::ResetBindingCache()
 {
-    m_MaterialBindings->Clear();
+    m_MaterialBindings->clear();
     m_InputBindingSets.clear();
 }
 
@@ -120,7 +120,7 @@ nvrhi::ShaderHandle GBufferFillPass::CreateGeometryShader(ShaderFactory& shaderF
                 nvrhi::FastGeometryShaderFlags::ForceFastGS |
                 nvrhi::FastGeometryShaderFlags::UseViewportMask |
                 nvrhi::FastGeometryShaderFlags::OffsetTargetIndexByViewportIndex))
-            .setCoordinateSwizzling(CubemapView::GetCubemapCoordinateSwizzle());
+            .setCoordinateSwizzling(CubemapView::getCubemapCoordinateSwizzle());
 
         return shaderFactory.CreateAutoShader("engine/passes/cubemap_gs.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_cubemap_gs), nullptr, desc);
     }
@@ -157,7 +157,7 @@ nvrhi::InputLayoutHandle GBufferFillPass::CreateInputLayout(nvrhi::IShader* vert
             inputDescs.push_back(GetVertexAttributeDesc(VertexAttribute::PrevTransform, "PREV_TRANSFORM", 5));
         }
 
-        return m_Device->createInputLayout(inputDescs.data(), static_cast<uint32_t>(inputDescs.size()), vertexShader);
+        return m_device->createInputLayout(inputDescs.data(), static_cast<uint32_t>(inputDescs.size()), vertexShader);
     }
 
     return nullptr;
@@ -171,7 +171,7 @@ void GBufferFillPass::CreateViewBindings(nvrhi::BindingLayoutHandle& layout, nvr
         .addItem(nvrhi::BindingLayoutItem::VolatileConstantBuffer(GBUFFER_BINDING_VIEW_CONSTANTS))
         .addItem(nvrhi::BindingLayoutItem::Sampler(GBUFFER_BINDING_MATERIAL_SAMPLER));
 
-    layout = m_Device->createBindingLayout(bindingLayoutDesc);
+    layout = m_device->createBindingLayout(bindingLayoutDesc);
 
     auto bindingSetDesc = nvrhi::BindingSetDesc()
         .setTrackLiveness(params.trackLiveness)
@@ -179,7 +179,7 @@ void GBufferFillPass::CreateViewBindings(nvrhi::BindingLayoutHandle& layout, nvr
         .addItem(nvrhi::BindingSetItem::Sampler(GBUFFER_BINDING_MATERIAL_SAMPLER,
             m_renderDevice->samplers().anisotropicWrap()));
 
-    set = m_Device->createBindingSet(bindingSetDesc, layout);
+    set = m_device->createBindingSet(bindingSetDesc, layout);
 }
 
 nvrhi::GraphicsPipelineHandle GBufferFillPass::CreateGraphicsPipeline(PipelineKey key, nvrhi::FramebufferInfo const& framebufferInfo)
@@ -192,7 +192,7 @@ nvrhi::GraphicsPipelineHandle GBufferFillPass::CreateGraphicsPipeline(PipelineKe
         .setFrontCounterClockwise(key.bits.frontCounterClockwise)
         .setCullMode(key.bits.cullMode);
     pipelineDesc.renderState.blendState.disableAlphaToCoverage();
-    pipelineDesc.bindingLayouts = { m_MaterialBindings->GetLayout(), m_ViewBindingLayout };
+    pipelineDesc.bindingLayouts = { m_MaterialBindings->getLayout(), m_ViewBindingLayout };
     if (!m_UseInputAssembler)
         pipelineDesc.bindingLayouts.push_back(m_InputBindingLayout);
 
@@ -232,7 +232,7 @@ nvrhi::GraphicsPipelineHandle GBufferFillPass::CreateGraphicsPipeline(PipelineKe
         pipelineDesc.PS = m_PixelShader;
     }
 
-    return m_Device->createGraphicsPipeline(pipelineDesc, framebufferInfo);
+    return m_device->createGraphicsPipeline(pipelineDesc, framebufferInfo);
 }
 
 std::shared_ptr<MaterialBindingCache> GBufferFillPass::CreateMaterialBindingCache(caustica::render::RenderDevice& renderDevice)
@@ -249,7 +249,7 @@ std::shared_ptr<MaterialBindingCache> GBufferFillPass::CreateMaterialBindingCach
     };
 
     return std::make_shared<MaterialBindingCache>(
-        m_Device,
+        m_device,
         nvrhi::ShaderType::Pixel,
         /* registerSpace = */ GBUFFER_SPACE_MATERIAL,
         /* registerSpaceIsDescriptorSet = */ true,
@@ -259,25 +259,25 @@ std::shared_ptr<MaterialBindingCache> GBufferFillPass::CreateMaterialBindingCach
         renderDevice.builtins().blackTexture());
 }
 
-ViewType::Enum GBufferFillPass::GetSupportedViewTypes() const
+ViewType::Enum GBufferFillPass::getSupportedViewTypes() const
 {
     return m_SupportedViewTypes;
 }
 
-void GBufferFillPass::SetupView(GeometryPassContext& abstractContext, nvrhi::ICommandList* commandList, const caustica::IView* view, const caustica::IView* viewPrev)
+void GBufferFillPass::setupView(GeometryPassContext& abstractContext, nvrhi::ICommandList* commandList, const caustica::IView* view, const caustica::IView* viewPrev)
 {
     auto& context = static_cast<Context&>(abstractContext);
     
     GBufferFillConstants gbufferConstants = {};
-    view->FillPlanarViewConstants(gbufferConstants.view);
-    viewPrev->FillPlanarViewConstants(gbufferConstants.viewPrev);
+    view->fillPlanarViewConstants(gbufferConstants.view);
+    viewPrev->fillPlanarViewConstants(gbufferConstants.viewPrev);
     commandList->writeBuffer(m_GBufferCB, &gbufferConstants, sizeof(gbufferConstants));
 
-    context.keyTemplate.bits.frontCounterClockwise = view->IsMirrored();
-    context.keyTemplate.bits.reverseDepth = view->IsReverseDepth();
+    context.keyTemplate.bits.frontCounterClockwise = view->isMirrored();
+    context.keyTemplate.bits.reverseDepth = view->isReverseDepth();
 }
 
-bool GBufferFillPass::SetupMaterial(GeometryPassContext& abstractContext, const caustica::Material* material, nvrhi::RasterCullMode cullMode, nvrhi::GraphicsState& state)
+bool GBufferFillPass::setupMaterial(GeometryPassContext& abstractContext, const caustica::Material* material, nvrhi::RasterCullMode cullMode, nvrhi::GraphicsState& state)
 {
     auto& context = static_cast<Context&>(abstractContext);
     
@@ -300,7 +300,7 @@ bool GBufferFillPass::SetupMaterial(GeometryPassContext& abstractContext, const 
         return false;
     }
 
-    nvrhi::IBindingSet* materialBindingSet = m_MaterialBindings->GetMaterialBindingSet(material);
+    nvrhi::IBindingSet* materialBindingSet = m_MaterialBindings->getMaterialBindingSet(material);
 
     if (!materialBindingSet)
         return false;
@@ -310,7 +310,7 @@ bool GBufferFillPass::SetupMaterial(GeometryPassContext& abstractContext, const 
 
     if (!pipeline)
     {
-        std::lock_guard<std::mutex> lockGuard(m_Mutex);
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
 
         if (!pipeline)
             pipeline = CreateGraphicsPipeline(key, framebufferInfo);
@@ -330,7 +330,7 @@ bool GBufferFillPass::SetupMaterial(GeometryPassContext& abstractContext, const 
     return true;
 }
 
-void GBufferFillPass::SetupInputBuffers(GeometryPassContext& abstractContext, const caustica::BufferGroup* buffers, nvrhi::GraphicsState& state)
+void GBufferFillPass::setupInputBuffers(GeometryPassContext& abstractContext, const caustica::BufferGroup* buffers, nvrhi::GraphicsState& state)
 {
     auto& context = static_cast<Context&>(abstractContext);
 
@@ -372,7 +372,7 @@ nvrhi::BindingLayoutHandle GBufferFillPass::CreateInputBindingLayout()
         .addItem(nvrhi::BindingLayoutItem::RawBuffer_SRV(GBUFFER_BINDING_VERTEX_BUFFER))
         .addItem(nvrhi::BindingLayoutItem::PushConstants(GBUFFER_BINDING_PUSH_CONSTANTS, sizeof(GBufferPushConstants)));
         
-    return m_Device->createBindingLayout(bindingLayoutDesc);
+    return m_device->createBindingLayout(bindingLayoutDesc);
 }
 
 nvrhi::BindingSetHandle GBufferFillPass::CreateInputBindingSet(const BufferGroup* bufferGroup)
@@ -384,7 +384,7 @@ nvrhi::BindingSetHandle GBufferFillPass::CreateInputBindingSet(const BufferGroup
         .addItem(nvrhi::BindingSetItem::RawBuffer_SRV(GBUFFER_BINDING_VERTEX_BUFFER, bufferGroup->vertexBuffer))
         .addItem(nvrhi::BindingSetItem::PushConstants(GBUFFER_BINDING_PUSH_CONSTANTS, sizeof(GBufferPushConstants)));
 
-    return m_Device->createBindingSet(bindingSetDesc, m_InputBindingLayout);
+    return m_device->createBindingSet(bindingSetDesc, m_InputBindingLayout);
 }
 
 nvrhi::BindingSetHandle GBufferFillPass::GetOrCreateInputBindingSet(const BufferGroup* bufferGroup)
@@ -400,7 +400,7 @@ nvrhi::BindingSetHandle GBufferFillPass::GetOrCreateInputBindingSet(const Buffer
     return it->second;
 }
 
-void GBufferFillPass::SetPushConstants(
+void GBufferFillPass::setPushConstants(
     caustica::render::GeometryPassContext& abstractContext,
     nvrhi::ICommandList* commandList,
     nvrhi::GraphicsState& state,

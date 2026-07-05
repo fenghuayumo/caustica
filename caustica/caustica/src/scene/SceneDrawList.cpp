@@ -136,7 +136,7 @@ void BuildOpaqueDrawList(
 {
     out.clear();
 
-    const dm::frustum viewFrustum = view.GetViewFrustum();
+    const dm::frustum viewFrustum = view.getViewFrustum();
     const auto relevantContentFlags = SceneContentFlags::OpaqueMeshes | SceneContentFlags::AlphaTestedMeshes;
 
     for (const MeshInstanceRenderProxy& proxy : renderData.meshInstances)
@@ -161,8 +161,8 @@ void BuildTransparentDrawList(
 {
     out.clear();
 
-    const dm::frustum viewFrustum = view.GetViewFrustum();
-    const float3 viewOrigin = view.GetViewOrigin();
+    const dm::frustum viewFrustum = view.getViewFrustum();
+    const float3 viewOrigin = view.getViewOrigin();
     const auto relevantContentFlags = SceneContentFlags::BlendedMeshes;
 
     for (const MeshInstanceRenderProxy& proxy : renderData.meshInstances)

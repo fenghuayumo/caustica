@@ -29,15 +29,15 @@ namespace caustica::render
     class IGeometryPass
     {
     public:
-        [[nodiscard]] virtual caustica::ViewType::Enum GetSupportedViewTypes() const = 0;
-        virtual void SetupView(GeometryPassContext& context, nvrhi::ICommandList* commandList, const caustica::IView* view, const caustica::IView* viewPrev) = 0;
-        virtual bool SetupMaterial(GeometryPassContext& context, const caustica::Material* material, nvrhi::RasterCullMode cullMode, nvrhi::GraphicsState& state) = 0;
-        virtual void SetupInputBuffers(GeometryPassContext& context, const caustica::BufferGroup* buffers, nvrhi::GraphicsState& state) = 0;
-        virtual void SetPushConstants(GeometryPassContext& context, nvrhi::ICommandList* commandList, nvrhi::GraphicsState& state, nvrhi::DrawArguments& args) = 0;
+        [[nodiscard]] virtual caustica::ViewType::Enum getSupportedViewTypes() const = 0;
+        virtual void setupView(GeometryPassContext& context, nvrhi::ICommandList* commandList, const caustica::IView* view, const caustica::IView* viewPrev) = 0;
+        virtual bool setupMaterial(GeometryPassContext& context, const caustica::Material* material, nvrhi::RasterCullMode cullMode, nvrhi::GraphicsState& state) = 0;
+        virtual void setupInputBuffers(GeometryPassContext& context, const caustica::BufferGroup* buffers, nvrhi::GraphicsState& state) = 0;
+        virtual void setPushConstants(GeometryPassContext& context, nvrhi::ICommandList* commandList, nvrhi::GraphicsState& state, nvrhi::DrawArguments& args) = 0;
         virtual ~IGeometryPass() = default;
     };
 
-    void RenderView(
+    void renderView(
         nvrhi::ICommandList* commandList, 
         const caustica::IView* view, 
         const caustica::IView* viewPrev, 
@@ -47,7 +47,7 @@ namespace caustica::render
         GeometryPassContext& passContext,
         bool materialEvents = false);
 
-    void RenderCompositeView(
+    void renderCompositeView(
         nvrhi::ICommandList* commandList,
         const caustica::ICompositeView* compositeView,
         const caustica::ICompositeView* compositeViewPrev,

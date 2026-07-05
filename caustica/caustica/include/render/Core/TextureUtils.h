@@ -17,7 +17,7 @@ enum class TextureCompressionType
 
 // Estimated GPU memory size of a texture.
 // Moved from editor/SampleCommon/SampleCommon.cpp
-inline uint64_t GetEstimatedTextureSize(const nvrhi::TextureDesc& desc)
+inline uint64_t getEstimatedTextureSize(const nvrhi::TextureDesc& desc)
 {
     nvrhi::FormatInfo fi = nvrhi::getFormatInfo(desc.format);
     uint64_t pixelsCount = 0;
@@ -34,4 +34,4 @@ inline uint64_t GetEstimatedTextureSize(const nvrhi::TextureDesc& desc)
 
 // Batch-compress uncompressed textures using nvtt_export.
 // Moved from editor/SampleCommon/SampleCommon.cpp
-bool CompressTextures(std::map<std::shared_ptr<caustica::LoadedTexture>, TextureCompressionType>& uncompressedTextures);
+bool compressTextures(std::map<std::shared_ptr<caustica::LoadedTexture>, TextureCompressionType>& uncompressedTextures);

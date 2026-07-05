@@ -20,7 +20,7 @@ typedef int DescriptorIndex;
 class DescriptorHandle
 {
 private:
-    std::weak_ptr<IDescriptorTableManager> m_Manager;
+    std::weak_ptr<IDescriptorTableManager> m_manager;
     DescriptorIndex m_DescriptorIndex;
 
 public:
@@ -28,10 +28,10 @@ public:
     DescriptorHandle(const std::shared_ptr<IDescriptorTableManager>& managerPtr, DescriptorIndex index);
     ~DescriptorHandle();
 
-    [[nodiscard]] bool IsValid() const { return m_DescriptorIndex >= 0 && !m_Manager.expired(); }
-    [[nodiscard]] DescriptorIndex Get() const { if (m_DescriptorIndex >= 0) assert(!m_Manager.expired()); return m_DescriptorIndex; }
+    [[nodiscard]] bool isValid() const { return m_DescriptorIndex >= 0 && !m_manager.expired(); }
+    [[nodiscard]] DescriptorIndex Get() const { if (m_DescriptorIndex >= 0) assert(!m_manager.expired()); return m_DescriptorIndex; }
     [[nodiscard]] DescriptorIndex GetIndexInHeap() const;
-    void Reset() { m_DescriptorIndex = -1; m_Manager.reset(); }
+    void Reset() { m_DescriptorIndex = -1; m_manager.reset(); }
 
     DescriptorHandle(const DescriptorHandle&) = delete;
     DescriptorHandle(DescriptorHandle&&) = default;

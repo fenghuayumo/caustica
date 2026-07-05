@@ -80,14 +80,14 @@ MipMapGenPass::MipMapGenPass(
     std::shared_ptr<ShaderFactory> shaderFactory,
     nvrhi::TextureHandle input, 
     Mode mode)
-    : m_Device(device)
+    : m_device(device)
     , m_Texture(input)
     , m_BindingSets(MAX_PASSES)
     , m_BindingCache(device)
 {
     assert(m_Texture);
 
-    m_NullTextures = NullTextures::get(m_Device);
+    m_NullTextures = NullTextures::get(m_device);
 
     uint nmipLevels = m_Texture->getDesc().mipLevels;
 
@@ -105,7 +105,7 @@ MipMapGenPass::MipMapGenPass(
     constantBufferDesc.isVolatile = true;
     constantBufferDesc.debugName = "MipMapGenPass/Constants";
     constantBufferDesc.maxVersions = c_MaxRenderPassConstantBufferVersions;
-    m_ConstantBuffer = m_Device->createBuffer(constantBufferDesc);
+    m_ConstantBuffer = m_device->createBuffer(constantBufferDesc);
 
     // BindingLayout
     nvrhi::BindingLayoutDesc layoutDesc;
@@ -113,7 +113,7 @@ MipMapGenPass::MipMapGenPass(
     layoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::VolatileConstantBuffer(0));
     layoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_SRV(0));
     layoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_UAV(0).setSize(NUM_LODS));
-    m_BindingLayout = m_Device->createBindingLayout(layoutDesc);
+    m_BindingLayout = m_device->createBindingLayout(layoutDesc);
 
     // BindingSets
     m_BindingSets.resize(MAX_PASSES);
@@ -143,7 +143,7 @@ MipMapGenPass::MipMapGenPass(
                     .setArrayElement(mipLevel - 1));
             }
         }
-        set = m_Device->createBindingSet(setDesc, m_BindingLayout);
+        set = m_device->createBindingSet(setDesc, m_BindingLayout);
     }
 
     nvrhi::ComputePipelineDesc computePipelineDesc;

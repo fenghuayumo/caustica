@@ -1,8 +1,5 @@
 #include <render/graph/GraphBuilder.h>
 
-#include <render/graph/GpuTypes.h>
-#include <rhi/nvrhi.h>
-
 #include <cassert>
 #include <vector>
 

@@ -30,11 +30,11 @@ using namespace caustica::render;
 namespace caustica::render
 {
 
-    caustica::render::JointsRenderPass::JointsRenderPass(nvrhi::IDevice* device) : m_Device(device) { }
+    caustica::render::JointsRenderPass::JointsRenderPass(nvrhi::IDevice* device) : m_device(device) { }
 
     void caustica::render::JointsRenderPass::Init(caustica::ShaderFactory& shaderFactory)
     {
-        m_ConstantsBuffer = m_Device->createBuffer(
+        m_ConstantsBuffer = m_device->createBuffer(
             nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(PlanarViewConstants), "JointsWidget_Constants", 16));
 
         std::vector<ShaderMacro> macros;
@@ -48,7 +48,7 @@ namespace caustica::render
         bindingLayoutDesc.bindings = {
             nvrhi::BindingLayoutItem::VolatileConstantBuffer(0),
         };
-        m_BindingLayout = m_Device->createBindingLayout(bindingLayoutDesc);
+        m_BindingLayout = m_device->createBindingLayout(bindingLayoutDesc);
 
         nvrhi::VertexAttributeDesc inputDescs[] = {
             nvrhi::VertexAttributeDesc()
@@ -62,7 +62,7 @@ namespace caustica::render
                 .setOffset(offsetof(Vertex, color))
                 .setElementStride(sizeof(Vertex)),
         };
-        m_InputLayout = m_Device->createInputLayout(inputDescs, uint32_t(std::size(inputDescs)), m_VertexShader);
+        m_InputLayout = m_device->createInputLayout(inputDescs, uint32_t(std::size(inputDescs)), m_VertexShader);
     }
 
     nvrhi::BufferHandle caustica::render::JointsRenderPass::CreateVertexBuffer(uint32_t numVertices) const
@@ -75,7 +75,7 @@ namespace caustica::render
         bufferDesc.canHaveRawViews = true;
         bufferDesc.keepInitialState = true;
         bufferDesc.canHaveRawViews = true;
-        return m_Device->createBuffer(bufferDesc);
+        return m_device->createBuffer(bufferDesc);
     }
 
     void JointsRenderPass::ResetCaches()
@@ -162,7 +162,7 @@ namespace caustica::render
         }
     }
 
-    void JointsRenderPass::RenderView(
+    void JointsRenderPass::renderView(
         nvrhi::ICommandList* commandList, 
         const caustica::IView* view,
         nvrhi::IFramebuffer* framebuffer,
@@ -196,7 +196,7 @@ namespace caustica::render
         commandList->beginMarker("JointsRenderPass");
 
         PlanarViewConstants constants;
-        view->FillPlanarViewConstants(constants);   
+        view->fillPlanarViewConstants(constants);   
         commandList->writeBuffer(m_ConstantsBuffer, &constants, sizeof(PlanarViewConstants));
 
         UpdateVertices(scene);
@@ -215,11 +215,11 @@ namespace caustica::render
             pipelineDesc.PS = m_PixelShader;
 
             pipelineDesc.renderState.rasterState.setCullMode(nvrhi::RasterCullMode::None);
-            pipelineDesc.renderState.rasterState.setFrontCounterClockwise(view->IsMirrored());
+            pipelineDesc.renderState.rasterState.setFrontCounterClockwise(view->isMirrored());
             pipelineDesc.renderState.rasterState.fillMode = nvrhi::RasterFillMode::Wireframe;
             pipelineDesc.renderState.depthStencilState.disableDepthTest();
 
-            m_Pipeline = m_Device->createGraphicsPipeline(pipelineDesc, framebufferInfo);
+            m_Pipeline = m_device->createGraphicsPipeline(pipelineDesc, framebufferInfo);
         }
 
         assert(m_Pipeline->getFramebufferInfo() == framebufferInfo);
@@ -230,14 +230,14 @@ namespace caustica::render
             bindingSetDesc.bindings = {
                 nvrhi::BindingSetItem::ConstantBuffer(0, m_ConstantsBuffer),
             };
-            m_BindingSet = m_Device->createBindingSet(bindingSetDesc, m_BindingLayout);
+            m_BindingSet = m_device->createBindingSet(bindingSetDesc, m_BindingLayout);
         }
 
         nvrhi::GraphicsState state;
         state.vertexBuffers = { { m_VertexBuffer, 0, 0 } };
         state.pipeline = m_Pipeline;
         state.framebuffer = framebuffer;
-        state.viewport = view->GetViewportState();
+        state.viewport = view->getViewportState();
         state.bindings = { m_BindingSet };
 
         commandList->setGraphicsState(state);

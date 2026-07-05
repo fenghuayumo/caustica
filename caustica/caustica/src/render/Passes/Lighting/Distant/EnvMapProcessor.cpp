@@ -61,9 +61,9 @@ void EnvMapProcessor::CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebu
     if (m_computePipelineRegistry && m_enableRasterPrecompute)
     {
         if (m_ggxPrefilterVariant)
-            m_computePipelineRegistry->ReleaseVariant(m_ggxPrefilterVariant);
+            m_computePipelineRegistry->releaseVariant(m_ggxPrefilterVariant);
         if (m_irradianceConvolveVariant)
-            m_computePipelineRegistry->ReleaseVariant(m_irradianceConvolveVariant);
+            m_computePipelineRegistry->releaseVariant(m_irradianceConvolveVariant);
     }
     m_ggxPrefilterVariant = nullptr;
     m_irradianceConvolveVariant = nullptr;
@@ -233,7 +233,7 @@ void EnvMapProcessor::CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebu
                 
         if (m_computePipelineRegistry)
         {
-            m_ggxPrefilterVariant = m_computePipelineRegistry->CreateVariant(
+            m_ggxPrefilterVariant = m_computePipelineRegistry->createVariant(
                 "render/Lighting/Distant/CubemapProcessing.hlsl",  // source path relative to ShadersPath (caustica/caustica/shaders)
                 "GGXPrefilterCS",                               // entry point
                 {},                                             // macros (empty)
@@ -257,7 +257,7 @@ void EnvMapProcessor::CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebu
                 
         if (m_computePipelineRegistry)
         {
-            m_irradianceConvolveVariant = m_computePipelineRegistry->CreateVariant(
+            m_irradianceConvolveVariant = m_computePipelineRegistry->createVariant(
                 "render/Lighting/Distant/CubemapProcessing.hlsl",  // source path relative to ShadersPath (caustica/caustica/shaders)
                 "ConvolveIrradianceCS",                         // entry point
                 {},                                             // macros (empty)
@@ -518,7 +518,7 @@ bool EnvMapProcessor::Update(nvrhi::ICommandList* commandList, caustica::Binding
             nvrhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->GetGPUWriteBuffer()),
             nvrhi::BindingSetItem::Texture_UAV(SHADER_DEBUG_VIZ_TEXTURE_UAV_INDEX, m_shaderDebug->GetDebugVizTexture()),
     };
-    nvrhi::BindingSetHandle bindingSetLowResPrePass = bindingCache.GetOrCreateBindingSet(bindingSetDesc, m_commonBindingLayout);
+    nvrhi::BindingSetHandle bindingSetLowResPrePass = bindingCache.getOrCreateBindingSet(bindingSetDesc, m_commonBindingLayout);
     bindingSetDesc.bindings[5] = nvrhi::BindingSetItem::Texture_SRV(
         2,
         m_cubemapLowRes,
@@ -526,7 +526,7 @@ bool EnvMapProcessor::Update(nvrhi::ICommandList* commandList, caustica::Binding
         nvrhi::AllSubresources,
         nvrhi::TextureDimension::TextureCube);
     bindingSetDesc.bindings[1] = nvrhi::BindingSetItem::Texture_UAV(0, m_cubemap, nvrhi::Format::UNKNOWN, nvrhi::TextureSubresourceSet(0, 1, 0, 6)).setDimension(nvrhi::TextureDimension::Texture2DArray);
-    nvrhi::BindingSetHandle bindingSetBake = bindingCache.GetOrCreateBindingSet(bindingSetDesc, m_commonBindingLayout);
+    nvrhi::BindingSetHandle bindingSetBake = bindingCache.getOrCreateBindingSet(bindingSetDesc, m_commonBindingLayout);
 
     {
         // Low res pre-pass (only needed for proc sky)
@@ -585,7 +585,7 @@ bool EnvMapProcessor::Update(nvrhi::ICommandList* commandList, caustica::Binding
                     nvrhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->GetGPUWriteBuffer()),
                     nvrhi::BindingSetItem::Texture_UAV(SHADER_DEBUG_VIZ_TEXTURE_UAV_INDEX, m_shaderDebug->GetDebugVizTexture()),
             };
-            nvrhi::BindingSetHandle localBindingSet = bindingCache.GetOrCreateBindingSet(localBindingSetDesc, m_reduceBindingLayout);
+            nvrhi::BindingSetHandle localBindingSet = bindingCache.getOrCreateBindingSet(localBindingSetDesc, m_reduceBindingLayout);
         
             nvrhi::ComputeState state;
             state.bindings = { localBindingSet };
@@ -617,7 +617,7 @@ bool EnvMapProcessor::Update(nvrhi::ICommandList* commandList, caustica::Binding
                     nvrhi::BindingSetItem::Texture_SRV(0, m_cubemap, nvrhi::Format::UNKNOWN, nvrhi::TextureSubresourceSet(i, 1, 0, 6)).setDimension(nvrhi::TextureDimension::Texture2DArray),
                     nvrhi::BindingSetItem::Sampler(0, m_pointSampler),
             };
-            nvrhi::BindingSetHandle localBindingSet = bindingCache.GetOrCreateBindingSet(localBindingSetDesc, m_BC6UCompressBindingLayout);
+            nvrhi::BindingSetHandle localBindingSet = bindingCache.getOrCreateBindingSet(localBindingSetDesc, m_BC6UCompressBindingLayout);
 
             nvrhi::ComputeState state;
             state.bindings = { localBindingSet };
@@ -769,7 +769,7 @@ bool EnvMapProcessor::GenerateBRDFLUT(nvrhi::ICommandList* commandList, caustica
         nvrhi::BindingSetItem::ConstantBuffer(0, m_brdfLUTConstantBuffer),
         nvrhi::BindingSetItem::Texture_UAV(0, m_brdfLUT)
     };
-    nvrhi::BindingSetHandle bindingSet = bindingCache.GetOrCreateBindingSet(bindingSetDesc, m_brdfLUTBindingLayout);
+    nvrhi::BindingSetHandle bindingSet = bindingCache.getOrCreateBindingSet(bindingSetDesc, m_brdfLUTBindingLayout);
     
     nvrhi::ComputeState state;
     state.bindings = { bindingSet };
@@ -793,7 +793,7 @@ void EnvMapProcessor::GGXPrefilterCubemap(nvrhi::ICommandList* commandList, caus
     RAII_SCOPE(commandList->beginMarker("GGXPrefilter");, commandList->endMarker(););
     
     // Get pipeline from hot-reloadable variant
-    auto pipeline = m_ggxPrefilterVariant ? m_ggxPrefilterVariant->GetPipeline() : nullptr;
+    auto pipeline = m_ggxPrefilterVariant ? m_ggxPrefilterVariant->getPipeline() : nullptr;
     if (!pipeline)
         return; // Pipeline not yet compiled or compilation failed
     
@@ -824,7 +824,7 @@ void EnvMapProcessor::GGXPrefilterCubemap(nvrhi::ICommandList* commandList, caus
             nvrhi::BindingSetItem::Texture_UAV(0, dstCubemap, nvrhi::Format::UNKNOWN, nvrhi::TextureSubresourceSet(mip, 1, 0, 6)).setDimension(nvrhi::TextureDimension::Texture2DArray),
             nvrhi::BindingSetItem::Sampler(0, m_linearSampler)
         };
-        nvrhi::BindingSetHandle bindingSet = bindingCache.GetOrCreateBindingSet(bindingSetDesc, m_ggxPrefilterBindingLayout);
+        nvrhi::BindingSetHandle bindingSet = bindingCache.getOrCreateBindingSet(bindingSetDesc, m_ggxPrefilterBindingLayout);
         
         nvrhi::ComputeState state;
         state.bindings = { bindingSet };
@@ -850,7 +850,7 @@ void EnvMapProcessor::ConvolveDiffuseIrradiance(nvrhi::ICommandList* commandList
     RAII_SCOPE(commandList->beginMarker("ConvolveIrradiance");, commandList->endMarker(););
     
     // Get pipeline from hot-reloadable variant
-    auto pipeline = m_irradianceConvolveVariant ? m_irradianceConvolveVariant->GetPipeline() : nullptr;
+    auto pipeline = m_irradianceConvolveVariant ? m_irradianceConvolveVariant->getPipeline() : nullptr;
     if (!pipeline)
         return; // Pipeline not yet compiled or compilation failed
     
@@ -867,7 +867,7 @@ void EnvMapProcessor::ConvolveDiffuseIrradiance(nvrhi::ICommandList* commandList
         nvrhi::BindingSetItem::Texture_UAV(0, dstCubemap, nvrhi::Format::UNKNOWN, nvrhi::TextureSubresourceSet(0, 1, 0, 6)).setDimension(nvrhi::TextureDimension::Texture2DArray),
         nvrhi::BindingSetItem::Sampler(0, m_linearSampler)
     };
-    nvrhi::BindingSetHandle bindingSet = bindingCache.GetOrCreateBindingSet(bindingSetDesc, m_irradianceConvolveBindingLayout);
+    nvrhi::BindingSetHandle bindingSet = bindingCache.getOrCreateBindingSet(bindingSetDesc, m_irradianceConvolveBindingLayout);
     
     nvrhi::ComputeState state;
     state.bindings = { bindingSet };
@@ -905,7 +905,7 @@ void EnvMapProcessor::GenerateCubemapMips(nvrhi::ICommandList* commandList, caus
             nvrhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->GetGPUWriteBuffer()),
             nvrhi::BindingSetItem::Texture_UAV(SHADER_DEBUG_VIZ_TEXTURE_UAV_INDEX, m_shaderDebug->GetDebugVizTexture()),
         };
-        nvrhi::BindingSetHandle localBindingSet = bindingCache.GetOrCreateBindingSet(localBindingSetDesc, m_reduceBindingLayout);
+        nvrhi::BindingSetHandle localBindingSet = bindingCache.getOrCreateBindingSet(localBindingSetDesc, m_reduceBindingLayout);
         
         nvrhi::ComputeState state;
         state.bindings = { localBindingSet };

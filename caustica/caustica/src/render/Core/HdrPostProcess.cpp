@@ -21,14 +21,14 @@ void hdrPostProcess(CameraController& camera, HdrPostProcessParams& params)
 
     PlanarView fullscreenView = *camera.view();
     nvrhi::Viewport windowViewport(float(params.displaySize.x), float(params.displaySize.y));
-    fullscreenView.SetViewport(windowViewport);
-    fullscreenView.UpdateCache();
+    fullscreenView.setViewport(windowViewport);
+    fullscreenView.updateCache();
 
     params.bloomPass->Render(
         commandList,
-        params.renderTargets->ProcessedOutputFramebuffer,
+        params.renderTargets->processedOutputFramebuffer,
         fullscreenView,
-        params.renderTargets->ProcessedOutputColor,
+        params.renderTargets->processedOutputColor,
         params.settings.BloomRadius,
         params.settings.BloomIntensity);
 }

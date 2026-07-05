@@ -711,7 +711,7 @@ std::string SceneRuntime::GetResolutionInfo() const
 {
     auto& r = *GetWorldRenderer();
     const auto* targets = r.getRenderTargets();
-    if (targets == nullptr || targets->OutputColor == nullptr)
+    if (targets == nullptr || targets->outputColor == nullptr)
         return "uninitialized";
     const auto renderSize = r.getRenderSize();
     const auto displaySize = r.getDisplaySize();
@@ -805,7 +805,7 @@ ecs::Entity SceneRuntime::FindEntityByInstanceIndex(int instanceIndex) const
 nvrhi::ITexture* SceneRuntime::GetLdrColorTexture() const
 {
     const auto* targets = GetWorldRenderer() ? GetWorldRenderer()->getRenderTargets() : nullptr;
-    return targets ? targets->LdrColor.Get() : nullptr;
+    return targets ? targets->ldrColor.Get() : nullptr;
 }
 
 const DebugFeedbackStruct& SceneRuntime::GetFeedbackData() const

@@ -4,21 +4,21 @@ namespace caustica::render
 {
 
 StandardSamplers::StandardSamplers(nvrhi::IDevice* device)
-    : m_Device(device)
+    : m_device(device)
 {
     auto samplerDesc = nvrhi::SamplerDesc()
         .setAllFilters(false)
         .setAllAddressModes(nvrhi::SamplerAddressMode::Clamp);
-    m_PointClampSampler = m_Device->createSampler(samplerDesc);
+    m_pointClampSampler = m_device->createSampler(samplerDesc);
 
     samplerDesc.setAllFilters(true);
-    m_LinearClampSampler = m_Device->createSampler(samplerDesc);
+    m_linearClampSampler = m_device->createSampler(samplerDesc);
 
     samplerDesc.setAllAddressModes(nvrhi::SamplerAddressMode::Wrap);
-    m_LinearWrapSampler = m_Device->createSampler(samplerDesc);
+    m_linearWrapSampler = m_device->createSampler(samplerDesc);
 
     samplerDesc.setMaxAnisotropy(16);
-    m_AnisotropicWrapSampler = m_Device->createSampler(samplerDesc);
+    m_anisotropicWrapSampler = m_device->createSampler(samplerDesc);
 }
 
 } // namespace caustica::render

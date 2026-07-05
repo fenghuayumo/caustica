@@ -44,10 +44,10 @@ using namespace caustica::render;
 ForwardShadingPass::ForwardShadingPass(
     nvrhi::IDevice* device,
     caustica::render::RenderDevice& renderDevice)
-    : m_Device(device)
+    : m_device(device)
     , m_renderDevice(&renderDevice)
 {
-    m_IsDX11 = m_Device->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D11;
+    m_IsDX11 = m_device->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D11;
 }
 
 void ForwardShadingPass::Init(ShaderFactory& shaderFactory, const CreateParameters& params)
@@ -72,10 +72,10 @@ void ForwardShadingPass::Init(ShaderFactory& shaderFactory, const CreateParamete
     auto samplerDesc = nvrhi::SamplerDesc()
         .setAllAddressModes(nvrhi::SamplerAddressMode::Border)
         .setBorderColor(1.0f);
-    m_ShadowSampler = m_Device->createSampler(samplerDesc);
+    m_ShadowSampler = m_device->createSampler(samplerDesc);
 
-    m_ForwardViewCB = m_Device->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ForwardShadingViewConstants), "ForwardShadingViewConstants", params.numConstantBufferVersions));
-    m_ForwardLightCB = m_Device->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ForwardShadingLightConstants), "ForwardShadingLightConstants", params.numConstantBufferVersions));
+    m_ForwardViewCB = m_device->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ForwardShadingViewConstants), "ForwardShadingViewConstants", params.numConstantBufferVersions));
+    m_ForwardLightCB = m_device->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ForwardShadingLightConstants), "ForwardShadingLightConstants", params.numConstantBufferVersions));
 
     m_ViewBindingLayout = CreateViewBindingLayout();
     m_ViewBindingSet = CreateViewBindingSet();
@@ -85,7 +85,7 @@ void ForwardShadingPass::Init(ShaderFactory& shaderFactory, const CreateParamete
 
 void ForwardShadingPass::ResetBindingCache()
 {
-    m_MaterialBindings->Clear();
+    m_MaterialBindings->clear();
     m_ShadingBindingSets.clear();
     m_InputBindingSets.clear();
 }
@@ -116,7 +116,7 @@ nvrhi::ShaderHandle ForwardShadingPass::CreateGeometryShader(ShaderFactory& shad
                 nvrhi::FastGeometryShaderFlags::ForceFastGS |
                 nvrhi::FastGeometryShaderFlags::UseViewportMask |
                 nvrhi::FastGeometryShaderFlags::OffsetTargetIndexByViewportIndex))
-            .setCoordinateSwizzling(CubemapView::GetCubemapCoordinateSwizzle());
+            .setCoordinateSwizzling(CubemapView::getCubemapCoordinateSwizzle());
 
         return shaderFactory.CreateAutoShader("engine/passes/cubemap_gs.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_cubemap_gs), nullptr, desc);
     }
@@ -146,7 +146,7 @@ nvrhi::InputLayoutHandle ForwardShadingPass::CreateInputLayout(nvrhi::IShader* v
             GetVertexAttributeDesc(VertexAttribute::Transform, "TRANSFORM", 5),
         };
 
-        return m_Device->createInputLayout(inputDescs, uint32_t(std::size(inputDescs)), vertexShader);
+        return m_device->createInputLayout(inputDescs, uint32_t(std::size(inputDescs)), vertexShader);
     }
     
     return nullptr;
@@ -159,7 +159,7 @@ nvrhi::BindingLayoutHandle ForwardShadingPass::CreateViewBindingLayout()
         .setRegisterSpaceAndDescriptorSet(FORWARD_SPACE_VIEW)
         .addItem(nvrhi::BindingLayoutItem::VolatileConstantBuffer(FORWARD_BINDING_VIEW_CONSTANTS));
 
-    return m_Device->createBindingLayout(bindingLayoutDesc);
+    return m_device->createBindingLayout(bindingLayoutDesc);
 }
 
 
@@ -169,7 +169,7 @@ nvrhi::BindingSetHandle ForwardShadingPass::CreateViewBindingSet()
         .setTrackLiveness(m_TrackLiveness)
         .addItem(nvrhi::BindingSetItem::ConstantBuffer(FORWARD_BINDING_VIEW_CONSTANTS, m_ForwardViewCB));
 
-    return m_Device->createBindingSet(bindingSetDesc, m_ViewBindingLayout);
+    return m_device->createBindingSet(bindingSetDesc, m_ViewBindingLayout);
 }
 
 nvrhi::BindingLayoutHandle ForwardShadingPass::CreateShadingBindingLayout()
@@ -187,7 +187,7 @@ nvrhi::BindingLayoutHandle ForwardShadingPass::CreateShadingBindingLayout()
         .addItem(nvrhi::BindingLayoutItem::Sampler(FORWARD_BINDING_LIGHT_PROBE_SAMPLER))
         .addItem(nvrhi::BindingLayoutItem::Sampler(FORWARD_BINDING_ENVIRONMENT_BRDF_SAMPLER));
 
-    return m_Device->createBindingLayout(bindingLayoutDesc);
+    return m_device->createBindingLayout(bindingLayoutDesc);
 }
 
 nvrhi::BindingSetHandle ForwardShadingPass::CreateShadingBindingSet(nvrhi::ITexture* shadowMapTexture,
@@ -213,7 +213,7 @@ nvrhi::BindingSetHandle ForwardShadingPass::CreateShadingBindingSet(nvrhi::IText
         .addItem(nvrhi::BindingSetItem::Sampler(FORWARD_BINDING_ENVIRONMENT_BRDF_SAMPLER,
             m_renderDevice->samplers().linearClamp()));
 
-    return m_Device->createBindingSet(bindingSetDesc, m_ShadingBindingLayout);
+    return m_device->createBindingSet(bindingSetDesc, m_ShadingBindingLayout);
 }
 
 
@@ -228,7 +228,7 @@ nvrhi::GraphicsPipelineHandle ForwardShadingPass::CreateGraphicsPipeline(Forward
     pipelineDesc.renderState.rasterState.setCullMode(key.cullMode);
     pipelineDesc.renderState.blendState.alphaToCoverageEnable = false;
     pipelineDesc.shadingRateState = key.shadingRateState;
-    pipelineDesc.bindingLayouts = { m_MaterialBindings->GetLayout(), m_ViewBindingLayout, m_ShadingBindingLayout };
+    pipelineDesc.bindingLayouts = { m_MaterialBindings->getLayout(), m_ViewBindingLayout, m_ShadingBindingLayout };
     if (!m_UseInputAssembler)
         pipelineDesc.bindingLayouts.push_back(m_InputBindingLayout);
 
@@ -281,7 +281,7 @@ nvrhi::GraphicsPipelineHandle ForwardShadingPass::CreateGraphicsPipeline(Forward
         return nullptr;
     }
 
-    return m_Device->createGraphicsPipeline(pipelineDesc, framebufferInfo);
+    return m_device->createGraphicsPipeline(pipelineDesc, framebufferInfo);
 }
 
 std::shared_ptr<MaterialBindingCache> ForwardShadingPass::CreateMaterialBindingCache(caustica::render::RenderDevice& renderDevice)
@@ -298,7 +298,7 @@ std::shared_ptr<MaterialBindingCache> ForwardShadingPass::CreateMaterialBindingC
     };
 
     return std::make_shared<MaterialBindingCache>(
-        m_Device,
+        m_device,
         nvrhi::ShaderType::Pixel,
         /* registerSpace = */ FORWARD_SPACE_MATERIAL,
         /* registerSpaceIsDescriptorSet = */ true,
@@ -308,7 +308,7 @@ std::shared_ptr<MaterialBindingCache> ForwardShadingPass::CreateMaterialBindingC
         renderDevice.builtins().blackTexture());
 }
 
-void ForwardShadingPass::SetupView(
+void ForwardShadingPass::setupView(
     GeometryPassContext& abstractContext,
     nvrhi::ICommandList* commandList,
     const IView* view,
@@ -317,12 +317,12 @@ void ForwardShadingPass::SetupView(
     auto& context = static_cast<Context&>(abstractContext);
     
     ForwardShadingViewConstants viewConstants = {};
-    view->FillPlanarViewConstants(viewConstants.view);
+    view->fillPlanarViewConstants(viewConstants.view);
     commandList->writeBuffer(m_ForwardViewCB, &viewConstants, sizeof(viewConstants));
 
-    context.keyTemplate.frontCounterClockwise = view->IsMirrored();
-    context.keyTemplate.reverseDepth = view->IsReverseDepth();
-    context.keyTemplate.shadingRateState = view->GetVariableRateShadingState();
+    context.keyTemplate.frontCounterClockwise = view->isMirrored();
+    context.keyTemplate.reverseDepth = view->isReverseDepth();
+    context.keyTemplate.shadingRateState = view->getVariableRateShadingState();
 }
 
 void ForwardShadingPass::PrepareLights(
@@ -376,7 +376,7 @@ void ForwardShadingPass::PrepareLights(
     }
 
     {
-        std::lock_guard<std::mutex> lockGuard(m_Mutex);
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
 
         nvrhi::BindingSetHandle& shadingBindings = m_ShadingBindingSets[std::make_pair(shadowMapTexture, lightProbeDiffuse)];
 
@@ -457,17 +457,17 @@ void ForwardShadingPass::PrepareLights(
     commandList->writeBuffer(m_ForwardLightCB, &constants, sizeof(constants));
 }
 
-ViewType::Enum ForwardShadingPass::GetSupportedViewTypes() const
+ViewType::Enum ForwardShadingPass::getSupportedViewTypes() const
 {
     return m_SupportedViewTypes;
 }
 
-bool ForwardShadingPass::SetupMaterial(GeometryPassContext& abstractContext, const Material* material,
+bool ForwardShadingPass::setupMaterial(GeometryPassContext& abstractContext, const Material* material,
     nvrhi::RasterCullMode cullMode, nvrhi::GraphicsState& state)
 {
     auto& context = static_cast<Context&>(abstractContext);
 
-    nvrhi::IBindingSet* materialBindingSet = m_MaterialBindings->GetMaterialBindingSet(material);
+    nvrhi::IBindingSet* materialBindingSet = m_MaterialBindings->getMaterialBindingSet(material);
 
     if (!materialBindingSet)
         return false;
@@ -486,7 +486,7 @@ bool ForwardShadingPass::SetupMaterial(GeometryPassContext& abstractContext, con
 
     if (!pipeline)
     {
-        std::lock_guard<std::mutex> lockGuard(m_Mutex);
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
 
         if (!pipeline)
             pipeline = CreateGraphicsPipeline(key, state.framebuffer->getFramebufferInfo());
@@ -506,7 +506,7 @@ bool ForwardShadingPass::SetupMaterial(GeometryPassContext& abstractContext, con
     return true;
 }
 
-void ForwardShadingPass::SetupInputBuffers(GeometryPassContext& abstractContext, const BufferGroup* buffers, nvrhi::GraphicsState& state)
+void ForwardShadingPass::setupInputBuffers(GeometryPassContext& abstractContext, const BufferGroup* buffers, nvrhi::GraphicsState& state)
 {
     auto& context = static_cast<Context&>(abstractContext);
     
@@ -547,7 +547,7 @@ nvrhi::BindingLayoutHandle ForwardShadingPass::CreateInputBindingLayout()
         .addItem(nvrhi::BindingLayoutItem::RawBuffer_SRV(FORWARD_BINDING_VERTEX_BUFFER))
         .addItem(nvrhi::BindingLayoutItem::PushConstants(FORWARD_BINDING_PUSH_CONSTANTS, sizeof(ForwardPushConstants)));
         
-    return m_Device->createBindingLayout(bindingLayoutDesc);
+    return m_device->createBindingLayout(bindingLayoutDesc);
 }
 
 nvrhi::BindingSetHandle ForwardShadingPass::CreateInputBindingSet(const BufferGroup* bufferGroup)
@@ -559,7 +559,7 @@ nvrhi::BindingSetHandle ForwardShadingPass::CreateInputBindingSet(const BufferGr
         .addItem(nvrhi::BindingSetItem::RawBuffer_SRV(FORWARD_BINDING_VERTEX_BUFFER, bufferGroup->vertexBuffer))
         .addItem(nvrhi::BindingSetItem::PushConstants(FORWARD_BINDING_PUSH_CONSTANTS, sizeof(ForwardPushConstants)));
 
-    return m_Device->createBindingSet(bindingSetDesc, m_InputBindingLayout);
+    return m_device->createBindingSet(bindingSetDesc, m_InputBindingLayout);
 }
 
 nvrhi::BindingSetHandle ForwardShadingPass::GetOrCreateInputBindingSet(const BufferGroup* bufferGroup)
@@ -575,7 +575,7 @@ nvrhi::BindingSetHandle ForwardShadingPass::GetOrCreateInputBindingSet(const Buf
     return it->second;
 }
 
-void ForwardShadingPass::SetPushConstants(
+void ForwardShadingPass::setPushConstants(
     caustica::render::GeometryPassContext& abstractContext,
     nvrhi::ICommandList* commandList,
     nvrhi::GraphicsState& state,

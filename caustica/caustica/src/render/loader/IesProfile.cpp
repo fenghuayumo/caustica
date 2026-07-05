@@ -267,6 +267,6 @@ void IesProfileLoader::BakeIesProfile(IesProfile& profile, nvrhi::ICommandList* 
 
     if (m_DescriptorTableManager)
     {
-        profile.textureIndex = m_DescriptorTableManager->CreateDescriptor(nvrhi::BindingSetItem::Texture_SRV(0, profile.texture));
+        profile.textureIndex = m_DescriptorTableManager->createDescriptor(nvrhi::BindingSetItem::Texture_SRV(0, profile.texture));
     }
 }
