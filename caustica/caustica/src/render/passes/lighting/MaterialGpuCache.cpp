@@ -46,6 +46,15 @@ using namespace caustica;
 
 static std::string kNoModel = "<no_model>";
 
+static Json::Value JsonMemberEither(const Json::Value& object, const char* primary, const char* alternate)
+{
+    if (object.isMember(primary))
+        return object[primary];
+    if (alternate && object.isMember(alternate))
+        return object[alternate];
+    return Json::Value();
+}
+
 static std::array<unsigned char, picosha2::k_digest_size> HashMyString(const std::string& string)
 {
     std::array<unsigned char, picosha2::k_digest_size> arr;
@@ -259,14 +268,14 @@ bool PTMaterial::read(
     //     caustica::warning("Unsupported/missing material version"); return nullptr;
     // }
 
-    const bool hasMaterialModelField = input.isMember("materialModel");
+    const bool hasMaterialModelField = input.isMember("materialModel") || input.isMember("MaterialModel");
     const bool hasOpenPBRBlock = input.isMember("OpenPBR");
     const bool hasTopLevelOpenPBRFields = HasOpenPBRLiteFields(input);
 
-    auto loadTexture = [ & ](Json::Value& input, PTTexture& output, const std::string& name)
+    auto loadTexture = [&](const char* camelName, const char* pascalName, PTTexture& output)
     {
         output = PTTexture();
-        Json::Value texJ = input[name];
+        Json::Value texJ = JsonMemberEither(input, camelName, pascalName);
 
         if (texJ.empty())
             return;
@@ -278,7 +287,10 @@ bool PTMaterial::read(
             caustica::warning("Path for texture is empty"); return;
         }
         texJ["sRGB"] >> output.sRGB;
-        texJ["normalMap"] >> output.normalMap;
+        if (texJ.isMember("normalMap"))
+            texJ["normalMap"] >> output.normalMap;
+        else if (texJ.isMember("NormalMap"))
+            texJ["NormalMap"] >> output.normalMap;
 
         std::filesystem::path storagePath;
         std::filesystem::path fullPath = ResolveMaterialTexturePath(
@@ -292,67 +304,76 @@ bool PTMaterial::read(
         output.enabled = output.loaded != nullptr;
     };
 
-    loadTexture(input, this->baseTexture, "baseTexture");
-    loadTexture(input, this->occlusionRoughnessMetallicTexture, "occlusionRoughnessMetallicTexture");
-    loadTexture(input, this->normalTexture, "normalTexture");
-    loadTexture(input, this->emissiveTexture, "emissiveTexture");
-    loadTexture(input, this->transmissionTexture, "transmissionTexture");
+    loadTexture("baseTexture", "BaseTexture", this->baseTexture);
+    loadTexture("occlusionRoughnessMetallicTexture", "OcclusionRoughnessMetallicTexture", this->occlusionRoughnessMetallicTexture);
+    loadTexture("normalTexture", "NormalTexture", this->normalTexture);
+    loadTexture("emissiveTexture", "EmissiveTexture", this->emissiveTexture);
+    loadTexture("transmissionTexture", "TransmissionTexture", this->transmissionTexture);
 
-#define LOAD_FIELD(NAME) input[#NAME] >> this->NAME;
+#define LOAD_FIELD_EITHER(CAMEL, PASCAL) \
+    do { \
+        if (input.isMember(#CAMEL)) \
+            input[#CAMEL] >> this->CAMEL; \
+        else if (input.isMember(PASCAL)) \
+            input[PASCAL] >> this->CAMEL; \
+    } while (0)
 
-    LOAD_FIELD(baseOrDiffuseColor);
-    LOAD_FIELD(specularColor);
-    LOAD_FIELD(emissiveColor);
+    LOAD_FIELD_EITHER(baseOrDiffuseColor, "BaseOrDiffuseColor");
+    LOAD_FIELD_EITHER(specularColor, "SpecularColor");
+    LOAD_FIELD_EITHER(emissiveColor, "EmissiveColor");
 
-    LOAD_FIELD(materialModel);
-    LOAD_FIELD(baseWeight);
-    LOAD_FIELD(specularWeight);
-    LOAD_FIELD(anisotropy);
-    LOAD_FIELD(fuzzWeight);
-    LOAD_FIELD(fuzzColor);
-    LOAD_FIELD(fuzzRoughness);
+    LOAD_FIELD_EITHER(materialModel, "MaterialModel");
+    LOAD_FIELD_EITHER(baseWeight, "BaseWeight");
+    LOAD_FIELD_EITHER(specularWeight, "SpecularWeight");
+    LOAD_FIELD_EITHER(anisotropy, "Anisotropy");
+    LOAD_FIELD_EITHER(fuzzWeight, "FuzzWeight");
+    LOAD_FIELD_EITHER(fuzzColor, "FuzzColor");
+    LOAD_FIELD_EITHER(fuzzRoughness, "FuzzRoughness");
 
-    LOAD_FIELD(emissiveIntensity);
-    LOAD_FIELD(metalness);
-    LOAD_FIELD(roughness);
-    LOAD_FIELD(opacity);
-    LOAD_FIELD(transmissionFactor);
-    LOAD_FIELD(diffuseTransmissionFactor);
-    LOAD_FIELD(normalTextureScale);
-    LOAD_FIELD(IoR);
+    LOAD_FIELD_EITHER(emissiveIntensity, "EmissiveIntensity");
+    LOAD_FIELD_EITHER(metalness, "Metalness");
+    LOAD_FIELD_EITHER(roughness, "Roughness");
+    LOAD_FIELD_EITHER(opacity, "Opacity");
+    LOAD_FIELD_EITHER(transmissionFactor, "TransmissionFactor");
+    LOAD_FIELD_EITHER(diffuseTransmissionFactor, "DiffuseTransmissionFactor");
+    LOAD_FIELD_EITHER(normalTextureScale, "NormalTextureScale");
+    LOAD_FIELD_EITHER(IoR, "IoR");
 
-    LOAD_FIELD(useSpecularGlossModel);
-    LOAD_FIELD(enableBaseTexture);
-    LOAD_FIELD(enableOcclusionRoughnessMetallicTexture);
-    LOAD_FIELD(enableNormalTexture);
-    LOAD_FIELD(enableEmissiveTexture);
-    LOAD_FIELD(enableTransmissionTexture);
-    LOAD_FIELD(enableAlphaTesting);
-    LOAD_FIELD(alphaCutoff);
-    LOAD_FIELD(enableTransmission);
-    LOAD_FIELD(metalnessInRedChannel);
-    LOAD_FIELD(thinSurface);
-    LOAD_FIELD(excludeFromNEE);
-    LOAD_FIELD(psdExclude);
-    LOAD_FIELD(psdBlockMotionVectorsAtSurfaceType);
+    LOAD_FIELD_EITHER(useSpecularGlossModel, "UseSpecularGlossModel");
+    LOAD_FIELD_EITHER(enableBaseTexture, "EnableBaseTexture");
+    LOAD_FIELD_EITHER(enableOcclusionRoughnessMetallicTexture, "EnableOcclusionRoughnessMetallicTexture");
+    LOAD_FIELD_EITHER(enableNormalTexture, "EnableNormalTexture");
+    LOAD_FIELD_EITHER(enableEmissiveTexture, "EnableEmissiveTexture");
+    LOAD_FIELD_EITHER(enableTransmissionTexture, "EnableTransmissionTexture");
+    LOAD_FIELD_EITHER(enableAlphaTesting, "EnableAlphaTesting");
+    LOAD_FIELD_EITHER(alphaCutoff, "AlphaCutoff");
+    LOAD_FIELD_EITHER(enableTransmission, "EnableTransmission");
+    LOAD_FIELD_EITHER(metalnessInRedChannel, "MetalnessInRedChannel");
+    LOAD_FIELD_EITHER(thinSurface, "ThinSurface");
+    LOAD_FIELD_EITHER(excludeFromNEE, "ExcludeFromNEE");
+    LOAD_FIELD_EITHER(psdExclude, "PSDExclude");
+    LOAD_FIELD_EITHER(psdBlockMotionVectorsAtSurfaceType, "PSDBlockMotionVectorsAtSurfaceType");
 
-    LOAD_FIELD(psdDominantDeltaLobe);
-    LOAD_FIELD(nestedPriority);
+    LOAD_FIELD_EITHER(psdDominantDeltaLobe, "PSDDominantDeltaLobe");
+    LOAD_FIELD_EITHER(nestedPriority, "NestedPriority");
 
-    LOAD_FIELD(volumeAttenuationDistance);
-    LOAD_FIELD(volumeAttenuationColor);
+    LOAD_FIELD_EITHER(volumeAttenuationDistance, "VolumeAttenuationDistance");
+    LOAD_FIELD_EITHER(volumeAttenuationColor, "VolumeAttenuationColor");
 
-    LOAD_FIELD(shadowNoLFadeout);
+    LOAD_FIELD_EITHER(shadowNoLFadeout, "ShadowNoLFadeout");
 
-    LOAD_FIELD(enableAsAnalyticLightProxy);
+    LOAD_FIELD_EITHER(enableAsAnalyticLightProxy, "EnableAsAnalyticLightProxy");
 
-    LOAD_FIELD(ignoreMeshTangentSpace);
+    LOAD_FIELD_EITHER(ignoreMeshTangentSpace, "IgnoreMeshTangentSpace");
 
-    LOAD_FIELD(useEngineEmissiveIntensity);
-    if (!input.isMember("useEngineEmissiveIntensity") && input.isMember("UseDonutEmissiveIntensity"))
+    if (input.isMember("useEngineEmissiveIntensity"))
+        input["useEngineEmissiveIntensity"] >> useEngineEmissiveIntensity;
+    else if (input.isMember("UseEngineEmissiveIntensity"))
+        input["UseEngineEmissiveIntensity"] >> useEngineEmissiveIntensity;
+    else if (input.isMember("UseDonutEmissiveIntensity"))
         input["UseDonutEmissiveIntensity"] >> useEngineEmissiveIntensity;
 
-    LOAD_FIELD(skipRender);
+    LOAD_FIELD_EITHER(skipRender, "SkipRender");
 
     auto readOpenPBRLite = [this](const Json::Value& openPBR)
     {
