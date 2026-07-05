@@ -1,9 +1,9 @@
 #pragma once
 
 #include <ecs/Entity.h>
-#include <render/Core/PathTracerSettings.h>
-#include <render/Passes/Gaussian/GaussianSplatPass.h>
-#include <render/Passes/Gaussian/GaussianSplatEmissionProxy.h>
+#include <render/core/PathTracerSettings.h>
+#include <render/passes/gaussian/GaussianSplatPass.h>
+#include <render/passes/gaussian/GaussianSplatEmissionProxy.h>
 #include <render/RenderRuntimeState.h>
 
 #include <filesystem>

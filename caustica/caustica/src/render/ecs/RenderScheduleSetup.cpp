@@ -1,7 +1,7 @@
 #include <render/ecs/RenderScheduleSetup.h>
 #include <render/ecs/RenderSystems.h>
 #include <render/FramePassRegistry.h>
-#include <render/WorldRenderer/WorldRenderer.h>
+#include <render/worldRenderer/WorldRenderer.h>
 
 namespace caustica::render
 {

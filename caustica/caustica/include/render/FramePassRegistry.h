@@ -1,6 +1,6 @@
 #pragma once
 
-#include <render/WorldRenderer/PathTracingFramePipeline.h>
+#include <render/worldRenderer/PathTracingFramePipeline.h>
 
 #include <functional>
 #include <memory>

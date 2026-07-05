@@ -1,14 +1,14 @@
 #pragma once
 
-#include <render/Passes/Lighting/Distant/EnvMapProcessor.h>
-#include <render/Passes/Lighting/LightSamplingCache.h>
-#include <render/Passes/Lighting/MaterialGpuCache.h>
-#include <render/Passes/OMM/OpacityMicromapBuilder.h>
+#include <render/passes/lighting/distant/EnvMapProcessor.h>
+#include <render/passes/lighting/LightSamplingCache.h>
+#include <render/passes/lighting/MaterialGpuCache.h>
+#include <render/passes/omm/OpacityMicromapBuilder.h>
 
 #include <assets/loader/TextureLoader.h>
 #include <ecs/Entity.h>
-#include <render/Core/DescriptorTableManager.h>
-#include <render/Core/PathTracerSettings.h>
+#include <render/core/DescriptorTableManager.h>
+#include <render/core/PathTracerSettings.h>
 #include <scene/SceneManager.h>
 
 #include <filesystem>

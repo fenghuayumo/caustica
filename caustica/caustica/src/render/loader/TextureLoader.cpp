@@ -1,9 +1,9 @@
 #include <assets/loader/TextureLoader.h>
 #include <assets/AssetSystem.h>
 
-#include <render/Core/DescriptorTableManager.h>
-#include <render/Core/RenderDevice.h>
-#include <render/Core/FullscreenBlitPass.h>
+#include <render/core/DescriptorTableManager.h>
+#include <render/core/RenderDevice.h>
+#include <render/core/FullscreenBlitPass.h>
 #include <assets/loader/DDSFile.h>
 #include <core/ThreadPool.h>
 #include <core/vfs/VFS.h>

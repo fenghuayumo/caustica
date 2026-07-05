@@ -6,11 +6,11 @@
 #include <engine/SceneRuntimeRegistration.h>
 #include <engine/EngineFrameApplication.h>
 #include <engine/Application.h>
-#include <render/Core/RenderDevice.h>
+#include <render/core/RenderDevice.h>
 #include <backend/GpuDevice.h>
 #include <render/SceneGaussianSplatPasses.h>
 #include <render/SceneLightingPasses.h>
-#include <render/WorldRenderer/WorldRenderer.h>
+#include <render/worldRenderer/WorldRenderer.h>
 #include <core/file_utils.h>
 #include <core/format.h>
 #include <core/path_utils.h>
@@ -19,8 +19,8 @@
 #include <core/system_utils.h>
 #include <core/command_line.h>
 #include <core/scope.h>
-#include <render/Core/ScopedPerfMarker.h>
-#include <render/Core/TextureUtils.h>
+#include <render/core/ScopedPerfMarker.h>
+#include <render/core/TextureUtils.h>
 #include <assets/loader/ShaderPackFileSystem.h>
 
 #include <backend/GpuDevice.h>
@@ -30,12 +30,12 @@
 #include <core/vfs/VFS.h>
 #include <assets/loader/ShaderFactory.h>
 #include <assets/loader/TextureLoader.h>
-#include <render/Core/BindingCache.h>
+#include <render/core/BindingCache.h>
 #include <core/vfs/VFS.h>
 #include <engine/UserInterfaceUtils.h>
 #include <platform/glfw_window.h>
 #if CAUSTICA_WITH_NATIVE_DLSS
-#include <render/Passes/Geometry/DLSS.h>
+#include <render/passes/geometry/DLSS.h>
 #endif
 
 #include <GLFW/glfw3.h>

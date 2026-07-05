@@ -8,10 +8,10 @@
 #include <math/math.h>
 #include <scene/camera/Camera.h>
 #include <scene/SceneEcs.h>
-#include <render/Core/View.h>
+#include <render/core/View.h>
 #include <cmath>
 
-#include <render/Passes/Debug/Korgi.h>
+#include <render/passes/debug/Korgi.h>
 
 using namespace caustica::math;
 using namespace caustica;

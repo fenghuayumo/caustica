@@ -1,6 +1,6 @@
 #pragma once
 
-#include <render/WorldRenderer/PathTracingFrameContext.h>
+#include <render/worldRenderer/PathTracingFrameContext.h>
 #include <render/graph/GraphBuilder.h>
 #include <scene/View.h>
 

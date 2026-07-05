@@ -8,7 +8,7 @@
 #include <events/event.h>
 #include <events/application_event.h>
 
-#include <render/Passes/Debug/Korgi.h>
+#include <render/passes/debug/Korgi.h>
 #include "common/LocalConfig.h"
 #include <core/log.h>
 #include "EditorRuntime.h"

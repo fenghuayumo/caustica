@@ -1,16 +1,16 @@
 #include <render/SceneGaussianSplatPasses.h>
 
-#include <render/Core/RenderDevice.h>
+#include <render/core/RenderDevice.h>
 
 #include <render/PathTracerScenePasses.h>
-#include <render/WorldRenderer/WorldRenderer.h>
-#include <render/Passes/Gaussian/GaussianSplatPass.h>
-#include <render/GPUSort/GPUSort.h>
+#include <render/worldRenderer/WorldRenderer.h>
+#include <render/passes/gaussian/GaussianSplatPass.h>
+#include <render/gpuSort/GPUSort.h>
 
 #include <backend/GpuDevice.h>
 #include <core/command_line.h>
 #include <core/log.h>
-#include <render/Core/AccelStructManager.h>
+#include <render/core/AccelStructManager.h>
 #include <scene/SceneEcs.h>
 #include <scene/SceneManager.h>
 #include <scene/Scene.h>

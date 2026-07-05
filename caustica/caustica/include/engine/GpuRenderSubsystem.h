@@ -6,12 +6,12 @@
 #include <vector>
 
 #include <rhi/nvrhi.h>
-#include <render/Core/PathTracerSettings.h>
-#include <render/Core/CameraController.h>
-#include <render/Core/AccelStructManager.h>
+#include <render/core/PathTracerSettings.h>
+#include <render/core/CameraController.h>
+#include <render/core/AccelStructManager.h>
 #include <render/PathTracerScenePasses.h>
 #include <render/SessionDiagnostics.h>
-#include <render/WorldRenderer/PathTracingContext.h>
+#include <render/worldRenderer/PathTracingContext.h>
 #include <engine/ISubsystem.h>
 
 class SceneManager;

@@ -10,7 +10,7 @@
 #include <vector>
 
 #if CAUSTICA_WITH_NATIVE_DLSS
-#include <render/Passes/Geometry/DLSS.h>
+#include <render/passes/geometry/DLSS.h>
 #endif
 
 namespace caustica

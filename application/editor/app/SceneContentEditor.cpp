@@ -10,8 +10,8 @@
 #include <render/SceneGaussianSplatPasses.h>
 #include <render/SceneLightingPasses.h>
 #include <render/SceneRayTracingResources.h>
-#include <render/Core/RenderSceneTypeFactory.h>
-#include <render/Core/SceneMeshEditing.h>
+#include <render/core/RenderSceneTypeFactory.h>
+#include <render/core/SceneMeshEditing.h>
 #include <scene/SceneEcs.h>
 #include <scene/SceneManager.h>
 #include <scene/SceneRuntimeMutation.h>

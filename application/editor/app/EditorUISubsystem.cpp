@@ -8,7 +8,7 @@
 #include <engine/Engine.h>
 #include <engine/GpuRenderSubsystem.h>
 #include <platform/window.h>
-#include <render/Passes/Debug/ZoomTool.h>
+#include <render/passes/debug/ZoomTool.h>
 
 namespace caustica::editor
 {

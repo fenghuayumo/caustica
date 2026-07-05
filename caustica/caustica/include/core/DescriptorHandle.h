@@ -8,7 +8,7 @@
 //
 // Lives in core/ so both scene/ and render/ layers can use it without creating
 // a circular dependency. The implementation (which needs DescriptorTableManager)
-// lives in src/render/Core/DescriptorTableManager.cpp.
+// lives in src/render/core/DescriptorTableManager.cpp.
 // =============================================================================
 
 namespace caustica

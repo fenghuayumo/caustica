@@ -1,6 +1,6 @@
 #pragma once
 
-#include <render/Core/SceneCameraController.h>
+#include <render/core/SceneCameraController.h>
 
 namespace caustica::editor
 {

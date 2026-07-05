@@ -4,7 +4,7 @@
 #include "EditorApplication.h"
 #include "common/ImGuiManager.h"
 
-#include <render/Core/PathTracerSettings.h>
+#include <render/core/PathTracerSettings.h>
 #include <render/SceneLightingPasses.h>
 #include <render/SceneGaussianSplatPasses.h>
 #include <engine/UserInterfaceUtils.h>
@@ -13,12 +13,12 @@
 #include <scene/SceneEcs.h>
 #include <imgui_internal.h>
 #include <assets/loader/ShaderFactory.h>
-#include <render/Passes/Lighting/MaterialGpuCache.h>
-#include <render/Passes/PostProcess/ToneMappingPasses.h>
-#include <render/Passes/Debug/Korgi.h>
-#include <render/Passes/OMM/OpacityMicromapBuilder.h>
+#include <render/passes/lighting/MaterialGpuCache.h>
+#include <render/passes/postProcess/ToneMappingPasses.h>
+#include <render/passes/debug/Korgi.h>
+#include <render/passes/omm/OpacityMicromapBuilder.h>
 #include <game/GameScene.h>
-#include <render/Passes/Debug/ZoomTool.h>
+#include <render/passes/debug/ZoomTool.h>
 #include <common/CaptureScriptManager.h>
 
 #include <cmath>
@@ -263,7 +263,7 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
             {
                 RAII_SCOPE( ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
                 if (auto& materialGpuCache = m_sceneEditor.GetLightingPasses().materials(); materialGpuCache != nullptr)
-                    materialGpuCache->DebugGUI(layout.indent);
+                    materialGpuCache->debugGui(layout.indent);
             }
         }
 
@@ -409,43 +409,43 @@ void EditorUI::BuildSceneWidgetsPanel(const PanelLayout& layout)
                 // bistro dry-wet test
                 std::vector<std::string> pavementList = { "LMBR0000163Cobbl_a1d987f5", "LMBR000016bCobbl_8652c51e", "LMBR0000162Paris_c30c71f1", "LMBR0000162Paris_c30c71f1", "LMBR000016cCobbl_f202ecfa", "LMBR0000161Pavem_e2e87964", "LMBR0000168Cobbl_a5a7f4b4", "LMBR0000160Pavem_613287fe", "LMBR000016aCobbl_e1c68d26" };
                 for (std::string& id : pavementList)
-                    if (auto m = m_sceneEditor.GetLightingPasses().materials()->FindByUniqueID(id))
+                    if (auto m = m_sceneEditor.GetLightingPasses().materials()->findByUniqueId(id))
                     {
                         if (m_settings.MaterialVariantIndex == 0) // reset to default
-                            m_sceneEditor.GetLightingPasses().materials()->LoadSingle(*m);
+                            m_sceneEditor.GetLightingPasses().materials()->loadSingle(*m);
                         else
                         {   // make wet-looking
-                            m->Roughness = 0.0f;
-                            //m->SpecularColor = float3(0.08f, 0.08f, 0.08f);
+                            m->roughness = 0.0f;
+                            //m->specularColor = float3(0.08f, 0.08f, 0.08f);
                         }
-                        m->GPUDataDirty = true;
+                        m->gpuDataDirty = true;
                     }
 
                 std::vector<std::string> emissivesList = { "LMBR0000172Paris_1d83765c" /*bollards*/, "LMBR00000aeGreen_04f5ae02" /*green leaves*/, "LMBR00000afOrang_a907f305" /*yellow leaves*/, "LMBR00000b0Branc_5990161e" /*branches*/ };
                 for (std::string& id : emissivesList)
-                    if (auto m = m_sceneEditor.GetLightingPasses().materials()->FindByUniqueID(id))
+                    if (auto m = m_sceneEditor.GetLightingPasses().materials()->findByUniqueId(id))
                     {
                         if (m_settings.MaterialVariantIndex == 0 || m_settings.MaterialVariantIndex == 1) // reset to default
-                            m_sceneEditor.GetLightingPasses().materials()->LoadSingle(*m);
+                            m_sceneEditor.GetLightingPasses().materials()->loadSingle(*m);
                         else
                         {   // silly stuff
                             if (id == "LMBR0000172Paris_1d83765c")
                             {
-                                m->EmissiveColor = float3( 0.01f, 1.0f, 0.1f );
-                                m->EmissiveIntensity = 0.5f;
+                                m->emissiveColor = float3( 0.01f, 1.0f, 0.1f );
+                                m->emissiveIntensity = 0.5f;
                             }
                             if (id == "LMBR00000aeGreen_04f5ae02" || id == "LMBR00000afOrang_a907f305")
                             {
-                                m->EmissiveColor = (id == "LMBR00000aeGreen_04f5ae02")?float3(0.9f, 0.3f, 0.01f):float3(0.001f, 1.0f, 0.01f);
-                                m->EmissiveIntensity = 0.6f;
+                                m->emissiveColor = (id == "LMBR00000aeGreen_04f5ae02")?float3(0.9f, 0.3f, 0.01f):float3(0.001f, 1.0f, 0.01f);
+                                m->emissiveIntensity = 0.6f;
                             }
                             if (id == "LMBR00000b0Branc_5990161e")
                             {
-                                m->EmissiveColor = float3(1.0f, 0.001f, 0.005f);
-                                m->EmissiveIntensity = 1.0f;
+                                m->emissiveColor = float3(1.0f, 0.001f, 0.005f);
+                                m->emissiveIntensity = 1.0f;
                             }
                         }
-                        m->GPUDataDirty = true;
+                        m->gpuDataDirty = true;
                     }
 
                 if (m_settings.MaterialVariantIndex != 1 && materialVariantIndexPrev != 0) // this one doesn't change emissives so no TLAS/BLAS update needed

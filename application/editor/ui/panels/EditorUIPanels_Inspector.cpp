@@ -4,7 +4,7 @@
 #include "EditorApplication.h"
 #include "common/ImGuiManager.h"
 
-#include <render/Core/PathTracerSettings.h>
+#include <render/core/PathTracerSettings.h>
 #include <render/SceneLightingPasses.h>
 #include <render/SceneGaussianSplatPasses.h>
 #include <engine/UserInterfaceUtils.h>
@@ -13,12 +13,12 @@
 #include <scene/SceneEcs.h>
 #include <imgui_internal.h>
 #include <assets/loader/ShaderFactory.h>
-#include <render/Passes/Lighting/MaterialGpuCache.h>
-#include <render/Passes/PostProcess/ToneMappingPasses.h>
-#include <render/Passes/Debug/Korgi.h>
-#include <render/Passes/OMM/OpacityMicromapBuilder.h>
+#include <render/passes/lighting/MaterialGpuCache.h>
+#include <render/passes/postProcess/ToneMappingPasses.h>
+#include <render/passes/debug/Korgi.h>
+#include <render/passes/omm/OpacityMicromapBuilder.h>
 #include <game/GameScene.h>
-#include <render/Passes/Debug/ZoomTool.h>
+#include <render/passes/debug/ZoomTool.h>
 #include <common/CaptureScriptManager.h>
 
 #include <cmath>
@@ -157,7 +157,7 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
 void EditorUI::BuildMaterialEditorPanel(const PanelLayout& layout)
 {
     // Material Editor panel (right-click pick)
-    std::shared_ptr<PTMaterial> material = PTMaterial::SafeCast(m_editorUI.SelectedMaterial);
+    std::shared_ptr<PTMaterial> material = PTMaterial::safeCast(m_editorUI.SelectedMaterial);
     if (material != nullptr && m_sceneEditor.GetLightingPasses().materials() != nullptr && m_editorUI.ShowMaterialEditor)
     {
         const bool inspectorVisible = m_editorUI.SelectedEntity != ecs::NullEntity && m_editorUI.ShowInspector;
@@ -166,27 +166,27 @@ void EditorUI::BuildMaterialEditorPanel(const PanelLayout& layout)
         ImGui::Begin("Material Editor");
         ImGui::PushItemWidth(layout.defItemWidth);
 
-        ImGui::Text("Material %d: %s.%s ", material->GPUDataIndex, material->ModelName.c_str(), material->Name.c_str());
+        ImGui::Text("Material %d: %s.%s ", material->gpuDataIndex, material->modelName.c_str(), material->name.c_str());
 
-        const bool wasAlphaTestedEnabled = material->EnableAlphaTesting;
-        const bool wasTransmissionEnabled = material->EnableTransmission;
-        const bool wasExcludedFromNEE = material->ExcludeFromNEE;
-        const float alphaCutoffBefore = material->AlphaCutoff;
-        const bool wasSkipRender = material->SkipRender;
+        const bool wasAlphaTestedEnabled = material->enableAlphaTesting;
+        const bool wasTransmissionEnabled = material->enableTransmission;
+        const bool wasExcludedFromNEE = material->excludeFromNEE;
+        const float alphaCutoffBefore = material->alphaCutoff;
+        const bool wasSkipRender = material->skipRender;
 
-        MaterialShaderPermutationKey mspBefore = MaterialShaderPermutationKey(material->ComputeShaderPermutation(""));
+        MaterialShaderPermutationKey mspBefore = MaterialShaderPermutationKey(material->computeShaderPermutation(""));
 
-        bool dirty = material->EditorGUI(*m_sceneEditor.GetLightingPasses().materials());
+        bool dirty = material->editorGui(*m_sceneEditor.GetLightingPasses().materials());
 
-        MaterialShaderPermutationKey mspAfter = MaterialShaderPermutationKey(material->ComputeShaderPermutation(""));
+        MaterialShaderPermutationKey mspAfter = MaterialShaderPermutationKey(material->computeShaderPermutation(""));
 
-        const float alphaCutoffAfter = material->AlphaCutoff;
+        const float alphaCutoffAfter = material->alphaCutoff;
 
         if (mspBefore != mspAfter ||
-            wasAlphaTestedEnabled != material->EnableAlphaTesting ||
-            wasTransmissionEnabled != material->EnableTransmission ||
-            wasExcludedFromNEE != material->ExcludeFromNEE ||
-            wasSkipRender != material->SkipRender ||
+            wasAlphaTestedEnabled != material->enableAlphaTesting ||
+            wasTransmissionEnabled != material->enableTransmission ||
+            wasExcludedFromNEE != material->excludeFromNEE ||
+            wasSkipRender != material->skipRender ||
             dirty)
         {
             if (auto s = m_sceneEditor.GetScene())
@@ -194,8 +194,8 @@ void EditorUI::BuildMaterialEditorPanel(const PanelLayout& layout)
             m_settings.ResetAccumulation = 1;
         }
 
-        if (wasAlphaTestedEnabled != material->EnableAlphaTesting || alphaCutoffBefore != alphaCutoffAfter ||
-            wasExcludedFromNEE != material->ExcludeFromNEE || mspBefore != mspAfter || wasSkipRender != material->SkipRender)
+        if (wasAlphaTestedEnabled != material->enableAlphaTesting || alphaCutoffBefore != alphaCutoffAfter ||
+            wasExcludedFromNEE != material->excludeFromNEE || mspBefore != mspAfter || wasSkipRender != material->skipRender)
             m_runtime.Invalidation.ShaderAndACRefreshDelayedRequest = 1.0f;
 
         if (m_runtime.Invalidation.ShaderAndACRefreshDelayedRequest > 0)

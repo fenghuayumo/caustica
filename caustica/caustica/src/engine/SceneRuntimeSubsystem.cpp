@@ -7,10 +7,10 @@
 #include <engine/SubsystemCollection.h>
 
 #include <core/path_utils.h>
-#include <render/Core/RenderSceneTypeFactory.h>
+#include <render/core/RenderSceneTypeFactory.h>
 #include <render/RenderSessionState.h>
 #include <render/SceneLightingPasses.h>
-#include <render/WorldRenderer/WorldRenderer.h>
+#include <render/worldRenderer/WorldRenderer.h>
 
 namespace caustica
 {

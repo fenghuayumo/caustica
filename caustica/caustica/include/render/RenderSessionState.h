@@ -1,6 +1,6 @@
 #pragma once
 
-#include <render/Core/PathTracerSettings.h>
+#include <render/core/PathTracerSettings.h>
 #include <render/RenderRuntimeState.h>
 
 struct CommandLineOptions;

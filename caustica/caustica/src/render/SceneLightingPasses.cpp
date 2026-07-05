@@ -2,8 +2,8 @@
 
 #include <assets/loader/ShaderFactory.h>
 #include <core/path_utils.h>
-#include <render/Core/ComputePipelineRegistry.h>
-#include <render/Passes/OMM/OpacityMicromapBuilder.h>
+#include <render/core/ComputePipelineRegistry.h>
+#include <render/passes/omm/OpacityMicromapBuilder.h>
 #include <scene/scene_utils.h>
 #include <scene/Scene.h>
 #include <scene/SceneEcs.h>
@@ -111,7 +111,7 @@ void SceneLightingPasses::resyncLightsFromScene(caustica::Scene& scene)
 void SceneLightingPasses::notifySceneReloaded(caustica::Scene& scene)
 {
     if (m_materials != nullptr)
-        m_materials->SceneReloaded();
+        m_materials->sceneReloaded();
     if (m_environment != nullptr)
         m_environment->SceneReloaded();
     if (m_lightSampling != nullptr)
@@ -140,8 +140,8 @@ void SceneLightingPasses::forEachUsedMaterialTexture(
     if (m_materials == nullptr)
         return;
 
-    for (auto textureIT : m_materials->GetUsedTextures())
-        visitor(textureIT.second.Loaded, textureIT.second.NormalMap);
+    for (auto textureIT : m_materials->getUsedTextures())
+        visitor(textureIT.second.loaded, textureIT.second.normalMap);
 }
 
 } // namespace caustica::render

@@ -1,7 +1,7 @@
 #include <render/RenderSessionState.h>
 
 #include <core/command_line.h>
-#include <render/Passes/Denoisers/NrdConfig.h>
+#include <render/passes/denoisers/NrdConfig.h>
 
 #if CAUSTICA_WITH_ANY_DLSS
 #include <backend/StreamlineInterface.h>

@@ -1,5 +1,5 @@
 #include <render/ecs/RenderSystems.h>
-#include <render/WorldRenderer/WorldRenderer.h>
+#include <render/worldRenderer/WorldRenderer.h>
 
 namespace caustica::render
 {

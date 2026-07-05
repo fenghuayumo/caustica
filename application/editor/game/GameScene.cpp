@@ -17,7 +17,7 @@
 #include <core/format.h>
 #include "SceneEditor.h"
 
-#include <render/Passes/Debug/Korgi.h>
+#include <render/passes/debug/Korgi.h>
 #include <json/json.h>
 
 using namespace caustica::math;

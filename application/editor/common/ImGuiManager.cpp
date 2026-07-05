@@ -13,8 +13,8 @@
 #include <core/system_utils.h>
 #include <core/command_line.h>
 #include <core/scope.h>
-#include <render/Core/ScopedPerfMarker.h>
-#include <render/Core/TextureUtils.h>
+#include <render/core/ScopedPerfMarker.h>
+#include <render/core/TextureUtils.h>
 
 namespace caustica::editor
 {

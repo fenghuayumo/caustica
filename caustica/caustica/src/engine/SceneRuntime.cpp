@@ -3,10 +3,10 @@
 #include <render/SceneGaussianSplatPasses.h>
 #include <render/SceneLightingPasses.h>
 #include <render/SceneRayTracingResources.h>
-#include <render/WorldRenderer/WorldRenderer.h>
+#include <render/worldRenderer/WorldRenderer.h>
 #include <shaders/PathTracer/PathTracerDebug.hlsli>
-#include <render/Core/RenderTargets.h>
-#include <render/Passes/PostProcess/ToneMappingPasses.h>
+#include <render/core/RenderTargets.h>
+#include <render/passes/postProcess/ToneMappingPasses.h>
 
 #include <core/path_utils.h>
 #include <scene/scene_utils.h>
@@ -15,8 +15,8 @@
 #include <scene/SceneEcs.h>
 #include <assets/loader/ShaderFactory.h>
 #include <assets/loader/TextureLoader.h>
-#include <render/Core/BindingCache.h>
-#include <render/Core/View.h>
+#include <render/core/BindingCache.h>
+#include <render/core/View.h>
 #include <backend/GpuDevice.h>
 #include <cassert>
 #include <core/log.h>
@@ -24,7 +24,7 @@
 #include <engine/Application.h>
 #include <engine/GpuRenderSubsystem.h>
 #include <engine/RenderThread.h>
-#include <render/Core/RenderDevice.h>
+#include <render/core/RenderDevice.h>
 #include <core/vfs/VFS.h>
 #include <ecs/Entity.h>
 #include <math/math.h>

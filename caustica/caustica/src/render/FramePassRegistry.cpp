@@ -1,7 +1,7 @@
 #include <render/FramePassRegistry.h>
 #include <render/ecs/RenderFrameContext.h>
 #include <render/graph/GraphBuilder.h>
-#include <render/WorldRenderer/WorldRenderer.h>
+#include <render/worldRenderer/WorldRenderer.h>
 
 #include <ecs/Schedule.h>
 

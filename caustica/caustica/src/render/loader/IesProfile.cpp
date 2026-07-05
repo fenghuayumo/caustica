@@ -1,6 +1,6 @@
 #include <assets/loader/IesProfile.h>
 #include <assets/loader/ShaderFactory.h>
-#include <render/Core/DescriptorTableManager.h>
+#include <render/core/DescriptorTableManager.h>
 #include <core/vfs/VFS.h>
 #include <math/math.h>
 #include <core/log.h>

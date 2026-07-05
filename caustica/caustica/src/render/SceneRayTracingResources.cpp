@@ -2,14 +2,14 @@
 
 #include <render/PathTracerScenePasses.h>
 #include <render/SceneLightingPasses.h>
-#include <render/WorldRenderer/WorldRenderer.h>
+#include <render/worldRenderer/WorldRenderer.h>
 
 #include <backend/GpuDevice.h>
 #include <core/log.h>
-#include <render/Core/BindingCache.h>
-#include <render/Core/PathTracingShaderCompiler.h>
-#include <render/Core/AccelStructManager.h>
-#include <render/Passes/OMM/OpacityMicromapBuilder.h>
+#include <render/core/BindingCache.h>
+#include <render/core/PathTracingShaderCompiler.h>
+#include <render/core/AccelStructManager.h>
+#include <render/passes/omm/OpacityMicromapBuilder.h>
 #include <scene/SceneManager.h>
 #include <scene/Scene.h>
 

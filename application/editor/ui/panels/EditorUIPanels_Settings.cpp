@@ -4,7 +4,7 @@
 #include "EditorApplication.h"
 #include "common/ImGuiManager.h"
 
-#include <render/Core/PathTracerSettings.h>
+#include <render/core/PathTracerSettings.h>
 #include <render/SceneLightingPasses.h>
 #include <render/SceneGaussianSplatPasses.h>
 #include <engine/UserInterfaceUtils.h>
@@ -12,12 +12,12 @@
 #include <scene/SceneTypes.h>
 #include <imgui_internal.h>
 #include <assets/loader/ShaderFactory.h>
-#include <render/Passes/Lighting/MaterialGpuCache.h>
-#include <render/Passes/PostProcess/ToneMappingPasses.h>
-#include <render/Passes/Debug/Korgi.h>
-#include <render/Passes/OMM/OpacityMicromapBuilder.h>
+#include <render/passes/lighting/MaterialGpuCache.h>
+#include <render/passes/postProcess/ToneMappingPasses.h>
+#include <render/passes/debug/Korgi.h>
+#include <render/passes/omm/OpacityMicromapBuilder.h>
 #include <game/GameScene.h>
-#include <render/Passes/Debug/ZoomTool.h>
+#include <render/passes/debug/ZoomTool.h>
 #include <common/CaptureScriptManager.h>
 #include <platform/file_dialog.h>
 

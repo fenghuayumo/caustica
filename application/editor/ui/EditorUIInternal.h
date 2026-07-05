@@ -4,7 +4,7 @@
 #include "EditorUI.h"
 #include "EditorUIData.h"
 
-#include <render/Core/PathTracerSettings.h>
+#include <render/core/PathTracerSettings.h>
 #include <imgui.h>
 #include <math/math.h>
 #include <ecs/Entity.h>

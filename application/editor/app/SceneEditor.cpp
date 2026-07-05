@@ -4,9 +4,9 @@
 #include "common/LocalConfig.h"
 #include "common/CaptureScriptManager.h"
 
-#include <render/WorldRenderer/WorldRenderer.h>
-#include <render/Core/TextureUtils.h>
-#include <render/Passes/Debug/ZoomTool.h>
+#include <render/worldRenderer/WorldRenderer.h>
+#include <render/core/TextureUtils.h>
+#include <render/passes/debug/ZoomTool.h>
 #include <assets/loader/ShaderFactory.h>
 #include <engine/GpuRenderSubsystem.h>
 #include <core/path_utils.h>

@@ -4,10 +4,10 @@
 #include <core/command_line.h>
 #include <core/progress.h>
 #include <math/math.h>
-#include <render/Core/CameraController.h>
-#include <render/Core/PathTracerSettings.h>
-#include <render/Core/SceneCameraController.h>
-#include <render/Core/TextureUtils.h>
+#include <render/core/CameraController.h>
+#include <render/core/PathTracerSettings.h>
+#include <render/core/SceneCameraController.h>
+#include <render/core/TextureUtils.h>
 #include <render/RenderRuntimeState.h>
 #include <render/RenderSessionState.h>
 #include <render/SessionDiagnostics.h>

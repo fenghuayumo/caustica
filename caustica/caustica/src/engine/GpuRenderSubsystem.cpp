@@ -10,13 +10,13 @@
 #include <core/log.h>
 #include <core/path_utils.h>
 #include <core/vfs/VFS.h>
-#include <render/Core/BindingCache.h>
-#include <render/Core/BindlessTable.h>
-#include <render/Core/SceneGpuUpdater.h>
-#include <render/Core/RenderDevice.h>
+#include <render/core/BindingCache.h>
+#include <render/core/BindlessTable.h>
+#include <render/core/SceneGpuUpdater.h>
+#include <render/core/RenderDevice.h>
 #include <render/PathTracerScenePasses.h>
-#include <render/WorldRenderer/WorldRenderer.h>
-#include <render/WorldRenderer/PathTracingContext.h>
+#include <render/worldRenderer/WorldRenderer.h>
+#include <render/worldRenderer/PathTracingContext.h>
 #include <scene/Scene.h>
 #include <scene/SceneEcs.h>
 #include <scene/SceneManager.h>
@@ -302,7 +302,7 @@ void GpuRenderSubsystem::createShaderFactory(GpuDevice& gpuDevice)
     const std::filesystem::path shaderPackPath = appDirectory / (std::string("caustica.shaders.") + shaderTypeName + ".pack");
     auto shaderPackFS = std::make_shared<ShaderPackFileSystem>(shaderPackPath, "ShaderPrecompiled");
     const bool shaderPackHasCurrentLayout = shaderPackFS->isOpen()
-        && shaderPackFS->fileExists("caustica/caustica/shaders/render/Misc/DebugLines_main_vs.bin")
+        && shaderPackFS->fileExists("caustica/caustica/shaders/render/misc/DebugLines_main_vs.bin")
         && shaderPackFS->fileExists("engine/fullscreen_vs.bin");
 
     if (shaderPackFS->isOpen() && !shaderPackHasCurrentLayout)

@@ -10,7 +10,7 @@
 #include <core/vfs/VFS.h>
 #include <scene/Scene.h>
 #include <imgui_internal.h>
-#include <render/Passes/Debug/Korgi.h>
+#include <render/passes/debug/Korgi.h>
 #include <common/CaptureScriptManager.h>
 
 #if CAUSTICA_WITH_PYTHON

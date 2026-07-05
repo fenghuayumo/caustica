@@ -7,13 +7,13 @@
 #include <imgui/imgui_renderer.h>
 #include <imgui/imgui_console.h>
 
-#include <render/Passes/RTXDI/RtxdiPass.h>
+#include <render/passes/rtxdi/RtxdiPass.h>
 
-#include <render/Passes/Geometry/TemporalAntiAliasingPass.h>
+#include <render/passes/geometry/TemporalAntiAliasingPass.h>
 
 using namespace caustica::math;
 
-#include <render/Passes/PostProcess/ToneMappingPasses.h>
+#include <render/passes/postProcess/ToneMappingPasses.h>
 #include <shaders/PathTracer/PathTracerDebug.hlsli>
 
 #if ENABLE_DEBUG_DELTA_TREE_VIZUALISATION
@@ -24,9 +24,9 @@ using namespace caustica::math;
 #include <backend/StreamlineInterface.h>
 #endif
 
-#include <render/Passes/Denoisers/NrdConfig.h>
-#include <render/Core/PathTracerSettings.h>
-#include <render/Passes/Debug/Korgi.h>
+#include <render/passes/denoisers/NrdConfig.h>
+#include <render/core/PathTracerSettings.h>
+#include <render/passes/debug/Korgi.h>
 #include "EditorUIData.h"
 #include <core/command_line.h>
 
