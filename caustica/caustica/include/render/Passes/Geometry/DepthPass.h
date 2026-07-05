@@ -6,7 +6,7 @@
 #include <mutex>
 #include <rhi/nvrhi.h>
 
-namespace caustica::rhi
+namespace caustica::render
 {
 class RenderDevice;
 }
@@ -90,7 +90,7 @@ namespace caustica::render
 
         std::unordered_map<const caustica::BufferGroup*, nvrhi::BindingSetHandle> m_InputBindingSets;
         
-        rhi::RenderDevice* m_renderDevice = nullptr;
+        caustica::render::RenderDevice* m_renderDevice = nullptr;
         std::shared_ptr<caustica::MaterialBindingCache> m_MaterialBindings;
 
         virtual nvrhi::ShaderHandle CreateVertexShader(caustica::ShaderFactory& shaderFactory, const CreateParameters& params);
@@ -99,7 +99,7 @@ namespace caustica::render
         virtual nvrhi::BindingLayoutHandle CreateInputBindingLayout();
         virtual nvrhi::BindingSetHandle CreateInputBindingSet(const caustica::BufferGroup* bufferGroup);
         virtual void CreateViewBindings(nvrhi::BindingLayoutHandle& layout, nvrhi::BindingSetHandle& set, const CreateParameters& params);
-        virtual std::shared_ptr<caustica::MaterialBindingCache> CreateMaterialBindingCache(rhi::RenderDevice& renderDevice);
+        virtual std::shared_ptr<caustica::MaterialBindingCache> CreateMaterialBindingCache(caustica::render::RenderDevice& renderDevice);
         virtual nvrhi::GraphicsPipelineHandle CreateGraphicsPipeline(PipelineKey key, nvrhi::FramebufferInfo const& framebufferInfo);
         nvrhi::BindingSetHandle GetOrCreateInputBindingSet(const caustica::BufferGroup* bufferGroup);
 
@@ -107,7 +107,7 @@ namespace caustica::render
     public:
         DepthPass(
             nvrhi::IDevice* device,
-            rhi::RenderDevice& renderDevice);
+            caustica::render::RenderDevice& renderDevice);
 
         virtual void Init(
             caustica::ShaderFactory& shaderFactory,

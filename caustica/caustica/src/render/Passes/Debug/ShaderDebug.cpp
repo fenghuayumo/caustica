@@ -1,7 +1,7 @@
 #include <render/Passes/Debug/ShaderDebug.h>
 
 #include <assets/loader/ShaderFactory.h>
-#include <rhi/RenderDevice.h>
+#include <render/Core/RenderDevice.h>
 #include <scene/View.h>
 #include <core/log.h>
 #include <core/file_utils.h>
@@ -22,7 +22,7 @@
 using namespace caustica::math;
 using namespace caustica;
 
-ShaderDebug::ShaderDebug( nvrhi::IDevice* device, nvrhi::ICommandList* commandList, std::shared_ptr<caustica::ShaderFactory> shaderFactory, caustica::rhi::RenderDevice& renderDevice )
+ShaderDebug::ShaderDebug( nvrhi::IDevice* device, nvrhi::ICommandList* commandList, std::shared_ptr<caustica::ShaderFactory> shaderFactory, caustica::render::RenderDevice& renderDevice )
     : m_device(device)
     , m_shaderFactory(shaderFactory)
     , m_renderDevice(renderDevice)

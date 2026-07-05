@@ -25,7 +25,7 @@ class ShaderDebug;
 namespace caustica
 {
 	class ShaderFactory;
-	namespace rhi { class RenderDevice; }
+	namespace render { class RenderDevice; }
 	struct ShaderMacro;
 	class PlanarView;
 }
@@ -102,7 +102,7 @@ public:
 	RtxdiPass(
 		nvrhi::IDevice* device,
 		std::shared_ptr<caustica::ShaderFactory> shaderFactory,
-		caustica::rhi::RenderDevice& renderDevice,
+		caustica::render::RenderDevice& renderDevice,
 		nvrhi::BindingLayoutHandle bindlessLayout);
 	~RtxdiPass();
 
@@ -152,7 +152,7 @@ private:
 
 	nvrhi::DeviceHandle m_device; 
 	std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
-	caustica::rhi::RenderDevice& m_renderDevice;
+	caustica::render::RenderDevice& m_renderDevice;
 	std::shared_ptr<caustica::Scene> m_Scene;
 	nvrhi::BindingLayoutHandle m_bindingLayout;
 	nvrhi::BindingLayoutHandle m_bindlessLayout;

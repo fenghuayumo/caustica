@@ -4,7 +4,7 @@
 #include <rhi/nvrhi.h>
 #include <memory>
 
-namespace caustica::rhi
+namespace caustica::render
 {
 class RenderDevice;
 }
@@ -28,14 +28,14 @@ namespace caustica::render
         nvrhi::BindingSetHandle m_RenderBindingSet;
         nvrhi::GraphicsPipelineHandle m_RenderPso;
 
-        rhi::RenderDevice* m_renderDevice = nullptr;
+        caustica::render::RenderDevice* m_renderDevice = nullptr;
         std::shared_ptr<caustica::FramebufferFactory> m_FramebufferFactory;
 
     public:
         EnvironmentMapPass(
             nvrhi::IDevice* device,
             std::shared_ptr<caustica::ShaderFactory> shaderFactory,
-            rhi::RenderDevice& renderDevice,
+            caustica::render::RenderDevice& renderDevice,
             std::shared_ptr<caustica::FramebufferFactory> framebufferFactory,
             const caustica::ICompositeView& compositeView,
             nvrhi::ITexture* environmentMap);

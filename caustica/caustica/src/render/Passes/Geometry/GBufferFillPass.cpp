@@ -3,7 +3,7 @@
 #include <assets/loader/ShaderFactory.h>
 #include <render/Core/ShadowMap.h>
 #include <scene/SceneTypes.h>
-#include <rhi/RenderDevice.h>
+#include <render/Core/RenderDevice.h>
 #include <render/Core/MaterialBindingCache.h>
 #include <core/log.h>
 #include <rhi/utils.h>
@@ -39,7 +39,7 @@ using namespace caustica::math;
 using namespace caustica;
 using namespace caustica::render;
 
-GBufferFillPass::GBufferFillPass(nvrhi::IDevice* device, rhi::RenderDevice& renderDevice)
+GBufferFillPass::GBufferFillPass(nvrhi::IDevice* device, caustica::render::RenderDevice& renderDevice)
     : m_Device(device)
     , m_renderDevice(&renderDevice)
 {
@@ -235,7 +235,7 @@ nvrhi::GraphicsPipelineHandle GBufferFillPass::CreateGraphicsPipeline(PipelineKe
     return m_Device->createGraphicsPipeline(pipelineDesc, framebufferInfo);
 }
 
-std::shared_ptr<MaterialBindingCache> GBufferFillPass::CreateMaterialBindingCache(rhi::RenderDevice& renderDevice)
+std::shared_ptr<MaterialBindingCache> GBufferFillPass::CreateMaterialBindingCache(caustica::render::RenderDevice& renderDevice)
 {
     std::vector<MaterialResourceBinding> materialBindings = {
         { MaterialResource::ConstantBuffer,         GBUFFER_BINDING_MATERIAL_CONSTANTS },

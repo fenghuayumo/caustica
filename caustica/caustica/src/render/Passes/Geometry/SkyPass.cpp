@@ -3,7 +3,7 @@
 #include <assets/loader/ShaderFactory.h>
 #include <render/Core/ShadowMap.h>
 #include <render/Core/RenderPassConstants.h>
-#include <rhi/RenderDevice.h>
+#include <render/Core/RenderDevice.h>
 #include <scene/View.h>
 #include <scene/SceneObjects.h>
 
@@ -28,7 +28,7 @@ using namespace caustica::render;
 SkyPass::SkyPass(
     nvrhi::IDevice* device,
     const std::shared_ptr<caustica::ShaderFactory>& shaderFactory,
-    rhi::RenderDevice& renderDevice,
+    caustica::render::RenderDevice& renderDevice,
     const std::shared_ptr<caustica::FramebufferFactory>& framebufferFactory,
     const ICompositeView& compositeView)
     : m_FramebufferFactory(framebufferFactory)

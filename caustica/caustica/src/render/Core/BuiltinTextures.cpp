@@ -1,6 +1,6 @@
-#include <rhi/BuiltinTextures.h>
+#include <render/Core/BuiltinTextures.h>
 
-namespace caustica::rhi
+namespace caustica::render
 {
 
 BuiltinTextures::BuiltinTextures(nvrhi::IDevice* device)
@@ -92,4 +92,4 @@ BuiltinTextures::BuiltinTextures(nvrhi::IDevice* device)
     m_Device->executeCommandList(commandList);
 }
 
-} // namespace caustica::rhi
+} // namespace caustica::render

@@ -87,7 +87,7 @@ void OpacityMicromapBuilder::SceneUnloading()
     m_ommBuildQueue->CancelPendingBuilds();
 }
 
-void OpacityMicromapBuilder::CreateRenderPasses(nvrhi::BindingLayoutHandle bindlessLayout, caustica::rhi::RenderDevice& /*renderDevice*/)
+void OpacityMicromapBuilder::CreateRenderPasses(nvrhi::BindingLayoutHandle bindlessLayout, caustica::render::RenderDevice& /*renderDevice*/)
 {
     m_bindlessLayout = std::move(bindlessLayout);
 }

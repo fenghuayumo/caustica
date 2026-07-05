@@ -1,8 +1,8 @@
-#include <rhi/RenderDevice.h>
+#include <render/Core/RenderDevice.h>
 
 #include <assets/loader/ShaderFactory.h>
 
-namespace caustica::rhi
+namespace caustica::render
 {
 
 RenderDevice::RenderDevice(nvrhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory)
@@ -15,4 +15,4 @@ RenderDevice::RenderDevice(nvrhi::IDevice* device, std::shared_ptr<caustica::Sha
 
 RenderDevice::~RenderDevice() = default;
 
-} // namespace caustica::rhi
+} // namespace caustica::render

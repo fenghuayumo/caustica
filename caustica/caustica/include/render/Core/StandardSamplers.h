@@ -2,7 +2,7 @@
 
 #include <rhi/nvrhi.h>
 
-namespace caustica::rhi
+namespace caustica::render
 {
 
 class StandardSamplers
@@ -23,4 +23,4 @@ private:
     nvrhi::SamplerHandle m_AnisotropicWrapSampler;
 };
 
-} // namespace caustica::rhi
+} // namespace caustica::render

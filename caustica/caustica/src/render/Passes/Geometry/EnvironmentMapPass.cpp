@@ -2,7 +2,7 @@
 #include <render/Core/FramebufferFactory.h>
 #include <assets/loader/ShaderFactory.h>
 #include <render/Core/RenderPassConstants.h>
-#include <rhi/RenderDevice.h>
+#include <render/Core/RenderDevice.h>
 #include <scene/View.h>
 #include <math/math.h>
 
@@ -27,7 +27,7 @@ using namespace caustica::render;
 EnvironmentMapPass::EnvironmentMapPass(
     nvrhi::IDevice* device,
     std::shared_ptr<ShaderFactory> shaderFactory,
-    rhi::RenderDevice& renderDevice,
+    caustica::render::RenderDevice& renderDevice,
     std::shared_ptr<FramebufferFactory> framebufferFactory,
     const ICompositeView& compositeView,
     nvrhi::ITexture* environmentMap)

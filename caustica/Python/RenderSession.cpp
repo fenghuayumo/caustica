@@ -6,7 +6,7 @@
 #include <engine/SceneRuntimeRegistration.h>
 #include <engine/EngineFrameApplication.h>
 #include <engine/Application.h>
-#include <rhi/RenderDevice.h>
+#include <render/Core/RenderDevice.h>
 #include <backend/GpuDevice.h>
 #include <render/SceneGaussianSplatPasses.h>
 #include <render/SceneLightingPasses.h>

@@ -1,7 +1,7 @@
 #include <render/Passes/Geometry/TemporalAntiAliasingPass.h>
 #include <render/Core/FramebufferFactory.h>
 #include <assets/loader/ShaderFactory.h>
-#include <rhi/RenderDevice.h>
+#include <render/Core/RenderDevice.h>
 #include <scene/View.h>
 
 #if CAUSTICA_WITH_STATIC_SHADERS
@@ -33,7 +33,7 @@ using namespace caustica::render;
 TemporalAntiAliasingPass::TemporalAntiAliasingPass(
     nvrhi::IDevice* device,
     std::shared_ptr<ShaderFactory> shaderFactory, 
-    caustica::rhi::RenderDevice& renderDevice,
+    caustica::render::RenderDevice& renderDevice,
     const ICompositeView& compositeView,
     const CreateParameters& params)
     : m_renderDevice(renderDevice)

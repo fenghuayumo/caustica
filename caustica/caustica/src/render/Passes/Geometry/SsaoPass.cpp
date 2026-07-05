@@ -3,7 +3,7 @@
 #include <assets/loader/ShaderFactory.h>
 #include <render/Core/ShadowMap.h>
 #include <render/Core/RenderPassConstants.h>
-#include <rhi/RenderDevice.h>
+#include <render/Core/RenderDevice.h>
 #include <scene/View.h>
 #include <rhi/utils.h>
 
@@ -38,7 +38,7 @@ using namespace caustica::render;
 SsaoPass::SsaoPass(
     nvrhi::IDevice* device,
     std::shared_ptr<ShaderFactory> shaderFactory,
-    rhi::RenderDevice& renderDevice,
+    caustica::render::RenderDevice& renderDevice,
     const CreateParameters& params)
     : m_Device(device)
     , m_renderDevice(&renderDevice)
@@ -147,7 +147,7 @@ SsaoPass::SsaoPass(
 SsaoPass::SsaoPass(
     nvrhi::IDevice* device,
     std::shared_ptr<ShaderFactory> shaderFactory,
-    rhi::RenderDevice& renderDevice,
+    caustica::render::RenderDevice& renderDevice,
     nvrhi::ITexture* gbufferDepth,
     nvrhi::ITexture* gbufferNormals,
     nvrhi::ITexture* destinationTexture)

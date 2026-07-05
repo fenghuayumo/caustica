@@ -7,7 +7,7 @@
 #include <scene/SceneObjects.h>
 #include <scene/SceneEcs.h>
 #include <scene/SceneLightAccess.h>
-#include <rhi/RenderDevice.h>
+#include <render/Core/RenderDevice.h>
 #include <render/Core/MaterialBindingCache.h>
 #include <core/log.h>
 #include <rhi/utils.h>
@@ -43,7 +43,7 @@ using namespace caustica::render;
 
 ForwardShadingPass::ForwardShadingPass(
     nvrhi::IDevice* device,
-    rhi::RenderDevice& renderDevice)
+    caustica::render::RenderDevice& renderDevice)
     : m_Device(device)
     , m_renderDevice(&renderDevice)
 {
@@ -284,7 +284,7 @@ nvrhi::GraphicsPipelineHandle ForwardShadingPass::CreateGraphicsPipeline(Forward
     return m_Device->createGraphicsPipeline(pipelineDesc, framebufferInfo);
 }
 
-std::shared_ptr<MaterialBindingCache> ForwardShadingPass::CreateMaterialBindingCache(rhi::RenderDevice& renderDevice)
+std::shared_ptr<MaterialBindingCache> ForwardShadingPass::CreateMaterialBindingCache(caustica::render::RenderDevice& renderDevice)
 {
     std::vector<MaterialResourceBinding> materialBindings = {
         { MaterialResource::ConstantBuffer,         FORWARD_BINDING_MATERIAL_CONSTANTS },

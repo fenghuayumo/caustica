@@ -2,8 +2,8 @@
 #include <render/Core/FramebufferFactory.h>
 #include <assets/loader/ShaderFactory.h>
 #include <render/Core/RenderPassConstants.h>
-#include <rhi/Format.h>
-#include <rhi/RenderDevice.h>
+#include <render/graph/GpuTypes.h>
+#include <render/Core/RenderDevice.h>
 #include <scene/View.h>
 #include <utility>
 
@@ -30,9 +30,9 @@ using namespace caustica::render;
 
 namespace
 {
-    rhi::TextureDesc makeBloomMipDesc(uint32_t width, uint32_t height, rhi::Format format, const char* name)
+    rg::TextureDesc makeBloomMipDesc(uint32_t width, uint32_t height, rg::Format format, const char* name)
     {
-        rhi::TextureDesc desc{};
+        rg::TextureDesc desc{};
         desc.name = name;
         desc.width = width;
         desc.height = height;
@@ -55,20 +55,20 @@ namespace
         mip2Height = static_cast<uint32_t>(std::ceil(mip1Height / 2.f));
     }
 
-    rhi::Format bloomColorFormat(const std::shared_ptr<FramebufferFactory>& framebufferFactory,
+    rg::Format bloomColorFormat(const std::shared_ptr<FramebufferFactory>& framebufferFactory,
         const ICompositeView& compositeView)
     {
         const IView* view = compositeView.GetChildView(ViewType::PLANAR, 0);
         const nvrhi::IFramebuffer* framebuffer = framebufferFactory->GetFramebuffer(*view);
         const nvrhi::Format nativeFormat = framebuffer->getFramebufferInfo().colorFormats[0];
-        return rhi::fromNativeFormat(static_cast<uint32_t>(nativeFormat));
+        return rg::fromNativeFormat(static_cast<uint32_t>(nativeFormat));
     }
 }
 
 BloomPass::BloomPass(
     nvrhi::IDevice* device,
     const std::shared_ptr<ShaderFactory>& shaderFactory,
-    caustica::rhi::RenderDevice& renderDevice,
+    caustica::render::RenderDevice& renderDevice,
     std::shared_ptr<FramebufferFactory> framebufferFactory,
     const ICompositeView& compositeView)
     : m_renderDevice(renderDevice)
@@ -187,13 +187,13 @@ void BloomPass::renderInternal(
                     float(scissorRect.maxY) / (float)fbinfo.height)
             );
 
-            rhi::BlitParameters blitParams1;
+            caustica::render::BlitParameters blitParams1;
             blitParams1.targetFramebuffer = framebufferDownscale1;
             blitParams1.sourceTexture = sourceDestTexture;
             blitParams1.sourceBox = uvSrcRect;
             m_renderDevice.blit().blitTexture(commandList, blitParams1, nullptr);
 
-            rhi::BlitParameters blitParams2;
+            caustica::render::BlitParameters blitParams2;
             blitParams2.targetFramebuffer = framebufferDownscale2;
             blitParams2.sourceTexture = textureDownscale1;
             m_renderDevice.blit().blitTexture(commandList, blitParams2, nullptr);
@@ -243,7 +243,7 @@ void BloomPass::renderInternal(
         {
             commandList->beginMarker("Apply");
 
-            rhi::BlitParameters blitParams3;
+            caustica::render::BlitParameters blitParams3;
             blitParams3.targetFramebuffer = framebuffer;
             blitParams3.targetViewport = viewportState.viewports[0];
             blitParams3.sourceTexture = texturePass2Blur;
@@ -275,11 +275,11 @@ void BloomPass::Render(
     uint32_t mip1H = 0;
     uint32_t mip2W = 0;
     uint32_t mip2H = 0;
-    const rhi::Format colorFormat = bloomColorFormat(framebufferFactory, compositeView);
+    const rg::Format colorFormat = bloomColorFormat(framebufferFactory, compositeView);
     computeBloomMipSizes(view, mip1W, mip1H, mip2W, mip2H);
 
     nvrhi::TextureDesc nativeDesc;
-    nativeDesc.format = static_cast<nvrhi::Format>(rhi::toNativeFormat(colorFormat));
+    nativeDesc.format = static_cast<nvrhi::Format>(rg::toNativeFormat(colorFormat));
     nativeDesc.width = mip1W;
     nativeDesc.height = mip1H;
     nativeDesc.mipLevels = 1;
@@ -340,7 +340,7 @@ void BloomPass::registerGraphPass(
             uint32_t mip1H = 0;
             uint32_t mip2W = 0;
             uint32_t mip2H = 0;
-            const rhi::Format colorFormat = bloomColorFormat(framebufferFactory, compositeView);
+            const rg::Format colorFormat = bloomColorFormat(framebufferFactory, compositeView);
             computeBloomMipSizes(view, mip1W, mip1H, mip2W, mip2H);
 
             passData->downscale1 = setup.createTexture(makeBloomMipDesc(mip1W, mip1H, colorFormat, "bloom src mip1"));

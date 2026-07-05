@@ -3,7 +3,7 @@ namespace { constexpr int c_SwapchainCount = 3; }
 #include <render/WorldRenderer/WorldRenderer.h>
 #include <render/SceneGpuResources.h>
 #include <render/WorldRenderer/PathTracingContext.h>
-#include <rhi/RenderDevice.h>
+#include <render/Core/RenderDevice.h>
 #include <render/Core/RenderPassConstants.h>
 #include <render/SceneGaussianSplatPasses.h>
 #include <render/SceneRayTracingResources.h>

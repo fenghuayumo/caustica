@@ -98,7 +98,7 @@ AssetId AssetSystem::RegisterMesh(const std::filesystem::path& path)
 std::shared_ptr<LoadedTexture> AssetSystem::LoadTexture(
     const std::filesystem::path& path,
     bool sRGB,
-    rhi::RenderDevice* renderDevice,
+    caustica::render::RenderDevice* renderDevice,
     nvrhi::ICommandList* commandList)
 {
     if (!m_TextureLoader)

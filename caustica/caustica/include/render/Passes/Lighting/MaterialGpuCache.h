@@ -27,7 +27,7 @@ namespace caustica
     class TextureLoader;
     class TextureHandle;
     class ShaderFactory;
-    namespace rhi { class RenderDevice; }
+    namespace render { class RenderDevice; }
     struct TextureData;
     struct LoadedTexture;
 }
@@ -265,7 +265,7 @@ public:
     MaterialGpuCache(const std::string & relativeShaderSourcePath, nvrhi::IDevice* device, std::shared_ptr<caustica::TextureLoader> textureCache, std::shared_ptr<caustica::ShaderFactory> shaderFactory);
     ~MaterialGpuCache();
 
-    void                            CreateRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* bindlessLayout, caustica::rhi::RenderDevice& renderDevice, const std::shared_ptr<caustica::Scene>& scene, const std::filesystem::path & sceneFilePath, const std::filesystem::path & mediaPath);
+    void                            CreateRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* bindlessLayout, caustica::render::RenderDevice& renderDevice, const std::shared_ptr<caustica::Scene>& scene, const std::filesystem::path & sceneFilePath, const std::filesystem::path & mediaPath);
 
     // this update can happen in parallel with any other ray preparatory tracing work - anything from BVH building to laying down denoising layers
     void                            Update(nvrhi::ICommandList * commandList, const std::shared_ptr<caustica::Scene> & scene, std::vector<SubInstanceData> & subInstanceData);
@@ -319,7 +319,7 @@ private:
     nvrhi::DeviceHandle             m_device;
     std::string                     m_relativeShaderSourcePath;         // this is the path for the shader file containing material specializations for ClosestHit and (if enabled) AnyHit; it is currently 1 for all materials, but could be per-material
     std::shared_ptr<caustica::TextureLoader> m_textureCache;
-    caustica::rhi::RenderDevice* m_renderDevice = nullptr;
+    caustica::render::RenderDevice* m_renderDevice = nullptr;
     std::shared_ptr<caustica::FramebufferFactory> m_framebufferFactory;
     std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
 

@@ -13,7 +13,7 @@ class BindingCache;
 class GpuDevice;
 class ShaderFactory;
 
-namespace rhi
+namespace render
 {
 class RenderDevice;
 }
@@ -45,7 +45,7 @@ struct ScenePassWireParams
     SceneLightingPasses& lighting;
     caustica::BindingCache& bindingCache;
     std::shared_ptr<caustica::ShaderFactory>& shaderFactory;
-    caustica::rhi::RenderDevice& renderDevice;
+    caustica::render::RenderDevice& renderDevice;
 };
 
 // Scene-scoped render pass bundles owned by GpuRenderSubsystem (not Application hosts).

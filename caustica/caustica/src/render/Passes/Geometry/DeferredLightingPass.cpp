@@ -9,7 +9,7 @@
 #include <scene/SceneEcs.h>
 #include <scene/SceneLightAccess.h>
 #include <render/Core/RenderPassConstants.h>
-#include <rhi/RenderDevice.h>
+#include <render/Core/RenderDevice.h>
 #include <scene/View.h>
 #include <core/log.h>
 #include <utility>
@@ -43,7 +43,7 @@ void DeferredLightingPass::Inputs::SetGBuffer(const GBufferRenderTargets& target
 
 DeferredLightingPass::DeferredLightingPass(
     nvrhi::IDevice* device,
-    rhi::RenderDevice& renderDevice)
+    caustica::render::RenderDevice& renderDevice)
     : m_Device(device)
     , m_BindingSets(device)
     , m_renderDevice(&renderDevice)

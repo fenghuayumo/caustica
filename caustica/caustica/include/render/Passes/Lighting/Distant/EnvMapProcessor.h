@@ -34,7 +34,7 @@ namespace caustica
     class TextureLoader;
     class TextureHandle;
     class ShaderFactory;
-    namespace rhi { class RenderDevice; }
+    namespace render { class RenderDevice; }
     struct TextureData;
 }
 
@@ -89,8 +89,8 @@ public:
 
     void                            CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebug, std::shared_ptr<caustica::ShaderFactory> shaderFactory, std::shared_ptr<ComputePipelineRegistry> computePipelineRegistry);
 
-    void                            PreUpdate( nvrhi::ICommandList* commandList, caustica::rhi::RenderDevice& renderDevice, std::string envMapBackgroundPath, const std::filesystem::path& sceneDirectory = std::filesystem::path() );
-    bool                            Update( nvrhi::ICommandList * commandList, caustica::BindingCache & bindingCache, caustica::rhi::RenderDevice& renderDevice, const UpdateSettings & settings, double sceneTime, EMB_DirectionalLight const * directionalLights, uint directionaLightCount, bool forceInstantUpdate );
+    void                            PreUpdate( nvrhi::ICommandList* commandList, caustica::render::RenderDevice& renderDevice, std::string envMapBackgroundPath, const std::filesystem::path& sceneDirectory = std::filesystem::path() );
+    bool                            Update( nvrhi::ICommandList * commandList, caustica::BindingCache & bindingCache, caustica::render::RenderDevice& renderDevice, const UpdateSettings & settings, double sceneTime, EMB_DirectionalLight const * directionalLights, uint directionaLightCount, bool forceInstantUpdate );
 
     nvrhi::TextureHandle            GetEnvMapCube() const           { return (m_outputIsCompressed)?(m_cubemapBC6H):(m_cubemap); }
     nvrhi::SamplerHandle            GetEnvMapCubeSampler() const    { return m_linearSampler; }

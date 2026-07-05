@@ -1,18 +1,18 @@
 #pragma once
 
-#include <rhi/BuiltinTextures.h>
-#include <rhi/Device.h>
-#include <rhi/FullscreenBlitPass.h>
-#include <rhi/StandardSamplers.h>
+#include <render/Core/BuiltinTextures.h>
+#include <render/Core/FullscreenBlitPass.h>
+#include <render/Core/StandardSamplers.h>
+#include <render/graph/GpuDeviceAdapter.h>
 
 #include <memory>
 
 namespace caustica
 {
 class ShaderFactory;
-} // namespace caustica
+}
 
-namespace caustica::rhi
+namespace caustica::render
 {
 
 class RenderDevice
@@ -24,8 +24,8 @@ public:
     RenderDevice(const RenderDevice&) = delete;
     RenderDevice& operator=(const RenderDevice&) = delete;
 
-    [[nodiscard]] Device& device() { return m_device; }
-    [[nodiscard]] const Device& device() const { return m_device; }
+    [[nodiscard]] rg::Device& device() { return m_device; }
+    [[nodiscard]] const rg::Device& device() const { return m_device; }
 
     [[nodiscard]] BuiltinTextures& builtins() { return *m_builtins; }
     [[nodiscard]] const BuiltinTextures& builtins() const { return *m_builtins; }
@@ -37,10 +37,10 @@ public:
     [[nodiscard]] const FullscreenBlitPass& blit() const { return *m_blit; }
 
 private:
-    Device m_device;
+    rg::Device m_device;
     std::unique_ptr<BuiltinTextures> m_builtins;
     std::unique_ptr<StandardSamplers> m_samplers;
     std::unique_ptr<FullscreenBlitPass> m_blit;
 };
 
-} // namespace caustica::rhi
+} // namespace caustica::render

@@ -1,8 +1,8 @@
-#include <rhi/Device.h>
+#include <render/graph/GpuDeviceAdapter.h>
 
 #include <rhi/nvrhi.h>
 
-namespace caustica::rhi
+namespace caustica::rg
 {
 
 Device::Device(nvrhi::IDevice* device)
@@ -48,4 +48,4 @@ CommandList::CommandList(nvrhi::ICommandList* commandList)
 {
 }
 
-} // namespace caustica::rhi
+} // namespace caustica::rg

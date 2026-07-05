@@ -89,7 +89,7 @@ LightSamplingCache::~LightSamplingCache()
 {
 }
 
-void LightSamplingCache::CreateRenderPasses(std::shared_ptr<caustica::ShaderFactory> shaderFactory, nvrhi::IBindingLayout* bindlessLayout, caustica::rhi::RenderDevice& renderDevice, std::shared_ptr<ShaderDebug> shaderDebug, const uint2 renderResolution, const uint envMapProcessedResolution)
+void LightSamplingCache::CreateRenderPasses(std::shared_ptr<caustica::ShaderFactory> shaderFactory, nvrhi::IBindingLayout* bindlessLayout, caustica::render::RenderDevice& renderDevice, std::shared_ptr<ShaderDebug> shaderDebug, const uint2 renderResolution, const uint envMapProcessedResolution)
 {
     m_renderDevice = &renderDevice;
     m_shaderDebug = shaderDebug;

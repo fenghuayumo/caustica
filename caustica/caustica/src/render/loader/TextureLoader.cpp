@@ -2,8 +2,8 @@
 #include <assets/AssetSystem.h>
 
 #include <render/Core/DescriptorTableManager.h>
-#include <rhi/RenderDevice.h>
-#include <rhi/FullscreenBlitPass.h>
+#include <render/Core/RenderDevice.h>
+#include <render/Core/FullscreenBlitPass.h>
 #include <assets/loader/DDSFile.h>
 #include <core/ThreadPool.h>
 #include <core/vfs/VFS.h>
@@ -316,7 +316,7 @@ uint GetMipLevelsNum(uint width, uint height)
 
 void TextureLoader::FinalizeTexture(
     std::shared_ptr<TextureData> texture,
-    rhi::RenderDevice* renderDevice,
+    caustica::render::RenderDevice* renderDevice,
     nvrhi::ICommandList* commandList)
 {
     assert(texture->data);
@@ -438,7 +438,7 @@ void TextureLoader::FinalizeTexture(
                 .setArraySlice(0)
                 .setMipLevel(mipLevel)));
         
-        rhi::BlitParameters blitParams;
+        caustica::render::BlitParameters blitParams;
         blitParams.sourceTexture = texture->texture;
         blitParams.sourceMip = mipLevel - 1;
         blitParams.targetFramebuffer = framebuffer;
@@ -469,7 +469,7 @@ void TextureLoader::TextureLoaded(std::shared_ptr<TextureData> texture)
 std::shared_ptr<LoadedTexture> TextureLoader::LoadTextureFromFile(
     const std::filesystem::path& path,
     bool sRGB,
-    rhi::RenderDevice* renderDevice,
+    caustica::render::RenderDevice* renderDevice,
     nvrhi::ICommandList* commandList)
 {
     std::shared_ptr<TextureData> texture;
@@ -595,7 +595,7 @@ std::shared_ptr<LoadedTexture> TextureLoader::LoadTextureFromMemory(
     const std::string& name,
     const std::string& mimeType,
     bool sRGB,
-    rhi::RenderDevice* renderDevice,
+    caustica::render::RenderDevice* renderDevice,
     nvrhi::ICommandList* commandList)
 {
     std::shared_ptr<TextureData> texture = CreateTextureData();
@@ -651,7 +651,7 @@ std::shared_ptr<TextureData> TextureLoader::GetLoadedTexture(std::filesystem::pa
     return AssetSystem::Get().GetTextureCache().GetAny(id);
 }
 
-bool TextureLoader::ProcessRenderingThreadCommands(rhi::RenderDevice& renderDevice, float timeLimitMilliseconds)
+bool TextureLoader::ProcessRenderingThreadCommands(caustica::render::RenderDevice& renderDevice, float timeLimitMilliseconds)
 {
     using namespace std::chrono;
 
@@ -720,7 +720,7 @@ namespace caustica
 {
     bool SaveTextureToFile(
         nvrhi::IDevice* device,
-        rhi::RenderDevice& renderDevice,
+        caustica::render::RenderDevice& renderDevice,
         nvrhi::ITexture* texture,
         nvrhi::ResourceStates textureState,
         const char* fileName,

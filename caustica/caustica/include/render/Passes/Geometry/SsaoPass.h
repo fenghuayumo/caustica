@@ -4,7 +4,7 @@
 #include <rhi/nvrhi.h>
 #include <memory>
 
-namespace caustica::rhi
+namespace caustica::render
 {
 class RenderDevice;
 }
@@ -53,7 +53,7 @@ namespace caustica::render
         nvrhi::TextureHandle m_DeinterleavedOcclusion;
         dm::float2 m_QuantizedGbufferTextureSize;
                 
-        rhi::RenderDevice* m_renderDevice = nullptr;
+        caustica::render::RenderDevice* m_renderDevice = nullptr;
 
     public:
         struct CreateParameters
@@ -68,13 +68,13 @@ namespace caustica::render
         SsaoPass(
             nvrhi::IDevice* device,
             std::shared_ptr<caustica::ShaderFactory> shaderFactory,
-            rhi::RenderDevice& renderDevice,
+            caustica::render::RenderDevice& renderDevice,
             const CreateParameters& params);
 
         SsaoPass(
             nvrhi::IDevice* device,
             std::shared_ptr<caustica::ShaderFactory> shaderFactory,
-            rhi::RenderDevice& renderDevice,
+            caustica::render::RenderDevice& renderDevice,
             nvrhi::ITexture* gbufferDepth,
             nvrhi::ITexture* gbufferNormals,
             nvrhi::ITexture* destinationTexture);

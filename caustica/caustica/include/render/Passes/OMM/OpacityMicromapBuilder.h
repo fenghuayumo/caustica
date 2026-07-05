@@ -22,7 +22,7 @@ namespace caustica
     class TextureLoader;
     class TextureHandle;
     class ShaderFactory;
-    namespace rhi { class RenderDevice; }
+    namespace render { class RenderDevice; }
     struct TextureData;
     struct LoadedTexture;
 }
@@ -100,7 +100,7 @@ public:
         std::shared_ptr<caustica::ShaderFactory> shaderFactory);
     ~OpacityMicromapBuilder();
 
-    void                            CreateRenderPasses(nvrhi::BindingLayoutHandle bindlessLayout, caustica::rhi::RenderDevice& renderDevice);
+    void                            CreateRenderPasses(nvrhi::BindingLayoutHandle bindlessLayout, caustica::render::RenderDevice& renderDevice);
 
     bool                            Update(nvrhi::ICommandList& commandList, const caustica::Scene& scene);
 

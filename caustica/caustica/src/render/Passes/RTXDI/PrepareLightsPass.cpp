@@ -6,7 +6,7 @@
 #include <scene/SceneLightAccess.h>
 
 #include <assets/loader/ShaderFactory.h>
-#include <rhi/RenderDevice.h>
+#include <render/Core/RenderDevice.h>
 #include <core/log.h>
 #include <rhi/utils.h>
 
@@ -31,7 +31,7 @@ using namespace caustica;
 PrepareLightsPass::PrepareLightsPass(
     nvrhi::IDevice* device, 
     std::shared_ptr<caustica::ShaderFactory> shaderFactory, 
-    caustica::rhi::RenderDevice& renderDevice,
+    caustica::render::RenderDevice& renderDevice,
     std::shared_ptr<caustica::Scene> scene,
     std::shared_ptr<MaterialGpuCache> materialGpuCache,
     std::shared_ptr<OpacityMicromapBuilder> opacityMicromapBuilder,

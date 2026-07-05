@@ -1,8 +1,8 @@
 #include <render/Passes/Geometry/MipMapGenPass.h>
 #include <assets/loader/ShaderFactory.h>
 #include <render/Core/RenderPassConstants.h>
-#include <rhi/RenderDevice.h>
-#include <rhi/FullscreenBlitPass.h>
+#include <render/Core/RenderDevice.h>
+#include <render/Core/FullscreenBlitPass.h>
 
 #if CAUSTICA_WITH_STATIC_SHADERS
 #if CAUSTICA_WITH_DX11
@@ -190,7 +190,7 @@ void MipMapGenPass::Dispatch(nvrhi::ICommandList* commandList, int maxLOD)
 }
 
 
-void MipMapGenPass::Display(caustica::rhi::RenderDevice& renderDevice, nvrhi::ICommandList* commandList, nvrhi::IFramebuffer* target)
+void MipMapGenPass::Display(caustica::render::RenderDevice& renderDevice, nvrhi::ICommandList* commandList, nvrhi::IFramebuffer* target)
 {
     assert(m_Texture);
     
@@ -203,7 +203,7 @@ void MipMapGenPass::Display(caustica::rhi::RenderDevice& renderDevice, nvrhi::IC
  
     for (uint level = 0; level < m_Texture->getDesc().mipLevels-1; ++level)
     {
-        caustica::rhi::BlitParameters blitParams;
+        caustica::render::BlitParameters blitParams;
         blitParams.targetFramebuffer = target;
         blitParams.sourceTexture = m_Texture;
         blitParams.sourceMip = level + 1;

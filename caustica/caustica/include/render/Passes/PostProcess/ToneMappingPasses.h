@@ -6,7 +6,7 @@
 #include <render/Passes/Geometry/MipMapGenPass.h>
 #include <render/graph/GraphBuilder.h>
 #include <shaders/render/ToneMapper/ToneMapping_cb.h>
-#include <rhi/RenderDevice.h>
+#include <render/Core/RenderDevice.h>
 
 namespace caustica
 {
@@ -105,7 +105,7 @@ private:
     nvrhi::ComputePipelineHandle m_CaptureLumPso;
 #endif
 
-    caustica::rhi::RenderDevice& m_renderDevice;
+    caustica::render::RenderDevice& m_renderDevice;
     std::shared_ptr<caustica::FramebufferFactory> m_FramebufferFactory;
         
     ExposureMode m_ExposureMode;
@@ -150,7 +150,7 @@ public:
     ToneMappingPass(
         nvrhi::IDevice* device,
         std::shared_ptr<caustica::ShaderFactory> shaderFactory,
-        caustica::rhi::RenderDevice& renderDevice,
+        caustica::render::RenderDevice& renderDevice,
         std::shared_ptr<caustica::FramebufferFactory> colorFramebufferFactory,
         const caustica::ICompositeView& compositeView,
         nvrhi::TextureHandle sourceTexture

@@ -1,7 +1,7 @@
 #include <render/Passes/Geometry/DepthPass.h>
 #include <assets/loader/ShaderFactory.h>
 #include <scene/SceneTypes.h>
-#include <rhi/RenderDevice.h>
+#include <render/Core/RenderDevice.h>
 #include <scene/View.h>
 #include <render/Core/MaterialBindingCache.h>
 #include <rhi/utils.h>
@@ -34,7 +34,7 @@ using namespace caustica::render;
 
 DepthPass::DepthPass(
     nvrhi::IDevice* device,
-    rhi::RenderDevice& renderDevice)
+    caustica::render::RenderDevice& renderDevice)
     : m_Device(device)
     , m_renderDevice(&renderDevice)
 {
@@ -128,7 +128,7 @@ void DepthPass::CreateViewBindings(nvrhi::BindingLayoutHandle& layout, nvrhi::Bi
     set = m_Device->createBindingSet(bindingSetDesc, layout);
 }
 
-std::shared_ptr<MaterialBindingCache> DepthPass::CreateMaterialBindingCache(rhi::RenderDevice& renderDevice)
+std::shared_ptr<MaterialBindingCache> DepthPass::CreateMaterialBindingCache(caustica::render::RenderDevice& renderDevice)
 {
     std::vector<MaterialResourceBinding> materialBindings = {
         { MaterialResource::DiffuseTexture, DEPTH_BINDING_MATERIAL_DIFFUSE_TEXTURE },

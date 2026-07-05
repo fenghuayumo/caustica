@@ -6,7 +6,7 @@
 #include <unordered_map>
 #include <render/Core/BindingCache.h>
 
-namespace caustica::rhi
+namespace caustica::render
 {
 class RenderDevice;
 }
@@ -39,7 +39,7 @@ namespace caustica::render
         nvrhi::BindingLayoutHandle m_BindingLayout;
         caustica::BindingCache m_BindingSets;
 
-        rhi::RenderDevice* m_renderDevice = nullptr;
+        caustica::render::RenderDevice* m_renderDevice = nullptr;
 
     protected:
 
@@ -72,7 +72,7 @@ namespace caustica::render
 
         DeferredLightingPass(
             nvrhi::IDevice* device,
-            rhi::RenderDevice& renderDevice);
+            caustica::render::RenderDevice& renderDevice);
 
         virtual void Init(const std::shared_ptr<caustica::ShaderFactory>& shaderFactory);
 

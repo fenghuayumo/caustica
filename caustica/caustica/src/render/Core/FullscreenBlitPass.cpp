@@ -1,4 +1,4 @@
-#include <rhi/FullscreenBlitPass.h>
+#include <render/Core/FullscreenBlitPass.h>
 
 #include <assets/loader/ShaderFactory.h>
 #include <render/Core/BindingCache.h>
@@ -27,7 +27,7 @@
 using namespace caustica::math;
 #include <shaders/blit_cb.h>
 
-namespace caustica::rhi
+namespace caustica::render
 {
 
 FullscreenBlitPass::FullscreenBlitPass(nvrhi::IDevice* device,
@@ -189,4 +189,4 @@ void FullscreenBlitPass::blitTexture(nvrhi::ICommandList* commandList,
     blitTexture(commandList, params, bindingCache);
 }
 
-} // namespace caustica::rhi
+} // namespace caustica::render

@@ -2,10 +2,9 @@
 
 #include <rhi/nvrhi.h>
 
-namespace caustica::rhi
+namespace caustica::render
 {
 
-// Engine-owned 1x1 and placeholder GPU textures (fallback bindings).
 class BuiltinTextures
 {
 public:
@@ -34,4 +33,4 @@ private:
     nvrhi::TextureHandle m_BlackDepthStencilTexture2DArray;
 };
 
-} // namespace caustica::rhi
+} // namespace caustica::render

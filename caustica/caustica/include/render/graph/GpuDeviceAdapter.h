@@ -1,7 +1,6 @@
 #pragma once
 
-#include <rhi/Format.h>
-#include <rhi/Resources.h>
+#include <render/graph/GpuTypes.h>
 
 namespace nvrhi
 {
@@ -9,14 +8,11 @@ class IDevice;
 class ICommandList;
 class ITexture;
 class IBuffer;
-class IFramebuffer;
 } // namespace nvrhi
 
-namespace caustica::rhi
+namespace caustica::rg
 {
 
-// Thin facade over the backend GPU device. Pass / graph code should depend on this
-// type instead of nvrhi::IDevice directly.
 class Device
 {
 public:
@@ -47,4 +43,4 @@ private:
     nvrhi::ICommandList* m_commandList = nullptr;
 };
 
-} // namespace caustica::rhi
+} // namespace caustica::rg

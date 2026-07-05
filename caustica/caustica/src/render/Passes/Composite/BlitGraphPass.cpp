@@ -8,7 +8,7 @@ namespace caustica::rg
 void registerFinalBlitPass(
     GraphBuilder& graph,
     const FinalBlitPassParams& params,
-    rhi::FullscreenBlitPass& blitPass)
+    caustica::render::FullscreenBlitPass& blitPass)
 {
     assert(params.sourceLdrColor.isValid());
     assert(params.targetFramebuffer);
@@ -25,7 +25,7 @@ void registerFinalBlitPass(
             setup.write(targetColorHandle, TextureAccess::RenderTarget);
         },
         [params, &blitPass](RenderPassContext& ctx) {
-            rhi::BlitParameters blitParams{};
+            caustica::render::BlitParameters blitParams{};
             blitParams.targetFramebuffer = params.targetFramebuffer;
             blitParams.sourceTexture = ctx.texture(params.sourceLdrColor);
             blitPass.blitTexture(ctx.commandList(), blitParams, nullptr);

@@ -1,7 +1,7 @@
 #pragma once
 
-#include <rhi/Format.h>
-#include <rhi/Resources.h>
+#include <render/graph/GpuDeviceAdapter.h>
+#include <render/graph/GpuTypes.h>
 #include <rhi/nvrhi.h>
 
 #include <cstdint>
@@ -18,16 +18,8 @@ class IDevice;
 class ITexture;
 } // namespace nvrhi
 
-namespace caustica::rhi
-{
-class CommandList;
-class Device;
-}
-
 namespace caustica::rg
 {
-
-using TextureHandle = rhi::TextureHandle;
 
 enum class TextureAccess : uint8_t
 {
@@ -48,7 +40,7 @@ public:
     void read(TextureHandle texture, TextureAccess access = TextureAccess::ShaderResource);
     void write(TextureHandle texture, TextureAccess access = TextureAccess::RenderTarget);
 
-    [[nodiscard]] TextureHandle createTexture(const rhi::TextureDesc& desc);
+    [[nodiscard]] TextureHandle createTexture(const TextureDesc& desc);
 
     [[nodiscard]] const std::vector<std::pair<TextureHandle, TextureAccess>>& reads() const { return m_reads; }
     [[nodiscard]] const std::vector<std::pair<TextureHandle, TextureAccess>>& writes() const { return m_writes; }
@@ -65,7 +57,7 @@ public:
     RenderPassContext(nvrhi::ICommandList* commandList, const GraphBuilder& graph);
 
     [[nodiscard]] nvrhi::ICommandList* commandList() const { return m_commandList; }
-    [[nodiscard]] rhi::CommandList rhiCommandList() const;
+    [[nodiscard]] CommandList rhiCommandList() const;
     [[nodiscard]] nvrhi::ITexture* texture(TextureHandle handle) const;
 
 private:
@@ -82,18 +74,18 @@ public:
     using ExecuteFn = std::function<void(RenderPassContext&)>;
 
     void setDevice(nvrhi::IDevice* device);
-    void setDevice(rhi::Device& device);
+    void setDevice(Device& device);
 
     TextureHandle importTexture(nvrhi::ITexture* texture, nvrhi::ResourceStates initialState);
     TextureHandle importTexture(nvrhi::ITexture* texture, TextureAccess initialAccess = TextureAccess::ShaderResource);
 
-    [[nodiscard]] TextureHandle createTexture(const rhi::TextureDesc& desc);
+    [[nodiscard]] TextureHandle createTexture(const TextureDesc& desc);
 
     void addPass(std::string_view name, SetupFn setup, ExecuteFn execute, bool enabled = true);
 
     void compile();
     void execute(nvrhi::ICommandList* commandList);
-    void execute(rhi::CommandList& commandList);
+    void execute(CommandList& commandList);
 
     void reset();
 

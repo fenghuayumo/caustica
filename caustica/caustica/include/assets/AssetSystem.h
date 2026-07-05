@@ -30,7 +30,7 @@ namespace caustica
 struct TextureData;
 struct LoadedTexture;
 class TextureLoader;
-namespace rhi { class RenderDevice; }
+namespace render { class RenderDevice; }
 class ThreadPool;
 class IFileSystem;
 class IDescriptorTableManager;
@@ -78,7 +78,7 @@ public:
     [[nodiscard]] std::shared_ptr<LoadedTexture> LoadTexture(
         const std::filesystem::path& path,
         bool sRGB,
-        rhi::RenderDevice* renderDevice = nullptr,
+        caustica::render::RenderDevice* renderDevice = nullptr,
         nvrhi::ICommandList* commandList = nullptr);
     [[nodiscard]] std::shared_ptr<LoadedTexture> LoadTextureDeferred(
         const std::filesystem::path& path,

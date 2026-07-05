@@ -1,5 +1,5 @@
 #include <assets/loader/ShaderFactory.h>
-#include <rhi/RenderDevice.h>
+#include <render/Core/RenderDevice.h>
 #include <scene/View.h>
 #include <sstream>
 #include <assert.h>
@@ -21,7 +21,7 @@ using namespace caustica::render;
 ToneMappingPass::ToneMappingPass(
     nvrhi::IDevice* device,
     std::shared_ptr<caustica::ShaderFactory> shaderFactory,
-    caustica::rhi::RenderDevice& renderDevice,
+    caustica::render::RenderDevice& renderDevice,
     std::shared_ptr<caustica::FramebufferFactory> colorFramebufferFactory,
     const caustica::ICompositeView& compositeView,
 	nvrhi::TextureHandle sourceTexture)

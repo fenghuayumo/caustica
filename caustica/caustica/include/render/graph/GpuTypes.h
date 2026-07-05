@@ -1,12 +1,49 @@
 #pragma once
 
-#include <rhi/Format.h>
-
 #include <cstdint>
 #include <string>
 
-namespace caustica::rhi
+namespace caustica::rg
 {
+
+enum class Format : uint16_t
+{
+    Unknown = 0,
+
+    R8_UNORM,
+    RG8_UNORM,
+    RGBA8_UNORM,
+    RGBA8_UNORM_SRGB,
+    BGRA8_UNORM,
+    BGRA8_UNORM_SRGB,
+
+    R16_FLOAT,
+    RG16_FLOAT,
+    RGBA16_FLOAT,
+    R32_FLOAT,
+    RG32_FLOAT,
+    RGBA32_FLOAT,
+
+    R11G11B10_FLOAT,
+    R10G10B10A2_UNORM,
+
+    D24S8,
+    D32_FLOAT,
+};
+
+struct FormatInfo
+{
+    bool isDepth = false;
+    bool isStencil = false;
+    bool isSRGB = false;
+    bool isUAVCompatible = false;
+    bool isRenderTargetCompatible = false;
+    uint8_t blockSize = 1;
+};
+
+[[nodiscard]] FormatInfo getFormatInfo(Format format);
+[[nodiscard]] uint32_t toNativeFormat(Format format);
+[[nodiscard]] Format fromNativeFormat(uint32_t nativeFormat);
 
 struct TextureDesc
 {
@@ -31,7 +68,6 @@ struct BufferDesc
     uint32_t structuredStride = 0;
 };
 
-// Opaque GPU resource handles for render-graph and pass code.
 struct TextureHandle
 {
     uint32_t index = UINT32_MAX;
@@ -46,4 +82,4 @@ struct BufferHandle
     [[nodiscard]] bool isValid() const { return index != UINT32_MAX; }
 };
 
-} // namespace caustica::rhi
+} // namespace caustica::rg

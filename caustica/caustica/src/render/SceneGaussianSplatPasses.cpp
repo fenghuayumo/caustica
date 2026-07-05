@@ -1,6 +1,6 @@
 #include <render/SceneGaussianSplatPasses.h>
 
-#include <rhi/RenderDevice.h>
+#include <render/Core/RenderDevice.h>
 
 #include <render/PathTracerScenePasses.h>
 #include <render/WorldRenderer/WorldRenderer.h>

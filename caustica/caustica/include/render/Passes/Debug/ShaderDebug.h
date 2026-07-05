@@ -5,7 +5,7 @@
 #include <math/math.h>
 
 #include <shaders/Libraries/ShaderDebug/ShaderDebug.hlsl>
-#include <rhi/RenderDevice.h>
+#include <render/Core/RenderDevice.h>
 
 // HOW TO USE
 //
@@ -43,13 +43,13 @@ private:
 
 
     std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
-    caustica::rhi::RenderDevice& m_renderDevice;
+    caustica::render::RenderDevice& m_renderDevice;
 
     std::array<char, SHADER_DEBUG_HEADER_IN_BYTES>              m_initHeader;
     std::array<char, SHADER_DEBUG_BUFFER_IN_BYTES_NO_TRIANGLES> m_lastBuffer;
 
 public:
-    ShaderDebug( nvrhi::IDevice* device, nvrhi::ICommandList* commandList, std::shared_ptr<caustica::ShaderFactory> shaderFactory, caustica::rhi::RenderDevice& renderDevice );
+    ShaderDebug( nvrhi::IDevice* device, nvrhi::ICommandList* commandList, std::shared_ptr<caustica::ShaderFactory> shaderFactory, caustica::render::RenderDevice& renderDevice );
 
     void                    CreateRenderPasses( nvrhi::IFramebuffer * frameBuffer, nvrhi::TextureHandle depthBuffer );
 

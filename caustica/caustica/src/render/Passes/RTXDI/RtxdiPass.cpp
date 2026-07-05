@@ -5,7 +5,7 @@
 #include <render/Passes/RTXDI/RtxdiResources.h>
 #include <render/Passes/RTXDI/PrepareLightsPass.h>
 #include <assets/loader/ShaderFactory.h>
-#include <rhi/RenderDevice.h>
+#include <render/Core/RenderDevice.h>
 #include <scene/View.h>
 #include <render/Passes/RTXDI/GeneratePdfMipsPass.h>
 #include <render/Passes/Lighting/Distant/EnvMapProcessor.h>
@@ -23,7 +23,7 @@ using namespace caustica::render;
 RtxdiPass::RtxdiPass(
 	nvrhi::IDevice* device,
 	std::shared_ptr<caustica::ShaderFactory> shaderFactory,
-	caustica::rhi::RenderDevice& renderDevice,
+	caustica::render::RenderDevice& renderDevice,
 	nvrhi::BindingLayoutHandle bindlessLayout) :
 		m_device(device),
 		m_shaderFactory(shaderFactory),

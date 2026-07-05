@@ -25,15 +25,7 @@ class ShaderFactory;
 namespace render
 {
 class FramePassRegistry;
-}
-
-namespace rhi
-{
 class RenderDevice;
-}
-
-namespace render
-{
 
 // Session-scoped references wired once when the path tracer is created.
 struct PathTracingContext
@@ -47,7 +39,7 @@ struct PathTracingContext
     PathTracerScenePasses& scenePasses;
 
     std::shared_ptr<ShaderFactory>& shaderFactory;
-    rhi::RenderDevice& renderDevice;
+    caustica::render::RenderDevice& renderDevice;
     BindingCache& bindingCache;
     std::shared_ptr<TextureLoader>& textureCache;
     std::shared_ptr<DescriptorTableManager>& descriptorTable;

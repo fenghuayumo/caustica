@@ -3,7 +3,7 @@
 #include <render/Core/BindingCache.h>
 #include <rhi/nvrhi.h>
 #include <assets/loader/ShaderFactory.h>
-#include <rhi/RenderDevice.h>
+#include <render/Core/RenderDevice.h>
 #include <math/math.h>
 #include <memory>
 
@@ -40,7 +40,7 @@ public:
 private:
 
     nvrhi::DeviceHandle             m_device;
-    caustica::rhi::RenderDevice& m_renderDevice;
+    caustica::render::RenderDevice& m_renderDevice;
 
     nvrhi::ShaderHandle             m_computeShaders[(uint32_t)ComputePassType::MaxCount];
     nvrhi::ComputePipelineHandle    m_computePSOs[(uint32_t)ComputePassType::MaxCount];
@@ -60,7 +60,7 @@ public:
     PostProcess(
         nvrhi::IDevice* device,
         std::shared_ptr<caustica::ShaderFactory> shaderFactory,
-        caustica::rhi::RenderDevice& renderDevice,
+        caustica::render::RenderDevice& renderDevice,
         std::shared_ptr<ShaderDebug> shaderDebug
         //, std::shared_ptr<caustica::FramebufferFactory> colorFramebufferFactory
     );

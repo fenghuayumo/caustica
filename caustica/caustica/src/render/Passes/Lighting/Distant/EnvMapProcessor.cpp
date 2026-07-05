@@ -18,7 +18,7 @@
 #include <assets/loader/ShaderFactory.h>
 #include <render/Core/FramebufferFactory.h>
 #include <render/Core/RenderPassConstants.h>
-#include <rhi/RenderDevice.h>
+#include <render/Core/RenderDevice.h>
 #include <assets/loader/TextureLoader.h>
 
 #include <platform/file_dialog.h>
@@ -360,7 +360,7 @@ int EnvMapProcessor::GetTargetCubeResolution() const
     return m_targetResolution; 
 }
 
-void EnvMapProcessor::PreUpdate(nvrhi::ICommandList* commandList, caustica::rhi::RenderDevice& renderDevice, std::string envMapBackgroundPath, const std::filesystem::path& sceneDirectory)
+void EnvMapProcessor::PreUpdate(nvrhi::ICommandList* commandList, caustica::render::RenderDevice& renderDevice, std::string envMapBackgroundPath, const std::filesystem::path& sceneDirectory)
 {
     if( m_device->getGraphicsAPI() == nvrhi::GraphicsAPI::VULKAN && m_BC6UCompressionEnabled )
     {
@@ -423,7 +423,7 @@ void EnvMapProcessor::PreUpdate(nvrhi::ICommandList* commandList, caustica::rhi:
         m_proceduralSky = std::make_shared<SampleProceduralSky>(m_device, m_textureCache, renderDevice, commandList);
 }
 
-bool EnvMapProcessor::Update(nvrhi::ICommandList* commandList, caustica::BindingCache & bindingCache, caustica::rhi::RenderDevice& renderDevice, const UpdateSettings & _settings, double sceneTime, EMB_DirectionalLight const * directionalLights, uint directionaLightCount, bool forceInstantUpdate)
+bool EnvMapProcessor::Update(nvrhi::ICommandList* commandList, caustica::BindingCache & bindingCache, caustica::render::RenderDevice& renderDevice, const UpdateSettings & _settings, double sceneTime, EMB_DirectionalLight const * directionalLights, uint directionaLightCount, bool forceInstantUpdate)
 {
     UpdateSettings settings = _settings;
 

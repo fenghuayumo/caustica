@@ -1377,7 +1377,7 @@ void MaterialGpuCache::BakeShaderPermutations()
     }
 }
 
-void MaterialGpuCache::CreateRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* bindlessLayout, caustica::rhi::RenderDevice& renderDevice, const std::shared_ptr<caustica::Scene>& scene, const std::filesystem::path& sceneFilePath, const std::filesystem::path & mediaPath )
+void MaterialGpuCache::CreateRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* bindlessLayout, caustica::render::RenderDevice& renderDevice, const std::shared_ptr<caustica::Scene>& scene, const std::filesystem::path& sceneFilePath, const std::filesystem::path & mediaPath )
 {
     info("MaterialGpuCache: CreateRenderPassesAndLoadMaterials begin");
     assert(!mediaPath.empty());

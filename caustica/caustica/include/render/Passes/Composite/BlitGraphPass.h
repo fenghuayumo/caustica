@@ -1,7 +1,7 @@
 #pragma once
 
 #include <render/graph/GraphBuilder.h>
-#include <rhi/FullscreenBlitPass.h>
+#include <render/Core/FullscreenBlitPass.h>
 
 namespace caustica
 {
@@ -21,6 +21,6 @@ struct FinalBlitPassParams
 void registerFinalBlitPass(
     GraphBuilder& graph,
     const FinalBlitPassParams& params,
-    rhi::FullscreenBlitPass& blitPass);
+    caustica::render::FullscreenBlitPass& blitPass);
 
 } // namespace caustica::rg

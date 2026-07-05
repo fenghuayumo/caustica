@@ -1,8 +1,8 @@
-#include <rhi/Format.h>
+#include <render/graph/GpuTypes.h>
 
 #include <rhi/nvrhi.h>
 
-namespace caustica::rhi
+namespace caustica::rg
 {
 
 FormatInfo getFormatInfo(Format format)
@@ -93,4 +93,4 @@ Format fromNativeFormat(uint32_t nativeFormat)
     }
 }
 
-} // namespace caustica::rhi
+} // namespace caustica::rg

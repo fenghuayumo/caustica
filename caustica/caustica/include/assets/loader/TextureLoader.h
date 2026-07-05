@@ -24,7 +24,7 @@ namespace caustica
 {
     class ThreadPool;
 
-namespace rhi { class RenderDevice; }
+namespace render { class RenderDevice; }
 
     struct TextureSubresourceData
     {
@@ -86,7 +86,7 @@ namespace rhi { class RenderDevice; }
 
         void FinalizeTexture(
             std::shared_ptr<TextureData> texture,
-            rhi::RenderDevice* renderDevice,
+            caustica::render::RenderDevice* renderDevice,
             nvrhi::ICommandList* commandList);
 
         virtual void TextureLoaded(std::shared_ptr<TextureData> texture);
@@ -108,7 +108,7 @@ namespace rhi { class RenderDevice; }
         virtual std::shared_ptr<LoadedTexture> LoadTextureFromFile(
             const std::filesystem::path& path,
             bool sRGB,
-            rhi::RenderDevice* renderDevice,
+            caustica::render::RenderDevice* renderDevice,
             nvrhi::ICommandList* commandList);
 
         virtual std::shared_ptr<LoadedTexture> LoadTextureFromFileDeferred(
@@ -132,7 +132,7 @@ namespace rhi { class RenderDevice; }
             const std::string& name,
             const std::string& mimeType,
             bool sRGB,
-            rhi::RenderDevice* renderDevice,
+            caustica::render::RenderDevice* renderDevice,
             nvrhi::ICommandList* commandList);
 
         virtual std::shared_ptr<LoadedTexture> LoadTextureFromMemoryDeferred(
@@ -145,7 +145,7 @@ namespace rhi { class RenderDevice; }
         bool IsTextureFinalized(const std::shared_ptr<LoadedTexture>& texture);
         bool UnloadTexture(const std::shared_ptr<LoadedTexture>& texture);
 
-        bool ProcessRenderingThreadCommands(rhi::RenderDevice& renderDevice, float timeLimitMilliseconds);
+        bool ProcessRenderingThreadCommands(caustica::render::RenderDevice& renderDevice, float timeLimitMilliseconds);
         void LoadingFinished();
         void SetMaxTextureSize(uint32_t size);
         void SetGenerateMipmaps(bool generateMipmaps);
@@ -166,7 +166,7 @@ namespace rhi { class RenderDevice; }
     // Creates and destroys temporary resources internally, so should NOT be called often.
     bool SaveTextureToFile(
         nvrhi::IDevice* device,
-        rhi::RenderDevice& renderDevice,
+        caustica::render::RenderDevice& renderDevice,
         nvrhi::ITexture* texture,
         nvrhi::ResourceStates textureState,
         const char* fileName,

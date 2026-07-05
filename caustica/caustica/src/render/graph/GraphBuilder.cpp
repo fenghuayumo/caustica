@@ -1,7 +1,7 @@
 #include <render/graph/GraphBuilder.h>
 
-#include <rhi/Device.h>
-#include <rhi/Format.h>
+#include <render/graph/GpuDeviceAdapter.h>
+#include <render/graph/GpuTypes.h>
 #include <rhi/nvrhi.h>
 
 #include <cassert>
@@ -33,7 +33,7 @@ void PassBuilder::write(TextureHandle texture, TextureAccess access)
     m_writes.emplace_back(texture, access);
 }
 
-TextureHandle PassBuilder::createTexture(const rhi::TextureDesc& desc)
+TextureHandle PassBuilder::createTexture(const TextureDesc& desc)
 {
     assert(m_graph);
     return m_graph->createTexture(desc);
@@ -45,9 +45,9 @@ RenderPassContext::RenderPassContext(nvrhi::ICommandList* commandList, const Gra
 {
 }
 
-rhi::CommandList RenderPassContext::rhiCommandList() const
+CommandList RenderPassContext::rhiCommandList() const
 {
-    return rhi::CommandList(m_commandList);
+    return CommandList(m_commandList);
 }
 
 nvrhi::ITexture* RenderPassContext::texture(TextureHandle handle) const
@@ -80,7 +80,7 @@ void GraphBuilder::setDevice(nvrhi::IDevice* device)
     m_device = device;
 }
 
-void GraphBuilder::setDevice(rhi::Device& device)
+void GraphBuilder::setDevice(Device& device)
 {
     m_device = device.nativeDevice();
 }
@@ -107,11 +107,11 @@ TextureHandle GraphBuilder::importTexture(nvrhi::ITexture* texture, TextureAcces
     return importTexture(texture, accessToState(initialAccess));
 }
 
-TextureHandle GraphBuilder::createTexture(const rhi::TextureDesc& desc)
+TextureHandle GraphBuilder::createTexture(const TextureDesc& desc)
 {
     assert(m_device);
 
-    const rhi::FormatInfo formatInfo = rhi::getFormatInfo(desc.format);
+    const FormatInfo formatInfo = getFormatInfo(desc.format);
     nvrhi::TextureDesc nativeDesc;
     nativeDesc.debugName = desc.name.empty() ? "rg_transient" : desc.name.c_str();
     nativeDesc.width = desc.width;
@@ -119,7 +119,7 @@ TextureHandle GraphBuilder::createTexture(const rhi::TextureDesc& desc)
     nativeDesc.depth = desc.depth;
     nativeDesc.mipLevels = desc.mipLevels;
     nativeDesc.arraySize = desc.arraySize;
-    nativeDesc.format = static_cast<nvrhi::Format>(rhi::toNativeFormat(desc.format));
+    nativeDesc.format = static_cast<nvrhi::Format>(toNativeFormat(desc.format));
     nativeDesc.isRenderTarget = desc.isRenderTarget || formatInfo.isRenderTargetCompatible;
     nativeDesc.isUAV = desc.isUAV || formatInfo.isUAVCompatible;
     nativeDesc.isTypeless = desc.isTypeless;
@@ -282,7 +282,7 @@ void GraphBuilder::execute(nvrhi::ICommandList* commandList)
     }
 }
 
-void GraphBuilder::execute(rhi::CommandList& commandList)
+void GraphBuilder::execute(CommandList& commandList)
 {
     execute(commandList.nativeCommandList());
 }

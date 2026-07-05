@@ -1,8 +1,8 @@
 #pragma once
 
 #include <math/math.h>
+#include <render/Core/StandardSamplers.h>
 #include <rhi/nvrhi.h>
-#include <rhi/StandardSamplers.h>
 
 #include <memory>
 #include <unordered_map>
@@ -13,7 +13,7 @@ class BindingCache;
 class ShaderFactory;
 }
 
-namespace caustica::rhi
+namespace caustica::render
 {
 
 enum class BlitSampler
@@ -102,4 +102,4 @@ private:
     std::unordered_map<PsoCacheKey, nvrhi::GraphicsPipelineHandle, PsoCacheKey::Hash> m_BlitPsoCache;
 };
 
-} // namespace caustica::rhi
+} // namespace caustica::render

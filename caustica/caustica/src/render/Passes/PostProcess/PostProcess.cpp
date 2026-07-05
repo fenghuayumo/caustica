@@ -1,14 +1,14 @@
 #include <render/Passes/PostProcess/PostProcess.h>
 
 #include <render/Core/FramebufferFactory.h>
-#include <rhi/RenderDevice.h>
+#include <render/Core/RenderDevice.h>
 #include <render/Passes/Debug/ShaderDebug.h>
 
 using namespace caustica::math;
 using namespace caustica;
 
 PostProcess::PostProcess( nvrhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory, 
-    caustica::rhi::RenderDevice& renderDevice, std::shared_ptr<ShaderDebug> shaderDebug
+    caustica::render::RenderDevice& renderDevice, std::shared_ptr<ShaderDebug> shaderDebug
     )
     : m_device(device)
     , m_renderDevice(renderDevice)

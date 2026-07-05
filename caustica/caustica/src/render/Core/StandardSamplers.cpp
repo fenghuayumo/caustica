@@ -1,6 +1,6 @@
-#include <rhi/StandardSamplers.h>
+#include <render/Core/StandardSamplers.h>
 
-namespace caustica::rhi
+namespace caustica::render
 {
 
 StandardSamplers::StandardSamplers(nvrhi::IDevice* device)
@@ -21,4 +21,4 @@ StandardSamplers::StandardSamplers(nvrhi::IDevice* device)
     m_AnisotropicWrapSampler = m_Device->createSampler(samplerDesc);
 }
 
-} // namespace caustica::rhi
+} // namespace caustica::render
