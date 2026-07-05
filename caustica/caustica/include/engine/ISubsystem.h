@@ -31,6 +31,7 @@ public:
 
     virtual void onBeginFrame(GpuDevice& gpuDevice) {}
     virtual void onUpdate(float elapsedTimeSeconds, bool windowFocused) {}
+    virtual void onPrepareRenderScene(GpuDevice& gpuDevice) {}
     virtual void onRenderScene(GpuDevice& gpuDevice) {}
     virtual void onRenderEnd(GpuDevice& gpuDevice) {}
 

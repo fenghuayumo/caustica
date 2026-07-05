@@ -348,7 +348,7 @@ file(GLOB_RECURSE caus_render_sources src/render/*.cpp src/render/*.c src/render
 add_library(causRender STATIC ${caus_render_headers} ${caus_render_sources})
 caus_configure_static(causRender)
 target_link_libraries(causRender
-    PUBLIC causScene causBackend causImgui causAssets
+    PUBLIC causScene causBackend causImgui causAssets causEcs
     PUBLIC jsoncpp_static NRD Rtxdi omm-lib omm-gpu-nvrhi
 )
 # Optional render dependencies

@@ -24,6 +24,7 @@ protected:
     void onBeginFrame(GpuDevice& gpuDevice) override;
     bool skipRenderPhase() const override;
     void onUpdate(float elapsedTimeSeconds, bool windowFocused) override;
+    void onPrepareRenderScene(GpuDevice& gpuDevice) override;
     void onRender() override;
     bool shouldRenderWhenUnfocused() const override;
     void onBackBufferResizing() override;

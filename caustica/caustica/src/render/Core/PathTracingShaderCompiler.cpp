@@ -8,7 +8,9 @@
 #include <backend/ShaderUtils.h>
 
 #include <render/Passes/Lighting/MaterialGpuCache.h>
+#include <scene/Scene.h>
 #include <scene/SceneEcs.h>
+#include <scene/SceneRenderData.h>
 #include <shaders/PathTracer/PathTracerShared.h>
 
 #include <core/file_utils.h>
@@ -312,6 +314,12 @@ void PTPipelineVariant::UpdateFinalize()
     // if no changes, no need to re-create pipeline
     if (m_pipeline == nullptr )
     {
+        if (m_raygen.ShaderLibrary == nullptr)
+        {
+            assert(false);
+            return;
+        }
+
         std::string rayGenName  = ("RayGen_"+m_shortUniqueDebugID);
         std::string missName    = ("Miss_"+m_shortUniqueDebugID);
 
@@ -341,6 +349,11 @@ void PTPipelineVariant::UpdateFinalize()
 #else
             const ShaderPermutation & permutation = m_specializedPerMaterial[hitGroupInfo.GetShaderPermutationIndex()];
 #endif
+            if (permutation.ShaderLibrary == nullptr)
+            {
+                assert(false);
+                return;
+            }
             pipelineDesc.hitGroups.push_back(
                 {
                     .exportName = hitGroupInfo.GetExportName(),
@@ -554,24 +567,19 @@ void PathTracingShaderCompiler::Update(const std::shared_ptr<caustica::Scene>& s
         // Note: these map 1-1 to m_subInstanceData, and are used to (see '->addHitGroup' below) build 1-1 mapped hit groups 
         m_perSubInstanceHitGroup.clear();
         m_perSubInstanceHitGroup.assign(subInstanceCount, ComputeDefaultSubInstanceHitGroupInfo(*GetMaterialGpuCache()));
-        for (const ecs::Entity entity : scene->GetMeshInstances())
+        for (const scene::MeshInstanceRenderProxy& proxy : scene->GetRenderData().meshInstances)
         {
-            if (!scene->GetEntityWorld())
-                continue;
-            const auto* meshComp = scene->GetEntityWorld()->world().get<scene::MeshInstanceComponent>(entity);
-            if (!meshComp || !meshComp->mesh)
-                continue;
-            if (meshComp->geometryInstanceIndex < 0)
+            if (!proxy.mesh || proxy.geometryInstanceIndex < 0)
                 continue;
 
-            const size_t firstSubInstanceIndex = static_cast<size_t>(meshComp->geometryInstanceIndex);
-            for (size_t gi = 0; gi < meshComp->mesh->geometries.size(); gi++)
+            const size_t firstSubInstanceIndex = static_cast<size_t>(proxy.geometryInstanceIndex);
+            for (size_t gi = 0; gi < proxy.mesh->geometries.size(); gi++)
             {
                 const size_t subInstanceIndex = firstSubInstanceIndex + gi;
-                if (subInstanceIndex >= m_perSubInstanceHitGroup.size() || !meshComp->mesh->geometries[gi])
+                if (subInstanceIndex >= m_perSubInstanceHitGroup.size() || !proxy.mesh->geometries[gi])
                     continue;
 
-                std::shared_ptr<PTMaterial> materialPT = PTMaterial::SafeCast(meshComp->mesh->geometries[gi]->material);
+                std::shared_ptr<PTMaterial> materialPT = PTMaterial::SafeCast(proxy.mesh->geometries[gi]->material);
                 if (!materialPT)
                     continue;
 

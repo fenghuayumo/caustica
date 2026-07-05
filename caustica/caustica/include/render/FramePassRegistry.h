@@ -8,6 +8,11 @@
 #include <utility>
 #include <vector>
 
+namespace caustica::ecs
+{
+class Schedule;
+}
+
 namespace caustica::rg
 {
 class GraphBuilder;
@@ -16,9 +21,11 @@ class GraphBuilder;
 namespace caustica::render
 {
 
+class WorldRenderer;
+
 enum class FramePassInsertPoint
 {
-    // Matches WorldRenderer::ensureFramePipelineBuilt() ordering.
+    // Matches WorldRenderer::ensureRenderScheduleBuilt() ordering.
     BeforeFrameSetup,
     AfterFrameSetup,
     AfterRenderTargets,
@@ -34,8 +41,7 @@ enum class FramePassInsertPoint
     AfterFinalize,
 };
 
-// Declarative hook for future Render Graph work. Phase 0: records pass factories
-// and applies them to PathTracingFramePipeline when WorldRenderer builds the frame list.
+// Declarative hook for Render Graph and render-schedule extension passes.
 class FramePassRegistry
 {
 public:
@@ -80,8 +86,8 @@ public:
         rg::GraphBuilder& graph,
         PathTracingFrameContext& context) const;
 
-    // Merge pending registrations into `pipeline` (called from WorldRenderer once).
-    void applyTo(PathTracingFramePipeline& pipeline) const;
+    // Insert registered CPU passes into the render-thread ecs::Schedule.
+    void applyToRenderSchedule(ecs::Schedule& schedule, WorldRenderer& renderer) const;
 
     void clear();
 

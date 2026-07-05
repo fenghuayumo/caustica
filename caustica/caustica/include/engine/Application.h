@@ -101,6 +101,7 @@ protected:
     void unbindFrameDriver(GpuDevice* dm);
 
     virtual void onUpdate(float elapsedTimeSeconds, bool windowFocused) {}
+    virtual void onPrepareRenderScene(GpuDevice& gpuDevice) {}
     virtual void onRender() {}
     virtual void onBackBufferResizing() {}
     virtual void onBackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount) {}

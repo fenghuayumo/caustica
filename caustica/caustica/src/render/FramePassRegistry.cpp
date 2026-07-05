@@ -1,5 +1,9 @@
 #include <render/FramePassRegistry.h>
+#include <render/ecs/RenderFrameContext.h>
 #include <render/graph/GraphBuilder.h>
+#include <render/WorldRenderer/WorldRenderer.h>
+
+#include <ecs/Schedule.h>
 
 namespace caustica::render
 {
@@ -25,6 +29,19 @@ namespace
         case FramePassInsertPoint::AfterFinalize:         return "Finalize";
         }
         return "Finalize";
+    }
+
+    const char* renderScheduleAnchorName(FramePassInsertPoint point)
+    {
+        switch (point)
+        {
+        case FramePassInsertPoint::AfterToneMapping:
+            return "ExecuteRenderGraph";
+        case FramePassInsertPoint::AfterComposite:
+            return "DebugLines";
+        default:
+            return insertPointAnchorName(point);
+        }
     }
 }
 
@@ -87,7 +104,7 @@ void FramePassRegistry::applyGraphPasses(FramePassInsertPoint insertPoint,
     }
 }
 
-void FramePassRegistry::applyTo(PathTracingFramePipeline& pipeline) const
+void FramePassRegistry::applyToRenderSchedule(ecs::Schedule& schedule, WorldRenderer& renderer) const
 {
     for (const PassRegistration& reg : m_registrations)
     {
@@ -98,8 +115,18 @@ void FramePassRegistry::applyTo(PathTracingFramePipeline& pipeline) const
         if (!pass)
             continue;
 
-        const char* anchorName = insertPointAnchorName(reg.insertAfter);
-        pipeline.insertPassAfter(anchorName, reg.name, pass.release());
+        IPathTracingFramePass* rawPass = pass.get();
+        renderer.storeFramePassRegistryPass(std::move(pass));
+
+        const char* anchorName = renderScheduleAnchorName(reg.insertAfter);
+        schedule.addSystem("Prepare", reg.name,
+            [&renderer, rawPass](ecs::World& /*world*/, const ecs::ScheduleContext& /*ctx*/) {
+                RenderFrameContext* frameCtx = renderer.activeRenderFrameContext();
+                if (!frameCtx || frameCtx->frame.aborted || rawPass == nullptr)
+                    return;
+                rawPass->execute(frameCtx->frame);
+            });
+        schedule.after(reg.name, anchorName);
     }
 }
 

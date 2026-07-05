@@ -1,4 +1,5 @@
 #include <engine/SceneRuntimeSubsystem.h>
+#include <scene/Scene.h>
 
 #include <engine/GpuRenderSubsystem.h>
 #include <engine/SceneRuntime.h>
@@ -79,13 +80,19 @@ void SceneRuntimeSubsystem::onUpdate(float elapsedTimeSeconds, bool windowFocuse
         m_config.sceneRuntime.Animate(elapsedTimeSeconds);
 }
 
+void SceneRuntimeSubsystem::onPrepareRenderScene(GpuDevice& /*gpuDevice*/)
+{
+    if (m_config.sceneRuntime.shouldSkipRender())
+        return;
+
+    m_config.sceneRuntime.prepareRenderFrame();
+}
+
 void SceneRuntimeSubsystem::onRenderScene(GpuDevice& gpuDevice)
 {
     SceneRuntime& sceneRuntime = m_config.sceneRuntime;
     if (sceneRuntime.shouldSkipRender())
         return;
-
-    prepareSceneFrame();
 
     auto* worldRenderer = sceneRuntime.GetWorldRenderer();
     if (!worldRenderer)
@@ -117,11 +124,6 @@ void SceneRuntimeSubsystem::onInitializePost(EngineInitContext& /*context*/)
 
 void SceneRuntimeSubsystem::onBeforeBeginFrame()
 {
-}
-
-void SceneRuntimeSubsystem::prepareSceneFrame()
-{
-    m_config.sceneRuntime.prepareRenderFrame();
 }
 
 } // namespace caustica

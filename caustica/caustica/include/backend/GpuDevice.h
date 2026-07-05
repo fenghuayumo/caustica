@@ -300,6 +300,10 @@ namespace caustica
         int m_NumberOfAccumulatedFrames = 0;
 
         uint32_t m_FrameIndex = 0;
+        // Frame index for the render phase currently executing (async-safe; set in executeRenderPhase).
+        uint32_t m_renderPhaseFrameIndex = 0;
+        // Frame index for the upcoming render (set on the main thread before onPrepareRenderScene).
+        uint32_t m_preparedRenderFrameIndex = 0;
 
         std::vector<nvrhi::TextureHandle> m_HeadlessBackBuffers;
         uint32_t m_HeadlessBackBufferIndex = 0;
@@ -363,6 +367,10 @@ namespace caustica
         void ReleaseWindowOwnership() { m_Window = nullptr; }
 
         [[nodiscard]] uint32_t GetFrameIndex() const { return m_FrameIndex; }
+        [[nodiscard]] uint32_t GetRenderPhaseFrameIndex() const { return m_renderPhaseFrameIndex; }
+        void SetRenderPhaseFrameIndex(uint32_t frameIndex) { m_renderPhaseFrameIndex = frameIndex; }
+        [[nodiscard]] uint32_t GetPreparedRenderFrameIndex() const { return m_preparedRenderFrameIndex; }
+        void SetPreparedRenderFrameIndex(uint32_t frameIndex) { m_preparedRenderFrameIndex = frameIndex; }
 
         virtual nvrhi::ITexture* GetCurrentBackBuffer() = 0;
         virtual nvrhi::ITexture* GetBackBuffer(uint32_t index) = 0;

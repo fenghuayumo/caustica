@@ -290,27 +290,75 @@ size_t Scene::GetGeometryInstancesCount() const
 
 const std::vector<ecs::Entity>& Scene::GetMeshInstances() const
 {
-    return m_RenderSnapshot.readBuffer().meshInstanceEntities;
+    return getRenderSnapshotForRead().meshInstanceEntities;
 }
 
 const std::vector<ecs::Entity>& Scene::GetSkinnedMeshInstances() const
 {
-    return m_RenderSnapshot.readBuffer().skinnedMeshInstanceEntities;
+    return getRenderSnapshotForRead().skinnedMeshInstanceEntities;
 }
 
 const std::vector<ecs::Entity>& Scene::GetLightEntities() const
 {
-    return m_RenderSnapshot.readBuffer().lightEntities;
+    return getRenderSnapshotForRead().lightEntities;
 }
 
 const std::vector<ecs::Entity>& Scene::GetCameraEntities() const
 {
-    return m_RenderSnapshot.readBuffer().cameraEntities;
+    return getRenderSnapshotForRead().cameraEntities;
 }
 
 const std::vector<ecs::Entity>& Scene::GetAnimationEntities() const
 {
-    return m_RenderSnapshot.readBuffer().animationEntities;
+    return getRenderSnapshotForRead().animationEntities;
+}
+
+const scene::SceneRenderData& Scene::GetRenderData() const
+{
+    return getRenderSnapshotForRead();
+}
+
+const scene::SceneRenderData& Scene::getRenderSnapshotForRead() const
+{
+    const uint32_t gpuFrameIndex = m_gpuReadFrameIndex.load(std::memory_order_acquire);
+    if (gpuFrameIndex != UINT32_MAX)
+        return m_RenderSnapshot.readBufferForFrame(gpuFrameIndex);
+
+    const uint32_t latestFrameIndex = m_RenderSnapshot.latestExtractedFrameIndex();
+    if (latestFrameIndex != UINT32_MAX)
+        return m_RenderSnapshot.readBufferForFrame(latestFrameIndex);
+
+    return m_RenderSnapshot.readBufferForFrame(0);
+}
+
+void Scene::beginGpuReadFrame(uint32_t frameIndex)
+{
+    m_gpuReadFrameIndex.store(frameIndex, std::memory_order_release);
+}
+
+void Scene::endGpuReadFrame()
+{
+    m_gpuReadFrameIndex.store(UINT32_MAX, std::memory_order_release);
+}
+
+bool Scene::HasSceneTransformsChanged() const
+{
+    return m_SceneTransformsChanged;
+}
+
+bool Scene::HasSceneStructureChanged() const
+{
+    return m_SceneStructureChanged;
+}
+
+bool Scene::HasSceneTransformsChanged(uint32_t frameIndex) const
+{
+    return m_RenderSnapshot.publishedStateForFrame(frameIndex).transformsChanged;
+}
+
+bool Scene::HasSceneStructureChanged(uint32_t frameIndex) const
+{
+    return m_RenderSnapshot.publishedStateForFrame(frameIndex).structureChanged;
 }
 
 void Scene::AttachLightToRoot(const std::shared_ptr<Light>& light)
@@ -986,15 +1034,60 @@ void Scene::RefreshSceneWorld(uint32_t frameIndex)
     pending.frameIndex = frameIndex;
 
     m_EntityWorld->refresh(frameIndex);
-    scene::ExtractSceneRenderData(*m_EntityWorld, m_RenderSnapshot.writeBuffer());
+    scene::ExtractSceneRenderData(*m_EntityWorld, m_RenderSnapshot.writeBufferForFrame(frameIndex));
 }
 
-void Scene::PublishRenderSnapshot()
+void Scene::PublishRenderSnapshot(uint32_t frameIndex)
 {
-    m_RenderSnapshot.publish();
-    m_SceneStructureChanged = m_RenderSnapshot.publishedState().structureChanged;
-    m_SceneTransformsChanged = m_RenderSnapshot.publishedState().transformsChanged;
+    m_RenderSnapshot.publish(frameIndex);
+    const scene::SceneRenderPublishState& published = m_RenderSnapshot.publishedStateForFrame(frameIndex);
+    m_SceneStructureChanged = published.structureChanged;
+    m_SceneTransformsChanged = published.transformsChanged;
     m_RenderCommands.drain(*this);
+}
+
+void Scene::extractAndPublishRenderSnapshot(uint32_t frameIndex)
+{
+    if (!m_EntityWorld)
+        return;
+
+    if (m_EntityWorld->hasPendingStructureChanges() || m_EntityWorld->hasPendingTransformChanges())
+        RefreshSceneWorld(frameIndex);
+    else
+    {
+        scene::SceneRenderPublishState& pending = m_RenderSnapshot.pendingState();
+        pending.structureChanged = false;
+        pending.transformsChanged = false;
+        pending.frameIndex = frameIndex;
+        scene::ExtractSceneRenderData(*m_EntityWorld, m_RenderSnapshot.writeBufferForFrame(frameIndex));
+    }
+
+    PublishRenderSnapshot(frameIndex);
+}
+
+bool Scene::wasRenderSnapshotExtractedOnLogicThread(uint32_t frameIndex) const
+{
+    return m_RenderSnapshot.wasExtractedForFrame(frameIndex);
+}
+
+void Scene::syncRenderSnapshotGpuIndices(uint32_t frameIndex)
+{
+    if (!m_EntityWorld)
+        return;
+
+    scene::SceneRenderData& data = m_RenderSnapshot.bufferForFrame(frameIndex);
+    const ecs::World& world = m_EntityWorld->world();
+    for (scene::MeshInstanceRenderProxy& proxy : data.meshInstances)
+    {
+        if (!world.isAlive(proxy.entity))
+            continue;
+
+        if (const auto* meshComp = world.get<scene::MeshInstanceComponent>(proxy.entity))
+        {
+            proxy.instanceIndex = meshComp->instanceIndex;
+            proxy.geometryInstanceIndex = meshComp->geometryInstanceIndex;
+        }
+    }
 }
 
 GeometryData* Scene::GetGeometryData(const MeshGeometry& geometry) const

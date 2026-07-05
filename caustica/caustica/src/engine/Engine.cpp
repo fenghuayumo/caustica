@@ -50,6 +50,11 @@ void Engine::onUpdate(float elapsedTimeSeconds, bool windowFocused)
     m_subsystems.onUpdate(elapsedTimeSeconds, windowFocused);
 }
 
+void Engine::onPrepareRenderScene(GpuDevice& gpuDevice)
+{
+    m_subsystems.onPrepareRenderScene(gpuDevice);
+}
+
 void Engine::onRenderScene(GpuDevice& gpuDevice)
 {
     m_subsystems.onRenderScene(gpuDevice);

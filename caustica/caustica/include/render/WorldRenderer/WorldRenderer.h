@@ -5,7 +5,6 @@
 
 #include <render/Core/CameraController.h>
 #include <render/WorldRenderer/PathTracingContext.h>
-#include <render/WorldRenderer/PathTracingFramePipeline.h>
 #include <shaders/PathTracer/Config.h>
 #include <shaders/SampleConstantBuffer.h>
 #include <render/Core/RenderTargets.h>
@@ -17,7 +16,13 @@
 #include <render/Passes/Debug/ShaderDebug.h>
 #include <render/Passes/Gaussian/GaussianSplatEmissionProxy.h>
 
+#include <render/ecs/RenderFrameContext.h>
+#include <render/ecs/RenderScheduleSetup.h>
+#include <render/graph/GraphBuilder.h>
 #include <render/WorldRenderer/PathTracingFrameContext.h>
+#include <render/WorldRenderer/PathTracingFramePipeline.h>
+#include <ecs/Schedule.h>
+#include <ecs/World.h>
 
 #include <chrono>
 #include <functional>
@@ -47,7 +52,6 @@ class ICompositeView;
 class IView;
 namespace render
 {
-class PathTracingFramePipeline;
 class TemporalAntiAliasingPass;
 class BloomPass;
 class DLSS;
@@ -133,14 +137,36 @@ public:
 
     void denoisedScreenshot(nvrhi::ITexture* framebufferTexture) const;
 
+    void buildPostProcessGraphPasses(RenderFrameContext& ctx);
+    void buildCompositeGraphPasses(RenderFrameContext& ctx);
+    void executeFrameRenderGraph(RenderFrameContext& ctx);
+
+    void storeFramePassRegistryPass(std::unique_ptr<IPathTracingFramePass> pass);
+    [[nodiscard]] RenderFrameContext* activeRenderFrameContext() { return m_activeRenderCtx; }
+
 private:
+    friend void FrameSetupSystem(WorldRenderer&, RenderFrameContext&);
+    friend void EnsureRenderTargetsSystem(WorldRenderer&, RenderFrameContext&);
+    friend void RendererInitSystem(WorldRenderer&, RenderFrameContext&);
+    friend void ShaderUpdateSystem(WorldRenderer&, RenderFrameContext&);
+    friend void BeginCommandListSystem(WorldRenderer&, RenderFrameContext&);
+    friend void SceneUpdateSystem(WorldRenderer&, RenderFrameContext&);
+    friend void PathTracePrepareSystem(WorldRenderer&, RenderFrameContext&);
+    friend void PathTraceSystem(WorldRenderer&, RenderFrameContext&);
+    friend void DenoiseAndAASystem(WorldRenderer&, RenderFrameContext&);
+    friend void BuildPostProcessGraphSystem(WorldRenderer&, RenderFrameContext&);
+    friend void BuildCompositeGraphSystem(WorldRenderer&, RenderFrameContext&);
+    friend void ExecuteRenderGraphSystem(WorldRenderer&, RenderFrameContext&);
+    friend void DebugLinesSystem(WorldRenderer&, RenderFrameContext&);
+    friend void FinalizeSystem(WorldRenderer&, RenderFrameContext&);
+
     [[nodiscard]] nvrhi::IDevice* device() const { return m_context.gpuDevice.GetDevice(); }
 
     [[nodiscard]] CameraUpdateParams makeCameraUpdateParams() const;
     void syncCameraViews();
     [[nodiscard]] dm::float2 computeCameraJitter() const;
 
-    void ensureFramePipelineBuilt();
+    void ensureRenderScheduleBuilt();
     void framePassSetup(PathTracingFrameContext& ctx);
     void framePassEnsureRenderTargets(PathTracingFrameContext& ctx);
     void framePassRendererInit(PathTracingFrameContext& ctx);
@@ -150,8 +176,7 @@ private:
     void framePassPathTracePrepare(PathTracingFrameContext& ctx);
     void framePassPathTrace(PathTracingFrameContext& ctx);
     void framePassDenoiseAndAA(PathTracingFrameContext& ctx);
-    void framePassToneMapping(PathTracingFrameContext& ctx);
-    void framePassComposite(PathTracingFrameContext& ctx);
+    void framePassDebugOverlay(PathTracingFrameContext& ctx);
     void framePassFinalize(PathTracingFrameContext& ctx);
 
     void createRenderPasses(bool& exposureResetRequired, nvrhi::CommandListHandle initializeCommandList);
@@ -173,7 +198,13 @@ private:
 
     PathTracingContext&          m_context;
 
-    std::unique_ptr<PathTracingFramePipeline>   m_framePipeline;
+    ecs::Schedule                m_renderSchedule;
+    ecs::World                   m_renderScheduleWorld;
+    rg::GraphBuilder             m_frameGraph;
+    RenderFrameContext           m_renderFrameCtx{};
+    RenderFrameContext*          m_activeRenderCtx = nullptr;
+    bool                         m_renderScheduleBuilt = false;
+    std::vector<std::unique_ptr<IPathTracingFramePass>> m_framePassRegistryStorage;
 
     std::unique_ptr<RtxdiPass>                  m_rtxdiPass;
     std::unique_ptr<RenderTargets>              m_renderTargets;

@@ -11,7 +11,7 @@ namespace caustica
 {
 
 // Optional shared frame-pass registry for the process lifetime. WorldRenderer applies
-// this when building PathTracingFramePipeline and when composing post-process graphs.
+// this when building the render schedule and when composing post-process graphs.
 inline render::FramePassRegistry& getGlobalFramePassRegistry()
 {
     static render::FramePassRegistry registry;

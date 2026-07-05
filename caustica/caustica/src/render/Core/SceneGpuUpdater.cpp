@@ -1,5 +1,6 @@
 #include <render/Core/SceneGpuUpdater.h>
 
+#include <engine/RenderThread.h>
 #include <render/SceneGpuResources.h>
 #include <scene/Scene.h>
 #include <scene/SceneEcs.h>
@@ -22,6 +23,27 @@ namespace caustica::render
 
 namespace
 {
+
+class GpuReadFrameScope
+{
+public:
+    explicit GpuReadFrameScope(Scene& scene, uint32_t frameIndex)
+        : m_scene(scene)
+    {
+        m_scene.beginGpuReadFrame(frameIndex);
+    }
+
+    ~GpuReadFrameScope()
+    {
+        m_scene.endGpuReadFrame();
+    }
+
+    GpuReadFrameScope(const GpuReadFrameScope&) = delete;
+    GpuReadFrameScope& operator=(const GpuReadFrameScope&) = delete;
+
+private:
+    Scene& m_scene;
+};
 
 inline void AppendBufferRange(nvrhi::BufferRange& range, size_t size, uint64_t& currentBufferSize)
 {
@@ -677,20 +699,32 @@ void SceneGpuUpdater::Refresh(Scene& scene, nvrhi::ICommandList* commandList, ui
     if (entityWorld == nullptr)
         return;
 
-    if (entityWorld->hasPendingStructureChanges() || entityWorld->hasPendingTransformChanges())
-        scene.RefreshSceneWorld(frameIndex);
+    const GpuReadFrameScope gpuReadScope(scene, frameIndex);
 
-    scene.PublishRenderSnapshot();
+    if (IsRenderThread())
+    {
+        if (!scene.wasRenderSnapshotExtractedOnLogicThread(frameIndex))
+            caustica::warning("SceneGpuUpdater::Refresh: missing logic-thread extract for frame %u", frameIndex);
+    }
+    else if (!scene.wasRenderSnapshotExtractedOnLogicThread(frameIndex))
+    {
+        if (entityWorld->hasPendingStructureChanges() || entityWorld->hasPendingTransformChanges())
+            scene.RefreshSceneWorld(frameIndex);
 
-    const bool structureChanged = scene.HasSceneStructureChanged();
-    const bool transformsChanged = scene.HasSceneTransformsChanged();
+        scene.PublishRenderSnapshot(frameIndex);
+    }
+
+    const bool structureChanged = scene.HasSceneStructureChanged(frameIndex);
+    const bool transformsChanged = scene.HasSceneTransformsChanged(frameIndex);
 
     UpdateGpuSceneBuffers(scene, commandList, frameIndex, structureChanged, transformsChanged);
+    scene.syncRenderSnapshotGpuIndices(frameIndex);
 }
 
 void SceneGpuUpdater::RefreshAfterLoad(Scene& scene, uint32_t frameIndex)
 {
     scene.RefreshSceneWorld(frameIndex);
+    scene.PublishRenderSnapshot(frameIndex);
 
     SceneGpuResources& gpu = scene.GetGpuResources();
     if (!gpu.device->waitForIdle())
@@ -700,7 +734,7 @@ void SceneGpuUpdater::RefreshAfterLoad(Scene& scene, uint32_t frameIndex)
     commandList->open();
 
     EnsureMeshGpuBuffers(scene, commandList);
-    scene.PublishRenderSnapshot();
+    const GpuReadFrameScope gpuReadScope(scene, frameIndex);
     UpdateGpuSceneBuffers(scene, commandList, frameIndex, /*structureChanged=*/true, /*transformsChanged=*/true);
 
     commandList->close();

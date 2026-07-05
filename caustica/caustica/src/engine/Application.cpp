@@ -275,6 +275,8 @@ bool Application::executeRenderPhase(GpuDevice* gpuDevice, double elapsedTime, d
     if (frameIndex == 0 && gpuDevice->m_SkipRenderOnFirstFrame)
         return true;
 
+    gpuDevice->SetRenderPhaseFrameIndex(frameIndex);
+
     if (!gpuDevice->BeginFrame())
         return true;
 
@@ -360,6 +362,9 @@ bool Application::runFrame(std::optional<double> elapsedTimeOverride)
 
         if (!skipRenderPhase())
         {
+            const uint32_t renderFrameIndex = gpuDevice->m_FrameIndex;
+            gpuDevice->SetPreparedRenderFrameIndex(renderFrameIndex);
+            onPrepareRenderScene(*gpuDevice);
 #if CAUSTICA_WITH_STREAMLINE
         void* slFrameToken = nullptr;
         if (!gpuDevice->m_DeviceParams.headlessDevice)
@@ -368,7 +373,7 @@ bool Application::runFrame(std::optional<double> elapsedTimeOverride)
 
         if (m_useDedicatedRenderThread)
         {
-            const uint32_t frameIndex = gpuDevice->m_FrameIndex;
+            const uint32_t frameIndex = renderFrameIndex;
             m_renderThread.dispatch([this, gpuDevice, elapsedTime, curTime, frameIndex
 #if CAUSTICA_WITH_STREAMLINE
                 , slFrameToken
@@ -386,7 +391,7 @@ bool Application::runFrame(std::optional<double> elapsedTimeOverride)
 #if CAUSTICA_WITH_STREAMLINE
             StreamlineIntegration::RenderFrameTokenScope slFrameScope(slFrameToken);
 #endif
-            if (!executeRenderPhase(gpuDevice, elapsedTime, curTime, gpuDevice->m_FrameIndex))
+            if (!executeRenderPhase(gpuDevice, elapsedTime, curTime, renderFrameIndex))
             {
                 finishFrameWithRenderFailure(gpuDevice, elapsedTime, curTime);
                 return false;

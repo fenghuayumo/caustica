@@ -81,7 +81,6 @@ void SceneEditor::Init(const std::string& preferredScene,
 
 void SceneEditor::PrepareEditorFrame()
 {
-    prepareRenderFrame();
     HandleDroppedFiles();
     m_settings.DebugExploreDeltaTree = m_editor.ShowDeltaTree;
 }

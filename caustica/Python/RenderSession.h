@@ -25,7 +25,6 @@
 
 #include <math/math.h>
 #include <platform/window.h>
-#include <render/WorldRenderer/PathTracingFramePipeline.h>
 #include <render/RenderSessionState.h>
 #include <render/SessionDiagnostics.h>
 

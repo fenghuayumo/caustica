@@ -20,11 +20,11 @@ void registerFinalBlitPass(
 
     graph.addPass(
         "Blit",
-        [&](PassBuilder& setup) {
+        [params, targetColorHandle](PassBuilder& setup) {
             setup.read(params.sourceLdrColor, TextureAccess::ShaderResource);
             setup.write(targetColorHandle, TextureAccess::RenderTarget);
         },
-        [&](RenderPassContext& ctx) {
+        [params, &blitPass](RenderPassContext& ctx) {
             rhi::BlitParameters blitParams{};
             blitParams.targetFramebuffer = params.targetFramebuffer;
             blitParams.sourceTexture = ctx.texture(params.sourceLdrColor);

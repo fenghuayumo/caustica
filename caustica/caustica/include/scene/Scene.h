@@ -9,10 +9,11 @@
 #include <scene/SceneImport.h>
 #include <backend/IDescriptorTableManager.h>
 #include <rhi/nvrhi.h>
-#include <vector>
+#include <atomic>
+#include <cstdint>
+#include <filesystem>
 #include <memory>
 #include <mutex>
-#include <filesystem>
 #include <string>
 
 namespace Json
@@ -57,6 +58,8 @@ namespace caustica
         bool m_SceneTransformsChanged = false;
         bool m_SceneStructureChanged = false;
 
+        std::atomic<uint32_t> m_gpuReadFrameIndex{UINT32_MAX};
+
         std::filesystem::path m_textureSearchDirectory;
 
         std::shared_ptr<render::SceneGpuResources> m_GpuResources;
@@ -94,6 +97,8 @@ namespace caustica
 
         void attachLeafFromJson(ecs::Entity entity, const Json::Value& src);
 
+        [[nodiscard]] const scene::SceneRenderData& getRenderSnapshotForRead() const;
+
     public:
         virtual ~Scene() = default;
 
@@ -106,9 +111,23 @@ namespace caustica
             std::shared_ptr<SceneTypeFactory> sceneTypeFactory);
 
         void RefreshSceneWorld(uint32_t frameIndex);
-        void PublishRenderSnapshot();
-        [[nodiscard]] bool HasSceneTransformsChanged() const { return m_SceneTransformsChanged; }
-        [[nodiscard]] bool HasSceneStructureChanged() const { return m_SceneStructureChanged; }
+        void PublishRenderSnapshot(uint32_t frameIndex);
+
+        // Main/logic thread: refresh ECS (if dirty), extract, and publish for render thread.
+        void extractAndPublishRenderSnapshot(uint32_t frameIndex);
+
+        // Returns true when extractAndPublishRenderSnapshot already ran for `frameIndex`.
+        [[nodiscard]] bool wasRenderSnapshotExtractedOnLogicThread(uint32_t frameIndex) const;
+
+        void beginGpuReadFrame(uint32_t frameIndex);
+        void endGpuReadFrame();
+
+        void syncRenderSnapshotGpuIndices(uint32_t frameIndex);
+
+        [[nodiscard]] bool HasSceneTransformsChanged() const;
+        [[nodiscard]] bool HasSceneStructureChanged() const;
+        [[nodiscard]] bool HasSceneTransformsChanged(uint32_t frameIndex) const;
+        [[nodiscard]] bool HasSceneStructureChanged(uint32_t frameIndex) const;
 
         bool Load(const std::filesystem::path& jsonFileName);
 
@@ -132,7 +151,7 @@ namespace caustica
         [[nodiscard]] const std::vector<ecs::Entity>& GetLightEntities() const;
         [[nodiscard]] const std::vector<ecs::Entity>& GetCameraEntities() const;
         [[nodiscard]] const std::vector<ecs::Entity>& GetAnimationEntities() const;
-        [[nodiscard]] const scene::SceneRenderData& GetRenderData() const { return m_RenderSnapshot.readBuffer(); }
+        [[nodiscard]] const scene::SceneRenderData& GetRenderData() const;
         [[nodiscard]] scene::SceneRenderCommandQueue& GetRenderCommands() { return m_RenderCommands; }
         [[nodiscard]] const scene::SceneRenderCommandQueue& GetRenderCommands() const { return m_RenderCommands; }
 

@@ -3,9 +3,9 @@ namespace { constexpr int c_SwapchainCount = 3; }
 #include <render/WorldRenderer/WorldRenderer.h>
 #include <render/Passes/PostProcess/PostProcessGraph.h>
 #include <render/Passes/Composite/BlitGraphPass.h>
+#include <render/WorldRenderer/PathTracingFrameContext.h>
+#include <render/ecs/RenderScheduleSetup.h>
 #include <render/FramePassRegistry.h>
-#include <rhi/RenderDevice.h>
-#include <render/WorldRenderer/PathTracingFramePipeline.h>
 #include <render/SceneGpuResources.h>
 #include <render/SceneGaussianSplatPasses.h>
 #include <render/SceneRayTracingResources.h>
@@ -84,52 +84,111 @@ namespace
     }
 }
 
-void caustica::render::WorldRenderer::ensureFramePipelineBuilt()
+void caustica::render::WorldRenderer::ensureRenderScheduleBuilt()
 {
-    if (m_framePipeline)
+    if (m_renderScheduleBuilt)
         return;
 
-    m_framePipeline = std::make_unique<PathTracingFramePipeline>();
+    buildDefaultRenderSchedule(m_renderSchedule, *this, m_context.framePassRegistry);
+    m_renderScheduleBuilt = true;
+}
 
-    m_framePipeline->registerLambdaPass("FrameSetup", [this](PathTracingFrameContext& ctx) {
-        framePassSetup(ctx);
-    });
-    m_framePipeline->registerLambdaPass("RenderTargets", [this](PathTracingFrameContext& ctx) {
-        framePassEnsureRenderTargets(ctx);
-    });
-    m_framePipeline->registerLambdaPass("RendererInit", [this](PathTracingFrameContext& ctx) {
-        framePassRendererInit(ctx);
-    });
-    m_framePipeline->registerLambdaPass("ShaderUpdate", [this](PathTracingFrameContext& ctx) {
-        framePassShaderUpdate(ctx);
-    });
-    m_framePipeline->registerLambdaPass("BeginCommandList", [this](PathTracingFrameContext& ctx) {
-        framePassBeginCommandList(ctx);
-    });
-    m_framePipeline->registerLambdaPass("SceneUpdate", [this](PathTracingFrameContext& ctx) {
-        framePassSceneUpdate(ctx);
-    });
-    m_framePipeline->registerLambdaPass("PathTracePrepare", [this](PathTracingFrameContext& ctx) {
-        framePassPathTracePrepare(ctx);
-    });
-    m_framePipeline->registerLambdaPass("PathTrace", [this](PathTracingFrameContext& ctx) {
-        framePassPathTrace(ctx);
-    });
-    m_framePipeline->registerLambdaPass("DenoiseAndAA", [this](PathTracingFrameContext& ctx) {
-        framePassDenoiseAndAA(ctx);
-    });
-    m_framePipeline->registerLambdaPass("ToneMapping", [this](PathTracingFrameContext& ctx) {
-        framePassToneMapping(ctx);
-    });
-    m_framePipeline->registerLambdaPass("Composite", [this](PathTracingFrameContext& ctx) {
-        framePassComposite(ctx);
-    });
-    m_framePipeline->registerLambdaPass("Finalize", [this](PathTracingFrameContext& ctx) {
-        framePassFinalize(ctx);
-    });
+void caustica::render::WorldRenderer::storeFramePassRegistryPass(std::unique_ptr<IPathTracingFramePass> pass)
+{
+    if (pass)
+        m_framePassRegistryStorage.push_back(std::move(pass));
+}
 
+void caustica::render::WorldRenderer::buildPostProcessGraphPasses(RenderFrameContext& ctx)
+{
+    assert(ctx.graph != nullptr);
+
+    rg::GraphBuilder& graph = *ctx.graph;
+    graph.reset();
+    graph.setDevice(device());
+
+    ctx.commandListWasClosed = false;
+
+    ctx.postProcessCompositeView = *m_context.camera.view();
+    nvrhi::Viewport windowViewport(float(m_displaySize.x), float(m_displaySize.y));
+    ctx.postProcessCompositeView.SetViewport(windowViewport);
+    ctx.postProcessCompositeView.UpdateCache();
+
+    rg::PostProcessGraphParams ppParams{
+        .graph = graph,
+        .renderTargets = m_renderTargets.get(),
+        .settings = &m_context.settings,
+        .camera = &m_context.camera,
+        .bloomPass = m_bloomPass.get(),
+        .toneMappingPass = m_toneMappingPass.get(),
+        .compositeView = &ctx.postProcessCompositeView,
+        .displaySize = m_displaySize,
+        .pathTracingBindingSet = m_bindingSet,
+        .descriptorTable = m_context.descriptorTable ? m_context.descriptorTable->GetDescriptorTable() : nullptr,
+        .testRaygenPpHdrPipeline = m_ptPipelineTestRaygenPPHDR.get(),
+        .edgeDetectionPipeline = m_ptPipelineEdgeDetection.get(),
+        .outCommandListWasClosed = &ctx.commandListWasClosed,
+    };
     if (m_context.framePassRegistry)
-        m_context.framePassRegistry->applyTo(*m_framePipeline);
+        m_context.framePassRegistry->applyGraphPasses(
+            FramePassInsertPoint::AfterDenoiseAndAA, graph, ctx.frame);
+    rg::buildPostProcessGraph(ppParams);
+}
+
+void caustica::render::WorldRenderer::buildCompositeGraphPasses(RenderFrameContext& ctx)
+{
+    assert(ctx.graph != nullptr);
+
+    nvrhi::IFramebuffer* framebuffer = ctx.frame.framebuffer;
+    const auto& fbinfo = framebuffer->getFramebufferInfo();
+
+    if (m_context.settings.EnableShaderDebug && m_shaderDebug)
+    {
+        m_shaderDebug->EndFrameAndOutput(
+            m_commandList,
+            m_renderTargets->LdrFramebuffer->GetFramebuffer(ctx.postProcessCompositeView),
+            m_renderTargets->Depth,
+            fbinfo.getViewport());
+    }
+
+    rg::GraphBuilder& graph = *ctx.graph;
+    const rg::TextureHandle ldrColor = graph.importTexture(
+        m_renderTargets->LdrColor,
+        nvrhi::ResourceStates::ShaderResource);
+
+    rg::FinalBlitPassParams blitParams{};
+    blitParams.sourceLdrColor = ldrColor;
+    blitParams.targetFramebuffer = framebuffer;
+    blitParams.bindingCache = &m_context.bindingCache;
+    rg::registerFinalBlitPass(graph, blitParams, m_context.renderDevice.blit());
+    if (m_context.framePassRegistry)
+    {
+        m_context.framePassRegistry->applyGraphPasses(
+            FramePassInsertPoint::AfterToneMapping, graph, ctx.frame);
+    }
+}
+
+void caustica::render::WorldRenderer::executeFrameRenderGraph(RenderFrameContext& ctx)
+{
+    assert(ctx.graph != nullptr);
+
+    SampleConstants& constants = m_currentConstants;
+
+    ctx.graph->compile();
+    ctx.graph->execute(m_commandList);
+
+    if (ctx.commandListWasClosed)
+        m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
+
+    abortIfSubmitFailed(ctx.frame, "postToneMapping");
+    if (ctx.frame.aborted)
+        return;
+
+    abortIfSubmitFailed(ctx.frame, "finalBlit");
+    if (ctx.frame.aborted)
+        return;
+
+    m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
 }
 
 void caustica::render::WorldRenderer::framePassSetup(PathTracingFrameContext& ctx)
@@ -266,6 +325,9 @@ void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameCont
 
 void caustica::render::WorldRenderer::framePassShaderUpdate(PathTracingFrameContext& ctx)
 {
+    if (ctx.aborted || m_pathTracingShaderCompiler == nullptr)
+        return;
+
     m_pathTracingShaderCompiler->Update(
         m_context.sceneManager.getScene(),
         static_cast<unsigned int>(m_context.accelStructs.getSubInstanceData().size()),
@@ -338,7 +400,7 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
     };
     geoParams.materials = m_context.scenePasses.lighting.materials().get();
     geoParams.opacityMaps = m_context.scenePasses.lighting.opacityMaps().get();
-    geoParams.frameIndex = m_context.gpuDevice.GetFrameIndex();
+    geoParams.frameIndex = m_context.gpuDevice.GetRenderPhaseFrameIndex();
     geoParams.asyncLoadingInProgress = &m_context.diagnostics.asyncLoadingInProgress;
     caustica::updateSceneGeometry(m_context.accelStructs, geoParams);
     abortIfSubmitFailed(ctx, "updateSceneGeometry");
@@ -397,7 +459,8 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
 
 void caustica::render::WorldRenderer::framePassPathTracePrepare(PathTracingFrameContext& ctx)
 {
-    m_toneMappingPass->PreRender(m_context.settings.ToneMappingParams);
+    if (m_toneMappingPass != nullptr)
+        m_toneMappingPass->PreRender(m_context.settings.ToneMappingParams);
     preUpdatePathTracing(ctx.needNewPasses, m_commandList);
 
     m_renderTargets->Clear(m_commandList);
@@ -528,85 +591,10 @@ void caustica::render::WorldRenderer::framePassDenoiseAndAA(PathTracingFrameCont
     m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
 }
 
-void caustica::render::WorldRenderer::framePassToneMapping(PathTracingFrameContext& ctx)
+void caustica::render::WorldRenderer::framePassDebugOverlay(PathTracingFrameContext& ctx)
 {
-    SampleConstants& constants = m_currentConstants;
-
-    caustica::PlanarView fullscreenView = *m_context.camera.view();
-    nvrhi::Viewport windowViewport(float(m_displaySize.x), float(m_displaySize.y));
-    fullscreenView.SetViewport(windowViewport);
-    fullscreenView.UpdateCache();
-
-    rg::GraphBuilder graph;
-    graph.setDevice(device());
-
-    bool commandListWasClosed = false;
-    rg::PostProcessGraphParams ppParams{
-        .graph = graph,
-        .renderTargets = m_renderTargets.get(),
-        .settings = &m_context.settings,
-        .camera = &m_context.camera,
-        .bloomPass = m_bloomPass.get(),
-        .toneMappingPass = m_toneMappingPass.get(),
-        .compositeView = &fullscreenView,
-        .displaySize = m_displaySize,
-        .pathTracingBindingSet = m_bindingSet,
-        .descriptorTable = m_context.descriptorTable ? m_context.descriptorTable->GetDescriptorTable() : nullptr,
-        .testRaygenPpHdrPipeline = m_ptPipelineTestRaygenPPHDR.get(),
-        .edgeDetectionPipeline = m_ptPipelineEdgeDetection.get(),
-        .outCommandListWasClosed = &commandListWasClosed,
-    };
-    if (m_context.framePassRegistry)
-        m_context.framePassRegistry->applyGraphPasses(
-            FramePassInsertPoint::AfterDenoiseAndAA, graph, ctx);
-    rg::buildPostProcessGraph(ppParams);
-    graph.compile();
-    graph.execute(m_commandList);
-
-    if (commandListWasClosed)
-        m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
-
-    abortIfSubmitFailed(ctx, "postToneMapping");
-    if (ctx.aborted)
-        return;
-
-    m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
-}
-
-void caustica::render::WorldRenderer::framePassComposite(PathTracingFrameContext& ctx)
-{
-    SampleConstants& constants = m_currentConstants;
     nvrhi::IFramebuffer* framebuffer = ctx.framebuffer;
     const auto& fbinfo = framebuffer->getFramebufferInfo();
-
-    caustica::PlanarView fullscreenView = *m_context.camera.view();
-    nvrhi::Viewport windowViewport(float(m_displaySize.x), float(m_displaySize.y));
-    fullscreenView.SetViewport(windowViewport);
-    fullscreenView.UpdateCache();
-
-    if (m_context.settings.EnableShaderDebug && m_shaderDebug)
-        m_shaderDebug->EndFrameAndOutput(m_commandList, m_renderTargets->LdrFramebuffer->GetFramebuffer(fullscreenView), m_renderTargets->Depth, fbinfo.getViewport());
-
-    rg::GraphBuilder graph;
-    graph.setDevice(device());
-    const rg::TextureHandle ldrColor = graph.importTexture(
-        m_renderTargets->LdrColor,
-        nvrhi::ResourceStates::ShaderResource);
-
-    rg::FinalBlitPassParams blitParams{};
-    blitParams.sourceLdrColor = ldrColor;
-    blitParams.targetFramebuffer = framebuffer;
-    blitParams.bindingCache = &m_context.bindingCache;
-    rg::registerFinalBlitPass(graph, blitParams, m_context.renderDevice.blit());
-    if (m_context.framePassRegistry)
-        m_context.framePassRegistry->applyGraphPasses(
-            FramePassInsertPoint::AfterToneMapping, graph, ctx);
-    graph.compile();
-    graph.execute(m_commandList);
-    abortIfSubmitFailed(ctx, "finalBlit");
-    if (ctx.aborted)
-        return;
-    m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
 
     if (m_context.settings.ShowDebugLines == true)
     {

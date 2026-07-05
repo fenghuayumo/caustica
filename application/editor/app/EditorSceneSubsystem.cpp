@@ -25,8 +25,9 @@ void EditorSceneSubsystem::onBeforeBeginFrame()
     sceneEditor().CaptureScriptPreRender();
 }
 
-void EditorSceneSubsystem::prepareSceneFrame()
+void EditorSceneSubsystem::onPrepareRenderScene(caustica::GpuDevice& gpuDevice)
 {
+    SceneRuntimeSubsystem::onPrepareRenderScene(gpuDevice);
     sceneEditor().PrepareEditorFrame();
 }
 

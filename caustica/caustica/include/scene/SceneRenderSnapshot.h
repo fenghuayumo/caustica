@@ -14,19 +14,29 @@ namespace caustica::scene
         uint32_t frameIndex = 0;
     };
 
-    // Double-buffered render extract. The logic thread writes writeBuffer(); the render
-    // thread reads readBuffer() after publish().
+    // Frame-indexed triple buffer for pipelined extract (RenderThread::kMaxInFlightFrames == 2).
+    // The logic thread writes via extractAndPublishRenderSnapshot(); the render thread reads the
+    // slot for its render-phase frame index.
     class SceneRenderSnapshot
     {
     public:
-        [[nodiscard]] const SceneRenderData& readBuffer() const
+        static constexpr uint32_t kSlotCount = 3;
+
+        [[nodiscard]] static uint32_t slotForFrame(uint32_t frameIndex) { return frameIndex % kSlotCount; }
+
+        [[nodiscard]] SceneRenderData& bufferForFrame(uint32_t frameIndex)
         {
-            return m_buffers[m_readIndex.load(std::memory_order_acquire)];
+            return m_buffers[slotForFrame(frameIndex)];
         }
 
-        [[nodiscard]] SceneRenderData& writeBuffer()
+        [[nodiscard]] const SceneRenderData& readBufferForFrame(uint32_t frameIndex) const
         {
-            return m_buffers[m_writeIndex];
+            return m_buffers[slotForFrame(frameIndex)];
+        }
+
+        [[nodiscard]] SceneRenderData& writeBufferForFrame(uint32_t frameIndex)
+        {
+            return m_buffers[slotForFrame(frameIndex)];
         }
 
         [[nodiscard]] SceneRenderPublishState& pendingState()
@@ -34,35 +44,49 @@ namespace caustica::scene
             return m_pendingState;
         }
 
-        [[nodiscard]] const SceneRenderPublishState& publishedState() const
+        [[nodiscard]] const SceneRenderPublishState& publishedStateForFrame(uint32_t frameIndex) const
         {
-            return m_publishedState;
+            return m_publishedStates[slotForFrame(frameIndex)];
         }
 
-        void publish()
+        void publish(uint32_t frameIndex)
         {
-            m_publishedState = m_pendingState;
-            const uint32_t newRead = m_writeIndex;
-            m_writeIndex = m_readIndex.load(std::memory_order_relaxed);
-            m_readIndex.store(newRead, std::memory_order_release);
+            const uint32_t slot = slotForFrame(frameIndex);
+            m_pendingState.frameIndex = frameIndex;
+            m_publishedStates[slot] = m_pendingState;
+            m_extractedFrameIndex[slot].store(frameIndex, std::memory_order_release);
+            m_latestExtractedFrameIndex.store(frameIndex, std::memory_order_release);
+        }
+
+        [[nodiscard]] bool wasExtractedForFrame(uint32_t frameIndex) const
+        {
+            const uint32_t slot = slotForFrame(frameIndex);
+            return m_publishedStates[slot].frameIndex == frameIndex;
+        }
+
+        [[nodiscard]] uint32_t latestExtractedFrameIndex() const
+        {
+            return m_latestExtractedFrameIndex.load(std::memory_order_acquire);
         }
 
         void clear()
         {
-            m_buffers[0].clear();
-            m_buffers[1].clear();
+            for (uint32_t i = 0; i < kSlotCount; ++i)
+            {
+                m_buffers[i].clear();
+                m_publishedStates[i] = {};
+                m_extractedFrameIndex[i].store(UINT32_MAX, std::memory_order_release);
+            }
             m_pendingState = {};
-            m_publishedState = {};
-            m_readIndex.store(0, std::memory_order_release);
-            m_writeIndex = 1;
+            m_latestExtractedFrameIndex.store(UINT32_MAX, std::memory_order_release);
         }
 
     private:
-        SceneRenderData m_buffers[2];
-        std::atomic<uint32_t> m_readIndex{0};
-        uint32_t m_writeIndex = 1;
+        SceneRenderData m_buffers[kSlotCount];
         SceneRenderPublishState m_pendingState;
-        SceneRenderPublishState m_publishedState;
+        SceneRenderPublishState m_publishedStates[kSlotCount];
+        std::atomic<uint32_t> m_extractedFrameIndex[kSlotCount]{UINT32_MAX, UINT32_MAX, UINT32_MAX};
+        std::atomic<uint32_t> m_latestExtractedFrameIndex{UINT32_MAX};
     };
 
 } // namespace caustica::scene

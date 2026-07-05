@@ -8,6 +8,7 @@ namespace { constexpr int c_SwapchainCount = 3; }
 #include <render/SceneGaussianSplatPasses.h>
 #include <render/SceneRayTracingResources.h>
 
+#include <scene/Scene.h>
 #include <scene/SceneEcs.h>
 #include <scene/SceneLightAccess.h>
 #include <render/Core/PostProcessAA.h>
@@ -1137,16 +1138,31 @@ void caustica::render::WorldRenderer::render(nvrhi::IFramebuffer* framebuffer)
         framebuffer->getFramebufferInfo().width,
         framebuffer->getFramebufferInfo().height);
 
-    PathTracingFrameContext ctx{};
-    ctx.renderer = this;
-    ctx.framebuffer = framebuffer;
-    ctx.displaySize = m_displaySize;
-    ctx.renderSize = m_renderSize;
+    ensureRenderScheduleBuilt();
 
-    ensureFramePipelineBuilt();
-    m_framePipeline->executeAll(ctx);
+    m_renderFrameCtx = {};
+    m_renderFrameCtx.frame.renderer = this;
+    m_renderFrameCtx.frame.framebuffer = framebuffer;
+    m_renderFrameCtx.frame.displaySize = m_displaySize;
+    m_renderFrameCtx.frame.renderSize = m_renderSize;
+    m_renderFrameCtx.graph = &m_frameGraph;
+    m_activeRenderCtx = &m_renderFrameCtx;
 
-    if (ctx.aborted)
+    const uint32_t renderPhaseFrameIndex = m_context.gpuDevice.GetRenderPhaseFrameIndex();
+    std::shared_ptr<Scene> scene = m_context.sceneManager.getScene();
+    if (scene)
+        scene->beginGpuReadFrame(renderPhaseFrameIndex);
+
+    ecs::ScheduleContext schedCtx{};
+    schedCtx.frameIndex = static_cast<uint32_t>(m_frameIndex);
+    m_renderSchedule.run(m_renderScheduleWorld, schedCtx);
+
+    if (scene)
+        scene->endGpuReadFrame();
+
+    m_activeRenderCtx = nullptr;
+
+    if (m_renderFrameCtx.frame.aborted)
         postUpdatePathTracing();
 }
 void caustica::render::WorldRenderer::recreateBindingSet()
@@ -1457,11 +1473,11 @@ void caustica::render::WorldRenderer::denoise(nvrhi::IFramebuffer* framebuffer)
         bool enableValidation = m_context.settings.DebugView == DebugViewType::StablePlane_DenoiserValidation;
         if (nrdUseRelax)
         {
-            m_nrd[pass]->RunDenoiserPasses(m_commandList, *m_renderTargets, pass, *m_context.camera.view(), *m_context.camera.viewPrevious(), m_context.gpuDevice.GetFrameIndex(), m_context.settings.NRDDisocclusionThreshold, m_context.settings.NRDDisocclusionThresholdAlternate, m_context.settings.NRDUseAlternateDisocclusionThresholdMix, timeDeltaBetweenFrames, enableValidation, resetHistory, &m_context.settings.RelaxSettings);
+            m_nrd[pass]->RunDenoiserPasses(m_commandList, *m_renderTargets, pass, *m_context.camera.view(), *m_context.camera.viewPrevious(), m_context.gpuDevice.GetRenderPhaseFrameIndex(), m_context.settings.NRDDisocclusionThreshold, m_context.settings.NRDDisocclusionThresholdAlternate, m_context.settings.NRDUseAlternateDisocclusionThresholdMix, timeDeltaBetweenFrames, enableValidation, resetHistory, &m_context.settings.RelaxSettings);
         }
         else
         {
-            m_nrd[pass]->RunDenoiserPasses(m_commandList, *m_renderTargets, pass, *m_context.camera.view(), *m_context.camera.viewPrevious(), m_context.gpuDevice.GetFrameIndex(), m_context.settings.NRDDisocclusionThreshold, m_context.settings.NRDDisocclusionThresholdAlternate, m_context.settings.NRDUseAlternateDisocclusionThresholdMix, timeDeltaBetweenFrames, enableValidation, resetHistory, &m_context.settings.ReblurSettings);
+            m_nrd[pass]->RunDenoiserPasses(m_commandList, *m_renderTargets, pass, *m_context.camera.view(), *m_context.camera.viewPrevious(), m_context.gpuDevice.GetRenderPhaseFrameIndex(), m_context.settings.NRDDisocclusionThreshold, m_context.settings.NRDDisocclusionThresholdAlternate, m_context.settings.NRDUseAlternateDisocclusionThresholdMix, timeDeltaBetweenFrames, enableValidation, resetHistory, &m_context.settings.ReblurSettings);
         }
 
         m_commandList->beginMarker("MergeOutputs");

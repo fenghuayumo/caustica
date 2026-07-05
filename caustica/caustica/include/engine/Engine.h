@@ -37,6 +37,7 @@ public:
 
     void onBeginFrame(GpuDevice& gpuDevice);
     void onUpdate(float elapsedTimeSeconds, bool windowFocused);
+    void onPrepareRenderScene(GpuDevice& gpuDevice);
     void onRenderScene(GpuDevice& gpuDevice);
     void onRenderEnd(GpuDevice& gpuDevice);
 

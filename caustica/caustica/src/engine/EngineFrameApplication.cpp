@@ -35,6 +35,12 @@ void EngineFrameApplication::onUpdate(float elapsedTimeSeconds, bool windowFocus
         m_engine->onUpdate(elapsedTimeSeconds, windowFocused);
 }
 
+void EngineFrameApplication::onPrepareRenderScene(GpuDevice& gpuDevice)
+{
+    if (m_engine)
+        m_engine->onPrepareRenderScene(gpuDevice);
+}
+
 void EngineFrameApplication::onRender()
 {
     GpuDevice* gpuDevice = getGpuDevice();

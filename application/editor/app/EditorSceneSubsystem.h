@@ -22,7 +22,7 @@ public:
 protected:
     void onInitializePost(caustica::EngineInitContext& context) override;
     void onBeforeBeginFrame() override;
-    void prepareSceneFrame() override;
+    void onPrepareRenderScene(caustica::GpuDevice& gpuDevice) override;
 
 private:
     [[nodiscard]] SceneEditor& sceneEditor();

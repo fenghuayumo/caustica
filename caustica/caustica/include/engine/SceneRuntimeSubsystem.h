@@ -38,6 +38,7 @@ public:
 
     void onBeginFrame(GpuDevice& gpuDevice) override;
     void onUpdate(float elapsedTimeSeconds, bool windowFocused) override;
+    void onPrepareRenderScene(GpuDevice& gpuDevice) override;
     void onRenderScene(GpuDevice& gpuDevice) override;
 
     void onBackBufferResizing() override;
@@ -48,7 +49,6 @@ public:
 protected:
     virtual void onInitializePost(EngineInitContext& context);
     virtual void onBeforeBeginFrame();
-    virtual void prepareSceneFrame();
 
     SceneRuntimeSubsystemConfig m_config;
 };

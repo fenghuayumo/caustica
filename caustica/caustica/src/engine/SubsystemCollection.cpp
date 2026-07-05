@@ -68,6 +68,15 @@ void SubsystemCollection::onUpdate(float elapsedTimeSeconds, bool windowFocused)
     }
 }
 
+void SubsystemCollection::onPrepareRenderScene(GpuDevice& gpuDevice)
+{
+    for (const auto& subsystem : m_subsystems)
+    {
+        if (subsystem)
+            subsystem->onPrepareRenderScene(gpuDevice);
+    }
+}
+
 void SubsystemCollection::onRenderScene(GpuDevice& gpuDevice)
 {
     for (const auto& subsystem : m_subsystems)

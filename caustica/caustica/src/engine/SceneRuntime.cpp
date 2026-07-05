@@ -165,6 +165,15 @@ void SceneRuntime::prepareRenderFrame()
 {
     m_progressLoading.Stop();
     m_sessionDiagnostics.asyncLoadingInProgress = false;
+
+    if (!m_gpuDevice)
+        return;
+
+    const std::shared_ptr<Scene> scene = GetScene();
+    if (!scene)
+        return;
+
+    scene->extractAndPublishRenderSnapshot(m_gpuDevice->GetPreparedRenderFrameIndex());
 }
 
 std::shared_ptr<Scene> SceneRuntime::GetScene() const
@@ -507,6 +516,13 @@ void SceneRuntime::SceneLoaded()
     m_camera->syncPreviousViewFromCurrent();
 
     m_progressLoading.Set(100);
+
+    if (m_gpuDevice)
+    {
+        m_gpuDevice->SetPreparedRenderFrameIndex(m_gpuDevice->GetFrameIndex());
+        if (const std::shared_ptr<Scene> scene = GetScene())
+            scene->extractAndPublishRenderSnapshot(m_gpuDevice->GetPreparedRenderFrameIndex());
+    }
 
     onSceneLoadedComplete();
 }
