@@ -93,6 +93,57 @@ void App::buildPlugins()
     m_pluginsBuilt = true;
 }
 
+App& App::addSystem(AppSchedule schedule, std::string name, AppSystemFn system)
+{
+    m_schedules.addSystem(schedule, std::move(name), std::move(system));
+    return *this;
+}
+
+void App::runSchedule(AppSchedule schedule, AppScheduleContext& context)
+{
+    m_schedules.run(schedule, context);
+}
+
+void App::ensureDefaultSchedules()
+{
+    if (m_defaultSchedulesBuilt)
+        return;
+
+    addSystem(AppSchedule::PreUpdate, "ProcessEventQueue", [](AppScheduleContext& ctx) {
+        ctx.app.processEventQueue();
+    });
+
+    addSystem(AppSchedule::PreUpdate, "BeginFrame", [](AppScheduleContext& ctx) {
+        if (ctx.gpuDevice)
+            ctx.app.onBeginFrame(*ctx.gpuDevice);
+    });
+
+    addSystem(AppSchedule::Update, "SubsystemUpdate", [](AppScheduleContext& ctx) {
+        ctx.app.onUpdate(ctx.deltaTimeSeconds, ctx.windowFocused);
+    });
+
+    addSystem(AppSchedule::PreRender, "PrepareRenderScene", [](AppScheduleContext& ctx) {
+        if (ctx.gpuDevice)
+            ctx.app.onPrepareRenderScene(*ctx.gpuDevice);
+    });
+
+    m_defaultSchedulesBuilt = true;
+}
+
+void App::runStartupSchedules()
+{
+    GpuDevice* gpuDevice = device();
+    AppScheduleContext context{
+        *this,
+        gpuDevice,
+        0.0f,
+        gpuDevice ? gpuDevice->m_FrameIndex : 0u,
+        isWindowFocused(),
+        isWindowVisible(),
+    };
+    runSchedule(AppSchedule::Startup, context);
+}
+
 bool App::initializeGraphics(const GpuDeviceCreateDesc& desc)
 {
     GpuDeviceCreateResult result = GpuDevice::CreateInitialized(desc);
@@ -123,6 +174,7 @@ bool App::finishStartup()
     if (m_engineInitialized)
         return true;
 
+    ensureDefaultSchedules();
     buildPlugins();
 
     GpuDevice* gpuDevice = device();
@@ -139,6 +191,7 @@ bool App::finishStartup()
     }
 
     syncSwapChain();
+    runStartupSchedules();
     m_engineInitialized = true;
     return true;
 }
@@ -167,6 +220,7 @@ void App::shutdown()
     m_renderThread.stop();
 
     shutdownEngine();
+    m_schedules.clear();
 
     GpuDevice* gpuDevice = device();
     unbindFrameDriver(gpuDevice);
@@ -408,19 +462,26 @@ bool App::executeRenderPhase(GpuDevice* gpuDevice, double elapsedTime, double cu
 
 bool App::runFrame(std::optional<double> elapsedTimeOverride)
 {
-    processEventQueue();
-
     GpuDevice* gpuDevice = device();
     if (!gpuDevice)
         return false;
-
-    onBeginFrame(*gpuDevice);
 
     double curTime = GetNow(gpuDevice->m_DeviceParams.headlessDevice);
     double elapsedTime = elapsedTimeOverride.value_or(curTime - gpuDevice->m_PreviousFrameTimestamp);
 
     const bool windowVisible = isWindowVisible();
     const bool windowFocused = isWindowFocused();
+
+    AppScheduleContext scheduleContext{
+        *this,
+        gpuDevice,
+        float(elapsedTime),
+        gpuDevice->m_FrameIndex,
+        windowFocused,
+        windowVisible,
+    };
+
+    runSchedule(AppSchedule::PreUpdate, scheduleContext);
 
     if (m_useDedicatedRenderThread && !m_renderThread.isRunning())
         m_renderThread.start();
@@ -451,7 +512,8 @@ bool App::runFrame(std::optional<double> elapsedTimeOverride)
         if (beforeAnimate)
             beforeAnimate(*gpuDevice, gpuDevice->m_FrameIndex);
         onBeforeAnimate(*gpuDevice, gpuDevice->m_FrameIndex);
-        animate(elapsedTime, true);
+        scheduleContext.windowFocused = true;
+        runSchedule(AppSchedule::Update, scheduleContext);
 #if CAUSTICA_WITH_STREAMLINE
         if (!gpuDevice->m_DeviceParams.headlessDevice)
             StreamlineIntegration::Get().SimEnd(*gpuDevice);
@@ -459,11 +521,14 @@ bool App::runFrame(std::optional<double> elapsedTimeOverride)
         if (afterAnimate)
             afterAnimate(*gpuDevice, gpuDevice->m_FrameIndex);
 
+        runSchedule(AppSchedule::PostUpdate, scheduleContext);
+
         if (!skipRenderPhase())
         {
             const uint32_t renderFrameIndex = gpuDevice->m_FrameIndex;
             gpuDevice->SetPreparedRenderFrameIndex(renderFrameIndex);
-            onPrepareRenderScene(*gpuDevice);
+            runSchedule(AppSchedule::PreRender, scheduleContext);
+            runSchedule(AppSchedule::Render, scheduleContext);
 #if CAUSTICA_WITH_STREAMLINE
             void* slFrameToken = nullptr;
             if (!gpuDevice->m_DeviceParams.headlessDevice)
@@ -496,6 +561,8 @@ bool App::runFrame(std::optional<double> elapsedTimeOverride)
                     return false;
                 }
             }
+
+            runSchedule(AppSchedule::PostRender, scheduleContext);
         }
     }
     else if (windowVisible)
@@ -503,9 +570,11 @@ bool App::runFrame(std::optional<double> elapsedTimeOverride)
         if (beforeAnimate)
             beforeAnimate(*gpuDevice, gpuDevice->m_FrameIndex);
         onBeforeAnimate(*gpuDevice, gpuDevice->m_FrameIndex);
-        animate(elapsedTime, false);
+        scheduleContext.windowFocused = false;
+        runSchedule(AppSchedule::Update, scheduleContext);
         if (afterAnimate)
             afterAnimate(*gpuDevice, gpuDevice->m_FrameIndex);
+        runSchedule(AppSchedule::PostUpdate, scheduleContext);
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(0));

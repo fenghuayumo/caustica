@@ -5,7 +5,7 @@ namespace caustica
 
 class App;
 
-// Bevy-style plugin: register subsystems and resources during App startup.
+// Plugin: register subsystems via build(), schedule systems via addSystem().
 struct Plugin
 {
     virtual ~Plugin() = default;

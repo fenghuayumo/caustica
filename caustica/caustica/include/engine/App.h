@@ -2,6 +2,7 @@
 
 #include <backend/GpuDevice.h>
 #include <backend/GpuFrameDriver.h>
+#include <engine/AppSchedules.h>
 #include <engine/Engine.h>
 #include <engine/ISubsystem.h>
 #include <engine/Plugin.h>
@@ -65,6 +66,11 @@ public:
     }
 
     void buildPlugins();
+
+    App& addSystem(AppSchedule schedule, std::string name, AppSystemFn system);
+    void runSchedule(AppSchedule schedule, AppScheduleContext& context);
+    [[nodiscard]] AppSchedules& schedules() { return m_schedules; }
+    [[nodiscard]] const AppSchedules& schedules() const { return m_schedules; }
 
     bool initializeGraphics(const GpuDeviceCreateDesc& desc);
     bool initializeGraphics(int argc, const char* const* argv, GpuDeviceCreateDesc& desc);
@@ -152,6 +158,9 @@ protected:
     bool m_shutdownCalled = false;
     bool m_pluginsBuilt = false;
     bool m_engineInitialized = false;
+    bool m_defaultSchedulesBuilt = false;
+
+    AppSchedules m_schedules;
 
 private:
     void syncWindowState();
@@ -163,6 +172,8 @@ private:
     bool executeRenderPhase(GpuDevice* gpuDevice, double elapsedTime, double curTime, uint32_t frameIndex);
     void finishFrameWithRenderFailure(GpuDevice* gpuDevice, double elapsedTime, double curTime);
     void shutdownEngine();
+    void ensureDefaultSchedules();
+    void runStartupSchedules();
 
     GpuDevice* device() const;
     Window* window() const;
