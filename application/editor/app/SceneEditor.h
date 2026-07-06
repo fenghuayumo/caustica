@@ -27,7 +27,6 @@ namespace caustica
 {
 class App;
 class Event;
-class RootFileSystem;
 } // namespace caustica
 
 class RenderTargets;
@@ -241,8 +240,6 @@ private:
 
     EditorInputRouter m_inputRouter;
     SceneContentEditor m_contentEditor;
-
-    std::shared_ptr<caustica::RootFileSystem> m_RootFS;
 
     std::unique_ptr<::GameScene> m_sampleGame;
 

@@ -41,7 +41,7 @@ PixelReadbackPass::PixelReadbackPass(
     std::vector<ShaderMacro> macros;
     macros.push_back(ShaderMacro("TYPE", formatName));
     macros.push_back(ShaderMacro("INPUT_MSAA", inputTexture->getDesc().sampleCount > 1 ? "1" : "0"));
-    m_Shader = shaderFactory->CreateAutoShader("engine/passes/pixel_readback_cs.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_pixel_readback_cs), &macros, nvrhi::ShaderType::Compute);
+    m_Shader = shaderFactory->createAutoShader("engine/passes/pixel_readback_cs.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_pixel_readback_cs), &macros, nvrhi::ShaderType::Compute);
 
     nvrhi::BufferDesc bufferDesc;
     bufferDesc.byteSize = 16;

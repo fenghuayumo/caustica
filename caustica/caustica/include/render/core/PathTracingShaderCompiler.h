@@ -138,8 +138,8 @@ private:
 
     bool                                isVerbose() const                       { return m_verbose; }
     bool                                isNvapiShaderExtensionEnabled() const   { return m_enableNVAPIShaderExtension; }
-    bool                                canCompileShaders() const               { return m_compilerConfig.CanCompile(); }
-    bool                                isLoadOnlyMode() const                  { return !m_compilerConfig.CanCompile(); }
+    bool                                canCompileShaders() const               { return m_compilerConfig.canCompile(); }
+    bool                                isLoadOnlyMode() const                  { return !m_compilerConfig.canCompile(); }
 
     const ShaderCompilerUtils::ShaderCompilerConfig& 
                                         getCompilerConfig() const           { return m_compilerConfig; }

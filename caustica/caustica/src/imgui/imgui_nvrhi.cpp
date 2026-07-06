@@ -80,8 +80,8 @@ bool ImGui_NVRHI::init(nvrhi::IDevice* device, std::shared_ptr<ShaderFactory> sh
 
     m_commandList = m_device->createCommandList();
 
-    vertexShader = shaderFactory->CreateAutoShader("engine/imgui_vertex", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_imgui_vertex), nullptr, nvrhi::ShaderType::Vertex);
-    pixelShader = shaderFactory->CreateAutoShader("engine/imgui_pixel", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_imgui_pixel), nullptr, nvrhi::ShaderType::Pixel);
+    vertexShader = shaderFactory->createAutoShader("engine/imgui_vertex", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_imgui_vertex), nullptr, nvrhi::ShaderType::Vertex);
+    pixelShader = shaderFactory->createAutoShader("engine/imgui_pixel", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_imgui_pixel), nullptr, nvrhi::ShaderType::Pixel);
     
     if (!vertexShader || !pixelShader)
     {

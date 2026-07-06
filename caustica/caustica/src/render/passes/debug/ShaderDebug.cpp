@@ -108,7 +108,7 @@ void ShaderDebug::CreateRenderPasses( nvrhi::IFramebuffer * frameBuffer, nvrhi::
         std::vector<caustica::ShaderMacro> shaderMacros;
         shaderMacros.push_back(caustica::ShaderMacro({              "BLEND_DEBUG_BUFFER", "1" })); 
 
-        m_blendDebugVizPS = m_shaderFactory->CreateShader("caustica/shaders/Libraries/ShaderDebug/ShaderDebug.hlsl", "main", &shaderMacros, nvrhi::ShaderType::Pixel);
+        m_blendDebugVizPS = m_shaderFactory->createShader("caustica/shaders/Libraries/ShaderDebug/ShaderDebug.hlsl", "main", &shaderMacros, nvrhi::ShaderType::Pixel);
 
         nvrhi::GraphicsPipelineDesc pipelineDesc;
         pipelineDesc.bindingLayouts = { m_geometryBindingLayout };
@@ -129,14 +129,14 @@ void ShaderDebug::CreateRenderPasses( nvrhi::IFramebuffer * frameBuffer, nvrhi::
     // debug triangles and lines...
     {
         std::vector<ShaderMacro> drawTrianglesMacro = { ShaderMacro("DRAW_TRIANGLES_SHADERS", "1") };
-        m_trianglesVertexShader = m_shaderFactory->CreateShader("caustica/shaders/Libraries/ShaderDebug/ShaderDebug.hlsl", "main_vs", &drawTrianglesMacro, nvrhi::ShaderType::Vertex);
-        m_trianglesPixelShader = m_shaderFactory->CreateShader("caustica/shaders/Libraries/ShaderDebug/ShaderDebug.hlsl", "main_ps", &drawTrianglesMacro, nvrhi::ShaderType::Pixel);
+        m_trianglesVertexShader = m_shaderFactory->createShader("caustica/shaders/Libraries/ShaderDebug/ShaderDebug.hlsl", "main_vs", &drawTrianglesMacro, nvrhi::ShaderType::Vertex);
+        m_trianglesPixelShader = m_shaderFactory->createShader("caustica/shaders/Libraries/ShaderDebug/ShaderDebug.hlsl", "main_ps", &drawTrianglesMacro, nvrhi::ShaderType::Pixel);
     }
 
     {
         std::vector<ShaderMacro> drawLinesMacro = { ShaderMacro("DRAW_LINES_SHADERS", "1") };
-        m_linesVertexShader = m_shaderFactory->CreateShader("caustica/shaders/Libraries/ShaderDebug/ShaderDebug.hlsl", "main_vs", &drawLinesMacro, nvrhi::ShaderType::Vertex);
-        m_linesPixelShader = m_shaderFactory->CreateShader("caustica/shaders/Libraries/ShaderDebug/ShaderDebug.hlsl", "main_ps", &drawLinesMacro, nvrhi::ShaderType::Pixel);
+        m_linesVertexShader = m_shaderFactory->createShader("caustica/shaders/Libraries/ShaderDebug/ShaderDebug.hlsl", "main_vs", &drawLinesMacro, nvrhi::ShaderType::Vertex);
+        m_linesPixelShader = m_shaderFactory->createShader("caustica/shaders/Libraries/ShaderDebug/ShaderDebug.hlsl", "main_ps", &drawLinesMacro, nvrhi::ShaderType::Pixel);
     }
 
     nvrhi::BindingSetDesc bindingSetDesc;

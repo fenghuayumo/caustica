@@ -345,7 +345,7 @@ namespace
 
         std::memcpy(pngData, encodedPng.data(), encodedPng.size());
         auto blob = std::make_shared<caustica::Blob>(pngData, encodedPng.size());
-        return textureCache.LoadTextureFromMemoryDeferred(blob, generatedName, "image/png", sRGB);
+        return textureCache.loadTextureFromMemoryDeferred(blob, generatedName, "image/png", sRGB);
     }
 
     int ResolveObjIndex(int index, size_t count)
@@ -1049,7 +1049,7 @@ bool ObjImporter::Load(const std::filesystem::path& filePath, TextureLoader& tex
             return nullptr;
         }
 
-        return textureCache.LoadTextureFromFileDeferred(texturePath, sRGB);
+        return textureCache.loadTextureFromFileDeferred(texturePath, sRGB);
     };
 
     auto loadObjTextureReference = [&](const ObjTextureReference& texture, bool sRGB) -> std::shared_ptr<LoadedTexture>

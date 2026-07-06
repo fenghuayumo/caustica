@@ -20,7 +20,7 @@ using namespace caustica::render;
 DLSS::DLSS(nvrhi::IDevice* device, caustica::ShaderFactory& shaderFactory)
     : m_device(device)
 {
-    m_exposureShader = shaderFactory.CreateAutoShader("engine/passes/dlss_exposure_cs.hlsl", "main",
+    m_exposureShader = shaderFactory.createAutoShader("engine/passes/dlss_exposure_cs.hlsl", "main",
         CAUSTICA_MAKE_PLATFORM_SHADER(g_dlss_exposure_cs), nullptr, nvrhi::ShaderType::Compute);
 
     auto layoutDesc = nvrhi::BindingLayoutDesc()

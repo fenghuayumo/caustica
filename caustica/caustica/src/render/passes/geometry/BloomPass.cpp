@@ -76,7 +76,7 @@ BloomPass::BloomPass(
     , m_FramebufferFactory(std::move(framebufferFactory))
     , m_device(device)
 {
-    m_BloomBlurPixelShader = shaderFactory->CreateAutoShader("engine/passes/bloom_ps.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_bloom_ps), nullptr, nvrhi::ShaderType::Pixel);
+    m_BloomBlurPixelShader = shaderFactory->createAutoShader("engine/passes/bloom_ps.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_bloom_ps), nullptr, nvrhi::ShaderType::Pixel);
 
     nvrhi::BufferDesc constantBufferDesc;
     constantBufferDesc.byteSize = sizeof(BloomConstants);

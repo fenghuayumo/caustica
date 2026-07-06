@@ -39,20 +39,20 @@ FullscreenBlitPass::FullscreenBlitPass(nvrhi::IDevice* device,
     {
         std::vector<ShaderMacro> vsMacros;
         vsMacros.push_back(ShaderMacro("QUAD_Z", "0"));
-        m_fullscreenVS = shaderFactory->CreateAutoShader("engine/fullscreen_vs", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_fullscreen_vs), &vsMacros, nvrhi::ShaderType::Vertex);
+        m_fullscreenVS = shaderFactory->createAutoShader("engine/fullscreen_vs", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_fullscreen_vs), &vsMacros, nvrhi::ShaderType::Vertex);
 
         vsMacros[0].definition = "1";
-        m_fullscreenAtOneVS = shaderFactory->CreateAutoShader("engine/fullscreen_vs", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_fullscreen_vs), &vsMacros, nvrhi::ShaderType::Vertex);
+        m_fullscreenAtOneVS = shaderFactory->createAutoShader("engine/fullscreen_vs", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_fullscreen_vs), &vsMacros, nvrhi::ShaderType::Vertex);
     }
 
-    m_rectVS = shaderFactory->CreateAutoShader("engine/rect_vs", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_rect_vs), nullptr, nvrhi::ShaderType::Vertex);
+    m_rectVS = shaderFactory->createAutoShader("engine/rect_vs", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_rect_vs), nullptr, nvrhi::ShaderType::Vertex);
 
     std::vector<ShaderMacro> blitMacros = { ShaderMacro("TEXTURE_ARRAY", "0") };
-    m_blitPS = shaderFactory->CreateAutoShader("engine/blit_ps", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_blit_ps), &blitMacros, nvrhi::ShaderType::Pixel);
-    m_sharpenPS = shaderFactory->CreateAutoShader("engine/sharpen_ps", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_sharpen_ps), &blitMacros, nvrhi::ShaderType::Pixel);
+    m_blitPS = shaderFactory->createAutoShader("engine/blit_ps", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_blit_ps), &blitMacros, nvrhi::ShaderType::Pixel);
+    m_sharpenPS = shaderFactory->createAutoShader("engine/sharpen_ps", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_sharpen_ps), &blitMacros, nvrhi::ShaderType::Pixel);
     blitMacros[0].definition = "1";
-    m_blitArrayPS = shaderFactory->CreateAutoShader("engine/blit_ps", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_blit_ps), &blitMacros, nvrhi::ShaderType::Pixel);
-    m_sharpenArrayPS = shaderFactory->CreateAutoShader("engine/sharpen_ps", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_sharpen_ps), &blitMacros, nvrhi::ShaderType::Pixel);
+    m_blitArrayPS = shaderFactory->createAutoShader("engine/blit_ps", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_blit_ps), &blitMacros, nvrhi::ShaderType::Pixel);
+    m_sharpenArrayPS = shaderFactory->createAutoShader("engine/sharpen_ps", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_sharpen_ps), &blitMacros, nvrhi::ShaderType::Pixel);
 
     nvrhi::BindingLayoutDesc layoutDesc;
     layoutDesc.visibility = nvrhi::ShaderType::All;

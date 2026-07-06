@@ -95,7 +95,7 @@ MipMapGenPass::MipMapGenPass(
     assert(mode>=0 && mode <= MODE_MINMAX);
 
     std::vector<ShaderMacro> macros = { {"MODE", std::to_string(mode)} };
-    m_Shader = shaderFactory->CreateAutoShader(
+    m_Shader = shaderFactory->createAutoShader(
         "engine/passes/mipmapgen_cs.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_mipmapgen_cs), &macros, nvrhi::ShaderType::Compute);
 
     // Constants

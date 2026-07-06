@@ -7,7 +7,7 @@
 namespace caustica
 {
 
-AssetId AssetId::Generate()
+AssetId AssetId::generate()
 {
     AssetId id;
     id.low = GenerateRandom64();
@@ -15,7 +15,7 @@ AssetId AssetId::Generate()
     return id;
 }
 
-std::string AssetId::ToString() const
+std::string AssetId::toString() const
 {
     std::ostringstream ss;
     ss << std::hex << std::setfill('0')
@@ -24,17 +24,17 @@ std::string AssetId::ToString() const
     return ss.str();
 }
 
-AssetId AssetId::FromString(const std::string& str)
+AssetId AssetId::fromString(const std::string& str)
 {
     if (str.size() < 32)
-        return Invalid();
+        return invalid();
     AssetId id;
     id.high = std::stoull(str.substr(0, 16), nullptr, 16);
     id.low = std::stoull(str.substr(16, 16), nullptr, 16);
     return id;
 }
 
-const char* AssetTypeToString(AssetType type)
+const char* assetTypeToString(AssetType type)
 {
     switch (type)
     {

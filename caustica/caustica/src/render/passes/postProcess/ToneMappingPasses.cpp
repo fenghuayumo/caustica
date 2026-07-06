@@ -33,10 +33,10 @@ ToneMappingPass::ToneMappingPass(
     const IView* sampleView = compositeView.getChildView(ViewType::PLANAR, 0);
     nvrhi::IFramebuffer* colorSampleFramebuffer = m_FramebufferFactory->getFramebuffer(*sampleView);
     {
-        m_LuminanceShader = shaderFactory->CreateShader("caustica/shaders/render/toneMapper/luminance_ps.hlsl", "main", nullptr, nvrhi::ShaderType::Pixel);
-        m_ToneMapShader = shaderFactory->CreateShader("caustica/shaders/render/toneMapper/ToneMapping.hlsl", "main_ps", nullptr, nvrhi::ShaderType::Pixel);
+        m_LuminanceShader = shaderFactory->createShader("caustica/shaders/render/toneMapper/luminance_ps.hlsl", "main", nullptr, nvrhi::ShaderType::Pixel);
+        m_ToneMapShader = shaderFactory->createShader("caustica/shaders/render/toneMapper/ToneMapping.hlsl", "main_ps", nullptr, nvrhi::ShaderType::Pixel);
 #if TONEMAPPING_AUTOEXPOSURE_CPU
-        m_CaptureLuminanceShader = shaderFactory->CreateShader("caustica/shaders/render/toneMapper/ToneMapping.hlsl", "capture_cs", nullptr, nvrhi::ShaderType::Compute);
+        m_CaptureLuminanceShader = shaderFactory->createShader("caustica/shaders/render/toneMapper/ToneMapping.hlsl", "capture_cs", nullptr, nvrhi::ShaderType::Compute);
 #endif
     }
 

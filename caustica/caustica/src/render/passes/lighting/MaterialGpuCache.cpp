@@ -300,7 +300,7 @@ bool PTMaterial::read(
             storagePath);
         output.localPath = storagePath;
 
-        output.loaded = textureCache->LoadTextureFromFileDeferred(fullPath, output.sRGB);
+        output.loaded = textureCache->loadTextureFromFileDeferred(fullPath, output.sRGB);
         output.enabled = output.loaded != nullptr;
     };
 
@@ -987,11 +987,11 @@ bool MaterialGpuCache::setMaterialTexture(
     texture.localPath = storagePath;
     texture.sRGB = sRGB.value_or(DefaultTextureSRGB(material, slot));
     texture.normalMap = normalMap.value_or(DefaultTextureNormalMap(slot));
-    texture.loaded = m_textureCache->LoadTextureFromFileDeferred(fullPath, texture.sRGB);
+    texture.loaded = m_textureCache->loadTextureFromFileDeferred(fullPath, texture.sRGB);
     texture.enabled = texture.loaded != nullptr;
 
     if (texture.loaded == nullptr ||
-        (!m_textureCache->IsTextureLoaded(texture.loaded) && !m_textureCache->IsTextureFinalized(texture.loaded)))
+        (!m_textureCache->isTextureLoaded(texture.loaded) && !m_textureCache->isTextureFinalized(texture.loaded)))
     {
         texture = PTTexture();
         texture.enabled = false;
@@ -1226,8 +1226,8 @@ void MaterialGpuCache::completeDeferredTexturesLoad(nvrhi::ICommandList* command
         }
 
         // In case new textures were loaded, we need to make sure they were uploaded properly
-        const bool texturesFinalized = m_textureCache->ProcessRenderingThreadCommands(*m_renderDevice, 0.f);
-        m_textureCache->LoadingFinished();
+        const bool texturesFinalized = m_textureCache->processRenderingThreadCommands(*m_renderDevice, 0.f);
+        m_textureCache->loadingFinished();
         m_deferredTextureLoadInProgress = false;
         info("MaterialGpuCache: deferred texture flush end, ok=%s", texturesFinalized ? "true" : "false");
 
@@ -1282,14 +1282,14 @@ caustica::ShaderKey MaterialShaderPermutation::makeShaderKey(
     nvrhi::GraphicsAPI api,
     ShaderCompilerUtils::ShaderProfile profile) const
 {
-    return caustica::MakeShaderLibraryKey(shaderFilePath, caustica::shader::fromNvrhiGraphicsApi(api), macros, profile);
+    return caustica::makeShaderLibraryKey(shaderFilePath, caustica::shader::fromNvrhiGraphicsApi(api), macros, profile);
 }
 
 // MaterialShaderPermutation::MaterialShaderPermutation(const std::string & shaderFilePath, const std::string & closestHitName, const std::string & anyHitName, const std::vector<std::pair<std::string, std::string>> & macros )
 
 
 MaterialShaderPermutationKey::MaterialShaderPermutationKey( const MaterialShaderPermutation & msp )
-    : fullKey(msp.shaderFilePath + ", " + caustica::CanonicalMacroString(msp.macros))
+    : fullKey(msp.shaderFilePath + ", " + caustica::formatCanonicalMacros(msp.macros))
 {
     hash = ShortHash(HashMyString(fullKey));
 }

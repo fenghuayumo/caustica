@@ -6,18 +6,18 @@
 
 namespace caustica
 {
-    class IBlob;
-}
+class IBlob;
+struct TextureData;
 
-namespace caustica
-{
-    struct TextureData;
+bool loadDDSTextureFromMemory(TextureData& textureInfo);
 
-    // Initialized the TextureInfo from the 'data' array, which must be populated with DDS data
-    bool LoadDDSTextureFromMemory(TextureData& textureInfo);
+nvrhi::TextureHandle createDDSTextureFromMemory(
+    nvrhi::IDevice* device,
+    nvrhi::ICommandList* commandList,
+    std::shared_ptr<IBlob> data,
+    const char* debugName = nullptr,
+    bool forceSRGB = false);
 
-    // Creates a texture based on DDS data in memory
-    nvrhi::TextureHandle CreateDDSTextureFromMemory(nvrhi::IDevice* device, nvrhi::ICommandList* commandList, std::shared_ptr<caustica::IBlob> data, const char* debugName = nullptr, bool forceSRGB = false);
+std::shared_ptr<IBlob> saveStagingTextureAsDDS(nvrhi::IDevice* device, nvrhi::IStagingTexture* stagingTexture);
 
-    std::shared_ptr<caustica::IBlob> SaveStagingTextureAsDDS(nvrhi::IDevice* device, nvrhi::IStagingTexture* stagingTexture);
-}
+} // namespace caustica

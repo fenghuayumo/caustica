@@ -37,7 +37,7 @@ IesProfileLoader::IesProfileLoader(
     };
     m_BindingLayout = device->createBindingLayout(layoutDesc);
 
-    m_ComputeShader = m_ShaderFactory->CreateAutoShader("engine/ies_profile_cs.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_ies_profile_cs), nullptr, nvrhi::ShaderType::Compute);
+    m_ComputeShader = m_ShaderFactory->createAutoShader("engine/ies_profile_cs.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_ies_profile_cs), nullptr, nvrhi::ShaderType::Compute);
 
     nvrhi::ComputePipelineDesc pipelineDesc;
     pipelineDesc.bindingLayouts = { m_BindingLayout };
@@ -181,7 +181,7 @@ static IesStatus ParseIesFile(char* fileData,
     return IesStatus::Success;
 }
 
-std::shared_ptr<IesProfile> IesProfileLoader::LoadIesProfile(caustica::IFileSystem& fs, const std::filesystem::path& path)
+std::shared_ptr<IesProfile> IesProfileLoader::loadIesProfile(caustica::IFileSystem& fs, const std::filesystem::path& path)
 {
     auto fileBlob = fs.readFile(path);
 
@@ -222,7 +222,7 @@ std::shared_ptr<IesProfile> IesProfileLoader::LoadIesProfile(caustica::IFileSyst
     return profile;
 }
 
-void IesProfileLoader::BakeIesProfile(IesProfile& profile, nvrhi::ICommandList* commandList)
+void IesProfileLoader::bakeIesProfile(IesProfile& profile, nvrhi::ICommandList* commandList)
 {
     if (profile.texture)
         return;

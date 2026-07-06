@@ -1,174 +1,140 @@
 #pragma once
 
-#include <assets/LoadedTexture.h>
-#include <assets/AssetId.h>
+#include <assets/TextureData.h>
+#include <assets/AssetCache.h>
+#include <assets/AssetRegistry.h>
 #include <backend/IDescriptorTableManager.h>
 #include <core/log.h>
 
 #include <rhi/nvrhi.h>
 #include <atomic>
 #include <filesystem>
-#include <unordered_map>
 #include <memory>
-#include <shared_mutex>
+#include <mutex>
 #include <queue>
 
 namespace caustica
 {
-    class IBlob;
-    class IFileSystem;
-    class AssetRegistry;
-}
-
-namespace caustica
-{
-    class ThreadPool;
+class IBlob;
+class IFileSystem;
+class ThreadPool;
 
 namespace render { class RenderDevice; }
 
-    struct TextureSubresourceData
-    {
-        size_t rowPitch = 0;
-        size_t depthPitch = 0;
-        ptrdiff_t dataOffset = 0;
-        size_t dataSize = 0;
-    };
-
-    struct TextureData : public LoadedTexture
-    {
-        std::shared_ptr<caustica::IBlob> data;
-
-        nvrhi::Format format = nvrhi::Format::UNKNOWN;
-        uint32_t width = 1;
-        uint32_t height = 1;
-        uint32_t depth = 1;
-        uint32_t arraySize = 1;
-        uint32_t mipLevels = 1;
-        nvrhi::TextureDimension dimension = nvrhi::TextureDimension::Unknown;
-        bool isRenderTarget = false;
-        bool forceSRGB = false;
-
-        // ArraySlice -> MipLevel -> TextureSubresourceData
-        std::vector<std::vector<TextureSubresourceData>> dataLayout;
-    };
-
-    class TextureLoader
-    {
-    protected:
-        nvrhi::DeviceHandle m_Device;
-        nvrhi::CommandListHandle m_CommandList;
-
-        std::queue<std::shared_ptr<TextureData>> m_TexturesToFinalize;
-        std::shared_ptr<IDescriptorTableManager> m_DescriptorTable;
-        std::mutex m_TexturesToFinalizeMutex;
-
-        std::shared_ptr<caustica::IFileSystem> m_fs;
-
-        uint32_t m_MaxTextureSize = 0;
-
-        bool m_GenerateMipmaps = true;
-
-        caustica::Severity m_InfoLogSeverity = caustica::Severity::Info;
-        caustica::Severity m_ErrorLogSeverity = caustica::Severity::Warning;
-
-        std::atomic<uint32_t> m_TexturesRequested = 0;
-        std::atomic<uint32_t> m_TexturesLoaded = 0;
-        uint32_t m_TexturesFinalized = 0;
-
-        bool FindTextureInCache(const std::filesystem::path& path, std::shared_ptr<TextureData>& texture);
-        std::shared_ptr<caustica::IBlob> ReadTextureFile(const std::filesystem::path& path) const;
-
-        bool FillTextureData(
-            const std::shared_ptr<caustica::IBlob>& fileData,
-            const std::shared_ptr<TextureData>& texture,
-            const std::string& extension,
-            const std::string& mimeType) const;
-
-        void FinalizeTexture(
-            std::shared_ptr<TextureData> texture,
-            caustica::render::RenderDevice* renderDevice,
-            nvrhi::ICommandList* commandList);
-
-        virtual void TextureLoaded(std::shared_ptr<TextureData> texture);
-        virtual std::shared_ptr<TextureData> CreateTextureData();
-
-        // Register a texture path with the AssetRegistry and set its AssetId
-        void RegisterTextureAsset(const std::shared_ptr<TextureData>& texture);
-
-    public:
-        TextureLoader(
-            nvrhi::IDevice* device,
-            std::shared_ptr<caustica::IFileSystem> fs,
-            std::shared_ptr<IDescriptorTableManager> descriptorTable);
-        virtual ~TextureLoader();
-
-        // Release all cached textures
-        void Reset();
-
-        virtual std::shared_ptr<LoadedTexture> LoadTextureFromFile(
-            const std::filesystem::path& path,
-            bool sRGB,
-            caustica::render::RenderDevice* renderDevice,
-            nvrhi::ICommandList* commandList);
-
-        virtual std::shared_ptr<LoadedTexture> LoadTextureFromFileDeferred(
-            const std::filesystem::path& path,
-            bool sRGB);
-
-        virtual std::shared_ptr<LoadedTexture> LoadTextureFromFileAsync(
-            const std::filesystem::path& path,
-            bool sRGB,
-            ThreadPool& threadPool);
-
-        virtual std::shared_ptr<LoadedTexture> LoadTextureFromMemoryAsync(
-            const std::shared_ptr<caustica::IBlob>& data,
-            const std::string& name,
-            const std::string& mimeType,
-            bool sRGB,
-            ThreadPool& threadPool);
-
-        virtual std::shared_ptr<LoadedTexture> LoadTextureFromMemory(
-            const std::shared_ptr<caustica::IBlob>& data,
-            const std::string& name,
-            const std::string& mimeType,
-            bool sRGB,
-            caustica::render::RenderDevice* renderDevice,
-            nvrhi::ICommandList* commandList);
-
-        virtual std::shared_ptr<LoadedTexture> LoadTextureFromMemoryDeferred(
-            const std::shared_ptr<caustica::IBlob>& data,
-            const std::string& name,
-            const std::string& mimeType,
-            bool sRGB);
-
-        bool IsTextureLoaded(const std::shared_ptr<LoadedTexture>& texture);
-        bool IsTextureFinalized(const std::shared_ptr<LoadedTexture>& texture);
-        bool UnloadTexture(const std::shared_ptr<LoadedTexture>& texture);
-
-        bool ProcessRenderingThreadCommands(caustica::render::RenderDevice& renderDevice, float timeLimitMilliseconds);
-        void LoadingFinished();
-        void SetMaxTextureSize(uint32_t size);
-        void SetGenerateMipmaps(bool generateMipmaps);
-        void SetInfoLogSeverity(caustica::Severity value) { m_InfoLogSeverity = value; }
-        void SetErrorLogSeverity(caustica::Severity value) { m_ErrorLogSeverity = value; }
-
-        uint32_t GetNumberOfLoadedTextures() { return m_TexturesLoaded.load(); }
-        uint32_t GetNumberOfRequestedTextures() { return m_TexturesRequested.load(); }
-        uint32_t GetNumberOfFinalizedTextures() { return m_TexturesFinalized; }
-
-        std::shared_ptr<TextureData> GetLoadedTexture(std::filesystem::path const& path);
-    };
-
-    // Saves the contents of texture's slice 0 mip level 0 into an image file.
-    // The image format is determined from the file's extension.
-    // Supported formats are: BMP, PNG, JPG, TGA.
-    // Requires that no immediate command list is open at the time this function is called.
-    // Creates and destroys temporary resources internally, so should NOT be called often.
-    bool SaveTextureToFile(
+class TextureLoader
+{
+public:
+    TextureLoader(
         nvrhi::IDevice* device,
-        caustica::render::RenderDevice& renderDevice,
-        nvrhi::ITexture* texture,
-        nvrhi::ResourceStates textureState,
-        const char* fileName,
-        bool saveAlphaChannel = true);
-}
+        std::shared_ptr<IFileSystem> fs,
+        std::shared_ptr<IDescriptorTableManager> descriptorTable,
+        AssetRegistry& registry,
+        AssetCache<TextureData>& cache);
+    ~TextureLoader();
+
+    void reset();
+
+    std::shared_ptr<LoadedTexture> loadTextureFromFile(
+        const std::filesystem::path& path,
+        bool sRGB,
+        render::RenderDevice* renderDevice,
+        nvrhi::ICommandList* commandList);
+
+    std::shared_ptr<LoadedTexture> loadTextureFromFileDeferred(
+        const std::filesystem::path& path,
+        bool sRGB);
+
+    std::shared_ptr<LoadedTexture> loadTextureFromFileAsync(
+        const std::filesystem::path& path,
+        bool sRGB,
+        ThreadPool& threadPool);
+
+    std::shared_ptr<LoadedTexture> loadTextureFromMemoryAsync(
+        const std::shared_ptr<IBlob>& data,
+        const std::string& name,
+        const std::string& mimeType,
+        bool sRGB,
+        ThreadPool& threadPool);
+
+    std::shared_ptr<LoadedTexture> loadTextureFromMemory(
+        const std::shared_ptr<IBlob>& data,
+        const std::string& name,
+        const std::string& mimeType,
+        bool sRGB,
+        render::RenderDevice* renderDevice,
+        nvrhi::ICommandList* commandList);
+
+    std::shared_ptr<LoadedTexture> loadTextureFromMemoryDeferred(
+        const std::shared_ptr<IBlob>& data,
+        const std::string& name,
+        const std::string& mimeType,
+        bool sRGB);
+
+    bool isTextureLoaded(const std::shared_ptr<LoadedTexture>& texture);
+    bool isTextureFinalized(const std::shared_ptr<LoadedTexture>& texture);
+    bool unloadTexture(const std::shared_ptr<LoadedTexture>& texture);
+
+    bool processRenderingThreadCommands(render::RenderDevice& renderDevice, float timeLimitMilliseconds);
+    void loadingFinished();
+
+    void setMaxTextureSize(uint32_t size);
+    void setGenerateMipmaps(bool generateMipmaps);
+    void setInfoLogSeverity(Severity value) { m_InfoLogSeverity = value; }
+    void setErrorLogSeverity(Severity value) { m_ErrorLogSeverity = value; }
+
+    uint32_t getNumberOfLoadedTextures() { return m_TexturesLoaded.load(); }
+    uint32_t getNumberOfRequestedTextures() { return m_TexturesRequested.load(); }
+    uint32_t getNumberOfFinalizedTextures() { return m_TexturesFinalized; }
+
+    std::shared_ptr<TextureData> getLoadedTexture(std::filesystem::path const& path);
+
+private:
+    nvrhi::DeviceHandle m_Device;
+    nvrhi::CommandListHandle m_CommandList;
+
+    std::queue<std::shared_ptr<TextureData>> m_TexturesToFinalize;
+    std::shared_ptr<IDescriptorTableManager> m_DescriptorTable;
+    std::mutex m_TexturesToFinalizeMutex;
+
+    std::shared_ptr<IFileSystem> m_fs;
+    AssetRegistry& m_Registry;
+    AssetCache<TextureData>& m_Cache;
+
+    uint32_t m_MaxTextureSize = 0;
+    bool m_GenerateMipmaps = true;
+
+    Severity m_InfoLogSeverity = Severity::Info;
+    Severity m_ErrorLogSeverity = Severity::Warning;
+
+    std::atomic<uint32_t> m_TexturesRequested = 0;
+    std::atomic<uint32_t> m_TexturesLoaded = 0;
+    uint32_t m_TexturesFinalized = 0;
+
+    bool findTextureInCache(const std::filesystem::path& path, std::shared_ptr<TextureData>& texture);
+    std::shared_ptr<IBlob> readTextureFile(const std::filesystem::path& path) const;
+
+    bool fillTextureData(
+        const std::shared_ptr<IBlob>& fileData,
+        const std::shared_ptr<TextureData>& texture,
+        const std::string& extension,
+        const std::string& mimeType) const;
+
+    void finalizeTexture(
+        std::shared_ptr<TextureData> texture,
+        render::RenderDevice* renderDevice,
+        nvrhi::ICommandList* commandList);
+
+    void textureLoaded(std::shared_ptr<TextureData> texture);
+    std::shared_ptr<TextureData> createTextureData();
+    void registerTextureAsset(const std::shared_ptr<TextureData>& texture);
+};
+
+bool saveTextureToFile(
+    nvrhi::IDevice* device,
+    render::RenderDevice& renderDevice,
+    nvrhi::ITexture* texture,
+    nvrhi::ResourceStates textureState,
+    const char* fileName,
+    bool saveAlphaChannel = true);
+
+} // namespace caustica

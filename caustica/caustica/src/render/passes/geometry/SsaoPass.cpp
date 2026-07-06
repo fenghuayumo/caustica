@@ -73,7 +73,7 @@ SsaoPass::SsaoPass(
         std::vector<caustica::ShaderMacro> macros = { 
             { "LINEAR_DEPTH", params.inputLinearDepth ? "1" : "0" }
         };
-        m_Deinterleave.Shader = shaderFactory->CreateAutoShader("engine/passes/ssao_deinterleave_cs.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_ssao_deinterleave_cs), &macros, nvrhi::ShaderType::Compute);
+        m_Deinterleave.Shader = shaderFactory->createAutoShader("engine/passes/ssao_deinterleave_cs.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_ssao_deinterleave_cs), &macros, nvrhi::ShaderType::Compute);
 
         nvrhi::BindingLayoutDesc DeinterleaveBindings;
         DeinterleaveBindings.visibility = nvrhi::ShaderType::Compute;
@@ -97,7 +97,7 @@ SsaoPass::SsaoPass(
             { "OCT_ENCODED_NORMALS", params.octEncodedNormals ? "1" : "0" },
             { "DIRECTIONAL_OCCLUSION", params.directionalOcclusion ? "1" : "0" }
         };
-        m_Compute.Shader = shaderFactory->CreateAutoShader("engine/passes/ssao_compute_cs.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_ssao_compute_cs), &macros, nvrhi::ShaderType::Compute);
+        m_Compute.Shader = shaderFactory->createAutoShader("engine/passes/ssao_compute_cs.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_ssao_compute_cs), &macros, nvrhi::ShaderType::Compute);
 
         nvrhi::BindingLayoutDesc ComputeBindings;
         ComputeBindings.visibility = nvrhi::ShaderType::Compute;
@@ -121,7 +121,7 @@ SsaoPass::SsaoPass(
         std::vector<caustica::ShaderMacro> macros = {
             { "DIRECTIONAL_OCCLUSION", params.directionalOcclusion ? "1" : "0" }
         };
-        m_Blur.Shader = shaderFactory->CreateAutoShader("engine/passes/ssao_blur_cs.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_ssao_blur_cs), &macros, nvrhi::ShaderType::Compute);
+        m_Blur.Shader = shaderFactory->createAutoShader("engine/passes/ssao_blur_cs.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_ssao_blur_cs), &macros, nvrhi::ShaderType::Compute);
 
         nvrhi::BindingLayoutDesc BlurBindings;
         BlurBindings.visibility = nvrhi::ShaderType::Compute;

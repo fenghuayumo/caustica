@@ -34,7 +34,7 @@ SkyPass::SkyPass(
     const ICompositeView& compositeView)
     : m_FramebufferFactory(framebufferFactory)
 {
-    m_PixelShader = shaderFactory->CreateAutoShader("engine/passes/sky_ps.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_sky_ps), nullptr, nvrhi::ShaderType::Pixel);
+    m_PixelShader = shaderFactory->createAutoShader("engine/passes/sky_ps.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_sky_ps), nullptr, nvrhi::ShaderType::Pixel);
 
     nvrhi::BufferDesc constantBufferDesc;
     constantBufferDesc.byteSize = sizeof(SkyConstants);

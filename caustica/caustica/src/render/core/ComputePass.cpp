@@ -18,7 +18,7 @@ bool ComputePass::init(
 	nvrhi::IBindingLayout* extraBindingLayout /*= nullptr*/, 
 	nvrhi::IBindingLayout* bindlessLayout /*= nullptr*/)
 {
-	m_computeShader = shaderFactory.CreateShader(fileName, entry, &macros, nvrhi::ShaderType::Compute);
+	m_computeShader = shaderFactory.createShader(fileName, entry, &macros, nvrhi::ShaderType::Compute);
 	if (!m_computeShader)
 		return false;
 
@@ -46,7 +46,7 @@ bool ComputePass::init(
     const std::vector<caustica::ShaderMacro>& macros,
     nvrhi::BindingLayoutVector & bindingLayouts )
 {
-    m_computeShader = shaderFactory.CreateShader(fileName, entry, &macros, nvrhi::ShaderType::Compute);
+    m_computeShader = shaderFactory.createShader(fileName, entry, &macros, nvrhi::ShaderType::Compute);
     if (!m_computeShader)
         return false;
 

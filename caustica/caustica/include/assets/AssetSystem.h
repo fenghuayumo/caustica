@@ -1,127 +1,95 @@
 #pragma once
 
 #include <assets/AssetId.h>
-#include <assets/AssetHandle.h>
 #include <assets/AssetRegistry.h>
-#include <assets/AssetFileWatcher.h>
 #include <assets/AssetCache.h>
-#include <assets/RuntimeMeshLoadTypes.h>
+#include <assets/LoadedTexture.h>
+#include <assets/TextureData.h>
 
-#include <core/JobSystem.h>
 #include <filesystem>
-#include <functional>
 #include <memory>
 #include <string>
-
-// =============================================================================
-// AssetSystem facade for the entire asset management pipeline.
-//// Usage:
-//   AssetSystem::Initialize(device, fileSystem, descriptorTable);
-//   auto texHandle = AssetSystem::Get().LoadTexture("path/to/tex.dds", true);
-//   AssetSystem::Get().Update(frameIndex);
-//   AssetSystem::Shutdown();
-// =============================================================================
 
 namespace nvrhi { class IDevice; class ICommandList; }
 
 namespace caustica
 {
 
-struct TextureData;
-struct LoadedTexture;
 class TextureLoader;
-namespace render { class RenderDevice; }
-class ThreadPool;
 class IFileSystem;
 class IDescriptorTableManager;
+class IBlob;
+class ThreadPool;
 
+namespace render { class RenderDevice; }
+
+// Owns texture registry/cache and the TextureLoader that uses them.
 class AssetSystem
 {
 public:
-    static AssetSystem& Get();
-    // Creates and owns the TextureLoader. Upper layers pass the GPU device, the
-    // virtual file system, and the bindless descriptor table; they never
-    // construct or own a loader directly.
-    static void Initialize(
+    static AssetSystem& get();
+    static void initialize(
         nvrhi::IDevice* device,
         std::shared_ptr<IFileSystem> fileSystem,
         std::shared_ptr<IDescriptorTableManager> descriptorTable);
-    static void Shutdown();
+    static void shutdown();
 
-    void Update(uint64_t frameIndex);
+    AssetRegistry& getRegistry() { return m_Registry; }
+    const AssetRegistry& getRegistry() const { return m_Registry; }
+    AssetCache<TextureData>& getTextureCache() { return m_TextureCache; }
 
-    // --- Subsystems ---
-    AssetRegistry& GetRegistry() { return m_Registry; }
-    const AssetRegistry& GetRegistry() const { return m_Registry; }
-    AssetFileWatcher& GetFileWatcher() { return m_FileWatcher; }
+    [[nodiscard]] std::shared_ptr<TextureLoader> getTextureLoader() { return m_TextureLoader; }
+    [[nodiscard]] bool isInitialized() const { return m_Initialized; }
 
-    // --- Typed CPU caches (DIVSHOT-style) ---
-    AssetCache<TextureData>& GetTextureCache() { return m_TextureCache; }
-
-    // --- Hot reload ---
-    void EnableHotReload(bool enable);
-    [[nodiscard]] bool IsHotReloadEnabled() const { return m_HotReloadEnabled; }
-    void WatchAssetDirectory(const std::filesystem::path& path);
-
-    // --- Texture helpers ---
-    AssetId RegisterTexture(const std::filesystem::path& path);
-    void CacheTexture(const AssetId& id, std::shared_ptr<TextureData> texture) { m_TextureCache.Insert(id, std::move(texture)); }
-    [[nodiscard]] std::shared_ptr<TextureData> FindTexture(const AssetId& id) { return m_TextureCache.Get(id); }
-    [[nodiscard]] std::shared_ptr<TextureData> FindTextureByPath(const std::filesystem::path& path);
-    void SetTextureMemoryBudget(size_t bytes) { m_TextureMemoryBudget = bytes; }
-    void EvictTexturesToBudget();
-
-    // Single entry point for texture loading. Delegates to the owned loader and
-    // records results in m_TextureCache, so callers never touch the loader
-    // directly. The sync LoadTexture() uploads to the GPU immediately; the
-    // Deferred/Async variants queue the upload for ProcessRenderingThreadCommands.
-    [[nodiscard]] std::shared_ptr<LoadedTexture> LoadTexture(
+    std::shared_ptr<LoadedTexture> loadTextureFromFile(
         const std::filesystem::path& path,
         bool sRGB,
-        caustica::render::RenderDevice* renderDevice = nullptr,
-        nvrhi::ICommandList* commandList = nullptr);
-    [[nodiscard]] std::shared_ptr<LoadedTexture> LoadTextureDeferred(
+        render::RenderDevice* renderDevice,
+        nvrhi::ICommandList* commandList);
+
+    std::shared_ptr<LoadedTexture> loadTextureFromFileDeferred(
         const std::filesystem::path& path,
         bool sRGB);
-    [[nodiscard]] std::shared_ptr<LoadedTexture> LoadTextureAsync(
+
+    std::shared_ptr<LoadedTexture> loadTextureFromFileAsync(
         const std::filesystem::path& path,
         bool sRGB,
         ThreadPool& threadPool);
 
-    // The owned loader. Upper layers should prefer the LoadTexture*/FindTexture
-    // facade above; this is exposed for the import/baker pipelines that still
-    // thread a TextureLoader reference.
-    [[nodiscard]] std::shared_ptr<TextureLoader> GetTextureLoader() { return m_TextureLoader; }
+    std::shared_ptr<LoadedTexture> loadTextureFromMemory(
+        const std::shared_ptr<IBlob>& data,
+        const std::string& name,
+        const std::string& mimeType,
+        bool sRGB,
+        render::RenderDevice* renderDevice,
+        nvrhi::ICommandList* commandList);
 
-    // --- Runtime mesh import helpers ---
-    AssetId RegisterMesh(const std::filesystem::path& path);
-    [[nodiscard]] RuntimeMeshLoadResult LoadRuntimeMeshFile(
-        const RuntimeMeshLoadParams& params,
-        const std::filesystem::path& path);
-    [[nodiscard]] RuntimeMeshLoadResult LoadRuntimeGltfMeshFile(
-        const RuntimeMeshLoadParams& params,
-        const std::filesystem::path& path);
-    [[nodiscard]] RuntimeMeshLoadResult LoadRuntimeObjMeshFile(
-        const RuntimeMeshLoadParams& params,
-        const std::filesystem::path& path);
+    std::shared_ptr<LoadedTexture> loadTextureFromMemoryDeferred(
+        const std::shared_ptr<IBlob>& data,
+        const std::string& name,
+        const std::string& mimeType,
+        bool sRGB);
 
-    [[nodiscard]] bool IsInitialized() const { return m_Initialized; }
+    std::shared_ptr<LoadedTexture> loadTextureFromMemoryAsync(
+        const std::shared_ptr<IBlob>& data,
+        const std::string& name,
+        const std::string& mimeType,
+        bool sRGB,
+        ThreadPool& threadPool);
+
+    std::shared_ptr<TextureData> getLoadedTexture(const std::filesystem::path& path);
+    bool unloadTexture(const std::shared_ptr<LoadedTexture>& texture);
+
+    bool processRenderingThreadCommands(render::RenderDevice& renderDevice, float timeLimitMilliseconds);
+    void loadingFinished();
 
 private:
-    AssetSystem(const AssetSystem&) = delete;
-    AssetSystem& operator=(const AssetSystem&) = delete;
-public:
     AssetSystem() = default;
-    ~AssetSystem() = default;
 
-    AssetRegistry                 m_Registry;
-    AssetFileWatcher              m_FileWatcher;
-    AssetCache<TextureData>       m_TextureCache;
+    AssetRegistry m_Registry;
+    AssetCache<TextureData> m_TextureCache;
     std::shared_ptr<TextureLoader> m_TextureLoader;
-    size_t                        m_TextureMemoryBudget = 512 * 1024 * 1024;
-
     bool m_Initialized = false;
-    bool m_HotReloadEnabled = false;
 };
 
 } // namespace caustica

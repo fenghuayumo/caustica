@@ -120,7 +120,7 @@ ShaderPackFileSystem::~ShaderPackFileSystem()
     }
 }
 
-ShaderPackFileSystem::PackKey ShaderPackFileSystem::HashPath(const std::string& logicalPath)
+ShaderPackFileSystem::PackKey ShaderPackFileSystem::hashPath(const std::string& logicalPath)
 {
     return PackKey{
         Fnva64(logicalPath, 0x243f6a8885a308d3ull),
@@ -128,7 +128,7 @@ ShaderPackFileSystem::PackKey ShaderPackFileSystem::HashPath(const std::string& 
     };
 }
 
-void ShaderPackFileSystem::DecodePayload(uint8_t* data, size_t size, const PackKey& key)
+void ShaderPackFileSystem::decodePayload(uint8_t* data, size_t size, const PackKey& key)
 {
     uint64_t state = key.h0 ^ Rotl64(key.h1, 1) ^ 0xa5a5a5a55a5a5a5aull;
     uint64_t streamWord = 0;
@@ -148,7 +148,7 @@ void ShaderPackFileSystem::DecodePayload(uint8_t* data, size_t size, const PackK
     }
 }
 
-std::string ShaderPackFileSystem::NormalizeLogicalPath(const std::filesystem::path& name) const
+std::string ShaderPackFileSystem::normalizeLogicalPath(const std::filesystem::path& name) const
 {
     std::filesystem::path logicalPath = (m_virtualRoot / name.relative_path()).lexically_normal();
     std::string normalized = logicalPath.generic_string();
@@ -196,7 +196,7 @@ bool ShaderPackFileSystem::fileExists(const std::filesystem::path& name)
     if (!m_packFile)
         return false;
 
-    const PackKey key = HashPath(NormalizeLogicalPath(name));
+    const PackKey key = hashPath(normalizeLogicalPath(name));
     return m_entries.find(key) != m_entries.end();
 }
 
@@ -205,8 +205,8 @@ std::shared_ptr<caustica::IBlob> ShaderPackFileSystem::readFile(const std::files
     if (!m_packFile)
         return nullptr;
 
-    const std::string logicalPath = NormalizeLogicalPath(name);
-    const PackKey key = HashPath(logicalPath);
+    const std::string logicalPath = normalizeLogicalPath(name);
+    const PackKey key = hashPath(logicalPath);
     auto entryIt = m_entries.find(key);
     if (entryIt == m_entries.end())
         return nullptr;
@@ -235,7 +235,7 @@ std::shared_ptr<caustica::IBlob> ShaderPackFileSystem::readFile(const std::files
         }
     }
 
-    DecodePayload(encodedData.data(), encodedData.size(), key);
+    decodePayload(encodedData.data(), encodedData.size(), key);
 
     void* blobData = malloc(encodedData.size());
     if (!blobData)

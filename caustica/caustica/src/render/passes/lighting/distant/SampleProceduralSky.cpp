@@ -28,11 +28,11 @@ SampleProceduralSky::SampleProceduralSky( nvrhi::IDevice* device, std::shared_pt
 {
     auto path = GetLocalPath(c_AssetsFolder);
 
-    m_transmittanceTexture  = textureCache->LoadTextureFromFile(path.string() + "/StandaloneTextures/q2rtx_env/transmittance_earth.dds", false, &renderDevice, commandList);
-    m_scatterringTexture    = textureCache->LoadTextureFromFile(path.string() + "/StandaloneTextures/q2rtx_env/inscatter_earth.dds", false, &renderDevice, commandList);
-    m_irradianceTexture     = textureCache->LoadTextureFromFile(path.string() + "/StandaloneTextures/q2rtx_env/irradiance_earth.dds", false, &renderDevice, commandList);
-    m_cloudsTexture         = textureCache->LoadTextureFromFile(path.string() + "/StandaloneTextures/q2rtx_env/clouds.dds", false, &renderDevice, commandList);
-    m_noiseTexture          = textureCache->LoadTextureFromFile(path.string() + "/StandaloneTextures/RGBANoiseMedium.png", false, &renderDevice, commandList);
+    m_transmittanceTexture  = textureCache->loadTextureFromFile(path.string() + "/StandaloneTextures/q2rtx_env/transmittance_earth.dds", false, &renderDevice, commandList);
+    m_scatterringTexture    = textureCache->loadTextureFromFile(path.string() + "/StandaloneTextures/q2rtx_env/inscatter_earth.dds", false, &renderDevice, commandList);
+    m_irradianceTexture     = textureCache->loadTextureFromFile(path.string() + "/StandaloneTextures/q2rtx_env/irradiance_earth.dds", false, &renderDevice, commandList);
+    m_cloudsTexture         = textureCache->loadTextureFromFile(path.string() + "/StandaloneTextures/q2rtx_env/clouds.dds", false, &renderDevice, commandList);
+    m_noiseTexture          = textureCache->loadTextureFromFile(path.string() + "/StandaloneTextures/RGBANoiseMedium.png", false, &renderDevice, commandList);
 
     // Make sure the texture is loaded
      commandList->close();
@@ -46,7 +46,7 @@ SampleProceduralSky::SampleProceduralSky( nvrhi::IDevice* device, std::shared_pt
 SampleProceduralSky::~SampleProceduralSky()
 {
     if (m_noiseTexture != nullptr)
-        m_textureCache->UnloadTexture(m_noiseTexture);
+        m_textureCache->unloadTexture(m_noiseTexture);
 }
 
 nvrhi::TextureHandle SampleProceduralSky::GetTransmittanceTexture() const { return m_transmittanceTexture->texture; }

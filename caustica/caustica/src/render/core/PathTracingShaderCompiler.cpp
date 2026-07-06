@@ -133,7 +133,7 @@ void PTPipelineVariant::ShaderPermutation::resolveCacheIdentity(
     };
 
     const PathTracingShaderBuildResult buildResult =
-        BuildPathTracingLibraryShader(compiler.getCompilerConfig(), buildInput);
+        buildPathTracingLibraryShader(compiler.getCompilerConfig(), buildInput);
 
     const std::string previousHashHex = cacheKey.cacheHashHex;
     cacheKey = buildResult.key;
@@ -146,7 +146,7 @@ void PTPipelineVariant::ShaderPermutation::resolveCacheIdentity(
     packVfsPath = cacheKey.packVfsPath(c_PTShaderPackMount);
 
     const bool compiledBlobAvailable = compiler.getFs()->fileExists(packVfsPath);
-    const bool diskBlobUpToDate = ShaderCompilerUtils::IsCompiledShaderUpToDate(
+    const bool diskBlobUpToDate = ShaderCompilerUtils::isCompiledShaderUpToDate(
         compiledFullPath,
         lastModifiedSourceCode);
 
@@ -178,7 +178,7 @@ void PTPipelineVariant::ShaderPermutation::resolveCacheIdentity(
         ? std::filesystem::path{}
         : std::filesystem::path(compiledFullPath).replace_extension(".pdb");
 
-    usCompileCmdLine = MakePathTracingShaderCompileCommand(
+    usCompileCmdLine = makePathTracingShaderCompileCommand(
         compiler.getCompilerConfig(),
         buildResult,
         compiledFullPath,
@@ -420,7 +420,7 @@ PathTracingShaderCompiler::PathTracingShaderCompiler(nvrhi::IDevice* device, std
     , m_bindlessLayout(bindlessLayout)
     , m_enableNVAPIShaderExtension(device->queryFeatureSupport(nvrhi::Feature::HlslExtensionUAV))
 {
-    if (!m_compilerConfig.Initialize(device, c_PTShaderBinariesRoot))
+    if (!m_compilerConfig.initialize(device, c_PTShaderBinariesRoot))
         caustica::fatal("Failed to initialize shader compiler configuration");
 
     m_shadersFS = std::make_shared<caustica::RootFileSystem>();
@@ -447,7 +447,7 @@ PathTracingShaderCompiler::PathTracingShaderCompiler(nvrhi::IDevice* device, std
     else
     {
         m_shadersFS->mount("/" + c_PTShaderBinariesRoot, m_compilerConfig.ShaderBinariesPath);
-        if (m_compilerConfig.CanCompile())
+        if (m_compilerConfig.canCompile())
         {
             caustica::info("PathTracingShaderCompiler: dev mode — runtime DXC compilation enabled.");
         }
@@ -517,7 +517,7 @@ void PathTracingShaderCompiler::enqueueShaderPermutation(PTPipelineVariant::Shad
 void PathTracingShaderCompiler::update(const std::shared_ptr<caustica::Scene>& scene, unsigned int subInstanceCount, const std::function<void(std::vector<caustica::ShaderMacro>& macros)>& globalMacrosGetter, bool forceShaderReload)
 {
     // Auto-reload: poll for source file changes
-    if (m_compilerConfig.CanCompile() && !forceShaderReload && !m_variants.empty())
+    if (m_compilerConfig.canCompile() && !forceShaderReload && !m_variants.empty())
     {
         static auto lastPollTime = std::chrono::steady_clock::now();
         auto now = std::chrono::steady_clock::now();
@@ -602,13 +602,13 @@ void PathTracingShaderCompiler::update(const std::shared_ptr<caustica::Scene>& s
 
     if (needsUpdate)
     {
-        if (m_compilerConfig.CanCompile())
+        if (m_compilerConfig.canCompile())
         {
             // we need the output folder
             EnsureDirectoryExists(m_compilerConfig.ShaderBinariesPath);
         }
 
-        std::optional<std::filesystem::file_time_type> a = m_compilerConfig.CanCompile()
+        std::optional<std::filesystem::file_time_type> a = m_compilerConfig.canCompile()
             ? GetLatestModifiedTimeDirectoryRecursive(m_compilerConfig.ShadersPath)
             : std::optional<std::filesystem::file_time_type>(std::filesystem::file_time_type::min());
         // let's not track externals for perf reasons but here's the code in case it's needed

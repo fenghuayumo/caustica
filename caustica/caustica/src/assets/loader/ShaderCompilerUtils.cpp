@@ -20,7 +20,7 @@ namespace ShaderCompilerUtils
     
     static_assert(picosha2::k_digest_size == k_Sha256DigestSize, "SHA256 digest size mismatch");
     
-    std::string ComputeSha256Hex(const std::string& input)
+    std::string computeSha256Hex(const std::string& input)
     {
         std::vector<unsigned char> hash(picosha2::k_digest_size);
         picosha2::hash256(input.begin(), input.end(), hash.begin(), hash.end());
@@ -31,7 +31,7 @@ namespace ShaderCompilerUtils
     // Shader compiler configuration
     //////////////////////////////////////////////////////////////////////////
     
-    bool ShaderCompilerConfig::Initialize(nvrhi::IDevice* device, const std::string& binarySubfolder)
+    bool ShaderCompilerConfig::initialize(nvrhi::IDevice* device, const std::string& binarySubfolder)
     {
         std::string graphicsAPIName;
         if (device->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D12)
@@ -137,7 +137,7 @@ namespace ShaderCompilerUtils
         return true;
     }
     
-    std::string ShaderCompilerConfig::GetCompilerPathQuoted() const
+    std::string ShaderCompilerConfig::getCompilerPathQuoted() const
     {
         return "\"" + ShaderCompilerPath.string() + "\"";
     }
@@ -163,7 +163,7 @@ namespace ShaderCompilerUtils
         return profile == ShaderProfile::Library_6_6 || profile == ShaderProfile::Library_6_9;
     }
     
-    DxcCommandResult BuildDxcCommand(
+    DxcCommandResult buildDxcCommand(
         const ShaderCompilerConfig& config,
         const DxcCommandOptions& options)
     {
@@ -323,7 +323,7 @@ namespace ShaderCompilerUtils
         
         // Compute hash of command (which includes all macros) but NOT the full file path
         // This avoids recompiling if just moving folders around
-        result.HashHex = ComputeSha256Hex(hashCommand);
+        result.HashHex = computeSha256Hex(hashCommand);
         
         // Build suggested output filename
         std::filesystem::path outFileName = options.SourceFilePath;
@@ -333,7 +333,7 @@ namespace ShaderCompilerUtils
         return result;
     }
     
-    std::string AppendOutputToCommand(
+    std::string appendOutputToCommand(
         const std::string& commandBase,
         const std::string& fullOutputPath,
         const std::string& pdbPath)
@@ -352,7 +352,7 @@ namespace ShaderCompilerUtils
     // File timestamp utilities
     //////////////////////////////////////////////////////////////////////////
     
-    bool IsCompiledShaderUpToDate(
+    bool isCompiledShaderUpToDate(
         const std::filesystem::path& compiledFile,
         std::filesystem::file_time_type lastSourceModified)
     {
@@ -360,7 +360,7 @@ namespace ShaderCompilerUtils
         return lastModifiedTime.has_value() && (*lastModifiedTime) >= lastSourceModified;
     }
 
-    caustica::ShaderKey MakeShaderKey(
+    caustica::ShaderKey makeShaderKey(
         const ShaderCompilerConfig& config,
         const DxcCommandOptions& options)
     {
@@ -372,7 +372,7 @@ namespace ShaderCompilerUtils
             ? caustica::ShaderKeyKind::ShaderLibrary
             : caustica::ShaderKeyKind::SingleShader;
 
-        return caustica::MakeShaderKey(
+        return caustica::makeShaderKey(
             logicalSource.generic_string(),
             options.EntryPoint,
             kind,

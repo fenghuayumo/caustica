@@ -42,7 +42,7 @@ EnvironmentMapPass::EnvironmentMapPass(
     std::vector<caustica::ShaderMacro> PSMacros;
     PSMacros.push_back(caustica::ShaderMacro("LATLONG_TEXTURE", isCubeMap ? "0" : "1"));
 
-    m_PixelShader = shaderFactory->CreateAutoShader("engine/passes/environment_map_ps.hlsl", "main", 
+    m_PixelShader = shaderFactory->createAutoShader("engine/passes/environment_map_ps.hlsl", "main", 
         CAUSTICA_MAKE_PLATFORM_SHADER(g_environment_map_ps), &PSMacros, nvrhi::ShaderType::Pixel);
 
     nvrhi::BufferDesc constantBufferDesc;

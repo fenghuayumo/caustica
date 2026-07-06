@@ -103,7 +103,7 @@ bool startupEditor(caustica::App& app, EditorSession& session, int argc, const c
             uiSubsystem->onBackBufferResized(width, height, sampleCount);
     });
 
-    if (!app.initializeEngine())
+    if (!app.finishStartup())
         return false;
 
     return true;

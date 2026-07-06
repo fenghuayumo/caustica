@@ -46,7 +46,7 @@ struct FilePathOrInlineData
 
     bool operator!=(FilePathOrInlineData const& other) const { return !(*this == other); }
 
-    std::string const& ToString() const { return data ? data->name : path; }
+    std::string const& toString() const { return data ? data->name : path; }
 };
 
 struct TextureSwizzle

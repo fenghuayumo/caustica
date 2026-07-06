@@ -406,7 +406,7 @@ Scene::Scene(
     m_GpuResources->enableBindlessResources = !!m_DescriptorTable;
     m_GpuResources->rayTracingSupported = m_GpuResources->device->queryFeatureSupport(nvrhi::Feature::RayTracingAccelStruct);
 
-    m_GpuResources->skinningShader = shaderFactory.CreateAutoShader("engine/skinning_cs", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_skinning_cs), nullptr, nvrhi::ShaderType::Compute);
+    m_GpuResources->skinningShader = shaderFactory.createAutoShader("engine/skinning_cs", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_skinning_cs), nullptr, nvrhi::ShaderType::Compute);
 
     {
         nvrhi::BindingLayoutDesc layoutDesc;

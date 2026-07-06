@@ -82,9 +82,9 @@ void EnvMapProcessor::CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebu
     std::vector<caustica::ShaderMacro> shaderMacros;
     //shaderMacros.push_back(caustica::ShaderMacro({              "BLEND_DEBUG_BUFFER", "1" }));
 
-    m_lowResPrePassLayerCS = shaderFactory->CreateShader("caustica/shaders/render/lighting/distant/EnvMapProcessor.hlsl", "LowResPrePassLayerCS", &shaderMacros, nvrhi::ShaderType::Compute);
-    m_baseLayerCS = shaderFactory->CreateShader("caustica/shaders/render/lighting/distant/EnvMapProcessor.hlsl", "BaseLayerCS", &shaderMacros, nvrhi::ShaderType::Compute);
-    m_MIPReduceCS = shaderFactory->CreateShader("caustica/shaders/render/lighting/distant/EnvMapProcessor.hlsl", "MIPReduceCS", &shaderMacros, nvrhi::ShaderType::Compute);
+    m_lowResPrePassLayerCS = shaderFactory->createShader("caustica/shaders/render/lighting/distant/EnvMapProcessor.hlsl", "LowResPrePassLayerCS", &shaderMacros, nvrhi::ShaderType::Compute);
+    m_baseLayerCS = shaderFactory->createShader("caustica/shaders/render/lighting/distant/EnvMapProcessor.hlsl", "BaseLayerCS", &shaderMacros, nvrhi::ShaderType::Compute);
+    m_MIPReduceCS = shaderFactory->createShader("caustica/shaders/render/lighting/distant/EnvMapProcessor.hlsl", "MIPReduceCS", &shaderMacros, nvrhi::ShaderType::Compute);
 
     {
         nvrhi::BindingLayoutDesc layoutDesc;
@@ -164,8 +164,8 @@ void EnvMapProcessor::CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebu
     {
         std::vector<caustica::ShaderMacro> smQ0 = { caustica::ShaderMacro({ "QUALITY", "0" }) };
         std::vector<caustica::ShaderMacro> smQ1 = { caustica::ShaderMacro({ "QUALITY", "1" }) };
-        m_BC6UCompressLowCS = shaderFactory->CreateShader("caustica/shaders/render/lighting/distant/BC6UCompress.hlsl", "CSMain", &smQ0, nvrhi::ShaderType::Compute);
-        m_BC6UCompressHighCS = shaderFactory->CreateShader("caustica/shaders/render/lighting/distant/BC6UCompress.hlsl", "CSMain", &smQ1, nvrhi::ShaderType::Compute);
+        m_BC6UCompressLowCS = shaderFactory->createShader("caustica/shaders/render/lighting/distant/BC6UCompress.hlsl", "CSMain", &smQ0, nvrhi::ShaderType::Compute);
+        m_BC6UCompressHighCS = shaderFactory->createShader("caustica/shaders/render/lighting/distant/BC6UCompress.hlsl", "CSMain", &smQ1, nvrhi::ShaderType::Compute);
 
         nvrhi::BindingLayoutDesc layoutDesc;
         layoutDesc.visibility = nvrhi::ShaderType::Compute;
@@ -187,7 +187,7 @@ void EnvMapProcessor::CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebu
     // === BRDF LUT Generation ===
     if (m_enableRasterPrecompute)
     {
-        m_brdfLUTCS = shaderFactory->CreateShader("caustica/shaders/render/lighting/distant/BRDFLUTGenerator.hlsl", "main", nullptr, nvrhi::ShaderType::Compute);
+        m_brdfLUTCS = shaderFactory->createShader("caustica/shaders/render/lighting/distant/BRDFLUTGenerator.hlsl", "main", nullptr, nvrhi::ShaderType::Compute);
         
         nvrhi::BindingLayoutDesc layoutDesc;
         layoutDesc.visibility = nvrhi::ShaderType::Compute;
@@ -274,10 +274,10 @@ void EnvMapProcessor::CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebu
 void EnvMapProcessor::UnloadSourceBackgrounds()
 {
     if (m_loadedSourceBackgroundTextureEquirect != nullptr)
-        m_textureCache->UnloadTexture(m_loadedSourceBackgroundTextureEquirect);
+        m_textureCache->unloadTexture(m_loadedSourceBackgroundTextureEquirect);
     m_loadedSourceBackgroundTextureEquirect = nullptr;
     if (m_loadedSourceBackgroundTextureCubemap != nullptr)
-        m_textureCache->UnloadTexture(m_loadedSourceBackgroundTextureCubemap);
+        m_textureCache->unloadTexture(m_loadedSourceBackgroundTextureCubemap);
     m_loadedSourceBackgroundTextureCubemap = nullptr;
     m_loadedSourceBackgroundPath = "";
 }
@@ -398,13 +398,13 @@ void EnvMapProcessor::PreUpdate(nvrhi::ICommandList* commandList, caustica::rend
             const std::filesystem::path fullPath = ResolveSceneMediaPath(
                 m_loadedSourceBackgroundPath,
                 sceneDirectory);
-            m_textureCache->LoadTextureFromFile(fullPath, false, &renderDevice, commandList);
+            m_textureCache->loadTextureFromFile(fullPath, false, &renderDevice, commandList);
             commandList->close();
             m_device->executeCommandList(commandList);
             m_device->waitForIdle();
             commandList->open();
 
-            std::shared_ptr<TextureData> loadedTexture = m_textureCache->GetLoadedTexture(fullPath);
+            std::shared_ptr<TextureData> loadedTexture = m_textureCache->getLoadedTexture(fullPath);
             if (loadedTexture != nullptr && loadedTexture->format != nvrhi::Format::UNKNOWN)
             {
                 if (loadedTexture->arraySize == 6)
@@ -669,7 +669,7 @@ bool EnvMapProcessor::Update(nvrhi::ICommandList* commandList, caustica::Binding
         m_device->executeCommandList(commandList);
         m_device->waitForIdle();
 
-        auto blob = SaveStagingTextureAsDDS(m_device, cubemapStaging);
+        auto blob = saveStagingTextureAsDDS(m_device, cubemapStaging);
 
         if (blob != nullptr)
         {

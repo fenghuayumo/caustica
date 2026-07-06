@@ -818,18 +818,18 @@ bool GltfImporter::Load(
         if (textureSource.data)
         {
             if (threadPool)
-                loadedTexture = textureCache.LoadTextureFromMemoryAsync(textureSource.data->buffer,
+                loadedTexture = textureCache.loadTextureFromMemoryAsync(textureSource.data->buffer,
                     textureSource.data->name, textureSource.data->mimeType, sRGB, *threadPool);
             else
-                loadedTexture = textureCache.LoadTextureFromMemoryDeferred(textureSource.data->buffer,
+                loadedTexture = textureCache.loadTextureFromMemoryDeferred(textureSource.data->buffer,
                     textureSource.data->name, textureSource.data->mimeType, sRGB);
         }
         else if (!textureSource.path.empty())
         {
             if (threadPool)
-                loadedTexture = textureCache.LoadTextureFromFileAsync(textureSource.path, sRGB, *threadPool);
+                loadedTexture = textureCache.loadTextureFromFileAsync(textureSource.path, sRGB, *threadPool);
             else
-                loadedTexture = textureCache.LoadTextureFromFileDeferred(textureSource.path, sRGB);
+                loadedTexture = textureCache.loadTextureFromFileDeferred(textureSource.path, sRGB);
         }
 
         imageCache[image] = loadedTexture;

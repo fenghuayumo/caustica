@@ -46,11 +46,11 @@ LightProbeProcessingPass::LightProbeProcessingPass(
     , m_IntermediateTextureSize(intermediateTextureSize)
     , m_renderDevice(&renderDevice)
 {
-    m_GeometryShader = shaderFactory->CreateAutoShader("engine/passes/light_probe.hlsl", "cubemap_gs", CAUSTICA_MAKE_PLATFORM_SHADER(g_light_probe_cubemap_gs), nullptr, nvrhi::ShaderType::Geometry);
-    m_MipPixelShader = shaderFactory->CreateAutoShader("engine/passes/light_probe.hlsl", "mip_ps", CAUSTICA_MAKE_PLATFORM_SHADER(g_light_probe_mip_ps), nullptr, nvrhi::ShaderType::Pixel);
-    m_DiffusePixelShader = shaderFactory->CreateAutoShader("engine/passes/light_probe.hlsl", "diffuse_probe_ps", CAUSTICA_MAKE_PLATFORM_SHADER(g_light_probe_diffuse_probe_ps), nullptr, nvrhi::ShaderType::Pixel);
-    m_SpecularPixelShader = shaderFactory->CreateAutoShader("engine/passes/light_probe.hlsl", "specular_probe_ps", CAUSTICA_MAKE_PLATFORM_SHADER(g_light_probe_specular_probe_ps), nullptr, nvrhi::ShaderType::Pixel);
-    m_EnvironmentBrdfPixelShader = shaderFactory->CreateAutoShader("engine/passes/light_probe.hlsl", "environment_brdf_ps", CAUSTICA_MAKE_PLATFORM_SHADER(g_light_probe_environment_brdf_ps), nullptr, nvrhi::ShaderType::Pixel);
+    m_GeometryShader = shaderFactory->createAutoShader("engine/passes/light_probe.hlsl", "cubemap_gs", CAUSTICA_MAKE_PLATFORM_SHADER(g_light_probe_cubemap_gs), nullptr, nvrhi::ShaderType::Geometry);
+    m_MipPixelShader = shaderFactory->createAutoShader("engine/passes/light_probe.hlsl", "mip_ps", CAUSTICA_MAKE_PLATFORM_SHADER(g_light_probe_mip_ps), nullptr, nvrhi::ShaderType::Pixel);
+    m_DiffusePixelShader = shaderFactory->createAutoShader("engine/passes/light_probe.hlsl", "diffuse_probe_ps", CAUSTICA_MAKE_PLATFORM_SHADER(g_light_probe_diffuse_probe_ps), nullptr, nvrhi::ShaderType::Pixel);
+    m_SpecularPixelShader = shaderFactory->createAutoShader("engine/passes/light_probe.hlsl", "specular_probe_ps", CAUSTICA_MAKE_PLATFORM_SHADER(g_light_probe_specular_probe_ps), nullptr, nvrhi::ShaderType::Pixel);
+    m_EnvironmentBrdfPixelShader = shaderFactory->createAutoShader("engine/passes/light_probe.hlsl", "environment_brdf_ps", CAUSTICA_MAKE_PLATFORM_SHADER(g_light_probe_environment_brdf_ps), nullptr, nvrhi::ShaderType::Pixel);
 
     nvrhi::BindingLayoutDesc layoutDesc;
     layoutDesc.visibility = nvrhi::ShaderType::Pixel;

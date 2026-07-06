@@ -43,8 +43,8 @@ public:
     // Access to verbose mode for debugging
     bool isVerbose() const { return m_verbose; }
     void setVerbose(bool verbose) { m_verbose = verbose; }
-    bool canCompileShaders() const { return m_compilerConfig.CanCompile(); }
-    bool isLoadOnlyMode() const { return !m_compilerConfig.CanCompile(); }
+    bool canCompileShaders() const { return m_compilerConfig.canCompile(); }
+    bool isLoadOnlyMode() const { return !m_compilerConfig.canCompile(); }
 
 private:
     friend class ComputeShaderVariant;

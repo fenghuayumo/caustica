@@ -504,7 +504,7 @@ namespace caustica
         return dataOffset;
     }
 
-    bool LoadDDSTextureFromMemory(TextureData& textureInfo)
+    bool loadDDSTextureFromMemory(TextureData& textureInfo)
     {
         if (textureInfo.data->size() < sizeof(uint32_t) + sizeof(DDS_HEADER))
         {
@@ -694,7 +694,7 @@ namespace caustica
 
     static nvrhi::TextureHandle CreateDDSTextureInternal(nvrhi::IDevice* device, nvrhi::ICommandList* commandList, TextureData& info, const char* debugName)
     {
-        if (!LoadDDSTextureFromMemory(info))
+        if (!loadDDSTextureFromMemory(info))
             return nullptr;
 
         nvrhi::TextureDesc desc;
@@ -730,7 +730,7 @@ namespace caustica
         return texture;
     }
 
-    nvrhi::TextureHandle CreateDDSTextureFromMemory(nvrhi::IDevice* device, nvrhi::ICommandList* commandList, std::shared_ptr<IBlob> data, const char* debugName /*= nullptr*/, bool forceSRGB /*= false*/)
+    nvrhi::TextureHandle createDDSTextureFromMemory(nvrhi::IDevice* device, nvrhi::ICommandList* commandList, std::shared_ptr<IBlob> data, const char* debugName /*= nullptr*/, bool forceSRGB /*= false*/)
     {
         if (!data)
             return nullptr;
@@ -742,7 +742,7 @@ namespace caustica
         return CreateDDSTextureInternal(device, commandList, info, debugName);
     }
 
-    std::shared_ptr<IBlob> SaveStagingTextureAsDDS(nvrhi::IDevice* device, nvrhi::IStagingTexture* stagingTexture)
+    std::shared_ptr<IBlob> saveStagingTextureAsDDS(nvrhi::IDevice* device, nvrhi::IStagingTexture* stagingTexture)
     {
         DDS_HEADER header = {};
         DDS_HEADER_DXT10 dx10header = {};

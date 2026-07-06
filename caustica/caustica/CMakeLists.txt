@@ -129,11 +129,6 @@ file(GLOB_RECURSE caus_core_sub_sources
 list(APPEND caus_core_headers ${caus_core_sub_headers})
 list(APPEND caus_core_sources ${caus_core_sub_sources})
 
-if (NOT WIN32)
-    list(FILTER caus_core_headers EXCLUDE REGEX ".*/WinResFS\\.h$")
-    list(FILTER caus_core_sources EXCLUDE REGEX ".*/WinResFS\\.cpp$")
-endif()
-
 add_library(causCore STATIC ${caus_core_headers} ${caus_core_sources})
 caus_configure_static(causCore)
 target_link_libraries(causCore
@@ -315,6 +310,10 @@ target_link_libraries(causAssets
     PUBLIC causCore causBackend
     PUBLIC jsoncpp_static stb cgltf ShaderMakeBlob
 )
+if (CAUSTICA_WITH_TINYEXR)
+    target_link_libraries(causAssets PUBLIC tinyexr)
+    target_compile_definitions(causAssets PUBLIC CAUSTICA_WITH_TINYEXR)
+endif()
 
 # ── causScene ─────────────────────────────────────────────────────────────
 # Scene graph, scene management, camera.

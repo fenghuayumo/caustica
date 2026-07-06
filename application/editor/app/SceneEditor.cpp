@@ -616,7 +616,7 @@ void SceneEditor::afterWorldRender(GpuDevice& gpuDevice)
             return false;
         nvrhi::ITexture* texture = framebuffer->getDesc().colorAttachments[0].texture;
         auto* renderDevice = &gpuRender()->renderDevice();
-        return SaveTextureToFile(
+        return saveTextureToFile(
             gpuDevice.GetDevice(), *renderDevice, texture, nvrhi::ResourceStates::Common, fileName);
     };
     CaptureScriptPostRender(saveFramebuffer);

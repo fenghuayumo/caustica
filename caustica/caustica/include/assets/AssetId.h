@@ -5,12 +5,6 @@
 #include <functional>
 #include <string>
 
-// =============================================================================
-// AssetId — universally unique identifier for an asset.
-//
-// Wraps a UUID for stable identification across sessions and machines.
-// =============================================================================
-
 namespace caustica
 {
 
@@ -19,11 +13,11 @@ struct AssetId
     uint64_t low = 0;
     uint64_t high = 0;
 
-    static AssetId Generate();
-    static AssetId Invalid() { return {}; }
+    static AssetId generate();
+    static AssetId invalid() { return {}; }
 
-    bool IsValid() const { return low != 0 || high != 0; }
-    explicit operator bool() const { return IsValid(); }
+    bool isValid() const { return low != 0 || high != 0; }
+    explicit operator bool() const { return isValid(); }
 
     bool operator==(AssetId other) const { return low == other.low && high == other.high; }
     bool operator!=(AssetId other) const { return !(*this == other); }
@@ -32,8 +26,8 @@ struct AssetId
         return high != other.high ? high < other.high : low < other.low;
     }
 
-    std::string ToString() const;
-    static AssetId FromString(const std::string& str);
+    std::string toString() const;
+    static AssetId fromString(const std::string& str);
 
     struct Hash
     {
@@ -44,9 +38,6 @@ struct AssetId
     };
 };
 
-// =============================================================================
-// AssetType — categories of assets managed by the pipeline.
-// =============================================================================
 enum class AssetType : uint8_t
 {
     Unknown = 0,
@@ -64,11 +55,8 @@ enum class AssetType : uint8_t
     Count
 };
 
-const char* AssetTypeToString(AssetType type);
+const char* assetTypeToString(AssetType type);
 
-// =============================================================================
-// AssetState — lifecycle state of an asset in the registry.
-// =============================================================================
 enum class AssetState : uint8_t
 {
     Unknown,
@@ -79,19 +67,14 @@ enum class AssetState : uint8_t
     UploadedGpu,
 };
 
-// =============================================================================
-// AssetMetadata — registry entry for a single asset.
-// =============================================================================
 struct AssetMetadata
 {
     AssetId    id;
     AssetType  type = AssetType::Unknown;
     AssetState state = AssetState::Unknown;
-    uint32_t   version = 0;        // bumped on each reload
-    std::string path;              // canonical filesystem path
-    std::string sourceFile;        // original source (may differ from path)
-    uint64_t   fileSize = 0;
-    uint64_t   lastModified = 0;   // file write time for change detection
+    uint32_t   version = 0;
+    std::string path;
+    std::string sourceFile;
 };
 
 } // namespace caustica

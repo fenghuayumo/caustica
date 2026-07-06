@@ -27,7 +27,7 @@ namespace
     }
 }
 
-std::string CanonicalMacroString(const std::vector<ShaderMacro>& macros)
+std::string formatCanonicalMacros(const std::vector<ShaderMacro>& macros)
 {
     std::vector<ShaderMacro> sorted = macros;
     std::sort(sorted.begin(), sorted.end(), [](const ShaderMacro& a, const ShaderMacro& b) {
@@ -61,7 +61,7 @@ std::vector<ShaderMacro> ShaderKey::canonicalMacros() const
 
 std::string ShaderKey::canonicalMacroString() const
 {
-    return CanonicalMacroString(macros);
+    return formatCanonicalMacros(macros);
 }
 
 std::string ShaderKey::computeHashHex() const
@@ -72,8 +72,8 @@ std::string ShaderKey::computeHashHex() const
               << ProfileToken(profile) << '|'
               << sourcePath << '|'
               << entryPoint << '|'
-              << canonicalMacroString();
-    return ShaderCompilerUtils::ComputeSha256Hex(hashInput.str());
+              << formatCanonicalMacros(macros);
+    return ShaderCompilerUtils::computeSha256Hex(hashInput.str());
 }
 
 std::string ShaderKey::effectiveCacheHashHex() const
@@ -81,7 +81,7 @@ std::string ShaderKey::effectiveCacheHashHex() const
     return cacheHashHex.empty() ? computeHashHex() : cacheHashHex;
 }
 
-std::string ShaderKey::FormatCacheFileNameNoExt(std::string_view hashHex)
+std::string ShaderKey::formatCacheFileNameNoExt(std::string_view hashHex)
 {
     if (hashHex.size() >= 2)
         return std::string(hashHex.substr(0, 2)) + "/" + std::string(hashHex.substr(2));
@@ -90,7 +90,7 @@ std::string ShaderKey::FormatCacheFileNameNoExt(std::string_view hashHex)
 
 std::string ShaderKey::cacheFileNameNoExt() const
 {
-    return FormatCacheFileNameNoExt(effectiveCacheHashHex());
+    return formatCacheFileNameNoExt(effectiveCacheHashHex());
 }
 
 std::filesystem::path ShaderKey::cacheFilePath(const std::filesystem::path& binariesRoot) const
@@ -116,7 +116,7 @@ bool ShaderKey::operator==(const ShaderKey& other) const
         && canonicalMacroString() == other.canonicalMacroString();
 }
 
-ShaderKey MakeShaderKey(
+ShaderKey makeShaderKey(
     std::string_view sourcePath,
     std::string_view entryPoint,
     ShaderKeyKind kind,
@@ -134,13 +134,13 @@ ShaderKey MakeShaderKey(
     return key;
 }
 
-ShaderKey MakeShaderLibraryKey(
+ShaderKey makeShaderLibraryKey(
     std::string_view sourcePath,
     shader::Backend backend,
     const std::vector<ShaderMacro>& macros,
     ShaderCompilerUtils::ShaderProfile profile)
 {
-    return MakeShaderKey(sourcePath, {}, ShaderKeyKind::ShaderLibrary, backend, profile, macros);
+    return makeShaderKey(sourcePath, {}, ShaderKeyKind::ShaderLibrary, backend, profile, macros);
 }
 
 } // namespace caustica

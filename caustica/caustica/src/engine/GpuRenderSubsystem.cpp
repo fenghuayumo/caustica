@@ -46,10 +46,8 @@ bool GpuRenderSubsystem::initializeSession(const GpuRenderSubsystemInitParams& p
     m_descriptorTable = m_bindlessTable->getDescriptorTableManager();
 
     auto nativeFS = std::make_shared<NativeFileSystem>();
-    AssetSystem::Initialize(device, nativeFS, m_descriptorTable);
-    m_textureCache = AssetSystem::Get().GetTextureLoader();
-    AssetSystem::Get().EnableHotReload(true);
-    AssetSystem::Get().WatchAssetDirectory("Assets");
+    AssetSystem::initialize(device, nativeFS, m_descriptorTable);
+    m_textureCache = AssetSystem::get().getTextureLoader();
 
     m_accelStructs = AccelStructManager(device);
     m_camera.camera().SetRotateSpeed(.003f);
@@ -190,8 +188,8 @@ void GpuRenderSubsystem::onSceneLoadedGpuPrep()
 
     if (m_textureCache && m_renderDevice)
     {
-        m_textureCache->ProcessRenderingThreadCommands(*m_renderDevice, 0.f);
-        m_textureCache->LoadingFinished();
+        AssetSystem::get().processRenderingThreadCommands(*m_renderDevice, 0.f);
+        AssetSystem::get().loadingFinished();
     }
 
     if (m_sceneManager)
@@ -281,7 +279,7 @@ void GpuRenderSubsystem::shutdown()
     m_shaderFactory.reset();
     m_bindlessLayout = nullptr;
 
-    AssetSystem::Shutdown();
+    AssetSystem::shutdown();
 }
 
 void GpuRenderSubsystem::createShaderFactory(GpuDevice& gpuDevice)

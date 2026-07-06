@@ -167,7 +167,7 @@ OmmBuildQueue::OmmBuildQueue(
     {
         std::vector<caustica::ShaderMacro> defines = { caustica::ShaderMacro("COMPILER_DXC", "1") };
         std::string shaderNameStr = std::string("omm/third_party/omm/libraries/omm-lib/shaders/") + shaderName;
-        return m_shaderFactory->CreateShader(shaderNameStr.c_str(), shaderEntryName, &defines, type);
+        return m_shaderFactory->createShader(shaderNameStr.c_str(), shaderEntryName, &defines, type);
     };
 
     omm::GpuBakeNvrhi::MessageCallback messageCb = [](omm::MessageSeverity severity, const char* message) {

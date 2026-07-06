@@ -1,5 +1,6 @@
 #pragma once
 
+#include <assets/loader/ShaderMacro.h>
 #include <assets/loader/ShaderFactory.h>
 
 #include <string>
@@ -8,117 +9,77 @@
 #include <optional>
 #include <rhi/nvrhi.h>
 
-namespace caustica
-{
-struct ShaderKey;
-}
+namespace caustica { struct ShaderKey; }
 
 namespace ShaderCompilerUtils
 {
-    //////////////////////////////////////////////////////////////////////////
-    // SHA256 hash computation for shader permutations
-    //////////////////////////////////////////////////////////////////////////
-    
-    // Size of SHA256 digest in bytes (32 bytes = 256 bits)
-    constexpr size_t k_Sha256DigestSize = 32;
-    
-    // Computes SHA256 hash of a string and returns it as a hex string
-    std::string ComputeSha256Hex(const std::string& input);
-    
-    //////////////////////////////////////////////////////////////////////////
-    // Shader compiler configuration
-    //////////////////////////////////////////////////////////////////////////
-    
-    // Holds paths and configuration for the shader compiler
-    struct ShaderCompilerConfig
-    {
-        std::filesystem::path   ShaderCompilerPath;             // Path to dxc.exe
-        std::filesystem::path   ShadersPath;                    // Root path for shader sources
-        std::filesystem::path   ShadersPathExternalIncludes1;   // First external include path
-        std::filesystem::path   ShadersPathExternalIncludes2;   // Second external include path (can be empty)
-        std::filesystem::path   ShaderBinariesPath;             // Output path for compiled binaries
-        nvrhi::GraphicsAPI      GraphicsAPI;                    // D3D12 or Vulkan
-        bool                    RuntimeCompilationAvailable = false;
-        
-        // Initializes the config by finding shader compiler and source paths
-        // Returns true on success, false if required paths cannot be found
-        bool Initialize(nvrhi::IDevice* device, const std::string& binarySubfolder);
-        
-        // Returns the shader compiler executable path as a quoted string for command-line use
-        std::string GetCompilerPathQuoted() const;
 
-        bool CanCompile() const { return RuntimeCompilationAvailable; }
-    };
-    
-    //////////////////////////////////////////////////////////////////////////
-    // DXC command-line builder
-    //////////////////////////////////////////////////////////////////////////
-    
-    // Shader target profile
-    enum class ShaderProfile
-    {
-        Library_6_6,    // lib_6_6 - for ray tracing shaders
-        Library_6_9,    // lib_6_9 - for ray tracing shaders with newer features
-        Compute_6_6,    // cs_6_6 - for compute shaders
-        Compute_6_9,    // cs_6_9 - for compute shaders with newer features
-    };
-    
-    // Options for building DXC command line
-    struct DxcCommandOptions
-    {
-        std::filesystem::path   SourceFilePath;         // Full path to source .hlsl file
-        std::filesystem::path   LogicalSourceFileName;  // Path used for cache hashing (kept stable across installs)
-        ShaderProfile           Profile = ShaderProfile::Compute_6_6;
-        std::string             EntryPoint;             // Entry point function name (empty for library targets)
-        bool                    EnableDebugInfo = true;
-        bool                    EmbedPdb = false;
-        bool                    UseOptimizations = true;
-        bool                    Enable16BitTypes = true;
-        bool                    WarningsAsErrors = true;
-        bool                    AllResourcesBound = true;
-        bool                    EnableDebugPrint = true;
-        
-        // Additional macros to define
-        std::vector<caustica::ShaderMacro> Macros;
-        
-        // Include paths (in addition to config's external includes)
-        std::vector<std::filesystem::path> AdditionalIncludes;
-    };
-    
-    // Result of building a DXC command line
-    struct DxcCommandResult
-    {
-        std::string CommandBase;            // Command without output file specification
-        std::string HashHex;                // SHA256 hash of CommandBase (for caching)
-        std::string OutputFileNameNoExt;    // Suggested output filename without extension
-    };
-    
-    // Builds a DXC command line for compiling a shader
-    // Returns the command arguments (without the compiler path) and a hash for caching
-    DxcCommandResult BuildDxcCommand(
-        const ShaderCompilerConfig& config,
-        const DxcCommandOptions& options);
-    
-    // Appends output file specification to a command
-    // fullOutputPath: full path for the output .bin file
-    // pdbPath: optional path for external PDB (if not embedding)
-    std::string AppendOutputToCommand(
-        const std::string& commandBase,
-        const std::string& fullOutputPath,
-        const std::string& pdbPath = "");
-    
-    //////////////////////////////////////////////////////////////////////////
-    // File timestamp utilities (wrappers around SampleCommon functions)
-    //////////////////////////////////////////////////////////////////////////
-    
-    // Checks if a compiled shader file is up-to-date
-    // Returns true if compiledFile exists and is newer than lastSourceModified
-    bool IsCompiledShaderUpToDate(
-        const std::filesystem::path& compiledFile,
-        std::filesystem::file_time_type lastSourceModified);
+constexpr size_t k_Sha256DigestSize = 32;
 
-    [[nodiscard]] caustica::ShaderKey MakeShaderKey(
-        const ShaderCompilerConfig& config,
-        const DxcCommandOptions& options);
+std::string computeSha256Hex(const std::string& input);
+
+struct ShaderCompilerConfig
+{
+    std::filesystem::path   ShaderCompilerPath;
+    std::filesystem::path   ShadersPath;
+    std::filesystem::path   ShadersPathExternalIncludes1;
+    std::filesystem::path   ShadersPathExternalIncludes2;
+    std::filesystem::path   ShaderBinariesPath;
+    nvrhi::GraphicsAPI      GraphicsAPI;
+    bool                    RuntimeCompilationAvailable = false;
+
+    bool initialize(nvrhi::IDevice* device, const std::string& binarySubfolder);
+    std::string getCompilerPathQuoted() const;
+    bool canCompile() const { return RuntimeCompilationAvailable; }
+};
+
+enum class ShaderProfile
+{
+    Library_6_6,
+    Library_6_9,
+    Compute_6_6,
+    Compute_6_9,
+};
+
+struct DxcCommandOptions
+{
+    std::filesystem::path   SourceFilePath;
+    std::filesystem::path   LogicalSourceFileName;
+    ShaderProfile           Profile = ShaderProfile::Compute_6_6;
+    std::string             EntryPoint;
+    bool                    EnableDebugInfo = true;
+    bool                    EmbedPdb = false;
+    bool                    UseOptimizations = true;
+    bool                    Enable16BitTypes = true;
+    bool                    WarningsAsErrors = true;
+    bool                    AllResourcesBound = true;
+    bool                    EnableDebugPrint = true;
+    std::vector<caustica::ShaderMacro> Macros;
+    std::vector<std::filesystem::path> AdditionalIncludes;
+};
+
+struct DxcCommandResult
+{
+    std::string CommandBase;
+    std::string HashHex;
+    std::string OutputFileNameNoExt;
+};
+
+DxcCommandResult buildDxcCommand(
+    const ShaderCompilerConfig& config,
+    const DxcCommandOptions& options);
+
+std::string appendOutputToCommand(
+    const std::string& commandBase,
+    const std::string& fullOutputPath,
+    const std::string& pdbPath = "");
+
+bool isCompiledShaderUpToDate(
+    const std::filesystem::path& compiledFile,
+    std::filesystem::file_time_type lastSourceModified);
+
+[[nodiscard]] caustica::ShaderKey makeShaderKey(
+    const ShaderCompilerConfig& config,
+    const DxcCommandOptions& options);
 
 } // namespace ShaderCompilerUtils

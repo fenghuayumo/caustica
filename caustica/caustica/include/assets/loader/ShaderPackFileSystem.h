@@ -66,10 +66,10 @@ private:
         uint64_t size = 0;
     };
 
-    static PackKey HashPath(const std::string& logicalPath);
-    static void DecodePayload(uint8_t* data, size_t size, const PackKey& key);
+    static PackKey hashPath(const std::string& logicalPath);
+    static void decodePayload(uint8_t* data, size_t size, const PackKey& key);
 
-    std::string NormalizeLogicalPath(const std::filesystem::path& name) const;
+    std::string normalizeLogicalPath(const std::filesystem::path& name) const;
 
 private:
     std::filesystem::path m_packPath;

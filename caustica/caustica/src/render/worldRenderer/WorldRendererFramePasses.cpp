@@ -281,7 +281,7 @@ void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameCont
 
     if (m_context.scenePasses.rayTracing.consumeShaderReloadRequest())
     {
-        m_context.shaderFactory->ClearCache();
+        m_context.shaderFactory->clearCache();
         ctx.needNewPasses = true;
     }
 

@@ -4,7 +4,6 @@
 #include "common/LocalConfig.h"
 #include <EditorUI.h>
 
-#include <assets/AssetSystem.h>
 #include <assets/RuntimeMeshLoadTypes.h>
 #include <core/log.h>
 #include <render/SceneGaussianSplatPasses.h>

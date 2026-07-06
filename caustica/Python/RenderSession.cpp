@@ -463,7 +463,7 @@ bool RenderSession::InitRenderer()
             m_lastRenderedBackBufferIndex = manager.GetCurrentBackBufferIndex();
         };
 
-    if (!m_app->initializeEngine())
+    if (!m_app->finishStartup())
         return false;
 
     m_sceneHost = std::make_unique<caustica::PathTracerSceneHost>(*m_app);
@@ -619,7 +619,7 @@ bool RenderSession::SaveScreenshot(const std::string& outputPath)
         return false;
     }
 
-    // SaveTextureToFile creates its own command list. Wait for the last rendered
+    // saveTextureToFile creates its own command list. Wait for the last rendered
     // frame to finish so LdrColor is not still in use by an in-flight submit.
     if (!m_deviceManager->GetDevice()->waitForIdle())
     {
@@ -631,7 +631,7 @@ bool RenderSession::SaveScreenshot(const std::string& outputPath)
     if (p.has_parent_path())
         EnsureDirectoryExists(p.parent_path());
 
-    return caustica::SaveTextureToFile(
+    return caustica::saveTextureToFile(
         m_deviceManager->GetDevice(),
         *renderDevice,
         tex,

@@ -77,19 +77,19 @@ nvrhi::ShaderHandle DepthPass::CreateVertexShader(ShaderFactory& shaderFactory, 
 
     if (params.useInputAssembler)
     {
-        return shaderFactory.CreateAutoShader(sourceFileName, "input_assembler",
+        return shaderFactory.createAutoShader(sourceFileName, "input_assembler",
             CAUSTICA_MAKE_PLATFORM_SHADER(g_depth_vs_input_assembler), nullptr, nvrhi::ShaderType::Vertex);
     }
     else
     {
-        return shaderFactory.CreateAutoShader(sourceFileName, "buffer_loads",
+        return shaderFactory.createAutoShader(sourceFileName, "buffer_loads",
             CAUSTICA_MAKE_PLATFORM_SHADER(g_depth_vs_buffer_loads), nullptr, nvrhi::ShaderType::Vertex);
     }
 }
 
 nvrhi::ShaderHandle DepthPass::CreatePixelShader(ShaderFactory& shaderFactory, const CreateParameters& params)
 {
-    return shaderFactory.CreateAutoShader("engine/passes/depth_ps.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_depth_ps), nullptr, nvrhi::ShaderType::Pixel);
+    return shaderFactory.createAutoShader("engine/passes/depth_ps.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_depth_ps), nullptr, nvrhi::ShaderType::Pixel);
 }
 
 nvrhi::InputLayoutHandle DepthPass::CreateInputLayout(nvrhi::IShader* vertexShader, const CreateParameters& params)

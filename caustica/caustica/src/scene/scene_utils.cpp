@@ -1,6 +1,4 @@
 #include "scene/scene_utils.h"
-#include <core/scene_discovery.h>
-#include <core/vfs/VFS.h>
 #include <scene/Scene.h>
 #include <scene/SceneLightAccess.h>
 #include <scene/SceneObjects.h>

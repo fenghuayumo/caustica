@@ -31,7 +31,7 @@ static const std::string c_ComputeShaderPackMount = "/" + c_ComputeShaderBinarie
 ComputePipelineRegistry::ComputePipelineRegistry(nvrhi::IDevice* device, const std::vector<std::filesystem::path>& additionalMonitorPaths)
     : m_device(device)
 {
-    if (!m_compilerConfig.Initialize(device, c_ComputeShaderBinariesRoot))
+    if (!m_compilerConfig.initialize(device, c_ComputeShaderBinariesRoot))
         caustica::fatal("Failed to initialize compute shader compiler configuration");
 
     m_shadersFS = std::make_shared<caustica::RootFileSystem>();
@@ -58,7 +58,7 @@ ComputePipelineRegistry::ComputePipelineRegistry(nvrhi::IDevice* device, const s
     else
     {
         m_shadersFS->mount("/" + c_ComputeShaderBinariesRoot, m_compilerConfig.ShaderBinariesPath);
-        if (m_compilerConfig.CanCompile())
+        if (m_compilerConfig.canCompile())
             caustica::info("ComputePipelineRegistry: dev mode — runtime DXC compilation enabled.");
         else
             caustica::info("ComputePipelineRegistry: load-only mode using '%s'.", m_compilerConfig.ShaderBinariesPath.string().c_str());
@@ -121,7 +121,7 @@ void ComputePipelineRegistry::EnqueueShaderForCompilation(ComputeShaderVariant* 
 void ComputePipelineRegistry::update(bool forceReload)
 {
     // Auto-reload: poll for source file changes
-    if (m_compilerConfig.CanCompile() && !forceReload && !m_variants.empty())
+    if (m_compilerConfig.canCompile() && !forceReload && !m_variants.empty())
     {
         static auto lastPollTime = std::chrono::steady_clock::now();
         auto now = std::chrono::steady_clock::now();
@@ -186,15 +186,15 @@ void ComputePipelineRegistry::update(bool forceReload)
         return;
 
     // Get latest source modification time (from all monitored paths)
-    if (m_compilerConfig.CanCompile())
+    if (m_compilerConfig.canCompile())
         EnsureDirectoryExists(m_compilerConfig.ShaderBinariesPath);
     
-    m_lastUpdatedSourceTimestamp = m_compilerConfig.CanCompile()
+    m_lastUpdatedSourceTimestamp = m_compilerConfig.canCompile()
         ? GetLatestModifiedTimeDirectoryRecursive(m_compilerConfig.ShadersPath)
         : std::optional<std::filesystem::file_time_type>(std::filesystem::file_time_type::min());
     
     // Also include additional monitored paths
-    if (m_compilerConfig.CanCompile())
+    if (m_compilerConfig.canCompile())
     {
         for (const auto& path : m_additionalMonitorPaths)
         {
@@ -400,8 +400,8 @@ void ComputeShaderVariant::PrepareCompilation(std::filesystem::file_time_type la
     options.EnableDebugPrint = true;
     options.Macros = m_macros;
 
-    auto cmdResult = ShaderCompilerUtils::BuildDxcCommand(registry->GetCompilerConfig(), options);
-    caustica::ShaderKey cacheKey = ShaderCompilerUtils::MakeShaderKey(registry->GetCompilerConfig(), options);
+    auto cmdResult = ShaderCompilerUtils::buildDxcCommand(registry->GetCompilerConfig(), options);
+    caustica::ShaderKey cacheKey = ShaderCompilerUtils::makeShaderKey(registry->GetCompilerConfig(), options);
     cacheKey.cacheHashHex = cmdResult.HashHex;
 
     const std::string previousHashHex = m_cacheKey.cacheHashHex;
@@ -413,7 +413,7 @@ void ComputeShaderVariant::PrepareCompilation(std::filesystem::file_time_type la
     m_packVfsPath = m_cacheKey.packVfsPath(c_ComputeShaderPackMount);
 
     const bool compiledBlobAvailable = registry->GetFS()->fileExists(m_packVfsPath);
-    const bool diskBlobUpToDate = ShaderCompilerUtils::IsCompiledShaderUpToDate(m_compiledFullPath, lastModifiedSourceCode);
+    const bool diskBlobUpToDate = ShaderCompilerUtils::isCompiledShaderUpToDate(m_compiledFullPath, lastModifiedSourceCode);
     if (compiledBlobAvailable && (!registry->canCompileShaders() || diskBlobUpToDate))
     {
         if (registry->isVerbose())
@@ -423,7 +423,7 @@ void ComputeShaderVariant::PrepareCompilation(std::filesystem::file_time_type la
     else if (registry->canCompileShaders())
     {
         EnsureDirectoryExists(std::filesystem::path(m_compiledFullPath).parent_path());
-        std::string command = registry->GetCompilerConfig().GetCompilerPathQuoted();
+        std::string command = registry->GetCompilerConfig().getCompilerPathQuoted();
         command += cmdResult.CommandBase;
 
 #if !COMPUTE_REGISTRY_EMBED_PDBS

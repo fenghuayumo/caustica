@@ -76,7 +76,7 @@ void GPUSort::CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebug)
         if( specialInitIndicesFirstPass )
             shaderMacros.push_back(caustica::ShaderMacro({ "CAUSTICA_GPUSORT_FIRST_PASS_INIT_INDICES", "1" }));
 
-        shaderHandle = m_shaderFactory->CreateShader("caustica/shaders/render/gpuSort/GPUSort.hlsl", name.c_str(), &shaderMacros, nvrhi::ShaderType::Compute);
+        shaderHandle = m_shaderFactory->createShader("caustica/shaders/render/gpuSort/GPUSort.hlsl", name.c_str(), &shaderMacros, nvrhi::ShaderType::Compute);
         nvrhi::ComputePipelineDesc pipelineDesc;
         pipelineDesc.bindingLayouts = { (initOnly)?(m_initBindingLayout):(m_commonBindingLayout) };
         pipelineDesc.CS = shaderHandle;

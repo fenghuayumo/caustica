@@ -105,7 +105,7 @@ void caustica::render::DeferredLightingPass::Init(const std::shared_ptr<caustica
 
 nvrhi::ShaderHandle DeferredLightingPass::CreateComputeShader(ShaderFactory& shaderFactory)
 {
-    return shaderFactory.CreateAutoShader("engine/passes/deferred_lighting_cs.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_deferred_lighting_cs), nullptr, nvrhi::ShaderType::Compute);
+    return shaderFactory.createAutoShader("engine/passes/deferred_lighting_cs.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_deferred_lighting_cs), nullptr, nvrhi::ShaderType::Compute);
 }
 
 void DeferredLightingPass::Render(

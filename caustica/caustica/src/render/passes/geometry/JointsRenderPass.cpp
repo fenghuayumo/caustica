@@ -40,9 +40,9 @@ namespace caustica::render
 
         std::vector<ShaderMacro> macros;
 
-        m_VertexShader = shaderFactory.CreateAutoShader("engine/passes/joints.hlsl", "main_vs", CAUSTICA_MAKE_PLATFORM_SHADER(g_joints_main_vs), &macros, nvrhi::ShaderType::Vertex);
+        m_VertexShader = shaderFactory.createAutoShader("engine/passes/joints.hlsl", "main_vs", CAUSTICA_MAKE_PLATFORM_SHADER(g_joints_main_vs), &macros, nvrhi::ShaderType::Vertex);
 
-        m_PixelShader = shaderFactory.CreateAutoShader("engine/passes/joints.hlsl", "main_ps", CAUSTICA_MAKE_PLATFORM_SHADER(g_joints_main_ps), &macros, nvrhi::ShaderType::Pixel);
+        m_PixelShader = shaderFactory.createAutoShader("engine/passes/joints.hlsl", "main_ps", CAUSTICA_MAKE_PLATFORM_SHADER(g_joints_main_ps), &macros, nvrhi::ShaderType::Pixel);
      
         nvrhi::BindingLayoutDesc bindingLayoutDesc;
         bindingLayoutDesc.visibility = nvrhi::ShaderType::All;

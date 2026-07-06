@@ -75,12 +75,12 @@ TemporalAntiAliasingPass::TemporalAntiAliasingPass(
 
     std::vector<ShaderMacro> MotionVectorMacros;
     MotionVectorMacros.push_back(ShaderMacro("USE_STENCIL", useStencil ? "1" : "0"));
-    m_MotionVectorPS = shaderFactory->CreateAutoShader("engine/passes/motion_vectors_ps.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_motion_vectors_ps), &MotionVectorMacros, nvrhi::ShaderType::Pixel);
+    m_MotionVectorPS = shaderFactory->createAutoShader("engine/passes/motion_vectors_ps.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_motion_vectors_ps), &MotionVectorMacros, nvrhi::ShaderType::Pixel);
     
     std::vector<ShaderMacro> ResolveMacros;
     ResolveMacros.push_back(ShaderMacro("SAMPLE_COUNT", std::to_string(unresolvedColorDesc.sampleCount)));
     ResolveMacros.push_back(ShaderMacro("USE_CATMULL_ROM_FILTER", params.useCatmullRomFilter ? "1" : "0"));
-    m_TemporalAntiAliasingCS = shaderFactory->CreateAutoShader("engine/passes/taa_cs.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_taa_cs), &ResolveMacros, nvrhi::ShaderType::Compute);
+    m_TemporalAntiAliasingCS = shaderFactory->createAutoShader("engine/passes/taa_cs.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_taa_cs), &ResolveMacros, nvrhi::ShaderType::Compute);
 
     nvrhi::SamplerDesc samplerDesc;
     samplerDesc.addressU = samplerDesc.addressV = samplerDesc.addressW = nvrhi::SamplerAddressMode::Border;

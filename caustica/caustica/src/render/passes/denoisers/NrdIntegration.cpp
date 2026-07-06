@@ -172,7 +172,7 @@ bool NrdIntegration::Initialize(uint32_t width, uint32_t height, caustica::Shade
         std::vector<caustica::ShaderMacro> macros = { {"NRD_COMPILER_DXC", "1"}, {"NRD_NORMAL_ENCODING", "2"}, {"NRD_ROUGHNESS_ENCODING", "1"} };
         
         NrdPipeline pipeline;
-        pipeline.Shader = shaderFactory.CreateShader(fileName.c_str(), "main", &macros, nvrhi::ShaderType::Compute);
+        pipeline.Shader = shaderFactory.createShader(fileName.c_str(), "main", &macros, nvrhi::ShaderType::Compute);
 
         if (!pipeline.Shader)
         {

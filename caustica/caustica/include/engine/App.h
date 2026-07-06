@@ -29,11 +29,11 @@ class Window;
 // Lifecycle:
 //   app.addPlugin<DefaultPlugins>(sceneConfig);
 //   app.initializeGraphics(argc, argv, desc);
-//   app.initializeEngine();
+//   app.finishStartup();
 //   app.run();  // main loop, then shutdown
 //
 // Or use runApp(app, startup) where startup registers plugins and calls
-// initializeGraphics + initializeEngine before returning.
+// initializeGraphics + finishStartup before returning.
 class App : public IGpuFrameDriver
 {
 public:
@@ -142,13 +142,10 @@ public:
 
     bool initializeGraphics(const GpuDeviceCreateDesc& desc);
     bool initializeGraphics(int argc, const char* const* argv, GpuDeviceCreateDesc& desc);
-    bool initializeEngine();
-
-    // Deprecated alias for initializeEngine().
-    bool finishStartup() { return initializeEngine(); }
+    bool finishStartup();
 
     [[nodiscard]] bool isGraphicsInitialized() const { return m_graphicsInitialized; }
-    [[nodiscard]] bool isEngineInitialized() const { return m_engineInitialized; }
+    [[nodiscard]] bool isStarted() const { return m_started; }
 
     void syncSwapChain();
 
@@ -230,7 +227,7 @@ protected:
     bool m_shutdownCalled = false;
     bool m_pluginsBuilt = false;
     bool m_graphicsInitialized = false;
-    bool m_engineInitialized = false;
+    bool m_started = false;
     bool m_defaultSchedulesRegistered = false;
     bool m_sceneSessionSchedulesRegistered = false;
     bool m_gpuRenderSchedulesRegistered = false;
@@ -249,7 +246,6 @@ private:
 
     bool executeRenderPhase(GpuDevice* gpuDevice, double elapsedTime, double curTime, uint32_t frameIndex);
     void finishFrameWithRenderFailure(GpuDevice* gpuDevice, double elapsedTime, double curTime);
-    void shutdownEngine();
     void runStartupSchedules();
 
     void notifyDpiScaleIfChanged(GpuDevice& gpuDevice);

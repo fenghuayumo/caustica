@@ -60,7 +60,7 @@ void EnvMapImportanceSamplingCache::CreateRenderPasses()
 
     //Create importance map (for MIP descent) builder shader and resources
     {
-        m_importanceMapComputeShader = m_shaderFactory->CreateShader("caustica/shaders/render/lighting/distant/EnvMapImportanceSamplingCache.hlsl", "BuildMIPDescentImportanceMapCS", nullptr, nvrhi::ShaderType::Compute);
+        m_importanceMapComputeShader = m_shaderFactory->createShader("caustica/shaders/render/lighting/distant/EnvMapImportanceSamplingCache.hlsl", "BuildMIPDescentImportanceMapCS", nullptr, nvrhi::ShaderType::Compute);
         assert(m_importanceMapComputeShader);
 
         nvrhi::BindingLayoutDesc layoutDesc;
@@ -87,7 +87,7 @@ void EnvMapImportanceSamplingCache::CreateRenderPasses()
 #if 0
     {
         // Stuff for presampling goes below
-        m_presamplingCS = m_shaderFactory->CreateShader("caustica/shaders/render/lighting/distant/EnvMapImportanceSamplingCache.hlsl", "PreSampleCS", nullptr, nvrhi::ShaderType::Compute);
+        m_presamplingCS = m_shaderFactory->createShader("caustica/shaders/render/lighting/distant/EnvMapImportanceSamplingCache.hlsl", "PreSampleCS", nullptr, nvrhi::ShaderType::Compute);
         assert(m_presamplingCS);
 
         nvrhi::BindingLayoutDesc layoutDesc;

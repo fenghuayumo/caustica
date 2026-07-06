@@ -252,8 +252,8 @@ void caustica::render::WorldRenderer::createDeviceResources()
 
     {
         std::vector<ShaderMacro> drawLinesMacro = { ShaderMacro("DRAW_LINES_SHADERS_OLD", "1") };
-        m_linesVertexShader = m_context.shaderFactory->CreateShader("caustica/shaders/render/misc/DebugLines.hlsl", "main_vs", &drawLinesMacro, nvrhi::ShaderType::Vertex);
-        m_linesPixelShader = m_context.shaderFactory->CreateShader("caustica/shaders/render/misc/DebugLines.hlsl", "main_ps", &drawLinesMacro, nvrhi::ShaderType::Pixel);
+        m_linesVertexShader = m_context.shaderFactory->createShader("caustica/shaders/render/misc/DebugLines.hlsl", "main_vs", &drawLinesMacro, nvrhi::ShaderType::Vertex);
+        m_linesPixelShader = m_context.shaderFactory->createShader("caustica/shaders/render/misc/DebugLines.hlsl", "main_ps", &drawLinesMacro, nvrhi::ShaderType::Pixel);
 
         nvrhi::VertexAttributeDesc attributes[] = {
             nvrhi::VertexAttributeDesc()
@@ -354,7 +354,7 @@ void caustica::render::WorldRenderer::createDeviceResources()
 bool caustica::render::WorldRenderer::createPTPipeline()
 {
     std::vector<caustica::ShaderMacro> shaderMacros;
-    m_exportVBufferCS = m_context.shaderFactory->CreateShader(
+    m_exportVBufferCS = m_context.shaderFactory->createShader(
         "caustica/shaders/render/processingPasses/ExportVisibilityBuffer.hlsl", "main", &shaderMacros, nvrhi::ShaderType::Compute);
     nvrhi::ComputePipelineDesc pipelineDesc;
     pipelineDesc.bindingLayouts = { m_bindingLayout, m_bindlessLayout };
@@ -1986,7 +1986,7 @@ void caustica::render::WorldRenderer::denoisedScreenshot(nvrhi::ITexture * frame
             return;
         }
 
-        if (!SaveTextureToFile(device(), m_context.renderDevice, framebufferTexture, nvrhi::ResourceStates::Common, noisyImagePath.c_str()))
+        if (!saveTextureToFile(device(), m_context.renderDevice, framebufferTexture, nvrhi::ResourceStates::Common, noisyImagePath.c_str()))
         { assert(false); return; }
 
         std::string startCmd = "\"" + denoiserPath.string() + "\"" + " -hdr 0 -i \"" + noisyImagePath + "\"" " -o \"" + denoisedImagePath + "\"";

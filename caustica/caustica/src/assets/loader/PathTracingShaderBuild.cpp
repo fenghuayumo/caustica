@@ -4,7 +4,7 @@
 namespace caustica
 {
 
-PathTracingShaderBuildResult BuildPathTracingLibraryShader(
+PathTracingShaderBuildResult buildPathTracingLibraryShader(
     const ShaderCompilerUtils::ShaderCompilerConfig& config,
     const PathTracingShaderBuildInput& input)
 {
@@ -22,8 +22,8 @@ PathTracingShaderBuildResult BuildPathTracingLibraryShader(
     options.Macros = input.macros;
 
     PathTracingShaderBuildResult result{};
-    result.dxc = ShaderCompilerUtils::BuildDxcCommand(config, options);
-    result.key = MakeShaderLibraryKey(
+    result.dxc = ShaderCompilerUtils::buildDxcCommand(config, options);
+    result.key = makeShaderLibraryKey(
         input.logicalSourcePath.generic_string(),
         shader::fromNvrhiGraphicsApi(config.GraphicsAPI),
         input.macros,
@@ -32,14 +32,14 @@ PathTracingShaderBuildResult BuildPathTracingLibraryShader(
     return result;
 }
 
-std::string MakePathTracingShaderCompileCommand(
+std::string makePathTracingShaderCompileCommand(
     const ShaderCompilerUtils::ShaderCompilerConfig& config,
     const PathTracingShaderBuildResult& buildResult,
     const std::filesystem::path& outputBinPath,
     const std::filesystem::path& outputPdbPath)
 {
-    std::string command = config.GetCompilerPathQuoted() + buildResult.dxc.CommandBase;
-    return ShaderCompilerUtils::AppendOutputToCommand(
+    std::string command = config.getCompilerPathQuoted() + buildResult.dxc.CommandBase;
+    return ShaderCompilerUtils::appendOutputToCommand(
         command,
         outputBinPath.string(),
         outputPdbPath.string());

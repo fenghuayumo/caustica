@@ -271,14 +271,14 @@ bool App::initializeGraphics(int argc, const char* const* argv, GpuDeviceCreateD
     return initializeGraphics(desc);
 }
 
-bool App::initializeEngine()
+bool App::finishStartup()
 {
-    if (m_engineInitialized)
+    if (m_started)
         return true;
 
     if (!m_graphicsInitialized && !m_ExternalGpuDevice)
     {
-        error("App::initializeEngine requires initializeGraphics or an external GpuDevice");
+        error("App::finishStartup requires initializeGraphics or an external GpuDevice");
         return false;
     }
 
@@ -290,7 +290,7 @@ bool App::initializeEngine()
 
     runStartupSchedules();
     syncSwapChain();
-    m_engineInitialized = true;
+    m_started = true;
     return true;
 }
 
@@ -303,11 +303,6 @@ void App::syncSwapChain()
     const BackBufferInfo backBuffer = gpuDevice->GetBackBufferInfo();
     notifyBackBufferResizing();
     notifyBackBufferResized(backBuffer.width, backBuffer.height, backBuffer.sampleCount);
-}
-
-void App::shutdownEngine()
-{
-    m_engineInitialized = false;
 }
 
 void App::shutdown()
@@ -331,7 +326,7 @@ void App::shutdown()
 
     m_renderThread.stop();
 
-    shutdownEngine();
+    m_started = false;
     m_schedules.clear();
     m_resources.clear();
     m_defaultSchedulesRegistered = false;
@@ -748,9 +743,9 @@ void App::run()
         return;
     }
 
-    if (!m_engineInitialized)
+    if (!m_started)
     {
-        error("App::run requires initializeEngine");
+        error("App::run requires finishStartup");
         return;
     }
 

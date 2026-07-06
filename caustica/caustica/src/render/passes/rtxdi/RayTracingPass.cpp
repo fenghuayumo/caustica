@@ -34,7 +34,7 @@ bool RayTracingPass::Init(
             macros.push_back({ "NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP", "1" });
 #endif // NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP
 
-        ComputeShader = shaderFactory.CreateShader(shaderName, "main", &macros, nvrhi::ShaderType::Compute);
+        ComputeShader = shaderFactory.createShader(shaderName, "main", &macros, nvrhi::ShaderType::Compute);
         if (!ComputeShader)
             return false;    
 
@@ -55,7 +55,7 @@ bool RayTracingPass::Init(
     }
 
     macros[0].definition = "0"; // USE_RAY_QUERY
-    ShaderLibrary = shaderFactory.CreateShaderLibrary(shaderName, &macros);
+    ShaderLibrary = shaderFactory.createShaderLibrary(shaderName, &macros);
     if (!ShaderLibrary)
         return false;
 

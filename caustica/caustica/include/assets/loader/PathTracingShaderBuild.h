@@ -24,13 +24,11 @@ struct PathTracingShaderBuildResult
     ShaderCompilerUtils::DxcCommandResult     dxc;
 };
 
-// Builds a path-tracing shader library ShaderKey + DXC command for dev-time compilation.
-// The returned key.cacheHashHex matches legacy PathTracingShaderCompiler cache layout.
-[[nodiscard]] PathTracingShaderBuildResult BuildPathTracingLibraryShader(
+[[nodiscard]] PathTracingShaderBuildResult buildPathTracingLibraryShader(
     const ShaderCompilerUtils::ShaderCompilerConfig& config,
     const PathTracingShaderBuildInput& input);
 
-[[nodiscard]] std::string MakePathTracingShaderCompileCommand(
+[[nodiscard]] std::string makePathTracingShaderCompileCommand(
     const ShaderCompilerUtils::ShaderCompilerConfig& config,
     const PathTracingShaderBuildResult& buildResult,
     const std::filesystem::path& outputBinPath,

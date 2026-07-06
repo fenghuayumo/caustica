@@ -92,12 +92,12 @@ nvrhi::ShaderHandle GBufferFillPass::CreateVertexShader(ShaderFactory& shaderFac
 
     if (params.useInputAssembler)
     {
-        return shaderFactory.CreateAutoShader(sourceFileName, "input_assembler",
+        return shaderFactory.createAutoShader(sourceFileName, "input_assembler",
             CAUSTICA_MAKE_PLATFORM_SHADER(g_gbuffer_vs_input_assembler), &VertexShaderMacros, nvrhi::ShaderType::Vertex);
     }
     else
     {
-        return shaderFactory.CreateAutoShader(sourceFileName, "buffer_loads",
+        return shaderFactory.createAutoShader(sourceFileName, "buffer_loads",
             CAUSTICA_MAKE_PLATFORM_SHADER(g_gbuffer_vs_buffer_loads), &VertexShaderMacros, nvrhi::ShaderType::Vertex);
     }
 }
@@ -122,7 +122,7 @@ nvrhi::ShaderHandle GBufferFillPass::CreateGeometryShader(ShaderFactory& shaderF
                 nvrhi::FastGeometryShaderFlags::OffsetTargetIndexByViewportIndex))
             .setCoordinateSwizzling(CubemapView::getCubemapCoordinateSwizzle());
 
-        return shaderFactory.CreateAutoShader("engine/passes/cubemap_gs.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_cubemap_gs), nullptr, desc);
+        return shaderFactory.createAutoShader("engine/passes/cubemap_gs.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_cubemap_gs), nullptr, desc);
     }
     else
     {
@@ -136,7 +136,7 @@ nvrhi::ShaderHandle GBufferFillPass::CreatePixelShader(ShaderFactory& shaderFact
     PixelShaderMacros.push_back(ShaderMacro("MOTION_VECTORS", params.enableMotionVectors ? "1" : "0"));
     PixelShaderMacros.push_back(ShaderMacro("ALPHA_TESTED", alphaTested ? "1" : "0"));
 
-    return shaderFactory.CreateAutoShader("engine/passes/gbuffer_ps.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_gbuffer_ps), &PixelShaderMacros, nvrhi::ShaderType::Pixel);
+    return shaderFactory.createAutoShader("engine/passes/gbuffer_ps.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_gbuffer_ps), &PixelShaderMacros, nvrhi::ShaderType::Pixel);
 }
 
 nvrhi::InputLayoutHandle GBufferFillPass::CreateInputLayout(nvrhi::IShader* vertexShader, const CreateParameters& params)
@@ -444,6 +444,6 @@ nvrhi::ShaderHandle MaterialIDPass::CreatePixelShader(caustica::ShaderFactory& s
     std::vector<ShaderMacro> PixelShaderMacros;
     PixelShaderMacros.push_back(ShaderMacro("ALPHA_TESTED", alphaTested ? "1" : "0"));
 
-    return shaderFactory.CreateAutoShader("engine/passes/material_id_ps.hlsl", "main",
+    return shaderFactory.createAutoShader("engine/passes/material_id_ps.hlsl", "main",
         CAUSTICA_MAKE_PLATFORM_SHADER(g_material_id_ps), &PixelShaderMacros, nvrhi::ShaderType::Pixel);
 }

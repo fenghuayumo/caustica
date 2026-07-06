@@ -39,7 +39,7 @@ int runApp(App& app, const std::function<bool(App&)>& startup, AppHook preGpuIni
 
     const auto shutdownOnFailure = [&app]() {
         app.shutdown();
-        AssetSystem::Shutdown();
+        AssetSystem::shutdown();
         JobSystem::Shutdown();
     };
 
@@ -66,9 +66,9 @@ int runApp(App& app, const std::function<bool(App&)>& startup, AppHook preGpuIni
         return 1;
     }
 
-    if (!app.isEngineInitialized())
+    if (!app.isStarted())
     {
-        error("runApp startup must call initializeEngine");
+        error("runApp startup must call finishStartup");
         shutdownOnFailure();
         s_preGpuInit = nullptr;
 #ifdef _WIN32
@@ -82,7 +82,7 @@ int runApp(App& app, const std::function<bool(App&)>& startup, AppHook preGpuIni
 
     app.run();
 
-    AssetSystem::Shutdown();
+    AssetSystem::shutdown();
     JobSystem::Shutdown();
 
 #ifdef _WIN32

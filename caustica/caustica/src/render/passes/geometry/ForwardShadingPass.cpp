@@ -96,12 +96,12 @@ nvrhi::ShaderHandle ForwardShadingPass::CreateVertexShader(ShaderFactory& shader
 
     if (params.useInputAssembler)
     {
-        return shaderFactory.CreateAutoShader(sourceFileName, "input_assembler",
+        return shaderFactory.createAutoShader(sourceFileName, "input_assembler",
             CAUSTICA_MAKE_PLATFORM_SHADER(g_forward_vs_input_assembler), nullptr, nvrhi::ShaderType::Vertex);
     }
     else
     {
-        return shaderFactory.CreateAutoShader(sourceFileName, "buffer_loads",
+        return shaderFactory.createAutoShader(sourceFileName, "buffer_loads",
             CAUSTICA_MAKE_PLATFORM_SHADER(g_forward_vs_buffer_loads), nullptr, nvrhi::ShaderType::Vertex);
     }
 }
@@ -118,7 +118,7 @@ nvrhi::ShaderHandle ForwardShadingPass::CreateGeometryShader(ShaderFactory& shad
                 nvrhi::FastGeometryShaderFlags::OffsetTargetIndexByViewportIndex))
             .setCoordinateSwizzling(CubemapView::getCubemapCoordinateSwizzle());
 
-        return shaderFactory.CreateAutoShader("engine/passes/cubemap_gs.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_cubemap_gs), nullptr, desc);
+        return shaderFactory.createAutoShader("engine/passes/cubemap_gs.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_cubemap_gs), nullptr, desc);
     }
 
     return nullptr;
@@ -129,7 +129,7 @@ nvrhi::ShaderHandle ForwardShadingPass::CreatePixelShader(ShaderFactory& shaderF
     std::vector<ShaderMacro> Macros;
     Macros.push_back(ShaderMacro("TRANSMISSIVE_MATERIAL", transmissiveMaterial ? "1" : "0"));
 
-    return shaderFactory.CreateAutoShader("engine/passes/forward_ps.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_forward_ps), &Macros, nvrhi::ShaderType::Pixel);
+    return shaderFactory.createAutoShader("engine/passes/forward_ps.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_forward_ps), &Macros, nvrhi::ShaderType::Pixel);
 }
 
 nvrhi::InputLayoutHandle ForwardShadingPass::CreateInputLayout(nvrhi::IShader* vertexShader, const CreateParameters& params)
