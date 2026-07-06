@@ -39,7 +39,7 @@ void updateWindowTitle(App& app)
 
 void registerWindowTitlePlugin(App& app)
 {
-    app.addSystemAfter(AppSchedule::Update, "SceneSession.UpdateWindowTitle", "SceneSession.TickSimulation", [](AppScheduleContext& ctx) {
+    app.addSystemAfter(AppSchedule::Update, "SceneSession.UpdateWindowTitle", "SceneSession.TickSimulation", [](SystemContext& ctx) {
         if (!ctx.windowFocused)
             return;
 

@@ -32,7 +32,7 @@ void prepareRenderFrame(App& app)
 
 void registerRenderExtractPlugin(App& app)
 {
-    app.addSystemAfter(AppSchedule::Extract, "SceneSession.PrepareRenderFrame", "SetRenderFrameIndex", [](AppScheduleContext& ctx) {
+    app.addSystemAfter(AppSchedule::Extract, "SceneSession.PrepareRenderFrame", "SetRenderFrameIndex", [](SystemContext& ctx) {
         if (!ctx.gpuDevice)
             return;
 

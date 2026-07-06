@@ -18,18 +18,18 @@ void refreshEntityWorld(App& app, uint32_t frameIndex)
 
 void registerSceneAnimationPlugin(App& app)
 {
-    app.addSystem(AppSchedule::Update, "SceneSession.Animate", [](AppScheduleContext& ctx) {
+    app.addSystem(AppSchedule::Update, "SceneSession.Animate", [](SystemContext& ctx) {
         if (!ctx.windowFocused)
             return;
 
         sceneSession::animate(ctx.app, ctx.deltaTimeSeconds);
     });
 
-    app.addSystem(AppSchedule::PostUpdate, "SceneSession.RefreshEntityWorld", [](AppScheduleContext& ctx) {
+    app.addSystem(AppSchedule::PostUpdate, "SceneSession.RefreshEntityWorld", [](SystemContext& ctx) {
         sceneSession::refreshEntityWorld(ctx.app, ctx.frameIndex);
     });
 
-    app.addSystemAfter(AppSchedule::Update, "SceneSession.TickSimulation", "SceneSession.UpdateCamera", [](AppScheduleContext& ctx) {
+    app.addSystemAfter(AppSchedule::Update, "SceneSession.TickSimulation", "SceneSession.UpdateCamera", [](SystemContext& ctx) {
         if (!ctx.windowFocused)
             return;
 

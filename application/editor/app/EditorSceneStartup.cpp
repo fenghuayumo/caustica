@@ -17,7 +17,7 @@ void registerEditorSceneStartup(caustica::App& app, const EditorSceneStartupConf
         AppSchedule::Startup,
         "EditorScene.PreStartup",
         "SceneSession.Startup",
-        [&app, config](AppScheduleContext& ctx) {
+        [&app, config](SystemContext& ctx) {
             (void)ctx;
 
             if (config.sceneEditor)
@@ -31,12 +31,12 @@ void registerEditorSceneStartup(caustica::App& app, const EditorSceneStartupConf
         AppSchedule::Startup,
         "EditorScene.PostStartup",
         "SceneSession.Startup",
-        [&app, config](AppScheduleContext& ctx) {
+        [&app, config](SystemContext& ctx) {
             (void)ctx;
 
             if (config.sceneEditor)
             {
-                if (auto* gpuRender = app.tryResource<caustica::GpuRenderSubsystem>())
+                if (auto* gpuRender = ctx.tryRes<caustica::GpuRenderSubsystem>())
                     config.sceneEditor->attachGpuRenderSubsystem(*gpuRender);
             }
 
@@ -51,8 +51,8 @@ void registerEditorUISubsystemLifecycle(caustica::App& app)
         AppSchedule::Startup,
         "EditorUI.Startup",
         "EditorScene.PostStartup",
-        [&app](AppScheduleContext& ctx) {
-            auto* uiSubsystem = app.tryResource<EditorUISubsystem>();
+        [&app](SystemContext& ctx) {
+            auto* uiSubsystem = ctx.tryRes<EditorUISubsystem>();
             if (!uiSubsystem || !ctx.gpuDevice)
                 return;
 
@@ -60,8 +60,8 @@ void registerEditorUISubsystemLifecycle(caustica::App& app)
             app.syncSwapChain();
         });
 
-    app.addSystem(AppSchedule::Shutdown, "EditorUI.Shutdown", [](AppScheduleContext& ctx) {
-        if (auto* uiSubsystem = ctx.app.tryResource<EditorUISubsystem>())
+    app.addSystem(AppSchedule::Shutdown, "EditorUI.Shutdown", [](SystemContext& ctx) {
+        if (auto* uiSubsystem = ctx.tryRes<EditorUISubsystem>())
             uiSubsystem->shutdown();
     });
 }

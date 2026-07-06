@@ -3,9 +3,9 @@
 #include <backend/GpuDevice.h>
 #include <backend/GpuFrameDriver.h>
 #include <engine/AppSchedules.h>
-#include <engine/AppResources.h>
 #include <engine/Plugin.h>
 #include <engine/RenderThread.h>
+#include <ecs/World.h>
 #include <events/event.h>
 
 #include <cstdint>
@@ -62,7 +62,7 @@ public:
     template<typename T, typename... Args>
     T& emplaceResource(Args&&... args)
     {
-        return m_resources.emplace<T>(std::forward<Args>(args)...);
+        return m_world.insertResource<T>(std::forward<Args>(args)...);
     }
 
     void buildPlugins();
@@ -79,64 +79,64 @@ public:
     template<typename T>
     T& insertResource(T value)
     {
-        return m_resources.insert(std::move(value));
+        return m_world.insertResourceValue<T>(std::move(value));
     }
 
     template<typename T>
     T& insertResourceRef(T& resource)
     {
-        return m_resources.insertRef(resource);
+        return m_world.insertResourceRef(resource);
     }
 
     template<typename T>
     const T& insertResourceRef(const T& resource)
     {
-        return m_resources.insertRef(resource);
+        return m_world.insertResourceRef(resource);
     }
 
     template<typename T>
     [[nodiscard]] T& resource()
     {
-        return m_resources.get<T>();
+        return m_world.resource<T>();
     }
 
     template<typename T>
     [[nodiscard]] const T& resource() const
     {
-        return m_resources.get<T>();
+        return m_world.resource<T>();
     }
 
     template<typename T>
     [[nodiscard]] T* tryResource()
     {
-        return m_resources.tryGet<T>();
+        return m_world.getResource<T>();
     }
 
     template<typename T>
     [[nodiscard]] const T* tryResource() const
     {
-        return m_resources.tryGet<T>();
+        return m_world.getResource<T>();
     }
 
-    [[nodiscard]] AppResources& resources() { return m_resources; }
-    [[nodiscard]] const AppResources& resources() const { return m_resources; }
+    [[nodiscard]] ecs::World& world() { return m_world; }
+    [[nodiscard]] const ecs::World& world() const { return m_world; }
 
     App& addSystem(
         AppSchedule schedule,
         std::string name,
-        AppSystemFn system,
+        SystemFn system,
         AppSystemOrdering ordering = {});
     App& addSystemBefore(
         AppSchedule schedule,
         std::string name,
         std::string before,
-        AppSystemFn system);
+        SystemFn system);
     App& addSystemAfter(
         AppSchedule schedule,
         std::string name,
         std::string after,
-        AppSystemFn system);
-    void runSchedule(AppSchedule schedule, AppScheduleContext& context);
+        SystemFn system);
+    void runSchedule(AppSchedule schedule, SystemContext& context);
     [[nodiscard]] AppSchedules& schedules() { return m_schedules; }
     [[nodiscard]] const AppSchedules& schedules() const { return m_schedules; }
 
@@ -235,7 +235,7 @@ protected:
     bool m_postUpdateTailRegistered = false;
 
     AppSchedules m_schedules;
-    AppResources m_resources;
+    ecs::World m_world;
 
 private:
     void syncWindowState();
@@ -249,8 +249,8 @@ private:
     void runStartupSchedules();
 
     void notifyDpiScaleIfChanged(GpuDevice& gpuDevice);
-    bool syncRenderThreadCompletedFrames(AppScheduleContext& context);
-    bool dispatchScheduledRender(AppScheduleContext& context);
+    bool syncRenderThreadCompletedFrames(SystemContext& context);
+    bool dispatchScheduledRender(SystemContext& context);
     void finalizeFrameTiming(GpuDevice& gpuDevice, double elapsedTime, double curTime);
     void runGpuRenderSchedules(GpuDevice& gpuDevice, uint32_t frameIndex);
 

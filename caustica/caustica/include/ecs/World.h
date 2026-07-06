@@ -9,7 +9,11 @@
 #include <entt/entity/registry.hpp>
 
 #include <functional>
+#include <stdexcept>
+#include <typeindex>
+#include <type_traits>
 #include <tuple>
+#include <unordered_map>
 #include <utility>
 
 namespace caustica::ecs
@@ -43,6 +47,7 @@ public:
     {
         m_registry.clear();
         m_registry.ctx().clear();
+        m_resourceRefs.clear();
         m_changeDetectionEnabled = false;
     }
 
@@ -130,19 +135,67 @@ public:
     template<typename T, typename... Args>
     T& insertResource(Args&&... args)
     {
-        return m_registry.ctx().emplace<T>(std::forward<Args>(args)...);
+        static_assert(std::is_same_v<T, std::remove_cv_t<T>>, "Resource type must be non-const");
+        m_resourceRefs.erase(std::type_index(typeid(T)));
+        m_registry.ctx().template erase<T>();
+        return m_registry.ctx().template emplace<T>(std::forward<Args>(args)...);
+    }
+
+    template<typename T>
+    T& insertResourceValue(T value)
+    {
+        static_assert(std::is_same_v<T, std::remove_cv_t<T>>, "Resource type must be non-const");
+        m_resourceRefs.erase(std::type_index(typeid(T)));
+        m_registry.ctx().template erase<T>();
+        return m_registry.ctx().template emplace<T>(std::move(value));
+    }
+
+    template<typename T>
+    T& insertResourceRef(T& resource)
+    {
+        static_assert(std::is_same_v<T, std::remove_cv_t<T>>, "Resource type must be non-const");
+        m_resourceRefs[std::type_index(typeid(T))] = &resource;
+        return resource;
+    }
+
+    template<typename T>
+    const T& insertResourceRef(const T& resource)
+    {
+        static_assert(std::is_same_v<T, std::remove_cv_t<T>>, "Resource type must be non-const");
+        m_resourceRefs[std::type_index(typeid(T))] = const_cast<T*>(&resource);
+        return resource;
     }
 
     template<typename T>
     T* getResource()
     {
+        if (auto it = m_resourceRefs.find(std::type_index(typeid(T))); it != m_resourceRefs.end())
+            return static_cast<T*>(it->second);
         return m_registry.ctx().find<T>();
     }
 
     template<typename T>
     const T* getResource() const
     {
+        if (auto it = m_resourceRefs.find(std::type_index(typeid(T))); it != m_resourceRefs.end())
+            return static_cast<const T*>(it->second);
         return m_registry.ctx().find<T>();
+    }
+
+    template<typename T>
+    T& resource()
+    {
+        if (T* ptr = getResource<T>())
+            return *ptr;
+        throw std::runtime_error("Requested ECS resource is not registered");
+    }
+
+    template<typename T>
+    const T& resource() const
+    {
+        if (const T* ptr = getResource<T>())
+            return *ptr;
+        throw std::runtime_error("Requested ECS resource is not registered");
     }
 
     CommandQueue& commands()
@@ -207,6 +260,7 @@ public:
 
 private:
     entt::registry m_registry;
+    std::unordered_map<std::type_index, void*> m_resourceRefs;
     bool m_changeDetectionEnabled = false;
 };
 

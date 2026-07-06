@@ -1,5 +1,7 @@
 #pragma once
 
+#include <ecs/World.h>
+
 #include <cstdint>
 #include <functional>
 #include <string>
@@ -28,9 +30,10 @@ enum class AppSchedule
 
 [[nodiscard]] const char* toString(AppSchedule schedule);
 
-struct AppScheduleContext
+struct SystemContext
 {
     App& app;
+    ecs::World& world;
     GpuDevice* gpuDevice = nullptr;
     float deltaTimeSeconds = 0.0f;
     uint32_t frameIndex = 0;
@@ -43,9 +46,38 @@ struct AppScheduleContext
     bool runUpdate = false;
     bool runRender = false;
     bool abortFrame = false;
+
+    template<typename T>
+    [[nodiscard]] T& resMut()
+    {
+        return world.resource<T>();
+    }
+
+    template<typename T>
+    [[nodiscard]] const T& res() const
+    {
+        return world.resource<T>();
+    }
+
+    template<typename T>
+    [[nodiscard]] T* tryRes()
+    {
+        return world.getResource<T>();
+    }
+
+    template<typename T>
+    [[nodiscard]] const T* tryRes() const
+    {
+        return world.getResource<T>();
+    }
+
+    [[nodiscard]] ecs::CommandQueue& commands()
+    {
+        return world.commands();
+    }
 };
 
-using AppSystemFn = std::function<void(AppScheduleContext&)>;
+using SystemFn = std::function<void(SystemContext&)>;
 
 struct AppSystemOrdering
 {
@@ -60,26 +92,26 @@ public:
     AppSchedules& addSystem(
         AppSchedule schedule,
         std::string name,
-        AppSystemFn system,
+        SystemFn system,
         AppSystemOrdering ordering = {});
     AppSchedules& addSystemBefore(
         AppSchedule schedule,
         std::string name,
         std::string before,
-        AppSystemFn system);
+        SystemFn system);
     AppSchedules& addSystemAfter(
         AppSchedule schedule,
         std::string name,
         std::string after,
-        AppSystemFn system);
-    void run(AppSchedule schedule, AppScheduleContext& context) const;
+        SystemFn system);
+    void run(AppSchedule schedule, SystemContext& context) const;
     void clear();
 
 private:
     struct System
     {
         std::string name;
-        AppSystemFn fn;
+        SystemFn fn;
         AppSystemOrdering ordering;
     };
 

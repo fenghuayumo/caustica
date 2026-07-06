@@ -78,7 +78,7 @@ void updateCamera(App& app, float elapsedTimeSeconds)
 
 void registerCameraPlugin(App& app)
 {
-    app.addSystemAfter(AppSchedule::Update, "SceneSession.UpdateCamera", "SceneSession.Animate", [](AppScheduleContext& ctx) {
+    app.addSystemAfter(AppSchedule::Update, "SceneSession.UpdateCamera", "SceneSession.Animate", [](SystemContext& ctx) {
         if (!ctx.windowFocused)
             return;
 

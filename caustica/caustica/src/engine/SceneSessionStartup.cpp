@@ -55,7 +55,7 @@ void initializeSceneSession(App& app, const SceneSessionConfig& config)
 
 void registerSceneSessionStartup(App& app, const SceneSessionConfig& config)
 {
-    app.addSystem(AppSchedule::Startup, "SceneSession.Startup", [&app, config](AppScheduleContext& ctx) {
+    app.addSystem(AppSchedule::Startup, "SceneSession.Startup", [&app, config](SystemContext& ctx) {
         (void)ctx;
         initializeSceneSession(app, config);
     });
@@ -63,8 +63,8 @@ void registerSceneSessionStartup(App& app, const SceneSessionConfig& config)
 
 void registerGpuRenderShutdown(App& app)
 {
-    app.addSystem(AppSchedule::Shutdown, "GpuRender.Shutdown", [](AppScheduleContext& ctx) {
-        if (auto* gpuRender = ctx.app.tryResource<GpuRenderSubsystem>())
+    app.addSystem(AppSchedule::Shutdown, "GpuRender.Shutdown", [](SystemContext& ctx) {
+        if (auto* gpuRender = ctx.tryRes<GpuRenderSubsystem>())
             gpuRender->shutdown();
     });
 }

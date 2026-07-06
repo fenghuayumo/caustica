@@ -1,7 +1,6 @@
 #pragma once
 
 #include <ecs/Entity.h>
-#include <ecs/Schedule.h>
 #include <ecs/World.h>
 #include <ecs/Events.h>
 #include <math/math.h>
@@ -310,21 +309,16 @@ private:
     void ensureChangeDetection();
     void syncDirtyFlagsFromChangeDetection();
 
-    // Phase-1 ECS schedule: the CPU scene refresh is a sequence of ordered systems
-    // driven by ecs::Schedule. Each systemXxx is one step split out of refresh().
-    void ensureScheduleBuilt();
-    void systemRefreshHierarchy(ecs::World& world, const ecs::ScheduleContext& ctx);
-    void systemUpdateGaussianSplatTransforms(ecs::World& world, const ecs::ScheduleContext& ctx);
-    void systemMarkDirtySkinnedMeshes(ecs::World& world, const ecs::ScheduleContext& ctx);
-    void systemMarkDirtySkinnedMeshesFromChangedJoints(ecs::World& world, const ecs::ScheduleContext& ctx);
-    void systemApplyDeferredCommands(ecs::World& world, const ecs::ScheduleContext& ctx);
-    void systemRefreshInstanceIndices(ecs::World& world, const ecs::ScheduleContext& ctx);
-    void systemAssignGlobalResourceIndices(ecs::World& world, const ecs::ScheduleContext& ctx);
-    void systemFinalizeFrameFlags(ecs::World& world, const ecs::ScheduleContext& ctx);
+    void beginRefreshFrame();
+    void updateGaussianSplatTransforms();
+    void markDirtySkinnedMeshes(uint32_t frameIndex);
+    void markDirtySkinnedMeshesFromChangedJoints(uint32_t frameIndex);
+    void applyDeferredCommands();
+    void refreshInstanceIndicesIfNeeded();
+    void assignGlobalResourceIndicesIfNeeded();
+    void finalizeRefreshFrame();
 
     ecs::World m_world;
-    ecs::Schedule m_schedule;
-    bool m_scheduleBuilt = false;
     bool m_frameStructureDirty = false;   // per-frame snapshot of m_structureDirty for systems
     bool m_frameTransformDirty = false;   // per-frame snapshot of m_transformDirty for systems
     ecs::Entity m_root = ecs::NullEntity;

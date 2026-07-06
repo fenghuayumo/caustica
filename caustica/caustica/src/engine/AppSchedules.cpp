@@ -32,7 +32,7 @@ std::size_t AppSchedules::phaseIndex(AppSchedule schedule)
 AppSchedules& AppSchedules::addSystem(
     AppSchedule schedule,
     std::string name,
-    AppSystemFn system,
+    SystemFn system,
     AppSystemOrdering ordering)
 {
     PhaseSchedule& phase = m_phases[phaseIndex(schedule)];
@@ -44,7 +44,7 @@ AppSchedules& AppSchedules::addSystemBefore(
     AppSchedule schedule,
     std::string name,
     std::string before,
-    AppSystemFn system)
+    SystemFn system)
 {
     AppSystemOrdering ordering;
     ordering.before.push_back(std::move(before));
@@ -55,7 +55,7 @@ AppSchedules& AppSchedules::addSystemAfter(
     AppSchedule schedule,
     std::string name,
     std::string after,
-    AppSystemFn system)
+    SystemFn system)
 {
     AppSystemOrdering ordering;
     ordering.after.push_back(std::move(after));
@@ -135,7 +135,7 @@ std::vector<int> AppSchedules::buildExecutionOrder(const PhaseSchedule& phase)
     return ordered;
 }
 
-void AppSchedules::run(AppSchedule schedule, AppScheduleContext& context) const
+void AppSchedules::run(AppSchedule schedule, SystemContext& context) const
 {
     const PhaseSchedule& phase = m_phases[phaseIndex(schedule)];
     const std::vector<int> order = buildExecutionOrder(phase);
