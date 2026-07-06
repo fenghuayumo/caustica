@@ -90,7 +90,7 @@ bool GpuRenderSubsystem::initializeSession(const GpuRenderSubsystemInitParams& p
     m_worldRenderer = std::make_unique<render::WorldRenderer>(*m_pathTracingContext);
     m_worldRenderer->createBindingLayouts(m_bindlessLayout);
 
-    m_scenePasses.wireSession(render::ScenePassWireParams{
+    render::ScenePassWireParams sceneWireParams{
         .gpuDevice = params.gpuDevice,
         .sceneManager = *m_sceneManager,
         .accelStructs = m_accelStructs,
@@ -102,7 +102,17 @@ bool GpuRenderSubsystem::initializeSession(const GpuRenderSubsystemInitParams& p
         .bindingCache = *m_bindingCache,
         .shaderFactory = m_shaderFactory,
         .renderDevice = *m_renderDevice,
-    });
+    };
+    sceneWireParams.onGaussianSplatTemporalReset = [worldRenderer = m_worldRenderer.get()]() {
+        worldRenderer->setGaussianSplatTemporalReset(true);
+    };
+    sceneWireParams.getRenderTargets = [worldRenderer = m_worldRenderer.get()]() {
+        return worldRenderer->getRenderTargets();
+    };
+    sceneWireParams.getShaderDebug = [worldRenderer = m_worldRenderer.get()]() {
+        return worldRenderer->getShaderDebug();
+    };
+    m_scenePasses.wireSession(sceneWireParams);
     return true;
 }
 

@@ -1,4 +1,5 @@
 #include <render/passes/gaussian/GaussianSplatPass.h>
+#include <render/passes/gaussian/GaussianSplatGeometry.h>
 #include <backend/ViewRhiConversion.h>
 
 #include <render/gpuSort/GPUSort.h>
@@ -12,443 +13,25 @@
 #include <rhi/utils.h>
 
 #include <algorithm>
-#include <array>
-#include <cctype>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
-#include <fstream>
 #include <limits>
 #include <numeric>
 #include <random>
-#include <sstream>
 #include <utility>
+
+#include <scene/loader/GaussianSplatLoader.h>
+#include <scene/GaussianSplatData.h>
 
 using namespace caustica::math;
 
 namespace
 {
-    constexpr float kSH_C0 = 0.28209479177387814f;
-    constexpr float kGaussianSplatAsRadius = 2.8284271247461903f;
-    constexpr float kGaussianSplatKernelMinResponse = 0.0113f;
-    constexpr std::array<float, 15> kRdfToRubShFlip = {
-        -1.0f, -1.0f, 1.0f, -1.0f, 1.0f,
-         1.0f, -1.0f, 1.0f, -1.0f, 1.0f,
-        -1.0f, -1.0f, 1.0f, -1.0f, 1.0f
-    };
-
-    enum class PlyFormat
-    {
-        Ascii,
-        BinaryLittleEndian,
-        Unsupported
-    };
-
-    enum class PlyScalarType
-    {
-        Int8,
-        UInt8,
-        Int16,
-        UInt16,
-        Int32,
-        UInt32,
-        Float32,
-        Float64,
-        Invalid
-    };
-
-    struct PlyProperty
-    {
-        std::string name;
-        PlyScalarType type = PlyScalarType::Invalid;
-        bool isList = false;
-        PlyScalarType listCountType = PlyScalarType::Invalid;
-    };
-
-    struct PlyElement
-    {
-        std::string name;
-        uint64_t count = 0;
-        std::vector<PlyProperty> properties;
-    };
-
-    struct RawGaussianSplat
-    {
-        float position[3] = {};
-        float scale[3] = { 1.0f, 1.0f, 1.0f };
-        float rotation[4] = { 1.0f, 0.0f, 0.0f, 0.0f }; // w, x, y, z
-        float color[3] = { 1.0f, 1.0f, 1.0f };
-        float alpha = 1.0f;
-    };
-
-    float GaussianKernelScale(float density, float kernelMinResponse, uint32_t kernelDegree, bool adaptiveClamping)
-    {
-        const float responseModulation = adaptiveClamping ? std::max(density, 1e-6f) : 1.0f;
-        const float minResponse = std::min(kernelMinResponse / responseModulation, 0.97f);
-
-        if (kernelDegree == 0)
-            return std::abs((minResponse - 1.0f) / -0.329630334487f);
-
-        const float b = std::max(float(kernelDegree), 1.0f);
-        const float a = -4.5f / std::pow(3.0f, b);
-        return std::pow(std::log(minResponse) / a, 1.0f / b);
-    }
-
-    float3 GaussianAabbExtent(const GaussianSplatData& splat, float splatScale, uint32_t kernelDegree, bool adaptiveClamp)
-    {
-        const float3 variance = float3(
-            std::max(splat.covariance0.x, 1e-8f),
-            std::max(splat.covariance0.w, 1e-8f),
-            std::max(splat.covariance1.y, 1e-8f));
-        const float kernelScale = GaussianKernelScale(
-            splat.centerOpacity.w,
-            kGaussianSplatKernelMinResponse,
-            kernelDegree,
-            adaptiveClamp);
-        return float3(
-            std::sqrt(variance.x),
-            std::sqrt(variance.y),
-            std::sqrt(variance.z)) * (std::max(splatScale, 1e-4f) * std::max(kernelScale, 1e-3f));
-    }
-
-    float SrgbToLinear(float srgb)
-    {
-        srgb = std::max(srgb, 0.0f);
-        return srgb <= 0.04045f
-            ? srgb / 12.92f
-            : std::pow((srgb + 0.055f) / 1.055f, 2.4f);
-    }
-
-    float3 SrgbToLinear(const float3& srgb)
-    {
-        return float3(SrgbToLinear(srgb.x), SrgbToLinear(srgb.y), SrgbToLinear(srgb.z));
-    }
-
-    float Luminance(const float3& color)
-    {
-        return dot(color, float3(0.2126f, 0.7152f, 0.0722f));
-    }
-
-    nvrhi::rt::GeometryAABB GaussianAabbFromSplat(const GaussianSplatData& splat, float splatScale, uint32_t kernelDegree, bool adaptiveClamp)
-    {
-        const float3 center = splat.centerOpacity.xyz();
-        const float3 extent = GaussianAabbExtent(splat, splatScale, kernelDegree, adaptiveClamp);
-
-        nvrhi::rt::GeometryAABB aabb = {};
-        aabb.minX = center.x - extent.x;
-        aabb.minY = center.y - extent.y;
-        aabb.minZ = center.z - extent.z;
-        aabb.maxX = center.x + extent.x;
-        aabb.maxY = center.y + extent.y;
-        aabb.maxZ = center.z + extent.z;
-        return aabb;
-    }
-
-    std::vector<nvrhi::rt::GeometryAABB> BuildGaussianAabbs(
-        const std::vector<GaussianSplatData>& splats,
-        float splatScale,
-        uint32_t kernelDegree,
-        bool adaptiveClamp)
-    {
-        std::vector<nvrhi::rt::GeometryAABB> aabbs;
-        aabbs.reserve(splats.size());
-
-        for (const GaussianSplatData& splat : splats)
-            aabbs.push_back(GaussianAabbFromSplat(splat, splatScale, kernelDegree, adaptiveClamp));
-
-        return aabbs;
-    }
-
-    void FillScaleTranslateTransform(nvrhi::rt::AffineTransform& transform, const float3& center, const float3& extent)
-    {
-        transform[0] = extent.x; transform[1] = 0.0f;     transform[2] = 0.0f;     transform[3] = center.x;
-        transform[4] = 0.0f;     transform[5] = extent.y; transform[6] = 0.0f;     transform[7] = center.y;
-        transform[8] = 0.0f;     transform[9] = 0.0f;     transform[10] = extent.z; transform[11] = center.z;
-    }
-
-    constexpr float kIcosahedronInvPhi = 0.61803398875f;
-
-    const std::array<float3, 12> kUnitIcosahedronVertices = {
-        float3(-kIcosahedronInvPhi,  1.0f, 0.0f),
-        float3( kIcosahedronInvPhi,  1.0f, 0.0f),
-        float3(-kIcosahedronInvPhi, -1.0f, 0.0f),
-        float3( kIcosahedronInvPhi, -1.0f, 0.0f),
-        float3(0.0f, -kIcosahedronInvPhi,  1.0f),
-        float3(0.0f,  kIcosahedronInvPhi,  1.0f),
-        float3(0.0f, -kIcosahedronInvPhi, -1.0f),
-        float3(0.0f,  kIcosahedronInvPhi, -1.0f),
-        float3( 1.0f, 0.0f, -kIcosahedronInvPhi),
-        float3( 1.0f, 0.0f,  kIcosahedronInvPhi),
-        float3(-1.0f, 0.0f, -kIcosahedronInvPhi),
-        float3(-1.0f, 0.0f,  kIcosahedronInvPhi)
-    };
-
-    const std::array<uint32_t, 60> kUnitIcosahedronIndices = {
-        0, 11, 5,
-        0, 5, 1,
-        0, 1, 7,
-        0, 7, 10,
-        0, 10, 11,
-        1, 5, 9,
-        5, 11, 4,
-        11, 10, 2,
-        10, 7, 6,
-        7, 1, 8,
-        3, 9, 4,
-        3, 4, 2,
-        3, 2, 6,
-        3, 6, 8,
-        3, 8, 9,
-        4, 9, 5,
-        2, 4, 11,
-        6, 2, 10,
-        8, 6, 7,
-        9, 8, 1
-    };
-
-    std::string ToLower(std::string value)
-    {
-        std::transform(value.begin(), value.end(), value.begin(),
-            [](unsigned char c) { return char(std::tolower(c)); });
-        return value;
-    }
-
-    std::string Trim(std::string value)
-    {
-        while (!value.empty() && std::isspace(static_cast<unsigned char>(value.back())))
-            value.pop_back();
-
-        size_t first = 0;
-        while (first < value.size() && std::isspace(static_cast<unsigned char>(value[first])))
-            ++first;
-
-        if (first)
-            value.erase(0, first);
-
-        return value;
-    }
-
-    PlyScalarType ParseScalarType(const std::string& token)
-    {
-        const std::string type = ToLower(token);
-
-        if (type == "char" || type == "int8")
-            return PlyScalarType::Int8;
-        if (type == "uchar" || type == "uint8" || type == "uint8_t")
-            return PlyScalarType::UInt8;
-        if (type == "short" || type == "int16")
-            return PlyScalarType::Int16;
-        if (type == "ushort" || type == "uint16")
-            return PlyScalarType::UInt16;
-        if (type == "int" || type == "int32")
-            return PlyScalarType::Int32;
-        if (type == "uint" || type == "uint32")
-            return PlyScalarType::UInt32;
-        if (type == "float" || type == "float32")
-            return PlyScalarType::Float32;
-        if (type == "double" || type == "float64")
-            return PlyScalarType::Float64;
-
-        return PlyScalarType::Invalid;
-    }
-
-    size_t ScalarTypeSize(PlyScalarType type)
-    {
-        switch (type)
-        {
-        case PlyScalarType::Int8:
-        case PlyScalarType::UInt8:
-            return 1;
-        case PlyScalarType::Int16:
-        case PlyScalarType::UInt16:
-            return 2;
-        case PlyScalarType::Int32:
-        case PlyScalarType::UInt32:
-        case PlyScalarType::Float32:
-            return 4;
-        case PlyScalarType::Float64:
-            return 8;
-        default:
-            return 0;
-        }
-    }
-
-    bool ReadScalarBinary(std::istream& stream, PlyScalarType type, double& value)
-    {
-        switch (type)
-        {
-        case PlyScalarType::Int8:
-        {
-            int8_t v = 0;
-            stream.read(reinterpret_cast<char*>(&v), sizeof(v));
-            value = double(v);
-            return bool(stream);
-        }
-        case PlyScalarType::UInt8:
-        {
-            uint8_t v = 0;
-            stream.read(reinterpret_cast<char*>(&v), sizeof(v));
-            value = double(v);
-            return bool(stream);
-        }
-        case PlyScalarType::Int16:
-        {
-            int16_t v = 0;
-            stream.read(reinterpret_cast<char*>(&v), sizeof(v));
-            value = double(v);
-            return bool(stream);
-        }
-        case PlyScalarType::UInt16:
-        {
-            uint16_t v = 0;
-            stream.read(reinterpret_cast<char*>(&v), sizeof(v));
-            value = double(v);
-            return bool(stream);
-        }
-        case PlyScalarType::Int32:
-        {
-            int32_t v = 0;
-            stream.read(reinterpret_cast<char*>(&v), sizeof(v));
-            value = double(v);
-            return bool(stream);
-        }
-        case PlyScalarType::UInt32:
-        {
-            uint32_t v = 0;
-            stream.read(reinterpret_cast<char*>(&v), sizeof(v));
-            value = double(v);
-            return bool(stream);
-        }
-        case PlyScalarType::Float32:
-        {
-            float v = 0.0f;
-            stream.read(reinterpret_cast<char*>(&v), sizeof(v));
-            value = double(v);
-            return bool(stream);
-        }
-        case PlyScalarType::Float64:
-        {
-            double v = 0.0;
-            stream.read(reinterpret_cast<char*>(&v), sizeof(v));
-            value = v;
-            return bool(stream);
-        }
-        default:
-            return false;
-        }
-    }
-
-    bool ParseScalarAscii(std::istream& stream, PlyScalarType type, double& value)
-    {
-        std::string token;
-        if (!(stream >> token))
-            return false;
-
-        try
-        {
-            switch (type)
-            {
-            case PlyScalarType::Float32:
-            case PlyScalarType::Float64:
-                value = std::stod(token);
-                return true;
-            case PlyScalarType::Int8:
-            case PlyScalarType::Int16:
-            case PlyScalarType::Int32:
-                value = double(std::stoll(token));
-                return true;
-            case PlyScalarType::UInt8:
-            case PlyScalarType::UInt16:
-            case PlyScalarType::UInt32:
-                value = double(std::stoull(token));
-                return true;
-            default:
-                return false;
-            }
-        }
-        catch (...)
-        {
-            return false;
-        }
-    }
-
-    int FindProperty(const std::vector<PlyProperty>& properties, const char* name)
-    {
-        for (size_t index = 0; index < properties.size(); ++index)
-        {
-            if (!properties[index].isList && properties[index].name == name)
-                return int(index);
-        }
-
-        return -1;
-    }
-
-    int FindFirstProperty(const std::vector<PlyProperty>& properties, const std::initializer_list<const char*> names)
-    {
-        for (const char* name : names)
-        {
-            int index = FindProperty(properties, name);
-            if (index >= 0)
-                return index;
-        }
-
-        return -1;
-    }
-
-    bool SkipElementRowBinary(std::istream& stream, const PlyElement& element)
-    {
-        for (const PlyProperty& property : element.properties)
-        {
-            if (!property.isList)
-            {
-                stream.seekg(static_cast<std::streamoff>(ScalarTypeSize(property.type)), std::ios::cur);
-                if (!stream)
-                    return false;
-                continue;
-            }
-
-            double countValue = 0.0;
-            if (!ReadScalarBinary(stream, property.listCountType, countValue))
-                return false;
-
-            const auto count = static_cast<uint64_t>(std::max(0.0, countValue));
-            stream.seekg(static_cast<std::streamoff>(count * ScalarTypeSize(property.type)), std::ios::cur);
-            if (!stream)
-                return false;
-        }
-
-        return true;
-    }
-
     float Clamp01(float value)
     {
         return std::min(1.0f, std::max(0.0f, value));
     }
-
-    float Sigmoid(float value)
-    {
-        return 1.0f / (1.0f + std::exp(-value));
-    }
-
-    void NormalizeQuaternion(float rotation[4])
-    {
-        float lengthSquared = rotation[0] * rotation[0] + rotation[1] * rotation[1] +
-            rotation[2] * rotation[2] + rotation[3] * rotation[3];
-
-        if (lengthSquared <= std::numeric_limits<float>::epsilon())
-        {
-            rotation[0] = 1.0f;
-            rotation[1] = rotation[2] = rotation[3] = 0.0f;
-            return;
-        }
-
-        float invLength = 1.0f / std::sqrt(lengthSquared);
-        rotation[0] *= invLength;
-        rotation[1] *= invLength;
-        rotation[2] *= invLength;
-        rotation[3] *= invLength;
-    }
-
     SimpleViewConstants FromPlanarViewConstants(const PlanarViewConstants& view)
     {
         SimpleViewConstants ret;
@@ -550,381 +133,6 @@ namespace
     {
         return std::max<uint64_t>(4, (size + 3u) & ~uint64_t(3u));
     }
-
-    GaussianSplatData ConvertToGpuSplat(const RawGaussianSplat& raw, bool convertRdfToRub)
-    {
-        float rotation[4] = { raw.rotation[0], raw.rotation[1], raw.rotation[2], raw.rotation[3] };
-        float position[3] = { raw.position[0], raw.position[1], raw.position[2] };
-
-        if (convertRdfToRub)
-        {
-            position[1] = -position[1];
-            position[2] = -position[2];
-            rotation[2] = -rotation[2];
-            rotation[3] = -rotation[3];
-        }
-
-        NormalizeQuaternion(rotation);
-
-        const float w = rotation[0];
-        const float x = rotation[1];
-        const float y = rotation[2];
-        const float z = rotation[3];
-
-        const float xx = x * x;
-        const float yy = y * y;
-        const float zz = z * z;
-        const float xy = x * y;
-        const float xz = x * z;
-        const float yz = y * z;
-        const float wx = w * x;
-        const float wy = w * y;
-        const float wz = w * z;
-
-        const float r00 = 1.0f - 2.0f * (yy + zz);
-        const float r01 = 2.0f * (xy - wz);
-        const float r02 = 2.0f * (xz + wy);
-        const float r10 = 2.0f * (xy + wz);
-        const float r11 = 1.0f - 2.0f * (xx + zz);
-        const float r12 = 2.0f * (yz - wx);
-        const float r20 = 2.0f * (xz - wy);
-        const float r21 = 2.0f * (yz + wx);
-        const float r22 = 1.0f - 2.0f * (xx + yy);
-
-        const float sx2 = raw.scale[0] * raw.scale[0];
-        const float sy2 = raw.scale[1] * raw.scale[1];
-        const float sz2 = raw.scale[2] * raw.scale[2];
-
-        float cov00 = r00 * r00 * sx2 + r01 * r01 * sy2 + r02 * r02 * sz2;
-        float cov01 = r00 * r10 * sx2 + r01 * r11 * sy2 + r02 * r12 * sz2;
-        float cov02 = r00 * r20 * sx2 + r01 * r21 * sy2 + r02 * r22 * sz2;
-        float cov11 = r10 * r10 * sx2 + r11 * r11 * sy2 + r12 * r12 * sz2;
-        float cov12 = r10 * r20 * sx2 + r11 * r21 * sy2 + r12 * r22 * sz2;
-        float cov22 = r20 * r20 * sx2 + r21 * r21 * sy2 + r22 * r22 * sz2;
-
-        GaussianSplatData splat = {};
-        splat.centerOpacity = float4(position[0], position[1], position[2], Clamp01(raw.alpha));
-        splat.covariance0 = float4(cov00, cov01, cov02, cov11);
-        splat.covariance1 = float4(cov12, cov22, 0.0f, 0.0f);
-        splat.color = float4(Clamp01(raw.color[0]), Clamp01(raw.color[1]), Clamp01(raw.color[2]), 0.0f);
-
-        return splat;
-    }
-
-    bool LoadPlyFile(
-        const std::filesystem::path& fileName,
-        bool convertRdfToRub,
-        std::vector<GaussianSplatData>& splats,
-        std::vector<float4>& shCoefficients,
-        uint32_t& shDegree)
-    {
-        std::ifstream file(fileName, std::ios::binary);
-        if (!file)
-        {
-            caustica::error("Failed to open Gaussian splat PLY file: %s", fileName.string().c_str());
-            return false;
-        }
-
-        std::string line;
-        if (!std::getline(file, line) || Trim(line) != "ply")
-        {
-            caustica::error("Invalid Gaussian splat PLY header: %s", fileName.string().c_str());
-            return false;
-        }
-
-        PlyFormat format = PlyFormat::Unsupported;
-        std::vector<PlyElement> elements;
-        PlyElement* currentElement = nullptr;
-
-        while (std::getline(file, line))
-        {
-            line = Trim(line);
-            if (line.empty())
-                continue;
-
-            std::istringstream parser(line);
-            std::string keyword;
-            parser >> keyword;
-
-            if (keyword == "end_header")
-                break;
-
-            if (keyword == "comment" || keyword == "obj_info")
-                continue;
-
-            if (keyword == "format")
-            {
-                std::string formatToken;
-                parser >> formatToken;
-                formatToken = ToLower(formatToken);
-
-                if (formatToken == "ascii")
-                    format = PlyFormat::Ascii;
-                else if (formatToken == "binary_little_endian")
-                    format = PlyFormat::BinaryLittleEndian;
-                else
-                    format = PlyFormat::Unsupported;
-
-                continue;
-            }
-
-            if (keyword == "element")
-            {
-                PlyElement element;
-                parser >> element.name >> element.count;
-                elements.push_back(std::move(element));
-                currentElement = &elements.back();
-                continue;
-            }
-
-            if (keyword == "property" && currentElement)
-            {
-                std::string typeToken;
-                parser >> typeToken;
-
-                PlyProperty property;
-                if (typeToken == "list")
-                {
-                    std::string countTypeToken;
-                    std::string valueTypeToken;
-                    parser >> countTypeToken >> valueTypeToken >> property.name;
-                    property.isList = true;
-                    property.listCountType = ParseScalarType(countTypeToken);
-                    property.type = ParseScalarType(valueTypeToken);
-                }
-                else
-                {
-                    parser >> property.name;
-                    property.type = ParseScalarType(typeToken);
-                }
-
-                if (property.type == PlyScalarType::Invalid ||
-                    (property.isList && property.listCountType == PlyScalarType::Invalid))
-                {
-                    caustica::error("Unsupported PLY property type in %s", fileName.string().c_str());
-                    return false;
-                }
-
-                currentElement->properties.push_back(std::move(property));
-            }
-        }
-
-        if (format == PlyFormat::Unsupported)
-        {
-            caustica::error("Unsupported PLY format in %s", fileName.string().c_str());
-            return false;
-        }
-
-        auto vertexElementIt = std::find_if(elements.begin(), elements.end(),
-            [](const PlyElement& element) { return element.name == "vertex"; });
-
-        if (vertexElementIt == elements.end() || vertexElementIt->count == 0)
-        {
-            caustica::error("Gaussian splat PLY has no vertex element: %s", fileName.string().c_str());
-            return false;
-        }
-
-        const PlyElement& vertexElement = *vertexElementIt;
-        const auto& properties = vertexElement.properties;
-
-        const int xIndex = FindProperty(properties, "x");
-        const int yIndex = FindProperty(properties, "y");
-        const int zIndex = FindProperty(properties, "z");
-        const int opacityIndex = FindProperty(properties, "opacity");
-        const int scale0Index = FindProperty(properties, "scale_0");
-        const int scale1Index = FindProperty(properties, "scale_1");
-        const int scale2Index = FindProperty(properties, "scale_2");
-        const int rot0Index = FindProperty(properties, "rot_0");
-        const int rot1Index = FindProperty(properties, "rot_1");
-        const int rot2Index = FindProperty(properties, "rot_2");
-        const int rot3Index = FindProperty(properties, "rot_3");
-        const int fdc0Index = FindProperty(properties, "f_dc_0");
-        const int fdc1Index = FindProperty(properties, "f_dc_1");
-        const int fdc2Index = FindProperty(properties, "f_dc_2");
-        const int redIndex = FindFirstProperty(properties, { "red", "r", "diffuse_red" });
-        const int greenIndex = FindFirstProperty(properties, { "green", "g", "diffuse_green" });
-        const int blueIndex = FindFirstProperty(properties, { "blue", "b", "diffuse_blue" });
-
-        std::array<int, 45> fRestIndices;
-        fRestIndices.fill(-1);
-        uint32_t fRestCount = 0;
-        for (uint32_t index = 0; index < uint32_t(fRestIndices.size()); ++index)
-        {
-            std::string propertyName = "f_rest_" + std::to_string(index);
-            fRestIndices[index] = FindProperty(properties, propertyName.c_str());
-            if (fRestIndices[index] >= 0)
-                ++fRestCount;
-        }
-
-        if (fRestCount >= 45)
-            shDegree = 3;
-        else if (fRestCount >= 24)
-            shDegree = 2;
-        else if (fRestCount >= 9)
-            shDegree = 1;
-        else
-            shDegree = 0;
-
-        const bool hasRequired3dgsProperties =
-            xIndex >= 0 && yIndex >= 0 && zIndex >= 0 &&
-            opacityIndex >= 0 &&
-            scale0Index >= 0 && scale1Index >= 0 && scale2Index >= 0 &&
-            rot0Index >= 0 && rot1Index >= 0 && rot2Index >= 0 && rot3Index >= 0 &&
-            ((fdc0Index >= 0 && fdc1Index >= 0 && fdc2Index >= 0) ||
-             (redIndex >= 0 && greenIndex >= 0 && blueIndex >= 0));
-
-        if (!hasRequired3dgsProperties)
-        {
-            caustica::error("PLY file does not contain the expected 3DGS attributes: %s", fileName.string().c_str());
-            return false;
-        }
-
-        splats.clear();
-        splats.reserve(size_t(vertexElement.count));
-        shCoefficients.clear();
-        shCoefficients.reserve(size_t(vertexElement.count) * GAUSSIAN_SPLAT_SH_FLOAT4_COUNT);
-
-        std::vector<double> values(properties.size(), 0.0);
-
-        for (const PlyElement& element : elements)
-        {
-            if (element.name != "vertex")
-            {
-                for (uint64_t row = 0; row < element.count; ++row)
-                {
-                    if (format == PlyFormat::Ascii)
-                    {
-                        std::getline(file, line);
-                    }
-                    else if (!SkipElementRowBinary(file, element))
-                    {
-                        caustica::error("Failed while skipping PLY element in %s", fileName.string().c_str());
-                        return false;
-                    }
-                }
-                continue;
-            }
-
-            for (uint64_t row = 0; row < element.count; ++row)
-            {
-                if (format == PlyFormat::Ascii)
-                {
-                    if (!std::getline(file, line))
-                    {
-                        caustica::error("Unexpected end of PLY vertex data: %s", fileName.string().c_str());
-                        return false;
-                    }
-
-                    std::istringstream rowParser(line);
-                    for (size_t propertyIndex = 0; propertyIndex < properties.size(); ++propertyIndex)
-                    {
-                        const PlyProperty& property = properties[propertyIndex];
-
-                        if (property.isList)
-                        {
-                            double countValue = 0.0;
-                            if (!ParseScalarAscii(rowParser, property.listCountType, countValue))
-                                return false;
-                            for (uint64_t i = 0; i < static_cast<uint64_t>(std::max(0.0, countValue)); ++i)
-                            {
-                                double ignored = 0.0;
-                                if (!ParseScalarAscii(rowParser, property.type, ignored))
-                                    return false;
-                            }
-                        }
-                        else if (!ParseScalarAscii(rowParser, property.type, values[propertyIndex]))
-                        {
-                            caustica::error("Failed to parse PLY vertex row in %s", fileName.string().c_str());
-                            return false;
-                        }
-                    }
-                }
-                else
-                {
-                    for (size_t propertyIndex = 0; propertyIndex < properties.size(); ++propertyIndex)
-                    {
-                        const PlyProperty& property = properties[propertyIndex];
-
-                        if (property.isList)
-                        {
-                            double countValue = 0.0;
-                            if (!ReadScalarBinary(file, property.listCountType, countValue))
-                                return false;
-                            file.seekg(static_cast<std::streamoff>(static_cast<uint64_t>(std::max(0.0, countValue)) * ScalarTypeSize(property.type)), std::ios::cur);
-                            if (!file)
-                                return false;
-                        }
-                        else if (!ReadScalarBinary(file, property.type, values[propertyIndex]))
-                        {
-                            caustica::error("Failed to read PLY vertex row in %s", fileName.string().c_str());
-                            return false;
-                        }
-                    }
-                }
-
-                RawGaussianSplat raw = {};
-                raw.position[0] = float(values[xIndex]);
-                raw.position[1] = float(values[yIndex]);
-                raw.position[2] = float(values[zIndex]);
-
-                raw.scale[0] = std::exp(float(values[scale0Index]));
-                raw.scale[1] = std::exp(float(values[scale1Index]));
-                raw.scale[2] = std::exp(float(values[scale2Index]));
-
-                raw.rotation[0] = float(values[rot0Index]);
-                raw.rotation[1] = float(values[rot1Index]);
-                raw.rotation[2] = float(values[rot2Index]);
-                raw.rotation[3] = float(values[rot3Index]);
-
-                raw.alpha = Sigmoid(float(values[opacityIndex]));
-
-                if (fdc0Index >= 0)
-                {
-                    raw.color[0] = 0.5f + kSH_C0 * float(values[fdc0Index]);
-                    raw.color[1] = 0.5f + kSH_C0 * float(values[fdc1Index]);
-                    raw.color[2] = 0.5f + kSH_C0 * float(values[fdc2Index]);
-                }
-                else
-                {
-                    raw.color[0] = float(values[redIndex]) / 255.0f;
-                    raw.color[1] = float(values[greenIndex]) / 255.0f;
-                    raw.color[2] = float(values[blueIndex]) / 255.0f;
-                }
-
-                splats.push_back(ConvertToGpuSplat(raw, convertRdfToRub));
-
-                std::array<float, GAUSSIAN_SPLAT_SH_FLOAT4_COUNT * 4> packedSh = {};
-                if (shDegree > 0)
-                {
-                    const uint32_t coefficientsPerChannel = shDegree == 3 ? 15u : (shDegree == 2 ? 8u : 3u);
-                    const uint32_t coefficientCount = coefficientsPerChannel * 3u;
-
-                    for (uint32_t coeff = 0; coeff < coefficientsPerChannel; ++coeff)
-                    {
-                        const float coordinateFlip = convertRdfToRub ? kRdfToRubShFlip[coeff] : 1.0f;
-                        for (uint32_t rgb = 0; rgb < 3; ++rgb)
-                        {
-                            const uint32_t sourceCoeff = rgb * coefficientsPerChannel + coeff;
-                            if (sourceCoeff < coefficientCount && fRestIndices[sourceCoeff] >= 0)
-                                packedSh[coeff * 3 + rgb] = float(values[fRestIndices[sourceCoeff]]) * coordinateFlip;
-                        }
-                    }
-                }
-
-                for (uint32_t i = 0; i < GAUSSIAN_SPLAT_SH_FLOAT4_COUNT; ++i)
-                {
-                    shCoefficients.push_back(float4(
-                        packedSh[i * 4 + 0],
-                        packedSh[i * 4 + 1],
-                        packedSh[i * 4 + 2],
-                        packedSh[i * 4 + 3]));
-                }
-            }
-        }
-
-        caustica::info("Loaded %zu Gaussian splats from %s (SH degree %u)", splats.size(), fileName.string().c_str(), shDegree);
-        return !splats.empty();
-    }
 }
 
 GaussianSplatPass::GaussianSplatPass(
@@ -932,6 +140,7 @@ GaussianSplatPass::GaussianSplatPass(
     std::shared_ptr<caustica::ShaderFactory> shaderFactory)
     : m_device(device)
     , m_shaderFactory(std::move(shaderFactory))
+    , m_accelBuilder(device)
 {
     m_constantBuffer = m_device->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(GaussianSplatConstants), "GaussianSplatConstants", 16));
 
@@ -985,35 +194,26 @@ bool GaussianSplatPass::CanReuseSort(const GaussianSplatConstants& constants) co
 
 bool GaussianSplatPass::LoadFromFile(const std::filesystem::path& fileName, bool convertRdfToRub)
 {
-    const std::string extension = ToLower(fileName.extension().string());
-    if (extension != ".ply")
-    {
-        caustica::error("Unsupported Gaussian splat file extension '%s'. This pass currently supports 3DGS .ply files.", extension.c_str());
-        return false;
-    }
-
-    std::vector<GaussianSplatData> loadedSplats;
-    std::vector<float4> loadedShCoefficients;
-    uint32_t loadedShDegree = 0;
-    if (!LoadPlyFile(fileName, convertRdfToRub, loadedSplats, loadedShCoefficients, loadedShDegree))
+    caustica::GaussianSplatDataset dataset;
+    if (!caustica::loadGaussianSplatPly(fileName, convertRdfToRub, dataset))
         return false;
 
-    m_splats = std::move(loadedSplats);
-    m_shCoefficients = std::move(loadedShCoefficients);
+    m_splats = std::move(dataset.splats);
+    m_shCoefficients = std::move(dataset.shCoefficients);
     m_emissionProxies.clear();
     m_splatCount = uint32_t(m_splats.size());
-    m_shDegree = loadedShDegree;
+    m_shDegree = dataset.shDegree;
     m_colorOpacity.clear();
     m_colorOpacity.reserve(m_splats.size());
-    for (const GaussianSplatData& splat : m_splats)
+    for (const caustica::GaussianSplatData& splat : m_splats)
         m_colorOpacity.push_back(float4(splat.color.x, splat.color.y, splat.color.z, splat.centerOpacity.w));
 
     if (m_shCoefficients.empty())
         m_shCoefficients.push_back(float4(0.0f, 0.0f, 0.0f, 0.0f));
 
     nvrhi::BufferDesc splatBufferDesc;
-    splatBufferDesc.byteSize = uint64_t(m_splatCount) * sizeof(GaussianSplatData);
-    splatBufferDesc.structStride = sizeof(GaussianSplatData);
+    splatBufferDesc.byteSize = uint64_t(m_splatCount) * sizeof(caustica::GaussianSplatData);
+    splatBufferDesc.structStride = sizeof(caustica::GaussianSplatData);
     splatBufferDesc.debugName = "GaussianSplatDataBuffer";
     splatBufferDesc.initialState = nvrhi::ResourceStates::ShaderResource;
     splatBufferDesc.keepInitialState = true;
@@ -1064,24 +264,14 @@ bool GaussianSplatPass::LoadFromFile(const std::filesystem::path& fileName, bool
     aabbBufferDesc.keepInitialState = true;
     m_splatAabbBuffer = m_device->createBuffer(aabbBufferDesc);
 
-    m_splatTriangleVertexBuffer = nullptr;
-    m_splatTriangleIndexBuffer = nullptr;
     m_rasterRenderBindingSet = nullptr;
     m_hybridRenderBindingSet = nullptr;
     m_sortKeyBindingSet = nullptr;
-    m_splatBottomLevelAS = nullptr;
-    m_splatTopLevelAS = nullptr;
     m_hybridRenderMeshTopLevelAS = nullptr;
+    m_accelBuilder.release();
     m_sourceFileName = fileName.string();
     m_splatUploadPending = true;
     m_formatUploadPending = true;
-    m_accelStructBuildPending = true;
-    m_lastBlasCompaction = false;
-    m_lastAsUseAABBs = true;
-    m_lastAsUseTLASInstances = false;
-    m_lastAsSplatScale = 1.0f;
-    m_lastAsKernelDegree = 2;
-    m_lastAsAdaptiveClamp = true;
     m_cachedEmissionProxyMaxCount = 0;
     m_cachedEmissionProxySplatScale = 1.0f;
     m_cachedEmissionProxyKernelDegree = 0;
@@ -1089,7 +279,6 @@ bool GaussianSplatPass::LoadFromFile(const std::filesystem::path& fileName, bool
     m_cachedEmissionProxyTintColor = float3(1.0f);
     m_cachedEmissionProxyAlphaCullThreshold = 0.0f;
     m_emissionProxyBuildPending = true;
-    m_shadowPrimitiveCountPerSplat = 1;
     m_randomIndices.clear();
     m_randomIndexUploadPending = true;
     InvalidateSortCache();
@@ -1144,20 +333,20 @@ void GaussianSplatPass::BuildEmissionProxies(
     std::vector<GaussianSplatEmissionProxy> candidates;
     candidates.reserve(m_splats.size());
 
-    for (const GaussianSplatData& splat : m_splats)
+    for (const caustica::GaussianSplatData& splat : m_splats)
     {
         const float opacity = std::max(splat.centerOpacity.w, 0.0f);
         if (opacity <= alphaCullThreshold)
             continue;
 
-        const float3 extent = GaussianAabbExtent(splat, splatScale, kernelDegree, adaptiveClamp);
+        const float3 extent = caustica::render::gaussianAabbExtent(splat, splatScale, kernelDegree, adaptiveClamp);
         const float radius = std::max(1e-4f, std::max(extent.x, std::max(extent.y, extent.z)));
-        const float3 linearSh0 = SrgbToLinear(float3(
+        const float3 linearSh0 = caustica::render::srgbToLinear(float3(
             std::max(splat.color.x, 0.0f),
             std::max(splat.color.y, 0.0f),
             std::max(splat.color.z, 0.0f)) * tintColor);
         const float3 radiance = linearSh0 * opacity;
-        const float weight = std::max(0.0f, Luminance(radiance)) * radius * radius;
+        const float weight = std::max(0.0f, caustica::render::luminance(radiance)) * radius * radius;
         if (weight <= 0.0f)
             continue;
 
@@ -1203,177 +392,21 @@ void GaussianSplatPass::BuildAccelerationStructures(
     if (!HasSplats() || !m_splatAabbBuffer)
         return;
 
-    if (!m_accelStructBuildPending
-        && m_lastBlasCompaction == allowBlasCompaction
-        && m_lastAsUseAABBs == useAABBs
-        && m_lastAsUseTLASInstances == useTLASInstances
-        && std::abs(m_lastAsSplatScale - splatScale) < 1e-4f
-        && m_lastAsKernelDegree == kernelDegree
-        && m_lastAsAdaptiveClamp == adaptiveClamp
-        && m_splatBottomLevelAS
-        && m_splatTopLevelAS)
-    {
-        return;
-    }
-
     UploadSplatDataIfNeeded(commandList);
 
-    nvrhi::rt::GeometryDesc geometryDesc;
-    m_shadowPrimitiveCountPerSplat = useAABBs ? 1u : uint32_t(kUnitIcosahedronIndices.size() / 3u);
-
-    if (useAABBs)
-    {
-        std::vector<nvrhi::rt::GeometryAABB> aabbs;
-        if (useTLASInstances)
-        {
-            aabbs.push_back({ -1.0f, -1.0f, -1.0f, 1.0f, 1.0f, 1.0f });
-        }
-        else
-        {
-            aabbs = BuildGaussianAabbs(m_splats, splatScale, kernelDegree, adaptiveClamp);
-        }
-
-        commandList->writeBuffer(m_splatAabbBuffer, aabbs.data(), aabbs.size() * sizeof(nvrhi::rt::GeometryAABB));
-        commandList->setBufferState(m_splatAabbBuffer, nvrhi::ResourceStates::AccelStructBuildInput);
-        commandList->commitBarriers();
-
-        nvrhi::rt::GeometryAABBs aabbGeometry;
-        aabbGeometry.buffer = m_splatAabbBuffer;
-        aabbGeometry.offset = 0;
-        aabbGeometry.count = uint32_t(aabbs.size());
-        aabbGeometry.stride = sizeof(nvrhi::rt::GeometryAABB);
-        geometryDesc.setAABBs(aabbGeometry);
-        geometryDesc.flags = nvrhi::rt::GeometryFlags::NoDuplicateAnyHitInvocation;
-    }
-    else
-    {
-        std::vector<float3> vertices;
-        std::vector<uint32_t> indices;
-        if (useTLASInstances)
-        {
-            vertices.assign(kUnitIcosahedronVertices.begin(), kUnitIcosahedronVertices.end());
-            indices.assign(kUnitIcosahedronIndices.begin(), kUnitIcosahedronIndices.end());
-        }
-        else
-        {
-            vertices.reserve(size_t(m_splatCount) * kUnitIcosahedronVertices.size());
-            indices.reserve(size_t(m_splatCount) * kUnitIcosahedronIndices.size());
-            for (uint32_t splatIndex = 0; splatIndex < m_splatCount; ++splatIndex)
-            {
-                const GaussianSplatData& splat = m_splats[splatIndex];
-                const float3 center = splat.centerOpacity.xyz();
-                const float3 extent = GaussianAabbExtent(splat, splatScale, kernelDegree, adaptiveClamp);
-                const uint32_t vertexBase = uint32_t(vertices.size());
-                for (const float3& unitVertex : kUnitIcosahedronVertices)
-                    vertices.push_back(center + unitVertex * extent);
-                for (uint32_t index : kUnitIcosahedronIndices)
-                    indices.push_back(vertexBase + index);
-            }
-        }
-
-        nvrhi::BufferDesc vertexDesc;
-        vertexDesc.byteSize = uint64_t(vertices.size()) * sizeof(float3);
-        vertexDesc.structStride = sizeof(float3);
-        vertexDesc.format = nvrhi::Format::RGB32_FLOAT;
-        vertexDesc.isVertexBuffer = true;
-        vertexDesc.isAccelStructBuildInput = true;
-        vertexDesc.initialState = nvrhi::ResourceStates::AccelStructBuildInput;
-        vertexDesc.keepInitialState = true;
-        vertexDesc.debugName = "GaussianSplatIcosahedronVertexBuffer";
-        m_splatTriangleVertexBuffer = m_device->createBuffer(vertexDesc);
-
-        nvrhi::BufferDesc indexDesc;
-        indexDesc.byteSize = uint64_t(indices.size()) * sizeof(uint32_t);
-        indexDesc.format = nvrhi::Format::R32_UINT;
-        indexDesc.isIndexBuffer = true;
-        indexDesc.isAccelStructBuildInput = true;
-        indexDesc.initialState = nvrhi::ResourceStates::AccelStructBuildInput;
-        indexDesc.keepInitialState = true;
-        indexDesc.debugName = "GaussianSplatIcosahedronIndexBuffer";
-        m_splatTriangleIndexBuffer = m_device->createBuffer(indexDesc);
-
-        commandList->writeBuffer(m_splatTriangleVertexBuffer, vertices.data(), vertices.size() * sizeof(float3));
-        commandList->writeBuffer(m_splatTriangleIndexBuffer, indices.data(), indices.size() * sizeof(uint32_t));
-        commandList->setBufferState(m_splatTriangleVertexBuffer, nvrhi::ResourceStates::AccelStructBuildInput);
-        commandList->setBufferState(m_splatTriangleIndexBuffer, nvrhi::ResourceStates::AccelStructBuildInput);
-        commandList->commitBarriers();
-
-        nvrhi::rt::GeometryTriangles triangles;
-        triangles.vertexBuffer = m_splatTriangleVertexBuffer;
-        triangles.indexBuffer = m_splatTriangleIndexBuffer;
-        triangles.vertexFormat = nvrhi::Format::RGB32_FLOAT;
-        triangles.indexFormat = nvrhi::Format::R32_UINT;
-        triangles.vertexStride = sizeof(float3);
-        triangles.vertexCount = uint32_t(vertices.size());
-        triangles.indexCount = uint32_t(indices.size());
-        geometryDesc.setTriangles(triangles);
-        geometryDesc.flags = nvrhi::rt::GeometryFlags::None;
-    }
-
-    nvrhi::rt::AccelStructDesc blasDesc;
-    blasDesc.isTopLevel = false;
-    blasDesc.debugName = useAABBs ? "GaussianSplatAabbBLAS" : "GaussianSplatIcosahedronBLAS";
-    blasDesc.buildFlags = nvrhi::rt::AccelStructBuildFlags::PreferFastTrace
-        | (allowBlasCompaction ? nvrhi::rt::AccelStructBuildFlags::AllowCompaction : nvrhi::rt::AccelStructBuildFlags::AllowUpdate);
-    blasDesc.bottomLevelGeometries.push_back(geometryDesc);
-
-    m_splatBottomLevelAS = m_device->createAccelStruct(blasDesc);
-    nvrhi::utils::BuildBottomLevelAccelStruct(commandList, m_splatBottomLevelAS, blasDesc);
-
-    nvrhi::rt::AccelStructDesc tlasDesc;
-    tlasDesc.isTopLevel = true;
-    tlasDesc.debugName = "GaussianSplatTLAS";
-    tlasDesc.topLevelMaxInstances = useTLASInstances ? m_splatCount : 1;
-    tlasDesc.buildFlags = nvrhi::rt::AccelStructBuildFlags::PreferFastTrace | nvrhi::rt::AccelStructBuildFlags::AllowUpdate;
-    m_splatTopLevelAS = m_device->createAccelStruct(tlasDesc);
-
-    std::vector<nvrhi::rt::InstanceDesc> instances;
-    instances.resize(useTLASInstances ? m_splatCount : 1u);
-    if (useTLASInstances)
-    {
-        for (uint32_t splatIndex = 0; splatIndex < m_splatCount; ++splatIndex)
-        {
-            const GaussianSplatData& splat = m_splats[splatIndex];
-            nvrhi::rt::InstanceDesc& instanceDesc = instances[splatIndex];
-            instanceDesc.bottomLevelAS = m_splatBottomLevelAS;
-            instanceDesc.instanceMask = 0xff;
-            instanceDesc.instanceID = splatIndex;
-            instanceDesc.instanceContributionToHitGroupIndex = 0;
-            instanceDesc.flags = nvrhi::rt::InstanceFlags::ForceNonOpaque;
-            FillScaleTranslateTransform(instanceDesc.transform, splat.centerOpacity.xyz(), GaussianAabbExtent(splat, splatScale, kernelDegree, adaptiveClamp));
-        }
-    }
-    else
-    {
-        nvrhi::rt::InstanceDesc& instanceDesc = instances[0];
-        instanceDesc.bottomLevelAS = m_splatBottomLevelAS;
-        instanceDesc.instanceMask = 0xff;
-        instanceDesc.instanceID = 0;
-        instanceDesc.instanceContributionToHitGroupIndex = 0;
-        instanceDesc.flags = nvrhi::rt::InstanceFlags::ForceNonOpaque;
-        std::memcpy(instanceDesc.transform, nvrhi::rt::c_IdentityTransform, sizeof(nvrhi::rt::AffineTransform));
-    }
-
-    commandList->buildTopLevelAccelStruct(
-        m_splatTopLevelAS,
-        instances.data(),
-        instances.size(),
-        nvrhi::rt::AccelStructBuildFlags::PreferFastTrace | nvrhi::rt::AccelStructBuildFlags::AllowUpdate);
-
-    m_accelStructBuildPending = false;
-    m_lastBlasCompaction = allowBlasCompaction;
-    m_lastAsUseAABBs = useAABBs;
-    m_lastAsUseTLASInstances = useTLASInstances;
-    m_lastAsSplatScale = splatScale;
-    m_lastAsKernelDegree = kernelDegree;
-    m_lastAsAdaptiveClamp = adaptiveClamp;
+    caustica::render::GaussianSplatAccelBuildParams params;
+    params.useAABBs = useAABBs;
+    params.useTLASInstances = useTLASInstances;
+    params.allowBlasCompaction = allowBlasCompaction;
+    params.splatScale = splatScale;
+    params.kernelDegree = kernelDegree;
+    params.adaptiveClamp = adaptiveClamp;
+    m_accelBuilder.build(commandList, params, m_splats, m_splatCount, m_splatAabbBuffer);
 }
 
 void GaussianSplatPass::ReleaseAccelerationStructures()
 {
-    m_splatBottomLevelAS = nullptr;
-    m_splatTopLevelAS = nullptr;
-    m_accelStructBuildPending = HasSplats();
+    m_accelBuilder.release(HasSplats());
 }
 
 void GaussianSplatPass::CreateBindingSets(const RenderTargets& renderTargets, nvrhi::rt::IAccelStruct* meshTopLevelAS)
@@ -1602,7 +635,7 @@ void GaussianSplatPass::UploadSplatDataIfNeeded(nvrhi::ICommandList* commandList
     if (!m_splatUploadPending || m_splats.empty())
         return;
 
-    commandList->writeBuffer(m_splatBuffer, m_splats.data(), m_splats.size() * sizeof(GaussianSplatData));
+    commandList->writeBuffer(m_splatBuffer, m_splats.data(), m_splats.size() * sizeof(caustica::GaussianSplatData));
     m_splatUploadPending = false;
 }
 

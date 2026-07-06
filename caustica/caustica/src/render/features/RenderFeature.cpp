@@ -49,7 +49,9 @@ namespace
         { "Rtxdi", registerRtxdiExecuteFeature },
         { "DenoiserPrepare", registerDenoiserPrepareFeature },
         { "NRD", registerNrdFeature },
+        { "GaussianSplatPreAA", registerGaussianSplatPreAAFeature },
         { "DenoiseAA", registerDenoiseAAFeature },
+        { "GaussianSplatComposite", registerGaussianSplatCompositeFeature },
         { "PostProcess", registerPostProcessFeature },
         { "Composite", registerCompositeFeature },
     };

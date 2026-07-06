@@ -3,7 +3,10 @@
 #include <math/math.h>
 #include <rhi/nvrhi.h>
 
+#include "GaussianSplatAccelBuilder.h"
 #include "GaussianSplatEmissionProxy.h"
+
+#include <scene/GaussianSplatData.h>
 
 #include <filesystem>
 #include <memory>
@@ -128,10 +131,10 @@ public:
     [[nodiscard]] bool HasSplats() const { return m_splatCount > 0; }
     [[nodiscard]] uint32_t GetSplatCount() const { return m_splatCount; }
     [[nodiscard]] const std::string& GetSourceFileName() const { return m_sourceFileName; }
-    [[nodiscard]] nvrhi::rt::IAccelStruct* GetTopLevelAS() const { return m_splatTopLevelAS.Get(); }
+    [[nodiscard]] nvrhi::rt::IAccelStruct* GetTopLevelAS() const { return m_accelBuilder.getTopLevelAS(); }
     [[nodiscard]] nvrhi::IBuffer* GetSplatBuffer() const { return m_splatBuffer.Get(); }
-    [[nodiscard]] uint32_t GetShadowPrimitiveCountPerSplat() const { return m_shadowPrimitiveCountPerSplat; }
-    [[nodiscard]] bool GetShadowUsesTLASInstances() const { return m_lastAsUseTLASInstances; }
+    [[nodiscard]] uint32_t GetShadowPrimitiveCountPerSplat() const { return m_accelBuilder.getShadowPrimitiveCountPerSplat(); }
+    [[nodiscard]] bool GetShadowUsesTLASInstances() const { return m_accelBuilder.getShadowUsesTLASInstances(); }
     [[nodiscard]] const std::vector<GaussianSplatEmissionProxy>& GetEmissionProxies() const { return m_emissionProxies; }
 
 private:
@@ -158,8 +161,6 @@ private:
     nvrhi::BufferHandle m_sortControlBuffer;
     nvrhi::BufferHandle m_drawIndirectBuffer;
     nvrhi::BufferHandle m_splatAabbBuffer;
-    nvrhi::BufferHandle m_splatTriangleVertexBuffer;
-    nvrhi::BufferHandle m_splatTriangleIndexBuffer;
     nvrhi::TextureHandle m_stochasticDepthBuffer;
     nvrhi::TextureHandle m_stochasticProcessedDepthBuffer;
 
@@ -182,13 +183,12 @@ private:
     nvrhi::GraphicsPipelineHandle m_stochasticProcessedRasterRenderPipeline;
     nvrhi::GraphicsPipelineHandle m_stochasticProcessedHybridRenderPipeline;
     nvrhi::ComputePipelineHandle m_sortKeyPipeline;
-    nvrhi::rt::AccelStructHandle m_splatBottomLevelAS;
-    nvrhi::rt::AccelStructHandle m_splatTopLevelAS;
+    caustica::render::GaussianSplatAccelBuilder m_accelBuilder;
     nvrhi::rt::IAccelStruct* m_hybridRenderMeshTopLevelAS = nullptr;
     std::shared_ptr<caustica::FramebufferFactory> m_stochasticFramebuffer;
     std::shared_ptr<caustica::FramebufferFactory> m_stochasticProcessedFramebuffer;
 
-    std::vector<GaussianSplatData> m_splats;
+    std::vector<caustica::GaussianSplatData> m_splats;
     std::vector<caustica::math::float4> m_colorOpacity;
     std::vector<caustica::math::float4> m_shCoefficients;
     std::vector<GaussianSplatEmissionProxy> m_emissionProxies;
@@ -198,14 +198,7 @@ private:
     uint32_t m_shDegree = 0;
     bool m_splatUploadPending = false;
     bool m_formatUploadPending = true;
-    bool m_accelStructBuildPending = false;
     bool m_randomIndexUploadPending = true;
-    bool m_lastBlasCompaction = false;
-    bool m_lastAsUseAABBs = true;
-    bool m_lastAsUseTLASInstances = false;
-    float m_lastAsSplatScale = 1.0f;
-    uint32_t m_lastAsKernelDegree = 2;
-    bool m_lastAsAdaptiveClamp = true;
     uint32_t m_cachedEmissionProxyMaxCount = 0;
     float m_cachedEmissionProxySplatScale = 1.0f;
     uint32_t m_cachedEmissionProxyKernelDegree = 0;
@@ -213,7 +206,6 @@ private:
     caustica::math::float3 m_cachedEmissionProxyTintColor = caustica::math::float3(1.0f);
     float m_cachedEmissionProxyAlphaCullThreshold = 0.0f;
     bool m_emissionProxyBuildPending = true;
-    uint32_t m_shadowPrimitiveCountPerSplat = 1;
     bool m_sortCacheValid = false;
     uint32_t m_cachedSortSplatCount = 0;
     GaussianSplatSortMode m_cachedSortMode = GaussianSplatSortMode::GpuSort;

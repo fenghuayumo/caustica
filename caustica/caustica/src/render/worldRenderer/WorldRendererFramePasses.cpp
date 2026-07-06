@@ -23,7 +23,8 @@ namespace { constexpr int c_SwapchainCount = 3; }
 #include <render/passes/lighting/MaterialGpuCache.h>
 #include <render/passes/lighting/distant/EnvMapImportanceSamplingCache.h>
 #include <render/passes/omm/OpacityMicromapBuilder.h>
-#include <render/passes/gaussian/GaussianSplatPass.h>
+#include <render/passes/gaussian/GaussianSplatGraph.h>
+#include <render/passes/gaussian/GaussianSplatSceneRuntime.h>
 #include <render/passes/debug/ShaderDebug.h>
 #include <render/core/FramebufferFactory.h>
 #include <assets/loader/ShaderFactory.h>
@@ -45,23 +46,6 @@ using namespace caustica::render;
 namespace
 {
     constexpr float c_envMapRadianceScale = 1.0f / 4.0f;
-    constexpr float kGaussianSplatKernelMinResponse = 0.0113f;
-
-    uint32_t ResolveGaussianSplatShadowMode(const PathTracerSettings& settings)
-    {
-        if (!settings.GaussianSplatShadows && settings.GaussianSplatShadowsMode == GAUSSIAN_SPLAT_SHADOWS_DISABLED)
-            return GAUSSIAN_SPLAT_SHADOWS_DISABLED;
-
-        const int requestedMode = settings.GaussianSplatShadowsMode == GAUSSIAN_SPLAT_SHADOWS_DISABLED
-            ? GAUSSIAN_SPLAT_SHADOWS_HARD
-            : settings.GaussianSplatShadowsMode;
-        return uint32_t(std::clamp(requestedMode, GAUSSIAN_SPLAT_SHADOWS_HARD, GAUSSIAN_SPLAT_SHADOWS_SOFT));
-    }
-
-    uint32_t ClampGaussianSplatSoftShadowSamples(int sampleCount)
-    {
-        return uint32_t(std::clamp(sampleCount, 1, 16));
-    }
 
     void abortIfSubmitFailed(PathTracingFrameContext& ctx, const char* stage)
     {
@@ -516,36 +500,11 @@ void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext
 
     updatePathTracerConstants(constants.ptConsts, ctx.cameraData);
     constants.MaterialCount = m_context.scenePasses.lighting.materials()->getMaterialDataCount();
-    const uint32_t gaussianSplatShadowMode = ResolveGaussianSplatShadowMode(m_context.settings);
-    const GaussianSplatBinding primaryGaussianBinding = m_context.scenePasses.gaussianSplats.getPrimaryBinding();
-    GaussianSplatPass* primaryGaussianSplatPass = const_cast<GaussianSplatPass*>(primaryGaussianBinding.splatPass);
-    constants.GaussianSplatShadowCount = (m_context.settings.EnableGaussianSplats
-            && gaussianSplatShadowMode != GAUSSIAN_SPLAT_SHADOWS_DISABLED
-            && primaryGaussianSplatPass != nullptr
-            && primaryGaussianSplatPass->GetTopLevelAS() != nullptr)
-        ? primaryGaussianSplatPass->GetSplatCount()
-        : 0;
-    constants.GaussianSplatShadowsEnabled = constants.GaussianSplatShadowCount > 0 ? 1u : 0u;
-    constants.GaussianSplatShadowScale = m_context.settings.GaussianSplatScale;
-    constants.GaussianSplatShadowAlphaThreshold = m_context.settings.GaussianSplatAlphaCullThreshold;
-    constants.GaussianSplatShadowUseTLASInstances =
-        (primaryGaussianSplatPass != nullptr && primaryGaussianSplatPass->GetShadowUsesTLASInstances()) ? 1u : 0u;
-    constants.GaussianSplatShadowPrimitiveCountPerSplat =
-        primaryGaussianSplatPass != nullptr ? primaryGaussianSplatPass->GetShadowPrimitiveCountPerSplat() : 1u;
-    constants.GaussianSplatShadowMode = constants.GaussianSplatShadowsEnabled != 0
-        ? gaussianSplatShadowMode
-        : GAUSSIAN_SPLAT_SHADOWS_DISABLED;
-    constants.GaussianSplatShadowSoftRadius = m_context.settings.GaussianSplatShadowSoftRadius;
-    constants.GaussianSplatShadowSoftSampleCount = ClampGaussianSplatSoftShadowSamples(m_context.settings.GaussianSplatShadowSoftSampleCount);
-    constants.GaussianSplatShadowFrameIndex = uint32_t(m_frameIndex & 0xffffffffu);
-    constants.GaussianSplatShadowRayOffset = m_context.settings.GaussianSplatRtxParticleShadowOffset;
-    constants.GaussianSplatShadowAlphaScale = m_context.settings.GaussianSplatAlphaScale;
-    constants.GaussianSplatShadowKernelMinResponse = kGaussianSplatKernelMinResponse;
-    constants.GaussianSplatShadowKernelDegree = uint32_t(std::clamp(m_context.settings.GaussianSplatRtxKernelDegree, 0, 5));
-    constants.GaussianSplatShadowAdaptiveClamp = m_context.settings.GaussianSplatRtxAdaptiveClamp ? 1u : 0u;
-    constants.GaussianSplatShadowWorldToObject = primaryGaussianBinding.splatPass != nullptr
-        ? inverse(primaryGaussianBinding.objectToWorld)
-        : float4x4::identity();
+    fillGaussianSplatShadowConstants(
+        constants,
+        m_context.settings,
+        getPrimaryGaussianSplatBinding(m_context.scenePasses.gaussianSplats),
+        uint32_t(m_frameIndex & 0xffffffffu));
 
     constants.envMapSceneParams = m_context.scenePasses.lighting.envMapSceneParams();
     constants.envMapImportanceSamplingParams = m_context.scenePasses.lighting.environment()->GetImportanceSampling()->GetShaderParams();

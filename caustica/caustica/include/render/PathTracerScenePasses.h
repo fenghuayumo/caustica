@@ -4,6 +4,7 @@
 #include <render/SceneLightingPasses.h>
 #include <render/SceneRayTracingResources.h>
 
+#include <functional>
 #include <memory>
 
 namespace caustica
@@ -20,6 +21,8 @@ class RenderDevice;
 } // namespace caustica
 
 class SceneManager;
+class RenderTargets;
+class ShaderDebug;
 
 namespace caustica::render
 {
@@ -46,6 +49,9 @@ struct ScenePassWireParams
     caustica::BindingCache& bindingCache;
     std::shared_ptr<caustica::ShaderFactory>& shaderFactory;
     caustica::render::RenderDevice& renderDevice;
+    std::function<void()> onGaussianSplatTemporalReset;
+    std::function<RenderTargets*()> getRenderTargets;
+    std::function<std::shared_ptr<ShaderDebug>()> getShaderDebug;
 };
 
 // Scene-scoped render pass bundles owned by GpuRenderSubsystem (not Application hosts).

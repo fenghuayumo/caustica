@@ -3,7 +3,6 @@
 #include <ecs/Entity.h>
 #include <render/core/PathTracerSettings.h>
 #include <render/passes/gaussian/GaussianSplatPass.h>
-#include <render/passes/gaussian/GaussianSplatEmissionProxy.h>
 #include <render/RenderRuntimeState.h>
 
 #include <filesystem>
@@ -13,36 +12,24 @@
 #include <vector>
 
 class RenderTargets;
-struct GaussianSplatRenderSettings;
+class ShaderDebug;
 
 namespace caustica
 {
-class AccelStructManager;
 class GaussianSplat;
 class GpuDevice;
 class ShaderFactory;
 namespace render { class RenderDevice; }
 } // namespace caustica
 
-namespace caustica::render
-{
-class WorldRenderer;
-struct ScenePassWireParams;
-}
-
 class SceneManager;
 struct CommandLineOptions;
 
 namespace caustica::render
 {
+struct ScenePassWireParams;
 
-struct GaussianSplatBinding
-{
-    const GaussianSplatPass* splatPass = nullptr;
-    dm::float4x4             objectToWorld = dm::float4x4::identity();
-};
-
-// Per-scene Gaussian splat passes, emission proxies, and WorldRenderer hooks.
+// Per-scene Gaussian splat asset ownership and ECS wiring.
 class SceneGaussianSplatPasses
 {
     friend struct PathTracerScenePasses;
@@ -62,20 +49,9 @@ public:
     bool loadFromFile(const std::filesystem::path& fileName, bool convertRdfToRub = true);
     bool removeObjectsUnderEntity(ecs::Entity rootEntity);
 
-    void preparePasses();
-    void buildEmissionProxyList();
-    bool isEmissionEnabled() const;
-    bool objectsEmpty() const;
-    caustica::render::GaussianSplatBinding getPrimaryBinding() const;
-    void renderSceneGaussianSplats(nvrhi::ICommandList* commandList,
-        const caustica::PlanarView& splatView,
-        RenderTargets& renderTargets,
-        const GaussianSplatRenderSettings& settings,
-        bool& renderedAny);
-    void buildAccelStructs(nvrhi::ICommandList* commandList);
-
-    std::vector<GaussianSplatEmissionProxy>& emissionProxies() { return m_emissionProxies; }
-    const std::vector<GaussianSplatEmissionProxy>& emissionProxies() const { return m_emissionProxies; }
+    [[nodiscard]] const std::vector<SceneObject>& objects() const { return m_objects; }
+    [[nodiscard]] std::vector<SceneObject>& objects() { return m_objects; }
+    [[nodiscard]] bool objectsEmpty() const { return m_objects.empty(); }
 
     uint32_t splatCount() const;
     uint32_t objectCount() const;
@@ -85,27 +61,24 @@ private:
     void wireSession(const ScenePassWireParams& params);
 
     std::filesystem::path resolveSplatPath(const caustica::GaussianSplat& splat) const;
-    void preparePass(GaussianSplatPass& pass);
     void loadFromSceneEntities();
     bool attachToScene(const std::filesystem::path& fileName, bool convertRdfToRub);
     void updateUIState();
+    void onPassLoaded(GaussianSplatPass& pass);
     uint32_t totalSplatCount() const;
-    SceneObject* primaryObject();
-    const SceneObject* primaryObject() const;
-    dm::float4x4 objectToWorld(const SceneObject& object) const;
 
     caustica::GpuDevice* m_gpuDevice = nullptr;
     SceneManager* m_sceneManager = nullptr;
-    caustica::AccelStructManager* m_accelStructs = nullptr;
-    caustica::render::WorldRenderer* m_worldRenderer = nullptr;
     PathTracerSettings* m_settings = nullptr;
     caustica::render::GaussianSplatSceneSummary* m_summary = nullptr;
     std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
     caustica::render::RenderDevice* m_renderDevice = nullptr;
 
-    std::shared_ptr<GPUSort> m_gpuSort;
+    std::function<void()> m_onTemporalReset;
+    std::function<RenderTargets*()> m_getRenderTargets;
+    std::function<std::shared_ptr<ShaderDebug>()> m_getShaderDebug;
+
     std::vector<SceneObject> m_objects;
-    std::vector<GaussianSplatEmissionProxy> m_emissionProxies;
     std::string m_fileNameSummary;
     bool m_initialCmdLineSplatAttached = false;
     std::function<void()> m_onRequestFullRebuild;

@@ -16,7 +16,9 @@ void registerRtxdiExecuteFeature(RenderFeatureContext ctx);
 void registerDenoiserPrepareFeature(RenderFeatureContext ctx);
 
 void registerNrdFeature(RenderFeatureContext ctx);
+void registerGaussianSplatPreAAFeature(RenderFeatureContext ctx);
 void registerDenoiseAAFeature(RenderFeatureContext ctx);
+void registerGaussianSplatCompositeFeature(RenderFeatureContext ctx);
 void registerPostProcessFeature(RenderFeatureContext ctx);
 void registerCompositeFeature(RenderFeatureContext ctx);
 

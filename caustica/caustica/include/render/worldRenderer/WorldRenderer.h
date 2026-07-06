@@ -53,6 +53,7 @@ namespace render
 class TemporalAntiAliasingPass;
 class BloomPass;
 class DLSS;
+class GPUSort;
 class RenderGraphRegistry;
 class PathTracingPipelinePlugin;
 struct ExtractedFrameView;
@@ -86,7 +87,16 @@ public:
     void denoise(nvrhi::ICommandList* commandList, nvrhi::IFramebuffer* framebuffer);
     void runDlssUpscale(nvrhi::ICommandList* commandList, bool reset);
     void runNoDenoiserFinalMerge(nvrhi::ICommandList* commandList);
-    void renderGaussianSplats(nvrhi::ICommandList* commandList, bool renderToOutputColor);
+    [[nodiscard]] bool hasActiveGaussianSplats() const;
+    void prepareGaussianSplatPasses();
+    void buildGaussianSplatEmissionProxies();
+    void executeGaussianSplatAccelBuild(nvrhi::ICommandList* commandList);
+    void executeGaussianSplatRender(nvrhi::ICommandList* commandList, bool renderToOutputColor);
+    void executeGaussianSplatAccumulate(nvrhi::ICommandList* commandList);
+    [[nodiscard]] const std::vector<GaussianSplatEmissionProxy>& gaussianSplatEmissionProxies() const
+    {
+        return m_gaussianSplatEmissionProxies;
+    }
     void postProcessAA(nvrhi::IFramebuffer* framebuffer, bool reset);
     void recreateBindingSet();
     void onSceneUnloading();
@@ -196,9 +206,6 @@ private:
     void updatePathTracerConstants(PathTracerConstants& constants, const PathTracerCameraData& cameraData);
     void rtxdiSetupFrame(nvrhi::IFramebuffer* framebuffer, PathTracerCameraData cameraData, dm::uint2 renderDims);
 
-    void renderGaussianSplats(bool renderToOutputColor);
-    void accumulateGaussianSplats(const IView& splatView);
-
     void resetReferenceOIDN();
     void applyReferenceOIDN();
 #if CAUSTICA_WITH_NATIVE_DLSS
@@ -270,8 +277,11 @@ private:
     nvrhi::TextureHandle                        m_gaussianSplatCurrentColor;
     nvrhi::TextureHandle                        m_gaussianSplatAccumulatedColor;
     std::unique_ptr<AccumulationPass>           m_gaussianSplatAccumulationPass;
+    std::shared_ptr<GPUSort>                    m_gaussianSplatGpuSort;
+    std::vector<GaussianSplatEmissionProxy>     m_gaussianSplatEmissionProxies;
     int                                         m_gaussianSplatTemporalSampleIndex = 0;
     bool                                        m_gaussianSplatTemporalReset = true;
+    bool                                        m_gaussianSplatCompositeRendered = false;
 
     nvrhi::BufferHandle                         m_feedback_Buffer_Gpu;
     nvrhi::BufferHandle                         m_feedback_Buffer_Cpu;

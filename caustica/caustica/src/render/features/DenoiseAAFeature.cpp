@@ -45,23 +45,6 @@ namespace
             && settings.RealtimeAA != 3;
     }
 
-    bool needsStochasticGaussianSplatsBeforeAA(const PathTracerSettings& settings)
-    {
-        const bool stochasticSplats = settings.EnableGaussianSplats && settings.GaussianSplatSortingMode == 1;
-        return stochasticSplats && settings.RealtimeMode && settings.RealtimeAA == 1;
-    }
-
-    bool needsGaussianSplatsCompositePass(const PathTracerSettings& settings)
-    {
-        if (!settings.EnableGaussianSplats)
-            return false;
-
-        const bool stochasticSplats = settings.GaussianSplatSortingMode == 1;
-        const bool stochasticUsesMainTemporal = stochasticSplats
-            && (!settings.RealtimeMode || settings.RealtimeAA == 1);
-        return !stochasticUsesMainTemporal;
-    }
-
     TemporalAntiAliasingParameters makeTemporalAAParameters(const RenderFeatureContext& ctx)
     {
         TemporalAntiAliasingParameters taaParams = ctx.settings->TemporalAntiAliasingParams;
@@ -188,25 +171,6 @@ void registerDenoiseAAFeature(RenderFeatureContext ctx)
             });
     }
 
-    if (needsStochasticGaussianSplatsBeforeAA(*ctx.settings))
-    {
-        const rg::TextureHandle depth = ctx.graph->importTexture(
-            targets.depth,
-            rg::TextureAccess::ShaderResource);
-
-        ctx.graph->addPass(
-            "Gaussian Splats Stochastic",
-            [&](rg::PassBuilder& setup) {
-                setup.read(outputColor, rg::TextureAccess::UnorderedAccess);
-                setup.read(depth, rg::TextureAccess::ShaderResource);
-                setup.write(outputColor, rg::TextureAccess::UnorderedAccess);
-            },
-            [ctx](rg::RenderPassContext& passCtx) {
-                ctx.renderer->renderGaussianSplats(passCtx.commandList(), true);
-            },
-            rg::PassOptions{ .sideEffect = true });
-    }
-
     if (needsTemporalAAPass(*ctx.settings, temporalAAPass))
     {
         const auto taaParams = makeTemporalAAParameters(ctx);
@@ -307,25 +271,6 @@ void registerDenoiseAAFeature(RenderFeatureContext ctx)
                     view,
                     accumulationWeight);
             });
-    }
-
-    if (needsGaussianSplatsCompositePass(*ctx.settings))
-    {
-        const rg::TextureHandle depth = ctx.graph->importTexture(
-            targets.depth,
-            rg::TextureAccess::ShaderResource);
-
-        ctx.graph->addPass(
-            "Gaussian Splats",
-            [&](rg::PassBuilder& setup) {
-                setup.read(processedOutputColor, rg::TextureAccess::UnorderedAccess);
-                setup.read(depth, rg::TextureAccess::ShaderResource);
-                setup.write(processedOutputColor, rg::TextureAccess::UnorderedAccess);
-            },
-            [ctx](rg::RenderPassContext& passCtx) {
-                ctx.renderer->renderGaussianSplats(passCtx.commandList(), false);
-            },
-            rg::PassOptions{ .sideEffect = true });
     }
 }
 

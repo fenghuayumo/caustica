@@ -1,5 +1,6 @@
 #include <render/PathTracerScenePasses.h>
 
+#include <render/worldRenderer/WorldRenderer.h>
 #include <rhi/nvrhi.h>
 
 namespace caustica::render
@@ -13,9 +14,10 @@ void PathTracerScenePasses::wireSession(const ScenePassWireParams& params)
     gaussianSplats.setOnRequestFullRebuild(
         [this]() { rayTracing.requestFullRebuild(); });
 
+    WorldRenderer& worldRenderer = params.worldRenderer;
     rayTracing.setAdditionalAccelStructBuilder(
-        [this](nvrhi::ICommandList* commandList) {
-            gaussianSplats.buildAccelStructs(commandList);
+        [&worldRenderer](nvrhi::ICommandList* commandList) {
+            worldRenderer.executeGaussianSplatAccelBuild(commandList);
         });
 }
 

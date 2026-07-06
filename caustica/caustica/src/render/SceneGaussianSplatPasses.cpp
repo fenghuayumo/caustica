@@ -1,22 +1,18 @@
 #include <render/SceneGaussianSplatPasses.h>
 
 #include <render/core/RenderDevice.h>
-
 #include <render/PathTracerScenePasses.h>
-#include <render/worldRenderer/WorldRenderer.h>
-#include <render/passes/gaussian/GaussianSplatPass.h>
-#include <render/gpuSort/GPUSort.h>
+#include <render/core/RenderTargets.h>
 
 #include <backend/GpuDevice.h>
 #include <core/command_line.h>
 #include <core/log.h>
-#include <render/core/AccelStructManager.h>
+#include <render/core/RenderTargets.h>
 #include <scene/SceneEcs.h>
 #include <scene/SceneManager.h>
 #include <scene/Scene.h>
 
 #include <algorithm>
-#include <cmath>
 #include <limits>
 #include <unordered_set>
 
@@ -25,22 +21,6 @@ namespace caustica::render
 
 namespace
 {
-    uint32_t ResolveGaussianSplatShadowMode(const PathTracerSettings& settings)
-    {
-        if (!settings.GaussianSplatShadows && settings.GaussianSplatShadowsMode == GAUSSIAN_SPLAT_SHADOWS_DISABLED)
-            return GAUSSIAN_SPLAT_SHADOWS_DISABLED;
-
-        const int requestedMode = settings.GaussianSplatShadowsMode == GAUSSIAN_SPLAT_SHADOWS_DISABLED
-            ? GAUSSIAN_SPLAT_SHADOWS_HARD
-            : settings.GaussianSplatShadowsMode;
-        return uint32_t(std::clamp(requestedMode, GAUSSIAN_SPLAT_SHADOWS_HARD, GAUSSIAN_SPLAT_SHADOWS_SOFT));
-    }
-
-    uint32_t ClampGaussianSplatEmissionProxyCount(int proxyCount)
-    {
-        return uint32_t(std::clamp(proxyCount, 0, 262144));
-    }
-
     std::string MakeUniqueChildEntityName(const scene::SceneEntityWorld& entityWorld,
         ecs::Entity parent,
         const std::string& desiredName)
@@ -67,12 +47,13 @@ void SceneGaussianSplatPasses::wireSession(const ScenePassWireParams& params)
 {
     m_gpuDevice = &params.gpuDevice;
     m_sceneManager = &params.sceneManager;
-    m_accelStructs = &params.accelStructs;
-    m_worldRenderer = &params.worldRenderer;
     m_settings = &params.settings;
     m_summary = &params.gaussianSplatsSummary;
     m_shaderFactory = params.shaderFactory;
     m_renderDevice = &params.renderDevice;
+    m_onTemporalReset = params.onGaussianSplatTemporalReset;
+    m_getRenderTargets = params.getRenderTargets;
+    m_getShaderDebug = params.getShaderDebug;
 }
 
 void SceneGaussianSplatPasses::setOnRequestFullRebuild(std::function<void()> callback)
@@ -83,9 +64,6 @@ void SceneGaussianSplatPasses::setOnRequestFullRebuild(std::function<void()> cal
 void SceneGaussianSplatPasses::sceneUnloading()
 {
     m_objects.clear();
-    m_emissionProxies.clear();
-    m_gpuSort = nullptr;
-    updateUIState();
 }
 
 void SceneGaussianSplatPasses::onSceneLoaded(const CommandLineOptions& cmdLine)
@@ -132,8 +110,8 @@ bool SceneGaussianSplatPasses::removeObjectsUnderEntity(ecs::Entity rootEntity)
     if (removedGaussianSplat)
     {
         updateUIState();
-        m_emissionProxies.clear();
-        m_worldRenderer->setGaussianSplatTemporalReset(true);
+        if (m_onTemporalReset)
+            m_onTemporalReset();
     }
 
     return removedGaussianSplat;
@@ -155,18 +133,13 @@ std::filesystem::path SceneGaussianSplatPasses::resolveSplatPath(const caustica:
     return std::filesystem::absolute(splatPath);
 }
 
-void SceneGaussianSplatPasses::preparePass(GaussianSplatPass& pass)
+void SceneGaussianSplatPasses::onPassLoaded(GaussianSplatPass& pass)
 {
-    auto* renderTargets = m_worldRenderer->getRenderTargets();
-    auto shaderDebug = m_worldRenderer->getShaderDebug();
-    if (renderTargets == nullptr || shaderDebug == nullptr)
+    if (!m_getRenderTargets)
         return;
 
-    if (m_gpuSort == nullptr)
-        m_gpuSort = std::make_shared<GPUSort>(m_gpuDevice->GetDevice(), m_shaderFactory);
-    m_gpuSort->CreateRenderPasses(shaderDebug);
-    pass.SetGpuSort(m_gpuSort);
-    pass.CreatePipeline(*renderTargets);
+    if (RenderTargets* renderTargets = m_getRenderTargets())
+        pass.CreatePipeline(*renderTargets);
 }
 
 uint32_t SceneGaussianSplatPasses::totalSplatCount() const
@@ -196,7 +169,6 @@ void SceneGaussianSplatPasses::updateUIState()
 void SceneGaussianSplatPasses::loadFromSceneEntities()
 {
     m_objects.clear();
-    m_emissionProxies.clear();
 
     if (!m_sceneManager->getScene() || !m_sceneManager->getScene()->GetEntityWorld() || !m_shaderFactory)
     {
@@ -228,7 +200,7 @@ void SceneGaussianSplatPasses::loadFromSceneEntities()
             {
                 splat->resolvedPath = splatPath.string();
                 splat->loadedSplatCount = pass->GetSplatCount();
-                preparePass(*pass);
+                onPassLoaded(*pass);
 
                 SceneObject object;
                 object.splat = splat;
@@ -244,7 +216,8 @@ void SceneGaussianSplatPasses::loadFromSceneEntities()
         });
 
     updateUIState();
-    m_worldRenderer->setGaussianSplatTemporalReset(true);
+    if (m_onTemporalReset)
+        m_onTemporalReset();
 }
 
 bool SceneGaussianSplatPasses::attachToScene(const std::filesystem::path& fileName, bool convertRdfToRub)
@@ -311,7 +284,7 @@ bool SceneGaussianSplatPasses::attachToScene(const std::filesystem::path& fileNa
     entityWorld->setGaussianSplat(entity, splat);
     scene->extractAndPublishRenderSnapshot(m_gpuDevice->GetFrameIndex());
 
-    preparePass(*pass);
+    onPassLoaded(*pass);
 
     SceneObject object;
     object.splat = splat;
@@ -321,7 +294,8 @@ bool SceneGaussianSplatPasses::attachToScene(const std::filesystem::path& fileNa
 
     m_settings->EnableGaussianSplats = true;
     updateUIState();
-    m_worldRenderer->setGaussianSplatTemporalReset(true);
+    if (m_onTemporalReset)
+        m_onTemporalReset();
     if (m_onRequestFullRebuild)
         m_onRequestFullRebuild();
     return true;
@@ -335,151 +309,6 @@ uint32_t SceneGaussianSplatPasses::splatCount() const
 uint32_t SceneGaussianSplatPasses::objectCount() const
 {
     return uint32_t(m_objects.size());
-}
-
-SceneGaussianSplatPasses::SceneObject* SceneGaussianSplatPasses::primaryObject()
-{
-    for (auto& object : m_objects)
-    {
-        if (object.splat != nullptr && object.splat->enabled && object.pass != nullptr && object.pass->HasSplats())
-            return &object;
-    }
-    return nullptr;
-}
-
-const SceneGaussianSplatPasses::SceneObject* SceneGaussianSplatPasses::primaryObject() const
-{
-    for (const auto& object : m_objects)
-    {
-        if (object.splat != nullptr && object.splat->enabled && object.pass != nullptr && object.pass->HasSplats())
-            return &object;
-    }
-    return nullptr;
-}
-
-dm::float4x4 SceneGaussianSplatPasses::objectToWorld(const SceneObject& object) const
-{
-    if (!object.splat)
-        return dm::float4x4::identity();
-
-    return dm::affineToHomogeneous(dm::affine3(object.splat->cachedGlobalTransform));
-}
-
-void SceneGaussianSplatPasses::preparePasses()
-{
-    for (auto& object : m_objects)
-    {
-        if (object.pass != nullptr && object.pass->HasSplats())
-            preparePass(*object.pass);
-    }
-}
-
-void SceneGaussianSplatPasses::buildEmissionProxyList()
-{
-    m_emissionProxies.clear();
-
-    if (!isEmissionEnabled())
-        return;
-
-    const uint32_t maxProxyCount = ClampGaussianSplatEmissionProxyCount(m_settings->GaussianSplatEmissionMaxProxyCount);
-    for (auto& object : m_objects)
-    {
-        if (object.splat == nullptr || !object.splat->enabled || object.pass == nullptr || !object.pass->HasSplats())
-            continue;
-
-        const uint32_t remainingProxyCount = maxProxyCount > m_emissionProxies.size()
-            ? maxProxyCount - uint32_t(m_emissionProxies.size())
-            : 0u;
-        if (remainingProxyCount == 0)
-            break;
-
-        object.pass->BuildEmissionProxies(
-            remainingProxyCount,
-            m_settings->GaussianSplatScale,
-            uint32_t(std::clamp(m_settings->GaussianSplatRtxKernelDegree, 0, 5)),
-            m_settings->GaussianSplatRtxAdaptiveClamp,
-            m_settings->GaussianSplatTintColor,
-            m_settings->GaussianSplatAlphaCullThreshold);
-
-        const dm::affine3 objectToWorldTransform = dm::affine3(object.splat->cachedGlobalTransform);
-
-        const float radiusScale = std::max({
-            length(objectToWorldTransform.transformVector(float3(1.0f, 0.0f, 0.0f))),
-            length(objectToWorldTransform.transformVector(float3(0.0f, 1.0f, 0.0f))),
-            length(objectToWorldTransform.transformVector(float3(0.0f, 0.0f, 1.0f))) });
-
-        const auto& proxies = object.pass->GetEmissionProxies();
-        m_emissionProxies.reserve(m_emissionProxies.size() + proxies.size());
-        for (const GaussianSplatEmissionProxy& proxy : proxies)
-        {
-            GaussianSplatEmissionProxy transformed = proxy;
-            transformed.center = objectToWorldTransform.transformPoint(proxy.center);
-            transformed.radius = proxy.radius * radiusScale;
-            m_emissionProxies.push_back(transformed);
-        }
-    }
-}
-
-bool SceneGaussianSplatPasses::isEmissionEnabled() const
-{
-    return m_settings->EnableGaussianSplats
-        && m_settings->GaussianSplatAsEmitter
-        && m_settings->GaussianSplatEmissionIntensity > 0.0f
-        && m_settings->GaussianSplatEmissionMaxProxyCount > 0;
-}
-
-bool SceneGaussianSplatPasses::objectsEmpty() const
-{
-    return m_objects.empty();
-}
-
-caustica::render::GaussianSplatBinding SceneGaussianSplatPasses::getPrimaryBinding() const
-{
-    caustica::render::GaussianSplatBinding binding;
-    if (const auto* object = primaryObject())
-    {
-        binding.splatPass = object->pass.get();
-        binding.objectToWorld = objectToWorld(*object);
-    }
-    return binding;
-}
-
-void SceneGaussianSplatPasses::renderSceneGaussianSplats(nvrhi::ICommandList* commandList,
-    const caustica::PlanarView& splatView,
-    RenderTargets& renderTargets,
-    const GaussianSplatRenderSettings& settings,
-    bool& renderedAny)
-{
-    for (auto& object : m_objects)
-    {
-        if (object.splat == nullptr || !object.splat->enabled || object.pass == nullptr || !object.pass->HasSplats())
-            continue;
-        GaussianSplatRenderSettings objectSettings = settings;
-        objectSettings.objectToWorld = objectToWorld(object);
-        object.pass->Render(commandList, splatView, m_accelStructs->getTopLevelAS().Get(), renderTargets, objectSettings);
-        renderedAny = true;
-    }
-}
-
-void SceneGaussianSplatPasses::buildAccelStructs(nvrhi::ICommandList* commandList)
-{
-    for (auto& object : m_objects)
-    {
-        if (object.splat == nullptr || !object.splat->enabled || object.pass == nullptr || !object.pass->HasSplats())
-            continue;
-
-        if (ResolveGaussianSplatShadowMode(*m_settings) != GAUSSIAN_SPLAT_SHADOWS_DISABLED)
-            object.pass->BuildAccelerationStructures(
-                commandList,
-                m_settings->GaussianSplatUseAABBs,
-                m_settings->GaussianSplatUseTLASInstances,
-                m_settings->GaussianSplatBlasCompaction,
-                m_settings->GaussianSplatScale,
-                uint32_t(std::clamp(m_settings->GaussianSplatRtxKernelDegree, 0, 5)),
-                m_settings->GaussianSplatRtxAdaptiveClamp);
-        else
-            object.pass->ReleaseAccelerationStructures();
-    }
 }
 
 } // namespace caustica::render
