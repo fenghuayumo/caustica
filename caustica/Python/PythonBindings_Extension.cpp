@@ -165,7 +165,7 @@ public:
         if (m_session) m_session->SetCameraFOV(fov);
     }
 
-    void setCameraIntrinsics(float fx, float fy, float cx, float cy, float width, float height) {
+    void SetCameraIntrinsics(float fx, float fy, float cx, float cy, float width, float height) {
         if (m_session) m_session->setCameraIntrinsics(fx, fy, cx, cy, width, height);
     }
 

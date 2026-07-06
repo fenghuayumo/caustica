@@ -288,17 +288,8 @@ bool App::initializeEngine()
     if (!gpuDevice)
         return false;
 
-    if (!m_engine.initialize(EngineInitContext{
-            .gpuDevice = gpuDevice,
-            .window = window(),
-            .app = this,
-        }))
-    {
-        return false;
-    }
-
-    syncSwapChain();
     runStartupSchedules();
+    syncSwapChain();
     m_engineInitialized = true;
     return true;
 }
@@ -306,16 +297,16 @@ bool App::initializeEngine()
 void App::syncSwapChain()
 {
     GpuDevice* gpuDevice = device();
-    if (gpuDevice)
-        Engine::syncSwapChain(*gpuDevice, *this);
+    if (!gpuDevice || !gpuDevice->GetDevice())
+        return;
+
+    const BackBufferInfo backBuffer = gpuDevice->GetBackBufferInfo();
+    notifyBackBufferResizing();
+    notifyBackBufferResized(backBuffer.width, backBuffer.height, backBuffer.sampleCount);
 }
 
 void App::shutdownEngine()
 {
-    if (!m_engineInitialized)
-        return;
-
-    m_engine.shutdown();
     m_engineInitialized = false;
 }
 
@@ -394,7 +385,8 @@ void App::notifyBackBufferResizing()
 {
     sceneSession::backBufferResizing(*this);
 
-    m_engine.onBackBufferResizing();
+    if (m_backBufferResizeHandler)
+        m_backBufferResizeHandler(true, 0, 0, 0);
 }
 
 void App::notifyBackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount)
@@ -532,12 +524,14 @@ void App::runGpuRenderSchedules(GpuDevice& gpuDevice, uint32_t frameIndex)
 
 void App::onBackBufferResizing()
 {
-    m_engine.onBackBufferResizing();
+    if (m_backBufferResizeHandler)
+        m_backBufferResizeHandler(true, 0, 0, 0);
 }
 
 void App::onBackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount)
 {
-    m_engine.onBackBufferResized(width, height, sampleCount);
+    if (m_backBufferResizeHandler)
+        m_backBufferResizeHandler(false, width, height, sampleCount);
 }
 
 void App::onDisplayScaleChanged(float scaleX, float scaleY)

@@ -1,154 +1,72 @@
-#include <engine/SceneSessionSubsystem.h>
-
-
+#include <engine/SceneSessionStartup.h>
 
 #include <scene/Scene.h>
 
-
-
 #include <engine/App.h>
-
 #include <engine/GpuRenderSubsystem.h>
-
 #include <engine/SceneSessionSystems.h>
 
-#include <engine/SubsystemCollection.h>
-
-
-
 #include <core/path_utils.h>
-
 #include <render/core/RenderSceneTypeFactory.h>
-
 #include <render/RenderSessionState.h>
-
 #include <render/worldRenderer/WorldRenderer.h>
 
-
-
 namespace caustica
-
 {
 
-
-
-SceneSessionSubsystem::SceneSessionSubsystem(SceneSessionConfig config)
-
-    : m_config(std::move(config))
-
+void initializeSceneSession(App& app, const SceneSessionConfig& config)
 {
-
-}
-
-
-
-void SceneSessionSubsystem::initialize(EngineInitContext& context)
-
-{
-
-    initializeSceneSession(context, m_config);
-
-    onInitializePost(context);
-
-}
-
-
-
-void SceneSessionSubsystem::onInitializePost(EngineInitContext& /*context*/)
-
-{
-
-}
-
-
-
-void initializeSceneSession(EngineInitContext& context, const SceneSessionConfig& config)
-
-{
-
-    if (!context.gpuDevice || !context.subsystems || !context.app)
-
+    GpuDevice* gpuDevice = app.getGpuDevice();
+    auto* gpuRenderSubsystem = app.tryResource<GpuRenderSubsystem>();
+    if (!gpuDevice || !gpuRenderSubsystem)
         return;
-
-
-
-    auto* gpuRenderSubsystem = context.subsystems->get<GpuRenderSubsystem>();
-
-    if (!gpuRenderSubsystem)
-
-        return;
-
-
-
-    App& app = *context.app;
 
     SceneViewState& viewState = config.viewState;
 
-    GpuDevice& gpuDevice = *context.gpuDevice;
-
-
-
     sceneSession::initStreamlineAndWindow(app);
-
     assert(config.sessionState && "SceneSessionConfig.sessionState is required for GpuRenderSubsystem init");
 
-
-
     gpuRenderSubsystem->initializeSession(GpuRenderSubsystemInitParams{
-
-        .gpuDevice = gpuDevice,
-
+        .gpuDevice = *gpuDevice,
         .settings = config.sessionState->settings,
-
         .runtimeState = config.sessionState->runtime,
-
         .sceneTime = viewState.sceneTime,
-
         .diagnostics = config.diagnostics,
-
         .cmdLine = config.cmdLine,
-
         .sceneTypeFactory = std::make_shared<render::RenderSceneTypeFactory>(),
-
         .sceneCallbacks = EngineSceneCallbacks{
-
             .OnSceneLoaded = [&app]() { sceneSession::onSceneLoaded(app); },
-
             .OnSceneUnloading = [&app]() { sceneSession::onSceneUnloading(app); },
-
         },
-
     });
 
-
-
     sceneSession::attachGpuRenderSubsystem(app, *gpuRenderSubsystem);
-
     sceneSession::initializeSession(app, config.preferredScene);
 
-
-
     if (config.refreshEnvMapMediaList)
-
     {
-
         gpuRenderSubsystem->lightingPasses().refreshEnvironmentMapMediaList(
-
             GetLocalPath(c_AssetsFolder), std::filesystem::path());
-
     }
 
-
-
     if (config.sessionState && config.cmdLine && config.applyCmdLineToSessionState)
-
         render::InitializeRenderSessionStateFromCommandLine(*config.sessionState, *config.cmdLine);
-
-
-
 }
 
+void registerSceneSessionStartup(App& app, const SceneSessionConfig& config)
+{
+    app.addSystem(AppSchedule::Startup, "SceneSession.Startup", [&app, config](AppScheduleContext& ctx) {
+        (void)ctx;
+        initializeSceneSession(app, config);
+    });
+}
 
+void registerGpuRenderShutdown(App& app)
+{
+    app.addSystem(AppSchedule::Shutdown, "GpuRender.Shutdown", [](AppScheduleContext& ctx) {
+        if (auto* gpuRender = ctx.app.tryResource<GpuRenderSubsystem>())
+            gpuRender->shutdown();
+    });
+}
 
 } // namespace caustica
-

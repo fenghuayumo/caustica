@@ -1,12 +1,8 @@
 #include <engine/SceneSessionResources.h>
-
-
+#include <engine/SceneSessionStartup.h>
 
 #include <core/command_line.h>
-
 #include <engine/App.h>
-
-#include <engine/SceneSessionSubsystem.h>
 
 #include <engine/SceneViewState.h>
 

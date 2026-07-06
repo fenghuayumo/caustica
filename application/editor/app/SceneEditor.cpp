@@ -72,7 +72,7 @@ GpuRenderSubsystem* SceneEditor::gpuRender() const
 {
     if (m_gpuRenderSubsystem)
         return m_gpuRenderSubsystem;
-    return m_app ? m_app->getSubsystem<GpuRenderSubsystem>() : nullptr;
+    return m_app ? m_app->tryResource<GpuRenderSubsystem>() : nullptr;
 }
 
 GpuDevice& SceneEditor::gpuDevice() const

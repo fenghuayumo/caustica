@@ -13,7 +13,7 @@ namespace caustica
 template<typename T, typename... Args>
 void registerRenderPipelinePlugin(App& app, Args&&... args)
 {
-    auto* gpuRender = app.getSubsystem<GpuRenderSubsystem>();
+    auto* gpuRender = app.tryResource<GpuRenderSubsystem>();
     render::WorldRenderer* worldRenderer = gpuRender ? gpuRender->worldRenderer() : nullptr;
     if (!worldRenderer)
         return;
@@ -26,7 +26,7 @@ inline void registerRenderPipelinePlugin(
     App& app,
     std::unique_ptr<render::IRenderPipelinePlugin> plugin)
 {
-    auto* gpuRender = app.getSubsystem<GpuRenderSubsystem>();
+    auto* gpuRender = app.tryResource<GpuRenderSubsystem>();
     render::WorldRenderer* worldRenderer = gpuRender ? gpuRender->worldRenderer() : nullptr;
     if (!worldRenderer)
         return;

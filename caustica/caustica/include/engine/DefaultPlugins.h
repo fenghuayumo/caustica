@@ -2,7 +2,7 @@
 
 #include <engine/GpuRenderSubsystem.h>
 #include <engine/Plugin.h>
-#include <engine/SceneSessionSubsystem.h>
+#include <engine/SceneSessionStartup.h>
 
 namespace caustica
 {

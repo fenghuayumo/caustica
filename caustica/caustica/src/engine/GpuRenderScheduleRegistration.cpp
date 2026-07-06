@@ -1,4 +1,5 @@
 #include <engine/GpuRenderScheduleRegistration.h>
+#include <engine/SceneSessionStartup.h>
 
 #include <engine/App.h>
 #include <engine/AppSchedules.h>
@@ -14,7 +15,7 @@ void registerGpuRenderSchedules(App& app)
     if (app.gpuRenderSchedulesRegistered())
         return;
 
-    if (!app.getSubsystem<GpuRenderSubsystem>())
+    if (!app.tryResource<GpuRenderSubsystem>())
         return;
 
     AppSystemOrdering ordering;
@@ -23,9 +24,11 @@ void registerGpuRenderSchedules(App& app)
 
     app.addSystem(AppSchedule::Render, "GpuRender.EndFrame", [&app](AppScheduleContext& ctx) {
         (void)ctx;
-        if (auto* gpuRender = app.getSubsystem<GpuRenderSubsystem>())
+        if (auto* gpuRender = app.tryResource<GpuRenderSubsystem>())
             gpuRender->endFrame();
     }, std::move(ordering));
+
+    registerGpuRenderShutdown(app);
 
     app.markGpuRenderSchedulesRegistered();
 }

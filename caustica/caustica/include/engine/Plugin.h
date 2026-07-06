@@ -6,7 +6,7 @@ namespace caustica
 class App;
 
 // Plugin lifecycle:
-//   build()                — register subsystems and resources
+//   build()                — register resources and owned services
 //   configureSchedules()   — register AppSchedule systems (before default schedules)
 //   configureLateSchedules() — register systems after default + scene runtime schedules
 struct Plugin

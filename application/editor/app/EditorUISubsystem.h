@@ -2,9 +2,14 @@
 
 #include <core/command_line.h>
 #include <engine/App.h>
-#include <engine/ISubsystem.h>
 
 #include <memory>
+
+namespace caustica
+{
+class GpuDevice;
+class Window;
+}
 
 namespace caustica::editor
 {
@@ -21,20 +26,19 @@ struct EditorUISubsystemConfig
     const CommandLineOptions& cmdLine;
 };
 
-class EditorUISubsystem : public caustica::ISubsystem
+class EditorUISubsystem
 {
 public:
     explicit EditorUISubsystem(EditorUISubsystemConfig config);
+    ~EditorUISubsystem();
 
-    [[nodiscard]] int priority() const override { return 250; }
-
-    void initialize(caustica::EngineInitContext& context) override;
-    void shutdown() override;
+    void startup(caustica::GpuDevice& gpuDevice, caustica::Window& window, caustica::App& app);
+    void shutdown();
 
     void animateScheduled(float elapsedTimeSeconds, bool windowFocused);
     void renderSceneScheduled(caustica::GpuDevice& gpuDevice);
-    void onBackBufferResizing() override;
-    void onBackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount) override;
+    void onBackBufferResizing();
+    void onBackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount);
 
     void onDisplayScaleChanged(float scaleX, float scaleY);
 

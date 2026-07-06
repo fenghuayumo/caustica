@@ -1,10 +1,9 @@
 #pragma once
 
 #include <engine/App.h>
-#include <engine/SceneSessionSubsystem.h>
+#include <engine/SceneSessionStartup.h>
 
 #include "EditorSession.h"
-#include "EditorUISubsystem.h"
 
 namespace caustica::editor
 {

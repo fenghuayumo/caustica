@@ -13,7 +13,6 @@
 #include <render/PathTracerScenePasses.h>
 #include <render/SessionDiagnostics.h>
 #include <render/worldRenderer/PathTracingContext.h>
-#include <engine/ISubsystem.h>
 
 class SceneManager;
 struct CommandLineOptions;
@@ -45,7 +44,6 @@ struct EngineSceneCallbacks
     std::function<void()> OnSceneUnloading;
 };
 
-// Inputs for initializing GpuRenderSubsystem (shared GPU infra + path tracer).
 struct GpuRenderSubsystemInitParams
 {
     GpuDevice& gpuDevice;
@@ -62,20 +60,16 @@ struct GpuRenderSubsystemInitParams
     EngineSceneCallbacks sceneCallbacks = {};
 };
 
-// Owns shared GPU infrastructure and the path-tracing WorldRenderer.
-class GpuRenderSubsystem : public ISubsystem
+class GpuRenderSubsystem
 {
 public:
     GpuRenderSubsystem();
-    ~GpuRenderSubsystem() override;
+    ~GpuRenderSubsystem();
 
     GpuRenderSubsystem(const GpuRenderSubsystem&) = delete;
     GpuRenderSubsystem& operator=(const GpuRenderSubsystem&) = delete;
 
-    [[nodiscard]] int priority() const override { return 100; }
-
-    void initialize(EngineInitContext& context) override;
-    void shutdown() override;
+    void shutdown();
 
     bool initializeSession(const GpuRenderSubsystemInitParams& params);
 
@@ -138,6 +132,7 @@ private:
     render::SessionDiagnostics* m_diagnostics = nullptr;
     double* m_sceneTime = nullptr;
     const CommandLineOptions* m_cmdLine = nullptr;
+    bool m_shutdown = false;
 };
 
 } // namespace caustica

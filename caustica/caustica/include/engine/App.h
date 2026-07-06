@@ -4,11 +4,11 @@
 #include <backend/GpuFrameDriver.h>
 #include <engine/AppSchedules.h>
 #include <engine/AppResources.h>
-#include <engine/Engine.h>
-#include <engine/ISubsystem.h>
 #include <engine/Plugin.h>
 #include <engine/RenderThread.h>
 #include <events/event.h>
+
+#include <cstdint>
 
 #include <functional>
 #include <memory>
@@ -24,7 +24,7 @@ namespace caustica
 class GpuDevice;
 class Window;
 
-// Plugin-driven application: Engine, window/GPU, and frame loop.
+// Plugin-driven application: window/GPU and frame loop.
 //
 // Lifecycle:
 //   app.addPlugin<DefaultPlugins>(sceneConfig);
@@ -60,13 +60,9 @@ public:
     }
 
     template<typename T, typename... Args>
-    T& emplaceSubsystem(Args&&... args)
+    T& emplaceResource(Args&&... args)
     {
-        static_assert(std::is_base_of_v<ISubsystem, T>, "T must derive from ISubsystem");
-        auto subsystem = std::make_unique<T>(std::forward<Args>(args)...);
-        T& ref = *subsystem;
-        m_engine.addSubsystem(std::move(subsystem));
-        return ref;
+        return m_resources.emplace<T>(std::forward<Args>(args)...);
     }
 
     void buildPlugins();
@@ -79,18 +75,6 @@ public:
 
     [[nodiscard]] bool gpuRenderSchedulesRegistered() const { return m_gpuRenderSchedulesRegistered; }
     void markGpuRenderSchedulesRegistered() { m_gpuRenderSchedulesRegistered = true; }
-
-    template<typename T>
-    [[nodiscard]] T* getSubsystem() const
-    {
-        return m_engine.getSubsystem<T>();
-    }
-
-    template<typename T, typename... Args>
-    T& emplaceResource(Args&&... args)
-    {
-        return m_resources.emplace<T>(std::forward<Args>(args)...);
-    }
 
     template<typename T>
     T& insertResource(T value)
@@ -173,9 +157,6 @@ public:
     GpuDevice* getGpuDevice() const;
     Window* getWindow() const;
 
-    Engine& engine() { return m_engine; }
-    const Engine& engine() const { return m_engine; }
-
     void run();
 
     bool frame();
@@ -211,6 +192,9 @@ public:
     using DisplayScaleHandler = std::function<void(float, float)>;
     void setDisplayScaleHandler(DisplayScaleHandler handler) { m_displayScaleHandler = std::move(handler); }
 
+    using BackBufferResizeHandler = std::function<void(bool resizing, uint32_t width, uint32_t height, uint32_t sampleCount)>;
+    void setBackBufferResizeHandler(BackBufferResizeHandler handler) { m_backBufferResizeHandler = std::move(handler); }
+
     // IGpuFrameDriver
     void notifyBackBufferResizing() override;
     void notifyBackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount) override;
@@ -239,8 +223,6 @@ protected:
 
     void onWindowEvent(Event& event);
     void installWindowEventCallback();
-
-    Engine m_engine;
 
     std::unique_ptr<GpuDevice> m_GpuDevice;
     std::unique_ptr<Window> m_Window;
@@ -290,6 +272,7 @@ private:
 
     EventHandler m_eventHandler;
     DisplayScaleHandler m_displayScaleHandler;
+    BackBufferResizeHandler m_backBufferResizeHandler;
 
     RenderThread m_renderThread;
     bool m_useDedicatedRenderThread = true;

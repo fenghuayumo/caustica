@@ -31,10 +31,6 @@ GpuRenderSubsystem::~GpuRenderSubsystem()
     shutdown();
 }
 
-void GpuRenderSubsystem::initialize(EngineInitContext& /*context*/)
-{
-}
-
 bool GpuRenderSubsystem::initializeSession(const GpuRenderSubsystemInitParams& params)
 {
     GpuDevice& gpuDevice = params.gpuDevice;
@@ -260,6 +256,11 @@ void GpuRenderSubsystem::applyCmdLinePostLoadOverrides()
 
 void GpuRenderSubsystem::shutdown()
 {
+    if (m_shutdown)
+        return;
+
+    m_shutdown = true;
+
     m_worldRenderer.reset();
     m_pathTracingContext.reset();
     m_sceneManager.reset();

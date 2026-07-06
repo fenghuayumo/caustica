@@ -5,7 +5,6 @@
 #include <imgui/imgui_renderer.h>
 
 #include <engine/App.h>
-#include <engine/Engine.h>
 #include <engine/GpuRenderSubsystem.h>
 #include <platform/window.h>
 #include <render/passes/debug/ZoomTool.h>
@@ -18,27 +17,26 @@ EditorUISubsystem::EditorUISubsystem(EditorUISubsystemConfig config)
 {
 }
 
-void EditorUISubsystem::initialize(caustica::EngineInitContext& context)
-{
-    if (!context.gpuDevice || !context.window || !context.subsystems || !context.app)
-        return;
+EditorUISubsystem::~EditorUISubsystem() = default;
 
-    auto* gpuRenderSubsystem = context.subsystems->get<caustica::GpuRenderSubsystem>();
+void EditorUISubsystem::startup(caustica::GpuDevice& gpuDevice, caustica::Window& window, caustica::App& app)
+{
+    auto* gpuRenderSubsystem = app.tryResource<caustica::GpuRenderSubsystem>();
     if (!gpuRenderSubsystem)
         return;
 
-    const bool serSupported = context.gpuDevice->SupportsShaderExecutionReordering()
+    const bool serSupported = gpuDevice.SupportsShaderExecutionReordering()
         && !m_config.cmdLine.disableSER;
 
     m_ui = std::make_unique<EditorUI>(
-        context.gpuDevice,
+        &gpuDevice,
         m_config.sceneEditor,
         m_config.editorUiData,
         serSupported,
         m_config.cmdLine);
     m_ui->Init(gpuRenderSubsystem->shaderFactory());
 
-    if (caustica::Window* platformWindow = context.gpuDevice->GetPlatformWindow())
+    if (caustica::Window* platformWindow = gpuDevice.GetPlatformWindow())
     {
         platformWindow->setFileDropCallback(
             [this](int count, const char** paths)
@@ -48,7 +46,7 @@ void EditorUISubsystem::initialize(caustica::EngineInitContext& context)
             });
     }
 
-    caustica::Engine::syncSwapChain(*context.gpuDevice, *context.app);
+    (void)window;
 }
 
 void EditorUISubsystem::shutdown()

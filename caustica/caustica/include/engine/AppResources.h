@@ -18,7 +18,9 @@ public:
         static_assert(std::is_same_v<T, std::remove_cv_t<T>>, "Resource type must be non-const");
         auto owned = std::make_unique<T>(std::forward<Args>(args)...);
         T& ref = *owned;
-        insertOwned(std::type_index(typeid(T)), std::move(owned));
+        insertOwned(
+            std::type_index(typeid(T)),
+            std::make_unique<ResourceBox<T>>(std::move(owned)));
         return ref;
     }
 

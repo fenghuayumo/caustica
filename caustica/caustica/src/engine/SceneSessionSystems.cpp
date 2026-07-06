@@ -58,21 +58,21 @@ namespace
 
     ::SceneManager* localSceneManager(App& app)
     {
-        if (GpuRenderSubsystem* gpuRender = app.getSubsystem<GpuRenderSubsystem>())
+        if (GpuRenderSubsystem* gpuRender = app.tryResource<GpuRenderSubsystem>())
             return gpuRender->sceneManager();
         return nullptr;
     }
 
     render::WorldRenderer* localWorldRenderer(App& app)
     {
-        if (GpuRenderSubsystem* gpuRender = app.getSubsystem<GpuRenderSubsystem>())
+        if (GpuRenderSubsystem* gpuRender = app.tryResource<GpuRenderSubsystem>())
             return gpuRender->worldRenderer();
         return nullptr;
     }
 
     CameraController* sessionCamera(App& app)
     {
-        if (GpuRenderSubsystem* gpuRender = app.getSubsystem<GpuRenderSubsystem>())
+        if (GpuRenderSubsystem* gpuRender = app.tryResource<GpuRenderSubsystem>())
             return &gpuRender->camera();
         return nullptr;
     }
@@ -258,7 +258,7 @@ namespace caustica::sceneSession
 
 GpuRenderSubsystem* gpuRender(const App& app)
 {
-    return app.getSubsystem<GpuRenderSubsystem>();
+    return const_cast<GpuRenderSubsystem*>(app.tryResource<GpuRenderSubsystem>());
 }
 
 GpuDevice* gpuDevice(const App& app)

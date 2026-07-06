@@ -88,8 +88,19 @@ bool startupEditor(caustica::App& app, EditorSession& session, int argc, const c
     });
 
     app.setDisplayScaleHandler([&app](float scaleX, float scaleY) {
-        if (auto* uiSubsystem = app.engine().getSubsystem<EditorUISubsystem>())
+        if (auto* uiSubsystem = app.tryResource<EditorUISubsystem>())
             uiSubsystem->onDisplayScaleChanged(scaleX, scaleY);
+    });
+
+    app.setBackBufferResizeHandler([&app](bool resizing, uint32_t width, uint32_t height, uint32_t sampleCount) {
+        auto* uiSubsystem = app.tryResource<EditorUISubsystem>();
+        if (!uiSubsystem)
+            return;
+
+        if (resizing)
+            uiSubsystem->onBackBufferResizing();
+        else
+            uiSubsystem->onBackBufferResized(width, height, sampleCount);
     });
 
     if (!app.initializeEngine())
