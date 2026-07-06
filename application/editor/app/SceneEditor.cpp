@@ -475,13 +475,17 @@ void SceneEditor::updateWindowTitle()
 
 bool SceneEditor::shouldRenderWhenUnfocused() const
 {
-    if (worldRenderer()->getFrameIndex() < 16 || m_settings.ResetAccumulation || m_settings.ResetRealtimeCaches || m_captureScriptManager->IsDoingWork())
+    auto* wr = worldRenderer();
+    if (!wr)
+        return false;
+
+    if (wr->getFrameIndex() < 16 || m_settings.ResetAccumulation || m_settings.ResetRealtimeCaches || m_captureScriptManager->IsDoingWork())
         return true;
 
     if (m_editor.RenderWhenOutOfFocus)
         return true;
 
-    return m_app ? sceneSession::shouldRenderWhenUnfocused(*m_app) : false;
+    return !m_settings.RealtimeMode && (wr->getAccumulationSampleIndex() < m_settings.AccumulationTarget);
 }
 
 void SceneEditor::setSceneTime(double sceneTime)
