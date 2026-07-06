@@ -41,6 +41,8 @@ SceneEditor::SceneEditor(const CommandLineOptions& cmdLine,
     , m_renderState(sessionState.runtime)
     , m_sessionDiagnostics(diagnostics)
     , m_editor(editorState)
+    , m_selectionState(editorState)
+    , m_editorCameraState(m_viewState)
     , m_inputRouter()
     , m_contentEditor(*this)
 {
@@ -48,6 +50,7 @@ SceneEditor::SceneEditor(const CommandLineOptions& cmdLine,
     m_viewState.progressLoading.Set(50);
     m_inputRouter.bind(*this);
     m_captureScriptManager = std::make_unique<CaptureScriptManager>(*this, m_sessionState, m_cmdLine);
+    m_captureScriptState.manager = m_captureScriptManager.get();
 }
 
 SceneEditor::SceneEditor(const CommandLineOptions& cmdLine,
@@ -394,13 +397,13 @@ void SceneEditor::syncLoadedSceneSystems()
         return;
 
     const std::string loadedSceneName = currentSceneName();
-    if (loadedSceneName.empty() || loadedSceneName == m_editorLoadedSceneName)
+    if (loadedSceneName.empty() || loadedSceneName == m_editorState.loadedSceneName)
         return;
 
-    if (!m_editorLoadedSceneName.empty())
+    if (!m_editorState.loadedSceneName.empty())
         onSceneUnloading();
 
-    m_editorLoadedSceneName = loadedSceneName;
+    m_editorState.loadedSceneName = loadedSceneName;
     onSceneLoadedEarly();
     onSceneLoadedBeforeGpuPrep();
     onSceneLoadedAfterCollectTextures();

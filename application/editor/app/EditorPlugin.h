@@ -14,11 +14,15 @@
 
 #include <engine/SceneSessionSubsystem.h>
 
+#include <render/worldRenderer/WorldRenderer.h>
+
 
 
 #include "EditorSceneSubsystem.h"
 
 #include "EditorUISubsystem.h"
+
+#include "common/CaptureScriptManager.h"
 
 #include "SceneEditor.h"
 
@@ -63,6 +67,12 @@ struct EditorPlugin : Plugin
         registerSceneSessionResources(app, sessionConfig);
 
         app.insertResourceRef(m_sceneEditor);
+        app.insertResourceRef(m_sceneEditor.editorState());
+        app.insertResourceRef(m_sceneEditor.captureScriptState());
+        app.insertResourceRef(m_sceneEditor.selectionState());
+        app.insertResourceRef(m_sceneEditor.editorCameraState());
+        if (m_sceneEditor.hasEditorUiData())
+            app.insertResourceRef(m_sceneEditor.GetUIData());
 
         app.emplaceSubsystem<GpuRenderSubsystem>();
 
@@ -98,11 +108,12 @@ struct EditorPlugin : Plugin
 
     {
 
-        app.addSystemBefore(AppSchedule::First, "EditorScene.BeginFrame", "SceneSession.BeginFrame", [this](AppScheduleContext& ctx) {
+        app.addSystemBefore(AppSchedule::First, "EditorScene.BeginFrame", "SceneSession.BeginFrame", [](AppScheduleContext& ctx) {
 
-            (void)ctx;
+            auto* capture = ctx.app.tryResource<CaptureScriptState>();
+            if (capture && capture->manager)
+                capture->manager->PreRender();
 
-            m_sceneEditor.onBeginFrameScheduled();
 
         });
 
@@ -116,7 +127,24 @@ struct EditorPlugin : Plugin
 
 
 
-            if (!m_sceneEditor.shouldRenderWhenUnfocused())
+            auto* wr = m_sceneEditor.worldRenderer();
+            auto* ui = ctx.app.tryResource<EditorUiData>();
+            auto* capture = ctx.app.tryResource<CaptureScriptState>();
+            const auto& settings = m_sceneEditor.pathTracerSettings();
+
+            const bool captureActive = capture && capture->manager && capture->manager->IsDoingWork();
+            const bool editorRequestsRender = ui && ui->editor.RenderWhenOutOfFocus;
+            const bool accumulationIncomplete = wr
+                && !settings.RealtimeMode
+                && wr->getAccumulationSampleIndex() < settings.AccumulationTarget;
+
+            if (!wr || (
+                wr->getFrameIndex() >= 16
+                && !settings.ResetAccumulation
+                && !settings.ResetRealtimeCaches
+                && !captureActive
+                && !editorRequestsRender
+                && !accumulationIncomplete))
 
                 return;
 

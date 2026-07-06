@@ -28,6 +28,13 @@ void registerSceneAnimationPlugin(App& app)
     app.addSystem(AppSchedule::PostUpdate, "SceneSession.RefreshEntityWorld", [](AppScheduleContext& ctx) {
         sceneSession::refreshEntityWorld(ctx.app, ctx.frameIndex);
     });
+
+    app.addSystemAfter(AppSchedule::Update, "SceneSession.TickSimulation", "SceneSession.UpdateCamera", [](AppScheduleContext& ctx) {
+        if (!ctx.windowFocused)
+            return;
+
+        sceneSession::tickSimulationAndFrameTiming(ctx.app, ctx.deltaTimeSeconds);
+    });
 }
 
 } // namespace caustica::sceneSession

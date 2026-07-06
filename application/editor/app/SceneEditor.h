@@ -14,6 +14,7 @@ struct GLFWwindow;
 
 #include "ui/EditorUIData.h"
 #include "EditorInputRouter.h"
+#include "EditorResources.h"
 #include "SceneContentEditor.h"
 
 #include <filesystem>
@@ -93,6 +94,15 @@ public:
     const EditorUIData& GetUIData() const { assert(m_editorUi); return *m_editorUi; }
     EditorUIState& GetEditorUIState() { return m_editor; }
     const EditorUIState& GetEditorUIState() const { return m_editor; }
+    [[nodiscard]] bool hasEditorUiData() const { return m_editorUi != nullptr; }
+    [[nodiscard]] EditorState& editorState() { return m_editorState; }
+    [[nodiscard]] const EditorState& editorState() const { return m_editorState; }
+    [[nodiscard]] CaptureScriptState& captureScriptState() { return m_captureScriptState; }
+    [[nodiscard]] const CaptureScriptState& captureScriptState() const { return m_captureScriptState; }
+    [[nodiscard]] SelectionState& selectionState() { return m_selectionState; }
+    [[nodiscard]] const SelectionState& selectionState() const { return m_selectionState; }
+    [[nodiscard]] EditorCameraState& editorCameraState() { return m_editorCameraState; }
+    [[nodiscard]] const EditorCameraState& editorCameraState() const { return m_editorCameraState; }
 
     void HandleDroppedFiles();
     bool LoadMeshFile(const std::filesystem::path& filePath);
@@ -213,15 +223,18 @@ private:
     render::SessionDiagnostics& m_sessionDiagnostics;
 
     SceneViewState m_viewState;
-    std::string m_editorLoadedSceneName;
+    EditorState m_editorState;
 
     App* m_app = nullptr;
     GpuRenderSubsystem* m_gpuRenderSubsystem = nullptr;
 
     EditorUIState& m_editor;
     EditorUIData* m_editorUi = nullptr;
+    SelectionState m_selectionState;
+    EditorCameraState m_editorCameraState;
 
     std::unique_ptr<CaptureScriptManager> m_captureScriptManager;
+    CaptureScriptState m_captureScriptState;
 #if CAUSTICA_WITH_PYTHON
     std::unique_ptr<PythonScripting> m_pythonScripting;
 #endif

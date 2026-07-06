@@ -65,6 +65,8 @@ void initializeSession(App& app, const std::string& preferredScene);
 
 void beginFrameScheduled(App& app);
 void animate(App& app, float elapsedTimeSeconds);
+void updateCamera(App& app, float elapsedTimeSeconds);
+void tickSimulationAndFrameTiming(App& app, float elapsedTimeSeconds);
 void updateWindowTitle(App& app);
 void prepareRenderFrame(App& app);
 void refreshEntityWorld(App& app, uint32_t frameIndex);

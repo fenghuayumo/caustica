@@ -687,9 +687,6 @@ void animate(App& app, float fElapsedTimeSeconds)
     if (::SceneManager* manager = sceneManager(app))
         manager->updateLoading();
 
-    if (CameraController* cam = sessionCamera(app))
-        cam->camera().SetMoveSpeed(cfg->CameraMoveSpeed);
-
     if (runtime->Invalidation.ShaderAndACRefreshDelayedRequest > 0)
     {
         runtime->Invalidation.ShaderAndACRefreshDelayedRequest -= fElapsedTimeSeconds;
@@ -748,63 +745,10 @@ void animate(App& app, float fElapsedTimeSeconds)
         vs->sceneTime = 0.0f;
     }
 
-    if (CameraController* cam = sessionCamera(app))
-    {
-        cam->selectedCameraIndex() = std::min(cam->selectedCameraIndex(), sceneCameraCount(app) - 1);
-        if (cam->selectedCameraIndex() > 0)
-        {
-            ::SceneManager* manager = localSceneManager(app);
-            auto activeScene = manager ? manager->getScene() : nullptr;
-            if (activeScene)
-            {
-                const auto& cameraEntities = activeScene->GetCameraEntities();
-                const uint32_t camIdx = cam->selectedCameraIndex() - 1;
-                const auto* ew = (camIdx < cameraEntities.size()) ? activeScene->GetEntityWorld() : nullptr;
-                if (ew)
-                {
-                    ecs::Entity camEntity = cameraEntities[camIdx];
-                    const auto* camComp = scene::TryGetCamera(ew->world(), camEntity);
-                    const auto* persData = camComp ? scene::TryGetPerspectiveCameraData(*camComp) : nullptr;
-                    const auto* globalComp = ew->world().get<scene::GlobalTransformComponent>(camEntity);
-                    if (persData && globalComp)
-                        vs->cameraController.syncFromSceneCamera(*persData, globalComp->transform);
-                }
-            }
-        }
+}
 
-        cam->camera().Animate(fElapsedTimeSeconds);
-    }
-
-    if (auto* wr = worldRenderer(app))
-    {
-        if (CameraController* cam = sessionCamera(app))
-        {
-            if (cfg->CameraAntiRRSleepJitter > 0)
-            {
-                float off = 0.05f * ((wr->getFrameIndex() % 2) ? (-cfg->CameraAntiRRSleepJitter) : (cfg->CameraAntiRRSleepJitter));
-
-                float3 dir = cam->camera().GetDir();
-                float3 right = normalize(cross(dir, cam->camera().GetUp()));
-                affine3 rot = rotation(right, off);
-                dir = rot.transformVector(dir);
-
-                cam->camera().LookTo(cam->camera().GetPosition(), dir, cam->camera().GetUp());
-            }
-        }
-    }
-
-    if (CameraController* cam = sessionCamera(app))
-    {
-        if (cam->cameraMovedSinceLastFrame())
-        {
-            cam->updateLastCameraState();
-            if (!cfg->RealtimeMode)
-                cfg->ResetAccumulation = true;
-            if (auto* wr = worldRenderer(app))
-                wr->setGaussianSplatTemporalReset(true);
-        }
-    }
-
+void tickSimulationAndFrameTiming(App& app, float fElapsedTimeSeconds)
+{
     if (isSceneLoaded(app))
     {
         if (::SceneManager* manager = sceneManager(app))
@@ -819,7 +763,6 @@ void animate(App& app, float fElapsedTimeSeconds)
     if (frameTime <= 0.0 && fElapsedTimeSeconds > 0.0f)
         frameTime = static_cast<double>(fElapsedTimeSeconds);
     updateFpsInfo(app, frameTime);
-
 }
 
 std::string resolutionInfo(const App& app)
