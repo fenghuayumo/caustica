@@ -4,8 +4,6 @@
 #include "EditorLaunch.h"
 #include "EditorSession.h"
 
-#include <core/JobSystem.h>
-#include <platform/engine/os.h>
 #include <render/passes/debug/Korgi.h>
 
 #include <cstring>
@@ -44,9 +42,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 int main(int argc, char** argv)
 #endif
 {
-    caustica::OS::initialize();
-    caustica::JobSystem::Initialize();
-
 #ifdef _WIN32
     SplashScreen splashScreen;
     if (!WantsHeadlessStartup(__argc, (const char**)__argv))

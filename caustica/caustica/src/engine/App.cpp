@@ -72,6 +72,8 @@ App::App(GpuDevice* gpuDevice, Window* window)
     , m_ExternalWindow(window)
 {
     bindFrameDriver(gpuDevice);
+    if (gpuDevice)
+        m_graphicsInitialized = true;
 }
 
 App::~App()
@@ -221,6 +223,7 @@ bool App::initializeGraphics(const GpuDeviceCreateDesc& desc)
 
     bindFrameDriver(m_GpuDevice.get());
     installWindowEventCallback();
+    m_graphicsInitialized = true;
     return true;
 }
 
@@ -235,10 +238,16 @@ bool App::initializeGraphics(int argc, const char* const* argv, GpuDeviceCreateD
     return initializeGraphics(desc);
 }
 
-bool App::finishStartup()
+bool App::initializeEngine()
 {
     if (m_engineInitialized)
         return true;
+
+    if (!m_graphicsInitialized && !m_ExternalGpuDevice)
+    {
+        error("App::initializeEngine requires initializeGraphics or an external GpuDevice");
+        return false;
+    }
 
     buildPlugins();
 
@@ -286,6 +295,7 @@ void App::shutdown()
 
     shutdownEngine();
     m_schedules.clear();
+    m_resources.clear();
     m_defaultSchedulesRegistered = false;
     m_subsystemSchedulesRegistered = false;
     m_preUpdateTailRegistered = false;
@@ -302,6 +312,8 @@ void App::shutdown()
         m_GpuDevice.reset();
     }
 
+    m_graphicsInitialized = false;
+    m_pluginsBuilt = false;
     m_shutdownCalled = true;
 }
 
@@ -686,6 +698,12 @@ void App::run()
     if (!gpuDevice)
     {
         error("App::run requires an initialized GpuDevice");
+        return;
+    }
+
+    if (!m_engineInitialized)
+    {
+        error("App::run requires initializeEngine");
         return;
     }
 

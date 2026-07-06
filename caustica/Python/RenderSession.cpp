@@ -461,7 +461,7 @@ bool RenderSession::InitRenderer()
             m_lastRenderedBackBufferIndex = manager.GetCurrentBackBufferIndex();
         };
 
-    if (!m_app->finishStartup())
+    if (!m_app->initializeEngine())
         return false;
 
     m_app->syncSwapChain();

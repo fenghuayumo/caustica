@@ -1,9 +1,10 @@
 #include <engine/EntryPoint.h>
 #include <engine/App.h>
 
-#include <assets/loader/TextureLoader.h>
 #include <assets/AssetSystem.h>
+#include <assets/loader/TextureLoader.h>
 #include <core/JobSystem.h>
+#include <core/log.h>
 #include <platform/engine/os.h>
 
 #ifdef _WIN32
@@ -36,10 +37,40 @@ int runApp(App& app, const std::function<bool(App&)>& startup, AppHook preGpuIni
     OS::initialize();
     JobSystem::Initialize();
 
-    if (!startup || !startup(app))
-    {
-        s_preGpuInit = nullptr;
+    const auto shutdownOnFailure = [&app]() {
+        app.shutdown();
+        AssetSystem::Shutdown();
         JobSystem::Shutdown();
+    };
+
+    if (!startup)
+    {
+        error("runApp requires a startup callback");
+        shutdownOnFailure();
+        s_preGpuInit = nullptr;
+#ifdef _WIN32
+        if (comNeedsUninit)
+            CoUninitialize();
+#endif
+        return 1;
+    }
+
+    if (!startup(app))
+    {
+        shutdownOnFailure();
+        s_preGpuInit = nullptr;
+#ifdef _WIN32
+        if (comNeedsUninit)
+            CoUninitialize();
+#endif
+        return 1;
+    }
+
+    if (!app.isEngineInitialized())
+    {
+        error("runApp startup must call initializeEngine");
+        shutdownOnFailure();
+        s_preGpuInit = nullptr;
 #ifdef _WIN32
         if (comNeedsUninit)
             CoUninitialize();

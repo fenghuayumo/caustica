@@ -2,6 +2,7 @@
 
 #include <engine/App.h>
 #include <engine/EngineScheduleRegistration.h>
+#include <engine/SceneSessionResources.h>
 #include <engine/GpuRenderSubsystem.h>
 #include <engine/Plugin.h>
 #include <engine/SceneRuntimeSubsystem.h>
@@ -23,6 +24,7 @@ struct EditorPlugin : Plugin
 
     void build(App& app) override
     {
+        registerSceneSessionResources(app, sceneConfig);
         app.emplaceSubsystem<GpuRenderSubsystem>();
         app.emplaceSubsystem<EditorSceneSubsystem>(EditorSceneSubsystemConfig{
             .runtime = sceneConfig,

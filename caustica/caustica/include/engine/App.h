@@ -3,6 +3,7 @@
 #include <backend/GpuDevice.h>
 #include <backend/GpuFrameDriver.h>
 #include <engine/AppSchedules.h>
+#include <engine/AppResources.h>
 #include <engine/Engine.h>
 #include <engine/ISubsystem.h>
 #include <engine/Plugin.h>
@@ -25,11 +26,14 @@ class Window;
 
 // Plugin-driven application: Engine, window/GPU, and frame loop.
 //
-//   App app;
+// Lifecycle:
 //   app.addPlugin<DefaultPlugins>(sceneConfig);
 //   app.initializeGraphics(argc, argv, desc);
-//   app.finishStartup();
-//   app.run();
+//   app.initializeEngine();
+//   app.run();  // main loop, then shutdown
+//
+// Or use runApp(app, startup) where startup registers plugins and calls
+// initializeGraphics + initializeEngine before returning.
 class App : public IGpuFrameDriver
 {
 public:
@@ -79,6 +83,57 @@ public:
         return m_engine.getSubsystem<T>();
     }
 
+    template<typename T, typename... Args>
+    T& emplaceResource(Args&&... args)
+    {
+        return m_resources.emplace<T>(std::forward<Args>(args)...);
+    }
+
+    template<typename T>
+    T& insertResource(T value)
+    {
+        return m_resources.insert(std::move(value));
+    }
+
+    template<typename T>
+    T& insertResourceRef(T& resource)
+    {
+        return m_resources.insertRef(resource);
+    }
+
+    template<typename T>
+    const T& insertResourceRef(const T& resource)
+    {
+        return m_resources.insertRef(resource);
+    }
+
+    template<typename T>
+    [[nodiscard]] T& resource()
+    {
+        return m_resources.get<T>();
+    }
+
+    template<typename T>
+    [[nodiscard]] const T& resource() const
+    {
+        return m_resources.get<T>();
+    }
+
+    template<typename T>
+    [[nodiscard]] T* tryResource()
+    {
+        return m_resources.tryGet<T>();
+    }
+
+    template<typename T>
+    [[nodiscard]] const T* tryResource() const
+    {
+        return m_resources.tryGet<T>();
+    }
+
+    [[nodiscard]] AppResources& resources() { return m_resources; }
+    [[nodiscard]] const AppResources& resources() const { return m_resources; }
+
     App& addSystem(AppSchedule schedule, std::string name, AppSystemFn system);
     void runSchedule(AppSchedule schedule, AppScheduleContext& context);
     [[nodiscard]] AppSchedules& schedules() { return m_schedules; }
@@ -86,7 +141,14 @@ public:
 
     bool initializeGraphics(const GpuDeviceCreateDesc& desc);
     bool initializeGraphics(int argc, const char* const* argv, GpuDeviceCreateDesc& desc);
-    bool finishStartup();
+    bool initializeEngine();
+
+    // Deprecated alias for initializeEngine().
+    bool finishStartup() { return initializeEngine(); }
+
+    [[nodiscard]] bool isGraphicsInitialized() const { return m_graphicsInitialized; }
+    [[nodiscard]] bool isEngineInitialized() const { return m_engineInitialized; }
+
     void syncSwapChain();
 
     void shutdown();
@@ -169,6 +231,7 @@ protected:
 
     bool m_shutdownCalled = false;
     bool m_pluginsBuilt = false;
+    bool m_graphicsInitialized = false;
     bool m_engineInitialized = false;
     bool m_defaultSchedulesRegistered = false;
     bool m_subsystemSchedulesRegistered = false;
@@ -176,6 +239,7 @@ protected:
     bool m_postUpdateTailRegistered = false;
 
     AppSchedules m_schedules;
+    AppResources m_resources;
 
 private:
     void syncWindowState();

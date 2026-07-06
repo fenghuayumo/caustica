@@ -92,7 +92,7 @@ bool startupEditor(caustica::App& app, EditorSession& session, int argc, const c
             uiSubsystem->onDisplayScaleChanged(scaleX, scaleY);
     });
 
-    if (!app.finishStartup())
+    if (!app.initializeEngine())
         return false;
 
     return true;
