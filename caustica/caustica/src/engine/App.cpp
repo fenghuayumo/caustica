@@ -111,15 +111,39 @@ void App::buildPlugins()
             plugin->configureLateSchedules(*this);
     }
 
-    ensurePreUpdateTail();
+    ensureUpdateTail();
     ensurePostUpdateTail();
 
     m_pluginsBuilt = true;
 }
 
-App& App::addSystem(AppSchedule schedule, std::string name, AppSystemFn system)
+App& App::addSystem(
+    AppSchedule schedule,
+    std::string name,
+    AppSystemFn system,
+    AppSystemOrdering ordering)
 {
-    m_schedules.addSystem(schedule, std::move(name), std::move(system));
+    m_schedules.addSystem(schedule, std::move(name), std::move(system), std::move(ordering));
+    return *this;
+}
+
+App& App::addSystemBefore(
+    AppSchedule schedule,
+    std::string name,
+    std::string before,
+    AppSystemFn system)
+{
+    m_schedules.addSystemBefore(schedule, std::move(name), std::move(before), std::move(system));
+    return *this;
+}
+
+App& App::addSystemAfter(
+    AppSchedule schedule,
+    std::string name,
+    std::string after,
+    AppSystemFn system)
+{
+    m_schedules.addSystemAfter(schedule, std::move(name), std::move(after), std::move(system));
     return *this;
 }
 
@@ -134,18 +158,18 @@ void App::registerDefaultSchedules()
         return;
 
 #if CAUSTICA_WITH_STREAMLINE
-    addSystem(AppSchedule::PreUpdate, "StreamlineSimStart", [](AppScheduleContext& ctx) {
+    addSystem(AppSchedule::Update, "StreamlineSimStart", [](AppScheduleContext& ctx) {
         if (ctx.gpuDevice && !ctx.gpuDevice->m_DeviceParams.headlessDevice)
             StreamlineIntegration::Get().SimStart(*ctx.gpuDevice);
     });
 #endif
 
-    addSystem(AppSchedule::PreUpdate, "BeforeFrame", [](AppScheduleContext& ctx) {
+    addSystem(AppSchedule::Update, "BeforeFrame", [](AppScheduleContext& ctx) {
         if (ctx.gpuDevice && ctx.app.beforeFrame)
             ctx.app.beforeFrame(*ctx.gpuDevice, ctx.frameIndex);
     });
 
-    addSystem(AppSchedule::PreUpdate, "ProcessEventQueue", [](AppScheduleContext& ctx) {
+    addSystem(AppSchedule::Update, "ProcessEventQueue", [](AppScheduleContext& ctx) {
         ctx.app.processEventQueue();
     });
 
@@ -163,30 +187,29 @@ void App::registerDefaultSchedules()
         ctx.app.onBeforeAnimate(*ctx.gpuDevice, ctx.frameIndex);
     });
 
-    addSystem(AppSchedule::PreRender, "SetRenderFrameIndex", [](AppScheduleContext& ctx) {
+    addSystem(AppSchedule::Extract, "SetRenderFrameIndex", [](AppScheduleContext& ctx) {
         if (ctx.gpuDevice)
             ctx.gpuDevice->SetPreparedRenderFrameIndex(ctx.frameIndex);
-    });
-
-    addSystem(AppSchedule::Render, "ExecuteGpuRender", [](AppScheduleContext& ctx) {
-        if (!ctx.app.dispatchScheduledRender(ctx))
-            ctx.abortFrame = true;
     });
 
     m_defaultSchedulesRegistered = true;
 }
 
-void App::ensurePreUpdateTail()
+void App::ensureUpdateTail()
 {
-    if (m_preUpdateTailRegistered)
+    if (m_updateTailRegistered)
         return;
 
-    addSystem(AppSchedule::PreUpdate, "SyncRenderThread", [](AppScheduleContext& ctx) {
+    AppSystemOrdering ordering;
+    ordering.before.push_back("NotifyDpiScale");
+    ordering.before.push_back("BeforeAnimate");
+
+    addSystem(AppSchedule::Update, "SyncRenderThread", [](AppScheduleContext& ctx) {
         if (!ctx.app.syncRenderThreadCompletedFrames(ctx))
             ctx.abortFrame = true;
-    });
+    }, std::move(ordering));
 
-    m_preUpdateTailRegistered = true;
+    m_updateTailRegistered = true;
 }
 
 void App::ensurePostUpdateTail()
@@ -302,6 +325,20 @@ void App::shutdown()
     if (m_shutdownCalled)
         return;
 
+    if (m_pluginsBuilt)
+    {
+        GpuDevice* gpuDevice = device();
+        AppScheduleContext context{
+            *this,
+            gpuDevice,
+            0.0f,
+            gpuDevice ? gpuDevice->m_FrameIndex : 0u,
+            isWindowFocused(),
+            isWindowVisible(),
+        };
+        runSchedule(AppSchedule::Shutdown, context);
+    }
+
     m_renderThread.stop();
 
     shutdownEngine();
@@ -310,7 +347,7 @@ void App::shutdown()
     m_defaultSchedulesRegistered = false;
     m_sceneSessionSchedulesRegistered = false;
     m_gpuRenderSchedulesRegistered = false;
-    m_preUpdateTailRegistered = false;
+    m_updateTailRegistered = false;
     m_postUpdateTailRegistered = false;
 
     GpuDevice* gpuDevice = device();
@@ -393,6 +430,12 @@ void App::requestExit()
     m_requestExit = true;
     if (Window* w = window())
         w->setExit(true);
+}
+
+void App::requestRenderUnfocused()
+{
+    if (GpuDevice* gpuDevice = device())
+        gpuDevice->m_RequestedRenderUnfocused = true;
 }
 
 void App::notifyDisplayScaleChanged(float scaleX, float scaleY)
@@ -485,8 +528,7 @@ void App::runGpuRenderSchedules(GpuDevice& gpuDevice, uint32_t frameIndex)
         isWindowVisible(),
     };
 
-    runSchedule(AppSchedule::RenderScene, context);
-    runSchedule(AppSchedule::RenderFinalize, context);
+    runSchedule(AppSchedule::Render, context);
 }
 
 void App::onBackBufferResizing()
@@ -674,21 +716,20 @@ bool App::runFrame(std::optional<double> elapsedTimeOverride)
     scheduleContext.runUpdate = windowVisible;
     scheduleContext.runRender = windowVisible && wantsRender && !skipRenderPhase();
 
-    runSchedule(AppSchedule::PreUpdate, scheduleContext);
-    if (scheduleContext.abortFrame)
-        return false;
-
     if (scheduleContext.runUpdate)
     {
         scheduleContext.windowFocused = scheduleContext.runRender;
         runSchedule(AppSchedule::Update, scheduleContext);
+        if (scheduleContext.abortFrame)
+            return false;
         runSchedule(AppSchedule::PostUpdate, scheduleContext);
     }
 
     if (scheduleContext.runRender)
     {
-        runSchedule(AppSchedule::PreRender, scheduleContext);
-        runSchedule(AppSchedule::Render, scheduleContext);
+        runSchedule(AppSchedule::Extract, scheduleContext);
+        if (!dispatchScheduledRender(scheduleContext))
+            scheduleContext.abortFrame = true;
         if (scheduleContext.abortFrame)
             return false;
         runSchedule(AppSchedule::PostRender, scheduleContext);

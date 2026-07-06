@@ -98,7 +98,95 @@ struct EditorPlugin : Plugin
 
     {
 
-        app.addSystem(AppSchedule::PreRender, "EditorScene.PrepareEditorFrame", [this](AppScheduleContext& ctx) {
+        app.addSystemBefore(AppSchedule::Update, "EditorScene.BeginFrame", "SceneSession.BeginFrame", [this](AppScheduleContext& ctx) {
+
+            (void)ctx;
+
+            m_sceneEditor.onBeginFrameScheduled();
+
+        });
+
+
+
+        app.addSystemAfter(AppSchedule::Update, "EditorScene.RequestUnfocusedRender", "NotifyDpiScale", [this](AppScheduleContext& ctx) {
+
+            if (ctx.runRender || !ctx.windowVisible || m_sceneEditor.shouldSkipRender())
+
+                return;
+
+
+
+            if (!m_sceneEditor.shouldRenderWhenUnfocused())
+
+                return;
+
+
+
+            ctx.runRender = true;
+
+            ctx.windowFocused = true;
+
+            ctx.app.requestRenderUnfocused();
+
+        });
+
+
+
+        app.addSystemBefore(AppSchedule::Update, "EditorScene.AnimateBegin", "SceneSession.Animate", [this](AppScheduleContext& ctx) {
+
+            if (!ctx.windowFocused)
+
+                return;
+
+
+
+            m_sceneEditor.onAnimateBegin(ctx.deltaTimeSeconds);
+
+            ctx.elapsedTime = ctx.deltaTimeSeconds;
+
+            const auto& settings = m_sceneEditor.pathTracerSettings();
+
+            const bool enableAnimations = settings.EnableAnimations && settings.RealtimeMode;
+
+            const bool enableAnimationUpdate = enableAnimations || settings.ResetAccumulation;
+
+            m_sceneEditor.onAnimateGameTick(ctx.deltaTimeSeconds, enableAnimations);
+
+            m_sceneEditor.onAnimateUpdateSceneTime(ctx.deltaTimeSeconds, enableAnimations, enableAnimationUpdate);
+
+        });
+
+
+
+        app.addSystemAfter(AppSchedule::Update, "EditorScene.SyncLoadedScene", "SceneSession.Animate", [this](AppScheduleContext& ctx) {
+
+            (void)ctx;
+
+            m_sceneEditor.syncLoadedSceneSystems();
+
+        });
+
+
+
+        app.addSystemAfter(AppSchedule::Update, "EditorScene.AnimateEnd", "SceneSession.Animate", [this](AppScheduleContext& ctx) {
+
+            if (!ctx.windowFocused)
+
+                return;
+
+
+
+            m_sceneEditor.onAnimateGameCamera(ctx.deltaTimeSeconds);
+
+            m_sceneEditor.onAnimateEnd(ctx.deltaTimeSeconds);
+
+            m_sceneEditor.updateWindowTitle();
+
+        });
+
+
+
+        app.addSystemAfter(AppSchedule::Extract, "EditorScene.PrepareEditorFrame", "SceneSession.PrepareRenderFrame", [this](AppScheduleContext& ctx) {
 
             if (!ctx.gpuDevice || m_sceneEditor.shouldSkipRender())
 
@@ -112,13 +200,31 @@ struct EditorPlugin : Plugin
 
 
 
+        AppSystemOrdering editorAfterWorldRenderOrdering;
+        editorAfterWorldRenderOrdering.before.push_back("SceneSession.AfterWorldRender");
+        editorAfterWorldRenderOrdering.before.push_back("GpuRender.EndFrame");
+
+        app.addSystem(AppSchedule::Render, "EditorScene.AfterWorldRender", [this](AppScheduleContext& ctx) {
+
+            if (!ctx.gpuDevice)
+
+                return;
+
+
+
+            m_sceneEditor.afterWorldRender(*ctx.gpuDevice);
+
+        }, std::move(editorAfterWorldRenderOrdering));
+
+
+
         if (!uiConfig)
 
             return;
 
 
 
-        app.addSystem(AppSchedule::Update, "EditorUI.Animate", [&app](AppScheduleContext& ctx) {
+        app.addSystemAfter(AppSchedule::Update, "EditorUI.Animate", "EditorScene.AnimateEnd", [&app](AppScheduleContext& ctx) {
 
             auto* uiSubsystem = app.getSubsystem<EditorUISubsystem>();
 
@@ -134,7 +240,11 @@ struct EditorPlugin : Plugin
 
 
 
-        app.addSystem(AppSchedule::RenderScene, "EditorUI.RenderScene", [&app](AppScheduleContext& ctx) {
+        AppSystemOrdering editorUiRenderOrdering;
+        editorUiRenderOrdering.after.push_back("SceneSession.AfterWorldRender");
+        editorUiRenderOrdering.before.push_back("GpuRender.EndFrame");
+
+        app.addSystem(AppSchedule::Render, "EditorUI.RenderScene", [&app](AppScheduleContext& ctx) {
 
             if (!ctx.gpuDevice)
 
@@ -152,7 +262,7 @@ struct EditorPlugin : Plugin
 
             uiSubsystem->renderSceneScheduled(*ctx.gpuDevice);
 
-        });
+        }, std::move(editorUiRenderOrdering));
 
     }
 

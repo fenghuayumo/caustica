@@ -22,6 +22,9 @@ void EditorSceneSubsystem::initialize(caustica::EngineInitContext& context)
     if (m_sceneEditor && context.app)
         m_sceneEditor->setApp(*context.app);
 
+    if (m_sceneEditor)
+        m_sceneEditor->onBeforeInitialSceneLoad();
+
     SceneSessionSubsystem::initialize(context);
 
     if (m_sceneEditor && context.subsystems)

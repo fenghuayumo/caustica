@@ -58,7 +58,6 @@ bool startupEditor(caustica::App& app, EditorSession& session, int argc, const c
         .preferredScene = preferredScene,
         .sessionState = &session.editorUiData.session,
         .cmdLine = &session.cmdLine,
-        .hooks = &session.sceneEditor.hooks(),
         .applyCmdLineToSessionState = session.cmdLine.noWindow || automatedRun,
     };
 

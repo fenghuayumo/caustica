@@ -24,10 +24,6 @@ namespace caustica
 
 
 
-struct SceneSessionHooks;
-
-
-
 struct SceneSessionConfig
 
 {
@@ -43,10 +39,6 @@ struct SceneSessionConfig
     render::RenderSessionState* sessionState = nullptr;
 
     const CommandLineOptions* cmdLine = nullptr;
-
-    SceneSessionHooks* hooks = nullptr;
-
-
 
     bool refreshEnvMapMediaList = true;
 

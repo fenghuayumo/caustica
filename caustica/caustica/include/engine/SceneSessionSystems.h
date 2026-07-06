@@ -34,7 +34,6 @@ class Material;
 class MeshInfo;
 class PlanarView;
 class SceneViewState;
-struct SceneSessionHooks;
 
 namespace render
 {
@@ -53,7 +52,6 @@ namespace sceneSession
 [[nodiscard]] render::SessionDiagnostics* diagnostics(const App& app);
 [[nodiscard]] const CommandLineOptions* cmdLine(const App& app);
 [[nodiscard]] SceneViewState* viewState(const App& app);
-[[nodiscard]] SceneSessionHooks* hooks(const App& app);
 
 [[nodiscard]] std::shared_ptr<Scene> scene(const App& app);
 [[nodiscard]] const std::vector<std::string>& availableScenes(const App& app);
@@ -70,6 +68,7 @@ void animate(App& app, float elapsedTimeSeconds);
 void prepareRenderFrame(App& app);
 void refreshEntityWorld(App& app, uint32_t frameIndex);
 void renderScene(App& app, GpuDevice& gpuDevice);
+void afterWorldRenderScheduled(App& app, GpuDevice& gpuDevice);
 void backBufferResizing(App& app);
 
 void onSceneLoaded(App& app);

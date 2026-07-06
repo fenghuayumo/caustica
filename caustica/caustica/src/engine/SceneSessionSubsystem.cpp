@@ -10,8 +10,6 @@
 
 #include <engine/GpuRenderSubsystem.h>
 
-#include <engine/SceneSessionHooks.h>
-
 #include <engine/SceneSessionSystems.h>
 
 #include <engine/SubsystemCollection.h>
@@ -92,12 +90,6 @@ void initializeSceneSession(EngineInitContext& context, const SceneSessionConfig
 
     sceneSession::initStreamlineAndWindow(app);
 
-    if (config.hooks)
-
-        app.insertResourceRef(*config.hooks);
-
-
-
     assert(config.sessionState && "SceneSessionConfig.sessionState is required for GpuRenderSubsystem init");
 
 
@@ -153,10 +145,6 @@ void initializeSceneSession(EngineInitContext& context, const SceneSessionConfig
         render::InitializeRenderSessionStateFromCommandLine(*config.sessionState, *config.cmdLine);
 
 
-
-    if (config.hooks && config.hooks->registerRenderPipelinePlugins)
-
-        config.hooks->registerRenderPipelinePlugins(*gpuRenderSubsystem);
 
 }
 

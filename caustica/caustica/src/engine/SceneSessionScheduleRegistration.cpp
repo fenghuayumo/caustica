@@ -34,7 +34,7 @@ void registerSceneSessionSchedules(App& app)
 
 
 
-    app.addSystem(AppSchedule::PreUpdate, "SceneSession.BeginFrame", [](AppScheduleContext& ctx) {
+    app.addSystemBefore(AppSchedule::Update, "SceneSession.BeginFrame", "NotifyDpiScale", [](AppScheduleContext& ctx) {
 
         sceneSession::beginFrameScheduled(ctx.app);
 
@@ -42,7 +42,7 @@ void registerSceneSessionSchedules(App& app)
 
 
 
-    app.addSystem(AppSchedule::Update, "SceneSession.Animate", [](AppScheduleContext& ctx) {
+    app.addSystemAfter(AppSchedule::Update, "SceneSession.Animate", "BeforeAnimate", [](AppScheduleContext& ctx) {
 
         if (!ctx.windowFocused)
 
@@ -56,7 +56,7 @@ void registerSceneSessionSchedules(App& app)
 
 
 
-    app.addSystem(AppSchedule::PostUpdate, "SceneSession.RefreshEntityWorld", [](AppScheduleContext& ctx) {
+    app.addSystemBefore(AppSchedule::PostUpdate, "SceneSession.RefreshEntityWorld", "AfterAnimate", [](AppScheduleContext& ctx) {
 
         sceneSession::refreshEntityWorld(ctx.app, ctx.frameIndex);
 
@@ -64,7 +64,7 @@ void registerSceneSessionSchedules(App& app)
 
 
 
-    app.addSystem(AppSchedule::PreRender, "SceneSession.PrepareRenderFrame", [](AppScheduleContext& ctx) {
+    app.addSystemAfter(AppSchedule::Extract, "SceneSession.PrepareRenderFrame", "SetRenderFrameIndex", [](AppScheduleContext& ctx) {
 
         if (!ctx.gpuDevice)
 
@@ -84,7 +84,7 @@ void registerSceneSessionSchedules(App& app)
 
 
 
-    app.addSystem(AppSchedule::RenderScene, "SceneSession.RenderScene", [](AppScheduleContext& ctx) {
+    app.addSystem(AppSchedule::Render, "SceneSession.RenderScene", [](AppScheduleContext& ctx) {
 
         if (!ctx.gpuDevice)
 
@@ -93,6 +93,20 @@ void registerSceneSessionSchedules(App& app)
 
 
         sceneSession::renderScene(ctx.app, *ctx.gpuDevice);
+
+    });
+
+
+
+    app.addSystemAfter(AppSchedule::Render, "SceneSession.AfterWorldRender", "SceneSession.RenderScene", [](AppScheduleContext& ctx) {
+
+        if (!ctx.gpuDevice)
+
+            return;
+
+
+
+        sceneSession::afterWorldRenderScheduled(ctx.app, *ctx.gpuDevice);
 
     });
 

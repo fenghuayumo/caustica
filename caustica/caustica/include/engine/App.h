@@ -71,7 +71,7 @@ public:
 
     void buildPlugins();
     void registerDefaultSchedules();
-    void ensurePreUpdateTail();
+    void ensureUpdateTail();
     void ensurePostUpdateTail();
 
     [[nodiscard]] bool sceneSessionSchedulesRegistered() const { return m_sceneSessionSchedulesRegistered; }
@@ -137,7 +137,21 @@ public:
     [[nodiscard]] AppResources& resources() { return m_resources; }
     [[nodiscard]] const AppResources& resources() const { return m_resources; }
 
-    App& addSystem(AppSchedule schedule, std::string name, AppSystemFn system);
+    App& addSystem(
+        AppSchedule schedule,
+        std::string name,
+        AppSystemFn system,
+        AppSystemOrdering ordering = {});
+    App& addSystemBefore(
+        AppSchedule schedule,
+        std::string name,
+        std::string before,
+        AppSystemFn system);
+    App& addSystemAfter(
+        AppSchedule schedule,
+        std::string name,
+        std::string after,
+        AppSystemFn system);
     void runSchedule(AppSchedule schedule, AppScheduleContext& context);
     [[nodiscard]] AppSchedules& schedules() { return m_schedules; }
     [[nodiscard]] const AppSchedules& schedules() const { return m_schedules; }
@@ -180,6 +194,7 @@ public:
     void waitForDedicatedRenderThreadIdle();
     void runGpuWorkOnRenderThread(const std::function<void()>& work);
     void requestExit();
+    void requestRenderUnfocused();
 
     using FrameCallback = std::function<void(GpuDevice&, uint32_t frameIndex)>;
     FrameCallback beforeFrame;
@@ -237,7 +252,7 @@ protected:
     bool m_defaultSchedulesRegistered = false;
     bool m_sceneSessionSchedulesRegistered = false;
     bool m_gpuRenderSchedulesRegistered = false;
-    bool m_preUpdateTailRegistered = false;
+    bool m_updateTailRegistered = false;
     bool m_postUpdateTailRegistered = false;
 
     AppSchedules m_schedules;

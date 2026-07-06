@@ -1,6 +1,5 @@
 #pragma once
 
-#include <engine/SceneSessionHooks.h>
 #include <core/progress.h>
 
 struct GLFWwindow;
@@ -61,8 +60,6 @@ public:
 
     [[nodiscard]] SceneViewState& viewState() { return m_viewState; }
     [[nodiscard]] const SceneViewState& viewState() const { return m_viewState; }
-    [[nodiscard]] SceneSessionHooks& hooks() { return m_hooks; }
-    [[nodiscard]] const SceneSessionHooks& hooks() const { return m_hooks; }
 
     void setApp(App& app) { m_app = &app; }
     [[nodiscard]] App* app() const { return m_app; }
@@ -123,6 +120,19 @@ public:
     void attachGpuRenderSubsystem(caustica::GpuRenderSubsystem& gpuRenderSubsystem);
     void initializeSession(const std::string& preferredScene);
     void initStreamlineAndWindow();
+
+    void onBeforeInitialSceneLoad();
+    void onBeginFrameScheduled();
+    void onAnimateBegin(float& elapsedTimeSeconds);
+    void onAnimateGameTick(float elapsedTimeSeconds, bool enableAnimations);
+    void onAnimateUpdateSceneTime(float elapsedTimeSeconds, bool enableAnimations, bool enableAnimationUpdate);
+    void onAnimateGameCamera(float elapsedTimeSeconds);
+    void onAnimateEnd(float elapsedTimeSeconds);
+    void onSceneUnloading();
+    void syncLoadedSceneSystems();
+    void updateWindowTitle();
+    void afterWorldRender(caustica::GpuDevice& gpuDevice);
+    bool shouldRenderWhenUnfocused() const;
 
     void PrepareEditorFrame();
     void CaptureScriptPreRender();
@@ -190,23 +200,11 @@ public:
 #endif
 
 private:
-    void bindHooks();
-    void onBeginFrameScheduled();
-    void onBeforeInitialSceneLoad();
-    void onAnimateBegin(float& elapsedTimeSeconds);
-    void onAnimateGameTick(float elapsedTimeSeconds, bool enableAnimations);
-    void onAnimateUpdateSceneTime(float elapsedTimeSeconds, bool enableAnimations, bool enableAnimationUpdate);
-    void onAnimateGameCamera(float elapsedTimeSeconds);
-    void onAnimateEnd(float elapsedTimeSeconds);
-    void onSceneUnloading();
     void onSceneLoaded();
     void onSceneLoadedEarly();
     void onSceneLoadedBeforeGpuPrep();
     void onSceneLoadedAfterCollectTextures();
     void onSceneLoadedComplete();
-    void updateWindowTitle();
-    void afterWorldRender(caustica::GpuDevice& gpuDevice);
-    bool shouldRenderWhenUnfocused() const;
 
     const CommandLineOptions& m_cmdLine;
     render::RenderSessionState& m_sessionState;
@@ -215,7 +213,7 @@ private:
     render::SessionDiagnostics& m_sessionDiagnostics;
 
     SceneViewState m_viewState;
-    SceneSessionHooks m_hooks;
+    std::string m_editorLoadedSceneName;
 
     App* m_app = nullptr;
     GpuRenderSubsystem* m_gpuRenderSubsystem = nullptr;

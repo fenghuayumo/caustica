@@ -3,7 +3,6 @@
 #include <engine/App.h>
 #include <engine/GpuRenderSubsystem.h>
 #include <engine/RenderThread.h>
-#include <engine/SceneSessionHooks.h>
 #include <engine/SceneViewState.h>
 
 #include <render/RenderSessionState.h>
@@ -143,14 +142,6 @@ namespace
 
     void updateWindowTitle(App& app)
     {
-        if (SceneSessionHooks* h = sceneSession::hooks(app))
-        {
-            if (h->updateWindowTitle)
-            {
-                h->updateWindowTitle();
-                return;
-            }
-        }
         updateWindowTitleDefault(app);
     }
 
@@ -288,14 +279,6 @@ namespace
 
     void afterWorldRender(App& app, GpuDevice& gpuDevice)
     {
-        if (SceneSessionHooks* h = sceneSession::hooks(app))
-        {
-            if (h->afterWorldRender)
-            {
-                h->afterWorldRender(gpuDevice);
-                return;
-            }
-        }
         afterWorldRenderDefault(app, gpuDevice);
     }
 }
@@ -350,11 +333,6 @@ const CommandLineOptions* cmdLine(const App& app)
 SceneViewState* viewState(const App& app)
 {
     return const_cast<App&>(app).tryResource<SceneViewState>();
-}
-
-SceneSessionHooks* hooks(const App& app)
-{
-    return const_cast<App&>(app).tryResource<SceneSessionHooks>();
 }
 
 void debugDrawLine(App& app, float3 start, float3 stop, float4 col1, float4 col2)
@@ -536,12 +514,6 @@ void initializeSession(App& app, const std::string& preferredScene)
     cfg->GaussianSplatEmissionMaxProxyCount = cmd->GaussianSplatEmissionMaxProxyCount;
     cfg->GaussianSplatAlphaCullThreshold = cmd->GaussianSplatAlphaCullThreshold;
 
-    if (SceneSessionHooks* h = hooks(app))
-    {
-        if (h->onBeforeInitialSceneLoad)
-            h->onBeforeInitialSceneLoad();
-    }
-
     GpuDevice* device = gpuDevice(app);
     if (device && device->GetDevice()->queryFeatureSupport(nvrhi::Feature::RayTracingOpacityMicromap))
     {
@@ -589,11 +561,6 @@ bool shouldSkipRender(const App& app)
 
 void beginFrameScheduled(App& app)
 {
-    if (SceneSessionHooks* h = hooks(app))
-    {
-        if (h->onBeginFrameScheduled)
-            h->onBeginFrameScheduled();
-    }
     ::beginFrame(app);
 }
 
@@ -607,8 +574,12 @@ void renderScene(App& app, GpuDevice& gpuDevice)
         return;
 
     wr->render(gpuDevice.GetCurrentFramebuffer(true));
-    ::afterWorldRender(app, gpuDevice);
     recordFrameTiming(app, gpuDevice);
+}
+
+void afterWorldRenderScheduled(App& app, GpuDevice& gpuDevice)
+{
+    ::afterWorldRender(app, gpuDevice);
 }
 
 bool loadGaussianSplatFile(App& app, const std::filesystem::path& fileName, bool convertRdfToRub)
@@ -670,21 +641,9 @@ void onSceneLoaded(App& app)
 
     vs->progressLoading.Set(50);
 
-    if (SceneSessionHooks* h = hooks(app))
-    {
-        if (h->onSceneLoadedEarly)
-            h->onSceneLoadedEarly();
-    }
-
     vs->progressLoading.Set(55);
 
     gr->onSceneLoadedBegin();
-
-    if (SceneSessionHooks* h = hooks(app))
-    {
-        if (h->onSceneLoadedBeforeGpuPrep)
-            h->onSceneLoadedBeforeGpuPrep();
-    }
 
     runGpuWorkOnRenderThread(app, [&app]() {
         if (GpuRenderSubsystem* gr = gpuRender(app))
@@ -700,12 +659,6 @@ void onSceneLoaded(App& app)
     collectUncompressedTextures(app);
 
     vs->progressLoading.Set(70);
-
-    if (SceneSessionHooks* h = hooks(app))
-    {
-        if (h->onSceneLoadedAfterCollectTextures)
-            h->onSceneLoadedAfterCollectTextures();
-    }
 
     vs->progressLoading.Set(90);
 
@@ -725,11 +678,6 @@ void onSceneLoaded(App& app)
             activeScene->extractAndPublishRenderSnapshot(device->GetPreparedRenderFrameIndex());
     }
 
-    if (SceneSessionHooks* h = hooks(app))
-    {
-        if (h->onSceneLoadedComplete)
-            h->onSceneLoadedComplete();
-    }
 }
 
 bool isSceneLoading(const App& app)
@@ -793,12 +741,6 @@ void animate(App& app, float fElapsedTimeSeconds)
     if (cfg->ActualFPSLimiter() > 0)
         fElapsedTimeSeconds = 1.0f / (float)cfg->ActualFPSLimiter();
 
-    if (SceneSessionHooks* h = hooks(app))
-    {
-        if (h->onAnimateBegin)
-            h->onAnimateBegin(fElapsedTimeSeconds);
-    }
-
     vs->lastDeltaTime = fElapsedTimeSeconds;
 
     if (::SceneManager* manager = sceneManager(app))
@@ -821,12 +763,6 @@ void animate(App& app, float fElapsedTimeSeconds)
     const bool enableAnimations = cfg->EnableAnimations && cfg->RealtimeMode;
     const bool enableAnimationUpdate = enableAnimations || cfg->ResetAccumulation;
 
-    if (SceneSessionHooks* h = hooks(app))
-    {
-        if (h->onAnimateGameTick)
-            h->onAnimateGameTick(fElapsedTimeSeconds, enableAnimations);
-    }
-
     if (auto* wr = worldRenderer(app))
     {
         if (auto* toneMappingPass = wr->getToneMappingPass())
@@ -837,12 +773,6 @@ void animate(App& app, float fElapsedTimeSeconds)
     {
         if (enableAnimations)
             vs->sceneTime += fElapsedTimeSeconds;
-
-        if (SceneSessionHooks* h = hooks(app))
-        {
-            if (h->onAnimateUpdateSceneTime)
-                h->onAnimateUpdateSceneTime(fElapsedTimeSeconds, enableAnimations, enableAnimationUpdate);
-        }
 
         ::SceneManager* manager = localSceneManager(app);
         if (manager)
@@ -904,12 +834,6 @@ void animate(App& app, float fElapsedTimeSeconds)
         cam->camera().Animate(fElapsedTimeSeconds);
     }
 
-    if (SceneSessionHooks* h = hooks(app))
-    {
-        if (h->onAnimateGameCamera)
-            h->onAnimateGameCamera(fElapsedTimeSeconds);
-    }
-
     if (auto* wr = worldRenderer(app))
     {
         if (CameraController* cam = sessionCamera(app))
@@ -947,12 +871,6 @@ void animate(App& app, float fElapsedTimeSeconds)
             if (GpuDevice* device = gpuDevice(app))
                 manager->tickSimulation(device->GetFrameIndex());
         }
-    }
-
-    if (SceneSessionHooks* h = hooks(app))
-    {
-        if (h->onAnimateEnd)
-            h->onAnimateEnd(fElapsedTimeSeconds);
     }
 
     GpuDevice* device = gpuDevice(app);
@@ -1043,12 +961,6 @@ void setEnvMapOverrideSource(App& app, const std::string& envMapOverride)
 
 bool shouldRenderWhenUnfocused(const App& app)
 {
-    if (SceneSessionHooks* h = hooks(app))
-    {
-        if (h->shouldRenderWhenUnfocused)
-            return h->shouldRenderWhenUnfocused();
-    }
-
     auto* wr = worldRenderer(app);
     PathTracerSettings* cfg = settings(app);
     if (!wr || !cfg)

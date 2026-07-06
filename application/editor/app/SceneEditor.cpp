@@ -46,7 +46,6 @@ SceneEditor::SceneEditor(const CommandLineOptions& cmdLine,
 {
     m_viewState.progressLoading.Start("Initializing...");
     m_viewState.progressLoading.Set(50);
-    bindHooks();
     m_inputRouter.bind(*this);
     m_captureScriptManager = std::make_unique<CaptureScriptManager>(*this, m_sessionState, m_cmdLine);
 }
@@ -64,26 +63,6 @@ SceneEditor::~SceneEditor()
 #if CAUSTICA_WITH_PYTHON
     m_pythonScripting.reset();
 #endif
-}
-
-void SceneEditor::bindHooks()
-{
-    m_hooks.onBeginFrameScheduled = [this]() { onBeginFrameScheduled(); };
-    m_hooks.onBeforeInitialSceneLoad = [this]() { onBeforeInitialSceneLoad(); };
-    m_hooks.onAnimateBegin = [this](float& dt) { onAnimateBegin(dt); };
-    m_hooks.onAnimateGameTick = [this](float dt, bool enable) { onAnimateGameTick(dt, enable); };
-    m_hooks.onAnimateUpdateSceneTime = [this](float dt, bool enable, bool enableUpdate) {
-        onAnimateUpdateSceneTime(dt, enable, enableUpdate);
-    };
-    m_hooks.onAnimateGameCamera = [this](float dt) { onAnimateGameCamera(dt); };
-    m_hooks.onAnimateEnd = [this](float dt) { onAnimateEnd(dt); };
-    m_hooks.onSceneLoadedEarly = [this]() { onSceneLoadedEarly(); };
-    m_hooks.onSceneLoadedBeforeGpuPrep = [this]() { onSceneLoadedBeforeGpuPrep(); };
-    m_hooks.onSceneLoadedAfterCollectTextures = [this]() { onSceneLoadedAfterCollectTextures(); };
-    m_hooks.onSceneLoadedComplete = [this]() { onSceneLoadedComplete(); };
-    m_hooks.updateWindowTitle = [this]() { updateWindowTitle(); };
-    m_hooks.afterWorldRender = [this](GpuDevice& gpuDevice) { afterWorldRender(gpuDevice); };
-    m_hooks.shouldRenderWhenUnfocused = [this]() { return shouldRenderWhenUnfocused(); };
 }
 
 GpuRenderSubsystem* SceneEditor::gpuRender() const
@@ -353,9 +332,6 @@ void SceneEditor::onSceneUnloading()
 
     if (m_sampleGame != nullptr)
         m_sampleGame->SceneUnloading();
-
-    if (m_app)
-        sceneSession::onSceneUnloading(*m_app);
 }
 
 void SceneEditor::onSceneLoadedEarly()
@@ -410,6 +386,25 @@ void SceneEditor::onSceneLoaded()
 {
     if (m_app)
         sceneSession::onSceneLoaded(*m_app);
+}
+
+void SceneEditor::syncLoadedSceneSystems()
+{
+    if (!m_app || !sceneSession::isSceneLoaded(*m_app))
+        return;
+
+    const std::string loadedSceneName = currentSceneName();
+    if (loadedSceneName.empty() || loadedSceneName == m_editorLoadedSceneName)
+        return;
+
+    if (!m_editorLoadedSceneName.empty())
+        onSceneUnloading();
+
+    m_editorLoadedSceneName = loadedSceneName;
+    onSceneLoadedEarly();
+    onSceneLoadedBeforeGpuPrep();
+    onSceneLoadedAfterCollectTextures();
+    onSceneLoadedComplete();
 }
 
 void SceneEditor::onBeginFrameScheduled()
