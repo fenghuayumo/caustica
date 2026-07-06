@@ -106,6 +106,12 @@ bool needsGaussianSplatStochasticAccumulate(const PathTracerSettings& settings)
     return stochasticSplats && needsGaussianSplatsCompositePass(settings);
 }
 
+bool needsGaussianSplatAccelBuild(const PathTracerSettings& settings)
+{
+    return settings.EnableGaussianSplats
+        && resolveGaussianSplatShadowMode(settings) != GAUSSIAN_SPLAT_SHADOWS_DISABLED;
+}
+
 GaussianSplatRenderSettings buildGaussianSplatRenderSettings(const GaussianSplatFrameInputs& inputs)
 {
     const PathTracerSettings& settings = inputs.settings;

@@ -1,5 +1,8 @@
 #include <render/passes/gaussian/GaussianSplatPass.h>
 #include <render/passes/gaussian/GaussianSplatGeometry.h>
+#include <render/passes/gaussian/GaussianSplatSorter.h>
+#include <render/passes/gaussian/GaussianSplatSorter.h>
+#include <render/passes/gaussian/GaussianSplatSorter.h>
 #include <backend/ViewRhiConversion.h>
 
 #include <render/gpuSort/GPUSort.h>
@@ -17,8 +20,6 @@
 #include <cstdint>
 #include <cstring>
 #include <limits>
-#include <numeric>
-#include <random>
 #include <utility>
 
 #include <scene/loader/GaussianSplatLoader.h>
@@ -47,17 +48,6 @@ namespace
         ret.viewportSizeInv = view.viewportSizeInv;
         ret.pixelOffset = view.pixelOffset;
         return ret;
-    }
-
-    bool MatrixEquals(const float4x4& a, const float4x4& b)
-    {
-        for (int index = 0; index < 16; ++index)
-        {
-            if (a.m_data[index] != b.m_data[index])
-                return false;
-        }
-
-        return true;
     }
 
     uint32_t FormatElementSize(GaussianSplatStorageFormat format)
@@ -178,18 +168,18 @@ void GaussianSplatPass::SetGpuSort(std::shared_ptr<GPUSort> gpuSort)
     m_gpuSort = std::move(gpuSort);
 }
 
-void GaussianSplatPass::InvalidateSortCache()
+caustica::render::GaussianSplatSortResources GaussianSplatPass::makeSortResources() const
 {
-    m_sortCacheValid = false;
-    m_cachedSortSplatCount = 0;
-}
-
-bool GaussianSplatPass::CanReuseSort(const GaussianSplatConstants& constants) const
-{
-    return m_sortCacheValid
-        && m_cachedSortSplatCount == m_splatCount
-        && MatrixEquals(m_cachedSortWorldToClipNoOffset, constants.view.matWorldToClipNoOffset)
-        && MatrixEquals(m_cachedSortObjectToWorld, constants.objectToWorld);
+    caustica::render::GaussianSplatSortResources resources;
+    resources.sortKeyBuffer = m_sortKeyBuffer.Get();
+    resources.indexBuffer = m_indexBuffer.Get();
+    resources.sortControlBuffer = m_sortControlBuffer.Get();
+    resources.drawIndirectBuffer = m_drawIndirectBuffer.Get();
+    resources.sortKeyBindingSet = m_sortKeyBindingSet;
+    resources.sortKeyPipeline = m_sortKeyPipeline;
+    resources.gpuSort = m_gpuSort;
+    resources.splatCount = m_splatCount;
+    return resources;
 }
 
 bool GaussianSplatPass::LoadFromFile(const std::filesystem::path& fileName, bool convertRdfToRub)
@@ -279,9 +269,8 @@ bool GaussianSplatPass::LoadFromFile(const std::filesystem::path& fileName, bool
     m_cachedEmissionProxyTintColor = float3(1.0f);
     m_cachedEmissionProxyAlphaCullThreshold = 0.0f;
     m_emissionProxyBuildPending = true;
-    m_randomIndices.clear();
-    m_randomIndexUploadPending = true;
-    InvalidateSortCache();
+    m_accelBuilder.release();
+    m_sorter.onSplatCountChanged(m_splatCount);
 
     return true;
 }
@@ -714,131 +703,6 @@ void GaussianSplatPass::UploadFormatDataIfNeeded(
     m_formatUploadPending = false;
 }
 
-void GaussianSplatPass::UploadStochasticSplatIndices(nvrhi::ICommandList* commandList)
-{
-    if (!m_indexBuffer || m_splatCount == 0)
-        return;
-
-    if (m_randomIndices.size() != m_splatCount)
-    {
-        m_randomIndices.resize(m_splatCount);
-        std::iota(m_randomIndices.begin(), m_randomIndices.end(), 0u);
-        std::mt19937 rng(0x3d05da7au);
-        std::shuffle(m_randomIndices.begin(), m_randomIndices.end(), rng);
-        m_randomIndexUploadPending = true;
-    }
-
-    if (!m_randomIndexUploadPending)
-        return;
-
-    commandList->writeBuffer(m_indexBuffer, m_randomIndices.data(), m_randomIndices.size() * sizeof(uint32_t));
-    m_randomIndexUploadPending = false;
-}
-
-void GaussianSplatPass::BuildDistanceCulledSplatList(nvrhi::ICommandList* commandList, GaussianSplatSortMode sortMode)
-{
-    if (!m_sortKeyBindingSet || !m_sortKeyPipeline || !m_sortControlBuffer || !m_drawIndirectBuffer)
-        return;
-
-    const uint32_t zero = 0;
-    nvrhi::DrawIndirectArguments drawArgs;
-    drawArgs.vertexCount = 0;
-    drawArgs.instanceCount = 1;
-    drawArgs.startVertexLocation = 0;
-    drawArgs.startInstanceLocation = 0;
-    commandList->writeBuffer(m_sortControlBuffer, &zero, sizeof(zero));
-    commandList->writeBuffer(m_drawIndirectBuffer, &drawArgs, sizeof(drawArgs));
-
-    {
-        nvrhi::ComputeState state;
-        state.pipeline = m_sortKeyPipeline;
-        state.bindings = { m_sortKeyBindingSet };
-
-        commandList->setBufferState(m_sortKeyBuffer, nvrhi::ResourceStates::UnorderedAccess);
-        commandList->setBufferState(m_indexBuffer, nvrhi::ResourceStates::UnorderedAccess);
-        commandList->setBufferState(m_sortControlBuffer, nvrhi::ResourceStates::UnorderedAccess);
-        commandList->setBufferState(m_drawIndirectBuffer, nvrhi::ResourceStates::UnorderedAccess);
-        commandList->commitBarriers();
-
-        commandList->setComputeState(state);
-        commandList->dispatch((m_splatCount + 255u) / 256u, 1, 1);
-    }
-
-    if (sortMode == GaussianSplatSortMode::GpuSort && m_gpuSort)
-    {
-        commandList->setBufferState(m_sortKeyBuffer, nvrhi::ResourceStates::ShaderResource);
-        commandList->setBufferState(m_indexBuffer, nvrhi::ResourceStates::UnorderedAccess);
-        commandList->setBufferState(m_sortControlBuffer, nvrhi::ResourceStates::CopySource);
-        commandList->commitBarriers();
-
-        m_gpuSort->Sort(commandList, m_sortControlBuffer, 0, m_sortKeyBuffer, m_indexBuffer, m_splatCount, false);
-    }
-
-    commandList->setBufferState(m_indexBuffer, nvrhi::ResourceStates::ShaderResource);
-    commandList->setBufferState(m_drawIndirectBuffer, nvrhi::ResourceStates::IndirectArgument);
-    commandList->commitBarriers();
-
-    m_cachedSortMode = sortMode;
-    m_sortCacheValid = false;
-    m_randomIndexUploadPending = true;
-}
-
-void GaussianSplatPass::UpdateSplatIndices(nvrhi::ICommandList* commandList, const GaussianSplatConstants& constants, GaussianSplatSortMode sortMode)
-{
-    if (constants.frustumCulling == uint32_t(GaussianSplatFrustumCulling::AtDistanceStage))
-    {
-        BuildDistanceCulledSplatList(commandList, sortMode);
-        return;
-    }
-
-    if (sortMode != m_cachedSortMode && sortMode == GaussianSplatSortMode::StochasticSplats)
-        m_randomIndexUploadPending = true;
-
-    if (sortMode == GaussianSplatSortMode::StochasticSplats)
-    {
-        UploadStochasticSplatIndices(commandList);
-        m_cachedSortMode = sortMode;
-        m_sortCacheValid = false;
-        return;
-    }
-
-    if (!m_gpuSort || !m_sortKeyBindingSet || !m_sortKeyPipeline || !m_sortControlBuffer || !m_drawIndirectBuffer)
-        return;
-
-    if (m_cachedSortMode == sortMode && CanReuseSort(constants))
-        return;
-
-    {
-        nvrhi::ComputeState state;
-        state.pipeline = m_sortKeyPipeline;
-        state.bindings = { m_sortKeyBindingSet };
-
-        commandList->setBufferState(m_sortKeyBuffer, nvrhi::ResourceStates::UnorderedAccess);
-        commandList->setBufferState(m_indexBuffer, nvrhi::ResourceStates::UnorderedAccess);
-        commandList->setBufferState(m_sortControlBuffer, nvrhi::ResourceStates::UnorderedAccess);
-        commandList->setBufferState(m_drawIndirectBuffer, nvrhi::ResourceStates::UnorderedAccess);
-        commandList->commitBarriers();
-
-        commandList->setComputeState(state);
-        commandList->dispatch((m_splatCount + 255u) / 256u, 1, 1);
-    }
-
-    commandList->writeBuffer(m_sortControlBuffer, &m_splatCount, sizeof(m_splatCount));
-
-    commandList->setBufferState(m_sortKeyBuffer, nvrhi::ResourceStates::ShaderResource);
-    commandList->setBufferState(m_indexBuffer, nvrhi::ResourceStates::UnorderedAccess);
-    commandList->setBufferState(m_sortControlBuffer, nvrhi::ResourceStates::CopySource);
-    commandList->commitBarriers();
-
-    m_gpuSort->Sort(commandList, m_sortControlBuffer, 0, m_sortKeyBuffer, m_indexBuffer, m_splatCount, true);
-
-    m_cachedSortWorldToClipNoOffset = constants.view.matWorldToClipNoOffset;
-    m_cachedSortObjectToWorld = constants.objectToWorld;
-    m_cachedSortSplatCount = m_splatCount;
-    m_cachedSortMode = sortMode;
-    m_sortCacheValid = true;
-}
-
 void GaussianSplatPass::Render(
     nvrhi::ICommandList* commandList,
     const caustica::IView& view,
@@ -924,7 +788,7 @@ void GaussianSplatPass::Render(
     constants.stochasticFrameIndex = settings.stochasticFrameIndex;
     commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
 
-    UpdateSplatIndices(commandList, constants, settings.sortingMode);
+    m_sorter.updateIndices(commandList, constants, settings.sortingMode, makeSortResources());
 
     nvrhi::GraphicsPipelineHandle renderPipeline;
     if (useHybridShadows)

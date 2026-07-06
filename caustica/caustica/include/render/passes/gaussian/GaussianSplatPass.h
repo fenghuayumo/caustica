@@ -5,6 +5,7 @@
 
 #include "GaussianSplatAccelBuilder.h"
 #include "GaussianSplatEmissionProxy.h"
+#include "GaussianSplatSorter.h"
 
 #include <scene/GaussianSplatData.h>
 
@@ -24,12 +25,6 @@ namespace caustica
 
 class GPUSort;
 class RenderTargets;
-
-enum class GaussianSplatSortMode : uint32_t
-{
-    GpuSort = 0,
-    StochasticSplats = 1
-};
 
 enum class GaussianSplatFrustumCulling : uint32_t
 {
@@ -142,11 +137,7 @@ private:
     void CreateStochasticFramebuffer(const RenderTargets& renderTargets);
     void UploadSplatDataIfNeeded(nvrhi::ICommandList* commandList);
     void UploadFormatDataIfNeeded(nvrhi::ICommandList* commandList, GaussianSplatStorageFormat shFormat, GaussianSplatStorageFormat rgbaFormat);
-    void UpdateSplatIndices(nvrhi::ICommandList* commandList, const GaussianSplatConstants& constants, GaussianSplatSortMode sortMode);
-    void BuildDistanceCulledSplatList(nvrhi::ICommandList* commandList, GaussianSplatSortMode sortMode);
-    void UploadStochasticSplatIndices(nvrhi::ICommandList* commandList);
-    [[nodiscard]] bool CanReuseSort(const GaussianSplatConstants& constants) const;
-    void InvalidateSortCache();
+    [[nodiscard]] caustica::render::GaussianSplatSortResources makeSortResources() const;
 
     nvrhi::DeviceHandle m_device;
     std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
@@ -184,6 +175,7 @@ private:
     nvrhi::GraphicsPipelineHandle m_stochasticProcessedHybridRenderPipeline;
     nvrhi::ComputePipelineHandle m_sortKeyPipeline;
     caustica::render::GaussianSplatAccelBuilder m_accelBuilder;
+    caustica::render::GaussianSplatSorter m_sorter;
     nvrhi::rt::IAccelStruct* m_hybridRenderMeshTopLevelAS = nullptr;
     std::shared_ptr<caustica::FramebufferFactory> m_stochasticFramebuffer;
     std::shared_ptr<caustica::FramebufferFactory> m_stochasticProcessedFramebuffer;
@@ -198,7 +190,6 @@ private:
     uint32_t m_shDegree = 0;
     bool m_splatUploadPending = false;
     bool m_formatUploadPending = true;
-    bool m_randomIndexUploadPending = true;
     uint32_t m_cachedEmissionProxyMaxCount = 0;
     float m_cachedEmissionProxySplatScale = 1.0f;
     uint32_t m_cachedEmissionProxyKernelDegree = 0;
@@ -206,13 +197,7 @@ private:
     caustica::math::float3 m_cachedEmissionProxyTintColor = caustica::math::float3(1.0f);
     float m_cachedEmissionProxyAlphaCullThreshold = 0.0f;
     bool m_emissionProxyBuildPending = true;
-    bool m_sortCacheValid = false;
-    uint32_t m_cachedSortSplatCount = 0;
-    GaussianSplatSortMode m_cachedSortMode = GaussianSplatSortMode::GpuSort;
     GaussianSplatStorageFormat m_currentShFormat = GaussianSplatStorageFormat::Float32;
     GaussianSplatStorageFormat m_currentRgbaFormat = GaussianSplatStorageFormat::Float32;
-    caustica::math::float4x4 m_cachedSortWorldToClipNoOffset = caustica::math::float4x4::identity();
-    caustica::math::float4x4 m_cachedSortObjectToWorld = caustica::math::float4x4::identity();
-    std::vector<uint32_t> m_randomIndices;
     std::string m_sourceFileName;
 };

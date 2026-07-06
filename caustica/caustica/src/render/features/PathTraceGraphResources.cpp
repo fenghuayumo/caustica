@@ -2,6 +2,7 @@
 
 #include <render/core/RenderTargets.h>
 #include <render/core/PathTracerSettings.h>
+#include <render/passes/gaussian/GaussianSplatGraph.h>
 
 #include <cassert>
 
@@ -129,6 +130,9 @@ const char* pathTraceLightingEndExecuteAfterPass(const PathTracerSettings& setti
 
 const char* pathTraceMainExecuteAfterPass(const PathTracerSettings& settings)
 {
+    if (needsGaussianSplatAccelBuild(settings))
+        return "GaussianSplatsAccelBuild";
+
     if (needsPathTraceLightingEndPass(settings))
         return "PathTraceLightingEnd";
 

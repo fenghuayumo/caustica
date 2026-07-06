@@ -45,6 +45,7 @@ namespace
         { "PathTracePrePass", registerPathTracePrePassFeature },
         { "VBufferExport", registerVBufferExportFeature },
         { "PathTraceLightingEnd", registerPathTraceLightingEndFeature },
+        { "GaussianSplatAccelBuild", registerGaussianSplatAccelBuildFeature },
         { "MainPathTrace", registerMainPathTraceFeature },
         { "Rtxdi", registerRtxdiExecuteFeature },
         { "DenoiserPrepare", registerDenoiserPrepareFeature },

@@ -42,6 +42,7 @@ void fillGaussianSplatShadowConstants(
 bool needsStochasticGaussianSplatsBeforeAA(const PathTracerSettings& settings);
 bool needsGaussianSplatsCompositePass(const PathTracerSettings& settings);
 bool needsGaussianSplatStochasticAccumulate(const PathTracerSettings& settings);
+bool needsGaussianSplatAccelBuild(const PathTracerSettings& settings);
 
 GaussianSplatRenderSettings buildGaussianSplatRenderSettings(const GaussianSplatFrameInputs& inputs);
 
