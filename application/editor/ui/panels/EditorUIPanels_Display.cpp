@@ -63,8 +63,8 @@ void EditorUI::BuildUIResolutionPicker()
     };
 
     const GLFWvidmode* monitorMode = glfwGetVideoMode(glfwGetPrimaryMonitor());
-    int currentW = (int)m_sceneEditor.GetDisplaySize().x;
-    int currentH = (int)m_sceneEditor.GetDisplaySize().y;
+    int currentW = (int)m_sceneEditor.displaySize().x;
+    int currentH = (int)m_sceneEditor.displaySize().y;
 
     ImGui::Text("Click to change resolution:");
     ImGui::Separator();
@@ -160,7 +160,7 @@ void EditorUI::BuildDisplayPerformancePanel(const PanelLayout& layout)
             RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
             
             {
-                if (ImGui::Button(StringFormat("Resolution:  %dx%d (click to change)", m_sceneEditor.GetDisplaySize().x, m_sceneEditor.GetDisplaySize().y, m_sceneEditor.GetRenderSize().x, m_sceneEditor.GetRenderSize().y).c_str(), { -1, 0 }))
+                if (ImGui::Button(StringFormat("Resolution:  %dx%d (click to change)", m_sceneEditor.displaySize().x, m_sceneEditor.displaySize().y, m_sceneEditor.renderSize().x, m_sceneEditor.renderSize().y).c_str(), { -1, 0 }))
                     ImGui::OpenPopup("Resolution Picker");
                 BuildUIResolutionPicker();
             }

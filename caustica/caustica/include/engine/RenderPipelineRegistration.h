@@ -1,6 +1,7 @@
 #pragma once
 
-#include <engine/SceneRuntime.h>
+#include <engine/GpuRenderSubsystem.h>
+#include <engine/App.h>
 #include <render/pipeline/RenderPipelineRegistry.h>
 #include <render/worldRenderer/WorldRenderer.h>
 
@@ -10,9 +11,10 @@ namespace caustica
 {
 
 template<typename T, typename... Args>
-void registerRenderPipelinePlugin(SceneRuntime& sceneRuntime, Args&&... args)
+void registerRenderPipelinePlugin(App& app, Args&&... args)
 {
-    render::WorldRenderer* worldRenderer = sceneRuntime.GetWorldRenderer();
+    auto* gpuRender = app.getSubsystem<GpuRenderSubsystem>();
+    render::WorldRenderer* worldRenderer = gpuRender ? gpuRender->worldRenderer() : nullptr;
     if (!worldRenderer)
         return;
 
@@ -21,10 +23,11 @@ void registerRenderPipelinePlugin(SceneRuntime& sceneRuntime, Args&&... args)
 }
 
 inline void registerRenderPipelinePlugin(
-    SceneRuntime& sceneRuntime,
+    App& app,
     std::unique_ptr<render::IRenderPipelinePlugin> plugin)
 {
-    render::WorldRenderer* worldRenderer = sceneRuntime.GetWorldRenderer();
+    auto* gpuRender = app.getSubsystem<GpuRenderSubsystem>();
+    render::WorldRenderer* worldRenderer = gpuRender ? gpuRender->worldRenderer() : nullptr;
     if (!worldRenderer)
         return;
 

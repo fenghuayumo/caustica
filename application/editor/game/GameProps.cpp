@@ -47,7 +47,7 @@ PropBase::PropBase(GameScene& gameScene, const std::string & name)
 
 caustica::scene::SceneEntityWorld* PropBase::EntityWorld() const
 {
-    const auto& scene = m_gameScene.GetScene();
+    const auto& scene = m_gameScene.scene();
     return scene ? scene->GetEntityWorld() : nullptr;
 }
 

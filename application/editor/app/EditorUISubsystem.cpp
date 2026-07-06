@@ -56,7 +56,7 @@ void EditorUISubsystem::shutdown()
     m_ui.reset();
 }
 
-void EditorUISubsystem::onUpdate(float elapsedTimeSeconds, bool windowFocused)
+void EditorUISubsystem::animateScheduled(float elapsedTimeSeconds, bool windowFocused)
 {
     if (!m_ui)
         return;
@@ -66,7 +66,7 @@ void EditorUISubsystem::onUpdate(float elapsedTimeSeconds, bool windowFocused)
         ui.Animate(elapsedTimeSeconds);
 }
 
-void EditorUISubsystem::onRenderScene(caustica::GpuDevice& gpuDevice)
+void EditorUISubsystem::renderSceneScheduled(caustica::GpuDevice& gpuDevice)
 {
     if (!m_ui)
         return;

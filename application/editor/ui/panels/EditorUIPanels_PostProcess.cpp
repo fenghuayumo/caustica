@@ -35,9 +35,9 @@ void EditorUI::BuildOpacityMicroMapsPanel(const PanelLayout& layout)
         {
             UI_SCOPED_INDENT(layout.indent);
 
-            if (auto& opacityMicromapBuilder = m_sceneEditor.GetLightingPasses().opacityMaps(); opacityMicromapBuilder)
+            if (auto& opacityMicromapBuilder = m_sceneEditor.lightingPasses().opacityMaps(); opacityMicromapBuilder)
             {
-                opacityMicromapBuilder->DebugGUI(layout.indent, *m_sceneEditor.GetScene());
+                opacityMicromapBuilder->DebugGUI(layout.indent, *m_sceneEditor.scene());
             }
             else
                 ImGui::Text("<Opacity Micro-Maps not supported on the current device>");
@@ -238,9 +238,9 @@ void EditorUI::BuildDebuggingPanel(const PanelLayout& layout)
                 m_settings.DebugViewStablePlaneIndex = dm::clamp(m_settings.DebugViewStablePlaneIndex, -1, (int)m_settings.StablePlanesActiveCount - 1);
             }
 
-            const DebugFeedbackStruct& feedback = m_sceneEditor.GetFeedbackData();
+            const DebugFeedbackStruct& feedback = m_sceneEditor.feedbackData();
             if (ImGui::InputInt2("Debug pixel", (int*)&m_settings.DebugPixel.x))
-                m_sceneEditor.GetRenderRuntimeState().Picking.requestMaterialPick();
+                m_sceneEditor.renderRuntimeState().Picking.requestMaterialPick();
 
             ImGui::Checkbox("Continuous feedback", &m_settings.ContinuousDebugFeedback);
 
@@ -271,7 +271,7 @@ void EditorUI::BuildDebuggingPanel(const PanelLayout& layout)
                 if (ImGui::Checkbox("Show delta tree window", &m_editorUI.ShowDeltaTree) && m_editorUI.ShowDeltaTree)
                 {
                     m_editorUI.ShowInspector = false; // no space for both
-                    m_sceneEditor.GetRenderRuntimeState().Picking.requestMaterialPick();
+                    m_sceneEditor.renderRuntimeState().Picking.requestMaterialPick();
                 }
             }
 #else

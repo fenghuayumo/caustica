@@ -45,7 +45,7 @@ bool CaptureScriptManager::ScriptProgressUI()
     }
     if (!m_ui.settings.RealtimeMode)
     {
-        ImGui::TextWrapped("Accumulation mode, sample %d (out of %d target)", m_app.GetAccumulationSampleIndex(), m_ui.settings.AccumulationTarget);
+        ImGui::TextWrapped("Accumulation mode, sample %d (out of %d target)", m_app.accumulationSampleIndex(), m_ui.settings.AccumulationTarget);
     }
     if (m_sequencer.SequenceRecordCounter() > 0)
     {
@@ -151,7 +151,7 @@ void CaptureScriptManager::ScriptMainUI(const ImVec4 & warnColor, const ImVec4 &
     else
     {
         if (m_screenshotSequenceCaptureIndex < 0) // first x frames are warmup!
-            m_app.ResetSceneTime();
+            m_app.setSceneTime(0.0);
         else
         {
             char windowName[1024];
@@ -170,8 +170,8 @@ void CaptureScriptManager::PreAnim(float& fElapsedTimeSeconds)
 {
     m_sequencer.PreAnim(
         fElapsedTimeSeconds,
-        m_app.HasAsyncLoadingInProgress(),
-        [this](double sceneTime) { m_app.SetSceneTime(sceneTime); });
+        m_app.hasAsyncLoadingInProgress(),
+        [this](double sceneTime) { m_app.setSceneTime(sceneTime); });
 }
 
 void CaptureScriptManager::PostAnim()
@@ -190,8 +190,8 @@ void CaptureScriptManager::PostRender(const std::function<bool(const char*)>& du
 {
     const CaptureSequencerPostRenderResult result = m_sequencer.PostRender(
         m_ui.settings.RealtimeMode,
-        m_app.AccumulationCompleted(),
-        m_app.GetSceneTime(),
+        m_app.accumulationCompleted(),
+        m_app.sceneTime(),
         dumpScreenshotCallback);
 
     if (result.ExitRequested)

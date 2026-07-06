@@ -47,7 +47,7 @@ public:
     void                    TickCamera(float deltaTime, caustica::FirstPersonCamera & renderCamera);
 
     const std::shared_ptr<caustica::Scene> &
-                            GetScene() const { return m_scene; }
+                            scene() const { return m_scene; }
 
     double                  GetGameTime() const             { return m_gameTime; }
     void                    SetGameTime(double t)           { m_gameTime = t; }

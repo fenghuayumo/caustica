@@ -383,3 +383,21 @@ void RegisteredFont::ReleaseScaledFont()
 {
     m_imFont = nullptr;
 }
+
+void caustica::ImGuiForwardKeyboard(int glfwKey, int action, int /*scancode*/)
+{
+    if (action == GLFW_REPEAT)
+        return;
+
+    ImGuiIO& io = ImGui::GetIO();
+    const ImGuiKey imguiKey = ImGui_ImplGlfw_KeyToImGuiKey(glfwKey);
+    if (imguiKey == ImGuiKey_None)
+        return;
+
+    io.AddKeyEvent(imguiKey, action != GLFW_RELEASE);
+}
+
+void caustica::ImGuiForwardInputCharacter(unsigned int codepoint)
+{
+    ImGui::GetIO().AddInputCharacter(codepoint);
+}

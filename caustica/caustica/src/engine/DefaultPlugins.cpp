@@ -8,9 +8,9 @@ namespace caustica
 
 void DefaultPlugins::build(App& app)
 {
-    registerSceneSessionResources(app, sceneConfig);
+    registerSceneSessionResources(app, sessionConfig);
     app.emplaceSubsystem<GpuRenderSubsystem>();
-    app.emplaceSubsystem<SceneRuntimeSubsystem>(sceneConfig);
+    app.emplaceSubsystem<SceneSessionSubsystem>(sessionConfig);
 }
 
 void DefaultPlugins::configureSchedules(App& app)

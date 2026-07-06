@@ -35,11 +35,6 @@ void GpuRenderSubsystem::initialize(EngineInitContext& /*context*/)
 {
 }
 
-void GpuRenderSubsystem::onRenderEnd(GpuDevice& /*gpuDevice*/)
-{
-    endFrame();
-}
-
 bool GpuRenderSubsystem::initializeSession(const GpuRenderSubsystemInitParams& params)
 {
     GpuDevice& gpuDevice = params.gpuDevice;

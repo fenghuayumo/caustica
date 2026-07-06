@@ -1,38 +1,64 @@
 #pragma once
 
-#include <engine/SceneRuntimeSubsystem.h>
 
-#include <string_view>
+
+#include <engine/SceneSessionSubsystem.h>
+
+
 
 namespace caustica::editor
+
 {
+
+
 
 class SceneEditor;
 
+
+
 struct EditorSceneSubsystemConfig
+
 {
-    caustica::SceneRuntimeSubsystemConfig runtime;
+
+    caustica::SceneSessionConfig session;
+
+    SceneEditor* sceneEditor = nullptr;
+
     bool postAppInit = true;
+
 };
 
-// Editor scene driver: extends SceneRuntimeSubsystem with capture scripts and local config.
-class EditorSceneSubsystem : public caustica::SceneRuntimeSubsystem
+
+
+// Editor scene driver: extends SceneSessionSubsystem with capture scripts and local config.
+
+class EditorSceneSubsystem : public caustica::SceneSessionSubsystem
+
 {
+
 public:
+
     explicit EditorSceneSubsystem(EditorSceneSubsystemConfig config);
 
-    [[nodiscard]] std::string_view scheduleLabel() const override { return "EditorScene"; }
+
+
+    void initialize(caustica::EngineInitContext& context) override;
+
+
 
 protected:
-    void onInitializePost(caustica::EngineInitContext& context) override;
-    void onBeforeBeginFrame() override;
-    void onPrepareRenderScene(caustica::GpuDevice& gpuDevice) override;
 
-private:
-    [[nodiscard]] SceneEditor& sceneEditor();
-    [[nodiscard]] const SceneEditor& sceneEditor() const;
+    void onInitializePost(caustica::EngineInitContext& context) override;
+
+
+
+    SceneEditor* m_sceneEditor = nullptr;
 
     bool m_postAppInit = true;
+
 };
 
+
+
 } // namespace caustica::editor
+

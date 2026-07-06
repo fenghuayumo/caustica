@@ -67,7 +67,7 @@ GameScene::GameScene(caustica::editor::SceneEditor& sample, const CommandLineOpt
 
 GLFWwindow* GameScene::GetGLFWWindow() const
 { 
-    return m_sample.GetGLFWWindow(); 
+    return m_sample.glfwWindow(); 
 }
 
 void GameScene::Deinitialize()

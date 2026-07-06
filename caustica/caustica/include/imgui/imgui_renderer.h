@@ -124,4 +124,8 @@ namespace caustica
         std::shared_ptr<RegisteredFont> CreateFontFromMemoryInternal(void const* pData, size_t size,
             bool compressed, float fontSize);
     };
+
+    // Forward GLFW-style input to ImGui (call from application event handlers).
+    void ImGuiForwardKeyboard(int glfwKey, int action, int scancode);
+    void ImGuiForwardInputCharacter(unsigned int codepoint);
 }

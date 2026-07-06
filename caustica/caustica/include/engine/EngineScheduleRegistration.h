@@ -5,8 +5,7 @@ namespace caustica
 
 class App;
 
-// Idempotent app infrastructure schedules (events, DPI, GPU dispatch).
-// Subsystem frame callbacks are registered separately via registerSubsystemSchedules().
+// Register default AppSchedule bridge systems (events, render dispatch, etc.).
 void registerEngineScheduleBridge(App& app);
 
 } // namespace caustica

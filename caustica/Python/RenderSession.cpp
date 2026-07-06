@@ -2,7 +2,8 @@
 
 #if CAUSTICA_WITH_PYTHON
 
-#include <engine/SceneRuntime.h>
+#include <engine/SceneSessionSystems.h>
+#include <engine/SceneViewState.h>
 #include <engine/App.h>
 #include <engine/DefaultPlugins.h>
 #include <render/core/RenderDevice.h>
@@ -436,7 +437,8 @@ bool RenderSession::InitRenderer()
     SetRuntimeDirectoryOverride(appDirectory);
     SetLocalPathBaseOverride(ResolveResourceRoot(appDirectory));
 
-    m_sceneRuntime = std::make_unique<caustica::SceneRuntime>(m_cmdLine, m_sessionState, m_sessionDiagnostics);
+    m_viewState.progressLoading.Start("Initializing...");
+    m_viewState.progressLoading.Set(50);
 
     std::string preferredScene = m_config.scene.empty()
         ? std::string("default.json")
@@ -446,8 +448,8 @@ bool RenderSession::InitRenderer()
         m_deviceManager.get(),
         m_config.headless ? nullptr : m_Window.get());
 
-    m_app->addPlugin<caustica::DefaultPlugins>(caustica::SceneRuntimeSubsystemConfig{
-        .sceneRuntime = *m_sceneRuntime,
+    m_app->addPlugin<caustica::DefaultPlugins>(caustica::SceneSessionConfig{
+        .viewState = m_viewState,
         .diagnostics = m_sessionDiagnostics,
         .preferredScene = preferredScene,
         .sessionState = &m_sessionState,
@@ -464,7 +466,7 @@ bool RenderSession::InitRenderer()
     if (!m_app->initializeEngine())
         return false;
 
-    m_app->syncSwapChain();
+    m_sceneHost = std::make_unique<caustica::PathTracerSceneHost>(*m_app);
 
     return true;
 }
@@ -475,7 +477,7 @@ void RenderSession::Shutdown()
         m_deviceManager->setFrameDriver(nullptr);
 
     m_app.reset();
-    m_sceneRuntime.reset();
+    m_sceneHost.reset();
 
     if (m_deviceManager)
     {
@@ -490,10 +492,10 @@ void RenderSession::Shutdown()
 
 bool RenderSession::LoadScene(const std::string& sceneName, bool waitUntilReady)
 {
-    if (!m_initialized || !m_sceneRuntime)
+    if (!m_initialized || !m_sceneHost)
         return false;
 
-    m_sceneRuntime->SetCurrentScene(PrepareSceneArgument(sceneName), /*forceReload=*/true);
+    m_sceneHost->setCurrentScene(PrepareSceneArgument(sceneName), /*forceReload=*/true);
 
     if (waitUntilReady)
         return WaitUntilReady();
@@ -511,7 +513,7 @@ bool RenderSession::WaitUntilReady(int maxFrames)
     for (int i = 0; i < maxFrames; ++i)
     {
         Step(0.0f);
-        if (m_sceneRuntime && m_sceneRuntime->IsSceneLoaded() && !m_sceneRuntime->IsSceneLoading())
+        if (m_sceneHost && m_sceneHost->isSceneLoaded() && !m_sceneHost->isSceneLoading())
             return true;
     }
     caustica::warning("RenderSession: scene did not finish loading within %d frames", maxFrames);
@@ -560,7 +562,7 @@ bool RenderSession::StepN(int frames)
 
 int RenderSession::StepUntilAccumulated(int maxFrames)
 {
-    if (!m_initialized || !m_sceneRuntime)
+    if (!m_initialized || !m_sceneHost)
         return 0;
 
     // Force reference / accumulation mode so we know "done" actually means
@@ -576,7 +578,7 @@ int RenderSession::StepUntilAccumulated(int maxFrames)
     {
         if (!Step()) break;
         ++frames;
-        if (m_sceneRuntime->AccumulationCompleted())
+        if (m_sceneHost->accumulationCompleted())
             break;
     }
     return frames;
@@ -584,12 +586,12 @@ int RenderSession::StepUntilAccumulated(int maxFrames)
 
 bool RenderSession::SaveScreenshot(const std::string& outputPath)
 {
-    if (!m_initialized || !m_deviceManager || !m_sceneRuntime)
+    if (!m_initialized || !m_deviceManager || !m_sceneHost)
         return false;
 
     // Prefer the renderer-owned final LDR target. It is the source of the
     // frame blit, so it does not depend on headless backbuffer rotation.
-    nvrhi::ITexture* tex = m_sceneRuntime->GetLdrColorTexture();
+    nvrhi::ITexture* tex = m_sceneHost->ldrColorTexture();
     nvrhi::ResourceStates state = nvrhi::ResourceStates::ShaderResource;
 
     if (!tex)
@@ -610,7 +612,7 @@ bool RenderSession::SaveScreenshot(const std::string& outputPath)
         return false;
     }
 
-    auto* renderDevice = m_sceneRuntime->GetRenderDevice();
+    auto* renderDevice = m_sceneHost->gpuRender() ? &m_sceneHost->gpuRender()->renderDevice() : nullptr;
     if (!renderDevice)
     {
         caustica::error("RenderSession: render device not initialized yet");
@@ -641,25 +643,35 @@ bool RenderSession::SetCamera(const caustica::math::float3& pos,
                               const caustica::math::float3& dir,
                               const caustica::math::float3& up)
 {
-    if (!m_sceneRuntime) return false;
+    if (!m_sceneHost) return false;
 
     auto v3 = [](const caustica::math::float3& v) {
         return std::to_string(v.x) + "," + std::to_string(v.y) + "," + std::to_string(v.z);
     };
     std::string s = v3(pos) + "," + v3(dir) + "," + v3(up);
-    return m_sceneRuntime->SetCurrentCameraPosDirUp(s);
+    return m_sceneHost->setCurrentCameraPosDirUp(s);
 }
 
 void RenderSession::SetCameraFOV(float verticalFovDegrees)
 {
-    if (m_sceneRuntime)
-        m_sceneRuntime->SetCameraVerticalFOV(caustica::math::radians(verticalFovDegrees));
+    if (m_sceneHost)
+        m_sceneHost->setCameraVerticalFOV(caustica::math::radians(verticalFovDegrees));
 }
 
-void RenderSession::SetCameraIntrinsics(float fx, float fy, float cx, float cy, float width, float height)
+void RenderSession::setCameraIntrinsics(float fx, float fy, float cx, float cy, float width, float height)
 {
-    if (m_sceneRuntime)
-        m_sceneRuntime->SetCameraIntrinsics(fx, fy, cx, cy, width, height);
+    if (m_sceneHost)
+        m_sceneHost->setCameraIntrinsics(fx, fy, cx, cy, width, height);
+}
+
+caustica::PathTracerSceneHost* RenderSession::GetSceneHost()
+{
+    return m_sceneHost.get();
+}
+
+const caustica::PathTracerSceneHost* RenderSession::GetSceneHost() const
+{
+    return m_sceneHost.get();
 }
 
 #endif // CAUSTICA_WITH_PYTHON

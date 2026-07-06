@@ -38,7 +38,7 @@ NB_MODULE(caustica, m)
           nb::rv_policy::reference,
           "Return the singleton SceneEditor renderer running in this caustica.exe.");
 
-    m.def("settings", []() -> PathTracerSettings* { return &RequireApp().GetRenderSessionState().settings; },
+    m.def("settings", []() -> PathTracerSettings* { return &RequireApp().renderSessionState().settings; },
           nb::rv_policy::reference,
           "Shortcut for caustica.app().settings.");
 

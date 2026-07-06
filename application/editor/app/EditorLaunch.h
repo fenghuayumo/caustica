@@ -1,7 +1,7 @@
 #pragma once
 
 #include <engine/App.h>
-#include <engine/SceneRuntimeSubsystem.h>
+#include <engine/SceneSessionSubsystem.h>
 
 #include "EditorSession.h"
 #include "EditorUISubsystem.h"

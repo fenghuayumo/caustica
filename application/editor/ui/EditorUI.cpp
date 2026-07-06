@@ -104,8 +104,8 @@ void EditorUI::buildUI(void)
         RAII_SCOPE( ImGui::Begin("Settings", 0, ImGuiWindowFlags_None /*AlwaysAutoResize*/); , ImGui::End(); );
         RAII_SCOPE( ImGui::PushItemWidth(layout.defItemWidth); , ImGui::PopItemWidth(); );
 
-        ImGui::Text("%s, %s", GetGpuDevice()->GetRendererString(), m_sceneEditor.GetResolutionInfo().c_str() );
-        ImGui::TextUnformatted(m_sceneEditor.GetFPSInfo().c_str());
+        ImGui::Text("%s, %s", GetGpuDevice()->GetRendererString(), m_sceneEditor.resolutionInfo().c_str() );
+        ImGui::TextUnformatted(m_sceneEditor.fpsInfo().c_str());
 
         if (BuildUIScriptsAndEtc())
         {

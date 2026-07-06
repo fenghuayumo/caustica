@@ -5,7 +5,6 @@
 #include <engine/ISubsystem.h>
 
 #include <memory>
-#include <string_view>
 
 namespace caustica::editor
 {
@@ -29,13 +28,11 @@ public:
 
     [[nodiscard]] int priority() const override { return 250; }
 
-    [[nodiscard]] std::string_view scheduleLabel() const override { return "EditorUI"; }
-
     void initialize(caustica::EngineInitContext& context) override;
     void shutdown() override;
 
-    void onUpdate(float elapsedTimeSeconds, bool windowFocused) override;
-    void onRenderScene(caustica::GpuDevice& gpuDevice) override;
+    void animateScheduled(float elapsedTimeSeconds, bool windowFocused);
+    void renderSceneScheduled(caustica::GpuDevice& gpuDevice);
     void onBackBufferResizing() override;
     void onBackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount) override;
 

@@ -7,6 +7,8 @@
 
 #if CAUSTICA_WITH_PYTHON
 
+#include <engine/SceneViewState.h>
+
 #include <memory>
 #include <string>
 #include <vector>
@@ -28,7 +30,7 @@ namespace caustica
 {
 class App;
 class GpuDevice;
-class SceneRuntime;
+class PathTracerSceneHost;
 }
 
 namespace caustica_py
@@ -74,13 +76,16 @@ public:
                    const caustica::math::float3& dir,
                    const caustica::math::float3& up);
     void SetCameraFOV(float verticalFovDegrees);
-    void SetCameraIntrinsics(float fx, float fy, float cx, float cy, float width, float height);
+    void setCameraIntrinsics(float fx, float fy, float cx, float cy, float width, float height);
 
-    caustica::SceneRuntime*       GetSceneRuntime()       { return m_sceneRuntime.get(); }
-    const caustica::SceneRuntime* GetSceneRuntime() const { return m_sceneRuntime.get(); }
+    caustica::App* GetApp() { return m_app.get(); }
+    const caustica::App* GetApp() const { return m_app.get(); }
 
-    caustica::render::RenderSessionState& GetRenderSessionState() { return m_sessionState; }
-    const caustica::render::RenderSessionState& GetRenderSessionState() const { return m_sessionState; }
+    caustica::PathTracerSceneHost*       GetSceneHost();
+    const caustica::PathTracerSceneHost* GetSceneHost() const;
+
+    caustica::render::RenderSessionState& renderSessionState() { return m_sessionState; }
+    const caustica::render::RenderSessionState& renderSessionState() const { return m_sessionState; }
 
     caustica::GpuDevice* GetGpuDevice() { return m_deviceManager.get(); }
     const Config&              GetConfig() const  { return m_config; }
@@ -94,10 +99,11 @@ private:
     CommandLineOptions                              m_cmdLine;
     caustica::render::RenderSessionState            m_sessionState;
     caustica::render::SessionDiagnostics              m_sessionDiagnostics;
+    caustica::SceneViewState                        m_viewState;
     std::unique_ptr<caustica::GpuDevice>      m_deviceManager;
     std::unique_ptr<caustica::Window>            m_Window;
     std::unique_ptr<caustica::App>                 m_app;
-    std::unique_ptr<caustica::SceneRuntime>        m_sceneRuntime;
+    std::unique_ptr<caustica::PathTracerSceneHost> m_sceneHost;
 #if CAUSTICA_WITH_DX12 && defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
     Microsoft::WRL::ComPtr<ID3D12DeviceFactory>     m_d3d12DeviceFactory;
 #endif

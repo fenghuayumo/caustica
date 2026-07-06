@@ -11,6 +11,8 @@
 namespace caustica
 {
 
+class EngineInitContext;
+
 class SubsystemCollection
 {
 public:
@@ -19,16 +21,8 @@ public:
     bool initializeAll(EngineInitContext& context);
     void shutdownAll();
 
-    void onBeginFrame(GpuDevice& gpuDevice);
-    void onUpdate(float elapsedTimeSeconds, bool windowFocused);
-    void onPrepareRenderScene(GpuDevice& gpuDevice);
-    void onRenderScene(GpuDevice& gpuDevice);
-    void onRenderEnd(GpuDevice& gpuDevice);
     void onBackBufferResizing();
     void onBackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount);
-
-    [[nodiscard]] bool skipRenderPhase() const;
-    [[nodiscard]] bool shouldRenderWhenUnfocused() const;
 
     template<typename T>
     [[nodiscard]] T* get() const
@@ -36,11 +30,9 @@ public:
         const auto it = m_byType.find(std::type_index(typeid(T)));
         if (it == m_byType.end())
             return nullptr;
+
         return static_cast<T*>(it->second);
     }
-
-    void forEach(const std::function<void(ISubsystem&)>& fn);
-    void forEach(const std::function<void(const ISubsystem&)>& fn) const;
 
 private:
     std::vector<std::unique_ptr<ISubsystem>> m_subsystems;

@@ -56,12 +56,12 @@ namespace
     caustica::SetSceneMeshVerticesParams MakeMeshEditParams(SceneEditor& sceneEditor)
     {
         return caustica::SetSceneMeshVerticesParams{
-            .device = sceneEditor.GetDevice(),
-            .scene = sceneEditor.GetScene(),
-            .frameIndex = sceneEditor.GetFrameIndex(),
-            .resetAccumulation = &sceneEditor.GetPathTracerSettings().ResetAccumulation,
+            .device = sceneEditor.device(),
+            .scene = sceneEditor.scene(),
+            .frameIndex = sceneEditor.frameIndex(),
+            .resetAccumulation = &sceneEditor.pathTracerSettings().ResetAccumulation,
             .requestMeshAccelRebuild = [&sceneEditor](const std::shared_ptr<caustica::MeshInfo>& dirtyMesh) {
-                sceneEditor.GetRayTracingResources().requestMeshAccelRebuild(dirtyMesh);
+                sceneEditor.gpuRender()->rayTracingResources().requestMeshAccelRebuild(dirtyMesh);
             },
         };
     }
@@ -89,11 +89,11 @@ void SceneContentEditor::handleDroppedFiles(std::vector<std::string>& pendingFil
         if (ext == ".ply")
         {
             caustica::info("Drag-drop: loading Gaussian Splat file '%s'", filePath.c_str());
-            if (m_sceneEditor.LoadGaussianSplatFile(path))
+            if (m_sceneEditor.loadGaussianSplatFile(path))
             {
                 caustica::info("Gaussian Splat loaded successfully: %d splats across %d objects",
-                    int(m_sceneEditor.GetGaussianSplatCount()),
-                    int(m_sceneEditor.GetGaussianSplatObjectCount()));
+                    int(m_sceneEditor.gaussianSplatCount()),
+                    int(m_sceneEditor.gaussianSplatObjectCount()));
             }
             else
                 caustica::error("Failed to load Gaussian Splat file '%s'", filePath.c_str());
@@ -116,8 +116,8 @@ void SceneContentEditor::handleDroppedFiles(std::vector<std::string>& pendingFil
 bool SceneContentEditor::importMeshFile(const std::filesystem::path& filePath,
     caustica::RuntimeMeshLoadResult (*loadFile)(const caustica::RuntimeMeshLoadParams&, const std::filesystem::path&))
 {
-    auto* sceneManager = m_sceneEditor.GetSceneManager();
-    auto textureLoader = m_sceneEditor.GetTextureLoader();
+    auto* sceneManager = m_sceneEditor.sceneManager();
+    auto textureLoader = m_sceneEditor.gpuRender()->textureLoader();
     if (!sceneManager || !textureLoader)
         return false;
 
@@ -130,7 +130,7 @@ bool SceneContentEditor::importMeshFile(const std::filesystem::path& filePath,
     const auto importedRoot = caustica::AttachRuntimeSceneImport(
         sceneManager->getScene(),
         *loadResult.ImportResult,
-        m_sceneEditor.GetFrameIndex(),
+        m_sceneEditor.frameIndex(),
         MakeMutationCallbacks());
     if (importedRoot == caustica::ecs::NullEntity)
         return false;
@@ -156,7 +156,7 @@ bool SceneContentEditor::loadObjMeshFile(const std::filesystem::path& filePath)
 
 void SceneContentEditor::finalizeRuntimeSceneMutation(caustica::ecs::Entity importedRoot)
 {
-    auto* sceneManager = m_sceneEditor.GetSceneManager();
+    auto* sceneManager = m_sceneEditor.sceneManager();
     if (!sceneManager)
         return;
 
@@ -165,19 +165,19 @@ void SceneContentEditor::finalizeRuntimeSceneMutation(caustica::ecs::Entity impo
         caustica::FinalizeRuntimeSceneMutation(
             sceneManager->getScene(),
             importedRoot,
-            m_sceneEditor.GetFrameIndex(),
+            m_sceneEditor.frameIndex(),
             MakeMutationCallbacks());
     }
 
     if (auto scene = sceneManager->getScene())
-        m_sceneEditor.GetLightingPasses().notifySceneReloaded(*scene);
+        m_sceneEditor.lightingPasses().notifySceneReloaded(*scene);
 
     requestFullRebuild();
 }
 
 bool SceneContentEditor::deleteSceneNode(caustica::ecs::Entity entity)
 {
-    auto* sceneManager = m_sceneEditor.GetSceneManager();
+    auto* sceneManager = m_sceneEditor.sceneManager();
     if (!sceneManager)
         return false;
 
@@ -187,17 +187,17 @@ bool SceneContentEditor::deleteSceneNode(caustica::ecs::Entity entity)
     if (!caustica::DeleteRuntimeSceneNode(caustica::DeleteRuntimeSceneNodeParams{
             .SceneInstance = scene,
             .Entity = entity,
-            .Device = m_sceneEditor.GetDevice(),
-            .FrameIndex = m_sceneEditor.GetFrameIndex(),
+            .Device = m_sceneEditor.device(),
+            .FrameIndex = m_sceneEditor.frameIndex(),
             .BeforeDetach = [&sceneEditor = m_sceneEditor](caustica::ecs::Entity deletedEntity) {
-                sceneEditor.GetGaussianSplatPasses().removeObjectsUnderEntity(deletedEntity);
+                sceneEditor.gpuRender()->gaussianSplatPasses().removeObjectsUnderEntity(deletedEntity);
             },
         }))
     {
         return false;
     }
 
-    auto& lightingPasses = m_sceneEditor.GetLightingPasses();
+    auto& lightingPasses = m_sceneEditor.lightingPasses();
     lightingPasses.resyncLightsFromScene(*scene);
 
     auto& editor = m_sceneEditor.GetEditorUIState();
@@ -222,7 +222,7 @@ bool SceneContentEditor::deleteSceneNode(caustica::ecs::Entity entity)
 
 void SceneContentEditor::requestFullRebuild()
 {
-    m_sceneEditor.GetRayTracingResources().requestFullRebuild();
+    m_sceneEditor.gpuRender()->rayTracingResources().requestFullRebuild();
 }
 
 std::vector<caustica::math::float3> SceneContentEditor::getMeshVertices(const std::shared_ptr<caustica::MeshInfo>& mesh) const
@@ -232,12 +232,12 @@ std::vector<caustica::math::float3> SceneContentEditor::getMeshVertices(const st
 
 std::vector<caustica::math::float3> SceneContentEditor::getMeshVerticesWorld(const std::shared_ptr<caustica::MeshInfo>& mesh) const
 {
-    return caustica::getMeshVerticesWorld(m_sceneEditor.GetScene(), mesh, m_sceneEditor.GetFrameIndex());
+    return caustica::getMeshVerticesWorld(m_sceneEditor.scene(), mesh, m_sceneEditor.frameIndex());
 }
 
 std::vector<caustica::math::float3> SceneContentEditor::getMeshVerticesWorld(caustica::ecs::Entity entity) const
 {
-    return caustica::getMeshVerticesWorld(m_sceneEditor.GetScene(), entity, m_sceneEditor.GetFrameIndex());
+    return caustica::getMeshVerticesWorld(m_sceneEditor.scene(), entity, m_sceneEditor.frameIndex());
 }
 
 void SceneContentEditor::setMeshVerticesWorld(const std::shared_ptr<caustica::MeshInfo>& mesh,

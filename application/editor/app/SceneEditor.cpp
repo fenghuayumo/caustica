@@ -8,10 +8,13 @@
 #include <render/core/TextureUtils.h>
 #include <render/passes/debug/ZoomTool.h>
 #include <assets/loader/ShaderFactory.h>
+#include <engine/App.h>
 #include <engine/GpuRenderSubsystem.h>
 #include <core/path_utils.h>
 #include <EditorUI.h>
 #include <shaders/PathTracer/PathTracerDebug.hlsli>
+
+#include <GLFW/glfw3.h>
 
 #include "game/GameScene.h"
 
@@ -23,6 +26,8 @@ using namespace caustica::math;
 using namespace caustica;
 using namespace caustica::render;
 
+extern const char* g_windowTitle;
+
 namespace caustica::editor
 {
 
@@ -30,11 +35,19 @@ SceneEditor::SceneEditor(const CommandLineOptions& cmdLine,
     caustica::render::RenderSessionState& sessionState,
     EditorUIState& editorState,
     caustica::render::SessionDiagnostics& diagnostics)
-    : SceneRuntime(cmdLine, sessionState, diagnostics)
+    : m_cmdLine(cmdLine)
+    , m_sessionState(sessionState)
+    , m_settings(sessionState.settings)
+    , m_renderState(sessionState.runtime)
+    , m_sessionDiagnostics(diagnostics)
     , m_editor(editorState)
     , m_inputRouter()
     , m_contentEditor(*this)
 {
+    m_viewState.progressLoading.Start("Initializing...");
+    m_viewState.progressLoading.Set(50);
+    bindHooks();
+    m_inputRouter.bind(*this);
     m_captureScriptManager = std::make_unique<CaptureScriptManager>(*this, m_sessionState, m_cmdLine);
 }
 
@@ -53,30 +66,274 @@ SceneEditor::~SceneEditor()
 #endif
 }
 
+void SceneEditor::bindHooks()
+{
+    m_hooks.onBeginFrameScheduled = [this]() { onBeginFrameScheduled(); };
+    m_hooks.onBeforeInitialSceneLoad = [this]() { onBeforeInitialSceneLoad(); };
+    m_hooks.onAnimateBegin = [this](float& dt) { onAnimateBegin(dt); };
+    m_hooks.onAnimateGameTick = [this](float dt, bool enable) { onAnimateGameTick(dt, enable); };
+    m_hooks.onAnimateUpdateSceneTime = [this](float dt, bool enable, bool enableUpdate) {
+        onAnimateUpdateSceneTime(dt, enable, enableUpdate);
+    };
+    m_hooks.onAnimateGameCamera = [this](float dt) { onAnimateGameCamera(dt); };
+    m_hooks.onAnimateEnd = [this](float dt) { onAnimateEnd(dt); };
+    m_hooks.onSceneLoadedEarly = [this]() { onSceneLoadedEarly(); };
+    m_hooks.onSceneLoadedBeforeGpuPrep = [this]() { onSceneLoadedBeforeGpuPrep(); };
+    m_hooks.onSceneLoadedAfterCollectTextures = [this]() { onSceneLoadedAfterCollectTextures(); };
+    m_hooks.onSceneLoadedComplete = [this]() { onSceneLoadedComplete(); };
+    m_hooks.updateWindowTitle = [this]() { updateWindowTitle(); };
+    m_hooks.afterWorldRender = [this](GpuDevice& gpuDevice) { afterWorldRender(gpuDevice); };
+    m_hooks.shouldRenderWhenUnfocused = [this]() { return shouldRenderWhenUnfocused(); };
+}
+
+GpuRenderSubsystem* SceneEditor::gpuRender() const
+{
+    if (m_gpuRenderSubsystem)
+        return m_gpuRenderSubsystem;
+    return m_app ? m_app->getSubsystem<GpuRenderSubsystem>() : nullptr;
+}
+
+GpuDevice& SceneEditor::gpuDevice() const
+{
+    assert(m_app && m_app->getGpuDevice());
+    return *m_app->getGpuDevice();
+}
+
+nvrhi::IDevice* SceneEditor::device() const
+{
+    return gpuDevice().GetDevice();
+}
+
+uint32_t SceneEditor::frameIndex() const
+{
+    return gpuDevice().GetFrameIndex();
+}
+
+std::shared_ptr<Scene> SceneEditor::scene() const
+{
+    return m_app ? sceneSession::scene(*m_app) : nullptr;
+}
+
+bool SceneEditor::shouldSkipRender() const
+{
+    return m_app ? sceneSession::shouldSkipRender(*m_app) : true;
+}
+
+SceneManager* SceneEditor::sceneManager() { return gpuRender() ? gpuRender()->sceneManager() : nullptr; }
+WorldRenderer* SceneEditor::worldRenderer() { return gpuRender() ? gpuRender()->worldRenderer() : nullptr; }
+SceneLightingPasses& SceneEditor::lightingPasses() { return gpuRender()->lightingPasses(); }
+const SceneManager* SceneEditor::sceneManager() const { return gpuRender() ? gpuRender()->sceneManager() : nullptr; }
+WorldRenderer* SceneEditor::worldRenderer() const { return gpuRender() ? gpuRender()->worldRenderer() : nullptr; }
+const SceneLightingPasses& SceneEditor::lightingPasses() const { return gpuRender()->lightingPasses(); }
+
+std::shared_ptr<Material> SceneEditor::findMaterial(int materialID) const
+{
+    return m_app ? sceneSession::findMaterial(*m_app, materialID) : nullptr;
+}
+
+ecs::Entity SceneEditor::findEntityByInstanceIndex(int instanceIndex) const
+{
+    return m_app ? sceneSession::findEntityByInstanceIndex(*m_app, instanceIndex) : ecs::NullEntity;
+}
+
+const FirstPersonCamera& SceneEditor::currentCamera() const
+{
+    return m_app ? sceneSession::currentCamera(*m_app) : gpuRender()->camera().camera();
+}
+
+const std::shared_ptr<PlanarView>& SceneEditor::currentView() const
+{
+    return m_app ? sceneSession::currentView(*m_app) : gpuRender()->camera().view();
+}
+
+const DebugFeedbackStruct& SceneEditor::feedbackData() const
+{
+    return m_app ? sceneSession::feedbackData(*m_app) : worldRenderer()->getFeedbackData();
+}
+
+const DeltaTreeVizPathVertex* SceneEditor::debugDeltaPathTree() const
+{
+    return m_app ? sceneSession::debugDeltaPathTree(*m_app) : nullptr;
+}
+
+int SceneEditor::accumulationSampleIndex() const
+{
+    return m_app ? sceneSession::accumulationSampleIndex(*m_app) : 0;
+}
+
+math::uint2 SceneEditor::renderSize() const
+{
+    return m_app ? sceneSession::renderSize(*m_app) : uint2{ 0, 0 };
+}
+
+math::uint2 SceneEditor::displaySize() const
+{
+    return m_app ? sceneSession::displaySize(*m_app) : uint2{ 0, 0 };
+}
+
+float SceneEditor::avgTimePerFrame() const
+{
+    return m_app ? sceneSession::avgTimePerFrame(*m_app) : 0.f;
+}
+
+void SceneEditor::debugDrawLine(float3 start, float3 stop, float4 col1, float4 col2)
+{
+    if (m_app)
+        sceneSession::debugDrawLine(*m_app, start, stop, col1, col2);
+}
+
+std::string SceneEditor::currentSceneName() const
+{
+    return m_app ? sceneSession::currentSceneName(*m_app) : std::string();
+}
+
+const std::vector<std::string>& SceneEditor::availableScenes() const
+{
+    static const std::vector<std::string> kEmpty;
+    return m_app ? sceneSession::availableScenes(*m_app) : kEmpty;
+}
+
+void SceneEditor::setCurrentScene(const std::string& sceneName, bool forceReload)
+{
+    if (m_app)
+        sceneSession::setCurrentScene(*m_app, sceneName, forceReload);
+}
+
+bool SceneEditor::loadGaussianSplatFile(const std::filesystem::path& fileName, bool convertRdfToRub)
+{
+    return m_app && sceneSession::loadGaussianSplatFile(*m_app, fileName, convertRdfToRub);
+}
+
+uint32_t SceneEditor::gaussianSplatCount() const
+{
+    return m_app ? sceneSession::gaussianSplatCount(*m_app) : 0;
+}
+
+uint32_t SceneEditor::gaussianSplatObjectCount() const
+{
+    return m_app ? sceneSession::gaussianSplatObjectCount(*m_app) : 0;
+}
+
+uint SceneEditor::sceneCameraCount() const
+{
+    return m_app ? sceneSession::sceneCameraCount(*m_app) : 1;
+}
+
+uint& SceneEditor::selectedCameraIndex()
+{
+    assert(m_app);
+    return sceneSession::selectedCameraIndex(*m_app);
+}
+
+void SceneEditor::saveCurrentCamera() const
+{
+    if (m_app)
+        sceneSession::saveCurrentCamera(*m_app);
+}
+
+void SceneEditor::loadCurrentCamera()
+{
+    if (m_app)
+        sceneSession::loadCurrentCamera(*m_app);
+}
+
+std::string SceneEditor::currentCameraPosDirUp() const
+{
+    return m_app ? sceneSession::currentCameraPosDirUp(*m_app) : std::string();
+}
+
+bool SceneEditor::setCurrentCameraPosDirUp(const std::string& val)
+{
+    return m_app ? sceneSession::setCurrentCameraPosDirUp(*m_app, val) : false;
+}
+
+void SceneEditor::setCameraVerticalFOV(float cameraFOV)
+{
+    if (m_app)
+        sceneSession::setCameraVerticalFOV(*m_app, cameraFOV);
+}
+
+float SceneEditor::cameraVerticalFOV() const
+{
+    return m_app ? sceneSession::cameraVerticalFOV(*m_app) : 0.f;
+}
+
+std::string SceneEditor::resolutionInfo() const
+{
+    return m_app ? sceneSession::resolutionInfo(*m_app) : "uninitialized";
+}
+
+std::string SceneEditor::fpsInfo() const
+{
+    return m_app ? sceneSession::fpsInfo(*m_app) : std::string();
+}
+
+const std::string& SceneEditor::envMapLocalPath() const
+{
+    static const std::string kEmpty;
+    return m_app ? sceneSession::envMapLocalPath(*m_app) : kEmpty;
+}
+
+const std::string& SceneEditor::envMapOverrideSource() const
+{
+    static const std::string kEmpty;
+    return m_app ? sceneSession::envMapOverrideSource(*m_app) : kEmpty;
+}
+
+const std::vector<std::filesystem::path>& SceneEditor::envMapMediaList()
+{
+    static const std::vector<std::filesystem::path> kEmpty;
+    return m_app ? sceneSession::envMapMediaList(*m_app) : kEmpty;
+}
+
+void SceneEditor::setEnvMapOverrideSource(const std::string& envMapOverride)
+{
+    if (m_app)
+        sceneSession::setEnvMapOverrideSource(*m_app, envMapOverride);
+}
+
+bool SceneEditor::hasAsyncLoadingInProgress() const
+{
+    return m_app && sceneSession::hasAsyncLoadingInProgress(*m_app);
+}
+
+bool SceneEditor::accumulationCompleted() const
+{
+    return m_app && sceneSession::accumulationCompleted(*m_app);
+}
+
+GLFWwindow* SceneEditor::glfwWindow() const
+{
+    return gpuDevice().GetWindow();
+}
+
 void SceneEditor::initStreamlineAndWindow()
 {
-    SceneRuntime::initStreamlineAndWindow();
+    if (m_app)
+        sceneSession::initStreamlineAndWindow(*m_app);
 #if CAUSTICA_WITH_PYTHON
     m_pythonScripting = std::make_unique<PythonScripting>(*this);
 #endif
 }
 
-void SceneEditor::bindGpuRenderSubsystem(caustica::GpuRenderSubsystem& gpuRenderSubsystem)
+void SceneEditor::attachGpuRenderSubsystem(GpuRenderSubsystem& gpuRenderSubsystem)
 {
-    SceneRuntime::bindGpuRenderSubsystem(gpuRenderSubsystem);
+    m_gpuRenderSubsystem = &gpuRenderSubsystem;
+    if (m_app)
+        sceneSession::attachGpuRenderSubsystem(*m_app, gpuRenderSubsystem);
     m_inputRouter.bind(*this);
 }
 
 void SceneEditor::onBeforeInitialSceneLoad()
 {
     m_sampleGame = std::make_unique<::GameScene>(*this, m_cmdLine);
-    m_progressLoading.Set(95);
+    m_viewState.progressLoading.Set(95);
 }
 
-void SceneEditor::Init(const std::string& preferredScene,
-    const std::shared_ptr<caustica::ShaderFactory>& shaderFactory)
+void SceneEditor::initializeSession(const std::string& preferredScene)
 {
-    SceneRuntime::Init(preferredScene, shaderFactory);
+    if (m_app)
+        sceneSession::initializeSession(*m_app, preferredScene);
 }
 
 void SceneEditor::PrepareEditorFrame()
@@ -85,7 +342,7 @@ void SceneEditor::PrepareEditorFrame()
     m_settings.DebugExploreDeltaTree = m_editor.ShowDeltaTree;
 }
 
-void SceneEditor::SceneUnloading()
+void SceneEditor::onSceneUnloading()
 {
     m_editor.TogglableNodes = nullptr;
     m_editor.SelectedMaterial = nullptr;
@@ -97,7 +354,8 @@ void SceneEditor::SceneUnloading()
     if (m_sampleGame != nullptr)
         m_sampleGame->SceneUnloading();
 
-    SceneRuntime::SceneUnloading();
+    if (m_app)
+        sceneSession::onSceneUnloading(*m_app);
 }
 
 void SceneEditor::onSceneLoadedEarly()
@@ -106,8 +364,8 @@ void SceneEditor::onSceneLoadedEarly()
     {
         const std::filesystem::path assetsRoot = GetLocalPath(c_AssetsFolder);
         m_sampleGame->SceneLoaded(
-            GetSceneManager()->getScene(),
-            GetSceneManager()->getCurrentScenePath(),
+            sceneManager()->getScene(),
+            sceneManager()->getCurrentScenePath(),
             assetsRoot);
     }
 }
@@ -116,8 +374,8 @@ void SceneEditor::onSceneLoadedBeforeGpuPrep()
 {
     if (m_editor.TogglableNodes == nullptr)
     {
-        auto scene = GetSceneManager()->getScene();
-        auto* ew = scene ? scene->GetEntityWorld() : nullptr;
+        auto activeScene = sceneManager()->getScene();
+        auto* ew = activeScene ? activeScene->GetEntityWorld() : nullptr;
         if (ew)
         {
             m_editor.TogglableNodes = std::make_shared<std::vector<TogglableNode>>();
@@ -148,9 +406,15 @@ void SceneEditor::onSceneLoadedComplete()
 #endif
 }
 
-void SceneEditor::SceneLoaded()
+void SceneEditor::onSceneLoaded()
 {
-    SceneRuntime::SceneLoaded();
+    if (m_app)
+        sceneSession::onSceneLoaded(*m_app);
+}
+
+void SceneEditor::onBeginFrameScheduled()
+{
+    CaptureScriptPreRender();
 }
 
 void SceneEditor::onAnimateBegin(float& fElapsedTimeSeconds)
@@ -158,7 +422,7 @@ void SceneEditor::onAnimateBegin(float& fElapsedTimeSeconds)
     m_captureScriptManager->PreAnim(fElapsedTimeSeconds);
 
 #if CAUSTICA_WITH_PYTHON
-    if (m_pythonScripting && IsSceneLoaded())
+    if (m_pythonScripting && m_app && sceneSession::isSceneLoaded(*m_app))
         m_pythonScripting->ProcessPendingScripts();
 #endif
 }
@@ -172,13 +436,13 @@ void SceneEditor::onAnimateGameTick(float fElapsedTimeSeconds, bool enableAnimat
 void SceneEditor::onAnimateUpdateSceneTime(float /*fElapsedTimeSeconds*/, bool enableAnimations, bool /*enableAnimationUpdate*/)
 {
     if (enableAnimations && m_sampleGame && m_sampleGame->IsInitialized())
-        m_sceneTime = m_sampleGame->GetGameTime();
+        m_viewState.sceneTime = m_sampleGame->GetGameTime();
 }
 
 void SceneEditor::onAnimateGameCamera(float fElapsedTimeSeconds)
 {
     if (m_sampleGame)
-        m_sampleGame->TickCamera(fElapsedTimeSeconds, GetCameraController()->camera());
+        m_sampleGame->TickCamera(fElapsedTimeSeconds, gpuRender()->camera().camera());
 }
 
 void SceneEditor::onAnimateEnd(float /*fElapsedTimeSeconds*/)
@@ -186,39 +450,52 @@ void SceneEditor::onAnimateEnd(float /*fElapsedTimeSeconds*/)
     m_captureScriptManager->PostAnim();
 }
 
-void SceneEditor::Animate(float fElapsedTimeSeconds)
-{
-    SceneRuntime::Animate(fElapsedTimeSeconds);
-}
-
 void SceneEditor::updateWindowTitle()
 {
-    SceneRuntime::updateWindowTitle();
+    if (!m_app)
+        return;
+
+    if (auto activeScene = scene())
+    {
+        SceneManager* manager = sceneManager();
+        std::string extraInfo = ", " + sceneSession::fpsInfo(*m_app) + ", " + manager->getCurrentSceneName()
+            + ", " + sceneSession::resolutionInfo(*m_app) + ", (L: " + std::to_string(activeScene->GetLightEntities().size())
+            + ", MAT: " + std::to_string(activeScene->GetMaterials().size())
+            + ", MESH: " + std::to_string(activeScene->GetMeshes().size())
+            + ", I: " + std::to_string(activeScene->GetMeshInstances().size())
+            + ", SI: " + std::to_string(activeScene->GetSkinnedMeshInstances().size())
+#if ENABLE_DEBUG_VIZUALISATIONS
+            + ", ENABLE_DEBUG_VIZUALISATIONS: 1"
+#endif
+            + ")";
+
+        gpuDevice().SetInformativeWindowTitle(g_windowTitle, false, extraInfo.c_str());
+    }
 }
 
-bool SceneEditor::ShouldRenderUnfocused() const
+bool SceneEditor::shouldRenderWhenUnfocused() const
 {
-    if (GetWorldRenderer()->getFrameIndex() < 16 || m_settings.ResetAccumulation || m_settings.ResetRealtimeCaches || m_captureScriptManager->IsDoingWork())
+    if (worldRenderer()->getFrameIndex() < 16 || m_settings.ResetAccumulation || m_settings.ResetRealtimeCaches || m_captureScriptManager->IsDoingWork())
         return true;
 
     if (m_editor.RenderWhenOutOfFocus)
         return true;
 
-    return SceneRuntime::ShouldRenderUnfocused();
+    return m_app ? sceneSession::shouldRenderWhenUnfocused(*m_app) : false;
 }
 
-void SceneEditor::SetSceneTime(double sceneTime)
+void SceneEditor::setSceneTime(double sceneTime)
 {
     if (m_sampleGame && m_sampleGame->IsInitialized())
         m_sampleGame->SetGameTime(sceneTime);
-    m_sceneTime = sceneTime;
+    m_viewState.sceneTime = sceneTime;
 }
 
-double SceneEditor::GetSceneTime()
+double SceneEditor::sceneTime() const
 {
     if (m_sampleGame && m_sampleGame->IsInitialized())
         return m_sampleGame->GetGameTime();
-    return m_sceneTime;
+    return m_viewState.sceneTime;
 }
 
 void SceneEditor::HandleDroppedFiles()
@@ -298,7 +575,7 @@ void SceneEditor::setMeshVertices(const std::shared_ptr<MeshInfo>& mesh,
 ZoomTool* SceneEditor::GetOrCreateZoomTool()
 {
     if (m_zoomTool == nullptr)
-        m_zoomTool = std::make_unique<ZoomTool>(GetDevice(), GetShaderFactory());
+        m_zoomTool = std::make_unique<ZoomTool>(device(), gpuRender()->shaderFactory());
     return m_zoomTool.get();
 }
 
@@ -310,34 +587,33 @@ bool SceneEditor::ShowDeltaTree() const
 void SceneEditor::ResolvePickFeedback(const DebugFeedbackStruct& feedback)
 {
     if (m_renderState.Picking.MaterialRequested)
-        m_editor.SelectedMaterial = FindMaterial(int(feedback.pickedMaterialID));
+        m_editor.SelectedMaterial = findMaterial(int(feedback.pickedMaterialID));
     if (m_renderState.Picking.InstanceRequested)
     {
-        m_editor.SelectedEntity = FindEntityByInstanceIndex(int(feedback.pickedInstanceIndex));
+        m_editor.SelectedEntity = findEntityByInstanceIndex(int(feedback.pickedInstanceIndex));
         if (m_editor.SelectedEntity != caustica::ecs::NullEntity)
             m_editor.SelectedGaussianSplat = false;
     }
 }
 
-void SceneEditor::afterWorldRender(caustica::GpuDevice& gpuDevice)
+void SceneEditor::afterWorldRender(GpuDevice& gpuDevice)
 {
-    auto* worldRenderer = GetWorldRenderer();
-    if (!worldRenderer)
+    auto* wr = worldRenderer();
+    if (!wr)
         return;
 
     if (m_settings.ContinuousDebugFeedback || m_renderState.Picking.hasActivePickRequest())
-        ResolvePickFeedback(worldRenderer->getFeedbackData());
+        ResolvePickFeedback(wr->getFeedbackData());
 
-    SceneRuntime::afterWorldRender(gpuDevice);
+    if (m_settings.ContinuousDebugFeedback || m_renderState.Picking.hasActivePickRequest())
+        m_renderState.Picking.clearPickRequests();
 
     auto saveFramebuffer = [this, &gpuDevice](const char* fileName) -> bool {
         nvrhi::IFramebuffer* framebuffer = gpuDevice.GetCurrentFramebuffer(true);
         if (!framebuffer)
             return false;
         nvrhi::ITexture* texture = framebuffer->getDesc().colorAttachments[0].texture;
-        auto* renderDevice = GetRenderDevice();
-        if (!renderDevice)
-            return false;
+        auto* renderDevice = &gpuRender()->renderDevice();
         return SaveTextureToFile(
             gpuDevice.GetDevice(), *renderDevice, texture, nvrhi::ResourceStates::Common, fileName);
     };
@@ -347,7 +623,7 @@ void SceneEditor::afterWorldRender(caustica::GpuDevice& gpuDevice)
     {
         nvrhi::IFramebuffer* framebuffer = gpuDevice.GetCurrentFramebuffer(true);
         if (framebuffer)
-            worldRenderer->denoisedScreenshot(framebuffer->getDesc().colorAttachments[0].texture);
+            wr->denoisedScreenshot(framebuffer->getDesc().colorAttachments[0].texture);
     }
 }
 

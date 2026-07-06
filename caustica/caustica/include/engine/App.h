@@ -74,8 +74,11 @@ public:
     void ensurePreUpdateTail();
     void ensurePostUpdateTail();
 
-    [[nodiscard]] bool subsystemSchedulesRegistered() const { return m_subsystemSchedulesRegistered; }
-    void markSubsystemSchedulesRegistered() { m_subsystemSchedulesRegistered = true; }
+    [[nodiscard]] bool sceneSessionSchedulesRegistered() const { return m_sceneSessionSchedulesRegistered; }
+    void markSceneSessionSchedulesRegistered() { m_sceneSessionSchedulesRegistered = true; }
+
+    [[nodiscard]] bool gpuRenderSchedulesRegistered() const { return m_gpuRenderSchedulesRegistered; }
+    void markGpuRenderSchedulesRegistered() { m_gpuRenderSchedulesRegistered = true; }
 
     template<typename T>
     [[nodiscard]] T* getSubsystem() const
@@ -206,20 +209,18 @@ public:
     void processEventQueue();
 
 protected:
-    virtual void onBeginFrame(GpuDevice& gpuDevice);
     virtual void onBeforeAnimate(GpuDevice& gpuDevice, uint32_t frameIndex) {}
-    virtual bool skipRenderPhase() const;
 
     void bindFrameDriver(GpuDevice* dm);
     void unbindFrameDriver(GpuDevice* dm);
 
-    virtual void onUpdate(float elapsedTimeSeconds, bool windowFocused);
-    virtual void onPrepareRenderScene(GpuDevice& gpuDevice);
-    virtual void onRender();
-    virtual void onBackBufferResizing();
-    virtual void onBackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount);
-    virtual void onDisplayScaleChanged(float scaleX, float scaleY);
-    virtual bool shouldRenderWhenUnfocused() const;
+    void onRender();
+    void onBackBufferResizing();
+    void onBackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount);
+    void onDisplayScaleChanged(float scaleX, float scaleY);
+
+    [[nodiscard]] bool skipRenderPhase() const;
+    [[nodiscard]] bool shouldRenderWhenUnfocused() const;
 
     void onWindowEvent(Event& event);
     void installWindowEventCallback();
@@ -234,7 +235,8 @@ protected:
     bool m_graphicsInitialized = false;
     bool m_engineInitialized = false;
     bool m_defaultSchedulesRegistered = false;
-    bool m_subsystemSchedulesRegistered = false;
+    bool m_sceneSessionSchedulesRegistered = false;
+    bool m_gpuRenderSchedulesRegistered = false;
     bool m_preUpdateTailRegistered = false;
     bool m_postUpdateTailRegistered = false;
 
@@ -257,7 +259,7 @@ private:
     bool syncRenderThreadCompletedFrames(AppScheduleContext& context);
     bool dispatchScheduledRender(AppScheduleContext& context);
     void finalizeFrameTiming(GpuDevice& gpuDevice, double elapsedTime, double curTime);
-    void runGpuSubsystemSchedules(GpuDevice& gpuDevice, uint32_t frameIndex);
+    void runGpuRenderSchedules(GpuDevice& gpuDevice, uint32_t frameIndex);
 
     GpuDevice* device() const;
     Window* window() const;

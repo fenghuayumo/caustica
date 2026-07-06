@@ -1,7 +1,6 @@
 #include <engine/SubsystemCollection.h>
 
 #include <algorithm>
-#include <functional>
 
 namespace caustica
 {
@@ -51,51 +50,6 @@ void SubsystemCollection::shutdownAll()
     m_initialized = false;
 }
 
-void SubsystemCollection::onBeginFrame(GpuDevice& gpuDevice)
-{
-    for (const auto& subsystem : m_subsystems)
-    {
-        if (subsystem)
-            subsystem->onBeginFrame(gpuDevice);
-    }
-}
-
-void SubsystemCollection::onUpdate(float elapsedTimeSeconds, bool windowFocused)
-{
-    for (const auto& subsystem : m_subsystems)
-    {
-        if (subsystem)
-            subsystem->onUpdate(elapsedTimeSeconds, windowFocused);
-    }
-}
-
-void SubsystemCollection::onPrepareRenderScene(GpuDevice& gpuDevice)
-{
-    for (const auto& subsystem : m_subsystems)
-    {
-        if (subsystem)
-            subsystem->onPrepareRenderScene(gpuDevice);
-    }
-}
-
-void SubsystemCollection::onRenderScene(GpuDevice& gpuDevice)
-{
-    for (const auto& subsystem : m_subsystems)
-    {
-        if (subsystem)
-            subsystem->onRenderScene(gpuDevice);
-    }
-}
-
-void SubsystemCollection::onRenderEnd(GpuDevice& gpuDevice)
-{
-    for (const auto& subsystem : m_subsystems)
-    {
-        if (subsystem)
-            subsystem->onRenderEnd(gpuDevice);
-    }
-}
-
 void SubsystemCollection::onBackBufferResizing()
 {
     for (const auto& subsystem : m_subsystems)
@@ -111,50 +65,6 @@ void SubsystemCollection::onBackBufferResized(uint32_t width, uint32_t height, u
     {
         if (subsystem)
             subsystem->onBackBufferResized(width, height, sampleCount);
-    }
-}
-
-bool SubsystemCollection::skipRenderPhase() const
-{
-    for (const auto& subsystem : m_subsystems)
-    {
-        if (subsystem && subsystem->skipRenderPhase())
-            return true;
-    }
-    return false;
-}
-
-bool SubsystemCollection::shouldRenderWhenUnfocused() const
-{
-    for (const auto& subsystem : m_subsystems)
-    {
-        if (subsystem && subsystem->shouldRenderWhenUnfocused())
-            return true;
-    }
-    return false;
-}
-
-void SubsystemCollection::forEach(const std::function<void(ISubsystem&)>& fn)
-{
-    if (!fn)
-        return;
-
-    for (const auto& subsystem : m_subsystems)
-    {
-        if (subsystem)
-            fn(*subsystem);
-    }
-}
-
-void SubsystemCollection::forEach(const std::function<void(const ISubsystem&)>& fn) const
-{
-    if (!fn)
-        return;
-
-    for (const auto& subsystem : m_subsystems)
-    {
-        if (subsystem)
-            fn(*subsystem);
     }
 }
 

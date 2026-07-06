@@ -71,8 +71,8 @@ void EditorUI::BuildSystemPanel(const PanelLayout& layout)
             if (ImGui::CollapsingHeader("Info")) //, ImGuiTreeNodeFlags_DefaultOpen))
             {
                 caustica::VideoMemoryInfo videoMemoryInfo;
-                if (caustica::GpuDevice* gpuDevice = GetGpuDevice();
-                    gpuDevice && gpuDevice->QueryVideoMemoryInfo(videoMemoryInfo))
+                if (caustica::GpuDevice* device = GetGpuDevice();
+                    device && device->QueryVideoMemoryInfo(videoMemoryInfo))
                 {
                     ImGui::TextColored(categoryColor, "Video memory:");
                     const uint64_t budget = videoMemoryInfo.budget / (1024 * 1024);
@@ -97,13 +97,13 @@ void EditorUI::BuildCameraPanel(const PanelLayout& layout)
         {
             RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
             std::vector<std::string> options; options.push_back("Free flight");
-            for (uint i = 0; i < m_sceneEditor.GetSceneCameraCount(); i++)
+            for (uint i = 0; i < m_sceneEditor.sceneCameraCount(); i++)
                 options.push_back("Scene cam " + std::to_string(i));
-            uint& currentlySelected = m_sceneEditor.SelectedCameraIndex();
-            currentlySelected = std::min(currentlySelected, (uint)m_sceneEditor.GetSceneCameraCount() - 1);
+            uint& currentlySelected = m_sceneEditor.selectedCameraIndex();
+            currentlySelected = std::min(currentlySelected, (uint)m_sceneEditor.sceneCameraCount() - 1);
             if (ImGui::BeginCombo("Motion", options[currentlySelected].c_str()))
             {
-                for (uint i = 0; i < m_sceneEditor.GetSceneCameraCount(); i++)
+                for (uint i = 0; i < m_sceneEditor.sceneCameraCount(); i++)
                 {
                     bool is_selected = i == currentlySelected;
                     if (ImGui::Selectable(options[i].c_str(), is_selected))
@@ -118,11 +118,11 @@ void EditorUI::BuildCameraPanel(const PanelLayout& layout)
             {
                 ImGui::Text("Camera position: "); 
                 RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
-                if (ImGui::Button("Save to file", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) m_sceneEditor.SaveCurrentCamera(); ImGui::SameLine();
-                if (ImGui::Button("Load from file", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) m_sceneEditor.LoadCurrentCamera();
-                if (ImGui::Button("Save to clipboard", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) ImGui::SetClipboardText(m_sceneEditor.GetCurrentCameraPosDirUp().c_str()); ImGui::SameLine();
+                if (ImGui::Button("Save to file", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) m_sceneEditor.saveCurrentCamera(); ImGui::SameLine();
+                if (ImGui::Button("Load from file", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) m_sceneEditor.loadCurrentCamera();
+                if (ImGui::Button("Save to clipboard", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) ImGui::SetClipboardText(m_sceneEditor.currentCameraPosDirUp().c_str()); ImGui::SameLine();
                 const char *cpbrdtxt = ImGui::GetClipboardText();
-                if (ImGui::Button("Load from clipboard", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) m_sceneEditor.SetCurrentCameraPosDirUp(cpbrdtxt?cpbrdtxt:"");
+                if (ImGui::Button("Load from clipboard", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) m_sceneEditor.setCurrentCameraPosDirUp(cpbrdtxt?cpbrdtxt:"");
             }
 
     #if 1
@@ -133,12 +133,12 @@ void EditorUI::BuildCameraPanel(const PanelLayout& layout)
             m_settings.CameraFocalDistance = dm::clamp(m_settings.CameraFocalDistance, 0.001f, 1e16f);
             ImGui::SliderFloat("Keyboard move speed", &m_settings.CameraMoveSpeed, 0.1f, 10.0f);
 
-            float cameraFOV = 2.0f * dm::degrees(m_sceneEditor.GetCameraVerticalFOV());
+            float cameraFOV = 2.0f * dm::degrees(m_sceneEditor.cameraVerticalFOV());
             if (ImGui::InputFloat("Vertical FOV", &cameraFOV, 0.1f))
             {
                 cameraFOV = dm::clamp(cameraFOV, 1.0f, 360.0f);
                 m_settings.ResetAccumulation = true;
-                m_sceneEditor.SetCameraVerticalFOV(dm::radians(cameraFOV / 2.0f));
+                m_sceneEditor.setCameraVerticalFOV(dm::radians(cameraFOV / 2.0f));
             }
 
             RESET_ON_CHANGE( ImGui::InputFloat("CameraAntiRRSleepJitter", &m_settings.CameraAntiRRSleepJitter, 0.001f ) );

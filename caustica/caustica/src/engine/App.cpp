@@ -1,6 +1,9 @@
 #include <engine/App.h>
 #include <engine/EntryPoint.h>
-#include <engine/SubsystemScheduleRegistration.h>
+#include <engine/GpuRenderScheduleRegistration.h>
+#include <engine/SceneSessionSystems.h>
+#include <engine/SceneViewState.h>
+#include <engine/SceneSessionScheduleRegistration.h>
 
 #include <backend/GpuDevice.h>
 #include <engine/cmdline_utils.h>
@@ -99,7 +102,15 @@ void App::buildPlugins()
     if (!m_defaultSchedulesRegistered)
         registerDefaultSchedules();
 
-    registerSubsystemSchedules(*this);
+    registerSceneSessionSchedules(*this);
+    registerGpuRenderSchedules(*this);
+
+    for (Plugin* plugin : m_pluginRefs)
+    {
+        if (plugin)
+            plugin->configureLateSchedules(*this);
+    }
+
     ensurePreUpdateTail();
     ensurePostUpdateTail();
 
@@ -297,7 +308,8 @@ void App::shutdown()
     m_schedules.clear();
     m_resources.clear();
     m_defaultSchedulesRegistered = false;
-    m_subsystemSchedulesRegistered = false;
+    m_sceneSessionSchedulesRegistered = false;
+    m_gpuRenderSchedulesRegistered = false;
     m_preUpdateTailRegistered = false;
     m_postUpdateTailRegistered = false;
 
@@ -344,7 +356,9 @@ void App::unbindFrameDriver(GpuDevice* gpuDevice)
 
 void App::notifyBackBufferResizing()
 {
-    onBackBufferResizing();
+    sceneSession::backBufferResizing(*this);
+
+    m_engine.onBackBufferResizing();
 }
 
 void App::notifyBackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount)
@@ -434,7 +448,8 @@ void App::updateWindowSize()
 
 void App::animate(double elapsedTime, bool windowIsFocused)
 {
-    onUpdate(float(elapsedTime), windowIsFocused);
+    (void)elapsedTime;
+    (void)windowIsFocused;
 }
 
 void App::render()
@@ -442,36 +457,24 @@ void App::render()
     onRender();
 }
 
-void App::onBeginFrame(GpuDevice& gpuDevice)
-{
-    m_engine.onBeginFrame(gpuDevice);
-}
-
 bool App::skipRenderPhase() const
 {
-    return m_engine.skipRenderPhase();
-}
+    if (tryResource<SceneViewState>())
+        return sceneSession::shouldSkipRender(*this);
 
-void App::onUpdate(float elapsedTimeSeconds, bool windowFocused)
-{
-    m_engine.onUpdate(elapsedTimeSeconds, windowFocused);
-}
-
-void App::onPrepareRenderScene(GpuDevice& gpuDevice)
-{
-    m_engine.onPrepareRenderScene(gpuDevice);
+    return false;
 }
 
 void App::onRender()
 {
     GpuDevice* gpuDevice = device();
-    if (!gpuDevice || m_engine.skipRenderPhase())
+    if (!gpuDevice || skipRenderPhase())
         return;
 
-    runGpuSubsystemSchedules(*gpuDevice, gpuDevice->GetRenderPhaseFrameIndex());
+    runGpuRenderSchedules(*gpuDevice, gpuDevice->GetRenderPhaseFrameIndex());
 }
 
-void App::runGpuSubsystemSchedules(GpuDevice& gpuDevice, uint32_t frameIndex)
+void App::runGpuRenderSchedules(GpuDevice& gpuDevice, uint32_t frameIndex)
 {
     AppScheduleContext context{
         *this,
@@ -504,7 +507,10 @@ void App::onDisplayScaleChanged(float scaleX, float scaleY)
 
 bool App::shouldRenderWhenUnfocused() const
 {
-    return m_engine.shouldRenderWhenUnfocused();
+    if (tryResource<SceneViewState>())
+        return sceneSession::shouldRenderWhenUnfocused(*this);
+
+    return false;
 }
 
 void App::finishFrameWithRenderFailure(GpuDevice* gpuDevice, double elapsedTime, double curTime)

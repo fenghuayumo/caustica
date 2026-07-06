@@ -74,11 +74,8 @@ public:
 
     [[nodiscard]] int priority() const override { return 100; }
 
-    [[nodiscard]] std::string_view scheduleLabel() const override { return "GpuRender"; }
-
     void initialize(EngineInitContext& context) override;
     void shutdown() override;
-    void onRenderEnd(GpuDevice& gpuDevice) override;
 
     bool initializeSession(const GpuRenderSubsystemInitParams& params);
 

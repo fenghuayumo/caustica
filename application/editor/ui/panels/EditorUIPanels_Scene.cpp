@@ -36,12 +36,12 @@ bool EditorUI::BuildSceneComboPanel(const PanelLayout& layout)
     std::string requestedScene;
 
     {
-        const std::string currentScene = m_sceneEditor.GetCurrentSceneName();
+        const std::string currentScene = m_sceneEditor.currentSceneName();
         RAII_SCOPE(ImGui::PushItemWidth(-60.0f * m_currentScale); , ImGui::PopItemWidth(); );
         RAII_SCOPE(ImGui::PushID("SceneComboID"); , ImGui::PopID(); );
         if (ImGui::BeginCombo("Scene", currentScene.c_str()))
         {
-            const std::vector<std::string>& scenes = m_sceneEditor.GetAvailableScenes();
+            const std::vector<std::string>& scenes = m_sceneEditor.availableScenes();
             for (const std::string& scene : scenes)
             {
                 bool is_selected = scene == currentScene;
@@ -59,7 +59,7 @@ bool EditorUI::BuildSceneComboPanel(const PanelLayout& layout)
 
     if (sceneChangeRequested)
     {
-        m_sceneEditor.SetCurrentScene(requestedScene);
+        m_sceneEditor.setCurrentScene(requestedScene);
         return true;
     }
 
@@ -71,14 +71,14 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
         if (ImGui::CollapsingHeader("Scene"/*, ImGuiTreeNodeFlags_DefaultOpen*/))
         {
             RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
-            uint uncompressedTextureCount = (uint)m_sceneEditor.GetUncompressedTextures().size();
+            uint uncompressedTextureCount = (uint)m_sceneEditor.uncompressedTextures().size();
             if (uncompressedTextureCount > 0)
             {
                 ImGui::TextColored(warnColor, "Scene has %d uncompressed textures", uncompressedTextureCount);
                 if (ImGui::Button("Batch compress with nvtt_export.exe", { -1, 0 }))
-                    if (compressTextures(m_sceneEditor.GetUncompressedTextures()))
+                    if (compressTextures(m_sceneEditor.uncompressedTextures()))
                     {   // reload scene
-                        m_sceneEditor.SetCurrentScene(m_sceneEditor.GetCurrentSceneName(), true);
+                        m_sceneEditor.setCurrentScene(m_sceneEditor.currentSceneName(), true);
                     }
             }
 
@@ -90,7 +90,7 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
             ImGui::SameLine();
             if (ImGui::Button("Reset animation time"))
             {
-                m_sceneEditor.SetSceneTime(0);
+                m_sceneEditor.setSceneTime(0);
                 m_settings.ResetAccumulation = true;
             }
 
@@ -197,13 +197,13 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
                 RESET_ON_CHANGE(ImGui::Checkbox("Enabled", &m_settings.EnvironmentMapParams.Enabled));
                 RESET_ON_CHANGE(ImGui::Checkbox("Visible to Camera", &m_settings.EnvironmentMapParams.VisibleToCamera));
 
-                if (m_sceneEditor.GetEnvMapLocalPath() != "==PROCEDURAL_SKY==")
-                    ImGui::TextWrapped("Source: `%s`", m_sceneEditor.GetEnvMapLocalPath().c_str());
+                if (m_sceneEditor.envMapLocalPath() != "==PROCEDURAL_SKY==")
+                    ImGui::TextWrapped("Source: `%s`", m_sceneEditor.envMapLocalPath().c_str());
                 else
                     ImGui::TextWrapped("Source: Procedural Sky");
 
-                std::string overrideSource = m_sceneEditor.GetEnvMapOverrideSource();
-                const std::vector<std::filesystem::path> & envMapMediaList = m_sceneEditor.GetEnvMapMediaList();
+                std::string overrideSource = m_sceneEditor.envMapOverrideSource();
+                const std::vector<std::filesystem::path> & envMapMediaList = m_sceneEditor.envMapMediaList();
 
                 RAII_SCOPE( ImGui::PushItemWidth(-65.0f*m_currentScale);, ImGui::PopItemWidth(); );
                 if (ImGui::BeginCombo("Override", overrideSource.c_str()))
@@ -237,10 +237,10 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
                     ImGui::EndCombo();
                 }
                 if (ImGui::IsItemHovered()) ImGui::SetTooltip("Overrides scene's default environment map");
-                if (m_sceneEditor.GetEnvMapOverrideSource() != overrideSource)
+                if (m_sceneEditor.envMapOverrideSource() != overrideSource)
                 {
                     m_settings.ResetAccumulation = true;
-                    m_sceneEditor.SetEnvMapOverrideSource(overrideSource);
+                    m_sceneEditor.setEnvMapOverrideSource(overrideSource);
                 }
 
                 ImGui::Separator();
@@ -249,7 +249,7 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
                 RESET_ON_CHANGE( ImGui::InputFloat3("Rotation XYZ", (float*)&m_settings.EnvironmentMapParams.RotationXYZ.x) );
                 ImGui::Separator();
 
-                if (auto& envMapProcessor = m_sceneEditor.GetLightingPasses().environment();
+                if (auto& envMapProcessor = m_sceneEditor.lightingPasses().environment();
                     envMapProcessor != nullptr && envMapProcessor->IsProcedural() && envMapProcessor->GetProceduralSky() != nullptr)
                 {
                     ImGui::TextColored(categoryColor, "Procedural Sky settings:");
@@ -261,7 +261,7 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
             if (ImGui::CollapsingHeader("Materials"))
             {
                 RAII_SCOPE( ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
-                if (auto& materialGpuCache = m_sceneEditor.GetLightingPasses().materials(); materialGpuCache != nullptr)
+                if (auto& materialGpuCache = m_sceneEditor.lightingPasses().materials(); materialGpuCache != nullptr)
                     materialGpuCache->debugGui(layout.indent);
             }
         }
@@ -292,7 +292,7 @@ void EditorUI::BuildSceneWidgetsPanel(const PanelLayout& layout)
         )
     {
 
-        std::string envMapOverrideSource = m_sceneEditor.GetEnvMapOverrideSource();
+        std::string envMapOverrideSource = m_sceneEditor.envMapOverrideSource();
         std::vector<std::string> envOptions;
         envOptions.push_back( c_EnvMapSceneDefault );
         //envOptions.push_back( c_EnvMapProcSky );
@@ -304,7 +304,7 @@ void EditorUI::BuildSceneWidgetsPanel(const PanelLayout& layout)
         int envOptionsCurrentIndex = -1; for (int i = 0; i < envOptions.size(); i++) if (envOptions[i]==envMapOverrideSource) envOptionsCurrentIndex = i;
 
         std::vector<std::string> materialVariants;
-        if (FindSubStringIgnoreCase(m_sceneEditor.GetCurrentSceneName(), "bistro") != std::string::npos)
+        if (FindSubStringIgnoreCase(m_sceneEditor.currentSceneName(), "bistro") != std::string::npos)
             materialVariants = {"dry", "wet", "silly"};
         int materialVariantIndexPrev = m_settings.MaterialVariantIndex;
 
@@ -398,20 +398,20 @@ void EditorUI::BuildSceneWidgetsPanel(const PanelLayout& layout)
 
         if (envOptionsCurrentIndex >= 0 && envOptionsCurrentIndex < envOptions.size() && envOptions[envOptionsCurrentIndex] != envMapOverrideSource )
         {
-            m_sceneEditor.SetEnvMapOverrideSource(envOptions[envOptionsCurrentIndex]);
+            m_sceneEditor.setEnvMapOverrideSource(envOptions[envOptionsCurrentIndex]);
         }
 
         if (m_settings.MaterialVariantIndex != materialVariantIndexPrev)
         {
-            if (FindSubStringIgnoreCase(m_sceneEditor.GetCurrentSceneName(), "bistro") != std::string::npos)
+            if (FindSubStringIgnoreCase(m_sceneEditor.currentSceneName(), "bistro") != std::string::npos)
             {
                 // bistro dry-wet test
                 std::vector<std::string> pavementList = { "LMBR0000163Cobbl_a1d987f5", "LMBR000016bCobbl_8652c51e", "LMBR0000162Paris_c30c71f1", "LMBR0000162Paris_c30c71f1", "LMBR000016cCobbl_f202ecfa", "LMBR0000161Pavem_e2e87964", "LMBR0000168Cobbl_a5a7f4b4", "LMBR0000160Pavem_613287fe", "LMBR000016aCobbl_e1c68d26" };
                 for (std::string& id : pavementList)
-                    if (auto m = m_sceneEditor.GetLightingPasses().materials()->findByUniqueId(id))
+                    if (auto m = m_sceneEditor.lightingPasses().materials()->findByUniqueId(id))
                     {
                         if (m_settings.MaterialVariantIndex == 0) // reset to default
-                            m_sceneEditor.GetLightingPasses().materials()->loadSingle(*m);
+                            m_sceneEditor.lightingPasses().materials()->loadSingle(*m);
                         else
                         {   // make wet-looking
                             m->roughness = 0.0f;
@@ -422,10 +422,10 @@ void EditorUI::BuildSceneWidgetsPanel(const PanelLayout& layout)
 
                 std::vector<std::string> emissivesList = { "LMBR0000172Paris_1d83765c" /*bollards*/, "LMBR00000aeGreen_04f5ae02" /*green leaves*/, "LMBR00000afOrang_a907f305" /*yellow leaves*/, "LMBR00000b0Branc_5990161e" /*branches*/ };
                 for (std::string& id : emissivesList)
-                    if (auto m = m_sceneEditor.GetLightingPasses().materials()->findByUniqueId(id))
+                    if (auto m = m_sceneEditor.lightingPasses().materials()->findByUniqueId(id))
                     {
                         if (m_settings.MaterialVariantIndex == 0 || m_settings.MaterialVariantIndex == 1) // reset to default
-                            m_sceneEditor.GetLightingPasses().materials()->loadSingle(*m);
+                            m_sceneEditor.lightingPasses().materials()->loadSingle(*m);
                         else
                         {   // silly stuff
                             if (id == "LMBR0000172Paris_1d83765c")
@@ -464,7 +464,7 @@ void EditorUI::BuildHierarchyPanel(const PanelLayout& layout)
         ImGui::SetNextWindowSize(ImVec2(layout.defWindowWidth, layout.scaledHeight * 0.45f), ImGuiCond_Appearing);
         RAII_SCOPE(ImGui::Begin("Hierarchy", nullptr, ImGuiWindowFlags_None);, ImGui::End(););
 
-        auto scene = m_sceneEditor.GetScene();
+        auto scene = m_sceneEditor.scene();
         auto* ew = scene ? scene->GetEntityWorld() : nullptr;
 
         if (ew && ew->root() != ecs::NullEntity)

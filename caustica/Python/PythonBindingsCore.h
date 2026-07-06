@@ -5,7 +5,7 @@
 //
 //   - Embed     : module-level `app()` returns the singleton SceneEditor set
 //                 by PythonScripting (g_pythonSceneEditorSingleton).
-//   - Extension : Renderer.app returns the RenderSession-owned SceneRuntime.
+//   - Extension : Renderer.app returns the RenderSession-owned SceneSession.
 
 #pragma once
 

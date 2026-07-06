@@ -40,31 +40,6 @@ void Engine::shutdown()
     m_initialized = false;
 }
 
-void Engine::onBeginFrame(GpuDevice& gpuDevice)
-{
-    m_subsystems.onBeginFrame(gpuDevice);
-}
-
-void Engine::onUpdate(float elapsedTimeSeconds, bool windowFocused)
-{
-    m_subsystems.onUpdate(elapsedTimeSeconds, windowFocused);
-}
-
-void Engine::onPrepareRenderScene(GpuDevice& gpuDevice)
-{
-    m_subsystems.onPrepareRenderScene(gpuDevice);
-}
-
-void Engine::onRenderScene(GpuDevice& gpuDevice)
-{
-    m_subsystems.onRenderScene(gpuDevice);
-}
-
-void Engine::onRenderEnd(GpuDevice& gpuDevice)
-{
-    m_subsystems.onRenderEnd(gpuDevice);
-}
-
 void Engine::onBackBufferResizing()
 {
     m_subsystems.onBackBufferResizing();
@@ -73,16 +48,6 @@ void Engine::onBackBufferResizing()
 void Engine::onBackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount)
 {
     m_subsystems.onBackBufferResized(width, height, sampleCount);
-}
-
-bool Engine::skipRenderPhase() const
-{
-    return m_subsystems.skipRenderPhase();
-}
-
-bool Engine::shouldRenderWhenUnfocused() const
-{
-    return m_subsystems.shouldRenderWhenUnfocused();
 }
 
 void Engine::syncSwapChain(GpuDevice& gpuDevice, App& app)

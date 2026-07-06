@@ -33,7 +33,7 @@ namespace caustica::editor
 void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
 {
     // Inspector panel: instance Transform + mesh name (right-click pick)
-    auto scene = m_sceneEditor.GetScene();
+    auto scene = m_sceneEditor.scene();
     auto* ew = scene ? scene->GetEntityWorld() : nullptr;
     if (m_editorUI.SelectedEntity != ecs::NullEntity && m_editorUI.ShowInspector && ew)
     {
@@ -157,7 +157,7 @@ void EditorUI::BuildMaterialEditorPanel(const PanelLayout& layout)
 {
     // Material Editor panel (right-click pick)
     std::shared_ptr<PTMaterial> material = PTMaterial::safeCast(m_editorUI.SelectedMaterial);
-    if (material != nullptr && m_sceneEditor.GetLightingPasses().materials() != nullptr && m_editorUI.ShowMaterialEditor)
+    if (material != nullptr && m_sceneEditor.lightingPasses().materials() != nullptr && m_editorUI.ShowMaterialEditor)
     {
         const bool inspectorVisible = m_editorUI.SelectedEntity != ecs::NullEntity && m_editorUI.ShowInspector;
         ImGui::SetNextWindowPos(ImVec2(float(layout.scaledWidth) - 10.f, inspectorVisible ? 350.f : 10.f), ImGuiCond_Appearing, ImVec2(1.f, 0.f));
@@ -175,7 +175,7 @@ void EditorUI::BuildMaterialEditorPanel(const PanelLayout& layout)
 
         MaterialShaderPermutationKey mspBefore = MaterialShaderPermutationKey(material->computeShaderPermutation(""));
 
-        bool dirty = material->editorGui(*m_sceneEditor.GetLightingPasses().materials());
+        bool dirty = material->editorGui(*m_sceneEditor.lightingPasses().materials());
 
         MaterialShaderPermutationKey mspAfter = MaterialShaderPermutationKey(material->computeShaderPermutation(""));
 
@@ -188,8 +188,8 @@ void EditorUI::BuildMaterialEditorPanel(const PanelLayout& layout)
             wasSkipRender != material->skipRender ||
             dirty)
         {
-            if (auto s = m_sceneEditor.GetScene())
-                s->RefreshSceneWorld(m_sceneEditor.GetFrameIndex());
+            if (auto s = m_sceneEditor.scene())
+                s->RefreshSceneWorld(m_sceneEditor.frameIndex());
             m_settings.ResetAccumulation = 1;
         }
 

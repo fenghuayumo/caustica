@@ -34,17 +34,8 @@ public:
     bool initialize(EngineInitContext context);
     void shutdown();
 
-    void onBeginFrame(GpuDevice& gpuDevice);
-    void onUpdate(float elapsedTimeSeconds, bool windowFocused);
-    void onPrepareRenderScene(GpuDevice& gpuDevice);
-    void onRenderScene(GpuDevice& gpuDevice);
-    void onRenderEnd(GpuDevice& gpuDevice);
-
     void onBackBufferResizing();
     void onBackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount);
-
-    [[nodiscard]] bool skipRenderPhase() const;
-    [[nodiscard]] bool shouldRenderWhenUnfocused() const;
 
     static void syncSwapChain(GpuDevice& gpuDevice, App& app);
 

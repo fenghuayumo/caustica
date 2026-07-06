@@ -42,7 +42,7 @@ void EditorUI::BuildLightingPanel(const PanelLayout& layout)
 
             {
                 RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent););
-                if (auto& lightSamplingCache = m_sceneEditor.GetLightingPasses().lightSampling(); lightSamplingCache != nullptr)
+                if (auto& lightSamplingCache = m_sceneEditor.lightingPasses().lightSampling(); lightSamplingCache != nullptr)
                     m_settings.ResetAccumulation |= lightSamplingCache->InfoGUI(layout.indent);
             }
 
@@ -53,7 +53,7 @@ void EditorUI::BuildLightingPanel(const PanelLayout& layout)
                 if (ImGui::CollapsingHeader("Distant lighting (envmap+directional)", 0/*ImGuiTreeNodeFlags_DefaultOpen*/))
                 {
                     RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent););
-                    if (auto& envMapProcessor = m_sceneEditor.GetLightingPasses().environment(); envMapProcessor != nullptr)
+                    if (auto& envMapProcessor = m_sceneEditor.lightingPasses().environment(); envMapProcessor != nullptr)
                         m_settings.ResetAccumulation |= envMapProcessor->DebugGUI(layout.indent);
                 }
             }
@@ -61,7 +61,7 @@ void EditorUI::BuildLightingPanel(const PanelLayout& layout)
             ImGui::TextColored(categoryColor, "Importance sampling:");
             {
                 RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent););
-                if (auto& lightSamplingCache = m_sceneEditor.GetLightingPasses().lightSampling(); lightSamplingCache != nullptr)
+                if (auto& lightSamplingCache = m_sceneEditor.lightingPasses().lightSampling(); lightSamplingCache != nullptr)
                 {
                     if( m_settings.NEEType != 2 )
                     {
@@ -96,7 +96,7 @@ void EditorUI::BuildLightingPanel(const PanelLayout& layout)
                     ImGui::TextColored(categoryColor, "Debugging:");
                     {
                         RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent););
-                        if (auto& lightSamplingCache = m_sceneEditor.GetLightingPasses().lightSampling(); lightSamplingCache != nullptr)
+                        if (auto& lightSamplingCache = m_sceneEditor.lightingPasses().lightSampling(); lightSamplingCache != nullptr)
                             m_settings.ResetAccumulation |= lightSamplingCache->DebugGUI(layout.indent);
                     }
                 }
@@ -151,8 +151,8 @@ void EditorUI::BuildPathTracerPanel(const PanelLayout& layout)
                     RESET_ON_CHANGE( ImGui::InputInt("Sample count", &m_settings.AccumulationTarget) );
                     m_settings.AccumulationTarget = dm::clamp(m_settings.AccumulationTarget, 1, 4 * 1024 * 1024); // this max is beyond float32 precision threshold; expect some banding creeping in when using more than 500k samples
                     if (ImGui::IsItemHovered()) ImGui::SetTooltip("Number of path samples per pixel to collect");
-                    ImGui::Text("Accumulated samples: %d (out of %d target)", m_sceneEditor.GetAccumulationSampleIndex(), m_settings.AccumulationTarget);
-                    ImGui::Text("(avg frame time: %.3fms)", m_sceneEditor.GetAvgTimePerFrame() * 1000.0f);
+                    ImGui::Text("Accumulated samples: %d (out of %d target)", m_sceneEditor.accumulationSampleIndex(), m_settings.AccumulationTarget);
+                    ImGui::Text("(avg frame time: %.3fms)", m_sceneEditor.avgTimePerFrame() * 1000.0f);
 
                     RESET_ON_CHANGE(ImGui::Checkbox("Pre-warm real-time caches", &m_settings.AccumulationPreWarmRealtimeCaches));
                     if (ImGui::IsItemHovered()) ImGui::SetTooltip("If enabled, various lighting and etc systems will be pre-warmed before sample 0 is \naccumulated; otherwise they're reset and initial few samples will be lower quality.");

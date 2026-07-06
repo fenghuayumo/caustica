@@ -52,12 +52,13 @@ bool startupEditor(caustica::App& app, EditorSession& session, int argc, const c
         };
     }
 
-    const SceneRuntimeSubsystemConfig sceneConfig{
-        .sceneRuntime = session.sceneEditor,
+    const SceneSessionConfig sceneConfig{
+        .viewState = session.sceneEditor.viewState(),
         .diagnostics = session.sessionDiagnostics,
         .preferredScene = preferredScene,
         .sessionState = &session.editorUiData.session,
         .cmdLine = &session.cmdLine,
+        .hooks = &session.sceneEditor.hooks(),
         .applyCmdLineToSessionState = session.cmdLine.noWindow || automatedRun,
     };
 
@@ -69,11 +70,11 @@ bool startupEditor(caustica::App& app, EditorSession& session, int argc, const c
             .editorUiData = session.editorUiData,
             .cmdLine = session.cmdLine,
         };
-        app.addPlugin<EditorPlugin>(sceneConfig, &uiConfig);
+        app.addPlugin<EditorPlugin>(sceneConfig, session.sceneEditor, &uiConfig);
     }
     else
     {
-        app.addPlugin<EditorPlugin>(sceneConfig, static_cast<const EditorUISubsystemConfig*>(nullptr));
+        app.addPlugin<EditorPlugin>(sceneConfig, session.sceneEditor, static_cast<const EditorUISubsystemConfig*>(nullptr));
     }
 
     app.setEventHandler([&session, &app](Event& event) {

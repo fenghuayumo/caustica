@@ -2,7 +2,7 @@
 
 #include <engine/GpuRenderSubsystem.h>
 #include <engine/Plugin.h>
-#include <engine/SceneRuntimeSubsystem.h>
+#include <engine/SceneSessionSubsystem.h>
 
 namespace caustica
 {
@@ -10,15 +10,15 @@ namespace caustica
 // Minimal runtime: GPU infra + scene session (no editor UI).
 struct DefaultPlugins : Plugin
 {
-    explicit DefaultPlugins(SceneRuntimeSubsystemConfig sceneConfig)
-        : sceneConfig(std::move(sceneConfig))
+    explicit DefaultPlugins(SceneSessionConfig sessionConfig)
+        : sessionConfig(std::move(sessionConfig))
     {
     }
 
     void build(App& app) override;
     void configureSchedules(App& app) override;
 
-    SceneRuntimeSubsystemConfig sceneConfig;
+    SceneSessionConfig sessionConfig;
 };
 
 } // namespace caustica
