@@ -115,36 +115,6 @@ namespace
         updateFpsInfo(app, frameTime);
     }
 
-    void updateWindowTitleDefault(App& app)
-    {
-        if (auto activeScene = sceneSession::scene(app))
-        {
-            SceneViewState* vs = sceneSession::viewState(app);
-            ::SceneManager* manager = localSceneManager(app);
-            GpuDevice* device = sceneSession::gpuDevice(app);
-            if (!vs || !manager || !device)
-                return;
-
-            std::string extraInfo = ", " + vs->fpsInfo + ", " + manager->getCurrentSceneName() + ", "
-                + sceneSession::resolutionInfo(app) + ", (L: " + std::to_string(activeScene->GetLightEntities().size())
-                + ", MAT: " + std::to_string(activeScene->GetMaterials().size())
-                + ", MESH: " + std::to_string(activeScene->GetMeshes().size())
-                + ", I: " + std::to_string(activeScene->GetMeshInstances().size())
-                + ", SI: " + std::to_string(activeScene->GetSkinnedMeshInstances().size())
-#if ENABLE_DEBUG_VIZUALISATIONS
-                + ", ENABLE_DEBUG_VIZUALISATIONS: 1"
-#endif
-                + ")";
-
-            device->SetInformativeWindowTitle(g_windowTitle, false, extraInfo.c_str());
-        }
-    }
-
-    void updateWindowTitle(App& app)
-    {
-        updateWindowTitleDefault(app);
-    }
-
     void applySceneSwitch(App& app, const std::string& sceneName, bool forceReload)
     {
         ::SceneManager* manager = localSceneManager(app);
@@ -360,35 +330,6 @@ void attachGpuRenderSubsystem(App& app, GpuRenderSubsystem& gpuRenderSubsystem)
 const std::string& envMapLocalPath(const App& app) { return gpuRender(app)->lightingPasses().envMapLocalPath(); }
 const std::string& envMapOverrideSource(const App& app) { return gpuRender(app)->lightingPasses().envMapOverride(); }
 const std::vector<std::filesystem::path>& envMapMediaList(App& app) { return gpuRender(app)->lightingPasses().envMapMediaList(); }
-
-void prepareRenderFrame(App& app)
-{
-    SceneViewState* vs = viewState(app);
-    SessionDiagnostics* diag = diagnostics(app);
-    GpuDevice* device = gpuDevice(app);
-    if (vs)
-        vs->progressLoading.Stop();
-    if (diag)
-        diag->asyncLoadingInProgress = false;
-
-    if (!device)
-        return;
-
-    const std::shared_ptr<Scene> activeScene = scene(app);
-    if (!activeScene)
-        return;
-
-    activeScene->extractAndPublishRenderSnapshot(device->GetPreparedRenderFrameIndex());
-}
-
-void refreshEntityWorld(App& app, uint32_t frameIndex)
-{
-    const std::shared_ptr<Scene> activeScene = scene(app);
-    if (!activeScene)
-        return;
-
-    activeScene->refreshEntityWorldForFrame(frameIndex);
-}
 
 std::shared_ptr<Scene> scene(const App& app)
 {
@@ -879,7 +820,6 @@ void animate(App& app, float fElapsedTimeSeconds)
         frameTime = static_cast<double>(fElapsedTimeSeconds);
     updateFpsInfo(app, frameTime);
 
-    ::updateWindowTitle(app);
 }
 
 std::string resolutionInfo(const App& app)

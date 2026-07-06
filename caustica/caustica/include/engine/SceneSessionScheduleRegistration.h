@@ -5,7 +5,7 @@ namespace caustica
 
 class App;
 
-// Explicit Update/PreRender/PostUpdate systems for SceneSession (animate, prepareRenderFrame, ECS refresh).
+// Registers the built-in SceneSession plugin systems.
 // Requires SceneSession registered on App via registerSceneSessionResources().
 void registerSceneSessionSchedules(App& app);
 
