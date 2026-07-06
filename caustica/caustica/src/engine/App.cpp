@@ -158,27 +158,27 @@ void App::registerDefaultSchedules()
         return;
 
 #if CAUSTICA_WITH_STREAMLINE
-    addSystem(AppSchedule::Update, "StreamlineSimStart", [](AppScheduleContext& ctx) {
+    addSystem(AppSchedule::First, "StreamlineSimStart", [](AppScheduleContext& ctx) {
         if (ctx.gpuDevice && !ctx.gpuDevice->m_DeviceParams.headlessDevice)
             StreamlineIntegration::Get().SimStart(*ctx.gpuDevice);
     });
 #endif
 
-    addSystem(AppSchedule::Update, "BeforeFrame", [](AppScheduleContext& ctx) {
+    addSystem(AppSchedule::First, "BeforeFrame", [](AppScheduleContext& ctx) {
         if (ctx.gpuDevice && ctx.app.beforeFrame)
             ctx.app.beforeFrame(*ctx.gpuDevice, ctx.frameIndex);
     });
 
-    addSystem(AppSchedule::Update, "ProcessEventQueue", [](AppScheduleContext& ctx) {
+    addSystem(AppSchedule::First, "ProcessEventQueue", [](AppScheduleContext& ctx) {
         ctx.app.processEventQueue();
     });
 
-    addSystem(AppSchedule::Update, "NotifyDpiScale", [](AppScheduleContext& ctx) {
+    addSystem(AppSchedule::PreUpdate, "NotifyDpiScale", [](AppScheduleContext& ctx) {
         if (ctx.runRender && ctx.gpuDevice)
             ctx.app.notifyDpiScaleIfChanged(*ctx.gpuDevice);
     });
 
-    addSystem(AppSchedule::Update, "BeforeAnimate", [](AppScheduleContext& ctx) {
+    addSystem(AppSchedule::PreUpdate, "BeforeAnimate", [](AppScheduleContext& ctx) {
         if (!ctx.gpuDevice)
             return;
 
@@ -201,10 +201,9 @@ void App::ensureUpdateTail()
         return;
 
     AppSystemOrdering ordering;
-    ordering.before.push_back("NotifyDpiScale");
-    ordering.before.push_back("BeforeAnimate");
+    ordering.after.push_back("ProcessEventQueue");
 
-    addSystem(AppSchedule::Update, "SyncRenderThread", [](AppScheduleContext& ctx) {
+    addSystem(AppSchedule::First, "SyncRenderThread", [](AppScheduleContext& ctx) {
         if (!ctx.app.syncRenderThreadCompletedFrames(ctx))
             ctx.abortFrame = true;
     }, std::move(ordering));
@@ -217,8 +216,8 @@ void App::ensurePostUpdateTail()
     if (m_postUpdateTailRegistered)
         return;
 
-    addSystem(AppSchedule::PostUpdate, "AfterAnimate", [](AppScheduleContext& ctx) {
-        if (!ctx.gpuDevice)
+    addSystem(AppSchedule::Last, "AfterAnimate", [](AppScheduleContext& ctx) {
+        if (!ctx.runUpdate || !ctx.gpuDevice)
             return;
 
 #if CAUSTICA_WITH_STREAMLINE
@@ -719,6 +718,12 @@ bool App::runFrame(std::optional<double> elapsedTimeOverride)
     if (scheduleContext.runUpdate)
     {
         scheduleContext.windowFocused = scheduleContext.runRender;
+        runSchedule(AppSchedule::First, scheduleContext);
+        if (scheduleContext.abortFrame)
+            return false;
+        runSchedule(AppSchedule::PreUpdate, scheduleContext);
+        if (scheduleContext.abortFrame)
+            return false;
         runSchedule(AppSchedule::Update, scheduleContext);
         if (scheduleContext.abortFrame)
             return false;
@@ -735,6 +740,7 @@ bool App::runFrame(std::optional<double> elapsedTimeOverride)
         runSchedule(AppSchedule::PostRender, scheduleContext);
     }
 
+    runSchedule(AppSchedule::Last, scheduleContext);
     finalizeFrameTiming(*gpuDevice, elapsedTime, curTime);
     return true;
 }

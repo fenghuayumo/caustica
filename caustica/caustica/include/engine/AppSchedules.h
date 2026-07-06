@@ -14,11 +14,14 @@ class GpuDevice;
 enum class AppSchedule
 {
     Startup,
+    First,
+    PreUpdate,
     Update,
     PostUpdate,
     Extract,
     Render,
     PostRender,
+    Last,
     Shutdown,
     Count,
 };

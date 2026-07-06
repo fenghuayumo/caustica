@@ -98,7 +98,7 @@ struct EditorPlugin : Plugin
 
     {
 
-        app.addSystemBefore(AppSchedule::Update, "EditorScene.BeginFrame", "SceneSession.BeginFrame", [this](AppScheduleContext& ctx) {
+        app.addSystemBefore(AppSchedule::First, "EditorScene.BeginFrame", "SceneSession.BeginFrame", [this](AppScheduleContext& ctx) {
 
             (void)ctx;
 
@@ -108,7 +108,7 @@ struct EditorPlugin : Plugin
 
 
 
-        app.addSystemAfter(AppSchedule::Update, "EditorScene.RequestUnfocusedRender", "NotifyDpiScale", [this](AppScheduleContext& ctx) {
+        app.addSystemAfter(AppSchedule::PreUpdate, "EditorScene.RequestUnfocusedRender", "NotifyDpiScale", [this](AppScheduleContext& ctx) {
 
             if (ctx.runRender || !ctx.windowVisible || m_sceneEditor.shouldSkipRender())
 
@@ -132,7 +132,7 @@ struct EditorPlugin : Plugin
 
 
 
-        app.addSystemBefore(AppSchedule::Update, "EditorScene.AnimateBegin", "SceneSession.Animate", [this](AppScheduleContext& ctx) {
+        app.addSystemAfter(AppSchedule::PreUpdate, "EditorScene.AnimateBegin", "BeforeAnimate", [this](AppScheduleContext& ctx) {
 
             if (!ctx.windowFocused)
 

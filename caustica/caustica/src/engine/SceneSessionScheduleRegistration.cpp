@@ -34,7 +34,7 @@ void registerSceneSessionSchedules(App& app)
 
 
 
-    app.addSystemBefore(AppSchedule::Update, "SceneSession.BeginFrame", "NotifyDpiScale", [](AppScheduleContext& ctx) {
+    app.addSystemAfter(AppSchedule::First, "SceneSession.BeginFrame", "SyncRenderThread", [](AppScheduleContext& ctx) {
 
         sceneSession::beginFrameScheduled(ctx.app);
 
@@ -42,7 +42,7 @@ void registerSceneSessionSchedules(App& app)
 
 
 
-    app.addSystemAfter(AppSchedule::Update, "SceneSession.Animate", "BeforeAnimate", [](AppScheduleContext& ctx) {
+    app.addSystem(AppSchedule::Update, "SceneSession.Animate", [](AppScheduleContext& ctx) {
 
         if (!ctx.windowFocused)
 
@@ -56,7 +56,7 @@ void registerSceneSessionSchedules(App& app)
 
 
 
-    app.addSystemBefore(AppSchedule::PostUpdate, "SceneSession.RefreshEntityWorld", "AfterAnimate", [](AppScheduleContext& ctx) {
+    app.addSystem(AppSchedule::PostUpdate, "SceneSession.RefreshEntityWorld", [](AppScheduleContext& ctx) {
 
         sceneSession::refreshEntityWorld(ctx.app, ctx.frameIndex);
 

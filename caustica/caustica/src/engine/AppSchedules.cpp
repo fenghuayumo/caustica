@@ -11,11 +11,14 @@ const char* toString(AppSchedule schedule)
     switch (schedule)
     {
     case AppSchedule::Startup: return "Startup";
+    case AppSchedule::First: return "First";
+    case AppSchedule::PreUpdate: return "PreUpdate";
     case AppSchedule::Update: return "Update";
     case AppSchedule::PostUpdate: return "PostUpdate";
     case AppSchedule::Extract: return "Extract";
     case AppSchedule::Render: return "Render";
     case AppSchedule::PostRender: return "PostRender";
+    case AppSchedule::Last: return "Last";
     case AppSchedule::Shutdown: return "Shutdown";
     default: return "Unknown";
     }
