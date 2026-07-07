@@ -75,7 +75,7 @@ public:
     void createOpacityMicromaps(caustica::Scene& scene);
 
     void forEachUsedMaterialTexture(
-        const std::function<void(std::shared_ptr<caustica::LoadedTexture>, bool normalMap)>& visitor);
+        const std::function<void(caustica::Handle<caustica::ImageAsset>, bool normalMap)>& visitor);
 
 private:
     std::string                                 m_envMapLocalPath;

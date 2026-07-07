@@ -23,7 +23,7 @@ public:
 		struct Geometry
 		{
 			int geometryIndexInMesh = -1;
-			std::shared_ptr < caustica::TextureData > alphaTexture;
+			std::shared_ptr < caustica::ImageAsset > alphaTexture;
 
 			// Settings
 			uint32_t maxSubdivisionLevel = 5;

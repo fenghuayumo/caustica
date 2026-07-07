@@ -7,6 +7,8 @@
 #include <scene/SceneRenderSnapshot.h>
 #include <scene/SceneRenderCommandQueue.h>
 #include <scene/SceneImport.h>
+#include <assets/Handle.h>
+#include <assets/TypedAssets.h>
 #include <backend/IDescriptorTableManager.h>
 #include <rhi/nvrhi.h>
 #include <atomic>
@@ -15,6 +17,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <utility>
 
 namespace Json
 {
@@ -63,6 +66,7 @@ namespace caustica
         std::filesystem::path m_textureSearchDirectory;
 
         std::shared_ptr<render::SceneGpuResources> m_GpuResources;
+        Handle<SceneAsset> m_Asset;
 
         void LoadModelAsync(
             uint32_t index,
@@ -170,6 +174,8 @@ namespace caustica
         [[nodiscard]] std::shared_ptr<SampleSettings> GetSampleSettingsNode() const { return m_loadedSettings; }
         [[nodiscard]] std::shared_ptr<GameSettings>   GetGameSettingsNode() const   { return m_loadedGameSettings; }
         [[nodiscard]] const std::vector<SceneImportResult>& GetModels() const        { return m_Models; }
+        [[nodiscard]] const Handle<SceneAsset>& GetAssetHandle() const               { return m_Asset; }
+        void SetAssetHandle(Handle<SceneAsset> asset)                                { m_Asset = std::move(asset); }
 
     };
 }

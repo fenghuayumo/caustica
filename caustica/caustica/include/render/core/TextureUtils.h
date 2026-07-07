@@ -1,10 +1,10 @@
 #pragma once
 
+#include <assets/Handle.h>
+#include <assets/ImageAsset.h>
 #include <rhi/nvrhi.h>
 #include <map>
 #include <memory>
-
-namespace caustica { struct LoadedTexture; }
 
 // Texture compression type for batch compression with nvtt_export.
 // Moved from editor/SampleCommon/SampleCommon.h
@@ -34,4 +34,4 @@ inline uint64_t getEstimatedTextureSize(const nvrhi::TextureDesc& desc)
 
 // Batch-compress uncompressed textures using nvtt_export.
 // Moved from editor/SampleCommon/SampleCommon.cpp
-bool compressTextures(std::map<std::shared_ptr<caustica::LoadedTexture>, TextureCompressionType>& uncompressedTextures);
+bool compressTextures(std::map<caustica::Handle<caustica::ImageAsset>, TextureCompressionType>& uncompressedTextures);

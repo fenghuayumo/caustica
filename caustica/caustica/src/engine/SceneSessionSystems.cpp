@@ -5,6 +5,7 @@
 #include <engine/RenderThread.h>
 #include <engine/SceneViewState.h>
 
+#include <assets/AssetSystem.h>
 #include <render/RenderSessionState.h>
 #include <render/SceneGaussianSplatPasses.h>
 #include <render/SceneLightingPasses.h>
@@ -162,6 +163,28 @@ namespace
         return true;
     }
 
+    bool processHotReloadChanges(App& app)
+    {
+        AssetSystem* assets = app.tryResource<AssetSystem>();
+        ::SceneManager* manager = localSceneManager(app);
+        if (!assets || !manager || manager->isSceneLoading())
+            return false;
+
+        const std::vector<HotReloadChange> changes = assets->pollHotReloadChanges();
+        if (changes.empty())
+            return false;
+
+        const std::string sceneName = manager->getCurrentSceneName();
+        const std::filesystem::path scenePath = manager->getCurrentScenePath();
+        if (sceneName.empty() || scenePath == std::filesystem::path(SceneManager::inlineSceneSentinel()))
+            return false;
+
+        caustica::info("Hot reload: detected %zu asset source change(s), reloading scene '%s'",
+            changes.size(), sceneName.c_str());
+        applySceneSwitch(app, sceneName, true);
+        return true;
+    }
+
     void tickSceneSwitchTest(App& app)
     {
         const CommandLineOptions* cmd = sceneSession::cmdLine(app);
@@ -199,7 +222,8 @@ namespace
 
     void beginFrame(App& app)
     {
-        processPendingSceneSwitch(app);
+        if (!processPendingSceneSwitch(app))
+            processHotReloadChanges(app);
         tickSceneSwitchTest(app);
     }
 
@@ -639,11 +663,11 @@ void collectUncompressedTextures(App& app)
     assert(vs);
     vs->uncompressedTextures.clear();
 
-    auto listUncompressedTextureIfNeeded = [&](std::shared_ptr<LoadedTexture> texture, bool normalMap)
+    auto listUncompressedTextureIfNeeded = [&](Handle<ImageAsset> texture, bool normalMap)
     {
-        if (texture == nullptr || texture->texture == nullptr)
+        if (texture == nullptr || texture->gpu.texture == nullptr)
             return;
-        nvrhi::TextureDesc desc = texture->texture->getDesc();
+        nvrhi::TextureDesc desc = texture->gpu.texture->getDesc();
         if (nvrhi::getFormatInfo(desc.format).blockSize != 1)
             return;
         TextureCompressionType compressionType = normalMap ? (TextureCompressionType::Normalmap) : (
@@ -656,7 +680,7 @@ void collectUncompressedTextures(App& app)
             return;
         }
     };
-    gpuRender(app)->lightingPasses().forEachUsedMaterialTexture([&](std::shared_ptr<LoadedTexture> texture, bool normalMap)
+    gpuRender(app)->lightingPasses().forEachUsedMaterialTexture([&](Handle<ImageAsset> texture, bool normalMap)
     {
         listUncompressedTextureIfNeeded(texture, normalMap);
     });

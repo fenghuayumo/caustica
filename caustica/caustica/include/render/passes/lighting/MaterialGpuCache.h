@@ -28,8 +28,8 @@ namespace caustica
     class TextureHandle;
     class ShaderFactory;
     namespace render { class RenderDevice; }
-    struct TextureData;
-    struct LoadedTexture;
+    struct ImageAsset;
+    struct ImageAsset;
 }
 
 class ShaderDebug;
@@ -87,7 +87,7 @@ struct PTTexture
 {
     std::filesystem::path   localPath;
     bool                    sRGB = false;   // whether to assume that, when loading from sRGB agnostic formats, the texture's .rgb channels are in sRGB (.a is always linear)
-    std::shared_ptr<caustica::LoadedTexture>
+    caustica::Handle<caustica::ImageAsset>
         loaded;
     bool                    normalMap = false; // determines unpacking (not actually used as a flag now by shading, but normalmaps are marked as so for future use)
 
@@ -97,7 +97,7 @@ struct PTTexture
     // float4                  ValueMultiply;
     // float4                  ValueAdd;
 
-    void                    initFromLoadedTexture(std::shared_ptr<caustica::LoadedTexture>& loaded, bool sRGB, bool normalMap, const std::filesystem::path& mediaPath);
+    void                    initFromLoadedTexture(caustica::Handle<caustica::ImageAsset>& loaded, bool sRGB, bool normalMap, const std::filesystem::path& mediaPath);
 };
 
 // All materials share these base properties and some of them have tight integration with the rest of the renderer

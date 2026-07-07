@@ -1,12 +1,14 @@
 #include "EditorPlugin.h"
 
 #include <engine/App.h>
+#include <engine/AssetPlugin.h>
 
 namespace caustica::editor
 {
 
 void EditorPlugin::build(App& app)
 {
+    registerAssetPlugin(app);
     registerSceneSessionResources(app, sessionConfig);
     app.insertResourceRef(m_sceneEditor);
     app.insertResourceRef(m_sceneEditor.editorState());

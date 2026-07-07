@@ -49,11 +49,11 @@ SampleProceduralSky::~SampleProceduralSky()
         m_textureCache->unloadTexture(m_noiseTexture);
 }
 
-nvrhi::TextureHandle SampleProceduralSky::GetTransmittanceTexture() const { return m_transmittanceTexture->texture; }
-nvrhi::TextureHandle SampleProceduralSky::GetScatterringTexture() const { return m_scatterringTexture->texture; }
-nvrhi::TextureHandle SampleProceduralSky::GetIrradianceTexture() const { return m_irradianceTexture->texture; }
-nvrhi::TextureHandle SampleProceduralSky::GetCloudsTexture() const { return m_cloudsTexture->texture; }
-nvrhi::TextureHandle SampleProceduralSky::GetNoiseTexture() const { return m_noiseTexture->texture; }
+nvrhi::TextureHandle SampleProceduralSky::GetTransmittanceTexture() const { return m_transmittanceTexture->gpu.texture; }
+nvrhi::TextureHandle SampleProceduralSky::GetScatterringTexture() const { return m_scatterringTexture->gpu.texture; }
+nvrhi::TextureHandle SampleProceduralSky::GetIrradianceTexture() const { return m_irradianceTexture->gpu.texture; }
+nvrhi::TextureHandle SampleProceduralSky::GetCloudsTexture() const { return m_cloudsTexture->gpu.texture; }
+nvrhi::TextureHandle SampleProceduralSky::GetNoiseTexture() const { return m_noiseTexture->gpu.texture; }
 
 // Time independent lerp function. The bigger the lerpRate, the faster the lerp! (based on continuously compounded interest rate I think)
 inline float TimeIndependentLerpF(float deltaTime, float lerpRate)

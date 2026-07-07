@@ -53,12 +53,12 @@ TextureLoader::TextureLoader(
     std::shared_ptr<IFileSystem> fs,
     std::shared_ptr<IDescriptorTableManager> descriptorTable,
     AssetRegistry& registry,
-    AssetCache<TextureData>& cache)
+    AssetStore<ImageAsset>& images)
     : m_Device(device)
     , m_DescriptorTable(std::move(descriptorTable))
     , m_fs(std::move(fs))
     , m_Registry(registry)
-    , m_Cache(cache)
+    , m_Images(images)
 {
 }
 
@@ -69,11 +69,11 @@ TextureLoader::~TextureLoader()
 
 void TextureLoader::reset()
 {
-    m_Cache.forEach([&](const AssetId& id, std::shared_ptr<TextureData>, CacheState) {
+    m_Images.forEach([&](const AssetId& id, std::shared_ptr<ImageAsset>) {
         m_Registry.unregisterAsset(id);
     });
 
-    m_Cache.clear();
+    m_Images.clear();
     m_TexturesRequested = 0;
     m_TexturesLoaded = 0;
 }
@@ -83,24 +83,23 @@ void TextureLoader::setGenerateMipmaps(bool generateMipmaps)
     m_GenerateMipmaps = generateMipmaps;
 }
 
-void TextureLoader::registerTextureAsset(const std::shared_ptr<TextureData>& texture)
+void TextureLoader::registerTextureAsset(const std::shared_ptr<ImageAsset>& texture)
 {
     if (texture->path.empty())
         return;
 
     AssetId id = m_Registry.registerAsset(texture->path, AssetType::Texture);
-    texture->assetIdLow = id.low;
-    texture->assetIdHigh = id.high;
+    texture->id = id;
     m_Registry.setState(id, AssetState::Loaded);
 }
 
-bool TextureLoader::findTextureInCache(const std::filesystem::path& path, std::shared_ptr<TextureData>& texture)
+bool TextureLoader::findTextureInCache(const std::filesystem::path& path, std::shared_ptr<ImageAsset>& texture)
 {
     AssetId id = m_Registry.findByPath(path);
 
     if (id.isValid())
     {
-        texture = m_Cache.getAny(id);
+        texture = m_Images.get(id);
         if (texture)
             return true;
     }
@@ -111,9 +110,8 @@ bool TextureLoader::findTextureInCache(const std::filesystem::path& path, std::s
     if (!id.isValid())
         id = m_Registry.registerAsset(path, AssetType::Texture);
 
-    texture->assetIdLow = id.low;
-    texture->assetIdHigh = id.high;
-    m_Cache.insert(id, texture);
+    texture->id = id;
+    (void)m_Images.insert(id, texture);
 
     ++m_TexturesRequested;
     return false;
@@ -129,14 +127,14 @@ std::shared_ptr<IBlob> TextureLoader::readTextureFile(const std::filesystem::pat
     return fileData;
 }
 
-std::shared_ptr<TextureData> TextureLoader::createTextureData()
+std::shared_ptr<ImageAsset> TextureLoader::createTextureData()
 {
-    return std::make_shared<TextureData>();
+    return std::make_shared<ImageAsset>();
 }
 
 bool TextureLoader::fillTextureData(
     const std::shared_ptr<IBlob>& fileData,
-    const std::shared_ptr<TextureData>& texture,
+    const std::shared_ptr<ImageAsset>& texture,
     const std::string& extension,
     const std::string& mimeType) const
 {
@@ -270,7 +268,7 @@ bool TextureLoader::fillTextureData(
     return true;
 }
 
-void TextureLoader::textureLoaded(std::shared_ptr<TextureData> texture)
+void TextureLoader::textureLoaded(std::shared_ptr<ImageAsset> texture)
 {
     std::lock_guard<std::mutex> guard(m_TexturesToFinalizeMutex);
 
@@ -284,16 +282,16 @@ void TextureLoader::textureLoaded(std::shared_ptr<TextureData> texture)
     registerTextureAsset(texture);
 }
 
-std::shared_ptr<LoadedTexture> TextureLoader::loadTextureFromFile(
+Handle<ImageAsset> TextureLoader::loadTextureFromFile(
     const std::filesystem::path& path,
     bool sRGB,
     render::RenderDevice* renderDevice,
     nvrhi::ICommandList* commandList)
 {
-    std::shared_ptr<TextureData> texture;
+    std::shared_ptr<ImageAsset> texture;
 
     if (findTextureInCache(path, texture))
-        return texture;
+        return makeHandle(texture);
 
     texture->forceSRGB = sRGB;
     texture->path = path.generic_string();
@@ -309,17 +307,17 @@ std::shared_ptr<LoadedTexture> TextureLoader::loadTextureFromFile(
     }
 
     ++m_TexturesLoaded;
-    return texture;
+    return makeHandle(texture);
 }
 
-std::shared_ptr<LoadedTexture> TextureLoader::loadTextureFromFileDeferred(
+Handle<ImageAsset> TextureLoader::loadTextureFromFileDeferred(
     const std::filesystem::path& path,
     bool sRGB)
 {
-    std::shared_ptr<TextureData> texture;
+    std::shared_ptr<ImageAsset> texture;
 
     if (findTextureInCache(path, texture))
-        return texture;
+        return makeHandle(texture);
 
     texture->forceSRGB = sRGB;
     texture->path = path.generic_string();
@@ -337,18 +335,18 @@ std::shared_ptr<LoadedTexture> TextureLoader::loadTextureFromFileDeferred(
     }
 
     ++m_TexturesLoaded;
-    return texture;
+    return makeHandle(texture);
 }
 
-std::shared_ptr<LoadedTexture> TextureLoader::loadTextureFromFileAsync(
+Handle<ImageAsset> TextureLoader::loadTextureFromFileAsync(
     const std::filesystem::path& path,
     bool sRGB,
     ThreadPool& threadPool)
 {
-    std::shared_ptr<TextureData> texture;
+    std::shared_ptr<ImageAsset> texture;
 
     if (findTextureInCache(path, texture))
-        return texture;
+        return makeHandle(texture);
 
     texture->forceSRGB = sRGB;
     texture->path = path.generic_string();
@@ -370,21 +368,24 @@ std::shared_ptr<LoadedTexture> TextureLoader::loadTextureFromFileAsync(
         ++m_TexturesLoaded;
     });
 
-    return texture;
+    return makeHandle(texture);
 }
 
-std::shared_ptr<LoadedTexture> TextureLoader::loadTextureFromMemoryAsync(
+Handle<ImageAsset> TextureLoader::loadTextureFromMemoryAsync(
     const std::shared_ptr<IBlob>& data,
     const std::string& name,
     const std::string& mimeType,
     bool sRGB,
     ThreadPool& threadPool)
 {
-    std::shared_ptr<TextureData> texture = createTextureData();
+    std::shared_ptr<ImageAsset> texture = createTextureData();
 
     texture->forceSRGB = sRGB;
     texture->path = name;
     texture->mimeType = mimeType;
+    AssetId id = m_Registry.registerAsset(name, AssetType::Texture);
+    texture->id = id;
+    (void)m_Images.insert(id, texture);
 
     threadPool.AddTask([this, texture, data, mimeType]()
     {
@@ -399,10 +400,10 @@ std::shared_ptr<LoadedTexture> TextureLoader::loadTextureFromMemoryAsync(
         ++m_TexturesLoaded;
     });
 
-    return texture;
+    return makeHandle(texture);
 }
 
-std::shared_ptr<LoadedTexture> TextureLoader::loadTextureFromMemory(
+Handle<ImageAsset> TextureLoader::loadTextureFromMemory(
     const std::shared_ptr<IBlob>& data,
     const std::string& name,
     const std::string& mimeType,
@@ -410,11 +411,14 @@ std::shared_ptr<LoadedTexture> TextureLoader::loadTextureFromMemory(
     render::RenderDevice* renderDevice,
     nvrhi::ICommandList* commandList)
 {
-    std::shared_ptr<TextureData> texture = createTextureData();
+    std::shared_ptr<ImageAsset> texture = createTextureData();
 
     texture->forceSRGB = sRGB;
     texture->path = name;
     texture->mimeType = mimeType;
+    AssetId id = m_Registry.registerAsset(name, AssetType::Texture);
+    texture->id = id;
+    (void)m_Images.insert(id, texture);
 
     if (fillTextureData(data, texture, "", mimeType))
     {
@@ -423,20 +427,23 @@ std::shared_ptr<LoadedTexture> TextureLoader::loadTextureFromMemory(
     }
 
     ++m_TexturesLoaded;
-    return texture;
+    return makeHandle(texture);
 }
 
-std::shared_ptr<LoadedTexture> TextureLoader::loadTextureFromMemoryDeferred(
+Handle<ImageAsset> TextureLoader::loadTextureFromMemoryDeferred(
     const std::shared_ptr<IBlob>& data,
     const std::string& name,
     const std::string& mimeType,
     bool sRGB)
 {
-    std::shared_ptr<TextureData> texture = createTextureData();
+    std::shared_ptr<ImageAsset> texture = createTextureData();
 
     texture->forceSRGB = sRGB;
     texture->path = name;
     texture->mimeType = mimeType;
+    AssetId id = m_Registry.registerAsset(name, AssetType::Texture);
+    texture->id = id;
+    (void)m_Images.insert(id, texture);
 
     if (fillTextureData(data, texture, "", mimeType))
     {
@@ -447,15 +454,15 @@ std::shared_ptr<LoadedTexture> TextureLoader::loadTextureFromMemoryDeferred(
     }
 
     ++m_TexturesLoaded;
-    return texture;
+    return makeHandle(texture);
 }
 
-std::shared_ptr<TextureData> TextureLoader::getLoadedTexture(std::filesystem::path const& path)
+std::shared_ptr<ImageAsset> TextureLoader::getLoadedTexture(std::filesystem::path const& path)
 {
     AssetId id = m_Registry.findByPath(path);
     if (!id.isValid())
         return nullptr;
-    return m_Cache.getAny(id);
+    return m_Images.get(id);
 }
 
 void TextureLoader::setMaxTextureSize(uint32_t size)
@@ -463,27 +470,31 @@ void TextureLoader::setMaxTextureSize(uint32_t size)
     m_MaxTextureSize = size;
 }
 
-bool TextureLoader::isTextureLoaded(const std::shared_ptr<LoadedTexture>& loadedTexture)
+bool TextureLoader::isTextureLoaded(const Handle<ImageAsset>& image)
 {
-    auto* texture = static_cast<TextureData*>(loadedTexture.get());
-    return texture && texture->data;
+    return image && image->data;
 }
 
-bool TextureLoader::isTextureFinalized(const std::shared_ptr<LoadedTexture>& texture)
+bool TextureLoader::isTextureFinalized(const Handle<ImageAsset>& texture)
 {
-    return texture->texture != nullptr;
+    return texture && texture->gpu.texture != nullptr;
 }
 
-bool TextureLoader::unloadTexture(const std::shared_ptr<LoadedTexture>& texture)
+bool TextureLoader::unloadTexture(const Handle<ImageAsset>& texture)
 {
-    AssetId id{texture->assetIdLow, texture->assetIdHigh};
+    AssetId id = texture.id();
     if (!id.isValid())
         return false;
 
-    if (!m_Cache.getAny(id))
+    if (!m_Images.get(id))
         return false;
 
     m_Registry.unregisterAsset(id);
-    m_Cache.remove(id);
+    m_Images.remove(id);
     return true;
+}
+
+Handle<ImageAsset> TextureLoader::makeHandle(const std::shared_ptr<ImageAsset>& texture) const
+{
+    return texture ? Handle<ImageAsset>(texture->id, texture) : Handle<ImageAsset>();
 }

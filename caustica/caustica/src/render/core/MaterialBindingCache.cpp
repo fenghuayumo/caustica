@@ -85,9 +85,9 @@ void MaterialBindingCache::clear()
     m_bindingSets.clear();
 }
 
-nvrhi::BindingSetItem MaterialBindingCache::getTextureBindingSetItem(uint32_t slot, const std::shared_ptr<LoadedTexture>& texture) const
+nvrhi::BindingSetItem MaterialBindingCache::getTextureBindingSetItem(uint32_t slot, const Handle<ImageAsset>& texture) const
 {
-    return nvrhi::BindingSetItem::Texture_SRV(slot, texture && texture->texture ? texture->texture.Get() : m_fallbackTexture.Get());
+    return nvrhi::BindingSetItem::Texture_SRV(slot, texture && texture->gpu.texture ? texture->gpu.texture.Get() : m_fallbackTexture.Get());
 }
 
 nvrhi::BindingSetHandle MaterialBindingCache::createMaterialBindingSet(const Material* material)

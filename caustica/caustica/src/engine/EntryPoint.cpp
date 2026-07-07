@@ -1,7 +1,6 @@
 #include <engine/EntryPoint.h>
 #include <engine/App.h>
 
-#include <assets/AssetSystem.h>
 #include <assets/loader/TextureLoader.h>
 #include <core/JobSystem.h>
 #include <core/log.h>
@@ -39,7 +38,6 @@ int runApp(App& app, const std::function<bool(App&)>& startup, AppHook preGpuIni
 
     const auto shutdownOnFailure = [&app]() {
         app.shutdown();
-        AssetSystem::shutdown();
         JobSystem::Shutdown();
     };
 
@@ -82,7 +80,6 @@ int runApp(App& app, const std::function<bool(App&)>& startup, AppHook preGpuIni
 
     app.run();
 
-    AssetSystem::shutdown();
     JobSystem::Shutdown();
 
 #ifdef _WIN32

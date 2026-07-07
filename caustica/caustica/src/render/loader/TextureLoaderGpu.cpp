@@ -31,7 +31,7 @@ uint32_t GetMipLevelsNum(uint32_t width, uint32_t height)
 } // namespace
 
 void TextureLoader::finalizeTexture(
-    std::shared_ptr<TextureData> texture,
+    std::shared_ptr<ImageAsset> texture,
     render::RenderDevice* renderDevice,
     nvrhi::ICommandList* commandList)
 {
@@ -95,13 +95,13 @@ void TextureLoader::finalizeTexture(
         : texture->mipLevels;
     textureDesc.debugName = texture->path;
     textureDesc.isRenderTarget = texture->isRenderTarget;
-    texture->texture = m_Device->createTexture(textureDesc);
+    texture->gpu.texture = m_Device->createTexture(textureDesc);
 
-    commandList->beginTrackingTextureState(texture->texture, nvrhi::AllSubresources, nvrhi::ResourceStates::Common);
+    commandList->beginTrackingTextureState(texture->gpu.texture, nvrhi::AllSubresources, nvrhi::ResourceStates::Common);
 
     if (m_DescriptorTable)
-        texture->bindlessDescriptor = m_DescriptorTable->createDescriptorHandle(
-            nvrhi::BindingSetItem::Texture_SRV(0, texture->texture));
+        texture->gpu.bindlessDescriptor = m_DescriptorTable->createDescriptorHandle(
+            nvrhi::BindingSetItem::Texture_SRV(0, texture->gpu.texture));
 
     if (scaledWidth != originalWidth || scaledHeight != originalHeight)
     {
@@ -127,7 +127,7 @@ void TextureLoader::finalizeTexture(
         }
 
         nvrhi::FramebufferHandle framebuffer = m_Device->createFramebuffer(
-            nvrhi::FramebufferDesc().addColorAttachment(texture->texture));
+            nvrhi::FramebufferDesc().addColorAttachment(texture->gpu.texture));
 
         renderDevice->blit().blitTexture(commandList, framebuffer, tempTexture);
     }
@@ -139,7 +139,7 @@ void TextureLoader::finalizeTexture(
             {
                 const TextureSubresourceData& layout = texture->dataLayout[arraySlice][mipLevel];
 
-                commandList->writeTexture(texture->texture, arraySlice, mipLevel, dataPointer + layout.dataOffset,
+                commandList->writeTexture(texture->gpu.texture, arraySlice, mipLevel, dataPointer + layout.dataOffset,
                     layout.rowPitch, layout.depthPitch);
             }
         }
@@ -151,18 +151,18 @@ void TextureLoader::finalizeTexture(
     {
         nvrhi::FramebufferHandle framebuffer = m_Device->createFramebuffer(nvrhi::FramebufferDesc()
             .addColorAttachment(nvrhi::FramebufferAttachment()
-                .setTexture(texture->texture)
+                .setTexture(texture->gpu.texture)
                 .setArraySlice(0)
                 .setMipLevel(mipLevel)));
 
         render::BlitParameters blitParams;
-        blitParams.sourceTexture = texture->texture;
+        blitParams.sourceTexture = texture->gpu.texture;
         blitParams.sourceMip = mipLevel - 1;
         blitParams.targetFramebuffer = framebuffer;
         renderDevice->blit().blitTexture(commandList, blitParams);
     }
 
-    commandList->setPermanentTextureState(texture->texture, nvrhi::ResourceStates::ShaderResource);
+    commandList->setPermanentTextureState(texture->gpu.texture, nvrhi::ResourceStates::ShaderResource);
     commandList->commitBarriers();
 
     ++m_TexturesFinalized;
@@ -177,7 +177,7 @@ bool TextureLoader::processRenderingThreadCommands(render::RenderDevice& renderD
     uint32_t commandsExecuted = 0;
     while (true)
     {
-        std::shared_ptr<TextureData> pTexture;
+        std::shared_ptr<ImageAsset> pTexture;
 
         if (timeLimitMilliseconds > 0 && commandsExecuted > 0)
         {

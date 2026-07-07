@@ -7,9 +7,9 @@
 namespace caustica
 {
 class IBlob;
-struct TextureData;
+struct ImageAsset;
 
-bool loadDDSTextureFromMemory(TextureData& textureInfo);
+bool loadDDSTextureFromMemory(ImageAsset& textureInfo);
 
 nvrhi::TextureHandle createDDSTextureFromMemory(
     nvrhi::IDevice* device,

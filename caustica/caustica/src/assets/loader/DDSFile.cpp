@@ -459,7 +459,7 @@ namespace caustica
         return TextureAlphaMode::UNKNOWN;
     }
 
-    static size_t FillTextureInfoOffsets(TextureData& textureInfo, size_t dataSize, ptrdiff_t dataOffset)
+    static size_t FillTextureInfoOffsets(ImageAsset& textureInfo, size_t dataSize, ptrdiff_t dataOffset)
     {
         textureInfo.originalBitsPerPixel = BitsPerPixel(textureInfo.format);
 
@@ -504,7 +504,7 @@ namespace caustica
         return dataOffset;
     }
 
-    bool loadDDSTextureFromMemory(TextureData& textureInfo)
+    bool loadDDSTextureFromMemory(ImageAsset& textureInfo)
     {
         if (textureInfo.data->size() < sizeof(uint32_t) + sizeof(DDS_HEADER))
         {
@@ -692,7 +692,7 @@ namespace caustica
         return true;
     }
 
-    static nvrhi::TextureHandle CreateDDSTextureInternal(nvrhi::IDevice* device, nvrhi::ICommandList* commandList, TextureData& info, const char* debugName)
+    static nvrhi::TextureHandle CreateDDSTextureInternal(nvrhi::IDevice* device, nvrhi::ICommandList* commandList, ImageAsset& info, const char* debugName)
     {
         if (!loadDDSTextureFromMemory(info))
             return nullptr;
@@ -735,7 +735,7 @@ namespace caustica
         if (!data)
             return nullptr;
 
-        TextureData info;
+        ImageAsset info;
         info.data = data;
         info.forceSRGB = forceSRGB;
 
@@ -808,7 +808,7 @@ namespace caustica
             return nullptr;
         }
 
-        TextureData textureInfo = {};
+        ImageAsset textureInfo = {};
         textureInfo.format = textureDesc.format;
         textureInfo.arraySize = textureDesc.arraySize;
         textureInfo.width = textureDesc.width;

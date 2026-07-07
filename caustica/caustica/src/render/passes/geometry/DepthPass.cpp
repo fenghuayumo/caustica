@@ -267,11 +267,11 @@ bool DepthPass::setupMaterial(GeometryPassContext& abstractContext, const causti
     key.bits.cullMode = cullMode;
 
     bool const hasBaseOrDiffuseTexture = material->baseOrDiffuseTexture
-        && material->baseOrDiffuseTexture->texture
+        && material->baseOrDiffuseTexture->gpu.texture
         && material->enableBaseOrDiffuseTexture;
 
     bool const hasOpacityTexture = material->opacityTexture
-        && material->opacityTexture->texture
+        && material->opacityTexture->gpu.texture
         && material->enableOpacityTexture;
         
     if (material->domain == MaterialDomain::AlphaTested && (hasBaseOrDiffuseTexture || hasOpacityTexture))

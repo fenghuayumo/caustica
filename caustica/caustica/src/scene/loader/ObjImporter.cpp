@@ -312,7 +312,7 @@ namespace
         bytes.insert(bytes.end(), begin, begin + size);
     }
 
-    std::shared_ptr<LoadedTexture> LoadGeneratedObjTexture(
+    Handle<ImageAsset> LoadGeneratedObjTexture(
         TextureLoader& textureCache,
         const std::string& generatedName,
         const std::vector<uint8_t>& rgba,
@@ -690,7 +690,7 @@ namespace
         return false;
     }
 
-    std::shared_ptr<LoadedTexture> BuildObjMetalRoughTexture(
+    Handle<ImageAsset> BuildObjMetalRoughTexture(
         const ObjMaterialInfo& material,
         const std::filesystem::path& objFilePath,
         TextureLoader& textureCache)
@@ -739,7 +739,7 @@ namespace
             false);
     }
 
-    std::shared_ptr<LoadedTexture> BuildObjSpecGlossTexture(
+    Handle<ImageAsset> BuildObjSpecGlossTexture(
         const ObjMaterialInfo& material,
         const std::filesystem::path& objFilePath,
         TextureLoader& textureCache)
@@ -1037,7 +1037,7 @@ bool ObjImporter::Load(const std::filesystem::path& filePath, TextureLoader& tex
         mesh->buffers->tangentData.push_back(dm::vectorToSnorm8(dm::float4(tangent, handedness)));
     }
 
-    auto loadObjTexture = [&](const std::filesystem::path& texturePath, bool sRGB) -> std::shared_ptr<LoadedTexture>
+    auto loadObjTexture = [&](const std::filesystem::path& texturePath, bool sRGB) -> Handle<ImageAsset>
     {
         if (texturePath.empty())
             return nullptr;
@@ -1052,7 +1052,7 @@ bool ObjImporter::Load(const std::filesystem::path& filePath, TextureLoader& tex
         return textureCache.loadTextureFromFileDeferred(texturePath, sRGB);
     };
 
-    auto loadObjTextureReference = [&](const ObjTextureReference& texture, bool sRGB) -> std::shared_ptr<LoadedTexture>
+    auto loadObjTextureReference = [&](const ObjTextureReference& texture, bool sRGB) -> Handle<ImageAsset>
     {
         return loadObjTexture(texture.path, sRGB);
     };

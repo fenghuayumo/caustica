@@ -1,5 +1,6 @@
 #pragma once
 
+#include <assets/AssetId.h>
 #include <core/DescriptorHandle.h>
 #include <rhi/nvrhi.h>
 
@@ -11,10 +12,6 @@
 namespace caustica
 {
 class IBlob;
-}
-
-namespace caustica
-{
 
 enum class TextureAlphaMode
 {
@@ -58,17 +55,43 @@ struct TextureSwizzle
     TextureSwizzle() { channels.fill(-1); }
 };
 
-struct LoadedTexture
+struct TextureSubresourceData
+{
+    size_t rowPitch = 0;
+    size_t depthPitch = 0;
+    ptrdiff_t dataOffset = 0;
+    size_t dataSize = 0;
+};
+
+struct GpuImage
 {
     nvrhi::TextureHandle texture;
-    TextureAlphaMode alphaMode = TextureAlphaMode::UNKNOWN;
-    uint32_t originalBitsPerPixel = 0;
     DescriptorHandle bindlessDescriptor;
+};
+
+struct ImageAsset
+{
+    AssetId id = AssetId::invalid();
     std::string path;
     std::string mimeType;
-    uint64_t assetIdLow = 0;
-    uint64_t assetIdHigh = 0;
+
+    std::shared_ptr<IBlob> data;
+    TextureAlphaMode alphaMode = TextureAlphaMode::UNKNOWN;
+    uint32_t originalBitsPerPixel = 0;
+
+    nvrhi::Format format = nvrhi::Format::UNKNOWN;
+    uint32_t width = 1;
+    uint32_t height = 1;
+    uint32_t depth = 1;
+    uint32_t arraySize = 1;
+    uint32_t mipLevels = 1;
+    nvrhi::TextureDimension dimension = nvrhi::TextureDimension::Unknown;
+    bool isRenderTarget = false;
+    bool forceSRGB = false;
+
+    std::vector<std::vector<TextureSubresourceData>> dataLayout;
     std::vector<TextureSwizzle> swizzleOptions;
+    GpuImage gpu;
 };
 
 } // namespace caustica

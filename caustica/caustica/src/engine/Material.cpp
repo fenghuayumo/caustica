@@ -8,13 +8,13 @@ namespace caustica
     void Material::FillConstantBuffer(MaterialConstants& constants, bool useResourceDescriptorHeapBindless) const
     {
         // Create lambda to handle bindless texture index retrieval
-        auto GetBindlessTextureIndex = [useResourceDescriptorHeapBindless](const std::shared_ptr<LoadedTexture>& texture) -> int {
+        auto GetBindlessTextureIndex = [useResourceDescriptorHeapBindless](const Handle<ImageAsset>& texture) -> int {
             if (!texture)
                 return -1;
             
             return useResourceDescriptorHeapBindless 
-                ? texture->bindlessDescriptor.GetIndexInHeap()
-                : texture->bindlessDescriptor.Get();
+                ? texture->gpu.bindlessDescriptor.GetIndexInHeap()
+                : texture->gpu.bindlessDescriptor.Get();
         };
 
         // flags

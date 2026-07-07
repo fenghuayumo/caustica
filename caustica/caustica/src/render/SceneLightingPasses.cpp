@@ -135,7 +135,7 @@ void SceneLightingPasses::createOpacityMicromaps(caustica::Scene& scene)
 }
 
 void SceneLightingPasses::forEachUsedMaterialTexture(
-    const std::function<void(std::shared_ptr<caustica::LoadedTexture>, bool normalMap)>& visitor)
+    const std::function<void(caustica::Handle<caustica::ImageAsset>, bool normalMap)>& visitor)
 {
     if (m_materials == nullptr)
         return;

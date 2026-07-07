@@ -1,14 +1,14 @@
 #include <render/core/TextureUtils.h>
 
 #include <core/log.h>
-#include <scene/SceneTypes.h> // for LoadedTexture
+#include <scene/SceneTypes.h> // for ImageAsset
 
 #include <filesystem>
 #include <fstream>
 #include <string>
 
 bool compressTextures(
-    std::map<std::shared_ptr<caustica::LoadedTexture>, TextureCompressionType>& uncompressedTextures)
+    std::map<caustica::Handle<caustica::ImageAsset>, TextureCompressionType>& uncompressedTextures)
 {
     std::string batchFileName = std::string(getenv("localappdata")) +
         "\\temp\\caustica_compressor.bat";

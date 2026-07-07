@@ -9,6 +9,8 @@
 
 #pragma once
 
+#include <assets/Handle.h>
+#include <assets/ImageAsset.h>
 #include <render/core/BindingCache.h>
 #include <rhi/nvrhi.h>
 #include <math/math.h>
@@ -27,8 +29,6 @@ namespace caustica
     class TextureHandle;
     class ShaderFactory;
     namespace render { class RenderDevice; }
-    struct TextureData;
-    struct LoadedTexture;
 }
 
 class SampleProceduralSky 
@@ -53,11 +53,11 @@ private:
     nvrhi::DeviceHandle                             m_device;
     std::shared_ptr<caustica::TextureLoader>    m_textureCache;
 
-    std::shared_ptr<caustica::LoadedTexture>   m_transmittanceTexture;
-    std::shared_ptr<caustica::LoadedTexture>   m_scatterringTexture;
-    std::shared_ptr<caustica::LoadedTexture>   m_irradianceTexture;
-    std::shared_ptr<caustica::LoadedTexture>   m_cloudsTexture;
-    std::shared_ptr<caustica::LoadedTexture>   m_noiseTexture;
+    caustica::Handle<caustica::ImageAsset>   m_transmittanceTexture;
+    caustica::Handle<caustica::ImageAsset>   m_scatterringTexture;
+    caustica::Handle<caustica::ImageAsset>   m_irradianceTexture;
+    caustica::Handle<caustica::ImageAsset>   m_cloudsTexture;
+    caustica::Handle<caustica::ImageAsset>   m_noiseTexture;
 
     float3                          m_colorTint                 = float3(1.45f, 1.29f, 1.27f);
     float                           m_brightness                = 1.0f;

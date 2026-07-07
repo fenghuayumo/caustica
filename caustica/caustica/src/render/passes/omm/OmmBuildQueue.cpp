@@ -20,7 +20,7 @@ namespace
             return false;
 
         const std::shared_ptr<PTMaterial> materialPT = PTMaterial::safeCast(meshGeometry->material);
-        if (!materialPT || !materialPT->baseTexture.loaded || !materialPT->baseTexture.loaded->texture)
+        if (!materialPT || !materialPT->baseTexture.loaded || !materialPT->baseTexture.loaded->gpu.texture)
             return false;
 
         return mesh.buffers && mesh.buffers->indexBuffer && mesh.buffers->vertexBuffer;
@@ -42,7 +42,7 @@ namespace
 
         omm::GpuBakeNvrhi::Input params;
         params.operation = op;
-        params.alphaTexture = materialPT->baseTexture.loaded->texture;
+        params.alphaTexture = materialPT->baseTexture.loaded->gpu.texture;
         params.alphaCutoff = materialPT->alphaCutoff;
         params.alphaCutoffGreater = geometry.alphaCutoffGT;
         params.alphaCutoffLessEqual = geometry.alphaCutoffLE;

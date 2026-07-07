@@ -2,7 +2,9 @@
 
 #include <math/math.h>
 #include <core/DescriptorHandle.h>
-#include <assets/LoadedTexture.h>
+#include <assets/Handle.h>
+#include <assets/ImageAsset.h>
+#include <assets/TypedAssets.h>
 #include <shaders/light_types.h>
 #include <rhi/nvrhi.h>
 #include <memory>
@@ -77,17 +79,18 @@ namespace caustica
 
     struct Material
     {
+        Handle<MaterialAsset> asset;
         std::string name;
         std::string modelFileName;      // where this material originated from, e.g. GLTF file name
         int materialIndexInModel = -1;  // index of the material in the model file
         MaterialDomain domain = MaterialDomain::Opaque;
-        std::shared_ptr<LoadedTexture> baseOrDiffuseTexture; // metal-rough: base color; spec-gloss: diffuse color; .a = opacity (both modes)
-        std::shared_ptr<LoadedTexture> metalRoughOrSpecularTexture; // metal-rough: ORM map; spec-gloss: specular color, .a = glossiness
-        std::shared_ptr<LoadedTexture> normalTexture;
-        std::shared_ptr<LoadedTexture> emissiveTexture;
-        std::shared_ptr<LoadedTexture> occlusionTexture;
-        std::shared_ptr<LoadedTexture> transmissionTexture; // see KHR_materials_transmission; undefined on specular-gloss materials
-        std::shared_ptr<LoadedTexture> opacityTexture; // for renderers that store opacity or alpha mask separately, overrides baseOrDiffuse.a
+        Handle<ImageAsset> baseOrDiffuseTexture; // metal-rough: base color; spec-gloss: diffuse color; .a = opacity (both modes)
+        Handle<ImageAsset> metalRoughOrSpecularTexture; // metal-rough: ORM map; spec-gloss: specular color, .a = glossiness
+        Handle<ImageAsset> normalTexture;
+        Handle<ImageAsset> emissiveTexture;
+        Handle<ImageAsset> occlusionTexture;
+        Handle<ImageAsset> transmissionTexture; // see KHR_materials_transmission; undefined on specular-gloss materials
+        Handle<ImageAsset> opacityTexture; // for renderers that store opacity or alpha mask separately, overrides baseOrDiffuse.a
         nvrhi::BufferHandle materialConstants;
         dm::float3 baseOrDiffuseColor = 1.f; // metal-rough: base color, spec-gloss: diffuse color (if no texture present)
         dm::float3 specularColor = 0.f; // spec-gloss: specular color
@@ -247,6 +250,7 @@ namespace caustica
 
     struct MeshInfo
     {
+        Handle<MeshAsset> asset;
         std::string name;
         MeshType type = MeshType::Triangles;
         std::shared_ptr<BufferGroup> buffers;

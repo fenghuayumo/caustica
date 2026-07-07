@@ -48,7 +48,7 @@ public:
 
 private:
     nvrhi::BindingSetHandle createMaterialBindingSet(const Material* material);
-    nvrhi::BindingSetItem getTextureBindingSetItem(uint32_t slot, const std::shared_ptr<LoadedTexture>& texture) const;
+    nvrhi::BindingSetItem getTextureBindingSetItem(uint32_t slot, const Handle<ImageAsset>& texture) const;
 
     nvrhi::DeviceHandle m_device;
     nvrhi::BindingLayoutHandle m_bindingLayout;

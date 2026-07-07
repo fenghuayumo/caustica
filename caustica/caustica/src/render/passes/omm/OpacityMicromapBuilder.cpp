@@ -126,12 +126,12 @@ void OpacityMicromapBuilder::CreateOpacityMicromaps(const caustica::Scene& scene
             const std::shared_ptr<PTMaterial> material = PTMaterial::safeCast(geometry.material);
             if (material == nullptr)
                 continue;
-            if (!(material->enableBaseTexture && material->baseTexture.loaded != nullptr && material->baseTexture.loaded->texture != nullptr))
+            if (!(material->enableBaseTexture && material->baseTexture.loaded != nullptr && material->baseTexture.loaded->gpu.texture != nullptr))
                 continue;
             if (!material->enableAlphaTesting)
                 continue;
 
-            std::shared_ptr<TextureData> alphaTexture = m_textureCache->getLoadedTexture(material->baseTexture.loaded->path);
+            std::shared_ptr<ImageAsset> alphaTexture = m_textureCache->getLoadedTexture(material->baseTexture.loaded->path);
 
             OmmBuildQueue::BuildInput::Geometry geom;
             geom.geometryIndexInMesh = i;

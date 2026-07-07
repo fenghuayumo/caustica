@@ -135,7 +135,7 @@ static std::filesystem::path ResolveMaterialTexturePath(
     return fullPath;
 }
 
-void PTTexture::initFromLoadedTexture(std::shared_ptr<caustica::LoadedTexture> & loaded, bool _sRGB, bool _normalMap, const std::filesystem::path & mediaPath)
+void PTTexture::initFromLoadedTexture(caustica::Handle<caustica::ImageAsset> & loaded, bool _sRGB, bool _normalMap, const std::filesystem::path & mediaPath)
 {
     if (loaded == nullptr)
     { localPath = ""; sRGB = false; this->loaded = nullptr; normalMap = false; enabled = false; return; }
@@ -731,21 +731,21 @@ bool PTMaterial::editorGui(MaterialGpuCache & cache)
     return update;
 }
 
-static void GetBindlessTextureIndex(const std::shared_ptr<LoadedTexture>& texture, uint& outEncodedInfo, unsigned int& flags, unsigned int textureBit)
+static void GetBindlessTextureIndex(const Handle<ImageAsset>& texture, uint& outEncodedInfo, unsigned int& flags, unsigned int textureBit)
 {
     // if bit not set, don't set the texture; if texture unavailable - remove the texture bit!
-    if ((flags & textureBit) == 0 || texture == nullptr || texture->texture == nullptr || texture->bindlessDescriptor.Get() == ~0u)
+    if ((flags & textureBit) == 0 || texture == nullptr || texture->gpu.texture == nullptr || texture->gpu.bindlessDescriptor.Get() == ~0u)
     {
         outEncodedInfo = 0xFFFFFFFF;
         flags &= ~textureBit; // remove flag
         return;
     }
 
-    uint bindlessDescIndex = texture->bindlessDescriptor.Get();
+    uint bindlessDescIndex = texture->gpu.bindlessDescriptor.Get();
     assert(bindlessDescIndex <= 0xFFFF);
     bindlessDescIndex &= 0xFFFF;
 
-    const auto desc = texture->texture->getDesc();
+    const auto desc = texture->gpu.texture->getDesc();
     float baseLODf = caustica::math::log2f((float)desc.width * desc.height);
     uint baseLOD = (uint)(baseLODf + 0.5f);
     uint mipLevels = desc.mipLevels;
@@ -893,7 +893,7 @@ static bool DefaultTextureNormalMap(PTMaterialTextureSlot slot)
 static void UpdateEngineMaterialTexture(
     PTMaterial& material,
     PTMaterialTextureSlot slot,
-    const std::shared_ptr<LoadedTexture>& loaded,
+    const Handle<ImageAsset>& loaded,
     bool enabled)
 {
     if (material.engineMaterialCounterpart == nullptr)
@@ -1486,9 +1486,9 @@ void UpdateSubInstanceData(SubInstanceData & ret, const std::shared_ptr<caustica
         // ret.alphaCutoff = material.alphaCutoff;
         alphaCutoff = material.alphaCutoff;
 
-        uint alphaTextureIndex = material.baseTexture.loaded->bindlessDescriptor.Get();
+        uint alphaTextureIndex = material.baseTexture.loaded->gpu.bindlessDescriptor.Get();
         assert(alphaTextureIndex < 0xFFFF);
-        // ret.AlphaTextureIndex = material.baseTexture.loaded->bindlessDescriptor.Get();
+        // ret.AlphaTextureIndex = material.baseTexture.loaded->gpu.bindlessDescriptor.Get();
 
         ret.FlagsAndAlphaInfo |= alphaTextureIndex & 0xFFFF;
     }

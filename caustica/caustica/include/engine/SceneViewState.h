@@ -21,7 +21,7 @@ struct SceneViewState
     double sceneTime = 0.;
     float lastDeltaTime = 0.0f;
 
-    std::map<std::shared_ptr<LoadedTexture>, TextureCompressionType> uncompressedTextures;
+    std::map<Handle<ImageAsset>, TextureCompressionType> uncompressedTextures;
 
     std::string fpsInfo;
 

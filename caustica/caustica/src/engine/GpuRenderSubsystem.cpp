@@ -20,6 +20,7 @@
 #include <scene/Scene.h>
 #include <scene/SceneEcs.h>
 #include <scene/SceneManager.h>
+#include <scene/SceneTypes.h>
 
 namespace caustica
 {
@@ -46,8 +47,8 @@ bool GpuRenderSubsystem::initializeSession(const GpuRenderSubsystemInitParams& p
     m_descriptorTable = m_bindlessTable->getDescriptorTableManager();
 
     auto nativeFS = std::make_shared<NativeFileSystem>();
-    AssetSystem::initialize(device, nativeFS, m_descriptorTable);
-    m_textureCache = AssetSystem::get().getTextureLoader();
+    params.assetSystem.initialize(device, nativeFS, m_descriptorTable);
+    m_textureCache = params.assetSystem.getTextureLoader();
 
     m_accelStructs = AccelStructManager(device);
     m_camera.camera().SetRotateSpeed(.003f);
@@ -64,6 +65,7 @@ bool GpuRenderSubsystem::initializeSession(const GpuRenderSubsystemInitParams& p
         std::move(params.sceneCallbacks.OnSceneUnloading));
 
     m_gpuDevice = &params.gpuDevice;
+    m_assetSystem = &params.assetSystem;
     m_settings = &params.settings;
     m_runtimeState = &params.runtimeState;
     m_diagnostics = &params.diagnostics;
@@ -124,6 +126,9 @@ void GpuRenderSubsystem::endFrame()
 
 void GpuRenderSubsystem::onSceneUnloading()
 {
+    if (m_assetSystem)
+        m_assetSystem->clearSceneAssets();
+
     if (m_worldRenderer)
         m_worldRenderer->onSceneUnloading();
     m_accelStructs.releaseGpuResources();
@@ -198,8 +203,8 @@ void GpuRenderSubsystem::onSceneLoadedGpuPrep()
 
     if (m_textureCache && m_renderDevice)
     {
-        AssetSystem::get().processRenderingThreadCommands(*m_renderDevice, 0.f);
-        AssetSystem::get().loadingFinished();
+        m_assetSystem->processRenderingThreadCommands(*m_renderDevice, 0.f);
+        m_assetSystem->loadingFinished();
     }
 
     if (m_sceneManager)
@@ -213,6 +218,7 @@ void GpuRenderSubsystem::onSceneLoadedGpuPrep()
             }
             render::SceneGpuUpdater::refreshAfterLoad(*scene, 0);
             m_scenePasses.lighting.notifySceneReloaded(*scene);
+            registerLoadedSceneAssets();
         }
     }
 }
@@ -275,6 +281,8 @@ void GpuRenderSubsystem::shutdown()
     m_accelStructs = AccelStructManager{};
 
     m_gpuDevice = nullptr;
+    AssetSystem* assetSystem = m_assetSystem;
+    m_assetSystem = nullptr;
     m_settings = nullptr;
     m_runtimeState = nullptr;
     m_diagnostics = nullptr;
@@ -289,7 +297,68 @@ void GpuRenderSubsystem::shutdown()
     m_shaderFactory.reset();
     m_bindlessLayout = nullptr;
 
-    AssetSystem::shutdown();
+    if (assetSystem)
+        assetSystem->shutdown();
+}
+
+void GpuRenderSubsystem::registerLoadedSceneAssets()
+{
+    if (!m_assetSystem || !m_sceneManager)
+        return;
+
+    const std::shared_ptr<Scene> scene = m_sceneManager->getScene();
+    if (!scene)
+        return;
+
+    m_assetSystem->clearSceneAssets();
+
+    const std::filesystem::path scenePath = m_sceneManager->getCurrentScenePath();
+    const std::string sceneName = m_sceneManager->getCurrentSceneName().empty()
+        ? scenePath.filename().generic_string()
+        : m_sceneManager->getCurrentSceneName();
+
+    Handle<SceneAsset> sceneAsset = m_assetSystem->registerSceneAsset(scene, scenePath, sceneName);
+    if (!sceneAsset)
+        return;
+    scene->SetAssetHandle(sceneAsset);
+
+    for (const std::shared_ptr<MeshInfo>& mesh : scene->GetMeshes())
+    {
+        Handle<MeshAsset> meshAsset = m_assetSystem->registerMeshAsset(mesh, scenePath, mesh ? mesh->name : std::string());
+        if (mesh)
+            mesh->asset = meshAsset;
+        if (meshAsset)
+            m_assetSystem->addDependency(sceneAsset.id(), meshAsset.id());
+    }
+
+    for (const std::shared_ptr<Material>& material : scene->GetMaterials())
+    {
+        Handle<MaterialAsset> materialAsset = m_assetSystem->registerMaterialAsset(
+            material,
+            scenePath,
+            material ? material->name : std::string());
+        if (!materialAsset)
+            continue;
+        material->asset = materialAsset;
+
+        m_assetSystem->addDependency(sceneAsset.id(), materialAsset.id());
+
+        const Handle<ImageAsset> textures[] = {
+            material->baseOrDiffuseTexture,
+            material->metalRoughOrSpecularTexture,
+            material->normalTexture,
+            material->emissiveTexture,
+            material->occlusionTexture,
+            material->transmissionTexture,
+            material->opacityTexture,
+        };
+
+        for (const Handle<ImageAsset>& texture : textures)
+        {
+            if (texture)
+                m_assetSystem->addDependency(materialAsset.id(), texture.id());
+        }
+    }
 }
 
 void GpuRenderSubsystem::createShaderFactory(GpuDevice& gpuDevice)

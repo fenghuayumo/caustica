@@ -27,7 +27,7 @@ namespace caustica
     class TextureHandle;
     class ShaderFactory;
     namespace render { class RenderDevice; }
-    struct TextureData;
+    struct ImageAsset;
 }
 
 class ShaderDebug;

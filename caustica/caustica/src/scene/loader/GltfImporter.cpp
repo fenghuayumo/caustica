@@ -686,7 +686,7 @@ bool GltfImporter::Load(
             const size_t dataSize = image->buffer_view->size;
 
             // We need to have a managed pointer to the texture data for async decoding.
-            std::shared_ptr<IBlob> textureData;
+            std::shared_ptr<IBlob> imageBlob;
 
             // Try to find an existing file blob that includes our data.
             for (const auto& blob : vfsContext.blobs)
@@ -698,18 +698,18 @@ bool GltfImporter::Load(
                 {
                     // Found the file blob - create a range blob out of it and keep a strong reference.
                     assert(dataPtr + dataSize <= blobData + blobSize);
-                    textureData = std::make_shared<BufferRegionBlob>(blob, dataPtr - blobData, dataSize);
+                    imageBlob = std::make_shared<BufferRegionBlob>(blob, dataPtr - blobData, dataSize);
                     break;
                 }
             }
 
             // Didn't find a file blob - copy the data into a new container.
-            if (!textureData)
+            if (!imageBlob)
             {
                 void* dataCopy = malloc(dataSize);
                 assert(dataCopy);
                 memcpy(dataCopy, dataPtr, dataSize);
-                textureData = std::make_shared<caustica::Blob>(dataCopy, dataSize);
+                imageBlob = std::make_shared<caustica::Blob>(dataCopy, dataSize);
             }
 
             result.data = std::make_shared<GltfInlineData>();
@@ -717,7 +717,7 @@ bool GltfImporter::Load(
                 ? image->name
                 : fileName.filename().generic_string() + "[" + std::to_string(imageIndex) + "]";
             result.data->mimeType = image->mime_type ? image->mime_type : "";
-            result.data->buffer = textureData;
+            result.data->buffer = imageBlob;
 
             inlineImageDataCache[image] = result.data;
         }
@@ -803,7 +803,7 @@ bool GltfImporter::Load(
         return result;
     };
 
-    std::unordered_map<const cgltf_image*, std::shared_ptr<LoadedTexture>> imageCache;
+    std::unordered_map<const cgltf_image*, Handle<ImageAsset>> imageCache;
 
     auto load_image = [&imageCache, &textureCache, threadPool, &load_image_data]
         (const cgltf_image* image, bool sRGB, bool searchForDDS)
@@ -812,37 +812,37 @@ bool GltfImporter::Load(
         if (it != imageCache.end())
             return it->second;
 
-        std::shared_ptr<LoadedTexture> loadedTexture;
+        Handle<ImageAsset> imageAsset;
         FilePathOrInlineData textureSource = load_image_data(image, searchForDDS);
 
         if (textureSource.data)
         {
             if (threadPool)
-                loadedTexture = textureCache.loadTextureFromMemoryAsync(textureSource.data->buffer,
+                imageAsset = textureCache.loadTextureFromMemoryAsync(textureSource.data->buffer,
                     textureSource.data->name, textureSource.data->mimeType, sRGB, *threadPool);
             else
-                loadedTexture = textureCache.loadTextureFromMemoryDeferred(textureSource.data->buffer,
+                imageAsset = textureCache.loadTextureFromMemoryDeferred(textureSource.data->buffer,
                     textureSource.data->name, textureSource.data->mimeType, sRGB);
         }
         else if (!textureSource.path.empty())
         {
             if (threadPool)
-                loadedTexture = textureCache.loadTextureFromFileAsync(textureSource.path, sRGB, *threadPool);
+                imageAsset = textureCache.loadTextureFromFileAsync(textureSource.path, sRGB, *threadPool);
             else
-                loadedTexture = textureCache.loadTextureFromFileDeferred(textureSource.path, sRGB);
+                imageAsset = textureCache.loadTextureFromFileDeferred(textureSource.path, sRGB);
         }
 
-        imageCache[image] = loadedTexture;
-        return loadedTexture;
+        imageCache[image] = imageAsset;
+        return imageAsset;
     };
 
-    std::unordered_map<const cgltf_texture*, std::shared_ptr<LoadedTexture>> gltfTextureLoader;
+    std::unordered_map<const cgltf_texture*, Handle<ImageAsset>> gltfTextureLoader;
 
     auto load_texture = [objects, c_SearchForDds, &gltfTextureLoader, &load_image, &load_image_data]
         (const cgltf_texture* texture, bool sRGB)
     {
         if (!texture)
-            return std::shared_ptr<LoadedTexture>(nullptr);
+            return Handle<ImageAsset>();
 
         auto it = gltfTextureLoader.find(texture);
         if (it != gltfTextureLoader.end())
@@ -850,30 +850,28 @@ bool GltfImporter::Load(
 
         cgltf_texture_extensions const extensions = cgltf_parse_texture_extensions(texture, objects);
 
-        std::shared_ptr<LoadedTexture> loadedTexture;
+        Handle<ImageAsset> imageAsset;
         
         // See if the extensions include a DDS image.
         // Try loading the DDS first if it's specified, fall back to the regular image.
         cgltf_image const* ddsImage = extensions.ddsImage;
         if (ddsImage)
-            loadedTexture = load_image(ddsImage, sRGB, false);
-        if (!loadedTexture && texture->image)
-            loadedTexture = load_image(texture->image, sRGB, c_SearchForDds);
+            imageAsset = load_image(ddsImage, sRGB, false);
+        if (!imageAsset && texture->image)
+            imageAsset = load_image(texture->image, sRGB, c_SearchForDds);
 
         // If the texture swizzle extension is present, load the source images and transfer the swizzle data
         if (!extensions.swizzleOptions.empty())
         {
-            if (!loadedTexture)
-            {
-                loadedTexture = std::make_shared<LoadedTexture>();
-            }
+            if (!imageAsset)
+                return Handle<ImageAsset>();
 
             // Convert the swizzle options from glTF structures to TextureSwizzle and merge them into the
             // existing texture object. Merge means that if the texture object already has a particular swizzle option,
             // it won't be inserted again; if this option is new, it will be added to the texture object.
             // This behavior is useful when materials combine textures in different ways, and the same texture
             // ends up being used by multiple materials, but their baked multi-channel representations are different.
-            size_t const existingOptionCount = loadedTexture->swizzleOptions.size();
+            size_t const existingOptionCount = imageAsset->swizzleOptions.size();
             for (auto const& swizzleOption : extensions.swizzleOptions)
             {
                 TextureSwizzle convertedOption;
@@ -887,7 +885,7 @@ bool GltfImporter::Load(
                 bool found = false;
                 for (size_t i = 0; i < existingOptionCount; ++i)
                 {
-                    if (loadedTexture->swizzleOptions[i].source == convertedOption.source)
+                    if (imageAsset->swizzleOptions[i].source == convertedOption.source)
                     {
                         found = true;
                         break;
@@ -896,13 +894,13 @@ bool GltfImporter::Load(
 
                 if (!found)
                 {
-                    loadedTexture->swizzleOptions.push_back(std::move(convertedOption));
+                    imageAsset->swizzleOptions.push_back(std::move(convertedOption));
                 }
             }
         }
 
-        gltfTextureLoader[texture] = loadedTexture;
-        return loadedTexture;
+        gltfTextureLoader[texture] = imageAsset;
+        return imageAsset;
     };
 
     std::unordered_map<const cgltf_material*, std::shared_ptr<Material>> materials;

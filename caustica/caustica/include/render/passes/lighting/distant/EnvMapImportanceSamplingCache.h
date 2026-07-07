@@ -21,7 +21,7 @@ namespace caustica
     class TextureLoader;
     class TextureHandle;
     class ShaderFactory;
-    struct TextureData;
+    struct ImageAsset;
 }
 namespace caustica::render
 {

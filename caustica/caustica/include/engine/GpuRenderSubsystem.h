@@ -32,6 +32,7 @@ class GpuDevice;
 class SceneTypeFactory;
 class ShaderFactory;
 class TextureLoader;
+class AssetSystem;
 
 namespace render
 {
@@ -47,6 +48,7 @@ struct EngineSceneCallbacks
 struct GpuRenderSubsystemInitParams
 {
     GpuDevice& gpuDevice;
+    AssetSystem& assetSystem;
     PathTracerSettings& settings;
     render::RenderRuntimeState& runtimeState;
 
@@ -111,6 +113,7 @@ public:
 private:
     void createShaderFactory(GpuDevice& gpuDevice);
     void applySampleSettingsFromScene();
+    void registerLoadedSceneAssets();
 
     render::PathTracerScenePasses m_scenePasses;
     nvrhi::BindingLayoutHandle m_bindlessLayout;
@@ -127,6 +130,7 @@ private:
     std::unique_ptr<render::WorldRenderer> m_worldRenderer;
 
     GpuDevice* m_gpuDevice = nullptr;
+    AssetSystem* m_assetSystem = nullptr;
     PathTracerSettings* m_settings = nullptr;
     render::RenderRuntimeState* m_runtimeState = nullptr;
     render::SessionDiagnostics* m_diagnostics = nullptr;

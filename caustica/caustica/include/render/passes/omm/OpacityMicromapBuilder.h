@@ -23,12 +23,12 @@ namespace caustica
     class TextureHandle;
     class ShaderFactory;
     namespace render { class RenderDevice; }
-    struct TextureData;
-    struct LoadedTexture;
+    struct ImageAsset;
+    struct ImageAsset;
 }
 
 // =============================================================================
-// MeshGeometryEx / MeshInfoEx — Now merged into base types in SceneTypes.h.
+// MeshGeometryEx / MeshInfoEx �?Now merged into base types in SceneTypes.h.
 //
 // MeshGeometry now has DebugData (MeshGeometryDebugData).
 // MeshInfo now has AccelStructOMM, OpacityMicroMaps,

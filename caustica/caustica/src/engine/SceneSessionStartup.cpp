@@ -2,6 +2,7 @@
 
 #include <scene/Scene.h>
 
+#include <assets/AssetSystem.h>
 #include <engine/App.h>
 #include <engine/GpuRenderSubsystem.h>
 #include <engine/SceneSessionSystems.h>
@@ -17,8 +18,9 @@ namespace caustica
 void initializeSceneSession(App& app, const SceneSessionConfig& config)
 {
     GpuDevice* gpuDevice = app.getGpuDevice();
+    auto* assetSystem = app.tryResource<AssetSystem>();
     auto* gpuRenderSubsystem = app.tryResource<GpuRenderSubsystem>();
-    if (!gpuDevice || !gpuRenderSubsystem)
+    if (!gpuDevice || !assetSystem || !gpuRenderSubsystem)
         return;
 
     SceneViewState& viewState = config.viewState;
@@ -28,6 +30,7 @@ void initializeSceneSession(App& app, const SceneSessionConfig& config)
 
     gpuRenderSubsystem->initializeSession(GpuRenderSubsystemInitParams{
         .gpuDevice = *gpuDevice,
+        .assetSystem = *assetSystem,
         .settings = config.sessionState->settings,
         .runtimeState = config.sessionState->runtime,
         .sceneTime = viewState.sceneTime,

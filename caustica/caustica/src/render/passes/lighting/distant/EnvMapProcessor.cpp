@@ -398,19 +398,18 @@ void EnvMapProcessor::PreUpdate(nvrhi::ICommandList* commandList, caustica::rend
             const std::filesystem::path fullPath = ResolveSceneMediaPath(
                 m_loadedSourceBackgroundPath,
                 sceneDirectory);
-            m_textureCache->loadTextureFromFile(fullPath, false, &renderDevice, commandList);
+            Handle<ImageAsset> image = m_textureCache->loadTextureFromFile(fullPath, false, &renderDevice, commandList);
             commandList->close();
             m_device->executeCommandList(commandList);
             m_device->waitForIdle();
             commandList->open();
 
-            std::shared_ptr<TextureData> loadedTexture = m_textureCache->getLoadedTexture(fullPath);
-            if (loadedTexture != nullptr && loadedTexture->format != nvrhi::Format::UNKNOWN)
+            if (image && image->format != nvrhi::Format::UNKNOWN)
             {
-                if (loadedTexture->arraySize == 6)
-                    m_loadedSourceBackgroundTextureCubemap = loadedTexture;
+                if (image->arraySize == 6)
+                    m_loadedSourceBackgroundTextureCubemap = image;
                 else
-                    m_loadedSourceBackgroundTextureEquirect = loadedTexture;
+                    m_loadedSourceBackgroundTextureEquirect = image;
             }
             else
                 m_loadedSourceBackgroundPath = "";
@@ -492,7 +491,7 @@ bool EnvMapProcessor::Update(nvrhi::ICommandList* commandList, caustica::Binding
     nvrhi::BindingSetItem sourceCubemapBinding = nvrhi::BindingSetItem::Texture_SRV(
         1,
         (m_loadedSourceBackgroundTextureCubemap != nullptr)
-            ? m_loadedSourceBackgroundTextureCubemap->texture
+            ? m_loadedSourceBackgroundTextureCubemap->gpu.texture
             : (nvrhi::TextureHandle)renderDevice.builtins().blackCubeMapArray().Get(),
         nvrhi::Format::UNKNOWN,
         nvrhi::AllSubresources,
@@ -503,7 +502,7 @@ bool EnvMapProcessor::Update(nvrhi::ICommandList* commandList, caustica::Binding
             //nvrhi::BindingSetItem::PushConstants(1, sizeof(SampleMiniConstants)),
             nvrhi::BindingSetItem::Texture_UAV(0, m_cubemapLowRes, nvrhi::Format::UNKNOWN, nvrhi::TextureSubresourceSet(0, 1, 0, 6)).setDimension(nvrhi::TextureDimension::Texture2DArray),
             nvrhi::BindingSetItem::Texture_UAV(1, m_cubemap, nvrhi::Format::UNKNOWN, nvrhi::TextureSubresourceSet(1, 1, 0, 6)).setDimension(nvrhi::TextureDimension::Texture2DArray),
-            nvrhi::BindingSetItem::Texture_SRV(0, (m_loadedSourceBackgroundTextureEquirect != nullptr) ? (m_loadedSourceBackgroundTextureEquirect->texture) : ((nvrhi::TextureHandle)renderDevice.builtins().blackTexture().Get())),
+            nvrhi::BindingSetItem::Texture_SRV(0, (m_loadedSourceBackgroundTextureEquirect != nullptr) ? (m_loadedSourceBackgroundTextureEquirect->gpu.texture) : ((nvrhi::TextureHandle)renderDevice.builtins().blackTexture().Get())),
             sourceCubemapBinding,
             nvrhi::BindingSetItem::Texture_SRV(2, (nvrhi::TextureHandle)renderDevice.builtins().blackCubeMapArray().Get()),
             nvrhi::BindingSetItem::Texture_SRV(10, (m_proceduralSky != nullptr && proceduralSkyEnabled) ? (m_proceduralSky->GetTransmittanceTexture()) : ((nvrhi::TextureHandle)renderDevice.builtins().blackTexture().Get())),

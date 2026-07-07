@@ -1,5 +1,7 @@
 #pragma once
 
+#include <assets/Handle.h>
+#include <assets/ImageAsset.h>
 #include <rhi/nvrhi.h>
 #include <math/math.h>
 #include <memory>
@@ -35,7 +37,7 @@ namespace caustica
     class TextureHandle;
     class ShaderFactory;
     namespace render { class RenderDevice; }
-    struct TextureData;
+    struct ImageAsset;
 }
 
 class ShaderDebug;
@@ -168,8 +170,8 @@ private:
 
     std::string                     m_sourceBackgroundPath;
     std::string                     m_loadedSourceBackgroundPath;
-    std::shared_ptr<caustica::TextureData>    m_loadedSourceBackgroundTextureEquirect;
-    std::shared_ptr<caustica::TextureData>    m_loadedSourceBackgroundTextureCubemap;
+    caustica::Handle<caustica::ImageAsset>  m_loadedSourceBackgroundTextureEquirect;
+    caustica::Handle<caustica::ImageAsset>  m_loadedSourceBackgroundTextureCubemap;
 
     nvrhi::TextureHandle            m_cubemap;
     nvrhi::TextureDesc              m_cubemapDesc;
