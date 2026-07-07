@@ -1471,6 +1471,11 @@ void UpdateSubInstanceData(SubInstanceData & ret, const std::shared_ptr<caustica
     // we need alpha texture for alpha testing to work - disable otherwise
     if (alphaTest && (!material.enableBaseTexture || material.baseTexture.loaded == nullptr))
         alphaTest = false;
+    if (alphaTest && (material.baseTexture.loaded->gpu.texture == nullptr
+        || material.baseTexture.loaded->gpu.bindlessDescriptor.Get() == ~0u))
+    {
+        alphaTest = false;
+    }
 
 
     float alphaCutoff = 0.0;
