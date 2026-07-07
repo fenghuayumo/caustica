@@ -876,6 +876,27 @@ void StreamlineIntegration::QueryDLSSRROptimalSettings(const DLSSRROptions& opti
 #endif
 }
 
+void StreamlineIntegration::CleanupDLSSRR(bool wfi)
+{
+#if STREAMLINE_HAS_DLSS_RR
+    if (!m_slInitialized)
+    {
+        caustica::warning("SL not initialised.");
+        return;
+    }
+
+    if (!m_dlssrrAvailable)
+        return;
+
+    if (wfi)
+        m_device->waitForIdle();
+
+    sl::Result status = slFreeResources(sl::kFeatureDLSS_RR, m_viewport);
+    // if we've never ran the feature on this viewport, this call may return 'eErrorInvalidParameter'
+    assert(status == sl::Result::eOk || status == sl::Result::eErrorInvalidParameter);
+#endif
+}
+
 void StreamlineIntegration::CleanupDLSS(bool wfi)
 {
     if (!m_slInitialized)

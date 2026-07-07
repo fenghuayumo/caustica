@@ -138,6 +138,7 @@ public:
     void onAnimateGameCamera(float elapsedTimeSeconds);
     void onAnimateEnd(float elapsedTimeSeconds);
     void onSceneUnloading();
+    void onSceneLoadedFromLoader();
     void syncLoadedSceneSystems();
     void updateWindowTitle();
     void afterWorldRender(caustica::GpuDevice& gpuDevice);

@@ -349,6 +349,30 @@ bool caustica::render::WorldRenderer::createPTPipeline()
 
 void caustica::render::WorldRenderer::onSceneUnloading()
 {
+#if CAUSTICA_WITH_STREAMLINE
+    if (!m_context.gpuDevice.IsHeadless())
+    {
+        auto& streamline = m_context.gpuDevice.GetStreamline();
+        if (streamline.IsDLSSRRAvailable())
+            streamline.CleanupDLSSRR(false);
+        if (streamline.IsDLSSAvailable())
+            streamline.CleanupDLSS(false);
+        if (streamline.IsDLSSGAvailable())
+            streamline.CleanupDLSSG(false);
+    }
+
+    m_recommendedDLSSSettings = {};
+    m_lastDLSSRROptions = {};
+    m_context.settings.DLSSFGOptions = {};
+    m_context.settings.DLSSFGMultiplier = 1;
+    m_context.settings.DLSSFGMaxNumFramesToGenerate = 1;
+#endif
+    m_context.settings.DLSSMode = PathTracerSettings::DLSSModeDefault;
+    m_context.settings.DLSSLastMode = SI::DLSSMode::eOff;
+    m_context.settings.DLSSLastDisplaySize = { 0, 0 };
+    m_context.settings.DLSSLastRealtimeAA = 0;
+    m_lastScheduledRealtimeAA = -1;
+
     m_bindingSet = nullptr;
     m_context.bindingCache.clear();
     if (m_commandList)
@@ -378,8 +402,13 @@ void caustica::render::WorldRenderer::onSceneLoaded()
     m_gaussianSplatTemporalReset = true;
     m_context.settings.ResetAccumulation = true;
     m_context.settings.ResetRealtimeCaches = true;
+    m_context.settings.DLSSMode = PathTracerSettings::DLSSModeDefault;
+    m_context.settings.DLSSLastMode = SI::DLSSMode::eOff;
+    m_context.settings.DLSSLastDisplaySize = { 0, 0 };
+    m_context.settings.DLSSLastRealtimeAA = 0;
     // Realtime->Realtime switches do not flip RealtimeMode; nudge so framePassSetup resets temporal state.
     m_lastRealtimeMode = !m_context.settings.RealtimeMode;
+    m_lastScheduledRealtimeAA = -1;
 
     if (m_rtxdiPass)
         m_rtxdiPass->Reset();

@@ -247,6 +247,12 @@ void GpuRenderSubsystem::onSceneLoadedGpuFinish()
         m_diagnostics->asyncLoadingInProgress = true;
 }
 
+void GpuRenderSubsystem::setSceneLoadingCallbacks(std::function<void()> onLoaded, std::function<void()> onUnloading)
+{
+    if (m_sceneManager)
+        m_sceneManager->setLoadingCallbacks(std::move(onLoaded), std::move(onUnloading));
+}
+
 void GpuRenderSubsystem::applyCmdLinePostLoadOverrides()
 {
     if (!m_settings || !m_cmdLine)

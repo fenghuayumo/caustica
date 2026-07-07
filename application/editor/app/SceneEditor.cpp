@@ -385,6 +385,16 @@ void SceneEditor::onSceneLoadedComplete()
 #endif
 }
 
+void SceneEditor::onSceneLoadedFromLoader()
+{
+    onSceneLoadedEarly();
+    onSceneLoadedBeforeGpuPrep();
+    if (m_app)
+        sceneSession::onSceneLoaded(*m_app);
+    onSceneLoadedAfterCollectTextures();
+    onSceneLoadedComplete();
+}
+
 void SceneEditor::onSceneLoaded()
 {
     if (m_app)
@@ -400,14 +410,7 @@ void SceneEditor::syncLoadedSceneSystems()
     if (loadedSceneName.empty() || loadedSceneName == m_editorState.loadedSceneName)
         return;
 
-    if (!m_editorState.loadedSceneName.empty())
-        onSceneUnloading();
-
     m_editorState.loadedSceneName = loadedSceneName;
-    onSceneLoadedEarly();
-    onSceneLoadedBeforeGpuPrep();
-    onSceneLoadedAfterCollectTextures();
-    onSceneLoadedComplete();
 }
 
 void SceneEditor::onBeginFrameScheduled()

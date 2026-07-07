@@ -2,6 +2,7 @@
 
 #include <core/command_line.h>
 
+#include <engine/GpuRenderSubsystem.h>
 #include <engine/SceneViewState.h>
 
 #include <render/RenderSessionState.h>
@@ -24,6 +25,8 @@ struct SceneSessionConfig
     const CommandLineOptions* cmdLine = nullptr;
     bool refreshEnvMapMediaList = true;
     bool applyCmdLineToSessionState = true;
+    bool hasSceneCallbacks = false;
+    EngineSceneCallbacks sceneCallbacks{};
 };
 
 void initializeSceneSession(App& app, const SceneSessionConfig& config);

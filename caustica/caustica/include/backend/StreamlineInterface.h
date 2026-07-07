@@ -326,6 +326,7 @@ public:
     virtual bool IsDLSSRRAvailable() const = 0;
     virtual void QueryDLSSRROptimalSettings(const DLSSRROptions& options, DLSSRRSettings& settings) = 0;
     virtual void EvaluateDLSSRR(nvrhi::ICommandList* commandList) = 0;
+    virtual void CleanupDLSSRR(bool wfi) = 0;
 
     virtual void TagResourcesGeneral(
         nvrhi::ICommandList* commandList,

@@ -431,8 +431,9 @@ Scene::Scene(
 
 bool Scene::Load(const std::filesystem::path& jsonFileName)
 {
-    ThreadPool threadPool;
-    return LoadWithThreadPool(jsonFileName, &threadPool);
+    // Texture and typed-asset registration are shared across model imports and are
+    // not safe to mutate from multiple importer tasks.
+    return LoadWithThreadPool(jsonFileName, nullptr);
 }
 
 bool Scene::LoadWithThreadPool(const std::filesystem::path& sceneFileName, ThreadPool* threadPool)

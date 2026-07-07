@@ -51,6 +51,7 @@ public:
     virtual bool IsDLSSRRAvailable() const override { return m_dlssrrAvailable; }
     virtual void QueryDLSSRROptimalSettings(const DLSSRROptions& options, DLSSRRSettings& settings) override;
     virtual void EvaluateDLSSRR(nvrhi::ICommandList* commandList) override;
+    virtual void CleanupDLSSRR(bool wfi) override;
 
     virtual void TagResourcesGeneral(
         nvrhi::ICommandList* commandList,

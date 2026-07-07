@@ -84,6 +84,7 @@ public:
     void onSceneLoadedGpuPrep();
     void onSceneLoadedGpuFinish();
     void applyCmdLinePostLoadOverrides();
+    void setSceneLoadingCallbacks(std::function<void()> onLoaded, std::function<void()> onUnloading);
 
     [[nodiscard]] std::shared_ptr<ShaderFactory> shaderFactory() const { return m_shaderFactory; }
     [[nodiscard]] caustica::render::RenderDevice& renderDevice();

@@ -2,6 +2,7 @@
 
 #include <engine/App.h>
 #include <engine/AssetPlugin.h>
+#include <engine/SceneSessionSystems.h>
 
 namespace caustica::editor
 {
@@ -27,6 +28,19 @@ void EditorPlugin::build(App& app)
 void EditorPlugin::configureSchedules(App& app)
 {
     registerEngineScheduleBridge(app);
+
+    m_sceneEditor.setApp(app);
+    sessionConfig.hasSceneCallbacks = true;
+    sessionConfig.sceneCallbacks = EngineSceneCallbacks{
+        .OnSceneLoaded = [&app, this]() {
+            m_sceneEditor.onSceneLoadedFromLoader();
+        },
+        .OnSceneUnloading = [&app, this]() {
+            sceneSession::onSceneUnloading(app);
+            m_sceneEditor.onSceneUnloading();
+        },
+    };
+
     registerSceneSessionStartup(app, sessionConfig);
     registerEditorSceneStartup(app, EditorSceneStartupConfig{
         .session = sessionConfig,

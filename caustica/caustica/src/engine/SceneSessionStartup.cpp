@@ -28,6 +28,13 @@ void initializeSceneSession(App& app, const SceneSessionConfig& config)
     sceneSession::initStreamlineAndWindow(app);
     assert(config.sessionState && "SceneSessionConfig.sessionState is required for GpuRenderSubsystem init");
 
+    EngineSceneCallbacks sceneCallbacks{
+        .OnSceneLoaded = [&app]() { sceneSession::onSceneLoaded(app); },
+        .OnSceneUnloading = [&app]() { sceneSession::onSceneUnloading(app); },
+    };
+    if (config.hasSceneCallbacks)
+        sceneCallbacks = config.sceneCallbacks;
+
     gpuRenderSubsystem->initializeSession(GpuRenderSubsystemInitParams{
         .gpuDevice = *gpuDevice,
         .assetSystem = *assetSystem,
@@ -37,10 +44,7 @@ void initializeSceneSession(App& app, const SceneSessionConfig& config)
         .diagnostics = config.diagnostics,
         .cmdLine = config.cmdLine,
         .sceneTypeFactory = std::make_shared<render::RenderSceneTypeFactory>(),
-        .sceneCallbacks = EngineSceneCallbacks{
-            .OnSceneLoaded = [&app]() { sceneSession::onSceneLoaded(app); },
-            .OnSceneUnloading = [&app]() { sceneSession::onSceneUnloading(app); },
-        },
+        .sceneCallbacks = std::move(sceneCallbacks),
     });
 
     sceneSession::attachGpuRenderSubsystem(app, *gpuRenderSubsystem);
