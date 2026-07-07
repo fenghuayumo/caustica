@@ -165,8 +165,18 @@ void PTPipelineVariant::ShaderPermutation::resolveCacheIdentity(
     if (!compiler.canCompileShaders())
     {
         usCompileError = StringFormat(
-            "Missing precompiled shader '%s' and runtime shader compilation is disabled.",
-            compiledFullPath.c_str());
+            "Missing precompiled shader '%s' for permutation '%s' and runtime shader compilation is disabled.",
+            compiledFullPath.c_str(),
+            permutationName.c_str());
+        std::string macroList;
+        for (const auto& macro : combinedAndSpecializedMacros)
+        {
+            if (!macroList.empty())
+                macroList += ", ";
+            macroList += macro.name + "=" + macro.definition;
+        }
+        if (!macroList.empty())
+            usCompileError += StringFormat(" Macros: [%s]", macroList.c_str());
         caustica::error("%s", usCompileError.c_str());
         return;
     }

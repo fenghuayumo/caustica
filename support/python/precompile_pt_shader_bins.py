@@ -134,7 +134,9 @@ def base_global_macro_map() -> dict[str, str]:
 
 
 def macro_map_to_list(values: dict[str, str]) -> list[tuple[str, str]]:
-    return sorted(values.items(), key=lambda item: item[0])
+    # Runtime hashing preserves macro insertion order. Keep this in sync with
+    # SceneRayTracingResources::fillPTPipelineGlobalMacros.
+    return list(values.items())
 
 
 def global_macro_presets(preset: str) -> list[list[tuple[str, str]]]:
@@ -158,6 +160,7 @@ def global_macro_presets(preset: str) -> list[list[tuple[str, str]]]:
         {"CAUSTICA_FIREFLY_FILTER": "0"},
         {"CAUSTICA_USE_APPROXIMATE_MIS": "0"},
         {"NEE_AT_SAMPLE_BAKED_ENVIRONMENT": "1"},
+        {"PT_NEE_ENABLED": "0", "NEE_AT_SAMPLE_BAKED_ENVIRONMENT": "1"},
         {
             "CAUSTICA_NEE_TOTAL_CANDIDATE_SAMPLE_COUNT": "8",
             "CAUSTICA_NEE_LOCAL_CANDIDATE_SAMPLE_COUNT": "5",
@@ -242,10 +245,13 @@ def hash_hex(command: str) -> str:
 
 
 def cache_paths(api: str, digest: str) -> tuple[Path, str]:
-    rel = f"{digest[:2]}/{digest}.bin"
+    # Match ShaderKey::formatCacheFileNameNoExt: split the first two hex chars
+    # into the directory and store only the remaining suffix as the file name.
+    file_stem = digest[2:] if len(digest) >= 2 else digest
+    rel = f"{digest[:2]}/{file_stem}.bin"
     out_dir = BIN_DIR / "ShaderDynamic" / "Bin" / api / digest[:2]
     out_dir.mkdir(parents=True, exist_ok=True)
-    return out_dir / f"{digest}.bin", rel
+    return out_dir / f"{file_stem}.bin", rel
 
 
 def find_dxc(api: str) -> Path:
@@ -325,8 +331,8 @@ def build_jobs(global_preset: str) -> list[dict]:
     for global_macros in global_macro_presets(global_preset):
         for variant in PIPELINE_VARIANTS:
             pipeline_id = variant["pipeline_id"]
-            pipeline_macros = list(global_macros)
-            pipeline_macros.extend(variant["macros"])
+            pipeline_macros = list(variant["macros"])
+            pipeline_macros.extend(global_macros)
             pipeline_macros.append(("CAUSTICA_PIPELINE_PERMUTATION_NAME", pipeline_id))
 
             jobs.append(

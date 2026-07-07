@@ -20,8 +20,8 @@ namespace
               | MaterialFeatureMask(MaterialFeature::AlphaTest) | MaterialFeatureMask(MaterialFeature::OnlyDeltaLobes),
           "NonEmissive" },
         { 3, MaterialFeatureMask(MaterialFeature::Specialized) | MaterialFeatureMask(MaterialFeature::HasTransmission), 0, "Transmission" },
-        { 4, MaterialFeatureMask(MaterialFeature::Specialized) | MaterialFeatureMask(MaterialFeature::ThinSurface), 0, "thinSurface" },
-        { 5, MaterialFeatureMask(MaterialFeature::Specialized) | MaterialFeatureMask(MaterialFeature::UseNormalTexture), 0, "normalMap" },
+        { 4, MaterialFeatureMask(MaterialFeature::Specialized) | MaterialFeatureMask(MaterialFeature::ThinSurface), 0, "ThinSurface" },
+        { 5, MaterialFeatureMask(MaterialFeature::Specialized) | MaterialFeatureMask(MaterialFeature::UseNormalTexture), 0, "NormalMap" },
         { 6, MaterialFeatureMask(MaterialFeature::Specialized) | MaterialFeatureMask(MaterialFeature::AlphaTest), 0, "AlphaTest" },
         { 7, MaterialFeatureMask(MaterialFeature::Specialized) | MaterialFeatureMask(MaterialFeature::OnlyDeltaLobes), 0, "DeltaLobes" },
     };
