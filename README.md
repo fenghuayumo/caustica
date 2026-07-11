@@ -1,6 +1,16 @@
 # Caustica
 
-![Title](./Docs/r-title.png)
+<p align="center">
+  <img src="docs/teaser.png" alt="Caustica path tracing teaser — transmission, caustics, and OpenPBR materials" width="900"/>
+</p>
+
+<p align="center">
+  <img src="docs/bistro.png" alt="Bistro exterior — ReSTIR GI and environment lighting" width="440"/>
+  &nbsp;
+  <img src="docs/kitchen.png" alt="Kitchen interior — embodied-AI simulation scene" width="440"/>
+</p>
+
+<p align="center"><i>Path-traced synthetic imagery for embodied-AI simulation: material showcase (top), outdoor bistro and indoor kitchen environments (bottom).</i></p>
 
 ## Overview
 
@@ -304,14 +314,6 @@ On Linux, CMake fetches the DLSS SDK and copies DLSS/DLSS-RR runtime `.so` files
 Caustica optionally integrates the [DirectX 12 Agility SDK](https://devblogs.microsoft.com/directx/directx12agility/). If `CAUSTICA_DOWNLOAD_AND_ENABLE_AGILITY_SDK` is `TRUE`, version 717-preview is downloaded via CMake and required build variables are set. For a different version, set `CAUSTICA_D3D_AGILITY_SDK_PATH` and `CAUSTICA_D3D_AGILITY_SDK_VERSION` manually.
 
 Version 717-preview enables native DirectX support for [Shader Execution Reordering](https://devblogs.microsoft.com/directx/ser/) and [Opacity Micromaps](https://devblogs.microsoft.com/directx/omm/). DXR 1.2 / Shader Model 6.9 may require a recent preview or production driver from your GPU vendor.
-
-## User Interface
-
-Once the application is running, most features are available from the UI panel on the left and drop-down controls at the top center.
-
-![UI](./Docs/r-ui.png)
-
-Move the camera with W/S/A/D and rotate by dragging with the left mouse button.
 
 ## Command Line
 
