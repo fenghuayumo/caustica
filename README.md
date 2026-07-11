@@ -1,126 +1,246 @@
-# RTX Path Tracing v1.8.1
+# Caustica
 
 ![Title](./Docs/r-title.png)
 
-## What's new in 1.8.0 and 1.8.1
- * Performance optimizations (25-30%+ perf gain over 1.7.x with comparable or better quality)
- * New performance/quality presets in "Display and performance" allow for better scaling from low end to high end GPUs 
- * New modes in `bistro-programmer-art` scene for stress testing animation and dynamic lighting scenarios (see [1](https://github.com/NVIDIA-RTX/caustica-Assets/blob/main/Screenshots/1.8.0/1_Balanced_4k.png), [2](https://github.com/NVIDIA-RTX/caustica-Assets/blob/main/Screenshots/1.8.0/2_Balanced_4k.png), [3](https://github.com/NVIDIA-RTX/caustica-Assets/blob/main/Screenshots/1.8.0/3_Balanced_4k.png), [4](https://github.com/NVIDIA-RTX/caustica-Assets/blob/main/Screenshots/1.8.0/4_Balanced_4k.png))
- * Fixes for a number of DLSS-RR denoising stability issues in reflected/refracted surfaces
- * DirectX SER and Opacity Micromaps are now available when Agility SDK 1.619 is enabled (on by default in 1.8.1, requires [DXR 1.2](https://devblogs.microsoft.com/directx/shader-model-6-9-retail-and-more/) driver support; to disable, remove Agility SDK 1.619 from CMake settings)
-
- 
-See [Releases](https://github.com/NVIDIA-RTX/caustica/releases) for more detail and downloads.
-
 ## Overview
 
-RTX Path Tracing is a code sample that strives to embody years of ray tracing and neural graphics research and experience. It is intended as a starting point for a clean path tracer integration, as a reference for various integrated SDKs, and/or for learning and experimentation. 
+Caustica is a modern ray tracing renderer aimed primarily at **embodied AI and robotics simulation** — generating photorealistic synthetic images, multi-view camera feeds, and ground-truth-quality references for perception, manipulation, and sim-to-real workflows.
 
-It is a pure path tracer that does not rely on rasterization. In its main configuration, all light transport is evaluated within a single ray tracing pass, leveraging light-sampling caches for real-time performance. It further employs path-space layer decomposition and guide-buffer generation to support real-time denoising (DLSS-RR) and other techniques.
+It takes **RTX Path Tracing (RTXPT)** as its functional and shading reference, but reimplements the runtime around a cleaner engine architecture that is easier to embed in simulation stacks:
 
-The base path tracing implementation derives from NVIDIA’s [Falcor Research Path Tracer](https://github.com/NVIDIAGameWorks/Falcor), integrated with the Caustica engine runtime. 
+* **Simulation-friendly runtime** — Bevy-inspired ECS (`App`, `Plugin`, `ecs::World`, `AppSchedule` systems) for scenes made of robots, objects, lights, and cameras that update every simulation step
+* **Production-style rendering** — Unreal Engine–inspired pipeline (`WorldRenderer`, render graph, pass features) for stable real-time previews and batch offline captures from the same scene description
+* **Physically based imagery** — path-traced diffuse/specular/transmission/fuzz (**OpenPBR-lite**), dynamic lighting (**ReSTIR DI/GI/PT**), and denoising/upscaling (**NRD**, **DLSS**) to reduce the visual gap between synthetic and real sensor data
 
-GTC presentation [How to Build a Real-time Path Tracer](https://www.nvidia.com/gtc/session-catalog/?tab.catalogallsessionstab=16566177511100015Kus&search.industry=option_1559593201839#/session/1666651593475001NN25) provides a high level introduction to most of the features, although it is pretty much out of date by now.
+Typical embodied-AI uses include: domain-randomized tabletop/manipulation scenes, indoor navigation environments, multi-camera rig rendering, scripted material/lighting variations, and headless dataset generation from Python.
 
+At a high level:
 
+* **Application & simulation layer** — Bevy-inspired ECS: `App`, `Plugin`, `ecs::World`, resources, and ordered `AppSchedule` systems (`Startup` → `Update` → `Extract` → `Render` → …).
+* **Rendering layer** — Unreal Engine–inspired pipeline: `WorldRenderer`, render features, pass graph (`GraphBuilder`), transient resource pools, and pipeline plugins that assemble frame work from declarative passes.
+* **Path tracing core** — RTXPT-derived shaders and algorithms, including **ReSTIR PT**, **ReSTIR GI**, **ReSTIR DI**, NEE-AT, path-space decomposition, denoiser guides, NRD, and **DLSS**, wired through the engine stack
+
+The result is a pure path tracer (no rasterization in the main light transport path) suited to both **interactive simulation preview** and **offline / headless synthetic-data rendering**.
+
+## Embodied AI & simulation rendering
+
+Caustica is designed as a **rendering backend** for embodied-intelligence pipelines, not as a full physics or robot-control simulator. A typical integration looks like:
+
+```
+Simulation / policy stack          Caustica
+─────────────────────────          ────────
+physics, kinematics, control  →     scene ECS update (poses, joints, attachments)
+sensor rig definition         →     scene JSON cameras + Python camera API
+domain randomization          →     `.material.json` / lights / env maps / scene variants
+batch or online inference     →     headless `caustica.Renderer`, accumulation, PNG/export
+```
+
+What fits embodied-AI workflows well:
+
+| Need | Caustica capability |
+| --- | --- |
+| Programmatic scenes | [Scene JSON](docs/scene-json.md) — models, transforms, lights, cameras, animation channels |
+| Consistent object appearance | **OpenPBR-lite** materials + glTF import with per-model `.material.json` overrides |
+| Multi-view / sensor rigs | Multiple scene cameras; runtime camera selection and transform control via Python/C++ |
+| Interactive + batch modes | Real-time path tracing with denoisers; reference accumulation for ground-truth frames |
+| Headless farm rendering | Python `Renderer(..., headless=True)` — no window/swap chain; see `caustica/Python/Examples/offline_render.py` |
+| Automation & tuning | Python extension (`pip install .`) for offline jobs; embed mode for live parameter edits in the editor |
+| Dynamic environments | Scene graph animation, emissive/analytic lights, environment maps, 3D Gaussian splats |
+
+Recommended starting points:
+
+* Scene authoring: [docs/scene-json.md](docs/scene-json.md)
+* Materials for sim-to-real variation: [docs/openpbr-lite.md](docs/openpbr-lite.md)
+* Python batch/headless API: [py_caustica.md](py_caustica.md), `caustica/Python/Examples/offline_render.py`
+
+## Architecture
+
+```
+App (frame loop, plugins, schedules)
+ └── ecs::World
+      ├── scene::SceneEntityWorld   — scene graph as ECS entities/components
+      ├── resources                 — GpuDevice, PathTracingContext, …
+      └── systems per AppSchedule
+           ├── Update              — animation, scene changes, input
+           ├── Extract             — scene → render-facing views
+           └── Render              — WorldRenderer + frame graph execution
+
+WorldRenderer (UE-like render pipeline)
+ ├── PathTracingContext            — persistent GPU state, settings, bindings
+ ├── RenderPipelineRegistry        — ordered render features / plugins
+ ├── GraphBuilder (rg::)           — pass DAG, barriers, transient textures
+ └── PathTracer passes             — trace, guides, denoise, post-process, present
+```
+
+Key code locations:
+
+| Layer | Paths |
+| --- | --- |
+| App & schedules | `caustica/caustica/include/engine/App.h`, `AppSchedules.h`, `Plugin.h` |
+| ECS core | `caustica/caustica/include/ecs/` |
+| Scene ECS | `caustica/caustica/include/scene/SceneEcs.h` |
+| World renderer | `caustica/caustica/include/render/worldRenderer/` |
+| Render graph | `caustica/caustica/include/render/graph/` |
+| Materials (OpenPBR-lite) | `caustica/caustica/src/render/passes/lighting/MaterialGpuCache.cpp`, `shaders/PathTracer/Rendering/Materials/BxDF.hlsli` |
+| Path tracing shaders | `caustica/caustica/shaders/PathTracer/` |
+| Sample app | `application/editor/app/Main.cpp` |
 
 ## Features
 
-* DirectX 12 and Vulkan back-ends
+### Simulation integration
+
+* **Scene JSON** workflow for reproducible environments, object placement, lights, and camera rigs
+* **ECS scene graph** (`SceneEntityWorld`) — entities/components map naturally to simulated actors and attachments
+* **Python extension** — headless and windowed `Renderer`, per-frame settings, camera/scene/material control, accumulation for dataset generation
+* **Reference + real-time modes** — interactive policy/debug preview and high-SPP offline captures from the same scene
+* glTF/OBJ asset import for props, robots, and scanned environments; animation channels for moving parts
+
+### Path tracing & light transport
+
+* Pure path tracer — no rasterization in the main light transport path
 * Reference and real-time modes
 * Simple BSDF model that is easy(ish) to extend
-* Simple asset pipeline based on glTF 2.0 (support for a subset of glTF extensions including animation)
 * Volumes and nested dielectrics with priority
-* Support for analytic lights (directional, spot, point), emissive triangles and environment map lighting
-* NEE lighting with feedback-based, temporaly adaptive guided importance sampling (NEE-AT)
-* Path tracing features such as: Low-discrepancy sample generator based on [Practical Hash-based Owen Scrambling](https://jcgt.org/published/0009/04/01/paper.pdf), use of [RayCones](https://research.nvidia.com/publication/2021-04_improved-shader-and-texture-level-detail-using-ray-cones) for texture MIP selection, RR early ray termination, firefly filter and similar 
-* Basic post-processing features such as: TAA, tone mapping, bloom and similar
-* Reference mode 'photo-mode screenshot' with simple [OptiX denoiser](https://developer.nvidia.com/optix-denoiser) integration
-* [Shader Execution Reordering](https://developer.nvidia.com/blog/improve-shader-performance-and-in-game-frame-rates-with-shader-execution-reordering/) for significant increase in execution performance
-* [RTXDI](https://github.com/NVIDIA-RTX/RTXDI) integration for ReSTIR DI (light importance sampling) and and ReSTIR GI (indirect lighting)
-* [OMM](https://github.com/NVIDIA-RTX/OMM) integration for fast ray traced alpha testing
-* [NRD](https://github.com/NVIDIA-RTX/NRD) ReLAX and ReBLUR denoiser integration with up to 3-layer path space decomposition
-* [RTXTF](https://github.com/NVIDIA-RTX/RTXTF) integration for Stochastic Texture Filtering
-* [Streamline](https://github.com/NVIDIAGameWorks/Streamline/) integration for DLSS (DLSS RR, DLSS SR, DLSS AA, DLSS FG & MFG)
+* Analytic lights (directional, spot, point), emissive triangles, and environment map lighting
+* NEE with feedback-based, temporally adaptive guided importance sampling (NEE-AT)
+* Low-discrepancy sampling ([Practical Hash-based Owen Scrambling](https://jcgt.org/published/0009/04/01/paper.pdf)), RayCones for texture MIP selection, RR early termination, firefly filter
 
+### ReSTIR / RTXDI (via RTXDI SDK)
+
+Integrated through `RtxdiPass` and RTXDI compute/ray-tracing shaders:
+
+* **ReSTIR DI** — resampled direct illumination for analytic and emissive lights; temporal/spatial resampling, checkerboard modes, fused DI+GI final shading
+* **ReSTIR GI** — resampled indirect lighting from secondary hits; temporal/spatial resampling and boiling filter
+* **ReSTIR PT** — path-level resampling with initial sampling, hybrid shift, reconnection, temporal/spatial resampling, and boiling filter
+* ReGIR light presampling support for large light counts
+
+Key paths: `caustica/caustica/src/render/passes/rtxdi/`, `caustica/caustica/shaders/render/rtxdi/`
+
+### Denoising, anti-aliasing & upscaling
+
+* **NRD** — ReLAX and ReBLUR with up to 3-layer path-space decomposition
+* **DLSS** (when enabled at build time):
+  * **DLSS Super Resolution (SR)** — spatial upscaling via Streamline (Windows) or native NGX (Linux Vulkan)
+  * **DLSS Ray Reconstruction (RR)** — neural denoising/AA using path-tracing guide buffers (diffuse/specular albedo, normal/roughness, motion, depth)
+  * **DLSS AA** and quality presets (Performance / Balanced / Quality / DLAA, etc.)
+  * **DLSS Frame Generation (FG)** and Reflex via Streamline on Windows
+* TAA, tone mapping, bloom, and accumulation for non-DLSS paths
+* Reference-mode OptiX denoiser for offline captures
+
+### OpenPBR material system (OpenPBR-lite)
+
+Caustica uses an **OpenPBR-first** material authoring layer on top of the internal `PTMaterial` GPU/shader backend. Scene materials are authored in `Assets/Materials/*.material.json` (see [scene JSON](docs/scene-json.md#材质覆盖)); existing legacy field names remain valid.
+
+* **Authoring model** — set `MaterialModel` to `"OpenPBR"` (default for new materials) and write parameters in OpenPBR-lite snake_case (`base_color`, `specular_roughness`, `fuzz_weight`, …) or inside an `OpenPBR` JSON block
+* **Shader lobes** — diffuse/base, GGX specular (with **anisotropy**), specular/diffuse **transmission**, and **fuzz** (cloth/velvet/sheen approximation)
+* **Backward compatible** — legacy `BaseOrDiffuseColor`, `Metalness`, `Roughness`, ORM textures, and related RTXPT-era fields still load and bake to the same GPU layout
+* **Editor UI** — material inspector shows OpenPBR-lite names when `MaterialModel` is `"OpenPBR"` and converts internally to `PTMaterial` constants
+
+Not yet implemented (full OpenPBR spec): coat, subsurface, thin-film, dispersion, and the complete OpenPBR energy model.
+
+Example:
+
+```json
+{
+  "MaterialModel": "OpenPBR",
+  "OpenPBR": {
+    "base_color": [0.55, 0.48, 0.40],
+    "base_metalness": 0.0,
+    "specular_weight": 0.45,
+    "specular_roughness": 0.82,
+    "specular_roughness_anisotropy": 0.45,
+    "fuzz_weight": 0.35,
+    "fuzz_roughness": 0.75
+  },
+  "NormalTexture": { "path": "Textures/weave_n.dds", "NormalMap": true }
+}
+```
+
+Key paths: `caustica/caustica/src/render/passes/lighting/MaterialGpuCache.cpp`, `caustica/caustica/shaders/PathTracer/Rendering/Materials/BxDF.hlsli`
+
+Full field reference: [OpenPBR-lite materials](docs/openpbr-lite.md)
+
+### Rendering platform & assets
+
+* DirectX 12 and Vulkan back-ends
+* Shader Execution Reordering (SER) and Opacity Micromaps (OMM) on supported DXR 1.2 builds
+* glTF 2.0 asset pipeline (subset of extensions, including animation) with **OpenPBR-lite** `.material.json` overrides
+* RTXTF stochastic texture filtering
+* 3D Gaussian Splat rendering and shadow proxy support
 
 ## Requirements
 
 - Windows 10 20H1 (version 2004-10.0.19041) or newer
-- DXR Capable GPU (DirectX Raytracing 1.1 API, or higher; if DXR 1.2 not available please disable Agility SDK 1.619 in CMake settings)
-- GeForce Game Ready Driver 595.71 or newer
+- DXR-capable GPU (DirectX Raytracing 1.1 API or higher; if DXR 1.2 is not available, disable Agility SDK 1.619 in CMake settings)
+- Recent GPU driver with DXR support
 - DirectX 12 or Vulkan API
 - CMake v4.02+
 - Visual Studio 2022 (v143 build tools) or later with Windows 10 SDK version 10.0.20348.0 or 10.0.26100.0 or later
 
-
 ## Known Issues
 
-* By default, Agility SDK 1.619 is enabled and requires DXR 1.2 (Shader Model 6.9). Our current setup can only switch to older shader models at build configuration time, so if your GPU does not support DXR 1.2 with Shader Model 6.9, set CAUSTICA_D3D_AGILITY_SDK_PATH, CAUSTICA_D3D_AGILITY_SDK_VERSION and CAUSTICA_D3D_AGILITY_SDK_VERSION_NAME CMake variables to empty before cleaning the `/bin` folder, re-configuring/re-generating and rebuilding the project.
-* Enabling Vulkan support requires a couple of manual steps, see [below](#building-vulkan)
-* SER and OMM support on Vulkan is currently work in progress
-* Running Vulkan on AMD GPUs may trigger a TDR during TLAS building in scenes with null TLAS instances
-* Enabling debug layer on Vulkan will show a number of warnings and errors - fixes are work in progress
-* We recommend using *NVIDIA Nsight Graphics* graphics for frame capture and analysis. If using other GPU performance tuning and debugging tools such as *PIX on Windows*, it is advisable to disable RHI_WITH_NVAPI and CAUSTICA_WITH_STREAMLINE variables in CMake to avoid compatibility issues. Please note: disabling these settings results in lower performance and missing features
-* There is a known issue resulting in LIVE_DEVICE DirectX warnings reported at shutdown when Streamline is enabled in Debug builds
-* There is a known issue resulting in black or incorrect transparencies/reflection on some AMD systems with latest drivers; this is most likely a driver error and has been reported
-
+* By default, Agility SDK 1.619 is enabled and requires DXR 1.2 (Shader Model 6.9). The current setup can only switch to older shader models at build configuration time. If your GPU does not support DXR 1.2 with Shader Model 6.9, set `CAUSTICA_D3D_AGILITY_SDK_PATH`, `CAUSTICA_D3D_AGILITY_SDK_VERSION`, and `CAUSTICA_D3D_AGILITY_SDK_VERSION_NAME` CMake variables to empty before cleaning the `/bin` folder, re-configuring, and rebuilding.
+* Enabling Vulkan support requires a couple of manual steps; see [Building Vulkan](#building-vulkan).
+* SER and OMM support on Vulkan is currently work in progress.
+* Running Vulkan on AMD GPUs may trigger a TDR during TLAS building in scenes with null TLAS instances.
+* Enabling the Vulkan debug layer will show a number of warnings and errors; fixes are work in progress.
+* For frame capture and GPU profiling, a vendor graphics debugger is recommended. If using tools such as PIX on Windows, disable `RHI_WITH_NVAPI` and `CAUSTICA_WITH_STREAMLINE` in CMake to avoid compatibility issues. Disabling these settings reduces performance and removes some features.
+* There is a known issue resulting in LIVE_DEVICE DirectX warnings at shutdown when Streamline is enabled in Debug builds.
+* There is a known issue with black or incorrect transparencies/reflections on some AMD systems with recent drivers.
 
 ## Folder Structure
 
-|						| |  
-| -						| - |
-| /bin					| default CMake folder for binaries and compiled shaders
-| /build				| default CMake folder for build files
-| /Assets				| models, textures, scene files  
-| /Docs					| documentation 
-| /External				| external libraries and SDKs, including Streamline, NRD, RTXDI, and OMM
-| /Support				| optional command line tools (denoiser, texture compressor, etc)
-| /caustica				| **Application wrapper**: engine (`caustica/caustica/`), Python bindings, shaders |
-| /application/editor		| **Desktop editor / sample app** — entry point at `app/Main.cpp` |
-| /caustica/caustica		| **Caustica engine** (`caus*` modules) |
-| /caustica/caustica/shaders/PathTracer | **Core path tracing shaders** |
-
+| | |
+| - | - |
+| `/bin` | default CMake folder for binaries and compiled shaders |
+| `/build` | default CMake folder for build files |
+| `/Assets` | models, textures, scene files |
+| `/Docs` | documentation |
+| `/docs` | additional project documentation (scene JSON, materials, etc.) |
+| `/External` | external libraries and SDKs, including Streamline, NRD, RTXDI, and OMM |
+| `/Support` | optional command line tools (denoiser, texture compressor, etc.) |
+| `/caustica` | application wrapper: engine (`caustica/caustica/`), Python bindings, shaders |
+| `/application/editor` | desktop editor / sample app — entry point at `app/Main.cpp` |
+| `/caustica/caustica` | Caustica engine: `causEngine`, `causRender`, `causScene`, `causBackend`, … |
+| `/caustica/caustica/shaders/PathTracer` | core path tracing shaders |
 
 ## Build
 
 Windows is the primary supported platform. Linux/WSL builds use the Vulkan backend and can enable OIDN reference-mode denoising.
 
 1. Clone the repository **with all submodules recursively**:
-   
-   `git clone --recursive https://github.com/NVIDIA-RTX/caustica.git`
 
-2. Use CMake to configure the build and generate the project files.
-   
    ```
+   git clone --recursive <repository-url>
    cd caustica
+   ```
+
+2. Use CMake to configure the build and generate project files:
+
+   ```
    cmake CMakeLists.txt -B ./build
    ```
 
-   Use `-G "some tested VS version"` if specific Visual Studio or other environment version required. Make sure the x64 platform is used. 
+   Use `-G "some tested VS version"` if a specific Visual Studio or toolchain version is required. Make sure the x64 platform is used.
 
 3. Build the solution generated by CMake in the `./build/` folder.
 
-   In example, if using Visual Studio, open the generated solution `build/RTXPathTracing.sln` and build it.
+   For example, with Visual Studio, open `build/RTXPathTracing.sln` and build.
 
-4. Select and run the `caustica` project. Binaries get built to the `bin` folder. Assets/media are loaded from `Assets` folder.
+4. Select and run the `caustica` project. Binaries are built to the `bin` folder. Assets are loaded from the `Assets` folder.
 
-   If making a binary build, the `Assets` and `Support` folders can be placed into `bin` next to executable and packed up together (i.e. the sample app will search for both `Assets/` and `../Assets/`).
+   For a binary distribution, place the `Assets` and `Support` folders next to the executable in `bin` (the app searches both `Assets/` and `../Assets/`).
 
 ## Python Extension Install
 
-caustica also builds a standalone Python extension module for offline rendering
-and automation. After building the `caustica_py` target, install it into the
-active Python environment from the repository root:
+Caustica builds a standalone Python extension for **headless synthetic-data rendering**, batch scene sweeps, and simulation-side automation. After building the `caustica_py` target, install it into the active Python environment from the repository root:
 
 ```
 python -m pip install .
 python -c "import caustica; print(caustica.MODE)"
 ```
 
-The pip build assembles a local binary wheel from `bin/`, including the native
-extension, runtime DLLs/so files, shaders, and a minimal asset payload. The
-payload can be adjusted with environment variables:
+The pip build assembles a local binary wheel from `bin/`, including the native extension, runtime DLLs/so files, shaders, and a minimal asset payload. The payload can be adjusted with environment variables:
 
 | Variable | Default | Values |
 | --- | --- | --- |
@@ -130,9 +250,7 @@ payload can be adjusted with environment variables:
 | `caustica_WHEEL_SHADER_API` | `d3d12` on Windows, `vulkan` elsewhere | `d3d12`, `vulkan`, `both` |
 | `CAUSTICA_WHEEL_SHADER_PACK` | `true` | `true`, `false` |
 
-By default, wheel builds package compiled shader binaries into
-`caustica.shaders.<api>.pack` instead of shipping the loose
-`ShaderPrecompiled/` and `ShaderDynamic/Bin/` file trees.
+By default, wheel builds package compiled shader binaries into `caustica.shaders.<api>.pack` instead of shipping loose `ShaderPrecompiled/` and `ShaderDynamic/Bin/` trees.
 
 You can also build a wheel explicitly:
 
@@ -141,24 +259,23 @@ python support/python/build_wheel.py
 python -m pip install dist/caustica-*.whl
 ```
 
-For a standalone executable distribution, generate a shader pack next to the
-binary after building and warming the dynamic shader cache:
+For a standalone executable distribution, generate a shader pack next to the binary after building and warming the dynamic shader cache:
 
 ```
 python support/python/package_shaders.py --shader-api d3d12
 ```
 
-
 ## Building Vulkan
 
-Due to interaction with various included libraries, Vulkan support is not enabled by default on Windows and needs a couple of additional tweaks on the user side; please find the recommended steps below:
- * Install Vulkan SDK (we tested with VulkanSDK-1.3.290.0) and clear CMake cache (if applicable) to make sure the correct dxc.exe path from Vulkan SDK is set for SPIRV compilation
- * Set CAUSTICA_WITH_VULKAN and RHI_WITH_VULKAN CMake variables to ON. DXC_SPIRV_PATH should already have automatically picked up the location of the DXC compiler in the Vulkan SDK during config; if not, please set it manually
- * To run with Vulkan use `--vk` command line parameter
+Vulkan support is not enabled by default on Windows and requires additional setup:
+
+* Install the Vulkan SDK (tested with VulkanSDK-1.3.290.0) and clear the CMake cache so the correct `dxc.exe` from the Vulkan SDK is used for SPIR-V compilation.
+* Set `CAUSTICA_WITH_VULKAN` and `RHI_WITH_VULKAN` CMake variables to `ON`. `DXC_SPIRV_PATH` should pick up the Vulkan SDK DXC during configuration; set it manually if needed.
+* Run with Vulkan using the `--vk` command-line parameter.
 
 ## Building Linux / WSL
 
-Linux and WSL builds default to Vulkan and disable Windows-only integrations such as DirectX 12 Agility SDK, NVAPI, and Streamline. DLSS/DLSS-RR uses the native NVIDIA NGX Vulkan path when `CAUSTICA_WITH_NATIVE_DLSS=ON` (default for Linux Vulkan builds), and OIDN is downloaded from the official x86_64 Linux package when `CAUSTICA_WITH_OIDN=ON`.
+Linux and WSL builds default to Vulkan and disable Windows-only integrations such as DirectX 12 Agility SDK, NVAPI, and Streamline. DLSS/DLSS-RR uses the native NGX Vulkan path when `CAUSTICA_WITH_NATIVE_DLSS=ON` (default for Linux Vulkan builds). OIDN is downloaded from the official x86_64 Linux package when `CAUSTICA_WITH_OIDN=ON`.
 
 Recommended WSL setup:
 
@@ -167,7 +284,7 @@ sudo apt update
 sudo apt install -y build-essential cmake ninja-build python3-dev xorg-dev libwayland-dev wayland-protocols
 ```
 
-Install the Linux Vulkan SDK and make sure `dxc` is on `PATH` or set `DXC_SPIRV_PATH` explicitly. Then configure and build:
+Install the Linux Vulkan SDK and ensure `dxc` is on `PATH`, or set `DXC_SPIRV_PATH` explicitly. Then configure and build:
 
 ```
 cmake -S . -B build-linux -G Ninja \
@@ -180,69 +297,68 @@ cmake -S . -B build-linux -G Ninja \
 cmake --build build-linux --config Release
 ```
 
-On Linux, CMake fetches NVIDIA's DLSS SDK and copies the DLSS/DLSS-RR runtime `.so` files next to the executable. Use `-DCAUSTICA_WITH_NATIVE_DLSS=OFF` if you need a build without NGX/DLSS. Streamline features that are not part of native NGX DLSS, such as Reflex and DLSS Frame Generation, remain Windows/Streamline-only in this codebase.
- 
+On Linux, CMake fetches the DLSS SDK and copies DLSS/DLSS-RR runtime `.so` files next to the executable. Use `-DCAUSTICA_WITH_NATIVE_DLSS=OFF` for a build without NGX/DLSS. Streamline-only features such as Reflex and DLSS Frame Generation remain Windows-only in this codebase.
 
- ## DirectX 12 Agility SDK
- RTX PT optionally integrates [DirectX 12 Agility SDK](https://devblogs.microsoft.com/directx/directx12agility/). If CAUSTICA_DOWNLOAD_AND_ENABLE_AGILITY_SDK CMake variable is set to TRUE, the version 717-preview will be automatically downloaded via CMake script and required build variables will be set. If different version is required, please set correct CAUSTICA_D3D_AGILITY_SDK_PATH and CAUSTICA_D3D_AGILITY_SDK_VERSION.
+## DirectX 12 Agility SDK
 
-Version 717-preview enables native DirectX support for [Shader Execution Reordering](https://devblogs.microsoft.com/directx/ser/) and [Opacity Micromaps](https://devblogs.microsoft.com/directx/omm/). For testing this on Nvidia hardware, a preview driver is required and can be downloaded from https://developer.nvidia.com/downloads/shadermodel6-9-preview-driver 
+Caustica optionally integrates the [DirectX 12 Agility SDK](https://devblogs.microsoft.com/directx/directx12agility/). If `CAUSTICA_DOWNLOAD_AND_ENABLE_AGILITY_SDK` is `TRUE`, version 717-preview is downloaded via CMake and required build variables are set. For a different version, set `CAUSTICA_D3D_AGILITY_SDK_PATH` and `CAUSTICA_D3D_AGILITY_SDK_VERSION` manually.
 
+Version 717-preview enables native DirectX support for [Shader Execution Reordering](https://devblogs.microsoft.com/directx/ser/) and [Opacity Micromaps](https://devblogs.microsoft.com/directx/omm/). DXR 1.2 / Shader Model 6.9 may require a recent preview or production driver from your GPU vendor.
 
+## User Interface
 
- ## User Interface
-
-Once the application is running, most of the SDK features can be accessed via the UI window on the left hand side and drop-down controls in the top-center. 
+Once the application is running, most features are available from the UI panel on the left and drop-down controls at the top center.
 
 ![UI](./Docs/r-ui.png)
 
-Camera can be moved using W/S/A/D keys and rotated by dragging with the left mouse cursor.
-
+Move the camera with W/S/A/D and rotate by dragging with the left mouse button.
 
 ## Command Line
 
-- `--scene` loads a specific .scene.json file; example: `--scene programmer-art.scene.json`
-- `--width` and `--height` to set the window size; example: `--width 3840 --height 2160`
-- `--fullscreen` to start in full screen mode; example: `--width 3840 --height 2160 --fullscreen`
-- `--debug` to enable the graphics API debug layer or runtime, and additional validation layers.
-- `--vk` to enable Vulkan (see [building-vulkan](#building-vulkan))
- 
+- `--scene` loads a specific `.scene.json` file; example: `--scene programmer-art.scene.json`
+- `--width` and `--height` set the window size; example: `--width 3840 --height 2160`
+- `--fullscreen` starts in full screen mode; example: `--width 3840 --height 2160 --fullscreen`
+- `--debug` enables the graphics API debug layer and additional validation.
+- `--vk` enables Vulkan (see [Building Vulkan](#building-vulkan))
 
 ## Developer Documentation
 
-We are working on more detailed SDK developer documentation - watch this space!
+* [Scene JSON format](docs/scene-json.md)
+* [OpenPBR Lite notes](docs/openpbr-lite.md)
+* [Python API overview](py_caustica.md)
 
+More detailed engine documentation is in progress.
 
 ## Contact
 
-RTX Path Tracing is under active development. Please report any issues directly through GitHub issue tracker, and for any information, suggestions or general requests please feel free to contact us at pathtracing-sdk-support@nvidia.com!
+Caustica is under active development. Please report issues through the repository issue tracker.
 
 ## Thanks
 
-Many thanks to the developers of the following open-source libraries or projects that make this project possible:
- * dear imgui (https://github.com/ocornut/imgui)
- * DirectX Shader Compiler (https://github.com/microsoft/DirectXShaderCompiler)
- * cgltf, Single-file glTF 2.0 loader (https://github.com/jkuhlmann/cgltf)
- * Krzysztof Narkowicz's Real-time BC6H compression on GPU (https://github.com/knarkowicz/GPURealTimeBC6H)
- * okdshin's https://github.com/okdshin/PicoSHA2
- * ...and any we might have forgotten (please let us know) :)
+Thanks to the developers of the following open-source libraries and projects:
+
+* dear imgui (https://github.com/ocornut/imgui)
+* DirectX Shader Compiler (https://github.com/microsoft/DirectXShaderCompiler)
+* cgltf, single-file glTF 2.0 loader (https://github.com/jkuhlmann/cgltf)
+* Krzysztof Narkowicz's real-time BC6H compression on GPU (https://github.com/knarkowicz/GPURealTimeBC6H)
+* okdshin's PicoSHA2 (https://github.com/okdshin/PicoSHA2)
+* ...and any we might have forgotten (please let us know)
 
 ## Citation
-If you use RTX Path Tracing in a research project leading to a publication, please cite the project.
-The BibTex entry is
+
+If you use Caustica in a research project that leads to a publication, please cite the project. Example BibTeX:
 
 ```bibtex
 @online{caustica,
-   title   = {{{NVIDIA}}\textregistered{} {RTX Path Tracing}},
-   author  = {{NVIDIA}},
-   year    = 2023,
-   url     = {https://github.com/NVIDIA-RTX/caustica},
-   urldate = {2024-01-26},
+   title   = {Caustica: Real-Time Path Tracing},
+   author  = {Caustica Contributors},
+   year    = {2023},
+   url     = {<repository-url>},
 }
 ```
 
 ## License
 
-See [LICENSE.txt](LICENSE.txt)
+See [LICENSE.txt](LICENSE.txt).
 
-This project includes NVAPI software. All uses of NVAPI software are governed by the license terms specified here: https://github.com/NVIDIA/nvapi/blob/main/License.txt.
+Bundled third-party components (including NVAPI, DLSS, NRD, RTXDI, and others) are governed by their respective license terms in `External/` and related notices in `LICENSE.txt`.

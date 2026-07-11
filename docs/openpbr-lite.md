@@ -1,19 +1,19 @@
 # OpenPBR-lite materials
 
-RTXPT now supports an OpenPBR-lite authoring layer on top of the existing
+Caustica supports an OpenPBR-lite authoring layer on top of the existing
 `PTMaterial` shader backend. Existing `.material.json` files remain valid. The
 OpenPBR-lite layer gives materials a standard parameter naming scheme and maps
-the supported fields onto RTXPT's current diffuse, GGX specular, transmission,
+the supported fields onto Caustica's current diffuse, GGX specular, transmission,
 anisotropy, and fuzz lobes.
 
 The material UI is OpenPBR-first: when `MaterialModel` is `"OpenPBR"`, the
 inspector shows OpenPBR-lite parameter names and converts them internally to the
-existing RTXPT material fields and GPU data layout.
+existing `PTMaterial` fields and GPU data layout.
 
 This is not full OpenPBR yet. Coat, subsurface, thin-film, dispersion, and the
 full OpenPBR energy model are not implemented in this pass.
 
-## Existing RTXPT Parameters
+## Existing material parameters
 
 Core textures:
 
@@ -101,9 +101,9 @@ You can write fields inside an `OpenPBR` object:
 ```
 
 Or write the same snake_case fields at the top level. If any OpenPBR-lite field
-is present at the top level, RTXPT treats the material as OpenPBR-lite.
+is present at the top level, Caustica treats the material as OpenPBR-lite.
 
-| OpenPBR-lite field | RTXPT backend field |
+| OpenPBR-lite field | Backend field |
 | --- | --- |
 | `base_weight` | `BaseWeight` |
 | `base_color` | `BaseOrDiffuseColor` |
