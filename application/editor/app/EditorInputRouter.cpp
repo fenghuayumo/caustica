@@ -8,6 +8,7 @@
 #include <events/key_event.h>
 #include <events/mouse_event.h>
 #include <imgui.h>
+#include <ImGuizmo.h>
 #include <imgui/imgui_renderer.h>
 #include <render/RenderSessionState.h>
 #include <render/worldRenderer/WorldRenderer.h>
@@ -25,6 +26,18 @@ inline constexpr int ToGlfwMods(caustica::ModifierKey m) { return static_cast<in
 inline constexpr int cGlfwPress = 1;
 inline constexpr int cGlfwRelease = 0;
 inline constexpr int cGlfwRepeat = 2;
+
+bool gizmoCapturesInput(const SceneEditor& sceneEditor)
+{
+    const auto& editor = sceneEditor.GetEditorUIState();
+    return editor.GizmoCapturingInput || ImGuizmo::IsOver() || ImGuizmo::IsUsing();
+}
+
+void requestViewportPick(caustica::render::RenderRuntimeState& runtime, const dm::uint2& position)
+{
+    runtime.Picking.MaterialRequested = true;
+    runtime.Picking.InstanceRequested = true;
+}
 
 bool onKeyPressed(SceneEditor& sceneEditor, caustica::KeyPressedEvent& e)
 {
@@ -109,7 +122,7 @@ bool onKeyTyped(SceneEditor& /*sceneEditor*/, caustica::KeyTypedEvent& e)
 
 bool onMouseMoved(SceneEditor& sceneEditor, caustica::MouseMovedEvent& e)
 {
-    if (ImGui::GetIO().WantCaptureMouse)
+    if (ImGui::GetIO().WantCaptureMouse || gizmoCapturesInput(sceneEditor))
         return false;
 
     auto* gpuRender = sceneEditor.gpuRender();
@@ -144,7 +157,7 @@ bool onMouseMoved(SceneEditor& sceneEditor, caustica::MouseMovedEvent& e)
 
 bool onMouseButtonPressed(SceneEditor& sceneEditor, caustica::MouseButtonPressedEvent& e)
 {
-    if (ImGui::GetIO().WantCaptureMouse)
+    if (ImGui::GetIO().WantCaptureMouse || gizmoCapturesInput(sceneEditor))
         return false;
 
     auto* gpuRender = sceneEditor.gpuRender();
@@ -165,10 +178,9 @@ bool onMouseButtonPressed(SceneEditor& sceneEditor, caustica::MouseButtonPressed
         camera->camera().MouseButtonUpdate(button, cGlfwPress, mods);
     if (game)
         game->MouseButtonUpdate(button, cGlfwPress, mods);
-    if (button == ToGlfwMouse(caustica::Mouse::Right))
+    if (button == ToGlfwMouse(caustica::Mouse::Left) || button == ToGlfwMouse(caustica::Mouse::Right))
     {
-        session.runtime.Picking.MaterialRequested = true;
-        session.runtime.Picking.InstanceRequested = true;
+        requestViewportPick(session.runtime, session.runtime.Picking.Position);
         session.settings.DebugPixel = session.runtime.Picking.Position;
     }
 #if CAUSTICA_WITH_STREAMLINE
@@ -180,7 +192,7 @@ bool onMouseButtonPressed(SceneEditor& sceneEditor, caustica::MouseButtonPressed
 
 bool onMouseButtonReleased(SceneEditor& sceneEditor, caustica::MouseButtonReleasedEvent& e)
 {
-    if (ImGui::GetIO().WantCaptureMouse)
+    if (ImGui::GetIO().WantCaptureMouse || gizmoCapturesInput(sceneEditor))
         return false;
 
     auto* gpuRender = sceneEditor.gpuRender();

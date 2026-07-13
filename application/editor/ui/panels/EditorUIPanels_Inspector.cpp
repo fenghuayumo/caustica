@@ -2,6 +2,7 @@
 
 #include "SceneEditor.h"
 #include "common/ImGuiManager.h"
+#include "common/TransformGizmo.h"
 
 #include <render/core/PathTracerSettings.h>
 #include <render/SceneLightingPasses.h>
@@ -63,6 +64,9 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
 
         if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen))
         {
+            BuildTransformGizmoToolbar(m_editorUI);
+            ImGui::Separator();
+
             auto* ltc = ew->world().tryGet<caustica::scene::LocalTransformComponent>(entity);
             dm::double3 translation = ltc ? ltc->translation : dm::double3(0.0);
             dm::dquat rotation = ltc ? ltc->rotation : dm::dquat::identity();
@@ -72,6 +76,7 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
             if (ImGui::DragFloat3("Position", pos, 0.01f))
             {
                 ew->setTranslation(entity, dm::double3(pos[0], pos[1], pos[2]));
+                ew->refreshHierarchy(caustica::scene::PreviousTransformPolicy::PreserveExisting);
                 m_settings.ResetAccumulation = true;
             }
 
@@ -100,6 +105,7 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
                 const dm::dquat newRotation = dm::rotationQuat(dm::double3(euler[0] * deg2rad, euler[1] * deg2rad, euler[2] * deg2rad));
                 m_editorUI.InspectorRotationQuat = newRotation;
                 ew->setRotation(entity, newRotation);
+                ew->refreshHierarchy(caustica::scene::PreviousTransformPolicy::PreserveExisting);
                 m_settings.ResetAccumulation = true;
             }
 
@@ -107,6 +113,7 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
             if (ImGui::DragFloat3("Scale", scl, 0.01f, 0.001f, 1000.0f))
             {
                 ew->setScaling(entity, dm::double3(scl[0], scl[1], scl[2]));
+                ew->refreshHierarchy(caustica::scene::PreviousTransformPolicy::PreserveExisting);
                 m_settings.ResetAccumulation = true;
             }
         }

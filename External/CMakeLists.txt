@@ -33,6 +33,11 @@ if (CAUSTICA_WITH_NVRHI AND NOT TARGET imgui)
     set_target_properties(imgui PROPERTIES FOLDER ${third_party_folder})
 endif()
 
+if (CAUSTICA_WITH_NVRHI AND NOT TARGET imguizmo)
+    include(imguizmo.cmake)
+    set_target_properties(imguizmo PROPERTIES FOLDER ${third_party_folder})
+endif()
+
 if (NOT TARGET jsoncpp_static)
     add_library(jsoncpp_static)
     set(jsoncpp_path "${CMAKE_CURRENT_SOURCE_DIR}/jsoncpp-amalgam")

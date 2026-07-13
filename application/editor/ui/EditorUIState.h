@@ -42,6 +42,18 @@ struct EditorSelectionState
     bool InspectorRotationEulerValid = false;
     bool SelectedGaussianSplat = false;
     std::shared_ptr<std::vector<TogglableNode>> TogglableNodes = nullptr;
+
+    // ImGuizmo transform gizmo state (operation/mode values match ImGuizmo enums)
+    bool ShowTransformGizmo = true;
+    bool GizmoEnabled = true;
+    int GizmoOperation = 7; // ImGuizmo::TRANSLATE
+    int GizmoMode = 0;      // ImGuizmo::LOCAL
+    bool GizmoSnapEnabled = false;
+    float GizmoSnapTranslation[3] = { 1.f, 1.f, 1.f };
+    float GizmoSnapRotation = 15.f;
+    float GizmoSnapScale = 0.1f;
+    // Updated each UI frame; input router uses this to avoid stealing gizmo clicks.
+    bool GizmoCapturingInput = false;
 };
 
 struct EditorFileDropState

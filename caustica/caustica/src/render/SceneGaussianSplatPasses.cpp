@@ -41,6 +41,13 @@ namespace
                 return candidate;
         }
     }
+
+    void ApplyGaussianSplatLocalBounds(scene::SceneEntityWorld& entityWorld, ecs::Entity entity, const GaussianSplatPass& pass)
+    {
+        entityWorld.world().emplace<scene::LocalBoundsComponent>(
+            entity, scene::LocalBoundsComponent{ pass.GetLocalBounds() });
+        entityWorld.refreshHierarchy(scene::PreviousTransformPolicy::PreserveExisting);
+    }
 }
 
 void SceneGaussianSplatPasses::wireSession(const ScenePassWireParams& params)
@@ -201,6 +208,7 @@ void SceneGaussianSplatPasses::loadFromSceneEntities()
                 splat->resolvedPath = splatPath.string();
                 splat->loadedSplatCount = pass->GetSplatCount();
                 onPassLoaded(*pass);
+                ApplyGaussianSplatLocalBounds(*entityWorld, entity, *pass);
 
                 SceneObject object;
                 object.splat = splat;
@@ -285,6 +293,7 @@ bool SceneGaussianSplatPasses::attachToScene(const std::filesystem::path& fileNa
     scene->extractAndPublishRenderSnapshot(m_gpuDevice->GetFrameIndex());
 
     onPassLoaded(*pass);
+    ApplyGaussianSplatLocalBounds(*entityWorld, entity, *pass);
 
     SceneObject object;
     object.splat = splat;

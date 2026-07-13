@@ -125,6 +125,7 @@ public:
 
     [[nodiscard]] bool HasSplats() const { return m_splatCount > 0; }
     [[nodiscard]] uint32_t GetSplatCount() const { return m_splatCount; }
+    [[nodiscard]] caustica::math::box3 GetLocalBounds() const { return m_localBounds; }
     [[nodiscard]] const std::string& GetSourceFileName() const { return m_sourceFileName; }
     [[nodiscard]] nvrhi::rt::IAccelStruct* GetTopLevelAS() const { return m_accelBuilder.getTopLevelAS(); }
     [[nodiscard]] nvrhi::IBuffer* GetSplatBuffer() const { return m_splatBuffer.Get(); }
@@ -186,6 +187,8 @@ private:
     std::vector<GaussianSplatEmissionProxy> m_emissionProxies;
     std::vector<uint8_t> m_packedColorOpacity;
     std::vector<uint8_t> m_packedShCoefficients;
+    caustica::math::box3 m_localBounds = caustica::math::box3::empty();
+    bool m_localBoundsValid = false;
     uint32_t m_splatCount = 0;
     uint32_t m_shDegree = 0;
     bool m_splatUploadPending = false;

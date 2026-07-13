@@ -151,6 +151,7 @@ public:
 
     bool ShowDeltaTree() const;
     void ResolvePickFeedback(const DebugFeedbackStruct& feedback);
+    [[nodiscard]] ecs::Entity pickGaussianSplatAtPixel(math::uint2 renderPixel) const;
     bool ConsumeExperimentalPhotoScreenshot();
 
     void onEvent(caustica::Event& event);

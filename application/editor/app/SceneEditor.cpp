@@ -7,10 +7,13 @@
 #include <render/worldRenderer/WorldRenderer.h>
 #include <render/core/TextureUtils.h>
 #include <render/passes/debug/ZoomTool.h>
+#include <render/SceneGaussianSplatPasses.h>
 #include <assets/loader/ShaderFactory.h>
 #include <engine/App.h>
 #include <engine/GpuRenderSubsystem.h>
 #include <core/path_utils.h>
+#include <scene/SceneEcs.h>
+#include <scene/View.h>
 #include <EditorUI.h>
 #include <shaders/PathTracer/PathTracerDebug.hlsli>
 
@@ -116,6 +119,95 @@ std::shared_ptr<Material> SceneEditor::findMaterial(int materialID) const
 ecs::Entity SceneEditor::findEntityByInstanceIndex(int instanceIndex) const
 {
     return m_app ? sceneSession::findEntityByInstanceIndex(*m_app, instanceIndex) : ecs::NullEntity;
+}
+
+ecs::Entity SceneEditor::pickGaussianSplatAtPixel(math::uint2 renderPixel) const
+{
+    auto* gpu = gpuRender();
+    auto scene = this->scene();
+    auto* entityWorld = scene ? scene->GetEntityWorld() : nullptr;
+    const auto& view = currentView();
+    if (!gpu || !entityWorld || !view)
+        return ecs::NullEntity;
+
+    const uint2 disp = displaySize();
+    const uint2 rend = renderSize();
+    if (disp.x == 0 || disp.y == 0 || rend.x == 0 || rend.y == 0)
+        return ecs::NullEntity;
+
+    // Picking.Position is in render pixels; project using display space for ImGui-style tests.
+    const float2 mousePos = float2(
+        float(renderPixel.x) * float(disp.x) / float(rend.x),
+        float(renderPixel.y) * float(disp.y) / float(rend.y));
+    const float2 displaySizeF = float2(float(disp.x), float(disp.y));
+    const float4x4 viewProj = view->getViewProjectionMatrix();
+
+    constexpr float2 kInvalidPos = float2(FLT_MAX, FLT_MAX);
+    auto projectToScreen = [&](const float3& worldPos) -> float2
+    {
+        float4 projv = float4(worldPos, 1.f) * viewProj;
+        if (std::fabs(projv.w) < 1e-8f)
+            return kInvalidPos;
+        projv /= projv.w;
+        if (projv.z < 0.f)
+            return kInvalidPos;
+        projv.xy() = projv.xy() * float2(0.5f, -0.5f) + float2(0.5f, 0.5f);
+        projv.xy() *= displaySizeF;
+        if (projv.x < 0.f || projv.x > displaySizeF.x || projv.y < 0.f || projv.y > displaySizeF.y)
+            return kInvalidPos;
+        return projv.xy();
+    };
+
+    ecs::Entity bestEntity = ecs::NullEntity;
+    float bestDistance = FLT_MAX;
+
+    for (const auto& object : gpu->gaussianSplatPasses().objects())
+    {
+        if (!object.splat || !object.splat->enabled || !ecs::isValid(object.entity) || !object.pass)
+            continue;
+
+        auto* boundsComp = entityWorld->world().tryGet<scene::BoundsComponent>(object.entity);
+        box3 bbox = boundsComp ? boundsComp->globalBounds : box3::empty();
+        if (bbox.isempty())
+        {
+            // Fallback: transform local splat AABB by the entity global transform.
+            auto* global = entityWorld->world().tryGet<scene::GlobalTransformComponent>(object.entity);
+            const box3 local = object.pass->GetLocalBounds();
+            if (global && !local.isempty())
+                bbox = local * global->transformFloat;
+        }
+        if (bbox.isempty())
+            continue;
+
+        const float3 center = bbox.center();
+        const float2 screenCenter = projectToScreen(center);
+        if (screenCenter.x == FLT_MAX)
+            continue;
+
+        float screenRadius = 0.f;
+        for (int corner = 0; corner < 8; ++corner)
+        {
+            const float2 screenCorner = projectToScreen(bbox.getCorner(corner));
+            if (screenCorner.x == FLT_MAX)
+                continue;
+            screenRadius = std::max(screenRadius, length(screenCenter - screenCorner));
+        }
+        if (screenRadius <= 0.f)
+            continue;
+
+        screenRadius += 10.f;
+        if (length(mousePos - screenCenter) > screenRadius)
+            continue;
+
+        const float range = length(center - view->getViewOrigin());
+        if (range < bestDistance)
+        {
+            bestDistance = range;
+            bestEntity = object.entity;
+        }
+    }
+
+    return bestEntity;
 }
 
 const FirstPersonCamera& SceneEditor::currentCamera() const
@@ -595,7 +687,10 @@ void SceneEditor::ResolvePickFeedback(const DebugFeedbackStruct& feedback)
         m_editor.SelectedMaterial = findMaterial(int(feedback.pickedMaterialID));
     if (m_renderState.Picking.InstanceRequested)
     {
-        m_editor.SelectedEntity = findEntityByInstanceIndex(int(feedback.pickedInstanceIndex));
+        ecs::Entity picked = findEntityByInstanceIndex(int(feedback.pickedInstanceIndex));
+        if (picked == ecs::NullEntity)
+            picked = pickGaussianSplatAtPixel(m_renderState.Picking.Position);
+        m_editor.SelectedEntity = picked;
         if (m_editor.SelectedEntity != caustica::ecs::NullEntity)
             m_editor.SelectedGaussianSplat = false;
     }

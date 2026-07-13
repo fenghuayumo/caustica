@@ -269,6 +269,8 @@ void SceneEntityWorld::syncDirtyFlagsFromChangeDetection()
 void SceneEntityWorld::refreshHierarchy(PreviousTransformPolicy previousPolicy)
 {
     UpdateHierarchy(m_world, previousPolicy);
+    // Keep GaussianSplat::cachedGlobalTransform in sync for the splat render path.
+    updateGaussianSplatTransforms();
 }
 
 void SceneEntityWorld::syncPreviousTransformsFromCurrent()
@@ -619,6 +621,12 @@ void SceneEntityWorld::updateLeafContentAndBounds(ecs::Entity entity)
             leafContent = GetMeshContentFlags(*mesh->mesh);
             localBounds = GetMeshLocalBounds(*mesh->mesh);
         }
+    }
+    else if (m_world.has<GaussianSplatComponent>(entity))
+    {
+        // Local AABB is filled after GaussianSplatPass load; preserve it across refresh.
+        if (const auto* existing = m_world.get<LocalBoundsComponent>(entity))
+            localBounds = existing->bounds;
     }
     else if (m_world.has<CameraComponent>(entity))
         leafContent = GetCameraContentFlags();

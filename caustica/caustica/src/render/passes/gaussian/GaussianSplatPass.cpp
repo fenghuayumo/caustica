@@ -198,6 +198,11 @@ bool GaussianSplatPass::LoadFromFile(const std::filesystem::path& fileName, bool
     for (const caustica::GaussianSplatData& splat : m_splats)
         m_colorOpacity.push_back(float4(splat.color.x, splat.color.y, splat.color.z, splat.centerOpacity.w));
 
+    m_localBounds = box3::empty();
+    for (const caustica::GaussianSplatData& splat : m_splats)
+        m_localBounds |= splat.centerOpacity.xyz();
+    m_localBoundsValid = !m_localBounds.isempty();
+
     if (m_shCoefficients.empty())
         m_shCoefficients.push_back(float4(0.0f, 0.0f, 0.0f, 0.0f));
 
