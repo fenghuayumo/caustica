@@ -88,7 +88,12 @@ void EditorPlugin::configureLateSchedules(App& app)
         ctx.app.requestRenderUnfocused();
     });
 
-    app.addSystemAfter(AppSchedule::PreUpdate, "EditorScene.AnimateBegin", "BeforeAnimate", [this](SystemContext& ctx) {
+    app.addSystemAfter(AppSchedule::PreUpdate, "EditorScene.ProcessPendingMutations", "BeforeAnimate", [this](SystemContext& ctx) {
+        (void)ctx;
+        m_sceneEditor.ProcessPendingSceneMutations();
+    });
+
+    app.addSystemAfter(AppSchedule::PreUpdate, "EditorScene.AnimateBegin", "EditorScene.ProcessPendingMutations", [this](SystemContext& ctx) {
         if (!ctx.windowFocused)
             return;
 

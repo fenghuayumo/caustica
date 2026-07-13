@@ -1567,6 +1567,8 @@ void MaterialGpuCache::update(nvrhi::ICommandList* commandList, const std::share
     {
         if (!entityWorld)
             continue;
+        if (!entityWorld->world().isAlive(entity))
+            continue;
         const auto* meshComp = entityWorld->world().get<scene::MeshInstanceComponent>(entity);
         if (!meshComp || !meshComp->mesh)
             continue;

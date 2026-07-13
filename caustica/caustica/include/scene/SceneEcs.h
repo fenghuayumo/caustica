@@ -299,6 +299,10 @@ public:
     [[nodiscard]] bool hasPendingStructureChanges() const { return m_structureDirty; }
     [[nodiscard]] bool hasPendingTransformChanges() const { return m_transformDirty || m_previousTransformDirty; }
 
+    // Pull ChangeDetection (e.g. despawn) into m_structureDirty / m_transformDirty before
+    // hasPending* queries. Required so RefreshSceneWorld does not early-out after destroyEntity.
+    void syncPendingChangesFromEcs();
+
     [[nodiscard]] const std::vector<ecs::Entity>& cameraEntitiesInRegistrationOrder() const { return m_CameraEntities; }
 
 private:

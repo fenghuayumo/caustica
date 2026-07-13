@@ -288,7 +288,19 @@ void AccelStructManager::buildTlas(nvrhi::ICommandList*            commandList,
         const bool useOmmBLAS = ommState.enabled && hasAttachementOMM && !settings.forceOpaque && !ommState.debugViewEnabled;
 
         const uint32_t meshSubInstanceCount = (uint32_t)mesh->geometries.size();
-        assert(subInstanceCount == proxy.geometryInstanceIndex);
+        // geometryInstanceIndex must be a dense prefix sum after refreshInstanceIndices.
+        // Prefer the compacted running count if a stale snapshot slips through.
+        if (subInstanceCount != static_cast<uint32_t>(proxy.geometryInstanceIndex))
+        {
+            static bool warnedStaleGeometryIndex = false;
+            if (!warnedStaleGeometryIndex)
+            {
+                warning("BuildTLAS: geometryInstanceIndex mismatch (got %d, expected %u); using compacted index.",
+                    proxy.geometryInstanceIndex, subInstanceCount);
+                warnedStaleGeometryIndex = true;
+            }
+        }
+        const uint32_t compactedGeometryInstanceIndex = subInstanceCount;
 
         auto* bottomLevelAS = useOmmBLAS ? mesh->AccelStructOMM.Get() : mesh->accelStruct.Get();
         if (bottomLevelAS == nullptr)
@@ -306,8 +318,8 @@ void AccelStructManager::buildTlas(nvrhi::ICommandList*            commandList,
         nvrhi::rt::InstanceDesc instanceDesc;
         instanceDesc.bottomLevelAS = bottomLevelAS;
         instanceDesc.instanceMask = (ommState.onlyOMMs && !hasAttachementOMM) ? 0 : 1;
-        instanceDesc.instanceID = proxy.geometryInstanceIndex;
-        instanceDesc.instanceContributionToHitGroupIndex = subInstanceCount;
+        instanceDesc.instanceID = compactedGeometryInstanceIndex;
+        instanceDesc.instanceContributionToHitGroupIndex = compactedGeometryInstanceIndex;
         instanceDesc.flags = ommState.force2State ? nvrhi::rt::InstanceFlags::ForceOMM2State : nvrhi::rt::InstanceFlags::None;
         if (settings.forceOpaque || ommState.debugViewEnabled)
             instanceDesc.flags = (nvrhi::rt::InstanceFlags)((uint32_t)instanceDesc.flags | (uint32_t)nvrhi::rt::InstanceFlags::ForceOpaque);

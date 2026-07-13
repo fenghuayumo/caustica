@@ -266,6 +266,12 @@ void SceneEntityWorld::syncDirtyFlagsFromChangeDetection()
     }
 }
 
+void SceneEntityWorld::syncPendingChangesFromEcs()
+{
+    ensureChangeDetection();
+    syncDirtyFlagsFromChangeDetection();
+}
+
 void SceneEntityWorld::refreshHierarchy(PreviousTransformPolicy previousPolicy)
 {
     UpdateHierarchy(m_world, previousPolicy);
@@ -286,7 +292,6 @@ void SceneEntityWorld::refresh(uint32_t frameIndex)
 {
     beginRefreshFrame();
     refreshHierarchy(PreviousTransformPolicy::CaptureCurrent);
-    updateGaussianSplatTransforms();
     markDirtySkinnedMeshesFromChangedJoints(frameIndex);
     markDirtySkinnedMeshes(frameIndex);
     refreshInstanceIndicesIfNeeded();
@@ -308,6 +313,8 @@ void SceneEntityWorld::updateGaussianSplatTransforms()
 {
     m_world.each<GaussianSplatComponent, GlobalTransformComponent>(
         [](ecs::Entity entity, GaussianSplatComponent& splatComponent, GlobalTransformComponent& global) {
+            if (!splatComponent.splat)
+                return;
             splatComponent.splat->ownerEntity = entity;
             splatComponent.splat->cachedGlobalTransform = global.transform;
         });

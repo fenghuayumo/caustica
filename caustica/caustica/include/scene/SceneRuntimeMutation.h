@@ -1,7 +1,6 @@
 #pragma once
 
 #include <ecs/Entity.h>
-#include <rhi/nvrhi.h>
 
 #include <cstdint>
 #include <functional>
@@ -25,8 +24,8 @@ struct DeleteRuntimeSceneNodeParams
 {
     std::shared_ptr<Scene> SceneInstance;
     ecs::Entity Entity = ecs::NullEntity;
-    nvrhi::IDevice* Device = nullptr;
     uint32_t FrameIndex = 0;
+    // Caller must drain render thread / GPU before invoking delete.
     std::function<void(ecs::Entity)> BeforeDetach;
 };
 

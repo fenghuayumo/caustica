@@ -60,6 +60,9 @@ namespace caustica
 
         bool m_SceneTransformsChanged = false;
         bool m_SceneStructureChanged = false;
+        // Stays true after a structure publish until SceneGpuUpdater consumes it, so a
+        // delete on a no-render frame still forces GPU buffer rebuild on the next render.
+        bool m_gpuStructureFlushPending = false;
 
         std::atomic<uint32_t> m_gpuReadFrameIndex{UINT32_MAX};
 
@@ -128,6 +131,7 @@ namespace caustica
         void endGpuReadFrame();
 
         void syncRenderSnapshotGpuIndices(uint32_t frameIndex);
+        void acknowledgeGpuStructureConsumed();
 
         [[nodiscard]] bool HasSceneTransformsChanged() const;
         [[nodiscard]] bool HasSceneStructureChanged() const;

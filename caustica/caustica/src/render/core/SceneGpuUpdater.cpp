@@ -708,6 +708,7 @@ void SceneGpuUpdater::refresh(Scene& scene, nvrhi::ICommandList* commandList, ui
     }
     else if (!scene.wasRenderSnapshotExtractedOnLogicThread(frameIndex))
     {
+        entityWorld->syncPendingChangesFromEcs();
         if (entityWorld->hasPendingStructureChanges() || entityWorld->hasPendingTransformChanges())
             scene.RefreshSceneWorld(frameIndex);
 
@@ -719,6 +720,8 @@ void SceneGpuUpdater::refresh(Scene& scene, nvrhi::ICommandList* commandList, ui
 
     UpdateGpuSceneBuffers(scene, commandList, frameIndex, structureChanged, transformsChanged);
     scene.syncRenderSnapshotGpuIndices(frameIndex);
+    if (structureChanged)
+        scene.acknowledgeGpuStructureConsumed();
 }
 
 void SceneGpuUpdater::refreshAfterLoad(Scene& scene, uint32_t frameIndex)
@@ -736,6 +739,7 @@ void SceneGpuUpdater::refreshAfterLoad(Scene& scene, uint32_t frameIndex)
     EnsureMeshGpuBuffers(scene, commandList);
     const GpuReadFrameScope gpuReadScope(scene, frameIndex);
     UpdateGpuSceneBuffers(scene, commandList, frameIndex, /*structureChanged=*/true, /*transformsChanged=*/true);
+    scene.acknowledgeGpuStructureConsumed();
 
     commandList->close();
     gpu.device->executeCommandList(commandList);

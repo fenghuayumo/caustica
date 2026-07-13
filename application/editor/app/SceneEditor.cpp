@@ -421,6 +421,7 @@ void SceneEditor::onSceneUnloading()
     m_editor.TogglableNodes = nullptr;
     m_editor.SelectedMaterial = nullptr;
     m_editor.SelectedEntity = caustica::ecs::NullEntity;
+    m_editor.PendingDeleteEntity = caustica::ecs::NullEntity;
     m_editor.InspectorRotationEntity = caustica::ecs::NullEntity;
     m_editor.InspectorRotationEulerValid = false;
     m_editor.SelectedGaussianSplat = false;
@@ -623,6 +624,27 @@ void SceneEditor::FinalizeRuntimeSceneMutation(caustica::ecs::Entity importedRoo
 bool SceneEditor::DeleteSceneNode(caustica::ecs::Entity entity)
 {
     return m_contentEditor.deleteSceneNode(entity);
+}
+
+void SceneEditor::ProcessPendingSceneMutations()
+{
+    if (m_editor.PendingDeleteEntity == caustica::ecs::NullEntity)
+        return;
+
+    const caustica::ecs::Entity entity = m_editor.PendingDeleteEntity;
+    m_editor.PendingDeleteEntity = caustica::ecs::NullEntity;
+
+    auto scene = this->scene();
+    auto* entityWorld = scene ? scene->GetEntityWorld() : nullptr;
+    if (!entityWorld || !entityWorld->world().isAlive(entity))
+        return;
+
+    // Match scene-load teardown: drain render thread, then GPU, before mutating ECS/GPU resources.
+    gpuDevice().waitForRenderThreadIdle();
+    if (nvrhi::IDevice* device = this->device())
+        device->waitForIdle();
+
+    DeleteSceneNode(entity);
 }
 
 void SceneEditor::RequestFullRebuild()

@@ -104,8 +104,13 @@ void SceneLightingPasses::onSceneLoaded(caustica::Scene& scene, PathTracerSettin
 void SceneLightingPasses::resyncLightsFromScene(caustica::Scene& scene)
 {
     m_lightEntities.clear();
+    auto* entityWorld = scene.GetEntityWorld();
     for (ecs::Entity lightEntity : scene.GetLightEntities())
+    {
+        if (entityWorld && !entityWorld->world().isAlive(lightEntity))
+            continue;
         m_lightEntities.push_back(lightEntity);
+    }
 }
 
 void SceneLightingPasses::notifySceneReloaded(caustica::Scene& scene)

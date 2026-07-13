@@ -57,6 +57,8 @@ public:
     void recreateAccelStructs(nvrhi::ICommandList* commandList);
     void requestMeshAccelRebuild(const std::shared_ptr<caustica::MeshInfo>& mesh);
 
+    // Structure-only invalidation (no shader reload). Prefer this after runtime scene graph edits.
+    void requestAccelerationStructureRebuild();
     void requestFullRebuild();
     void invalidateBindingSet();
     void recreateBindingSet();

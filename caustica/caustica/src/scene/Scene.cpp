@@ -348,7 +348,7 @@ bool Scene::HasSceneTransformsChanged() const
 
 bool Scene::HasSceneStructureChanged() const
 {
-    return m_SceneStructureChanged;
+    return m_SceneStructureChanged || m_gpuStructureFlushPending;
 }
 
 bool Scene::HasSceneTransformsChanged(uint32_t frameIndex) const
@@ -358,7 +358,14 @@ bool Scene::HasSceneTransformsChanged(uint32_t frameIndex) const
 
 bool Scene::HasSceneStructureChanged(uint32_t frameIndex) const
 {
-    return m_RenderSnapshot.publishedStateForFrame(frameIndex).structureChanged;
+    return m_RenderSnapshot.publishedStateForFrame(frameIndex).structureChanged
+        || m_gpuStructureFlushPending;
+}
+
+void Scene::acknowledgeGpuStructureConsumed()
+{
+    m_gpuStructureFlushPending = false;
+    m_SceneStructureChanged = false;
 }
 
 void Scene::AttachLightToRoot(const std::shared_ptr<Light>& light)
@@ -1029,6 +1036,10 @@ void Scene::refreshEntityWorldForFrame(uint32_t frameIndex)
     if (!m_EntityWorld)
         return;
 
+    // despawn() only flags ChangeDetection; sync into m_structureDirty before the early-out
+    // so destroyEntity paths still run refreshInstanceIndices / assignGlobalResourceIndices.
+    m_EntityWorld->syncPendingChangesFromEcs();
+
     if (!m_EntityWorld->hasPendingStructureChanges() && !m_EntityWorld->hasPendingTransformChanges())
         return;
 
@@ -1055,6 +1066,8 @@ void Scene::PublishRenderSnapshot(uint32_t frameIndex)
     const scene::SceneRenderPublishState& published = m_RenderSnapshot.publishedStateForFrame(frameIndex);
     m_SceneStructureChanged = published.structureChanged;
     m_SceneTransformsChanged = published.transformsChanged;
+    if (published.structureChanged)
+        m_gpuStructureFlushPending = true;
     m_RenderCommands.drain(*this);
 }
 
@@ -1063,17 +1076,22 @@ void Scene::extractAndPublishRenderSnapshot(uint32_t frameIndex)
     if (!m_EntityWorld)
         return;
 
+    m_EntityWorld->syncPendingChangesFromEcs();
+
     scene::SceneRenderPublishState& pending = m_RenderSnapshot.pendingState();
-    if (pending.frameIndex != frameIndex)
+    const bool hasPendingChanges =
+        m_EntityWorld->hasPendingStructureChanges() || m_EntityWorld->hasPendingTransformChanges();
+
+    if (hasPendingChanges)
     {
-        if (m_EntityWorld->hasPendingStructureChanges() || m_EntityWorld->hasPendingTransformChanges())
-            refreshEntityWorldForFrame(frameIndex);
-        else
-        {
-            pending.structureChanged = false;
-            pending.transformsChanged = false;
-            pending.frameIndex = frameIndex;
-        }
+        refreshEntityWorldForFrame(frameIndex);
+    }
+    else if (pending.frameIndex != frameIndex)
+    {
+        // Carry structure-flush across no-op frames until GPU consumes it.
+        pending.structureChanged = m_gpuStructureFlushPending;
+        pending.transformsChanged = false;
+        pending.frameIndex = frameIndex;
     }
 
     scene::ExtractSceneRenderData(*m_EntityWorld, m_RenderSnapshot.writeBufferForFrame(frameIndex));

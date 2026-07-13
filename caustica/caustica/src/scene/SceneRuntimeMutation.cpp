@@ -66,7 +66,7 @@ void FinalizeRuntimeSceneMutation(
     }
 
     if (scene)
-        scene->RefreshSceneWorld(frameIndex);
+        scene->extractAndPublishRenderSnapshot(frameIndex);
 }
 
 bool DeleteRuntimeSceneNode(const DeleteRuntimeSceneNodeParams& params)
@@ -81,15 +81,17 @@ bool DeleteRuntimeSceneNode(const DeleteRuntimeSceneNodeParams& params)
     if (params.Entity == entityWorld->root())
         return false;
 
-    if (params.Device)
-        params.Device->waitForIdle();
+    if (!entityWorld->world().isAlive(params.Entity))
+        return false;
 
     if (params.BeforeDetach)
         params.BeforeDetach(params.Entity);
 
     entityWorld->destroyEntity(params.Entity);
     entityWorld->rebuildPathsFromRoot();
-    params.SceneInstance->RefreshSceneWorld(params.FrameIndex);
+    // Reindex + publish in one path (same as import finalize). Caller must drain
+    // render thread / GPU first so snapshot readers are idle.
+    params.SceneInstance->extractAndPublishRenderSnapshot(params.FrameIndex);
     return true;
 }
 

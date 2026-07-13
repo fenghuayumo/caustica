@@ -207,6 +207,13 @@ void SceneRayTracingResources::requestMeshAccelRebuild(const std::shared_ptr<cau
     m_accelStructs->requestMeshRebuild(mesh);
 }
 
+void SceneRayTracingResources::requestAccelerationStructureRebuild()
+{
+    m_invalidation->AccelerationStructRebuildRequested = true;
+    m_settings->ResetAccumulation = true;
+    // Binding set is invalidated again inside recreateAccelStructs once GPU is idle.
+}
+
 void SceneRayTracingResources::requestFullRebuild()
 {
     m_invalidation->AccelerationStructRebuildRequested = true;

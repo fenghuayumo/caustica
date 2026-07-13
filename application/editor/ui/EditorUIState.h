@@ -36,6 +36,8 @@ struct EditorSelectionState
 {
     std::shared_ptr<caustica::Material> SelectedMaterial;
     caustica::ecs::Entity SelectedEntity = caustica::ecs::NullEntity;
+    // Queued on the UI/render thread; applied on the main thread before scene animate.
+    caustica::ecs::Entity PendingDeleteEntity = caustica::ecs::NullEntity;
     caustica::ecs::Entity InspectorRotationEntity = caustica::ecs::NullEntity;
     dm::dquat InspectorRotationQuat = dm::dquat::identity();
     dm::float3 InspectorRotationEulerDeg = dm::float3(0.0f);

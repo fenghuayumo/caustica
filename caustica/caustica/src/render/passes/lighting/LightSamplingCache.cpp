@@ -736,6 +736,9 @@ bool LightSamplingCache::ProcessEmissiveGeometry( const UpdateSettings & setting
             continue;
 
         auto& world = entityWorld->world();
+        if (!world.isAlive(entity))
+            continue;
+
         auto* meshComp = world.get<scene::MeshInstanceComponent>(entity);
         if (!meshComp || !meshComp->mesh)
             continue;

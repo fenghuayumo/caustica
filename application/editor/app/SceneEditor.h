@@ -109,6 +109,7 @@ public:
     bool LoadObjMeshFile(const std::filesystem::path& filePath);
     void FinalizeRuntimeSceneMutation(caustica::ecs::Entity importedRoot);
     bool DeleteSceneNode(caustica::ecs::Entity entity);
+    void ProcessPendingSceneMutations();
     void RequestFullRebuild();
     std::vector<dm::float3> getMeshVertices(const std::shared_ptr<caustica::MeshInfo>& mesh) const;
     void setMeshVertices(const std::shared_ptr<caustica::MeshInfo>& mesh,

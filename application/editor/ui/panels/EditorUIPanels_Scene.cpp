@@ -480,18 +480,33 @@ void EditorUI::BuildHierarchyPanel(const PanelLayout& layout)
             }
 
             const bool hierarchyFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
-            const auto* parentComp = (m_editorUI.SelectedEntity != ecs::NullEntity)
-                ? ew->world().tryGet<caustica::scene::ParentComponent>(m_editorUI.SelectedEntity)
+            const ecs::Entity selected = m_editorUI.SelectedEntity;
+            const bool selectedAlive = selected != ecs::NullEntity && ew->world().isAlive(selected);
+            const auto* parentComp = selectedAlive
+                ? ew->world().tryGet<caustica::scene::ParentComponent>(selected)
                 : nullptr;
-            const bool canDeleteSelected = m_editorUI.SelectedEntity != ecs::NullEntity
+            const bool canDeleteSelected = selectedAlive
                 && parentComp != nullptr
-                && parentComp->parent != ecs::NullEntity;
-            if (canDeleteSelected && hierarchyFocused && !ImGui::GetIO().WantTextInput && ImGui::IsKeyPressed(ImGuiKey_Delete))
+                && parentComp->parent != ecs::NullEntity
+                && m_editorUI.PendingDeleteEntity == ecs::NullEntity;
+            // Allow Delete after viewport pick too (not only when Hierarchy is focused).
+            // Disable key-repeat so holding Delete cannot queue overlapping deletes.
+            const bool deleteKeyPressed = !ImGui::GetIO().WantTextInput
+                && ImGui::IsKeyPressed(ImGuiKey_Delete, /*repeat=*/false);
+            if (canDeleteSelected && deleteKeyPressed
+                && (hierarchyFocused || !ImGui::GetIO().WantCaptureKeyboard))
                 deleteSelectedEntity = true;
 
             if (deleteSelectedEntity)
             {
-                m_sceneEditor.DeleteSceneNode(m_editorUI.SelectedEntity);
+                // Defer destruction to the main thread. Mutating the scene from the UI/render
+                // thread races with pipelined main-thread Update/Extract and can crash.
+                m_editorUI.PendingDeleteEntity = selected;
+                m_editorUI.SelectedEntity = ecs::NullEntity;
+                m_editorUI.SelectedMaterial = nullptr;
+                m_editorUI.InspectorRotationEntity = ecs::NullEntity;
+                m_editorUI.InspectorRotationEulerValid = false;
+                m_editorUI.SelectedGaussianSplat = false;
             }
         }
         else

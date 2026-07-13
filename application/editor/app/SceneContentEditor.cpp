@@ -177,51 +177,45 @@ void SceneContentEditor::finalizeRuntimeSceneMutation(caustica::ecs::Entity impo
 bool SceneContentEditor::deleteSceneNode(caustica::ecs::Entity entity)
 {
     auto* sceneManager = m_sceneEditor.sceneManager();
-    if (!sceneManager)
+    auto* gpuRender = m_sceneEditor.gpuRender();
+    if (!sceneManager || !gpuRender)
         return false;
 
     auto scene = sceneManager->getScene();
     auto* ew = scene ? scene->GetEntityWorld() : nullptr;
+    if (!ew || !ew->world().isAlive(entity))
+        return false;
 
     if (!caustica::DeleteRuntimeSceneNode(caustica::DeleteRuntimeSceneNodeParams{
             .SceneInstance = scene,
             .Entity = entity,
-            .Device = m_sceneEditor.device(),
             .FrameIndex = m_sceneEditor.frameIndex(),
-            .BeforeDetach = [&sceneEditor = m_sceneEditor](caustica::ecs::Entity deletedEntity) {
-                sceneEditor.gpuRender()->gaussianSplatPasses().removeObjectsUnderEntity(deletedEntity);
+            .BeforeDetach = [gpuRender](caustica::ecs::Entity deletedEntity) {
+                gpuRender->gaussianSplatPasses().removeObjectsUnderEntity(deletedEntity);
             },
         }))
     {
         return false;
     }
 
-    auto& lightingPasses = m_sceneEditor.lightingPasses();
-    lightingPasses.resyncLightsFromScene(*scene);
+    m_sceneEditor.lightingPasses().resyncLightsFromScene(*scene);
 
     auto& editor = m_sceneEditor.GetEditorUIState();
-    if (editor.TogglableNodes != nullptr && ew)
+    if (editor.TogglableNodes != nullptr)
     {
         editor.TogglableNodes->clear();
         UpdateTogglableNodes(*editor.TogglableNodes, *ew, ew->root());
     }
 
-    editor.SelectedMaterial = nullptr;
-    editor.SelectedEntity = caustica::ecs::NullEntity;
-    editor.InspectorRotationEntity = caustica::ecs::NullEntity;
-    editor.InspectorRotationEulerValid = false;
-    editor.SelectedGaussianSplat = false;
-
-    if (scene)
-        lightingPasses.notifySceneReloaded(*scene);
-
-    requestFullRebuild();
+    // Selection / PendingDeleteEntity are cleared by the UI deferral and ProcessPending.
+    gpuRender->rayTracingResources().requestAccelerationStructureRebuild();
     return true;
 }
 
 void SceneContentEditor::requestFullRebuild()
 {
-    m_sceneEditor.gpuRender()->rayTracingResources().requestFullRebuild();
+    if (auto* gpuRender = m_sceneEditor.gpuRender())
+        gpuRender->rayTracingResources().requestFullRebuild();
 }
 
 std::vector<caustica::math::float3> SceneContentEditor::getMeshVertices(const std::shared_ptr<caustica::MeshInfo>& mesh) const
