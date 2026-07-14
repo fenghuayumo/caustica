@@ -27,6 +27,9 @@ struct SetSceneMeshVerticesParams
     uint32_t frameIndex = 0;
     bool recomputeNormals = true;
     bool rebuildAccelerationStructure = true;
+    // When true, write the new positions into both Position and PrevPosition so
+    // motion vectors are zero (e.g. animation loop wrap / first sample).
+    bool zeroMotionHistory = false;
     bool* resetAccumulation = nullptr;
     std::function<void(const std::shared_ptr<MeshInfo>&)> requestMeshAccelRebuild;
 };

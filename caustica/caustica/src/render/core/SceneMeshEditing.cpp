@@ -384,6 +384,40 @@ bool UploadMeshDeformationToGpu(
     return true;
 }
 
+// Copy current Position → PrevPosition so held keyframes report zero object motion.
+bool SyncMeshPrevPositionFromCurrent(
+    nvrhi::IDevice* device,
+    const std::shared_ptr<MeshInfo>& mesh)
+{
+    if (!device || !mesh || !mesh->buffers || !mesh->buffers->vertexBuffer)
+        return false;
+
+    auto& buffers = *mesh->buffers;
+    const size_t begin = size_t(mesh->vertexOffset);
+    const size_t count = size_t(mesh->totalVertices);
+    const size_t end = begin + count;
+    if (count == 0 || buffers.positionData.size() < end)
+        return false;
+
+    const nvrhi::BufferRange& prevPositionRange = buffers.getVertexBufferRange(VertexAttribute::PrevPosition);
+    const uint64_t positionOffset = uint64_t(begin) * sizeof(float3);
+    const uint64_t positionBytes = uint64_t(count) * sizeof(float3);
+    if (!BufferRangeContainsBytes(prevPositionRange, positionOffset, positionBytes))
+        return false;
+
+    nvrhi::CommandListHandle commandList = device->createCommandList();
+    commandList->open();
+    commandList->writeBuffer(
+        buffers.vertexBuffer,
+        buffers.positionData.data() + begin,
+        positionBytes,
+        prevPositionRange.byteOffset + positionOffset);
+    commandList->setBufferState(buffers.vertexBuffer, GetMeshVertexBufferReadyState(buffers.vertexBuffer->getDesc()));
+    commandList->close();
+    device->executeCommandList(commandList);
+    return true;
+}
+
 void RebuildSceneMeshBuffersIfNeeded(const std::shared_ptr<MeshInfo>& mesh, const SetSceneMeshVerticesParams& params)
 {
     if (!params.device)
@@ -563,6 +597,7 @@ void setMeshPositionsDirect(
     if (buffers.positionData.size() < end)
         throw std::runtime_error("setMeshPositionsDirect: CPU vertex cache is unavailable");
 
+    // Capture previous pose before overwrite (used for motion vectors).
     const std::vector<float3> previousRenderVertices(
         buffers.positionData.begin() + begin,
         buffers.positionData.begin() + end);
@@ -573,11 +608,21 @@ void setMeshPositionsDirect(
     if (params.recomputeNormals)
         RecomputeMeshNormalsFromPositions(mesh);
 
+    // On discontinuous jumps (animation loop wrap), write the new pose into both
+    // Position and PrevPosition so temporal filters do not see a huge motion spike.
+    const std::vector<float3>* prevForUpload = &previousRenderVertices;
+    std::vector<float3> zeroMotionPrev;
+    if (params.zeroMotionHistory)
+    {
+        zeroMotionPrev.assign(positions, positions + count);
+        prevForUpload = &zeroMotionPrev;
+    }
+
     const bool uploadedToExistingGpuBuffer = UploadMeshDeformationToGpu(
         params.device,
         mesh,
         count,
-        &previousRenderVertices,
+        prevForUpload,
         params.recomputeNormals);
 
     if (!uploadedToExistingGpuBuffer)
@@ -588,7 +633,7 @@ void setMeshPositionsDirect(
         if (params.requestMeshAccelRebuild)
             params.requestMeshAccelRebuild(mesh);
     }
-    else     if (params.resetAccumulation)
+    else if (params.resetAccumulation)
     {
         *params.resetAccumulation = true;
     }
@@ -638,8 +683,20 @@ bool applyGeometrySequence(
         && frameB == sequence.lastAppliedFrameB
         && std::abs(alpha - sequence.lastAppliedAlpha) < 1e-5f)
     {
+        // Pose is held across display frames. After a keyframe jump, PrevPosition still
+        // encodes the previous keyframe — sync it once so TAA/NRD/DLSS see zero object
+        // motion while the mesh is visually static (matches skinning_cs FirstFrame-style
+        // Position→PrevPosition copy on idle frames).
+        if (sequence.prevPositionsNeedSync && params.device)
+        {
+            if (SyncMeshPrevPositionFromCurrent(params.device, sequence.mesh))
+                sequence.prevPositionsNeedSync = false;
+        }
         return false;
     }
+
+    // fmod loop wrap: sample index jumps backwards (typically last -> first).
+    const bool loopWrapped = sequence.lastAppliedFrameA >= 0 && frameA < sequence.lastAppliedFrameA;
 
     std::vector<float3> blended(sequence.vertexCount);
     const size_t stride = size_t(sequence.vertexCount) * 3;
@@ -669,11 +726,21 @@ bool applyGeometrySequence(
 
     SetSceneMeshVerticesParams localParams = params;
     localParams.recomputeNormals = sequence.recomputeNormals;
+    if (loopWrapped)
+    {
+        localParams.zeroMotionHistory = true;
+        if (localParams.resetAccumulation)
+            *localParams.resetAccumulation = true;
+    }
     setMeshPositionsDirect(sequence.mesh, blended.data(), blended.size(), localParams);
 
     sequence.lastAppliedFrameA = frameA;
     sequence.lastAppliedFrameB = frameB;
     sequence.lastAppliedAlpha = alpha;
+    // After a real pose change, PrevPosition holds the previous keyframe for one display
+    // frame (correct MV). On subsequent held frames we sync Prev→Current (see above).
+    // Loop wrap already wrote Prev=Current, so no deferred sync is needed.
+    sequence.prevPositionsNeedSync = !localParams.zeroMotionHistory;
     return true;
 }
 

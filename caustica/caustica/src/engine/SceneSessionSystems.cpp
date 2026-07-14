@@ -780,6 +780,7 @@ void animate(App& app, float fElapsedTimeSeconds)
                 // Fixed-topology USD / soft-body point caches.
                 if (GpuDevice* device = gpuDevice(app))
                 {
+                    bool temporalResetNeeded = false;
                     SetSceneMeshVerticesParams deformParams;
                     deformParams.device = device->GetDevice();
                     deformParams.scene = manager->getScene();
@@ -787,8 +788,9 @@ void animate(App& app, float fElapsedTimeSeconds)
                     deformParams.recomputeNormals = true;
                     deformParams.rebuildAccelerationStructure = true;
                     // Continuous playback must not wipe temporal denoise/TAA history every
-                    // source frame — that reads as whole-scene shimmer.
-                    deformParams.resetAccumulation = nullptr;
+                    // source frame — that reads as whole-scene shimmer. Loop wraps are
+                    // handled separately via resetAccumulation when the sample index jumps.
+                    deformParams.resetAccumulation = &temporalResetNeeded;
                     deformParams.requestMeshAccelRebuild = [&app](const std::shared_ptr<MeshInfo>& mesh) {
                         requestMeshAccelRebuild(app, mesh, /*resetAccumulation=*/false);
                     };
@@ -797,6 +799,14 @@ void animate(App& app, float fElapsedTimeSeconds)
                         [&](ecs::Entity, scene::GeometrySequenceComponent& sequence) {
                             (void)applyGeometrySequence(sequence, animTime, deformParams);
                         });
+
+                    if (temporalResetNeeded)
+                    {
+                        // Drop NRD/TAA history on loop wrap so the end→start pose jump
+                        // does not thrash temporal filters for many frames.
+                        cfg->ResetRealtimeCaches = true;
+                        cfg->ResetAccumulation = true;
+                    }
                 }
             }
         }

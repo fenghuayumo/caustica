@@ -177,7 +177,7 @@ BridgeGeometrySample getGeometryFromHit(
 
     if (attributes & GeomAttr_PrevPosition)
     {
-        if( gs.geometry.prevPositionOffset != 0xFFFFFFFF )  // only present for skinned objects
+        if( gs.geometry.prevPositionOffset != 0xFFFFFFFF )  // skinned / deformable (geometry-sequence) meshes
         {
             float3 prevVertexPositions[3];
             /*gs.*/prevVertexPositions[0]   = asfloat(vertexBuffer.Load3(gs.geometry.prevPositionOffset + indices[0] * c_SizeOfPosition));

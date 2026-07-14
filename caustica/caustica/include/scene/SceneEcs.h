@@ -218,6 +218,10 @@ struct GeometrySequenceComponent
     int lastAppliedFrameA = -1;
     int lastAppliedFrameB = -1;
     float lastAppliedAlpha = -1.f;
+    // After a pose upload, PrevPosition still encodes the previous keyframe.
+    // Sync it to the current pose on the next held display frame so TAA/NRD/DLSS
+    // do not keep seeing stale inter-keyframe motion while the mesh is static.
+    bool prevPositionsNeedSync = false;
     bool recomputeNormals = true;
     // Physics caches are authored per discrete time sample. Sub-frame lerp at display
     // refresh rates causes continuous AS updates and temporal-filter thrash.
