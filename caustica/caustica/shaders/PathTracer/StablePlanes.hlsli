@@ -17,7 +17,6 @@
 // https://developer.nvidia.com/blog/rendering-perfect-reflections-and-refractions-in-path-traced-games/ (Rendering Perfect Reflections and Refractions in Path-Traced Games) and
 // Falcor's NRD denoising (https://github.com/NVIDIAGameWorks/Falcor)
 
-static const uint       cStablePlaneMaxVertexIndex      = 15;               // 15 is max, it's enough for denoising and will allow stableBranchID staying at 32bit-s
 static const uint       cStablePlaneInvalidBranchID     = 0xFFFFFFFF;       // this means it's empty and any radiance there is invalid; within path tracer it also means one can start using it for the next exploration
 static const uint       cStablePlaneEnqueuedBranchID    = 0xFFFFFFFF-1;     // this means it contains enqueued delta path exploration data; it should never be set to this value outside of path tracing passes (would indicate bug)
 static const uint       cStablePlaneJustStartedID       = 0;                // this means the delta path is currently being explored; it should never be set to this value outside of path tracing passes (would indicate bug)

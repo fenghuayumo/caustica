@@ -2,7 +2,6 @@
 
 #include <scene/SceneContent.h>
 #include <scene/SceneTypes.h>
-#include <scene/IShadowMap.h>
 #include <ecs/Entity.h>
 #include <math/math.h>
 #include <memory>
@@ -215,8 +214,6 @@ namespace caustica
         std::string name;
         ecs::Entity ownerEntity = ecs::NullEntity;
         mutable dm::daffine3 cachedGlobalTransform = dm::daffine3::identity();
-        std::shared_ptr<IShadowMap> shadowMap;
-        int shadowChannel = -1;
         dm::float3 color = dm::colors::white;
 
         // Light sampler integration
@@ -277,7 +274,6 @@ namespace caustica
     public:
         float irradiance = 1.f;  // target illuminance (lm/m²) multiplied by color
         float angularSize = 0.f; // angular diameter of the source, in degrees
-        std::vector<std::shared_ptr<IShadowMap>> perObjectShadows;
 
         [[nodiscard]] std::shared_ptr<DirectionalLight> clone() const;
         [[nodiscard]] int getLightType() const override { return LightType_Directional; }

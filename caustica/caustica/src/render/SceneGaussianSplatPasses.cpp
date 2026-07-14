@@ -175,6 +175,8 @@ void SceneGaussianSplatPasses::updateUIState()
 
 void SceneGaussianSplatPasses::loadFromSceneEntities()
 {
+    // Game-thread load path: walks GaussianSplatComponent, creates GPU passes, then
+    // callers publish a render snapshot. Frame rendering must not call this.
     m_objects.clear();
 
     if (!m_sceneManager->getScene() || !m_sceneManager->getScene()->getEntityWorld() || !m_shaderFactory)

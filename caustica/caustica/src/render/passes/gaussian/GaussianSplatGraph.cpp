@@ -3,6 +3,7 @@
 #include <math/math.h>
 #include <scene/Scene.h>
 #include <scene/SceneManager.h>
+#include <scene/SceneRenderData.h>
 #include <scene/SceneLightAccess.h>
 #include <shaders/light_cb.h>
 #include <shaders/SampleConstantBuffer.h>
@@ -169,22 +170,13 @@ dm::float3 resolveGaussianSplatShadowDirection(SceneManager& sceneManager)
     if (!scene)
         return dm::float3(0.0f, 1.0f, 0.0f);
 
-    const auto* entityWorld = scene->getEntityWorld();
-    if (!entityWorld)
-        return dm::float3(0.0f, 1.0f, 0.0f);
-
-    for (ecs::Entity entity : scene->getLightEntities())
+    for (const scene::LightRenderProxy& lightProxy : scene->getRenderData().lights)
     {
-        const auto* lightComp = caustica::scene::tryGetLight(entityWorld->world(), entity);
-        if (!lightComp || !caustica::scene::tryGetDirectionalLightData(*lightComp))
-            continue;
-
-        const auto* globalComp = entityWorld->world().get<caustica::scene::GlobalTransformComponent>(entity);
-        if (!globalComp)
+        if (!caustica::scene::tryGetDirectionalLightData(lightProxy.data))
             continue;
 
         LightConstants lightConstants;
-        caustica::scene::fillLightConstants(*lightComp, globalComp->transform, lightConstants);
+        caustica::scene::fillLightConstants(lightProxy, lightConstants);
         return -lightConstants.direction;
     }
 

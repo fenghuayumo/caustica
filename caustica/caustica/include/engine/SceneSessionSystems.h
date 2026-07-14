@@ -31,7 +31,7 @@ namespace caustica
 class App;
 class GpuRenderSubsystem;
 class Material;
-class MeshInfo;
+struct MeshInfo;
 class PlanarView;
 class SceneViewState;
 

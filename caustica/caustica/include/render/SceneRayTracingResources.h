@@ -1,5 +1,6 @@
 #pragma once
 
+#include <assets/loader/ShaderMacro.h>
 #include <render/core/PathTracerSettings.h>
 #include <render/RenderRuntimeState.h>
 #include <rhi/nvrhi.h>
@@ -16,7 +17,7 @@ namespace caustica
 {
 class BindingCache;
 class GpuDevice;
-class MeshInfo;
+struct MeshInfo;
 class AccelStructManager;
 class Scene;
 class ShaderFactory;

@@ -158,6 +158,12 @@ public:
     std::vector<DebugLineStruct>& getCpuSideDebugLines() { return m_cpuSideDebugLines; }
 
     void setGaussianSplatTemporalReset(bool v) { m_gaussianSplatTemporalReset = v; }
+    [[nodiscard]] bool consumeGaussianSplatTemporalReset()
+    {
+        const bool value = m_gaussianSplatTemporalReset;
+        m_gaussianSplatTemporalReset = false;
+        return value;
+    }
 
 #if CAUSTICA_WITH_NATIVE_DLSS
     DLSS* getNativeDLSS() { return m_nativeDLSS.get(); }
@@ -282,6 +288,11 @@ private:
     int                                         m_gaussianSplatTemporalSampleIndex = 0;
     bool                                        m_gaussianSplatTemporalReset = true;
     bool                                        m_gaussianSplatCompositeRendered = false;
+
+    // Per-frame copies from SceneRenderData (filled at render() begin).
+    PathTracerSettings                          m_frameSettingsSnapshot;
+    RenderRuntimeState                          m_frameRuntimeSnapshot;
+    bool                                        m_frameGaussianSplatTemporalReset = false;
 
     nvrhi::BufferHandle                         m_feedback_Buffer_Gpu;
     nvrhi::BufferHandle                         m_feedback_Buffer_Cpu;

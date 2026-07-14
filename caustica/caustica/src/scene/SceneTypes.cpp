@@ -1,6 +1,5 @@
 #include <scene/SceneObjects.h>
 #include <scene/SceneEcs.h>
-#include <scene/IShadowMap.h>
 #include <core/json.h>
 #include <json/json-forwards.h>
 
@@ -20,11 +19,8 @@ void Light::fillLightConstants(LightConstants& lightConstants, const dm::daffine
     lightConstants.color = color;
     lightConstants.shadowCascades = int4(-1);
     lightConstants.perObjectShadows = int4(-1);
-    lightConstants.shadowChannel = int4(shadowChannel, -1, -1, -1);
-    if (shadowMap)
-        lightConstants.outOfBoundsShadow = shadowMap->isLitOutOfBounds() ? 1.f : 0.f;
-    else
-        lightConstants.outOfBoundsShadow = 1.f;
+    lightConstants.shadowChannel = int4(-1);
+    lightConstants.outOfBoundsShadow = 1.f;
 }
 
 bool Light::setProperty(const std::string& propName, const dm::float4& value)

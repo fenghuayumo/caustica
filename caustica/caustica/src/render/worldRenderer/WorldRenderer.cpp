@@ -93,7 +93,7 @@ namespace
 caustica::render::WorldRenderer::WorldRenderer(PathTracingContext& context)
     : m_context(context)
 {
-    m_lastRealtimeMode = m_context.settings.RealtimeMode;
+    m_lastRealtimeMode = m_context.activeSettings().RealtimeMode;
 }
 
 caustica::render::WorldRenderer::~WorldRenderer() = default;
@@ -219,11 +219,11 @@ void caustica::render::WorldRenderer::createDeviceResources()
     m_nativeDLSS = caustica::render::DLSS::create(device, m_context.shaderFactory, caustica::getDirectoryWithExecutable().string());
     if (m_nativeDLSS)
     {
-        m_context.settings.IsDLSSSuported = m_nativeDLSS->isDlssSupported();
-        m_context.settings.IsDLSSRRSupported = m_nativeDLSS->isRayReconstructionSupported();
+        m_context.activeSettings().IsDLSSSuported = m_nativeDLSS->isDlssSupported();
+        m_context.activeSettings().IsDLSSRRSupported = m_nativeDLSS->isRayReconstructionSupported();
         caustica::info("Native NGX DLSS support: DLSS=%s, DLSS-RR=%s.",
-            m_context.settings.IsDLSSSuported ? "yes" : "no",
-            m_context.settings.IsDLSSRRSupported ? "yes" : "no");
+            m_context.activeSettings().IsDLSSSuported ? "yes" : "no",
+            m_context.activeSettings().IsDLSSRRSupported ? "yes" : "no");
     }
     else
     {
@@ -363,14 +363,14 @@ void caustica::render::WorldRenderer::onSceneUnloading()
 
     m_recommendedDLSSSettings = {};
     m_lastDLSSRROptions = {};
-    m_context.settings.DLSSFGOptions = {};
-    m_context.settings.DLSSFGMultiplier = 1;
-    m_context.settings.DLSSFGMaxNumFramesToGenerate = 1;
+    m_context.activeSettings().DLSSFGOptions = {};
+    m_context.activeSettings().DLSSFGMultiplier = 1;
+    m_context.activeSettings().DLSSFGMaxNumFramesToGenerate = 1;
 #endif
-    m_context.settings.DLSSMode = PathTracerSettings::DLSSModeDefault;
-    m_context.settings.DLSSLastMode = SI::DLSSMode::eOff;
-    m_context.settings.DLSSLastDisplaySize = { 0, 0 };
-    m_context.settings.DLSSLastRealtimeAA = 0;
+    m_context.activeSettings().DLSSMode = PathTracerSettings::DLSSModeDefault;
+    m_context.activeSettings().DLSSLastMode = SI::DLSSMode::eOff;
+    m_context.activeSettings().DLSSLastDisplaySize = { 0, 0 };
+    m_context.activeSettings().DLSSLastRealtimeAA = 0;
     m_lastScheduledRealtimeAA = -1;
 
     m_bindingSet = nullptr;
@@ -400,14 +400,14 @@ void caustica::render::WorldRenderer::onSceneLoaded()
     m_accumulationSampleIndex = 0;
     m_sampleIndex = 0;
     m_gaussianSplatTemporalReset = true;
-    m_context.settings.ResetAccumulation = true;
-    m_context.settings.ResetRealtimeCaches = true;
-    m_context.settings.DLSSMode = PathTracerSettings::DLSSModeDefault;
-    m_context.settings.DLSSLastMode = SI::DLSSMode::eOff;
-    m_context.settings.DLSSLastDisplaySize = { 0, 0 };
-    m_context.settings.DLSSLastRealtimeAA = 0;
+    m_context.activeSettings().ResetAccumulation = true;
+    m_context.activeSettings().ResetRealtimeCaches = true;
+    m_context.activeSettings().DLSSMode = PathTracerSettings::DLSSModeDefault;
+    m_context.activeSettings().DLSSLastMode = SI::DLSSMode::eOff;
+    m_context.activeSettings().DLSSLastDisplaySize = { 0, 0 };
+    m_context.activeSettings().DLSSLastRealtimeAA = 0;
     // Realtime->Realtime switches do not flip RealtimeMode; nudge so framePassSetup resets temporal state.
-    m_lastRealtimeMode = !m_context.settings.RealtimeMode;
+    m_lastRealtimeMode = !m_context.activeSettings().RealtimeMode;
     m_lastScheduledRealtimeAA = -1;
 
     if (m_rtxdiPass)
@@ -429,7 +429,7 @@ void caustica::render::WorldRenderer::onBackBufferResizing()
 // NOTE: we're not yet sure if this is necessary to avoid crash with going in/out of fullscreen and FG
 #if CAUSTICA_WITH_STREAMLINE
     if (!m_context.gpuDevice.isHeadless() &&
-        (m_context.settings.DLSSFGOptions.mode == StreamlineInterface::DLSSGMode::eOn || m_context.settings.actualDLSSFGMode() == StreamlineInterface::DLSSGMode::eOn)) 
+        (m_context.activeSettings().DLSSFGOptions.mode == StreamlineInterface::DLSSGMode::eOn || m_context.activeSettings().actualDLSSFGMode() == StreamlineInterface::DLSSGMode::eOn)) 
     {
         m_context.gpuDevice.getStreamline().cleanupDLSS(false);
         m_context.gpuDevice.getStreamline().cleanupDLSSG(false);
@@ -439,11 +439,11 @@ void caustica::render::WorldRenderer::onBackBufferResizing()
             auto dlssgOptions = StreamlineInterface::DLSSGOptions{};
             StreamlineInterface::DLSSGState state;
             m_context.gpuDevice.getStreamline().getDLSSGState(state, dlssgOptions);
-            m_context.settings.DLSSFGMultiplier = state.numFramesActuallyPresented;
-            m_context.settings.DLSSFGMaxNumFramesToGenerate = state.numFramesToGenerateMax;
+            m_context.activeSettings().DLSSFGMultiplier = state.numFramesActuallyPresented;
+            m_context.activeSettings().DLSSFGMaxNumFramesToGenerate = state.numFramesToGenerateMax;
 
             m_context.gpuDevice.getStreamline().setDLSSGOptions(dlssgOptions);
-            m_context.settings.DLSSFGOptions = dlssgOptions;
+            m_context.activeSettings().DLSSFGOptions = dlssgOptions;
         }
     }
 #endif
@@ -474,7 +474,7 @@ void caustica::render::WorldRenderer::createRenderPasses( bool& exposureResetReq
 
     m_shaderDebug = std::make_shared<ShaderDebug>(device(), initializeCommandList, m_context.shaderFactory, m_context.renderDevice);
 
-    if (m_context.settings.actualUseRTXDIPasses())
+    if (m_context.activeSettings().actualUseRTXDIPasses())
         m_rtxdiPass = std::make_unique<RtxdiPass>(device(), m_context.shaderFactory, m_context.renderDevice, m_bindlessLayout);
     else
         m_rtxdiPass = nullptr;
@@ -572,7 +572,7 @@ void caustica::render::WorldRenderer::updateLighting(nvrhi::CommandListHandle co
     buildGaussianSplatEmissionProxies();
 
     UpdateLightingParams params{
-        m_context.settings,
+        m_context.activeSettings(),
         commandList,
         m_context.scenePasses.lighting.environment().get(),
         m_context.scenePasses.lighting.lightSampling().get(),
@@ -592,19 +592,19 @@ void caustica::render::WorldRenderer::updateLighting(nvrhi::CommandListHandle co
 }
 void caustica::render::WorldRenderer::preUpdatePathTracing( bool resetAccum, nvrhi::CommandListHandle commandList )
 {
-    const bool resetReferenceOidn = !m_context.settings.RealtimeMode && (resetAccum || m_context.settings.ResetAccumulation || m_context.settings.ReferenceOIDNDenoiserChanged);
-    if (resetReferenceOidn || m_context.settings.ReferenceOIDNDenoiserChanged)
+    const bool resetReferenceOidn = !m_context.activeSettings().RealtimeMode && (resetAccum || m_context.activeSettings().ResetAccumulation || m_context.activeSettings().ReferenceOIDNDenoiserChanged);
+    if (resetReferenceOidn || m_context.activeSettings().ReferenceOIDNDenoiserChanged)
     {
         resetReferenceOIDN();
-        m_context.settings.ReferenceOIDNDenoiserChanged = false;
+        m_context.activeSettings().ReferenceOIDNDenoiserChanged = false;
     }
 
-    resetAccum |= m_context.settings.ResetAccumulation;
-    resetAccum |= m_context.settings.RealtimeMode;
+    resetAccum |= m_context.activeSettings().ResetAccumulation;
+    resetAccum |= m_context.activeSettings().RealtimeMode;
 
     if (resetAccum)
     {
-        m_accumulationSampleIndex = (m_context.settings.AccumulationPreWarmRealtimeCaches)?(-32):(0);
+        m_accumulationSampleIndex = (m_context.activeSettings().AccumulationPreWarmRealtimeCaches)?(-32):(0);
     }
 #if ENABLE_DEBUG_VIZUALISATIONS
     if (resetAccum && m_shaderDebug)
@@ -617,30 +617,30 @@ void caustica::render::WorldRenderer::preUpdatePathTracing( bool resetAccum, nvr
         m_context.diagnostics.benchStart = std::chrono::high_resolution_clock::now( );
         m_context.diagnostics.benchLast = m_context.diagnostics.benchStart;
         m_context.diagnostics.benchFrames = 0;
-    } else if( m_accumulationSampleIndex < m_context.settings.AccumulationTarget )
+    } else if( m_accumulationSampleIndex < m_context.activeSettings().AccumulationTarget )
     {
         m_context.diagnostics.benchFrames++;
         m_context.diagnostics.benchLast = std::chrono::high_resolution_clock::now( );
     }
     m_accumulationCompleted = false;
     // 'min' in non-realtime path here is to keep looping the last sample for debugging purposes!
-    if( !m_context.settings.RealtimeMode )
+    if( !m_context.activeSettings().RealtimeMode )
     {
-        m_sampleIndex = (m_accumulationSampleIndex<0)?(m_accumulationSampleIndex+4096):(min(m_accumulationSampleIndex, m_context.settings.AccumulationTarget - 1));
-        m_accumulationCompleted |= m_accumulationSampleIndex == m_context.settings.AccumulationTarget - 1;
+        m_sampleIndex = (m_accumulationSampleIndex<0)?(m_accumulationSampleIndex+4096):(min(m_accumulationSampleIndex, m_context.activeSettings().AccumulationTarget - 1));
+        m_accumulationCompleted |= m_accumulationSampleIndex == m_context.activeSettings().AccumulationTarget - 1;
     }
     else
-        m_sampleIndex = (!m_context.settings.DbgFreezeRealtimeNoiseSeed)?( m_frameIndex % 8192 ):0;     // actual sample index
+        m_sampleIndex = (!m_context.activeSettings().DbgFreezeRealtimeNoiseSeed)?( m_frameIndex % 8192 ):0;     // actual sample index
 }
 void caustica::render::WorldRenderer::postUpdatePathTracing( )
 {
-    m_accumulationSampleIndex = std::min( m_accumulationSampleIndex+1, m_context.settings.AccumulationTarget );
+    m_accumulationSampleIndex = std::min( m_accumulationSampleIndex+1, m_context.activeSettings().AccumulationTarget );
 
-    if (m_context.settings.actualUseRTXDIPasses())
+    if (m_context.activeSettings().actualUseRTXDIPasses())
         m_rtxdiPass->endFrame();
 
-    m_context.settings.ResetAccumulation = false;
-    m_context.settings.ResetRealtimeCaches = false;
+    m_context.activeSettings().ResetAccumulation = false;
+    m_context.activeSettings().ResetRealtimeCaches = false;
     m_frameIndex++;
 }
 void caustica::render::WorldRenderer::updatePathTracerConstants( PathTracerConstants & constants, const PathTracerCameraData & cameraData )
@@ -681,18 +681,18 @@ void caustica::render::WorldRenderer::updatePathTracerConstants( PathTracerConst
     if (m_context.camera.viewPrevious())
         constants.prevCamera.PosW = m_context.camera.viewPrevious()->getInverseViewMatrix().m_translation;
 
-    constants.bounceCount = m_context.settings.BounceCount;
-    constants.diffuseBounceCount = m_context.settings.DiffuseBounceCount;
-    constants.perPixelJitterAAScale = (m_context.settings.RealtimeMode == false && m_context.settings.AccumulationAA)?(1):( (m_context.settings.RealtimeMode && m_context.settings.RealtimeAA == 3)?(m_context.settings.DLSSRRMicroJitter):(0.0f) );
+    constants.bounceCount = m_context.activeSettings().BounceCount;
+    constants.diffuseBounceCount = m_context.activeSettings().DiffuseBounceCount;
+    constants.perPixelJitterAAScale = (m_context.activeSettings().RealtimeMode == false && m_context.activeSettings().AccumulationAA)?(1):( (m_context.activeSettings().RealtimeMode && m_context.activeSettings().RealtimeAA == 3)?(m_context.activeSettings().DLSSRRMicroJitter):(0.0f) );
 
     // needed to allow super-resolution to work best
     float dlssBias = -dm::log2f(sqrtf((m_displaySize.x * m_displaySize.y) / float(m_renderSize.x * m_renderSize.y)));
 
-    constants.texLODBias = m_context.settings.TexLODBias + dlssBias;
-    constants.sampleBaseIndex = m_sampleIndex * m_context.settings.actualSamplesPerPixel();
+    constants.texLODBias = m_context.activeSettings().TexLODBias + dlssBias;
+    constants.sampleBaseIndex = m_sampleIndex * m_context.activeSettings().actualSamplesPerPixel();
 
-    //constants.subSampleCount = m_context.settings.actualSamplesPerPixel();
-    constants.invSubSampleCount = 1.0f / (float)m_context.settings.actualSamplesPerPixel();
+    //constants.subSampleCount = m_context.activeSettings().actualSamplesPerPixel();
+    constants.invSubSampleCount = 1.0f / (float)m_context.activeSettings().actualSamplesPerPixel();
 
     constants.imageWidth = m_renderSize.x;
     constants.imageHeight = m_renderSize.y;
@@ -702,75 +702,75 @@ void caustica::render::WorldRenderer::updatePathTracerConstants( PathTracerConst
         assert(m_renderSize.y == m_renderTargets->outputColor->getDesc().height);
     }
 
-    if (m_context.settings.EnableToneMapping && m_toneMappingPass != nullptr)
+    if (m_context.activeSettings().EnableToneMapping && m_toneMappingPass != nullptr)
         constants.preExposedGrayLuminance = dm::luminance(m_toneMappingPass->getPreExposedGray(0));
     else
         constants.preExposedGrayLuminance = 1.0f;
 
     const float disabledFF = 0.0f;
-    if (m_context.settings.RealtimeMode)
-        constants.fireflyFilterThreshold = (m_context.settings.RealtimeFireflyFilterEnabled)?(m_context.settings.RealtimeFireflyFilterThreshold*sqrtf(constants.preExposedGrayLuminance)*1e3f):(disabledFF); // it does make sense to make the realtime variant dependent on avg luminance - just didn't have time to try it out yet
+    if (m_context.activeSettings().RealtimeMode)
+        constants.fireflyFilterThreshold = (m_context.activeSettings().RealtimeFireflyFilterEnabled)?(m_context.activeSettings().RealtimeFireflyFilterThreshold*sqrtf(constants.preExposedGrayLuminance)*1e3f):(disabledFF); // it does make sense to make the realtime variant dependent on avg luminance - just didn't have time to try it out yet
     else
-        constants.fireflyFilterThreshold = (m_context.settings.ReferenceFireflyFilterEnabled)?(m_context.settings.ReferenceFireflyFilterThreshold*sqrtf(constants.preExposedGrayLuminance)*1e3f):(disabledFF); // making it exposure-adaptive breaks determinism with accumulation (because there's a feedback loop), so that's disabled
-    constants.useReSTIRDI = m_context.settings.actualUseReSTIRDI();
-    constants.useReSTIRGI = m_context.settings.actualUseReSTIRGI();
-    constants.useReSTIRPT = m_context.settings.actualUseReSTIRPT();
-    constants.environmentMapVisibleToCamera = m_context.settings.EnvironmentMapParams.VisibleToCamera ? 1u : 0u;
-    constants.denoiserRadianceClampK = m_context.settings.DenoiserRadianceClampK;
-    constants.DLSSRRBrightnessClampK = (m_context.settings.DLSSRRBrightnessClampK>0)?(m_context.settings.DLSSRRBrightnessClampK * constants.preExposedGrayLuminance):(0.0f);
+        constants.fireflyFilterThreshold = (m_context.activeSettings().ReferenceFireflyFilterEnabled)?(m_context.activeSettings().ReferenceFireflyFilterThreshold*sqrtf(constants.preExposedGrayLuminance)*1e3f):(disabledFF); // making it exposure-adaptive breaks determinism with accumulation (because there's a feedback loop), so that's disabled
+    constants.useReSTIRDI = m_context.activeSettings().actualUseReSTIRDI();
+    constants.useReSTIRGI = m_context.activeSettings().actualUseReSTIRGI();
+    constants.useReSTIRPT = m_context.activeSettings().actualUseReSTIRPT();
+    constants.environmentMapVisibleToCamera = m_context.activeSettings().EnvironmentMapParams.VisibleToCamera ? 1u : 0u;
+    constants.denoiserRadianceClampK = m_context.activeSettings().DenoiserRadianceClampK;
+    constants.DLSSRRBrightnessClampK = (m_context.activeSettings().DLSSRRBrightnessClampK>0)?(m_context.activeSettings().DLSSRRBrightnessClampK * constants.preExposedGrayLuminance):(0.0f);
 
     // no stable planes by default
-    constants.denoisingEnabled = m_context.settings.actualUseStandaloneDenoiser() || m_context.settings.RealtimeAA == 3;
+    constants.denoisingEnabled = m_context.activeSettings().actualUseStandaloneDenoiser() || m_context.activeSettings().RealtimeAA == 3;
 
-    constants._activeStablePlaneCount           = m_context.settings.StablePlanesActiveCount;
-    constants.maxStablePlaneVertexDepth         = std::min( std::min( (uint)m_context.settings.StablePlanesMaxVertexDepth, cStablePlaneMaxVertexIndex ), (uint)m_context.settings.BounceCount );
-    constants.allowPrimarySurfaceReplacement    = m_context.settings.AllowPrimarySurfaceReplacement;
-    constants.stablePlanesSplitStopThreshold    = m_context.settings.StablePlanesSplitStopThreshold;
+    constants._activeStablePlaneCount           = m_context.activeSettings().StablePlanesActiveCount;
+    constants.maxStablePlaneVertexDepth         = std::min( std::min( (uint)m_context.activeSettings().StablePlanesMaxVertexDepth, cStablePlaneMaxVertexIndex ), (uint)m_context.activeSettings().BounceCount );
+    constants.allowPrimarySurfaceReplacement    = m_context.activeSettings().AllowPrimarySurfaceReplacement;
+    constants.stablePlanesSplitStopThreshold    = m_context.activeSettings().StablePlanesSplitStopThreshold;
     constants._padding3                         = 0;
-    constants.stablePlanesSuppressPrimaryIndirectSpecularK  = m_context.settings.StablePlanesSuppressPrimaryIndirectSpecular?m_context.settings.StablePlanesSuppressPrimaryIndirectSpecularK:0.0f;
-    constants.stablePlanesAntiAliasingFallthrough = m_context.settings.StablePlanesAntiAliasingFallthrough;
+    constants.stablePlanesSuppressPrimaryIndirectSpecularK  = m_context.activeSettings().StablePlanesSuppressPrimaryIndirectSpecular?m_context.activeSettings().StablePlanesSuppressPrimaryIndirectSpecularK:0.0f;
+    constants.stablePlanesAntiAliasingFallthrough = m_context.activeSettings().StablePlanesAntiAliasingFallthrough;
     constants.frameIndex                        = m_frameIndex & 0xFFFFFFFF; //m_context.gpuDevice.getFrameIndex();
     constants.genericTSLineStride               = GenericTSComputeLineStride(constants.imageWidth, constants.imageHeight);
     constants.genericTSPlaneStride              = GenericTSComputePlaneStride(constants.imageWidth, constants.imageHeight);
 
-    constants.NEEEnabled                        = m_context.settings.UseNEE;
-    constants.NEEType                           = m_context.settings.NEEType;
-    constants.NEECandidateSamples               = m_context.settings.NEECandidateSamples;
-    constants.NEEFullSamples                    = m_context.settings.NEEFullSamples;
+    constants.NEEEnabled                        = m_context.activeSettings().UseNEE;
+    constants.NEEType                           = m_context.activeSettings().NEEType;
+    constants.NEECandidateSamples               = m_context.activeSettings().NEECandidateSamples;
+    constants.NEEFullSamples                    = m_context.activeSettings().NEEFullSamples;
 
-    constants.EnvironmentMapDiffuseSampleMIPLevel = m_context.settings.EnvironmentMapDiffuseSampleMIPLevel;
+    constants.EnvironmentMapDiffuseSampleMIPLevel = m_context.activeSettings().EnvironmentMapDiffuseSampleMIPLevel;
 
 #if CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
     // stochastic texture filtering type and size.
-    // constants.STFUseBlueNoise                   = m_context.settings.STFUseBlueNoise;
-    constants.STFMagnificationMethod            = GetStfMagnificationMethod(m_context.settings.STFMagnificationMethod);
-    constants.STFFilterMode                     = GetStfFilterMode(m_context.settings.STFFilterMode);
-    constants.STFGaussianSigma                  = m_context.settings.STFGaussianSigma;
+    // constants.STFUseBlueNoise                   = m_context.activeSettings().STFUseBlueNoise;
+    constants.STFMagnificationMethod            = GetStfMagnificationMethod(m_context.activeSettings().STFMagnificationMethod);
+    constants.STFFilterMode                     = GetStfFilterMode(m_context.activeSettings().STFFilterMode);
+    constants.STFGaussianSigma                  = m_context.activeSettings().STFGaussianSigma;
 #endif
 }
 void caustica::render::WorldRenderer::rtxdiSetupFrame(nvrhi::IFramebuffer* framebuffer, PathTracerCameraData cameraData, uint2 renderDims)
 {
-    const bool envMapPresent = m_context.settings.EnvironmentMapParams.enabled;
+    const bool envMapPresent = m_context.activeSettings().EnvironmentMapParams.enabled;
 
     RtxdiBridgeParameters bridgeParameters;
 	bridgeParameters.frameIndex = m_frameIndex & 0xFFFFFFFF;
 	bridgeParameters.frameDims = renderDims;
 	bridgeParameters.cameraPosition = m_context.camera.camera().getPosition();
-	bridgeParameters.userSettings = m_context.settings.RTXDI;
-    bridgeParameters.usingLightSampling = m_context.settings.actualUseReSTIRDI();
-    bridgeParameters.usingReGIR = m_context.settings.actualUseReSTIRDI();
+	bridgeParameters.userSettings = m_context.activeSettings().RTXDI;
+    bridgeParameters.usingLightSampling = m_context.activeSettings().actualUseReSTIRDI();
+    bridgeParameters.usingReGIR = m_context.activeSettings().actualUseReSTIRDI();
 
     bridgeParameters.userSettings.restirDI.initialSamplingParams.environmentMapImportanceSampling = envMapPresent;
 
     buildGaussianSplatEmissionProxies();
-    if (!m_gaussianSplatEmissionProxies.empty() && isGaussianSplatEmissionEnabled(m_context.settings))
+    if (!m_gaussianSplatEmissionProxies.empty() && isGaussianSplatEmissionEnabled(m_context.activeSettings()))
     {
         bridgeParameters.gaussianSplatEmissionProxies = &m_gaussianSplatEmissionProxies;
         bridgeParameters.gaussianSplatEmissionObjectToWorld = float4x4::identity();
-        bridgeParameters.gaussianSplatEmissionIntensity = m_context.settings.GaussianSplatEmissionIntensity;
+        bridgeParameters.gaussianSplatEmissionIntensity = m_context.activeSettings().GaussianSplatEmissionIntensity;
     }
 
-    if( m_context.settings.ResetRealtimeCaches )
+    if( m_context.activeSettings().ResetRealtimeCaches )
         m_rtxdiPass->reset();
 
 	m_rtxdiPass->prepareResources(m_commandList, *m_renderTargets, envMapPresent ? m_context.scenePasses.lighting.environment() : nullptr, m_context.scenePasses.lighting.envMapSceneParams(),
@@ -784,16 +784,16 @@ void caustica::render::WorldRenderer::streamlinePreRender()
         return;
 
     auto& streamline = m_context.gpuDevice.getStreamline();
-    m_context.settings.IsDLSSSuported = streamline.isDLSSAvailable();
-    m_context.settings.IsDLSSRRSupported = streamline.isDLSSRRAvailable();
-    m_context.settings.IsDLSSFGSupported = streamline.isDLSSGAvailable();
-    m_context.settings.IsReflexSupported = streamline.isReflexAvailable();
+    m_context.activeSettings().IsDLSSSuported = streamline.isDLSSAvailable();
+    m_context.activeSettings().IsDLSSRRSupported = streamline.isDLSSRRAvailable();
+    m_context.activeSettings().IsDLSSFGSupported = streamline.isDLSSGAvailable();
+    m_context.activeSettings().IsReflexSupported = streamline.isReflexAvailable();
 
     // Setup Reflex
     {
         auto reflexConsts = caustica::StreamlineInterface::ReflexOptions{};
-        reflexConsts.mode = (caustica::StreamlineInterface::ReflexMode) m_context.settings.actualReflexMode();
-        reflexConsts.frameLimitUs = m_context.settings.ReflexCappedFps == 0 ? 0 : int(1000000. / m_context.settings.ReflexCappedFps);
+        reflexConsts.mode = (caustica::StreamlineInterface::ReflexMode) m_context.activeSettings().actualReflexMode();
+        reflexConsts.frameLimitUs = m_context.activeSettings().ReflexCappedFps == 0 ? 0 : int(1000000. / m_context.activeSettings().ReflexCappedFps);
         reflexConsts.useMarkersToOptimize = true;
         reflexConsts.virtualKey = VK_F13;
         reflexConsts.idThread = 0; // std::hash<std::thread::id>()(std::this_thread::get_id())
@@ -802,10 +802,10 @@ void caustica::render::WorldRenderer::streamlinePreRender()
         // Need to update StreamlineIntegration with the ability to query reflex state
         caustica::StreamlineInterface::ReflexState reflexState{};
         streamline.getReflexState(reflexState);
-        if (m_context.settings.IsReflexSupported)
+        if (m_context.activeSettings().IsReflexSupported)
         {
-            m_context.settings.IsReflexLowLatencyAvailable = reflexState.lowLatencyAvailable;
-            m_context.settings.IsReflexFlashIndicatorDriverControlled = reflexState.flashIndicatorDriverControlled;
+            m_context.activeSettings().IsReflexLowLatencyAvailable = reflexState.lowLatencyAvailable;
+            m_context.activeSettings().IsReflexFlashIndicatorDriverControlled = reflexState.flashIndicatorDriverControlled;
 
             auto report = reflexState.frameReport[63];
             if (reflexState.lowLatencyAvailable && report.gpuRenderEndTime != 0)
@@ -819,26 +819,26 @@ void caustica::render::WorldRenderer::streamlinePreRender()
                 auto osRenderQueueDeltaUs = report.osRenderQueueEndTime - report.osRenderQueueStartTime;
                 auto gpuRenderDeltaUs = report.gpuRenderEndTime - report.gpuRenderStartTime;
 
-                m_context.settings.ReflexStats = "frameID: " + std::to_string(frameID);
-                m_context.settings.ReflexStats += "\ntotalGameToRenderLatencyUs: " + std::to_string(totalGameToRenderLatencyUs);
-                m_context.settings.ReflexStats += "\nsimDeltaUs: " + std::to_string(simDeltaUs);
-                m_context.settings.ReflexStats += "\nrenderDeltaUs: " + std::to_string(renderDeltaUs);
-                m_context.settings.ReflexStats += "\npresentDeltaUs: " + std::to_string(presentDeltaUs);
-                m_context.settings.ReflexStats += "\ndriverDeltaUs: " + std::to_string(driverDeltaUs);
-                m_context.settings.ReflexStats += "\nosRenderQueueDeltaUs: " + std::to_string(osRenderQueueDeltaUs);
-                m_context.settings.ReflexStats += "\ngpuRenderDeltaUs: " + std::to_string(gpuRenderDeltaUs);
+                m_context.activeSettings().ReflexStats = "frameID: " + std::to_string(frameID);
+                m_context.activeSettings().ReflexStats += "\ntotalGameToRenderLatencyUs: " + std::to_string(totalGameToRenderLatencyUs);
+                m_context.activeSettings().ReflexStats += "\nsimDeltaUs: " + std::to_string(simDeltaUs);
+                m_context.activeSettings().ReflexStats += "\nrenderDeltaUs: " + std::to_string(renderDeltaUs);
+                m_context.activeSettings().ReflexStats += "\npresentDeltaUs: " + std::to_string(presentDeltaUs);
+                m_context.activeSettings().ReflexStats += "\ndriverDeltaUs: " + std::to_string(driverDeltaUs);
+                m_context.activeSettings().ReflexStats += "\nosRenderQueueDeltaUs: " + std::to_string(osRenderQueueDeltaUs);
+                m_context.activeSettings().ReflexStats += "\ngpuRenderDeltaUs: " + std::to_string(gpuRenderDeltaUs);
             }
             else
             {
-                m_context.settings.ReflexStats = "Latency Report Unavailable";
+                m_context.activeSettings().ReflexStats = "Latency Report Unavailable";
             }
         }
     }
 
     // DLSS-G Setup
     {
-        const auto actualDLSSFGMode = m_context.settings.actualDLSSFGMode();
-        const bool wasDLSSFGEnabled = m_context.settings.DLSSFGOptions.mode == StreamlineInterface::DLSSGMode::eOn;
+        const auto actualDLSSFGMode = m_context.activeSettings().actualDLSSFGMode();
+        const bool wasDLSSFGEnabled = m_context.activeSettings().DLSSFGOptions.mode == StreamlineInterface::DLSSGMode::eOn;
 
         // If DLSS-G has been turned off, then we tell tell SL to clean it up expressly
         if (wasDLSSFGEnabled && actualDLSSFGMode == StreamlineInterface::DLSSGMode::eOff) {
@@ -848,77 +848,77 @@ void caustica::render::WorldRenderer::streamlinePreRender()
         // This is where DLSS-G is toggled On and Off (using dlssgOptions.mode) and where we set DLSS-G parameters.
         auto dlssgOptions = StreamlineInterface::DLSSGOptions{};
         dlssgOptions.mode = actualDLSSFGMode;
-        dlssgOptions.numFramesToGenerate = m_context.settings.DLSSFGNumFramesToGenerate;
+        dlssgOptions.numFramesToGenerate = m_context.activeSettings().DLSSFGNumFramesToGenerate;
 
         // This is where we query DLSS-G minimum swapchain size
-        if (m_context.settings.IsDLSSFGSupported &&
+        if (m_context.activeSettings().IsDLSSFGSupported &&
             (actualDLSSFGMode != StreamlineInterface::DLSSGMode::eOff || wasDLSSFGEnabled))
         {
             StreamlineInterface::DLSSGState state;
             streamline.getDLSSGState(state, dlssgOptions);
-            m_context.settings.DLSSFGMultiplier = state.numFramesActuallyPresented;
-            m_context.settings.DLSSFGMaxNumFramesToGenerate = state.numFramesToGenerateMax;
+            m_context.activeSettings().DLSSFGMultiplier = state.numFramesActuallyPresented;
+            m_context.activeSettings().DLSSFGMaxNumFramesToGenerate = state.numFramesToGenerateMax;
 
             streamline.setDLSSGOptions(dlssgOptions);
-            m_context.settings.DLSSFGOptions = dlssgOptions;
+            m_context.activeSettings().DLSSFGOptions = dlssgOptions;
         }
         else
         {
-            m_context.settings.DLSSFGMultiplier = 1;
-            m_context.settings.DLSSFGOptions = dlssgOptions;
+            m_context.activeSettings().DLSSFGMultiplier = 1;
+            m_context.activeSettings().DLSSFGOptions = dlssgOptions;
         }
     }
 
     // Ensure DLSS / DLSS-RR is available
-    if (m_context.settings.RealtimeAA == 3 && !m_context.settings.IsDLSSRRSupported)
+    if (m_context.activeSettings().RealtimeAA == 3 && !m_context.activeSettings().IsDLSSRRSupported)
     {
         caustica::warning("Requested DLSS-RR mode not available. Switching to DLSS. ");
-        m_context.settings.RealtimeAA = 2;
+        m_context.activeSettings().RealtimeAA = 2;
     }
-    if ( m_context.settings.RealtimeAA == 2 && !m_context.settings.IsDLSSSuported )
+    if ( m_context.activeSettings().RealtimeAA == 2 && !m_context.activeSettings().IsDLSSSuported )
     {
         caustica::warning("Requested DLSS mode not available. Switching to TAA. ");
-        m_context.settings.RealtimeAA = 1;
+        m_context.activeSettings().RealtimeAA = 1;
     }
 
     // Setup DLSS
-    const bool changeToDLSSMode = (m_context.settings.RealtimeAA >= 2 && m_context.settings.RealtimeAA <= 3) && m_context.settings.DLSSLastRealtimeAA != m_context.settings.RealtimeAA;
+    const bool changeToDLSSMode = (m_context.activeSettings().RealtimeAA >= 2 && m_context.activeSettings().RealtimeAA <= 3) && m_context.activeSettings().DLSSLastRealtimeAA != m_context.activeSettings().RealtimeAA;
     {
         // reset DLSS vars if we stop using it
-        if (changeToDLSSMode || m_context.settings.DLSSMode == StreamlineInterface::DLSSMode::eOff)
+        if (changeToDLSSMode || m_context.activeSettings().DLSSMode == StreamlineInterface::DLSSMode::eOff)
         {
-            m_context.settings.DLSSLastMode = PathTracerSettings::DLSSModeDefault;
-            m_context.settings.DLSSMode = PathTracerSettings::DLSSModeDefault;
-            m_context.settings.DLSSLastDisplaySize = { 0,0 };
+            m_context.activeSettings().DLSSLastMode = PathTracerSettings::DLSSModeDefault;
+            m_context.activeSettings().DLSSMode = PathTracerSettings::DLSSModeDefault;
+            m_context.activeSettings().DLSSLastDisplaySize = { 0,0 };
         }
 
-        m_context.settings.DLSSLastRealtimeAA = m_context.settings.RealtimeAA;
+        m_context.activeSettings().DLSSLastRealtimeAA = m_context.activeSettings().RealtimeAA;
 
         // If we are using DLSS set its constants
-        if ((m_context.settings.RealtimeAA == 2 || m_context.settings.RealtimeAA == 3) && m_context.settings.RealtimeMode)
+        if ((m_context.activeSettings().RealtimeAA == 2 || m_context.activeSettings().RealtimeAA == 3) && m_context.activeSettings().RealtimeMode)
         {
             StreamlineInterface::DLSSOptions dlssOptions = {};
-            if (m_context.settings.IsDLSSSuported)
+            if (m_context.activeSettings().IsDLSSSuported)
             {
-                dlssOptions.mode = m_context.settings.DLSSMode;
+                dlssOptions.mode = m_context.activeSettings().DLSSMode;
                 dlssOptions.outputWidth = m_displaySize.x;
                 dlssOptions.outputHeight = m_displaySize.y;
                 dlssOptions.sharpness = 0; //m_recommendedDLSSSettings.sharpness;    // <- is this no longer valid?
                 dlssOptions.colorBuffersHDR = true;
                 dlssOptions.useAutoExposure = true;     // Optional: provide proper "kBufferTypeExposure" for 0-lag for better precision handling
                 dlssOptions.preset = StreamlineInterface::DLSSPreset::eDefault;
-                // if (m_context.settings.RealtimeAA < 4) <- docs https://github.com/NVIDIAGameWorks/Streamline/blob/main/docs/ProgrammingGuideDLSS_RR.md#50-provide-dlss--dlss-rr-options seem to imply that these should be set even when DLSS-RR enabled
+                // if (m_context.activeSettings().RealtimeAA < 4) <- docs https://github.com/NVIDIAGameWorks/Streamline/blob/main/docs/ProgrammingGuideDLSS_RR.md#50-provide-dlss--dlss-rr-options seem to imply that these should be set even when DLSS-RR enabled
                     streamline.setDLSSOptions(dlssOptions);
             }
             else
             {
-                assert( false ); // shouldn't happen, code above should have dropped us to "m_context.settings.RealtimeAA = 1" - check for recent code changes.
+                assert( false ); // shouldn't happen, code above should have dropped us to "m_context.activeSettings().RealtimeAA = 1" - check for recent code changes.
             }
 
-            if (m_context.settings.RealtimeAA == 2 || m_context.settings.RealtimeAA == 3)
+            if (m_context.activeSettings().RealtimeAA == 2 || m_context.activeSettings().RealtimeAA == 3)
             {
                 // Check if we need to update the rendertarget size.
-                bool dlssResizeRequired = (m_context.settings.DLSSMode != m_context.settings.DLSSLastMode) || (m_displaySize.x != m_context.settings.DLSSLastDisplaySize.x) || (m_displaySize.y != m_context.settings.DLSSLastDisplaySize.y);
+                bool dlssResizeRequired = (m_context.activeSettings().DLSSMode != m_context.activeSettings().DLSSLastMode) || (m_displaySize.x != m_context.activeSettings().DLSSLastDisplaySize.x) || (m_displaySize.y != m_context.activeSettings().DLSSLastDisplaySize.y);
                 if (dlssResizeRequired)
                 {
                     // Only quality, target width and height matter here
@@ -933,21 +933,21 @@ void caustica::render::WorldRenderer::streamlinePreRender()
 
                     if (m_recommendedDLSSSettings.optimalRenderSize.x <= 0 || m_recommendedDLSSSettings.optimalRenderSize.y <= 0)
                     {
-                        m_context.settings.RealtimeAA = 0;
-                        m_context.settings.DLSSMode = PathTracerSettings::DLSSModeDefault;
+                        m_context.activeSettings().RealtimeAA = 0;
+                        m_context.activeSettings().DLSSMode = PathTracerSettings::DLSSModeDefault;
                         m_renderSize = m_displaySize;
                     }
                     else
                     {
-                        m_context.settings.DLSSLastMode = m_context.settings.DLSSMode;
-                        m_context.settings.DLSSLastDisplaySize = m_displaySize;
+                        m_context.activeSettings().DLSSLastMode = m_context.activeSettings().DLSSMode;
+                        m_context.activeSettings().DLSSLastDisplaySize = m_displaySize;
                     }
                 }
 
                 m_renderSize = (uint2)m_recommendedDLSSSettings.optimalRenderSize;
             }
 
-            if (m_context.settings.RealtimeAA == 3) // DLSS-RR
+            if (m_context.activeSettings().RealtimeAA == 3) // DLSS-RR
             {
                 StreamlineInterface::DLSSRROptions dlssRROptions = {};
                 dlssRROptions.mode              	= dlssOptions.mode;
@@ -961,13 +961,13 @@ void caustica::render::WorldRenderer::streamlinePreRender()
                 dlssRROptions.indicatorInvertAxisY 	= dlssOptions.indicatorInvertAxisY;
                 dlssRROptions.normalRoughnessMode 	= StreamlineInterface::DLSSRRNormalRoughnessMode::ePacked;
                 dlssRROptions.alphaUpscalingEnabled = false;
-                dlssRROptions.preset                = m_context.settings.DLSRRPreset;
+                dlssRROptions.preset                = m_context.activeSettings().DLSRRPreset;
                 m_lastDLSSRROptions = dlssRROptions; // we need to fill them up with view info, but we can only have proper view after it was initialized with correct RT size
             }
         }
         else
         {
-            if (m_context.settings.IsDLSSSuported)
+            if (m_context.activeSettings().IsDLSSSuported)
             {
                 StreamlineInterface::DLSSOptions dlssOptions = {};
                 dlssOptions.mode = StreamlineInterface::DLSSMode::eOff;
@@ -985,7 +985,7 @@ void caustica::render::WorldRenderer::streamlinePreRender()
 #if CAUSTICA_WITH_NATIVE_DLSS
 void caustica::render::WorldRenderer::nativeDLSSPreRender()
 {
-    if (!m_context.settings.RealtimeMode)
+    if (!m_context.activeSettings().RealtimeMode)
     {
         m_renderSize = m_displaySize;
         return;
@@ -993,48 +993,48 @@ void caustica::render::WorldRenderer::nativeDLSSPreRender()
 
     if (m_nativeDLSS)
     {
-        m_context.settings.IsDLSSSuported = m_nativeDLSS->isDlssSupported();
-        m_context.settings.IsDLSSRRSupported = m_nativeDLSS->isRayReconstructionSupported();
+        m_context.activeSettings().IsDLSSSuported = m_nativeDLSS->isDlssSupported();
+        m_context.activeSettings().IsDLSSRRSupported = m_nativeDLSS->isRayReconstructionSupported();
     }
 
-    if (m_context.settings.RealtimeAA == 3 && !m_context.settings.IsDLSSRRSupported)
+    if (m_context.activeSettings().RealtimeAA == 3 && !m_context.activeSettings().IsDLSSRRSupported)
     {
         caustica::warning("Requested DLSS-RR mode not available. Switching to DLSS.");
-        m_context.settings.RealtimeAA = 2;
+        m_context.activeSettings().RealtimeAA = 2;
     }
 
-    if (m_context.settings.RealtimeAA == 2 && !m_context.settings.IsDLSSSuported)
+    if (m_context.activeSettings().RealtimeAA == 2 && !m_context.activeSettings().IsDLSSSuported)
     {
         caustica::warning("Requested DLSS mode not available. Switching to TAA.");
-        m_context.settings.RealtimeAA = 1;
+        m_context.activeSettings().RealtimeAA = 1;
     }
 
-    const bool usingDLSS = (m_context.settings.RealtimeAA == 2 || m_context.settings.RealtimeAA == 3);
-    const bool changeToDLSSMode = usingDLSS && m_context.settings.DLSSLastRealtimeAA != m_context.settings.RealtimeAA;
+    const bool usingDLSS = (m_context.activeSettings().RealtimeAA == 2 || m_context.activeSettings().RealtimeAA == 3);
+    const bool changeToDLSSMode = usingDLSS && m_context.activeSettings().DLSSLastRealtimeAA != m_context.activeSettings().RealtimeAA;
 
-    if (changeToDLSSMode || m_context.settings.DLSSMode == SI::DLSSMode::eOff)
+    if (changeToDLSSMode || m_context.activeSettings().DLSSMode == SI::DLSSMode::eOff)
     {
-        m_context.settings.DLSSLastMode = PathTracerSettings::DLSSModeDefault;
-        m_context.settings.DLSSMode = PathTracerSettings::DLSSModeDefault;
-        m_context.settings.DLSSLastDisplaySize = { 0, 0 };
+        m_context.activeSettings().DLSSLastMode = PathTracerSettings::DLSSModeDefault;
+        m_context.activeSettings().DLSSMode = PathTracerSettings::DLSSModeDefault;
+        m_context.activeSettings().DLSSLastDisplaySize = { 0, 0 };
     }
 
-    m_context.settings.DLSSLastRealtimeAA = m_context.settings.RealtimeAA;
+    m_context.activeSettings().DLSSLastRealtimeAA = m_context.activeSettings().RealtimeAA;
 
     if (usingDLSS)
     {
         const bool dlssResizeRequired =
-            (m_context.settings.DLSSMode != m_context.settings.DLSSLastMode) ||
-            (m_displaySize.x != m_context.settings.DLSSLastDisplaySize.x) ||
-            (m_displaySize.y != m_context.settings.DLSSLastDisplaySize.y);
+            (m_context.activeSettings().DLSSMode != m_context.activeSettings().DLSSLastMode) ||
+            (m_displaySize.x != m_context.activeSettings().DLSSLastDisplaySize.x) ||
+            (m_displaySize.y != m_context.activeSettings().DLSSLastDisplaySize.y);
 
         if (dlssResizeRequired)
         {
-            m_context.settings.DLSSLastMode = m_context.settings.DLSSMode;
-            m_context.settings.DLSSLastDisplaySize = m_displaySize;
+            m_context.activeSettings().DLSSLastMode = m_context.activeSettings().DLSSMode;
+            m_context.activeSettings().DLSSLastDisplaySize = m_displaySize;
         }
 
-        m_renderSize = GetNativeDLSSRenderSize(m_displaySize, m_context.settings.DLSSMode);
+        m_renderSize = GetNativeDLSSRenderSize(m_displaySize, m_context.activeSettings().DLSSMode);
     }
     else
     {
@@ -1045,8 +1045,8 @@ void caustica::render::WorldRenderer::nativeDLSSPreRender()
 void caustica::render::WorldRenderer::preRender()
 {
     // Limit FPS
-    if (m_context.settings.actualFPSLimiter() > 0)
-        g_FPSLimiter.framerateLimit(m_context.settings.actualFPSLimiter());
+    if (m_context.activeSettings().actualFPSLimiter() > 0)
+        g_FPSLimiter.framerateLimit(m_context.activeSettings().actualFPSLimiter());
 
     korgi::update();
 }
@@ -1068,7 +1068,7 @@ void caustica::render::WorldRenderer::buildGaussianSplatEmissionProxies()
     caustica::render::buildGaussianSplatEmissionProxies(
         m_gaussianSplatEmissionProxies,
         m_context.scenePasses.gaussianSplats,
-        m_context.settings);
+        m_context.activeSettings());
 }
 
 void caustica::render::WorldRenderer::executeGaussianSplatAccelBuild(nvrhi::ICommandList* commandList)
@@ -1076,12 +1076,12 @@ void caustica::render::WorldRenderer::executeGaussianSplatAccelBuild(nvrhi::ICom
     if (commandList == nullptr || !hasActiveGaussianSplats())
         return;
 
-    buildGaussianSplatSceneAccelStructs(commandList, m_context.scenePasses.gaussianSplats, m_context.settings);
+    buildGaussianSplatSceneAccelStructs(commandList, m_context.scenePasses.gaussianSplats, m_context.activeSettings());
 }
 
 bool caustica::render::WorldRenderer::hasActiveGaussianSplats() const
 {
-    return m_context.settings.EnableGaussianSplats && !m_context.scenePasses.gaussianSplats.objectsEmpty();
+    return m_context.activeSettings().EnableGaussianSplats && !m_context.scenePasses.gaussianSplats.objectsEmpty();
 }
 
 void caustica::render::WorldRenderer::executeGaussianSplatRender(nvrhi::ICommandList* commandList, bool renderToOutputColor)
@@ -1090,12 +1090,12 @@ void caustica::render::WorldRenderer::executeGaussianSplatRender(nvrhi::ICommand
     if (commandList == nullptr || !hasActiveGaussianSplats())
         return;
 
-    const bool stochasticSplats = m_context.settings.EnableGaussianSplats && m_context.settings.GaussianSplatSortingMode == 1;
-    if (stochasticSplats && (m_context.settings.ResetAccumulation || m_context.settings.ResetRealtimeCaches || m_gaussianSplatTemporalReset))
+    const bool stochasticSplats = m_context.activeSettings().EnableGaussianSplats && m_context.activeSettings().GaussianSplatSortingMode == 1;
+    if (stochasticSplats && (m_context.activeSettings().ResetAccumulation || m_context.activeSettings().ResetRealtimeCaches || m_frameGaussianSplatTemporalReset || m_gaussianSplatTemporalReset))
         m_gaussianSplatTemporalSampleIndex = 0;
 
     const GaussianSplatFrameInputs frameInputs{
-        m_context.settings,
+        m_context.activeSettings(),
         int(m_frameIndex),
         int(m_sampleIndex),
         m_gaussianSplatTemporalSampleIndex,
@@ -1132,9 +1132,10 @@ void caustica::render::WorldRenderer::executeGaussianSplatAccumulate(nvrhi::ICom
         || m_gaussianSplatCurrentColor == nullptr || m_gaussianSplatAccumulatedColor == nullptr)
         return;
 
-    if (m_context.settings.ResetAccumulation || m_context.settings.ResetRealtimeCaches || m_gaussianSplatTemporalReset)
+    if (m_context.activeSettings().ResetAccumulation || m_context.activeSettings().ResetRealtimeCaches || m_frameGaussianSplatTemporalReset || m_gaussianSplatTemporalReset)
     {
         m_gaussianSplatTemporalSampleIndex = 0;
+        m_frameGaussianSplatTemporalReset = false;
         m_gaussianSplatTemporalReset = false;
     }
 
@@ -1167,14 +1168,56 @@ void caustica::render::WorldRenderer::render(nvrhi::IFramebuffer* framebuffer)
         framebuffer->getFramebufferInfo().width,
         framebuffer->getFramebufferInfo().height);
 
-    populateRenderFrameContext(framebuffer, m_renderFrameCtx);
-
     const uint32_t renderPhaseFrameIndex = m_context.gpuDevice.getRenderPhaseFrameIndex();
     std::shared_ptr<Scene> scene = m_context.sceneManager.getScene();
     if (scene)
+    {
         scene->beginGpuReadFrame(renderPhaseFrameIndex);
+        const scene::SceneRenderData& renderData = scene->getRenderData();
 
+        m_frameSettingsSnapshot = renderData.renderSettings.settings;
+        m_frameRuntimeSnapshot.Invalidation = renderData.renderSettings.invalidation;
+        m_frameRuntimeSnapshot.Picking = renderData.renderSettings.picking;
+        m_frameRuntimeSnapshot.GaussianSplats = m_context.runtimeState.GaussianSplats;
+        m_frameGaussianSplatTemporalReset = renderData.renderSettings.gaussianSplatTemporalReset;
+        m_context.sceneTime = renderData.renderSettings.sceneTime;
+
+        m_context.frameSettings = &m_frameSettingsSnapshot;
+        m_context.frameRuntime = &m_frameRuntimeSnapshot;
+
+        // Apply extracted camera pose before view update (RT owns view matrices).
+        m_context.camera.camera().lookTo(
+            renderData.camera.position, renderData.camera.direction, renderData.camera.up);
+        m_context.camera.setVerticalFOV(renderData.camera.verticalFovDegrees);
+        m_context.camera.setZNear(renderData.camera.zNear);
+        m_context.camera.setSelectedCameraIndex(renderData.camera.selectedCameraIndex);
+        if (renderData.camera.useCustomIntrinsics)
+        {
+            m_context.camera.setIntrinsics(
+                renderData.camera.intrinsics.x,
+                renderData.camera.intrinsics.y,
+                renderData.camera.intrinsics.z,
+                renderData.camera.intrinsics.w,
+                renderData.camera.intrinsicsViewport.x,
+                renderData.camera.intrinsicsViewport.y);
+        }
+        else
+        {
+            m_context.camera.clearIntrinsics();
+        }
+    }
+    else
+    {
+        m_context.frameSettings = nullptr;
+        m_context.frameRuntime = nullptr;
+        m_frameGaussianSplatTemporalReset = false;
+    }
+
+    populateRenderFrameContext(framebuffer, m_renderFrameCtx);
     m_pipelineRegistry.runFrame(*this, m_renderFrameCtx);
+
+    m_context.frameSettings = nullptr;
+    m_context.frameRuntime = nullptr;
 
     if (scene)
         scene->endGpuReadFrame();
@@ -1384,7 +1427,7 @@ void caustica::render::WorldRenderer::mainPathTrace(nvrhi::ICommandList* command
     nvrhi::CommandListHandle savedCommandList = m_commandList;
     m_commandList = commandList;
 
-    const bool useStablePlanes = m_context.settings.RealtimeMode;
+    const bool useStablePlanes = m_context.activeSettings().RealtimeMode;
 
     nvrhi::rt::State state;
     nvrhi::rt::DispatchRaysArguments args;
@@ -1399,7 +1442,7 @@ void caustica::render::WorldRenderer::mainPathTrace(nvrhi::ICommandList* command
     state.shaderTable = (useStablePlanes ? m_ptPipelineFillStablePlanes : m_ptPipelineReference)->getShaderTable();
     state.bindings = { m_bindingSet, m_context.descriptorTable->getDescriptorTable() };
 
-    for (uint subSampleIndex = 0; subSampleIndex < m_context.settings.actualSamplesPerPixel(); subSampleIndex++)
+    for (uint subSampleIndex = 0; subSampleIndex < m_context.activeSettings().actualSamplesPerPixel(); subSampleIndex++)
     {
         m_commandList->setRayTracingState(state);
 
@@ -1418,22 +1461,22 @@ void caustica::render::WorldRenderer::executeRtxdi(nvrhi::ICommandList* commandL
     m_commandList = commandList;
 
     static bool enableFusedDIGIFinal = true;
-    const bool useFusedDIGIFinal = m_context.settings.actualUseReSTIRDI()
-        && m_context.settings.actualUseReSTIRGI()
+    const bool useFusedDIGIFinal = m_context.activeSettings().actualUseReSTIRDI()
+        && m_context.activeSettings().actualUseReSTIRGI()
         && enableFusedDIGIFinal;
 
     RAII_SCOPE(m_commandList->beginMarker("RTXDI");, m_commandList->endMarker(); );
 
-    if (m_context.settings.actualUseReSTIRDI())
+    if (m_context.activeSettings().actualUseReSTIRDI())
         m_rtxdiPass->execute(m_commandList, m_bindingSet, useFusedDIGIFinal);
 
-    if (m_context.settings.actualUseReSTIRGI())
+    if (m_context.activeSettings().actualUseReSTIRGI())
         m_rtxdiPass->executeGI(m_commandList, m_bindingSet, useFusedDIGIFinal);
 
     if (useFusedDIGIFinal)
         m_rtxdiPass->executeFusedDIGIFinal(m_commandList, m_bindingSet);
 
-    if (m_context.settings.actualUseReSTIRPT())
+    if (m_context.activeSettings().actualUseReSTIRPT())
         m_rtxdiPass->executePT(m_commandList, m_bindingSet);
 
     m_commandList = savedCommandList;
@@ -1449,8 +1492,8 @@ void caustica::render::WorldRenderer::prepareDenoiserGuides(nvrhi::ICommandList*
     m_denoisingGuidesPass->denoiseSpecHitT(m_commandList, m_bindingSet);
     m_denoisingGuidesPass->computeAvgLayerRadiance(m_commandList, m_bindingSet);
 
-    if (m_context.settings.DebugView != DebugViewType::Disabled)
-        m_denoisingGuidesPass->renderDebugViz(m_commandList, m_context.settings.DebugView, m_bindingSet);
+    if (m_context.activeSettings().DebugView != DebugViewType::Disabled)
+        m_denoisingGuidesPass->renderDebugViz(m_commandList, m_context.activeSettings().DebugView, m_bindingSet);
 
     m_commandList = savedCommandList;
 }
@@ -1480,7 +1523,7 @@ void caustica::render::WorldRenderer::stablePlanesDebugViz(nvrhi::ICommandList* 
 
 void caustica::render::WorldRenderer::ensureNrdIntegrations()
 {
-    if (!m_context.settings.actualUseStandaloneDenoiser())
+    if (!m_context.activeSettings().actualUseStandaloneDenoiser())
         return;
 
     for (int i = 0; i < std::size(m_nrd); i++)
@@ -1488,7 +1531,7 @@ void caustica::render::WorldRenderer::ensureNrdIntegrations()
         if (m_nrd[i] != nullptr)
             continue;
 
-        nrd::Denoiser denoiserMethod = m_context.settings.NRDMethod == NrdConfig::DenoiserMethod::REBLUR
+        nrd::Denoiser denoiserMethod = m_context.activeSettings().NRDMethod == NrdConfig::DenoiserMethod::REBLUR
             ? nrd::Denoiser::REBLUR_DIFFUSE_SPECULAR
             : nrd::Denoiser::RELAX_DIFFUSE_SPECULAR;
 
@@ -1504,7 +1547,7 @@ void caustica::render::WorldRenderer::denoiseStablePlane(
 {
     (void)framebuffer;
 
-    if (!m_context.settings.actualUseStandaloneDenoiser())
+    if (!m_context.activeSettings().actualUseStandaloneDenoiser())
         return;
 
     nvrhi::CommandListHandle savedCommandList = m_commandList;
@@ -1514,7 +1557,7 @@ void caustica::render::WorldRenderer::denoiseStablePlane(
     assert(planeIndex >= 0 && planeIndex < static_cast<int>(std::size(m_nrd)));
     assert(planeIndex < static_cast<int>(std::size(passNames)));
 
-    const bool nrdUseRelax = m_context.settings.NRDMethod == NrdConfig::DenoiserMethod::RELAX;
+    const bool nrdUseRelax = m_context.activeSettings().NRDMethod == NrdConfig::DenoiserMethod::RELAX;
     const PostProcess::ComputePassType preparePassType = nrdUseRelax
         ? PostProcess::ComputePassType::RELAXDenoiserPrepareInputs
         : PostProcess::ComputePassType::REBLURDenoiserPrepareInputs;
@@ -1522,8 +1565,8 @@ void caustica::render::WorldRenderer::denoiseStablePlane(
         ? PostProcess::ComputePassType::RELAXDenoiserFinalMerge
         : PostProcess::ComputePassType::REBLURDenoiserFinalMerge;
 
-    const bool resetHistory = m_context.settings.ResetRealtimeCaches;
-    const int maxPassCount = std::min(m_context.settings.StablePlanesActiveCount, static_cast<int>(std::size(m_nrd)));
+    const bool resetHistory = m_context.activeSettings().ResetRealtimeCaches;
+    const int maxPassCount = std::min(m_context.activeSettings().StablePlanesActiveCount, static_cast<int>(std::size(m_nrd)));
     const bool initWithStableRadiance = planeIndex == (maxPassCount - 1);
 
     m_commandList->beginMarker(passNames[planeIndex]);
@@ -1544,7 +1587,7 @@ void caustica::render::WorldRenderer::denoiseStablePlane(
     m_commandList->endMarker();
 
     const float timeDeltaBetweenFrames = m_context.gpuDevice.isHeadless() ? 1.f / 60.f : -1.f;
-    const bool enableValidation = m_context.settings.DebugView == DebugViewType::StablePlane_DenoiserValidation;
+    const bool enableValidation = m_context.activeSettings().DebugView == DebugViewType::StablePlane_DenoiserValidation;
     if (nrdUseRelax)
     {
         m_nrd[planeIndex]->runDenoiserPasses(
@@ -1554,13 +1597,13 @@ void caustica::render::WorldRenderer::denoiseStablePlane(
             *m_context.camera.view(),
             *m_context.camera.viewPrevious(),
             m_context.gpuDevice.getRenderPhaseFrameIndex(),
-            m_context.settings.NRDDisocclusionThreshold,
-            m_context.settings.NRDDisocclusionThresholdAlternate,
-            m_context.settings.NRDUseAlternateDisocclusionThresholdMix,
+            m_context.activeSettings().NRDDisocclusionThreshold,
+            m_context.activeSettings().NRDDisocclusionThresholdAlternate,
+            m_context.activeSettings().NRDUseAlternateDisocclusionThresholdMix,
             timeDeltaBetweenFrames,
             enableValidation,
             resetHistory,
-            &m_context.settings.RelaxSettings);
+            &m_context.activeSettings().RelaxSettings);
     }
     else
     {
@@ -1571,13 +1614,13 @@ void caustica::render::WorldRenderer::denoiseStablePlane(
             *m_context.camera.view(),
             *m_context.camera.viewPrevious(),
             m_context.gpuDevice.getRenderPhaseFrameIndex(),
-            m_context.settings.NRDDisocclusionThreshold,
-            m_context.settings.NRDDisocclusionThresholdAlternate,
-            m_context.settings.NRDUseAlternateDisocclusionThresholdMix,
+            m_context.activeSettings().NRDDisocclusionThreshold,
+            m_context.activeSettings().NRDDisocclusionThresholdAlternate,
+            m_context.activeSettings().NRDUseAlternateDisocclusionThresholdMix,
             timeDeltaBetweenFrames,
             enableValidation,
             resetHistory,
-            &m_context.settings.ReblurSettings);
+            &m_context.activeSettings().ReblurSettings);
     }
 
     m_commandList->beginMarker("MergeOutputs");
@@ -1598,22 +1641,22 @@ void caustica::render::WorldRenderer::denoiseStablePlane(
 
 void caustica::render::WorldRenderer::denoise(nvrhi::ICommandList* commandList, nvrhi::IFramebuffer* framebuffer)
 {
-    if (!m_context.settings.actualUseStandaloneDenoiser())
+    if (!m_context.activeSettings().actualUseStandaloneDenoiser())
         return;
 
     ensureNrdIntegrations();
 
-    const int maxPassCount = std::min(m_context.settings.StablePlanesActiveCount, static_cast<int>(std::size(m_nrd)));
+    const int maxPassCount = std::min(m_context.activeSettings().StablePlanesActiveCount, static_cast<int>(std::size(m_nrd)));
     for (int pass = maxPassCount - 1; pass >= 0; pass--)
         denoiseStablePlane(commandList, framebuffer, pass);
 }
 #if CAUSTICA_WITH_NATIVE_DLSS
 bool caustica::render::WorldRenderer::evaluateNativeDLSS(bool reset)
 {
-    if (!m_nativeDLSS || !(m_context.settings.RealtimeAA == 2 || m_context.settings.RealtimeAA == 3))
+    if (!m_nativeDLSS || !(m_context.activeSettings().RealtimeAA == 2 || m_context.activeSettings().RealtimeAA == 3))
         return false;
 
-    const bool useRayReconstruction = m_context.settings.RealtimeAA == 3;
+    const bool useRayReconstruction = m_context.activeSettings().RealtimeAA == 3;
     if (useRayReconstruction && !m_nativeDLSS->isRayReconstructionSupported())
         return false;
     if (!useRayReconstruction && !m_nativeDLSS->isDlssSupported())
@@ -1653,7 +1696,7 @@ bool caustica::render::WorldRenderer::evaluateNativeDLSS(bool reset)
     evaluateParams.motionVectorsTexture = m_renderTargets->screenMotionVectors;
     evaluateParams.motionVectorScaleX = 1.0f / float(m_renderSize.x);
     evaluateParams.motionVectorScaleY = 1.0f / float(m_renderSize.y);
-    evaluateParams.resetHistory = reset || m_context.settings.ResetRealtimeCaches;
+    evaluateParams.resetHistory = reset || m_context.activeSettings().ResetRealtimeCaches;
 
     if (useRayReconstruction)
     {
@@ -1680,10 +1723,10 @@ bool caustica::render::WorldRenderer::evaluateNativeDLSS(bool reset)
 #endif
 void caustica::render::WorldRenderer::runNoDenoiserFinalMerge(nvrhi::ICommandList* commandList)
 {
-    if (!m_context.settings.RealtimeMode || m_context.settings.actualUseStandaloneDenoiser())
+    if (!m_context.activeSettings().RealtimeMode || m_context.activeSettings().actualUseStandaloneDenoiser())
         return;
 
-    if (m_context.settings.RealtimeAA == 2 || m_context.settings.RealtimeAA == 3)
+    if (m_context.activeSettings().RealtimeAA == 2 || m_context.activeSettings().RealtimeAA == 3)
         return;
 
     SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
@@ -1703,14 +1746,14 @@ void caustica::render::WorldRenderer::runNoDenoiserFinalMerge(nvrhi::ICommandLis
 
 void caustica::render::WorldRenderer::runDlssUpscale(nvrhi::ICommandList* commandList, bool reset)
 {
-    if (!m_context.settings.RealtimeMode)
+    if (!m_context.activeSettings().RealtimeMode)
         return;
 
-    if (!(m_context.settings.RealtimeAA == 2 || m_context.settings.RealtimeAA == 3))
+    if (!(m_context.activeSettings().RealtimeAA == 2 || m_context.activeSettings().RealtimeAA == 3))
         return;
 
     PostProcessAAParams params{
-        m_context.settings,
+        m_context.activeSettings(),
         commandList,
         m_renderTargets.get(),
         &m_context.gpuDevice,
@@ -1730,7 +1773,7 @@ void caustica::render::WorldRenderer::runDlssUpscale(nvrhi::ICommandList* comman
     params.constantBuffer = m_constantBuffer;
     params.accumulationSampleIndex = m_accumulationSampleIndex;
     params.gaussianSplatTemporalSampleIndex = &m_gaussianSplatTemporalSampleIndex;
-    params.gaussianSplatTemporalReset = &m_gaussianSplatTemporalReset;
+    params.gaussianSplatTemporalReset = &m_frameGaussianSplatTemporalReset;
 #if CAUSTICA_WITH_STREAMLINE
     params.dlssRROptions = &m_lastDLSSRROptions;
 #endif
@@ -1745,7 +1788,7 @@ void caustica::render::WorldRenderer::runDlssUpscale(nvrhi::ICommandList* comman
 
     if (!nativeDLSSEvaluated)
     {
-        if (m_context.settings.actualUseStandaloneDenoiser())
+        if (m_context.activeSettings().actualUseStandaloneDenoiser())
         {
             commandList->copyTexture(
                 m_renderTargets->processedOutputColor, nvrhi::TextureSlice(),
@@ -1788,11 +1831,11 @@ void caustica::render::WorldRenderer::resetReferenceOIDN()
 }
 void caustica::render::WorldRenderer::applyReferenceOIDN()
 {
-    if (m_context.settings.RealtimeMode || !m_context.settings.ReferenceOIDNDenoiser || m_renderTargets == nullptr)
+    if (m_context.activeSettings().RealtimeMode || !m_context.activeSettings().ReferenceOIDNDenoiser || m_renderTargets == nullptr)
         return;
 
 #if CAUSTICA_WITH_OIDN
-    const bool accumulationReady = m_accumulationCompleted || m_accumulationSampleIndex >= m_context.settings.AccumulationTarget;
+    const bool accumulationReady = m_accumulationCompleted || m_accumulationSampleIndex >= m_context.activeSettings().AccumulationTarget;
     if (!accumulationReady)
         return;
 
@@ -1832,10 +1875,10 @@ void caustica::render::WorldRenderer::applyReferenceOIDN()
     const uint32_t height = sourceDesc.height;
 
     OidnDenoiser::Options oidnOptions;
-    oidnOptions.UseGPU = m_context.settings.ReferenceOIDNUseGPU;
-    oidnOptions.GuidePasses = static_cast<OidnDenoiser::Passes>(std::clamp(m_context.settings.ReferenceOIDNPasses, 0, 2));
-    oidnOptions.GuidePrefilter = static_cast<OidnDenoiser::Prefilter>(std::clamp(m_context.settings.ReferenceOIDNPrefilter, 0, 2));
-    oidnOptions.FilterQuality = static_cast<OidnDenoiser::Quality>(std::clamp(m_context.settings.ReferenceOIDNQuality, 0, 2));
+    oidnOptions.UseGPU = m_context.activeSettings().ReferenceOIDNUseGPU;
+    oidnOptions.GuidePasses = static_cast<OidnDenoiser::Passes>(std::clamp(m_context.activeSettings().ReferenceOIDNPasses, 0, 2));
+    oidnOptions.GuidePrefilter = static_cast<OidnDenoiser::Prefilter>(std::clamp(m_context.activeSettings().ReferenceOIDNPrefilter, 0, 2));
+    oidnOptions.FilterQuality = static_cast<OidnDenoiser::Quality>(std::clamp(m_context.activeSettings().ReferenceOIDNQuality, 0, 2));
 
     const bool requestAlbedoGuide = oidnOptions.GuidePasses == OidnDenoiser::Passes::Albedo || oidnOptions.GuidePasses == OidnDenoiser::Passes::AlbedoNormal;
     const bool requestNormalGuide = oidnOptions.GuidePasses == OidnDenoiser::Passes::AlbedoNormal;
@@ -2015,11 +2058,11 @@ caustica::CameraUpdateParams caustica::render::WorldRenderer::makeCameraUpdatePa
     params.displayAspectRatio = m_displayAspectRatio;
     params.sampleIndex = m_sampleIndex;
     params.frameIndex = static_cast<uint32_t>(m_frameIndex);
-    params.realtimeMode = m_context.settings.RealtimeMode;
-    params.realtimeAA = m_context.settings.RealtimeAA;
-    params.dbgFreezeRealtimeNoiseSeed = m_context.settings.DbgFreezeRealtimeNoiseSeed;
-    params.syncPreviousView = m_context.settings.ResetAccumulation || m_context.settings.ResetRealtimeCaches;
-    params.temporalAAJitter = m_context.settings.TemporalAntiAliasingJitter;
+    params.realtimeMode = m_context.activeSettings().RealtimeMode;
+    params.realtimeAA = m_context.activeSettings().RealtimeAA;
+    params.dbgFreezeRealtimeNoiseSeed = m_context.activeSettings().DbgFreezeRealtimeNoiseSeed;
+    params.syncPreviousView = m_context.activeSettings().ResetAccumulation || m_context.activeSettings().ResetRealtimeCaches;
+    params.temporalAAJitter = m_context.activeSettings().TemporalAntiAliasingJitter;
     params.temporalAAPass = m_temporalAntiAliasingPass.get();
     return params;
 }

@@ -6,10 +6,11 @@
 #include <memory>
 #include <algorithm>
 
-#include <render/passes/rtxdi/RtxdiPass.h>
+#include <render/passes/rtxdi/RtxdiUserSettings.h>
 #include <render/passes/geometry/TemporalAntiAliasingPass.h>
 #include <render/passes/postProcess/ToneMappingPasses.h>
-#include <shaders/PathTracer/PathTracerDebug.hlsli>
+#include <shaders/PathTracer/Config.h>
+#include <shaders/PathTracer/DebugViewType.hlsli>
 #include <render/passes/denoisers/NrdConfig.h>
 
 #if CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE

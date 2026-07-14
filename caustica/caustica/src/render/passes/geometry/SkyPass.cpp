@@ -2,7 +2,6 @@
 #include <render/core/FramebufferFactory.h>
 #include <backend/ViewRhiConversion.h>
 #include <assets/loader/ShaderFactory.h>
-#include <render/core/ShadowMap.h>
 #include <render/core/RenderPassConstants.h>
 #include <render/core/RenderDevice.h>
 #include <scene/View.h>

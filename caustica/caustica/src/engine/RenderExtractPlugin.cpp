@@ -4,8 +4,11 @@
 #include <engine/AppSchedules.h>
 #include <engine/SceneViewState.h>
 #include <engine/SceneSessionSystems.h>
+#include <engine/GpuRenderSubsystem.h>
 
 #include <render/SessionDiagnostics.h>
+#include <render/worldRenderer/WorldRenderer.h>
+#include <scene/SceneRenderData.h>
 
 namespace caustica::sceneSession
 {
@@ -27,7 +30,17 @@ void prepareRenderFrame(App& app)
     if (!activeScene)
         return;
 
-    activeScene->extractAndPublishRenderSnapshot(device->getPreparedRenderFrameIndex());
+    scene::SessionRenderExtractInputs sessionInputs;
+    if (GpuRenderSubsystem* gr = gpuRender(app))
+        sessionInputs.camera = &gr->camera();
+    if (render::WorldRenderer* wr = worldRenderer(app))
+        sessionInputs.gaussianSplatTemporalReset = wr->consumeGaussianSplatTemporalReset();
+    sessionInputs.settings = settings(app);
+    sessionInputs.runtime = runtimeState(app);
+    if (vs)
+        sessionInputs.sceneTime = vs->sceneTime;
+
+    activeScene->extractAndPublishRenderSnapshot(device->getPreparedRenderFrameIndex(), &sessionInputs);
 }
 
 void registerRenderExtractPlugin(App& app)

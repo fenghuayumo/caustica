@@ -61,26 +61,30 @@ Recommended starting points:
 
 * Scene authoring: [docs/scene-json.md](docs/scene-json.md)
 * Materials for sim-to-real variation: [docs/openpbr-lite.md](docs/openpbr-lite.md)
+* ECS + render proxies: [docs/architecture-render-proxy.md](docs/architecture-render-proxy.md)
 * Python batch/headless API: [py_caustica.md](py_caustica.md), `caustica/Python/Examples/offline_render.py`
 
 ## Architecture
 
 ```
 App (frame loop, plugins, schedules)
- └── ecs::World
-      ├── scene::SceneEntityWorld   — scene graph as ECS entities/components
-      ├── resources                 — GpuDevice, PathTracingContext, …
-      └── systems per AppSchedule
-           ├── Update              — animation, scene changes, input
-           ├── Extract             — scene → render-facing views
-           └── Render              — WorldRenderer + frame graph execution
+ └── App world (resources) + SceneEntityWorld (scene ECS)
+      ├── Update / PostUpdate   — animation, hierarchy, simulation
+      ├── Extract               — ECS → SceneRenderData proxies (triple-buffered)
+      └── Render (RT)           — WorldRenderer reads proxies only (no live ECS)
 
 WorldRenderer (UE-like render pipeline)
  ├── PathTracingContext            — persistent GPU state, settings, bindings
  ├── RenderPipelineRegistry        — ordered render features / plugins
- ├── GraphBuilder (rg::)           — pass DAG, barriers, transient textures
- └── PathTracer passes             — trace, guides, denoise, post-process, present
+ ├── Frame graph (GraphBuilder)    — transient targets, pass edges
+ └── Path-trace / ReSTIR / NRD / DLSS features
 ```
+
+**ECS × Render Proxy:** logic thread owns `SceneEntityWorld`; Extract copies lights/meshes into `LightRenderProxy` / `MeshInstanceRenderProxy`; the render thread consumes `Scene::getRenderData()` and must not walk live ECS for frame lighting. Details: [docs/architecture-render-proxy.md](docs/architecture-render-proxy.md).
+
+* **Application & simulation layer** — Bevy-inspired: `App`, `Plugin`, schedules, scene ECS components.
+* **Rendering layer** — UE-inspired: dedicated `RenderThread`, extract proxies, `WorldRenderer`, render graph.
+* **Path tracing core** — RTXPT-derived shaders (ReSTIR, NEE-AT, NRD, DLSS) wired through the proxy packet.
 
 Key code locations:
 
@@ -89,6 +93,7 @@ Key code locations:
 | App & schedules | `caustica/caustica/include/engine/App.h`, `AppSchedules.h`, `Plugin.h` |
 | ECS core | `caustica/caustica/include/ecs/` |
 | Scene ECS | `caustica/caustica/include/scene/SceneEcs.h` |
+| Render proxies | `caustica/caustica/include/scene/SceneRenderData.h`, `docs/architecture-render-proxy.md` |
 | World renderer | `caustica/caustica/include/render/worldRenderer/` |
 | Render graph | `caustica/caustica/include/render/graph/` |
 | Materials (OpenPBR-lite) | `caustica/caustica/src/render/passes/lighting/MaterialGpuCache.cpp`, `shaders/PathTracer/Rendering/Materials/BxDF.hlsli` |

@@ -1075,7 +1075,7 @@ void Scene::publishRenderSnapshot(uint32_t frameIndex)
     m_RenderCommands.drain(*this);
 }
 
-void Scene::extractAndPublishRenderSnapshot(uint32_t frameIndex)
+void Scene::extractAndPublishRenderSnapshot(uint32_t frameIndex, const scene::SessionRenderExtractInputs* session)
 {
     if (!m_EntityWorld)
         return;
@@ -1096,7 +1096,10 @@ void Scene::extractAndPublishRenderSnapshot(uint32_t frameIndex)
         pending.frameIndex = frameIndex;
     }
 
-    scene::extractSceneRenderData(*m_EntityWorld, m_RenderSnapshot.writeBufferForFrame(frameIndex), frameIndex);
+    scene::SceneRenderData& writeBuffer = m_RenderSnapshot.writeBufferForFrame(frameIndex);
+    scene::extractSceneRenderData(*m_EntityWorld, writeBuffer, frameIndex);
+    if (session)
+        scene::extractSessionRenderState(*session, writeBuffer);
     publishRenderSnapshot(frameIndex);
 }
 

@@ -2,6 +2,7 @@
 
 #include <render/gpuSort/GPUSort.h>
 #include <render/passes/debug/ShaderDebug.h>
+#include <scene/SceneObjects.h>
 
 #include <algorithm>
 #include <cmath>

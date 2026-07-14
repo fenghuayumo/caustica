@@ -46,6 +46,27 @@ struct PathTracingContext
     double& sceneTime;
 
     SessionDiagnostics& diagnostics;
+
+    // Per-frame: pointed at SceneRenderData snapshot copies for the render phase.
+    PathTracerSettings* frameSettings = nullptr;
+    RenderRuntimeState* frameRuntime = nullptr;
+
+    [[nodiscard]] PathTracerSettings& activeSettings()
+    {
+        return frameSettings ? *frameSettings : settings;
+    }
+    [[nodiscard]] const PathTracerSettings& activeSettings() const
+    {
+        return frameSettings ? *frameSettings : settings;
+    }
+    [[nodiscard]] RenderRuntimeState& activeRuntime()
+    {
+        return frameRuntime ? *frameRuntime : runtimeState;
+    }
+    [[nodiscard]] const RenderRuntimeState& activeRuntime() const
+    {
+        return frameRuntime ? *frameRuntime : runtimeState;
+    }
 };
 
 } // namespace render

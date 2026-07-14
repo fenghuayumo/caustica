@@ -6,6 +6,9 @@
 #include <scene/SceneObjects.h>
 #include <scene/SceneTypes.h>
 
+// Logic / game thread only (editor, Python deform, animation geometry sequences).
+// Do not call from the dedicated render thread — mutate ECS then Extract.
+
 #include <algorithm>
 #include <array>
 #include <cmath>

@@ -117,7 +117,6 @@ struct DirectionalLightData
 {
     float irradiance = 1.f;
     float angularSize = 0.f;
-    std::vector<std::shared_ptr<caustica::IShadowMap>> perObjectShadows;
 };
 
 struct SpotLightData
@@ -148,8 +147,6 @@ using LightData = std::variant<DirectionalLightData, SpotLightData, PointLightDa
 
 struct LightComponent
 {
-    std::shared_ptr<caustica::IShadowMap> shadowMap;
-    int shadowChannel = -1;
     dm::float3 color = dm::colors::white;
     LightSamplerLink lightLink;
     std::vector<std::string> proxies;
@@ -247,6 +244,13 @@ enum class PreviousTransformPolicy
 };
 
 void updateHierarchy(ecs::World& world, PreviousTransformPolicy previousPolicy);
+
+[[nodiscard]] SceneContentFlags getMeshContentFlags(const MeshInfo& mesh);
+[[nodiscard]] dm::box3 getMeshLocalBounds(const MeshInfo& mesh);
+[[nodiscard]] bool setMeshProperty(MeshInfo& mesh, const std::string& propName, const dm::float4& value);
+void initializeMeshInstanceComponent(MeshInstanceComponent& component, const std::shared_ptr<MeshInfo>& mesh);
+[[nodiscard]] std::shared_ptr<MeshInfo> createSkinnedMeshFromPrototype(
+    SceneTypeFactory& factory, const std::shared_ptr<MeshInfo>& prototypeMesh);
 
 // ECS scene world: entity hierarchy + resource tracking (meshes, lights, cameras, …).
 class SceneEntityWorld : public SceneResources

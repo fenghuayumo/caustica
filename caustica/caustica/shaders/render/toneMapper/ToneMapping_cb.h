@@ -6,12 +6,12 @@
 
 enum class ToneMapperOperator : uint32_t
 {
-	Linear,             ///< Linear mapping
-	Reinhard,           ///< Reinhard operator
-	ReinhardModified,   ///< Reinhard operator with maximum white intensity
-	HejiHableAlu,       ///< John Hable's ALU approximation of Jim Heji's filmic operator
-	HableUc2,           ///< John Hable's filmic tone-mapping used in Uncharted 2
-	Aces,               ///< Aces Filmic Tone-Mapping
+    Linear,             ///< Linear mapping
+    Reinhard,           ///< Reinhard operator
+    ReinhardModified,   ///< Reinhard operator with maximum white intensity
+    HejiHableAlu,       ///< John Hable's ALU approximation of Jim Heji's filmic operator
+    HableUc2,           ///< John Hable's filmic tone-mapping used in Uncharted 2
+    Aces,               ///< Aces Filmic Tone-Mapping
 };
 
 
@@ -19,12 +19,12 @@ struct ToneMappingConstants
 {
     float whiteScale;
     float whiteMaxLuminance;
-	uint toneMapOperator;
+    uint toneMapOperator;
     uint clamped;
-	uint autoExposure;
-	float avgLuminance;
-	float autoExposureLumValueMin;
-	float autoExposureLumValueMax;
+    uint autoExposure;
+    float avgLuminance;
+    float autoExposureLumValueMin;
+    float autoExposureLumValueMax;
     float3x4 colorTransform;
     uint enabled;
     uint _padding0;

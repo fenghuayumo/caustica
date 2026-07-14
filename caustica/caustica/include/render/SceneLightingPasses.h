@@ -4,6 +4,7 @@
 #include <render/passes/lighting/LightSamplingCache.h>
 #include <render/passes/lighting/MaterialGpuCache.h>
 #include <render/passes/omm/OpacityMicromapBuilder.h>
+#include <shaders/PathTracer/Lighting/EnvMap.hlsli>
 
 #include <assets/loader/TextureLoader.h>
 #include <ecs/Entity.h>

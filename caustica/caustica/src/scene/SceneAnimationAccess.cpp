@@ -1,7 +1,7 @@
 #include <scene/SceneAnimationAccess.h>
 
 #include <scene/SceneLightAccess.h>
-#include <scene/SceneMeshAccess.h>
+#include <scene/SceneEcs.h>
 #include <core/log.h>
 
 namespace caustica::scene

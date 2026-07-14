@@ -1,0 +1,74 @@
+# Architecture: ECS + UE-style Render Proxies
+
+Caustica combines a **Bevy-inspired logic-side ECS** with an **Unreal-style game/render thread split**. The two concerns are orthogonal:
+
+| Layer | Responsibility | Thread |
+| --- | --- | --- |
+| `SceneEntityWorld` (ECS) | Entities, components, queries, animation, hierarchy, `Changed<>` | Logic / game |
+| Extract | Copy ECS + session camera/settings → flat proxies | Logic (Extract schedule) |
+| `SceneRenderData` / `SceneRenderSnapshot` | Triple-buffered, ECS-free frame packet | Logic writes, render reads |
+| `WorldRenderer` + passes | AS build, path trace, denoise, present | Render thread |
+
+## Intended contract
+
+```
+SceneWorld (ECS)          Extract                SceneRenderData[N%3]           WorldRenderer
+─────────────────         ───────                ────────────────────          ─────────────
+TransformComponent   ──►  Changed / dirty   ──►  MeshInstanceRenderProxy      read-only
+LightComponent       ──►  light fields      ──►  LightRenderProxy             no getEntityWorld()
+CameraController     ──►  pose / FOV        ──►  CameraSnapshot               apply then updateViews
+PathTracerSettings   ──►  full copy         ──►  RenderSettingsSnapshot       activeSettings()
+```
+
+**Rules**
+
+1. Render-thread frame work must consume `Scene::getRenderData()` (or typed proxies inside it).
+2. Render thread must **not** call `Scene::getEntityWorld()` for per-frame lighting / emissive / mesh enumeration.
+3. Light history (NEE-AT remapping) lives in render-side maps (`LightSamplingCache`), not in `LightComponent::lightLink`.
+4. Operate on `LightRenderProxy` / `LightData` directly — **no** `asComponent()` glue back to ECS.
+5. Game-thread scene-load / editor mutation may still touch ECS; that is not the render path.
+
+## What is extracted today
+
+`extractSceneRenderData()` + `extractSessionRenderState()` (`scene/SceneRenderExtract.cpp`):
+
+- `MeshInstanceRenderProxy` — transform, bounds, mesh, `proxiedAnalyticLight`, `parentLightEntity`
+- `SkinnedMeshRenderProxy` — joint matrices / debug lines
+- `LightRenderProxy` — color, `LightData`, world transform (no shadow maps)
+- `CameraSnapshot` — position / dir / up / FOV / intrinsics
+- `RenderSettingsSnapshot` — `PathTracerSettings` copy, invalidation, picking, splat temporal reset, scene time
+- Entity id lists for cameras / animations
+
+Published via `Scene::extractAndPublishRenderSnapshot(frameIndex, &sessionInputs)` into a **3-slot** snapshot.
+
+## Game-thread-only ECS paths (intentional)
+
+| Path | Why ECS is OK |
+| --- | --- |
+| `SceneMeshEditing` | Editor / Python deform / geometry sequences on logic thread |
+| `SceneGaussianSplatPasses::loadFromSceneEntities` / `attachToScene` | Load/edit mutates entities then publishes snapshot |
+| Importers + `initialize*Component` | Authoring bridge until importers write ECS directly |
+
+Frame rendering already uses light proxies + cached splat transforms; do not move these load/edit paths onto the render thread.
+
+## Remaining gaps
+
+| Item | Status |
+| --- | --- |
+| OO `SceneLightAccess` / `SceneCameraAccess` / `SceneAnimationAccess` | Real helpers stay; OO `initialize*Component` deleted after importers migrate |
+| `sceneSession::*` facade | Still used by plugins; migrate call sites to `ctx.res<T>()` incrementally |
+| `SceneRenderCommandQueue` | Unused — delete or wire |
+
+## File map
+
+| Piece | Path |
+| --- | --- |
+| Proxy + session snapshot types | `include/scene/SceneRenderData.h` |
+| Extract | `src/scene/SceneRenderExtract.cpp` |
+| Extract schedule | `src/engine/RenderExtractPlugin.cpp` |
+| Snapshot buffer | `include/scene/SceneRenderSnapshot.h` |
+| Frame settings binding | `PathTracingContext::activeSettings()` / `WorldRenderer::render()` |
+
+## Why not a “render ECS”
+
+A second EnTT world on the render thread would add sync cost without helping path tracing. Flat proxy arrays match bindless / light-buffer upload and match UE’s `F*SceneProxy` model. Keep ECS where queries and composition pay off (simulation); keep proxies where the GPU thread needs stable, read-only packets.

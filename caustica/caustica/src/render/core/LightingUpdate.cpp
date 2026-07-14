@@ -10,7 +10,7 @@
 #include <render/passes/gaussian/GaussianSplatEmissionProxy.h>
 #include <scene/Scene.h>
 #include <scene/SceneObjects.h>
-#include <scene/SceneEcs.h>
+#include <scene/SceneRenderData.h>
 #include <scene/SceneLightAccess.h>
 #include <core/scope.h>
 #include <shaders/light_cb.h>
@@ -66,35 +66,27 @@ void updateLighting(CameraController& camera, AccelStructManager& accelStructs, 
     {
         const float3 rotationInRadians = radians(params.settings.EnvironmentMapParams.RotationXYZ);
         const affine3 rotationTransform = dm::rotation(rotationInRadians);
-        const scene::SceneEntityWorld* ew = params.scene->getEntityWorld();
-        if (ew)
+        for (const scene::LightRenderProxy& lightProxy : params.scene->getRenderData().lights)
         {
-            for (ecs::Entity entity : params.scene->getLightEntities())
-            {
-                const auto* lightComp = scene::tryGetLight(ew->world(), entity);
-                if (!lightComp || !scene::tryGetDirectionalLightData(*lightComp))
-                    continue;
-                const auto* globalComp = ew->world().get<scene::GlobalTransformComponent>(entity);
-                if (!globalComp)
-                    continue;
+            if (!scene::tryGetDirectionalLightData(lightProxy.data))
+                continue;
 
-                LightConstants lightConstants;
-                scene::fillLightConstants(*lightComp, globalComp->transform, lightConstants);
+            LightConstants lightConstants;
+            scene::fillLightConstants(lightProxy, lightConstants);
 
-                if (dirLightCount >= EnvMapProcessor::c_MaxDirLights)
-                    break;
+            if (dirLightCount >= EnvMapProcessor::c_MaxDirLights)
+                break;
 
-                const float minAngularSize = PI_f / (params.environment->getTargetCubeResolution() / 2.0f);
-                assert(lightConstants.angularSizeOrInvRange >= minAngularSize);
+            const float minAngularSize = PI_f / (params.environment->getTargetCubeResolution() / 2.0f);
+            assert(lightConstants.angularSizeOrInvRange >= minAngularSize);
 
-                dirLights[dirLightCount].AngularSize =
-                    std::max(lightConstants.angularSizeOrInvRange, minAngularSize);
-                dirLights[dirLightCount].ColorIntensity =
-                    float4(lightConstants.color, lightConstants.intensity);
-                dirLights[dirLightCount].Direction =
-                    rotationTransform.transformVector(lightConstants.direction);
-                dirLightCount++;
-            }
+            dirLights[dirLightCount].AngularSize =
+                std::max(lightConstants.angularSizeOrInvRange, minAngularSize);
+            dirLights[dirLightCount].ColorIntensity =
+                float4(lightConstants.color, lightConstants.intensity);
+            dirLights[dirLightCount].Direction =
+                rotationTransform.transformVector(lightConstants.direction);
+            dirLightCount++;
         }
     }
 

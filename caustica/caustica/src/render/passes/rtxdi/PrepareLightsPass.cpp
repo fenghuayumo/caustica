@@ -2,7 +2,7 @@
 #include <render/SceneGpuResources.h>
 #include <render/passes/rtxdi/RtxdiResources.h>
 #include <scene/Scene.h>
-#include <scene/SceneEcs.h>
+#include <scene/SceneRenderData.h>
 #include <scene/SceneLightAccess.h>
 
 #include <assets/loader/ShaderFactory.h>
@@ -156,17 +156,12 @@ void PrepareLightsPass::countLightsInScene(uint32_t& numEmissiveMeshes, uint32_t
     numEmissiveMeshes = 0;
     numEmissiveTriangles = 0;
 
-    const auto& instances = m_Scene->getMeshInstances();
-    auto* entityWorld = m_Scene->getEntityWorld();
-    for (const ecs::Entity entity : instances)
+    for (const scene::MeshInstanceRenderProxy& meshProxy : m_Scene->getRenderData().meshInstances)
     {
-        if (!entityWorld)
-            continue;
-        const auto* meshComp = entityWorld->world().get<scene::MeshInstanceComponent>(entity);
-        if (!meshComp || !meshComp->mesh)
+        if (!meshProxy.mesh)
             continue;
 
-        for (const auto& geometry : meshComp->mesh->geometries)
+        for (const auto& geometry : meshProxy.mesh->geometries)
         {
             if (!geometry)
                 continue;
@@ -250,24 +245,23 @@ static uint16_t fp32ToFp16(float v)
     return (uint16_t)(sign >> 16 | body >> 13) & 0xFFFF;
 }
 
-static bool ConvertLightComponent(
-    const caustica::scene::LightComponent& comp,
-    const dm::daffine3& globalTransform,
+static bool ConvertLightProxy(
+    const caustica::scene::LightRenderProxy& proxy,
     PolymorphicLightInfoFull& polymorphic,
     bool enableImportanceSampledEnvironmentLight,
     EnvMapProcessor* /*environmentMap*/)
 {
     using namespace caustica::scene;
-    switch (getLightType(comp))
+    switch (getLightType(proxy))
     {
     case LightType_Spot: {
-        const auto& spot = std::get<SpotLightData>(comp.data);
-        const float3 lightPos = float3(getLightPosition(globalTransform));
-        const float3 lightDir = float3(normalize(getLightDirection(globalTransform)));
+        const auto& spot = std::get<SpotLightData>(proxy.data);
+        const float3 lightPos = float3(getLightPosition(proxy.transform));
+        const float3 lightDir = float3(normalize(getLightDirection(proxy.transform)));
 
         if (spot.radius == 0.f)
         {
-            float3 flux = comp.color * spot.intensity;
+            float3 flux = proxy.color * spot.intensity;
             polymorphic.Base.ColorTypeAndFlags = (uint32_t)PolymorphicLightType::kPoint << kPolymorphicLightTypeShift | ((spot.outerAngle < 0) ? kPolymorphicLightShapingUseMinFalloff : 0);
             packLightColor(flux, polymorphic);
             polymorphic.Base.Center = lightPos;
@@ -278,7 +272,7 @@ static bool ConvertLightComponent(
         else
         {
             float projectedArea = dm::PI_f * square(spot.radius);
-            float3 radiance = comp.color * spot.intensity / projectedArea;
+            float3 radiance = proxy.color * spot.intensity / projectedArea;
             float softness = saturate(1.f - spot.innerAngle / abs(spot.outerAngle));
             polymorphic.Base.ColorTypeAndFlags = (uint32_t)PolymorphicLightType::kSphere << kPolymorphicLightTypeShift | ((spot.outerAngle < 0) ? kPolymorphicLightShapingUseMinFalloff : 0);
             polymorphic.Base.ColorTypeAndFlags |= kPolymorphicLightShapingEnableBit;
@@ -292,12 +286,12 @@ static bool ConvertLightComponent(
         return true;
     }
     case LightType_Point: {
-        const auto& point = std::get<PointLightData>(comp.data);
-        const float3 lightPos = float3(getLightPosition(globalTransform));
+        const auto& point = std::get<PointLightData>(proxy.data);
+        const float3 lightPos = float3(getLightPosition(proxy.transform));
 
         if (point.radius == 0.f)
         {
-            float3 flux = comp.color * point.intensity;
+            float3 flux = proxy.color * point.intensity;
             polymorphic.Base.ColorTypeAndFlags = (uint32_t)PolymorphicLightType::kPoint << kPolymorphicLightTypeShift;
             packLightColor(flux, polymorphic);
             polymorphic.Base.Center = lightPos;
@@ -306,7 +300,7 @@ static bool ConvertLightComponent(
         else
         {
             float projectedArea = dm::PI_f * square(point.radius);
-            float3 radiance = comp.color * point.intensity / projectedArea;
+            float3 radiance = proxy.color * point.intensity / projectedArea;
             polymorphic.Base.ColorTypeAndFlags = (uint32_t)PolymorphicLightType::kSphere << kPolymorphicLightTypeShift;
             packLightColor(radiance, polymorphic);
             polymorphic.Base.Center = lightPos;
@@ -327,9 +321,9 @@ static bool ConvertLightComponent(
     }
 }
 
-static int isInfiniteLightComponent(const caustica::scene::LightComponent& comp)
+static int lightInfinityRank(const caustica::scene::LightRenderProxy& proxy)
 {
-    switch (caustica::scene::getLightType(comp))
+    switch (caustica::scene::getLightType(proxy))
     {
     case LightType_Directional: return 1;
     case LightType_Environment: return 2;
@@ -403,22 +397,20 @@ RTXDI_LightBufferParameters PrepareLightsPass::process(nvrhi::ICommandList* comm
     uint32_t lightBufferOffset = 0;
     std::vector<uint32_t> geometryInstanceToLight(m_Scene->getGeometryInstancesCount(), RTXDI_INVALID_LIGHT_INDEX);
 
-    const auto& instances = m_Scene->getMeshInstances();
-    auto* entityWorld = m_Scene->getEntityWorld();
-    for (const ecs::Entity entity : instances)
+    const auto& renderData = m_Scene->getRenderData();
+    for (const scene::MeshInstanceRenderProxy& meshProxy : renderData.meshInstances)
     {
-        if (!entityWorld)
-            continue;
-        const auto* meshComp = entityWorld->world().get<scene::MeshInstanceComponent>(entity);
-        if (!meshComp || !meshComp->mesh)
+        if (!meshProxy.mesh)
             continue;
 
-        const auto& mesh = meshComp->mesh;
-
-        assert(meshComp->geometryInstanceIndex < geometryInstanceToLight.size());
-        if (meshComp->geometryInstanceIndex < 0)
+        const auto& mesh = meshProxy.meshShared;
+        if (!mesh)
             continue;
-        uint32_t firstGeometryInstanceIndex = meshComp->geometryInstanceIndex;
+
+        assert(meshProxy.geometryInstanceIndex < geometryInstanceToLight.size());
+        if (meshProxy.geometryInstanceIndex < 0)
+            continue;
+        uint32_t firstGeometryInstanceIndex = meshProxy.geometryInstanceIndex;
 
         for (size_t geometryIndex = 0; geometryIndex < mesh->geometries.size(); ++geometryIndex)
         {
@@ -431,7 +423,7 @@ RTXDI_LightBufferParameters PrepareLightsPass::process(nvrhi::ICommandList* comm
             }
 
             size_t instanceHash = 0;
-            nvrhi::hash_combine(instanceHash, static_cast<uint32_t>(entity));
+            nvrhi::hash_combine(instanceHash, static_cast<uint32_t>(meshProxy.entity));
             nvrhi::hash_combine(instanceHash, geometryIndex);
 
             std::shared_ptr<PTMaterial> materialPTPtr = PTMaterial::safeCast(geometry->material);
@@ -453,7 +445,7 @@ RTXDI_LightBufferParameters PrepareLightsPass::process(nvrhi::ICommandList* comm
             assert(geometryIndex < 0xfff);
 
             PrepareLightsTask task;
-            task.instanceAndGeometryIndex = (meshComp->instanceIndex << 12) | uint32_t(geometryIndex & 0xfff);
+            task.instanceAndGeometryIndex = (meshProxy.instanceIndex << 12) | uint32_t(geometryIndex & 0xfff);
             task.lightBufferOffset = lightBufferOffset;
             task.triangleCount = geometry->numIndices / 3;
             task.previousLightBufferOffset = (pOffset != m_InstanceLightBufferOffsets.end()) ? int(pOffset->second) : -1;
@@ -473,18 +465,14 @@ RTXDI_LightBufferParameters PrepareLightsPass::process(nvrhi::ICommandList* comm
 	lightBufferParams.localLightBufferRegion.firstLightIndex = 0;
 	lightBufferParams.localLightBufferRegion.numLights = lightBufferOffset;
 
-    const auto& lightEntities = m_Scene->getLightEntities();
-    auto* lightEntityWorld = m_Scene->getEntityWorld();
-
-    // sort entities: finite first (0), directional next (1), environment last (2)
-    std::vector<ecs::Entity> sortedLightEntities = lightEntities;
-    std::sort(sortedLightEntities.begin(), sortedLightEntities.end(),
-        [lightEntityWorld](ecs::Entity a, ecs::Entity b) {
-            if (!lightEntityWorld) return false;
-            const auto* ca = lightEntityWorld->world().get<caustica::scene::LightComponent>(a);
-            const auto* cb = lightEntityWorld->world().get<caustica::scene::LightComponent>(b);
-            return isInfiniteLightComponent(ca ? *ca : caustica::scene::LightComponent{})
-                 < isInfiniteLightComponent(cb ? *cb : caustica::scene::LightComponent{});
+    // sort proxies: finite first (0), directional next (1), environment last (2)
+    std::vector<const scene::LightRenderProxy*> sortedLights;
+    sortedLights.reserve(renderData.lights.size());
+    for (const scene::LightRenderProxy& light : renderData.lights)
+        sortedLights.push_back(&light);
+    std::sort(sortedLights.begin(), sortedLights.end(),
+        [](const scene::LightRenderProxy* a, const scene::LightRenderProxy* b) {
+            return lightInfinityRank(*a) < lightInfinityRank(*b);
         });
 
     uint32_t numFinitePrimLights = 0;
@@ -517,19 +505,13 @@ RTXDI_LightBufferParameters PrepareLightsPass::process(nvrhi::ICommandList* comm
         }
     }
 
-    for (ecs::Entity entity : sortedLightEntities)
+    for (const scene::LightRenderProxy* lightProxy : sortedLights)
     {
-        if (!lightEntityWorld) continue;
-        const auto* lightComp = lightEntityWorld->world().get<caustica::scene::LightComponent>(entity);
-        if (!lightComp) continue;
-        const auto* globalComp = lightEntityWorld->world().get<caustica::scene::GlobalTransformComponent>(entity);
-        if (!globalComp) continue;
-
         PolymorphicLightInfoFull polymorphicLight = {};
-        if (!ConvertLightComponent(*lightComp, globalComp->transform, polymorphicLight, enableImportanceSampledEnvironmentLight, m_EnvironmentMap.get()))
+        if (!ConvertLightProxy(*lightProxy, polymorphicLight, enableImportanceSampledEnvironmentLight, m_EnvironmentMap.get()))
             continue;
 
-        auto pOffset = m_PrimitiveLightBufferOffsets.find(entity);
+        auto pOffset = m_PrimitiveLightBufferOffsets.find(lightProxy->entity);
 
         PrepareLightsTask task;
         task.instanceAndGeometryIndex = TASK_PRIMITIVE_LIGHT_BIT | uint32_t(primitiveLightInfos.size());
@@ -537,14 +519,14 @@ RTXDI_LightBufferParameters PrepareLightsPass::process(nvrhi::ICommandList* comm
         task.triangleCount = 1;
         task.previousLightBufferOffset = (pOffset != m_PrimitiveLightBufferOffsets.end()) ? pOffset->second : -1;
 
-        m_PrimitiveLightBufferOffsets[entity] = lightBufferOffset;
+        m_PrimitiveLightBufferOffsets[lightProxy->entity] = lightBufferOffset;
 
         lightBufferOffset += task.triangleCount;
 
         tasks.push_back(task);
         primitiveLightInfos.push_back(polymorphicLight);
 
-        if (isInfiniteLightComponent(*lightComp))
+        if (lightInfinityRank(*lightProxy) != 0)
             numInfinitePrimLights++;
         else
             numFinitePrimLights++;

@@ -107,14 +107,14 @@ void caustica::render::WorldRenderer::populateRenderFrameContext(
 
 RenderFeatureContext caustica::render::WorldRenderer::makeRenderFeatureContext(RenderFrameContext& ctx)
 {
-    const bool aaReset = ctx.frame.needNewPasses || m_context.settings.ResetRealtimeCaches;
+    const bool aaReset = ctx.frame.needNewPasses || m_context.activeSettings().ResetRealtimeCaches;
 
     return RenderFeatureContext{
         .graph = ctx.graph,
         .renderer = this,
         .frame = &ctx.frame,
         .renderTargets = m_renderTargets.get(),
-        .settings = &m_context.settings,
+        .settings = &m_context.activeSettings(),
         .sampleConstants = &m_currentConstants,
         .targetFramebuffer = ctx.frame.framebuffer,
         .extractedView = &ctx.view,
@@ -124,7 +124,7 @@ RenderFeatureContext caustica::render::WorldRenderer::makeRenderFeatureContext(R
         .aaReset = aaReset,
         .commandListWasClosed = &ctx.commandListWasClosed,
         .gaussianSplatTemporalSampleIndex = &m_gaussianSplatTemporalSampleIndex,
-        .gaussianSplatTemporalReset = &m_gaussianSplatTemporalReset,
+        .gaussianSplatTemporalReset = &m_frameGaussianSplatTemporalReset,
     };
 }
 
@@ -156,7 +156,7 @@ void caustica::render::WorldRenderer::buildFrameGraphPasses(
     nvrhi::IFramebuffer* framebuffer = ctx.frame.framebuffer;
     const auto& fbinfo = framebuffer->getFramebufferInfo();
 
-    if (m_context.settings.EnableShaderDebug && m_shaderDebug)
+    if (m_context.activeSettings().EnableShaderDebug && m_shaderDebug)
     {
         m_shaderDebug->endFrameAndOutput(
             m_commandList,
@@ -178,8 +178,8 @@ void caustica::render::WorldRenderer::executeFrameRenderGraph(RenderFrameContext
     ctx.graph->compile();
 
 #ifndef NDEBUG
-    if (!m_context.settings.RealtimeMode)
-        validateReferencePathTraceGraph(*ctx.graph, m_context.settings);
+    if (!m_context.activeSettings().RealtimeMode)
+        validateReferencePathTraceGraph(*ctx.graph, m_context.activeSettings());
 #endif
 
     ctx.graph->execute(m_commandList);
@@ -207,21 +207,21 @@ void caustica::render::WorldRenderer::framePassSetup(PathTracingFrameContext& ct
 
     preRender();
 
-    const bool realtimeModeChanged = (m_lastRealtimeMode != m_context.settings.RealtimeMode);
+    const bool realtimeModeChanged = (m_lastRealtimeMode != m_context.activeSettings().RealtimeMode);
     if (realtimeModeChanged)
     {
-        m_context.settings.ResetAccumulation = true;
-        if (m_context.settings.RealtimeMode)
+        m_context.activeSettings().ResetAccumulation = true;
+        if (m_context.activeSettings().RealtimeMode)
         {
-            m_context.settings.ResetRealtimeCaches = true;
+            m_context.activeSettings().ResetRealtimeCaches = true;
             m_context.scenePasses.rayTracing.ensureStablePlanePipelines();
         }
-        m_lastRealtimeMode = m_context.settings.RealtimeMode;
+        m_lastRealtimeMode = m_context.activeSettings().RealtimeMode;
     }
 
-    if (m_lastScheduledRealtimeAA >= 0 && m_lastScheduledRealtimeAA != m_context.settings.RealtimeAA)
-        m_context.settings.ResetRealtimeCaches = true;
-    m_lastScheduledRealtimeAA = m_context.settings.RealtimeAA;
+    if (m_lastScheduledRealtimeAA >= 0 && m_lastScheduledRealtimeAA != m_context.activeSettings().RealtimeAA)
+        m_context.activeSettings().ResetRealtimeCaches = true;
+    m_lastScheduledRealtimeAA = m_context.activeSettings().RealtimeAA;
 
 #if CAUSTICA_WITH_STREAMLINE
     streamlinePreRender();
@@ -261,7 +261,7 @@ void caustica::render::WorldRenderer::framePassEnsureRenderTargets(PathTracingFr
 
 void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameContext& ctx)
 {
-    caustica::syncEnvMapSceneParams(m_context.settings, m_context.scenePasses.lighting.envMapSceneParams(), c_envMapRadianceScale);
+    caustica::syncEnvMapSceneParams(m_context.activeSettings(), m_context.scenePasses.lighting.envMapSceneParams(), c_envMapRadianceScale);
 
     if (m_context.scenePasses.rayTracing.consumeShaderReloadRequest())
     {
@@ -269,13 +269,13 @@ void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameCont
         ctx.needNewPasses = true;
     }
 
-    if (m_context.settings.NRDModeChanged)
+    if (m_context.activeSettings().NRDModeChanged)
     {
         ctx.needNewPasses = true;
         for (int i = 0; i < std::size(m_nrd); i++)
             m_nrd[i] = nullptr;
     }
-    if (!m_context.settings.actualUseStandaloneDenoiser())
+    if (!m_context.activeSettings().actualUseStandaloneDenoiser())
     {
         for (int i = 0; i < std::size(m_nrd); i++)
             m_nrd[i] = nullptr;
@@ -312,9 +312,9 @@ void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameCont
     m_context.scenePasses.rayTracing.recreateAccelStructs(m_commandList);
     m_commandList = device()->createCommandList();
 
-    if (m_context.settings.actualUseRTXDIPasses() && m_rtxdiPass == nullptr)
+    if (m_context.activeSettings().actualUseRTXDIPasses() && m_rtxdiPass == nullptr)
         ctx.needNewPasses = true;
-    if (!m_context.settings.actualUseRTXDIPasses())
+    if (!m_context.activeSettings().actualUseRTXDIPasses())
         m_rtxdiPass = nullptr;
 
     if (ctx.needNewPasses)
@@ -403,20 +403,20 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
             m_context.camera.camera().getDir(),
             m_context.camera.camera().getUp(),
             fovY, m_context.camera.zNear(), 1e7f,
-            m_context.settings.CameraFocalDistance, m_context.settings.CameraAperture, jitter);
+            m_context.activeSettings().CameraFocalDistance, m_context.activeSettings().CameraAperture, jitter);
     }
 
     if ((ctx.needNewPasses || ctx.needNewBindings || m_bindingSet == nullptr) && m_shaderDebug)
         m_shaderDebug->createRenderPasses(framebuffer, m_renderTargets->depth);
 
-    if (m_context.settings.EnableShaderDebug && m_shaderDebug)
+    if (m_context.activeSettings().EnableShaderDebug && m_shaderDebug)
     {
         dm::float4x4 viewProj = m_context.camera.view()->getViewProjectionMatrix();
         m_shaderDebug->beginFrame(m_commandList, viewProj);
     }
 
     UpdateSceneGeometryParams geoParams{
-        m_context.settings,
+        m_context.activeSettings(),
         m_context.scenePasses.rayTracing.accelerationStructRebuildRequested(),
         m_context.sceneManager.getScene(),
         m_commandList,
@@ -483,7 +483,7 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
 void caustica::render::WorldRenderer::framePassPathTracePrepare(PathTracingFrameContext& ctx)
 {
     if (m_toneMappingPass != nullptr)
-        m_toneMappingPass->preRender(m_context.settings.ToneMappingParams);
+        m_toneMappingPass->preRender(m_context.activeSettings().ToneMappingParams);
     preUpdatePathTracing(ctx.needNewPasses, m_commandList);
 
     abortIfSubmitFailed(ctx, "preUpdatePathTracing");
@@ -501,14 +501,14 @@ void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext
         return;
     }
 
-    if (m_toneMappingPass != nullptr && m_context.settings.EnableToneMapping)
-        m_toneMappingPass->preRender(m_context.settings.ToneMappingParams);
+    if (m_toneMappingPass != nullptr && m_context.activeSettings().EnableToneMapping)
+        m_toneMappingPass->preRender(m_context.activeSettings().ToneMappingParams);
 
     updatePathTracerConstants(constants.ptConsts, ctx.cameraData);
     constants.MaterialCount = m_context.scenePasses.lighting.materials()->getMaterialDataCount();
     fillGaussianSplatShadowConstants(
         constants,
-        m_context.settings,
+        m_context.activeSettings(),
         getPrimaryGaussianSplatBinding(m_context.scenePasses.gaussianSplats),
         uint32_t(m_frameIndex & 0xffffffffu));
 
@@ -523,30 +523,30 @@ void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext
     constants.previousView = FromPlanarViewConstants(previousView);
 
     constants.debug = {};
-    constants.debug.pick = m_context.runtimeState.Picking.hasActivePickRequest() || m_context.settings.ContinuousDebugFeedback;
-    constants.debug.pickX = (constants.debug.pick) ? (m_context.settings.DebugPixel.x) : (-1);
-    constants.debug.pickY = (constants.debug.pick) ? (m_context.settings.DebugPixel.y) : (-1);
-    constants.debug.debugLineScale = (m_context.settings.ShowDebugLines) ? (m_context.settings.DebugLineScale) : (0.0f);
-    constants.debug.showWireframe = m_context.settings.ShowWireframe;
-    constants.debug.debugViewType = (int)m_context.settings.DebugView;
-    constants.debug.debugViewStablePlaneIndex = (m_context.settings.StablePlanesActiveCount == 1) ? (0) : (m_context.settings.DebugViewStablePlaneIndex);
+    constants.debug.pick = m_context.runtimeState.Picking.hasActivePickRequest() || m_context.activeSettings().ContinuousDebugFeedback;
+    constants.debug.pickX = (constants.debug.pick) ? (m_context.activeSettings().DebugPixel.x) : (-1);
+    constants.debug.pickY = (constants.debug.pick) ? (m_context.activeSettings().DebugPixel.y) : (-1);
+    constants.debug.debugLineScale = (m_context.activeSettings().ShowDebugLines) ? (m_context.activeSettings().DebugLineScale) : (0.0f);
+    constants.debug.showWireframe = m_context.activeSettings().ShowWireframe;
+    constants.debug.debugViewType = (int)m_context.activeSettings().DebugView;
+    constants.debug.debugViewStablePlaneIndex = (m_context.activeSettings().StablePlanesActiveCount == 1) ? (0) : (m_context.activeSettings().DebugViewStablePlaneIndex);
 #if ENABLE_DEBUG_DELTA_TREE_VIZUALISATION
-    constants.debug.exploreDeltaTree = (m_context.settings.DebugExploreDeltaTree && constants.debug.pick) ? 1 : 0;
+    constants.debug.exploreDeltaTree = (m_context.activeSettings().DebugExploreDeltaTree && constants.debug.pick) ? 1 : 0;
 #else
     constants.debug.exploreDeltaTree = false;
 #endif
     constants.debug.imageWidth = constants.ptConsts.imageWidth;
     constants.debug.imageHeight = constants.ptConsts.imageHeight;
-    constants.debug.mouseX = m_context.settings.MousePos.x;
-    constants.debug.mouseY = m_context.settings.MousePos.y;
+    constants.debug.mouseX = m_context.activeSettings().MousePos.x;
+    constants.debug.mouseY = m_context.activeSettings().MousePos.y;
     constants.debug.cameraPosW = constants.ptConsts.camera.PosW;
     constants.debug._padding0 = 0;
 
     constants.denoisingHitParamConsts = {
-        m_context.settings.ReblurSettings.hitDistanceParameters.A,
-        m_context.settings.ReblurSettings.hitDistanceParameters.B,
-        m_context.settings.ReblurSettings.hitDistanceParameters.C,
-        m_context.settings.ReblurSettings.hitDistanceParameters.D
+        m_context.activeSettings().ReblurSettings.hitDistanceParameters.A,
+        m_context.activeSettings().ReblurSettings.hitDistanceParameters.B,
+        m_context.activeSettings().ReblurSettings.hitDistanceParameters.C,
+        m_context.activeSettings().ReblurSettings.hitDistanceParameters.D
     };
 
     updateLighting(m_commandList);
@@ -567,7 +567,7 @@ void caustica::render::WorldRenderer::framePassDenoiseAndAA(PathTracingFrameCont
 
     // Copy, TAA, DLSS, accumulation, and Gaussian splats run in the frame graph after path trace and NRD.
     applyReferenceOIDN();
-    if (m_context.settings.ReferenceOIDNDenoiser)
+    if (m_context.activeSettings().ReferenceOIDNDenoiser)
         m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
 
     abortIfSubmitFailed(ctx, "denoiseAndAA");
@@ -582,7 +582,7 @@ void caustica::render::WorldRenderer::framePassDebugOverlay(PathTracingFrameCont
     nvrhi::IFramebuffer* framebuffer = ctx.framebuffer;
     const auto& fbinfo = framebuffer->getFramebufferInfo();
 
-    if (m_context.settings.ShowDebugLines == true)
+    if (m_context.activeSettings().ShowDebugLines == true)
     {
         m_commandList->beginMarker("Debug Lines");
 
@@ -623,7 +623,7 @@ void caustica::render::WorldRenderer::framePassDebugOverlay(PathTracingFrameCont
     }
     m_cpuSideDebugLines.clear();
 
-    if (m_context.settings.ContinuousDebugFeedback || m_context.runtimeState.Picking.MaterialRequested)
+    if (m_context.activeSettings().ContinuousDebugFeedback || m_context.runtimeState.Picking.MaterialRequested)
     {
         m_commandList->copyBuffer(m_feedback_Buffer_Cpu, 0, m_feedback_Buffer_Gpu, 0, sizeof(DebugFeedbackStruct) * 1);
         m_commandList->copyBuffer(m_debugLineBufferDisplay, 0, m_debugLineBufferCapture, 0, sizeof(DebugLineStruct) * MAX_DEBUG_LINES);
@@ -649,7 +649,7 @@ void caustica::render::WorldRenderer::framePassFinalize(PathTracingFrameContext&
         }
     }
 
-    if (m_context.settings.ContinuousDebugFeedback || m_context.runtimeState.Picking.hasActivePickRequest())
+    if (m_context.activeSettings().ContinuousDebugFeedback || m_context.runtimeState.Picking.hasActivePickRequest())
     {
         device()->waitForIdle();
         void* pData = device()->mapBuffer(m_feedback_Buffer_Cpu, nvrhi::CpuAccessMode::Read);
@@ -667,7 +667,7 @@ void caustica::render::WorldRenderer::framePassFinalize(PathTracingFrameContext&
         m_temporalAntiAliasingPass->advanceFrame();
 
     m_context.camera.swapViews();
-    m_context.gpuDevice.setVsyncEnabled(m_context.settings.actualEnableVsync());
+    m_context.gpuDevice.setVsyncEnabled(m_context.activeSettings().actualEnableVsync());
 
     postUpdatePathTracing();
 }

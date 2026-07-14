@@ -17,6 +17,7 @@
 #include <render/passes/gaussian/GaussianSplatEmissionProxy.h>
 
 #include <filesystem>
+#include <unordered_map>
 
 using namespace caustica::math;
 
@@ -33,8 +34,8 @@ namespace caustica
 class ShaderDebug;
 #include <scene/Scene.h>
 
-// this is a fallback for when the engine light source can't be modified to add tracking (otherwise, see 'struct LightSamplerLink')
-// #define HASH_LOOKUP_BASED_HISTORIC_LIGHT_SOURCE_MATCHING
+// Render-thread light history is keyed by entity / instance hash.
+// Do not mutate LightComponent::lightLink or MeshInstanceComponent::perGeometryLightSamplerLinks.
 
 // This prepares all scene lighting (including environment map already partially processed by EnvMapProcessor) for sampling in path tracing.
 // Supported sampling approaches are Uniform, Power and NEE-AT. All NEE-AT baking logic is included here.
@@ -209,10 +210,10 @@ private:
     uint                                m_historicTotalLightCount;
 
     // NOTE: there's no mechanism to erase stale historic indices; it would be ideal to double-buffer both of these and each frame populate the new one afresh, while clearing the old one; that way we would never have leftover historic entries and reduce chance of hash collisions
-#ifdef HASH_LOOKUP_BASED_HISTORIC_LIGHT_SOURCE_MATCHING
     std::unordered_map<size_t, uint32_t> m_historyRemapEmissiveLightBlockOffsets;
     std::unordered_map<size_t, uint32_t> m_historyRemapAnalyticLightIndices;
-#endif
+    // Same-frame entity → analytic light index (for mesh analytic-light proxy resolution).
+    std::unordered_map<uint32_t, uint32_t> m_currentFrameAnalyticLightIndex;
 
     float2                          m_localJitterF                      = {0, 0};
     uint2                           m_localJitter                       = {0, 0};

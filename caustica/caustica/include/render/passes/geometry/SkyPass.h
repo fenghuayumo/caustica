@@ -13,7 +13,6 @@ class RenderDevice;
 namespace caustica
 {
     class ShaderFactory;
-    class ShadowMap;
     class FramebufferFactory;
     class ICompositeView;
     class DirectionalLight;

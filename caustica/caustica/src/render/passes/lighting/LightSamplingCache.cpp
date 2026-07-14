@@ -22,7 +22,7 @@
 #include <render/core/ScopedPerfMarker.h>
 #include <render/core/TextureUtils.h>
 #include <scene/Scene.h>
-#include <scene/SceneEcs.h>
+#include <scene/SceneRenderData.h>
 #include <scene/SceneLightAccess.h>
 
 #include <cmath>
@@ -75,10 +75,9 @@ void LightSamplingCache::sceneReloaded()
     memset( &m_lastReadback, 0, sizeof(m_lastReadback) ); 
 
     // clear history
-#ifdef HASH_LOOKUP_BASED_HISTORIC_LIGHT_SOURCE_MATCHING
     m_historyRemapAnalyticLightIndices.clear();
     m_historyRemapEmissiveLightBlockOffsets.clear();
-#endif
+    m_currentFrameAnalyticLightIndex.clear();
     m_historicTotalLightCount = 0;
     m_lastFrameIndex = -1;
     memset(&m_currentCtrlBuff, 0, sizeof(m_currentCtrlBuff));
@@ -455,27 +454,24 @@ static uint16_t fp32ToFp16(float v)
     return (uint16_t)(sign >> 16 | body >> 13) & 0xFFFF;
 }
 
-static PolymorphicLightInfoFull ConvertLight(
-    const caustica::scene::LightComponent* comp,
-    const dm::daffine3* globalTransform)
+static PolymorphicLightInfoFull ConvertLightProxy(
+    const caustica::scene::LightRenderProxy& proxy)
 {
     PolymorphicLightInfo polymorphic; memset(&polymorphic, 0, sizeof(polymorphic));
     PolymorphicLightInfoEx polymorphicEx; memset(&polymorphicEx, 0, sizeof(polymorphicEx));
-    if (!comp || !globalTransform)
-        return PolymorphicLightInfoFull::make(polymorphic, polymorphicEx);
 
-    const float3 lightPos = globalTransform ? float3(caustica::scene::getLightPosition(*globalTransform)) : float3(0.f);
-    const float3 lightDir = globalTransform ? float3(normalize(caustica::scene::getLightDirection(*globalTransform))) : float3(0.f, 0.f, -1.f);
+    const float3 lightPos = float3(caustica::scene::getLightPosition(proxy.transform));
+    const float3 lightDir = float3(normalize(caustica::scene::getLightDirection(proxy.transform)));
 
-    switch (caustica::scene::getLightType(*comp))
+    switch (caustica::scene::getLightType(proxy))
     {
     case LightType_Spot:
     {
-        const auto& spot = std::get<caustica::scene::SpotLightData>(comp->data);
+        const auto& spot = std::get<caustica::scene::SpotLightData>(proxy.data);
         if (spot.radius == 0.f)
         {
             assert(false); // not tested with radius == 0
-            float3 flux = comp->color * spot.intensity;
+            float3 flux = proxy.color * spot.intensity;
             polymorphic.ColorTypeAndFlags = (uint32_t)PolymorphicLightType::kPoint << kPolymorphicLightTypeShift | ((spot.outerAngle < 0) ? kPolymorphicLightShapingUseMinFalloff : 0);
             packLightColor(flux, polymorphic);
             polymorphic.Center = lightPos;
@@ -486,7 +482,7 @@ static PolymorphicLightInfoFull ConvertLight(
         else
         {
             float projectedArea = dm::PI_f * (spot.radius * spot.radius);
-            float3 radiance = comp->color * spot.intensity / projectedArea;
+            float3 radiance = proxy.color * spot.intensity / projectedArea;
             float softness = saturate(1.f - spot.innerAngle / abs(spot.outerAngle));
             polymorphic.ColorTypeAndFlags = (uint32_t)PolymorphicLightType::kSphere << kPolymorphicLightTypeShift | ((spot.outerAngle < 0) ? kPolymorphicLightShapingUseMinFalloff : 0);
             polymorphic.ColorTypeAndFlags |= kPolymorphicLightShapingEnableBit;
@@ -505,10 +501,10 @@ static PolymorphicLightInfoFull ConvertLight(
     } break;
     case LightType_Point:
     {
-        const auto& point = std::get<caustica::scene::PointLightData>(comp->data);
+        const auto& point = std::get<caustica::scene::PointLightData>(proxy.data);
         if (point.radius == 0.f)
         {
-            float3 flux = comp->color * point.intensity;
+            float3 flux = proxy.color * point.intensity;
             polymorphic.ColorTypeAndFlags = (uint32_t)PolymorphicLightType::kPoint << kPolymorphicLightTypeShift;
             packLightColor(flux, polymorphic);
             polymorphic.Center = lightPos;
@@ -517,7 +513,7 @@ static PolymorphicLightInfoFull ConvertLight(
         else
         {
             float projectedArea = dm::PI_f * (point.radius * point.radius);
-            float3 radiance = comp->color * point.intensity / projectedArea;
+            float3 radiance = proxy.color * point.intensity / projectedArea;
             polymorphic.ColorTypeAndFlags = (uint32_t)PolymorphicLightType::kSphere << kPolymorphicLightTypeShift;
             packLightColor(radiance, polymorphic);
             polymorphic.Center = lightPos;
@@ -598,11 +594,11 @@ bool LightSamplingCache::collectEnvmapLightPlaceholders(const UpdateSettings & s
 // #endif
 bool LightSamplingCache::collectAnalyticLightsCPU(const UpdateSettings & settings, const std::shared_ptr<caustica::Scene> & scene, LightingControlData & ctrlBuff, std::vector<PolymorphicLightInfo> & outLightBuffer, std::vector<PolymorphicLightInfoEx> & outLightExBuffer, std::vector<uint> & outLightHistoryRemapCurrentToPastBuffer, std::vector<uint> & outLightHistoryRemapPastToCurrent)
 {
+    (void)settings;
     bool allGood = true;
-    const auto& lightEntities = scene->getLightEntities();
-    auto* entityWorld = scene->getEntityWorld();
+    m_currentFrameAnalyticLightIndex.clear();
 
-    for (ecs::Entity entity : lightEntities)
+    for (const scene::LightRenderProxy& lightProxy : scene->getRenderData().lights)
     {
         if (outLightBuffer.size() >= CAUSTICA_LIGHTING_MAX_LIGHTS)
         {
@@ -610,36 +606,20 @@ bool LightSamplingCache::collectAnalyticLightsCPU(const UpdateSettings & setting
             break;
         }
 
-        if (!entityWorld) continue;
-        auto* lightComp = entityWorld->world().get<caustica::scene::LightComponent>(entity);
-        if (!lightComp) continue;
-
-        const int lightType = caustica::scene::getLightType(*lightComp);
+        const int lightType = caustica::scene::getLightType(lightProxy);
         switch (lightType)
         {
         case LightType_Spot:
         case LightType_Point:
         {
-            LightSamplerLink& pastLink = lightComp->lightLink;
-            if (pastLink.IndexOrBase != -1 && pastLink.LastUpdateTag != m_lastFrameIndex)
-                pastLink.IndexOrBase = -1;
-            pastLink.LastUpdateTag = settings.FrameIndex;
-
-            const auto* globalComp = entityWorld->world().get<caustica::scene::GlobalTransformComponent>(entity);
-            if (!globalComp) break;
-
-            PolymorphicLightInfoFull lightPackedFull = ConvertLight(
-                static_cast<const caustica::scene::LightComponent*>(lightComp),
-                &globalComp->transform);
+            PolymorphicLightInfoFull lightPackedFull = ConvertLightProxy(lightProxy);
             outLightBuffer.push_back( lightPackedFull.Base );
             outLightExBuffer.push_back( lightPackedFull.Extended );
 
-            // Use entity id as stable unique identifier
-            const uint32_t entityId = uint32_t(entity);
+            const uint32_t entityId = uint32_t(lightProxy.entity);
             outLightExBuffer.back().UniqueID = Hash32Combine(entityId, 0u);
 
-#ifdef HASH_LOOKUP_BASED_HISTORIC_LIGHT_SOURCE_MATCHING
-            size_t lightHash = size_t(entity);
+            size_t lightHash = size_t(entityId);
             uint historicIndex = CAUSTICA_INVALID_LIGHT_INDEX;
             auto entry = m_historyRemapAnalyticLightIndices.find(lightHash);
             if( entry != m_historyRemapAnalyticLightIndices.end() )
@@ -649,12 +629,9 @@ bool LightSamplingCache::collectAnalyticLightsCPU(const UpdateSettings & setting
             }
             else
                 m_historyRemapAnalyticLightIndices.insert( std::make_pair(lightHash, ctrlBuff.TotalLightCount) );
-            assert(historicIndex == pastLink.IndexOrBase);
-#else
-            uint historicIndex = pastLink.IndexOrBase;
-#endif
+
             outLightHistoryRemapCurrentToPastBuffer.push_back(historicIndex);
-            pastLink.IndexOrBase = ctrlBuff.TotalLightCount;
+            m_currentFrameAnalyticLightIndex[entityId] = ctrlBuff.TotalLightCount;
 
             ctrlBuff.AnalyticLightCount++;
             ctrlBuff.TotalLightCount++;
@@ -722,39 +699,25 @@ bool LightSamplingCache::collectGaussianSplatEmissionProxies(
 // #endif
 bool LightSamplingCache::processEmissiveGeometry( const UpdateSettings & settings, const std::shared_ptr<caustica::Scene> & scene, std::vector<SubInstanceData> & subInstanceData, LightingControlData & ctrlBuff, std::vector<struct EmissiveTrianglesProcTask> & tasks )
 {
+    (void)settings;
     bool allGood = true;
 
     tasks.clear();
 
     assert( ctrlBuff.TotalLightCount == (ctrlBuff.AnalyticLightCount+ctrlBuff.EnvmapQuadNodeCount) );
 
-    auto* entityWorld = scene->getEntityWorld();
-    const auto& instances = scene->getMeshInstances();
-    for (const ecs::Entity entity : instances)
+    for (const scene::MeshInstanceRenderProxy& meshProxy : scene->getRenderData().meshInstances)
     {
-        if (!entityWorld)
+        if (!meshProxy.mesh)
             continue;
 
-        auto& world = entityWorld->world();
-        if (!world.isAlive(entity))
+        const auto& mesh = meshProxy.meshShared;
+        if (!mesh)
             continue;
 
-        auto* meshComp = world.get<scene::MeshInstanceComponent>(entity);
-        if (!meshComp || !meshComp->mesh)
+        uint32_t firstGeometryInstanceIndex = meshProxy.geometryInstanceIndex;
+        if (meshProxy.geometryInstanceIndex < 0)
             continue;
-
-        std::vector<LightSamplerLink>& perGeometryLightSamplerLinks = meshComp->perGeometryLightSamplerLinks;
-        const auto& mesh = meshComp->mesh;
-
-        uint32_t firstGeometryInstanceIndex = meshComp->geometryInstanceIndex;
-        if (meshComp->geometryInstanceIndex < 0)
-            continue;
-
-        if (perGeometryLightSamplerLinks.size() != mesh->geometries.size())
-        {
-            assert(false);
-            continue;
-        }
 
         for (size_t geometryIndex = 0; geometryIndex < mesh->geometries.size(); ++geometryIndex)
         {
@@ -766,13 +729,8 @@ bool LightSamplingCache::processEmissiveGeometry( const UpdateSettings & setting
                 continue;
             }
 
-            LightSamplerLink & pastLink = perGeometryLightSamplerLinks[geometryIndex];
-            if (pastLink.IndexOrBase != -1 && pastLink.LastUpdateTag != m_lastFrameIndex ) // if not used specifically during last frame, 
-                pastLink.IndexOrBase = -1;
-            pastLink.LastUpdateTag = settings.FrameIndex;
-                
             size_t instanceHash = 0;
-            nvrhi::hash_combine(instanceHash, static_cast<uint32_t>(entity));
+            nvrhi::hash_combine(instanceHash, static_cast<uint32_t>(meshProxy.entity));
             nvrhi::hash_combine(instanceHash, geometryIndex);
 
             std::shared_ptr<PTMaterial> materialPTPtr = PTMaterial::safeCast(geometry->material);
@@ -780,52 +738,32 @@ bool LightSamplingCache::processEmissiveGeometry( const UpdateSettings & setting
                 continue;
             PTMaterial & materialPT = *materialPTPtr;
 
-            // this has nothing to do with emissive materials, it's instead a mechanism used to evaluate specific analytic light after hitting this mesh
+            // Analytic-light proxy binding after hitting this mesh (not emissive geometry).
             uint analyticProxyLightIndex = CAUSTICA_INVALID_LIGHT_INDEX;
             if (materialPT.enableAsAnalyticLightProxy)
             {
-                // this is the first way to set proxy lights
-                const caustica::scene::LightComponent* parentLightComp = nullptr;
-                if (ecs::isValid(entity))
+                auto resolveAnalyticIndex = [&](ecs::Entity lightEntity) -> uint {
+                    if (!ecs::isValid(lightEntity))
+                        return CAUSTICA_INVALID_LIGHT_INDEX;
+                    const auto it = m_currentFrameAnalyticLightIndex.find(uint32_t(lightEntity));
+                    if (it == m_currentFrameAnalyticLightIndex.end())
+                        return CAUSTICA_INVALID_LIGHT_INDEX;
+                    return it->second;
+                };
+
+                if (ecs::isValid(meshProxy.parentLightEntity))
                 {
-                    if (const auto* parentComp = world.get<scene::ParentComponent>(entity);
-                        parentComp && ecs::isValid(parentComp->parent))
+                    if (const scene::LightRenderProxy* parentLight =
+                            scene->getRenderData().findLight(meshProxy.parentLightEntity))
                     {
-                        parentLightComp = world.get<scene::LightComponent>(parentComp->parent);
+                        const int lType = caustica::scene::getLightType(*parentLight);
+                        if (lType == LightType_Spot || lType == LightType_Point)
+                            analyticProxyLightIndex = resolveAnalyticIndex(meshProxy.parentLightEntity);
                     }
                 }
 
-                if (parentLightComp)
-                {
-                    const int lType = caustica::scene::getLightType(*parentLightComp);
-                    if (lType == LightType_Spot || lType == LightType_Point)
-                    {
-#ifdef HASH_LOOKUP_BASED_HISTORIC_LIGHT_SOURCE_MATCHING
-                        // Use entity hash for historic matching
-                        size_t lightHash = size_t(parentLightComp - (caustica::scene::LightComponent*)nullptr); // use pointer as stable id
-                        auto entry = m_historyRemapAnalyticLightIndices.find(lightHash);
-                        if (entry != m_historyRemapAnalyticLightIndices.end())
-                            analyticProxyLightIndex = entry->second;
-                        assert(parentLightComp->lightLink.LastUpdateTag == settings.FrameIndex && parentLightComp->lightLink.IndexOrBase == analyticProxyLightIndex);
-#else
-                        if (parentLightComp->lightLink.LastUpdateTag == settings.FrameIndex)
-                            analyticProxyLightIndex = parentLightComp->lightLink.IndexOrBase;
-#endif
-                    }
-                }
-
-                // this is the second way to set proxy lights - via light marking the nodes
                 if (analyticProxyLightIndex == CAUSTICA_INVALID_LIGHT_INDEX)
-                {
-                    if (ecs::isValid(meshComp->proxiedAnalyticLight))
-                    {
-                        if (const auto* lc = world.get<scene::LightComponent>(meshComp->proxiedAnalyticLight))
-                        {
-                            if (lc->lightLink.LastUpdateTag == settings.FrameIndex)
-                                analyticProxyLightIndex = lc->lightLink.IndexOrBase;
-                        }
-                    }
-                }
+                    analyticProxyLightIndex = resolveAnalyticIndex(meshProxy.proxiedAnalyticLight);
             }
 
             // now set the convertedLightIndex into subInstanceData - if CAUSTICA_INVALID_LIGHT_INDEX that's fine, nothing happens
@@ -837,15 +775,11 @@ bool LightSamplingCache::processEmissiveGeometry( const UpdateSettings & setting
             if (!materialPT.isEmissive() || materialPT.skipRender || overflow)
             {
                 // remove the info about this instance, just in case it was emissive and now it's not
-#ifdef HASH_LOOKUP_BASED_HISTORIC_LIGHT_SOURCE_MATCHING
                 m_historyRemapEmissiveLightBlockOffsets.erase(instanceHash);
-#endif
-                pastLink.IndexOrBase = -1;
                 subInstanceData[subInstanceIndex].EmissiveLightMappingOffset = 0xFFFFFFFF;
                 continue;
             }
 
-#ifdef HASH_LOOKUP_BASED_HISTORIC_LIGHT_SOURCE_MATCHING
             uint historicBufferOffset = CAUSTICA_INVALID_LIGHT_INDEX;
             auto entry = m_historyRemapEmissiveLightBlockOffsets.find(instanceHash);
             if (entry != m_historyRemapEmissiveLightBlockOffsets.end())
@@ -856,11 +790,6 @@ bool LightSamplingCache::processEmissiveGeometry( const UpdateSettings & setting
             }
             else
                 m_historyRemapEmissiveLightBlockOffsets.insert(std::make_pair(instanceHash, ctrlBuff.TotalLightCount));
-            assert( historicBufferOffset == pastLink.IndexOrBase );
-#else
-            uint historicBufferOffset = pastLink.IndexOrBase;
-#endif
-            pastLink.IndexOrBase = ctrlBuff.TotalLightCount;
 
             subInstanceData[subInstanceIndex].EmissiveLightMappingOffset = ctrlBuff.TotalLightCount;
 
@@ -874,7 +803,7 @@ bool LightSamplingCache::processEmissiveGeometry( const UpdateSettings & setting
             {
                 EmissiveTrianglesProcTask task;
 
-                task.InstanceIndex      = meshComp->instanceIndex;
+                task.InstanceIndex      = meshProxy.instanceIndex;
                 task.GeometryIndex      = (uint)geometryIndex;
                 task.TriangleIndexFrom  = triangleFrom;
                 int taskTriangleCount   = std::min( remainingTriangles, LLB_MAX_TRIANGLES_PER_TASK );

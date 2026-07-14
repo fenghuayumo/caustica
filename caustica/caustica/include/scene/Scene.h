@@ -126,7 +126,9 @@ namespace caustica
         void publishRenderSnapshot(uint32_t frameIndex);
 
         // Main/logic thread: extract and publish (ECS refresh runs in App PostUpdate).
-        void extractAndPublishRenderSnapshot(uint32_t frameIndex);
+        // Optional session inputs fill CameraSnapshot / RenderSettingsSnapshot in the same slot.
+        void extractAndPublishRenderSnapshot(
+            uint32_t frameIndex, const scene::SessionRenderExtractInputs* session = nullptr);
 
         // Returns true when extractAndPublishRenderSnapshot already ran for `frameIndex`.
         [[nodiscard]] bool wasRenderSnapshotExtractedOnLogicThread(uint32_t frameIndex) const;

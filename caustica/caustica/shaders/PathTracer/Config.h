@@ -76,6 +76,7 @@
 #define  kMaxRayTravel                      (1e15f)         // one AU is ~1.5e11; 1e15 is high enough to use as environment map distance to avoid parallax but low enough to avoid precision issues with various packing and etc.
 
 #define  cStablePlaneCount                  (3u)            // more than 3 is not supported although 4 could be supported if needed (with some reshuffling)
+#define  cStablePlaneMaxVertexIndex         (15u)           // enough for denoising; keeps stableBranchID in 32 bits
 
 #define  NUM_COMPUTE_THREADS_PER_DIM        8
 

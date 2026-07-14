@@ -1,11 +1,10 @@
 #include <render/passes/geometry/ForwardShadingPass.h>
 #include <render/core/FramebufferFactory.h>
 #include <assets/loader/ShaderFactory.h>
-#include <render/core/ShadowMap.h>
 #include <scene/Scene.h>
 #include <scene/SceneTypes.h>
 #include <scene/SceneObjects.h>
-#include <scene/SceneEcs.h>
+#include <scene/SceneRenderData.h>
 #include <scene/SceneLightAccess.h>
 #include <render/core/RenderDevice.h>
 #include <render/core/MaterialBindingCache.h>
@@ -334,20 +333,7 @@ void ForwardShadingPass::prepareLights(
 {
     nvrhi::ITexture* shadowMapTexture = nullptr;
     int2 shadowMapTextureSize = 0;
-    const auto* ew = scene.getEntityWorld();
-    if (ew)
-    {
-        for (ecs::Entity entity : scene.getLightEntities())
-        {
-            const auto* lightComp = ew->world().get<scene::LightComponent>(entity);
-            if (lightComp && lightComp->shadowMap)
-            {
-                shadowMapTexture = lightComp->shadowMap->getTexture();
-                shadowMapTextureSize = lightComp->shadowMap->getTextureSize();
-                break;
-            }
-        }
-    }
+    const auto& renderLights = scene.getRenderData().lights;
 
     nvrhi::ITexture* lightProbeDiffuse = nullptr;
     nvrhi::ITexture* lightProbeSpecular = nullptr;
@@ -392,46 +378,13 @@ void ForwardShadingPass::prepareLights(
     constants.shadowMapTextureSize = float2(shadowMapTextureSize);
     constants.shadowMapTextureSizeInv = 1.f / constants.shadowMapTextureSize;
 
-    int numShadows = 0;
-
-    if (ew)
     {
-        const auto& lightEntities = scene.getLightEntities();
-        const int maxLights = std::min(static_cast<int>(lightEntities.size()), FORWARD_MAX_LIGHTS);
+        const int maxLights = std::min(static_cast<int>(renderLights.size()), FORWARD_MAX_LIGHTS);
         for (int nLight = 0; nLight < maxLights; nLight++)
         {
-            ecs::Entity entity = lightEntities[nLight];
-            const auto* lightComp = ew->world().get<scene::LightComponent>(entity);
-            if (!lightComp) continue;
-            const auto* globalComp = ew->world().get<scene::GlobalTransformComponent>(entity);
-            if (!globalComp) continue;
-
+            const scene::LightRenderProxy& lightProxy = renderLights[nLight];
             LightConstants& lightConstants = constants.lights[constants.numLights];
-            scene::fillLightConstants(*lightComp, globalComp->transform, lightConstants);
-
-            if (lightComp->shadowMap)
-            {
-                for (uint32_t cascade = 0; cascade < lightComp->shadowMap->getNumberOfCascades(); cascade++)
-                {
-                    if (numShadows < FORWARD_MAX_SHADOWS)
-                    {
-                        lightComp->shadowMap->getCascade(cascade)->fillShadowConstants(constants.shadows[numShadows]);
-                        lightConstants.shadowCascades[cascade] = numShadows;
-                        ++numShadows;
-                    }
-                }
-
-                for (uint32_t perObjectShadow = 0; perObjectShadow < lightComp->shadowMap->getNumberOfPerObjectShadows(); perObjectShadow++)
-                {
-                    if (numShadows < FORWARD_MAX_SHADOWS)
-                    {
-                        lightComp->shadowMap->getPerObjectShadow(perObjectShadow)->fillShadowConstants(constants.shadows[numShadows]);
-                        lightConstants.perObjectShadows[perObjectShadow] = numShadows;
-                        ++numShadows;
-                    }
-                }
-            }
-
+            scene::fillLightConstants(lightProxy, lightConstants);
             ++constants.numLights;
         }
     }

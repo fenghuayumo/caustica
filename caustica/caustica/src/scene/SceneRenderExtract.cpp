@@ -12,11 +12,26 @@ void SceneRenderData::clear()
 {
     meshInstances.clear();
     skinnedMeshes.clear();
+    lights.clear();
+    camera = {};
+    renderSettings = {};
     meshInstanceEntities.clear();
     skinnedMeshInstanceEntities.clear();
     lightEntities.clear();
     cameraEntities.clear();
     animationEntities.clear();
+}
+
+const LightRenderProxy* SceneRenderData::findLight(ecs::Entity entity) const
+{
+    if (!ecs::isValid(entity))
+        return nullptr;
+    for (const LightRenderProxy& light : lights)
+    {
+        if (light.entity == entity)
+            return &light;
+    }
+    return nullptr;
 }
 
 void extractSceneRenderData(SceneEntityWorld& entityWorld, SceneRenderData& out, uint32_t frameIndex)
@@ -57,6 +72,14 @@ void extractSceneRenderData(SceneEntityWorld& entityWorld, SceneRenderData& out,
         proxy.previousTransformFloat = ref.global->previousTransformFloat;
         proxy.globalBounds = ref.bounds->globalBounds;
         proxy.leafContent = ref.content->leafContent;
+        proxy.proxiedAnalyticLight = ref.meshComp->proxiedAnalyticLight;
+
+        if (const auto* parent = world.get<ParentComponent>(ref.entity);
+            parent && ecs::isValid(parent->parent) && world.has<LightComponent>(parent->parent))
+        {
+            proxy.parentLightEntity = parent->parent;
+        }
+
         out.meshInstances.push_back(std::move(proxy));
         out.meshInstanceEntities.push_back(ref.entity);
     }
@@ -128,9 +151,18 @@ void extractSceneRenderData(SceneEntityWorld& entityWorld, SceneRenderData& out,
             out.skinnedMeshInstanceEntities.push_back(entity);
         });
 
-    world.each<LightComponent>([&](ecs::Entity entity, const LightComponent&) {
-        out.lightEntities.push_back(entity);
-    });
+    world.each<LightComponent, GlobalTransformComponent>(
+        [&](ecs::Entity entity, const LightComponent& light, const GlobalTransformComponent& global)
+        {
+            LightRenderProxy proxy;
+            proxy.entity = entity;
+            proxy.color = light.color;
+            proxy.proxies = light.proxies;
+            proxy.data = light.data;
+            proxy.transform = global.transform;
+            out.lights.push_back(std::move(proxy));
+            out.lightEntities.push_back(entity);
+        });
 
     for (ecs::Entity entity : entityWorld.cameraEntitiesInRegistrationOrder())
     {
@@ -141,6 +173,49 @@ void extractSceneRenderData(SceneEntityWorld& entityWorld, SceneRenderData& out,
     world.each<AnimationComponent>([&](ecs::Entity entity, const AnimationComponent&) {
         out.animationEntities.push_back(entity);
     });
+}
+
+} // namespace caustica::scene
+
+#include <render/core/CameraController.h>
+
+namespace caustica::scene
+{
+
+void extractSessionRenderState(const SessionRenderExtractInputs& inputs, SceneRenderData& out)
+{
+    if (inputs.camera)
+    {
+        const CameraController& camera = *inputs.camera;
+        out.camera.position = camera.camera().getPosition();
+        out.camera.direction = camera.camera().getDir();
+        out.camera.up = camera.camera().getUp();
+        out.camera.verticalFovDegrees = camera.verticalFOV();
+        out.camera.zNear = camera.zNear();
+        out.camera.useCustomIntrinsics = camera.useCustomIntrinsics();
+        out.camera.intrinsics = camera.intrinsics();
+        out.camera.intrinsicsViewport = camera.intrinsicsViewport();
+        out.camera.selectedCameraIndex = camera.selectedCameraIndex();
+    }
+
+    if (inputs.settings)
+    {
+        out.renderSettings.settings = *inputs.settings;
+        // One-shots are owned by this frame's snapshot; clear live so GT does not re-fire.
+        inputs.settings->ResetAccumulation = false;
+        inputs.settings->ResetRealtimeCaches = false;
+        inputs.settings->NRDModeChanged = false;
+    }
+
+    if (inputs.runtime)
+    {
+        out.renderSettings.invalidation = inputs.runtime->Invalidation;
+        out.renderSettings.picking = inputs.runtime->Picking;
+        // Consume delayed reload request into snapshot only (keep live countdown on GT).
+    }
+
+    out.renderSettings.gaussianSplatTemporalReset = inputs.gaussianSplatTemporalReset;
+    out.renderSettings.sceneTime = inputs.sceneTime;
 }
 
 } // namespace caustica::scene

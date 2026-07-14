@@ -1,7 +1,6 @@
 #include <render/passes/geometry/SsaoPass.h>
 #include <render/core/FramebufferFactory.h>
 #include <assets/loader/ShaderFactory.h>
-#include <render/core/ShadowMap.h>
 #include <render/core/RenderPassConstants.h>
 #include <render/core/RenderDevice.h>
 #include <scene/View.h>

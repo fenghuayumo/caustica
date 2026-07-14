@@ -3,11 +3,10 @@
 #include <render/core/GBuffer.h>
 #include <render/core/FramebufferFactory.h>
 #include <assets/loader/ShaderFactory.h>
-#include <render/core/ShadowMap.h>
 #include <scene/Scene.h>
 #include <scene/SceneTypes.h>
 #include <scene/SceneObjects.h>
-#include <scene/SceneEcs.h>
+#include <scene/SceneRenderData.h>
 #include <scene/SceneLightAccess.h>
 #include <render/core/RenderPassConstants.h>
 #include <render/core/RenderDevice.h>
@@ -137,72 +136,20 @@ void DeferredLightingPass::render(
 
     nvrhi::ITexture* shadowMapTexture = nullptr;
 
-    int numShadows = 0;
-
     if (inputs.scene)
     {
-        const auto* ew = inputs.scene->getEntityWorld();
-        if (ew)
+        for (const scene::LightRenderProxy& lightProxy : inputs.scene->getRenderData().lights)
         {
-            for (ecs::Entity entity : inputs.scene->getLightEntities())
+            if (deferredConstants.numLights >= DEFERRED_MAX_LIGHTS)
             {
-                const auto* lightComp = ew->world().get<scene::LightComponent>(entity);
-                if (!lightComp) continue;
-                const auto* globalComp = ew->world().get<scene::GlobalTransformComponent>(entity);
-                if (!globalComp) continue;
-
-                if (lightComp->shadowMap)
-                {
-                    if (!shadowMapTexture)
-                    {
-                        shadowMapTexture = lightComp->shadowMap->getTexture();
-                        deferredConstants.shadowMapTextureSize = float2(lightComp->shadowMap->getTextureSize());
-                    }
-                    else
-                    {
-                        if (shadowMapTexture != lightComp->shadowMap->getTexture())
-                        {
-                            caustica::error("All lights submitted to DeferredLightingPass::render(...) must use the same shadow map textures");
-                            return;
-                        }
-                    }
-                }
-
-                if (deferredConstants.numLights >= DEFERRED_MAX_LIGHTS)
-                {
-                    caustica::warning("Maximum number of active lights (%d) exceeded in DeferredLightingPass",
-                        DEFERRED_MAX_LIGHTS);
-                    break;
-                }
-
-                LightConstants& lightConstants = deferredConstants.lights[deferredConstants.numLights];
-                scene::fillLightConstants(*lightComp, globalComp->transform, lightConstants);
-
-                if (lightComp->shadowMap)
-                {
-                    for (uint32_t cascade = 0; cascade < lightComp->shadowMap->getNumberOfCascades(); cascade++)
-                    {
-                        if (numShadows < DEFERRED_MAX_SHADOWS)
-                        {
-                            lightComp->shadowMap->getCascade(cascade)->fillShadowConstants(deferredConstants.shadows[numShadows]);
-                            lightConstants.shadowCascades[cascade] = numShadows;
-                            ++numShadows;
-                        }
-                    }
-
-                    for (uint32_t perObjectShadow = 0; perObjectShadow < lightComp->shadowMap->getNumberOfPerObjectShadows(); perObjectShadow++)
-                    {
-                        if (numShadows < DEFERRED_MAX_SHADOWS)
-                        {
-                            lightComp->shadowMap->getPerObjectShadow(perObjectShadow)->fillShadowConstants(deferredConstants.shadows[numShadows]);
-                            lightConstants.perObjectShadows[perObjectShadow] = numShadows;
-                            ++numShadows;
-                        }
-                    }
-                }
-
-                ++deferredConstants.numLights;
+                caustica::warning("Maximum number of active lights (%d) exceeded in DeferredLightingPass",
+                    DEFERRED_MAX_LIGHTS);
+                break;
             }
+
+            LightConstants& lightConstants = deferredConstants.lights[deferredConstants.numLights];
+            scene::fillLightConstants(lightProxy, lightConstants);
+            ++deferredConstants.numLights;
         }
     }
 

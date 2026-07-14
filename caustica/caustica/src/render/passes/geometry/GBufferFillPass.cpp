@@ -1,7 +1,6 @@
 #include <render/passes/geometry/GBufferFillPass.h>
 #include <render/core/FramebufferFactory.h>
 #include <assets/loader/ShaderFactory.h>
-#include <render/core/ShadowMap.h>
 #include <scene/SceneTypes.h>
 #include <render/core/RenderDevice.h>
 #include <render/core/MaterialBindingCache.h>

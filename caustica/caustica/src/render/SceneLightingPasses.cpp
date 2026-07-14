@@ -15,6 +15,25 @@
 namespace caustica::render
 {
 
+namespace
+{
+
+void collectLiveLightEntities(caustica::Scene& scene, std::vector<ecs::Entity>& out)
+{
+    out.clear();
+    scene::SceneEntityWorld* entityWorld = scene.getEntityWorld();
+    if (!entityWorld)
+        return;
+
+    entityWorld->world().each<scene::LightComponent>(
+        [&](ecs::Entity entity, const scene::LightComponent&)
+        {
+            out.push_back(entity);
+        });
+}
+
+} // namespace
+
 void SceneLightingPasses::refreshEnvironmentMapMediaList(const std::filesystem::path& assetsFolder,
     const std::filesystem::path& currentScenePath)
 {
@@ -55,17 +74,20 @@ void SceneLightingPasses::sceneUnloading()
 
 void SceneLightingPasses::onSceneLoaded(caustica::Scene& scene, PathTracerSettings& settings)
 {
-    m_lightEntities.clear();
-    for (ecs::Entity lightEntity : scene.getLightEntities())
-        m_lightEntities.push_back(lightEntity);
+    // Game-thread only: walk live ECS (snapshot may not be published yet during load).
+    collectLiveLightEntities(scene, m_lightEntities);
 
-    const scene::SceneEntityWorld* entityWorld = scene.getEntityWorld();
-    ecs::Entity envEntity = findEnvironmentLightEntity(scene);
+    scene::SceneEntityWorld* entityWorld = scene.getEntityWorld();
+    ecs::Entity envEntity = ecs::NullEntity;
     m_envMapLocalPath = "";
-    if (entityWorld && ecs::isValid(envEntity))
+    if (entityWorld)
     {
-        if (const auto* light = scene::tryGetLight(entityWorld->world(), envEntity))
-            m_envMapLocalPath = scene::getEnvironmentLightPath(*light);
+        envEntity = scene::findEnvironmentLightEntity(entityWorld->world(), m_lightEntities);
+        if (ecs::isValid(envEntity))
+        {
+            if (const auto* light = scene::tryGetLight(entityWorld->world(), envEntity))
+                m_envMapLocalPath = scene::getEnvironmentLightPath(*light);
+        }
     }
     settings.EnvironmentMapParams = EnvironmentMapRuntimeParameters();
     m_envMapOverride = c_EnvMapSceneDefault;
@@ -96,21 +118,14 @@ void SceneLightingPasses::onSceneLoaded(caustica::Scene& scene, PathTracerSettin
             if (auto* environment = std::get_if<scene::EnvironmentLightData>(&component.data))
                 environment->path = m_envMapLocalPath;
             scene.attachLightToRoot(std::move(component), "Environment");
-            m_lightEntities.push_back(scene.getLightEntities().back());
+            collectLiveLightEntities(scene, m_lightEntities);
         }
     }
 }
 
 void SceneLightingPasses::resyncLightsFromScene(caustica::Scene& scene)
 {
-    m_lightEntities.clear();
-    auto* entityWorld = scene.getEntityWorld();
-    for (ecs::Entity lightEntity : scene.getLightEntities())
-    {
-        if (entityWorld && !entityWorld->world().isAlive(lightEntity))
-            continue;
-        m_lightEntities.push_back(lightEntity);
-    }
+    collectLiveLightEntities(scene, m_lightEntities);
 }
 
 void SceneLightingPasses::notifySceneReloaded(caustica::Scene& scene)
