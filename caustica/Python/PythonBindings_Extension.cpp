@@ -18,12 +18,19 @@
 #include "SceneEditor.h"
 #include <engine/SceneSessionSystems.h>
 #include <engine/App.h>
+#include <engine/GpuRenderSubsystem.h>
 #include <EditorUI.h>
 
+#include <assets/RuntimeMeshLoadTypes.h>
+#include <render/core/RenderSceneTypeFactory.h>
 #include <scene/Scene.h>
+#include <scene/SceneManager.h>
+#include <scene/SceneRuntimeMutation.h>
+#include <scene/loader/RuntimeMeshLoader.h>
 #include <math/box.h>
 #include <math/math.h>
 
+#include <filesystem>
 #include <stdexcept>
 
 namespace nb = nanobind;
@@ -158,7 +165,37 @@ public:
             return false;
         if (auto* editor = m_session->GetApp()->tryResource<SceneEditor>())
             return editor->LoadMeshFile(fileName);
-        return false;
+
+        // Headless / DefaultPlugins sessions have no SceneEditor; load via SceneManager.
+        caustica::App& app = *m_session->GetApp();
+        auto* sceneMgr = caustica::sceneSession::sceneManager(app);
+        auto* gpu = caustica::sceneSession::gpuRender(app);
+        if (!sceneMgr || !gpu || !gpu->textureLoader())
+            return false;
+
+        const caustica::RuntimeMeshLoadParams params{
+            .TextureCache = gpu->textureLoader().get(),
+            .SceneTypes = std::make_shared<caustica::render::RenderSceneTypeFactory>(),
+            .TextureSearchDirectory = {},
+        };
+        const auto loadResult = caustica::LoadRuntimeMeshFile(params, std::filesystem::path(fileName));
+        if (!loadResult || !loadResult.ImportResult)
+            return false;
+
+        const auto scene = sceneMgr->getScene();
+        if (!scene)
+            return false;
+
+        const uint32_t frameIndex = m_session->GetSceneHost()
+            ? m_session->GetSceneHost()->frameIndex()
+            : 0u;
+        const auto importedRoot = caustica::AttachRuntimeSceneImport(
+            scene, *loadResult.ImportResult, frameIndex);
+        if (importedRoot == caustica::ecs::NullEntity)
+            return false;
+
+        caustica::FinalizeRuntimeSceneMutation(scene, importedRoot, frameIndex);
+        return true;
     }
 
     void SetCameraFOV(float fov) {
@@ -228,7 +265,7 @@ NB_MODULE(caustica, m)
 
         .def("load_mesh_file", &PyRenderer::LoadMeshFile,
              nb::arg("file_name"),
-             "Append a mesh file (.gltf, .glb, or .obj) to the current scene.")
+             "Append a mesh file (.gltf, .glb, .obj, .urdf, or .usd/.usda/.usdc/.caususd) to the current scene.")
 
         .def("step", &PyRenderer::Step,
              nb::arg("dt") = -1.0f,

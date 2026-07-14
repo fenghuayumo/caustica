@@ -39,6 +39,7 @@ namespace caustica
     class GltfImporter;
     class ObjImporter;
     class CausUsdImporter;
+    class UrdfImporter;
 
     namespace render
     {
@@ -58,6 +59,7 @@ namespace caustica
         std::shared_ptr<GltfImporter> m_GltfImporter;
         std::shared_ptr<ObjImporter> m_ObjImporter;
         std::shared_ptr<CausUsdImporter> m_CausUsdImporter;
+        std::shared_ptr<UrdfImporter> m_UrdfImporter;
         std::vector<SceneImportResult> m_Models;
 
         bool m_SceneTransformsChanged = false;

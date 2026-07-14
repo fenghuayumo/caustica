@@ -16,5 +16,8 @@ RuntimeMeshLoadResult LoadRuntimeGltfMeshFile(
 RuntimeMeshLoadResult LoadRuntimeObjMeshFile(
     const RuntimeMeshLoadParams& params,
     const std::filesystem::path& filePath);
+RuntimeMeshLoadResult LoadRuntimeUrdfMeshFile(
+    const RuntimeMeshLoadParams& params,
+    const std::filesystem::path& filePath);
 
 } // namespace caustica

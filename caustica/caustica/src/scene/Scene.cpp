@@ -8,6 +8,7 @@
 #include <scene/loader/GltfImporter.h>
 #include <scene/loader/ObjImporter.h>
 #include <scene/loader/CausUsdImporter.h>
+#include <scene/loader/UrdfImporter.h>
 #include <scene/scene_utils.h>
 #include <render/SceneGpuResources.h>
 #include <core/ThreadPool.h>
@@ -411,6 +412,7 @@ Scene::Scene(
     m_GltfImporter = std::make_shared<GltfImporter>(m_fs, m_SceneTypeFactory);
     m_ObjImporter = std::make_shared<ObjImporter>(m_SceneTypeFactory);
     m_CausUsdImporter = std::make_shared<CausUsdImporter>(m_SceneTypeFactory);
+    m_UrdfImporter = std::make_shared<UrdfImporter>(m_SceneTypeFactory);
 
     m_GpuResources->enableBindlessResources = !!m_DescriptorTable;
     m_GpuResources->rayTracingSupported = m_GpuResources->device->queryFeatureSupport(nvrhi::Feature::RayTracingAccelStruct);
@@ -567,6 +569,8 @@ bool Scene::LoadModelFile(
         return m_ObjImporter->Load(fileName, *m_TextureLoader, g_LoadingStats, threadPool, result, m_textureSearchDirectory);
     if (ext == ".usd" || ext == ".usda" || ext == ".usdc" || ext == ".caususd")
         return m_CausUsdImporter->Load(fileName, *m_TextureLoader, g_LoadingStats, threadPool, result, m_textureSearchDirectory);
+    if (ext == ".urdf")
+        return m_UrdfImporter->Load(fileName, *m_TextureLoader, g_LoadingStats, threadPool, result, m_textureSearchDirectory);
 
     return m_GltfImporter->Load(fileName, *m_TextureLoader, g_LoadingStats, threadPool, result, m_textureSearchDirectory);
 }

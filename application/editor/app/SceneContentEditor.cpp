@@ -98,7 +98,7 @@ void SceneContentEditor::handleDroppedFiles(std::vector<std::string>& pendingFil
             else
                 caustica::error("Failed to load Gaussian Splat file '%s'", filePath.c_str());
         }
-        else if (ext == ".gltf" || ext == ".glb" || ext == ".obj"
+        else if (ext == ".gltf" || ext == ".glb" || ext == ".obj" || ext == ".urdf"
             || ext == ".usd" || ext == ".usda" || ext == ".usdc" || ext == ".caususd")
         {
             caustica::info("Drag-drop: loading mesh file '%s'", filePath.c_str());
@@ -109,7 +109,7 @@ void SceneContentEditor::handleDroppedFiles(std::vector<std::string>& pendingFil
         }
         else
         {
-            caustica::warning("Drag-drop: unsupported file type '%s' (supported: .ply, .gltf, .glb, .obj, .usd/.usda/.usdc/.caususd)", ext.c_str());
+            caustica::warning("Drag-drop: unsupported file type '%s' (supported: .ply, .gltf, .glb, .obj, .urdf, .usd/.usda/.usdc/.caususd)", ext.c_str());
         }
     }
 }

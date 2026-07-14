@@ -3,6 +3,7 @@
 #include <scene/loader/GltfImporter.h>
 #include <scene/loader/ObjImporter.h>
 #include <scene/loader/CausUsdImporter.h>
+#include <scene/loader/UrdfImporter.h>
 #include <assets/loader/TextureLoader.h>
 #include <core/log.h>
 #include <core/vfs/VFS.h>
@@ -62,6 +63,8 @@ RuntimeMeshLoadResult LoadRuntimeMeshFile(
         return LoadRuntimeGltfMeshFile(params, absPath);
     if (ext == ".obj")
         return LoadRuntimeObjMeshFile(params, absPath);
+    if (ext == ".urdf")
+        return LoadRuntimeUrdfMeshFile(params, absPath);
     if (ext == ".usd" || ext == ".usda" || ext == ".usdc" || ext == ".caususd")
     {
         if (!params.TextureCache || !params.SceneTypes)
@@ -143,6 +146,36 @@ RuntimeMeshLoadResult LoadRuntimeObjMeshFile(
 
     if (!ecs::isValid(importResult->rootEntity) || !importResult->entityWorld)
         return FailedRuntimeMeshLoad(filePath);
+
+    return RuntimeMeshLoadResult{
+        .Success = true,
+        .SourcePath = filePath,
+        .ImportResult = importResult,
+    };
+}
+
+RuntimeMeshLoadResult LoadRuntimeUrdfMeshFile(
+    const RuntimeMeshLoadParams& params,
+    const std::filesystem::path& filePath)
+{
+    if (!params.TextureCache || !params.SceneTypes)
+        return FailedRuntimeMeshLoad(filePath);
+
+    caustica::UrdfImporter importer(params.SceneTypes);
+
+    caustica::SceneLoadingStats stats;
+    auto importResult = std::make_shared<caustica::SceneImportResult>();
+    if (!importer.Load(filePath, *params.TextureCache, stats, nullptr, *importResult, params.TextureSearchDirectory))
+    {
+        caustica::error("UrdfImporter failed to load '%s'", filePath.string().c_str());
+        return FailedRuntimeMeshLoad(filePath);
+    }
+
+    if (!ecs::isValid(importResult->rootEntity) || !importResult->entityWorld)
+    {
+        caustica::error("URDF import produced an empty scene: '%s'", filePath.string().c_str());
+        return FailedRuntimeMeshLoad(filePath);
+    }
 
     return RuntimeMeshLoadResult{
         .Success = true,
