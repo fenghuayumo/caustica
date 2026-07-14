@@ -28,7 +28,7 @@ palette = [
 
 lights = scene.get_lights()
 for i, light in enumerate(lights):
-    if not hasattr(light, "intensity"):
+    if light.light_type not in (2, 3):  # Spot / Point
         continue
     color = palette[i % len(palette)]
     light.color = (color[0] * (0.7 + 0.3 * math.sin(phase + i)),

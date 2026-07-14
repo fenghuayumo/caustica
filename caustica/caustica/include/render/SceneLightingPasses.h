@@ -22,7 +22,6 @@ class ComputePipelineRegistry;
 
 namespace caustica
 {
-class Light;
 class Scene;
 class ShaderFactory;
 } // namespace caustica

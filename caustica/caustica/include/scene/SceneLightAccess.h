@@ -25,6 +25,8 @@ struct LightRenderProxy;
 
 [[nodiscard]] dm::double3 getLightPosition(const dm::daffine3& globalTransform);
 [[nodiscard]] dm::double3 getLightDirection(const dm::daffine3& globalTransform);
+void setLightWorldPosition(SceneEntityWorld& world, ecs::Entity entity, const dm::double3& position);
+void setLightWorldDirection(SceneEntityWorld& world, ecs::Entity entity, const dm::double3& direction);
 [[nodiscard]] bool isInfiniteLight(const LightData& data);
 [[nodiscard]] bool isInfiniteLight(const LightRenderProxy& proxy);
 

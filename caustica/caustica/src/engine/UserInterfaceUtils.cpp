@@ -1,5 +1,5 @@
 #include <engine/UserInterfaceUtils.h>
-#include <scene/SceneObjects.h>
+#include <scene/SceneTypes.h>
 #include <platform/file_dialog.h>
 #include <core/log.h>
 #include <core/string_utils.h>
@@ -170,64 +170,6 @@ bool caustica::materialEditor(caustica::Material* material, bool allowMaterialDo
     }
     
     return update;
-}
-
-bool caustica::LightEditor_Directional(caustica::DirectionalLight& light)
-{
-    bool changed = false;
-    double3 direction = light.getDirection();
-    if (azimuthElevationSliders(direction, true))
-    {
-        if (ecs::isValid(light.ownerEntity))
-            light.updateCachedDirection(direction);
-        changed = true;
-    }
-    changed |= ImGui::ColorEdit3("Color", &light.color.x, ImGuiColorEditFlags_Float);
-    changed |= ImGui::SliderFloat("Irradiance", &light.irradiance, 0.f, 100.f, "%.2f", ImGuiSliderFlags_Logarithmic);
-    changed |= ImGui::SliderFloat("Angular Size", &light.angularSize, 0.1f, 20.f);
-    return changed;
-}
-
-bool caustica::LightEditor_Point(caustica::PointLight& light)
-{
-    bool changed = false;
-    changed |= ImGui::SliderFloat("Radius", &light.radius, 0.01f, 1.f, "%.3f", ImGuiSliderFlags_Logarithmic);
-    changed |= ImGui::ColorEdit3("Color", &light.color.x, ImGuiColorEditFlags_Float);
-    changed |= ImGui::SliderFloat("Intensity", &light.intensity, 0.f, 100.f, "%.2f", ImGuiSliderFlags_Logarithmic);
-    return changed;
-}
-
-bool caustica::LightEditor_Spot(caustica::SpotLight& light)
-{
-    bool changed = false;
-    double3 direction = light.getDirection();
-    if (azimuthElevationSliders(direction, false))
-    {
-        if (ecs::isValid(light.ownerEntity))
-            light.updateCachedDirection(direction);
-        changed = true;
-    }
-    changed |= ImGui::SliderFloat("Radius", &light.radius, 0.01f, 1.f, "%.3f", ImGuiSliderFlags_Logarithmic);
-    changed |= ImGui::ColorEdit3("Color", &light.color.x, ImGuiColorEditFlags_Float);
-    changed |= ImGui::SliderFloat("Intensity", &light.intensity, 0.f, 100.f, "%.2f", ImGuiSliderFlags_Logarithmic);
-    changed |= ImGui::SliderFloat("Inner Angle", &light.innerAngle, 0.f, 180.f);
-    changed |= ImGui::SliderFloat("Outer Angle", &light.outerAngle, 0.f, 180.f);
-    return changed;
-}
-
-bool caustica::lightEditor(caustica::Light& light)
-{
-    switch (light.getLightType())
-    {
-    case LightType_Directional:
-        return LightEditor_Directional(static_cast<DirectionalLight&>(light));
-    case LightType_Point:
-        return LightEditor_Point(static_cast<PointLight&>(light));
-    case LightType_Spot:
-        return LightEditor_Spot(static_cast<SpotLight&>(light));
-    default:
-        return false;
-    }
 }
 
 bool caustica::azimuthElevationSliders(dm::double3& direction, bool negative)

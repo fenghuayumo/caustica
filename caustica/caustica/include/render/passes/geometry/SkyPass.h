@@ -15,7 +15,6 @@ namespace caustica
     class ShaderFactory;
     class FramebufferFactory;
     class ICompositeView;
-    class DirectionalLight;
 }
 
 struct ProceduralSkyShaderParameters;
@@ -58,11 +57,17 @@ namespace caustica::render
         void render(
             nvrhi::ICommandList* commandList,
             const caustica::ICompositeView& compositeView,
-            const caustica::DirectionalLight& light,
+            dm::float3 lightColor,
+            float lightIrradiance,
+            float lightAngularSizeDegrees,
+            dm::double3 lightDirection,
             const SkyParameters& params) const;
 
         static void fillShaderParameters(
-            const caustica::DirectionalLight& light,
+            dm::float3 lightColor,
+            float lightIrradiance,
+            float lightAngularSizeDegrees,
+            dm::double3 lightDirection,
             const SkyParameters& input,
             ProceduralSkyShaderParameters& output);
     };

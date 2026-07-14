@@ -22,7 +22,6 @@ class AccelStructManager;
 class BindingCache;
 class CameraController;
 namespace render { class RenderDevice; }
-class Light;
 class Scene;
 
 struct PreUpdateLightingParams

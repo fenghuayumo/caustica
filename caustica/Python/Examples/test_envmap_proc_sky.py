@@ -420,7 +420,7 @@ def switch_environment(renderer, case: EnvTestCase, scene_hdri_path: str) -> Non
     if resolved != scene_hdri_path:
         sky = app.scene.find_light("Sky")
         if sky is not None:
-            sky.path = resolved
+            sky.environment_path = resolved
     app.set_environment_map(SCENE_DEFAULT_ENV)
 
 

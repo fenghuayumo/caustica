@@ -918,63 +918,33 @@ app.request_accel_rebuild()
 
 ## Light
 
-Scene light lookup and per-type light properties.
+Lights are ECS components on `SceneNode`. Lookup returns `SceneNode` handles; typed fields are exposed as properties on that node.
 
 ### Scene Lookup
 
 | API | Return | Notes |
 | --- | --- | --- |
-| `scene.get_lights()` | `list[Light]` | All lights in current scene. |
-| `scene.find_light(name)` | `Light | None` | Match by scene node name. |
+| `scene.get_lights()` | `list[SceneNode]` | All light entities in the current scene. |
+| `scene.find_light(name)` | `SceneNode | None` | Match by entity name. |
 | `scene.light_count` | `int` | Number of lights in the current scene. |
-| `Sample.get_lights()` | `list[Light]` | Compatibility alias for `scene.get_lights()`. |
-| `Sample.find_light(name)` | `Light | None` | Compatibility alias for `scene.find_light(name)`. |
+| `Sample.get_lights()` | `list[SceneNode]` | Compatibility alias for `scene.get_lights()`. |
+| `Sample.find_light(name)` | `SceneNode | None` | Compatibility alias for `scene.find_light(name)`. |
 | `Sample.set_environment_map(path)` | `None` | Override scene environment map source. |
 
-### Base Class `Light`
+### Light properties on `SceneNode`
 
 | Property | Type | Notes |
 | --- | --- | --- |
-| `light_type` | implementation enum/int | Underlying engine light type. |
-| `name` | `str` | Scene node name. Read-only. |
+| `is_light` | `bool` | True when the entity has a typed light component. |
+| `light_type` | `int` | Engine `LightType_*` constant (1=Directional, 2=Spot, 3=Point, 1000=Environment). |
+| `name` | `str` | Entity name. Read-only. |
 | `color` | `(r, g, b)` | Writable. |
-| `position` | `(x, y, z)` | Writable. |
-| `direction` | `(x, y, z)` | Writable. |
-
-Derived classes expose extra properties depending on actual light type.
-
-### `DirectionalLight`
-
-| Property | Type | Notes |
-| --- | --- | --- |
-| `irradiance` | `float` | Target illuminance, multiplied by `color`. |
-| `angular_size` | `float` | Apparent angular size in degrees. |
-
-### `SpotLight`
-
-| Property | Type |
-| --- | --- |
-| `intensity` | `float` |
-| `radius` | `float` |
-| `range` | `float` |
-| `inner_angle` | `float` |
-| `outer_angle` | `float` |
-
-### `PointLight`
-
-| Property | Type |
-| --- | --- |
-| `intensity` | `float` |
-| `radius` | `float` |
-| `range` | `float` |
-
-### `EnvironmentLight`
-
-| Property | Type |
-| --- | --- |
-| `radiance_scale` | `(r, g, b)` |
-| `rotation` | float / implementation-specific value |
-| `path` | `str` |
+| `position` | `(x, y, z)` | World-space; updates local translation. |
+| `direction` | `(x, y, z)` | World-space; updates local rotation. |
+| `irradiance` / `angular_size` | `float` | Directional. |
+| `intensity` / `radius` / `range` | `float` | Point / Spot. |
+| `inner_angle` / `outer_angle` | `float` | Spot. |
+| `environment_path` | `str` | Environment light HDRI path. |
 
 For common environment tweaks, prefer `settings.environment_map` (see [Settings](#settings)) and `Sample.set_environment_map(path)`.
 

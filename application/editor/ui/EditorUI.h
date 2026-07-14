@@ -119,7 +119,6 @@ private:
     float                       m_showSceneWidgets = 0.0f;
 
     std::unique_ptr<caustica::ImGui_Console> m_console;
-    std::shared_ptr<caustica::Light> m_SelectedLight;
 
     std::unique_ptr<ImGuiManager> m_imguiManager;
 

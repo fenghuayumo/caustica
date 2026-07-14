@@ -10,7 +10,6 @@
 namespace caustica
 {
 
-class Light;
 class Scene;
 
 bool isDirectMeshSceneFile(const std::filesystem::path& sceneFileName);

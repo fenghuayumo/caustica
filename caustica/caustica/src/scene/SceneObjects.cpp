@@ -13,7 +13,6 @@ std::shared_ptr<MeshInstance> MeshInstance::clone() const
     copy->name = name;
     copy->ownerEntity = ownerEntity;
     copy->PerGeometryLightSamplerLinks = PerGeometryLightSamplerLinks;
-    copy->ProxiedAnalyticLight = ProxiedAnalyticLight;
     return copy;
 }
 
@@ -181,32 +180,6 @@ bool OrthographicCamera::setProperty(const std::string& propName, const dm::floa
 }
 
 // =============================================================================
-// EnvironmentLight
-// =============================================================================
-
-std::shared_ptr<EnvironmentLight> EnvironmentLight::clone() const
-{
-    auto copy = std::make_shared<EnvironmentLight>();
-    copy->name          = name;
-    copy->color         = color;
-    copy->radianceScale = radianceScale;
-    copy->textureIndex  = textureIndex;
-    copy->rotation      = rotation;
-    copy->path          = path;
-    copy->LightLink     = LightLink;
-    copy->Proxies       = Proxies;
-    return copy;
-}
-
-void EnvironmentLight::load(const Json::Value& node)
-{
-    node["radianceScale"] >> radianceScale;
-    node["textureIndex"]  >> textureIndex;
-    node["rotation"]      >> rotation;
-    node["path"]          >> path;
-}
-
-// =============================================================================
 // GaussianSplat
 // =============================================================================
 
@@ -286,14 +259,6 @@ void GameSettings::load(const Json::Value& node)
 
 std::shared_ptr<void> SceneTypeFactory::createLeaf(const std::string& type)
 {
-    if (type == "DirectionalLight")
-        return std::make_shared<DirectionalLight>();
-    if (type == "PointLight")
-        return std::make_shared<PointLight>();
-    if (type == "SpotLight")
-        return std::make_shared<SpotLight>();
-    if (type == "EnvironmentLight")
-        return std::make_shared<EnvironmentLight>();
     if (type == "PerspectiveCamera" || type == "PerspectiveCameraEx")
         return std::make_shared<PerspectiveCamera>();
     if (type == "OrthographicCamera")

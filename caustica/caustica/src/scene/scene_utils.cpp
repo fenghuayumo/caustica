@@ -1,7 +1,6 @@
 #include "scene/scene_utils.h"
 #include <scene/Scene.h>
 #include <scene/SceneLightAccess.h>
-#include <scene/SceneObjects.h>
 
 #include <algorithm>
 #include <cctype>

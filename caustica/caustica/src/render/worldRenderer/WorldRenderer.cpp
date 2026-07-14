@@ -1186,24 +1186,28 @@ void caustica::render::WorldRenderer::render(nvrhi::IFramebuffer* framebuffer)
         m_context.frameRuntime = &m_frameRuntimeSnapshot;
 
         // Apply extracted camera pose before view update (RT owns view matrices).
-        m_context.camera.camera().lookTo(
-            renderData.camera.position, renderData.camera.direction, renderData.camera.up);
-        m_context.camera.setVerticalFOV(renderData.camera.verticalFovDegrees);
-        m_context.camera.setZNear(renderData.camera.zNear);
-        m_context.camera.setSelectedCameraIndex(renderData.camera.selectedCameraIndex);
-        if (renderData.camera.useCustomIntrinsics)
+        // Skip when snapshot has no session camera (structure-only republish / scene-load extract).
+        if (renderData.camera.valid)
         {
-            m_context.camera.setIntrinsics(
-                renderData.camera.intrinsics.x,
-                renderData.camera.intrinsics.y,
-                renderData.camera.intrinsics.z,
-                renderData.camera.intrinsics.w,
-                renderData.camera.intrinsicsViewport.x,
-                renderData.camera.intrinsicsViewport.y);
-        }
-        else
-        {
-            m_context.camera.clearIntrinsics();
+            m_context.camera.camera().lookTo(
+                renderData.camera.position, renderData.camera.direction, renderData.camera.up);
+            m_context.camera.setVerticalFOV(renderData.camera.verticalFovDegrees);
+            m_context.camera.setZNear(renderData.camera.zNear);
+            m_context.camera.setSelectedCameraIndex(renderData.camera.selectedCameraIndex);
+            if (renderData.camera.useCustomIntrinsics)
+            {
+                m_context.camera.setIntrinsics(
+                    renderData.camera.intrinsics.x,
+                    renderData.camera.intrinsics.y,
+                    renderData.camera.intrinsics.z,
+                    renderData.camera.intrinsics.w,
+                    renderData.camera.intrinsicsViewport.x,
+                    renderData.camera.intrinsicsViewport.y);
+            }
+            else
+            {
+                m_context.camera.clearIntrinsics();
+            }
         }
     }
     else

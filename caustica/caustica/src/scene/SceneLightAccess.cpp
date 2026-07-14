@@ -80,6 +80,44 @@ dm::double3 getLightDirection(const dm::daffine3& globalTransform)
     return -normalize(dm::double3(globalTransform.m_linear.row2));
 }
 
+void setLightWorldPosition(SceneEntityWorld& world, ecs::Entity entity, const dm::double3& position)
+{
+    ecs::Entity parentEntity = ecs::NullEntity;
+    if (const auto* parent = world.world().get<ParentComponent>(entity))
+        parentEntity = parent->parent;
+
+    dm::daffine3 parentToWorld = dm::daffine3::identity();
+    if (ecs::isValid(parentEntity))
+    {
+        if (const auto* globalTransform = world.world().get<GlobalTransformComponent>(parentEntity))
+            parentToWorld = globalTransform->transform;
+    }
+
+    world.setTranslation(entity, inverse(parentToWorld).transformPoint(position));
+}
+
+void setLightWorldDirection(SceneEntityWorld& world, ecs::Entity entity, const dm::double3& direction)
+{
+    ecs::Entity parentEntity = ecs::NullEntity;
+    if (const auto* parent = world.world().get<ParentComponent>(entity))
+        parentEntity = parent->parent;
+
+    dm::daffine3 parentToWorld = dm::daffine3::identity();
+    if (ecs::isValid(parentEntity))
+    {
+        if (const auto* globalTransform = world.world().get<GlobalTransformComponent>(parentEntity))
+            parentToWorld = globalTransform->transform;
+    }
+
+    const dm::daffine3 worldToLocal = lookatZ(direction);
+    const dm::daffine3 localToParent = inverse(worldToLocal * parentToWorld);
+
+    dm::dquat rotation;
+    dm::double3 scaling;
+    decomposeAffine<double>(localToParent, nullptr, &rotation, &scaling);
+    world.setLocalTransform(entity, nullptr, &rotation, &scaling);
+}
+
 bool isInfiniteLight(const LightData& data)
 {
     switch (getLightType(data))

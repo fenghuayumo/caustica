@@ -218,6 +218,7 @@ void extractSessionRenderState(const SessionRenderExtractInputs& inputs, SceneRe
         out.camera.intrinsics = camera.intrinsics();
         out.camera.intrinsicsViewport = camera.intrinsicsViewport();
         out.camera.selectedCameraIndex = camera.selectedCameraIndex();
+        out.camera.valid = true;
     }
 
     if (inputs.settings)

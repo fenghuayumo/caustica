@@ -380,13 +380,3 @@ Json::Value LightController::write()
     return ret;
 
 }
-
-caustica::SpotLight* LightController::getSpotLight()
-{
-    return nullptr;
-}
-
-caustica::PointLight* LightController::getPointLight()
-{
-    return nullptr;
-}

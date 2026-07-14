@@ -1106,7 +1106,18 @@ void Scene::refreshSceneWorld(uint32_t frameIndex)
     if (!m_EntityWorld)
         return;
 
-    scene::extractSceneRenderData(*m_EntityWorld, m_RenderSnapshot.writeBufferForFrame(frameIndex), frameIndex);
+    scene::SceneRenderData& writeBuffer = m_RenderSnapshot.writeBufferForFrame(frameIndex);
+    const bool preserveSessionState = m_RenderSnapshot.wasExtractedForFrame(frameIndex);
+    const scene::CameraSnapshot preservedCamera = writeBuffer.camera;
+    const scene::RenderSettingsSnapshot preservedSettings = writeBuffer.renderSettings;
+
+    scene::extractSceneRenderData(*m_EntityWorld, writeBuffer, frameIndex);
+
+    if (preserveSessionState)
+    {
+        writeBuffer.camera = preservedCamera;
+        writeBuffer.renderSettings = preservedSettings;
+    }
 }
 
 void Scene::publishRenderSnapshot(uint32_t frameIndex)
@@ -1142,9 +1153,23 @@ void Scene::extractAndPublishRenderSnapshot(uint32_t frameIndex, const scene::Se
     }
 
     scene::SceneRenderData& writeBuffer = m_RenderSnapshot.writeBufferForFrame(frameIndex);
+
+    // Runtime import/delete re-publishes the same frame after PrepareRenderFrame.
+    // Preserve session camera/settings so extractSceneRenderData::clear() does not
+    // replace them with defaults that WorldRenderer would apply to the live camera.
+    const bool preserveSessionState =
+        session == nullptr && m_RenderSnapshot.wasExtractedForFrame(frameIndex);
+    const scene::CameraSnapshot preservedCamera = writeBuffer.camera;
+    const scene::RenderSettingsSnapshot preservedSettings = writeBuffer.renderSettings;
+
     scene::extractSceneRenderData(*m_EntityWorld, writeBuffer, frameIndex);
     if (session)
         scene::extractSessionRenderState(*session, writeBuffer);
+    else if (preserveSessionState)
+    {
+        writeBuffer.camera = preservedCamera;
+        writeBuffer.renderSettings = preservedSettings;
+    }
     publishRenderSnapshot(frameIndex);
 }
 

@@ -5,7 +5,6 @@
 #include <render/core/RenderPassConstants.h>
 #include <render/core/RenderDevice.h>
 #include <scene/View.h>
-#include <scene/SceneObjects.h>
 
 #if CAUSTICA_WITH_STATIC_SHADERS
 #if CAUSTICA_WITH_DX11
@@ -83,7 +82,10 @@ SkyPass::SkyPass(
 void SkyPass::render(
     nvrhi::ICommandList* commandList,
     const ICompositeView& compositeView,
-    const DirectionalLight& light,
+    dm::float3 lightColor,
+    float lightIrradiance,
+    float lightAngularSizeDegrees,
+    dm::double3 lightDirection,
     const SkyParameters& params) const
 {
     commandList->beginMarker("Sky");
@@ -104,7 +106,7 @@ void SkyPass::render(
 
         SkyConstants skyConstants{};
         skyConstants.matClipToTranslatedWorld = clipToTranslatedWorld;
-        fillShaderParameters(light, params, skyConstants.params);
+        fillShaderParameters(lightColor, lightIrradiance, lightAngularSizeDegrees, lightDirection, params, skyConstants.params);
         commandList->writeBuffer(m_SkyCB, &skyConstants, sizeof(skyConstants));
 
         commandList->setGraphicsState(state);
@@ -118,17 +120,23 @@ void SkyPass::render(
     commandList->endMarker();
 }
 
-void SkyPass::fillShaderParameters(const caustica::DirectionalLight& light, const SkyParameters& input, ProceduralSkyShaderParameters& output)
+void SkyPass::fillShaderParameters(
+    dm::float3 lightColor,
+    float lightIrradiance,
+    float lightAngularSizeDegrees,
+    dm::double3 lightDirection,
+    const SkyParameters& input,
+    ProceduralSkyShaderParameters& output)
 {
-    float lightAngularSize = dm::radians(clamp(light.angularSize, 0.1f, 90.f));
-    float lightSolidAngle = 4 * dm::PI_f * square(sinf(lightAngularSize * 0.5f));
-    float lightRadiance = light.irradiance / lightSolidAngle;
+    float lightAngularSize = dm::radians(clamp(lightAngularSizeDegrees, 0.1f, 90.f));
+    float lightSolidAngle = 4 * dm::PI_f * (sinf(lightAngularSize * 0.5f) * sinf(lightAngularSize * 0.5f));
+    float lightRadiance = lightIrradiance / lightSolidAngle;
     if (input.maxLightRadiance > 0.f)
         lightRadiance = min(lightRadiance, input.maxLightRadiance);
 
-    output.directionToLight = float3(normalize(-light.getDirection()));
+    output.directionToLight = float3(normalize(-lightDirection));
     output.angularSizeOfLight = lightAngularSize;
-    output.lightColor = lightRadiance * light.color;
+    output.lightColor = lightRadiance * lightColor;
     output.glowSize = dm::radians(dm::clamp(input.glowSize, 0.f, 90.f));
     output.skyColor = input.skyColor * input.brightness;
     output.glowIntensity = dm::clamp(input.glowIntensity, 0.f, 1.f);

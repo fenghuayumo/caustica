@@ -7,20 +7,11 @@
 namespace caustica
 {
     struct Material;
-    class Light;
-    class DirectionalLight;
-    class PointLight;
-    class SpotLight;
 }
 
 namespace caustica
 {
     bool materialEditor(Material* material, bool allowMaterialDomainChanges);
-
-    bool LightEditor_Directional(DirectionalLight& light);
-    bool LightEditor_Point(PointLight& light);
-    bool LightEditor_Spot(SpotLight& light);
-    bool lightEditor(Light& light);
 
     bool azimuthElevationSliders(dm::double3& direction, bool negative = false);
 }

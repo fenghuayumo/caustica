@@ -65,6 +65,10 @@ namespace caustica::scene
 
     struct CameraSnapshot
     {
+        // False until extractSessionRenderState fills from CameraController.
+        // Structure-only republish (runtime import) must not apply defaults to the live camera —
+        // verticalFovDegrees stores radians despite the name; default 60 would be treated as 60 rad.
+        bool valid = false;
         dm::float3 position = { 0.f, 0.f, 0.f };
         dm::float3 direction = { 0.f, 0.f, -1.f };
         dm::float3 up = { 0.f, 1.f, 0.f };

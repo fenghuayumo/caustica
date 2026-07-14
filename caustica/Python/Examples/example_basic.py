@@ -42,8 +42,7 @@ if wall is not None:
 print("\n=== Lights ===")
 for light in scene.get_lights():
     print(f"  type={light.light_type}  name={light.name}  color={light.color}")
-    # Light is the base class; cast or duck-type by attribute:
-    if hasattr(light, "intensity"):
+    if light.intensity:
         light.intensity = light.intensity * 1.5
 
 # 5) Tone & quality settings

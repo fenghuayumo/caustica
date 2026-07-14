@@ -26,6 +26,7 @@
 #include <ecs/Entity.h>
 #include <core/log.h>
 #include <math/math.h>
+#include <shaders/light_types.h>
 
 #include <stdexcept>
 #include <cmath>
@@ -195,6 +196,53 @@ namespace
         }
     };
 
+    [[nodiscard]] int EntityLightType(const PySceneEntity& self)
+    {
+        scene::SceneEntityWorld* entityWorld = self.entityWorld();
+        if (!entityWorld)
+            return LightType_None;
+        auto& world = entityWorld->world();
+        if (world.has<scene::DirectionalLightComponent>(self.entity))
+            return LightType_Directional;
+        if (world.has<scene::SpotLightComponent>(self.entity))
+            return LightType_Spot;
+        if (world.has<scene::PointLightComponent>(self.entity))
+            return LightType_Point;
+        if (world.has<scene::EnvironmentLightComponent>(self.entity))
+            return LightType_Environment;
+        return LightType_None;
+    }
+
+    [[nodiscard]] dm::float3* TryMutableLightColor(PySceneEntity& self)
+    {
+        scene::SceneEntityWorld* entityWorld = self.entityWorld();
+        if (!entityWorld)
+            return nullptr;
+        auto& world = entityWorld->world();
+        if (auto* directional = scene::tryGetDirectionalLight(world, self.entity))
+            return &directional->color;
+        if (auto* spot = scene::tryGetSpotLight(world, self.entity))
+            return &spot->color;
+        if (auto* point = scene::tryGetPointLight(world, self.entity))
+            return &point->color;
+        if (auto* environment = scene::tryGetEnvironmentLight(world, self.entity))
+            return &environment->color;
+        return nullptr;
+    }
+
+    [[nodiscard]] float* TryMutableLightIntensity(PySceneEntity& self)
+    {
+        scene::SceneEntityWorld* entityWorld = self.entityWorld();
+        if (!entityWorld)
+            return nullptr;
+        auto& world = entityWorld->world();
+        if (auto* spot = scene::tryGetSpotLight(world, self.entity))
+            return &spot->intensity;
+        if (auto* point = scene::tryGetPointLight(world, self.entity))
+            return &point->intensity;
+        return nullptr;
+    }
+
 
     std::vector<std::shared_ptr<PTMaterial>> GetSceneMaterials(const Scene* scene)
     {
@@ -237,13 +285,18 @@ namespace
         return nullptr;
     }
 
-    std::vector<std::shared_ptr<Light>> GetSceneLights(const Scene* scene)
+    std::vector<std::shared_ptr<PySceneEntity>> GetSceneLights(Scene* scene)
     {
-        // Legacy helper: returns empty since lights are now ECS components.
-        return {};
+        std::vector<std::shared_ptr<PySceneEntity>> result;
+        if (!scene)
+            return result;
+
+        for (ecs::Entity entity : scene->getLightEntities())
+            result.push_back(std::make_shared<PySceneEntity>(PySceneEntity{ scene, entity }));
+        return result;
     }
 
-    std::shared_ptr<Light> FindSceneLight(const Scene* scene, const std::string& name)
+    std::shared_ptr<PySceneEntity> FindSceneLight(Scene* scene, const std::string& name)
     {
         if (!scene)
             return nullptr;
@@ -255,10 +308,7 @@ namespace
         for (ecs::Entity entity : scene->getLightEntities())
         {
             if (entityWorld->getEntityName(entity) == name)
-            {
-                // Return a stub - callers should migrate to ECS-based API
-                return nullptr;
-            }
+                return std::make_shared<PySceneEntity>(PySceneEntity{ scene, entity });
         }
         return nullptr;
     }
@@ -897,56 +947,7 @@ void RegisterCoreBindings(nb::module_& m)
                 return std::string("<caustica.Material '") + self.name + "'>";
             });
 
-    // --- Lights -----------------------------------------------------------
-    nb::class_<Light>(m, "Light", "Base class for all scene lights.")
-        .def_prop_ro("light_type", [](Light& self) { return self.getLightType(); })
-        .def_prop_rw("color",
-            [](Light& self) { return Float3ToTuple(self.color); },
-            [](Light& self, nb::object v) { self.color = ToFloat3(v); })
-        .def_prop_ro("name", [](Light& self) -> std::string {
-                return self.name;
-            })
-        .def_prop_rw("position",
-            [](Light& self) { return Double3ToTuple(self.getPosition()); },
-            [](Light& self, nb::object v) {
-                self.cachedGlobalTransform.m_translation = ToDouble3(v);
-            })
-        .def_prop_rw("direction",
-            [](Light& self) { return Double3ToTuple(self.getDirection()); },
-            [](Light& self, nb::object v) {
-                self.updateCachedDirection(ToDouble3(v));
-            })
-        .def("__repr__", [](Light& self) {
-                const std::string& n = self.name.empty() ? std::string("<unnamed>") : self.name;
-                return std::string("<caustica.Light '") + n + "'>";
-            });
-
-    nb::class_<DirectionalLight, Light>(m, "DirectionalLight",
-        "Distant directional light source (sun-style).")
-        .def_rw("irradiance", &DirectionalLight::irradiance,
-                "Target illuminance (lm/m^2) - multiplied by `color`.")
-        .def_rw("angular_size", &DirectionalLight::angularSize,
-                "Apparent angular size of the light source, in degrees.");
-
-    nb::class_<SpotLight, Light>(m, "SpotLight", "Spot light with inner / outer cones.")
-        .def_rw("intensity", &SpotLight::intensity)
-        .def_rw("radius", &SpotLight::radius)
-        .def_rw("range", &SpotLight::range)
-        .def_rw("inner_angle", &SpotLight::innerAngle)
-        .def_rw("outer_angle", &SpotLight::outerAngle);
-
-    nb::class_<PointLight, Light>(m, "PointLight", "Omnidirectional point light.")
-        .def_rw("intensity", &PointLight::intensity)
-        .def_rw("radius", &PointLight::radius)
-        .def_rw("range", &PointLight::range);
-
-    nb::class_<EnvironmentLight, Light>(m, "EnvironmentLight",
-        "RTXPT environment map / IBL light.")
-        .def_prop_rw("radiance_scale",
-            [](EnvironmentLight& self) { return Float3ToTuple(self.radianceScale); },
-            [](EnvironmentLight& self, nb::object v) { self.radianceScale = ToFloat3(v); })
-        .def_rw("rotation", &EnvironmentLight::rotation)
-        .def_rw("path", &EnvironmentLight::path);
+    // Lights are ECS typed components on SceneNode (no OO Light hierarchy).
 
     nb::class_<MeshInfo>(m, "Mesh",
         "CPU/GPU mesh wrapper. Use Sample.get_mesh_vertices(mesh) and\n"
@@ -982,6 +983,168 @@ void RegisterCoreBindings(nb::module_& m)
         .def_prop_ro("is_mesh", [](PySceneEntity& self) {
                 return MeshFromEntity(self) != nullptr;
             })
+        .def_prop_ro("is_light", [](PySceneEntity& self) {
+                return EntityLightType(self) != LightType_None;
+            })
+        .def_prop_ro("light_type", [](PySceneEntity& self) {
+                return EntityLightType(self);
+            }, "LightType_* constant, or 0 when this entity is not a light.")
+        .def_prop_rw("color",
+            [](PySceneEntity& self) {
+                if (const dm::float3* color = TryMutableLightColor(self))
+                    return Float3ToTuple(*color);
+                return Float3ToTuple(dm::float3(1.f));
+            },
+            [](PySceneEntity& self, nb::object v) {
+                if (dm::float3* color = TryMutableLightColor(self))
+                    *color = ToFloat3(v);
+            },
+            "Light color when this node has a light component.")
+        .def_prop_rw("intensity",
+            [](PySceneEntity& self) {
+                const float* intensity = TryMutableLightIntensity(self);
+                return intensity ? *intensity : 0.f;
+            },
+            [](PySceneEntity& self, nb::object v) {
+                if (float* intensity = TryMutableLightIntensity(self))
+                    *intensity = nb::cast<float>(v);
+            },
+            "Point/spot luminous intensity.")
+        .def_prop_rw("irradiance",
+            [](PySceneEntity& self) {
+                scene::SceneEntityWorld* entityWorld = self.entityWorld();
+                const auto* directional = entityWorld
+                    ? scene::tryGetDirectionalLight(entityWorld->world(), self.entity) : nullptr;
+                return directional ? directional->irradiance : 0.f;
+            },
+            [](PySceneEntity& self, nb::object v) {
+                if (scene::SceneEntityWorld* entityWorld = self.entityWorld())
+                {
+                    if (auto* directional = scene::tryGetDirectionalLight(entityWorld->world(), self.entity))
+                        directional->irradiance = nb::cast<float>(v);
+                }
+            })
+        .def_prop_rw("angular_size",
+            [](PySceneEntity& self) {
+                scene::SceneEntityWorld* entityWorld = self.entityWorld();
+                const auto* directional = entityWorld
+                    ? scene::tryGetDirectionalLight(entityWorld->world(), self.entity) : nullptr;
+                return directional ? directional->angularSize : 0.f;
+            },
+            [](PySceneEntity& self, nb::object v) {
+                if (scene::SceneEntityWorld* entityWorld = self.entityWorld())
+                {
+                    if (auto* directional = scene::tryGetDirectionalLight(entityWorld->world(), self.entity))
+                        directional->angularSize = nb::cast<float>(v);
+                }
+            })
+        .def_prop_rw("radius",
+            [](PySceneEntity& self) {
+                scene::SceneEntityWorld* entityWorld = self.entityWorld();
+                if (!entityWorld)
+                    return 0.f;
+                if (const auto* spot = scene::tryGetSpotLight(entityWorld->world(), self.entity))
+                    return spot->radius;
+                if (const auto* point = scene::tryGetPointLight(entityWorld->world(), self.entity))
+                    return point->radius;
+                return 0.f;
+            },
+            [](PySceneEntity& self, nb::object v) {
+                scene::SceneEntityWorld* entityWorld = self.entityWorld();
+                if (!entityWorld)
+                    return;
+                const float radius = nb::cast<float>(v);
+                if (auto* spot = scene::tryGetSpotLight(entityWorld->world(), self.entity))
+                    spot->radius = radius;
+                else if (auto* point = scene::tryGetPointLight(entityWorld->world(), self.entity))
+                    point->radius = radius;
+            })
+        .def_prop_rw("range",
+            [](PySceneEntity& self) {
+                scene::SceneEntityWorld* entityWorld = self.entityWorld();
+                if (!entityWorld)
+                    return 0.f;
+                if (const auto* spot = scene::tryGetSpotLight(entityWorld->world(), self.entity))
+                    return spot->range;
+                if (const auto* point = scene::tryGetPointLight(entityWorld->world(), self.entity))
+                    return point->range;
+                return 0.f;
+            },
+            [](PySceneEntity& self, nb::object v) {
+                scene::SceneEntityWorld* entityWorld = self.entityWorld();
+                if (!entityWorld)
+                    return;
+                const float range = nb::cast<float>(v);
+                if (auto* spot = scene::tryGetSpotLight(entityWorld->world(), self.entity))
+                    spot->range = range;
+                else if (auto* point = scene::tryGetPointLight(entityWorld->world(), self.entity))
+                    point->range = range;
+            })
+        .def_prop_rw("inner_angle",
+            [](PySceneEntity& self) {
+                scene::SceneEntityWorld* entityWorld = self.entityWorld();
+                const auto* spot = entityWorld ? scene::tryGetSpotLight(entityWorld->world(), self.entity) : nullptr;
+                return spot ? spot->innerAngle : 0.f;
+            },
+            [](PySceneEntity& self, nb::object v) {
+                if (scene::SceneEntityWorld* entityWorld = self.entityWorld())
+                {
+                    if (auto* spot = scene::tryGetSpotLight(entityWorld->world(), self.entity))
+                        spot->innerAngle = nb::cast<float>(v);
+                }
+            })
+        .def_prop_rw("outer_angle",
+            [](PySceneEntity& self) {
+                scene::SceneEntityWorld* entityWorld = self.entityWorld();
+                const auto* spot = entityWorld ? scene::tryGetSpotLight(entityWorld->world(), self.entity) : nullptr;
+                return spot ? spot->outerAngle : 0.f;
+            },
+            [](PySceneEntity& self, nb::object v) {
+                if (scene::SceneEntityWorld* entityWorld = self.entityWorld())
+                {
+                    if (auto* spot = scene::tryGetSpotLight(entityWorld->world(), self.entity))
+                        spot->outerAngle = nb::cast<float>(v);
+                }
+            })
+        .def_prop_rw("environment_path",
+            [](PySceneEntity& self) {
+                scene::SceneEntityWorld* entityWorld = self.entityWorld();
+                const auto* environment = entityWorld
+                    ? scene::tryGetEnvironmentLight(entityWorld->world(), self.entity) : nullptr;
+                return environment ? environment->path : std::string{};
+            },
+            [](PySceneEntity& self, nb::object v) {
+                if (scene::SceneEntityWorld* entityWorld = self.entityWorld())
+                {
+                    if (auto* environment = scene::tryGetEnvironmentLight(entityWorld->world(), self.entity))
+                        environment->path = nb::cast<std::string>(v);
+                }
+            },
+            "Environment light HDRI path.")
+        .def_prop_rw("position",
+            [](PySceneEntity& self) {
+                scene::SceneEntityWorld* entityWorld = self.entityWorld();
+                const auto* global = entityWorld
+                    ? entityWorld->world().tryGet<scene::GlobalTransformComponent>(self.entity) : nullptr;
+                return Double3ToTuple(global ? scene::getLightPosition(global->transform) : double3(0.0));
+            },
+            [](PySceneEntity& self, nb::object v) {
+                if (scene::SceneEntityWorld* entityWorld = self.entityWorld())
+                    scene::setLightWorldPosition(*entityWorld, self.entity, ToDouble3(v));
+            },
+            "World-space light position (updates local translation).")
+        .def_prop_rw("direction",
+            [](PySceneEntity& self) {
+                scene::SceneEntityWorld* entityWorld = self.entityWorld();
+                const auto* global = entityWorld
+                    ? entityWorld->world().tryGet<scene::GlobalTransformComponent>(self.entity) : nullptr;
+                return Double3ToTuple(global ? scene::getLightDirection(global->transform) : double3(0.0, -1.0, 0.0));
+            },
+            [](PySceneEntity& self, nb::object v) {
+                if (scene::SceneEntityWorld* entityWorld = self.entityWorld())
+                    scene::setLightWorldDirection(*entityWorld, self.entity, ToDouble3(v));
+            },
+            "World-space light direction (updates local rotation).")
         .def_prop_rw("translation",
             [](PySceneEntity& self) {
                 scene::SceneEntityWorld* entityWorld = self.entityWorld();
@@ -1066,11 +1229,11 @@ void RegisterCoreBindings(nb::module_& m)
 
         .def("get_lights", [](Scene& self) {
                 return GetSceneLights(&self);
-            }, "Return every Light in this scene.")
+            }, "Return every light entity as SceneNode.")
 
         .def("find_light", [](Scene& self, const std::string& name) {
                 return FindSceneLight(&self, name);
-            }, nb::arg("name"), "Look up a light by entity or light name.")
+            }, nb::arg("name"), "Look up a light entity by name; returns SceneNode or None.")
         .def("find_node", [](Scene& self, const std::string& path) {
                 return FindSceneEntity(&self, path);
             }, nb::arg("path"), "Look up a scene entity by name or path.")
@@ -1433,7 +1596,7 @@ void RegisterCoreBindings(nb::module_& m)
                 return SceneBoundsSize(SceneBoundsFromScene(sceneSession::scene(self)));
             }, "Shortcut for `sample.scene.bounds_size` (or `None`).")
 
-        .def("find_light", [](App& self, const std::string& name) -> std::shared_ptr<Light> {
+        .def("find_light", [](App& self, const std::string& name) -> std::shared_ptr<PySceneEntity> {
                 return FindSceneLight(sceneSession::scene(self).get(), name);
             }, nb::arg("name"), "Compatibility alias for `sample.scene.find_light(name)`.")
         .def("find_node", [](App& self, const std::string& path) -> std::shared_ptr<PySceneEntity> {

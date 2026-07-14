@@ -16,7 +16,7 @@ SceneWorld (ECS)          Extract                SceneRenderData[N%3]           
 ─────────────────         ───────                ────────────────────          ─────────────
 TransformComponent   ──►  Changed / dirty   ──►  MeshInstanceRenderProxy      read-only
 *LightComponent      ──►  LightData pack    ──►  LightRenderProxy             no getEntityWorld()
-CameraController     ──►  pose / FOV        ──►  CameraSnapshot               apply then updateViews
+| CameraController     ──►  pose / FOV        ──►  CameraSnapshot (valid)      apply then updateViews
 PathTracerSettings   ──►  full copy         ──►  RenderSettingsSnapshot       activeSettings()
 ```
 
@@ -28,6 +28,7 @@ PathTracerSettings   ──►  full copy         ──►  RenderSettingsSnaps
 4. Operate on `LightRenderProxy` / `LightData` directly — **no** `asComponent()` glue back to ECS.
 5. ECS lights are UE-style typed components (`DirectionalLightComponent`, `SpotLightComponent`, `PointLightComponent`, `EnvironmentLightComponent`); Extract packs them into unified `LightRenderProxy` + `LightData` for the GPU thread.
 6. Game-thread scene-load / editor mutation may still touch ECS; that is not the render path.
+7. Structure-only republish (runtime drag-drop import) must not stomp `CameraSnapshot` — either pass `SessionRenderExtractInputs`, preserve a same-frame session extract, or leave `camera.valid == false` so WorldRenderer skips apply.
 
 ## What is extracted today
 
@@ -56,8 +57,7 @@ Frame rendering already uses light proxies + cached splat transforms; do not mov
 
 | Item | Status |
 | --- | --- |
-| OO light/camera leaf classes | Import writes typed ECS light components. OO classes remain for store/UI until retired |
-| Typed light components | Done — replace single `LightComponent`+variant on ECS; proxy keeps `LightData` |
+| OO light/camera leaf classes | Light OO hierarchy removed; camera OO remains for store/UI until retired |
 | `sceneSession::*` | Python/Editor still call facade; engine plugins use `tryRes` |
 | `SceneRenderCommandQueue` | Unused — delete or wire |
 

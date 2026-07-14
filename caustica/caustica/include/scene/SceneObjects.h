@@ -9,15 +9,10 @@
 #include <string>
 #include <vector>
 
-struct LightConstants;
-
 namespace Json { class Value; }
-
-namespace caustica::scene { class SceneEntityWorld; }
 
 namespace caustica
 {
-    class Light;
     class SceneTypeFactory;
 
     // Per-light and per-geometry link into the light sampling system.
@@ -62,7 +57,6 @@ namespace caustica
         bool setProperty(const std::string& propName, const dm::float4& value);
 
         std::vector<LightSamplerLink> PerGeometryLightSamplerLinks;
-        std::weak_ptr<Light> ProxiedAnalyticLight;
 
         MeshInstance(const MeshInstance&) = delete;
         MeshInstance(MeshInstance&&) = delete;
@@ -202,136 +196,6 @@ namespace caustica
         [[nodiscard]] std::shared_ptr<OrthographicCamera> clone() const;
         void load(const Json::Value& node) override;
         bool setProperty(const std::string& propName, const dm::float4& value) override;
-    };
-
-    // =========================================================================
-    // Light hierarchy
-    // =========================================================================
-
-    class Light
-    {
-    public:
-        std::string name;
-        ecs::Entity ownerEntity = ecs::NullEntity;
-        mutable dm::daffine3 cachedGlobalTransform = dm::daffine3::identity();
-        dm::float3 color = dm::colors::white;
-
-        // Light sampler integration
-        LightSamplerLink LightLink;
-        std::vector<std::string> Proxies; // proxy mesh entity names for light sampling
-
-        virtual ~Light() = default;
-
-        [[nodiscard]] SceneContentFlags getContentFlags() const { return SceneContentFlags::Lights; }
-
-        [[nodiscard]] virtual int getLightType() const = 0;
-        // Caller supplies the entity's GlobalTransformComponent::transform.
-        virtual void fillLightConstants(LightConstants& lightConstants, const dm::daffine3& globalTransform) const;
-        virtual void store(Json::Value& node) const {}
-        virtual void load(const Json::Value& node) {}
-        virtual bool setProperty(const std::string& propName, const dm::float4& value);
-
-        // Getters derive position/direction from the supplied global transform.
-        [[nodiscard]] dm::double3 getPosition(const dm::daffine3& globalTransform) const
-        {
-            return globalTransform.m_translation;
-        }
-        [[nodiscard]] dm::double3 getDirection(const dm::daffine3& globalTransform) const
-        {
-            return -normalize(dm::double3(globalTransform.m_linear.row2));
-        }
-
-        [[nodiscard]] dm::double3 getPosition() const { return getPosition(cachedGlobalTransform); }
-        [[nodiscard]] dm::double3 getDirection() const { return getDirection(cachedGlobalTransform); }
-
-        void fillLightConstants(LightConstants& lightConstants) const
-        {
-            fillLightConstants(lightConstants, cachedGlobalTransform);
-        }
-
-        void updateCachedDirection(const dm::double3& direction)
-        {
-            const dm::double3 position = cachedGlobalTransform.m_translation;
-            cachedGlobalTransform = lookatZ(direction);
-            cachedGlobalTransform.m_translation = position;
-        }
-
-        // Setters update the entity's local transform via SceneEntityWorld.
-        void setPosition(scene::SceneEntityWorld& world, ecs::Entity entity, const dm::double3& position) const;
-        void setDirection(scene::SceneEntityWorld& world, ecs::Entity entity, const dm::double3& direction) const;
-
-    protected:
-        Light() = default;
-
-        Light(const Light&) = delete;
-        Light(Light&&) = delete;
-        Light& operator=(const Light&) = delete;
-        Light& operator=(Light&&) = delete;
-    };
-
-    class DirectionalLight : public Light
-    {
-    public:
-        float irradiance = 1.f;  // target illuminance (lm/m²) multiplied by color
-        float angularSize = 0.f; // angular diameter of the source, in degrees
-
-        [[nodiscard]] std::shared_ptr<DirectionalLight> clone() const;
-        [[nodiscard]] int getLightType() const override { return LightType_Directional; }
-        using Light::fillLightConstants;
-        void fillLightConstants(LightConstants& lightConstants, const dm::daffine3& globalTransform) const override;
-        void load(const Json::Value& node) override;
-        void store(Json::Value& node) const override;
-        bool setProperty(const std::string& propName, const dm::float4& value) override;
-    };
-
-    class SpotLight : public Light
-    {
-    public:
-        float intensity = 1.f;   // luminous intensity (lm/sr) multiplied by color
-        float radius = 0.f;      // sphere radius, in world units
-        float range = 0.f;       // influence range; 0 = infinite
-        float innerAngle = 180.f; // apex angle of the full-bright cone, in degrees
-        float outerAngle = 180.f; // apex angle of the full cone, in degrees
-
-        [[nodiscard]] std::shared_ptr<SpotLight> clone() const;
-        [[nodiscard]] int getLightType() const override { return LightType_Spot; }
-        using Light::fillLightConstants;
-        void fillLightConstants(LightConstants& lightConstants, const dm::daffine3& globalTransform) const override;
-        void load(const Json::Value& node) override;
-        void store(Json::Value& node) const override;
-        bool setProperty(const std::string& propName, const dm::float4& value) override;
-    };
-
-    class PointLight : public Light
-    {
-    public:
-        float intensity = 1.f; // luminous intensity (lm/sr) multiplied by color
-        float radius = 0.f;    // sphere radius, in world units
-        float range = 0.f;     // influence range; 0 = infinite
-
-        [[nodiscard]] std::shared_ptr<PointLight> clone() const;
-        [[nodiscard]] int getLightType() const override { return LightType_Point; }
-        using Light::fillLightConstants;
-        void fillLightConstants(LightConstants& lightConstants, const dm::daffine3& globalTransform) const override;
-        void load(const Json::Value& node) override;
-        void store(Json::Value& node) const override;
-        bool setProperty(const std::string& propName, const dm::float4& value) override;
-    };
-
-    // Environment / sky light
-    class EnvironmentLight : public Light
-    {
-    public:
-        dm::float3 radianceScale = dm::float3(1.f);
-        int textureIndex = -1;
-        float rotation = 0.f;
-        std::string path;
-
-        [[nodiscard]] std::shared_ptr<EnvironmentLight> clone() const;
-        [[nodiscard]] int getLightType() const override { return LightType_Environment; }
-        using Light::fillLightConstants;
-        void fillLightConstants(LightConstants& lightConstants, const dm::daffine3& globalTransform) const override;
-        void load(const Json::Value& node) override;
     };
 
     // =========================================================================

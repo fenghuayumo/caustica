@@ -2,7 +2,6 @@
 
 #include <math/math.h>
 #include <ecs/Entity.h>
-#include <scene/SceneObjects.h>
 #include <scene/SceneContent.h>
 
 #include <json/json-forwards.h>
@@ -65,9 +64,6 @@ namespace game
         float      AutoOffTime         = 0.0f;
         float      AutoOnTime          = 0.0f;
         float      AutoOnOffTimeOffset = 0.0f;
-
-        caustica::SpotLight*  getSpotLight();
-        caustica::PointLight* getPointLight();
 
         bool read(const Json::Value& node);
         Json::Value write();
