@@ -47,7 +47,7 @@ Published via `Scene::extractAndPublishRenderSnapshot(frameIndex, &sessionInputs
 | --- | --- |
 | `SceneMeshEditing` | Editor / Python deform / geometry sequences on logic thread |
 | `SceneGaussianSplatPasses::loadFromSceneEntities` / `attachToScene` | Load/edit mutates entities then publishes snapshot |
-| Importers + `initialize*Component` | Authoring bridge until importers write ECS directly |
+| JSON / glTF / USD importers | Write `LightComponent` / `CameraComponent` / `AnimationComponent` directly |
 
 Frame rendering already uses light proxies + cached splat transforms; do not move these load/edit paths onto the render thread.
 
@@ -55,8 +55,8 @@ Frame rendering already uses light proxies + cached splat transforms; do not mov
 
 | Item | Status |
 | --- | --- |
-| OO `initialize*Component` in `*Access` | Removed from Access headers; JSON/GLTF OO→ECS conversion lives only in `SceneEcs.cpp` |
-| `sceneSession::*` resource getters | Engine plugins use `ctx.tryRes` / `app.tryResource`; Python/Editor still call `sceneSession` |
+| OO light/camera leaf classes | Import no longer uses them; JSON/glTF/USD write components. Classes remain for store/UI until retired |
+| `sceneSession::*` | Python/Editor still call facade; engine plugins use `tryRes` |
 | `SceneRenderCommandQueue` | Unused — delete or wire |
 
 ## File map

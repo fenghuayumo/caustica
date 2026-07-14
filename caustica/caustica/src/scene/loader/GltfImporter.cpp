@@ -5,8 +5,7 @@
 #include <scene/SceneImport.h>
 #include <assets/loader/TextureLoader.h>
 #include <scene/SceneEcs.h>
-#include <scene/SceneAnimation.h>
-#include <scene/SceneObjects.h>
+#include <scene/SceneAnimationAccess.h>
 #include <core/vfs/VFS.h>
 #include <core/log.h>
 
@@ -1631,81 +1630,72 @@ bool GltfImporter::load(
         }
     }
 
-    std::unordered_map<const cgltf_camera*, std::shared_ptr<SceneCamera>> cameraMap;
+    std::unordered_map<const cgltf_camera*, scene::CameraComponent> cameraMap;
     for (size_t camera_idx = 0; camera_idx < objects->cameras_count; camera_idx++)
     {
         const cgltf_camera* src = &objects->cameras[camera_idx];
-        std::shared_ptr<SceneCamera> dst;
+        scene::CameraComponent dst;
 
         if (src->type == cgltf_camera_type_perspective)
         {
-            std::shared_ptr<PerspectiveCamera> perspectiveCamera = std::make_shared<PerspectiveCamera>();
-
-            perspectiveCamera->zNear = src->data.perspective.znear;
+            scene::PerspectiveCameraData perspective;
+            perspective.zNear = src->data.perspective.znear;
             if (src->data.perspective.has_zfar)
-                perspectiveCamera->zFar = src->data.perspective.zfar;
-            perspectiveCamera->verticalFov = src->data.perspective.yfov;
+                perspective.zFar = src->data.perspective.zfar;
+            perspective.verticalFov = src->data.perspective.yfov;
             if (src->data.perspective.has_aspect_ratio)
-                perspectiveCamera->aspectRatio = src->data.perspective.aspect_ratio;
-
-            dst = perspectiveCamera;
+                perspective.aspectRatio = src->data.perspective.aspect_ratio;
+            dst.data = perspective;
         }
         else
         {
-            std::shared_ptr<OrthographicCamera> orthographicCamera = std::make_shared<OrthographicCamera>();
-            
-            orthographicCamera->zNear = src->data.orthographic.znear;
-            orthographicCamera->zFar = src->data.orthographic.zfar;
-            orthographicCamera->xMag = src->data.orthographic.xmag;
-            orthographicCamera->yMag = src->data.orthographic.ymag;
-
-            dst = orthographicCamera;
+            scene::OrthographicCameraData orthographic;
+            orthographic.zNear = src->data.orthographic.znear;
+            orthographic.zFar = src->data.orthographic.zfar;
+            orthographic.xMag = src->data.orthographic.xmag;
+            orthographic.yMag = src->data.orthographic.ymag;
+            dst.data = orthographic;
         }
 
-        cameraMap[src] = dst;
+        cameraMap[src] = std::move(dst);
     }
 
-    std::unordered_map<const cgltf_light*, std::shared_ptr<Light>> lightMap;
+    std::unordered_map<const cgltf_light*, scene::LightComponent> lightMap;
     for (size_t light_idx = 0; light_idx < objects->lights_count; light_idx++)
     {
         const cgltf_light* src = &objects->lights[light_idx];
-        std::shared_ptr<Light> dst;
+        scene::LightComponent dst;
+        dst.color = src->color;
 
-        switch(src->type)  // NOLINT(clang-diagnostic-switch-enum)
+        switch (src->type) // NOLINT(clang-diagnostic-switch-enum)
         {
         case cgltf_light_type_directional: {
-            auto directional = std::static_pointer_cast<DirectionalLight>(m_SceneTypeFactory->createLeaf("DirectionalLight"));
-            directional->irradiance = src->intensity;
-            directional->color = src->color;
-            dst = directional;
+            scene::DirectionalLightData directional;
+            directional.irradiance = src->intensity;
+            dst.data = directional;
             break;
         }
         case cgltf_light_type_point: {
-            auto point = std::static_pointer_cast<PointLight>(m_SceneTypeFactory->createLeaf("PointLight"));
-            point->intensity = src->intensity;
-            point->color = src->color;
-            point->range = src->range;
-            dst = point;
+            scene::PointLightData point;
+            point.intensity = src->intensity;
+            point.range = src->range;
+            dst.data = point;
             break;
         }
         case cgltf_light_type_spot: {
-            auto spot = std::static_pointer_cast<SpotLight>(m_SceneTypeFactory->createLeaf("SpotLight"));
-            spot->intensity = src->intensity;
-            spot->color = src->color;
-            spot->range = src->range;
-            spot->innerAngle = dm::degrees(src->spot_inner_cone_angle);
-            spot->outerAngle = dm::degrees(src->spot_outer_cone_angle);
-            dst = spot;
+            scene::SpotLightData spot;
+            spot.intensity = src->intensity;
+            spot.range = src->range;
+            spot.innerAngle = dm::degrees(src->spot_inner_cone_angle);
+            spot.outerAngle = dm::degrees(src->spot_outer_cone_angle);
+            dst.data = spot;
             break;
         }
         default:
-            break;
+            continue;
         }
 
-        if (dst)
-        {
-            lightMap[src] = dst;
-        }
+        lightMap[src] = std::move(dst);
     }
 
     result.entityWorld = std::make_shared<scene::SceneEntityWorld>();
@@ -1721,8 +1711,6 @@ bool GltfImporter::load(
         size_t srcCount = 0;
     };
     std::vector<StackItem> stack;
-
-    int unnamedCameraCounter = 1;
 
     StackItem context;
     context.dstParent = root;
@@ -1779,23 +1767,18 @@ bool GltfImporter::load(
             auto found = cameraMap.find(src->camera);
             if (found != cameraMap.end())
             {
-                auto camera = found->second;
+                scene::CameraComponent camera = found->second;
 
                 if (entityHasMesh(dst))
                 {
                     ecs::Entity cameraEntity = world.createEntity({}, dst);
-                    world.setCamera(cameraEntity, camera);
+                    world.setCamera(cameraEntity, std::move(camera));
                     dst = cameraEntity;
                 }
                 else
                 {
-                    world.setCamera(dst, camera);
+                    world.setCamera(dst, std::move(camera));
                 }
-
-                if (src->camera->name)
-                    camera->name = src->camera->name;
-                else if (camera->name.empty())
-                    camera->name = "Camera" + std::to_string(unnamedCameraCounter++);
             }
         }
 
@@ -1804,16 +1787,16 @@ bool GltfImporter::load(
             auto found = lightMap.find(src->light);
             if (found != lightMap.end())
             {
-                auto light = found->second;
+                scene::LightComponent light = found->second;
 
                 if (entityHasMesh(dst))
                 {
                     ecs::Entity lightEntity = world.createEntity({}, dst);
-                    world.setLight(lightEntity, light);
+                    world.setLight(lightEntity, std::move(light));
                 }
                 else
                 {
-                    world.setLight(dst, light);
+                    world.setLight(dst, std::move(light));
                 }
             }
         }
@@ -1882,7 +1865,7 @@ bool GltfImporter::load(
     for (size_t a_idx = 0; a_idx < objects->animations_count; a_idx++)
     {
         const cgltf_animation* srcAnim = &objects->animations[a_idx];
-        auto dstAnim = std::make_shared<SceneAnimation>();
+        scene::AnimationComponent dstAnim;
 
         animationSamplers.clear();
 
@@ -1975,15 +1958,19 @@ bool GltfImporter::load(
             if (!dstSampler)
                 continue;
 
-            auto dstTrack = std::make_shared<SceneAnimationChannel>(dstSampler, dstEntity, attribute);
-            dstAnim->addChannel(dstTrack);
+            scene::AnimationChannelData channel;
+            channel.sampler = dstSampler;
+            channel.targetEntity = dstEntity;
+            channel.attribute = attribute;
+            scene::addAnimationChannel(dstAnim, std::move(channel));
         }
 
-        if (dstAnim->isVald())
+        scene::recalculateAnimationDuration(dstAnim);
+        if (scene::isAnimationValid(dstAnim))
         {
             std::string animName = srcAnim->name ? srcAnim->name : std::string{};
             ecs::Entity animationEntity = world.createEntity(animName, animationContainer);
-            world.setAnimation(animationEntity, dstAnim);
+            world.setAnimation(animationEntity, std::move(dstAnim));
         }
     }
 

@@ -1,9 +1,7 @@
 #include <scene/SceneEcs.h>
-#include <scene/SceneAnimation.h>
 #include <scene/SceneAnimationAccess.h>
 #include <scene/SceneCameraAccess.h>
 #include <scene/SceneLightAccess.h>
-#include <scene/SceneObjects.h>
 
 #include <ecs/ChangeDetection.h>
 
@@ -13,77 +11,6 @@
 
 namespace caustica::scene
 {
-namespace
-{
-
-void fillLightComponentFromObject(LightComponent& component, const Light& light)
-{
-    component.color = light.color;
-    component.lightLink = light.LightLink;
-    component.proxies = light.Proxies;
-
-    if (const auto* directional = dynamic_cast<const DirectionalLight*>(&light))
-    {
-        component.data = DirectionalLightData{ directional->irradiance, directional->angularSize };
-    }
-    else if (const auto* spot = dynamic_cast<const SpotLight*>(&light))
-    {
-        component.data = SpotLightData{
-            spot->intensity, spot->radius, spot->range, spot->innerAngle, spot->outerAngle };
-    }
-    else if (const auto* point = dynamic_cast<const PointLight*>(&light))
-    {
-        component.data = PointLightData{ point->intensity, point->radius, point->range };
-    }
-    else if (const auto* environment = dynamic_cast<const EnvironmentLight*>(&light))
-    {
-        component.data = EnvironmentLightData{
-            environment->radianceScale, environment->textureIndex, environment->rotation, environment->path };
-    }
-}
-
-void fillCameraComponentFromObject(CameraComponent& component, const SceneCamera& camera)
-{
-    if (const auto* perspective = dynamic_cast<const PerspectiveCamera*>(&camera))
-    {
-        component.data = PerspectiveCameraData{
-            perspective->zNear,
-            perspective->verticalFov,
-            perspective->zFar,
-            perspective->aspectRatio,
-            perspective->enableAutoExposure,
-            perspective->exposureCompensation,
-            perspective->exposureValue,
-            perspective->exposureValueMin,
-            perspective->exposureValueMax,
-        };
-    }
-    else if (const auto* orthographic = dynamic_cast<const OrthographicCamera*>(&camera))
-    {
-        component.data = OrthographicCameraData{
-            orthographic->zNear, orthographic->zFar, orthographic->xMag, orthographic->yMag };
-    }
-}
-
-void fillAnimationComponentFromObject(AnimationComponent& component, const SceneAnimation& animation)
-{
-    component.channels.clear();
-    component.duration = animation.getDuration();
-    component.channels.reserve(animation.getChannels().size());
-    for (const auto& channel : animation.getChannels())
-    {
-        AnimationChannelData data;
-        data.sampler = channel->getSampler();
-        data.targetEntity = channel->getTargetEntity();
-        data.targetMaterial = channel->getTargetMaterial();
-        data.attribute = channel->getAttribute();
-        data.leafPropertyName = channel->getLeafPropertyName();
-        component.channels.push_back(std::move(data));
-    }
-}
-
-} // namespace
-
 
 SceneContentFlags getMeshContentFlags(const MeshInfo& mesh)
 {
@@ -883,15 +810,6 @@ void SceneEntityWorld::setLight(ecs::Entity entity, LightComponent component)
     updateLeafContentAndBounds(entity);
 }
 
-void SceneEntityWorld::setLight(ecs::Entity entity, const std::shared_ptr<Light>& light)
-{
-    if (!light)
-        return;
-    LightComponent component;
-    fillLightComponentFromObject(component, *light);
-    setLight(entity, std::move(component));
-}
-
 void SceneEntityWorld::setCamera(ecs::Entity entity, CameraComponent component)
 {
     m_world.emplace<CameraComponent>(entity, std::move(component));
@@ -899,28 +817,10 @@ void SceneEntityWorld::setCamera(ecs::Entity entity, CameraComponent component)
     updateLeafContentAndBounds(entity);
 }
 
-void SceneEntityWorld::setCamera(ecs::Entity entity, const std::shared_ptr<SceneCamera>& camera)
-{
-    if (!camera)
-        return;
-    CameraComponent component;
-    fillCameraComponentFromObject(component, *camera);
-    setCamera(entity, std::move(component));
-}
-
 void SceneEntityWorld::setAnimation(ecs::Entity entity, AnimationComponent component)
 {
     m_world.emplace<AnimationComponent>(entity, std::move(component));
     updateLeafContentAndBounds(entity);
-}
-
-void SceneEntityWorld::setAnimation(ecs::Entity entity, const std::shared_ptr<SceneAnimation>& animation)
-{
-    if (!animation)
-        return;
-    AnimationComponent component;
-    fillAnimationComponentFromObject(component, *animation);
-    setAnimation(entity, std::move(component));
 }
 
 void SceneEntityWorld::setGaussianSplat(ecs::Entity entity, const std::shared_ptr<GaussianSplat>& splat)

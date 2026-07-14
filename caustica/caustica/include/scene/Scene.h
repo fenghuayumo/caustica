@@ -170,7 +170,6 @@ namespace caustica
         [[nodiscard]] scene::SceneRenderCommandQueue& getRenderCommands() { return m_RenderCommands; }
         [[nodiscard]] const scene::SceneRenderCommandQueue& getRenderCommands() const { return m_RenderCommands; }
 
-        void attachLightToRoot(const std::shared_ptr<Light>& light);
         void attachLightToRoot(scene::LightComponent component, const std::string& name = {});
         [[nodiscard]] nvrhi::IDescriptorTable* getDescriptorTable() const { return m_DescriptorTable ? m_DescriptorTable->getDescriptorTable() : nullptr; }
         [[nodiscard]] IDescriptorTableManager* getDescriptorTableManager() const { return m_DescriptorTable.get(); }

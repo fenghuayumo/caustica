@@ -19,9 +19,6 @@
 
 namespace caustica
 {
-class Light;
-class SceneCamera;
-class SceneAnimation;
 class GaussianSplat;
 class SampleSettings;
 class GameSettings;
@@ -280,11 +277,8 @@ public:
     void setSkinnedMeshInstance(ecs::Entity entity, SceneTypeFactory& factory, const std::shared_ptr<MeshInfo>& prototypeMesh);
     void setSkinnedMeshReference(ecs::Entity entity, ecs::Entity skinnedMeshEntity);
     void setLight(ecs::Entity entity, LightComponent component);
-    void setLight(ecs::Entity entity, const std::shared_ptr<Light>& light);
     void setCamera(ecs::Entity entity, CameraComponent component);
-    void setCamera(ecs::Entity entity, const std::shared_ptr<SceneCamera>& camera);
     void setAnimation(ecs::Entity entity, AnimationComponent component);
-    void setAnimation(ecs::Entity entity, const std::shared_ptr<SceneAnimation>& animation);
     void setGaussianSplat(ecs::Entity entity, const std::shared_ptr<GaussianSplat>& splat);
     void setSampleSettings(ecs::Entity entity, const std::shared_ptr<SampleSettings>& settings);
     void setGameSettings(ecs::Entity entity, const std::shared_ptr<GameSettings>& settings);

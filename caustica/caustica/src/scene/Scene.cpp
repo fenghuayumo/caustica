@@ -1,6 +1,7 @@
 #include <scene/Scene.h>
 #include <scene/SceneImport.h>
 #include <scene/SceneRenderExtract.h>
+#include <scene/SceneComponentBuilders.h>
 #include <scene/SceneLightAccess.h>
 #include <scene/SceneObjects.h>
 #include <scene/SceneAnimation.h>
@@ -370,16 +371,6 @@ void Scene::acknowledgeGpuStructureConsumed()
     m_SceneStructureChanged = false;
 }
 
-void Scene::attachLightToRoot(const std::shared_ptr<Light>& light)
-{
-    if (!m_EntityWorld || !light || !ecs::isValid(m_EntityWorld->root()))
-        return;
-
-    ecs::Entity entity = m_EntityWorld->createEntity(light->name, m_EntityWorld->root());
-    m_EntityWorld->setLight(entity, light);
-    m_EntityWorld->rebuildPathsFromRoot();
-}
-
 void Scene::attachLightToRoot(scene::LightComponent component, const std::string& name)
 {
     if (!m_EntityWorld || !ecs::isValid(m_EntityWorld->root()))
@@ -676,6 +667,25 @@ void Scene::attachLeafFromJson(ecs::Entity entity, const Json::Value& src)
         return;
 
     const std::string type = leafTypeNode.asString();
+
+    if (scene::isJsonLightLeafType(type))
+    {
+        if (auto component = scene::makeLightComponentFromJson(type, src))
+            m_EntityWorld->setLight(entity, std::move(*component));
+        else
+            caustica::warning("Failed to build light leaf type '%s'.", type.c_str());
+        return;
+    }
+
+    if (scene::isJsonCameraLeafType(type))
+    {
+        if (auto component = scene::makeCameraComponentFromJson(type, src))
+            m_EntityWorld->setCamera(entity, std::move(*component));
+        else
+            caustica::warning("Failed to build camera leaf type '%s'.", type.c_str());
+        return;
+    }
+
     auto leaf = m_SceneTypeFactory->createLeaf(type);
     if (!leaf)
     {
@@ -683,19 +693,7 @@ void Scene::attachLeafFromJson(ecs::Entity entity, const Json::Value& src)
         return;
     }
 
-    if (type == "DirectionalLight" || type == "PointLight" || type == "SpotLight" || type == "EnvironmentLight")
-    {
-        auto light = std::static_pointer_cast<Light>(leaf);
-        light->load(src);
-        m_EntityWorld->setLight(entity, light);
-    }
-    else if (type == "PerspectiveCamera" || type == "PerspectiveCameraEx" || type == "OrthographicCamera")
-    {
-        auto camera = std::static_pointer_cast<SceneCamera>(leaf);
-        camera->load(src);
-        m_EntityWorld->setCamera(entity, camera);
-    }
-    else if (type == "GaussianSplat" || type == "GaussianSplats" || type == "3DGaussianSplat")
+    if (type == "GaussianSplat" || type == "GaussianSplats" || type == "3DGaussianSplat")
     {
         auto splat = std::static_pointer_cast<GaussianSplat>(leaf);
         splat->load(src);
