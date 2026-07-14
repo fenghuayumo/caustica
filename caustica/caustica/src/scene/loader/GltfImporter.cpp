@@ -11,6 +11,9 @@
 
 #include "rhi/common/misc.h"
 
+#include <type_traits>
+#include <variant>
+
 using namespace caustica::math;
 using namespace caustica;
 using namespace caustica;
@@ -1660,42 +1663,45 @@ bool GltfImporter::load(
         cameraMap[src] = std::move(dst);
     }
 
-    std::unordered_map<const cgltf_light*, scene::LightComponent> lightMap;
+    using ImportedLight = std::variant<
+        scene::DirectionalLightComponent,
+        scene::PointLightComponent,
+        scene::SpotLightComponent>;
+    std::unordered_map<const cgltf_light*, ImportedLight> lightMap;
     for (size_t light_idx = 0; light_idx < objects->lights_count; light_idx++)
     {
         const cgltf_light* src = &objects->lights[light_idx];
-        scene::LightComponent dst;
-        dst.color = src->color;
 
         switch (src->type) // NOLINT(clang-diagnostic-switch-enum)
         {
         case cgltf_light_type_directional: {
-            scene::DirectionalLightData directional;
+            scene::DirectionalLightComponent directional;
+            directional.color = src->color;
             directional.irradiance = src->intensity;
-            dst.data = directional;
+            lightMap[src] = std::move(directional);
             break;
         }
         case cgltf_light_type_point: {
-            scene::PointLightData point;
+            scene::PointLightComponent point;
+            point.color = src->color;
             point.intensity = src->intensity;
             point.range = src->range;
-            dst.data = point;
+            lightMap[src] = std::move(point);
             break;
         }
         case cgltf_light_type_spot: {
-            scene::SpotLightData spot;
+            scene::SpotLightComponent spot;
+            spot.color = src->color;
             spot.intensity = src->intensity;
             spot.range = src->range;
             spot.innerAngle = dm::degrees(src->spot_inner_cone_angle);
             spot.outerAngle = dm::degrees(src->spot_outer_cone_angle);
-            dst.data = spot;
+            lightMap[src] = std::move(spot);
             break;
         }
         default:
             continue;
         }
-
-        lightMap[src] = std::move(dst);
     }
 
     result.entityWorld = std::make_shared<scene::SceneEntityWorld>();
@@ -1787,16 +1793,30 @@ bool GltfImporter::load(
             auto found = lightMap.find(src->light);
             if (found != lightMap.end())
             {
-                scene::LightComponent light = found->second;
+                auto attachLight = [&](ecs::Entity lightEntity, ImportedLight light)
+                {
+                    std::visit(
+                        [&](auto&& component)
+                        {
+                            using T = std::decay_t<decltype(component)>;
+                            if constexpr (std::is_same_v<T, scene::DirectionalLightComponent>)
+                                world.setDirectionalLight(lightEntity, std::move(component));
+                            else if constexpr (std::is_same_v<T, scene::PointLightComponent>)
+                                world.setPointLight(lightEntity, std::move(component));
+                            else if constexpr (std::is_same_v<T, scene::SpotLightComponent>)
+                                world.setSpotLight(lightEntity, std::move(component));
+                        },
+                        std::move(light));
+                };
 
                 if (entityHasMesh(dst))
                 {
                     ecs::Entity lightEntity = world.createEntity({}, dst);
-                    world.setLight(lightEntity, std::move(light));
+                    attachLight(lightEntity, found->second);
                 }
                 else
                 {
-                    world.setLight(dst, std::move(light));
+                    attachLight(dst, found->second);
                 }
             }
         }

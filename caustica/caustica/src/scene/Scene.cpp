@@ -27,6 +27,8 @@
 #include <cmath>
 #include <cstring>
 #include <sstream>
+#include <type_traits>
+#include <variant>
 
 #if CAUSTICA_WITH_STATIC_SHADERS
 #if CAUSTICA_WITH_DX11
@@ -371,13 +373,43 @@ void Scene::acknowledgeGpuStructureConsumed()
     m_SceneStructureChanged = false;
 }
 
-void Scene::attachLightToRoot(scene::LightComponent component, const std::string& name)
+void Scene::attachDirectionalLightToRoot(scene::DirectionalLightComponent component, const std::string& name)
 {
     if (!m_EntityWorld || !ecs::isValid(m_EntityWorld->root()))
         return;
 
     ecs::Entity entity = m_EntityWorld->createEntity(name, m_EntityWorld->root());
-    m_EntityWorld->setLight(entity, std::move(component));
+    m_EntityWorld->setDirectionalLight(entity, std::move(component));
+    m_EntityWorld->rebuildPathsFromRoot();
+}
+
+void Scene::attachSpotLightToRoot(scene::SpotLightComponent component, const std::string& name)
+{
+    if (!m_EntityWorld || !ecs::isValid(m_EntityWorld->root()))
+        return;
+
+    ecs::Entity entity = m_EntityWorld->createEntity(name, m_EntityWorld->root());
+    m_EntityWorld->setSpotLight(entity, std::move(component));
+    m_EntityWorld->rebuildPathsFromRoot();
+}
+
+void Scene::attachPointLightToRoot(scene::PointLightComponent component, const std::string& name)
+{
+    if (!m_EntityWorld || !ecs::isValid(m_EntityWorld->root()))
+        return;
+
+    ecs::Entity entity = m_EntityWorld->createEntity(name, m_EntityWorld->root());
+    m_EntityWorld->setPointLight(entity, std::move(component));
+    m_EntityWorld->rebuildPathsFromRoot();
+}
+
+void Scene::attachEnvironmentLightToRoot(scene::EnvironmentLightComponent component, const std::string& name)
+{
+    if (!m_EntityWorld || !ecs::isValid(m_EntityWorld->root()))
+        return;
+
+    ecs::Entity entity = m_EntityWorld->createEntity(name, m_EntityWorld->root());
+    m_EntityWorld->setEnvironmentLight(entity, std::move(component));
     m_EntityWorld->rebuildPathsFromRoot();
 }
 
@@ -671,7 +703,22 @@ void Scene::attachLeafFromJson(ecs::Entity entity, const Json::Value& src)
     if (scene::isJsonLightLeafType(type))
     {
         if (auto component = scene::makeLightComponentFromJson(type, src))
-            m_EntityWorld->setLight(entity, std::move(*component));
+        {
+            std::visit(
+                [&](auto&& light)
+                {
+                    using T = std::decay_t<decltype(light)>;
+                    if constexpr (std::is_same_v<T, scene::DirectionalLightComponent>)
+                        m_EntityWorld->setDirectionalLight(entity, std::move(light));
+                    else if constexpr (std::is_same_v<T, scene::SpotLightComponent>)
+                        m_EntityWorld->setSpotLight(entity, std::move(light));
+                    else if constexpr (std::is_same_v<T, scene::PointLightComponent>)
+                        m_EntityWorld->setPointLight(entity, std::move(light));
+                    else if constexpr (std::is_same_v<T, scene::EnvironmentLightComponent>)
+                        m_EntityWorld->setEnvironmentLight(entity, std::move(light));
+                },
+                std::move(*component));
+        }
         else
             caustica::warning("Failed to build light leaf type '%s'.", type.c_str());
         return;
@@ -1144,13 +1191,12 @@ void Scene::processNodesRecursive()
         m_loadedGameSettings = component.settings;
     });
 
-    world.each<scene::LightComponent>([this, &world](ecs::Entity lightEntity, scene::LightComponent& component)
+    auto bindProxyMeshes = [this, &world](ecs::Entity lightEntity, const std::vector<std::string>& proxies)
     {
-        const int lightType = scene::getLightType(component);
-        if ((lightType != LightType_Spot && lightType != LightType_Point) || component.proxies.empty())
+        if (proxies.empty())
             return;
 
-        for (const auto& proxyPath : component.proxies)
+        for (const auto& proxyPath : proxies)
         {
             ecs::Entity proxyEntity = m_EntityWorld->entityForPath(proxyPath);
             if (!ecs::isValid(proxyEntity))
@@ -1163,5 +1209,14 @@ void Scene::processNodesRecursive()
                     mesh->proxiedAnalyticLight = lightEntity;
             }
         }
+    };
+
+    world.each<scene::SpotLightComponent>([&](ecs::Entity lightEntity, scene::SpotLightComponent& component)
+    {
+        bindProxyMeshes(lightEntity, component.proxies);
+    });
+    world.each<scene::PointLightComponent>([&](ecs::Entity lightEntity, scene::PointLightComponent& component)
+    {
+        bindProxyMeshes(lightEntity, component.proxies);
     });
 }

@@ -40,14 +40,29 @@ int getLightType(const LightData& data)
     }
 }
 
-int getLightType(const LightComponent& component)
-{
-    return getLightType(component.data);
-}
-
 int getLightType(const LightRenderProxy& proxy)
 {
     return getLightType(proxy.data);
+}
+
+int getLightType(const DirectionalLightComponent&)
+{
+    return LightType_Directional;
+}
+
+int getLightType(const SpotLightComponent&)
+{
+    return LightType_Spot;
+}
+
+int getLightType(const PointLightComponent&)
+{
+    return LightType_Point;
+}
+
+int getLightType(const EnvironmentLightComponent&)
+{
+    return LightType_Environment;
 }
 
 SceneContentFlags getLightContentFlags()
@@ -75,14 +90,40 @@ bool isInfiniteLight(const LightData& data)
     }
 }
 
-bool isInfiniteLight(const LightComponent& component)
-{
-    return isInfiniteLight(component.data);
-}
-
 bool isInfiniteLight(const LightRenderProxy& proxy)
 {
     return isInfiniteLight(proxy.data);
+}
+
+LightData toLightData(const DirectionalLightComponent& component)
+{
+    return DirectionalLightData{ component.irradiance, component.angularSize };
+}
+
+LightData toLightData(const SpotLightComponent& component)
+{
+    return SpotLightData{
+        component.intensity,
+        component.radius,
+        component.range,
+        component.innerAngle,
+        component.outerAngle,
+    };
+}
+
+LightData toLightData(const PointLightComponent& component)
+{
+    return PointLightData{ component.intensity, component.radius, component.range };
+}
+
+LightData toLightData(const EnvironmentLightComponent& component)
+{
+    return EnvironmentLightData{
+        component.radianceScale,
+        component.textureIndex,
+        component.rotation,
+        component.path,
+    };
 }
 
 void fillLightConstants(
@@ -136,67 +177,123 @@ void fillLightConstants(
     }
 }
 
-void fillLightConstants(
-    const LightComponent& component, const dm::daffine3& globalTransform, LightConstants& lightConstants)
-{
-    fillLightConstants(component.color, component.data, globalTransform, lightConstants);
-}
-
 void fillLightConstants(const LightRenderProxy& proxy, LightConstants& lightConstants)
 {
     fillLightConstants(proxy.color, proxy.data, proxy.transform, lightConstants);
 }
 
-bool setLightProperty(LightComponent& component, const std::string& propName, const dm::float4& value)
+bool tryFillLightConstants(
+    const ecs::World& world, ecs::Entity entity, const dm::daffine3& globalTransform, LightConstants& lightConstants)
 {
-    if (propName == "color")
+    if (const auto* directional = tryGetDirectionalLight(world, entity))
     {
-        component.color = value.xyz();
+        fillLightConstants(directional->color, toLightData(*directional), globalTransform, lightConstants);
         return true;
     }
+    if (const auto* spot = tryGetSpotLight(world, entity))
+    {
+        fillLightConstants(spot->color, toLightData(*spot), globalTransform, lightConstants);
+        return true;
+    }
+    if (const auto* point = tryGetPointLight(world, entity))
+    {
+        fillLightConstants(point->color, toLightData(*point), globalTransform, lightConstants);
+        return true;
+    }
+    if (const auto* environment = tryGetEnvironmentLight(world, entity))
+    {
+        fillLightConstants(environment->color, toLightData(*environment), globalTransform, lightConstants);
+        return true;
+    }
+    return false;
+}
 
-    switch (component.data.index())
+bool hasAnyLightComponent(const ecs::World& world, ecs::Entity entity)
+{
+    return world.has<DirectionalLightComponent>(entity)
+        || world.has<SpotLightComponent>(entity)
+        || world.has<PointLightComponent>(entity)
+        || world.has<EnvironmentLightComponent>(entity);
+}
+
+bool setLightProperty(
+    ecs::World& world, ecs::Entity entity, const std::string& propName, const dm::float4& value)
+{
+    if (auto* directional = tryGetDirectionalLight(world, entity))
     {
-    case 0:
-    {
-        auto& directional = std::get<DirectionalLightData>(component.data);
-        if (propName == "irradiance") { directional.irradiance = value.x; return true; }
-        if (propName == "angularSize") { directional.angularSize = value.x; return true; }
-        break;
+        if (propName == "color") { directional->color = value.xyz(); return true; }
+        if (propName == "irradiance") { directional->irradiance = value.x; return true; }
+        if (propName == "angularSize") { directional->angularSize = value.x; return true; }
+        return false;
     }
-    case 1:
+
+    if (auto* spot = tryGetSpotLight(world, entity))
     {
-        auto& spot = std::get<SpotLightData>(component.data);
-        if (propName == "intensity") { spot.intensity = value.x; return true; }
-        if (propName == "radius") { spot.radius = value.x; return true; }
-        if (propName == "range") { spot.range = value.x; return true; }
-        if (propName == "innerAngle") { spot.innerAngle = value.x; return true; }
-        if (propName == "outerAngle") { spot.outerAngle = value.x; return true; }
-        break;
+        if (propName == "color") { spot->color = value.xyz(); return true; }
+        if (propName == "intensity") { spot->intensity = value.x; return true; }
+        if (propName == "radius") { spot->radius = value.x; return true; }
+        if (propName == "range") { spot->range = value.x; return true; }
+        if (propName == "innerAngle") { spot->innerAngle = value.x; return true; }
+        if (propName == "outerAngle") { spot->outerAngle = value.x; return true; }
+        return false;
     }
-    case 2:
+
+    if (auto* point = tryGetPointLight(world, entity))
     {
-        auto& point = std::get<PointLightData>(component.data);
-        if (propName == "intensity") { point.intensity = value.x; return true; }
-        if (propName == "radius") { point.radius = value.x; return true; }
-        if (propName == "range") { point.range = value.x; return true; }
-        break;
+        if (propName == "color") { point->color = value.xyz(); return true; }
+        if (propName == "intensity") { point->intensity = value.x; return true; }
+        if (propName == "radius") { point->radius = value.x; return true; }
+        if (propName == "range") { point->range = value.x; return true; }
+        return false;
     }
-    default:
-        break;
+
+    if (auto* environment = tryGetEnvironmentLight(world, entity))
+    {
+        if (propName == "color") { environment->color = value.xyz(); return true; }
+        return false;
     }
 
     return false;
 }
 
-const LightComponent* tryGetLight(const ecs::World& world, ecs::Entity entity)
+DirectionalLightComponent* tryGetDirectionalLight(ecs::World& world, ecs::Entity entity)
 {
-    return world.tryGet<LightComponent>(entity);
+    return world.tryGet<DirectionalLightComponent>(entity);
 }
 
-LightComponent* tryGetLight(ecs::World& world, ecs::Entity entity)
+SpotLightComponent* tryGetSpotLight(ecs::World& world, ecs::Entity entity)
 {
-    return world.tryGet<LightComponent>(entity);
+    return world.tryGet<SpotLightComponent>(entity);
+}
+
+PointLightComponent* tryGetPointLight(ecs::World& world, ecs::Entity entity)
+{
+    return world.tryGet<PointLightComponent>(entity);
+}
+
+EnvironmentLightComponent* tryGetEnvironmentLight(ecs::World& world, ecs::Entity entity)
+{
+    return world.tryGet<EnvironmentLightComponent>(entity);
+}
+
+const DirectionalLightComponent* tryGetDirectionalLight(const ecs::World& world, ecs::Entity entity)
+{
+    return world.tryGet<DirectionalLightComponent>(entity);
+}
+
+const SpotLightComponent* tryGetSpotLight(const ecs::World& world, ecs::Entity entity)
+{
+    return world.tryGet<SpotLightComponent>(entity);
+}
+
+const PointLightComponent* tryGetPointLight(const ecs::World& world, ecs::Entity entity)
+{
+    return world.tryGet<PointLightComponent>(entity);
+}
+
+const EnvironmentLightComponent* tryGetEnvironmentLight(const ecs::World& world, ecs::Entity entity)
+{
+    return world.tryGet<EnvironmentLightComponent>(entity);
 }
 
 DirectionalLightData* tryGetDirectionalLightData(LightData& data)
@@ -239,63 +336,19 @@ const EnvironmentLightData* tryGetEnvironmentLightData(const LightData& data)
     return std::get_if<EnvironmentLightData>(&data);
 }
 
-DirectionalLightData* tryGetDirectionalLightData(LightComponent& component)
-{
-    return tryGetDirectionalLightData(component.data);
-}
-
-SpotLightData* tryGetSpotLightData(LightComponent& component)
-{
-    return tryGetSpotLightData(component.data);
-}
-
-PointLightData* tryGetPointLightData(LightComponent& component)
-{
-    return tryGetPointLightData(component.data);
-}
-
-EnvironmentLightData* tryGetEnvironmentLightData(LightComponent& component)
-{
-    return tryGetEnvironmentLightData(component.data);
-}
-
-const DirectionalLightData* tryGetDirectionalLightData(const LightComponent& component)
-{
-    return tryGetDirectionalLightData(component.data);
-}
-
-const SpotLightData* tryGetSpotLightData(const LightComponent& component)
-{
-    return tryGetSpotLightData(component.data);
-}
-
-const PointLightData* tryGetPointLightData(const LightComponent& component)
-{
-    return tryGetPointLightData(component.data);
-}
-
-const EnvironmentLightData* tryGetEnvironmentLightData(const LightComponent& component)
-{
-    return tryGetEnvironmentLightData(component.data);
-}
-
 ecs::Entity findEnvironmentLightEntity(const ecs::World& world, const std::vector<ecs::Entity>& lightEntities)
 {
     for (ecs::Entity entity : lightEntities)
     {
-        const auto* component = tryGetLight(world, entity);
-        if (component && getLightType(*component) == LightType_Environment)
+        if (world.has<EnvironmentLightComponent>(entity))
             return entity;
     }
     return ecs::NullEntity;
 }
 
-const std::string& getEnvironmentLightPath(const LightComponent& component)
+const std::string& getEnvironmentLightPath(const EnvironmentLightComponent& component)
 {
-    static const std::string s_empty;
-    if (const auto* environment = tryGetEnvironmentLightData(component))
-        return environment->path;
-    return s_empty;
+    return component.path;
 }
 
 } // namespace caustica::scene

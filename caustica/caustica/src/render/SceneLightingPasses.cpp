@@ -25,11 +25,15 @@ void collectLiveLightEntities(caustica::Scene& scene, std::vector<ecs::Entity>& 
     if (!entityWorld)
         return;
 
-    entityWorld->world().each<scene::LightComponent>(
-        [&](ecs::Entity entity, const scene::LightComponent&)
-        {
-            out.push_back(entity);
-        });
+    auto& world = entityWorld->world();
+    world.each<scene::DirectionalLightComponent>(
+        [&](ecs::Entity entity, const scene::DirectionalLightComponent&) { out.push_back(entity); });
+    world.each<scene::SpotLightComponent>(
+        [&](ecs::Entity entity, const scene::SpotLightComponent&) { out.push_back(entity); });
+    world.each<scene::PointLightComponent>(
+        [&](ecs::Entity entity, const scene::PointLightComponent&) { out.push_back(entity); });
+    world.each<scene::EnvironmentLightComponent>(
+        [&](ecs::Entity entity, const scene::EnvironmentLightComponent&) { out.push_back(entity); });
 }
 
 } // namespace
@@ -85,7 +89,7 @@ void SceneLightingPasses::onSceneLoaded(caustica::Scene& scene, PathTracerSettin
         envEntity = scene::findEnvironmentLightEntity(entityWorld->world(), m_lightEntities);
         if (ecs::isValid(envEntity))
         {
-            if (const auto* light = scene::tryGetLight(entityWorld->world(), envEntity))
+            if (const auto* light = scene::tryGetEnvironmentLight(entityWorld->world(), envEntity))
                 m_envMapLocalPath = scene::getEnvironmentLightPath(*light);
         }
     }
@@ -97,13 +101,13 @@ void SceneLightingPasses::onSceneLoaded(caustica::Scene& scene, PathTracerSettin
         auto& world = entityWorld->world();
         for (int i = static_cast<int>(m_lightEntities.size()) - 1; i >= 0; --i)
         {
-            const auto* light = scene::tryGetLight(world, m_lightEntities[i]);
             const auto* global = world.tryGet<scene::GlobalTransformComponent>(m_lightEntities[i]);
-            if (!light || !global)
+            if (!global)
                 continue;
 
             LightConstants lc;
-            scene::fillLightConstants(*light, global->transform, lc);
+            if (!scene::tryFillLightConstants(world, m_lightEntities[i], global->transform, lc))
+                continue;
             if (length(lc.color * lc.intensity) <= 1e-7f)
                 m_lightEntities.erase(m_lightEntities.begin() + i);
         }
@@ -113,11 +117,9 @@ void SceneLightingPasses::onSceneLoaded(caustica::Scene& scene, PathTracerSettin
     {
         if (!ecs::isValid(envEntity))
         {
-            scene::LightComponent component;
-            component.data = scene::EnvironmentLightData{};
-            if (auto* environment = std::get_if<scene::EnvironmentLightData>(&component.data))
-                environment->path = m_envMapLocalPath;
-            scene.attachLightToRoot(std::move(component), "Environment");
+            scene::EnvironmentLightComponent component;
+            component.path = m_envMapLocalPath;
+            scene.attachEnvironmentLightToRoot(std::move(component), "Environment");
             collectLiveLightEntities(scene, m_lightEntities);
         }
     }

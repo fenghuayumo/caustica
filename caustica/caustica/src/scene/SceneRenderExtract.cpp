@@ -1,6 +1,7 @@
 #include <scene/SceneRenderExtract.h>
 #include <scene/SceneRenderData.h>
 #include <scene/SceneEcs.h>
+#include <scene/SceneLightAccess.h>
 
 #include <algorithm>
 #include <vector>
@@ -75,7 +76,7 @@ void extractSceneRenderData(SceneEntityWorld& entityWorld, SceneRenderData& out,
         proxy.proxiedAnalyticLight = ref.meshComp->proxiedAnalyticLight;
 
         if (const auto* parent = world.get<ParentComponent>(ref.entity);
-            parent && ecs::isValid(parent->parent) && world.has<LightComponent>(parent->parent))
+            parent && ecs::isValid(parent->parent) && hasAnyLightComponent(world, parent->parent))
         {
             proxy.parentLightEntity = parent->parent;
         }
@@ -151,17 +152,38 @@ void extractSceneRenderData(SceneEntityWorld& entityWorld, SceneRenderData& out,
             out.skinnedMeshInstanceEntities.push_back(entity);
         });
 
-    world.each<LightComponent, GlobalTransformComponent>(
-        [&](ecs::Entity entity, const LightComponent& light, const GlobalTransformComponent& global)
+    auto extractLight = [&](ecs::Entity entity, dm::float3 color, const std::vector<std::string>& proxies,
+                            LightData data, const GlobalTransformComponent& global)
+    {
+        LightRenderProxy proxy;
+        proxy.entity = entity;
+        proxy.color = color;
+        proxy.proxies = proxies;
+        proxy.data = std::move(data);
+        proxy.transform = global.transform;
+        out.lights.push_back(std::move(proxy));
+        out.lightEntities.push_back(entity);
+    };
+
+    world.each<DirectionalLightComponent, GlobalTransformComponent>(
+        [&](ecs::Entity entity, const DirectionalLightComponent& light, const GlobalTransformComponent& global)
         {
-            LightRenderProxy proxy;
-            proxy.entity = entity;
-            proxy.color = light.color;
-            proxy.proxies = light.proxies;
-            proxy.data = light.data;
-            proxy.transform = global.transform;
-            out.lights.push_back(std::move(proxy));
-            out.lightEntities.push_back(entity);
+            extractLight(entity, light.color, {}, toLightData(light), global);
+        });
+    world.each<SpotLightComponent, GlobalTransformComponent>(
+        [&](ecs::Entity entity, const SpotLightComponent& light, const GlobalTransformComponent& global)
+        {
+            extractLight(entity, light.color, light.proxies, toLightData(light), global);
+        });
+    world.each<PointLightComponent, GlobalTransformComponent>(
+        [&](ecs::Entity entity, const PointLightComponent& light, const GlobalTransformComponent& global)
+        {
+            extractLight(entity, light.color, light.proxies, toLightData(light), global);
+        });
+    world.each<EnvironmentLightComponent, GlobalTransformComponent>(
+        [&](ecs::Entity entity, const EnvironmentLightComponent& light, const GlobalTransformComponent& global)
+        {
+            extractLight(entity, light.color, {}, toLightData(light), global);
         });
 
     for (ecs::Entity entity : entityWorld.cameraEntitiesInRegistrationOrder())

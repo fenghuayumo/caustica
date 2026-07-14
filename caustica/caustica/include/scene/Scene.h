@@ -170,7 +170,10 @@ namespace caustica
         [[nodiscard]] scene::SceneRenderCommandQueue& getRenderCommands() { return m_RenderCommands; }
         [[nodiscard]] const scene::SceneRenderCommandQueue& getRenderCommands() const { return m_RenderCommands; }
 
-        void attachLightToRoot(scene::LightComponent component, const std::string& name = {});
+        void attachDirectionalLightToRoot(scene::DirectionalLightComponent component, const std::string& name = {});
+        void attachSpotLightToRoot(scene::SpotLightComponent component, const std::string& name = {});
+        void attachPointLightToRoot(scene::PointLightComponent component, const std::string& name = {});
+        void attachEnvironmentLightToRoot(scene::EnvironmentLightComponent component, const std::string& name = {});
         [[nodiscard]] nvrhi::IDescriptorTable* getDescriptorTable() const { return m_DescriptorTable ? m_DescriptorTable->getDescriptorTable() : nullptr; }
         [[nodiscard]] IDescriptorTableManager* getDescriptorTableManager() const { return m_DescriptorTable.get(); }
         [[nodiscard]] render::SceneGpuResources& getGpuResources() { return *m_GpuResources; }

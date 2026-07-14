@@ -15,7 +15,7 @@ Caustica combines a **Bevy-inspired logic-side ECS** with an **Unreal-style game
 SceneWorld (ECS)          Extract                SceneRenderData[N%3]           WorldRenderer
 ─────────────────         ───────                ────────────────────          ─────────────
 TransformComponent   ──►  Changed / dirty   ──►  MeshInstanceRenderProxy      read-only
-LightComponent       ──►  light fields      ──►  LightRenderProxy             no getEntityWorld()
+*LightComponent      ──►  LightData pack    ──►  LightRenderProxy             no getEntityWorld()
 CameraController     ──►  pose / FOV        ──►  CameraSnapshot               apply then updateViews
 PathTracerSettings   ──►  full copy         ──►  RenderSettingsSnapshot       activeSettings()
 ```
@@ -24,9 +24,10 @@ PathTracerSettings   ──►  full copy         ──►  RenderSettingsSnaps
 
 1. Render-thread frame work must consume `Scene::getRenderData()` (or typed proxies inside it).
 2. Render thread must **not** call `Scene::getEntityWorld()` for per-frame lighting / emissive / mesh enumeration.
-3. Light history (NEE-AT remapping) lives in render-side maps (`LightSamplingCache`), not in `LightComponent::lightLink`.
+3. Light history (NEE-AT remapping) lives in render-side maps (`LightSamplingCache`), not in typed `*LightComponent::lightLink`.
 4. Operate on `LightRenderProxy` / `LightData` directly — **no** `asComponent()` glue back to ECS.
-5. Game-thread scene-load / editor mutation may still touch ECS; that is not the render path.
+5. ECS lights are UE-style typed components (`DirectionalLightComponent`, `SpotLightComponent`, `PointLightComponent`, `EnvironmentLightComponent`); Extract packs them into unified `LightRenderProxy` + `LightData` for the GPU thread.
+6. Game-thread scene-load / editor mutation may still touch ECS; that is not the render path.
 
 ## What is extracted today
 
@@ -47,7 +48,7 @@ Published via `Scene::extractAndPublishRenderSnapshot(frameIndex, &sessionInputs
 | --- | --- |
 | `SceneMeshEditing` | Editor / Python deform / geometry sequences on logic thread |
 | `SceneGaussianSplatPasses::loadFromSceneEntities` / `attachToScene` | Load/edit mutates entities then publishes snapshot |
-| JSON / glTF / USD importers | Write `LightComponent` / `CameraComponent` / `AnimationComponent` directly |
+| JSON / glTF / USD importers | Write typed `*LightComponent` / `CameraComponent` / `AnimationComponent` directly |
 
 Frame rendering already uses light proxies + cached splat transforms; do not move these load/edit paths onto the render thread.
 
@@ -55,7 +56,8 @@ Frame rendering already uses light proxies + cached splat transforms; do not mov
 
 | Item | Status |
 | --- | --- |
-| OO light/camera leaf classes | Import no longer uses them; JSON/glTF/USD write components. Classes remain for store/UI until retired |
+| OO light/camera leaf classes | Import writes typed ECS light components. OO classes remain for store/UI until retired |
+| Typed light components | Done — replace single `LightComponent`+variant on ECS; proxy keeps `LightData` |
 | `sceneSession::*` | Python/Editor still call facade; engine plugins use `tryRes` |
 | `SceneRenderCommandQueue` | Unused — delete or wire |
 

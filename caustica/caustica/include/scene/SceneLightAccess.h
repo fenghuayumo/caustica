@@ -16,25 +16,42 @@ namespace caustica::scene
 struct LightRenderProxy;
 
 [[nodiscard]] int getLightType(const LightData& data);
-[[nodiscard]] int getLightType(const LightComponent& component);
 [[nodiscard]] int getLightType(const LightRenderProxy& proxy);
+[[nodiscard]] int getLightType(const DirectionalLightComponent&);
+[[nodiscard]] int getLightType(const SpotLightComponent&);
+[[nodiscard]] int getLightType(const PointLightComponent&);
+[[nodiscard]] int getLightType(const EnvironmentLightComponent&);
 [[nodiscard]] SceneContentFlags getLightContentFlags();
 
 [[nodiscard]] dm::double3 getLightPosition(const dm::daffine3& globalTransform);
 [[nodiscard]] dm::double3 getLightDirection(const dm::daffine3& globalTransform);
 [[nodiscard]] bool isInfiniteLight(const LightData& data);
-[[nodiscard]] bool isInfiniteLight(const LightComponent& component);
 [[nodiscard]] bool isInfiniteLight(const LightRenderProxy& proxy);
+
+[[nodiscard]] LightData toLightData(const DirectionalLightComponent& component);
+[[nodiscard]] LightData toLightData(const SpotLightComponent& component);
+[[nodiscard]] LightData toLightData(const PointLightComponent& component);
+[[nodiscard]] LightData toLightData(const EnvironmentLightComponent& component);
 
 void fillLightConstants(
     dm::float3 color, const LightData& data, const dm::daffine3& globalTransform, LightConstants& lightConstants);
-void fillLightConstants(
-    const LightComponent& component, const dm::daffine3& globalTransform, LightConstants& lightConstants);
 void fillLightConstants(const LightRenderProxy& proxy, LightConstants& lightConstants);
-[[nodiscard]] bool setLightProperty(LightComponent& component, const std::string& propName, const dm::float4& value);
+[[nodiscard]] bool tryFillLightConstants(
+    const ecs::World& world, ecs::Entity entity, const dm::daffine3& globalTransform, LightConstants& lightConstants);
 
-[[nodiscard]] const LightComponent* tryGetLight(const ecs::World& world, ecs::Entity entity);
-[[nodiscard]] LightComponent* tryGetLight(ecs::World& world, ecs::Entity entity);
+[[nodiscard]] bool hasAnyLightComponent(const ecs::World& world, ecs::Entity entity);
+[[nodiscard]] bool setLightProperty(
+    ecs::World& world, ecs::Entity entity, const std::string& propName, const dm::float4& value);
+
+[[nodiscard]] DirectionalLightComponent* tryGetDirectionalLight(ecs::World& world, ecs::Entity entity);
+[[nodiscard]] SpotLightComponent* tryGetSpotLight(ecs::World& world, ecs::Entity entity);
+[[nodiscard]] PointLightComponent* tryGetPointLight(ecs::World& world, ecs::Entity entity);
+[[nodiscard]] EnvironmentLightComponent* tryGetEnvironmentLight(ecs::World& world, ecs::Entity entity);
+
+[[nodiscard]] const DirectionalLightComponent* tryGetDirectionalLight(const ecs::World& world, ecs::Entity entity);
+[[nodiscard]] const SpotLightComponent* tryGetSpotLight(const ecs::World& world, ecs::Entity entity);
+[[nodiscard]] const PointLightComponent* tryGetPointLight(const ecs::World& world, ecs::Entity entity);
+[[nodiscard]] const EnvironmentLightComponent* tryGetEnvironmentLight(const ecs::World& world, ecs::Entity entity);
 
 [[nodiscard]] DirectionalLightData* tryGetDirectionalLightData(LightData& data);
 [[nodiscard]] SpotLightData* tryGetSpotLightData(LightData& data);
@@ -46,17 +63,7 @@ void fillLightConstants(const LightRenderProxy& proxy, LightConstants& lightCons
 [[nodiscard]] const PointLightData* tryGetPointLightData(const LightData& data);
 [[nodiscard]] const EnvironmentLightData* tryGetEnvironmentLightData(const LightData& data);
 
-[[nodiscard]] DirectionalLightData* tryGetDirectionalLightData(LightComponent& component);
-[[nodiscard]] SpotLightData* tryGetSpotLightData(LightComponent& component);
-[[nodiscard]] PointLightData* tryGetPointLightData(LightComponent& component);
-[[nodiscard]] EnvironmentLightData* tryGetEnvironmentLightData(LightComponent& component);
-
-[[nodiscard]] const DirectionalLightData* tryGetDirectionalLightData(const LightComponent& component);
-[[nodiscard]] const SpotLightData* tryGetSpotLightData(const LightComponent& component);
-[[nodiscard]] const PointLightData* tryGetPointLightData(const LightComponent& component);
-[[nodiscard]] const EnvironmentLightData* tryGetEnvironmentLightData(const LightComponent& component);
-
 [[nodiscard]] ecs::Entity findEnvironmentLightEntity(const ecs::World& world, const std::vector<ecs::Entity>& lightEntities);
-[[nodiscard]] const std::string& getEnvironmentLightPath(const LightComponent& component);
+[[nodiscard]] const std::string& getEnvironmentLightPath(const EnvironmentLightComponent& component);
 
 } // namespace caustica::scene

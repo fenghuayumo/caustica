@@ -110,6 +110,7 @@ struct SkinnedMeshReferenceComponent
     ecs::Entity skinnedMeshEntity = ecs::NullEntity;
 };
 
+// Typed payloads also used by LightRenderProxy (GPU-facing flat packet).
 struct DirectionalLightData
 {
     float irradiance = 1.f;
@@ -142,12 +143,45 @@ struct EnvironmentLightData
 
 using LightData = std::variant<DirectionalLightData, SpotLightData, PointLightData, EnvironmentLightData>;
 
-struct LightComponent
+// UE-style typed light components (mutually exclusive on an entity).
+struct DirectionalLightComponent
+{
+    dm::float3 color = dm::colors::white;
+    LightSamplerLink lightLink;
+    float irradiance = 1.f;
+    float angularSize = 0.f;
+};
+
+struct SpotLightComponent
 {
     dm::float3 color = dm::colors::white;
     LightSamplerLink lightLink;
     std::vector<std::string> proxies;
-    LightData data;
+    float intensity = 1.f;
+    float radius = 0.f;
+    float range = 0.f;
+    float innerAngle = 180.f;
+    float outerAngle = 180.f;
+};
+
+struct PointLightComponent
+{
+    dm::float3 color = dm::colors::white;
+    LightSamplerLink lightLink;
+    std::vector<std::string> proxies;
+    float intensity = 1.f;
+    float radius = 0.f;
+    float range = 0.f;
+};
+
+struct EnvironmentLightComponent
+{
+    dm::float3 color = dm::colors::white;
+    LightSamplerLink lightLink;
+    dm::float3 radianceScale = dm::float3(1.f);
+    int textureIndex = -1;
+    float rotation = 0.f;
+    std::string path;
 };
 
 struct PerspectiveCameraData
@@ -276,7 +310,10 @@ public:
     void setMeshInstance(ecs::Entity entity, const std::shared_ptr<MeshInfo>& mesh);
     void setSkinnedMeshInstance(ecs::Entity entity, SceneTypeFactory& factory, const std::shared_ptr<MeshInfo>& prototypeMesh);
     void setSkinnedMeshReference(ecs::Entity entity, ecs::Entity skinnedMeshEntity);
-    void setLight(ecs::Entity entity, LightComponent component);
+    void setDirectionalLight(ecs::Entity entity, DirectionalLightComponent component);
+    void setSpotLight(ecs::Entity entity, SpotLightComponent component);
+    void setPointLight(ecs::Entity entity, PointLightComponent component);
+    void setEnvironmentLight(ecs::Entity entity, EnvironmentLightComponent component);
     void setCamera(ecs::Entity entity, CameraComponent component);
     void setAnimation(ecs::Entity entity, AnimationComponent component);
     void setGaussianSplat(ecs::Entity entity, const std::shared_ptr<GaussianSplat>& splat);

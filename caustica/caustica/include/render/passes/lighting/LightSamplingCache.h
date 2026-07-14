@@ -35,7 +35,7 @@ class ShaderDebug;
 #include <scene/Scene.h>
 
 // Render-thread light history is keyed by entity / instance hash.
-// Do not mutate LightComponent::lightLink or MeshInstanceComponent::perGeometryLightSamplerLinks.
+// Do not mutate *LightComponent::lightLink or MeshInstanceComponent::perGeometryLightSamplerLinks.
 
 // This prepares all scene lighting (including environment map already partially processed by EnvMapProcessor) for sampling in path tracing.
 // Supported sampling approaches are Uniform, Power and NEE-AT. All NEE-AT baking logic is included here.

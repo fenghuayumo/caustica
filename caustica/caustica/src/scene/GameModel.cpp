@@ -137,8 +137,8 @@ void ModelInstance::mapLightControllers(ecs::Entity entity)
     auto& ecsWorld = world->world();
 
     ForEachEntityInSubtree(*world, entity, [&](ecs::Entity current) {
-        if (auto* lightComp = ecsWorld.get<scene::LightComponent>(current))
-        {
+        if (!scene::hasAnyLightComponent(ecsWorld, current))
+            return;
 
             const std::string entityName = world->getEntityName(current);
             std::string data = m_modelType->findLightControllerInfo(entityName);
@@ -161,7 +161,6 @@ void ModelInstance::mapLightControllers(ecs::Entity entity)
                 caustica::warning("Model instance '%s', light '%s' has no controller",
                     m_name.c_str(), entityName.c_str());
             }
-        }
     });
 }
 
@@ -186,14 +185,15 @@ void ModelInstance::updateLightFromControllers(double gameTime)
         dm::decomposeAffine<float>(global->transformFloat, nullptr, nullptr, &scale);
         float reallyAverageScale = (scale.x + scale.y + scale.z) / 3.0f;
 
-        auto* lightComp = ecsWorld.get<scene::LightComponent>(controller->Entity);
-        if (!lightComp)
+        auto* spot = scene::tryGetSpotLight(ecsWorld, controller->Entity);
+        auto* point = scene::tryGetPointLight(ecsWorld, controller->Entity);
+        if (!spot && !point)
             continue;
 
-        auto* spotData = scene::tryGetSpotLightData(*lightComp);
-        auto* pointData = scene::tryGetPointLightData(*lightComp);
-
-        lightComp->color = controller->Color;
+        if (spot)
+            spot->color = controller->Color;
+        if (point)
+            point->color = controller->Color;
 
         bool enabled = controller->enabled;
 
@@ -207,21 +207,21 @@ void ModelInstance::updateLightFromControllers(double gameTime)
 
         float intensity = enabled ? controller->Intensity : 0.0f;
 
-        if (spotData != nullptr)
+        if (spot != nullptr)
         {
-            spotData->radius = reallyAverageScale;
-            spotData->intensity = intensity;
-            spotData->outerAngle = abs(controller->OuterAngle);
-            spotData->innerAngle = controller->InnerAngle;
+            spot->radius = reallyAverageScale;
+            spot->intensity = intensity;
+            spot->outerAngle = abs(controller->OuterAngle);
+            spot->innerAngle = controller->InnerAngle;
 
             const bool kUseMinSpotlightFalloff = true;
             if (kUseMinSpotlightFalloff)
-                spotData->outerAngle = -spotData->outerAngle;
+                spot->outerAngle = -spot->outerAngle;
         }
-        if (pointData != nullptr)
+        if (point != nullptr)
         {
-            pointData->radius = reallyAverageScale;
-            pointData->intensity = intensity;
+            point->radius = reallyAverageScale;
+            point->intensity = intensity;
         }
     }
 }

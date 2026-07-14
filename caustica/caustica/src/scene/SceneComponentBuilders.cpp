@@ -34,54 +34,48 @@ bool isJsonCameraLeafType(const std::string& type)
         || type == "OrthographicCamera";
 }
 
-std::optional<LightComponent> makeLightComponentFromJson(const std::string& type, const Json::Value& src)
+std::optional<AnyLightComponent> makeLightComponentFromJson(const std::string& type, const Json::Value& src)
 {
-    LightComponent component;
-
     if (type == "DirectionalLight")
     {
-        DirectionalLightData data;
+        DirectionalLightComponent component;
         src["color"] >> component.color;
-        src["irradiance"] >> data.irradiance;
-        src["angularSize"] >> data.angularSize;
-        component.data = data;
+        src["irradiance"] >> component.irradiance;
+        src["angularSize"] >> component.angularSize;
         return component;
     }
 
     if (type == "PointLight")
     {
-        PointLightData data;
+        PointLightComponent component;
         src["color"] >> component.color;
-        src["intensity"] >> data.intensity;
-        src["radius"] >> data.radius;
-        src["range"] >> data.range;
+        src["intensity"] >> component.intensity;
+        src["radius"] >> component.radius;
+        src["range"] >> component.range;
         loadProxyMeshNodes(src, component.proxies);
-        component.data = data;
         return component;
     }
 
     if (type == "SpotLight")
     {
-        SpotLightData data;
+        SpotLightComponent component;
         src["color"] >> component.color;
-        src["intensity"] >> data.intensity;
-        src["innerAngle"] >> data.innerAngle;
-        src["outerAngle"] >> data.outerAngle;
-        src["radius"] >> data.radius;
-        src["range"] >> data.range;
+        src["intensity"] >> component.intensity;
+        src["innerAngle"] >> component.innerAngle;
+        src["outerAngle"] >> component.outerAngle;
+        src["radius"] >> component.radius;
+        src["range"] >> component.range;
         loadProxyMeshNodes(src, component.proxies);
-        component.data = data;
         return component;
     }
 
     if (type == "EnvironmentLight")
     {
-        EnvironmentLightData data;
-        src["radianceScale"] >> data.radianceScale;
-        src["textureIndex"] >> data.textureIndex;
-        src["rotation"] >> data.rotation;
-        src["path"] >> data.path;
-        component.data = std::move(data);
+        EnvironmentLightComponent component;
+        src["radianceScale"] >> component.radianceScale;
+        src["textureIndex"] >> component.textureIndex;
+        src["rotation"] >> component.rotation;
+        src["path"] >> component.path;
         return component;
     }
 

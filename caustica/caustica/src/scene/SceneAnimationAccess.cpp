@@ -137,9 +137,9 @@ bool applyAnimationChannel(const AnimationChannelData& channel, float time, Scen
                         channel.leafPropertyName.c_str());
                 }
             }
-            else if (auto* lightComp = world.world().get<LightComponent>(channel.targetEntity))
+            else if (hasAnyLightComponent(world.world(), channel.targetEntity))
             {
-                if (!setLightProperty(*lightComp, channel.leafPropertyName, value))
+                if (!setLightProperty(world.world(), channel.targetEntity, channel.leafPropertyName, value))
                 {
                     caustica::warning("Cannot set property '%s' on light: the light doesn't support this property.",
                         channel.leafPropertyName.c_str());

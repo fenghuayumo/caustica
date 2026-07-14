@@ -227,8 +227,14 @@ void CopyEntityComponents(
     }
     if (const auto* skinRef = srcWorld.get<SkinnedMeshReferenceComponent>(srcEntity))
         dstWorld.emplace<SkinnedMeshReferenceComponent>(dstEntity, *skinRef);
-    if (const auto* light = srcWorld.get<LightComponent>(srcEntity))
-        dstWorld.emplace<LightComponent>(dstEntity, *light);
+    if (const auto* directional = srcWorld.get<DirectionalLightComponent>(srcEntity))
+        dstWorld.emplace<DirectionalLightComponent>(dstEntity, *directional);
+    if (const auto* spot = srcWorld.get<SpotLightComponent>(srcEntity))
+        dstWorld.emplace<SpotLightComponent>(dstEntity, *spot);
+    if (const auto* point = srcWorld.get<PointLightComponent>(srcEntity))
+        dstWorld.emplace<PointLightComponent>(dstEntity, *point);
+    if (const auto* environment = srcWorld.get<EnvironmentLightComponent>(srcEntity))
+        dstWorld.emplace<EnvironmentLightComponent>(dstEntity, *environment);
     if (const auto* camera = srcWorld.get<CameraComponent>(srcEntity))
         dstWorld.emplace<CameraComponent>(dstEntity, *camera);
     if (const auto* animation = srcWorld.get<AnimationComponent>(srcEntity))
@@ -312,7 +318,10 @@ void SceneEntityWorld::syncDirtyFlagsFromChangeDetection()
         || changeDetection->anyOfChangedThisFrame<
             MeshInstanceComponent,
             SkinnedMeshComponent,
-            LightComponent,
+            DirectionalLightComponent,
+            SpotLightComponent,
+            PointLightComponent,
+            EnvironmentLightComponent,
             CameraComponent,
             AnimationComponent,
             GaussianSplatComponent,
@@ -321,7 +330,10 @@ void SceneEntityWorld::syncDirtyFlagsFromChangeDetection()
         || changeDetection->anyOfAddedThisFrame<
             MeshInstanceComponent,
             SkinnedMeshComponent,
-            LightComponent,
+            DirectionalLightComponent,
+            SpotLightComponent,
+            PointLightComponent,
+            EnvironmentLightComponent,
             CameraComponent,
             AnimationComponent,
             GaussianSplatComponent,
@@ -755,7 +767,7 @@ void SceneEntityWorld::updateLeafContentAndBounds(ecs::Entity entity)
     }
     else if (m_world.has<CameraComponent>(entity))
         leafContent = getCameraContentFlags();
-    else if (m_world.has<LightComponent>(entity))
+    else if (hasAnyLightComponent(m_world, entity))
         leafContent = getLightContentFlags();
     else if (m_world.has<AnimationComponent>(entity))
         leafContent = getAnimationContentFlags();
@@ -804,9 +816,44 @@ void SceneEntityWorld::setSkinnedMeshReference(ecs::Entity entity, ecs::Entity s
     updateLeafContentAndBounds(entity);
 }
 
-void SceneEntityWorld::setLight(ecs::Entity entity, LightComponent component)
+namespace
 {
-    m_world.emplace<LightComponent>(entity, std::move(component));
+
+void clearLightComponents(ecs::World& world, ecs::Entity entity)
+{
+    world.remove<DirectionalLightComponent>(entity);
+    world.remove<SpotLightComponent>(entity);
+    world.remove<PointLightComponent>(entity);
+    world.remove<EnvironmentLightComponent>(entity);
+}
+
+} // namespace
+
+void SceneEntityWorld::setDirectionalLight(ecs::Entity entity, DirectionalLightComponent component)
+{
+    clearLightComponents(m_world, entity);
+    m_world.emplace<DirectionalLightComponent>(entity, std::move(component));
+    updateLeafContentAndBounds(entity);
+}
+
+void SceneEntityWorld::setSpotLight(ecs::Entity entity, SpotLightComponent component)
+{
+    clearLightComponents(m_world, entity);
+    m_world.emplace<SpotLightComponent>(entity, std::move(component));
+    updateLeafContentAndBounds(entity);
+}
+
+void SceneEntityWorld::setPointLight(ecs::Entity entity, PointLightComponent component)
+{
+    clearLightComponents(m_world, entity);
+    m_world.emplace<PointLightComponent>(entity, std::move(component));
+    updateLeafContentAndBounds(entity);
+}
+
+void SceneEntityWorld::setEnvironmentLight(ecs::Entity entity, EnvironmentLightComponent component)
+{
+    clearLightComponents(m_world, entity);
+    m_world.emplace<EnvironmentLightComponent>(entity, std::move(component));
     updateLeafContentAndBounds(entity);
 }
 
