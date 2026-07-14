@@ -97,7 +97,8 @@ void SceneContentEditor::handleDroppedFiles(std::vector<std::string>& pendingFil
             else
                 caustica::error("Failed to load Gaussian Splat file '%s'", filePath.c_str());
         }
-        else if (ext == ".gltf" || ext == ".glb" || ext == ".obj")
+        else if (ext == ".gltf" || ext == ".glb" || ext == ".obj"
+            || ext == ".usd" || ext == ".usda" || ext == ".usdc" || ext == ".caususd")
         {
             caustica::info("Drag-drop: loading mesh file '%s'", filePath.c_str());
             if (loadMeshFile(path))
@@ -107,7 +108,7 @@ void SceneContentEditor::handleDroppedFiles(std::vector<std::string>& pendingFil
         }
         else
         {
-            caustica::warning("Drag-drop: unsupported file type '%s' (supported: .ply, .gltf, .glb, .obj)", ext.c_str());
+            caustica::warning("Drag-drop: unsupported file type '%s' (supported: .ply, .gltf, .glb, .obj, .usd/.usda/.usdc/.caususd)", ext.c_str());
         }
     }
 }
@@ -169,9 +170,18 @@ void SceneContentEditor::finalizeRuntimeSceneMutation(caustica::ecs::Entity impo
     }
 
     if (auto scene = sceneManager->getScene())
-        m_sceneEditor.lightingPasses().notifySceneReloaded(*scene);
+    {
+        // Runtime import must not wipe existing PT materials (that leaves a
+        // window where SubInstanceData points at cleared material slots, and
+        // with 3DGS present the instance-index remap can stick on wrong colors).
+        m_sceneEditor.lightingPasses().ensureMaterialsFromScene(scene);
+    }
 
-    requestFullRebuild();
+    // AS rebuild only — requestFullRebuild also forces shader reload +
+    // createRenderPassesAndLoadMaterials, which rebuilds hit groups from a
+    // pre-sync snapshot and permanently mis-maps materials when 3DGS is present.
+    if (auto* gpuRender = m_sceneEditor.gpuRender())
+        gpuRender->rayTracingResources().requestAccelerationStructureRebuild();
 }
 
 bool SceneContentEditor::deleteSceneNode(caustica::ecs::Entity entity)

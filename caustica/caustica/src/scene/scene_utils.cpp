@@ -36,7 +36,8 @@ bool IsDirectMeshSceneFile(const std::filesystem::path& sceneFileName)
 {
     std::string ext = sceneFileName.extension().string();
     std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return char(std::tolower(c)); });
-    return ext == ".gltf" || ext == ".glb" || ext == ".obj";
+    return ext == ".gltf" || ext == ".glb" || ext == ".obj"
+        || ext == ".usd" || ext == ".usda" || ext == ".usdc" || ext == ".caususd";
 }
 
 } // namespace caustica

@@ -104,22 +104,29 @@ namespace nvrhi::d3d12
         uint32_t freeCount = 0;
         bool found = false;
 
-        // Find a contiguous range of 'count' indices for which m_AllocatedDescriptors[index] is false
-
-        for (DescriptorIndex index = m_SearchStart; index < m_NumDescriptors; index++)
-        {
-            if (m_AllocatedDescriptors[index])
-                freeCount = 0;
-            else
-                freeCount += 1;
-
-            if (freeCount >= count)
+        auto tryFind = [&](DescriptorIndex begin, DescriptorIndex end) {
+            freeCount = 0;
+            for (DescriptorIndex index = begin; index < end; index++)
             {
-                foundIndex = index - count + 1;
-                found = true;
-                break;
+                if (m_AllocatedDescriptors[index])
+                    freeCount = 0;
+                else
+                    freeCount += 1;
+
+                if (freeCount >= count)
+                {
+                    foundIndex = index - count + 1;
+                    found = true;
+                    return;
+                }
             }
-        }
+        };
+
+        // Prefer the search hint, then scan from the start so freed slots are reused
+        // before we grow (and potentially fail at the D3D12 shader-visible limit).
+        tryFind(m_SearchStart, m_NumDescriptors);
+        if (!found && m_SearchStart > 0)
+            tryFind(0, m_SearchStart);
 
         if (!found)
         {

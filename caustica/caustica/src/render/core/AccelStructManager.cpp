@@ -162,20 +162,36 @@ void AccelStructManager::rebuildDirtyMeshes(nvrhi::ICommandList*            comm
         }
 
         bvh::Config cfg = { .excludeTransmissive = settings.excludeTransmissive };
-        nvrhi::rt::AccelStructDesc blasDesc = bvh::getMeshBlasDesc(cfg, *mesh, nullptr, false);
-        blasDesc.buildFlags = nvrhi::rt::AccelStructBuildFlags::PreferFastBuild;
+        // Geometry-sequence / point-cache meshes keep fixed topology; rebuild like skinned
+        // meshes via AllowUpdate + PerformUpdate so we do not allocate a new BLAS every frame.
+        nvrhi::rt::AccelStructDesc blasDesc = bvh::getMeshBlasDesc(cfg, *mesh, nullptr, true);
         assert((int)blasDesc.bottomLevelGeometries.size() < (1 << 12));
         if (blasDesc.bottomLevelGeometries.empty())
             continue;
 
-        nvrhi::rt::AccelStructHandle as = m_device->createAccelStruct(blasDesc);
-        nvrhi::utils::BuildBottomLevelAccelStruct(commandList, as, blasDesc);
-        mesh->accelStruct = as;
+        const bool canUpdateInPlace = mesh->accelStruct
+            && (mesh->accelStruct->getDesc().buildFlags & nvrhi::rt::AccelStructBuildFlags::AllowUpdate) != 0;
 
-        mesh->AccelStructOMM = nullptr;
-        mesh->OpacityMicroMaps.clear();
-        mesh->DebugData = nullptr;
-        mesh->DebugDataDirty = true;
+        if (canUpdateInPlace)
+        {
+            blasDesc.buildFlags = nvrhi::rt::AccelStructBuildFlags::PreferFastBuild
+                | nvrhi::rt::AccelStructBuildFlags::PerformUpdate;
+            nvrhi::utils::BuildBottomLevelAccelStruct(commandList, mesh->accelStruct, blasDesc);
+        }
+        else
+        {
+            blasDesc.buildFlags = nvrhi::rt::AccelStructBuildFlags::PreferFastBuild
+                | nvrhi::rt::AccelStructBuildFlags::AllowUpdate;
+            nvrhi::rt::AccelStructHandle as = m_device->createAccelStruct(blasDesc);
+            nvrhi::utils::BuildBottomLevelAccelStruct(commandList, as, blasDesc);
+            mesh->accelStruct = as;
+
+            // Recreating the BLAS invalidates any OMM attachment on the previous AS.
+            mesh->AccelStructOMM = nullptr;
+            mesh->OpacityMicroMaps.clear();
+            mesh->DebugData = nullptr;
+            mesh->DebugDataDirty = true;
+        }
     }
 }
 

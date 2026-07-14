@@ -191,12 +191,13 @@ void SceneRayTracingResources::recreateAccelStructs(nvrhi::ICommandList* command
     info("AS rebuild: post-build wait end, ok=%s", postBuildWaitOk ? "true" : "false");
 }
 
-void SceneRayTracingResources::requestMeshAccelRebuild(const std::shared_ptr<caustica::MeshInfo>& mesh)
+void SceneRayTracingResources::requestMeshAccelRebuild(const std::shared_ptr<caustica::MeshInfo>& mesh, bool resetAccumulation)
 {
     if (!mesh)
         return;
 
-    m_settings->ResetAccumulation = true;
+    if (resetAccumulation)
+        m_settings->ResetAccumulation = true;
 
     if (!m_accelStructs->hasTopLevelAS())
     {

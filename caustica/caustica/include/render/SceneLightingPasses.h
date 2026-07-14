@@ -70,6 +70,7 @@ public:
     void onSceneLoaded(caustica::Scene& scene, PathTracerSettings& settings);
     void resyncLightsFromScene(caustica::Scene& scene);
     void notifySceneReloaded(caustica::Scene& scene);
+    int ensureMaterialsFromScene(const std::shared_ptr<caustica::Scene>& scene);
 
     void applyShaderMacros(std::vector<caustica::ShaderMacro>& macros);
     void createOpacityMicromaps(caustica::Scene& scene);

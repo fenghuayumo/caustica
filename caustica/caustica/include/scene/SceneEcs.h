@@ -207,6 +207,23 @@ struct AnimationComponent
     float duration = 0.f;
 };
 
+// Fixed-topology mesh point cache (e.g. soft body from USD bake).
+struct GeometrySequenceComponent
+{
+    std::shared_ptr<MeshInfo> mesh;
+    uint32_t vertexCount = 0;
+    std::vector<float> timesSeconds;
+    // Interleaved frames: frameCount * vertexCount * 3
+    std::vector<float> positions;
+    int lastAppliedFrameA = -1;
+    int lastAppliedFrameB = -1;
+    float lastAppliedAlpha = -1.f;
+    bool recomputeNormals = true;
+    // Physics caches are authored per discrete time sample. Sub-frame lerp at display
+    // refresh rates causes continuous AS updates and temporal-filter thrash.
+    bool interpolateFrames = false;
+};
+
 struct GaussianSplatComponent
 {
     std::shared_ptr<GaussianSplat> splat;

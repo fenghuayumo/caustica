@@ -1214,6 +1214,58 @@ void MaterialGpuCache::sceneReloaded()
     clear();
 }
 
+int MaterialGpuCache::ensureMaterialsFromScene(const std::shared_ptr<caustica::Scene>& scene)
+{
+    if (!scene)
+        return 0;
+
+    int added = 0;
+    for (auto& material : scene->GetMaterials())
+    {
+        std::shared_ptr<MaterialEx> materialEx = std::dynamic_pointer_cast<MaterialEx>(material);
+        if (materialEx == nullptr)
+            continue;
+        if (materialEx->ptData != nullptr)
+            continue;
+
+        std::shared_ptr<PTMaterial> materialPT;
+        if (IsBuiltinModelFileName(material->modelFileName))
+            materialPT = importFromEngineMaterial(*material);
+        else
+        {
+            materialPT = load(material->modelFileName, material->name);
+            if (materialPT == nullptr)
+                materialPT = importFromEngineMaterial(*material);
+        }
+
+        materialEx->ptData = materialPT;
+        materialEx->ptData->engineMaterialCounterpart = materialEx.get();
+        materialEx->ptData->runtimeMaterialGpuCache = this;
+
+        m_materials.push_back(materialEx->ptData);
+        m_materialsGPU.push_back(PTMaterialData{});
+        materialEx->ptData->gpuDataIndex = uint(m_materialsGPU.size() - 1);
+        materialEx->ptData->gpuDataDirty = true;
+        assert(m_materialsGPU.size() <= CAUSTICA_MATERIAL_MAX_COUNT);
+
+        recordTexture(materialEx->ptData->baseTexture);
+        recordTexture(materialEx->ptData->occlusionRoughnessMetallicTexture);
+        recordTexture(materialEx->ptData->normalTexture);
+        recordTexture(materialEx->ptData->emissiveTexture);
+        recordTexture(materialEx->ptData->transmissionTexture);
+        initializeUniqueDeterministicName(materialEx->ptData);
+        ++added;
+    }
+
+    if (added > 0)
+    {
+        m_materialDataWasReset = true;
+        bakeShaderPermutations();
+        caustica::info("MaterialGpuCache: ensured %d new runtime materials (total=%zu)", added, m_materials.size());
+    }
+    return added;
+}
+
 void MaterialGpuCache::completeDeferredTexturesLoad(nvrhi::ICommandList* commandList)
 {
     if (m_deferredTextureLoadInProgress)
@@ -1350,9 +1402,15 @@ void MaterialGpuCache::createRenderPassesAndLoadMaterials(nvrhi::IBindingLayout*
         bufferDesc.byteSize = sizeof(PTMaterialData) * CAUSTICA_MATERIAL_MAX_COUNT;
         bufferDesc.structStride = sizeof(PTMaterialData);
         bufferDesc.debugName = "PTMaterialDataStorage";
-        m_materialData = m_device->createBuffer(bufferDesc);
+        if (!m_materialData)
+            m_materialData = m_device->createBuffer(bufferDesc);
         m_materialDataWasReset = true;
     }
+
+    // Runtime imports can add materials after the first load. Keep existing PT
+    // materials and only create missing ones (same path as ensureMaterialsFromScene).
+    if (m_mediaPath != "" && scene)
+        ensureMaterialsFromScene(scene);
 
     if (m_mediaPath == "") // first time load all
     {
@@ -1560,24 +1618,19 @@ void MaterialGpuCache::update(nvrhi::ICommandList* commandList, const std::share
         m_materialDataWasReset = false;
     }
 
-    // NOTE: this also handles some of the geometry data and mixed geometry&material stuff - it might be a good idea to rethink whether it needs to live outside of material baker
-    const auto& instances = scene->GetMeshInstances();
-    auto* entityWorld = scene->GetEntityWorld();
-    for (const ecs::Entity entity : instances)
+    // NOTE: this also handles some of the geometry data and mixed geometry&material stuff - it might be a good idea to rethink whether it needs to live outside of material baker.
+    // Walk the render snapshot in the same order as TLAS / hit-group setup and write a dense
+    // prefix of SubInstanceData slots. Do not trust live geometryInstanceIndex alone — after
+    // runtime import it can briefly disagree with the snapshot order TLAS already committed.
+    size_t compactedGeometryInstanceIndex = 0;
+    for (const scene::MeshInstanceRenderProxy& proxy : scene->GetRenderData().meshInstances)
     {
-        if (!entityWorld)
-            continue;
-        if (!entityWorld->world().isAlive(entity))
-            continue;
-        const auto* meshComp = entityWorld->world().get<scene::MeshInstanceComponent>(entity);
-        if (!meshComp || !meshComp->mesh)
+        if (!proxy.meshShared)
             continue;
 
-        const auto& mesh = meshComp->mesh;
-        if (meshComp->geometryInstanceIndex < 0)
-            continue;
-
-        const size_t firstSubInstanceIndex = static_cast<size_t>(meshComp->geometryInstanceIndex);
+        const auto& mesh = proxy.meshShared;
+        const size_t firstSubInstanceIndex = compactedGeometryInstanceIndex;
+        compactedGeometryInstanceIndex += mesh->geometries.size();
         for (size_t geometryIndex = 0; geometryIndex < mesh->geometries.size(); ++geometryIndex)
         {
             const auto& geometry = mesh->geometries[geometryIndex];
@@ -1594,7 +1647,7 @@ void MaterialGpuCache::update(nvrhi::ICommandList* commandList, const std::share
             if (!materialPT)
                 continue;
 
-            UpdateSubInstanceData(subInstanceData[subInstanceIndex], scene, mesh, *geometry, geometryIndex, *materialPT);
+            UpdateSubInstanceData(subInstanceData[subInstanceIndex], scene, mesh, *geometry, static_cast<uint>(geometryIndex), *materialPT);
         }
     }
 }

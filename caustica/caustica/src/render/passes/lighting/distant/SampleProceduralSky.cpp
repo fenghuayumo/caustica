@@ -94,6 +94,13 @@ void SampleProceduralSky::CreateLutResources()
 {
     assert(m_shaderFactory != nullptr);
 
+    // Layouts/textures are recreated below; drop cached binding sets that reference them.
+    m_transmittanceBindings = nullptr;
+    m_multiScatBindings = nullptr;
+    m_skyViewBindings = nullptr;
+    m_aerialPerspectiveBindings = nullptr;
+    m_atmosphereLutsValid = false;
+
     auto makeLut = [&](uint width, uint height, const char* name) -> nvrhi::TextureHandle
     {
         nvrhi::TextureDesc desc;
@@ -226,29 +233,31 @@ void SampleProceduralSky::DispatchLutPasses(
     lutConsts.SkyViewLutHeight = (uint)SKY_ATM_SKYVIEW_LUT_HEIGHT;
     commandList->writeBuffer(m_lutConstantBuffer, &lutConsts, sizeof(lutConsts));
 
-    auto makeBindings = [&](nvrhi::TextureHandle uav, nvrhi::TextureHandle srv0, nvrhi::TextureHandle srv1) -> nvrhi::BindingSetHandle
+    auto ensureBindings = [&](nvrhi::BindingSetHandle& cached,
+        nvrhi::TextureHandle uav, nvrhi::TextureHandle srv0, nvrhi::TextureHandle srv1) -> nvrhi::BindingSetHandle
     {
-        nvrhi::BindingSetDesc setDesc;
-        setDesc.bindings = {
-            nvrhi::BindingSetItem::ConstantBuffer(0, m_lutConstantBuffer),
-            nvrhi::BindingSetItem::Texture_UAV(0, uav),
-            nvrhi::BindingSetItem::Texture_SRV(0, srv0),
-            nvrhi::BindingSetItem::Texture_SRV(1, srv1),
-            nvrhi::BindingSetItem::Texture_SRV(2, m_blackLut),
-            nvrhi::BindingSetItem::Sampler(0, m_linearClampSampler),
-        };
-        return m_device->createBindingSet(setDesc, m_lutBindingLayout);
+        if (!cached)
+        {
+            nvrhi::BindingSetDesc setDesc;
+            setDesc.bindings = {
+                nvrhi::BindingSetItem::ConstantBuffer(0, m_lutConstantBuffer),
+                nvrhi::BindingSetItem::Texture_UAV(0, uav),
+                nvrhi::BindingSetItem::Texture_SRV(0, srv0),
+                nvrhi::BindingSetItem::Texture_SRV(1, srv1),
+                nvrhi::BindingSetItem::Texture_SRV(2, m_blackLut),
+                nvrhi::BindingSetItem::Sampler(0, m_linearClampSampler),
+            };
+            cached = m_device->createBindingSet(setDesc, m_lutBindingLayout);
+        }
+        return cached;
     };
-
-    nvrhi::BindingSetHandle transmittanceBindings;
-    nvrhi::BindingSetHandle multiScatBindings;
-    nvrhi::BindingSetHandle skyViewBindings;
 
     if (rebuildAtmosphereLuts)
     {
         {
             RAII_SCOPE(commandList->beginMarker("SkyAtm/TransmittanceLUT");, commandList->endMarker(););
-            transmittanceBindings = makeBindings(m_transmittanceLut, m_blackLut, m_blackLut);
+            nvrhi::BindingSetHandle transmittanceBindings =
+                ensureBindings(m_transmittanceBindings, m_transmittanceLut, m_blackLut, m_blackLut);
             nvrhi::ComputeState state;
             state.bindings = { transmittanceBindings };
             state.pipeline = m_transmittancePSO;
@@ -262,7 +271,8 @@ void SampleProceduralSky::DispatchLutPasses(
 
         {
             RAII_SCOPE(commandList->beginMarker("SkyAtm/MultiScatteringLUT");, commandList->endMarker(););
-            multiScatBindings = makeBindings(m_multiScatLut, m_transmittanceLut, m_blackLut);
+            nvrhi::BindingSetHandle multiScatBindings =
+                ensureBindings(m_multiScatBindings, m_multiScatLut, m_transmittanceLut, m_blackLut);
             nvrhi::ComputeState state;
             state.bindings = { multiScatBindings };
             state.pipeline = m_multiScattPSO;
@@ -278,7 +288,8 @@ void SampleProceduralSky::DispatchLutPasses(
     if (rebuildSkyView)
     {
         RAII_SCOPE(commandList->beginMarker("SkyAtm/SkyViewLUT");, commandList->endMarker(););
-        skyViewBindings = makeBindings(m_skyViewLut, m_transmittanceLut, m_multiScatLut);
+        nvrhi::BindingSetHandle skyViewBindings =
+            ensureBindings(m_skyViewBindings, m_skyViewLut, m_transmittanceLut, m_multiScatLut);
         nvrhi::ComputeState state;
         state.bindings = { skyViewBindings };
         state.pipeline = m_skyViewPSO;
@@ -336,11 +347,18 @@ void SampleProceduralSky::ApplyAerialPerspective(
         nvrhi::BindingSetItem::Texture_SRV(2, m_multiScatLut),
         nvrhi::BindingSetItem::Sampler(0, m_linearClampSampler),
     };
-    nvrhi::BindingSetHandle bindingSet = m_device->createBindingSet(
-        bindingSetDesc, m_aerialPerspectiveBindingLayout);
+
+    // color/depth can change with resolution or render-target swaps; recreate only then.
+    const bool needNewBindings = !m_aerialPerspectiveBindings
+        || !m_aerialPerspectiveBindings->getDesc()
+        || m_aerialPerspectiveBindings->getDesc()->bindings.size() != bindingSetDesc.bindings.size()
+        || m_aerialPerspectiveBindings->getDesc()->bindings[1].resourceHandle != color
+        || m_aerialPerspectiveBindings->getDesc()->bindings[2].resourceHandle != depth;
+    if (needNewBindings)
+        m_aerialPerspectiveBindings = m_device->createBindingSet(bindingSetDesc, m_aerialPerspectiveBindingLayout);
 
     nvrhi::ComputeState state;
-    state.bindings = { bindingSet };
+    state.bindings = { m_aerialPerspectiveBindings };
     state.pipeline = m_aerialPerspectivePSO;
     commandList->setComputeState(state);
     commandList->dispatch((width + 7) / 8, (height + 7) / 8, 1);

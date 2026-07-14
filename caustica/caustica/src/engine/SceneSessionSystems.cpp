@@ -26,6 +26,8 @@
 #include <assets/loader/TextureLoader.h>
 #include <render/core/BindingCache.h>
 #include <render/core/View.h>
+#include <render/core/SceneMeshEditing.h>
+#include <scene/SceneTypes.h>
 #include <backend/GpuDevice.h>
 #include <cassert>
 #include <core/Timer.h>
@@ -743,24 +745,59 @@ void animate(App& app, float fElapsedTimeSeconds)
             if (ew)
             {
                 auto& world = ew->world();
+                float loopDuration = 0.f;
+                for (ecs::Entity animEntity : manager->getScene()->GetAnimationEntities())
+                {
+                    auto* animation = scene::TryGetAnimation(world, animEntity);
+                    if (animation)
+                        loopDuration = std::max(loopDuration, scene::GetAnimationDuration(*animation));
+                }
+                world.each<scene::GeometrySequenceComponent>(
+                    [&](ecs::Entity, scene::GeometrySequenceComponent& sequence) {
+                        if (!sequence.timesSeconds.empty())
+                            loopDuration = std::max(loopDuration, sequence.timesSeconds.back());
+                    });
+
+                const float animTime = (loopDuration > 0.f)
+                    ? float(fmod(vs->sceneTime, double(loopDuration)))
+                    : float(vs->sceneTime);
+
                 for (ecs::Entity animEntity : manager->getScene()->GetAnimationEntities())
                 {
                     auto* animation = scene::TryGetAnimation(world, animEntity);
                     if (!animation || animation->channels.empty())
                         continue;
 
-                    const float duration = scene::GetAnimationDuration(*animation);
-                    if (duration <= 0.0f)
+                    if (scene::GetAnimationDuration(*animation) <= 0.0f)
                         continue;
 
-                    double cutLeft = 0.0;
-                    double cutRight = 0.0;
-                    const float animTime = (float)fmod(vs->sceneTime + cutLeft, duration - cutLeft - cutRight);
                     (void)scene::ApplyAnimation(*animation, animTime, *ew);
                 }
 
                 if (enableAnimations)
                     ew->refreshHierarchy(scene::PreviousTransformPolicy::CaptureCurrent);
+
+                // Fixed-topology USD / soft-body point caches.
+                if (GpuDevice* device = gpuDevice(app))
+                {
+                    SetSceneMeshVerticesParams deformParams;
+                    deformParams.device = device->GetDevice();
+                    deformParams.scene = manager->getScene();
+                    deformParams.frameIndex = device->GetFrameIndex();
+                    deformParams.recomputeNormals = true;
+                    deformParams.rebuildAccelerationStructure = true;
+                    // Continuous playback must not wipe temporal denoise/TAA history every
+                    // source frame — that reads as whole-scene shimmer.
+                    deformParams.resetAccumulation = nullptr;
+                    deformParams.requestMeshAccelRebuild = [&app](const std::shared_ptr<MeshInfo>& mesh) {
+                        requestMeshAccelRebuild(app, mesh, /*resetAccumulation=*/false);
+                    };
+
+                    world.each<scene::GeometrySequenceComponent>(
+                        [&](ecs::Entity, scene::GeometrySequenceComponent& sequence) {
+                            (void)applyGeometrySequence(sequence, animTime, deformParams);
+                        });
+                }
             }
         }
     }
@@ -858,7 +895,12 @@ void loadCurrentCamera(App& app)
 
 void requestMeshAccelRebuild(App& app, const std::shared_ptr<MeshInfo>& mesh)
 {
-    gpuRender(app)->rayTracingResources().requestMeshAccelRebuild(mesh);
+    requestMeshAccelRebuild(app, mesh, true);
+}
+
+void requestMeshAccelRebuild(App& app, const std::shared_ptr<MeshInfo>& mesh, bool resetAccumulation)
+{
+    gpuRender(app)->rayTracingResources().requestMeshAccelRebuild(mesh, resetAccumulation);
 }
 
 void setEnvMapOverrideSource(App& app, const std::string& envMapOverride)

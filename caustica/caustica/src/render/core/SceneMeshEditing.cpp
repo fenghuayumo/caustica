@@ -542,4 +542,139 @@ void setMeshVerticesWorld(
     setMeshVerticesWorld(entity, vertices, params);
 }
 
+void setMeshPositionsDirect(
+    const std::shared_ptr<MeshInfo>& mesh,
+    const dm::float3* positions,
+    size_t count,
+    const SetSceneMeshVerticesParams& params)
+{
+    if (!mesh)
+        throw std::runtime_error("setMeshPositionsDirect: mesh is null");
+    if (!mesh->buffers)
+        throw std::runtime_error("setMeshPositionsDirect: mesh has no buffer group");
+    if (!positions)
+        throw std::runtime_error("setMeshPositionsDirect: positions is null");
+    if (count != size_t(mesh->totalVertices))
+        throw std::runtime_error("setMeshPositionsDirect: vertex count mismatch");
+
+    auto& buffers = *mesh->buffers;
+    const size_t begin = size_t(mesh->vertexOffset);
+    const size_t end = begin + count;
+    if (buffers.positionData.size() < end)
+        throw std::runtime_error("setMeshPositionsDirect: CPU vertex cache is unavailable");
+
+    const std::vector<float3> previousRenderVertices(
+        buffers.positionData.begin() + begin,
+        buffers.positionData.begin() + end);
+
+    std::copy(positions, positions + count, buffers.positionData.begin() + begin);
+    UpdateMeshBoundsFromPositions(mesh);
+
+    if (params.recomputeNormals)
+        RecomputeMeshNormalsFromPositions(mesh);
+
+    const bool uploadedToExistingGpuBuffer = UploadMeshDeformationToGpu(
+        params.device,
+        mesh,
+        count,
+        &previousRenderVertices,
+        params.recomputeNormals);
+
+    if (!uploadedToExistingGpuBuffer)
+        RebuildSceneMeshBuffersIfNeeded(mesh, params);
+
+    if (params.rebuildAccelerationStructure)
+    {
+        if (params.requestMeshAccelRebuild)
+            params.requestMeshAccelRebuild(mesh);
+    }
+    else     if (params.resetAccumulation)
+    {
+        *params.resetAccumulation = true;
+    }
+}
+
+bool applyGeometrySequence(
+    scene::GeometrySequenceComponent& sequence,
+    float timeSeconds,
+    const SetSceneMeshVerticesParams& params)
+{
+    if (!sequence.mesh || sequence.vertexCount == 0 || sequence.timesSeconds.empty())
+        return false;
+
+    const size_t frameCount = sequence.timesSeconds.size();
+    if (sequence.positions.size() < frameCount * size_t(sequence.vertexCount) * 3)
+        return false;
+
+    auto findFrameIndex = [](const std::vector<float>& times, float t) -> int {
+        if (times.empty())
+            return -1;
+        if (t <= times.front())
+            return 0;
+        if (t >= times.back())
+            return int(times.size()) - 1;
+        const auto it = std::upper_bound(times.begin(), times.end(), t);
+        return int(it - times.begin()) - 1;
+    };
+
+    const int frameA = findFrameIndex(sequence.timesSeconds, timeSeconds);
+    if (frameA < 0)
+        return false;
+
+    int frameB = frameA;
+    float alpha = 0.f;
+    if (sequence.interpolateFrames
+        && frameA + 1 < int(frameCount)
+        && timeSeconds > sequence.timesSeconds[size_t(frameA)])
+    {
+        frameB = frameA + 1;
+        const float t0 = sequence.timesSeconds[size_t(frameA)];
+        const float t1 = sequence.timesSeconds[size_t(frameB)];
+        const float dt = t1 - t0;
+        alpha = (dt > 1e-8f) ? std::clamp((timeSeconds - t0) / dt, 0.f, 1.f) : 0.f;
+    }
+
+    if (frameA == sequence.lastAppliedFrameA
+        && frameB == sequence.lastAppliedFrameB
+        && std::abs(alpha - sequence.lastAppliedAlpha) < 1e-5f)
+    {
+        return false;
+    }
+
+    std::vector<float3> blended(sequence.vertexCount);
+    const size_t stride = size_t(sequence.vertexCount) * 3;
+    const float* a = sequence.positions.data() + size_t(frameA) * stride;
+    const float* b = sequence.positions.data() + size_t(frameB) * stride;
+    if (frameA == frameB || alpha <= 0.f)
+    {
+        for (uint32_t i = 0; i < sequence.vertexCount; ++i)
+            blended[i] = float3(a[i * 3 + 0], a[i * 3 + 1], a[i * 3 + 2]);
+    }
+    else if (alpha >= 1.f)
+    {
+        for (uint32_t i = 0; i < sequence.vertexCount; ++i)
+            blended[i] = float3(b[i * 3 + 0], b[i * 3 + 1], b[i * 3 + 2]);
+    }
+    else
+    {
+        const float oneMinus = 1.f - alpha;
+        for (uint32_t i = 0; i < sequence.vertexCount; ++i)
+        {
+            blended[i] = float3(
+                a[i * 3 + 0] * oneMinus + b[i * 3 + 0] * alpha,
+                a[i * 3 + 1] * oneMinus + b[i * 3 + 1] * alpha,
+                a[i * 3 + 2] * oneMinus + b[i * 3 + 2] * alpha);
+        }
+    }
+
+    SetSceneMeshVerticesParams localParams = params;
+    localParams.recomputeNormals = sequence.recomputeNormals;
+    setMeshPositionsDirect(sequence.mesh, blended.data(), blended.size(), localParams);
+
+    sequence.lastAppliedFrameA = frameA;
+    sequence.lastAppliedFrameB = frameB;
+    sequence.lastAppliedAlpha = alpha;
+    return true;
+}
+
 } // namespace caustica

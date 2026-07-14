@@ -574,15 +574,19 @@ void PathTracingShaderCompiler::update(const std::shared_ptr<caustica::Scene>& s
     // no need to update these if already set up
     if (needsUpdate) // m_uniqueHitGroups.size() == 0)
     {
-        // Note: these map 1-1 to m_subInstanceData, and are used to (see '->addHitGroup' below) build 1-1 mapped hit groups 
+        // Note: these map 1-1 to m_subInstanceData, and are used to (see '->addHitGroup' below) build 1-1 mapped hit groups.
+        // Use the same dense prefix as AccelStructManager::buildTlas / MaterialGpuCache::update so a stale
+        // proxy.geometryInstanceIndex cannot permanently mis-bind materials after runtime import.
         m_perSubInstanceHitGroup.clear();
         m_perSubInstanceHitGroup.assign(subInstanceCount, ComputeDefaultSubInstanceHitGroupInfo(*getMaterialGpuCache()));
+        size_t compactedGeometryInstanceIndex = 0;
         for (const scene::MeshInstanceRenderProxy& proxy : scene->GetRenderData().meshInstances)
         {
-            if (!proxy.mesh || proxy.geometryInstanceIndex < 0)
+            if (!proxy.mesh)
                 continue;
 
-            const size_t firstSubInstanceIndex = static_cast<size_t>(proxy.geometryInstanceIndex);
+            const size_t firstSubInstanceIndex = compactedGeometryInstanceIndex;
+            compactedGeometryInstanceIndex += proxy.mesh->geometries.size();
             for (size_t gi = 0; gi < proxy.mesh->geometries.size(); gi++)
             {
                 const size_t subInstanceIndex = firstSubInstanceIndex + gi;

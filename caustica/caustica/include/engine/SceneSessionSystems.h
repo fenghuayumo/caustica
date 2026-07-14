@@ -114,6 +114,7 @@ void setEnvMapOverrideSource(App& app, const std::string& envMapOverride);
 [[nodiscard]] const std::vector<std::filesystem::path>& envMapMediaList(App& app);
 
 void requestMeshAccelRebuild(App& app, const std::shared_ptr<MeshInfo>& mesh);
+void requestMeshAccelRebuild(App& app, const std::shared_ptr<MeshInfo>& mesh, bool resetAccumulation);
 void debugDrawLine(App& app, math::float3 start, math::float3 stop, math::float4 col1, math::float4 col2);
 
 [[nodiscard]] std::shared_ptr<Material> findMaterial(const App& app, int materialID);

@@ -38,6 +38,7 @@ namespace caustica
     class ThreadPool;
     class GltfImporter;
     class ObjImporter;
+    class CausUsdImporter;
 
     namespace render
     {
@@ -56,6 +57,7 @@ namespace caustica
         scene::SceneRenderCommandQueue m_RenderCommands;
         std::shared_ptr<GltfImporter> m_GltfImporter;
         std::shared_ptr<ObjImporter> m_ObjImporter;
+        std::shared_ptr<CausUsdImporter> m_CausUsdImporter;
         std::vector<SceneImportResult> m_Models;
 
         bool m_SceneTransformsChanged = false;

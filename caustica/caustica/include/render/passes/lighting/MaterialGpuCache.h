@@ -279,6 +279,9 @@ public:
     bool                            debugGui(float indent);
 
     void                            sceneReloaded();
+    // Incrementally create PT materials for scene materials that do not yet have
+    // ptData. Used by runtime mesh import so existing materials stay valid.
+    int                             ensureMaterialsFromScene(const std::shared_ptr<caustica::Scene>& scene);
 
     std::filesystem::path           getMaterialStoragePath(PTMaterialBase& material);
 

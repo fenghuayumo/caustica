@@ -2,6 +2,7 @@
 
 #include <scene/loader/GltfImporter.h>
 #include <scene/loader/ObjImporter.h>
+#include <scene/loader/CausUsdImporter.h>
 #include <assets/loader/TextureLoader.h>
 #include <core/log.h>
 #include <core/vfs/VFS.h>
@@ -61,6 +62,31 @@ RuntimeMeshLoadResult LoadRuntimeMeshFile(
         return LoadRuntimeGltfMeshFile(params, absPath);
     if (ext == ".obj")
         return LoadRuntimeObjMeshFile(params, absPath);
+    if (ext == ".usd" || ext == ".usda" || ext == ".usdc" || ext == ".caususd")
+    {
+        if (!params.TextureCache || !params.SceneTypes)
+            return FailedRuntimeMeshLoad(absPath);
+
+        auto importer = std::make_shared<caustica::CausUsdImporter>(params.SceneTypes);
+        caustica::SceneLoadingStats stats;
+        auto importResult = std::make_shared<caustica::SceneImportResult>();
+        if (!importer->Load(absPath, *params.TextureCache, stats, nullptr, *importResult, params.TextureSearchDirectory))
+        {
+            caustica::error("CausUsdImporter failed to load '%s'", absPath.string().c_str());
+            return FailedRuntimeMeshLoad(absPath);
+        }
+        if (!ecs::isValid(importResult->rootEntity) || !importResult->entityWorld)
+        {
+            caustica::error("USD import produced an empty scene: '%s'", absPath.string().c_str());
+            return FailedRuntimeMeshLoad(absPath);
+        }
+
+        RuntimeMeshLoadResult result;
+        result.Success = true;
+        result.SourcePath = absPath;
+        result.ImportResult = std::move(importResult);
+        return result;
+    }
 
     caustica::error("Unsupported mesh file type '%s'.", ext.c_str());
     return FailedRuntimeMeshLoad(absPath);

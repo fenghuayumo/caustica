@@ -15,6 +15,11 @@ namespace caustica
 class Scene;
 struct MeshInfo;
 
+namespace scene
+{
+struct GeometrySequenceComponent;
+}
+
 struct SetSceneMeshVerticesParams
 {
     nvrhi::IDevice* device = nullptr;
@@ -47,6 +52,20 @@ void setMeshVerticesWorld(
 void setMeshVerticesWorld(
     const std::shared_ptr<MeshInfo>& mesh,
     const std::vector<dm::float3>& vertices,
+    const SetSceneMeshVerticesParams& params);
+
+// Direct 1:1 update of mesh->buffers->positionData[vertexOffset .. +count).
+// Used by geometry-sequence playback (fixed topology point caches).
+void setMeshPositionsDirect(
+    const std::shared_ptr<MeshInfo>& mesh,
+    const dm::float3* positions,
+    size_t count,
+    const SetSceneMeshVerticesParams& params);
+
+// Sample a GeometrySequenceComponent at `timeSeconds` and upload positions.
+bool applyGeometrySequence(
+    scene::GeometrySequenceComponent& sequence,
+    float timeSeconds,
     const SetSceneMeshVerticesParams& params);
 
 } // namespace caustica

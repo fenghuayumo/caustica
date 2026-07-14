@@ -345,6 +345,12 @@ void caustica::render::WorldRenderer::framePassShaderUpdate(PathTracingFrameCont
     if (ctx.aborted || m_pathTracingShaderCompiler == nullptr)
         return;
 
+    // Hit-group rebuild reads snapshot geometryInstanceIndex. Sync from live ECS
+    // before that so import/AS-rebuild frames do not permanently bake stale slots
+    // (especially visible when GaussianSplat entities reshuffle ECS iteration).
+    if (const auto scene = m_context.sceneManager.getScene())
+        scene->syncRenderSnapshotGpuIndices(m_context.gpuDevice.GetRenderPhaseFrameIndex());
+
     m_pathTracingShaderCompiler->update(
         m_context.sceneManager.getScene(),
         static_cast<unsigned int>(m_context.accelStructs.getSubInstanceData().size()),

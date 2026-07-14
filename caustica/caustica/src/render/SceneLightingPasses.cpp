@@ -125,6 +125,13 @@ void SceneLightingPasses::notifySceneReloaded(caustica::Scene& scene)
         m_opacityMaps->SceneLoaded(scene);
 }
 
+int SceneLightingPasses::ensureMaterialsFromScene(const std::shared_ptr<caustica::Scene>& scene)
+{
+    if (m_materials == nullptr || !scene)
+        return 0;
+    return m_materials->ensureMaterialsFromScene(scene);
+}
+
 void SceneLightingPasses::applyShaderMacros(std::vector<caustica::ShaderMacro>& macros)
 {
     if (m_lightSampling != nullptr)

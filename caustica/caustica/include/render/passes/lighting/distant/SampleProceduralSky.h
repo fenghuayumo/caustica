@@ -76,11 +76,15 @@ private:
     nvrhi::ComputePipelineHandle m_multiScattPSO;
     nvrhi::ComputePipelineHandle m_skyViewPSO;
     nvrhi::BindingLayoutHandle m_lutBindingLayout;
+    nvrhi::BindingSetHandle m_transmittanceBindings;
+    nvrhi::BindingSetHandle m_multiScatBindings;
+    nvrhi::BindingSetHandle m_skyViewBindings;
 
     nvrhi::BufferHandle m_aerialPerspectiveConstantBuffer;
     nvrhi::ShaderHandle m_aerialPerspectiveCS;
     nvrhi::ComputePipelineHandle m_aerialPerspectivePSO;
     nvrhi::BindingLayoutHandle m_aerialPerspectiveBindingLayout;
+    nvrhi::BindingSetHandle m_aerialPerspectiveBindings;
 
     bool m_atmosphereLutsValid = false;
     AtmosphereParameters m_lastAtmosphere = {};

@@ -55,7 +55,7 @@ public:
     void uploadSubInstanceData(nvrhi::ICommandList* commandList);
     void createAccelStructs(nvrhi::ICommandList* commandList);
     void recreateAccelStructs(nvrhi::ICommandList* commandList);
-    void requestMeshAccelRebuild(const std::shared_ptr<caustica::MeshInfo>& mesh);
+    void requestMeshAccelRebuild(const std::shared_ptr<caustica::MeshInfo>& mesh, bool resetAccumulation = true);
 
     // Structure-only invalidation (no shader reload). Prefer this after runtime scene graph edits.
     void requestAccelerationStructureRebuild();

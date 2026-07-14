@@ -356,9 +356,11 @@ namespace nvrhi::d3d12
 
     BindingSet::~BindingSet()
     {
-        m_Resources.shaderResourceViewHeap.releaseDescriptors(descriptorTableSRVetc, layout->descriptorTableSizeSRVetc);
-    
-        m_Resources.samplerHeap.releaseDescriptors(descriptorTableSamplers, layout->descriptorTableSizeSamplers);
+        if (descriptorTableValidSRVetc)
+            m_Resources.shaderResourceViewHeap.releaseDescriptors(descriptorTableSRVetc, layout->descriptorTableSizeSRVetc);
+
+        if (descriptorTableValidSamplers)
+            m_Resources.samplerHeap.releaseDescriptors(descriptorTableSamplers, layout->descriptorTableSizeSamplers);
     }
 
     DescriptorTable::~DescriptorTable()

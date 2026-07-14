@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <functional>
+#include <vector>
 
 namespace caustica::scene
 {
@@ -163,6 +164,8 @@ void CopyEntityComponents(
         dstWorld.emplace<CameraComponent>(dstEntity, *camera);
     if (const auto* animation = srcWorld.get<AnimationComponent>(srcEntity))
         dstWorld.emplace<AnimationComponent>(dstEntity, *animation);
+    if (const auto* geomSeq = srcWorld.get<GeometrySequenceComponent>(srcEntity))
+        dstWorld.emplace<GeometrySequenceComponent>(dstEntity, *geomSeq);
     if (const auto* splat = srcWorld.get<GaussianSplatComponent>(srcEntity))
         dstWorld.emplace<GaussianSplatComponent>(dstEntity, *splat);
     if (const auto* sample = srcWorld.get<SampleSettingsComponent>(srcEntity))
@@ -405,13 +408,30 @@ void SceneEntityWorld::refreshInstanceIndices()
     int instanceIndex = 0;
     int geometryInstanceIndex = 0;
 
-    m_world.each<MeshInstanceComponent>([&](ecs::Entity, MeshInstanceComponent& mesh)
+    // Collect then sort by entity id so GaussianSplat (and other non-mesh) archetypes
+    // cannot reshuffle EnTT iteration order across imports / deletes.
+    struct MeshInstanceRef
     {
-        mesh.instanceIndex = instanceIndex++;
-        mesh.geometryInstanceIndex = geometryInstanceIndex;
-        if (mesh.mesh)
-            geometryInstanceIndex += static_cast<int>(mesh.mesh->geometries.size());
+        ecs::Entity entity = ecs::NullEntity;
+        MeshInstanceComponent* mesh = nullptr;
+    };
+    std::vector<MeshInstanceRef> instances;
+    m_world.each<MeshInstanceComponent, GlobalTransformComponent, BoundsComponent, SceneContentComponent>(
+        [&](ecs::Entity entity, MeshInstanceComponent& mesh, GlobalTransformComponent&, BoundsComponent&, SceneContentComponent&)
+        {
+            instances.push_back(MeshInstanceRef{ entity, &mesh });
+        });
+    std::sort(instances.begin(), instances.end(), [](const MeshInstanceRef& a, const MeshInstanceRef& b) {
+        return static_cast<uint32_t>(a.entity) < static_cast<uint32_t>(b.entity);
     });
+
+    for (MeshInstanceRef& entry : instances)
+    {
+        entry.mesh->instanceIndex = instanceIndex++;
+        entry.mesh->geometryInstanceIndex = geometryInstanceIndex;
+        if (entry.mesh->mesh)
+            geometryInstanceIndex += static_cast<int>(entry.mesh->mesh->geometries.size());
+    }
 
     m_GeometryInstancesCount = static_cast<size_t>(geometryInstanceIndex);
 }
@@ -555,12 +575,31 @@ void SceneEntityWorld::setLocalTransform(
     if (!local)
         local = &m_world.emplace<LocalTransformComponent>(entity, LocalTransformComponent{});
 
-    if (translation)
+    bool changed = !local->hasLocalTransform;
+    if (translation && any(*translation != local->translation))
+    {
         local->translation = *translation;
+        changed = true;
+    }
     if (rotation)
-        local->rotation = *rotation;
-    if (scaling)
+    {
+        // q and -q are the same orientation; avoid thrashing on sign flips.
+        const double align = dm::dot(local->rotation, *rotation);
+        const dm::dquat canonical = (align < 0.0) ? -(*rotation) : *rotation;
+        if (any(canonical != local->rotation))
+        {
+            local->rotation = canonical;
+            changed = true;
+        }
+    }
+    if (scaling && any(*scaling != local->scaling))
+    {
         local->scaling = *scaling;
+        changed = true;
+    }
+
+    if (!changed)
+        return;
 
     local->hasLocalTransform = true;
     local->transform = ComposeLocalTransform(*local);
@@ -803,6 +842,9 @@ ecs::Entity SceneEntityWorld::importSubtree(
                         std::shared_ptr<MeshInfo> skinnedMesh = dstMesh->mesh;
                         *dstMesh = *srcMesh;
                         dstMesh->mesh = std::move(skinnedMesh);
+                        // Importer-world indices are meaningless in the destination scene.
+                        dstMesh->instanceIndex = -1;
+                        dstMesh->geometryInstanceIndex = -1;
                     }
 
                     if (auto* dstSkinned = m_world.get<SkinnedMeshComponent>(dstEntity))
@@ -814,7 +856,9 @@ ecs::Entity SceneEntityWorld::importSubtree(
                 }
                 else
                 {
-                    m_world.emplace<MeshInstanceComponent>(dstEntity, *srcMesh);
+                    // Fresh MeshInstanceComponent — avoid copying stale -1 indices
+                    // from the isolated importer world.
+                    setMeshInstance(dstEntity, srcMesh->mesh);
                     if (srcSkinned)
                     {
                         SkinnedMeshComponent copiedSkinned = *srcSkinned;
@@ -823,7 +867,6 @@ ecs::Entity SceneEntityWorld::importSubtree(
                         m_world.emplace<SkinnedMeshGpuComponent>(dstEntity, SkinnedMeshGpuComponent{});
                         importedSkinnedEntities.push_back(dstEntity);
                     }
-                    RegisterMeshInstanceEntity(dstEntity, srcMesh->mesh, srcSkinned != nullptr);
                 }
             }
 
