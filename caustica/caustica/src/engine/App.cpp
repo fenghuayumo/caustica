@@ -805,6 +805,11 @@ void App::run()
     while (!w->getExit())
     {
         w->onUpdate();
+        // Close was requested during event polling — skip another full path-trace
+        // frame so exit does not block on a multi-second render.
+        if (w->getExit() || m_requestExit)
+            break;
+
         updateWindowSize();
         syncDpiScaleFromWindow();
         if (!runFrame())

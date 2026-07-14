@@ -81,8 +81,7 @@ bool startupEditor(caustica::App& app, EditorSession& session, int argc, const c
 
         EventDispatcher dispatcher(event);
         dispatcher.Dispatch<WindowCloseEvent>([&app](WindowCloseEvent&) {
-            if (Window* window = app.getWindow())
-                window->setExit(true);
+            app.requestExit();
             return true;
         });
     });

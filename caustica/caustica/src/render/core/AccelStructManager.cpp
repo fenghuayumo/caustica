@@ -293,20 +293,20 @@ void AccelStructManager::buildTlas(nvrhi::ICommandList*            commandList,
 
     uint subInstanceCount = 0;
     const scene::SceneRenderData& renderData = scene.GetRenderData();
+    instances.reserve(renderData.meshInstances.size());
+
+    // One TLAS slot per meshInstances entry so DXR InstanceIndex() matches ECS
+    // instanceIndex / instanceBuffer / pick → findEntityByInstanceIndex().
+    // Missing mesh or BLAS becomes an empty instance (mask 0) via AllowEmptyInstances.
     for (const scene::MeshInstanceRenderProxy& proxy : renderData.meshInstances)
     {
-        if (!proxy.meshShared)
-            continue;
+        assert(proxy.instanceIndex < 0
+            || static_cast<size_t>(proxy.instanceIndex) == instances.size());
 
-        const std::shared_ptr<MeshInfo>& mesh = proxy.meshShared;
-
-        const bool hasAttachementOMM = opacityMicromapBuilder && mesh->AccelStructOMM.Get() != nullptr;
-        const bool useOmmBLAS = ommState.enabled && hasAttachementOMM && !settings.forceOpaque && !ommState.debugViewEnabled;
-
-        const uint32_t meshSubInstanceCount = (uint32_t)mesh->geometries.size();
         // geometryInstanceIndex must be a dense prefix sum after refreshInstanceIndices.
         // Prefer the compacted running count if a stale snapshot slips through.
-        if (subInstanceCount != static_cast<uint32_t>(proxy.geometryInstanceIndex))
+        if (proxy.meshShared
+            && subInstanceCount != static_cast<uint32_t>(proxy.geometryInstanceIndex))
         {
             static bool warnedStaleGeometryIndex = false;
             if (!warnedStaleGeometryIndex)
@@ -318,35 +318,54 @@ void AccelStructManager::buildTlas(nvrhi::ICommandList*            commandList,
         }
         const uint32_t compactedGeometryInstanceIndex = subInstanceCount;
 
+        nvrhi::rt::InstanceDesc instanceDesc;
+        instanceDesc.instanceID = compactedGeometryInstanceIndex;
+        instanceDesc.instanceContributionToHitGroupIndex = compactedGeometryInstanceIndex;
+        instanceDesc.flags = nvrhi::rt::InstanceFlags::None;
+        dm::affineToColumnMajor(proxy.transformFloat, instanceDesc.transform);
+
+        if (!proxy.meshShared)
+        {
+            instanceDesc.bottomLevelAS = nullptr;
+            instanceDesc.instanceMask = 0;
+            instances.push_back(instanceDesc);
+            continue;
+        }
+
+        const std::shared_ptr<MeshInfo>& mesh = proxy.meshShared;
+        const uint32_t meshSubInstanceCount = (uint32_t)mesh->geometries.size();
+
+        const bool hasAttachementOMM = opacityMicromapBuilder && mesh->AccelStructOMM.Get() != nullptr;
+        const bool useOmmBLAS = ommState.enabled && hasAttachementOMM && !settings.forceOpaque && !ommState.debugViewEnabled;
         auto* bottomLevelAS = useOmmBLAS ? mesh->AccelStructOMM.Get() : mesh->accelStruct.Get();
+
         if (bottomLevelAS == nullptr)
         {
             static bool warnedNullBlas = false;
             if (!warnedNullBlas)
             {
-                warning("BuildTLAS skipped one or more mesh instances with null BLAS to avoid invalid TLAS input.");
+                warning("BuildTLAS: one or more mesh instances have null BLAS; "
+                    "inserting empty TLAS slots so InstanceIndex stays aligned with ECS.");
                 warnedNullBlas = true;
             }
+            instanceDesc.bottomLevelAS = nullptr;
+            instanceDesc.instanceMask = 0;
             subInstanceCount += meshSubInstanceCount;
+            instances.push_back(instanceDesc);
             continue;
         }
 
-        nvrhi::rt::InstanceDesc instanceDesc;
         instanceDesc.bottomLevelAS = bottomLevelAS;
         instanceDesc.instanceMask = (ommState.onlyOMMs && !hasAttachementOMM) ? 0 : 1;
-        instanceDesc.instanceID = compactedGeometryInstanceIndex;
-        instanceDesc.instanceContributionToHitGroupIndex = compactedGeometryInstanceIndex;
         instanceDesc.flags = ommState.force2State ? nvrhi::rt::InstanceFlags::ForceOMM2State : nvrhi::rt::InstanceFlags::None;
         if (settings.forceOpaque || ommState.debugViewEnabled)
             instanceDesc.flags = (nvrhi::rt::InstanceFlags)((uint32_t)instanceDesc.flags | (uint32_t)nvrhi::rt::InstanceFlags::ForceOpaque);
 
         subInstanceCount += meshSubInstanceCount;
-
-        dm::affineToColumnMajor(proxy.transformFloat, instanceDesc.transform);
-
         instances.push_back(instanceDesc);
     }
     assert(m_subInstanceCount == subInstanceCount);
+    assert(instances.size() == renderData.meshInstances.size());
 
     commandList->beginMarker("TLAS Update");
     commandList->buildTopLevelAccelStruct(

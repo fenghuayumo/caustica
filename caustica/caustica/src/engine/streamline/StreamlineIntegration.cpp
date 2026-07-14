@@ -626,6 +626,17 @@ void StreamlineIntegration::Shutdown()
     if (!m_slInitialized)
         return;
 
+    // Free feature resources before slShutdown. Without this (especially DLSS-G),
+    // window close can hang or crash while Streamline still owns live GPU work.
+    if (m_dlssgAvailable)
+        CleanupDLSSG(false);
+    if (m_dlssAvailable)
+        CleanupDLSS(false);
+    if (m_dlssrrAvailable)
+        CleanupDLSSRR(false);
+    if (m_deepdvcAvailable)
+        CleanupDeepDVC();
+
     // Un-set all tags
     sl::ResourceTag inputs[] = 
     {
@@ -1156,7 +1167,21 @@ void StreamlineIntegration::WaitForDLSSGInputsProcessing()
         const HRESULT hr = fence->SetEventOnCompletion(value, event);
         if (SUCCEEDED(hr))
         {
-            WaitForSingleObject(event, INFINITE);
+            // Cap wait so a stuck DLSS-G fence cannot freeze window close forever.
+            constexpr DWORD kDlssgWaitTimeoutMs = 5000;
+            const DWORD waitResult = WaitForSingleObject(event, kDlssgWaitTimeoutMs);
+            if (waitResult == WAIT_TIMEOUT)
+            {
+                caustica::warning(
+                    "DLSS-G input processing fence wait timed out after %u ms (completed=%llu, target=%llu).",
+                    kDlssgWaitTimeoutMs,
+                    static_cast<unsigned long long>(fence->GetCompletedValue()),
+                    static_cast<unsigned long long>(value));
+            }
+            else if (waitResult != WAIT_OBJECT_0)
+            {
+                caustica::warning("DLSS-G input processing fence wait failed: WaitForSingleObject=%lu", waitResult);
+            }
         }
         else
         {

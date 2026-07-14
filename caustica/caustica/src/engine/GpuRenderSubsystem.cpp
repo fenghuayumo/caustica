@@ -281,10 +281,32 @@ void GpuRenderSubsystem::shutdown()
 
     m_shutdown = true;
 
+    // Drain GPU work, then release Streamline/DLSS/DLSS-G and scene GPU resources
+    // before destroying WorldRenderer. Skipping this leaves live SL resources for
+    // slShutdown and can hang or crash on window close.
+    if (m_gpuDevice)
+    {
+        m_gpuDevice->waitForRenderThreadIdle();
+        if (nvrhi::IDevice* device = m_gpuDevice->GetDevice())
+            device->waitForIdle();
+    }
+
+    onSceneUnloading();
+
+    if (m_gpuDevice)
+    {
+        if (nvrhi::IDevice* device = m_gpuDevice->GetDevice())
+        {
+            device->waitForIdle();
+            device->runGarbageCollection();
+        }
+    }
+
     m_worldRenderer.reset();
     m_pathTracingContext.reset();
     m_sceneManager.reset();
     m_accelStructs = AccelStructManager{};
+    m_scenePasses = {};
 
     m_gpuDevice = nullptr;
     AssetSystem* assetSystem = m_assetSystem;
