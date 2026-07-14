@@ -78,7 +78,7 @@ void EditorUI::BuildUIResolutionPicker()
         std::string displayLabel = std::string(res.label) + (isCurrent ? "  [current]" : "");
         if (ImGui::Selectable(displayLabel.c_str(), isCurrent))
         {
-            glfwSetWindowSize(GetGpuDevice()->GetWindow(), res.w, res.h);
+            glfwSetWindowSize(getGpuDevice()->getWindow(), res.w, res.h);
             ImGui::CloseCurrentPopup();
         }
     }
@@ -160,7 +160,7 @@ void EditorUI::BuildDisplayPerformancePanel(const PanelLayout& layout)
             RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
             
             {
-                if (ImGui::Button(StringFormat("Resolution:  %dx%d (click to change)", m_sceneEditor.displaySize().x, m_sceneEditor.displaySize().y, m_sceneEditor.renderSize().x, m_sceneEditor.renderSize().y).c_str(), { -1, 0 }))
+                if (ImGui::Button(stringFormat("Resolution:  %dx%d (click to change)", m_sceneEditor.displaySize().x, m_sceneEditor.displaySize().y, m_sceneEditor.renderSize().x, m_sceneEditor.renderSize().y).c_str(), { -1, 0 }))
                     ImGui::OpenPopup("Resolution Picker");
                 BuildUIResolutionPicker();
             }
@@ -169,7 +169,7 @@ void EditorUI::BuildDisplayPerformancePanel(const PanelLayout& layout)
                 const char* currentPresetName = "Custom";
                 for (const auto& preset : s_performancePresets)
                     if (MatchesPreset(m_ui, preset)) { currentPresetName = preset.Name; break; }
-                if (ImGui::Button(StringFormat("Perf. preset: %s (click to change)", currentPresetName).c_str(), { -1, 0 }))
+                if (ImGui::Button(stringFormat("Perf. preset: %s (click to change)", currentPresetName).c_str(), { -1, 0 }))
                     ImGui::OpenPopup("Performance Preset");
                 BuildUIPerformancePresets();
             }

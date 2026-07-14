@@ -49,7 +49,7 @@ SceneEditor::SceneEditor(const CommandLineOptions& cmdLine,
     , m_inputRouter()
     , m_contentEditor(*this)
 {
-    m_viewState.progressLoading.Start("Initializing...");
+    m_viewState.progressLoading.start("Initializing...");
     m_viewState.progressLoading.Set(50);
     m_inputRouter.bind(*this);
     m_captureScriptManager = std::make_unique<CaptureScriptManager>(*this, m_sessionState, m_cmdLine);
@@ -91,7 +91,7 @@ nvrhi::IDevice* SceneEditor::device() const
 
 uint32_t SceneEditor::frameIndex() const
 {
-    return gpuDevice().GetFrameIndex();
+    return gpuDevice().getFrameIndex();
 }
 
 std::shared_ptr<Scene> SceneEditor::scene() const
@@ -378,7 +378,7 @@ bool SceneEditor::accumulationCompleted() const
 
 GLFWwindow* SceneEditor::glfwWindow() const
 {
-    return gpuDevice().GetWindow();
+    return gpuDevice().getWindow();
 }
 
 void SceneEditor::initStreamlineAndWindow()
@@ -434,7 +434,7 @@ void SceneEditor::onSceneLoadedEarly()
 {
     if (m_sampleGame != nullptr)
     {
-        const std::filesystem::path assetsRoot = GetLocalPath(c_AssetsFolder);
+        const std::filesystem::path assetsRoot = getLocalPath(c_AssetsFolder);
         m_sampleGame->sceneLoaded(
             sceneManager()->getScene(),
             sceneManager()->getCurrentScenePath(),
@@ -513,7 +513,7 @@ void SceneEditor::onBeginFrameScheduled()
 
 void SceneEditor::onAnimateBegin(float& fElapsedTimeSeconds)
 {
-    m_captureScriptManager->PreAnim(fElapsedTimeSeconds);
+    m_captureScriptManager->preAnim(fElapsedTimeSeconds);
 
 #if CAUSTICA_WITH_PYTHON
     if (m_pythonScripting && m_app && sceneSession::isSceneLoaded(*m_app))
@@ -563,7 +563,7 @@ void SceneEditor::updateWindowTitle()
 #endif
             + ")";
 
-        gpuDevice().SetInformativeWindowTitle(g_windowTitle, false, extraInfo.c_str());
+        gpuDevice().setInformativeWindowTitle(g_windowTitle, false, extraInfo.c_str());
     }
 }
 
@@ -573,7 +573,7 @@ bool SceneEditor::shouldRenderWhenUnfocused() const
     if (!wr)
         return false;
 
-    if (wr->getFrameIndex() < 16 || m_settings.ResetAccumulation || m_settings.ResetRealtimeCaches || m_captureScriptManager->IsDoingWork())
+    if (wr->getFrameIndex() < 16 || m_settings.ResetAccumulation || m_settings.ResetRealtimeCaches || m_captureScriptManager->isDoingWork())
         return true;
 
     if (m_editor.RenderWhenOutOfFocus)
@@ -731,7 +731,7 @@ void SceneEditor::afterWorldRender(GpuDevice& gpuDevice)
         m_renderState.Picking.clearPickRequests();
 
     auto saveFramebuffer = [this, &gpuDevice](const char* fileName) -> bool {
-        nvrhi::IFramebuffer* framebuffer = gpuDevice.GetCurrentFramebuffer(true);
+        nvrhi::IFramebuffer* framebuffer = gpuDevice.getCurrentFramebuffer(true);
         if (!framebuffer)
             return false;
         nvrhi::ITexture* texture = framebuffer->getDesc().colorAttachments[0].texture;
@@ -743,7 +743,7 @@ void SceneEditor::afterWorldRender(GpuDevice& gpuDevice)
 
     if (ConsumeExperimentalPhotoScreenshot())
     {
-        nvrhi::IFramebuffer* framebuffer = gpuDevice.GetCurrentFramebuffer(true);
+        nvrhi::IFramebuffer* framebuffer = gpuDevice.getCurrentFramebuffer(true);
         if (framebuffer)
             wr->denoisedScreenshot(framebuffer->getDesc().colorAttachments[0].texture);
     }
@@ -766,7 +766,7 @@ void SceneEditor::CaptureScriptPreRender()
 void SceneEditor::CaptureScriptPostRender(std::function<bool(const char* fileName)> saveTexture)
 {
     if (m_captureScriptManager)
-        m_captureScriptManager->PostRender(saveTexture);
+        m_captureScriptManager->postRender(saveTexture);
 }
 
 void SceneEditor::onEvent(caustica::Event& event)

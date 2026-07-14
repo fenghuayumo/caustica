@@ -34,7 +34,7 @@ using namespace caustica;
 namespace
 {
 #if defined(CAUSTICA_D3D_AGILITY_SDK_VERSION) && (CAUSTICA_D3D_AGILITY_SDK_VERSION >= 619)
-    bool ValidateAgilityShaderModel(ID3D12Device* device)
+    bool validateAgilityShaderModel(ID3D12Device* device)
     {
         D3D12_FEATURE_DATA_SHADER_MODEL shaderModel = { D3D_SHADER_MODEL_6_9 };
         const HRESULT hr = device->CheckFeatureSupport(
@@ -52,13 +52,13 @@ namespace
 #endif
 } // namespace
 
-static bool IsNvDeviceID(UINT id)
+static bool isNvDeviceID(UINT id)
 {
     return id == 0x10DE;
 }
 
 // Adjust window rect so that it is centred on the given adapter.  Clamps to fit if it's too big.
-static bool MoveWindowOntoAdapter(IDXGIAdapter* targetAdapter, RECT& rect)
+static bool moveWindowOntoAdapter(IDXGIAdapter* targetAdapter, RECT& rect)
 {
     assert(targetAdapter != NULL);
 
@@ -95,7 +95,7 @@ static bool MoveWindowOntoAdapter(IDXGIAdapter* targetAdapter, RECT& rect)
     return false;
 }
 
-void GpuDevice_DX12::ReportLiveObjects()
+void GpuDevice_DX12::reportLiveObjects()
 {
     nvrhi::RefCountPtr<IDXGIDebug> pDebug;
     DXGIGetDebugInterface1(0, IID_PPV_ARGS(&pDebug));
@@ -106,17 +106,17 @@ void GpuDevice_DX12::ReportLiveObjects()
         HRESULT hr = pDebug->ReportLiveObjects(DXGI_DEBUG_ALL, flags);
         if (FAILED(hr))
         {
-            caustica::error("ReportLiveObjects failed, HRESULT = 0x%08x", hr);
+            caustica::error("reportLiveObjects failed, HRESULT = 0x%08x", hr);
         }
     }
 }
 
-bool GpuDevice_DX12::CreateInstanceInternal()
+bool GpuDevice_DX12::createInstanceInternal()
 {
 #if defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
     if (!m_DeviceParams.d3d12DeviceFactory)
     {
-        const dx12::AgilityBootstrapResult bootstrap = dx12::BootstrapAgilitySdk();
+        const dx12::AgilityBootstrapResult bootstrap = dx12::bootstrapAgilitySdk();
         if (bootstrap.deviceFactory)
         {
             m_OwnedD3d12DeviceFactory = bootstrap.deviceFactory;
@@ -125,12 +125,12 @@ bool GpuDevice_DX12::CreateInstanceInternal()
     }
     else
     {
-        dx12::EnableExperimentalShaderModels(m_DeviceParams.d3d12DeviceFactory);
+        dx12::enableExperimentalShaderModels(m_DeviceParams.d3d12DeviceFactory);
     }
 #endif
 
 #if CAUSTICA_WITH_STREAMLINE
-    StreamlineIntegration::Get().InitializePreDevice(nvrhi::GraphicsAPI::D3D12, m_DeviceParams.streamlineAppId, m_DeviceParams.checkStreamlineSignature, m_DeviceParams.enableStreamlineLog);
+    StreamlineIntegration::Get().initializePreDevice(nvrhi::GraphicsAPI::D3D12, m_DeviceParams.streamlineAppId, m_DeviceParams.checkStreamlineSignature, m_DeviceParams.enableStreamlineLog);
 #endif
 
     if (!m_DxgiFactory2)
@@ -147,7 +147,7 @@ bool GpuDevice_DX12::CreateInstanceInternal()
     return true;
 }
 
-bool GpuDevice_DX12::EnumerateAdapters(std::vector<AdapterInfo>& outAdapters)
+bool GpuDevice_DX12::enumerateAdapters(std::vector<AdapterInfo>& outAdapters)
 {
     if (!m_DxgiFactory2)
         return false;
@@ -168,7 +168,7 @@ bool GpuDevice_DX12::EnumerateAdapters(std::vector<AdapterInfo>& outAdapters)
 
         AdapterInfo adapterInfo;
 
-        adapterInfo.name = GetAdapterName(desc);
+        adapterInfo.name = getAdapterName(desc);
         adapterInfo.dxgiAdapter = adapter;
         adapterInfo.vendorID = desc.VendorId;
         adapterInfo.deviceID = desc.DeviceId;
@@ -183,7 +183,7 @@ bool GpuDevice_DX12::EnumerateAdapters(std::vector<AdapterInfo>& outAdapters)
     }
 }
 
-bool GpuDevice_DX12::CreateDevice()
+bool GpuDevice_DX12::createDevice()
 {
     if (m_DeviceParams.enableDebugRuntime)
     {
@@ -227,7 +227,7 @@ bool GpuDevice_DX12::CreateDevice()
 #if CAUSTICA_WITH_STREAMLINE
     // Auto select best adapter for streamline features
     if (adapterIndex < 0)
-        adapterIndex = StreamlineIntegration::Get().FindBestAdapterDX();
+        adapterIndex = StreamlineIntegration::Get().findBestAdapterDX();
 #endif
 
     if (adapterIndex < 0)
@@ -247,8 +247,8 @@ bool GpuDevice_DX12::CreateDevice()
         DXGI_ADAPTER_DESC aDesc;
         m_DxgiAdapter->GetDesc(&aDesc);
         
-        m_RendererString = GetAdapterName(aDesc);
-        m_IsNvidia = IsNvDeviceID(aDesc.VendorId);
+        m_RendererString = getAdapterName(aDesc);
+        m_IsNvidia = isNvDeviceID(aDesc.VendorId);
     }
 
     
@@ -275,12 +275,12 @@ bool GpuDevice_DX12::CreateDevice()
     }
 
 #if defined(CAUSTICA_D3D_AGILITY_SDK_VERSION) && (CAUSTICA_D3D_AGILITY_SDK_VERSION >= 619)
-    if (!ValidateAgilityShaderModel(m_Device12))
+    if (!validateAgilityShaderModel(m_Device12))
         return false;
 #endif
 
 #if CAUSTICA_WITH_STREAMLINE
-    StreamlineIntegration::Get().SetD3DDevice(m_Device12);
+    StreamlineIntegration::Get().setD3DDevice(m_Device12);
 #endif
 
     if (m_DeviceParams.enableDebugRuntime)
@@ -358,13 +358,13 @@ bool GpuDevice_DX12::CreateDevice()
 #endif
 
 #if CAUSTICA_WITH_STREAMLINE
-    StreamlineIntegration::Get().InitializeDeviceDX(m_NvrhiDevice);
+    StreamlineIntegration::Get().initializeDeviceDX(m_NvrhiDevice);
 #endif
 
     return true;
 }
 
-bool GpuDevice_DX12::CreateSwapChain()
+bool GpuDevice_DX12::createSwapChain()
 {
     UINT windowStyle = m_DeviceParams.startFullscreen
         ? (WS_POPUP | WS_SYSMENU | WS_VISIBLE)
@@ -375,7 +375,7 @@ bool GpuDevice_DX12::CreateSwapChain()
     RECT rect = { 0, 0, LONG(m_DeviceParams.backBufferWidth), LONG(m_DeviceParams.backBufferHeight) };
     AdjustWindowRect(&rect, windowStyle, FALSE);
 
-    if (MoveWindowOntoAdapter(m_DxgiAdapter, rect))
+    if (moveWindowOntoAdapter(m_DxgiAdapter, rect))
     {
         glfwSetWindowPos(m_Window, rect.left, rect.top);
     }
@@ -442,7 +442,7 @@ bool GpuDevice_DX12::CreateSwapChain()
 	hr = pSwapChain1->QueryInterface(IID_PPV_ARGS(&m_SwapChain));
 	HR_RETURN(hr)
 
-    if (!CreateRenderTargets())
+    if (!createRenderTargets())
         return false;
 
     hr = m_Device12->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_FrameFence));
@@ -456,12 +456,12 @@ bool GpuDevice_DX12::CreateSwapChain()
     return true;
 }
 
-void GpuDevice_DX12::DestroyDeviceAndSwapChain()
+void GpuDevice_DX12::destroyDeviceAndSwapChain()
 {
     m_RhiSwapChainBuffers.clear();
     m_RendererString.clear();
 
-    ReleaseRenderTargets();
+    releaseRenderTargets();
 
     m_NvrhiDevice = nullptr;
     m_NvrhiDevice = nullptr;
@@ -489,7 +489,7 @@ void GpuDevice_DX12::DestroyDeviceAndSwapChain()
     m_Device12 = nullptr;
 }
 
-bool GpuDevice_DX12::CreateRenderTargets()
+bool GpuDevice_DX12::createRenderTargets()
 {
     m_SwapChainBuffers.resize(m_SwapChainDesc.BufferCount);
     m_RhiSwapChainBuffers.resize(m_SwapChainDesc.BufferCount);
@@ -517,7 +517,7 @@ bool GpuDevice_DX12::CreateRenderTargets()
     return true;
 }
 
-void GpuDevice_DX12::ReleaseRenderTargets()
+void GpuDevice_DX12::releaseRenderTargets()
 {
     if (m_NvrhiDevice)
     {
@@ -537,9 +537,9 @@ void GpuDevice_DX12::ReleaseRenderTargets()
     m_SwapChainBuffers.clear();
 }
 
-void GpuDevice_DX12::ResizeSwapChain()
+void GpuDevice_DX12::resizeSwapChain()
 {
-    ReleaseRenderTargets();
+    releaseRenderTargets();
 
     if (!m_NvrhiDevice)
         return;
@@ -558,17 +558,17 @@ void GpuDevice_DX12::ResizeSwapChain()
         caustica::fatal("ResizeBuffers failed");
     }
 
-    bool ret = CreateRenderTargets();
+    bool ret = createRenderTargets();
     if (!ret)
     {
-        caustica::fatal("CreateRenderTarget failed");
+        caustica::fatal("createRenderTarget failed");
     }
 }
 
 bool GpuDevice_DX12::beginFrame()
 {
     if (m_DeviceParams.headlessDevice)
-        return BeginHeadlessFrame();
+        return beginHeadlessFrame();
 
     DXGI_SWAP_CHAIN_DESC1 newSwapChainDesc;
     DXGI_SWAP_CHAIN_FULLSCREEN_DESC newFullScreenDesc;
@@ -576,7 +576,7 @@ bool GpuDevice_DX12::beginFrame()
     {
         if (m_FullScreenDesc.Windowed != newFullScreenDesc.Windowed)
         {
-            BackBufferResizing();
+            backBufferResizing();
             
             m_FullScreenDesc = newFullScreenDesc;
             m_SwapChainDesc = newSwapChainDesc;
@@ -586,8 +586,8 @@ bool GpuDevice_DX12::beginFrame()
             if(newFullScreenDesc.Windowed)
                 glfwSetWindowMonitor(m_Window, nullptr, 50, 50, newSwapChainDesc.Width, newSwapChainDesc.Height, 0);
 
-            ResizeSwapChain();
-            BackBufferResized();
+            resizeSwapChain();
+            backBufferResized();
         }
 
     }
@@ -599,44 +599,44 @@ bool GpuDevice_DX12::beginFrame()
     return true;
 }
 
-nvrhi::ITexture* GpuDevice_DX12::GetCurrentBackBuffer()
+nvrhi::ITexture* GpuDevice_DX12::getCurrentBackBuffer()
 {
     if (m_DeviceParams.headlessDevice)
-        return GetHeadlessBackBuffer(GetCurrentHeadlessBackBufferIndex());
+        return getHeadlessBackBuffer(getCurrentHeadlessBackBufferIndex());
 
     return m_RhiSwapChainBuffers[m_SwapChain->GetCurrentBackBufferIndex()];
 }
 
-nvrhi::ITexture* GpuDevice_DX12::GetBackBuffer(uint32_t index)
+nvrhi::ITexture* GpuDevice_DX12::getBackBuffer(uint32_t index)
 {
     if (m_DeviceParams.headlessDevice)
-        return GetHeadlessBackBuffer(index);
+        return getHeadlessBackBuffer(index);
 
     if (index < m_RhiSwapChainBuffers.size())
         return m_RhiSwapChainBuffers[index];
     return nullptr;
 }
 
-uint32_t GpuDevice_DX12::GetCurrentBackBufferIndex()
+uint32_t GpuDevice_DX12::getCurrentBackBufferIndex()
 {
     if (m_DeviceParams.headlessDevice)
-        return GetCurrentHeadlessBackBufferIndex();
+        return getCurrentHeadlessBackBufferIndex();
 
     return m_SwapChain->GetCurrentBackBufferIndex();
 }
 
-uint32_t GpuDevice_DX12::GetBackBufferCount()
+uint32_t GpuDevice_DX12::getBackBufferCount()
 {
     if (m_DeviceParams.headlessDevice)
-        return GetHeadlessBackBufferCount();
+        return getHeadlessBackBufferCount();
 
     return m_SwapChainDesc.BufferCount;
 }
 
-bool GpuDevice_DX12::Present()
+bool GpuDevice_DX12::present()
 {
     if (m_DeviceParams.headlessDevice)
-        return PresentHeadlessFrame();
+        return presentHeadlessFrame();
 
     if (!m_CanPresentSwapChain)
         return true;
@@ -655,7 +655,7 @@ bool GpuDevice_DX12::Present()
     return SUCCEEDED(result);
 }
 
-void GpuDevice_DX12::PrepareShutdown()
+void GpuDevice_DX12::prepareShutdown()
 {
 #if NVRHI_D3D12_WITH_NVAPI
     if (m_Device12)
@@ -663,25 +663,25 @@ void GpuDevice_DX12::PrepareShutdown()
 #endif
 }
 
-void GpuDevice_DX12::Shutdown()
+void GpuDevice_DX12::shutdown()
 {
-    GpuDevice::Shutdown();
+    GpuDevice::shutdown();
 
     m_DxgiAdapter = nullptr;
     m_DxgiFactory2 = nullptr;
 
     if (m_DeviceParams.enableDebugRuntime)
     {
-        ReportLiveObjects();
+        reportLiveObjects();
     }
 }
 
-bool GpuDevice_DX12::QueryVideoMemoryInfo(caustica::VideoMemoryInfo& out) const
+bool GpuDevice_DX12::queryVideoMemoryInfo(caustica::VideoMemoryInfo& out) const
 {
-    return caustica::QueryDxgiAdapterVideoMemory(m_DxgiAdapter, out);
+    return caustica::queryDxgiAdapterVideoMemory(m_DxgiAdapter, out);
 }
 
-GpuDevice *GpuDevice::CreateD3D12(void)
+GpuDevice *GpuDevice::createD3D12(void)
 {
     return new GpuDevice_DX12();
 }

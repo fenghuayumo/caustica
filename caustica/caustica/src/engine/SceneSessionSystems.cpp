@@ -82,7 +82,7 @@ namespace
 
     void initViewState(SceneViewState& viewState)
     {
-        viewState.progressLoading.Start("Initializing...");
+        viewState.progressLoading.start("Initializing...");
         viewState.progressLoading.Set(50);
     }
 
@@ -100,19 +100,19 @@ namespace
             if (presentedFrames == 0)
                 presentedFrames = 1u + cfg->DLSSFGNumFramesToGenerate;
 
-            vs->fpsInfo = StringFormat("%.3f ms/%d-frames* (%.1f FPS*) *DLSS-G",
+            vs->fpsInfo = stringFormat("%.3f ms/%d-frames* (%.1f FPS*) *DLSS-G",
                 frameTimeSeconds * 1e3, presentedFrames, presentedFrames / frameTimeSeconds);
             return;
         }
 #endif
 
-        vs->fpsInfo = StringFormat("%.3f ms/frame (%.1f FPS)", frameTimeSeconds * 1e3, 1.0 / frameTimeSeconds);
+        vs->fpsInfo = stringFormat("%.3f ms/frame (%.1f FPS)", frameTimeSeconds * 1e3, 1.0 / frameTimeSeconds);
     }
 
     void recordFrameTiming(App& app, const GpuDevice& gpuDevice)
     {
         SceneViewState* vs = sceneSession::viewState(app);
-        double frameTime = gpuDevice.GetAverageFrameTimeSeconds();
+        double frameTime = gpuDevice.getAverageFrameTimeSeconds();
         if (frameTime <= 0.0 && vs && vs->lastDeltaTime > 0.0f)
             frameTime = static_cast<double>(vs->lastDeltaTime);
         updateFpsInfo(app, frameTime);
@@ -126,15 +126,15 @@ namespace
         if (!manager || !cfg || !vs)
             return;
 
-        if (!manager->beginSceneSwitch(sceneName, GetLocalPath(c_AssetsFolder), forceReload))
+        if (!manager->beginSceneSwitch(sceneName, getLocalPath(c_AssetsFolder), forceReload))
             return;
 
         cfg->ResetAccumulation = true;
         cfg->ResetRealtimeCaches = true;
         manager->setAsyncLoadingEnabled(false);
 
-        vs->progressLoading.Stop();
-        vs->progressLoading.Start("Loading scene...");
+        vs->progressLoading.stop();
+        vs->progressLoading.start("Loading scene...");
         manager->beginLoadingScene(
             std::make_shared<caustica::NativeFileSystem>(),
             manager->getCurrentScenePath());
@@ -142,7 +142,7 @@ namespace
         {
             caustica::error("Unable to load scene '%s'", sceneName.c_str());
             manager->clearScene();
-            vs->progressLoading.Stop();
+            vs->progressLoading.stop();
         }
     }
 
@@ -419,13 +419,13 @@ void initStreamlineAndWindow(App& app)
 #if CAUSTICA_WITH_STREAMLINE
     PathTracerSettings* cfg = settings(app);
     GpuDevice* device = gpuDevice(app);
-    if (!cfg || !device || device->IsHeadless())
+    if (!cfg || !device || device->isHeadless())
         return;
 
-    cfg->IsDLSSSuported = device->GetStreamline().IsDLSSAvailable();
-    cfg->IsDLSSFGSupported = device->GetStreamline().IsDLSSGAvailable();
-    cfg->IsReflexSupported = device->GetStreamline().IsReflexAvailable();
-    cfg->IsDLSSRRSupported = device->GetStreamline().IsDLSSRRAvailable();
+    cfg->IsDLSSSuported = device->getStreamline().isDLSSAvailable();
+    cfg->IsDLSSFGSupported = device->getStreamline().isDLSSGAvailable();
+    cfg->IsReflexSupported = device->getStreamline().isReflexAvailable();
+    cfg->IsDLSSRRSupported = device->getStreamline().isDLSSRRAvailable();
 #endif
 }
 
@@ -488,7 +488,7 @@ void initializeSession(App& app, const std::string& preferredScene)
             device->getDevice(), descriptorTable, textureLoader, shaderFactory);
     }
 
-    manager->discoverAvailableScenes(GetLocalPath(c_AssetsFolder));
+    manager->discoverAvailableScenes(getLocalPath(c_AssetsFolder));
 
     std::string sceneArg;
     if (LooksLikeInlineSceneJson(preferredScene))
@@ -508,7 +508,7 @@ void initializeSession(App& app, const std::string& preferredScene)
 
 void setCurrentScene(App& app, const std::string& sceneName, bool forceReload)
 {
-    if (caustica::IsRenderThread())
+    if (caustica::isRenderThread())
     {
         SceneViewState* vs = viewState(app);
         assert(vs);
@@ -540,7 +540,7 @@ void renderScene(App& app, GpuDevice& gpuDevice)
     if (!wr)
         return;
 
-    wr->render(gpuDevice.GetCurrentFramebuffer(true));
+    wr->render(gpuDevice.getCurrentFramebuffer(true));
     recordFrameTiming(app, gpuDevice);
 }
 
@@ -603,7 +603,7 @@ void onSceneLoaded(App& app)
     if (!manager || !vs || !cmd)
         return;
 
-    const std::filesystem::path assetsRoot = GetLocalPath(c_AssetsFolder);
+    const std::filesystem::path assetsRoot = getLocalPath(c_AssetsFolder);
     gr->refreshEnvironmentMapMediaList(assetsRoot, manager->getCurrentScenePath());
 
     vs->progressLoading.Set(50);
@@ -640,9 +640,9 @@ void onSceneLoaded(App& app)
 
     if (GpuDevice* device = gpuDevice(app))
     {
-        device->SetPreparedRenderFrameIndex(device->GetFrameIndex());
+        device->setPreparedRenderFrameIndex(device->getFrameIndex());
         if (const std::shared_ptr<Scene> activeScene = scene(app))
-            activeScene->extractAndPublishRenderSnapshot(device->GetPreparedRenderFrameIndex());
+            activeScene->extractAndPublishRenderSnapshot(device->getPreparedRenderFrameIndex());
     }
 
 }
@@ -784,7 +784,7 @@ void animate(App& app, float fElapsedTimeSeconds)
                     SetSceneMeshVerticesParams deformParams;
                     deformParams.device = device->getDevice();
                     deformParams.scene = manager->getScene();
-                    deformParams.frameIndex = device->GetFrameIndex();
+                    deformParams.frameIndex = device->getFrameIndex();
                     deformParams.recomputeNormals = true;
                     deformParams.rebuildAccelerationStructure = true;
                     // Continuous playback must not wipe temporal denoise/TAA history every
@@ -825,12 +825,12 @@ void tickSimulationAndFrameTiming(App& app, float fElapsedTimeSeconds)
         if (::SceneManager* manager = sceneManager(app))
         {
             if (GpuDevice* device = gpuDevice(app))
-                manager->tickSimulation(device->GetFrameIndex());
+                manager->tickSimulation(device->getFrameIndex());
         }
     }
 
     GpuDevice* device = gpuDevice(app);
-    double frameTime = device ? device->GetAverageFrameTimeSeconds() : 0.0;
+    double frameTime = device ? device->getAverageFrameTimeSeconds() : 0.0;
     if (frameTime <= 0.0 && fElapsedTimeSeconds > 0.0f)
         frameTime = static_cast<double>(fElapsedTimeSeconds);
     updateFpsInfo(app, frameTime);

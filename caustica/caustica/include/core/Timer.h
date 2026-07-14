@@ -14,12 +14,12 @@ namespace caustica
         {
         }
 
-        void Start()
+        void start()
         {
             startTime = std::chrono::high_resolution_clock::now();
         }
 
-        void Stop()
+        void stop()
         {
             stopTime = std::chrono::high_resolution_clock::now();
         }
@@ -41,7 +41,7 @@ namespace caustica
 class FPSLimiter
 {
 public:
-    void FramerateLimit(int fpsTarget);
+    void framerateLimit(int fpsTarget);
 
 private:
     std::chrono::high_resolution_clock::time_point m_lastTimestamp =

@@ -5,7 +5,7 @@
 // this device can be much more direct and much easier than using ImGUI.
 // https://www.korg.com/uk/products/computergear/nanokontrol2/
 //
-// There are init, Shutdown and update calls that need making to initialise the system,
+// There are init, shutdown and update calls that need making to initialise the system,
 // shut it down, and update it (just call update once per frame).
 //
 // Controls are grouped into pages.  There are 4 pages numbered 0-3.  The current page can be
@@ -59,11 +59,11 @@ namespace korgi
 
 #if KORGI_ENABLED
 void init();
-void Shutdown();
+void shutdown();
 void update();
 #else
 static inline void init() {}
-static inline void Shutdown() {}
+static inline void shutdown() {}
 static inline void update() {}
 #endif
 
@@ -132,7 +132,7 @@ enum class Control : unsigned char
     NextMarker = 62,
     Rewind = 43,
     FastForward = 44,
-    Stop = 42,
+    stop = 42,
     Play = 41,
     Record = 45,
 

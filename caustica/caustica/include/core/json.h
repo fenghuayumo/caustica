@@ -62,15 +62,15 @@ namespace caustica::json
     template<> void write<dm::double4>(Json::Value& node, const dm::double4& value);
 
 // File-based JSON I/O (uses std::filesystem, not VFS)
-bool SaveToFile(const std::filesystem::path& filePath, const Json::Value& rootNode);
+bool saveToFile(const std::filesystem::path& filePath, const Json::Value& rootNode);
 bool loadFromFile(const std::filesystem::path& filePath, Json::Value& outRootNode);
 
 // String-based JSON I/O
-std::string ToString(const Json::Value& rootNode);
-bool FromString(const std::string& jsonData, Json::Value& outRootNode);
+std::string toString(const Json::Value& rootNode);
+bool fromString(const std::string& jsonData, Json::Value& outRootNode);
 
 // Extract string array from JSON array node
-std::vector<std::string> ReadStringArray(const Json::Value& arr);
+std::vector<std::string> readStringArray(const Json::Value& arr);
 
 }
 

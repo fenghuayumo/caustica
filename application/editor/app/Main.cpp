@@ -46,14 +46,14 @@ int main(int argc, char** argv)
     SplashScreen splashScreen;
     if (!WantsHeadlessStartup(__argc, (const char**)__argv))
     {
-        splashScreen.Start(L"loading_splash.png");
+        splashScreen.start(L"loading_splash.png");
         g_activeSplash = &splashScreen;
     }
 
     auto stopSplash = []() {
         if (g_activeSplash)
         {
-            g_activeSplash->Stop();
+            g_activeSplash->stop();
             g_activeSplash = nullptr;
         }
     };
@@ -78,6 +78,6 @@ int main(int argc, char** argv)
         });
 #endif
 
-    korgi::Shutdown();
+    korgi::shutdown();
     return exitCode;
 }

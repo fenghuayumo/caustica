@@ -38,7 +38,7 @@ void ImGuiManager::loadDefaultFont(caustica::ImGui_Renderer& renderer,
 {
     auto nativeFS = std::make_shared<NativeFileSystem>();
     auto fontPath = assetsPath / "fonts/DroidSans/DroidSans-Mono.ttf";
-    renderer.CreateFontFromFile(*nativeFS, fontPath, 16.0f);
+    renderer.createFontFromFile(*nativeFS, fontPath, 16.0f);
 }
 
 void ImGuiManager::configureExtensions(int graphicsAPI)

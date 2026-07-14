@@ -314,7 +314,7 @@ void EditorUI::BuildSceneWidgetsPanel(const PanelLayout& layout)
         int envOptionsCurrentIndex = -1; for (int i = 0; i < envOptions.size(); i++) if (envOptions[i]==envMapOverrideSource) envOptionsCurrentIndex = i;
 
         std::vector<std::string> materialVariants;
-        if (FindSubStringIgnoreCase(m_sceneEditor.currentSceneName(), "bistro") != std::string::npos)
+        if (findSubStringIgnoreCase(m_sceneEditor.currentSceneName(), "bistro") != std::string::npos)
             materialVariants = {"dry", "wet", "silly"};
         int materialVariantIndexPrev = m_settings.MaterialVariantIndex;
 
@@ -413,7 +413,7 @@ void EditorUI::BuildSceneWidgetsPanel(const PanelLayout& layout)
 
         if (m_settings.MaterialVariantIndex != materialVariantIndexPrev)
         {
-            if (FindSubStringIgnoreCase(m_sceneEditor.currentSceneName(), "bistro") != std::string::npos)
+            if (findSubStringIgnoreCase(m_sceneEditor.currentSceneName(), "bistro") != std::string::npos)
             {
                 // bistro dry-wet test
                 std::vector<std::string> pavementList = { "LMBR0000163Cobbl_a1d987f5", "LMBR000016bCobbl_8652c51e", "LMBR0000162Paris_c30c71f1", "LMBR0000162Paris_c30c71f1", "LMBR000016cCobbl_f202ecfa", "LMBR0000161Pavem_e2e87964", "LMBR0000168Cobbl_a5a7f4b4", "LMBR0000160Pavem_613287fe", "LMBR000016aCobbl_e1c68d26" };

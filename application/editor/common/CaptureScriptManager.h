@@ -24,13 +24,13 @@ public:
 
     void ScriptMainUI(const ImVec4 & warnColor, const ImVec4 & categoryColor, float indent, float currentScale);
 
-    void PreAnim(float & fElapsedTimeSeconds);
+    void preAnim(float & fElapsedTimeSeconds);
     void PostAnim();
 
     void preRender();
-    void PostRender(const std::function<bool(const char*)>& dumpScreenshotCallback);
+    void postRender(const std::function<bool(const char*)>& dumpScreenshotCallback);
 
-    bool IsDoingWork() const    { return m_sequencer.IsDoingWork(); }
+    bool isDoingWork() const    { return m_sequencer.isDoingWork(); }
 
 
 private:

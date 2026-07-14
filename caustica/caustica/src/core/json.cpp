@@ -381,7 +381,7 @@ void operator<<(Json::Value& node, const char* src)
 namespace caustica::json
 {
 
-bool SaveToFile(const std::filesystem::path& filePath, const Json::Value& rootNode)
+bool saveToFile(const std::filesystem::path& filePath, const Json::Value& rootNode)
 {
     std::ofstream outFile(filePath, std::ios::trunc);
     if (!outFile.is_open())
@@ -413,13 +413,13 @@ bool loadFromFile(const std::filesystem::path& filePath, Json::Value& outRootNod
     return true;
 }
 
-std::string ToString(const Json::Value& rootNode)
+std::string toString(const Json::Value& rootNode)
 {
     Json::StreamWriterBuilder writer;
     return Json::writeString(writer, rootNode);
 }
 
-bool FromString(const std::string& jsonData, Json::Value& outRootNode)
+bool fromString(const std::string& jsonData, Json::Value& outRootNode)
 {
     Json::CharReaderBuilder readerBuilder;
     std::string errs;
@@ -427,7 +427,7 @@ bool FromString(const std::string& jsonData, Json::Value& outRootNode)
     return Json::parseFromStream(readerBuilder, iss, &outRootNode, &errs);
 }
 
-std::vector<std::string> ReadStringArray(const Json::Value& arr)
+std::vector<std::string> readStringArray(const Json::Value& arr)
 {
     std::vector<std::string> result;
     if (arr.isArray())

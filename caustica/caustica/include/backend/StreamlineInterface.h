@@ -25,7 +25,7 @@ public:
     };
 
     // Set the current viewport which affects constants, options and tagging
-    virtual void SetViewport(uint32_t viewportIndex) = 0;
+    virtual void setViewport(uint32_t viewportIndex) = 0;
 
     // see sl_consts.h for documentation
     struct Constants 
@@ -59,7 +59,7 @@ public:
         bool motionVectorsJittered = false;
         float minRelativeLinearDepthObjectSeparation = 40.0f;
     };
-    virtual void SetConstants(const Constants& consts) = 0;
+    virtual void setConstants(const Constants& consts) = 0;
 
     // See sl_dlss.h for documentation
     enum class DLSSMode : uint32_t
@@ -110,11 +110,11 @@ public:
         dm::int2 maxRenderSize;
         float sharpness;
     };
-    virtual void SetDLSSOptions(const DLSSOptions& options) = 0;
-    virtual bool IsDLSSAvailable() const = 0;
-    virtual void QueryDLSSOptimalSettings(const DLSSOptions& options, DLSSSettings& settings) = 0;
-    virtual void EvaluateDLSS(nvrhi::ICommandList* commandList) = 0;
-    virtual void CleanupDLSS(bool wfi) = 0;
+    virtual void setDLSSOptions(const DLSSOptions& options) = 0;
+    virtual bool isDLSSAvailable() const = 0;
+    virtual void queryDLSSOptimalSettings(const DLSSOptions& options, DLSSSettings& settings) = 0;
+    virtual void evaluateDLSS(nvrhi::ICommandList* commandList) = 0;
+    virtual void cleanupDLSS(bool wfi) = 0;
 
     // See sl_nis.h for documentation
     enum class NISMode : uint32_t
@@ -137,10 +137,10 @@ public:
         NISHDR hdrMode = NISHDR::eNone;
         float sharpness = 0.0f;
     };
-    virtual void SetNISOptions(const NISOptions& options) = 0;
-    virtual bool IsNISAvailable() const = 0;
-    virtual void EvaluateNIS(nvrhi::ICommandList* commandList) = 0;
-    virtual void CleanupNIS(bool wfi) = 0;
+    virtual void setNISOptions(const NISOptions& options) = 0;
+    virtual bool isNISAvailable() const = 0;
+    virtual void evaluateNIS(nvrhi::ICommandList* commandList) = 0;
+    virtual void cleanupNIS(bool wfi) = 0;
 
     // See sl_dvc.h for documentation
     enum class DeepDVCMode : uint32_t
@@ -155,11 +155,11 @@ public:
         float intensity = 0.5f;
         float saturationBoost = 0.25f;
     };
-    virtual void SetDeepDVCOptions(const DeepDVCOptions& options) = 0;
-    virtual bool IsDeepDVCAvailable() const = 0;
-    virtual void QueryDeepDVCState(uint64_t& estimatedVRamUsage) = 0;
-    virtual void EvaluateDeepDVC(nvrhi::ICommandList* commandList) = 0;
-    virtual void CleanupDeepDVC() = 0;
+    virtual void setDeepDVCOptions(const DeepDVCOptions& options) = 0;
+    virtual bool isDeepDVCAvailable() const = 0;
+    virtual void queryDeepDVCState(uint64_t& estimatedVRamUsage) = 0;
+    virtual void evaluateDeepDVC(nvrhi::ICommandList* commandList) = 0;
+    virtual void cleanupDeepDVC() = 0;
 
     // See sl_reflex.h for documentation
     enum ReflexMode
@@ -204,13 +204,13 @@ public:
         ReflexReport frameReport[64];
         bool flashIndicatorDriverControlled = false;
     };
-    virtual void GetReflexState(ReflexState& state) const = 0;
-    virtual bool IsReflexAvailable() const = 0;
-    virtual bool IsPCLAvailable() const = 0;
-    virtual void SetReflexConsts(const ReflexOptions& options) = 0;
+    virtual void getReflexState(ReflexState& state) const = 0;
+    virtual bool isReflexAvailable() const = 0;
+    virtual bool isPCLAvailable() const = 0;
+    virtual void setReflexConsts(const ReflexOptions& options) = 0;
 
-    virtual void ReflexTriggerFlash(int frameNumber) = 0;
-    virtual void ReflexTriggerPcPing(int frameNumber) = 0;
+    virtual void reflexTriggerFlash(int frameNumber) = 0;
+    virtual void reflexTriggerPcPing(int frameNumber) = 0;
     
     // See dlss_g.h for documentation
     enum class DLSSGMode : uint32_t
@@ -274,10 +274,10 @@ public:
         void* inputsProcessingCompletionFence{};
         uint64_t lastPresentInputsProcessingCompletionFenceValue{};
     };
-    virtual void GetDLSSGState(DLSSGState& state, const DLSSGOptions& options) = 0;
-    virtual void SetDLSSGOptions(const DLSSGOptions& options) = 0;
-    virtual bool IsDLSSGAvailable() const = 0;
-    virtual void CleanupDLSSG(bool wfi) = 0;
+    virtual void getDLSSGState(DLSSGState& state, const DLSSGOptions& options) = 0;
+    virtual void setDLSSGOptions(const DLSSGOptions& options) = 0;
+    virtual bool isDLSSGAvailable() const = 0;
+    virtual void cleanupDLSSG(bool wfi) = 0;
 
     // See dlss_d.h for documentation
     enum class DLSSRRPreset : uint32_t
@@ -322,43 +322,43 @@ public:
         caustica::math::int2 maxRenderSize;
         float sharpness;
     };
-    virtual void SetDLSSRROptions(const DLSSRROptions& options) = 0;
-    virtual bool IsDLSSRRAvailable() const = 0;
-    virtual void QueryDLSSRROptimalSettings(const DLSSRROptions& options, DLSSRRSettings& settings) = 0;
-    virtual void EvaluateDLSSRR(nvrhi::ICommandList* commandList) = 0;
-    virtual void CleanupDLSSRR(bool wfi) = 0;
+    virtual void setDLSSRROptions(const DLSSRROptions& options) = 0;
+    virtual bool isDLSSRRAvailable() const = 0;
+    virtual void queryDLSSRROptimalSettings(const DLSSRROptions& options, DLSSRRSettings& settings) = 0;
+    virtual void evaluateDLSSRR(nvrhi::ICommandList* commandList) = 0;
+    virtual void cleanupDLSSRR(bool wfi) = 0;
 
-    virtual void TagResourcesGeneral(
+    virtual void tagResourcesGeneral(
         nvrhi::ICommandList* commandList,
         const IView* view,
         nvrhi::ITexture* motionVectors,
         nvrhi::ITexture* depth,
         nvrhi::ITexture* finalColorHudless) = 0;
 
-    virtual void TagResourcesDLSSNIS(
+    virtual void tagResourcesDLSSNIS(
         nvrhi::ICommandList* commandList,
         const IView* view,
         nvrhi::ITexture* output,
         nvrhi::ITexture* input) = 0;
 
-    virtual void TagResourcesDLSSFG(
+    virtual void tagResourcesDLSSFG(
         nvrhi::ICommandList* commandList,
         bool validViewportExtent = false,
         const Extent& backBufferExtent = {}) = 0;
 
-    virtual void TagResourcesDeepDVC(
+    virtual void tagResourcesDeepDVC(
         nvrhi::ICommandList* commandList,
         const IView* view,
         nvrhi::ITexture* output) = 0;
 
-    virtual void UnTagResourcesDeepDVC() = 0;
+    virtual void unTagResourcesDeepDVC() = 0;
 
 	// * If roughness != nullptr, normalsAndOptionalRoughness contains only normals. If roughness == nullptr then the 
 	//   roughness value should be in .a channel of the normalsAndOptionalRoughness and normalRoughnessMode in 
 	//   StreamlineInterface::DLSSRROptions must be set to DLSSRRNormalRoughnessMode::ePacked.
 	// * Either specHitDist or specMotionVectors should be provided but not both nor neither. Refer to DLSS-RR 
 	//   documentation for more detail.
-    virtual void TagResourcesDLSSRR(
+    virtual void tagResourcesDLSSRR(
         nvrhi::ICommandList* commandList,
         const IView* view,
         dm::int2 renderSize,
@@ -373,12 +373,12 @@ public:
         nvrhi::ITexture* outputColor
     ) = 0;
 
-    virtual void SimStart(GpuDevice& manager) = 0;
-    virtual void SimEnd(GpuDevice& manager) = 0;
-    virtual void RenderStart(GpuDevice& manager) = 0;
-    virtual void RenderEnd(GpuDevice& manager) = 0;
-    virtual void PresentStart(GpuDevice& manager) = 0;
-    virtual void PresentEnd(GpuDevice& manager) = 0;
+    virtual void simStart(GpuDevice& manager) = 0;
+    virtual void simEnd(GpuDevice& manager) = 0;
+    virtual void renderStart(GpuDevice& manager) = 0;
+    virtual void renderEnd(GpuDevice& manager) = 0;
+    virtual void presentStart(GpuDevice& manager) = 0;
+    virtual void presentEnd(GpuDevice& manager) = 0;
 };
 
 } // namespace caustica

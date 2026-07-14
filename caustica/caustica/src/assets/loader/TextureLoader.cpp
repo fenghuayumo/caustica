@@ -351,7 +351,7 @@ Handle<ImageAsset> TextureLoader::loadTextureFromFileAsync(
     texture->forceSRGB = sRGB;
     texture->path = path.generic_string();
 
-    threadPool.AddTask([this, texture, path]()
+    threadPool.addTask([this, texture, path]()
     {
         auto fileData = readTextureFile(path);
         if (fileData)
@@ -387,7 +387,7 @@ Handle<ImageAsset> TextureLoader::loadTextureFromMemoryAsync(
     texture->id = id;
     (void)m_Images.insert(id, texture);
 
-    threadPool.AddTask([this, texture, data, mimeType]()
+    threadPool.addTask([this, texture, data, mimeType]()
     {
         if (fillTextureData(data, texture, "", mimeType))
         {

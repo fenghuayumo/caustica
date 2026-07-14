@@ -201,7 +201,7 @@ bool GpuDevice_VK::createInstance()
     return true;
 }
 
-bool GpuDevice_VK::ShouldIgnoreValidationMessageLocation(size_t location) const
+bool GpuDevice_VK::shouldIgnoreValidationMessageLocation(size_t location) const
 {
     const auto& ignored = m_DeviceParams.ignoredVulkanValidationMessageLocations;
     return std::find(ignored.begin(), ignored.end(), location) != ignored.end();
@@ -221,7 +221,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL vulkanDebugCallback(
 
     if (manager)
     {
-        if (manager->ShouldIgnoreValidationMessageLocation(location))
+        if (manager->shouldIgnoreValidationMessageLocation(location))
             return VK_FALSE;
     }
 
@@ -267,7 +267,7 @@ bool GpuDevice_VK::pickPhysicalDevice()
         lastDevice = adapterIndex;
     }
 
-    // Start building an error message in case we cannot find a device.
+    // start building an error message in case we cannot find a device.
     std::stringstream errorStream;
     errorStream << "Cannot find a Vulkan device that supports all the required extensions and properties.";
 
@@ -423,7 +423,7 @@ bool GpuDevice_VK::pickPhysicalDevice()
 #if CAUSTICA_WITH_STREAMLINE
         // Auto select best adapter for streamline features
         if (!m_DeviceParams.headlessDevice && adapterIndex < 0)
-            selectedIndex = StreamlineIntegration::Get().FindBestAdapterVulkan(discreteGPUs);
+            selectedIndex = StreamlineIntegration::Get().findBestAdapterVulkan(discreteGPUs);
 #endif
 
         m_VulkanPhysicalDevice = discreteGPUs[selectedIndex];
@@ -436,7 +436,7 @@ bool GpuDevice_VK::pickPhysicalDevice()
 #if CAUSTICA_WITH_STREAMLINE
         // Auto select best adapter for streamline features
         if (!m_DeviceParams.headlessDevice && adapterIndex < 0)
-            selectedIndex = StreamlineIntegration::Get().FindBestAdapterVulkan(otherGPUs);
+            selectedIndex = StreamlineIntegration::Get().findBestAdapterVulkan(otherGPUs);
 #endif
         m_VulkanPhysicalDevice = otherGPUs[selectedIndex];
         return true;
@@ -878,11 +878,11 @@ bool GpuDevice_VK::createSwapChain()
 
 #define CHECK(a) if (!(a)) { return false; }
 
-bool GpuDevice_VK::CreateInstanceInternal()
+bool GpuDevice_VK::createInstanceInternal()
 {
 #if CAUSTICA_WITH_STREAMLINE
     if (!m_DeviceParams.headlessDevice)
-        StreamlineIntegration::Get().InitializePreDevice(nvrhi::GraphicsAPI::VULKAN, m_DeviceParams.streamlineAppId, m_DeviceParams.checkStreamlineSignature, m_DeviceParams.enableStreamlineLog);
+        StreamlineIntegration::Get().initializePreDevice(nvrhi::GraphicsAPI::VULKAN, m_DeviceParams.streamlineAppId, m_DeviceParams.checkStreamlineSignature, m_DeviceParams.enableStreamlineLog);
 #endif
 
     if (m_DeviceParams.enableDebugRuntime)
@@ -905,7 +905,7 @@ bool GpuDevice_VK::CreateInstanceInternal()
     return createInstance();
 }
 
-bool GpuDevice_VK::EnumerateAdapters(std::vector<AdapterInfo>& outAdapters)
+bool GpuDevice_VK::enumerateAdapters(std::vector<AdapterInfo>& outAdapters)
 {
     if (!m_VulkanInstance)
         return false;
@@ -959,7 +959,7 @@ bool GpuDevice_VK::EnumerateAdapters(std::vector<AdapterInfo>& outAdapters)
     return true;
 }
 
-bool GpuDevice_VK::CreateDevice()
+bool GpuDevice_VK::createDevice()
 {
     if (m_DeviceParams.enableDebugRuntime)
     {
@@ -1041,14 +1041,14 @@ bool GpuDevice_VK::CreateDevice()
         vulkanInfo.graphicsQueueIndex = kGraphicsQueueIndex;
         vulkanInfo.graphicsQueueFamily = m_GraphicsQueueFamily;
         
-        StreamlineIntegration::Get().InitializeDeviceVK(m_NvrhiDevice, vulkanInfo);
+        StreamlineIntegration::Get().initializeDeviceVK(m_NvrhiDevice, vulkanInfo);
     }
 #endif
 
     return true;
 }
 
-bool GpuDevice_VK::CreateSwapChain()
+bool GpuDevice_VK::createSwapChain()
 {
     CHECK(createSwapChain())
 
@@ -1071,7 +1071,7 @@ bool GpuDevice_VK::CreateSwapChain()
 }
 #undef CHECK
 
-void GpuDevice_VK::DestroyDeviceAndSwapChain()
+void GpuDevice_VK::destroyDeviceAndSwapChain()
 {
     destroySwapChain();
 
@@ -1126,7 +1126,7 @@ void GpuDevice_VK::DestroyDeviceAndSwapChain()
 bool GpuDevice_VK::beginFrame()
 {
     if (m_DeviceParams.headlessDevice)
-        return BeginHeadlessFrame();
+        return beginHeadlessFrame();
 
     const auto& semaphore = m_AcquireSemaphores[m_AcquireSemaphoreIndex];
 
@@ -1144,14 +1144,14 @@ bool GpuDevice_VK::beginFrame()
 
         if ((res == vk::Result::eErrorOutOfDateKHR || res == vk::Result::eSuboptimalKHR) && attempt < maxAttempts)
         {
-            BackBufferResizing();
+            backBufferResizing();
             auto surfaceCaps = m_VulkanPhysicalDevice.getSurfaceCapabilitiesKHR(m_WindowSurface);
 
             m_DeviceParams.backBufferWidth = surfaceCaps.currentExtent.width;
             m_DeviceParams.backBufferHeight = surfaceCaps.currentExtent.height;
 
-            ResizeSwapChain();
-            BackBufferResized();
+            resizeSwapChain();
+            backBufferResized();
         }
         else
             break;
@@ -1169,10 +1169,10 @@ bool GpuDevice_VK::beginFrame()
     return false;
 }
 
-bool GpuDevice_VK::Present()
+bool GpuDevice_VK::present()
 {
     if (m_DeviceParams.headlessDevice)
-        return PresentHeadlessFrame();
+        return presentHeadlessFrame();
 
     const auto& semaphore = m_PresentSemaphores[m_SwapChainIndex];
 

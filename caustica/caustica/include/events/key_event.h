@@ -18,18 +18,18 @@ public:
         : m_KeyCode(keyCode), m_Scancode(scancode), m_RepeatCount(repeatCount), m_Mods(mods)
     {}
 
-    KeyCode     GetKeyCode()     const { return m_KeyCode; }
-    int         GetScancode()    const { return m_Scancode; }
-    int         GetRepeatCount() const { return m_RepeatCount; }
-    ModifierKey GetModifiers()   const { return m_Mods; }
+    KeyCode     getKeyCode()     const { return m_KeyCode; }
+    int         getScancode()    const { return m_Scancode; }
+    int         getRepeatCount() const { return m_RepeatCount; }
+    ModifierKey getModifiers()   const { return m_Mods; }
 
-    bool IsRepeat() const { return m_RepeatCount > 0; }
+    bool isRepeat() const { return m_RepeatCount > 0; }
 
     EVENT_CLASS_TYPE(KeyPressed);
     EVENT_CLASS_CATEGORY_FLAGS(EventCategory::Input | EventCategory::Keyboard);
 
-    const char* GetName() const override { return "KeyPressed"; }
-    std::string ToString() const override
+    const char* getName() const override { return "KeyPressed"; }
+    std::string toString() const override
     {
         std::ostringstream ss;
         ss << "KeyPressed: key=" << m_KeyCode << " repeat=" << m_RepeatCount;
@@ -53,15 +53,15 @@ public:
         : m_KeyCode(keyCode), m_Scancode(scancode), m_Mods(mods)
     {}
 
-    KeyCode     GetKeyCode()   const { return m_KeyCode; }
-    int         GetScancode()  const { return m_Scancode; }
-    ModifierKey GetModifiers() const { return m_Mods; }
+    KeyCode     getKeyCode()   const { return m_KeyCode; }
+    int         getScancode()  const { return m_Scancode; }
+    ModifierKey getModifiers() const { return m_Mods; }
 
     EVENT_CLASS_TYPE(KeyReleased);
     EVENT_CLASS_CATEGORY_FLAGS(EventCategory::Input | EventCategory::Keyboard);
 
-    const char* GetName() const override { return "KeyReleased"; }
-    std::string ToString() const override
+    const char* getName() const override { return "KeyReleased"; }
+    std::string toString() const override
     {
         std::ostringstream ss;
         ss << "KeyReleased: key=" << m_KeyCode;
@@ -84,13 +84,13 @@ public:
         : m_Codepoint(codepoint)
     {}
 
-    unsigned int GetCodepoint() const { return m_Codepoint; }
+    unsigned int getCodepoint() const { return m_Codepoint; }
 
     EVENT_CLASS_TYPE(KeyTyped);
     EVENT_CLASS_CATEGORY_FLAGS(EventCategory::Input | EventCategory::Keyboard);
 
-    const char* GetName() const override { return "KeyTyped"; }
-    std::string ToString() const override
+    const char* getName() const override { return "KeyTyped"; }
+    std::string toString() const override
     {
         std::ostringstream ss;
         ss << "KeyTyped: codepoint=" << m_Codepoint;

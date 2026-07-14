@@ -45,21 +45,21 @@ namespace caustica
 
 		void Print(std::string_view line);
 
-		void ClearLog();
+		void clearLog();
 
-		void ClearHistory();
+		void clearHistory();
 
 		void render(bool * open=nullptr);
 
 	private:
 
-		int HistoryKeyCallback(ImGuiInputTextCallbackData* data);
+		int historyKeyCallback(ImGuiInputTextCallbackData* data);
 
-		int AutoCompletionCallback(ImGuiInputTextCallbackData* data);
+		int autoCompletionCallback(ImGuiInputTextCallbackData* data);
 
-		int TextEditCallback(ImGuiInputTextCallbackData* data);
+		int textEditCallback(ImGuiInputTextCallbackData* data);
 
-		void ExecCommand(char const* cmd);
+		void execCommand(char const* cmd);
 
 	private:
 

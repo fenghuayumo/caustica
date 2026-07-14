@@ -187,14 +187,14 @@ std::shared_ptr<AudioData const> AudioCache::loadFromFile(const std::filesystem:
     return audio;
 }
 
-std::shared_ptr<AudioData const> AudioCache::LoadFromFileAsync(const std::filesystem::path & path, ThreadPool& threadPool)
+std::shared_ptr<AudioData const> AudioCache::loadFromFileAsync(const std::filesystem::path & path, ThreadPool& threadPool)
 {
     std::shared_ptr<AudioData const> audio;
 
     if (findInCache(path, audio))
         return audio;
 
-    threadPool.AddTask([this, &audio, path]()
+    threadPool.addTask([this, &audio, path]()
     {
         if ((audio = loadAudioFile(path)))
         {

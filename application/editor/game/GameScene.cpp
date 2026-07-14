@@ -143,18 +143,18 @@ void GameScene::sceneLoaded(const std::shared_ptr<caustica::Scene>& scene, const
         return;
 
     const std::filesystem::path mediaGamePath = ResolveGameDataRoot(sceneFilePath, mediaPath);
-    if (!EnsureDirectoryExists(mediaGamePath))
+    if (!ensureDirectoryExists(mediaGamePath))
         { assert(false); return; }
 
     m_gameStoragePath = ResolveGameStoragePath(mediaGamePath, sceneFilePath);
-    if (!EnsureDirectoryExists(m_gameStoragePath))
+    if (!ensureDirectoryExists(m_gameStoragePath))
         { assert(false); return; }
 
-    EnsureDirectoryExists(m_gameStoragePath / "models");
-    EnsureDirectoryExists(m_gameStoragePath / "props");
+    ensureDirectoryExists(m_gameStoragePath / "models");
+    ensureDirectoryExists(m_gameStoragePath / "props");
 
     Json::Value node;
-    bool parsingSuccessful = caustica::json::FromString(gameSettings->getJsonData(), node);
+    bool parsingSuccessful = caustica::json::fromString(gameSettings->getJsonData(), node);
     if (!parsingSuccessful) 
     {
         caustica::warning( "Unable to load game settings" );
@@ -164,7 +164,7 @@ void GameScene::sceneLoaded(const std::shared_ptr<caustica::Scene>& scene, const
 
     m_scene = scene;
 
-    auto modelFiles = EnumerateFilesWithWildcard(m_gameStoragePath / "models", "*.model.json");
+    auto modelFiles = enumerateFilesWithWildcard(m_gameStoragePath / "models", "*.model.json");
 
     for (auto modelPath : modelFiles)
     {
@@ -178,7 +178,7 @@ void GameScene::sceneLoaded(const std::shared_ptr<caustica::Scene>& scene, const
         m_modelTypes.push_back( std::make_shared<game::ModelType>(*m_scene, fileNoExt.string(), modelRoot) );
     }
 
-    auto propFiles = EnumerateFilesWithWildcard(m_gameStoragePath / "props", "*.prop.json");
+    auto propFiles = enumerateFilesWithWildcard(m_gameStoragePath / "props", "*.prop.json");
 
     for( auto propPath : propFiles )
     {
@@ -197,7 +197,7 @@ void GameScene::sceneLoaded(const std::shared_ptr<caustica::Scene>& scene, const
 
     if( m_cmdLine.PropCameraAttach != "" )
     {
-        auto it = std::find_if(m_props.begin(), m_props.end(), [this]( const std::shared_ptr<game::PropBase> & prop ) { return caustica::EqualsIgnoreCase(prop->GetName(), m_cmdLine.PropCameraAttach); } );
+        auto it = std::find_if(m_props.begin(), m_props.end(), [this]( const std::shared_ptr<game::PropBase> & prop ) { return caustica::equalsIgnoreCase(prop->getName(), m_cmdLine.PropCameraAttach); } );
         if (it != m_props.end())
             AttachCamera(*it);
     }
@@ -218,7 +218,7 @@ void GameScene::sceneLoaded(const std::shared_ptr<caustica::Scene>& scene, const
     // for (int i = 0; i < (int)m_modelInstances.size(); i++)
     // {
     //     ModelInstance& vehicle = *m_modelInstances[i];
-    //     std::string fileName = vehicle.GetName() + ".vehicle.json";
+    //     std::string fileName = vehicle.getName() + ".vehicle.json";
     //     vehicle.SetStoragePath(m_gameStoragePath/fileName);
     //     vehicle.load();
     //     //vehicle.SetAnimOffset(std::rand() / (float)RAND_MAX * 110.0f);
@@ -301,7 +301,7 @@ bool GameScene::debugGUI(float indent)
             ImGui::Text("Game camera not active");
         else
         {
-            ImGui::Text("Game camera attached to %s", cameraAttached->GetName().c_str());
+            ImGui::Text("Game camera attached to %s", cameraAttached->getName().c_str());
             if (ImGui::Button("Detach"))
                 m_gameCameraAttached.reset();
         }
@@ -322,7 +322,7 @@ bool GameScene::debugGUI(float indent)
             const std::shared_ptr<game::PropBase> & prop = m_props[i];
 
             bool selected = m_selectedProp.lock() == prop;
-            if (ImGui::Selectable(prop->GetName().c_str(), &selected, ImGuiSelectableFlags_None))
+            if (ImGui::Selectable(prop->getName().c_str(), &selected, ImGuiSelectableFlags_None))
                 m_selectedProp = (selected)?(prop):(nullptr);
         }
         ImGui::EndChild();
@@ -354,7 +354,7 @@ bool GameScene::debugGUI(float indent)
 
     if(!m_camRecEnabled)
     {
-        if (ImGui::Button("Start camera rec (1 sec delay)"))
+        if (ImGui::Button("start camera rec (1 sec delay)"))
         {
             m_camRecEnabled = true;
             m_camRecTimeToNextKeyframe = 1;
@@ -363,7 +363,7 @@ bool GameScene::debugGUI(float indent)
     }
     if (m_camRecEnabled)
     {
-        if (ImGui::Button("Stop recording"))
+        if (ImGui::Button("stop recording"))
             m_camRecEnabled = false;
     }
     ImGui::Text("Recorded poses: %d", m_recordedCameraPoses.size());
@@ -384,7 +384,7 @@ bool GameScene::debugGUI(float indent)
             Json::Value rootJ;
             rootJ["animation"] = animsJ;
 
-            caustica::json::SaveToFile(m_gameStoragePath / "EXPORT_POSES.json", rootJ);
+            caustica::json::saveToFile(m_gameStoragePath / "EXPORT_POSES.json", rootJ);
             m_recordedCameraPoses.clear();
         }
     }
@@ -541,7 +541,7 @@ void GameScene::StandaloneGUI(const std::shared_ptr<caustica::PlanarView> & view
 
     auto gameCameraAttached = m_gameCameraAttached.lock();
     if (gameCameraAttached!=nullptr)
-        buttons.push_back( BigButton("Exit prop camera", StringFormat( "Camera attached to %s", gameCameraAttached->GetName().c_str() ), [&]() { AttachCamera(nullptr); }, [ ]() { return true; } ) );
+        buttons.push_back( BigButton("Exit prop camera", stringFormat( "Camera attached to %s", gameCameraAttached->getName().c_str() ), [&]() { AttachCamera(nullptr); }, [ ]() { return true; } ) );
 
     if (buttons.size() > 0)
     {
@@ -611,7 +611,7 @@ void GameScene::StandaloneGUI(const std::shared_ptr<caustica::PlanarView> & view
     {
         ImDrawList* draw_list = ImGui::GetForegroundDrawList();
         draw_list->AddCircle(ImVec2(selArea.ScreenPos.x, selArea.ScreenPos.y), selArea.ScreenRadius, IM_COL32(0, 0, 255, 255), 32);
-        std::string info = StringFormat("Press 'F' to lock camera to prop '%s'", selProp->GetName().c_str());
+        std::string info = stringFormat("Press 'F' to lock camera to prop '%s'", selProp->getName().c_str());
         draw_list->AddText(ImVec2(selArea.ScreenPos.x+1, selArea.ScreenPos.y+1), IM_COL32(0, 0, 0, 192), info.c_str() );
         draw_list->AddText(ImVec2(selArea.ScreenPos.x, selArea.ScreenPos.y), IM_COL32(255, 255, 255, 255), info.c_str());
 

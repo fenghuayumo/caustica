@@ -385,7 +385,7 @@ void EnvMapProcessor::preUpdate(nvrhi::ICommandList* commandList, caustica::rend
 
         if (!proceduralSkyEnabled)
         {
-            const std::filesystem::path fullPath = ResolveSceneMediaPath(
+            const std::filesystem::path fullPath = resolveSceneMediaPath(
                 m_loadedSourceBackgroundPath,
                 sceneDirectory);
             Handle<ImageAsset> image = m_textureCache->loadTextureFromFile(fullPath, false, &renderDevice, commandList);

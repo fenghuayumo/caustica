@@ -216,7 +216,7 @@ void caustica::render::WorldRenderer::createDeviceResources()
     m_frameGraph.setRenderBufferPool(&m_renderBufferPool);
 
 #if CAUSTICA_WITH_NATIVE_DLSS
-    m_nativeDLSS = caustica::render::DLSS::create(device, m_context.shaderFactory, caustica::GetDirectoryWithExecutable().string());
+    m_nativeDLSS = caustica::render::DLSS::create(device, m_context.shaderFactory, caustica::getDirectoryWithExecutable().string());
     if (m_nativeDLSS)
     {
         m_context.settings.IsDLSSSuported = m_nativeDLSS->isDlssSupported();
@@ -350,15 +350,15 @@ bool caustica::render::WorldRenderer::createPTPipeline()
 void caustica::render::WorldRenderer::onSceneUnloading()
 {
 #if CAUSTICA_WITH_STREAMLINE
-    if (!m_context.gpuDevice.IsHeadless())
+    if (!m_context.gpuDevice.isHeadless())
     {
-        auto& streamline = m_context.gpuDevice.GetStreamline();
-        if (streamline.IsDLSSRRAvailable())
-            streamline.CleanupDLSSRR(false);
-        if (streamline.IsDLSSAvailable())
-            streamline.CleanupDLSS(false);
-        if (streamline.IsDLSSGAvailable())
-            streamline.CleanupDLSSG(false);
+        auto& streamline = m_context.gpuDevice.getStreamline();
+        if (streamline.isDLSSRRAvailable())
+            streamline.cleanupDLSSRR(false);
+        if (streamline.isDLSSAvailable())
+            streamline.cleanupDLSS(false);
+        if (streamline.isDLSSGAvailable())
+            streamline.cleanupDLSSG(false);
     }
 
     m_recommendedDLSSSettings = {};
@@ -428,21 +428,21 @@ void caustica::render::WorldRenderer::onBackBufferResizing()
 
 // NOTE: we're not yet sure if this is necessary to avoid crash with going in/out of fullscreen and FG
 #if CAUSTICA_WITH_STREAMLINE
-    if (!m_context.gpuDevice.IsHeadless() &&
+    if (!m_context.gpuDevice.isHeadless() &&
         (m_context.settings.DLSSFGOptions.mode == StreamlineInterface::DLSSGMode::eOn || m_context.settings.actualDLSSFGMode() == StreamlineInterface::DLSSGMode::eOn)) 
     {
-        m_context.gpuDevice.GetStreamline().CleanupDLSS(false);
-        m_context.gpuDevice.GetStreamline().CleanupDLSSG(false);
+        m_context.gpuDevice.getStreamline().cleanupDLSS(false);
+        m_context.gpuDevice.getStreamline().cleanupDLSSG(false);
 
-        if (m_context.gpuDevice.GetStreamline().IsDLSSGAvailable())
+        if (m_context.gpuDevice.getStreamline().isDLSSGAvailable())
         {
             auto dlssgOptions = StreamlineInterface::DLSSGOptions{};
             StreamlineInterface::DLSSGState state;
-            m_context.gpuDevice.GetStreamline().GetDLSSGState(state, dlssgOptions);
+            m_context.gpuDevice.getStreamline().getDLSSGState(state, dlssgOptions);
             m_context.settings.DLSSFGMultiplier = state.numFramesActuallyPresented;
             m_context.settings.DLSSFGMaxNumFramesToGenerate = state.numFramesToGenerateMax;
 
-            m_context.gpuDevice.GetStreamline().SetDLSSGOptions(dlssgOptions);
+            m_context.gpuDevice.getStreamline().setDLSSGOptions(dlssgOptions);
             m_context.settings.DLSSFGOptions = dlssgOptions;
         }
     }
@@ -555,7 +555,7 @@ void caustica::render::WorldRenderer::preUpdateLighting(nvrhi::CommandListHandle
         envMapActualPath = (isProceduralSky(m_context.scenePasses.lighting.envMapOverride().c_str())) ? (m_context.scenePasses.lighting.envMapOverride()) : (std::string(c_EnvMapSubFolder) + "/" + m_context.scenePasses.lighting.envMapOverride());
 
     if (!envMapActualPath.empty() && !isProceduralSky(envMapActualPath.c_str()))
-        envMapActualPath = ResolveSceneMediaPath(envMapActualPath, sceneDirectory).generic_string();
+        envMapActualPath = resolveSceneMediaPath(envMapActualPath, sceneDirectory).generic_string();
 
     PreUpdateLightingParams params{
         commandList,
@@ -729,7 +729,7 @@ void caustica::render::WorldRenderer::updatePathTracerConstants( PathTracerConst
     constants._padding3                         = 0;
     constants.stablePlanesSuppressPrimaryIndirectSpecularK  = m_context.settings.StablePlanesSuppressPrimaryIndirectSpecular?m_context.settings.StablePlanesSuppressPrimaryIndirectSpecularK:0.0f;
     constants.stablePlanesAntiAliasingFallthrough = m_context.settings.StablePlanesAntiAliasingFallthrough;
-    constants.frameIndex                        = m_frameIndex & 0xFFFFFFFF; //m_context.gpuDevice.GetFrameIndex();
+    constants.frameIndex                        = m_frameIndex & 0xFFFFFFFF; //m_context.gpuDevice.getFrameIndex();
     constants.genericTSLineStride               = GenericTSComputeLineStride(constants.imageWidth, constants.imageHeight);
     constants.genericTSPlaneStride              = GenericTSComputePlaneStride(constants.imageWidth, constants.imageHeight);
 
@@ -780,14 +780,14 @@ void caustica::render::WorldRenderer::rtxdiSetupFrame(nvrhi::IFramebuffer* frame
 void caustica::render::WorldRenderer::streamlinePreRender()
 {
 #if CAUSTICA_WITH_STREAMLINE
-    if (m_context.gpuDevice.IsHeadless())
+    if (m_context.gpuDevice.isHeadless())
         return;
 
-    auto& streamline = m_context.gpuDevice.GetStreamline();
-    m_context.settings.IsDLSSSuported = streamline.IsDLSSAvailable();
-    m_context.settings.IsDLSSRRSupported = streamline.IsDLSSRRAvailable();
-    m_context.settings.IsDLSSFGSupported = streamline.IsDLSSGAvailable();
-    m_context.settings.IsReflexSupported = streamline.IsReflexAvailable();
+    auto& streamline = m_context.gpuDevice.getStreamline();
+    m_context.settings.IsDLSSSuported = streamline.isDLSSAvailable();
+    m_context.settings.IsDLSSRRSupported = streamline.isDLSSRRAvailable();
+    m_context.settings.IsDLSSFGSupported = streamline.isDLSSGAvailable();
+    m_context.settings.IsReflexSupported = streamline.isReflexAvailable();
 
     // Setup Reflex
     {
@@ -797,11 +797,11 @@ void caustica::render::WorldRenderer::streamlinePreRender()
         reflexConsts.useMarkersToOptimize = true;
         reflexConsts.virtualKey = VK_F13;
         reflexConsts.idThread = 0; // std::hash<std::thread::id>()(std::this_thread::get_id())
-        streamline.SetReflexConsts(reflexConsts);
+        streamline.setReflexConsts(reflexConsts);
 
         // Need to update StreamlineIntegration with the ability to query reflex state
         caustica::StreamlineInterface::ReflexState reflexState{};
-        streamline.GetReflexState(reflexState);
+        streamline.getReflexState(reflexState);
         if (m_context.settings.IsReflexSupported)
         {
             m_context.settings.IsReflexLowLatencyAvailable = reflexState.lowLatencyAvailable;
@@ -842,7 +842,7 @@ void caustica::render::WorldRenderer::streamlinePreRender()
 
         // If DLSS-G has been turned off, then we tell tell SL to clean it up expressly
         if (wasDLSSFGEnabled && actualDLSSFGMode == StreamlineInterface::DLSSGMode::eOff) {
-            streamline.CleanupDLSSG(true);
+            streamline.cleanupDLSSG(true);
         }
 
         // This is where DLSS-G is toggled On and Off (using dlssgOptions.mode) and where we set DLSS-G parameters.
@@ -855,11 +855,11 @@ void caustica::render::WorldRenderer::streamlinePreRender()
             (actualDLSSFGMode != StreamlineInterface::DLSSGMode::eOff || wasDLSSFGEnabled))
         {
             StreamlineInterface::DLSSGState state;
-            streamline.GetDLSSGState(state, dlssgOptions);
+            streamline.getDLSSGState(state, dlssgOptions);
             m_context.settings.DLSSFGMultiplier = state.numFramesActuallyPresented;
             m_context.settings.DLSSFGMaxNumFramesToGenerate = state.numFramesToGenerateMax;
 
-            streamline.SetDLSSGOptions(dlssgOptions);
+            streamline.setDLSSGOptions(dlssgOptions);
             m_context.settings.DLSSFGOptions = dlssgOptions;
         }
         else
@@ -908,7 +908,7 @@ void caustica::render::WorldRenderer::streamlinePreRender()
                 dlssOptions.useAutoExposure = true;     // Optional: provide proper "kBufferTypeExposure" for 0-lag for better precision handling
                 dlssOptions.preset = StreamlineInterface::DLSSPreset::eDefault;
                 // if (m_context.settings.RealtimeAA < 4) <- docs https://github.com/NVIDIAGameWorks/Streamline/blob/main/docs/ProgrammingGuideDLSS_RR.md#50-provide-dlss--dlss-rr-options seem to imply that these should be set even when DLSS-RR enabled
-                    streamline.SetDLSSOptions(dlssOptions);
+                    streamline.setDLSSOptions(dlssOptions);
             }
             else
             {
@@ -922,7 +922,7 @@ void caustica::render::WorldRenderer::streamlinePreRender()
                 if (dlssResizeRequired)
                 {
                     // Only quality, target width and height matter here
-                    streamline.QueryDLSSOptimalSettings(dlssOptions, m_recommendedDLSSSettings);
+                    streamline.queryDLSSOptimalSettings(dlssOptions, m_recommendedDLSSSettings);
 
                     // this is an example on how to override defaults - overriding default 2/3 to higher res 3/4
                     if (dlssOptions.mode == SI::DLSSMode::eMaxQuality)
@@ -971,7 +971,7 @@ void caustica::render::WorldRenderer::streamlinePreRender()
             {
                 StreamlineInterface::DLSSOptions dlssOptions = {};
                 dlssOptions.mode = StreamlineInterface::DLSSMode::eOff;
-                streamline.SetDLSSOptions(dlssOptions);
+                streamline.setDLSSOptions(dlssOptions);
             }
 
             m_renderSize = m_displaySize;
@@ -1046,7 +1046,7 @@ void caustica::render::WorldRenderer::preRender()
 {
     // Limit FPS
     if (m_context.settings.actualFPSLimiter() > 0)
-        g_FPSLimiter.FramerateLimit(m_context.settings.actualFPSLimiter());
+        g_FPSLimiter.framerateLimit(m_context.settings.actualFPSLimiter());
 
     korgi::update();
 }
@@ -1169,7 +1169,7 @@ void caustica::render::WorldRenderer::render(nvrhi::IFramebuffer* framebuffer)
 
     populateRenderFrameContext(framebuffer, m_renderFrameCtx);
 
-    const uint32_t renderPhaseFrameIndex = m_context.gpuDevice.GetRenderPhaseFrameIndex();
+    const uint32_t renderPhaseFrameIndex = m_context.gpuDevice.getRenderPhaseFrameIndex();
     std::shared_ptr<Scene> scene = m_context.sceneManager.getScene();
     if (scene)
         scene->beginGpuReadFrame(renderPhaseFrameIndex);
@@ -1543,7 +1543,7 @@ void caustica::render::WorldRenderer::denoiseStablePlane(
         tdesc.height);
     m_commandList->endMarker();
 
-    const float timeDeltaBetweenFrames = m_context.gpuDevice.IsHeadless() ? 1.f / 60.f : -1.f;
+    const float timeDeltaBetweenFrames = m_context.gpuDevice.isHeadless() ? 1.f / 60.f : -1.f;
     const bool enableValidation = m_context.settings.DebugView == DebugViewType::StablePlane_DenoiserValidation;
     if (nrdUseRelax)
     {
@@ -1553,7 +1553,7 @@ void caustica::render::WorldRenderer::denoiseStablePlane(
             planeIndex,
             *m_context.camera.view(),
             *m_context.camera.viewPrevious(),
-            m_context.gpuDevice.GetRenderPhaseFrameIndex(),
+            m_context.gpuDevice.getRenderPhaseFrameIndex(),
             m_context.settings.NRDDisocclusionThreshold,
             m_context.settings.NRDDisocclusionThresholdAlternate,
             m_context.settings.NRDUseAlternateDisocclusionThresholdMix,
@@ -1570,7 +1570,7 @@ void caustica::render::WorldRenderer::denoiseStablePlane(
             planeIndex,
             *m_context.camera.view(),
             *m_context.camera.viewPrevious(),
-            m_context.gpuDevice.GetRenderPhaseFrameIndex(),
+            m_context.gpuDevice.getRenderPhaseFrameIndex(),
             m_context.settings.NRDDisocclusionThreshold,
             m_context.settings.NRDDisocclusionThresholdAlternate,
             m_context.settings.NRDUseAlternateDisocclusionThresholdMix,
@@ -1955,7 +1955,7 @@ void caustica::render::WorldRenderer::applyReferenceOIDN()
         const float r = std::clamp(std::isfinite(outputRgb[rgbOffset + 0]) ? outputRgb[rgbOffset + 0] : 0.0f, 0.0f, maxHalf);
         const float g = std::clamp(std::isfinite(outputRgb[rgbOffset + 1]) ? outputRgb[rgbOffset + 1] : 0.0f, 0.0f, maxHalf);
         const float b = std::clamp(std::isfinite(outputRgb[rgbOffset + 2]) ? outputRgb[rgbOffset + 2] : 0.0f, 0.0f, maxHalf);
-        outputHalf[pixel] = Float32ToFloat16x4(float4(r, g, b, 1.0f));
+        outputHalf[pixel] = float32ToFloat16x4(float4(r, g, b, 1.0f));
     }
 
     m_commandList->writeTexture(m_oidnDenoisedOutput, 0, 0, outputHalf.data(), size_t(width) * sizeof(float16_t4));
@@ -1974,7 +1974,7 @@ void caustica::render::WorldRenderer::applyReferenceOIDN()
 }
 void caustica::render::WorldRenderer::denoisedScreenshot(nvrhi::ITexture * framebufferTexture) const
 {
-    std::string noisyImagePath = (caustica::GetDirectoryWithExecutable( ) / "photo.bmp").string();
+    std::string noisyImagePath = (caustica::getDirectoryWithExecutable( ) / "photo.bmp").string();
 
     auto execute = [&](const std::string & dn = "OptiX")
     {
@@ -1983,8 +1983,8 @@ void caustica::render::WorldRenderer::denoisedScreenshot(nvrhi::ITexture * frame
 
         const std::string fileName = "photo-denoised_" + dn + "_" + timestamp + ".bmp";
 
-        std::string denoisedImagePath = (caustica::GetDirectoryWithExecutable() / fileName).string();
-        std::filesystem::path denoiserPath = GetLocalPath("Support/denoiser_"+dn) / "denoiser.exe";
+        std::string denoisedImagePath = (caustica::getDirectoryWithExecutable() / fileName).string();
+        std::filesystem::path denoiserPath = getLocalPath("Support/denoiser_"+dn) / "denoiser.exe";
         if (!std::filesystem::exists(denoiserPath))
         {
             caustica::warning("External %s denoiser not found at '%s'.", dn.c_str(), denoiserPath.string().c_str());
@@ -1995,14 +1995,14 @@ void caustica::render::WorldRenderer::denoisedScreenshot(nvrhi::ITexture * frame
         { assert(false); return; }
 
         std::string startCmd = "\"" + denoiserPath.string() + "\"" + " -hdr 0 -i \"" + noisyImagePath + "\"" " -o \"" + denoisedImagePath + "\"";
-        auto [resNum, resString, errorString] =  SystemShell(startCmd.c_str());
+        auto [resNum, resString, errorString] =  systemShell(startCmd.c_str());
         if (resString!="")
             caustica::info("result: %s", resString.c_str());
         if (errorString != "")
             caustica::info("error: %s", errorString.c_str());
 
         std::string viewCmd = "\"" + denoisedImagePath + "\"";
-        SystemShell(viewCmd.c_str(), true);
+        systemShell(viewCmd.c_str(), true);
     };
     execute("OptiX");
     execute("OIDN");

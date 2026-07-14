@@ -10,8 +10,8 @@ namespace caustica
 AssetId AssetId::generate()
 {
     AssetId id;
-    id.low = GenerateRandom64();
-    id.high = GenerateRandom64();
+    id.low = generateRandom64();
+    id.high = generateRandom64();
     return id;
 }
 

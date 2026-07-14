@@ -11,27 +11,27 @@ class IFileSystem;
 // --- Executable / runtime directory ---
 
 // Returns the directory containing the current executable.
-std::filesystem::path GetDirectoryWithExecutable();
+std::filesystem::path getDirectoryWithExecutable();
 
-// Override the base path used by GetLocalPath(). Empty means default.
-void SetLocalPathBaseOverride(const std::filesystem::path& basePath);
+// Override the base path used by getLocalPath(). Empty means default.
+void setLocalPathBaseOverride(const std::filesystem::path& basePath);
 
 // Returns the current runtime directory (executable dir by default).
-std::filesystem::path GetRuntimeDirectory();
+std::filesystem::path getRuntimeDirectory();
 
 // Override the runtime directory. Empty means default.
-void SetRuntimeDirectoryOverride(const std::filesystem::path& runtimeDirectory);
+void setRuntimeDirectoryOverride(const std::filesystem::path& runtimeDirectory);
 
 // --- Directory search ---
 
 // Searches upward from 'startPath' for a directory 'dirname'.
-std::filesystem::path FindDirectory(IFileSystem& fs,
+std::filesystem::path findDirectory(IFileSystem& fs,
     const std::filesystem::path& startPath,
     const std::filesystem::path& dirname,
     int maxDepth = 5);
 
 // Searches upward from 'startPath' for a file with 'relativeFilePath'.
-std::filesystem::path FindDirectoryWithFile(IFileSystem& fs,
+std::filesystem::path findDirectoryWithFile(IFileSystem& fs,
     const std::filesystem::path& startPath,
     const std::filesystem::path& relativeFilePath,
     int maxDepth = 5);
@@ -39,17 +39,17 @@ std::filesystem::path FindDirectoryWithFile(IFileSystem& fs,
 // --- Asset / media path resolution ---
 
 // Returns the local path for a "Assets/" subfolder (e.g. "Assets", "Assets/EnvironmentMaps").
-std::filesystem::path GetLocalPath(std::string subfolder);
+std::filesystem::path getLocalPath(std::string subfolder);
 
 // Resolves a relative media path against a prioritized list of search roots.
 // Returns the first existing match, or the first root-joined path as fallback.
-std::filesystem::path ResolveMediaRelativePath(
+std::filesystem::path resolveMediaRelativePath(
     const std::filesystem::path& localPath,
     std::initializer_list<std::filesystem::path> searchRoots);
 
 // Resolves a scene-relative media path using the standard caustica lookup:
 // Assets/ first, then the scene JSON's parent directory.
-std::filesystem::path ResolveSceneMediaPath(
+std::filesystem::path resolveSceneMediaPath(
     const std::filesystem::path& localPath,
     const std::filesystem::path& sceneDirectory,
     const std::filesystem::path& mediaPath = std::filesystem::path());

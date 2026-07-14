@@ -22,9 +22,9 @@ enum class AppSchedule
     PostUpdate,
     Extract,
     render,
-    PostRender,
+    postRender,
     Last,
-    Shutdown,
+    shutdown,
     Count,
 };
 

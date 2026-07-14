@@ -51,7 +51,7 @@ caustica::scene::SceneEntityWorld* PropBase::EntityWorld() const
     return scene ? scene->getEntityWorld() : nullptr;
 }
 
-std::string PropBase::GetName() const
+std::string PropBase::getName() const
 {
     auto* ew = EntityWorld();
     if (!ew || m_entity == caustica::ecs::NullEntity) return {};
@@ -220,11 +220,11 @@ void PropBase::load(const Json::Value& jsonRoot)
 
     Json::Value modelsLightsOverrides = jsonRoot["modelsLightsOverrides"];
     if (!modelsLightsOverrides.empty())
-        m_modelsLightsOverrides = caustica::json::ToString(modelsLightsOverrides);
+        m_modelsLightsOverrides = caustica::json::toString(modelsLightsOverrides);
 
     Json::Value components = jsonRoot["components"];
     if (!components.empty())
-        m_componentsData = caustica::json::ToString(components);
+        m_componentsData = caustica::json::toString(components);
 }
 
 void PropBase::PostLoadSetup()
@@ -232,7 +232,7 @@ void PropBase::PostLoadSetup()
     if (m_modelsLightsOverrides != "")
     {
         Json::Value modelsLightsOverrides;
-        caustica::json::FromString(m_modelsLightsOverrides, modelsLightsOverrides);
+        caustica::json::fromString(m_modelsLightsOverrides, modelsLightsOverrides);
         for( Json::Value & m : modelsLightsOverrides )
         {
             std::string modelName; m["modelInstanceName"] >> modelName;
@@ -255,16 +255,16 @@ void PropBase::PostLoadSetup()
                     {
                         (*lit)->read(lo);
                     }
-                    else { caustica::warning("Bad light override, prop %s, model %s, light name %s", GetName().c_str(), modelName.c_str(), lightName.c_str()); }
+                    else { caustica::warning("Bad light override, prop %s, model %s, light name %s", getName().c_str(), modelName.c_str(), lightName.c_str()); }
                 }
             }
-            else { caustica::warning("Bad light override, prop %s, model %s", GetName().c_str(), modelName.c_str()); }
+            else { caustica::warning("Bad light override, prop %s, model %s", getName().c_str(), modelName.c_str()); }
         }
     }
     if (m_componentsData != "")
     {
         Json::Value components;
-        caustica::json::FromString(m_componentsData, components);
+        caustica::json::fromString(m_componentsData, components);
         for (Json::Value& m : components)
         {
             std::shared_ptr<PropComponentBase> comp = PropComponentBase::create(*this, m);
@@ -288,13 +288,13 @@ Json::Value PropBase::Save()
     if (m_modelsLightsOverrides!="")
     {
         Json::Value outRootNode;
-        if (caustica::json::FromString(m_modelsLightsOverrides, outRootNode))
+        if (caustica::json::fromString(m_modelsLightsOverrides, outRootNode))
             jsonRoot["modelsLightsOverrides"] = outRootNode;
     }
     if (m_componentsData != "")
     {
         Json::Value outRootNode;
-        if (caustica::json::FromString(m_componentsData, outRootNode))
+        if (caustica::json::fromString(m_componentsData, outRootNode))
             jsonRoot["components"] = outRootNode;
     }
     return jsonRoot;
@@ -303,7 +303,7 @@ Json::Value PropBase::Save()
 void PropBase::GUI(float indent, bool & gameCameraAttached, caustica::FirstPersonCamera & gameCamera)
 {
     RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent); );
-    ImGui::Text("Properties for %s", GetName().c_str());
+    ImGui::Text("Properties for %s", getName().c_str());
 
     if (gameCameraAttached)
     {
@@ -365,7 +365,7 @@ void PropBase::GUI(float indent, bool & gameCameraAttached, caustica::FirstPerso
         ImGui::Text("Storage: ");
         ImGui::SameLine();
         if (ImGui::Button("Save"))
-            caustica::json::SaveToFile(m_storagePath, Save());
+            caustica::json::saveToFile(m_storagePath, Save());
 
         if (ImGui::CollapsingHeader("Lights"))
         {
@@ -423,7 +423,7 @@ void SimpleProp::load(const Json::Value& jsonRoot)
     PropBase::load(jsonRoot);
 
     if (m_showOnlyIfTagged != "")
-        if (FindSubStringIgnoreCase(m_gameScene.GetCmdLine().PropShowTags, m_showOnlyIfTagged) == std::string::npos)
+        if (findSubStringIgnoreCase(m_gameScene.GetCmdLine().PropShowTags, m_showOnlyIfTagged) == std::string::npos)
             return; // nothing to see here
 
     jsonRoot["modelName"] >> m_modelName;

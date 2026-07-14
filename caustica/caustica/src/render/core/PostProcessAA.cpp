@@ -32,7 +32,7 @@ void postProcessAAPlatform(CameraController& camera, PostProcessAAParams& params
 
 #if CAUSTICA_WITH_STREAMLINE
     const bool useStreamlineThisFrame = params.gpuDevice != nullptr
-        && !params.gpuDevice->IsHeadless();
+        && !params.gpuDevice->isHeadless();
     if (useStreamlineThisFrame)
     {
         {
@@ -68,7 +68,7 @@ void postProcessAAPlatform(CameraController& camera, PostProcessAAParams& params
             slConstants.motionVectors3D = false;
             slConstants.motionVectorsInvalidValue = FLT_MIN;
 
-            params.gpuDevice->GetStreamline().SetConstants(slConstants);
+            params.gpuDevice->getStreamline().setConstants(slConstants);
 
             if (settings.RealtimeAA == 3 && params.dlssRROptions != nullptr)
             {
@@ -76,20 +76,20 @@ void postProcessAAPlatform(CameraController& camera, PostProcessAAParams& params
                     dm::affineToHomogeneous(camera.view()->getViewMatrix());
                 params.dlssRROptions->cameraViewToWorld =
                     dm::affineToHomogeneous(camera.view()->getInverseViewMatrix());
-                params.gpuDevice->GetStreamline().SetDLSSRROptions(*params.dlssRROptions);
+                params.gpuDevice->getStreamline().setDLSSRROptions(*params.dlssRROptions);
             }
         }
 
         commandList->commitBarriers();
 
-        params.gpuDevice->GetStreamline().TagResourcesGeneral(
+        params.gpuDevice->getStreamline().tagResourcesGeneral(
             commandList,
             camera.view()->getChildView(ViewType::PLANAR, 0),
             renderTargets->screenMotionVectors,
             renderTargets->depth,
             renderTargets->preUIColor);
 
-        params.gpuDevice->GetStreamline().TagResourcesDLSSNIS(
+        params.gpuDevice->getStreamline().tagResourcesDLSSNIS(
             commandList,
             camera.view()->getChildView(ViewType::PLANAR, 0),
             renderTargets->processedOutputColor,
@@ -98,7 +98,7 @@ void postProcessAAPlatform(CameraController& camera, PostProcessAAParams& params
         if (settings.RealtimeAA == 2)
         {
             RAII_SCOPE(commandList->beginMarker("DLSS");, commandList->endMarker(););
-            params.gpuDevice->GetStreamline().EvaluateDLSS(commandList);
+            params.gpuDevice->getStreamline().evaluateDLSS(commandList);
             commandList->clearState();
         }
     }
@@ -122,7 +122,7 @@ void postProcessAAPlatform(CameraController& camera, PostProcessAAParams& params
         commandList->endMarker();
 
         static bool useSpecHitT = false;
-        params.gpuDevice->GetStreamline().TagResourcesDLSSRR(
+        params.gpuDevice->getStreamline().tagResourcesDLSSRR(
             commandList,
             camera.view()->getChildView(ViewType::PLANAR, 0),
             (int2)params.renderSize,
@@ -137,7 +137,7 @@ void postProcessAAPlatform(CameraController& camera, PostProcessAAParams& params
             renderTargets->processedOutputColor);
 
         commandList->commitBarriers();
-        params.gpuDevice->GetStreamline().EvaluateDLSSRR(commandList);
+        params.gpuDevice->getStreamline().evaluateDLSSRR(commandList);
         commandList->clearState();
     }
     else if (!settings.actualUseStandaloneDenoiser())

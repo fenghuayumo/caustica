@@ -30,7 +30,7 @@ protected:
     std::string m_RendererString;
 
 public:
-    [[nodiscard]] std::string GetAdapterName(DXGI_ADAPTER_DESC const& aDesc)
+    [[nodiscard]] std::string getAdapterName(DXGI_ADAPTER_DESC const& aDesc)
     {
         size_t length = wcsnlen(aDesc.Description, _countof(aDesc.Description));
 
@@ -41,7 +41,7 @@ public:
         return name;
     }
 
-    [[nodiscard]] const char* GetRendererString() const override
+    [[nodiscard]] const char* getRendererString() const override
     {
         return m_RendererString.c_str();
     }
@@ -52,28 +52,28 @@ public:
     }
 
     bool beginFrame() override;
-    void ReportLiveObjects() override;
-    bool EnumerateAdapters(std::vector<caustica::AdapterInfo>& outAdapters) override;
-    [[nodiscard]] bool QueryVideoMemoryInfo(caustica::VideoMemoryInfo& out) const override;
+    void reportLiveObjects() override;
+    bool enumerateAdapters(std::vector<caustica::AdapterInfo>& outAdapters) override;
+    [[nodiscard]] bool queryVideoMemoryInfo(caustica::VideoMemoryInfo& out) const override;
 
-    [[nodiscard]] nvrhi::GraphicsAPI GetGraphicsAPI() const override
+    [[nodiscard]] nvrhi::GraphicsAPI getGraphicsAPI() const override
     {
         return nvrhi::GraphicsAPI::D3D11;
     }
 protected:
-    bool CreateInstanceInternal() override;
-    bool CreateDevice() override;
-    bool CreateSwapChain() override;
-    void DestroyDeviceAndSwapChain() override;
-    void ResizeSwapChain() override;
-    void Shutdown() override;
+    bool createInstanceInternal() override;
+    bool createDevice() override;
+    bool createSwapChain() override;
+    void destroyDeviceAndSwapChain() override;
+    void resizeSwapChain() override;
+    void shutdown() override;
 
-    nvrhi::ITexture* GetCurrentBackBuffer() override
+    nvrhi::ITexture* getCurrentBackBuffer() override
     {
         return m_RhiBackBuffer;
     }
 
-    nvrhi::ITexture* GetBackBuffer(uint32_t index) override
+    nvrhi::ITexture* getBackBuffer(uint32_t index) override
     {
         if (index == 0)
             return m_RhiBackBuffer;
@@ -81,17 +81,17 @@ protected:
         return nullptr;
     }
 
-    uint32_t GetCurrentBackBufferIndex() override
+    uint32_t getCurrentBackBufferIndex() override
     {
         return 0;
     }
 
-    uint32_t GetBackBufferCount() override
+    uint32_t getBackBufferCount() override
     {
         return 1;
     }
 
-    bool Present() override;
-    bool CreateRenderTarget();
-    void ReleaseRenderTarget();
+    bool present() override;
+    bool createRenderTarget();
+    void releaseRenderTarget();
 };

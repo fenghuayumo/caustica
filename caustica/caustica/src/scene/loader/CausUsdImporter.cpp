@@ -178,9 +178,9 @@ void AppendTransformChannels(
     auto translation = std::make_shared<animation::Sampler>();
     auto rotation = std::make_shared<animation::Sampler>();
     auto scaling = std::make_shared<animation::Sampler>();
-    translation->SetInterpolationMode(animation::InterpolationMode::Step);
-    rotation->SetInterpolationMode(animation::InterpolationMode::Step);
-    scaling->SetInterpolationMode(animation::InterpolationMode::Step);
+    translation->setInterpolationMode(animation::InterpolationMode::Step);
+    rotation->setInterpolationMode(animation::InterpolationMode::Step);
+    scaling->setInterpolationMode(animation::InterpolationMode::Step);
 
     for (size_t i = 0; i < times.size(); ++i)
     {
@@ -188,17 +188,17 @@ void AppendTransformChannels(
         animation::Keyframe tKf;
         tKf.time = times[i];
         tKf.value = dm::float4(k[0], k[1], k[2], 0.f);
-        translation->AddKeyframe(tKf);
+        translation->addKeyframe(tKf);
 
         animation::Keyframe rKf;
         rKf.time = times[i];
         rKf.value = dm::float4(k[3], k[4], k[5], k[6]);
-        rotation->AddKeyframe(rKf);
+        rotation->addKeyframe(rKf);
 
         animation::Keyframe sKf;
         sKf.time = times[i];
         sKf.value = dm::float4(k[7], k[8], k[9], 0.f);
-        scaling->AddKeyframe(sKf);
+        scaling->addKeyframe(sKf);
     }
 
     scene::addAnimationChannel(anim, scene::AnimationChannelData{ translation, target, nullptr, AnimationAttribute::Translation, {} });

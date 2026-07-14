@@ -26,21 +26,21 @@ public:
         return m_NvrhiDevice;
     }
     
-    [[nodiscard]] nvrhi::GraphicsAPI GetGraphicsAPI() const override
+    [[nodiscard]] nvrhi::GraphicsAPI getGraphicsAPI() const override
     {
         return nvrhi::GraphicsAPI::VULKAN;
     }
 
-    bool EnumerateAdapters(std::vector<caustica::AdapterInfo>& outAdapters) override;
-    [[nodiscard]] bool ShouldIgnoreValidationMessageLocation(size_t location) const;
+    bool enumerateAdapters(std::vector<caustica::AdapterInfo>& outAdapters) override;
+    [[nodiscard]] bool shouldIgnoreValidationMessageLocation(size_t location) const;
 
 protected:
-    bool CreateInstanceInternal() override;
-    bool CreateDevice() override;
-    bool CreateSwapChain() override;
-    void DestroyDeviceAndSwapChain() override;
+    bool createInstanceInternal() override;
+    bool createDevice() override;
+    bool createSwapChain() override;
+    void destroyDeviceAndSwapChain() override;
 
-    void ResizeSwapChain() override
+    void resizeSwapChain() override
     {
         if (m_DeviceParams.headlessDevice)
             return;
@@ -52,73 +52,73 @@ protected:
         }
     }
 
-    nvrhi::ITexture* GetCurrentBackBuffer() override
+    nvrhi::ITexture* getCurrentBackBuffer() override
     {
         if (m_DeviceParams.headlessDevice)
-            return GetHeadlessBackBuffer(GetCurrentHeadlessBackBufferIndex());
+            return getHeadlessBackBuffer(getCurrentHeadlessBackBufferIndex());
 
         return m_SwapChainImages[m_SwapChainIndex].rhiHandle;
     }
-    nvrhi::ITexture* GetBackBuffer(uint32_t index) override
+    nvrhi::ITexture* getBackBuffer(uint32_t index) override
     {
         if (m_DeviceParams.headlessDevice)
-            return GetHeadlessBackBuffer(index);
+            return getHeadlessBackBuffer(index);
 
         if (index < m_SwapChainImages.size())
             return m_SwapChainImages[index].rhiHandle;
         return nullptr;
     }
-    uint32_t GetCurrentBackBufferIndex() override
+    uint32_t getCurrentBackBufferIndex() override
     {
         if (m_DeviceParams.headlessDevice)
-            return GetCurrentHeadlessBackBufferIndex();
+            return getCurrentHeadlessBackBufferIndex();
 
         return m_SwapChainIndex;
     }
-    uint32_t GetBackBufferCount() override
+    uint32_t getBackBufferCount() override
     {
         if (m_DeviceParams.headlessDevice)
-            return GetHeadlessBackBufferCount();
+            return getHeadlessBackBufferCount();
 
         return uint32_t(m_SwapChainImages.size());
     }
 
     bool beginFrame() override;
-    bool Present() override;
+    bool present() override;
 
-    const char *GetRendererString() const override
+    const char *getRendererString() const override
     {
         return m_RendererString.c_str();
     }
 
-    bool IsVulkanInstanceExtensionEnabled(const char* extensionName) const override
+    bool isVulkanInstanceExtensionEnabled(const char* extensionName) const override
     {
         return enabledExtensions.instance.find(extensionName) != enabledExtensions.instance.end();
     }
 
-    bool IsVulkanDeviceExtensionEnabled(const char* extensionName) const override
+    bool isVulkanDeviceExtensionEnabled(const char* extensionName) const override
     {
         return enabledExtensions.device.find(extensionName) != enabledExtensions.device.end();
     }
     
-    bool IsVulkanLayerEnabled(const char* layerName) const override
+    bool isVulkanLayerEnabled(const char* layerName) const override
     {
         return enabledExtensions.layers.find(layerName) != enabledExtensions.layers.end();
     }
 
-    void GetEnabledVulkanInstanceExtensions(std::vector<std::string>& extensions) const override
+    void getEnabledVulkanInstanceExtensions(std::vector<std::string>& extensions) const override
     {
         for (const auto& ext : enabledExtensions.instance)
             extensions.push_back(ext);
     }
 
-    void GetEnabledVulkanDeviceExtensions(std::vector<std::string>& extensions) const override
+    void getEnabledVulkanDeviceExtensions(std::vector<std::string>& extensions) const override
     {
         for (const auto& ext : enabledExtensions.device)
             extensions.push_back(ext);
     }
 
-    void GetEnabledVulkanLayers(std::vector<std::string>& layers) const override
+    void getEnabledVulkanLayers(std::vector<std::string>& layers) const override
     {
         for (const auto& ext : enabledExtensions.layers)
             layers.push_back(ext);

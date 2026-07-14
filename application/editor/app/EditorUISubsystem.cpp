@@ -25,7 +25,7 @@ void EditorUISubsystem::startup(caustica::GpuDevice& gpuDevice, caustica::Window
     if (!gpuRenderSubsystem)
         return;
 
-    const bool serSupported = gpuDevice.SupportsShaderExecutionReordering()
+    const bool serSupported = gpuDevice.supportsShaderExecutionReordering()
         && !m_config.cmdLine.disableSER;
 
     m_ui = std::make_unique<EditorUI>(
@@ -36,7 +36,7 @@ void EditorUISubsystem::startup(caustica::GpuDevice& gpuDevice, caustica::Window
         m_config.cmdLine);
     m_ui->init(gpuRenderSubsystem->shaderFactory());
 
-    if (caustica::Window* platformWindow = gpuDevice.GetPlatformWindow())
+    if (caustica::Window* platformWindow = gpuDevice.getPlatformWindow())
     {
         platformWindow->setFileDropCallback(
             [this](int count, const char** paths)
@@ -60,7 +60,7 @@ void EditorUISubsystem::animateScheduled(float elapsedTimeSeconds, bool windowFo
         return;
 
     auto& ui = static_cast<caustica::ImGui_Renderer&>(*m_ui);
-    if (windowFocused || ui.ShouldAnimateUnfocused())
+    if (windowFocused || ui.shouldAnimateUnfocused())
         ui.animate(elapsedTimeSeconds);
 }
 
@@ -69,7 +69,7 @@ void EditorUISubsystem::renderSceneScheduled(caustica::GpuDevice& gpuDevice)
     if (!m_ui)
         return;
 
-    nvrhi::IFramebuffer* framebuffer = gpuDevice.GetCurrentFramebuffer(m_ui->SupportsDepthBuffer());
+    nvrhi::IFramebuffer* framebuffer = gpuDevice.getCurrentFramebuffer(m_ui->supportsDepthBuffer());
     if (ZoomTool* zoom = m_config.sceneEditor.GetOrCreateZoomTool())
     {
         if (zoom->enabled())
@@ -89,19 +89,19 @@ void EditorUISubsystem::renderSceneScheduled(caustica::GpuDevice& gpuDevice)
 void EditorUISubsystem::onBackBufferResizing()
 {
     if (m_ui)
-        m_ui->BackBufferResizing();
+        m_ui->backBufferResizing();
 }
 
 void EditorUISubsystem::onBackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount)
 {
     if (m_ui)
-        m_ui->BackBufferResized(width, height, sampleCount);
+        m_ui->backBufferResized(width, height, sampleCount);
 }
 
 void EditorUISubsystem::onDisplayScaleChanged(float scaleX, float scaleY)
 {
     if (m_ui)
-        static_cast<caustica::ImGui_Renderer&>(*m_ui).DisplayScaleChanged(scaleX, scaleY);
+        static_cast<caustica::ImGui_Renderer&>(*m_ui).displayScaleChanged(scaleX, scaleY);
 }
 
 } // namespace caustica::editor

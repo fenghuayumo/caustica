@@ -81,5 +81,5 @@ struct CommandLineOptions
     CommandLineOptions() = default;
 
     // Parses argc/argv using cxxopts. Returns false on error or --help.
-    bool InitFromCommandLine(int argc, char const* const* argv);
+    bool initFromCommandLine(int argc, char const* const* argv);
 };

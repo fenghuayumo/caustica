@@ -9,18 +9,18 @@ namespace caustica
 class GpuDevice;
 
 // GPU device access for UI/scene render helpers (not a pass registry).
-class RenderContext
+class renderContext
 {
 public:
-    explicit RenderContext(GpuDevice* device)
+    explicit renderContext(GpuDevice* device)
         : m_GpuDevice(device)
     { }
 
-    virtual ~RenderContext() = default;
+    virtual ~renderContext() = default;
 
-    [[nodiscard]] GpuDevice* GetGpuDevice() const { return m_GpuDevice; }
+    [[nodiscard]] GpuDevice* getGpuDevice() const { return m_GpuDevice; }
     [[nodiscard]] nvrhi::IDevice* getDevice() const;
-    [[nodiscard]] uint32_t GetFrameIndex() const;
+    [[nodiscard]] uint32_t getFrameIndex() const;
 
 protected:
     GpuDevice* m_GpuDevice;

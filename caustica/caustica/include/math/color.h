@@ -46,28 +46,28 @@ namespace caustica::math
 		{ return float4(toSRGB(float3(c)), c.w); }
 
 	// float3/HSV conversions
-	float3 RGBtoHSV(const float3& c);
-	float3 HSVtoRGB(const float3& c);
-	inline float4 RGBtoHSV(const float4& c)
-		{ return float4(RGBtoHSV(float3(c)), c.w); }
-	inline float4 HSVtoRGB(const float4& c)
-		{ return float4(HSVtoRGB(float3(c)), c.w); }
+	float3 rgbToHSV(const float3& c);
+	float3 hsvToRGB(const float3& c);
+	inline float4 rgbToHSV(const float4& c)
+		{ return float4(rgbToHSV(float3(c)), c.w); }
+	inline float4 hsvToRGB(const float4& c)
+		{ return float4(hsvToRGB(float3(c)), c.w); }
 
 	// float3/YCoCg conversions
-	inline float3 RGBtoYCoCg(const float3& c)
+	inline float3 rgbToYCoCg(const float3& c)
 		{ return float3(0.25f*(c.x+2.0f*c.y+c.z), c.x-c.z, c.y - 0.5f*(c.x+c.z)); }
-	inline float3 YCoCgtoRGB(const float3& c)
+	inline float3 yCoCgToRGB(const float3& c)
 		{ return float3(c.x+0.5f*(c.y-c.z), c.x+0.5f*c.z, c.x-0.5f*(c.y+c.z)); }
-	inline float4 RGBtoYCoCg(const float4& c)
-		{ return float4(RGBtoYCoCg(float3(c)), c.w); }
-	inline float4 YCoCgtoRGB(const float4& c)
-		{ return float4(YCoCgtoRGB(float3(c)), c.w); }
+	inline float4 rgbToYCoCg(const float4& c)
+		{ return float4(rgbToYCoCg(float3(c)), c.w); }
+	inline float4 yCoCgToRGB(const float4& c)
+		{ return float4(yCoCgToRGB(float3(c)), c.w); }
 
 	// float3/CIELAB conversions
-	float3 RGBtoCIELAB(const float3& c);
-	float3 CIELABtoRGB(float3 c);
-	inline float4 RGBtoCIELAB(const float4& c)
-		{ return float4(RGBtoCIELAB(float3(c)), c.w); }
-	inline float4 CIELABtoRGB(const float4& c)
-		{ return float4(CIELABtoRGB(float3(c)), c.w); }
+	float3 rgbToCIELAB(const float3& c);
+	float3 cielabToRGB(float3 c);
+	inline float4 rgbToCIELAB(const float4& c)
+		{ return float4(rgbToCIELAB(float3(c)), c.w); }
+	inline float4 cielabToRGB(const float4& c)
+		{ return float4(cielabToRGB(float3(c)), c.w); }
 }

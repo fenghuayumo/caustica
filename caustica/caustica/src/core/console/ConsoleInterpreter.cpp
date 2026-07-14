@@ -182,18 +182,18 @@ namespace caustica::console
 		if (args.empty())
 			return {false};
 
-		if (auto * cobj = FindObject(args[0]))
+		if (auto * cobj = findObject(args[0]))
 		{
-			if (auto * cmd = cobj->AsCommand())
+			if (auto * cmd = cobj->asCommand())
 			{
 				auto [status, output] = cmd->execute(args);
 				return { status, output };
 			}
-			else if (auto * var = cobj->AsVariable())
+			else if (auto * var = cobj->asVariable())
 			{
 				if (args.size() == 1)
 				{
-					return { true, var->GetValueAsString() };
+					return { true, var->getValueAsString() };
 				}
 				else
 				{
@@ -202,7 +202,7 @@ namespace caustica::console
 						args[1].data(),
 						(size_t)((cmdline.data() + cmdline.size()) - args[1].data())
 					};
-					return { var->SetValueFromString(value), {} };
+					return { var->setValueFromString(value), {} };
 				}
 			}
 		}
@@ -212,7 +212,7 @@ namespace caustica::console
 		return {false};
 	}
 
-	std::vector<std::string> Interpreter::Suggest(std::string_view const cmdline, size_t cursor_pos)
+	std::vector<std::string> Interpreter::suggest(std::string_view const cmdline, size_t cursor_pos)
 	{
 		if (cmdline.empty() || (cursor_pos > cmdline.size()))
 			return {};
@@ -227,14 +227,14 @@ namespace caustica::console
 			if ((tokens.size() == 1) && (token_start <= cursor) && (cursor <= token_end))
 			{		
 				// user is looking for a command
-				auto names = MatchObjectNames(("^" + std::string(token_start, cursor) + ".*").c_str());
+				auto names = matchObjectNames(("^" + std::string(token_start, cursor) + ".*").c_str());
 				return {names.begin(), names.end()};
 			}
 			else
 			{
 				// user is looking for the command's arguments
-				if (auto* cobj = FindCommand(tokens[0]))
-				return cobj->Suggest(cmdline, cursor_pos);
+				if (auto* cobj = findCommand(tokens[0]))
+				return cobj->suggest(cmdline, cursor_pos);
 			}
 		}
 		return {};
@@ -258,7 +258,7 @@ namespace caustica::console
 				if (args[1] == "--list")
 				{
 					Command::Result r;
-					for (auto name : MatchObjectNames(args.size() > 2 ? std::string(args[2]).c_str() : ".*"))
+					for (auto name : matchObjectNames(args.size() > 2 ? std::string(args[2]).c_str() : ".*"))
 					{
 						r.output += name;
 						r.output += '\n';
@@ -268,8 +268,8 @@ namespace caustica::console
 				}
 				else
 			{
-				if (auto cobj = FindObject(args[1]))
-					return { true, cobj->GetDescription() };
+				if (auto cobj = findObject(args[1]))
+					return { true, cobj->getDescription() };
 				else
 					return { false, std::string("no console object with name '") + std::string(args[1]) + "' found" };
 			}
@@ -290,7 +290,7 @@ namespace caustica::console
 			{
 				if ((token.data() <= cursor) && (cursor <= (token.data() + token.size())))
 				{
-					auto names = MatchObjectNames(("^" + std::string(token.data(), cursor) + ".*").c_str());
+					auto names = matchObjectNames(("^" + std::string(token.data(), cursor) + ".*").c_str());
 					return {names.begin(), names.end()};
 			}
 			}
@@ -303,7 +303,7 @@ namespace caustica::console
 		static bool initialized = false;
 		if (!initialized)
 			for (auto const& cmd : { help_cmd })
-				RegisterCommand(cmd);
+				registerCommand(cmd);
 		initialized = true;
 	}
 

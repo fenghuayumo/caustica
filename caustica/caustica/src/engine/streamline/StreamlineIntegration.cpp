@@ -242,7 +242,7 @@ StreamlineIntegration& StreamlineIntegration::Get()
     return instance;
 }
 
-bool StreamlineIntegration::InitializePreDevice(nvrhi::GraphicsAPI api, int appId, const bool checkSig, const bool enableLog)
+bool StreamlineIntegration::initializePreDevice(nvrhi::GraphicsAPI api, int appId, const bool checkSig, const bool enableLog)
 {
     if (m_slInitialized)
     {
@@ -256,8 +256,8 @@ bool StreamlineIntegration::InitializePreDevice(nvrhi::GraphicsAPI api, int appI
 
     if (m_api != nvrhi::GraphicsAPI::VULKAN)
     {
-        pref.allocateCallback = &AllocateResourceCallback;
-        pref.releaseCallback = &ReleaseResourceCallback;
+        pref.allocateCallback = &allocateResourceCallback;
+        pref.releaseCallback = &releaseResourceCallback;
     }
 
     pref.applicationId = appId;
@@ -338,7 +338,7 @@ bool StreamlineIntegration::InitializePreDevice(nvrhi::GraphicsAPI api, int appI
 }
 
 #if CAUSTICA_WITH_DX11 || CAUSTICA_WITH_DX12
-bool StreamlineIntegration::SetD3DDevice(IUnknown* nativeDevice)
+bool StreamlineIntegration::setD3DDevice(IUnknown* nativeDevice)
 {
     bool result = successCheck(slSetD3DDevice(nativeDevice), "slSetD3DDevice");
     if (!result)
@@ -350,7 +350,7 @@ bool StreamlineIntegration::SetD3DDevice(IUnknown* nativeDevice)
 #endif
 
 #if CAUSTICA_WITH_DX11 || CAUSTICA_WITH_DX12
-bool StreamlineIntegration::InitializeDeviceDX(nvrhi::IDevice *device, AdapterInfo::LUID *pAdapterIdDx11)
+bool StreamlineIntegration::initializeDeviceDX(nvrhi::IDevice *device, AdapterInfo::LUID *pAdapterIdDx11)
 {
     m_device = device;
 
@@ -362,13 +362,13 @@ bool StreamlineIntegration::InitializeDeviceDX(nvrhi::IDevice *device, AdapterIn
     }
 #endif
 
-    UpdateFeatureAvailable();
+    updateFeatureAvailable();
     return true;
 }
 #endif
 
 #if CAUSTICA_WITH_DX11 || CAUSTICA_WITH_DX12
-bool StreamlineIntegration::UpgradeInterface(IUnknown*& interfacePointer)
+bool StreamlineIntegration::upgradeInterface(IUnknown*& interfacePointer)
 {
     IUnknown* nativeInterface = interfacePointer;
     sl::Result slRes = slUpgradeInterface((void**)&interfacePointer);
@@ -384,16 +384,16 @@ bool StreamlineIntegration::UpgradeInterface(IUnknown*& interfacePointer)
 #endif
 
 #if CAUSTICA_WITH_VULKAN
-bool StreamlineIntegration::InitializeDeviceVK(nvrhi::IDevice* device, const VulkanInfo& vulkanInfo)
+bool StreamlineIntegration::initializeDeviceVK(nvrhi::IDevice* device, const VulkanInfo& vulkanInfo)
 {
     m_device = device;
 
-    UpdateFeatureAvailable();
+    updateFeatureAvailable();
     return true;
 }
 #endif
 
-uint32_t StreamlineIntegration::CheckNumSupportedFeatures(const sl::AdapterInfo &adapterInfo)
+uint32_t StreamlineIntegration::checkNumSupportedFeatures(const sl::AdapterInfo &adapterInfo)
 {
     auto checkFeature = [this, &adapterInfo](sl::Feature feature, std::string feature_name) -> bool
         {
@@ -442,7 +442,7 @@ uint32_t StreamlineIntegration::CheckNumSupportedFeatures(const sl::AdapterInfo 
 }
 
 #if CAUSTICA_WITH_DX11 || CAUSTICA_WITH_DX12
-uint32_t StreamlineIntegration::FindBestAdapterDX()
+uint32_t StreamlineIntegration::findBestAdapterDX()
 {
     uint32_t foundAdapter = 0;
     int maxSLSupportedFeatures = -1;
@@ -478,7 +478,7 @@ uint32_t StreamlineIntegration::FindBestAdapterDX()
 
             caustica::info("Found adapter: %S, DeviceId=0x%X, Vendor: %i", adapterDesc.Description, adapterDesc.DeviceId, adapterDesc.VendorId);
 
-            int supportedSLFeatureCnt = CheckNumSupportedFeatures(adapterInfo);
+            int supportedSLFeatureCnt = checkNumSupportedFeatures(adapterInfo);
             if (supportedSLFeatureCnt > maxSLSupportedFeatures)
             {
                 pBestAdapter = pAdapter;
@@ -507,7 +507,7 @@ uint32_t StreamlineIntegration::FindBestAdapterDX()
 #endif
 
 #if CAUSTICA_WITH_VULKAN
-uint32_t StreamlineIntegration::FindBestAdapterVulkan(const std::vector <vk::PhysicalDevice> &vkDevices)
+uint32_t StreamlineIntegration::findBestAdapterVulkan(const std::vector <vk::PhysicalDevice> &vkDevices)
 {
     uint32_t foundAdapter = 0;
     int maxSLSupportedFeatures = -1;
@@ -527,7 +527,7 @@ uint32_t StreamlineIntegration::FindBestAdapterVulkan(const std::vector <vk::Phy
             auto str = adapterDesc.deviceName.data();
             caustica::info("Found adapter: %s, DeviceId=0x%X, Vendor: %i", str, adapterDesc.deviceID, adapterDesc.vendorID);
 
-            int supportedSLFeatureCnt = CheckNumSupportedFeatures(adapterInfo);
+            int supportedSLFeatureCnt = checkNumSupportedFeatures(adapterInfo);
             if (supportedSLFeatureCnt > maxSLSupportedFeatures)
             {
                 pBestAdapter = &devicePtr;
@@ -552,7 +552,7 @@ uint32_t StreamlineIntegration::FindBestAdapterVulkan(const std::vector <vk::Phy
 }
 #endif
 
-void StreamlineIntegration::UpdateFeatureAvailable()
+void StreamlineIntegration::updateFeatureAvailable()
 {
     sl::AdapterInfo adapterInfo;
 
@@ -621,7 +621,7 @@ void StreamlineIntegration::UpdateFeatureAvailable()
 }
 
 
-void StreamlineIntegration::Shutdown()
+void StreamlineIntegration::shutdown()
 {
     if (!m_slInitialized)
         return;
@@ -629,13 +629,13 @@ void StreamlineIntegration::Shutdown()
     // free feature resources before slShutdown. Without this (especially DLSS-G),
     // window close can hang or crash while Streamline still owns live GPU work.
     if (m_dlssgAvailable)
-        CleanupDLSSG(false);
+        cleanupDLSSG(false);
     if (m_dlssAvailable)
-        CleanupDLSS(false);
+        cleanupDLSS(false);
     if (m_dlssrrAvailable)
-        CleanupDLSSRR(false);
+        cleanupDLSSRR(false);
     if (m_deepdvcAvailable)
-        CleanupDeepDVC();
+        cleanupDeepDVC();
 
     // Un-set all tags
     sl::ResourceTag inputs[] = 
@@ -655,17 +655,17 @@ void StreamlineIntegration::Shutdown()
     };
     successCheck(slSetTag(m_viewport, inputs, _countof(inputs), nullptr), "slSetTag_clear");
 
-    // Shutdown Streamline
+    // shutdown Streamline
     successCheck(slShutdown(), "slShutdown");
     m_slInitialized = false;
 }
 
-void StreamlineIntegration::SetViewport(uint32_t viewportIndex)
+void StreamlineIntegration::setViewport(uint32_t viewportIndex)
 {
     m_viewport = sl::ViewportHandle(viewportIndex);
 }
 
-void StreamlineIntegration::SetConstants(const Constants& consts)
+void StreamlineIntegration::setConstants(const Constants& consts)
 {
     sl::Constants slConstants;
     slConstants.cameraViewToClip = make_sl_float4x4(consts.cameraViewToClip);
@@ -707,7 +707,7 @@ void StreamlineIntegration::SetConstants(const Constants& consts)
     successCheck(slSetConstants(slConstants, *frameToken, m_viewport), "slSetConstants");
 }
 
-static sl::DLSSOptions ConvertOptions(const StreamlineIntegration::DLSSOptions& options)
+static sl::DLSSOptions convertOptions(const StreamlineIntegration::DLSSOptions& options)
 {
     static_assert(sl::DLSSPreset::eDefault == (sl::DLSSPreset)StreamlineIntegration::DLSSPreset::eDefault);
 #if !(SL_VERSION_MAJOR >= 2 && (SL_VERSION_MAJOR > 2 || SL_VERSION_MINOR >= 9))
@@ -763,7 +763,7 @@ static sl::DLSSOptions ConvertOptions(const StreamlineIntegration::DLSSOptions& 
     return slOptions;
 }
 
-void StreamlineIntegration::SetDLSSOptions(const DLSSOptions& options)
+void StreamlineIntegration::setDLSSOptions(const DLSSOptions& options)
 {
     if (!m_slInitialized || !m_dlssAvailable)
     {
@@ -771,10 +771,10 @@ void StreamlineIntegration::SetDLSSOptions(const DLSSOptions& options)
         return;
     }
 
-    successCheck(slDLSSSetOptions(m_viewport, ConvertOptions(options)), "slDLSSSetOptions");
+    successCheck(slDLSSSetOptions(m_viewport, convertOptions(options)), "slDLSSSetOptions");
 }
 
-void StreamlineIntegration::QueryDLSSOptimalSettings(const DLSSOptions& options, DLSSSettings& settings)
+void StreamlineIntegration::queryDLSSOptimalSettings(const DLSSOptions& options, DLSSSettings& settings)
 {
     if (!m_slInitialized || !m_dlssAvailable)
     {
@@ -784,7 +784,7 @@ void StreamlineIntegration::QueryDLSSOptimalSettings(const DLSSOptions& options,
     }
 
     sl::DLSSOptimalSettings dlssOptimal = {};
-    successCheck(slDLSSGetOptimalSettings(ConvertOptions(options), dlssOptimal), "slDLSSGetOptimalSettings");
+    successCheck(slDLSSGetOptimalSettings(convertOptions(options), dlssOptimal), "slDLSSGetOptimalSettings");
 
     settings.optimalRenderSize.x = static_cast<int>(dlssOptimal.optimalRenderWidth);
     settings.optimalRenderSize.y = static_cast<int>(dlssOptimal.optimalRenderHeight);
@@ -797,7 +797,7 @@ void StreamlineIntegration::QueryDLSSOptimalSettings(const DLSSOptions& options,
 }
 
 #if STREAMLINE_HAS_DLSS_RR
-static sl::DLSSDOptions ConvertOptions(const StreamlineIntegration::DLSSRROptions& options)
+static sl::DLSSDOptions convertOptions(const StreamlineIntegration::DLSSRROptions& options)
 {
     static_assert(sl::DLSSDPreset::eDefault == (sl::DLSSDPreset)StreamlineIntegration::DLSSRRPreset::eDefault);
 #if !(SL_VERSION_MAJOR >= 2 && (SL_VERSION_MAJOR > 2 || SL_VERSION_MINOR >= 9))
@@ -850,7 +850,7 @@ static sl::DLSSDOptions ConvertOptions(const StreamlineIntegration::DLSSRROption
 }
 #endif
 
-void StreamlineIntegration::SetDLSSRROptions(const DLSSRROptions& options)
+void StreamlineIntegration::setDLSSRROptions(const DLSSRROptions& options)
 {
 #if STREAMLINE_HAS_DLSS_RR
     if (!m_slInitialized || !m_dlssrrAvailable)
@@ -859,11 +859,11 @@ void StreamlineIntegration::SetDLSSRROptions(const DLSSRROptions& options)
         return;
     }
 
-    successCheck(slDLSSDSetOptions(m_viewport, ConvertOptions(options)), "slDLSSSetOptions");
+    successCheck(slDLSSDSetOptions(m_viewport, convertOptions(options)), "slDLSSSetOptions");
 #endif
 }
 
-void StreamlineIntegration::QueryDLSSRROptimalSettings(const DLSSRROptions& options, DLSSRRSettings& settings)
+void StreamlineIntegration::queryDLSSRROptimalSettings(const DLSSRROptions& options, DLSSRRSettings& settings)
 {
 #if STREAMLINE_HAS_DLSS_RR
     if (!m_slInitialized || !m_dlssrrAvailable)
@@ -874,7 +874,7 @@ void StreamlineIntegration::QueryDLSSRROptimalSettings(const DLSSRROptions& opti
     }
 
     sl::DLSSDOptimalSettings dlssOptimal = {};
-    successCheck(slDLSSDGetOptimalSettings(ConvertOptions(options), dlssOptimal), "slDLSSGetOptimalSettings");
+    successCheck(slDLSSDGetOptimalSettings(convertOptions(options), dlssOptimal), "slDLSSGetOptimalSettings");
 
     settings.optimalRenderSize.x = static_cast<int>(dlssOptimal.optimalRenderWidth);
     settings.optimalRenderSize.y = static_cast<int>(dlssOptimal.optimalRenderHeight);
@@ -887,7 +887,7 @@ void StreamlineIntegration::QueryDLSSRROptimalSettings(const DLSSRROptions& opti
 #endif
 }
 
-void StreamlineIntegration::CleanupDLSSRR(bool wfi)
+void StreamlineIntegration::cleanupDLSSRR(bool wfi)
 {
 #if STREAMLINE_HAS_DLSS_RR
     if (!m_slInitialized)
@@ -908,7 +908,7 @@ void StreamlineIntegration::CleanupDLSSRR(bool wfi)
 #endif
 }
 
-void StreamlineIntegration::CleanupDLSS(bool wfi)
+void StreamlineIntegration::cleanupDLSS(bool wfi)
 {
     if (!m_slInitialized)
     {
@@ -937,7 +937,7 @@ void StreamlineIntegration::CleanupDLSS(bool wfi)
     assert(status == sl::Result::eOk || status == sl::Result::eErrorInvalidParameter);
 }
 
-void StreamlineIntegration::SetNISOptions(const NISOptions& options)
+void StreamlineIntegration::setNISOptions(const NISOptions& options)
 {
     static_assert(sl::NISMode::eOff == (sl::NISMode)NISMode::eOff);
     static_assert(sl::NISMode::eScaler == (sl::NISMode)NISMode::eScaler);
@@ -963,7 +963,7 @@ void StreamlineIntegration::SetNISOptions(const NISOptions& options)
     successCheck(slNISSetOptions(m_viewport, slOptions), "slNISSetOptions");
 }
 
-void StreamlineIntegration::CleanupNIS(bool wfi)
+void StreamlineIntegration::cleanupNIS(bool wfi)
 {
     if (!m_slInitialized)
     {
@@ -985,7 +985,7 @@ void StreamlineIntegration::CleanupNIS(bool wfi)
     successCheck(slFreeResources(sl::kFeatureNIS, m_viewport), "slFreeResources_NIS");
 }
 
-void StreamlineIntegration::SetDeepDVCOptions(const DeepDVCOptions& options)
+void StreamlineIntegration::setDeepDVCOptions(const DeepDVCOptions& options)
 {
     static_assert(sl::DeepDVCMode::eOff == (sl::DeepDVCMode)DeepDVCMode::eOff);
     static_assert(sl::DeepDVCMode::eOn == (sl::DeepDVCMode)DeepDVCMode::eOn);
@@ -1005,7 +1005,7 @@ void StreamlineIntegration::SetDeepDVCOptions(const DeepDVCOptions& options)
     successCheck(slDeepDVCSetOptions(m_viewport, slOptions), "slDeepDVCSetOptions");
 }
 
-void StreamlineIntegration::CleanupDeepDVC()
+void StreamlineIntegration::cleanupDeepDVC()
 {
     if (!m_slInitialized)
     {
@@ -1023,7 +1023,7 @@ void StreamlineIntegration::CleanupDeepDVC()
     successCheck(slFreeResources(sl::kFeatureDeepDVC, m_viewport), "slFreeResources_DeepDVC");
 }
 
-void StreamlineIntegration::SetDLSSGOptions(const DLSSGOptions& options)
+void StreamlineIntegration::setDLSSGOptions(const DLSSGOptions& options)
 {
     if (!m_slInitialized || !m_dlssgAvailable)
     {
@@ -1031,7 +1031,7 @@ void StreamlineIntegration::SetDLSSGOptions(const DLSSGOptions& options)
         return;
     }
 
-    WaitForDLSSGInputsProcessing();
+    waitForDLSSGInputsProcessing();
 
     sl::DLSSGOptions slOptions;
     slOptions.mode = (sl::DLSSGMode)options.mode;
@@ -1058,7 +1058,7 @@ void StreamlineIntegration::SetDLSSGOptions(const DLSSGOptions& options)
     successCheck(slDLSSGSetOptions(m_viewport, slOptions), "slDLSSGSetOptions");
 }
 
-void StreamlineIntegration::GetDLSSGState(DLSSGState& state, const DLSSGOptions& options)
+void StreamlineIntegration::getDLSSGState(DLSSGState& state, const DLSSGOptions& options)
 {
     if (!m_slInitialized || !m_dlssgAvailable)
     {
@@ -1066,7 +1066,7 @@ void StreamlineIntegration::GetDLSSGState(DLSSGState& state, const DLSSGOptions&
         return;
     }
 
-    WaitForDLSSGInputsProcessing();
+    waitForDLSSGInputsProcessing();
 
     sl::DLSSGOptions slOptions;
     slOptions.mode = (sl::DLSSGMode)options.mode;
@@ -1111,10 +1111,10 @@ void StreamlineIntegration::GetDLSSGState(DLSSGState& state, const DLSSGOptions&
 
     m_dlssgInputsProcessingCompletionFence = slState.inputsProcessingCompletionFence;
     m_dlssgLastPresentInputsProcessingCompletionFenceValue = slState.lastPresentInputsProcessingCompletionFenceValue;
-    WaitForDLSSGInputsProcessing();
+    waitForDLSSGInputsProcessing();
 }
 
-void StreamlineIntegration::CleanupDLSSG(bool wfi)
+void StreamlineIntegration::cleanupDLSSG(bool wfi)
 {
     if (!m_slInitialized)
     {
@@ -1133,7 +1133,7 @@ void StreamlineIntegration::CleanupDLSSG(bool wfi)
         m_device->waitForIdle();
     }
 
-    WaitForDLSSGInputsProcessing();
+    waitForDLSSGInputsProcessing();
 
     sl::Result status = slFreeResources(sl::kFeatureDLSS_G, m_viewport);
     // if we've never ran the feature on this viewport, this call may return 'eErrorInvalidParameter'
@@ -1143,7 +1143,7 @@ void StreamlineIntegration::CleanupDLSSG(bool wfi)
     m_dlssgLastPresentInputsProcessingCompletionFenceValue = 0;
 }
 
-void StreamlineIntegration::WaitForDLSSGInputsProcessing()
+void StreamlineIntegration::waitForDLSSGInputsProcessing()
 {
     if (!m_dlssgInputsProcessingCompletionFence || m_dlssgLastPresentInputsProcessingCompletionFenceValue == 0)
         return;
@@ -1197,7 +1197,7 @@ void StreamlineIntegration::WaitForDLSSGInputsProcessing()
         m_device->waitForIdle();
 }
 
-sl::Resource StreamlineIntegration::AllocateResourceCallback(const sl::ResourceAllocationDesc* resDesc, void* device)
+sl::Resource StreamlineIntegration::allocateResourceCallback(const sl::ResourceAllocationDesc* resDesc, void* device)
 {
     sl::Resource res = {};
 
@@ -1283,7 +1283,7 @@ sl::Resource StreamlineIntegration::AllocateResourceCallback(const sl::ResourceA
     return res;
 }
 
-void StreamlineIntegration::ReleaseResourceCallback(sl::Resource* resource, void* device)
+void StreamlineIntegration::releaseResourceCallback(sl::Resource* resource, void* device)
 {
     if (resource)
     {
@@ -1325,7 +1325,7 @@ D3D12_RESOURCE_STATES D3D12convertResourceStates(nvrhi::ResourceStates stateBits
 }
 #endif
 
-nvrhi::Object StreamlineIntegration::GetNativeCommandList(nvrhi::ICommandList* commandList)
+nvrhi::Object StreamlineIntegration::getNativeCommandList(nvrhi::ICommandList* commandList)
 {
 #if CAUSTICA_WITH_DX11
     if (m_api == nvrhi::GraphicsAPI::D3D11)
@@ -1439,7 +1439,7 @@ static void GetSLResource(
     }
 }
 
-void StreamlineIntegration::TagResourcesGeneral(
+void StreamlineIntegration::tagResourcesGeneral(
     nvrhi::ICommandList* commandList,
     const caustica::IView* view,
     nvrhi::ITexture* motionVectors,
@@ -1454,7 +1454,7 @@ void StreamlineIntegration::TagResourcesGeneral(
 
     sl::Extent renderExtent{ 0, 0, depth->getDesc().width, depth->getDesc().height };
     sl::Extent fullExtent{ 0, 0, finalColorHudless->getDesc().width, finalColorHudless->getDesc().height };
-    void* cmdbuffer = GetNativeCommandList(commandList);
+    void* cmdbuffer = getNativeCommandList(commandList);
     sl::Resource motionVectorsResource{}, depthResource{}, finalColorHudlessResource{};
 
     GetSLResource(commandList, motionVectorsResource, motionVectors, view);
@@ -1469,7 +1469,7 @@ void StreamlineIntegration::TagResourcesGeneral(
     successCheck(slSetTag(m_viewport, inputs, _countof(inputs), cmdbuffer), "slSetTag_General");
 }
 
-void StreamlineIntegration::TagResourcesDLSSNIS(
+void StreamlineIntegration::tagResourcesDLSSNIS(
     nvrhi::ICommandList* commandList,
     const caustica::IView* view,
     nvrhi::ITexture* Output,
@@ -1483,7 +1483,7 @@ void StreamlineIntegration::TagResourcesDLSSNIS(
 
     sl::Extent renderExtent{ 0, 0, Input->getDesc().width, Input->getDesc().height };
     sl::Extent fullExtent{ 0, 0, Output->getDesc().width, Output->getDesc().height };
-    void* cmdbuffer = GetNativeCommandList(commandList);
+    void* cmdbuffer = getNativeCommandList(commandList);
     sl::Resource outputResource{}, inputResource{};
 
     GetSLResource(commandList, outputResource, Output, view);
@@ -1496,7 +1496,7 @@ void StreamlineIntegration::TagResourcesDLSSNIS(
     successCheck(slSetTag(m_viewport, inputs, _countof(inputs), cmdbuffer), "slSetTag_dlss_nis");
 }
 
-void StreamlineIntegration::TagResourcesDLSSFG(
+void StreamlineIntegration::tagResourcesDLSSFG(
     nvrhi::ICommandList* commandList,
     bool validViewportExtent,
     const Extent& backBufferExtent)
@@ -1507,7 +1507,7 @@ void StreamlineIntegration::TagResourcesDLSSFG(
         return;
     }
 
-    void* cmdbuffer = GetNativeCommandList(commandList);
+    void* cmdbuffer = getNativeCommandList(commandList);
 
     // tag backbuffer resource mainly to pass extent data and therefore resource can be nullptr.
     // If the viewport extent is invalid - set extent to null. This informs streamline that full resource extent needs to be used
@@ -1517,7 +1517,7 @@ void StreamlineIntegration::TagResourcesDLSSFG(
     successCheck(slSetTag(m_viewport, inputs, _countof(inputs), cmdbuffer), "slSetTag_dlss_fg");
 }
 
-void StreamlineIntegration::TagResourcesDeepDVC(
+void StreamlineIntegration::tagResourcesDeepDVC(
     nvrhi::ICommandList* commandList,
     const caustica::IView* view,
     nvrhi::ITexture* Output)
@@ -1529,7 +1529,7 @@ void StreamlineIntegration::TagResourcesDeepDVC(
     }
 
     sl::Extent fullExtent{ 0, 0, Output->getDesc().width, Output->getDesc().height };
-    void* cmdbuffer = GetNativeCommandList(commandList);
+    void* cmdbuffer = getNativeCommandList(commandList);
     sl::Resource outputResource{};
 
     GetSLResource(commandList, outputResource, Output, view);
@@ -1540,7 +1540,7 @@ void StreamlineIntegration::TagResourcesDeepDVC(
     successCheck(slSetTag(m_viewport, inputs, _countof(inputs), cmdbuffer), "slSetTag_deepdvc");
 }
 
-void StreamlineIntegration::UnTagResourcesDeepDVC()
+void StreamlineIntegration::unTagResourcesDeepDVC()
 {
     sl::ResourceTag outputResourceTag = sl::ResourceTag{ nullptr, sl::kBufferTypeScalingOutputColor, sl::ResourceLifecycle::eValidUntilPresent };
 
@@ -1548,7 +1548,7 @@ void StreamlineIntegration::UnTagResourcesDeepDVC()
     successCheck(slSetTag(m_viewport, inputs, _countof(inputs), nullptr), "slSetTag_deepdvc_untag");
 }
 
-void StreamlineIntegration::TagResourcesDLSSRR(
+void StreamlineIntegration::tagResourcesDLSSRR(
     nvrhi::ICommandList* commandList,
     const caustica::IView* view,
     dm::int2 renderSize,
@@ -1624,9 +1624,9 @@ void StreamlineIntegration::TagResourcesDLSSRR(
 #endif
 }
 
-void StreamlineIntegration::EvaluateDLSS(nvrhi::ICommandList* commandList)
+void StreamlineIntegration::evaluateDLSS(nvrhi::ICommandList* commandList)
 {
-    void* nativeCommandList = GetNativeCommandList(commandList);
+    void* nativeCommandList = getNativeCommandList(commandList);
     if (nativeCommandList == nullptr)
     {
         caustica::warning("Failed to retrieve context for DLSS evaluation.");
@@ -1644,10 +1644,10 @@ void StreamlineIntegration::EvaluateDLSS(nvrhi::ICommandList* commandList)
     commandList->clearState();
 }
 
-void StreamlineIntegration::EvaluateDLSSRR(nvrhi::ICommandList* commandList)
+void StreamlineIntegration::evaluateDLSSRR(nvrhi::ICommandList* commandList)
 {
 #if STREAMLINE_HAS_DLSS_RR
-    void* nativeCommandList = GetNativeCommandList(commandList);
+    void* nativeCommandList = getNativeCommandList(commandList);
     if (nativeCommandList == nullptr)
     {
         caustica::warning("Failed to retrieve context for DLSS evaluation.");
@@ -1666,9 +1666,9 @@ void StreamlineIntegration::EvaluateDLSSRR(nvrhi::ICommandList* commandList)
 #endif
 }
 
-void StreamlineIntegration::EvaluateNIS(nvrhi::ICommandList* commandList)
+void StreamlineIntegration::evaluateNIS(nvrhi::ICommandList* commandList)
 {
-    void* nativeCommandList = GetNativeCommandList(commandList);
+    void* nativeCommandList = getNativeCommandList(commandList);
     if (nativeCommandList == nullptr)
     {
         caustica::warning("Failed to retrieve context for NIS evaluation.");
@@ -1686,9 +1686,9 @@ void StreamlineIntegration::EvaluateNIS(nvrhi::ICommandList* commandList)
     commandList->clearState();
 }
 
-void StreamlineIntegration::EvaluateDeepDVC(nvrhi::ICommandList* commandList)
+void StreamlineIntegration::evaluateDeepDVC(nvrhi::ICommandList* commandList)
 {
-    void* nativeCommandList = GetNativeCommandList(commandList);
+    void* nativeCommandList = getNativeCommandList(commandList);
     if (nativeCommandList == nullptr)
     {
         caustica::warning("Failed to retrieve context for NIS evaluation.");
@@ -1706,7 +1706,7 @@ void StreamlineIntegration::EvaluateDeepDVC(nvrhi::ICommandList* commandList)
     commandList->clearState();
 }
 
-void StreamlineIntegration::QueryDeepDVCState(uint64_t& estimatedVRamUsage)
+void StreamlineIntegration::queryDeepDVCState(uint64_t& estimatedVRamUsage)
 {
     if (!m_slInitialized || !m_deepdvcAvailable)
     {
@@ -1718,7 +1718,7 @@ void StreamlineIntegration::QueryDeepDVCState(uint64_t& estimatedVRamUsage)
     estimatedVRamUsage = state.estimatedVRAMUsageInBytes;
 }
 
-void StreamlineIntegration::SetReflexConsts(const ReflexOptions& options)
+void StreamlineIntegration::setReflexConsts(const ReflexOptions& options)
 {
     static_assert(sl::ReflexMode::eOff == (sl::ReflexMode)StreamlineIntegration::ReflexMode::eOff);
     static_assert(sl::ReflexMode::eLowLatency == (sl::ReflexMode)StreamlineIntegration::ReflexMode::eLowLatency);
@@ -1744,7 +1744,7 @@ void StreamlineIntegration::SetReflexConsts(const ReflexOptions& options)
     successCheck(slReflexSetOptions(slOptions), "slReflexSetOptions");
 }
 
-void StreamlineIntegration::GetReflexState(ReflexState& state) const
+void StreamlineIntegration::getReflexState(ReflexState& state) const
 {
     if (!m_slInitialized || !m_reflexAvailable)
     {
@@ -1779,32 +1779,32 @@ void StreamlineIntegration::GetReflexState(ReflexState& state) const
     }
 }
 
-void StreamlineIntegration::SimStart(GpuDevice& manager)
+void StreamlineIntegration::simStart(GpuDevice& manager)
 {
     successCheck(slGetNewFrameToken(m_currentFrame, nullptr), "SL_GetFrameToken");
 
-    if (IsReflexAvailable())
+    if (isReflexAvailable())
     {
         successCheck(slReflexSleep(*m_currentFrame), "Reflex_Sleep");
 
     }
-    if (IsPCLAvailable())
+    if (isPCLAvailable())
     {
         successCheck(slPCLSetMarker(sl::PCLMarker::eSimulationStart, *m_currentFrame), "PCL_BeforeFrame");
     }
 }
 
-void StreamlineIntegration::SimEnd(GpuDevice& manager)
+void StreamlineIntegration::simEnd(GpuDevice& manager)
 {
-    if (IsPCLAvailable())
+    if (isPCLAvailable())
     {
         successCheck(slPCLSetMarker(sl::PCLMarker::eSimulationEnd, *m_currentFrame), "PCL_SimEnd");
     }
 }
 
-void StreamlineIntegration::RenderStart(GpuDevice& manager)
+void StreamlineIntegration::renderStart(GpuDevice& manager)
 {
-    if (IsPCLAvailable())
+    if (isPCLAvailable())
     {
         sl::FrameToken* frameToken = activeFrameToken();
         if (frameToken)
@@ -1812,9 +1812,9 @@ void StreamlineIntegration::RenderStart(GpuDevice& manager)
     }
 }
 
-void StreamlineIntegration::RenderEnd(GpuDevice& manager)
+void StreamlineIntegration::renderEnd(GpuDevice& manager)
 {
-    if (IsPCLAvailable())
+    if (isPCLAvailable())
     {
         sl::FrameToken* frameToken = activeFrameToken();
         if (frameToken)
@@ -1822,9 +1822,9 @@ void StreamlineIntegration::RenderEnd(GpuDevice& manager)
     }
 }
 
-void StreamlineIntegration::PresentStart(GpuDevice& manager)
+void StreamlineIntegration::presentStart(GpuDevice& manager)
 {
-    if (IsPCLAvailable())
+    if (isPCLAvailable())
     {
         sl::FrameToken* frameToken = activeFrameToken();
         if (frameToken)
@@ -1832,9 +1832,9 @@ void StreamlineIntegration::PresentStart(GpuDevice& manager)
     }
 }
 
-void StreamlineIntegration::PresentEnd(GpuDevice& manager)
+void StreamlineIntegration::presentEnd(GpuDevice& manager)
 {
-    if (IsPCLAvailable())
+    if (isPCLAvailable())
     {
         sl::FrameToken* frameToken = activeFrameToken();
         if (frameToken)
@@ -1842,16 +1842,16 @@ void StreamlineIntegration::PresentEnd(GpuDevice& manager)
     }
 }
 
-void StreamlineIntegration::ReflexTriggerFlash(int frameNumber)
+void StreamlineIntegration::reflexTriggerFlash(int frameNumber)
 {
     sl::FrameToken* frameToken = activeFrameToken();
     if (frameToken)
         successCheck(slPCLSetMarker(sl::PCLMarker::eTriggerFlash, *frameToken), "Reflex_Flash");
 }
 
-void StreamlineIntegration::ReflexTriggerPcPing(int frameNumber)
+void StreamlineIntegration::reflexTriggerPcPing(int frameNumber)
 {
-    if (IsPCLAvailable())
+    if (isPCLAvailable())
     {
         sl::FrameToken* frameToken = activeFrameToken();
         if (frameToken)

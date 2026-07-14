@@ -32,12 +32,12 @@ namespace
     {
         if (cmdLine.nonInteractive)
         {
-            caustica::EnableOutputToMessageBox(false);
-            HelpersSetNonInteractive();
+            caustica::enableOutputToMessageBox(false);
+            helpersSetNonInteractive();
         }
 
         if (cmdLine.noWindow || cmdLine.nonInteractive)
-            caustica::ConsoleApplicationMode();
+            caustica::consoleApplicationMode();
     }
 }
 
@@ -48,7 +48,7 @@ bool ProcessEditorStartupCommandLine(int argc, char const* const* argv,
 {
     ApplyDefaultWindowSizeForLargeDisplays(cmdLine);
 
-    if (!cmdLine.InitFromCommandLine(argc, argv))
+    if (!cmdLine.initFromCommandLine(argc, argv))
         return false;
 
     if (cmdLine.noWindow)

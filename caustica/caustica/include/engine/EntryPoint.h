@@ -17,6 +17,6 @@ using AppHook = void (*)();
 // Returns process exit code (0 = success).
 int runApp(App& app, const std::function<bool(App&)>& startup, AppHook preGpuInit = nullptr);
 
-void InvokePreGpuDeviceInitHook();
+void invokePreGpuDeviceInitHook();
 
 } // namespace caustica

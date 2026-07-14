@@ -11,7 +11,7 @@ void registerAssetPlugin(App& app)
     if (!app.tryResource<AssetSystem>())
         app.emplaceResource<AssetSystem>();
 
-    app.addSystemAfter(AppSchedule::Shutdown, "AssetSystem.Shutdown", "GpuRender.Shutdown", [](SystemContext& ctx) {
+    app.addSystemAfter(AppSchedule::shutdown, "AssetSystem.shutdown", "GpuRender.shutdown", [](SystemContext& ctx) {
         if (auto* assets = ctx.tryRes<AssetSystem>())
             assets->shutdown();
     });

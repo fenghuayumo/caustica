@@ -28,9 +28,9 @@ public:
     ThreadPool(uint32_t numThreads = 0);
     ~ThreadPool();
 
-    void AddTask(std::shared_ptr<ThreadPoolTask> const& task);
-    void AddTask(std::function<void()> func);
-    void WaitForTasks();
+    void addTask(std::shared_ptr<ThreadPoolTask> const& task);
+    void addTask(std::function<void()> func);
+    void waitForTasks();
 
 private:
     JobSystem::Context m_Context;

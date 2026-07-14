@@ -69,6 +69,6 @@ private:
     std::atomic<std::thread::id> m_renderThreadId{};
 };
 
-[[nodiscard]] bool IsRenderThread();
+[[nodiscard]] bool isRenderThread();
 
 } // namespace caustica

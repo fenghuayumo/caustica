@@ -10,7 +10,7 @@
 namespace caustica
 {
 
-bool QueryDxgiAdapterVideoMemory(IDXGIAdapter* adapter, VideoMemoryInfo& out)
+bool queryDxgiAdapterVideoMemory(IDXGIAdapter* adapter, VideoMemoryInfo& out)
 {
     if (!adapter)
         return false;

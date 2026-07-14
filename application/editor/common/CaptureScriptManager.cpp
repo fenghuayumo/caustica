@@ -34,25 +34,25 @@ CaptureScriptManager::~CaptureScriptManager()
 
 bool CaptureScriptManager::ScriptProgressUI()
 {
-    if (!m_sequencer.isActive() && !m_sequencer.IsStarting())
+    if (!m_sequencer.isActive() && !m_sequencer.isStarting())
         return false;
 
     const auto& settings = m_sequencer.settings();
-    if (m_sequencer.ResetAndWarmupCounter() > 0)
+    if (m_sequencer.resetAndWarmupCounter() > 0)
     {
         ImGui::Spacing();
-        ImGui::TextWrapped("Running warm-up: %d out of %d", m_sequencer.ResetAndWarmupCounter(), settings.ResetAndWarmupFrames);
+        ImGui::TextWrapped("Running warm-up: %d out of %d", m_sequencer.resetAndWarmupCounter(), settings.ResetAndWarmupFrames);
     }
     if (!m_ui.settings.RealtimeMode)
     {
         ImGui::TextWrapped("Accumulation mode, sample %d (out of %d target)", m_app.accumulationSampleIndex(), m_ui.settings.AccumulationTarget);
     }
-    if (m_sequencer.SequenceRecordCounter() > 0)
+    if (m_sequencer.sequenceRecordCounter() > 0)
     {
         ImGui::Spacing();
-        ImGui::TextWrapped("Running sequence export: %d", m_sequencer.SequenceRecordCounter());
+        ImGui::TextWrapped("Running sequence export: %d", m_sequencer.sequenceRecordCounter());
     }
-    if (m_sequencer.IsStarting())
+    if (m_sequencer.isStarting())
     {
         ImGui::Spacing();
         ImGui::TextWrapped("Starting (scene loading might still in progress)...");
@@ -63,7 +63,7 @@ bool CaptureScriptManager::ScriptProgressUI()
 
 void CaptureScriptManager::ScriptMainUI(const ImVec4 & warnColor, const ImVec4 & categoryColor, float indent, float currentScale)
 {
-    assert(!m_sequencer.isActive() && !m_sequencer.IsStarting()); // this point should never be reached if active because ScriptProgressUI should be up instead
+    assert(!m_sequencer.isActive() && !m_sequencer.isStarting()); // this point should never be reached if active because ScriptProgressUI should be up instead
 
     auto& settings = m_sequencer.settings();
 
@@ -133,7 +133,7 @@ void CaptureScriptManager::ScriptMainUI(const ImVec4 & warnColor, const ImVec4 &
         }
 
         if (ImGui::Button("=== START CAPTURE ===", ImVec2(-FLT_MIN, 0.0f)))
-            m_sequencer.RequestStart();
+            m_sequencer.requestStart();
     }
 
 
@@ -166,9 +166,9 @@ void CaptureScriptManager::ScriptMainUI(const ImVec4 & warnColor, const ImVec4 &
 #endif
 }
 
-void CaptureScriptManager::PreAnim(float& fElapsedTimeSeconds)
+void CaptureScriptManager::preAnim(float& fElapsedTimeSeconds)
 {
-    m_sequencer.PreAnim(
+    m_sequencer.preAnim(
         fElapsedTimeSeconds,
         m_app.hasAsyncLoadingInProgress(),
         [this](double sceneTime) { m_app.setSceneTime(sceneTime); });
@@ -186,9 +186,9 @@ void CaptureScriptManager::preRender()
     m_ui.settings.ResetAccumulation |= actions.ResetAccumulation;
 }
 
-void CaptureScriptManager::PostRender(const std::function<bool(const char*)>& dumpScreenshotCallback)
+void CaptureScriptManager::postRender(const std::function<bool(const char*)>& dumpScreenshotCallback)
 {
-    const CaptureSequencerPostRenderResult result = m_sequencer.PostRender(
+    const CaptureSequencerPostRenderResult result = m_sequencer.postRender(
         m_ui.settings.RealtimeMode,
         m_app.accumulationCompleted(),
         m_app.sceneTime(),
@@ -197,7 +197,7 @@ void CaptureScriptManager::PostRender(const std::function<bool(const char*)>& du
     if (result.ExitRequested)
     {
         const std::filesystem::path& capturePath = result.CapturePath;
-        if (result.CaptureSuccess)
+        if (result.captureSuccess)
         {
             caustica::info("capture of '%s' finished successfully. Exiting.", capturePath.string().c_str());
             std::exit(0);

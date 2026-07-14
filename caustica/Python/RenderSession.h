@@ -72,11 +72,11 @@ public:
     caustica::render::RenderSessionState& renderSessionState() { return m_engine->renderSessionState(); }
     const caustica::render::RenderSessionState& renderSessionState() const { return m_engine->renderSessionState(); }
 
-    caustica::GpuDevice* GetGpuDevice() { return m_engine ? m_engine->device() : nullptr; }
+    caustica::GpuDevice* getGpuDevice() { return m_engine ? m_engine->device() : nullptr; }
     const Config&              GetConfig() const  { return m_config; }
 
 private:
-    void Shutdown();
+    void shutdown();
 
     Config                                          m_config;
     std::unique_ptr<caustica::EngineApp>            m_engine;

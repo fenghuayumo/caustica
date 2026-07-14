@@ -13,7 +13,7 @@ namespace caustica
 // --- String formatting ---
 // printf-style format with automatic buffer sizing.
 template<typename... Args>
-std::string StringFormat(const std::string& format, Args... args)
+std::string stringFormat(const std::string& format, Args... args)
 {
     int size_s = std::snprintf(nullptr, 0, format.c_str(), args...) + 1;
     if (size_s <= 0)
@@ -25,19 +25,19 @@ std::string StringFormat(const std::string& format, Args... args)
 }
 
 // --- Hex formatting ---
-std::string HexString(unsigned int value);
+std::string hexString(unsigned int value);
 
 // --- String cleaning ---
-std::string StripNonAsciiAlnum(const std::string& input);
+std::string stripNonAsciiAlnum(const std::string& input);
 
 // --- Case-insensitive search ---
 // Returns std::string::npos if not found.
-size_t FindSubStringIgnoreCase(const std::string& text, const std::string& subString);
-bool EqualsIgnoreCase(const std::string& a, const std::string& b);
+size_t findSubStringIgnoreCase(const std::string& text, const std::string& subString);
+bool equalsIgnoreCase(const std::string& a, const std::string& b);
 
 // --- Float3 parsing from comma-separated string ---
 // Parses up to 3 floats separated by commas. Consumes the parsed portion from 's'.
 // Returns true if 3 valid floats were parsed.
-bool ParseFloat3Consume(std::string& s, dm::float3& out);
+bool parseFloat3Consume(std::string& s, dm::float3& out);
 
 } // namespace caustica

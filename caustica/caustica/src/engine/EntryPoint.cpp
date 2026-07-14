@@ -18,7 +18,7 @@ namespace
 AppHook s_preGpuInit = nullptr;
 }
 
-void InvokePreGpuDeviceInitHook()
+void invokePreGpuDeviceInitHook()
 {
     if (s_preGpuInit)
         s_preGpuInit();
@@ -38,7 +38,7 @@ int runApp(App& app, const std::function<bool(App&)>& startup, AppHook preGpuIni
 
     const auto shutdownOnFailure = [&app]() {
         app.shutdown();
-        JobSystem::Shutdown();
+        JobSystem::shutdown();
     };
 
     if (!startup)
@@ -80,7 +80,7 @@ int runApp(App& app, const std::function<bool(App&)>& startup, AppHook preGpuIni
 
     app.run();
 
-    JobSystem::Shutdown();
+    JobSystem::shutdown();
 
 #ifdef _WIN32
     if (comNeedsUninit)

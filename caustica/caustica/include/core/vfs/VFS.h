@@ -116,7 +116,7 @@ namespace caustica
     public:
         RelativeFileSystem(std::shared_ptr<IFileSystem> fs, const std::filesystem::path& basePath);
 
-        [[nodiscard]] std::filesystem::path const& GetBasePath() const { return m_BasePath; }
+        [[nodiscard]] std::filesystem::path const& getBasePath() const { return m_BasePath; }
 
         bool folderExists(const std::filesystem::path& name) override;
         bool fileExists(const std::filesystem::path& name) override;

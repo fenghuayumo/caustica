@@ -41,7 +41,7 @@ EditorUI::EditorUI(GpuDevice* deviceManager, SceneEditor& sceneEditor, EditorUID
 
     // ImGui lifecycle management (fonts, context config, extensions)
     m_imguiManager = std::make_unique<ImGuiManager>(m_ui, cmdLine, NVAPI_SERSupported);
-    m_imguiManager->loadDefaultFont(*this, GetLocalPath(c_AssetsFolder));
+    m_imguiManager->loadDefaultFont(*this, getLocalPath(c_AssetsFolder));
 
     // Choose which, if any, hit object extension we can use
     m_imguiManager->configureExtensions((int)getDevice()->getGraphicsAPI());
@@ -76,7 +76,7 @@ void EditorUI::animate(float elapsedTimeSeconds)
     caustica::ImGui_Renderer::animate(elapsedTimeSeconds);
 
     int w, h;
-    GetGpuDevice()->GetWindowDimensions(w, h);
+    getGpuDevice()->getWindowDimensions(w, h);
     ImGuiIO& io = ImGui::GetIO();
 
     m_showSceneWidgets = dm::clamp(m_showSceneWidgets + elapsedTimeSeconds * 8.0f * ((io.MousePos.y >= 0 && io.MousePos.y < h * 0.1f) ? (1) : (-1)), 0.0f, 1.0f);
@@ -88,7 +88,7 @@ void EditorUI::buildUI(void)
     if (!m_editorUI.ShowUI)
         return;
 
-    RAII_SCOPE( ImGui::PushFont(m_defaultFont->GetScaledFont());, ImGui::PopFont(); );
+    RAII_SCOPE( ImGui::PushFont(m_defaultFont->getScaledFont());, ImGui::PopFont(); );
 
     auto& io = ImGui::GetIO();
     PanelLayout layout;
@@ -105,7 +105,7 @@ void EditorUI::buildUI(void)
         RAII_SCOPE( ImGui::Begin("settings", 0, ImGuiWindowFlags_None /*AlwaysAutoResize*/); , ImGui::End(); );
         RAII_SCOPE( ImGui::PushItemWidth(layout.defItemWidth); , ImGui::PopItemWidth(); );
 
-        ImGui::Text("%s, %s", GetGpuDevice()->GetRendererString(), m_sceneEditor.resolutionInfo().c_str() );
+        ImGui::Text("%s, %s", getGpuDevice()->getRendererString(), m_sceneEditor.resolutionInfo().c_str() );
         ImGui::TextUnformatted(m_sceneEditor.fpsInfo().c_str());
 
         if (BuildUIScriptsAndEtc())

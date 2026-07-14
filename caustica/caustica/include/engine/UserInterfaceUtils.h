@@ -15,12 +15,12 @@ namespace caustica
 
 namespace caustica
 {
-    bool MaterialEditor(Material* material, bool allowMaterialDomainChanges);
+    bool materialEditor(Material* material, bool allowMaterialDomainChanges);
 
     bool LightEditor_Directional(DirectionalLight& light);
     bool LightEditor_Point(PointLight& light);
     bool LightEditor_Spot(SpotLight& light);
-    bool LightEditor(Light& light);
+    bool lightEditor(Light& light);
 
-    bool AzimuthElevationSliders(dm::double3& direction, bool negative = false);
+    bool azimuthElevationSliders(dm::double3& direction, bool negative = false);
 }

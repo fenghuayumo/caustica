@@ -38,9 +38,9 @@ public:
     [[nodiscard]] bool isValid() const { return m_Value != Invalid; }
     [[nodiscard]] explicit operator bool() const { return isValid(); }
 
-    [[nodiscard]] uint32_t GetIndex() const { return uint32_t(m_Value & 0xFFFFFFFFFF); }
-    [[nodiscard]] uint16_t GetGeneration() const { return uint16_t(m_Value >> 40); }
-    [[nodiscard]] uint64_t GetValue() const { return m_Value; }
+    [[nodiscard]] uint32_t getIndex() const { return uint32_t(m_Value & 0xFFFFFFFFFF); }
+    [[nodiscard]] uint16_t getGeneration() const { return uint16_t(m_Value >> 40); }
+    [[nodiscard]] uint64_t getValue() const { return m_Value; }
 
     bool operator==(Handle other) const { return m_Value == other.m_Value; }
     bool operator!=(Handle other) const { return m_Value != other.m_Value; }
@@ -92,21 +92,21 @@ public:
     {
         if (!handle.isValid())
             return;
-        uint32_t index = handle.GetIndex();
+        uint32_t index = handle.getIndex();
         m_Generations[index].fetch_add(1, std::memory_order_release);
         uint32_t slot = m_FreeCount.fetch_add(1, std::memory_order_release);
         m_FreeList[slot] = index;
     }
 
     // Check if a handle is still valid (generation matches).
-    [[nodiscard]] bool IsHandleValid(HandleType handle) const
+    [[nodiscard]] bool isHandleValid(HandleType handle) const
     {
         if (!handle.isValid())
             return false;
-        uint32_t index = handle.GetIndex();
+        uint32_t index = handle.getIndex();
         if (index >= N)
             return false;
-        return m_Generations[index].load(std::memory_order_acquire) == handle.GetGeneration();
+        return m_Generations[index].load(std::memory_order_acquire) == handle.getGeneration();
     }
 
     [[nodiscard]] size_t Capacity() const { return N; }

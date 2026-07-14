@@ -68,7 +68,7 @@ void EditorPlugin::configureLateSchedules(App& app)
         auto* capture = ctx.tryRes<CaptureScriptState>();
         const auto& settings = m_sceneEditor.pathTracerSettings();
 
-        const bool captureActive = capture && capture->manager && capture->manager->IsDoingWork();
+        const bool captureActive = capture && capture->manager && capture->manager->isDoingWork();
         const bool editorRequestsRender = ui && ui->editor.RenderWhenOutOfFocus;
         const bool accumulationIncomplete = wr
             && !settings.RealtimeMode

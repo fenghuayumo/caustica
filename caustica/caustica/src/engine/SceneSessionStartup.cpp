@@ -53,7 +53,7 @@ void initializeSceneSession(App& app, const SceneSessionConfig& config)
     if (config.refreshEnvMapMediaList)
     {
         gpuRenderSubsystem->lightingPasses().refreshEnvironmentMapMediaList(
-            GetLocalPath(c_AssetsFolder), std::filesystem::path());
+            getLocalPath(c_AssetsFolder), std::filesystem::path());
     }
 
     if (config.sessionState && config.cmdLine && config.applyCmdLineToSessionState)
@@ -70,7 +70,7 @@ void registerSceneSessionStartup(App& app, const SceneSessionConfig& config)
 
 void registerGpuRenderShutdown(App& app)
 {
-    app.addSystem(AppSchedule::Shutdown, "GpuRender.Shutdown", [](SystemContext& ctx) {
+    app.addSystem(AppSchedule::shutdown, "GpuRender.shutdown", [](SystemContext& ctx) {
         if (auto* gpuRender = ctx.tryRes<GpuRenderSubsystem>())
             gpuRender->shutdown();
     });

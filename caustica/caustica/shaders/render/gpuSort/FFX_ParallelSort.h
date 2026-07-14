@@ -102,11 +102,11 @@
 	groupshared uint gs_FFX_PARALLELSORT_Histogram[FFX_PARALLELSORT_THREADGROUP_SIZE * FFX_PARALLELSORT_SORT_BIN_COUNT];
 	void FFX_ParallelSort_Count_uint(uint localID, uint groupID, FFX_ParallelSortCB CBuffer, uint ShiftBit, Buffer<uint> SrcBuffer, RWBuffer<uint> SumTable, Buffer<uint> SrcPayload)
 	{
-		// Start by clearing our local counts in LDS
+		// start by clearing our local counts in LDS
 		for (int i = 0; i < FFX_PARALLELSORT_SORT_BIN_COUNT; i++)
 			gs_FFX_PARALLELSORT_Histogram[(i * FFX_PARALLELSORT_THREADGROUP_SIZE) + localID] = 0;
 
-		// Wait for everyone to catch up
+		// wait for everyone to catch up
 		GroupMemoryBarrierWithGroupSync();
 
 		// Data is processed in blocks, and how many we process can changed based on how much data we are processing
@@ -192,7 +192,7 @@
 		if (WaveIsFirstLane())
 			gs_FFX_PARALLELSORT_LDSSums[waveID] = waveReduced;
 
-		// Wait for everyone to catch up
+		// wait for everyone to catch up
 		GroupMemoryBarrierWithGroupSync();
 
 		// First wave worth of threads sum up wave reductions
@@ -216,14 +216,14 @@
 		if (laneID == WaveGetLaneCount() - 1)
 			gs_FFX_PARALLELSORT_LDSSums[waveID] = wavePrefixed + localSum;
 
-		// Wait for everyone to catch up
+		// wait for everyone to catch up
 		GroupMemoryBarrierWithGroupSync();
 
 		// First wave prefixes partial sums
 		if (!waveID)
 			gs_FFX_PARALLELSORT_LDSSums[localID] = WavePrefixSum(gs_FFX_PARALLELSORT_LDSSums[localID]);
 
-		// Wait for everyone to catch up
+		// wait for everyone to catch up
 		GroupMemoryBarrierWithGroupSync();
 
 		// Add the partial sums back to each wave prefix
@@ -278,7 +278,7 @@
 			gs_FFX_PARALLELSORT_LDS[row][col] = (DataIndex < numValuesToScan) ? ScanSrc[BinOffset + DataIndex] : 0;
 		}
 
-		// Wait for everyone to catch up
+		// wait for everyone to catch up
 		GroupMemoryBarrierWithGroupSync();
 
 		uint threadgroupSum = 0;
@@ -306,7 +306,7 @@
 		for (i = 0; i < FFX_PARALLELSORT_ELEMENTS_PER_THREAD; i++)
 			gs_FFX_PARALLELSORT_LDS[i][localID] += threadgroupSum;
 
-		// Wait for everyone to catch up
+		// wait for everyone to catch up
 		GroupMemoryBarrierWithGroupSync();
 
 		// Perform coalesced writes to scan dst
@@ -335,7 +335,7 @@
 		if (localID < FFX_PARALLELSORT_SORT_BIN_COUNT)
 			gs_FFX_PARALLELSORT_BinOffsetCache[localID] = SumTable[localID * CBuffer.NumThreadGroups + groupID];
 
-		// Wait for everyone to catch up
+		// wait for everyone to catch up
 		GroupMemoryBarrierWithGroupSync();
 
 		// Data is processed in blocks, and how many we process can changed based on how much data we are processing
@@ -418,7 +418,7 @@
 					if (localID == (FFX_PARALLELSORT_THREADGROUP_SIZE - 1))
 						gs_FFX_PARALLELSORT_LDSScratch[0] = localSum + packedHistogram;
 
-					// Wait for everyone to catch up
+					// wait for everyone to catch up
 					GroupMemoryBarrierWithGroupSync();
 
 					// load the sums value for the thread group
@@ -438,7 +438,7 @@
 					GroupMemoryBarrierWithGroupSync();
 					localKey = gs_FFX_PARALLELSORT_LDSSums[localID];
 
-					// Wait for everyone to catch up
+					// wait for everyone to catch up
 					GroupMemoryBarrierWithGroupSync();
 
 //#ifdef kRS_ValueCopy
@@ -447,7 +447,7 @@
 					GroupMemoryBarrierWithGroupSync();
 					localValue = gs_FFX_PARALLELSORT_LDSSums[localID];
 
-					// Wait for everyone to catch up
+					// wait for everyone to catch up
 					GroupMemoryBarrierWithGroupSync();
 //#endif // kRS_ValueCopy
 				}
@@ -458,7 +458,7 @@
 				// Reconstruct histogram
 				InterlockedAdd(gs_FFX_PARALLELSORT_LocalHistogram[keyIndex], 1);
 
-				// Wait for everyone to catch up
+				// wait for everyone to catch up
 				GroupMemoryBarrierWithGroupSync();
 
 				// Prefix histogram
@@ -471,7 +471,7 @@
 				// Get the global offset for this key out of the cache
 				uint globalOffset = gs_FFX_PARALLELSORT_BinOffsetCache[keyIndex];
 
-				// Wait for everyone to catch up
+				// wait for everyone to catch up
 				GroupMemoryBarrierWithGroupSync();
 
 				// Get the local offset (at this point the keys are all in increasing order from 0 -> num bins in localID 0 -> thread group size)
@@ -489,7 +489,7 @@
 //#endif // kRS_ValueCopy
 				}
 
-				// Wait for everyone to catch up
+				// wait for everyone to catch up
 				GroupMemoryBarrierWithGroupSync();
 
 				// update the cached histogram for the next set of entries

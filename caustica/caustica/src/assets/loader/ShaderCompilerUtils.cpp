@@ -47,7 +47,7 @@ namespace ShaderCompilerUtils
         GraphicsAPI = device->getGraphicsAPI();
         
         std::string platformName = "x64"; // add "arm64" for ARM
-        const std::filesystem::path runtimeDirectory = GetRuntimeDirectory();
+        const std::filesystem::path runtimeDirectory = getRuntimeDirectory();
         const std::filesystem::path sourceRootDirectory = runtimeDirectory.parent_path();
         
     #if defined(_WIN32)
@@ -62,7 +62,7 @@ namespace ShaderCompilerUtils
             runtimeDirectory / "ShaderDynamic/Source/caustica/caustica/shaders";
 
         ShaderBinariesPath = runtimeDirectory / binarySubfolder / 
-            caustica::GetShaderTypeName(device->getGraphicsAPI());
+            caustica::getShaderTypeName(device->getGraphicsAPI());
 
         ShaderCompilerPath = std::filesystem::absolute(
             runtimeDirectory / "ShaderDynamic/Tools" / graphicsAPIName / platformName / dxcExecutableName);
@@ -308,14 +308,14 @@ namespace ShaderCompilerUtils
             for (int i = 0; i < 7; i++)
             {
                 // TODO: test with 'all' instead of the second %d - should work as well
-                command += StringFormat(" -fvk-s-shift %d %d", cBindingOffsets.sampler, i);
-                command += StringFormat(" -fvk-t-shift %d %d", cBindingOffsets.shaderResource, i);
-                command += StringFormat(" -fvk-b-shift %d %d", cBindingOffsets.constantBuffer, i);
-                command += StringFormat(" -fvk-u-shift %d %d", cBindingOffsets.unorderedAccess, i);
-                hashCommand += StringFormat(" -fvk-s-shift %d %d", cBindingOffsets.sampler, i);
-                hashCommand += StringFormat(" -fvk-t-shift %d %d", cBindingOffsets.shaderResource, i);
-                hashCommand += StringFormat(" -fvk-b-shift %d %d", cBindingOffsets.constantBuffer, i);
-                hashCommand += StringFormat(" -fvk-u-shift %d %d", cBindingOffsets.unorderedAccess, i);
+                command += stringFormat(" -fvk-s-shift %d %d", cBindingOffsets.sampler, i);
+                command += stringFormat(" -fvk-t-shift %d %d", cBindingOffsets.shaderResource, i);
+                command += stringFormat(" -fvk-b-shift %d %d", cBindingOffsets.constantBuffer, i);
+                command += stringFormat(" -fvk-u-shift %d %d", cBindingOffsets.unorderedAccess, i);
+                hashCommand += stringFormat(" -fvk-s-shift %d %d", cBindingOffsets.sampler, i);
+                hashCommand += stringFormat(" -fvk-t-shift %d %d", cBindingOffsets.shaderResource, i);
+                hashCommand += stringFormat(" -fvk-b-shift %d %d", cBindingOffsets.constantBuffer, i);
+                hashCommand += stringFormat(" -fvk-u-shift %d %d", cBindingOffsets.unorderedAccess, i);
             }
         }
         
@@ -356,7 +356,7 @@ namespace ShaderCompilerUtils
         const std::filesystem::path& compiledFile,
         std::filesystem::file_time_type lastSourceModified)
     {
-        auto lastModifiedTime = GetFileModifiedTime(compiledFile);
+        auto lastModifiedTime = getFileModifiedTime(compiledFile);
         return lastModifiedTime.has_value() && (*lastModifiedTime) >= lastSourceModified;
     }
 

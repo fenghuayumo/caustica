@@ -8,7 +8,7 @@ namespace caustica
 
 // Parse -d3d11/-dx11, -d3d12/-dx12, -vk/-vulkan flags from argv.
 // Returns the detected API, or a build-time default.
-inline nvrhi::GraphicsAPI GetGraphicsAPIFromCommandLine(int argc, const char* const* argv)
+inline nvrhi::GraphicsAPI getGraphicsAPIFromCommandLine(int argc, const char* const* argv)
 {
     for (int n = 1; n < argc; n++)
     {
@@ -37,6 +37,6 @@ inline nvrhi::GraphicsAPI GetGraphicsAPIFromCommandLine(int argc, const char* co
 }
 
 // Extended parser that also accepts --backend= / --api= style overrides.
-nvrhi::GraphicsAPI ResolveGraphicsAPIFromCommandLine(int argc, const char* const* argv);
+nvrhi::GraphicsAPI resolveGraphicsAPIFromCommandLine(int argc, const char* const* argv);
 
 } // namespace caustica

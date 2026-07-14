@@ -222,9 +222,9 @@ bool CameraController::setFromPosDirUpString(const std::string& val)
     bool ok = true;
     dm::float3 worldPos, worldDir, worldUp;
     std::string temp = val;
-    ok &= ParseFloat3Consume(temp, worldPos);
-    ok &= ParseFloat3Consume(temp, worldDir);
-    ok &= ParseFloat3Consume(temp, worldUp);
+    ok &= parseFloat3Consume(temp, worldPos);
+    ok &= parseFloat3Consume(temp, worldDir);
+    ok &= parseFloat3Consume(temp, worldUp);
     if (ok)
         m_camera.lookAt(worldPos, worldPos + worldDir, worldUp);
     return ok;

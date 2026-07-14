@@ -19,8 +19,8 @@
 //   JobSystem::Context ctx;
 //   JobSystem::execute(ctx, [] { ... });
 //   JobSystem::dispatch(ctx, 100, 10, [](JobDispatchArgs args) { ... });
-//   JobSystem::Wait(ctx);
-//   JobSystem::Shutdown();             // once at app exit
+//   JobSystem::wait(ctx);
+//   JobSystem::shutdown();             // once at app exit
 // =============================================================================
 
 struct JobDispatchArgs
@@ -42,10 +42,10 @@ namespace JobSystem
 void Initialize(uint32_t numThreads = 0, uint32_t reservedThreads = 1);
 
 // Shuts down all threads. Waits for outstanding work.
-void Shutdown();
+void shutdown();
 
 // Returns the number of worker threads.
-uint32_t GetThreadCount();
+uint32_t getThreadCount();
 
 // ==========================================================================
 // Context — tracks a group of submitted jobs for waiting.
@@ -66,13 +66,13 @@ void dispatch(Context& ctx, uint32_t jobCount, uint32_t groupSize,
               std::function<void(JobDispatchArgs)> task);
 
 // Returns the number of groups for a given jobCount and groupSize.
-uint32_t GetGroupCount(uint32_t jobCount, uint32_t groupSize);
+uint32_t getGroupCount(uint32_t jobCount, uint32_t groupSize);
 
 // Returns true if any jobs in this context are still running.
-bool IsBusy(const Context& ctx);
+bool isBusy(const Context& ctx);
 
 // Block until all jobs submitted to this context have completed.
-void Wait(const Context& ctx);
+void wait(const Context& ctx);
 
 // ==========================================================================
 // Convenience: parallel-for over a range.

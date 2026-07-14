@@ -66,7 +66,7 @@ namespace
             return std::filesystem::path(info.dli_fname).parent_path();
 #endif
 
-        return caustica::GetDirectoryWithExecutable();
+        return caustica::getDirectoryWithExecutable();
     }
 
     std::filesystem::path ResolveRuntimeDirectory()
@@ -75,7 +75,7 @@ namespace
         if (std::filesystem::exists(moduleDirectory / "ShaderPrecompiled"))
             return moduleDirectory;
 
-        std::filesystem::path executableDirectory = caustica::GetDirectoryWithExecutable();
+        std::filesystem::path executableDirectory = caustica::getDirectoryWithExecutable();
         if (std::filesystem::exists(executableDirectory / "ShaderPrecompiled"))
             return executableDirectory;
 
@@ -91,7 +91,7 @@ namespace
         if (std::filesystem::exists(parentDirectory / c_AssetsFolder))
             return parentDirectory;
 
-        return caustica::GetDirectoryWithExecutable();
+        return caustica::getDirectoryWithExecutable();
     }
 
     std::string TrimCopy(const std::string& value)
@@ -199,7 +199,7 @@ namespace
         settings["startingCamera"] = -1;
         root["graph"].append(settings);
 
-        return caustica::json::ToString(root);
+        return caustica::json::toString(root);
     }
 
     std::string PrepareSceneArgument(const std::string& sceneArgument)
@@ -323,10 +323,10 @@ RenderSession::RenderSession(const Config& cfg)
 
     if (cfg.nonInteractive)
     {
-        caustica::EnableOutputToMessageBox(false);
-        caustica::EnableOutputToConsole(true);
-        caustica::SetMinSeverity(caustica::Severity::Warning);
-        HelpersSetNonInteractive();
+        caustica::enableOutputToMessageBox(false);
+        caustica::enableOutputToConsole(true);
+        caustica::setMinSeverity(caustica::Severity::Warning);
+        helpersSetNonInteractive();
     }
 
 #if CAUSTICA_WITH_DX12 && defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
@@ -365,7 +365,7 @@ RenderSession::RenderSession(const Config& cfg)
     m_engine->renderSessionState().settings.AccumulationTarget = cfg.accumulationTarget;
 
     m_engine->app().beforePresent = [this](caustica::GpuDevice& manager, uint32_t) {
-        m_lastRenderedBackBufferIndex = manager.GetCurrentBackBufferIndex();
+        m_lastRenderedBackBufferIndex = manager.getCurrentBackBufferIndex();
     };
 
     m_initialized = true;
@@ -376,10 +376,10 @@ RenderSession::RenderSession(const Config& cfg)
 
 RenderSession::~RenderSession()
 {
-    Shutdown();
+    shutdown();
 }
 
-void RenderSession::Shutdown()
+void RenderSession::shutdown()
 {
     if (m_engine)
         m_engine->shutdown();
@@ -443,7 +443,7 @@ bool RenderSession::Step(float dt)
         }
     }
 
-    GLFWwindow* window = device->GetWindow();
+    GLFWwindow* window = device->getWindow();
     return !window || !glfwWindowShouldClose(window);
 }
 
@@ -500,9 +500,9 @@ bool RenderSession::SaveScreenshot(const std::string& outputPath)
     {
         uint32_t backBufferIndex = m_lastRenderedBackBufferIndex;
         if (backBufferIndex == UINT32_MAX)
-            backBufferIndex = device->GetCurrentBackBufferIndex();
+            backBufferIndex = device->getCurrentBackBufferIndex();
 
-        tex = device->GetBackBuffer(backBufferIndex);
+        tex = device->getBackBuffer(backBufferIndex);
         state = m_config.headless
             ? nvrhi::ResourceStates::RenderTarget
             : nvrhi::ResourceStates::Present;
@@ -523,7 +523,7 @@ bool RenderSession::SaveScreenshot(const std::string& outputPath)
         return false;
     }
 
-    // saveTextureToFile creates its own command list. Wait for the last rendered
+    // saveTextureToFile creates its own command list. wait for the last rendered
     // frame to finish so LdrColor is not still in use by an in-flight submit.
     if (!device->getDevice()->waitForIdle())
     {
@@ -533,7 +533,7 @@ bool RenderSession::SaveScreenshot(const std::string& outputPath)
 
     std::filesystem::path p(outputPath);
     if (p.has_parent_path())
-        EnsureDirectoryExists(p.parent_path());
+        ensureDirectoryExists(p.parent_path());
 
     return caustica::saveTextureToFile(
         device->getDevice(),

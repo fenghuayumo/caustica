@@ -41,7 +41,7 @@ std::filesystem::path GetCurrentModuleDirectory()
     if (dladdr(reinterpret_cast<void*>(&GetCurrentModuleDirectory), &info) && info.dli_fname)
         return std::filesystem::path(info.dli_fname).parent_path();
 #endif
-    return GetDirectoryWithExecutable();
+    return getDirectoryWithExecutable();
 }
 
 std::filesystem::path ResolveDefaultRuntimeDirectory()
@@ -50,7 +50,7 @@ std::filesystem::path ResolveDefaultRuntimeDirectory()
     if (std::filesystem::exists(moduleDirectory / "ShaderPrecompiled"))
         return moduleDirectory;
 
-    const std::filesystem::path executableDirectory = GetDirectoryWithExecutable();
+    const std::filesystem::path executableDirectory = getDirectoryWithExecutable();
     if (std::filesystem::exists(executableDirectory / "ShaderPrecompiled"))
         return executableDirectory;
 
@@ -66,7 +66,7 @@ std::filesystem::path ResolveDefaultResourceRoot(const std::filesystem::path& ru
     if (std::filesystem::exists(parentDirectory / c_AssetsFolder))
         return parentDirectory;
 
-    return GetDirectoryWithExecutable();
+    return getDirectoryWithExecutable();
 }
 
 nvrhi::GraphicsAPI ResolveGraphicsApi(const EngineAppDesc& desc)
@@ -113,8 +113,8 @@ bool EngineApp::initialize(EngineAppDesc desc)
         ? ResolveDefaultResourceRoot(runtimeDirectory)
         : m_desc.resourceRoot;
 
-    SetRuntimeDirectoryOverride(runtimeDirectory);
-    SetLocalPathBaseOverride(resourceRoot);
+    setRuntimeDirectoryOverride(runtimeDirectory);
+    setLocalPathBaseOverride(resourceRoot);
 
     m_cmdLine.width = m_desc.width;
     m_cmdLine.height = m_desc.height;
@@ -147,7 +147,7 @@ bool EngineApp::initialize(EngineAppDesc desc)
         createDesc.d3d12DeviceFactory = m_desc.d3d12DeviceFactory;
 #endif
 
-        GpuDeviceCreateResult graphicsResult = GpuDevice::CreateInitialized(createDesc);
+        GpuDeviceCreateResult graphicsResult = GpuDevice::createInitialized(createDesc);
         if (!graphicsResult.gpuDevice)
         {
             error("EngineApp: failed to create GPU device");
@@ -161,7 +161,7 @@ bool EngineApp::initialize(EngineAppDesc desc)
         m_ownsDevice = true;
     }
 
-    m_viewState.progressLoading.Start("Initializing...");
+    m_viewState.progressLoading.start("Initializing...");
     m_viewState.progressLoading.Set(50);
 
     const std::string preferredScene = m_desc.scene.empty() ? std::string("default.json") : m_desc.scene;
@@ -224,8 +224,8 @@ void EngineApp::shutdown()
 
     if (m_ownsDevice && m_ownedDevice)
     {
-        m_ownedDevice->ReleaseWindowOwnership();
-        m_ownedDevice->Shutdown();
+        m_ownedDevice->releaseWindowOwnership();
+        m_ownedDevice->shutdown();
         m_ownedDevice.reset();
     }
 
@@ -330,7 +330,7 @@ nvrhi::ITexture* EngineApp::ldrColorTexture() const
 
 uint32_t EngineApp::frameIndex() const
 {
-    return m_device ? m_device->GetFrameIndex() : 0;
+    return m_device ? m_device->getFrameIndex() : 0;
 }
 
 } // namespace caustica

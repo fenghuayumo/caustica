@@ -22,13 +22,13 @@ using nvrhi::RefCountPtr;
 
 using namespace caustica;
 
-static bool IsNvDeviceID(UINT id)
+static bool isNvDeviceID(UINT id)
 {
     return id == 0x10DE;
 }
 
 // Adjust window rect so that it is centred on the given adapter.  Clamps to fit if it's too big.
-static bool MoveWindowOntoAdapter(IDXGIAdapter* targetAdapter, RECT& rect)
+static bool moveWindowOntoAdapter(IDXGIAdapter* targetAdapter, RECT& rect)
 {
     assert(targetAdapter != NULL);
 
@@ -72,7 +72,7 @@ bool GpuDevice_DX11::beginFrame()
     {
         if (m_SwapChainDesc.Windowed != newSwapChainDesc.Windowed)
         {
-            BackBufferResizing();
+            backBufferResizing();
 
             m_SwapChainDesc = newSwapChainDesc;
             m_DeviceParams.backBufferWidth = newSwapChainDesc.BufferDesc.Width;
@@ -81,14 +81,14 @@ bool GpuDevice_DX11::beginFrame()
             if (newSwapChainDesc.Windowed)
                 glfwSetWindowMonitor(m_Window, nullptr, 50, 50, newSwapChainDesc.BufferDesc.Width, newSwapChainDesc.BufferDesc.Height, 0);
 
-            ResizeSwapChain();
-            BackBufferResized();
+            resizeSwapChain();
+            backBufferResized();
         }
     }
     return true;
 }
 
-void GpuDevice_DX11::ReportLiveObjects()
+void GpuDevice_DX11::reportLiveObjects()
 {
     nvrhi::RefCountPtr<IDXGIDebug> pDebug;
     DXGIGetDebugInterface1(0, IID_PPV_ARGS(&pDebug));
@@ -97,10 +97,10 @@ void GpuDevice_DX11::ReportLiveObjects()
         pDebug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_DETAIL);
 }
 
-bool GpuDevice_DX11::CreateInstanceInternal()
+bool GpuDevice_DX11::createInstanceInternal()
 {
 #if CAUSTICA_WITH_STREAMLINE
-    StreamlineIntegration::Get().InitializePreDevice(nvrhi::GraphicsAPI::D3D11, m_DeviceParams.streamlineAppId, m_DeviceParams.checkStreamlineSignature, m_DeviceParams.enableStreamlineLog);
+    StreamlineIntegration::Get().initializePreDevice(nvrhi::GraphicsAPI::D3D11, m_DeviceParams.streamlineAppId, m_DeviceParams.checkStreamlineSignature, m_DeviceParams.enableStreamlineLog);
 #endif
 
     if (!m_DxgiFactory)
@@ -117,7 +117,7 @@ bool GpuDevice_DX11::CreateInstanceInternal()
     return true;
 }
 
-bool GpuDevice_DX11::EnumerateAdapters(std::vector<AdapterInfo>& outAdapters)
+bool GpuDevice_DX11::enumerateAdapters(std::vector<AdapterInfo>& outAdapters)
 {
     if (!m_DxgiFactory)
         return false;
@@ -138,7 +138,7 @@ bool GpuDevice_DX11::EnumerateAdapters(std::vector<AdapterInfo>& outAdapters)
 
         AdapterInfo adapterInfo;
         
-        adapterInfo.name = GetAdapterName(desc);
+        adapterInfo.name = getAdapterName(desc);
         adapterInfo.dxgiAdapter = adapter;
         adapterInfo.vendorID = desc.VendorId;
         adapterInfo.deviceID = desc.DeviceId;
@@ -153,14 +153,14 @@ bool GpuDevice_DX11::EnumerateAdapters(std::vector<AdapterInfo>& outAdapters)
     }
 }
 
-bool GpuDevice_DX11::CreateDevice()
+bool GpuDevice_DX11::createDevice()
 {
     int adapterIndex = m_DeviceParams.adapterIndex;
 
 #if CAUSTICA_WITH_STREAMLINE
     // Auto select best adapter for streamline features
     if (adapterIndex < 0)
-        adapterIndex = StreamlineIntegration::Get().FindBestAdapterDX();
+        adapterIndex = StreamlineIntegration::Get().findBestAdapterDX();
 #endif
     if (adapterIndex < 0)
         adapterIndex = 0;
@@ -178,8 +178,8 @@ bool GpuDevice_DX11::CreateDevice()
     
     m_DxgiAdapter->GetDesc(&aDesc);
 
-    m_RendererString = GetAdapterName(aDesc);
-    m_IsNvidia = IsNvDeviceID(aDesc.VendorId);
+    m_RendererString = getAdapterName(aDesc);
+    m_IsNvidia = isNvDeviceID(aDesc.VendorId);
 
     UINT createFlags = 0;
     if (m_DeviceParams.enableDebugRuntime)
@@ -203,7 +203,7 @@ bool GpuDevice_DX11::CreateDevice()
         return false;
     }
 #if CAUSTICA_WITH_STREAMLINE
-    StreamlineIntegration::Get().SetD3DDevice(m_Device);
+    StreamlineIntegration::Get().setD3DDevice(m_Device);
 #endif
 
     nvrhi::d3d11::DeviceDesc deviceDesc;
@@ -224,13 +224,13 @@ bool GpuDevice_DX11::CreateDevice()
     AdapterInfo::LUID luid;
     static_assert(luid.size() == sizeof(aDesc.AdapterLuid));
     memcpy(luid.data(), &aDesc.AdapterLuid, luid.size());
-    StreamlineIntegration::Get().InitializeDeviceDX(m_NvrhiDevice, &luid);
+    StreamlineIntegration::Get().initializeDeviceDX(m_NvrhiDevice, &luid);
 #endif
 
     return true;
 }
 
-bool GpuDevice_DX11::CreateSwapChain()
+bool GpuDevice_DX11::createSwapChain()
 {
     UINT windowStyle = m_DeviceParams.startFullscreen
         ? (WS_POPUP | WS_SYSMENU | WS_VISIBLE)
@@ -241,7 +241,7 @@ bool GpuDevice_DX11::CreateSwapChain()
     RECT rect = { 0, 0, LONG(m_DeviceParams.backBufferWidth), LONG(m_DeviceParams.backBufferHeight) };
     AdjustWindowRect(&rect, windowStyle, FALSE);
     
-    if (MoveWindowOntoAdapter(m_DxgiAdapter, rect))
+    if (moveWindowOntoAdapter(m_DxgiAdapter, rect))
     {
         glfwSetWindowPos(m_Window, rect.left, rect.top);
     }
@@ -283,7 +283,7 @@ bool GpuDevice_DX11::CreateSwapChain()
         break;
     }
     
-    HRESULT hr = m_DxgiFactory->CreateSwapChain(m_Device, &m_SwapChainDesc, &m_SwapChain);
+    HRESULT hr = m_DxgiFactory->createSwapChain(m_Device, &m_SwapChainDesc, &m_SwapChain);
     
     if(FAILED(hr))
     {
@@ -291,7 +291,7 @@ bool GpuDevice_DX11::CreateSwapChain()
         return false;
     }
 
-    bool ret = CreateRenderTarget();
+    bool ret = createRenderTarget();
 
     if(!ret)
     {
@@ -301,7 +301,7 @@ bool GpuDevice_DX11::CreateSwapChain()
     return true;
 }
 
-void GpuDevice_DX11::DestroyDeviceAndSwapChain()
+void GpuDevice_DX11::destroyDeviceAndSwapChain()
 {
     m_RhiBackBuffer = nullptr;
     m_NvrhiDevice = nullptr;
@@ -312,16 +312,16 @@ void GpuDevice_DX11::DestroyDeviceAndSwapChain()
         m_SwapChain->SetFullscreenState(false, nullptr);
     }
 
-    ReleaseRenderTarget();
+    releaseRenderTarget();
 
     m_SwapChain = nullptr;
     m_ImmediateContext = nullptr;
     m_Device = nullptr;
 }
 
-bool GpuDevice_DX11::CreateRenderTarget()
+bool GpuDevice_DX11::createRenderTarget()
 {
-    ReleaseRenderTarget();
+    releaseRenderTarget();
 
     const HRESULT hr = m_SwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&m_D3D11BackBuffer);  // NOLINT(clang-diagnostic-language-extension-token)
     if (FAILED(hr))
@@ -349,15 +349,15 @@ bool GpuDevice_DX11::CreateRenderTarget()
     return true;
 }
 
-void GpuDevice_DX11::ReleaseRenderTarget()
+void GpuDevice_DX11::releaseRenderTarget()
 {
     m_RhiBackBuffer = nullptr;
     m_D3D11BackBuffer = nullptr;
 }
 
-void GpuDevice_DX11::ResizeSwapChain()
+void GpuDevice_DX11::resizeSwapChain()
 {
-    ReleaseRenderTarget();
+    releaseRenderTarget();
 
     if (!m_SwapChain)
         return;
@@ -373,35 +373,35 @@ void GpuDevice_DX11::ResizeSwapChain()
         caustica::fatal("ResizeBuffers failed");
     }
 
-    const bool ret = CreateRenderTarget();
+    const bool ret = createRenderTarget();
     if (!ret)
     {
-        caustica::fatal("CreateRenderTarget failed");
+        caustica::fatal("createRenderTarget failed");
     }
 }
 
-void GpuDevice_DX11::Shutdown()
+void GpuDevice_DX11::shutdown()
 {
-    GpuDevice::Shutdown();
+    GpuDevice::shutdown();
 
     if (m_DeviceParams.enableDebugRuntime)
     {
-        ReportLiveObjects();
+        reportLiveObjects();
     }
 }
 
-bool GpuDevice_DX11::QueryVideoMemoryInfo(caustica::VideoMemoryInfo& out) const
+bool GpuDevice_DX11::queryVideoMemoryInfo(caustica::VideoMemoryInfo& out) const
 {
-    return caustica::QueryDxgiAdapterVideoMemory(m_DxgiAdapter, out);
+    return caustica::queryDxgiAdapterVideoMemory(m_DxgiAdapter, out);
 }
 
-bool GpuDevice_DX11::Present()
+bool GpuDevice_DX11::present()
 {
     HRESULT result = m_SwapChain->Present(m_DeviceParams.vsyncEnabled ? 1 : 0, 0);
     return SUCCEEDED(result);
 }
 
-GpuDevice *GpuDevice::CreateD3D11()
+GpuDevice *GpuDevice::createD3D11()
 {
     return new GpuDevice_DX11();
 }

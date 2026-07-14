@@ -64,7 +64,7 @@ SplashScreen::SplashScreen()
 
 SplashScreen::~SplashScreen()
 {
-    Stop();
+    stop();
     delete m_state;
     m_state = nullptr;
 }
@@ -132,9 +132,9 @@ static std::wstring FindSplashPngPath(const std::wstring& pngName)
 }
 
 
-bool SplashScreen::Start(const std::wstring& pngName)
+bool SplashScreen::start(const std::wstring& pngName)
 {
-    Stop();
+    stop();
 
     auto& s = m_state->s;
     s.pngPath = FindSplashPngPath(pngName);
@@ -152,7 +152,7 @@ bool SplashScreen::Start(const std::wstring& pngName)
         return false;
     }
 
-    // Wait until the splash thread has created the window (or decided it can't).
+    // wait until the splash thread has created the window (or decided it can't).
     WaitForSingleObject(s.readyEvent, INFINITE);
     CloseHandle(s.readyEvent);
     s.readyEvent = nullptr;
@@ -160,7 +160,7 @@ bool SplashScreen::Start(const std::wstring& pngName)
     return true;
 }
 
-void SplashScreen::Stop()
+void SplashScreen::stop()
 {
     auto& s = m_state->s;
 
@@ -228,7 +228,7 @@ DWORD WINAPI SplashScreen::ThreadProc(void* param)
         SetForegroundWindow(hwnd);
         UpdateWindow(hwnd);
 
-        SetLayeredWindowBitmap(hwnd, bgra.data(), w, h);
+        setLayeredWindowBitmap(hwnd, bgra.data(), w, h);
     }
     else
     {
@@ -364,7 +364,7 @@ bool SplashScreen::LoadPngWic_BGRA32(const wchar_t* path, std::vector<uint8_t>& 
     return SUCCEEDED(hr);
 }
 
-void SplashScreen::CenterOnPrimaryMonitorPx(UINT wPx, UINT hPx, int& outX, int& outY)
+void SplashScreen::centerOnPrimaryMonitorPx(UINT wPx, UINT hPx, int& outX, int& outY)
 {
     // With thread DPI set to PerMonitorV2, these monitor rects are in physical pixels.
     POINT pt = { 0, 0 };
@@ -382,7 +382,7 @@ void SplashScreen::CenterOnPrimaryMonitorPx(UINT wPx, UINT hPx, int& outX, int& 
     outY = rc.top + (monH - (int)hPx) / 2;
 }
 
-void SplashScreen::SetLayeredWindowBitmap(HWND hwnd, const uint8_t* bgraPremul, UINT w, UINT h)
+void SplashScreen::setLayeredWindowBitmap(HWND hwnd, const uint8_t* bgraPremul, UINT w, UINT h)
 {
     HDC screenDC = GetDC(nullptr);
     HDC memDC = CreateCompatibleDC(screenDC);
@@ -403,7 +403,7 @@ void SplashScreen::SetLayeredWindowBitmap(HWND hwnd, const uint8_t* bgraPremul, 
 
     int x = 0;
     int y = 0;
-    CenterOnPrimaryMonitorPx(w, h, x, y);
+    centerOnPrimaryMonitorPx(w, h, x, y);
 
     POINT ptDst = { x, y };
     SIZE  szDst = { (LONG)w, (LONG)h };

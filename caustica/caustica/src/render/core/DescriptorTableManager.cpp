@@ -24,7 +24,7 @@ caustica::DescriptorHandle::~DescriptorHandle()
     }
 }
 
-caustica::DescriptorIndex caustica::DescriptorHandle::GetIndexInHeap() const
+caustica::DescriptorIndex caustica::DescriptorHandle::getIndexInHeap() const
 {
     if (m_DescriptorIndex >= 0)
     {

@@ -9,9 +9,9 @@ namespace caustica::dx12
 namespace
 {
 
-std::string GetAgilitySdkPath()
+std::string getAgilitySdkPath()
 {
-    std::string sdkPath = (GetRuntimeDirectory() / "D3D12").string();
+    std::string sdkPath = (getRuntimeDirectory() / "D3D12").string();
     if (!sdkPath.empty() && sdkPath.back() != '\\' && sdkPath.back() != '/')
         sdkPath += "\\";
     return sdkPath;
@@ -19,7 +19,7 @@ std::string GetAgilitySdkPath()
 
 } // namespace
 
-bool EnableExperimentalShaderModels(ID3D12DeviceFactory* factory)
+bool enableExperimentalShaderModels(ID3D12DeviceFactory* factory)
 {
     static const UUID D3D12ExperimentalShaderModels = {
         0x76f5573e, 0xf13a, 0x40f5, {0xb2, 0x97, 0x81, 0xce, 0x9e, 0x18, 0x93, 0x3f}
@@ -41,10 +41,10 @@ bool EnableExperimentalShaderModels(ID3D12DeviceFactory* factory)
     return true;
 }
 
-AgilityBootstrapResult BootstrapAgilitySdk()
+AgilityBootstrapResult bootstrapAgilitySdk()
 {
     AgilityBootstrapResult result;
-    const std::string sdkPath = GetAgilitySdkPath();
+    const std::string sdkPath = getAgilitySdkPath();
 
     Microsoft::WRL::ComPtr<ID3D12SDKConfiguration1> sdkConfig1;
     HRESULT hr = D3D12GetInterface(CLSID_D3D12SDKConfiguration, IID_PPV_ARGS(&sdkConfig1));
@@ -58,7 +58,7 @@ AgilityBootstrapResult BootstrapAgilitySdk()
 
         if (SUCCEEDED(hr) && factory)
         {
-            EnableExperimentalShaderModels(factory.Get());
+            enableExperimentalShaderModels(factory.Get());
             result.deviceFactory = std::move(factory);
             return result;
         }
@@ -97,7 +97,7 @@ AgilityBootstrapResult BootstrapAgilitySdk()
         return result;
     }
 
-    EnableExperimentalShaderModels(nullptr);
+    enableExperimentalShaderModels(nullptr);
     return result;
 }
 

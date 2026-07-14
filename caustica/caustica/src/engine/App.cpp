@@ -160,7 +160,7 @@ void App::registerDefaultSchedules()
 #if CAUSTICA_WITH_STREAMLINE
     addSystem(AppSchedule::First, "StreamlineSimStart", [](SystemContext& ctx) {
         if (ctx.gpuDevice && !ctx.gpuDevice->m_DeviceParams.headlessDevice)
-            StreamlineIntegration::Get().SimStart(*ctx.gpuDevice);
+            StreamlineIntegration::Get().simStart(*ctx.gpuDevice);
     });
 #endif
 
@@ -189,7 +189,7 @@ void App::registerDefaultSchedules()
 
     addSystem(AppSchedule::Extract, "SetRenderFrameIndex", [](SystemContext& ctx) {
         if (ctx.gpuDevice)
-            ctx.gpuDevice->SetPreparedRenderFrameIndex(ctx.frameIndex);
+            ctx.gpuDevice->setPreparedRenderFrameIndex(ctx.frameIndex);
     });
 
     m_defaultSchedulesRegistered = true;
@@ -222,7 +222,7 @@ void App::ensurePostUpdateTail()
 
 #if CAUSTICA_WITH_STREAMLINE
         if (ctx.runRender && !ctx.gpuDevice->m_DeviceParams.headlessDevice)
-            StreamlineIntegration::Get().SimEnd(*ctx.gpuDevice);
+            StreamlineIntegration::Get().simEnd(*ctx.gpuDevice);
 #endif
         if (ctx.app.afterAnimate)
             ctx.app.afterAnimate(*ctx.gpuDevice, ctx.frameIndex);
@@ -248,7 +248,7 @@ void App::runStartupSchedules()
 
 bool App::initializeGraphics(const GpuDeviceCreateDesc& desc)
 {
-    GpuDeviceCreateResult result = GpuDevice::CreateInitialized(desc);
+    GpuDeviceCreateResult result = GpuDevice::createInitialized(desc);
     if (!result.gpuDevice)
         return false;
 
@@ -263,9 +263,9 @@ bool App::initializeGraphics(const GpuDeviceCreateDesc& desc)
 
 bool App::initializeGraphics(int argc, const char* const* argv, GpuDeviceCreateDesc& desc)
 {
-    InvokePreGpuDeviceInitHook();
+    invokePreGpuDeviceInitHook();
 
-    desc.api = ResolveGraphicsAPIFromCommandLine(argc, argv);
+    desc.api = resolveGraphicsAPIFromCommandLine(argc, argv);
     if (desc.headless)
         desc.vsyncEnabled = false;
 
@@ -301,7 +301,7 @@ void App::syncSwapChain()
     if (!gpuDevice || !gpuDevice->getDevice())
         return;
 
-    const BackBufferInfo backBuffer = gpuDevice->GetBackBufferInfo();
+    const BackBufferInfo backBuffer = gpuDevice->getBackBufferInfo();
     notifyBackBufferResizing();
     notifyBackBufferResized(backBuffer.width, backBuffer.height, backBuffer.sampleCount);
 }
@@ -323,7 +323,7 @@ void App::shutdown()
             isWindowFocused(),
             isWindowVisible(),
         };
-        runSchedule(AppSchedule::Shutdown, context);
+        runSchedule(AppSchedule::shutdown, context);
     }
 
     m_renderThread.stop();
@@ -342,9 +342,9 @@ void App::shutdown()
 
     if (m_GpuDevice)
     {
-        m_GpuDevice->ReleaseWindowOwnership();
+        m_GpuDevice->releaseWindowOwnership();
         m_Window.reset();
-        m_GpuDevice->Shutdown();
+        m_GpuDevice->shutdown();
         m_GpuDevice.reset();
     }
 
@@ -472,9 +472,9 @@ void App::updateWindowSize()
         return;
 
     if (m_useDedicatedRenderThread && m_renderThread.isRunning())
-        m_renderThread.dispatchAndWait([gpuDevice]() { gpuDevice->UpdateWindowSize(); });
+        m_renderThread.dispatchAndWait([gpuDevice]() { gpuDevice->updateWindowSize(); });
     else
-        gpuDevice->UpdateWindowSize();
+        gpuDevice->updateWindowSize();
 }
 
 void App::animate(double elapsedTime, bool windowIsFocused)
@@ -502,7 +502,7 @@ void App::onRender()
     if (!gpuDevice || skipRenderPhase())
         return;
 
-    runGpuRenderSchedules(*gpuDevice, gpuDevice->GetRenderPhaseFrameIndex());
+    runGpuRenderSchedules(*gpuDevice, gpuDevice->getRenderPhaseFrameIndex());
 }
 
 void App::runGpuRenderSchedules(GpuDevice& gpuDevice, uint32_t frameIndex)
@@ -548,7 +548,7 @@ bool App::shouldRenderWhenUnfocused() const
 
 void App::finishFrameWithRenderFailure(GpuDevice* gpuDevice, double elapsedTime, double curTime)
 {
-    gpuDevice->UpdateAverageFrameTime(elapsedTime);
+    gpuDevice->updateAverageFrameTime(elapsedTime);
     gpuDevice->m_PreviousFrameTimestamp = curTime;
     ++gpuDevice->m_FrameIndex;
 }
@@ -635,7 +635,7 @@ void App::finalizeFrameTiming(GpuDevice& gpuDevice, double elapsedTime, double c
 {
     std::this_thread::sleep_for(std::chrono::milliseconds(0));
     gpuDevice.getDevice()->runGarbageCollection();
-    gpuDevice.UpdateAverageFrameTime(elapsedTime);
+    gpuDevice.updateAverageFrameTime(elapsedTime);
     gpuDevice.m_PreviousFrameTimestamp = curTime;
     ++gpuDevice.m_FrameIndex;
 }
@@ -645,7 +645,7 @@ bool App::executeRenderPhase(GpuDevice* gpuDevice, double elapsedTime, double cu
     if (frameIndex == 0 && gpuDevice->m_SkipRenderOnFirstFrame)
         return true;
 
-    gpuDevice->SetRenderPhaseFrameIndex(frameIndex);
+    gpuDevice->setRenderPhaseFrameIndex(frameIndex);
 
     if (!gpuDevice->beginFrame())
         return true;
@@ -655,7 +655,7 @@ bool App::executeRenderPhase(GpuDevice* gpuDevice, double elapsedTime, double cu
         --fi;
 #if CAUSTICA_WITH_STREAMLINE
     if (!gpuDevice->m_DeviceParams.headlessDevice)
-        StreamlineIntegration::Get().RenderStart(*gpuDevice);
+        StreamlineIntegration::Get().renderStart(*gpuDevice);
 #endif
     if (beforeRender)
         beforeRender(*gpuDevice, fi);
@@ -665,18 +665,18 @@ bool App::executeRenderPhase(GpuDevice* gpuDevice, double elapsedTime, double cu
 #if CAUSTICA_WITH_STREAMLINE
     if (!gpuDevice->m_DeviceParams.headlessDevice)
     {
-        StreamlineIntegration::Get().RenderEnd(*gpuDevice);
-        StreamlineIntegration::Get().PresentStart(*gpuDevice);
+        StreamlineIntegration::Get().renderEnd(*gpuDevice);
+        StreamlineIntegration::Get().presentStart(*gpuDevice);
     }
 #endif
     if (beforePresent)
         beforePresent(*gpuDevice, fi);
-    const bool ok = gpuDevice->Present();
+    const bool ok = gpuDevice->present();
     if (afterPresent)
         afterPresent(*gpuDevice, fi);
 #if CAUSTICA_WITH_STREAMLINE
     if (!gpuDevice->m_DeviceParams.headlessDevice)
-        StreamlineIntegration::Get().PresentEnd(*gpuDevice);
+        StreamlineIntegration::Get().presentEnd(*gpuDevice);
 #endif
     return ok;
 }
@@ -730,7 +730,7 @@ bool App::runFrame(std::optional<double> elapsedTimeOverride)
             scheduleContext.abortFrame = true;
         if (scheduleContext.abortFrame)
             return false;
-        runSchedule(AppSchedule::PostRender, scheduleContext);
+        runSchedule(AppSchedule::postRender, scheduleContext);
     }
 
     runSchedule(AppSchedule::Last, scheduleContext);
@@ -791,7 +791,7 @@ void App::run()
 #if CAUSTICA_WITH_AFTERMATH
         dumpingCrash |= !ok;
         if (dumpingCrash && gpuDevice->m_DeviceParams.enableAftermath)
-            AftermathCrashDump::WaitForCrashDump();
+            AftermathCrashDump::waitForCrashDump();
 #else
         (void)ok;
 #endif
@@ -828,7 +828,7 @@ void App::run()
 #if CAUSTICA_WITH_AFTERMATH
     dumpingCrash |= !ok;
     if (dumpingCrash && gpuDevice->m_DeviceParams.enableAftermath)
-        AftermathCrashDump::WaitForCrashDump();
+        AftermathCrashDump::waitForCrashDump();
 #else
     (void)ok;
 #endif

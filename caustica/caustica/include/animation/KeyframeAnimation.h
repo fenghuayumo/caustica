@@ -31,7 +31,7 @@ namespace caustica::animation
         HermiteSpline
     };
 
-    dm::float4 Interpolate(InterpolationMode mode, 
+    dm::float4 interpolate(InterpolationMode mode, 
         const Keyframe& a, const Keyframe& b,
         const Keyframe& c, const Keyframe& d, float t, float dt);
 
@@ -47,14 +47,14 @@ namespace caustica::animation
 
         std::optional<dm::float4> evaluate(float time, bool extrapolateLastValues = false) const;
 
-        [[nodiscard]] std::vector<Keyframe>& GetKeyframes() { return m_Keyframes; }
-        void AddKeyframe(const Keyframe keyframe);
+        [[nodiscard]] std::vector<Keyframe>& getKeyframes() { return m_Keyframes; }
+        void addKeyframe(const Keyframe keyframe);
 
         [[nodiscard]] InterpolationMode getMode() const { return m_Mode; }
-        void SetInterpolationMode(InterpolationMode mode) { m_Mode = mode; }
+        void setInterpolationMode(InterpolationMode mode) { m_Mode = mode; }
 
-        [[nodiscard]] float GetStartTime() const;
-        [[nodiscard]] float GetEndTime() const;
+        [[nodiscard]] float getStartTime() const;
+        [[nodiscard]] float getEndTime() const;
 
         void load(Json::Value& node);
     };
@@ -69,14 +69,14 @@ namespace caustica::animation
         Sequence() = default;
         virtual ~Sequence() = default;
 
-        std::shared_ptr<Sampler> GetTrack(const std::string& name)
+        std::shared_ptr<Sampler> getTrack(const std::string& name)
         {
             return m_Tracks[name];
         }
 
         std::optional<dm::float4> evaluate(const std::string& name, float time, bool extrapolateLastValues = false);
 
-        void AddTrack(const std::string& name, const std::shared_ptr<Sampler>& track);
+        void addTrack(const std::string& name, const std::shared_ptr<Sampler>& track);
 
         [[nodiscard]] float getDuration() const { return m_Duration; }
 

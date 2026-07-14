@@ -15,9 +15,9 @@ struct AgilityBootstrapResult
 
 // load the Agility SDK redistributable from <runtime>/D3D12/ and enable
 // experimental shader models via the factory when possible.
-AgilityBootstrapResult BootstrapAgilitySdk();
+AgilityBootstrapResult bootstrapAgilitySdk();
 
-bool EnableExperimentalShaderModels(ID3D12DeviceFactory* factory);
+bool enableExperimentalShaderModels(ID3D12DeviceFactory* factory);
 
 } // namespace caustica::dx12
 

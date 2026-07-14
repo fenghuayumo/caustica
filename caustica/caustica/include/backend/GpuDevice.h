@@ -66,15 +66,15 @@ namespace caustica
 
         // Enables per-monitor DPI scale support.
         //
-        // If set to true, the app will receive DisplayScaleChanged() events on DPI change and can read
-        // the scaling factors using GetDPIScaleInfo(...). The window may be resized when DPI changes if
+        // If set to true, the app will receive displayScaleChanged() events on DPI change and can read
+        // the scaling factors using getDPIScaleInfo(...). The window may be resized when DPI changes if
         // DeviceCreationParameters::resizeWindowWithDisplayScale is true.
         //
         // If set to false, the app will see DPI scaling factors being 1.0 all the time, but the OS
         // may scale the contents of the window based on DPI.
         //
         // This field is located in InstanceParameters and not DeviceCreationParameters because it is needed
-        // in the CreateInstance() function to override the glfwInit() behavior.
+        // in the createInstance() function to override the glfwInit() behavior.
         bool enablePerMonitorDPI = false;
 
         // Severity of the information log messages from the device manager, like the device name or enabled extensions.
@@ -127,7 +127,7 @@ namespace caustica
 
         // Index of the adapter (DX11, DX12) or physical device (Vk) on which to initialize the device.
         // Negative values mean automatic detection.
-        // The order of indices matches that returned by GpuDevice::EnumerateAdapters.
+        // The order of indices matches that returned by GpuDevice::enumerateAdapters.
         int adapterIndex = -1;
 
         // Set this to true if the application implements UI scaling for DPI explicitly instead of relying
@@ -135,7 +135,7 @@ namespace caustica
         // but requires considerable changes to applications that rely on the old behavior:
         // all UI sizes and offsets need to be computed as multiples of some scaled parameter,
         // such as ImGui::GetFontSize(). Note that the ImGUI style is automatically reset and scaled in 
-        // ImGui_Renderer::DisplayScaleChanged(...).
+        // ImGui_Renderer::displayScaleChanged(...).
         //
         // See ImGUI FAQ for more info:
         //   https://github.com/ocornut/imgui/blob/master/docs/FAQ.md#q-how-should-i-handle-dpi-in-my-application
@@ -243,30 +243,30 @@ namespace caustica
 
     public:
         // Application entry: creates GpuDevice (+ optional Window/swap chain or headless buffers).
-        static GpuDeviceCreateResult CreateInitialized(const GpuDeviceCreateDesc& desc);
+        static GpuDeviceCreateResult createInitialized(const GpuDeviceCreateDesc& desc);
 
-        [[nodiscard]] bool SupportsRayTracingPipeline() const;
-        [[nodiscard]] bool SupportsRayQuery() const;
-        [[nodiscard]] bool SupportsShaderExecutionReordering() const;
+        [[nodiscard]] bool supportsRayTracingPipeline() const;
+        [[nodiscard]] bool supportsRayQuery() const;
+        [[nodiscard]] bool supportsShaderExecutionReordering() const;
 
         // Initializes device-independent objects (DXGI factory, Vulkan instnace).
-        // Calling CreateInstance() is required before EnumerateAdapters(), but optional if you don't use EnumerateAdapters().
-        // Note: if you call CreateInstance before device initialization, the values in InstanceParameters must match those
+        // Calling createInstance() is required before enumerateAdapters(), but optional if you don't use enumerateAdapters().
+        // Note: if you call createInstance before device initialization, the values in InstanceParameters must match those
         // in DeviceCreationParameters passed to the device call.
-        bool CreateInstance(const InstanceParameters& params);
+        bool createInstance(const InstanceParameters& params);
 
         // Enumerates adapters or physical devices present in the system.
-        // Note: a call to CreateInstance() or CreateInitialized() is required before EnumerateAdapters().
-        virtual bool EnumerateAdapters(std::vector<AdapterInfo>& outAdapters) = 0;
+        // Note: a call to createInstance() or createInitialized() is required before enumerateAdapters().
+        virtual bool enumerateAdapters(std::vector<AdapterInfo>& outAdapters) = 0;
 
         void setFrameDriver(IGpuFrameDriver* driver) { m_frameDriver = driver; }
         [[nodiscard]] IGpuFrameDriver* getFrameDriver() const { return m_frameDriver; }
         void waitForRenderThreadIdle();
 
         // returns the size of the window in screen coordinates
-        void GetWindowDimensions(int& width, int& height);
+        void getWindowDimensions(int& width, int& height);
         // returns the screen coordinate to pixel coordinate scale factor
-        void GetDPIScaleInfo(float& x, float& y) const;
+        void getDPIScaleInfo(float& x, float& y) const;
 
     protected:
         // useful for apps that require 2 frames worth of simulation data before first render
@@ -311,90 +311,90 @@ namespace caustica
         GpuDevice();
 
         static GpuDevice* create(nvrhi::GraphicsAPI api);
-        bool InitializeGraphicsDevice(const DeviceCreationParameters& params);
-        bool InitializeWindowSwapChain(class Window* window);
-        bool InitializeHeadlessGraphics(const DeviceCreationParameters& params);
+        bool initializeGraphicsDevice(const DeviceCreationParameters& params);
+        bool initializeWindowSwapChain(class Window* window);
+        bool initializeHeadlessGraphics(const DeviceCreationParameters& params);
 
-        void UpdateWindowSize();
-        void BackBufferResizing();
-        void BackBufferResized();
-        void CreateDepthBuffer();
-        bool CreateHeadlessBackBuffers();
-        void ReleaseHeadlessBackBuffers();
-        bool BeginHeadlessFrame();
-        bool PresentHeadlessFrame();
-        nvrhi::ITexture* GetHeadlessBackBuffer(uint32_t index);
-        uint32_t GetCurrentHeadlessBackBufferIndex() const;
-        uint32_t GetHeadlessBackBufferCount() const;
+        void updateWindowSize();
+        void backBufferResizing();
+        void backBufferResized();
+        void createDepthBuffer();
+        bool createHeadlessBackBuffers();
+        void releaseHeadlessBackBuffers();
+        bool beginHeadlessFrame();
+        bool presentHeadlessFrame();
+        nvrhi::ITexture* getHeadlessBackBuffer(uint32_t index);
+        uint32_t getCurrentHeadlessBackBufferIndex() const;
+        uint32_t getHeadlessBackBufferCount() const;
 
-        void UpdateAverageFrameTime(double elapsedTime);
+        void updateAverageFrameTime(double elapsedTime);
         // device-specific methods
-        virtual bool CreateInstanceInternal() = 0;
-        virtual bool CreateDevice() = 0;
-        virtual bool CreateSwapChain() = 0;
-        bool ValidatePathTracerRequirements() const;
-        virtual void DestroyDeviceAndSwapChain() = 0;
-        virtual void ResizeSwapChain() = 0;
+        virtual bool createInstanceInternal() = 0;
+        virtual bool createDevice() = 0;
+        virtual bool createSwapChain() = 0;
+        bool validatePathTracerRequirements() const;
+        virtual void destroyDeviceAndSwapChain() = 0;
+        virtual void resizeSwapChain() = 0;
         virtual bool beginFrame() = 0;
-        virtual bool Present() = 0;
-        virtual void PrepareShutdown() {}
+        virtual bool present() = 0;
+        virtual void prepareShutdown() {}
 
     public:
         [[nodiscard]] virtual nvrhi::IDevice *getDevice() const = 0;
-        [[nodiscard]] virtual const char *GetRendererString() const = 0;
-        [[nodiscard]] virtual nvrhi::GraphicsAPI GetGraphicsAPI() const = 0;
+        [[nodiscard]] virtual const char *getRendererString() const = 0;
+        [[nodiscard]] virtual nvrhi::GraphicsAPI getGraphicsAPI() const = 0;
 
-        [[nodiscard]] BackBufferInfo GetBackBufferInfo() const;
-        [[nodiscard]] double GetAverageFrameTimeSeconds() const { return m_AverageFrameTime; }
-        [[nodiscard]] double GetPreviousFrameTimestamp() const { return m_PreviousFrameTimestamp; }
-        void SetFrameTimeUpdateInterval(double seconds) { m_AverageTimeUpdateInterval = seconds; }
-        [[nodiscard]] bool IsHeadless() const { return m_DeviceParams.headlessDevice; }
-        [[nodiscard]] bool IsVsyncEnabled() const { return m_DeviceParams.vsyncEnabled; }
-        [[nodiscard]] bool SupportsExplicitDisplayScaling() const { return m_DeviceParams.supportExplicitDisplayScaling; }
-        virtual void SetVsyncEnabled(bool enabled) { m_RequestedVSync = enabled; /* will be processed later */ }
-        virtual void ReportLiveObjects() {}
+        [[nodiscard]] BackBufferInfo getBackBufferInfo() const;
+        [[nodiscard]] double getAverageFrameTimeSeconds() const { return m_AverageFrameTime; }
+        [[nodiscard]] double getPreviousFrameTimestamp() const { return m_PreviousFrameTimestamp; }
+        void setFrameTimeUpdateInterval(double seconds) { m_AverageTimeUpdateInterval = seconds; }
+        [[nodiscard]] bool isHeadless() const { return m_DeviceParams.headlessDevice; }
+        [[nodiscard]] bool isVsyncEnabled() const { return m_DeviceParams.vsyncEnabled; }
+        [[nodiscard]] bool supportsExplicitDisplayScaling() const { return m_DeviceParams.supportExplicitDisplayScaling; }
+        virtual void setVsyncEnabled(bool enabled) { m_RequestedVSync = enabled; /* will be processed later */ }
+        virtual void reportLiveObjects() {}
 
-        [[nodiscard]] virtual bool QueryVideoMemoryInfo(VideoMemoryInfo& out) const;
+        [[nodiscard]] virtual bool queryVideoMemoryInfo(VideoMemoryInfo& out) const;
 
-        [[nodiscard]] bool IsD3D12() const { return GetGraphicsAPI() == nvrhi::GraphicsAPI::D3D12; }
-        [[nodiscard]] bool IsVulkan() const { return GetGraphicsAPI() == nvrhi::GraphicsAPI::VULKAN; }
+        [[nodiscard]] bool isD3D12() const { return getGraphicsAPI() == nvrhi::GraphicsAPI::D3D12; }
+        [[nodiscard]] bool isVulkan() const { return getGraphicsAPI() == nvrhi::GraphicsAPI::VULKAN; }
 
-        [[nodiscard]] GLFWwindow* GetWindow() const { return m_Window; }
-        [[nodiscard]] Window* GetPlatformWindow() const { return m_WindowPtr; }
+        [[nodiscard]] GLFWwindow* getWindow() const { return m_Window; }
+        [[nodiscard]] Window* getPlatformWindow() const { return m_WindowPtr; }
 
         // When window is owned externally (new 4-layer Window), call this
-        // before Shutdown() to prevent double-free of the GLFW window.
-        void ReleaseWindowOwnership() { m_Window = nullptr; }
+        // before shutdown() to prevent double-free of the GLFW window.
+        void releaseWindowOwnership() { m_Window = nullptr; }
 
-        [[nodiscard]] uint32_t GetFrameIndex() const { return m_FrameIndex; }
-        [[nodiscard]] uint32_t GetRenderPhaseFrameIndex() const { return m_renderPhaseFrameIndex; }
-        void SetRenderPhaseFrameIndex(uint32_t frameIndex) { m_renderPhaseFrameIndex = frameIndex; }
-        [[nodiscard]] uint32_t GetPreparedRenderFrameIndex() const { return m_preparedRenderFrameIndex; }
-        void SetPreparedRenderFrameIndex(uint32_t frameIndex) { m_preparedRenderFrameIndex = frameIndex; }
+        [[nodiscard]] uint32_t getFrameIndex() const { return m_FrameIndex; }
+        [[nodiscard]] uint32_t getRenderPhaseFrameIndex() const { return m_renderPhaseFrameIndex; }
+        void setRenderPhaseFrameIndex(uint32_t frameIndex) { m_renderPhaseFrameIndex = frameIndex; }
+        [[nodiscard]] uint32_t getPreparedRenderFrameIndex() const { return m_preparedRenderFrameIndex; }
+        void setPreparedRenderFrameIndex(uint32_t frameIndex) { m_preparedRenderFrameIndex = frameIndex; }
 
-        virtual nvrhi::ITexture* GetCurrentBackBuffer() = 0;
-        virtual nvrhi::ITexture* GetBackBuffer(uint32_t index) = 0;
-        virtual uint32_t GetCurrentBackBufferIndex() = 0;
-        virtual uint32_t GetBackBufferCount() = 0;
-        nvrhi::IFramebuffer* GetCurrentFramebuffer(bool withDepth = true);
+        virtual nvrhi::ITexture* getCurrentBackBuffer() = 0;
+        virtual nvrhi::ITexture* getBackBuffer(uint32_t index) = 0;
+        virtual uint32_t getCurrentBackBufferIndex() = 0;
+        virtual uint32_t getBackBufferCount() = 0;
+        nvrhi::IFramebuffer* getCurrentFramebuffer(bool withDepth = true);
         nvrhi::IFramebuffer* getFramebuffer(uint32_t index, bool withDepth = true);
-        nvrhi::ITexture* GetDepthBuffer() const { return m_SwapChain.depthBuffer; }
+        nvrhi::ITexture* getDepthBuffer() const { return m_SwapChain.depthBuffer; }
 
-        virtual void Shutdown();
+        virtual void shutdown();
         virtual ~GpuDevice() = default;
 
-        void SetWindowTitle(const char* title);
-        void SetInformativeWindowTitle(const char* applicationName, bool includeFramerate = true, const char* extraInfo = nullptr);
-        const char* GetWindowTitle();
+        void setWindowTitle(const char* title);
+        void setInformativeWindowTitle(const char* applicationName, bool includeFramerate = true, const char* extraInfo = nullptr);
+        const char* getWindowTitle();
 
-        virtual bool IsVulkanInstanceExtensionEnabled(const char* extensionName) const { return false; }
-        virtual bool IsVulkanDeviceExtensionEnabled(const char* extensionName) const { return false; }
-        virtual bool IsVulkanLayerEnabled(const char* layerName) const { return false; }
-        virtual void GetEnabledVulkanInstanceExtensions(std::vector<std::string>& extensions) const { }
-        virtual void GetEnabledVulkanDeviceExtensions(std::vector<std::string>& extensions) const { }
-        virtual void GetEnabledVulkanLayers(std::vector<std::string>& layers) const { }
+        virtual bool isVulkanInstanceExtensionEnabled(const char* extensionName) const { return false; }
+        virtual bool isVulkanDeviceExtensionEnabled(const char* extensionName) const { return false; }
+        virtual bool isVulkanLayerEnabled(const char* layerName) const { return false; }
+        virtual void getEnabledVulkanInstanceExtensions(std::vector<std::string>& extensions) const { }
+        virtual void getEnabledVulkanDeviceExtensions(std::vector<std::string>& extensions) const { }
+        virtual void getEnabledVulkanLayers(std::vector<std::string>& layers) const { }
 
-        // GetFrameIndex cannot be used inside of these callbacks, hence the additional passing of frameID.
+        // getFrameIndex cannot be used inside of these callbacks, hence the additional passing of frameID.
         // Frame lifecycle callbacks; typically wired by the IGpuFrameDriver owner (engine Application).
         struct PipelineCallbacks {
             std::function<void(GpuDevice&, uint32_t)> beforeFrame = nullptr;
@@ -407,12 +407,12 @@ namespace caustica
         } m_callbacks;
 
 #if CAUSTICA_WITH_STREAMLINE
-        static StreamlineInterface& GetStreamline();
+        static StreamlineInterface& getStreamline();
 #endif
 
     private:
-        static GpuDevice* CreateD3D11();
-        static GpuDevice* CreateD3D12();
+        static GpuDevice* createD3D11();
+        static GpuDevice* createD3D12();
         static GpuDevice* createVK();
 
         std::string m_WindowTitle;

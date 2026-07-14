@@ -17,14 +17,14 @@ public:
         : m_Width(width), m_Height(height)
     {}
 
-    int GetWidth()  const { return m_Width; }
-    int GetHeight() const { return m_Height; }
+    int getWidth()  const { return m_Width; }
+    int getHeight() const { return m_Height; }
 
     EVENT_CLASS_TYPE(WindowResize);
     EVENT_CLASS_CATEGORY(Application);
 
-    const char* GetName() const override { return "WindowResize"; }
-    std::string ToString() const override
+    const char* getName() const override { return "WindowResize"; }
+    std::string toString() const override
     {
         std::ostringstream ss;
         ss << "WindowResize: " << m_Width << "x" << m_Height;
@@ -45,7 +45,7 @@ public:
     EVENT_CLASS_TYPE(WindowClose);
     EVENT_CLASS_CATEGORY(Application);
 
-    const char* GetName() const override { return "WindowClose"; }
+    const char* getName() const override { return "WindowClose"; }
 };
 
 // =============================================================================
@@ -57,7 +57,7 @@ public:
     EVENT_CLASS_TYPE(WindowFocus);
     EVENT_CLASS_CATEGORY(Application);
 
-    const char* GetName() const override { return "WindowFocus"; }
+    const char* getName() const override { return "WindowFocus"; }
 };
 
 // =============================================================================
@@ -69,7 +69,7 @@ public:
     EVENT_CLASS_TYPE(WindowLostFocus);
     EVENT_CLASS_CATEGORY(Application);
 
-    const char* GetName() const override { return "WindowLostFocus"; }
+    const char* getName() const override { return "WindowLostFocus"; }
 };
 
 // =============================================================================
@@ -80,14 +80,14 @@ class WindowMovedEvent : public Event
 public:
     WindowMovedEvent(int x, int y) : m_X(x), m_Y(y) {}
 
-    int GetX() const { return m_X; }
-    int GetY() const { return m_Y; }
+    int getX() const { return m_X; }
+    int getY() const { return m_Y; }
 
     EVENT_CLASS_TYPE(WindowMoved);
     EVENT_CLASS_CATEGORY(Application);
 
-    const char* GetName() const override { return "WindowMoved"; }
-    std::string ToString() const override
+    const char* getName() const override { return "WindowMoved"; }
+    std::string toString() const override
     {
         std::ostringstream ss;
         ss << "WindowMoved: " << m_X << "," << m_Y;
@@ -106,13 +106,13 @@ class WindowIconifyEvent : public Event
 public:
     explicit WindowIconifyEvent(bool iconified) : m_Iconified(iconified) {}
 
-    bool IsIconified() const { return m_Iconified; }
+    bool isIconified() const { return m_Iconified; }
 
     EVENT_CLASS_TYPE(WindowIconify);
     EVENT_CLASS_CATEGORY(Application);
 
-    const char* GetName() const override { return m_Iconified ? "WindowIconified" : "WindowRestored"; }
-    std::string ToString() const override
+    const char* getName() const override { return m_Iconified ? "WindowIconified" : "WindowRestored"; }
+    std::string toString() const override
     {
         std::ostringstream ss;
         ss << (m_Iconified ? "WindowIconified" : "WindowRestored");
@@ -132,7 +132,7 @@ public:
     EVENT_CLASS_TYPE(AppTick);
     EVENT_CLASS_CATEGORY(Application);
 
-    const char* GetName() const override { return "AppTick"; }
+    const char* getName() const override { return "AppTick"; }
 };
 
 // =============================================================================
@@ -145,13 +145,13 @@ public:
         : m_ElapsedSeconds(elapsedSeconds)
     {}
 
-    double GetElapsedSeconds() const { return m_ElapsedSeconds; }
+    double getElapsedSeconds() const { return m_ElapsedSeconds; }
 
     EVENT_CLASS_TYPE(AppUpdate);
     EVENT_CLASS_CATEGORY(Application);
 
-    const char* GetName() const override { return "AppUpdate"; }
-    std::string ToString() const override
+    const char* getName() const override { return "AppUpdate"; }
+    std::string toString() const override
     {
         std::ostringstream ss;
         ss << "AppUpdate: dt=" << m_ElapsedSeconds;
@@ -171,7 +171,7 @@ public:
     EVENT_CLASS_TYPE(AppRender);
     EVENT_CLASS_CATEGORY(Application);
 
-    const char* GetName() const override { return "AppRender"; }
+    const char* getName() const override { return "AppRender"; }
 };
 
 } // namespace caustica

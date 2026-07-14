@@ -35,8 +35,8 @@ ComputePipelineRegistry::ComputePipelineRegistry(nvrhi::IDevice* device, const s
         caustica::fatal("Failed to initialize compute shader compiler configuration");
 
     m_shadersFS = std::make_shared<caustica::RootFileSystem>();
-    const char* shaderTypeName = caustica::GetShaderTypeName(device->getGraphicsAPI());
-    const std::filesystem::path shaderPackPath = GetRuntimeDirectory() / (std::string("caustica.shaders.") + shaderTypeName + ".pack");
+    const char* shaderTypeName = caustica::getShaderTypeName(device->getGraphicsAPI());
+    const std::filesystem::path shaderPackPath = getRuntimeDirectory() / (std::string("caustica.shaders.") + shaderTypeName + ".pack");
     auto shaderPackFS = std::make_shared<ShaderPackFileSystem>(shaderPackPath, c_ComputeShaderBinariesRoot);
     const bool shaderPackHasDynamicBins = shaderPackFS->hasDynamicBinLayout(m_compilerConfig.ShaderBinariesPath);
     if (shaderPackFS->isOpen() && !shaderPackHasDynamicBins)
@@ -132,14 +132,14 @@ void ComputePipelineRegistry::update(bool forceReload)
             lastPollTime = now;
             
             // Check the main shaders path
-            auto currentTimestamp = GetLatestModifiedTimeDirectoryRecursive(m_compilerConfig.ShadersPath);
+            auto currentTimestamp = getLatestModifiedTimeDirectoryRecursive(m_compilerConfig.ShadersPath);
             
             // Also check additional monitored paths
             for (const auto& path : m_additionalMonitorPaths)
             {
                 if (std::filesystem::exists(path))
                 {
-                    auto pathTimestamp = GetLatestModifiedTimeDirectoryRecursive(path);
+                    auto pathTimestamp = getLatestModifiedTimeDirectoryRecursive(path);
                     if (pathTimestamp.has_value())
                     {
                         if (!currentTimestamp.has_value() || *pathTimestamp > *currentTimestamp)
@@ -187,10 +187,10 @@ void ComputePipelineRegistry::update(bool forceReload)
 
     // Get latest source modification time (from all monitored paths)
     if (m_compilerConfig.canCompile())
-        EnsureDirectoryExists(m_compilerConfig.ShaderBinariesPath);
+        ensureDirectoryExists(m_compilerConfig.ShaderBinariesPath);
     
     m_lastUpdatedSourceTimestamp = m_compilerConfig.canCompile()
-        ? GetLatestModifiedTimeDirectoryRecursive(m_compilerConfig.ShadersPath)
+        ? getLatestModifiedTimeDirectoryRecursive(m_compilerConfig.ShadersPath)
         : std::optional<std::filesystem::file_time_type>(std::filesystem::file_time_type::min());
     
     // Also include additional monitored paths
@@ -200,7 +200,7 @@ void ComputePipelineRegistry::update(bool forceReload)
         {
             if (std::filesystem::exists(path))
             {
-                auto pathTimestamp = GetLatestModifiedTimeDirectoryRecursive(path);
+                auto pathTimestamp = getLatestModifiedTimeDirectoryRecursive(path);
                 if (pathTimestamp.has_value())
                 {
                     if (!m_lastUpdatedSourceTimestamp.has_value() || *pathTimestamp > *m_lastUpdatedSourceTimestamp)
@@ -249,7 +249,7 @@ void ComputePipelineRegistry::update(bool forceReload)
         progressTotal = (int)m_parallelCompileListUnique.size();
         
         if (progressTotal > 0)
-            progressCompilingShaders.Start(StringFormat("Compiling compute shaders (%d)...", progressTotal).c_str());
+            progressCompilingShaders.start(stringFormat("Compiling compute shaders (%d)...", progressTotal).c_str());
 
         // Compile shaders (potentially in parallel)
         for (auto& [name, variant] : m_parallelCompileListUnique)
@@ -261,7 +261,7 @@ void ComputePipelineRegistry::update(bool forceReload)
             }
 
 #if COMPUTE_REGISTRY_ENABLE_MULTITHREADED_COMPILE
-            m_threadPool.AddTask([this, variant, &progressCompilingShaders, &progressCounterCompleted, progressTotal]() {
+            m_threadPool.addTask([this, variant, &progressCompilingShaders, &progressCounterCompleted, progressTotal]() {
 #endif
                 variant->compileIfNeeded();
                 int completed = progressCounterCompleted.fetch_add(1) + 1;
@@ -272,7 +272,7 @@ void ComputePipelineRegistry::update(bool forceReload)
         }
 
 #if COMPUTE_REGISTRY_ENABLE_MULTITHREADED_COMPILE
-        m_threadPool.WaitForTasks();
+        m_threadPool.waitForTasks();
 #endif
 
         // Check for errors and load shaders
@@ -312,9 +312,9 @@ void ComputePipelineRegistry::update(bool forceReload)
             caustica::error("%s", firstError.c_str());
             bool retry = false;
 #if _WIN32
-            if (!HelpersIsNonInteractive())
+            if (!helpersIsNonInteractive())
             {
-                int result = MessageBoxA((HWND)HelpersGetActiveWindow(), firstError.c_str(),
+                int result = MessageBoxA((HWND)helpersGetActiveWindow(), firstError.c_str(),
                     "Compute Shader Compile Error", MB_RETRYCANCEL | MB_ICONWARNING | MB_SETFOREGROUND | MB_TASKMODAL);
                 retry = result != IDCANCEL;
             }
@@ -422,7 +422,7 @@ void ComputeShaderVariant::prepareCompilation(std::filesystem::file_time_type la
     }
     else if (registry->canCompileShaders())
     {
-        EnsureDirectoryExists(std::filesystem::path(m_compiledFullPath).parent_path());
+        ensureDirectoryExists(std::filesystem::path(m_compiledFullPath).parent_path());
         std::string command = registry->getCompilerConfig().getCompilerPathQuoted();
         command += cmdResult.CommandBase;
 
@@ -444,7 +444,7 @@ void ComputeShaderVariant::prepareCompilation(std::filesystem::file_time_type la
     }
     else
     {
-        m_compileError = StringFormat(
+        m_compileError = stringFormat(
             "Missing precompiled compute shader '%s' and runtime shader compilation is disabled.",
             m_compiledFullPath.c_str());
         caustica::error("%s", m_compileError.c_str());
@@ -458,13 +458,13 @@ void ComputeShaderVariant::compileIfNeeded()
 
     caustica::info("Compiling compute shader '%s'...", m_debugName.c_str());
 
-    auto [resNum, resString, resErrorString] = SystemShell(m_compileCmdLine, false);
+    auto [resNum, resString, resErrorString] = systemShell(m_compileCmdLine, false);
 
     m_compileError = "";
 
     if (!resErrorString.empty())
     {
-        m_compileError = StringFormat("ERROR compiling compute shader '%s':\nCommand: %s\nError: %s",
+        m_compileError = stringFormat("ERROR compiling compute shader '%s':\nCommand: %s\nError: %s",
             m_debugName.c_str(), m_compileCmdLine.c_str(), resErrorString.c_str());
     }
 
@@ -484,7 +484,7 @@ void ComputeShaderVariant::loadShaderAndCreatePipeline()
 
     if (!data)
     {
-        m_compileError = StringFormat(
+        m_compileError = stringFormat(
             "Failed to load compiled compute shader '%s' (pack path '%s').",
             m_debugName.c_str(),
             m_packVfsPath.c_str());
@@ -501,7 +501,7 @@ void ComputeShaderVariant::loadShaderAndCreatePipeline()
 
     if (!m_shader)
     {
-        m_compileError = StringFormat("ERROR creating compute shader handle for '%s'", m_debugName.c_str());
+        m_compileError = stringFormat("ERROR creating compute shader handle for '%s'", m_debugName.c_str());
         return;
     }
 
@@ -514,7 +514,7 @@ void ComputeShaderVariant::loadShaderAndCreatePipeline()
 
     if (!m_pipeline)
     {
-        m_compileError = StringFormat("ERROR creating compute pipeline for '%s'", m_debugName.c_str());
+        m_compileError = stringFormat("ERROR creating compute pipeline for '%s'", m_debugName.c_str());
         m_shader = nullptr;
         return;
     }

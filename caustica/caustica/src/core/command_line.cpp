@@ -7,7 +7,7 @@
 #include <cctype>
 #include <filesystem>
 
-bool CommandLineOptions::InitFromCommandLine(int _argc, char const* const* _argv)
+bool CommandLineOptions::initFromCommandLine(int _argc, char const* const* _argv)
 {
     using namespace cxxopts;
 
@@ -21,8 +21,8 @@ bool CommandLineOptions::InitFromCommandLine(int _argc, char const* const* _argv
 
         options.add_options()
             ("s,scene", "Preferred scene to load (.scene.json)", value(scene))
-            ("nonInteractive", "Start in non-interactive mode, disabling popups", value(nonInteractive))
-            ("noWindow", "Start without a window (headless)", value(noWindow))
+            ("nonInteractive", "start in non-interactive mode, disabling popups", value(nonInteractive))
+            ("noWindow", "start without a window (headless)", value(noWindow))
             ("d,debug", "Enable D3D12/VK debug layer and NVRHI validation", value(debug))
             ("width", "Window width", value(width))
             ("height", "Window height", value(height))
@@ -36,7 +36,7 @@ bool CommandLineOptions::InitFromCommandLine(int _argc, char const* const* _argv
             ("dx12", "Alias for --d3d12")
             ("vk", "Use Vulkan", value(useVulkan))
             ("vulkan", "Alias for --vk", value(useVulkan))
-            ("stopAnimations", "Start with animations disabled", value(stopAnimations))
+            ("stopAnimations", "start with animations disabled", value(stopAnimations))
             ("noSER", "Disable Shader Execution Reordering", value(disableSER))
             ("adapterIndex", "Preferred adapter index (default: -1 = auto)", value(adapterIndex))
             ("captureSimple", "Trigger simple screenshot capture", value(captureSimple))

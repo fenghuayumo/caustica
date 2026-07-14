@@ -13,7 +13,7 @@ namespace caustica
                 return -1;
             
             return useResourceDescriptorHeapBindless 
-                ? texture->gpu.bindlessDescriptor.GetIndexInHeap()
+                ? texture->gpu.bindlessDescriptor.getIndexInHeap()
                 : texture->gpu.bindlessDescriptor.Get();
         };
 

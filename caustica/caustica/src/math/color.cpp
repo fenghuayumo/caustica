@@ -5,7 +5,7 @@ namespace caustica::math
 {
 	// Color space conversions
 
-	float3 RGBtoHSV(const float3& c)
+	float3 rgbToHSV(const float3& c)
 	{
 		float minComp = minComponent(c);
 		float maxComp = maxComponent(c);
@@ -33,7 +33,7 @@ namespace caustica::math
 		return result;
 	}
 
-	float3 HSVtoRGB(const float3& c)
+	float3 hsvToRGB(const float3& c)
 	{
 		if (c.y == 0.0f)
 			return float3(c.z);
@@ -63,7 +63,7 @@ namespace caustica::math
 	// chosen to make RGB (1, 1, 1) come out to CIELAB (100, 0, 0).
 	static const float3 xyzWhitePoint = { 0.9505f, 1.0f, 1.0887f };
 
-	float3 RGBtoCIELAB(const float3& c)
+	float3 rgbToCIELAB(const float3& c)
 	{
 		// Convert RGB to XYZ color space
 		static const float3x3 RGBtoXYZ =
@@ -86,7 +86,7 @@ namespace caustica::math
 					200.0f * (warp.y - warp.z));
 	}
 
-	float3 CIELABtoRGB(const float3& c)
+	float3 cielabToRGB(const float3& c)
 	{
 		// Convert CIELAB to XYZ
 		float warpY = (c.x + 16.0f) / 116.0f;

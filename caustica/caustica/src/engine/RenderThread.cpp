@@ -10,7 +10,7 @@ namespace
 thread_local bool g_isRenderThread = false;
 } // namespace
 
-bool IsRenderThread()
+bool isRenderThread()
 {
     return g_isRenderThread;
 }

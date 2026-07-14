@@ -61,7 +61,7 @@ bool SceneAnimation::apply(float time, scene::SceneEntityWorld& world) const
 void SceneAnimation::addChannel(const std::shared_ptr<SceneAnimationChannel>& channel)
 {
     m_Channels.push_back(channel);
-    m_Duration = std::max(m_Duration, channel->getSampler()->GetEndTime());
+    m_Duration = std::max(m_Duration, channel->getSampler()->getEndTime());
 }
 
 bool SceneAnimation::isVald() const

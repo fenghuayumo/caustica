@@ -6,7 +6,7 @@
 namespace caustica
 {
 
-void FPSLimiter::FramerateLimit(int fpsTarget)
+void FPSLimiter::framerateLimit(int fpsTarget)
 {
     auto nowTimestamp = std::chrono::high_resolution_clock::now();
     double deltaTime = std::chrono::duration<double>(nowTimestamp - m_lastTimestamp).count();

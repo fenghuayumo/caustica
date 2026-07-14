@@ -1896,15 +1896,15 @@ bool GltfImporter::load(
             {
             case cgltf_interpolation_type_linear:
                 if (srcChannel->target_path == cgltf_animation_path_type_rotation)
-                    dstSampler->SetInterpolationMode(animation::InterpolationMode::Slerp);
+                    dstSampler->setInterpolationMode(animation::InterpolationMode::Slerp);
                 else
-                    dstSampler->SetInterpolationMode(animation::InterpolationMode::Linear);
+                    dstSampler->setInterpolationMode(animation::InterpolationMode::Linear);
                 break;
             case cgltf_interpolation_type_step:
-                dstSampler->SetInterpolationMode(animation::InterpolationMode::Step);
+                dstSampler->setInterpolationMode(animation::InterpolationMode::Step);
                 break;
             case cgltf_interpolation_type_cubic_spline:
-                dstSampler->SetInterpolationMode(animation::InterpolationMode::HermiteSpline);
+                dstSampler->setInterpolationMode(animation::InterpolationMode::HermiteSpline);
                 break;
             default:
                 break;
@@ -1933,10 +1933,10 @@ bool GltfImporter::load(
                 }
 
                 if (timeRead && valueRead)
-                    dstSampler->AddKeyframe(keyframe);
+                    dstSampler->addKeyframe(keyframe);
             }
 
-            if (!dstSampler->GetKeyframes().empty())
+            if (!dstSampler->getKeyframes().empty())
                 animationSamplers[srcSampler] = dstSampler;
             else
                 caustica::warning("Animation channel imported with no keyframes, ignoring.");

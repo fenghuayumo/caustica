@@ -156,9 +156,9 @@ void Initialize(uint32_t numThreads, uint32_t reservedThreads)
 }
 
 // ==========================================================================
-// Shutdown
+// shutdown
 // ==========================================================================
-void Shutdown()
+void shutdown()
 {
     if (!s_Initialized)
         return;
@@ -180,9 +180,9 @@ void Shutdown()
 }
 
 // ==========================================================================
-// GetThreadCount
+// getThreadCount
 // ==========================================================================
-uint32_t GetThreadCount()
+uint32_t getThreadCount()
 {
     return s_NumThreads;
 }
@@ -243,7 +243,7 @@ void dispatch(Context& ctx, uint32_t jobCount, uint32_t groupSize,
         return;
     }
 
-    uint32_t groupCount = GetGroupCount(jobCount, groupSize);
+    uint32_t groupCount = getGroupCount(jobCount, groupSize);
     ctx.counter.fetch_add(groupCount, std::memory_order_release);
 
     // Distribute groups across workers
@@ -280,25 +280,25 @@ void dispatch(Context& ctx, uint32_t jobCount, uint32_t groupSize,
 }
 
 // ==========================================================================
-// GetGroupCount
+// getGroupCount
 // ==========================================================================
-uint32_t GetGroupCount(uint32_t jobCount, uint32_t groupSize)
+uint32_t getGroupCount(uint32_t jobCount, uint32_t groupSize)
 {
     return (jobCount + groupSize - 1) / groupSize;
 }
 
 // ==========================================================================
-// IsBusy — check if any jobs in this context are running
+// isBusy — check if any jobs in this context are running
 // ==========================================================================
-bool IsBusy(const Context& ctx)
+bool isBusy(const Context& ctx)
 {
     return ctx.counter.load(std::memory_order_acquire) > 0;
 }
 
 // ==========================================================================
-// Wait — block until all jobs in context complete
+// wait — block until all jobs in context complete
 // ==========================================================================
-void Wait(const Context& ctx)
+void wait(const Context& ctx)
 {
     // Spin briefly, then yield
     while (ctx.counter.load(std::memory_order_acquire) > 0)

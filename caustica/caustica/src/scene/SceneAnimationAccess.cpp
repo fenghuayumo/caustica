@@ -38,7 +38,7 @@ float getAnimationDuration(const AnimationComponent& component)
 void addAnimationChannel(AnimationComponent& component, AnimationChannelData channel)
 {
     if (channel.sampler)
-        component.duration = std::max(component.duration, channel.sampler->GetEndTime());
+        component.duration = std::max(component.duration, channel.sampler->getEndTime());
     component.channels.push_back(std::move(channel));
 }
 
@@ -48,7 +48,7 @@ void recalculateAnimationDuration(AnimationComponent& component)
     for (const auto& channel : component.channels)
     {
         if (channel.sampler)
-            component.duration = std::max(component.duration, channel.sampler->GetEndTime());
+            component.duration = std::max(component.duration, channel.sampler->getEndTime());
     }
 }
 

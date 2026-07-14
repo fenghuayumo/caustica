@@ -81,7 +81,7 @@ namespace caustica
             abort();
     }
 
-    void SetErrorMessageCaption(const char* caption)
+    void setErrorMessageCaption(const char* caption)
     {
         g_ErrorMessageCaption = (caption) ? caption : "";
     }
@@ -89,42 +89,42 @@ namespace caustica
     static Callback g_Callback = &DefaultCallback;
     static Severity g_MinSeverity = Severity::Info;
 
-    void SetMinSeverity(Severity severity)
+    void setMinSeverity(Severity severity)
     {
         g_MinSeverity = severity;
     }
 
-    void SetCallback(Callback func)
+    void setCallback(Callback func)
     {
         g_Callback = func ? std::move(func) : Callback(&DefaultCallback);
     }
 
-	Callback GetCallback()
+	Callback getCallback()
 	{
 		return g_Callback;
 	}
 
-    void ResetCallback()
+    void resetCallback()
     {
         g_Callback = &DefaultCallback;
     }
     
-    void EnableOutputToMessageBox(bool enable)
+    void enableOutputToMessageBox(bool enable)
     {
         g_OutputToMessageBox = enable;
     }
     
-    void EnableOutputToConsole(bool enable)
+    void enableOutputToConsole(bool enable)
     {
         g_OutputToConsole = enable;
     }
     
-    void EnableOutputToDebug(bool enable)
+    void enableOutputToDebug(bool enable)
     {
         g_OutputToDebug = enable;
     }
 
-    void ConsoleApplicationMode()
+    void consoleApplicationMode()
     {
         g_OutputToConsole = true;
         g_OutputToDebug = true;

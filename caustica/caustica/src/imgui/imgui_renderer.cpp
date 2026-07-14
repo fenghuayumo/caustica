@@ -4,8 +4,8 @@
 using namespace caustica;
 
 ImGui_Renderer::ImGui_Renderer(GpuDevice *devManager)
-    : RenderContext(devManager)
-    , m_supportExplicitDisplayScaling(devManager->SupportsExplicitDisplayScaling())
+    : renderContext(devManager)
+    , m_supportExplicitDisplayScaling(devManager->supportsExplicitDisplayScaling())
 {
     ImGui::CreateContext();
 
@@ -163,7 +163,7 @@ bool ImGui_Renderer::init(std::shared_ptr<ShaderFactory> shaderFactory)
     return imgui_nvrhi->init(getDevice(), shaderFactory);
 }
 
-std::shared_ptr<RegisteredFont> ImGui_Renderer::CreateFontFromFile(IFileSystem& fs,
+std::shared_ptr<RegisteredFont> ImGui_Renderer::createFontFromFile(IFileSystem& fs,
     const std::filesystem::path& fontFile, float fontSize)
 {
 	auto fontData = fs.readFile(fontFile);
@@ -176,7 +176,7 @@ std::shared_ptr<RegisteredFont> ImGui_Renderer::CreateFontFromFile(IFileSystem& 
     return font;
 }
 
-std::shared_ptr<RegisteredFont> ImGui_Renderer::CreateFontFromMemoryInternal(void const* pData, size_t size,
+std::shared_ptr<RegisteredFont> ImGui_Renderer::createFontFromMemoryInternal(void const* pData, size_t size,
     bool compressed, float fontSize)
 {
     if (!pData || !size)
@@ -193,15 +193,15 @@ std::shared_ptr<RegisteredFont> ImGui_Renderer::CreateFontFromMemoryInternal(voi
     return font;
 }
 
-std::shared_ptr<RegisteredFont> ImGui_Renderer::CreateFontFromMemory(void const* pData, size_t size, float fontSize)
+std::shared_ptr<RegisteredFont> ImGui_Renderer::createFontFromMemory(void const* pData, size_t size, float fontSize)
 {
-    return CreateFontFromMemoryInternal(pData, size, false, fontSize);
+    return createFontFromMemoryInternal(pData, size, false, fontSize);
 }
 
-std::shared_ptr<RegisteredFont> ImGui_Renderer::CreateFontFromMemoryCompressed(void const* pData, size_t size,
+std::shared_ptr<RegisteredFont> ImGui_Renderer::createFontFromMemoryCompressed(void const* pData, size_t size,
     float fontSize)
 {
-    return CreateFontFromMemoryInternal(pData, size, true, fontSize);
+    return createFontFromMemoryInternal(pData, size, true, fontSize);
 }
 
 
@@ -226,18 +226,18 @@ void ImGui_Renderer::animate(float elapsedTimeSeconds)
 
     // make sure that all registered fonts have corresponding ImFont objects at the current DPI scale
     float scaleX, scaleY;
-    GetGpuDevice()->GetDPIScaleInfo(scaleX, scaleY);
+    getGpuDevice()->getDPIScaleInfo(scaleX, scaleY);
     for (auto& font : m_fonts)
     {
-        if (!font->GetScaledFont())
-            font->CreateScaledFont(m_supportExplicitDisplayScaling ? scaleX : 1.f);
+        if (!font->getScaledFont())
+            font->createScaledFont(m_supportExplicitDisplayScaling ? scaleX : 1.f);
     }
 
     // Creates the font texture if it's not yet valid
     imgui_nvrhi->updateFontTexture();
     
     int w, h;
-    GetGpuDevice()->GetWindowDimensions(w, h);
+    getGpuDevice()->getWindowDimensions(w, h);
 
     ImGuiIO& io = ImGui::GetIO();
     io.DisplaySize = ImVec2(float(w), float(h));
@@ -251,7 +251,7 @@ void ImGui_Renderer::animate(float elapsedTimeSeconds)
     io.MouseDrawCursor = false;
 
     // Forward mouse input to ImGui (keyboard is handled via GLFW callbacks)
-    GLFWwindow* glfwWindow = GetGpuDevice()->GetWindow();
+    GLFWwindow* glfwWindow = getGpuDevice()->getWindow();
     if (glfwWindow)
     {
         ImGui_ImplGlfw_UpdateKeyModifiers(io, glfwWindow);
@@ -284,19 +284,19 @@ void ImGui_Renderer::render(nvrhi::IFramebuffer* framebuffer)
     m_imguiFrameOpened = false;
 }
 
-void ImGui_Renderer::BackBufferResizing()
+void ImGui_Renderer::backBufferResizing()
 {
     if(imgui_nvrhi) imgui_nvrhi->backbufferResizing();
 }
 
-void ImGui_Renderer::DisplayScaleChanged(float scaleX, float scaleY)
+void ImGui_Renderer::displayScaleChanged(float scaleX, float scaleY)
 {
     // Apps that don't implement explicit scaling won't expect the fonts to be resized etc.
     if (!m_supportExplicitDisplayScaling)
         return;
 
     // When the application starts unfocused, we open and close ImGui frames without rendering anything,
-    // and the first call to DisplayScaleChanged happens before animate and tries to update fonts.
+    // and the first call to displayScaleChanged happens before animate and tries to update fonts.
     // Since the ImGui frame is open at that time, the call crashes because the font atlas is locked.
     // Prevent that by closing the frame first.
     if (m_imguiFrameOpened)
@@ -313,13 +313,13 @@ void ImGui_Renderer::DisplayScaleChanged(float scaleX, float scaleY)
     io.Fonts->TexRef = ImTextureRef();
 
     for (auto& font : m_fonts)
-        font->ReleaseScaledFont();
+        font->releaseScaledFont();
         
     ImGui::GetStyle() = ImGuiStyle();
     ImGui::GetStyle().ScaleAllSizes(scaleX);
 }
 
-void ImGui_Renderer::BeginFullScreenWindow()
+void ImGui_Renderer::beginFullScreenWindow()
 {
     ImGuiIO const& io = ImGui::GetIO();
     ImGui::SetNextWindowPos(ImVec2(0.f, 0.f), ImGuiCond_Always);
@@ -332,7 +332,7 @@ void ImGui_Renderer::BeginFullScreenWindow()
     ImGui::Begin(" ", 0, ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar);
 }
 
-void ImGui_Renderer::DrawScreenCenteredText(const char* text)
+void ImGui_Renderer::drawScreenCenteredText(const char* text)
 {
     ImGuiIO const& io = ImGui::GetIO();
     ImVec2 textSize = ImGui::CalcTextSize(text);
@@ -341,13 +341,13 @@ void ImGui_Renderer::DrawScreenCenteredText(const char* text)
     ImGui::TextUnformatted(text);
 }
 
-void ImGui_Renderer::EndFullScreenWindow()
+void ImGui_Renderer::endFullScreenWindow()
 {
     ImGui::End();
     ImGui::PopStyleVar();
 }
 
-void RegisteredFont::CreateScaledFont(float displayScale)
+void RegisteredFont::createScaledFont(float displayScale)
 {
     ImFontConfig fontConfig;
     fontConfig.SizePixels = m_sizeAtDefaultScale * displayScale;
@@ -379,12 +379,12 @@ void RegisteredFont::CreateScaledFont(float displayScale)
     }
 }
 
-void RegisteredFont::ReleaseScaledFont()
+void RegisteredFont::releaseScaledFont()
 {
     m_imFont = nullptr;
 }
 
-void caustica::ImGuiForwardKeyboard(int glfwKey, int action, int /*scancode*/)
+void caustica::imGuiForwardKeyboard(int glfwKey, int action, int /*scancode*/)
 {
     if (action == GLFW_REPEAT)
         return;
@@ -397,7 +397,7 @@ void caustica::ImGuiForwardKeyboard(int glfwKey, int action, int /*scancode*/)
     io.AddKeyEvent(imguiKey, action != GLFW_RELEASE);
 }
 
-void caustica::ImGuiForwardInputCharacter(unsigned int codepoint)
+void caustica::imGuiForwardInputCharacter(unsigned int codepoint)
 {
     ImGui::GetIO().AddInputCharacter(codepoint);
 }

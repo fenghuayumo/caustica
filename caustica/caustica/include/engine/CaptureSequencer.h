@@ -29,7 +29,7 @@ struct CaptureSequencerPreRenderActions
 struct CaptureSequencerPostRenderResult
 {
     bool ExitRequested = false;
-    bool CaptureSuccess = false;
+    bool captureSuccess = false;
     std::filesystem::path CapturePath;
 };
 
@@ -42,18 +42,18 @@ public:
     CaptureSequencerSettings& settings() { return m_settings; }
     const CaptureSequencerSettings& settings() const { return m_settings; }
 
-    void RequestStart() { m_start = true; }
-    bool IsStarting() const { return m_start; }
+    void requestStart() { m_start = true; }
+    bool isStarting() const { return m_start; }
     bool isActive() const { return m_active; }
-    bool IsDoingWork() const { return m_start || m_active; }
-    bool ExitAfterCapture() const { return m_exitAfterCapture; }
-    bool CaptureSuccess() const { return m_captureSuccess; }
-    int ResetAndWarmupCounter() const { return m_resetAndWarmupCounter; }
-    int SequenceRecordCounter() const { return m_sequenceRecordCounter; }
+    bool isDoingWork() const { return m_start || m_active; }
+    bool exitAfterCapture() const { return m_exitAfterCapture; }
+    bool captureSuccess() const { return m_captureSuccess; }
+    int resetAndWarmupCounter() const { return m_resetAndWarmupCounter; }
+    int sequenceRecordCounter() const { return m_sequenceRecordCounter; }
 
-    void PreAnim(float& elapsedTimeSeconds, bool asyncLoadingInProgress, const std::function<void(double)>& setSceneTime);
+    void preAnim(float& elapsedTimeSeconds, bool asyncLoadingInProgress, const std::function<void(double)>& setSceneTime);
     CaptureSequencerPreRenderActions preRender();
-    CaptureSequencerPostRenderResult PostRender(
+    CaptureSequencerPostRenderResult postRender(
         bool realtimeMode,
         bool accumulationCompleted,
         double sceneTime,

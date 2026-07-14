@@ -46,7 +46,7 @@ protected:
 #endif
 
 public:
-    std::string GetAdapterName(DXGI_ADAPTER_DESC const& aDesc)
+    std::string getAdapterName(DXGI_ADAPTER_DESC const& aDesc)
     {
         size_t length = wcsnlen(aDesc.Description, _countof(aDesc.Description));
 
@@ -57,7 +57,7 @@ public:
         return name;
     }
 
-    const char *GetRendererString() const override
+    const char *getRendererString() const override
     {
         return m_RendererString.c_str();
     }
@@ -67,29 +67,29 @@ public:
         return m_NvrhiDevice;
     }
 
-    void ReportLiveObjects() override;
-    bool EnumerateAdapters(std::vector<caustica::AdapterInfo>& outAdapters) override;
-    [[nodiscard]] bool QueryVideoMemoryInfo(caustica::VideoMemoryInfo& out) const override;
+    void reportLiveObjects() override;
+    bool enumerateAdapters(std::vector<caustica::AdapterInfo>& outAdapters) override;
+    [[nodiscard]] bool queryVideoMemoryInfo(caustica::VideoMemoryInfo& out) const override;
 
-    nvrhi::GraphicsAPI GetGraphicsAPI() const override
+    nvrhi::GraphicsAPI getGraphicsAPI() const override
     {
         return nvrhi::GraphicsAPI::D3D12;
     }
     
 protected:
-    bool CreateInstanceInternal() override;
-    bool CreateDevice() override;
-    bool CreateSwapChain() override;
-    void DestroyDeviceAndSwapChain() override;
-    void ResizeSwapChain() override;
-    nvrhi::ITexture* GetCurrentBackBuffer() override;
-    nvrhi::ITexture* GetBackBuffer(uint32_t index) override;
-    uint32_t GetCurrentBackBufferIndex() override;
-    uint32_t GetBackBufferCount() override;
+    bool createInstanceInternal() override;
+    bool createDevice() override;
+    bool createSwapChain() override;
+    void destroyDeviceAndSwapChain() override;
+    void resizeSwapChain() override;
+    nvrhi::ITexture* getCurrentBackBuffer() override;
+    nvrhi::ITexture* getBackBuffer(uint32_t index) override;
+    uint32_t getCurrentBackBufferIndex() override;
+    uint32_t getBackBufferCount() override;
     bool beginFrame() override;
-    bool Present() override;
-    void Shutdown() override;
-    void PrepareShutdown() override;
-    bool CreateRenderTargets();
-    void ReleaseRenderTargets();
+    bool present() override;
+    void shutdown() override;
+    void prepareShutdown() override;
+    bool createRenderTargets();
+    void releaseRenderTargets();
 };

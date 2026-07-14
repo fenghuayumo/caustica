@@ -31,7 +31,7 @@ namespace game
 
         void                    SetStoragePath(const std::filesystem::path& path) { m_storagePath = path; }
         void                    SetAnimOffset(double animOffset)        { m_animOffset = animOffset; }
-        std::string             GetName() const;
+        std::string             getName() const;
         caustica::ecs::Entity   GetEntity() const                       { return m_entity; }
         const std::vector<std::shared_ptr<ModelInstance>> &
                                 getModels() const                       { return m_models; }

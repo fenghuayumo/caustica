@@ -8,7 +8,7 @@ namespace caustica
 {
 struct VideoMemoryInfo;
 
-bool QueryDxgiAdapterVideoMemory(IDXGIAdapter* adapter, VideoMemoryInfo& out);
+bool queryDxgiAdapterVideoMemory(IDXGIAdapter* adapter, VideoMemoryInfo& out);
 } // namespace caustica
 
 #endif

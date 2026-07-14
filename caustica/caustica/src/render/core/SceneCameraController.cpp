@@ -90,7 +90,7 @@ void SceneCameraController::saveToFile() const
     float fovY = atanf(tanHalfFOVY) * 2.0f;
 
     m_camera->saveToFile(
-        GetDirectoryWithExecutable() / "campos.txt",
+        getDirectoryWithExecutable() / "campos.txt",
         m_camera->zNear(),
         fovY);
 }
@@ -98,7 +98,7 @@ void SceneCameraController::saveToFile() const
 void SceneCameraController::loadFromFile()
 {
     if (m_camera)
-        m_camera->loadFromFile(GetDirectoryWithExecutable() / "campos.txt");
+        m_camera->loadFromFile(getDirectoryWithExecutable() / "campos.txt");
 }
 
 void SceneCameraController::syncFromSceneCamera(const std::shared_ptr<PerspectiveCamera>& sceneCamera)

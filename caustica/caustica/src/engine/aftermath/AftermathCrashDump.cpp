@@ -10,10 +10,10 @@
 static void DumpFileCallback(const void* pGpuCrashDump, const uint32_t gpuCrashDumpSize, void* pUserData)
 {
     caustica::AftermathCrashDump *dumper = reinterpret_cast<caustica::AftermathCrashDump*>(pUserData);
-    std::filesystem::create_directory(dumper->GetDumpFolder());
+    std::filesystem::create_directory(dumper->getDumpFolder());
 
     auto nativeFS = std::make_unique<caustica::NativeFileSystem>();
-    std::filesystem::path dumpPath = dumper->GetDumpFolder() / "crash.nv-gpudmp";
+    std::filesystem::path dumpPath = dumper->getDumpFolder() / "crash.nv-gpudmp";
     nativeFS->writeFile(dumpPath, pGpuCrashDump, gpuCrashDumpSize);
 
     GFSDK_Aftermath_GpuCrashDump_Decoder decoder = {};
@@ -35,13 +35,13 @@ static void DumpFileCallback(const void* pGpuCrashDump, const uint32_t gpuCrashD
             {
                 GFSDK_Aftermath_ShaderBinaryHash shaderHash = {};
                 GFSDK_Aftermath_GetShaderHashForShaderInfo(decoder, &shaderInfo, &shaderHash);
-                nvrhi::AftermathCrashDumpHelper& crashDumpHelper = dumper->GetGpuDevice().getDevice()->getAftermathCrashDumpHelper();
-                nvrhi::BinaryBlob shaderLookupResult = crashDumpHelper.findShaderBinary(shaderHash.hash, caustica::AftermathCrashDump::GetShaderHashForBinary);
+                nvrhi::AftermathCrashDumpHelper& crashDumpHelper = dumper->getGpuDevice().getDevice()->getAftermathCrashDumpHelper();
+                nvrhi::BinaryBlob shaderLookupResult = crashDumpHelper.findShaderBinary(shaderHash.hash, caustica::AftermathCrashDump::getShaderHashForBinary);
                 if (shaderLookupResult.second > 0)
                 {
                     std::stringstream ss;
                     ss << std::hex << shaderHash.hash << ".bin";
-                    std::filesystem::path shaderPath = dumper->GetDumpFolder() / ss.str();
+                    std::filesystem::path shaderPath = dumper->getDumpFolder() / ss.str();
                     nativeFS->writeFile(shaderPath, shaderLookupResult.first, shaderLookupResult.second);
                 }
             }
@@ -53,7 +53,7 @@ static void DumpFileCallback(const void* pGpuCrashDump, const uint32_t gpuCrashD
 static void ShaderDebugInfoCallback(const void* pShaderDebugInfo, const uint32_t shaderDebugInfoSize, void* pUserData)
 {
     caustica::AftermathCrashDump* dumper = reinterpret_cast<caustica::AftermathCrashDump*>(pUserData);
-    std::filesystem::create_directory(dumper->GetDumpFolder());
+    std::filesystem::create_directory(dumper->getDumpFolder());
 
     auto nativeFS = std::make_unique<caustica::NativeFileSystem>();
     // the hash used for nsight is stored in the shader debug info file in address 0x20-0x40
@@ -63,14 +63,14 @@ static void ShaderDebugInfoCallback(const void* pShaderDebugInfo, const uint32_t
     std::stringstream ss;
     ss << std::hex << std::setfill('0') << std::setw(8) << ptr64[5] << std::setw(8) << ptr64[4]
         << "-" << std::setw(8) << ptr64[7] << std::setw(8) << ptr64[6] << ".nvdbg";
-    std::filesystem::path dumpPath = dumper->GetDumpFolder() / ss.str();
+    std::filesystem::path dumpPath = dumper->getDumpFolder() / ss.str();
     nativeFS->writeFile(dumpPath, pShaderDebugInfo, shaderDebugInfoSize);
 }
 
 static void DescriptionCallback(PFN_GFSDK_Aftermath_AddGpuCrashDumpDescription addDescription, void* pUserData)
 {
     caustica::AftermathCrashDump* dumper = reinterpret_cast<caustica::AftermathCrashDump*>(pUserData);
-    addDescription(GFSDK_Aftermath_GpuCrashDumpDescriptionKey_ApplicationName, dumper->GetGpuDevice().GetWindowTitle());
+    addDescription(GFSDK_Aftermath_GpuCrashDumpDescriptionKey_ApplicationName, dumper->getGpuDevice().getWindowTitle());
 }
 
 // this callback should call into the nvrhi device which has the necessary information
@@ -79,12 +79,12 @@ static void ResolveMarkerCallback(const void* pMarkerData, const uint32_t marker
     caustica::AftermathCrashDump* dumper = reinterpret_cast<caustica::AftermathCrashDump*>(pUserData);
     const uint64_t markerAsHash = reinterpret_cast<const uint64_t>(pMarkerData);
     // as long as the device is not yet destroyed, these references should be ok to pass back
-    const std::string& resolvedMarker = dumper->ResolveMarker(markerAsHash);
+    const std::string& resolvedMarker = dumper->resolveMarker(markerAsHash);
     *ppResolvedMarkerData = (void*) resolvedMarker.data();
     *pResolvedMarkerDataSize = uint32_t(resolvedMarker.length());
 }
 
-void caustica::AftermathCrashDump::WaitForCrashDump(uint32_t maxTimeoutSeconds)
+void caustica::AftermathCrashDump::waitForCrashDump(uint32_t maxTimeoutSeconds)
 {
     std::chrono::time_point startTime = std::chrono::system_clock::now();
     bool timedOut = false;
@@ -101,7 +101,7 @@ void caustica::AftermathCrashDump::WaitForCrashDump(uint32_t maxTimeoutSeconds)
     }
 }
 
-uint64_t caustica::AftermathCrashDump::GetShaderHashForBinary(std::pair<const void*, size_t> shaderBinary, nvrhi::GraphicsAPI api)
+uint64_t caustica::AftermathCrashDump::getShaderHashForBinary(std::pair<const void*, size_t> shaderBinary, nvrhi::GraphicsAPI api)
 {
 #if CAUSTICA_WITH_VULKAN
     if (api == nvrhi::GraphicsAPI::VULKAN)
@@ -129,7 +129,7 @@ uint64_t caustica::AftermathCrashDump::GetShaderHashForBinary(std::pair<const vo
 }
 
 static bool AftermathInitialized = false;
-void caustica::AftermathCrashDump::InitializeAftermathCrashDump(AftermathCrashDump* dumper)
+void caustica::AftermathCrashDump::initializeAftermathCrashDump(AftermathCrashDump* dumper)
 {
     // if already initialized, reinit with new crash dumper
     if (AftermathInitialized)
@@ -166,30 +166,30 @@ caustica::AftermathCrashDump::AftermathCrashDump(GpuDevice& deviceManager) :
 {
 }
 
-void caustica::AftermathCrashDump::EnableCrashDumpTracking()
+void caustica::AftermathCrashDump::enableCrashDumpTracking()
 {
-    InitializeAftermathCrashDump(this);
+    initializeAftermathCrashDump(this);
     // create a unique path to store the dump files based on date/time
     // using date/time at creation time since we need to use the same value for different callbacks but they will be called at different times
     std::stringstream folder;
     std::time_t t = std::time(nullptr);
     std::tm tm = *std::localtime(&t);
     folder << "crash_" << std::put_time(&tm, "%Y-%m-%d-%H_%M_%S");
-    m_dumpFolder = caustica::GetDirectoryWithExecutable() / folder.str();
+    m_dumpFolder = caustica::getDirectoryWithExecutable() / folder.str();
 }
 
-const std::string& caustica::AftermathCrashDump::ResolveMarker(uint64_t markerHash)
+const std::string& caustica::AftermathCrashDump::resolveMarker(uint64_t markerHash)
 {
-    auto [found, markerString] = m_deviceManager.getDevice()->getAftermathCrashDumpHelper().ResolveMarker(markerHash);
+    auto [found, markerString] = m_deviceManager.getDevice()->getAftermathCrashDumpHelper().resolveMarker(markerHash);
     return markerString;
 }
 
-caustica::GpuDevice& caustica::AftermathCrashDump::GetGpuDevice()
+caustica::GpuDevice& caustica::AftermathCrashDump::getGpuDevice()
 {
     return m_deviceManager;
 }
 
-std::filesystem::path caustica::AftermathCrashDump::GetDumpFolder()
+std::filesystem::path caustica::AftermathCrashDump::getDumpFolder()
 {
     return m_dumpFolder;
 }

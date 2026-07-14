@@ -16,74 +16,74 @@ namespace caustica
 class StreamlineIntegration : public StreamlineInterface
 {
 public:
-    virtual void SetViewport(uint32_t viewportIndex) override;
-    virtual void SetConstants(const Constants& consts) override;
-    virtual void SetDLSSOptions(const DLSSOptions& options) override;
-    virtual bool IsDLSSAvailable() const override { return m_dlssAvailable; }
-    virtual void QueryDLSSOptimalSettings(const DLSSOptions& options, DLSSSettings& settings) override;
-    virtual void EvaluateDLSS(nvrhi::ICommandList* commandList) override;
-    virtual void CleanupDLSS(bool wfi) override;
+    virtual void setViewport(uint32_t viewportIndex) override;
+    virtual void setConstants(const Constants& consts) override;
+    virtual void setDLSSOptions(const DLSSOptions& options) override;
+    virtual bool isDLSSAvailable() const override { return m_dlssAvailable; }
+    virtual void queryDLSSOptimalSettings(const DLSSOptions& options, DLSSSettings& settings) override;
+    virtual void evaluateDLSS(nvrhi::ICommandList* commandList) override;
+    virtual void cleanupDLSS(bool wfi) override;
 
-    virtual void SetNISOptions(const NISOptions& options) override;
-    virtual bool IsNISAvailable() const override { return m_nisAvailable; }
-    virtual void EvaluateNIS(nvrhi::ICommandList* commandList) override;
-    virtual void CleanupNIS(bool wfi) override;
+    virtual void setNISOptions(const NISOptions& options) override;
+    virtual bool isNISAvailable() const override { return m_nisAvailable; }
+    virtual void evaluateNIS(nvrhi::ICommandList* commandList) override;
+    virtual void cleanupNIS(bool wfi) override;
 
-    virtual void SetDeepDVCOptions(const DeepDVCOptions& options) override;
-    virtual bool IsDeepDVCAvailable() const override { return m_deepdvcAvailable; }
-    virtual void QueryDeepDVCState(uint64_t& estimatedVRamUsage) override;
-    virtual void EvaluateDeepDVC(nvrhi::ICommandList* commandList) override;
-    virtual void CleanupDeepDVC() override;
+    virtual void setDeepDVCOptions(const DeepDVCOptions& options) override;
+    virtual bool isDeepDVCAvailable() const override { return m_deepdvcAvailable; }
+    virtual void queryDeepDVCState(uint64_t& estimatedVRamUsage) override;
+    virtual void evaluateDeepDVC(nvrhi::ICommandList* commandList) override;
+    virtual void cleanupDeepDVC() override;
 
-    virtual bool IsReflexAvailable() const override { return m_reflexAvailable; }
-    virtual bool IsPCLAvailable() const override { return m_pclAvailable; }
-    virtual void SetReflexConsts(const ReflexOptions& options) override;
-    virtual void GetReflexState(ReflexState& state) const override;
-    virtual void ReflexTriggerFlash(int frameNumber) override;
-    virtual void ReflexTriggerPcPing(int frameNumber) override;
+    virtual bool isReflexAvailable() const override { return m_reflexAvailable; }
+    virtual bool isPCLAvailable() const override { return m_pclAvailable; }
+    virtual void setReflexConsts(const ReflexOptions& options) override;
+    virtual void getReflexState(ReflexState& state) const override;
+    virtual void reflexTriggerFlash(int frameNumber) override;
+    virtual void reflexTriggerPcPing(int frameNumber) override;
 
-    virtual void GetDLSSGState(DLSSGState& state, const DLSSGOptions& options) override;
-    virtual void SetDLSSGOptions(const DLSSGOptions& options) override;
-    virtual bool IsDLSSGAvailable() const override { return m_dlssgAvailable; }
-    virtual void CleanupDLSSG(bool wfi) override;
+    virtual void getDLSSGState(DLSSGState& state, const DLSSGOptions& options) override;
+    virtual void setDLSSGOptions(const DLSSGOptions& options) override;
+    virtual bool isDLSSGAvailable() const override { return m_dlssgAvailable; }
+    virtual void cleanupDLSSG(bool wfi) override;
 
-    virtual void SetDLSSRROptions(const DLSSRROptions& options) override;
-    virtual bool IsDLSSRRAvailable() const override { return m_dlssrrAvailable; }
-    virtual void QueryDLSSRROptimalSettings(const DLSSRROptions& options, DLSSRRSettings& settings) override;
-    virtual void EvaluateDLSSRR(nvrhi::ICommandList* commandList) override;
-    virtual void CleanupDLSSRR(bool wfi) override;
+    virtual void setDLSSRROptions(const DLSSRROptions& options) override;
+    virtual bool isDLSSRRAvailable() const override { return m_dlssrrAvailable; }
+    virtual void queryDLSSRROptimalSettings(const DLSSRROptions& options, DLSSRRSettings& settings) override;
+    virtual void evaluateDLSSRR(nvrhi::ICommandList* commandList) override;
+    virtual void cleanupDLSSRR(bool wfi) override;
 
-    virtual void TagResourcesGeneral(
+    virtual void tagResourcesGeneral(
         nvrhi::ICommandList* commandList,
         const caustica::IView* view,
         nvrhi::ITexture* motionVectors,
         nvrhi::ITexture* depth,
         nvrhi::ITexture* finalColorHudless) override;
 
-    virtual void TagResourcesDLSSNIS(
+    virtual void tagResourcesDLSSNIS(
         nvrhi::ICommandList* commandList,
         const caustica::IView* view,
         nvrhi::ITexture* output,
         nvrhi::ITexture* input) override;
 
-    virtual void TagResourcesDLSSFG(
+    virtual void tagResourcesDLSSFG(
         nvrhi::ICommandList* commandList,
         bool validViewportExtent = false,
         const Extent &backBufferExtent = {}) override;
 
-    virtual void TagResourcesDeepDVC(
+    virtual void tagResourcesDeepDVC(
         nvrhi::ICommandList* commandList,
         const caustica::IView* view,
         nvrhi::ITexture* output) override;
 
-    virtual void UnTagResourcesDeepDVC() override;
+    virtual void unTagResourcesDeepDVC() override;
 
     // * If roughness != nullptr, normalsAndOptionalRoughness contains only normals. If roughness == nullptr then the 
     //   roughness value should be in .a channel of the normalsAndOptionalRoughness and normalRoughnessMode in 
     //   StreamlineInterface::DLSSRROptions must be set to DLSSRRNormalRoughnessMode::ePacked.
     // * Either specHitDist or specMotionVectors should be provided but not both nor neither. Refer to DLSS-RR 
     //   documentation for more detail.
-    virtual void TagResourcesDLSSRR(
+    virtual void tagResourcesDLSSRR(
         nvrhi::ICommandList* commandList,
         const caustica::IView* view,
         dm::int2 renderSize,
@@ -99,11 +99,11 @@ public:
     ) override;
 private:
     StreamlineIntegration() {}
-    void UpdateFeatureAvailable();
-    uint32_t CheckNumSupportedFeatures(const sl::AdapterInfo& adapterInfo);
+    void updateFeatureAvailable();
+    uint32_t checkNumSupportedFeatures(const sl::AdapterInfo& adapterInfo);
 
-    nvrhi::Object GetNativeCommandList(nvrhi::ICommandList* commandList);
-    void WaitForDLSSGInputsProcessing();
+    nvrhi::Object getNativeCommandList(nvrhi::ICommandList* commandList);
+    void waitForDLSSGInputsProcessing();
 
     bool m_slInitialized = false;
     nvrhi::GraphicsAPI m_api = nvrhi::GraphicsAPI::D3D12;
@@ -121,9 +121,9 @@ private:
     bool m_reflexAvailable = false;
     bool m_pclAvailable = false;
 
-    static sl::Resource AllocateResourceCallback(const sl::ResourceAllocationDesc* resDesc, void* device);
-    static void ReleaseResourceCallback(sl::Resource* resource, void* device);
-    static bool UpgradeInterface(IUnknown*& interfacePointer);
+    static sl::Resource allocateResourceCallback(const sl::ResourceAllocationDesc* resDesc, void* device);
+    static void releaseResourceCallback(sl::Resource* resource, void* device);
+    static bool upgradeInterface(IUnknown*& interfacePointer);
 
     sl::FrameToken* m_currentFrame = nullptr;
     sl::ViewportHandle m_viewport = {0};
@@ -142,14 +142,14 @@ public:
     StreamlineIntegration& operator=(const StreamlineIntegration&) = delete;
     StreamlineIntegration& operator=(StreamlineIntegration&&) = delete;
 
-    void SimStart(GpuDevice& manager) override;
-    void SimEnd(GpuDevice& manager) override;
-    void RenderStart(GpuDevice& manager) override;
-    void RenderEnd(GpuDevice& manager) override;
-    void PresentStart(GpuDevice& manager) override;
-    void PresentEnd(GpuDevice& manager) override;
+    void simStart(GpuDevice& manager) override;
+    void simEnd(GpuDevice& manager) override;
+    void renderStart(GpuDevice& manager) override;
+    void renderEnd(GpuDevice& manager) override;
+    void presentStart(GpuDevice& manager) override;
+    void presentEnd(GpuDevice& manager) override;
 
-    // Captures the Streamline frame token for the current sim frame (call after SimEnd on the main thread).
+    // Captures the Streamline frame token for the current sim frame (call after simEnd on the main thread).
     void* getFrameTokenForRender() const { return m_currentFrame; }
 
     class RenderFrameTokenScope
@@ -161,26 +161,26 @@ public:
         RenderFrameTokenScope& operator=(const RenderFrameTokenScope&) = delete;
     };
 
-    bool InitializePreDevice(nvrhi::GraphicsAPI api, int appId, const bool checkSig = true, const bool enableLog = false);
+    bool initializePreDevice(nvrhi::GraphicsAPI api, int appId, const bool checkSig = true, const bool enableLog = false);
 #if CAUSTICA_WITH_DX11 || CAUSTICA_WITH_DX12
-    bool SetD3DDevice(IUnknown* nativeDevice);
-    bool InitializeDeviceDX(nvrhi::IDevice *device, AdapterInfo::LUID* pAdapterIdDx11 = nullptr);
+    bool setD3DDevice(IUnknown* nativeDevice);
+    bool initializeDeviceDX(nvrhi::IDevice *device, AdapterInfo::LUID* pAdapterIdDx11 = nullptr);
     // In-place slUpgradeInterface of a raw pointer
     template<typename T>
-    static inline bool UpgradeInterface(T*& interfacePointer)
+    static inline bool upgradeInterface(T*& interfacePointer)
     {
         // Ensure that T derives from IUnknown
         static_assert(std::is_base_of<IUnknown, T>::value);
-        return UpgradeInterface((IUnknown*&)interfacePointer);
+        return upgradeInterface((IUnknown*&)interfacePointer);
     }
     // In-place slUpgradeInterface of a nvrhi::RefCountPtr
     template<typename T>
-    static inline bool UpgradeInterface(nvrhi::RefCountPtr<T>& interfacePointer)
+    static inline bool upgradeInterface(nvrhi::RefCountPtr<T>& interfacePointer)
     {
         // Ensure that T derives from IUnknown
         static_assert(std::is_base_of<IUnknown, T>::value);
-        T* rawPointer = interfacePointer; // We need to pass a raw pointer to UpgradeInterface
-        bool result = UpgradeInterface(rawPointer);
+        T* rawPointer = interfacePointer; // We need to pass a raw pointer to upgradeInterface
+        bool result = upgradeInterface(rawPointer);
         interfacePointer = rawPointer;
         return result;
     }
@@ -206,17 +206,17 @@ public:
         uint32_t graphicsQueueCreateFlags{};
         uint32_t opticalFlowQueueCreateFlags{};
     };
-    bool InitializeDeviceVK(nvrhi::IDevice* device, const VulkanInfo& vulkanInfo);
+    bool initializeDeviceVK(nvrhi::IDevice* device, const VulkanInfo& vulkanInfo);
 #endif
 
-    void Shutdown();
+    void shutdown();
 
 #if CAUSTICA_WITH_DX11 || CAUSTICA_WITH_DX12
-    uint32_t FindBestAdapterDX();
+    uint32_t findBestAdapterDX();
 #endif
 
 #if CAUSTICA_WITH_VULKAN
-    uint32_t FindBestAdapterVulkan(const std::vector <vk::PhysicalDevice>& vkDevices);
+    uint32_t findBestAdapterVulkan(const std::vector <vk::PhysicalDevice>& vkDevices);
 #endif
 };
 

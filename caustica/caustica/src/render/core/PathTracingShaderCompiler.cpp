@@ -81,12 +81,12 @@ void PTPipelineVariant::ShaderPermutation::compileIfNeeded()
 
     caustica::info("Compiling shader '%s' file '%s'...", permutationName.c_str(), compiledFullPath.c_str() );
 
-    auto [resNum, resString, resErrorString] = SystemShell(usCompileCmdLine, false);
+    auto [resNum, resString, resErrorString] = systemShell(usCompileCmdLine, false);
 
     usCompileError = "";
 
     if (resErrorString != "")
-        usCompileError = StringFormat("ERROR compiling shader, command \n   %s\n result: \n   %s", usCompileCmdLine.c_str(), resErrorString.c_str());
+        usCompileError = stringFormat("ERROR compiling shader, command \n   %s\n result: \n   %s", usCompileCmdLine.c_str(), resErrorString.c_str());
 
     if (usCompileError != "")
         caustica::warning(usCompileError.c_str());
@@ -109,7 +109,7 @@ void PTPipelineVariant::ShaderPermutation::loadShaderLibraryIfNeeded(PathTracing
 
     if (!shaderLibrary)
     {
-        usCompileError = StringFormat(
+        usCompileError = stringFormat(
             "Failed to load shader library '%s' (pack path '%s').",
             compiledFullPath.c_str(),
             packVfsPath.c_str());
@@ -164,7 +164,7 @@ void PTPipelineVariant::ShaderPermutation::resolveCacheIdentity(
 
     if (!compiler.canCompileShaders())
     {
-        usCompileError = StringFormat(
+        usCompileError = stringFormat(
             "Missing precompiled shader '%s' for permutation '%s' and runtime shader compilation is disabled.",
             compiledFullPath.c_str(),
             permutationName.c_str());
@@ -176,12 +176,12 @@ void PTPipelineVariant::ShaderPermutation::resolveCacheIdentity(
             macroList += macro.name + "=" + macro.definition;
         }
         if (!macroList.empty())
-            usCompileError += StringFormat(" Macros: [%s]", macroList.c_str());
+            usCompileError += stringFormat(" Macros: [%s]", macroList.c_str());
         caustica::error("%s", usCompileError.c_str());
         return;
     }
 
-    EnsureDirectoryExists(std::filesystem::path(compiledFullPath).parent_path());
+    ensureDirectoryExists(std::filesystem::path(compiledFullPath).parent_path());
 
     const std::filesystem::path pdbPath =
         compiler.getDevice()->getGraphicsAPI() == nvrhi::GraphicsAPI::VULKAN || c_PTEmbedPdbs
@@ -205,7 +205,7 @@ PTPipelineVariant::PTPipelineVariant(const std::string & relativeSourcePath, con
 
     // short unique ID distinguishes exports between pipeline variants and must be safe for HLSL entry point names
 #if PIPELINE_BAKER_ENABLE_VERBOSE_FUNCTION_NAMING
-    m_shortUniqueDebugID = StripNonAsciiAlnum(shortUniqueDebugID);
+    m_shortUniqueDebugID = stripNonAsciiAlnum(shortUniqueDebugID);
     assert( shortUniqueDebugID == m_shortUniqueDebugID ); // short unique debug ID must not contain any of the forbidden characters or bad things will happen, very bad
     if (m_shortUniqueDebugID.size()>6)
     {
@@ -434,8 +434,8 @@ PathTracingShaderCompiler::PathTracingShaderCompiler(nvrhi::IDevice* device, std
         caustica::fatal("Failed to initialize shader compiler configuration");
 
     m_shadersFS = std::make_shared<caustica::RootFileSystem>();
-    const char* shaderTypeName = caustica::GetShaderTypeName(device->getGraphicsAPI());
-    const std::filesystem::path shaderPackPath = GetRuntimeDirectory() / (std::string("caustica.shaders.") + shaderTypeName + ".pack");
+    const char* shaderTypeName = caustica::getShaderTypeName(device->getGraphicsAPI());
+    const std::filesystem::path shaderPackPath = getRuntimeDirectory() / (std::string("caustica.shaders.") + shaderTypeName + ".pack");
     auto shaderPackFS = std::make_shared<ShaderPackFileSystem>(shaderPackPath, c_PTShaderBinariesRoot);
     const bool shaderPackHasDynamicBins = shaderPackFS->hasDynamicBinLayout(m_compilerConfig.ShaderBinariesPath);
     if (shaderPackFS->isOpen() && !shaderPackHasDynamicBins)
@@ -536,7 +536,7 @@ void PathTracingShaderCompiler::update(const std::shared_ptr<caustica::Scene>& s
         if (elapsed >= m_autoReloadPollIntervalSeconds)
         {
             lastPollTime = now;
-            auto currentTimestamp = GetLatestModifiedTimeDirectoryRecursive(m_compilerConfig.ShadersPath);
+            auto currentTimestamp = getLatestModifiedTimeDirectoryRecursive(m_compilerConfig.ShadersPath);
             
             if (currentTimestamp.has_value())
             {
@@ -619,11 +619,11 @@ void PathTracingShaderCompiler::update(const std::shared_ptr<caustica::Scene>& s
         if (m_compilerConfig.canCompile())
         {
             // we need the output folder
-            EnsureDirectoryExists(m_compilerConfig.ShaderBinariesPath);
+            ensureDirectoryExists(m_compilerConfig.ShaderBinariesPath);
         }
 
         std::optional<std::filesystem::file_time_type> a = m_compilerConfig.canCompile()
-            ? GetLatestModifiedTimeDirectoryRecursive(m_compilerConfig.ShadersPath)
+            ? getLatestModifiedTimeDirectoryRecursive(m_compilerConfig.ShadersPath)
             : std::optional<std::filesystem::file_time_type>(std::filesystem::file_time_type::min());
         // let's not track externals for perf reasons but here's the code in case it's needed
         //std::optional<std::filesystem::file_time_type> b = GetLatestModifiedTimeRecursive(m_compilerConfig.ShadersPathExternalIncludes1);
@@ -665,7 +665,7 @@ void PathTracingShaderCompiler::update(const std::shared_ptr<caustica::Scene>& s
         progressCounterCompleted = 0;
         progressTotal = (int)m_parallelCompileListUnique.size();
         if (m_parallelCompileListUnique.size() > 0)
-            progressCompilingShaders.Start(StringFormat("Compiling shaders (%d)...", progressTotal).c_str());
+            progressCompilingShaders.start(stringFormat("Compiling shaders (%d)...", progressTotal).c_str());
         else if (isLoadOnlyMode() && !updateQueue.empty())
             caustica::info("PathTracingShaderCompiler: loading precompiled RT shader libraries...");
 
@@ -678,7 +678,7 @@ void PathTracingShaderCompiler::update(const std::shared_ptr<caustica::Scene>& s
             } // not sure why this would happen
 
 #if BAKER_ENABLE_MULTITHREADED_COMPILE_SHADER
-            m_threadPool.AddTask([ this, permutation, &progressCompilingShaders, &progressCounterCompleted, progressTotal ]() {
+            m_threadPool.addTask([ this, permutation, &progressCompilingShaders, &progressCounterCompleted, progressTotal ]() {
 #endif
                 permutation->compileIfNeeded();
                 int completed = progressCounterCompleted.fetch_add(1) + 1;
@@ -691,7 +691,7 @@ void PathTracingShaderCompiler::update(const std::shared_ptr<caustica::Scene>& s
 
 // wait for all to complete
 #if BAKER_ENABLE_MULTITHREADED_COMPILE_SHADER
-        m_threadPool.WaitForTasks();
+        m_threadPool.waitForTasks();
 #endif
  
         std::string firstError = "";
@@ -723,7 +723,7 @@ void PathTracingShaderCompiler::update(const std::shared_ptr<caustica::Scene>& s
         progressCounterCompleted = 0;
         progressTotal = (int)updateQueue.size();
         if (progressTotal > 0)
-            progressCompilingPSOs.Start( StringFormat("Compiling PSOs (%d)...", progressTotal).c_str() );
+            progressCompilingPSOs.start( stringFormat("Compiling PSOs (%d)...", progressTotal).c_str() );
 
         if (!updateQueue.empty() && firstError == "")
         {
@@ -732,7 +732,7 @@ void PathTracingShaderCompiler::update(const std::shared_ptr<caustica::Scene>& s
             for (const std::shared_ptr<PTPipelineVariant>& variant : updateQueue)
             {
     #if BAKER_ENABLE_MULTITHREADED_COMPILE_PSO
-                m_threadPool.AddTask([this, variant, &progressCompilingPSOs, &progressCounterCompleted, progressTotal ](){
+                m_threadPool.addTask([this, variant, &progressCompilingPSOs, &progressCounterCompleted, progressTotal ](){
     #endif
                 variant->updateFinalize();
                 int completed = progressCounterCompleted.fetch_add(1)+1;
@@ -742,7 +742,7 @@ void PathTracingShaderCompiler::update(const std::shared_ptr<caustica::Scene>& s
     #endif
             }
     #if BAKER_ENABLE_MULTITHREADED_COMPILE_PSO
-            m_threadPool.WaitForTasks();
+            m_threadPool.waitForTasks();
     #endif
 
             progressCompilingPSOs.Set(100);
@@ -754,9 +754,9 @@ void PathTracingShaderCompiler::update(const std::shared_ptr<caustica::Scene>& s
             caustica::error("%s", firstError.c_str());
             bool retry = false;
 #if _WIN32
-            if (!HelpersIsNonInteractive())
+            if (!helpersIsNonInteractive())
             {
-                int result = MessageBoxA((HWND)HelpersGetActiveWindow(), firstError.c_str(),
+                int result = MessageBoxA((HWND)helpersGetActiveWindow(), firstError.c_str(),
                     "Shader compile error", MB_RETRYCANCEL | MB_ICONWARNING | MB_SETFOREGROUND | MB_TASKMODAL);
                 retry = result != IDCANCEL;
             }

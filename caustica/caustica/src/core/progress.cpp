@@ -229,7 +229,7 @@ namespace
 } // anonymous namespace
 
 // --- ProgressBar ---
-bool ProgressBar::Start(const char* windowText)
+bool ProgressBar::start(const char* windowText)
 {
     std::lock_guard lock(m_mtx);
     assert(!Active());
@@ -246,7 +246,7 @@ void ProgressBar::Set(int percentage)
         ProgressBarUpdateImpl(m_slot, percentage);
 }
 
-void ProgressBar::Stop()
+void ProgressBar::stop()
 {
     std::lock_guard lock(m_mtx);
     if (Active())
@@ -261,23 +261,23 @@ bool ProgressBar::Active() const
 }
 
 // --- helpers ---
-void HelpersSetNonInteractive() { g_NonInteractive = true; }
-bool HelpersIsNonInteractive() { return g_NonInteractive; }
+void helpersSetNonInteractive() { g_NonInteractive = true; }
+bool helpersIsNonInteractive() { return g_NonInteractive; }
 
 #ifdef _WIN32
-void HelpersRegisterActiveWindow(void* nativeWindowHandle)
+void helpersRegisterActiveWindow(void* nativeWindowHandle)
 {
     HWND hwnd = nativeWindowHandle ? static_cast<HWND>(nativeWindowHandle) : GetActiveWindow();
     g_hActiveParentWindow.store(hwnd);
 }
 
-void* HelpersGetActiveWindow()
+void* helpersGetActiveWindow()
 {
     return g_hActiveParentWindow.load();
 }
 #else
-void HelpersRegisterActiveWindow() {}
-void* HelpersGetActiveWindow() { return nullptr; }
+void helpersRegisterActiveWindow() {}
+void* helpersGetActiveWindow() { return nullptr; }
 #endif
 
 } // namespace caustica

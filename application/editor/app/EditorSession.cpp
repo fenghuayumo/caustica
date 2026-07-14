@@ -10,8 +10,8 @@ EditorSession::EditorSession()
 
 void installEditorLogFilter(EditorSession& /*session*/)
 {
-    Callback defaultCallback = GetCallback();
-    SetCallback([defaultCallback](Severity severity, const char* message) {
+    Callback defaultCallback = getCallback();
+    setCallback([defaultCallback](Severity severity, const char* message) {
         if (severity == Severity::Error)
         {
             std::string msg(message);

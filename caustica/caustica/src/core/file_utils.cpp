@@ -8,7 +8,7 @@
 namespace caustica
 {
 
-bool EnsureDirectoryExists(const std::filesystem::path& dir)
+bool ensureDirectoryExists(const std::filesystem::path& dir)
 {
     if (std::filesystem::exists(dir))
     {
@@ -44,7 +44,7 @@ bool EnsureDirectoryExists(const std::filesystem::path& dir)
     return true;
 }
 
-std::vector<std::filesystem::path> EnumerateFilesWithWildcard(
+std::vector<std::filesystem::path> enumerateFilesWithWildcard(
     const std::filesystem::path& folder, const std::string& wildcard)
 {
     // Convert wildcard to regex: ? -> ., * -> .*
@@ -74,7 +74,7 @@ std::vector<std::filesystem::path> EnumerateFilesWithWildcard(
     return result;
 }
 
-std::string StringLoadFromFile(const std::filesystem::path& filePath)
+std::string stringLoadFromFile(const std::filesystem::path& filePath)
 {
     std::ifstream file(filePath);
     if (!file)
@@ -85,7 +85,7 @@ std::string StringLoadFromFile(const std::filesystem::path& filePath)
     return buffer.str();
 }
 
-std::optional<std::filesystem::file_time_type> GetLatestModifiedTimeDirectoryRecursive(
+std::optional<std::filesystem::file_time_type> getLatestModifiedTimeDirectoryRecursive(
     const std::filesystem::path& directory)
 {
     namespace fs = std::filesystem;
@@ -126,7 +126,7 @@ std::optional<std::filesystem::file_time_type> GetLatestModifiedTimeDirectoryRec
     return latest_time;
 }
 
-std::optional<std::filesystem::file_time_type> GetFileModifiedTime(
+std::optional<std::filesystem::file_time_type> getFileModifiedTime(
     const std::filesystem::path& file)
 {
     namespace fs = std::filesystem;

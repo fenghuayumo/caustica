@@ -87,27 +87,27 @@ namespace caustica::math
 
     // Returns true if the CPU supports F16C instructions (x64 only)
     // See https://en.wikipedia.org/wiki/F16C
-    bool IsF16CSupported();
+    bool isF16CSupported();
     
     // Enables the use of F16C instructions, if supported (x64 only)
-    void EnableF16C(bool enable);
+    void enableF16C(bool enable);
 
-    float16_t Float32ToFloat16(float x);
-    float16_t2 Float32ToFloat16x2(float2 x);
-    float16_t4 Float32ToFloat16x4(float4 x);
-    float Float16ToFloat32(float16_t x);
-    float2 Float16ToFloat32x2(float16_t2 x);
-    float4 Float16ToFloat32x4(float16_t4 x);
+    float16_t float32ToFloat16(float x);
+    float16_t2 float32ToFloat16x2(float2 x);
+    float16_t4 float32ToFloat16x4(float4 x);
+    float float16ToFloat32(float16_t x);
+    float2 float16ToFloat32x2(float16_t2 x);
+    float4 float16ToFloat32x4(float16_t4 x);
 
-    float8e4m3_t Float32ToFloat8E4M3(float x);
-    float8e4m3_t4 Float32ToFloat8E4M3x4(float4 x);
-    float Float8E4M3ToFloat32(float8e4m3_t x);
-    float4 Float8E4M3ToFloat32x4(float8e4m3_t4 x);
+    float8e4m3_t float32ToFloat8E4M3(float x);
+    float8e4m3_t4 float32ToFloat8E4M3x4(float4 x);
+    float float8E4M3ToFloat32(float8e4m3_t x);
+    float4 float8E4M3ToFloat32x4(float8e4m3_t4 x);
     
-    float8e5m2_t Float32ToFloat8E5M2(float x);
-    float8e5m2_t4 Float32ToFloat8E5M2x4(float4 x);
-    float Float8E5M2ToFloat32(float8e5m2_t x);
-    float4 Float8E5M2ToFloat32x4(float8e5m2_t4 x);
+    float8e5m2_t float32ToFloat8E5M2(float x);
+    float8e5m2_t4 float32ToFloat8E5M2x4(float4 x);
+    float float8E5M2ToFloat32(float8e5m2_t x);
+    float4 float8E5M2ToFloat32x4(float8e5m2_t4 x);
 }
 
 namespace std

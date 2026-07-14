@@ -462,7 +462,7 @@ bool Scene::loadWithThreadPool(const std::filesystem::path& sceneFileName, Threa
         loadModelAsync(0, sceneFileName, threadPool);
 
         if (threadPool)
-            threadPool->WaitForTasks();
+            threadPool->waitForTasks();
 
         const auto& modelResult = m_Models[0];
         if (!modelResult.entityWorld || !ecs::isValid(modelResult.rootEntity))
@@ -541,7 +541,7 @@ void Scene::loadModelAsync(
 {   
     if (threadPool)
     {
-        threadPool->AddTask([this, index, threadPool, fileName]()
+        threadPool->addTask([this, index, threadPool, fileName]()
         {
             SceneImportResult result;
             loadModelFile(fileName, threadPool, result);
@@ -611,7 +611,7 @@ void Scene::loadModels(
     }
 
     if (threadPool)
-        threadPool->WaitForTasks();
+        threadPool->waitForTasks();
 }
 
 SceneImportResult Scene::loadBuiltinModel(const std::string& builtinName)
@@ -883,22 +883,22 @@ void Scene::loadAnimations(const Json::Value& nodeList)
                 if (modeNode.isString())
                 {
                     if (modeNode.asString() == "step")
-                        sampler->SetInterpolationMode(animation::InterpolationMode::Step);
+                        sampler->setInterpolationMode(animation::InterpolationMode::Step);
                     else if (modeNode.asString() == "linear")
-                        sampler->SetInterpolationMode(animation::InterpolationMode::Linear);
+                        sampler->setInterpolationMode(animation::InterpolationMode::Linear);
                     else if (modeNode.asString() == "slerp")
-                        sampler->SetInterpolationMode(animation::InterpolationMode::Slerp);
+                        sampler->setInterpolationMode(animation::InterpolationMode::Slerp);
                     else if (modeNode.asString() == "hermite")
-                        sampler->SetInterpolationMode(animation::InterpolationMode::HermiteSpline);
+                        sampler->setInterpolationMode(animation::InterpolationMode::HermiteSpline);
                     else if (modeNode.asString() == "catmull-rom")
-                        sampler->SetInterpolationMode(animation::InterpolationMode::CatmullRomSpline);
+                        sampler->setInterpolationMode(animation::InterpolationMode::CatmullRomSpline);
                     else
                         caustica::warning("Unknown interpolation mode '%s' specified for animation '%s' channel %d.",
                             modeNode.asCString(), animationName.c_str(), channelIndex);
                 }
                 else
                 {
-                    sampler->SetInterpolationMode(animation::InterpolationMode::Step);
+                    sampler->setInterpolationMode(animation::InterpolationMode::Step);
                     caustica::warning("Interpolation mode is not specified for animation '%s' channel %d, using step.",
                         animationName.c_str(), channelIndex);
                 }
@@ -942,7 +942,7 @@ void Scene::loadAnimations(const Json::Value& nodeList)
                     keyframe.inTangent = ReadUpToFloat4(dataPoint["inTangent"]);
                     keyframe.outTangent = ReadUpToFloat4(dataPoint["outTangent"]);
 
-                    sampler->AddKeyframe(keyframe);
+                    sampler->addKeyframe(keyframe);
                 }
 
                 auto processTarget = [this, &component, &sampler, attribute, &attributeNode, channelIndex, &animationName](

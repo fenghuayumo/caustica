@@ -52,7 +52,7 @@ private:
     void buildDeltaTreeViz();
 
     virtual bool mousePosUpdate(double xpos, double ypos);
-    virtual void DisplayScaleChanged(float scaleX, float scaleY) override { m_currentScale = scaleX; assert( scaleX == scaleY ); }
+    virtual void displayScaleChanged(float scaleX, float scaleY) override { m_currentScale = scaleX; assert( scaleX == scaleY ); }
     virtual void animate(float elapsedTimeSeconds) override;
 
     bool BuildUIScriptsAndEtc(void);

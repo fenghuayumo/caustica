@@ -6,7 +6,7 @@ namespace caustica
 {
 
 // Returns "dxil", "dxbc", or "spirv" based on the graphics API.
-inline const char* GetShaderTypeName(nvrhi::GraphicsAPI api)
+inline const char* getShaderTypeName(nvrhi::GraphicsAPI api)
 {
     switch (api)
     {

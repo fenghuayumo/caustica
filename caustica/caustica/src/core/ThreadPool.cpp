@@ -16,10 +16,10 @@ ThreadPool::ThreadPool(uint32_t /*numThreads*/)
 
 ThreadPool::~ThreadPool()
 {
-    WaitForTasks();
+    waitForTasks();
 }
 
-void ThreadPool::AddTask(std::shared_ptr<ThreadPoolTask> const& task)
+void ThreadPool::addTask(std::shared_ptr<ThreadPoolTask> const& task)
 {
     // capture the shared_ptr to keep the task alive
     JobSystem::execute(m_Context, [task]() {
@@ -27,14 +27,14 @@ void ThreadPool::AddTask(std::shared_ptr<ThreadPoolTask> const& task)
     });
 }
 
-void ThreadPool::AddTask(std::function<void()> func)
+void ThreadPool::addTask(std::function<void()> func)
 {
     JobSystem::execute(m_Context, std::move(func));
 }
 
-void ThreadPool::WaitForTasks()
+void ThreadPool::waitForTasks()
 {
-    JobSystem::Wait(m_Context);
+    JobSystem::wait(m_Context);
 }
 
 }

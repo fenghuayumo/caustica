@@ -41,11 +41,11 @@ void requestViewportPick(caustica::render::RenderRuntimeState& runtime, const dm
 
 bool onKeyPressed(SceneEditor& sceneEditor, caustica::KeyPressedEvent& e)
 {
-    const int key = ToGlfwKey(e.GetKeyCode());
-    const int mods = ToGlfwMods(e.GetModifiers());
-    const int action = e.IsRepeat() ? cGlfwRepeat : cGlfwPress;
+    const int key = ToGlfwKey(e.getKeyCode());
+    const int mods = ToGlfwMods(e.getModifiers());
+    const int action = e.isRepeat() ? cGlfwRepeat : cGlfwPress;
 
-    ImGuiForwardKeyboard(key, action, e.GetScancode());
+    imGuiForwardKeyboard(key, action, e.getScancode());
     if (ImGui::GetIO().WantCaptureKeyboard)
         return true;
 
@@ -57,13 +57,13 @@ bool onKeyPressed(SceneEditor& sceneEditor, caustica::KeyPressedEvent& e)
     auto* game = sceneEditor.GetGame().get();
     auto* camera = &gpuRender->camera();
 
-    if (zoomTool && zoomTool->keyboardUpdate(key, e.GetScancode(), action, mods))
+    if (zoomTool && zoomTool->keyboardUpdate(key, e.getScancode(), action, mods))
         return true;
 
     if (!(game && game->CameraActive()))
-        camera->camera().keyboardUpdate(key, e.GetScancode(), action, mods);
+        camera->camera().keyboardUpdate(key, e.getScancode(), action, mods);
 
-    if (game && game->keyboardUpdate(key, e.GetScancode(), action, mods))
+    if (game && game->keyboardUpdate(key, e.getScancode(), action, mods))
         return true;
 
     auto& session = sceneEditor.renderSessionState();
@@ -83,17 +83,17 @@ bool onKeyPressed(SceneEditor& sceneEditor, caustica::KeyPressedEvent& e)
         session.runtime.Invalidation.ShaderReloadRequested = true;
 #if CAUSTICA_WITH_STREAMLINE
     if (key == ToGlfwKey(caustica::Key::F13) && action == cGlfwPress)
-        sceneEditor.gpuDevice().GetStreamline().ReflexTriggerPcPing(sceneEditor.frameIndex());
+        sceneEditor.gpuDevice().getStreamline().reflexTriggerPcPing(sceneEditor.frameIndex());
 #endif
     return true;
 }
 
 bool onKeyReleased(SceneEditor& sceneEditor, caustica::KeyReleasedEvent& e)
 {
-    const int key = ToGlfwKey(e.GetKeyCode());
-    const int mods = ToGlfwMods(e.GetModifiers());
+    const int key = ToGlfwKey(e.getKeyCode());
+    const int mods = ToGlfwMods(e.getModifiers());
 
-    ImGuiForwardKeyboard(key, cGlfwRelease, e.GetScancode());
+    imGuiForwardKeyboard(key, cGlfwRelease, e.getScancode());
     if (ImGui::GetIO().WantCaptureKeyboard)
         return true;
 
@@ -105,18 +105,18 @@ bool onKeyReleased(SceneEditor& sceneEditor, caustica::KeyReleasedEvent& e)
     auto* game = sceneEditor.GetGame().get();
     auto* camera = &gpuRender->camera();
 
-    if (zoomTool && zoomTool->keyboardUpdate(key, e.GetScancode(), cGlfwRelease, mods))
+    if (zoomTool && zoomTool->keyboardUpdate(key, e.getScancode(), cGlfwRelease, mods))
         return true;
     if (!(game && game->CameraActive()))
-        camera->camera().keyboardUpdate(key, e.GetScancode(), cGlfwRelease, mods);
-    if (game && game->keyboardUpdate(key, e.GetScancode(), cGlfwRelease, mods))
+        camera->camera().keyboardUpdate(key, e.getScancode(), cGlfwRelease, mods);
+    if (game && game->keyboardUpdate(key, e.getScancode(), cGlfwRelease, mods))
         return true;
     return true;
 }
 
 bool onKeyTyped(SceneEditor& /*sceneEditor*/, caustica::KeyTypedEvent& e)
 {
-    ImGuiForwardInputCharacter(e.GetCodepoint());
+    imGuiForwardInputCharacter(e.getCodepoint());
     return ImGui::GetIO().WantTextInput;
 }
 
@@ -135,9 +135,9 @@ bool onMouseMoved(SceneEditor& sceneEditor, caustica::MouseMovedEvent& e)
     auto& session = sceneEditor.renderSessionState();
 
     if (!(game && game->CameraActive()))
-        camera->camera().mousePosUpdate(e.GetX(), e.GetY());
+        camera->camera().mousePosUpdate(e.getX(), e.getY());
     if (game)
-        game->mousePosUpdate(e.GetX(), e.GetY());
+        game->mousePosUpdate(e.getX(), e.getY());
 
     dm::float2 upscalingScale(1.0f, 1.0f);
     if (worldRenderer && worldRenderer->getRenderTargets())
@@ -145,13 +145,13 @@ bool onMouseMoved(SceneEditor& sceneEditor, caustica::MouseMovedEvent& e)
             / dm::float2(worldRenderer->getDisplaySize());
 
     session.runtime.Picking.Position = dm::uint2{
-        static_cast<uint>(e.GetX() * upscalingScale.x),
-        static_cast<uint>(e.GetY() * upscalingScale.y)};
+        static_cast<uint>(e.getX() * upscalingScale.x),
+        static_cast<uint>(e.getY() * upscalingScale.y)};
     session.settings.MousePos = session.runtime.Picking.Position;
 
     auto* zoomTool = sceneEditor.GetZoomTool().get();
     if (zoomTool)
-        zoomTool->mousePosUpdate(e.GetX(), e.GetY());
+        zoomTool->mousePosUpdate(e.getX(), e.getY());
     return true;
 }
 
@@ -164,8 +164,8 @@ bool onMouseButtonPressed(SceneEditor& sceneEditor, caustica::MouseButtonPressed
     if (!gpuRender)
         return true;
 
-    const int button = ToGlfwMouse(e.GetButton());
-    const int mods = ToGlfwMods(e.GetModifiers());
+    const int button = ToGlfwMouse(e.getButton());
+    const int mods = ToGlfwMods(e.getModifiers());
 
     auto* zoomTool = sceneEditor.GetZoomTool().get();
     auto* game = sceneEditor.GetGame().get();
@@ -185,7 +185,7 @@ bool onMouseButtonPressed(SceneEditor& sceneEditor, caustica::MouseButtonPressed
     }
 #if CAUSTICA_WITH_STREAMLINE
     if (button == ToGlfwMouse(caustica::Mouse::Left))
-        sceneEditor.gpuDevice().GetStreamline().ReflexTriggerFlash(sceneEditor.frameIndex());
+        sceneEditor.gpuDevice().getStreamline().reflexTriggerFlash(sceneEditor.frameIndex());
 #endif
     return true;
 }
@@ -199,8 +199,8 @@ bool onMouseButtonReleased(SceneEditor& sceneEditor, caustica::MouseButtonReleas
     if (!gpuRender)
         return true;
 
-    const int button = ToGlfwMouse(e.GetButton());
-    const int mods = ToGlfwMods(e.GetModifiers());
+    const int button = ToGlfwMouse(e.getButton());
+    const int mods = ToGlfwMods(e.getModifiers());
 
     auto* zoomTool = sceneEditor.GetZoomTool().get();
     auto* game = sceneEditor.GetGame().get();
@@ -218,13 +218,13 @@ bool onMouseButtonReleased(SceneEditor& sceneEditor, caustica::MouseButtonReleas
 bool onMouseScrolled(SceneEditor& sceneEditor, caustica::MouseScrolledEvent& e)
 {
     ImGuiIO& io = ImGui::GetIO();
-    io.AddMouseWheelEvent(static_cast<float>(e.GetXOffset()), static_cast<float>(e.GetYOffset()));
+    io.AddMouseWheelEvent(static_cast<float>(e.getXOffset()), static_cast<float>(e.getYOffset()));
     if (io.WantCaptureMouse)
         return true;
 
     auto* game = sceneEditor.GetGame().get();
     if (!(game && game->CameraActive()))
-        sceneEditor.renderSessionState().settings.CameraMoveSpeed *= 1.0f + static_cast<float>(e.GetYOffset()) * 0.1f;
+        sceneEditor.renderSessionState().settings.CameraMoveSpeed *= 1.0f + static_cast<float>(e.getYOffset()) * 0.1f;
     return true;
 }
 

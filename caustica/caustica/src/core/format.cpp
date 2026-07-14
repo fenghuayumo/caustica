@@ -9,12 +9,12 @@
 namespace caustica
 {
 
-std::string HexString(unsigned int value)
+std::string hexString(unsigned int value)
 {
     return std::format("{:08x}", value);
 }
 
-std::string StripNonAsciiAlnum(const std::string& input)
+std::string stripNonAsciiAlnum(const std::string& input)
 {
     std::string result;
     result.reserve(input.size());
@@ -25,7 +25,7 @@ std::string StripNonAsciiAlnum(const std::string& input)
     return result;
 }
 
-size_t FindSubStringIgnoreCase(const std::string& text, const std::string& subString)
+size_t findSubStringIgnoreCase(const std::string& text, const std::string& subString)
 {
     auto toLower = [](char ch) {
         return static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
@@ -51,7 +51,7 @@ size_t FindSubStringIgnoreCase(const std::string& text, const std::string& subSt
     return std::string::npos;
 }
 
-bool EqualsIgnoreCase(const std::string& a, const std::string& b)
+bool equalsIgnoreCase(const std::string& a, const std::string& b)
 {
     if (a.size() != b.size())
         return false;
@@ -73,7 +73,7 @@ namespace
     }
 }
 
-bool ParseFloat3Consume(std::string& s, dm::float3& out)
+bool parseFloat3Consume(std::string& s, dm::float3& out)
 {
     const char* begin = s.data();
     const char* p = begin;

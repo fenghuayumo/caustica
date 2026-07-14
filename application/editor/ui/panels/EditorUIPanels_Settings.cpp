@@ -71,8 +71,8 @@ void EditorUI::BuildSystemPanel(const PanelLayout& layout)
             if (ImGui::CollapsingHeader("Info")) //, ImGuiTreeNodeFlags_DefaultOpen))
             {
                 caustica::VideoMemoryInfo videoMemoryInfo;
-                if (caustica::GpuDevice* device = GetGpuDevice();
-                    device && device->QueryVideoMemoryInfo(videoMemoryInfo))
+                if (caustica::GpuDevice* device = getGpuDevice();
+                    device && device->queryVideoMemoryInfo(videoMemoryInfo))
                 {
                     ImGui::TextColored(categoryColor, "Video memory:");
                     const uint64_t budget = videoMemoryInfo.budget / (1024 * 1024);

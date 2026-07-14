@@ -82,7 +82,7 @@ public:
     std::shared_ptr<AudioData const> loadFromFile(const std::filesystem::path & path);
 
     // Asynchronous read
-    std::shared_ptr<AudioData const> LoadFromFileAsync(const std::filesystem::path & path, ThreadPool& threadPool);
+    std::shared_ptr<AudioData const> loadFromFileAsync(const std::filesystem::path & path, ThreadPool& threadPool);
 
 private:
 

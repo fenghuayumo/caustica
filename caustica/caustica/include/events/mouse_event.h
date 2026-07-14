@@ -18,14 +18,14 @@ public:
         : m_MouseX(x), m_MouseY(y)
     {}
 
-    double GetX() const { return m_MouseX; }
-    double GetY() const { return m_MouseY; }
+    double getX() const { return m_MouseX; }
+    double getY() const { return m_MouseY; }
 
     EVENT_CLASS_TYPE(MouseMoved);
     EVENT_CLASS_CATEGORY_FLAGS(EventCategory::Input | EventCategory::Mouse);
 
-    const char* GetName() const override { return "MouseMoved"; }
-    std::string ToString() const override
+    const char* getName() const override { return "MouseMoved"; }
+    std::string toString() const override
     {
         std::ostringstream ss;
         ss << "MouseMoved: x=" << m_MouseX << " y=" << m_MouseY;
@@ -47,14 +47,14 @@ public:
         : m_XOffset(xoffset), m_YOffset(yoffset)
     {}
 
-    double GetXOffset() const { return m_XOffset; }
-    double GetYOffset() const { return m_YOffset; }
+    double getXOffset() const { return m_XOffset; }
+    double getYOffset() const { return m_YOffset; }
 
     EVENT_CLASS_TYPE(MouseScrolled);
     EVENT_CLASS_CATEGORY_FLAGS(EventCategory::Input | EventCategory::Mouse);
 
-    const char* GetName() const override { return "MouseScrolled"; }
-    std::string ToString() const override
+    const char* getName() const override { return "MouseScrolled"; }
+    std::string toString() const override
     {
         std::ostringstream ss;
         ss << "MouseScrolled: dx=" << m_XOffset << " dy=" << m_YOffset;
@@ -76,14 +76,14 @@ public:
         : m_Button(button), m_Mods(mods)
     {}
 
-    MouseCode   GetButton()    const { return m_Button; }
-    ModifierKey GetModifiers() const { return m_Mods; }
+    MouseCode   getButton()    const { return m_Button; }
+    ModifierKey getModifiers() const { return m_Mods; }
 
     EVENT_CLASS_TYPE(MouseButtonPressed);
     EVENT_CLASS_CATEGORY_FLAGS(EventCategory::Input | EventCategory::Mouse | EventCategory::MouseButton);
 
-    const char* GetName() const override { return "MouseButtonPressed"; }
-    std::string ToString() const override
+    const char* getName() const override { return "MouseButtonPressed"; }
+    std::string toString() const override
     {
         std::ostringstream ss;
         ss << "MouseButtonPressed: button=" << m_Button;
@@ -105,14 +105,14 @@ public:
         : m_Button(button), m_Mods(mods)
     {}
 
-    MouseCode   GetButton()    const { return m_Button; }
-    ModifierKey GetModifiers() const { return m_Mods; }
+    MouseCode   getButton()    const { return m_Button; }
+    ModifierKey getModifiers() const { return m_Mods; }
 
     EVENT_CLASS_TYPE(MouseButtonReleased);
     EVENT_CLASS_CATEGORY_FLAGS(EventCategory::Input | EventCategory::Mouse | EventCategory::MouseButton);
 
-    const char* GetName() const override { return "MouseButtonReleased"; }
-    std::string ToString() const override
+    const char* getName() const override { return "MouseButtonReleased"; }
+    std::string toString() const override
     {
         std::ostringstream ss;
         ss << "MouseButtonReleased: button=" << m_Button;

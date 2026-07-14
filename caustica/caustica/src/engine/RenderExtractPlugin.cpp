@@ -16,7 +16,7 @@ void prepareRenderFrame(App& app)
     render::SessionDiagnostics* diag = diagnostics(app);
     GpuDevice* device = gpuDevice(app);
     if (vs)
-        vs->progressLoading.Stop();
+        vs->progressLoading.stop();
     if (diag)
         diag->asyncLoadingInProgress = false;
 
@@ -27,7 +27,7 @@ void prepareRenderFrame(App& app)
     if (!activeScene)
         return;
 
-    activeScene->extractAndPublishRenderSnapshot(device->GetPreparedRenderFrameIndex());
+    activeScene->extractAndPublishRenderSnapshot(device->getPreparedRenderFrameIndex());
 }
 
 void registerRenderExtractPlugin(App& app)

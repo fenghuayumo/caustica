@@ -14,17 +14,17 @@ namespace caustica
 //   bar.Set(50);
 //   // ... work ...
 //   bar.Set(100);
-//   // bar.Stop() called automatically in destructor
+//   // bar.stop() called automatically in destructor
 class ProgressBar
 {
 public:
     ProgressBar() = default;
-    explicit ProgressBar(const char* windowText) { Start(windowText); }
-    ~ProgressBar() { Stop(); }
+    explicit ProgressBar(const char* windowText) { start(windowText); }
+    ~ProgressBar() { stop(); }
 
-    bool Start(const char* windowText);
+    bool start(const char* windowText);
     void Set(int percentage);
-    void Stop();
+    void stop();
     [[nodiscard]] bool Active() const;
 
 private:
@@ -34,16 +34,16 @@ private:
 
 // Register the active window handle (for centering progress bars).
 // Pass the platform native handle when available; falls back to GetActiveWindow().
-void HelpersRegisterActiveWindow(void* nativeWindowHandle = nullptr);
+void helpersRegisterActiveWindow(void* nativeWindowHandle = nullptr);
 
 // Returns the active window handle (for fullscreen detection, etc.).
 // Windows only — returns NULL on other platforms.
-void* HelpersGetActiveWindow();
+void* helpersGetActiveWindow();
 
 // Set non-interactive mode — progress bars are suppressed.
-void HelpersSetNonInteractive();
+void helpersSetNonInteractive();
 
 // Returns true if non-interactive mode is set.
-bool HelpersIsNonInteractive();
+bool helpersIsNonInteractive();
 
 } // namespace caustica

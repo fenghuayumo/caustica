@@ -14,7 +14,7 @@
 namespace caustica
 {
 
-std::filesystem::path GetDirectoryWithExecutable()
+std::filesystem::path getDirectoryWithExecutable()
 {
     char path[PATH_MAX] = { 0 };
 #ifdef _WIN32
@@ -31,7 +31,7 @@ std::filesystem::path GetDirectoryWithExecutable()
     return result.parent_path();
 }
 
-std::filesystem::path FindDirectory(IFileSystem& fs,
+std::filesystem::path findDirectory(IFileSystem& fs,
     const std::filesystem::path& startPath,
     const std::filesystem::path& dirname,
     int maxDepth)
@@ -49,7 +49,7 @@ std::filesystem::path FindDirectory(IFileSystem& fs,
     return {};
 }
 
-std::filesystem::path FindDirectoryWithFile(IFileSystem& fs,
+std::filesystem::path findDirectoryWithFile(IFileSystem& fs,
     const std::filesystem::path& startPath,
     const std::filesystem::path& relativeFilePath,
     int maxDepth)
@@ -82,16 +82,16 @@ namespace
     }
 }
 
-std::filesystem::path GetLocalPath(std::string subfolder)
+std::filesystem::path getLocalPath(std::string subfolder)
 {
     static std::filesystem::path oneChoice;
     {
         std::filesystem::path baseOverride = GetLocalPathBaseOverride();
         std::filesystem::path candidateA = baseOverride.empty()
-            ? caustica::GetDirectoryWithExecutable() / subfolder
+            ? caustica::getDirectoryWithExecutable() / subfolder
             : baseOverride / subfolder;
         std::filesystem::path candidateB = baseOverride.empty()
-            ? caustica::GetDirectoryWithExecutable().parent_path() / subfolder
+            ? caustica::getDirectoryWithExecutable().parent_path() / subfolder
             : baseOverride.parent_path() / subfolder;
         if (std::filesystem::exists(candidateA))
             oneChoice = candidateA;
@@ -101,7 +101,7 @@ std::filesystem::path GetLocalPath(std::string subfolder)
     return oneChoice;
 }
 
-void SetLocalPathBaseOverride(const std::filesystem::path& basePath)
+void setLocalPathBaseOverride(const std::filesystem::path& basePath)
 {
     std::lock_guard guard(g_localPathBaseMutex);
     g_localPathBaseOverride = basePath.empty()
@@ -109,15 +109,15 @@ void SetLocalPathBaseOverride(const std::filesystem::path& basePath)
         : std::filesystem::absolute(basePath).lexically_normal();
 }
 
-std::filesystem::path GetRuntimeDirectory()
+std::filesystem::path getRuntimeDirectory()
 {
     std::lock_guard guard(g_localPathBaseMutex);
     if (!g_runtimeDirectoryOverride.empty())
         return g_runtimeDirectoryOverride;
-    return caustica::GetDirectoryWithExecutable();
+    return caustica::getDirectoryWithExecutable();
 }
 
-void SetRuntimeDirectoryOverride(const std::filesystem::path& runtimeDirectory)
+void setRuntimeDirectoryOverride(const std::filesystem::path& runtimeDirectory)
 {
     std::lock_guard guard(g_localPathBaseMutex);
     g_runtimeDirectoryOverride = runtimeDirectory.empty()
@@ -125,7 +125,7 @@ void SetRuntimeDirectoryOverride(const std::filesystem::path& runtimeDirectory)
         : std::filesystem::absolute(runtimeDirectory).lexically_normal();
 }
 
-std::filesystem::path ResolveMediaRelativePath(
+std::filesystem::path resolveMediaRelativePath(
     const std::filesystem::path& localPath,
     std::initializer_list<std::filesystem::path> searchRoots)
 {
@@ -157,15 +157,15 @@ std::filesystem::path ResolveMediaRelativePath(
     return std::filesystem::absolute(localPath);
 }
 
-std::filesystem::path ResolveSceneMediaPath(
+std::filesystem::path resolveSceneMediaPath(
     const std::filesystem::path& localPath,
     const std::filesystem::path& sceneDirectory,
     const std::filesystem::path& mediaPath)
 {
     const std::filesystem::path assetsRoot = mediaPath.empty()
-        ? GetLocalPath(c_AssetsFolder)
+        ? getLocalPath(c_AssetsFolder)
         : mediaPath;
-    return ResolveMediaRelativePath(localPath, { assetsRoot, sceneDirectory });
+    return resolveMediaRelativePath(localPath, { assetsRoot, sceneDirectory });
 }
 
 } // namespace caustica

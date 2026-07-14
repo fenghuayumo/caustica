@@ -18,10 +18,10 @@ namespace caustica
 {
 
 // =============================================================================
-// SystemShell
+// systemShell
 // =============================================================================
 
-std::tuple<int, std::string, std::string> SystemShell(
+std::tuple<int, std::string, std::string> systemShell(
     const std::string& command, bool useCmd, bool blockOnExecution)
 {
     assert(blockOnExecution); // non-blocking not implemented
@@ -113,9 +113,9 @@ std::tuple<int, std::string, std::string> SystemShell(
     int uniqueIndex = fileLogIndexStorage.fetch_add(1);
 
     auto tempLogFile = std::filesystem::temp_directory_path() /
-        StringFormat("CAUSTICA_out_%d_%d.txt", getpid(), uniqueIndex);
+        stringFormat("CAUSTICA_out_%d_%d.txt", getpid(), uniqueIndex);
     auto tempErrLogFile = std::filesystem::temp_directory_path() /
-        StringFormat("CAUSTICA_err_%d_%d.txt", getpid(), uniqueIndex);
+        stringFormat("CAUSTICA_err_%d_%d.txt", getpid(), uniqueIndex);
 
     std::string startCmd = command + " > \"" + tempLogFile.string() + "\"" +
         " 2> \"" + tempErrLogFile.string() + "\"";
@@ -124,12 +124,12 @@ std::tuple<int, std::string, std::string> SystemShell(
 
     if (std::filesystem::exists(tempLogFile))
     {
-        resultString = StringLoadFromFile(tempLogFile);
+        resultString = stringLoadFromFile(tempLogFile);
         std::filesystem::remove(tempLogFile);
     }
     if (std::filesystem::exists(tempErrLogFile))
     {
-        resultErrorString = StringLoadFromFile(tempErrLogFile);
+        resultErrorString = stringLoadFromFile(tempErrLogFile);
         std::filesystem::remove(tempErrLogFile);
     }
 #endif

@@ -33,7 +33,7 @@ void updateWindowTitle(App& app)
 #endif
             + ")";
 
-        device->SetInformativeWindowTitle(g_windowTitle, false, extraInfo.c_str());
+        device->setInformativeWindowTitle(g_windowTitle, false, extraInfo.c_str());
     }
 }
 

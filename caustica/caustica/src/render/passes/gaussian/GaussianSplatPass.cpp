@@ -88,7 +88,7 @@ namespace
         }
         case GaussianSplatStorageFormat::Float16:
         {
-            const float16_t halfValue = Float32ToFloat16(value);
+            const float16_t halfValue = float32ToFloat16(value);
             std::memcpy(data.data() + byteOffset, &halfValue.bits, sizeof(halfValue.bits));
             break;
         }

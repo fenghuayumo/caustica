@@ -391,8 +391,8 @@ void GpuRenderSubsystem::registerLoadedSceneAssets()
 
 void GpuRenderSubsystem::createShaderFactory(GpuDevice& gpuDevice)
 {
-    const char* shaderTypeName = GetShaderTypeName(gpuDevice.GetGraphicsAPI());
-    const std::filesystem::path appDirectory = GetRuntimeDirectory();
+    const char* shaderTypeName = getShaderTypeName(gpuDevice.getGraphicsAPI());
+    const std::filesystem::path appDirectory = getRuntimeDirectory();
     const std::filesystem::path engineShaderPath = appDirectory / "ShaderPrecompiled/engine" / shaderTypeName;
     const std::filesystem::path appShaderPath = appDirectory / "ShaderPrecompiled/caustica" / shaderTypeName;
     const std::filesystem::path nrdShaderPath = appDirectory / "ShaderPrecompiled/nrd" / shaderTypeName;

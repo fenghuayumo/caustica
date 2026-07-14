@@ -8,7 +8,7 @@ using namespace caustica::math;
 using namespace caustica;
 using namespace caustica::animation;
 
-float4 caustica::animation::Interpolate(const InterpolationMode mode,
+float4 caustica::animation::interpolate(const InterpolationMode mode,
     const Keyframe& a, const Keyframe& b, const Keyframe& c, const Keyframe& d, const float t, const float dt)
 {
     switch (mode)
@@ -111,17 +111,17 @@ std::optional<dm::float4> Sampler::evaluate(float time, bool extrapolateLastValu
     const float dt = c.time - b.time;
     const float u = (time - b.time) / dt;
 
-    float4 y = Interpolate(m_Mode, a, b, c, d, u, dt);
+    float4 y = interpolate(m_Mode, a, b, c, d, u, dt);
     
     return std::optional(y);
 }
 
-void Sampler::AddKeyframe(const Keyframe keyframe)
+void Sampler::addKeyframe(const Keyframe keyframe)
 {
     m_Keyframes.push_back(keyframe);
 }
 
-float Sampler::GetStartTime() const
+float Sampler::getStartTime() const
 {
     if (!m_Keyframes.empty())
         return m_Keyframes[0].time;
@@ -129,7 +129,7 @@ float Sampler::GetStartTime() const
     return 0.f;
 }
 
-float Sampler::GetEndTime() const
+float Sampler::getEndTime() const
 {
     if (!m_Keyframes.empty())
         return m_Keyframes[m_Keyframes.size() - 1].time;
@@ -143,11 +143,11 @@ void Sampler::load(Json::Value& node)
     {
         std::string mode = node["mode"].asString();
         if (mode == "step")
-            SetInterpolationMode(InterpolationMode::Step);
+            setInterpolationMode(InterpolationMode::Step);
         else if (mode == "linear")
-            SetInterpolationMode(InterpolationMode::Linear);
+            setInterpolationMode(InterpolationMode::Linear);
         if (mode == "spline")
-            SetInterpolationMode(InterpolationMode::CatmullRomSpline);
+            setInterpolationMode(InterpolationMode::CatmullRomSpline);
     }
 
     bool warningPrinted = false;
@@ -176,7 +176,7 @@ void Sampler::load(Json::Value& node)
                 continue;
             }
 
-            AddKeyframe(keyframe);
+            addKeyframe(keyframe);
         }
         
         std::sort(m_Keyframes.begin(), m_Keyframes.end(),
@@ -186,17 +186,17 @@ void Sampler::load(Json::Value& node)
 
 std::optional<dm::float4> Sequence::evaluate(const std::string& name, float time, bool extrapolateLastValues)
 {
-    std::shared_ptr<Sampler> track = GetTrack(name);
+    std::shared_ptr<Sampler> track = getTrack(name);
     if (!track)
         return std::optional<dm::float4>();
 
     return track->evaluate(time, extrapolateLastValues);
 }
 
-void Sequence::AddTrack(const std::string& name, const std::shared_ptr<Sampler>& track)
+void Sequence::addTrack(const std::string& name, const std::shared_ptr<Sampler>& track)
 {
     m_Tracks[name] = track;
-    m_Duration = std::max(m_Duration, track->GetEndTime());
+    m_Duration = std::max(m_Duration, track->getEndTime());
 }
 
 void Sequence::load(Json::Value& node)
@@ -207,6 +207,6 @@ void Sequence::load(Json::Value& node)
         track->load(trackNode);
 
         std::string name = trackNode["name"].asString();
-        AddTrack(name, track);
+        addTrack(name, track);
     }
 }

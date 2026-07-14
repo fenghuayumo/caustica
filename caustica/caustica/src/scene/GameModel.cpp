@@ -50,7 +50,7 @@ ModelType::ModelType(caustica::Scene& scene, const std::string& name, const Json
                 assert(false && "malformed or repeated light name in .model.json");
                 continue;
             }
-            m_lightsInfos.insert({ lightName, caustica::json::ToString(lightData) });
+            m_lightsInfos.insert({ lightName, caustica::json::toString(lightData) });
         }
     }
 
@@ -63,7 +63,7 @@ ModelType::ModelType(caustica::Scene& scene, const std::string& name, const Json
             if (!models[i].entityWorld || !ecs::isValid(models[i].rootEntity))
                 continue;
             const std::string loadedName = models[i].entityWorld->getEntityName(models[i].rootEntity);
-            if (FindSubStringIgnoreCase(loadedName, modelName) != std::string::npos)
+            if (findSubStringIgnoreCase(loadedName, modelName) != std::string::npos)
             {
                 modelIndex = i;
                 break;
@@ -143,7 +143,7 @@ void ModelInstance::mapLightControllers(ecs::Entity entity)
             const std::string entityName = world->getEntityName(current);
             std::string data = m_modelType->findLightControllerInfo(entityName);
             Json::Value jsonData;
-            if (data != "" && caustica::json::FromString(data, jsonData))
+            if (data != "" && caustica::json::fromString(data, jsonData))
             {
                 auto lightController = std::make_shared<LightController>();
                 if (!lightController->read(jsonData))

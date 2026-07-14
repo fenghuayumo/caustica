@@ -34,17 +34,17 @@ namespace caustica::console
 	}
 
 	// Variable types conversions
-	template <> inline VariableType::Type VariableType::IsA<bool>() { return TYPE_BOOL; }
-	template <> inline VariableType::Type VariableType::IsA<int>() { return TYPE_INT; }
-	template <> inline VariableType::Type VariableType::IsA<float>() { return TYPE_FLOAT; }
-	template <> inline VariableType::Type VariableType::IsA<dm::int2>() { return TYPE_INT2; }
-	template <> inline VariableType::Type VariableType::IsA<dm::int3>() { return TYPE_INT3; }
-	template <> inline VariableType::Type VariableType::IsA<dm::float2>() { return TYPE_FLOAT2; }
-	template <> inline VariableType::Type VariableType::IsA<dm::float3>() { return TYPE_FLOAT3; }
-	template <> inline VariableType::Type VariableType::IsA<dm::float4>() { return TYPE_FLOAT4; }
-	template <> inline VariableType::Type VariableType::IsA<std::string>() { return TYPE_STRING; }
+	template <> inline VariableType::Type VariableType::isA<bool>() { return TYPE_BOOL; }
+	template <> inline VariableType::Type VariableType::isA<int>() { return TYPE_INT; }
+	template <> inline VariableType::Type VariableType::isA<float>() { return TYPE_FLOAT; }
+	template <> inline VariableType::Type VariableType::isA<dm::int2>() { return TYPE_INT2; }
+	template <> inline VariableType::Type VariableType::isA<dm::int3>() { return TYPE_INT3; }
+	template <> inline VariableType::Type VariableType::isA<dm::float2>() { return TYPE_FLOAT2; }
+	template <> inline VariableType::Type VariableType::isA<dm::float3>() { return TYPE_FLOAT3; }
+	template <> inline VariableType::Type VariableType::isA<dm::float4>() { return TYPE_FLOAT4; }
+	template <> inline VariableType::Type VariableType::isA<std::string>() { return TYPE_STRING; }
 
-	static char const* AsString(VariableType::Type type)
+	static char const* asString(VariableType::Type type)
 	{
 		switch (type)
 		{
@@ -62,7 +62,7 @@ namespace caustica::console
 		}
 	}
 
-	static char const* AsString(VariableState::SetBy setby)
+	static char const* asString(VariableState::SetBy setby)
 	{
 		switch (setby)
 		{
@@ -74,14 +74,14 @@ namespace caustica::console
 		}
 	}
 
-	bool VariableState::IsInitalized() const
+	bool VariableState::isInitalized() const
 	{
 		return type != VariableType::TYPE_UNKNOWN && setby != UNSET;
 	}
 
-	bool VariableState::CanSetValue(SetBy origin) const
+	bool VariableState::canSetValue(SetBy origin) const
 	{
-		if (!IsInitalized() || read_only)
+		if (!isInitalized() || read_only)
 			return false;
 		if (cheat && (setby <= CODE) && (origin > CODE))
 			return false;
@@ -102,7 +102,7 @@ namespace caustica::console
 			return (name && (std::strlen(name) > 0)) ? true : false;
 		}
 
-		Object* RegisterCommand(CommandDesc const& desc)
+		Object* registerCommand(CommandDesc const& desc)
 		{
 			if (IsValidName(desc.name))
 			{
@@ -126,12 +126,12 @@ namespace caustica::console
 			return nullptr;
 		}
 
-		bool UnregisterCommand(std::string_view name)
+		bool unregisterCommand(std::string_view name)
 		{
 			std::lock_guard<std::mutex> lock(m_Mutex);
 			if (auto it = m_Dictionary.find(name); it != m_Dictionary.end())
 			{
-				if (it->second->AsCommand())
+				if (it->second->asCommand())
 				{
 					m_Dictionary.erase(it);
 					return true;
@@ -160,16 +160,16 @@ namespace caustica::console
 				std::lock_guard<std::mutex> lock(m_Mutex);				
 				if (auto it = m_Dictionary.find(name); it != m_Dictionary.end())
 				{
-					if (VariableImpl<T>* cvar = (VariableImpl<T>*)it->second->AsVariable())
+					if (VariableImpl<T>* cvar = (VariableImpl<T>*)it->second->asVariable())
 					{
-						if (cvar->getState().type == VariableType::IsA<T>())
+						if (cvar->getState().type == VariableType::isA<T>())
 						{
 							// cvar may have been referenced elsewhere but not be initialized yet
 							if (cvar->m_Description.empty() && IsValidName(description))
 								cvar->m_Description = description;
 
 							// override the value
-							cvar->SetData(value, (SetBy)state.setby);
+							cvar->setData(value, (SetBy)state.setby);
 
 							return cvar;
 						}
@@ -181,8 +181,8 @@ namespace caustica::console
 				}
 				else
 				{
-					assert(state.type == VariableType::IsA<T>());
-					state.type = VariableType::IsA<T>(); // force type to be correct
+					assert(state.type == VariableType::isA<T>());
+					state.type = VariableType::isA<T>(); // force type to be correct
 
 					VariableImpl<T>* cvar = new VariableImpl<T>(value, description, state);
 					m_Dictionary[name] = cvar;					
@@ -194,7 +194,7 @@ namespace caustica::console
 			return nullptr;
 		}
 
-		Object* FindObject(std::string_view name)
+		Object* findObject(std::string_view name)
 		{
 			if (!name.empty())
 			{
@@ -273,7 +273,7 @@ namespace caustica::console
 	// Console Object
 	//
 
-	std::string const& Object::GetName() const
+	std::string const& Object::getName() const
 	{
 		return objectsDictionary.GetObjectName(this);
 	}
@@ -291,11 +291,11 @@ namespace caustica::console
 		if (m_OnExecute)
 			return m_OnExecute(args);
 		else
-			caustica::error("console command '%s' has no function", this->GetName().c_str());
+			caustica::error("console command '%s' has no function", this->getName().c_str());
 		return Result();
 	}
 
-	std::vector<std::string> Command::Suggest(std::string_view cmdline, size_t cursor_pos)
+	std::vector<std::string> Command::suggest(std::string_view cmdline, size_t cursor_pos)
 	{
 		if (m_OnSuggest)
 			return m_OnSuggest(cmdline, cursor_pos);
@@ -307,17 +307,17 @@ namespace caustica::console
 	// Console Variable
 	//
 
-	void Variable::SetOnChangeCallback(Callback onChange)
+	void Variable::setOnChangeCallback(Callback onChange)
 	{
 		m_OnChange = onChange;
 	}
 
-	void Variable::ExecuteOnChangeCallback()
+	void Variable::executeOnChangeCallback()
 	{
 		if (m_OnChange)
 			m_OnChange(*this);
 		else
-			caustica::error("no callback set for CVar '%s'", this->GetName().c_str());
+			caustica::error("no callback set for CVar '%s'", this->getName().c_str());
 	}
 
 	//
@@ -333,16 +333,16 @@ namespace caustica::console
 		VariableImpl(T const& data, char const* description, VariableState state) 
 			: Variable(description, state), m_Data(data) { }
 
-		virtual Variable* AsVariable() override { return this; }
+		virtual Variable* asVariable() override { return this; }
 
-		inline T GetData() const { return m_Data; }
+		inline T getData() const { return m_Data; }
 
-		inline T const& GetDataRef() const { return m_Data; }
+		inline T const& getDataRef() const { return m_Data; }
 
-		inline bool SetData(T const& value, SetBy setby)
+		inline bool setData(T const& value, SetBy setby)
 		{
 			VariableState flags = this->getState();
-			if (flags.CanSetValue(setby))
+			if (flags.canSetValue(setby))
 			{
 				m_Data = value;
 				this->m_State.setby = setby;
@@ -355,31 +355,31 @@ namespace caustica::console
 			{
 				VariableState state = this->getState();
 				if (state.read_only)
-					caustica::error("cvar '%s' is read-only - value not set", this->GetName().c_str());
+					caustica::error("cvar '%s' is read-only - value not set", this->getName().c_str());
 				else
 					caustica::error("cvar '%s' not enough privilege with '%s' to override '%s' - value not set",
-						this->GetName().c_str(), AsString(setby), AsString((SetBy)state.setby));
+						this->getName().c_str(), asString(setby), asString((SetBy)state.setby));
 			}
 			return false;
 		}
 
-		virtual bool SetValueFromString(std::string_view s, SetBy setby) override
+		virtual bool setValueFromString(std::string_view s, SetBy setby) override
 		{
 			if (!s.empty())
 				if (auto value = ds::parse<T>(s))
-					return this->SetData(*value, setby);
+					return this->setData(*value, setby);
 
 			caustica::error("cvar '%s' failed parsing value string '%s' (expected a %s) - value not set",
-				this->GetName().c_str(), std::string(s).c_str(), AsString((VariableType::Type)m_State.type));
+				this->getName().c_str(), std::string(s).c_str(), asString((VariableType::Type)m_State.type));
 			return false;
 		}
 
-		virtual bool SetValueFromString(std::string const& s, SetBy setby) override
+		virtual bool setValueFromString(std::string const& s, SetBy setby) override
 		{
-			return SetValueFromString(std::string_view(s), setby);
+			return setValueFromString(std::string_view(s), setby);
 		}
 
-		virtual std::string GetValueAsString() const override
+		virtual std::string getValueAsString() const override
 		{
 			char buff[16] = { 0 };
 			if (auto [p, ec] = std::to_chars(buff, buff+16, m_Data); ec == std::errc())
@@ -390,13 +390,13 @@ namespace caustica::console
 		// default accessors
 
 		#define DEFINE_TYPED_ACCESSORS_IMPLEMENTATION(name, type) \
-			virtual bool Is##name() const override { return false; } \
-			virtual type Get##name() const override { \
-				caustica::error("cvar '%s' is not a "#type" (cannot get)", this->GetName().c_str()); \
+			virtual bool is##name() const override { return false; } \
+			virtual type get##name() const override { \
+				caustica::error("cvar '%s' is not a "#type" (cannot get)", this->getName().c_str()); \
 				return type(); \
 			} \
-			virtual void Set##name(type value, SetBy) override { \
-				caustica::error("cvar '%s' is not a "#type" (cannot set)", this->GetName().c_str()); \
+			virtual void set##name(type value, SetBy) override { \
+				caustica::error("cvar '%s' is not a "#type" (cannot set)", this->getName().c_str()); \
 			}
 
 		DEFINE_TYPED_ACCESSORS_IMPLEMENTATION(Bool, bool);
@@ -410,13 +410,13 @@ namespace caustica::console
 
 
 		#define DEFINE_TYPED_REF_ACCESSORS_IMPLEMENTATION(name, type) \
-			virtual bool Is##name() const override { return false; } \
-			virtual type const& Get##name() const override { \
-				caustica::error("cvar '%s' is not a "#type" (cannot get)", this->GetName().c_str()); \
+			virtual bool is##name() const override { return false; } \
+			virtual type const& get##name() const override { \
+				caustica::error("cvar '%s' is not a "#type" (cannot get)", this->getName().c_str()); \
 				return emptyString; \
 			} \
-			virtual void Set##name(type const& value, SetBy) override { \
-				caustica::error("cvar '%s' is not a "#type" (cannot set)", this->GetName().c_str()); \
+			virtual void set##name(type const& value, SetBy) override { \
+				caustica::error("cvar '%s' is not a "#type" (cannot set)", this->getName().c_str()); \
 			}
 
 		DEFINE_TYPED_REF_ACCESSORS_IMPLEMENTATION(String, std::string);
@@ -429,53 +429,53 @@ namespace caustica::console
 
 	// specialisations
 
-	template<> bool VariableImpl<bool>::IsBool() const { return true; }
-	template<> bool VariableImpl<int>::IsInt() const { return true; }
-	template<> bool VariableImpl<int2>::IsInt() const { return true; }
-	template<> bool VariableImpl<int3>::IsInt() const { return true; }
-	template<> bool VariableImpl<float>::IsFloat() const { return true; }
-	template<> bool VariableImpl<float2>::IsFloat2() const { return true; }
-	template<> bool VariableImpl<float3>::IsFloat3() const { return true; }
-	template<> bool VariableImpl<float4>::IsFloat4() const { return true; }
-	template<> bool VariableImpl<std::string>::IsString() const { return true; }
+	template<> bool VariableImpl<bool>::isBool() const { return true; }
+	template<> bool VariableImpl<int>::isInt() const { return true; }
+	template<> bool VariableImpl<int2>::isInt() const { return true; }
+	template<> bool VariableImpl<int3>::isInt() const { return true; }
+	template<> bool VariableImpl<float>::isFloat() const { return true; }
+	template<> bool VariableImpl<float2>::isFloat2() const { return true; }
+	template<> bool VariableImpl<float3>::isFloat3() const { return true; }
+	template<> bool VariableImpl<float4>::isFloat4() const { return true; }
+	template<> bool VariableImpl<std::string>::isString() const { return true; }
 
-	template<> bool VariableImpl<bool>::GetBool() const { return GetData(); }
-	template<> int VariableImpl<bool>::GetInt() const { return GetData()==true ? 1 : 0; }
-	template<> float VariableImpl<bool>::GetFloat() const { return GetData()==true ? 1.f : 0.f; }
-	template<> std::string const& VariableImpl<bool>::GetString() const
+	template<> bool VariableImpl<bool>::getBool() const { return getData(); }
+	template<> int VariableImpl<bool>::getInt() const { return getData()==true ? 1 : 0; }
+	template<> float VariableImpl<bool>::getFloat() const { return getData()==true ? 1.f : 0.f; }
+	template<> std::string const& VariableImpl<bool>::getString() const
 	{
 		static const std::string _true = "true", _false = "false";
-		return GetData()==true ? _true : _false;
+		return getData()==true ? _true : _false;
 	}
 
-	template<> bool VariableImpl<int>::GetBool() const { return GetData() != 0; }
-	template<> int VariableImpl<int>::GetInt() const { return GetData(); }
-	template<> float VariableImpl<int>::GetFloat() const { return (float)GetData(); }
+	template<> bool VariableImpl<int>::getBool() const { return getData() != 0; }
+	template<> int VariableImpl<int>::getInt() const { return getData(); }
+	template<> float VariableImpl<int>::getFloat() const { return (float)getData(); }
 
-	template<> int2 VariableImpl<int2>::GetInt2() const { return GetData(); }
-	template<> int3 VariableImpl<int3>::GetInt3() const { return GetData(); }
+	template<> int2 VariableImpl<int2>::getInt2() const { return getData(); }
+	template<> int3 VariableImpl<int3>::getInt3() const { return getData(); }
 
-	template<> bool VariableImpl<float>::GetBool() const { return GetData() != 0.f; }
-	template<> int VariableImpl<float> ::GetInt() const { return (int)GetData(); }
-	template<> float VariableImpl<float>::GetFloat() const { return GetData(); }
+	template<> bool VariableImpl<float>::getBool() const { return getData() != 0.f; }
+	template<> int VariableImpl<float> ::getInt() const { return (int)getData(); }
+	template<> float VariableImpl<float>::getFloat() const { return getData(); }
 
-	template<> float2 VariableImpl<float2>::GetFloat2() const { return GetData(); }
-	template<> float3 VariableImpl<float3>::GetFloat3() const { return GetData(); }
-	template<> float4 VariableImpl<float4>::GetFloat4() const { return GetData(); }
+	template<> float2 VariableImpl<float2>::getFloat2() const { return getData(); }
+	template<> float3 VariableImpl<float3>::getFloat3() const { return getData(); }
+	template<> float4 VariableImpl<float4>::getFloat4() const { return getData(); }
 
-	template<> int VariableImpl<std::string>::GetInt() const { return std::atoi(GetDataRef().c_str()); }
-	template<> float VariableImpl<std::string>::GetFloat() const { return (float)std::atof(GetDataRef().c_str()); }
-	template<> std::string const& VariableImpl<std::string>::GetString() const { return GetDataRef(); }
+	template<> int VariableImpl<std::string>::getInt() const { return std::atoi(getDataRef().c_str()); }
+	template<> float VariableImpl<std::string>::getFloat() const { return (float)std::atof(getDataRef().c_str()); }
+	template<> std::string const& VariableImpl<std::string>::getString() const { return getDataRef(); }
 
-	template<> void VariableImpl<bool>::SetBool(bool value, SetBy setby) { SetData(value, setby); }
-	template<> void VariableImpl<int>::SetInt(int value, SetBy setby) { SetData(value, setby); }
-	template<> void VariableImpl<int2>::SetInt2(int2 value, SetBy setby) { SetData(value, setby); }
-	template<> void VariableImpl<int3>::SetInt3(int3 value, SetBy setby) { SetData(value, setby); }
-	template<> void VariableImpl<float>::SetFloat(float value, SetBy setby) { SetData(value, setby); }
-	template<> void VariableImpl<float2>::SetFloat2(float2 value, SetBy setby) { SetData(value, setby); }
-	template<> void VariableImpl<float3>::SetFloat3(float3 value, SetBy setby) { SetData(value, setby); }
-	template<> void VariableImpl<float4>::SetFloat4(float4 value, SetBy setby) { SetData(value, setby); }
-	template<> void VariableImpl<std::string>::SetString(std::string const& value, SetBy setby) { SetData(value, setby); }
+	template<> void VariableImpl<bool>::setBool(bool value, SetBy setby) { setData(value, setby); }
+	template<> void VariableImpl<int>::setInt(int value, SetBy setby) { setData(value, setby); }
+	template<> void VariableImpl<int2>::setInt2(int2 value, SetBy setby) { setData(value, setby); }
+	template<> void VariableImpl<int3>::setInt3(int3 value, SetBy setby) { setData(value, setby); }
+	template<> void VariableImpl<float>::setFloat(float value, SetBy setby) { setData(value, setby); }
+	template<> void VariableImpl<float2>::setFloat2(float2 value, SetBy setby) { setData(value, setby); }
+	template<> void VariableImpl<float3>::setFloat3(float3 value, SetBy setby) { setData(value, setby); }
+	template<> void VariableImpl<float4>::setFloat4(float4 value, SetBy setby) { setData(value, setby); }
+	template<> void VariableImpl<std::string>::setString(std::string const& value, SetBy setby) { setData(value, setby); }
 
 	template <typename T> std::string vector_to_string(T v)
 	{
@@ -521,14 +521,14 @@ namespace caustica::console
 		return buff;
 	}
 
-	template <> std::string VariableImpl<bool>::GetValueAsString() const { return m_Data ? "true" : "false"; }
-	template <> std::string VariableImpl<int2>::GetValueAsString() const { return vector_to_string(m_Data); }
-	template <> std::string VariableImpl<int3>::GetValueAsString() const { return vector_to_string(m_Data); }
-    template <> std::string VariableImpl<float>::GetValueAsString() const { return float_to_string(m_Data); }
-    template <> std::string VariableImpl<float2>::GetValueAsString() const { return float_vector_to_string(m_Data); }
-	template <> std::string VariableImpl<float3>::GetValueAsString() const { return float_vector_to_string(m_Data); }
-	template <> std::string VariableImpl<float4>::GetValueAsString() const { return float_vector_to_string(m_Data); }
-	template <> std::string VariableImpl<std::string>::GetValueAsString() const { return m_Data; }
+	template <> std::string VariableImpl<bool>::getValueAsString() const { return m_Data ? "true" : "false"; }
+	template <> std::string VariableImpl<int2>::getValueAsString() const { return vector_to_string(m_Data); }
+	template <> std::string VariableImpl<int3>::getValueAsString() const { return vector_to_string(m_Data); }
+    template <> std::string VariableImpl<float>::getValueAsString() const { return float_to_string(m_Data); }
+    template <> std::string VariableImpl<float2>::getValueAsString() const { return float_vector_to_string(m_Data); }
+	template <> std::string VariableImpl<float3>::getValueAsString() const { return float_vector_to_string(m_Data); }
+	template <> std::string VariableImpl<float4>::getValueAsString() const { return float_vector_to_string(m_Data); }
+	template <> std::string VariableImpl<std::string>::getValueAsString() const { return m_Data; }
 
 	//
 	// Console Variable Reference 
@@ -537,18 +537,18 @@ namespace caustica::console
 #define DEFINE_CVARREF_IMPLEMENTATION(type) \
 	template <> AutoVariable<type>::AutoVariable(char const* name, char const* description, type const& value, bool ronly, bool cheat) \
 	: m_Variable(*(VariableImpl<type>*)objectsDictionary.RegisterVariable<type>( \
-	    name, description, value, VariableState(ronly, cheat, VariableType::IsA<type>(), VariableState::CODE))) { } \
+	    name, description, value, VariableState(ronly, cheat, VariableType::isA<type>(), VariableState::CODE))) { } \
     \
-	template <> std::string const& AutoVariable<type>::GetName() const { return objectsDictionary.GetObjectName(&m_Variable); } \
-	template <> std::string const& AutoVariable<type>::GetDescription() const { return m_Variable.GetDescription(); } \
-	template <> void AutoVariable<type>::SetDescription(std::string const& description) { m_Variable.SetDescription(description); } \
+	template <> std::string const& AutoVariable<type>::getName() const { return objectsDictionary.GetObjectName(&m_Variable); } \
+	template <> std::string const& AutoVariable<type>::getDescription() const { return m_Variable.getDescription(); } \
+	template <> void AutoVariable<type>::setDescription(std::string const& description) { m_Variable.setDescription(description); } \
 	template <> VariableState AutoVariable<type>::getState() const { return m_Variable.getState(); } \
-	template <> type AutoVariable<type>::GetValue() const { return m_Variable.GetData(); } \
-	template <> void AutoVariable<type>::setValue(type const& value) { m_Variable.SetData(value, VariableState::CODE); } \
-    template <> void AutoVariable<type>::SetOnChangeCallback(Variable::Callback onChange) { m_Variable.SetOnChangeCallback(onChange); } \
-	template <> void AutoVariable<type>::ExecuteOnChangeCallback() { m_Variable.ExecuteOnChangeCallback(); } \
+	template <> type AutoVariable<type>::getValue() const { return m_Variable.getData(); } \
+	template <> void AutoVariable<type>::setValue(type const& value) { m_Variable.setData(value, VariableState::CODE); } \
+    template <> void AutoVariable<type>::setOnChangeCallback(Variable::Callback onChange) { m_Variable.setOnChangeCallback(onChange); } \
+	template <> void AutoVariable<type>::executeOnChangeCallback() { m_Variable.executeOnChangeCallback(); } \
 	template <> Variable* AutoVariable<type>::operator &() { return &m_Variable; } \
-	template <> AutoVariable<type>::operator type() const { return GetValue(); } \
+	template <> AutoVariable<type>::operator type() const { return getValue(); } \
 	template <> AutoVariable<type>& AutoVariable<type>::operator=(const type& value) { setValue(value); return *this; }
 
 
@@ -566,51 +566,51 @@ namespace caustica::console
 	// Dictionary implementation
 	//
 
-	bool RegisterCommand(CommandDesc const& desc)
+	bool registerCommand(CommandDesc const& desc)
 	{
-		return objectsDictionary.RegisterCommand(desc) != nullptr;
+		return objectsDictionary.registerCommand(desc) != nullptr;
 	}
 
-	bool UnregisterCommand(std::string_view name)
+	bool unregisterCommand(std::string_view name)
 	{
-		return objectsDictionary.UnregisterCommand(name);
+		return objectsDictionary.unregisterCommand(name);
 	}
 
-	Object* FindObject(std::string_view name)
+	Object* findObject(std::string_view name)
 	{
-		return objectsDictionary.FindObject(name);
+		return objectsDictionary.findObject(name);
 	}
 
-	std::vector<std::string_view> MatchObjectNames(char const* regex)
+	std::vector<std::string_view> matchObjectNames(char const* regex)
 	{
 		return objectsDictionary.FindObjectNames(regex);
 	}
 
-	std::vector<Object*> MatchObjects(char const* regex)
+	std::vector<Object*> matchObjects(char const* regex)
 	{
 		return objectsDictionary.FindObjects(regex);
 	}
 
-	Command* FindCommand(std::string_view name)
+	Command* findCommand(std::string_view name)
 	{
-		if (Object* cobj = FindObject(name))
-			return cobj->AsCommand();
+		if (Object* cobj = findObject(name))
+			return cobj->asCommand();
 		return nullptr;
 	}
 
-	Variable* FindVariable(std::string_view name)
+	Variable* findVariable(std::string_view name)
 	{
-		if (Object* cobj = FindObject(name))
-			return cobj->AsVariable();
+		if (Object* cobj = findObject(name))
+			return cobj->asVariable();
 		return nullptr;
 	}
 
-	void ResetAll()
+	void resetAll()
 	{
 		objectsDictionary.reset();
 	}
 
-	void ParseIniFile(char const* inidata, char const* filename)
+	void parseIniFile(char const* inidata, char const* filename)
 	{
 		if (!filename)
 			filename = "<nullptr name>";
@@ -650,9 +650,9 @@ namespace caustica::console
 
 			assert(cvarname.length() > 0 && cvarvalue.length() > 0);
 
-			if (cvar* var = FindVariable(cvarname.data()))
+			if (cvar* var = findVariable(cvarname.data()))
 			{
-				if (!var->SetValueFromString(cvarvalue, VariableState::INI))
+				if (!var->setValueFromString(cvarvalue, VariableState::INI))
 				{
 					caustica::error("%s:%d parse error : cannot set value for variable '%s'", filename, lineno, cvarname.data());
 				}

@@ -28,13 +28,13 @@ namespace caustica
 
 			virtual ~Object() {}
 
-			std::string const& GetName() const;
+			std::string const& getName() const;
 
-			std::string const& GetDescription() const { return m_Description; }
-			void SetDescription(std::string const& description) { m_Description = description; }
+			std::string const& getDescription() const { return m_Description; }
+			void setDescription(std::string const& description) { m_Description = description; }
 
-			virtual Variable* AsVariable() { return nullptr; }
-			virtual Command* AsCommand() { return nullptr; }
+			virtual Variable* asVariable() { return nullptr; }
+			virtual Command* asCommand() { return nullptr; }
 
 		protected:
 			friend class ObjectDictionary;
@@ -52,7 +52,7 @@ namespace caustica
 		{
 		public:
 
-			virtual Command* AsCommand() override { return this; }
+			virtual Command* asCommand() override { return this; }
 
 			// execution callback
 
@@ -71,7 +71,7 @@ namespace caustica
 
 			typedef std::function<std::vector<std::string>(std::string_view const cmdline, size_t cursor_pos)> OnSuggestFunction;
 
-			std::vector<std::string> Suggest(std::string_view const cmdline, size_t cursor_pos);
+			std::vector<std::string> suggest(std::string_view const cmdline, size_t cursor_pos);
 
 		private:
 
@@ -97,7 +97,7 @@ namespace caustica
 		//
 		//     ex:
 		//        cvarInt var = AutoVariable("myvar", "my variable description", 123);
-		//        int i = var.GetValue();
+		//        int i = var.getValue();
 		//     
 		//     Convenience conversion operators are defined so that variables can be 
 		//     used as if they were values:
@@ -112,11 +112,11 @@ namespace caustica
 		//     "Variable" class.
 		//
 		//     ex:
-		//         if (cvar* var = FindVariable("myvar"))
-		//             if (var->IsInt())
-		//                 int i = var->GetInt();
+		//         if (cvar* var = findVariable("myvar"))
+		//             if (var->isInt())
+		//                 int i = var->getInt();
 		//     note: some accessors have specializations to cast between types
-		//     (ex. GetString() on a bool typed variable returns "true" or "false" strings)
+		//     (ex. getString() on a bool typed variable returns "true" or "false" strings)
 		//
 		
 		struct VariableType
@@ -133,7 +133,7 @@ namespace caustica
 				TYPE_FLOAT4,
 				TYPE_STRING
 			};
-			template <typename T> static Type IsA() { return TYPE_UNKNOWN; }
+			template <typename T> static Type isA() { return TYPE_UNKNOWN; }
 		};
 
 		struct VariableState
@@ -156,12 +156,12 @@ namespace caustica
 			bool operator == (VariableState const& other) const { return *((uint32_t const*)this) == *((uint32_t const*)(&other)); }
 			bool operator != (VariableState const& other) const { return !(*this==other); }
 
-			bool IsInitalized() const;
+			bool isInitalized() const;
 
 			// Returns true if the setter is allowed to modify the value.
 			// note: if the 'cheat' state is true, the variable can be initialized from 'CODE',
 			// but it cannot be modified from either the 'CONSOLE' or 'INI' sources
-			bool CanSetValue(SetBy origin = CONSOLE) const;
+			bool canSetValue(SetBy origin = CONSOLE) const;
 
 			uint32_t read_only : 1;
 			uint32_t cheat     : 1;
@@ -179,26 +179,26 @@ namespace caustica
 
 			VariableState getState() const { return m_State; }
 
-			void SetReadOnly(bool ronly) { m_State.read_only = ronly; }
+			void setReadOnly(bool ronly) { m_State.read_only = ronly; }
 
-			void SetCheat() { m_State.cheat = true; }	
+			void setCheat() { m_State.cheat = true; }	
 
 		public:
 
 			// Value accessors for each type. Ex.
-			//     bool IsInt() const;
-			//     int GetInt() const;
-			//     void SetInt(int value, SetBy setby=SETBY_CODE);
+			//     bool isInt() const;
+			//     int getInt() const;
+			//     void setInt(int value, SetBy setby=SETBY_CODE);
 
 #define DEFINE_TYPED_ACCESSORS(name, type) \
-	virtual bool Is##name() const = 0;   \
-	virtual type Get##name() const = 0;  \
-	virtual void Set##name(type value, SetBy setby=SetBy::CODE) = 0;
+	virtual bool is##name() const = 0;   \
+	virtual type get##name() const = 0;  \
+	virtual void set##name(type value, SetBy setby=SetBy::CODE) = 0;
 
 #define DEFINE_TYPED_REF_ACCESSORS(name, type)   \
-	virtual bool Is##name() const = 0;         \
-	virtual type const& Get##name() const = 0; \
-	virtual void Set##name(type const& value, SetBy setby=SetBy::CODE) = 0;
+	virtual bool is##name() const = 0;         \
+	virtual type const& get##name() const = 0; \
+	virtual void set##name(type const& value, SetBy setby=SetBy::CODE) = 0;
 
 			DEFINE_TYPED_ACCESSORS(Bool, bool);
 
@@ -214,10 +214,10 @@ namespace caustica
 			DEFINE_TYPED_REF_ACCESSORS(String, std::string);
 
 			// attenmpt to parse value from string
-			virtual bool SetValueFromString(std::string_view s, SetBy setby = SetBy::CODE) = 0;
-			virtual bool SetValueFromString(std::string const& s, SetBy setby = SetBy::CODE) = 0;
+			virtual bool setValueFromString(std::string_view s, SetBy setby = SetBy::CODE) = 0;
+			virtual bool setValueFromString(std::string const& s, SetBy setby = SetBy::CODE) = 0;
 
-			virtual std::string GetValueAsString() const = 0;
+			virtual std::string getValueAsString() const = 0;
 
 		public:
 
@@ -225,9 +225,9 @@ namespace caustica
 
 			typedef std::function<void(Variable & cvar)> Callback;
 			
-			void SetOnChangeCallback(Callback onChange);
+			void setOnChangeCallback(Callback onChange);
 
-			void ExecuteOnChangeCallback();
+			void executeOnChangeCallback();
 
 		protected:
 
@@ -248,21 +248,21 @@ namespace caustica
 			// note: registering a console object with null or empty name string will result in fatal error
 			AutoVariable(char const* name, char const* description, T const& defaultValue, bool read_only=false, bool cheat=false);
 
-			std::string const& GetName() const;
+			std::string const& getName() const;
 
-			void SetDescription(std::string const& description);
+			void setDescription(std::string const& description);
 
-			std::string const& GetDescription() const;
+			std::string const& getDescription() const;
 
 			VariableState getState() const;
 
-			T GetValue() const;
+			T getValue() const;
 
 			void setValue(T const& value);
 
-			void SetOnChangeCallback(Variable::Callback onChange);
+			void setOnChangeCallback(Variable::Callback onChange);
 
-			void ExecuteOnChangeCallback();
+			void executeOnChangeCallback();
 
 			Variable* operator & ();
 
@@ -288,23 +288,23 @@ namespace caustica
 			Command::OnSuggestFunction on_suggest;
 		};
 
-		bool RegisterCommand(CommandDesc const& desc);
+		bool registerCommand(CommandDesc const& desc);
 
-		Object* FindObject(std::string_view name);
+		Object* findObject(std::string_view name);
 
-		std::vector<std::string_view> MatchObjectNames(char const* regex = ".*");
+		std::vector<std::string_view> matchObjectNames(char const* regex = ".*");
 
-		std::vector<Object*> MatchObjects(char const* regex = ".*");
+		std::vector<Object*> matchObjects(char const* regex = ".*");
 
-		Command* FindCommand(std::string_view name);
+		Command* findCommand(std::string_view name);
 
-		Variable* FindVariable(std::string_view name);
+		Variable* findVariable(std::string_view name);
 		
 		// note: ini files can only modify values of existing consolve variables
-		void ParseIniFile(char const* inidata, char const* filename);
+		void parseIniFile(char const* inidata, char const* filename);
 
 		// nuclear option: removes all console objects from dictionary
-		void ResetAll(); 
+		void resetAll(); 
 
 	} // end namespace console
 

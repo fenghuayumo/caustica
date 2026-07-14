@@ -57,7 +57,7 @@ namespace caustica
 			Result execute(std::string_view const cmdline);
 
 			// parse incomplete command line & return auto-completion suggestions
-			std::vector<std::string> Suggest(std::string_view const cmdline, size_t cursor_pos);
+			std::vector<std::string> suggest(std::string_view const cmdline, size_t cursor_pos);
 
 		private:
 		};

@@ -45,7 +45,7 @@ struct Controller
         return true;
     }
 
-    void Shutdown()
+    void shutdown()
     {
         CloseMidiDevice();
     }
@@ -78,7 +78,7 @@ struct Controller
 
     ~Controller()
     {
-        Shutdown();
+        shutdown();
     }
 
     static Controller* Get()
@@ -268,9 +268,9 @@ void init()
 {
     Controller::Get()->init();
 }
-void Shutdown()
+void shutdown()
 {
-    Controller::Get()->Shutdown();
+    Controller::Get()->shutdown();
 }
 void update()
 {

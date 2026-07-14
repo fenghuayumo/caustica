@@ -1,7 +1,7 @@
 #pragma once
 
 #include <backend/GpuDevice.h>
-#include <backend/RenderContext.h>
+#include <backend/renderContext.h>
 #include <imgui/imgui_nvrhi.h>
 
 #include <filesystem>
@@ -32,8 +32,8 @@ namespace caustica
         float const m_sizeAtDefaultScale;
         ImFont* m_imFont = nullptr;
 
-        void CreateScaledFont(float displayScale);
-        void ReleaseScaledFont();
+        void createScaledFont(float displayScale);
+        void releaseScaledFont();
     public:
         // Creates an invalid font that will not add any ImGUI fonts
         RegisteredFont()
@@ -59,19 +59,19 @@ namespace caustica
 
         // Returns true if the custom font data has been successfully loaded.
         // This doesn't necessarily mean that the font data is valid: the actual font object is only created
-        // in the first call to ImGui_Renderer::animate(...). After that, use GetScaledFont()
+        // in the first call to ImGui_Renderer::animate(...). After that, use getScaledFont()
         // to test if the font is valid.
-        bool HasFontData() const { return m_data != nullptr; }
+        bool hasFontData() const { return m_data != nullptr; }
 
         // Returns the ImFont object that can be used with ImGUI.
         // Note that the returned pointer is transient and will change when screen DPI changes,
         // or when new fonts are loaded. Do not cache the returned value between frames.
         // The returned pointer may be NULL if the font has failed to load, which is OK for ImGUI's PushFont(...)
-        ImFont* GetScaledFont() { return m_imFont; }
+        ImFont* getScaledFont() { return m_imFont; }
     };
 
     // Base class for ImGui UIs rendered through NVRHI.
-    class ImGui_Renderer : public RenderContext
+    class ImGui_Renderer : public renderContext
     {
     protected:
 
@@ -90,42 +90,42 @@ namespace caustica
         bool init(std::shared_ptr<caustica::ShaderFactory> shaderFactory);
 
         // Loads a TTF font from file and registers it with the ImGui_Renderer.
-        // To use the font with ImGUI at runtime, call RegisteredFont::GetScaledFont().
-        std::shared_ptr<RegisteredFont> CreateFontFromFile(caustica::IFileSystem& fs,
+        // To use the font with ImGUI at runtime, call RegisteredFont::getScaledFont().
+        std::shared_ptr<RegisteredFont> createFontFromFile(caustica::IFileSystem& fs,
             std::filesystem::path const& fontFile, float fontSize);
 
         // Registers a TTF font stored in memory with the ImGui_Renderer.
-        // To use the font with ImGUI at runtime, call RegisteredFont::GetScaledFont().
-        std::shared_ptr<RegisteredFont> CreateFontFromMemory(void const* pData, size_t size, float fontSize);
+        // To use the font with ImGUI at runtime, call RegisteredFont::getScaledFont().
+        std::shared_ptr<RegisteredFont> createFontFromMemory(void const* pData, size_t size, float fontSize);
         
-        // Identical to CreateFontFromMemory except that the data is compressed
+        // Identical to createFontFromMemory except that the data is compressed
         // using 'binary_to_compressed_c.cpp' in imgui.
-        std::shared_ptr<RegisteredFont> CreateFontFromMemoryCompressed(void const* pData, size_t size, float fontSize);
+        std::shared_ptr<RegisteredFont> createFontFromMemoryCompressed(void const* pData, size_t size, float fontSize);
 
         // Returns the default font.
-        std::shared_ptr<RegisteredFont> GetDefaultFont() { return m_defaultFont; }
+        std::shared_ptr<RegisteredFont> getDefaultFont() { return m_defaultFont; }
 
         virtual void animate(float elapsedTimeSeconds);
         virtual void render(nvrhi::IFramebuffer* framebuffer);
-        virtual void BackBufferResizing();
-        virtual void BackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount) {}
-        virtual void DisplayScaleChanged(float scaleX, float scaleY);
-        virtual bool ShouldAnimateUnfocused() { return true; }
-        virtual bool SupportsDepthBuffer() { return false; }
+        virtual void backBufferResizing();
+        virtual void backBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount) {}
+        virtual void displayScaleChanged(float scaleX, float scaleY);
+        virtual bool shouldAnimateUnfocused() { return true; }
+        virtual bool supportsDepthBuffer() { return false; }
 
     protected:
         // creates the UI in ImGui, updates internal UI state
         virtual void buildUI(void) = 0;
 
-        void BeginFullScreenWindow();
-        void DrawScreenCenteredText(const char* text);
-        void EndFullScreenWindow();
+        void beginFullScreenWindow();
+        void drawScreenCenteredText(const char* text);
+        void endFullScreenWindow();
     private:
-        std::shared_ptr<RegisteredFont> CreateFontFromMemoryInternal(void const* pData, size_t size,
+        std::shared_ptr<RegisteredFont> createFontFromMemoryInternal(void const* pData, size_t size,
             bool compressed, float fontSize);
     };
 
     // Forward GLFW-style input to ImGui (call from application event handlers).
-    void ImGuiForwardKeyboard(int glfwKey, int action, int scancode);
-    void ImGuiForwardInputCharacter(unsigned int codepoint);
+    void imGuiForwardKeyboard(int glfwKey, int action, int scancode);
+    void imGuiForwardInputCharacter(unsigned int codepoint);
 }

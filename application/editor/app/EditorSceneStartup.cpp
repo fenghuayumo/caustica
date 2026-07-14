@@ -60,7 +60,7 @@ void registerEditorUISubsystemLifecycle(caustica::App& app)
             app.syncSwapChain();
         });
 
-    app.addSystem(AppSchedule::Shutdown, "EditorUI.Shutdown", [](SystemContext& ctx) {
+    app.addSystem(AppSchedule::shutdown, "EditorUI.shutdown", [](SystemContext& ctx) {
         if (auto* uiSubsystem = ctx.tryRes<EditorUISubsystem>())
             uiSubsystem->shutdown();
     });

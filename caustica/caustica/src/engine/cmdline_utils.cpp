@@ -50,10 +50,10 @@ namespace
     }
 } // namespace
 
-nvrhi::GraphicsAPI ResolveGraphicsAPIFromCommandLine(int argc, const char* const* argv)
+nvrhi::GraphicsAPI resolveGraphicsAPIFromCommandLine(int argc, const char* const* argv)
 {
 #if defined(_WIN32)
-    nvrhi::GraphicsAPI api = GetGraphicsAPIFromCommandLine(argc, argv);
+    nvrhi::GraphicsAPI api = getGraphicsAPIFromCommandLine(argc, argv);
 
     for (int n = 1; n < argc; ++n)
     {

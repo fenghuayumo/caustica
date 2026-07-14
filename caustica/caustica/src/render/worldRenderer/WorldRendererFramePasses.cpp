@@ -98,7 +98,7 @@ void caustica::render::WorldRenderer::populateRenderFrameContext(
 
     if (const std::shared_ptr<Scene> scene = m_context.sceneManager.getScene())
     {
-        const uint32_t frameIndex = m_context.gpuDevice.GetRenderPhaseFrameIndex();
+        const uint32_t frameIndex = m_context.gpuDevice.getRenderPhaseFrameIndex();
         ctx.scene = &scene->getRenderData();
         ctx.sceneStructureChanged = scene->hasSceneStructureChanged(frameIndex);
         ctx.sceneTransformsChanged = scene->hasSceneTransformsChanged(frameIndex);
@@ -283,7 +283,7 @@ void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameCont
 
     if (ctx.needNewPasses)
     {
-        m_context.diagnostics.progressInitializingRenderer.Start("Initializing renderer...");
+        m_context.diagnostics.progressInitializingRenderer.start("Initializing renderer...");
 
         if (m_context.scenePasses.lighting.materials() == nullptr)
         {
@@ -302,7 +302,7 @@ void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameCont
 
         m_context.scenePasses.lighting.materials()->createRenderPassesAndLoadMaterials(
             m_bindlessLayout, m_context.renderDevice, m_context.sceneManager.getScene(),
-            m_context.sceneManager.getCurrentScenePath(), GetLocalPath(c_AssetsFolder));
+            m_context.sceneManager.getCurrentScenePath(), getLocalPath(c_AssetsFolder));
         m_context.diagnostics.progressInitializingRenderer.Set(5);
         if (m_context.scenePasses.lighting.opacityMaps())
             m_context.scenePasses.lighting.opacityMaps()->createRenderPasses(m_bindlessLayout, m_context.renderDevice);
@@ -349,7 +349,7 @@ void caustica::render::WorldRenderer::framePassShaderUpdate(PathTracingFrameCont
     // before that so import/AS-rebuild frames do not permanently bake stale slots
     // (especially visible when GaussianSplat entities reshuffle ECS iteration).
     if (const auto scene = m_context.sceneManager.getScene())
-        scene->syncRenderSnapshotGpuIndices(m_context.gpuDevice.GetRenderPhaseFrameIndex());
+        scene->syncRenderSnapshotGpuIndices(m_context.gpuDevice.getRenderPhaseFrameIndex());
 
     m_pathTracingShaderCompiler->update(
         m_context.sceneManager.getScene(),
@@ -423,7 +423,7 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
     };
     geoParams.materials = m_context.scenePasses.lighting.materials().get();
     geoParams.opacityMaps = m_context.scenePasses.lighting.opacityMaps().get();
-    geoParams.frameIndex = m_context.gpuDevice.GetRenderPhaseFrameIndex();
+    geoParams.frameIndex = m_context.gpuDevice.getRenderPhaseFrameIndex();
     geoParams.asyncLoadingInProgress = &m_context.diagnostics.asyncLoadingInProgress;
     caustica::updateSceneGeometry(m_context.accelStructs, geoParams);
     abortIfSubmitFailed(ctx, "updateSceneGeometry");
@@ -476,7 +476,7 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
 
             m_linesPipeline = device()->createGraphicsPipeline(psoDesc, framebuffer);
         }
-        m_context.diagnostics.progressInitializingRenderer.Stop();
+        m_context.diagnostics.progressInitializingRenderer.stop();
     }
 }
 
@@ -667,7 +667,7 @@ void caustica::render::WorldRenderer::framePassFinalize(PathTracingFrameContext&
         m_temporalAntiAliasingPass->advanceFrame();
 
     m_context.camera.swapViews();
-    m_context.gpuDevice.SetVsyncEnabled(m_context.settings.actualEnableVsync());
+    m_context.gpuDevice.setVsyncEnabled(m_context.settings.actualEnableVsync());
 
     postUpdatePathTracing();
 }

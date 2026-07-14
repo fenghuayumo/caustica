@@ -62,7 +62,7 @@ namespace caustica::math
         static constexpr uint32_t EXPONENT_MANTISSA_MASK = SIGN_BIT - 1;
     };
 
-    bool IsF16CSupported()
+    bool isF16CSupported()
     {
 #if USE_F16C
         constexpr int F16C_BIT = 29;
@@ -81,12 +81,12 @@ namespace caustica::math
 #endif
     }
 
-    static bool g_SupportsF16C = IsF16CSupported();
+    static bool g_SupportsF16C = isF16CSupported();
 
-    void EnableF16C(bool enable)
+    void enableF16C(bool enable)
     {
         if (enable)
-            g_SupportsF16C = IsF16CSupported();
+            g_SupportsF16C = isF16CSupported();
         else
             g_SupportsF16C = false;
     }
@@ -369,7 +369,7 @@ namespace caustica::math
         return asfloat(outSign | outExponent | outMantissa);
     }
 
-    float16_t Float32ToFloat16(float x)
+    float16_t float32ToFloat16(float x)
     {
 #if USE_F16C
         if (g_SupportsF16C)
@@ -384,7 +384,7 @@ namespace caustica::math
         return float16_t{ a };
     }
 
-    float16_t2 Float32ToFloat16x2(float2 x)
+    float16_t2 float32ToFloat16x2(float2 x)
     {
 #if USE_F16C
         if (g_SupportsF16C)
@@ -401,7 +401,7 @@ namespace caustica::math
         return float16_t2{ packed };
     }
 
-    float16_t4 Float32ToFloat16x4(float4 x)
+    float16_t4 float32ToFloat16x4(float4 x)
     {
 #if USE_F16C
         if (g_SupportsF16C)
@@ -419,7 +419,7 @@ namespace caustica::math
         return float16_t4{ packed };
     }
 
-    float Float16ToFloat32(float16_t x)
+    float float16ToFloat32(float16_t x)
     {
 #if USE_F16C
         if (g_SupportsF16C)
@@ -435,7 +435,7 @@ namespace caustica::math
         return UpConvert<HELPER<FLOAT16>, uint16_t>(x.bits);
     }
 
-    float2 Float16ToFloat32x2(float16_t2 x)
+    float2 float16ToFloat32x2(float16_t2 x)
     {
 #if USE_F16C
         if (g_SupportsF16C)
@@ -454,7 +454,7 @@ namespace caustica::math
         return v;
     }
 
-    float4 Float16ToFloat32x4(float16_t4 x)
+    float4 float16ToFloat32x4(float16_t4 x)
     {
 #if USE_F16C
         if (g_SupportsF16C)
@@ -475,13 +475,13 @@ namespace caustica::math
         return v;
     }
 
-    float8e4m3_t Float32ToFloat8E4M3(float x)
+    float8e4m3_t float32ToFloat8E4M3(float x)
     {
         uint8_t const a = DownConvert<HELPER<FLOAT8E4M3>, uint8_t>(x);
         return float8e4m3_t{ a };
     }
 
-    float8e4m3_t4 Float32ToFloat8E4M3x4(float4 x)
+    float8e4m3_t4 float32ToFloat8E4M3x4(float4 x)
     {
         uint8_t const a = DownConvert<HELPER<FLOAT8E4M3>, uint8_t>(x.x);
         uint8_t const b = DownConvert<HELPER<FLOAT8E4M3>, uint8_t>(x.y);
@@ -491,12 +491,12 @@ namespace caustica::math
         return float8e4m3_t4{ packed };
     }
 
-    float Float8E4M3ToFloat32(float8e4m3_t x)
+    float float8E4M3ToFloat32(float8e4m3_t x)
     {
         return UpConvert<HELPER<FLOAT8E4M3>, uint8_t>(x.bits);
     }
 
-    float4 Float8E4M3ToFloat32x4(float8e4m3_t4 x)
+    float4 float8E4M3ToFloat32x4(float8e4m3_t4 x)
     {
         float4 v;
         v.x = UpConvert<HELPER<FLOAT8E4M3>, uint8_t>(uint8_t(x.bits & 0xff));
@@ -506,13 +506,13 @@ namespace caustica::math
         return v;
     }
 
-    float8e5m2_t Float32ToFloat8E5M2(float x)
+    float8e5m2_t float32ToFloat8E5M2(float x)
     {
         uint8_t const a = DownConvert<HELPER<FLOAT8E5M2>, uint8_t>(x);
         return float8e5m2_t{ a };
     }
 
-    float8e5m2_t4 Float32ToFloat8E5M2x4(float4 x)
+    float8e5m2_t4 float32ToFloat8E5M2x4(float4 x)
     {
         uint8_t const a = DownConvert<HELPER<FLOAT8E5M2>, uint8_t>(x.x);
         uint8_t const b = DownConvert<HELPER<FLOAT8E5M2>, uint8_t>(x.y);
@@ -522,12 +522,12 @@ namespace caustica::math
         return float8e5m2_t4{ packed };
     }
 
-    float Float8E5M2ToFloat32(float8e5m2_t x)
+    float float8E5M2ToFloat32(float8e5m2_t x)
     {
         return UpConvert<HELPER<FLOAT8E5M2>, uint8_t>(x.bits);
     }
 
-    float4 Float8E5M2ToFloat32x4(float8e5m2_t4 x)
+    float4 float8E5M2ToFloat32x4(float8e5m2_t4 x)
     {
         float4 v;
         v.x = UpConvert<HELPER<FLOAT8E5M2>, uint8_t>(uint8_t(x.bits & 0xff));

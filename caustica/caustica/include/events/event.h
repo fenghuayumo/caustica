@@ -9,7 +9,7 @@
 // event.h — Event base class, type/category enums, EventDispatcher template.
 //
 // Pattern: DIVSHOT's events layer. Each concrete event implements
-// GetEventType() + GetCategoryFlags() and uses the helper macros below.
+// getEventType() + getCategoryFlags() and uses the helper macros below.
 // The EventDispatcher provides type-safe, category-filtered dispatch.
 // =============================================================================
 
@@ -80,13 +80,13 @@ class Event
 public:
     virtual ~Event() = default;
 
-    virtual EventType    GetEventType()     const = 0;
-    virtual const char*  GetName()          const = 0;
-    virtual int          GetCategoryFlags() const = 0;
-    virtual std::string  ToString()         const { return GetName(); }
+    virtual EventType    getEventType()     const = 0;
+    virtual const char*  getName()          const = 0;
+    virtual int          getCategoryFlags() const = 0;
+    virtual std::string  toString()         const { return getName(); }
 
-    bool Handled() const { return m_Handled; }
-    void SetHandled(bool h = true) { m_Handled = h; }
+    bool handled() const { return m_Handled; }
+    void setHandled(bool h = true) { m_Handled = h; }
 
 protected:
     bool m_Handled = false;
@@ -116,29 +116,29 @@ public:
     template<EventTypeConcept T>
     bool dispatch(std::function<bool(T&)> handler)
     {
-        if (m_Event.GetEventType() != T::GetStaticType())
+        if (m_Event.getEventType() != T::getStaticType())
             return false;
 
         bool handled = handler(static_cast<T&>(m_Event));
         if (handled)
-            m_Event.SetHandled(true);
+            m_Event.setHandled(true);
         return handled;
     }
 
     // dispatch only if the event category matches.
     template<EventTypeConcept T>
-    bool DispatchIf(EventCategory category, std::function<bool(T&)> handler)
+    bool dispatchIf(EventCategory category, std::function<bool(T&)> handler)
     {
-        if (m_Event.GetEventType() != T::GetStaticType())
+        if (m_Event.getEventType() != T::getStaticType())
             return false;
 
         const int cat = static_cast<int>(category);
-        if ((m_Event.GetCategoryFlags() & cat) == 0)
+        if ((m_Event.getCategoryFlags() & cat) == 0)
             return false;
 
         bool handled = handler(static_cast<T&>(m_Event));
         if (handled)
-            m_Event.SetHandled(true);
+            m_Event.setHandled(true);
         return handled;
     }
 
@@ -150,15 +150,15 @@ private:
 // Convenience macros for defining concrete event types
 // ---------------------------------------------------------------------------
 #define EVENT_CLASS_TYPE(eventType) \
-    static EventType GetStaticType() { return EventType::eventType; } \
-    EventType GetEventType() const override { return GetStaticType(); }
+    static EventType getStaticType() { return EventType::eventType; } \
+    EventType getEventType() const override { return getStaticType(); }
 
 #define EVENT_CLASS_CATEGORY(category) \
-    int GetCategoryFlags() const override { return static_cast<int>(EventCategory::category); }
+    int getCategoryFlags() const override { return static_cast<int>(EventCategory::category); }
 
 // For events spanning multiple categories
 #define EVENT_CLASS_CATEGORY_FLAGS(...) \
-    int GetCategoryFlags() const override { return static_cast<int>((__VA_ARGS__)); }
+    int getCategoryFlags() const override { return static_cast<int>((__VA_ARGS__)); }
 
 // Binds a member function as an std::function for EventDispatcher
 #define BIND_EVENT_FN(fn) \

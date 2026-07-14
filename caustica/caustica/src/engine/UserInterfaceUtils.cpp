@@ -21,7 +21,7 @@ using namespace caustica;
 using namespace caustica;
 using namespace caustica::math;
 
-bool caustica::MaterialEditor(caustica::Material* material, bool allowMaterialDomainChanges)
+bool caustica::materialEditor(caustica::Material* material, bool allowMaterialDomainChanges)
 {
     bool update = false;
 
@@ -176,7 +176,7 @@ bool caustica::LightEditor_Directional(caustica::DirectionalLight& light)
 {
     bool changed = false;
     double3 direction = light.getDirection();
-    if (AzimuthElevationSliders(direction, true))
+    if (azimuthElevationSliders(direction, true))
     {
         if (ecs::isValid(light.ownerEntity))
             light.updateCachedDirection(direction);
@@ -201,7 +201,7 @@ bool caustica::LightEditor_Spot(caustica::SpotLight& light)
 {
     bool changed = false;
     double3 direction = light.getDirection();
-    if (AzimuthElevationSliders(direction, false))
+    if (azimuthElevationSliders(direction, false))
     {
         if (ecs::isValid(light.ownerEntity))
             light.updateCachedDirection(direction);
@@ -215,7 +215,7 @@ bool caustica::LightEditor_Spot(caustica::SpotLight& light)
     return changed;
 }
 
-bool caustica::LightEditor(caustica::Light& light)
+bool caustica::lightEditor(caustica::Light& light)
 {
     switch (light.getLightType())
     {
@@ -230,7 +230,7 @@ bool caustica::LightEditor(caustica::Light& light)
     }
 }
 
-bool caustica::AzimuthElevationSliders(dm::double3& direction, bool negative)
+bool caustica::azimuthElevationSliders(dm::double3& direction, bool negative)
 {
     double3 normalizedDir = normalize(direction);
     if (negative) normalizedDir = -normalizedDir;

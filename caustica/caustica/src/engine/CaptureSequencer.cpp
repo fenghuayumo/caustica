@@ -43,7 +43,7 @@ CaptureSequencer::CaptureSequencer(const CommandLineOptions& cmdLine)
     }
 }
 
-void CaptureSequencer::PreAnim(
+void CaptureSequencer::preAnim(
     float& elapsedTimeSeconds,
     bool asyncLoadingInProgress,
     const std::function<void(double)>& setSceneTime)
@@ -82,7 +82,7 @@ CaptureSequencerPreRenderActions CaptureSequencer::preRender()
     return actions;
 }
 
-CaptureSequencerPostRenderResult CaptureSequencer::PostRender(
+CaptureSequencerPostRenderResult CaptureSequencer::postRender(
     bool realtimeMode,
     bool accumulationCompleted,
     double sceneTime,
@@ -109,13 +109,13 @@ CaptureSequencerPostRenderResult CaptureSequencer::PostRender(
             std::filesystem::path justExtension = screenshotFile.extension();
             screenshotFile.remove_filename();
             screenshotFile /= justName.string()
-                + StringFormat("_%03d", m_settings.SequenceRecordFrames - m_sequenceRecordCounter)
+                + stringFormat("_%03d", m_settings.SequenceRecordFrames - m_sequenceRecordCounter)
                 + justExtension.string();
             m_sequenceRecordCounter--;
         }
 
         m_captureSuccess = dumpScreenshotCallback(screenshotFile.string().c_str());
-        result.CaptureSuccess = m_captureSuccess;
+        result.captureSuccess = m_captureSuccess;
         result.CapturePath = screenshotFile;
 
         if (m_settings.Type == 0 || (m_settings.Type == 1 && m_sequenceRecordCounter == 0) || !m_captureSuccess)
@@ -129,7 +129,7 @@ CaptureSequencerPostRenderResult CaptureSequencer::PostRender(
     if (m_exitAfterCapture && !m_active && !m_start)
     {
         result.ExitRequested = true;
-        result.CaptureSuccess = m_captureSuccess;
+        result.captureSuccess = m_captureSuccess;
         result.CapturePath = m_settings.ScreenshotFileName;
     }
 

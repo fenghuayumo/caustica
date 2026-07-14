@@ -112,7 +112,7 @@ namespace
     }
 } // namespace
 
-GpuDeviceCreateResult GpuDevice::CreateInitialized(const GpuDeviceCreateDesc& desc)
+GpuDeviceCreateResult GpuDevice::createInitialized(const GpuDeviceCreateDesc& desc)
 {
     GpuDeviceCreateResult result;
     const DeviceCreationParameters deviceParams = MakePathTracerDeviceParameters(desc);
@@ -120,17 +120,17 @@ GpuDeviceCreateResult GpuDevice::CreateInitialized(const GpuDeviceCreateDesc& de
     std::unique_ptr<GpuDevice> gpuDevice(GpuDevice::create(desc.api));
     if (!gpuDevice)
     {
-        caustica::error("GpuDevice::CreateInitialized: GpuDevice::create returned null");
+        caustica::error("GpuDevice::createInitialized: GpuDevice::create returned null");
         return result;
     }
 
-    gpuDevice->SetFrameTimeUpdateInterval(1.0);
+    gpuDevice->setFrameTimeUpdateInterval(1.0);
 
     if (desc.headless)
     {
-        if (!gpuDevice->InitializeHeadlessGraphics(deviceParams))
+        if (!gpuDevice->initializeHeadlessGraphics(deviceParams))
         {
-            caustica::error("GpuDevice::CreateInitialized: failed to create headless graphics device");
+            caustica::error("GpuDevice::createInitialized: failed to create headless graphics device");
             return result;
         }
 
@@ -152,23 +152,23 @@ GpuDeviceCreateResult GpuDevice::CreateInitialized(const GpuDeviceCreateDesc& de
     std::unique_ptr<Window> window(Window::create(windowDesc));
     if (!window || !window->hasInitialised())
     {
-        caustica::error("GpuDevice::CreateInitialized: failed to create platform window");
+        caustica::error("GpuDevice::createInitialized: failed to create platform window");
         return result;
     }
 
-    if (!gpuDevice->InitializeGraphicsDevice(deviceParams))
+    if (!gpuDevice->initializeGraphicsDevice(deviceParams))
     {
-        caustica::error("GpuDevice::CreateInitialized: failed to create graphics device");
+        caustica::error("GpuDevice::createInitialized: failed to create graphics device");
         return result;
     }
 
-    if (!gpuDevice->InitializeWindowSwapChain(window.get()))
+    if (!gpuDevice->initializeWindowSwapChain(window.get()))
     {
-        caustica::error("GpuDevice::CreateInitialized: failed to create swap chain");
+        caustica::error("GpuDevice::createInitialized: failed to create swap chain");
         return result;
     }
 
-    HelpersRegisterActiveWindow(window->getNativeHandle());
+    helpersRegisterActiveWindow(window->getNativeHandle());
     result.gpuDevice = std::move(gpuDevice);
     result.window = std::move(window);
     return result;

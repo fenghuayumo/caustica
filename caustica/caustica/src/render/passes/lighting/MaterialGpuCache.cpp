@@ -115,7 +115,7 @@ static std::filesystem::path ResolveMaterialTexturePath(
     std::filesystem::path& localPathForStorage)
 {
     localPathForStorage = localPath;
-    std::filesystem::path fullPath = ResolveSceneMediaPath(localPath, sceneDirectory, mediaPath);
+    std::filesystem::path fullPath = resolveSceneMediaPath(localPath, sceneDirectory, mediaPath);
 
     constexpr bool cSearchForDDS = true;
     const std::string extension = LowerCopy(fullPath.extension().string());
@@ -123,7 +123,7 @@ static std::filesystem::path ResolveMaterialTexturePath(
     {
         std::filesystem::path ddsLocalPath = localPathForStorage;
         ddsLocalPath.replace_extension(".dds");
-        std::filesystem::path ddsFullPath = ResolveSceneMediaPath(ddsLocalPath, sceneDirectory, mediaPath);
+        std::filesystem::path ddsFullPath = resolveSceneMediaPath(ddsLocalPath, sceneDirectory, mediaPath);
 
         if (std::filesystem::exists(ddsFullPath))
         {
@@ -1023,7 +1023,7 @@ void MaterialGpuCache::initializeUniqueDeterministicName(const std::shared_ptr<P
     std::string hashBase = material->modelName + "_" + material->name;
     uint evenShorterHash = ShortHash(HashMyString(hashBase));
     
-    std::string uniqueName = StripNonAsciiAlnum(material->name).substr(0, 16) + "_" + HexString(evenShorterHash);
+    std::string uniqueName = stripNonAsciiAlnum(material->name).substr(0, 16) + "_" + hexString(evenShorterHash);
 
     auto findV = m_uniqueNames.find(uniqueName);
     if (findV == m_uniqueNames.end())
@@ -1705,12 +1705,12 @@ bool MaterialGpuCache::loadSingle(PTMaterialBase & material)
 
 bool MaterialGpuCache::saveSingle(PTMaterialBase & material)
 {
-    if (!EnsureDirectoryExists(m_materialsPath))
+    if (!ensureDirectoryExists(m_materialsPath))
         return false;
     std::filesystem::path outPath = m_materialsPath;
     if (!material.sharedWithAllScenes)
         outPath = m_materialsSceneSpecializedPath;
-    if (!EnsureDirectoryExists(outPath))
+    if (!ensureDirectoryExists(outPath))
 
     assert( material.modelName != "" && material.name != "" );
     outPath = getMaterialStoragePath(material);
@@ -1720,7 +1720,7 @@ bool MaterialGpuCache::saveSingle(PTMaterialBase & material)
 
     material.write(rootJ);
 
-    // TODO: refactor, replace with caustica::json::SaveToFile
+    // TODO: refactor, replace with caustica::json::saveToFile
  
     std::ofstream outFile(outPath, std::ios::trunc);
     if (!outFile.is_open())
@@ -1825,7 +1825,7 @@ MaterialShaderPermutation PTMaterial::computeShaderPermutation(const std::string
 std::shared_ptr<PTMaterial> MaterialGpuCache::findByUniqueId(const std::string & name)
 {
     for( int i = 0; i < m_materials.size(); i++)
-        if (EqualsIgnoreCase(name, m_materials[i]->uniqueFullName()))
+        if (equalsIgnoreCase(name, m_materials[i]->uniqueFullName()))
             return m_materials[i];
 
     return nullptr;

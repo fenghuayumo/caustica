@@ -17,9 +17,9 @@ const char* toString(AppSchedule schedule)
     case AppSchedule::PostUpdate: return "PostUpdate";
     case AppSchedule::Extract: return "Extract";
     case AppSchedule::render: return "render";
-    case AppSchedule::PostRender: return "PostRender";
+    case AppSchedule::postRender: return "postRender";
     case AppSchedule::Last: return "Last";
-    case AppSchedule::Shutdown: return "Shutdown";
+    case AppSchedule::shutdown: return "shutdown";
     default: return "Unknown";
     }
 }

@@ -32,7 +32,7 @@ ImGui_Console::ImGui_Console(std::shared_ptr<console::Interpreter> interpreter, 
 {
 	if (options.capture_log)
 	{
-		caustica::SetCallback([&](caustica::Severity severity, char const* msg) {			
+		caustica::setCallback([&](caustica::Severity severity, char const* msg) {			
 				ImVec4 color = getSeverityColor(severity);
 				this->m_ItemsLog.push_back({severity, color, msg});
 			});
@@ -63,12 +63,12 @@ void ImGui_Console::Print(std::string_view line)
 	m_ItemsLog.push_back(item);
 }
 
-void ImGui_Console::ClearLog()
+void ImGui_Console::clearLog()
 {
 	m_ItemsLog.clear();
 }
 
-void ImGui_Console::ClearHistory()
+void ImGui_Console::clearHistory()
 {
 	m_History.clear();
 	m_HistoryIterator = m_History.rend();
@@ -99,9 +99,9 @@ void ImGui_Console::render(bool* open)
 			bool clearAll = ImGui::MenuItem("clear All");
 
 			if (clearLog || clearAll)
-				this->ClearLog();
+				this->clearLog();
 			if (clearHistory || clearAll)
-				this->ClearHistory();
+				this->clearHistory();
 			ImGui::EndMenu();
 		}
 		ImGui::EndMenuBar();			
@@ -118,14 +118,14 @@ void ImGui_Console::render(bool* open)
 	if (ImGui::BeginPopupContextWindow()) 
 	{
 		if (ImGui::Selectable("clear"))
-			ClearLog();
+			clearLog();
 		ImGui::EndPopup();
 	}
 
 	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 1)); // Tighten spacing
 
 	if (m_Options.font)
-		ImGui::PushFont(m_Options.font->GetScaledFont());
+		ImGui::PushFont(m_Options.font->getScaledFont());
 	for (auto const& item : m_ItemsLog)
 	{
 		using namespace caustica;
@@ -163,7 +163,7 @@ void ImGui_Console::render(bool* open)
 
 	// Command line
 	if (m_Options.font)
-		ImGui::PushFont(m_Options.font->GetScaledFont());
+		ImGui::PushFont(m_Options.font->getScaledFont());
 
 	bool reclaim_focus = false;
 	auto flags = ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackCompletion | ImGuiInputTextFlags_CallbackHistory;
@@ -171,12 +171,12 @@ void ImGui_Console::render(bool* open)
 		[](ImGuiInputTextCallbackData* data)
 		{
 			ImGui_Console* console = (ImGui_Console*)data->UserData;
-			return console->TextEditCallback(data);
+			return console->textEditCallback(data);
 		}, (void*)this))
 	{
 		if (m_InputBuffer.front()!='0')
 		{
-			this->ExecCommand(m_InputBuffer.data());
+			this->execCommand(m_InputBuffer.data());
 			m_InputBuffer.front() = 0;
 		}
 		reclaim_focus = true;
@@ -223,7 +223,7 @@ static void printLines(ImGui_Console& console, std::string const& output)
 	}		
 }
 
-void ImGui_Console::ExecCommand(char const* cmdline)
+void ImGui_Console::execCommand(char const* cmdline)
 {
 	std::string_view const cmd = cmdline;
 	if (!cmd.empty())
@@ -312,13 +312,13 @@ inline std::string_view isolateKeyword(std::string_view line)
 	return line;
 }
 
-int ImGui_Console::AutoCompletionCallback(ImGuiInputTextCallbackData* data)
+int ImGui_Console::autoCompletionCallback(ImGuiInputTextCallbackData* data)
 {
 
 	std::string_view cmdline(data->Buf, data->CursorPos);
     std::string_view keyword = isolateKeyword(cmdline);
 
-	if (auto candidates = m_Interpreter->Suggest(data->Buf, data->CursorPos); !candidates.empty())
+	if (auto candidates = m_Interpreter->suggest(data->Buf, data->CursorPos); !candidates.empty())
 	{
 		if (candidates.size() == 1)
 		{
@@ -345,7 +345,7 @@ int ImGui_Console::AutoCompletionCallback(ImGuiInputTextCallbackData* data)
 	return 0;
 }
 
-int ImGui_Console::HistoryKeyCallback(ImGuiInputTextCallbackData* data)
+int ImGui_Console::historyKeyCallback(ImGuiInputTextCallbackData* data)
 {
 	HistoryBuffer::reverse_iterator currentPos = m_HistoryIterator;
 	switch (data->EventKey)
@@ -364,15 +364,15 @@ int ImGui_Console::HistoryKeyCallback(ImGuiInputTextCallbackData* data)
 	return 0;
 }
 
-int ImGui_Console::TextEditCallback(ImGuiInputTextCallbackData* data)
+int ImGui_Console::textEditCallback(ImGuiInputTextCallbackData* data)
 {
 	switch (data->EventFlag)
 	{
 	case ImGuiInputTextFlags_CallbackCompletion:
-		return AutoCompletionCallback(data);
+		return autoCompletionCallback(data);
 
 	case ImGuiInputTextFlags_CallbackHistory:
-		return HistoryKeyCallback(data);
+		return historyKeyCallback(data);
 	}
 	return 0;
 }

@@ -10,7 +10,7 @@ namespace caustica
 {
 
 // Simple UUID v4 generator (no external dependency).
-inline uint64_t GenerateRandom64()
+inline uint64_t generateRandom64()
 {
     static std::random_device rd;
     static std::mt19937_64 gen(rd());

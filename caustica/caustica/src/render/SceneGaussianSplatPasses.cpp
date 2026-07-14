@@ -290,7 +290,7 @@ bool SceneGaussianSplatPasses::attachToScene(const std::filesystem::path& fileNa
         double(m_settings->GaussianSplatObjectScale.y),
         double(m_settings->GaussianSplatObjectScale.z)));
     entityWorld->setGaussianSplat(entity, splat);
-    scene->extractAndPublishRenderSnapshot(m_gpuDevice->GetFrameIndex());
+    scene->extractAndPublishRenderSnapshot(m_gpuDevice->getFrameIndex());
 
     onPassLoaded(*pass);
     ApplyGaussianSplatLocalBounds(*entityWorld, entity, *pass);
