@@ -10,6 +10,7 @@
 #include <render/SceneLightingPasses.h>
 #include <render/SceneRayTracingResources.h>
 #include <render/core/RenderSceneTypeFactory.h>
+#include <render/core/SceneGpuUpdater.h>
 #include <render/core/SceneMeshEditing.h>
 #include <scene/SceneEcs.h>
 #include <scene/SceneManager.h>
@@ -169,12 +170,25 @@ void SceneContentEditor::finalizeRuntimeSceneMutation(caustica::ecs::Entity impo
             MakeMutationCallbacks());
     }
 
+    // Match delete / scene-load teardown: drain render thread before uploading
+    // new mesh GPU buffers or requesting AS rebuild while the previous frame
+    // may still be reading the old snapshot / acceleration structures.
+    m_sceneEditor.gpuDevice().waitForRenderThreadIdle();
+    if (nvrhi::IDevice* device = m_sceneEditor.device())
+        device->waitForIdle();
+
     if (auto scene = sceneManager->getScene())
     {
         // Runtime import must not wipe existing PT materials (that leaves a
         // window where SubInstanceData points at cleared material slots, and
         // with 3DGS present the instance-index remap can stick on wrong colors).
         m_sceneEditor.lightingPasses().ensureMaterialsFromScene(scene);
+
+        // recreateAccelStructs runs before updateSceneGeometry in the render frame.
+        // Without uploading vertex/index buffers first, createBlases skips new meshes
+        // (empty BLAS desc) and buildTlas drops null BLAS — imported geometry never
+        // appears until a later accidental rebuild. Same precondition as full scene load.
+        caustica::render::SceneGpuUpdater::refreshAfterLoad(*scene, m_sceneEditor.frameIndex());
     }
 
     // AS rebuild only — requestFullRebuild also forces shader reload +
