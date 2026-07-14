@@ -55,7 +55,10 @@ void EnvMapProcessor::CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebu
 {
     m_importanceSamplingCache = nullptr;
     m_shaderDebug = shaderDebug;
+    m_shaderFactory = shaderFactory;
     m_computePipelineRegistry = computePipelineRegistry;
+    if (m_proceduralSky)
+        m_proceduralSky->ReloadShaders(shaderFactory);
 
     // Release existing compute shader variants from the baker
     if (m_computePipelineRegistry && m_enableRasterPrecompute)
@@ -69,10 +72,10 @@ void EnvMapProcessor::CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebu
     m_irradianceConvolveVariant = nullptr;
 
     // early de-alloc when re-creating passes
-    m_lowResPrePassLayerCS = m_baseLayerCS = m_MIPReduceCS = nullptr;
+    m_baseLayerCS = m_MIPReduceCS = nullptr;
     m_commonBindingLayout = m_reduceBindingLayout = nullptr;
-    m_lowResPrePassLayerPSO = m_baseLayerPSO = m_MIPReducePSO = m_BC6UCompressLowPSO = m_BC6UCompressHighPSO = nullptr;
-    m_pointSampler = m_linearSampler = m_equiRectSampler = nullptr;
+    m_baseLayerPSO = m_MIPReducePSO = m_BC6UCompressLowPSO = m_BC6UCompressHighPSO = nullptr;
+    m_pointSampler = m_linearSampler = m_linearClampSampler = m_equiRectSampler = nullptr;
     
     // Reset new processing shaders
     m_brdfLUTCS = nullptr;
@@ -82,7 +85,6 @@ void EnvMapProcessor::CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebu
     std::vector<caustica::ShaderMacro> shaderMacros;
     //shaderMacros.push_back(caustica::ShaderMacro({              "BLEND_DEBUG_BUFFER", "1" }));
 
-    m_lowResPrePassLayerCS = shaderFactory->createShader("caustica/shaders/render/lighting/distant/EnvMapProcessor.hlsl", "LowResPrePassLayerCS", &shaderMacros, nvrhi::ShaderType::Compute);
     m_baseLayerCS = shaderFactory->createShader("caustica/shaders/render/lighting/distant/EnvMapProcessor.hlsl", "BaseLayerCS", &shaderMacros, nvrhi::ShaderType::Compute);
     m_MIPReduceCS = shaderFactory->createShader("caustica/shaders/render/lighting/distant/EnvMapProcessor.hlsl", "MIPReduceCS", &shaderMacros, nvrhi::ShaderType::Compute);
 
@@ -96,15 +98,12 @@ void EnvMapProcessor::CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebu
             nvrhi::BindingLayoutItem::Texture_UAV(1),
             nvrhi::BindingLayoutItem::Texture_SRV(0),
             nvrhi::BindingLayoutItem::Texture_SRV(1),
-            nvrhi::BindingLayoutItem::Texture_SRV(2),
             nvrhi::BindingLayoutItem::Texture_SRV(10),
-            nvrhi::BindingLayoutItem::Texture_SRV(11),
             nvrhi::BindingLayoutItem::Texture_SRV(12),
-            nvrhi::BindingLayoutItem::Texture_SRV(13),
-            nvrhi::BindingLayoutItem::Texture_SRV(14),
             nvrhi::BindingLayoutItem::Sampler(0),
             nvrhi::BindingLayoutItem::Sampler(1),
             nvrhi::BindingLayoutItem::Sampler(2),
+            nvrhi::BindingLayoutItem::Sampler(3),
             nvrhi::BindingLayoutItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX),
             nvrhi::BindingLayoutItem::Texture_UAV(SHADER_DEBUG_VIZ_TEXTURE_UAV_INDEX)
         };
@@ -131,10 +130,6 @@ void EnvMapProcessor::CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebu
     nvrhi::ComputePipelineDesc pipelineDesc;
 
     pipelineDesc.bindingLayouts = { m_commonBindingLayout };
-    pipelineDesc.CS = m_lowResPrePassLayerCS;
-    m_lowResPrePassLayerPSO = m_device->createComputePipeline(pipelineDesc);
-
-    pipelineDesc.bindingLayouts = { m_commonBindingLayout };
     pipelineDesc.CS = m_baseLayerCS;
     m_baseLayerPSO = m_device->createComputePipeline(pipelineDesc);
 
@@ -149,6 +144,10 @@ void EnvMapProcessor::CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebu
     samplerDesc.setAllAddressModes(nvrhi::SamplerAddressMode::Wrap);
     m_linearSampler = m_device->createSampler(samplerDesc);
 
+    samplerDesc.setAllAddressModes(nvrhi::SamplerAddressMode::Clamp);
+    m_linearClampSampler = m_device->createSampler(samplerDesc);
+
+    samplerDesc.setAllAddressModes(nvrhi::SamplerAddressMode::Wrap);
     samplerDesc.setAllFilters(false);
     m_pointSampler = m_device->createSampler(samplerDesc);
 
@@ -313,15 +312,6 @@ void EnvMapProcessor::InitBuffers(uint cubeDim)
         
         m_cubemapDesc = desc; // save original cubemap settings
 
-        // low res cubemap used for fast procedural generation or etc.
-        m_cubeDimLowResDim = m_cubeDim / 2; assert( m_cubeDimLowResDim > 0 );
-
-        desc.width = m_cubeDimLowResDim;
-        desc.height = m_cubeDimLowResDim;
-        desc.debugName = "EnvMapProcessorMainCubeLowRes";
-        desc.mipLevels = 1;
-        m_cubemapLowRes = m_device->createTexture(desc);
-
         if (m_BC6UCompressionEnabled)
         {
             // BC6H compression resources: final compressed
@@ -419,7 +409,10 @@ void EnvMapProcessor::PreUpdate(nvrhi::ICommandList* commandList, caustica::rend
     }
 
     if (proceduralSkyEnabled && m_proceduralSky == nullptr)
-        m_proceduralSky = std::make_shared<SampleProceduralSky>(m_device, m_textureCache, renderDevice, commandList);
+    {
+        assert(m_shaderFactory != nullptr);
+        m_proceduralSky = std::make_shared<SampleProceduralSky>(m_device, m_shaderFactory);
+    }
 }
 
 bool EnvMapProcessor::Update(nvrhi::ICommandList* commandList, caustica::BindingCache & bindingCache, caustica::render::RenderDevice& renderDevice, const UpdateSettings & _settings, double sceneTime, EMB_DirectionalLight const * directionalLights, uint directionaLightCount, bool forceInstantUpdate)
@@ -453,7 +446,7 @@ bool EnvMapProcessor::Update(nvrhi::ICommandList* commandList, caustica::Binding
 
     ProceduralSkyConstants procSkyConsts; memset(&procSkyConsts, 0, sizeof(procSkyConsts));
     if (m_proceduralSky != nullptr && proceduralSkyEnabled)
-        contentsChanged |= m_proceduralSky->Update(sceneTime, procSkyConsts, m_sourceBackgroundPath, forceInstantUpdate);
+        contentsChanged |= m_proceduralSky->Update(commandList, sceneTime, procSkyConsts, m_sourceBackgroundPath, forceInstantUpdate);
 
     if (!contentsChanged)
         return contentsChanged;
@@ -476,7 +469,6 @@ bool EnvMapProcessor::Update(nvrhi::ICommandList* commandList, caustica::Binding
             consts.DirectionalLights[i] = m_bakedLights[i] = directionalLights[i];
 
         consts.CubeDim = m_cubeDim;
-        consts.CubeDimLowRes = m_cubeDimLowResDim;
         consts.ScaleColor = float3(settings.EnvMapRadianceScale,settings.EnvMapRadianceScale,settings.EnvMapRadianceScale);
         consts.BackgroundSourceType = 0;
         if (m_loadedSourceBackgroundTextureEquirect != nullptr)
@@ -500,52 +492,23 @@ bool EnvMapProcessor::Update(nvrhi::ICommandList* commandList, caustica::Binding
     bindingSetDesc.bindings = {
             nvrhi::BindingSetItem::ConstantBuffer(0, m_constantBuffer),
             //nvrhi::BindingSetItem::PushConstants(1, sizeof(SampleMiniConstants)),
-            nvrhi::BindingSetItem::Texture_UAV(0, m_cubemapLowRes, nvrhi::Format::UNKNOWN, nvrhi::TextureSubresourceSet(0, 1, 0, 6)).setDimension(nvrhi::TextureDimension::Texture2DArray),
+            nvrhi::BindingSetItem::Texture_UAV(0, m_cubemap, nvrhi::Format::UNKNOWN, nvrhi::TextureSubresourceSet(0, 1, 0, 6)).setDimension(nvrhi::TextureDimension::Texture2DArray),
             nvrhi::BindingSetItem::Texture_UAV(1, m_cubemap, nvrhi::Format::UNKNOWN, nvrhi::TextureSubresourceSet(1, 1, 0, 6)).setDimension(nvrhi::TextureDimension::Texture2DArray),
             nvrhi::BindingSetItem::Texture_SRV(0, (m_loadedSourceBackgroundTextureEquirect != nullptr) ? (m_loadedSourceBackgroundTextureEquirect->gpu.texture) : ((nvrhi::TextureHandle)renderDevice.builtins().blackTexture().Get())),
             sourceCubemapBinding,
-            nvrhi::BindingSetItem::Texture_SRV(2, (nvrhi::TextureHandle)renderDevice.builtins().blackCubeMapArray().Get()),
             nvrhi::BindingSetItem::Texture_SRV(10, (m_proceduralSky != nullptr && proceduralSkyEnabled) ? (m_proceduralSky->GetTransmittanceTexture()) : ((nvrhi::TextureHandle)renderDevice.builtins().blackTexture().Get())),
-            nvrhi::BindingSetItem::Texture_SRV(11, (m_proceduralSky != nullptr && proceduralSkyEnabled) ? (m_proceduralSky->GetScatterringTexture()) : ((nvrhi::TextureHandle)renderDevice.builtins().blackTexture3D().Get())),
-            nvrhi::BindingSetItem::Texture_SRV(12, (m_proceduralSky != nullptr && proceduralSkyEnabled) ? (m_proceduralSky->GetIrradianceTexture()) : ((nvrhi::TextureHandle)renderDevice.builtins().blackTexture().Get())),
-            nvrhi::BindingSetItem::Texture_SRV(13, (m_proceduralSky != nullptr && proceduralSkyEnabled) ? (m_proceduralSky->GetCloudsTexture()) : ((nvrhi::TextureHandle)renderDevice.builtins().blackTexture().Get())),
-            nvrhi::BindingSetItem::Texture_SRV(14, (m_proceduralSky != nullptr && proceduralSkyEnabled) ? (m_proceduralSky->GetNoiseTexture()) : ((nvrhi::TextureHandle)renderDevice.builtins().blackTexture().Get())),
+            nvrhi::BindingSetItem::Texture_SRV(12, (m_proceduralSky != nullptr && proceduralSkyEnabled) ? (m_proceduralSky->GetSkyViewTexture()) : ((nvrhi::TextureHandle)renderDevice.builtins().blackTexture().Get())),
             //nvrhi::BindingSetItem::Texture_UAV(0, m_Cubemap),
             nvrhi::BindingSetItem::Sampler(0, m_pointSampler),
             nvrhi::BindingSetItem::Sampler(1, m_linearSampler),
             nvrhi::BindingSetItem::Sampler(2, m_equiRectSampler),
+            nvrhi::BindingSetItem::Sampler(3, m_linearClampSampler),
             nvrhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->GetGPUWriteBuffer()),
             nvrhi::BindingSetItem::Texture_UAV(SHADER_DEBUG_VIZ_TEXTURE_UAV_INDEX, m_shaderDebug->GetDebugVizTexture()),
     };
-    nvrhi::BindingSetHandle bindingSetLowResPrePass = bindingCache.getOrCreateBindingSet(bindingSetDesc, m_commonBindingLayout);
-    bindingSetDesc.bindings[5] = nvrhi::BindingSetItem::Texture_SRV(
-        2,
-        m_cubemapLowRes,
-        nvrhi::Format::UNKNOWN,
-        nvrhi::AllSubresources,
-        nvrhi::TextureDimension::TextureCube);
-    bindingSetDesc.bindings[1] = nvrhi::BindingSetItem::Texture_UAV(0, m_cubemap, nvrhi::Format::UNKNOWN, nvrhi::TextureSubresourceSet(0, 1, 0, 6)).setDimension(nvrhi::TextureDimension::Texture2DArray);
     nvrhi::BindingSetHandle bindingSetBake = bindingCache.getOrCreateBindingSet(bindingSetDesc, m_commonBindingLayout);
 
     {
-        // Low res pre-pass (only needed for proc sky)
-        if (proceduralSkyEnabled)
-        {
-            RAII_SCOPE(commandList->beginMarker("ProcSkyLowResPrePass"); , commandList->endMarker(); );
-
-            nvrhi::ComputeState state;
-            state.bindings = { bindingSetLowResPrePass };
-            state.pipeline = m_lowResPrePassLayerPSO;
-
-            commandList->setComputeState(state);
-
-            const dm::uint  threads = EMB_NUM_COMPUTE_THREADS_PER_DIM;
-            const dm::uint2 dispatchSize = dm::uint2((m_cubeDimLowResDim + threads - 1) / threads, (m_cubeDimLowResDim + threads - 1) / threads);
-            assert(m_cubeDim % EMB_NUM_COMPUTE_THREADS_PER_DIM == 0); // if not, shaders need fixing!
-            //commandList->setPushConstants(&miniConsts, sizeof(miniConsts));
-            commandList->dispatch(dispatchSize.x, dispatchSize.y, 6); // <- 6 cubemap faces! :)
-        }
-
         // Base bake
         {
             RAII_SCOPE(commandList->beginMarker("ProcSkyBaseBake");, commandList->endMarker(); );

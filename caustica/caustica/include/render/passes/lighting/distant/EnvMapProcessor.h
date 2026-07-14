@@ -46,7 +46,6 @@ class ComputePipelineRegistry;
 class ComputeShaderVariant;
 
 // This is used to bake the cubemap with the given inputs. Inputs can be equirectangular envmap image or procedural sky, and directional lights.
-// There's a low resolution (half by half) pass which can be used to speed up baking - currently only used for procedural sky.
 // Also provides shared cubemap processing functionality (mips, GGX filtering, SH projection) via ProcessCubemap().
 class EnvMapProcessor 
 {
@@ -143,9 +142,6 @@ private:
     std::shared_ptr<caustica::TextureLoader> m_textureCache;
     std::shared_ptr<ShaderDebug>    m_shaderDebug;
 
-    nvrhi::ShaderHandle             m_lowResPrePassLayerCS;
-    nvrhi::ComputePipelineHandle    m_lowResPrePassLayerPSO;
-
     nvrhi::ShaderHandle             m_baseLayerCS;
     nvrhi::ComputePipelineHandle    m_baseLayerPSO;
 
@@ -166,6 +162,7 @@ private:
 
     nvrhi::SamplerHandle            m_pointSampler;
     nvrhi::SamplerHandle            m_linearSampler;
+    nvrhi::SamplerHandle            m_linearClampSampler;
     nvrhi::SamplerHandle            m_equiRectSampler;
 
     std::string                     m_sourceBackgroundPath;
@@ -180,10 +177,6 @@ private:
     uint                            m_cubeDim = 0;
 
     uint                            m_targetResolution = 0;
-
-    // optional low res pre-pass goes into this cubemap and is (additively) sampled in the full res pass
-    nvrhi::TextureHandle            m_cubemapLowRes;
-    uint                            m_cubeDimLowResDim = 0;
 
     uint64_t                        m_versionID = -1;
     bool                            m_renderPassesDirty = true;
@@ -202,6 +195,8 @@ private:
 
     std::shared_ptr<EnvMapImportanceSamplingCache>
                                     m_importanceSamplingCache;
+
+    std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
 
     bool                            m_enableRasterPrecompute = false;
 

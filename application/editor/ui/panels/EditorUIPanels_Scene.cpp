@@ -8,6 +8,7 @@
 #include <render/SceneGaussianSplatPasses.h>
 #include <engine/UserInterfaceUtils.h>
 #include <core/vfs/VFS.h>
+#include <core/path_utils.h>
 #include <scene/SceneTypes.h>
 #include <scene/SceneEcs.h>
 #include <imgui_internal.h>
@@ -197,16 +198,20 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
                 RESET_ON_CHANGE(ImGui::Checkbox("Enabled", &m_settings.EnvironmentMapParams.Enabled));
                 RESET_ON_CHANGE(ImGui::Checkbox("Visible to Camera", &m_settings.EnvironmentMapParams.VisibleToCamera));
 
-                if (m_sceneEditor.envMapLocalPath() != "==PROCEDURAL_SKY==")
-                    ImGui::TextWrapped("Source: `%s`", m_sceneEditor.envMapLocalPath().c_str());
+                if (IsProceduralSky(m_sceneEditor.envMapLocalPath().c_str()) ||
+                    IsProceduralSky(m_sceneEditor.envMapOverrideSource().c_str()))
+                    ImGui::TextWrapped("Source: Procedural Sky (Hillaire 2020)");
                 else
-                    ImGui::TextWrapped("Source: Procedural Sky");
+                    ImGui::TextWrapped("Source: `%s`", m_sceneEditor.envMapLocalPath().c_str());
 
                 std::string overrideSource = m_sceneEditor.envMapOverrideSource();
                 const std::vector<std::filesystem::path> & envMapMediaList = m_sceneEditor.envMapMediaList();
 
                 RAII_SCOPE( ImGui::PushItemWidth(-65.0f*m_currentScale);, ImGui::PopItemWidth(); );
-                if (ImGui::BeginCombo("Override", overrideSource.c_str()))
+                const std::string overridePreview = IsProceduralSky(overrideSource.c_str()) || overrideSource == c_EnvMapSceneDefault
+                    ? TrimSkyDisplayName(overrideSource)
+                    : overrideSource;
+                if (ImGui::BeginCombo("Override", overridePreview.c_str()))
                 {
                     for (int i = -7; i < (int)envMapMediaList.size(); i++)
                     {
@@ -228,15 +233,20 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
                         else
                             itemName = envMapMediaList[i].filename().string();
 
+                        const std::string displayName =
+                            (i < 0) ? TrimSkyDisplayName(itemName) : itemName;
+
                         bool is_selected = itemName == overrideSource;
-                        if (ImGui::Selectable(itemName.c_str(), is_selected))
+                        if (ImGui::Selectable(displayName.c_str(), is_selected))
                             overrideSource = itemName;
                         if (is_selected)
                             ImGui::SetItemDefaultFocus();
                     }
                     ImGui::EndCombo();
                 }
-                if (ImGui::IsItemHovered()) ImGui::SetTooltip("Overrides scene's default environment map");
+                if (ImGui::IsItemHovered()) ImGui::SetTooltip(
+                    "Overrides scene environment map.\n"
+                    "'sky (manual)' = free elevation/azimuth control in Sky Atmosphere panel.");
                 if (m_sceneEditor.envMapOverrideSource() != overrideSource)
                 {
                     m_settings.ResetAccumulation = true;
@@ -252,9 +262,9 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
                 if (auto& envMapProcessor = m_sceneEditor.lightingPasses().environment();
                     envMapProcessor != nullptr && envMapProcessor->IsProcedural() && envMapProcessor->GetProceduralSky() != nullptr)
                 {
-                    ImGui::TextColored(categoryColor, "Procedural Sky settings:");
+                    ImGui::TextColored(categoryColor, "Sky Atmosphere");
                     RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent););
-                    envMapProcessor->GetProceduralSky()->DebugGUI(layout.indent);
+                    m_settings.ResetAccumulation |= envMapProcessor->GetProceduralSky()->DebugGUI(layout.indent);
                 }
             }
 
@@ -295,7 +305,7 @@ void EditorUI::BuildSceneWidgetsPanel(const PanelLayout& layout)
         std::string envMapOverrideSource = m_sceneEditor.envMapOverrideSource();
         std::vector<std::string> envOptions;
         envOptions.push_back( c_EnvMapSceneDefault );
-        //envOptions.push_back( c_EnvMapProcSky );
+        envOptions.push_back( c_EnvMapProcSky );
         envOptions.push_back( c_EnvMapProcSky_Morning );
         envOptions.push_back( c_EnvMapProcSky_Midday );
         envOptions.push_back( c_EnvMapProcSky_Evening );

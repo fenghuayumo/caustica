@@ -580,7 +580,7 @@ std::string TrimSkyDisplayName(std::string text)
     if (text == c_EnvMapSceneDefault)
         return "default";
     else if (text == c_EnvMapProcSky)
-        return "procedural";
+        return "sky (manual)";
     else if (text == c_EnvMapProcSky_Morning)
         return "morning";
     else if (text == c_EnvMapProcSky_Midday)

@@ -3,6 +3,7 @@
 #include <core/log.h>
 
 #include <algorithm>
+#include <cctype>
 #include <cstring>
 #include <limits>
 #include <vector>
@@ -156,6 +157,10 @@ std::string ShaderPackFileSystem::normalizeLogicalPath(const std::filesystem::pa
     while (!normalized.empty() && (normalized.front() == '/' || normalized.front() == '\\'))
         normalized.erase(normalized.begin());
 
+    std::transform(normalized.begin(), normalized.end(), normalized.begin(), [](unsigned char ch) {
+        return static_cast<char>(std::tolower(ch));
+    });
+
     return normalized;
 }
 
@@ -183,7 +188,7 @@ bool ShaderPackFileSystem::hasDynamicBinLayout(const std::filesystem::path& disk
 
             foundDiskBin = true;
             const std::filesystem::path vfsRelative =
-                diskBinApiRoot.filename() / prefixDir.path().filename() / binFile.path().filename();
+                prefixDir.path().filename() / binFile.path().filename();
             return fileExists(vfsRelative);
         }
     }

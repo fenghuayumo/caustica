@@ -6,6 +6,7 @@
 #include <render/graph/GraphBuilder.h>
 #include <render/features/RenderFeatureContext.h>
 #include <render/passes/geometry/BloomPass.h>
+#include <render/passes/lighting/distant/EnvMapProcessor.h>
 #include <render/passes/postProcess/ToneMappingPasses.h>
 #include <render/worldRenderer/WorldRenderer.h>
 #include <shaders/SampleConstantBuffer.h>
@@ -17,6 +18,44 @@ namespace caustica::render
 
 namespace
 {
+    void registerAerialPerspectivePass(
+        rg::TextureHandle processedOutputColor,
+        RenderFeatureContext ctx)
+    {
+        auto environment = ctx.renderer->getPathTracingContext().scenePasses.lighting.environment();
+        if (!environment || !environment->IsProcedural() || !ctx.settings->EnvironmentMapParams.Enabled)
+            return;
+
+        const std::shared_ptr<SampleProceduralSky>& sky = environment->GetProceduralSky();
+        if (!sky || !sky->IsAerialPerspectiveEnabled())
+            return;
+
+        const rg::TextureHandle depth = ctx.graph->importTexture(
+            ctx.renderTargets->depth,
+            rg::TextureAccess::ShaderResource);
+
+        ctx.graph->addPass(
+            "SkyAerialPerspective",
+            [processedOutputColor, depth](rg::PassBuilder& setup) {
+                setup.read(processedOutputColor, rg::TextureAccess::UnorderedAccess);
+                setup.read(depth, rg::TextureAccess::ShaderResource);
+                setup.write(processedOutputColor, rg::TextureAccess::UnorderedAccess);
+            },
+            [processedOutputColor, depth, sky, ctx](rg::RenderPassContext& passCtx) {
+                const dm::uint2 size = ctx.extractedView->displaySize;
+                sky->ApplyAerialPerspective(
+                    passCtx.commandList(),
+                    passCtx.texture(processedOutputColor),
+                    passCtx.texture(depth),
+                    ctx.extractedView->postProcessView,
+                    size.x,
+                    size.y,
+                    ctx.settings->EnvironmentMapParams.TintColor,
+                    ctx.settings->EnvironmentMapParams.Intensity,
+                    ctx.settings->EnvironmentMapParams.RotationXYZ);
+            });
+    }
+
     bool isBloomEnabled(const PathTracerSettings& settings)
     {
         return settings.EnableBloom
@@ -148,6 +187,8 @@ void registerPostProcessFeature(RenderFeatureContext ctx)
     ctx.graph->extractTexture(processedOutputColor, rg::TextureAccess::UnorderedAccess);
     ctx.graph->extractTexture(ldrColor, rg::TextureAccess::ShaderResource);
     ctx.graph->extractTexture(ldrColorScratch, rg::TextureAccess::ShaderResource);
+
+    registerAerialPerspectivePass(processedOutputColor, ctx);
 
     BloomPass* bloomPass = ctx.renderer->getBloomPass();
     if (bloomPass != nullptr)

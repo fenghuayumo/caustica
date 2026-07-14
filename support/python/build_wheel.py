@@ -24,16 +24,7 @@ BASE_MINIMAL_ASSET_FILES = [
     "loading_splash.png",
 ]
 
-# Required by SampleProceduralSky for ==PROCEDURAL_SKY== environment lights.
-PROC_SKY_ASSET_FILES = [
-    "StandaloneTextures/RGBANoiseMedium.png",
-    "StandaloneTextures/q2rtx_env/transmittance_earth.dds",
-    "StandaloneTextures/q2rtx_env/inscatter_earth.dds",
-    "StandaloneTextures/q2rtx_env/irradiance_earth.dds",
-    "StandaloneTextures/q2rtx_env/clouds.dds",
-]
-
-MINIMAL_ASSET_FILES = BASE_MINIMAL_ASSET_FILES + PROC_SKY_ASSET_FILES
+MINIMAL_ASSET_FILES = BASE_MINIMAL_ASSET_FILES
 
 
 def copy_file(src: Path, dst: Path) -> None:
@@ -92,6 +83,9 @@ def fnv1a64(value: str, seed: int) -> int:
 
 
 def shader_pack_key(logical_path: str) -> tuple[int, int]:
+    # Keep pack lookup stable when ShaderMake preserves source-directory casing
+    # differently from runtime VFS requests.
+    logical_path = logical_path.replace("\\", "/").lower()
     return (
         fnv1a64(logical_path, 0x243F6A8885A308D3),
         fnv1a64(logical_path, 0x13198A2E03707344),
@@ -131,14 +125,23 @@ def is_hash_hex(value: str) -> bool:
 
 def normalized_dynamic_shader_rel(path: Path) -> Path:
     stem = path.stem
-    if is_hash_hex(stem):
+    parent = path.parent.name
+    is_split_hash = (
+        len(parent) == 2
+        and all(ch in HEX_CHARS for ch in parent)
+        and len(stem) == 62
+        and all(ch in HEX_CHARS for ch in stem)
+    )
+    if is_split_hash:
+        shader_hash = (parent + stem).lower()
+    elif is_hash_hex(stem):
         shader_hash = stem.lower()
     else:
         maybe_hash = stem.rsplit("_", 1)[-1].lower()
         if not is_hash_hex(maybe_hash):
-            return Path(path.name)
+            return path
         shader_hash = maybe_hash
-    return Path(shader_hash[:2]) / f"{shader_hash}.bin"
+    return Path(shader_hash[:2]) / f"{shader_hash[2:]}.bin"
 
 
 def add_shader_pack_tree(
@@ -164,7 +167,7 @@ def add_shader_pack_tree(
 def collect_shader_pack_entries(shader_type: str, dynamic_shaders: str) -> dict[str, Path]:
     entries: dict[str, Path] = {}
     static_roots = {
-        "framework": "ShaderPrecompiled/engine",
+        "engine": "ShaderPrecompiled/engine",
         "caustica": "ShaderPrecompiled/caustica",
         "nrd": "ShaderPrecompiled/nrd",
         "omm": "ShaderPrecompiled/omm",

@@ -24,9 +24,9 @@ struct EnvMapProcessorConstants
     uint                    DirectionalLightCount;
 
 	uint                    CubeDim;
-    uint                    CubeDimLowRes;
     uint                    ProcSkyEnabled;
     uint                    BackgroundSourceType;                   // 0 - disabled; 1 - t_SrcEquirectangularEnvMap; 2 - t_SrcCubemapEnvMap
+    uint                    _padding0;
 };
 
 #if !defined(__cplusplus)
@@ -46,17 +46,13 @@ TextureCubeArray<float4>                t_SrcCubemapEnvMap          : register(t
 
 Texture2DArray<float4>                  t_EnvMapCubeFaces           : register(t0);
 
-TextureCube<float4>                     t_LowResPrePassCube         : register(t2);
-
 Texture2D                               t_ProcSkyTransmittance      : register(t10);
-Texture3D                               t_ProcSkyScatter            : register(t11);
-Texture2D                               t_ProcSkyIrradiance         : register(t12);
-Texture3D                               t_ProcSkyClouds             : register(t13);
-Texture2D                               t_ProcSkyNoise              : register(t14);
+Texture2D                               t_ProcSkySkyView            : register(t12);
 
 SamplerState                            s_Point                     : register(s0);
 SamplerState                            s_Linear                    : register(s1);
 SamplerState                            s_EquiRectSampler           : register(s2);
+SamplerState                            s_LinearClamp               : register(s3);
 
 // Originally from https://github.com/GameTechDev/XeGTAO/blob/0b276c0ce820475c2adf6e2f3b696b696c172f43/Source/Rendering/engine/shaders/vaShared.hlsl#L4
 float3 CubemapGetDirectionFor(uint face, float2 uv)
@@ -183,13 +179,10 @@ float3 ComputeLightContribution( uint2 pixel, uint face, const EMB_DirectionalLi
 ProceduralSkyWorkingContext GetProcSkyContext()
 {
     ProceduralSkyWorkingContext pswc;
-    pswc.Consts                 = g_Const.ProcSkyConsts;
-    pswc.SamplerLinearWrap      = s_Linear;
-    pswc.TransmittanceTexture   = t_ProcSkyTransmittance;
-    pswc.ScatterTexture         = t_ProcSkyScatter;
-    pswc.IrradianceTexture      = t_ProcSkyIrradiance;
-    pswc.CloudsTexture          = t_ProcSkyClouds;
-    pswc.NoiseTexture           = t_ProcSkyNoise;
+    pswc.Consts                  = g_Const.ProcSkyConsts;
+    pswc.SamplerLinearClamp      = s_LinearClamp;
+    pswc.TransmittanceTexture    = t_ProcSkyTransmittance;
+    pswc.SkyViewTexture          = t_ProcSkySkyView;
     return pswc;
 }
 
@@ -211,9 +204,7 @@ float4 GenerateTexel( const uint2 cubePixelPos, const uint cubeFace, const uint 
     for (uint i = 0; i < g_Const.DirectionalLightCount; i++ )
         envCol += ComputeLightContribution( cubePixelPos, cubeFace, g_Const.DirectionalLights[i] );
 
-    float3 cubeDir          = CubemapGetDirectionFor( cubeFace, (float2(cubePixelPos) + 0.5.xx ) / float(g_Const.CubeDim).xx );
-    float3 cubeDirRight     = CubemapGetDirectionFor( cubeFace, (float2(cubePixelPos+float2(1,0)) + 0.5.xx ) / float(g_Const.CubeDim).xx ) - cubeDir;
-    float3 cubeDirBottom    = CubemapGetDirectionFor( cubeFace, (float2(cubePixelPos+float2(0,1)) + 0.5.xx ) / float(g_Const.CubeDim).xx ) - cubeDir;
+    float3 cubeDir = CubemapGetDirectionFor( cubeFace, (float2(cubePixelPos) + 0.5.xx ) / float(g_Const.CubeDim).xx );
 
     if (g_Const.ProcSkyEnabled)
     {
@@ -222,7 +213,7 @@ float4 GenerateTexel( const uint2 cubePixelPos, const uint cubeFace, const uint 
                                 0, 1, 0 };
         float3 localDirection = mul( cubeDir, toLocal );
 
-        envCol += ProceduralSky( g_Const.CubeDim, uint3(cubePixelPos, cubeFace), localDirection, GetProcSkyContext(), t_LowResPrePassCube, cubeDir, cubeDirRight, cubeDirBottom );
+        envCol += ProceduralSky(localDirection, GetProcSkyContext());
     }
     
     envCol *= g_Const.ScaleColor;
@@ -232,26 +223,6 @@ float4 GenerateTexel( const uint2 cubePixelPos, const uint cubeFace, const uint 
     envCol = clamp( envCol, 0.0.xxx, fp16Max.xxx );    
    
     return float4( envCol, 1 );
-}
-
-// (Low res layer): process top (MIP 0) environment map cubemap (all 6 faces!)
-[numthreads(EMB_NUM_COMPUTE_THREADS_PER_DIM, EMB_NUM_COMPUTE_THREADS_PER_DIM, 1)]
-void LowResPrePassLayerCS( uint3 dispatchThreadID : SV_DispatchThreadID )
-{
-    const uint cubeFace = dispatchThreadID.z;
-    uint2 cubePixelPos = dispatchThreadID.xy;
-    const uint cubeRes = g_Const.CubeDimLowRes;
-
-    if (g_Const.ProcSkyEnabled)
-    {
-        float3 direction = CubemapGetDirectionFor( cubeFace, (float2(cubePixelPos) + 0.5.xx ) / float(cubeRes).xx );
-        float3x3 toLocal = {    1, 0, 0, 
-                                0, 0, 1, 
-                                0, 1, 0 };
-        float3 localDirection = mul( direction, toLocal );
-
-        u_EnvMapCubeFacesDst0[dispatchThreadID.xyz] = ProceduralSkyLowRes( cubeRes, uint3(cubePixelPos, cubeFace), localDirection, GetProcSkyContext() );
-    }
 }
 
 // Process top (MIP 0) of our dynamic (or static) environment map cubemap (all 6 faces!)
