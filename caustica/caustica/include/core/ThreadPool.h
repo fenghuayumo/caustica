@@ -20,7 +20,7 @@ public:
 // ThreadPool — now a thin wrapper around JobSystem.
 //
 // Existing code continues to work unchanged.  New code should use
-// JobSystem::Execute / JobSystem::Dispatch directly.
+// JobSystem::execute / JobSystem::dispatch directly.
 // ==========================================================================
 class ThreadPool
 {

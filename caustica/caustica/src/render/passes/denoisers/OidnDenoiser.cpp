@@ -268,7 +268,7 @@ OidnDenoiser::OidnDenoiser()
 
 OidnDenoiser::~OidnDenoiser() = default;
 
-bool OidnDenoiser::IsAvailable() const
+bool OidnDenoiser::isAvailable() const
 {
 #if CAUSTICA_WITH_OIDN
     return true;
@@ -277,17 +277,17 @@ bool OidnDenoiser::IsAvailable() const
 #endif
 }
 
-const std::string& OidnDenoiser::GetLastError() const
+const std::string& OidnDenoiser::getLastError() const
 {
     return m_impl->LastError;
 }
 
-const std::string& OidnDenoiser::GetDeviceDescription() const
+const std::string& OidnDenoiser::getDeviceDescription() const
 {
     return m_impl->DeviceDescription;
 }
 
-bool OidnDenoiser::Denoise(const float* inputRgb, uint32_t width, uint32_t height, const Options& options, std::vector<float>& outputRgb)
+bool OidnDenoiser::denoise(const float* inputRgb, uint32_t width, uint32_t height, const Options& options, std::vector<float>& outputRgb)
 {
     m_impl->LastError.clear();
 
@@ -376,7 +376,7 @@ bool OidnDenoiser::Denoise(const float* inputRgb, uint32_t width, uint32_t heigh
 #endif
 }
 
-void OidnDenoiser::Reset()
+void OidnDenoiser::reset()
 {
 #if CAUSTICA_WITH_OIDN
     m_impl->ReleaseBuffers();

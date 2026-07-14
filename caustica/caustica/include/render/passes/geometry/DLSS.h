@@ -40,7 +40,7 @@ namespace caustica::render
             nvrhi::TextureHandle inputColorTexture;
             nvrhi::TextureHandle outputColorTexture;
 
-            // The exposure buffer returned by ToneMappingPass::GetExposureBuffer(), optional.
+            // The exposure buffer returned by ToneMappingPass::getExposureBuffer(), optional.
             nvrhi::BufferHandle exposureBuffer;
 
             // DLSS RR (ray reconstruction) specific textures.
@@ -57,25 +57,25 @@ namespace caustica::render
 
         DLSS(nvrhi::IDevice* device, caustica::ShaderFactory& shaderFactory);
 
-        [[nodiscard]] bool IsDlssSupported() const;
-        [[nodiscard]] bool IsDlssInitialized() const;
+        [[nodiscard]] bool isDlssSupported() const;
+        [[nodiscard]] bool isDlssInitialized() const;
 
-        [[nodiscard]] bool IsRayReconstructionSupported() const;
-        [[nodiscard]] bool IsRayReconstructionInitialized() const;
+        [[nodiscard]] bool isRayReconstructionSupported() const;
+        [[nodiscard]] bool isRayReconstructionInitialized() const;
 
-        virtual void Init(const InitParameters& params) = 0;
+        virtual void init(const InitParameters& params) = 0;
 
-        virtual bool Evaluate(
+        virtual bool evaluate(
             nvrhi::ICommandList* commandList,
             const EvaluateParameters& params,
             const caustica::PlanarView& view) = 0;
 
         virtual ~DLSS() = default;
 
-        static std::unique_ptr<DLSS> Create(nvrhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
+        static std::unique_ptr<DLSS> create(nvrhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
             std::string const& directoryWithExecutable, uint32_t applicationID = DefaultApplicationID);
 
-        static void GetRequiredVulkanExtensions(std::vector<std::string>& instanceExtensions, std::vector<std::string>& deviceExtensions);
+        static void getRequiredVulkanExtensions(std::vector<std::string>& instanceExtensions, std::vector<std::string>& deviceExtensions);
 
         static const uint32_t DefaultApplicationID = 231313132;
 
@@ -100,18 +100,18 @@ namespace caustica::render
         nvrhi::BindingSetHandle m_exposureBindingSet;
         nvrhi::CommandListHandle m_featureCommandList;
 
-        void ComputeExposure(nvrhi::ICommandList* commandList, nvrhi::IBuffer* toneMapperExposureBuffer, float exposureScale);
+        void computeExposure(nvrhi::ICommandList* commandList, nvrhi::IBuffer* toneMapperExposureBuffer, float exposureScale);
         
     #if CAUSTICA_WITH_DX11
-        static std::unique_ptr<DLSS> CreateDX11(nvrhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
+        static std::unique_ptr<DLSS> createDX11(nvrhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
             std::string const& directoryWithExecutable, uint32_t applicationID);
     #endif
     #if CAUSTICA_WITH_DX12
-        static std::unique_ptr<DLSS> CreateDX12(nvrhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
+        static std::unique_ptr<DLSS> createDX12(nvrhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
             std::string const& directoryWithExecutable, uint32_t applicationID);
     #endif
     #if CAUSTICA_WITH_VULKAN
-        static std::unique_ptr<DLSS> CreateVK(nvrhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
+        static std::unique_ptr<DLSS> createVK(nvrhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
             std::string const& directoryWithExecutable, uint32_t applicationID);
     #endif
     };

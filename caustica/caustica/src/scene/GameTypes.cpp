@@ -9,7 +9,7 @@ using namespace caustica::math;
 using namespace caustica;
 using namespace game;
 
-bool Pose::Read( const Json::Value & node )
+bool Pose::read( const Json::Value & node )
 {
     if (node.isNull())
         return false;
@@ -47,7 +47,7 @@ bool Pose::Read( const Json::Value & node )
     return true;
 }
 
-Json::Value Pose::Write()
+Json::Value Pose::write()
 {
     Json::Value ret;
     ret["translation"] << Translation;
@@ -58,7 +58,7 @@ Json::Value Pose::Write()
     return ret;
 }
 
-bool KeyframeAnimation::Read(const Json::Value& node)
+bool KeyframeAnimation::read(const Json::Value& node)
 {
     assert(node.isArray());
     KeyTimeMin = FLT_MAX;
@@ -66,7 +66,7 @@ bool KeyframeAnimation::Read(const Json::Value& node)
     for( int i = 0; i < node.size(); i++)
     {
         Pose key;
-        key.Read(node[i]);
+        key.read(node[i]);
         Keys.push_back(key);
         KeyTimeMin = min( KeyTimeMin, key.KeyTime );
         KeyTimeMax = max( KeyTimeMax, key.KeyTime );
@@ -75,15 +75,15 @@ bool KeyframeAnimation::Read(const Json::Value& node)
     return true;
 }
 
-Json::Value KeyframeAnimation::Write()
+Json::Value KeyframeAnimation::write()
 {
     Json::Value nodesArray;
     for (int i = 0; i < Keys.size(); i++)
-        nodesArray.append( Keys[i].Write() );
+        nodesArray.append( Keys[i].write() );
     return nodesArray;
 }
 
-void KeyframeAnimation::FromKeys(const std::vector<game::Pose> & keys)
+void KeyframeAnimation::fromKeys(const std::vector<game::Pose> & keys)
 {
     KeyTimeMin = FLT_MAX;
     KeyTimeMax = -FLT_MAX;
@@ -97,7 +97,7 @@ void KeyframeAnimation::FromKeys(const std::vector<game::Pose> & keys)
     std::sort(Keys.begin(), Keys.end(), [ ](const Pose& a, const Pose& b) { return a.KeyTime < b.KeyTime; });
 }
 
-affine3 Pose::ToTransform() const
+affine3 Pose::toTransform() const
 {
     dm::daffine3 transformD = dm::scaling(this->Scaling);
     transformD *= this->Rotation.toAffine();
@@ -105,7 +105,7 @@ affine3 Pose::ToTransform() const
     return dm::affine3(transformD);
 }
 
-std::tuple<float3, float3, float3> Pose::GetPosDirUp() const
+std::tuple<float3, float3, float3> Pose::getPosDirUp() const
 {
     auto rot = affine3(Rotation.toAffine()).m_linear;
     float3 dir = rot.row0;
@@ -113,15 +113,15 @@ std::tuple<float3, float3, float3> Pose::GetPosDirUp() const
     return std::make_tuple(float3(Translation), dir, up);
 }
 
-void Pose::SetTransform(const affine3 & transform)
+void Pose::setTransform(const affine3 & transform)
 {
     dm::decomposeAffine(daffine3(transform), &Translation, &Rotation, &Scaling);
 }
 
-void Pose::SetTransformFromCamera(const float3 & pos, const float3 & dir, const float3 & up)
+void Pose::setTransformFromCamera(const float3 & pos, const float3 & dir, const float3 & up)
 {
     float3 camRight = normalize(cross(dir, up));
-    SetTransform(affine3(dir, up, camRight, pos));
+    setTransform(affine3(dir, up, camRight, pos));
 }
 
 static double3 my_lerp(double3 a, double3 b, double u) { return a + (b - a) * u; }
@@ -289,7 +289,7 @@ static Pose NiceSpline(const Pose& v0, const Pose& v1, const Pose& v2, const Pos
     return ret;
 }
 
-bool KeyframeAnimation::GetAt(double time, bool wrap, Pose & outPose, float & outAnimTime)
+bool KeyframeAnimation::getAt(double time, bool wrap, Pose & outPose, float & outAnimTime)
 {
     if (Keys.size()==0)
         return false;
@@ -345,14 +345,14 @@ bool KeyframeAnimation::GetAt(double time, bool wrap, Pose & outPose, float & ou
     return true;
 }
 
-bool        LightController::Read(const Json::Value& node)
+bool        LightController::read(const Json::Value& node)
 {
     if (node.isNull())
         return false;
 
     node["color"] >> Color;
     node["intensity"] >> Intensity;
-    node["enabled"] >> Enabled;
+    node["enabled"] >> enabled;
     node["toggleOnUIClick"] >> ToggleOnUIClick;
     node["innerAngle"] >> InnerAngle;
     node["outerAngle"] >> OuterAngle;
@@ -362,12 +362,12 @@ bool        LightController::Read(const Json::Value& node)
     return true;
 }
 
-Json::Value LightController::Write()
+Json::Value LightController::write()
 {
     Json::Value ret;
     ret["color"] << Color;
     ret["intensity"] << Intensity;
-    ret["enabled"] << Enabled;
+    ret["enabled"] << enabled;
     ret["toggleOnUIClick"] << ToggleOnUIClick;
     ret["innerAngle"] << InnerAngle;
     ret["outerAngle"] << OuterAngle;
@@ -381,12 +381,12 @@ Json::Value LightController::Write()
 
 }
 
-caustica::SpotLight* LightController::GetSpotLight()
+caustica::SpotLight* LightController::getSpotLight()
 {
     return nullptr;
 }
 
-caustica::PointLight* LightController::GetPointLight()
+caustica::PointLight* LightController::getPointLight()
 {
     return nullptr;
 }

@@ -26,14 +26,14 @@ namespace game
         dm::double3 Scaling     = { 1, 1, 1 };
         double      KeyTime     = 0.0;
 
-        bool Read(const Json::Value& node);
-        Json::Value Write();
+        bool read(const Json::Value& node);
+        Json::Value write();
 
-        dm::affine3 ToTransform() const;
-        std::tuple<dm::float3, dm::float3, dm::float3> GetPosDirUp() const;
+        dm::affine3 toTransform() const;
+        std::tuple<dm::float3, dm::float3, dm::float3> getPosDirUp() const;
 
-        void SetTransform(const dm::affine3& transform);
-        void SetTransformFromCamera(const dm::float3& pos, const dm::float3& dir, const dm::float3& up);
+        void setTransform(const dm::affine3& transform);
+        void setTransformFromCamera(const dm::float3& pos, const dm::float3& dir, const dm::float3& up);
     };
 
     struct KeyframeAnimation
@@ -42,11 +42,11 @@ namespace game
         double KeyTimeMin = 0.0;
         double KeyTimeMax = 0.0;
 
-        bool Read(const Json::Value& node);
-        Json::Value Write();
+        bool read(const Json::Value& node);
+        Json::Value write();
 
-        void FromKeys(const std::vector<Pose>& keys);
-        bool GetAt(double time, bool wrap, Pose& outPose, float& outAnimTime);
+        void fromKeys(const std::vector<Pose>& keys);
+        bool getAt(double time, bool wrap, Pose& outPose, float& outAnimTime);
 
     private:
         int LastFound = -1;
@@ -58,7 +58,7 @@ namespace game
 
         dm::float3 Color               = dm::float3(1, 1, 1);
         float      Intensity           = 1.0f;
-        bool       Enabled             = true;
+        bool       enabled             = true;
         bool       ToggleOnUIClick     = false;
         float      InnerAngle          = 0.0f;
         float      OuterAngle          = 0.0f;
@@ -66,11 +66,11 @@ namespace game
         float      AutoOnTime          = 0.0f;
         float      AutoOnOffTimeOffset = 0.0f;
 
-        caustica::SpotLight*  GetSpotLight();
-        caustica::PointLight* GetPointLight();
+        caustica::SpotLight*  getSpotLight();
+        caustica::PointLight* getPointLight();
 
-        bool Read(const Json::Value& node);
-        Json::Value Write();
+        bool read(const Json::Value& node);
+        Json::Value write();
     };
 
     struct ScreenGUISel
@@ -82,4 +82,4 @@ namespace game
     };
 }
 
-inline void operator>>(const Json::Value& node, game::Pose& p) { p.Read(node); }
+inline void operator>>(const Json::Value& node, game::Pose& p) { p.read(node); }

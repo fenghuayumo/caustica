@@ -43,32 +43,32 @@ public:
     EnvMapImportanceSamplingCache( nvrhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory );
     ~EnvMapImportanceSamplingCache();
 
-    void                            CreateRenderPasses();
+    void                            createRenderPasses();
 
-    void                            PreUpdate(nvrhi::TextureHandle sourceCubemap, bool newSource);
-    void                            Update(nvrhi::CommandListHandle commandList, nvrhi::TextureHandle sourceCubemap);
+    void                            preUpdate(nvrhi::TextureHandle sourceCubemap, bool newSource);
+    void                            update(nvrhi::CommandListHandle commandList, nvrhi::TextureHandle sourceCubemap);
 
-    int                             GetImportanceMapResolution();
-    int                             GetImportanceMapMIPLevels();
-    nvrhi::TextureHandle            GetImportanceMapOnly() const        { return m_importanceMapTexture; }
-    nvrhi::TextureHandle            GetRadianceAndImportanceMap() const { return m_radianceMapTexture; }
+    int                             getImportanceMapResolution();
+    int                             getImportanceMapMIPLevels();
+    nvrhi::TextureHandle            getImportanceMapOnly() const        { return m_importanceMapTexture; }
+    nvrhi::TextureHandle            getRadianceAndImportanceMap() const { return m_radianceMapTexture; }
     
     // TODO: this will be obsolete and will be removed
-    void                            ExecutePresampling(nvrhi::CommandListHandle commandList, nvrhi::TextureHandle sourceCubemap, int sampleIndex);
-    //nvrhi::BufferHandle             GetPresampledBuffer() const { return m_presampledBuffer; }
+    void                            executePresampling(nvrhi::CommandListHandle commandList, nvrhi::TextureHandle sourceCubemap, int sampleIndex);
+    //nvrhi::BufferHandle             getPresampledBuffer() const { return m_presampledBuffer; }
 
-    nvrhi::SamplerHandle            GetImportanceMapSampler() const { return m_pointClampSampler; }
+    nvrhi::SamplerHandle            getImportanceMapSampler() const { return m_pointClampSampler; }
 
-    // nvrhi::TextureHandle            GetEnvMapCube() const           { return m_cubemap; }
+    // nvrhi::TextureHandle            getEnvMapCube() const           { return m_cubemap; }
 
-    bool                            DebugGUI(float indent);
+    bool                            debugGUI(float indent);
 
-    EnvMapImportanceSamplingParams  GetShaderParams()                   { return m_envMapImportanceSamplingParams; }
+    EnvMapImportanceSamplingParams  getShaderParams()                   { return m_envMapImportanceSamplingParams; }
 
 private:
-    void                            CreateImportanceMap();
-    void                            GenerateImportanceMap(nvrhi::CommandListHandle commandList, nvrhi::TextureHandle sourceCubemap);
-    void                            FillCacheConsts(EnvMapImportanceSamplingCacheConstants & constants, nvrhi::TextureHandle sourceCubemap, int sampleIndex);
+    void                            createImportanceMap();
+    void                            generateImportanceMap(nvrhi::CommandListHandle commandList, nvrhi::TextureHandle sourceCubemap);
+    void                            fillCacheConsts(EnvMapImportanceSamplingCacheConstants & constants, nvrhi::TextureHandle sourceCubemap, int sampleIndex);
 
 private:
     nvrhi::DeviceHandle             m_device;

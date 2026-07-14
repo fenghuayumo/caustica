@@ -129,7 +129,7 @@ void AppendTransparentGeometryCommands(
 
 } // namespace
 
-void BuildOpaqueDrawList(
+void buildOpaqueDrawList(
     const SceneRenderData& renderData,
     const caustica::IView& view,
     std::vector<DrawCommand>& out)
@@ -153,7 +153,7 @@ void BuildOpaqueDrawList(
         std::sort(out.begin(), out.end(), CompareOpaqueDrawCommands);
 }
 
-void BuildTransparentDrawList(
+void buildTransparentDrawList(
     const SceneRenderData& renderData,
     const caustica::IView& view,
     std::vector<DrawCommand>& out,
@@ -179,14 +179,14 @@ void BuildTransparentDrawList(
         std::sort(out.begin(), out.end(), CompareTransparentDrawCommands);
 }
 
-void BuildViewDrawLists(
+void buildViewDrawLists(
     const SceneRenderData& renderData,
     const caustica::IView& view,
     ViewDrawLists& out,
     const DrawListBuildOptions& options)
 {
-    BuildOpaqueDrawList(renderData, view, out.opaque);
-    BuildTransparentDrawList(renderData, view, out.transparent, options);
+    buildOpaqueDrawList(renderData, view, out.opaque);
+    buildTransparentDrawList(renderData, view, out.transparent, options);
 }
 
 } // namespace caustica::scene

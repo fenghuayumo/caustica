@@ -15,7 +15,7 @@ struct RenderSessionState
     RenderRuntimeState runtime;
 };
 
-void ApplyPerformancePreset(PathTracerSettings& settings, const PerformancePreset& preset);
+void applyPerformancePreset(PathTracerSettings& settings, const PerformancePreset& preset);
 bool MatchesPerformancePreset(const PathTracerSettings& settings, const PerformancePreset& preset);
 
 void InitializeRenderSessionStateFromCommandLine(RenderSessionState& state, const CommandLineOptions& cmdLine);

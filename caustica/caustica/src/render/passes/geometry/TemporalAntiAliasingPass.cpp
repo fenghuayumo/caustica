@@ -180,7 +180,7 @@ TemporalAntiAliasingPass::TemporalAntiAliasingPass(
     }
 }
 
-void TemporalAntiAliasingPass::RenderMotionVectors(
+void TemporalAntiAliasingPass::renderMotionVectors(
     nvrhi::ICommandList* commandList,
     const ICompositeView& compositeView,
     const ICompositeView& compositeViewPrevious,
@@ -227,7 +227,7 @@ void TemporalAntiAliasingPass::RenderMotionVectors(
     commandList->endMarker();
 }
 
-void TemporalAntiAliasingPass::TemporalResolve(
+void TemporalAntiAliasingPass::temporalResolve(
     nvrhi::ICommandList* commandList,
     const TemporalAntiAliasingParameters& params,
     bool feedbackIsValid,
@@ -276,7 +276,7 @@ void TemporalAntiAliasingPass::TemporalResolve(
     commandList->endMarker();
 }
 
-void TemporalAntiAliasingPass::AdvanceFrame()
+void TemporalAntiAliasingPass::advanceFrame()
 {
     m_FrameIndex++;
 
@@ -309,7 +309,7 @@ static float VanDerCorput(size_t base, size_t index)
     return ret;
 }
 
-dm::float2 TemporalAntiAliasingPass::GetCurrentPixelOffset()
+dm::float2 TemporalAntiAliasingPass::getCurrentPixelOffset()
 {
     switch (m_Jitter)
     {
@@ -343,7 +343,7 @@ dm::float2 TemporalAntiAliasingPass::GetCurrentPixelOffset()
     }
 }
 
-void caustica::render::TemporalAntiAliasingPass::SetJitter(TemporalAntiAliasingJitter jitter)
+void caustica::render::TemporalAntiAliasingPass::setJitter(TemporalAntiAliasingJitter jitter)
 {
     m_Jitter = jitter;
 }

@@ -23,11 +23,11 @@ void updateWindowTitle(App& app)
             return;
 
         std::string extraInfo = ", " + vs->fpsInfo + ", " + manager->getCurrentSceneName() + ", "
-            + resolutionInfo(app) + ", (L: " + std::to_string(activeScene->GetLightEntities().size())
-            + ", MAT: " + std::to_string(activeScene->GetMaterials().size())
-            + ", MESH: " + std::to_string(activeScene->GetMeshes().size())
-            + ", I: " + std::to_string(activeScene->GetMeshInstances().size())
-            + ", SI: " + std::to_string(activeScene->GetSkinnedMeshInstances().size())
+            + resolutionInfo(app) + ", (L: " + std::to_string(activeScene->getLightEntities().size())
+            + ", MAT: " + std::to_string(activeScene->getMaterials().size())
+            + ", MESH: " + std::to_string(activeScene->getMeshes().size())
+            + ", I: " + std::to_string(activeScene->getMeshInstances().size())
+            + ", SI: " + std::to_string(activeScene->getSkinnedMeshInstances().size())
 #if ENABLE_DEBUG_VIZUALISATIONS
             + ", ENABLE_DEBUG_VIZUALISATIONS: 1"
 #endif
@@ -39,7 +39,7 @@ void updateWindowTitle(App& app)
 
 void registerWindowTitlePlugin(App& app)
 {
-    app.addSystemAfter(AppSchedule::Update, "SceneSession.UpdateWindowTitle", "SceneSession.TickSimulation", [](SystemContext& ctx) {
+    app.addSystemAfter(AppSchedule::update, "SceneSession.UpdateWindowTitle", "SceneSession.TickSimulation", [](SystemContext& ctx) {
         if (!ctx.windowFocused)
             return;
 

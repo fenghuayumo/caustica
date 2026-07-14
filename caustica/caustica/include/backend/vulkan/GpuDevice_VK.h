@@ -18,7 +18,7 @@
 class GpuDevice_VK : public caustica::GpuDevice
 {
 public:
-    [[nodiscard]] nvrhi::IDevice* GetDevice() const override
+    [[nodiscard]] nvrhi::IDevice* getDevice() const override
     {
         if (m_ValidationLayer)
             return m_ValidationLayer;
@@ -83,7 +83,7 @@ protected:
         return uint32_t(m_SwapChainImages.size());
     }
 
-    bool BeginFrame() override;
+    bool beginFrame() override;
     bool Present() override;
 
     const char *GetRendererString() const override

@@ -21,7 +21,7 @@ namespace caustica
     public:
         explicit CausUsdImporter(std::shared_ptr<SceneTypeFactory> sceneTypeFactory);
 
-        bool Load(
+        bool load(
             const std::filesystem::path& fileName,
             TextureLoader& textureCache,
             SceneLoadingStats& stats,
@@ -30,8 +30,8 @@ namespace caustica
             const std::filesystem::path& sceneDirectory = std::filesystem::path()) const;
 
         // If `usdPath` is .usd/.usda/.usdc, ensure a sibling .caususd exists (bake via Python if needed).
-        static std::filesystem::path ResolveCachePath(const std::filesystem::path& usdOrCachePath);
-        static bool EnsureCache(
+        static std::filesystem::path resolveCachePath(const std::filesystem::path& usdOrCachePath);
+        static bool ensureCache(
             const std::filesystem::path& usdPath,
             std::filesystem::path& outCachePath,
             std::string* errorMessage = nullptr);

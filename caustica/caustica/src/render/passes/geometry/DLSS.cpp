@@ -52,27 +52,27 @@ DLSS::DLSS(nvrhi::IDevice* device, caustica::ShaderFactory& shaderFactory)
     m_featureCommandList = device->createCommandList();
 }
 
-bool DLSS::IsDlssSupported() const
+bool DLSS::isDlssSupported() const
 {
     return m_dlssSupported;
 }
 
-bool DLSS::IsDlssInitialized() const
+bool DLSS::isDlssInitialized() const
 {
     return m_dlssInitialized;
 }
 
-bool DLSS::IsRayReconstructionSupported() const
+bool DLSS::isRayReconstructionSupported() const
 {
     return m_rayReconstructionSupported;
 }
 
-bool DLSS::IsRayReconstructionInitialized() const
+bool DLSS::isRayReconstructionInitialized() const
 {
     return m_rayReconstructionInitialized;
 }
 
-void DLSS::ComputeExposure(nvrhi::ICommandList* commandList, nvrhi::IBuffer* toneMapperExposureBuffer, float exposureScale)
+void DLSS::computeExposure(nvrhi::ICommandList* commandList, nvrhi::IBuffer* toneMapperExposureBuffer, float exposureScale)
 {
     if (m_exposureSourceBuffer != toneMapperExposureBuffer)
     {
@@ -99,26 +99,26 @@ void DLSS::ComputeExposure(nvrhi::ICommandList* commandList, nvrhi::IBuffer* ton
     commandList->dispatch(1);
 }
 
- std::unique_ptr<DLSS> DLSS::Create(nvrhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
+ std::unique_ptr<DLSS> DLSS::create(nvrhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
     std::string const& directoryWithExecutable, uint32_t applicationID)
 {
     switch(device->getGraphicsAPI())
     {
     case nvrhi::GraphicsAPI::D3D11:
         #if CAUSTICA_WITH_DX11
-        return DLSS::CreateDX11(device, shaderFactory, directoryWithExecutable, applicationID);
+        return DLSS::createDX11(device, shaderFactory, directoryWithExecutable, applicationID);
         #else
         return nullptr;
         #endif
     case nvrhi::GraphicsAPI::D3D12:
         #if CAUSTICA_WITH_DX12
-        return DLSS::CreateDX12(device, shaderFactory, directoryWithExecutable, applicationID);
+        return DLSS::createDX12(device, shaderFactory, directoryWithExecutable, applicationID);
         #else
         return nullptr;
         #endif
     case nvrhi::GraphicsAPI::VULKAN:
         #if CAUSTICA_WITH_VULKAN
-        return DLSS::CreateVK(device, shaderFactory, directoryWithExecutable, applicationID);
+        return DLSS::createVK(device, shaderFactory, directoryWithExecutable, applicationID);
         #else
         return nullptr;
         #endif

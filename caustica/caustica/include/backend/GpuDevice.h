@@ -47,7 +47,7 @@ namespace caustica
 
     struct DefaultMessageCallback : public nvrhi::IMessageCallback
     {
-        static DefaultMessageCallback& GetInstance();
+        static DefaultMessageCallback& getInstance();
 
         void message(nvrhi::MessageSeverity severity, const char* messageText) override;
     };
@@ -310,7 +310,7 @@ namespace caustica
 
         GpuDevice();
 
-        static GpuDevice* Create(nvrhi::GraphicsAPI api);
+        static GpuDevice* create(nvrhi::GraphicsAPI api);
         bool InitializeGraphicsDevice(const DeviceCreationParameters& params);
         bool InitializeWindowSwapChain(class Window* window);
         bool InitializeHeadlessGraphics(const DeviceCreationParameters& params);
@@ -335,12 +335,12 @@ namespace caustica
         bool ValidatePathTracerRequirements() const;
         virtual void DestroyDeviceAndSwapChain() = 0;
         virtual void ResizeSwapChain() = 0;
-        virtual bool BeginFrame() = 0;
+        virtual bool beginFrame() = 0;
         virtual bool Present() = 0;
         virtual void PrepareShutdown() {}
 
     public:
-        [[nodiscard]] virtual nvrhi::IDevice *GetDevice() const = 0;
+        [[nodiscard]] virtual nvrhi::IDevice *getDevice() const = 0;
         [[nodiscard]] virtual const char *GetRendererString() const = 0;
         [[nodiscard]] virtual nvrhi::GraphicsAPI GetGraphicsAPI() const = 0;
 
@@ -413,7 +413,7 @@ namespace caustica
     private:
         static GpuDevice* CreateD3D11();
         static GpuDevice* CreateD3D12();
-        static GpuDevice* CreateVK();
+        static GpuDevice* createVK();
 
         std::string m_WindowTitle;
 #if CAUSTICA_WITH_AFTERMATH

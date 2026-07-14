@@ -29,7 +29,7 @@ namespace caustica
     public:
         explicit GltfImporter(std::shared_ptr<caustica::IFileSystem> fs, std::shared_ptr<SceneTypeFactory> sceneTypeFactory);
         
-        bool Load(
+        bool load(
             const std::filesystem::path& fileName,
             TextureLoader& textureCache,
             SceneLoadingStats& stats,

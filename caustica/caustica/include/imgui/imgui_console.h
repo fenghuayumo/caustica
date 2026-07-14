@@ -49,7 +49,7 @@ namespace caustica
 
 		void ClearHistory();
 
-		void Render(bool * open=nullptr);
+		void render(bool * open=nullptr);
 
 	private:
 

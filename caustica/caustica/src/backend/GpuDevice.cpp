@@ -233,12 +233,12 @@ void GpuDevice::BackBufferResized()
         nvrhi::FramebufferDesc framebufferDesc = nvrhi::FramebufferDesc()
             .addColorAttachment(GetBackBuffer(index));
         
-        m_SwapChain.framebuffers[index] = GetDevice()->createFramebuffer(framebufferDesc);
+        m_SwapChain.framebuffers[index] = getDevice()->createFramebuffer(framebufferDesc);
 
         if (m_SwapChain.depthBuffer)
         {
             framebufferDesc.setDepthAttachment(m_SwapChain.depthBuffer);
-            m_SwapChain.framebuffersWithDepth[index] = GetDevice()->createFramebuffer(framebufferDesc);
+            m_SwapChain.framebuffersWithDepth[index] = getDevice()->createFramebuffer(framebufferDesc);
         }
         else
         {
@@ -268,14 +268,14 @@ void GpuDevice::CreateDepthBuffer()
         .setIsRenderTarget(true)
         .enableAutomaticStateTracking(nvrhi::ResourceStates::DepthWrite);
 
-    m_SwapChain.depthBuffer = GetDevice()->createTexture(textureDesc);
+    m_SwapChain.depthBuffer = getDevice()->createTexture(textureDesc);
 }
 
 bool GpuDevice::CreateHeadlessBackBuffers()
 {
     ReleaseHeadlessBackBuffers();
 
-    if (!GetDevice())
+    if (!getDevice())
         return false;
 
     if (m_DeviceParams.backBufferWidth == 0 || m_DeviceParams.backBufferHeight == 0)
@@ -303,7 +303,7 @@ bool GpuDevice::CreateHeadlessBackBuffers()
             .setInitialState(nvrhi::ResourceStates::RenderTarget)
             .setKeepInitialState(true);
 
-        nvrhi::TextureHandle texture = GetDevice()->createTexture(textureDesc);
+        nvrhi::TextureHandle texture = getDevice()->createTexture(textureDesc);
         if (!texture)
         {
             caustica::error("Failed to create headless back buffer %u.", index);
@@ -424,19 +424,19 @@ bool GpuDevice::ValidatePathTracerRequirements() const
 
 bool GpuDevice::SupportsRayTracingPipeline() const
 {
-    nvrhi::IDevice* device = GetDevice();
+    nvrhi::IDevice* device = getDevice();
     return device && device->queryFeatureSupport(nvrhi::Feature::RayTracingPipeline);
 }
 
 bool GpuDevice::SupportsRayQuery() const
 {
-    nvrhi::IDevice* device = GetDevice();
+    nvrhi::IDevice* device = getDevice();
     return device && device->queryFeatureSupport(nvrhi::Feature::RayQuery);
 }
 
 bool GpuDevice::SupportsShaderExecutionReordering() const
 {
-    nvrhi::IDevice* device = GetDevice();
+    nvrhi::IDevice* device = getDevice();
     return device
         && device->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D12
         && device->queryFeatureSupport(nvrhi::Feature::ShaderExecutionReordering);
@@ -549,7 +549,7 @@ void GpuDevice::SetInformativeWindowTitle(const char* applicationName, bool incl
 {
     std::stringstream ss;
     ss << applicationName;
-    ss << " (" << nvrhi::utils::GraphicsAPIToString(GetDevice()->getGraphicsAPI());
+    ss << " (" << nvrhi::utils::GraphicsAPIToString(getDevice()->getGraphicsAPI());
 
     if (m_DeviceParams.enableDebugRuntime)
     {
@@ -585,7 +585,7 @@ const char* caustica::GpuDevice::GetWindowTitle()
     return m_WindowTitle.c_str();
 }
 
-caustica::GpuDevice* caustica::GpuDevice::Create(nvrhi::GraphicsAPI api)
+caustica::GpuDevice* caustica::GpuDevice::create(nvrhi::GraphicsAPI api)
 {
     switch (api)
     {
@@ -599,15 +599,15 @@ caustica::GpuDevice* caustica::GpuDevice::Create(nvrhi::GraphicsAPI api)
 #endif
 #if CAUSTICA_WITH_VULKAN
     case nvrhi::GraphicsAPI::VULKAN:
-        return CreateVK();
+        return createVK();
 #endif
     default:
-        caustica::error("GpuDevice::Create: Unsupported Graphics API (%d)", api);
+        caustica::error("GpuDevice::create: Unsupported Graphics API (%d)", api);
         return nullptr;
     }
 }
 
-DefaultMessageCallback& DefaultMessageCallback::GetInstance()
+DefaultMessageCallback& DefaultMessageCallback::getInstance()
 {
     static DefaultMessageCallback Instance;
     return Instance;

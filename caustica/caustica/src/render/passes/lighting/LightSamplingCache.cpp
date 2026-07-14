@@ -46,7 +46,7 @@ using namespace caustica;
 LightSamplingCache::LightSamplingCache(nvrhi::IDevice* device)
     : m_device(device)
 {
-    SceneReloaded();
+    sceneReloaded();
 
 #if 0 // Switch to this when nvrhi::Feature::WaveLaneCountMinMax lands
     nvrhi::WaveLaneCountMinMaxFeatureInfo waveLaneCountMinMaxFeatureInfo;
@@ -68,7 +68,7 @@ LightSamplingCache::LightSamplingCache(nvrhi::IDevice* device)
 #endif
 }
 
-void LightSamplingCache::SceneReloaded() 
+void LightSamplingCache::sceneReloaded() 
 { 
     m_NEE_AT_FeedbackBufferFilled = false;
     m_framesFromLastReadbackCopy = -1; 
@@ -89,7 +89,7 @@ LightSamplingCache::~LightSamplingCache()
 {
 }
 
-void LightSamplingCache::CreateRenderPasses(std::shared_ptr<caustica::ShaderFactory> shaderFactory, nvrhi::IBindingLayout* bindlessLayout, caustica::render::RenderDevice& renderDevice, std::shared_ptr<ShaderDebug> shaderDebug, const uint2 renderResolution, const uint envMapProcessedResolution)
+void LightSamplingCache::createRenderPasses(std::shared_ptr<caustica::ShaderFactory> shaderFactory, nvrhi::IBindingLayout* bindlessLayout, caustica::render::RenderDevice& renderDevice, std::shared_ptr<ShaderDebug> shaderDebug, const uint2 renderResolution, const uint envMapProcessedResolution)
 {
     m_renderDevice = &renderDevice;
     m_shaderDebug = shaderDebug;
@@ -379,7 +379,7 @@ void LightSamplingCache::CreateRenderPasses(std::shared_ptr<caustica::ShaderFact
     m_allocatedVRAM += getEstimatedTextureSize(m_envLightLookupMap->getDesc());
     m_allocatedVRAM += getEstimatedTextureSize(m_NEE_AT_HistoryDepth->getDesc());
 
-    SceneReloaded();
+    sceneReloaded();
 }
 
 // TODO: combine these
@@ -464,10 +464,10 @@ static PolymorphicLightInfoFull ConvertLight(
     if (!comp || !globalTransform)
         return PolymorphicLightInfoFull::make(polymorphic, polymorphicEx);
 
-    const float3 lightPos = globalTransform ? float3(caustica::scene::GetLightPosition(*globalTransform)) : float3(0.f);
-    const float3 lightDir = globalTransform ? float3(normalize(caustica::scene::GetLightDirection(*globalTransform))) : float3(0.f, 0.f, -1.f);
+    const float3 lightPos = globalTransform ? float3(caustica::scene::getLightPosition(*globalTransform)) : float3(0.f);
+    const float3 lightDir = globalTransform ? float3(normalize(caustica::scene::getLightDirection(*globalTransform))) : float3(0.f, 0.f, -1.f);
 
-    switch (caustica::scene::GetLightType(*comp))
+    switch (caustica::scene::getLightType(*comp))
     {
     case LightType_Spot:
     {
@@ -572,7 +572,7 @@ static PolymorphicLightInfoFull ConvertGaussianSplatEmissionProxy(
 // #ifdef _DEBUG
 // #pragma optimize("gt", on)
 // #endif
-bool LightSamplingCache::CollectEnvmapLightPlaceholders(const UpdateSettings & settings, LightingControlData & ctrlBuff, std::vector<PolymorphicLightInfo> & outLightBuffer, std::vector<PolymorphicLightInfoEx> & outLightExBuffer, std::vector<uint> & outLightHistoryRemapCurrentToPastBuffer, std::vector<uint> & outLightHistoryRemapPastToCurrent)
+bool LightSamplingCache::collectEnvmapLightPlaceholders(const UpdateSettings & settings, LightingControlData & ctrlBuff, std::vector<PolymorphicLightInfo> & outLightBuffer, std::vector<PolymorphicLightInfoEx> & outLightExBuffer, std::vector<uint> & outLightHistoryRemapCurrentToPastBuffer, std::vector<uint> & outLightHistoryRemapPastToCurrent)
 {
     ctrlBuff.EnvmapQuadNodeCount += CAUSTICA_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT;
     ctrlBuff.TotalLightCount += CAUSTICA_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT;
@@ -596,11 +596,11 @@ bool LightSamplingCache::CollectEnvmapLightPlaceholders(const UpdateSettings & s
 // #ifdef _DEBUG
 // #pragma optimize("gt", on)
 // #endif
-bool LightSamplingCache::CollectAnalyticLightsCPU(const UpdateSettings & settings, const std::shared_ptr<caustica::Scene> & scene, LightingControlData & ctrlBuff, std::vector<PolymorphicLightInfo> & outLightBuffer, std::vector<PolymorphicLightInfoEx> & outLightExBuffer, std::vector<uint> & outLightHistoryRemapCurrentToPastBuffer, std::vector<uint> & outLightHistoryRemapPastToCurrent)
+bool LightSamplingCache::collectAnalyticLightsCPU(const UpdateSettings & settings, const std::shared_ptr<caustica::Scene> & scene, LightingControlData & ctrlBuff, std::vector<PolymorphicLightInfo> & outLightBuffer, std::vector<PolymorphicLightInfoEx> & outLightExBuffer, std::vector<uint> & outLightHistoryRemapCurrentToPastBuffer, std::vector<uint> & outLightHistoryRemapPastToCurrent)
 {
     bool allGood = true;
-    const auto& lightEntities = scene->GetLightEntities();
-    auto* entityWorld = scene->GetEntityWorld();
+    const auto& lightEntities = scene->getLightEntities();
+    auto* entityWorld = scene->getEntityWorld();
 
     for (ecs::Entity entity : lightEntities)
     {
@@ -614,7 +614,7 @@ bool LightSamplingCache::CollectAnalyticLightsCPU(const UpdateSettings & setting
         auto* lightComp = entityWorld->world().get<caustica::scene::LightComponent>(entity);
         if (!lightComp) continue;
 
-        const int lightType = caustica::scene::GetLightType(*lightComp);
+        const int lightType = caustica::scene::getLightType(*lightComp);
         switch (lightType)
         {
         case LightType_Spot:
@@ -677,7 +677,7 @@ bool LightSamplingCache::CollectAnalyticLightsCPU(const UpdateSettings & setting
     return allGood;
 };
 
-bool LightSamplingCache::CollectGaussianSplatEmissionProxies(
+bool LightSamplingCache::collectGaussianSplatEmissionProxies(
     const UpdateSettings& settings,
     LightingControlData& ctrlBuff,
     std::vector<PolymorphicLightInfo>& outLightBuffer,
@@ -720,7 +720,7 @@ bool LightSamplingCache::CollectGaussianSplatEmissionProxies(
 // #ifdef _DEBUG
 // #pragma optimize("gt", on)
 // #endif
-bool LightSamplingCache::ProcessEmissiveGeometry( const UpdateSettings & settings, const std::shared_ptr<caustica::Scene> & scene, std::vector<SubInstanceData> & subInstanceData, LightingControlData & ctrlBuff, std::vector<struct EmissiveTrianglesProcTask> & tasks )
+bool LightSamplingCache::processEmissiveGeometry( const UpdateSettings & settings, const std::shared_ptr<caustica::Scene> & scene, std::vector<SubInstanceData> & subInstanceData, LightingControlData & ctrlBuff, std::vector<struct EmissiveTrianglesProcTask> & tasks )
 {
     bool allGood = true;
 
@@ -728,8 +728,8 @@ bool LightSamplingCache::ProcessEmissiveGeometry( const UpdateSettings & setting
 
     assert( ctrlBuff.TotalLightCount == (ctrlBuff.AnalyticLightCount+ctrlBuff.EnvmapQuadNodeCount) );
 
-    auto* entityWorld = scene->GetEntityWorld();
-    const auto& instances = scene->GetMeshInstances();
+    auto* entityWorld = scene->getEntityWorld();
+    const auto& instances = scene->getMeshInstances();
     for (const ecs::Entity entity : instances)
     {
         if (!entityWorld)
@@ -797,7 +797,7 @@ bool LightSamplingCache::ProcessEmissiveGeometry( const UpdateSettings & setting
 
                 if (parentLightComp)
                 {
-                    const int lType = caustica::scene::GetLightType(*parentLightComp);
+                    const int lType = caustica::scene::getLightType(*parentLightComp);
                     if (lType == LightType_Spot || lType == LightType_Point)
                     {
 #ifdef HASH_LOOKUP_BASED_HISTORIC_LIGHT_SOURCE_MATCHING
@@ -904,12 +904,12 @@ bool LightSamplingCache::ProcessEmissiveGeometry( const UpdateSettings & setting
     return allGood;
 }
 
-bool LightSamplingCache::TotalLightCountOverflow() const
+bool LightSamplingCache::totalLightCountOverflow() const
 {
     return !m_noOverflow;
 }
 
-void LightSamplingCache::FillBindings(nvrhi::BindingSetDesc& outBindingSetDesc, const std::shared_ptr<caustica::Scene>& scene, std::shared_ptr<class MaterialGpuCache> materialGpuCache, std::shared_ptr<OpacityMicromapBuilder> opacityMicromapBuilder, nvrhi::BufferHandle subInstanceDataBuffer,
+void LightSamplingCache::fillBindings(nvrhi::BindingSetDesc& outBindingSetDesc, const std::shared_ptr<caustica::Scene>& scene, std::shared_ptr<class MaterialGpuCache> materialGpuCache, std::shared_ptr<OpacityMicromapBuilder> opacityMicromapBuilder, nvrhi::BufferHandle subInstanceDataBuffer,
 nvrhi::TextureHandle depthBuffer, nvrhi::TextureHandle motionVectors, nvrhi::TextureHandle envMapProcessed)
 {
     if( depthBuffer == nullptr )
@@ -950,16 +950,16 @@ nvrhi::TextureHandle depthBuffer, nvrhi::TextureHandle motionVectors, nvrhi::Tex
             nvrhi::BindingSetItem::Sampler(1, m_linearSampler),
             nvrhi::BindingSetItem::Sampler(2, m_renderDevice->samplers().anisotropicWrap()),    // s_MaterialSampler
             nvrhi::BindingSetItem::StructuredBuffer_SRV(1, subInstanceDataBuffer),
-            nvrhi::BindingSetItem::StructuredBuffer_SRV(2, scene->GetGpuResources().instanceBuffer),
-            nvrhi::BindingSetItem::StructuredBuffer_SRV(3, scene->GetGpuResources().geometryBuffer),
-            //nvrhi::BindingSetItem::StructuredBuffer_SRV(4, opacityMicromapBuilder->GetGeometryDebugBuffer()),
+            nvrhi::BindingSetItem::StructuredBuffer_SRV(2, scene->getGpuResources().instanceBuffer),
+            nvrhi::BindingSetItem::StructuredBuffer_SRV(3, scene->getGpuResources().geometryBuffer),
+            //nvrhi::BindingSetItem::StructuredBuffer_SRV(4, opacityMicromapBuilder->getGeometryDebugBuffer()),
             nvrhi::BindingSetItem::StructuredBuffer_SRV(5, materialGpuCache->getMaterialDataBuffer()),
-            nvrhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->GetGPUWriteBuffer()),
-            nvrhi::BindingSetItem::Texture_UAV(SHADER_DEBUG_VIZ_TEXTURE_UAV_INDEX, m_shaderDebug->GetDebugVizTexture()),
+            nvrhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->getGPUWriteBuffer()),
+            nvrhi::BindingSetItem::Texture_UAV(SHADER_DEBUG_VIZ_TEXTURE_UAV_INDEX, m_shaderDebug->getDebugVizTexture()),
     };
 }
 
-void LightSamplingCache::UpdateFrustumConsts(LightSamplingCacheConstants & outConsts, const LightSamplingCache::UpdateSettings & settings)
+void LightSamplingCache::updateFrustumConsts(LightSamplingCacheConstants & outConsts, const LightSamplingCache::UpdateSettings & settings)
 {
     float4 frustPlanes[6];
 
@@ -1018,7 +1018,7 @@ void LightSamplingCache::UpdateFrustumConsts(LightSamplingCacheConstants & outCo
         outConsts.FrustumCorners[i] = float4(getCorner(i), 0);
 }
 
-void LightSamplingCache::UpdateLocalJitter()
+void LightSamplingCache::updateLocalJitter()
 {
     m_prevLocalJitter = m_localJitter;
     if (!m_dbgDebugDisableJitter)
@@ -1039,7 +1039,7 @@ void LightSamplingCache::UpdateLocalJitter()
     }
 }
 
-void LightSamplingCache::UpdateBegin(nvrhi::ICommandList* commandList, caustica::BindingCache & bindingCache, const UpdateSettings& _settings, double sceneTime, const std::shared_ptr<caustica::Scene>& scene, std::shared_ptr<class MaterialGpuCache> materialGpuCache, 
+void LightSamplingCache::updateBegin(nvrhi::ICommandList* commandList, caustica::BindingCache & bindingCache, const UpdateSettings& _settings, double sceneTime, const std::shared_ptr<caustica::Scene>& scene, std::shared_ptr<class MaterialGpuCache> materialGpuCache, 
     std::shared_ptr<class OpacityMicromapBuilder> opacityMicromapBuilder, nvrhi::BufferHandle subInstanceDataBuffer, std::vector<SubInstanceData>& subInstanceData, nvrhi::TextureHandle envMapProcessed)
 {
     RAII_SCOPE( commandList->beginMarker("LightingUpdateBegin");, commandList->endMarker(); );
@@ -1065,7 +1065,7 @@ void LightSamplingCache::UpdateBegin(nvrhi::ICommandList* commandList, caustica:
         m_NEE_AT_FeedbackBufferFilled = false;
     }
 
-    UpdateLocalJitter();
+    updateLocalJitter();
 
     m_updateCounter++;
 
@@ -1085,7 +1085,7 @@ void LightSamplingCache::UpdateBegin(nvrhi::ICommandList* commandList, caustica:
     LightingControlData ctrlBuff; memset(&ctrlBuff, 0, sizeof(ctrlBuff)); 
     LightSamplingCacheConstants & cacheConsts = ctrlBuff.CacheConstants;
 
-    UpdateFrustumConsts(cacheConsts, m_currentSettings);
+    updateFrustumConsts(cacheConsts, m_currentSettings);
 
     cacheConsts.UpdateCounter = m_updateCounter;
     cacheConsts.EnableMotionReprojection      = true;
@@ -1153,13 +1153,13 @@ void LightSamplingCache::UpdateBegin(nvrhi::ICommandList* commandList, caustica:
     m_scratchLightHistoryRemapPastToCurrentBuffer.clear();
     // collect all environment lights (create placeholders to be filled on the GPU later)
     m_noOverflow = true;
-    m_noOverflow &= CollectEnvmapLightPlaceholders( m_currentSettings, ctrlBuff, m_scratchLightBuffer, m_scratchLightExBuffer, m_scratchLightHistoryRemapCurrentToPastBuffer, m_scratchLightHistoryRemapPastToCurrentBuffer );
+    m_noOverflow &= collectEnvmapLightPlaceholders( m_currentSettings, ctrlBuff, m_scratchLightBuffer, m_scratchLightExBuffer, m_scratchLightHistoryRemapCurrentToPastBuffer, m_scratchLightHistoryRemapPastToCurrentBuffer );
     // collect all analytic lights
-    m_noOverflow &= CollectAnalyticLightsCPU( m_currentSettings, scene, ctrlBuff, m_scratchLightBuffer, m_scratchLightExBuffer, m_scratchLightHistoryRemapCurrentToPastBuffer, m_scratchLightHistoryRemapPastToCurrentBuffer );
+    m_noOverflow &= collectAnalyticLightsCPU( m_currentSettings, scene, ctrlBuff, m_scratchLightBuffer, m_scratchLightExBuffer, m_scratchLightHistoryRemapCurrentToPastBuffer, m_scratchLightHistoryRemapPastToCurrentBuffer );
     // inject 3DGS SH0/DC emission proxies as analytic sphere lights
-    m_noOverflow &= CollectGaussianSplatEmissionProxies( m_currentSettings, ctrlBuff, m_scratchLightBuffer, m_scratchLightExBuffer, m_scratchLightHistoryRemapCurrentToPastBuffer, m_scratchLightHistoryRemapPastToCurrentBuffer );
+    m_noOverflow &= collectGaussianSplatEmissionProxies( m_currentSettings, ctrlBuff, m_scratchLightBuffer, m_scratchLightExBuffer, m_scratchLightHistoryRemapCurrentToPastBuffer, m_scratchLightHistoryRemapPastToCurrentBuffer );
     // collect all emissive triangles and other geometry specific work - this builds batch jobs on the CPU that are executed on the GPU later, but at the end of this step we know the exact number of added emissive triangles (even though some might be black)
-    m_noOverflow &= ProcessEmissiveGeometry(m_currentSettings, scene, subInstanceData, ctrlBuff, *m_scratchTaskBuffer);
+    m_noOverflow &= processEmissiveGeometry(m_currentSettings, scene, subInstanceData, ctrlBuff, *m_scratchTaskBuffer);
     cacheConsts.TriangleLightTaskCount = (int)(*m_scratchTaskBuffer).size();
     assert( ctrlBuff.EnvmapQuadNodeCount == CAUSTICA_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT );
     assert( ctrlBuff.TotalLightCount == ctrlBuff.EnvmapQuadNodeCount + ctrlBuff.AnalyticLightCount + ctrlBuff.TriangleLightCount ); assert(ctrlBuff.TotalLightCount <= CAUSTICA_LIGHTING_MAX_LIGHTS);
@@ -1182,7 +1182,7 @@ void LightSamplingCache::UpdateBegin(nvrhi::ICommandList* commandList, caustica:
 
     // Bindings
     nvrhi::BindingSetDesc bindingSetDesc;
-    FillBindings(bindingSetDesc, scene, materialGpuCache, opacityMicromapBuilder, subInstanceDataBuffer, nullptr, nullptr, envMapProcessed);
+    fillBindings(bindingSetDesc, scene, materialGpuCache, opacityMicromapBuilder, subInstanceDataBuffer, nullptr, nullptr, envMapProcessed);
     nvrhi::BindingSetHandle bindingSet = bindingCache.getOrCreateBindingSet(bindingSetDesc, m_commonBindingLayout);
 
     nvrhi::BindingSetVector bindings = { bindingSet };
@@ -1398,7 +1398,7 @@ void LightSamplingCache::UpdateBegin(nvrhi::ICommandList* commandList, caustica:
             // Copy from GPU buffer to CPU readback buffer
             commandList->copyBuffer(m_controlBufferReadback, 0, m_controlBuffer, 0, sizeof(LightingControlData) * 1);
 
-            // Reset counter
+            // reset counter
             m_framesFromLastReadbackCopy = 0;
         }
     }
@@ -1408,7 +1408,7 @@ void LightSamplingCache::UpdateBegin(nvrhi::ICommandList* commandList, caustica:
 
 #define UAV_BARRIER_m_NEE_AT_LocalSamplingBuffer() { commandList->setBufferState(m_NEE_AT_LocalSamplingBuffer, nvrhi::ResourceStates::UnorderedAccess); }
 
-void LightSamplingCache::UpdateEnd(nvrhi::ICommandList * commandList, caustica::BindingCache & bindingCache, const std::shared_ptr<caustica::Scene> & scene, std::shared_ptr<class MaterialGpuCache> materialGpuCache, std::shared_ptr<class OpacityMicromapBuilder> opacityMicromapBuilder, nvrhi::BufferHandle subInstanceDataBuffer, nvrhi::TextureHandle depthBuffer, nvrhi::TextureHandle motionVectors)
+void LightSamplingCache::updateEnd(nvrhi::ICommandList * commandList, caustica::BindingCache & bindingCache, const std::shared_ptr<caustica::Scene> & scene, std::shared_ptr<class MaterialGpuCache> materialGpuCache, std::shared_ptr<class OpacityMicromapBuilder> opacityMicromapBuilder, nvrhi::BufferHandle subInstanceDataBuffer, nvrhi::TextureHandle depthBuffer, nvrhi::TextureHandle motionVectors)
 {
     RAII_SCOPE(commandList->beginMarker("LightingUpdateEnd");, commandList->endMarker(); );
 
@@ -1419,7 +1419,7 @@ void LightSamplingCache::UpdateEnd(nvrhi::ICommandList * commandList, caustica::
     bool lastFrameFeedbackAvailable = m_NEE_AT_FeedbackBufferFilled;
 
     nvrhi::BindingSetDesc bindingSetDesc;
-    FillBindings(bindingSetDesc, scene, materialGpuCache, opacityMicromapBuilder, subInstanceDataBuffer, depthBuffer, motionVectors, nullptr);
+    fillBindings(bindingSetDesc, scene, materialGpuCache, opacityMicromapBuilder, subInstanceDataBuffer, depthBuffer, motionVectors, nullptr);
     nvrhi::BindingSetHandle bindingSet = bindingCache.getOrCreateBindingSet(bindingSetDesc, m_commonBindingLayout);
     nvrhi::BindingSetVector bindings = { bindingSet };
 
@@ -1497,11 +1497,11 @@ void LightSamplingCache::UpdateEnd(nvrhi::ICommandList * commandList, caustica::
     commandList->commitBarriers();
 }
 
-bool LightSamplingCache::InfoGUI(float indent)
+bool LightSamplingCache::infoGUI(float indent)
 {
     RAII_SCOPE(ImGui::PushID("LightSamplingCacheInfoGUI");, ImGui::PopID(); );
 
-    if (TotalLightCountOverflow())
+    if (totalLightCountOverflow())
     {
         ImGui::TextColored({ 1,0.5f,0.5f,1 }, "!!WARNING - scene light count overflow!!");
         ImGui::TextColored({ 1,0.5f,0.5f,1 }, "increase CAUSTICA_LIGHTING_MAX_LIGHTS (%d)", CAUSTICA_LIGHTING_MAX_LIGHTS);
@@ -1529,7 +1529,7 @@ bool LightSamplingCache::InfoGUI(float indent)
     return false;
 }
 
-bool LightSamplingCache::DebugGUI(float indent)
+bool LightSamplingCache::debugGUI(float indent)
 {
     RAII_SCOPE(ImGui::PushID("LightSamplingCacheDebugGUI"); , ImGui::PopID(); );
 
@@ -1605,7 +1605,7 @@ bool LightSamplingCache::DebugGUI(float indent)
     return resetAccumulation;
 }
 
-void LightSamplingCache::SetGlobalShaderMacros(std::vector<caustica::ShaderMacro> & macros)
+void LightSamplingCache::setGlobalShaderMacros(std::vector<caustica::ShaderMacro> & macros)
 {
     macros.push_back({ "NEE_AT_SAMPLE_BAKED_ENVIRONMENT", (m_advSetting_SampleBakedEnvironment) ? ("1") : ("0") });
 }

@@ -29,18 +29,18 @@ struct DeleteRuntimeSceneNodeParams
     std::function<void(ecs::Entity)> BeforeDetach;
 };
 
-ecs::Entity AttachRuntimeSceneImport(
+ecs::Entity attachRuntimeSceneImport(
     const std::shared_ptr<Scene>& scene,
     const SceneImportResult& importResult,
     uint32_t frameIndex,
     const RuntimeSceneMutationCallbacks& callbacks = {});
 
-void FinalizeRuntimeSceneMutation(
+void finalizeRuntimeSceneMutation(
     const std::shared_ptr<Scene>& scene,
     ecs::Entity importedRoot,
     uint32_t frameIndex,
     const RuntimeSceneMutationCallbacks& callbacks = {});
 
-bool DeleteRuntimeSceneNode(const DeleteRuntimeSceneNodeParams& params);
+bool deleteRuntimeSceneNode(const DeleteRuntimeSceneNodeParams& params);
 
 } // namespace caustica

@@ -100,26 +100,26 @@ public:
         std::shared_ptr<caustica::ShaderFactory> shaderFactory);
     ~OpacityMicromapBuilder();
 
-    void                            CreateRenderPasses(nvrhi::BindingLayoutHandle bindlessLayout, caustica::render::RenderDevice& renderDevice);
+    void                            createRenderPasses(nvrhi::BindingLayoutHandle bindlessLayout, caustica::render::RenderDevice& renderDevice);
 
-    bool                            Update(nvrhi::ICommandList& commandList, const caustica::Scene& scene);
+    bool                            update(nvrhi::ICommandList& commandList, const caustica::Scene& scene);
 
-    OpacityMicroMapUIData &         UIData()    { return m_uiData; }
-    bool                            DebugGUI(float indent, const caustica::Scene& scene);
+    OpacityMicroMapUIData &         uiData()    { return m_uiData; }
+    bool                            debugGUI(float indent, const caustica::Scene& scene);
 
-    void                            SceneLoaded(const caustica::Scene& scene);
-    void                            SceneUnloading();
+    void                            sceneLoaded(const caustica::Scene& scene);
+    void                            sceneUnloading();
 
-    void                            CreateOpacityMicromaps(const caustica::Scene& scene);
-    void                            DestroyOpacityMicromaps(nvrhi::ICommandList& commandList, const caustica::Scene& scene);
-    void                            BuildOpacityMicromaps(nvrhi::ICommandList& commandList, const caustica::Scene& scene);
-    void                            WriteGeometryDebugBuffer(nvrhi::ICommandList& commandList);
-    void                            UpdateDebugGeometry(const caustica::MeshInfo& mesh);
+    void                            createOpacityMicromaps(const caustica::Scene& scene);
+    void                            destroyOpacityMicromaps(nvrhi::ICommandList& commandList, const caustica::Scene& scene);
+    void                            buildOpacityMicromaps(nvrhi::ICommandList& commandList, const caustica::Scene& scene);
+    void                            writeGeometryDebugBuffer(nvrhi::ICommandList& commandList);
+    void                            updateDebugGeometry(const caustica::MeshInfo& mesh);
 
-    [[nodiscard]] nvrhi::IBuffer*   GetGeometryDebugBuffer() const { return m_geometryDebugBuffer; }
-    [[nodiscard]] bool              ShouldUseRayTracingOpacityMicromaps() const { return m_uiData.Enable; }
+    [[nodiscard]] nvrhi::IBuffer*   getGeometryDebugBuffer() const { return m_geometryDebugBuffer; }
+    [[nodiscard]] bool              shouldUseRayTracingOpacityMicromaps() const { return m_uiData.Enable; }
 
-    void                            SetGlobalShaderMacros(std::vector<caustica::ShaderMacro> & macros);
+    void                            setGlobalShaderMacros(std::vector<caustica::ShaderMacro> & macros);
 
 
 private:

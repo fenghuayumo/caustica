@@ -22,7 +22,7 @@ void registerGpuRenderSchedules(App& app)
     ordering.after.push_back("SceneSession.RenderScene");
     ordering.after.push_back("SceneSession.AfterWorldRender");
 
-    app.addSystem(AppSchedule::Render, "GpuRender.EndFrame", [](SystemContext& ctx) {
+    app.addSystem(AppSchedule::render, "GpuRender.endFrame", [](SystemContext& ctx) {
         if (auto* gpuRender = ctx.tryRes<GpuRenderSubsystem>())
             gpuRender->endFrame();
     }, std::move(ordering));

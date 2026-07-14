@@ -23,37 +23,37 @@ void ForEachEntityInSubtree(scene::SceneEntityWorld& world, ecs::Entity root, co
 }
 } // namespace
 
-ecs::Entity AttachRuntimeSceneImport(
+ecs::Entity attachRuntimeSceneImport(
     const std::shared_ptr<Scene>& scene,
     const SceneImportResult& importResult,
     uint32_t frameIndex,
     const RuntimeSceneMutationCallbacks& callbacks)
 {
-    if (!scene || !scene->GetEntityWorld() || !importResult.entityWorld || !ecs::isValid(importResult.rootEntity))
+    if (!scene || !scene->getEntityWorld() || !importResult.entityWorld || !ecs::isValid(importResult.rootEntity))
         return ecs::NullEntity;
 
-    auto* entityWorld = scene->GetEntityWorld();
+    auto* entityWorld = scene->getEntityWorld();
     ecs::Entity importedRoot = entityWorld->importSubtree(
         entityWorld->root(),
         *importResult.entityWorld,
         importResult.rootEntity,
-        scene->GetSceneTypeFactory().get());
+        scene->getSceneTypeFactory().get());
 
-    FinalizeRuntimeSceneMutation(scene, importedRoot, frameIndex, callbacks);
+    finalizeRuntimeSceneMutation(scene, importedRoot, frameIndex, callbacks);
     return importedRoot;
 }
 
-void FinalizeRuntimeSceneMutation(
+void finalizeRuntimeSceneMutation(
     const std::shared_ptr<Scene>& scene,
     ecs::Entity importedRoot,
     uint32_t frameIndex,
     const RuntimeSceneMutationCallbacks& callbacks)
 {
-    if (ecs::isValid(importedRoot) && callbacks.PostMaterialLoad && scene && scene->GetEntityWorld())
+    if (ecs::isValid(importedRoot) && callbacks.PostMaterialLoad && scene && scene->getEntityWorld())
     {
         std::unordered_set<Material*> processedMaterials;
-        ForEachEntityInSubtree(*scene->GetEntityWorld(), importedRoot, [&](ecs::Entity entity) {
-            auto* meshComp = scene->GetEntityWorld()->world().get<scene::MeshInstanceComponent>(entity);
+        ForEachEntityInSubtree(*scene->getEntityWorld(), importedRoot, [&](ecs::Entity entity) {
+            auto* meshComp = scene->getEntityWorld()->world().get<scene::MeshInstanceComponent>(entity);
             if (!meshComp || !meshComp->mesh)
                 return;
 
@@ -69,12 +69,12 @@ void FinalizeRuntimeSceneMutation(
         scene->extractAndPublishRenderSnapshot(frameIndex);
 }
 
-bool DeleteRuntimeSceneNode(const DeleteRuntimeSceneNodeParams& params)
+bool deleteRuntimeSceneNode(const DeleteRuntimeSceneNodeParams& params)
 {
     if (!ecs::isValid(params.Entity) || params.SceneInstance == nullptr)
         return false;
 
-    auto* entityWorld = params.SceneInstance->GetEntityWorld();
+    auto* entityWorld = params.SceneInstance->getEntityWorld();
     if (!entityWorld || !ecs::isValid(entityWorld->root()))
         return false;
 

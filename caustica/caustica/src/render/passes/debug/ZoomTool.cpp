@@ -52,10 +52,10 @@ ZoomTool::~ZoomTool( )
 {
 }
 
-bool ZoomTool::KeyboardUpdate(int key, int scancode, int action, int mods)
+bool ZoomTool::keyboardUpdate(int key, int scancode, int action, int mods)
 {
     if (key == GLFW_KEY_Z && action == GLFW_PRESS && mods == GLFW_MOD_CONTROL)
-        m_settings.Enabled = !m_settings.Enabled;
+        m_settings.enabled = !m_settings.enabled;
 
     if (key == GLFW_KEY_Z && mods == GLFW_MOD_CONTROL)
         return true;
@@ -63,14 +63,14 @@ bool ZoomTool::KeyboardUpdate(int key, int scancode, int action, int mods)
     return false;
 }
 
-void ZoomTool::MousePosUpdate(double xpos, double ypos)
+void ZoomTool::mousePosUpdate(double xpos, double ypos)
 {
     m_lastMousePos = float2(xpos, ypos);
 }
 
-bool ZoomTool::MouseButtonUpdate(int button, int action, int mods)
+bool ZoomTool::mouseButtonUpdate(int button, int action, int mods)
 {
-    if (m_settings.Enabled)
+    if (m_settings.enabled)
     {
         if (button == GLFW_MOUSE_BUTTON_1)
         {
@@ -82,9 +82,9 @@ bool ZoomTool::MouseButtonUpdate(int button, int action, int mods)
     return false;
 }
 
-void ZoomTool::Render( nvrhi::ICommandList * commandList, nvrhi::TextureHandle colorInOut )
+void ZoomTool::render( nvrhi::ICommandList * commandList, nvrhi::TextureHandle colorInOut )
 {
-    if( !m_settings.Enabled )
+    if( !m_settings.enabled )
         return;
 
     ZoomToolShaderConstants consts{};
@@ -109,11 +109,11 @@ void ZoomTool::Render( nvrhi::ICommandList * commandList, nvrhi::TextureHandle c
     }
 }
 
-bool ZoomTool::DebugGUI(float indent)
+bool ZoomTool::debugGUI(float indent)
 {
     //ImGui::PushItemWidth(120.0f);
 
-    ImGui::Checkbox("Enabled", &m_settings.Enabled);
+    ImGui::Checkbox("enabled", &m_settings.enabled);
     ImGui::InputInt("ZoomFactor", &m_settings.ZoomFactor, 1);
     m_settings.ZoomFactor = caustica::math::clamp(m_settings.ZoomFactor, 2, 32);
 

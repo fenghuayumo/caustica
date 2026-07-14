@@ -58,7 +58,7 @@ public:
         m_dlssSupported = true;
     }
 
-    void Init(const InitParameters& params) override
+    void init(const InitParameters& params) override
     {
         if (!m_dlssSupported)
             return;
@@ -104,7 +104,7 @@ public:
         m_initParameters = params;
     }
     
-    bool Evaluate(
+    bool evaluate(
         nvrhi::ICommandList* commandList,
         const EvaluateParameters& params,
         const caustica::PlanarView& view) override
@@ -118,7 +118,7 @@ public:
 
         if (useExposureBuffer)
         {
-            ComputeExposure(commandList, params.exposureBuffer, params.exposureScale);
+            computeExposure(commandList, params.exposureBuffer, params.exposureScale);
         }
 
         ID3D11DeviceContext* d3dcontext = commandList->getNativeObject(nvrhi::ObjectTypes::D3D11_DeviceContext);
@@ -182,7 +182,7 @@ public:
     }
 };
 
-std::unique_ptr<DLSS> DLSS::CreateDX11(nvrhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
+std::unique_ptr<DLSS> DLSS::createDX11(nvrhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
     std::string const& directoryWithExecutable, uint32_t applicationID)
 {
     return std::make_unique<DLSS_DX11>(device, shaderFactory, directoryWithExecutable, applicationID);

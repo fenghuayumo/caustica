@@ -23,11 +23,11 @@ public:
     ~DenoisingGuidesPass( );
 
 public:
-    void                            DenoiseSpecHitT( nvrhi::ICommandList * commandList, nvrhi::BindingSetHandle bindingSet );
-    void                            ComputeAvgLayerRadiance( nvrhi::ICommandList * commandList, nvrhi::BindingSetHandle bindingSet );
-    void                            RenderDebugViz( nvrhi::ICommandList * commandList, DebugViewType debugView, nvrhi::BindingSetHandle bindingSet );
+    void                            denoiseSpecHitT( nvrhi::ICommandList * commandList, nvrhi::BindingSetHandle bindingSet );
+    void                            computeAvgLayerRadiance( nvrhi::ICommandList * commandList, nvrhi::BindingSetHandle bindingSet );
+    void                            renderDebugViz( nvrhi::ICommandList * commandList, DebugViewType debugView, nvrhi::BindingSetHandle bindingSet );
 
-    bool                            DebugGUI(float indent);
+    bool                            debugGUI(float indent);
 
 
 private:

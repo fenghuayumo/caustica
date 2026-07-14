@@ -147,7 +147,7 @@ void validateReferencePathTraceGraph(const rg::GraphBuilder& graph, const PathTr
     assert(!graph.isPassRegistered("PathTracePrePass"));
     assert(!graph.isPassRegistered("VBufferExport"));
 
-    if (!settings.ActualUseRTXDIPasses())
+    if (!settings.actualUseRTXDIPasses())
     {
         assert(!graph.isPassRegistered("RtxdiBeginFrame"));
         assert(!graph.isPassRegistered("Rtxdi"));

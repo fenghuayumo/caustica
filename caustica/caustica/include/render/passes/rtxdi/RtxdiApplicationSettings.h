@@ -4,7 +4,7 @@
 #include <rtxdi/PT/ReSTIRPT.h>
 
 // Set default values RTXDI settings
-const rtxdi::ReSTIRDI_ResamplingMode GetReSTIRDI_ResamplingMode();
+const rtxdi::ReSTIRDI_ResamplingMode getReSTIRDI_ResamplingMode();
 
 const ReSTIRDI_InitialSamplingParameters getReSTIRDIInitialSamplingParams();
 
@@ -14,7 +14,7 @@ const ReSTIRDI_SpatialResamplingParameters getReSTIRDISpatialResamplingParams();
 
 const ReSTIRDI_ShadingParameters getReSTIRDIShadingParams();
 
-const rtxdi::ReSTIRGI_ResamplingMode GetReSTIRGI_ResamplingMode();
+const rtxdi::ReSTIRGI_ResamplingMode getReSTIRGI_ResamplingMode();
 
 const ReSTIRGI_TemporalResamplingParameters getReSTIRGITemporalResamplingParams();
 
@@ -24,7 +24,7 @@ const ReSTIRGI_FinalShadingParameters getReSTIRGIFinalShadingParams();
 
 const rtxdi::ReGIRDynamicParameters getReGIRDynamicParams();
 
-const rtxdi::ReSTIRPT_ResamplingMode GetReSTIRPT_ResamplingMode();
+const rtxdi::ReSTIRPT_ResamplingMode getReSTIRPT_ResamplingMode();
 
 const RTXDI_PTInitialSamplingParameters getReSTIRPTInitialSamplingParams();
 

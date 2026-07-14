@@ -9,14 +9,14 @@ namespace caustica::sceneSession
 
 void registerPathTracingPlugin(App& app)
 {
-    app.addSystem(AppSchedule::Render, "SceneSession.RenderScene", [](SystemContext& ctx) {
+    app.addSystem(AppSchedule::render, "SceneSession.RenderScene", [](SystemContext& ctx) {
         if (!ctx.gpuDevice)
             return;
 
         sceneSession::renderScene(ctx.app, *ctx.gpuDevice);
     });
 
-    app.addSystemAfter(AppSchedule::Render, "SceneSession.AfterWorldRender", "SceneSession.RenderScene", [](SystemContext& ctx) {
+    app.addSystemAfter(AppSchedule::render, "SceneSession.AfterWorldRender", "SceneSession.RenderScene", [](SystemContext& ctx) {
         if (!ctx.gpuDevice)
             return;
 

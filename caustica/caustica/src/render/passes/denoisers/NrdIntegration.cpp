@@ -97,7 +97,7 @@ NrdIntegration::~NrdIntegration()
     }
 }
 
-bool NrdIntegration::Initialize(uint32_t width, uint32_t height, caustica::ShaderFactory& shaderFactory)
+bool NrdIntegration::initialize(uint32_t width, uint32_t height, caustica::ShaderFactory& shaderFactory)
 {
     const nrd::LibraryDesc& libraryDesc = nrd::GetLibraryDesc();
 
@@ -184,8 +184,8 @@ bool NrdIntegration::Initialize(uint32_t width, uint32_t height, caustica::Shade
         // see NVRHI_DEFAULT_VK_REGISTER_OFFSETS in \external\cmake\compileshaders.cmake - it now matches the NVRHI defaults
 		nvrhi::VulkanBindingOffsets cNRDBindingOffsets; // = { .shaderResource = libraryDesc.spirvBindingOffsets.textureOffset, .sampler = libraryDesc.spirvBindingOffsets.samplerOffset, .constantBuffer = libraryDesc.spirvBindingOffsets.constantBufferOffset, .unorderedAccess = libraryDesc.spirvBindingOffsets.storageTextureAndBufferOffset };
         
-        pipeline.ResourcesBindingLayout = CreateResourcesBindingLayout(instanceDesc, nrdPipelineDesc);
-        pipeline.ConstantsAndSamplersBindingLayout = CreateConstantsAndSamplersBindingLayout(instanceDesc);
+        pipeline.ResourcesBindingLayout = createResourcesBindingLayout(instanceDesc, nrdPipelineDesc);
+        pipeline.ConstantsAndSamplersBindingLayout = createConstantsAndSamplersBindingLayout(instanceDesc);
 
         if (!pipeline.ResourcesBindingLayout || !pipeline.ConstantsAndSamplersBindingLayout)
         {
@@ -257,7 +257,7 @@ bool NrdIntegration::Initialize(uint32_t width, uint32_t height, caustica::Shade
     return true;
 }
 
-nvrhi::BindingLayoutHandle NrdIntegration::CreateConstantsAndSamplersBindingLayout(const nrd::InstanceDesc& instanceDesc)
+nvrhi::BindingLayoutHandle NrdIntegration::createConstantsAndSamplersBindingLayout(const nrd::InstanceDesc& instanceDesc)
 {
     nvrhi::BindingLayoutDesc layoutDesc;
     layoutDesc.registerSpace = instanceDesc.rootSpaceIndex;
@@ -289,7 +289,7 @@ nvrhi::BindingLayoutHandle NrdIntegration::CreateConstantsAndSamplersBindingLayo
     return bindingLayout;
 }
 
-nvrhi::BindingLayoutHandle NrdIntegration::CreateResourcesBindingLayout(const nrd::InstanceDesc& instanceDesc, const nrd::PipelineDesc& nrdPipelineDesc)
+nvrhi::BindingLayoutHandle NrdIntegration::createResourcesBindingLayout(const nrd::InstanceDesc& instanceDesc, const nrd::PipelineDesc& nrdPipelineDesc)
 {
     nvrhi::BindingLayoutDesc layoutDesc;
     layoutDesc.registerSpaceIsDescriptorSet = true;
@@ -331,7 +331,7 @@ nvrhi::BindingLayoutHandle NrdIntegration::CreateResourcesBindingLayout(const nr
     return bindingLayout;
 }
 
-bool NrdIntegration::IsAvailable() const
+bool NrdIntegration::isAvailable() const
 {
     return m_initialized;
 }
@@ -342,7 +342,7 @@ static inline void MatrixToNrd(float* dest, const dm::float4x4& m)
     memcpy(dest, &m, sizeof(m));
 }
 
-void NrdIntegration::RunDenoiserPasses(
+void NrdIntegration::runDenoiserPasses(
     nvrhi::ICommandList* commandList,
     const RenderTargets& renderTargets,
     int pass,

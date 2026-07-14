@@ -115,7 +115,7 @@ bool GpuDevice_VK::createInstance()
         return false;
     }
 
-    caustica::message(m_DeviceParams.infoLogSeverity, "Enabled Vulkan instance extensions:");
+    caustica::message(m_DeviceParams.infoLogSeverity, "enabled Vulkan instance extensions:");
     for (const auto& ext : enabledExtensions.instance)
     {
         caustica::message(m_DeviceParams.infoLogSeverity, "    %s", ext.c_str());
@@ -145,7 +145,7 @@ bool GpuDevice_VK::createInstance()
         return false;
     }
     
-    caustica::message(m_DeviceParams.infoLogSeverity, "Enabled Vulkan layers:");
+    caustica::message(m_DeviceParams.infoLogSeverity, "enabled Vulkan layers:");
     for (const auto& layer : enabledExtensions.layers)
     {
         caustica::message(m_DeviceParams.infoLogSeverity, "    %s", layer.c_str());
@@ -181,7 +181,7 @@ bool GpuDevice_VK::createInstance()
         return false;
     }
 
-    // Create the vulkan instance
+    // create the vulkan instance
     vk::InstanceCreateInfo info = vk::InstanceCreateInfo()
         .setEnabledLayerCount(uint32_t(layerVec.size()))
         .setPpEnabledLayerNames(layerVec.data())
@@ -547,7 +547,7 @@ bool GpuDevice_VK::createDevice()
     bool linearSweptSpheresSupported = false;
     bool meshShaderSupported = false;
 
-    caustica::message(m_DeviceParams.infoLogSeverity, "Enabled Vulkan device extensions:");
+    caustica::message(m_DeviceParams.infoLogSeverity, "enabled Vulkan device extensions:");
     for (const auto& ext : enabledExtensions.device)
     {
         caustica::message(m_DeviceParams.infoLogSeverity, "    %s", ext.c_str());
@@ -995,7 +995,7 @@ bool GpuDevice_VK::CreateDevice()
     auto vecDeviceExt = stringSetToVector(enabledExtensions.device);
 
     nvrhi::vulkan::DeviceDesc deviceDesc;
-    deviceDesc.errorCB = &DefaultMessageCallback::GetInstance();
+    deviceDesc.errorCB = &DefaultMessageCallback::getInstance();
     deviceDesc.instance = m_VulkanInstance;
     deviceDesc.physicalDevice = m_VulkanPhysicalDevice;
     deviceDesc.device = m_VulkanDevice;
@@ -1123,7 +1123,7 @@ void GpuDevice_VK::DestroyDeviceAndSwapChain()
     }
 }
 
-bool GpuDevice_VK::BeginFrame()
+bool GpuDevice_VK::beginFrame()
 {
     if (m_DeviceParams.headlessDevice)
         return BeginHeadlessFrame();
@@ -1231,7 +1231,7 @@ bool GpuDevice_VK::Present()
     return true;
 }
 
-GpuDevice *GpuDevice::CreateVK()
+GpuDevice *GpuDevice::createVK()
 {
     return new GpuDevice_VK();
 }

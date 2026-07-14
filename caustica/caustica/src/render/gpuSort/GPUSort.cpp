@@ -39,7 +39,7 @@ GPUSort::~GPUSort()
 {
 }
 
-void GPUSort::CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebug)
+void GPUSort::createRenderPasses(std::shared_ptr<ShaderDebug> shaderDebug)
 {
     m_shaderDebug = shaderDebug;
 
@@ -116,7 +116,7 @@ void GPUSort::CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebug)
 
 }
 
-void GPUSort::ReCreateWorkingBuffers(uint32_t maxItemCount)
+void GPUSort::reCreateWorkingBuffers(uint32_t maxItemCount)
 {
 // TODO: test; this should cause crashes.
 //    static uint debugTest = 0; debugTest++; 
@@ -128,7 +128,7 @@ void GPUSort::ReCreateWorkingBuffers(uint32_t maxItemCount)
     
     m_scratchMaxItemCountSize = maxItemCount;
 
-    // Allocate the scratch buffers needed for radix sort
+    // allocate the scratch buffers needed for radix sort
     uint32_t scratchBufferSize;
     uint32_t reducedScratchBufferSize;
     uint32_t scratchIndicesBufferSize = maxItemCount;
@@ -166,11 +166,11 @@ void GPUSort::ReCreateWorkingBuffers(uint32_t maxItemCount)
 uint32_t FloorLog2(uint32_t n)  { assert(n > 0); return n == 1 ? 0 : 1 + FloorLog2(n >> 1); }
 uint32_t CeilLog2(uint32_t n)   { assert(n > 0); return n == 1 ? 0 : FloorLog2(n - 1) + 1; };
 
-void GPUSort::Sort(nvrhi::ICommandList * commandList, nvrhi::BufferHandle controlBuffer, uint32_t itemCountByteOffset, nvrhi::BufferHandle bufferKeys, nvrhi::BufferHandle bufferIndices, uint32_t maxItemCount, bool resetIndices)
+void GPUSort::sort(nvrhi::ICommandList * commandList, nvrhi::BufferHandle controlBuffer, uint32_t itemCountByteOffset, nvrhi::BufferHandle bufferKeys, nvrhi::BufferHandle bufferIndices, uint32_t maxItemCount, bool resetIndices)
 {
     RAII_SCOPE( commandList->beginMarker("GPUSort");, commandList->endMarker(); );
 
-    ReCreateWorkingBuffers(maxItemCount);
+    reCreateWorkingBuffers(maxItemCount);
 
     commandList->copyBuffer( m_controlBuffer, 0, controlBuffer, itemCountByteOffset, sizeof(uint32_t) );
 
@@ -194,7 +194,7 @@ void GPUSort::Sort(nvrhi::ICommandList * commandList, nvrhi::BufferHandle contro
             nvrhi::BindingSetItem::TypedBuffer_UAV(2, m_scratchIndicesBuffer),          // DstIndices
             nvrhi::BindingSetItem::StructuredBuffer_UAV(3, m_controlBuffer),            // ConstsUAV
             //nvrhi::BindingSetItem::StructuredBuffer_UAV(4, m_dispatchIndirectBuffer),   // DispIndUAV
-            nvrhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->GetGPUWriteBuffer()),
+            nvrhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->getGPUWriteBuffer()),
         };
     bindingSetDescPong.bindings = {
             nvrhi::BindingSetItem::PushConstants(1, 4 * sizeof(uint32_t)),
@@ -205,7 +205,7 @@ void GPUSort::Sort(nvrhi::ICommandList * commandList, nvrhi::BufferHandle contro
             nvrhi::BindingSetItem::TypedBuffer_UAV(2, bufferIndices),                   // DstIndices
             nvrhi::BindingSetItem::StructuredBuffer_UAV(3, m_controlBuffer),            // ConstsUAV
             //nvrhi::BindingSetItem::StructuredBuffer_UAV(4, m_dispatchIndirectBuffer),   // DispIndUAV
-            nvrhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->GetGPUWriteBuffer()),
+            nvrhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->getGPUWriteBuffer()),
     };
 
     nvrhi::BindingSetHandle bindingSetInit = m_bindingCache.getOrCreateBindingSet(bindingSetDescInit, m_initBindingLayout);

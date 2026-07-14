@@ -46,12 +46,12 @@ public:
         return m_RendererString.c_str();
     }
 
-    [[nodiscard]] nvrhi::IDevice* GetDevice() const override
+    [[nodiscard]] nvrhi::IDevice* getDevice() const override
     {
         return m_NvrhiDevice;
     }
 
-    bool BeginFrame() override;
+    bool beginFrame() override;
     void ReportLiveObjects() override;
     bool EnumerateAdapters(std::vector<caustica::AdapterInfo>& outAdapters) override;
     [[nodiscard]] bool QueryVideoMemoryInfo(caustica::VideoMemoryInfo& out) const override;

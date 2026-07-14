@@ -38,7 +38,7 @@ struct RtxdiUserSettings
 
 	struct
 	{
-		rtxdi::ReSTIRDI_ResamplingMode resamplingMode = GetReSTIRDI_ResamplingMode();
+		rtxdi::ReSTIRDI_ResamplingMode resamplingMode = getReSTIRDI_ResamplingMode();
 		ReSTIRDI_InitialSamplingParameters initialSamplingParams = getReSTIRDIInitialSamplingParams();
 		ReSTIRDI_TemporalResamplingParameters temporalResamplingParams = getReSTIRDITemporalResamplingParams();
 		ReSTIRDI_SpatialResamplingParameters spatialResamplingParams = getReSTIRDISpatialResamplingParams();
@@ -47,7 +47,7 @@ struct RtxdiUserSettings
 
 	struct  
 	{
-		rtxdi::ReSTIRGI_ResamplingMode resamplingMode = GetReSTIRGI_ResamplingMode();
+		rtxdi::ReSTIRGI_ResamplingMode resamplingMode = getReSTIRGI_ResamplingMode();
 		ReSTIRGI_TemporalResamplingParameters temporalResamplingParams = getReSTIRGITemporalResamplingParams();
 		ReSTIRGI_SpatialResamplingParameters spatialResamplingParams = getReSTIRGISpatialResamplingParams();
 		ReSTIRGI_FinalShadingParameters finalShadingParams = getReSTIRGIFinalShadingParams();
@@ -55,7 +55,7 @@ struct RtxdiUserSettings
 
     struct
     {
-        rtxdi::ReSTIRPT_ResamplingMode resamplingMode = GetReSTIRPT_ResamplingMode();
+        rtxdi::ReSTIRPT_ResamplingMode resamplingMode = getReSTIRPT_ResamplingMode();
         RTXDI_PTInitialSamplingParameters initialSamplingParams = getReSTIRPTInitialSamplingParams();
         RTXDI_PTTemporalResamplingParameters temporalResamplingParams = getReSTIRPTTemporalResamplingParams();
         RTXDI_PTReconnectionParameters reconnectionParams = getReSTIRPTReconnectionParams();
@@ -106,8 +106,8 @@ public:
 		nvrhi::BindingLayoutHandle bindlessLayout);
 	~RtxdiPass();
 
-	void Reset();
-    void PrepareResources(
+	void reset();
+    void prepareResources(
         nvrhi::CommandListHandle commandList,
         const RenderTargets& renderTargets,
         std::shared_ptr<EnvMapProcessor> envMap,
@@ -119,7 +119,7 @@ public:
         const RtxdiBridgeParameters& bridgeParams,
         const nvrhi::BindingLayoutHandle extraBindingLayout,
         std::shared_ptr<ShaderDebug> shaderDebug);
-	void BeginFrame(
+	void beginFrame(
 		nvrhi::CommandListHandle commandList,
 		const RenderTargets& renderTargets,
 		const nvrhi::BindingLayoutHandle extraBindingLayout,
@@ -127,22 +127,22 @@ public:
 	void execute(
 		nvrhi::CommandListHandle commandList,
 		nvrhi::BindingSetHandle extraBindingSet, bool skipFinal);
-	void ExecuteGI(nvrhi::CommandListHandle commandList,
+	void executeGI(nvrhi::CommandListHandle commandList,
 		nvrhi::BindingSetHandle extraBindingSet, bool skipFinal);
-    void ExecuteFusedDIGIFinal(nvrhi::CommandListHandle commandList,
+    void executeFusedDIGIFinal(nvrhi::CommandListHandle commandList,
         nvrhi::BindingSetHandle extraBindingSet);
-    void ExecutePT(nvrhi::CommandListHandle commandList,
+    void executePT(nvrhi::CommandListHandle commandList,
         nvrhi::BindingSetHandle extraBindingSet);
-	void EndFrame();
+	void endFrame();
 	
-	std::shared_ptr<RtxdiResources> GetRTXDIResources() { return m_rtxdiResources; }
-	nvrhi::BufferHandle GetRTXDIConstants() { return m_rtxdiConstantBuffer; }
+	std::shared_ptr<RtxdiResources> getRTXDIResources() { return m_rtxdiResources; }
+	nvrhi::BufferHandle getRTXDIConstants() { return m_rtxdiConstantBuffer; }
 
 private:
-	void CheckContextStaticParameters();
-	void UpdateContextDynamicParameters();
-	void CreatePipelines(nvrhi::BindingLayoutHandle extraBindingLayout = nullptr, bool useRayQuery = true);
-	void CreateBindingSet(const RenderTargets& renderTargets);
+	void checkContextStaticParameters();
+	void updateContextDynamicParameters();
+	void createPipelines(nvrhi::BindingLayoutHandle extraBindingLayout = nullptr, bool useRayQuery = true);
+	void createBindingSet(const RenderTargets& renderTargets);
 
 	std::unique_ptr<rtxdi::ImportanceSamplingContext> m_ImportanceSamplingContext;
     std::unique_ptr<rtxdi::ReSTIRPTContext> m_ReSTIRPTContext;
@@ -178,14 +178,14 @@ private:
     RayTracingPass m_PTSpatialResamplingPass;
     RayTracingPass m_PTFinalShadingPass;
 
-	void ExecuteComputePass(
+	void executeComputePass(
 		nvrhi::CommandListHandle& commandList, 
 		ComputePass& pass, 
 		const char* passName, 
 		dm::int3 dispatchSize, 
 		nvrhi::BindingSetHandle extraBindingSet = nullptr);
 
-	void ExecuteRayTracingPass(
+	void executeRayTracingPass(
 		nvrhi::CommandListHandle& commandList,
 		RayTracingPass& pass,
 		const char* passName,
@@ -193,15 +193,15 @@ private:
 		nvrhi::IBindingSet* extraBindingSet = nullptr
 	);
 
-	caustica::ShaderMacro GetReGirMacro(const rtxdi::ReGIRStaticParameters& regirParameters);
+	caustica::ShaderMacro getReGirMacro(const rtxdi::ReGIRStaticParameters& regirParameters);
 
-	void FillConstants(nvrhi::CommandListHandle commandList);
-	void FillSharedConstants(struct RtxdiBridgeConstants& bridgeConstants) const;
-	void FillDIConstants(ReSTIRDI_Parameters& diParams);
-	void FillGIConstants(ReSTIRGI_Parameters& giParams);
-    void FillPTConstants(RTXDI_PTParameters& ptParams);
-	void FillReGIRConstant(ReGIR_Parameters& regirParams);
-	void FillReGirIndirectConstants(ReGirIndirectConstants& regirIndirectConstants);
+	void fillConstants(nvrhi::CommandListHandle commandList);
+	void fillSharedConstants(struct RtxdiBridgeConstants& bridgeConstants) const;
+	void fillDIConstants(ReSTIRDI_Parameters& diParams);
+	void fillGIConstants(ReSTIRGI_Parameters& giParams);
+    void fillPTConstants(RTXDI_PTParameters& ptParams);
+	void fillReGIRConstant(ReGIR_Parameters& regirParams);
+	void fillReGirIndirectConstants(ReGirIndirectConstants& regirIndirectConstants);
 
 	RtxdiBridgeParameters m_BridgeParameters;
 	uint32_t m_CurrentReservoirIndex;

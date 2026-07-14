@@ -23,29 +23,29 @@ namespace caustica
     class BaseCamera
     {
     public:
-        virtual void KeyboardUpdate(int key, int scancode, int action, int mods) { }
-        virtual void MousePosUpdate(double xpos, double ypos) { }
-        virtual void MouseButtonUpdate(int button, int action, int mods) { }
-        virtual void MouseScrollUpdate(double xoffset, double yoffset) { }
-        virtual void JoystickButtonUpdate(int button, bool pressed) { }
-        virtual void JoystickUpdate(int axis, float value) { }
-        virtual void Animate(float deltaT) { }
+        virtual void keyboardUpdate(int key, int scancode, int action, int mods) { }
+        virtual void mousePosUpdate(double xpos, double ypos) { }
+        virtual void mouseButtonUpdate(int button, int action, int mods) { }
+        virtual void mouseScrollUpdate(double xoffset, double yoffset) { }
+        virtual void joystickButtonUpdate(int button, bool pressed) { }
+        virtual void joystickUpdate(int axis, float value) { }
+        virtual void animate(float deltaT) { }
         virtual ~BaseCamera() = default;
 
-        void SetMoveSpeed(float value) { m_MoveSpeed = value; }
-        void SetRotateSpeed(float value) { m_RotateSpeed = value; }
+        void setMoveSpeed(float value) { m_MoveSpeed = value; }
+        void setRotateSpeed(float value) { m_RotateSpeed = value; }
 
-        [[nodiscard]] const dm::affine3& GetWorldToViewMatrix() const { return m_MatWorldToView; }
-        [[nodiscard]] const dm::affine3& GetTranslatedWorldToViewMatrix() const { return m_MatTranslatedWorldToView; }
-        [[nodiscard]] const dm::float3& GetPosition() const { return m_CameraPos; }
-        [[nodiscard]] const dm::float3& GetDir() const { return m_CameraDir; }
-        [[nodiscard]] const dm::float3& GetUp() const { return m_CameraUp; }
+        [[nodiscard]] const dm::affine3& getWorldToViewMatrix() const { return m_MatWorldToView; }
+        [[nodiscard]] const dm::affine3& getTranslatedWorldToViewMatrix() const { return m_MatTranslatedWorldToView; }
+        [[nodiscard]] const dm::float3& getPosition() const { return m_CameraPos; }
+        [[nodiscard]] const dm::float3& getDir() const { return m_CameraDir; }
+        [[nodiscard]] const dm::float3& getUp() const { return m_CameraUp; }
 
     protected:
         // This can be useful for derived classes while not necessarily public, i.e., in a third person
         // camera class, public clients cannot direct the gaze point.
-        void BaseLookAt(dm::float3 cameraPos, dm::float3 cameraTarget, dm::float3 cameraUp = dm::float3{ 0.f, 1.f, 0.f });
-        void UpdateWorldToView();
+        void baseLookAt(dm::float3 cameraPos, dm::float3 cameraTarget, dm::float3 cameraUp = dm::float3{ 0.f, 1.f, 0.f });
+        void updateWorldToView();
 
         dm::affine3 m_MatWorldToView = dm::affine3::identity();
         dm::affine3 m_MatTranslatedWorldToView = dm::affine3::identity();
@@ -62,19 +62,19 @@ namespace caustica
     class FirstPersonCamera : public BaseCamera
     {
     public:
-        void KeyboardUpdate(int key, int scancode, int action, int mods) override;
-        void MousePosUpdate(double xpos, double ypos) override;
-        void MouseButtonUpdate(int button, int action, int mods) override;
-        void Animate(float deltaT) override;
-        void AnimateSmooth(float deltaT);
+        void keyboardUpdate(int key, int scancode, int action, int mods) override;
+        void mousePosUpdate(double xpos, double ypos) override;
+        void mouseButtonUpdate(int button, int action, int mods) override;
+        void animate(float deltaT) override;
+        void animateSmooth(float deltaT);
 
-        void LookAt(dm::float3 cameraPos, dm::float3 cameraTarget, dm::float3 cameraUp = dm::float3{ 0.f, 1.f, 0.f });
-        void LookTo(dm::float3 cameraPos, dm::float3 cameraDir, dm::float3 cameraUp = dm::float3{ 0.f, 1.f, 0.f });
+        void lookAt(dm::float3 cameraPos, dm::float3 cameraTarget, dm::float3 cameraUp = dm::float3{ 0.f, 1.f, 0.f });
+        void lookTo(dm::float3 cameraPos, dm::float3 cameraDir, dm::float3 cameraUp = dm::float3{ 0.f, 1.f, 0.f });
 
     private:
-        std::pair<bool, dm::affine3> AnimateRoll(dm::affine3 initialRotation);
-        std::pair<bool, dm::float3> AnimateTranslation(float deltaT);
-        void UpdateCamera(dm::float3 cameraMoveVec, dm::affine3 cameraRotation);
+        std::pair<bool, dm::affine3> animateRoll(dm::affine3 initialRotation);
+        std::pair<bool, dm::float3> animateTranslation(float deltaT);
+        void updateCamera(dm::float3 cameraMoveVec, dm::affine3 cameraRotation);
 
         dm::float2 m_MousePos = 0.f;
         dm::float2 m_MousePosPrev = 0.f;
@@ -147,36 +147,36 @@ namespace caustica
     class ThirdPersonCamera : public BaseCamera
     {
     public:
-        void KeyboardUpdate(int key, int scancode, int action, int mods) override;
-        void MousePosUpdate(double xpos, double ypos) override;
-        void MouseButtonUpdate(int button, int action, int mods) override;
-        void MouseScrollUpdate(double xoffset, double yoffset) override;
-        void JoystickButtonUpdate(int button, bool pressed) override;
-        void JoystickUpdate(int axis, float value) override;
-        void Animate(float deltaT) override;
+        void keyboardUpdate(int key, int scancode, int action, int mods) override;
+        void mousePosUpdate(double xpos, double ypos) override;
+        void mouseButtonUpdate(int button, int action, int mods) override;
+        void mouseScrollUpdate(double xoffset, double yoffset) override;
+        void joystickButtonUpdate(int button, bool pressed) override;
+        void joystickUpdate(int axis, float value) override;
+        void animate(float deltaT) override;
 
-        dm::float3 GetTargetPosition() const { return m_TargetPos; }
-        void SetTargetPosition(dm::float3 position) { m_TargetPos = position; }
+        dm::float3 getTargetPosition() const { return m_TargetPos; }
+        void setTargetPosition(dm::float3 position) { m_TargetPos = position; }
 
-        float GetDistance() const { return m_Distance; }
-        void SetDistance(float distance) { m_Distance = distance; }
+        float getDistance() const { return m_Distance; }
+        void setDistance(float distance) { m_Distance = distance; }
         
-        float GetRotationYaw() const { return m_Yaw; }
-        float GetRotationPitch() const { return m_Pitch; }
-        void SetRotation(float yaw, float pitch);
+        float getRotationYaw() const { return m_Yaw; }
+        float getRotationPitch() const { return m_Pitch; }
+        void setRotation(float yaw, float pitch);
 
-        float GetMaxDistance() const { return m_MaxDistance; }
-        void SetMaxDistance(float value) { m_MaxDistance = value; }
+        float getMaxDistance() const { return m_MaxDistance; }
+        void setMaxDistance(float value) { m_MaxDistance = value; }
 
-        void SetView(const PlanarView& view);
+        void setView(const PlanarView& view);
 
-        void LookAt(dm::float3 cameraPos, dm::float3 cameraTarget);
-        void LookTo(dm::float3 cameraPos, dm::float3 cameraDir,
+        void lookAt(dm::float3 cameraPos, dm::float3 cameraTarget);
+        void lookTo(dm::float3 cameraPos, dm::float3 cameraDir,
             std::optional<float> targetDistance = std::optional<float>());
         
     private:
-        void AnimateOrbit(float deltaT, dm::float2 mouseMove);
-        void AnimateTranslation(const dm::float3x3& viewMatrix);
+        void animateOrbit(float deltaT, dm::float2 mouseMove);
+        void animateTranslation(const dm::float3x3& viewMatrix);
 
         // View parameters to derive translation amounts
         dm::float4x4 m_ProjectionMatrix = dm::float4x4::identity();
@@ -229,61 +229,61 @@ namespace caustica
     public:
         // Returns the active user-controllable camera (first-person or third-person),
         // or nullptr if a scene camera is active.
-        BaseCamera* GetActiveUserCamera();
+        BaseCamera* getActiveUserCamera();
 
-        // A constant version of GetActiveUserCamera.
-        BaseCamera const* GetActiveUserCamera() const;
+        // A constant version of getActiveUserCamera.
+        BaseCamera const* getActiveUserCamera() const;
 
-        bool IsFirstPersonActive() const { return !m_SceneCamera && m_UseFirstPerson; }
-        bool IsThirdPersonActive() const { return !m_SceneCamera && !m_UseFirstPerson; }
-        bool IsSceneCameraActive() const { return !!m_SceneCamera; }
+        bool isFirstPersonActive() const { return !m_SceneCamera && m_UseFirstPerson; }
+        bool isThirdPersonActive() const { return !m_SceneCamera && !m_UseFirstPerson; }
+        bool isSceneCameraActive() const { return !!m_SceneCamera; }
 
         // Always returns the first-person camera object.
-        FirstPersonCamera& GetFirstPersonCamera() { return m_FirstPerson; }
+        FirstPersonCamera& getFirstPersonCamera() { return m_FirstPerson; }
 
         // Always returns the third-person camera object.
-        ThirdPersonCamera& GetThirdPersonCamera() { return m_ThirdPerson; }
+        ThirdPersonCamera& getThirdPersonCamera() { return m_ThirdPerson; }
 
         // Returns the active scene camera object, or nullptr if a user camera is active.
-        std::shared_ptr<SceneCamera>& GetSceneCamera() { return m_SceneCamera; }
+        std::shared_ptr<SceneCamera>& getSceneCamera() { return m_SceneCamera; }
 
         // Returns the view matrix for the currently active camera.
-        dm::affine3 GetWorldToViewMatrix() const;
+        dm::affine3 getWorldToViewMatrix() const;
 
         // Fills out the projection parameters from a scene camera, if there is a perspective camera active.
         // Returns true when the parameters were filled, false if no such camera available.
         // In the latter case, the input values for the parameters are left unmodified.
-        bool GetSceneCameraProjectionParams(float& verticalFov, float& zNear) const;
+        bool getSceneCameraProjectionParams(float& verticalFov, float& zNear) const;
 
         // Switches to the first-person camera, optionally copying the position and direction
         // from another active camera type.
-        void SwitchToFirstPerson(bool copyView = true);
+        void switchToFirstPerson(bool copyView = true);
 
         // Switches to the third-person camera, optionally copying the position and direction
         // from another active camera type. When 'targetDistance' is specified, it overrides the current
         // distance stored in the third-person camera. Suggested use is to determine the distance to the
         // object in the center of the view at the time of the camera switch and use that distance.
-        void SwitchToThirdPerson(bool copyView = true, std::optional<float> targetDistance = std::optional<float>());
+        void switchToThirdPerson(bool copyView = true, std::optional<float> targetDistance = std::optional<float>());
 
         // Switches to the provided scene camera that must not be a nullptr.
         // The user-controllable cameras are not affected by this call.
-        void SwitchToSceneCamera(
+        void switchToSceneCamera(
             std::shared_ptr<SceneCamera> const& sceneCamera,
             const dm::daffine3& globalTransform = dm::daffine3::identity());
 
         // The following methods direct user input events to the active user camera
         // and return 'true' if such camera is active.
 
-        bool KeyboardUpdate(int key, int scancode, int action, int mods);
-        bool MousePosUpdate(double xpos, double ypos);
-        bool MouseButtonUpdate(int button, int action, int mods);
-        bool MouseScrollUpdate(double xoffset, double yoffset);
-        bool JoystickButtonUpdate(int button, bool pressed);
-        bool JoystickUpdate(int axis, float value);
+        bool keyboardUpdate(int key, int scancode, int action, int mods);
+        bool mousePosUpdate(double xpos, double ypos);
+        bool mouseButtonUpdate(int button, int action, int mods);
+        bool mouseScrollUpdate(double xoffset, double yoffset);
+        bool joystickButtonUpdate(int button, bool pressed);
+        bool joystickUpdate(int axis, float value);
 
-        // Calls 'Animate' on the active user camera.
-        // It is necessary to call Animate on the camera once per frame to correctly update its state.
-        void Animate(float deltaT);
+        // Calls 'animate' on the active user camera.
+        // It is necessary to call animate on the camera once per frame to correctly update its state.
+        void animate(float deltaT);
 
     private:
         FirstPersonCamera m_FirstPerson;

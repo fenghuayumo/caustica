@@ -17,7 +17,7 @@ namespace caustica::editor
 
 bool startupEditor(caustica::App& app, EditorSession& session, int argc, const char* const* argv)
 {
-    korgi::Init();
+    korgi::init();
     installEditorLogFilter(session);
 
     GpuDeviceCreateDesc createDesc{};
@@ -46,7 +46,7 @@ bool startupEditor(caustica::App& app, EditorSession& session, int argc, const c
             if (previousAfterPresent)
                 previousAfterPresent(device, frameIndex);
 
-            const bool waitOk = device.GetDevice()->waitForIdle();
+            const bool waitOk = device.getDevice()->waitForIdle();
             if (!waitOk)
                 error("Automated run frame sync detected device loss after frame %u", frameIndex);
         };
@@ -80,7 +80,7 @@ bool startupEditor(caustica::App& app, EditorSession& session, int argc, const c
         session.sceneEditor.onEvent(event);
 
         EventDispatcher dispatcher(event);
-        dispatcher.Dispatch<WindowCloseEvent>([&app](WindowCloseEvent&) {
+        dispatcher.dispatch<WindowCloseEvent>([&app](WindowCloseEvent&) {
             app.requestExit();
             return true;
         });

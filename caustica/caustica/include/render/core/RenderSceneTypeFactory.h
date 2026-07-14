@@ -9,14 +9,14 @@ namespace caustica::render
 // =============================================================================
 // RenderSceneTypeFactory — SceneTypeFactory that creates render-specific types.
 //
-// Only overrides CreateMaterial() to produce MaterialEx (which adds the
+// Only overrides createMaterial() to produce MaterialEx (which adds the
 // path-tracing PTMaterial data). MeshInfo / MeshGeometry have been fully
 // merged into the base types and no longer need overrides.
 // =============================================================================
 class RenderSceneTypeFactory : public SceneTypeFactory
 {
 public:
-    std::shared_ptr<Material> CreateMaterial() override
+    std::shared_ptr<Material> createMaterial() override
     {
         return std::static_pointer_cast<Material>(std::make_shared<MaterialEx>());
     }

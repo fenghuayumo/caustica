@@ -15,7 +15,7 @@ class ZoomTool
 public:
     struct ZoomSettings
     {
-        bool                Enabled     = false;
+        bool                enabled     = false;
         int                 ZoomFactor  = 4;
         caustica::math::int2   BoxPos      = { 400, 300 };
         caustica::math::int2   BoxSize     = { 128, 96 };
@@ -25,17 +25,17 @@ public:
     ~ZoomTool( );
 
 public:
-    ZoomSettings &                  Settings( )         { return m_settings; }
+    ZoomSettings &                  settings( )         { return m_settings; }
 
-     void                           Render( nvrhi::ICommandList * commandList, nvrhi::TextureHandle colorInOut );
+     void                           render( nvrhi::ICommandList * commandList, nvrhi::TextureHandle colorInOut );
 
-     bool                           KeyboardUpdate(int key, int scancode, int action, int mods);
-     void                           MousePosUpdate(double xpos, double ypos);
-     bool                           MouseButtonUpdate(int button, int action, int mods);
+     bool                           keyboardUpdate(int key, int scancode, int action, int mods);
+     void                           mousePosUpdate(double xpos, double ypos);
+     bool                           mouseButtonUpdate(int button, int action, int mods);
 
-     bool                           Enabled( ) const    { return m_settings.Enabled; }
+     bool                           enabled( ) const    { return m_settings.enabled; }
 
-     bool                           DebugGUI(float indent);
+     bool                           debugGUI(float indent);
 
 private:
     const nvrhi::DeviceHandle       m_device;

@@ -50,7 +50,7 @@ ForwardShadingPass::ForwardShadingPass(
     m_IsDX11 = m_device->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D11;
 }
 
-void ForwardShadingPass::Init(ShaderFactory& shaderFactory, const CreateParameters& params)
+void ForwardShadingPass::init(ShaderFactory& shaderFactory, const CreateParameters& params)
 {
     m_UseInputAssembler = params.useInputAssembler;
 
@@ -58,16 +58,16 @@ void ForwardShadingPass::Init(ShaderFactory& shaderFactory, const CreateParamete
     if (params.singlePassCubemap)
         m_SupportedViewTypes = ViewType::CUBEMAP;
     
-    m_VertexShader = CreateVertexShader(shaderFactory, params);
-    m_InputLayout = CreateInputLayout(m_VertexShader, params);
-    m_GeometryShader = CreateGeometryShader(shaderFactory, params);
-    m_PixelShader = CreatePixelShader(shaderFactory, params, false);
-    m_PixelShaderTransmissive = CreatePixelShader(shaderFactory, params, true);
+    m_VertexShader = createVertexShader(shaderFactory, params);
+    m_InputLayout = createInputLayout(m_VertexShader, params);
+    m_GeometryShader = createGeometryShader(shaderFactory, params);
+    m_PixelShader = createPixelShader(shaderFactory, params, false);
+    m_PixelShaderTransmissive = createPixelShader(shaderFactory, params, true);
 
     if (params.materialBindings)
         m_MaterialBindings = params.materialBindings;
     else
-        m_MaterialBindings = CreateMaterialBindingCache(*m_renderDevice);
+        m_MaterialBindings = createMaterialBindingCache(*m_renderDevice);
 
     auto samplerDesc = nvrhi::SamplerDesc()
         .setAllAddressModes(nvrhi::SamplerAddressMode::Border)
@@ -77,20 +77,20 @@ void ForwardShadingPass::Init(ShaderFactory& shaderFactory, const CreateParamete
     m_ForwardViewCB = m_device->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ForwardShadingViewConstants), "ForwardShadingViewConstants", params.numConstantBufferVersions));
     m_ForwardLightCB = m_device->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ForwardShadingLightConstants), "ForwardShadingLightConstants", params.numConstantBufferVersions));
 
-    m_ViewBindingLayout = CreateViewBindingLayout();
-    m_ViewBindingSet = CreateViewBindingSet();
-    m_ShadingBindingLayout = CreateShadingBindingLayout();
-    m_InputBindingLayout = CreateInputBindingLayout();
+    m_ViewBindingLayout = createViewBindingLayout();
+    m_ViewBindingSet = createViewBindingSet();
+    m_ShadingBindingLayout = createShadingBindingLayout();
+    m_InputBindingLayout = createInputBindingLayout();
 }
 
-void ForwardShadingPass::ResetBindingCache()
+void ForwardShadingPass::resetBindingCache()
 {
     m_MaterialBindings->clear();
     m_ShadingBindingSets.clear();
     m_InputBindingSets.clear();
 }
 
-nvrhi::ShaderHandle ForwardShadingPass::CreateVertexShader(ShaderFactory& shaderFactory, const CreateParameters& params)
+nvrhi::ShaderHandle ForwardShadingPass::createVertexShader(ShaderFactory& shaderFactory, const CreateParameters& params)
 {
     char const* sourceFileName = "engine/passes/forward_vs.hlsl";
 
@@ -106,7 +106,7 @@ nvrhi::ShaderHandle ForwardShadingPass::CreateVertexShader(ShaderFactory& shader
     }
 }
 
-nvrhi::ShaderHandle ForwardShadingPass::CreateGeometryShader(ShaderFactory& shaderFactory, const CreateParameters& params)
+nvrhi::ShaderHandle ForwardShadingPass::createGeometryShader(ShaderFactory& shaderFactory, const CreateParameters& params)
 {
     if (params.singlePassCubemap)
     {
@@ -124,7 +124,7 @@ nvrhi::ShaderHandle ForwardShadingPass::CreateGeometryShader(ShaderFactory& shad
     return nullptr;
 }
 
-nvrhi::ShaderHandle ForwardShadingPass::CreatePixelShader(ShaderFactory& shaderFactory, const CreateParameters& params, bool transmissiveMaterial)
+nvrhi::ShaderHandle ForwardShadingPass::createPixelShader(ShaderFactory& shaderFactory, const CreateParameters& params, bool transmissiveMaterial)
 {
     std::vector<ShaderMacro> Macros;
     Macros.push_back(ShaderMacro("TRANSMISSIVE_MATERIAL", transmissiveMaterial ? "1" : "0"));
@@ -132,18 +132,18 @@ nvrhi::ShaderHandle ForwardShadingPass::CreatePixelShader(ShaderFactory& shaderF
     return shaderFactory.createAutoShader("engine/passes/forward_ps.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_forward_ps), &Macros, nvrhi::ShaderType::Pixel);
 }
 
-nvrhi::InputLayoutHandle ForwardShadingPass::CreateInputLayout(nvrhi::IShader* vertexShader, const CreateParameters& params)
+nvrhi::InputLayoutHandle ForwardShadingPass::createInputLayout(nvrhi::IShader* vertexShader, const CreateParameters& params)
 {
     if (params.useInputAssembler)
     {
         const nvrhi::VertexAttributeDesc inputDescs[] =
         {
-            GetVertexAttributeDesc(VertexAttribute::Position, "POS", 0),
-            GetVertexAttributeDesc(VertexAttribute::PrevPosition, "PREV_POS", 1),
-            GetVertexAttributeDesc(VertexAttribute::TexCoord1, "TEXCOORD", 2),
-            GetVertexAttributeDesc(VertexAttribute::Normal, "NORMAL", 3),
-            GetVertexAttributeDesc(VertexAttribute::Tangent, "TANGENT", 4),
-            GetVertexAttributeDesc(VertexAttribute::Transform, "TRANSFORM", 5),
+            getVertexAttributeDesc(VertexAttribute::Position, "POS", 0),
+            getVertexAttributeDesc(VertexAttribute::PrevPosition, "PREV_POS", 1),
+            getVertexAttributeDesc(VertexAttribute::TexCoord1, "TEXCOORD", 2),
+            getVertexAttributeDesc(VertexAttribute::Normal, "NORMAL", 3),
+            getVertexAttributeDesc(VertexAttribute::Tangent, "TANGENT", 4),
+            getVertexAttributeDesc(VertexAttribute::Transform, "TRANSFORM", 5),
         };
 
         return m_device->createInputLayout(inputDescs, uint32_t(std::size(inputDescs)), vertexShader);
@@ -152,7 +152,7 @@ nvrhi::InputLayoutHandle ForwardShadingPass::CreateInputLayout(nvrhi::IShader* v
     return nullptr;
 }
 
-nvrhi::BindingLayoutHandle ForwardShadingPass::CreateViewBindingLayout()
+nvrhi::BindingLayoutHandle ForwardShadingPass::createViewBindingLayout()
 {
     auto bindingLayoutDesc = nvrhi::BindingLayoutDesc()
         .setVisibility(nvrhi::ShaderType::Vertex | nvrhi::ShaderType::Pixel)
@@ -163,7 +163,7 @@ nvrhi::BindingLayoutHandle ForwardShadingPass::CreateViewBindingLayout()
 }
 
 
-nvrhi::BindingSetHandle ForwardShadingPass::CreateViewBindingSet()
+nvrhi::BindingSetHandle ForwardShadingPass::createViewBindingSet()
 {
     auto bindingSetDesc = nvrhi::BindingSetDesc()
         .setTrackLiveness(m_TrackLiveness)
@@ -172,7 +172,7 @@ nvrhi::BindingSetHandle ForwardShadingPass::CreateViewBindingSet()
     return m_device->createBindingSet(bindingSetDesc, m_ViewBindingLayout);
 }
 
-nvrhi::BindingLayoutHandle ForwardShadingPass::CreateShadingBindingLayout()
+nvrhi::BindingLayoutHandle ForwardShadingPass::createShadingBindingLayout()
 {
     auto bindingLayoutDesc = nvrhi::BindingLayoutDesc()
         .setVisibility(nvrhi::ShaderType::Pixel)
@@ -190,7 +190,7 @@ nvrhi::BindingLayoutHandle ForwardShadingPass::CreateShadingBindingLayout()
     return m_device->createBindingLayout(bindingLayoutDesc);
 }
 
-nvrhi::BindingSetHandle ForwardShadingPass::CreateShadingBindingSet(nvrhi::ITexture* shadowMapTexture,
+nvrhi::BindingSetHandle ForwardShadingPass::createShadingBindingSet(nvrhi::ITexture* shadowMapTexture,
     nvrhi::ITexture* diffuse, nvrhi::ITexture* specular, nvrhi::ITexture* environmentBrdf)
 {
     auto bindingSetDesc = nvrhi::BindingSetDesc()
@@ -217,7 +217,7 @@ nvrhi::BindingSetHandle ForwardShadingPass::CreateShadingBindingSet(nvrhi::IText
 }
 
 
-nvrhi::GraphicsPipelineHandle ForwardShadingPass::CreateGraphicsPipeline(ForwardShadingPassPipelineKey const& key,
+nvrhi::GraphicsPipelineHandle ForwardShadingPass::createGraphicsPipeline(ForwardShadingPassPipelineKey const& key,
     nvrhi::FramebufferInfo const& framebufferInfo)
 {
     nvrhi::GraphicsPipelineDesc pipelineDesc;
@@ -284,7 +284,7 @@ nvrhi::GraphicsPipelineHandle ForwardShadingPass::CreateGraphicsPipeline(Forward
     return m_device->createGraphicsPipeline(pipelineDesc, framebufferInfo);
 }
 
-std::shared_ptr<MaterialBindingCache> ForwardShadingPass::CreateMaterialBindingCache(caustica::render::RenderDevice& renderDevice)
+std::shared_ptr<MaterialBindingCache> ForwardShadingPass::createMaterialBindingCache(caustica::render::RenderDevice& renderDevice)
 {
     std::vector<MaterialResourceBinding> materialBindings = {
         { MaterialResource::ConstantBuffer,         FORWARD_BINDING_MATERIAL_CONSTANTS },
@@ -324,7 +324,7 @@ void ForwardShadingPass::setupView(
     context.keyTemplate.reverseDepth = view->isReverseDepth();
 }
 
-void ForwardShadingPass::PrepareLights(
+void ForwardShadingPass::prepareLights(
     Context& context,
     nvrhi::ICommandList* commandList,
     const caustica::Scene& scene,
@@ -334,16 +334,16 @@ void ForwardShadingPass::PrepareLights(
 {
     nvrhi::ITexture* shadowMapTexture = nullptr;
     int2 shadowMapTextureSize = 0;
-    const auto* ew = scene.GetEntityWorld();
+    const auto* ew = scene.getEntityWorld();
     if (ew)
     {
-        for (ecs::Entity entity : scene.GetLightEntities())
+        for (ecs::Entity entity : scene.getLightEntities())
         {
             const auto* lightComp = ew->world().get<scene::LightComponent>(entity);
             if (lightComp && lightComp->shadowMap)
             {
-                shadowMapTexture = lightComp->shadowMap->GetTexture();
-                shadowMapTextureSize = lightComp->shadowMap->GetTextureSize();
+                shadowMapTexture = lightComp->shadowMap->getTexture();
+                shadowMapTextureSize = lightComp->shadowMap->getTextureSize();
                 break;
             }
         }
@@ -368,7 +368,7 @@ void ForwardShadingPass::PrepareLights(
         {
             if (lightProbeDiffuse != probe->diffuseMap || lightProbeSpecular != probe->specularMap || lightProbeEnvironmentBrdf != probe->environmentBrdf)
             {
-                caustica::error("All lights probe submitted to ForwardShadingPass::PrepareLights(...) must use the same set of textures");
+                caustica::error("All lights probe submitted to ForwardShadingPass::prepareLights(...) must use the same set of textures");
                 return;
             }
         }
@@ -381,7 +381,7 @@ void ForwardShadingPass::PrepareLights(
 
         if (!shadingBindings)
         {
-            shadingBindings = CreateShadingBindingSet(shadowMapTexture, lightProbeDiffuse, lightProbeSpecular, lightProbeEnvironmentBrdf);
+            shadingBindings = createShadingBindingSet(shadowMapTexture, lightProbeDiffuse, lightProbeSpecular, lightProbeEnvironmentBrdf);
         }
 
         context.shadingBindingSet = shadingBindings;
@@ -396,7 +396,7 @@ void ForwardShadingPass::PrepareLights(
 
     if (ew)
     {
-        const auto& lightEntities = scene.GetLightEntities();
+        const auto& lightEntities = scene.getLightEntities();
         const int maxLights = std::min(static_cast<int>(lightEntities.size()), FORWARD_MAX_LIGHTS);
         for (int nLight = 0; nLight < maxLights; nLight++)
         {
@@ -407,25 +407,25 @@ void ForwardShadingPass::PrepareLights(
             if (!globalComp) continue;
 
             LightConstants& lightConstants = constants.lights[constants.numLights];
-            scene::FillLightConstants(*lightComp, globalComp->transform, lightConstants);
+            scene::fillLightConstants(*lightComp, globalComp->transform, lightConstants);
 
             if (lightComp->shadowMap)
             {
-                for (uint32_t cascade = 0; cascade < lightComp->shadowMap->GetNumberOfCascades(); cascade++)
+                for (uint32_t cascade = 0; cascade < lightComp->shadowMap->getNumberOfCascades(); cascade++)
                 {
                     if (numShadows < FORWARD_MAX_SHADOWS)
                     {
-                        lightComp->shadowMap->GetCascade(cascade)->FillShadowConstants(constants.shadows[numShadows]);
+                        lightComp->shadowMap->getCascade(cascade)->fillShadowConstants(constants.shadows[numShadows]);
                         lightConstants.shadowCascades[cascade] = numShadows;
                         ++numShadows;
                     }
                 }
 
-                for (uint32_t perObjectShadow = 0; perObjectShadow < lightComp->shadowMap->GetNumberOfPerObjectShadows(); perObjectShadow++)
+                for (uint32_t perObjectShadow = 0; perObjectShadow < lightComp->shadowMap->getNumberOfPerObjectShadows(); perObjectShadow++)
                 {
                     if (numShadows < FORWARD_MAX_SHADOWS)
                     {
-                        lightComp->shadowMap->GetPerObjectShadow(perObjectShadow)->FillShadowConstants(constants.shadows[numShadows]);
+                        lightComp->shadowMap->getPerObjectShadow(perObjectShadow)->fillShadowConstants(constants.shadows[numShadows]);
                         lightConstants.perObjectShadows[perObjectShadow] = numShadows;
                         ++numShadows;
                     }
@@ -441,11 +441,11 @@ void ForwardShadingPass::PrepareLights(
 
     for (const auto& probe : lightProbes)
     {
-        if (!probe->IsActive())
+        if (!probe->isActive())
             continue;
 
         LightProbeConstants& lightProbeConstants = constants.lightProbes[constants.numLightProbes];
-        probe->FillLightProbeConstants(lightProbeConstants);
+        probe->fillLightProbeConstants(lightProbeConstants);
 
         ++constants.numLightProbes;
 
@@ -488,7 +488,7 @@ bool ForwardShadingPass::setupMaterial(GeometryPassContext& abstractContext, con
         std::lock_guard<std::mutex> lockGuard(m_mutex);
 
         if (!pipeline)
-            pipeline = CreateGraphicsPipeline(key, state.framebuffer->getFramebufferInfo());
+            pipeline = createGraphicsPipeline(key, state.framebuffer->getFramebufferInfo());
 
         if (!pipeline)
             return false;
@@ -524,7 +524,7 @@ void ForwardShadingPass::setupInputBuffers(GeometryPassContext& abstractContext,
     }
     else
     {
-        context.inputBindingSet = GetOrCreateInputBindingSet(buffers);
+        context.inputBindingSet = getOrCreateInputBindingSet(buffers);
         context.positionOffset = uint32_t(buffers->getVertexBufferRange(VertexAttribute::Position).byteOffset);
         context.texCoordOffset = uint32_t(buffers->getVertexBufferRange(VertexAttribute::TexCoord1).byteOffset);
         context.normalOffset = uint32_t(buffers->getVertexBufferRange(VertexAttribute::Normal).byteOffset);
@@ -532,7 +532,7 @@ void ForwardShadingPass::setupInputBuffers(GeometryPassContext& abstractContext,
     }
 }
 
-nvrhi::BindingLayoutHandle ForwardShadingPass::CreateInputBindingLayout()
+nvrhi::BindingLayoutHandle ForwardShadingPass::createInputBindingLayout()
 {
     if (m_UseInputAssembler)
         return nullptr;
@@ -549,7 +549,7 @@ nvrhi::BindingLayoutHandle ForwardShadingPass::CreateInputBindingLayout()
     return m_device->createBindingLayout(bindingLayoutDesc);
 }
 
-nvrhi::BindingSetHandle ForwardShadingPass::CreateInputBindingSet(const BufferGroup* bufferGroup)
+nvrhi::BindingSetHandle ForwardShadingPass::createInputBindingSet(const BufferGroup* bufferGroup)
 {
     auto bindingSetDesc = nvrhi::BindingSetDesc()
         .addItem(m_IsDX11
@@ -561,12 +561,12 @@ nvrhi::BindingSetHandle ForwardShadingPass::CreateInputBindingSet(const BufferGr
     return m_device->createBindingSet(bindingSetDesc, m_InputBindingLayout);
 }
 
-nvrhi::BindingSetHandle ForwardShadingPass::GetOrCreateInputBindingSet(const BufferGroup* bufferGroup)
+nvrhi::BindingSetHandle ForwardShadingPass::getOrCreateInputBindingSet(const BufferGroup* bufferGroup)
 {
     auto it = m_InputBindingSets.find(bufferGroup);
     if (it == m_InputBindingSets.end())
     {
-        auto bindingSet = CreateInputBindingSet(bufferGroup);
+        auto bindingSet = createInputBindingSet(bufferGroup);
         m_InputBindingSets[bufferGroup] = bindingSet;
         return bindingSet;
     }

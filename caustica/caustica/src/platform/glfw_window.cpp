@@ -94,7 +94,7 @@ bool GlfwWindow::initialise(const WindowDesc& desc)
         fprintf(stderr, "[GlfwWindow] Failed to create GLFW window\n");
         return false;
     }
-    // Store this pointer for GLFW callbacks
+    // store this pointer for GLFW callbacks
     glfwSetWindowUserPointer(m_Window, this);
 
     // Register GLFW callbacks
@@ -462,7 +462,7 @@ void GlfwWindow::onMove(int x, int y)
         glfwGetMonitorContentScale(monitor, &m_DPIScaleX, &m_DPIScaleY);
 #endif
 
-    // Render-during-move (was in GpuDevice)
+    // render-during-move (was in GpuDevice)
     if (m_RenderDuringMove && m_OnRenderDuringMove)
         m_OnRenderDuringMove();
 }

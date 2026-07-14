@@ -20,7 +20,7 @@ struct RayTracingPass
 
     uint32_t ComputeGroupSize = 0;
 
-    bool Init(
+    bool init(
         nvrhi::IDevice* device,
         caustica::ShaderFactory& shaderFactory,
         const char* shaderName,
@@ -31,7 +31,7 @@ struct RayTracingPass
         nvrhi::IBindingLayout* extraBindingLayout = nullptr,
         nvrhi::IBindingLayout* bindlessLayout = nullptr);
 
-    void Execute(
+    void execute(
         nvrhi::ICommandList* commandList,
         int width,
         int height,

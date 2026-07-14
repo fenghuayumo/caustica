@@ -29,7 +29,7 @@ namespace caustica::render
             bool isUAV = false);
 
         // Computes the cascade projections based on the view frustum, shadow distance, and the distribution exponent.
-        bool SetupForPlanarView(
+        bool setupForPlanarView(
             const caustica::DirectionalLight& light, 
             dm::frustum viewFrustum, 
             float maxShadowDistance, 
@@ -39,10 +39,10 @@ namespace caustica::render
             dm::float3 preViewTranslation = 0.f,
             int numberOfCascades = -1);
 
-        // Similar to SetupForPlanarView, but the size of the cascades does not depend on orientation, and therefore 
+        // Similar to setupForPlanarView, but the size of the cascades does not depend on orientation, and therefore 
         // the shadow map texels have the same world space projections when the camera turns or moves.
         // The downside of this algorithm is that the cascades are often larger than necessary.
-        bool SetupForPlanarViewStable(
+        bool setupForPlanarViewStable(
             const caustica::DirectionalLight& light, 
             dm::frustum projectionFrustum, 
             dm::affine3 inverseViewMatrix, 
@@ -54,7 +54,7 @@ namespace caustica::render
             int numberOfCascades = -1);
 
         // Computes the cascade projections to cover an omnidirectional view from a given point. The cascades are all centered on that point.
-        bool SetupForCubemapView(
+        bool setupForCubemapView(
             const caustica::DirectionalLight& light, 
             dm::float3 center, 
             float maxShadowDistance, float lightSpaceZUp, 
@@ -63,30 +63,30 @@ namespace caustica::render
             int numberOfCascades = -1);
 
         // Computes a simple directional shadow projection that covers a given world space box.
-        bool SetupPerObjectShadow(const caustica::DirectionalLight& light, uint32_t object, const dm::box3& objectBounds);
+        bool setupPerObjectShadow(const caustica::DirectionalLight& light, uint32_t object, const dm::box3& objectBounds);
 
-        void SetupProxyViews();
+        void setupProxyViews();
 
-        void Clear(nvrhi::ICommandList* commandList);
+        void clear(nvrhi::ICommandList* commandList);
 
-        void SetLitOutOfBounds(bool litOutOfBounds);
-        void SetFalloffDistance(float distance);
-		void SetNumberOfCascadesUnsafe(int cascades);
+        void setLitOutOfBounds(bool litOutOfBounds);
+        void setFalloffDistance(float distance);
+		void setNumberOfCascadesUnsafe(int cascades);
 
-        std::shared_ptr<caustica::PlanarView> GetCascadeView(uint32_t cascade);
-        std::shared_ptr<caustica::PlanarView> GetPerObjectView(uint32_t object);
+        std::shared_ptr<caustica::PlanarView> getCascadeView(uint32_t cascade);
+        std::shared_ptr<caustica::PlanarView> getPerObjectView(uint32_t object);
 
-        virtual dm::float4x4 GetWorldToUvzwMatrix() const override;
-        virtual const caustica::ICompositeView& GetView() const override;
-        virtual nvrhi::ITexture* GetTexture() const override;
-        virtual uint32_t GetNumberOfCascades() const override;
-        virtual const IShadowMap* GetCascade(uint32_t index) const override;
-        virtual uint32_t GetNumberOfPerObjectShadows() const override;
-        virtual const IShadowMap* GetPerObjectShadow(uint32_t index) const override;
-        virtual dm::int2 GetTextureSize() const override;
-        virtual dm::box2 GetUVRange() const override;
-        virtual dm::float2 GetFadeRangeInTexels() const override;
-        virtual bool IsLitOutOfBounds() const override;
-        virtual void FillShadowConstants(ShadowConstants& constants) const override;
+        virtual dm::float4x4 getWorldToUvzwMatrix() const override;
+        virtual const caustica::ICompositeView& getView() const override;
+        virtual nvrhi::ITexture* getTexture() const override;
+        virtual uint32_t getNumberOfCascades() const override;
+        virtual const IShadowMap* getCascade(uint32_t index) const override;
+        virtual uint32_t getNumberOfPerObjectShadows() const override;
+        virtual const IShadowMap* getPerObjectShadow(uint32_t index) const override;
+        virtual dm::int2 getTextureSize() const override;
+        virtual dm::box2 getUVRange() const override;
+        virtual dm::float2 getFadeRangeInTexels() const override;
+        virtual bool isLitOutOfBounds() const override;
+        virtual void fillShadowConstants(ShadowConstants& constants) const override;
     };
 }

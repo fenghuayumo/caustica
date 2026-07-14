@@ -800,7 +800,7 @@ namespace
     }
 }
 
-bool ObjImporter::Load(const std::filesystem::path& filePath, TextureLoader& textureCache, SceneLoadingStats&, ThreadPool*, SceneImportResult& result, const std::filesystem::path&) const
+bool ObjImporter::load(const std::filesystem::path& filePath, TextureLoader& textureCache, SceneLoadingStats&, ThreadPool*, SceneImportResult& result, const std::filesystem::path&) const
 {
     std::ifstream file(filePath);
     if (!file)
@@ -839,7 +839,7 @@ bool ObjImporter::Load(const std::filesystem::path& filePath, TextureLoader& tex
 
     ObjGroup* currentGroup = &getGroup("default");
 
-    auto mesh = std::static_pointer_cast<MeshInfo>(m_SceneTypeFactory->CreateMesh());
+    auto mesh = std::static_pointer_cast<MeshInfo>(m_SceneTypeFactory->createMesh());
     mesh->name = filePath.stem().string();
     mesh->type = MeshType::Triangles;
     mesh->buffers = std::make_shared<BufferGroup>();
@@ -1066,7 +1066,7 @@ bool ObjImporter::Load(const std::filesystem::path& filePath, TextureLoader& tex
             ? materials[group.materialName]
             : materials["default"];
 
-        auto material = std::dynamic_pointer_cast<Material>(m_SceneTypeFactory->CreateMaterial());
+        auto material = std::dynamic_pointer_cast<Material>(m_SceneTypeFactory->createMaterial());
         material->name = objMaterial.name;
         material->modelFileName = filePath.string();
         const bool hasPbrRoughnessTexture = !objMaterial.roughnessTexture.empty() || !objMaterial.packedMetalRoughTexture.empty();
@@ -1126,7 +1126,7 @@ bool ObjImporter::Load(const std::filesystem::path& filePath, TextureLoader& tex
         else
             material->domain = objMaterial.opacity < 0.999f ? MaterialDomain::AlphaBlended : MaterialDomain::Opaque;
 
-        auto geometry = std::static_pointer_cast<MeshGeometry>(m_SceneTypeFactory->CreateMeshGeometry());
+        auto geometry = std::static_pointer_cast<MeshGeometry>(m_SceneTypeFactory->createMeshGeometry());
         geometry->material = material;
         geometry->indexOffsetInMesh = static_cast<uint32_t>(mesh->buffers->indexData.size());
         geometry->vertexOffsetInMesh = 0;

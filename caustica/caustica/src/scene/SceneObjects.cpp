@@ -7,7 +7,7 @@ using namespace caustica;
 // MeshInstance
 // =============================================================================
 
-std::shared_ptr<MeshInstance> MeshInstance::Clone() const
+std::shared_ptr<MeshInstance> MeshInstance::clone() const
 {
     auto copy = std::make_shared<MeshInstance>(m_Mesh);
     copy->name = name;
@@ -17,7 +17,7 @@ std::shared_ptr<MeshInstance> MeshInstance::Clone() const
     return copy;
 }
 
-SceneContentFlags MeshInstance::GetContentFlags() const
+SceneContentFlags MeshInstance::getContentFlags() const
 {
     if (!m_Mesh)
         return SceneContentFlags::None;
@@ -46,10 +46,10 @@ SceneContentFlags MeshInstance::GetContentFlags() const
     return flags;
 }
 
-bool MeshInstance::SetProperty(const std::string& propName, const dm::float4& value)
+bool MeshInstance::setProperty(const std::string& propName, const dm::float4& value)
 {
     if (m_Mesh && m_Mesh->geometries.size() == 1 && m_Mesh->geometries[0]->material) // TODO: support targeting a specific geometry
-        return m_Mesh->geometries[0]->material->SetProperty(propName, value);
+        return m_Mesh->geometries[0]->material->setProperty(propName, value);
 
     return false;
 }
@@ -65,7 +65,7 @@ SkinnedMeshInstance::SkinnedMeshInstance(std::shared_ptr<SceneTypeFactory> scene
 {
     m_PrototypeMesh = std::move(prototypeMesh);
 
-    auto skinnedMesh              = m_SceneTypeFactory->CreateMesh();
+    auto skinnedMesh              = m_SceneTypeFactory->createMesh();
     skinnedMesh->skinPrototype    = m_PrototypeMesh;
     skinnedMesh->name             = m_PrototypeMesh->name;
     skinnedMesh->objectSpaceBounds = m_PrototypeMesh->objectSpaceBounds;
@@ -76,7 +76,7 @@ SkinnedMeshInstance::SkinnedMeshInstance(std::shared_ptr<SceneTypeFactory> scene
 
     for (const auto& geometry : m_PrototypeMesh->geometries)
     {
-        auto newGeometry = m_SceneTypeFactory->CreateMeshGeometry();
+        auto newGeometry = m_SceneTypeFactory->createMeshGeometry();
         *newGeometry = *geometry;
         skinnedMesh->geometries.push_back(std::move(newGeometry));
     }
@@ -85,7 +85,7 @@ SkinnedMeshInstance::SkinnedMeshInstance(std::shared_ptr<SceneTypeFactory> scene
     PerGeometryLightSamplerLinks.resize(skinnedMesh->geometries.size(), { -1, -1 });
 }
 
-std::shared_ptr<MeshInstance> SkinnedMeshInstance::Clone() const
+std::shared_ptr<MeshInstance> SkinnedMeshInstance::clone() const
 {
     auto copy = std::make_shared<SkinnedMeshInstance>(m_SceneTypeFactory, m_PrototypeMesh);
     copy->name = name;
@@ -99,7 +99,7 @@ std::shared_ptr<MeshInstance> SkinnedMeshInstance::Clone() const
 // SkinnedMeshReference
 // =============================================================================
 
-std::shared_ptr<SkinnedMeshReference> SkinnedMeshReference::Clone() const
+std::shared_ptr<SkinnedMeshReference> SkinnedMeshReference::clone() const
 {
     auto copy = std::make_shared<SkinnedMeshReference>(m_Instance.lock());
     copy->name = name;
@@ -110,7 +110,7 @@ std::shared_ptr<SkinnedMeshReference> SkinnedMeshReference::Clone() const
 // PerspectiveCamera
 // =============================================================================
 
-std::shared_ptr<PerspectiveCamera> PerspectiveCamera::Clone() const
+std::shared_ptr<PerspectiveCamera> PerspectiveCamera::clone() const
 {
     auto copy = std::make_shared<PerspectiveCamera>();
     copy->name                 = name;
@@ -126,7 +126,7 @@ std::shared_ptr<PerspectiveCamera> PerspectiveCamera::Clone() const
     return copy;
 }
 
-void PerspectiveCamera::Load(const Json::Value& node)
+void PerspectiveCamera::load(const Json::Value& node)
 {
     node["verticalFov"]          >> verticalFov;
     node["aspectRatio"]          >> aspectRatio;
@@ -139,7 +139,7 @@ void PerspectiveCamera::Load(const Json::Value& node)
     node["exposureValueMax"]     >> exposureValueMax;
 }
 
-bool PerspectiveCamera::SetProperty(const std::string& propName, const dm::float4& value)
+bool PerspectiveCamera::setProperty(const std::string& propName, const dm::float4& value)
 {
     if (propName == "zNear")       { zNear       = value.x; return true; }
     if (propName == "zFar")        { zFar        = value.x; return true; }
@@ -152,7 +152,7 @@ bool PerspectiveCamera::SetProperty(const std::string& propName, const dm::float
 // OrthographicCamera
 // =============================================================================
 
-std::shared_ptr<OrthographicCamera> OrthographicCamera::Clone() const
+std::shared_ptr<OrthographicCamera> OrthographicCamera::clone() const
 {
     auto copy = std::make_shared<OrthographicCamera>();
     copy->name  = name;
@@ -163,7 +163,7 @@ std::shared_ptr<OrthographicCamera> OrthographicCamera::Clone() const
     return copy;
 }
 
-void OrthographicCamera::Load(const Json::Value& node)
+void OrthographicCamera::load(const Json::Value& node)
 {
     node["xMag"]  >> xMag;
     node["yMag"]  >> yMag;
@@ -171,7 +171,7 @@ void OrthographicCamera::Load(const Json::Value& node)
     node["zFar"]  >> zFar;
 }
 
-bool OrthographicCamera::SetProperty(const std::string& propName, const dm::float4& value)
+bool OrthographicCamera::setProperty(const std::string& propName, const dm::float4& value)
 {
     if (propName == "zNear") { zNear = value.x; return true; }
     if (propName == "zFar")  { zFar  = value.x; return true; }
@@ -184,7 +184,7 @@ bool OrthographicCamera::SetProperty(const std::string& propName, const dm::floa
 // EnvironmentLight
 // =============================================================================
 
-std::shared_ptr<EnvironmentLight> EnvironmentLight::Clone() const
+std::shared_ptr<EnvironmentLight> EnvironmentLight::clone() const
 {
     auto copy = std::make_shared<EnvironmentLight>();
     copy->name          = name;
@@ -198,7 +198,7 @@ std::shared_ptr<EnvironmentLight> EnvironmentLight::Clone() const
     return copy;
 }
 
-void EnvironmentLight::Load(const Json::Value& node)
+void EnvironmentLight::load(const Json::Value& node)
 {
     node["radianceScale"] >> radianceScale;
     node["textureIndex"]  >> textureIndex;
@@ -210,7 +210,7 @@ void EnvironmentLight::Load(const Json::Value& node)
 // GaussianSplat
 // =============================================================================
 
-std::shared_ptr<GaussianSplat> GaussianSplat::Clone() const
+std::shared_ptr<GaussianSplat> GaussianSplat::clone() const
 {
     auto copy = std::make_shared<GaussianSplat>();
     copy->name             = name;
@@ -222,7 +222,7 @@ std::shared_ptr<GaussianSplat> GaussianSplat::Clone() const
     return copy;
 }
 
-void GaussianSplat::Load(const Json::Value& node)
+void GaussianSplat::load(const Json::Value& node)
 {
     node["path"] >> path;
     if (path.empty()) node["file"]     >> path;
@@ -237,7 +237,7 @@ void GaussianSplat::Load(const Json::Value& node)
 // SampleSettings
 // =============================================================================
 
-std::shared_ptr<SampleSettings> SampleSettings::Clone() const
+std::shared_ptr<SampleSettings> SampleSettings::clone() const
 {
     auto copy = std::make_shared<SampleSettings>();
     copy->name                  = name;
@@ -251,7 +251,7 @@ std::shared_ptr<SampleSettings> SampleSettings::Clone() const
     return copy;
 }
 
-void SampleSettings::Load(const Json::Value& node)
+void SampleSettings::load(const Json::Value& node)
 {
     node["realtimeMode"]          >> realtimeMode;
     node["enableAnimations"]      >> enableAnimations;
@@ -266,7 +266,7 @@ void SampleSettings::Load(const Json::Value& node)
 // GameSettings
 // =============================================================================
 
-std::shared_ptr<GameSettings> GameSettings::Clone() const
+std::shared_ptr<GameSettings> GameSettings::clone() const
 {
     auto copy = std::make_shared<GameSettings>();
     copy->name      = name;
@@ -274,7 +274,7 @@ std::shared_ptr<GameSettings> GameSettings::Clone() const
     return copy;
 }
 
-void GameSettings::Load(const Json::Value& node)
+void GameSettings::load(const Json::Value& node)
 {
     Json::StreamWriterBuilder writer;
     m_JsonData = Json::writeString(writer, node);
@@ -284,7 +284,7 @@ void GameSettings::Load(const Json::Value& node)
 // SceneTypeFactory
 // =============================================================================
 
-std::shared_ptr<void> SceneTypeFactory::CreateLeaf(const std::string& type)
+std::shared_ptr<void> SceneTypeFactory::createLeaf(const std::string& type)
 {
     if (type == "DirectionalLight")
         return std::make_shared<DirectionalLight>();
@@ -308,27 +308,27 @@ std::shared_ptr<void> SceneTypeFactory::CreateLeaf(const std::string& type)
     return nullptr;
 }
 
-std::shared_ptr<Material> SceneTypeFactory::CreateMaterial()
+std::shared_ptr<Material> SceneTypeFactory::createMaterial()
 {
     return std::make_shared<Material>();
 }
 
-std::shared_ptr<MeshInfo> SceneTypeFactory::CreateMesh()
+std::shared_ptr<MeshInfo> SceneTypeFactory::createMesh()
 {
     return std::make_shared<MeshInfo>();
 }
 
-std::shared_ptr<MeshGeometry> SceneTypeFactory::CreateMeshGeometry()
+std::shared_ptr<MeshGeometry> SceneTypeFactory::createMeshGeometry()
 {
     return std::make_shared<MeshGeometry>();
 }
 
-std::shared_ptr<MeshInstance> SceneTypeFactory::CreateMeshInstance(const std::shared_ptr<MeshInfo>& mesh)
+std::shared_ptr<MeshInstance> SceneTypeFactory::createMeshInstance(const std::shared_ptr<MeshInfo>& mesh)
 {
     return std::make_shared<MeshInstance>(mesh);
 }
 
-std::shared_ptr<SkinnedMeshInstance> SceneTypeFactory::CreateSkinnedMeshInstance(
+std::shared_ptr<SkinnedMeshInstance> SceneTypeFactory::createSkinnedMeshInstance(
     const std::shared_ptr<SceneTypeFactory>& sceneTypeFactory,
     const std::shared_ptr<MeshInfo>& prototypeMesh)
 {

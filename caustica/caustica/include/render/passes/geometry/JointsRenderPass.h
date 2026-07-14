@@ -33,7 +33,7 @@ namespace caustica::render
         nvrhi::BindingLayoutHandle m_BindingLayout;
         nvrhi::GraphicsPipelineHandle m_Pipeline;
 
-        nvrhi::BufferHandle CreateVertexBuffer(uint32_t numVertices) const;
+        nvrhi::BufferHandle createVertexBuffer(uint32_t numVertices) const;
 
     protected:
 
@@ -44,15 +44,15 @@ namespace caustica::render
 
         std::vector<Vertex> m_Vertices;
 
-        void UpdateVertices(const caustica::Scene& scene);
+        void updateVertices(const caustica::Scene& scene);
 
     public:
 
         JointsRenderPass(nvrhi::IDevice* device);
 
-        void Init(caustica::ShaderFactory& shaderFactory);
+        void init(caustica::ShaderFactory& shaderFactory);
 
-        void ResetCaches();
+        void resetCaches();
 
         void renderView(
             nvrhi::ICommandList* commandList,

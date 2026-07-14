@@ -46,7 +46,7 @@ GBufferFillPass::GBufferFillPass(nvrhi::IDevice* device, caustica::render::Rende
     m_IsDX11 = m_device->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D11;
 }
 
-void GBufferFillPass::Init(ShaderFactory& shaderFactory, const CreateParameters& params)
+void GBufferFillPass::init(ShaderFactory& shaderFactory, const CreateParameters& params)
 {
     m_EnableMotionVectors = params.enableMotionVectors;
     m_UseInputAssembler = params.useInputAssembler;
@@ -55,35 +55,35 @@ void GBufferFillPass::Init(ShaderFactory& shaderFactory, const CreateParameters&
     if (params.enableSinglePassCubemap)
         m_SupportedViewTypes = ViewType::Enum(m_SupportedViewTypes | ViewType::CUBEMAP);
     
-    m_VertexShader = CreateVertexShader(shaderFactory, params);
-    m_InputLayout = CreateInputLayout(m_VertexShader, params);
-    m_GeometryShader = CreateGeometryShader(shaderFactory, params);
-    m_PixelShader = CreatePixelShader(shaderFactory, params, false);
-    m_PixelShaderAlphaTested = CreatePixelShader(shaderFactory, params, true);
+    m_VertexShader = createVertexShader(shaderFactory, params);
+    m_InputLayout = createInputLayout(m_VertexShader, params);
+    m_GeometryShader = createGeometryShader(shaderFactory, params);
+    m_PixelShader = createPixelShader(shaderFactory, params, false);
+    m_PixelShaderAlphaTested = createPixelShader(shaderFactory, params, true);
 
     if (params.materialBindings)
         m_MaterialBindings = params.materialBindings;
     else
-        m_MaterialBindings = CreateMaterialBindingCache(*m_renderDevice);
+        m_MaterialBindings = createMaterialBindingCache(*m_renderDevice);
 
     m_GBufferCB = m_device->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(GBufferFillConstants),
         "GBufferFillConstants", params.numConstantBufferVersions));
 
-    CreateViewBindings(m_ViewBindingLayout, m_ViewBindings, params);
+    createViewBindings(m_ViewBindingLayout, m_ViewBindings, params);
 
     m_EnableDepthWrite = params.enableDepthWrite;
     m_StencilWriteMask = params.stencilWriteMask;
 
-    m_InputBindingLayout = CreateInputBindingLayout();
+    m_InputBindingLayout = createInputBindingLayout();
 }
 
-void GBufferFillPass::ResetBindingCache()
+void GBufferFillPass::resetBindingCache()
 {
     m_MaterialBindings->clear();
     m_InputBindingSets.clear();
 }
 
-nvrhi::ShaderHandle GBufferFillPass::CreateVertexShader(ShaderFactory& shaderFactory, const CreateParameters& params)
+nvrhi::ShaderHandle GBufferFillPass::createVertexShader(ShaderFactory& shaderFactory, const CreateParameters& params)
 {
     char const* sourceFileName = "engine/passes/gbuffer_vs.hlsl";
 
@@ -102,7 +102,7 @@ nvrhi::ShaderHandle GBufferFillPass::CreateVertexShader(ShaderFactory& shaderFac
     }
 }
 
-nvrhi::ShaderHandle GBufferFillPass::CreateGeometryShader(ShaderFactory& shaderFactory, const CreateParameters& params)
+nvrhi::ShaderHandle GBufferFillPass::createGeometryShader(ShaderFactory& shaderFactory, const CreateParameters& params)
 {
 
     ShaderMacro MotionVectorsMacro("MOTION_VECTORS", params.enableMotionVectors ? "1" : "0");
@@ -130,7 +130,7 @@ nvrhi::ShaderHandle GBufferFillPass::CreateGeometryShader(ShaderFactory& shaderF
     }
 }
 
-nvrhi::ShaderHandle GBufferFillPass::CreatePixelShader(ShaderFactory& shaderFactory, const CreateParameters& params, bool alphaTested)
+nvrhi::ShaderHandle GBufferFillPass::createPixelShader(ShaderFactory& shaderFactory, const CreateParameters& params, bool alphaTested)
 {
     std::vector<ShaderMacro> PixelShaderMacros;
     PixelShaderMacros.push_back(ShaderMacro("MOTION_VECTORS", params.enableMotionVectors ? "1" : "0"));
@@ -139,22 +139,22 @@ nvrhi::ShaderHandle GBufferFillPass::CreatePixelShader(ShaderFactory& shaderFact
     return shaderFactory.createAutoShader("engine/passes/gbuffer_ps.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_gbuffer_ps), &PixelShaderMacros, nvrhi::ShaderType::Pixel);
 }
 
-nvrhi::InputLayoutHandle GBufferFillPass::CreateInputLayout(nvrhi::IShader* vertexShader, const CreateParameters& params)
+nvrhi::InputLayoutHandle GBufferFillPass::createInputLayout(nvrhi::IShader* vertexShader, const CreateParameters& params)
 {
     if (params.useInputAssembler)
     {
         std::vector<nvrhi::VertexAttributeDesc> inputDescs =
         {
-            GetVertexAttributeDesc(VertexAttribute::Position, "POS", 0),
-            GetVertexAttributeDesc(VertexAttribute::PrevPosition, "PREV_POS", 1),
-            GetVertexAttributeDesc(VertexAttribute::TexCoord1, "TEXCOORD", 2),
-            GetVertexAttributeDesc(VertexAttribute::Normal, "NORMAL", 3),
-            GetVertexAttributeDesc(VertexAttribute::Tangent, "TANGENT", 4),
-            GetVertexAttributeDesc(VertexAttribute::Transform, "TRANSFORM", 5),
+            getVertexAttributeDesc(VertexAttribute::Position, "POS", 0),
+            getVertexAttributeDesc(VertexAttribute::PrevPosition, "PREV_POS", 1),
+            getVertexAttributeDesc(VertexAttribute::TexCoord1, "TEXCOORD", 2),
+            getVertexAttributeDesc(VertexAttribute::Normal, "NORMAL", 3),
+            getVertexAttributeDesc(VertexAttribute::Tangent, "TANGENT", 4),
+            getVertexAttributeDesc(VertexAttribute::Transform, "TRANSFORM", 5),
         };
         if (params.enableMotionVectors)
         {
-            inputDescs.push_back(GetVertexAttributeDesc(VertexAttribute::PrevTransform, "PREV_TRANSFORM", 5));
+            inputDescs.push_back(getVertexAttributeDesc(VertexAttribute::PrevTransform, "PREV_TRANSFORM", 5));
         }
 
         return m_device->createInputLayout(inputDescs.data(), static_cast<uint32_t>(inputDescs.size()), vertexShader);
@@ -163,7 +163,7 @@ nvrhi::InputLayoutHandle GBufferFillPass::CreateInputLayout(nvrhi::IShader* vert
     return nullptr;
 }
 
-void GBufferFillPass::CreateViewBindings(nvrhi::BindingLayoutHandle& layout, nvrhi::BindingSetHandle& set, const CreateParameters& params)
+void GBufferFillPass::createViewBindings(nvrhi::BindingLayoutHandle& layout, nvrhi::BindingSetHandle& set, const CreateParameters& params)
 {
     auto bindingLayoutDesc = nvrhi::BindingLayoutDesc()
         .setVisibility(nvrhi::ShaderType::Vertex | nvrhi::ShaderType::Pixel)
@@ -182,7 +182,7 @@ void GBufferFillPass::CreateViewBindings(nvrhi::BindingLayoutHandle& layout, nvr
     set = m_device->createBindingSet(bindingSetDesc, layout);
 }
 
-nvrhi::GraphicsPipelineHandle GBufferFillPass::CreateGraphicsPipeline(PipelineKey key, nvrhi::FramebufferInfo const& framebufferInfo)
+nvrhi::GraphicsPipelineHandle GBufferFillPass::createGraphicsPipeline(PipelineKey key, nvrhi::FramebufferInfo const& framebufferInfo)
 {
     nvrhi::GraphicsPipelineDesc pipelineDesc;
     pipelineDesc.inputLayout = m_InputLayout;
@@ -235,7 +235,7 @@ nvrhi::GraphicsPipelineHandle GBufferFillPass::CreateGraphicsPipeline(PipelineKe
     return m_device->createGraphicsPipeline(pipelineDesc, framebufferInfo);
 }
 
-std::shared_ptr<MaterialBindingCache> GBufferFillPass::CreateMaterialBindingCache(caustica::render::RenderDevice& renderDevice)
+std::shared_ptr<MaterialBindingCache> GBufferFillPass::createMaterialBindingCache(caustica::render::RenderDevice& renderDevice)
 {
     std::vector<MaterialResourceBinding> materialBindings = {
         { MaterialResource::ConstantBuffer,         GBUFFER_BINDING_MATERIAL_CONSTANTS },
@@ -313,7 +313,7 @@ bool GBufferFillPass::setupMaterial(GeometryPassContext& abstractContext, const 
         std::lock_guard<std::mutex> lockGuard(m_mutex);
 
         if (!pipeline)
-            pipeline = CreateGraphicsPipeline(key, framebufferInfo);
+            pipeline = createGraphicsPipeline(key, framebufferInfo);
 
         if (!pipeline)
             return false;
@@ -349,7 +349,7 @@ void GBufferFillPass::setupInputBuffers(GeometryPassContext& abstractContext, co
     }
     else
     {
-        context.inputBindingSet = GetOrCreateInputBindingSet(buffers);
+        context.inputBindingSet = getOrCreateInputBindingSet(buffers);
         context.positionOffset = uint32_t(buffers->getVertexBufferRange(VertexAttribute::Position).byteOffset);
         context.prevPositionOffset = uint32_t(buffers->getVertexBufferRange(VertexAttribute::PrevPosition).byteOffset);
         context.texCoordOffset = uint32_t(buffers->getVertexBufferRange(VertexAttribute::TexCoord1).byteOffset);
@@ -358,7 +358,7 @@ void GBufferFillPass::setupInputBuffers(GeometryPassContext& abstractContext, co
     }
 }
 
-nvrhi::BindingLayoutHandle GBufferFillPass::CreateInputBindingLayout()
+nvrhi::BindingLayoutHandle GBufferFillPass::createInputBindingLayout()
 {
     if (m_UseInputAssembler)
         return nullptr;
@@ -375,7 +375,7 @@ nvrhi::BindingLayoutHandle GBufferFillPass::CreateInputBindingLayout()
     return m_device->createBindingLayout(bindingLayoutDesc);
 }
 
-nvrhi::BindingSetHandle GBufferFillPass::CreateInputBindingSet(const BufferGroup* bufferGroup)
+nvrhi::BindingSetHandle GBufferFillPass::createInputBindingSet(const BufferGroup* bufferGroup)
 {
     auto bindingSetDesc = nvrhi::BindingSetDesc()
         .addItem(m_IsDX11
@@ -387,12 +387,12 @@ nvrhi::BindingSetHandle GBufferFillPass::CreateInputBindingSet(const BufferGroup
     return m_device->createBindingSet(bindingSetDesc, m_InputBindingLayout);
 }
 
-nvrhi::BindingSetHandle GBufferFillPass::GetOrCreateInputBindingSet(const BufferGroup* bufferGroup)
+nvrhi::BindingSetHandle GBufferFillPass::getOrCreateInputBindingSet(const BufferGroup* bufferGroup)
 {
     auto it = m_InputBindingSets.find(bufferGroup);
     if (it == m_InputBindingSets.end())
     {
-        auto bindingSet = CreateInputBindingSet(bufferGroup);
+        auto bindingSet = createInputBindingSet(bufferGroup);
         m_InputBindingSets[bufferGroup] = bindingSet;
         return bindingSet;
     }
@@ -426,7 +426,7 @@ void GBufferFillPass::setPushConstants(
     args.startVertexLocation = 0;
 }
 
-void MaterialIDPass::Init(
+void MaterialIDPass::init(
     caustica::ShaderFactory& shaderFactory,
     const CreateParameters& params)
 {
@@ -436,10 +436,10 @@ void MaterialIDPass::Init(
     // The material ID pass doesn't support generating motion vectors
     paramsCopy.enableMotionVectors = false;
 
-    GBufferFillPass::Init(shaderFactory, paramsCopy);
+    GBufferFillPass::init(shaderFactory, paramsCopy);
 }
 
-nvrhi::ShaderHandle MaterialIDPass::CreatePixelShader(caustica::ShaderFactory& shaderFactory, const CreateParameters& params, bool alphaTested)
+nvrhi::ShaderHandle MaterialIDPass::createPixelShader(caustica::ShaderFactory& shaderFactory, const CreateParameters& params, bool alphaTested)
 {
     std::vector<ShaderMacro> PixelShaderMacros;
     PixelShaderMacros.push_back(ShaderMacro("ALPHA_TESTED", alphaTested ? "1" : "0"));

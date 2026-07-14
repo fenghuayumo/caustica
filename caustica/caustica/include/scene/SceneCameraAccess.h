@@ -11,25 +11,25 @@
 namespace caustica::scene
 {
 
-[[nodiscard]] SceneContentFlags GetCameraContentFlags();
+[[nodiscard]] SceneContentFlags getCameraContentFlags();
 
-[[nodiscard]] dm::affine3 GetCameraViewToWorldMatrix(const dm::daffine3& globalTransform);
-[[nodiscard]] dm::affine3 GetCameraWorldToViewMatrix(const dm::daffine3& globalTransform);
+[[nodiscard]] dm::affine3 getCameraViewToWorldMatrix(const dm::daffine3& globalTransform);
+[[nodiscard]] dm::affine3 getCameraWorldToViewMatrix(const dm::daffine3& globalTransform);
 
-[[nodiscard]] bool IsPerspectiveCamera(const CameraComponent& component);
-[[nodiscard]] bool IsOrthographicCamera(const CameraComponent& component);
+[[nodiscard]] bool isPerspectiveCamera(const CameraComponent& component);
+[[nodiscard]] bool isOrthographicCamera(const CameraComponent& component);
 
-[[nodiscard]] const PerspectiveCameraData* TryGetPerspectiveCameraData(const CameraComponent& component);
-[[nodiscard]] PerspectiveCameraData* TryGetPerspectiveCameraData(CameraComponent& component);
-[[nodiscard]] const OrthographicCameraData* TryGetOrthographicCameraData(const CameraComponent& component);
-[[nodiscard]] OrthographicCameraData* TryGetOrthographicCameraData(CameraComponent& component);
+[[nodiscard]] const PerspectiveCameraData* tryGetPerspectiveCameraData(const CameraComponent& component);
+[[nodiscard]] PerspectiveCameraData* tryGetPerspectiveCameraData(CameraComponent& component);
+[[nodiscard]] const OrthographicCameraData* tryGetOrthographicCameraData(const CameraComponent& component);
+[[nodiscard]] OrthographicCameraData* tryGetOrthographicCameraData(CameraComponent& component);
 
-[[nodiscard]] bool SetCameraProperty(CameraComponent& component, const std::string& propName, const dm::float4& value);
+[[nodiscard]] bool setCameraProperty(CameraComponent& component, const std::string& propName, const dm::float4& value);
 
-void InitializeCameraComponent(CameraComponent& component, const SceneCamera& camera);
-void InitializeCameraComponent(CameraComponent& component, const std::shared_ptr<SceneCamera>& camera);
+void initializeCameraComponent(CameraComponent& component, const SceneCamera& camera);
+void initializeCameraComponent(CameraComponent& component, const std::shared_ptr<SceneCamera>& camera);
 
-[[nodiscard]] const CameraComponent* TryGetCamera(const ecs::World& world, ecs::Entity entity);
-[[nodiscard]] CameraComponent* TryGetCamera(ecs::World& world, ecs::Entity entity);
+[[nodiscard]] const CameraComponent* tryGetCamera(const ecs::World& world, ecs::Entity entity);
+[[nodiscard]] CameraComponent* tryGetCamera(ecs::World& world, ecs::Entity entity);
 
 } // namespace caustica::scene

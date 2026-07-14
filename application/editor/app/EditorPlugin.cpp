@@ -53,13 +53,13 @@ void EditorPlugin::configureSchedules(App& app)
 
 void EditorPlugin::configureLateSchedules(App& app)
 {
-    app.addSystemBefore(AppSchedule::First, "EditorScene.BeginFrame", "SceneSession.BeginFrame", [](SystemContext& ctx) {
+    app.addSystemBefore(AppSchedule::First, "EditorScene.beginFrame", "SceneSession.beginFrame", [](SystemContext& ctx) {
         auto* capture = ctx.tryRes<CaptureScriptState>();
         if (capture && capture->manager)
-            capture->manager->PreRender();
+            capture->manager->preRender();
     });
 
-    app.addSystemAfter(AppSchedule::PreUpdate, "EditorScene.RequestUnfocusedRender", "NotifyDpiScale", [this](SystemContext& ctx) {
+    app.addSystemAfter(AppSchedule::preUpdate, "EditorScene.RequestUnfocusedRender", "NotifyDpiScale", [this](SystemContext& ctx) {
         if (ctx.runRender || !ctx.windowVisible || m_sceneEditor.shouldSkipRender())
             return;
 
@@ -88,12 +88,12 @@ void EditorPlugin::configureLateSchedules(App& app)
         ctx.app.requestRenderUnfocused();
     });
 
-    app.addSystemAfter(AppSchedule::PreUpdate, "EditorScene.ProcessPendingMutations", "BeforeAnimate", [this](SystemContext& ctx) {
+    app.addSystemAfter(AppSchedule::preUpdate, "EditorScene.ProcessPendingMutations", "BeforeAnimate", [this](SystemContext& ctx) {
         (void)ctx;
         m_sceneEditor.ProcessPendingSceneMutations();
     });
 
-    app.addSystemAfter(AppSchedule::PreUpdate, "EditorScene.AnimateBegin", "EditorScene.ProcessPendingMutations", [this](SystemContext& ctx) {
+    app.addSystemAfter(AppSchedule::preUpdate, "EditorScene.AnimateBegin", "EditorScene.ProcessPendingMutations", [this](SystemContext& ctx) {
         if (!ctx.windowFocused)
             return;
 
@@ -107,12 +107,12 @@ void EditorPlugin::configureLateSchedules(App& app)
         m_sceneEditor.onAnimateUpdateSceneTime(ctx.deltaTimeSeconds, enableAnimations, enableAnimationUpdate);
     });
 
-    app.addSystemAfter(AppSchedule::Update, "EditorScene.SyncLoadedScene", "SceneSession.Animate", [this](SystemContext& ctx) {
+    app.addSystemAfter(AppSchedule::update, "EditorScene.SyncLoadedScene", "SceneSession.animate", [this](SystemContext& ctx) {
         (void)ctx;
         m_sceneEditor.syncLoadedSceneSystems();
     });
 
-    app.addSystemAfter(AppSchedule::Update, "EditorScene.AnimateEnd", "SceneSession.Animate", [this](SystemContext& ctx) {
+    app.addSystemAfter(AppSchedule::update, "EditorScene.AnimateEnd", "SceneSession.animate", [this](SystemContext& ctx) {
         if (!ctx.windowFocused)
             return;
 
@@ -130,9 +130,9 @@ void EditorPlugin::configureLateSchedules(App& app)
 
     AppSystemOrdering editorAfterWorldRenderOrdering;
     editorAfterWorldRenderOrdering.before.push_back("SceneSession.AfterWorldRender");
-    editorAfterWorldRenderOrdering.before.push_back("GpuRender.EndFrame");
+    editorAfterWorldRenderOrdering.before.push_back("GpuRender.endFrame");
 
-    app.addSystem(AppSchedule::Render, "EditorScene.AfterWorldRender", [this](SystemContext& ctx) {
+    app.addSystem(AppSchedule::render, "EditorScene.AfterWorldRender", [this](SystemContext& ctx) {
         if (!ctx.gpuDevice)
             return;
 
@@ -142,7 +142,7 @@ void EditorPlugin::configureLateSchedules(App& app)
     if (!uiConfig)
         return;
 
-    app.addSystemAfter(AppSchedule::Update, "EditorUI.Animate", "EditorScene.AnimateEnd", [](SystemContext& ctx) {
+    app.addSystemAfter(AppSchedule::update, "EditorUI.animate", "EditorScene.AnimateEnd", [](SystemContext& ctx) {
         auto* uiSubsystem = ctx.tryRes<EditorUISubsystem>();
         if (!uiSubsystem)
             return;
@@ -152,9 +152,9 @@ void EditorPlugin::configureLateSchedules(App& app)
 
     AppSystemOrdering editorUiRenderOrdering;
     editorUiRenderOrdering.after.push_back("SceneSession.AfterWorldRender");
-    editorUiRenderOrdering.before.push_back("GpuRender.EndFrame");
+    editorUiRenderOrdering.before.push_back("GpuRender.endFrame");
 
-    app.addSystem(AppSchedule::Render, "EditorUI.RenderScene", [](SystemContext& ctx) {
+    app.addSystem(AppSchedule::render, "EditorUI.RenderScene", [](SystemContext& ctx) {
         if (!ctx.gpuDevice)
             return;
 

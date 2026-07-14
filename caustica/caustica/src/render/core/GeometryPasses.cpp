@@ -147,7 +147,7 @@ void caustica::render::renderCompositeView(
         assert(compositeView->getNumChildViews(supportedViewTypes) == compositeViewPrev->getNumChildViews(supportedViewTypes));
     }
 
-    const scene::SceneRenderData& renderData = scene.GetRenderData();
+    const scene::SceneRenderData& renderData = scene.getRenderData();
     std::vector<DrawCommand> drawCommands;
 
     for (uint viewIndex = 0; viewIndex < compositeView->getNumChildViews(supportedViewTypes); viewIndex++)
@@ -158,9 +158,9 @@ void caustica::render::renderCompositeView(
         assert(view != nullptr);
 
         if (domain == MeshDrawDomain::Opaque)
-            scene::BuildOpaqueDrawList(renderData, *view, drawCommands);
+            scene::buildOpaqueDrawList(renderData, *view, drawCommands);
         else
-            scene::BuildTransparentDrawList(renderData, *view, drawCommands, drawOptions);
+            scene::buildTransparentDrawList(renderData, *view, drawCommands, drawOptions);
 
         nvrhi::IFramebuffer* framebuffer = framebufferFactory.getFramebuffer(*view);
 

@@ -157,7 +157,7 @@ namespace caustica::console
 		initializeDefaultCommands();
 	}
 		
-	Interpreter::Result Interpreter::Execute(std::string_view const cmdline)
+	Interpreter::Result Interpreter::execute(std::string_view const cmdline)
 	{
 		if (cmdline.empty())
 			return { false };
@@ -186,7 +186,7 @@ namespace caustica::console
 		{
 			if (auto * cmd = cobj->AsCommand())
 			{
-				auto [status, output] = cmd->Execute(args);
+				auto [status, output] = cmd->execute(args);
 				return { status, output };
 			}
 			else if (auto * var = cobj->AsVariable())

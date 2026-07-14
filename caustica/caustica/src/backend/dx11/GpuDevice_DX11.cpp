@@ -65,7 +65,7 @@ static bool MoveWindowOntoAdapter(IDXGIAdapter* targetAdapter, RECT& rect)
     return false;
 }
 
-bool GpuDevice_DX11::BeginFrame()
+bool GpuDevice_DX11::beginFrame()
 {
     DXGI_SWAP_CHAIN_DESC newSwapChainDesc;
     if (SUCCEEDED(m_SwapChain->GetDesc(&newSwapChainDesc)))
@@ -207,7 +207,7 @@ bool GpuDevice_DX11::CreateDevice()
 #endif
 
     nvrhi::d3d11::DeviceDesc deviceDesc;
-    deviceDesc.messageCallback = &DefaultMessageCallback::GetInstance();
+    deviceDesc.messageCallback = &DefaultMessageCallback::getInstance();
     deviceDesc.context = m_ImmediateContext;
 #if CAUSTICA_WITH_AFTERMATH
     deviceDesc.aftermathEnabled = m_DeviceParams.enableAftermath;

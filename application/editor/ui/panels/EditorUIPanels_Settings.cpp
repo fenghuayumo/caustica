@@ -44,15 +44,15 @@ void EditorUI::BuildSystemPanel(const PanelLayout& layout)
             if (ImGui::Button("Reload Shaders (requires VS .hlsl->.bin build)"))
                 m_runtime.Invalidation.ShaderReloadRequested = true;
 
-            ImGui::Checkbox("Render when out of focus", &m_editorUI.RenderWhenOutOfFocus);
+            ImGui::Checkbox("render when out of focus", &m_editorUI.RenderWhenOutOfFocus);
             if (ImGui::IsItemHovered()) 
-                ImGui::SetTooltip("Render loop will pause when app window is out of focus. Note: Reference mode will accumulate until all frames are done.");
+                ImGui::SetTooltip("render loop will pause when app window is out of focus. Note: Reference mode will accumulate until all frames are done.");
         
         
             {
                 //RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent););
 
-                if (ImGui::CollapsingHeader("Capture scripts and tools"))
+                if (ImGui::CollapsingHeader("capture scripts and tools"))
                 {
                     RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
 
@@ -96,7 +96,7 @@ void EditorUI::BuildCameraPanel(const PanelLayout& layout)
         if (ImGui::CollapsingHeader("Camera", 0/*ImGuiTreeNodeFlags_DefaultOpen*/))
         {
             RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
-            std::vector<std::string> options; options.push_back("Free flight");
+            std::vector<std::string> options; options.push_back("free flight");
             for (uint i = 0; i < m_sceneEditor.sceneCameraCount(); i++)
                 options.push_back("Scene cam " + std::to_string(i));
             uint& currentlySelected = m_sceneEditor.selectedCameraIndex();
@@ -119,10 +119,10 @@ void EditorUI::BuildCameraPanel(const PanelLayout& layout)
                 ImGui::Text("Camera position: "); 
                 RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
                 if (ImGui::Button("Save to file", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) m_sceneEditor.saveCurrentCamera(); ImGui::SameLine();
-                if (ImGui::Button("Load from file", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) m_sceneEditor.loadCurrentCamera();
+                if (ImGui::Button("load from file", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) m_sceneEditor.loadCurrentCamera();
                 if (ImGui::Button("Save to clipboard", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) ImGui::SetClipboardText(m_sceneEditor.currentCameraPosDirUp().c_str()); ImGui::SameLine();
                 const char *cpbrdtxt = ImGui::GetClipboardText();
-                if (ImGui::Button("Load from clipboard", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) m_sceneEditor.setCurrentCameraPosDirUp(cpbrdtxt?cpbrdtxt:"");
+                if (ImGui::Button("load from clipboard", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) m_sceneEditor.setCurrentCameraPosDirUp(cpbrdtxt?cpbrdtxt:"");
             }
 
     #if 1
@@ -208,7 +208,7 @@ void EditorUI::BuildPythonScriptingUI(float indent)
         scripting->QueueScriptString(m_pythonInlineCode, "<UI inline>");
     }
     ImGui::SameLine();
-    if (ImGui::Button("Clear inline"))
+    if (ImGui::Button("clear inline"))
         inlineBuffer[0] = '\0';
 
     // ---- Output log ------------------------------------------------------
@@ -219,7 +219,7 @@ void EditorUI::BuildPythonScriptingUI(float indent)
     ImGui::Separator();
     ImGui::TextUnformatted("Captured stdout/stderr:");
     ImGui::SameLine();
-    if (ImGui::SmallButton("Clear log"))
+    if (ImGui::SmallButton("clear log"))
         m_pythonOutputLog.clear();
     ImGui::BeginChild("##PythonOutput",
         ImVec2(-1.0f, ImGui::GetTextLineHeight() * 8.0f), true, ImGuiWindowFlags_HorizontalScrollbar);

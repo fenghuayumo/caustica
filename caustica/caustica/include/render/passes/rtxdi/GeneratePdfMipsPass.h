@@ -17,7 +17,7 @@ public:
         nvrhi::ITexture* sourceEnvironmentMap,
         nvrhi::ITexture* destinationTexture);
     ~GenerateMipsPass();
-    void Process(nvrhi::ICommandList* commandList);
+    void process(nvrhi::ICommandList* commandList);
 
 private:
     nvrhi::ComputePipelineHandle n_pipeline;

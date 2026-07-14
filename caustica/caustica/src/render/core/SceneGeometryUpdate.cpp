@@ -26,7 +26,7 @@ OmmAccelStructState makeOmmAccelState(OpacityMicromapBuilder* opacityMicromapBui
     if (opacityMicromapBuilder == nullptr)
         return ommState;
 
-    const auto& ommUI = opacityMicromapBuilder->UIData();
+    const auto& ommUI = opacityMicromapBuilder->uiData();
     ommState.enabled = ommUI.Enable;
     ommState.force2State = ommUI.Force2State;
     ommState.onlyOMMs = ommUI.OnlyOMMs;
@@ -36,7 +36,7 @@ OmmAccelStructState makeOmmAccelState(OpacityMicromapBuilder* opacityMicromapBui
 
 void transitionSkinnedMeshBuffersToReadOnly(nvrhi::ICommandList* commandList, const Scene& scene)
 {
-    for (const scene::SkinnedMeshRenderProxy& proxy : scene.GetRenderData().skinnedMeshes)
+    for (const scene::SkinnedMeshRenderProxy& proxy : scene.getRenderData().skinnedMeshes)
     {
         if (!proxy.mesh || !proxy.mesh->buffers || !proxy.mesh->buffers->vertexBuffer)
             continue;
@@ -59,7 +59,7 @@ void updateSceneGeometry(AccelStructManager& accelStructs, UpdateSceneGeometryPa
     render::SceneGpuUpdater::refresh(*scene, commandList, static_cast<uint32_t>(params.frameIndex));
 
     if (params.opacityMaps != nullptr)
-        params.opacityMaps->BuildOpacityMicromaps(*commandList, *scene);
+        params.opacityMaps->buildOpacityMicromaps(*commandList, *scene);
 
     const AccelStructBuildSettings rebuildSettings = makeAccelBuildSettings(params.settings, false);
     accelStructs.rebuildDirtyMeshes(
@@ -80,12 +80,12 @@ void updateSceneGeometry(AccelStructManager& accelStructs, UpdateSceneGeometryPa
     {
         if (params.asyncLoadingInProgress != nullptr)
         {
-            *params.asyncLoadingInProgress |= params.opacityMaps->Update(*commandList, *scene);
-            *params.asyncLoadingInProgress |= params.opacityMaps->UIData().BuildsLeftInQueue > 0;
+            *params.asyncLoadingInProgress |= params.opacityMaps->update(*commandList, *scene);
+            *params.asyncLoadingInProgress |= params.opacityMaps->uiData().BuildsLeftInQueue > 0;
         }
         else
         {
-            (void)params.opacityMaps->Update(*commandList, *scene);
+            (void)params.opacityMaps->update(*commandList, *scene);
         }
     }
 

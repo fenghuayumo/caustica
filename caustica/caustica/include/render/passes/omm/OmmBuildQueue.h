@@ -25,7 +25,7 @@ public:
 			int geometryIndexInMesh = -1;
 			std::shared_ptr < caustica::ImageAsset > alphaTexture;
 
-			// Settings
+			// settings
 			uint32_t maxSubdivisionLevel = 5;
 			float dynamicSubdivisionScale = 2.f;
 			nvrhi::rt::OpacityMicromapFormat format = nvrhi::rt::OpacityMicromapFormat::OC1_4_State;
@@ -55,10 +55,10 @@ public:
 	);
 	~OmmBuildQueue();
 
-	void Update(nvrhi::ICommandList& commandList);
-	void CancelPendingBuilds();
-	void QueueBuild(const BuildInput& inputs);
-	uint32_t NumPendingBuilds() const;
+	void update(nvrhi::ICommandList& commandList);
+	void cancelPendingBuilds();
+	void queueBuild(const BuildInput& inputs);
+	uint32_t numPendingBuilds() const;
 
 private:
 
@@ -110,23 +110,23 @@ private:
 		std::vector<BufferInfo> bufferInfos;
 
 		BuildTask(const BuildInput& input) : input(input) {}
-		void Reset();
+		void reset();
 	};
 
-	void ConsumeOneTask(nvrhi::ICommandList& commandList, BuildState taskState);
-	bool ExecuteTask(nvrhi::ICommandList& commandList, BuildTask& taskState); // Returns whether the task is finished and can be removed from the queue
+	void consumeOneTask(nvrhi::ICommandList& commandList, BuildState taskState);
+	bool executeTask(nvrhi::ICommandList& commandList, BuildTask& taskState); // Returns whether the task is finished and can be removed from the queue
 
-	void RunSetup(nvrhi::ICommandList& commandList, BuildTask& task);
-	void RunBakeAndBuild(nvrhi::ICommandList& commandList, BuildTask& task);
-	void Finalize(nvrhi::ICommandList& commandList, BuildTask& task);
+	void runSetup(nvrhi::ICommandList& commandList, BuildTask& task);
+	void runBakeAndBuild(nvrhi::ICommandList& commandList, BuildTask& task);
+	void finalize(nvrhi::ICommandList& commandList, BuildTask& task);
 	
-	void AllocateOMMArrayDataBuffer(BuildTask& task);
-	void BakeOmmArrayData(nvrhi::ICommandList& commandList, BuildTask& task);
-	std::vector<bvh::OmmAttachment> BuildOMMAttachments(nvrhi::ICommandList& commandList, BuildTask& task);
-	void BuildBLASWithOMM(nvrhi::ICommandList& commandList, BuildTask& task, const std::vector<bvh::OmmAttachment>& ommAttachment);
+	void allocateOMMArrayDataBuffer(BuildTask& task);
+	void bakeOmmArrayData(nvrhi::ICommandList& commandList, BuildTask& task);
+	std::vector<bvh::OmmAttachment> buildOMMAttachments(nvrhi::ICommandList& commandList, BuildTask& task);
+	void buildBLASWithOMM(nvrhi::ICommandList& commandList, BuildTask& task, const std::vector<bvh::OmmAttachment>& ommAttachment);
 
-	bool ReadyToRecordWork();
-	void SubmitAndSubscribeQuery(nvrhi::ICommandList& commandList);
+	bool readyToRecordWork();
+	void submitAndSubscribeQuery(nvrhi::ICommandList& commandList);
 
 	std::vector<BuildTask> m_pending;
 	nvrhi::EventQueryHandle m_InFlightQuery;

@@ -77,7 +77,7 @@ public:
         }
     }
 
-    void Init(const InitParameters& params) override
+    void init(const InitParameters& params) override
     {
         if (params.useRayReconstruction && !m_rayReconstructionSupported)
             return;
@@ -167,7 +167,7 @@ public:
         viewInfo.SubresourceRange.levelCount = 1;
     }
 
-    bool Evaluate(
+    bool evaluate(
         nvrhi::ICommandList* commandList,
         const EvaluateParameters& params,
         const caustica::PlanarView& view) override
@@ -180,7 +180,7 @@ public:
         bool const useExposureBuffer = params.exposureBuffer != nullptr && params.exposureScale != 0.f && !m_rayReconstructionInitialized;
         if (useExposureBuffer)
         {
-            ComputeExposure(commandList, params.exposureBuffer, params.exposureScale);
+            computeExposure(commandList, params.exposureBuffer, params.exposureScale);
         }
 
         VkCommandBuffer vkCmdBuf = commandList->getNativeObject(nvrhi::ObjectTypes::VK_CommandBuffer);
@@ -281,13 +281,13 @@ public:
     }
 };
 
-std::unique_ptr<DLSS> DLSS::CreateVK(nvrhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
+std::unique_ptr<DLSS> DLSS::createVK(nvrhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
     std::string const& directoryWithExecutable, uint32_t applicationID)
 {
     return std::make_unique<DLSS_VK>(device, shaderFactory, directoryWithExecutable, applicationID);
 }
 
-void DLSS::GetRequiredVulkanExtensions(std::vector<std::string>& instanceExtensions, std::vector<std::string>& deviceExtensions)
+void DLSS::getRequiredVulkanExtensions(std::vector<std::string>& instanceExtensions, std::vector<std::string>& deviceExtensions)
 {
     unsigned int instanceExtCount = 0;
     unsigned int deviceExtCount = 0;

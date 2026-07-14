@@ -127,7 +127,7 @@ namespace
         {
         }
 
-        size_t Allocate(size_t sizeInBytes, size_t alignment)
+        size_t allocate(size_t sizeInBytes, size_t alignment)
         {
             m_offset = nvrhi::align(m_offset, alignment);
             size_t offset = m_offset;
@@ -190,7 +190,7 @@ OmmBuildQueue::~OmmBuildQueue()
 {
 }
 
-void OmmBuildQueue::RunSetup(nvrhi::ICommandList& commandList, BuildTask& task)
+void OmmBuildQueue::runSetup(nvrhi::ICommandList& commandList, BuildTask& task)
 {
     assert(task.state == BuildState::None);
 
@@ -215,16 +215,16 @@ void OmmBuildQueue::RunSetup(nvrhi::ICommandList& commandList, BuildTask& task)
         BufferInfo info;
         info.ommIndexFormat                         = setupInfo.ommIndexFormat;
         info.ommIndexCount                          = setupInfo.ommIndexCount;
-        info.ommIndexOffset                         = ommIndexBufferAllocator.Allocate(setupInfo.ommIndexBufferSize, 256);
-        info.ommDescArrayOffset                     = ommDescBufferAllocator.Allocate(setupInfo.ommDescBufferSize, 256);
-        info.ommDescArrayHistogramOffset            = ommDescArrayHistogramBufferAllocator.Allocate(setupInfo.ommDescArrayHistogramSize, 256);
+        info.ommIndexOffset                         = ommIndexBufferAllocator.allocate(setupInfo.ommIndexBufferSize, 256);
+        info.ommDescArrayOffset                     = ommDescBufferAllocator.allocate(setupInfo.ommDescBufferSize, 256);
+        info.ommDescArrayHistogramOffset            = ommDescArrayHistogramBufferAllocator.allocate(setupInfo.ommDescArrayHistogramSize, 256);
         info.ommDescArrayHistogramSize              = setupInfo.ommDescArrayHistogramSize;
-        info.ommDescArrayHistogramReadbackOffset    = ommReadbackBufferAllocator.Allocate(setupInfo.ommDescArrayHistogramSize, 256);
-        info.ommIndexHistogramOffset                = ommIndexArrayHistogramBufferAllocator.Allocate(setupInfo.ommIndexHistogramSize, 256);
+        info.ommDescArrayHistogramReadbackOffset    = ommReadbackBufferAllocator.allocate(setupInfo.ommDescArrayHistogramSize, 256);
+        info.ommIndexHistogramOffset                = ommIndexArrayHistogramBufferAllocator.allocate(setupInfo.ommIndexHistogramSize, 256);
         info.ommIndexHistogramSize                  = setupInfo.ommIndexHistogramSize;
-        info.ommIndexHistogramReadbackOffset        = ommReadbackBufferAllocator.Allocate(setupInfo.ommIndexHistogramSize, 256);
-        info.ommPostDispatchInfoOffset              = ommPostBuildInfoBufferAllocator.Allocate(setupInfo.ommPostDispatchInfoBufferSize, 256);
-        info.ommPostDispatchInfoReadbackOffset      = ommReadbackBufferAllocator.Allocate(setupInfo.ommPostDispatchInfoBufferSize, 256);
+        info.ommIndexHistogramReadbackOffset        = ommReadbackBufferAllocator.allocate(setupInfo.ommIndexHistogramSize, 256);
+        info.ommPostDispatchInfoOffset              = ommPostBuildInfoBufferAllocator.allocate(setupInfo.ommPostDispatchInfoBufferSize, 256);
+        info.ommPostDispatchInfoReadbackOffset      = ommReadbackBufferAllocator.allocate(setupInfo.ommPostDispatchInfoBufferSize, 256);
         info.ommArrayDataOffset                     = 0xFFFFFFFF; // Not yet known
 
         bufferInfos.push_back(info);
@@ -245,7 +245,7 @@ void OmmBuildQueue::RunSetup(nvrhi::ICommandList& commandList, BuildTask& task)
     commandList.beginTrackingBufferState(buffers.ommPostDispatchInfoBuffer, nvrhi::ResourceStates::Common);
     commandList.beginTrackingBufferState(buffers.ommReadbackBuffer, nvrhi::ResourceStates::Common);
 
-    // Dispatch all setup tasks.
+    // dispatch all setup tasks.
     for (uint32_t i = 0; i < task.input.geometries.size(); ++i)
     {
         const BufferInfo& bufferInfo = bufferInfos[i];
@@ -278,7 +278,7 @@ void OmmBuildQueue::RunSetup(nvrhi::ICommandList& commandList, BuildTask& task)
     task.state = BuildState::Setup;
 }
 
-void OmmBuildQueue::AllocateOMMArrayDataBuffer(BuildTask& task)
+void OmmBuildQueue::allocateOMMArrayDataBuffer(BuildTask& task)
 {
     LinearBufferAllocator ommArrayDataBufferAllocator;
     
@@ -293,7 +293,7 @@ void OmmBuildQueue::AllocateOMMArrayDataBuffer(BuildTask& task)
 
         omm::GpuBakeNvrhi::PostDispatchInfo postDispatchInfo;
         m_baker->ReadPostDispatchInfo((uint8_t*)pReadbackData + bufferInfo.ommPostDispatchInfoReadbackOffset, sizeof(postDispatchInfo), postDispatchInfo);
-        size_t ommArrayDataOffset = ommArrayDataBufferAllocator.Allocate(postDispatchInfo.ommArrayBufferSize, 256);
+        size_t ommArrayDataOffset = ommArrayDataBufferAllocator.allocate(postDispatchInfo.ommArrayBufferSize, 256);
 
         if ((ommArrayDataOffset) > std::numeric_limits<uint32_t>::max())
         {
@@ -307,7 +307,7 @@ void OmmBuildQueue::AllocateOMMArrayDataBuffer(BuildTask& task)
     task.buffers.ommArrayDataBuffer = ommArrayDataBufferAllocator.CreateBuffer(m_device, "OmmArrayBuffer", BufferConfig::RawUAVAndASBuildInput);
 }
 
-void OmmBuildQueue::BakeOmmArrayData(nvrhi::ICommandList& commandList, BuildTask& task)
+void OmmBuildQueue::bakeOmmArrayData(nvrhi::ICommandList& commandList, BuildTask& task)
 {
     commandList.beginTrackingBufferState(task.buffers.ommIndexBuffer, nvrhi::ResourceStates::Common);
     commandList.beginTrackingBufferState(task.buffers.ommDescBuffer, nvrhi::ResourceStates::Common);
@@ -350,7 +350,7 @@ void OmmBuildQueue::BakeOmmArrayData(nvrhi::ICommandList& commandList, BuildTask
     }
 }
 
-std::vector<bvh::OmmAttachment> OmmBuildQueue::BuildOMMAttachments(nvrhi::ICommandList& commandList, BuildTask& task)
+std::vector<bvh::OmmAttachment> OmmBuildQueue::buildOMMAttachments(nvrhi::ICommandList& commandList, BuildTask& task)
 {
     std::vector<bvh::OmmAttachment> ommAttachment;
     ommAttachment.resize(task.input.mesh->geometries.size());
@@ -388,7 +388,7 @@ std::vector<bvh::OmmAttachment> OmmBuildQueue::BuildOMMAttachments(nvrhi::IComma
     return ommAttachment;
 }
 
-void OmmBuildQueue::BuildBLASWithOMM(nvrhi::ICommandList& commandList, BuildTask& task, const std::vector<bvh::OmmAttachment>& ommAttachment)
+void OmmBuildQueue::buildBLASWithOMM(nvrhi::ICommandList& commandList, BuildTask& task, const std::vector<bvh::OmmAttachment>& ommAttachment)
 {
     nvrhi::rt::AccelStructDesc blasDesc = bvh::getMeshBlasDesc(task.input.bvhCfg , *task.input.mesh, ommAttachment.data(), false);
     // The spec says instance Id is only 24 bits, and we already take 16 for the instance index, so we only have 8 bits for the geometry.
@@ -397,26 +397,26 @@ void OmmBuildQueue::BuildBLASWithOMM(nvrhi::ICommandList& commandList, BuildTask
     nvrhi::rt::AccelStructHandle as = m_device->createAccelStruct(blasDesc);
     nvrhi::utils::BuildBottomLevelAccelStruct(&commandList, as, blasDesc);
         
-    // Store results
+    // store results
     std::static_pointer_cast<MeshInfoEx>(task.input.mesh)->AccelStructOMM = as;
 }
 
-void OmmBuildQueue::RunBakeAndBuild(nvrhi::ICommandList& commandList, BuildTask& task)
+void OmmBuildQueue::runBakeAndBuild(nvrhi::ICommandList& commandList, BuildTask& task)
 {
     assert(task.state == BuildState::None || task.state == BuildState::Setup);
 
-    AllocateOMMArrayDataBuffer(task);
+    allocateOMMArrayDataBuffer(task);
 
-    BakeOmmArrayData(commandList, task); // Dispatch the bake which will fill the ommArrayData
+    bakeOmmArrayData(commandList, task); // dispatch the bake which will fill the ommArrayData
 
-    std::vector<bvh::OmmAttachment> ommAttachment = BuildOMMAttachments(commandList, task);
+    std::vector<bvh::OmmAttachment> ommAttachment = buildOMMAttachments(commandList, task);
 
-    BuildBLASWithOMM(commandList, task, ommAttachment); // Build a BLAS with OMM Attached.
+    buildBLASWithOMM(commandList, task, ommAttachment); // Build a BLAS with OMM Attached.
 
     task.state = BuildState::BakeAndBuild;
 }
 
-void OmmBuildQueue::SubmitAndSubscribeQuery(nvrhi::ICommandList& commandList)
+void OmmBuildQueue::submitAndSubscribeQuery(nvrhi::ICommandList& commandList)
 {
     // Need to submit the command list for the event query to be relevant. Ideally, we would have the query point to the next fence value instead of the last submitted one, or we would defer query set up to happen on command list submission.
     commandList.close();
@@ -427,7 +427,7 @@ void OmmBuildQueue::SubmitAndSubscribeQuery(nvrhi::ICommandList& commandList)
     m_device->setEventQuery(m_InFlightQuery, nvrhi::CommandQueue::Graphics);
 }
 
-void OmmBuildQueue::Finalize(nvrhi::ICommandList& commandList, BuildTask& task)
+void OmmBuildQueue::finalize(nvrhi::ICommandList& commandList, BuildTask& task)
 {
     std::unique_ptr<MeshDebugData> debugData = std::make_unique<MeshDebugData>();
     debugData->ommArrayDataBuffer = task.buffers.ommArrayDataBuffer;
@@ -470,22 +470,22 @@ void OmmBuildQueue::Finalize(nvrhi::ICommandList& commandList, BuildTask& task)
     m_baker->Clear();
 }
 
-void OmmBuildQueue::BuildTask::Reset()
+void OmmBuildQueue::BuildTask::reset()
 {
     bufferInfos.clear();
 }
 
-void OmmBuildQueue::ConsumeOneTask(nvrhi::ICommandList& commandList, BuildState taskState)
+void OmmBuildQueue::consumeOneTask(nvrhi::ICommandList& commandList, BuildState taskState)
 {
     for (auto& task : m_pending)
     {
         if (task.state == taskState)
         {
-            bool finished = ExecuteTask(commandList, task);
+            bool finished = executeTask(commandList, task);
             if (finished)
             {
                 // Remove the task from the queue
-                task.Reset(); // No need to swap the whole BufferInfo vector just to pop it
+                task.reset(); // No need to swap the whole BufferInfo vector just to pop it
                 std::swap(m_pending.back(), task);
                 m_pending.pop_back();
             }
@@ -495,23 +495,23 @@ void OmmBuildQueue::ConsumeOneTask(nvrhi::ICommandList& commandList, BuildState 
     }
 }
 
-bool OmmBuildQueue::ExecuteTask(nvrhi::ICommandList& commandList, BuildTask& task)
+bool OmmBuildQueue::executeTask(nvrhi::ICommandList& commandList, BuildTask& task)
 {
     switch (task.state)
     {
     case BuildState::None:
     {
-        RunSetup(commandList, task);
+        runSetup(commandList, task);
         break;
     }
     case BuildState::Setup:
     {
-        RunBakeAndBuild(commandList, task);
+        runBakeAndBuild(commandList, task);
         break;
     }
     case BuildState::BakeAndBuild:
     {
-        Finalize(commandList, task);
+        finalize(commandList, task);
         return true;
     }
     default:
@@ -524,11 +524,11 @@ bool OmmBuildQueue::ExecuteTask(nvrhi::ICommandList& commandList, BuildTask& tas
     return false;
 }
 
-bool OmmBuildQueue::ReadyToRecordWork()
+bool OmmBuildQueue::readyToRecordWork()
 {
     if (!m_InFlightQuery)
     {
-        // Create a query to check for command list completion
+        // create a query to check for command list completion
         m_InFlightQuery = m_device->createEventQuery();
         return true;
     }
@@ -541,20 +541,20 @@ bool OmmBuildQueue::ReadyToRecordWork()
     return false;
 }
 
-void OmmBuildQueue::Update(nvrhi::ICommandList& commandList)
+void OmmBuildQueue::update(nvrhi::ICommandList& commandList)
 {
-    if (ReadyToRecordWork() && !m_pending.empty())
+    if (readyToRecordWork() && !m_pending.empty())
     {
         // Work backwards from the final state to avoid consuming consecutive states of the same task in a single frame.
-        ConsumeOneTask(commandList, BuildState::BakeAndBuild);
-        ConsumeOneTask(commandList, BuildState::Setup);
-        ConsumeOneTask(commandList, BuildState::None);
+        consumeOneTask(commandList, BuildState::BakeAndBuild);
+        consumeOneTask(commandList, BuildState::Setup);
+        consumeOneTask(commandList, BuildState::None);
 
-        SubmitAndSubscribeQuery(commandList);
+        submitAndSubscribeQuery(commandList);
     }
 }
 
-void OmmBuildQueue::QueueBuild(const BuildInput& input)
+void OmmBuildQueue::queueBuild(const BuildInput& input)
 {
     if (!input.mesh)
         return;
@@ -571,12 +571,12 @@ void OmmBuildQueue::QueueBuild(const BuildInput& input)
         m_pending.push_back(filteredInput);
 }
 
-uint32_t OmmBuildQueue::NumPendingBuilds() const
+uint32_t OmmBuildQueue::numPendingBuilds() const
 {
     return (uint32_t)m_pending.size();
 }
 
-void OmmBuildQueue::CancelPendingBuilds()
+void OmmBuildQueue::cancelPendingBuilds()
 {
     m_pending.clear();
 }

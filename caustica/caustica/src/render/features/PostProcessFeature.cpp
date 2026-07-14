@@ -23,11 +23,11 @@ namespace
         RenderFeatureContext ctx)
     {
         auto environment = ctx.renderer->getPathTracingContext().scenePasses.lighting.environment();
-        if (!environment || !environment->IsProcedural() || !ctx.settings->EnvironmentMapParams.Enabled)
+        if (!environment || !environment->isProcedural() || !ctx.settings->EnvironmentMapParams.enabled)
             return;
 
-        const std::shared_ptr<SampleProceduralSky>& sky = environment->GetProceduralSky();
-        if (!sky || !sky->IsAerialPerspectiveEnabled())
+        const std::shared_ptr<SampleProceduralSky>& sky = environment->getProceduralSky();
+        if (!sky || !sky->isAerialPerspectiveEnabled())
             return;
 
         const rg::TextureHandle depth = ctx.graph->importTexture(
@@ -43,7 +43,7 @@ namespace
             },
             [processedOutputColor, depth, sky, ctx](rg::RenderPassContext& passCtx) {
                 const dm::uint2 size = ctx.extractedView->displaySize;
-                sky->ApplyAerialPerspective(
+                sky->applyAerialPerspective(
                     passCtx.commandList(),
                     passCtx.texture(processedOutputColor),
                     passCtx.texture(depth),

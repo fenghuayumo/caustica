@@ -201,9 +201,9 @@ void AppendTransformChannels(
         scaling->AddKeyframe(sKf);
     }
 
-    scene::AddAnimationChannel(anim, scene::AnimationChannelData{ translation, target, nullptr, AnimationAttribute::Translation, {} });
-    scene::AddAnimationChannel(anim, scene::AnimationChannelData{ rotation, target, nullptr, AnimationAttribute::Rotation, {} });
-    scene::AddAnimationChannel(anim, scene::AnimationChannelData{ scaling, target, nullptr, AnimationAttribute::Scaling, {} });
+    scene::addAnimationChannel(anim, scene::AnimationChannelData{ translation, target, nullptr, AnimationAttribute::Translation, {} });
+    scene::addAnimationChannel(anim, scene::AnimationChannelData{ rotation, target, nullptr, AnimationAttribute::Rotation, {} });
+    scene::addAnimationChannel(anim, scene::AnimationChannelData{ scaling, target, nullptr, AnimationAttribute::Scaling, {} });
 }
 
 std::shared_ptr<MeshInfo> BuildMesh(
@@ -215,7 +215,7 @@ std::shared_ptr<MeshInfo> BuildMesh(
     const std::vector<uint32_t>& indices,
     bool keepDeformationIndices)
 {
-    auto mesh = factory.CreateMesh();
+    auto mesh = factory.createMesh();
     mesh->name = name;
     mesh->buffers = std::make_shared<BufferGroup>();
     auto& buffers = *mesh->buffers;
@@ -240,12 +240,12 @@ std::shared_ptr<MeshInfo> BuildMesh(
             mesh->DeformationSourcePositionIndices.push_back(uint32_t(i));
     }
 
-    auto material = factory.CreateMaterial();
+    auto material = factory.createMaterial();
     material->name = name + "_mat";
     material->baseOrDiffuseColor = color;
     material->domain = MaterialDomain::Opaque;
 
-    auto geometry = factory.CreateMeshGeometry();
+    auto geometry = factory.createMeshGeometry();
     geometry->material = material;
     geometry->objectSpaceBounds = mesh->objectSpaceBounds;
     geometry->indexOffsetInMesh = 0;
@@ -349,7 +349,7 @@ using scene::GeometrySequenceComponent;
 using scene::PerspectiveCameraData;
 using scene::CameraComponent;
 
-std::filesystem::path CausUsdImporter::ResolveCachePath(const std::filesystem::path& usdOrCachePath)
+std::filesystem::path CausUsdImporter::resolveCachePath(const std::filesystem::path& usdOrCachePath)
 {
     std::string ext = usdOrCachePath.extension().string();
     std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return char(std::tolower(c)); });
@@ -360,12 +360,12 @@ std::filesystem::path CausUsdImporter::ResolveCachePath(const std::filesystem::p
     return cache;
 }
 
-bool CausUsdImporter::EnsureCache(
+bool CausUsdImporter::ensureCache(
     const std::filesystem::path& usdPath,
     std::filesystem::path& outCachePath,
     std::string* errorMessage)
 {
-    outCachePath = ResolveCachePath(usdPath);
+    outCachePath = resolveCachePath(usdPath);
     std::string ext = usdPath.extension().string();
     std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return char(std::tolower(c)); });
     if (ext == ".caususd")
@@ -384,7 +384,7 @@ bool CausUsdImporter::EnsureCache(
     return RunPythonBake(usdPath, outCachePath, errorMessage);
 }
 
-bool CausUsdImporter::Load(
+bool CausUsdImporter::load(
     const std::filesystem::path& fileName,
     TextureLoader& /*textureCache*/,
     SceneLoadingStats& /*stats*/,
@@ -400,7 +400,7 @@ bool CausUsdImporter::Load(
         if (ext == ".usd" || ext == ".usda" || ext == ".usdc")
         {
             std::string error;
-            if (!EnsureCache(fileName, cachePath, &error))
+            if (!ensureCache(fileName, cachePath, &error))
             {
                 caustica::error("USD load failed for '%s': %s", fileName.string().c_str(), error.c_str());
                 return false;
@@ -545,7 +545,7 @@ bool CausUsdImporter::Load(
 
         if (!animation.channels.empty())
         {
-            scene::RecalculateAnimationDuration(animation);
+            scene::recalculateAnimationDuration(animation);
             ecs::Entity animEntity = world.createEntity("UsdAnimation", root);
             world.setAnimation(animEntity, std::move(animation));
         }

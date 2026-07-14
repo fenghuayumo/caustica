@@ -33,7 +33,7 @@ public:
     BindlessHandle() = default;
     explicit BindlessHandle(uint32_t raw) : m_value(raw) {}
 
-    static BindlessHandle Make(uint32_t index, uint16_t generation)
+    static BindlessHandle make(uint32_t index, uint16_t generation)
     {
         return BindlessHandle((index & 0xFFFFF) | (uint32_t(generation) << 20));
     }
@@ -72,10 +72,10 @@ public:
     ~BindlessTable();
 
     // --- New API: O(1) freelist allocation with generation tracking ---
-    [[nodiscard]] uint32_t Allocate(nvrhi::BindingSetItem item);
-    void Free(uint32_t handle);
-    void FreeDeferred(uint32_t handle);
-    void FlushDeferredFrees();
+    [[nodiscard]] uint32_t allocate(nvrhi::BindingSetItem item);
+    void free(uint32_t handle);
+    void freeDeferred(uint32_t handle);
+    void flushDeferredFrees();
     [[nodiscard]] bool isValid(uint32_t handle) const;
 
     // --- Backward-compatible API (replaces DescriptorTableManager) ---
@@ -90,13 +90,13 @@ public:
     [[nodiscard]] uint32_t getCapacity() const;
     [[nodiscard]] uint32_t getAllocatedCount() const;
 
-    // Create a typed bindless handle from a raw index.
+    // create a typed bindless handle from a raw index.
     template <typename Tag>
     [[nodiscard]] BindlessHandle<Tag> makeHandle(uint32_t index) const
     {
         if (index >= m_generationCount)
             return BindlessHandle<Tag>();
-        return BindlessHandle<Tag>::Make(index, m_generations[index].load());
+        return BindlessHandle<Tag>::make(index, m_generations[index].load());
     }
 
     // Fixed slots for common resources
@@ -104,7 +104,7 @@ public:
     static constexpr uint32_t kNormalTextureSlot = 4;
 
 private:
-    void Grow();
+    void grow();
 
     std::shared_ptr<DescriptorTableManager> m_manager;
     std::unique_ptr<std::atomic<uint16_t>[]> m_generations;

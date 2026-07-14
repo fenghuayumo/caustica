@@ -99,9 +99,9 @@ void caustica::render::WorldRenderer::populateRenderFrameContext(
     if (const std::shared_ptr<Scene> scene = m_context.sceneManager.getScene())
     {
         const uint32_t frameIndex = m_context.gpuDevice.GetRenderPhaseFrameIndex();
-        ctx.scene = &scene->GetRenderData();
-        ctx.sceneStructureChanged = scene->HasSceneStructureChanged(frameIndex);
-        ctx.sceneTransformsChanged = scene->HasSceneTransformsChanged(frameIndex);
+        ctx.scene = &scene->getRenderData();
+        ctx.sceneStructureChanged = scene->hasSceneStructureChanged(frameIndex);
+        ctx.sceneTransformsChanged = scene->hasSceneTransformsChanged(frameIndex);
     }
 }
 
@@ -158,7 +158,7 @@ void caustica::render::WorldRenderer::buildFrameGraphPasses(
 
     if (m_context.settings.EnableShaderDebug && m_shaderDebug)
     {
-        m_shaderDebug->EndFrameAndOutput(
+        m_shaderDebug->endFrameAndOutput(
             m_commandList,
             m_renderTargets->ldrFramebuffer->getFramebuffer(ctx.view.postProcessView),
             m_renderTargets->depth,
@@ -275,7 +275,7 @@ void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameCont
         for (int i = 0; i < std::size(m_nrd); i++)
             m_nrd[i] = nullptr;
     }
-    if (!m_context.settings.ActualUseStandaloneDenoiser())
+    if (!m_context.settings.actualUseStandaloneDenoiser())
     {
         for (int i = 0; i < std::size(m_nrd); i++)
             m_nrd[i] = nullptr;
@@ -305,16 +305,16 @@ void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameCont
             m_context.sceneManager.getCurrentScenePath(), GetLocalPath(c_AssetsFolder));
         m_context.diagnostics.progressInitializingRenderer.Set(5);
         if (m_context.scenePasses.lighting.opacityMaps())
-            m_context.scenePasses.lighting.opacityMaps()->CreateRenderPasses(m_bindlessLayout, m_context.renderDevice);
+            m_context.scenePasses.lighting.opacityMaps()->createRenderPasses(m_bindlessLayout, m_context.renderDevice);
         m_context.diagnostics.progressInitializingRenderer.Set(20);
     }
 
     m_context.scenePasses.rayTracing.recreateAccelStructs(m_commandList);
     m_commandList = device()->createCommandList();
 
-    if (m_context.settings.ActualUseRTXDIPasses() && m_rtxdiPass == nullptr)
+    if (m_context.settings.actualUseRTXDIPasses() && m_rtxdiPass == nullptr)
         ctx.needNewPasses = true;
-    if (!m_context.settings.ActualUseRTXDIPasses())
+    if (!m_context.settings.actualUseRTXDIPasses())
         m_rtxdiPass = nullptr;
 
     if (ctx.needNewPasses)
@@ -399,20 +399,20 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
         float fovY = atanf(tanHalfFOVY) * 2.0f;
         ctx.cameraData = BridgeCamera(
             uint(viewSize.x), uint(viewSize.y), outputAspectRatio,
-            m_context.camera.camera().GetPosition(),
-            m_context.camera.camera().GetDir(),
-            m_context.camera.camera().GetUp(),
+            m_context.camera.camera().getPosition(),
+            m_context.camera.camera().getDir(),
+            m_context.camera.camera().getUp(),
             fovY, m_context.camera.zNear(), 1e7f,
             m_context.settings.CameraFocalDistance, m_context.settings.CameraAperture, jitter);
     }
 
     if ((ctx.needNewPasses || ctx.needNewBindings || m_bindingSet == nullptr) && m_shaderDebug)
-        m_shaderDebug->CreateRenderPasses(framebuffer, m_renderTargets->depth);
+        m_shaderDebug->createRenderPasses(framebuffer, m_renderTargets->depth);
 
     if (m_context.settings.EnableShaderDebug && m_shaderDebug)
     {
         dm::float4x4 viewProj = m_context.camera.view()->getViewProjectionMatrix();
-        m_shaderDebug->BeginFrame(m_commandList, viewProj);
+        m_shaderDebug->beginFrame(m_commandList, viewProj);
     }
 
     UpdateSceneGeometryParams geoParams{
@@ -438,7 +438,7 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
     if (m_rtxdiPass != nullptr)
     {
         if (ctx.needNewPasses || ctx.needNewBindings || m_bindingSet == nullptr)
-            m_rtxdiPass->Reset();
+            m_rtxdiPass->reset();
         rtxdiSetupFrame(framebuffer, ctx.cameraData, m_renderSize);
         abortIfSubmitFailed(ctx, "rtxdiSetupFrame");
         if (ctx.aborted)
@@ -483,7 +483,7 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
 void caustica::render::WorldRenderer::framePassPathTracePrepare(PathTracingFrameContext& ctx)
 {
     if (m_toneMappingPass != nullptr)
-        m_toneMappingPass->PreRender(m_context.settings.ToneMappingParams);
+        m_toneMappingPass->preRender(m_context.settings.ToneMappingParams);
     preUpdatePathTracing(ctx.needNewPasses, m_commandList);
 
     abortIfSubmitFailed(ctx, "preUpdatePathTracing");
@@ -502,7 +502,7 @@ void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext
     }
 
     if (m_toneMappingPass != nullptr && m_context.settings.EnableToneMapping)
-        m_toneMappingPass->PreRender(m_context.settings.ToneMappingParams);
+        m_toneMappingPass->preRender(m_context.settings.ToneMappingParams);
 
     updatePathTracerConstants(constants.ptConsts, ctx.cameraData);
     constants.MaterialCount = m_context.scenePasses.lighting.materials()->getMaterialDataCount();
@@ -513,7 +513,7 @@ void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext
         uint32_t(m_frameIndex & 0xffffffffu));
 
     constants.envMapSceneParams = m_context.scenePasses.lighting.envMapSceneParams();
-    constants.envMapImportanceSamplingParams = m_context.scenePasses.lighting.environment()->GetImportanceSampling()->GetShaderParams();
+    constants.envMapImportanceSamplingParams = m_context.scenePasses.lighting.environment()->getImportanceSampling()->getShaderParams();
 
     PlanarViewConstants view;
     m_context.camera.view()->fillPlanarViewConstants(view);
@@ -664,10 +664,10 @@ void caustica::render::WorldRenderer::framePassFinalize(PathTracingFrameContext&
     }
 
     if (m_temporalAntiAliasingPass != nullptr)
-        m_temporalAntiAliasingPass->AdvanceFrame();
+        m_temporalAntiAliasingPass->advanceFrame();
 
     m_context.camera.swapViews();
-    m_context.gpuDevice.SetVsyncEnabled(m_context.settings.ActualEnableVsync());
+    m_context.gpuDevice.SetVsyncEnabled(m_context.settings.actualEnableVsync());
 
     postUpdatePathTracing();
 }

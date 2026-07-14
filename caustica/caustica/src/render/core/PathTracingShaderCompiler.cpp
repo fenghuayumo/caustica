@@ -580,7 +580,7 @@ void PathTracingShaderCompiler::update(const std::shared_ptr<caustica::Scene>& s
         m_perSubInstanceHitGroup.clear();
         m_perSubInstanceHitGroup.assign(subInstanceCount, ComputeDefaultSubInstanceHitGroupInfo(*getMaterialGpuCache()));
         size_t compactedGeometryInstanceIndex = 0;
-        for (const scene::MeshInstanceRenderProxy& proxy : scene->GetRenderData().meshInstances)
+        for (const scene::MeshInstanceRenderProxy& proxy : scene->getRenderData().meshInstances)
         {
             if (!proxy.mesh)
                 continue;

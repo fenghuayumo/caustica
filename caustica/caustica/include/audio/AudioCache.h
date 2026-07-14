@@ -74,12 +74,12 @@ public:
     AudioCache(std::shared_ptr<caustica::IFileSystem> fs);
 
     // Release all cached audio files
-    void Reset();
+    void reset();
 
 public:
 
     // Synchronous read
-    std::shared_ptr<AudioData const> LoadFromFile(const std::filesystem::path & path);
+    std::shared_ptr<AudioData const> loadFromFile(const std::filesystem::path & path);
 
     // Asynchronous read
     std::shared_ptr<AudioData const> LoadFromFileAsync(const std::filesystem::path & path, ThreadPool& threadPool);

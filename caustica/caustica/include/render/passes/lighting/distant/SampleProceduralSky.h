@@ -24,9 +24,9 @@ public:
         std::shared_ptr<caustica::ShaderFactory> shaderFactory);
     ~SampleProceduralSky() = default;
 
-    nvrhi::TextureHandle GetTransmittanceTexture() const { return m_transmittanceLut; }
-    nvrhi::TextureHandle GetSkyViewTexture() const { return m_skyViewLut; }
-    bool Update(
+    nvrhi::TextureHandle getTransmittanceTexture() const { return m_transmittanceLut; }
+    nvrhi::TextureHandle getSkyViewTexture() const { return m_skyViewLut; }
+    bool update(
         nvrhi::ICommandList* commandList,
         double sceneTime,
         ProceduralSkyConstants& outConstants,
@@ -34,11 +34,11 @@ public:
         bool forceInstantUpdate);
 
     // Returns true if any tuned parameter changed (caller should reset accumulation).
-    bool DebugGUI(float indent);
-    void ReloadShaders(std::shared_ptr<caustica::ShaderFactory> shaderFactory);
+    bool debugGUI(float indent);
+    void reloadShaders(std::shared_ptr<caustica::ShaderFactory> shaderFactory);
 
-    bool IsAerialPerspectiveEnabled() const { return m_aerialPerspectiveEnabled; }
-    void ApplyAerialPerspective(
+    bool isAerialPerspectiveEnabled() const { return m_aerialPerspectiveEnabled; }
+    void applyAerialPerspective(
         nvrhi::ICommandList* commandList,
         nvrhi::ITexture* color,
         nvrhi::ITexture* depth,
@@ -50,11 +50,11 @@ public:
         const float3& environmentRotationDeg);
 
 private:
-    void CreateLutResources();
-    void FillEarthAtmosphere(AtmosphereParameters& atm) const;
-    void DispatchLutPasses(nvrhi::ICommandList* commandList, const ProceduralSkyConstants& consts, bool rebuildAtmosphereLuts, bool rebuildSkyView);
-    float3 ComputeSunDirection(float elevationDeg, float azimuthDeg) const;
-    void ApplySunPreset(float elevationDeg, float azimuthDeg);
+    void createLutResources();
+    void fillEarthAtmosphere(AtmosphereParameters& atm) const;
+    void dispatchLutPasses(nvrhi::ICommandList* commandList, const ProceduralSkyConstants& consts, bool rebuildAtmosphereLuts, bool rebuildSkyView);
+    float3 computeSunDirection(float elevationDeg, float azimuthDeg) const;
+    void applySunPreset(float elevationDeg, float azimuthDeg);
 
     double m_lastSceneTime = 0.0;
 

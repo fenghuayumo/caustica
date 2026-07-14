@@ -279,7 +279,7 @@ void RenderTargets::init(
     }
 #endif
 
-    // === Reflection System Render Targets ===
+    // === Reflection System render Targets ===
     {
         // Local cubemap for ray-traced environment probe
         nvrhi::TextureDesc cubeDesc;

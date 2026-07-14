@@ -56,13 +56,13 @@ namespace caustica::render
             const std::shared_ptr<caustica::FramebufferFactory>& framebufferFactory,
             const caustica::ICompositeView& compositeView);
 
-        void Render(
+        void render(
             nvrhi::ICommandList* commandList,
             const caustica::ICompositeView& compositeView,
             const caustica::DirectionalLight& light,
             const SkyParameters& params) const;
 
-        static void FillShaderParameters(
+        static void fillShaderParameters(
             const caustica::DirectionalLight& light,
             const SkyParameters& input,
             ProceduralSkyShaderParameters& output);

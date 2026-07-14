@@ -52,7 +52,7 @@ PlanarShadowMap::PlanarShadowMap(
     m_View->setArraySlice(arraySlice);
 }
 
-bool PlanarShadowMap::SetupWholeSceneDirectionalLightView(const DirectionalLight& light, box3_arg sceneBounds, float fadeRangeWorld)
+bool PlanarShadowMap::setupWholeSceneDirectionalLightView(const DirectionalLight& light, box3_arg sceneBounds, float fadeRangeWorld)
 {
     daffine3 viewToWorld = light.cachedGlobalTransform;
     viewToWorld = dm::scaling(dm::double3(1.0, 1.0, -1.0)) * viewToWorld;
@@ -89,7 +89,7 @@ bool PlanarShadowMap::SetupWholeSceneDirectionalLightView(const DirectionalLight
     return viewIsModified;
 }
 
-bool PlanarShadowMap::SetupDynamicDirectionalLightView(const DirectionalLight& light, float3 anchor, float3 halfShadowBoxSize, float3 preViewTranslation, float fadeRangeWorld)
+bool PlanarShadowMap::setupDynamicDirectionalLightView(const DirectionalLight& light, float3 anchor, float3 halfShadowBoxSize, float3 preViewTranslation, float fadeRangeWorld)
 {
     daffine3 viewToWorld = light.cachedGlobalTransform;
     // Zero the translation component to ignore where the actual light scene node is located, we only care about direction
@@ -104,7 +104,7 @@ bool PlanarShadowMap::SetupDynamicDirectionalLightView(const DirectionalLight& l
     anchorView.xy() = float2(round(anchorView.xy() / texelSize)) * texelSize; // why doesn't it compile without float2(...) ?
     float3 center = float3(viewToWorld.transformPoint(double3(anchorView))) + preViewTranslation;
 
-    // Make sure we didn't move the anchor too far
+    // make sure we didn't move the anchor too far
     assert(length(center - anchor) < max(texelSize.x, texelSize.y) * 2);
 
     worldToView = translation(-center) * worldToView;
@@ -128,7 +128,7 @@ bool PlanarShadowMap::SetupDynamicDirectionalLightView(const DirectionalLight& l
     return viewIsModified;
 }
 
-void PlanarShadowMap::SetupProxyView()
+void PlanarShadowMap::setupProxyView()
 {
     affine3 viewToWorld = lookatZ(float3(0, 1, 0), float3(0, 0, 1));
     affine3 worldToView = transpose(viewToWorld);
@@ -139,12 +139,12 @@ void PlanarShadowMap::SetupProxyView()
     m_View->updateCache();
 }
 
-void PlanarShadowMap::SetLitOutOfBounds(bool litOutOfBounds)
+void PlanarShadowMap::setLitOutOfBounds(bool litOutOfBounds)
 {
     m_IsLitOutOfBounds = litOutOfBounds;
 }
 
-void PlanarShadowMap::SetFalloffDistance(float distance)
+void PlanarShadowMap::setFalloffDistance(float distance)
 {
     m_FalloffDistance = distance;
 }
@@ -154,7 +154,7 @@ std::shared_ptr<PlanarView> PlanarShadowMap::getPlanarView()
     return m_View;
 }
 
-dm::float4x4 PlanarShadowMap::GetWorldToUvzwMatrix() const
+dm::float4x4 PlanarShadowMap::getWorldToUvzwMatrix() const
 {
     // Calculate alternate matrix that maps to [0, 1] UV space instead of [-1, 1] clip space
     float4x4 matClipToUvzw =
@@ -168,43 +168,43 @@ dm::float4x4 PlanarShadowMap::GetWorldToUvzwMatrix() const
     return m_View->getViewProjectionMatrix() * matClipToUvzw;
 }
 
-const ICompositeView& PlanarShadowMap::GetView() const
+const ICompositeView& PlanarShadowMap::getView() const
 {
     return *m_View;
 }
 
-nvrhi::ITexture* PlanarShadowMap::GetTexture() const
+nvrhi::ITexture* PlanarShadowMap::getTexture() const
 {
     return m_ShadowMapTexture;
 }
 
-uint32_t PlanarShadowMap::GetNumberOfCascades() const
+uint32_t PlanarShadowMap::getNumberOfCascades() const
 {
     return 1;
 }
 
-const IShadowMap* PlanarShadowMap::GetCascade(uint32_t index) const
+const IShadowMap* PlanarShadowMap::getCascade(uint32_t index) const
 {
     return this;
 }
 
-uint32_t PlanarShadowMap::GetNumberOfPerObjectShadows() const
+uint32_t PlanarShadowMap::getNumberOfPerObjectShadows() const
 {
     return 0;
 }
 
-const IShadowMap* PlanarShadowMap::GetPerObjectShadow(uint32_t index) const
+const IShadowMap* PlanarShadowMap::getPerObjectShadow(uint32_t index) const
 {
     return nullptr;
 }
 
-dm::int2 PlanarShadowMap::GetTextureSize() const
+dm::int2 PlanarShadowMap::getTextureSize() const
 {
     const nvrhi::TextureDesc& textureDesc = m_ShadowMapTexture->getDesc();
     return int2(textureDesc.width, textureDesc.height);
 }
 
-dm::box2 PlanarShadowMap::GetUVRange() const
+dm::box2 PlanarShadowMap::getUVRange() const
 {
     const ViewportStateDesc viewportState = m_View->getViewportState();
     const ViewportDesc& viewport = viewportState.viewports[0];
@@ -216,31 +216,31 @@ dm::box2 PlanarShadowMap::GetUVRange() const
         (bottomRight - 1.f) / m_TextureSize);
 }
 
-dm::float2 PlanarShadowMap::GetFadeRangeInTexels() const
+dm::float2 PlanarShadowMap::getFadeRangeInTexels() const
 {
     return m_FadeRangeTexels;
 }
 
-bool PlanarShadowMap::IsLitOutOfBounds() const
+bool PlanarShadowMap::isLitOutOfBounds() const
 {
     return m_IsLitOutOfBounds;
 }
 
-void PlanarShadowMap::FillShadowConstants(struct ShadowConstants& constants) const
+void PlanarShadowMap::fillShadowConstants(struct ShadowConstants& constants) const
 {
-    constants.matWorldToUvzwShadow = GetWorldToUvzwMatrix();
+    constants.matWorldToUvzwShadow = getWorldToUvzwMatrix();
     constants.shadowMapArrayIndex = m_View->getSubresources().baseArraySlice;
-    box2 uvRange = GetUVRange();
-    float2 fadeUV = GetFadeRangeInTexels() / m_TextureSize;
+    box2 uvRange = getUVRange();
+    float2 fadeUV = getFadeRangeInTexels() / m_TextureSize;
     constants.shadowMapCenterUV = uvRange.center();
     constants.shadowFadeBias = uvRange.diagonal() / (2.f * fadeUV);
     constants.shadowFadeScale = -1.f / fadeUV;
     constants.shadowFalloffDistance = m_FalloffDistance;
-    constants.shadowMapSizeTexels = float2(GetTextureSize());
+    constants.shadowMapSizeTexels = float2(getTextureSize());
     constants.shadowMapSizeTexelsInv = 1.f / constants.shadowMapSizeTexels;
 }
 
-void PlanarShadowMap::Clear(nvrhi::ICommandList* commandList)
+void PlanarShadowMap::clear(nvrhi::ICommandList* commandList)
 {
     commandList->clearTextureFloat(m_ShadowMapTexture, toNvrhi(m_View->getSubresources()), nvrhi::Color(1.f));
 }

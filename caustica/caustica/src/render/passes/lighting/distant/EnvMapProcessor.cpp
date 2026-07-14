@@ -14,7 +14,7 @@
 #include <render/core/ScopedPerfMarker.h>
 #include <render/core/TextureUtils.h>
 
-#include <render/core/BindingCache.h>
+#include <render/core/bindingCache.h>
 #include <assets/loader/ShaderFactory.h>
 #include <render/core/FramebufferFactory.h>
 #include <render/core/RenderPassConstants.h>
@@ -48,17 +48,17 @@ EnvMapProcessor::EnvMapProcessor( nvrhi::IDevice* device, std::shared_ptr<causti
 
 EnvMapProcessor::~EnvMapProcessor()
 {
-    UnloadSourceBackgrounds();
+    unloadSourceBackgrounds();
 }
 
-void EnvMapProcessor::CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebug, std::shared_ptr<caustica::ShaderFactory> shaderFactory, std::shared_ptr<ComputePipelineRegistry> computePipelineRegistry)
+void EnvMapProcessor::createRenderPasses(std::shared_ptr<ShaderDebug> shaderDebug, std::shared_ptr<caustica::ShaderFactory> shaderFactory, std::shared_ptr<ComputePipelineRegistry> computePipelineRegistry)
 {
     m_importanceSamplingCache = nullptr;
     m_shaderDebug = shaderDebug;
     m_shaderFactory = shaderFactory;
     m_computePipelineRegistry = computePipelineRegistry;
     if (m_proceduralSky)
-        m_proceduralSky->ReloadShaders(shaderFactory);
+        m_proceduralSky->reloadShaders(shaderFactory);
 
     // Release existing compute shader variants from the baker
     if (m_computePipelineRegistry && m_enableRasterPrecompute)
@@ -77,7 +77,7 @@ void EnvMapProcessor::CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebu
     m_baseLayerPSO = m_MIPReducePSO = m_BC6UCompressLowPSO = m_BC6UCompressHighPSO = nullptr;
     m_pointSampler = m_linearSampler = m_linearClampSampler = m_equiRectSampler = nullptr;
     
-    // Reset new processing shaders
+    // reset new processing shaders
     m_brdfLUTCS = nullptr;
     m_brdfLUTPSO = nullptr;
     m_brdfLUTBindingLayout = m_ggxPrefilterBindingLayout = m_irradianceConvolveBindingLayout = nullptr;
@@ -157,7 +157,7 @@ void EnvMapProcessor::CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebu
     m_equiRectSampler = m_device->createSampler(samplerDesc);
 
     m_importanceSamplingCache = std::make_shared<EnvMapImportanceSamplingCache>(m_device, shaderFactory);
-    m_importanceSamplingCache->CreateRenderPasses();
+    m_importanceSamplingCache->createRenderPasses();
 
     if (m_BC6UCompressionEnabled)
     {
@@ -204,7 +204,7 @@ void EnvMapProcessor::CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebu
         m_brdfLUTConstantBuffer = m_device->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(
             sizeof(BRDFLUTConstants), "BRDFLUTConstants", caustica::c_MaxRenderPassConstantBufferVersions));
         
-        // Create BRDF LUT texture
+        // create BRDF LUT texture
         nvrhi::TextureDesc lutDesc;
         lutDesc.width = c_BRDFLUTSize;
         lutDesc.height = c_BRDFLUTSize;
@@ -270,7 +270,7 @@ void EnvMapProcessor::CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebu
     m_brdfLUTGenerated = false; // Force BRDF LUT regeneration
 }
 
-void EnvMapProcessor::UnloadSourceBackgrounds()
+void EnvMapProcessor::unloadSourceBackgrounds()
 {
     if (m_loadedSourceBackgroundTextureEquirect != nullptr)
         m_textureCache->unloadTexture(m_loadedSourceBackgroundTextureEquirect);
@@ -281,7 +281,7 @@ void EnvMapProcessor::UnloadSourceBackgrounds()
     m_loadedSourceBackgroundPath = "";
 }
 
-void EnvMapProcessor::InitBuffers(uint cubeDim)
+void EnvMapProcessor::initBuffers(uint cubeDim)
 {
     m_cubeDim = cubeDim;
 
@@ -344,13 +344,13 @@ bool isnear(EMB_DirectionalLight const & a, EMB_DirectionalLight const & b)
         dm::all(dm::isnear( a.Direction, b.Direction ));
 }
 
-int EnvMapProcessor::GetTargetCubeResolution() const     
+int EnvMapProcessor::getTargetCubeResolution() const     
 { 
-    assert( m_targetResolution != 0 ); // PreUpdate() needs to be called to establish this value early
+    assert( m_targetResolution != 0 ); // preUpdate() needs to be called to establish this value early
     return m_targetResolution; 
 }
 
-void EnvMapProcessor::PreUpdate(nvrhi::ICommandList* commandList, caustica::render::RenderDevice& renderDevice, std::string envMapBackgroundPath, const std::filesystem::path& sceneDirectory)
+void EnvMapProcessor::preUpdate(nvrhi::ICommandList* commandList, caustica::render::RenderDevice& renderDevice, std::string envMapBackgroundPath, const std::filesystem::path& sceneDirectory)
 {
     if( m_device->getGraphicsAPI() == nvrhi::GraphicsAPI::VULKAN && m_BC6UCompressionEnabled )
     {
@@ -358,7 +358,7 @@ void EnvMapProcessor::PreUpdate(nvrhi::ICommandList* commandList, caustica::rend
         m_BC6UCompressionEnabled = false;
     }
 
-    bool proceduralSkyEnabled = IsProceduralSky( envMapBackgroundPath.c_str() );
+    bool proceduralSkyEnabled = isProceduralSky( envMapBackgroundPath.c_str() );
 
     if (m_targetResolution == 0)
         m_targetResolution = (proceduralSkyEnabled) ? (1024) : (2048);
@@ -373,14 +373,14 @@ void EnvMapProcessor::PreUpdate(nvrhi::ICommandList* commandList, caustica::rend
     {
         newBuffers = true;
         m_renderPassesDirty = true;
-        InitBuffers(m_targetResolution);
+        initBuffers(m_targetResolution);
     }
-    m_importanceSamplingCache->PreUpdate(m_cubemap, newBuffers);
+    m_importanceSamplingCache->preUpdate(m_cubemap, newBuffers);
 
-    // Load static (background) environment map or procedural sky if enabled
+    // load static (background) environment map or procedural sky if enabled
     if (m_sourceBackgroundPath != m_loadedSourceBackgroundPath)
     {
-        UnloadSourceBackgrounds();
+        unloadSourceBackgrounds();
         m_loadedSourceBackgroundPath = m_sourceBackgroundPath;
 
         if (!proceduralSkyEnabled)
@@ -415,14 +415,14 @@ void EnvMapProcessor::PreUpdate(nvrhi::ICommandList* commandList, caustica::rend
     }
 }
 
-bool EnvMapProcessor::Update(nvrhi::ICommandList* commandList, caustica::BindingCache & bindingCache, caustica::render::RenderDevice& renderDevice, const UpdateSettings & _settings, double sceneTime, EMB_DirectionalLight const * directionalLights, uint directionaLightCount, bool forceInstantUpdate)
+bool EnvMapProcessor::update(nvrhi::ICommandList* commandList, caustica::BindingCache & bindingCache, caustica::render::RenderDevice& renderDevice, const UpdateSettings & _settings, double sceneTime, EMB_DirectionalLight const * directionalLights, uint directionaLightCount, bool forceInstantUpdate)
 {
     UpdateSettings settings = _settings;
 
     bool contentsChanged = m_dbgForceDynamic || m_renderPassesDirty;
     m_renderPassesDirty = false;
 
-    bool proceduralSkyEnabled = IsProceduralSky( m_sourceBackgroundPath.c_str() );
+    bool proceduralSkyEnabled = isProceduralSky( m_sourceBackgroundPath.c_str() );
 
     if (m_dbgSaveBaked != "") // re-bake if saving
     {
@@ -446,7 +446,7 @@ bool EnvMapProcessor::Update(nvrhi::ICommandList* commandList, caustica::Binding
 
     ProceduralSkyConstants procSkyConsts; memset(&procSkyConsts, 0, sizeof(procSkyConsts));
     if (m_proceduralSky != nullptr && proceduralSkyEnabled)
-        contentsChanged |= m_proceduralSky->Update(commandList, sceneTime, procSkyConsts, m_sourceBackgroundPath, forceInstantUpdate);
+        contentsChanged |= m_proceduralSky->update(commandList, sceneTime, procSkyConsts, m_sourceBackgroundPath, forceInstantUpdate);
 
     if (!contentsChanged)
         return contentsChanged;
@@ -496,15 +496,15 @@ bool EnvMapProcessor::Update(nvrhi::ICommandList* commandList, caustica::Binding
             nvrhi::BindingSetItem::Texture_UAV(1, m_cubemap, nvrhi::Format::UNKNOWN, nvrhi::TextureSubresourceSet(1, 1, 0, 6)).setDimension(nvrhi::TextureDimension::Texture2DArray),
             nvrhi::BindingSetItem::Texture_SRV(0, (m_loadedSourceBackgroundTextureEquirect != nullptr) ? (m_loadedSourceBackgroundTextureEquirect->gpu.texture) : ((nvrhi::TextureHandle)renderDevice.builtins().blackTexture().Get())),
             sourceCubemapBinding,
-            nvrhi::BindingSetItem::Texture_SRV(10, (m_proceduralSky != nullptr && proceduralSkyEnabled) ? (m_proceduralSky->GetTransmittanceTexture()) : ((nvrhi::TextureHandle)renderDevice.builtins().blackTexture().Get())),
-            nvrhi::BindingSetItem::Texture_SRV(12, (m_proceduralSky != nullptr && proceduralSkyEnabled) ? (m_proceduralSky->GetSkyViewTexture()) : ((nvrhi::TextureHandle)renderDevice.builtins().blackTexture().Get())),
+            nvrhi::BindingSetItem::Texture_SRV(10, (m_proceduralSky != nullptr && proceduralSkyEnabled) ? (m_proceduralSky->getTransmittanceTexture()) : ((nvrhi::TextureHandle)renderDevice.builtins().blackTexture().Get())),
+            nvrhi::BindingSetItem::Texture_SRV(12, (m_proceduralSky != nullptr && proceduralSkyEnabled) ? (m_proceduralSky->getSkyViewTexture()) : ((nvrhi::TextureHandle)renderDevice.builtins().blackTexture().Get())),
             //nvrhi::BindingSetItem::Texture_UAV(0, m_Cubemap),
             nvrhi::BindingSetItem::Sampler(0, m_pointSampler),
             nvrhi::BindingSetItem::Sampler(1, m_linearSampler),
             nvrhi::BindingSetItem::Sampler(2, m_equiRectSampler),
             nvrhi::BindingSetItem::Sampler(3, m_linearClampSampler),
-            nvrhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->GetGPUWriteBuffer()),
-            nvrhi::BindingSetItem::Texture_UAV(SHADER_DEBUG_VIZ_TEXTURE_UAV_INDEX, m_shaderDebug->GetDebugVizTexture()),
+            nvrhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->getGPUWriteBuffer()),
+            nvrhi::BindingSetItem::Texture_UAV(SHADER_DEBUG_VIZ_TEXTURE_UAV_INDEX, m_shaderDebug->getDebugVizTexture()),
     };
     nvrhi::BindingSetHandle bindingSetBake = bindingCache.getOrCreateBindingSet(bindingSetDesc, m_commonBindingLayout);
 
@@ -544,8 +544,8 @@ bool EnvMapProcessor::Update(nvrhi::ICommandList* commandList, caustica::Binding
                     nvrhi::BindingSetItem::Sampler(0, m_pointSampler),
                     nvrhi::BindingSetItem::Sampler(1, m_linearSampler),
                     nvrhi::BindingSetItem::Sampler(2, m_equiRectSampler),
-                    nvrhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->GetGPUWriteBuffer()),
-                    nvrhi::BindingSetItem::Texture_UAV(SHADER_DEBUG_VIZ_TEXTURE_UAV_INDEX, m_shaderDebug->GetDebugVizTexture()),
+                    nvrhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->getGPUWriteBuffer()),
+                    nvrhi::BindingSetItem::Texture_UAV(SHADER_DEBUG_VIZ_TEXTURE_UAV_INDEX, m_shaderDebug->getDebugVizTexture()),
             };
             nvrhi::BindingSetHandle localBindingSet = bindingCache.getOrCreateBindingSet(localBindingSetDesc, m_reduceBindingLayout);
         
@@ -608,7 +608,7 @@ bool EnvMapProcessor::Update(nvrhi::ICommandList* commandList, caustica::Binding
     else
         m_outputIsCompressed = false;
 
-    m_importanceSamplingCache->Update(commandList, m_cubemap);
+    m_importanceSamplingCache->update(commandList, m_cubemap);
 
     m_versionID++; 
 
@@ -664,7 +664,7 @@ std::string CubeResToString(uint res)
     return resRet;
 }
 
-bool EnvMapProcessor::DebugGUI(float indent)
+bool EnvMapProcessor::debugGUI(float indent)
 {
     bool resetAccumulation = false;
     #define IMAGE_QUALITY_OPTION(code) do{if (code) resetAccumulation = true;} while(false)
@@ -712,12 +712,12 @@ bool EnvMapProcessor::DebugGUI(float indent)
     return resetAccumulation;
 }
 
-bool EnvMapProcessor::GenerateBRDFLUT(nvrhi::ICommandList* commandList, caustica::BindingCache& bindingCache)
+bool EnvMapProcessor::generateBRDFLUT(nvrhi::ICommandList* commandList, caustica::BindingCache& bindingCache)
 {
     if (!m_enableRasterPrecompute || m_brdfLUTGenerated)
         return false;
     
-    RAII_SCOPE(commandList->beginMarker("GenerateBRDFLUT");, commandList->endMarker(););
+    RAII_SCOPE(commandList->beginMarker("generateBRDFLUT");, commandList->endMarker(););
     
     BRDFLUTConstants consts;
     consts.LUTSize = c_BRDFLUTSize;
@@ -746,7 +746,7 @@ bool EnvMapProcessor::GenerateBRDFLUT(nvrhi::ICommandList* commandList, caustica
     return true;
 }
 
-void EnvMapProcessor::GGXPrefilterCubemap(nvrhi::ICommandList* commandList, caustica::BindingCache& bindingCache, 
+void EnvMapProcessor::ggxPrefilterCubemap(nvrhi::ICommandList* commandList, caustica::BindingCache& bindingCache, 
     nvrhi::TextureHandle srcCubemap, nvrhi::TextureHandle dstCubemap)
 {
     if (!m_enableRasterPrecompute)
@@ -803,7 +803,7 @@ void EnvMapProcessor::GGXPrefilterCubemap(nvrhi::ICommandList* commandList, caus
     }
 }
 
-void EnvMapProcessor::ConvolveDiffuseIrradiance(nvrhi::ICommandList* commandList, caustica::BindingCache& bindingCache,
+void EnvMapProcessor::convolveDiffuseIrradiance(nvrhi::ICommandList* commandList, caustica::BindingCache& bindingCache,
     nvrhi::TextureHandle srcCubemap, nvrhi::TextureHandle dstCubemap)
 {
     if (!m_enableRasterPrecompute)
@@ -837,17 +837,17 @@ void EnvMapProcessor::ConvolveDiffuseIrradiance(nvrhi::ICommandList* commandList
     commandList->setComputeState(state);
     commandList->setPushConstants(&consts, sizeof(IrradianceConvolveConstants));
     
-    // Dispatch once per face - 1024 threads per group, one group per face (32x32 resolution)
+    // dispatch once per face - 1024 threads per group, one group per face (32x32 resolution)
     commandList->dispatch(1, 1, 6);
 }
 
-void EnvMapProcessor::GenerateCubemapMips(nvrhi::ICommandList* commandList, caustica::BindingCache& bindingCache, 
+void EnvMapProcessor::generateCubemapMips(nvrhi::ICommandList* commandList, caustica::BindingCache& bindingCache, 
     nvrhi::TextureHandle cubemap)
 {
     // Reuse the existing MIPReduceCS for solid-angle weighted mip generation
-    RAII_SCOPE(commandList->beginMarker("GenerateCubemapMips");, commandList->endMarker(););
+    RAII_SCOPE(commandList->beginMarker("generateCubemapMips");, commandList->endMarker(););
     
-    // Write dummy constants (MIPReduceCS doesn't actually read them, but binding layout requires it)
+    // write dummy constants (MIPReduceCS doesn't actually read them, but binding layout requires it)
     EnvMapProcessorConstants dummyConsts = {};
     commandList->writeBuffer(m_constantBuffer, &dummyConsts, sizeof(dummyConsts));
     
@@ -864,8 +864,8 @@ void EnvMapProcessor::GenerateCubemapMips(nvrhi::ICommandList* commandList, caus
             nvrhi::BindingSetItem::Sampler(0, m_pointSampler),
             nvrhi::BindingSetItem::Sampler(1, m_linearSampler),
             nvrhi::BindingSetItem::Sampler(2, m_equiRectSampler),
-            nvrhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->GetGPUWriteBuffer()),
-            nvrhi::BindingSetItem::Texture_UAV(SHADER_DEBUG_VIZ_TEXTURE_UAV_INDEX, m_shaderDebug->GetDebugVizTexture()),
+            nvrhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->getGPUWriteBuffer()),
+            nvrhi::BindingSetItem::Texture_UAV(SHADER_DEBUG_VIZ_TEXTURE_UAV_INDEX, m_shaderDebug->getDebugVizTexture()),
         };
         nvrhi::BindingSetHandle localBindingSet = bindingCache.getOrCreateBindingSet(localBindingSetDesc, m_reduceBindingLayout);
         
@@ -882,32 +882,32 @@ void EnvMapProcessor::GenerateCubemapMips(nvrhi::ICommandList* commandList, caus
     }
 }
 
-void EnvMapProcessor::ProcessCubemap(
+void EnvMapProcessor::processCubemap(
     nvrhi::ICommandList* commandList,
     caustica::BindingCache& bindingCache,
     nvrhi::TextureHandle sourceCubemap,
     const CubemapProcessingOptions& options,
     const CubemapProcessingResults& results)
 {
-    RAII_SCOPE(commandList->beginMarker("ProcessCubemap");, commandList->endMarker(););
+    RAII_SCOPE(commandList->beginMarker("processCubemap");, commandList->endMarker(););
     
     // Generate mips for source if needed
     if (options.generateMips)
     {
-        GenerateCubemapMips(commandList, bindingCache, sourceCubemap);
+        generateCubemapMips(commandList, bindingCache, sourceCubemap);
     }
     
     // GGX pre-filtering for specular
     if (options.ggxPrefilter)
     {
         assert(results.filteredCubemap);
-        GGXPrefilterCubemap(commandList, bindingCache, sourceCubemap, results.filteredCubemap);
+        ggxPrefilterCubemap(commandList, bindingCache, sourceCubemap, results.filteredCubemap);
     }
     
     // SH-based diffuse irradiance
     if (options.projectToSH)
     {
         assert(results.diffuseIrradianceCube);
-        ConvolveDiffuseIrradiance(commandList, bindingCache, sourceCubemap, results.diffuseIrradianceCube);
+        convolveDiffuseIrradiance(commandList, bindingCache, sourceCubemap, results.diffuseIrradianceCube);
     }
 }

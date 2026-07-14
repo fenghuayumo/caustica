@@ -33,7 +33,7 @@ namespace caustica
 
         // Adds a reference to the specified resource.
         // Returns true if this is the first reference, i.e. if the resource has just been added to the tracker.
-        bool AddRef(const std::shared_ptr<T>& resource)
+        bool addRef(const std::shared_ptr<T>& resource)
         {
             if (!resource) return false;
             uint32_t refCount = ++m_Map[resource];
@@ -42,7 +42,7 @@ namespace caustica
 
         // Removes a reference from the specified resource.
         // Returns true if this was the last reference, i.e. if the resource has just been removed from the tracker.
-        bool Release(const std::shared_ptr<T>& resource)
+        bool release(const std::shared_ptr<T>& resource)
         {
             if (!resource) return false;
             auto it = m_Map.find(resource);

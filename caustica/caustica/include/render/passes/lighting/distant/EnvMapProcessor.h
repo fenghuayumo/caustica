@@ -46,7 +46,7 @@ class ComputePipelineRegistry;
 class ComputeShaderVariant;
 
 // This is used to bake the cubemap with the given inputs. Inputs can be equirectangular envmap image or procedural sky, and directional lights.
-// Also provides shared cubemap processing functionality (mips, GGX filtering, SH projection) via ProcessCubemap().
+// Also provides shared cubemap processing functionality (mips, GGX filtering, SH projection) via processCubemap().
 class EnvMapProcessor 
 {
 public:
@@ -60,7 +60,7 @@ public:
         //BakeSettings(const float envMapRadianceScale) : EnvMapRadianceScale(envMapRadianceScale) {}
     };
 
-    // Options for ProcessCubemap() - shared cubemap processing
+    // Options for processCubemap() - shared cubemap processing
     struct CubemapProcessingOptions
     {
         bool generateMips = true;           // Solid-angle weighted mip chain
@@ -70,7 +70,7 @@ public:
         bool generateImportanceMap = false; // For path tracer importance sampling
     };
 
-    // Results from ProcessCubemap() - caller provides the destination textures
+    // Results from processCubemap() - caller provides the destination textures
     struct CubemapProcessingResults
     {
         nvrhi::TextureHandle filteredCubemap;       // GGX-filtered mip chain (for specular)
@@ -86,37 +86,37 @@ public:
     EnvMapProcessor( nvrhi::IDevice* device, std::shared_ptr<caustica::TextureLoader> textureCache, bool enableRasterPrecompute );
     ~EnvMapProcessor();
 
-    void                            SceneReloaded()                 { m_targetResolution = 0; } // change default target resolution on each scene load
+    void                            sceneReloaded()                 { m_targetResolution = 0; } // change default target resolution on each scene load
 
-    void                            CreateRenderPasses(std::shared_ptr<ShaderDebug> shaderDebug, std::shared_ptr<caustica::ShaderFactory> shaderFactory, std::shared_ptr<ComputePipelineRegistry> computePipelineRegistry);
+    void                            createRenderPasses(std::shared_ptr<ShaderDebug> shaderDebug, std::shared_ptr<caustica::ShaderFactory> shaderFactory, std::shared_ptr<ComputePipelineRegistry> computePipelineRegistry);
 
-    void                            PreUpdate( nvrhi::ICommandList* commandList, caustica::render::RenderDevice& renderDevice, std::string envMapBackgroundPath, const std::filesystem::path& sceneDirectory = std::filesystem::path() );
-    bool                            Update( nvrhi::ICommandList * commandList, caustica::BindingCache & bindingCache, caustica::render::RenderDevice& renderDevice, const UpdateSettings & settings, double sceneTime, EMB_DirectionalLight const * directionalLights, uint directionaLightCount, bool forceInstantUpdate );
+    void                            preUpdate( nvrhi::ICommandList* commandList, caustica::render::RenderDevice& renderDevice, std::string envMapBackgroundPath, const std::filesystem::path& sceneDirectory = std::filesystem::path() );
+    bool                            update( nvrhi::ICommandList * commandList, caustica::BindingCache & bindingCache, caustica::render::RenderDevice& renderDevice, const UpdateSettings & settings, double sceneTime, EMB_DirectionalLight const * directionalLights, uint directionaLightCount, bool forceInstantUpdate );
 
-    nvrhi::TextureHandle            GetEnvMapCube() const           { return (m_outputIsCompressed)?(m_cubemapBC6H):(m_cubemap); }
-    nvrhi::SamplerHandle            GetEnvMapCubeSampler() const    { return m_linearSampler; }
-    uint                            GetEnvMapCubeDim() const        { return m_cubeDim; }
-    uint64_t                        GetEnvMapVersion() const        { return m_versionID; }
+    nvrhi::TextureHandle            getEnvMapCube() const           { return (m_outputIsCompressed)?(m_cubemapBC6H):(m_cubemap); }
+    nvrhi::SamplerHandle            getEnvMapCubeSampler() const    { return m_linearSampler; }
+    uint                            getEnvMapCubeDim() const        { return m_cubeDim; }
+    uint64_t                        getEnvMapVersion() const        { return m_versionID; }
 
-    bool                            DebugGUI(float indent);
+    bool                            debugGUI(float indent);
 
-    bool                            IsProcedural() const            { return IsProceduralSky( m_loadedSourceBackgroundPath.c_str() ); }
+    bool                            isProcedural() const            { return isProceduralSky( m_loadedSourceBackgroundPath.c_str() ); }
     const std::shared_ptr<SampleProceduralSky> &
-                                    GetProceduralSky() const        { return m_proceduralSky; }
+                                    getProceduralSky() const        { return m_proceduralSky; }
 
-    void                            SetTargetCubeResolution(uint res)   { m_targetResolution = res; }
-    int                             GetTargetCubeResolution() const;
+    void                            setTargetCubeResolution(uint res)   { m_targetResolution = res; }
+    int                             getTargetCubeResolution() const;
 
     const std::shared_ptr<EnvMapImportanceSamplingCache>
-                                    GetImportanceSampling() const   { return m_importanceSamplingCache; }
+                                    getImportanceSampling() const   { return m_importanceSamplingCache; }
 
     // BRDF LUT for split-sum IBL approximation (generated once at startup)
-    nvrhi::TextureHandle            GetBRDFLUT() const              { return m_brdfLUT; }
-    bool                            IsBRDFLUTReady() const          { return m_brdfLUT != nullptr && m_brdfLUTGenerated; }
+    nvrhi::TextureHandle            getBRDFLUT() const              { return m_brdfLUT; }
+    bool                            isBRDFLUTReady() const          { return m_brdfLUT != nullptr && m_brdfLUTGenerated; }
 
-    // Process an external cubemap with the specified options
+    // process an external cubemap with the specified options
     // This allows reusing the mip generation, GGX filtering, and SH projection for external cubemaps (e.g., local RT cubemap)
-    void                            ProcessCubemap(
+    void                            processCubemap(
                                         nvrhi::ICommandList* commandList,
                                         caustica::BindingCache& bindingCache,
                                         nvrhi::TextureHandle sourceCubemap,
@@ -124,18 +124,18 @@ public:
                                         const CubemapProcessingResults& results);
     
     // Generate the BRDF integration LUT (should be called once during initialization)
-    bool                            GenerateBRDFLUT(nvrhi::ICommandList* commandList, caustica::BindingCache& bindingCache);
+    bool                            generateBRDFLUT(nvrhi::ICommandList* commandList, caustica::BindingCache& bindingCache);
     
 private:
-    void                            GGXPrefilterCubemap(nvrhi::ICommandList* commandList, caustica::BindingCache& bindingCache, 
+    void                            ggxPrefilterCubemap(nvrhi::ICommandList* commandList, caustica::BindingCache& bindingCache, 
                                         nvrhi::TextureHandle srcCubemap, nvrhi::TextureHandle dstCubemap);
-    void                            ConvolveDiffuseIrradiance(nvrhi::ICommandList* commandList, caustica::BindingCache& bindingCache,
+    void                            convolveDiffuseIrradiance(nvrhi::ICommandList* commandList, caustica::BindingCache& bindingCache,
                                         nvrhi::TextureHandle srcCubemap, nvrhi::TextureHandle dstCubemap);
-    void                            GenerateCubemapMips(nvrhi::ICommandList* commandList, caustica::BindingCache& bindingCache, 
+    void                            generateCubemapMips(nvrhi::ICommandList* commandList, caustica::BindingCache& bindingCache, 
                                         nvrhi::TextureHandle cubemap);
 
-    void                            InitBuffers(uint cubeDim);
-    void                            UnloadSourceBackgrounds();
+    void                            initBuffers(uint cubeDim);
+    void                            unloadSourceBackgrounds();
 
 private:
     nvrhi::DeviceHandle             m_device;
@@ -185,7 +185,7 @@ private:
     uint                            m_bakedLightCount = 0;
 
     int                             m_compressionQuality = 1;       // 0 - disabled; 1 - low quality; 2 - high quality
-    bool                            m_outputIsCompressed = false;   // updated in Update() - it reflects current state of textures while 'm_compressionQuality' reflects required (future) state
+    bool                            m_outputIsCompressed = false;   // updated in update() - it reflects current state of textures while 'm_compressionQuality' reflects required (future) state
 
     std::shared_ptr<SampleProceduralSky>
                                     m_proceduralSky;

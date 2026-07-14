@@ -18,7 +18,7 @@ using namespace caustica::math;
               0.2126390058715104   0.7151686787677559   0.0721923153607337;
               0.0193308187155918   0.1191947797946259   0.9505321522496608 ]
 
-    CIE XYZ to LMS using the CAT02 transform (part of CIECAM02):
+    CIE XYZ to LMS using the cat02 transform (part of CIECAM02):
 
         M = [ 0.7328   0.4296  -0.1624;
              -0.7036   1.6975   0.0061;
@@ -54,7 +54,7 @@ namespace caustica::math
         -0.4986107602930033f, 0.0415550574071756f, 1.0569715142428784f
     };
 
-    // Transform from CIE XYZ to LMS using the CAT02 transform.
+    // Transform from CIE XYZ to LMS using the cat02 transform.
     static const float3x3 kColorTransform_XYZtoLMS_CAT02 =
     {
         0.7328f, -0.7036f, 0.0030f,
@@ -62,7 +62,7 @@ namespace caustica::math
         -0.1624f, 0.0061f, 0.9834f
     };
 
-    // Transform from LMS to CIE XYZ using the inverse CAT02 transform.
+    // Transform from LMS to CIE XYZ using the inverse cat02 transform.
     static const float3x3 kColorTransform_LMStoXYZ_CAT02 =
     {
         1.096123820835514f, 0.454369041975359f, -0.009627608738429f,
@@ -165,7 +165,7 @@ namespace caustica::math
         to a target color temperature.
 
         The function uses the von Kries transform, i.e. a diagonal scaling matrix in LMS space.
-        The default LMS transform is CAT02 (part of CIECAM02).
+        The default LMS transform is cat02 (part of CIECAM02).
 
         The transform is chosen so that the D65 white point is exactly preserved at T=6500K.
         Note that the transformed RGB can be out-of-gamut in Rec.709 (negative values

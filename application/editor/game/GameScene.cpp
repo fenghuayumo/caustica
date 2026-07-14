@@ -92,7 +92,7 @@ void GameScene::ResetGame()
 {
     m_camRecEnabled = false;
     for( auto & prop : m_props )
-        prop->Reset();
+        prop->reset();
 }
 
 // void GameScene::SetActive(bool active)
@@ -111,7 +111,7 @@ std::shared_ptr<game::ModelType> GameScene::FindModelType(const std::string& mod
 {
     if (modelTypeName == "")
         return nullptr;
-    auto it = std::find_if(m_modelTypes.begin(), m_modelTypes.end(), [ &modelTypeName ](const std::shared_ptr<game::ModelType>& pt) { return pt->GetModelName() == modelTypeName; });
+    auto it = std::find_if(m_modelTypes.begin(), m_modelTypes.end(), [ &modelTypeName ](const std::shared_ptr<game::ModelType>& pt) { return pt->getModelName() == modelTypeName; });
     if (it == m_modelTypes.end())
         return nullptr;
     return *it;
@@ -128,17 +128,17 @@ std::shared_ptr<game::PropBase> GameScene::CreatePropFromFile(const std::string&
     if (prop == nullptr)
         { assert( false ); return nullptr; }
     prop->SetStoragePath(storagePath);
-    prop->Load(jsonRoot);
+    prop->load(jsonRoot);
     prop->PostLoadSetup();
-    prop->Reset();
+    prop->reset();
     return prop;
 }
 
-void GameScene::SceneLoaded(const std::shared_ptr<caustica::Scene>& scene, const std::filesystem::path& sceneFilePath, const std::filesystem::path & mediaPath)
+void GameScene::sceneLoaded(const std::shared_ptr<caustica::Scene>& scene, const std::filesystem::path& sceneFilePath, const std::filesystem::path & mediaPath)
 {
     Deinitialize();
 
-    auto gameSettings = scene->GetGameSettingsNode();
+    auto gameSettings = scene->getGameSettingsNode();
     if (gameSettings == nullptr)
         return;
 
@@ -154,7 +154,7 @@ void GameScene::SceneLoaded(const std::shared_ptr<caustica::Scene>& scene, const
     EnsureDirectoryExists(m_gameStoragePath / "props");
 
     Json::Value node;
-    bool parsingSuccessful = caustica::json::FromString(gameSettings->GetJsonData(), node);
+    bool parsingSuccessful = caustica::json::FromString(gameSettings->getJsonData(), node);
     if (!parsingSuccessful) 
     {
         caustica::warning( "Unable to load game settings" );
@@ -173,7 +173,7 @@ void GameScene::SceneLoaded(const std::shared_ptr<caustica::Scene>& scene, const
         fileNoExt.replace_extension();
 
         Json::Value modelRoot;
-        if (!caustica::json::LoadFromFile(modelPath, modelRoot) || modelRoot.empty() || !modelRoot.isObject())
+        if (!caustica::json::loadFromFile(modelPath, modelRoot) || modelRoot.empty() || !modelRoot.isObject())
             continue;
         m_modelTypes.push_back( std::make_shared<game::ModelType>(*m_scene, fileNoExt.string(), modelRoot) );
     }
@@ -187,7 +187,7 @@ void GameScene::SceneLoaded(const std::shared_ptr<caustica::Scene>& scene, const
         fileNoExt.replace_extension();
 
         Json::Value propRoot;
-        if (!caustica::json::LoadFromFile(propPath, propRoot) || propRoot.empty() || !propRoot.isObject() )
+        if (!caustica::json::loadFromFile(propPath, propRoot) || propRoot.empty() || !propRoot.isObject() )
             continue;
         
         std::shared_ptr<game::PropBase> newProp = CreatePropFromFile(fileNoExt.string(), propPath, propRoot);
@@ -220,13 +220,13 @@ void GameScene::SceneLoaded(const std::shared_ptr<caustica::Scene>& scene, const
     //     ModelInstance& vehicle = *m_modelInstances[i];
     //     std::string fileName = vehicle.GetName() + ".vehicle.json";
     //     vehicle.SetStoragePath(m_gameStoragePath/fileName);
-    //     vehicle.Load();
+    //     vehicle.load();
     //     //vehicle.SetAnimOffset(std::rand() / (float)RAND_MAX * 110.0f);
     // }
 
 }
 
-void GameScene::SceneUnloading()
+void GameScene::sceneUnloading()
 {
     Deinitialize();
 }
@@ -250,13 +250,13 @@ void GameScene::AttachCamera(const std::shared_ptr<game::PropBase> & prop)
         m_gameCameraAttached.reset();
     else
     {
-        auto [pos, dir, up] = prop->GetDefaultCameraPose().GetPosDirUp();
-        m_gameCamera.LookTo(pos, dir, up);
+        auto [pos, dir, up] = prop->GetDefaultCameraPose().getPosDirUp();
+        m_gameCamera.lookTo(pos, dir, up);
         m_gameCameraAttached = prop;
     }
 }
 
-bool GameScene::DebugGUI(float indent)
+bool GameScene::debugGUI(float indent)
 {
     if (!m_lastTickGlobalAnimationEnabled)
         ImGui::Text("Note: global animations disabled, game world not updating!");
@@ -284,7 +284,7 @@ bool GameScene::DebugGUI(float indent)
 
         ImGui::Text("Time %05.2f, play speed %.2fx", m_gameTime, playSpeedK);
         ImGui::SameLine();
-        if (ImGui::Button("Reset##Timer"))
+        if (ImGui::Button("reset##Timer"))
             m_gameTime = 0.0f;
 
         ImGui::Checkbox("Loop", &m_timeLoopEnable);
@@ -380,7 +380,7 @@ bool GameScene::DebugGUI(float indent)
         {
             Json::Value animsJ;
             for (auto& pose : m_recordedCameraPoses)
-                animsJ.append(pose.Write());
+                animsJ.append(pose.write());
             Json::Value rootJ;
             rootJ["animation"] = animsJ;
 
@@ -393,28 +393,28 @@ bool GameScene::DebugGUI(float indent)
     return false;
 }
 
-bool GameScene::KeyboardUpdate(int key, int scancode, int action, int mods)
+bool GameScene::keyboardUpdate(int key, int scancode, int action, int mods)
 {
     if (CameraActive())
-        m_gameCamera.KeyboardUpdate(key, scancode, action, mods);
+        m_gameCamera.keyboardUpdate(key, scancode, action, mods);
 
     //if (key == GLFW_KEY_SPACE && action == GLFW_PRESS && mods == GLFW_MOD_CONTROL)
     //    m_recordCamera = true;
 
-    if (!IsActive())
+    if (!isActive())
         return false;
 
     return false;
 }
-void GameScene::MousePosUpdate(double xpos, double ypos)
+void GameScene::mousePosUpdate(double xpos, double ypos)
 {
     if (CameraActive())
-        m_gameCamera.MousePosUpdate(xpos, ypos);
+        m_gameCamera.mousePosUpdate(xpos, ypos);
 }
-void GameScene::MouseButtonUpdate(int button, int action, int mods)
+void GameScene::mouseButtonUpdate(int button, int action, int mods)
 {
     if (CameraActive())
-        m_gameCamera.MouseButtonUpdate(button, action, mods);
+        m_gameCamera.mouseButtonUpdate(button, action, mods);
 }
 
 void GameScene::Tick(float deltaTime, bool globalAnimationEnabled)
@@ -428,7 +428,7 @@ void GameScene::Tick(float deltaTime, bool globalAnimationEnabled)
     float playSpeedK = GetPlaySpeedK(m_playSpeed);
 
     m_lastTickGlobalAnimationEnabled = globalAnimationEnabled;
-    if (IsActive() && globalAnimationEnabled)
+    if (isActive() && globalAnimationEnabled)
     {
         m_gameTime += deltaTime * playSpeedK;
 
@@ -455,20 +455,20 @@ void GameScene::TickCamera(float deltaTime, caustica::FirstPersonCamera & render
     // in case we're switching from scene camera (renderCamera) to game camera and back, save/restore scene camera
     if (!m_wasGameCameraActive && CameraActive())
     {
-        m_sceneCameraLastPos = renderCamera.GetPosition();
-        m_sceneCameraLastDir = renderCamera.GetDir();
-        m_sceneCameraLastUp  = renderCamera.GetUp();
+        m_sceneCameraLastPos = renderCamera.getPosition();
+        m_sceneCameraLastDir = renderCamera.getDir();
+        m_sceneCameraLastUp  = renderCamera.getUp();
     }
     if (m_wasGameCameraActive && !CameraActive())
     {
-        renderCamera.LookTo(m_sceneCameraLastPos, m_sceneCameraLastDir, m_sceneCameraLastUp);
+        renderCamera.lookTo(m_sceneCameraLastPos, m_sceneCameraLastDir, m_sceneCameraLastUp);
     }
     m_wasGameCameraActive = CameraActive();
 
     if (CameraActive())
     {
         // Allow game camera to move in its own reference frame - this should be optional as some props might like to have control of it
-        m_gameCamera.Animate(deltaTime);
+        m_gameCamera.animate(deltaTime);
 
         // Move game camera into it's parent (attached) prop's reference frame and apply to global renderCamera
         {
@@ -493,23 +493,23 @@ void GameScene::TickCamera(float deltaTime, caustica::FirstPersonCamera & render
                 transform = dm::affine3(transformD);
             }
 
-            renderCamera.LookTo( transform.transformPoint(m_gameCamera.GetPosition()), transform.transformVector(m_gameCamera.GetDir()), transform.transformVector(m_gameCamera.GetUp()));
+            renderCamera.lookTo( transform.transformPoint(m_gameCamera.getPosition()), transform.transformVector(m_gameCamera.getDir()), transform.transformVector(m_gameCamera.getUp()));
         }
     }
 
-    m_lastRenderCameraPose.SetTransformFromCamera(renderCamera.GetPosition(), renderCamera.GetDir(), renderCamera.GetUp());
+    m_lastRenderCameraPose.setTransformFromCamera(renderCamera.getPosition(), renderCamera.getDir(), renderCamera.getUp());
 
     //if (!m_active)
     //    return;
     
-    if (m_camRecEnabled && IsActive())
+    if (m_camRecEnabled && isActive())
     {
         m_camRecTimeToNextKeyframe = dm::clamp(m_camRecTimeToNextKeyframe-deltaTime, -m_camRecKeyframeStep, m_camRecKeyframeStep);
 
         if (m_camRecTimeToNextKeyframe <= 0)
         {
             game::Pose pose;
-            pose.SetTransformFromCamera(renderCamera.GetPosition(), renderCamera.GetDir(), renderCamera.GetUp());
+            pose.setTransformFromCamera(renderCamera.getPosition(), renderCamera.getDir(), renderCamera.getUp());
             pose.Scaling = { 1,1,1 };
             pose.KeyTime = m_gameTime;
 
@@ -531,9 +531,9 @@ void GameScene::StandaloneGUI(const std::shared_ptr<caustica::PlanarView> & view
         std::function<bool(void)>   IsSelected;
         std::function<void(void)>   OnClick;
 
-        bool                        Enabled;
+        bool                        enabled;
 
-        BigButton(const std::string& name, const std::string& hoverText, std::function<void(void)> onClick, std::function<bool(void)> isSelected) : Name(name), HoverText(hoverText), OnClick(onClick), IsSelected(isSelected), Enabled(true) { }
+        BigButton(const std::string& name, const std::string& hoverText, std::function<void(void)> onClick, std::function<bool(void)> isSelected) : Name(name), HoverText(hoverText), OnClick(onClick), IsSelected(isSelected), enabled(true) { }
         std::string                 GetText() const { return Name; }
 
     };
@@ -564,7 +564,7 @@ void GameScene::StandaloneGUI(const std::shared_ptr<caustica::PlanarView> & view
                 if (i > 0)
                     ImGui::SameLine();
 
-                UI_SCOPED_DISABLE(!buttons[i].Enabled);
+                UI_SCOPED_DISABLE(!buttons[i].enabled);
 
                 bool selected = buttons[i].IsSelected();
 

@@ -98,7 +98,7 @@ void GaussianSplatSorter::buildDistanceCulledSplatList(
         commandList->setBufferState(resources.sortControlBuffer, nvrhi::ResourceStates::CopySource);
         commandList->commitBarriers();
 
-        resources.gpuSort->Sort(
+        resources.gpuSort->sort(
             commandList,
             resources.sortControlBuffer,
             0,
@@ -181,7 +181,7 @@ void GaussianSplatSorter::updateIndices(
     commandList->setBufferState(resources.sortControlBuffer, nvrhi::ResourceStates::CopySource);
     commandList->commitBarriers();
 
-    resources.gpuSort->Sort(
+    resources.gpuSort->sort(
         commandList,
         resources.sortControlBuffer,
         0,

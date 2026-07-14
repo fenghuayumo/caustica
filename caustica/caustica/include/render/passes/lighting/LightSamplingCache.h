@@ -76,55 +76,55 @@ public:
     LightSamplingCache(nvrhi::IDevice* device);
     ~LightSamplingCache();
 
-    // Reset scene related stuff
-    void                            SceneReloaded();
+    // reset scene related stuff
+    void                            sceneReloaded();
 
-    void                            CreateRenderPasses(std::shared_ptr<caustica::ShaderFactory> shaderFactory, nvrhi::IBindingLayout* bindlessLayout, caustica::render::RenderDevice& renderDevice, std::shared_ptr<ShaderDebug> shaderDebug, const uint2 renderResolution, const uint envMapProcessedResolution);
+    void                            createRenderPasses(std::shared_ptr<caustica::ShaderFactory> shaderFactory, nvrhi::IBindingLayout* bindlessLayout, caustica::render::RenderDevice& renderDevice, std::shared_ptr<ShaderDebug> shaderDebug, const uint2 renderResolution, const uint envMapProcessedResolution);
 
-    // Main and only processing stage is split into UpdateBegin/UpdateEnd. These can be called one after the other as soon as screen space motion vectors are available.
+    // Main and only processing stage is split into updateBegin/updateEnd. These can be called one after the other as soon as screen space motion vectors are available.
     // The split is purely to facilitate any potential async compute.
     
-    // UpdateBegin can happen in parallel with any other ray preparatory tracing work - anything from BVH building to laying down denoising layers. Emissive triangle emission must be accessible at this point.
-    void                            UpdateBegin(nvrhi::ICommandList * commandList, caustica::BindingCache & bindingCache, const UpdateSettings & settings, double sceneTime, const std::shared_ptr<caustica::Scene> & scene, std::shared_ptr<class MaterialGpuCache> materialGpuCache, std::shared_ptr<class OpacityMicromapBuilder> opacityMicromapBuilder, nvrhi::BufferHandle subInstanceDataBuffer, std::vector<SubInstanceData> & subInstanceData, nvrhi::TextureHandle envMapProcessed);
-    // UpdateEnd must happen BEFORE any light sampling (e.g. PT pass with NEE) but AFTER screen space motion vectors are available for reprojection.
-    void                            UpdateEnd(nvrhi::ICommandList * commandList, caustica::BindingCache & bindingCache, const std::shared_ptr<caustica::Scene> & scene, std::shared_ptr<class MaterialGpuCache> materialGpuCache, std::shared_ptr<class OpacityMicromapBuilder> opacityMicromapBuilder, nvrhi::BufferHandle subInstanceDataBuffer, nvrhi::TextureHandle depthBuffer, nvrhi::TextureHandle motionVectors);
+    // updateBegin can happen in parallel with any other ray preparatory tracing work - anything from BVH building to laying down denoising layers. Emissive triangle emission must be accessible at this point.
+    void                            updateBegin(nvrhi::ICommandList * commandList, caustica::BindingCache & bindingCache, const UpdateSettings & settings, double sceneTime, const std::shared_ptr<caustica::Scene> & scene, std::shared_ptr<class MaterialGpuCache> materialGpuCache, std::shared_ptr<class OpacityMicromapBuilder> opacityMicromapBuilder, nvrhi::BufferHandle subInstanceDataBuffer, std::vector<SubInstanceData> & subInstanceData, nvrhi::TextureHandle envMapProcessed);
+    // updateEnd must happen BEFORE any light sampling (e.g. PT pass with NEE) but AFTER screen space motion vectors are available for reprojection.
+    void                            updateEnd(nvrhi::ICommandList * commandList, caustica::BindingCache & bindingCache, const std::shared_ptr<caustica::Scene> & scene, std::shared_ptr<class MaterialGpuCache> materialGpuCache, std::shared_ptr<class OpacityMicromapBuilder> opacityMicromapBuilder, nvrhi::BufferHandle subInstanceDataBuffer, nvrhi::TextureHandle depthBuffer, nvrhi::TextureHandle motionVectors);
 
-    nvrhi::BufferHandle             GetControlBuffer() const                    { return m_controlBuffer; }
-    nvrhi::BufferHandle             GetLightBuffer() const                      { return m_lightsBuffer; }              // this is the list of lights
-    nvrhi::BufferHandle             GetLightExBuffer() const                    { return m_lightsExBuffer; }            // this is the list of light (extended data)
-    nvrhi::BufferHandle             GetLightProxyCounters() const               { return m_perLightProxyCounters; }     // these are counters of how many proxies each light has
-    nvrhi::BufferHandle             GetLightSamplingProxies() const             { return m_lightSamplingProxies; }      // these are indices into the GetLightBuffer()
+    nvrhi::BufferHandle             getControlBuffer() const                    { return m_controlBuffer; }
+    nvrhi::BufferHandle             getLightBuffer() const                      { return m_lightsBuffer; }              // this is the list of lights
+    nvrhi::BufferHandle             getLightExBuffer() const                    { return m_lightsExBuffer; }            // this is the list of light (extended data)
+    nvrhi::BufferHandle             getLightProxyCounters() const               { return m_perLightProxyCounters; }     // these are counters of how many proxies each light has
+    nvrhi::BufferHandle             getLightSamplingProxies() const             { return m_lightSamplingProxies; }      // these are indices into the getLightBuffer()
 
-    nvrhi::TextureHandle            GetEnvLightLookupMap() const                { return m_envLightLookupMap; }
+    nvrhi::TextureHandle            getEnvLightLookupMap() const                { return m_envLightLookupMap; }
 
-    nvrhi::BufferHandle             GetLocalSamplingBuffer() const              { return m_NEE_AT_LocalSamplingBuffer; }
+    nvrhi::BufferHandle             getLocalSamplingBuffer() const              { return m_NEE_AT_LocalSamplingBuffer; }
 
-    nvrhi::TextureHandle            GetFeedbackTotalWeight() const              { return m_NEE_AT_FeedbackTotalWeight; }
-    nvrhi::TextureHandle            GetFeedbackCandidates() const               { return m_NEE_AT_FeedbackCandidates; }
+    nvrhi::TextureHandle            getFeedbackTotalWeight() const              { return m_NEE_AT_FeedbackTotalWeight; }
+    nvrhi::TextureHandle            getFeedbackCandidates() const               { return m_NEE_AT_FeedbackCandidates; }
 
 
-    bool                            InfoGUI(float indent);
-    bool                            DebugGUI(float indent);
+    bool                            infoGUI(float indent);
+    bool                            debugGUI(float indent);
 
-    void                            SetGlobalShaderMacros(std::vector<caustica::ShaderMacro> & macros);
+    void                            setGlobalShaderMacros(std::vector<caustica::ShaderMacro> & macros);
 
-    bool                            TotalLightCountOverflow() const;
+    bool                            totalLightCountOverflow() const;
 
 private:
 
     // output goes into m_scratchLightBuffer and 
-    static bool                     CollectEnvmapLightPlaceholders(const UpdateSettings & settings, LightingControlData & ctrlBuff, std::vector<PolymorphicLightInfo> & outLightBuffer, std::vector<PolymorphicLightInfoEx> & outLightExBuffer, std::vector<uint> & outLightHistoryRemapCurrentToPastBuffer, std::vector<uint> & outLightHistoryRemapPastToCurrent);
-    bool                            CollectAnalyticLightsCPU(const UpdateSettings & settings, const std::shared_ptr<caustica::Scene> & scene, LightingControlData & ctrlBuff, std::vector<PolymorphicLightInfo> & outLightBuffer, std::vector<PolymorphicLightInfoEx> & outLightExBuffer, std::vector<uint> & outLightHistoryRemapCurrentToPast, std::vector<uint> & outLightHistoryRemapPastToCurrent);
-    bool                            CollectGaussianSplatEmissionProxies(const UpdateSettings & settings, LightingControlData & ctrlBuff, std::vector<PolymorphicLightInfo> & outLightBuffer, std::vector<PolymorphicLightInfoEx> & outLightExBuffer, std::vector<uint> & outLightHistoryRemapCurrentToPast, std::vector<uint> & outLightHistoryRemapPastToCurrent);
+    static bool                     collectEnvmapLightPlaceholders(const UpdateSettings & settings, LightingControlData & ctrlBuff, std::vector<PolymorphicLightInfo> & outLightBuffer, std::vector<PolymorphicLightInfoEx> & outLightExBuffer, std::vector<uint> & outLightHistoryRemapCurrentToPastBuffer, std::vector<uint> & outLightHistoryRemapPastToCurrent);
+    bool                            collectAnalyticLightsCPU(const UpdateSettings & settings, const std::shared_ptr<caustica::Scene> & scene, LightingControlData & ctrlBuff, std::vector<PolymorphicLightInfo> & outLightBuffer, std::vector<PolymorphicLightInfoEx> & outLightExBuffer, std::vector<uint> & outLightHistoryRemapCurrentToPast, std::vector<uint> & outLightHistoryRemapPastToCurrent);
+    bool                            collectGaussianSplatEmissionProxies(const UpdateSettings & settings, LightingControlData & ctrlBuff, std::vector<PolymorphicLightInfo> & outLightBuffer, std::vector<PolymorphicLightInfoEx> & outLightExBuffer, std::vector<uint> & outLightHistoryRemapCurrentToPast, std::vector<uint> & outLightHistoryRemapPastToCurrent);
 
-    // this creates emissive triangle proc tasks and also does any required geometry instance (subInstance) processing such as analyt light proxies; has to happen AFTER CollectAnalyticLightsCPU
-    bool                            ProcessEmissiveGeometry( const UpdateSettings & settings, const std::shared_ptr<caustica::Scene> & scene, std::vector<SubInstanceData> & subInstanceData, LightingControlData & ctrlBuff, std::vector<struct EmissiveTrianglesProcTask> & tasks );
+    // this creates emissive triangle proc tasks and also does any required geometry instance (subInstance) processing such as analyt light proxies; has to happen AFTER collectAnalyticLightsCPU
+    bool                            processEmissiveGeometry( const UpdateSettings & settings, const std::shared_ptr<caustica::Scene> & scene, std::vector<SubInstanceData> & subInstanceData, LightingControlData & ctrlBuff, std::vector<struct EmissiveTrianglesProcTask> & tasks );
 
-    void                            FillBindings(nvrhi::BindingSetDesc& outBindingSetDesc, const std::shared_ptr<caustica::Scene> & scene, std::shared_ptr<class MaterialGpuCache> materialGpuCache, std::shared_ptr<class OpacityMicromapBuilder> opacityMicromapBuilder, nvrhi::BufferHandle subInstanceDataBuffer, nvrhi::TextureHandle depthBuffer, nvrhi::TextureHandle motionVectors, nvrhi::TextureHandle envMapProcessed);
+    void                            fillBindings(nvrhi::BindingSetDesc& outBindingSetDesc, const std::shared_ptr<caustica::Scene> & scene, std::shared_ptr<class MaterialGpuCache> materialGpuCache, std::shared_ptr<class OpacityMicromapBuilder> opacityMicromapBuilder, nvrhi::BufferHandle subInstanceDataBuffer, nvrhi::TextureHandle depthBuffer, nvrhi::TextureHandle motionVectors, nvrhi::TextureHandle envMapProcessed);
 
-    void                            UpdateFrustumConsts(LightSamplingCacheConstants & outConsts, const LightSamplingCache::UpdateSettings & settings);
+    void                            updateFrustumConsts(LightSamplingCacheConstants & outConsts, const LightSamplingCache::UpdateSettings & settings);
 
-    void                            UpdateLocalJitter();
+    void                            updateLocalJitter();
 
 private:
     nvrhi::DeviceHandle             m_device;
@@ -163,7 +163,7 @@ private:
     nvrhi::BindingLayoutHandle      m_commonBindingLayout;
 
     UpdateSettings                    m_currentSettings;
-    LightingControlData             m_currentCtrlBuff;              // NOTE: this does not include GPU-side changes, only the initial state set in Update
+    LightingControlData             m_currentCtrlBuff;              // NOTE: this does not include GPU-side changes, only the initial state set in update
 
     nvrhi::BufferHandle             m_controlBuffer;
 
@@ -223,7 +223,7 @@ private:
     int                             m_localSamplingBufferHeight         = 0;
     const int                       m_localSamplingBufferDepth          = CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT;
 
-    // various buffers are ping-ponged where current and history swap places; this bool is inverted at every Update()
+    // various buffers are ping-ponged where current and history swap places; this bool is inverted at every update()
     bool                            m_ping                              = false;
 
     bool                            m_dbgDebugDrawLights                = false;

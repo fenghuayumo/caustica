@@ -67,7 +67,7 @@ public:
         const std::shared_ptr<caustica::Scene>& scene, int materialID)
     {
         if (!scene) return nullptr;
-        for (const auto& mat : scene->GetMaterials())
+        for (const auto& mat : scene->getMaterials())
             if (mat->materialID == materialID) return mat;
         return nullptr;
     }
@@ -76,7 +76,7 @@ public:
         const std::shared_ptr<caustica::Scene>& scene, int instanceIndex)
     {
         if (!scene || instanceIndex < 0) return caustica::ecs::NullEntity;
-        const auto& instances = scene->GetMeshInstances();
+        const auto& instances = scene->getMeshInstances();
         if (instanceIndex >= static_cast<int>(instances.size())) return caustica::ecs::NullEntity;
         return instances[instanceIndex];
     }

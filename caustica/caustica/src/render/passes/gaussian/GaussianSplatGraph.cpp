@@ -57,16 +57,16 @@ void fillGaussianSplatShadowConstants(
     constants.GaussianSplatShadowCount = (settings.EnableGaussianSplats
             && gaussianSplatShadowMode != GAUSSIAN_SPLAT_SHADOWS_DISABLED
             && primaryGaussianSplatPass != nullptr
-            && primaryGaussianSplatPass->GetTopLevelAS() != nullptr)
-        ? primaryGaussianSplatPass->GetSplatCount()
+            && primaryGaussianSplatPass->getTopLevelAS() != nullptr)
+        ? primaryGaussianSplatPass->getSplatCount()
         : 0;
     constants.GaussianSplatShadowsEnabled = constants.GaussianSplatShadowCount > 0 ? 1u : 0u;
     constants.GaussianSplatShadowScale = settings.GaussianSplatScale;
     constants.GaussianSplatShadowAlphaThreshold = settings.GaussianSplatAlphaCullThreshold;
     constants.GaussianSplatShadowUseTLASInstances =
-        (primaryGaussianSplatPass != nullptr && primaryGaussianSplatPass->GetShadowUsesTLASInstances()) ? 1u : 0u;
+        (primaryGaussianSplatPass != nullptr && primaryGaussianSplatPass->getShadowUsesTLASInstances()) ? 1u : 0u;
     constants.GaussianSplatShadowPrimitiveCountPerSplat =
-        primaryGaussianSplatPass != nullptr ? primaryGaussianSplatPass->GetShadowPrimitiveCountPerSplat() : 1u;
+        primaryGaussianSplatPass != nullptr ? primaryGaussianSplatPass->getShadowPrimitiveCountPerSplat() : 1u;
     constants.GaussianSplatShadowMode = constants.GaussianSplatShadowsEnabled != 0
         ? gaussianSplatShadowMode
         : GAUSSIAN_SPLAT_SHADOWS_DISABLED;
@@ -169,14 +169,14 @@ dm::float3 resolveGaussianSplatShadowDirection(SceneManager& sceneManager)
     if (!scene)
         return dm::float3(0.0f, 1.0f, 0.0f);
 
-    const auto* entityWorld = scene->GetEntityWorld();
+    const auto* entityWorld = scene->getEntityWorld();
     if (!entityWorld)
         return dm::float3(0.0f, 1.0f, 0.0f);
 
-    for (ecs::Entity entity : scene->GetLightEntities())
+    for (ecs::Entity entity : scene->getLightEntities())
     {
-        const auto* lightComp = caustica::scene::TryGetLight(entityWorld->world(), entity);
-        if (!lightComp || !caustica::scene::TryGetDirectionalLightData(*lightComp))
+        const auto* lightComp = caustica::scene::tryGetLight(entityWorld->world(), entity);
+        if (!lightComp || !caustica::scene::tryGetDirectionalLightData(*lightComp))
             continue;
 
         const auto* globalComp = entityWorld->world().get<caustica::scene::GlobalTransformComponent>(entity);
@@ -184,7 +184,7 @@ dm::float3 resolveGaussianSplatShadowDirection(SceneManager& sceneManager)
             continue;
 
         LightConstants lightConstants;
-        caustica::scene::FillLightConstants(*lightComp, globalComp->transform, lightConstants);
+        caustica::scene::fillLightConstants(*lightComp, globalComp->transform, lightConstants);
         return -lightConstants.direction;
     }
 

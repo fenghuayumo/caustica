@@ -131,7 +131,7 @@ void UpdateMaterial(SceneGpuResources& gpu, const std::shared_ptr<Material>& mat
     if (!material || material->materialID >= gpu.materialData.size())
         return;
 
-    material->FillConstantBuffer(gpu.materialData[material->materialID], gpu.useResourceDescriptorHeapBindless);
+    material->fillConstantBuffer(gpu.materialData[material->materialID], gpu.useResourceDescriptorHeapBindless);
 }
 
 void UpdateGeometry(SceneGpuResources& gpu, const std::shared_ptr<MeshInfo>& mesh)
@@ -170,7 +170,7 @@ void UpdateInstance(Scene& scene, const scene::MeshInstanceRenderProxy& proxy)
     if (!proxy.mesh || proxy.instanceIndex < 0)
         return;
 
-    SceneGpuResources& gpu = scene.GetGpuResources();
+    SceneGpuResources& gpu = scene.getGpuResources();
     if (static_cast<size_t>(proxy.instanceIndex) >= gpu.instanceData.size())
         return;
 
@@ -196,10 +196,10 @@ void UpdateInstance(Scene& scene, const scene::MeshInstanceRenderProxy& proxy)
 
 void EnsureMeshGpuBuffers(Scene& scene, nvrhi::ICommandList* commandList)
 {
-    SceneGpuResources& gpu = scene.GetGpuResources();
+    SceneGpuResources& gpu = scene.getGpuResources();
     IDescriptorTableManager* descriptorTable = scene.getDescriptorTableManager();
 
-    for (const auto& mesh : scene.GetMeshes())
+    for (const auto& mesh : scene.getMeshes())
     {
         auto buffers = mesh->buffers;
 
@@ -338,7 +338,7 @@ void EnsureMeshGpuBuffers(Scene& scene, nvrhi::ICommandList* commandList)
     }
 
     auto& skinnedGpuMap = gpu.skinnedGpuByEntity;
-    for (const scene::SkinnedMeshRenderProxy& proxy : scene.GetRenderData().skinnedMeshes)
+    for (const scene::SkinnedMeshRenderProxy& proxy : scene.getRenderData().skinnedMeshes)
     {
         if (!proxy.mesh || !proxy.prototypeMesh)
             continue;
@@ -424,8 +424,8 @@ void EnsureMeshGpuBuffers(Scene& scene, nvrhi::ICommandList* commandList)
 
 void DispatchSkinnedMeshUpdates(Scene& scene, nvrhi::ICommandList* commandList, uint32_t /*frameIndex*/)
 {
-    SceneGpuResources& gpu = scene.GetGpuResources();
-    const scene::SceneRenderData& renderData = scene.GetRenderData();
+    SceneGpuResources& gpu = scene.getGpuResources();
+    const scene::SceneRenderData& renderData = scene.getRenderData();
 
     bool skinningMarkerPlaced = false;
     std::vector<nvrhi::BufferHandle> skinnedVertexBuffersWritten;
@@ -530,7 +530,7 @@ void DispatchSkinnedMeshUpdates(Scene& scene, nvrhi::ICommandList* commandList, 
 
 void UpdateGpuSceneBuffers(Scene& scene, nvrhi::ICommandList* commandList, uint32_t frameIndex, bool structureChanged, bool transformsChanged)
 {
-    SceneGpuResources& gpu = scene.GetGpuResources();
+    SceneGpuResources& gpu = scene.getGpuResources();
     bool materialsChanged = false;
 
     if (structureChanged)
@@ -542,29 +542,29 @@ void UpdateGpuSceneBuffers(Scene& scene, nvrhi::ICommandList* commandList, uint3
     const size_t allocationGranularity = 1024;
     bool arraysAllocated = false;
 
-    if (gpu.enableBindlessResources && scene.GetGeometryCount() > gpu.geometryData.size())
+    if (gpu.enableBindlessResources && scene.getGeometryCount() > gpu.geometryData.size())
     {
-        gpu.geometryData.resize(nvrhi::align<size_t>(scene.GetGeometryCount(), allocationGranularity));
+        gpu.geometryData.resize(nvrhi::align<size_t>(scene.getGeometryCount(), allocationGranularity));
         gpu.geometryBuffer = CreateGeometryBuffer(gpu);
         arraysAllocated = true;
     }
 
-    if (scene.GetMaterials().size() > gpu.materialData.size())
+    if (scene.getMaterials().size() > gpu.materialData.size())
     {
-        gpu.materialData.resize(nvrhi::align<size_t>(scene.GetMaterials().size(), allocationGranularity));
+        gpu.materialData.resize(nvrhi::align<size_t>(scene.getMaterials().size(), allocationGranularity));
         if (gpu.enableBindlessResources)
             gpu.materialBuffer = CreateMaterialBuffer(gpu);
         arraysAllocated = true;
     }
 
-    if (scene.GetMeshInstances().size() > gpu.instanceData.size())
+    if (scene.getMeshInstances().size() > gpu.instanceData.size())
     {
-        gpu.instanceData.resize(nvrhi::align<size_t>(scene.GetMeshInstances().size(), allocationGranularity));
+        gpu.instanceData.resize(nvrhi::align<size_t>(scene.getMeshInstances().size(), allocationGranularity));
         gpu.instanceBuffer = CreateInstanceBuffer(gpu);
         arraysAllocated = true;
     }
 
-    for (const auto& material : scene.GetMaterials())
+    for (const auto& material : scene.getMaterials())
     {
         if (material->dirty || structureChanged || arraysAllocated)
             UpdateMaterial(gpu, material);
@@ -592,7 +592,7 @@ void UpdateGpuSceneBuffers(Scene& scene, nvrhi::ICommandList* commandList, uint3
     if (!gpu.geometryData.empty())
     {
         uint32_t geometryResourceIndex = 0;
-        for (const auto& mesh : scene.GetMeshes())
+        for (const auto& mesh : scene.getMeshes())
         {
             if (arraysAllocated)
                 break;
@@ -621,7 +621,7 @@ void UpdateGpuSceneBuffers(Scene& scene, nvrhi::ICommandList* commandList, uint3
 
     if (structureChanged || arraysAllocated)
     {
-        for (const auto& mesh : scene.GetMeshes())
+        for (const auto& mesh : scene.getMeshes())
         {
             if (!mesh || !mesh->buffers)
                 continue;
@@ -638,7 +638,7 @@ void UpdateGpuSceneBuffers(Scene& scene, nvrhi::ICommandList* commandList, uint3
 
     if (structureChanged || transformsChanged || arraysAllocated)
     {
-        for (const scene::MeshInstanceRenderProxy& proxy : scene.GetRenderData().meshInstances)
+        for (const scene::MeshInstanceRenderProxy& proxy : scene.getRenderData().meshInstances)
             UpdateInstance(scene, proxy);
 
         WriteInstanceBuffer(commandList, gpu);
@@ -666,8 +666,8 @@ void SceneGpuUpdater::refresh(Scene& scene, nvrhi::ICommandList* commandList, ui
             frameIndex);
     }
 
-    const bool structureChanged = scene.HasSceneStructureChanged(frameIndex);
-    const bool transformsChanged = scene.HasSceneTransformsChanged(frameIndex);
+    const bool structureChanged = scene.hasSceneStructureChanged(frameIndex);
+    const bool transformsChanged = scene.hasSceneTransformsChanged(frameIndex);
 
     UpdateGpuSceneBuffers(scene, commandList, frameIndex, structureChanged, transformsChanged);
     scene.syncRenderSnapshotGpuIndices(frameIndex);
@@ -677,10 +677,10 @@ void SceneGpuUpdater::refresh(Scene& scene, nvrhi::ICommandList* commandList, ui
 
 void SceneGpuUpdater::refreshAfterLoad(Scene& scene, uint32_t frameIndex)
 {
-    scene.RefreshSceneWorld(frameIndex);
-    scene.PublishRenderSnapshot(frameIndex);
+    scene.refreshSceneWorld(frameIndex);
+    scene.publishRenderSnapshot(frameIndex);
 
-    SceneGpuResources& gpu = scene.GetGpuResources();
+    SceneGpuResources& gpu = scene.getGpuResources();
     if (!gpu.device->waitForIdle())
         return;
 

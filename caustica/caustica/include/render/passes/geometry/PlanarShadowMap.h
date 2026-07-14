@@ -31,38 +31,38 @@ namespace caustica::render
             uint32_t arraySlice,
             const caustica::ViewportDesc& viewport);
 
-        bool SetupWholeSceneDirectionalLightView(
+        bool setupWholeSceneDirectionalLightView(
             const caustica::DirectionalLight& light, 
             dm::box3_arg sceneBounds, 
             float fadeRangeWorld = 0.f);
 
-        bool SetupDynamicDirectionalLightView(
+        bool setupDynamicDirectionalLightView(
             const caustica::DirectionalLight& light, 
             dm::float3 anchor, 
             dm::float3 halfShadowBoxSize, 
             dm::float3 preViewTranslation = 0.f,
             float fadeRangeWorld = 0.f);
 
-        void SetupProxyView();
+        void setupProxyView();
 
-        void Clear(nvrhi::ICommandList* commandList);
+        void clear(nvrhi::ICommandList* commandList);
 
-        void SetLitOutOfBounds(bool litOutOfBounds);
-        void SetFalloffDistance(float distance);
+        void setLitOutOfBounds(bool litOutOfBounds);
+        void setFalloffDistance(float distance);
 
         std::shared_ptr<caustica::PlanarView> getPlanarView();
 
-        virtual dm::float4x4 GetWorldToUvzwMatrix() const override;
-        virtual const caustica::ICompositeView& GetView() const override;
-        virtual nvrhi::ITexture* GetTexture() const override;
-        virtual uint32_t GetNumberOfCascades() const override;
-        virtual const IShadowMap* GetCascade(uint32_t index) const override;
-        virtual uint32_t GetNumberOfPerObjectShadows() const override;
-        virtual const IShadowMap* GetPerObjectShadow(uint32_t index) const override;
-        virtual dm::int2 GetTextureSize() const override;
-        virtual dm::box2 GetUVRange() const override;
-        virtual dm::float2 GetFadeRangeInTexels() const override;
-        virtual bool IsLitOutOfBounds() const override;
-        virtual void FillShadowConstants(ShadowConstants& constants) const override;
+        virtual dm::float4x4 getWorldToUvzwMatrix() const override;
+        virtual const caustica::ICompositeView& getView() const override;
+        virtual nvrhi::ITexture* getTexture() const override;
+        virtual uint32_t getNumberOfCascades() const override;
+        virtual const IShadowMap* getCascade(uint32_t index) const override;
+        virtual uint32_t getNumberOfPerObjectShadows() const override;
+        virtual const IShadowMap* getPerObjectShadow(uint32_t index) const override;
+        virtual dm::int2 getTextureSize() const override;
+        virtual dm::box2 getUVRange() const override;
+        virtual dm::float2 getFadeRangeInTexels() const override;
+        virtual bool isLitOutOfBounds() const override;
+        virtual void fillShadowConstants(ShadowConstants& constants) const override;
     };
 }

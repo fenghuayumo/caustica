@@ -21,14 +21,14 @@ namespace game
     public:
         ModelType(caustica::Scene& scene, const std::string& name, const Json::Value& node);
 
-        bool IsValid() const { return m_valid; }
-        [[nodiscard]] caustica::ecs::Entity GetRootEntity() const { return m_rootEntity; }
-        [[nodiscard]] const std::shared_ptr<caustica::scene::SceneEntityWorld>& GetEntityWorld() const { return m_entityWorld; }
-        const std::string& GetModelName() const { return m_name; }
-        const Pose& GetModelPose() const { return m_modelPose; }
-        caustica::Scene& GetScene() const { return m_scene; }
+        bool isValid() const { return m_valid; }
+        [[nodiscard]] caustica::ecs::Entity getRootEntity() const { return m_rootEntity; }
+        [[nodiscard]] const std::shared_ptr<caustica::scene::SceneEntityWorld>& getEntityWorld() const { return m_entityWorld; }
+        const std::string& getModelName() const { return m_name; }
+        const Pose& getModelPose() const { return m_modelPose; }
+        caustica::Scene& getScene() const { return m_scene; }
 
-        std::string FindLightControllerInfo(const std::string& nodeName);
+        std::string findLightControllerInfo(const std::string& nodeName);
 
     private:
         caustica::Scene& m_scene;
@@ -47,16 +47,16 @@ namespace game
                       const std::shared_ptr<ModelType>& modelType,
                       caustica::ecs::Entity parentEntity);
 
-        const std::string& GetInstanceName() const { return m_name; }
-        const std::string& GetModelName() const { return m_modelType->GetModelName(); }
-        [[nodiscard]] caustica::ecs::Entity GetRootEntity() const { return m_entity; }
+        const std::string& getInstanceName() const { return m_name; }
+        const std::string& getModelName() const { return m_modelType->getModelName(); }
+        [[nodiscard]] caustica::ecs::Entity getRootEntity() const { return m_entity; }
 
-        void SetTransform(const dm::double3& translation, const dm::dquat& rotation, const dm::double3& scaling);
-        void SetTransform(const dm::float3& translation, const dm::quat& rotation, const dm::float3& scaling);
+        void setTransform(const dm::double3& translation, const dm::dquat& rotation, const dm::double3& scaling);
+        void setTransform(const dm::float3& translation, const dm::quat& rotation, const dm::float3& scaling);
 
-        void UpdateLightFromControllers(double gameTime);
+        void updateLightFromControllers(double gameTime);
 
-        const std::vector<std::shared_ptr<LightController>>& GetLights() const { return m_lightControllers; }
+        const std::vector<std::shared_ptr<LightController>>& getLights() const { return m_lightControllers; }
 
     private:
         std::shared_ptr<ModelType> m_modelType;
@@ -64,6 +64,6 @@ namespace game
         std::string m_name;
         std::vector<std::shared_ptr<LightController>> m_lightControllers;
 
-        void MapLightControllers(caustica::ecs::Entity entity);
+        void mapLightControllers(caustica::ecs::Entity entity);
     };
 }

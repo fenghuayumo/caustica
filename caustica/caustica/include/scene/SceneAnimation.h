@@ -45,18 +45,18 @@ namespace caustica
             , m_Attribute(AnimationAttribute::LeafProperty)
         { }
 
-        [[nodiscard]] bool IsValid() const;
-        [[nodiscard]] const std::shared_ptr<animation::Sampler>& GetSampler() const { return m_Sampler; }
-        [[nodiscard]] AnimationAttribute GetAttribute() const { return m_Attribute; }
-        [[nodiscard]] ecs::Entity GetTargetEntity() const { return m_TargetEntity; }
-        [[nodiscard]] std::shared_ptr<Material> GetTargetMaterial() const { return m_TargetMaterial.lock(); }
-        [[nodiscard]] const std::string& GetLeafPropertyName() const { return m_LeafPropertyName; }
-        void SetTargetEntity(ecs::Entity entity) { m_TargetEntity = entity; }
-        void SetLeafPropertyName(const std::string& name) { m_LeafPropertyName = name; }
+        [[nodiscard]] bool isValid() const;
+        [[nodiscard]] const std::shared_ptr<animation::Sampler>& getSampler() const { return m_Sampler; }
+        [[nodiscard]] AnimationAttribute getAttribute() const { return m_Attribute; }
+        [[nodiscard]] ecs::Entity getTargetEntity() const { return m_TargetEntity; }
+        [[nodiscard]] std::shared_ptr<Material> getTargetMaterial() const { return m_TargetMaterial.lock(); }
+        [[nodiscard]] const std::string& getLeafPropertyName() const { return m_LeafPropertyName; }
+        void setTargetEntity(ecs::Entity entity) { m_TargetEntity = entity; }
+        void setLeafPropertyName(const std::string& name) { m_LeafPropertyName = name; }
 
-        // Apply the sampled value for `time` to the target entity/material via `world`.
+        // apply the sampled value for `time` to the target entity/material via `world`.
         // Returns false if the channel has no valid target or the sampler has no data at `time`.
-        bool Apply(float time, scene::SceneEntityWorld& world) const;  // NOLINT(modernize-use-nodiscard)
+        bool apply(float time, scene::SceneEntityWorld& world) const;  // NOLINT(modernize-use-nodiscard)
     };
 
     class SceneAnimation
@@ -70,13 +70,13 @@ namespace caustica
 
         SceneAnimation() = default;
 
-        [[nodiscard]] std::shared_ptr<SceneAnimation> Clone();
-        [[nodiscard]] SceneContentFlags GetContentFlags() const { return SceneContentFlags::Animations; }
-        [[nodiscard]] const std::vector<std::shared_ptr<SceneAnimationChannel>>& GetChannels() const { return m_Channels; }
-        [[nodiscard]] float GetDuration() const { return m_Duration; }
-        [[nodiscard]] bool IsVald() const;  // note: preserves original typo
-        bool Apply(float time, scene::SceneEntityWorld& world) const;  // NOLINT(modernize-use-nodiscard)
-        void AddChannel(const std::shared_ptr<SceneAnimationChannel>& channel);
+        [[nodiscard]] std::shared_ptr<SceneAnimation> clone();
+        [[nodiscard]] SceneContentFlags getContentFlags() const { return SceneContentFlags::Animations; }
+        [[nodiscard]] const std::vector<std::shared_ptr<SceneAnimationChannel>>& getChannels() const { return m_Channels; }
+        [[nodiscard]] float getDuration() const { return m_Duration; }
+        [[nodiscard]] bool isVald() const;  // note: preserves original typo
+        bool apply(float time, scene::SceneEntityWorld& world) const;  // NOLINT(modernize-use-nodiscard)
+        void addChannel(const std::shared_ptr<SceneAnimationChannel>& channel);
     };
 
 } // namespace caustica

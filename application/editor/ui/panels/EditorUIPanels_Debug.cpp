@@ -136,7 +136,7 @@ void EditorUI::buildDeltaTreeViz()
         UITreeNode *                parent = nullptr;
         std::vector<UITreeNode *>   children;
 
-        void Init(const DeltaTreeVizPathVertex& deltaVertex, SceneEditor & app, const ImVec2 & nodeSize, const ImVec2 & nodePadding, const ImVec2 & topLeft)
+        void init(const DeltaTreeVizPathVertex& deltaVertex, SceneEditor & app, const ImVec2 & nodeSize, const ImVec2 & nodePadding, const ImVec2 & topLeft)
         {   app;
             this->deltaVertex = deltaVertex;
             selected = false;
@@ -164,7 +164,7 @@ void EditorUI::buildDeltaTreeViz()
     for (int i = 0; i < nodeCount; i++)
     {
         UITreeNode & node = treeNodes[i];
-        node.Init(deltaPathTreeVertices[i], m_sceneEditor, nodeSize, nodePadding, topLeft);
+        node.init(deltaPathTreeVertices[i], m_sceneEditor, nodeSize, nodePadding, topLeft);
         assert(node.vertexIndex < nodeLevels.size());
         nodeLevels[node.vertexIndex].push_back(&node);
         longestLevelCount = std::max(longestLevelCount, (int)nodeLevels[node.vertexIndex].size());
@@ -315,11 +315,11 @@ void EditorUI::buildDeltaTreeViz()
             if (isAnyHovered)
             {
                 float3 worldPos = treeNode.deltaVertex.worldPos;
-                float3 viewVec = worldPos - m_sceneEditor.currentCamera().GetPosition();
+                float3 viewVec = worldPos - m_sceneEditor.currentCamera().getPosition();
                 float sphereSize = 0.006f + 0.004f * dm::length(viewVec);
                 float step = 0.15f;
                 viewVec = dm::normalize(viewVec);
-                float3 right = dm::cross(viewVec, m_sceneEditor.currentCamera().GetUp());
+                float3 right = dm::cross(viewVec, m_sceneEditor.currentCamera().getUp());
                 float3 up = dm::cross(right, viewVec);
                 float3 prev0 = worldPos;
                 float3 prev1 = worldPos;

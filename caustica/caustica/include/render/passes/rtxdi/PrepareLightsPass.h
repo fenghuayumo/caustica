@@ -78,13 +78,13 @@ public:
         std::shared_ptr<ShaderDebug> shaderDebug
     );
 
-    void SetScene(std::shared_ptr<caustica::Scene> scene, std::shared_ptr<EnvMapProcessor> environmentMap = nullptr, EnvMapSceneParams envMapSceneParams = {} );
-    void SetGaussianSplatEmissionProxies(const std::vector<GaussianSplatEmissionProxy>* proxies, caustica::math::float4x4 objectToWorld, float emissionIntensity);
-    void CreatePipeline();
-    void CreateBindingSet(RtxdiResources& resources, const RenderTargets& renderTargets);
-    void CountLightsInScene(uint32_t& numEmissiveMeshes, uint32_t& numEmissiveTriangles);
+    void setScene(std::shared_ptr<caustica::Scene> scene, std::shared_ptr<EnvMapProcessor> environmentMap = nullptr, EnvMapSceneParams envMapSceneParams = {} );
+    void setGaussianSplatEmissionProxies(const std::vector<GaussianSplatEmissionProxy>* proxies, caustica::math::float4x4 objectToWorld, float emissionIntensity);
+    void createPipeline();
+    void createBindingSet(RtxdiResources& resources, const RenderTargets& renderTargets);
+    void countLightsInScene(uint32_t& numEmissiveMeshes, uint32_t& numEmissiveTriangles);
     
-    RTXDI_LightBufferParameters Process(nvrhi::ICommandList* commandList);
+    RTXDI_LightBufferParameters process(nvrhi::ICommandList* commandList);
 
-    nvrhi::TextureHandle GetEnvironmentMapTexture();
+    nvrhi::TextureHandle getEnvironmentMapTexture();
 };

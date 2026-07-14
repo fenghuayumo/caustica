@@ -34,10 +34,10 @@ CaptureScriptManager::~CaptureScriptManager()
 
 bool CaptureScriptManager::ScriptProgressUI()
 {
-    if (!m_sequencer.IsActive() && !m_sequencer.IsStarting())
+    if (!m_sequencer.isActive() && !m_sequencer.IsStarting())
         return false;
 
-    const auto& settings = m_sequencer.Settings();
+    const auto& settings = m_sequencer.settings();
     if (m_sequencer.ResetAndWarmupCounter() > 0)
     {
         ImGui::Spacing();
@@ -63,13 +63,13 @@ bool CaptureScriptManager::ScriptProgressUI()
 
 void CaptureScriptManager::ScriptMainUI(const ImVec4 & warnColor, const ImVec4 & categoryColor, float indent, float currentScale)
 {
-    assert(!m_sequencer.IsActive() && !m_sequencer.IsStarting()); // this point should never be reached if active because ScriptProgressUI should be up instead
+    assert(!m_sequencer.isActive() && !m_sequencer.IsStarting()); // this point should never be reached if active because ScriptProgressUI should be up instead
 
-    auto& settings = m_sequencer.Settings();
+    auto& settings = m_sequencer.settings();
 
     ImGui::TextColored(categoryColor, "Options");
 
-    if (ImGui::Combo("Capture type", &settings.Type, "SimpleScreenshot\0SequenceCapture\0Benchmark\00" ))
+    if (ImGui::Combo("capture type", &settings.Type, "SimpleScreenshot\0SequenceCapture\0Benchmark\00" ))
         settings.Type = dm::clamp(settings.Type, 0, 0 );
 
     if (settings.Type == 0)
@@ -179,9 +179,9 @@ void CaptureScriptManager::PostAnim()
 
 }
 
-void CaptureScriptManager::PreRender()
+void CaptureScriptManager::preRender()
 {
-    const CaptureSequencerPreRenderActions actions = m_sequencer.PreRender();
+    const CaptureSequencerPreRenderActions actions = m_sequencer.preRender();
     m_ui.settings.ResetRealtimeCaches |= actions.ResetRealtimeCaches;
     m_ui.settings.ResetAccumulation |= actions.ResetAccumulation;
 }
@@ -199,7 +199,7 @@ void CaptureScriptManager::PostRender(const std::function<bool(const char*)>& du
         const std::filesystem::path& capturePath = result.CapturePath;
         if (result.CaptureSuccess)
         {
-            caustica::info("Capture of '%s' finished successfully. Exiting.", capturePath.string().c_str());
+            caustica::info("capture of '%s' finished successfully. Exiting.", capturePath.string().c_str());
             std::exit(0);
         }
         else

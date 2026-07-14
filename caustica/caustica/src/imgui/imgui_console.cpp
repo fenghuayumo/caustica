@@ -74,7 +74,7 @@ void ImGui_Console::ClearHistory()
 	m_HistoryIterator = m_History.rend();
 }
 
-void ImGui_Console::Render(bool* open)
+void ImGui_Console::render(bool* open)
 {
 	ImGui::SetNextWindowSize(ImVec2(800, 600), ImGuiCond_FirstUseEver);
 	if (!ImGui::Begin("Console", open, ImGuiWindowFlags_MenuBar))
@@ -94,9 +94,9 @@ void ImGui_Console::Render(bool* open)
 	{
 		if (ImGui::BeginMenu("Edit"))
 		{
-			bool clearLog = ImGui::MenuItem("Clear Log");
-			bool clearHistory = ImGui::MenuItem("Clear History");
-			bool clearAll = ImGui::MenuItem("Clear All");
+			bool clearLog = ImGui::MenuItem("clear Log");
+			bool clearHistory = ImGui::MenuItem("clear History");
+			bool clearAll = ImGui::MenuItem("clear All");
 
 			if (clearLog || clearAll)
 				this->ClearLog();
@@ -117,7 +117,7 @@ void ImGui_Console::Render(bool* open)
 	// right click popup on log panel
 	if (ImGui::BeginPopupContextWindow()) 
 	{
-		if (ImGui::Selectable("Clear"))
+		if (ImGui::Selectable("clear"))
 			ClearLog();
 		ImGui::EndPopup();
 	}
@@ -230,7 +230,7 @@ void ImGui_Console::ExecCommand(char const* cmdline)
 	{
 		this->Print("> %s", cmd.data());
 
-		if (auto result = m_Interpreter->Execute(cmd); result.status)
+		if (auto result = m_Interpreter->execute(cmd); result.status)
 		{
 			if (!result.output.empty())
 				printLines(*this, result.output.c_str());

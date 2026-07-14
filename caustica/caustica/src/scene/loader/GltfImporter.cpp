@@ -619,7 +619,7 @@ static std::pair<const uint8_t*, size_t> cgltf_buffer_iterator(const cgltf_acces
     return std::make_pair(data, stride);
 }
 
-bool GltfImporter::Load(
+bool GltfImporter::load(
     const std::filesystem::path& fileName,
     TextureLoader& textureCache,
     SceneLoadingStats& stats,
@@ -909,7 +909,7 @@ bool GltfImporter::Load(
     {
         const cgltf_material& material = objects->materials[mat_idx];
         
-        std::shared_ptr<Material> matinfo = m_SceneTypeFactory->CreateMaterial();
+        std::shared_ptr<Material> matinfo = m_SceneTypeFactory->createMaterial();
         if (material.name)
             matinfo->name = material.name;
         matinfo->modelFileName = normalizedFileName;
@@ -1052,7 +1052,7 @@ bool GltfImporter::Load(
     buffers->radiusData.resize(totalVertices);
     if (hasJoints)
     {
-        // Allocate joint/weight arrays for all the vertices in the model.
+        // allocate joint/weight arrays for all the vertices in the model.
         // This is wasteful in case the model has both skinned and non-skinned meshes; TODO: improve.
         buffers->jointData.resize(totalVertices);
         buffers->weightData.resize(totalVertices);
@@ -1073,7 +1073,7 @@ bool GltfImporter::Load(
     {
         const cgltf_mesh& mesh = objects->meshes[mesh_idx];
 
-        std::shared_ptr<MeshInfo> minfo = m_SceneTypeFactory->CreateMesh();
+        std::shared_ptr<MeshInfo> minfo = m_SceneTypeFactory->createMesh();
         if (mesh.name) minfo->name = mesh.name;
         minfo->buffers = buffers;
         minfo->indexOffset = (uint32_t)totalIndices;
@@ -1515,7 +1515,7 @@ bool GltfImporter::Load(
                 }
             }
 
-            auto geometry = m_SceneTypeFactory->CreateMeshGeometry();
+            auto geometry = m_SceneTypeFactory->createMeshGeometry();
             if (prim.material)
             {
                 geometry->material = materials[prim.material];
@@ -1674,14 +1674,14 @@ bool GltfImporter::Load(
         switch(src->type)  // NOLINT(clang-diagnostic-switch-enum)
         {
         case cgltf_light_type_directional: {
-            auto directional = std::static_pointer_cast<DirectionalLight>(m_SceneTypeFactory->CreateLeaf("DirectionalLight"));
+            auto directional = std::static_pointer_cast<DirectionalLight>(m_SceneTypeFactory->createLeaf("DirectionalLight"));
             directional->irradiance = src->intensity;
             directional->color = src->color;
             dst = directional;
             break;
         }
         case cgltf_light_type_point: {
-            auto point = std::static_pointer_cast<PointLight>(m_SceneTypeFactory->CreateLeaf("PointLight"));
+            auto point = std::static_pointer_cast<PointLight>(m_SceneTypeFactory->createLeaf("PointLight"));
             point->intensity = src->intensity;
             point->color = src->color;
             point->range = src->range;
@@ -1689,7 +1689,7 @@ bool GltfImporter::Load(
             break;
         }
         case cgltf_light_type_spot: {
-            auto spot = std::static_pointer_cast<SpotLight>(m_SceneTypeFactory->CreateLeaf("SpotLight"));
+            auto spot = std::static_pointer_cast<SpotLight>(m_SceneTypeFactory->createLeaf("SpotLight"));
             spot->intensity = src->intensity;
             spot->color = src->color;
             spot->range = src->range;
@@ -1976,10 +1976,10 @@ bool GltfImporter::Load(
                 continue;
 
             auto dstTrack = std::make_shared<SceneAnimationChannel>(dstSampler, dstEntity, attribute);
-            dstAnim->AddChannel(dstTrack);
+            dstAnim->addChannel(dstTrack);
         }
 
-        if (dstAnim->IsVald())
+        if (dstAnim->isVald())
         {
             std::string animName = srcAnim->name ? srcAnim->name : std::string{};
             ecs::Entity animationEntity = world.createEntity(animName, animationContainer);

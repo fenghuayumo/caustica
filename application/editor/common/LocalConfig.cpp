@@ -116,7 +116,7 @@ void LocalConfig::PostAppInit(caustica::render::RenderSessionState& sampleUI)
         sampleUI.settings.EnableBloom = false;
         //sampleUI.settings.ToneMappingParams.exposureCompensation = 1.5f;
 #endif
-        //sampleUI.settings.EnvironmentMapParams.Enabled = false;
+        //sampleUI.settings.EnvironmentMapParams.enabled = false;
         //sampleUI.settings.ToneMappingParams.exposureCompensation = 5.2f;
         sampleUI.settings.EnableAnimations = false;
     }

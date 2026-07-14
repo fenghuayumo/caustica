@@ -43,7 +43,7 @@ void EditorUI::BuildLightingPanel(const PanelLayout& layout)
             {
                 RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent););
                 if (auto& lightSamplingCache = m_sceneEditor.lightingPasses().lightSampling(); lightSamplingCache != nullptr)
-                    m_settings.ResetAccumulation |= lightSamplingCache->InfoGUI(layout.indent);
+                    m_settings.ResetAccumulation |= lightSamplingCache->infoGUI(layout.indent);
             }
 
 
@@ -54,7 +54,7 @@ void EditorUI::BuildLightingPanel(const PanelLayout& layout)
                 {
                     RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent););
                     if (auto& envMapProcessor = m_sceneEditor.lightingPasses().environment(); envMapProcessor != nullptr)
-                        m_settings.ResetAccumulation |= envMapProcessor->DebugGUI(layout.indent);
+                        m_settings.ResetAccumulation |= envMapProcessor->debugGUI(layout.indent);
                 }
             }
 
@@ -97,7 +97,7 @@ void EditorUI::BuildLightingPanel(const PanelLayout& layout)
                     {
                         RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent););
                         if (auto& lightSamplingCache = m_sceneEditor.lightingPasses().lightSampling(); lightSamplingCache != nullptr)
-                            m_settings.ResetAccumulation |= lightSamplingCache->DebugGUI(layout.indent);
+                            m_settings.ResetAccumulation |= lightSamplingCache->debugGUI(layout.indent);
                     }
                 }
             }
@@ -131,13 +131,13 @@ void EditorUI::BuildPathTracerPanel(const PanelLayout& layout)
             
                 if (m_settings.RealtimeMode)
                 {
-                    if (ImGui::Button("Reset##RTMACC"))
+                    if (ImGui::Button("reset##RTMACC"))
                         m_settings.ResetRealtimeCaches = true;
-                    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Reset all temporal caches in denoising, lighting and etc");
+                    if (ImGui::IsItemHovered()) ImGui::SetTooltip("reset all temporal caches in denoising, lighting and etc");
                     ImGui::SameLine();
             
                     {
-                        UI_SCOPED_DISABLE( (m_settings.ActualUseReSTIRDI() || m_settings.ActualUseReSTIRGI() || m_settings.ActualUseReSTIRPT()) );
+                        UI_SCOPED_DISABLE( (m_settings.actualUseReSTIRDI() || m_settings.actualUseReSTIRGI() || m_settings.actualUseReSTIRPT()) );
                         ImGui::InputInt("Samples per pixel", &m_settings.RealtimeSamplesPerPixel); 
                         m_settings.RealtimeSamplesPerPixel = dm::clamp(m_settings.RealtimeSamplesPerPixel, 1, 64);
                         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) 
@@ -146,7 +146,7 @@ void EditorUI::BuildPathTracerPanel(const PanelLayout& layout)
                 }
                 else
                 {
-                    RESET_ON_CHANGE( ImGui::Button("Reset##REFMACC") );
+                    RESET_ON_CHANGE( ImGui::Button("reset##REFMACC") );
                     ImGui::SameLine();
                     RESET_ON_CHANGE( ImGui::InputInt("Sample count", &m_settings.AccumulationTarget) );
                     m_settings.AccumulationTarget = dm::clamp(m_settings.AccumulationTarget, 1, 4 * 1024 * 1024); // this max is beyond float32 precision threshold; expect some banding creeping in when using more than 500k samples
@@ -271,7 +271,7 @@ void EditorUI::BuildPathTracerPanel(const PanelLayout& layout)
 #if CAUSTICA_WITH_OIDN
                     bool oidnChanged = false;
                     oidnChanged |= ImGui::Checkbox("Use OIDN denoiser", &m_settings.ReferenceOIDNDenoiser);
-                    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Runs Intel Open Image Denoise once after the Reference accumulation target is reached.\nThe denoised HDR result is reused until accumulation is reset.");
+                    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Runs Intel Open Image denoise once after the Reference accumulation target is reached.\nThe denoised HDR result is reused until accumulation is reset.");
 
                     {
                         RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent););
@@ -375,12 +375,12 @@ void EditorUI::BuildPathTracerPanel(const PanelLayout& layout)
                     if (ImGui::Combo("ReSTIR DI/GI Preset", (int*)&m_settings.RTXDIRestirPreset,
                         "(Custom)\0Fast\0Medium\0Unbiased\0Ultra\0Reference\0\0"))
                     {
-                        m_settings.ApplyRTXDIRestirPreset();
+                        m_settings.applyRTXDIRestirPreset();
                     }
                     if (ImGui::Combo("ReSTIR PT Preset", (int*)&m_settings.RTXDIRestirPTPreset,
                         "(Custom)\0Fast\0Medium\0Ultra\0\0"))
                     {
-                        m_settings.ApplyRTXDIRestirPTPreset();
+                        m_settings.applyRTXDIRestirPTPreset();
                     }
                     ImGui::PopItemWidth();
                 }
@@ -424,7 +424,7 @@ void EditorUI::BuildPathTracerPanel(const PanelLayout& layout)
                 }
             }
 
-            if (ImGui::CollapsingHeader("PT: Advanced Settings", 0))
+            if (ImGui::CollapsingHeader("PT: Advanced settings", 0))
             {
                 ImGui::TextColored(categoryColor, "Features:");
                 ImGui::Combo("Nested Dielectrics", (int*)&m_settings.NestedDielectricsQuality, "Off\0Fast\0Quality\0"); m_settings.NestedDielectricsQuality = clamp( m_settings.NestedDielectricsQuality, 0, 2 );
@@ -457,7 +457,7 @@ void EditorUI::BuildPathTracerPanel(const PanelLayout& layout)
                     }
 
 #if CAUSTICA_D3D_AGILITY_SDK_VERSION >= 619
-                    if (GetDevice()->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D12)
+                    if (getDevice()->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D12)
                     {
                         RESET_ON_CHANGE(ImGui::Checkbox("dx::HitObject codepath", &m_settings.DXHitObjectExtension));
                         if (m_settings.DXHitObjectExtension)

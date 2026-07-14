@@ -98,8 +98,8 @@ protected:
 // Usage:
 //   void onEvent(Event& e) {
 //       EventDispatcher dispatcher(e);
-//       dispatcher.Dispatch<KeyPressedEvent>(BIND_EVENT_FN(onKeyPressed));
-//       dispatcher.Dispatch<WindowResizeEvent>([&](auto& ev) { ... });
+//       dispatcher.dispatch<KeyPressedEvent>(BIND_EVENT_FN(onKeyPressed));
+//       dispatcher.dispatch<WindowResizeEvent>([&](auto& ev) { ... });
 //   }
 // ---------------------------------------------------------------------------
 template<typename T>
@@ -112,9 +112,9 @@ public:
         : m_Event(event)
     {}
 
-    // Dispatch to a handler of concrete type T. Returns true if handled.
+    // dispatch to a handler of concrete type T. Returns true if handled.
     template<EventTypeConcept T>
-    bool Dispatch(std::function<bool(T&)> handler)
+    bool dispatch(std::function<bool(T&)> handler)
     {
         if (m_Event.GetEventType() != T::GetStaticType())
             return false;
@@ -125,7 +125,7 @@ public:
         return handled;
     }
 
-    // Dispatch only if the event category matches.
+    // dispatch only if the event category matches.
     template<EventTypeConcept T>
     bool DispatchIf(EventCategory category, std::function<bool(T&)> handler)
     {

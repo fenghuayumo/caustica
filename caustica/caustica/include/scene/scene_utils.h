@@ -13,11 +13,11 @@ namespace caustica
 class Light;
 class Scene;
 
-bool IsDirectMeshSceneFile(const std::filesystem::path& sceneFileName);
+bool isDirectMeshSceneFile(const std::filesystem::path& sceneFileName);
 
-std::string FindPreferredScene(const std::vector<std::string>& available,
+std::string findPreferredScene(const std::vector<std::string>& available,
     const std::string& preferred);
 
-ecs::Entity FindEnvironmentLightEntity(const Scene& scene);
+ecs::Entity findEnvironmentLightEntity(const Scene& scene);
 
 } // namespace caustica

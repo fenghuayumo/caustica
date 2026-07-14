@@ -132,7 +132,7 @@ void SceneManager::onSceneLoadedGpuPrep(caustica::Scene& scene, bool& accelRebui
 {
     accelRebuildRequested = true;
 
-    if (auto* entityWorld = scene.GetEntityWorld())
+    if (auto* entityWorld = scene.getEntityWorld())
         entityWorld->applyAnimations(0.0f);
 }
 
@@ -167,7 +167,7 @@ std::shared_ptr<caustica::Scene> SceneManager::loadScene(
     const std::filesystem::path&           sceneFileName)
 {
     auto scene = std::make_shared<caustica::Scene>(
-        m_device.GetDevice(),
+        m_device.getDevice(),
         m_shaderFactory,
         std::move(fs),
         m_textureCache,
@@ -176,9 +176,9 @@ std::shared_ptr<caustica::Scene> SceneManager::loadScene(
 
     if (sceneFileName == std::filesystem::path(inlineSceneSentinel()))
     {
-        if (scene->LoadFromJsonString(m_inlineSceneJson))
+        if (scene->loadFromJsonString(m_inlineSceneJson))
         {
-            scene->ProcessNodesRecursive();
+            scene->processNodesRecursive();
             m_scene = scene;
             return scene;
         }
@@ -186,9 +186,9 @@ std::shared_ptr<caustica::Scene> SceneManager::loadScene(
         return nullptr;
     }
 
-    if (scene->Load(sceneFileName))
+    if (scene->load(sceneFileName))
     {
-        scene->ProcessNodesRecursive();
+        scene->processNodesRecursive();
         m_scene = scene;
         return scene;
     }
@@ -213,8 +213,8 @@ void SceneManager::beginLoadingScene(std::shared_ptr<caustica::IFileSystem> fs,
                                      const std::filesystem::path& sceneFileName)
 {
     m_device.waitForRenderThreadIdle();
-    m_device.GetDevice()->waitForIdle();
-    m_device.GetDevice()->runGarbageCollection();
+    m_device.getDevice()->waitForIdle();
+    m_device.getDevice()->runGarbageCollection();
 
     m_loader.beginLoading(std::move(fs), sceneFileName);
 
@@ -230,7 +230,7 @@ void SceneManager::updateLoading()
 void SceneManager::tickSimulation(uint32_t frameIndex)
 {
     if (m_scene)
-        m_scene->RefreshSceneWorld(frameIndex);
+        m_scene->refreshSceneWorld(frameIndex);
 }
 
 bool SceneManager::isSceneLoading() const

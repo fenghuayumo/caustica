@@ -62,7 +62,7 @@ public:
         return m_RendererString.c_str();
     }
 
-    nvrhi::IDevice *GetDevice() const override
+    nvrhi::IDevice *getDevice() const override
     {
         return m_NvrhiDevice;
     }
@@ -86,7 +86,7 @@ protected:
     nvrhi::ITexture* GetBackBuffer(uint32_t index) override;
     uint32_t GetCurrentBackBufferIndex() override;
     uint32_t GetBackBufferCount() override;
-    bool BeginFrame() override;
+    bool beginFrame() override;
     bool Present() override;
     void Shutdown() override;
     void PrepareShutdown() override;

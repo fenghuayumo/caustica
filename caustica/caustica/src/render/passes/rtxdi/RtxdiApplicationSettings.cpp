@@ -1,6 +1,6 @@
 #include <render/passes/rtxdi/RtxdiApplicationSettings.h>
 
-const rtxdi::ReSTIRDI_ResamplingMode GetReSTIRDI_ResamplingMode() { return rtxdi::ReSTIRDI_ResamplingMode::TemporalAndSpatial; }
+const rtxdi::ReSTIRDI_ResamplingMode getReSTIRDI_ResamplingMode() { return rtxdi::ReSTIRDI_ResamplingMode::TemporalAndSpatial; }
 
 const ReSTIRDI_InitialSamplingParameters getReSTIRDIInitialSamplingParams()
 {
@@ -59,7 +59,7 @@ const ReSTIRDI_ShadingParameters getReSTIRDIShadingParams()
 	return params;
 }
 
-const rtxdi::ReSTIRGI_ResamplingMode GetReSTIRGI_ResamplingMode() { return rtxdi::ReSTIRGI_ResamplingMode::TemporalAndSpatial; }
+const rtxdi::ReSTIRGI_ResamplingMode getReSTIRGI_ResamplingMode() { return rtxdi::ReSTIRGI_ResamplingMode::TemporalAndSpatial; }
 
 const ReSTIRGI_TemporalResamplingParameters getReSTIRGITemporalResamplingParams()
 {
@@ -103,7 +103,7 @@ const rtxdi::ReGIRDynamicParameters getReGIRDynamicParams()
 	return params;
 }
 
-const rtxdi::ReSTIRPT_ResamplingMode GetReSTIRPT_ResamplingMode()
+const rtxdi::ReSTIRPT_ResamplingMode getReSTIRPT_ResamplingMode()
 {
     return rtxdi::ReSTIRPT_ResamplingMode::TemporalAndSpatial;
 }

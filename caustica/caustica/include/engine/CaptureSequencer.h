@@ -39,12 +39,12 @@ public:
     CaptureSequencer() = default;
     explicit CaptureSequencer(const CommandLineOptions& cmdLine);
 
-    CaptureSequencerSettings& Settings() { return m_settings; }
-    const CaptureSequencerSettings& Settings() const { return m_settings; }
+    CaptureSequencerSettings& settings() { return m_settings; }
+    const CaptureSequencerSettings& settings() const { return m_settings; }
 
     void RequestStart() { m_start = true; }
     bool IsStarting() const { return m_start; }
-    bool IsActive() const { return m_active; }
+    bool isActive() const { return m_active; }
     bool IsDoingWork() const { return m_start || m_active; }
     bool ExitAfterCapture() const { return m_exitAfterCapture; }
     bool CaptureSuccess() const { return m_captureSuccess; }
@@ -52,7 +52,7 @@ public:
     int SequenceRecordCounter() const { return m_sequenceRecordCounter; }
 
     void PreAnim(float& elapsedTimeSeconds, bool asyncLoadingInProgress, const std::function<void(double)>& setSceneTime);
-    CaptureSequencerPreRenderActions PreRender();
+    CaptureSequencerPreRenderActions preRender();
     CaptureSequencerPostRenderResult PostRender(
         bool realtimeMode,
         bool accumulationCompleted,

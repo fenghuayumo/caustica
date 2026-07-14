@@ -242,7 +242,7 @@ void BloomPass::renderInternal(
         }
 
         {
-            commandList->beginMarker("Apply");
+            commandList->beginMarker("apply");
 
             caustica::render::BlitParameters blitParams3;
             blitParams3.targetFramebuffer = framebuffer;
@@ -263,7 +263,7 @@ void BloomPass::renderInternal(
     commandList->endMarker();
 }
 
-void BloomPass::Render(
+void BloomPass::render(
     nvrhi::ICommandList* commandList,
     const std::shared_ptr<FramebufferFactory>& framebufferFactory,
     const ICompositeView& compositeView,

@@ -85,7 +85,7 @@ PostProcess::PostProcess( nvrhi::IDevice* device, std::shared_ptr<caustica::Shad
     m_pointSampler = m_device->createSampler(samplerDesc);
 }
 
-void PostProcess::Apply(nvrhi::ICommandList* commandList, ComputePassType passType, nvrhi::BufferHandle consts, SampleMiniConstants & miniConsts, nvrhi::BindingSetHandle bindingSet, nvrhi::BindingLayoutHandle bindingLayout, uint32_t width, uint32_t height)
+void PostProcess::apply(nvrhi::ICommandList* commandList, ComputePassType passType, nvrhi::BufferHandle consts, SampleMiniConstants & miniConsts, nvrhi::BindingSetHandle bindingSet, nvrhi::BindingLayoutHandle bindingLayout, uint32_t width, uint32_t height)
 {
     uint passIndex = (uint32_t)passType;
 
@@ -109,7 +109,7 @@ void PostProcess::Apply(nvrhi::ICommandList* commandList, ComputePassType passTy
     commandList->dispatch(dispatchSize.x, dispatchSize.y);
 }
 
-void PostProcess::Apply( nvrhi::ICommandList* commandList, ComputePassType passType, int pass, nvrhi::BufferHandle consts, SampleMiniConstants & miniConsts, nvrhi::ITexture* workTexture, RenderTargets & renderTargets, nvrhi::ITexture* sourceTexture)
+void PostProcess::apply( nvrhi::ICommandList* commandList, ComputePassType passType, int pass, nvrhi::BufferHandle consts, SampleMiniConstants & miniConsts, nvrhi::ITexture* workTexture, RenderTargets & renderTargets, nvrhi::ITexture* sourceTexture)
 {
     // commandList->beginMarker("PostProcessCS");
 
@@ -130,13 +130,13 @@ void PostProcess::Apply( nvrhi::ICommandList* commandList, ComputePassType passT
             nvrhi::BindingSetItem::Texture_SRV(7, renderTargets.denoiserDisocclusionThresholdMix),
             nvrhi::BindingSetItem::StructuredBuffer_SRV(10, renderTargets.stablePlanesBuffer),
             nvrhi::BindingSetItem::Sampler(0, (true) ? m_linearSampler : m_pointSampler),
-            nvrhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->GetGPUWriteBuffer()),
-            nvrhi::BindingSetItem::Texture_UAV(SHADER_DEBUG_VIZ_TEXTURE_UAV_INDEX, m_shaderDebug->GetDebugVizTexture()),
+            nvrhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->getGPUWriteBuffer()),
+            nvrhi::BindingSetItem::Texture_UAV(SHADER_DEBUG_VIZ_TEXTURE_UAV_INDEX, m_shaderDebug->getDebugVizTexture()),
     	};
 
     nvrhi::BindingSetHandle bindingSet = m_bindingCache.getOrCreateBindingSet(bindingSetDesc, m_bindingLayoutCS);
 
-    Apply(commandList, passType, consts, miniConsts, bindingSet, m_bindingLayoutCS, workTexture->getDesc().width, workTexture->getDesc().height);
+    apply(commandList, passType, consts, miniConsts, bindingSet, m_bindingLayoutCS, workTexture->getDesc().width, workTexture->getDesc().height);
 
     // commandList->endMarker();
 }

@@ -52,11 +52,11 @@ void postProcessAAPlatform(CameraController& camera, PostProcessAAParams& params
             slConstants.cameraMotionIncluded = true;
             slConstants.cameraNear = camera.zNear();
             slConstants.cameraPinholeOffset = { 0.f, 0.f };
-            slConstants.cameraPos = camera.camera().GetPosition();
-            slConstants.cameraFwd = camera.camera().GetDir();
-            slConstants.cameraUp = camera.camera().GetUp();
+            slConstants.cameraPos = camera.camera().getPosition();
+            slConstants.cameraFwd = camera.camera().getDir();
+            slConstants.cameraUp = camera.camera().getUp();
             slConstants.cameraRight = normalize(
-                cross(camera.camera().GetDir(), camera.camera().GetUp()));
+                cross(camera.camera().getDir(), camera.camera().getUp()));
             slConstants.cameraViewToClip = projection;
             slConstants.clipToCameraView = inverse(projection);
             slConstants.clipToPrevClip = reprojectionMatrix;
@@ -110,7 +110,7 @@ void postProcessAAPlatform(CameraController& camera, PostProcessAAParams& params
         SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
         nvrhi::TextureDesc tdesc = renderTargets->outputColor->getDesc();
         commandList->beginMarker("DLSSRR_PrepareInputs");
-        params.postProcess->Apply(
+        params.postProcess->apply(
             commandList,
             PostProcess::ComputePassType::DLSSRRDenoiserPrepareInputs,
             params.constantBuffer,
@@ -140,12 +140,12 @@ void postProcessAAPlatform(CameraController& camera, PostProcessAAParams& params
         params.gpuDevice->GetStreamline().EvaluateDLSSRR(commandList);
         commandList->clearState();
     }
-    else if (!settings.ActualUseStandaloneDenoiser())
+    else if (!settings.actualUseStandaloneDenoiser())
     {
         SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
         nvrhi::TextureDesc tdesc = renderTargets->outputColor->getDesc();
         commandList->beginMarker("NoDenoiserFinalMerge");
-        params.postProcess->Apply(
+        params.postProcess->apply(
             commandList,
             PostProcess::ComputePassType::NoDenoiserFinalMerge,
             params.constantBuffer,

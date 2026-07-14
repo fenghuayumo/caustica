@@ -59,7 +59,7 @@ namespace caustica
 
         // Returns true if the custom font data has been successfully loaded.
         // This doesn't necessarily mean that the font data is valid: the actual font object is only created
-        // in the first call to ImGui_Renderer::Animate(...). After that, use GetScaledFont()
+        // in the first call to ImGui_Renderer::animate(...). After that, use GetScaledFont()
         // to test if the font is valid.
         bool HasFontData() const { return m_data != nullptr; }
 
@@ -87,7 +87,7 @@ namespace caustica
     public:
         ImGui_Renderer(GpuDevice *devManager);
         ~ImGui_Renderer();
-        bool Init(std::shared_ptr<caustica::ShaderFactory> shaderFactory);
+        bool init(std::shared_ptr<caustica::ShaderFactory> shaderFactory);
 
         // Loads a TTF font from file and registers it with the ImGui_Renderer.
         // To use the font with ImGUI at runtime, call RegisteredFont::GetScaledFont().
@@ -105,8 +105,8 @@ namespace caustica
         // Returns the default font.
         std::shared_ptr<RegisteredFont> GetDefaultFont() { return m_defaultFont; }
 
-        virtual void Animate(float elapsedTimeSeconds);
-        virtual void Render(nvrhi::IFramebuffer* framebuffer);
+        virtual void animate(float elapsedTimeSeconds);
+        virtual void render(nvrhi::IFramebuffer* framebuffer);
         virtual void BackBufferResizing();
         virtual void BackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount) {}
         virtual void DisplayScaleChanged(float scaleX, float scaleY);

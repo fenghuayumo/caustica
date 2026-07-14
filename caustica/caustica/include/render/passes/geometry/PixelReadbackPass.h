@@ -36,10 +36,10 @@ namespace caustica::render
             uint32_t arraySlice = 0,
             uint32_t mipLevel = 0);
 
-        void Capture(nvrhi::ICommandList* commandList, dm::uint2 pixelPosition);
+        void capture(nvrhi::ICommandList* commandList, dm::uint2 pixelPosition);
 
-        dm::float4 ReadFloats();
-        dm::uint4 ReadUInts();
-        dm::int4 ReadInts();
+        dm::float4 readFloats();
+        dm::uint4 readUInts();
+        dm::int4 readInts();
     };
 }

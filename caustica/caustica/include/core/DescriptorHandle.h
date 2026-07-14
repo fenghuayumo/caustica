@@ -31,7 +31,7 @@ public:
     [[nodiscard]] bool isValid() const { return m_DescriptorIndex >= 0 && !m_manager.expired(); }
     [[nodiscard]] DescriptorIndex Get() const { if (m_DescriptorIndex >= 0) assert(!m_manager.expired()); return m_DescriptorIndex; }
     [[nodiscard]] DescriptorIndex GetIndexInHeap() const;
-    void Reset() { m_DescriptorIndex = -1; m_manager.reset(); }
+    void reset() { m_DescriptorIndex = -1; m_manager.reset(); }
 
     DescriptorHandle(const DescriptorHandle&) = delete;
     DescriptorHandle(DescriptorHandle&&) = default;

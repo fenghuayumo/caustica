@@ -22,9 +22,9 @@ class GameScene
 public:
     GameScene(caustica::editor::SceneEditor& sample, const CommandLineOptions& cmdLine);
 
-    void                    SceneLoaded( const std::shared_ptr<caustica::Scene> & scene, const std::filesystem::path& sceneFilePath, const std::filesystem::path & mediaPath );
-    void                    SceneUnloading( );
-    bool                    DebugGUI(float indent);
+    void                    sceneLoaded( const std::shared_ptr<caustica::Scene> & scene, const std::filesystem::path& sceneFilePath, const std::filesystem::path & mediaPath );
+    void                    sceneUnloading( );
+    bool                    debugGUI(float indent);
     void                    StandaloneGUI(const std::shared_ptr<caustica::PlanarView> & view, const float2 & displaySize);
 
     bool                    IsInitialized() const           { return m_scene != nullptr && !m_props.empty(); }
@@ -38,11 +38,11 @@ public:
 
     // active means animating / physics is enabled
     //void                    SetActive(bool active);
-    bool                    IsActive()                      { return m_playSpeed != 0; }
+    bool                    isActive()                      { return m_playSpeed != 0; }
 
-    bool                    KeyboardUpdate(int key, int scancode, int action, int mods);
-    void                    MousePosUpdate(double xpos, double ypos);
-    void                    MouseButtonUpdate(int button, int action, int mods);
+    bool                    keyboardUpdate(int key, int scancode, int action, int mods);
+    void                    mousePosUpdate(double xpos, double ypos);
+    void                    mouseButtonUpdate(int button, int action, int mods);
     void                    Tick(float deltaTime, bool globalAnimationEnabled); // globalAnimationEnabled will be false if not in reference mode or global scene animations not enabled
     void                    TickCamera(float deltaTime, caustica::FirstPersonCamera & renderCamera);
 

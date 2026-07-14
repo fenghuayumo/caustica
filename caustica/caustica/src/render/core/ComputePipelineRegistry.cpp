@@ -64,7 +64,7 @@ ComputePipelineRegistry::ComputePipelineRegistry(nvrhi::IDevice* device, const s
             caustica::info("ComputePipelineRegistry: load-only mode using '%s'.", m_compilerConfig.ShaderBinariesPath.string().c_str());
     }
     
-    // Store additional paths to monitor (converted to absolute)
+    // store additional paths to monitor (converted to absolute)
     for (const auto& path : additionalMonitorPaths)
     {
         m_additionalMonitorPaths.push_back(std::filesystem::absolute(path));
@@ -107,7 +107,7 @@ void ComputePipelineRegistry::releaseVariant(std::shared_ptr<ComputeShaderVarian
     assert(false); // Variant not found
 }
 
-void ComputePipelineRegistry::EnqueueShaderForCompilation(ComputeShaderVariant* variant)
+void ComputePipelineRegistry::enqueueShaderForCompilation(ComputeShaderVariant* variant)
 {
     if (variant->m_compileCmdLine != "")
     {
@@ -230,10 +230,10 @@ void ComputePipelineRegistry::update(bool forceReload)
             if (variant->m_localVersion != m_version || forceReload)
             {
                 updateQueue.push_back(variant);
-                variant->ResetPipeline();
+                variant->resetPipeline();
                 variant->m_lockedRegistry = shared_from_this();
-                variant->PrepareCompilation(*m_lastUpdatedSourceTimestamp);
-                EnqueueShaderForCompilation(variant.get());
+                variant->prepareCompilation(*m_lastUpdatedSourceTimestamp);
+                enqueueShaderForCompilation(variant.get());
             }
         }
 
@@ -263,7 +263,7 @@ void ComputePipelineRegistry::update(bool forceReload)
 #if COMPUTE_REGISTRY_ENABLE_MULTITHREADED_COMPILE
             m_threadPool.AddTask([this, variant, &progressCompilingShaders, &progressCounterCompleted, progressTotal]() {
 #endif
-                variant->CompileIfNeeded();
+                variant->compileIfNeeded();
                 int completed = progressCounterCompleted.fetch_add(1) + 1;
                 progressCompilingShaders.Set(100 * completed / progressTotal);
 #if COMPUTE_REGISTRY_ENABLE_MULTITHREADED_COMPILE
@@ -286,7 +286,7 @@ void ComputePipelineRegistry::update(bool forceReload)
                 break;
             }
 
-            variant->LoadShaderAndCreatePipeline();
+            variant->loadShaderAndCreatePipeline();
             
             if (variant->m_compileError != "")
             {
@@ -359,27 +359,27 @@ bool ComputeShaderVariant::needsUpdate() const
     auto registry = m_registry.lock();
     if (!registry)
         return false;
-    return m_localVersion != registry->GetVersion() || m_pipeline == nullptr;
+    return m_localVersion != registry->getVersion() || m_pipeline == nullptr;
 }
 
-void ComputeShaderVariant::ResetPipeline()
+void ComputeShaderVariant::resetPipeline()
 {
     m_shader = nullptr;
     m_pipeline = nullptr;
     m_localVersion = -1;
 }
 
-void ComputeShaderVariant::PrepareCompilation(std::filesystem::file_time_type lastModifiedSourceCode)
+void ComputeShaderVariant::prepareCompilation(std::filesystem::file_time_type lastModifiedSourceCode)
 {
     auto registry = m_lockedRegistry;
     assert(registry != nullptr);
 
-    // Clear any previous error
+    // clear any previous error
     m_compileError = "";
     m_compileCmdLine = "";
 
     // Build full source path
-    auto srcFullPath = std::filesystem::absolute(registry->GetShadersPath() / m_shaderSrcFileName);
+    auto srcFullPath = std::filesystem::absolute(registry->getShadersPath() / m_shaderSrcFileName);
 
     // Build DXC command using shared utilities
     ShaderCompilerUtils::DxcCommandOptions options;
@@ -400,19 +400,19 @@ void ComputeShaderVariant::PrepareCompilation(std::filesystem::file_time_type la
     options.EnableDebugPrint = true;
     options.Macros = m_macros;
 
-    auto cmdResult = ShaderCompilerUtils::buildDxcCommand(registry->GetCompilerConfig(), options);
-    caustica::ShaderKey cacheKey = ShaderCompilerUtils::makeShaderKey(registry->GetCompilerConfig(), options);
+    auto cmdResult = ShaderCompilerUtils::buildDxcCommand(registry->getCompilerConfig(), options);
+    caustica::ShaderKey cacheKey = ShaderCompilerUtils::makeShaderKey(registry->getCompilerConfig(), options);
     cacheKey.cacheHashHex = cmdResult.HashHex;
 
     const std::string previousHashHex = m_cacheKey.cacheHashHex;
     m_cacheKey = std::move(cacheKey);
     if (m_cacheKey.cacheHashHex != previousHashHex)
-        ResetPipeline();
+        resetPipeline();
 
-    m_compiledFullPath = m_cacheKey.cacheFilePath(registry->GetShaderBinariesPath()).string();
+    m_compiledFullPath = m_cacheKey.cacheFilePath(registry->getShaderBinariesPath()).string();
     m_packVfsPath = m_cacheKey.packVfsPath(c_ComputeShaderPackMount);
 
-    const bool compiledBlobAvailable = registry->GetFS()->fileExists(m_packVfsPath);
+    const bool compiledBlobAvailable = registry->getFS()->fileExists(m_packVfsPath);
     const bool diskBlobUpToDate = ShaderCompilerUtils::isCompiledShaderUpToDate(m_compiledFullPath, lastModifiedSourceCode);
     if (compiledBlobAvailable && (!registry->canCompileShaders() || diskBlobUpToDate))
     {
@@ -423,11 +423,11 @@ void ComputeShaderVariant::PrepareCompilation(std::filesystem::file_time_type la
     else if (registry->canCompileShaders())
     {
         EnsureDirectoryExists(std::filesystem::path(m_compiledFullPath).parent_path());
-        std::string command = registry->GetCompilerConfig().getCompilerPathQuoted();
+        std::string command = registry->getCompilerConfig().getCompilerPathQuoted();
         command += cmdResult.CommandBase;
 
 #if !COMPUTE_REGISTRY_EMBED_PDBS
-        if (registry->GetCompilerConfig().GraphicsAPI != nvrhi::GraphicsAPI::VULKAN)
+        if (registry->getCompilerConfig().GraphicsAPI != nvrhi::GraphicsAPI::VULKAN)
         {
             std::filesystem::path pdbPath = m_compiledFullPath;
             pdbPath.replace_extension(".pdb");
@@ -440,7 +440,7 @@ void ComputeShaderVariant::PrepareCompilation(std::filesystem::file_time_type la
             caustica::info("Enqueuing compute shader '%s' for compilation...", m_debugName.c_str());
 
         m_compileCmdLine = command;
-        ResetPipeline();
+        resetPipeline();
     }
     else
     {
@@ -451,7 +451,7 @@ void ComputeShaderVariant::PrepareCompilation(std::filesystem::file_time_type la
     }
 }
 
-void ComputeShaderVariant::CompileIfNeeded()
+void ComputeShaderVariant::compileIfNeeded()
 {
     if (m_compileCmdLine.empty())
         return;
@@ -472,7 +472,7 @@ void ComputeShaderVariant::CompileIfNeeded()
         caustica::warning("%s", m_compileError.c_str());
 }
 
-void ComputeShaderVariant::LoadShaderAndCreatePipeline()
+void ComputeShaderVariant::loadShaderAndCreatePipeline()
 {
     if (!m_compileError.empty() || m_pipeline != nullptr)
         return;
@@ -480,7 +480,7 @@ void ComputeShaderVariant::LoadShaderAndCreatePipeline()
     auto registry = m_lockedRegistry;
     assert(registry != nullptr);
 
-    std::shared_ptr<caustica::IBlob> data = registry->GetFS()->readFile(m_packVfsPath.c_str());
+    std::shared_ptr<caustica::IBlob> data = registry->getFS()->readFile(m_packVfsPath.c_str());
 
     if (!data)
     {
@@ -491,13 +491,13 @@ void ComputeShaderVariant::LoadShaderAndCreatePipeline()
         return;
     }
 
-    // Create shader
+    // create shader
     nvrhi::ShaderDesc shaderDesc;
     shaderDesc.shaderType = nvrhi::ShaderType::Compute;
     shaderDesc.debugName = m_debugName;
     shaderDesc.entryName = m_entryPoint.c_str();
 
-    m_shader = registry->GetDevice()->createShader(shaderDesc, data->data(), data->size());
+    m_shader = registry->getDevice()->createShader(shaderDesc, data->data(), data->size());
 
     if (!m_shader)
     {
@@ -505,12 +505,12 @@ void ComputeShaderVariant::LoadShaderAndCreatePipeline()
         return;
     }
 
-    // Create pipeline
+    // create pipeline
     nvrhi::ComputePipelineDesc pipelineDesc;
     pipelineDesc.CS = m_shader;
     pipelineDesc.bindingLayouts = m_bindingLayouts;
 
-    m_pipeline = registry->GetDevice()->createComputePipeline(pipelineDesc);
+    m_pipeline = registry->getDevice()->createComputePipeline(pipelineDesc);
 
     if (!m_pipeline)
     {

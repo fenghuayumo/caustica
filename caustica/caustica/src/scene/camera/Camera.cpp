@@ -6,13 +6,13 @@
 using namespace caustica::math;
 using namespace caustica;
 
-void BaseCamera::UpdateWorldToView()
+void BaseCamera::updateWorldToView()
 {
     m_MatTranslatedWorldToView = affine3::from_cols(m_CameraRight, m_CameraUp, m_CameraDir, 0.f);
     m_MatWorldToView = translation(-m_CameraPos) * m_MatTranslatedWorldToView;
 }
 
-void BaseCamera::BaseLookAt(float3 cameraPos, float3 cameraTarget, float3 cameraUp)
+void BaseCamera::baseLookAt(float3 cameraPos, float3 cameraTarget, float3 cameraUp)
 {
     this->m_CameraPos = cameraPos;
     this->m_CameraDir = normalize(cameraTarget - cameraPos);
@@ -20,10 +20,10 @@ void BaseCamera::BaseLookAt(float3 cameraPos, float3 cameraTarget, float3 camera
     this->m_CameraRight = normalize(cross(this->m_CameraDir, this->m_CameraUp));
     this->m_CameraUp = normalize(cross(this->m_CameraRight, this->m_CameraDir));
 
-    UpdateWorldToView();
+    updateWorldToView();
 }
 
-void FirstPersonCamera::KeyboardUpdate(int key, int scancode, int action, int mods)
+void FirstPersonCamera::keyboardUpdate(int key, int scancode, int action, int mods)
 {
     if (m_KeyboardMap.find(key) == m_KeyboardMap.end())
     {
@@ -40,12 +40,12 @@ void FirstPersonCamera::KeyboardUpdate(int key, int scancode, int action, int mo
     }
 }
 
-void FirstPersonCamera::MousePosUpdate(double xpos, double ypos)
+void FirstPersonCamera::mousePosUpdate(double xpos, double ypos)
 {
     m_MousePos = { float(xpos), float(ypos) };
 }
 
-void FirstPersonCamera::MouseButtonUpdate(int button, int action, int mods)
+void FirstPersonCamera::mouseButtonUpdate(int button, int action, int mods)
 {
     if (m_MouseButtonMap.find(button) == m_MouseButtonMap.end())
     {
@@ -62,24 +62,24 @@ void FirstPersonCamera::MouseButtonUpdate(int button, int action, int mods)
     }
 }
 
-void FirstPersonCamera::LookAt(float3 cameraPos, float3 cameraTarget, float3 cameraUp)
+void FirstPersonCamera::lookAt(float3 cameraPos, float3 cameraTarget, float3 cameraUp)
 {
-    // Make the base method public.
-    BaseLookAt(cameraPos, cameraTarget, cameraUp);
+    // make the base method public.
+    baseLookAt(cameraPos, cameraTarget, cameraUp);
     m_MouseMotionAccumulator = 0.f;
     m_CameraMoveDamp = 0.f;
     m_CameraMovePrev = 0.f;
 }
 
-void FirstPersonCamera::LookTo(dm::float3 cameraPos, dm::float3 cameraDir, dm::float3 cameraUp)
+void FirstPersonCamera::lookTo(dm::float3 cameraPos, dm::float3 cameraDir, dm::float3 cameraUp)
 {
-    BaseLookAt(cameraPos, cameraPos + cameraDir, cameraUp);
+    baseLookAt(cameraPos, cameraPos + cameraDir, cameraUp);
     m_MouseMotionAccumulator = 0.f;
     m_CameraMoveDamp = 0.f;
     m_CameraMovePrev = 0.f;
 }
 
-std::pair<bool, float3> FirstPersonCamera::AnimateTranslation(float deltaT)
+std::pair<bool, float3> FirstPersonCamera::animateTranslation(float deltaT)
 {
     bool cameraDirty = false;
     float moveStep = deltaT * m_MoveSpeed;
@@ -129,17 +129,17 @@ std::pair<bool, float3> FirstPersonCamera::AnimateTranslation(float deltaT)
     return std::make_pair(cameraDirty, cameraMoveVec);
 }
 
-void FirstPersonCamera::UpdateCamera(dm::float3 cameraMoveVec, dm::affine3 cameraRotation)
+void FirstPersonCamera::updateCamera(dm::float3 cameraMoveVec, dm::affine3 cameraRotation)
 {
     m_CameraPos += cameraMoveVec;
     m_CameraDir = normalize(cameraRotation.transformVector(m_CameraDir));
     m_CameraUp = normalize(cameraRotation.transformVector(m_CameraUp));
     m_CameraRight = normalize(cross(m_CameraDir, m_CameraUp));
 
-    UpdateWorldToView();
+    updateWorldToView();
 }
 
-std::pair<bool, affine3> FirstPersonCamera::AnimateRoll(affine3 initialRotation)
+std::pair<bool, affine3> FirstPersonCamera::animateRoll(affine3 initialRotation)
 {
     bool cameraDirty = false;
     affine3 cameraRotation = initialRotation;
@@ -155,7 +155,7 @@ std::pair<bool, affine3> FirstPersonCamera::AnimateRoll(affine3 initialRotation)
     return std::make_pair(cameraDirty, cameraRotation);
 }
 
-void FirstPersonCamera::Animate(float deltaT)
+void FirstPersonCamera::animate(float deltaT)
 {
     // Track mouse delta.
     // Use m_IsDragging to avoid random camera rotations when clicking inside an inactive window.
@@ -190,22 +190,22 @@ void FirstPersonCamera::Animate(float deltaT)
     }
 
     // handle keyboard roll next
-    auto rollResult = AnimateRoll(cameraRotation);
+    auto rollResult = animateRoll(cameraRotation);
     cameraDirty |= rollResult.first;
     cameraRotation = rollResult.second;
 
     // handle translation
-    auto translateResult = AnimateTranslation(deltaT);
+    auto translateResult = animateTranslation(deltaT);
     cameraDirty |= translateResult.first;
     const float3& cameraMoveVec = translateResult.second;
 
     if (cameraDirty)
     {
-        UpdateCamera(cameraMoveVec, cameraRotation);
+        updateCamera(cameraMoveVec, cameraRotation);
     }
 }
 
-void FirstPersonCamera::AnimateSmooth(float deltaT)
+void FirstPersonCamera::animateSmooth(float deltaT)
 {
     const float c_DampeningRate = 7.5f;
     float dampenWeight = exp(-c_DampeningRate * deltaT);
@@ -245,20 +245,20 @@ void FirstPersonCamera::AnimateSmooth(float deltaT)
     }
 
     // handle keyboard roll next
-    auto rollResult = AnimateRoll(cameraRotation);
+    auto rollResult = animateRoll(cameraRotation);
     cameraRotation = rollResult.second;
 
     // handle translation
-    auto translateResult = AnimateTranslation(deltaT);
+    auto translateResult = animateTranslation(deltaT);
     const float3& cameraMoveVec = translateResult.second;
 
     m_CameraMoveDamp = lerp(cameraMoveVec, m_CameraMovePrev, dampenWeight);
     m_CameraMovePrev = m_CameraMoveDamp;
 
-    UpdateCamera(m_CameraMoveDamp, cameraRotation);
+    updateCamera(m_CameraMoveDamp, cameraRotation);
 }
 
-void ThirdPersonCamera::KeyboardUpdate(int key, int scancode, int action, int mods)
+void ThirdPersonCamera::keyboardUpdate(int key, int scancode, int action, int mods)
 {
     if (m_KeyboardMap.find(key) == m_KeyboardMap.end())
     {
@@ -275,12 +275,12 @@ void ThirdPersonCamera::KeyboardUpdate(int key, int scancode, int action, int mo
     }
 }
 
-void ThirdPersonCamera::MousePosUpdate(double xpos, double ypos)
+void ThirdPersonCamera::mousePosUpdate(double xpos, double ypos)
 {
     m_MousePos = float2(float(xpos), float(ypos));
 }
 
-void ThirdPersonCamera::MouseButtonUpdate(int button, int action, int mods)
+void ThirdPersonCamera::mouseButtonUpdate(int button, int action, int mods)
 {
     const bool pressed = (action == GLFW_PRESS);
 
@@ -309,13 +309,13 @@ void ThirdPersonCamera::MouseButtonUpdate(int button, int action, int mods)
     }
 }
 
-void ThirdPersonCamera::MouseScrollUpdate(double xoffset, double yoffset)
+void ThirdPersonCamera::mouseScrollUpdate(double xoffset, double yoffset)
 {
     const float scrollFactor = 1.15f;
     m_Distance = clamp(m_Distance * (yoffset < 0 ? scrollFactor : 1.0f / scrollFactor), m_MinDistance,  m_MaxDistance);
 }
 
-void ThirdPersonCamera::JoystickUpdate(int axis, float value)
+void ThirdPersonCamera::joystickUpdate(int axis, float value)
 {
     switch (axis)
     {
@@ -325,7 +325,7 @@ void ThirdPersonCamera::JoystickUpdate(int axis, float value)
     }
 }
 
-void ThirdPersonCamera::JoystickButtonUpdate(int button, bool pressed)
+void ThirdPersonCamera::joystickButtonUpdate(int button, bool pressed)
 {
     switch (button)
     {
@@ -335,13 +335,13 @@ void ThirdPersonCamera::JoystickButtonUpdate(int button, bool pressed)
     }
 }
 
-void ThirdPersonCamera::SetRotation(float yaw, float pitch)
+void ThirdPersonCamera::setRotation(float yaw, float pitch)
 {
     m_Yaw = yaw;
     m_Pitch = pitch;
 }
 
-void ThirdPersonCamera::SetView(const caustica::PlanarView& view)
+void ThirdPersonCamera::setView(const caustica::PlanarView& view)
 {
     m_ProjectionMatrix = view.getProjectionMatrix(false);
     m_InverseProjectionMatrix = view.getInverseProjectionMatrix(false);
@@ -349,7 +349,7 @@ void ThirdPersonCamera::SetView(const caustica::PlanarView& view)
     m_ViewportSize = float2(viewport.width(), viewport.height());
 }
 
-void ThirdPersonCamera::AnimateOrbit(float deltaT, float2 mouseMove)
+void ThirdPersonCamera::animateOrbit(float deltaT, float2 mouseMove)
 {
     m_Yaw -= m_RotateSpeed * mouseMove.x;
     m_Pitch += m_RotateSpeed * mouseMove.y;
@@ -369,7 +369,7 @@ void ThirdPersonCamera::AnimateOrbit(float deltaT, float2 mouseMove)
     m_DeltaPitch = 0;
 }
 
-void ThirdPersonCamera::AnimateTranslation(const dm::float3x3& viewMatrix)
+void ThirdPersonCamera::animateTranslation(const dm::float3x3& viewMatrix)
 {
     // If the view parameters have never been set, we can't translate
     if (m_ViewportSize.x <= 0.f || m_ViewportSize.y <= 0.f)
@@ -408,7 +408,7 @@ void ThirdPersonCamera::AnimateTranslation(const dm::float3x3& viewMatrix)
         m_TargetPos += viewMotion.y * viewMatrix.row1;
 }
 
-void ThirdPersonCamera::Animate(float deltaT)
+void ThirdPersonCamera::animate(float deltaT)
 {
     quat orbit = rotationQuat(float3(m_Pitch, m_Yaw, 0));
     const auto targetRotation = orbit.toMatrix();
@@ -418,11 +418,11 @@ void ThirdPersonCamera::Animate(float deltaT)
     case MouseState::Orbiting:
         {
             float2 mouseMove = m_MousePos - m_MousePosPrev;
-            AnimateOrbit(deltaT, mouseMove);
+            animateOrbit(deltaT, mouseMove);
             break;
         }
     case MouseState::Panning:
-        AnimateTranslation(targetRotation);
+        animateTranslation(targetRotation);
         break;
     case MouseState::Idle:
         break;
@@ -435,69 +435,69 @@ void ThirdPersonCamera::Animate(float deltaT)
     m_CameraRight = -targetRotation.row0;
     m_CameraUp = targetRotation.row1;
     m_CameraDir = targetRotation.row2;
-    UpdateWorldToView();
+    updateWorldToView();
     
     m_MousePosPrev = m_MousePos;
 }
 
-void ThirdPersonCamera::LookAt(dm::float3 cameraPos, dm::float3 cameraTarget)
+void ThirdPersonCamera::lookAt(dm::float3 cameraPos, dm::float3 cameraTarget)
 {
     dm::float3 cameraDir = cameraTarget - cameraPos;
 
     float azimuth, elevation, dirLength;
     dm::cartesianToSpherical(cameraDir, azimuth, elevation, dirLength);
 
-    SetTargetPosition(cameraTarget);
-    SetDistance(dirLength);
+    setTargetPosition(cameraTarget);
+    setDistance(dirLength);
     azimuth = -(azimuth + dm::PI_f * 0.5f);
-    SetRotation(azimuth, elevation);
+    setRotation(azimuth, elevation);
 }
 
-void ThirdPersonCamera::LookTo(dm::float3 cameraPos, dm::float3 cameraDir,
+void ThirdPersonCamera::lookTo(dm::float3 cameraPos, dm::float3 cameraDir,
     std::optional<float> targetDistance)
 {
     float azimuth, elevation, dirLength;
     dm::cartesianToSpherical(-cameraDir, azimuth, elevation, dirLength);
     cameraDir /= dirLength;
 
-    float const distance = targetDistance.value_or(GetDistance());
-    SetTargetPosition(cameraPos + cameraDir * distance);
-    SetDistance(distance);
+    float const distance = targetDistance.value_or(getDistance());
+    setTargetPosition(cameraPos + cameraDir * distance);
+    setDistance(distance);
     azimuth = -(azimuth + dm::PI_f * 0.5f);
-    SetRotation(azimuth, elevation);
+    setRotation(azimuth, elevation);
 }
 
-BaseCamera* SwitchableCamera::GetActiveUserCamera()
+BaseCamera* SwitchableCamera::getActiveUserCamera()
 {
-    if (IsFirstPersonActive())
+    if (isFirstPersonActive())
         return &m_FirstPerson;
 
-    if (IsThirdPersonActive())
+    if (isThirdPersonActive())
         return &m_ThirdPerson;
 
     return nullptr;
 }
 
-BaseCamera const* SwitchableCamera::GetActiveUserCamera() const
+BaseCamera const* SwitchableCamera::getActiveUserCamera() const
 {
-    if (IsFirstPersonActive())
+    if (isFirstPersonActive())
         return &m_FirstPerson;
 
-    if (IsThirdPersonActive())
+    if (isThirdPersonActive())
         return &m_ThirdPerson;
 
     return nullptr;
 }
 
-dm::affine3 SwitchableCamera::GetWorldToViewMatrix() const
+dm::affine3 SwitchableCamera::getWorldToViewMatrix() const
 {
     if (m_SceneCamera)
-        return m_SceneCamera->GetWorldToViewMatrix(m_SceneCameraGlobalTransform);
+        return m_SceneCamera->getWorldToViewMatrix(m_SceneCameraGlobalTransform);
 
-    return GetActiveUserCamera()->GetWorldToViewMatrix();
+    return getActiveUserCamera()->getWorldToViewMatrix();
 }
 
-bool SwitchableCamera::GetSceneCameraProjectionParams(float& verticalFov, float& zNear) const
+bool SwitchableCamera::getSceneCameraProjectionParams(float& verticalFov, float& zNear) const
 {
     auto perspectiveCamera = std::dynamic_pointer_cast<caustica::PerspectiveCamera>(m_SceneCamera);
     if (perspectiveCamera)
@@ -509,21 +509,21 @@ bool SwitchableCamera::GetSceneCameraProjectionParams(float& verticalFov, float&
     return false;
 }
 
-void SwitchableCamera::SwitchToFirstPerson(bool copyView)
+void SwitchableCamera::switchToFirstPerson(bool copyView)
 {
-    if (IsFirstPersonActive())
+    if (isFirstPersonActive())
         return;
 
     if (copyView)
     {
         if (m_SceneCamera)
         {
-            dm::affine3 viewToWorld = m_SceneCamera->GetViewToWorldMatrix(m_SceneCameraGlobalTransform);
-            m_FirstPerson.LookTo(viewToWorld.m_translation, viewToWorld.m_linear.row2, viewToWorld.m_linear.row1);
+            dm::affine3 viewToWorld = m_SceneCamera->getViewToWorldMatrix(m_SceneCameraGlobalTransform);
+            m_FirstPerson.lookTo(viewToWorld.m_translation, viewToWorld.m_linear.row2, viewToWorld.m_linear.row1);
         }
         else
         {
-            m_FirstPerson.LookTo(m_ThirdPerson.GetPosition(), m_ThirdPerson.GetDir(), m_ThirdPerson.GetUp());
+            m_FirstPerson.lookTo(m_ThirdPerson.getPosition(), m_ThirdPerson.getDir(), m_ThirdPerson.getUp());
         }
     }
 
@@ -531,21 +531,21 @@ void SwitchableCamera::SwitchToFirstPerson(bool copyView)
     m_SceneCamera = nullptr;
 }
 
-void SwitchableCamera::SwitchToThirdPerson(bool copyView, std::optional<float> targetDistance)
+void SwitchableCamera::switchToThirdPerson(bool copyView, std::optional<float> targetDistance)
 {
-    if (IsThirdPersonActive())
+    if (isThirdPersonActive())
         return;
         
     if (copyView)
     {
         if (m_SceneCamera)
         {
-            dm::affine3 viewToWorld = m_SceneCamera->GetViewToWorldMatrix(m_SceneCameraGlobalTransform);
-            m_ThirdPerson.LookTo(viewToWorld.m_translation, viewToWorld.m_linear.row2, targetDistance);
+            dm::affine3 viewToWorld = m_SceneCamera->getViewToWorldMatrix(m_SceneCameraGlobalTransform);
+            m_ThirdPerson.lookTo(viewToWorld.m_translation, viewToWorld.m_linear.row2, targetDistance);
         }
         else
         {
-            m_ThirdPerson.LookTo(m_FirstPerson.GetPosition(), m_FirstPerson.GetDir(), targetDistance);
+            m_ThirdPerson.lookTo(m_FirstPerson.getPosition(), m_FirstPerson.getDir(), targetDistance);
         }
     }
 
@@ -553,7 +553,7 @@ void SwitchableCamera::SwitchToThirdPerson(bool copyView, std::optional<float> t
     m_SceneCamera = nullptr;
 }
 
-void SwitchableCamera::SwitchToSceneCamera(
+void SwitchableCamera::switchToSceneCamera(
     std::shared_ptr<caustica::SceneCamera> const& sceneCamera,
     const dm::daffine3& globalTransform)
 {
@@ -563,77 +563,77 @@ void SwitchableCamera::SwitchToSceneCamera(
     m_SceneCameraGlobalTransform = globalTransform;
 }
 
-bool SwitchableCamera::KeyboardUpdate(int key, int scancode, int action, int mods)
+bool SwitchableCamera::keyboardUpdate(int key, int scancode, int action, int mods)
 {
-    BaseCamera* activeCamera = GetActiveUserCamera();
+    BaseCamera* activeCamera = getActiveUserCamera();
     if (activeCamera)
     {
-        activeCamera->KeyboardUpdate(key, scancode, action, mods);
+        activeCamera->keyboardUpdate(key, scancode, action, mods);
         return true;
     }
     return false;
 }
 
-bool SwitchableCamera::MousePosUpdate(double xpos, double ypos)
+bool SwitchableCamera::mousePosUpdate(double xpos, double ypos)
 {
-    BaseCamera* activeCamera = GetActiveUserCamera();
+    BaseCamera* activeCamera = getActiveUserCamera();
     if (activeCamera)
     {
-        activeCamera->MousePosUpdate(xpos, ypos);
+        activeCamera->mousePosUpdate(xpos, ypos);
         return true;
     }
     return false;
 }
 
-bool SwitchableCamera::MouseButtonUpdate(int button, int action, int mods)
+bool SwitchableCamera::mouseButtonUpdate(int button, int action, int mods)
 {
-    BaseCamera* activeCamera = GetActiveUserCamera();
+    BaseCamera* activeCamera = getActiveUserCamera();
     if (activeCamera)
     {
-        activeCamera->MouseButtonUpdate(button, action, mods);
+        activeCamera->mouseButtonUpdate(button, action, mods);
         return true;
     }
     return false;
 }
 
-bool SwitchableCamera::MouseScrollUpdate(double xoffset, double yoffset)
+bool SwitchableCamera::mouseScrollUpdate(double xoffset, double yoffset)
 {
-    BaseCamera* activeCamera = GetActiveUserCamera();
+    BaseCamera* activeCamera = getActiveUserCamera();
     if (activeCamera)
     {
-        activeCamera->MouseScrollUpdate(xoffset, yoffset);
+        activeCamera->mouseScrollUpdate(xoffset, yoffset);
         return true;
     }
     return false;
 }
 
-bool SwitchableCamera::JoystickButtonUpdate(int button, bool pressed)
+bool SwitchableCamera::joystickButtonUpdate(int button, bool pressed)
 {
-    BaseCamera* activeCamera = GetActiveUserCamera();
+    BaseCamera* activeCamera = getActiveUserCamera();
     if (activeCamera)
     {
-        activeCamera->JoystickButtonUpdate(button, pressed);
+        activeCamera->joystickButtonUpdate(button, pressed);
         return true;
     }
     return false;
 }
 
-bool SwitchableCamera::JoystickUpdate(int axis, float value)
+bool SwitchableCamera::joystickUpdate(int axis, float value)
 {
-    BaseCamera* activeCamera = GetActiveUserCamera();
+    BaseCamera* activeCamera = getActiveUserCamera();
     if (activeCamera)
     {
-        activeCamera->JoystickUpdate(axis, value);
+        activeCamera->joystickUpdate(axis, value);
         return true;
     }
     return false;
 }
 
-void SwitchableCamera::Animate(float deltaT)
+void SwitchableCamera::animate(float deltaT)
 {
-    BaseCamera* activeCamera = GetActiveUserCamera();
+    BaseCamera* activeCamera = getActiveUserCamera();
     if (activeCamera)
     {
-        activeCamera->Animate(deltaT);
+        activeCamera->animate(deltaT);
     }
 }

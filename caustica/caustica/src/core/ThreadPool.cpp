@@ -21,15 +21,15 @@ ThreadPool::~ThreadPool()
 
 void ThreadPool::AddTask(std::shared_ptr<ThreadPoolTask> const& task)
 {
-    // Capture the shared_ptr to keep the task alive
-    JobSystem::Execute(m_Context, [task]() {
+    // capture the shared_ptr to keep the task alive
+    JobSystem::execute(m_Context, [task]() {
         task->Run();
     });
 }
 
 void ThreadPool::AddTask(std::function<void()> func)
 {
-    JobSystem::Execute(m_Context, std::move(func));
+    JobSystem::execute(m_Context, std::move(func));
 }
 
 void ThreadPool::WaitForTasks()

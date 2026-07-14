@@ -51,9 +51,9 @@ protected:
 private:
     void buildDeltaTreeViz();
 
-    virtual bool MousePosUpdate(double xpos, double ypos);
+    virtual bool mousePosUpdate(double xpos, double ypos);
     virtual void DisplayScaleChanged(float scaleX, float scaleY) override { m_currentScale = scaleX; assert( scaleX == scaleY ); }
-    virtual void Animate(float elapsedTimeSeconds) override;
+    virtual void animate(float elapsedTimeSeconds) override;
 
     bool BuildUIScriptsAndEtc(void);
     void BuildUIResolutionPicker();
@@ -76,7 +76,7 @@ private:
 
     bool CheckboxUInt32(const char* label, uint32_t* v);
 
-    // Settings window collapsing-header panels
+    // settings window collapsing-header panels
     void BuildDisplayPerformancePanel(const PanelLayout& layout);
     void BuildSystemPanel(const PanelLayout& layout);
     bool BuildSceneComboPanel(const PanelLayout& layout);

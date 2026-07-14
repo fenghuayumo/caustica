@@ -44,7 +44,7 @@ namespace caustica::audio
 
 AudioCache::AudioCache(std::shared_ptr<caustica::IFileSystem> fs) : m_fs(fs) { }
 
-void AudioCache::Reset()
+void AudioCache::reset()
 {
     std::lock_guard<std::mutex> guard(m_LoadedDataMutex);
 
@@ -173,7 +173,7 @@ void AudioCache::sendAudioLoadedMessage(std::shared_ptr<AudioData const> audio, 
     caustica::info("Loaded (%dkHz) : %s", audio->sampleRate/1000, path);
 }
 
-std::shared_ptr<AudioData const> AudioCache::LoadFromFile(const std::filesystem::path & path)
+std::shared_ptr<AudioData const> AudioCache::loadFromFile(const std::filesystem::path & path)
 {
     std::shared_ptr<AudioData const> audio;
 

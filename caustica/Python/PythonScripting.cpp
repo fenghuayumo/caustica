@@ -83,7 +83,7 @@ bool PythonScripting::Initialize()
     if (m_initialized)
         return true;
 
-    // Make the Sample pointer visible to nanobind bindings before init.
+    // make the Sample pointer visible to nanobind bindings before init.
     g_pythonSceneEditorSingleton = &m_app;
 
     // Register our embedded module before Py_Initialize so that scripts can

@@ -163,7 +163,7 @@ GaussianSplatPass::GaussianSplatPass(
     m_sortKeyBindingLayout = m_device->createBindingLayout(sortLayoutDesc);
 }
 
-void GaussianSplatPass::SetGpuSort(std::shared_ptr<GPUSort> gpuSort)
+void GaussianSplatPass::setGpuSort(std::shared_ptr<GPUSort> gpuSort)
 {
     m_gpuSort = std::move(gpuSort);
 }
@@ -182,7 +182,7 @@ caustica::render::GaussianSplatSortResources GaussianSplatPass::makeSortResource
     return resources;
 }
 
-bool GaussianSplatPass::LoadFromFile(const std::filesystem::path& fileName, bool convertRdfToRub)
+bool GaussianSplatPass::loadFromFile(const std::filesystem::path& fileName, bool convertRdfToRub)
 {
     caustica::GaussianSplatDataset dataset;
     if (!caustica::loadGaussianSplatPly(fileName, convertRdfToRub, dataset))
@@ -280,7 +280,7 @@ bool GaussianSplatPass::LoadFromFile(const std::filesystem::path& fileName, bool
     return true;
 }
 
-void GaussianSplatPass::BuildEmissionProxies(
+void GaussianSplatPass::buildEmissionProxies(
     uint32_t maxProxyCount,
     float splatScale,
     uint32_t kernelDegree,
@@ -295,7 +295,7 @@ void GaussianSplatPass::BuildEmissionProxies(
         std::max(tintColor.z, 0.0f));
     alphaCullThreshold = std::max(alphaCullThreshold, 0.0f);
 
-    if (!HasSplats() || maxProxyCount == 0)
+    if (!hasSplats() || maxProxyCount == 0)
     {
         m_emissionProxies.clear();
         m_cachedEmissionProxyMaxCount = maxProxyCount;
@@ -374,7 +374,7 @@ void GaussianSplatPass::BuildEmissionProxies(
     m_emissionProxyBuildPending = false;
 }
 
-void GaussianSplatPass::BuildAccelerationStructures(
+void GaussianSplatPass::buildAccelerationStructures(
     nvrhi::ICommandList* commandList,
     bool useAABBs,
     bool useTLASInstances,
@@ -383,10 +383,10 @@ void GaussianSplatPass::BuildAccelerationStructures(
     uint32_t kernelDegree,
     bool adaptiveClamp)
 {
-    if (!HasSplats() || !m_splatAabbBuffer)
+    if (!hasSplats() || !m_splatAabbBuffer)
         return;
 
-    UploadSplatDataIfNeeded(commandList);
+    uploadSplatDataIfNeeded(commandList);
 
     caustica::render::GaussianSplatAccelBuildParams params;
     params.useAABBs = useAABBs;
@@ -398,12 +398,12 @@ void GaussianSplatPass::BuildAccelerationStructures(
     m_accelBuilder.build(commandList, params, m_splats, m_splatCount, m_splatAabbBuffer);
 }
 
-void GaussianSplatPass::ReleaseAccelerationStructures()
+void GaussianSplatPass::releaseAccelerationStructures()
 {
-    m_accelBuilder.release(HasSplats());
+    m_accelBuilder.release(hasSplats());
 }
 
-void GaussianSplatPass::CreateBindingSets(const RenderTargets& renderTargets, nvrhi::rt::IAccelStruct* meshTopLevelAS)
+void GaussianSplatPass::createBindingSets(const RenderTargets& renderTargets, nvrhi::rt::IAccelStruct* meshTopLevelAS)
 {
     if (!m_splatBuffer || !m_colorBuffer || !m_shBuffer || !m_indexBuffer || !m_sortKeyBuffer || !m_sortControlBuffer || !m_drawIndirectBuffer)
         return;
@@ -444,7 +444,7 @@ void GaussianSplatPass::CreateBindingSets(const RenderTargets& renderTargets, nv
     m_sortKeyBindingSet = m_device->createBindingSet(sortKeyBindingSetDesc, m_sortKeyBindingLayout);
 }
 
-void GaussianSplatPass::CreateStochasticFramebuffer(const RenderTargets& renderTargets)
+void GaussianSplatPass::createStochasticFramebuffer(const RenderTargets& renderTargets)
 {
     auto createFramebuffer = [this](
         const nvrhi::TextureHandle& colorTarget,
@@ -513,12 +513,12 @@ void GaussianSplatPass::CreateStochasticFramebuffer(const RenderTargets& renderT
     createFramebuffer(renderTargets.processedOutputColor, m_stochasticProcessedDepthBuffer, m_stochasticProcessedFramebuffer, "GaussianSplatStochasticProcessedDepth");
 }
 
-void GaussianSplatPass::CreatePipeline(const RenderTargets& renderTargets)
+void GaussianSplatPass::createPipeline(const RenderTargets& renderTargets)
 {
-    if (!HasSplats())
+    if (!hasSplats())
         return;
 
-    CreateStochasticFramebuffer(renderTargets);
+    createStochasticFramebuffer(renderTargets);
 
     std::vector<caustica::ShaderMacro> rasterShadowMacros = {
         caustica::ShaderMacro({ "GAUSSIAN_SPLAT_HYBRID_SHADOWS", "0" })
@@ -624,7 +624,7 @@ void GaussianSplatPass::CreatePipeline(const RenderTargets& renderTargets)
     m_hybridRenderMeshTopLevelAS = nullptr;
 }
 
-void GaussianSplatPass::UploadSplatDataIfNeeded(nvrhi::ICommandList* commandList)
+void GaussianSplatPass::uploadSplatDataIfNeeded(nvrhi::ICommandList* commandList)
 {
     if (!m_splatUploadPending || m_splats.empty())
         return;
@@ -633,12 +633,12 @@ void GaussianSplatPass::UploadSplatDataIfNeeded(nvrhi::ICommandList* commandList
     m_splatUploadPending = false;
 }
 
-void GaussianSplatPass::UploadFormatDataIfNeeded(
+void GaussianSplatPass::uploadFormatDataIfNeeded(
     nvrhi::ICommandList* commandList,
     GaussianSplatStorageFormat shFormat,
     GaussianSplatStorageFormat rgbaFormat)
 {
-    if (!HasSplats())
+    if (!hasSplats())
         return;
 
     const bool formatChanged = !m_colorBuffer || !m_shBuffer || shFormat != m_currentShFormat || rgbaFormat != m_currentRgbaFormat;
@@ -708,14 +708,14 @@ void GaussianSplatPass::UploadFormatDataIfNeeded(
     m_formatUploadPending = false;
 }
 
-void GaussianSplatPass::Render(
+void GaussianSplatPass::render(
     nvrhi::ICommandList* commandList,
     const caustica::IView& view,
     nvrhi::rt::IAccelStruct* meshTopLevelAS,
     const RenderTargets& renderTargets,
     const GaussianSplatRenderSettings& settings)
 {
-    if (!settings.enabled || !HasSplats())
+    if (!settings.enabled || !hasSplats())
         return;
 
     if (settings.sortingMode == GaussianSplatSortMode::GpuSort && !m_gpuSort)
@@ -735,13 +735,13 @@ void GaussianSplatPass::Render(
 
     commandList->beginMarker("GaussianSplats");
 
-    UploadSplatDataIfNeeded(commandList);
-    UploadFormatDataIfNeeded(commandList, settings.shFormat, settings.rgbaFormat);
+    uploadSplatDataIfNeeded(commandList);
+    uploadFormatDataIfNeeded(commandList, settings.shFormat, settings.rgbaFormat);
 
     const bool useHybridShadows = settings.shadowsEnabled && meshTopLevelAS != nullptr && m_hybridRenderPipeline;
 
     if (!m_rasterRenderBindingSet || (useHybridShadows && (!m_hybridRenderBindingSet || m_hybridRenderMeshTopLevelAS != meshTopLevelAS)))
-        CreateBindingSets(renderTargets, useHybridShadows ? meshTopLevelAS : nullptr);
+        createBindingSets(renderTargets, useHybridShadows ? meshTopLevelAS : nullptr);
 
     nvrhi::BindingSetHandle renderBindingSet = useHybridShadows ? m_hybridRenderBindingSet : m_rasterRenderBindingSet;
     if (!renderBindingSet)

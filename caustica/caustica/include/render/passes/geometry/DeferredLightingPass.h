@@ -43,7 +43,7 @@ namespace caustica::render
 
     protected:
 
-        virtual nvrhi::ShaderHandle CreateComputeShader(
+        virtual nvrhi::ShaderHandle createComputeShader(
             caustica::ShaderFactory& shaderFactory);
 
     public:
@@ -67,21 +67,21 @@ namespace caustica::render
             dm::float3 ambientColorBottom = 0.f;
 
             // Fills the GBuffer-related textures (depth, normals, etc.) from the provided structure.
-            void SetGBuffer(const GBufferRenderTargets& targets);
+            void setGBuffer(const GBufferRenderTargets& targets);
         };
 
         DeferredLightingPass(
             nvrhi::IDevice* device,
             caustica::render::RenderDevice& renderDevice);
 
-        virtual void Init(const std::shared_ptr<caustica::ShaderFactory>& shaderFactory);
+        virtual void init(const std::shared_ptr<caustica::ShaderFactory>& shaderFactory);
 
-        void Render(
+        void render(
             nvrhi::ICommandList* commandList,
             const caustica::ICompositeView& compositeView,
             const Inputs& inputs,
             dm::float2 randomOffset = dm::float2::zero());
 
-        void ResetBindingCache();
+        void resetBindingCache();
     };
 }

@@ -47,18 +47,18 @@ namespace caustica::scene
         std::vector<DrawCommand> transparent;
     };
 
-    void BuildOpaqueDrawList(
+    void buildOpaqueDrawList(
         const SceneRenderData& renderData,
         const caustica::IView& view,
         std::vector<DrawCommand>& out);
 
-    void BuildTransparentDrawList(
+    void buildTransparentDrawList(
         const SceneRenderData& renderData,
         const caustica::IView& view,
         std::vector<DrawCommand>& out,
         const DrawListBuildOptions& options = {});
 
-    void BuildViewDrawLists(
+    void buildViewDrawLists(
         const SceneRenderData& renderData,
         const caustica::IView& view,
         ViewDrawLists& out,

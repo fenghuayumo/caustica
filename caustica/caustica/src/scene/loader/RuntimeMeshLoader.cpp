@@ -41,7 +41,7 @@ RuntimeMeshLoadResult FailedRuntimeMeshLoad(const std::filesystem::path& filePat
 
 } // namespace
 
-RuntimeMeshLoadResult LoadRuntimeMeshFile(
+RuntimeMeshLoadResult loadRuntimeMeshFile(
     const RuntimeMeshLoadParams& params,
     const std::filesystem::path& filePath)
 {
@@ -60,11 +60,11 @@ RuntimeMeshLoadResult LoadRuntimeMeshFile(
 
     const std::string ext = LowercaseExtension(absPath);
     if (ext == ".gltf" || ext == ".glb")
-        return LoadRuntimeGltfMeshFile(params, absPath);
+        return loadRuntimeGltfMeshFile(params, absPath);
     if (ext == ".obj")
-        return LoadRuntimeObjMeshFile(params, absPath);
+        return loadRuntimeObjMeshFile(params, absPath);
     if (ext == ".urdf")
-        return LoadRuntimeUrdfMeshFile(params, absPath);
+        return loadRuntimeUrdfMeshFile(params, absPath);
     if (ext == ".usd" || ext == ".usda" || ext == ".usdc" || ext == ".caususd")
     {
         if (!params.TextureCache || !params.SceneTypes)
@@ -73,7 +73,7 @@ RuntimeMeshLoadResult LoadRuntimeMeshFile(
         auto importer = std::make_shared<caustica::CausUsdImporter>(params.SceneTypes);
         caustica::SceneLoadingStats stats;
         auto importResult = std::make_shared<caustica::SceneImportResult>();
-        if (!importer->Load(absPath, *params.TextureCache, stats, nullptr, *importResult, params.TextureSearchDirectory))
+        if (!importer->load(absPath, *params.TextureCache, stats, nullptr, *importResult, params.TextureSearchDirectory))
         {
             caustica::error("CausUsdImporter failed to load '%s'", absPath.string().c_str());
             return FailedRuntimeMeshLoad(absPath);
@@ -95,7 +95,7 @@ RuntimeMeshLoadResult LoadRuntimeMeshFile(
     return FailedRuntimeMeshLoad(absPath);
 }
 
-RuntimeMeshLoadResult LoadRuntimeGltfMeshFile(
+RuntimeMeshLoadResult loadRuntimeGltfMeshFile(
     const RuntimeMeshLoadParams& params,
     const std::filesystem::path& filePath)
 {
@@ -108,7 +108,7 @@ RuntimeMeshLoadResult LoadRuntimeGltfMeshFile(
     caustica::SceneLoadingStats stats;
     auto importResult = std::make_shared<caustica::SceneImportResult>();
 
-    if (!importer->Load(filePath, *params.TextureCache, stats, nullptr, *importResult, params.TextureSearchDirectory))
+    if (!importer->load(filePath, *params.TextureCache, stats, nullptr, *importResult, params.TextureSearchDirectory))
     {
         caustica::error("GltfImporter failed to load '%s'", filePath.string().c_str());
         return FailedRuntimeMeshLoad(filePath);
@@ -130,7 +130,7 @@ RuntimeMeshLoadResult LoadRuntimeGltfMeshFile(
     };
 }
 
-RuntimeMeshLoadResult LoadRuntimeObjMeshFile(
+RuntimeMeshLoadResult loadRuntimeObjMeshFile(
     const RuntimeMeshLoadParams& params,
     const std::filesystem::path& filePath)
 {
@@ -141,7 +141,7 @@ RuntimeMeshLoadResult LoadRuntimeObjMeshFile(
 
     caustica::SceneLoadingStats stats;
     auto importResult = std::make_shared<caustica::SceneImportResult>();
-    if (!importer.Load(filePath, *params.TextureCache, stats, nullptr, *importResult))
+    if (!importer.load(filePath, *params.TextureCache, stats, nullptr, *importResult))
         return FailedRuntimeMeshLoad(filePath);
 
     if (!ecs::isValid(importResult->rootEntity) || !importResult->entityWorld)
@@ -154,7 +154,7 @@ RuntimeMeshLoadResult LoadRuntimeObjMeshFile(
     };
 }
 
-RuntimeMeshLoadResult LoadRuntimeUrdfMeshFile(
+RuntimeMeshLoadResult loadRuntimeUrdfMeshFile(
     const RuntimeMeshLoadParams& params,
     const std::filesystem::path& filePath)
 {
@@ -165,7 +165,7 @@ RuntimeMeshLoadResult LoadRuntimeUrdfMeshFile(
 
     caustica::SceneLoadingStats stats;
     auto importResult = std::make_shared<caustica::SceneImportResult>();
-    if (!importer.Load(filePath, *params.TextureCache, stats, nullptr, *importResult, params.TextureSearchDirectory))
+    if (!importer.load(filePath, *params.TextureCache, stats, nullptr, *importResult, params.TextureSearchDirectory))
     {
         caustica::error("UrdfImporter failed to load '%s'", filePath.string().c_str());
         return FailedRuntimeMeshLoad(filePath);

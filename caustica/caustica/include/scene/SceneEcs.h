@@ -246,7 +246,7 @@ enum class PreviousTransformPolicy
     PreserveExisting
 };
 
-void UpdateHierarchy(ecs::World& world, PreviousTransformPolicy previousPolicy);
+void updateHierarchy(ecs::World& world, PreviousTransformPolicy previousPolicy);
 
 // ECS scene world: entity hierarchy + resource tracking (meshes, lights, cameras, …).
 class SceneEntityWorld : public SceneResources

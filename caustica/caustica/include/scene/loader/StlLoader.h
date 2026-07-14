@@ -18,5 +18,5 @@ namespace caustica
     };
 
     // Loads ASCII or binary STL into triangle mesh data (positions + smooth/face normals).
-    bool LoadStlFile(const std::filesystem::path& filePath, StlMeshData& outMesh);
+    bool loadStlFile(const std::filesystem::path& filePath, StlMeshData& outMesh);
 }

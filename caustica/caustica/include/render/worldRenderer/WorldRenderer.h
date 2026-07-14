@@ -68,7 +68,7 @@ public:
     WorldRenderer(PathTracingContext& context);
     ~WorldRenderer();
 
-    static nvrhi::BindingLayoutHandle CreateBindlessLayout(nvrhi::IDevice* device);
+    static nvrhi::BindingLayoutHandle createBindlessLayout(nvrhi::IDevice* device);
     void createBindingLayouts(nvrhi::IBindingLayout* precreatedBindless = nullptr);
     void createDeviceResources();
     void onBackBufferResizing();
@@ -177,7 +177,7 @@ private:
     friend class PathTracingPipelinePlugin;
     friend class RenderPipelineRegistry;
 
-    [[nodiscard]] nvrhi::IDevice* device() const { return m_context.gpuDevice.GetDevice(); }
+    [[nodiscard]] nvrhi::IDevice* device() const { return m_context.gpuDevice.getDevice(); }
 
     [[nodiscard]] CameraUpdateParams makeCameraUpdateParams() const;
     void syncCameraViews();

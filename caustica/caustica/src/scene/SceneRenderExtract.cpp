@@ -19,7 +19,7 @@ void SceneRenderData::clear()
     animationEntities.clear();
 }
 
-void ExtractSceneRenderData(SceneEntityWorld& entityWorld, SceneRenderData& out, uint32_t frameIndex)
+void extractSceneRenderData(SceneEntityWorld& entityWorld, SceneRenderData& out, uint32_t frameIndex)
 {
     out.clear();
 
@@ -77,7 +77,7 @@ void ExtractSceneRenderData(SceneEntityWorld& entityWorld, SceneRenderData& out,
             proxy.needsSkinningUpdate =
                 forceUpdate || skinned.lastUpdateFrameIndex + 1 >= frameIndex;
 
-            // Clear FORCE on the logic thread so render never writes back into ECS.
+            // clear FORCE on the logic thread so render never writes back into ECS.
             if (forceUpdate)
                 skinned.lastUpdateFrameIndex = frameIndex;
 

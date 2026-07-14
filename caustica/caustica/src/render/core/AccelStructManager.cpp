@@ -29,7 +29,7 @@ void AccelStructManager::createBlases(nvrhi::ICommandList* commandList,
     uint64_t maxMeshTriangleCount = 0;
     std::string maxMeshName;
 
-    for (const std::shared_ptr<MeshInfo>& mesh : scene.GetMeshes())
+    for (const std::shared_ptr<MeshInfo>& mesh : scene.getMeshes())
     {
         if (mesh->isSkinPrototype)
             continue;
@@ -78,7 +78,7 @@ void AccelStructManager::createTlas(nvrhi::ICommandList* commandList, const Scen
     tlasDesc.buildFlags = nvrhi::rt::AccelStructBuildFlags::PreferFastTrace;
 
     m_subInstanceCount = 0;
-    const scene::SceneRenderData& renderData = scene.GetRenderData();
+    const scene::SceneRenderData& renderData = scene.getRenderData();
     for (const scene::MeshInstanceRenderProxy& proxy : renderData.meshInstances)
     {
         if (proxy.meshShared)
@@ -115,7 +115,7 @@ void AccelStructManager::uploadSubInstanceData(nvrhi::ICommandList* commandList)
 
 void AccelStructManager::clearMeshAccelStructs(Scene& scene)
 {
-    for (const std::shared_ptr<MeshInfo>& mesh : scene.GetMeshes())
+    for (const std::shared_ptr<MeshInfo>& mesh : scene.getMeshes())
     {
         mesh->accelStruct = nullptr;
         mesh->AccelStructOMM = nullptr;
@@ -207,7 +207,7 @@ void AccelStructManager::updateSkinnedBlases(nvrhi::ICommandList*            com
     std::unordered_set<const MeshInfo*> preparedSkinnedMeshes;
     std::unordered_set<const MeshInfo*> updatedSkinnedMeshes;
 
-    const scene::SceneRenderData& renderData = scene.GetRenderData();
+    const scene::SceneRenderData& renderData = scene.getRenderData();
 
     for (const scene::SkinnedMeshRenderProxy& proxy : renderData.skinnedMeshes)
     {
@@ -276,7 +276,7 @@ void AccelStructManager::buildTlas(nvrhi::ICommandList*            commandList,
     std::vector<nvrhi::rt::InstanceDesc> instances;
 
     uint subInstanceCount = 0;
-    const scene::SceneRenderData& renderData = scene.GetRenderData();
+    const scene::SceneRenderData& renderData = scene.getRenderData();
     instances.reserve(renderData.meshInstances.size());
 
     // One TLAS slot per meshInstances entry so DXR InstanceIndex() matches ECS
@@ -351,7 +351,7 @@ void AccelStructManager::buildTlas(nvrhi::ICommandList*            commandList,
     assert(m_subInstanceCount == subInstanceCount);
     assert(instances.size() == renderData.meshInstances.size());
 
-    commandList->beginMarker("TLAS Update");
+    commandList->beginMarker("TLAS update");
     commandList->buildTopLevelAccelStruct(
         m_topLevelAS,
         instances.empty() ? nullptr : instances.data(),

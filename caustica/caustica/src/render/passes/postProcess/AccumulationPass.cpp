@@ -32,7 +32,7 @@ AccumulationPass::AccumulationPass(nvrhi::IDevice* device, std::shared_ptr<Shade
     m_sampler = m_device->createSampler(samplerDesc);
 }
 
-void AccumulationPass::CreatePipeline()
+void AccumulationPass::createPipeline()
 {
     m_computeShader = m_shaderFactory->createShader("caustica/shaders/render/processingPasses/AccumulationPass.hlsl", "main", nullptr, nvrhi::ShaderType::Compute);
 
@@ -42,7 +42,7 @@ void AccumulationPass::CreatePipeline()
     m_computePipeline = m_device->createComputePipeline(pipelineDesc);
 }
 
-void AccumulationPass::CreateBindingSet(nvrhi::ITexture* inputTexture, nvrhi::ITexture* outputTexture, nvrhi::ITexture* renderOutputTexture)
+void AccumulationPass::createBindingSet(nvrhi::ITexture* inputTexture, nvrhi::ITexture* outputTexture, nvrhi::ITexture* renderOutputTexture)
 {
     nvrhi::BindingSetDesc bindingSetDesc;
 
@@ -59,7 +59,7 @@ void AccumulationPass::CreateBindingSet(nvrhi::ITexture* inputTexture, nvrhi::IT
     m_compositedColor = outputTexture;
 }
 
-void AccumulationPass::Render(
+void AccumulationPass::render(
     nvrhi::ICommandList* commandList,
     const caustica::IView& sourceView,
     const caustica::IView& upscaledView,

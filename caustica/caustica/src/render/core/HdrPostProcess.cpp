@@ -24,7 +24,7 @@ void hdrPostProcess(CameraController& camera, HdrPostProcessParams& params)
     fullscreenView.setViewport(windowViewport);
     fullscreenView.updateCache();
 
-    params.bloomPass->Render(
+    params.bloomPass->render(
         commandList,
         params.renderTargets->processedOutputFramebuffer,
         fullscreenView,

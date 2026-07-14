@@ -65,7 +65,7 @@ namespace caustica
 			typedef std::vector<std::string> Args;
 			typedef std::function<Result(Args const& args)> OnExecuteFunction;
 
-			Result Execute(Args const& args);
+			Result execute(Args const& args);
 
 			// optional callback to suggest argument values
 
@@ -177,7 +177,7 @@ namespace caustica
 
 			typedef VariableState::SetBy SetBy;
 
-			VariableState GetState() const { return m_State; }
+			VariableState getState() const { return m_State; }
 
 			void SetReadOnly(bool ronly) { m_State.read_only = ronly; }
 
@@ -254,11 +254,11 @@ namespace caustica
 
 			std::string const& GetDescription() const;
 
-			VariableState GetState() const;
+			VariableState getState() const;
 
 			T GetValue() const;
 
-			void SetValue(T const& value);
+			void setValue(T const& value);
 
 			void SetOnChangeCallback(Variable::Callback onChange);
 

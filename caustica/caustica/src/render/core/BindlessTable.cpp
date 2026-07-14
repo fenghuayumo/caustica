@@ -31,18 +31,18 @@ BindlessTable::BindlessTable(nvrhi::IDevice* device, nvrhi::IBindingLayout* layo
 
 BindlessTable::~BindlessTable()
 {
-    FlushDeferredFrees();
+    flushDeferredFrees();
 }
 
 // =============================================================================
-// Grow — double the capacity
+// grow — double the capacity
 // =============================================================================
-void BindlessTable::Grow()
+void BindlessTable::grow()
 {
     uint32_t oldCapacity = m_generationCount;
     uint32_t newCapacity = std::max(64u, oldCapacity * 2);
 
-    // Allocate new generation array and copy old values
+    // allocate new generation array and copy old values
     auto newGens = std::make_unique<std::atomic<uint16_t>[]>(newCapacity);
     for (uint32_t i = 0; i < oldCapacity; ++i)
         newGens[i].store(m_generations[i].load(std::memory_order_relaxed), std::memory_order_relaxed);
@@ -66,9 +66,9 @@ void BindlessTable::Grow()
 }
 
 // =============================================================================
-// Allocate
+// allocate
 // =============================================================================
-uint32_t BindlessTable::Allocate(nvrhi::BindingSetItem item)
+uint32_t BindlessTable::allocate(nvrhi::BindingSetItem item)
 {
     std::lock_guard lock(m_mutex);
 
@@ -76,7 +76,7 @@ uint32_t BindlessTable::Allocate(nvrhi::BindingSetItem item)
     uint32_t freeCount = m_freeCount.load(std::memory_order_acquire);
     if (freeCount == 0)
     {
-        Grow();
+        grow();
         freeCount = m_freeCount.load(std::memory_order_acquire);
     }
 
@@ -88,17 +88,17 @@ uint32_t BindlessTable::Allocate(nvrhi::BindingSetItem item)
     m_manager->createDescriptor(item);
 
     // Bump generation (on free, so next alloc gets a fresh generation)
-    // Actually, generation is bumped on Free, not Allocate.
+    // Actually, generation is bumped on free, not allocate.
     // On allocate, we just return the current generation.
 
     uint16_t gen = m_generations[slot].load(std::memory_order_relaxed);
-    return BindlessHandle<BindlessTextureTag>::Make(slot, gen).getRaw();
+    return BindlessHandle<BindlessTextureTag>::make(slot, gen).getRaw();
 }
 
 // =============================================================================
-// Free
+// free
 // =============================================================================
-void BindlessTable::Free(uint32_t handle)
+void BindlessTable::free(uint32_t handle)
 {
     BindlessHandle<BindlessTextureTag> h(handle);
     if (!h.isValid())
@@ -122,25 +122,25 @@ void BindlessTable::Free(uint32_t handle)
 }
 
 // =============================================================================
-// FreeDeferred — queue for end-of-frame processing
+// freeDeferred — queue for end-of-frame processing
 // =============================================================================
-void BindlessTable::FreeDeferred(uint32_t handle)
+void BindlessTable::freeDeferred(uint32_t handle)
 {
     std::lock_guard lock(m_deferredMutex);
     m_deferredFrees.push(handle);
 }
 
 // =============================================================================
-// FlushDeferredFrees
+// flushDeferredFrees
 // =============================================================================
-void BindlessTable::FlushDeferredFrees()
+void BindlessTable::flushDeferredFrees()
 {
     std::lock_guard lock(m_deferredMutex);
     while (!m_deferredFrees.empty())
     {
         uint32_t handle = m_deferredFrees.front();
         m_deferredFrees.pop();
-        Free(handle);
+        free(handle);
     }
 }
 
@@ -181,7 +181,7 @@ uint32_t BindlessTable::getAllocatedCount() const
 // =============================================================================
 DescriptorIndex BindlessTable::createDescriptor(nvrhi::BindingSetItem item)
 {
-    return static_cast<DescriptorIndex>(Allocate(item));
+    return static_cast<DescriptorIndex>(allocate(item));
 }
 
 DescriptorHandle BindlessTable::createDescriptorHandle(nvrhi::BindingSetItem item)
@@ -194,7 +194,7 @@ DescriptorHandle BindlessTable::createDescriptorHandle(nvrhi::BindingSetItem ite
 
 void BindlessTable::releaseDescriptor(DescriptorIndex index)
 {
-    FreeDeferred(static_cast<uint32_t>(index));
+    freeDeferred(static_cast<uint32_t>(index));
 }
 
 nvrhi::BindingSetItem BindlessTable::getDescriptor(DescriptorIndex index) const

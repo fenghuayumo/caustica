@@ -34,10 +34,10 @@ struct Controller
     void AddHook(unsigned char controlChannel, Button* pParam)
     {
         buttons[controlChannel].push_back(pParam);
-        SetLedStatus(controlChannel, pParam);
+        setLedStatus(controlChannel, pParam);
     }
 
-    bool Init()
+    bool init()
     {
         if (!OpenMidiDevice())
             return false;
@@ -50,7 +50,7 @@ struct Controller
         CloseMidiDevice();
     }
 
-    void Update()
+    void update()
     {
         int currentPage = (s_PageBit0 ? 1 : 0) | (s_PageBit1 ? 2 : 0);
         if(currentPage != m_CurrentPage)
@@ -60,16 +60,16 @@ struct Controller
         }
         else
         {
-            // Update the status of LEDs if the code has changed any of the button values
+            // update the status of LEDs if the code has changed any of the button values
             for(const auto& it0 : buttons)
             {
                 int cc = it0.first;
                 for(Button* pButton : it0.second)
                 {
-                    if(((pButton->GetPage() == -1) || (pButton->GetPage() == m_CurrentPage))
-                        && (pButton->GetLedStatus() != pButton->GetState()))
+                    if(((pButton->getPage() == -1) || (pButton->getPage() == m_CurrentPage))
+                        && (pButton->getLedStatus() != pButton->getState()))
                     {
-                        SetLedStatus((unsigned char) cc, pButton);
+                        setLedStatus((unsigned char) cc, pButton);
                     }
                 }
             }
@@ -112,32 +112,32 @@ private:
         {
             for (auto b : button->second)
             {
-                if((b->GetPage() == -1) || (b->GetPage() == m_CurrentPage))
+                if((b->getPage() == -1) || (b->getPage() == m_CurrentPage))
                 {
                     bool isPressed = (midiValue > 0);
-                    switch(b->GetMode())
+                    switch(b->getMode())
                     {
                     case ButtonMode::Momentary:
                         // Set the value to the current state of the button
-                        b->SetState(isPressed);
-                        SetLedStatus(controlChannel, b);
+                        b->setState(isPressed);
+                        setLedStatus(controlChannel, b);
                         break;
                     case ButtonMode::BoolToggle:
                     case ButtonMode::IntToggle:
                         if(isPressed)
                         {
                             // Toggle the button
-                            if(b->GetState())
+                            if(b->getState())
                             {
                                 // Turn off
-                                b->SetState(false);
-                                SetLedStatus(controlChannel, b);
+                                b->setState(false);
+                                setLedStatus(controlChannel, b);
                             }
                             else
                             {
                                 // Turn on
-                                b->SetState(true);
-                                SetLedStatus(controlChannel, b);
+                                b->setState(true);
+                                setLedStatus(controlChannel, b);
                             }
                         }
                         break;
@@ -152,9 +152,9 @@ private:
 
             for (auto k : knob->second)
             {
-                if((k->GetPage() == -1) || (k->GetPage() == m_CurrentPage))
+                if((k->getPage() == -1) || (k->getPage() == m_CurrentPage))
                 {
-                    k->SetValue(fvalue);
+                    k->setValue(fvalue);
                 }
             }
         }
@@ -209,7 +209,7 @@ private:
         const unsigned char kFinalCcToClear = 71;
         for (unsigned char cc = kFirstCcToClear; cc <= kFinalCcToClear; ++cc)
         {
-            SetLedStatus(cc, nullptr/*pButton*/);
+            setLedStatus(cc, nullptr/*pButton*/);
         }
     }
 
@@ -221,15 +221,15 @@ private:
             int cc = it0.first;
             for(Button* pButton : it0.second)
             {
-                if((pButton->GetPage() == -1) || (pButton->GetPage() == m_CurrentPage))
+                if((pButton->getPage() == -1) || (pButton->getPage() == m_CurrentPage))
                 {
-                    SetLedStatus((unsigned char) cc, pButton);
+                    setLedStatus((unsigned char) cc, pButton);
                 }
             }
         }
     }
 
-    void SetLedStatus(unsigned char controlChannel, Button* pButton)
+    void setLedStatus(unsigned char controlChannel, Button* pButton)
     {
         if(m_MidiOutHandle)
         {
@@ -240,12 +240,12 @@ private:
             const uint8_t kMidiChannel = 0;
             u.bData[0] = 0xb0/*control change*/ | kMidiChannel;  // MIDI status byte
             u.bData[1] = controlChannel;  // first MIDI data byte  : CC number
-            u.bData[2] = (pButton && pButton->GetState()) ? 127 : 0; // second MIDI data byte : Value
+            u.bData[2] = (pButton && pButton->getState()) ? 127 : 0; // second MIDI data byte : Value
             u.bData[3] = 0;
             midiOutShortMsg(m_MidiOutHandle, u.dwData);
             if (pButton)
             {
-                pButton->SetLedStatus(pButton->GetState());
+                pButton->setLedStatus(pButton->getState());
             }
         }
     }
@@ -264,17 +264,17 @@ private:
 
 Controller* korgi::Controller::s_pController = nullptr;
 
-void Init()
+void init()
 {
-    Controller::Get()->Init();
+    Controller::Get()->init();
 }
 void Shutdown()
 {
     Controller::Get()->Shutdown();
 }
-void Update()
+void update()
 {
-    Controller::Get()->Update();
+    Controller::Get()->update();
 }
 
 Button::Button(int page, Control controlChannel, ButtonMode mode, bool* pValue)
@@ -286,7 +286,7 @@ Button::Button(int page, Control controlChannel, ButtonMode mode, bool* pValue)
     , m_OnValue((int)true)
     , m_Page(page)
 {
-    m_LedStatus = GetState();
+    m_LedStatus = getState();
     Controller::Get()->AddHook((unsigned char)controlChannel, this);
 }
 
@@ -299,22 +299,22 @@ Button::Button(int page, Control controlChannel, int* pValue, int offValue, int 
     , m_OnValue(onValue)
     , m_Page(page)
 {
-    m_LedStatus = GetState();
+    m_LedStatus = getState();
     Controller::Get()->AddHook((unsigned char)controlChannel, this);
 }
 
-bool Button::GetState() const
+bool Button::getState() const
 {
-    if(GetMode() == ButtonMode::IntToggle)
+    if(getMode() == ButtonMode::IntToggle)
     {
         return *reinterpret_cast<const int*>(m_pValue) == m_OnValue;
     }
     return *reinterpret_cast<const bool*>(m_pValue);
 }
 
-void Button::SetState(bool state)
+void Button::setState(bool state)
 {
-    if (GetMode() == ButtonMode::IntToggle)
+    if (getMode() == ButtonMode::IntToggle)
     {
         *reinterpret_cast<int*>(m_pValue) = (state ? m_OnValue : m_OffValue);
         return;
@@ -322,15 +322,15 @@ void Button::SetState(bool state)
     *reinterpret_cast<bool*>(m_pValue) = state;
 }
 
-bool Button::WasMomentarilyPressed()
+bool Button::wasMomentarilyPressed()
 {
     bool retVal = false;
-    const bool state = GetState();
+    const bool state = getState();
     if (state && !m_PreviousState)
     {
         retVal = true;
     }
-    // Clear the previous value, so this function only returns true once.
+    // clear the previous value, so this function only returns true once.
     m_PreviousState = state;
     return retVal;
 }

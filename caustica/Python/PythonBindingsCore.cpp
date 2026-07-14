@@ -191,7 +191,7 @@ namespace
 
         [[nodiscard]] scene::SceneEntityWorld* entityWorld() const
         {
-            return scene ? scene->GetEntityWorld() : nullptr;
+            return scene ? scene->getEntityWorld() : nullptr;
         }
     };
 
@@ -202,7 +202,7 @@ namespace
         if (!scene)
             return result;
 
-        for (const auto& mat : scene->GetMaterials())
+        for (const auto& mat : scene->getMaterials())
         {
             if (auto pt = PTMaterial::safeCast(mat))
                 result.push_back(pt);
@@ -215,7 +215,7 @@ namespace
         if (!scene)
             return nullptr;
 
-        for (const auto& mat : scene->GetMaterials())
+        for (const auto& mat : scene->getMaterials())
         {
             auto pt = PTMaterial::safeCast(mat);
             if (pt && (pt->name == name || pt->uniqueName == name))
@@ -229,7 +229,7 @@ namespace
         if (!scene)
             return nullptr;
 
-        for (const auto& mat : scene->GetMaterials())
+        for (const auto& mat : scene->getMaterials())
         {
             if (mat && mat->materialID == materialId)
                 return PTMaterial::safeCast(mat);
@@ -248,11 +248,11 @@ namespace
         if (!scene)
             return nullptr;
 
-        const scene::SceneEntityWorld* entityWorld = scene->GetEntityWorld();
+        const scene::SceneEntityWorld* entityWorld = scene->getEntityWorld();
         if (!entityWorld)
             return nullptr;
 
-        for (ecs::Entity entity : scene->GetLightEntities())
+        for (ecs::Entity entity : scene->getLightEntities())
         {
             if (entityWorld->getEntityName(entity) == name)
             {
@@ -283,7 +283,7 @@ namespace
         if (!scene || path.empty())
             return nullptr;
 
-        scene::SceneEntityWorld* entityWorld = scene->GetEntityWorld();
+        scene::SceneEntityWorld* entityWorld = scene->getEntityWorld();
         if (!entityWorld)
             return nullptr;
 
@@ -308,7 +308,7 @@ namespace
         if (!scene)
             return result;
 
-        for (const auto& mesh : scene->GetMeshes())
+        for (const auto& mesh : scene->getMeshes())
             result.push_back(mesh);
         return result;
     }
@@ -318,7 +318,7 @@ namespace
         if (!scene)
             return nullptr;
 
-        for (const auto& mesh : scene->GetMeshes())
+        for (const auto& mesh : scene->getMeshes())
         {
             if (mesh && mesh->name == name)
                 return mesh;
@@ -427,7 +427,7 @@ namespace
     {
         if (!scene)
             return std::nullopt;
-        return ValidSceneBounds(scene->GetSceneBounds());
+        return ValidSceneBounds(scene->getSceneBounds());
     }
 
     std::optional<caustica::math::box3> SceneBoundsFromScene(const std::shared_ptr<Scene>& scene)
@@ -899,7 +899,7 @@ void RegisterCoreBindings(nb::module_& m)
 
     // --- Lights -----------------------------------------------------------
     nb::class_<Light>(m, "Light", "Base class for all scene lights.")
-        .def_prop_ro("light_type", [](Light& self) { return self.GetLightType(); })
+        .def_prop_ro("light_type", [](Light& self) { return self.getLightType(); })
         .def_prop_rw("color",
             [](Light& self) { return Float3ToTuple(self.color); },
             [](Light& self, nb::object v) { self.color = ToFloat3(v); })
@@ -907,14 +907,14 @@ void RegisterCoreBindings(nb::module_& m)
                 return self.name;
             })
         .def_prop_rw("position",
-            [](Light& self) { return Double3ToTuple(self.GetPosition()); },
+            [](Light& self) { return Double3ToTuple(self.getPosition()); },
             [](Light& self, nb::object v) {
                 self.cachedGlobalTransform.m_translation = ToDouble3(v);
             })
         .def_prop_rw("direction",
-            [](Light& self) { return Double3ToTuple(self.GetDirection()); },
+            [](Light& self) { return Double3ToTuple(self.getDirection()); },
             [](Light& self, nb::object v) {
-                self.UpdateCachedDirection(ToDouble3(v));
+                self.updateCachedDirection(ToDouble3(v));
             })
         .def("__repr__", [](Light& self) {
                 const std::string& n = self.name.empty() ? std::string("<unnamed>") : self.name;
@@ -1085,10 +1085,10 @@ void RegisterCoreBindings(nb::module_& m)
                 return GetSceneMaterials(&self).size();
             }, "Number of PTMaterial instances in this scene.")
         .def_prop_ro("mesh_count", [](Scene& self) {
-                return self.GetMeshes().size();
+                return self.getMeshes().size();
             }, "Number of meshes in this scene.")
         .def_prop_ro("light_count", [](Scene& self) {
-                return self.GetLightEntities().size();
+                return self.getLightEntities().size();
             }, "Number of lights in this scene.")
 
         .def("get_bounds", [](Scene& self) {
@@ -1120,7 +1120,7 @@ void RegisterCoreBindings(nb::module_& m)
 
         .def("__repr__", [](Scene& self) {
                 const auto materialCount = GetSceneMaterials(&self).size();
-                const auto lightCount = self.GetLightEntities().size();
+                const auto lightCount = self.getLightEntities().size();
                 return std::string("<caustica.Scene materials=") + std::to_string(materialCount)
                     + " lights=" + std::to_string(lightCount) + ">";
             });
@@ -1136,13 +1136,13 @@ void RegisterCoreBindings(nb::module_& m)
         .def_prop_rw("rotation_xyz",
             [](EnvironmentMapRuntimeParameters& s) { return Float3ToTuple(s.RotationXYZ); },
             [](EnvironmentMapRuntimeParameters& s, nb::object v) { s.RotationXYZ = ToFloat3(v); })
-        .def_rw("enabled", &EnvironmentMapRuntimeParameters::Enabled)
+        .def_rw("enabled", &EnvironmentMapRuntimeParameters::enabled)
         .def_rw("visible_to_camera", &EnvironmentMapRuntimeParameters::VisibleToCamera)
         .def_prop_rw("hide_source",
             [](EnvironmentMapRuntimeParameters& s) { return !s.VisibleToCamera; },
             [](EnvironmentMapRuntimeParameters& s, bool hide) { s.VisibleToCamera = !hide; });
 
-    nb::class_<PathTracerSettings>(m, "Settings",
+    nb::class_<PathTracerSettings>(m, "settings",
         "Live renderer session state (path tracer settings and runtime flags).\n"
         "Mutating attributes is equivalent to moving the corresponding ImGui widget.")
         .def_rw("enable_animations",             &PathTracerSettings::EnableAnimations)
@@ -1163,7 +1163,7 @@ void RegisterCoreBindings(nb::module_& m)
                 }
             },
                 "True for realtime mode, False for reference / accumulation mode.\n"
-                "See `Settings.path_tracer_mode` for an enum-flavored version.")
+                "See `settings.path_tracer_mode` for an enum-flavored version.")
         .def_prop_rw("path_tracer_mode",
             [](PathTracerSettings& s) -> int { return s.RealtimeMode ? 0 /*Realtime*/ : 1 /*Reference*/; },
             [](PathTracerSettings& s, int mode) {
@@ -1324,7 +1324,7 @@ void RegisterCoreBindings(nb::module_& m)
                 "NVIDIA Reflex mode (caustica.ReflexMode).")
         .def_rw("reflex_capped_fps",             &PathTracerSettings::ReflexCappedFps)
 
-        // --- Read-only support flags -------------------------------------
+        // --- read-only support flags -------------------------------------
         .def_ro("is_dlss_supported",     &PathTracerSettings::IsDLSSSuported)
         .def_ro("is_dlss_fg_supported",  &PathTracerSettings::IsDLSSFGSupported)
         .def_ro("is_dlss_rr_supported",  &PathTracerSettings::IsDLSSRRSupported)
@@ -1337,7 +1337,7 @@ void RegisterCoreBindings(nb::module_& m)
 
         // --- OIDN reference-mode denoiser --------------------------------
         .def_rw("oidn_enabled",            &PathTracerSettings::ReferenceOIDNDenoiser,
-                "(Reference mode) Run Intel Open Image Denoise after accumulation reaches the SPP target.")
+                "(Reference mode) Run Intel Open Image denoise after accumulation reaches the SPP target.")
         .def_rw("oidn_use_gpu",            &PathTracerSettings::ReferenceOIDNUseGPU,
                 "Use OIDN GPU device (CUDA/HIP/SYCL) when available, else CPU.")
         .def_rw("oidn_passes",             &PathTracerSettings::ReferenceOIDNPasses,
@@ -1358,7 +1358,7 @@ void RegisterCoreBindings(nb::module_& m)
         ;
 
     nb::class_<EditorUIData>(m, "EditorSettings",
-        "Desktop-editor settings that extend `Settings` with ImGui view state.")
+        "Desktop-editor settings that extend `settings` with ImGui view state.")
         .def_prop_rw("show_ui",
             [](EditorUIData& ui) { return ui.editor.ShowUI; },
             [](EditorUIData& ui, bool value) { ui.editor.ShowUI = value; });
@@ -1370,7 +1370,7 @@ void RegisterCoreBindings(nb::module_& m)
         .def_prop_ro("settings", [](App& self) -> PathTracerSettings* {
                 return sceneSession::settings(self);
             }, nb::rv_policy::reference,
-            "Live `Settings` mirror of the current UI state.")
+            "Live `settings` mirror of the current UI state.")
         .def_prop_ro("scene", [](App& self) {
                 return sceneSession::scene(self);
             }, "Current loaded `Scene`, or None before a scene is available.")
@@ -1394,7 +1394,7 @@ void RegisterCoreBindings(nb::module_& m)
                 return sceneSession::loadGaussianSplatFile(self, fileName, convertRdfToRub);
             },
             nb::arg("file_name"), nb::arg("convert_rdf_to_rub") = true,
-            "Load a 3DGS .ply file and rasterize it over the current scene.")
+            "load a 3DGS .ply file and rasterize it over the current scene.")
 
         .def_prop_ro("gaussian_splat_count", [](App& self) { return sceneSession::gaussianSplatCount(self); })
         .def_prop_ro("gaussian_splat_object_count", [](App& self) { return sceneSession::gaussianSplatObjectCount(self); })
@@ -1594,7 +1594,7 @@ void RegisterCoreBindings(nb::module_& m)
             },
             nb::arg("mesh"), nb::arg("callback"), nb::arg("recompute_normals") = true,
             nb::arg("rebuild_acceleration_structure") = true,
-            "Apply a Python callback to each unique vertex.")
+            "apply a Python callback to each unique vertex.")
         .def("get_mesh_vertices_world", [](SceneEditor& self, const std::shared_ptr<MeshInfo>& mesh) {
                 return Float3VectorToList(self.getMeshVerticesWorld(mesh));
             }, nb::arg("mesh"))

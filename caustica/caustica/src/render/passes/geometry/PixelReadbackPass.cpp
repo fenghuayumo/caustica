@@ -92,7 +92,7 @@ PixelReadbackPass::PixelReadbackPass(
 }
 
 
-void PixelReadbackPass::Capture(nvrhi::ICommandList* commandList, dm::uint2 pixelPosition)
+void PixelReadbackPass::capture(nvrhi::ICommandList* commandList, dm::uint2 pixelPosition)
 {
     PixelReadbackConstants constants = {};
     constants.pixelPosition = dm::int2(pixelPosition);
@@ -107,7 +107,7 @@ void PixelReadbackPass::Capture(nvrhi::ICommandList* commandList, dm::uint2 pixe
     commandList->copyBuffer(m_ReadbackBuffer, 0, m_IntermediateBuffer, 0, m_ReadbackBuffer->getDesc().byteSize);
 }
 
-dm::float4 PixelReadbackPass::ReadFloats()
+dm::float4 PixelReadbackPass::readFloats()
 {
     void* pData = m_device->mapBuffer(m_ReadbackBuffer, nvrhi::CpuAccessMode::Read);
     assert(pData);
@@ -118,7 +118,7 @@ dm::float4 PixelReadbackPass::ReadFloats()
     return values;
 }
 
-dm::uint4 PixelReadbackPass::ReadUInts()
+dm::uint4 PixelReadbackPass::readUInts()
 {
     void* pData = m_device->mapBuffer(m_ReadbackBuffer, nvrhi::CpuAccessMode::Read);
     assert(pData);
@@ -129,7 +129,7 @@ dm::uint4 PixelReadbackPass::ReadUInts()
     return values;
 }
 
-dm::int4 PixelReadbackPass::ReadInts()
+dm::int4 PixelReadbackPass::readInts()
 {
     void* pData = m_device->mapBuffer(m_ReadbackBuffer, nvrhi::CpuAccessMode::Read);
     assert(pData);

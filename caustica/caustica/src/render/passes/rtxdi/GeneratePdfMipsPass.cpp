@@ -64,9 +64,9 @@ GenerateMipsPass::GenerateMipsPass(
 
 GenerateMipsPass::~GenerateMipsPass(){}
 
-void GenerateMipsPass::Process(nvrhi::ICommandList* commandList)
+void GenerateMipsPass::process(nvrhi::ICommandList* commandList)
 {
-    commandList->beginMarker("GenerateMips");
+    commandList->beginMarker("generateMips");
     
     const auto& destDesc = m_destinationTexture->getDesc();
 

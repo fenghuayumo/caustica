@@ -23,7 +23,7 @@ void registerPathTracePrePassFeature(RenderFeatureContext ctx)
     const PathTraceGraphTargets handles = importPathTraceGraphTargets(*ctx.graph, *ctx.renderTargets);
 
     rg::PassOptions passOptions{};
-    passOptions.executeAfter = ctx.settings->ActualUseRTXDIPasses() ? "RtxdiBeginFrame" : "FrameClear";
+    passOptions.executeAfter = ctx.settings->actualUseRTXDIPasses() ? "RtxdiBeginFrame" : "FrameClear";
 
     ctx.graph->addPass(
         "PathTracePrePass",

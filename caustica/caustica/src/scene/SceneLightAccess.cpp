@@ -23,14 +23,14 @@ void FillCommonLightConstants(const LightComponent& component, LightConstants& l
     lightConstants.perObjectShadows = int4(-1);
     lightConstants.shadowChannel = int4(component.shadowChannel, -1, -1, -1);
     if (component.shadowMap)
-        lightConstants.outOfBoundsShadow = component.shadowMap->IsLitOutOfBounds() ? 1.f : 0.f;
+        lightConstants.outOfBoundsShadow = component.shadowMap->isLitOutOfBounds() ? 1.f : 0.f;
     else
         lightConstants.outOfBoundsShadow = 1.f;
 }
 
 } // namespace
 
-int GetLightType(const LightComponent& component)
+int getLightType(const LightComponent& component)
 {
     switch (component.data.index())
     {
@@ -42,24 +42,24 @@ int GetLightType(const LightComponent& component)
     }
 }
 
-SceneContentFlags GetLightContentFlags()
+SceneContentFlags getLightContentFlags()
 {
     return SceneContentFlags::Lights;
 }
 
-dm::double3 GetLightPosition(const dm::daffine3& globalTransform)
+dm::double3 getLightPosition(const dm::daffine3& globalTransform)
 {
     return globalTransform.m_translation;
 }
 
-dm::double3 GetLightDirection(const dm::daffine3& globalTransform)
+dm::double3 getLightDirection(const dm::daffine3& globalTransform)
 {
     return -normalize(dm::double3(globalTransform.m_linear.row2));
 }
 
-bool IsInfiniteLight(const LightComponent& component)
+bool isInfiniteLight(const LightComponent& component)
 {
-    switch (GetLightType(component))
+    switch (getLightType(component))
     {
     case LightType_Directional: return true;
     case LightType_Environment: return true;
@@ -67,18 +67,18 @@ bool IsInfiniteLight(const LightComponent& component)
     }
 }
 
-void FillLightConstants(
+void fillLightConstants(
     const LightComponent& component, const dm::daffine3& globalTransform, LightConstants& lightConstants)
 {
     FillCommonLightConstants(component, lightConstants);
 
-    switch (GetLightType(component))
+    switch (getLightType(component))
     {
     case LightType_Directional:
     {
         const auto& directional = std::get<DirectionalLightData>(component.data);
         lightConstants.lightType = LightType_Directional;
-        lightConstants.direction = float3(normalize(GetLightDirection(globalTransform)));
+        lightConstants.direction = float3(normalize(getLightDirection(globalTransform)));
         const float clampedAngularSize = clamp(directional.angularSize, 0.f, 90.f);
         lightConstants.angularSizeOrInvRange = dm::radians(clampedAngularSize);
         lightConstants.intensity = directional.irradiance;
@@ -88,8 +88,8 @@ void FillLightConstants(
     {
         const auto& spot = std::get<SpotLightData>(component.data);
         lightConstants.lightType = LightType_Spot;
-        lightConstants.direction = float3(GetLightDirection(globalTransform));
-        lightConstants.position = float3(GetLightPosition(globalTransform));
+        lightConstants.direction = float3(getLightDirection(globalTransform));
+        lightConstants.position = float3(getLightPosition(globalTransform));
         lightConstants.radius = spot.radius;
         lightConstants.angularSizeOrInvRange = (spot.range <= 0.f) ? 0.f : 1.f / spot.range;
         lightConstants.intensity = spot.intensity;
@@ -102,7 +102,7 @@ void FillLightConstants(
     {
         const auto& point = std::get<PointLightData>(component.data);
         lightConstants.lightType = LightType_Point;
-        lightConstants.position = float3(GetLightPosition(globalTransform));
+        lightConstants.position = float3(getLightPosition(globalTransform));
         lightConstants.radius = point.radius;
         lightConstants.angularSizeOrInvRange = (point.range <= 0.f) ? 0.f : 1.f / point.range;
         lightConstants.intensity = point.intensity;
@@ -118,7 +118,7 @@ void FillLightConstants(
     }
 }
 
-bool SetLightProperty(LightComponent& component, const std::string& propName, const dm::float4& value)
+bool setLightProperty(LightComponent& component, const std::string& propName, const dm::float4& value)
 {
     if (propName == "color")
     {
@@ -160,7 +160,7 @@ bool SetLightProperty(LightComponent& component, const std::string& propName, co
     return false;
 }
 
-void SetLightPosition(SceneEntityWorld& world, ecs::Entity entity, const dm::double3& position)
+void setLightPosition(SceneEntityWorld& world, ecs::Entity entity, const dm::double3& position)
 {
     ecs::Entity parentEntity = ecs::NullEntity;
     if (const auto* parent = world.world().get<ParentComponent>(entity))
@@ -177,7 +177,7 @@ void SetLightPosition(SceneEntityWorld& world, ecs::Entity entity, const dm::dou
     world.setTranslation(entity, translation);
 }
 
-void SetLightDirection(SceneEntityWorld& world, ecs::Entity entity, const dm::double3& direction)
+void setLightDirection(SceneEntityWorld& world, ecs::Entity entity, const dm::double3& direction)
 {
     ecs::Entity parentEntity = ecs::NullEntity;
     if (const auto* parent = world.world().get<ParentComponent>(entity))
@@ -200,7 +200,7 @@ void SetLightDirection(SceneEntityWorld& world, ecs::Entity entity, const dm::do
     world.setLocalTransform(entity, nullptr, &rotation, &scaling);
 }
 
-void InitializeLightComponent(LightComponent& component, const Light& light)
+void initializeLightComponent(LightComponent& component, const Light& light)
 {
     component.shadowMap = light.shadowMap;
     component.shadowChannel = light.shadowChannel;
@@ -245,77 +245,77 @@ void InitializeLightComponent(LightComponent& component, const Light& light)
     }
 }
 
-void InitializeLightComponent(LightComponent& component, const std::shared_ptr<Light>& light)
+void initializeLightComponent(LightComponent& component, const std::shared_ptr<Light>& light)
 {
     if (light)
-        InitializeLightComponent(component, *light);
+        initializeLightComponent(component, *light);
 }
 
-const LightComponent* TryGetLight(const ecs::World& world, ecs::Entity entity)
+const LightComponent* tryGetLight(const ecs::World& world, ecs::Entity entity)
 {
     return world.tryGet<LightComponent>(entity);
 }
 
-LightComponent* TryGetLight(ecs::World& world, ecs::Entity entity)
+LightComponent* tryGetLight(ecs::World& world, ecs::Entity entity)
 {
     return world.tryGet<LightComponent>(entity);
 }
 
-DirectionalLightData* TryGetDirectionalLightData(LightComponent& component)
+DirectionalLightData* tryGetDirectionalLightData(LightComponent& component)
 {
     return std::get_if<DirectionalLightData>(&component.data);
 }
 
-SpotLightData* TryGetSpotLightData(LightComponent& component)
+SpotLightData* tryGetSpotLightData(LightComponent& component)
 {
     return std::get_if<SpotLightData>(&component.data);
 }
 
-PointLightData* TryGetPointLightData(LightComponent& component)
+PointLightData* tryGetPointLightData(LightComponent& component)
 {
     return std::get_if<PointLightData>(&component.data);
 }
 
-EnvironmentLightData* TryGetEnvironmentLightData(LightComponent& component)
+EnvironmentLightData* tryGetEnvironmentLightData(LightComponent& component)
 {
     return std::get_if<EnvironmentLightData>(&component.data);
 }
 
-const DirectionalLightData* TryGetDirectionalLightData(const LightComponent& component)
+const DirectionalLightData* tryGetDirectionalLightData(const LightComponent& component)
 {
     return std::get_if<DirectionalLightData>(&component.data);
 }
 
-const SpotLightData* TryGetSpotLightData(const LightComponent& component)
+const SpotLightData* tryGetSpotLightData(const LightComponent& component)
 {
     return std::get_if<SpotLightData>(&component.data);
 }
 
-const PointLightData* TryGetPointLightData(const LightComponent& component)
+const PointLightData* tryGetPointLightData(const LightComponent& component)
 {
     return std::get_if<PointLightData>(&component.data);
 }
 
-const EnvironmentLightData* TryGetEnvironmentLightData(const LightComponent& component)
+const EnvironmentLightData* tryGetEnvironmentLightData(const LightComponent& component)
 {
     return std::get_if<EnvironmentLightData>(&component.data);
 }
 
-ecs::Entity FindEnvironmentLightEntity(const ecs::World& world, const std::vector<ecs::Entity>& lightEntities)
+ecs::Entity findEnvironmentLightEntity(const ecs::World& world, const std::vector<ecs::Entity>& lightEntities)
 {
     for (ecs::Entity entity : lightEntities)
     {
-        const auto* component = TryGetLight(world, entity);
-        if (component && GetLightType(*component) == LightType_Environment)
+        const auto* component = tryGetLight(world, entity);
+        if (component && getLightType(*component) == LightType_Environment)
             return entity;
     }
     return ecs::NullEntity;
 }
 
-const std::string& GetEnvironmentLightPath(const LightComponent& component)
+const std::string& getEnvironmentLightPath(const LightComponent& component)
 {
     static const std::string s_empty;
-    if (const auto* environment = TryGetEnvironmentLightData(component))
+    if (const auto* environment = tryGetEnvironmentLightData(component))
         return environment->path;
     return s_empty;
 }

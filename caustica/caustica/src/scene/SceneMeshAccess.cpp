@@ -5,7 +5,7 @@
 namespace caustica::scene
 {
 
-SceneContentFlags GetMeshContentFlags(const MeshInfo& mesh)
+SceneContentFlags getMeshContentFlags(const MeshInfo& mesh)
 {
     SceneContentFlags flags = SceneContentFlags::None;
 
@@ -31,20 +31,20 @@ SceneContentFlags GetMeshContentFlags(const MeshInfo& mesh)
     return flags;
 }
 
-dm::box3 GetMeshLocalBounds(const MeshInfo& mesh)
+dm::box3 getMeshLocalBounds(const MeshInfo& mesh)
 {
     return mesh.objectSpaceBounds;
 }
 
-bool SetMeshProperty(MeshInfo& mesh, const std::string& propName, const dm::float4& value)
+bool setMeshProperty(MeshInfo& mesh, const std::string& propName, const dm::float4& value)
 {
     if (mesh.geometries.size() == 1 && mesh.geometries[0]->material)
-        return mesh.geometries[0]->material->SetProperty(propName, value);
+        return mesh.geometries[0]->material->setProperty(propName, value);
 
     return false;
 }
 
-void InitializeMeshInstanceComponent(MeshInstanceComponent& component, const std::shared_ptr<MeshInfo>& mesh)
+void initializeMeshInstanceComponent(MeshInstanceComponent& component, const std::shared_ptr<MeshInfo>& mesh)
 {
     component.mesh = mesh;
     component.instanceIndex = -1;
@@ -55,36 +55,36 @@ void InitializeMeshInstanceComponent(MeshInstanceComponent& component, const std
         component.perGeometryLightSamplerLinks.resize(mesh->geometries.size(), LightSamplerLink{ -1, -1 });
 }
 
-const MeshInstanceComponent* TryGetMeshInstance(const ecs::World& world, ecs::Entity entity)
+const MeshInstanceComponent* tryGetMeshInstance(const ecs::World& world, ecs::Entity entity)
 {
     return world.tryGet<MeshInstanceComponent>(entity);
 }
 
-std::shared_ptr<MeshInfo> GetMeshAsset(const ecs::World& world, ecs::Entity entity)
+std::shared_ptr<MeshInfo> getMeshAsset(const ecs::World& world, ecs::Entity entity)
 {
-    const auto* component = TryGetMeshInstance(world, entity);
+    const auto* component = tryGetMeshInstance(world, entity);
     return component ? component->mesh : nullptr;
 }
 
-bool HasSkinnedMesh(const ecs::World& world, ecs::Entity entity)
+bool hasSkinnedMesh(const ecs::World& world, ecs::Entity entity)
 {
     return world.has<SkinnedMeshComponent>(entity);
 }
 
-const SkinnedMeshComponent* TryGetSkinnedMesh(const ecs::World& world, ecs::Entity entity)
+const SkinnedMeshComponent* tryGetSkinnedMesh(const ecs::World& world, ecs::Entity entity)
 {
     return world.tryGet<SkinnedMeshComponent>(entity);
 }
 
-SkinnedMeshComponent* TryGetSkinnedMesh(ecs::World& world, ecs::Entity entity)
+SkinnedMeshComponent* tryGetSkinnedMesh(ecs::World& world, ecs::Entity entity)
 {
     return world.tryGet<SkinnedMeshComponent>(entity);
 }
 
-std::shared_ptr<MeshInfo> CreateSkinnedMeshFromPrototype(
+std::shared_ptr<MeshInfo> createSkinnedMeshFromPrototype(
     SceneTypeFactory& factory, const std::shared_ptr<MeshInfo>& prototypeMesh)
 {
-    auto skinnedMesh = factory.CreateMesh();
+    auto skinnedMesh = factory.createMesh();
     skinnedMesh->skinPrototype = prototypeMesh;
     skinnedMesh->name = prototypeMesh->name;
     skinnedMesh->objectSpaceBounds = prototypeMesh->objectSpaceBounds;
@@ -96,7 +96,7 @@ std::shared_ptr<MeshInfo> CreateSkinnedMeshFromPrototype(
 
     for (const auto& geometry : prototypeMesh->geometries)
     {
-        auto newGeometry = factory.CreateMeshGeometry();
+        auto newGeometry = factory.createMeshGeometry();
         *newGeometry = *geometry;
         skinnedMesh->geometries.push_back(std::move(newGeometry));
     }

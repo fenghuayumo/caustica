@@ -119,7 +119,7 @@ struct EnvironmentMapRuntimeParameters
     dm::float3  TintColor = { 1.f, 1.f, 1.f };
     float       Intensity = 1.f;
     dm::float3  RotationXYZ = { 0.f, 0.f, 0.f };
-    bool        Enabled = true;
+    bool        enabled = true;
     bool        VisibleToCamera = true;
 };
 
@@ -186,28 +186,28 @@ enum class RTXDIRestirPTQualityPreset : uint32_t
 
 struct PathTracerSettings
 {
-    bool                                ActualUseRTXDIPasses() const { return ActualUseReSTIRDI() || ActualUseReSTIRGI() || ActualUseReSTIRPT(); }
-    bool                                ActualUseReSTIRDI() const { return UseNEE && (RealtimeMode) && (UseReSTIRDI) && (RealtimeAA < 3 || !DisableReSTIRsWithDLSSRR); }
-    bool                                ActualUseReSTIRGI() const { return (RealtimeMode) && (UseReSTIRGI) && (!UseReSTIRPT) && (RealtimeAA < 3 || !DisableReSTIRsWithDLSSRR); }
-    bool                                ActualUseReSTIRPT() const { return (RealtimeMode) && (UseReSTIRPT) && (RealtimeAA < 3 || !DisableReSTIRsWithDLSSRR); }
-    uint                                ActualSamplesPerPixel() const { return (RealtimeMode && !(ActualUseReSTIRDI() || ActualUseReSTIRGI() || ActualUseReSTIRPT())) ? RealtimeSamplesPerPixel : 1u; }
-    bool                                ActualUseStandaloneDenoiser() const { return (RealtimeMode && RealtimeAA < 3) ? StandaloneDenoiser : false; }
+    bool                                actualUseRTXDIPasses() const { return actualUseReSTIRDI() || actualUseReSTIRGI() || actualUseReSTIRPT(); }
+    bool                                actualUseReSTIRDI() const { return UseNEE && (RealtimeMode) && (UseReSTIRDI) && (RealtimeAA < 3 || !DisableReSTIRsWithDLSSRR); }
+    bool                                actualUseReSTIRGI() const { return (RealtimeMode) && (UseReSTIRGI) && (!UseReSTIRPT) && (RealtimeAA < 3 || !DisableReSTIRsWithDLSSRR); }
+    bool                                actualUseReSTIRPT() const { return (RealtimeMode) && (UseReSTIRPT) && (RealtimeAA < 3 || !DisableReSTIRsWithDLSSRR); }
+    uint                                actualSamplesPerPixel() const { return (RealtimeMode && !(actualUseReSTIRDI() || actualUseReSTIRGI() || actualUseReSTIRPT())) ? RealtimeSamplesPerPixel : 1u; }
+    bool                                actualUseStandaloneDenoiser() const { return (RealtimeMode && RealtimeAA < 3) ? StandaloneDenoiser : false; }
     float                               ActualNEEAT_LocalToGlobalSampleRatio() const { return (NEEType == 2) ? (NEEAT_LocalToGlobalSampleRatio) : (0); }    // make sure we use no local samples when NEE-AT disabled!
-    bool                                ActualFireflyFilterEnabled() const { return (RealtimeMode)?RealtimeFireflyFilterEnabled:ReferenceFireflyFilterEnabled; }
+    bool                                actualFireflyFilterEnabled() const { return (RealtimeMode)?RealtimeFireflyFilterEnabled:ReferenceFireflyFilterEnabled; }
 
 #if CAUSTICA_WITH_STREAMLINE
-    int                                 ActualReflexMode() const { return (RealtimeMode && IsReflexSupported) ? (ReflexMode || (ActualDLSSFGMode()!=SI::DLSSGMode::eOff)) : (SI::ReflexMode::eOff); }
-    SI::DLSSGMode                       ActualDLSSFGMode() const { return (RealtimeMode && IsDLSSFGSupported) ? (DLSSFGMode) : (SI::DLSSGMode::eOff); }
+    int                                 actualReflexMode() const { return (RealtimeMode && IsReflexSupported) ? (ReflexMode || (actualDLSSFGMode()!=SI::DLSSGMode::eOff)) : (SI::ReflexMode::eOff); }
+    SI::DLSSGMode                       actualDLSSFGMode() const { return (RealtimeMode && IsDLSSFGSupported) ? (DLSSFGMode) : (SI::DLSSGMode::eOff); }
 #endif
 
-    bool                                ActualUseApproximateMIS() const { return (RealtimeMode)?(NEEMISType!=0):(NEEMISType==2); }
+    bool                                actualUseApproximateMIS() const { return (RealtimeMode)?(NEEMISType!=0):(NEEMISType==2); }
 
 #if CAUSTICA_WITH_STREAMLINE
-    bool                                ActualEnableVsync() const       { return (ActualDLSSFGMode() != SI::DLSSGMode::eOff) ? (false) : (EnableVsync); }
-    int                                 ActualFPSLimiter() const        { return (ActualDLSSFGMode() != SI::DLSSGMode::eOff) ? (0) : (FPSLimiter); }
+    bool                                actualEnableVsync() const       { return (actualDLSSFGMode() != SI::DLSSGMode::eOff) ? (false) : (EnableVsync); }
+    int                                 actualFPSLimiter() const        { return (actualDLSSFGMode() != SI::DLSSGMode::eOff) ? (0) : (FPSLimiter); }
 #else
-    bool                                ActualEnableVsync() const       { return EnableVsync; }
-    int                                 ActualFPSLimiter() const        { return FPSLimiter; }
+    bool                                actualEnableVsync() const       { return EnableVsync; }
+    int                                 actualFPSLimiter() const        { return FPSLimiter; }
 #endif
     int                                 FPSLimiter                              = 0; // 0 - no limit, otherwise limit fps to FPSLimiter and fix scene update deltaTime to 1./FPSLimiter
     bool                                EnableAnimations                        = false;
@@ -304,8 +304,8 @@ struct PathTracerSettings
 
     RtxdiUserSettings                   RTXDI;
 
-    void                                ApplyRTXDIRestirPreset();
-    void                                ApplyRTXDIRestirPTPreset();
+    void                                applyRTXDIRestirPreset();
+    void                                applyRTXDIRestirPTPreset();
 
     // DLSS specific parameters
     //float                               DLSSSharpness = 0.f;

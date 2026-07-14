@@ -16,7 +16,7 @@ bool tryImportRtxdiGraphResources(
     if (rtxdiPass == nullptr)
         return false;
 
-    const std::shared_ptr<RtxdiResources> resources = rtxdiPass->GetRTXDIResources();
+    const std::shared_ptr<RtxdiResources> resources = rtxdiPass->getRTXDIResources();
     if (resources == nullptr)
         return false;
 
@@ -55,10 +55,10 @@ void declareRtxdiExecuteAccess(
     setup.read(rtxdiResources.lightDataBuffer, rg::BufferAccess::UnorderedAccess);
     setup.write(rtxdiResources.lightReservoirBuffer, rg::BufferAccess::UnorderedAccess);
 
-    if (settings.ActualUseReSTIRGI())
+    if (settings.actualUseReSTIRGI())
         setup.write(rtxdiResources.giReservoirBuffer, rg::BufferAccess::UnorderedAccess);
 
-    if (settings.ActualUseReSTIRPT())
+    if (settings.actualUseReSTIRPT())
         setup.write(rtxdiResources.ptReservoirBuffer, rg::BufferAccess::UnorderedAccess);
 }
 

@@ -9,7 +9,7 @@ namespace caustica::sceneSession
 
 void registerSceneLoadingPlugin(App& app)
 {
-    app.addSystemAfter(AppSchedule::First, "SceneSession.BeginFrame", "SyncRenderThread", [](SystemContext& ctx) {
+    app.addSystemAfter(AppSchedule::First, "SceneSession.beginFrame", "SyncRenderThread", [](SystemContext& ctx) {
         sceneSession::beginFrameScheduled(ctx.app);
     });
 }

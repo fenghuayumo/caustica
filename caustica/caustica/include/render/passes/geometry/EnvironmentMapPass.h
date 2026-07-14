@@ -40,7 +40,7 @@ namespace caustica::render
             const caustica::ICompositeView& compositeView,
             nvrhi::ITexture* environmentMap);
 
-        void Render(
+        void render(
             nvrhi::ICommandList* commandList,
             const caustica::ICompositeView& compositeView);
     };

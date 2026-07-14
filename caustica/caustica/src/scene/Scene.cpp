@@ -238,12 +238,12 @@ namespace
     }
 }
 
-const SceneLoadingStats& Scene::GetLoadingStats()
+const SceneLoadingStats& Scene::getLoadingStats()
 {
     return g_LoadingStats;
 }
 
-box3 Scene::GetSceneBounds() const
+box3 Scene::getSceneBounds() const
 {
     if (!m_EntityWorld || !ecs::isValid(m_EntityWorld->root()))
         return box3::empty();
@@ -257,65 +257,65 @@ box3 Scene::GetSceneBounds() const
     return finite ? globalBounds : box3::empty();
 }
 
-const ResourceTracker<Material>& Scene::GetMaterials() const
+const ResourceTracker<Material>& Scene::getMaterials() const
 {
     if (m_EntityWorld)
-        return m_EntityWorld->GetMaterials();
+        return m_EntityWorld->getMaterials();
 
     static const ResourceTracker<Material> s_empty;
     return s_empty;
 }
 
-const ResourceTracker<MeshInfo>& Scene::GetMeshes() const
+const ResourceTracker<MeshInfo>& Scene::getMeshes() const
 {
     if (m_EntityWorld)
-        return m_EntityWorld->GetMeshes();
+        return m_EntityWorld->getMeshes();
 
     static const ResourceTracker<MeshInfo> s_empty;
     return s_empty;
 }
 
-size_t Scene::GetGeometryCount() const
+size_t Scene::getGeometryCount() const
 {
-    return m_EntityWorld ? m_EntityWorld->GetGeometryCount() : 0;
+    return m_EntityWorld ? m_EntityWorld->getGeometryCount() : 0;
 }
 
-size_t Scene::GetMaxGeometryCountPerMesh() const
+size_t Scene::getMaxGeometryCountPerMesh() const
 {
-    return m_EntityWorld ? m_EntityWorld->GetMaxGeometryCountPerMesh() : 0;
+    return m_EntityWorld ? m_EntityWorld->getMaxGeometryCountPerMesh() : 0;
 }
 
-size_t Scene::GetGeometryInstancesCount() const
+size_t Scene::getGeometryInstancesCount() const
 {
-    return m_EntityWorld ? m_EntityWorld->GetGeometryInstancesCount() : 0;
+    return m_EntityWorld ? m_EntityWorld->getGeometryInstancesCount() : 0;
 }
 
-const std::vector<ecs::Entity>& Scene::GetMeshInstances() const
+const std::vector<ecs::Entity>& Scene::getMeshInstances() const
 {
     return getRenderSnapshotForRead().meshInstanceEntities;
 }
 
-const std::vector<ecs::Entity>& Scene::GetSkinnedMeshInstances() const
+const std::vector<ecs::Entity>& Scene::getSkinnedMeshInstances() const
 {
     return getRenderSnapshotForRead().skinnedMeshInstanceEntities;
 }
 
-const std::vector<ecs::Entity>& Scene::GetLightEntities() const
+const std::vector<ecs::Entity>& Scene::getLightEntities() const
 {
     return getRenderSnapshotForRead().lightEntities;
 }
 
-const std::vector<ecs::Entity>& Scene::GetCameraEntities() const
+const std::vector<ecs::Entity>& Scene::getCameraEntities() const
 {
     return getRenderSnapshotForRead().cameraEntities;
 }
 
-const std::vector<ecs::Entity>& Scene::GetAnimationEntities() const
+const std::vector<ecs::Entity>& Scene::getAnimationEntities() const
 {
     return getRenderSnapshotForRead().animationEntities;
 }
 
-const scene::SceneRenderData& Scene::GetRenderData() const
+const scene::SceneRenderData& Scene::getRenderData() const
 {
     return getRenderSnapshotForRead();
 }
@@ -343,22 +343,22 @@ void Scene::endGpuReadFrame()
     m_gpuReadFrameIndex.store(UINT32_MAX, std::memory_order_release);
 }
 
-bool Scene::HasSceneTransformsChanged() const
+bool Scene::hasSceneTransformsChanged() const
 {
     return m_SceneTransformsChanged;
 }
 
-bool Scene::HasSceneStructureChanged() const
+bool Scene::hasSceneStructureChanged() const
 {
     return m_SceneStructureChanged || m_gpuStructureFlushPending;
 }
 
-bool Scene::HasSceneTransformsChanged(uint32_t frameIndex) const
+bool Scene::hasSceneTransformsChanged(uint32_t frameIndex) const
 {
     return m_RenderSnapshot.publishedStateForFrame(frameIndex).transformsChanged;
 }
 
-bool Scene::HasSceneStructureChanged(uint32_t frameIndex) const
+bool Scene::hasSceneStructureChanged(uint32_t frameIndex) const
 {
     return m_RenderSnapshot.publishedStateForFrame(frameIndex).structureChanged
         || m_gpuStructureFlushPending;
@@ -370,7 +370,7 @@ void Scene::acknowledgeGpuStructureConsumed()
     m_SceneStructureChanged = false;
 }
 
-void Scene::AttachLightToRoot(const std::shared_ptr<Light>& light)
+void Scene::attachLightToRoot(const std::shared_ptr<Light>& light)
 {
     if (!m_EntityWorld || !light || !ecs::isValid(m_EntityWorld->root()))
         return;
@@ -380,7 +380,7 @@ void Scene::AttachLightToRoot(const std::shared_ptr<Light>& light)
     m_EntityWorld->rebuildPathsFromRoot();
 }
 
-void Scene::AttachLightToRoot(scene::LightComponent component, const std::string& name)
+void Scene::attachLightToRoot(scene::LightComponent component, const std::string& name)
 {
     if (!m_EntityWorld || !ecs::isValid(m_EntityWorld->root()))
         return;
@@ -440,26 +440,26 @@ Scene::Scene(
     }
 }
 
-bool Scene::Load(const std::filesystem::path& jsonFileName)
+bool Scene::load(const std::filesystem::path& jsonFileName)
 {
     // Texture and typed-asset registration are shared across model imports and are
     // not safe to mutate from multiple importer tasks.
-    return LoadWithThreadPool(jsonFileName, nullptr);
+    return loadWithThreadPool(jsonFileName, nullptr);
 }
 
-bool Scene::LoadWithThreadPool(const std::filesystem::path& sceneFileName, ThreadPool* threadPool)
+bool Scene::loadWithThreadPool(const std::filesystem::path& sceneFileName, ThreadPool* threadPool)
 {
     g_LoadingStats.ObjectsLoaded = 0;
     g_LoadingStats.ObjectsTotal = 0;
 
     m_EntityWorld = std::make_unique<scene::SceneEntityWorld>();
 
-    if (IsDirectMeshSceneFile(sceneFileName))
+    if (isDirectMeshSceneFile(sceneFileName))
     {
         m_textureSearchDirectory = sceneFileName.parent_path();
         ++g_LoadingStats.ObjectsTotal;
         m_Models.resize(1);
-        LoadModelAsync(0, sceneFileName, threadPool);
+        loadModelAsync(0, sceneFileName, threadPool);
 
         if (threadPool)
             threadPool->WaitForTasks();
@@ -476,17 +476,17 @@ bool Scene::LoadWithThreadPool(const std::filesystem::path& sceneFileName, Threa
         std::filesystem::path scenePath = sceneFileName.parent_path();
 
         Json::Value documentRoot;
-        if (!caustica::json::LoadFromFile(*m_fs, sceneFileName, documentRoot))
+        if (!caustica::json::loadFromFile(*m_fs, sceneFileName, documentRoot))
             return false;
 
-        if (!LoadJsonDocument(documentRoot, scenePath, threadPool))
+        if (!loadJsonDocument(documentRoot, scenePath, threadPool))
             return false;
     }
 
     return true;
 }
 
-bool Scene::LoadFromJsonString(const std::string& sceneJson, const std::filesystem::path& scenePath)
+bool Scene::loadFromJsonString(const std::string& sceneJson, const std::filesystem::path& scenePath)
 {
     g_LoadingStats.ObjectsLoaded = 0;
     g_LoadingStats.ObjectsTotal = 0;
@@ -503,10 +503,10 @@ bool Scene::LoadFromJsonString(const std::string& sceneJson, const std::filesyst
         return false;
     }
 
-    return LoadJsonDocument(documentRoot, scenePath, nullptr);
+    return loadJsonDocument(documentRoot, scenePath, nullptr);
 }
 
-bool Scene::LoadJsonDocument(Json::Value documentRoot, const std::filesystem::path& scenePath, ThreadPool* threadPool)
+bool Scene::loadJsonDocument(Json::Value documentRoot, const std::filesystem::path& scenePath, ThreadPool* threadPool)
 {
     m_textureSearchDirectory = scenePath;
 
@@ -517,12 +517,12 @@ bool Scene::LoadJsonDocument(Json::Value documentRoot, const std::filesystem::pa
 
     if (documentRoot.isObject())
     {
-        if (!LoadCustomData(documentRoot, threadPool))
+        if (!loadCustomData(documentRoot, threadPool))
             return false;
 
-        LoadModels(documentRoot["models"], scenePath, threadPool);
-        LoadSceneEntities(documentRoot["graph"], m_EntityWorld->root());
-        LoadAnimations(documentRoot["animations"]);
+        loadModels(documentRoot["models"], scenePath, threadPool);
+        loadSceneEntities(documentRoot["graph"], m_EntityWorld->root());
+        loadAnimations(documentRoot["animations"]);
         m_EntityWorld->rebuildPathsFromRoot();
     }
     else
@@ -534,7 +534,7 @@ bool Scene::LoadJsonDocument(Json::Value documentRoot, const std::filesystem::pa
     return true;
 }
 
-void Scene::LoadModelAsync(
+void Scene::loadModelAsync(
     uint32_t index,
     const std::filesystem::path& fileName,
     ThreadPool* threadPool)
@@ -544,7 +544,7 @@ void Scene::LoadModelAsync(
         threadPool->AddTask([this, index, threadPool, fileName]()
         {
             SceneImportResult result;
-            LoadModelFile(fileName, threadPool, result);
+            loadModelFile(fileName, threadPool, result);
             ++g_LoadingStats.ObjectsLoaded;
             m_Models[index] = result;
         });
@@ -552,13 +552,13 @@ void Scene::LoadModelAsync(
     else
     {
         SceneImportResult result;
-        LoadModelFile(fileName, threadPool, result);
+        loadModelFile(fileName, threadPool, result);
         ++g_LoadingStats.ObjectsLoaded;
         m_Models[index] = result;
     }
 }
 
-bool Scene::LoadModelFile(
+bool Scene::loadModelFile(
     const std::filesystem::path& fileName,
     ThreadPool* threadPool,
     SceneImportResult& result)
@@ -566,16 +566,16 @@ bool Scene::LoadModelFile(
     std::string ext = fileName.extension().string();
     std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return char(std::tolower(c)); });
     if (ext == ".obj")
-        return m_ObjImporter->Load(fileName, *m_TextureLoader, g_LoadingStats, threadPool, result, m_textureSearchDirectory);
+        return m_ObjImporter->load(fileName, *m_TextureLoader, g_LoadingStats, threadPool, result, m_textureSearchDirectory);
     if (ext == ".usd" || ext == ".usda" || ext == ".usdc" || ext == ".caususd")
-        return m_CausUsdImporter->Load(fileName, *m_TextureLoader, g_LoadingStats, threadPool, result, m_textureSearchDirectory);
+        return m_CausUsdImporter->load(fileName, *m_TextureLoader, g_LoadingStats, threadPool, result, m_textureSearchDirectory);
     if (ext == ".urdf")
-        return m_UrdfImporter->Load(fileName, *m_TextureLoader, g_LoadingStats, threadPool, result, m_textureSearchDirectory);
+        return m_UrdfImporter->load(fileName, *m_TextureLoader, g_LoadingStats, threadPool, result, m_textureSearchDirectory);
 
-    return m_GltfImporter->Load(fileName, *m_TextureLoader, g_LoadingStats, threadPool, result, m_textureSearchDirectory);
+    return m_GltfImporter->load(fileName, *m_TextureLoader, g_LoadingStats, threadPool, result, m_textureSearchDirectory);
 }
 
-void Scene::LoadModels(
+void Scene::loadModels(
     const Json::Value& modelList,
     const std::filesystem::path& scenePath,
     ThreadPool* threadPool)
@@ -593,18 +593,18 @@ void Scene::LoadModels(
 
         if (model.isString() && IsBuiltinModelReference(model.asString()))
         {
-            m_Models[index] = LoadBuiltinModel(model.asString());
+            m_Models[index] = loadBuiltinModel(model.asString());
             ++g_LoadingStats.ObjectsLoaded;
         }
         else if (model.isObject() && model["builtin"].isString())
         {
-            m_Models[index] = LoadBuiltinModel(model["builtin"].asString());
+            m_Models[index] = loadBuiltinModel(model["builtin"].asString());
             ++g_LoadingStats.ObjectsLoaded;
         }
         else
         {
             std::filesystem::path fileName = scenePath / std::filesystem::path(model.asString());
-            LoadModelAsync(index, fileName, threadPool);
+            loadModelAsync(index, fileName, threadPool);
         }
 
         ++index;
@@ -614,7 +614,7 @@ void Scene::LoadModels(
         threadPool->WaitForTasks();
 }
 
-SceneImportResult Scene::LoadBuiltinModel(const std::string& builtinName)
+SceneImportResult Scene::loadBuiltinModel(const std::string& builtinName)
 {
     SceneImportResult result;
 
@@ -623,13 +623,13 @@ SceneImportResult Scene::LoadBuiltinModel(const std::string& builtinName)
         return result;
 
     auto buffers = std::make_shared<BufferGroup>();
-    auto mesh = m_SceneTypeFactory->CreateMesh();
+    auto mesh = m_SceneTypeFactory->createMesh();
     mesh->name = NormalizeBuiltinModelName(builtinName);
     mesh->buffers = buffers;
 
     for (const BuiltinMeshData& builtinMesh : builtinMeshes)
     {
-        auto material = m_SceneTypeFactory->CreateMaterial();
+        auto material = m_SceneTypeFactory->createMaterial();
         material->name = builtinMesh.materialName;
         material->modelFileName = std::string("builtin:") + NormalizeBuiltinModelName(builtinName);
         material->baseOrDiffuseColor = builtinMesh.baseColor;
@@ -642,7 +642,7 @@ SceneImportResult Scene::LoadBuiltinModel(const std::string& builtinName)
 
         AppendMeshToBuffers(builtinMesh, *buffers);
 
-        auto geometry = m_SceneTypeFactory->CreateMeshGeometry();
+        auto geometry = m_SceneTypeFactory->createMeshGeometry();
         geometry->material = material;
         geometry->indexOffsetInMesh = indexOffset;
         geometry->vertexOffsetInMesh = vertexOffset;
@@ -676,7 +676,7 @@ void Scene::attachLeafFromJson(ecs::Entity entity, const Json::Value& src)
         return;
 
     const std::string type = leafTypeNode.asString();
-    auto leaf = m_SceneTypeFactory->CreateLeaf(type);
+    auto leaf = m_SceneTypeFactory->createLeaf(type);
     if (!leaf)
     {
         caustica::warning("Unknown leaf type '%s', skipping.", type.c_str());
@@ -686,31 +686,31 @@ void Scene::attachLeafFromJson(ecs::Entity entity, const Json::Value& src)
     if (type == "DirectionalLight" || type == "PointLight" || type == "SpotLight" || type == "EnvironmentLight")
     {
         auto light = std::static_pointer_cast<Light>(leaf);
-        light->Load(src);
+        light->load(src);
         m_EntityWorld->setLight(entity, light);
     }
     else if (type == "PerspectiveCamera" || type == "PerspectiveCameraEx" || type == "OrthographicCamera")
     {
         auto camera = std::static_pointer_cast<SceneCamera>(leaf);
-        camera->Load(src);
+        camera->load(src);
         m_EntityWorld->setCamera(entity, camera);
     }
     else if (type == "GaussianSplat" || type == "GaussianSplats" || type == "3DGaussianSplat")
     {
         auto splat = std::static_pointer_cast<GaussianSplat>(leaf);
-        splat->Load(src);
+        splat->load(src);
         m_EntityWorld->setGaussianSplat(entity, splat);
     }
     else if (type == "SampleSettings")
     {
         auto settings = std::static_pointer_cast<SampleSettings>(leaf);
-        settings->Load(src);
+        settings->load(src);
         m_EntityWorld->setSampleSettings(entity, settings);
     }
     else if (type == "GameSettings")
     {
         auto settings = std::static_pointer_cast<GameSettings>(leaf);
-        settings->Load(src);
+        settings->load(src);
         m_EntityWorld->setGameSettings(entity, settings);
     }
     else
@@ -719,7 +719,7 @@ void Scene::attachLeafFromJson(ecs::Entity entity, const Json::Value& src)
     }
 }
 
-void Scene::LoadSceneEntities(const Json::Value& nodeList, ecs::Entity parent)
+void Scene::loadSceneEntities(const Json::Value& nodeList, ecs::Entity parent)
 {
     for (const auto& src : nodeList)
     {
@@ -826,7 +826,7 @@ void Scene::LoadSceneEntities(const Json::Value& nodeList, ecs::Entity parent)
 
         const auto& children = src["children"];
         if (!children.isNull())
-            LoadSceneEntities(children, entity);
+            loadSceneEntities(children, entity);
 
         if (src["type"].isString())
             attachLeafFromJson(entity, src);
@@ -856,7 +856,7 @@ static dm::float4 ReadUpToFloat4(const Json::Value& node)
     return float4::zero();
 }
 
-void Scene::LoadAnimations(const Json::Value& nodeList)
+void Scene::loadAnimations(const Json::Value& nodeList)
 {
     ecs::Entity animationContainer = ecs::NullEntity;
 
@@ -961,7 +961,7 @@ void Scene::LoadAnimations(const Json::Value& nodeList)
                         targetName = targetName.substr(9);
 
                         std::shared_ptr<Material> material;
-                        for (const auto& it : m_EntityWorld->GetMaterials())
+                        for (const auto& it : m_EntityWorld->getMaterials())
                         {
                             if (it->name == targetName)
                             {
@@ -977,7 +977,7 @@ void Scene::LoadAnimations(const Json::Value& nodeList)
                             channelData.targetMaterial = material;
                             channelData.attribute = AnimationAttribute::LeafProperty;
                             channelData.leafPropertyName = attributeNode.asString();
-                            scene::AddAnimationChannel(component, std::move(channelData));
+                            scene::addAnimationChannel(component, std::move(channelData));
                         }
                         else
                         {
@@ -996,7 +996,7 @@ void Scene::LoadAnimations(const Json::Value& nodeList)
                             channelData.attribute = attribute;
                             if (attribute == AnimationAttribute::LeafProperty)
                                 channelData.leafPropertyName = attributeNode.asString();
-                            scene::AddAnimationChannel(component, std::move(channelData));
+                            scene::addAnimationChannel(component, std::move(channelData));
                         }
                         else
                         {
@@ -1033,7 +1033,7 @@ void Scene::LoadAnimations(const Json::Value& nodeList)
     }
 }
 
-bool Scene::LoadCustomData(Json::Value& rootNode, ThreadPool* threadPool)
+bool Scene::loadCustomData(Json::Value& rootNode, ThreadPool* threadPool)
 {
     // Reserved for derived classes
     return true;
@@ -1055,16 +1055,16 @@ void Scene::refreshEntityWorldForFrame(uint32_t frameIndex)
     m_EntityWorld->refresh(frameIndex);
 }
 
-void Scene::RefreshSceneWorld(uint32_t frameIndex)
+void Scene::refreshSceneWorld(uint32_t frameIndex)
 {
     refreshEntityWorldForFrame(frameIndex);
     if (!m_EntityWorld)
         return;
 
-    scene::ExtractSceneRenderData(*m_EntityWorld, m_RenderSnapshot.writeBufferForFrame(frameIndex), frameIndex);
+    scene::extractSceneRenderData(*m_EntityWorld, m_RenderSnapshot.writeBufferForFrame(frameIndex), frameIndex);
 }
 
-void Scene::PublishRenderSnapshot(uint32_t frameIndex)
+void Scene::publishRenderSnapshot(uint32_t frameIndex)
 {
     m_RenderSnapshot.publish(frameIndex);
     const scene::SceneRenderPublishState& published = m_RenderSnapshot.publishedStateForFrame(frameIndex);
@@ -1096,8 +1096,8 @@ void Scene::extractAndPublishRenderSnapshot(uint32_t frameIndex)
         pending.frameIndex = frameIndex;
     }
 
-    scene::ExtractSceneRenderData(*m_EntityWorld, m_RenderSnapshot.writeBufferForFrame(frameIndex), frameIndex);
-    PublishRenderSnapshot(frameIndex);
+    scene::extractSceneRenderData(*m_EntityWorld, m_RenderSnapshot.writeBufferForFrame(frameIndex), frameIndex);
+    publishRenderSnapshot(frameIndex);
 }
 
 bool Scene::wasRenderSnapshotExtractedOnLogicThread(uint32_t frameIndex) const
@@ -1108,10 +1108,10 @@ bool Scene::wasRenderSnapshotExtractedOnLogicThread(uint32_t frameIndex) const
 void Scene::syncRenderSnapshotGpuIndices(uint32_t /*frameIndex*/)
 {
     // Instance indices are assigned during logic-thread refresh and copied into
-    // MeshInstanceRenderProxy at Extract. Render thread must not patch from ECS.
+    // MeshInstanceRenderProxy at Extract. render thread must not patch from ECS.
 }
 
-GeometryData* Scene::GetGeometryData(const MeshGeometry& geometry) const
+GeometryData* Scene::getGeometryData(const MeshGeometry& geometry) const
 {
     if (m_GpuResources == nullptr || uint(geometry.globalGeometryIndex) >= m_GpuResources->geometryData.size() )
         return nullptr;
@@ -1121,10 +1121,10 @@ GeometryData* Scene::GetGeometryData(const MeshGeometry& geometry) const
 
 
 // =============================================================================
-// ProcessNodesRecursive - post-load scene traversal (merged from ExtendedScene)
+// processNodesRecursive - post-load scene traversal (merged from ExtendedScene)
 // =============================================================================
 
-void Scene::ProcessNodesRecursive()
+void Scene::processNodesRecursive()
 {
     if (!m_EntityWorld || !ecs::isValid(m_EntityWorld->root()))
         return;
@@ -1145,7 +1145,7 @@ void Scene::ProcessNodesRecursive()
 
     world.each<scene::LightComponent>([this, &world](ecs::Entity lightEntity, scene::LightComponent& component)
     {
-        const int lightType = scene::GetLightType(component);
+        const int lightType = scene::getLightType(component);
         if ((lightType != LightType_Spot && lightType != LightType_Point) || component.proxies.empty())
             return;
 

@@ -87,21 +87,21 @@ namespace caustica::render
             const caustica::ICompositeView& compositeView,
             const CreateParameters& params);
 
-        void RenderMotionVectors(
+        void renderMotionVectors(
             nvrhi::ICommandList* commandList,
             const caustica::ICompositeView& compositeView,
             const caustica::ICompositeView& compositeViewPrevious,
             dm::float3 preViewTranslationDifference = dm::float3::zero());
 
-        void TemporalResolve(
+        void temporalResolve(
             nvrhi::ICommandList* commandList,
             const TemporalAntiAliasingParameters& params,
             bool feedbackIsValid,
             const caustica::ICompositeView& compositeViewInput,
             const caustica::ICompositeView& compositeViewOutput);
 
-        void AdvanceFrame();
-        void SetJitter(TemporalAntiAliasingJitter jitter);
-        dm::float2 GetCurrentPixelOffset();
+        void advanceFrame();
+        void setJitter(TemporalAntiAliasingJitter jitter);
+        dm::float2 getCurrentPixelOffset();
     };
 }

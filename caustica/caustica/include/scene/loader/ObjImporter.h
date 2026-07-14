@@ -19,7 +19,7 @@ namespace caustica
     public:
         explicit ObjImporter(std::shared_ptr<SceneTypeFactory> sceneTypeFactory);
 
-        bool Load(
+        bool load(
             const std::filesystem::path& fileName,
             TextureLoader& textureCache,
             SceneLoadingStats& stats,

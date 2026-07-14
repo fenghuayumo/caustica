@@ -174,23 +174,23 @@ ToneMappingPass::ToneMappingPass(
     }
 }
 
-void ToneMappingPass::PreRender(const ToneMappingParameters& params)
+void ToneMappingPass::preRender(const ToneMappingParameters& params)
 {
-    SetParameters(params);
-    UpdateExposureValue();
-    UpdateWhiteBalanceTransform();
-    UpdateColorTransform();
+    setParameters(params);
+    updateExposureValue();
+    updateWhiteBalanceTransform();
+    updateColorTransform();
     m_FrameParamsSet = true;
 }
 
-bool ToneMappingPass::Render(
+bool ToneMappingPass::render(
     nvrhi::ICommandList* commandList, 
     const caustica::ICompositeView& compositeView,
     nvrhi::ITexture* sourceTexture,
     nvrhi::IBuffer* constantsBuffer,
     bool enabled)
 {
-    assert( m_FrameParamsSet ); // forgot to call PreRender before this?
+    assert( m_FrameParamsSet ); // forgot to call preRender before this?
     assert(constantsBuffer);
     m_FrameParamsSet = false;
 
@@ -202,7 +202,7 @@ bool ToneMappingPass::Render(
 
         if (viewData.sourceTexture != sourceTexture)
         {
-            // Make sure that our cached binding sets represent the right source texture.
+            // make sure that our cached binding sets represent the right source texture.
             viewData.luminanceBindingSet = nullptr;
             viewData.colorBindingSet = nullptr;
             viewData.sourceTexture = sourceTexture;
@@ -244,7 +244,7 @@ bool ToneMappingPass::Render(
 			args.vertexCount = 4;
 			commandList->draw(args);    
 
-            GenerateMips(commandList, compositeView.getNumChildViews(ViewType::PLANAR));
+            generateMips(commandList, compositeView.getNumChildViews(ViewType::PLANAR));
 
 #if TONEMAPPING_AUTOEXPOSURE_CPU
             {
@@ -374,7 +374,7 @@ void ToneMappingPass::registerGraphPass(
             setup.write(outputLdrColor, caustica::rg::TextureAccess::RenderTarget);
         },
         [this, sourceColor, constantsBuffer, &compositeView, enabled, outCommandListWasClosed](caustica::rg::RenderPassContext& ctx) {
-            const bool closed = Render(
+            const bool closed = render(
                 ctx.commandList(),
                 compositeView,
                 ctx.texture(sourceColor),
@@ -385,7 +385,7 @@ void ToneMappingPass::registerGraphPass(
         });
 }
 
-void ToneMappingPass::AdvanceFrame(float frameTime)
+void ToneMappingPass::advanceFrame(float frameTime)
 {
     m_FrameTime = frameTime;
     m_FrameParamsSet = false;
@@ -395,7 +395,7 @@ void ToneMappingPass::AdvanceFrame(float frameTime)
 static const float g_minLogLuminance = -10; // TODO: figure out how to set these properly
 static const float g_maxLogLuminamce = 4;
 
-void ToneMappingPass::SetParameters(const ToneMappingParameters& params)
+void ToneMappingPass::setParameters(const ToneMappingParameters& params)
 {
     m_ExposureMode = params.exposureMode;
     m_ToneMapOperator = params.toneMapOperator;
@@ -415,7 +415,7 @@ void ToneMappingPass::SetParameters(const ToneMappingParameters& params)
 }
 
 
-void ToneMappingPass::UpdateWhiteBalanceTransform()
+void ToneMappingPass::updateWhiteBalanceTransform()
 {
 	//Calculate color transform for the current white point. 
 	m_WhiteBalanceTransform = m_WhiteBalance ?
@@ -426,7 +426,7 @@ void ToneMappingPass::UpdateWhiteBalanceTransform()
 	m_SourceWhite = inverse(m_WhiteBalanceTransform) * float3(1, 1, 1);
 }
     
-void ToneMappingPass::UpdateExposureValue()
+void ToneMappingPass::updateExposureValue()
 {
 	const float kShutterMin = 0.001f;        // Min reciprocal shutter time
 	const float kShutterMax = 10000.f;       // Max reciprocal shutter time
@@ -452,7 +452,7 @@ void ToneMappingPass::UpdateExposureValue()
     }
 }
 
-void ToneMappingPass::UpdateColorTransform()
+void ToneMappingPass::updateColorTransform()
 {
 	//Exposure scale due to exposure compensation 
 	float exposureScale = pow(2.f, m_ExposureCompensation);
@@ -467,9 +467,9 @@ void ToneMappingPass::UpdateColorTransform()
 }
 
 #if TONEMAPPING_AUTOEXPOSURE_CPU
-float3 ToneMappingPass::GetPreExposedGray(uint viewIndex) 
+float3 ToneMappingPass::getPreExposedGray(uint viewIndex) 
 { 
-    assert(m_FrameParamsSet); // forgot to call PreRender before this?
+    assert(m_FrameParamsSet); // forgot to call preRender before this?
     assert(viewIndex < m_PerView.size()); 
     if (viewIndex >= m_PerView.size()) 
         return float3(0,0,0); 
@@ -484,10 +484,10 @@ float3 ToneMappingPass::GetPreExposedGray(uint viewIndex)
 }
 #endif
 
-void ToneMappingPass::GenerateMips(nvrhi::ICommandList* commandList, uint32_t numberOfViews)
+void ToneMappingPass::generateMips(nvrhi::ICommandList* commandList, uint32_t numberOfViews)
 {
     for (uint32_t i = 0; i < numberOfViews; i++)
     {
-        m_PerView[i].mipMapPass->Dispatch(commandList);
+        m_PerView[i].mipMapPass->dispatch(commandList);
     }
 }

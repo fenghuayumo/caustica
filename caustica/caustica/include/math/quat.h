@@ -273,7 +273,7 @@ namespace caustica::math
 	quaternion<T> inverse(const quaternion<T>& a)
 		{ return conjugate(a) / lengthSquared(a); }
 
-	// Apply a normalized quat as a rotation to a vector or point
+	// apply a normalized quat as a rotation to a vector or point
 
 	template <typename T>
 	vector<T, 3> applyQuat(const quaternion<T>& a, vector<T, 3> const & b)

@@ -70,7 +70,7 @@ inline constexpr const char* c_EnvMapProcSky_Dawn       = "==PROCEDURAL_SKY_DAWN
 inline constexpr const char* c_EnvMapProcSky_PitchBlack = "==PROCEDURAL_SKY_PITCHBLACK==";
 inline constexpr const char* c_EnvMapSceneDefault       = "==SCENE_DEFAULT==";
 
-inline bool IsProceduralSky(const char* str)
+inline bool isProceduralSky(const char* str)
 {
     if (str == nullptr) return false;
     for (int i = 0; i < 12; i++)

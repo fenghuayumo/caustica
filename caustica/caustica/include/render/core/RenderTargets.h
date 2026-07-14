@@ -75,7 +75,7 @@ public:
     nvrhi::TextureHandle specularHitT;                      // input for denoisers to be able to resolve spec motion vectors
     nvrhi::TextureHandle scratchFloat1;                     // can be used to ping-pong stuff - 32bit float 1
 
-    // === Reflection System Render Targets ===
+    // === Reflection System render Targets ===
     nvrhi::TextureHandle localCubemap;                      // 256x256x6, RGBA16F, ray-traced local environment cubemap
     nvrhi::TextureHandle ssrResult;                         // Screen-sized, RGBA16F (rgb=reflection, a=confidence)
     nvrhi::TextureHandle ssrBlurMipChain;                   // Screen-sized with mip levels for roughness blur

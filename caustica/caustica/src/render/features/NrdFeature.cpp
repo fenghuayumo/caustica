@@ -73,7 +73,7 @@ void registerNrdFeature(RenderFeatureContext ctx)
     assert(ctx.settings);
     assert(ctx.graph);
 
-    if (!ctx.hasScene || !ctx.settings->ActualUseStandaloneDenoiser())
+    if (!ctx.hasScene || !ctx.settings->actualUseStandaloneDenoiser())
         return;
 
     ctx.renderer->ensureNrdIntegrations();

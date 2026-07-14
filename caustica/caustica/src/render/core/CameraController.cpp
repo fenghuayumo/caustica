@@ -87,14 +87,14 @@ dm::float2 CameraController::computeJitter(const CameraUpdateParams& params) con
     if (!params.realtimeMode || params.realtimeAA == 0 ||
         params.temporalAAPass == nullptr || params.dbgFreezeRealtimeNoiseSeed)
         return dm::float2(0, 0);
-    return params.temporalAAPass->GetCurrentPixelOffset();
+    return params.temporalAAPass->getCurrentPixelOffset();
 }
 
 void CameraController::updateFromSceneCamera(const std::shared_ptr<PerspectiveCamera>& sceneCamera)
 {
-    dm::affine3 viewToWorld = sceneCamera->GetViewToWorldMatrix();
+    dm::affine3 viewToWorld = sceneCamera->getViewToWorldMatrix();
     dm::float3 cameraPos = viewToWorld.m_translation;
-    m_camera.LookAt(cameraPos, cameraPos + viewToWorld.m_linear.row2, viewToWorld.m_linear.row1);
+    m_camera.lookAt(cameraPos, cameraPos + viewToWorld.m_linear.row2, viewToWorld.m_linear.row1);
     m_verticalFOV = sceneCamera->verticalFov;
     m_zNear = sceneCamera->zNear;
 }
@@ -103,9 +103,9 @@ void CameraController::updateFromSceneCamera(
     const scene::PerspectiveCameraData& camData,
     const dm::daffine3& globalTransform)
 {
-    const dm::affine3 viewToWorld = scene::GetCameraViewToWorldMatrix(globalTransform);
+    const dm::affine3 viewToWorld = scene::getCameraViewToWorldMatrix(globalTransform);
     const dm::float3 cameraPos = viewToWorld.m_translation;
-    m_camera.LookAt(cameraPos, cameraPos + viewToWorld.m_linear.row2, viewToWorld.m_linear.row1);
+    m_camera.lookAt(cameraPos, cameraPos + viewToWorld.m_linear.row2, viewToWorld.m_linear.row1);
     m_verticalFOV = camData.verticalFov;
     m_zNear = camData.zNear;
 }
@@ -113,7 +113,7 @@ void CameraController::updateFromSceneCamera(
 void CameraController::updateViews(const CameraUpdateParams& params)
 {
     if (params.temporalAAPass)
-        params.temporalAAPass->SetJitter(params.temporalAAJitter);
+        params.temporalAAPass->setJitter(params.temporalAAJitter);
 
     ViewportDesc windowViewport(float(params.renderSize.x), float(params.renderSize.y));
     m_view->setViewport(windowViewport);
@@ -124,7 +124,7 @@ void CameraController::updateViews(const CameraUpdateParams& params)
             m_intrinsicsViewport.x, m_intrinsicsViewport.y, m_zNear)
         : dm::perspProjD3DStyleReverse(m_verticalFOV, params.displayAspectRatio, m_zNear);
 
-    m_view->setMatrices(m_camera.GetWorldToViewMatrix(), projection);
+    m_view->setMatrices(m_camera.getWorldToViewMatrix(), projection);
     m_view->setPixelOffset(computeJitter(params));
     m_view->updateCache();
 
@@ -149,12 +149,12 @@ void CameraController::saveToFile(const std::filesystem::path& path,
                                   float zNear,
                                   float fovYRadians) const
 {
-    dm::float3 worldPos = m_camera.GetPosition();
-    dm::float3 worldDir = m_camera.GetDir();
-    dm::float3 worldUp = m_camera.GetUp();
+    dm::float3 worldPos = m_camera.getPosition();
+    dm::float3 worldDir = m_camera.getDir();
+    dm::float3 worldUp = m_camera.getUp();
     dm::dquat rotation;
     dm::affine3 sceneWorldToView = dm::scaling(dm::float3(1.f, 1.f, -1.f)) *
-        dm::inverse(m_camera.GetWorldToViewMatrix());
+        dm::inverse(m_camera.getWorldToViewMatrix());
     dm::decomposeAffine<double>(dm::daffine3(sceneWorldToView), nullptr, &rotation, nullptr);
 
     std::ofstream file;
@@ -201,7 +201,7 @@ void CameraController::loadFromFile(const std::filesystem::path& path)
     file.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
     file >> worldUp.x >> std::ws >> worldUp.y >> std::ws >> worldUp.z;
     file.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-    m_camera.LookAt(worldPos, worldPos + worldDir, worldUp);
+    m_camera.lookAt(worldPos, worldPos + worldDir, worldUp);
 }
 
 std::string CameraController::getPosDirUpString() const
@@ -209,9 +209,9 @@ std::string CameraController::getPosDirUpString() const
     auto toString = [](const dm::float3& val) {
         return std::to_string(val.x) + "," + std::to_string(val.y) + "," + std::to_string(val.z);
     };
-    return toString(m_camera.GetPosition()) + "," +
-           toString(m_camera.GetDir()) + "," +
-           toString(m_camera.GetUp());
+    return toString(m_camera.getPosition()) + "," +
+           toString(m_camera.getDir()) + "," +
+           toString(m_camera.getUp());
 }
 
 bool CameraController::setFromPosDirUpString(const std::string& val)
@@ -226,13 +226,13 @@ bool CameraController::setFromPosDirUpString(const std::string& val)
     ok &= ParseFloat3Consume(temp, worldDir);
     ok &= ParseFloat3Consume(temp, worldUp);
     if (ok)
-        m_camera.LookAt(worldPos, worldPos + worldDir, worldUp);
+        m_camera.lookAt(worldPos, worldPos + worldDir, worldUp);
     return ok;
 }
 
 void CameraController::setupDefaultCamera()
 {
-    m_camera.LookAt(dm::float3(0.f, 1.8f, 0.f), dm::float3(1.f, 1.55f, 0.f), dm::float3(0, 1, 0));
+    m_camera.lookAt(dm::float3(0.f, 1.8f, 0.f), dm::float3(1.f, 1.55f, 0.f), dm::float3(0, 1, 0));
     m_verticalFOV = dm::radians(60.0f);
     m_zNear = 0.001f;
 }
@@ -247,9 +247,9 @@ void CameraController::setupFromSceneCamera(const std::shared_ptr<PerspectiveCam
 
 bool CameraController::cameraMovedSinceLastFrame() const
 {
-    const dm::float3 camPos = m_camera.GetPosition();
-    const dm::float3 camDir = m_camera.GetDir();
-    const dm::float3 camUp = m_camera.GetUp();
+    const dm::float3 camPos = m_camera.getPosition();
+    const dm::float3 camDir = m_camera.getDir();
+    const dm::float3 camUp = m_camera.getUp();
     return m_lastDir.x != camDir.x || m_lastDir.y != camDir.y || m_lastDir.z != camDir.z
         || m_lastPos.x != camPos.x || m_lastPos.y != camPos.y || m_lastPos.z != camPos.z
         || m_lastUp.x != camUp.x || m_lastUp.y != camUp.y || m_lastUp.z != camUp.z;
@@ -257,9 +257,9 @@ bool CameraController::cameraMovedSinceLastFrame() const
 
 void CameraController::updateLastCameraState()
 {
-    m_lastPos = m_camera.GetPosition();
-    m_lastDir = m_camera.GetDir();
-    m_lastUp = m_camera.GetUp();
+    m_lastPos = m_camera.getPosition();
+    m_lastDir = m_camera.getDir();
+    m_lastUp = m_camera.getUp();
 }
 
 } // namespace caustica

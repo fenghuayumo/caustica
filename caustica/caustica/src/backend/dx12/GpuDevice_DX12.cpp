@@ -337,7 +337,7 @@ bool GpuDevice_DX12::CreateDevice()
     }
 
     nvrhi::d3d12::DeviceDesc deviceDesc;
-    deviceDesc.errorCB = m_DeviceParams.messageCallback ? m_DeviceParams.messageCallback : &DefaultMessageCallback::GetInstance();
+    deviceDesc.errorCB = m_DeviceParams.messageCallback ? m_DeviceParams.messageCallback : &DefaultMessageCallback::getInstance();
     deviceDesc.pDevice = m_Device12;
     deviceDesc.pGraphicsCommandQueue = m_GraphicsQueue;
     deviceDesc.pComputeCommandQueue = m_ComputeQueue;
@@ -521,7 +521,7 @@ void GpuDevice_DX12::ReleaseRenderTargets()
 {
     if (m_NvrhiDevice)
     {
-        // Make sure that all frames have finished rendering
+        // make sure that all frames have finished rendering
         m_NvrhiDevice->waitForIdle();
 
         // Release all in-flight references to the render targets
@@ -565,7 +565,7 @@ void GpuDevice_DX12::ResizeSwapChain()
     }
 }
 
-bool GpuDevice_DX12::BeginFrame()
+bool GpuDevice_DX12::beginFrame()
 {
     if (m_DeviceParams.headlessDevice)
         return BeginHeadlessFrame();

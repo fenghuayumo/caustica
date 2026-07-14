@@ -50,8 +50,8 @@ DenoisingGuidesPass::DenoisingGuidesPass( nvrhi::IDevice* device, std::shared_pt
 
     // These need to know about the scene
     pipelineDesc.bindingLayouts = { m_bindingLayout };
-    m_csDenoiseSpecHitT.init(m_device, *shaderFactory, "caustica/shaders/render/processingPasses/DenoisingGuidesPass.hlsl", "DenoiseSpecHitT", std::vector<caustica::ShaderMacro>(), pipelineDesc.bindingLayouts);
-    m_csComputeAvgLayerRadiance.init(m_device, *shaderFactory, "caustica/shaders/render/processingPasses/DenoisingGuidesPass.hlsl", "ComputeAvgLayerRadiance", std::vector<caustica::ShaderMacro>(), pipelineDesc.bindingLayouts);
+    m_csDenoiseSpecHitT.init(m_device, *shaderFactory, "caustica/shaders/render/processingPasses/DenoisingGuidesPass.hlsl", "denoiseSpecHitT", std::vector<caustica::ShaderMacro>(), pipelineDesc.bindingLayouts);
+    m_csComputeAvgLayerRadiance.init(m_device, *shaderFactory, "caustica/shaders/render/processingPasses/DenoisingGuidesPass.hlsl", "computeAvgLayerRadiance", std::vector<caustica::ShaderMacro>(), pipelineDesc.bindingLayouts);
     m_csDebugViz.init(m_device, *shaderFactory, "caustica/shaders/render/processingPasses/DenoisingGuidesPass.hlsl", "DebugViz", std::vector<caustica::ShaderMacro>(), pipelineDesc.bindingLayouts);
 
     //m_constantBuffer = m_device->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(DenoisingGuidesPassConstants), "DenoisingGuidesPassConstants", caustica::c_MaxRenderPassConstantBufferVersions));
@@ -63,9 +63,9 @@ DenoisingGuidesPass::~DenoisingGuidesPass( )
 
 #pragma optimize("", off)
 
-void DenoisingGuidesPass::DenoiseSpecHitT(nvrhi::ICommandList* commandList, nvrhi::BindingSetHandle bindingSet)
+void DenoisingGuidesPass::denoiseSpecHitT(nvrhi::ICommandList* commandList, nvrhi::BindingSetHandle bindingSet)
 {
-    RAII_SCOPE(commandList->beginMarker("DenoiseSpecHitT"); , commandList->endMarker(); );
+    RAII_SCOPE(commandList->beginMarker("denoiseSpecHitT"); , commandList->endMarker(); );
 
     int threadGroupCountX = div_ceil(m_renderTargets->renderSize.x, DGB_2D_THREADGROUP_SIZE);
     int threadGroupCountY = div_ceil(m_renderTargets->renderSize.y, DGB_2D_THREADGROUP_SIZE);
@@ -87,9 +87,9 @@ void DenoisingGuidesPass::DenoiseSpecHitT(nvrhi::ICommandList* commandList, nvrh
     commandList->setTextureState(m_renderTargets->specularHitT, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
 }
 
-void DenoisingGuidesPass::ComputeAvgLayerRadiance(nvrhi::ICommandList* commandList, nvrhi::BindingSetHandle bindingSet)
+void DenoisingGuidesPass::computeAvgLayerRadiance(nvrhi::ICommandList* commandList, nvrhi::BindingSetHandle bindingSet)
 {
-    RAII_SCOPE(commandList->beginMarker("ComputeAvgLayerRadiance"); , commandList->endMarker(); );
+    RAII_SCOPE(commandList->beginMarker("computeAvgLayerRadiance"); , commandList->endMarker(); );
 
     const auto& texDesc = m_renderTargets->denoiserAvgLayerRadianceHalfRes->getDesc();
     int halfWidth = (int)texDesc.width;
@@ -104,9 +104,9 @@ void DenoisingGuidesPass::ComputeAvgLayerRadiance(nvrhi::ICommandList* commandLi
     commandList->setTextureState(m_renderTargets->denoiserAvgLayerRadianceHalfRes, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
 }
 
-void DenoisingGuidesPass::RenderDebugViz( nvrhi::ICommandList * commandList, DebugViewType debugView, nvrhi::BindingSetHandle bindingSet )
+void DenoisingGuidesPass::renderDebugViz( nvrhi::ICommandList * commandList, DebugViewType debugView, nvrhi::BindingSetHandle bindingSet )
 {
-    //if( !m_settings.Enabled )
+    //if( !m_settings.enabled )
     //    return;
 
     
@@ -120,7 +120,7 @@ void DenoisingGuidesPass::RenderDebugViz( nvrhi::ICommandList * commandList, Deb
     m_csDebugViz.execute(commandList, threadGroupCountX, threadGroupCountY, 1, bindingSet, nullptr, nullptr, &consts, sizeof(consts) );
 }
 
-bool DenoisingGuidesPass::DebugGUI(float indent)
+bool DenoisingGuidesPass::debugGUI(float indent)
 {
     //ImGui::PushItemWidth(120.0f);
 

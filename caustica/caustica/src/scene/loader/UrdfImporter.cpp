@@ -70,7 +70,7 @@ namespace
         return ss.str();
     }
 
-    std::optional<std::string> GetAttribute(const std::string& tag, const std::string& attribute)
+    std::optional<std::string> getAttribute(const std::string& tag, const std::string& attribute)
     {
         const std::string key = attribute + "=\"";
         size_t pos = 0;
@@ -162,9 +162,9 @@ namespace
             return pose;
 
         const std::string tag = xmlRegion.substr(originPos, originEnd - originPos + 1);
-        if (auto xyz = GetAttribute(tag, "xyz"))
+        if (auto xyz = getAttribute(tag, "xyz"))
             pose.xyz = ParseXyz(*xyz);
-        if (auto rpy = GetAttribute(tag, "rpy"))
+        if (auto rpy = getAttribute(tag, "rpy"))
             pose.rpy = ParseXyz(*rpy);
         return pose;
     }
@@ -294,9 +294,9 @@ namespace
                 return;
             const std::string tag = visualXml.substr(pos, end - pos + 1);
             visual.geomType = UrdfVisual::GeomType::Mesh;
-            if (auto filename = GetAttribute(tag, "filename"))
+            if (auto filename = getAttribute(tag, "filename"))
                 visual.meshFilename = *filename;
-            if (auto scale = GetAttribute(tag, "scale"))
+            if (auto scale = getAttribute(tag, "scale"))
                 visual.meshScale = ParseFloat3(*scale, dm::float3(1.f));
         };
         auto parseBox = [&](size_t pos)
@@ -306,7 +306,7 @@ namespace
                 return;
             const std::string tag = visualXml.substr(pos, end - pos + 1);
             visual.geomType = UrdfVisual::GeomType::Box;
-            if (auto size = GetAttribute(tag, "size"))
+            if (auto size = getAttribute(tag, "size"))
                 visual.boxSize = ParseFloat3(*size, dm::float3(1.f));
         };
         auto parseCylinder = [&](size_t pos)
@@ -316,9 +316,9 @@ namespace
                 return;
             const std::string tag = visualXml.substr(pos, end - pos + 1);
             visual.geomType = UrdfVisual::GeomType::Cylinder;
-            if (auto radius = GetAttribute(tag, "radius"))
+            if (auto radius = getAttribute(tag, "radius"))
                 visual.cylinderRadius = std::strtof(radius->c_str(), nullptr);
-            if (auto length = GetAttribute(tag, "length"))
+            if (auto length = getAttribute(tag, "length"))
                 visual.cylinderLength = std::strtof(length->c_str(), nullptr);
         };
         auto parseSphere = [&](size_t pos)
@@ -328,7 +328,7 @@ namespace
                 return;
             const std::string tag = visualXml.substr(pos, end - pos + 1);
             visual.geomType = UrdfVisual::GeomType::Sphere;
-            if (auto radius = GetAttribute(tag, "radius"))
+            if (auto radius = getAttribute(tag, "radius"))
                 visual.sphereRadius = std::strtof(radius->c_str(), nullptr);
         };
 
@@ -353,7 +353,7 @@ namespace
 
         const auto [begin, end] = materialRanges.front();
         const std::string openTag = ElementOpenTag(visualXml, begin, end);
-        if (auto name = GetAttribute(openTag, "name"))
+        if (auto name = getAttribute(openTag, "name"))
             visual.materialName = *name;
 
         const std::string inner = ElementInner(visualXml, begin, end);
@@ -365,7 +365,7 @@ namespace
             if (colorEnd != std::string::npos)
             {
                 const std::string colorTag = inner.substr(colorPos, colorEnd - colorPos + 1);
-                if (auto rgba = GetAttribute(colorTag, "rgba"))
+                if (auto rgba = getAttribute(colorTag, "rgba"))
                     visual.rgba = ParseRgba(*rgba);
             }
         }
@@ -385,7 +385,7 @@ namespace
         for (const auto& [begin, end] : FindElements(robotXml, "material"))
         {
             const std::string openTag = ElementOpenTag(robotXml, begin, end);
-            auto name = GetAttribute(openTag, "name");
+            auto name = getAttribute(openTag, "name");
             if (!name || name->empty())
                 continue;
             const std::string inner = ElementInner(robotXml, begin, end);
@@ -397,7 +397,7 @@ namespace
             if (colorEnd == std::string::npos)
                 continue;
             const std::string colorTag = inner.substr(colorPos, colorEnd - colorPos + 1);
-            if (auto rgba = GetAttribute(colorTag, "rgba"))
+            if (auto rgba = getAttribute(colorTag, "rgba"))
                 materials[*name] = ParseRgba(*rgba);
         }
         return materials;
@@ -412,7 +412,7 @@ namespace
         {
             UrdfLink link;
             const std::string openTag = ElementOpenTag(robotXml, begin, end);
-            if (auto name = GetAttribute(openTag, "name"))
+            if (auto name = getAttribute(openTag, "name"))
                 link.name = *name;
             if (link.name.empty())
                 continue;
@@ -441,7 +441,7 @@ namespace
         {
             UrdfJoint joint;
             const std::string openTag = ElementOpenTag(robotXml, begin, end);
-            if (auto name = GetAttribute(openTag, "name"))
+            if (auto name = getAttribute(openTag, "name"))
                 joint.name = *name;
 
             const std::string inner = ElementInner(robotXml, begin, end);
@@ -450,13 +450,13 @@ namespace
             for (const auto& [pBegin, pEnd] : FindElements(inner, "parent"))
             {
                 const std::string tag = ElementOpenTag(inner, pBegin, pEnd);
-                if (auto link = GetAttribute(tag, "link"))
+                if (auto link = getAttribute(tag, "link"))
                     joint.parent = *link;
             }
             for (const auto& [cBegin, cEnd] : FindElements(inner, "child"))
             {
                 const std::string tag = ElementOpenTag(inner, cBegin, cEnd);
-                if (auto link = GetAttribute(tag, "link"))
+                if (auto link = getAttribute(tag, "link"))
                     joint.child = *link;
             }
 
@@ -515,7 +515,7 @@ namespace
         if (end == std::string::npos)
             return {};
         const std::string tag = robotXml.substr(compilerPos, end - compilerPos + 1);
-        if (auto meshdir = GetAttribute(tag, "meshdir"))
+        if (auto meshdir = getAttribute(tag, "meshdir"))
             return std::filesystem::path(*meshdir);
         return {};
     }
@@ -724,7 +724,7 @@ namespace
         if (found == stlCache.end())
         {
             StlMeshData loaded;
-            if (!LoadStlFile(resolved, loaded))
+            if (!loadStlFile(resolved, loaded))
                 return false;
             found = stlCache.emplace(cacheKey, std::move(loaded)).first;
         }
@@ -741,7 +741,7 @@ namespace
         const dm::float4& rgba,
         const std::filesystem::path& sourcePath)
     {
-        auto mesh = std::static_pointer_cast<MeshInfo>(factory.CreateMesh());
+        auto mesh = std::static_pointer_cast<MeshInfo>(factory.createMesh());
         mesh->name = name;
         mesh->type = MeshType::Triangles;
         mesh->buffers = std::make_shared<BufferGroup>();
@@ -766,7 +766,7 @@ namespace
             buffers.tangentData[i] = dm::vectorToSnorm8(dm::float4(tangent, 1.f));
         }
 
-        auto material = std::dynamic_pointer_cast<Material>(factory.CreateMaterial());
+        auto material = std::dynamic_pointer_cast<Material>(factory.createMaterial());
         material->name = name + "_mat";
         material->modelFileName = sourcePath.string();
         material->baseOrDiffuseColor = dm::float3(rgba.x, rgba.y, rgba.z);
@@ -775,7 +775,7 @@ namespace
         material->metalness = 0.05f;
         material->domain = rgba.w < 0.999f ? MaterialDomain::AlphaBlended : MaterialDomain::Opaque;
 
-        auto geometry = std::static_pointer_cast<MeshGeometry>(factory.CreateMeshGeometry());
+        auto geometry = std::static_pointer_cast<MeshGeometry>(factory.createMeshGeometry());
         geometry->material = material;
         geometry->objectSpaceBounds = stl.bounds;
         geometry->indexOffsetInMesh = 0;
@@ -795,7 +795,7 @@ UrdfImporter::UrdfImporter(std::shared_ptr<SceneTypeFactory> sceneTypeFactory)
 {
 }
 
-bool UrdfImporter::Load(
+bool UrdfImporter::load(
     const std::filesystem::path& fileName,
     TextureLoader&,
     SceneLoadingStats&,
@@ -828,7 +828,7 @@ bool UrdfImporter::Load(
     const std::string robotOpen = ElementOpenTag(xml, robotBegin, robotEnd);
     const std::string robotInner = ElementInner(xml, robotBegin, robotEnd);
     std::string robotName = fileName.stem().string();
-    if (auto name = GetAttribute(robotOpen, "name"))
+    if (auto name = getAttribute(robotOpen, "name"))
         if (!name->empty())
             robotName = *name;
 

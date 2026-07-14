@@ -33,7 +33,7 @@ using namespace caustica::math;
 using namespace caustica;
 using namespace caustica::render;
 
-void DeferredLightingPass::Inputs::SetGBuffer(const GBufferRenderTargets& targets)
+void DeferredLightingPass::Inputs::setGBuffer(const GBufferRenderTargets& targets)
 {
     depth = targets.depth;
     gbufferNormals = targets.gBufferNormals;
@@ -51,7 +51,7 @@ DeferredLightingPass::DeferredLightingPass(
 {
 }
 
-void caustica::render::DeferredLightingPass::Init(const std::shared_ptr<caustica::ShaderFactory>& shaderFactory)
+void caustica::render::DeferredLightingPass::init(const std::shared_ptr<caustica::ShaderFactory>& shaderFactory)
 {
     auto samplerDesc = nvrhi::SamplerDesc()
         .setAllAddressModes(nvrhi::SamplerAddressMode::Border)
@@ -96,19 +96,19 @@ void caustica::render::DeferredLightingPass::Init(const std::shared_ptr<caustica
         m_BindingLayout = m_device->createBindingLayout(layoutDesc);
         
         nvrhi::ComputePipelineDesc pipelineDesc;
-        pipelineDesc.CS = CreateComputeShader(*shaderFactory);
+        pipelineDesc.CS = createComputeShader(*shaderFactory);
         pipelineDesc.bindingLayouts = { m_BindingLayout };
         
         m_Pso = m_device->createComputePipeline(pipelineDesc);
     }
 }
 
-nvrhi::ShaderHandle DeferredLightingPass::CreateComputeShader(ShaderFactory& shaderFactory)
+nvrhi::ShaderHandle DeferredLightingPass::createComputeShader(ShaderFactory& shaderFactory)
 {
     return shaderFactory.createAutoShader("engine/passes/deferred_lighting_cs.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_deferred_lighting_cs), nullptr, nvrhi::ShaderType::Compute);
 }
 
-void DeferredLightingPass::Render(
+void DeferredLightingPass::render(
     nvrhi::ICommandList* commandList,
     const ICompositeView& compositeView,
     const Inputs& inputs,
@@ -141,10 +141,10 @@ void DeferredLightingPass::Render(
 
     if (inputs.scene)
     {
-        const auto* ew = inputs.scene->GetEntityWorld();
+        const auto* ew = inputs.scene->getEntityWorld();
         if (ew)
         {
-            for (ecs::Entity entity : inputs.scene->GetLightEntities())
+            for (ecs::Entity entity : inputs.scene->getLightEntities())
             {
                 const auto* lightComp = ew->world().get<scene::LightComponent>(entity);
                 if (!lightComp) continue;
@@ -155,14 +155,14 @@ void DeferredLightingPass::Render(
                 {
                     if (!shadowMapTexture)
                     {
-                        shadowMapTexture = lightComp->shadowMap->GetTexture();
-                        deferredConstants.shadowMapTextureSize = float2(lightComp->shadowMap->GetTextureSize());
+                        shadowMapTexture = lightComp->shadowMap->getTexture();
+                        deferredConstants.shadowMapTextureSize = float2(lightComp->shadowMap->getTextureSize());
                     }
                     else
                     {
-                        if (shadowMapTexture != lightComp->shadowMap->GetTexture())
+                        if (shadowMapTexture != lightComp->shadowMap->getTexture())
                         {
-                            caustica::error("All lights submitted to DeferredLightingPass::Render(...) must use the same shadow map textures");
+                            caustica::error("All lights submitted to DeferredLightingPass::render(...) must use the same shadow map textures");
                             return;
                         }
                     }
@@ -176,25 +176,25 @@ void DeferredLightingPass::Render(
                 }
 
                 LightConstants& lightConstants = deferredConstants.lights[deferredConstants.numLights];
-                scene::FillLightConstants(*lightComp, globalComp->transform, lightConstants);
+                scene::fillLightConstants(*lightComp, globalComp->transform, lightConstants);
 
                 if (lightComp->shadowMap)
                 {
-                    for (uint32_t cascade = 0; cascade < lightComp->shadowMap->GetNumberOfCascades(); cascade++)
+                    for (uint32_t cascade = 0; cascade < lightComp->shadowMap->getNumberOfCascades(); cascade++)
                     {
                         if (numShadows < DEFERRED_MAX_SHADOWS)
                         {
-                            lightComp->shadowMap->GetCascade(cascade)->FillShadowConstants(deferredConstants.shadows[numShadows]);
+                            lightComp->shadowMap->getCascade(cascade)->fillShadowConstants(deferredConstants.shadows[numShadows]);
                             lightConstants.shadowCascades[cascade] = numShadows;
                             ++numShadows;
                         }
                     }
 
-                    for (uint32_t perObjectShadow = 0; perObjectShadow < lightComp->shadowMap->GetNumberOfPerObjectShadows(); perObjectShadow++)
+                    for (uint32_t perObjectShadow = 0; perObjectShadow < lightComp->shadowMap->getNumberOfPerObjectShadows(); perObjectShadow++)
                     {
                         if (numShadows < DEFERRED_MAX_SHADOWS)
                         {
-                            lightComp->shadowMap->GetPerObjectShadow(perObjectShadow)->FillShadowConstants(deferredConstants.shadows[numShadows]);
+                            lightComp->shadowMap->getPerObjectShadow(perObjectShadow)->fillShadowConstants(deferredConstants.shadows[numShadows]);
                             lightConstants.perObjectShadows[perObjectShadow] = numShadows;
                             ++numShadows;
                         }
@@ -214,11 +214,11 @@ void DeferredLightingPass::Render(
     {
         for (const auto& probe : *inputs.lightProbes)
         {
-            if (!probe->IsActive())
+            if (!probe->isActive())
                 continue;
 
             LightProbeConstants& lightProbeConstants = deferredConstants.lightProbes[deferredConstants.numLightProbes];
-            probe->FillLightProbeConstants(lightProbeConstants);
+            probe->fillLightProbeConstants(lightProbeConstants);
 
             ++deferredConstants.numLightProbes;
 
@@ -239,7 +239,7 @@ void DeferredLightingPass::Render(
             {
                 if (lightProbeDiffuse != probe->diffuseMap || lightProbeSpecular != probe->specularMap || lightProbeEnvironmentBrdf != probe->environmentBrdf)
                 {
-                    caustica::error("All light probes submitted to DeferredLightingPass::Render(...) must use the same set of textures");
+                    caustica::error("All light probes submitted to DeferredLightingPass::render(...) must use the same set of textures");
                     return;
                 }
             }
@@ -294,7 +294,7 @@ void DeferredLightingPass::Render(
     commandList->endMarker();
 }
 
-void DeferredLightingPass::ResetBindingCache()
+void DeferredLightingPass::resetBindingCache()
 {
     m_BindingSets.clear();
 }

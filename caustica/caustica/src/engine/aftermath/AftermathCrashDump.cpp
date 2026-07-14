@@ -35,7 +35,7 @@ static void DumpFileCallback(const void* pGpuCrashDump, const uint32_t gpuCrashD
             {
                 GFSDK_Aftermath_ShaderBinaryHash shaderHash = {};
                 GFSDK_Aftermath_GetShaderHashForShaderInfo(decoder, &shaderInfo, &shaderHash);
-                nvrhi::AftermathCrashDumpHelper& crashDumpHelper = dumper->GetGpuDevice().GetDevice()->getAftermathCrashDumpHelper();
+                nvrhi::AftermathCrashDumpHelper& crashDumpHelper = dumper->GetGpuDevice().getDevice()->getAftermathCrashDumpHelper();
                 nvrhi::BinaryBlob shaderLookupResult = crashDumpHelper.findShaderBinary(shaderHash.hash, caustica::AftermathCrashDump::GetShaderHashForBinary);
                 if (shaderLookupResult.second > 0)
                 {
@@ -180,7 +180,7 @@ void caustica::AftermathCrashDump::EnableCrashDumpTracking()
 
 const std::string& caustica::AftermathCrashDump::ResolveMarker(uint64_t markerHash)
 {
-    auto [found, markerString] = m_deviceManager.GetDevice()->getAftermathCrashDumpHelper().ResolveMarker(markerHash);
+    auto [found, markerString] = m_deviceManager.getDevice()->getAftermathCrashDumpHelper().ResolveMarker(markerHash);
     return markerString;
 }
 

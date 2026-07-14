@@ -1,4 +1,4 @@
-#include <render/passes/lighting/MaterialFeatureMask.h>
+#include <render/passes/lighting/materialFeatureMask.h>
 
 #include <render/passes/lighting/MaterialGpuCache.h>
 
@@ -13,22 +13,22 @@ namespace caustica::render
 namespace
 {
     constexpr MaterialFeatureTierDesc kMaterialFeatureTiers[] = {
-        { 0, 0, MaterialFeatureMask(MaterialFeature::Specialized), "Ubershader" },
-        { 1, MaterialFeatureMask(MaterialFeature::Specialized), 0, "Standard" },
-        { 2, MaterialFeatureMask(MaterialFeature::Specialized) | MaterialFeatureMask(MaterialFeature::NonEmissive) | MaterialFeatureMask(MaterialFeature::NonAnalyticProxy),
-          MaterialFeatureMask(MaterialFeature::HasTransmission) | MaterialFeatureMask(MaterialFeature::ThinSurface) | MaterialFeatureMask(MaterialFeature::UseNormalTexture)
-              | MaterialFeatureMask(MaterialFeature::AlphaTest) | MaterialFeatureMask(MaterialFeature::OnlyDeltaLobes),
+        { 0, 0, materialFeatureMask(MaterialFeature::Specialized), "Ubershader" },
+        { 1, materialFeatureMask(MaterialFeature::Specialized), 0, "Standard" },
+        { 2, materialFeatureMask(MaterialFeature::Specialized) | materialFeatureMask(MaterialFeature::NonEmissive) | materialFeatureMask(MaterialFeature::NonAnalyticProxy),
+          materialFeatureMask(MaterialFeature::HasTransmission) | materialFeatureMask(MaterialFeature::ThinSurface) | materialFeatureMask(MaterialFeature::UseNormalTexture)
+              | materialFeatureMask(MaterialFeature::AlphaTest) | materialFeatureMask(MaterialFeature::OnlyDeltaLobes),
           "NonEmissive" },
-        { 3, MaterialFeatureMask(MaterialFeature::Specialized) | MaterialFeatureMask(MaterialFeature::HasTransmission), 0, "Transmission" },
-        { 4, MaterialFeatureMask(MaterialFeature::Specialized) | MaterialFeatureMask(MaterialFeature::ThinSurface), 0, "ThinSurface" },
-        { 5, MaterialFeatureMask(MaterialFeature::Specialized) | MaterialFeatureMask(MaterialFeature::UseNormalTexture), 0, "NormalMap" },
-        { 6, MaterialFeatureMask(MaterialFeature::Specialized) | MaterialFeatureMask(MaterialFeature::AlphaTest), 0, "AlphaTest" },
-        { 7, MaterialFeatureMask(MaterialFeature::Specialized) | MaterialFeatureMask(MaterialFeature::OnlyDeltaLobes), 0, "DeltaLobes" },
+        { 3, materialFeatureMask(MaterialFeature::Specialized) | materialFeatureMask(MaterialFeature::HasTransmission), 0, "Transmission" },
+        { 4, materialFeatureMask(MaterialFeature::Specialized) | materialFeatureMask(MaterialFeature::ThinSurface), 0, "ThinSurface" },
+        { 5, materialFeatureMask(MaterialFeature::Specialized) | materialFeatureMask(MaterialFeature::UseNormalTexture), 0, "NormalMap" },
+        { 6, materialFeatureMask(MaterialFeature::Specialized) | materialFeatureMask(MaterialFeature::AlphaTest), 0, "AlphaTest" },
+        { 7, materialFeatureMask(MaterialFeature::Specialized) | materialFeatureMask(MaterialFeature::OnlyDeltaLobes), 0, "DeltaLobes" },
     };
 
     static_assert(std::size(kMaterialFeatureTiers) == kMaterialFeatureTierCount, "kMaterialFeatureTierCount must match tier table size");
 
-    bool TierMatchesMask(const MaterialFeatureTierDesc& tier, MaterialFeatureMask mask)
+    bool TierMatchesMask(const MaterialFeatureTierDesc& tier, materialFeatureMask mask)
     {
         if ((mask & tier.requiredMask) != tier.requiredMask)
             return false;
@@ -37,7 +37,7 @@ namespace
         return true;
     }
 
-    uint32_t ScoreTierMatch(const MaterialFeatureTierDesc& tier, MaterialFeatureMask mask)
+    uint32_t ScoreTierMatch(const MaterialFeatureTierDesc& tier, materialFeatureMask mask)
     {
         if (!TierMatchesMask(tier, mask))
             return 0;
@@ -45,7 +45,7 @@ namespace
         uint32_t score = 0;
         for (uint32_t bit = 0; bit < 32; ++bit)
         {
-            const MaterialFeatureMask featureBit = (1u << bit);
+            const materialFeatureMask featureBit = (1u << bit);
             if ((tier.requiredMask & featureBit) != 0 && (mask & featureBit) != 0)
                 ++score;
         }
@@ -53,9 +53,9 @@ namespace
     }
 }
 
-MaterialFeatureMask ComputeMaterialFeatureMask(const PTMaterial& material)
+materialFeatureMask computeMaterialFeatureMask(const PTMaterial& material)
 {
-    MaterialFeatureMask mask = MaterialFeatureMask(MaterialFeature::Specialized);
+    materialFeatureMask mask = materialFeatureMask(MaterialFeature::Specialized);
 
     const bool isEmissive = material.isEmissive();
     const bool isAnalyticProxy = material.enableAsAnalyticLightProxy;
@@ -93,9 +93,9 @@ MaterialFeatureMask ComputeMaterialFeatureMask(const PTMaterial& material)
     return mask;
 }
 
-uint32_t MapFeatureMaskToTier(MaterialFeatureMask mask)
+uint32_t mapFeatureMaskToTier(materialFeatureMask mask)
 {
-    if (!HasFeature(mask, MaterialFeature::Specialized))
+    if (!hasFeature(mask, MaterialFeature::Specialized))
         return 0;
 
     uint32_t bestTier = 1;
@@ -116,13 +116,13 @@ uint32_t MapFeatureMaskToTier(MaterialFeatureMask mask)
     return bestTier;
 }
 
-const MaterialFeatureTierDesc& GetMaterialFeatureTierDesc(uint32_t tierIndex)
+const MaterialFeatureTierDesc& getMaterialFeatureTierDesc(uint32_t tierIndex)
 {
     assert(tierIndex < kMaterialFeatureTierCount);
     return kMaterialFeatureTiers[tierIndex];
 }
 
-std::vector<caustica::ShaderMacro> BuildMaterialShaderMacros(uint32_t tierIndex)
+std::vector<caustica::ShaderMacro> buildMaterialShaderMacros(uint32_t tierIndex)
 {
     assert(tierIndex < kMaterialFeatureTierCount);
 
@@ -138,29 +138,29 @@ std::vector<caustica::ShaderMacro> BuildMaterialShaderMacros(uint32_t tierIndex)
 
     macros.push_back({ "CAUSTICA_MATERIAL_PERMUTATIONS_ENABLED", "1" });
 
-    const MaterialFeatureTierDesc& tier = GetMaterialFeatureTierDesc(tierIndex);
-    if (HasFeature(tier.requiredMask, MaterialFeature::NonEmissive))
+    const MaterialFeatureTierDesc& tier = getMaterialFeatureTierDesc(tierIndex);
+    if (hasFeature(tier.requiredMask, MaterialFeature::NonEmissive))
         macros.push_back({ "CAUSTICA_MATERIAL_IS_EMISSIVE", "0" });
-    if (HasFeature(tier.requiredMask, MaterialFeature::NonAnalyticProxy))
+    if (hasFeature(tier.requiredMask, MaterialFeature::NonAnalyticProxy))
         macros.push_back({ "CAUSTICA_MATERIAL_IS_ANALYTIC_LIGHT_PROXY", "0" });
-    if (HasFeature(tier.requiredMask, MaterialFeature::HasTransmission))
+    if (hasFeature(tier.requiredMask, MaterialFeature::HasTransmission))
         macros.push_back({ "CAUSTICA_MATERIAL_HAS_TRANSMISSION", "1" });
-    if (HasFeature(tier.requiredMask, MaterialFeature::ThinSurface))
+    if (hasFeature(tier.requiredMask, MaterialFeature::ThinSurface))
         macros.push_back({ "CAUSTICA_MATERIAL_THIN_SURFACE", "1" });
-    if (HasFeature(tier.requiredMask, MaterialFeature::UseNormalTexture))
+    if (hasFeature(tier.requiredMask, MaterialFeature::UseNormalTexture))
         macros.push_back({ "CAUSTICA_MATERIAL_USE_NORMAL_TEXTURE", "1" });
-    if (HasFeature(tier.requiredMask, MaterialFeature::AlphaTest))
+    if (hasFeature(tier.requiredMask, MaterialFeature::AlphaTest))
         macros.push_back({ "CAUSTICA_MATERIAL_ALPHA_TEST", "1" });
-    if (HasFeature(tier.requiredMask, MaterialFeature::OnlyDeltaLobes))
+    if (hasFeature(tier.requiredMask, MaterialFeature::OnlyDeltaLobes))
         macros.push_back({ "CAUSTICA_MATERIAL_ONLY_DELTA_LOBES", "1" });
 
     return macros;
 }
 
-std::string MaterialFeatureTierStableName(uint32_t tierIndex)
+std::string materialFeatureTierStableName(uint32_t tierIndex)
 {
     assert(tierIndex < kMaterialFeatureTierCount);
-    return std::string(GetMaterialFeatureTierDesc(tierIndex).debugName);
+    return std::string(getMaterialFeatureTierDesc(tierIndex).debugName);
 }
 
 } // namespace caustica::render

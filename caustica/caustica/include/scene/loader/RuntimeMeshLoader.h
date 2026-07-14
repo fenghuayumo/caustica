@@ -7,16 +7,16 @@
 namespace caustica
 {
 
-RuntimeMeshLoadResult LoadRuntimeMeshFile(
+RuntimeMeshLoadResult loadRuntimeMeshFile(
     const RuntimeMeshLoadParams& params,
     const std::filesystem::path& filePath);
-RuntimeMeshLoadResult LoadRuntimeGltfMeshFile(
+RuntimeMeshLoadResult loadRuntimeGltfMeshFile(
     const RuntimeMeshLoadParams& params,
     const std::filesystem::path& filePath);
-RuntimeMeshLoadResult LoadRuntimeObjMeshFile(
+RuntimeMeshLoadResult loadRuntimeObjMeshFile(
     const RuntimeMeshLoadParams& params,
     const std::filesystem::path& filePath);
-RuntimeMeshLoadResult LoadRuntimeUrdfMeshFile(
+RuntimeMeshLoadResult loadRuntimeUrdfMeshFile(
     const RuntimeMeshLoadParams& params,
     const std::filesystem::path& filePath);
 

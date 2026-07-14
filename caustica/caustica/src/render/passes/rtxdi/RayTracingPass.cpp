@@ -8,7 +8,7 @@
 using namespace caustica;
 
 
-bool RayTracingPass::Init(
+bool RayTracingPass::init(
     nvrhi::IDevice* device,
     caustica::ShaderFactory& shaderFactory,
     const char* shaderName,
@@ -98,7 +98,7 @@ bool RayTracingPass::Init(
     return true;
 }
 
-void RayTracingPass::Execute(
+void RayTracingPass::execute(
     nvrhi::ICommandList* commandList,
     int width,
     int height,

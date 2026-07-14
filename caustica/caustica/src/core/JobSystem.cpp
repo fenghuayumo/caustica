@@ -95,7 +95,7 @@ void Initialize(uint32_t numThreads, uint32_t reservedThreads)
                 // Try to get work from the global pool or steal
                 bool didWork = false;
 
-                // Process local queue
+                // process local queue
                 Job localJob;
                 {
                     std::lock_guard<std::mutex> lock(worker->queueMutex);
@@ -188,9 +188,9 @@ uint32_t GetThreadCount()
 }
 
 // ==========================================================================
-// Execute — submit a single job
+// execute — submit a single job
 // ==========================================================================
-void Execute(Context& ctx, std::function<void()> task)
+void execute(Context& ctx, std::function<void()> task)
 {
     if (!s_Initialized || s_NumThreads == 0)
     {
@@ -220,9 +220,9 @@ void Execute(Context& ctx, std::function<void()> task)
 }
 
 // ==========================================================================
-// Dispatch — parallel-for
+// dispatch — parallel-for
 // ==========================================================================
-void Dispatch(Context& ctx, uint32_t jobCount, uint32_t groupSize,
+void dispatch(Context& ctx, uint32_t jobCount, uint32_t groupSize,
               std::function<void(JobDispatchArgs)> task)
 {
     if (jobCount == 0)

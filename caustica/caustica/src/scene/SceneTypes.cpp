@@ -15,19 +15,19 @@ using namespace caustica::scene;
 // Light (base)
 // =============================================================================
 
-void Light::FillLightConstants(LightConstants& lightConstants, const dm::daffine3& /*globalTransform*/) const
+void Light::fillLightConstants(LightConstants& lightConstants, const dm::daffine3& /*globalTransform*/) const
 {
     lightConstants.color = color;
     lightConstants.shadowCascades = int4(-1);
     lightConstants.perObjectShadows = int4(-1);
     lightConstants.shadowChannel = int4(shadowChannel, -1, -1, -1);
     if (shadowMap)
-        lightConstants.outOfBoundsShadow = shadowMap->IsLitOutOfBounds() ? 1.f : 0.f;
+        lightConstants.outOfBoundsShadow = shadowMap->isLitOutOfBounds() ? 1.f : 0.f;
     else
         lightConstants.outOfBoundsShadow = 1.f;
 }
 
-bool Light::SetProperty(const std::string& propName, const dm::float4& value)
+bool Light::setProperty(const std::string& propName, const dm::float4& value)
 {
     if (propName == "color")
     {
@@ -38,7 +38,7 @@ bool Light::SetProperty(const std::string& propName, const dm::float4& value)
     return false;
 }
 
-void Light::SetPosition(scene::SceneEntityWorld& world, ecs::Entity entity, const dm::double3& position) const
+void Light::setPosition(scene::SceneEntityWorld& world, ecs::Entity entity, const dm::double3& position) const
 {
     ecs::Entity parentEntity = ecs::NullEntity;
     if (const auto* parent = world.world().get<scene::ParentComponent>(entity))
@@ -55,7 +55,7 @@ void Light::SetPosition(scene::SceneEntityWorld& world, ecs::Entity entity, cons
     world.setTranslation(entity, translation);
 }
 
-void Light::SetDirection(scene::SceneEntityWorld& world, ecs::Entity entity, const dm::double3& direction) const
+void Light::setDirection(scene::SceneEntityWorld& world, ecs::Entity entity, const dm::double3& direction) const
 {
     ecs::Entity parentEntity = ecs::NullEntity;
     if (const auto* parent = world.world().get<scene::ParentComponent>(entity))
@@ -82,7 +82,7 @@ void Light::SetDirection(scene::SceneEntityWorld& world, ecs::Entity entity, con
 // DirectionalLight
 // =============================================================================
 
-std::shared_ptr<DirectionalLight> DirectionalLight::Clone() const
+std::shared_ptr<DirectionalLight> DirectionalLight::clone() const
 {
     auto copy = std::make_shared<DirectionalLight>();
     copy->name = name;
@@ -94,25 +94,25 @@ std::shared_ptr<DirectionalLight> DirectionalLight::Clone() const
     return copy;
 }
 
-void DirectionalLight::FillLightConstants(LightConstants& lightConstants, const dm::daffine3& globalTransform) const
+void DirectionalLight::fillLightConstants(LightConstants& lightConstants, const dm::daffine3& globalTransform) const
 {
-    Light::FillLightConstants(lightConstants, globalTransform);
+    Light::fillLightConstants(lightConstants, globalTransform);
 
     lightConstants.lightType = LightType_Directional;
-    lightConstants.direction = float3(normalize(GetDirection(globalTransform)));
+    lightConstants.direction = float3(normalize(getDirection(globalTransform)));
     float clampedAngularSize = clamp(angularSize, 0.f, 90.f);
     lightConstants.angularSizeOrInvRange = dm::radians(clampedAngularSize);
     lightConstants.intensity = irradiance;
 }
 
-void DirectionalLight::Load(const Json::Value& node)
+void DirectionalLight::load(const Json::Value& node)
 {
     node["color"] >> color;
     node["irradiance"] >> irradiance;
     node["angularSize"] >> angularSize;
 }
 
-void DirectionalLight::Store(Json::Value& node) const
+void DirectionalLight::store(Json::Value& node) const
 {
     node["type"] << "DirectionalLight";
     node["color"] << color;
@@ -120,11 +120,11 @@ void DirectionalLight::Store(Json::Value& node) const
     node["angularSize"] << angularSize;
 }
 
-bool DirectionalLight::SetProperty(const std::string& propName, const dm::float4& value)
+bool DirectionalLight::setProperty(const std::string& propName, const dm::float4& value)
 {
     if (propName == "irradiance")  { irradiance = value.x; return true; }
     if (propName == "angularSize") { angularSize = value.x; return true; }
-    return Light::SetProperty(propName, value);
+    return Light::setProperty(propName, value);
 }
 
 // =============================================================================
@@ -133,7 +133,7 @@ bool DirectionalLight::SetProperty(const std::string& propName, const dm::float4
 
 inline float square(const float x) { return x * x; }
 
-std::shared_ptr<SpotLight> SpotLight::Clone() const
+std::shared_ptr<SpotLight> SpotLight::clone() const
 {
     auto copy = std::make_shared<SpotLight>();
     copy->name = name;
@@ -148,13 +148,13 @@ std::shared_ptr<SpotLight> SpotLight::Clone() const
     return copy;
 }
 
-void SpotLight::FillLightConstants(LightConstants& lightConstants, const dm::daffine3& globalTransform) const
+void SpotLight::fillLightConstants(LightConstants& lightConstants, const dm::daffine3& globalTransform) const
 {
-    Light::FillLightConstants(lightConstants, globalTransform);
+    Light::fillLightConstants(lightConstants, globalTransform);
 
     lightConstants.lightType = LightType_Spot;
-    lightConstants.direction = float3(GetDirection(globalTransform));
-    lightConstants.position = float3(GetPosition(globalTransform));
+    lightConstants.direction = float3(getDirection(globalTransform));
+    lightConstants.position = float3(getPosition(globalTransform));
     lightConstants.radius = radius;
     lightConstants.angularSizeOrInvRange = (range <= 0.f) ? 0.f : 1.f / range;
     lightConstants.intensity = intensity;
@@ -163,7 +163,7 @@ void SpotLight::FillLightConstants(LightConstants& lightConstants, const dm::daf
     lightConstants.outerAngle = dm::radians(outerAngle);
 }
 
-void SpotLight::Load(const Json::Value& node)
+void SpotLight::load(const Json::Value& node)
 {
     node["color"] >> color;
     node["intensity"] >> intensity;
@@ -172,7 +172,7 @@ void SpotLight::Load(const Json::Value& node)
     node["radius"] >> radius;
     node["range"] >> range;
 
-    // Load light-sampler proxy mesh references
+    // load light-sampler proxy mesh references
     if (node.isMember("proxyMeshNodes") && node["proxyMeshNodes"].isArray())
     {
         Proxies.reserve(node["proxyMeshNodes"].size());
@@ -181,7 +181,7 @@ void SpotLight::Load(const Json::Value& node)
     }
 }
 
-void SpotLight::Store(Json::Value& node) const
+void SpotLight::store(Json::Value& node) const
 {
     node["type"] << "SpotLight";
     node["color"] << color;
@@ -192,21 +192,21 @@ void SpotLight::Store(Json::Value& node) const
     node["range"] << range;
 }
 
-bool SpotLight::SetProperty(const std::string& propName, const dm::float4& value)
+bool SpotLight::setProperty(const std::string& propName, const dm::float4& value)
 {
     if (propName == "intensity")   { intensity = value.x; return true; }
     if (propName == "radius")      { radius = value.x; return true; }
     if (propName == "range")       { range = value.x; return true; }
     if (propName == "innerAngle")  { innerAngle = value.x; return true; }
     if (propName == "outerAngle")  { outerAngle = value.x; return true; }
-    return Light::SetProperty(propName, value);
+    return Light::setProperty(propName, value);
 }
 
 // =============================================================================
 // PointLight
 // =============================================================================
 
-std::shared_ptr<PointLight> PointLight::Clone() const
+std::shared_ptr<PointLight> PointLight::clone() const
 {
     auto copy = std::make_shared<PointLight>();
     copy->name = name;
@@ -219,26 +219,26 @@ std::shared_ptr<PointLight> PointLight::Clone() const
     return copy;
 }
 
-void PointLight::FillLightConstants(LightConstants& lightConstants, const dm::daffine3& globalTransform) const
+void PointLight::fillLightConstants(LightConstants& lightConstants, const dm::daffine3& globalTransform) const
 {
-    Light::FillLightConstants(lightConstants, globalTransform);
+    Light::fillLightConstants(lightConstants, globalTransform);
 
     lightConstants.lightType = LightType_Point;
-    lightConstants.position = float3(GetPosition(globalTransform));
+    lightConstants.position = float3(getPosition(globalTransform));
     lightConstants.radius = radius;
     lightConstants.angularSizeOrInvRange = (range <= 0.f) ? 0.f : 1.f / range;
     lightConstants.intensity = intensity;
     lightConstants.color = color;
 }
 
-void PointLight::Load(const Json::Value& node)
+void PointLight::load(const Json::Value& node)
 {
     node["color"] >> color;
     node["intensity"] >> intensity;
     node["radius"] >> radius;
     node["range"] >> range;
 
-    // Load light-sampler proxy mesh references
+    // load light-sampler proxy mesh references
     if (node.isMember("proxyMeshNodes") && node["proxyMeshNodes"].isArray())
     {
         Proxies.reserve(node["proxyMeshNodes"].size());
@@ -247,7 +247,7 @@ void PointLight::Load(const Json::Value& node)
     }
 }
 
-void PointLight::Store(Json::Value& node) const
+void PointLight::store(Json::Value& node) const
 {
     node["type"] << "PointLight";
     node["color"] << color;
@@ -256,21 +256,21 @@ void PointLight::Store(Json::Value& node) const
     node["range"] << range;
 }
 
-bool PointLight::SetProperty(const std::string& propName, const dm::float4& value)
+bool PointLight::setProperty(const std::string& propName, const dm::float4& value)
 {
     if (propName == "intensity") { intensity = value.x; return true; }
     if (propName == "radius")    { radius = value.x; return true; }
     if (propName == "range")     { range = value.x; return true; }
-    return Light::SetProperty(propName, value);
+    return Light::setProperty(propName, value);
 }
 
 // =============================================================================
 // EnvironmentLight
 // =============================================================================
 
-void EnvironmentLight::FillLightConstants(LightConstants& lightConstants, const dm::daffine3& globalTransform) const
+void EnvironmentLight::fillLightConstants(LightConstants& lightConstants, const dm::daffine3& globalTransform) const
 {
-    Light::FillLightConstants(lightConstants, globalTransform);
+    Light::fillLightConstants(lightConstants, globalTransform);
     lightConstants.intensity = 0.0f;
     lightConstants.color = { 0, 0, 0 };
 }
@@ -279,7 +279,7 @@ void EnvironmentLight::FillLightConstants(LightConstants& lightConstants, const 
 // Vertex attribute descriptors and material helpers (unchanged)
 // =============================================================================
 
-nvrhi::VertexAttributeDesc caustica::GetVertexAttributeDesc(VertexAttribute attribute, const char* name, uint32_t bufferIndex)
+nvrhi::VertexAttributeDesc caustica::getVertexAttributeDesc(VertexAttribute attribute, const char* name, uint32_t bufferIndex)
 {
     nvrhi::VertexAttributeDesc result = {};
     result.name = name;
@@ -325,7 +325,7 @@ nvrhi::VertexAttributeDesc caustica::GetVertexAttributeDesc(VertexAttribute attr
     return result;
 }
 
-const char* caustica::MaterialDomainToString(MaterialDomain domain)
+const char* caustica::materialDomainToString(MaterialDomain domain)
 {
     switch (domain)
     {
@@ -340,7 +340,7 @@ const char* caustica::MaterialDomainToString(MaterialDomain domain)
     }
 }
 
-bool LightProbe::IsActive() const
+bool LightProbe::isActive() const
 {
     if (!enabled)
         return false;
@@ -352,7 +352,7 @@ bool LightProbe::IsActive() const
     return true;
 }
 
-void LightProbe::FillLightProbeConstants(LightProbeConstants& lightProbeConstants) const
+void LightProbe::fillLightProbeConstants(LightProbeConstants& lightProbeConstants) const
 {
     lightProbeConstants.diffuseArrayIndex = diffuseArrayIndex;
     lightProbeConstants.specularArrayIndex = specularArrayIndex;

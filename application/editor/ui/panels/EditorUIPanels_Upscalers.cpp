@@ -182,7 +182,7 @@ void EditorUI::BuildTAAPanel(const PanelLayout& layout)
 
 void EditorUI::BuildRTXDIPanel(const PanelLayout& layout)
 {
-        if ( (m_settings.ActualUseReSTIRDI() || m_settings.ActualUseReSTIRGI() || m_settings.ActualUseReSTIRPT()) && ImGui::CollapsingHeader("RTXDI Settings") )
+        if ( (m_settings.actualUseReSTIRDI() || m_settings.actualUseReSTIRGI() || m_settings.actualUseReSTIRPT()) && ImGui::CollapsingHeader("RTXDI settings") )
         {
 #define RTXDI_RESTIR_RESET_ON_CHANGE(code) do { if (code) { m_settings.ResetAccumulation = true; m_settings.RTXDIRestirPreset = RTXDIRestirQualityPreset::Custom; } } while(false)
 #define RTXDI_RESTIR_PT_RESET_ON_CHANGE(code) do { if (code) { m_settings.ResetAccumulation = true; m_settings.RTXDIRestirPTPreset = RTXDIRestirPTQualityPreset::Custom; } } while(false)
@@ -191,7 +191,7 @@ void EditorUI::BuildRTXDIPanel(const PanelLayout& layout)
             {
                 RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
 
-                if (m_settings.ActualUseReSTIRDI())
+                if (m_settings.actualUseReSTIRDI())
                 {
 		            ImGui::PushItemWidth(layout.defItemWidth);
        
@@ -209,7 +209,7 @@ void EditorUI::BuildRTXDIPanel(const PanelLayout& layout)
             ImGui::TextColored(categoryColor, "ReSTIR DI");
             {
                 RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
-                if( m_settings.ActualUseReSTIRDI() )
+                if( m_settings.actualUseReSTIRDI() )
                 {
                     ImGui::PushItemWidth(layout.defItemWidth);
 
@@ -286,7 +286,7 @@ void EditorUI::BuildRTXDIPanel(const PanelLayout& layout)
             ImGui::TextColored(categoryColor, "ReSTIR GI");
             {
                 RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
-                if (m_settings.ActualUseReSTIRGI())
+                if (m_settings.actualUseReSTIRGI())
                 {
                     RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
                     ImGui::PushItemWidth(layout.defItemWidth);
@@ -316,7 +316,7 @@ void EditorUI::BuildRTXDIPanel(const PanelLayout& layout)
             ImGui::TextColored(categoryColor, "ReSTIR PT");
             {
                 RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
-                if (m_settings.ActualUseReSTIRPT())
+                if (m_settings.actualUseReSTIRPT())
                 {
                     ImGui::PushItemWidth(layout.defItemWidth);
 
@@ -400,7 +400,7 @@ void EditorUI::BuildStablePlanesPanel(const PanelLayout& layout)
 
 void EditorUI::BuildStandaloneDenoiserPanel(const PanelLayout& layout)
 {
-        if (m_settings.ActualUseStandaloneDenoiser() && ImGui::CollapsingHeader("Standalone Denoiser (NRD)"))
+        if (m_settings.actualUseStandaloneDenoiser() && ImGui::CollapsingHeader("Standalone Denoiser (NRD)"))
         {
             RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
 
@@ -414,7 +414,7 @@ void EditorUI::BuildStandaloneDenoiserPanel(const PanelLayout& layout)
             m_settings.NRDModeChanged = ImGui::Combo("Denoiser Mode", (int*)&m_settings.NRDMethod, "REBLUR\0RELAX\0\0");
             m_settings.NRDMethod = dm::clamp(m_settings.NRDMethod, (NrdConfig::DenoiserMethod)0, (NrdConfig::DenoiserMethod)1);
 
-            if (ImGui::CollapsingHeader("Advanced Settings"))
+            if (ImGui::CollapsingHeader("Advanced settings"))
             {
                 if (m_settings.NRDMethod == NrdConfig::DenoiserMethod::REBLUR)
                 {
@@ -507,7 +507,7 @@ void EditorUI::BuildStandaloneDenoiserPanel(const PanelLayout& layout)
                     ImGui::SliderFloat("Antilag Acceleration Amount", &m_settings.RelaxSettings.antilagSettings.accelerationAmount, 0.0f, 1.0f);
                     ImGui::SliderFloat("Antilag Spatial Sigma Scale", &m_settings.RelaxSettings.antilagSettings.spatialSigmaScale, 0.0f, 5.0f);
                     ImGui::SliderFloat("Antilag Temporal Sigma Scale", &m_settings.RelaxSettings.antilagSettings.temporalSigmaScale, 0.0f, 5.0f);
-                    ImGui::SliderFloat("Antilag Reset Amount", &m_settings.RelaxSettings.antilagSettings.resetAmount, 0.0f, 1.0f);
+                    ImGui::SliderFloat("Antilag reset Amount", &m_settings.RelaxSettings.antilagSettings.resetAmount, 0.0f, 1.0f);
 
                     // ImGui::Combo("Checkerboard Mode", (int*)&m_settings.RelaxSettings.checkerboardMode, "Off\0Black\0White\0\0");
 

@@ -8,7 +8,7 @@ namespace caustica
 
 // --- System shell ---
 
-// Execute a shell command. Returns (exitCode, stdout, stderr).
+// execute a shell command. Returns (exitCode, stdout, stderr).
 // On Windows, optionally uses cmd /C wrapper (useCmd=true).
 // Currently only supports blockOnExecution=true.
 std::tuple<int, std::string, std::string> SystemShell(

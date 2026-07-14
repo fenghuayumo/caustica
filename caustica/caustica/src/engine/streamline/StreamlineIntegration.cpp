@@ -626,7 +626,7 @@ void StreamlineIntegration::Shutdown()
     if (!m_slInitialized)
         return;
 
-    // Free feature resources before slShutdown. Without this (especially DLSS-G),
+    // free feature resources before slShutdown. Without this (especially DLSS-G),
     // window close can hang or crash while Streamline still owns live GPU work.
     if (m_dlssgAvailable)
         CleanupDLSSG(false);

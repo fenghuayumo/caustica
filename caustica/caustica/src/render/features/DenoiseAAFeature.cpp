@@ -40,7 +40,7 @@ namespace
     bool needsNoDenoiserFinalMergePass(const PathTracerSettings& settings)
     {
         return settings.RealtimeMode
-            && !settings.ActualUseStandaloneDenoiser()
+            && !settings.actualUseStandaloneDenoiser()
             && settings.RealtimeAA != 2
             && settings.RealtimeAA != 3;
     }
@@ -191,7 +191,7 @@ void registerDenoiseAAFeature(RenderFeatureContext ctx)
             },
             [ctx, temporalAAPass, taaParams, feedbackIsValid, stochasticSplats](rg::RenderPassContext& passCtx) {
                 const ICompositeView& taaView = *ctx.renderer->getCameraController().view();
-                temporalAAPass->TemporalResolve(
+                temporalAAPass->temporalResolve(
                     passCtx.commandList(),
                     taaParams,
                     feedbackIsValid,
@@ -265,7 +265,7 @@ void registerDenoiseAAFeature(RenderFeatureContext ctx)
             },
             [ctx, accumulationPass, accumulationWeight](rg::RenderPassContext& passCtx) {
                 const IView& view = *ctx.renderer->getCameraController().view();
-                accumulationPass->Render(
+                accumulationPass->render(
                     passCtx.commandList(),
                     view,
                     view,

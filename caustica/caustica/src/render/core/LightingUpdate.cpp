@@ -42,11 +42,11 @@ void preUpdateLighting(PreUpdateLightingParams& params)
 
     RAII_SCOPE(commandList->beginMarker("PreUpdateLighting");, commandList->endMarker(););
 
-    nvrhi::TextureHandle preUpdateCube = params.environment->GetEnvMapCube();
-    params.environment->PreUpdate(
+    nvrhi::TextureHandle preUpdateCube = params.environment->getEnvMapCube();
+    params.environment->preUpdate(
         commandList, params.renderDevice, params.envMapActualPath, params.sceneDirectory);
 
-    if (preUpdateCube != params.environment->GetEnvMapCube())
+    if (preUpdateCube != params.environment->getEnvMapCube())
         params.needNewBindings = true;
 }
 
@@ -66,25 +66,25 @@ void updateLighting(CameraController& camera, AccelStructManager& accelStructs, 
     {
         const float3 rotationInRadians = radians(params.settings.EnvironmentMapParams.RotationXYZ);
         const affine3 rotationTransform = dm::rotation(rotationInRadians);
-        const scene::SceneEntityWorld* ew = params.scene->GetEntityWorld();
+        const scene::SceneEntityWorld* ew = params.scene->getEntityWorld();
         if (ew)
         {
-            for (ecs::Entity entity : params.scene->GetLightEntities())
+            for (ecs::Entity entity : params.scene->getLightEntities())
             {
-                const auto* lightComp = scene::TryGetLight(ew->world(), entity);
-                if (!lightComp || !scene::TryGetDirectionalLightData(*lightComp))
+                const auto* lightComp = scene::tryGetLight(ew->world(), entity);
+                if (!lightComp || !scene::tryGetDirectionalLightData(*lightComp))
                     continue;
                 const auto* globalComp = ew->world().get<scene::GlobalTransformComponent>(entity);
                 if (!globalComp)
                     continue;
 
                 LightConstants lightConstants;
-                scene::FillLightConstants(*lightComp, globalComp->transform, lightConstants);
+                scene::fillLightConstants(*lightComp, globalComp->transform, lightConstants);
 
                 if (dirLightCount >= EnvMapProcessor::c_MaxDirLights)
                     break;
 
-                const float minAngularSize = PI_f / (params.environment->GetTargetCubeResolution() / 2.0f);
+                const float minAngularSize = PI_f / (params.environment->getTargetCubeResolution() / 2.0f);
                 assert(lightConstants.angularSizeOrInvRange >= minAngularSize);
 
                 dirLights[dirLightCount].AngularSize =
@@ -98,7 +98,7 @@ void updateLighting(CameraController& camera, AccelStructManager& accelStructs, 
         }
     }
 
-    if (params.environment->Update(
+    if (params.environment->update(
             commandList,
             *params.bindingCache,
             params.renderDevice,
@@ -113,13 +113,13 @@ void updateLighting(CameraController& camera, AccelStructManager& accelStructs, 
 
     LightSamplingCache::UpdateSettings settings;
     settings.ImportanceSamplingType = static_cast<uint>(params.settings.NEEType);
-    settings.CameraPosition = camera.camera().GetPosition();
-    settings.CameraDirection = camera.camera().GetDir();
+    settings.CameraPosition = camera.camera().getPosition();
+    settings.CameraDirection = camera.camera().getDir();
     settings.ViewProjMatrix = camera.view()->getViewProjectionMatrix();
     settings.MouseCursorPos = params.settings.MousePos;
     settings.GlobalTemporalFeedbackWeight = params.settings.NEEAT_GlobalTemporalFeedbackWeight;
     settings.LocalToGlobalSampleRatio = params.settings.ActualNEEAT_LocalToGlobalSampleRatio();
-    settings.UseApproximateMIS = params.settings.ActualUseApproximateMIS();
+    settings.UseApproximateMIS = params.settings.actualUseApproximateMIS();
     settings.DistantVsLocalImportanceScale = params.settings.NEEAT_Distant_vs_Local_Importance;
     settings.ResetFeedback = params.settings.ResetAccumulation && !params.settings.RealtimeMode
 #if 1
@@ -149,7 +149,7 @@ void updateLighting(CameraController& camera, AccelStructManager& accelStructs, 
         settings.GaussianSplatEmissionIntensity = params.settings.GaussianSplatEmissionIntensity;
     }
 
-    params.lightSampling->UpdateBegin(
+    params.lightSampling->updateBegin(
         commandList,
         *params.bindingCache,
         settings,
@@ -159,7 +159,7 @@ void updateLighting(CameraController& camera, AccelStructManager& accelStructs, 
         params.opacityMaps,
         accelStructs.getSubInstanceBuffer(),
         accelStructs.getSubInstanceData(),
-        params.environment->GetImportanceSampling()->GetRadianceAndImportanceMap());
+        params.environment->getImportanceSampling()->getRadianceAndImportanceMap());
 }
 
 void syncEnvMapSceneParams(
@@ -167,7 +167,7 @@ void syncEnvMapSceneParams(
     EnvMapSceneParams& params,
     float envMapRadianceScale)
 {
-    if (settings.EnvironmentMapParams.Enabled)
+    if (settings.EnvironmentMapParams.enabled)
     {
         const float intensity = settings.EnvironmentMapParams.Intensity / envMapRadianceScale;
         params.ColorMultiplier = settings.EnvironmentMapParams.TintColor * intensity;
@@ -194,7 +194,7 @@ void updateLightingEnd(UpdateLightingEndParams& params)
         return;
     }
 
-    params.lightSampling->UpdateEnd(
+    params.lightSampling->updateEnd(
         params.commandList,
         *params.bindingCache,
         params.scene,

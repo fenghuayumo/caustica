@@ -30,7 +30,7 @@ namespace
     {
 #if CAUSTICA_WITH_VULKAN
 #if CAUSTICA_WITH_NATIVE_DLSS
-        render::DLSS::GetRequiredVulkanExtensions(
+        render::DLSS::getRequiredVulkanExtensions(
             params.requiredVulkanInstanceExtensions,
             params.requiredVulkanDeviceExtensions);
 #endif
@@ -117,10 +117,10 @@ GpuDeviceCreateResult GpuDevice::CreateInitialized(const GpuDeviceCreateDesc& de
     GpuDeviceCreateResult result;
     const DeviceCreationParameters deviceParams = MakePathTracerDeviceParameters(desc);
 
-    std::unique_ptr<GpuDevice> gpuDevice(GpuDevice::Create(desc.api));
+    std::unique_ptr<GpuDevice> gpuDevice(GpuDevice::create(desc.api));
     if (!gpuDevice)
     {
-        caustica::error("GpuDevice::CreateInitialized: GpuDevice::Create returned null");
+        caustica::error("GpuDevice::CreateInitialized: GpuDevice::create returned null");
         return result;
     }
 

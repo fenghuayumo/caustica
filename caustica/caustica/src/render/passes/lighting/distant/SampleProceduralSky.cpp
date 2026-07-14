@@ -53,7 +53,7 @@ SampleProceduralSky::SampleProceduralSky(
     : m_device(device)
     , m_shaderFactory(std::move(shaderFactory))
 {
-    CreateLutResources();
+    createLutResources();
     memset(&m_lastConstants, 0, sizeof(m_lastConstants));
 
     static_assert(sizeof(AtmosphereParameters) == 128, "AtmosphereParameters must match HLSL cbuffer packing");
@@ -62,14 +62,14 @@ SampleProceduralSky::SampleProceduralSky(
     static_assert(sizeof(AerialPerspectiveConstants) % 16 == 0, "AerialPerspectiveConstants must be 16-byte aligned");
 }
 
-void SampleProceduralSky::ReloadShaders(std::shared_ptr<caustica::ShaderFactory> shaderFactory)
+void SampleProceduralSky::reloadShaders(std::shared_ptr<caustica::ShaderFactory> shaderFactory)
 {
     assert(shaderFactory != nullptr);
     m_shaderFactory = std::move(shaderFactory);
-    CreateLutResources();
+    createLutResources();
 }
 
-float3 SampleProceduralSky::ComputeSunDirection(float elevationDeg, float azimuthDeg) const
+float3 SampleProceduralSky::computeSunDirection(float elevationDeg, float azimuthDeg) const
 {
     const float elev = dm::radians(dm::clamp(elevationDeg, -89.9f, 89.9f));
     const float azim = dm::radians(azimuthDeg);
@@ -80,7 +80,7 @@ float3 SampleProceduralSky::ComputeSunDirection(float elevationDeg, float azimut
         std::sin(elev)));
 }
 
-void SampleProceduralSky::ApplySunPreset(float elevationDeg, float azimuthDeg)
+void SampleProceduralSky::applySunPreset(float elevationDeg, float azimuthDeg)
 {
     m_sunElevationDeg = elevationDeg;
     m_sunAzimuthDeg = WrapDegrees360(azimuthDeg);
@@ -90,7 +90,7 @@ void SampleProceduralSky::ApplySunPreset(float elevationDeg, float azimuthDeg)
     m_animateSun = false;
 }
 
-void SampleProceduralSky::CreateLutResources()
+void SampleProceduralSky::createLutResources()
 {
     assert(m_shaderFactory != nullptr);
 
@@ -193,7 +193,7 @@ void SampleProceduralSky::CreateLutResources()
     m_atmosphereLutsValid = false;
 }
 
-void SampleProceduralSky::FillEarthAtmosphere(AtmosphereParameters& atm) const
+void SampleProceduralSky::fillEarthAtmosphere(AtmosphereParameters& atm) const
 {
     memset(&atm, 0, sizeof(atm));
     atm.BottomRadius = 6360.0f;
@@ -215,7 +215,7 @@ void SampleProceduralSky::FillEarthAtmosphere(AtmosphereParameters& atm) const
     atm.MultiScatteringFactor = m_multiScatteringFactor;
 }
 
-void SampleProceduralSky::DispatchLutPasses(
+void SampleProceduralSky::dispatchLutPasses(
     nvrhi::ICommandList* commandList,
     const ProceduralSkyConstants& consts,
     bool rebuildAtmosphereLuts,
@@ -306,7 +306,7 @@ void SampleProceduralSky::DispatchLutPasses(
     }
 }
 
-void SampleProceduralSky::ApplyAerialPerspective(
+void SampleProceduralSky::applyAerialPerspective(
     nvrhi::ICommandList* commandList,
     nvrhi::ITexture* color,
     nvrhi::ITexture* depth,
@@ -364,7 +364,7 @@ void SampleProceduralSky::ApplyAerialPerspective(
     commandList->dispatch((width + 7) / 8, (height + 7) / 8, 1);
 }
 
-bool SampleProceduralSky::Update(
+bool SampleProceduralSky::update(
     nvrhi::ICommandList* commandList,
     double sceneTime,
     ProceduralSkyConstants& outConstants,
@@ -374,7 +374,7 @@ bool SampleProceduralSky::Update(
     memset(&outConstants, 0, sizeof(outConstants));
     m_activePresetType = presetType;
 
-    FillEarthAtmosphere(outConstants.Atmosphere);
+    fillEarthAtmosphere(outConstants.Atmosphere);
 
     outConstants.CameraHeightKm = dm::clamp(
         m_cameraHeightKm,
@@ -432,7 +432,7 @@ bool SampleProceduralSky::Update(
     }
     else if (m_animateSun)
     {
-        // Free sky day-cycle: elevation from -max..+max, azimuth swings ±90° around noon bearing.
+        // free sky day-cycle: elevation from -max..+max, azimuth swings ±90° around noon bearing.
         const float daysPerSecond = m_sunAnimSpeed / 60.0f;
         m_sunAnimPhase = (float)std::fmod(m_sunAnimPhase + deltaTime * daysPerSecond + 1.0, 1.0);
         const float dayAngle = m_sunAnimPhase * 2.0f * PI_f;
@@ -448,7 +448,7 @@ bool SampleProceduralSky::Update(
         m_sunAzimuthL1 = m_sunAzimuthL2 = m_sunAzimuthDeg;
     }
 
-    outConstants.SunDir = ComputeSunDirection(m_sunElevationDeg, m_sunAzimuthDeg);
+    outConstants.SunDir = computeSunDirection(m_sunElevationDeg, m_sunAzimuthDeg);
 
     const bool rebuildAtmosphereLuts = !m_atmosphereLutsValid || !AtmosphereEqual(outConstants.Atmosphere, m_lastAtmosphere);
     const bool rebuildSkyView = rebuildAtmosphereLuts
@@ -457,14 +457,14 @@ bool SampleProceduralSky::Update(
         || outConstants.CameraHeightKm != m_lastCameraHeightKm;
 
     if (commandList && (rebuildAtmosphereLuts || rebuildSkyView))
-        DispatchLutPasses(commandList, outConstants, rebuildAtmosphereLuts, rebuildSkyView);
+        dispatchLutPasses(commandList, outConstants, rebuildAtmosphereLuts, rebuildSkyView);
 
     bool changes = memcmp(&outConstants, &m_lastConstants, sizeof(outConstants)) != 0 || rebuildAtmosphereLuts || rebuildSkyView;
     m_lastConstants = outConstants;
     return changes;
 }
 
-bool SampleProceduralSky::DebugGUI(float indent)
+bool SampleProceduralSky::debugGUI(float indent)
 {
     bool changed = false;
     auto mark = [&](bool v) { changed |= v; };
@@ -476,7 +476,7 @@ bool SampleProceduralSky::DebugGUI(float indent)
     {
         RAII_SCOPE(ImGui::Indent(indent);, ImGui::Unindent(indent););
 
-        const bool namedPreset = IsProceduralSky(m_activePresetType.c_str())
+        const bool namedPreset = isProceduralSky(m_activePresetType.c_str())
             && m_activePresetType != c_EnvMapProcSky;
         if (namedPreset)
         {
@@ -487,7 +487,7 @@ bool SampleProceduralSky::DebugGUI(float indent)
 
         ImGui::BeginDisabled(namedPreset);
 
-        mark(ImGui::Checkbox("Animate sun (day cycle)", &m_animateSun));
+        mark(ImGui::Checkbox("animate sun (day cycle)", &m_animateSun));
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("When enabled, elevation/azimuth follow a day arc.\nDisable for full manual control.");
 
@@ -516,19 +516,19 @@ bool SampleProceduralSky::DebugGUI(float indent)
         }
 
         ImGui::Text("Presets:");
-        if (ImGui::Button("Sunrise")) { ApplySunPreset(5.0f, 85.0f); changed = true; }
+        if (ImGui::Button("Sunrise")) { applySunPreset(5.0f, 85.0f); changed = true; }
         ImGui::SameLine();
-        if (ImGui::Button("Morning")) { ApplySunPreset(25.0f, 100.0f); changed = true; }
+        if (ImGui::Button("Morning")) { applySunPreset(25.0f, 100.0f); changed = true; }
         ImGui::SameLine();
-        if (ImGui::Button("Noon")) { ApplySunPreset(65.0f, 180.0f); changed = true; }
+        if (ImGui::Button("Noon")) { applySunPreset(65.0f, 180.0f); changed = true; }
         ImGui::SameLine();
-        if (ImGui::Button("Golden hour")) { ApplySunPreset(12.0f, 260.0f); changed = true; }
+        if (ImGui::Button("Golden hour")) { applySunPreset(12.0f, 260.0f); changed = true; }
         ImGui::SameLine();
-        if (ImGui::Button("Sunset")) { ApplySunPreset(3.0f, 275.0f); changed = true; }
+        if (ImGui::Button("Sunset")) { applySunPreset(3.0f, 275.0f); changed = true; }
 
         ImGui::EndDisabled();
 
-        const float3 dir = ComputeSunDirection(m_sunElevationDeg, m_sunAzimuthDeg);
+        const float3 dir = computeSunDirection(m_sunElevationDeg, m_sunAzimuthDeg);
         ImGui::Text("Direction: (%.3f, %.3f, %.3f)  elev=%.1f°  azim=%.1f°",
             dir.x, dir.y, dir.z, m_sunElevationDeg, m_sunAzimuthDeg);
     }
@@ -563,7 +563,7 @@ bool SampleProceduralSky::DebugGUI(float indent)
         mark(ImGui::SliderFloat("Ozone absorption", &m_ozoneScale, 0.0f, 4.0f, "%.3f"));
         mark(ImGui::ColorEdit3("Ground albedo", &m_groundAlbedo.x, ImGuiColorEditFlags_Float));
 
-        if (ImGui::Button("Reset Earth atmosphere"))
+        if (ImGui::Button("reset Earth atmosphere"))
         {
             m_atmosphereHeightKm = 100.0f;
             m_rayleighScatteringScale = 1.0f;

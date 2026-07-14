@@ -94,12 +94,12 @@ public:
         nvrhi::IDevice* device,
         std::shared_ptr<caustica::ShaderFactory> shaderFactory);
 
-    void SetGpuSort(std::shared_ptr<GPUSort> gpuSort);
+    void setGpuSort(std::shared_ptr<GPUSort> gpuSort);
 
-    bool LoadFromFile(const std::filesystem::path& fileName, bool convertRdfToRub);
+    bool loadFromFile(const std::filesystem::path& fileName, bool convertRdfToRub);
 
-    void CreatePipeline(const RenderTargets& renderTargets);
-    void BuildAccelerationStructures(
+    void createPipeline(const RenderTargets& renderTargets);
+    void buildAccelerationStructures(
         nvrhi::ICommandList* commandList,
         bool useAABBs,
         bool useTLASInstances,
@@ -107,8 +107,8 @@ public:
         float splatScale,
         uint32_t kernelDegree,
         bool adaptiveClamp);
-    void ReleaseAccelerationStructures();
-    void BuildEmissionProxies(
+    void releaseAccelerationStructures();
+    void buildEmissionProxies(
         uint32_t maxProxyCount,
         float splatScale,
         uint32_t kernelDegree,
@@ -116,28 +116,28 @@ public:
         caustica::math::float3 tintColor,
         float alphaCullThreshold);
 
-    void Render(
+    void render(
         nvrhi::ICommandList* commandList,
         const caustica::IView& view,
         nvrhi::rt::IAccelStruct* meshTopLevelAS,
         const RenderTargets& renderTargets,
         const GaussianSplatRenderSettings& settings);
 
-    [[nodiscard]] bool HasSplats() const { return m_splatCount > 0; }
-    [[nodiscard]] uint32_t GetSplatCount() const { return m_splatCount; }
-    [[nodiscard]] caustica::math::box3 GetLocalBounds() const { return m_localBounds; }
-    [[nodiscard]] const std::string& GetSourceFileName() const { return m_sourceFileName; }
-    [[nodiscard]] nvrhi::rt::IAccelStruct* GetTopLevelAS() const { return m_accelBuilder.getTopLevelAS(); }
-    [[nodiscard]] nvrhi::IBuffer* GetSplatBuffer() const { return m_splatBuffer.Get(); }
-    [[nodiscard]] uint32_t GetShadowPrimitiveCountPerSplat() const { return m_accelBuilder.getShadowPrimitiveCountPerSplat(); }
-    [[nodiscard]] bool GetShadowUsesTLASInstances() const { return m_accelBuilder.getShadowUsesTLASInstances(); }
-    [[nodiscard]] const std::vector<GaussianSplatEmissionProxy>& GetEmissionProxies() const { return m_emissionProxies; }
+    [[nodiscard]] bool hasSplats() const { return m_splatCount > 0; }
+    [[nodiscard]] uint32_t getSplatCount() const { return m_splatCount; }
+    [[nodiscard]] caustica::math::box3 getLocalBounds() const { return m_localBounds; }
+    [[nodiscard]] const std::string& getSourceFileName() const { return m_sourceFileName; }
+    [[nodiscard]] nvrhi::rt::IAccelStruct* getTopLevelAS() const { return m_accelBuilder.getTopLevelAS(); }
+    [[nodiscard]] nvrhi::IBuffer* getSplatBuffer() const { return m_splatBuffer.Get(); }
+    [[nodiscard]] uint32_t getShadowPrimitiveCountPerSplat() const { return m_accelBuilder.getShadowPrimitiveCountPerSplat(); }
+    [[nodiscard]] bool getShadowUsesTLASInstances() const { return m_accelBuilder.getShadowUsesTLASInstances(); }
+    [[nodiscard]] const std::vector<GaussianSplatEmissionProxy>& getEmissionProxies() const { return m_emissionProxies; }
 
 private:
-    void CreateBindingSets(const RenderTargets& renderTargets, nvrhi::rt::IAccelStruct* meshTopLevelAS);
-    void CreateStochasticFramebuffer(const RenderTargets& renderTargets);
-    void UploadSplatDataIfNeeded(nvrhi::ICommandList* commandList);
-    void UploadFormatDataIfNeeded(nvrhi::ICommandList* commandList, GaussianSplatStorageFormat shFormat, GaussianSplatStorageFormat rgbaFormat);
+    void createBindingSets(const RenderTargets& renderTargets, nvrhi::rt::IAccelStruct* meshTopLevelAS);
+    void createStochasticFramebuffer(const RenderTargets& renderTargets);
+    void uploadSplatDataIfNeeded(nvrhi::ICommandList* commandList);
+    void uploadFormatDataIfNeeded(nvrhi::ICommandList* commandList, GaussianSplatStorageFormat shFormat, GaussianSplatStorageFormat rgbaFormat);
     [[nodiscard]] caustica::render::GaussianSplatSortResources makeSortResources() const;
 
     nvrhi::DeviceHandle m_device;

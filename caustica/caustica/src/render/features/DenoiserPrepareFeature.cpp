@@ -39,7 +39,7 @@ void registerDenoiserPrepareFeature(RenderFeatureContext ctx)
     extractPathTraceGraphOutputs(*ctx.graph, handles);
 
     rg::PassOptions denoiserPassOptions{};
-    denoiserPassOptions.executeAfter = ctx.settings->ActualUseRTXDIPasses() ? "Rtxdi" : "MainPathTrace";
+    denoiserPassOptions.executeAfter = ctx.settings->actualUseRTXDIPasses() ? "Rtxdi" : "MainPathTrace";
 
     ctx.graph->addPass(
         "DenoiserPrepare",

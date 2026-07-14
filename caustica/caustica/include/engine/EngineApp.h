@@ -48,7 +48,7 @@ struct EngineAppDesc
 // Bevy-style embed entry: one create() call, then run() or stepFrame().
 //
 //   auto engine = caustica::EngineApp::create({ .scene = "Kitchen/kitchen.json" });
-//   engine->app().addSystem(AppSchedule::Update, "MySim", [](SystemContext& ctx) { ... });
+//   engine->app().addSystem(AppSchedule::update, "MySim", [](SystemContext& ctx) { ... });
 //   engine->run();
 //
 // Headless:

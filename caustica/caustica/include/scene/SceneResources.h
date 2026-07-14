@@ -25,14 +25,14 @@ namespace caustica
         SceneResourceCallback<Material>  OnMaterialAdded;
         SceneResourceCallback<Material>  OnMaterialRemoved;
 
-        [[nodiscard]] const ResourceTracker<Material>& GetMaterials()              const { return m_Materials; }
-        [[nodiscard]] const ResourceTracker<MeshInfo>& GetMeshes()                 const { return m_Meshes; }
-        [[nodiscard]] size_t GetGeometryCount()                                    const { return m_GeometryCount; }
-        [[nodiscard]] size_t GetMaxGeometryCountPerMesh()                          const { return m_MaxGeometryCountPerMesh; }
-        [[nodiscard]] size_t GetGeometryInstancesCount()                           const { return m_GeometryInstancesCount; }
+        [[nodiscard]] const ResourceTracker<Material>& getMaterials()              const { return m_Materials; }
+        [[nodiscard]] const ResourceTracker<MeshInfo>& getMeshes()                 const { return m_Meshes; }
+        [[nodiscard]] size_t getGeometryCount()                                    const { return m_GeometryCount; }
+        [[nodiscard]] size_t getMaxGeometryCountPerMesh()                          const { return m_MaxGeometryCountPerMesh; }
+        [[nodiscard]] size_t getGeometryInstancesCount()                           const { return m_GeometryInstancesCount; }
 
-        void RegisterMeshInstanceEntity(ecs::Entity entity, const std::shared_ptr<MeshInfo>& mesh, bool skinned);
-        void UnregisterMeshInstanceEntity(ecs::Entity entity, const std::shared_ptr<MeshInfo>& mesh, bool skinned);
+        void registerMeshInstanceEntity(ecs::Entity entity, const std::shared_ptr<MeshInfo>& mesh, bool skinned);
+        void unregisterMeshInstanceEntity(ecs::Entity entity, const std::shared_ptr<MeshInfo>& mesh, bool skinned);
 
         SceneResources(const SceneResources&) = delete;
         SceneResources& operator=(const SceneResources&) = delete;

@@ -10,7 +10,7 @@
 namespace caustica
 {
 
-std::string FindPreferredScene(const std::vector<std::string>& available,
+std::string findPreferredScene(const std::vector<std::string>& available,
     const std::string& preferred)
 {
     if (available.empty())
@@ -23,16 +23,16 @@ std::string FindPreferredScene(const std::vector<std::string>& available,
     return available.front();
 }
 
-ecs::Entity FindEnvironmentLightEntity(const Scene& scene)
+ecs::Entity findEnvironmentLightEntity(const Scene& scene)
 {
-    const scene::SceneEntityWorld* entityWorld = scene.GetEntityWorld();
+    const scene::SceneEntityWorld* entityWorld = scene.getEntityWorld();
     if (!entityWorld)
         return ecs::NullEntity;
 
-    return scene::FindEnvironmentLightEntity(entityWorld->world(), scene.GetLightEntities());
+    return scene::findEnvironmentLightEntity(entityWorld->world(), scene.getLightEntities());
 }
 
-bool IsDirectMeshSceneFile(const std::filesystem::path& sceneFileName)
+bool isDirectMeshSceneFile(const std::filesystem::path& sceneFileName)
 {
     std::string ext = sceneFileName.extension().string();
     std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return char(std::tolower(c)); });

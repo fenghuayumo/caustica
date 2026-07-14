@@ -4,9 +4,9 @@
 namespace caustica
 {
 
-nvrhi::IDevice* RenderContext::GetDevice() const
+nvrhi::IDevice* RenderContext::getDevice() const
 {
-    return m_GpuDevice->GetDevice();
+    return m_GpuDevice->getDevice();
 }
 
 uint32_t RenderContext::GetFrameIndex() const

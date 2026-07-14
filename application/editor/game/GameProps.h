@@ -19,13 +19,13 @@ namespace game
         virtual ~PropBase() { }
 
         virtual void            Tick(double gameTime, float deltaTime);
-        virtual void            Reset();
-        virtual void            Load(const Json::Value& jsonRoot);
+        virtual void            reset();
+        virtual void            load(const Json::Value& jsonRoot);
         virtual void            PostLoadSetup();
         virtual Json::Value     Save();
 
-        virtual void            SetTransform(const dm::double3& translation, const dm::dquat& rotation, const dm::double3& scaling);
-        virtual void            SetTransform(const dm::float3& translation, const dm::quat& rotation, const dm::float3& scaling);
+        virtual void            setTransform(const dm::double3& translation, const dm::dquat& rotation, const dm::double3& scaling);
+        virtual void            setTransform(const dm::float3& translation, const dm::quat& rotation, const dm::float3& scaling);
 
         const Pose &            GetDefaultCameraPose() const            { return m_defaultCameraPose; }
 
@@ -34,7 +34,7 @@ namespace game
         std::string             GetName() const;
         caustica::ecs::Entity   GetEntity() const                       { return m_entity; }
         const std::vector<std::shared_ptr<ModelInstance>> &
-                                GetModels() const                       { return m_models; }
+                                getModels() const                       { return m_models; }
 
         virtual void            GUI(float indent, bool & gameCameraAttached, caustica::FirstPersonCamera & gameCamera);
         virtual ScreenGUISel    StandaloneGUI(const std::shared_ptr<caustica::PlanarView> & view, const float2 & mousePos, const float2 & displaySize);
@@ -87,8 +87,8 @@ namespace game
 
     protected:
         virtual void            Tick(double gameTime, float deltaTime) override;
-        virtual void            Reset() override;
-        virtual void            Load(const Json::Value& jsonRoot) override;
+        virtual void            reset() override;
+        virtual void            load(const Json::Value& jsonRoot) override;
         virtual Json::Value     Save() override;
 
     protected:

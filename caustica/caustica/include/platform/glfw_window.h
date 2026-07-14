@@ -58,7 +58,7 @@ public:
     // Access the raw GLFW window
     GLFWwindow* glfwWindow() const { return m_Window; }
 
-    // Render-during-move callback (set by GpuDevice/Application)
+    // render-during-move callback (set by GpuDevice/Application)
     using RenderDuringMoveFn = std::function<void()>;
     void setRenderDuringMoveCallback(RenderDuringMoveFn fn) { m_OnRenderDuringMove = std::move(fn); }
 

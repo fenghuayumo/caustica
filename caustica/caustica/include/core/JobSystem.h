@@ -10,15 +10,15 @@
 //
 // Replaces the older ThreadPool with:
 //   - Named Contexts for grouping and waiting on related work
-//   - Dispatch() for data-parallel workloads (like HLSL Dispatch)
-//   - Execute() for async single jobs
+//   - dispatch() for data-parallel workloads (like HLSL dispatch)
+//   - execute() for async single jobs
 //   - Lightweight: jobs are lock-free where possible
 //
 // Usage:
 //   JobSystem::Initialize();            // once at app startup
 //   JobSystem::Context ctx;
-//   JobSystem::Execute(ctx, [] { ... });
-//   JobSystem::Dispatch(ctx, 100, 10, [](JobDispatchArgs args) { ... });
+//   JobSystem::execute(ctx, [] { ... });
+//   JobSystem::dispatch(ctx, 100, 10, [](JobDispatchArgs args) { ... });
 //   JobSystem::Wait(ctx);
 //   JobSystem::Shutdown();             // once at app exit
 // =============================================================================
@@ -56,13 +56,13 @@ struct Context
 };
 
 // Submit a single job for asynchronous execution.
-void Execute(Context& ctx, std::function<void()> task);
+void execute(Context& ctx, std::function<void()> task);
 
-// Dispatch a parallel-for workload across worker threads.
+// dispatch a parallel-for workload across worker threads.
 //   jobCount: total number of work items
 //   groupSize: items per group (groups execute serially within a thread)
 //   task: receives JobDispatchArgs describing which item to process
-void Dispatch(Context& ctx, uint32_t jobCount, uint32_t groupSize,
+void dispatch(Context& ctx, uint32_t jobCount, uint32_t groupSize,
               std::function<void(JobDispatchArgs)> task);
 
 // Returns the number of groups for a given jobCount and groupSize.
@@ -82,7 +82,7 @@ void ParallelFor(Context& ctx, uint32_t count, F&& func)
 {
     if (count == 0) return;
     constexpr uint32_t kGroupSize = 64;
-    Dispatch(ctx, count, kGroupSize,
+    dispatch(ctx, count, kGroupSize,
              [func = std::forward<F>(func)](JobDispatchArgs args) {
                  func(args.jobIndex);
              });

@@ -86,7 +86,7 @@ PrepareLightsPass::PrepareLightsPass(
 }
 
 
-void PrepareLightsPass::SetScene(std::shared_ptr<caustica::Scene> scene,
+void PrepareLightsPass::setScene(std::shared_ptr<caustica::Scene> scene,
     std::shared_ptr<EnvMapProcessor> environmentMap, EnvMapSceneParams envMapSceneParams)
 {
     m_Scene = scene;
@@ -94,7 +94,7 @@ void PrepareLightsPass::SetScene(std::shared_ptr<caustica::Scene> scene,
     m_EnvironmentMapSceneParams = envMapSceneParams;
 }
 
-void PrepareLightsPass::SetGaussianSplatEmissionProxies(
+void PrepareLightsPass::setGaussianSplatEmissionProxies(
     const std::vector<GaussianSplatEmissionProxy>* proxies,
     float4x4 objectToWorld,
     float emissionIntensity)
@@ -104,11 +104,11 @@ void PrepareLightsPass::SetGaussianSplatEmissionProxies(
     m_GaussianSplatEmissionIntensity = emissionIntensity;
 }
 
-void PrepareLightsPass::CreatePipeline()
+void PrepareLightsPass::createPipeline()
 {
     caustica::debug("Initializing PrepareLightsPass...");
 
-    m_computeShader = m_shaderFactory->createShader("caustica/shaders/render/rtxdi/PrepareLights.hlsl", "main", nullptr, nvrhi::ShaderType::Compute);
+    m_computeShader = m_shaderFactory->createShader("caustica/shaders/render/rtxdi/prepareLights.hlsl", "main", nullptr, nvrhi::ShaderType::Compute);
 
     nvrhi::ComputePipelineDesc pipelineDesc;
     pipelineDesc.bindingLayouts = { m_bindingLayout, m_bindlessLayout };
@@ -116,7 +116,7 @@ void PrepareLightsPass::CreatePipeline()
     m_computePipeline = m_device->createComputePipeline(pipelineDesc);
 }
 
-void PrepareLightsPass::CreateBindingSet(RtxdiResources& resources, const RenderTargets& renderTargets)
+void PrepareLightsPass::createBindingSet(RtxdiResources& resources, const RenderTargets& renderTargets)
 {
     nvrhi::BindingSetDesc bindingSetDesc;
     bindingSetDesc.bindings = {
@@ -126,20 +126,20 @@ void PrepareLightsPass::CreateBindingSet(RtxdiResources& resources, const Render
         nvrhi::BindingSetItem::Texture_UAV(2, resources.LocalLightPdfTexture),
         nvrhi::BindingSetItem::StructuredBuffer_SRV(0, resources.TaskBuffer),
         nvrhi::BindingSetItem::StructuredBuffer_SRV(1, m_subInstanceData),
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(2, m_Scene->GetGpuResources().instanceBuffer),
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(3, m_Scene->GetGpuResources().geometryBuffer),
-        //nvrhi::BindingSetItem::StructuredBuffer_SRV(4, (m_opacityMicromapBuilder!=nullptr)?(m_opacityMicromapBuilder->GetGeometryDebugBuffer()):(resources.LightDataBuffer.Get())), // yuck
+        nvrhi::BindingSetItem::StructuredBuffer_SRV(2, m_Scene->getGpuResources().instanceBuffer),
+        nvrhi::BindingSetItem::StructuredBuffer_SRV(3, m_Scene->getGpuResources().geometryBuffer),
+        //nvrhi::BindingSetItem::StructuredBuffer_SRV(4, (m_opacityMicromapBuilder!=nullptr)?(m_opacityMicromapBuilder->getGeometryDebugBuffer()):(resources.LightDataBuffer.Get())), // yuck
         nvrhi::BindingSetItem::StructuredBuffer_SRV(5, m_materialGpuCache->getMaterialDataBuffer()),
-        nvrhi::BindingSetItem::Texture_SRV(6, m_EnvironmentMap ? m_EnvironmentMap->GetEnvMapCube() : m_renderDevice.builtins().blackCubeMapArray()),
-        nvrhi::BindingSetItem::Texture_SRV(7, m_EnvironmentMap ? m_EnvironmentMap->GetImportanceSampling()->GetImportanceMapOnly() : m_renderDevice.builtins().blackTexture()),
+        nvrhi::BindingSetItem::Texture_SRV(6, m_EnvironmentMap ? m_EnvironmentMap->getEnvMapCube() : m_renderDevice.builtins().blackCubeMapArray()),
+        nvrhi::BindingSetItem::Texture_SRV(7, m_EnvironmentMap ? m_EnvironmentMap->getImportanceSampling()->getImportanceMapOnly() : m_renderDevice.builtins().blackTexture()),
         nvrhi::BindingSetItem::StructuredBuffer_SRV(8, resources.PrimitiveLightBuffer),
-        nvrhi::BindingSetItem::Texture_UAV(50, m_shaderDebug->GetDebugVizTexture()), // TODO: move to shader debug uav
+        nvrhi::BindingSetItem::Texture_UAV(50, m_shaderDebug->getDebugVizTexture()), // TODO: move to shader debug uav
 
-        nvrhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->GetGPUWriteBuffer()),
+        nvrhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->getGPUWriteBuffer()),
 
         nvrhi::BindingSetItem::Sampler(0, m_renderDevice.samplers().anisotropicWrap()),
-        nvrhi::BindingSetItem::Sampler(1, m_EnvironmentMap ? m_EnvironmentMap->GetEnvMapCubeSampler() : m_renderDevice.samplers().anisotropicWrap()),
-        nvrhi::BindingSetItem::Sampler(2, m_EnvironmentMap ? m_EnvironmentMap->GetImportanceSampling()->GetImportanceMapSampler() : m_renderDevice.samplers().anisotropicWrap())
+        nvrhi::BindingSetItem::Sampler(1, m_EnvironmentMap ? m_EnvironmentMap->getEnvMapCubeSampler() : m_renderDevice.samplers().anisotropicWrap()),
+        nvrhi::BindingSetItem::Sampler(2, m_EnvironmentMap ? m_EnvironmentMap->getImportanceSampling()->getImportanceMapSampler() : m_renderDevice.samplers().anisotropicWrap())
     };
 
     m_bindingSet = m_device->createBindingSet(bindingSetDesc, m_bindingLayout);
@@ -151,13 +151,13 @@ void PrepareLightsPass::CreateBindingSet(RtxdiResources& resources, const Render
     m_MaxLightsInBuffer = uint32_t(resources.LightDataBuffer->getDesc().byteSize / (sizeof(PolymorphicLightInfoFull) * 2));
 }
 
-void PrepareLightsPass::CountLightsInScene(uint32_t& numEmissiveMeshes, uint32_t& numEmissiveTriangles)
+void PrepareLightsPass::countLightsInScene(uint32_t& numEmissiveMeshes, uint32_t& numEmissiveTriangles)
 {
     numEmissiveMeshes = 0;
     numEmissiveTriangles = 0;
 
-    const auto& instances = m_Scene->GetMeshInstances();
-    auto* entityWorld = m_Scene->GetEntityWorld();
+    const auto& instances = m_Scene->getMeshInstances();
+    auto* entityWorld = m_Scene->getEntityWorld();
     for (const ecs::Entity entity : instances)
     {
         if (!entityWorld)
@@ -258,12 +258,12 @@ static bool ConvertLightComponent(
     EnvMapProcessor* /*environmentMap*/)
 {
     using namespace caustica::scene;
-    switch (GetLightType(comp))
+    switch (getLightType(comp))
     {
     case LightType_Spot: {
         const auto& spot = std::get<SpotLightData>(comp.data);
-        const float3 lightPos = float3(GetLightPosition(globalTransform));
-        const float3 lightDir = float3(normalize(GetLightDirection(globalTransform)));
+        const float3 lightPos = float3(getLightPosition(globalTransform));
+        const float3 lightDir = float3(normalize(getLightDirection(globalTransform)));
 
         if (spot.radius == 0.f)
         {
@@ -293,7 +293,7 @@ static bool ConvertLightComponent(
     }
     case LightType_Point: {
         const auto& point = std::get<PointLightData>(comp.data);
-        const float3 lightPos = float3(GetLightPosition(globalTransform));
+        const float3 lightPos = float3(getLightPosition(globalTransform));
 
         if (point.radius == 0.f)
         {
@@ -329,7 +329,7 @@ static bool ConvertLightComponent(
 
 static int isInfiniteLightComponent(const caustica::scene::LightComponent& comp)
 {
-    switch (caustica::scene::GetLightType(comp))
+    switch (caustica::scene::getLightType(comp))
     {
     case LightType_Directional: return 1;
     case LightType_Environment: return 2;
@@ -392,19 +392,19 @@ static PolymorphicLightInfoFull ConvertGaussianSplatEmissionProxy(
 }
 
 
-RTXDI_LightBufferParameters PrepareLightsPass::Process(nvrhi::ICommandList* commandList)
+RTXDI_LightBufferParameters PrepareLightsPass::process(nvrhi::ICommandList* commandList)
 {
     RTXDI_LightBufferParameters lightBufferParams = {};
     
-    commandList->beginMarker("PrepareLights");
+    commandList->beginMarker("prepareLights");
 
     std::vector<PrepareLightsTask> tasks;
     std::vector<PolymorphicLightInfoFull> primitiveLightInfos;
     uint32_t lightBufferOffset = 0;
-    std::vector<uint32_t> geometryInstanceToLight(m_Scene->GetGeometryInstancesCount(), RTXDI_INVALID_LIGHT_INDEX);
+    std::vector<uint32_t> geometryInstanceToLight(m_Scene->getGeometryInstancesCount(), RTXDI_INVALID_LIGHT_INDEX);
 
-    const auto& instances = m_Scene->GetMeshInstances();
-    auto* entityWorld = m_Scene->GetEntityWorld();
+    const auto& instances = m_Scene->getMeshInstances();
+    auto* entityWorld = m_Scene->getEntityWorld();
     for (const ecs::Entity entity : instances)
     {
         if (!entityWorld)
@@ -473,10 +473,10 @@ RTXDI_LightBufferParameters PrepareLightsPass::Process(nvrhi::ICommandList* comm
 	lightBufferParams.localLightBufferRegion.firstLightIndex = 0;
 	lightBufferParams.localLightBufferRegion.numLights = lightBufferOffset;
 
-    const auto& lightEntities = m_Scene->GetLightEntities();
-    auto* lightEntityWorld = m_Scene->GetEntityWorld();
+    const auto& lightEntities = m_Scene->getLightEntities();
+    auto* lightEntityWorld = m_Scene->getEntityWorld();
 
-    // Sort entities: finite first (0), directional next (1), environment last (2)
+    // sort entities: finite first (0), directional next (1), environment last (2)
     std::vector<ecs::Entity> sortedLightEntities = lightEntities;
     std::sort(sortedLightEntities.begin(), sortedLightEntities.end(),
         [lightEntityWorld](ecs::Entity a, ecs::Entity b) {
@@ -567,7 +567,7 @@ RTXDI_LightBufferParameters PrepareLightsPass::Process(nvrhi::ICommandList* comm
     // clear the mapping buffer - value of 0 means all mappings are invalid
     commandList->clearBufferUInt(m_LightIndexMappingBuffer, 0);
 
-    // Clear the PDF texture mip 0 - not all of it might be written by this shader
+    // clear the PDF texture mip 0 - not all of it might be written by this shader
     commandList->clearTextureFloat(m_LocalLightPdfTexture, 
         nvrhi::TextureSubresourceSet(0, 1, 0, 1), 
         nvrhi::Color(0.f));
@@ -585,7 +585,7 @@ RTXDI_LightBufferParameters PrepareLightsPass::Process(nvrhi::ICommandList* comm
     if (enableImportanceSampledEnvironmentLight)
     {
         constants.envMapSceneParams = m_EnvironmentMapSceneParams;
-        constants.envMapImportanceSamplingParams = m_EnvironmentMap->GetImportanceSampling()->GetShaderParams( );
+        constants.envMapImportanceSamplingParams = m_EnvironmentMap->getImportanceSampling()->getShaderParams( );
     }
 
     commandList->writeBuffer(m_constantBuffer, &constants, sizeof(PrepareLightsConstants));
@@ -608,7 +608,7 @@ RTXDI_LightBufferParameters PrepareLightsPass::Process(nvrhi::ICommandList* comm
     return lightBufferParams;
 }
 
-nvrhi::TextureHandle PrepareLightsPass::GetEnvironmentMapTexture()
+nvrhi::TextureHandle PrepareLightsPass::getEnvironmentMapTexture()
 {
-    return m_EnvironmentMap ? m_EnvironmentMap->GetEnvMapCube() : nullptr;
+    return m_EnvironmentMap ? m_EnvironmentMap->getEnvMapCube() : nullptr;
 }

@@ -72,7 +72,7 @@ public:
         }
     }
 
-    void Init(const InitParameters& params) override
+    void init(const InitParameters& params) override
     {
         if (params.useRayReconstruction && !m_rayReconstructionSupported)
             return;
@@ -143,7 +143,7 @@ public:
         m_initParameters = params;
     }
 
-    bool Evaluate(
+    bool evaluate(
         nvrhi::ICommandList* commandList,
         const EvaluateParameters& params,
         const caustica::PlanarView& view) override
@@ -156,7 +156,7 @@ public:
         bool const useExposureBuffer = params.exposureBuffer != nullptr && params.exposureScale != 0.f && !m_rayReconstructionInitialized;
         if (useExposureBuffer)
         {
-            ComputeExposure(commandList, params.exposureBuffer, params.exposureScale);
+            computeExposure(commandList, params.exposureBuffer, params.exposureScale);
         }
 
         ID3D12GraphicsCommandList* d3dcmdlist = commandList->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList);
@@ -234,7 +234,7 @@ public:
     }
 };
 
-std::unique_ptr<DLSS> DLSS::CreateDX12(nvrhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
+std::unique_ptr<DLSS> DLSS::createDX12(nvrhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
     std::string const& directoryWithExecutable, uint32_t applicationID)
 {
     return std::make_unique<DLSS_DX12>(device, shaderFactory, directoryWithExecutable, applicationID);

@@ -128,7 +128,7 @@ bool SceneContentEditor::importMeshFile(const std::filesystem::path& filePath,
     if (!loadResult)
         return false;
 
-    const auto importedRoot = caustica::AttachRuntimeSceneImport(
+    const auto importedRoot = caustica::attachRuntimeSceneImport(
         sceneManager->getScene(),
         *loadResult.ImportResult,
         m_sceneEditor.frameIndex(),
@@ -142,17 +142,17 @@ bool SceneContentEditor::importMeshFile(const std::filesystem::path& filePath,
 
 bool SceneContentEditor::loadMeshFile(const std::filesystem::path& filePath)
 {
-    return importMeshFile(filePath, caustica::LoadRuntimeMeshFile);
+    return importMeshFile(filePath, caustica::loadRuntimeMeshFile);
 }
 
 bool SceneContentEditor::loadGltfMeshFile(const std::filesystem::path& filePath)
 {
-    return importMeshFile(filePath, caustica::LoadRuntimeGltfMeshFile);
+    return importMeshFile(filePath, caustica::loadRuntimeGltfMeshFile);
 }
 
 bool SceneContentEditor::loadObjMeshFile(const std::filesystem::path& filePath)
 {
-    return importMeshFile(filePath, caustica::LoadRuntimeObjMeshFile);
+    return importMeshFile(filePath, caustica::loadRuntimeObjMeshFile);
 }
 
 void SceneContentEditor::finalizeRuntimeSceneMutation(caustica::ecs::Entity importedRoot)
@@ -163,7 +163,7 @@ void SceneContentEditor::finalizeRuntimeSceneMutation(caustica::ecs::Entity impo
 
     if (importedRoot != caustica::ecs::NullEntity)
     {
-        caustica::FinalizeRuntimeSceneMutation(
+        caustica::finalizeRuntimeSceneMutation(
             sceneManager->getScene(),
             importedRoot,
             m_sceneEditor.frameIndex(),
@@ -206,11 +206,11 @@ bool SceneContentEditor::deleteSceneNode(caustica::ecs::Entity entity)
         return false;
 
     auto scene = sceneManager->getScene();
-    auto* ew = scene ? scene->GetEntityWorld() : nullptr;
+    auto* ew = scene ? scene->getEntityWorld() : nullptr;
     if (!ew || !ew->world().isAlive(entity))
         return false;
 
-    if (!caustica::DeleteRuntimeSceneNode(caustica::DeleteRuntimeSceneNodeParams{
+    if (!caustica::deleteRuntimeSceneNode(caustica::DeleteRuntimeSceneNodeParams{
             .SceneInstance = scene,
             .Entity = entity,
             .FrameIndex = m_sceneEditor.frameIndex(),

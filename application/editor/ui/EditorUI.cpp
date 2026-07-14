@@ -37,16 +37,16 @@ EditorUI::EditorUI(GpuDevice* deviceManager, SceneEditor& sceneEditor, EditorUID
         , m_editorUI(ui.editor)
         , m_NVAPI_SERSupported(NVAPI_SERSupported)
 {
-    m_commandList = GetDevice()->createCommandList();
+    m_commandList = getDevice()->createCommandList();
 
     // ImGui lifecycle management (fonts, context config, extensions)
     m_imguiManager = std::make_unique<ImGuiManager>(m_ui, cmdLine, NVAPI_SERSupported);
     m_imguiManager->loadDefaultFont(*this, GetLocalPath(c_AssetsFolder));
 
     // Choose which, if any, hit object extension we can use
-    m_imguiManager->configureExtensions((int)GetDevice()->getGraphicsAPI());
+    m_imguiManager->configureExtensions((int)getDevice()->getGraphicsAPI());
 
-    // Apply command-line overrides to UI defaults
+    // apply command-line overrides to UI defaults
     m_imguiManager->applyCommandLineDefaults();
 
 #if KORGI_ENABLED
@@ -65,15 +65,15 @@ EditorUI::~EditorUI()
 #endif
 }
 
-bool EditorUI::MousePosUpdate(double xpos, double ypos)
+bool EditorUI::mousePosUpdate(double xpos, double ypos)
 {
     (void)xpos; (void)ypos;
     return false;
 }
 
-void EditorUI::Animate(float elapsedTimeSeconds)
+void EditorUI::animate(float elapsedTimeSeconds)
 {
-    caustica::ImGui_Renderer::Animate(elapsedTimeSeconds);
+    caustica::ImGui_Renderer::animate(elapsedTimeSeconds);
 
     int w, h;
     GetGpuDevice()->GetWindowDimensions(w, h);
@@ -102,7 +102,7 @@ void EditorUI::buildUI(void)
         ImGui::SetNextWindowPos(ImVec2(10.f, 10.f), ImGuiCond_Appearing);
         ImGui::SetNextWindowSize(ImVec2(layout.defWindowWidth, layout.scaledHeight - 20), ImGuiCond_Appearing);
 
-        RAII_SCOPE( ImGui::Begin("Settings", 0, ImGuiWindowFlags_None /*AlwaysAutoResize*/); , ImGui::End(); );
+        RAII_SCOPE( ImGui::Begin("settings", 0, ImGuiWindowFlags_None /*AlwaysAutoResize*/); , ImGui::End(); );
         RAII_SCOPE( ImGui::PushItemWidth(layout.defItemWidth); , ImGui::PopItemWidth(); );
 
         ImGui::Text("%s, %s", GetGpuDevice()->GetRendererString(), m_sceneEditor.resolutionInfo().c_str() );

@@ -162,7 +162,7 @@ namespace caustica::console
 				{
 					if (VariableImpl<T>* cvar = (VariableImpl<T>*)it->second->AsVariable())
 					{
-						if (cvar->GetState().type == VariableType::IsA<T>())
+						if (cvar->getState().type == VariableType::IsA<T>())
 						{
 							// cvar may have been referenced elsewhere but not be initialized yet
 							if (cvar->m_Description.empty() && IsValidName(description))
@@ -246,7 +246,7 @@ namespace caustica::console
 			return emptyString;
 		}
 
-		void Reset()
+		void reset()
 		{
 			std::lock_guard<std::mutex> lock(m_Mutex);
 			m_Dictionary.clear();
@@ -286,7 +286,7 @@ namespace caustica::console
 		: Object(description), m_OnExecute(onexec), m_OnSuggest(onsuggest)
 	{ }
 
-	Command::Result Command::Execute(Args const& args)
+	Command::Result Command::execute(Args const& args)
 	{
 		if (m_OnExecute)
 			return m_OnExecute(args);
@@ -341,7 +341,7 @@ namespace caustica::console
 
 		inline bool SetData(T const& value, SetBy setby)
 		{
-			VariableState flags = this->GetState();
+			VariableState flags = this->getState();
 			if (flags.CanSetValue(setby))
 			{
 				m_Data = value;
@@ -353,7 +353,7 @@ namespace caustica::console
 			}
 			else
 			{
-				VariableState state = this->GetState();
+				VariableState state = this->getState();
 				if (state.read_only)
 					caustica::error("cvar '%s' is read-only - value not set", this->GetName().c_str());
 				else
@@ -542,14 +542,14 @@ namespace caustica::console
 	template <> std::string const& AutoVariable<type>::GetName() const { return objectsDictionary.GetObjectName(&m_Variable); } \
 	template <> std::string const& AutoVariable<type>::GetDescription() const { return m_Variable.GetDescription(); } \
 	template <> void AutoVariable<type>::SetDescription(std::string const& description) { m_Variable.SetDescription(description); } \
-	template <> VariableState AutoVariable<type>::GetState() const { return m_Variable.GetState(); } \
+	template <> VariableState AutoVariable<type>::getState() const { return m_Variable.getState(); } \
 	template <> type AutoVariable<type>::GetValue() const { return m_Variable.GetData(); } \
-	template <> void AutoVariable<type>::SetValue(type const& value) { m_Variable.SetData(value, VariableState::CODE); } \
+	template <> void AutoVariable<type>::setValue(type const& value) { m_Variable.SetData(value, VariableState::CODE); } \
     template <> void AutoVariable<type>::SetOnChangeCallback(Variable::Callback onChange) { m_Variable.SetOnChangeCallback(onChange); } \
 	template <> void AutoVariable<type>::ExecuteOnChangeCallback() { m_Variable.ExecuteOnChangeCallback(); } \
 	template <> Variable* AutoVariable<type>::operator &() { return &m_Variable; } \
 	template <> AutoVariable<type>::operator type() const { return GetValue(); } \
-	template <> AutoVariable<type>& AutoVariable<type>::operator=(const type& value) { SetValue(value); return *this; }
+	template <> AutoVariable<type>& AutoVariable<type>::operator=(const type& value) { setValue(value); return *this; }
 
 
 	DEFINE_CVARREF_IMPLEMENTATION(bool);
@@ -607,7 +607,7 @@ namespace caustica::console
 
 	void ResetAll()
 	{
-		objectsDictionary.Reset();
+		objectsDictionary.reset();
 	}
 
 	void ParseIniFile(char const* inidata, char const* filename)

@@ -27,7 +27,7 @@ public:
     void PreAnim(float & fElapsedTimeSeconds);
     void PostAnim();
 
-    void PreRender();
+    void preRender();
     void PostRender(const std::function<bool(const char*)>& dumpScreenshotCallback);
 
     bool IsDoingWork() const    { return m_sequencer.IsDoingWork(); }

@@ -57,13 +57,13 @@ bool onKeyPressed(SceneEditor& sceneEditor, caustica::KeyPressedEvent& e)
     auto* game = sceneEditor.GetGame().get();
     auto* camera = &gpuRender->camera();
 
-    if (zoomTool && zoomTool->KeyboardUpdate(key, e.GetScancode(), action, mods))
+    if (zoomTool && zoomTool->keyboardUpdate(key, e.GetScancode(), action, mods))
         return true;
 
     if (!(game && game->CameraActive()))
-        camera->camera().KeyboardUpdate(key, e.GetScancode(), action, mods);
+        camera->camera().keyboardUpdate(key, e.GetScancode(), action, mods);
 
-    if (game && game->KeyboardUpdate(key, e.GetScancode(), action, mods))
+    if (game && game->keyboardUpdate(key, e.GetScancode(), action, mods))
         return true;
 
     auto& session = sceneEditor.renderSessionState();
@@ -105,11 +105,11 @@ bool onKeyReleased(SceneEditor& sceneEditor, caustica::KeyReleasedEvent& e)
     auto* game = sceneEditor.GetGame().get();
     auto* camera = &gpuRender->camera();
 
-    if (zoomTool && zoomTool->KeyboardUpdate(key, e.GetScancode(), cGlfwRelease, mods))
+    if (zoomTool && zoomTool->keyboardUpdate(key, e.GetScancode(), cGlfwRelease, mods))
         return true;
     if (!(game && game->CameraActive()))
-        camera->camera().KeyboardUpdate(key, e.GetScancode(), cGlfwRelease, mods);
-    if (game && game->KeyboardUpdate(key, e.GetScancode(), cGlfwRelease, mods))
+        camera->camera().keyboardUpdate(key, e.GetScancode(), cGlfwRelease, mods);
+    if (game && game->keyboardUpdate(key, e.GetScancode(), cGlfwRelease, mods))
         return true;
     return true;
 }
@@ -135,9 +135,9 @@ bool onMouseMoved(SceneEditor& sceneEditor, caustica::MouseMovedEvent& e)
     auto& session = sceneEditor.renderSessionState();
 
     if (!(game && game->CameraActive()))
-        camera->camera().MousePosUpdate(e.GetX(), e.GetY());
+        camera->camera().mousePosUpdate(e.GetX(), e.GetY());
     if (game)
-        game->MousePosUpdate(e.GetX(), e.GetY());
+        game->mousePosUpdate(e.GetX(), e.GetY());
 
     dm::float2 upscalingScale(1.0f, 1.0f);
     if (worldRenderer && worldRenderer->getRenderTargets())
@@ -151,7 +151,7 @@ bool onMouseMoved(SceneEditor& sceneEditor, caustica::MouseMovedEvent& e)
 
     auto* zoomTool = sceneEditor.GetZoomTool().get();
     if (zoomTool)
-        zoomTool->MousePosUpdate(e.GetX(), e.GetY());
+        zoomTool->mousePosUpdate(e.GetX(), e.GetY());
     return true;
 }
 
@@ -172,12 +172,12 @@ bool onMouseButtonPressed(SceneEditor& sceneEditor, caustica::MouseButtonPressed
     auto* camera = &gpuRender->camera();
     auto& session = sceneEditor.renderSessionState();
 
-    if (zoomTool && zoomTool->MouseButtonUpdate(button, cGlfwPress, mods))
+    if (zoomTool && zoomTool->mouseButtonUpdate(button, cGlfwPress, mods))
         return true;
     if (!(game && game->CameraActive()))
-        camera->camera().MouseButtonUpdate(button, cGlfwPress, mods);
+        camera->camera().mouseButtonUpdate(button, cGlfwPress, mods);
     if (game)
-        game->MouseButtonUpdate(button, cGlfwPress, mods);
+        game->mouseButtonUpdate(button, cGlfwPress, mods);
     if (button == ToGlfwMouse(caustica::Mouse::Left) || button == ToGlfwMouse(caustica::Mouse::Right))
     {
         requestViewportPick(session.runtime, session.runtime.Picking.Position);
@@ -206,12 +206,12 @@ bool onMouseButtonReleased(SceneEditor& sceneEditor, caustica::MouseButtonReleas
     auto* game = sceneEditor.GetGame().get();
     auto* camera = &gpuRender->camera();
 
-    if (zoomTool && zoomTool->MouseButtonUpdate(button, cGlfwRelease, mods))
+    if (zoomTool && zoomTool->mouseButtonUpdate(button, cGlfwRelease, mods))
         return true;
     if (!(game && game->CameraActive()))
-        camera->camera().MouseButtonUpdate(button, cGlfwRelease, mods);
+        camera->camera().mouseButtonUpdate(button, cGlfwRelease, mods);
     if (game)
-        game->MouseButtonUpdate(button, cGlfwRelease, mods);
+        game->mouseButtonUpdate(button, cGlfwRelease, mods);
     return true;
 }
 
@@ -242,13 +242,13 @@ void EditorInputRouter::onEvent(caustica::Event& event)
 
     SceneEditor& sceneEditor = *m_sceneEditor;
     caustica::EventDispatcher dispatcher(event);
-    dispatcher.Dispatch<caustica::KeyPressedEvent>([&](auto& e) { return onKeyPressed(sceneEditor, e); });
-    dispatcher.Dispatch<caustica::KeyReleasedEvent>([&](auto& e) { return onKeyReleased(sceneEditor, e); });
-    dispatcher.Dispatch<caustica::KeyTypedEvent>([&](auto& e) { return onKeyTyped(sceneEditor, e); });
-    dispatcher.Dispatch<caustica::MouseMovedEvent>([&](auto& e) { return onMouseMoved(sceneEditor, e); });
-    dispatcher.Dispatch<caustica::MouseButtonPressedEvent>([&](auto& e) { return onMouseButtonPressed(sceneEditor, e); });
-    dispatcher.Dispatch<caustica::MouseButtonReleasedEvent>([&](auto& e) { return onMouseButtonReleased(sceneEditor, e); });
-    dispatcher.Dispatch<caustica::MouseScrolledEvent>([&](auto& e) { return onMouseScrolled(sceneEditor, e); });
+    dispatcher.dispatch<caustica::KeyPressedEvent>([&](auto& e) { return onKeyPressed(sceneEditor, e); });
+    dispatcher.dispatch<caustica::KeyReleasedEvent>([&](auto& e) { return onKeyReleased(sceneEditor, e); });
+    dispatcher.dispatch<caustica::KeyTypedEvent>([&](auto& e) { return onKeyTyped(sceneEditor, e); });
+    dispatcher.dispatch<caustica::MouseMovedEvent>([&](auto& e) { return onMouseMoved(sceneEditor, e); });
+    dispatcher.dispatch<caustica::MouseButtonPressedEvent>([&](auto& e) { return onMouseButtonPressed(sceneEditor, e); });
+    dispatcher.dispatch<caustica::MouseButtonReleasedEvent>([&](auto& e) { return onMouseButtonReleased(sceneEditor, e); });
+    dispatcher.dispatch<caustica::MouseScrolledEvent>([&](auto& e) { return onMouseScrolled(sceneEditor, e); });
 }
 
 } // namespace caustica::editor

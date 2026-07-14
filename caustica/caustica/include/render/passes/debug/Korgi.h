@@ -5,7 +5,7 @@
 // this device can be much more direct and much easier than using ImGUI.
 // https://www.korg.com/uk/products/computergear/nanokontrol2/
 //
-// There are Init, Shutdown and Update calls that need making to initialise the system,
+// There are init, Shutdown and update calls that need making to initialise the system,
 // shut it down, and update it (just call update once per frame).
 //
 // Controls are grouped into pages.  There are 4 pages numbered 0-3.  The current page can be
@@ -28,11 +28,11 @@
 // Another use of buttons is that of 'momentary' actions, where you want to test
 // if a button has been pressed and perform some action.
 // In order to use this mode, you need to create a korgi::Button variable that you can
-// then call `WasMomentarilyPressed()` on to test if that button has just been pressed.
+// then call `wasMomentarilyPressed()` on to test if that button has just been pressed.
 //
 // g_launchMissilesButton = korgi::Button( 0, korgi::Control::M1, korgi::ButtonMode::Momentary );
 //
-// if( g_launchMissilesButton.WasMomentarilyPressed() )
+// if( g_launchMissilesButton.wasMomentarilyPressed() )
 // {
 //     if( GentleConfirmationDialogue( "Are you sure?" ) )
 // ...
@@ -58,13 +58,13 @@ namespace korgi
 {
 
 #if KORGI_ENABLED
-void Init();
+void init();
 void Shutdown();
-void Update();
+void update();
 #else
-static inline void Init() {}
+static inline void init() {}
 static inline void Shutdown() {}
-static inline void Update() {}
+static inline void update() {}
 #endif
 
 // Macro concatenation machinary
@@ -167,17 +167,17 @@ struct Button
 
     // Returns true only once as the button is pressed
     // (will not continue to return true as the button is held)
-    bool WasMomentarilyPressed();
+    bool wasMomentarilyPressed();
 
 private:
     friend struct Controller;
 
-    bool GetState() const;
-    void SetState(bool state);
-    bool GetLedStatus() const { return m_LedStatus;  }
-    void SetLedStatus(bool status) { m_LedStatus = status; }
-    int GetPage() const { return m_Page; }
-    ButtonMode GetMode() const { return m_Mode; }
+    bool getState() const;
+    void setState(bool state);
+    bool getLedStatus() const { return m_LedStatus;  }
+    void setLedStatus(bool status) { m_LedStatus = status; }
+    int getPage() const { return m_Page; }
+    ButtonMode getMode() const { return m_Mode; }
 
     ButtonMode m_Mode;
     void* m_pValue;
@@ -192,7 +192,7 @@ private:
     {
         (void)pValue;
     }
-    bool WasMomentarilyPressed() { return false; }
+    bool wasMomentarilyPressed() { return false; }
 #endif
 };
 
@@ -204,11 +204,11 @@ struct Knob
 private:
     friend struct Controller;
 
-    void SetValue(const float newRawValue)
+    void setValue(const float newRawValue)
     {
         *m_pValue = m_MinValue * (1.f - newRawValue) + m_MaxValue * newRawValue;
     }
-    int GetPage() const { return m_Page; }
+    int getPage() const { return m_Page; }
 
     float* m_pValue;
     float m_MinValue;

@@ -120,7 +120,7 @@ MipMapGenPass::MipMapGenPass(
     nvrhi::BindingSetDesc setDesc;
     for (uint i = 0; i < (uint)m_BindingSets.size(); ++i)
     {
-        // Create a unique binding set for each compute pass
+        // create a unique binding set for each compute pass
         if (i * NUM_LODS >= nmipLevels)
             break;
 
@@ -153,11 +153,11 @@ MipMapGenPass::MipMapGenPass(
     m_Pso = device->createComputePipeline(computePipelineDesc);
 }
 
-void MipMapGenPass::Dispatch(nvrhi::ICommandList* commandList, int maxLOD) 
+void MipMapGenPass::dispatch(nvrhi::ICommandList* commandList, int maxLOD) 
 {
     assert(m_Texture);
 
-    commandList->beginMarker("MipMapGen::Dispatch");
+    commandList->beginMarker("MipMapGen::dispatch");
 
     uint nmipLevels = m_Texture->getDesc().mipLevels;
     if (maxLOD > 0 && maxLOD < (int)nmipLevels)
@@ -186,15 +186,15 @@ void MipMapGenPass::Dispatch(nvrhi::ICommandList* commandList, int maxLOD)
         commandList->dispatch(width, height);
     }
 
-    commandList->endMarker(); // "MipMapGen::Dispatch"
+    commandList->endMarker(); // "MipMapGen::dispatch"
 }
 
 
-void MipMapGenPass::Display(caustica::render::RenderDevice& renderDevice, nvrhi::ICommandList* commandList, nvrhi::IFramebuffer* target)
+void MipMapGenPass::display(caustica::render::RenderDevice& renderDevice, nvrhi::ICommandList* commandList, nvrhi::IFramebuffer* target)
 {
     assert(m_Texture);
     
-    commandList->beginMarker("MipMapGen::Display");
+    commandList->beginMarker("MipMapGen::display");
     
     nvrhi::Viewport viewport = nvrhi::Viewport((float)target->getFramebufferInfo().width, (float)target->getFramebufferInfo().height);
 
@@ -226,5 +226,5 @@ void MipMapGenPass::Display(caustica::render::RenderDevice& renderDevice, nvrhi:
         }
         size = { size.x / 2.f, size.y / 2.f };
     }
-    commandList->endMarker(); // "MipMapGen::Display"
+    commandList->endMarker(); // "MipMapGen::display"
 }

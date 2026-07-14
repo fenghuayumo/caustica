@@ -102,7 +102,7 @@ LightProbeProcessingPass::LightProbeProcessingPass(
     m_EnvironmentBrdfTexture = m_device->createTexture(brdfTextureDesc);
 }
 
-nvrhi::FramebufferHandle LightProbeProcessingPass::GetCachedFramebuffer(nvrhi::ITexture* texture, nvrhi::TextureSubresourceSet subresources)
+nvrhi::FramebufferHandle LightProbeProcessingPass::getCachedFramebuffer(nvrhi::ITexture* texture, nvrhi::TextureSubresourceSet subresources)
 {
     TextureSubresourcesKey key;
     key.texture = texture;
@@ -118,7 +118,7 @@ nvrhi::FramebufferHandle LightProbeProcessingPass::GetCachedFramebuffer(nvrhi::I
 }
 
 
-nvrhi::BindingSetHandle LightProbeProcessingPass::GetCachedBindingSet(nvrhi::ITexture* texture, nvrhi::TextureSubresourceSet subresources)
+nvrhi::BindingSetHandle LightProbeProcessingPass::getCachedBindingSet(nvrhi::ITexture* texture, nvrhi::TextureSubresourceSet subresources)
 {
     TextureSubresourcesKey key;
     key.texture = texture;
@@ -140,7 +140,7 @@ nvrhi::BindingSetHandle LightProbeProcessingPass::GetCachedBindingSet(nvrhi::ITe
     return bindingSet;
 }
 
-void LightProbeProcessingPass::BlitCubemap(nvrhi::ICommandList* commandList, nvrhi::ITexture* inCubeMap, uint32_t inBaseArraySlice, uint32_t inMipLevel, nvrhi::ITexture* outCubeMap, uint32_t outBaseArraySlice, uint32_t outMipLevel)
+void LightProbeProcessingPass::blitCubemap(nvrhi::ICommandList* commandList, nvrhi::ITexture* inCubeMap, uint32_t inBaseArraySlice, uint32_t inMipLevel, nvrhi::ITexture* outCubeMap, uint32_t outBaseArraySlice, uint32_t outMipLevel)
 {
 #ifdef _DEBUG
     const nvrhi::TextureDesc& inputDesc = inCubeMap->getDesc();
@@ -151,7 +151,7 @@ void LightProbeProcessingPass::BlitCubemap(nvrhi::ICommandList* commandList, nvr
     assert(outputDesc.dimension == nvrhi::TextureDimension::TextureCube || outputDesc.dimension == nvrhi::TextureDimension::TextureCubeArray);
 
     
-    nvrhi::FramebufferHandle framebuffer = GetCachedFramebuffer(outCubeMap, nvrhi::TextureSubresourceSet(outMipLevel, 1, outBaseArraySlice, 6));
+    nvrhi::FramebufferHandle framebuffer = getCachedFramebuffer(outCubeMap, nvrhi::TextureSubresourceSet(outMipLevel, 1, outBaseArraySlice, 6));
 
     nvrhi::FramebufferInfo const& framebufferInfo = framebuffer->getFramebufferInfo();
     nvrhi::GraphicsPipelineHandle& pso = m_BlitPsoCache[framebufferInfo];
@@ -173,7 +173,7 @@ void LightProbeProcessingPass::BlitCubemap(nvrhi::ICommandList* commandList, nvr
     LightProbeProcessingConstants constants = {};
     commandList->writeBuffer(m_LightProbeCB, &constants, sizeof(constants));
 
-    nvrhi::BindingSetHandle bindingSet = GetCachedBindingSet(inCubeMap, nvrhi::TextureSubresourceSet(inMipLevel, 1, inBaseArraySlice, 6));
+    nvrhi::BindingSetHandle bindingSet = getCachedBindingSet(inCubeMap, nvrhi::TextureSubresourceSet(inMipLevel, 1, inBaseArraySlice, 6));
 
     float mipSize = ceilf(float(outputDesc.width) * powf(0.5f, float(outMipLevel)));
 
@@ -191,7 +191,7 @@ void LightProbeProcessingPass::BlitCubemap(nvrhi::ICommandList* commandList, nvr
     commandList->draw(args);
 }
 
-void LightProbeProcessingPass::GenerateCubemapMips(
+void LightProbeProcessingPass::generateCubemapMips(
     nvrhi::ICommandList* commandList, 
     nvrhi::ITexture* cubeMap,
     uint32_t baseArraySlice,
@@ -203,13 +203,13 @@ void LightProbeProcessingPass::GenerateCubemapMips(
     for (uint32_t index = 0; index < levelsToGenerate; index++)
     {
         uint32_t mipLevel = sourceMipLevel + index;
-        BlitCubemap(commandList, cubeMap, baseArraySlice, mipLevel, cubeMap, baseArraySlice, mipLevel + 1);
+        blitCubemap(commandList, cubeMap, baseArraySlice, mipLevel, cubeMap, baseArraySlice, mipLevel + 1);
     }
 
     commandList->endMarker();
 }
 
-void LightProbeProcessingPass::RenderDiffuseMap(
+void LightProbeProcessingPass::renderDiffuseMap(
     nvrhi::ICommandList* commandList,
     nvrhi::ITexture* inEnvironmentMap,
     nvrhi::TextureSubresourceSet inSubresources,
@@ -230,7 +230,7 @@ void LightProbeProcessingPass::RenderDiffuseMap(
 
     commandList->beginMarker("Diffuse Light Probe");
 
-    nvrhi::FramebufferHandle framebuffer = GetCachedFramebuffer(m_IntermediateTexture, nvrhi::TextureSubresourceSet(intermediateMipLevel, 1, 0, 6));
+    nvrhi::FramebufferHandle framebuffer = getCachedFramebuffer(m_IntermediateTexture, nvrhi::TextureSubresourceSet(intermediateMipLevel, 1, 0, 6));
 
     nvrhi::FramebufferInfo const& framebufferInfo = framebuffer->getFramebufferInfo();
     nvrhi::GraphicsPipelineHandle& pso = m_DiffusePsoCache[framebufferInfo];
@@ -254,7 +254,7 @@ void LightProbeProcessingPass::RenderDiffuseMap(
     constants.lodBias = 1.0f + 0.5f * dm::log2f((inputSize * inputSize) / constants.sampleCount);
     commandList->writeBuffer(m_LightProbeCB, &constants, sizeof(constants));
 
-    nvrhi::BindingSetHandle bindingSet = GetCachedBindingSet(inEnvironmentMap, inSubresources);
+    nvrhi::BindingSetHandle bindingSet = getCachedBindingSet(inEnvironmentMap, inSubresources);
 
     nvrhi::GraphicsState state;
     state.pipeline = pso;
@@ -269,13 +269,13 @@ void LightProbeProcessingPass::RenderDiffuseMap(
     args.vertexCount = 4;
     commandList->draw(args);
 
-    BlitCubemap(commandList, m_IntermediateTexture, 0, intermediateMipLevel, m_IntermediateTexture, 0, intermediateMipLevel + 1);
-    BlitCubemap(commandList, m_IntermediateTexture, 0, intermediateMipLevel + 1, outDiffuseMap, outBaseArraySlice, outMipLevel);
+    blitCubemap(commandList, m_IntermediateTexture, 0, intermediateMipLevel, m_IntermediateTexture, 0, intermediateMipLevel + 1);
+    blitCubemap(commandList, m_IntermediateTexture, 0, intermediateMipLevel + 1, outDiffuseMap, outBaseArraySlice, outMipLevel);
     
     commandList->endMarker();
 }
 
-void LightProbeProcessingPass::RenderSpecularMap(nvrhi::ICommandList* commandList, float roughness, nvrhi::ITexture* inEnvironmentMap, nvrhi::TextureSubresourceSet inSubresources, nvrhi::ITexture* outDiffuseMap, uint32_t outBaseArraySlice, uint32_t outMipLevel)
+void LightProbeProcessingPass::renderSpecularMap(nvrhi::ICommandList* commandList, float roughness, nvrhi::ITexture* inEnvironmentMap, nvrhi::TextureSubresourceSet inSubresources, nvrhi::ITexture* outDiffuseMap, uint32_t outBaseArraySlice, uint32_t outMipLevel)
 {
     const nvrhi::TextureDesc& inDesc = inEnvironmentMap->getDesc();
     assert(inDesc.dimension == nvrhi::TextureDimension::TextureCube || inDesc.dimension == nvrhi::TextureDimension::TextureCubeArray);
@@ -290,7 +290,7 @@ void LightProbeProcessingPass::RenderSpecularMap(nvrhi::ICommandList* commandLis
 
     commandList->beginMarker("Specular Light Probe");
 
-    nvrhi::FramebufferHandle framebuffer = GetCachedFramebuffer(m_IntermediateTexture, nvrhi::TextureSubresourceSet(intermediateMipLevel, 1, 0, 6));
+    nvrhi::FramebufferHandle framebuffer = getCachedFramebuffer(m_IntermediateTexture, nvrhi::TextureSubresourceSet(intermediateMipLevel, 1, 0, 6));
 
     nvrhi::FramebufferInfo const& framebufferInfo = framebuffer->getFramebufferInfo();
     nvrhi::GraphicsPipelineHandle& pso = m_SpecularPsoCache[framebufferInfo];
@@ -316,7 +316,7 @@ void LightProbeProcessingPass::RenderSpecularMap(nvrhi::ICommandList* commandLis
     constants.roughness = std::max(0.01f, roughness);
     commandList->writeBuffer(m_LightProbeCB, &constants, sizeof(constants));
 
-    nvrhi::BindingSetHandle bindingSet = GetCachedBindingSet(inEnvironmentMap, inSubresources);
+    nvrhi::BindingSetHandle bindingSet = getCachedBindingSet(inEnvironmentMap, inSubresources);
 
     nvrhi::GraphicsState state;
     state.pipeline = pso;
@@ -331,13 +331,13 @@ void LightProbeProcessingPass::RenderSpecularMap(nvrhi::ICommandList* commandLis
     args.vertexCount = 4;
     commandList->draw(args);
 
-    BlitCubemap(commandList, m_IntermediateTexture, 0, intermediateMipLevel, m_IntermediateTexture, 0, intermediateMipLevel + 1);
-    BlitCubemap(commandList, m_IntermediateTexture, 0, intermediateMipLevel + 1, outDiffuseMap, outBaseArraySlice, outMipLevel);
+    blitCubemap(commandList, m_IntermediateTexture, 0, intermediateMipLevel, m_IntermediateTexture, 0, intermediateMipLevel + 1);
+    blitCubemap(commandList, m_IntermediateTexture, 0, intermediateMipLevel + 1, outDiffuseMap, outBaseArraySlice, outMipLevel);
 
     commandList->endMarker();
 }
 
-void LightProbeProcessingPass::RenderEnvironmentBrdfTexture(nvrhi::ICommandList* commandList)
+void LightProbeProcessingPass::renderEnvironmentBrdfTexture(nvrhi::ICommandList* commandList)
 {
     commandList->beginMarker("Environment BRDF");
 
@@ -368,12 +368,12 @@ void LightProbeProcessingPass::RenderEnvironmentBrdfTexture(nvrhi::ICommandList*
     commandList->endMarker();
 }
 
-nvrhi::ITexture* LightProbeProcessingPass::GetEnvironmentBrdfTexture()
+nvrhi::ITexture* LightProbeProcessingPass::getEnvironmentBrdfTexture()
 {
     return m_EnvironmentBrdfTexture;
 }
 
-void LightProbeProcessingPass::ResetCaches()
+void LightProbeProcessingPass::resetCaches()
 {
     m_BlitPsoCache.clear();
     m_DiffusePsoCache.clear();

@@ -178,12 +178,12 @@ ecs::Entity FindUniqueMeshInstanceEntity(
     ecs::Entity result = ecs::NullEntity;
     size_t instanceCount = 0;
 
-    for (const ecs::Entity instanceEntity : scene->GetMeshInstances())
+    for (const ecs::Entity instanceEntity : scene->getMeshInstances())
     {
-        if (!scene->GetEntityWorld())
+        if (!scene->getEntityWorld())
             continue;
 
-        const auto* meshComp = scene->GetEntityWorld()->world().get<scene::MeshInstanceComponent>(instanceEntity);
+        const auto* meshComp = scene->getEntityWorld()->world().get<scene::MeshInstanceComponent>(instanceEntity);
         if (!meshComp || meshComp->mesh != mesh)
             continue;
 
@@ -464,9 +464,9 @@ std::vector<dm::float3> getMeshVerticesWorld(
     if (!scene)
         throw std::runtime_error("getMeshVerticesWorld: no scene is loaded");
 
-    scene->RefreshSceneWorld(frameIndex);
+    scene->refreshSceneWorld(frameIndex);
 
-    const scene::SceneEntityWorld* entityWorld = scene->GetEntityWorld();
+    const scene::SceneEntityWorld* entityWorld = scene->getEntityWorld();
     if (!entityWorld)
         throw std::runtime_error("getMeshVerticesWorld: scene has no entity world");
 
@@ -545,9 +545,9 @@ void setMeshVerticesWorld(
     if (!params.scene)
         throw std::runtime_error("setMeshVerticesWorld: no scene is loaded");
 
-    params.scene->RefreshSceneWorld(params.frameIndex);
+    params.scene->refreshSceneWorld(params.frameIndex);
 
-    const scene::SceneEntityWorld* entityWorld = params.scene->GetEntityWorld();
+    const scene::SceneEntityWorld* entityWorld = params.scene->getEntityWorld();
     if (!entityWorld)
         throw std::runtime_error("setMeshVerticesWorld: scene has no entity world");
 
@@ -597,7 +597,7 @@ void setMeshPositionsDirect(
     if (buffers.positionData.size() < end)
         throw std::runtime_error("setMeshPositionsDirect: CPU vertex cache is unavailable");
 
-    // Capture previous pose before overwrite (used for motion vectors).
+    // capture previous pose before overwrite (used for motion vectors).
     const std::vector<float3> previousRenderVertices(
         buffers.positionData.begin() + begin,
         buffers.positionData.begin() + end);

@@ -12,7 +12,7 @@
 // 1.) In your render pass C++ side, #include "../../ShaderDebug.h"
 // 2.) You also need access to the global shared_ptr<ShaderDebug> 
 // 3.) Add " nvrhi::BindingLayoutItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX), " to your binding layout(s) and
-// 4.) Add " nvrhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderPrintf->GetGPUWriteBuffer()), " to your binding set(s)
+// 4.) Add " nvrhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderPrintf->getGPUWriteBuffer()), " to your binding set(s)
 // 5.) 
 
 class ShaderDebug
@@ -51,19 +51,19 @@ private:
 public:
     ShaderDebug( nvrhi::IDevice* device, nvrhi::ICommandList* commandList, std::shared_ptr<caustica::ShaderFactory> shaderFactory, caustica::render::RenderDevice& renderDevice );
 
-    void                    CreateRenderPasses( nvrhi::IFramebuffer * frameBuffer, nvrhi::TextureHandle depthBuffer );
+    void                    createRenderPasses( nvrhi::IFramebuffer * frameBuffer, nvrhi::TextureHandle depthBuffer );
 
-    void                    BeginFrame( nvrhi::ICommandList* commandList, const caustica::math::float4x4 & matWorldToClip );
-    void                    ClearDebugVizTexture(nvrhi::CommandListHandle commandList); // not merged with BeginFrame since sometimes you want it to persist between frames
+    void                    beginFrame( nvrhi::ICommandList* commandList, const caustica::math::float4x4 & matWorldToClip );
+    void                    clearDebugVizTexture(nvrhi::CommandListHandle commandList); // not merged with beginFrame since sometimes you want it to persist between frames
 
-    void                    EndFrameAndOutput( nvrhi::ICommandList* commandList, nvrhi::IFramebuffer * frameBuffer, nvrhi::TextureHandle depthBuffer, const nvrhi::Viewport & viewport );
+    void                    endFrameAndOutput( nvrhi::ICommandList* commandList, nvrhi::IFramebuffer * frameBuffer, nvrhi::TextureHandle depthBuffer, const nvrhi::Viewport & viewport );
 
-    nvrhi::BufferHandle     GetGPUWriteBuffer()         { return m_bufferGPU; };
-    nvrhi::TextureHandle    GetDebugVizTexture()        { return m_debugVizOutput; };
+    nvrhi::BufferHandle     getGPUWriteBuffer()         { return m_bufferGPU; };
+    nvrhi::TextureHandle    getDebugVizTexture()        { return m_debugVizOutput; };
 
     //void                    DrawLastBuffer( view? Frame buffer? Depth buffer? See line drawing! )
 
 private:
-    void                    OutputLastBufferPrints();
-    void                    DrawCurrentBufferGeometry(nvrhi::ICommandList* commandList, nvrhi::IFramebuffer * frameBuffer, nvrhi::TextureHandle depthBuffer, const nvrhi::Viewport & viewport);
+    void                    outputLastBufferPrints();
+    void                    drawCurrentBufferGeometry(nvrhi::ICommandList* commandList, nvrhi::IFramebuffer * frameBuffer, nvrhi::TextureHandle depthBuffer, const nvrhi::Viewport & viewport);
 };

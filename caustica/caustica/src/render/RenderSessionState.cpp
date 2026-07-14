@@ -37,7 +37,7 @@ const PerformancePreset kDefaultPerformancePreset{
 
 } // namespace
 
-void ApplyPerformancePreset(PathTracerSettings& settings, const PerformancePreset& preset)
+void applyPerformancePreset(PathTracerSettings& settings, const PerformancePreset& preset)
 {
     settings.NEECandidateSamples = preset.NEECandidateSamples;
     settings.NEEFullSamples = preset.NEEFullSamples;
@@ -105,11 +105,11 @@ void InitializeRenderSessionStateFromCommandLine(RenderSessionState& state, cons
     settings.StandaloneDenoiser = cmdLine.StandaloneDenoiser != 0;
     settings.RealtimeAA = cmdLine.RealtimeAA;
 
-    ApplyPerformancePreset(settings, kDefaultPerformancePreset);
+    applyPerformancePreset(settings, kDefaultPerformancePreset);
     settings.RTXDIRestirPreset = RTXDIRestirQualityPreset::Ultra;
-    settings.ApplyRTXDIRestirPreset();
+    settings.applyRTXDIRestirPreset();
     settings.RTXDIRestirPTPreset = RTXDIRestirPTQualityPreset::Ultra;
-    settings.ApplyRTXDIRestirPTPreset();
+    settings.applyRTXDIRestirPTPreset();
 
     settings.EnableBloom &= !cmdLine.DisablePostProcessFilters;
 }

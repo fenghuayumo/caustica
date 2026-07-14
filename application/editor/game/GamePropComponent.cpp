@@ -45,15 +45,15 @@ protected:
     dquat               m_blobLeftRot = dquat::identity();
     dquat               m_blobRightRot = dquat::identity();
 
-    virtual void Load(const Json::Value & loadData) override
+    virtual void load(const Json::Value & loadData) override
     {
         loadData["animTimeStart"] >> m_start;
         loadData["animTimeStop"] >> m_stop;
 
         auto* ew = m_prop.EntityWorld();
-        for (auto & model : m_prop.GetModels())
+        for (auto & model : m_prop.getModels())
         {
-            for (auto & light : model->GetLights() )
+            for (auto & light : model->getLights() )
             {
                 if (!ew || light->Entity == caustica::ecs::NullEntity) continue;
                 std::string lightName = ew->getEntityName(light->Entity);
@@ -138,7 +138,7 @@ public:
 
 protected:
 
-    virtual void Load(const Json::Value& loadData) override
+    virtual void load(const Json::Value& loadData) override
     {
         // loadData["animTimeStart"] >> m_start;
     }
@@ -213,7 +213,7 @@ protected:
     }
 };
 
-std::shared_ptr<PropComponentBase> PropComponentBase::Create(class PropBase & prop, const Json::Value & loadData)
+std::shared_ptr<PropComponentBase> PropComponentBase::create(class PropBase & prop, const Json::Value & loadData)
 {
     std::string type;
     loadData["type"] >> type;
@@ -224,7 +224,7 @@ std::shared_ptr<PropComponentBase> PropComponentBase::Create(class PropBase & pr
     if (type == "BasicInteractableUI")
         ret = std::make_shared<PropComponentBasicInteractableUI>(prop, type);
     if (ret != nullptr)
-        ret->Load(loadData);
+        ret->load(loadData);
     return ret;
 }
 

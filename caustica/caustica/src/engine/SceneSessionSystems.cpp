@@ -94,7 +94,7 @@ namespace
             return;
 
 #if CAUSTICA_WITH_STREAMLINE
-        if (cfg->ActualDLSSFGMode() != SI::DLSSGMode::eOff)
+        if (cfg->actualDLSSFGMode() != SI::DLSSGMode::eOff)
         {
             uint32_t presentedFrames = cfg->DLSSFGMultiplier;
             if (presentedFrames == 0)
@@ -237,8 +237,8 @@ namespace
         if (!activeScene || !cam || !vs)
             return;
 
-        const auto& cameraEntities = activeScene->GetCameraEntities();
-        const auto* ew = activeScene->GetEntityWorld();
+        const auto& cameraEntities = activeScene->getCameraEntities();
+        const auto* ew = activeScene->getEntityWorld();
         bool syncedCamera = false;
         if (!cameraEntities.empty() && ew)
         {
@@ -248,8 +248,8 @@ namespace
             if (camIdx < cameraEntities.size())
             {
                 ecs::Entity camEntity = cameraEntities[camIdx];
-                const auto* camComp = scene::TryGetCamera(ew->world(), camEntity);
-                const auto* persData = camComp ? scene::TryGetPerspectiveCameraData(*camComp) : nullptr;
+                const auto* camComp = scene::tryGetCamera(ew->world(), camEntity);
+                const auto* persData = camComp ? scene::tryGetPerspectiveCameraData(*camComp) : nullptr;
                 const auto* globalComp = ew->world().get<scene::GlobalTransformComponent>(camEntity);
                 if (persData && globalComp)
                 {
@@ -381,7 +381,7 @@ uint sceneCameraCount(const App& app)
     auto activeScene = scene(app);
     if (!activeScene)
         return 1;
-    return (uint)activeScene->GetCameraEntities().size() + 1;
+    return (uint)activeScene->getCameraEntities().size() + 1;
 }
 
 uint& selectedCameraIndex(App& app)
@@ -482,10 +482,10 @@ void initializeSession(App& app, const std::string& preferredScene)
     cfg->GaussianSplatAlphaCullThreshold = cmd->GaussianSplatAlphaCullThreshold;
 
     GpuDevice* device = gpuDevice(app);
-    if (device && device->GetDevice()->queryFeatureSupport(nvrhi::Feature::RayTracingOpacityMicromap))
+    if (device && device->getDevice()->queryFeatureSupport(nvrhi::Feature::RayTracingOpacityMicromap))
     {
         gr->lightingPasses().createOpacityMapsIfSupported(
-            device->GetDevice(), descriptorTable, textureLoader, shaderFactory);
+            device->getDevice(), descriptorTable, textureLoader, shaderFactory);
     }
 
     manager->discoverAvailableScenes(GetLocalPath(c_AssetsFolder));
@@ -500,7 +500,7 @@ void initializeSession(App& app, const std::string& preferredScene)
         std::filesystem::path preferredScenePath(preferredScene);
         sceneArg = (!preferredScene.empty() && (preferredScenePath.is_absolute() || std::filesystem::exists(preferredScenePath)))
             ? preferredScene
-            : FindPreferredScene(manager->getAvailableScenes(), preferredScene);
+            : findPreferredScene(manager->getAvailableScenes(), preferredScene);
     }
 
     setCurrentScene(app, sceneArg);
@@ -705,8 +705,8 @@ void animate(App& app, float fElapsedTimeSeconds)
     SceneViewState* vs = viewState(app);
     assert(cfg && runtime && vs);
 
-    if (cfg->ActualFPSLimiter() > 0)
-        fElapsedTimeSeconds = 1.0f / (float)cfg->ActualFPSLimiter();
+    if (cfg->actualFPSLimiter() > 0)
+        fElapsedTimeSeconds = 1.0f / (float)cfg->actualFPSLimiter();
 
     vs->lastDeltaTime = fElapsedTimeSeconds;
 
@@ -730,7 +730,7 @@ void animate(App& app, float fElapsedTimeSeconds)
     if (auto* wr = worldRenderer(app))
     {
         if (auto* toneMappingPass = wr->getToneMappingPass())
-            toneMappingPass->AdvanceFrame(fElapsedTimeSeconds);
+            toneMappingPass->advanceFrame(fElapsedTimeSeconds);
     }
 
     if (isSceneLoaded(app) && enableAnimationUpdate)
@@ -741,16 +741,16 @@ void animate(App& app, float fElapsedTimeSeconds)
         ::SceneManager* manager = localSceneManager(app);
         if (manager)
         {
-            auto* ew = manager->getScene()->GetEntityWorld();
+            auto* ew = manager->getScene()->getEntityWorld();
             if (ew)
             {
                 auto& world = ew->world();
                 float loopDuration = 0.f;
-                for (ecs::Entity animEntity : manager->getScene()->GetAnimationEntities())
+                for (ecs::Entity animEntity : manager->getScene()->getAnimationEntities())
                 {
-                    auto* animation = scene::TryGetAnimation(world, animEntity);
+                    auto* animation = scene::tryGetAnimation(world, animEntity);
                     if (animation)
-                        loopDuration = std::max(loopDuration, scene::GetAnimationDuration(*animation));
+                        loopDuration = std::max(loopDuration, scene::getAnimationDuration(*animation));
                 }
                 world.each<scene::GeometrySequenceComponent>(
                     [&](ecs::Entity, scene::GeometrySequenceComponent& sequence) {
@@ -762,16 +762,16 @@ void animate(App& app, float fElapsedTimeSeconds)
                     ? float(fmod(vs->sceneTime, double(loopDuration)))
                     : float(vs->sceneTime);
 
-                for (ecs::Entity animEntity : manager->getScene()->GetAnimationEntities())
+                for (ecs::Entity animEntity : manager->getScene()->getAnimationEntities())
                 {
-                    auto* animation = scene::TryGetAnimation(world, animEntity);
+                    auto* animation = scene::tryGetAnimation(world, animEntity);
                     if (!animation || animation->channels.empty())
                         continue;
 
-                    if (scene::GetAnimationDuration(*animation) <= 0.0f)
+                    if (scene::getAnimationDuration(*animation) <= 0.0f)
                         continue;
 
-                    (void)scene::ApplyAnimation(*animation, animTime, *ew);
+                    (void)scene::applyAnimation(*animation, animTime, *ew);
                 }
 
                 if (enableAnimations)
@@ -782,7 +782,7 @@ void animate(App& app, float fElapsedTimeSeconds)
                 {
                     bool temporalResetNeeded = false;
                     SetSceneMeshVerticesParams deformParams;
-                    deformParams.device = device->GetDevice();
+                    deformParams.device = device->getDevice();
                     deformParams.scene = manager->getScene();
                     deformParams.frameIndex = device->GetFrameIndex();
                     deformParams.recomputeNormals = true;

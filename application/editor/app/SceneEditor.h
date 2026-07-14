@@ -46,7 +46,7 @@ class CaptureScriptManager;
 
 using namespace caustica::math;
 
-// Scene editor shell (mesh edit, Inspector, Capture). Frame logic lives in sceneSession systems.
+// Scene editor shell (mesh edit, Inspector, capture). Frame logic lives in sceneSession systems.
 class SceneEditor
 {
 public:
@@ -107,7 +107,7 @@ public:
     bool LoadMeshFile(const std::filesystem::path& filePath);
     bool LoadGltfMeshFile(const std::filesystem::path& filePath);
     bool LoadObjMeshFile(const std::filesystem::path& filePath);
-    void FinalizeRuntimeSceneMutation(caustica::ecs::Entity importedRoot);
+    void finalizeRuntimeSceneMutation(caustica::ecs::Entity importedRoot);
     bool DeleteSceneNode(caustica::ecs::Entity entity);
     void ProcessPendingSceneMutations();
     void RequestFullRebuild();

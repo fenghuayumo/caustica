@@ -23,10 +23,10 @@ public:
     NrdIntegration(nvrhi::IDevice* device, nrd::Denoiser method);
     ~NrdIntegration();
 
-    bool Initialize(uint32_t width, uint32_t height, caustica::ShaderFactory& shaderFactory);
-    bool IsAvailable() const;
+    bool initialize(uint32_t width, uint32_t height, caustica::ShaderFactory& shaderFactory);
+    bool isAvailable() const;
 
-    void RunDenoiserPasses(
+    void runDenoiserPasses(
         nvrhi::ICommandList* commandList,
         const RenderTargets& renderTargets,
         int pass,
@@ -41,7 +41,7 @@ public:
         bool resetHistory,
         const void* methodSettings);
 
-    const nrd::Denoiser GetDenoiser() const { return m_denoiser; }
+    const nrd::Denoiser getDenoiser() const { return m_denoiser; }
 
 private:
     nvrhi::DeviceHandle m_device;
@@ -58,8 +58,8 @@ private:
         nvrhi::ComputePipelineHandle Pipeline;
     };
 
-    nvrhi::BindingLayoutHandle CreateConstantsAndSamplersBindingLayout(const nrd::InstanceDesc& instanceDesc);
-    nvrhi::BindingLayoutHandle CreateResourcesBindingLayout(const nrd::InstanceDesc& instanceDesc, const nrd::PipelineDesc& nrdPipelineDesc);
+    nvrhi::BindingLayoutHandle createConstantsAndSamplersBindingLayout(const nrd::InstanceDesc& instanceDesc);
+    nvrhi::BindingLayoutHandle createResourcesBindingLayout(const nrd::InstanceDesc& instanceDesc, const nrd::PipelineDesc& nrdPipelineDesc);
 
     nvrhi::BufferHandle m_constantBuffer;
     std::vector<NrdPipeline> m_pipelines;

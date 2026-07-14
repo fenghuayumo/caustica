@@ -86,7 +86,7 @@ GpuDevice& SceneEditor::gpuDevice() const
 
 nvrhi::IDevice* SceneEditor::device() const
 {
-    return gpuDevice().GetDevice();
+    return gpuDevice().getDevice();
 }
 
 uint32_t SceneEditor::frameIndex() const
@@ -125,7 +125,7 @@ ecs::Entity SceneEditor::pickGaussianSplatAtPixel(math::uint2 renderPixel) const
 {
     auto* gpu = gpuRender();
     auto scene = this->scene();
-    auto* entityWorld = scene ? scene->GetEntityWorld() : nullptr;
+    auto* entityWorld = scene ? scene->getEntityWorld() : nullptr;
     const auto& view = currentView();
     if (!gpu || !entityWorld || !view)
         return ecs::NullEntity;
@@ -172,7 +172,7 @@ ecs::Entity SceneEditor::pickGaussianSplatAtPixel(math::uint2 renderPixel) const
         {
             // Fallback: transform local splat AABB by the entity global transform.
             auto* global = entityWorld->world().tryGet<scene::GlobalTransformComponent>(object.entity);
-            const box3 local = object.pass->GetLocalBounds();
+            const box3 local = object.pass->getLocalBounds();
             if (global && !local.isempty())
                 bbox = local * global->transformFloat;
         }
@@ -427,7 +427,7 @@ void SceneEditor::onSceneUnloading()
     m_editor.SelectedGaussianSplat = false;
 
     if (m_sampleGame != nullptr)
-        m_sampleGame->SceneUnloading();
+        m_sampleGame->sceneUnloading();
 }
 
 void SceneEditor::onSceneLoadedEarly()
@@ -435,7 +435,7 @@ void SceneEditor::onSceneLoadedEarly()
     if (m_sampleGame != nullptr)
     {
         const std::filesystem::path assetsRoot = GetLocalPath(c_AssetsFolder);
-        m_sampleGame->SceneLoaded(
+        m_sampleGame->sceneLoaded(
             sceneManager()->getScene(),
             sceneManager()->getCurrentScenePath(),
             assetsRoot);
@@ -447,7 +447,7 @@ void SceneEditor::onSceneLoadedBeforeGpuPrep()
     if (m_editor.TogglableNodes == nullptr)
     {
         auto activeScene = sceneManager()->getScene();
-        auto* ew = activeScene ? activeScene->GetEntityWorld() : nullptr;
+        auto* ew = activeScene ? activeScene->getEntityWorld() : nullptr;
         if (ew)
         {
             m_editor.TogglableNodes = std::make_shared<std::vector<TogglableNode>>();
@@ -553,11 +553,11 @@ void SceneEditor::updateWindowTitle()
     {
         SceneManager* manager = sceneManager();
         std::string extraInfo = ", " + sceneSession::fpsInfo(*m_app) + ", " + manager->getCurrentSceneName()
-            + ", " + sceneSession::resolutionInfo(*m_app) + ", (L: " + std::to_string(activeScene->GetLightEntities().size())
-            + ", MAT: " + std::to_string(activeScene->GetMaterials().size())
-            + ", MESH: " + std::to_string(activeScene->GetMeshes().size())
-            + ", I: " + std::to_string(activeScene->GetMeshInstances().size())
-            + ", SI: " + std::to_string(activeScene->GetSkinnedMeshInstances().size())
+            + ", " + sceneSession::resolutionInfo(*m_app) + ", (L: " + std::to_string(activeScene->getLightEntities().size())
+            + ", MAT: " + std::to_string(activeScene->getMaterials().size())
+            + ", MESH: " + std::to_string(activeScene->getMeshes().size())
+            + ", I: " + std::to_string(activeScene->getMeshInstances().size())
+            + ", SI: " + std::to_string(activeScene->getSkinnedMeshInstances().size())
 #if ENABLE_DEBUG_VIZUALISATIONS
             + ", ENABLE_DEBUG_VIZUALISATIONS: 1"
 #endif
@@ -616,7 +616,7 @@ bool SceneEditor::LoadObjMeshFile(const std::filesystem::path& filePath)
     return m_contentEditor.loadObjMeshFile(filePath);
 }
 
-void SceneEditor::FinalizeRuntimeSceneMutation(caustica::ecs::Entity importedRoot)
+void SceneEditor::finalizeRuntimeSceneMutation(caustica::ecs::Entity importedRoot)
 {
     m_contentEditor.finalizeRuntimeSceneMutation(importedRoot);
 }
@@ -635,7 +635,7 @@ void SceneEditor::ProcessPendingSceneMutations()
     m_editor.PendingDeleteEntity = caustica::ecs::NullEntity;
 
     auto scene = this->scene();
-    auto* entityWorld = scene ? scene->GetEntityWorld() : nullptr;
+    auto* entityWorld = scene ? scene->getEntityWorld() : nullptr;
     if (!entityWorld || !entityWorld->world().isAlive(entity))
         return;
 
@@ -737,7 +737,7 @@ void SceneEditor::afterWorldRender(GpuDevice& gpuDevice)
         nvrhi::ITexture* texture = framebuffer->getDesc().colorAttachments[0].texture;
         auto* renderDevice = &gpuRender()->renderDevice();
         return saveTextureToFile(
-            gpuDevice.GetDevice(), *renderDevice, texture, nvrhi::ResourceStates::Common, fileName);
+            gpuDevice.getDevice(), *renderDevice, texture, nvrhi::ResourceStates::Common, fileName);
     };
     CaptureScriptPostRender(saveFramebuffer);
 
@@ -760,7 +760,7 @@ bool SceneEditor::ConsumeExperimentalPhotoScreenshot()
 void SceneEditor::CaptureScriptPreRender()
 {
     if (m_captureScriptManager)
-        m_captureScriptManager->PreRender();
+        m_captureScriptManager->preRender();
 }
 
 void SceneEditor::CaptureScriptPostRender(std::function<bool(const char* fileName)> saveTexture)

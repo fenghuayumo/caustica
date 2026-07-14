@@ -135,32 +135,32 @@ namespace caustica::render
         caustica::render::RenderDevice* m_renderDevice = nullptr;
         std::shared_ptr<caustica::MaterialBindingCache> m_MaterialBindings;
         
-        virtual nvrhi::ShaderHandle CreateVertexShader(caustica::ShaderFactory& shaderFactory, const CreateParameters& params);
-        virtual nvrhi::ShaderHandle CreateGeometryShader(caustica::ShaderFactory& shaderFactory, const CreateParameters& params);
-        virtual nvrhi::ShaderHandle CreatePixelShader(caustica::ShaderFactory& shaderFactory, const CreateParameters& params, bool transmissiveMaterial);
-        virtual nvrhi::InputLayoutHandle CreateInputLayout(nvrhi::IShader* vertexShader, const CreateParameters& params);
-        virtual nvrhi::BindingLayoutHandle CreateViewBindingLayout();
-        virtual nvrhi::BindingSetHandle CreateViewBindingSet();
-        virtual nvrhi::BindingLayoutHandle CreateShadingBindingLayout();
-        virtual nvrhi::BindingSetHandle CreateShadingBindingSet(nvrhi::ITexture* shadowMapTexture, nvrhi::ITexture* diffuse, nvrhi::ITexture* specular, nvrhi::ITexture* environmentBrdf);
-        virtual nvrhi::BindingLayoutHandle CreateInputBindingLayout();
-        virtual nvrhi::BindingSetHandle CreateInputBindingSet(const caustica::BufferGroup* bufferGroup);
-        virtual std::shared_ptr<caustica::MaterialBindingCache> CreateMaterialBindingCache(caustica::render::RenderDevice& renderDevice);
-        virtual nvrhi::GraphicsPipelineHandle CreateGraphicsPipeline(ForwardShadingPassPipelineKey const& key, nvrhi::FramebufferInfo const& framebufferInfo);
-        nvrhi::BindingSetHandle GetOrCreateInputBindingSet(const caustica::BufferGroup* bufferGroup);
+        virtual nvrhi::ShaderHandle createVertexShader(caustica::ShaderFactory& shaderFactory, const CreateParameters& params);
+        virtual nvrhi::ShaderHandle createGeometryShader(caustica::ShaderFactory& shaderFactory, const CreateParameters& params);
+        virtual nvrhi::ShaderHandle createPixelShader(caustica::ShaderFactory& shaderFactory, const CreateParameters& params, bool transmissiveMaterial);
+        virtual nvrhi::InputLayoutHandle createInputLayout(nvrhi::IShader* vertexShader, const CreateParameters& params);
+        virtual nvrhi::BindingLayoutHandle createViewBindingLayout();
+        virtual nvrhi::BindingSetHandle createViewBindingSet();
+        virtual nvrhi::BindingLayoutHandle createShadingBindingLayout();
+        virtual nvrhi::BindingSetHandle createShadingBindingSet(nvrhi::ITexture* shadowMapTexture, nvrhi::ITexture* diffuse, nvrhi::ITexture* specular, nvrhi::ITexture* environmentBrdf);
+        virtual nvrhi::BindingLayoutHandle createInputBindingLayout();
+        virtual nvrhi::BindingSetHandle createInputBindingSet(const caustica::BufferGroup* bufferGroup);
+        virtual std::shared_ptr<caustica::MaterialBindingCache> createMaterialBindingCache(caustica::render::RenderDevice& renderDevice);
+        virtual nvrhi::GraphicsPipelineHandle createGraphicsPipeline(ForwardShadingPassPipelineKey const& key, nvrhi::FramebufferInfo const& framebufferInfo);
+        nvrhi::BindingSetHandle getOrCreateInputBindingSet(const caustica::BufferGroup* bufferGroup);
 
     public:
         ForwardShadingPass(
             nvrhi::IDevice* device,
             caustica::render::RenderDevice& renderDevice);
 
-        virtual void Init(
+        virtual void init(
             caustica::ShaderFactory& shaderFactory,
             const CreateParameters& params);
 
-        void ResetBindingCache();
+        void resetBindingCache();
         
-        virtual void PrepareLights(
+        virtual void prepareLights(
             Context& context,
             nvrhi::ICommandList* commandList,
             const caustica::Scene& scene,

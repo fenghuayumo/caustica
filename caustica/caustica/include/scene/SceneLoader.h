@@ -21,8 +21,8 @@ namespace caustica
 //   m_Loader.setLoadFunc([this](auto fs, auto& path) {
 //       return LoadScene(fs, path);   // subclass virtual
 //   });
-//   m_Loader.onLoaded   = [this] { SceneLoaded(); };
-//   m_Loader.onUnloading = [this] { SceneUnloading(); };
+//   m_Loader.onLoaded   = [this] { sceneLoaded(); };
+//   m_Loader.onUnloading = [this] { sceneUnloading(); };
 // =============================================================================
 class SceneLoader
 {

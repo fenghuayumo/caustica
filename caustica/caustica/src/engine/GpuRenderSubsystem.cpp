@@ -38,8 +38,8 @@ bool GpuRenderSubsystem::initializeSession(const GpuRenderSubsystemInitParams& p
 
     createShaderFactory(gpuDevice);
 
-    auto* device = gpuDevice.GetDevice();
-    m_bindlessLayout = render::WorldRenderer::CreateBindlessLayout(device);
+    auto* device = gpuDevice.getDevice();
+    m_bindlessLayout = render::WorldRenderer::createBindlessLayout(device);
 
     m_renderDevice = std::make_unique<caustica::render::RenderDevice>(device, m_shaderFactory);
     m_bindingCache = std::make_unique<BindingCache>(device);
@@ -51,7 +51,7 @@ bool GpuRenderSubsystem::initializeSession(const GpuRenderSubsystemInitParams& p
     m_textureCache = params.assetSystem.getTextureLoader();
 
     m_accelStructs = AccelStructManager(device);
-    m_camera.camera().SetRotateSpeed(.003f);
+    m_camera.camera().setRotateSpeed(.003f);
 
     m_sceneManager = std::make_unique<SceneManager>(
         gpuDevice,
@@ -121,7 +121,7 @@ bool GpuRenderSubsystem::initializeSession(const GpuRenderSubsystemInitParams& p
 void GpuRenderSubsystem::endFrame()
 {
     if (m_bindlessTable)
-        m_bindlessTable->FlushDeferredFrees();
+        m_bindlessTable->flushDeferredFrees();
 }
 
 void GpuRenderSubsystem::onSceneUnloading()
@@ -153,7 +153,7 @@ void GpuRenderSubsystem::applySampleSettingsFromScene()
     if (!scene)
         return;
 
-    if (std::shared_ptr<SampleSettings> sampleSettings = scene->GetSampleSettingsNode())
+    if (std::shared_ptr<SampleSettings> sampleSettings = scene->getSampleSettingsNode())
     {
         m_settings->RealtimeMode = sampleSettings->realtimeMode.value_or(m_settings->RealtimeMode);
         m_settings->EnableAnimations = sampleSettings->enableAnimations.value_or(m_settings->EnableAnimations);
@@ -211,7 +211,7 @@ void GpuRenderSubsystem::onSceneLoadedGpuPrep()
     {
         if (auto scene = m_sceneManager->getScene())
         {
-            if (auto* entityWorld = scene->GetEntityWorld())
+            if (auto* entityWorld = scene->getEntityWorld())
             {
                 entityWorld->refreshHierarchy(scene::PreviousTransformPolicy::CaptureCurrent);
                 entityWorld->syncPreviousTransformsFromCurrent();
@@ -287,7 +287,7 @@ void GpuRenderSubsystem::shutdown()
     if (m_gpuDevice)
     {
         m_gpuDevice->waitForRenderThreadIdle();
-        if (nvrhi::IDevice* device = m_gpuDevice->GetDevice())
+        if (nvrhi::IDevice* device = m_gpuDevice->getDevice())
             device->waitForIdle();
     }
 
@@ -295,7 +295,7 @@ void GpuRenderSubsystem::shutdown()
 
     if (m_gpuDevice)
     {
-        if (nvrhi::IDevice* device = m_gpuDevice->GetDevice())
+        if (nvrhi::IDevice* device = m_gpuDevice->getDevice())
         {
             device->waitForIdle();
             device->runGarbageCollection();
@@ -348,9 +348,9 @@ void GpuRenderSubsystem::registerLoadedSceneAssets()
     Handle<SceneAsset> sceneAsset = m_assetSystem->registerSceneAsset(scene, scenePath, sceneName);
     if (!sceneAsset)
         return;
-    scene->SetAssetHandle(sceneAsset);
+    scene->setAssetHandle(sceneAsset);
 
-    for (const std::shared_ptr<MeshInfo>& mesh : scene->GetMeshes())
+    for (const std::shared_ptr<MeshInfo>& mesh : scene->getMeshes())
     {
         Handle<MeshAsset> meshAsset = m_assetSystem->registerMeshAsset(mesh, scenePath, mesh ? mesh->name : std::string());
         if (mesh)
@@ -359,7 +359,7 @@ void GpuRenderSubsystem::registerLoadedSceneAssets()
             m_assetSystem->addDependency(sceneAsset.id(), meshAsset.id());
     }
 
-    for (const std::shared_ptr<Material>& material : scene->GetMaterials())
+    for (const std::shared_ptr<Material>& material : scene->getMaterials())
     {
         Handle<MaterialAsset> materialAsset = m_assetSystem->registerMaterialAsset(
             material,
@@ -423,7 +423,7 @@ void GpuRenderSubsystem::createShaderFactory(GpuDevice& gpuDevice)
         rootFS->mount("/ShaderPrecompiled/omm", ommShaderPath);
     }
 
-    m_shaderFactory = std::make_shared<ShaderFactory>(gpuDevice.GetDevice(), rootFS, "/ShaderPrecompiled");
+    m_shaderFactory = std::make_shared<ShaderFactory>(gpuDevice.getDevice(), rootFS, "/ShaderPrecompiled");
 }
 
 caustica::render::RenderDevice& GpuRenderSubsystem::renderDevice()

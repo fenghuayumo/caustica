@@ -35,7 +35,7 @@ bool caustica::MaterialEditor(caustica::Material* material, bool allowMaterialDo
     }
     else
     {
-        ImGui::Text("Material Domain: %s", MaterialDomainToString(material->domain));
+        ImGui::Text("Material Domain: %s", materialDomainToString(material->domain));
     }
 
     auto getShortTexturePath = [](const std::string& fullPath)
@@ -175,11 +175,11 @@ bool caustica::MaterialEditor(caustica::Material* material, bool allowMaterialDo
 bool caustica::LightEditor_Directional(caustica::DirectionalLight& light)
 {
     bool changed = false;
-    double3 direction = light.GetDirection();
+    double3 direction = light.getDirection();
     if (AzimuthElevationSliders(direction, true))
     {
         if (ecs::isValid(light.ownerEntity))
-            light.UpdateCachedDirection(direction);
+            light.updateCachedDirection(direction);
         changed = true;
     }
     changed |= ImGui::ColorEdit3("Color", &light.color.x, ImGuiColorEditFlags_Float);
@@ -200,11 +200,11 @@ bool caustica::LightEditor_Point(caustica::PointLight& light)
 bool caustica::LightEditor_Spot(caustica::SpotLight& light)
 {
     bool changed = false;
-    double3 direction = light.GetDirection();
+    double3 direction = light.getDirection();
     if (AzimuthElevationSliders(direction, false))
     {
         if (ecs::isValid(light.ownerEntity))
-            light.UpdateCachedDirection(direction);
+            light.updateCachedDirection(direction);
         changed = true;
     }
     changed |= ImGui::SliderFloat("Radius", &light.radius, 0.01f, 1.f, "%.3f", ImGuiSliderFlags_Logarithmic);
@@ -217,7 +217,7 @@ bool caustica::LightEditor_Spot(caustica::SpotLight& light)
 
 bool caustica::LightEditor(caustica::Light& light)
 {
-    switch (light.GetLightType())
+    switch (light.getLightType())
     {
     case LightType_Directional:
         return LightEditor_Directional(static_cast<DirectionalLight&>(light));

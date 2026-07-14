@@ -75,33 +75,33 @@ namespace caustica
         std::shared_ptr<render::SceneGpuResources> m_GpuResources;
         Handle<SceneAsset> m_Asset;
 
-        void LoadModelAsync(
+        void loadModelAsync(
             uint32_t index,
             const std::filesystem::path& fileName,
             ThreadPool* threadPool);
 
-        virtual bool LoadModelFile(
+        virtual bool loadModelFile(
             const std::filesystem::path& fileName,
             ThreadPool* threadPool,
             SceneImportResult& result);
 
-        void LoadModels(
+        void loadModels(
             const Json::Value& modelList, 
             const std::filesystem::path& scenePath, 
             ThreadPool* threadPool);
 
-        SceneImportResult LoadBuiltinModel(
+        SceneImportResult loadBuiltinModel(
             const std::string& builtinName);
 
-        bool LoadJsonDocument(
+        bool loadJsonDocument(
             Json::Value documentRoot,
             const std::filesystem::path& scenePath,
             ThreadPool* threadPool);
 
-        void LoadSceneEntities(const Json::Value& nodeList, ecs::Entity parent);
-        void LoadAnimations(const Json::Value& nodeList);
+        void loadSceneEntities(const Json::Value& nodeList, ecs::Entity parent);
+        void loadAnimations(const Json::Value& nodeList);
         
-        virtual bool LoadCustomData(Json::Value& rootNode, ThreadPool* threadPool);
+        virtual bool loadCustomData(Json::Value& rootNode, ThreadPool* threadPool);
 
         std::shared_ptr<class SampleSettings> m_loadedSettings;
         std::shared_ptr<class GameSettings>   m_loadedGameSettings;
@@ -121,9 +121,9 @@ namespace caustica
             std::shared_ptr<IDescriptorTableManager> descriptorTable,
             std::shared_ptr<SceneTypeFactory> sceneTypeFactory);
 
-        void RefreshSceneWorld(uint32_t frameIndex);
+        void refreshSceneWorld(uint32_t frameIndex);
         void refreshEntityWorldForFrame(uint32_t frameIndex);
-        void PublishRenderSnapshot(uint32_t frameIndex);
+        void publishRenderSnapshot(uint32_t frameIndex);
 
         // Main/logic thread: extract and publish (ECS refresh runs in App PostUpdate).
         void extractAndPublishRenderSnapshot(uint32_t frameIndex);
@@ -137,53 +137,53 @@ namespace caustica
         void syncRenderSnapshotGpuIndices(uint32_t frameIndex);
         void acknowledgeGpuStructureConsumed();
 
-        [[nodiscard]] bool HasSceneTransformsChanged() const;
-        [[nodiscard]] bool HasSceneStructureChanged() const;
-        [[nodiscard]] bool HasSceneTransformsChanged(uint32_t frameIndex) const;
-        [[nodiscard]] bool HasSceneStructureChanged(uint32_t frameIndex) const;
+        [[nodiscard]] bool hasSceneTransformsChanged() const;
+        [[nodiscard]] bool hasSceneStructureChanged() const;
+        [[nodiscard]] bool hasSceneTransformsChanged(uint32_t frameIndex) const;
+        [[nodiscard]] bool hasSceneStructureChanged(uint32_t frameIndex) const;
 
-        bool Load(const std::filesystem::path& jsonFileName);
+        bool load(const std::filesystem::path& jsonFileName);
 
-        virtual bool LoadWithThreadPool(const std::filesystem::path& sceneFileName, ThreadPool* threadPool);
-        virtual bool LoadFromJsonString(const std::string& sceneJson, const std::filesystem::path& scenePath = {});
+        virtual bool loadWithThreadPool(const std::filesystem::path& sceneFileName, ThreadPool* threadPool);
+        virtual bool loadFromJsonString(const std::string& sceneJson, const std::filesystem::path& scenePath = {});
 
-        static const SceneLoadingStats& GetLoadingStats();
+        static const SceneLoadingStats& getLoadingStats();
 
-        [[nodiscard]] scene::SceneEntityWorld* GetEntityWorld() const { return m_EntityWorld.get(); }
-        [[nodiscard]] const std::shared_ptr<SceneTypeFactory>& GetSceneTypeFactory() const { return m_SceneTypeFactory; }
-        [[nodiscard]] dm::box3 GetSceneBounds() const;
+        [[nodiscard]] scene::SceneEntityWorld* getEntityWorld() const { return m_EntityWorld.get(); }
+        [[nodiscard]] const std::shared_ptr<SceneTypeFactory>& getSceneTypeFactory() const { return m_SceneTypeFactory; }
+        [[nodiscard]] dm::box3 getSceneBounds() const;
 
-        [[nodiscard]] const ResourceTracker<Material>& GetMaterials() const;
-        [[nodiscard]] const ResourceTracker<MeshInfo>& GetMeshes() const;
-        [[nodiscard]] size_t GetGeometryCount() const;
-        [[nodiscard]] size_t GetMaxGeometryCountPerMesh() const;
-        [[nodiscard]] size_t GetGeometryInstancesCount() const;
+        [[nodiscard]] const ResourceTracker<Material>& getMaterials() const;
+        [[nodiscard]] const ResourceTracker<MeshInfo>& getMeshes() const;
+        [[nodiscard]] size_t getGeometryCount() const;
+        [[nodiscard]] size_t getMaxGeometryCountPerMesh() const;
+        [[nodiscard]] size_t getGeometryInstancesCount() const;
 
-        [[nodiscard]] const std::vector<ecs::Entity>& GetMeshInstances() const;
-        [[nodiscard]] const std::vector<ecs::Entity>& GetSkinnedMeshInstances() const;
-        [[nodiscard]] const std::vector<ecs::Entity>& GetLightEntities() const;
-        [[nodiscard]] const std::vector<ecs::Entity>& GetCameraEntities() const;
-        [[nodiscard]] const std::vector<ecs::Entity>& GetAnimationEntities() const;
-        [[nodiscard]] const scene::SceneRenderData& GetRenderData() const;
-        [[nodiscard]] scene::SceneRenderCommandQueue& GetRenderCommands() { return m_RenderCommands; }
-        [[nodiscard]] const scene::SceneRenderCommandQueue& GetRenderCommands() const { return m_RenderCommands; }
+        [[nodiscard]] const std::vector<ecs::Entity>& getMeshInstances() const;
+        [[nodiscard]] const std::vector<ecs::Entity>& getSkinnedMeshInstances() const;
+        [[nodiscard]] const std::vector<ecs::Entity>& getLightEntities() const;
+        [[nodiscard]] const std::vector<ecs::Entity>& getCameraEntities() const;
+        [[nodiscard]] const std::vector<ecs::Entity>& getAnimationEntities() const;
+        [[nodiscard]] const scene::SceneRenderData& getRenderData() const;
+        [[nodiscard]] scene::SceneRenderCommandQueue& getRenderCommands() { return m_RenderCommands; }
+        [[nodiscard]] const scene::SceneRenderCommandQueue& getRenderCommands() const { return m_RenderCommands; }
 
-        void AttachLightToRoot(const std::shared_ptr<Light>& light);
-        void AttachLightToRoot(scene::LightComponent component, const std::string& name = {});
+        void attachLightToRoot(const std::shared_ptr<Light>& light);
+        void attachLightToRoot(scene::LightComponent component, const std::string& name = {});
         [[nodiscard]] nvrhi::IDescriptorTable* getDescriptorTable() const { return m_DescriptorTable ? m_DescriptorTable->getDescriptorTable() : nullptr; }
         [[nodiscard]] IDescriptorTableManager* getDescriptorTableManager() const { return m_DescriptorTable.get(); }
-        [[nodiscard]] render::SceneGpuResources& GetGpuResources() { return *m_GpuResources; }
-        [[nodiscard]] const render::SceneGpuResources& GetGpuResources() const { return *m_GpuResources; }
+        [[nodiscard]] render::SceneGpuResources& getGpuResources() { return *m_GpuResources; }
+        [[nodiscard]] const render::SceneGpuResources& getGpuResources() const { return *m_GpuResources; }
 
-        GeometryData* GetGeometryData(const MeshGeometry& geometry) const;
+        GeometryData* getGeometryData(const MeshGeometry& geometry) const;
 
-        void ProcessNodesRecursive();
+        void processNodesRecursive();
 
-        [[nodiscard]] std::shared_ptr<SampleSettings> GetSampleSettingsNode() const { return m_loadedSettings; }
-        [[nodiscard]] std::shared_ptr<GameSettings>   GetGameSettingsNode() const   { return m_loadedGameSettings; }
-        [[nodiscard]] const std::vector<SceneImportResult>& GetModels() const        { return m_Models; }
-        [[nodiscard]] const Handle<SceneAsset>& GetAssetHandle() const               { return m_Asset; }
-        void SetAssetHandle(Handle<SceneAsset> asset)                                { m_Asset = std::move(asset); }
+        [[nodiscard]] std::shared_ptr<SampleSettings> getSampleSettingsNode() const { return m_loadedSettings; }
+        [[nodiscard]] std::shared_ptr<GameSettings>   getGameSettingsNode() const   { return m_loadedGameSettings; }
+        [[nodiscard]] const std::vector<SceneImportResult>& getModels() const        { return m_Models; }
+        [[nodiscard]] const Handle<SceneAsset>& getAssetHandle() const               { return m_Asset; }
+        void setAssetHandle(Handle<SceneAsset> asset)                                { m_Asset = std::move(asset); }
 
     };
 }

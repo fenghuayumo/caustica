@@ -39,7 +39,7 @@ void SceneRayTracingResources::fillPTPipelineGlobalMacros(std::vector<caustica::
 {
     macros.clear();
 
-    auto* device = m_gpuDevice->GetDevice();
+    auto* device = m_gpuDevice->getDevice();
     const bool canUseNvapiHitObject =
         m_settings->NVAPIHitObjectExtension &&
         device->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D12 &&
@@ -61,15 +61,15 @@ void SceneRayTracingResources::fillPTPipelineGlobalMacros(std::vector<caustica::
 
     macros.push_back({ "PT_ENABLE_RUSSIAN_ROULETTE", (m_settings->EnableRussianRoulette) ? ("1") : ("0") });
     macros.push_back({ "PT_NEE_ENABLED", (m_settings->UseNEE)?("1"):("0") });
-    macros.push_back({ "PT_USE_RESTIR_DI", (m_settings->ActualUseReSTIRDI()) ? ("1") : ("0") });
-    macros.push_back({ "PT_USE_RESTIR_GI", (m_settings->ActualUseReSTIRGI()) ? ("1") : ("0") });
-    macros.push_back({ "PT_USE_RESTIR_PT", (m_settings->ActualUseReSTIRPT()) ? ("1") : ("0") });
+    macros.push_back({ "PT_USE_RESTIR_DI", (m_settings->actualUseReSTIRDI()) ? ("1") : ("0") });
+    macros.push_back({ "PT_USE_RESTIR_GI", (m_settings->actualUseReSTIRGI()) ? ("1") : ("0") });
+    macros.push_back({ "PT_USE_RESTIR_PT", (m_settings->actualUseReSTIRPT()) ? ("1") : ("0") });
 
     const std::shared_ptr<OpacityMicromapBuilder>& opacityMaps = m_lightingPasses->opacityMaps();
-    const bool useOpacityMicromaps = opacityMaps != nullptr && opacityMaps->ShouldUseRayTracingOpacityMicromaps();
+    const bool useOpacityMicromaps = opacityMaps != nullptr && opacityMaps->shouldUseRayTracingOpacityMicromaps();
     macros.push_back({ "CAUSTICA_ENABLE_OPACITY_MICROMAPS", useOpacityMicromaps ? "1" : "0" });
 
-    macros.push_back({ "CAUSTICA_USE_APPROXIMATE_MIS", (m_settings->ActualUseApproximateMIS()) ? ("1") : ("0") });
+    macros.push_back({ "CAUSTICA_USE_APPROXIMATE_MIS", (m_settings->actualUseApproximateMIS()) ? ("1") : ("0") });
 
     macros.push_back({ "CAUSTICA_NEE_FULL_SAMPLE_COUNT", std::to_string(m_settings->NEEFullSamples) });
     uint localCandidateSamples = ComputeCandidateSampleLocalCount(m_settings->ActualNEEAT_LocalToGlobalSampleRatio(), m_settings->NEECandidateSamples);
@@ -82,7 +82,7 @@ void SceneRayTracingResources::fillPTPipelineGlobalMacros(std::vector<caustica::
     macros.push_back({ "CAUSTICA_DISCARD_NON_NEE_LIGHTING", (m_settings->DbgDiscardNonNEELighting) ? ("1") : ("0") });
     macros.push_back({ "CAUSTICA_DISCARD_NEE_LIGHTING", (m_settings->DbgDiscardNEELighting) ? ("1") : ("0") });
 
-    macros.push_back({ "CAUSTICA_FIREFLY_FILTER", (m_settings->ActualFireflyFilterEnabled()) ? ("1") : ("0") });
+    macros.push_back({ "CAUSTICA_FIREFLY_FILTER", (m_settings->actualFireflyFilterEnabled()) ? ("1") : ("0") });
     macros.push_back({ "CAUSTICA_ACTIVE_STABLE_PLANE_COUNT", std::to_string(m_settings->StablePlanesActiveCount) });
     macros.push_back({ "CAUSTICA_NESTED_DIELECTRICS_QUALITY", std::to_string(m_settings->NestedDielectricsQuality) });
     macros.push_back({ "CAUSTICA_LP_TYPES_USE_16BIT_PRECISION", (m_settings->UseFp16Types) ? ("1") : ("0") });
@@ -171,7 +171,7 @@ void SceneRayTracingResources::recreateAccelStructs(nvrhi::ICommandList* command
     m_settings->ResetAccumulation = true;
 
     info("AS rebuild: pre-release wait begin");
-    const bool preReleaseWaitOk = m_gpuDevice->GetDevice()->waitForIdle();
+    const bool preReleaseWaitOk = m_gpuDevice->getDevice()->waitForIdle();
     info("AS rebuild: pre-release wait end, ok=%s", preReleaseWaitOk ? "true" : "false");
     if (!preReleaseWaitOk)
         return;
@@ -179,15 +179,15 @@ void SceneRayTracingResources::recreateAccelStructs(nvrhi::ICommandList* command
     m_worldRenderer->invalidateBindingSet();
     m_accelStructs->releaseGpuResources();
     m_accelStructs->clearMeshAccelStructs(*m_sceneManager->getScene());
-    m_gpuDevice->GetDevice()->runGarbageCollection();
+    m_gpuDevice->getDevice()->runGarbageCollection();
 
     commandList->open();
     createAccelStructs(commandList);
     commandList->close();
     info("AS rebuild: execute command list");
-    m_gpuDevice->GetDevice()->executeCommandList(commandList);
+    m_gpuDevice->getDevice()->executeCommandList(commandList);
     info("AS rebuild: post-build wait begin");
-    const bool postBuildWaitOk = m_gpuDevice->GetDevice()->waitForIdle();
+    const bool postBuildWaitOk = m_gpuDevice->getDevice()->waitForIdle();
     info("AS rebuild: post-build wait end, ok=%s", postBuildWaitOk ? "true" : "false");
 }
 

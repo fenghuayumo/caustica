@@ -40,7 +40,7 @@ struct SceneGpuResources
     nvrhi::ComputePipelineHandle skinningPipeline;
     nvrhi::BindingLayoutHandle skinningBindingLayout;
 
-    // Keyed by ecs::Entity raw id. Render thread only.
+    // Keyed by ecs::Entity raw id. render thread only.
     std::unordered_map<uint32_t, SkinnedMeshGpuState> skinnedGpuByEntity;
 
     bool enableBindlessResources = false;

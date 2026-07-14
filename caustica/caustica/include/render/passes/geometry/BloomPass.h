@@ -59,7 +59,7 @@ namespace caustica::render
             std::shared_ptr<caustica::FramebufferFactory> framebufferFactory,
             const caustica::ICompositeView& compositeView);
 
-        void Render(
+        void render(
             nvrhi::ICommandList* commandList,
             const std::shared_ptr<caustica::FramebufferFactory>& framebufferFactory,
             const caustica::ICompositeView& compositeView,

@@ -28,7 +28,7 @@ class Window;
 //
 // Prefer EngineApp::create for new apps (Bevy-like one-liner):
 //   auto engine = EngineApp::create({ .scene = "Kitchen/kitchen.json" });
-//   engine->app().addSystem(AppSchedule::Update, "MySim", ...);
+//   engine->app().addSystem(AppSchedule::update, "MySim", ...);
 //   engine->run();
 //
 // Low-level lifecycle (advanced):

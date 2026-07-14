@@ -32,7 +32,7 @@ EnvMapImportanceSamplingCache::~EnvMapImportanceSamplingCache()
 {
 }
 
-void EnvMapImportanceSamplingCache::CreateRenderPasses()
+void EnvMapImportanceSamplingCache::createRenderPasses()
 {
     // Samplers
     {
@@ -58,7 +58,7 @@ void EnvMapImportanceSamplingCache::CreateRenderPasses()
         m_builderConstants = m_device->createBuffer(constBufferDesc);
     }   
 
-    //Create importance map (for MIP descent) builder shader and resources
+    //create importance map (for MIP descent) builder shader and resources
     {
         m_importanceMapComputeShader = m_shaderFactory->createShader("caustica/shaders/render/lighting/distant/EnvMapImportanceSamplingCache.hlsl", "BuildMIPDescentImportanceMapCS", nullptr, nvrhi::ShaderType::Compute);
         assert(m_importanceMapComputeShader);
@@ -129,28 +129,28 @@ void EnvMapImportanceSamplingCache::CreateRenderPasses()
     m_MIPMapPass = nullptr;
 }
 
-int EnvMapImportanceSamplingCache::GetImportanceMapResolution()
+int EnvMapImportanceSamplingCache::getImportanceMapResolution()
 {
     return EMISB_IMPORTANCE_MAP_DIM;
 }
 
-int EnvMapImportanceSamplingCache::GetImportanceMapMIPLevels()
+int EnvMapImportanceSamplingCache::getImportanceMapMIPLevels()
 {
-    const uint32_t dimensions = GetImportanceMapResolution();
+    const uint32_t dimensions = getImportanceMapResolution();
     uint32_t mips = (uint32_t)log2(dimensions) + 1;
     assert((1u << (mips - 1)) == dimensions);
     assert(mips > 1 && mips <= 12);
     return mips;
 }
 
-void EnvMapImportanceSamplingCache::CreateImportanceMap()
+void EnvMapImportanceSamplingCache::createImportanceMap()
 {
-    const uint32_t dimensions = GetImportanceMapResolution();
+    const uint32_t dimensions = getImportanceMapResolution();
     const uint32_t samples = EMISB_IMPORTANCE_SAMPLES_PER_PIXEL;
 
     assert(ispow2(dimensions) && ispow2(samples));
 
-    uint32_t mips = GetImportanceMapMIPLevels();
+    uint32_t mips = getImportanceMapMIPLevels();
 
     nvrhi::TextureDesc texDesc;
     texDesc.format = nvrhi::Format::R32_FLOAT;
@@ -172,7 +172,7 @@ void EnvMapImportanceSamplingCache::CreateImportanceMap()
     m_MIPMapPassRad = std::make_unique<caustica::render::MipMapGenPass>(m_device, m_shaderFactory, m_radianceMapTexture, caustica::render::MipMapGenPass::MODE_COLOR);
 }
 
-void EnvMapImportanceSamplingCache::FillCacheConsts(EnvMapImportanceSamplingCacheConstants & constants, nvrhi::TextureHandle sourceCubemap, int sampleIndex)
+void EnvMapImportanceSamplingCache::fillCacheConsts(EnvMapImportanceSamplingCacheConstants & constants, nvrhi::TextureHandle sourceCubemap, int sampleIndex)
 {
     const uint32_t dimensions = EMISB_IMPORTANCE_MAP_DIM;
     const uint32_t samples = EMISB_IMPORTANCE_SAMPLES_PER_PIXEL;
@@ -189,12 +189,12 @@ void EnvMapImportanceSamplingCache::FillCacheConsts(EnvMapImportanceSamplingCach
     constants.SampleIndex = sampleIndex;
 }
 
-void EnvMapImportanceSamplingCache::PreUpdate(nvrhi::TextureHandle sourceCubemap, bool newSource)
+void EnvMapImportanceSamplingCache::preUpdate(nvrhi::TextureHandle sourceCubemap, bool newSource)
 {
     assert(sourceCubemap);
 
     if (m_importanceMapTexture == nullptr)
-        CreateImportanceMap();
+        createImportanceMap();
 
     if (m_importanceMapBindingSet == nullptr || newSource)
     {
@@ -211,7 +211,7 @@ void EnvMapImportanceSamplingCache::PreUpdate(nvrhi::TextureHandle sourceCubemap
     }
 }
 
-void EnvMapImportanceSamplingCache::GenerateImportanceMap(nvrhi::CommandListHandle commandList, nvrhi::TextureHandle sourceCubemap)
+void EnvMapImportanceSamplingCache::generateImportanceMap(nvrhi::CommandListHandle commandList, nvrhi::TextureHandle sourceCubemap)
 {
     nvrhi::ComputeState state;
     state.pipeline = m_importanceMapPipeline;
@@ -220,7 +220,7 @@ void EnvMapImportanceSamplingCache::GenerateImportanceMap(nvrhi::CommandListHand
     uint32_t groupCount = (EMISB_IMPORTANCE_MAP_DIM+EMISB_NUM_COMPUTE_THREADS_PER_DIM-1) / EMISB_NUM_COMPUTE_THREADS_PER_DIM;
 
     EnvMapImportanceSamplingCacheConstants constants;
-    FillCacheConsts( constants, sourceCubemap, -1 );    // sampleIndex not relevant during importance map generation
+    fillCacheConsts( constants, sourceCubemap, -1 );    // sampleIndex not relevant during importance map generation
 
     {
         RAII_SCOPE(commandList->beginMarker("GenIM"); , commandList->endMarker(); );
@@ -231,8 +231,8 @@ void EnvMapImportanceSamplingCache::GenerateImportanceMap(nvrhi::CommandListHand
 
     {
         //RAII_SCOPE(commandList->beginMarker("GenMIPs");, commandList->endMarker(); );
-        m_MIPMapPass->Dispatch(commandList);
-        m_MIPMapPassRad->Dispatch(commandList);
+        m_MIPMapPass->dispatch(commandList);
+        m_MIPMapPassRad->dispatch(commandList);
     }
 
     commandList->setTextureState(m_importanceMapTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
@@ -243,14 +243,14 @@ void EnvMapImportanceSamplingCache::GenerateImportanceMap(nvrhi::CommandListHand
     m_envMapImportanceSamplingParams.padding0 = 0;
 }
 
-void EnvMapImportanceSamplingCache::Update(nvrhi::CommandListHandle commandList, nvrhi::TextureHandle sourceCubemap)
+void EnvMapImportanceSamplingCache::update(nvrhi::CommandListHandle commandList, nvrhi::TextureHandle sourceCubemap)
 {
     RAII_SCOPE( commandList->beginMarker("ISBake");, commandList->endMarker(); );
 
-    GenerateImportanceMap(commandList, sourceCubemap);
+    generateImportanceMap(commandList, sourceCubemap);
 }
 
-void EnvMapImportanceSamplingCache::ExecutePresampling(nvrhi::CommandListHandle commandList, nvrhi::TextureHandle sourceCubemap, int sampleIndex)
+void EnvMapImportanceSamplingCache::executePresampling(nvrhi::CommandListHandle commandList, nvrhi::TextureHandle sourceCubemap, int sampleIndex)
 {
     assert( false );
 #if 0
@@ -271,7 +271,7 @@ void EnvMapImportanceSamplingCache::ExecutePresampling(nvrhi::CommandListHandle 
     }
 
     EnvMapImportanceSamplingCacheConstants constants;
-    FillCacheConsts(constants, sourceCubemap, sampleIndex);    // sampleIndex not relevant during importance map generation
+    fillCacheConsts(constants, sourceCubemap, sampleIndex);    // sampleIndex not relevant during importance map generation
 
     {
         RAII_SCOPE(commandList->beginMarker("Pre-sampling");, commandList->endMarker(); );
@@ -289,7 +289,7 @@ void EnvMapImportanceSamplingCache::ExecutePresampling(nvrhi::CommandListHandle 
 }
 
 
-bool EnvMapImportanceSamplingCache::DebugGUI(float indent)
+bool EnvMapImportanceSamplingCache::debugGUI(float indent)
 {
     return false;
 }

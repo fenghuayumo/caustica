@@ -79,13 +79,13 @@ namespace caustica::render
             nvrhi::ITexture* gbufferNormals,
             nvrhi::ITexture* destinationTexture);
 
-        void CreateBindingSet(
+        void createBindingSet(
             nvrhi::ITexture* gbufferDepth,
             nvrhi::ITexture* gbufferNormals,
             nvrhi::ITexture* destinationTexture,
             int bindingSetIndex = 0);
 
-        void Render(
+        void render(
             nvrhi::ICommandList* commandList,
             const SsaoParameters& params,
             const caustica::ICompositeView& compositeView,

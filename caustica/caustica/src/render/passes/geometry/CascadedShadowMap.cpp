@@ -49,13 +49,13 @@ CascadedShadowMap::CascadedShadowMap(
     for (int object = 0; object < numPerObjectShadows; object++)
     {
         std::shared_ptr<PlanarShadowMap> planarShadowMap = std::make_shared<PlanarShadowMap>(device, m_ShadowMapTexture, numCascades + object, cascadeViewportDesc);
-        planarShadowMap->SetFalloffDistance(0.f); // disable falloff on per-object shadows: their bboxes are short by design
+        planarShadowMap->setFalloffDistance(0.f); // disable falloff on per-object shadows: their bboxes are short by design
 
         m_PerObjectShadows.push_back(planarShadowMap);
     }
 }
 
-bool CascadedShadowMap::SetupForPlanarView(const DirectionalLight& light, frustum viewFrustum, float maxShadowDistance, float lightSpaceZUp, float lightSpaceZDown, float exponent, float3 preViewTranslation, int numberOfCascades)
+bool CascadedShadowMap::setupForPlanarView(const DirectionalLight& light, frustum viewFrustum, float maxShadowDistance, float lightSpaceZUp, float lightSpaceZDown, float exponent, float3 preViewTranslation, int numberOfCascades)
 {
     assert(exponent > 1);
 
@@ -113,10 +113,10 @@ bool CascadedShadowMap::SetupForPlanarView(const DirectionalLight& light, frustu
 
         float zDown = std::max(halfShadowBoxSize.z, lightSpaceZDown);
         float zUp = std::max(halfShadowBoxSize.z, lightSpaceZUp);
-        cascadeCenter += dm::float3(light.GetDirection()) * (zDown - zUp) * 0.5f;
+        cascadeCenter += dm::float3(light.getDirection()) * (zDown - zUp) * 0.5f;
         halfShadowBoxSize.z = (zDown + zUp) * 0.5f;
 
-        if (m_Cascades[cascade]->SetupDynamicDirectionalLightView(light, cascadeCenter, halfShadowBoxSize, preViewTranslation, fadeRange))
+        if (m_Cascades[cascade]->setupDynamicDirectionalLightView(light, cascadeCenter, halfShadowBoxSize, preViewTranslation, fadeRange))
             viewModified = true;
 
         far = near;
@@ -126,7 +126,7 @@ bool CascadedShadowMap::SetupForPlanarView(const DirectionalLight& light, frustu
     return viewModified;
 }
 
-bool CascadedShadowMap::SetupForPlanarViewStable(const DirectionalLight& light, frustum projectionFrustum, affine3 inverseViewMatrix, float maxShadowDistance, float lightSpaceZUp, float lightSpaceZDown, float exponent, float3 preViewTranslation, int numberOfCascades)
+bool CascadedShadowMap::setupForPlanarViewStable(const DirectionalLight& light, frustum projectionFrustum, affine3 inverseViewMatrix, float maxShadowDistance, float lightSpaceZUp, float lightSpaceZDown, float exponent, float3 preViewTranslation, int numberOfCascades)
 {
     assert(exponent > 1);
     
@@ -189,10 +189,10 @@ bool CascadedShadowMap::SetupForPlanarViewStable(const DirectionalLight& light, 
 
         float zDown = std::max(sphereRadius, lightSpaceZDown);
         float zUp = std::max(sphereRadius, lightSpaceZUp);
-        cascadeCenter += dm::float3(light.GetDirection()) * (zDown - zUp) * 0.5f;
+        cascadeCenter += dm::float3(light.getDirection()) * (zDown - zUp) * 0.5f;
         halfShadowBoxSize.z = (zDown + zUp) * 0.5f;
 
-        if (m_Cascades[cascade]->SetupDynamicDirectionalLightView(light, cascadeCenter, halfShadowBoxSize, preViewTranslation, fadeRange))
+        if (m_Cascades[cascade]->setupDynamicDirectionalLightView(light, cascadeCenter, halfShadowBoxSize, preViewTranslation, fadeRange))
             viewModified = true;
 
         far = near;
@@ -202,7 +202,7 @@ bool CascadedShadowMap::SetupForPlanarViewStable(const DirectionalLight& light, 
     return viewModified;
 }
 
-bool CascadedShadowMap::SetupForCubemapView(const DirectionalLight& light, float3 center, float maxShadowDistance, float lightSpaceZUp, float lightSpaceZDown, float exponent, int numberOfCascades)
+bool CascadedShadowMap::setupForCubemapView(const DirectionalLight& light, float3 center, float maxShadowDistance, float lightSpaceZUp, float lightSpaceZDown, float exponent, int numberOfCascades)
 {
     assert(maxShadowDistance > 0);
     assert(exponent > 1);
@@ -244,10 +244,10 @@ bool CascadedShadowMap::SetupForCubemapView(const DirectionalLight& light, float
 
         float zDown = std::max(halfShadowBoxSize.z, lightSpaceZDown);
         float zUp = std::max(halfShadowBoxSize.z, lightSpaceZUp);
-        cascadeCenter += dm::float3(light.GetDirection()) * (zDown - zUp) * 0.5f;
+        cascadeCenter += dm::float3(light.getDirection()) * (zDown - zUp) * 0.5f;
         halfShadowBoxSize.z = (zDown + zUp) * 0.5f;
 
-        if (m_Cascades[cascade]->SetupDynamicDirectionalLightView(light, cascadeCenter, halfShadowBoxSize, fadeRange))
+        if (m_Cascades[cascade]->setupDynamicDirectionalLightView(light, cascadeCenter, halfShadowBoxSize, fadeRange))
             viewModified = true;
         
         far = far / exponent;
@@ -256,62 +256,62 @@ bool CascadedShadowMap::SetupForCubemapView(const DirectionalLight& light, float
     return viewModified;
 }
 
-bool CascadedShadowMap::SetupPerObjectShadow(const DirectionalLight& light, uint32_t object, const box3& objectBounds)
+bool CascadedShadowMap::setupPerObjectShadow(const DirectionalLight& light, uint32_t object, const box3& objectBounds)
 {
-    return m_PerObjectShadows[object]->SetupWholeSceneDirectionalLightView(light, objectBounds);
+    return m_PerObjectShadows[object]->setupWholeSceneDirectionalLightView(light, objectBounds);
 }
 
-void CascadedShadowMap::SetupProxyViews()
+void CascadedShadowMap::setupProxyViews()
 {
     for (auto cascade : m_Cascades)
     {
-        cascade->SetupProxyView();
+        cascade->setupProxyView();
     }
 
     for (auto object : m_PerObjectShadows)
     {
-        object->SetupProxyView();
+        object->setupProxyView();
     }
 }
 
-void CascadedShadowMap::SetLitOutOfBounds(bool litOutOfBounds)
+void CascadedShadowMap::setLitOutOfBounds(bool litOutOfBounds)
 {
     for (auto cascade : m_Cascades)
     {
-        cascade->SetLitOutOfBounds(litOutOfBounds);
+        cascade->setLitOutOfBounds(litOutOfBounds);
     }
 }
 
-void CascadedShadowMap::SetFalloffDistance(float distance)
+void CascadedShadowMap::setFalloffDistance(float distance)
 {
     for (auto cascade : m_Cascades)
     {
-        cascade->SetFalloffDistance(distance);
+        cascade->setFalloffDistance(distance);
     }
 }
 
-dm::float4x4 CascadedShadowMap::GetWorldToUvzwMatrix() const
+dm::float4x4 CascadedShadowMap::getWorldToUvzwMatrix() const
 {
     assert(false);
     return float4x4::identity();
 }
 
-const ICompositeView& CascadedShadowMap::GetView() const
+const ICompositeView& CascadedShadowMap::getView() const
 {
     return m_CompositeView;
 }
 
-nvrhi::ITexture* CascadedShadowMap::GetTexture() const
+nvrhi::ITexture* CascadedShadowMap::getTexture() const
 {
     return m_ShadowMapTexture;
 }
 
-uint32_t CascadedShadowMap::GetNumberOfCascades() const
+uint32_t CascadedShadowMap::getNumberOfCascades() const
 {
     return static_cast<uint32_t>(m_NumberOfCascades);
 }
 
-const IShadowMap* CascadedShadowMap::GetCascade(uint32_t index) const
+const IShadowMap* CascadedShadowMap::getCascade(uint32_t index) const
 {
     if (static_cast<int>(index) < m_NumberOfCascades)
         return m_Cascades[index].get();
@@ -319,12 +319,12 @@ const IShadowMap* CascadedShadowMap::GetCascade(uint32_t index) const
     return nullptr;
 }
 
-uint32_t CascadedShadowMap::GetNumberOfPerObjectShadows() const
+uint32_t CascadedShadowMap::getNumberOfPerObjectShadows() const
 {
     return static_cast<uint32_t>(m_PerObjectShadows.size());
 }
 
-const IShadowMap* CascadedShadowMap::GetPerObjectShadow(uint32_t index) const
+const IShadowMap* CascadedShadowMap::getPerObjectShadow(uint32_t index) const
 {
     if (static_cast<size_t>(index) < m_PerObjectShadows.size())
         return m_PerObjectShadows[index].get();
@@ -332,34 +332,34 @@ const IShadowMap* CascadedShadowMap::GetPerObjectShadow(uint32_t index) const
     return nullptr;
 }
 
-dm::int2 CascadedShadowMap::GetTextureSize() const
+dm::int2 CascadedShadowMap::getTextureSize() const
 {
     const nvrhi::TextureDesc& textureDesc = m_ShadowMapTexture->getDesc();
     return int2(textureDesc.width, textureDesc.height);
 }
 
-dm::box2 CascadedShadowMap::GetUVRange() const
+dm::box2 CascadedShadowMap::getUVRange() const
 {
     assert(false);
-    return m_Cascades[0]->GetUVRange();
+    return m_Cascades[0]->getUVRange();
 }
 
-dm::float2 CascadedShadowMap::GetFadeRangeInTexels() const
+dm::float2 CascadedShadowMap::getFadeRangeInTexels() const
 {
-    return m_Cascades[0]->GetFadeRangeInTexels();
+    return m_Cascades[0]->getFadeRangeInTexels();
 }
 
-bool CascadedShadowMap::IsLitOutOfBounds() const
+bool CascadedShadowMap::isLitOutOfBounds() const
 {
-    return m_Cascades[0]->IsLitOutOfBounds();
+    return m_Cascades[0]->isLitOutOfBounds();
 }
 
-void CascadedShadowMap::FillShadowConstants(struct ShadowConstants& constants) const
+void CascadedShadowMap::fillShadowConstants(struct ShadowConstants& constants) const
 {
     assert(false);
 }
 
-std::shared_ptr<caustica::PlanarView> caustica::render::CascadedShadowMap::GetCascadeView(uint32_t cascade)
+std::shared_ptr<caustica::PlanarView> caustica::render::CascadedShadowMap::getCascadeView(uint32_t cascade)
 {
     if (static_cast<int>(cascade) < m_NumberOfCascades)
         return m_Cascades[cascade]->getPlanarView();
@@ -367,7 +367,7 @@ std::shared_ptr<caustica::PlanarView> caustica::render::CascadedShadowMap::GetCa
     return nullptr;
 }
 
-std::shared_ptr<caustica::PlanarView> caustica::render::CascadedShadowMap::GetPerObjectView(uint32_t object)
+std::shared_ptr<caustica::PlanarView> caustica::render::CascadedShadowMap::getPerObjectView(uint32_t object)
 {
     if (object < m_PerObjectShadows.size())
         return m_PerObjectShadows[object]->getPlanarView();
@@ -375,12 +375,12 @@ std::shared_ptr<caustica::PlanarView> caustica::render::CascadedShadowMap::GetPe
     return nullptr;
 }
 
-void caustica::render::CascadedShadowMap::SetNumberOfCascadesUnsafe(int cascades)
+void caustica::render::CascadedShadowMap::setNumberOfCascadesUnsafe(int cascades)
 {
 	m_NumberOfCascades = (cascades < 0 || cascades >= (int)m_Cascades.size()) ? (int)m_Cascades.size() : cascades;
 }
 
-void CascadedShadowMap::Clear(nvrhi::ICommandList* commandList)
+void CascadedShadowMap::clear(nvrhi::ICommandList* commandList)
 {
     const nvrhi::FormatInfo& depthFormatInfo = nvrhi::getFormatInfo(m_ShadowMapTexture->getDesc().format);
 

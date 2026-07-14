@@ -34,7 +34,7 @@ void EditorUISubsystem::startup(caustica::GpuDevice& gpuDevice, caustica::Window
         m_config.editorUiData,
         serSupported,
         m_config.cmdLine);
-    m_ui->Init(gpuRenderSubsystem->shaderFactory());
+    m_ui->init(gpuRenderSubsystem->shaderFactory());
 
     if (caustica::Window* platformWindow = gpuDevice.GetPlatformWindow())
     {
@@ -61,7 +61,7 @@ void EditorUISubsystem::animateScheduled(float elapsedTimeSeconds, bool windowFo
 
     auto& ui = static_cast<caustica::ImGui_Renderer&>(*m_ui);
     if (windowFocused || ui.ShouldAnimateUnfocused())
-        ui.Animate(elapsedTimeSeconds);
+        ui.animate(elapsedTimeSeconds);
 }
 
 void EditorUISubsystem::renderSceneScheduled(caustica::GpuDevice& gpuDevice)
@@ -72,18 +72,18 @@ void EditorUISubsystem::renderSceneScheduled(caustica::GpuDevice& gpuDevice)
     nvrhi::IFramebuffer* framebuffer = gpuDevice.GetCurrentFramebuffer(m_ui->SupportsDepthBuffer());
     if (ZoomTool* zoom = m_config.sceneEditor.GetOrCreateZoomTool())
     {
-        if (zoom->Enabled())
+        if (zoom->enabled())
         {
             nvrhi::ITexture* color = framebuffer->getDesc().colorAttachments[0].texture;
-            nvrhi::CommandListHandle commandList = gpuDevice.GetDevice()->createCommandList();
+            nvrhi::CommandListHandle commandList = gpuDevice.getDevice()->createCommandList();
             commandList->open();
-            zoom->Render(commandList, color);
+            zoom->render(commandList, color);
             commandList->close();
-            gpuDevice.GetDevice()->executeCommandList(commandList);
+            gpuDevice.getDevice()->executeCommandList(commandList);
         }
     }
 
-    m_ui->Render(framebuffer);
+    m_ui->render(framebuffer);
 }
 
 void EditorUISubsystem::onBackBufferResizing()

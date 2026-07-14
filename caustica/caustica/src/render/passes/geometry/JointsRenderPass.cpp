@@ -33,7 +33,7 @@ namespace caustica::render
 
     caustica::render::JointsRenderPass::JointsRenderPass(nvrhi::IDevice* device) : m_device(device) { }
 
-    void caustica::render::JointsRenderPass::Init(caustica::ShaderFactory& shaderFactory)
+    void caustica::render::JointsRenderPass::init(caustica::ShaderFactory& shaderFactory)
     {
         m_ConstantsBuffer = m_device->createBuffer(
             nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(PlanarViewConstants), "JointsWidget_Constants", 16));
@@ -66,7 +66,7 @@ namespace caustica::render
         m_InputLayout = m_device->createInputLayout(inputDescs, uint32_t(std::size(inputDescs)), m_VertexShader);
     }
 
-    nvrhi::BufferHandle caustica::render::JointsRenderPass::CreateVertexBuffer(uint32_t numVertices) const
+    nvrhi::BufferHandle caustica::render::JointsRenderPass::createVertexBuffer(uint32_t numVertices) const
     {
         nvrhi::BufferDesc bufferDesc;
         bufferDesc.isVertexBuffer = true;
@@ -79,18 +79,18 @@ namespace caustica::render
         return m_device->createBuffer(bufferDesc);
     }
 
-    void JointsRenderPass::ResetCaches()
+    void JointsRenderPass::resetCaches()
     {
         m_Vertices.clear();
     }
 
-    void caustica::render::JointsRenderPass::UpdateVertices(const caustica::Scene& scene)
+    void caustica::render::JointsRenderPass::updateVertices(const caustica::Scene& scene)
     {
         static const uint32_t blue = vectorToSnorm8(float3(0.f, 0.f, 1.f));
         static const uint32_t red = vectorToSnorm8(float3(1.f, 0.f, 0.f));
 
         uint32_t vertexId = 0;
-        for (const scene::SkinnedMeshRenderProxy& proxy : scene.GetRenderData().skinnedMeshes)
+        for (const scene::SkinnedMeshRenderProxy& proxy : scene.getRenderData().skinnedMeshes)
         {
             for (const scene::SkinnedMeshJointLineProxy& line : proxy.jointLines)
             {
@@ -114,7 +114,7 @@ namespace caustica::render
         if (m_Vertices.empty())
         {
             size_t totalJoints = 0;
-            for (const scene::SkinnedMeshRenderProxy& proxy : scene.GetRenderData().skinnedMeshes)
+            for (const scene::SkinnedMeshRenderProxy& proxy : scene.getRenderData().skinnedMeshes)
                 totalJoints += proxy.jointLines.size();
             
             size_t numVertices = totalJoints * 2;
@@ -122,7 +122,7 @@ namespace caustica::render
             m_Vertices.resize(numVertices);
             
             if (!m_Vertices.empty())
-                m_VertexBuffer = CreateVertexBuffer((uint32_t)numVertices);
+                m_VertexBuffer = createVertexBuffer((uint32_t)numVertices);
             else
                 return;
         }
@@ -133,7 +133,7 @@ namespace caustica::render
         view->fillPlanarViewConstants(constants);   
         commandList->writeBuffer(m_ConstantsBuffer, &constants, sizeof(PlanarViewConstants));
 
-        UpdateVertices(scene);
+        updateVertices(scene);
 
         commandList->writeBuffer(m_VertexBuffer, m_Vertices.data(), m_Vertices.size() * sizeof(Vertex));
     

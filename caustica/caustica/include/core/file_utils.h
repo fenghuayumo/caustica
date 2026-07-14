@@ -17,7 +17,7 @@ std::vector<std::filesystem::path> EnumerateFilesWithWildcard(
     const std::filesystem::path& folder,
     const std::string& wildcard);
 
-// Read entire contents of a text file into a string.
+// read entire contents of a text file into a string.
 std::string StringLoadFromFile(const std::filesystem::path& filePath);
 
 // Returns the latest write time of any file recursively under 'directory'.

@@ -173,7 +173,7 @@ void CopyEntityComponents(
 }
 } // namespace
 
-void UpdateHierarchy(ecs::World& world, PreviousTransformPolicy previousPolicy)
+void updateHierarchy(ecs::World& world, PreviousTransformPolicy previousPolicy)
 {
     if (const auto* root = world.getResource<SceneRootResource>();
         root && ecs::isValid(root->root) && world.isAlive(root->root))
@@ -282,7 +282,7 @@ bool SceneEntityWorld::hasPendingTransformChanges()
 
 void SceneEntityWorld::refreshHierarchy(PreviousTransformPolicy previousPolicy)
 {
-    UpdateHierarchy(m_world, previousPolicy);
+    updateHierarchy(m_world, previousPolicy);
     // Keep GaussianSplat::cachedGlobalTransform in sync for the splat render path.
     updateGaussianSplatTransforms();
 }
@@ -467,7 +467,7 @@ void SceneEntityWorld::assignGlobalResourceIndices()
 void SceneEntityWorld::applyAnimations(float time)
 {
     m_world.each<AnimationComponent>([&](ecs::Entity, AnimationComponent& animation) {
-        (void)ApplyAnimation(animation, time, *this);
+        (void)applyAnimation(animation, time, *this);
     });
 }
 
@@ -501,7 +501,7 @@ void SceneEntityWorld::unregisterEntityLeaves(ecs::Entity entity)
         unregisterCameraEntity(entity);
 
     if (auto* mesh = m_world.get<MeshInstanceComponent>(entity))
-        UnregisterMeshInstanceEntity(entity, mesh->mesh, m_world.has<SkinnedMeshComponent>(entity));
+        unregisterMeshInstanceEntity(entity, mesh->mesh, m_world.has<SkinnedMeshComponent>(entity));
 }
 
 void SceneEntityWorld::destroyEntity(ecs::Entity entity)
@@ -672,8 +672,8 @@ void SceneEntityWorld::updateLeafContentAndBounds(ecs::Entity entity)
     {
         if (mesh->mesh)
         {
-            leafContent = GetMeshContentFlags(*mesh->mesh);
-            localBounds = GetMeshLocalBounds(*mesh->mesh);
+            leafContent = getMeshContentFlags(*mesh->mesh);
+            localBounds = getMeshLocalBounds(*mesh->mesh);
         }
     }
     else if (m_world.has<GaussianSplatComponent>(entity))
@@ -683,11 +683,11 @@ void SceneEntityWorld::updateLeafContentAndBounds(ecs::Entity entity)
             localBounds = existing->bounds;
     }
     else if (m_world.has<CameraComponent>(entity))
-        leafContent = GetCameraContentFlags();
+        leafContent = getCameraContentFlags();
     else if (m_world.has<LightComponent>(entity))
-        leafContent = GetLightContentFlags();
+        leafContent = getLightContentFlags();
     else if (m_world.has<AnimationComponent>(entity))
-        leafContent = GetAnimationContentFlags();
+        leafContent = getAnimationContentFlags();
 
     m_world.emplace<LocalBoundsComponent>(entity, LocalBoundsComponent{ localBounds });
     m_world.emplace<SceneContentComponent>(entity, SceneContentComponent{
@@ -702,26 +702,26 @@ void SceneEntityWorld::setMeshInstance(ecs::Entity entity, const std::shared_ptr
         return;
 
     MeshInstanceComponent component;
-    InitializeMeshInstanceComponent(component, mesh);
+    initializeMeshInstanceComponent(component, mesh);
     m_world.emplace<MeshInstanceComponent>(entity, std::move(component));
-    RegisterMeshInstanceEntity(entity, mesh, false);
+    registerMeshInstanceEntity(entity, mesh, false);
     updateLeafContentAndBounds(entity);
 }
 
 void SceneEntityWorld::setSkinnedMeshInstance(
     ecs::Entity entity, SceneTypeFactory& factory, const std::shared_ptr<MeshInfo>& prototypeMesh)
 {
-    auto skinnedMesh = CreateSkinnedMeshFromPrototype(factory, prototypeMesh);
+    auto skinnedMesh = createSkinnedMeshFromPrototype(factory, prototypeMesh);
 
     MeshInstanceComponent component;
-    InitializeMeshInstanceComponent(component, skinnedMesh);
+    initializeMeshInstanceComponent(component, skinnedMesh);
     m_world.emplace<MeshInstanceComponent>(entity, std::move(component));
 
     SkinnedMeshComponent skinned;
     skinned.prototypeMesh = prototypeMesh;
     m_world.emplace<SkinnedMeshComponent>(entity, std::move(skinned));
 
-    RegisterMeshInstanceEntity(entity, skinnedMesh, true);
+    registerMeshInstanceEntity(entity, skinnedMesh, true);
     updateLeafContentAndBounds(entity);
 }
 
@@ -744,7 +744,7 @@ void SceneEntityWorld::setLight(ecs::Entity entity, const std::shared_ptr<Light>
     if (!light)
         return;
     LightComponent component;
-    InitializeLightComponent(component, light);
+    initializeLightComponent(component, light);
     setLight(entity, std::move(component));
 }
 
@@ -760,7 +760,7 @@ void SceneEntityWorld::setCamera(ecs::Entity entity, const std::shared_ptr<Scene
     if (!camera)
         return;
     CameraComponent component;
-    InitializeCameraComponent(component, camera);
+    initializeCameraComponent(component, camera);
     setCamera(entity, std::move(component));
 }
 
@@ -775,7 +775,7 @@ void SceneEntityWorld::setAnimation(ecs::Entity entity, const std::shared_ptr<Sc
     if (!animation)
         return;
     AnimationComponent component;
-    InitializeAnimationComponent(component, animation);
+    initializeAnimationComponent(component, animation);
     setAnimation(entity, std::move(component));
 }
 

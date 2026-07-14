@@ -19,7 +19,7 @@ public:
     virtual ~RenderContext() = default;
 
     [[nodiscard]] GpuDevice* GetGpuDevice() const { return m_GpuDevice; }
-    [[nodiscard]] nvrhi::IDevice* GetDevice() const;
+    [[nodiscard]] nvrhi::IDevice* getDevice() const;
     [[nodiscard]] uint32_t GetFrameIndex() const;
 
 protected:

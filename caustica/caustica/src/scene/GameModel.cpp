@@ -54,7 +54,7 @@ ModelType::ModelType(caustica::Scene& scene, const std::string& name, const Json
         }
     }
 
-    const std::vector<caustica::SceneImportResult>& models = m_scene.GetModels();
+    const std::vector<caustica::SceneImportResult>& models = m_scene.getModels();
 
     if (modelIndex == -1 && modelName != "")
     {
@@ -89,7 +89,7 @@ ModelType::ModelType(caustica::Scene& scene, const std::string& name, const Json
     m_valid = m_name != "" && modelIndex != -1;
 }
 
-std::string ModelType::FindLightControllerInfo(const std::string& nodeName)
+std::string ModelType::findLightControllerInfo(const std::string& nodeName)
 {
     auto it = m_lightsInfos.find(nodeName);
     if (it == m_lightsInfos.end())
@@ -104,33 +104,33 @@ ModelInstance::ModelInstance(const std::string& name,
     , m_name(name)
 {
     assert(modelType != nullptr);
-    caustica::Scene& scene = modelType->GetScene();
-    auto* world = scene.GetEntityWorld();
+    caustica::Scene& scene = modelType->getScene();
+    auto* world = scene.getEntityWorld();
     if (!world)
         return;
 
     m_entity = world->createEntity(name, parentEntity);
 
-    if (modelType->GetEntityWorld() && ecs::isValid(modelType->GetRootEntity()))
+    if (modelType->getEntityWorld() && ecs::isValid(modelType->getRootEntity()))
     {
         ecs::Entity importedRoot = world->importSubtree(
             m_entity,
-            *modelType->GetEntityWorld(),
-            modelType->GetRootEntity(),
-            scene.GetSceneTypeFactory().get());
+            *modelType->getEntityWorld(),
+            modelType->getRootEntity(),
+            scene.getSceneTypeFactory().get());
         if (ecs::isValid(importedRoot))
         {
-            const Pose& pose = modelType->GetModelPose();
+            const Pose& pose = modelType->getModelPose();
             world->setLocalTransform(importedRoot, &pose.Translation, &pose.Rotation, &pose.Scaling);
         }
     }
 
-    MapLightControllers(m_entity);
+    mapLightControllers(m_entity);
 }
 
-void ModelInstance::MapLightControllers(ecs::Entity entity)
+void ModelInstance::mapLightControllers(ecs::Entity entity)
 {
-    auto* world = m_modelType->GetScene().GetEntityWorld();
+    auto* world = m_modelType->getScene().getEntityWorld();
     if (!world)
         return;
 
@@ -141,12 +141,12 @@ void ModelInstance::MapLightControllers(ecs::Entity entity)
         {
 
             const std::string entityName = world->getEntityName(current);
-            std::string data = m_modelType->FindLightControllerInfo(entityName);
+            std::string data = m_modelType->findLightControllerInfo(entityName);
             Json::Value jsonData;
             if (data != "" && caustica::json::FromString(data, jsonData))
             {
                 auto lightController = std::make_shared<LightController>();
-                if (!lightController->Read(jsonData))
+                if (!lightController->read(jsonData))
                 {
                     assert(false && "Error reading LightController data");
                 }
@@ -165,9 +165,9 @@ void ModelInstance::MapLightControllers(ecs::Entity entity)
     });
 }
 
-void ModelInstance::UpdateLightFromControllers(double gameTime)
+void ModelInstance::updateLightFromControllers(double gameTime)
 {
-    auto* world = m_modelType->GetScene().GetEntityWorld();
+    auto* world = m_modelType->getScene().getEntityWorld();
     if (!world)
         return;
 
@@ -190,12 +190,12 @@ void ModelInstance::UpdateLightFromControllers(double gameTime)
         if (!lightComp)
             continue;
 
-        auto* spotData = scene::TryGetSpotLightData(*lightComp);
-        auto* pointData = scene::TryGetPointLightData(*lightComp);
+        auto* spotData = scene::tryGetSpotLightData(*lightComp);
+        auto* pointData = scene::tryGetPointLightData(*lightComp);
 
         lightComp->color = controller->Color;
 
-        bool enabled = controller->Enabled;
+        bool enabled = controller->enabled;
 
         if (controller->AutoOffTime != 0 && controller->AutoOnTime != 0)
         {
@@ -226,13 +226,13 @@ void ModelInstance::UpdateLightFromControllers(double gameTime)
     }
 }
 
-void ModelInstance::SetTransform(const dm::double3& translation, const dm::dquat& rotation, const dm::double3& scaling)
+void ModelInstance::setTransform(const dm::double3& translation, const dm::dquat& rotation, const dm::double3& scaling)
 {
-    if (auto* world = m_modelType->GetScene().GetEntityWorld())
+    if (auto* world = m_modelType->getScene().getEntityWorld())
         world->setLocalTransform(m_entity, &translation, &rotation, &scaling);
 }
 
-void ModelInstance::SetTransform(const dm::float3& translation, const dm::quat& rotation, const dm::float3& scaling)
+void ModelInstance::setTransform(const dm::float3& translation, const dm::quat& rotation, const dm::float3& scaling)
 {
-    SetTransform(dm::double3(translation), dm::dquat(rotation), dm::double3(scaling));
+    setTransform(dm::double3(translation), dm::dquat(rotation), dm::double3(scaling));
 }

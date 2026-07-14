@@ -155,7 +155,7 @@ void EditorUI::DLSSFGSelectorUI()
 
 void EditorUI::BuildDisplayPerformancePanel(const PanelLayout& layout)
 {
-        if (ImGui::CollapsingHeader("Display and performance")) //, ImGuiTreeNodeFlags_DefaultOpen))
+        if (ImGui::CollapsingHeader("display and performance")) //, ImGuiTreeNodeFlags_DefaultOpen))
         {
             RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
             
@@ -181,7 +181,7 @@ void EditorUI::BuildDisplayPerformancePanel(const PanelLayout& layout)
 
             {
 #if CAUSTICA_WITH_STREAMLINE
-                UI_SCOPED_DISABLE(m_settings.ActualDLSSFGMode() != SI::DLSSGMode::eOff);
+                UI_SCOPED_DISABLE(m_settings.actualDLSSFGMode() != SI::DLSSGMode::eOff);
 #endif
                 ImGui::Checkbox("VSync", &m_settings.EnableVsync);
                 bool fpsLimiter = m_settings.FPSLimiter != 0;

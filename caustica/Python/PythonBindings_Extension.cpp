@@ -45,7 +45,7 @@ namespace
     App& RequireCurrentApp()
     {
         if (!g_currentExtensionApp)
-            throw std::runtime_error("caustica: no Renderer is currently active. Create one via caustica.Renderer(...)");
+            throw std::runtime_error("caustica: no Renderer is currently active. create one via caustica.Renderer(...)");
         return *g_currentExtensionApp;
     }
 
@@ -76,7 +76,7 @@ namespace
         auto scene = caustica::sceneSession::scene(*app);
         if (!scene)
             return std::nullopt;
-        const caustica::math::box3 bbox = scene->GetSceneBounds();
+        const caustica::math::box3 bbox = scene->getSceneBounds();
         if (bbox.isempty() || !IsFiniteBox(bbox))
             return std::nullopt;
         return bbox;
@@ -84,7 +84,7 @@ namespace
 }
 
 // Small wrapper holding RenderSession + automatic singleton tracking so the
-// shared bindings (Material, Light, Settings, ...) keep functioning unchanged.
+// shared bindings (Material, Light, settings, ...) keep functioning unchanged.
 class PyRenderer
 {
 public:
@@ -176,7 +176,7 @@ public:
             .SceneTypes = std::make_shared<caustica::render::RenderSceneTypeFactory>(),
             .TextureSearchDirectory = {},
         };
-        const auto loadResult = caustica::LoadRuntimeMeshFile(params, std::filesystem::path(fileName));
+        const auto loadResult = caustica::loadRuntimeMeshFile(params, std::filesystem::path(fileName));
         if (!loadResult || !loadResult.ImportResult)
             return false;
 
@@ -187,12 +187,12 @@ public:
         const uint32_t frameIndex = m_session->GetEngine()
             ? m_session->GetEngine()->frameIndex()
             : 0u;
-        const auto importedRoot = caustica::AttachRuntimeSceneImport(
+        const auto importedRoot = caustica::attachRuntimeSceneImport(
             scene, *loadResult.ImportResult, frameIndex);
         if (importedRoot == caustica::ecs::NullEntity)
             return false;
 
-        caustica::FinalizeRuntimeSceneMutation(scene, importedRoot, frameIndex);
+        caustica::finalizeRuntimeSceneMutation(scene, importedRoot, frameIndex);
         return true;
     }
 
@@ -208,7 +208,7 @@ public:
         return m_session && m_session->GetEngine() ? &m_session->GetEngine()->app() : nullptr;
     }
 
-    bool IsValid() const { return m_session && m_session->GetEngine() != nullptr; }
+    bool isValid() const { return m_session && m_session->GetEngine() != nullptr; }
 
 private:
     std::unique_ptr<RenderSession> m_session;
@@ -252,7 +252,7 @@ NB_MODULE(caustica, m)
         .def("load_scene",
              [](PyRenderer& self, const std::string& name, bool wait) { return self.LoadScene(name, wait); },
              nb::arg("scene_name"), nb::arg("wait_until_ready") = true,
-             "Load a scene by name, builtin primitive reference, or inline scene JSON string.")
+             "load a scene by name, builtin primitive reference, or inline scene JSON string.")
 
         .def("load_gaussian_splats",
              [](PyRenderer& self, const std::string& fileName, bool convertRdfToRub) {
@@ -267,15 +267,15 @@ NB_MODULE(caustica, m)
 
         .def("step", &PyRenderer::Step,
              nb::arg("dt") = -1.0f,
-             "Render exactly one frame.  Returns True on success.")
+             "render exactly one frame.  Returns True on success.")
 
         .def("step_n", &PyRenderer::StepN,
              nb::arg("frames"),
-             "Render N frames.")
+             "render N frames.")
 
         .def("step_until_accumulated", &PyRenderer::StepUntilAccumulated,
              nb::arg("max_frames") = 0,
-             "Reset accumulation and keep stepping until the SPP target is reached\n"
+             "reset accumulation and keep stepping until the SPP target is reached\n"
              "(or `max_frames` frames have been produced if positive).")
 
         .def("save_screenshot", &PyRenderer::SaveScreenshot,
@@ -341,7 +341,7 @@ NB_MODULE(caustica, m)
                  return app ? caustica::sceneSession::settings(*app) : nullptr;
              },
              nb::rv_policy::reference,
-             "Live `Settings` mirror (same object as caustica.settings()).")
+             "Live `settings` mirror (same object as caustica.settings()).")
 
         .def("__enter__", [](PyRenderer& self) -> PyRenderer* { return &self; },
              nb::rv_policy::reference)
@@ -358,7 +358,7 @@ NB_MODULE(caustica, m)
             return caustica::sceneSession::settings(RequireCurrentApp());
         },
           nb::rv_policy::reference,
-          "Shortcut for the global Settings (same as Renderer.settings).");
+          "Shortcut for the global settings (same as Renderer.settings).");
 
     m.def("builtin_scene_json", &caustica_py::BuiltinSceneJson,
           nb::arg("builtin_model") = std::string("plane_cube"),

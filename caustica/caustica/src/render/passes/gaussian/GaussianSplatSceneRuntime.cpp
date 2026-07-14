@@ -22,7 +22,7 @@ bool isGaussianSplatSceneObjectActive(const SceneGaussianSplatPasses::SceneObjec
     return object.splat != nullptr
         && object.splat->enabled
         && object.pass != nullptr
-        && object.pass->HasSplats();
+        && object.pass->hasSplats();
 }
 
 GaussianSplatBinding getPrimaryGaussianSplatBinding(const SceneGaussianSplatPasses& scenePasses)
@@ -48,8 +48,8 @@ void prepareGaussianSplatScenePass(GaussianSplatPass& pass, const GaussianSplatP
     if (context.gpuSort == nullptr)
         return;
 
-    pass.SetGpuSort(context.gpuSort);
-    pass.CreatePipeline(*context.renderTargets);
+    pass.setGpuSort(context.gpuSort);
+    pass.createPipeline(*context.renderTargets);
 }
 
 void prepareGaussianSplatScenePasses(SceneGaussianSplatPasses& scenePasses, GaussianSplatPrepareContext& context)
@@ -60,12 +60,12 @@ void prepareGaussianSplatScenePasses(SceneGaussianSplatPasses& scenePasses, Gaus
         && context.shaderDebug != nullptr)
     {
         context.gpuSort = std::make_shared<GPUSort>(context.device, context.shaderFactory);
-        context.gpuSort->CreateRenderPasses(context.shaderDebug);
+        context.gpuSort->createRenderPasses(context.shaderDebug);
     }
 
     for (SceneGaussianSplatPasses::SceneObject& object : scenePasses.objects())
     {
-        if (object.pass != nullptr && object.pass->HasSplats())
+        if (object.pass != nullptr && object.pass->hasSplats())
             prepareGaussianSplatScenePass(*object.pass, context);
     }
 }
@@ -92,7 +92,7 @@ void buildGaussianSplatEmissionProxies(
         if (remainingProxyCount == 0)
             break;
 
-        object.pass->BuildEmissionProxies(
+        object.pass->buildEmissionProxies(
             remainingProxyCount,
             settings.GaussianSplatScale,
             uint32_t(std::clamp(settings.GaussianSplatRtxKernelDegree, 0, 5)),
@@ -106,7 +106,7 @@ void buildGaussianSplatEmissionProxies(
             length(objectToWorldTransform.transformVector(dm::float3(0.0f, 1.0f, 0.0f))),
             length(objectToWorldTransform.transformVector(dm::float3(0.0f, 0.0f, 1.0f))) });
 
-        const auto& proxies = object.pass->GetEmissionProxies();
+        const auto& proxies = object.pass->getEmissionProxies();
         out.reserve(out.size() + proxies.size());
         for (const GaussianSplatEmissionProxy& proxy : proxies)
         {
@@ -134,7 +134,7 @@ bool renderGaussianSplatScene(
 
         GaussianSplatRenderSettings objectSettings = settings;
         objectSettings.objectToWorld = gaussianSplatObjectToWorld(object);
-        object.pass->Render(commandList, splatView, meshTopLevelAS, renderTargets, objectSettings);
+        object.pass->render(commandList, splatView, meshTopLevelAS, renderTargets, objectSettings);
         renderedAny = true;
     }
     return renderedAny;
@@ -153,7 +153,7 @@ void buildGaussianSplatSceneAccelStructs(
 
         if (buildShadowAccelStructs)
         {
-            object.pass->BuildAccelerationStructures(
+            object.pass->buildAccelerationStructures(
                 commandList,
                 settings.GaussianSplatUseAABBs,
                 settings.GaussianSplatUseTLASInstances,
@@ -164,7 +164,7 @@ void buildGaussianSplatSceneAccelStructs(
         }
         else
         {
-            object.pass->ReleaseAccelerationStructures();
+            object.pass->releaseAccelerationStructures();
         }
     }
 }

@@ -64,10 +64,10 @@ namespace caustica::render
         };
 
         std::unordered_map<TextureSubresourcesKey, nvrhi::FramebufferHandle, TextureSubresourcesKey::Hash> m_framebufferCache;
-        nvrhi::FramebufferHandle GetCachedFramebuffer(nvrhi::ITexture* texture, nvrhi::TextureSubresourceSet subresources);
+        nvrhi::FramebufferHandle getCachedFramebuffer(nvrhi::ITexture* texture, nvrhi::TextureSubresourceSet subresources);
 
         std::unordered_map<TextureSubresourcesKey, nvrhi::BindingSetHandle, TextureSubresourcesKey::Hash> m_BindingSetCache;
-        nvrhi::BindingSetHandle GetCachedBindingSet(nvrhi::ITexture* texture, nvrhi::TextureSubresourceSet subresources);
+        nvrhi::BindingSetHandle getCachedBindingSet(nvrhi::ITexture* texture, nvrhi::TextureSubresourceSet subresources);
 
 
     public:
@@ -79,7 +79,7 @@ namespace caustica::render
             nvrhi::Format intermediateTextureFormat = nvrhi::Format::RGBA16_FLOAT
         );
 
-        void BlitCubemap(
+        void blitCubemap(
             nvrhi::ICommandList* commandList,
             nvrhi::ITexture* inCubeMap,
             uint32_t inBaseArraySlice,
@@ -88,14 +88,14 @@ namespace caustica::render
             uint32_t outBaseArraySlice,
             uint32_t outMipLevel);
 
-        void GenerateCubemapMips(
+        void generateCubemapMips(
             nvrhi::ICommandList* commandList,
             nvrhi::ITexture* cubeMap,
             uint32_t baseArraySlice,
             uint32_t sourceMipLevel,
             uint32_t levelsToGenerate);
 
-        void RenderDiffuseMap(
+        void renderDiffuseMap(
             nvrhi::ICommandList* commandList,
             nvrhi::ITexture* inEnvironmentMap,
             nvrhi::TextureSubresourceSet inSubresources,
@@ -103,7 +103,7 @@ namespace caustica::render
             uint32_t outBaseArraySlice,
             uint32_t outMipLevel);
 
-        void RenderSpecularMap(
+        void renderSpecularMap(
             nvrhi::ICommandList* commandList,
             float roughness,
             nvrhi::ITexture* inEnvironmentMap,
@@ -112,11 +112,11 @@ namespace caustica::render
             uint32_t outBaseArraySlice,
             uint32_t outMipLevel);
 
-        void RenderEnvironmentBrdfTexture(
+        void renderEnvironmentBrdfTexture(
             nvrhi::ICommandList* commandList);
 
-        nvrhi::ITexture* GetEnvironmentBrdfTexture();
+        nvrhi::ITexture* getEnvironmentBrdfTexture();
 
-        void ResetCaches();
+        void resetCaches();
     };
 }

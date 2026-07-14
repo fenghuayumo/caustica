@@ -45,7 +45,7 @@ namespace
     void ApplyGaussianSplatLocalBounds(scene::SceneEntityWorld& entityWorld, ecs::Entity entity, const GaussianSplatPass& pass)
     {
         entityWorld.world().emplace<scene::LocalBoundsComponent>(
-            entity, scene::LocalBoundsComponent{ pass.GetLocalBounds() });
+            entity, scene::LocalBoundsComponent{ pass.getLocalBounds() });
         entityWorld.refreshHierarchy(scene::PreviousTransformPolicy::PreserveExisting);
     }
 }
@@ -95,7 +95,7 @@ bool SceneGaussianSplatPasses::removeObjectsUnderEntity(ecs::Entity rootEntity)
         return false;
 
     const scene::SceneEntityWorld* entityWorld = m_sceneManager->getScene()
-        ? m_sceneManager->getScene()->GetEntityWorld()
+        ? m_sceneManager->getScene()->getEntityWorld()
         : nullptr;
     if (!entityWorld)
         return false;
@@ -146,7 +146,7 @@ void SceneGaussianSplatPasses::onPassLoaded(GaussianSplatPass& pass)
         return;
 
     if (RenderTargets* renderTargets = m_getRenderTargets())
-        pass.CreatePipeline(*renderTargets);
+        pass.createPipeline(*renderTargets);
 }
 
 uint32_t SceneGaussianSplatPasses::totalSplatCount() const
@@ -155,7 +155,7 @@ uint32_t SceneGaussianSplatPasses::totalSplatCount() const
     for (const auto& object : m_objects)
     {
         if (object.pass != nullptr)
-            total += object.pass->GetSplatCount();
+            total += object.pass->getSplatCount();
     }
     return uint32_t(std::min<uint64_t>(total, std::numeric_limits<uint32_t>::max()));
 }
@@ -167,7 +167,7 @@ void SceneGaussianSplatPasses::updateUIState()
 
     m_fileNameSummary.clear();
     if (m_objects.size() == 1 && m_objects.front().pass != nullptr)
-        m_fileNameSummary = m_objects.front().pass->GetSourceFileName();
+        m_fileNameSummary = m_objects.front().pass->getSourceFileName();
     else if (!m_objects.empty())
         m_fileNameSummary = std::to_string(m_objects.size()) + " scene Gaussian Splat objects";
     m_summary->FileName = m_fileNameSummary;
@@ -177,13 +177,13 @@ void SceneGaussianSplatPasses::loadFromSceneEntities()
 {
     m_objects.clear();
 
-    if (!m_sceneManager->getScene() || !m_sceneManager->getScene()->GetEntityWorld() || !m_shaderFactory)
+    if (!m_sceneManager->getScene() || !m_sceneManager->getScene()->getEntityWorld() || !m_shaderFactory)
     {
         updateUIState();
         return;
     }
 
-    auto* entityWorld = m_sceneManager->getScene()->GetEntityWorld();
+    auto* entityWorld = m_sceneManager->getScene()->getEntityWorld();
     entityWorld->world().each<scene::GaussianSplatComponent>(
         [&](ecs::Entity entity, scene::GaussianSplatComponent& component)
         {
@@ -202,11 +202,11 @@ void SceneGaussianSplatPasses::loadFromSceneEntities()
                 return;
             }
 
-            auto pass = std::make_unique<GaussianSplatPass>(m_gpuDevice->GetDevice(), m_shaderFactory);
-            if (pass->LoadFromFile(splatPath, splat->convertRdfToRub))
+            auto pass = std::make_unique<GaussianSplatPass>(m_gpuDevice->getDevice(), m_shaderFactory);
+            if (pass->loadFromFile(splatPath, splat->convertRdfToRub))
             {
                 splat->resolvedPath = splatPath.string();
-                splat->loadedSplatCount = pass->GetSplatCount();
+                splat->loadedSplatCount = pass->getSplatCount();
                 onPassLoaded(*pass);
                 ApplyGaussianSplatLocalBounds(*entityWorld, entity, *pass);
 
@@ -231,7 +231,7 @@ void SceneGaussianSplatPasses::loadFromSceneEntities()
 bool SceneGaussianSplatPasses::attachToScene(const std::filesystem::path& fileName, bool convertRdfToRub)
 {
     auto scene = m_sceneManager->getScene();
-    auto* entityWorld = scene ? scene->GetEntityWorld() : nullptr;
+    auto* entityWorld = scene ? scene->getEntityWorld() : nullptr;
     if (!scene || !entityWorld || !ecs::isValid(entityWorld->root()))
     {
         caustica::error("Cannot load Gaussian splats before a scene is loaded.");
@@ -253,13 +253,13 @@ bool SceneGaussianSplatPasses::attachToScene(const std::filesystem::path& fileNa
         return false;
     }
 
-    auto pass = std::make_unique<GaussianSplatPass>(m_gpuDevice->GetDevice(), m_shaderFactory);
-    if (!pass->LoadFromFile(splatPath, convertRdfToRub))
+    auto pass = std::make_unique<GaussianSplatPass>(m_gpuDevice->getDevice(), m_shaderFactory);
+    if (!pass->loadFromFile(splatPath, convertRdfToRub))
     {
         caustica::error("Failed to load Gaussian Splat file '%s'.", splatPath.string().c_str());
         return false;
     }
-    if (pass->GetSplatCount() == 0)
+    if (pass->getSplatCount() == 0)
     {
         caustica::error("Gaussian Splat file '%s' contains no splats.", splatPath.string().c_str());
         return false;
@@ -270,7 +270,7 @@ bool SceneGaussianSplatPasses::attachToScene(const std::filesystem::path& fileNa
     splat->resolvedPath = splatPath.string();
     splat->convertRdfToRub = convertRdfToRub;
     splat->enabled = true;
-    splat->loadedSplatCount = pass->GetSplatCount();
+    splat->loadedSplatCount = pass->getSplatCount();
 
     const ecs::Entity parent = entityWorld->root();
     const std::string entityName = MakeUniqueChildEntityName(*entityWorld, parent, splatPath.filename().string());

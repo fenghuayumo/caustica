@@ -73,11 +73,11 @@ namespace caustica
         // Test if a file exists.
         virtual bool fileExists(const std::filesystem::path& name) = 0;
 
-        // Read the entire file.
+        // read the entire file.
         // Returns nullptr if the file cannot be read.
         virtual std::shared_ptr<IBlob> readFile(const std::filesystem::path& name) = 0;
 
-        // Write the entire file.
+        // write the entire file.
         // Returns false if the file cannot be written.
         virtual bool writeFile(const std::filesystem::path& name, const void* data, size_t size) = 0;
 

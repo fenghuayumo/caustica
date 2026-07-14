@@ -186,7 +186,7 @@ DWORD WINAPI SplashScreen::ThreadProc(void* param)
     State* st = (State*)param;
     auto& s = st->s;
 
-    // Your app is PerMonitorV2. Make this UI thread PerMonitorV2 as well.
+    // Your app is PerMonitorV2. make this UI thread PerMonitorV2 as well.
     auto oldCtx = SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
     CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
@@ -201,7 +201,7 @@ DWORD WINAPI SplashScreen::ThreadProc(void* param)
     wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
     RegisterClassW(&wc);
 
-    // Create window: borderless, no taskbar button, optionally topmost.
+    // create window: borderless, no taskbar button, optionally topmost.
     HWND hwnd = CreateWindowExW(
         WS_EX_TOOLWINDOW | WS_EX_LAYERED,
         kClassName,
@@ -213,7 +213,7 @@ DWORD WINAPI SplashScreen::ThreadProc(void* param)
 
     s.hwnd.store(hwnd, std::memory_order_release);
 
-    // Load image
+    // load image
     std::vector<uint8_t> bgra;
     UINT w = 0;
     UINT h = 0;
@@ -266,7 +266,7 @@ LRESULT CALLBACK SplashScreen::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
     {
     case WM_NCCREATE:
     {
-        // Store pointer for potential future extension.
+        // store pointer for potential future extension.
         auto* cs = (CREATESTRUCTW*)lParam;
         SetWindowLongPtrW(hwnd, GWLP_USERDATA, (LONG_PTR)cs->lpCreateParams);
         return TRUE;

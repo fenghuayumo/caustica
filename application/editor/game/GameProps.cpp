@@ -48,7 +48,7 @@ PropBase::PropBase(GameScene& gameScene, const std::string & name)
 caustica::scene::SceneEntityWorld* PropBase::EntityWorld() const
 {
     const auto& scene = m_gameScene.scene();
-    return scene ? scene->GetEntityWorld() : nullptr;
+    return scene ? scene->getEntityWorld() : nullptr;
 }
 
 std::string PropBase::GetName() const
@@ -61,18 +61,18 @@ std::string PropBase::GetName() const
 std::shared_ptr<ModelInstance> PropBase::CreateAndAttachModel(const std::shared_ptr<game::ModelType> & modelType, const std::string & instanceName, const dm::float3& translation, const dm::quat& rotation, const dm::float3& scaling )
 {
     auto ret = std::make_shared<game::ModelInstance>(instanceName, modelType, m_entity);
-    ret->SetTransform(translation, rotation, scaling);
+    ret->setTransform(translation, rotation, scaling);
     return ret;
 }
 
-void PropBase::SetTransform(const dm::double3& translation, const dm::dquat& rotation, const dm::double3& scaling)
+void PropBase::setTransform(const dm::double3& translation, const dm::dquat& rotation, const dm::double3& scaling)
 {
     auto* ew = EntityWorld();
     if (ew && m_entity != caustica::ecs::NullEntity)
         ew->setLocalTransform(m_entity, &translation, &rotation, &scaling);
 }
 
-void PropBase::SetTransform(const dm::float3& translation, const dm::quat& rotation, const dm::float3& scaling)
+void PropBase::setTransform(const dm::float3& translation, const dm::quat& rotation, const dm::float3& scaling)
 {
     dm::double3 transD = dm::double3(translation);
     dm::dquat rotD = dm::dquat(rotation);
@@ -172,39 +172,39 @@ void PropBase::Tick(double gameTime, float deltaTime)
     }
 #endif
 
-    // if (!m_gameScene.IsActive())
+    // if (!m_gameScene.isActive())
     //     return;
 
     Pose animPose;
     float animTime = 0.0f;
-    if (m_animation.GetAt(m_animPlaybackSpeed*gameTime + m_animOffset, true, animPose, animTime))
-        SetTransform(animPose.Translation, animPose.Rotation, animPose.Scaling);
+    if (m_animation.getAt(m_animPlaybackSpeed*gameTime + m_animOffset, true, animPose, animTime))
+        setTransform(animPose.Translation, animPose.Rotation, animPose.Scaling);
 
     for (auto & comp : m_components)
         comp->Tick(gameTime, animTime, deltaTime);
 
     // transfer all changes to lights - especially necessary if scaling used
     for (auto& model : m_models)
-        model->UpdateLightFromControllers(gameTime);
+        model->updateLightFromControllers(gameTime);
 }
 
-void PropBase::Reset()
+void PropBase::reset()
 {
-    SetTransform(m_startPose.Translation, m_startPose.Rotation, m_startPose.Scaling);
+    setTransform(m_startPose.Translation, m_startPose.Rotation, m_startPose.Scaling);
     m_animOffset = 0;
 }
 
-void PropBase::Load(const Json::Value& jsonRoot)
+void PropBase::load(const Json::Value& jsonRoot)
 {
     jsonRoot["propType"] >> m_propType;
 
-    m_startPose.Read(jsonRoot["startPose"]);
+    m_startPose.read(jsonRoot["startPose"]);
 
     auto jsonDefaultCameraPose = jsonRoot["defaultCameraPose"];
     if (jsonDefaultCameraPose.empty())
-        m_defaultCameraPose.SetTransformFromCamera( {0,0,0}, {1, 0, 0}, {0, 1, 0} );
+        m_defaultCameraPose.setTransformFromCamera( {0,0,0}, {1, 0, 0}, {0, 1, 0} );
     else
-        m_defaultCameraPose.Read(jsonDefaultCameraPose);
+        m_defaultCameraPose.read(jsonDefaultCameraPose);
 
     jsonRoot["animPlaybackSpeed"] >> m_animPlaybackSpeed;
 
@@ -214,7 +214,7 @@ void PropBase::Load(const Json::Value& jsonRoot)
 
     if (!animationRecording.empty() && animationRecording.isArray())
     {
-        m_animation.Read(animationRecording);
+        m_animation.read(animationRecording);
         m_animating = true;
     }
 
@@ -237,10 +237,10 @@ void PropBase::PostLoadSetup()
         {
             std::string modelName; m["modelInstanceName"] >> modelName;
             
-            auto it = std::find_if(m_models.begin(), m_models.end(), [&modelName](auto & model) { return model->GetInstanceName() == modelName; });
+            auto it = std::find_if(m_models.begin(), m_models.end(), [&modelName](auto & model) { return model->getInstanceName() == modelName; });
             if (it != m_models.end())
             {
-                const std::vector<std::shared_ptr<LightController>> & modelLights = (*it)->GetLights();
+                const std::vector<std::shared_ptr<LightController>> & modelLights = (*it)->getLights();
                 Json::Value lightOverrides = m["lightOverrides"];
                 for (Json::Value& lo : lightOverrides)
                 {
@@ -253,7 +253,7 @@ void PropBase::PostLoadSetup()
                     });
                     if (lit != modelLights.end())
                     {
-                        (*lit)->Read(lo);
+                        (*lit)->read(lo);
                     }
                     else { caustica::warning("Bad light override, prop %s, model %s, light name %s", GetName().c_str(), modelName.c_str(), lightName.c_str()); }
                 }
@@ -267,7 +267,7 @@ void PropBase::PostLoadSetup()
         caustica::json::FromString(m_componentsData, components);
         for (Json::Value& m : components)
         {
-            std::shared_ptr<PropComponentBase> comp = PropComponentBase::Create(*this, m);
+            std::shared_ptr<PropComponentBase> comp = PropComponentBase::create(*this, m);
             if (comp != nullptr)
                 m_components.push_back(comp);
         }
@@ -278,10 +278,10 @@ Json::Value PropBase::Save()
 {
     Json::Value jsonRoot;
     if (m_animation.Keys.size() > 0)
-        jsonRoot["animation"] = m_animation.Write();
+        jsonRoot["animation"] = m_animation.write();
 
-    jsonRoot["defaultCameraPose"] = m_defaultCameraPose.Write();
-    jsonRoot["startPose"] = m_startPose.Write();
+    jsonRoot["defaultCameraPose"] = m_defaultCameraPose.write();
+    jsonRoot["startPose"] = m_startPose.write();
     jsonRoot["propType"] = m_propType;
     jsonRoot["animPlaybackSpeed"] = m_animPlaybackSpeed;
     
@@ -315,13 +315,13 @@ void PropBase::GUI(float indent, bool & gameCameraAttached, caustica::FirstPerso
         ImGui::Text("Camera pose: "); ImGui::SameLine();
         if (ImGui::Button("Save"))
         {
-            m_defaultCameraPose.SetTransformFromCamera(gameCamera.GetPosition(), gameCamera.GetDir(), gameCamera.GetUp());
+            m_defaultCameraPose.setTransformFromCamera(gameCamera.getPosition(), gameCamera.getDir(), gameCamera.getUp());
         }
         ImGui::SameLine();
-        if (ImGui::Button("Load"))
+        if (ImGui::Button("load"))
         {
-            auto [pos, dir, up] = m_defaultCameraPose.GetPosDirUp();
-            gameCamera.LookTo( pos, dir, up );
+            auto [pos, dir, up] = m_defaultCameraPose.getPosDirUp();
+            gameCamera.lookTo( pos, dir, up );
         }
 #endif
     }
@@ -334,7 +334,7 @@ void PropBase::GUI(float indent, bool & gameCameraAttached, caustica::FirstPerso
         if (ImGui::Button("Move prop to camera pose"))
         {
             auto& pose = m_gameScene.GetLastRenderCameraPose();
-            SetTransform(pose.Translation, pose.Rotation, pose.Scaling);
+            setTransform(pose.Translation, pose.Rotation, pose.Scaling);
         }
 #endif
     }
@@ -356,7 +356,7 @@ void PropBase::GUI(float indent, bool & gameCameraAttached, caustica::FirstPerso
     if (m_gameScene.GetCamRecAnimation().size() > 0 && ImGui::Button("Copy current cam animation"))
     {
         m_animation.Keys.clear();
-        m_animation.FromKeys(m_gameScene.GetCamRecAnimation());
+        m_animation.fromKeys(m_gameScene.GetCamRecAnimation());
     }
     ImGui::Separator();
     {
@@ -371,21 +371,21 @@ void PropBase::GUI(float indent, bool & gameCameraAttached, caustica::FirstPerso
         {
             int counter = 0;
             for (const auto & model : m_models)
-                for (const auto & light : model->GetLights())
+                for (const auto & light : model->getLights())
                 {
                     counter++; RAII_SCOPE(ImGui::PushID(counter);, ImGui::PopID(););
                     auto* ew = EntityWorld();
                     std::string lightName = (ew && light->Entity != caustica::ecs::NullEntity) ? ew->getEntityName(light->Entity) : "?";
-                    ImGui::Checkbox( std::format("Light {} - {}", model->GetInstanceName().c_str(), lightName.c_str()).c_str(), &light->Enabled );
+                    ImGui::Checkbox( std::format("Light {} - {}", model->getInstanceName().c_str(), lightName.c_str()).c_str(), &light->enabled );
                 }
         }
         // ImGui::SameLine();
-        // if (ImGui::Button("Load"))
+        // if (ImGui::Button("load"))
         // {
         //     Json::Value jread;
-        //     caustica::json::LoadFromFile( m_storagePath, jread );
-        //     Load(jread);
-        //     Reset();
+        //     caustica::json::loadFromFile( m_storagePath, jread );
+        //     load(jread);
+        //     reset();
         // }
     }
 #endif
@@ -413,14 +413,14 @@ void SimpleProp::Tick(double gameTime, float deltaTime)
     PropBase::Tick(gameTime, deltaTime);
 }
 
-void SimpleProp::Reset()
+void SimpleProp::reset()
 {
-    PropBase::Reset();
+    PropBase::reset();
 }
 
-void SimpleProp::Load(const Json::Value& jsonRoot)
+void SimpleProp::load(const Json::Value& jsonRoot)
 {
-    PropBase::Load(jsonRoot);
+    PropBase::load(jsonRoot);
 
     if (m_showOnlyIfTagged != "")
         if (FindSubStringIgnoreCase(m_gameScene.GetCmdLine().PropShowTags, m_showOnlyIfTagged) == std::string::npos)

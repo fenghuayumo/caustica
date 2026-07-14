@@ -155,7 +155,7 @@ RtxdiResources::RtxdiResources(
     LocalLightPdfTexture = device->createTexture(localLightPdfDesc);
 }
 
-void RtxdiResources::InitializeNeighborOffsets(nvrhi::ICommandList* commandList, uint32_t neighborOffsetCount)
+void RtxdiResources::initializeNeighborOffsets(nvrhi::ICommandList* commandList, uint32_t neighborOffsetCount)
 {
     if (m_NeighborOffsetsInitialized)
         return;

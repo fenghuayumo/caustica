@@ -63,7 +63,7 @@ void CaptureSequencer::PreAnim(
         elapsedTimeSeconds = static_cast<float>(m_settings.SequenceDeltaTime);
 }
 
-CaptureSequencerPreRenderActions CaptureSequencer::PreRender()
+CaptureSequencerPreRenderActions CaptureSequencer::preRender()
 {
     CaptureSequencerPreRenderActions actions;
     if (m_active && m_settings.ResetAndWarmup)

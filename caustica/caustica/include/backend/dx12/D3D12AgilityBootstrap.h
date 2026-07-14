@@ -13,7 +13,7 @@ struct AgilityBootstrapResult
     Microsoft::WRL::ComPtr<ID3D12DeviceFactory> deviceFactory;
 };
 
-// Load the Agility SDK redistributable from <runtime>/D3D12/ and enable
+// load the Agility SDK redistributable from <runtime>/D3D12/ and enable
 // experimental shader models via the factory when possible.
 AgilityBootstrapResult BootstrapAgilitySdk();
 

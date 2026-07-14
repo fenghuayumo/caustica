@@ -35,7 +35,7 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
 {
     // Inspector panel: instance Transform + mesh name (right-click pick)
     auto scene = m_sceneEditor.scene();
-    auto* ew = scene ? scene->GetEntityWorld() : nullptr;
+    auto* ew = scene ? scene->getEntityWorld() : nullptr;
     if (m_editorUI.SelectedEntity != ecs::NullEntity && m_editorUI.ShowInspector && ew)
     {
         ImGui::SetNextWindowPos(ImVec2(float(layout.scaledWidth) - 10.f, 10.f), ImGuiCond_Appearing, ImVec2(1.f, 0.f));
@@ -122,7 +122,7 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
         {
             if (ImGui::CollapsingHeader("3D Gaussian Splats", ImGuiTreeNodeFlags_DefaultOpen))
             {
-                if (ImGui::Checkbox("Enabled", &gaussianSplat->enabled))
+                if (ImGui::Checkbox("enabled", &gaussianSplat->enabled))
                 {
                     m_runtime.Invalidation.AccelerationStructRebuildRequested = true;
                     m_settings.ResetAccumulation = true;
@@ -196,7 +196,7 @@ void EditorUI::BuildMaterialEditorPanel(const PanelLayout& layout)
             dirty)
         {
             if (auto s = m_sceneEditor.scene())
-                s->RefreshSceneWorld(m_sceneEditor.frameIndex());
+                s->refreshSceneWorld(m_sceneEditor.frameIndex());
             m_settings.ResetAccumulation = 1;
         }
 

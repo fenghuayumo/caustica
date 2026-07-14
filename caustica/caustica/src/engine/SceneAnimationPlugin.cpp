@@ -18,7 +18,7 @@ void refreshEntityWorld(App& app, uint32_t frameIndex)
 
 void registerSceneAnimationPlugin(App& app)
 {
-    app.addSystem(AppSchedule::Update, "SceneSession.Animate", [](SystemContext& ctx) {
+    app.addSystem(AppSchedule::update, "SceneSession.animate", [](SystemContext& ctx) {
         if (!ctx.windowFocused)
             return;
 
@@ -29,7 +29,7 @@ void registerSceneAnimationPlugin(App& app)
         sceneSession::refreshEntityWorld(ctx.app, ctx.frameIndex);
     });
 
-    app.addSystemAfter(AppSchedule::Update, "SceneSession.TickSimulation", "SceneSession.UpdateCamera", [](SystemContext& ctx) {
+    app.addSystemAfter(AppSchedule::update, "SceneSession.TickSimulation", "SceneSession.updateCamera", [](SystemContext& ctx) {
         if (!ctx.windowFocused)
             return;
 

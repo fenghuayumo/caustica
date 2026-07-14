@@ -14,9 +14,9 @@ class AccumulationPass
 public:
     AccumulationPass(nvrhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory);
 
-    void CreatePipeline();
-    void CreateBindingSet(nvrhi::ITexture* inputTexture, nvrhi::ITexture* outputTexture, nvrhi::ITexture* renderOutputTexture);
-    void Render(nvrhi::ICommandList* commandList, const caustica::IView& sourceView, const caustica::IView& upscaledView, float accumulationWeight);
+    void createPipeline();
+    void createBindingSet(nvrhi::ITexture* inputTexture, nvrhi::ITexture* outputTexture, nvrhi::ITexture* renderOutputTexture);
+    void render(nvrhi::ICommandList* commandList, const caustica::IView& sourceView, const caustica::IView& upscaledView, float accumulationWeight);
 
 private:
     nvrhi::DeviceHandle m_device;

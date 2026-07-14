@@ -92,7 +92,7 @@ EnvironmentMapPass::EnvironmentMapPass(
     }
 }
 
-void EnvironmentMapPass::Render(
+void EnvironmentMapPass::render(
     nvrhi::ICommandList* commandList,
     const ICompositeView& compositeView)
 {

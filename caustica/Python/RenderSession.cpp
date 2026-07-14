@@ -436,7 +436,7 @@ bool RenderSession::Step(float dt)
     // (e.g. screenshot readback or auto-exposure buffer maps). Serialize frames.
     if (m_config.headless)
     {
-        if (!device->GetDevice()->waitForIdle())
+        if (!device->getDevice()->waitForIdle())
         {
             caustica::error("RenderSession: GPU device lost or removed");
             return false;
@@ -525,7 +525,7 @@ bool RenderSession::SaveScreenshot(const std::string& outputPath)
 
     // saveTextureToFile creates its own command list. Wait for the last rendered
     // frame to finish so LdrColor is not still in use by an in-flight submit.
-    if (!device->GetDevice()->waitForIdle())
+    if (!device->getDevice()->waitForIdle())
     {
         caustica::error("RenderSession: GPU device lost or removed before screenshot");
         return false;
@@ -536,7 +536,7 @@ bool RenderSession::SaveScreenshot(const std::string& outputPath)
         EnsureDirectoryExists(p.parent_path());
 
     return caustica::saveTextureToFile(
-        device->GetDevice(),
+        device->getDevice(),
         *renderDevice,
         tex,
         state,

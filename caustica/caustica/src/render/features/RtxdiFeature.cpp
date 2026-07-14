@@ -19,7 +19,7 @@ void registerRtxdiBeginFrameFeature(RenderFeatureContext ctx)
     assert(ctx.renderTargets);
     assert(ctx.settings);
 
-    if (!ctx.hasScene || !ctx.settings->ActualUseRTXDIPasses())
+    if (!ctx.hasScene || !ctx.settings->actualUseRTXDIPasses())
         return;
 
     RtxdiPass* rtxdiPass = ctx.renderer->getRtxdiPass();
@@ -41,7 +41,7 @@ void registerRtxdiBeginFrameFeature(RenderFeatureContext ctx)
             if (rtxdiPass == nullptr)
                 return;
 
-            rtxdiPass->BeginFrame(
+            rtxdiPass->beginFrame(
                 passCtx.commandList(),
                 *ctx.renderTargets,
                 ctx.renderer->getBindingLayout(),
@@ -57,7 +57,7 @@ void registerRtxdiExecuteFeature(RenderFeatureContext ctx)
     assert(ctx.renderTargets);
     assert(ctx.settings);
 
-    if (!ctx.hasScene || !ctx.settings->ActualUseRTXDIPasses())
+    if (!ctx.hasScene || !ctx.settings->actualUseRTXDIPasses())
         return;
 
     RtxdiPass* rtxdiPass = ctx.renderer->getRtxdiPass();

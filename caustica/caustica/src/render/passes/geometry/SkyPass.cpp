@@ -81,7 +81,7 @@ SkyPass::SkyPass(
     }
 }
 
-void SkyPass::Render(
+void SkyPass::render(
     nvrhi::ICommandList* commandList,
     const ICompositeView& compositeView,
     const DirectionalLight& light,
@@ -105,7 +105,7 @@ void SkyPass::Render(
 
         SkyConstants skyConstants{};
         skyConstants.matClipToTranslatedWorld = clipToTranslatedWorld;
-        FillShaderParameters(light, params, skyConstants.params);
+        fillShaderParameters(light, params, skyConstants.params);
         commandList->writeBuffer(m_SkyCB, &skyConstants, sizeof(skyConstants));
 
         commandList->setGraphicsState(state);
@@ -119,7 +119,7 @@ void SkyPass::Render(
     commandList->endMarker();
 }
 
-void SkyPass::FillShaderParameters(const caustica::DirectionalLight& light, const SkyParameters& input, ProceduralSkyShaderParameters& output)
+void SkyPass::fillShaderParameters(const caustica::DirectionalLight& light, const SkyParameters& input, ProceduralSkyShaderParameters& output)
 {
     float lightAngularSize = dm::radians(clamp(light.angularSize, 0.1f, 90.f));
     float lightSolidAngle = 4 * dm::PI_f * square(sinf(lightAngularSize * 0.5f));
@@ -127,7 +127,7 @@ void SkyPass::FillShaderParameters(const caustica::DirectionalLight& light, cons
     if (input.maxLightRadiance > 0.f)
         lightRadiance = min(lightRadiance, input.maxLightRadiance);
 
-    output.directionToLight = float3(normalize(-light.GetDirection()));
+    output.directionToLight = float3(normalize(-light.getDirection()));
     output.angularSizeOfLight = lightAngularSize;
     output.lightColor = lightRadiance * light.color;
     output.glowSize = dm::radians(dm::clamp(input.glowSize, 0.f, 90.f));

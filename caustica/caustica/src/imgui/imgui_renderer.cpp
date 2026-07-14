@@ -157,10 +157,10 @@ static void ImGui_ImplGlfw_UpdateKeyModifiers(ImGuiIO& io, GLFWwindow* window)
     io.AddKeyEvent(ImGuiMod_Super, (glfwGetKey(window, GLFW_KEY_LEFT_SUPER)   == GLFW_PRESS) || (glfwGetKey(window, GLFW_KEY_RIGHT_SUPER)   == GLFW_PRESS));
 }
 
-bool ImGui_Renderer::Init(std::shared_ptr<ShaderFactory> shaderFactory)
+bool ImGui_Renderer::init(std::shared_ptr<ShaderFactory> shaderFactory)
 {
     imgui_nvrhi = std::make_unique<ImGui_NVRHI>();
-    return imgui_nvrhi->init(GetDevice(), shaderFactory);
+    return imgui_nvrhi->init(getDevice(), shaderFactory);
 }
 
 std::shared_ptr<RegisteredFont> ImGui_Renderer::CreateFontFromFile(IFileSystem& fs,
@@ -209,12 +209,12 @@ std::shared_ptr<RegisteredFont> ImGui_Renderer::CreateFontFromMemoryCompressed(v
 
 
 
-void ImGui_Renderer::Animate(float elapsedTimeSeconds)
+void ImGui_Renderer::animate(float elapsedTimeSeconds)
 {
     if (!imgui_nvrhi)
         return;
 
-    // When the app doesn't call Render(), we may have left a frame open. Close it now.
+    // When the app doesn't call render(), we may have left a frame open. Close it now.
     // This may happen when the app is unfocused and its ShouldRenderUnfocused() returns false.
     // We still process ImGui messages while unfocused to make sure that a first click on an ImGui object
     // in an unfocused window doesn't propagate to the app handlers, such as camera controls.
@@ -224,7 +224,7 @@ void ImGui_Renderer::Animate(float elapsedTimeSeconds)
         m_imguiFrameOpened = false;
     }
 
-    // Make sure that all registered fonts have corresponding ImFont objects at the current DPI scale
+    // make sure that all registered fonts have corresponding ImFont objects at the current DPI scale
     float scaleX, scaleY;
     GetGpuDevice()->GetDPIScaleInfo(scaleX, scaleY);
     for (auto& font : m_fonts)
@@ -272,7 +272,7 @@ void ImGui_Renderer::Animate(float elapsedTimeSeconds)
     m_imguiFrameOpened = true;
 }
 
-void ImGui_Renderer::Render(nvrhi::IFramebuffer* framebuffer)
+void ImGui_Renderer::render(nvrhi::IFramebuffer* framebuffer)
 {
     if (!imgui_nvrhi)
         return;
@@ -296,7 +296,7 @@ void ImGui_Renderer::DisplayScaleChanged(float scaleX, float scaleY)
         return;
 
     // When the application starts unfocused, we open and close ImGui frames without rendering anything,
-    // and the first call to DisplayScaleChanged happens before Animate and tries to update fonts.
+    // and the first call to DisplayScaleChanged happens before animate and tries to update fonts.
     // Since the ImGui frame is open at that time, the call crashes because the font atlas is locked.
     // Prevent that by closing the frame first.
     if (m_imguiFrameOpened)
@@ -307,8 +307,8 @@ void ImGui_Renderer::DisplayScaleChanged(float scaleX, float scaleY)
 
     auto& io = ImGui::GetIO();
 
-    // Clear the ImGui font atlas and invalidate the font texture
-    // to re-register and re-rasterize all fonts on the next frame (see Animate)
+    // clear the ImGui font atlas and invalidate the font texture
+    // to re-register and re-rasterize all fonts on the next frame (see animate)
     io.Fonts->Clear();
     io.Fonts->TexRef = ImTextureRef();
 

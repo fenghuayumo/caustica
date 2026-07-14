@@ -42,12 +42,12 @@ public:
     OidnDenoiser();
     ~OidnDenoiser();
 
-    [[nodiscard]] bool IsAvailable() const;
-    [[nodiscard]] const std::string& GetLastError() const;
-    [[nodiscard]] const std::string& GetDeviceDescription() const;
+    [[nodiscard]] bool isAvailable() const;
+    [[nodiscard]] const std::string& getLastError() const;
+    [[nodiscard]] const std::string& getDeviceDescription() const;
 
-    bool Denoise(const float* inputRgb, uint32_t width, uint32_t height, const Options& options, std::vector<float>& outputRgb);
-    void Reset();
+    bool denoise(const float* inputRgb, uint32_t width, uint32_t height, const Options& options, std::vector<float>& outputRgb);
+    void reset();
 
 private:
     struct Impl;

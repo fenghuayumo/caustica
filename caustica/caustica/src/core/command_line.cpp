@@ -29,7 +29,7 @@ bool CommandLineOptions::InitFromCommandLine(int _argc, char const* const* _argv
             ("f,fullscreen", "Run in fullscreen mode", value(fullscreen))
             ("a,adapter", "Preferred adapter substring (e.g. NVIDIA or RTX)", value(adapter))
             ("h,help", "Print this help message", value(help))
-            ("backend", "Render backend: dx12/d3d12 or vulkan/vk", value(graphicsBackend))
+            ("backend", "render backend: dx12/d3d12 or vulkan/vk", value(graphicsBackend))
             ("api", "Alias for --backend", value(graphicsBackend))
             ("graphicsApi", "Alias for --backend", value(graphicsBackend))
             ("d3d12", "Use DirectX 12 (default)")

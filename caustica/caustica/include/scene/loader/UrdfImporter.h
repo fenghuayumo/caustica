@@ -22,7 +22,7 @@ namespace caustica
     public:
         explicit UrdfImporter(std::shared_ptr<SceneTypeFactory> sceneTypeFactory);
 
-        bool Load(
+        bool load(
             const std::filesystem::path& fileName,
             TextureLoader& textureCache,
             SceneLoadingStats& stats,

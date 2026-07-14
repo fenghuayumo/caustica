@@ -5,9 +5,9 @@ using namespace caustica::math;
 
 namespace caustica
 {
-    void Material::FillConstantBuffer(MaterialConstants& constants, bool useResourceDescriptorHeapBindless) const
+    void Material::fillConstantBuffer(MaterialConstants& constants, bool useResourceDescriptorHeapBindless) const
     {
-        // Create lambda to handle bindless texture index retrieval
+        // create lambda to handle bindless texture index retrieval
         auto GetBindlessTextureIndex = [useResourceDescriptorHeapBindless](const Handle<ImageAsset>& texture) -> int {
             if (!texture)
                 return -1;
@@ -139,7 +139,7 @@ namespace caustica
         constants.padding1 = uint3(0, 0, 0);
     }
 
-    bool Material::SetProperty(const std::string& name, const dm::float4& value)
+    bool Material::setProperty(const std::string& name, const dm::float4& value)
     {
 #define FLOAT3_PROPERTY(pname) if (name == #pname) { pname = value.xyz(); dirty = true; return true; }
 #define FLOAT_PROPERTY(pname) if (name == #pname) { pname = value.x; dirty = true; return true; }

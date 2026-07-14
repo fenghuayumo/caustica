@@ -89,7 +89,7 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
                 if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip("Animations are not available in reference mode");
             }
             ImGui::SameLine();
-            if (ImGui::Button("Reset animation time"))
+            if (ImGui::Button("reset animation time"))
             {
                 m_sceneEditor.setSceneTime(0);
                 m_settings.ResetAccumulation = true;
@@ -100,7 +100,7 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
                 if (ImGui::CollapsingHeader("Interactive elements"/*, ImGuiTreeNodeFlags_DefaultOpen*/))
                 {
                     RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
-                    m_sceneEditor.GetGame()->DebugGUI(layout.indent);
+                    m_sceneEditor.GetGame()->debugGUI(layout.indent);
                 }
             }
 
@@ -195,11 +195,11 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
             {
                 RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
 
-                RESET_ON_CHANGE(ImGui::Checkbox("Enabled", &m_settings.EnvironmentMapParams.Enabled));
+                RESET_ON_CHANGE(ImGui::Checkbox("enabled", &m_settings.EnvironmentMapParams.enabled));
                 RESET_ON_CHANGE(ImGui::Checkbox("Visible to Camera", &m_settings.EnvironmentMapParams.VisibleToCamera));
 
-                if (IsProceduralSky(m_sceneEditor.envMapLocalPath().c_str()) ||
-                    IsProceduralSky(m_sceneEditor.envMapOverrideSource().c_str()))
+                if (isProceduralSky(m_sceneEditor.envMapLocalPath().c_str()) ||
+                    isProceduralSky(m_sceneEditor.envMapOverrideSource().c_str()))
                     ImGui::TextWrapped("Source: Procedural Sky (Hillaire 2020)");
                 else
                     ImGui::TextWrapped("Source: `%s`", m_sceneEditor.envMapLocalPath().c_str());
@@ -208,7 +208,7 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
                 const std::vector<std::filesystem::path> & envMapMediaList = m_sceneEditor.envMapMediaList();
 
                 RAII_SCOPE( ImGui::PushItemWidth(-65.0f*m_currentScale);, ImGui::PopItemWidth(); );
-                const std::string overridePreview = IsProceduralSky(overrideSource.c_str()) || overrideSource == c_EnvMapSceneDefault
+                const std::string overridePreview = isProceduralSky(overrideSource.c_str()) || overrideSource == c_EnvMapSceneDefault
                     ? TrimSkyDisplayName(overrideSource)
                     : overrideSource;
                 if (ImGui::BeginCombo("Override", overridePreview.c_str()))
@@ -260,11 +260,11 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
                 ImGui::Separator();
 
                 if (auto& envMapProcessor = m_sceneEditor.lightingPasses().environment();
-                    envMapProcessor != nullptr && envMapProcessor->IsProcedural() && envMapProcessor->GetProceduralSky() != nullptr)
+                    envMapProcessor != nullptr && envMapProcessor->isProcedural() && envMapProcessor->getProceduralSky() != nullptr)
                 {
                     ImGui::TextColored(categoryColor, "Sky Atmosphere");
                     RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent););
-                    m_settings.ResetAccumulation |= envMapProcessor->GetProceduralSky()->DebugGUI(layout.indent);
+                    m_settings.ResetAccumulation |= envMapProcessor->getProceduralSky()->debugGUI(layout.indent);
                 }
             }
 
@@ -286,7 +286,7 @@ void EditorUI::BuildSampleGamePanel(const PanelLayout& layout)
             if (ImGui::CollapsingHeader("Sample Game"/*, ImGuiTreeNodeFlags_DefaultOpen*/))
             {
                 RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
-                m_sceneEditor.GetGame()->DebugGUI(layout.indent);
+                m_sceneEditor.GetGame()->debugGUI(layout.indent);
             }
         }
 
@@ -331,12 +331,12 @@ void EditorUI::BuildSceneWidgetsPanel(const PanelLayout& layout)
             std::function<std::string(std::string)>
                                         GetItemName     = nullptr;
 
-            bool                        Enabled;
+            bool                        enabled;
 
-            BigButton( const std::string & name, bool & prop ) : Name(name), PropVar(&prop), PropNode(nullptr), Enabled(true) {}
-            BigButton( const std::string & name, bool & prop, const std::string& hoverText, bool enabled ) : Name(name), PropVar(&prop), PropNode(nullptr), HoverText(hoverText), Enabled(enabled) {}
-            BigButton( const std::string & name, TogglableNode * prop ) : Name(TrimTogglable(name)), PropVar(nullptr), PropNode(prop), Enabled(true) {}
-            BigButton( const std::string & name, std::vector<std::string>* propOptions, int* propOptionIndex, const std::string& hoverText, const std::function<std::string(std::string)> & getItemName) : Name(name), PropOptions(propOptions), PropOptionIndex(propOptionIndex), HoverText(hoverText), Enabled(true), GetItemName(getItemName) { assert(PropOptions->size()>0); }
+            BigButton( const std::string & name, bool & prop ) : Name(name), PropVar(&prop), PropNode(nullptr), enabled(true) {}
+            BigButton( const std::string & name, bool & prop, const std::string& hoverText, bool enabled ) : Name(name), PropVar(&prop), PropNode(nullptr), HoverText(hoverText), enabled(enabled) {}
+            BigButton( const std::string & name, TogglableNode * prop ) : Name(TrimTogglable(name)), PropVar(nullptr), PropNode(prop), enabled(true) {}
+            BigButton( const std::string & name, std::vector<std::string>* propOptions, int* propOptionIndex, const std::string& hoverText, const std::function<std::string(std::string)> & getItemName) : Name(name), PropOptions(propOptions), PropOptionIndex(propOptionIndex), HoverText(hoverText), enabled(true), GetItemName(getItemName) { assert(PropOptions->size()>0); }
             bool                IsSelected() const            { return (PropOptions != nullptr)?(true):((PropVar != nullptr)?(*PropVar):(PropNode->IsSelected())); }
             void                SetSelected( bool selected )  { if( PropVar != nullptr ) *PropVar = selected; else if (PropNode != nullptr ) PropNode->SetSelected(selected); else *PropOptionIndex = ( ((*PropOptionIndex)+1) % PropOptions->size() ); }
             std::string         GetText() const 
@@ -378,7 +378,7 @@ void EditorUI::BuildSceneWidgetsPanel(const PanelLayout& layout)
                     if (i > 0)
                         ImGui::SameLine();
                     
-                    UI_SCOPED_DISABLE(!buttons[i].Enabled);
+                    UI_SCOPED_DISABLE(!buttons[i].enabled);
 
                     bool selected = buttons[i].IsSelected();
 
@@ -475,12 +475,12 @@ void EditorUI::BuildHierarchyPanel(const PanelLayout& layout)
         RAII_SCOPE(ImGui::Begin("Hierarchy", nullptr, ImGuiWindowFlags_None);, ImGui::End(););
 
         auto scene = m_sceneEditor.scene();
-        auto* ew = scene ? scene->GetEntityWorld() : nullptr;
+        auto* ew = scene ? scene->getEntityWorld() : nullptr;
 
         if (ew && ew->root() != ecs::NullEntity)
         {
             bool deleteSelectedEntity = false;
-            ImGui::Text("Objects: %zu mesh, %u 3DGS", scene->GetMeshInstances().size(), m_runtime.GaussianSplats.ObjectCount);
+            ImGui::Text("Objects: %zu mesh, %u 3DGS", scene->getMeshInstances().size(), m_runtime.GaussianSplats.ObjectCount);
             ImGui::Separator();
 
             if (ImGui::TreeNodeEx("Scene", ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_SpanAvailWidth))
@@ -510,7 +510,7 @@ void EditorUI::BuildHierarchyPanel(const PanelLayout& layout)
             if (deleteSelectedEntity)
             {
                 // Defer destruction to the main thread. Mutating the scene from the UI/render
-                // thread races with pipelined main-thread Update/Extract and can crash.
+                // thread races with pipelined main-thread update/Extract and can crash.
                 m_editorUI.PendingDeleteEntity = selected;
                 m_editorUI.SelectedEntity = ecs::NullEntity;
                 m_editorUI.SelectedMaterial = nullptr;

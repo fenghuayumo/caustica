@@ -186,7 +186,7 @@ int ResolveGaussianSplatShadowMode(const EditorUIData& ui)
 
 void BuildHierarchyNodeUI(EditorUIData& ui, caustica::Scene& scene, ecs::Entity entity)
     {
-        auto* ew = scene.GetEntityWorld();
+        auto* ew = scene.getEntityWorld();
         if (!ew || entity == ecs::NullEntity) return;
         if (!HasHierarchyEntity(*ew, entity)) return;
 
@@ -319,12 +319,12 @@ bool MatchesPreset(const EditorUIData& ui, const ::PerformancePreset& p)
 
 void ApplyPreset(EditorUIData& ui, const ::PerformancePreset& p)
 {
-    caustica::render::ApplyPerformancePreset(ui.session.settings, p);
+    caustica::render::applyPerformancePreset(ui.session.settings, p);
 }
 
 } // namespace caustica::editor
 
-void PathTracerSettings::ApplyRTXDIRestirPreset()
+void PathTracerSettings::applyRTXDIRestirPreset()
 {
     if (RTXDIRestirPreset == RTXDIRestirQualityPreset::Custom)
         return;
@@ -332,13 +332,13 @@ void PathTracerSettings::ApplyRTXDIRestirPreset()
     const bool wasUsingCheckerboard = RTXDI.checkerboardMode != rtxdi::CheckerboardMode::Off;
     bool enableCheckerboardSampling = wasUsingCheckerboard;
 
-    RTXDI.restirDI.resamplingMode = GetReSTIRDI_ResamplingMode();
+    RTXDI.restirDI.resamplingMode = getReSTIRDI_ResamplingMode();
     RTXDI.restirDI.initialSamplingParams = getReSTIRDIInitialSamplingParams();
     RTXDI.restirDI.temporalResamplingParams = getReSTIRDITemporalResamplingParams();
     RTXDI.restirDI.spatialResamplingParams = getReSTIRDISpatialResamplingParams();
     RTXDI.restirDI.shadingParams = getReSTIRDIShadingParams();
 
-    RTXDI.restirGI.resamplingMode = GetReSTIRGI_ResamplingMode();
+    RTXDI.restirGI.resamplingMode = getReSTIRGI_ResamplingMode();
     RTXDI.restirGI.temporalResamplingParams = getReSTIRGITemporalResamplingParams();
     RTXDI.restirGI.spatialResamplingParams = getReSTIRGISpatialResamplingParams();
     RTXDI.restirGI.finalShadingParams = getReSTIRGIFinalShadingParams();
@@ -480,7 +480,7 @@ void PathTracerSettings::ApplyRTXDIRestirPreset()
     ResetRealtimeCaches |= wasUsingCheckerboard != enableCheckerboardSampling;
 }
 
-void PathTracerSettings::ApplyRTXDIRestirPTPreset()
+void PathTracerSettings::applyRTXDIRestirPTPreset()
 {
     if (RTXDIRestirPTPreset == RTXDIRestirPTQualityPreset::Custom)
         return;

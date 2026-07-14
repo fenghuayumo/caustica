@@ -575,7 +575,7 @@ namespace caustica
                 return false;
             }
 
-            // Apply the forceSRGB flag and promote various compatible formats to sRGB
+            // apply the forceSRGB flag and promote various compatible formats to sRGB
             if (textureInfo.forceSRGB)
             {
                 switch (textureInfo.format)  // NOLINT(clang-diagnostic-switch-enum)

@@ -7,42 +7,42 @@
 namespace caustica::scene
 {
 
-SceneContentFlags GetAnimationContentFlags()
+SceneContentFlags getAnimationContentFlags()
 {
     return SceneContentFlags::Animations;
 }
 
-bool IsAnimationChannelValid(const AnimationChannelData& channel)
+bool isAnimationChannelValid(const AnimationChannelData& channel)
 {
     return ecs::isValid(channel.targetEntity) || channel.targetMaterial != nullptr;
 }
 
-bool IsAnimationValid(const AnimationComponent& component)
+bool isAnimationValid(const AnimationComponent& component)
 {
     if (component.channels.empty())
         return false;
 
     for (const auto& channel : component.channels)
     {
-        if (!IsAnimationChannelValid(channel))
+        if (!isAnimationChannelValid(channel))
             return false;
     }
     return true;
 }
 
-float GetAnimationDuration(const AnimationComponent& component)
+float getAnimationDuration(const AnimationComponent& component)
 {
     return component.duration;
 }
 
-void AddAnimationChannel(AnimationComponent& component, AnimationChannelData channel)
+void addAnimationChannel(AnimationComponent& component, AnimationChannelData channel)
 {
     if (channel.sampler)
         component.duration = std::max(component.duration, channel.sampler->GetEndTime());
     component.channels.push_back(std::move(channel));
 }
 
-void RecalculateAnimationDuration(AnimationComponent& component)
+void recalculateAnimationDuration(AnimationComponent& component)
 {
     component.duration = 0.f;
     for (const auto& channel : component.channels)
@@ -69,7 +69,7 @@ void MarkSkinnedMeshDirtyForTransformChannel(
 }
 } // namespace
 
-bool ApplyAnimationChannel(const AnimationChannelData& channel, float time, SceneEntityWorld& world)
+bool applyAnimationChannel(const AnimationChannelData& channel, float time, SceneEntityWorld& world)
 {
     if (channel.attribute != AnimationAttribute::LeafProperty && !ecs::isValid(channel.targetEntity))
         return false;
@@ -83,7 +83,7 @@ bool ApplyAnimationChannel(const AnimationChannelData& channel, float time, Scen
     if (!channel.sampler)
         return false;
 
-    const auto valueOption = channel.sampler->Evaluate(time, true);
+    const auto valueOption = channel.sampler->evaluate(time, true);
     if (!valueOption.has_value())
         return false;
 
@@ -120,7 +120,7 @@ bool ApplyAnimationChannel(const AnimationChannelData& channel, float time, Scen
     case AnimationAttribute::LeafProperty: {
         if (channel.targetMaterial)
         {
-            if (!channel.targetMaterial->SetProperty(channel.leafPropertyName, value))
+            if (!channel.targetMaterial->setProperty(channel.leafPropertyName, value))
             {
                 caustica::warning("Cannot set property '%s' on material '%s': the material doesn't support this property.",
                     channel.leafPropertyName.c_str(), channel.targetMaterial->name.c_str());
@@ -131,7 +131,7 @@ bool ApplyAnimationChannel(const AnimationChannelData& channel, float time, Scen
             auto* meshComp = world.world().get<MeshInstanceComponent>(channel.targetEntity);
             if (meshComp && meshComp->mesh)
             {
-                if (!SetMeshProperty(*meshComp->mesh, channel.leafPropertyName, value))
+                if (!setMeshProperty(*meshComp->mesh, channel.leafPropertyName, value))
                 {
                     caustica::warning("Cannot set property '%s' on mesh instance: the instance doesn't support this property.",
                         channel.leafPropertyName.c_str());
@@ -139,7 +139,7 @@ bool ApplyAnimationChannel(const AnimationChannelData& channel, float time, Scen
             }
             else if (auto* lightComp = world.world().get<LightComponent>(channel.targetEntity))
             {
-                if (!SetLightProperty(*lightComp, channel.leafPropertyName, value))
+                if (!setLightProperty(*lightComp, channel.leafPropertyName, value))
                 {
                     caustica::warning("Cannot set property '%s' on light: the light doesn't support this property.",
                         channel.leafPropertyName.c_str());
@@ -163,11 +163,11 @@ bool ApplyAnimationChannel(const AnimationChannelData& channel, float time, Scen
     return true;
 }
 
-bool ApplyAnimation(AnimationComponent& component, float time, SceneEntityWorld& world)
+bool applyAnimation(AnimationComponent& component, float time, SceneEntityWorld& world)
 {
     bool success = true;
     for (const auto& channel : component.channels)
-        success = ApplyAnimationChannel(channel, time, world) && success;
+        success = applyAnimationChannel(channel, time, world) && success;
 
     if (success)
         world.markTransformDirty();
@@ -175,36 +175,36 @@ bool ApplyAnimation(AnimationComponent& component, float time, SceneEntityWorld&
     return success;
 }
 
-void InitializeAnimationComponent(AnimationComponent& component, const SceneAnimation& animation)
+void initializeAnimationComponent(AnimationComponent& component, const SceneAnimation& animation)
 {
     component.channels.clear();
-    component.duration = animation.GetDuration();
-    component.channels.reserve(animation.GetChannels().size());
+    component.duration = animation.getDuration();
+    component.channels.reserve(animation.getChannels().size());
 
-    for (const auto& channel : animation.GetChannels())
+    for (const auto& channel : animation.getChannels())
     {
         AnimationChannelData data;
-        data.sampler = channel->GetSampler();
-        data.targetEntity = channel->GetTargetEntity();
-        data.targetMaterial = channel->GetTargetMaterial();
-        data.attribute = channel->GetAttribute();
-        data.leafPropertyName = channel->GetLeafPropertyName();
+        data.sampler = channel->getSampler();
+        data.targetEntity = channel->getTargetEntity();
+        data.targetMaterial = channel->getTargetMaterial();
+        data.attribute = channel->getAttribute();
+        data.leafPropertyName = channel->getLeafPropertyName();
         component.channels.push_back(std::move(data));
     }
 }
 
-void InitializeAnimationComponent(AnimationComponent& component, const std::shared_ptr<SceneAnimation>& animation)
+void initializeAnimationComponent(AnimationComponent& component, const std::shared_ptr<SceneAnimation>& animation)
 {
     if (animation)
-        InitializeAnimationComponent(component, *animation);
+        initializeAnimationComponent(component, *animation);
 }
 
-const AnimationComponent* TryGetAnimation(const ecs::World& world, ecs::Entity entity)
+const AnimationComponent* tryGetAnimation(const ecs::World& world, ecs::Entity entity)
 {
     return world.tryGet<AnimationComponent>(entity);
 }
 
-AnimationComponent* TryGetAnimation(ecs::World& world, ecs::Entity entity)
+AnimationComponent* tryGetAnimation(ecs::World& world, ecs::Entity entity)
 {
     return world.tryGet<AnimationComponent>(entity);
 }

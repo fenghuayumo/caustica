@@ -13,8 +13,8 @@
 namespace caustica::scene
 {
     // Canonical render-thread scene snapshot (UE-style render proxies).
-    // Logic thread: ExtractSceneRenderData → SceneRenderSnapshot.
-    // Render thread: Scene::GetRenderData() — never touches ECS components.
+    // Logic thread: extractSceneRenderData → SceneRenderSnapshot.
+    // render thread: Scene::getRenderData() — never touches ECS components.
     struct MeshInstanceRenderProxy
     {
         ecs::Entity entity = ecs::NullEntity;

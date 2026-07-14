@@ -61,11 +61,11 @@ OpacityMicromapBuilder::~OpacityMicromapBuilder()
 {
 }
 
-void OpacityMicromapBuilder::SceneLoaded(const caustica::Scene& scene)
+void OpacityMicromapBuilder::sceneLoaded(const caustica::Scene& scene)
 {
     const size_t allocationGranularity = 1024;
-    const size_t geometryCount = scene.GetGeometryCount();
-    if (scene.GetGeometryCount() > m_geometryDebugDataPtr.size())
+    const size_t geometryCount = scene.getGeometryCount();
+    if (scene.getGeometryCount() > m_geometryDebugDataPtr.size())
     {
         m_geometryDebugDataPtr.resize(nvrhi::align<size_t>(geometryCount, allocationGranularity));
         
@@ -82,19 +82,19 @@ void OpacityMicromapBuilder::SceneLoaded(const caustica::Scene& scene)
     }
 }
 
-void OpacityMicromapBuilder::SceneUnloading()
+void OpacityMicromapBuilder::sceneUnloading()
 {
-    m_ommBuildQueue->CancelPendingBuilds();
+    m_ommBuildQueue->cancelPendingBuilds();
 }
 
-void OpacityMicromapBuilder::CreateRenderPasses(nvrhi::BindingLayoutHandle bindlessLayout, caustica::render::RenderDevice& /*renderDevice*/)
+void OpacityMicromapBuilder::createRenderPasses(nvrhi::BindingLayoutHandle bindlessLayout, caustica::render::RenderDevice& /*renderDevice*/)
 {
     m_bindlessLayout = std::move(bindlessLayout);
 }
 
-void OpacityMicromapBuilder::CreateOpacityMicromaps(const caustica::Scene& scene)
+void OpacityMicromapBuilder::createOpacityMicromaps(const caustica::Scene& scene)
 {
-    m_ommBuildQueue->CancelPendingBuilds();
+    m_ommBuildQueue->cancelPendingBuilds();
 
     m_uiData.BuildsLeftInQueue = 0;
     m_uiData.BuildsQueued = 0;
@@ -107,7 +107,7 @@ void OpacityMicromapBuilder::CreateOpacityMicromaps(const caustica::Scene& scene
 
     m_uiData.ActiveState = m_uiData.DesiredState;
 
-    for (auto& mesh : scene.GetMeshes())
+    for (auto& mesh : scene.getMeshes())
     {
         if (mesh->isSkinPrototype) //buffers->hasAttribute(caustica::VertexAttribute::JointWeights))
             continue; // skip the skinning prototypes
@@ -158,19 +158,19 @@ void OpacityMicromapBuilder::CreateOpacityMicromaps(const caustica::Scene& scene
         if (input.geometries.size() != 0ull)
         {
             m_uiData.BuildsQueued += (uint32_t)input.geometries.size();
-            m_ommBuildQueue->QueueBuild(input);
+            m_ommBuildQueue->queueBuild(input);
         }
     }
 }
 
-void OpacityMicromapBuilder::DestroyOpacityMicromaps(nvrhi::ICommandList& commandList, const caustica::Scene& scene)
+void OpacityMicromapBuilder::destroyOpacityMicromaps(nvrhi::ICommandList& commandList, const caustica::Scene& scene)
 {
     commandList.close();
     m_device->executeCommandList(&commandList);
     m_device->waitForIdle();
     commandList.open();
 
-    for (const std::shared_ptr<MeshInfo>& _mesh : scene.GetMeshes())
+    for (const std::shared_ptr<MeshInfo>& _mesh : scene.getMeshes())
     {
         assert(std::dynamic_pointer_cast<MeshInfoEx>(_mesh) != nullptr);
         const std::shared_ptr<MeshInfoEx>& mesh = std::static_pointer_cast<MeshInfoEx>(_mesh);
@@ -181,13 +181,13 @@ void OpacityMicromapBuilder::DestroyOpacityMicromaps(nvrhi::ICommandList& comman
     }
 }
 
-void OpacityMicromapBuilder::BuildOpacityMicromaps(nvrhi::ICommandList& commandList, const caustica::Scene& scene)
+void OpacityMicromapBuilder::buildOpacityMicromaps(nvrhi::ICommandList& commandList, const caustica::Scene& scene)
 {
     commandList.beginMarker("OMM Updates");
 
     if (!m_uiData.Enable)
     {
-        m_ommBuildQueue->CancelPendingBuilds();
+        m_ommBuildQueue->cancelPendingBuilds();
         m_uiData.BuildsLeftInQueue = 0;
         m_uiData.BuildsQueued = 0;
         commandList.endMarker();
@@ -196,28 +196,28 @@ void OpacityMicromapBuilder::BuildOpacityMicromaps(nvrhi::ICommandList& commandL
 
     if (m_uiData.TriggerRebuild)
     {
-        DestroyOpacityMicromaps(commandList, scene);
+        destroyOpacityMicromaps(commandList, scene);
 
-        m_ommBuildQueue->CancelPendingBuilds();
+        m_ommBuildQueue->cancelPendingBuilds();
 
-        CreateOpacityMicromaps(scene);
+        createOpacityMicromaps(scene);
 
         m_uiData.TriggerRebuild = false;
     }
 
-    m_ommBuildQueue->Update(commandList);
+    m_ommBuildQueue->update(commandList);
 
-    m_uiData.BuildsLeftInQueue = m_ommBuildQueue->NumPendingBuilds();
+    m_uiData.BuildsLeftInQueue = m_ommBuildQueue->numPendingBuilds();
 
     commandList.endMarker();
 }
 
-void OpacityMicromapBuilder::WriteGeometryDebugBuffer(nvrhi::ICommandList& commandList)
+void OpacityMicromapBuilder::writeGeometryDebugBuffer(nvrhi::ICommandList& commandList)
 {
     commandList.writeBuffer(m_geometryDebugBuffer, m_geometryDebugDataPtr.data(), m_geometryDebugDataPtr.size() * sizeof(GeometryDebugData));
 }
 
-void OpacityMicromapBuilder::UpdateDebugGeometry(const MeshInfo& _mesh)
+void OpacityMicromapBuilder::updateDebugGeometry(const MeshInfo& _mesh)
 {
     const MeshInfoEx& mesh = static_cast<const MeshInfoEx&>(_mesh);
     assert(&mesh != nullptr);
@@ -254,12 +254,12 @@ void OpacityMicromapBuilder::UpdateDebugGeometry(const MeshInfo& _mesh)
     }
 }
 
-bool OpacityMicromapBuilder::Update(nvrhi::ICommandList& commandList, const caustica::Scene& scene)
+bool OpacityMicromapBuilder::update(nvrhi::ICommandList& commandList, const caustica::Scene& scene)
 {
     RAII_SCOPE( commandList.beginMarker("OpacityMicromapBuilder");, commandList.endMarker(); );
 
     bool anyDirty = false;
-    for (auto& _mesh : scene.GetMeshes())
+    for (auto& _mesh : scene.getMeshes())
     {
         MeshInfoEx& mesh = static_cast<MeshInfoEx&>(*_mesh);
         assert(&mesh != nullptr);
@@ -268,15 +268,15 @@ bool OpacityMicromapBuilder::Update(nvrhi::ICommandList& commandList, const caus
         {
             mesh.DebugDataDirty = false;
             anyDirty = true;
-            UpdateDebugGeometry(mesh);
+            updateDebugGeometry(mesh);
         }
     }
     if (anyDirty)
-        WriteGeometryDebugBuffer(commandList);
+        writeGeometryDebugBuffer(commandList);
     return anyDirty;
 }
 
-void OpacityMicromapBuilder::SetGlobalShaderMacros(std::vector<caustica::ShaderMacro>& macros)
+void OpacityMicromapBuilder::setGlobalShaderMacros(std::vector<caustica::ShaderMacro>& macros)
 {
     if (m_uiData.DebugView == OpacityMicroMapDebugView::InWorld)
         macros.push_back( { "OMM_DEBUG_VIEW_IN_WORLD", "1" } );
@@ -284,7 +284,7 @@ void OpacityMicromapBuilder::SetGlobalShaderMacros(std::vector<caustica::ShaderM
         macros.push_back( { "OMM_DEBUG_VIEW_OVERLAY", "1" } );
 }
 
-bool OpacityMicromapBuilder::DebugGUI(float indent, const caustica::Scene& scene)
+bool OpacityMicromapBuilder::debugGUI(float indent, const caustica::Scene& scene)
 {
     RAII_SCOPE(ImGui::PushID("OpacityMicromapBuilderDebugGUI"); , ImGui::PopID(); );
     
@@ -303,12 +303,12 @@ bool OpacityMicromapBuilder::DebugGUI(float indent, const caustica::Scene& scene
         }
 
         {
-            if (ImGui::Checkbox("Render ONLY OMMs", &m_uiData.OnlyOMMs))
+            if (ImGui::Checkbox("render ONLY OMMs", &m_uiData.OnlyOMMs))
                 resetAccumulation = true;
         }
 
         ImGui::Separator();
-        ImGui::Text("Bake Settings (Require Rebuild to take effect)");
+        ImGui::Text("Bake settings (Require Rebuild to take effect)");
 
         if (m_uiData.BuildsLeftInQueue != 0)
         {
@@ -426,7 +426,7 @@ bool OpacityMicromapBuilder::DebugGUI(float indent, const caustica::Scene& scene
             }
         }
 
-        if (ImGui::CollapsingHeader("Debug Settings"))
+        if (ImGui::CollapsingHeader("Debug settings"))
         {
             UI_SCOPED_INDENT(indent);
 
@@ -465,7 +465,7 @@ bool OpacityMicromapBuilder::DebugGUI(float indent, const caustica::Scene& scene
             {
                 UI_SCOPED_INDENT(indent);
 
-                for (const std::shared_ptr<caustica::MeshInfo>& mesh : scene.GetMeshes())
+                for (const std::shared_ptr<caustica::MeshInfo>& mesh : scene.getMeshes())
                 {
                     bool meshHasOmms = false;
                     for (uint32_t i = 0; i < mesh->geometries.size(); ++i)

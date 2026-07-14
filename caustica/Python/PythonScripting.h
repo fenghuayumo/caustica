@@ -45,7 +45,7 @@ public:
     void QueueScriptString(std::string code, std::string label = "<inline>");
 
     // Run any queued scripts on the calling thread. Must be called from the
-    // main thread (between renders), after SceneEditor::SceneLoaded() has run.
+    // main thread (between renders), after SceneEditor::sceneLoaded() has run.
     void ProcessPendingScripts();
 
     // Returns the most recent stdout/stderr output captured from Python.

@@ -98,25 +98,25 @@ namespace caustica::render
         bool m_UseInputAssembler = false;
         uint32_t m_StencilWriteMask = 0;
         
-        virtual nvrhi::ShaderHandle CreateVertexShader(caustica::ShaderFactory& shaderFactory, const CreateParameters& params);
-        virtual nvrhi::ShaderHandle CreateGeometryShader(caustica::ShaderFactory& shaderFactory, const CreateParameters& params);
-        virtual nvrhi::ShaderHandle CreatePixelShader(caustica::ShaderFactory& shaderFactory, const CreateParameters& params, bool alphaTested);
-        virtual nvrhi::InputLayoutHandle CreateInputLayout(nvrhi::IShader* vertexShader, const CreateParameters& params);
-        virtual nvrhi::BindingLayoutHandle CreateInputBindingLayout();
-        virtual nvrhi::BindingSetHandle CreateInputBindingSet(const caustica::BufferGroup* bufferGroup);
-        virtual void CreateViewBindings(nvrhi::BindingLayoutHandle& layout, nvrhi::BindingSetHandle& set, const CreateParameters& params);
-        virtual std::shared_ptr<caustica::MaterialBindingCache> CreateMaterialBindingCache(caustica::render::RenderDevice& renderDevice);
-        virtual nvrhi::GraphicsPipelineHandle CreateGraphicsPipeline(PipelineKey key, nvrhi::FramebufferInfo const& framebufferInfo);
-        nvrhi::BindingSetHandle GetOrCreateInputBindingSet(const caustica::BufferGroup* bufferGroup);
+        virtual nvrhi::ShaderHandle createVertexShader(caustica::ShaderFactory& shaderFactory, const CreateParameters& params);
+        virtual nvrhi::ShaderHandle createGeometryShader(caustica::ShaderFactory& shaderFactory, const CreateParameters& params);
+        virtual nvrhi::ShaderHandle createPixelShader(caustica::ShaderFactory& shaderFactory, const CreateParameters& params, bool alphaTested);
+        virtual nvrhi::InputLayoutHandle createInputLayout(nvrhi::IShader* vertexShader, const CreateParameters& params);
+        virtual nvrhi::BindingLayoutHandle createInputBindingLayout();
+        virtual nvrhi::BindingSetHandle createInputBindingSet(const caustica::BufferGroup* bufferGroup);
+        virtual void createViewBindings(nvrhi::BindingLayoutHandle& layout, nvrhi::BindingSetHandle& set, const CreateParameters& params);
+        virtual std::shared_ptr<caustica::MaterialBindingCache> createMaterialBindingCache(caustica::render::RenderDevice& renderDevice);
+        virtual nvrhi::GraphicsPipelineHandle createGraphicsPipeline(PipelineKey key, nvrhi::FramebufferInfo const& framebufferInfo);
+        nvrhi::BindingSetHandle getOrCreateInputBindingSet(const caustica::BufferGroup* bufferGroup);
         
     public:
         GBufferFillPass(nvrhi::IDevice* device, caustica::render::RenderDevice& renderDevice);
 
-        virtual void Init(
+        virtual void init(
             caustica::ShaderFactory& shaderFactory,
             const CreateParameters& params);
 
-        void ResetBindingCache();
+        void resetBindingCache();
         
         // IGeometryPass implementation
 
@@ -130,12 +130,12 @@ namespace caustica::render
     class MaterialIDPass : public GBufferFillPass
     {
     protected:
-        nvrhi::ShaderHandle CreatePixelShader(caustica::ShaderFactory& shaderFactory, const CreateParameters& params, bool alphaTested) override;
+        nvrhi::ShaderHandle createPixelShader(caustica::ShaderFactory& shaderFactory, const CreateParameters& params, bool alphaTested) override;
 
     public:
         using GBufferFillPass::GBufferFillPass;
 
-        void Init(
+        void init(
             caustica::ShaderFactory& shaderFactory,
             const CreateParameters& params) override;
     };

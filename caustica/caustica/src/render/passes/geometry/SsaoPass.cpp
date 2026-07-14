@@ -161,10 +161,10 @@ SsaoPass::SsaoPass(
     assert(depthDesc.dimension == nvrhi::TextureDimension::Texture2D); // arrays are currently unsupported
 #endif
 
-    CreateBindingSet(gbufferDepth, gbufferNormals, destinationTexture, 0);
+    createBindingSet(gbufferDepth, gbufferNormals, destinationTexture, 0);
 }
 
-void SsaoPass::CreateBindingSet(
+void SsaoPass::createBindingSet(
     nvrhi::ITexture* gbufferDepth,
     nvrhi::ITexture* gbufferNormals,
     nvrhi::ITexture* destinationTexture,
@@ -198,7 +198,7 @@ void SsaoPass::CreateBindingSet(
     m_Blur.BindingSets[bindingSetIndex] = m_device->createBindingSet(BlurBindings, m_Blur.BindingLayout);
 }
 
-void SsaoPass::Render(
+void SsaoPass::render(
     nvrhi::ICommandList* commandList,
     const SsaoParameters& params,
     const ICompositeView& compositeView,

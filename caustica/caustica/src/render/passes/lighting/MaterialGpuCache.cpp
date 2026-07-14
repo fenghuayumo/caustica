@@ -1,5 +1,5 @@
 #include <render/passes/lighting/MaterialGpuCache.h>
-#include <render/passes/lighting/MaterialFeatureMask.h>
+#include <render/passes/lighting/materialFeatureMask.h>
 
 #include <assets/loader/ShaderFactory.h>
 #include <assets/loader/ShaderBackend.h>
@@ -704,7 +704,7 @@ bool PTMaterial::editorGui(MaterialGpuCache & cache)
         ImGui::Unindent();
     }
 
-    if (ImGui::CollapsingHeader("Save/Load"))
+    if (ImGui::CollapsingHeader("Save/load"))
     {
         RAII_SCOPE( ImGui::Indent();, ImGui::Unindent(); );
 
@@ -715,7 +715,7 @@ bool PTMaterial::editorGui(MaterialGpuCache & cache)
 
         ImGui::TextWrapped("File name: %s", matPath.string().c_str());
 
-        if (ImGui::Button("Load"))
+        if (ImGui::Button("load"))
         {
             cache.loadSingle(*this);
             update = true;
@@ -1184,7 +1184,7 @@ std::shared_ptr<PTMaterial> MaterialGpuCache::load(const std::string & modelFile
     bool shared = false;
     for (const MaterialFileCandidate& candidate : candidates)
     {
-        if (std::filesystem::exists(candidate.path) && caustica::json::LoadFromFile(candidate.path, rootJ))
+        if (std::filesystem::exists(candidate.path) && caustica::json::loadFromFile(candidate.path, rootJ))
         {
             actualLoadedFileName = candidate.path.string();
             shared = candidate.sharedWithAllScenes;
@@ -1220,7 +1220,7 @@ int MaterialGpuCache::ensureMaterialsFromScene(const std::shared_ptr<caustica::S
         return 0;
 
     int added = 0;
-    for (auto& material : scene->GetMaterials())
+    for (auto& material : scene->getMaterials())
     {
         std::shared_ptr<MaterialEx> materialEx = std::dynamic_pointer_cast<MaterialEx>(material);
         if (materialEx == nullptr)
@@ -1326,7 +1326,7 @@ static void InitializeStableShaderIdentity(MaterialShaderPermutation& msp)
         return;
     }
 
-    msp.stableShaderName = caustica::render::MaterialFeatureTierStableName(tierIndex);
+    msp.stableShaderName = caustica::render::materialFeatureTierStableName(tierIndex);
     msp.stableShaderId = int(tierIndex);
 }
 
@@ -1350,7 +1350,7 @@ void MaterialGpuCache::bakeShaderPermutations()
 {
     MaterialShaderPermutation ubershader{
         .shaderFilePath = m_relativeShaderSourcePath,
-        .macros = caustica::render::BuildMaterialShaderMacros(0),
+        .macros = caustica::render::buildMaterialShaderMacros(0),
     };
     InitializeStableShaderIdentity(ubershader);
     m_ubershader = std::make_shared<MaterialShaderPermutation>(ubershader);
@@ -1436,13 +1436,13 @@ void MaterialGpuCache::createRenderPassesAndLoadMaterials(nvrhi::IBindingLayout*
 
         int initializedFromEngineCount = 0;
 
-        auto& materials = scene->GetMaterials();
+        auto& materials = scene->getMaterials();
         for (auto& material : materials)
         {
             std::shared_ptr<MaterialEx> materialEx = std::dynamic_pointer_cast<MaterialEx>(material);
             if (materialEx == nullptr)
             {
-                assert(false && "Is there something wrong with ExtendedSceneTypeFactory::CreateMaterial()?");
+                assert(false && "Is there something wrong with ExtendedSceneTypeFactory::createMaterial()?");
                 continue;
             }
             else
@@ -1571,7 +1571,7 @@ void UpdateSubInstanceData(SubInstanceData & ret, const std::shared_ptr<caustica
     ret.GlobalGeometryIndex_PTMaterialDataIndex = (globalGeometryIndex << 16) | globalMaterialIndex;
 
 #if SUBINSTANCEDATA_EXTENDED
-    GeometryData * gdata = scene->GetGeometryData(geometry);
+    GeometryData * gdata = scene->getGeometryData(geometry);
     if( gdata != nullptr )
     {
         GeometryData & geometryData = *gdata;
@@ -1623,7 +1623,7 @@ void MaterialGpuCache::update(nvrhi::ICommandList* commandList, const std::share
     // prefix of SubInstanceData slots. Do not trust live geometryInstanceIndex alone — after
     // runtime import it can briefly disagree with the snapshot order TLAS already committed.
     size_t compactedGeometryInstanceIndex = 0;
-    for (const scene::MeshInstanceRenderProxy& proxy : scene->GetRenderData().meshInstances)
+    for (const scene::MeshInstanceRenderProxy& proxy : scene->getRenderData().meshInstances)
     {
         if (!proxy.meshShared)
             continue;
@@ -1693,7 +1693,7 @@ bool MaterialGpuCache::loadSingle(PTMaterialBase & material)
     std::filesystem::path inPath = getMaterialStoragePath(material);
 
     Json::Value rootJ;
-    if ( !caustica::json::LoadFromFile(inPath, rootJ) )
+    if ( !caustica::json::loadFromFile(inPath, rootJ) )
     {
         caustica::warning("No RTXPT material definition file found '%s'- consider doing Scene->Materials->Advanced->Save All", inPath.string().c_str());
         return false;
@@ -1747,7 +1747,7 @@ void MaterialGpuCache::saveAll()
     for (auto& materialPT : m_materials)
     {
         Json::Value materialJ;
-        materialPT->Write(materialJ, m_mediaPath);
+        materialPT->write(materialJ, m_mediaPath);
         materialsJ.append(materialJ);
     }
 
@@ -1814,11 +1814,11 @@ bool MaterialGpuCache::debugGui(float indent)
 
 MaterialShaderPermutation PTMaterial::computeShaderPermutation(const std::string& defaultShaderPath)
 {
-    const caustica::render::MaterialFeatureMask featureMask = caustica::render::ComputeMaterialFeatureMask(*this);
-    const uint32_t tierIndex = caustica::render::MapFeatureMaskToTier(featureMask);
+    const caustica::render::materialFeatureMask featureMask = caustica::render::computeMaterialFeatureMask(*this);
+    const uint32_t tierIndex = caustica::render::mapFeatureMaskToTier(featureMask);
     return MaterialShaderPermutation{
         .shaderFilePath = defaultShaderPath,
-        .macros = caustica::render::BuildMaterialShaderMacros(tierIndex),
+        .macros = caustica::render::buildMaterialShaderMacros(tierIndex),
     };
 }
 

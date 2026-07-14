@@ -37,7 +37,7 @@ void EditorUI::BuildOpacityMicroMapsPanel(const PanelLayout& layout)
 
             if (auto& opacityMicromapBuilder = m_sceneEditor.lightingPasses().opacityMaps(); opacityMicromapBuilder)
             {
-                opacityMicromapBuilder->DebugGUI(layout.indent, *m_sceneEditor.scene());
+                opacityMicromapBuilder->debugGUI(layout.indent, *m_sceneEditor.scene());
             }
             else
                 ImGui::Text("<Opacity Micro-Maps not supported on the current device>");
@@ -63,7 +63,7 @@ void EditorUI::BuildAccelerationStructurePanel(const PanelLayout& layout)
             }
 
             ImGui::Separator();
-            ImGui::Text("Settings below require AS rebuild");
+            ImGui::Text("settings below require AS rebuild");
 
             {
                 if (ImGui::Checkbox("Exclude Transmissive", &m_settings.AS.ExcludeTransmissive))
@@ -288,7 +288,7 @@ void EditorUI::BuildDebuggingPanel(const PanelLayout& layout)
 #endif 
 
             if (m_sceneEditor.GetZoomTool() != nullptr && ImGui::CollapsingHeader("Zoom Tool"))
-                m_sceneEditor.GetZoomTool()->DebugGUI(layout.indent);
+                m_sceneEditor.GetZoomTool()->debugGUI(layout.indent);
         }
 
 

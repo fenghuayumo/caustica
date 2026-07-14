@@ -49,23 +49,23 @@ public:
 private:
     friend class ComputeShaderVariant;
 
-    nvrhi::DeviceHandle GetDevice() const { return m_device; }
+    nvrhi::DeviceHandle getDevice() const { return m_device; }
     
-    const ShaderCompilerUtils::ShaderCompilerConfig& GetCompilerConfig() const { return m_compilerConfig; }
+    const ShaderCompilerUtils::ShaderCompilerConfig& getCompilerConfig() const { return m_compilerConfig; }
     
-    const std::filesystem::path& GetShaderBinariesPath() const { return m_compilerConfig.ShaderBinariesPath; }
-    const std::filesystem::path& GetShaderCompilerPath() const { return m_compilerConfig.ShaderCompilerPath; }
-    const std::filesystem::path& GetShadersPath() const { return m_compilerConfig.ShadersPath; }
-    const std::filesystem::path& GetShadersPathExternalIncludes1() const { return m_compilerConfig.ShadersPathExternalIncludes1; }
-    const std::filesystem::path& GetShadersPathExternalIncludes2() const { return m_compilerConfig.ShadersPathExternalIncludes2; }
+    const std::filesystem::path& getShaderBinariesPath() const { return m_compilerConfig.ShaderBinariesPath; }
+    const std::filesystem::path& getShaderCompilerPath() const { return m_compilerConfig.ShaderCompilerPath; }
+    const std::filesystem::path& getShadersPath() const { return m_compilerConfig.ShadersPath; }
+    const std::filesystem::path& getShadersPathExternalIncludes1() const { return m_compilerConfig.ShadersPathExternalIncludes1; }
+    const std::filesystem::path& getShadersPathExternalIncludes2() const { return m_compilerConfig.ShadersPathExternalIncludes2; }
     
-    std::shared_ptr<caustica::RootFileSystem> GetFS() { return m_shadersFS; }
-    std::mutex& GetMutex() { return m_mutex; }
+    std::shared_ptr<caustica::RootFileSystem> getFS() { return m_shadersFS; }
+    std::mutex& getMutex() { return m_mutex; }
 
-    int64_t GetVersion() const { return m_version; }
+    int64_t getVersion() const { return m_version; }
 
     // Enqueue a shader for compilation (thread-safe)
-    void EnqueueShaderForCompilation(ComputeShaderVariant* variant);
+    void enqueueShaderForCompilation(ComputeShaderVariant* variant);
 
 private:
     nvrhi::DeviceHandle m_device;
@@ -127,16 +127,16 @@ private:
         const std::shared_ptr<ComputePipelineRegistry>& registry);
 
     // Prepare compilation command (does not execute)
-    void PrepareCompilation(std::filesystem::file_time_type lastModifiedSourceCode);
+    void prepareCompilation(std::filesystem::file_time_type lastModifiedSourceCode);
 
-    // Execute the actual compilation (called from thread pool)
-    void CompileIfNeeded();
+    // execute the actual compilation (called from thread pool)
+    void compileIfNeeded();
 
-    // Load shader blob and create pipeline
-    void LoadShaderAndCreatePipeline();
+    // load shader blob and create pipeline
+    void loadShaderAndCreatePipeline();
 
-    // Reset pipeline (forces recompile on next update)
-    void ResetPipeline();
+    // reset pipeline (forces recompile on next update)
+    void resetPipeline();
 
 private:
     std::weak_ptr<ComputePipelineRegistry> m_registry;

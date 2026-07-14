@@ -29,14 +29,14 @@ public:
     Handle() = default;
     explicit Handle(uint64_t raw) : m_Value(raw) {}
 
-    // Create a handle from index and generation.
-    static Handle Make(uint32_t index, uint16_t generation)
+    // create a handle from index and generation.
+    static Handle make(uint32_t index, uint16_t generation)
     {
         return Handle((uint64_t(index) & 0xFFFFFFFFFF) | (uint64_t(generation) << 40));
     }
 
-    [[nodiscard]] bool IsValid() const { return m_Value != Invalid; }
-    [[nodiscard]] explicit operator bool() const { return IsValid(); }
+    [[nodiscard]] bool isValid() const { return m_Value != Invalid; }
+    [[nodiscard]] explicit operator bool() const { return isValid(); }
 
     [[nodiscard]] uint32_t GetIndex() const { return uint32_t(m_Value & 0xFFFFFFFFFF); }
     [[nodiscard]] uint16_t GetGeneration() const { return uint16_t(m_Value >> 40); }
@@ -75,22 +75,22 @@ public:
         m_FreeCount = static_cast<uint32_t>(N);
     }
 
-    // Allocate a new handle. Returns Invalid if the pool is full.
-    HandleType Allocate()
+    // allocate a new handle. Returns Invalid if the pool is full.
+    HandleType allocate()
     {
         uint32_t index = m_FreeCount.fetch_sub(1, std::memory_order_acquire);
         if (index == 0)
             return HandleType(); // pool full
         index = m_FreeList[index - 1];
         uint16_t gen = m_Generations[index].load(std::memory_order_relaxed);
-        return HandleType::Make(index, gen);
+        return HandleType::make(index, gen);
     }
 
-    // Free a handle, making its slot available for re-allocation.
+    // free a handle, making its slot available for re-allocation.
     // Bumps the generation so any outstanding handles to this slot become invalid.
-    void Free(HandleType handle)
+    void free(HandleType handle)
     {
-        if (!handle.IsValid())
+        if (!handle.isValid())
             return;
         uint32_t index = handle.GetIndex();
         m_Generations[index].fetch_add(1, std::memory_order_release);
@@ -101,7 +101,7 @@ public:
     // Check if a handle is still valid (generation matches).
     [[nodiscard]] bool IsHandleValid(HandleType handle) const
     {
-        if (!handle.IsValid())
+        if (!handle.isValid())
             return false;
         uint32_t index = handle.GetIndex();
         if (index >= N)

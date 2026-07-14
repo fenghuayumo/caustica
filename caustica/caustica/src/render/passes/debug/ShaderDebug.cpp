@@ -76,7 +76,7 @@ ShaderDebug::ShaderDebug( nvrhi::IDevice* device, nvrhi::ICommandList* commandLi
     reinterpret_cast<ShaderDebugHeader*>(m_initHeader.data())->VertexCountPerInstance = 3;  // needed for indirect draw
 }
 
-void ShaderDebug::CreateRenderPasses( nvrhi::IFramebuffer * frameBuffer, nvrhi::TextureHandle depthBuffer )
+void ShaderDebug::createRenderPasses( nvrhi::IFramebuffer * frameBuffer, nvrhi::TextureHandle depthBuffer )
 {
     nvrhi::TextureDesc desc;
     //desc.width = frameBuffer->getDesc().colorAttachments[0].texture->getDesc().width;
@@ -143,7 +143,7 @@ void ShaderDebug::CreateRenderPasses( nvrhi::IFramebuffer * frameBuffer, nvrhi::
     bindingSetDesc.bindings = {
         nvrhi::BindingSetItem::Texture_SRV(0, depthBuffer),
         nvrhi::BindingSetItem::Texture_SRV(1, m_debugVizOutput),
-        nvrhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, GetGPUWriteBuffer()),
+        nvrhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, getGPUWriteBuffer()),
     };
     m_geometryBindingSet = m_device->createBindingSet(bindingSetDesc, m_geometryBindingLayout);
 
@@ -165,7 +165,7 @@ void ShaderDebug::CreateRenderPasses( nvrhi::IFramebuffer * frameBuffer, nvrhi::
     m_linesPipeline = m_device->createGraphicsPipeline(psoDesc, frameBuffer);
 }
 
-void ShaderDebug::BeginFrame( nvrhi::ICommandList* commandList, const float4x4& matWorldToClip )
+void ShaderDebug::beginFrame( nvrhi::ICommandList* commandList, const float4x4& matWorldToClip )
 {
     ShaderDebugHeader* header = reinterpret_cast<ShaderDebugHeader*>(m_initHeader.data());
     memcpy( header->WorldViewProjectionMatrix, matWorldToClip.m_data, sizeof(float)*16 );
@@ -173,12 +173,12 @@ void ShaderDebug::BeginFrame( nvrhi::ICommandList* commandList, const float4x4& 
     commandList->writeBuffer(m_bufferGPU, m_initHeader.data(), m_initHeader.size());   // only need to clear the counters
 }
     
-void ShaderDebug::ClearDebugVizTexture(nvrhi::CommandListHandle commandList)
+void ShaderDebug::clearDebugVizTexture(nvrhi::CommandListHandle commandList)
 {
     commandList->clearTextureFloat(m_debugVizOutput, nvrhi::AllSubresources, nvrhi::Color(0, 0, 0, 0));
 }
 
-void ShaderDebug::EndFrameAndOutput( nvrhi::ICommandList* commandList, nvrhi::IFramebuffer * frameBuffer, nvrhi::TextureHandle depthBuffer, const nvrhi::Viewport & viewport )
+void ShaderDebug::endFrameAndOutput( nvrhi::ICommandList* commandList, nvrhi::IFramebuffer * frameBuffer, nvrhi::TextureHandle depthBuffer, const nvrhi::Viewport & viewport )
 {
     RAII_SCOPE( commandList->beginMarker("ShaderDebug");, commandList->endMarker(); );
 
@@ -197,9 +197,9 @@ void ShaderDebug::EndFrameAndOutput( nvrhi::ICommandList* commandList, nvrhi::IF
     m_currentBufferIndex = (m_currentBufferIndex+1)%c_swapchainCount;
 
     if (hadReadbackHistory)
-        OutputLastBufferPrints();
+        outputLastBufferPrints();
     
-    DrawCurrentBufferGeometry(commandList, frameBuffer, depthBuffer, viewport );
+    drawCurrentBufferGeometry(commandList, frameBuffer, depthBuffer, viewport );
 
     // Draw debug viz overlay with blending
     {
@@ -285,7 +285,7 @@ static std::string ProcessArg( const char * & currentData, const char * endData 
     return ret + ")";
 }
 
-void ShaderDebug::OutputLastBufferPrints()
+void ShaderDebug::outputLastBufferPrints()
 {
     const char * rawData = m_lastBuffer.data();
     uint shaderPrintByteCount = *reinterpret_cast<const uint*>(rawData);
@@ -369,7 +369,7 @@ void ShaderDebug::OutputLastBufferPrints()
     }
 }
 
-void ShaderDebug::DrawCurrentBufferGeometry(nvrhi::ICommandList* commandList, nvrhi::IFramebuffer * frameBuffer, nvrhi::TextureHandle depthBuffer, const nvrhi::Viewport & viewport)
+void ShaderDebug::drawCurrentBufferGeometry(nvrhi::ICommandList* commandList, nvrhi::IFramebuffer * frameBuffer, nvrhi::TextureHandle depthBuffer, const nvrhi::Viewport & viewport)
 {
     RAII_SCOPE(commandList->beginMarker("Tris"); , commandList->endMarker(); );
 

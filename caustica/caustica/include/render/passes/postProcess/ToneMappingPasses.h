@@ -132,11 +132,11 @@ private:
         
     bool m_FrameParamsSet = false;
 
-    void SetParameters(const ToneMappingParameters& params);
-    void UpdateExposureValue();
-	void UpdateWhiteBalanceTransform();
-	void UpdateColorTransform();
-    void GenerateMips(nvrhi::ICommandList* commandList, uint32_t numberOfViews);
+    void setParameters(const ToneMappingParameters& params);
+    void updateExposureValue();
+	void updateWhiteBalanceTransform();
+	void updateColorTransform();
+    void generateMips(nvrhi::ICommandList* commandList, uint32_t numberOfViews);
 public:
     struct CreateParameters
     {
@@ -156,10 +156,10 @@ public:
         nvrhi::TextureHandle sourceTexture
         );
 
-    void PreRender(const ToneMappingParameters& params);
+    void preRender(const ToneMappingParameters& params);
 
     // note - if enable == false, it still does autoexposure (if enabled) and everything else, but the output is just passthrough
-    bool Render(nvrhi::ICommandList* commandList,
+    bool render(nvrhi::ICommandList* commandList,
         const caustica::ICompositeView& compositeView,
         nvrhi::ITexture* sourceTexture,
         nvrhi::IBuffer* constantsBuffer,
@@ -175,11 +175,11 @@ public:
         bool* outCommandListWasClosed = nullptr);
 
 #if TONEMAPPING_AUTOEXPOSURE_CPU
-    float3 GetPreExposedGray( uint viewIndex );
+    float3 getPreExposedGray( uint viewIndex );
 #endif
 
-    void AdvanceFrame(float frameTime);
+    void advanceFrame(float frameTime);
 
-    nvrhi::TextureHandle GetLuminanceTexture(uint viewIndex)    { return m_PerView[viewIndex].luminanceTexture; }
+    nvrhi::TextureHandle getLuminanceTexture(uint viewIndex)    { return m_PerView[viewIndex].luminanceTexture; }
 };
 //}

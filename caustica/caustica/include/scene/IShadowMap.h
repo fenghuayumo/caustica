@@ -14,18 +14,18 @@ class IShadowMap
 {
 public:
     virtual ~IShadowMap() = default;
-    virtual dm::float4x4 GetWorldToUvzwMatrix() const = 0;
-    virtual const ICompositeView& GetView() const = 0;
-    virtual nvrhi::ITexture* GetTexture() const = 0;
-    virtual uint32_t GetNumberOfCascades() const = 0;
-    virtual const IShadowMap* GetCascade(uint32_t index) const = 0;
-    virtual uint32_t GetNumberOfPerObjectShadows() const = 0;
-    virtual const IShadowMap* GetPerObjectShadow(uint32_t index) const = 0;
-    virtual dm::int2 GetTextureSize() const = 0;
-    virtual dm::box2 GetUVRange() const = 0;
-    virtual dm::float2 GetFadeRangeInTexels() const = 0;
-    virtual bool IsLitOutOfBounds() const = 0;
-    virtual void FillShadowConstants(ShadowConstants& constants) const = 0;
+    virtual dm::float4x4 getWorldToUvzwMatrix() const = 0;
+    virtual const ICompositeView& getView() const = 0;
+    virtual nvrhi::ITexture* getTexture() const = 0;
+    virtual uint32_t getNumberOfCascades() const = 0;
+    virtual const IShadowMap* getCascade(uint32_t index) const = 0;
+    virtual uint32_t getNumberOfPerObjectShadows() const = 0;
+    virtual const IShadowMap* getPerObjectShadow(uint32_t index) const = 0;
+    virtual dm::int2 getTextureSize() const = 0;
+    virtual dm::box2 getUVRange() const = 0;
+    virtual dm::float2 getFadeRangeInTexels() const = 0;
+    virtual bool isLitOutOfBounds() const = 0;
+    virtual void fillShadowConstants(ShadowConstants& constants) const = 0;
 };
 
 } // namespace caustica

@@ -163,7 +163,7 @@ namespace
     }
 } // namespace
 
-bool LoadStlFile(const std::filesystem::path& filePath, StlMeshData& outMesh)
+bool loadStlFile(const std::filesystem::path& filePath, StlMeshData& outMesh)
 {
     outMesh = StlMeshData{};
 

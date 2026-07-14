@@ -37,11 +37,11 @@ namespace caustica::render
 
         // Dispatches reduction kernel : reads LOD 0 and populates
         // LOD 1 and up
-        void Dispatch(nvrhi::ICommandList* commandList, int maxLOD=-1);
+        void dispatch(nvrhi::ICommandList* commandList, int maxLOD=-1);
 
         // debug : blits mip-map levels in spiral pattern to 'target'
         // (assumes 'target' texture resolution is high enough...)
-        void Display(
+        void display(
             caustica::render::RenderDevice& renderDevice,
             nvrhi::ICommandList* commandList, 
             nvrhi::IFramebuffer* target);

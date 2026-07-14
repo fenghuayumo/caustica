@@ -41,37 +41,37 @@ DepthPass::DepthPass(
     m_IsDX11 = m_device->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D11;
 }
 
-void DepthPass::Init(ShaderFactory& shaderFactory, const CreateParameters& params)
+void DepthPass::init(ShaderFactory& shaderFactory, const CreateParameters& params)
 {
     m_UseInputAssembler = params.useInputAssembler;
 
-    m_VertexShader = CreateVertexShader(shaderFactory, params);
-    m_PixelShader = CreatePixelShader(shaderFactory, params);
-    m_InputLayout = CreateInputLayout(m_VertexShader, params);
-    m_InputBindingLayout = CreateInputBindingLayout();
+    m_VertexShader = createVertexShader(shaderFactory, params);
+    m_PixelShader = createPixelShader(shaderFactory, params);
+    m_InputLayout = createInputLayout(m_VertexShader, params);
+    m_InputBindingLayout = createInputBindingLayout();
 
     if (params.materialBindings)
         m_MaterialBindings = params.materialBindings;
     else
-        m_MaterialBindings = CreateMaterialBindingCache(*m_renderDevice);
+        m_MaterialBindings = createMaterialBindingCache(*m_renderDevice);
 
     m_DepthCB = m_device->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(DepthPassConstants),
         "DepthPassConstants", params.numConstantBufferVersions));
 
-    CreateViewBindings(m_ViewBindingLayout, m_ViewBindingSet, params);
+    createViewBindings(m_ViewBindingLayout, m_ViewBindingSet, params);
 
     m_DepthBias = params.depthBias;
     m_DepthBiasClamp = params.depthBiasClamp;
     m_SlopeScaledDepthBias = params.slopeScaledDepthBias;
 }
 
-void DepthPass::ResetBindingCache()
+void DepthPass::resetBindingCache()
 {
     m_MaterialBindings->clear();
     m_InputBindingSets.clear();
 }
 
-nvrhi::ShaderHandle DepthPass::CreateVertexShader(ShaderFactory& shaderFactory, const CreateParameters& params)
+nvrhi::ShaderHandle DepthPass::createVertexShader(ShaderFactory& shaderFactory, const CreateParameters& params)
 {
     char const* sourceFileName = "engine/passes/depth_vs.hlsl";
 
@@ -87,20 +87,20 @@ nvrhi::ShaderHandle DepthPass::CreateVertexShader(ShaderFactory& shaderFactory, 
     }
 }
 
-nvrhi::ShaderHandle DepthPass::CreatePixelShader(ShaderFactory& shaderFactory, const CreateParameters& params)
+nvrhi::ShaderHandle DepthPass::createPixelShader(ShaderFactory& shaderFactory, const CreateParameters& params)
 {
     return shaderFactory.createAutoShader("engine/passes/depth_ps.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_depth_ps), nullptr, nvrhi::ShaderType::Pixel);
 }
 
-nvrhi::InputLayoutHandle DepthPass::CreateInputLayout(nvrhi::IShader* vertexShader, const CreateParameters& params)
+nvrhi::InputLayoutHandle DepthPass::createInputLayout(nvrhi::IShader* vertexShader, const CreateParameters& params)
 {
     if (params.useInputAssembler)
     {
         nvrhi::VertexAttributeDesc aInputDescs[] =
         {
-            GetVertexAttributeDesc(VertexAttribute::Position, "POSITION", 0),
-            GetVertexAttributeDesc(VertexAttribute::TexCoord1, "TEXCOORD", 1),
-            GetVertexAttributeDesc(VertexAttribute::Transform, "TRANSFORM", 2)
+            getVertexAttributeDesc(VertexAttribute::Position, "POSITION", 0),
+            getVertexAttributeDesc(VertexAttribute::TexCoord1, "TEXCOORD", 1),
+            getVertexAttributeDesc(VertexAttribute::Transform, "TRANSFORM", 2)
         };
 
         return m_device->createInputLayout(aInputDescs, dim(aInputDescs), vertexShader);
@@ -109,7 +109,7 @@ nvrhi::InputLayoutHandle DepthPass::CreateInputLayout(nvrhi::IShader* vertexShad
     return nullptr;
 }
 
-void DepthPass::CreateViewBindings(nvrhi::BindingLayoutHandle& layout, nvrhi::BindingSetHandle& set, const CreateParameters& params)
+void DepthPass::createViewBindings(nvrhi::BindingLayoutHandle& layout, nvrhi::BindingSetHandle& set, const CreateParameters& params)
 {
     auto bindingLayoutDesc = nvrhi::BindingLayoutDesc()
         .setVisibility(nvrhi::ShaderType::Vertex | nvrhi::ShaderType::Pixel)
@@ -128,7 +128,7 @@ void DepthPass::CreateViewBindings(nvrhi::BindingLayoutHandle& layout, nvrhi::Bi
     set = m_device->createBindingSet(bindingSetDesc, layout);
 }
 
-std::shared_ptr<MaterialBindingCache> DepthPass::CreateMaterialBindingCache(caustica::render::RenderDevice& renderDevice)
+std::shared_ptr<MaterialBindingCache> DepthPass::createMaterialBindingCache(caustica::render::RenderDevice& renderDevice)
 {
     std::vector<MaterialResourceBinding> materialBindings = {
         { MaterialResource::DiffuseTexture, DEPTH_BINDING_MATERIAL_DIFFUSE_TEXTURE },
@@ -147,7 +147,7 @@ std::shared_ptr<MaterialBindingCache> DepthPass::CreateMaterialBindingCache(caus
         renderDevice.builtins().blackTexture());
 }
 
-nvrhi::GraphicsPipelineHandle DepthPass::CreateGraphicsPipeline(PipelineKey key,
+nvrhi::GraphicsPipelineHandle DepthPass::createGraphicsPipeline(PipelineKey key,
     nvrhi::FramebufferInfo const& framebufferInfo)
 {
     nvrhi::GraphicsPipelineDesc pipelineDesc;
@@ -177,7 +177,7 @@ nvrhi::GraphicsPipelineHandle DepthPass::CreateGraphicsPipeline(PipelineKey key,
     return m_device->createGraphicsPipeline(pipelineDesc, framebufferInfo);
 }
 
-nvrhi::BindingLayoutHandle DepthPass::CreateInputBindingLayout()
+nvrhi::BindingLayoutHandle DepthPass::createInputBindingLayout()
 {
     if (m_UseInputAssembler)
         return nullptr;
@@ -194,7 +194,7 @@ nvrhi::BindingLayoutHandle DepthPass::CreateInputBindingLayout()
     return m_device->createBindingLayout(bindingLayoutDesc);
 }
 
-nvrhi::BindingSetHandle DepthPass::CreateInputBindingSet(const BufferGroup* bufferGroup)
+nvrhi::BindingSetHandle DepthPass::createInputBindingSet(const BufferGroup* bufferGroup)
 {
     auto bindingSetDesc = nvrhi::BindingSetDesc()
         .addItem(m_IsDX11
@@ -206,12 +206,12 @@ nvrhi::BindingSetHandle DepthPass::CreateInputBindingSet(const BufferGroup* buff
     return m_device->createBindingSet(bindingSetDesc, m_InputBindingLayout);
 }
 
-nvrhi::BindingSetHandle DepthPass::GetOrCreateInputBindingSet(const BufferGroup* bufferGroup)
+nvrhi::BindingSetHandle DepthPass::getOrCreateInputBindingSet(const BufferGroup* bufferGroup)
 {
     auto it = m_InputBindingSets.find(bufferGroup);
     if (it == m_InputBindingSets.end())
     {
-        auto bindingSet = CreateInputBindingSet(bufferGroup);
+        auto bindingSet = createInputBindingSet(bufferGroup);
         m_InputBindingSets[bufferGroup] = bindingSet;
         return bindingSet;
     }
@@ -305,7 +305,7 @@ bool DepthPass::setupMaterial(GeometryPassContext& abstractContext, const causti
         std::lock_guard<std::mutex> lockGuard(m_mutex);
 
         if (!pipeline)
-            pipeline = CreateGraphicsPipeline(key, framebufferInfo);
+            pipeline = createGraphicsPipeline(key, framebufferInfo);
 
         if (!pipeline)
             return false;
@@ -333,7 +333,7 @@ void DepthPass::setupInputBuffers(GeometryPassContext& abstractContext, const ca
     }
     else
     {
-        context.inputBindingSet = GetOrCreateInputBindingSet(buffers);
+        context.inputBindingSet = getOrCreateInputBindingSet(buffers);
         context.positionOffset = uint32_t(buffers->getVertexBufferRange(VertexAttribute::Position).byteOffset);
         context.texCoordOffset = uint32_t(buffers->getVertexBufferRange(VertexAttribute::TexCoord1).byteOffset);
     }

@@ -45,18 +45,18 @@ namespace caustica::animation
         Sampler() = default;
         virtual ~Sampler() = default;
 
-        std::optional<dm::float4> Evaluate(float time, bool extrapolateLastValues = false) const;
+        std::optional<dm::float4> evaluate(float time, bool extrapolateLastValues = false) const;
 
         [[nodiscard]] std::vector<Keyframe>& GetKeyframes() { return m_Keyframes; }
         void AddKeyframe(const Keyframe keyframe);
 
-        [[nodiscard]] InterpolationMode GetMode() const { return m_Mode; }
+        [[nodiscard]] InterpolationMode getMode() const { return m_Mode; }
         void SetInterpolationMode(InterpolationMode mode) { m_Mode = mode; }
 
         [[nodiscard]] float GetStartTime() const;
         [[nodiscard]] float GetEndTime() const;
 
-        void Load(Json::Value& node);
+        void load(Json::Value& node);
     };
 
     class Sequence
@@ -74,12 +74,12 @@ namespace caustica::animation
             return m_Tracks[name];
         }
 
-        std::optional<dm::float4> Evaluate(const std::string& name, float time, bool extrapolateLastValues = false);
+        std::optional<dm::float4> evaluate(const std::string& name, float time, bool extrapolateLastValues = false);
 
         void AddTrack(const std::string& name, const std::shared_ptr<Sampler>& track);
 
-        [[nodiscard]] float GetDuration() const { return m_Duration; }
+        [[nodiscard]] float getDuration() const { return m_Duration; }
 
-        void Load(Json::Value& node);
+        void load(Json::Value& node);
     };
 }

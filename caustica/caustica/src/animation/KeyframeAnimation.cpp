@@ -51,7 +51,7 @@ float4 caustica::animation::Interpolate(const InterpolationMode mode,
     }
 }
 
-std::optional<dm::float4> Sampler::Evaluate(float time, bool extrapolateLastValues) const
+std::optional<dm::float4> Sampler::evaluate(float time, bool extrapolateLastValues) const
 {
     const size_t count = m_Keyframes.size();
 
@@ -93,7 +93,7 @@ std::optional<dm::float4> Sampler::Evaluate(float time, bool extrapolateLastValu
         }
     }
 
-    // Load 4 keyframes around the required time.
+    // load 4 keyframes around the required time.
     // The outside keyframes (a) and (d) are needed for higher-order interpolation.
     size_t const offset = left;
     const Keyframe& b = m_Keyframes[offset];
@@ -137,7 +137,7 @@ float Sampler::GetEndTime() const
     return 0.f;
 }
 
-void Sampler::Load(Json::Value& node)
+void Sampler::load(Json::Value& node)
 {
     if (node["mode"].isString())
     {
@@ -184,13 +184,13 @@ void Sampler::Load(Json::Value& node)
     }
 }
 
-std::optional<dm::float4> Sequence::Evaluate(const std::string& name, float time, bool extrapolateLastValues)
+std::optional<dm::float4> Sequence::evaluate(const std::string& name, float time, bool extrapolateLastValues)
 {
     std::shared_ptr<Sampler> track = GetTrack(name);
     if (!track)
         return std::optional<dm::float4>();
 
-    return track->Evaluate(time, extrapolateLastValues);
+    return track->evaluate(time, extrapolateLastValues);
 }
 
 void Sequence::AddTrack(const std::string& name, const std::shared_ptr<Sampler>& track)
@@ -199,12 +199,12 @@ void Sequence::AddTrack(const std::string& name, const std::shared_ptr<Sampler>&
     m_Duration = std::max(m_Duration, track->GetEndTime());
 }
 
-void Sequence::Load(Json::Value& node)
+void Sequence::load(Json::Value& node)
 {
     for (auto& trackNode : node)
     {
         auto track = std::make_shared<Sampler>();
-        track->Load(trackNode);
+        track->load(trackNode);
 
         std::string name = trackNode["name"].asString();
         AddTrack(name, track);

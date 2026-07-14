@@ -29,7 +29,7 @@ void SceneLightingPasses::refreshEnvironmentMapMediaList(const std::filesystem::
 void SceneLightingPasses::setEnvMapOverrideSource(const std::string& envMapOverride)
 {
     if (m_envMapOverride != envMapOverride && m_environment != nullptr)
-        m_environment->SetTargetCubeResolution(0);
+        m_environment->setTargetCubeResolution(0);
     m_envMapOverride = envMapOverride;
 }
 
@@ -49,23 +49,23 @@ void SceneLightingPasses::sceneUnloading()
     m_lightSampling = nullptr;
     m_materials = nullptr;
     if (m_opacityMaps != nullptr)
-        m_opacityMaps->SceneUnloading();
+        m_opacityMaps->sceneUnloading();
     m_computePipelines = nullptr;
 }
 
 void SceneLightingPasses::onSceneLoaded(caustica::Scene& scene, PathTracerSettings& settings)
 {
     m_lightEntities.clear();
-    for (ecs::Entity lightEntity : scene.GetLightEntities())
+    for (ecs::Entity lightEntity : scene.getLightEntities())
         m_lightEntities.push_back(lightEntity);
 
-    const scene::SceneEntityWorld* entityWorld = scene.GetEntityWorld();
-    ecs::Entity envEntity = FindEnvironmentLightEntity(scene);
+    const scene::SceneEntityWorld* entityWorld = scene.getEntityWorld();
+    ecs::Entity envEntity = findEnvironmentLightEntity(scene);
     m_envMapLocalPath = "";
     if (entityWorld && ecs::isValid(envEntity))
     {
-        if (const auto* light = scene::TryGetLight(entityWorld->world(), envEntity))
-            m_envMapLocalPath = scene::GetEnvironmentLightPath(*light);
+        if (const auto* light = scene::tryGetLight(entityWorld->world(), envEntity))
+            m_envMapLocalPath = scene::getEnvironmentLightPath(*light);
     }
     settings.EnvironmentMapParams = EnvironmentMapRuntimeParameters();
     m_envMapOverride = c_EnvMapSceneDefault;
@@ -75,13 +75,13 @@ void SceneLightingPasses::onSceneLoaded(caustica::Scene& scene, PathTracerSettin
         auto& world = entityWorld->world();
         for (int i = static_cast<int>(m_lightEntities.size()) - 1; i >= 0; --i)
         {
-            const auto* light = scene::TryGetLight(world, m_lightEntities[i]);
+            const auto* light = scene::tryGetLight(world, m_lightEntities[i]);
             const auto* global = world.tryGet<scene::GlobalTransformComponent>(m_lightEntities[i]);
             if (!light || !global)
                 continue;
 
             LightConstants lc;
-            scene::FillLightConstants(*light, global->transform, lc);
+            scene::fillLightConstants(*light, global->transform, lc);
             if (length(lc.color * lc.intensity) <= 1e-7f)
                 m_lightEntities.erase(m_lightEntities.begin() + i);
         }
@@ -95,8 +95,8 @@ void SceneLightingPasses::onSceneLoaded(caustica::Scene& scene, PathTracerSettin
             component.data = scene::EnvironmentLightData{};
             if (auto* environment = std::get_if<scene::EnvironmentLightData>(&component.data))
                 environment->path = m_envMapLocalPath;
-            scene.AttachLightToRoot(std::move(component), "Environment");
-            m_lightEntities.push_back(scene.GetLightEntities().back());
+            scene.attachLightToRoot(std::move(component), "Environment");
+            m_lightEntities.push_back(scene.getLightEntities().back());
         }
     }
 }
@@ -104,8 +104,8 @@ void SceneLightingPasses::onSceneLoaded(caustica::Scene& scene, PathTracerSettin
 void SceneLightingPasses::resyncLightsFromScene(caustica::Scene& scene)
 {
     m_lightEntities.clear();
-    auto* entityWorld = scene.GetEntityWorld();
-    for (ecs::Entity lightEntity : scene.GetLightEntities())
+    auto* entityWorld = scene.getEntityWorld();
+    for (ecs::Entity lightEntity : scene.getLightEntities())
     {
         if (entityWorld && !entityWorld->world().isAlive(lightEntity))
             continue;
@@ -118,11 +118,11 @@ void SceneLightingPasses::notifySceneReloaded(caustica::Scene& scene)
     if (m_materials != nullptr)
         m_materials->sceneReloaded();
     if (m_environment != nullptr)
-        m_environment->SceneReloaded();
+        m_environment->sceneReloaded();
     if (m_lightSampling != nullptr)
-        m_lightSampling->SceneReloaded();
+        m_lightSampling->sceneReloaded();
     if (m_opacityMaps != nullptr)
-        m_opacityMaps->SceneLoaded(scene);
+        m_opacityMaps->sceneLoaded(scene);
 }
 
 int SceneLightingPasses::ensureMaterialsFromScene(const std::shared_ptr<caustica::Scene>& scene)
@@ -135,15 +135,15 @@ int SceneLightingPasses::ensureMaterialsFromScene(const std::shared_ptr<caustica
 void SceneLightingPasses::applyShaderMacros(std::vector<caustica::ShaderMacro>& macros)
 {
     if (m_lightSampling != nullptr)
-        m_lightSampling->SetGlobalShaderMacros(macros);
+        m_lightSampling->setGlobalShaderMacros(macros);
     if (m_opacityMaps != nullptr)
-        m_opacityMaps->SetGlobalShaderMacros(macros);
+        m_opacityMaps->setGlobalShaderMacros(macros);
 }
 
 void SceneLightingPasses::createOpacityMicromaps(caustica::Scene& scene)
 {
     if (m_opacityMaps != nullptr)
-        m_opacityMaps->CreateOpacityMicromaps(scene);
+        m_opacityMaps->createOpacityMicromaps(scene);
 }
 
 void SceneLightingPasses::forEachUsedMaterialTexture(

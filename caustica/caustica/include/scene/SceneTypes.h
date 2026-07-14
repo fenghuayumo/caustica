@@ -45,7 +45,7 @@ namespace caustica
         Count
     };
 
-    nvrhi::VertexAttributeDesc GetVertexAttributeDesc(VertexAttribute attribute, const char* name, uint32_t bufferIndex);
+    nvrhi::VertexAttributeDesc getVertexAttributeDesc(VertexAttribute attribute, const char* name, uint32_t bufferIndex);
 
 
     struct SceneLoadingStats
@@ -75,7 +75,7 @@ namespace caustica
         Count
     };
 
-    const char* MaterialDomainToString(MaterialDomain domain);
+    const char* materialDomainToString(MaterialDomain domain);
 
     struct Material
     {
@@ -152,8 +152,8 @@ namespace caustica
         bool dirty = true; // set this to true to make Scene update the material data
 
         virtual ~Material() = default;
-        void FillConstantBuffer(struct MaterialConstants& constants, bool useResourceDescriptorHeapBindless = false) const;
-        bool SetProperty(const std::string& name, const dm::float4& value);
+        void fillConstantBuffer(struct MaterialConstants& constants, bool useResourceDescriptorHeapBindless = false) const;
+        bool setProperty(const std::string& name, const dm::float4& value);
     };
 
 
@@ -274,7 +274,7 @@ namespace caustica
         bool DebugDataDirty = true;
 
         virtual ~MeshInfo() = default;
-        bool IsCurve() const
+        bool isCurve() const
         {
             return (type == MeshType::CurvePolytubes)
                 || (type == MeshType::CurveDisjointOrthogonalTriangleStrips)
@@ -295,11 +295,11 @@ namespace caustica
         bool enabled = true;
         dm::frustum bounds = dm::frustum::infinite();
 
-        [[nodiscard]] bool IsActive() const;
-        void FillLightProbeConstants(LightProbeConstants& lightProbeConstants) const;
+        [[nodiscard]] bool isActive() const;
+        void fillLightProbeConstants(LightProbeConstants& lightProbeConstants) const;
     };
 
-    inline nvrhi::IBuffer* BufferOrFallback(nvrhi::IBuffer* primary, nvrhi::IBuffer* secondary)
+    inline nvrhi::IBuffer* bufferOrFallback(nvrhi::IBuffer* primary, nvrhi::IBuffer* secondary)
     {
         return primary ? primary : secondary;
     }
