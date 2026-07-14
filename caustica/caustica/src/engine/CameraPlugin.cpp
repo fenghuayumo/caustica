@@ -3,12 +3,14 @@
 #include <engine/App.h>
 #include <engine/AppSchedules.h>
 #include <engine/GpuRenderSubsystem.h>
-#include <engine/SceneSessionSystems.h>
 #include <engine/SceneViewState.h>
 
+#include <render/core/PathTracerSettings.h>
 #include <render/worldRenderer/WorldRenderer.h>
+#include <scene/Scene.h>
 #include <scene/SceneCameraAccess.h>
 #include <scene/SceneEcs.h>
+#include <scene/SceneManager.h>
 
 #include <algorithm>
 
@@ -17,19 +19,23 @@ namespace caustica::sceneSession
 
 void updateCamera(App& app, float elapsedTimeSeconds)
 {
-    PathTracerSettings* cfg = settings(app);
-    SceneViewState* vs = viewState(app);
-    GpuRenderSubsystem* gpuRenderSubsystem = gpuRender(app);
-    if (!cfg || !vs || !gpuRenderSubsystem)
+    auto* cfg = app.tryResource<PathTracerSettings>();
+    auto* vs = app.tryResource<SceneViewState>();
+    auto* gr = app.tryResource<GpuRenderSubsystem>();
+    if (!cfg || !vs || !gr)
         return;
 
-    CameraController& cam = gpuRenderSubsystem->camera();
+    CameraController& cam = gr->camera();
     cam.camera().setMoveSpeed(cfg->CameraMoveSpeed);
 
-    cam.selectedCameraIndex() = std::min(cam.selectedCameraIndex(), sceneCameraCount(app) - 1);
+    const uint cameraCount = gr->sceneManager() && gr->sceneManager()->getScene()
+        ? static_cast<uint>(gr->sceneManager()->getScene()->getCameraEntities().size()) + 1
+        : 1;
+    cam.selectedCameraIndex() = std::min(cam.selectedCameraIndex(), cameraCount - 1);
     if (cam.selectedCameraIndex() > 0)
     {
-        const std::shared_ptr<Scene> activeScene = scene(app);
+        const std::shared_ptr<Scene> activeScene =
+            gr->sceneManager() ? gr->sceneManager()->getScene() : nullptr;
         if (activeScene)
         {
             const auto& cameraEntities = activeScene->getCameraEntities();
@@ -49,7 +55,7 @@ void updateCamera(App& app, float elapsedTimeSeconds)
 
     cam.camera().animate(elapsedTimeSeconds);
 
-    if (auto* wr = worldRenderer(app))
+    if (auto* wr = gr->worldRenderer())
     {
         if (cfg->CameraAntiRRSleepJitter > 0)
         {
@@ -71,18 +77,17 @@ void updateCamera(App& app, float elapsedTimeSeconds)
         cam.updateLastCameraState();
         if (!cfg->RealtimeMode)
             cfg->ResetAccumulation = true;
-        if (auto* wr = worldRenderer(app))
+        if (auto* wr = gr->worldRenderer())
             wr->setGaussianSplatTemporalReset(true);
     }
 }
 
 void registerCameraPlugin(App& app)
 {
-    app.addSystemAfter(AppSchedule::update, "SceneSession.updateCamera", "SceneSession.animate", [](SystemContext& ctx) {
+    app.addSystem(AppSchedule::update, "SceneSession.updateCamera", [](SystemContext& ctx) {
         if (!ctx.windowFocused)
             return;
-
-        sceneSession::updateCamera(ctx.app, ctx.deltaTimeSeconds);
+        updateCamera(ctx.app, ctx.deltaTimeSeconds);
     });
 }
 

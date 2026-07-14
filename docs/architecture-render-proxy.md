@@ -55,8 +55,8 @@ Frame rendering already uses light proxies + cached splat transforms; do not mov
 
 | Item | Status |
 | --- | --- |
-| OO `SceneLightAccess` / `SceneCameraAccess` / `SceneAnimationAccess` | Real helpers stay; OO `initialize*Component` deleted after importers migrate |
-| `sceneSession::*` facade | Still used by plugins; migrate call sites to `ctx.res<T>()` incrementally |
+| OO `initialize*Component` in `*Access` | Removed from Access headers; JSON/GLTF OO→ECS conversion lives only in `SceneEcs.cpp` |
+| `sceneSession::*` resource getters | Engine plugins use `ctx.tryRes` / `app.tryResource`; Python/Editor still call `sceneSession` |
 | `SceneRenderCommandQueue` | Unused — delete or wire |
 
 ## File map

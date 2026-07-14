@@ -2,6 +2,8 @@
 
 #include <scene/SceneEcs.h>
 
+#include <string>
+
 namespace caustica::scene
 {
 
@@ -67,39 +69,6 @@ bool setCameraProperty(CameraComponent& component, const std::string& propName, 
         if (propName == "yMag") { orthographic->yMag = value.x; return true; }
     }
     return false;
-}
-
-void initializeCameraComponent(CameraComponent& component, const SceneCamera& camera)
-{
-    if (const auto* perspective = dynamic_cast<const PerspectiveCamera*>(&camera))
-    {
-        component.data = PerspectiveCameraData{
-            perspective->zNear,
-            perspective->verticalFov,
-            perspective->zFar,
-            perspective->aspectRatio,
-            perspective->enableAutoExposure,
-            perspective->exposureCompensation,
-            perspective->exposureValue,
-            perspective->exposureValueMin,
-            perspective->exposureValueMax,
-        };
-    }
-    else if (const auto* orthographic = dynamic_cast<const OrthographicCamera*>(&camera))
-    {
-        component.data = OrthographicCameraData{
-            orthographic->zNear,
-            orthographic->zFar,
-            orthographic->xMag,
-            orthographic->yMag,
-        };
-    }
-}
-
-void initializeCameraComponent(CameraComponent& component, const std::shared_ptr<SceneCamera>& camera)
-{
-    if (camera)
-        initializeCameraComponent(component, *camera);
 }
 
 const CameraComponent* tryGetCamera(const ecs::World& world, ecs::Entity entity)

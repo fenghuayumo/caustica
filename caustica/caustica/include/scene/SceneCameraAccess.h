@@ -4,9 +4,6 @@
 #include <ecs/World.h>
 #include <math/math.h>
 #include <scene/SceneEcs.h>
-#include <scene/SceneObjects.h>
-
-#include <memory>
 
 namespace caustica::scene
 {
@@ -25,9 +22,6 @@ namespace caustica::scene
 [[nodiscard]] OrthographicCameraData* tryGetOrthographicCameraData(CameraComponent& component);
 
 [[nodiscard]] bool setCameraProperty(CameraComponent& component, const std::string& propName, const dm::float4& value);
-
-void initializeCameraComponent(CameraComponent& component, const SceneCamera& camera);
-void initializeCameraComponent(CameraComponent& component, const std::shared_ptr<SceneCamera>& camera);
 
 [[nodiscard]] const CameraComponent* tryGetCamera(const ecs::World& world, ecs::Entity entity);
 [[nodiscard]] CameraComponent* tryGetCamera(ecs::World& world, ecs::Entity entity);

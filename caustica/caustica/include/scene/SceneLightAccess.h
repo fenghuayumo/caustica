@@ -4,10 +4,9 @@
 #include <ecs/World.h>
 #include <math/math.h>
 #include <scene/SceneEcs.h>
-#include <scene/SceneObjects.h>
 
-#include <memory>
 #include <string>
+#include <vector>
 
 struct LightConstants;
 
@@ -33,12 +32,6 @@ void fillLightConstants(
     const LightComponent& component, const dm::daffine3& globalTransform, LightConstants& lightConstants);
 void fillLightConstants(const LightRenderProxy& proxy, LightConstants& lightConstants);
 [[nodiscard]] bool setLightProperty(LightComponent& component, const std::string& propName, const dm::float4& value);
-
-void setLightPosition(SceneEntityWorld& world, ecs::Entity entity, const dm::double3& position);
-void setLightDirection(SceneEntityWorld& world, ecs::Entity entity, const dm::double3& direction);
-
-void initializeLightComponent(LightComponent& component, const Light& light);
-void initializeLightComponent(LightComponent& component, const std::shared_ptr<Light>& light);
 
 [[nodiscard]] const LightComponent* tryGetLight(const ecs::World& world, ecs::Entity entity);
 [[nodiscard]] LightComponent* tryGetLight(ecs::World& world, ecs::Entity entity);

@@ -175,30 +175,6 @@ bool applyAnimation(AnimationComponent& component, float time, SceneEntityWorld&
     return success;
 }
 
-void initializeAnimationComponent(AnimationComponent& component, const SceneAnimation& animation)
-{
-    component.channels.clear();
-    component.duration = animation.getDuration();
-    component.channels.reserve(animation.getChannels().size());
-
-    for (const auto& channel : animation.getChannels())
-    {
-        AnimationChannelData data;
-        data.sampler = channel->getSampler();
-        data.targetEntity = channel->getTargetEntity();
-        data.targetMaterial = channel->getTargetMaterial();
-        data.attribute = channel->getAttribute();
-        data.leafPropertyName = channel->getLeafPropertyName();
-        component.channels.push_back(std::move(data));
-    }
-}
-
-void initializeAnimationComponent(AnimationComponent& component, const std::shared_ptr<SceneAnimation>& animation)
-{
-    if (animation)
-        initializeAnimationComponent(component, *animation);
-}
-
 const AnimationComponent* tryGetAnimation(const ecs::World& world, ecs::Entity entity)
 {
     return world.tryGet<AnimationComponent>(entity);

@@ -3,10 +3,8 @@
 #include <animation/KeyframeAnimation.h>
 #include <ecs/Entity.h>
 #include <ecs/World.h>
-#include <scene/SceneAnimation.h>
 #include <scene/SceneEcs.h>
 
-#include <memory>
 #include <string>
 
 namespace caustica::scene
@@ -24,9 +22,6 @@ void recalculateAnimationDuration(AnimationComponent& component);
 [[nodiscard]] bool applyAnimationChannel(
     const AnimationChannelData& channel, float time, SceneEntityWorld& world);
 [[nodiscard]] bool applyAnimation(AnimationComponent& component, float time, SceneEntityWorld& world);
-
-void initializeAnimationComponent(AnimationComponent& component, const SceneAnimation& animation);
-void initializeAnimationComponent(AnimationComponent& component, const std::shared_ptr<SceneAnimation>& animation);
 
 [[nodiscard]] const AnimationComponent* tryGetAnimation(const ecs::World& world, ecs::Entity entity);
 [[nodiscard]] AnimationComponent* tryGetAnimation(ecs::World& world, ecs::Entity entity);

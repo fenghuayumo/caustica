@@ -2,14 +2,20 @@
 
 #include <engine/App.h>
 #include <engine/AppSchedules.h>
+#include <engine/GpuRenderSubsystem.h>
 #include <engine/SceneSessionSystems.h>
+
+#include <scene/Scene.h>
+#include <scene/SceneManager.h>
 
 namespace caustica::sceneSession
 {
 
 void refreshEntityWorld(App& app, uint32_t frameIndex)
 {
-    const std::shared_ptr<Scene> activeScene = scene(app);
+    auto* gr = app.tryResource<GpuRenderSubsystem>();
+    const std::shared_ptr<Scene> activeScene =
+        gr && gr->sceneManager() ? gr->sceneManager()->getScene() : nullptr;
     if (!activeScene)
         return;
 
@@ -22,18 +28,18 @@ void registerSceneAnimationPlugin(App& app)
         if (!ctx.windowFocused)
             return;
 
-        sceneSession::animate(ctx.app, ctx.deltaTimeSeconds);
+        animate(ctx.app, ctx.deltaTimeSeconds);
     });
 
     app.addSystem(AppSchedule::PostUpdate, "SceneSession.RefreshEntityWorld", [](SystemContext& ctx) {
-        sceneSession::refreshEntityWorld(ctx.app, ctx.frameIndex);
+        refreshEntityWorld(ctx.app, ctx.frameIndex);
     });
 
     app.addSystemAfter(AppSchedule::update, "SceneSession.TickSimulation", "SceneSession.updateCamera", [](SystemContext& ctx) {
         if (!ctx.windowFocused)
             return;
 
-        sceneSession::tickSimulationAndFrameTiming(ctx.app, ctx.deltaTimeSeconds);
+        tickSimulationAndFrameTiming(ctx.app, ctx.deltaTimeSeconds);
     });
 }
 

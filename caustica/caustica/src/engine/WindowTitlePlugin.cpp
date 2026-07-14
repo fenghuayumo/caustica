@@ -2,8 +2,13 @@
 
 #include <engine/App.h>
 #include <engine/AppSchedules.h>
-#include <engine/SceneViewState.h>
+#include <engine/GpuRenderSubsystem.h>
 #include <engine/SceneSessionSystems.h>
+#include <engine/SceneViewState.h>
+
+#include <backend/GpuDevice.h>
+#include <scene/Scene.h>
+#include <scene/SceneManager.h>
 
 #include <string>
 
@@ -14,27 +19,28 @@ namespace caustica::sceneSession
 
 void updateWindowTitle(App& app)
 {
-    if (auto activeScene = scene(app))
-    {
-        SceneViewState* vs = viewState(app);
-        ::SceneManager* manager = sceneManager(app);
-        GpuDevice* device = gpuDevice(app);
-        if (!vs || !manager || !device)
-            return;
+    auto* gr = app.tryResource<GpuRenderSubsystem>();
+    auto* vs = app.tryResource<SceneViewState>();
+    GpuDevice* device = app.getGpuDevice();
+    if (!gr || !vs || !device || !gr->sceneManager())
+        return;
 
-        std::string extraInfo = ", " + vs->fpsInfo + ", " + manager->getCurrentSceneName() + ", "
-            + resolutionInfo(app) + ", (L: " + std::to_string(activeScene->getLightEntities().size())
-            + ", MAT: " + std::to_string(activeScene->getMaterials().size())
-            + ", MESH: " + std::to_string(activeScene->getMeshes().size())
-            + ", I: " + std::to_string(activeScene->getMeshInstances().size())
-            + ", SI: " + std::to_string(activeScene->getSkinnedMeshInstances().size())
+    auto activeScene = gr->sceneManager()->getScene();
+    if (!activeScene)
+        return;
+
+    std::string extraInfo = ", " + vs->fpsInfo + ", " + gr->sceneManager()->getCurrentSceneName() + ", "
+        + resolutionInfo(app) + ", (L: " + std::to_string(activeScene->getLightEntities().size())
+        + ", MAT: " + std::to_string(activeScene->getMaterials().size())
+        + ", MESH: " + std::to_string(activeScene->getMeshes().size())
+        + ", I: " + std::to_string(activeScene->getMeshInstances().size())
+        + ", SI: " + std::to_string(activeScene->getSkinnedMeshInstances().size())
 #if ENABLE_DEBUG_VIZUALISATIONS
-            + ", ENABLE_DEBUG_VIZUALISATIONS: 1"
+        + ", ENABLE_DEBUG_VIZUALISATIONS: 1"
 #endif
-            + ")";
+        + ")";
 
-        device->setInformativeWindowTitle(g_windowTitle, false, extraInfo.c_str());
-    }
+    device->setInformativeWindowTitle(g_windowTitle, false, extraInfo.c_str());
 }
 
 void registerWindowTitlePlugin(App& app)
@@ -43,7 +49,7 @@ void registerWindowTitlePlugin(App& app)
         if (!ctx.windowFocused)
             return;
 
-        sceneSession::updateWindowTitle(ctx.app);
+        updateWindowTitle(ctx.app);
     });
 }
 

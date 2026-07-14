@@ -2,12 +2,16 @@
 
 #include <engine/App.h>
 #include <engine/AppSchedules.h>
-#include <engine/SceneViewState.h>
-#include <engine/SceneSessionSystems.h>
 #include <engine/GpuRenderSubsystem.h>
+#include <engine/SceneViewState.h>
 
+#include <backend/GpuDevice.h>
+#include <render/RenderRuntimeState.h>
 #include <render/SessionDiagnostics.h>
+#include <render/core/PathTracerSettings.h>
 #include <render/worldRenderer/WorldRenderer.h>
+#include <scene/Scene.h>
+#include <scene/SceneManager.h>
 #include <scene/SceneRenderData.h>
 
 namespace caustica::sceneSession
@@ -15,28 +19,29 @@ namespace caustica::sceneSession
 
 void prepareRenderFrame(App& app)
 {
-    SceneViewState* vs = viewState(app);
-    render::SessionDiagnostics* diag = diagnostics(app);
-    GpuDevice* device = gpuDevice(app);
+    auto* vs = app.tryResource<SceneViewState>();
+    auto* diag = app.tryResource<render::SessionDiagnostics>();
+    auto* gr = app.tryResource<GpuRenderSubsystem>();
+    GpuDevice* device = app.getGpuDevice();
     if (vs)
         vs->progressLoading.stop();
     if (diag)
         diag->asyncLoadingInProgress = false;
 
-    if (!device)
+    if (!device || !gr)
         return;
 
-    const std::shared_ptr<Scene> activeScene = scene(app);
+    const std::shared_ptr<Scene> activeScene =
+        gr->sceneManager() ? gr->sceneManager()->getScene() : nullptr;
     if (!activeScene)
         return;
 
     scene::SessionRenderExtractInputs sessionInputs;
-    if (GpuRenderSubsystem* gr = gpuRender(app))
-        sessionInputs.camera = &gr->camera();
-    if (render::WorldRenderer* wr = worldRenderer(app))
+    sessionInputs.camera = &gr->camera();
+    if (render::WorldRenderer* wr = gr->worldRenderer())
         sessionInputs.gaussianSplatTemporalReset = wr->consumeGaussianSplatTemporalReset();
-    sessionInputs.settings = settings(app);
-    sessionInputs.runtime = runtimeState(app);
+    sessionInputs.settings = app.tryResource<PathTracerSettings>();
+    sessionInputs.runtime = app.tryResource<render::RenderRuntimeState>();
     if (vs)
         sessionInputs.sceneTime = vs->sceneTime;
 
@@ -49,10 +54,11 @@ void registerRenderExtractPlugin(App& app)
         if (!ctx.gpuDevice)
             return;
 
-        if (sceneSession::shouldSkipRender(ctx.app))
+        auto* gr = ctx.tryRes<GpuRenderSubsystem>();
+        if (!gr || !gr->sceneManager() || !gr->sceneManager()->getScene())
             return;
 
-        sceneSession::prepareRenderFrame(ctx.app);
+        prepareRenderFrame(ctx.app);
     });
 }
 

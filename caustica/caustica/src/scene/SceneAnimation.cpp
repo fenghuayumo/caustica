@@ -3,6 +3,28 @@
 
 namespace caustica
 {
+namespace
+{
+
+scene::AnimationComponent makeAnimationComponent(const SceneAnimation& animation)
+{
+    scene::AnimationComponent component;
+    component.duration = animation.getDuration();
+    component.channels.reserve(animation.getChannels().size());
+    for (const auto& channel : animation.getChannels())
+    {
+        scene::AnimationChannelData data;
+        data.sampler = channel->getSampler();
+        data.targetEntity = channel->getTargetEntity();
+        data.targetMaterial = channel->getTargetMaterial();
+        data.attribute = channel->getAttribute();
+        data.leafPropertyName = channel->getLeafPropertyName();
+        component.channels.push_back(std::move(data));
+    }
+    return component;
+}
+
+} // namespace
 
 bool SceneAnimationChannel::isValid() const
 {
@@ -53,8 +75,7 @@ std::shared_ptr<SceneAnimation> SceneAnimation::clone()
 
 bool SceneAnimation::apply(float time, scene::SceneEntityWorld& world) const
 {
-    scene::AnimationComponent component;
-    scene::initializeAnimationComponent(component, *this);
+    scene::AnimationComponent component = makeAnimationComponent(*this);
     return scene::applyAnimation(component, time, world);
 }
 
@@ -66,9 +87,7 @@ void SceneAnimation::addChannel(const std::shared_ptr<SceneAnimationChannel>& ch
 
 bool SceneAnimation::isVald() const
 {
-    scene::AnimationComponent component;
-    scene::initializeAnimationComponent(component, *this);
-    return scene::isAnimationValid(component);
+    return scene::isAnimationValid(makeAnimationComponent(*this));
 }
 
 } // namespace caustica
