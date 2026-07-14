@@ -2,53 +2,24 @@
 
 #if CAUSTICA_WITH_PYTHON
 
+#include <engine/EngineApp.h>
+#include <engine/GpuRenderSubsystem.h>
 #include <engine/SceneSessionSystems.h>
-#include <engine/SceneViewState.h>
-#include <engine/App.h>
-#include <engine/DefaultPlugins.h>
-#include <render/core/RenderDevice.h>
-#include <backend/GpuDevice.h>
-#include <render/SceneGaussianSplatPasses.h>
-#include <render/SceneLightingPasses.h>
-#include <render/worldRenderer/WorldRenderer.h>
+#include <assets/loader/TextureLoader.h>
 #include <core/file_utils.h>
-#include <core/format.h>
-#include <core/path_utils.h>
-#include <core/progress.h>
-#include <core/Timer.h>
-#include <core/system_utils.h>
-#include <core/command_line.h>
-#include <core/scope.h>
-#include <render/core/ScopedPerfMarker.h>
-#include <render/core/TextureUtils.h>
-#include <assets/loader/ShaderPackFileSystem.h>
-
-#include <backend/GpuDevice.h>
-#include <backend/ShaderUtils.h>
+#include <core/json.h>
 #include <core/log.h>
 #include <core/path_utils.h>
-#include <core/vfs/VFS.h>
-#include <assets/loader/ShaderFactory.h>
-#include <assets/loader/TextureLoader.h>
-#include <render/core/BindingCache.h>
-#include <core/vfs/VFS.h>
-#include <engine/UserInterfaceUtils.h>
-#include <platform/glfw_window.h>
-#if CAUSTICA_WITH_NATIVE_DLSS
-#include <render/passes/geometry/DLSS.h>
-#endif
+#include <core/progress.h>
 
 #include <GLFW/glfw3.h>
 #include <json/json.h>
-#include <core/json.h>
-#include <platform/glfw_window.h>
+
 #include <algorithm>
 #include <array>
-#include <chrono>
 #include <cctype>
 #include <cstring>
 #include <filesystem>
-#include <thread>
 #include <vector>
 
 #if CAUSTICA_WITH_DX12
@@ -350,20 +321,6 @@ RenderSession::RenderSession(const Config& cfg)
 {
     m_config.scene = PrepareSceneArgument(cfg.scene);
 
-    // Mirror command-line semantics: this is the configuration the rest of
-    // the renderer (CaptureScriptManager, Sample::Init, ...) consumes.
-    m_cmdLine.width             = uint32_t(cfg.width);
-    m_cmdLine.height            = uint32_t(cfg.height);
-    m_cmdLine.noWindow          = cfg.headless;
-    m_cmdLine.useVulkan         = cfg.useVulkan;
-    m_cmdLine.adapterIndex      = cfg.adapterIndex;
-    m_cmdLine.debug             = cfg.debug;
-    m_cmdLine.nonInteractive    = cfg.nonInteractive;
-    m_cmdLine.scene             = m_config.scene;
-    m_cmdLine.OverrideToReferenceMode = !cfg.realtimeMode;
-    m_cmdLine.OverrideToRealtimeMode  =  cfg.realtimeMode;
-    m_cmdLine.ReferenceSamplesPerPixel = cfg.accumulationTarget;
-
     if (cfg.nonInteractive)
     {
         caustica::EnableOutputToMessageBox(false);
@@ -372,22 +329,47 @@ RenderSession::RenderSession(const Config& cfg)
         HelpersSetNonInteractive();
     }
 
-    if (!InitDevice())
+#if CAUSTICA_WITH_DX12 && defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
+    if (!cfg.useVulkan)
+        m_d3d12DeviceFactory = CreateD3D12AgilityDeviceFactory();
+#endif
+
+    caustica::EngineAppDesc desc{};
+    desc.width = uint32_t(cfg.width);
+    desc.height = uint32_t(cfg.height);
+    desc.headless = cfg.headless;
+    desc.debugDevice = cfg.debug;
+    desc.adapterIndex = cfg.adapterIndex;
+    desc.useVulkan = cfg.useVulkan;
+    desc.scene = m_config.scene;
+    desc.windowTitle = "caustica_py";
+    desc.dedicatedRenderThread = !cfg.headless;
+    desc.runtimeDirectory = ResolveRuntimeDirectory();
+#if CAUSTICA_WITH_DX12 && defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
+    if (m_d3d12DeviceFactory)
+        desc.d3d12DeviceFactory = m_d3d12DeviceFactory.Get();
+#endif
+
+    m_engine = caustica::EngineApp::create(std::move(desc));
+    if (!m_engine || !m_engine->isValid())
     {
-        caustica::error("RenderSession: failed to initialize the graphics device");
+        caustica::error("RenderSession: failed to initialize EngineApp");
         return;
     }
 
-    if (!InitRenderer())
-    {
-        caustica::error("RenderSession: failed to initialize the renderer");
-        return;
-    }
+    auto& cmdLine = m_engine->commandLine();
+    cmdLine.nonInteractive = cfg.nonInteractive;
+    cmdLine.OverrideToReferenceMode = !cfg.realtimeMode;
+    cmdLine.OverrideToRealtimeMode = cfg.realtimeMode;
+    cmdLine.ReferenceSamplesPerPixel = cfg.accumulationTarget;
+    m_engine->renderSessionState().settings.AccumulationTarget = cfg.accumulationTarget;
+
+    m_engine->app().beforePresent = [this](caustica::GpuDevice& manager, uint32_t) {
+        m_lastRenderedBackBufferIndex = manager.GetCurrentBackBufferIndex();
+    };
 
     m_initialized = true;
 
-    // If a scene was specified up-front, InitRenderer already requested it.
-    // Wait for the first rendered frame instead of reloading the same scene.
     if (!m_config.scene.empty())
         WaitUntilReady();
 }
@@ -397,105 +379,20 @@ RenderSession::~RenderSession()
     Shutdown();
 }
 
-bool RenderSession::InitDevice()
-{
-    nvrhi::GraphicsAPI api = ResolveGraphicsAPI(m_config);
-
-#if CAUSTICA_WITH_DX12 && defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
-    if (api == nvrhi::GraphicsAPI::D3D12)
-        m_d3d12DeviceFactory = CreateD3D12AgilityDeviceFactory();
-#endif
-
-    caustica::GpuDeviceCreateDesc createDesc{};
-    createDesc.api = api;
-    createDesc.headless = m_config.headless;
-    createDesc.windowTitle = "caustica_py";
-    createDesc.backBufferWidth = m_config.width;
-    createDesc.backBufferHeight = m_config.height;
-    createDesc.adapterIndex = m_config.adapterIndex;
-    createDesc.enableDebug = m_config.debug;
-    if (m_config.headless)
-        createDesc.vsyncEnabled = false;
-
-#if CAUSTICA_WITH_DX12 && defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
-    if (api == nvrhi::GraphicsAPI::D3D12 && m_d3d12DeviceFactory)
-        createDesc.d3d12DeviceFactory = m_d3d12DeviceFactory.Get();
-#endif
-
-    caustica::GpuDeviceCreateResult graphicsResult = caustica::GpuDevice::CreateInitialized(createDesc);
-    if (!graphicsResult.gpuDevice)
-        return false;
-
-    m_deviceManager = std::move(graphicsResult.gpuDevice);
-    m_Window = std::move(graphicsResult.window);
-    return true;
-}
-
-bool RenderSession::InitRenderer()
-{
-    const std::filesystem::path appDirectory = ResolveRuntimeDirectory();
-    SetRuntimeDirectoryOverride(appDirectory);
-    SetLocalPathBaseOverride(ResolveResourceRoot(appDirectory));
-
-    m_viewState.progressLoading.Start("Initializing...");
-    m_viewState.progressLoading.Set(50);
-
-    std::string preferredScene = m_config.scene.empty()
-        ? std::string("default.json")
-        : m_config.scene;
-
-    m_app = std::make_unique<caustica::App>(
-        m_deviceManager.get(),
-        m_config.headless ? nullptr : m_Window.get());
-
-    m_app->addPlugin<caustica::DefaultPlugins>(caustica::SceneSessionConfig{
-        .viewState = m_viewState,
-        .diagnostics = m_sessionDiagnostics,
-        .preferredScene = preferredScene,
-        .sessionState = &m_sessionState,
-        .cmdLine = &m_cmdLine,
-        .applyCmdLineToSessionState = true,
-    });
-
-    m_app->setUseDedicatedRenderThread(!m_cmdLine.syncRender && !m_config.headless);
-    m_app->beforePresent =
-        [this](caustica::GpuDevice& manager, uint32_t) {
-            m_lastRenderedBackBufferIndex = manager.GetCurrentBackBufferIndex();
-        };
-
-    if (!m_app->finishStartup())
-        return false;
-
-    m_sceneHost = std::make_unique<caustica::PathTracerSceneHost>(*m_app);
-
-    return true;
-}
-
 void RenderSession::Shutdown()
 {
-    if (m_deviceManager)
-        m_deviceManager->setFrameDriver(nullptr);
-
-    m_app.reset();
-    m_sceneHost.reset();
-
-    if (m_deviceManager)
-    {
-        m_deviceManager->ReleaseWindowOwnership();
-        m_deviceManager->Shutdown();
-        m_deviceManager.reset();
-    }
-
-    m_Window.reset();
+    if (m_engine)
+        m_engine->shutdown();
+    m_engine.reset();
     m_initialized = false;
 }
 
 bool RenderSession::LoadScene(const std::string& sceneName, bool waitUntilReady)
 {
-    if (!m_initialized || !m_sceneHost)
+    if (!m_initialized || !m_engine)
         return false;
 
-    m_sceneHost->setCurrentScene(PrepareSceneArgument(sceneName), /*forceReload=*/true);
+    m_engine->setScene(PrepareSceneArgument(sceneName), /*forceReload=*/true);
 
     if (waitUntilReady)
         return WaitUntilReady();
@@ -504,16 +401,15 @@ bool RenderSession::LoadScene(const std::string& sceneName, bool waitUntilReady)
 
 bool RenderSession::WaitUntilReady(int maxFrames)
 {
-    if (!m_initialized || !m_deviceManager)
+    if (!m_initialized || !m_engine)
         return false;
 
     // Loading + first-frame setup may take quite a few frames - keep
-    // pumping until the renderer reports its accumulation index moved
-    // past 0 (= scene fully loaded and at least one image was produced).
+    // pumping until the scene reports loaded.
     for (int i = 0; i < maxFrames; ++i)
     {
         Step(0.0f);
-        if (m_sceneHost && m_sceneHost->isSceneLoaded() && !m_sceneHost->isSceneLoading())
+        if (m_engine->isSceneLoaded() && !m_engine->isSceneLoading())
             return true;
     }
     caustica::warning("RenderSession: scene did not finish loading within %d frames", maxFrames);
@@ -522,15 +418,16 @@ bool RenderSession::WaitUntilReady(int maxFrames)
 
 bool RenderSession::Step(float dt)
 {
-    if (!m_initialized || !m_deviceManager)
+    if (!m_initialized || !m_engine)
         return false;
 
-    if (m_Window && m_Window->getExit())
+    auto* device = m_engine->device();
+    if (!device)
         return false;
 
     const bool frameOk = dt >= 0.0f
-        ? m_app->stepFrame(double(dt))
-        : m_app->stepFrame(m_config.headless ? c_HeadlessFrameTimeSeconds : -1.0);
+        ? m_engine->stepFrame(dt)
+        : m_engine->stepFrame(m_config.headless ? float(c_HeadlessFrameTimeSeconds) : -1.f);
 
     if (!frameOk)
         return false;
@@ -539,14 +436,14 @@ bool RenderSession::Step(float dt)
     // (e.g. screenshot readback or auto-exposure buffer maps). Serialize frames.
     if (m_config.headless)
     {
-        if (!m_deviceManager->GetDevice()->waitForIdle())
+        if (!device->GetDevice()->waitForIdle())
         {
             caustica::error("RenderSession: GPU device lost or removed");
             return false;
         }
     }
 
-    GLFWwindow* window = m_deviceManager->GetWindow();
+    GLFWwindow* window = device->GetWindow();
     return !window || !glfwWindowShouldClose(window);
 }
 
@@ -562,23 +459,24 @@ bool RenderSession::StepN(int frames)
 
 int RenderSession::StepUntilAccumulated(int maxFrames)
 {
-    if (!m_initialized || !m_sceneHost)
+    if (!m_initialized || !m_engine)
         return 0;
 
     // Force reference / accumulation mode so we know "done" actually means
     // the SPP target has been reached.
-    m_sessionState.settings.ResetAccumulation = true;
+    auto& settings = m_engine->renderSessionState().settings;
+    settings.ResetAccumulation = true;
 
     int target = (maxFrames > 0)
         ? maxFrames
-        : std::max(1, m_sessionState.settings.AccumulationTarget + 128);
+        : std::max(1, settings.AccumulationTarget + 128);
 
     int frames = 0;
     while (frames < target)
     {
         if (!Step()) break;
         ++frames;
-        if (m_sceneHost->accumulationCompleted())
+        if (m_engine->accumulationCompleted())
             break;
     }
     return frames;
@@ -586,21 +484,25 @@ int RenderSession::StepUntilAccumulated(int maxFrames)
 
 bool RenderSession::SaveScreenshot(const std::string& outputPath)
 {
-    if (!m_initialized || !m_deviceManager || !m_sceneHost)
+    if (!m_initialized || !m_engine)
+        return false;
+
+    auto* device = m_engine->device();
+    if (!device)
         return false;
 
     // Prefer the renderer-owned final LDR target. It is the source of the
     // frame blit, so it does not depend on headless backbuffer rotation.
-    nvrhi::ITexture* tex = m_sceneHost->ldrColorTexture();
+    nvrhi::ITexture* tex = m_engine->ldrColorTexture();
     nvrhi::ResourceStates state = nvrhi::ResourceStates::ShaderResource;
 
     if (!tex)
     {
         uint32_t backBufferIndex = m_lastRenderedBackBufferIndex;
         if (backBufferIndex == UINT32_MAX)
-            backBufferIndex = m_deviceManager->GetCurrentBackBufferIndex();
+            backBufferIndex = device->GetCurrentBackBufferIndex();
 
-        tex = m_deviceManager->GetBackBuffer(backBufferIndex);
+        tex = device->GetBackBuffer(backBufferIndex);
         state = m_config.headless
             ? nvrhi::ResourceStates::RenderTarget
             : nvrhi::ResourceStates::Present;
@@ -612,7 +514,9 @@ bool RenderSession::SaveScreenshot(const std::string& outputPath)
         return false;
     }
 
-    auto* renderDevice = m_sceneHost->gpuRender() ? &m_sceneHost->gpuRender()->renderDevice() : nullptr;
+    auto* host = m_engine.get();
+    auto* gpuRender = host ? caustica::sceneSession::gpuRender(host->app()) : nullptr;
+    auto* renderDevice = gpuRender ? &gpuRender->renderDevice() : nullptr;
     if (!renderDevice)
     {
         caustica::error("RenderSession: render device not initialized yet");
@@ -621,7 +525,7 @@ bool RenderSession::SaveScreenshot(const std::string& outputPath)
 
     // saveTextureToFile creates its own command list. Wait for the last rendered
     // frame to finish so LdrColor is not still in use by an in-flight submit.
-    if (!m_deviceManager->GetDevice()->waitForIdle())
+    if (!device->GetDevice()->waitForIdle())
     {
         caustica::error("RenderSession: GPU device lost or removed before screenshot");
         return false;
@@ -632,7 +536,7 @@ bool RenderSession::SaveScreenshot(const std::string& outputPath)
         EnsureDirectoryExists(p.parent_path());
 
     return caustica::saveTextureToFile(
-        m_deviceManager->GetDevice(),
+        device->GetDevice(),
         *renderDevice,
         tex,
         state,
@@ -643,35 +547,25 @@ bool RenderSession::SetCamera(const caustica::math::float3& pos,
                               const caustica::math::float3& dir,
                               const caustica::math::float3& up)
 {
-    if (!m_sceneHost) return false;
+    if (!m_engine) return false;
 
     auto v3 = [](const caustica::math::float3& v) {
         return std::to_string(v.x) + "," + std::to_string(v.y) + "," + std::to_string(v.z);
     };
     std::string s = v3(pos) + "," + v3(dir) + "," + v3(up);
-    return m_sceneHost->setCurrentCameraPosDirUp(s);
+    return m_engine->setCameraPosDirUp(s);
 }
 
 void RenderSession::SetCameraFOV(float verticalFovDegrees)
 {
-    if (m_sceneHost)
-        m_sceneHost->setCameraVerticalFOV(caustica::math::radians(verticalFovDegrees));
+    if (m_engine)
+        m_engine->setCameraVerticalFOV(caustica::math::radians(verticalFovDegrees));
 }
 
 void RenderSession::setCameraIntrinsics(float fx, float fy, float cx, float cy, float width, float height)
 {
-    if (m_sceneHost)
-        m_sceneHost->setCameraIntrinsics(fx, fy, cx, cy, width, height);
-}
-
-caustica::PathTracerSceneHost* RenderSession::GetSceneHost()
-{
-    return m_sceneHost.get();
-}
-
-const caustica::PathTracerSceneHost* RenderSession::GetSceneHost() const
-{
-    return m_sceneHost.get();
+    if (m_engine)
+        m_engine->setCameraIntrinsics(fx, fy, cx, cy, width, height);
 }
 
 #endif // CAUSTICA_WITH_PYTHON

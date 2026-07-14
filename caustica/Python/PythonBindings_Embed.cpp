@@ -10,21 +10,31 @@
 #include <nanobind/stl/string.h>
 
 #include "SceneEditor.h"
-#include <EditorUI.h>
+#include <engine/App.h>
+#include <engine/SceneSessionSystems.h>
 
 #include <stdexcept>
 
 namespace nb = nanobind;
+using caustica::App;
 using caustica::editor::SceneEditor;
-using caustica::editor::EditorUIData;
 
 namespace
 {
-    SceneEditor& RequireApp()
+    SceneEditor& RequireSceneEditor()
     {
         if (!g_pythonSceneEditorSingleton)
             throw std::runtime_error("caustica: no SceneEditor instance bound (renderer not initialized?)");
         return *g_pythonSceneEditorSingleton;
+    }
+
+    App& RequireApp()
+    {
+        SceneEditor& editor = RequireSceneEditor();
+        App* app = editor.app();
+        if (!app)
+            throw std::runtime_error("caustica: SceneEditor has no App bound");
+        return *app;
     }
 }
 
@@ -34,11 +44,13 @@ NB_MODULE(caustica, m)
 
     caustica_py::RegisterCoreBindings(m);
 
-    m.def("app", []() -> SceneEditor* { return &RequireApp(); },
+    m.def("app", []() -> App* { return &RequireApp(); },
           nb::rv_policy::reference,
-          "Return the singleton SceneEditor renderer running in this caustica.exe.");
+          "Return the App owned by the SceneEditor running in this caustica.exe.");
 
-    m.def("settings", []() -> PathTracerSettings* { return &RequireApp().renderSessionState().settings; },
+    m.def("settings", []() -> PathTracerSettings* {
+            return caustica::sceneSession::settings(RequireApp());
+        },
           nb::rv_policy::reference,
           "Shortcut for caustica.app().settings.");
 

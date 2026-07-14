@@ -81,16 +81,6 @@ SkinnedMeshComponent* TryGetSkinnedMesh(ecs::World& world, ecs::Entity entity)
     return world.tryGet<SkinnedMeshComponent>(entity);
 }
 
-const SkinnedMeshGpuComponent* TryGetSkinnedMeshGpu(const ecs::World& world, ecs::Entity entity)
-{
-    return world.tryGet<SkinnedMeshGpuComponent>(entity);
-}
-
-SkinnedMeshGpuComponent* TryGetSkinnedMeshGpu(ecs::World& world, ecs::Entity entity)
-{
-    return world.tryGet<SkinnedMeshGpuComponent>(entity);
-}
-
 std::shared_ptr<MeshInfo> CreateSkinnedMeshFromPrototype(
     SceneTypeFactory& factory, const std::shared_ptr<MeshInfo>& prototypeMesh)
 {

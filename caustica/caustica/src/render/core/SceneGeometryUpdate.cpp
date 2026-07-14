@@ -38,10 +38,10 @@ void transitionSkinnedMeshBuffersToReadOnly(nvrhi::ICommandList* commandList, co
 {
     for (const scene::SkinnedMeshRenderProxy& proxy : scene.GetRenderData().skinnedMeshes)
     {
-        if (!proxy.meshInstance || !proxy.meshInstance->mesh || !proxy.meshInstance->mesh->buffers)
+        if (!proxy.mesh || !proxy.mesh->buffers || !proxy.mesh->buffers->vertexBuffer)
             continue;
         commandList->setBufferState(
-            proxy.meshInstance->mesh->buffers->vertexBuffer,
+            proxy.mesh->buffers->vertexBuffer,
             nvrhi::ResourceStates::ShaderResource);
     }
     commandList->commitBarriers();

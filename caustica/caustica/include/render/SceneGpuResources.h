@@ -9,10 +9,20 @@ using namespace caustica::math;
 #include <shaders/bindless.h>
 #include <shaders/material_cb.h>
 
+#include <cstdint>
+#include <unordered_map>
 #include <vector>
 
 namespace caustica::render
 {
+
+// Per-skinned-mesh GPU state owned by the render side (not ECS).
+struct SkinnedMeshGpuState
+{
+    nvrhi::BufferHandle jointBuffer;
+    nvrhi::BindingSetHandle skinningBindingSet;
+    bool skinningInitialized = false;
+};
 
 // GPU-side storage derived from a CPU scene.
 struct SceneGpuResources
@@ -29,6 +39,9 @@ struct SceneGpuResources
     nvrhi::ShaderHandle skinningShader;
     nvrhi::ComputePipelineHandle skinningPipeline;
     nvrhi::BindingLayoutHandle skinningBindingLayout;
+
+    // Keyed by ecs::Entity raw id. Render thread only.
+    std::unordered_map<uint32_t, SkinnedMeshGpuState> skinnedGpuByEntity;
 
     bool enableBindlessResources = false;
     bool useResourceDescriptorHeapBindless = false;

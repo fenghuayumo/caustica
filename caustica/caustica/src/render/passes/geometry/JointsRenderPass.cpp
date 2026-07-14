@@ -1,7 +1,7 @@
 #include <render/passes/geometry/JointsRenderPass.h>
 #include <backend/ViewRhiConversion.h>
 #include <scene/Scene.h>
-#include <scene/SceneEcs.h>
+#include <scene/SceneRenderData.h>
 #include <assets/loader/ShaderFactory.h>
 #include <math/math.h>
 #include <rhi/utils.h>
@@ -89,76 +89,18 @@ namespace caustica::render
         static const uint32_t blue = vectorToSnorm8(float3(0.f, 0.f, 1.f));
         static const uint32_t red = vectorToSnorm8(float3(1.f, 0.f, 0.f));
 
-        const scene::SceneEntityWorld* entityWorld = scene.GetEntityWorld();
-        if (!entityWorld)
-            return;
-
-        const auto& world = entityWorld->world();
-        const auto& skinnedInstances = scene.GetSkinnedMeshInstances();
-
         uint32_t vertexId = 0;
-        for (const ecs::Entity entity : skinnedInstances)
+        for (const scene::SkinnedMeshRenderProxy& proxy : scene.GetRenderData().skinnedMeshes)
         {
-            if (!ecs::isValid(entity))
-                continue;
-
-            const auto* skinned = world.get<scene::SkinnedMeshComponent>(entity);
-            if (!skinned)
-                continue;
-
-            const auto* ownerGlobal = world.get<scene::GlobalTransformComponent>(entity);
-            if (!ownerGlobal)
-                continue;
-
-            const affine3 localToWorldTransform = ownerGlobal->transformFloat;
-
-            daffine3 worldToRoot = inverse(daffine3(localToWorldTransform));
-
-            uint32_t njoints = (uint32_t)skinned->joints.size();
-
-            Vertex a = { float3(), blue };
-            Vertex b = { float3(), blue };
-
-            for (size_t i = 0; i < njoints; i++)
+            for (const scene::SkinnedMeshJointLineProxy& line : proxy.jointLines)
             {
-                const SkinnedMeshJoint& joint = skinned->joints[i];
-
-                if (!ecs::isValid(joint.jointEntity))
-                    continue;
-
-                const auto* jointGlobal = world.get<scene::GlobalTransformComponent>(joint.jointEntity);
-                if (!jointGlobal)
-                    continue;
-
-                dm::float4x4 jointMatrix = dm::affineToHomogeneous(dm::affine3(jointGlobal->transform * worldToRoot));
-
-                a.position = (float4(0.f, 0.f, 0.f, 1.f) * jointMatrix).xyz();
-
-                ecs::Entity parentEntity = ecs::NullEntity;
-                if (const auto* parent = world.get<scene::ParentComponent>(joint.jointEntity))
-                    parentEntity = parent->parent;
-
-                if (ecs::isValid(parentEntity))
-                {
-                    const auto* parentGlobal = world.get<scene::GlobalTransformComponent>(parentEntity);
-                    if (parentGlobal)
-                    {
-                        dm::float4x4 parentMatrix = dm::affineToHomogeneous(dm::affine3(parentGlobal->transform * worldToRoot));
-                        b.position = (float4(0.f, 0.f, 0.f, 1.f) * parentMatrix).xyz();
-                    }
-                    else
-                        b = Vertex({ float3(0.f, 0.f, 0.f), red });
-                }
-                else
-                    b = Vertex({ float3(0.f, 0.f, 0.f), red });
-
-                float4x4 instanceTransform = affineToHomogeneous(localToWorldTransform);
-
-                a.position = (float4(a.position, 1.f) * instanceTransform).xyz();
-                b.position = (float4(b.position, 1.f) * instanceTransform).xyz();
+                Vertex a = { line.jointPosition, blue };
+                Vertex b = line.hasParent
+                    ? Vertex{ line.parentPosition, blue }
+                    : Vertex{ float3(0.f, 0.f, 0.f), red };
 
                 m_Vertices[vertexId++] = a;
-                m_Vertices[vertexId++] = b;               
+                m_Vertices[vertexId++] = b;
             }
         }
     }
@@ -169,20 +111,11 @@ namespace caustica::render
         nvrhi::IFramebuffer* framebuffer,
         const caustica::Scene& scene)
     {
-        const auto& skinnedInstances = scene.GetSkinnedMeshInstances();
-
         if (m_Vertices.empty())
         {
             size_t totalJoints = 0;
-            if (const auto* entityWorld = scene.GetEntityWorld())
-            {
-                const auto& world = entityWorld->world();
-                for (const ecs::Entity entity : skinnedInstances)
-                {
-                    if (const auto* skinned = world.get<scene::SkinnedMeshComponent>(entity))
-                        totalJoints += skinned->joints.size();
-                }
-            }
+            for (const scene::SkinnedMeshRenderProxy& proxy : scene.GetRenderData().skinnedMeshes)
+                totalJoints += proxy.jointLines.size();
             
             size_t numVertices = totalJoints * 2;
             

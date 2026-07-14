@@ -1044,10 +1044,6 @@ void Scene::refreshEntityWorldForFrame(uint32_t frameIndex)
     if (!m_EntityWorld)
         return;
 
-    // despawn() only flags ChangeDetection; sync into m_structureDirty before the early-out
-    // so destroyEntity paths still run refreshInstanceIndices / assignGlobalResourceIndices.
-    m_EntityWorld->syncPendingChangesFromEcs();
-
     if (!m_EntityWorld->hasPendingStructureChanges() && !m_EntityWorld->hasPendingTransformChanges())
         return;
 
@@ -1065,7 +1061,7 @@ void Scene::RefreshSceneWorld(uint32_t frameIndex)
     if (!m_EntityWorld)
         return;
 
-    scene::ExtractSceneRenderData(*m_EntityWorld, m_RenderSnapshot.writeBufferForFrame(frameIndex));
+    scene::ExtractSceneRenderData(*m_EntityWorld, m_RenderSnapshot.writeBufferForFrame(frameIndex), frameIndex);
 }
 
 void Scene::PublishRenderSnapshot(uint32_t frameIndex)
@@ -1084,8 +1080,6 @@ void Scene::extractAndPublishRenderSnapshot(uint32_t frameIndex)
     if (!m_EntityWorld)
         return;
 
-    m_EntityWorld->syncPendingChangesFromEcs();
-
     scene::SceneRenderPublishState& pending = m_RenderSnapshot.pendingState();
     const bool hasPendingChanges =
         m_EntityWorld->hasPendingStructureChanges() || m_EntityWorld->hasPendingTransformChanges();
@@ -1102,7 +1096,7 @@ void Scene::extractAndPublishRenderSnapshot(uint32_t frameIndex)
         pending.frameIndex = frameIndex;
     }
 
-    scene::ExtractSceneRenderData(*m_EntityWorld, m_RenderSnapshot.writeBufferForFrame(frameIndex));
+    scene::ExtractSceneRenderData(*m_EntityWorld, m_RenderSnapshot.writeBufferForFrame(frameIndex), frameIndex);
     PublishRenderSnapshot(frameIndex);
 }
 
@@ -1111,24 +1105,10 @@ bool Scene::wasRenderSnapshotExtractedOnLogicThread(uint32_t frameIndex) const
     return m_RenderSnapshot.wasExtractedForFrame(frameIndex);
 }
 
-void Scene::syncRenderSnapshotGpuIndices(uint32_t frameIndex)
+void Scene::syncRenderSnapshotGpuIndices(uint32_t /*frameIndex*/)
 {
-    if (!m_EntityWorld)
-        return;
-
-    scene::SceneRenderData& data = m_RenderSnapshot.bufferForFrame(frameIndex);
-    const ecs::World& world = m_EntityWorld->world();
-    for (scene::MeshInstanceRenderProxy& proxy : data.meshInstances)
-    {
-        if (!world.isAlive(proxy.entity))
-            continue;
-
-        if (const auto* meshComp = world.get<scene::MeshInstanceComponent>(proxy.entity))
-        {
-            proxy.instanceIndex = meshComp->instanceIndex;
-            proxy.geometryInstanceIndex = meshComp->geometryInstanceIndex;
-        }
-    }
+    // Instance indices are assigned during logic-thread refresh and copied into
+    // MeshInstanceRenderProxy at Extract. Render thread must not patch from ECS.
 }
 
 GeometryData* Scene::GetGeometryData(const MeshGeometry& geometry) const

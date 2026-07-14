@@ -4,7 +4,6 @@
 #include <ecs/World.h>
 #include <ecs/Events.h>
 #include <math/math.h>
-#include <rhi/nvrhi.h>
 #include <scene/SceneContent.h>
 #include <scene/SceneResources.h>
 #include <scene/SceneTypes.h>
@@ -107,13 +106,6 @@ struct SkinnedMeshComponent
     std::shared_ptr<MeshInfo> prototypeMesh;
     std::vector<SkinnedMeshJoint> joints;
     uint32_t lastUpdateFrameIndex = 0;
-};
-
-struct SkinnedMeshGpuComponent
-{
-    nvrhi::BufferHandle jointBuffer;
-    nvrhi::BindingSetHandle skinningBindingSet;
-    bool skinningInitialized = false;
 };
 
 struct SkinnedMeshReferenceComponent
@@ -317,12 +309,11 @@ public:
     [[nodiscard]] const std::vector<ecs::Entity>& getEntityChildren(ecs::Entity entity) const;
     [[nodiscard]] bool entitySubtreeContains(ecs::Entity root, ecs::Entity candidate) const;
 
-    [[nodiscard]] bool hasPendingStructureChanges() const { return m_structureDirty; }
-    [[nodiscard]] bool hasPendingTransformChanges() const { return m_transformDirty || m_previousTransformDirty; }
+    [[nodiscard]] bool hasPendingStructureChanges();
+    [[nodiscard]] bool hasPendingTransformChanges();
 
-    // Pull ChangeDetection (e.g. despawn) into m_structureDirty / m_transformDirty before
-    // hasPending* queries. Required so RefreshSceneWorld does not early-out after destroyEntity.
-    void syncPendingChangesFromEcs();
+    // ChangeDetection is the write path for ECS mutations; m_*Dirty is the
+    // scene-level read path (hydrated lazily inside hasPending*).
 
     [[nodiscard]] const std::vector<ecs::Entity>& cameraEntitiesInRegistrationOrder() const { return m_CameraEntities; }
 

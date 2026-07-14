@@ -1,37 +1,22 @@
 // RenderSession is the offline / extension-mode counterpart to the desktop editor.
-// Where the editor drives a blocking GLFW message loop via App::run(), RenderSession
-// initialises the same GpuDevice + DefaultPlugins pipeline but lets Python step
-// frames manually and dump the framebuffer to disk.
+// It wraps EngineApp and lets Python step frames / dump the framebuffer.
 
 #pragma once
 
 #if CAUSTICA_WITH_PYTHON
 
-#include <engine/SceneViewState.h>
+#include <engine/EngineApp.h>
 
 #include <memory>
 #include <string>
-#include <vector>
 #include <cstdint>
 
 #include <math/math.h>
-#include <platform/window.h>
-#include <render/RenderSessionState.h>
-#include <render/SessionDiagnostics.h>
-
-#include <core/command_line.h>
 
 #if CAUSTICA_WITH_DX12 && defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
 #include <d3d12.h>
 #include <wrl/client.h>
 #endif
-
-namespace caustica
-{
-class App;
-class GpuDevice;
-class PathTracerSceneHost;
-}
 
 namespace caustica_py
 {
@@ -78,32 +63,23 @@ public:
     void SetCameraFOV(float verticalFovDegrees);
     void setCameraIntrinsics(float fx, float fy, float cx, float cy, float width, float height);
 
-    caustica::App* GetApp() { return m_app.get(); }
-    const caustica::App* GetApp() const { return m_app.get(); }
+    caustica::App* GetApp() { return m_engine ? &m_engine->app() : nullptr; }
+    const caustica::App* GetApp() const { return m_engine ? &m_engine->app() : nullptr; }
 
-    caustica::PathTracerSceneHost*       GetSceneHost();
-    const caustica::PathTracerSceneHost* GetSceneHost() const;
+    caustica::EngineApp* GetEngine() { return m_engine.get(); }
+    const caustica::EngineApp* GetEngine() const { return m_engine.get(); }
 
-    caustica::render::RenderSessionState& renderSessionState() { return m_sessionState; }
-    const caustica::render::RenderSessionState& renderSessionState() const { return m_sessionState; }
+    caustica::render::RenderSessionState& renderSessionState() { return m_engine->renderSessionState(); }
+    const caustica::render::RenderSessionState& renderSessionState() const { return m_engine->renderSessionState(); }
 
-    caustica::GpuDevice* GetGpuDevice() { return m_deviceManager.get(); }
+    caustica::GpuDevice* GetGpuDevice() { return m_engine ? m_engine->device() : nullptr; }
     const Config&              GetConfig() const  { return m_config; }
 
 private:
-    bool InitDevice();
-    bool InitRenderer();
     void Shutdown();
 
     Config                                          m_config;
-    CommandLineOptions                              m_cmdLine;
-    caustica::render::RenderSessionState            m_sessionState;
-    caustica::render::SessionDiagnostics              m_sessionDiagnostics;
-    caustica::SceneViewState                        m_viewState;
-    std::unique_ptr<caustica::GpuDevice>      m_deviceManager;
-    std::unique_ptr<caustica::Window>            m_Window;
-    std::unique_ptr<caustica::App>                 m_app;
-    std::unique_ptr<caustica::PathTracerSceneHost> m_sceneHost;
+    std::unique_ptr<caustica::EngineApp>            m_engine;
 #if CAUSTICA_WITH_DX12 && defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
     Microsoft::WRL::ComPtr<ID3D12DeviceFactory>     m_d3d12DeviceFactory;
 #endif

@@ -1,17 +1,20 @@
 #pragma once
 
 #include <ecs/Entity.h>
+#include <math/math.h>
 #include <scene/SceneContent.h>
-#include <scene/SceneEcs.h>
-#include <scene/SceneObjects.h>
+#include <scene/SceneTypes.h>
+
+#include <cstdint>
 #include <memory>
+#include <string>
 #include <vector>
 
 namespace caustica::scene
 {
-    // Canonical render-thread scene snapshot (UE-style render resource).
+    // Canonical render-thread scene snapshot (UE-style render proxies).
     // Logic thread: ExtractSceneRenderData → SceneRenderSnapshot.
-    // Render thread: Scene::GetRenderData() or render::tryGetRenderSceneData(renderWorld).
+    // Render thread: Scene::GetRenderData() — never touches ECS components.
     struct MeshInstanceRenderProxy
     {
         ecs::Entity entity = ecs::NullEntity;
@@ -20,15 +23,30 @@ namespace caustica::scene
         MeshInfo* mesh = nullptr;
         std::shared_ptr<MeshInfo> meshShared;
         dm::affine3 transformFloat = dm::affine3::identity();
+        dm::affine3 previousTransformFloat = dm::affine3::identity();
         dm::box3 globalBounds = dm::box3::empty();
         SceneContentFlags leafContent = SceneContentFlags::None;
+    };
+
+    // Debug lines for JointsRenderPass (world-space endpoints).
+    struct SkinnedMeshJointLineProxy
+    {
+        dm::float3 jointPosition = { 0.f, 0.f, 0.f };
+        dm::float3 parentPosition = { 0.f, 0.f, 0.f };
+        bool hasParent = false;
     };
 
     struct SkinnedMeshRenderProxy
     {
         ecs::Entity entity = ecs::NullEntity;
-        SkinnedMeshComponent* skinned = nullptr;
-        MeshInstanceComponent* meshInstance = nullptr;
+        std::shared_ptr<MeshInfo> mesh;
+        std::shared_ptr<MeshInfo> prototypeMesh;
+        dm::affine3 transformFloat = dm::affine3::identity();
+        std::string debugName;
+        // Skinning matrices in root space (inverseBind * jointLocalToRoot), computed at Extract.
+        std::vector<dm::float4x4> jointMatrices;
+        std::vector<SkinnedMeshJointLineProxy> jointLines;
+        bool needsSkinningUpdate = false;
     };
 
     class SceneRenderData

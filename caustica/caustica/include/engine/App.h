@@ -26,14 +26,16 @@ class Window;
 
 // Plugin-driven application: window/GPU and frame loop.
 //
-// Lifecycle:
+// Prefer EngineApp::create for new apps (Bevy-like one-liner):
+//   auto engine = EngineApp::create({ .scene = "Kitchen/kitchen.json" });
+//   engine->app().addSystem(AppSchedule::Update, "MySim", ...);
+//   engine->run();
+//
+// Low-level lifecycle (advanced):
 //   app.addPlugin<DefaultPlugins>(sceneConfig);
 //   app.initializeGraphics(argc, argv, desc);
 //   app.finishStartup();
-//   app.run();  // main loop, then shutdown
-//
-// Or use runApp(app, startup) where startup registers plugins and calls
-// initializeGraphics + finishStartup before returning.
+//   app.run();
 class App : public IGpuFrameDriver
 {
 public:

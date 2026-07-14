@@ -23,8 +23,6 @@ void InitializeMeshInstanceComponent(MeshInstanceComponent& component, const std
 [[nodiscard]] bool HasSkinnedMesh(const ecs::World& world, ecs::Entity entity);
 [[nodiscard]] const SkinnedMeshComponent* TryGetSkinnedMesh(const ecs::World& world, ecs::Entity entity);
 [[nodiscard]] SkinnedMeshComponent* TryGetSkinnedMesh(ecs::World& world, ecs::Entity entity);
-[[nodiscard]] const SkinnedMeshGpuComponent* TryGetSkinnedMeshGpu(const ecs::World& world, ecs::Entity entity);
-[[nodiscard]] SkinnedMeshGpuComponent* TryGetSkinnedMeshGpu(ecs::World& world, ecs::Entity entity);
 
 [[nodiscard]] std::shared_ptr<MeshInfo> CreateSkinnedMeshFromPrototype(
     SceneTypeFactory& factory, const std::shared_ptr<MeshInfo>& prototypeMesh);

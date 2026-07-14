@@ -153,8 +153,6 @@ void CopyEntityComponents(
             dstWorld.emplace<MeshInstanceComponent>(dstEntity, *mesh);
         if (const auto* skinned = srcWorld.get<SkinnedMeshComponent>(srcEntity))
             dstWorld.emplace<SkinnedMeshComponent>(dstEntity, *skinned);
-        if (const auto* skinnedGpu = srcWorld.get<SkinnedMeshGpuComponent>(srcEntity))
-            dstWorld.emplace<SkinnedMeshGpuComponent>(dstEntity, *skinnedGpu);
     }
     if (const auto* skinRef = srcWorld.get<SkinnedMeshReferenceComponent>(srcEntity))
         dstWorld.emplace<SkinnedMeshReferenceComponent>(dstEntity, *skinRef);
@@ -232,6 +230,7 @@ void SceneEntityWorld::ensureChangeDetection()
 
 void SceneEntityWorld::syncDirtyFlagsFromChangeDetection()
 {
+    ensureChangeDetection();
     const auto* changeDetection = m_world.getResource<ecs::ChangeDetection>();
     if (!changeDetection)
         return;
@@ -269,10 +268,16 @@ void SceneEntityWorld::syncDirtyFlagsFromChangeDetection()
     }
 }
 
-void SceneEntityWorld::syncPendingChangesFromEcs()
+bool SceneEntityWorld::hasPendingStructureChanges()
 {
-    ensureChangeDetection();
     syncDirtyFlagsFromChangeDetection();
+    return m_structureDirty;
+}
+
+bool SceneEntityWorld::hasPendingTransformChanges()
+{
+    syncDirtyFlagsFromChangeDetection();
+    return m_transformDirty || m_previousTransformDirty;
 }
 
 void SceneEntityWorld::refreshHierarchy(PreviousTransformPolicy previousPolicy)
@@ -504,6 +509,9 @@ void SceneEntityWorld::destroyEntity(ecs::Entity entity)
     if (!m_world.isAlive(entity))
         return;
 
+    m_structureDirty = true;
+    m_transformDirty = true;
+
     if (auto* children = m_world.get<ChildrenComponent>(entity))
     {
         auto childCopy = children->children;
@@ -712,7 +720,6 @@ void SceneEntityWorld::setSkinnedMeshInstance(
     SkinnedMeshComponent skinned;
     skinned.prototypeMesh = prototypeMesh;
     m_world.emplace<SkinnedMeshComponent>(entity, std::move(skinned));
-    m_world.emplace<SkinnedMeshGpuComponent>(entity, SkinnedMeshGpuComponent{});
 
     RegisterMeshInstanceEntity(entity, skinnedMesh, true);
     updateLeafContentAndBounds(entity);
@@ -864,7 +871,6 @@ ecs::Entity SceneEntityWorld::importSubtree(
                         SkinnedMeshComponent copiedSkinned = *srcSkinned;
                         copiedSkinned.lastUpdateFrameIndex = 0;
                         m_world.emplace<SkinnedMeshComponent>(dstEntity, std::move(copiedSkinned));
-                        m_world.emplace<SkinnedMeshGpuComponent>(dstEntity, SkinnedMeshGpuComponent{});
                         importedSkinnedEntities.push_back(dstEntity);
                     }
                 }

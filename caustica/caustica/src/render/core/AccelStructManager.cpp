@@ -198,7 +198,7 @@ void AccelStructManager::rebuildDirtyMeshes(nvrhi::ICommandList*            comm
 void AccelStructManager::updateSkinnedBlases(nvrhi::ICommandList*            commandList,
                                              const Scene&                    scene,
                                              const AccelStructBuildSettings& settings,
-                                             uint32_t                        frameIndex) const
+                                             uint32_t                        /*frameIndex*/) const
 {
     commandList->beginMarker("Skinned BLAS Updates");
     uint32_t skinnedUpdateCount = 0;
@@ -211,59 +211,43 @@ void AccelStructManager::updateSkinnedBlases(nvrhi::ICommandList*            com
 
     for (const scene::SkinnedMeshRenderProxy& proxy : renderData.skinnedMeshes)
     {
-        if (!proxy.skinned || !proxy.meshInstance)
+        if (!proxy.needsSkinningUpdate || !proxy.mesh)
             continue;
 
-        scene::SkinnedMeshComponent& skinned = *proxy.skinned;
-        scene::MeshInstanceComponent& meshComp = *proxy.meshInstance;
-
-        if (skinned.lastUpdateFrameIndex != scene::kForceSkinnedMeshUpdateFrameIndex
-            && skinned.lastUpdateFrameIndex < frameIndex
-            || !meshComp.mesh
-            || !meshComp.mesh->accelStruct
-            || !meshComp.mesh->buffers
-            || !meshComp.mesh->buffers->vertexBuffer)
+        if (!proxy.mesh->accelStruct
+            || !proxy.mesh->buffers
+            || !proxy.mesh->buffers->vertexBuffer)
         {
             continue;
         }
-        if (!preparedSkinnedMeshes.insert(meshComp.mesh.get()).second)
+        if (!preparedSkinnedMeshes.insert(proxy.mesh.get()).second)
             continue;
 
-        commandList->setAccelStructState(meshComp.mesh->accelStruct, nvrhi::ResourceStates::AccelStructWrite);
-        commandList->setBufferState(meshComp.mesh->buffers->vertexBuffer,
+        commandList->setAccelStructState(proxy.mesh->accelStruct, nvrhi::ResourceStates::AccelStructWrite);
+        commandList->setBufferState(proxy.mesh->buffers->vertexBuffer,
                                     nvrhi::ResourceStates::AccelStructBuildInput);
     }
     commandList->commitBarriers();
 
     for (const scene::SkinnedMeshRenderProxy& proxy : renderData.skinnedMeshes)
     {
-        if (!proxy.skinned || !proxy.meshInstance)
+        if (!proxy.needsSkinningUpdate || !proxy.mesh || !proxy.mesh->accelStruct)
             continue;
 
-        scene::SkinnedMeshComponent& skinned = *proxy.skinned;
-        scene::MeshInstanceComponent& meshComp = *proxy.meshInstance;
-
-        if (skinned.lastUpdateFrameIndex != scene::kForceSkinnedMeshUpdateFrameIndex
-            && skinned.lastUpdateFrameIndex < frameIndex
-            || !meshComp.mesh
-            || !meshComp.mesh->accelStruct)
-        {
-            continue;
-        }
-        if (!updatedSkinnedMeshes.insert(meshComp.mesh.get()).second)
+        if (!updatedSkinnedMeshes.insert(proxy.mesh.get()).second)
         {
             skippedDuplicateSkinnedUpdateCount++;
             continue;
         }
 
         bvh::Config cfg = { .excludeTransmissive = settings.excludeTransmissive };
-        nvrhi::rt::AccelStructDesc blasDesc = bvh::getMeshBlasDesc(cfg, *meshComp.mesh, nullptr, true);
+        nvrhi::rt::AccelStructDesc blasDesc = bvh::getMeshBlasDesc(cfg, *proxy.mesh, nullptr, true);
         if (blasDesc.bottomLevelGeometries.empty())
         {
             skippedEmptySkinnedUpdateCount++;
             continue;
         }
-        nvrhi::utils::BuildBottomLevelAccelStruct(commandList, meshComp.mesh->accelStruct, blasDesc);
+        nvrhi::utils::BuildBottomLevelAccelStruct(commandList, proxy.mesh->accelStruct, blasDesc);
         skinnedUpdateCount++;
     }
     if (skippedDuplicateSkinnedUpdateCount > 0)

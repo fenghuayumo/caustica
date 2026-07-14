@@ -10,6 +10,7 @@
 #include <nanobind/operators.h>
 
 #include "SceneEditor.h"
+#include <engine/App.h>
 #include <engine/SceneSessionSystems.h>
 #include <render/RenderSessionState.h>
 #include <EditorUI.h>
@@ -39,6 +40,7 @@
 
 namespace nb = nanobind;
 using namespace caustica;
+using caustica::App;
 using caustica::math::float2;
 using caustica::math::float3;
 using caustica::math::float4;
@@ -1362,140 +1364,152 @@ void RegisterCoreBindings(nb::module_& m)
             [](EditorUIData& ui, bool value) { ui.editor.ShowUI = value; });
 
     // --- Sample (top-level renderer access) -------------------------------
-    nb::class_<PathTracerSceneHost>(m, "Sample",
+    nb::class_<App>(m, "Sample",
         "caustica renderer instance. In embed mode use caustica.app(); in extension\n"
         "mode use Renderer.app to retrieve the underlying instance.")
-        .def_prop_ro("settings", [](PathTracerSceneHost& self) -> PathTracerSettings* {
-                return &self.renderSessionState().settings;
+        .def_prop_ro("settings", [](App& self) -> PathTracerSettings* {
+                return sceneSession::settings(self);
             }, nb::rv_policy::reference,
             "Live `Settings` mirror of the current UI state.")
-        .def_prop_ro("scene", [](PathTracerSceneHost& self) {
-                return self.scene();
+        .def_prop_ro("scene", [](App& self) {
+                return sceneSession::scene(self);
             }, "Current loaded `Scene`, or None before a scene is available.")
 
-        .def_prop_ro("scene_name",  [](PathTracerSceneHost& self) { return self.currentSceneName(); })
-        .def_prop_ro("available_scenes", [](PathTracerSceneHost& self) { return self.availableScenes(); })
+        .def_prop_ro("scene_name",  [](App& self) { return sceneSession::currentSceneName(self); })
+        .def_prop_ro("available_scenes", [](App& self) { return sceneSession::availableScenes(self); })
 
-        .def("get_scene", [](PathTracerSceneHost& self) {
-                return self.scene();
+        .def("get_scene", [](App& self) {
+                return sceneSession::scene(self);
             }, "Return the current loaded Scene, matching the C++ scene() entry point.")
 
-        .def("set_scene", [](PathTracerSceneHost& self, const std::string& name, bool forceReload)
+        .def("set_scene", [](App& self, const std::string& name, bool forceReload)
             {
-                self.setCurrentScene(name, forceReload);
+                sceneSession::setCurrentScene(self, name, forceReload);
             },
             nb::arg("scene_name"), nb::arg("force_reload") = false,
             "Switch to a different scene file from caustica.Sample.available_scenes.")
 
-        .def("load_gaussian_splats", [](PathTracerSceneHost& self, const std::string& fileName, bool convertRdfToRub)
+        .def("load_gaussian_splats", [](App& self, const std::string& fileName, bool convertRdfToRub)
             {
-                return self.loadGaussianSplatFile(fileName, convertRdfToRub);
+                return sceneSession::loadGaussianSplatFile(self, fileName, convertRdfToRub);
             },
             nb::arg("file_name"), nb::arg("convert_rdf_to_rub") = true,
             "Load a 3DGS .ply file and rasterize it over the current scene.")
 
-        .def_prop_ro("gaussian_splat_count", [](PathTracerSceneHost& self) { return self.gaussianSplatCount(); })
-        .def_prop_ro("gaussian_splat_object_count", [](PathTracerSceneHost& self) { return self.gaussianSplatObjectCount(); })
-        .def_prop_ro("gaussian_splat_file_name", [](PathTracerSceneHost& self) { return self.gaussianSplatFileName(); })
+        .def_prop_ro("gaussian_splat_count", [](App& self) { return sceneSession::gaussianSplatCount(self); })
+        .def_prop_ro("gaussian_splat_object_count", [](App& self) { return sceneSession::gaussianSplatObjectCount(self); })
+        .def_prop_ro("gaussian_splat_file_name", [](App& self) { return sceneSession::gaussianSplatFileName(self); })
 
-        .def("get_materials", [](PathTracerSceneHost& self) {
-                return GetSceneMaterials(self.scene().get());
+        .def("get_materials", [](App& self) {
+                return GetSceneMaterials(sceneSession::scene(self).get());
             }, "Compatibility alias for `sample.scene.get_materials()`.")
 
-        .def("find_material", [](PathTracerSceneHost& self, const std::string& name) -> std::shared_ptr<PTMaterial> {
-                return FindSceneMaterial(self.scene().get(), name);
+        .def("find_material", [](App& self, const std::string& name) -> std::shared_ptr<PTMaterial> {
+                return FindSceneMaterial(sceneSession::scene(self).get(), name);
             }, nb::arg("name"), "Compatibility alias for `sample.scene.find_material(name)`.")
 
-        .def("find_material_by_id", [](PathTracerSceneHost& self, int materialId) -> std::shared_ptr<PTMaterial> {
-                return FindSceneMaterialById(self.scene().get(), materialId);
+        .def("find_material_by_id", [](App& self, int materialId) -> std::shared_ptr<PTMaterial> {
+                return FindSceneMaterialById(sceneSession::scene(self).get(), materialId);
             }, nb::arg("material_id"), "Compatibility alias for `sample.scene.find_material_by_id(material_id)`.")
 
-        .def("get_lights", [](PathTracerSceneHost& self) {
-                return GetSceneLights(self.scene().get());
+        .def("get_lights", [](App& self) {
+                return GetSceneLights(sceneSession::scene(self).get());
             }, "Compatibility alias for `sample.scene.get_lights()`.")
 
-        .def("get_scene_bounds", [](PathTracerSceneHost& self) {
-                return SceneBoundsTuple(SceneBoundsFromScene(self.scene()));
+        .def("get_scene_bounds", [](App& self) {
+                return SceneBoundsTuple(SceneBoundsFromScene(sceneSession::scene(self)));
             },
             "Compatibility alias for `sample.scene.get_scene_bounds()`.")
 
-        .def_prop_ro("scene_bounds", [](PathTracerSceneHost& self) {
-                return SceneBoundsTuple(SceneBoundsFromScene(self.scene()));
+        .def_prop_ro("scene_bounds", [](App& self) {
+                return SceneBoundsTuple(SceneBoundsFromScene(sceneSession::scene(self)));
             },
             "Shortcut for `sample.scene.bounds`. Returns the world-space\n"
             "((min.xyz), (max.xyz)) AABB or `None` if no scene is loaded.")
-        .def_prop_ro("scene_bounds_center", [](PathTracerSceneHost& self) {
-                return SceneBoundsCenter(SceneBoundsFromScene(self.scene()));
+        .def_prop_ro("scene_bounds_center", [](App& self) {
+                return SceneBoundsCenter(SceneBoundsFromScene(sceneSession::scene(self)));
             }, "Shortcut for `sample.scene.bounds_center` (or `None`).")
-        .def_prop_ro("scene_bounds_size", [](PathTracerSceneHost& self) {
-                return SceneBoundsSize(SceneBoundsFromScene(self.scene()));
+        .def_prop_ro("scene_bounds_size", [](App& self) {
+                return SceneBoundsSize(SceneBoundsFromScene(sceneSession::scene(self)));
             }, "Shortcut for `sample.scene.bounds_size` (or `None`).")
 
-        .def("find_light", [](PathTracerSceneHost& self, const std::string& name) -> std::shared_ptr<Light> {
-                return FindSceneLight(self.scene().get(), name);
+        .def("find_light", [](App& self, const std::string& name) -> std::shared_ptr<Light> {
+                return FindSceneLight(sceneSession::scene(self).get(), name);
             }, nb::arg("name"), "Compatibility alias for `sample.scene.find_light(name)`.")
-        .def("find_node", [](PathTracerSceneHost& self, const std::string& path) -> std::shared_ptr<PySceneEntity> {
-                return FindSceneEntity(self.scene().get(), path);
+        .def("find_node", [](App& self, const std::string& path) -> std::shared_ptr<PySceneEntity> {
+                return FindSceneEntity(sceneSession::scene(self).get(), path);
             }, nb::arg("path"), "Compatibility alias for `sample.scene.find_node(path)`.")
 
-        .def("get_meshes", [](PathTracerSceneHost& self) {
-                return GetSceneMeshes(self.scene().get());
+        .def("get_meshes", [](App& self) {
+                return GetSceneMeshes(sceneSession::scene(self).get());
             }, "Compatibility alias for `sample.scene.get_meshes()`.")
-        .def("find_mesh", [](PathTracerSceneHost& self, const std::string& name) -> std::shared_ptr<MeshInfo> {
-                return FindSceneMesh(self.scene().get(), name);
+        .def("find_mesh", [](App& self, const std::string& name) -> std::shared_ptr<MeshInfo> {
+                return FindSceneMesh(sceneSession::scene(self).get(), name);
             }, nb::arg("name"), "Compatibility alias for `sample.scene.find_mesh(name)`.")
 
-        .def("set_environment_map", [](PathTracerSceneHost& self, const std::string& path) {
-                self.setEnvMapOverrideSource(path);
+        .def("set_environment_map", [](App& self, const std::string& path) {
+                sceneSession::setEnvMapOverrideSource(self, path);
             }, nb::arg("path"))
 
-        .def("get_camera_pos_dir_up", [](PathTracerSceneHost& self) {
-                return self.currentCameraPosDirUp();
+        .def("get_camera_pos_dir_up", [](App& self) {
+                return sceneSession::currentCameraPosDirUp(self);
             }, "Returns a comma-separated string of pos.xyz, dir.xyz, up.xyz.")
 
-        .def("set_camera_pos_dir_up", [](PathTracerSceneHost& self, const std::string& v) {
-                return self.setCurrentCameraPosDirUp(v);
+        .def("set_camera_pos_dir_up", [](App& self, const std::string& v) {
+                return sceneSession::setCurrentCameraPosDirUp(self, v);
             }, nb::arg("pos_dir_up"))
 
-        .def("set_camera_fov", [](PathTracerSceneHost& self, float fov) { self.setCameraVerticalFOV(caustica::math::radians(fov)); },
+        .def("set_camera_fov", [](App& self, float fov) {
+                sceneSession::setCameraVerticalFOV(self, caustica::math::radians(fov));
+            },
             nb::arg("vertical_fov_degrees"))
 
         .def("set_camera_intrinsics",
-            [](PathTracerSceneHost& self, float fx, float fy, float cx, float cy, float width, float height) {
-                self.setCameraIntrinsics(fx, fy, cx, cy, width, height);
+            [](App& self, float fx, float fy, float cx, float cy, float width, float height) {
+                sceneSession::setCameraIntrinsics(self, fx, fy, cx, cy, width, height);
             },
             nb::arg("fx"), nb::arg("fy"), nb::arg("cx"), nb::arg("cy"), nb::arg("width"), nb::arg("height"))
 
-        .def("get_camera_fov", [](PathTracerSceneHost& self) { return self.cameraVerticalFOV(); })
+        .def("get_camera_fov", [](App& self) { return sceneSession::cameraVerticalFOV(self); })
 
-        .def("save_current_camera",  [](PathTracerSceneHost& self) { self.saveCurrentCamera(); })
-        .def("load_current_camera",  [](PathTracerSceneHost& self) { self.loadCurrentCamera(); })
+        .def("save_current_camera",  [](App& self) { sceneSession::saveCurrentCamera(self); })
+        .def("load_current_camera",  [](App& self) { sceneSession::loadCurrentCamera(self); })
 
-        .def("request_shader_reload",  [](PathTracerSceneHost& self) { self.renderSessionState().runtime.Invalidation.ShaderReloadRequested = true; })
-        .def("request_accel_rebuild",  [](PathTracerSceneHost& self) { self.renderSessionState().runtime.Invalidation.AccelerationStructRebuildRequested = true; })
+        .def("request_shader_reload",  [](App& self) {
+                self.resource<RenderSessionState>().runtime.Invalidation.ShaderReloadRequested = true;
+            })
+        .def("request_accel_rebuild",  [](App& self) {
+                self.resource<RenderSessionState>().runtime.Invalidation.AccelerationStructRebuildRequested = true;
+            })
         .def("request_mesh_accel_rebuild",
-            [](PathTracerSceneHost& self, const std::shared_ptr<MeshInfo>& mesh) {
-                self.requestMeshAccelRebuild(mesh);
+            [](App& self, const std::shared_ptr<MeshInfo>& mesh) {
+                sceneSession::requestMeshAccelRebuild(self, mesh);
             },
             nb::arg("mesh"),
             "Request a BLAS rebuild for one dirty mesh without forcing a full scene AS rebuild.")
         .def("request_mesh_accel_rebuild",
-            [](PathTracerSceneHost& self, const std::shared_ptr<PySceneEntity>& node) {
+            [](App& self, const std::shared_ptr<PySceneEntity>& node) {
                 if (!node)
                     throw std::runtime_error("request_mesh_accel_rebuild: node is null");
                 std::shared_ptr<MeshInfo> mesh = MeshFromEntity(*node);
                 if (!mesh)
                     throw std::runtime_error("request_mesh_accel_rebuild: entity has no mesh");
-                self.requestMeshAccelRebuild(mesh);
+                sceneSession::requestMeshAccelRebuild(self, mesh);
             },
             nb::arg("node"),
             "Request a BLAS rebuild for the mesh attached to one scene entity.")
-        .def("reset_accumulation",     [](PathTracerSceneHost& self) { self.renderSessionState().settings.ResetAccumulation = true; })
-        .def("reset_realtime_caches",  [](PathTracerSceneHost& self) { self.renderSessionState().settings.ResetRealtimeCaches = true; })
+        .def("reset_accumulation",     [](App& self) {
+                if (auto* s = sceneSession::settings(self))
+                    s->ResetAccumulation = true;
+            })
+        .def("reset_realtime_caches",  [](App& self) {
+                if (auto* s = sceneSession::settings(self))
+                    s->ResetRealtimeCaches = true;
+            })
 
-        .def("set_realtime_mode", [](PathTracerSceneHost& self, bool standaloneDenoiser, int realtimeAA)
+        .def("set_realtime_mode", [](App& self, bool standaloneDenoiser, int realtimeAA)
             {
-                PathTracerSettings& settings = self.renderSessionState().settings;
+                PathTracerSettings& settings = *sceneSession::settings(self);
                 if (!settings.RealtimeMode)
                 {
                     settings.ResetAccumulation = true;
@@ -1512,9 +1526,9 @@ void RegisterCoreBindings(nb::module_& m)
             "    standalone_denoiser: enable NRD (no effect with DLSS-RR)\n"
             "    realtime_aa        : 0=Off, 1=TAA, 2=DLSS, 3=DLSS-RR")
 
-        .def("set_reference_mode", [](PathTracerSceneHost& self, int spp, bool oidn, int oidnQuality, int oidnPasses, int oidnPrefilter)
+        .def("set_reference_mode", [](App& self, int spp, bool oidn, int oidnQuality, int oidnPasses, int oidnPrefilter)
             {
-                PathTracerSettings& settings = self.renderSessionState().settings;
+                PathTracerSettings& settings = *sceneSession::settings(self);
                 if (settings.RealtimeMode)
                     settings.ResetAccumulation = true;
                 settings.RealtimeMode             = false;
@@ -1540,9 +1554,9 @@ void RegisterCoreBindings(nb::module_& m)
             "    oidn_prefilter: caustica.OidnPrefilter (0=None, 1=Fast, 2=Accurate)")
 
         .def_prop_ro("accumulation_completed",
-            [](PathTracerSceneHost& self) { return self.accumulationCompleted(); })
+            [](App& self) { return sceneSession::accumulationCompleted(self); })
         .def_prop_ro("accumulation_sample_index",
-            [](PathTracerSceneHost& self) { return self.accumulationSampleIndex(); })
+            [](App& self) { return sceneSession::accumulationSampleIndex(self); })
         ;
 
     nb::class_<SceneEditor>(m, "EditorSample",

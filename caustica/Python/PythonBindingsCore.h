@@ -1,11 +1,11 @@
 // Shared bindings between the embedded Python (caustica.exe) and the Python
 // extension module (caustica.pyd).  The actual NB_MODULE() definitions live
-// in their respective hosts and only differ in how the running Sample is
+// in their respective hosts and only differ in how the running Sample (App) is
 // looked up:
 //
-//   - Embed     : module-level `app()` returns the singleton SceneEditor set
-//                 by PythonScripting (g_pythonSceneEditorSingleton).
-//   - Extension : Renderer.app returns the RenderSession-owned SceneSession.
+//   - Embed     : module-level `app()` returns SceneEditor::app() from the
+//                 singleton set by PythonScripting (g_pythonSceneEditorSingleton).
+//   - Extension : Renderer.app returns EngineApp::app() from the RenderSession.
 
 #pragma once
 

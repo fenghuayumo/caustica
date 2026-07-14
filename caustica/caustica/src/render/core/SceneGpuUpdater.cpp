@@ -1,9 +1,8 @@
 #include <render/core/SceneGpuUpdater.h>
 
-#include <engine/RenderThread.h>
 #include <render/SceneGpuResources.h>
 #include <scene/Scene.h>
-#include <scene/SceneEcs.h>
+#include <scene/SceneRenderData.h>
 #include <backend/IDescriptorTableManager.h>
 #include <core/DescriptorHandle.h>
 #include <core/log.h>
@@ -166,31 +165,21 @@ void UpdateGeometry(SceneGpuResources& gpu, const std::shared_ptr<MeshInfo>& mes
     }
 }
 
-void UpdateInstance(Scene& scene, ecs::Entity entity)
+void UpdateInstance(Scene& scene, const scene::MeshInstanceRenderProxy& proxy)
 {
-    if (!ecs::isValid(entity))
-        return;
-
-    const auto* entityWorld = scene.GetEntityWorld();
-    if (!entityWorld)
-        return;
-
-    const auto& world = entityWorld->world();
-    const auto* meshComp = world.get<scene::MeshInstanceComponent>(entity);
-    const auto* global = world.get<scene::GlobalTransformComponent>(entity);
-    if (!meshComp || !meshComp->mesh || !global || meshComp->instanceIndex < 0)
+    if (!proxy.mesh || proxy.instanceIndex < 0)
         return;
 
     SceneGpuResources& gpu = scene.GetGpuResources();
-    if (meshComp->instanceIndex < 0 || static_cast<size_t>(meshComp->instanceIndex) >= gpu.instanceData.size())
+    if (static_cast<size_t>(proxy.instanceIndex) >= gpu.instanceData.size())
         return;
 
-    InstanceData& idata = gpu.instanceData[meshComp->instanceIndex];
-    affineToColumnMajor(global->transformFloat, idata.transform);
-    affineToColumnMajor(global->previousTransformFloat, idata.prevTransform);
+    InstanceData& idata = gpu.instanceData[proxy.instanceIndex];
+    affineToColumnMajor(proxy.transformFloat, idata.transform);
+    affineToColumnMajor(proxy.previousTransformFloat, idata.prevTransform);
 
-    const auto& mesh = meshComp->mesh;
-    idata.firstGeometryInstanceIndex = meshComp->geometryInstanceIndex;
+    const auto& mesh = proxy.meshShared;
+    idata.firstGeometryInstanceIndex = proxy.geometryInstanceIndex;
     idata.numGeometries = uint32_t(mesh->geometries.size());
     idata.firstGeometryIndex = idata.numGeometries > 0 ? mesh->geometries[0]->globalGeometryIndex : -1;
     idata.flags = 0u;
@@ -348,20 +337,14 @@ void EnsureMeshGpuBuffers(Scene& scene, nvrhi::ICommandList* commandList)
         }
     }
 
-    auto* entityWorld = scene.GetEntityWorld();
-    for (const ecs::Entity entity : scene.GetSkinnedMeshInstances())
+    auto& skinnedGpuMap = gpu.skinnedGpuByEntity;
+    for (const scene::SkinnedMeshRenderProxy& proxy : scene.GetRenderData().skinnedMeshes)
     {
-        if (!entityWorld)
+        if (!proxy.mesh || !proxy.prototypeMesh)
             continue;
 
-        auto& world = entityWorld->world();
-        auto* skinned = world.get<scene::SkinnedMeshComponent>(entity);
-        auto* meshComp = world.get<scene::MeshInstanceComponent>(entity);
-        auto* skinnedGpu = world.get<scene::SkinnedMeshGpuComponent>(entity);
-        if (!skinned || !meshComp || !meshComp->mesh || !skinnedGpu || !skinned->prototypeMesh)
-            continue;
-
-        const auto& skinnedMesh = meshComp->mesh;
+        const auto& skinnedMesh = proxy.mesh;
+        SkinnedMeshGpuState& skinnedGpu = skinnedGpuMap[static_cast<uint32_t>(proxy.entity)];
 
         if (!skinnedMesh->buffers)
         {
@@ -369,10 +352,10 @@ void EnsureMeshGpuBuffers(Scene& scene, nvrhi::ICommandList* commandList)
 
             const uint32_t totalVertices = skinnedMesh->totalVertices;
 
-            skinnedMesh->buffers->indexBuffer = skinned->prototypeMesh->buffers->indexBuffer;
-            skinnedMesh->buffers->indexBufferDescriptor = skinned->prototypeMesh->buffers->indexBufferDescriptor;
+            skinnedMesh->buffers->indexBuffer = proxy.prototypeMesh->buffers->indexBuffer;
+            skinnedMesh->buffers->indexBufferDescriptor = proxy.prototypeMesh->buffers->indexBufferDescriptor;
 
-            const auto& prototypeBuffers = skinned->prototypeMesh->buffers;
+            const auto& prototypeBuffers = proxy.prototypeMesh->buffers;
             const auto& skinnedBuffers = skinnedMesh->buffers;
 
             size_t skinnedVertexBufferSize = 0;
@@ -410,70 +393,62 @@ void EnsureMeshGpuBuffers(Scene& scene, nvrhi::ICommandList* commandList)
             }
         }
 
-        if (!skinnedGpu->jointBuffer)
+        if (!skinnedGpu.jointBuffer)
         {
             nvrhi::BufferDesc jointBufferDesc;
             jointBufferDesc.debugName = "JointBuffer";
             jointBufferDesc.initialState = nvrhi::ResourceStates::ShaderResource;
             jointBufferDesc.keepInitialState = true;
             jointBufferDesc.canHaveRawViews = true;
-            jointBufferDesc.byteSize = sizeof(dm::float4x4) * skinned->joints.size();
-            skinnedGpu->jointBuffer = gpu.device->createBuffer(jointBufferDesc);
+            jointBufferDesc.byteSize = sizeof(dm::float4x4) * proxy.jointMatrices.size();
+            skinnedGpu.jointBuffer = gpu.device->createBuffer(jointBufferDesc);
         }
 
-        if (!skinnedGpu->skinningBindingSet)
+        if (!skinnedGpu.skinningBindingSet)
         {
-            const auto& prototypeBuffers = skinned->prototypeMesh->buffers;
+            const auto& prototypeBuffers = proxy.prototypeMesh->buffers;
             const auto& skinnedBuffers = skinnedMesh->buffers;
 
             nvrhi::BindingSetDesc setDesc;
             setDesc.bindings = {
                 nvrhi::BindingSetItem::PushConstants(0, sizeof(SkinningConstants)),
                 nvrhi::BindingSetItem::RawBuffer_SRV(0, prototypeBuffers->vertexBuffer),
-                nvrhi::BindingSetItem::RawBuffer_SRV(1, skinnedGpu->jointBuffer),
+                nvrhi::BindingSetItem::RawBuffer_SRV(1, skinnedGpu.jointBuffer),
                 nvrhi::BindingSetItem::RawBuffer_UAV(0, skinnedBuffers->vertexBuffer)
             };
 
-            skinnedGpu->skinningBindingSet = gpu.device->createBindingSet(setDesc, gpu.skinningBindingLayout);
+            skinnedGpu.skinningBindingSet = gpu.device->createBindingSet(setDesc, gpu.skinningBindingLayout);
         }
     }
 }
 
-void DispatchSkinnedMeshUpdates(Scene& scene, nvrhi::ICommandList* commandList, uint32_t frameIndex)
+void DispatchSkinnedMeshUpdates(Scene& scene, nvrhi::ICommandList* commandList, uint32_t /*frameIndex*/)
 {
     SceneGpuResources& gpu = scene.GetGpuResources();
-    auto* entityWorld = scene.GetEntityWorld();
-    if (!entityWorld)
-        return;
+    const scene::SceneRenderData& renderData = scene.GetRenderData();
 
     bool skinningMarkerPlaced = false;
-    std::vector<dm::float4x4> jointMatrices;
     std::vector<nvrhi::BufferHandle> skinnedVertexBuffersWritten;
     std::unordered_set<const MeshInfo*> skinnedMeshesWritten;
     uint32_t skippedDuplicateSkinnedDispatchCount = 0;
 
-    for (const ecs::Entity entity : scene.GetSkinnedMeshInstances())
+    for (const scene::SkinnedMeshRenderProxy& proxy : renderData.skinnedMeshes)
     {
-        auto& world = entityWorld->world();
-        auto* skinned = world.get<scene::SkinnedMeshComponent>(entity);
-        auto* meshComp = world.get<scene::MeshInstanceComponent>(entity);
-        auto* skinnedGpu = world.get<scene::SkinnedMeshGpuComponent>(entity);
-        if (!skinned || !meshComp || !meshComp->mesh || !skinnedGpu || !skinned->prototypeMesh)
+        if (!proxy.needsSkinningUpdate || !proxy.mesh || !proxy.prototypeMesh)
             continue;
 
-        if (skinned->lastUpdateFrameIndex != scene::kForceSkinnedMeshUpdateFrameIndex
-            && skinned->lastUpdateFrameIndex + 1 < frameIndex)
+        auto gpuIt = gpu.skinnedGpuByEntity.find(static_cast<uint32_t>(proxy.entity));
+        if (gpuIt == gpu.skinnedGpuByEntity.end())
+            continue;
+        SkinnedMeshGpuState& skinnedGpu = gpuIt->second;
+        if (!skinnedGpu.jointBuffer || !skinnedGpu.skinningBindingSet)
             continue;
 
-        if (!skinnedMeshesWritten.insert(meshComp->mesh.get()).second)
+        if (!skinnedMeshesWritten.insert(proxy.mesh.get()).second)
         {
             skippedDuplicateSkinnedDispatchCount++;
             continue;
         }
-
-        const auto* ownerGlobal = world.get<scene::GlobalTransformComponent>(entity);
-        if (!ownerGlobal)
-            continue;
 
         if (!skinningMarkerPlaced)
         {
@@ -481,48 +456,33 @@ void DispatchSkinnedMeshUpdates(Scene& scene, nvrhi::ICommandList* commandList, 
             skinningMarkerPlaced = true;
         }
 
-        const auto* name = world.get<scene::NameComponent>(entity);
-        const std::string groupName = name ? name->value : std::string{};
-        if (!groupName.empty())
-            commandList->beginMarker(groupName.c_str());
+        if (!proxy.debugName.empty())
+            commandList->beginMarker(proxy.debugName.c_str());
 
-        jointMatrices.resize(skinned->joints.size());
-
-        dm::daffine3 worldToRoot = inverse(ownerGlobal->transform);
-
-        for (size_t i = 0; i < skinned->joints.size(); i++)
-        {
-            const ecs::Entity jointEntity = skinned->joints[i].jointEntity;
-            const auto* jointGlobal = world.get<scene::GlobalTransformComponent>(jointEntity);
-            if (!jointGlobal)
-                continue;
-
-            dm::float4x4 jointMatrix = dm::affineToHomogeneous(dm::affine3(jointGlobal->transform * worldToRoot));
-            jointMatrix = skinned->joints[i].inverseBindMatrix * jointMatrix;
-            jointMatrices[i] = jointMatrix;
-        }
-
-        commandList->writeBuffer(skinnedGpu->jointBuffer, jointMatrices.data(), jointMatrices.size() * sizeof(float4x4));
+        commandList->writeBuffer(
+            skinnedGpu.jointBuffer,
+            proxy.jointMatrices.data(),
+            proxy.jointMatrices.size() * sizeof(float4x4));
 
         nvrhi::ComputeState state;
         state.pipeline = gpu.skinningPipeline;
-        state.bindings = { skinnedGpu->skinningBindingSet };
+        state.bindings = { skinnedGpu.skinningBindingSet };
         commandList->setComputeState(state);
 
-        uint32_t vertexOffset = skinned->prototypeMesh->vertexOffset;
-        const auto& prototypeBuffers = skinned->prototypeMesh->buffers;
-        const auto& skinnedBuffers = meshComp->mesh->buffers;
+        uint32_t vertexOffset = proxy.prototypeMesh->vertexOffset;
+        const auto& prototypeBuffers = proxy.prototypeMesh->buffers;
+        const auto& skinnedBuffers = proxy.mesh->buffers;
 
         SkinningConstants constants{};
-        constants.numVertices = skinned->prototypeMesh->totalVertices;
+        constants.numVertices = proxy.prototypeMesh->totalVertices;
 
         constants.flags = 0;
         if (prototypeBuffers->hasAttribute(VertexAttribute::Normal)) constants.flags |= SkinningFlag_Normals;
         if (prototypeBuffers->hasAttribute(VertexAttribute::Tangent)) constants.flags |= SkinningFlag_Tangents;
         if (prototypeBuffers->hasAttribute(VertexAttribute::TexCoord1)) constants.flags |= SkinningFlag_TexCoord1;
         if (prototypeBuffers->hasAttribute(VertexAttribute::TexCoord2)) constants.flags |= SkinningFlag_TexCoord2;
-        if (!skinnedGpu->skinningInitialized) constants.flags |= SkinningFlag_FirstFrame;
-        skinnedGpu->skinningInitialized = true;
+        if (!skinnedGpu.skinningInitialized) constants.flags |= SkinningFlag_FirstFrame;
+        skinnedGpu.skinningInitialized = true;
 
         constants.inputPositionOffset = uint32_t(prototypeBuffers->getVertexBufferRange(VertexAttribute::Position).byteOffset + vertexOffset * sizeof(float3));
         constants.inputNormalOffset = uint32_t(prototypeBuffers->getVertexBufferRange(VertexAttribute::Normal).byteOffset + vertexOffset * sizeof(uint32_t));
@@ -540,10 +500,9 @@ void DispatchSkinnedMeshUpdates(Scene& scene, nvrhi::ICommandList* commandList, 
         commandList->setPushConstants(&constants, sizeof(constants));
 
         commandList->dispatch(dm::div_ceil(constants.numVertices, 256));
-        skinned->lastUpdateFrameIndex = frameIndex;
         skinnedVertexBuffersWritten.push_back(skinnedBuffers->vertexBuffer);
 
-        if (!groupName.empty())
+        if (!proxy.debugName.empty())
             commandList->endMarker();
     }
 
@@ -575,7 +534,10 @@ void UpdateGpuSceneBuffers(Scene& scene, nvrhi::ICommandList* commandList, uint3
     bool materialsChanged = false;
 
     if (structureChanged)
+    {
+        gpu.skinnedGpuByEntity.clear();
         EnsureMeshGpuBuffers(scene, commandList);
+    }
 
     const size_t allocationGranularity = 1024;
     bool arraysAllocated = false;
@@ -676,8 +638,8 @@ void UpdateGpuSceneBuffers(Scene& scene, nvrhi::ICommandList* commandList, uint3
 
     if (structureChanged || transformsChanged || arraysAllocated)
     {
-        for (const ecs::Entity entity : scene.GetMeshInstances())
-            UpdateInstance(scene, entity);
+        for (const scene::MeshInstanceRenderProxy& proxy : scene.GetRenderData().meshInstances)
+            UpdateInstance(scene, proxy);
 
         WriteInstanceBuffer(commandList, gpu);
     }
@@ -695,24 +657,13 @@ void SceneGpuUpdater::refresh(Scene& scene, nvrhi::ICommandList* commandList, ui
     if (commandList == nullptr)
         return;
 
-    auto* entityWorld = scene.GetEntityWorld();
-    if (entityWorld == nullptr)
-        return;
-
     const GpuReadFrameScope gpuReadScope(scene, frameIndex);
 
-    if (IsRenderThread())
+    if (!scene.wasRenderSnapshotExtractedOnLogicThread(frameIndex))
     {
-        if (!scene.wasRenderSnapshotExtractedOnLogicThread(frameIndex))
-            caustica::warning("SceneGpuUpdater::refresh: missing logic-thread extract for frame %u", frameIndex);
-    }
-    else if (!scene.wasRenderSnapshotExtractedOnLogicThread(frameIndex))
-    {
-        entityWorld->syncPendingChangesFromEcs();
-        if (entityWorld->hasPendingStructureChanges() || entityWorld->hasPendingTransformChanges())
-            scene.RefreshSceneWorld(frameIndex);
-
-        scene.PublishRenderSnapshot(frameIndex);
+        caustica::warning(
+            "SceneGpuUpdater::refresh: missing logic-thread extract for frame %u (render will use last published snapshot)",
+            frameIndex);
     }
 
     const bool structureChanged = scene.HasSceneStructureChanged(frameIndex);

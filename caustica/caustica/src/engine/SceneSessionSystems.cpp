@@ -1023,38 +1023,3 @@ void backBufferResizing(App& app)
 }
 
 } // namespace caustica::sceneSession
-
-namespace caustica
-{
-
-GpuDevice& PathTracerSceneHost::gpuDevice() const
-{
-    return *sceneSession::gpuDevice(m_app);
-}
-
-nvrhi::IDevice* PathTracerSceneHost::device() const
-{
-    return gpuDevice().GetDevice();
-}
-
-uint32_t PathTracerSceneHost::frameIndex() const
-{
-    return gpuDevice().GetFrameIndex();
-}
-
-render::RenderSessionState& PathTracerSceneHost::renderSessionState() const
-{
-    return m_app.resource<render::RenderSessionState>();
-}
-
-PathTracerSettings& PathTracerSceneHost::pathTracerSettings() const
-{
-    return m_app.resource<PathTracerSettings>();
-}
-
-render::RenderRuntimeState& PathTracerSceneHost::renderRuntimeState() const
-{
-    return m_app.resource<RenderRuntimeState>();
-}
-
-} // namespace caustica
