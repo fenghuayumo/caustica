@@ -82,8 +82,14 @@ namespace
 
     void initViewState(SceneViewState& viewState)
     {
-        viewState.progressLoading.start("Initializing...");
-        viewState.progressLoading.Set(50);
+        // SceneEditor / EngineApp already start this during early startup so the
+        // user sees progress while GPU/session init runs. Only start here if that
+        // did not happen (e.g. alternate hosts).
+        if (!viewState.progressLoading.Active())
+        {
+            viewState.progressLoading.start("Initializing...");
+            viewState.progressLoading.Set(50);
+        }
     }
 
     void updateFpsInfo(App& app, double frameTimeSeconds)

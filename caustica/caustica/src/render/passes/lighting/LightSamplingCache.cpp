@@ -706,18 +706,18 @@ bool LightSamplingCache::processEmissiveGeometry( const UpdateSettings & setting
 
     assert( ctrlBuff.TotalLightCount == (ctrlBuff.AnalyticLightCount+ctrlBuff.EnvmapQuadNodeCount) );
 
+    // Same dense geometryInstance prefix as TLAS / MaterialGpuCache / hit-group fill.
+    // Stale proxy.geometryInstanceIndex after runtime import must not skip emissives.
+    size_t compactedGeometryInstanceIndex = 0;
     for (const scene::MeshInstanceRenderProxy& meshProxy : scene->getRenderData().meshInstances)
     {
-        if (!meshProxy.mesh)
-            continue;
-
         const auto& mesh = meshProxy.meshShared;
         if (!mesh)
             continue;
 
-        uint32_t firstGeometryInstanceIndex = meshProxy.geometryInstanceIndex;
-        if (meshProxy.geometryInstanceIndex < 0)
-            continue;
+        const uint32_t firstGeometryInstanceIndex =
+            static_cast<uint32_t>(compactedGeometryInstanceIndex);
+        compactedGeometryInstanceIndex += mesh->geometries.size();
 
         for (size_t geometryIndex = 0; geometryIndex < mesh->geometries.size(); ++geometryIndex)
         {

@@ -19,9 +19,14 @@
 #include <engine/SceneSessionSystems.h>
 #include <engine/App.h>
 #include <engine/GpuRenderSubsystem.h>
+#include <backend/GpuDevice.h>
+#include <rhi/nvrhi.h>
 
 #include <assets/RuntimeMeshLoadTypes.h>
+#include <assets/loader/TextureLoader.h>
 #include <render/core/RenderSceneTypeFactory.h>
+#include <render/core/SceneGpuUpdater.h>
+#include <render/SceneLightingPasses.h>
 #include <scene/Scene.h>
 #include <scene/SceneManager.h>
 #include <scene/SceneRuntimeMutation.h>
@@ -171,12 +176,13 @@ public:
         if (!sceneMgr || !gpu || !gpu->textureLoader())
             return false;
 
+        const std::filesystem::path meshPath(fileName);
         const caustica::RuntimeMeshLoadParams params{
             .TextureCache = gpu->textureLoader().get(),
             .SceneTypes = std::make_shared<caustica::render::RenderSceneTypeFactory>(),
-            .TextureSearchDirectory = {},
+            .TextureSearchDirectory = meshPath.parent_path(),
         };
-        const auto loadResult = caustica::loadRuntimeMeshFile(params, std::filesystem::path(fileName));
+        const auto loadResult = caustica::loadRuntimeMeshFile(params, meshPath);
         if (!loadResult || !loadResult.ImportResult)
             return false;
 
@@ -187,12 +193,33 @@ public:
         const uint32_t frameIndex = m_session->GetEngine()
             ? m_session->GetEngine()->frameIndex()
             : 0u;
+
+        // attachRuntimeSceneImport publishes immediately; make sure no render
+        // frame is still consuming the snapshot that is about to be replaced.
+        app.waitForDedicatedRenderThreadIdle();
         const auto importedRoot = caustica::attachRuntimeSceneImport(
             scene, *loadResult.ImportResult, frameIndex);
         if (importedRoot == caustica::ecs::NullEntity)
             return false;
 
-        caustica::finalizeRuntimeSceneMutation(scene, importedRoot, frameIndex);
+        // Same post-import GPU finalize as SceneContentEditor: drain render work,
+        // upload deferred textures before creating PT materials, then refresh meshes.
+        app.runGpuWorkOnRenderThread([&app, gpu, scene, frameIndex]() {
+            if (auto* device = app.getGpuDevice())
+            {
+                if (nvrhi::IDevice* nvrhiDevice = device->getDevice())
+                    nvrhiDevice->waitForIdle();
+            }
+            if (auto textureLoader = gpu->textureLoader())
+            {
+                textureLoader->processRenderingThreadCommands(gpu->renderDevice(), 0.f);
+                textureLoader->loadingFinished();
+            }
+            gpu->lightingPasses().ensureMaterialsFromScene(scene);
+            caustica::render::SceneGpuUpdater::refreshAfterLoad(*scene, frameIndex);
+        });
+
+        gpu->rayTracingResources().requestAccelerationStructureRebuild();
         return true;
     }
 

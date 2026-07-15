@@ -9,6 +9,7 @@
 #include <rhi/common/misc.h>
 
 #include <cassert>
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <unordered_set>
@@ -47,8 +48,20 @@ private:
 inline void AppendBufferRange(nvrhi::BufferRange& range, size_t size, uint64_t& currentBufferSize)
 {
     range.byteOffset = currentBufferSize;
-    range.byteSize = nvrhi::align(size, size_t(16));
-    currentBufferSize += range.byteSize;
+    // GPU allocation is 16-byte aligned, but writeBuffer must copy only `size` source
+    // bytes — using the padded range.byteSize reads past the end of CPU vectors.
+    range.byteSize = size;
+    currentBufferSize += nvrhi::align(size, size_t(16));
+}
+
+template <typename T>
+inline void WriteAttributeRange(nvrhi::ICommandList* commandList, nvrhi::IBuffer* buffer,
+    const std::vector<T>& data, const nvrhi::BufferRange& range)
+{
+    if (data.empty() || range.byteSize == 0)
+        return;
+    assert(range.byteSize == data.size() * sizeof(T));
+    commandList->writeBuffer(buffer, data.data(), range.byteSize, range.byteOffset);
 }
 
 nvrhi::BufferHandle CreateMaterialBuffer(SceneGpuResources& gpu)
@@ -136,8 +149,20 @@ void UpdateMaterial(SceneGpuResources& gpu, const std::shared_ptr<Material>& mat
 
 void UpdateGeometry(SceneGpuResources& gpu, const std::shared_ptr<MeshInfo>& mesh)
 {
+    if (!mesh || !mesh->buffers)
+        return;
+
     for (const auto& geometry : mesh->geometries)
     {
+        if (!geometry)
+            continue;
+        if (geometry->globalGeometryIndex >= gpu.geometryData.size())
+        {
+            caustica::warning("UpdateGeometry: geometry index %u out of range (size=%zu); skipping.",
+                geometry->globalGeometryIndex, gpu.geometryData.size());
+            continue;
+        }
+
         const uint32_t indexOffset = mesh->indexOffset + geometry->indexOffsetInMesh;
         const uint32_t vertexOffset = mesh->vertexOffset + geometry->vertexOffsetInMesh;
 
@@ -165,9 +190,11 @@ void UpdateGeometry(SceneGpuResources& gpu, const std::shared_ptr<MeshInfo>& mes
     }
 }
 
-void UpdateInstance(Scene& scene, const scene::MeshInstanceRenderProxy& proxy)
+void UpdateInstance(Scene& scene, const scene::MeshInstanceRenderProxy& proxy,
+    uint32_t compactedGeometryInstanceIndex)
 {
-    if (!proxy.mesh || proxy.instanceIndex < 0)
+    const auto& mesh = proxy.meshShared;
+    if (!mesh || proxy.instanceIndex < 0)
         return;
 
     SceneGpuResources& gpu = scene.getGpuResources();
@@ -178,10 +205,13 @@ void UpdateInstance(Scene& scene, const scene::MeshInstanceRenderProxy& proxy)
     affineToColumnMajor(proxy.transformFloat, idata.transform);
     affineToColumnMajor(proxy.previousTransformFloat, idata.prevTransform);
 
-    const auto& mesh = proxy.meshShared;
-    idata.firstGeometryInstanceIndex = proxy.geometryInstanceIndex;
+    // Must match TLAS instanceID / MaterialGpuCache dense prefix — not a possibly
+    // stale proxy.geometryInstanceIndex from a mid-import snapshot.
+    idata.firstGeometryInstanceIndex = int32_t(compactedGeometryInstanceIndex);
     idata.numGeometries = uint32_t(mesh->geometries.size());
-    idata.firstGeometryIndex = idata.numGeometries > 0 ? mesh->geometries[0]->globalGeometryIndex : -1;
+    idata.firstGeometryIndex = -1;
+    if (!mesh->geometries.empty() && mesh->geometries[0])
+        idata.firstGeometryIndex = mesh->geometries[0]->globalGeometryIndex;
     idata.flags = 0u;
 
     if (mesh->type == MeshType::CurveDisjointOrthogonalTriangleStrips)
@@ -289,48 +319,26 @@ void EnsureMeshGpuBuffers(Scene& scene, nvrhi::ICommandList* commandList)
 
             if (!buffers->positionData.empty())
             {
-                const auto& range = buffers->getVertexBufferRange(VertexAttribute::Position);
-                commandList->writeBuffer(buffers->vertexBuffer, buffers->positionData.data(), range.byteSize, range.byteOffset);
-
-                const auto& prevRange = buffers->getVertexBufferRange(VertexAttribute::PrevPosition);
-                commandList->writeBuffer(buffers->vertexBuffer, buffers->positionData.data(), prevRange.byteSize, prevRange.byteOffset);
+                WriteAttributeRange(commandList, buffers->vertexBuffer, buffers->positionData,
+                    buffers->getVertexBufferRange(VertexAttribute::Position));
+                WriteAttributeRange(commandList, buffers->vertexBuffer, buffers->positionData,
+                    buffers->getVertexBufferRange(VertexAttribute::PrevPosition));
             }
 
-            if (!buffers->normalData.empty())
-            {
-                const auto& range = buffers->getVertexBufferRange(VertexAttribute::Normal);
-                commandList->writeBuffer(buffers->vertexBuffer, buffers->normalData.data(), range.byteSize, range.byteOffset);
-            }
-            if (!buffers->tangentData.empty())
-            {
-                const auto& range = buffers->getVertexBufferRange(VertexAttribute::Tangent);
-                commandList->writeBuffer(buffers->vertexBuffer, buffers->tangentData.data(), range.byteSize, range.byteOffset);
-            }
-            if (!buffers->texcoord1Data.empty())
-            {
-                const auto& range = buffers->getVertexBufferRange(VertexAttribute::TexCoord1);
-                commandList->writeBuffer(buffers->vertexBuffer, buffers->texcoord1Data.data(), range.byteSize, range.byteOffset);
-            }
-            if (!buffers->texcoord2Data.empty())
-            {
-                const auto& range = buffers->getVertexBufferRange(VertexAttribute::TexCoord2);
-                commandList->writeBuffer(buffers->vertexBuffer, buffers->texcoord2Data.data(), range.byteSize, range.byteOffset);
-            }
-            if (!buffers->weightData.empty())
-            {
-                const auto& range = buffers->getVertexBufferRange(VertexAttribute::JointWeights);
-                commandList->writeBuffer(buffers->vertexBuffer, buffers->weightData.data(), range.byteSize, range.byteOffset);
-            }
-            if (!buffers->jointData.empty())
-            {
-                const auto& range = buffers->getVertexBufferRange(VertexAttribute::JointIndices);
-                commandList->writeBuffer(buffers->vertexBuffer, buffers->jointData.data(), range.byteSize, range.byteOffset);
-            }
-            if (!buffers->radiusData.empty())
-            {
-                const auto& range = buffers->getVertexBufferRange(VertexAttribute::CurveRadius);
-                commandList->writeBuffer(buffers->vertexBuffer, buffers->radiusData.data(), range.byteSize, range.byteOffset);
-            }
+            WriteAttributeRange(commandList, buffers->vertexBuffer, buffers->normalData,
+                buffers->getVertexBufferRange(VertexAttribute::Normal));
+            WriteAttributeRange(commandList, buffers->vertexBuffer, buffers->tangentData,
+                buffers->getVertexBufferRange(VertexAttribute::Tangent));
+            WriteAttributeRange(commandList, buffers->vertexBuffer, buffers->texcoord1Data,
+                buffers->getVertexBufferRange(VertexAttribute::TexCoord1));
+            WriteAttributeRange(commandList, buffers->vertexBuffer, buffers->texcoord2Data,
+                buffers->getVertexBufferRange(VertexAttribute::TexCoord2));
+            WriteAttributeRange(commandList, buffers->vertexBuffer, buffers->weightData,
+                buffers->getVertexBufferRange(VertexAttribute::JointWeights));
+            WriteAttributeRange(commandList, buffers->vertexBuffer, buffers->jointData,
+                buffers->getVertexBufferRange(VertexAttribute::JointIndices));
+            WriteAttributeRange(commandList, buffers->vertexBuffer, buffers->radiusData,
+                buffers->getVertexBufferRange(VertexAttribute::CurveRadius));
 
             commandList->setBufferState(buffers->vertexBuffer, state);
             commandList->commitBarriers();
@@ -400,7 +408,7 @@ void EnsureMeshGpuBuffers(Scene& scene, nvrhi::ICommandList* commandList)
             jointBufferDesc.initialState = nvrhi::ResourceStates::ShaderResource;
             jointBufferDesc.keepInitialState = true;
             jointBufferDesc.canHaveRawViews = true;
-            jointBufferDesc.byteSize = sizeof(dm::float4x4) * proxy.jointMatrices.size();
+            jointBufferDesc.byteSize = sizeof(dm::float4x4) * std::max<size_t>(1, proxy.jointMatrices.size());
             skinnedGpu.jointBuffer = gpu.device->createBuffer(jointBufferDesc);
         }
 
@@ -638,8 +646,13 @@ void UpdateGpuSceneBuffers(Scene& scene, nvrhi::ICommandList* commandList, uint3
 
     if (structureChanged || transformsChanged || arraysAllocated)
     {
+        uint32_t compactedGeometryInstanceIndex = 0;
         for (const scene::MeshInstanceRenderProxy& proxy : scene.getRenderData().meshInstances)
-            UpdateInstance(scene, proxy);
+        {
+            UpdateInstance(scene, proxy, compactedGeometryInstanceIndex);
+            if (proxy.meshShared)
+                compactedGeometryInstanceIndex += static_cast<uint32_t>(proxy.meshShared->geometries.size());
+        }
 
         WriteInstanceBuffer(commandList, gpu);
     }
@@ -694,6 +707,7 @@ void SceneGpuUpdater::refreshAfterLoad(Scene& scene, uint32_t frameIndex)
 
     commandList->close();
     gpu.device->executeCommandList(commandList);
+    gpu.device->waitForIdle();
 }
 
 } // namespace caustica::render

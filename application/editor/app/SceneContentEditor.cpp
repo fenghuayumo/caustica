@@ -6,6 +6,7 @@
 
 #include <assets/RuntimeMeshLoadTypes.h>
 #include <core/log.h>
+#include <engine/App.h>
 #include <render/SceneGaussianSplatPasses.h>
 #include <render/SceneLightingPasses.h>
 #include <render/SceneRayTracingResources.h>
@@ -42,14 +43,21 @@ namespace
         };
     }
 
-    caustica::RuntimeMeshLoadParams MakeRuntimeMeshLoadParams(SceneManager* sceneManager, caustica::TextureLoader* textureLoader)
+    caustica::RuntimeMeshLoadParams MakeRuntimeMeshLoadParams(
+        SceneManager* sceneManager,
+        caustica::TextureLoader* textureLoader,
+        const std::filesystem::path& meshFilePath)
     {
+        // Prefer the imported mesh directory so relative texture URIs resolve next to the
+        // .gltf/.obj, not against the currently open scene JSON folder.
+        std::filesystem::path textureSearchDirectory = meshFilePath.parent_path();
+        if (textureSearchDirectory.empty() && sceneManager)
+            textureSearchDirectory = RuntimeMeshTextureSearchDirectory(sceneManager->getCurrentScenePath());
+
         return caustica::RuntimeMeshLoadParams{
             .TextureCache = textureLoader,
             .SceneTypes = std::make_shared<caustica::render::RenderSceneTypeFactory>(),
-            .TextureSearchDirectory = sceneManager
-                ? RuntimeMeshTextureSearchDirectory(sceneManager->getCurrentScenePath())
-                : std::filesystem::path{},
+            .TextureSearchDirectory = std::move(textureSearchDirectory),
         };
     }
 
@@ -118,15 +126,23 @@ bool SceneContentEditor::importMeshFile(const std::filesystem::path& filePath,
     caustica::RuntimeMeshLoadResult (*loadFile)(const caustica::RuntimeMeshLoadParams&, const std::filesystem::path&))
 {
     auto* sceneManager = m_sceneEditor.sceneManager();
-    auto textureLoader = m_sceneEditor.gpuRender()->textureLoader();
-    if (!sceneManager || !textureLoader)
+    auto* gpuRender = m_sceneEditor.gpuRender();
+    if (!sceneManager || !gpuRender)
+        return false;
+
+    auto textureLoader = gpuRender->textureLoader();
+    if (!textureLoader)
         return false;
 
     const auto loadResult = loadFile(
-        MakeRuntimeMeshLoadParams(sceneManager, textureLoader.get()),
+        MakeRuntimeMeshLoadParams(sceneManager, textureLoader.get(), filePath),
         filePath);
     if (!loadResult)
         return false;
+
+    // Do not publish a snapshot containing the imported entities while the
+    // dedicated render thread can still be consuming the previous frame.
+    m_sceneEditor.gpuDevice().waitForRenderThreadIdle();
 
     const auto importedRoot = caustica::attachRuntimeSceneImport(
         sceneManager->getScene(),
@@ -163,6 +179,7 @@ void SceneContentEditor::finalizeRuntimeSceneMutation(caustica::ecs::Entity impo
 
     if (importedRoot != caustica::ecs::NullEntity)
     {
+        m_sceneEditor.gpuDevice().waitForRenderThreadIdle();
         caustica::finalizeRuntimeSceneMutation(
             sceneManager->getScene(),
             importedRoot,
@@ -170,15 +187,26 @@ void SceneContentEditor::finalizeRuntimeSceneMutation(caustica::ecs::Entity impo
             MakeMutationCallbacks());
     }
 
-    // Match delete / scene-load teardown: drain render thread before uploading
-    // new mesh GPU buffers or requesting AS rebuild while the previous frame
-    // may still be reading the old snapshot / acceleration structures.
-    m_sceneEditor.gpuDevice().waitForRenderThreadIdle();
-    if (nvrhi::IDevice* device = m_sceneEditor.device())
-        device->waitForIdle();
+    auto scene = sceneManager->getScene();
+    auto* gpuRender = m_sceneEditor.gpuRender();
+    if (!scene || !gpuRender)
+        return;
 
-    if (auto scene = sceneManager->getScene())
-    {
+    const uint32_t frameIndex = m_sceneEditor.frameIndex();
+    const auto gpuFinalize = [this, scene, gpuRender, frameIndex]() {
+        if (nvrhi::IDevice* device = m_sceneEditor.device())
+            device->waitForIdle();
+
+        // Importers queue textures as deferred (CPU-only). Full scene load flushes
+        // them in onSceneLoadedGpuPrep; runtime drag-drop must do the same before
+        // ensureMaterialsFromScene / importFromEngineMaterial, otherwise bindless
+        // indices stay invalid and meshes render as white base-color only.
+        if (auto textureLoader = gpuRender->textureLoader())
+        {
+            textureLoader->processRenderingThreadCommands(gpuRender->renderDevice(), 0.f);
+            textureLoader->loadingFinished();
+        }
+
         // Runtime import must not wipe existing PT materials (that leaves a
         // window where SubInstanceData points at cleared material slots, and
         // with 3DGS present the instance-index remap can stick on wrong colors).
@@ -188,14 +216,18 @@ void SceneContentEditor::finalizeRuntimeSceneMutation(caustica::ecs::Entity impo
         // Without uploading vertex/index buffers first, createBlases skips new meshes
         // (empty BLAS desc) and buildTlas drops null BLAS — imported geometry never
         // appears until a later accidental rebuild. Same precondition as full scene load.
-        caustica::render::SceneGpuUpdater::refreshAfterLoad(*scene, m_sceneEditor.frameIndex());
-    }
+        caustica::render::SceneGpuUpdater::refreshAfterLoad(*scene, frameIndex);
+    };
+
+    if (auto* app = m_sceneEditor.app())
+        app->runGpuWorkOnRenderThread(gpuFinalize);
+    else
+        gpuFinalize();
 
     // AS rebuild only — requestFullRebuild also forces shader reload +
     // createRenderPassesAndLoadMaterials, which rebuilds hit groups from a
     // pre-sync snapshot and permanently mis-maps materials when 3DGS is present.
-    if (auto* gpuRender = m_sceneEditor.gpuRender())
-        gpuRender->rayTracingResources().requestAccelerationStructureRebuild();
+    gpuRender->rayTracingResources().requestAccelerationStructureRebuild();
 }
 
 bool SceneContentEditor::deleteSceneNode(caustica::ecs::Entity entity)

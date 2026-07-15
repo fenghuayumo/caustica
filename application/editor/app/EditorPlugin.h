@@ -14,6 +14,7 @@
 #include "SceneEditor.h"
 
 #include <imgui/imgui_renderer.h>
+#include <optional>
 
 namespace caustica::editor
 {
@@ -25,7 +26,9 @@ struct EditorPlugin : Plugin
         const EditorUISubsystemConfig* uiConfig = nullptr)
         : sessionConfig(std::move(sessionConfig))
         , m_sceneEditor(sceneEditor)
-        , uiConfig(uiConfig)
+        , uiConfig(uiConfig
+            ? std::optional<EditorUISubsystemConfig>(*uiConfig)
+            : std::nullopt)
     {
     }
 
@@ -35,7 +38,7 @@ struct EditorPlugin : Plugin
 
     SceneSessionConfig sessionConfig;
     SceneEditor& m_sceneEditor;
-    const EditorUISubsystemConfig* uiConfig = nullptr;
+    std::optional<EditorUISubsystemConfig> uiConfig;
 };
 
 } // namespace caustica::editor

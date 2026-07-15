@@ -19,6 +19,8 @@
 #include <core/progress.h>
 #include <core/system_utils.h>
 
+#include <cstdio>
+
 using namespace caustica;
 
 #define BAKER_ENABLE_MULTITHREADED_COMPILE_SHADER 1
@@ -350,15 +352,29 @@ void PTPipelineVariant::updateFinalize()
         if (!m_rayGenOnly)
         for (auto& [_, hitGroupInfo] : baker->getUniqueHitGroups())
         {
-            std::string shaderPermutationName = hitGroupInfo.getShaderPermutationName();
-            std::string closestHit = "ClosestHit_" + m_shortUniqueDebugID + "_" + shaderPermutationName;
-            std::string anyHit = (m_exportAnyHit && hitGroupInfo.hasAnyHitShader)?("AnyHit_" + m_shortUniqueDebugID + "_" + shaderPermutationName):("");
-
 #if PIPELINE_BAKER_REVERT_TO_UBERSHADER
-            const ShaderPermutation & permutation = m_ubershaderMaterial;
+            HitGroupInfo effectiveHitGroup = hitGroupInfo;
+            effectiveHitGroup.materialShaderPermutation = baker->getMaterialGpuCache()->getUbershader();
+            const ShaderPermutation& permutation = m_ubershaderMaterial;
 #else
-            const ShaderPermutation & permutation = m_specializedPerMaterial[hitGroupInfo.getShaderPermutationIndex()];
+            // m_specializedPerMaterial is 0..N-1 for baked tiers. Ubershader is separate
+            // (indexInTable == -1). A material snapshot can also briefly retain an index
+            // from the previous table while a runtime import rebuild is being finalized.
+            const int permIndex = hitGroupInfo.getShaderPermutationIndex();
+            const bool hasSpecializedPermutation =
+                permIndex >= 0 && static_cast<size_t>(permIndex) < m_specializedPerMaterial.size();
+            HitGroupInfo effectiveHitGroup = hitGroupInfo;
+            if (!hasSpecializedPermutation)
+                effectiveHitGroup.materialShaderPermutation = baker->getMaterialGpuCache()->getUbershader();
+            const ShaderPermutation& permutation = hasSpecializedPermutation
+                ? m_specializedPerMaterial[static_cast<size_t>(permIndex)]
+                : m_ubershaderMaterial;
 #endif
+            const std::string shaderPermutationName = effectiveHitGroup.getShaderPermutationName();
+            const std::string closestHit = "ClosestHit_" + m_shortUniqueDebugID + "_" + shaderPermutationName;
+            const std::string anyHit = (m_exportAnyHit && effectiveHitGroup.hasAnyHitShader)
+                ? ("AnyHit_" + m_shortUniqueDebugID + "_" + shaderPermutationName)
+                : "";
             if (permutation.shaderLibrary == nullptr)
             {
                 assert(false);
@@ -366,7 +382,7 @@ void PTPipelineVariant::updateFinalize()
             }
             pipelineDesc.hitGroups.push_back(
                 {
-                    .exportName = hitGroupInfo.getExportName(),
+                    .exportName = effectiveHitGroup.getExportName(),
                     .closestHitShader = permutation.shaderLibrary->getShader(closestHit.c_str(), nvrhi::ShaderType::ClosestHit),
                     .anyHitShader = (anyHit != "") ? (permutation.shaderLibrary->getShader(anyHit.c_str(), nvrhi::ShaderType::AnyHit)) : (nullptr),
                     .intersectionShader = nullptr,
@@ -474,16 +490,29 @@ PathTracingShaderCompiler::~PathTracingShaderCompiler()
 {
 }
 
-std::string HitGroupInfo::getExportName() const { return "HitGroup_" + std::to_string(materialShaderPermutation->indexInTable); }
+std::string HitGroupInfo::getExportName() const
+{
+    const int index = getShaderPermutationIndex();
+    return "HitGroup_" + std::to_string(index);
+}
 
 
 #if PIPELINE_BAKER_ENABLE_VERBOSE_FUNCTION_NAMING
-std::string HitGroupInfo::getShaderPermutationName() const { return materialShaderPermutation->stableShaderName; }
+std::string HitGroupInfo::getShaderPermutationName() const
+{
+    return materialShaderPermutation ? materialShaderPermutation->stableShaderName : "MissingPermutation";
+}
 #else
-std::string HitGroupInfo::getShaderPermutationName() const { return materialShaderPermutation->stableShaderName; }
+std::string HitGroupInfo::getShaderPermutationName() const
+{
+    return materialShaderPermutation ? materialShaderPermutation->stableShaderName : "MissingPermutation";
+}
 #endif
 
-int HitGroupInfo::getShaderPermutationIndex() const { return materialShaderPermutation->indexInTable; }
+int HitGroupInfo::getShaderPermutationIndex() const
+{
+    return materialShaderPermutation ? materialShaderPermutation->indexInTable : -1;
+}
 
 HitGroupInfo ComputeSubInstanceHitGroupInfo(const MaterialGpuCache & baker, const PTMaterial& material)
 {
@@ -492,7 +521,14 @@ HitGroupInfo ComputeSubInstanceHitGroupInfo(const MaterialGpuCache & baker, cons
 #if PIPELINE_BAKER_REVERT_TO_UBERSHADER
     info.materialShaderPermutation = baker.getUbershader();
 #else
-    info.materialShaderPermutation = material.bakedShaderPermutation;
+    const auto& candidate = material.bakedShaderPermutation;
+    const auto& table = baker.getShaderPermutationTable();
+    const int candidateIndex = candidate ? candidate->indexInTable : -1;
+    const bool candidateIsCurrent =
+        candidateIndex >= 0
+        && static_cast<size_t>(candidateIndex) < table.size()
+        && table[static_cast<size_t>(candidateIndex)] == candidate;
+    info.materialShaderPermutation = candidateIsCurrent ? candidate : baker.getUbershader();
 #endif
 
     info.hasAnyHitShader = material.hasAlphaTest();
@@ -577,23 +613,25 @@ void PathTracingShaderCompiler::update(const std::shared_ptr<caustica::Scene>& s
         // Note: these map 1-1 to m_subInstanceData, and are used to (see '->addHitGroup' below) build 1-1 mapped hit groups.
         // Use the same dense prefix as AccelStructManager::buildTlas / MaterialGpuCache::update so a stale
         // proxy.geometryInstanceIndex cannot permanently mis-bind materials after runtime import.
+        // Same dense prefix as AccelStructManager / MaterialGpuCache (meshShared order).
         m_perSubInstanceHitGroup.clear();
         m_perSubInstanceHitGroup.assign(subInstanceCount, ComputeDefaultSubInstanceHitGroupInfo(*getMaterialGpuCache()));
         size_t compactedGeometryInstanceIndex = 0;
         for (const scene::MeshInstanceRenderProxy& proxy : scene->getRenderData().meshInstances)
         {
-            if (!proxy.mesh)
+            if (!proxy.meshShared)
                 continue;
 
+            const MeshInfo& mesh = *proxy.meshShared;
             const size_t firstSubInstanceIndex = compactedGeometryInstanceIndex;
-            compactedGeometryInstanceIndex += proxy.mesh->geometries.size();
-            for (size_t gi = 0; gi < proxy.mesh->geometries.size(); gi++)
+            compactedGeometryInstanceIndex += mesh.geometries.size();
+            for (size_t gi = 0; gi < mesh.geometries.size(); gi++)
             {
                 const size_t subInstanceIndex = firstSubInstanceIndex + gi;
-                if (subInstanceIndex >= m_perSubInstanceHitGroup.size() || !proxy.mesh->geometries[gi])
+                if (subInstanceIndex >= m_perSubInstanceHitGroup.size() || !mesh.geometries[gi])
                     continue;
 
-                std::shared_ptr<PTMaterial> materialPT = PTMaterial::safeCast(proxy.mesh->geometries[gi]->material);
+                std::shared_ptr<PTMaterial> materialPT = PTMaterial::safeCast(mesh.geometries[gi]->material);
                 if (!materialPT)
                     continue;
 
@@ -603,6 +641,7 @@ void PathTracingShaderCompiler::update(const std::shared_ptr<caustica::Scene>& s
         assert(m_perSubInstanceHitGroup.size() == subInstanceCount);
 
         // Prime the instances to make sure we only include the necessary CHS variants in the PSO. Many (sub)instances can map to same materials.
+        // Ubershader keeps indexInTable == -1 and lives in m_ubershaderMaterial, not m_specializedPerMaterial.
         m_uniqueHitGroups.clear();
         for (int i = 0; i < m_perSubInstanceHitGroup.size(); i++)
             m_uniqueHitGroups[m_perSubInstanceHitGroup[i].getShaderPermutationIndex()] = m_perSubInstanceHitGroup[i];
@@ -668,6 +707,7 @@ void PathTracingShaderCompiler::update(const std::shared_ptr<caustica::Scene>& s
             progressCompilingShaders.start(stringFormat("Compiling shaders (%d)...", progressTotal).c_str());
         else if (isLoadOnlyMode() && !updateQueue.empty())
             caustica::info("PathTracingShaderCompiler: loading precompiled RT shader libraries...");
+            fflush(stdout);
 
         for (auto it : m_parallelCompileListUnique)
         {

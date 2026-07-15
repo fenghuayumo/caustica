@@ -5,9 +5,11 @@
 #pragma once
 
 #include <wincodec.h>
+#include <imm.h>
 #include <atomic>
 
 #pragma comment(lib, "windowscodecs.lib")
+#pragma comment(lib, "imm32.lib")
 
 namespace
 {
@@ -186,6 +188,11 @@ DWORD WINAPI SplashScreen::ThreadProc(void* param)
     State* st = (State*)param;
     auto& s = st->s;
 
+    // The splash is a display-only window on a temporary UI thread. Prevent
+    // third-party IMEs from attaching thread-local hooks and outliving the
+    // window during shutdown (observed as a delayed heap corruption crash).
+    ImmDisableIME(GetCurrentThreadId());
+
     // Your app is PerMonitorV2. make this UI thread PerMonitorV2 as well.
     auto oldCtx = SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
@@ -203,7 +210,7 @@ DWORD WINAPI SplashScreen::ThreadProc(void* param)
 
     // create window: borderless, no taskbar button, optionally topmost.
     HWND hwnd = CreateWindowExW(
-        WS_EX_TOOLWINDOW | WS_EX_LAYERED,
+        WS_EX_TOOLWINDOW | WS_EX_LAYERED | WS_EX_NOACTIVATE,
         kClassName,
         L"",
         WS_POPUP,
@@ -224,8 +231,7 @@ DWORD WINAPI SplashScreen::ThreadProc(void* param)
         // Premultiply for UpdateLayeredWindow (even if mostly opaque, this is fine).
         PremultiplyIfNeeded(bgra);
 
-        ShowWindow(hwnd, SW_SHOWNORMAL);
-        SetForegroundWindow(hwnd);
+        ShowWindow(hwnd, SW_SHOWNOACTIVATE);
         UpdateWindow(hwnd);
 
         setLayeredWindowBitmap(hwnd, bgra.data(), w, h);

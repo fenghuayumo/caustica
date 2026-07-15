@@ -8,7 +8,9 @@
 #ifdef _WIN32
 #include <windows.h>
 #include <commctrl.h>
+#include <imm.h>
 #pragma comment(lib, "Comctl32.lib")
+#pragma comment(lib, "Imm32.lib")
 #endif
 
 namespace caustica
@@ -93,6 +95,11 @@ namespace
     {
         ProgressBarGlobals& slot = g_ProgressSlots[slotIndex];
 
+        // Progress windows never accept text. Disable IME hooks before creating
+        // any HWND on this temporary UI thread; some third-party IMEs otherwise
+        // retain freed global-memory handles when the window is destroyed.
+        ImmDisableIME(GetCurrentThreadId());
+
         const char* wClassName = "ProgressWindowClass";
         HINSTANCE hInstance = GetModuleHandle(NULL);
         static std::mutex registerClassMtx;
@@ -135,7 +142,7 @@ namespace
                 y += height * slotIndex;
             }
 
-            slot.hMainWindow = CreateWindowEx(WS_EX_TOOLWINDOW, wClassName, slot.Title.c_str(),
+            slot.hMainWindow = CreateWindowEx(WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE, wClassName, slot.Title.c_str(),
                 WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU, x, y, width, height,
                 NULL, NULL, hInstance, reinterpret_cast<LPVOID>(&slot));
 
@@ -148,7 +155,7 @@ namespace
             hwnd = slot.hMainWindow;
         }
 
-        ShowWindow(hwnd, SW_SHOW);
+        ShowWindow(hwnd, SW_SHOWNOACTIVATE);
         UpdateWindow(hwnd);
 
         while (true)
@@ -232,7 +239,13 @@ namespace
 bool ProgressBar::start(const char* windowText)
 {
     std::lock_guard lock(m_mtx);
-    assert(!Active());
+    // Restarting without stop() would orphan the previous native window:
+    // m_slot is overwritten while the old slot stays Active forever.
+    if (m_slot != -1)
+    {
+        ProgressBarStopImpl(m_slot);
+        m_slot = -1;
+    }
     m_slot = ProgressBarStartImpl(windowText);
     return Active();
 }

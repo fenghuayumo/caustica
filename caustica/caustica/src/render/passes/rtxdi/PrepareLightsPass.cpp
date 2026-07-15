@@ -397,20 +397,19 @@ RTXDI_LightBufferParameters PrepareLightsPass::process(nvrhi::ICommandList* comm
     uint32_t lightBufferOffset = 0;
     std::vector<uint32_t> geometryInstanceToLight(m_Scene->getGeometryInstancesCount(), RTXDI_INVALID_LIGHT_INDEX);
 
+    // Dense prefix must match AccelStructManager / MaterialGpuCache / PathTracingShaderCompiler.
+    // Do not skip on stale proxy.geometryInstanceIndex after runtime import.
     const auto& renderData = m_Scene->getRenderData();
+    size_t compactedGeometryInstanceIndex = 0;
     for (const scene::MeshInstanceRenderProxy& meshProxy : renderData.meshInstances)
     {
-        if (!meshProxy.mesh)
-            continue;
-
         const auto& mesh = meshProxy.meshShared;
         if (!mesh)
             continue;
 
-        assert(meshProxy.geometryInstanceIndex < geometryInstanceToLight.size());
-        if (meshProxy.geometryInstanceIndex < 0)
-            continue;
-        uint32_t firstGeometryInstanceIndex = meshProxy.geometryInstanceIndex;
+        const uint32_t firstGeometryInstanceIndex =
+            static_cast<uint32_t>(compactedGeometryInstanceIndex);
+        compactedGeometryInstanceIndex += mesh->geometries.size();
 
         for (size_t geometryIndex = 0; geometryIndex < mesh->geometries.size(); ++geometryIndex)
         {

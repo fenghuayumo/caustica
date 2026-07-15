@@ -140,7 +140,10 @@ void PTTexture::initFromLoadedTexture(caustica::Handle<caustica::ImageAsset> & l
     if (loaded == nullptr)
     { localPath = ""; sRGB = false; this->loaded = nullptr; normalMap = false; enabled = false; return; }
 
-    localPath = std::filesystem::relative(loaded->path, mediaPath);
+    std::error_code relativeError;
+    localPath = std::filesystem::relative(loaded->path, mediaPath, relativeError);
+    if (relativeError || localPath.empty())
+        localPath = std::filesystem::path(loaded->path).lexically_normal();
     sRGB = _sRGB;
     this->loaded = loaded;
     normalMap = _normalMap;
@@ -932,7 +935,11 @@ void MaterialGpuCache::recordTexture(const PTTexture& texture)
     if (texture.loaded == nullptr)
         return;
 
-    assert(texture.localPath != "");
+    if (texture.localPath.empty())
+    {
+        caustica::warning("Skipping loaded texture with no storage path.");
+        return;
+    }
 
     auto existing = m_textures.find(texture.localPath.generic_string());
     if (existing != m_textures.end())
