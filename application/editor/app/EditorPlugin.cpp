@@ -17,7 +17,7 @@ void EditorPlugin::build(App& app)
     app.insertResourceRef(m_sceneEditor.selectionState());
     app.insertResourceRef(m_sceneEditor.editorCameraState());
     if (m_sceneEditor.hasEditorUiData())
-        app.insertResourceRef(m_sceneEditor.GetUIData());
+        app.insertResourceRef(m_sceneEditor.uiData());
 
     app.emplaceResource<GpuRenderSubsystem>();
 
@@ -90,7 +90,7 @@ void EditorPlugin::configureLateSchedules(App& app)
 
     app.addSystemAfter(AppSchedule::preUpdate, "EditorScene.ProcessPendingMutations", "BeforeAnimate", [this](SystemContext& ctx) {
         (void)ctx;
-        m_sceneEditor.ProcessPendingSceneMutations();
+        m_sceneEditor.processPendingSceneDeletes();
     });
 
     app.addSystemAfter(AppSchedule::preUpdate, "EditorScene.AnimateBegin", "EditorScene.ProcessPendingMutations", [this](SystemContext& ctx) {
@@ -121,11 +121,18 @@ void EditorPlugin::configureLateSchedules(App& app)
         m_sceneEditor.updateWindowTitle();
     });
 
-    app.addSystemAfter(AppSchedule::Extract, "EditorScene.PrepareEditorFrame", "SceneSession.PrepareRenderFrame", [this](SystemContext& ctx) {
+    app.addSystem(AppSchedule::PostUpdate, "EditorScene.handleDroppedFiles", [this](SystemContext& ctx) {
+        (void)ctx;
+        // Import before Extract so PrepareRenderFrame sees the final ECS graph and
+        // the render phase does not race a mid-Extract snapshot overwrite.
+        m_sceneEditor.handleDroppedFiles();
+    });
+
+    app.addSystemAfter(AppSchedule::Extract, "EditorScene.prepareEditorFrame", "SceneSession.PrepareRenderFrame", [this](SystemContext& ctx) {
         if (!ctx.gpuDevice || m_sceneEditor.shouldSkipRender())
             return;
 
-        m_sceneEditor.PrepareEditorFrame();
+        m_sceneEditor.prepareEditorFrame();
     });
 
     AppSystemOrdering editorAfterWorldRenderOrdering;

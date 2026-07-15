@@ -243,6 +243,20 @@ bool SceneManager::isSceneLoaded() const
     return m_loader.isLoaded();
 }
 
+bool SceneManager::tryBeginStructureEdit()
+{
+    if (isSceneLoading())
+        return false;
+    ++m_structureEditDepth;
+    return true;
+}
+
+void SceneManager::endStructureEdit()
+{
+    if (m_structureEditDepth > 0)
+        --m_structureEditDepth;
+}
+
 // --- Environment map listing ---
 
 void SceneManager::refreshEnvironmentMapMediaList(

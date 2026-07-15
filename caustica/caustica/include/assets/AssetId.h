@@ -52,6 +52,7 @@ enum class AssetType : uint8_t
     Skeleton,
     PointCloud,
     Gaussian,
+    Prefab,
     Count
 };
 

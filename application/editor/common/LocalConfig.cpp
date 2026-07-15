@@ -138,7 +138,7 @@ void LocalConfig::PostSceneLoad(SceneEditor& sample, caustica::render::RenderSes
     (void)sampleUI;
 }
 
-void LocalConfig::PostMaterialLoad(caustica::Material& mat)
+void LocalConfig::postMaterialLoad(caustica::Material& mat)
 {
 #if 0 // convert transmissive to white opaque
     if (mat.domain == MaterialDomain::Transmissive || mat.domain == MaterialDomain::TransmissiveAlphaBlended || mat.domain == MaterialDomain::TransmissiveAlphaTested)

@@ -10,6 +10,9 @@
 #include <render/core/CameraController.h>
 #include <render/core/PathTracerSettings.h>
 #include <scene/Scene.h>
+#include <scene/SceneApply.h>
+#include <assets/Handle.h>
+#include <assets/TypedAssets.h>
 
 #include <filesystem>
 #include <functional>
@@ -132,6 +135,20 @@ void debugDrawLine(App& app, math::float3 start, math::float3 stop, math::float4
 [[nodiscard]] std::string fpsInfo(const App& app);
 
 void runGpuWorkOnRenderThread(App& app, const std::function<void()>& work);
+
+void syncSceneGpu(App& app);
+
+// Bevy-style assets.load + spawn for mesh scene files (.glb/.gltf/.obj/…).
+// load caches a CPU prefab; spawn attaches ECS then syncs GPU/proxies.
+[[nodiscard]] Handle<ScenePrefabAsset> load(App& app, const std::filesystem::path& path);
+[[nodiscard]] ecs::Entity spawn(
+    App& app,
+    const Handle<ScenePrefabAsset>& prefab,
+    const SceneApplyCallbacks& callbacks = {});
+[[nodiscard]] ecs::Entity spawnFromFile(
+    App& app,
+    const std::filesystem::path& path,
+    const SceneApplyCallbacks& callbacks = {});
 
 } // namespace sceneSession
 

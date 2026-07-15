@@ -10,6 +10,7 @@
 
 #ifdef _WIN32
 #include <engine/SplashScreen.h>
+#include <core/log.h>
 #endif
 
 namespace
@@ -43,6 +44,17 @@ int main(int argc, char** argv)
 #endif
 {
 #ifdef _WIN32
+    // Allocate a console for engine logs. Release starts hidden; Debug starts visible.
+    // F1 toggles visibility. Headless/--noWindow forces visible in EditorStartup.
+#if defined(_DEBUG)
+    caustica::initNativeConsole(/*visibleByDefault=*/true);
+#else
+    caustica::initNativeConsole(/*visibleByDefault=*/false);
+#endif
+
+    if (WantsHeadlessStartup(__argc, (const char**)__argv))
+        caustica::setNativeConsoleVisible(true);
+
     SplashScreen splashScreen;
     if (!WantsHeadlessStartup(__argc, (const char**)__argv))
     {

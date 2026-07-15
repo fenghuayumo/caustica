@@ -50,6 +50,7 @@ const char* assetTypeToString(AssetType type)
     case AssetType::Skeleton:   return "Skeleton";
     case AssetType::PointCloud: return "PointCloud";
     case AssetType::Gaussian:   return "Gaussian";
+    case AssetType::Prefab:     return "Prefab";
     default:                    return "Unknown";
     }
 }

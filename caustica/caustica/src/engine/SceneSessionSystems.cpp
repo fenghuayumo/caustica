@@ -26,11 +26,15 @@
 #include <assets/loader/TextureLoader.h>
 #include <render/core/BindingCache.h>
 #include <render/core/View.h>
+#include <render/core/SceneGpuUpdater.h>
 #include <render/core/SceneMeshEditing.h>
+#include <render/core/RenderSceneTypeFactory.h>
+#include <scene/SceneApply.h>
 #include <scene/SceneTypes.h>
+#include <scene/loader/RuntimeMeshLoader.h>
+#include <assets/RuntimeMeshLoadTypes.h>
 #include <backend/GpuDevice.h>
 #include <cassert>
-#include <core/Timer.h>
 #include <core/Timer.h>
 #include <render/core/RenderDevice.h>
 #include <core/vfs/VFS.h>
@@ -595,6 +599,108 @@ void runGpuWorkOnRenderThread(App& app, const std::function<void()>& work)
     if (!work)
         return;
     app.runGpuWorkOnRenderThread(work);
+}
+
+void syncSceneGpu(App& app)
+{
+    GpuRenderSubsystem* gr = gpuRender(app);
+    GpuDevice* device = gpuDevice(app);
+    auto scenePtr = scene(app);
+    if (!gr || !device || !scenePtr)
+        return;
+
+    // Exclusive access: no in-flight Extract/render reading an incomplete structure.
+    device->waitForRenderThreadIdle();
+
+    const uint32_t frameIndex = device->getFrameIndex();
+    runGpuWorkOnRenderThread(app, [gr, scenePtr, device, frameIndex]() {
+        if (nvrhi::IDevice* nvrhiDevice = device->getDevice())
+            nvrhiDevice->waitForIdle();
+
+        if (auto textureLoader = gr->textureLoader())
+        {
+            textureLoader->processRenderingThreadCommands(gr->renderDevice(), 0.f);
+            textureLoader->loadingFinished();
+        }
+
+        gr->lightingPasses().ensureMaterialsFromScene(scenePtr);
+        render::SceneGpuUpdater::refreshAfterLoad(*scenePtr, frameIndex);
+
+        // Rebuild BLAS/TLAS immediately while exclusive. Leaving this to the next
+        // render frame races new proxies against a stale TLAS and crashes nvwgf2umx.
+        gr->rayTracingResources().requestAccelerationStructureRebuild();
+        nvrhi::CommandListHandle commandList = device->getDevice()->createCommandList();
+        gr->rayTracingResources().recreateAccelStructs(commandList);
+    });
+}
+
+Handle<ScenePrefabAsset> load(App& app, const std::filesystem::path& path)
+{
+    AssetSystem* assets = app.tryResource<AssetSystem>();
+    GpuRenderSubsystem* gr = gpuRender(app);
+    if (!assets || !gr || path.empty())
+        return {};
+
+    if (Handle<ScenePrefabAsset> existing = assets->findScenePrefab(path))
+        return existing;
+
+    auto textureLoader = gr->textureLoader();
+    if (!textureLoader)
+        return {};
+
+    RuntimeMeshLoadParams params{
+        .TextureCache = textureLoader.get(),
+        .SceneTypes = std::make_shared<render::RenderSceneTypeFactory>(),
+        .TextureSearchDirectory = path.parent_path(),
+    };
+
+    const RuntimeMeshLoadResult result = loadRuntimeMeshFile(params, path);
+    if (!result)
+        return {};
+
+    return assets->registerScenePrefab(result.ImportResult, path);
+}
+
+ecs::Entity spawn(App& app, const Handle<ScenePrefabAsset>& prefab, const SceneApplyCallbacks& callbacks)
+{
+    if (!prefab || !prefab->import)
+        return ecs::NullEntity;
+
+    ::SceneManager* manager = sceneManager(app);
+    GpuDevice* device = gpuDevice(app);
+    auto scenePtr = scene(app);
+    if (!manager || !device || !scenePtr)
+        return ecs::NullEntity;
+
+    if (!manager->tryBeginStructureEdit())
+        return ecs::NullEntity;
+
+    struct StructureEditGuard
+    {
+        ::SceneManager* manager = nullptr;
+        ~StructureEditGuard()
+        {
+            if (manager)
+                manager->endStructureEdit();
+        }
+    } guard{ manager };
+
+    device->waitForRenderThreadIdle();
+
+    const ecs::Entity root = attachImportedScene(scenePtr, *prefab->import, callbacks);
+    if (!ecs::isValid(root))
+        return ecs::NullEntity;
+
+    syncSceneGpu(app);
+    return root;
+}
+
+ecs::Entity spawnFromFile(
+    App& app,
+    const std::filesystem::path& path,
+    const SceneApplyCallbacks& callbacks)
+{
+    return spawn(app, load(app, path), callbacks);
 }
 
 void onSceneLoaded(App& app)

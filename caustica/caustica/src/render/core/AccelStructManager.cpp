@@ -351,6 +351,28 @@ void AccelStructManager::buildTlas(nvrhi::ICommandList*            commandList,
     assert(m_subInstanceCount == subInstanceCount);
     assert(instances.size() == renderData.meshInstances.size());
 
+    if (!m_topLevelAS)
+    {
+        warning("BuildTLAS: top-level AS is null; skipping.");
+        return;
+    }
+
+    const size_t tlasMaxInstances = m_topLevelAS->getDesc().topLevelMaxInstances;
+    if (instances.size() > tlasMaxInstances)
+    {
+        error("BuildTLAS: instance count %zu exceeds TLAS capacity %zu; skipping to avoid driver crash. "
+            "Request a full acceleration-structure rebuild.",
+            instances.size(), tlasMaxInstances);
+        return;
+    }
+
+    if (m_subInstanceCount != subInstanceCount)
+    {
+        error("BuildTLAS: sub-instance count mismatch (allocated %u, built %u); skipping.",
+            m_subInstanceCount, subInstanceCount);
+        return;
+    }
+
     commandList->beginMarker("TLAS update");
     commandList->buildTopLevelAccelStruct(
         m_topLevelAS,

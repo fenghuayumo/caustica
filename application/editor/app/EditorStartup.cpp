@@ -37,7 +37,10 @@ namespace
         }
 
         if (cmdLine.noWindow || cmdLine.nonInteractive)
+        {
             caustica::consoleApplicationMode();
+            caustica::setNativeConsoleVisible(true);
+        }
     }
 }
 

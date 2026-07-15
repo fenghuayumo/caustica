@@ -12,6 +12,7 @@ namespace caustica
 struct Material;
 struct MeshInfo;
 class Scene;
+struct SceneImportResult;
 
 struct MeshAsset
 {
@@ -35,6 +36,15 @@ struct SceneAsset
     std::string name;
     std::filesystem::path sourcePath;
     std::shared_ptr<Scene> scene;
+};
+
+// CPU-only imported hierarchy (glTF/OBJ/…) ready to attachImportedScene / spawn.
+struct ScenePrefabAsset
+{
+    AssetId id = AssetId::invalid();
+    std::string name;
+    std::filesystem::path sourcePath;
+    std::shared_ptr<SceneImportResult> import;
 };
 
 } // namespace caustica

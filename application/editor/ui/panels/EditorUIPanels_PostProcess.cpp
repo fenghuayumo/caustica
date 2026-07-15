@@ -287,8 +287,8 @@ void EditorUI::BuildDebuggingPanel(const PanelLayout& layout)
             ImGui::TextWrapped("Debug visualization disabled; to enable set ENABLE_DEBUG_VIZUALISATIONS to 1");
 #endif 
 
-            if (m_sceneEditor.GetZoomTool() != nullptr && ImGui::CollapsingHeader("Zoom Tool"))
-                m_sceneEditor.GetZoomTool()->debugGUI(layout.indent);
+            if (m_sceneEditor.zoomTool() != nullptr && ImGui::CollapsingHeader("Zoom Tool"))
+                m_sceneEditor.zoomTool()->debugGUI(layout.indent);
         }
 
 

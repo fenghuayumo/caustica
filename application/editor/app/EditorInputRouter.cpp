@@ -4,6 +4,7 @@
 #include "EditorUIState.h"
 
 #include <backend/GpuDevice.h>
+#include <core/log.h>
 #include <events/event.h>
 #include <events/key_event.h>
 #include <events/mouse_event.h>
@@ -29,7 +30,7 @@ inline constexpr int cGlfwRepeat = 2;
 
 bool gizmoCapturesInput(const SceneEditor& sceneEditor)
 {
-    const auto& editor = sceneEditor.GetEditorUIState();
+    const auto& editor = sceneEditor.editorUIState();
     return editor.GizmoCapturingInput || ImGuizmo::IsOver() || ImGuizmo::IsUsing();
 }
 
@@ -53,8 +54,8 @@ bool onKeyPressed(SceneEditor& sceneEditor, caustica::KeyPressedEvent& e)
     if (!gpuRender)
         return true;
 
-    auto* zoomTool = sceneEditor.GetZoomTool().get();
-    auto* game = sceneEditor.GetGame().get();
+    auto* zoomTool = sceneEditor.zoomTool().get();
+    auto* game = sceneEditor.game().get();
     auto* camera = &gpuRender->camera();
 
     if (zoomTool && zoomTool->keyboardUpdate(key, e.getScancode(), action, mods))
@@ -67,13 +68,19 @@ bool onKeyPressed(SceneEditor& sceneEditor, caustica::KeyPressedEvent& e)
         return true;
 
     auto& session = sceneEditor.renderSessionState();
-    auto& editor = sceneEditor.GetEditorUIState();
+    auto& editor = sceneEditor.editorUIState();
 
     if (key == ToGlfwKey(caustica::Key::Space) && action == cGlfwPress
         && mods != ToGlfwMods(caustica::ModifierKey::Control)
         && mods != ToGlfwMods(caustica::ModifierKey::Alt))
     {
         session.settings.EnableAnimations = !session.settings.EnableAnimations;
+        return true;
+    }
+    if (key == ToGlfwKey(caustica::Key::F1) && action == cGlfwPress)
+    {
+        const bool visible = caustica::toggleNativeConsoleVisible();
+        caustica::info("Native console %s", visible ? "shown" : "hidden");
         return true;
     }
     if (key == ToGlfwKey(caustica::Key::F2) && action == cGlfwPress)
@@ -101,8 +108,8 @@ bool onKeyReleased(SceneEditor& sceneEditor, caustica::KeyReleasedEvent& e)
     if (!gpuRender)
         return true;
 
-    auto* zoomTool = sceneEditor.GetZoomTool().get();
-    auto* game = sceneEditor.GetGame().get();
+    auto* zoomTool = sceneEditor.zoomTool().get();
+    auto* game = sceneEditor.game().get();
     auto* camera = &gpuRender->camera();
 
     if (zoomTool && zoomTool->keyboardUpdate(key, e.getScancode(), cGlfwRelease, mods))
@@ -129,7 +136,7 @@ bool onMouseMoved(SceneEditor& sceneEditor, caustica::MouseMovedEvent& e)
     if (!gpuRender)
         return true;
 
-    auto* game = sceneEditor.GetGame().get();
+    auto* game = sceneEditor.game().get();
     auto* camera = &gpuRender->camera();
     auto* worldRenderer = sceneEditor.worldRenderer();
     auto& session = sceneEditor.renderSessionState();
@@ -149,7 +156,7 @@ bool onMouseMoved(SceneEditor& sceneEditor, caustica::MouseMovedEvent& e)
         static_cast<uint>(e.getY() * upscalingScale.y)};
     session.settings.MousePos = session.runtime.Picking.Position;
 
-    auto* zoomTool = sceneEditor.GetZoomTool().get();
+    auto* zoomTool = sceneEditor.zoomTool().get();
     if (zoomTool)
         zoomTool->mousePosUpdate(e.getX(), e.getY());
     return true;
@@ -167,8 +174,8 @@ bool onMouseButtonPressed(SceneEditor& sceneEditor, caustica::MouseButtonPressed
     const int button = ToGlfwMouse(e.getButton());
     const int mods = ToGlfwMods(e.getModifiers());
 
-    auto* zoomTool = sceneEditor.GetZoomTool().get();
-    auto* game = sceneEditor.GetGame().get();
+    auto* zoomTool = sceneEditor.zoomTool().get();
+    auto* game = sceneEditor.game().get();
     auto* camera = &gpuRender->camera();
     auto& session = sceneEditor.renderSessionState();
 
@@ -202,8 +209,8 @@ bool onMouseButtonReleased(SceneEditor& sceneEditor, caustica::MouseButtonReleas
     const int button = ToGlfwMouse(e.getButton());
     const int mods = ToGlfwMods(e.getModifiers());
 
-    auto* zoomTool = sceneEditor.GetZoomTool().get();
-    auto* game = sceneEditor.GetGame().get();
+    auto* zoomTool = sceneEditor.zoomTool().get();
+    auto* game = sceneEditor.game().get();
     auto* camera = &gpuRender->camera();
 
     if (zoomTool && zoomTool->mouseButtonUpdate(button, cGlfwRelease, mods))
@@ -222,7 +229,7 @@ bool onMouseScrolled(SceneEditor& sceneEditor, caustica::MouseScrolledEvent& e)
     if (io.WantCaptureMouse)
         return true;
 
-    auto* game = sceneEditor.GetGame().get();
+    auto* game = sceneEditor.game().get();
     if (!(game && game->CameraActive()))
         sceneEditor.renderSessionState().settings.CameraMoveSpeed *= 1.0f + static_cast<float>(e.getYOffset()) * 0.1f;
     return true;

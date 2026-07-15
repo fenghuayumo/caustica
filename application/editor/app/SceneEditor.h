@@ -87,12 +87,12 @@ public:
     caustica::render::WorldRenderer* worldRenderer() const;
     const caustica::render::SceneLightingPasses& lightingPasses() const;
 
-    const std::unique_ptr<::GameScene>& GetGame() const { return m_sampleGame; }
+    const std::unique_ptr<::GameScene>& game() const { return m_sampleGame; }
 
-    EditorUIData& GetUIData() { assert(m_editorUi); return *m_editorUi; }
-    const EditorUIData& GetUIData() const { assert(m_editorUi); return *m_editorUi; }
-    EditorUIState& GetEditorUIState() { return m_editor; }
-    const EditorUIState& GetEditorUIState() const { return m_editor; }
+    EditorUIData& uiData() { assert(m_editorUi); return *m_editorUi; }
+    const EditorUIData& uiData() const { assert(m_editorUi); return *m_editorUi; }
+    EditorUIState& editorUIState() { return m_editor; }
+    const EditorUIState& editorUIState() const { return m_editor; }
     [[nodiscard]] bool hasEditorUiData() const { return m_editorUi != nullptr; }
     [[nodiscard]] EditorState& editorState() { return m_editorState; }
     [[nodiscard]] const EditorState& editorState() const { return m_editorState; }
@@ -103,14 +103,14 @@ public:
     [[nodiscard]] EditorCameraState& editorCameraState() { return m_editorCameraState; }
     [[nodiscard]] const EditorCameraState& editorCameraState() const { return m_editorCameraState; }
 
-    void HandleDroppedFiles();
-    bool LoadMeshFile(const std::filesystem::path& filePath);
-    bool LoadGltfMeshFile(const std::filesystem::path& filePath);
-    bool LoadObjMeshFile(const std::filesystem::path& filePath);
-    void finalizeRuntimeSceneMutation(caustica::ecs::Entity importedRoot);
-    bool DeleteSceneNode(caustica::ecs::Entity entity);
-    void ProcessPendingSceneMutations();
-    void RequestFullRebuild();
+    void handleDroppedFiles();
+    bool loadMeshFile(const std::filesystem::path& filePath);
+    bool loadGltfMeshFile(const std::filesystem::path& filePath);
+    bool loadObjMeshFile(const std::filesystem::path& filePath);
+    void syncSceneGpu();
+    bool deleteSceneNode(caustica::ecs::Entity entity);
+    void processPendingSceneDeletes();
+    void requestFullRebuild();
     std::vector<dm::float3> getMeshVertices(const std::shared_ptr<caustica::MeshInfo>& mesh) const;
     void setMeshVertices(const std::shared_ptr<caustica::MeshInfo>& mesh,
         const std::vector<dm::float3>& vertices,
@@ -145,15 +145,15 @@ public:
     void afterWorldRender(caustica::GpuDevice& gpuDevice);
     bool shouldRenderWhenUnfocused() const;
 
-    void PrepareEditorFrame();
-    void CaptureScriptPreRender();
-    void CaptureScriptPostRender(std::function<bool(const char* fileName)> saveTexture);
-    ::ZoomTool* GetOrCreateZoomTool();
+    void prepareEditorFrame();
+    void captureScriptPreRender();
+    void captureScriptPostRender(std::function<bool(const char* fileName)> saveTexture);
+    ::ZoomTool* getOrCreateZoomTool();
 
-    bool ShowDeltaTree() const;
-    void ResolvePickFeedback(const DebugFeedbackStruct& feedback);
+    bool showDeltaTree() const;
+    void resolvePickFeedback(const DebugFeedbackStruct& feedback);
     [[nodiscard]] ecs::Entity pickGaussianSplatAtPixel(math::uint2 renderPixel) const;
-    bool ConsumeExperimentalPhotoScreenshot();
+    bool consumeExperimentalPhotoScreenshot();
 
     void onEvent(caustica::Event& event);
 
@@ -204,11 +204,11 @@ public:
     [[nodiscard]] float avgTimePerFrame() const;
     void debugDrawLine(math::float3 start, math::float3 stop, math::float4 col1, math::float4 col2);
 
-    const std::unique_ptr<::ZoomTool>& GetZoomTool() const { return m_zoomTool; }
-    const std::unique_ptr<CaptureScriptManager>& GetCaptureScriptManager() const { return m_captureScriptManager; }
+    const std::unique_ptr<::ZoomTool>& zoomTool() const { return m_zoomTool; }
+    const std::unique_ptr<CaptureScriptManager>& captureScriptManager() const { return m_captureScriptManager; }
 
 #if CAUSTICA_WITH_PYTHON
-    const std::unique_ptr<PythonScripting>& GetPythonScripting() const { return m_pythonScripting; }
+    const std::unique_ptr<PythonScripting>& pythonScripting() const { return m_pythonScripting; }
 #endif
 
 private:

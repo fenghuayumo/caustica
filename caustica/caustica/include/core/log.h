@@ -44,6 +44,14 @@ namespace caustica
     // - enableOutputToMessageBox(false);
     void consoleApplicationMode();
 
+    // Windows WIN32 subsystem: allocate a console once, redirect stdio, and enable
+    // log output to it. visibleByDefault=false hides the window (Release default).
+    // No-op on non-Windows. Safe to call more than once.
+    void initNativeConsole(bool visibleByDefault);
+    void setNativeConsoleVisible(bool visible);
+    [[nodiscard]] bool isNativeConsoleVisible();
+    bool toggleNativeConsoleVisible();
+
     void message(Severity severity, const char* fmt...);
     void debug(const char* fmt...);
     void info(const char* fmt...);

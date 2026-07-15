@@ -410,9 +410,8 @@ void SceneEditor::initializeSession(const std::string& preferredScene)
         sceneSession::initializeSession(*m_app, preferredScene);
 }
 
-void SceneEditor::PrepareEditorFrame()
+void SceneEditor::prepareEditorFrame()
 {
-    HandleDroppedFiles();
     m_settings.DebugExploreDeltaTree = m_editor.ShowDeltaTree;
 }
 
@@ -508,7 +507,7 @@ void SceneEditor::syncLoadedSceneSystems()
 
 void SceneEditor::onBeginFrameScheduled()
 {
-    CaptureScriptPreRender();
+    captureScriptPreRender();
 }
 
 void SceneEditor::onAnimateBegin(float& fElapsedTimeSeconds)
@@ -530,7 +529,7 @@ void SceneEditor::onAnimateGameTick(float fElapsedTimeSeconds, bool enableAnimat
 void SceneEditor::onAnimateUpdateSceneTime(float /*fElapsedTimeSeconds*/, bool enableAnimations, bool /*enableAnimationUpdate*/)
 {
     if (enableAnimations && m_sampleGame && m_sampleGame->IsInitialized())
-        m_viewState.sceneTime = m_sampleGame->GetGameTime();
+        m_viewState.sceneTime = m_sampleGame->gameTime();
 }
 
 void SceneEditor::onAnimateGameCamera(float fElapsedTimeSeconds)
@@ -592,41 +591,41 @@ void SceneEditor::setSceneTime(double sceneTime)
 double SceneEditor::sceneTime() const
 {
     if (m_sampleGame && m_sampleGame->IsInitialized())
-        return m_sampleGame->GetGameTime();
+        return m_sampleGame->gameTime();
     return m_viewState.sceneTime;
 }
 
-void SceneEditor::HandleDroppedFiles()
+void SceneEditor::handleDroppedFiles()
 {
     m_contentEditor.handleDroppedFiles(m_editor.PendingDroppedFiles);
 }
 
-bool SceneEditor::LoadMeshFile(const std::filesystem::path& filePath)
+bool SceneEditor::loadMeshFile(const std::filesystem::path& filePath)
 {
     return m_contentEditor.loadMeshFile(filePath);
 }
 
-bool SceneEditor::LoadGltfMeshFile(const std::filesystem::path& filePath)
+bool SceneEditor::loadGltfMeshFile(const std::filesystem::path& filePath)
 {
     return m_contentEditor.loadGltfMeshFile(filePath);
 }
 
-bool SceneEditor::LoadObjMeshFile(const std::filesystem::path& filePath)
+bool SceneEditor::loadObjMeshFile(const std::filesystem::path& filePath)
 {
     return m_contentEditor.loadObjMeshFile(filePath);
 }
 
-void SceneEditor::finalizeRuntimeSceneMutation(caustica::ecs::Entity importedRoot)
+void SceneEditor::syncSceneGpu()
 {
-    m_contentEditor.finalizeRuntimeSceneMutation(importedRoot);
+    m_contentEditor.syncSceneGpu();
 }
 
-bool SceneEditor::DeleteSceneNode(caustica::ecs::Entity entity)
+bool SceneEditor::deleteSceneNode(caustica::ecs::Entity entity)
 {
     return m_contentEditor.deleteSceneNode(entity);
 }
 
-void SceneEditor::ProcessPendingSceneMutations()
+void SceneEditor::processPendingSceneDeletes()
 {
     if (m_editor.PendingDeleteEntity == caustica::ecs::NullEntity)
         return;
@@ -644,10 +643,10 @@ void SceneEditor::ProcessPendingSceneMutations()
     if (nvrhi::IDevice* device = this->device())
         device->waitForIdle();
 
-    DeleteSceneNode(entity);
+    deleteSceneNode(entity);
 }
 
-void SceneEditor::RequestFullRebuild()
+void SceneEditor::requestFullRebuild()
 {
     m_contentEditor.requestFullRebuild();
 }
@@ -691,19 +690,19 @@ void SceneEditor::setMeshVertices(const std::shared_ptr<MeshInfo>& mesh,
     m_contentEditor.setMeshVertices(mesh, vertices, recomputeNormals, rebuildAccelerationStructure);
 }
 
-ZoomTool* SceneEditor::GetOrCreateZoomTool()
+ZoomTool* SceneEditor::getOrCreateZoomTool()
 {
     if (m_zoomTool == nullptr)
         m_zoomTool = std::make_unique<ZoomTool>(device(), gpuRender()->shaderFactory());
     return m_zoomTool.get();
 }
 
-bool SceneEditor::ShowDeltaTree() const
+bool SceneEditor::showDeltaTree() const
 {
     return m_editor.ShowDeltaTree;
 }
 
-void SceneEditor::ResolvePickFeedback(const DebugFeedbackStruct& feedback)
+void SceneEditor::resolvePickFeedback(const DebugFeedbackStruct& feedback)
 {
     if (m_renderState.Picking.MaterialRequested)
         m_editor.SelectedMaterial = findMaterial(int(feedback.pickedMaterialID));
@@ -725,7 +724,7 @@ void SceneEditor::afterWorldRender(GpuDevice& gpuDevice)
         return;
 
     if (m_settings.ContinuousDebugFeedback || m_renderState.Picking.hasActivePickRequest())
-        ResolvePickFeedback(wr->getFeedbackData());
+        resolvePickFeedback(wr->getFeedbackData());
 
     if (m_settings.ContinuousDebugFeedback || m_renderState.Picking.hasActivePickRequest())
         m_renderState.Picking.clearPickRequests();
@@ -739,9 +738,9 @@ void SceneEditor::afterWorldRender(GpuDevice& gpuDevice)
         return saveTextureToFile(
             gpuDevice.getDevice(), *renderDevice, texture, nvrhi::ResourceStates::Common, fileName);
     };
-    CaptureScriptPostRender(saveFramebuffer);
+    captureScriptPostRender(saveFramebuffer);
 
-    if (ConsumeExperimentalPhotoScreenshot())
+    if (consumeExperimentalPhotoScreenshot())
     {
         nvrhi::IFramebuffer* framebuffer = gpuDevice.getCurrentFramebuffer(true);
         if (framebuffer)
@@ -749,7 +748,7 @@ void SceneEditor::afterWorldRender(GpuDevice& gpuDevice)
     }
 }
 
-bool SceneEditor::ConsumeExperimentalPhotoScreenshot()
+bool SceneEditor::consumeExperimentalPhotoScreenshot()
 {
     if (!m_editor.ExperimentalPhotoModeScreenshot)
         return false;
@@ -757,13 +756,13 @@ bool SceneEditor::ConsumeExperimentalPhotoScreenshot()
     return true;
 }
 
-void SceneEditor::CaptureScriptPreRender()
+void SceneEditor::captureScriptPreRender()
 {
     if (m_captureScriptManager)
         m_captureScriptManager->preRender();
 }
 
-void SceneEditor::CaptureScriptPostRender(std::function<bool(const char* fileName)> saveTexture)
+void SceneEditor::captureScriptPostRender(std::function<bool(const char* fileName)> saveTexture)
 {
     if (m_captureScriptManager)
         m_captureScriptManager->postRender(saveTexture);

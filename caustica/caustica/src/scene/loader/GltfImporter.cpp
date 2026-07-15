@@ -13,6 +13,8 @@
 
 #include <type_traits>
 #include <variant>
+#include <cmath>
+#include <cstring>
 
 using namespace caustica::math;
 using namespace caustica;
@@ -615,6 +617,9 @@ static const char* cgltf_error_to_string(cgltf_result res)
 static std::pair<const uint8_t*, size_t> cgltf_buffer_iterator(const cgltf_accessor* accessor, size_t defaultStride)
 {
     // TODO: sparse accessor support
+    if (!accessor || !accessor->buffer_view || !accessor->buffer_view->buffer || !accessor->buffer_view->buffer->data)
+        return std::make_pair(nullptr, defaultStride);
+
     const cgltf_buffer_view* view = accessor->buffer_view;
     const uint8_t* data = (uint8_t*)view->buffer->data + view->offset + accessor->offset;
     const size_t stride = view->stride ? view->stride : defaultStride;
@@ -661,7 +666,8 @@ bool GltfImporter::load(
     res = cgltf_load_buffers(&options, objects, normalizedFileName.c_str());
     if (res != cgltf_result_success)
     {
-        caustica::error("Failed to load buffers for glTF file '%s': ", normalizedFileName.c_str(), cgltf_error_to_string(res));
+        caustica::error("Failed to load buffers for glTF file '%s': %s", normalizedFileName.c_str(), cgltf_error_to_string(res));
+        cgltf_free(objects);
         return false;
     }
 
@@ -696,10 +702,9 @@ bool GltfImporter::load(
                 const uint8_t* blobData = static_cast<const uint8_t*>(blob->data());
                 const size_t blobSize = blob->size();
 
-                if (blobData < dataPtr && blobData + blobSize > dataPtr)
+                if (blobData <= dataPtr && dataPtr + dataSize <= blobData + blobSize)
                 {
                     // Found the file blob - create a range blob out of it and keep a strong reference.
-                    assert(dataPtr + dataSize <= blobData + blobSize);
                     imageBlob = std::make_shared<BufferRegionBlob>(blob, dataPtr - blobData, dataSize);
                     break;
                 }
@@ -1005,6 +1010,7 @@ bool GltfImporter::load(
     size_t totalVertices = 0;
     size_t morphTargetTotalVertices = 0;
     bool hasJoints = false;
+    bool hasRadiusAttribute = false;
 
     for (size_t mesh_idx = 0; mesh_idx < objects->meshes_count; mesh_idx++)
     {
@@ -1022,23 +1028,34 @@ bool GltfImporter::load(
                 continue;
             }
 
+            size_t primVertexCount = 0;
+            for (size_t attr_idx = 0; attr_idx < prim.attributes_count; attr_idx++)
+            {
+                const cgltf_attribute& attr = prim.attributes[attr_idx];
+                if (attr.type == cgltf_attribute_type_position && attr.data)
+                {
+                    primVertexCount = attr.data->count;
+                    break;
+                }
+            }
+            if (primVertexCount == 0 && prim.attributes->data)
+                primVertexCount = prim.attributes->data->count;
+
             if (prim.indices)
                 totalIndices += prim.indices->count;
             else
-                totalIndices += prim.attributes->data->count;
-            totalVertices += prim.attributes->data->count;
+                totalIndices += primVertexCount;
+            totalVertices += primVertexCount;
 
-            if (!hasJoints)
+            if (!hasJoints || !hasRadiusAttribute)
             {
-                // Detect if the primitive has joints or weights attributes.
                 for (size_t attr_idx = 0; attr_idx < prim.attributes_count; attr_idx++)
                 {
                     const cgltf_attribute& attr = prim.attributes[attr_idx];
                     if (attr.type == cgltf_attribute_type_joints || attr.type == cgltf_attribute_type_weights)
-                    {
                         hasJoints = true;
-                        break;
-                    }
+                    if (attr.type == cgltf_attribute_type_custom && attr.name && strncmp(attr.name, "_RADIUS", 7) == 0)
+                        hasRadiusAttribute = true;
                 }
             }
         }
@@ -1051,7 +1068,8 @@ bool GltfImporter::load(
     buffers->normalData.resize(totalVertices);
     buffers->tangentData.resize(totalVertices);
     buffers->texcoord1Data.resize(totalVertices);
-    buffers->radiusData.resize(totalVertices);
+    if (hasRadiusAttribute)
+        buffers->radiusData.resize(totalVertices);
     if (hasJoints)
     {
         // allocate joint/weight arrays for all the vertices in the model.
@@ -1172,6 +1190,11 @@ bool GltfImporter::load(
             }
 
             assert(positions);
+            if (!positions)
+            {
+                caustica::warning("Mesh '%s': primitive has no POSITION attribute, skipping.", minfo->name.c_str());
+                continue;
+            }
 
             size_t indexCount = 0;
 
@@ -1181,6 +1204,11 @@ bool GltfImporter::load(
 
                 // copy the indices
                 auto [indexSrc, indexStride] = cgltf_buffer_iterator(prim.indices, 0);
+                if (!indexSrc)
+                {
+                    caustica::warning("Mesh '%s': invalid index accessor, skipping primitive.", minfo->name.c_str());
+                    continue;
+                }
 
                 uint32_t* indexDst = buffers->indexData.data() + totalIndices;
 
@@ -1238,6 +1266,11 @@ bool GltfImporter::load(
             if (positions)
             {
                 auto [positionSrc, positionStride] = cgltf_buffer_iterator(positions, sizeof(float) * 3);
+                if (!positionSrc)
+                {
+                    caustica::warning("Mesh '%s': invalid POSITION accessor, skipping primitive.", minfo->name.c_str());
+                    continue;
+                }
                 float3* positionDst = buffers->positionData.data() + totalVertices;
 
                 for (size_t v_idx = 0; v_idx < positions->count; v_idx++)
@@ -1254,20 +1287,23 @@ bool GltfImporter::load(
             if (radius)
             {
                 auto [radiusSrc, radiusStride] = cgltf_buffer_iterator(radius, sizeof(float));
-                float* radiusDst = buffers->radiusData.data() + totalVertices;
-                for (size_t v_idx = 0; v_idx < radius->count; v_idx++)
+                if (!radiusSrc || buffers->radiusData.empty())
                 {
-                    *radiusDst = *(const float*)radiusSrc;
-
-                    bounds |= *radiusDst;
-
-                    radiusSrc += radiusStride;
-                    ++radiusDst;
+                    caustica::warning("Mesh '%s': invalid _RADIUS accessor, skipping.", minfo->name.c_str());
                 }
-            }
-            else
-            {
-                buffers->radiusData.clear();
+                else
+                {
+                    float* radiusDst = buffers->radiusData.data() + totalVertices;
+                    for (size_t v_idx = 0; v_idx < radius->count; v_idx++)
+                    {
+                        *radiusDst = *(const float*)radiusSrc;
+
+                        bounds |= *radiusDst;
+
+                        radiusSrc += radiusStride;
+                        ++radiusDst;
+                    }
+                }
             }
 
             if (normals)
@@ -1360,7 +1396,11 @@ bool GltfImporter::load(
 
                     float2 dTds = t1 - t0;
                     float2 dTdt = t2 - t0;
-                    float r = 1.0f / (dTds.x * dTdt.y - dTds.y * dTdt.x);
+                    float det = dTds.x * dTdt.y - dTds.y * dTdt.x;
+                    if (std::abs(det) < 1e-8f)
+                        continue;
+
+                    float r = 1.0f / det;
                     float3 tangent = r * (dPds * dTdt.y - dPdt * dTds.y);
                     float3 bitangent = r * (dPdt * dTds.x - dPds * dTdt.x);
 
@@ -1720,6 +1760,12 @@ bool GltfImporter::load(
 
     StackItem context;
     context.dstParent = root;
+    if (!objects->scene)
+    {
+        caustica::error("glTF file '%s' has no default scene.", normalizedFileName.c_str());
+        cgltf_free(objects);
+        return false;
+    }
     context.srcNodes = objects->scene->nodes;
     context.srcCount = objects->scene->nodes_count;
 
@@ -1892,13 +1938,23 @@ bool GltfImporter::load(
         for (size_t s_idx = 0; s_idx < srcAnim->samplers_count; s_idx++)
         {
             const cgltf_animation_sampler* srcSampler = &srcAnim->samplers[s_idx];
-            const cgltf_animation_channel* srcChannel = &srcAnim->channels[s_idx];
             auto dstSampler = std::make_shared<animation::Sampler>();
+
+            bool usedForRotation = false;
+            for (size_t channel_idx = 0; channel_idx < srcAnim->channels_count; channel_idx++)
+            {
+                const cgltf_animation_channel& channel = srcAnim->channels[channel_idx];
+                if (channel.sampler == srcSampler && channel.target_path == cgltf_animation_path_type_rotation)
+                {
+                    usedForRotation = true;
+                    break;
+                }
+            }
 
             switch (srcSampler->interpolation)
             {
             case cgltf_interpolation_type_linear:
-                if (srcChannel->target_path == cgltf_animation_path_type_rotation)
+                if (usedForRotation)
                     dstSampler->setInterpolationMode(animation::InterpolationMode::Slerp);
                 else
                     dstSampler->setInterpolationMode(animation::InterpolationMode::Linear);

@@ -17,7 +17,7 @@ struct LocalConfig
 {
     static void        PreferredSceneOverride( std::string & preferredScene );
     static void        PostAppInit(caustica::render::RenderSessionState & sessionState );
-    static void        PostMaterialLoad( caustica::Material & material );
+    static void postMaterialLoad(caustica::Material& material);
     static void        PostSceneLoad( SceneEditor & sample, caustica::render::RenderSessionState & sessionState, EditorUIState & editorState );
 };
 

@@ -690,8 +690,9 @@ void SceneGpuUpdater::refresh(Scene& scene, nvrhi::ICommandList* commandList, ui
 
 void SceneGpuUpdater::refreshAfterLoad(Scene& scene, uint32_t frameIndex)
 {
+    // Fill the write slot first. beginGpuReadFrame lets UpdateGpuSceneBuffers read that
+    // slot before publish — proxies must not become "latest" until bindless buffers exist.
     scene.refreshSceneWorld(frameIndex);
-    scene.publishRenderSnapshot(frameIndex);
 
     SceneGpuResources& gpu = scene.getGpuResources();
     if (!gpu.device->waitForIdle())
@@ -699,15 +700,17 @@ void SceneGpuUpdater::refreshAfterLoad(Scene& scene, uint32_t frameIndex)
 
     nvrhi::CommandListHandle commandList = gpu.device->createCommandList();
     commandList->open();
-
-    EnsureMeshGpuBuffers(scene, commandList);
-    const GpuReadFrameScope gpuReadScope(scene, frameIndex);
-    UpdateGpuSceneBuffers(scene, commandList, frameIndex, /*structureChanged=*/true, /*transformsChanged=*/true);
-    scene.acknowledgeGpuStructureConsumed();
-
+    {
+        const GpuReadFrameScope gpuReadScope(scene, frameIndex);
+        EnsureMeshGpuBuffers(scene, commandList);
+        UpdateGpuSceneBuffers(scene, commandList, frameIndex, /*structureChanged=*/true, /*transformsChanged=*/true);
+        scene.acknowledgeGpuStructureConsumed();
+    }
     commandList->close();
     gpu.device->executeCommandList(commandList);
     gpu.device->waitForIdle();
+
+    scene.publishRenderSnapshot(frameIndex);
 }
 
 } // namespace caustica::render

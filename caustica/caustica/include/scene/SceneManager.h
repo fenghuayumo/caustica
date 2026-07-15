@@ -63,6 +63,13 @@ public:
     [[nodiscard]] bool isSceneLoading() const;
     [[nodiscard]] bool isSceneLoaded() const;
 
+    // Runtime attach/destroy while a full scene load (or another structure edit) is
+    // in flight races Extract → GPU upload → AS rebuild. Gate all ECS structure edits.
+    [[nodiscard]] bool tryBeginStructureEdit();
+    void endStructureEdit();
+    [[nodiscard]] bool isStructureEditInFlight() const { return m_structureEditDepth > 0; }
+    [[nodiscard]] bool isSceneStructureBusy() const { return isSceneLoading() || isStructureEditInFlight(); }
+
     static std::shared_ptr<caustica::Material> findMaterial(
         const std::shared_ptr<caustica::Scene>& scene, int materialID)
     {
@@ -120,4 +127,5 @@ private:
     std::string                               m_inlineSceneJson;
 
     caustica::SceneLoader                     m_loader;
+    int                                       m_structureEditDepth = 0;
 };

@@ -35,22 +35,21 @@ const LightRenderProxy* SceneRenderData::findLight(ecs::Entity entity) const
     return nullptr;
 }
 
-void extractSceneRenderData(SceneEntityWorld& entityWorld, SceneRenderData& out, uint32_t frameIndex)
+namespace
 {
-    out.clear();
 
-    ecs::World& world = entityWorld.world();
+struct MeshInstanceRef
+{
+    ecs::Entity entity = ecs::NullEntity;
+    MeshInstanceComponent* meshComp = nullptr;
+    GlobalTransformComponent* global = nullptr;
+    BoundsComponent* bounds = nullptr;
+    SceneContentComponent* content = nullptr;
+};
 
-    // Must match SceneEntityWorld::refreshInstanceIndices ordering (stable by entity id).
-    struct MeshInstanceRef
-    {
-        ecs::Entity entity = ecs::NullEntity;
-        MeshInstanceComponent* meshComp = nullptr;
-        GlobalTransformComponent* global = nullptr;
-        BoundsComponent* bounds = nullptr;
-        SceneContentComponent* content = nullptr;
-    };
-    std::vector<MeshInstanceRef> meshRefs;
+void CollectMeshInstanceRefs(ecs::World& world, std::vector<MeshInstanceRef>& meshRefs)
+{
+    meshRefs.clear();
     world.each<MeshInstanceComponent, GlobalTransformComponent, BoundsComponent, SceneContentComponent>(
         [&](ecs::Entity entity, MeshInstanceComponent& meshComp, GlobalTransformComponent& global,
             BoundsComponent& bounds, SceneContentComponent& content)
@@ -60,30 +59,72 @@ void extractSceneRenderData(SceneEntityWorld& entityWorld, SceneRenderData& out,
     std::sort(meshRefs.begin(), meshRefs.end(), [](const MeshInstanceRef& a, const MeshInstanceRef& b) {
         return static_cast<uint32_t>(a.entity) < static_cast<uint32_t>(b.entity);
     });
+}
 
+void FillMeshInstanceProxy(
+    ecs::World& world,
+    const MeshInstanceRef& ref,
+    MeshInstanceRenderProxy& proxy)
+{
+    proxy.entity = ref.entity;
+    proxy.instanceIndex = ref.meshComp->instanceIndex;
+    proxy.geometryInstanceIndex = ref.meshComp->geometryInstanceIndex;
+    proxy.meshShared = ref.meshComp->mesh;
+    proxy.mesh = ref.meshComp->mesh.get();
+    proxy.transformFloat = ref.global->transformFloat;
+    proxy.previousTransformFloat = ref.global->previousTransformFloat;
+    proxy.globalBounds = ref.bounds->globalBounds;
+    proxy.leafContent = ref.content->leafContent;
+    proxy.proxiedAnalyticLight = ref.meshComp->proxiedAnalyticLight;
+    proxy.parentLightEntity = ecs::NullEntity;
+
+    if (const auto* parent = world.get<ParentComponent>(ref.entity);
+        parent && ecs::isValid(parent->parent) && hasAnyLightComponent(world, parent->parent))
+    {
+        proxy.parentLightEntity = parent->parent;
+    }
+}
+
+void ExtractMeshInstancesFull(ecs::World& world, SceneRenderData& out)
+{
+    out.meshInstances.clear();
+    out.meshInstanceEntities.clear();
+
+    std::vector<MeshInstanceRef> meshRefs;
+    CollectMeshInstanceRefs(world, meshRefs);
+
+    out.meshInstances.reserve(meshRefs.size());
+    out.meshInstanceEntities.reserve(meshRefs.size());
     for (const MeshInstanceRef& ref : meshRefs)
     {
         MeshInstanceRenderProxy proxy;
-        proxy.entity = ref.entity;
-        proxy.instanceIndex = ref.meshComp->instanceIndex;
-        proxy.geometryInstanceIndex = ref.meshComp->geometryInstanceIndex;
-        proxy.meshShared = ref.meshComp->mesh;
-        proxy.mesh = ref.meshComp->mesh.get();
-        proxy.transformFloat = ref.global->transformFloat;
-        proxy.previousTransformFloat = ref.global->previousTransformFloat;
-        proxy.globalBounds = ref.bounds->globalBounds;
-        proxy.leafContent = ref.content->leafContent;
-        proxy.proxiedAnalyticLight = ref.meshComp->proxiedAnalyticLight;
-
-        if (const auto* parent = world.get<ParentComponent>(ref.entity);
-            parent && ecs::isValid(parent->parent) && hasAnyLightComponent(world, parent->parent))
-        {
-            proxy.parentLightEntity = parent->parent;
-        }
-
-        out.meshInstances.push_back(std::move(proxy));
+        FillMeshInstanceProxy(world, ref, proxy);
         out.meshInstanceEntities.push_back(ref.entity);
+        out.meshInstances.push_back(std::move(proxy));
     }
+}
+
+bool ExtractMeshInstancesTransforms(ecs::World& world, SceneRenderData& inout)
+{
+    std::vector<MeshInstanceRef> meshRefs;
+    CollectMeshInstanceRefs(world, meshRefs);
+    if (meshRefs.size() != inout.meshInstances.size())
+        return false;
+
+    for (size_t i = 0; i < meshRefs.size(); ++i)
+    {
+        if (meshRefs[i].entity != inout.meshInstances[i].entity)
+            return false;
+        FillMeshInstanceProxy(world, meshRefs[i], inout.meshInstances[i]);
+        inout.meshInstanceEntities[i] = meshRefs[i].entity;
+    }
+    return true;
+}
+
+void ExtractSkinnedMeshes(ecs::World& world, SceneRenderData& out, uint32_t frameIndex)
+{
+    out.skinnedMeshes.clear();
+    out.skinnedMeshInstanceEntities.clear();
 
     world.each<SkinnedMeshComponent, MeshInstanceComponent, GlobalTransformComponent>(
         [&](ecs::Entity entity, SkinnedMeshComponent& skinned, MeshInstanceComponent& meshInstance,
@@ -101,7 +142,6 @@ void extractSceneRenderData(SceneEntityWorld& entityWorld, SceneRenderData& out,
             proxy.needsSkinningUpdate =
                 forceUpdate || skinned.lastUpdateFrameIndex + 1 >= frameIndex;
 
-            // clear FORCE on the logic thread so render never writes back into ECS.
             if (forceUpdate)
                 skinned.lastUpdateFrameIndex = frameIndex;
 
@@ -151,6 +191,12 @@ void extractSceneRenderData(SceneEntityWorld& entityWorld, SceneRenderData& out,
             out.skinnedMeshes.push_back(std::move(proxy));
             out.skinnedMeshInstanceEntities.push_back(entity);
         });
+}
+
+void ExtractLightsFull(ecs::World& world, SceneRenderData& out)
+{
+    out.lights.clear();
+    out.lightEntities.clear();
 
     auto extractLight = [&](ecs::Entity entity, dm::float3 color, const std::vector<std::string>& proxies,
                             LightData data, const GlobalTransformComponent& global)
@@ -185,6 +231,38 @@ void extractSceneRenderData(SceneEntityWorld& entityWorld, SceneRenderData& out,
         {
             extractLight(entity, light.color, {}, toLightData(light), global);
         });
+}
+
+bool ExtractLightsTransforms(ecs::World& world, SceneRenderData& inout)
+{
+    // Lights are few; rebuild when the set drifts, otherwise patch transforms/color/data.
+    SceneRenderData rebuilt;
+    ExtractLightsFull(world, rebuilt);
+    if (rebuilt.lights.size() != inout.lights.size())
+    {
+        inout.lights = std::move(rebuilt.lights);
+        inout.lightEntities = std::move(rebuilt.lightEntities);
+        return true;
+    }
+
+    for (size_t i = 0; i < rebuilt.lights.size(); ++i)
+    {
+        if (rebuilt.lights[i].entity != inout.lights[i].entity)
+        {
+            inout.lights = std::move(rebuilt.lights);
+            inout.lightEntities = std::move(rebuilt.lightEntities);
+            return true;
+        }
+        inout.lights[i] = std::move(rebuilt.lights[i]);
+        inout.lightEntities[i] = rebuilt.lightEntities[i];
+    }
+    return true;
+}
+
+void ExtractCameraAndAnimationEntities(SceneEntityWorld& entityWorld, ecs::World& world, SceneRenderData& out)
+{
+    out.cameraEntities.clear();
+    out.animationEntities.clear();
 
     for (ecs::Entity entity : entityWorld.cameraEntitiesInRegistrationOrder())
     {
@@ -195,6 +273,49 @@ void extractSceneRenderData(SceneEntityWorld& entityWorld, SceneRenderData& out,
     world.each<AnimationComponent>([&](ecs::Entity entity, const AnimationComponent&) {
         out.animationEntities.push_back(entity);
     });
+}
+
+} // namespace
+
+void extractSceneRenderData(
+    SceneEntityWorld& entityWorld,
+    SceneRenderData& inout,
+    uint32_t frameIndex,
+    SceneRenderExtractFlags flags)
+{
+    ecs::World& world = entityWorld.world();
+
+    const bool needFull =
+        flags.structureChanged
+        || inout.meshInstances.empty();
+
+    if (needFull)
+    {
+        // Keep session camera/settings; callers preserve them across republish.
+        const CameraSnapshot camera = inout.camera;
+        const RenderSettingsSnapshot renderSettings = inout.renderSettings;
+        inout.clear();
+        inout.camera = camera;
+        inout.renderSettings = renderSettings;
+
+        ExtractMeshInstancesFull(world, inout);
+        ExtractSkinnedMeshes(world, inout, frameIndex);
+        ExtractLightsFull(world, inout);
+        ExtractCameraAndAnimationEntities(entityWorld, world, inout);
+        return;
+    }
+
+    if (flags.transformsChanged)
+    {
+        if (!ExtractMeshInstancesTransforms(world, inout))
+        {
+            ExtractMeshInstancesFull(world, inout);
+        }
+        ExtractLightsTransforms(world, inout);
+    }
+
+    // Skinned joints track animation every frame even when hierarchy is idle.
+    ExtractSkinnedMeshes(world, inout, frameIndex);
 }
 
 } // namespace caustica::scene
@@ -224,7 +345,6 @@ void extractSessionRenderState(const SessionRenderExtractInputs& inputs, SceneRe
     if (inputs.settings)
     {
         out.renderSettings.settings = *inputs.settings;
-        // One-shots are owned by this frame's snapshot; clear live so GT does not re-fire.
         inputs.settings->ResetAccumulation = false;
         inputs.settings->ResetRealtimeCaches = false;
         inputs.settings->NRDModeChanged = false;
@@ -234,7 +354,6 @@ void extractSessionRenderState(const SessionRenderExtractInputs& inputs, SceneRe
     {
         out.renderSettings.invalidation = inputs.runtime->Invalidation;
         out.renderSettings.picking = inputs.runtime->Picking;
-        // Consume delayed reload request into snapshot only (keep live countdown on GT).
     }
 
     out.renderSettings.gaussianSplatTemporalReset = inputs.gaussianSplatTemporalReset;

@@ -60,11 +60,11 @@ void EditorUI::BuildDeltaTreeExplorerPanel(const PanelLayout& layout)
 
 void EditorUI::BuildGameStandalonePanel(const PanelLayout& layout)
 {
-    if ( m_sceneEditor.GetGame() != nullptr && m_sceneEditor.GetGame()->IsInitialized() )
+    if ( m_sceneEditor.game() != nullptr && m_sceneEditor.game()->IsInitialized() )
     {
         const auto view = m_sceneEditor.currentView();
         if (view)
-            m_sceneEditor.GetGame()->StandaloneGUI(view, float2(m_sceneEditor.displaySize()));
+            m_sceneEditor.game()->StandaloneGUI(view, float2(m_sceneEditor.displaySize()));
     }
 
     // ImGui::ShowDemoWindow();

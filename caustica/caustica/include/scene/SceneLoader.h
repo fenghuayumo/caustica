@@ -2,6 +2,7 @@
 
 #include <core/vfs/VFS.h>
 
+#include <atomic>
 #include <filesystem>
 #include <functional>
 #include <memory>
@@ -41,7 +42,7 @@ public:
     void setAsyncEnabled(bool enabled) { m_asyncLoad = enabled; }
 
     // --- State ---
-    bool isLoaded() const { return m_loaded; }
+    bool isLoaded() const { return m_loaded.load(std::memory_order_acquire); }
     bool isLoading() const { return m_thread != nullptr; }
 
     // --- Lifecycle ---
@@ -68,7 +69,8 @@ public:
 private:
     LoadFunc                       m_loadFunc;
     std::unique_ptr<std::thread>    m_thread;
-    bool m_loaded    = false;
+    std::atomic<bool> m_loaded{false};
+    std::atomic<bool> m_loadFinished{false};
     bool m_asyncLoad = true;
 };
 

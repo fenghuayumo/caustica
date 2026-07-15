@@ -32,7 +32,7 @@ namespace caustica::editor
 bool EditorUI::BuildUIScriptsAndEtc(void)
 {
     bool scriptsActive = false;
-    if (m_sceneEditor.GetCaptureScriptManager()->ScriptProgressUI())
+    if (m_sceneEditor.captureScriptManager()->ScriptProgressUI())
         scriptsActive = true;
 
     if (scriptsActive)

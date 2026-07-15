@@ -49,7 +49,7 @@ public:
     const std::shared_ptr<caustica::Scene> &
                             scene() const { return m_scene; }
 
-    double                  GetGameTime() const             { return m_gameTime; }
+    double                  gameTime() const             { return m_gameTime; }
     void                    SetGameTime(double t)           { m_gameTime = t; }
 
     std::shared_ptr<game::ModelType>

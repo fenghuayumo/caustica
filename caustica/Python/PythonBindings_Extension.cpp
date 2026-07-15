@@ -163,11 +163,11 @@ public:
         return m_session->SetCamera(ToFloat3(pos), ToFloat3(dir), ToFloat3(up));
     }
 
-    bool LoadMeshFile(const std::string& fileName) {
+    bool loadMeshFile(const std::string& fileName) {
         if (!m_session || !m_session->GetApp())
             return false;
         if (auto* editor = m_session->GetApp()->tryResource<SceneEditor>())
-            return editor->LoadMeshFile(fileName);
+            return editor->loadMeshFile(fileName);
 
         // Headless / DefaultPlugins sessions have no SceneEditor; load via SceneManager.
         caustica::App& app = *m_session->GetApp();
@@ -194,16 +194,14 @@ public:
             ? m_session->GetEngine()->frameIndex()
             : 0u;
 
-        // attachRuntimeSceneImport publishes immediately; make sure no render
-        // frame is still consuming the snapshot that is about to be replaced.
+        // attach grafts ECS only; snapshot publish waits until GPU buffers exist
+        // inside refreshAfterLoad on the render thread (same as SceneContentEditor).
         app.waitForDedicatedRenderThreadIdle();
         const auto importedRoot = caustica::attachRuntimeSceneImport(
-            scene, *loadResult.ImportResult, frameIndex);
+            scene, *loadResult.ImportResult);
         if (importedRoot == caustica::ecs::NullEntity)
             return false;
 
-        // Same post-import GPU finalize as SceneContentEditor: drain render work,
-        // upload deferred textures before creating PT materials, then refresh meshes.
         app.runGpuWorkOnRenderThread([&app, gpu, scene, frameIndex]() {
             if (auto* device = app.getGpuDevice())
             {
@@ -288,7 +286,7 @@ NB_MODULE(caustica, m)
              nb::arg("file_name"), nb::arg("convert_rdf_to_rub") = true,
              "Append a 3DGS .ply file as a GaussianSplat entity in the current scene.")
 
-        .def("load_mesh_file", &PyRenderer::LoadMeshFile,
+        .def("load_mesh_file", &PyRenderer::loadMeshFile,
              nb::arg("file_name"),
              "Append a mesh file (.gltf, .glb, .obj, .urdf, or .usd/.usda/.usdc/.caususd) to the current scene.")
 

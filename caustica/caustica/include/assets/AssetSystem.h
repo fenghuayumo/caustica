@@ -48,6 +48,8 @@ public:
     const AssetStore<MaterialAsset>& materials() const { return m_Materials; }
     AssetStore<SceneAsset>& scenes() { return m_Scenes; }
     const AssetStore<SceneAsset>& scenes() const { return m_Scenes; }
+    AssetStore<ScenePrefabAsset>& prefabs() { return m_Prefabs; }
+    const AssetStore<ScenePrefabAsset>& prefabs() const { return m_Prefabs; }
     DependencyGraph& dependencies() { return m_Dependencies; }
     const DependencyGraph& dependencies() const { return m_Dependencies; }
     HotReloadTracker& hotReload() { return m_HotReload; }
@@ -109,6 +111,11 @@ public:
         const std::shared_ptr<Scene>& scene,
         const std::filesystem::path& sourcePath,
         const std::string& name = {});
+    Handle<ScenePrefabAsset> registerScenePrefab(
+        const std::shared_ptr<SceneImportResult>& importResult,
+        const std::filesystem::path& sourcePath,
+        const std::string& name = {});
+    [[nodiscard]] Handle<ScenePrefabAsset> findScenePrefab(const std::filesystem::path& sourcePath) const;
     void clearSceneAssets();
 
     void addDependency(AssetId asset, AssetId dependency);
@@ -123,6 +130,7 @@ private:
     AssetStore<MeshAsset> m_Meshes;
     AssetStore<MaterialAsset> m_Materials;
     AssetStore<SceneAsset> m_Scenes;
+    AssetStore<ScenePrefabAsset> m_Prefabs;
     DependencyGraph m_Dependencies;
     HotReloadTracker m_HotReload;
     ArtifactCache m_ArtifactCache;

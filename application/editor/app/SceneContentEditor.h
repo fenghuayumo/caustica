@@ -4,8 +4,6 @@
 #include <rhi/nvrhi.h>
 #include <ecs/Entity.h>
 
-#include <assets/RuntimeMeshLoadTypes.h>
-
 #include <filesystem>
 #include <memory>
 
@@ -30,7 +28,7 @@ public:
     bool loadMeshFile(const std::filesystem::path& filePath);
     bool loadGltfMeshFile(const std::filesystem::path& filePath);
     bool loadObjMeshFile(const std::filesystem::path& filePath);
-    void finalizeRuntimeSceneMutation(caustica::ecs::Entity importedRoot);
+    void syncSceneGpu();
     bool deleteSceneNode(caustica::ecs::Entity entity);
     void requestFullRebuild();
 
@@ -51,8 +49,7 @@ public:
         bool rebuildAccelerationStructure = true);
 
 private:
-    bool importMeshFile(const std::filesystem::path& filePath,
-        caustica::RuntimeMeshLoadResult (*loadFile)(const caustica::RuntimeMeshLoadParams&, const std::filesystem::path&));
+    bool importMeshFile(const std::filesystem::path& filePath);
 
     SceneEditor& m_sceneEditor;
 };

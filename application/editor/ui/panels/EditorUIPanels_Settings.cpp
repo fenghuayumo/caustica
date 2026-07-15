@@ -56,7 +56,7 @@ void EditorUI::BuildSystemPanel(const PanelLayout& layout)
                 {
                     RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
 
-                    m_sceneEditor.GetCaptureScriptManager()->ScriptMainUI(warnColor, categoryColor, layout.indent, m_currentScale);
+                    m_sceneEditor.captureScriptManager()->ScriptMainUI(warnColor, categoryColor, layout.indent, m_currentScale);
                 }
 
 #if CAUSTICA_WITH_PYTHON
@@ -153,7 +153,7 @@ void EditorUI::BuildCameraPanel(const PanelLayout& layout)
 
 void EditorUI::BuildPythonScriptingUI(float indent)
 {
-    auto& scripting = m_sceneEditor.GetPythonScripting();
+    auto& scripting = m_sceneEditor.pythonScripting();
     if (!scripting)
     {
         ImGui::TextDisabled("Python scripting host unavailable.");

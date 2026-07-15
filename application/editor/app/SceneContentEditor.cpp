@@ -4,19 +4,16 @@
 #include "common/LocalConfig.h"
 #include <EditorUI.h>
 
-#include <assets/RuntimeMeshLoadTypes.h>
 #include <core/log.h>
 #include <engine/App.h>
+#include <engine/SceneSessionSystems.h>
 #include <render/SceneGaussianSplatPasses.h>
 #include <render/SceneLightingPasses.h>
 #include <render/SceneRayTracingResources.h>
-#include <render/core/RenderSceneTypeFactory.h>
-#include <render/core/SceneGpuUpdater.h>
 #include <render/core/SceneMeshEditing.h>
+#include <scene/SceneApply.h>
 #include <scene/SceneEcs.h>
 #include <scene/SceneManager.h>
-#include <scene/SceneRuntimeMutation.h>
-#include <scene/loader/RuntimeMeshLoader.h>
 
 #include <algorithm>
 #include <cctype>
@@ -26,42 +23,14 @@ namespace caustica::editor
 
 namespace
 {
-    constexpr const char* c_InlineSceneSentinel = "__CAUSTICA_INLINE_SCENE_JSON__";
-
-    std::filesystem::path RuntimeMeshTextureSearchDirectory(const std::filesystem::path& currentScenePath)
+    caustica::SceneApplyCallbacks makeApplyCallbacks()
     {
-        if (currentScenePath.empty() || currentScenePath == std::filesystem::path(c_InlineSceneSentinel))
-            return {};
-
-        return currentScenePath.parent_path();
-    }
-
-    caustica::RuntimeSceneMutationCallbacks MakeMutationCallbacks()
-    {
-        return caustica::RuntimeSceneMutationCallbacks{
-            .PostMaterialLoad = [](caustica::Material& material) { LocalConfig::PostMaterialLoad(material); },
+        return caustica::SceneApplyCallbacks{
+            .postMaterialLoad = [](caustica::Material& material) { LocalConfig::postMaterialLoad(material); },
         };
     }
 
-    caustica::RuntimeMeshLoadParams MakeRuntimeMeshLoadParams(
-        SceneManager* sceneManager,
-        caustica::TextureLoader* textureLoader,
-        const std::filesystem::path& meshFilePath)
-    {
-        // Prefer the imported mesh directory so relative texture URIs resolve next to the
-        // .gltf/.obj, not against the currently open scene JSON folder.
-        std::filesystem::path textureSearchDirectory = meshFilePath.parent_path();
-        if (textureSearchDirectory.empty() && sceneManager)
-            textureSearchDirectory = RuntimeMeshTextureSearchDirectory(sceneManager->getCurrentScenePath());
-
-        return caustica::RuntimeMeshLoadParams{
-            .TextureCache = textureLoader,
-            .SceneTypes = std::make_shared<caustica::render::RenderSceneTypeFactory>(),
-            .TextureSearchDirectory = std::move(textureSearchDirectory),
-        };
-    }
-
-    caustica::SetSceneMeshVerticesParams MakeMeshEditParams(SceneEditor& sceneEditor)
+    caustica::SetSceneMeshVerticesParams makeMeshEditParams(SceneEditor& sceneEditor)
     {
         return caustica::SetSceneMeshVerticesParams{
             .device = sceneEditor.device(),
@@ -84,6 +53,12 @@ void SceneContentEditor::handleDroppedFiles(std::vector<std::string>& pendingFil
 {
     if (pendingFiles.empty())
         return;
+
+    if (auto* sceneManager = m_sceneEditor.sceneManager();
+        sceneManager && sceneManager->isSceneStructureBusy())
+    {
+        return;
+    }
 
     auto files = std::move(pendingFiles);
     pendingFiles.clear();
@@ -122,112 +97,36 @@ void SceneContentEditor::handleDroppedFiles(std::vector<std::string>& pendingFil
     }
 }
 
-bool SceneContentEditor::importMeshFile(const std::filesystem::path& filePath,
-    caustica::RuntimeMeshLoadResult (*loadFile)(const caustica::RuntimeMeshLoadParams&, const std::filesystem::path&))
+bool SceneContentEditor::importMeshFile(const std::filesystem::path& filePath)
 {
-    auto* sceneManager = m_sceneEditor.sceneManager();
-    auto* gpuRender = m_sceneEditor.gpuRender();
-    if (!sceneManager || !gpuRender)
+    auto* app = m_sceneEditor.app();
+    if (!app)
         return false;
 
-    auto textureLoader = gpuRender->textureLoader();
-    if (!textureLoader)
-        return false;
-
-    const auto loadResult = loadFile(
-        MakeRuntimeMeshLoadParams(sceneManager, textureLoader.get(), filePath),
-        filePath);
-    if (!loadResult)
-        return false;
-
-    // Do not publish a snapshot containing the imported entities while the
-    // dedicated render thread can still be consuming the previous frame.
-    m_sceneEditor.gpuDevice().waitForRenderThreadIdle();
-
-    const auto importedRoot = caustica::attachRuntimeSceneImport(
-        sceneManager->getScene(),
-        *loadResult.ImportResult,
-        m_sceneEditor.frameIndex(),
-        MakeMutationCallbacks());
-    if (importedRoot == caustica::ecs::NullEntity)
-        return false;
-
-    finalizeRuntimeSceneMutation(caustica::ecs::NullEntity);
-    return true;
+    // assets.load + spawn ??one path for editor and future apps.
+    const auto root = caustica::sceneSession::spawnFromFile(*app, filePath, makeApplyCallbacks());
+    return root != caustica::ecs::NullEntity;
 }
 
 bool SceneContentEditor::loadMeshFile(const std::filesystem::path& filePath)
 {
-    return importMeshFile(filePath, caustica::loadRuntimeMeshFile);
+    return importMeshFile(filePath);
 }
 
 bool SceneContentEditor::loadGltfMeshFile(const std::filesystem::path& filePath)
 {
-    return importMeshFile(filePath, caustica::loadRuntimeGltfMeshFile);
+    return importMeshFile(filePath);
 }
 
 bool SceneContentEditor::loadObjMeshFile(const std::filesystem::path& filePath)
 {
-    return importMeshFile(filePath, caustica::loadRuntimeObjMeshFile);
+    return importMeshFile(filePath);
 }
 
-void SceneContentEditor::finalizeRuntimeSceneMutation(caustica::ecs::Entity importedRoot)
+void SceneContentEditor::syncSceneGpu()
 {
-    auto* sceneManager = m_sceneEditor.sceneManager();
-    if (!sceneManager)
-        return;
-
-    if (importedRoot != caustica::ecs::NullEntity)
-    {
-        m_sceneEditor.gpuDevice().waitForRenderThreadIdle();
-        caustica::finalizeRuntimeSceneMutation(
-            sceneManager->getScene(),
-            importedRoot,
-            m_sceneEditor.frameIndex(),
-            MakeMutationCallbacks());
-    }
-
-    auto scene = sceneManager->getScene();
-    auto* gpuRender = m_sceneEditor.gpuRender();
-    if (!scene || !gpuRender)
-        return;
-
-    const uint32_t frameIndex = m_sceneEditor.frameIndex();
-    const auto gpuFinalize = [this, scene, gpuRender, frameIndex]() {
-        if (nvrhi::IDevice* device = m_sceneEditor.device())
-            device->waitForIdle();
-
-        // Importers queue textures as deferred (CPU-only). Full scene load flushes
-        // them in onSceneLoadedGpuPrep; runtime drag-drop must do the same before
-        // ensureMaterialsFromScene / importFromEngineMaterial, otherwise bindless
-        // indices stay invalid and meshes render as white base-color only.
-        if (auto textureLoader = gpuRender->textureLoader())
-        {
-            textureLoader->processRenderingThreadCommands(gpuRender->renderDevice(), 0.f);
-            textureLoader->loadingFinished();
-        }
-
-        // Runtime import must not wipe existing PT materials (that leaves a
-        // window where SubInstanceData points at cleared material slots, and
-        // with 3DGS present the instance-index remap can stick on wrong colors).
-        m_sceneEditor.lightingPasses().ensureMaterialsFromScene(scene);
-
-        // recreateAccelStructs runs before updateSceneGeometry in the render frame.
-        // Without uploading vertex/index buffers first, createBlases skips new meshes
-        // (empty BLAS desc) and buildTlas drops null BLAS — imported geometry never
-        // appears until a later accidental rebuild. Same precondition as full scene load.
-        caustica::render::SceneGpuUpdater::refreshAfterLoad(*scene, frameIndex);
-    };
-
     if (auto* app = m_sceneEditor.app())
-        app->runGpuWorkOnRenderThread(gpuFinalize);
-    else
-        gpuFinalize();
-
-    // AS rebuild only — requestFullRebuild also forces shader reload +
-    // createRenderPassesAndLoadMaterials, which rebuilds hit groups from a
-    // pre-sync snapshot and permanently mis-maps materials when 3DGS is present.
-    gpuRender->rayTracingResources().requestAccelerationStructureRebuild();
+        caustica::sceneSession::syncSceneGpu(*app);
 }
 
 bool SceneContentEditor::deleteSceneNode(caustica::ecs::Entity entity)
@@ -237,16 +136,29 @@ bool SceneContentEditor::deleteSceneNode(caustica::ecs::Entity entity)
     if (!sceneManager || !gpuRender)
         return false;
 
+    if (!sceneManager->tryBeginStructureEdit())
+        return false;
+
+    struct StructureEditGuard
+    {
+        SceneManager* manager = nullptr;
+        ~StructureEditGuard()
+        {
+            if (manager)
+                manager->endStructureEdit();
+        }
+    } structureGuard{ sceneManager };
+
     auto scene = sceneManager->getScene();
     auto* ew = scene ? scene->getEntityWorld() : nullptr;
     if (!ew || !ew->world().isAlive(entity))
         return false;
 
-    if (!caustica::deleteRuntimeSceneNode(caustica::DeleteRuntimeSceneNodeParams{
-            .SceneInstance = scene,
-            .Entity = entity,
-            .FrameIndex = m_sceneEditor.frameIndex(),
-            .BeforeDetach = [gpuRender](caustica::ecs::Entity deletedEntity) {
+    if (!caustica::destroySceneEntity(caustica::DestroySceneEntityParams{
+            .scene = scene,
+            .entity = entity,
+            .frameIndex = m_sceneEditor.frameIndex(),
+            .beforeDetach = [gpuRender](caustica::ecs::Entity deletedEntity) {
                 gpuRender->gaussianSplatPasses().removeObjectsUnderEntity(deletedEntity);
             },
         }))
@@ -256,14 +168,13 @@ bool SceneContentEditor::deleteSceneNode(caustica::ecs::Entity entity)
 
     m_sceneEditor.lightingPasses().resyncLightsFromScene(*scene);
 
-    auto& editor = m_sceneEditor.GetEditorUIState();
+    auto& editor = m_sceneEditor.editorUIState();
     if (editor.TogglableNodes != nullptr)
     {
         editor.TogglableNodes->clear();
         UpdateTogglableNodes(*editor.TogglableNodes, *ew, ew->root());
     }
 
-    // Selection / PendingDeleteEntity are cleared by the UI deferral and ProcessPending.
     gpuRender->rayTracingResources().requestAccelerationStructureRebuild();
     return true;
 }
@@ -294,7 +205,7 @@ void SceneContentEditor::setMeshVerticesWorld(const std::shared_ptr<caustica::Me
     bool recomputeNormals,
     bool rebuildAccelerationStructure)
 {
-    auto params = MakeMeshEditParams(m_sceneEditor);
+    auto params = makeMeshEditParams(m_sceneEditor);
     params.recomputeNormals = recomputeNormals;
     params.rebuildAccelerationStructure = rebuildAccelerationStructure;
     caustica::setMeshVerticesWorld(mesh, vertices, params);
@@ -305,7 +216,7 @@ void SceneContentEditor::setMeshVerticesWorld(caustica::ecs::Entity entity,
     bool recomputeNormals,
     bool rebuildAccelerationStructure)
 {
-    auto params = MakeMeshEditParams(m_sceneEditor);
+    auto params = makeMeshEditParams(m_sceneEditor);
     params.recomputeNormals = recomputeNormals;
     params.rebuildAccelerationStructure = rebuildAccelerationStructure;
     caustica::setMeshVerticesWorld(entity, vertices, params);
@@ -316,7 +227,7 @@ void SceneContentEditor::setMeshVertices(const std::shared_ptr<caustica::MeshInf
     bool recomputeNormals,
     bool rebuildAccelerationStructure)
 {
-    auto params = MakeMeshEditParams(m_sceneEditor);
+    auto params = makeMeshEditParams(m_sceneEditor);
     params.recomputeNormals = recomputeNormals;
     params.rebuildAccelerationStructure = rebuildAccelerationStructure;
     caustica::setMeshVertices(mesh, vertices, params);

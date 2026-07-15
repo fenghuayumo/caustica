@@ -95,12 +95,12 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
                 m_settings.ResetAccumulation = true;
             }
 
-            if (m_sceneEditor.GetGame() && m_sceneEditor.GetGame()->IsInitialized())
+            if (m_sceneEditor.game() && m_sceneEditor.game()->IsInitialized())
             {
                 if (ImGui::CollapsingHeader("Interactive elements"/*, ImGuiTreeNodeFlags_DefaultOpen*/))
                 {
                     RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
-                    m_sceneEditor.GetGame()->debugGUI(layout.indent);
+                    m_sceneEditor.game()->debugGUI(layout.indent);
                 }
             }
 
@@ -281,12 +281,12 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
 
 void EditorUI::BuildSampleGamePanel(const PanelLayout& layout)
 {
-        if (m_sceneEditor.GetGame() && m_sceneEditor.GetGame()->IsInitialized())
+        if (m_sceneEditor.game() && m_sceneEditor.game()->IsInitialized())
         {
             if (ImGui::CollapsingHeader("Sample Game"/*, ImGuiTreeNodeFlags_DefaultOpen*/))
             {
                 RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
-                m_sceneEditor.GetGame()->debugGUI(layout.indent);
+                m_sceneEditor.game()->debugGUI(layout.indent);
             }
         }
 

@@ -4,8 +4,12 @@
 #include <iterator>
 #include <mutex>
 #include <utility>
+#include <string>
 #if _WIN32
 #include <Windows.h>
+#include <iostream>
+#include <io.h>
+#include <fcntl.h>
 #endif
 
 namespace caustica
@@ -130,6 +134,82 @@ namespace caustica
         g_OutputToDebug = true;
         g_OutputToMessageBox = false;
     }
+
+#if _WIN32
+    namespace
+    {
+        HWND g_NativeConsoleHwnd = nullptr;
+        bool g_NativeConsoleVisible = false;
+        bool g_NativeConsoleInitialized = false;
+
+        void RedirectStdioToConsole()
+        {
+            FILE* unused = nullptr;
+            freopen_s(&unused, "CONOUT$", "w", stdout);
+            freopen_s(&unused, "CONOUT$", "w", stderr);
+            freopen_s(&unused, "CONIN$", "r", stdin);
+            setvbuf(stdout, nullptr, _IONBF, 0);
+            setvbuf(stderr, nullptr, _IONBF, 0);
+            std::ios::sync_with_stdio(true);
+        }
+    }
+
+    void initNativeConsole(bool visibleByDefault)
+    {
+        if (g_NativeConsoleInitialized)
+        {
+            setNativeConsoleVisible(visibleByDefault);
+            return;
+        }
+
+        // Prefer attaching to a parent console (launched from cmd); else allocate one.
+        if (!AttachConsole(ATTACH_PARENT_PROCESS))
+            AllocConsole();
+
+        g_NativeConsoleHwnd = GetConsoleWindow();
+        if (!g_NativeConsoleHwnd)
+            return;
+
+        SetConsoleTitleW(L"caustica console");
+        SetConsoleOutputCP(CP_UTF8);
+        SetConsoleCP(CP_UTF8);
+        RedirectStdioToConsole();
+
+        g_NativeConsoleInitialized = true;
+        g_OutputToConsole = true;
+        setNativeConsoleVisible(visibleByDefault);
+
+        info("Native console ready (F1 toggles visibility)");
+    }
+
+    void setNativeConsoleVisible(bool visible)
+    {
+        if (!g_NativeConsoleHwnd)
+            g_NativeConsoleHwnd = GetConsoleWindow();
+        if (!g_NativeConsoleHwnd)
+            return;
+
+        ShowWindow(g_NativeConsoleHwnd, visible ? SW_SHOW : SW_HIDE);
+        g_NativeConsoleVisible = visible;
+    }
+
+    bool isNativeConsoleVisible()
+    {
+        return g_NativeConsoleVisible;
+    }
+
+    bool toggleNativeConsoleVisible()
+    {
+        const bool next = !g_NativeConsoleVisible;
+        setNativeConsoleVisible(next);
+        return next;
+    }
+#else
+    void initNativeConsole(bool) {}
+    void setNativeConsoleVisible(bool) {}
+    bool isNativeConsoleVisible() { return true; }
+    bool toggleNativeConsoleVisible() { return true; }
+#endif
 
     void message(Severity severity, const char* fmt...)
     {

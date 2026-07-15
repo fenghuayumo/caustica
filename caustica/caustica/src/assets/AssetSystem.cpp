@@ -46,6 +46,7 @@ void AssetSystem::shutdown()
     m_HotReload.clear();
     m_Dependencies.clear();
     m_Scenes.clear();
+    m_Prefabs.clear();
     m_Materials.clear();
     m_Meshes.clear();
     m_Images.clear();
@@ -186,11 +187,51 @@ Handle<SceneAsset> AssetSystem::registerSceneAsset(
     return m_Scenes.insert(id, std::move(asset));
 }
 
+Handle<ScenePrefabAsset> AssetSystem::registerScenePrefab(
+    const std::shared_ptr<SceneImportResult>& importResult,
+    const std::filesystem::path& sourcePath,
+    const std::string& name)
+{
+    if (!importResult)
+        return {};
+
+    if (Handle<ScenePrefabAsset> existing = findScenePrefab(sourcePath))
+        return existing;
+
+    const std::filesystem::path assetPath = sourcePath.empty()
+        ? MakeTypedAssetPath({}, "prefab", name, importResult.get())
+        : sourcePath;
+    AssetId id = m_Registry.registerAsset(assetPath, AssetType::Prefab);
+
+    auto asset = std::make_shared<ScenePrefabAsset>();
+    asset->id = id;
+    asset->name = name.empty() ? assetPath.stem().string() : name;
+    asset->sourcePath = sourcePath;
+    asset->import = importResult;
+
+    if (!sourcePath.empty() && std::filesystem::exists(sourcePath))
+        m_HotReload.watch(id, sourcePath);
+
+    m_Registry.setState(id, AssetState::Loaded);
+    return m_Prefabs.insert(id, std::move(asset));
+}
+
+Handle<ScenePrefabAsset> AssetSystem::findScenePrefab(const std::filesystem::path& sourcePath) const
+{
+    if (sourcePath.empty())
+        return {};
+    const AssetId id = m_Registry.findByPath(sourcePath);
+    if (!id)
+        return {};
+    return m_Prefabs.handle(id);
+}
+
 void AssetSystem::clearSceneAssets()
 {
     m_HotReload.clear();
     m_Dependencies.clear();
     m_Scenes.clear();
+    m_Prefabs.clear();
     m_Materials.clear();
     m_Meshes.clear();
 }

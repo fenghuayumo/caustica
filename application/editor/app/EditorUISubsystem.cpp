@@ -70,7 +70,7 @@ void EditorUISubsystem::renderSceneScheduled(caustica::GpuDevice& gpuDevice)
         return;
 
     nvrhi::IFramebuffer* framebuffer = gpuDevice.getCurrentFramebuffer(m_ui->supportsDepthBuffer());
-    if (ZoomTool* zoom = m_config.sceneEditor.GetOrCreateZoomTool())
+    if (ZoomTool* zoom = m_config.sceneEditor.getOrCreateZoomTool())
     {
         if (zoom->enabled())
         {

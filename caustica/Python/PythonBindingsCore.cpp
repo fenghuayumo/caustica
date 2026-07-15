@@ -1726,7 +1726,7 @@ void RegisterCoreBindings(nb::module_& m)
         "Editor-only Sample extensions (mesh import and vertex deformation).")
         .def("load_mesh_file", [](SceneEditor& self, const std::string& fileName)
             {
-                return self.LoadMeshFile(fileName);
+                return self.loadMeshFile(fileName);
             },
             nb::arg("file_name"),
             "Append a mesh file (.gltf, .glb, or .obj) to the current scene.")

@@ -55,6 +55,10 @@ namespace caustica
         std::shared_ptr<IDescriptorTableManager> m_DescriptorTable;
         std::unique_ptr<scene::SceneEntityWorld> m_EntityWorld;
         scene::SceneRenderSnapshot m_RenderSnapshot;
+        // Logic-thread extract cache (Bevy Extract / UE proxy sync). Triple-buffer slots
+        // receive a copy each publish so incremental extract does not depend on slot reuse.
+        scene::SceneRenderData m_LogicExtractCache;
+        bool m_LogicExtractCacheValid = false;
         scene::SceneRenderCommandQueue m_RenderCommands;
         std::shared_ptr<GltfImporter> m_GltfImporter;
         std::shared_ptr<ObjImporter> m_ObjImporter;

@@ -1,46 +1,42 @@
 #pragma once
 
-#include <ecs/Entity.h>
-
-#include <cstdint>
-#include <functional>
-#include <memory>
+// Compatibility aliases for older call sites. Prefer SceneApply.h.
+#include <scene/SceneApply.h>
 
 namespace caustica
 {
 
-class Scene;
-struct Material;
-struct SceneImportResult;
+using RuntimeSceneMutationCallbacks = SceneApplyCallbacks;
+using DeleteRuntimeSceneNodeParams = DestroySceneEntityParams;
 
-namespace scene { class SceneEntityWorld; }
-
-struct RuntimeSceneMutationCallbacks
-{
-    std::function<void(Material&)> PostMaterialLoad;
-};
-
-struct DeleteRuntimeSceneNodeParams
-{
-    std::shared_ptr<Scene> SceneInstance;
-    ecs::Entity Entity = ecs::NullEntity;
-    uint32_t FrameIndex = 0;
-    // Caller must drain render thread / GPU before invoking delete.
-    std::function<void(ecs::Entity)> BeforeDetach;
-};
-
-ecs::Entity attachRuntimeSceneImport(
+inline ecs::Entity attachRuntimeSceneImport(
     const std::shared_ptr<Scene>& scene,
     const SceneImportResult& importResult,
-    uint32_t frameIndex,
-    const RuntimeSceneMutationCallbacks& callbacks = {});
+    const RuntimeSceneMutationCallbacks& callbacks = {})
+{
+    return attachImportedScene(scene, importResult, callbacks);
+}
 
-void finalizeRuntimeSceneMutation(
+inline void finalizeRuntimeSceneMutation(
     const std::shared_ptr<Scene>& scene,
     ecs::Entity importedRoot,
     uint32_t frameIndex,
-    const RuntimeSceneMutationCallbacks& callbacks = {});
+    const RuntimeSceneMutationCallbacks& callbacks = {})
+{
+    publishSceneRenderProxies(scene, importedRoot, frameIndex, callbacks);
+}
 
-bool deleteRuntimeSceneNode(const DeleteRuntimeSceneNodeParams& params);
+inline void applyRuntimeSceneMaterialCallbacks(
+    const std::shared_ptr<Scene>& scene,
+    ecs::Entity importedRoot,
+    const RuntimeSceneMutationCallbacks& callbacks)
+{
+    applyImportedSceneMaterialCallbacks(scene, importedRoot, callbacks);
+}
+
+inline bool deleteRuntimeSceneNode(const DeleteRuntimeSceneNodeParams& params)
+{
+    return destroySceneEntity(params);
+}
 
 } // namespace caustica
