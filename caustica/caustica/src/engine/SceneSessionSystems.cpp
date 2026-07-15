@@ -486,18 +486,9 @@ void initializeSession(App& app, const std::string& preferredScene)
     }
 
     PathTracerSettings* cfg = settings(app);
-    const CommandLineOptions* cmd = cmdLine(app);
-    assert(cfg && cmd);
+    assert(cfg);
 
     cfg->EnableGaussianSplats = true;
-    cfg->GaussianSplatDepthTest = cmd->GaussianSplatDepthTest;
-    cfg->GaussianSplatScale = cmd->GaussianSplatScale;
-    cfg->GaussianSplatAlphaScale = cmd->GaussianSplatAlphaScale;
-    cfg->GaussianSplatBrightness = cmd->GaussianSplatBrightness;
-    cfg->GaussianSplatAsEmitter = cmd->GaussianSplatAsEmitter;
-    cfg->GaussianSplatEmissionIntensity = cmd->GaussianSplatEmissionIntensity;
-    cfg->GaussianSplatEmissionMaxProxyCount = cmd->GaussianSplatEmissionMaxProxyCount;
-    cfg->GaussianSplatAlphaCullThreshold = cmd->GaussianSplatAlphaCullThreshold;
 
     GpuDevice* device = gpuDevice(app);
     if (device && device->getDevice()->queryFeatureSupport(nvrhi::Feature::RayTracingOpacityMicromap))
@@ -634,7 +625,6 @@ void flushPendingStructureGpu(App& app)
         }
 
         gr->lightingPasses().ensureMaterialsFromScene(scenePtr);
-        gr->lightingPasses().resyncLightsFromScene(*scenePtr);
         render::SceneGpuUpdater::refreshAfterLoad(*scenePtr, frameIndex);
 
         // Rebuild BLAS/TLAS immediately while exclusive. Leaving this to the next

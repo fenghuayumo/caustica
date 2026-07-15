@@ -6,37 +6,11 @@
 #include <render/passes/omm/OpacityMicromapBuilder.h>
 #include <scene/scene_utils.h>
 #include <scene/Scene.h>
-#include <scene/SceneEcs.h>
 #include <scene/SceneLightAccess.h>
-#include <shaders/light_cb.h>
-
-#include <math/math.h>
+#include <scene/SceneRenderData.h>
 
 namespace caustica::render
 {
-
-namespace
-{
-
-void collectLiveLightEntities(caustica::Scene& scene, std::vector<ecs::Entity>& out)
-{
-    out.clear();
-    scene::SceneEntityWorld* entityWorld = scene.getEntityWorld();
-    if (!entityWorld)
-        return;
-
-    auto& world = entityWorld->world();
-    world.each<scene::DirectionalLightComponent>(
-        [&](ecs::Entity entity, const scene::DirectionalLightComponent&) { out.push_back(entity); });
-    world.each<scene::SpotLightComponent>(
-        [&](ecs::Entity entity, const scene::SpotLightComponent&) { out.push_back(entity); });
-    world.each<scene::PointLightComponent>(
-        [&](ecs::Entity entity, const scene::PointLightComponent&) { out.push_back(entity); });
-    world.each<scene::EnvironmentLightComponent>(
-        [&](ecs::Entity entity, const scene::EnvironmentLightComponent&) { out.push_back(entity); });
-}
-
-} // namespace
 
 void SceneLightingPasses::refreshEnvironmentMapMediaList(const std::filesystem::path& assetsFolder,
     const std::filesystem::path& currentScenePath)
@@ -67,7 +41,6 @@ void SceneLightingPasses::createOpacityMapsIfSupported(nvrhi::IDevice* device,
 
 void SceneLightingPasses::sceneUnloading()
 {
-    m_lightEntities.clear();
     m_environment = nullptr;
     m_lightSampling = nullptr;
     m_materials = nullptr;
@@ -78,56 +51,19 @@ void SceneLightingPasses::sceneUnloading()
 
 void SceneLightingPasses::onSceneLoaded(caustica::Scene& scene, PathTracerSettings& settings)
 {
-    // Game-thread only: walk live ECS (snapshot may not be published yet during load).
-    collectLiveLightEntities(scene, m_lightEntities);
-
-    scene::SceneEntityWorld* entityWorld = scene.getEntityWorld();
-    ecs::Entity envEntity = ecs::NullEntity;
-    m_envMapLocalPath = "";
-    if (entityWorld)
+    // Prefer published light proxies (refreshAfterLoad publishes before this runs).
+    m_envMapLocalPath.clear();
+    for (const scene::LightRenderProxy& light : scene.getRenderData().lights)
     {
-        envEntity = scene::findEnvironmentLightEntity(entityWorld->world(), m_lightEntities);
-        if (ecs::isValid(envEntity))
+        if (const scene::EnvironmentLightData* env = scene::tryGetEnvironmentLightData(light.data))
         {
-            if (const auto* light = scene::tryGetEnvironmentLight(entityWorld->world(), envEntity))
-                m_envMapLocalPath = scene::getEnvironmentLightPath(*light);
+            m_envMapLocalPath = env->path;
+            break;
         }
     }
+
     settings.EnvironmentMapParams = EnvironmentMapRuntimeParameters();
     m_envMapOverride = c_EnvMapSceneDefault;
-
-    if (entityWorld)
-    {
-        auto& world = entityWorld->world();
-        for (int i = static_cast<int>(m_lightEntities.size()) - 1; i >= 0; --i)
-        {
-            const auto* global = world.tryGet<scene::GlobalTransformComponent>(m_lightEntities[i]);
-            if (!global)
-                continue;
-
-            LightConstants lc;
-            if (!scene::tryFillLightConstants(world, m_lightEntities[i], global->transform, lc))
-                continue;
-            if (length(lc.color * lc.intensity) <= 1e-7f)
-                m_lightEntities.erase(m_lightEntities.begin() + i);
-        }
-    }
-
-    if (m_envMapLocalPath != "")
-    {
-        if (!ecs::isValid(envEntity))
-        {
-            scene::EnvironmentLightComponent component;
-            component.path = m_envMapLocalPath;
-            scene.attachEnvironmentLightToRoot(std::move(component), "Environment");
-            collectLiveLightEntities(scene, m_lightEntities);
-        }
-    }
-}
-
-void SceneLightingPasses::resyncLightsFromScene(caustica::Scene& scene)
-{
-    collectLiveLightEntities(scene, m_lightEntities);
 }
 
 void SceneLightingPasses::notifySceneReloaded(caustica::Scene& scene)

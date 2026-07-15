@@ -73,15 +73,11 @@ void SceneGaussianSplatPasses::sceneUnloading()
     m_objects.clear();
 }
 
-void SceneGaussianSplatPasses::onSceneLoaded(const CommandLineOptions& cmdLine)
+void SceneGaussianSplatPasses::onSceneLoaded()
 {
+    // Runtime splat knobs live on PathTracerSettings (UI / defaults).
+    // Attach PLY via drag-drop, scene entities, or loadFromFile — not cmdline.
     loadFromSceneEntities();
-
-    if (!m_initialCmdLineSplatAttached && !cmdLine.GaussianSplatFileName.empty())
-    {
-        m_initialCmdLineSplatAttached = true;
-        (void)attachToScene(cmdLine.GaussianSplatFileName, cmdLine.GaussianSplatConvertRdfToRub);
-    }
 }
 
 bool SceneGaussianSplatPasses::loadFromFile(const std::filesystem::path& fileName, bool convertRdfToRub)

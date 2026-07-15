@@ -206,6 +206,19 @@ void GpuRenderSubsystem::onSceneLoadedBegin()
 
     m_settings->ToneMappingParams.exposureCompensation = 2.0f;
     m_settings->ToneMappingParams.exposureValue = 0.0f;
+
+    // Logic-thread hierarchy snapshot before RT exclusive GPU upload.
+    if (m_sceneManager)
+    {
+        if (auto scene = m_sceneManager->getScene())
+        {
+            if (auto* entityWorld = scene->getEntityWorld())
+            {
+                entityWorld->refreshHierarchy(scene::PreviousTransformPolicy::CaptureCurrent);
+                entityWorld->syncPreviousTransformsFromCurrent();
+            }
+        }
+    }
 }
 
 void GpuRenderSubsystem::onSceneLoadedGpuPrep()
@@ -223,11 +236,6 @@ void GpuRenderSubsystem::onSceneLoadedGpuPrep()
     {
         if (auto scene = m_sceneManager->getScene())
         {
-            if (auto* entityWorld = scene->getEntityWorld())
-            {
-                entityWorld->refreshHierarchy(scene::PreviousTransformPolicy::CaptureCurrent);
-                entityWorld->syncPreviousTransformsFromCurrent();
-            }
             render::SceneGpuUpdater::refreshAfterLoad(*scene, 0);
             m_scenePasses.lighting.notifySceneReloaded(*scene);
             registerLoadedSceneAssets();
@@ -245,7 +253,7 @@ void GpuRenderSubsystem::onSceneLoadedGpuFinish()
         return;
 
     if (m_cmdLine)
-        m_scenePasses.gaussianSplats.onSceneLoaded(*m_cmdLine);
+        m_scenePasses.gaussianSplats.onSceneLoaded();
 
     m_scenePasses.lighting.onSceneLoaded(*scene, *m_settings);
 

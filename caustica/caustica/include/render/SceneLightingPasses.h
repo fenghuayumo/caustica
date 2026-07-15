@@ -1,5 +1,7 @@
 #pragma once
 
+#include <assets/loader/ShaderMacro.h>
+#include <render/core/PathTracerSettings.h>
 #include <render/passes/lighting/distant/EnvMapProcessor.h>
 #include <render/passes/lighting/LightSamplingCache.h>
 #include <render/passes/lighting/MaterialGpuCache.h>
@@ -7,9 +9,7 @@
 #include <shaders/PathTracer/Lighting/EnvMap.hlsli>
 
 #include <assets/loader/TextureLoader.h>
-#include <ecs/Entity.h>
 #include <render/core/DescriptorTableManager.h>
-#include <render/core/PathTracerSettings.h>
 #include <scene/SceneManager.h>
 
 #include <filesystem>
@@ -44,9 +44,6 @@ public:
     std::shared_ptr<ComputePipelineRegistry>& computePipelines() { return m_computePipelines; }
     const std::shared_ptr<ComputePipelineRegistry>& computePipelines() const { return m_computePipelines; }
 
-    std::vector<ecs::Entity>& lightEntities() { return m_lightEntities; }
-    const std::vector<ecs::Entity>& lightEntities() const { return m_lightEntities; }
-
     EnvMapSceneParams& envMapSceneParams() { return m_envMapSceneParams; }
     const EnvMapSceneParams& envMapSceneParams() const { return m_envMapSceneParams; }
 
@@ -68,7 +65,6 @@ public:
 
     void sceneUnloading();
     void onSceneLoaded(caustica::Scene& scene, PathTracerSettings& settings);
-    void resyncLightsFromScene(caustica::Scene& scene);
     void notifySceneReloaded(caustica::Scene& scene);
     int ensureMaterialsFromScene(const std::shared_ptr<caustica::Scene>& scene);
 
@@ -90,8 +86,6 @@ private:
     std::shared_ptr<MaterialGpuCache>           m_materials;
     std::shared_ptr<OpacityMicromapBuilder>     m_opacityMaps;
     std::shared_ptr<ComputePipelineRegistry>    m_computePipelines;
-
-    std::vector<ecs::Entity> m_lightEntities;
 };
 
 } // namespace caustica::render

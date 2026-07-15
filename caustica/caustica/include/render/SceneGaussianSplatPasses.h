@@ -23,7 +23,6 @@ namespace render { class RenderDevice; }
 } // namespace caustica
 
 class SceneManager;
-struct CommandLineOptions;
 
 namespace caustica::render
 {
@@ -45,7 +44,7 @@ public:
     void setOnRequestFullRebuild(std::function<void()> callback);
 
     void sceneUnloading();
-    void onSceneLoaded(const CommandLineOptions& cmdLine);
+    void onSceneLoaded();
     bool loadFromFile(const std::filesystem::path& fileName, bool convertRdfToRub = true);
     bool removeObjectsUnderEntity(ecs::Entity rootEntity);
 
@@ -80,7 +79,6 @@ private:
 
     std::vector<SceneObject> m_objects;
     std::string m_fileNameSummary;
-    bool m_initialCmdLineSplatAttached = false;
     std::function<void()> m_onRequestFullRebuild;
 };
 
