@@ -16,6 +16,7 @@
 
 #include <core/file_utils.h>
 #include <core/format.h>
+#include <core/log.h>
 #include <core/path_utils.h>
 #include <core/progress.h>
 #include <core/Timer.h>
@@ -61,25 +62,31 @@ OpacityMicromapBuilder::~OpacityMicromapBuilder()
 {
 }
 
-void OpacityMicromapBuilder::sceneLoaded(const caustica::Scene& scene)
+void OpacityMicromapBuilder::ensureGeometryDebugCapacity(const caustica::Scene& scene)
 {
     const size_t allocationGranularity = 1024;
     const size_t geometryCount = scene.getGeometryCount();
-    if (scene.getGeometryCount() > m_geometryDebugDataPtr.size())
-    {
-        m_geometryDebugDataPtr.resize(nvrhi::align<size_t>(geometryCount, allocationGranularity));
-        
-        nvrhi::BufferDesc bufferDesc;
-        bufferDesc.byteSize = sizeof(GeometryDebugData) * m_geometryDebugDataPtr.size();
-        bufferDesc.debugName = "BindlessGeometryDebug";
-        bufferDesc.structStride = sizeof(GeometryDebugData);
-        bufferDesc.canHaveRawViews = true;
-        bufferDesc.canHaveUAVs = true;
-        bufferDesc.initialState = nvrhi::ResourceStates::Common;
-        bufferDesc.keepInitialState = true;
+    if (geometryCount <= m_geometryDebugDataPtr.size())
+        return;
 
-        m_geometryDebugBuffer = m_device->createBuffer(bufferDesc);
-    }
+    m_geometryDebugDataPtr.resize(nvrhi::align<size_t>(geometryCount, allocationGranularity));
+
+    nvrhi::BufferDesc bufferDesc;
+    bufferDesc.byteSize = sizeof(GeometryDebugData) * m_geometryDebugDataPtr.size();
+    bufferDesc.debugName = "BindlessGeometryDebug";
+    bufferDesc.structStride = sizeof(GeometryDebugData);
+    bufferDesc.canHaveRawViews = true;
+    bufferDesc.canHaveUAVs = true;
+    bufferDesc.initialState = nvrhi::ResourceStates::Common;
+    bufferDesc.keepInitialState = true;
+
+    m_geometryDebugBuffer = m_device->createBuffer(bufferDesc);
+}
+
+void OpacityMicromapBuilder::sceneLoaded(const caustica::Scene& scene)
+{
+    // Runtime imports grow geometry count without calling sceneLoaded again.
+    ensureGeometryDebugCapacity(scene);
 }
 
 void OpacityMicromapBuilder::sceneUnloading()
@@ -94,6 +101,10 @@ void OpacityMicromapBuilder::createRenderPasses(nvrhi::BindingLayoutHandle bindl
 
 void OpacityMicromapBuilder::createOpacityMicromaps(const caustica::Scene& scene)
 {
+    // Always grow the debug buffer for runtime imports — AS rebuild marks DebugDataDirty
+    // and update() will write per-geometry slots even when OMM baking is disabled.
+    ensureGeometryDebugCapacity(scene);
+
     m_ommBuildQueue->cancelPendingBuilds();
 
     m_uiData.BuildsLeftInQueue = 0;
@@ -227,6 +238,16 @@ void OpacityMicromapBuilder::updateDebugGeometry(const MeshInfo& _mesh)
         assert(std::dynamic_pointer_cast<MeshGeometryEx>(_geometry) != nullptr);
         const std::shared_ptr<MeshGeometryEx>& geometry = std::static_pointer_cast<MeshGeometryEx>(_geometry);
 
+        if (geometry->globalGeometryIndex >= m_geometryDebugDataPtr.size())
+        {
+            caustica::error(
+                "OpacityMicromapBuilder: globalGeometryIndex %u out of range (debug slots=%zu); "
+                "skipping debug write after runtime import.",
+                geometry->globalGeometryIndex,
+                m_geometryDebugDataPtr.size());
+            continue;
+        }
+
         if (MeshDebugData* debugData = mesh.DebugData.get())
         {
             GeometryDebugData& dgdata = m_geometryDebugDataPtr[geometry->globalGeometryIndex];
@@ -257,6 +278,9 @@ void OpacityMicromapBuilder::updateDebugGeometry(const MeshInfo& _mesh)
 bool OpacityMicromapBuilder::update(nvrhi::ICommandList& commandList, const caustica::Scene& scene)
 {
     RAII_SCOPE( commandList.beginMarker("OpacityMicromapBuilder");, commandList.endMarker(); );
+
+    // Runtime drag-drop grows geometry count without sceneLoaded(); resize before any writes.
+    ensureGeometryDebugCapacity(scene);
 
     bool anyDirty = false;
     for (auto& _mesh : scene.getMeshes())

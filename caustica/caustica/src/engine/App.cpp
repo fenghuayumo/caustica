@@ -418,6 +418,8 @@ void App::requestExit()
     m_requestExit = true;
     if (Window* w = window())
         w->setExit(true);
+    if (GpuDevice* gpuDevice = device())
+        gpuDevice->setShuttingDown(true);
 }
 
 void App::requestRenderUnfocused()
@@ -645,6 +647,10 @@ bool App::executeRenderPhase(GpuDevice* gpuDevice, double elapsedTime, double cu
     if (frameIndex == 0 && gpuDevice->m_SkipRenderOnFirstFrame)
         return true;
 
+    // Window close: finish the frame token quickly without path-tracing / RTPSO work.
+    if (gpuDevice->isShuttingDown() || m_requestExit)
+        return true;
+
     gpuDevice->setRenderPhaseFrameIndex(frameIndex);
 
     if (!gpuDevice->beginFrame())
@@ -784,6 +790,8 @@ void App::run()
             }
         }
 
+        gpuDevice->setShuttingDown(true);
+
         if (m_useDedicatedRenderThread)
             m_renderThread.waitForIdle();
 
@@ -820,6 +828,9 @@ void App::run()
             break;
         }
     }
+
+    // Signal in-flight RT work to skip long RTPSO / shader rebuilds before we drain.
+    gpuDevice->setShuttingDown(true);
 
     if (m_useDedicatedRenderThread)
         m_renderThread.waitForIdle();

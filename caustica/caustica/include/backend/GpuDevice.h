@@ -39,6 +39,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <atomic>
 
 namespace caustica
 {
@@ -263,6 +264,11 @@ namespace caustica
         [[nodiscard]] IGpuFrameDriver* getFrameDriver() const { return m_frameDriver; }
         void waitForRenderThreadIdle();
 
+        // Set when the app is closing so in-flight render work can skip RTPSO rebuilds
+        // and other long stalls that would freeze window close.
+        void setShuttingDown(bool value) { m_ShuttingDown.store(value, std::memory_order_release); }
+        [[nodiscard]] bool isShuttingDown() const { return m_ShuttingDown.load(std::memory_order_acquire); }
+
         // returns the size of the window in screen coordinates
         void getWindowDimensions(int& width, int& height);
         // returns the screen coordinate to pixel coordinate scale factor
@@ -283,6 +289,7 @@ namespace caustica
         // set to true if running on NV GPU
         bool m_IsNvidia = false;
         IGpuFrameDriver* m_frameDriver = nullptr;
+        std::atomic<bool> m_ShuttingDown{false};
         // timestamp in seconds for the previous frame
         double m_PreviousFrameTimestamp = 0.0;
         // current DPI scale info (updated when window moves)

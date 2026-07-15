@@ -30,6 +30,8 @@
 #include <render/core/SceneGpuUpdater.h>
 #include <render/core/SceneMeshEditing.h>
 #include <render/core/RenderSceneTypeFactory.h>
+#include <render/core/PathTracingShaderCompiler.h>
+#include <assets/loader/ShaderMacro.h>
 #include <scene/SceneApply.h>
 #include <scene/SceneTypes.h>
 #include <scene/loader/RuntimeMeshLoader.h>
@@ -632,6 +634,23 @@ void flushPendingStructureGpu(App& app)
         gr->rayTracingResources().requestAccelerationStructureRebuild();
         nvrhi::CommandListHandle commandList = device->getDevice()->createCommandList();
         gr->rayTracingResources().recreateAccelStructs(commandList);
+
+        // Keep SBT hit-group count in lockstep with the new TLAS while GPU is idle.
+        // Otherwise the next DispatchRays can use new contribution indices against a
+        // short/stale shader table (intermittent hang after drag-drop import).
+        if (auto compiler = gr->rayTracingResources().pathTracingShaderCompiler())
+        {
+            compiler->update(
+                scenePtr,
+                static_cast<unsigned int>(gr->accelStructs().getSubInstanceData().size()),
+                [gr](std::vector<caustica::ShaderMacro>& macros) {
+                    gr->rayTracingResources().fillPTPipelineGlobalMacros(macros);
+                },
+                false);
+        }
+
+        // Binding set still points at the destroyed TLAS until the next frame otherwise.
+        gr->rayTracingResources().recreateBindingSet();
     });
 
     scenePtr->clearGpuStructureSyncRequest();

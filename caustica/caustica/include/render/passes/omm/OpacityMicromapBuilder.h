@@ -123,6 +123,8 @@ public:
 
 
 private:
+    void                            ensureGeometryDebugCapacity(const caustica::Scene& scene);
+
     nvrhi::DeviceHandle             m_device;
     std::shared_ptr<caustica::TextureLoader> m_textureCache;
     std::shared_ptr<caustica::FramebufferFactory> m_framebufferFactory;

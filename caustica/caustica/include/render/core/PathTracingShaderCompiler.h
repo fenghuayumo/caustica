@@ -62,6 +62,7 @@ public:
 private:
     void                                    updateStart(std::filesystem::file_time_type lastModifiedSourceCode);
     void                                    updateFinalize();
+    void                                    rebuildShaderTableOnly();
     int64_t                                 getVersion() const { return m_localVersion; }
 
 private:
@@ -184,6 +185,10 @@ private:
     caustica::ThreadPool                       m_threadPool;
 
     int64_t                                         m_version = -1;
+    // Once RT pipelines exist, runtime imports only remap hit-group table entries onto
+    // this frozen unique set. Growing unique exports forces createRayTracingPipeline and
+    // can stall the render thread for a very long time (and hang window close).
+    bool                                            m_uniqueHitGroupsFrozen = false;
 
     std::mutex                                      m_mutex;    // for synchronizing work by variants
 

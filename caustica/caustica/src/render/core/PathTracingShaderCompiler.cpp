@@ -319,6 +319,54 @@ void PTPipelineVariant::updateStart(std::filesystem::file_time_type lastModified
     compileIfNeededEnqueue(lastModifiedSourceCode);
 }
 
+void PTPipelineVariant::rebuildShaderTableOnly()
+{
+    std::shared_ptr<PathTracingShaderCompiler> baker = m_compiler.lock();
+    if (!baker || !m_pipeline)
+        return;
+
+    const std::string rayGenName = "RayGen_" + m_shortUniqueDebugID;
+    const std::string missName = "Miss_" + m_shortUniqueDebugID;
+
+    // Always allocate a new table. In-place clearHitShaders races with in-flight
+    // DispatchRays that still reference the live ShaderTable (intermittent GPU hang/TDR).
+    nvrhi::rt::ShaderTableHandle newTable = m_pipeline->createShaderTable();
+    if (!newTable)
+    {
+        assert(false);
+        return;
+    }
+
+    newTable->setRayGenerationShader(rayGenName.c_str());
+
+    if (!m_rayGenOnly)
+    {
+        const auto& perSubInstanceHitGroup = baker->getPerSubInstanceHitGroup();
+        int added = 0;
+        int failed = 0;
+        for (const HitGroupInfo& hitGroup : perSubInstanceHitGroup)
+        {
+            if (newTable->addHitGroup(hitGroup.getExportName().c_str()) >= 0)
+                ++added;
+            else
+                ++failed;
+        }
+        if (failed > 0)
+        {
+            caustica::error(
+                "PathTracingShaderCompiler: shader table hit-group bind failed (ok=%d failed=%d). "
+                "DispatchRays with a short SBT can TDR/hang the GPU.",
+                added, failed);
+            return;
+        }
+    }
+
+    if (m_exportMiss)
+        newTable->addMissShader(missName.c_str());
+
+    m_shaderTable = newTable;
+}
+
 void PTPipelineVariant::updateFinalize()
 {
     std::shared_ptr<PathTracingShaderCompiler> & baker = m_lockedCompiler; assert( baker != nullptr );
@@ -408,7 +456,17 @@ void PTPipelineVariant::updateFinalize()
         if (usesNvapiHitObjectExtension && baker->isNvapiShaderExtensionEnabled())
             pipelineDesc.hlslExtensionsUAV = NV_SHADER_EXTN_SLOT_NUM;
 
+        caustica::info(
+            "PathTracingShaderCompiler: CreateStateObject begin (%s, hitGroups=%zu, subInstances=%zu)",
+            m_shortUniqueDebugID.c_str(),
+            pipelineDesc.hitGroups.size(),
+            baker->getPerSubInstanceHitGroup().size());
+        fflush(stdout);
+
         m_pipeline = baker->getDevice()->createRayTracingPipeline(pipelineDesc);
+
+        caustica::info("PathTracingShaderCompiler: CreateStateObject end (%s)", m_shortUniqueDebugID.c_str());
+        fflush(stdout);
 
         if (!m_pipeline)
             { assert( false ); return; }
@@ -592,28 +650,25 @@ void PathTracingShaderCompiler::update(const std::shared_ptr<caustica::Scene>& s
         }
     }
 
-    bool needsUpdate = m_perSubInstanceHitGroup.size() != subInstanceCount;
-    needsUpdate |= subInstanceCount > 0 && m_uniqueHitGroups.empty();
+    bool missingPipelines = false;
+    bool anyPipeline = false;
     for (const std::shared_ptr<PTPipelineVariant>& variant : m_variants)
-        needsUpdate |= variant->m_pipeline == nullptr;
+    {
+        missingPipelines |= variant->m_pipeline == nullptr;
+        anyPipeline |= variant->m_pipeline != nullptr;
+    }
 
     std::vector<caustica::ShaderMacro> newMacros;
     globalMacrosGetter(newMacros);
-    if (newMacros.size() != m_macros.size() || !std::equal(newMacros.begin(), newMacros.end(), m_macros.begin(), macrosEqual))
-    {
-        needsUpdate = true;
-        m_macros = newMacros;
-    }
+    const bool macrosChanged =
+        newMacros.size() != m_macros.size()
+        || !std::equal(newMacros.begin(), newMacros.end(), m_macros.begin(), macrosEqual);
 
-    needsUpdate |= forceShaderReload;
+    const bool countChanged = m_perSubInstanceHitGroup.size() != subInstanceCount;
+    const bool uniqueEmpty = subInstanceCount > 0 && m_uniqueHitGroups.empty();
 
-    // no need to update these if already set up
-    if (needsUpdate) // m_uniqueHitGroups.size() == 0)
+    const auto rebuildPerSubInstanceHitGroups = [&]()
     {
-        // Note: these map 1-1 to m_subInstanceData, and are used to (see '->addHitGroup' below) build 1-1 mapped hit groups.
-        // Use the same dense prefix as AccelStructManager::buildTlas / MaterialGpuCache::update so a stale
-        // proxy.geometryInstanceIndex cannot permanently mis-bind materials after runtime import.
-        // Same dense prefix as AccelStructManager / MaterialGpuCache (meshShared order).
         m_perSubInstanceHitGroup.clear();
         m_perSubInstanceHitGroup.assign(subInstanceCount, ComputeDefaultSubInstanceHitGroupInfo(*getMaterialGpuCache()));
         size_t compactedGeometryInstanceIndex = 0;
@@ -639,45 +694,170 @@ void PathTracingShaderCompiler::update(const std::shared_ptr<caustica::Scene>& s
             }
         }
         assert(m_perSubInstanceHitGroup.size() == subInstanceCount);
+    };
+
+    const auto ensureUniqueHitGroupsBootstrapped = [&]()
+    {
+        if (!m_uniqueHitGroups.empty())
+            return;
+
+        // Pipelines exist but unique map was lost. Only advertise the ubershader export —
+        // specialized indices from the live scene may not exist in the already-built PSO.
+        HitGroupInfo uberHitGroup = ComputeDefaultSubInstanceHitGroupInfo(*getMaterialGpuCache());
+        uberHitGroup.hasAnyHitShader = true;
+        m_uniqueHitGroups[uberHitGroup.getShaderPermutationIndex()] = uberHitGroup;
+        caustica::warning(
+            "PathTracingShaderCompiler: unique hit-group map was empty with live PSOs; "
+            "remapping all instances to ubershader export");
+    };
+
+    const auto remapHitGroupsOntoFrozenUnique = [&]()
+    {
+        ensureUniqueHitGroupsBootstrapped();
+
+        HitGroupInfo fallback = ComputeDefaultSubInstanceHitGroupInfo(*getMaterialGpuCache());
+        fallback.hasAnyHitShader = true;
+        if (const auto it = m_uniqueHitGroups.find(fallback.getShaderPermutationIndex()); it != m_uniqueHitGroups.end())
+            fallback = it->second;
+        else if (!m_uniqueHitGroups.empty())
+            fallback = m_uniqueHitGroups.begin()->second;
+
+        for (HitGroupInfo& hitGroup : m_perSubInstanceHitGroup)
+        {
+            if (m_uniqueHitGroups.find(hitGroup.getShaderPermutationIndex()) != m_uniqueHitGroups.end())
+                continue;
+            hitGroup = fallback;
+        }
+    };
+
+    // HARD RULE: if ANY RT PSO already exists, never call createRayTracingPipeline unless the
+    // caller explicitly requested a shader reload. A single missing late-created variant must
+    // not resetPipeline()+CreateStateObject the live ones (that hangs after runtime import).
+    if (anyPipeline && !forceShaderReload)
+    {
+        if (macrosChanged)
+        {
+            caustica::warning(
+                "PathTracingShaderCompiler: PT macros changed but RT PSOs stay frozen "
+                "(avoid CreateStateObject hang). Use shader reload to apply macros.");
+            m_macros = newMacros;
+        }
+        if (missingPipelines)
+        {
+            caustica::warning(
+                "PathTracingShaderCompiler: some RT variants have no PSO yet; skipping their "
+                "create to avoid resetting live pipelines after runtime import");
+        }
+
+        if (countChanged || uniqueEmpty)
+        {
+            rebuildPerSubInstanceHitGroups();
+            remapHitGroupsOntoFrozenUnique();
+
+            // Previous frames may still be referencing the old ShaderTable on the GPU.
+            // Swap only after idle so we never race DispatchRays (probabilistic hang/TDR).
+            if (!m_device->waitForIdle())
+            {
+                caustica::error(
+                    "PathTracingShaderCompiler: waitForIdle failed before shader table refresh; "
+                    "skipping SBT update this frame");
+                return;
+            }
+
+            caustica::info(
+                "PathTracingShaderCompiler: refreshing shader tables only "
+                "(hit entries=%zu, unique groups=%zu, macrosChanged=%d missingPipelines=%d)",
+                m_perSubInstanceHitGroup.size(),
+                m_uniqueHitGroups.size(),
+                macrosChanged ? 1 : 0,
+                missingPipelines ? 1 : 0);
+            fflush(stdout);
+            for (const std::shared_ptr<PTPipelineVariant>& variant : m_variants)
+            {
+                if (variant->m_pipeline)
+                    variant->rebuildShaderTableOnly();
+            }
+        }
+
+        m_uniqueHitGroupsFrozen = true;
+        if (!m_lastUpdatedSourceTimestamp.has_value())
+        {
+            m_lastUpdatedSourceTimestamp = m_compilerConfig.canCompile()
+                ? getLatestModifiedTimeDirectoryRecursive(m_compilerConfig.ShadersPath)
+                : std::optional<std::filesystem::file_time_type>(std::filesystem::file_time_type::min());
+        }
+        return;
+    }
+
+    if (macrosChanged)
+        m_macros = newMacros;
+
+    const bool hitGroupsNeedRebuild = countChanged || uniqueEmpty || forceShaderReload || macrosChanged || !m_uniqueHitGroupsFrozen;
+    if (!hitGroupsNeedRebuild && !missingPipelines)
+        return;
+
+    if (hitGroupsNeedRebuild)
+    {
+        // Note: these map 1-1 to m_subInstanceData, and are used to (see '->addHitGroup' below) build 1-1 mapped hit groups.
+        // Use the same dense prefix as AccelStructManager::buildTlas / MaterialGpuCache::update so a stale
+        // proxy.geometryInstanceIndex cannot permanently mis-bind materials after runtime import.
+        // Same dense prefix as AccelStructManager / MaterialGpuCache (meshShared order).
+        rebuildPerSubInstanceHitGroups();
 
         // Prime the instances to make sure we only include the necessary CHS variants in the PSO. Many (sub)instances can map to same materials.
         // Ubershader keeps indexInTable == -1 and lives in m_ubershaderMaterial, not m_specializedPerMaterial.
         m_uniqueHitGroups.clear();
-        for (int i = 0; i < m_perSubInstanceHitGroup.size(); i++)
-            m_uniqueHitGroups[m_perSubInstanceHitGroup[i].getShaderPermutationIndex()] = m_perSubInstanceHitGroup[i];
-        needsUpdate = true;
-    }
-
-    if (needsUpdate)
-    {
-        m_version++;
-    }
-
-    if (needsUpdate)
-    {
-        if (m_compilerConfig.canCompile())
         {
-            // we need the output folder
-            ensureDirectoryExists(m_compilerConfig.ShaderBinariesPath);
+            // Always keep the ubershader export in the PSO so later runtime imports can remap onto it.
+            HitGroupInfo uberHitGroup = ComputeDefaultSubInstanceHitGroupInfo(*getMaterialGpuCache());
+            uberHitGroup.hasAnyHitShader = true;
+            m_uniqueHitGroups[uberHitGroup.getShaderPermutationIndex()] = uberHitGroup;
         }
-
-        std::optional<std::filesystem::file_time_type> a = m_compilerConfig.canCompile()
-            ? getLatestModifiedTimeDirectoryRecursive(m_compilerConfig.ShadersPath)
-            : std::optional<std::filesystem::file_time_type>(std::filesystem::file_time_type::min());
-        // let's not track externals for perf reasons but here's the code in case it's needed
-        //std::optional<std::filesystem::file_time_type> b = GetLatestModifiedTimeRecursive(m_compilerConfig.ShadersPathExternalIncludes1);
-        //std::optional<std::filesystem::file_time_type> c = GetLatestModifiedTimeRecursive(m_compilerConfig.ShadersPathExternalIncludes2);
-        m_lastUpdatedSourceTimestamp = a;
+        for (int i = 0; i < int(m_perSubInstanceHitGroup.size()); i++)
+        {
+            HitGroupInfo hitGroup = m_perSubInstanceHitGroup[i];
+            if (hitGroup.getShaderPermutationIndex() < 0)
+                hitGroup.hasAnyHitShader = true;
+            m_uniqueHitGroups[hitGroup.getShaderPermutationIndex()] = hitGroup;
+        }
     }
+
+    bool needsUpdate = hitGroupsNeedRebuild || missingPipelines || forceShaderReload || macrosChanged;
+    if (!needsUpdate)
+        return;
+
+    caustica::info(
+        "PathTracingShaderCompiler: full RT pipeline update (countChanged=%d macrosChanged=%d force=%d missingPipelines=%d uniqueGroups=%zu hitEntries=%zu)",
+        countChanged ? 1 : 0,
+        macrosChanged ? 1 : 0,
+        forceShaderReload ? 1 : 0,
+        missingPipelines ? 1 : 0,
+        m_uniqueHitGroups.size(),
+        m_perSubInstanceHitGroup.size());
+    fflush(stdout);
+
+    m_version++;
+    m_uniqueHitGroupsFrozen = false;
+
+    if (m_compilerConfig.canCompile())
+    {
+        // we need the output folder
+        ensureDirectoryExists(m_compilerConfig.ShaderBinariesPath);
+    }
+
+    std::optional<std::filesystem::file_time_type> a = m_compilerConfig.canCompile()
+        ? getLatestModifiedTimeDirectoryRecursive(m_compilerConfig.ShadersPath)
+        : std::optional<std::filesystem::file_time_type>(std::filesystem::file_time_type::min());
+    // let's not track externals for perf reasons but here's the code in case it's needed
+    //std::optional<std::filesystem::file_time_type> b = GetLatestModifiedTimeRecursive(m_compilerConfig.ShadersPathExternalIncludes1);
+    //std::optional<std::filesystem::file_time_type> c = GetLatestModifiedTimeRecursive(m_compilerConfig.ShadersPathExternalIncludes2);
+    m_lastUpdatedSourceTimestamp = a;
 
     if (!m_lastUpdatedSourceTimestamp.has_value())
     {
         caustica::error("There is something wrong with the shader source path or logic - unable to load or dynamically compile shaders");
         return;
     }
-
-    if (!needsUpdate)
-        return;
 
     do // in case of compile errors allow user to modify and attempt recompile
     {
@@ -813,6 +993,13 @@ void PathTracingShaderCompiler::update(const std::shared_ptr<caustica::Scene>& s
         }
         else
         {
+            // Successful PSO build: freeze unique exports so runtime imports only refresh SBT.
+            bool allPipelinesReady = !m_variants.empty();
+            for (const std::shared_ptr<PTPipelineVariant>& variant : m_variants)
+                allPipelinesReady &= variant->m_pipeline != nullptr;
+            m_uniqueHitGroupsFrozen = allPipelinesReady;
+            if (m_uniqueHitGroupsFrozen)
+                caustica::info("PathTracingShaderCompiler: unique hit groups frozen (%zu exports)", m_uniqueHitGroups.size());
             break;
         }
 

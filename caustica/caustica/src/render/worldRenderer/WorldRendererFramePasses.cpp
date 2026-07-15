@@ -261,12 +261,19 @@ void caustica::render::WorldRenderer::framePassEnsureRenderTargets(PathTracingFr
 
 void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameContext& ctx)
 {
+    if (m_context.gpuDevice.isShuttingDown())
+    {
+        ctx.aborted = true;
+        return;
+    }
+
     caustica::syncEnvMapSceneParams(m_context.activeSettings(), m_context.scenePasses.lighting.envMapSceneParams(), c_envMapRadianceScale);
 
     if (m_context.scenePasses.rayTracing.consumeShaderReloadRequest())
     {
         m_context.shaderFactory->clearCache();
         ctx.needNewPasses = true;
+        ctx.forcePathTracingShaderReload = true;
     }
 
     if (m_context.activeSettings().NRDModeChanged)
@@ -345,6 +352,9 @@ void caustica::render::WorldRenderer::framePassShaderUpdate(PathTracingFrameCont
     if (ctx.aborted || m_pathTracingShaderCompiler == nullptr)
         return;
 
+    if (m_context.gpuDevice.isShuttingDown())
+        return;
+
     // Hit-group rebuild uses instance indices already assigned at Extract.
     if (const auto scene = m_context.sceneManager.getScene())
         scene->syncRenderSnapshotGpuIndices(m_context.gpuDevice.getRenderPhaseFrameIndex());
@@ -353,7 +363,9 @@ void caustica::render::WorldRenderer::framePassShaderUpdate(PathTracingFrameCont
         m_context.sceneManager.getScene(),
         static_cast<unsigned int>(m_context.accelStructs.getSubInstanceData().size()),
         [this](std::vector<caustica::ShaderMacro>& macros) { m_context.scenePasses.rayTracing.fillPTPipelineGlobalMacros(macros); },
-        ctx.needNewPasses);
+        // needNewPasses covers resize/bindings and must NOT force RT PSO recreation after
+        // runtime import (that recreates DXR state objects and can hang close).
+        ctx.forcePathTracingShaderReload);
 
     if (m_context.scenePasses.lighting.computePipelines())
         m_context.scenePasses.lighting.computePipelines()->update(ctx.needNewPasses);

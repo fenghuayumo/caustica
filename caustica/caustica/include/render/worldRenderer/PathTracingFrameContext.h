@@ -37,6 +37,7 @@ struct PathTracingFrameContext
     bool needNewPasses = false;
     bool needNewBindings = false;
     bool exposureResetRequired = false;
+    bool forcePathTracingShaderReload = false;
 
     PathTracerCameraData cameraData{};
     SampleConstants      constants{};

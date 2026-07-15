@@ -265,19 +265,42 @@ void Scene::prepareForUnload()
     m_LogicExtractCache.clear();
     m_LogicExtractCacheValid = false;
     m_RenderSnapshot.clear();
+    m_Models.clear();
 
     if (m_EntityWorld)
     {
+        auto releaseMeshGpu = [](const std::shared_ptr<MeshInfo>& mesh) {
+            if (!mesh)
+                return;
+            mesh->asset = nullptr;
+            mesh->accelStruct = nullptr;
+            mesh->AccelStructOMM = nullptr;
+            mesh->OpacityMicroMaps.clear();
+            mesh->buffers.reset();
+        };
+
         for (const std::shared_ptr<MeshInfo>& mesh : m_EntityWorld->getMeshes())
         {
+            releaseMeshGpu(mesh);
             if (mesh)
-                mesh->asset = nullptr;
+                releaseMeshGpu(mesh->skinPrototype);
         }
         for (const std::shared_ptr<Material>& material : m_EntityWorld->getMaterials())
         {
             if (material)
                 material->asset = nullptr;
         }
+    }
+
+    if (m_GpuResources)
+    {
+        m_GpuResources->skinnedGpuByEntity.clear();
+        m_GpuResources->materialBuffer = nullptr;
+        m_GpuResources->geometryBuffer = nullptr;
+        m_GpuResources->instanceBuffer = nullptr;
+        m_GpuResources->materialData.clear();
+        m_GpuResources->geometryData.clear();
+        m_GpuResources->instanceData.clear();
     }
 
     m_Asset = nullptr;
