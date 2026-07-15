@@ -70,6 +70,9 @@ public:
     [[nodiscard]] bool isStructureEditInFlight() const { return m_structureEditDepth > 0; }
     [[nodiscard]] bool isSceneStructureBusy() const { return isSceneLoading() || isStructureEditInFlight(); }
 
+    // Looks up by Material::materialID (dense scene-list index). For path-tracer /
+    // Material Editor ids (PTMaterial::gpuDataIndex), use the editor/Python helpers —
+    // those two indices can diverge because getMaterials() is an unordered_map.
     static std::shared_ptr<caustica::Material> findMaterial(
         const std::shared_ptr<caustica::Scene>& scene, int materialID)
     {

@@ -7,6 +7,7 @@
 #include <render/worldRenderer/WorldRenderer.h>
 #include <render/core/TextureUtils.h>
 #include <render/passes/debug/ZoomTool.h>
+#include <render/passes/lighting/MaterialGpuCache.h>
 #include <render/SceneGaussianSplatPasses.h>
 #include <assets/loader/ShaderFactory.h>
 #include <engine/App.h>
@@ -113,7 +114,27 @@ const SceneLightingPasses& SceneEditor::lightingPasses() const { return gpuRende
 
 std::shared_ptr<Material> SceneEditor::findMaterial(int materialID) const
 {
-    return m_app ? sceneSession::findMaterial(*m_app, materialID) : nullptr;
+    // Path-tracer pick / Material Editor display use PTMaterial::gpuDataIndex.
+    // Material::materialID is a dense scene-list index from unordered_map iteration and
+    // can diverge after imports/deletes — prefer gpuDataIndex, fall back to materialID.
+    if (materialID < 0)
+        return nullptr;
+
+    if (auto scene = this->scene())
+    {
+        for (const auto& mat : scene->getMaterials())
+        {
+            const auto pt = PTMaterial::safeCast(mat);
+            if (pt && int(pt->gpuDataIndex) == materialID)
+                return mat;
+        }
+        for (const auto& mat : scene->getMaterials())
+        {
+            if (mat && mat->materialID == materialID)
+                return mat;
+        }
+    }
+    return nullptr;
 }
 
 ecs::Entity SceneEditor::findEntityByInstanceIndex(int instanceIndex) const
@@ -704,6 +725,8 @@ bool SceneEditor::showDeltaTree() const
 
 void SceneEditor::resolvePickFeedback(const DebugFeedbackStruct& feedback)
 {
+    // pickedMaterialID is PTMaterial::gpuDataIndex for the hit geometry (sub-mesh),
+    // not a per-instance material.
     if (m_renderState.Picking.MaterialRequested)
         m_editor.SelectedMaterial = findMaterial(int(feedback.pickedMaterialID));
     if (m_renderState.Picking.InstanceRequested)

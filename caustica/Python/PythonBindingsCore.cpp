@@ -274,9 +274,17 @@ namespace
 
     std::shared_ptr<PTMaterial> FindSceneMaterialById(const Scene* scene, int materialId)
     {
-        if (!scene)
+        if (!scene || materialId < 0)
             return nullptr;
 
+        // Prefer gpuDataIndex (path-tracer / Material Editor id). materialID is a dense
+        // scene-list index from unordered_map iteration and can diverge after imports.
+        for (const auto& mat : scene->getMaterials())
+        {
+            const auto pt = PTMaterial::safeCast(mat);
+            if (pt && int(pt->gpuDataIndex) == materialId)
+                return pt;
+        }
         for (const auto& mat : scene->getMaterials())
         {
             if (mat && mat->materialID == materialId)
@@ -1225,7 +1233,8 @@ void RegisterCoreBindings(nb::module_& m)
 
         .def("find_material_by_id", [](Scene& self, int materialId) {
                 return FindSceneMaterialById(&self, materialId);
-            }, nb::arg("material_id"), "Look up a material by engine material ID.")
+            }, nb::arg("material_id"),
+            "Look up a material by path-tracer GPU index (Material Editor id), with materialID fallback.")
 
         .def("get_lights", [](Scene& self) {
                 return GetSceneLights(&self);
