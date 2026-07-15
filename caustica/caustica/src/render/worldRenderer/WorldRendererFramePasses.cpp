@@ -623,7 +623,7 @@ void caustica::render::WorldRenderer::framePassDebugOverlay(PathTracingFrameCont
     }
     m_cpuSideDebugLines.clear();
 
-    if (m_context.activeSettings().ContinuousDebugFeedback || m_context.runtimeState.Picking.MaterialRequested)
+    if (m_context.activeSettings().ContinuousDebugFeedback || m_context.runtimeState.Picking.hasActivePickRequest())
     {
         m_commandList->copyBuffer(m_feedback_Buffer_Cpu, 0, m_feedback_Buffer_Gpu, 0, sizeof(DebugFeedbackStruct) * 1);
         m_commandList->copyBuffer(m_debugLineBufferDisplay, 0, m_debugLineBufferCapture, 0, sizeof(DebugLineStruct) * MAX_DEBUG_LINES);

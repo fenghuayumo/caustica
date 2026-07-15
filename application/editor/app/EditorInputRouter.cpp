@@ -34,9 +34,15 @@ bool gizmoCapturesInput(const SceneEditor& sceneEditor)
     return editor.GizmoCapturingInput || ImGuizmo::IsOver() || ImGuizmo::IsUsing();
 }
 
-void requestViewportPick(caustica::render::RenderRuntimeState& runtime, const dm::uint2& position)
+void requestMaterialPick(caustica::render::RenderRuntimeState& runtime)
 {
+    // Right-click: pick the hit geometry's material (per sub-mesh), not the whole instance.
     runtime.Picking.MaterialRequested = true;
+}
+
+void requestInstancePick(caustica::render::RenderRuntimeState& runtime)
+{
+    // Left-click: select the mesh instance entity for Inspector / gizmo.
     runtime.Picking.InstanceRequested = true;
 }
 
@@ -185,9 +191,14 @@ bool onMouseButtonPressed(SceneEditor& sceneEditor, caustica::MouseButtonPressed
         camera->camera().mouseButtonUpdate(button, cGlfwPress, mods);
     if (game)
         game->mouseButtonUpdate(button, cGlfwPress, mods);
-    if (button == ToGlfwMouse(caustica::Mouse::Left) || button == ToGlfwMouse(caustica::Mouse::Right))
+    if (button == ToGlfwMouse(caustica::Mouse::Left))
     {
-        requestViewportPick(session.runtime, session.runtime.Picking.Position);
+        requestInstancePick(session.runtime);
+        session.settings.DebugPixel = session.runtime.Picking.Position;
+    }
+    else if (button == ToGlfwMouse(caustica::Mouse::Right))
+    {
+        requestMaterialPick(session.runtime);
         session.settings.DebugPixel = session.runtime.Picking.Position;
     }
 #if CAUSTICA_WITH_STREAMLINE
