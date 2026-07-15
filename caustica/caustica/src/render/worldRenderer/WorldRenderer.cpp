@@ -1220,6 +1220,12 @@ void caustica::render::WorldRenderer::render(nvrhi::IFramebuffer* framebuffer)
     populateRenderFrameContext(framebuffer, m_renderFrameCtx);
     m_pipelineRegistry.runFrame(*this, m_renderFrameCtx);
 
+    // Preserve snapshot pick flags for AfterWorldRender resolve/clear. Live
+    // runtimeState.Picking can change while older frames are still in flight.
+    m_lastRenderedPicking = m_context.frameRuntime
+        ? m_context.frameRuntime->Picking
+        : RenderPickState{};
+
     m_context.frameSettings = nullptr;
     m_context.frameRuntime = nullptr;
 
@@ -2074,9 +2080,14 @@ caustica::CameraUpdateParams caustica::render::WorldRenderer::makeCameraUpdatePa
 void caustica::render::WorldRenderer::syncCameraViews()
 {
     m_context.camera.updateViews(makeCameraUpdateParams());
+    // Stable primary-hit pick: disable TAA/DLSS jitter for the pick frame.
+    if (m_context.activeRuntime().Picking.hasActivePickRequest())
+        m_context.camera.view()->setPixelOffset(dm::float2::zero());
 }
 
 dm::float2 caustica::render::WorldRenderer::computeCameraJitter() const
 {
+    if (m_context.activeRuntime().Picking.hasActivePickRequest())
+        return dm::float2::zero();
     return m_context.camera.computeJitter(makeCameraUpdateParams());
 }

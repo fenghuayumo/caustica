@@ -723,17 +723,17 @@ bool SceneEditor::showDeltaTree() const
     return m_editor.ShowDeltaTree;
 }
 
-void SceneEditor::resolvePickFeedback(const DebugFeedbackStruct& feedback)
+void SceneEditor::resolvePickFeedback(const DebugFeedbackStruct& feedback, const caustica::render::RenderPickState& renderedPick)
 {
     // pickedMaterialID is PTMaterial::gpuDataIndex for the hit geometry (sub-mesh),
-    // not a per-instance material.
-    if (m_renderState.Picking.MaterialRequested)
+    // not a per-instance material. Use the rendered-frame pick flags, not live UI state.
+    if (renderedPick.MaterialRequested)
         m_editor.SelectedMaterial = findMaterial(int(feedback.pickedMaterialID));
-    if (m_renderState.Picking.InstanceRequested)
+    if (renderedPick.InstanceRequested)
     {
         ecs::Entity picked = findEntityByInstanceIndex(int(feedback.pickedInstanceIndex));
         if (picked == ecs::NullEntity)
-            picked = pickGaussianSplatAtPixel(m_renderState.Picking.Position);
+            picked = pickGaussianSplatAtPixel(renderedPick.Position);
         m_editor.SelectedEntity = picked;
         if (m_editor.SelectedEntity != caustica::ecs::NullEntity)
             m_editor.SelectedGaussianSplat = false;
@@ -746,11 +746,16 @@ void SceneEditor::afterWorldRender(GpuDevice& gpuDevice)
     if (!wr)
         return;
 
-    if (m_settings.ContinuousDebugFeedback || m_renderState.Picking.hasActivePickRequest())
-        resolvePickFeedback(wr->getFeedbackData());
+    const auto& renderedPick = wr->getLastRenderedPicking();
+    if (m_settings.ContinuousDebugFeedback || renderedPick.hasActivePickRequest())
+        resolvePickFeedback(wr->getFeedbackData(), renderedPick);
 
-    if (m_settings.ContinuousDebugFeedback || m_renderState.Picking.hasActivePickRequest())
-        m_renderState.Picking.clearPickRequests();
+    // Clear only the requests this finished frame actually owned. Clearing live
+    // state from an older in-flight frame would drop a newer click.
+    if (renderedPick.MaterialRequested)
+        m_renderState.Picking.MaterialRequested = false;
+    if (renderedPick.InstanceRequested)
+        m_renderState.Picking.InstanceRequested = false;
 
     auto saveFramebuffer = [this, &gpuDevice](const char* fileName) -> bool {
         nvrhi::IFramebuffer* framebuffer = gpuDevice.getCurrentFramebuffer(true);

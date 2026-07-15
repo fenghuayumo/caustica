@@ -46,6 +46,29 @@ void requestInstancePick(caustica::render::RenderRuntimeState& runtime)
     runtime.Picking.InstanceRequested = true;
 }
 
+void syncPickPositionFromCursor(SceneEditor& sceneEditor)
+{
+    auto& session = sceneEditor.renderSessionState();
+    GLFWwindow* window = sceneEditor.glfwWindow();
+    if (!window)
+        return;
+
+    double cursorX = 0.0;
+    double cursorY = 0.0;
+    glfwGetCursorPos(window, &cursorX, &cursorY);
+
+    dm::float2 upscalingScale(1.0f, 1.0f);
+    if (auto* worldRenderer = sceneEditor.worldRenderer(); worldRenderer && worldRenderer->getRenderTargets())
+        upscalingScale = dm::float2(worldRenderer->getRenderSize())
+            / dm::float2(worldRenderer->getDisplaySize());
+
+    session.runtime.Picking.Position = dm::uint2{
+        static_cast<uint>(cursorX * upscalingScale.x),
+        static_cast<uint>(cursorY * upscalingScale.y)};
+    session.settings.MousePos = session.runtime.Picking.Position;
+    session.settings.DebugPixel = session.runtime.Picking.Position;
+}
+
 bool onKeyPressed(SceneEditor& sceneEditor, caustica::KeyPressedEvent& e)
 {
     const int key = ToGlfwKey(e.getKeyCode());
@@ -193,13 +216,13 @@ bool onMouseButtonPressed(SceneEditor& sceneEditor, caustica::MouseButtonPressed
         game->mouseButtonUpdate(button, cGlfwPress, mods);
     if (button == ToGlfwMouse(caustica::Mouse::Left))
     {
+        syncPickPositionFromCursor(sceneEditor);
         requestInstancePick(session.runtime);
-        session.settings.DebugPixel = session.runtime.Picking.Position;
     }
     else if (button == ToGlfwMouse(caustica::Mouse::Right))
     {
+        syncPickPositionFromCursor(sceneEditor);
         requestMaterialPick(session.runtime);
-        session.settings.DebugPixel = session.runtime.Picking.Position;
     }
 #if CAUSTICA_WITH_STREAMLINE
     if (button == ToGlfwMouse(caustica::Mouse::Left))

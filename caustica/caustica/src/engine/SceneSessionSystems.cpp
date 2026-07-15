@@ -274,13 +274,20 @@ namespace
 
     void afterWorldRenderDefault(App& app, GpuDevice& /*gpuDevice*/)
     {
-        PathTracerSettings* cfg = sceneSession::settings(app);
         RenderRuntimeState* runtime = sceneSession::runtimeState(app);
-        if (!cfg || !runtime)
+        if (!runtime)
             return;
 
-        if (cfg->ContinuousDebugFeedback || runtime->Picking.hasActivePickRequest())
-            runtime->Picking.clearPickRequests();
+        // Clear only requests owned by the frame that just rendered. Using live
+        // Picking here drops clicks stolen by an older in-flight frame.
+        const auto* wr = sceneSession::worldRenderer(app);
+        const caustica::render::RenderPickState renderedPick = wr
+            ? wr->getLastRenderedPicking()
+            : caustica::render::RenderPickState{};
+        if (renderedPick.MaterialRequested)
+            runtime->Picking.MaterialRequested = false;
+        if (renderedPick.InstanceRequested)
+            runtime->Picking.InstanceRequested = false;
     }
 
     void afterWorldRender(App& app, GpuDevice& gpuDevice)

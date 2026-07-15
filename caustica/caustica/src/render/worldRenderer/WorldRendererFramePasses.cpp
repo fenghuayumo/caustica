@@ -523,9 +523,13 @@ void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext
     constants.previousView = FromPlanarViewConstants(previousView);
 
     constants.debug = {};
-    constants.debug.pick = m_context.runtimeState.Picking.hasActivePickRequest() || m_context.activeSettings().ContinuousDebugFeedback;
-    constants.debug.pickX = (constants.debug.pick) ? (m_context.activeSettings().DebugPixel.x) : (-1);
-    constants.debug.pickY = (constants.debug.pick) ? (m_context.activeSettings().DebugPixel.y) : (-1);
+    // Use the frame snapshot (activeRuntime), not live runtimeState — with a
+    // pipelined render thread an older in-flight frame must not steal a new click.
+    const bool pickActive = m_context.activeRuntime().Picking.hasActivePickRequest()
+        || m_context.activeSettings().ContinuousDebugFeedback;
+    constants.debug.pick = pickActive;
+    constants.debug.pickX = pickActive ? (m_context.activeSettings().DebugPixel.x) : (-1);
+    constants.debug.pickY = pickActive ? (m_context.activeSettings().DebugPixel.y) : (-1);
     constants.debug.debugLineScale = (m_context.activeSettings().ShowDebugLines) ? (m_context.activeSettings().DebugLineScale) : (0.0f);
     constants.debug.showWireframe = m_context.activeSettings().ShowWireframe;
     constants.debug.debugViewType = (int)m_context.activeSettings().DebugView;
@@ -623,7 +627,7 @@ void caustica::render::WorldRenderer::framePassDebugOverlay(PathTracingFrameCont
     }
     m_cpuSideDebugLines.clear();
 
-    if (m_context.activeSettings().ContinuousDebugFeedback || m_context.runtimeState.Picking.hasActivePickRequest())
+    if (m_context.activeSettings().ContinuousDebugFeedback || m_context.activeRuntime().Picking.hasActivePickRequest())
     {
         m_commandList->copyBuffer(m_feedback_Buffer_Cpu, 0, m_feedback_Buffer_Gpu, 0, sizeof(DebugFeedbackStruct) * 1);
         m_commandList->copyBuffer(m_debugLineBufferDisplay, 0, m_debugLineBufferCapture, 0, sizeof(DebugLineStruct) * MAX_DEBUG_LINES);
@@ -649,7 +653,7 @@ void caustica::render::WorldRenderer::framePassFinalize(PathTracingFrameContext&
         }
     }
 
-    if (m_context.activeSettings().ContinuousDebugFeedback || m_context.runtimeState.Picking.hasActivePickRequest())
+    if (m_context.activeSettings().ContinuousDebugFeedback || m_context.activeRuntime().Picking.hasActivePickRequest())
     {
         device()->waitForIdle();
         void* pData = device()->mapBuffer(m_feedback_Buffer_Cpu, nvrhi::CpuAccessMode::Read);
