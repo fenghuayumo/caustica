@@ -48,6 +48,7 @@ namespace caustica
     // log output to it. visibleByDefault=false hides the window (Release default).
     // No-op on non-Windows. Safe to call more than once.
     void initNativeConsole(bool visibleByDefault);
+    void shutdownNativeConsole();
     void setNativeConsoleVisible(bool visible);
     [[nodiscard]] bool isNativeConsoleVisible();
     bool toggleNativeConsoleVisible();

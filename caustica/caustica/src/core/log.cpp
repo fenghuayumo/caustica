@@ -141,6 +141,7 @@ namespace caustica
         HWND g_NativeConsoleHwnd = nullptr;
         bool g_NativeConsoleVisible = false;
         bool g_NativeConsoleInitialized = false;
+        bool g_NativeConsoleOwned = false; // true when we AllocConsole()'d (not AttachConsole)
 
         void RedirectStdioToConsole()
         {
@@ -163,8 +164,9 @@ namespace caustica
         }
 
         // Prefer attaching to a parent console (launched from cmd); else allocate one.
-        if (!AttachConsole(ATTACH_PARENT_PROCESS))
-            AllocConsole();
+        const bool attachedToParent = AttachConsole(ATTACH_PARENT_PROCESS) != 0;
+        if (!attachedToParent && !AllocConsole())
+            return;
 
         g_NativeConsoleHwnd = GetConsoleWindow();
         if (!g_NativeConsoleHwnd)
@@ -176,10 +178,34 @@ namespace caustica
         RedirectStdioToConsole();
 
         g_NativeConsoleInitialized = true;
+        g_NativeConsoleOwned = !attachedToParent;
         g_OutputToConsole = true;
         setNativeConsoleVisible(visibleByDefault);
 
         info("Native console ready (F1 toggles visibility)");
+    }
+
+    void shutdownNativeConsole()
+    {
+        if (!g_NativeConsoleInitialized)
+            return;
+
+        g_OutputToConsole = false;
+
+        // Detach CRT from the console before FreeConsole so exit-time stream
+        // flush/close cannot heap-corrupt against a torn-down console.
+        FILE* unused = nullptr;
+        freopen_s(&unused, "NUL", "w", stdout);
+        freopen_s(&unused, "NUL", "w", stderr);
+        freopen_s(&unused, "NUL", "r", stdin);
+
+        if (g_NativeConsoleOwned)
+            FreeConsole();
+
+        g_NativeConsoleHwnd = nullptr;
+        g_NativeConsoleVisible = false;
+        g_NativeConsoleOwned = false;
+        g_NativeConsoleInitialized = false;
     }
 
     void setNativeConsoleVisible(bool visible)
@@ -206,6 +232,7 @@ namespace caustica
     }
 #else
     void initNativeConsole(bool) {}
+    void shutdownNativeConsole() {}
     void setNativeConsoleVisible(bool) {}
     bool isNativeConsoleVisible() { return true; }
     bool toggleNativeConsoleVisible() { return true; }

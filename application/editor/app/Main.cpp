@@ -91,5 +91,8 @@ int main(int argc, char** argv)
 #endif
 
     korgi::shutdown();
+#ifdef _WIN32
+    caustica::shutdownNativeConsole();
+#endif
     return exitCode;
 }

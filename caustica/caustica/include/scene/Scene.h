@@ -193,5 +193,10 @@ namespace caustica
         [[nodiscard]] const Handle<SceneAsset>& getAssetHandle() const               { return m_Asset; }
         void setAssetHandle(Handle<SceneAsset> asset)                                { m_Asset = std::move(asset); }
 
+        // Break MeshInfo↔MeshAsset / Material↔MaterialAsset / Scene↔SceneAsset
+        // shared_ptr cycles and drop extract-cache retained mesh refs so GPU
+        // resources can destroy while the device is still alive (window close).
+        void prepareForUnload();
+
     };
 }

@@ -126,6 +126,18 @@ void GpuRenderSubsystem::endFrame()
 
 void GpuRenderSubsystem::onSceneUnloading()
 {
+    // Break asset shared_ptr cycles and drop extract retained refs BEFORE clearing
+    // the AssetSystem store / destroying the scene. Otherwise MeshInfo↔MeshAsset
+    // cycles keep BLAS/buffers alive past GpuDevice::shutdown and heap-corrupt on close.
+    if (m_sceneManager)
+    {
+        if (const std::shared_ptr<Scene> scene = m_sceneManager->getScene())
+        {
+            scene->prepareForUnload();
+            m_accelStructs.clearMeshAccelStructs(*scene);
+        }
+    }
+
     if (m_assetSystem)
         m_assetSystem->clearSceneAssets();
 

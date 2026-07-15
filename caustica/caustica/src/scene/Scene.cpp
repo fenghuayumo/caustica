@@ -260,6 +260,29 @@ box3 Scene::getSceneBounds() const
     return finite ? globalBounds : box3::empty();
 }
 
+void Scene::prepareForUnload()
+{
+    m_LogicExtractCache.clear();
+    m_LogicExtractCacheValid = false;
+    m_RenderSnapshot.clear();
+
+    if (m_EntityWorld)
+    {
+        for (const std::shared_ptr<MeshInfo>& mesh : m_EntityWorld->getMeshes())
+        {
+            if (mesh)
+                mesh->asset = nullptr;
+        }
+        for (const std::shared_ptr<Material>& material : m_EntityWorld->getMaterials())
+        {
+            if (material)
+                material->asset = nullptr;
+        }
+    }
+
+    m_Asset = nullptr;
+}
+
 const ResourceTracker<Material>& Scene::getMaterials() const
 {
     if (m_EntityWorld)
