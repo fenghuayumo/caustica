@@ -23,6 +23,7 @@ inline void finalizeRuntimeSceneMutation(
     uint32_t frameIndex,
     const RuntimeSceneMutationCallbacks& callbacks = {})
 {
+    // Prefer spawn() / Extract auto-flush. This only marks sync + republishes proxies.
     publishSceneRenderProxies(scene, importedRoot, frameIndex, callbacks);
 }
 

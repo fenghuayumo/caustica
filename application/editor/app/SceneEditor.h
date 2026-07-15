@@ -107,7 +107,6 @@ public:
     bool loadMeshFile(const std::filesystem::path& filePath);
     bool loadGltfMeshFile(const std::filesystem::path& filePath);
     bool loadObjMeshFile(const std::filesystem::path& filePath);
-    void syncSceneGpu();
     bool deleteSceneNode(caustica::ecs::Entity entity);
     void processPendingSceneDeletes();
     void requestFullRebuild();

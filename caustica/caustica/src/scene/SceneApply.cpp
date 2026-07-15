@@ -61,6 +61,8 @@ ecs::Entity attachImportedScene(
         scene->getSceneTypeFactory().get());
 
     ApplyMaterialCallbacks(scene, importedRoot, callbacks);
+    if (ecs::isValid(importedRoot))
+        scene->requestGpuStructureSync();
     return importedRoot;
 }
 
@@ -80,8 +82,11 @@ void publishSceneRenderProxies(
 {
     ApplyMaterialCallbacks(scene, importedRoot, callbacks);
 
-    if (scene)
-        scene->extractAndPublishRenderSnapshot(frameIndex);
+    if (!scene)
+        return;
+
+    scene->requestGpuStructureSync();
+    scene->extractAndPublishRenderSnapshot(frameIndex);
 }
 
 bool destroySceneEntity(const DestroySceneEntityParams& params)
@@ -104,7 +109,7 @@ bool destroySceneEntity(const DestroySceneEntityParams& params)
 
     entityWorld->destroyEntity(params.entity);
     entityWorld->rebuildPathsFromRoot();
-    params.scene->extractAndPublishRenderSnapshot(params.frameIndex);
+    params.scene->requestGpuStructureSync();
     return true;
 }
 

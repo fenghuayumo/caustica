@@ -636,11 +636,6 @@ bool SceneEditor::loadObjMeshFile(const std::filesystem::path& filePath)
     return m_contentEditor.loadObjMeshFile(filePath);
 }
 
-void SceneEditor::syncSceneGpu()
-{
-    m_contentEditor.syncSceneGpu();
-}
-
 bool SceneEditor::deleteSceneNode(caustica::ecs::Entity entity)
 {
     return m_contentEditor.deleteSceneNode(entity);

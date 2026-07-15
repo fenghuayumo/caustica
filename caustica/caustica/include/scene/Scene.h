@@ -71,6 +71,9 @@ namespace caustica
         // Stays true after a structure publish until SceneGpuUpdater consumes it, so a
         // delete on a no-render frame still forces GPU buffer rebuild on the next render.
         bool m_gpuStructureFlushPending = false;
+        // Logic mutated ECS structure; Extract must exclusive-upload meshes/AS before
+        // publishing proxies that reference the new graph.
+        bool m_pendingGpuStructureSync = false;
 
         std::atomic<uint32_t> m_gpuReadFrameIndex{UINT32_MAX};
 
@@ -142,6 +145,11 @@ namespace caustica
 
         void syncRenderSnapshotGpuIndices(uint32_t frameIndex);
         void acknowledgeGpuStructureConsumed();
+
+        // Bevy-style: mutate ECS only; engine flushes GPU/AS before Extract.
+        void requestGpuStructureSync();
+        [[nodiscard]] bool needsGpuStructureSync() const { return m_pendingGpuStructureSync; }
+        void clearGpuStructureSyncRequest();
 
         [[nodiscard]] bool hasSceneTransformsChanged() const;
         [[nodiscard]] bool hasSceneStructureChanged() const;

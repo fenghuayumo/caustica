@@ -7,13 +7,8 @@
 #include <core/log.h>
 #include <engine/App.h>
 #include <engine/SceneSessionSystems.h>
-#include <render/SceneGaussianSplatPasses.h>
-#include <render/SceneLightingPasses.h>
-#include <render/SceneRayTracingResources.h>
 #include <render/core/SceneMeshEditing.h>
-#include <scene/SceneApply.h>
 #include <scene/SceneEcs.h>
-#include <scene/SceneManager.h>
 
 #include <algorithm>
 #include <cctype>
@@ -123,59 +118,24 @@ bool SceneContentEditor::loadObjMeshFile(const std::filesystem::path& filePath)
     return importMeshFile(filePath);
 }
 
-void SceneContentEditor::syncSceneGpu()
-{
-    if (auto* app = m_sceneEditor.app())
-        caustica::sceneSession::syncSceneGpu(*app);
-}
-
 bool SceneContentEditor::deleteSceneNode(caustica::ecs::Entity entity)
 {
-    auto* sceneManager = m_sceneEditor.sceneManager();
-    auto* gpuRender = m_sceneEditor.gpuRender();
-    if (!sceneManager || !gpuRender)
+    auto* app = m_sceneEditor.app();
+    if (!app)
         return false;
 
-    if (!sceneManager->tryBeginStructureEdit())
+    if (!caustica::sceneSession::despawn(*app, entity))
         return false;
 
-    struct StructureEditGuard
-    {
-        SceneManager* manager = nullptr;
-        ~StructureEditGuard()
-        {
-            if (manager)
-                manager->endStructureEdit();
-        }
-    } structureGuard{ sceneManager };
-
-    auto scene = sceneManager->getScene();
+    auto scene = m_sceneEditor.scene();
     auto* ew = scene ? scene->getEntityWorld() : nullptr;
-    if (!ew || !ew->world().isAlive(entity))
-        return false;
-
-    if (!caustica::destroySceneEntity(caustica::DestroySceneEntityParams{
-            .scene = scene,
-            .entity = entity,
-            .frameIndex = m_sceneEditor.frameIndex(),
-            .beforeDetach = [gpuRender](caustica::ecs::Entity deletedEntity) {
-                gpuRender->gaussianSplatPasses().removeObjectsUnderEntity(deletedEntity);
-            },
-        }))
-    {
-        return false;
-    }
-
-    m_sceneEditor.lightingPasses().resyncLightsFromScene(*scene);
-
     auto& editor = m_sceneEditor.editorUIState();
-    if (editor.TogglableNodes != nullptr)
+    if (ew && editor.TogglableNodes != nullptr)
     {
         editor.TogglableNodes->clear();
         UpdateTogglableNodes(*editor.TogglableNodes, *ew, ew->root());
     }
 
-    gpuRender->rayTracingResources().requestAccelerationStructureRebuild();
     return true;
 }
 

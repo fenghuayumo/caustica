@@ -1,4 +1,5 @@
 #include <engine/SceneSessionSystems.h>
+#include <engine/SceneSessionPlugins.h>
 
 #include <engine/App.h>
 #include <engine/GpuRenderSubsystem.h>
@@ -608,17 +609,19 @@ void runGpuWorkOnRenderThread(App& app, const std::function<void()>& work)
     app.runGpuWorkOnRenderThread(work);
 }
 
-void syncSceneGpu(App& app)
+void flushPendingStructureGpu(App& app)
 {
     GpuRenderSubsystem* gr = gpuRender(app);
     GpuDevice* device = gpuDevice(app);
     auto scenePtr = scene(app);
-    if (!gr || !device || !scenePtr)
+    if (!gr || !device || !scenePtr || !scenePtr->needsGpuStructureSync())
         return;
 
     // Exclusive access: no in-flight Extract/render reading an incomplete structure.
     device->waitForRenderThreadIdle();
 
+    // Use logic frame index (matches Extract after SetRenderFrameIndex; correct for
+    // immediate flush from spawn/despawn in PostUpdate before Extract runs).
     const uint32_t frameIndex = device->getFrameIndex();
     runGpuWorkOnRenderThread(app, [gr, scenePtr, device, frameIndex]() {
         if (nvrhi::IDevice* nvrhiDevice = device->getDevice())
@@ -631,6 +634,7 @@ void syncSceneGpu(App& app)
         }
 
         gr->lightingPasses().ensureMaterialsFromScene(scenePtr);
+        gr->lightingPasses().resyncLightsFromScene(*scenePtr);
         render::SceneGpuUpdater::refreshAfterLoad(*scenePtr, frameIndex);
 
         // Rebuild BLAS/TLAS immediately while exclusive. Leaving this to the next
@@ -639,6 +643,8 @@ void syncSceneGpu(App& app)
         nvrhi::CommandListHandle commandList = device->getDevice()->createCommandList();
         gr->rayTracingResources().recreateAccelStructs(commandList);
     });
+
+    scenePtr->clearGpuStructureSyncRequest();
 }
 
 Handle<ScenePrefabAsset> load(App& app, const std::filesystem::path& path)
@@ -692,13 +698,16 @@ ecs::Entity spawn(App& app, const Handle<ScenePrefabAsset>& prefab, const SceneA
         }
     } guard{ manager };
 
+    // Some render paths still touch live ECS; never mutate structure while RT is in-flight.
     device->waitForRenderThreadIdle();
 
     const ecs::Entity root = attachImportedScene(scenePtr, *prefab->import, callbacks);
     if (!ecs::isValid(root))
         return ecs::NullEntity;
 
-    syncSceneGpu(app);
+    // Upload meshes/AS before any later system or Extract publishes proxies.
+    // (Extract flush is a no-op when the pending flag is already cleared.)
+    flushPendingStructureGpu(app);
     return root;
 }
 
@@ -708,6 +717,45 @@ ecs::Entity spawnFromFile(
     const SceneApplyCallbacks& callbacks)
 {
     return spawn(app, load(app, path), callbacks);
+}
+
+bool despawn(App& app, ecs::Entity entity)
+{
+    ::SceneManager* manager = sceneManager(app);
+    GpuRenderSubsystem* gr = gpuRender(app);
+    GpuDevice* device = gpuDevice(app);
+    auto scenePtr = scene(app);
+    if (!manager || !gr || !device || !scenePtr || !ecs::isValid(entity))
+        return false;
+
+    if (!manager->tryBeginStructureEdit())
+        return false;
+
+    struct StructureEditGuard
+    {
+        ::SceneManager* manager = nullptr;
+        ~StructureEditGuard()
+        {
+            if (manager)
+                manager->endStructureEdit();
+        }
+    } guard{ manager };
+
+    device->waitForRenderThreadIdle();
+
+    if (!destroySceneEntity(DestroySceneEntityParams{
+            .scene = scenePtr,
+            .entity = entity,
+            .beforeDetach = [gr](ecs::Entity deletedEntity) {
+                gr->gaussianSplatPasses().removeObjectsUnderEntity(deletedEntity);
+            },
+        }))
+    {
+        return false;
+    }
+
+    flushPendingStructureGpu(app);
+    return true;
 }
 
 void onSceneLoaded(App& app)

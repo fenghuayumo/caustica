@@ -396,6 +396,16 @@ void Scene::acknowledgeGpuStructureConsumed()
     m_SceneStructureChanged = false;
 }
 
+void Scene::requestGpuStructureSync()
+{
+    m_pendingGpuStructureSync = true;
+}
+
+void Scene::clearGpuStructureSyncRequest()
+{
+    m_pendingGpuStructureSync = false;
+}
+
 void Scene::attachDirectionalLightToRoot(scene::DirectionalLightComponent component, const std::string& name)
 {
     if (!m_EntityWorld || !ecs::isValid(m_EntityWorld->root()))

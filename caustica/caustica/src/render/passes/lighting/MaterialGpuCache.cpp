@@ -1267,7 +1267,22 @@ int MaterialGpuCache::ensureMaterialsFromScene(const std::shared_ptr<caustica::S
     if (added > 0)
     {
         m_materialDataWasReset = true;
-        bakeShaderPermutations();
+        // Runtime import: do not rebuild the specialized permutation table.
+        // Rebaking every material forces PathTracingShaderCompiler to reload/create
+        // dozens of RT libraries + a huge hit-group PSO (looks like a hang after drag-drop).
+        // New materials use the ubershader until the next full scene material bake.
+        if (m_ubershader)
+        {
+            for (auto& materialPT : m_materials)
+            {
+                if (!materialPT->bakedShaderPermutation)
+                    materialPT->bakedShaderPermutation = m_ubershader;
+            }
+        }
+        else
+        {
+            bakeShaderPermutations();
+        }
         caustica::info("MaterialGpuCache: ensured %d new runtime materials (total=%zu)", added, m_materials.size());
     }
     return added;

@@ -19,12 +19,9 @@ namespace caustica::scene
     //
     // Contract:
     //   Logic thread (Bevy-style): mutate SceneEntityWorld only; never upload GPU.
-    //   Extract schedule: build MeshInstanceRenderProxy / LightRenderProxy / …
-    //                     into SceneRenderSnapshot (triple-buffered).
+    //   Structure edits call Scene::requestGpuStructureSync(); Extract flushes mesh/AS
+    //   then builds MeshInstanceRenderProxy / LightRenderProxy / … into SceneRenderSnapshot.
     //   Render thread: Scene::getRenderData() — never touches live ECS components.
-    //
-    // Structure changes (import/destroy) must call sceneSession::syncSceneGpu
-    // so mesh GPU buffers exist before proxies are published.
 
     struct MeshInstanceRenderProxy
     {

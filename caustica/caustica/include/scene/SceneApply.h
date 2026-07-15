@@ -14,8 +14,8 @@ struct Material;
 struct SceneImportResult;
 
 // Logic-thread scene graph edits (Bevy-style: change the world, do not touch GPU).
-// After attach/destroy, call sceneSession::syncSceneGpu so the render thread
-// uploads resources and publishes UE-style render proxies.
+// Structure edits mark Scene::requestGpuStructureSync(); Extract flushes mesh upload
+// and AS rebuild before publishing UE-style render proxies.
 
 struct SceneApplyCallbacks
 {
@@ -26,12 +26,11 @@ struct DestroySceneEntityParams
 {
     std::shared_ptr<Scene> scene;
     ecs::Entity entity = ecs::NullEntity;
-    uint32_t frameIndex = 0;
-    // Caller must drain the render thread / GPU before destroy.
+    // Optional hook before ECS detach (e.g. drop render-owned splat objects).
     std::function<void(ecs::Entity)> beforeDetach;
 };
 
-// Grafts an importer subtree into the live ECS. Does not publish render proxies.
+// Grafts an importer subtree into the live ECS. Does not upload GPU or publish proxies.
 ecs::Entity attachImportedScene(
     const std::shared_ptr<Scene>& scene,
     const SceneImportResult& importResult,
@@ -42,8 +41,8 @@ void applyImportedSceneMaterialCallbacks(
     ecs::Entity importedRoot,
     const SceneApplyCallbacks& callbacks);
 
-// Publishes a render snapshot only. Prefer syncSceneGpu so mesh GPU buffers
-// exist before proxies are visible to the render thread.
+// Marks GPU structure sync + extracts proxies for the current frame.
+// Prefer letting Extract auto-flush; this remains for rare immediate republish paths.
 void publishSceneRenderProxies(
     const std::shared_ptr<Scene>& scene,
     ecs::Entity importedRoot,

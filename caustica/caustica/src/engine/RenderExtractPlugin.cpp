@@ -3,6 +3,7 @@
 #include <engine/App.h>
 #include <engine/AppSchedules.h>
 #include <engine/GpuRenderSubsystem.h>
+#include <engine/SceneSessionSystems.h>
 #include <engine/SceneViewState.h>
 
 #include <backend/GpuDevice.h>
@@ -35,6 +36,9 @@ void prepareRenderFrame(App& app)
         gr->sceneManager() ? gr->sceneManager()->getScene() : nullptr;
     if (!activeScene)
         return;
+
+    // Structure mutations from update systems are ECS-only until here.
+    flushPendingStructureGpu(app);
 
     scene::SessionRenderExtractInputs sessionInputs;
     sessionInputs.camera = &gr->camera();

@@ -136,10 +136,8 @@ void debugDrawLine(App& app, math::float3 start, math::float3 stop, math::float4
 
 void runGpuWorkOnRenderThread(App& app, const std::function<void()>& work);
 
-void syncSceneGpu(App& app);
-
 // Bevy-style assets.load + spawn for mesh scene files (.glb/.gltf/.obj/…).
-// load caches a CPU prefab; spawn attaches ECS then syncs GPU/proxies.
+// load caches a CPU prefab; spawn attaches ECS — Extract auto-flushes GPU/proxies.
 [[nodiscard]] Handle<ScenePrefabAsset> load(App& app, const std::filesystem::path& path);
 [[nodiscard]] ecs::Entity spawn(
     App& app,
@@ -149,6 +147,7 @@ void syncSceneGpu(App& app);
     App& app,
     const std::filesystem::path& path,
     const SceneApplyCallbacks& callbacks = {});
+[[nodiscard]] bool despawn(App& app, ecs::Entity entity);
 
 } // namespace sceneSession
 

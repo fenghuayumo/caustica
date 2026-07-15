@@ -755,6 +755,10 @@ void PathTracingShaderCompiler::update(const std::shared_ptr<caustica::Scene>& s
             }
         }
 
+        if (firstError == "" && isLoadOnlyMode() && !updateQueue.empty())
+            caustica::info("PathTracingShaderCompiler: loaded %zu shader libraries, building %zu PSOs...",
+                m_parallelCompileListAll.size(), updateQueue.size());
+
         progressCompilingShaders.Set(100);
         m_parallelCompileListAll.clear();
         m_parallelCompileListUnique.clear();

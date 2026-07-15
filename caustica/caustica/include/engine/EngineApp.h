@@ -55,8 +55,8 @@ struct EngineAppDesc
 //   auto engine = caustica::EngineApp::create({ .headless = true });
 //   while (running) engine->stepFrame();
 //
-// Scene / settings / camera: use sceneSession:: free functions on engine->app(),
-// or the convenience methods below.
+// Scene / settings / camera: use sceneSession::load/spawn/despawn and free functions
+// on engine->app(), or the convenience methods below.
 class EngineApp
 {
 public:
