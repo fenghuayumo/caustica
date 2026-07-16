@@ -432,6 +432,18 @@ std::string currentSceneName(const App& app)
     return manager ? manager->getCurrentSceneName() : std::string();
 }
 
+std::filesystem::path currentScenePath(const App& app)
+{
+    ::SceneManager* manager = sceneManager(app);
+    return manager ? manager->getCurrentScenePath() : std::filesystem::path{};
+}
+
+bool isSceneStructureBusy(const App& app)
+{
+    ::SceneManager* manager = sceneManager(app);
+    return manager && manager->isSceneStructureBusy();
+}
+
 uint sceneCameraCount(const App& app)
 {
     auto scenePtr = activeScene(app);
@@ -569,8 +581,7 @@ void setCurrentScene(App& app, const std::string& sceneName, bool forceReload)
 
 bool shouldSkipRender(const App& app)
 {
-    ::SceneManager* manager = sceneManager(app);
-    return !manager || manager->getScene() == nullptr;
+    return activeScene(app) == nullptr;
 }
 
 void beginFrameScheduled(App& app)

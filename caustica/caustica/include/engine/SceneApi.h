@@ -62,6 +62,8 @@ void syncSceneAccess(App& app);
 [[nodiscard]] std::shared_ptr<Scene> activeScene(const App& app);
 [[nodiscard]] const std::vector<std::string>& availableScenes(const App& app);
 [[nodiscard]] std::string currentSceneName(const App& app);
+[[nodiscard]] std::filesystem::path currentScenePath(const App& app);
+[[nodiscard]] bool isSceneStructureBusy(const App& app);
 [[nodiscard]] bool shouldSkipRender(const App& app);
 [[nodiscard]] bool shouldRenderWhenUnfocused(const App& app);
 

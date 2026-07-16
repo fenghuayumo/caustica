@@ -2,13 +2,11 @@
 
 #include <engine/App.h>
 #include <engine/AppSchedules.h>
-#include <engine/GpuRenderSubsystem.h>
 #include <engine/SceneApi.h>
 #include <engine/SceneViewState.h>
 
 #include <backend/GpuDevice.h>
 #include <scene/Scene.h>
-#include <scene/SceneManager.h>
 
 #include <string>
 
@@ -19,22 +17,18 @@ namespace caustica
 
 void updateWindowTitle(App& app)
 {
-    auto* gr = app.tryResource<GpuRenderSubsystem>();
     auto* vs = app.tryResource<SceneViewState>();
     GpuDevice* device = app.getGpuDevice();
-    if (!gr || !vs || !device || !gr->sceneManager())
+    const std::shared_ptr<Scene> scene = activeScene(app);
+    if (!vs || !device || !scene)
         return;
 
-    auto activeScene = gr->sceneManager()->getScene();
-    if (!activeScene)
-        return;
-
-    std::string extraInfo = ", " + vs->fpsInfo + ", " + gr->sceneManager()->getCurrentSceneName() + ", "
-        + resolutionInfo(app) + ", (L: " + std::to_string(activeScene->getLightEntities().size())
-        + ", MAT: " + std::to_string(activeScene->getMaterials().size())
-        + ", MESH: " + std::to_string(activeScene->getMeshes().size())
-        + ", I: " + std::to_string(activeScene->getMeshInstances().size())
-        + ", SI: " + std::to_string(activeScene->getSkinnedMeshInstances().size())
+    std::string extraInfo = ", " + vs->fpsInfo + ", " + currentSceneName(app) + ", "
+        + resolutionInfo(app) + ", (L: " + std::to_string(scene->getLightEntities().size())
+        + ", MAT: " + std::to_string(scene->getMaterials().size())
+        + ", MESH: " + std::to_string(scene->getMeshes().size())
+        + ", I: " + std::to_string(scene->getMeshInstances().size())
+        + ", SI: " + std::to_string(scene->getSkinnedMeshInstances().size())
 #if ENABLE_DEBUG_VIZUALISATIONS
         + ", ENABLE_DEBUG_VIZUALISATIONS: 1"
 #endif

@@ -12,7 +12,6 @@
 #include <render/core/PathTracerSettings.h>
 #include <render/worldRenderer/WorldRenderer.h>
 #include <scene/Scene.h>
-#include <scene/SceneManager.h>
 #include <scene/SceneRenderData.h>
 
 namespace caustica
@@ -32,9 +31,8 @@ void prepareRenderFrame(App& app)
     if (!device || !gr)
         return;
 
-    const std::shared_ptr<Scene> activeScene =
-        gr->sceneManager() ? gr->sceneManager()->getScene() : nullptr;
-    if (!activeScene)
+    const std::shared_ptr<Scene> scene = activeScene(app);
+    if (!scene)
         return;
 
     // Structure mutations from update systems are ECS-only until here.
@@ -51,17 +49,13 @@ void prepareRenderFrame(App& app)
     if (vs)
         sessionInputs.sceneTime = vs->sceneTime;
 
-    activeScene->extractAndPublishRenderSnapshot(device->getPreparedRenderFrameIndex(), &sessionInputs);
+    scene->extractAndPublishRenderSnapshot(device->getPreparedRenderFrameIndex(), &sessionInputs);
 }
 
 void registerRenderExtractPlugin(App& app)
 {
     app.addSystemAfter(AppSchedule::Extract, "Scene.PrepareRenderFrame", "SetRenderFrameIndex", [](SystemContext& ctx) {
-        if (!ctx.gpuDevice)
-            return;
-
-        auto* gr = ctx.tryRes<GpuRenderSubsystem>();
-        if (!gr || !gr->sceneManager() || !gr->sceneManager()->getScene())
+        if (!ctx.gpuDevice || !activeScene(ctx.app))
             return;
 
         prepareRenderFrame(ctx.app);

@@ -7,7 +7,9 @@
 namespace caustica
 {
 
-// Minimal runtime: GPU infra + scene plugins (no editor UI).
+// Shared runtime bootstrap for headless apps and the editor:
+// assets, SceneApp resources, SceneAccess, GpuRenderSubsystem, schedule bridge, scene startup.
+// EditorPlugin composes this and only adds editor resources / systems.
 struct DefaultPlugins : Plugin
 {
     explicit DefaultPlugins(SceneAppConfig appConfig)

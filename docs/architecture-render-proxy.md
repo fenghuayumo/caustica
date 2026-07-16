@@ -60,7 +60,8 @@ Frame rendering already uses light proxies + cached splat transforms; do not mov
 | OO mesh/camera leaf classes | Removed; meshes/cameras are ECS components + Extract proxies |
 | `SceneRenderCommandQueue` | Removed (Extract + RenderThread dispatch is the sync path) |
 | GaussianSplat / SampleSettings / GameSettings OO | Still `shared_ptr` leaf payloads on ECS — fold into value components later |
-| `caustica::*` SceneApi facade (ex-`sceneSession`) | Python/Editor still call facade; engine plugins prefer `tryRes` / `entityWorld` |
+| `caustica::*` SceneApi facade (ex-`sceneSession`) | Still large; prefer `activeScene` / `entityWorld` / `SceneAccess` for scene queries |
+| Scene query path | Engine plugins + editor use `activeScene`/`entityWorld`; do not dig `gpu->sceneManager()->getScene()` |
 | `EditorPlugin` | Composes `DefaultPlugins` (shared bootstrap + `SceneAccess`) |
 
 ## File map

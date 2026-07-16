@@ -2,11 +2,9 @@
 
 #include <engine/App.h>
 #include <engine/AppSchedules.h>
-#include <engine/GpuRenderSubsystem.h>
 #include <engine/SceneApi.h>
 
 #include <scene/Scene.h>
-#include <scene/SceneManager.h>
 
 namespace caustica
 {
@@ -15,13 +13,11 @@ void refreshEntityWorld(App& app, uint32_t frameIndex)
 {
     syncSceneAccess(app);
 
-    auto* gr = app.tryResource<GpuRenderSubsystem>();
-    const std::shared_ptr<Scene> activeScene =
-        gr && gr->sceneManager() ? gr->sceneManager()->getScene() : nullptr;
-    if (!activeScene)
+    const std::shared_ptr<Scene> scene = activeScene(app);
+    if (!scene)
         return;
 
-    activeScene->refreshEntityWorldForFrame(frameIndex);
+    scene->refreshEntityWorldForFrame(frameIndex);
 }
 
 void registerSceneAnimationPlugin(App& app)

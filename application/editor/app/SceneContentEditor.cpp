@@ -50,11 +50,8 @@ void SceneContentEditor::handleDroppedFiles(std::vector<std::string>& pendingFil
     if (pendingFiles.empty())
         return;
 
-    if (auto* sceneManager = caustica::editor::editorGpu(m_sceneEditor)->sceneManager();
-        sceneManager && sceneManager->isSceneStructureBusy())
-    {
+    if (caustica::isSceneStructureBusy(editorApp(m_sceneEditor)))
         return;
-    }
 
     auto files = std::move(pendingFiles);
     pendingFiles.clear();

@@ -2,10 +2,7 @@
 
 #include <engine/App.h>
 #include <engine/AppSchedules.h>
-#include <engine/GpuRenderSubsystem.h>
 #include <engine/SceneApi.h>
-
-#include <scene/SceneManager.h>
 
 namespace caustica
 {
@@ -13,11 +10,7 @@ namespace caustica
 void registerPathTracingPlugin(App& app)
 {
     app.addSystem(AppSchedule::render, "Scene.RenderScene", [](SystemContext& ctx) {
-        if (!ctx.gpuDevice)
-            return;
-
-        auto* gr = ctx.tryRes<GpuRenderSubsystem>();
-        if (!gr || !gr->sceneManager() || !gr->sceneManager()->getScene())
+        if (!ctx.gpuDevice || !activeScene(ctx.app))
             return;
 
         renderScene(ctx.app, *ctx.gpuDevice);

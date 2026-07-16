@@ -208,14 +208,14 @@ void SceneEditor::onSceneLoadedEarly()
     if (m_sampleGame == nullptr || !m_app)
         return;
 
-    auto* manager = gpuRender() ? gpuRender()->sceneManager() : nullptr;
-    if (!manager)
+    auto scene = caustica::activeScene(*m_app);
+    if (!scene)
         return;
 
     const std::filesystem::path assetsRoot = getLocalPath(c_AssetsFolder);
     m_sampleGame->sceneLoaded(
-        manager->getScene(),
-        manager->getCurrentScenePath(),
+        scene,
+        caustica::currentScenePath(*m_app),
         assetsRoot);
 }
 
@@ -321,17 +321,16 @@ void SceneEditor::updateWindowTitle()
         return;
 
     auto* device = m_app->getGpuDevice();
-    auto* manager = gpuRender() ? gpuRender()->sceneManager() : nullptr;
-    auto activeScene = caustica::activeScene(*m_app);
-    if (!device || !manager || !activeScene)
+    auto scene = caustica::activeScene(*m_app);
+    if (!device || !scene)
         return;
 
-    std::string extraInfo = ", " + caustica::fpsInfo(*m_app) + ", " + manager->getCurrentSceneName()
-        + ", " + caustica::resolutionInfo(*m_app) + ", (L: " + std::to_string(activeScene->getLightEntities().size())
-        + ", MAT: " + std::to_string(activeScene->getMaterials().size())
-        + ", MESH: " + std::to_string(activeScene->getMeshes().size())
-        + ", I: " + std::to_string(activeScene->getMeshInstances().size())
-        + ", SI: " + std::to_string(activeScene->getSkinnedMeshInstances().size())
+    std::string extraInfo = ", " + caustica::fpsInfo(*m_app) + ", " + caustica::currentSceneName(*m_app)
+        + ", " + caustica::resolutionInfo(*m_app) + ", (L: " + std::to_string(scene->getLightEntities().size())
+        + ", MAT: " + std::to_string(scene->getMaterials().size())
+        + ", MESH: " + std::to_string(scene->getMeshes().size())
+        + ", I: " + std::to_string(scene->getMeshInstances().size())
+        + ", SI: " + std::to_string(scene->getSkinnedMeshInstances().size())
 #if ENABLE_DEBUG_VIZUALISATIONS
         + ", ENABLE_DEBUG_VIZUALISATIONS: 1"
 #endif
