@@ -337,6 +337,48 @@ target_link_libraries(causScene
     PUBLIC causCore causMath causAnimation causEcs causAssets causBackend
 )
 
+if (CAUSTICA_WITH_OPENUSD)
+    target_compile_definitions(causScene
+        PUBLIC CAUSTICA_WITH_OPENUSD=1
+        PRIVATE "CAUSTICA_USD_ROOT_STRING=\"${CAUSTICA_USD_ROOT}\""
+        PRIVATE BOOST_ALL_NO_LIB=1
+    )
+    target_include_directories(causScene PUBLIC
+        "${CAUSTICA_USD_ROOT}/include"
+        "${CAUSTICA_USD_PYTHON_DIR}/Include"
+    )
+    target_link_directories(causScene PUBLIC
+        "${CAUSTICA_USD_ROOT}/lib"
+        "${CAUSTICA_USD_PYTHON_DIR}/libs"
+    )
+    # Minimal set for UsdStage + UsdGeom Mesh/Camera (NVIDIA modular OpenUSD 25.05).
+    # NVIDIA's USD DLLs depend on Python 3.11, so link python311 as well.
+    target_link_libraries(causScene PUBLIC
+        usd_usdGeom
+        usd_usd
+        usd_sdf
+        usd_pcp
+        usd_ar
+        usd_kind
+        usd_plug
+        usd_vt
+        usd_gf
+        usd_tf
+        usd_trace
+        usd_work
+        usd_arch
+        usd_js
+        usd_ts
+        usd_pegtl
+        usd_boost
+        usd_python
+        python311
+        tbb
+    )
+else()
+    target_compile_definitions(causScene PUBLIC CAUSTICA_WITH_OPENUSD=0)
+endif()
+
 # ── causRender ────────────────────────────────────────────────────────────
 # Render passes, world renderer, GPU utilities, path tracer, post-processing,
 # denoising (NRD / OIDN), RTXDI, Gaussian splatting, GPU sort, debugging.

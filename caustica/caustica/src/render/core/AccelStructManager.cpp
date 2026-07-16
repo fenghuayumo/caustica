@@ -57,6 +57,13 @@ void AccelStructManager::createBlases(nvrhi::ICommandList* commandList,
         }
 
         nvrhi::rt::AccelStructHandle as = m_device->createAccelStruct(blasDesc);
+        if (!as)
+        {
+            error("Failed to create BLAS for mesh '%s' (triangles=%llu). Skipping mesh AS.",
+                mesh->name.c_str(),
+                static_cast<unsigned long long>(meshTriangleCount));
+            continue;
+        }
         nvrhi::utils::BuildBottomLevelAccelStruct(commandList, as, blasDesc);
         mesh->accelStruct = as;
     }
@@ -88,6 +95,11 @@ void AccelStructManager::createTlas(nvrhi::ICommandList* commandList, const Scen
     tlasDesc.topLevelMaxInstances = std::max<size_t>(1, renderData.meshInstanceEntities.size());
     assert(tlasDesc.topLevelMaxInstances < (1 << 15));
     m_topLevelAS = m_device->createAccelStruct(tlasDesc);
+    if (!m_topLevelAS)
+    {
+        error("Failed to create TLAS for %zu instances.", renderData.meshInstanceEntities.size());
+        return;
+    }
 
     nvrhi::BufferDesc bufferDesc;
     bufferDesc.byteSize = sizeof(SubInstanceData) * std::max(1u, m_subInstanceCount);
@@ -183,6 +195,13 @@ void AccelStructManager::rebuildDirtyMeshes(nvrhi::ICommandList*            comm
             blasDesc.buildFlags = nvrhi::rt::AccelStructBuildFlags::PreferFastBuild
                 | nvrhi::rt::AccelStructBuildFlags::AllowUpdate;
             nvrhi::rt::AccelStructHandle as = m_device->createAccelStruct(blasDesc);
+            if (!as)
+            {
+                error("Failed to create updatable BLAS for mesh '%s'. Deferring full rebuild.",
+                    mesh->name.c_str());
+                fullRebuildRequested = true;
+                continue;
+            }
             nvrhi::utils::BuildBottomLevelAccelStruct(commandList, as, blasDesc);
             mesh->accelStruct = as;
 

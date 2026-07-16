@@ -11,8 +11,8 @@ namespace caustica
     class ThreadPool;
     class SceneTypeFactory;
 
-    // Loads a .caususd cache produced by tools/usd_bake_caustica.py
-    // (baked from OpenUSD .usd/.usda/.usdc stages).
+    // Loads OpenUSD stages (.usd/.usda/.usdc) and optional legacy .caususd caches.
+    // With CAUSTICA_WITH_OPENUSD, USD files are read directly via the C++ SDK.
     class CausUsdImporter
     {
     protected:
@@ -29,7 +29,7 @@ namespace caustica
             SceneImportResult& result,
             const std::filesystem::path& sceneDirectory = std::filesystem::path()) const;
 
-        // If `usdPath` is .usd/.usda/.usdc, ensure a sibling .caususd exists (bake via Python if needed).
+        // Legacy .caususd helpers (used when OpenUSD C++ is unavailable).
         static std::filesystem::path resolveCachePath(const std::filesystem::path& usdOrCachePath);
         static bool ensureCache(
             const std::filesystem::path& usdPath,

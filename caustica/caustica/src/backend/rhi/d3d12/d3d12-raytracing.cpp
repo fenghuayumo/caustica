@@ -887,6 +887,13 @@ namespace nvrhi::d3d12
             bufferDesc.isVirtual = desc.isVirtual;
             BufferHandle buffer = createBuffer(bufferDesc);
             as->dataBuffer = checked_cast<Buffer*>(buffer.Get());
+            // Non-virtual AS storage is required before build; a null buffer used to
+            // return a handle that immediately AVs in BuildBottomLevelAccelStruct.
+            if (!desc.isVirtual && !as->dataBuffer)
+            {
+                as->Release();
+                return nullptr;
+            }
         }
         
         // Sanitize the geometry data to avoid dangling pointers, we don't need these buffers in the desc

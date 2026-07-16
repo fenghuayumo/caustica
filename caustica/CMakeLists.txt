@@ -393,6 +393,17 @@ macro(add_caustica_sample TARGET_NAME MAIN_SOURCE)
             COMMAND_EXPAND_LISTS
         )
     endif()
+
+    if (CAUSTICA_WITH_OPENUSD AND CAUSTICA_USD_RUNTIME_DLLS)
+        add_custom_command(
+            TARGET ${TARGET_NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${TARGET_NAME}>/usd"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CAUSTICA_USD_RUNTIME_DLLS} "$<TARGET_FILE_DIR:${TARGET_NAME}>"
+            COMMAND ${CMAKE_COMMAND} -E copy_directory "${CAUSTICA_USD_PLUGIN_DIR}" "$<TARGET_FILE_DIR:${TARGET_NAME}>/usd"
+            COMMAND_EXPAND_LISTS
+            COMMENT "Deploy OpenUSD runtime DLLs and plugins beside ${TARGET_NAME}"
+        )
+    endif()
     
     # AgilitySDK support for this target
     if (CAUSTICA_D3D_AGILITY_SDK_PATH AND CAUSTICA_D3D_AGILITY_SDK_VERSION)

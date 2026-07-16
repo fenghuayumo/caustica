@@ -1,4 +1,5 @@
 #include <scene/loader/CausUsdImporter.h>
+#include "CausUsdOpenUsd.h"
 
 #include <scene/SceneImport.h>
 #include <scene/SceneEcs.h>
@@ -14,6 +15,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
+#include <new>
 #include <stdexcept>
 #include <type_traits>
 
@@ -299,6 +301,123 @@ std::filesystem::path FindBakeScript()
     return {};
 }
 
+int NormalizeProcessExitCode(int rc)
+{
+#if defined(_WIN32)
+    // CRT system()/pclose often encode the exit status as exitCode << 8.
+    if (rc > 0 && (rc & 0xff) == 0)
+        return (rc >> 8) & 0xff;
+#endif
+    return rc;
+}
+
+bool PythonHasPxr(const std::filesystem::path& pythonExe)
+{
+    if (pythonExe.empty())
+        return false;
+    if (pythonExe.is_absolute())
+    {
+        std::error_code ec;
+        if (!std::filesystem::exists(pythonExe, ec))
+            return false;
+    }
+
+    std::ostringstream probe;
+    // Quote absolute paths; leave bare commands like `python` unquoted.
+    if (pythonExe.is_absolute() || pythonExe.string().find(' ') != std::string::npos)
+        probe << '"' << pythonExe.string() << "\" -c \"import pxr\"";
+    else
+        probe << pythonExe.string() << " -c \"import pxr\"";
+#if defined(_WIN32)
+    FILE* pipe = _popen(probe.str().c_str(), "r");
+#else
+    FILE* pipe = popen(probe.str().c_str(), "r");
+#endif
+    if (!pipe)
+        return false;
+#if defined(_WIN32)
+    const int rc = _pclose(pipe);
+#else
+    const int rc = pclose(pipe);
+#endif
+    return NormalizeProcessExitCode(rc) == 0;
+}
+
+std::string ResolvePythonFromCommand(const std::string& command)
+{
+    std::ostringstream resolve;
+    resolve << command << " -c \"import sys; sys.stdout.write(sys.executable)\"";
+#if defined(_WIN32)
+    FILE* pipe = _popen(resolve.str().c_str(), "r");
+#else
+    FILE* pipe = popen(resolve.str().c_str(), "r");
+#endif
+    if (!pipe)
+        return command;
+    char buffer[512] = {};
+    const size_t n = fread(buffer, 1, sizeof(buffer) - 1, pipe);
+#if defined(_WIN32)
+    (void)_pclose(pipe);
+#else
+    (void)pclose(pipe);
+#endif
+    if (n == 0)
+        return command;
+    std::string path(buffer, n);
+    while (!path.empty() && (path.back() == '\n' || path.back() == '\r' || path.back() == ' '))
+        path.pop_back();
+    return path.empty() ? command : path;
+}
+
+std::string ResolvePythonExecutable()
+{
+    if (const char* env = std::getenv("CAUSTICA_PYTHON"); env && *env)
+    {
+        if (PythonHasPxr(env))
+            return env;
+        caustica::warning("CAUSTICA_PYTHON='%s' cannot import pxr; searching for another interpreter.", env);
+    }
+
+    std::vector<std::filesystem::path> candidates;
+
+#if defined(_WIN32)
+    // Absolute installs first. Do not use `py -3` — it often resolves to a
+    // conda/env without OpenUSD while PATH `python` does have pxr.
+    if (const char* localAppData = std::getenv("LOCALAPPDATA"); localAppData && *localAppData)
+    {
+        candidates.emplace_back(std::filesystem::path(localAppData) / "Programs" / "Python" / "Python311" / "python.exe");
+        candidates.emplace_back(std::filesystem::path(localAppData) / "Programs" / "Python" / "Python312" / "python.exe");
+        candidates.emplace_back(std::filesystem::path(localAppData) / "Programs" / "Python" / "Python310" / "python.exe");
+    }
+    candidates.emplace_back(R"(D:\ProgramTool\Pyton3\python.exe)");
+    candidates.emplace_back(R"(C:\Python311\python.exe)");
+    candidates.emplace_back(R"(C:\Python312\python.exe)");
+
+    char modulePath[MAX_PATH] = {};
+    if (GetModuleFileNameA(nullptr, modulePath, MAX_PATH) > 0)
+    {
+        const std::filesystem::path exeDir = std::filesystem::path(modulePath).parent_path();
+        candidates.emplace_back(exeDir / "python.exe");
+        candidates.emplace_back(exeDir / ".." / "python" / "python.exe");
+    }
+#endif
+
+    // PATH lookup last (skip WindowsApps store stub and bare `py`).
+    candidates.emplace_back("python");
+    candidates.emplace_back("python3");
+
+    for (const auto& candidate : candidates)
+    {
+        if (!PythonHasPxr(candidate))
+            continue;
+        if (candidate.is_absolute())
+            return candidate.string();
+        return ResolvePythonFromCommand(candidate.string());
+    }
+
+    return {};
+}
+
 bool RunPythonBake(const std::filesystem::path& usdPath, const std::filesystem::path& cachePath, std::string* errorMessage)
 {
     const std::filesystem::path script = FindBakeScript();
@@ -309,22 +428,60 @@ bool RunPythonBake(const std::filesystem::path& usdPath, const std::filesystem::
         return false;
     }
 
-    const char* python = std::getenv("CAUSTICA_PYTHON");
-    if (!python || !*python)
-        python = "python";
+    const std::string python = ResolvePythonExecutable();
+    if (python.empty())
+    {
+        if (errorMessage)
+            *errorMessage =
+                "no Python with OpenUSD (`pxr`) found. Install pxr or set CAUSTICA_PYTHON "
+                "to an interpreter that can `import pxr`";
+        return false;
+    }
 
+    // Capture stderr so bake exceptions (not only missing pxr) show in the UI.
+    const std::filesystem::path logPath = cachePath.string() + ".bake.log";
     std::ostringstream cmd;
+#if defined(_WIN32)
     cmd << '"' << python << "\" "
         << '"' << script.string() << "\" "
         << '"' << usdPath.string() << "\" "
-        << "-o \"" << cachePath.string() << '"';
+        << "-o \"" << cachePath.string() << "\" "
+        << "1>\"" << logPath.string() << "\" 2>&1";
+#else
+    cmd << '"' << python << "\" "
+        << '"' << script.string() << "\" "
+        << '"' << usdPath.string() << "\" "
+        << "-o \"" << cachePath.string() << "\" "
+        << ">\"" << logPath.string() << "\" 2>&1";
+#endif
 
     caustica::info("Baking USD cache: %s", cmd.str().c_str());
-    const int rc = std::system(cmd.str().c_str());
+    const int rc = NormalizeProcessExitCode(std::system(cmd.str().c_str()));
     if (rc != 0)
     {
+        std::string details;
+        {
+            std::ifstream log(logPath);
+            if (log)
+            {
+                std::ostringstream ss;
+                ss << log.rdbuf();
+                details = ss.str();
+                while (!details.empty() && (details.back() == '\n' || details.back() == '\r'))
+                    details.pop_back();
+                if (details.size() > 500)
+                    details = details.substr(details.size() - 500);
+            }
+        }
         if (errorMessage)
-            *errorMessage = "usd bake failed with exit code " + std::to_string(rc);
+        {
+            *errorMessage = "usd bake failed with exit code " + std::to_string(rc)
+                + " using " + python;
+            if (!details.empty())
+                *errorMessage += ": " + details;
+            else
+                *errorMessage += " (see " + logPath.string() + ")";
+        }
         return false;
     }
     std::error_code ec;
@@ -397,6 +554,19 @@ bool CausUsdImporter::load(
         std::filesystem::path cachePath = fileName;
         std::string ext = fileName.extension().string();
         std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return char(std::tolower(c)); });
+
+#if CAUSTICA_WITH_OPENUSD
+        if (ext == ".usd" || ext == ".usda" || ext == ".usdc")
+        {
+            std::string error;
+            if (!LoadSceneFromOpenUsd(fileName, *m_SceneTypeFactory, result, &error))
+            {
+                caustica::error("OpenUSD load failed for '%s': %s", fileName.string().c_str(), error.c_str());
+                return false;
+            }
+            return true;
+        }
+#else
         if (ext == ".usd" || ext == ".usda" || ext == ".usdc")
         {
             std::string error;
@@ -406,6 +576,7 @@ bool CausUsdImporter::load(
                 return false;
             }
         }
+#endif
 
         BinaryReader reader(ReadEntireFile(cachePath));
         char magic[8] = {};
@@ -557,6 +728,15 @@ bool CausUsdImporter::load(
             meshCount,
             cameraCount);
         return true;
+    }
+    catch (const std::bad_alloc& ex)
+    {
+        caustica::error(
+            "CausUsdImporter ran out of memory loading '%s' (%s). "
+            "Large USD point caches may require more RAM; try baking with fewer frames.",
+            fileName.string().c_str(),
+            ex.what());
+        return false;
     }
     catch (const std::exception& ex)
     {

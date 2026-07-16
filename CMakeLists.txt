@@ -205,6 +205,35 @@ endif()
 #----------------------------------------------------------------------------------------------------------------------
 
 #----------------------------------------------------------------------------------------------------------------------
+# Native OpenUSD C++ import (.usd/.usda/.usdc without .caususd bake)
+option(CAUSTICA_WITH_OPENUSD "Enable native OpenUSD C++ stage loading" ON)
+set(CAUSTICA_USD_ROOT "D:/ProgramTool/OpenUSD" CACHE PATH "OpenUSD SDK root (include/, lib/, plugin/)")
+set(CAUSTICA_USD_PYTHON_DIR "D:/ProgramTool/Pyton3" CACHE PATH "Python 3.11 dir providing python311.dll for NVIDIA OpenUSD")
+
+if (CAUSTICA_WITH_OPENUSD)
+    if (EXISTS "${CAUSTICA_USD_ROOT}/include/pxr/usd/usd/stage.h"
+        AND EXISTS "${CAUSTICA_USD_ROOT}/lib/usd_usd.lib"
+        AND EXISTS "${CAUSTICA_USD_ROOT}/lib/usd_usdGeom.lib")
+        message(STATUS "OpenUSD enabled: ${CAUSTICA_USD_ROOT}")
+        file(GLOB CAUSTICA_USD_RUNTIME_DLLS
+            "${CAUSTICA_USD_ROOT}/lib/usd_*.dll"
+            "${CAUSTICA_USD_ROOT}/lib/tbb*.dll"
+            "${CAUSTICA_USD_ROOT}/bin/*.dll"
+        )
+        if (EXISTS "${CAUSTICA_USD_PYTHON_DIR}/python311.dll")
+            list(APPEND CAUSTICA_USD_RUNTIME_DLLS "${CAUSTICA_USD_PYTHON_DIR}/python311.dll")
+        else()
+            message(WARNING "python311.dll not found at CAUSTICA_USD_PYTHON_DIR=${CAUSTICA_USD_PYTHON_DIR}; USD DLLs may fail to load.")
+        endif()
+        set(CAUSTICA_USD_PLUGIN_DIR "${CAUSTICA_USD_ROOT}/lib/usd")
+    else()
+        message(WARNING "CAUSTICA_WITH_OPENUSD is ON but OpenUSD SDK was not found at CAUSTICA_USD_ROOT=${CAUSTICA_USD_ROOT}; disabling.")
+        set(CAUSTICA_WITH_OPENUSD OFF CACHE BOOL "Enable native OpenUSD C++ stage loading" FORCE)
+    endif()
+endif()
+#----------------------------------------------------------------------------------------------------------------------
+
+#----------------------------------------------------------------------------------------------------------------------
 # Intel Open Image Denoise for offline reference-mode denoising
 option(CAUSTICA_WITH_OIDN "Enable Intel Open Image Denoise for Reference path tracing mode" ON)
 set(CAUSTICA_OIDN_VERSION "2.4.1" CACHE STRING "Open Image Denoise release version")

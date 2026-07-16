@@ -159,10 +159,22 @@ namespace bvh
             blasDesc.bottomLevelGeometries.push_back(geometryDesc);
         }
 
-        // don't compact acceleration structures that are built per frame
-        if (mesh.skinPrototype.use_count() != 0)
+        // Skinned meshes and fixed-topology point caches (USD GeometrySequence /
+        // DeformationSourcePositionIndices) are updated every frame. Build them with
+        // AllowUpdate up front so the first animation tick can PerformUpdate in-place
+        // instead of allocating a second BLAS (VRAM spike / TDR on large imports).
+        const bool needsDynamicUpdate = mesh.skinPrototype.use_count() != 0
+            || !mesh.DeformationSourcePositionIndices.empty();
+        if (needsDynamicUpdate)
         {
-            blasDesc.buildFlags = nvrhi::rt::AccelStructBuildFlags::PreferFastTrace | (updateSkinMeshes ? nvrhi::rt::AccelStructBuildFlags::PerformUpdate : nvrhi::rt::AccelStructBuildFlags::AllowUpdate);
+            const nvrhi::rt::AccelStructBuildFlags quality =
+                !mesh.DeformationSourcePositionIndices.empty()
+                    ? nvrhi::rt::AccelStructBuildFlags::PreferFastBuild
+                    : nvrhi::rt::AccelStructBuildFlags::PreferFastTrace;
+            blasDesc.buildFlags = quality
+                | (updateSkinMeshes
+                    ? nvrhi::rt::AccelStructBuildFlags::PerformUpdate
+                    : nvrhi::rt::AccelStructBuildFlags::AllowUpdate);
         }
         else
         {

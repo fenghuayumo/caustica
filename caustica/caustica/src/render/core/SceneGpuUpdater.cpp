@@ -248,6 +248,12 @@ void EnsureMeshGpuBuffers(Scene& scene, nvrhi::ICommandList* commandList)
             bufferDesc.isAccelStructBuildInput = gpu.rayTracingSupported;
 
             buffers->indexBuffer = gpu.device->createBuffer(bufferDesc);
+            if (!buffers->indexBuffer)
+            {
+                caustica::error("Failed to create index buffer for mesh '%s' (%zu indices).",
+                    mesh->name.c_str(), buffers->indexData.size());
+                continue;
+            }
 
             if (descriptorTable)
             {
@@ -309,6 +315,13 @@ void EnsureMeshGpuBuffers(Scene& scene, nvrhi::ICommandList* commandList)
                 continue;
 
             buffers->vertexBuffer = gpu.device->createBuffer(bufferDesc);
+            if (!buffers->vertexBuffer)
+            {
+                caustica::error("Failed to create vertex buffer for mesh '%s' (%llu bytes).",
+                    mesh->name.c_str(),
+                    static_cast<unsigned long long>(bufferDesc.byteSize));
+                continue;
+            }
             if (descriptorTable)
             {
                 buffers->vertexBufferDescriptor = std::make_shared<DescriptorHandle>(
