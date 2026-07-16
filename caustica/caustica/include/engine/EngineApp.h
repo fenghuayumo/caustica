@@ -2,7 +2,11 @@
 
 #include <backend/GpuDevice.h>
 #include <engine/App.h>
-#include <engine/SceneApi.h>
+#include <engine/SceneQuery.h>
+#include <engine/SceneSpawn.h>
+#include <engine/SceneLifecycle.h>
+#include <engine/CameraApi.h>
+#include <engine/RenderSessionApi.h>
 #include <engine/SceneViewState.h>
 #include <core/command_line.h>
 #include <render/RenderAppState.h>

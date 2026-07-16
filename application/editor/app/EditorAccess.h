@@ -3,8 +3,9 @@
 #include "SceneEditor.h"
 
 #include <engine/App.h>
+#include <engine/AppResources.h>
 #include <engine/GpuRenderSubsystem.h>
-#include <engine/SceneApi.h>
+#include <engine/SceneQuery.h>
 #include <scene/Scene.h>
 #include <scene/SceneManager.h>
 
