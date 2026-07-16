@@ -1,17 +1,18 @@
 #include "EditorPlugin.h"
 #include "EditorAccess.h"
+#include "common/CaptureScriptManager.h"
 
 #include <engine/App.h>
-#include <engine/AssetPlugin.h>
 #include <engine/SceneApi.h>
+#include <render/worldRenderer/WorldRenderer.h>
 
 namespace caustica::editor
 {
 
 void EditorPlugin::build(App& app)
 {
-    registerAssetPlugin(app);
-    registerSceneAppResources(app, appConfig);
+    defaults.build(app);
+
     app.insertResourceRef(m_sceneEditor);
     app.insertResourceRef(m_sceneEditor.editorState());
     app.insertResourceRef(m_sceneEditor.captureScriptState());
@@ -20,20 +21,16 @@ void EditorPlugin::build(App& app)
     if (m_sceneEditor.hasEditorUiData())
         app.insertResourceRef(m_sceneEditor.uiData());
 
-    app.emplaceResource<GpuRenderSubsystem>();
-
     if (uiConfig)
         app.emplaceResource<EditorUISubsystem>(*uiConfig);
 }
 
 void EditorPlugin::configureSchedules(App& app)
 {
-    registerEngineScheduleBridge(app);
-
     m_sceneEditor.setApp(app);
-    appConfig.hasSceneCallbacks = true;
-    appConfig.sceneCallbacks = EngineSceneCallbacks{
-        .OnSceneLoaded = [&app, this]() {
+    defaults.appConfig.hasSceneCallbacks = true;
+    defaults.appConfig.sceneCallbacks = EngineSceneCallbacks{
+        .OnSceneLoaded = [this]() {
             m_sceneEditor.onSceneLoadedFromLoader();
         },
         .OnSceneUnloading = [&app, this]() {
@@ -42,9 +39,9 @@ void EditorPlugin::configureSchedules(App& app)
         },
     };
 
-    registerSceneStartup(app, appConfig);
+    defaults.configureSchedules(app);
     registerEditorSceneStartup(app, EditorSceneStartupConfig{
-        .appConfig = appConfig,
+        .appConfig = defaults.appConfig,
         .sceneEditor = &m_sceneEditor,
     });
 

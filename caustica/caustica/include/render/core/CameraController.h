@@ -2,7 +2,6 @@
 
 #include <scene/camera/Camera.h>
 #include <scene/View.h>
-#include <scene/SceneEcs.h>
 #include <render/passes/geometry/TemporalAntiAliasingPass.h>
 
 #include <cstdint>
@@ -12,7 +11,6 @@
 
 namespace caustica
 {
-class PerspectiveCamera;
 
 struct CameraUpdateParams
 {
@@ -29,10 +27,8 @@ struct CameraUpdateParams
     caustica::render::TemporalAntiAliasingPass* temporalAAPass = nullptr;
 };
 
-// =============================================================================
-// CameraController - first-person camera, planar views, and scene-camera import.
-// Extracted from editor Renderer (Phase C).
-// =============================================================================
+// First-person camera, planar views, and file/string pose import.
+// Scene cameras sync via Extract → CameraRenderProxy → applyCameraRenderProxyToController.
 class CameraController
 {
 public:
@@ -71,9 +67,6 @@ public:
 
     [[nodiscard]] dm::float2 computeJitter(const CameraUpdateParams& params) const;
 
-    void updateFromSceneCamera(const std::shared_ptr<PerspectiveCamera>& sceneCamera);
-    void updateFromSceneCamera(const scene::PerspectiveCameraData& camData, const dm::daffine3& globalTransform);
-
     void updateViews(const CameraUpdateParams& params);
     void syncPreviousViewFromCurrent();
 
@@ -84,7 +77,6 @@ public:
     bool setFromPosDirUpString(const std::string& val);
 
     void setupDefaultCamera();
-    void setupFromSceneCamera(const std::shared_ptr<PerspectiveCamera>& sceneCamera);
 
     [[nodiscard]] bool cameraMovedSinceLastFrame() const;
     void updateLastCameraState();

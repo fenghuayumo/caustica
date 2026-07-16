@@ -4,182 +4,6 @@
 using namespace caustica;
 
 // =============================================================================
-// MeshInstance
-// =============================================================================
-
-std::shared_ptr<MeshInstance> MeshInstance::clone() const
-{
-    auto copy = std::make_shared<MeshInstance>(m_Mesh);
-    copy->name = name;
-    copy->ownerEntity = ownerEntity;
-    copy->PerGeometryLightSamplerLinks = PerGeometryLightSamplerLinks;
-    return copy;
-}
-
-SceneContentFlags MeshInstance::getContentFlags() const
-{
-    if (!m_Mesh)
-        return SceneContentFlags::None;
-
-    SceneContentFlags flags = SceneContentFlags::None;
-
-    for (const auto& geometry : m_Mesh->geometries)
-    {
-        if (!geometry->material)
-            continue;
-
-        switch (geometry->material->domain)  // NOLINT(clang-diagnostic-switch-enum)
-        {
-        case MaterialDomain::Opaque:
-            flags |= SceneContentFlags::OpaqueMeshes;
-            break;
-        case MaterialDomain::AlphaTested:
-            flags |= SceneContentFlags::AlphaTestedMeshes;
-            break;
-        default:
-            flags |= SceneContentFlags::BlendedMeshes;
-            break;
-        }
-    }
-
-    return flags;
-}
-
-bool MeshInstance::setProperty(const std::string& propName, const dm::float4& value)
-{
-    if (m_Mesh && m_Mesh->geometries.size() == 1 && m_Mesh->geometries[0]->material) // TODO: support targeting a specific geometry
-        return m_Mesh->geometries[0]->material->setProperty(propName, value);
-
-    return false;
-}
-
-// =============================================================================
-// SkinnedMeshInstance
-// =============================================================================
-
-SkinnedMeshInstance::SkinnedMeshInstance(std::shared_ptr<SceneTypeFactory> sceneTypeFactory,
-                                         std::shared_ptr<MeshInfo> prototypeMesh)
-    : MeshInstance(nullptr)
-    , m_SceneTypeFactory(std::move(sceneTypeFactory))
-{
-    m_PrototypeMesh = std::move(prototypeMesh);
-
-    auto skinnedMesh              = m_SceneTypeFactory->createMesh();
-    skinnedMesh->skinPrototype    = m_PrototypeMesh;
-    skinnedMesh->name             = m_PrototypeMesh->name;
-    skinnedMesh->objectSpaceBounds = m_PrototypeMesh->objectSpaceBounds;
-    skinnedMesh->indexOffset      = m_PrototypeMesh->indexOffset;
-    skinnedMesh->totalVertices    = m_PrototypeMesh->totalVertices;
-    skinnedMesh->totalIndices     = m_PrototypeMesh->totalIndices;
-    skinnedMesh->geometries.reserve(m_PrototypeMesh->geometries.size());
-
-    for (const auto& geometry : m_PrototypeMesh->geometries)
-    {
-        auto newGeometry = m_SceneTypeFactory->createMeshGeometry();
-        *newGeometry = *geometry;
-        skinnedMesh->geometries.push_back(std::move(newGeometry));
-    }
-
-    m_Mesh = skinnedMesh;
-    PerGeometryLightSamplerLinks.resize(skinnedMesh->geometries.size(), { -1, -1 });
-}
-
-std::shared_ptr<MeshInstance> SkinnedMeshInstance::clone() const
-{
-    auto copy = std::make_shared<SkinnedMeshInstance>(m_SceneTypeFactory, m_PrototypeMesh);
-    copy->name = name;
-    copy->ownerEntity = ownerEntity;
-    for (const auto& joint : joints)
-        copy->joints.push_back(joint);
-    return copy;
-}
-
-// =============================================================================
-// SkinnedMeshReference
-// =============================================================================
-
-std::shared_ptr<SkinnedMeshReference> SkinnedMeshReference::clone() const
-{
-    auto copy = std::make_shared<SkinnedMeshReference>(m_Instance.lock());
-    copy->name = name;
-    return copy;
-}
-
-// =============================================================================
-// PerspectiveCamera
-// =============================================================================
-
-std::shared_ptr<PerspectiveCamera> PerspectiveCamera::clone() const
-{
-    auto copy = std::make_shared<PerspectiveCamera>();
-    copy->name                 = name;
-    copy->zNear                = zNear;
-    copy->zFar                 = zFar;
-    copy->verticalFov          = verticalFov;
-    copy->aspectRatio          = aspectRatio;
-    copy->enableAutoExposure   = enableAutoExposure;
-    copy->exposureCompensation = exposureCompensation;
-    copy->exposureValue        = exposureValue;
-    copy->exposureValueMin     = exposureValueMin;
-    copy->exposureValueMax     = exposureValueMax;
-    return copy;
-}
-
-void PerspectiveCamera::load(const Json::Value& node)
-{
-    node["verticalFov"]          >> verticalFov;
-    node["aspectRatio"]          >> aspectRatio;
-    node["zNear"]                >> zNear;
-    node["zFar"]                 >> zFar;
-    node["enableAutoExposure"]   >> enableAutoExposure;
-    node["exposureCompensation"] >> exposureCompensation;
-    node["exposureValue"]        >> exposureValue;
-    node["exposureValueMin"]     >> exposureValueMin;
-    node["exposureValueMax"]     >> exposureValueMax;
-}
-
-bool PerspectiveCamera::setProperty(const std::string& propName, const dm::float4& value)
-{
-    if (propName == "zNear")       { zNear       = value.x; return true; }
-    if (propName == "zFar")        { zFar        = value.x; return true; }
-    if (propName == "verticalFov") { verticalFov = value.x; return true; }
-    if (propName == "aspectRatio") { aspectRatio = value.x; return true; }
-    return false;
-}
-
-// =============================================================================
-// OrthographicCamera
-// =============================================================================
-
-std::shared_ptr<OrthographicCamera> OrthographicCamera::clone() const
-{
-    auto copy = std::make_shared<OrthographicCamera>();
-    copy->name  = name;
-    copy->zNear = zNear;
-    copy->zFar  = zFar;
-    copy->xMag  = xMag;
-    copy->yMag  = yMag;
-    return copy;
-}
-
-void OrthographicCamera::load(const Json::Value& node)
-{
-    node["xMag"]  >> xMag;
-    node["yMag"]  >> yMag;
-    node["zNear"] >> zNear;
-    node["zFar"]  >> zFar;
-}
-
-bool OrthographicCamera::setProperty(const std::string& propName, const dm::float4& value)
-{
-    if (propName == "zNear") { zNear = value.x; return true; }
-    if (propName == "zFar")  { zFar  = value.x; return true; }
-    if (propName == "xMag")  { xMag  = value.x; return true; }
-    if (propName == "yMag")  { yMag  = value.x; return true; }
-    return false;
-}
-
-// =============================================================================
 // GaussianSplat
 // =============================================================================
 
@@ -259,17 +83,12 @@ void GameSettings::load(const Json::Value& node)
 
 std::shared_ptr<void> SceneTypeFactory::createLeaf(const std::string& type)
 {
-    if (type == "PerspectiveCamera" || type == "PerspectiveCameraEx")
-        return std::make_shared<PerspectiveCamera>();
-    if (type == "OrthographicCamera")
-        return std::make_shared<OrthographicCamera>();
     if (type == "GaussianSplat" || type == "GaussianSplats" || type == "3DGaussianSplat")
         return std::make_shared<GaussianSplat>();
     if (type == "SampleSettings")
         return std::make_shared<SampleSettings>();
     if (type == "GameSettings")
         return std::make_shared<GameSettings>();
-    // Legacy type no longer supported.
     return nullptr;
 }
 
@@ -286,16 +105,4 @@ std::shared_ptr<MeshInfo> SceneTypeFactory::createMesh()
 std::shared_ptr<MeshGeometry> SceneTypeFactory::createMeshGeometry()
 {
     return std::make_shared<MeshGeometry>();
-}
-
-std::shared_ptr<MeshInstance> SceneTypeFactory::createMeshInstance(const std::shared_ptr<MeshInfo>& mesh)
-{
-    return std::make_shared<MeshInstance>(mesh);
-}
-
-std::shared_ptr<SkinnedMeshInstance> SceneTypeFactory::createSkinnedMeshInstance(
-    const std::shared_ptr<SceneTypeFactory>& sceneTypeFactory,
-    const std::shared_ptr<MeshInfo>& prototypeMesh)
-{
-    return std::make_shared<SkinnedMeshInstance>(sceneTypeFactory, prototypeMesh);
 }

@@ -2,15 +2,9 @@
 
 #include <render/core/CameraController.h>
 #include <render/core/PathTracerSettings.h>
-#include <scene/SceneEcs.h>
 
 #include <memory>
 #include <string>
-
-namespace caustica
-{
-class PerspectiveCamera;
-}
 
 namespace caustica::render
 {
@@ -21,6 +15,7 @@ namespace caustica
 {
 
 // Scene camera controls with path-tracer side effects (accumulation reset, etc.).
+// Scene-camera pose sync goes through Extract proxies, not OO SceneCamera types.
 class SceneCameraController
 {
 public:
@@ -39,9 +34,6 @@ public:
     bool setFromPosDirUpString(const std::string& value);
     void saveToFile() const;
     void loadFromFile();
-
-    void syncFromSceneCamera(const std::shared_ptr<PerspectiveCamera>& sceneCamera);
-    void syncFromSceneCamera(const scene::PerspectiveCameraData& camData, const dm::daffine3& globalTransform);
 
     const FirstPersonCamera& camera() const;
     const std::shared_ptr<PlanarView>& view() const;

@@ -16,57 +16,12 @@ namespace caustica
     class SceneTypeFactory;
 
     // Per-light and per-geometry link into the light sampling system.
+    // Render-side caches own history; do not treat these as game-thread authority.
     struct LightSamplerLink
     {
         int IndexOrBase = -1;   // index of the corresponding PolymorphicLight in the light sampler
         int LastUpdateTag = -1; // identifier of when IndexOrBase was last updated
     };
-
-    // =========================================================================
-    // MeshInstance
-    // =========================================================================
-
-    class MeshInstance
-    {
-        friend class SceneResources;
-        int m_InstanceIndex = -1;
-        int m_GeometryInstanceIndex = -1;
-
-    protected:
-        std::shared_ptr<MeshInfo> m_Mesh;
-
-    public:
-        std::string name;
-        ecs::Entity ownerEntity = ecs::NullEntity; // entity whose GlobalTransformComponent provides the world transform
-
-        explicit MeshInstance(std::shared_ptr<MeshInfo> mesh)
-            : m_Mesh(std::move(mesh))
-        {
-            if (m_Mesh)
-                PerGeometryLightSamplerLinks.resize(m_Mesh->geometries.size(), { -1, -1 });
-        }
-
-        virtual ~MeshInstance() = default;
-
-        [[nodiscard]] const std::shared_ptr<MeshInfo>& getMesh() const { return m_Mesh; }
-        [[nodiscard]] int getInstanceIndex() const { return m_InstanceIndex; }
-        [[nodiscard]] int getGeometryInstanceIndex() const { return m_GeometryInstanceIndex; }
-        [[nodiscard]] virtual dm::box3 getLocalBoundingBox() const { return m_Mesh ? m_Mesh->objectSpaceBounds : dm::box3::empty(); }
-        [[nodiscard]] virtual std::shared_ptr<MeshInstance> clone() const;
-        [[nodiscard]] SceneContentFlags getContentFlags() const;
-        bool setProperty(const std::string& propName, const dm::float4& value);
-
-        std::vector<LightSamplerLink> PerGeometryLightSamplerLinks;
-
-        MeshInstance(const MeshInstance&) = delete;
-        MeshInstance(MeshInstance&&) = delete;
-        MeshInstance& operator=(const MeshInstance&) = delete;
-        MeshInstance& operator=(MeshInstance&&) = delete;
-    };
-
-    // =========================================================================
-    // SkinnedMeshInstance / SkinnedMeshReference
-    // =========================================================================
 
     // Joint reference for skinned meshes; uses an ECS entity instead of a scene graph node.
     struct SkinnedMeshJoint
@@ -75,131 +30,9 @@ namespace caustica
         dm::float4x4 inverseBindMatrix = dm::float4x4::identity();
     };
 
-    class SkinnedMeshInstance : public MeshInstance
-    {
-        friend class SceneResources;
-
-        std::shared_ptr<MeshInfo> m_PrototypeMesh;
-        uint32_t m_LastUpdateFrameIndex = 0;
-        std::shared_ptr<SceneTypeFactory> m_SceneTypeFactory;
-
-    public:
-        std::vector<SkinnedMeshJoint> joints;
-        nvrhi::BufferHandle jointBuffer;
-        nvrhi::BindingSetHandle skinningBindingSet;
-        bool skinningInitialized = false;
-
-        explicit SkinnedMeshInstance(std::shared_ptr<SceneTypeFactory> sceneTypeFactory, std::shared_ptr<MeshInfo> prototypeMesh);
-
-        [[nodiscard]] const std::shared_ptr<MeshInfo>& getPrototypeMesh() const { return m_PrototypeMesh; }
-        [[nodiscard]] uint32_t getLastUpdateFrameIndex() const { return m_LastUpdateFrameIndex; }
-        void setLastUpdateFrameIndex(uint32_t frameIndex) { m_LastUpdateFrameIndex = frameIndex; }
-        [[nodiscard]] std::shared_ptr<MeshInstance> clone() const override;
-    };
-
-    // Attached to joint entities so that when the joint transform changes the skinned mesh is flagged for rebuild.
-    // The skeleton hierarchy may be separate from the mesh entity.
-    class SkinnedMeshReference
-    {
-        friend class SceneResources;
-        std::weak_ptr<SkinnedMeshInstance> m_Instance;
-
-    public:
-        std::string name;
-
-        explicit SkinnedMeshReference(std::shared_ptr<SkinnedMeshInstance> instance)
-            : m_Instance(std::move(instance))
-        {}
-
-        [[nodiscard]] std::shared_ptr<SkinnedMeshInstance> getInstance() const { return m_Instance.lock(); }
-        [[nodiscard]] std::shared_ptr<SkinnedMeshReference> clone() const;
-        [[nodiscard]] SceneContentFlags getContentFlags() const { return SceneContentFlags::None; }
-
-        SkinnedMeshReference(const SkinnedMeshReference&) = delete;
-        SkinnedMeshReference& operator=(const SkinnedMeshReference&) = delete;
-    };
-
-    // =========================================================================
-    // SceneCamera / PerspectiveCamera / OrthographicCamera
-    // =========================================================================
-
-    class SceneCamera
-    {
-    public:
-        std::string name;
-        ecs::Entity ownerEntity = ecs::NullEntity;
-        mutable dm::daffine3 cachedGlobalTransform = dm::daffine3::identity();
-
-        virtual ~SceneCamera() = default;
-
-        [[nodiscard]] SceneContentFlags getContentFlags() const { return SceneContentFlags::Cameras; }
-
-        // Callers supply the entity's GlobalTransformComponent::transform.
-        [[nodiscard]] dm::affine3 getViewToWorldMatrix(const dm::daffine3& globalTransform) const
-        {
-            return dm::scaling(dm::float3(1.f, 1.f, -1.f)) * dm::affine3(globalTransform);
-        }
-        [[nodiscard]] dm::affine3 getWorldToViewMatrix(const dm::daffine3& globalTransform) const
-        {
-            return dm::affine3(inverse(globalTransform)) * dm::scaling(dm::float3(1.f, 1.f, -1.f));
-        }
-
-        [[nodiscard]] dm::affine3 getViewToWorldMatrix() const
-        {
-            return getViewToWorldMatrix(cachedGlobalTransform);
-        }
-        [[nodiscard]] dm::affine3 getWorldToViewMatrix() const
-        {
-            return getWorldToViewMatrix(cachedGlobalTransform);
-        }
-
-        virtual void load(const Json::Value& node) {}
-        virtual bool setProperty(const std::string& propName, const dm::float4& value) { return false; }
-
-    protected:
-        SceneCamera() = default;
-
-        SceneCamera(const SceneCamera&) = delete;
-        SceneCamera(SceneCamera&&) = delete;
-        SceneCamera& operator=(const SceneCamera&) = delete;
-        SceneCamera& operator=(SceneCamera&&) = delete;
-    };
-
-    class PerspectiveCamera : public SceneCamera
-    {
-    public:
-        float zNear = 1.f;
-        float verticalFov = 1.f; // radians
-        std::optional<float> zFar; // reverse infinite projection when absent
-        std::optional<float> aspectRatio;
-
-        // Auto-exposure / tone mapping
-        std::optional<bool>  enableAutoExposure;
-        std::optional<float> exposureCompensation;
-        std::optional<float> exposureValue;
-        std::optional<float> exposureValueMin;
-        std::optional<float> exposureValueMax;
-
-        [[nodiscard]] std::shared_ptr<PerspectiveCamera> clone() const;
-        void load(const Json::Value& node) override;
-        bool setProperty(const std::string& propName, const dm::float4& value) override;
-    };
-
-    class OrthographicCamera : public SceneCamera
-    {
-    public:
-        float zNear = 0.f;
-        float zFar = 1.f;
-        float xMag = 1.f;
-        float yMag = 1.f;
-
-        [[nodiscard]] std::shared_ptr<OrthographicCamera> clone() const;
-        void load(const Json::Value& node) override;
-        bool setProperty(const std::string& propName, const dm::float4& value) override;
-    };
-
     // =========================================================================
     // GaussianSplat / SampleSettings / GameSettings
+    // (JSON leaf payloads still stored as shared_ptr on ECS components)
     // =========================================================================
 
     class GaussianSplat
@@ -265,10 +98,8 @@ namespace caustica
     // SceneTypeFactory
     // =========================================================================
 
-    // Factory that creates typed scene objects. Subclasses may override any method
-    // to produce project-specific subtypes.
-    // Placed in SceneObjects.h (not SceneResources.h) to break the circular dependency
-    // with SkinnedMeshInstance, which needs SceneTypeFactory in its constructor.
+    // Factory that creates mesh/material/JSON leaf payloads. Subclasses may override
+    // to produce project-specific subtypes (e.g. MaterialEx).
     class SceneTypeFactory
     {
     public:
@@ -276,15 +107,12 @@ namespace caustica
 
         // Returns a type-erased object by type string; caller casts via static_pointer_cast.
         // Returns nullptr for unrecognised or unsupported types.
+        // Cameras/lights are built as ECS components (see SceneComponentBuilders), not here.
         virtual std::shared_ptr<void> createLeaf(const std::string& type);
 
-        virtual std::shared_ptr<Material>            createMaterial();
-        virtual std::shared_ptr<MeshInfo>            createMesh();
-        virtual std::shared_ptr<MeshGeometry>        createMeshGeometry();
-        virtual std::shared_ptr<MeshInstance>        createMeshInstance(const std::shared_ptr<MeshInfo>& mesh);
-        virtual std::shared_ptr<SkinnedMeshInstance> createSkinnedMeshInstance(
-            const std::shared_ptr<SceneTypeFactory>& sceneTypeFactory,
-            const std::shared_ptr<MeshInfo>& prototypeMesh);
+        virtual std::shared_ptr<Material>     createMaterial();
+        virtual std::shared_ptr<MeshInfo>     createMesh();
+        virtual std::shared_ptr<MeshGeometry> createMeshGeometry();
     };
 
 } // namespace caustica

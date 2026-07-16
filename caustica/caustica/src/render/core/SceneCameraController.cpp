@@ -1,10 +1,8 @@
 #include <render/core/SceneCameraController.h>
 
 #include <core/path_utils.h>
-#include <render/passes/postProcess/ToneMappingPasses.h>
 #include <render/worldRenderer/WorldRenderer.h>
 #include <scene/camera/Camera.h>
-#include <scene/SceneCameraAccess.h>
 
 #include <cmath>
 
@@ -99,54 +97,6 @@ void SceneCameraController::loadFromFile()
 {
     if (m_camera)
         m_camera->loadFromFile(getDirectoryWithExecutable() / "campos.txt");
-}
-
-void SceneCameraController::syncFromSceneCamera(const std::shared_ptr<PerspectiveCamera>& sceneCamera)
-{
-    if (!m_camera || !m_settings)
-        return;
-
-    m_camera->updateFromSceneCamera(sceneCamera);
-
-    auto sceneCameraEx = std::dynamic_pointer_cast<PerspectiveCamera>(sceneCamera);
-    if (sceneCameraEx == nullptr)
-        return;
-
-    ToneMappingParameters defaults;
-    m_settings->ToneMappingParams.autoExposure =
-        sceneCameraEx->enableAutoExposure.value_or(defaults.autoExposure);
-    m_settings->ToneMappingParams.exposureCompensation =
-        sceneCameraEx->exposureCompensation.value_or(defaults.exposureCompensation);
-    m_settings->ToneMappingParams.exposureValue =
-        sceneCameraEx->exposureValue.value_or(defaults.exposureValue);
-    m_settings->ToneMappingParams.exposureValueMin =
-        sceneCameraEx->exposureValueMin.value_or(defaults.exposureValueMin);
-    m_settings->ToneMappingParams.exposureValueMax =
-        sceneCameraEx->exposureValueMax.value_or(defaults.exposureValueMax);
-}
-
-void SceneCameraController::syncFromSceneCamera(
-    const scene::PerspectiveCameraData& camData,
-    const dm::daffine3& globalTransform)
-{
-    if (!m_camera || !m_settings)
-        return;
-
-    m_camera->updateFromSceneCamera(camData, globalTransform);
-
-    ToneMappingParameters defaults;
-    m_settings->ToneMappingParams.autoExposure =
-        camData.enableAutoExposure.value_or(defaults.autoExposure);
-    m_settings->ToneMappingParams.exposureCompensation =
-        camData.exposureCompensation.value_or(defaults.exposureCompensation);
-    m_settings->ToneMappingParams.exposureValue =
-        camData.exposureValue.value_or(defaults.exposureValue);
-    m_settings->ToneMappingParams.exposureValueMin =
-        camData.exposureValueMin.value_or(defaults.exposureValueMin);
-    m_settings->ToneMappingParams.exposureValueMax =
-        camData.exposureValueMax.value_or(defaults.exposureValueMax);
-
-    markCameraChanged();
 }
 
 } // namespace caustica

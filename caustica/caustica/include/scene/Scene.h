@@ -5,7 +5,6 @@
 #include <scene/SceneEcs.h>
 #include <scene/SceneRenderData.h>
 #include <scene/SceneRenderSnapshot.h>
-#include <scene/SceneRenderCommandQueue.h>
 #include <scene/SceneImport.h>
 #include <assets/Handle.h>
 #include <assets/TypedAssets.h>
@@ -59,7 +58,6 @@ namespace caustica
         // receive a copy each publish so incremental extract does not depend on slot reuse.
         scene::SceneRenderData m_LogicExtractCache;
         bool m_LogicExtractCacheValid = false;
-        scene::SceneRenderCommandQueue m_RenderCommands;
         std::shared_ptr<GltfImporter> m_GltfImporter;
         std::shared_ptr<ObjImporter> m_ObjImporter;
         std::shared_ptr<CausUsdImporter> m_CausUsdImporter;
@@ -179,8 +177,6 @@ namespace caustica
         [[nodiscard]] const std::vector<ecs::Entity>& getCameraEntities() const;
         [[nodiscard]] const std::vector<ecs::Entity>& getAnimationEntities() const;
         [[nodiscard]] const scene::SceneRenderData& getRenderData() const;
-        [[nodiscard]] scene::SceneRenderCommandQueue& getRenderCommands() { return m_RenderCommands; }
-        [[nodiscard]] const scene::SceneRenderCommandQueue& getRenderCommands() const { return m_RenderCommands; }
 
         void attachDirectionalLightToRoot(scene::DirectionalLightComponent component, const std::string& name = {});
         void attachSpotLightToRoot(scene::SpotLightComponent component, const std::string& name = {});

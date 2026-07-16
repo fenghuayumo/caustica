@@ -7,7 +7,6 @@
 namespace caustica
 {
     class PlanarView;
-    class SceneCamera;
 }
 
 namespace game

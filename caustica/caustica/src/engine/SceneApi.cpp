@@ -273,7 +273,7 @@ namespace
                         scene::makeCameraRenderProxy(camEntity, *camComp, *globalComp);
                     PathTracerSettings* settings = caustica::settings(app);
                     scene::applyCameraRenderProxyToController(proxy, *cam, settings);
-                    // Match former SceneCameraController::syncFromSceneCamera side effects.
+                    // Exposure / pose side effects for free-cam when selecting a scene camera.
                     if (settings)
                         settings->ResetAccumulation = true;
                     if (auto* wr = caustica::worldRenderer(app))

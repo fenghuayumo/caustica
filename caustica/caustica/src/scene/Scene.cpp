@@ -1198,7 +1198,6 @@ void Scene::publishRenderSnapshot(uint32_t frameIndex)
     m_SceneTransformsChanged = published.transformsChanged;
     if (published.structureChanged)
         m_gpuStructureFlushPending = true;
-    m_RenderCommands.drain(*this);
 }
 
 void Scene::extractAndPublishRenderSnapshot(uint32_t frameIndex, const scene::SessionRenderExtractInputs* session)

@@ -1,8 +1,6 @@
 #include <render/core/CameraController.h>
 
 #include <render/passes/geometry/TemporalAntiAliasingPass.h>
-#include <scene/SceneObjects.h>
-#include <scene/SceneCameraAccess.h>
 #include <core/file_utils.h>
 #include <core/format.h>
 
@@ -88,26 +86,6 @@ dm::float2 CameraController::computeJitter(const CameraUpdateParams& params) con
         params.temporalAAPass == nullptr || params.dbgFreezeRealtimeNoiseSeed)
         return dm::float2(0, 0);
     return params.temporalAAPass->getCurrentPixelOffset();
-}
-
-void CameraController::updateFromSceneCamera(const std::shared_ptr<PerspectiveCamera>& sceneCamera)
-{
-    dm::affine3 viewToWorld = sceneCamera->getViewToWorldMatrix();
-    dm::float3 cameraPos = viewToWorld.m_translation;
-    m_camera.lookAt(cameraPos, cameraPos + viewToWorld.m_linear.row2, viewToWorld.m_linear.row1);
-    m_verticalFOV = sceneCamera->verticalFov;
-    m_zNear = sceneCamera->zNear;
-}
-
-void CameraController::updateFromSceneCamera(
-    const scene::PerspectiveCameraData& camData,
-    const dm::daffine3& globalTransform)
-{
-    const dm::affine3 viewToWorld = scene::getCameraViewToWorldMatrix(globalTransform);
-    const dm::float3 cameraPos = viewToWorld.m_translation;
-    m_camera.lookAt(cameraPos, cameraPos + viewToWorld.m_linear.row2, viewToWorld.m_linear.row1);
-    m_verticalFOV = camData.verticalFov;
-    m_zNear = camData.zNear;
 }
 
 void CameraController::updateViews(const CameraUpdateParams& params)
@@ -237,13 +215,6 @@ void CameraController::setupDefaultCamera()
     m_zNear = 0.001f;
 }
 
-void CameraController::setupFromSceneCamera(const std::shared_ptr<PerspectiveCamera>& sceneCamera)
-{
-    if (!sceneCamera)
-        setupDefaultCamera();
-    else
-        updateFromSceneCamera(sceneCamera);
-}
 
 bool CameraController::cameraMovedSinceLastFrame() const
 {
