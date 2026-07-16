@@ -200,7 +200,7 @@ void SceneGaussianSplatPasses::loadFromSceneEntities()
                 return;
             }
 
-            auto pass = std::make_unique<GaussianSplatPass>(m_gpuDevice->getDevice(), m_shaderFactory);
+            auto pass = std::make_shared<GaussianSplatPass>(m_gpuDevice->getDevice(), m_shaderFactory);
             if (pass->loadFromFile(splatPath, splat->convertRdfToRub))
             {
                 splat->resolvedPath = splatPath.string();
@@ -251,7 +251,7 @@ bool SceneGaussianSplatPasses::attachToScene(const std::filesystem::path& fileNa
         return false;
     }
 
-    auto pass = std::make_unique<GaussianSplatPass>(m_gpuDevice->getDevice(), m_shaderFactory);
+    auto pass = std::make_shared<GaussianSplatPass>(m_gpuDevice->getDevice(), m_shaderFactory);
     if (!pass->loadFromFile(splatPath, convertRdfToRub))
     {
         caustica::error("Failed to load Gaussian Splat file '%s'.", splatPath.string().c_str());

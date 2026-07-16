@@ -13,6 +13,46 @@ namespace caustica
 class App;
 class GpuDevice;
 
+template<class T>
+class Res
+{
+public:
+    explicit Res(const T& resource) : v(&resource) {}
+
+    [[nodiscard]] const T& get() const { return *v; }
+    [[nodiscard]] const T* operator->() const { return v; }
+    [[nodiscard]] const T& operator*() const { return *v; }
+
+private:
+    const T* v;
+};
+
+template<class T>
+class ResMut
+{
+public:
+    explicit ResMut(T& resource) : v(&resource) {}
+
+    [[nodiscard]] T& get() { return *v; }
+    [[nodiscard]] T* operator->() { return v; }
+    [[nodiscard]] T& operator*() { return *v; }
+
+private:
+    T* v;
+};
+
+class Commands
+{
+public:
+    explicit Commands(ecs::CommandQueue& queue) : v(&queue) {}
+
+    [[nodiscard]] ecs::CommandQueue& get() { return *v; }
+    [[nodiscard]] ecs::CommandQueue* operator->() { return v; }
+
+private:
+    ecs::CommandQueue* v;
+};
+
 namespace scene
 {
 class SceneEntityWorld;

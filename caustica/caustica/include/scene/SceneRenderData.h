@@ -4,6 +4,7 @@
 #include <math/math.h>
 #include <render/RenderRuntimeState.h>
 #include <render/core/PathTracerSettings.h>
+#include <render/passes/gaussian/GaussianSplatPass.h>
 #include <scene/SceneContent.h>
 #include <scene/SceneEcs.h>
 #include <scene/SceneTypes.h>
@@ -14,9 +15,16 @@
 #include <string>
 #include <vector>
 
+class GaussianSplatPass;
+
 namespace caustica
 {
 class CameraController;
+}
+
+namespace caustica::render
+{
+class SceneGaussianSplatPasses;
 }
 
 namespace caustica::scene
@@ -31,7 +39,8 @@ namespace caustica::scene
     //
     // Proxy inventory (must stay complete for anything RT reads per frame):
     //   MeshInstanceRenderProxy, SkinnedMeshRenderProxy, LightRenderProxy,
-    //   CameraRenderProxy (+ resolved ActiveCameraRenderProxy), RenderSettingsSnapshot.
+    //   CameraRenderProxy (+ resolved ActiveCameraRenderProxy), GaussianSplatRenderProxy,
+    //   RenderSettingsSnapshot.
     // Free-camera pose / selected index enter via SessionRenderExtractInputs; scene cameras
     // are resolved from CameraRenderProxy during Extract, not by RT querying ECS.
 
@@ -130,6 +139,16 @@ namespace caustica::scene
     // Backward-compatible name used by older call sites.
     using CameraSnapshot = ActiveCameraRenderProxy;
 
+    // One ECS GaussianSplatComponent + GlobalTransform, extracted for the render world.
+    // The pass is bound from SceneGaussianSplatPasses during session extract, never from ECS.
+    struct GaussianSplatRenderProxy
+    {
+        ecs::Entity entity = ecs::NullEntity;
+        bool enabled = true;
+        dm::affine3 objectToWorld = dm::affine3::identity();
+        std::shared_ptr<::GaussianSplatPass> pass;
+    };
+
     struct RenderSettingsSnapshot
     {
         PathTracerSettings settings;
@@ -148,6 +167,7 @@ namespace caustica::scene
         const class CameraController* camera = nullptr;
         PathTracerSettings* settings = nullptr; // non-const: one-shot flags cleared after copy
         const render::RenderRuntimeState* runtime = nullptr;
+        const render::SceneGaussianSplatPasses* gaussianSplatPasses = nullptr;
         double sceneTime = 0.0;
         bool gaussianSplatTemporalReset = false;
     };
@@ -164,6 +184,7 @@ namespace caustica::scene
         std::vector<SkinnedMeshRenderProxy> skinnedMeshes;
         std::vector<LightRenderProxy> lights;
         std::vector<CameraRenderProxy> cameras;
+        std::vector<GaussianSplatRenderProxy> gaussianSplats;
 
         ActiveCameraRenderProxy camera;
         RenderSettingsSnapshot renderSettings;

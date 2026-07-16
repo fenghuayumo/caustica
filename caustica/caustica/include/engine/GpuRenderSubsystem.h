@@ -124,7 +124,10 @@ private:
     std::unique_ptr<BindlessTable> m_bindlessTable;
     std::shared_ptr<DescriptorTableManager> m_descriptorTable;
     std::shared_ptr<TextureLoader> m_textureCache;
+    // Logic-thread free camera used by Extract, CameraPlugin, and editor input.
     CameraController m_camera;
+    // Render-thread camera populated from ActiveCameraRenderProxy each frame.
+    CameraController m_renderCamera;
     AccelStructManager m_accelStructs;
     std::unique_ptr<SceneManager> m_sceneManager;
     std::unique_ptr<render::PathTracingContext> m_pathTracingContext;

@@ -28,7 +28,8 @@ class RenderDevice;
 
 // Session-scoped references wired once when the path tracer is created.
 // Per-frame camera pose/settings come from SceneRenderData (ActiveCameraRenderProxy /
-// RenderSettingsSnapshot); CameraController here holds RT-owned views updated from that proxy.
+// RenderSettingsSnapshot); camera is the RT frame camera, filled from ActiveCameraRenderProxy
+// every frame and never used as the logic-thread free-camera controller.
 struct PathTracingContext
 {
     GpuDevice& gpuDevice;

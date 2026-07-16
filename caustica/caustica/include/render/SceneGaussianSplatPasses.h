@@ -38,7 +38,7 @@ public:
     {
         std::shared_ptr<caustica::GaussianSplat> splat;
         ecs::Entity entity = ecs::NullEntity;
-        std::unique_ptr<GaussianSplatPass> pass;
+        std::shared_ptr<GaussianSplatPass> pass;
     };
 
     void setOnRequestFullRebuild(std::function<void()> callback);

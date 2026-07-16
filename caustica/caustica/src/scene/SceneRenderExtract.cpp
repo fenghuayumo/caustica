@@ -7,6 +7,7 @@
 #include <render/core/CameraController.h>
 #include <render/core/PathTracerSettings.h>
 #include <render/core/ToneMappingParameters.h>
+#include <render/SceneGaussianSplatPasses.h>
 
 #include <algorithm>
 #include <vector>
@@ -20,6 +21,7 @@ void SceneRenderData::clear()
     skinnedMeshes.clear();
     lights.clear();
     cameras.clear();
+    gaussianSplats.clear();
     camera = {};
     renderSettings = {};
     meshInstanceEntities.clear();
@@ -296,6 +298,23 @@ void ExtractCameras(SceneEntityWorld& entityWorld, ecs::World& world, SceneRende
     }
 }
 
+void ExtractGaussianSplats(ecs::World& world, SceneRenderData& out)
+{
+    out.gaussianSplats.clear();
+    world.each<GaussianSplatComponent, GlobalTransformComponent>(
+        [&](ecs::Entity entity, const GaussianSplatComponent& splat, const GlobalTransformComponent& global)
+        {
+            if (!splat.splat)
+                return;
+
+            GaussianSplatRenderProxy proxy;
+            proxy.entity = entity;
+            proxy.enabled = splat.splat->enabled;
+            proxy.objectToWorld = global.transformFloat;
+            out.gaussianSplats.push_back(std::move(proxy));
+        });
+}
+
 void ExtractAnimationEntities(ecs::World& world, SceneRenderData& out)
 {
     out.animationEntities.clear();
@@ -434,6 +453,7 @@ void extractSceneRenderData(
         ExtractSkinnedMeshes(world, inout, frameIndex);
         ExtractLightsFull(world, inout);
         ExtractCameras(entityWorld, world, inout);
+        ExtractGaussianSplats(world, inout);
         ExtractAnimationEntities(world, inout);
         return;
     }
@@ -451,6 +471,8 @@ void extractSceneRenderData(
     ExtractSkinnedMeshes(world, inout, frameIndex);
     // Cameras are few; refresh every frame so animated scene cams stay current.
     ExtractCameras(entityWorld, world, inout);
+    // Gaussian splats are few; refresh transforms and enabled state every frame.
+    ExtractGaussianSplats(world, inout);
 }
 
 void extractSessionRenderState(const SessionRenderExtractInputs& inputs, SceneRenderData& out)
@@ -471,6 +493,22 @@ void extractSessionRenderState(const SessionRenderExtractInputs& inputs, SceneRe
 
     out.renderSettings.gaussianSplatTemporalReset = inputs.gaussianSplatTemporalReset;
     out.renderSettings.sceneTime = inputs.sceneTime;
+
+    if (inputs.gaussianSplatPasses)
+    {
+        for (GaussianSplatRenderProxy& proxy : out.gaussianSplats)
+        {
+            proxy.pass.reset();
+            for (const render::SceneGaussianSplatPasses::SceneObject& object : inputs.gaussianSplatPasses->objects())
+            {
+                if (object.entity == proxy.entity)
+                {
+                    proxy.pass = object.pass;
+                    break;
+                }
+            }
+        }
+    }
 
     if (!inputs.camera)
         return;

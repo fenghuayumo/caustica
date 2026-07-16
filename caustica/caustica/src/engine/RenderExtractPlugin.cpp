@@ -43,6 +43,7 @@ void prepareRenderFrame(App& app)
 
     scene::SessionRenderExtractInputs sessionInputs;
     sessionInputs.camera = &gr->camera();
+    sessionInputs.gaussianSplatPasses = &gr->gaussianSplatPasses();
     if (render::WorldRenderer* wr = gr->worldRenderer())
         sessionInputs.gaussianSplatTemporalReset = wr->consumeGaussianSplatTemporalReset();
     sessionInputs.settings = app.tryResource<PathTracerSettings>();

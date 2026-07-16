@@ -3,8 +3,10 @@
 #include <render/SceneGaussianSplatPasses.h>
 #include <render/passes/gaussian/GaussianSplatGraph.h>
 #include <render/passes/gaussian/GaussianSplatEmissionProxy.h>
+#include <scene/SceneRenderData.h>
 
 #include <memory>
+#include <span>
 #include <vector>
 
 class GPUSort;
@@ -30,21 +32,22 @@ struct GaussianSplatPrepareContext
     std::shared_ptr<GPUSort> gpuSort;
 };
 
-[[nodiscard]] dm::float4x4 gaussianSplatObjectToWorld(const SceneGaussianSplatPasses::SceneObject& object);
-[[nodiscard]] bool isGaussianSplatSceneObjectActive(const SceneGaussianSplatPasses::SceneObject& object);
-[[nodiscard]] GaussianSplatBinding getPrimaryGaussianSplatBinding(const SceneGaussianSplatPasses& scenePasses);
+[[nodiscard]] dm::float4x4 gaussianSplatObjectToWorld(const scene::GaussianSplatRenderProxy& proxy);
+[[nodiscard]] bool isGaussianSplatProxyActive(const scene::GaussianSplatRenderProxy& proxy);
+[[nodiscard]] GaussianSplatBinding getPrimaryGaussianSplatBinding(
+    std::span<const scene::GaussianSplatRenderProxy> gaussianSplats);
 
 void prepareGaussianSplatScenePasses(SceneGaussianSplatPasses& scenePasses, GaussianSplatPrepareContext& context);
 void prepareGaussianSplatScenePass(GaussianSplatPass& pass, const GaussianSplatPrepareContext& context);
 
 void buildGaussianSplatEmissionProxies(
     std::vector<GaussianSplatEmissionProxy>& out,
-    const SceneGaussianSplatPasses& scenePasses,
+    std::span<const scene::GaussianSplatRenderProxy> gaussianSplats,
     const PathTracerSettings& settings);
 
 [[nodiscard]] bool renderGaussianSplatScene(
     nvrhi::ICommandList* commandList,
-    const SceneGaussianSplatPasses& scenePasses,
+    std::span<const scene::GaussianSplatRenderProxy> gaussianSplats,
     const caustica::IView& splatView,
     nvrhi::rt::IAccelStruct* meshTopLevelAS,
     RenderTargets& renderTargets,
@@ -52,7 +55,7 @@ void buildGaussianSplatEmissionProxies(
 
 void buildGaussianSplatSceneAccelStructs(
     nvrhi::ICommandList* commandList,
-    SceneGaussianSplatPasses& scenePasses,
+    std::span<const scene::GaussianSplatRenderProxy> gaussianSplats,
     const PathTracerSettings& settings);
 
 } // namespace caustica::render

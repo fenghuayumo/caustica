@@ -75,7 +75,7 @@ bool GpuRenderSubsystem::initialize(const GpuRenderSubsystemInitParams& params)
     m_pathTracingContext = std::make_unique<render::PathTracingContext>(render::PathTracingContext{
         .gpuDevice = params.gpuDevice,
         .sceneManager = *m_sceneManager,
-        .camera = m_camera,
+        .camera = m_renderCamera,
         .accelStructs = m_accelStructs,
         .settings = params.settings,
         .runtimeState = params.runtimeState,

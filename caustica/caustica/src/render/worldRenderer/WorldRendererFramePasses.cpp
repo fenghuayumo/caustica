@@ -516,10 +516,14 @@ void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext
 
     updatePathTracerConstants(constants.ptConsts, ctx.cameraData);
     constants.MaterialCount = m_context.scenePasses.lighting.materials()->getMaterialDataCount();
+    const std::shared_ptr<Scene> scene = m_context.sceneManager.getScene();
+    const std::span<const caustica::scene::GaussianSplatRenderProxy> gaussianSplats =
+        scene ? std::span<const caustica::scene::GaussianSplatRenderProxy>(scene->getRenderData().gaussianSplats)
+              : std::span<const caustica::scene::GaussianSplatRenderProxy>();
     fillGaussianSplatShadowConstants(
         constants,
         m_context.activeSettings(),
-        getPrimaryGaussianSplatBinding(m_context.scenePasses.gaussianSplats),
+        getPrimaryGaussianSplatBinding(gaussianSplats),
         uint32_t(m_frameIndex & 0xffffffffu));
 
     constants.envMapSceneParams = m_context.scenePasses.lighting.envMapSceneParams();

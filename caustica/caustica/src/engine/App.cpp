@@ -150,6 +150,11 @@ App& App::addSystemAfter(
 void App::runSchedule(AppSchedule schedule, SystemContext& context)
 {
     m_schedules.run(schedule, context);
+    if (schedule != AppSchedule::render)
+    {
+        if (ecs::CommandQueue* queue = context.world.getResource<ecs::CommandQueue>(); queue && !queue->empty())
+            queue->apply(context.world);
+    }
 }
 
 void App::registerDefaultSchedules()

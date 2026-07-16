@@ -15,6 +15,7 @@
 #include <mutex>
 #include <optional>
 #include <type_traits>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -23,6 +24,80 @@ namespace caustica
 
 class GpuDevice;
 class Window;
+
+namespace detail
+{
+template<typename T>
+struct SystemCallableTraits;
+
+template<typename C, typename R, typename... Args>
+struct SystemCallableTraits<R(C::*)(Args...)>
+{
+    using ArgsTuple = std::tuple<Args...>;
+};
+
+template<typename C, typename R, typename... Args>
+struct SystemCallableTraits<R(C::*)(Args...) const>
+{
+    using ArgsTuple = std::tuple<Args...>;
+};
+
+template<typename T>
+struct SystemParameter
+{
+    static_assert(!std::is_same_v<T, T>, "Unsupported typed system parameter");
+};
+
+template<typename T>
+struct SystemParameter<Res<T>>
+{
+    static Res<T> make(SystemContext& context) { return Res<T>(context.res<T>()); }
+};
+
+template<typename T>
+struct SystemParameter<ResMut<T>>
+{
+    static ResMut<T> make(SystemContext& context) { return ResMut<T>(context.resMut<T>()); }
+};
+
+template<>
+struct SystemParameter<Commands>
+{
+    static Commands make(SystemContext& context) { return Commands(context.commands()); }
+};
+
+template<>
+struct SystemParameter<SystemContext>
+{
+    static SystemContext& make(SystemContext& context) { return context; }
+};
+
+template<typename Parameter>
+decltype(auto) makeSystemParameter(SystemContext& context)
+{
+    using RawParameter = std::remove_cvref_t<Parameter>;
+    return SystemParameter<RawParameter>::make(context);
+}
+
+template<typename F, typename Tuple, std::size_t... Indices>
+void invokeTypedSystem(F& system, SystemContext& context, std::index_sequence<Indices...>)
+{
+    std::tuple<decltype(makeSystemParameter<std::tuple_element_t<Indices, Tuple>>(context))...> parameters(
+        makeSystemParameter<std::tuple_element_t<Indices, Tuple>>(context)...);
+    std::apply([&](auto&... parameters) { std::invoke(system, parameters...); }, parameters);
+}
+
+template<typename F>
+SystemFn makeTypedSystem(F&& system)
+{
+    using Callable = std::remove_cvref_t<F>;
+    using Arguments = typename SystemCallableTraits<decltype(&Callable::operator())>::ArgsTuple;
+    return [system = std::forward<F>(system)](SystemContext& context) mutable {
+        invokeTypedSystem<Callable, Arguments>(
+            system, context, std::make_index_sequence<std::tuple_size_v<Arguments>>{});
+    };
+}
+} // namespace detail
 
 // Plugin-driven application: window/GPU and frame loop.
 //
@@ -128,6 +203,19 @@ public:
         std::string name,
         SystemFn system,
         AppSystemOrdering ordering = {});
+    template<class F>
+    App& addSystem(AppSchedule schedule, std::string name, F&& system)
+        requires (!std::is_convertible_v<std::decay_t<F>, SystemFn>)
+    {
+        return addSystem(schedule, std::move(name), detail::makeTypedSystem(std::forward<F>(system)));
+    }
+    template<class F>
+    App& addSystem(AppSchedule schedule, std::string name, F&& system, AppSystemOrdering ordering)
+        requires (!std::is_convertible_v<std::decay_t<F>, SystemFn>)
+    {
+        return addSystem(
+            schedule, std::move(name), detail::makeTypedSystem(std::forward<F>(system)), std::move(ordering));
+    }
     App& addSystemBefore(
         AppSchedule schedule,
         std::string name,
