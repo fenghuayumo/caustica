@@ -1,6 +1,8 @@
 #include "EditorInputRouter.h"
 
 #include "SceneEditor.h"
+#include "EditorAccess.h"
+#include <engine/SceneApi.h>
 #include "EditorUIState.h"
 
 #include <backend/GpuDevice.h>
@@ -49,7 +51,7 @@ void requestInstancePick(caustica::render::RenderRuntimeState& runtime)
 void syncPickPositionFromCursor(SceneEditor& sceneEditor)
 {
     auto& session = sceneEditor.renderAppState();
-    GLFWwindow* window = sceneEditor.glfwWindow();
+    GLFWwindow* window = sceneEditor.app()->getGpuDevice()->getWindow();
     if (!window)
         return;
 
@@ -58,7 +60,7 @@ void syncPickPositionFromCursor(SceneEditor& sceneEditor)
     glfwGetCursorPos(window, &cursorX, &cursorY);
 
     dm::float2 upscalingScale(1.0f, 1.0f);
-    if (auto* worldRenderer = sceneEditor.worldRenderer(); worldRenderer && worldRenderer->getRenderTargets())
+    if (auto* worldRenderer = caustica::editor::editorGpu(sceneEditor)->worldRenderer(); worldRenderer && worldRenderer->getRenderTargets())
         upscalingScale = dm::float2(worldRenderer->getRenderSize())
             / dm::float2(worldRenderer->getDisplaySize());
 
@@ -79,7 +81,7 @@ bool onKeyPressed(SceneEditor& sceneEditor, caustica::KeyPressedEvent& e)
     if (ImGui::GetIO().WantCaptureKeyboard)
         return true;
 
-    auto* gpuRender = sceneEditor.gpuRender();
+    auto* gpuRender = caustica::editor::editorGpu(sceneEditor);
     if (!gpuRender)
         return true;
 
@@ -119,7 +121,8 @@ bool onKeyPressed(SceneEditor& sceneEditor, caustica::KeyPressedEvent& e)
         session.runtime.Invalidation.ShaderReloadRequested = true;
 #if CAUSTICA_WITH_STREAMLINE
     if (key == ToGlfwKey(caustica::Key::F13) && action == cGlfwPress)
-        sceneEditor.gpuDevice().getStreamline().reflexTriggerPcPing(sceneEditor.frameIndex());
+        sceneEditor.app()->getGpuDevice()->getStreamline().reflexTriggerPcPing(
+            sceneEditor.app()->getGpuDevice()->getFrameIndex());
 #endif
     return true;
 }
@@ -133,7 +136,7 @@ bool onKeyReleased(SceneEditor& sceneEditor, caustica::KeyReleasedEvent& e)
     if (ImGui::GetIO().WantCaptureKeyboard)
         return true;
 
-    auto* gpuRender = sceneEditor.gpuRender();
+    auto* gpuRender = caustica::editor::editorGpu(sceneEditor);
     if (!gpuRender)
         return true;
 
@@ -161,13 +164,13 @@ bool onMouseMoved(SceneEditor& sceneEditor, caustica::MouseMovedEvent& e)
     if (ImGui::GetIO().WantCaptureMouse || gizmoCapturesInput(sceneEditor))
         return false;
 
-    auto* gpuRender = sceneEditor.gpuRender();
+    auto* gpuRender = caustica::editor::editorGpu(sceneEditor);
     if (!gpuRender)
         return true;
 
     auto* game = sceneEditor.game().get();
     auto* camera = &gpuRender->camera();
-    auto* worldRenderer = sceneEditor.worldRenderer();
+    auto* worldRenderer = caustica::editor::editorGpu(sceneEditor)->worldRenderer();
     auto& session = sceneEditor.renderAppState();
 
     if (!(game && game->CameraActive()))
@@ -196,7 +199,7 @@ bool onMouseButtonPressed(SceneEditor& sceneEditor, caustica::MouseButtonPressed
     if (ImGui::GetIO().WantCaptureMouse || gizmoCapturesInput(sceneEditor))
         return false;
 
-    auto* gpuRender = sceneEditor.gpuRender();
+    auto* gpuRender = caustica::editor::editorGpu(sceneEditor);
     if (!gpuRender)
         return true;
 
@@ -226,7 +229,8 @@ bool onMouseButtonPressed(SceneEditor& sceneEditor, caustica::MouseButtonPressed
     }
 #if CAUSTICA_WITH_STREAMLINE
     if (button == ToGlfwMouse(caustica::Mouse::Left))
-        sceneEditor.gpuDevice().getStreamline().reflexTriggerFlash(sceneEditor.frameIndex());
+        sceneEditor.app()->getGpuDevice()->getStreamline().reflexTriggerFlash(
+            sceneEditor.app()->getGpuDevice()->getFrameIndex());
 #endif
     return true;
 }
@@ -236,7 +240,7 @@ bool onMouseButtonReleased(SceneEditor& sceneEditor, caustica::MouseButtonReleas
     if (ImGui::GetIO().WantCaptureMouse || gizmoCapturesInput(sceneEditor))
         return false;
 
-    auto* gpuRender = sceneEditor.gpuRender();
+    auto* gpuRender = caustica::editor::editorGpu(sceneEditor);
     if (!gpuRender)
         return true;
 

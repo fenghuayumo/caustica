@@ -1,6 +1,7 @@
 #include "SceneContentEditor.h"
 
 #include "SceneEditor.h"
+#include "EditorAccess.h"
 #include "common/LocalConfig.h"
 #include <EditorUI.h>
 
@@ -28,12 +29,12 @@ namespace
     caustica::SetSceneMeshVerticesParams makeMeshEditParams(SceneEditor& sceneEditor)
     {
         return caustica::SetSceneMeshVerticesParams{
-            .device = sceneEditor.device(),
-            .scene = sceneEditor.scene(),
-            .frameIndex = sceneEditor.frameIndex(),
+            .device = sceneEditor.app()->getGpuDevice()->getDevice(),
+            .scene = caustica::activeScene(*sceneEditor.app()),
+            .frameIndex = sceneEditor.app()->getGpuDevice()->getFrameIndex(),
             .resetAccumulation = &sceneEditor.pathTracerSettings().ResetAccumulation,
             .requestMeshAccelRebuild = [&sceneEditor](const std::shared_ptr<caustica::MeshInfo>& dirtyMesh) {
-                sceneEditor.gpuRender()->rayTracingResources().requestMeshAccelRebuild(dirtyMesh);
+                caustica::editor::editorGpu(sceneEditor)->rayTracingResources().requestMeshAccelRebuild(dirtyMesh);
             },
         };
     }
@@ -49,7 +50,7 @@ void SceneContentEditor::handleDroppedFiles(std::vector<std::string>& pendingFil
     if (pendingFiles.empty())
         return;
 
-    if (auto* sceneManager = m_sceneEditor.sceneManager();
+    if (auto* sceneManager = caustica::editor::editorGpu(m_sceneEditor)->sceneManager();
         sceneManager && sceneManager->isSceneStructureBusy())
     {
         return;
@@ -67,11 +68,11 @@ void SceneContentEditor::handleDroppedFiles(std::vector<std::string>& pendingFil
         if (ext == ".ply")
         {
             caustica::info("Drag-drop: loading Gaussian Splat file '%s'", filePath.c_str());
-            if (m_sceneEditor.loadGaussianSplatFile(path))
+            if (caustica::loadGaussianSplatFile(*m_sceneEditor.app(), path))
             {
                 caustica::info("Gaussian Splat loaded successfully: %d splats across %d objects",
-                    int(m_sceneEditor.gaussianSplatCount()),
-                    int(m_sceneEditor.gaussianSplatObjectCount()));
+                    int(caustica::gaussianSplatCount(*m_sceneEditor.app())),
+                    int(caustica::gaussianSplatObjectCount(*m_sceneEditor.app())));
             }
             else
                 caustica::error("Failed to load Gaussian Splat file '%s'", filePath.c_str());
@@ -140,7 +141,7 @@ bool SceneContentEditor::deleteSceneNode(caustica::ecs::Entity entity)
 
 void SceneContentEditor::requestFullRebuild()
 {
-    if (auto* gpuRender = m_sceneEditor.gpuRender())
+    if (auto* gpuRender = caustica::editor::editorGpu(m_sceneEditor))
         gpuRender->rayTracingResources().requestFullRebuild();
 }
 
@@ -151,12 +152,12 @@ std::vector<caustica::math::float3> SceneContentEditor::getMeshVertices(const st
 
 std::vector<caustica::math::float3> SceneContentEditor::getMeshVerticesWorld(const std::shared_ptr<caustica::MeshInfo>& mesh) const
 {
-    return caustica::getMeshVerticesWorld(m_sceneEditor.scene(), mesh, m_sceneEditor.frameIndex());
+    return caustica::getMeshVerticesWorld(caustica::activeScene(*m_sceneEditor.app()), mesh, m_sceneEditor.app()->getGpuDevice()->getFrameIndex());
 }
 
 std::vector<caustica::math::float3> SceneContentEditor::getMeshVerticesWorld(caustica::ecs::Entity entity) const
 {
-    return caustica::getMeshVerticesWorld(m_sceneEditor.scene(), entity, m_sceneEditor.frameIndex());
+    return caustica::getMeshVerticesWorld(caustica::activeScene(*m_sceneEditor.app()), entity, m_sceneEditor.app()->getGpuDevice()->getFrameIndex());
 }
 
 void SceneContentEditor::setMeshVerticesWorld(const std::shared_ptr<caustica::MeshInfo>& mesh,

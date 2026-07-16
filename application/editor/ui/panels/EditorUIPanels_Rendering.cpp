@@ -1,6 +1,8 @@
 #include "ui/EditorUIInternal.h"
 
 #include "SceneEditor.h"
+#include "EditorAccess.h"
+#include <engine/SceneApi.h>
 #include "common/ImGuiManager.h"
 
 #include <render/core/PathTracerSettings.h>
@@ -42,7 +44,7 @@ void EditorUI::BuildLightingPanel(const PanelLayout& layout)
 
             {
                 RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent););
-                if (auto& lightSamplingCache = m_sceneEditor.lightingPasses().lightSampling(); lightSamplingCache != nullptr)
+                if (auto& lightSamplingCache = caustica::editor::requireGpu(m_sceneEditor).lightingPasses().lightSampling(); lightSamplingCache != nullptr)
                     m_settings.ResetAccumulation |= lightSamplingCache->infoGUI(layout.indent);
             }
 
@@ -53,7 +55,7 @@ void EditorUI::BuildLightingPanel(const PanelLayout& layout)
                 if (ImGui::CollapsingHeader("Distant lighting (envmap+directional)", 0/*ImGuiTreeNodeFlags_DefaultOpen*/))
                 {
                     RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent););
-                    if (auto& envMapProcessor = m_sceneEditor.lightingPasses().environment(); envMapProcessor != nullptr)
+                    if (auto& envMapProcessor = caustica::editor::requireGpu(m_sceneEditor).lightingPasses().environment(); envMapProcessor != nullptr)
                         m_settings.ResetAccumulation |= envMapProcessor->debugGUI(layout.indent);
                 }
             }
@@ -61,7 +63,7 @@ void EditorUI::BuildLightingPanel(const PanelLayout& layout)
             ImGui::TextColored(categoryColor, "Importance sampling:");
             {
                 RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent););
-                if (auto& lightSamplingCache = m_sceneEditor.lightingPasses().lightSampling(); lightSamplingCache != nullptr)
+                if (auto& lightSamplingCache = caustica::editor::requireGpu(m_sceneEditor).lightingPasses().lightSampling(); lightSamplingCache != nullptr)
                 {
                     if( m_settings.NEEType != 2 )
                     {
@@ -96,7 +98,7 @@ void EditorUI::BuildLightingPanel(const PanelLayout& layout)
                     ImGui::TextColored(categoryColor, "Debugging:");
                     {
                         RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent););
-                        if (auto& lightSamplingCache = m_sceneEditor.lightingPasses().lightSampling(); lightSamplingCache != nullptr)
+                        if (auto& lightSamplingCache = caustica::editor::requireGpu(m_sceneEditor).lightingPasses().lightSampling(); lightSamplingCache != nullptr)
                             m_settings.ResetAccumulation |= lightSamplingCache->debugGUI(layout.indent);
                     }
                 }
@@ -151,8 +153,8 @@ void EditorUI::BuildPathTracerPanel(const PanelLayout& layout)
                     RESET_ON_CHANGE( ImGui::InputInt("Sample count", &m_settings.AccumulationTarget) );
                     m_settings.AccumulationTarget = dm::clamp(m_settings.AccumulationTarget, 1, 4 * 1024 * 1024); // this max is beyond float32 precision threshold; expect some banding creeping in when using more than 500k samples
                     if (ImGui::IsItemHovered()) ImGui::SetTooltip("Number of path samples per pixel to collect");
-                    ImGui::Text("Accumulated samples: %d (out of %d target)", m_sceneEditor.accumulationSampleIndex(), m_settings.AccumulationTarget);
-                    ImGui::Text("(avg frame time: %.3fms)", m_sceneEditor.avgTimePerFrame() * 1000.0f);
+                    ImGui::Text("Accumulated samples: %d (out of %d target)", caustica::accumulationSampleIndex(*m_sceneEditor.app()), m_settings.AccumulationTarget);
+                    ImGui::Text("(avg frame time: %.3fms)", caustica::avgTimePerFrame(*m_sceneEditor.app()) * 1000.0f);
 
                     RESET_ON_CHANGE(ImGui::Checkbox("Pre-warm real-time caches", &m_settings.AccumulationPreWarmRealtimeCaches));
                     if (ImGui::IsItemHovered()) ImGui::SetTooltip("If enabled, various lighting and etc systems will be pre-warmed before sample 0 is \naccumulated; otherwise they're reset and initial few samples will be lower quality.");

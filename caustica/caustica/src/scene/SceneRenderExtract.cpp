@@ -1,7 +1,12 @@
 #include <scene/SceneRenderExtract.h>
 #include <scene/SceneRenderData.h>
+#include <scene/SceneCameraAccess.h>
 #include <scene/SceneEcs.h>
 #include <scene/SceneLightAccess.h>
+
+#include <render/core/CameraController.h>
+#include <render/core/PathTracerSettings.h>
+#include <render/core/ToneMappingParameters.h>
 
 #include <algorithm>
 #include <vector>
@@ -14,6 +19,7 @@ void SceneRenderData::clear()
     meshInstances.clear();
     skinnedMeshes.clear();
     lights.clear();
+    cameras.clear();
     camera = {};
     renderSettings = {};
     meshInstanceEntities.clear();
@@ -31,6 +37,18 @@ const LightRenderProxy* SceneRenderData::findLight(ecs::Entity entity) const
     {
         if (light.entity == entity)
             return &light;
+    }
+    return nullptr;
+}
+
+const CameraRenderProxy* SceneRenderData::findCamera(ecs::Entity entity) const
+{
+    if (!ecs::isValid(entity))
+        return nullptr;
+    for (const CameraRenderProxy& cameraProxy : cameras)
+    {
+        if (cameraProxy.entity == entity)
+            return &cameraProxy;
     }
     return nullptr;
 }
@@ -259,23 +277,137 @@ bool ExtractLightsTransforms(ecs::World& world, SceneRenderData& inout)
     return true;
 }
 
-void ExtractCameraAndAnimationEntities(SceneEntityWorld& entityWorld, ecs::World& world, SceneRenderData& out)
+void ExtractCameras(SceneEntityWorld& entityWorld, ecs::World& world, SceneRenderData& out)
 {
+    out.cameras.clear();
     out.cameraEntities.clear();
-    out.animationEntities.clear();
 
     for (ecs::Entity entity : entityWorld.cameraEntitiesInRegistrationOrder())
     {
-        if (world.isAlive(entity) && world.has<CameraComponent>(entity))
-            out.cameraEntities.push_back(entity);
-    }
+        if (!world.isAlive(entity))
+            continue;
+        const CameraComponent* camComp = tryGetCamera(world, entity);
+        const GlobalTransformComponent* global = world.get<GlobalTransformComponent>(entity);
+        if (!camComp || !global)
+            continue;
 
+        out.cameraEntities.push_back(entity);
+        out.cameras.push_back(makeCameraRenderProxy(entity, *camComp, *global));
+    }
+}
+
+void ExtractAnimationEntities(ecs::World& world, SceneRenderData& out)
+{
+    out.animationEntities.clear();
     world.each<AnimationComponent>([&](ecs::Entity entity, const AnimationComponent&) {
         out.animationEntities.push_back(entity);
     });
 }
 
+void FillActiveCameraFromFreeController(const CameraController& camera, ActiveCameraRenderProxy& out)
+{
+    out.sourceEntity = ecs::NullEntity;
+    out.selectedCameraIndex = camera.selectedCameraIndex();
+    out.position = camera.camera().getPosition();
+    out.direction = camera.camera().getDir();
+    out.up = camera.camera().getUp();
+    out.verticalFovRadians = camera.verticalFOV();
+    out.zNear = camera.zNear();
+    out.useCustomIntrinsics = camera.useCustomIntrinsics();
+    out.intrinsics = camera.intrinsics();
+    out.intrinsicsViewport = camera.intrinsicsViewport();
+    out.valid = true;
+}
+
+void FillActiveCameraFromPerspectiveProxy(const CameraRenderProxy& proxy, uint32_t selectedIndex, ActiveCameraRenderProxy& out)
+{
+    const dm::affine3 viewToWorld = getCameraViewToWorldMatrix(proxy.transform);
+    out.sourceEntity = proxy.entity;
+    out.selectedCameraIndex = selectedIndex;
+    out.position = viewToWorld.m_translation;
+    out.direction = viewToWorld.m_linear.row2;
+    out.up = viewToWorld.m_linear.row1;
+    out.verticalFovRadians = proxy.verticalFovRadians;
+    out.zNear = proxy.zNear;
+    out.useCustomIntrinsics = false;
+    out.intrinsics = dm::float4(0.f);
+    out.intrinsicsViewport = dm::float2(0.f);
+    out.valid = true;
+}
+
+void ApplyCameraExposureToSettings(const CameraRenderProxy& proxy, PathTracerSettings& settings)
+{
+    if (proxy.projection != CameraProjectionKind::Perspective)
+        return;
+
+    ToneMappingParameters defaults;
+    settings.ToneMappingParams.autoExposure =
+        proxy.enableAutoExposure.value_or(defaults.autoExposure);
+    settings.ToneMappingParams.exposureCompensation =
+        proxy.exposureCompensation.value_or(defaults.exposureCompensation);
+    settings.ToneMappingParams.exposureValue =
+        proxy.exposureValue.value_or(defaults.exposureValue);
+    settings.ToneMappingParams.exposureValueMin =
+        proxy.exposureValueMin.value_or(defaults.exposureValueMin);
+    settings.ToneMappingParams.exposureValueMax =
+        proxy.exposureValueMax.value_or(defaults.exposureValueMax);
+}
+
 } // namespace
+
+CameraRenderProxy makeCameraRenderProxy(
+    ecs::Entity entity,
+    const CameraComponent& component,
+    const GlobalTransformComponent& global)
+{
+    CameraRenderProxy proxy;
+    proxy.entity = entity;
+    proxy.transform = global.transform;
+
+    if (const PerspectiveCameraData* pers = tryGetPerspectiveCameraData(component))
+    {
+        proxy.projection = CameraProjectionKind::Perspective;
+        proxy.zNear = pers->zNear;
+        proxy.zFar = pers->zFar;
+        proxy.verticalFovRadians = pers->verticalFov;
+        proxy.aspectRatio = pers->aspectRatio;
+        proxy.enableAutoExposure = pers->enableAutoExposure;
+        proxy.exposureCompensation = pers->exposureCompensation;
+        proxy.exposureValue = pers->exposureValue;
+        proxy.exposureValueMin = pers->exposureValueMin;
+        proxy.exposureValueMax = pers->exposureValueMax;
+        return proxy;
+    }
+
+    if (const OrthographicCameraData* ortho = tryGetOrthographicCameraData(component))
+    {
+        proxy.projection = CameraProjectionKind::Orthographic;
+        proxy.zNear = ortho->zNear;
+        proxy.zFar = ortho->zFar;
+        proxy.xMag = ortho->xMag;
+        proxy.yMag = ortho->yMag;
+    }
+    return proxy;
+}
+
+void applyCameraRenderProxyToController(
+    const CameraRenderProxy& proxy,
+    CameraController& camera,
+    PathTracerSettings* settings)
+{
+    if (proxy.projection != CameraProjectionKind::Perspective)
+        return;
+
+    ActiveCameraRenderProxy active;
+    FillActiveCameraFromPerspectiveProxy(proxy, camera.selectedCameraIndex(), active);
+    camera.camera().lookTo(active.position, active.direction, active.up);
+    camera.setVerticalFOV(active.verticalFovRadians);
+    camera.setZNear(active.zNear);
+    camera.clearIntrinsics();
+
+    if (settings)
+        ApplyCameraExposureToSettings(proxy, *settings);
+}
 
 void extractSceneRenderData(
     SceneEntityWorld& entityWorld,
@@ -291,8 +423,8 @@ void extractSceneRenderData(
 
     if (needFull)
     {
-        // Keep session camera/settings; callers preserve them across republish.
-        const CameraSnapshot camera = inout.camera;
+        // Keep active camera/settings; callers preserve them across republish.
+        const ActiveCameraRenderProxy camera = inout.camera;
         const RenderSettingsSnapshot renderSettings = inout.renderSettings;
         inout.clear();
         inout.camera = camera;
@@ -301,7 +433,8 @@ void extractSceneRenderData(
         ExtractMeshInstancesFull(world, inout);
         ExtractSkinnedMeshes(world, inout, frameIndex);
         ExtractLightsFull(world, inout);
-        ExtractCameraAndAnimationEntities(entityWorld, world, inout);
+        ExtractCameras(entityWorld, world, inout);
+        ExtractAnimationEntities(world, inout);
         return;
     }
 
@@ -316,32 +449,12 @@ void extractSceneRenderData(
 
     // Skinned joints track animation every frame even when hierarchy is idle.
     ExtractSkinnedMeshes(world, inout, frameIndex);
+    // Cameras are few; refresh every frame so animated scene cams stay current.
+    ExtractCameras(entityWorld, world, inout);
 }
-
-} // namespace caustica::scene
-
-#include <render/core/CameraController.h>
-
-namespace caustica::scene
-{
 
 void extractSessionRenderState(const SessionRenderExtractInputs& inputs, SceneRenderData& out)
 {
-    if (inputs.camera)
-    {
-        const CameraController& camera = *inputs.camera;
-        out.camera.position = camera.camera().getPosition();
-        out.camera.direction = camera.camera().getDir();
-        out.camera.up = camera.camera().getUp();
-        out.camera.verticalFovDegrees = camera.verticalFOV();
-        out.camera.zNear = camera.zNear();
-        out.camera.useCustomIntrinsics = camera.useCustomIntrinsics();
-        out.camera.intrinsics = camera.intrinsics();
-        out.camera.intrinsicsViewport = camera.intrinsicsViewport();
-        out.camera.selectedCameraIndex = camera.selectedCameraIndex();
-        out.camera.valid = true;
-    }
-
     if (inputs.settings)
     {
         out.renderSettings.settings = *inputs.settings;
@@ -358,6 +471,27 @@ void extractSessionRenderState(const SessionRenderExtractInputs& inputs, SceneRe
 
     out.renderSettings.gaussianSplatTemporalReset = inputs.gaussianSplatTemporalReset;
     out.renderSettings.sceneTime = inputs.sceneTime;
+
+    if (!inputs.camera)
+        return;
+
+    const CameraController& freeCamera = *inputs.camera;
+    const uint32_t selectedIndex = freeCamera.selectedCameraIndex();
+
+    // selectedIndex 0 = free camera; 1..N = CameraRenderProxy[N-1].
+    if (selectedIndex > 0)
+    {
+        const uint32_t proxyIndex = selectedIndex - 1;
+        if (proxyIndex < out.cameras.size()
+            && out.cameras[proxyIndex].projection == CameraProjectionKind::Perspective)
+        {
+            FillActiveCameraFromPerspectiveProxy(out.cameras[proxyIndex], selectedIndex, out.camera);
+            ApplyCameraExposureToSettings(out.cameras[proxyIndex], out.renderSettings.settings);
+            return;
+        }
+    }
+
+    FillActiveCameraFromFreeController(freeCamera, out.camera);
 }
 
 } // namespace caustica::scene

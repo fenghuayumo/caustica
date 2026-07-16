@@ -7,18 +7,16 @@
 #include <render/worldRenderer/WorldRenderer.h>
 #include <render/core/TextureUtils.h>
 #include <render/passes/debug/ZoomTool.h>
-#include <render/passes/lighting/MaterialGpuCache.h>
 #include <render/SceneGaussianSplatPasses.h>
 #include <assets/loader/ShaderFactory.h>
 #include <engine/App.h>
 #include <engine/GpuRenderSubsystem.h>
+#include <engine/SceneApi.h>
 #include <core/path_utils.h>
 #include <scene/SceneEcs.h>
 #include <scene/View.h>
 #include <EditorUI.h>
 #include <shaders/PathTracer/PathTracerDebug.hlsli>
-
-#include <GLFW/glfw3.h>
 
 #include "game/GameScene.h"
 
@@ -79,68 +77,22 @@ GpuRenderSubsystem* SceneEditor::gpuRender() const
     return m_app ? m_app->tryResource<GpuRenderSubsystem>() : nullptr;
 }
 
-GpuDevice& SceneEditor::gpuDevice() const
-{
-    assert(m_app && m_app->getGpuDevice());
-    return *m_app->getGpuDevice();
-}
-
-nvrhi::IDevice* SceneEditor::device() const
-{
-    return gpuDevice().getDevice();
-}
-
-uint32_t SceneEditor::frameIndex() const
-{
-    return gpuDevice().getFrameIndex();
-}
-
-std::shared_ptr<Scene> SceneEditor::scene() const
-{
-    return m_app ? caustica::activeScene(*m_app) : nullptr;
-}
-
-scene::SceneEntityWorld* SceneEditor::entityWorld() const
-{
-    return m_app ? caustica::entityWorld(*m_app) : nullptr;
-}
-
-bool SceneEditor::shouldSkipRender() const
-{
-    return m_app ? caustica::shouldSkipRender(*m_app) : true;
-}
-
-SceneManager* SceneEditor::sceneManager() { return gpuRender() ? gpuRender()->sceneManager() : nullptr; }
-WorldRenderer* SceneEditor::worldRenderer() { return gpuRender() ? gpuRender()->worldRenderer() : nullptr; }
-SceneLightingPasses& SceneEditor::lightingPasses() { return gpuRender()->lightingPasses(); }
-const SceneManager* SceneEditor::sceneManager() const { return gpuRender() ? gpuRender()->sceneManager() : nullptr; }
-WorldRenderer* SceneEditor::worldRenderer() const { return gpuRender() ? gpuRender()->worldRenderer() : nullptr; }
-const SceneLightingPasses& SceneEditor::lightingPasses() const { return gpuRender()->lightingPasses(); }
-
-std::shared_ptr<Material> SceneEditor::findMaterial(int materialID) const
-{
-    return m_app ? caustica::findMaterial(*m_app, materialID) : nullptr;
-}
-
-ecs::Entity SceneEditor::findEntityByInstanceIndex(int instanceIndex) const
-{
-    return m_app ? caustica::findEntityByInstanceIndex(*m_app, instanceIndex) : ecs::NullEntity;
-}
-
 ecs::Entity SceneEditor::pickGaussianSplatAtPixel(math::uint2 renderPixel) const
 {
+    if (!m_app)
+        return ecs::NullEntity;
+
     auto* gpu = gpuRender();
-    auto* entityWorld = this->entityWorld();
-    const auto& view = currentView();
+    auto* entityWorld = caustica::entityWorld(*m_app);
+    const auto& view = caustica::currentView(*m_app);
     if (!gpu || !entityWorld || !view)
         return ecs::NullEntity;
 
-    const uint2 disp = displaySize();
-    const uint2 rend = renderSize();
+    const uint2 disp = caustica::displaySize(*m_app);
+    const uint2 rend = caustica::renderSize(*m_app);
     if (disp.x == 0 || disp.y == 0 || rend.x == 0 || rend.y == 0)
         return ecs::NullEntity;
 
-    // Picking.Position is in render pixels; project using display space for ImGui-style tests.
     const float2 mousePos = float2(
         float(renderPixel.x) * float(disp.x) / float(rend.x),
         float(renderPixel.y) * float(disp.y) / float(rend.y));
@@ -175,7 +127,6 @@ ecs::Entity SceneEditor::pickGaussianSplatAtPixel(math::uint2 renderPixel) const
         box3 bbox = boundsComp ? boundsComp->globalBounds : box3::empty();
         if (bbox.isempty())
         {
-            // Fallback: transform local splat AABB by the entity global transform.
             auto* global = entityWorld->world().tryGet<scene::GlobalTransformComponent>(object.entity);
             const box3 local = object.pass->getLocalBounds();
             if (global && !local.isempty())
@@ -215,191 +166,15 @@ ecs::Entity SceneEditor::pickGaussianSplatAtPixel(math::uint2 renderPixel) const
     return bestEntity;
 }
 
-const FirstPersonCamera& SceneEditor::currentCamera() const
-{
-    return m_app ? caustica::currentCamera(*m_app) : gpuRender()->camera().camera();
-}
-
-const std::shared_ptr<PlanarView>& SceneEditor::currentView() const
-{
-    return m_app ? caustica::currentView(*m_app) : gpuRender()->camera().view();
-}
-
-const DebugFeedbackStruct& SceneEditor::feedbackData() const
-{
-    return m_app ? caustica::feedbackData(*m_app) : worldRenderer()->getFeedbackData();
-}
-
-const DeltaTreeVizPathVertex* SceneEditor::debugDeltaPathTree() const
-{
-    return m_app ? caustica::debugDeltaPathTree(*m_app) : nullptr;
-}
-
-int SceneEditor::accumulationSampleIndex() const
-{
-    return m_app ? caustica::accumulationSampleIndex(*m_app) : 0;
-}
-
-math::uint2 SceneEditor::renderSize() const
-{
-    return m_app ? caustica::renderSize(*m_app) : uint2{ 0, 0 };
-}
-
-math::uint2 SceneEditor::displaySize() const
-{
-    return m_app ? caustica::displaySize(*m_app) : uint2{ 0, 0 };
-}
-
-float SceneEditor::avgTimePerFrame() const
-{
-    return m_app ? caustica::avgTimePerFrame(*m_app) : 0.f;
-}
-
-void SceneEditor::debugDrawLine(float3 start, float3 stop, float4 col1, float4 col2)
-{
-    if (m_app)
-        caustica::debugDrawLine(*m_app, start, stop, col1, col2);
-}
-
-std::string SceneEditor::currentSceneName() const
-{
-    return m_app ? caustica::currentSceneName(*m_app) : std::string();
-}
-
-const std::vector<std::string>& SceneEditor::availableScenes() const
-{
-    static const std::vector<std::string> kEmpty;
-    return m_app ? caustica::availableScenes(*m_app) : kEmpty;
-}
-
-void SceneEditor::setCurrentScene(const std::string& sceneName, bool forceReload)
-{
-    if (m_app)
-        caustica::setCurrentScene(*m_app, sceneName, forceReload);
-}
-
-bool SceneEditor::loadGaussianSplatFile(const std::filesystem::path& fileName, bool convertRdfToRub)
-{
-    return m_app && caustica::loadGaussianSplatFile(*m_app, fileName, convertRdfToRub);
-}
-
-uint32_t SceneEditor::gaussianSplatCount() const
-{
-    return m_app ? caustica::gaussianSplatCount(*m_app) : 0;
-}
-
-uint32_t SceneEditor::gaussianSplatObjectCount() const
-{
-    return m_app ? caustica::gaussianSplatObjectCount(*m_app) : 0;
-}
-
-uint SceneEditor::sceneCameraCount() const
-{
-    return m_app ? caustica::sceneCameraCount(*m_app) : 1;
-}
-
-uint& SceneEditor::selectedCameraIndex()
-{
-    assert(m_app);
-    return caustica::selectedCameraIndex(*m_app);
-}
-
-void SceneEditor::saveCurrentCamera() const
-{
-    if (m_app)
-        caustica::saveCurrentCamera(*m_app);
-}
-
-void SceneEditor::loadCurrentCamera()
-{
-    if (m_app)
-        caustica::loadCurrentCamera(*m_app);
-}
-
-std::string SceneEditor::currentCameraPosDirUp() const
-{
-    return m_app ? caustica::currentCameraPosDirUp(*m_app) : std::string();
-}
-
-bool SceneEditor::setCurrentCameraPosDirUp(const std::string& val)
-{
-    return m_app ? caustica::setCurrentCameraPosDirUp(*m_app, val) : false;
-}
-
-void SceneEditor::setCameraVerticalFOV(float cameraFOV)
-{
-    if (m_app)
-        caustica::setCameraVerticalFOV(*m_app, cameraFOV);
-}
-
-float SceneEditor::cameraVerticalFOV() const
-{
-    return m_app ? caustica::cameraVerticalFOV(*m_app) : 0.f;
-}
-
-std::string SceneEditor::resolutionInfo() const
-{
-    return m_app ? caustica::resolutionInfo(*m_app) : "uninitialized";
-}
-
-std::string SceneEditor::fpsInfo() const
-{
-    return m_app ? caustica::fpsInfo(*m_app) : std::string();
-}
-
-const std::string& SceneEditor::envMapLocalPath() const
-{
-    static const std::string kEmpty;
-    return m_app ? caustica::envMapLocalPath(*m_app) : kEmpty;
-}
-
-const std::string& SceneEditor::envMapOverrideSource() const
-{
-    static const std::string kEmpty;
-    return m_app ? caustica::envMapOverrideSource(*m_app) : kEmpty;
-}
-
-const std::vector<std::filesystem::path>& SceneEditor::envMapMediaList()
-{
-    static const std::vector<std::filesystem::path> kEmpty;
-    return m_app ? caustica::envMapMediaList(*m_app) : kEmpty;
-}
-
-void SceneEditor::setEnvMapOverrideSource(const std::string& envMapOverride)
-{
-    if (m_app)
-        caustica::setEnvMapOverrideSource(*m_app, envMapOverride);
-}
-
-bool SceneEditor::hasAsyncLoadingInProgress() const
-{
-    return m_app && caustica::hasAsyncLoadingInProgress(*m_app);
-}
-
-bool SceneEditor::accumulationCompleted() const
-{
-    return m_app && caustica::accumulationCompleted(*m_app);
-}
-
-GLFWwindow* SceneEditor::glfwWindow() const
-{
-    return gpuDevice().getWindow();
-}
-
-void SceneEditor::initStreamlineAndWindow()
-{
-    if (m_app)
-        caustica::initStreamlineAndWindow(*m_app);
-#if CAUSTICA_WITH_PYTHON
-    m_pythonScripting = std::make_unique<PythonScripting>(*this);
-#endif
-}
-
 void SceneEditor::attachGpuRenderSubsystem(GpuRenderSubsystem& gpuRenderSubsystem)
 {
     m_gpuRenderSubsystem = &gpuRenderSubsystem;
     if (m_app)
         caustica::attachGpuRenderSubsystem(*m_app, gpuRenderSubsystem);
+#if CAUSTICA_WITH_PYTHON
+    if (!m_pythonScripting)
+        m_pythonScripting = std::make_unique<PythonScripting>(*this);
+#endif
     m_inputRouter.bind(*this);
 }
 
@@ -407,12 +182,6 @@ void SceneEditor::onBeforeInitialSceneLoad()
 {
     m_sampleGame = std::make_unique<::GameScene>(*this, m_cmdLine);
     m_viewState.progressLoading.Set(95);
-}
-
-void SceneEditor::initializeScene(const std::string& preferredScene)
-{
-    if (m_app)
-        caustica::initializeScene(*m_app, preferredScene);
 }
 
 void SceneEditor::prepareEditorFrame()
@@ -436,25 +205,29 @@ void SceneEditor::onSceneUnloading()
 
 void SceneEditor::onSceneLoadedEarly()
 {
-    if (m_sampleGame != nullptr)
-    {
-        const std::filesystem::path assetsRoot = getLocalPath(c_AssetsFolder);
-        m_sampleGame->sceneLoaded(
-            sceneManager()->getScene(),
-            sceneManager()->getCurrentScenePath(),
-            assetsRoot);
-    }
+    if (m_sampleGame == nullptr || !m_app)
+        return;
+
+    auto* manager = gpuRender() ? gpuRender()->sceneManager() : nullptr;
+    if (!manager)
+        return;
+
+    const std::filesystem::path assetsRoot = getLocalPath(c_AssetsFolder);
+    m_sampleGame->sceneLoaded(
+        manager->getScene(),
+        manager->getCurrentScenePath(),
+        assetsRoot);
 }
 
 void SceneEditor::onSceneLoadedBeforeGpuPrep()
 {
-    if (m_editor.TogglableNodes == nullptr)
+    if (m_editor.TogglableNodes != nullptr || !m_app)
+        return;
+
+    if (auto* ew = caustica::entityWorld(*m_app))
     {
-        if (auto* ew = entityWorld())
-        {
-            m_editor.TogglableNodes = std::make_shared<std::vector<TogglableNode>>();
-            UpdateTogglableNodes(*m_editor.TogglableNodes, *ew, ew->root());
-        }
+        m_editor.TogglableNodes = std::make_shared<std::vector<TogglableNode>>();
+        UpdateTogglableNodes(*m_editor.TogglableNodes, *ew, ew->root());
     }
 }
 
@@ -501,16 +274,11 @@ void SceneEditor::syncLoadedSceneSystems()
     if (!m_app || !caustica::isSceneLoaded(*m_app))
         return;
 
-    const std::string loadedSceneName = currentSceneName();
+    const std::string loadedSceneName = caustica::currentSceneName(*m_app);
     if (loadedSceneName.empty() || loadedSceneName == m_editorState.loadedSceneName)
         return;
 
     m_editorState.loadedSceneName = loadedSceneName;
-}
-
-void SceneEditor::onBeginFrameScheduled()
-{
-    captureScriptPreRender();
 }
 
 void SceneEditor::onAnimateBegin(float& fElapsedTimeSeconds)
@@ -537,8 +305,9 @@ void SceneEditor::onAnimateUpdateSceneTime(float /*fElapsedTimeSeconds*/, bool e
 
 void SceneEditor::onAnimateGameCamera(float fElapsedTimeSeconds)
 {
-    if (m_sampleGame)
-        m_sampleGame->TickCamera(fElapsedTimeSeconds, gpuRender()->camera().camera());
+    auto* gpu = gpuRender();
+    if (m_sampleGame && gpu)
+        m_sampleGame->TickCamera(fElapsedTimeSeconds, gpu->camera().camera());
 }
 
 void SceneEditor::onAnimateEnd(float /*fElapsedTimeSeconds*/)
@@ -551,37 +320,24 @@ void SceneEditor::updateWindowTitle()
     if (!m_app)
         return;
 
-    if (auto activeScene = scene())
-    {
-        SceneManager* manager = sceneManager();
-        std::string extraInfo = ", " + caustica::fpsInfo(*m_app) + ", " + manager->getCurrentSceneName()
-            + ", " + caustica::resolutionInfo(*m_app) + ", (L: " + std::to_string(activeScene->getLightEntities().size())
-            + ", MAT: " + std::to_string(activeScene->getMaterials().size())
-            + ", MESH: " + std::to_string(activeScene->getMeshes().size())
-            + ", I: " + std::to_string(activeScene->getMeshInstances().size())
-            + ", SI: " + std::to_string(activeScene->getSkinnedMeshInstances().size())
+    auto* device = m_app->getGpuDevice();
+    auto* manager = gpuRender() ? gpuRender()->sceneManager() : nullptr;
+    auto activeScene = caustica::activeScene(*m_app);
+    if (!device || !manager || !activeScene)
+        return;
+
+    std::string extraInfo = ", " + caustica::fpsInfo(*m_app) + ", " + manager->getCurrentSceneName()
+        + ", " + caustica::resolutionInfo(*m_app) + ", (L: " + std::to_string(activeScene->getLightEntities().size())
+        + ", MAT: " + std::to_string(activeScene->getMaterials().size())
+        + ", MESH: " + std::to_string(activeScene->getMeshes().size())
+        + ", I: " + std::to_string(activeScene->getMeshInstances().size())
+        + ", SI: " + std::to_string(activeScene->getSkinnedMeshInstances().size())
 #if ENABLE_DEBUG_VIZUALISATIONS
-            + ", ENABLE_DEBUG_VIZUALISATIONS: 1"
+        + ", ENABLE_DEBUG_VIZUALISATIONS: 1"
 #endif
-            + ")";
+        + ")";
 
-        gpuDevice().setInformativeWindowTitle(g_windowTitle, false, extraInfo.c_str());
-    }
-}
-
-bool SceneEditor::shouldRenderWhenUnfocused() const
-{
-    auto* wr = worldRenderer();
-    if (!wr)
-        return false;
-
-    if (wr->getFrameIndex() < 16 || m_settings.ResetAccumulation || m_settings.ResetRealtimeCaches || m_captureScriptManager->isDoingWork())
-        return true;
-
-    if (m_editor.RenderWhenOutOfFocus)
-        return true;
-
-    return !m_settings.RealtimeMode && (wr->getAccumulationSampleIndex() < m_settings.AccumulationTarget);
+    device->setInformativeWindowTitle(g_windowTitle, false, extraInfo.c_str());
 }
 
 void SceneEditor::setSceneTime(double sceneTime)
@@ -625,17 +381,16 @@ bool SceneEditor::deleteSceneNode(caustica::ecs::Entity entity)
 
 void SceneEditor::processPendingSceneDeletes()
 {
-    if (m_editor.PendingDeleteEntity == caustica::ecs::NullEntity)
+    if (m_editor.PendingDeleteEntity == caustica::ecs::NullEntity || !m_app)
         return;
 
     const caustica::ecs::Entity entity = m_editor.PendingDeleteEntity;
     m_editor.PendingDeleteEntity = caustica::ecs::NullEntity;
 
-    auto* ew = entityWorld();
+    auto* ew = caustica::entityWorld(*m_app);
     if (!ew || !ew->world().isAlive(entity))
         return;
 
-    // despawn mutates ECS only; Extract flushes GPU/AS.
     deleteSceneNode(entity);
 }
 
@@ -685,8 +440,10 @@ void SceneEditor::setMeshVertices(const std::shared_ptr<MeshInfo>& mesh,
 
 ZoomTool* SceneEditor::getOrCreateZoomTool()
 {
-    if (m_zoomTool == nullptr)
-        m_zoomTool = std::make_unique<ZoomTool>(device(), gpuRender()->shaderFactory());
+    auto* gpu = gpuRender();
+    auto* device = m_app ? m_app->getGpuDevice() : nullptr;
+    if (m_zoomTool == nullptr && gpu && device)
+        m_zoomTool = std::make_unique<ZoomTool>(device->getDevice(), gpu->shaderFactory());
     return m_zoomTool.get();
 }
 
@@ -697,13 +454,14 @@ bool SceneEditor::showDeltaTree() const
 
 void SceneEditor::resolvePickFeedback(const DebugFeedbackStruct& feedback, const caustica::render::RenderPickState& renderedPick)
 {
-    // pickedMaterialID is PTMaterial::gpuDataIndex for the hit geometry (sub-mesh),
-    // not a per-instance material. Use the rendered-frame pick flags, not live UI state.
+    if (!m_app)
+        return;
+
     if (renderedPick.MaterialRequested)
-        m_editor.SelectedMaterial = findMaterial(int(feedback.pickedMaterialID));
+        m_editor.SelectedMaterial = caustica::findMaterial(*m_app, int(feedback.pickedMaterialID));
     if (renderedPick.InstanceRequested)
     {
-        ecs::Entity picked = findEntityByInstanceIndex(int(feedback.pickedInstanceIndex));
+        ecs::Entity picked = caustica::findEntityByInstanceIndex(*m_app, int(feedback.pickedInstanceIndex));
         if (picked == ecs::NullEntity)
             picked = pickGaussianSplatAtPixel(renderedPick.Position);
         m_editor.SelectedEntity = picked;
@@ -714,7 +472,7 @@ void SceneEditor::resolvePickFeedback(const DebugFeedbackStruct& feedback, const
 
 void SceneEditor::afterWorldRender(GpuDevice& gpuDevice)
 {
-    auto* wr = worldRenderer();
+    auto* wr = gpuRender() ? gpuRender()->worldRenderer() : nullptr;
     if (!wr)
         return;
 
@@ -722,8 +480,6 @@ void SceneEditor::afterWorldRender(GpuDevice& gpuDevice)
     if (m_settings.ContinuousDebugFeedback || renderedPick.hasActivePickRequest())
         resolvePickFeedback(wr->getFeedbackData(), renderedPick);
 
-    // Clear only the requests this finished frame actually owned. Clearing live
-    // state from an older in-flight frame would drop a newer click.
     if (renderedPick.MaterialRequested)
         m_renderState.Picking.MaterialRequested = false;
     if (renderedPick.InstanceRequested)
@@ -731,7 +487,7 @@ void SceneEditor::afterWorldRender(GpuDevice& gpuDevice)
 
     auto saveFramebuffer = [this, &gpuDevice](const char* fileName) -> bool {
         nvrhi::IFramebuffer* framebuffer = gpuDevice.getCurrentFramebuffer(true);
-        if (!framebuffer)
+        if (!framebuffer || !gpuRender())
             return false;
         nvrhi::ITexture* texture = framebuffer->getDesc().colorAttachments[0].texture;
         auto* renderDevice = &gpuRender()->renderDevice();
@@ -754,12 +510,6 @@ bool SceneEditor::consumeExperimentalPhotoScreenshot()
         return false;
     m_editor.ExperimentalPhotoModeScreenshot = false;
     return true;
-}
-
-void SceneEditor::captureScriptPreRender()
-{
-    if (m_captureScriptManager)
-        m_captureScriptManager->preRender();
 }
 
 void SceneEditor::captureScriptPostRender(std::function<bool(const char* fileName)> saveTexture)

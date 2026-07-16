@@ -3,14 +3,13 @@
 #include <engine/App.h>
 #include <engine/AppSchedules.h>
 #include <engine/GpuRenderSubsystem.h>
-#include <engine/SceneViewState.h>
-
 #include <render/core/PathTracerSettings.h>
 #include <render/worldRenderer/WorldRenderer.h>
 #include <scene/Scene.h>
 #include <scene/SceneCameraAccess.h>
 #include <scene/SceneEcs.h>
 #include <scene/SceneManager.h>
+#include <scene/SceneRenderExtract.h>
 
 #include <algorithm>
 
@@ -20,35 +19,37 @@ namespace caustica
 void updateCamera(App& app, float elapsedTimeSeconds)
 {
     auto* cfg = app.tryResource<PathTracerSettings>();
-    auto* vs = app.tryResource<SceneViewState>();
     auto* gr = app.tryResource<GpuRenderSubsystem>();
-    if (!cfg || !vs || !gr)
+    if (!cfg || !gr)
         return;
 
     CameraController& cam = gr->camera();
     cam.camera().setMoveSpeed(cfg->CameraMoveSpeed);
 
-    const uint cameraCount = gr->sceneManager() && gr->sceneManager()->getScene()
-        ? static_cast<uint>(gr->sceneManager()->getScene()->getCameraEntities().size()) + 1
+    const std::shared_ptr<Scene> activeScene =
+        gr->sceneManager() ? gr->sceneManager()->getScene() : nullptr;
+    const uint cameraCount = activeScene
+        ? static_cast<uint>(activeScene->getCameraEntities().size()) + 1
         : 1;
     cam.selectedCameraIndex() = std::min(cam.selectedCameraIndex(), cameraCount - 1);
-    if (cam.selectedCameraIndex() > 0)
+
+    // Logic-side preview of the selected scene camera (same proxy math Extract uses).
+    // RT still consumes ActiveCameraRenderProxy from the published snapshot.
+    if (cam.selectedCameraIndex() > 0 && activeScene)
     {
-        const std::shared_ptr<Scene> activeScene =
-            gr->sceneManager() ? gr->sceneManager()->getScene() : nullptr;
-        if (activeScene)
+        const auto& cameraEntities = activeScene->getCameraEntities();
+        const uint32_t camIdx = cam.selectedCameraIndex() - 1;
+        const auto* ew = (camIdx < cameraEntities.size()) ? activeScene->getEntityWorld() : nullptr;
+        if (ew)
         {
-            const auto& cameraEntities = activeScene->getCameraEntities();
-            const uint32_t camIdx = cam.selectedCameraIndex() - 1;
-            const auto* ew = (camIdx < cameraEntities.size()) ? activeScene->getEntityWorld() : nullptr;
-            if (ew)
+            const ecs::Entity camEntity = cameraEntities[camIdx];
+            const auto* camComp = scene::tryGetCamera(ew->world(), camEntity);
+            const auto* globalComp = ew->world().get<scene::GlobalTransformComponent>(camEntity);
+            if (camComp && globalComp)
             {
-                ecs::Entity camEntity = cameraEntities[camIdx];
-                const auto* camComp = scene::tryGetCamera(ew->world(), camEntity);
-                const auto* persData = camComp ? scene::tryGetPerspectiveCameraData(*camComp) : nullptr;
-                const auto* globalComp = ew->world().get<scene::GlobalTransformComponent>(camEntity);
-                if (persData && globalComp)
-                    vs->cameraController.syncFromSceneCamera(*persData, globalComp->transform);
+                const scene::CameraRenderProxy proxy =
+                    scene::makeCameraRenderProxy(camEntity, *camComp, *globalComp);
+                scene::applyCameraRenderProxyToController(proxy, cam, cfg);
             }
         }
     }

@@ -1,6 +1,8 @@
 #include "common/TransformGizmo.h"
 
 #include "SceneEditor.h"
+#include "EditorAccess.h"
+#include <engine/SceneApi.h>
 #include "ui/EditorUIInternal.h"
 
 #include <ImGuizmo.h>
@@ -137,7 +139,7 @@ const float* GetSnapValues(const EditorUIState& editorUI)
 
 void BuildGizmoProjectionMatrix(const TransformGizmoContext& ctx, const PlanarView& view, float outMatrix[16])
 {
-    auto* gpuRender = ctx.sceneEditor.gpuRender();
+    auto* gpuRender = caustica::editor::editorGpu(ctx.sceneEditor);
     if (gpuRender && view.isReverseDepth())
     {
         const ImGuiIO& io = ImGui::GetIO();
@@ -200,7 +202,7 @@ bool caustica::editor::DrawTransformGizmo(const TransformGizmoContext& ctx)
 
     HandleTransformGizmoShortcuts(ctx.editorUI);
 
-    auto* entityWorld = ctx.sceneEditor.entityWorld();
+    auto* entityWorld = caustica::entityWorld(*ctx.sceneEditor.app());
     const ecs::Entity entity = ctx.editorUI.SelectedEntity;
     if (!entityWorld || entity == ecs::NullEntity)
     {
@@ -216,7 +218,7 @@ bool caustica::editor::DrawTransformGizmo(const TransformGizmoContext& ctx)
         return false;
     }
 
-    const auto& view = ctx.sceneEditor.currentView();
+    const auto& view = caustica::currentView(*ctx.sceneEditor.app());
     if (!view)
     {
         g_drag = {};

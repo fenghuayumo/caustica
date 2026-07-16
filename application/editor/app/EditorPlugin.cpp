@@ -1,4 +1,5 @@
 #include "EditorPlugin.h"
+#include "EditorAccess.h"
 
 #include <engine/App.h>
 #include <engine/AssetPlugin.h>
@@ -60,10 +61,10 @@ void EditorPlugin::configureLateSchedules(App& app)
     });
 
     app.addSystemAfter(AppSchedule::preUpdate, "EditorScene.RequestUnfocusedRender", "NotifyDpiScale", [this](SystemContext& ctx) {
-        if (ctx.runRender || !ctx.windowVisible || m_sceneEditor.shouldSkipRender())
+        if (ctx.runRender || !ctx.windowVisible || caustica::shouldSkipRender(*m_sceneEditor.app()))
             return;
 
-        auto* wr = m_sceneEditor.worldRenderer();
+        auto* wr = caustica::editor::editorGpu(m_sceneEditor)->worldRenderer();
         auto* ui = ctx.tryRes<EditorUiData>();
         auto* capture = ctx.tryRes<CaptureScriptState>();
         const auto& settings = m_sceneEditor.pathTracerSettings();
@@ -129,7 +130,7 @@ void EditorPlugin::configureLateSchedules(App& app)
     });
 
     app.addSystemAfter(AppSchedule::Extract, "EditorScene.prepareEditorFrame", "Scene.PrepareRenderFrame", [this](SystemContext& ctx) {
-        if (!ctx.gpuDevice || m_sceneEditor.shouldSkipRender())
+        if (!ctx.gpuDevice || caustica::shouldSkipRender(*m_sceneEditor.app()))
             return;
 
         m_sceneEditor.prepareEditorFrame();

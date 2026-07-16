@@ -25,6 +25,8 @@
 #include <scene/SceneCameraAccess.h>
 #include <scene/SceneEcs.h>
 #include <scene/SceneManager.h>
+#include <scene/SceneRenderExtract.h>
+#include <scene/SceneRenderExtract.h>
 #include <assets/loader/ShaderFactory.h>
 #include <assets/loader/TextureLoader.h>
 #include <render/core/BindingCache.h>
@@ -35,6 +37,7 @@
 #include <render/core/PathTracingShaderCompiler.h>
 #include <assets/loader/ShaderMacro.h>
 #include <scene/SceneApply.h>
+#include <scene/SceneRenderExtract.h>
 #include <scene/SceneTypes.h>
 #include <scene/loader/RuntimeMeshLoader.h>
 #include <assets/RuntimeMeshLoadTypes.h>
@@ -248,8 +251,7 @@ namespace
     {
         auto scenePtr = caustica::activeScene(app);
         CameraController* cam = sessionCamera(app);
-        SceneViewState* vs = caustica::viewState(app);
-        if (!scenePtr || !cam || !vs)
+        if (!scenePtr || !cam)
             return;
 
         const auto& cameraEntities = scenePtr->getCameraEntities();
@@ -264,12 +266,19 @@ namespace
             {
                 ecs::Entity camEntity = cameraEntities[camIdx];
                 const auto* camComp = scene::tryGetCamera(ew->world(), camEntity);
-                const auto* persData = camComp ? scene::tryGetPerspectiveCameraData(*camComp) : nullptr;
                 const auto* globalComp = ew->world().get<scene::GlobalTransformComponent>(camEntity);
-                if (persData && globalComp)
+                if (camComp && globalComp)
                 {
-                    vs->cameraController.syncFromSceneCamera(*persData, globalComp->transform);
-                    syncedCamera = true;
+                    const scene::CameraRenderProxy proxy =
+                        scene::makeCameraRenderProxy(camEntity, *camComp, *globalComp);
+                    PathTracerSettings* settings = caustica::settings(app);
+                    scene::applyCameraRenderProxyToController(proxy, *cam, settings);
+                    // Match former SceneCameraController::syncFromSceneCamera side effects.
+                    if (settings)
+                        settings->ResetAccumulation = true;
+                    if (auto* wr = caustica::worldRenderer(app))
+                        wr->setGaussianSplatTemporalReset(true);
+                    syncedCamera = proxy.projection == scene::CameraProjectionKind::Perspective;
                 }
             }
         }

@@ -1,6 +1,6 @@
 #include "ui/EditorUIInternal.h"
+#include <engine/SceneApi.h>
 
-#include "SceneEditor.h"
 #include "SceneEditor.h"
 #include "common/ImGuiManager.h"
 
@@ -41,7 +41,7 @@ void EditorUI::BuildDeltaTreeExplorerPanel(const PanelLayout& layout)
         float scaledWindowWidth = layout.scaledWidth - layout.defWindowWidth - 20;
         ImGui::SetNextWindowPos(ImVec2(layout.scaledWidth - float(scaledWindowWidth) - 10, 10.f), ImGuiCond_FirstUseEver);
         ImGui::SetNextWindowSize(ImVec2(scaledWindowWidth, scaledWindowWidth * 0.5f), ImGuiCond_FirstUseEver);
-        const DeltaTreeVizHeader& DeltaTreeVizHeader = m_sceneEditor.feedbackData().deltaPathTree;
+        const DeltaTreeVizHeader& DeltaTreeVizHeader = caustica::feedbackData(*m_sceneEditor.app()).deltaPathTree;
         char windowName[1024];
         snprintf(windowName, sizeof(windowName), "Delta Tree Explorer, pixel (%d, %d), sampleIndex: %d, nodes: %d###DeltaExplorer", DeltaTreeVizHeader.pixelPos.x, DeltaTreeVizHeader.pixelPos.y, DeltaTreeVizHeader.sampleIndex, DeltaTreeVizHeader.nodeCount);
 
@@ -62,9 +62,9 @@ void EditorUI::BuildGameStandalonePanel(const PanelLayout& layout)
 {
     if ( m_sceneEditor.game() != nullptr && m_sceneEditor.game()->IsInitialized() )
     {
-        const auto view = m_sceneEditor.currentView();
+        const auto view = caustica::currentView(*m_sceneEditor.app());
         if (view)
-            m_sceneEditor.game()->StandaloneGUI(view, float2(m_sceneEditor.displaySize()));
+            m_sceneEditor.game()->StandaloneGUI(view, float2(caustica::displaySize(*m_sceneEditor.app())));
     }
 
     // ImGui::ShowDemoWindow();
@@ -94,12 +94,12 @@ void EditorUI::buildDeltaTreeViz()
     //     if ((frameCounter - lastUpdated) > 0)
     //     {
     //         lastUpdated = frameCounter;
-    //         cachedHeader = m_sceneEditor.feedbackData().deltaPathTree;
-    //         memcpy( cachedVertices, m_sceneEditor.debugDeltaPathTree(), sizeof(DeltaTreeVizPathVertex)*cDeltaTreeVizMaxVertices );
+    //         cachedHeader = caustica::feedbackData(*m_sceneEditor.app()).deltaPathTree;
+    //         memcpy( cachedVertices, caustica::debugDeltaPathTree(*m_sceneEditor.app()), sizeof(DeltaTreeVizPathVertex)*cDeltaTreeVizMaxVertices );
     //     }
     // }
-    const DeltaTreeVizHeader& DeltaTreeVizHeader   = m_sceneEditor.feedbackData().deltaPathTree; // cachedHeader;
-    const DeltaTreeVizPathVertex* deltaPathTreeVertices = m_sceneEditor.debugDeltaPathTree(); // cachedVertices;
+    const DeltaTreeVizHeader& DeltaTreeVizHeader   = caustica::feedbackData(*m_sceneEditor.app()).deltaPathTree; // cachedHeader;
+    const DeltaTreeVizPathVertex* deltaPathTreeVertices = caustica::debugDeltaPathTree(*m_sceneEditor.app()); // cachedVertices;
     const int nodeCount = DeltaTreeVizHeader.nodeCount;
 
     ImGui::NewLine(); ImGui::NewLine(); ImGui::NewLine(); ImGui::NewLine(); ImGui::NewLine(); ImGui::NewLine(); ImGui::NewLine(); ImGui::NewLine(); ImGui::NewLine(); ImGui::NewLine();
@@ -267,7 +267,7 @@ void EditorUI::buildDeltaTreeViz()
             std::string matName = ">>SKY<<";
             if( treeNode.deltaVertex.materialID != 0xFFFFFFFF )
             {
-                treeNode.material = m_sceneEditor.findMaterial((int)treeNode.deltaVertex.materialID);
+                treeNode.material = caustica::findMaterial(*m_sceneEditor.app(), (int)treeNode.deltaVertex.materialID);
                 if( treeNode.material != nullptr )
                     matName = treeNode.material->name; 
             }
@@ -315,11 +315,11 @@ void EditorUI::buildDeltaTreeViz()
             if (isAnyHovered)
             {
                 float3 worldPos = treeNode.deltaVertex.worldPos;
-                float3 viewVec = worldPos - m_sceneEditor.currentCamera().getPosition();
+                float3 viewVec = worldPos - caustica::currentCamera(*m_sceneEditor.app()).getPosition();
                 float sphereSize = 0.006f + 0.004f * dm::length(viewVec);
                 float step = 0.15f;
                 viewVec = dm::normalize(viewVec);
-                float3 right = dm::cross(viewVec, m_sceneEditor.currentCamera().getUp());
+                float3 right = dm::cross(viewVec, caustica::currentCamera(*m_sceneEditor.app()).getUp());
                 float3 up = dm::cross(right, viewVec);
                 float3 prev0 = worldPos;
                 float3 prev1 = worldPos;
@@ -335,11 +335,11 @@ void EditorUI::buildDeltaTreeViz()
                     float4 col0 = float4(0,0,0,1);
                     if( s > 0.0f )
                     {
-                        m_sceneEditor.debugDrawLine(prev0, sp0, col1, col1); 
-                        m_sceneEditor.debugDrawLine(prev1, sp1, col0, col0); 
-                        m_sceneEditor.debugDrawLine(prev0, sp1, col1, col0);
-                        m_sceneEditor.debugDrawLine(prev2, sp0, col1, col0);
-                        m_sceneEditor.debugDrawLine(prev2, sp2, col1, col1);
+                        caustica::debugDrawLine(*m_sceneEditor.app(), prev0, sp0, col1, col1); 
+                        caustica::debugDrawLine(*m_sceneEditor.app(), prev1, sp1, col0, col0); 
+                        caustica::debugDrawLine(*m_sceneEditor.app(), prev0, sp1, col1, col0);
+                        caustica::debugDrawLine(*m_sceneEditor.app(), prev2, sp0, col1, col0);
+                        caustica::debugDrawLine(*m_sceneEditor.app(), prev2, sp2, col1, col1);
                     }
                     prev0 = sp0; prev1 = sp1; prev2 = sp2;
                 }

@@ -1,4 +1,5 @@
 #include "ui/EditorUIInternal.h"
+#include <engine/SceneApi.h>
 
 #include "SceneEditor.h"
 #include "common/ImGuiManager.h"
@@ -63,8 +64,8 @@ void EditorUI::BuildUIResolutionPicker()
     };
 
     const GLFWvidmode* monitorMode = glfwGetVideoMode(glfwGetPrimaryMonitor());
-    int currentW = (int)m_sceneEditor.displaySize().x;
-    int currentH = (int)m_sceneEditor.displaySize().y;
+    int currentW = (int)caustica::displaySize(*m_sceneEditor.app()).x;
+    int currentH = (int)caustica::displaySize(*m_sceneEditor.app()).y;
 
     ImGui::Text("Click to change resolution:");
     ImGui::Separator();
@@ -160,7 +161,7 @@ void EditorUI::BuildDisplayPerformancePanel(const PanelLayout& layout)
             RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
             
             {
-                if (ImGui::Button(stringFormat("Resolution:  %dx%d (click to change)", m_sceneEditor.displaySize().x, m_sceneEditor.displaySize().y, m_sceneEditor.renderSize().x, m_sceneEditor.renderSize().y).c_str(), { -1, 0 }))
+                if (ImGui::Button(stringFormat("Resolution:  %dx%d (click to change)", caustica::displaySize(*m_sceneEditor.app()).x, caustica::displaySize(*m_sceneEditor.app()).y, caustica::renderSize(*m_sceneEditor.app()).x, caustica::renderSize(*m_sceneEditor.app()).y).c_str(), { -1, 0 }))
                     ImGui::OpenPopup("Resolution Picker");
                 BuildUIResolutionPicker();
             }

@@ -1,6 +1,8 @@
 #include "ui/EditorUIInternal.h"
 
 #include "SceneEditor.h"
+#include "EditorAccess.h"
+#include <engine/SceneApi.h>
 #include "common/ImGuiManager.h"
 #include "common/TransformGizmo.h"
 
@@ -34,7 +36,7 @@ namespace caustica::editor
 void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
 {
     // Inspector panel: instance Transform + mesh name (right-click pick)
-    auto* ew = m_sceneEditor.entityWorld();
+    auto* ew = caustica::entityWorld(*m_sceneEditor.app());
     if (m_editorUI.SelectedEntity != ecs::NullEntity && m_editorUI.ShowInspector && ew)
     {
         ImGui::SetNextWindowPos(ImVec2(float(layout.scaledWidth) - 10.f, 10.f), ImGuiCond_Appearing, ImVec2(1.f, 0.f));
@@ -163,7 +165,7 @@ void EditorUI::BuildMaterialEditorPanel(const PanelLayout& layout)
 {
     // Material Editor panel (right-click pick)
     std::shared_ptr<PTMaterial> material = PTMaterial::safeCast(m_editorUI.SelectedMaterial);
-    if (material != nullptr && m_sceneEditor.lightingPasses().materials() != nullptr && m_editorUI.ShowMaterialEditor)
+    if (material != nullptr && caustica::editor::requireGpu(m_sceneEditor).lightingPasses().materials() != nullptr && m_editorUI.ShowMaterialEditor)
     {
         const bool inspectorVisible = m_editorUI.SelectedEntity != ecs::NullEntity && m_editorUI.ShowInspector;
         ImGui::SetNextWindowPos(ImVec2(float(layout.scaledWidth) - 10.f, inspectorVisible ? 350.f : 10.f), ImGuiCond_Appearing, ImVec2(1.f, 0.f));
@@ -181,7 +183,7 @@ void EditorUI::BuildMaterialEditorPanel(const PanelLayout& layout)
 
         MaterialShaderPermutationKey mspBefore = MaterialShaderPermutationKey(material->computeShaderPermutation(""));
 
-        bool dirty = material->editorGui(*m_sceneEditor.lightingPasses().materials());
+        bool dirty = material->editorGui(*caustica::editor::requireGpu(m_sceneEditor).lightingPasses().materials());
 
         MaterialShaderPermutationKey mspAfter = MaterialShaderPermutationKey(material->computeShaderPermutation(""));
 
@@ -194,8 +196,8 @@ void EditorUI::BuildMaterialEditorPanel(const PanelLayout& layout)
             wasSkipRender != material->skipRender ||
             dirty)
         {
-            if (auto s = m_sceneEditor.scene())
-                s->refreshSceneWorld(m_sceneEditor.frameIndex());
+            if (auto s = caustica::activeScene(*m_sceneEditor.app()))
+                s->refreshSceneWorld(m_sceneEditor.app()->getGpuDevice()->getFrameIndex());
             m_settings.ResetAccumulation = 1;
         }
 

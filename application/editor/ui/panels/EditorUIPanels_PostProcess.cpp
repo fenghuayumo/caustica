@@ -1,6 +1,8 @@
 #include "ui/EditorUIInternal.h"
 
 #include "SceneEditor.h"
+#include "EditorAccess.h"
+#include <engine/SceneApi.h>
 #include "common/ImGuiManager.h"
 
 #include <render/core/PathTracerSettings.h>
@@ -35,9 +37,9 @@ void EditorUI::BuildOpacityMicroMapsPanel(const PanelLayout& layout)
         {
             UI_SCOPED_INDENT(layout.indent);
 
-            if (auto& opacityMicromapBuilder = m_sceneEditor.lightingPasses().opacityMaps(); opacityMicromapBuilder)
+            if (auto& opacityMicromapBuilder = caustica::editor::requireGpu(m_sceneEditor).lightingPasses().opacityMaps(); opacityMicromapBuilder)
             {
-                opacityMicromapBuilder->debugGUI(layout.indent, *m_sceneEditor.scene());
+                opacityMicromapBuilder->debugGUI(layout.indent, *caustica::activeScene(*m_sceneEditor.app()));
             }
             else
                 ImGui::Text("<Opacity Micro-Maps not supported on the current device>");
@@ -238,7 +240,7 @@ void EditorUI::BuildDebuggingPanel(const PanelLayout& layout)
                 m_settings.DebugViewStablePlaneIndex = dm::clamp(m_settings.DebugViewStablePlaneIndex, -1, (int)m_settings.StablePlanesActiveCount - 1);
             }
 
-            const DebugFeedbackStruct& feedback = m_sceneEditor.feedbackData();
+            const DebugFeedbackStruct& feedback = caustica::feedbackData(*m_sceneEditor.app());
             if (ImGui::InputInt2("Debug pixel", (int*)&m_settings.DebugPixel.x))
                 m_sceneEditor.renderRuntimeState().Picking.requestMaterialPick();
 

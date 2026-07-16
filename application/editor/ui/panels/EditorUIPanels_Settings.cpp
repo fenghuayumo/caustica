@@ -1,4 +1,5 @@
 #include "ui/EditorUIInternal.h"
+#include <engine/SceneApi.h>
 
 #include "SceneEditor.h"
 #include "common/ImGuiManager.h"
@@ -97,13 +98,13 @@ void EditorUI::BuildCameraPanel(const PanelLayout& layout)
         {
             RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
             std::vector<std::string> options; options.push_back("free flight");
-            for (uint i = 0; i < m_sceneEditor.sceneCameraCount(); i++)
+            for (uint i = 0; i < caustica::sceneCameraCount(*m_sceneEditor.app()); i++)
                 options.push_back("Scene cam " + std::to_string(i));
-            uint& currentlySelected = m_sceneEditor.selectedCameraIndex();
-            currentlySelected = std::min(currentlySelected, (uint)m_sceneEditor.sceneCameraCount() - 1);
+            uint& currentlySelected = caustica::selectedCameraIndex(*m_sceneEditor.app());
+            currentlySelected = std::min(currentlySelected, (uint)caustica::sceneCameraCount(*m_sceneEditor.app()) - 1);
             if (ImGui::BeginCombo("Motion", options[currentlySelected].c_str()))
             {
-                for (uint i = 0; i < m_sceneEditor.sceneCameraCount(); i++)
+                for (uint i = 0; i < caustica::sceneCameraCount(*m_sceneEditor.app()); i++)
                 {
                     bool is_selected = i == currentlySelected;
                     if (ImGui::Selectable(options[i].c_str(), is_selected))
@@ -118,11 +119,11 @@ void EditorUI::BuildCameraPanel(const PanelLayout& layout)
             {
                 ImGui::Text("Camera position: "); 
                 RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
-                if (ImGui::Button("Save to file", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) m_sceneEditor.saveCurrentCamera(); ImGui::SameLine();
-                if (ImGui::Button("load from file", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) m_sceneEditor.loadCurrentCamera();
-                if (ImGui::Button("Save to clipboard", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) ImGui::SetClipboardText(m_sceneEditor.currentCameraPosDirUp().c_str()); ImGui::SameLine();
+                if (ImGui::Button("Save to file", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) caustica::saveCurrentCamera(*m_sceneEditor.app()); ImGui::SameLine();
+                if (ImGui::Button("load from file", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) caustica::loadCurrentCamera(*m_sceneEditor.app());
+                if (ImGui::Button("Save to clipboard", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) ImGui::SetClipboardText(caustica::currentCameraPosDirUp(*m_sceneEditor.app()).c_str()); ImGui::SameLine();
                 const char *cpbrdtxt = ImGui::GetClipboardText();
-                if (ImGui::Button("load from clipboard", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) m_sceneEditor.setCurrentCameraPosDirUp(cpbrdtxt?cpbrdtxt:"");
+                if (ImGui::Button("load from clipboard", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) caustica::setCurrentCameraPosDirUp(*m_sceneEditor.app(), cpbrdtxt?cpbrdtxt:"");
             }
 
     #if 1
@@ -133,12 +134,12 @@ void EditorUI::BuildCameraPanel(const PanelLayout& layout)
             m_settings.CameraFocalDistance = dm::clamp(m_settings.CameraFocalDistance, 0.001f, 1e16f);
             ImGui::SliderFloat("Keyboard move speed", &m_settings.CameraMoveSpeed, 0.1f, 10.0f);
 
-            float cameraFOV = 2.0f * dm::degrees(m_sceneEditor.cameraVerticalFOV());
+            float cameraFOV = 2.0f * dm::degrees(caustica::cameraVerticalFOV(*m_sceneEditor.app()));
             if (ImGui::InputFloat("Vertical FOV", &cameraFOV, 0.1f))
             {
                 cameraFOV = dm::clamp(cameraFOV, 1.0f, 360.0f);
                 m_settings.ResetAccumulation = true;
-                m_sceneEditor.setCameraVerticalFOV(dm::radians(cameraFOV / 2.0f));
+                caustica::setCameraVerticalFOV(*m_sceneEditor.app(), dm::radians(cameraFOV / 2.0f));
             }
 
             RESET_ON_CHANGE( ImGui::InputFloat("CameraAntiRRSleepJitter", &m_settings.CameraAntiRRSleepJitter, 0.001f ) );

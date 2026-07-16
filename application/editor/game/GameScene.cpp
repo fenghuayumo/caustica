@@ -17,6 +17,8 @@
 #include <core/format.h>
 #include "SceneEditor.h"
 
+#include <engine/App.h>
+#include <backend/GpuDevice.h>
 #include <render/passes/debug/Korgi.h>
 #include <json/json.h>
 
@@ -66,8 +68,10 @@ GameScene::GameScene(caustica::editor::SceneEditor& sample, const CommandLineOpt
 }
 
 GLFWwindow* GameScene::GetGLFWWindow() const
-{ 
-    return m_sample.glfwWindow(); 
+{
+    return m_sample.app() && m_sample.app()->getGpuDevice()
+        ? m_sample.app()->getGpuDevice()->getWindow()
+        : nullptr;
 }
 
 void GameScene::Deinitialize()

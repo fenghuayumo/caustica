@@ -10,18 +10,30 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
+
+namespace caustica
+{
+class CameraController;
+}
 
 namespace caustica::scene
 {
     // Canonical render-thread scene snapshot (UE-style render proxies).
     //
     // Contract:
-    //   Logic thread (Bevy-style): mutate SceneEntityWorld only; never upload GPU.
+    //   Logic thread (Bevy-style): mutate SceneEntityWorld / resources only; never upload GPU.
     //   Structure edits call Scene::requestGpuStructureSync(); Extract flushes mesh/AS
-    //   then builds MeshInstanceRenderProxy / LightRenderProxy / … into SceneRenderSnapshot.
-    //   Render thread: Scene::getRenderData() — never touches live ECS components.
+    //   then builds *RenderProxy lists + ActiveCamera / RenderSettings into SceneRenderSnapshot.
+    //   Render thread: Scene::getRenderData() only — never touches live ECS components.
+    //
+    // Proxy inventory (must stay complete for anything RT reads per frame):
+    //   MeshInstanceRenderProxy, SkinnedMeshRenderProxy, LightRenderProxy,
+    //   CameraRenderProxy (+ resolved ActiveCameraRenderProxy), RenderSettingsSnapshot.
+    // Free-camera pose / selected index enter via SessionRenderExtractInputs; scene cameras
+    // are resolved from CameraRenderProxy during Extract, not by RT querying ECS.
 
     struct MeshInstanceRenderProxy
     {
@@ -67,22 +79,56 @@ namespace caustica::scene
         dm::daffine3 transform = dm::daffine3::identity();
     };
 
-    struct CameraSnapshot
+    enum class CameraProjectionKind : uint8_t
     {
-        // False until extractSessionRenderState fills from CameraController.
-        // Structure-only republish (runtime import) must not apply defaults to the live camera —
-        // verticalFovDegrees stores radians despite the name; default 60 would be treated as 60 rad.
+        Perspective,
+        Orthographic,
+    };
+
+    // One ECS CameraComponent + GlobalTransform, extracted for the render world.
+    struct CameraRenderProxy
+    {
+        ecs::Entity entity = ecs::NullEntity;
+        CameraProjectionKind projection = CameraProjectionKind::Perspective;
+        dm::daffine3 transform = dm::daffine3::identity();
+
+        float zNear = 1.f;
+        std::optional<float> zFar;
+
+        // Perspective
+        float verticalFovRadians = 1.f;
+        std::optional<float> aspectRatio;
+        std::optional<bool> enableAutoExposure;
+        std::optional<float> exposureCompensation;
+        std::optional<float> exposureValue;
+        std::optional<float> exposureValueMin;
+        std::optional<float> exposureValueMax;
+
+        // Orthographic
+        float xMag = 1.f;
+        float yMag = 1.f;
+    };
+
+    // Resolved camera the render thread applies for this frame (free cam or selected scene cam).
+    struct ActiveCameraRenderProxy
+    {
+        // False until Extract fills from free CameraController or a CameraRenderProxy.
+        // Structure-only republish (runtime import) must not apply defaults to the live camera.
         bool valid = false;
+        ecs::Entity sourceEntity = ecs::NullEntity; // NullEntity => free camera (index 0)
+        uint32_t selectedCameraIndex = 0;
         dm::float3 position = { 0.f, 0.f, 0.f };
         dm::float3 direction = { 0.f, 0.f, -1.f };
         dm::float3 up = { 0.f, 1.f, 0.f };
-        float verticalFovDegrees = 60.f;
+        float verticalFovRadians = dm::radians(60.f);
         float zNear = 0.001f;
         bool useCustomIntrinsics = false;
         dm::float4 intrinsics = { 0.f, 0.f, 0.f, 0.f };
         dm::float2 intrinsicsViewport = { 0.f, 0.f };
-        uint32_t selectedCameraIndex = 0;
     };
+
+    // Backward-compatible name used by older call sites.
+    using CameraSnapshot = ActiveCameraRenderProxy;
 
     struct RenderSettingsSnapshot
     {
@@ -93,7 +139,10 @@ namespace caustica::scene
         double sceneTime = 0.0;
     };
 
-    // Optional session inputs filled on the logic thread during Extract (not ECS).
+    // Logic-thread session inputs consumed during Extract (not ECS).
+    // Free-camera pose / selection come from CameraController; PathTracerSettings is copied
+    // into RenderSettingsSnapshot (one-shot flags cleared after copy). Scene cameras are
+    // taken from CameraRenderProxy when selectedCameraIndex > 0.
     struct SessionRenderExtractInputs
     {
         const class CameraController* camera = nullptr;
@@ -109,12 +158,14 @@ namespace caustica::scene
         void clear();
 
         [[nodiscard]] const LightRenderProxy* findLight(ecs::Entity entity) const;
+        [[nodiscard]] const CameraRenderProxy* findCamera(ecs::Entity entity) const;
 
         std::vector<MeshInstanceRenderProxy> meshInstances;
         std::vector<SkinnedMeshRenderProxy> skinnedMeshes;
         std::vector<LightRenderProxy> lights;
+        std::vector<CameraRenderProxy> cameras;
 
-        CameraSnapshot camera;
+        ActiveCameraRenderProxy camera;
         RenderSettingsSnapshot renderSettings;
 
         std::vector<ecs::Entity> meshInstanceEntities;

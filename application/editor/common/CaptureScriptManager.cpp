@@ -1,4 +1,5 @@
 #include "ui/ui_macros.h"
+#include <engine/SceneApi.h>
 #include "CaptureScriptManager.h"
 
 #include <string>
@@ -45,7 +46,7 @@ bool CaptureScriptManager::ScriptProgressUI()
     }
     if (!m_ui.settings.RealtimeMode)
     {
-        ImGui::TextWrapped("Accumulation mode, sample %d (out of %d target)", m_app.accumulationSampleIndex(), m_ui.settings.AccumulationTarget);
+        ImGui::TextWrapped("Accumulation mode, sample %d (out of %d target)", caustica::accumulationSampleIndex(*m_app.app()), m_ui.settings.AccumulationTarget);
     }
     if (m_sequencer.sequenceRecordCounter() > 0)
     {
@@ -170,7 +171,7 @@ void CaptureScriptManager::preAnim(float& fElapsedTimeSeconds)
 {
     m_sequencer.preAnim(
         fElapsedTimeSeconds,
-        m_app.hasAsyncLoadingInProgress(),
+        caustica::hasAsyncLoadingInProgress(*m_app.app()),
         [this](double sceneTime) { m_app.setSceneTime(sceneTime); });
 }
 
@@ -190,7 +191,7 @@ void CaptureScriptManager::postRender(const std::function<bool(const char*)>& du
 {
     const CaptureSequencerPostRenderResult result = m_sequencer.postRender(
         m_ui.settings.RealtimeMode,
-        m_app.accumulationCompleted(),
+        caustica::accumulationCompleted(*m_app.app()),
         m_app.sceneTime(),
         dumpScreenshotCallback);
 

@@ -1,6 +1,8 @@
 #include "ui/EditorUIInternal.h"
 
 #include "SceneEditor.h"
+#include "EditorAccess.h"
+#include <engine/SceneApi.h>
 #include "common/ImGuiManager.h"
 
 #include <render/core/PathTracerSettings.h>
@@ -37,12 +39,12 @@ bool EditorUI::BuildSceneComboPanel(const PanelLayout& layout)
     std::string requestedScene;
 
     {
-        const std::string currentScene = m_sceneEditor.currentSceneName();
+        const std::string currentScene = caustica::currentSceneName(*m_sceneEditor.app());
         RAII_SCOPE(ImGui::PushItemWidth(-60.0f * m_currentScale); , ImGui::PopItemWidth(); );
         RAII_SCOPE(ImGui::PushID("SceneComboID"); , ImGui::PopID(); );
         if (ImGui::BeginCombo("Scene", currentScene.c_str()))
         {
-            const std::vector<std::string>& scenes = m_sceneEditor.availableScenes();
+            const std::vector<std::string>& scenes = caustica::availableScenes(*m_sceneEditor.app());
             for (const std::string& scene : scenes)
             {
                 bool is_selected = scene == currentScene;
@@ -60,7 +62,7 @@ bool EditorUI::BuildSceneComboPanel(const PanelLayout& layout)
 
     if (sceneChangeRequested)
     {
-        m_sceneEditor.setCurrentScene(requestedScene);
+        caustica::setCurrentScene(*m_sceneEditor.app(), requestedScene);
         return true;
     }
 
@@ -79,7 +81,7 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
                 if (ImGui::Button("Batch compress with nvtt_export.exe", { -1, 0 }))
                     if (compressTextures(m_sceneEditor.uncompressedTextures()))
                     {   // reload scene
-                        m_sceneEditor.setCurrentScene(m_sceneEditor.currentSceneName(), true);
+                        caustica::setCurrentScene(*m_sceneEditor.app(), caustica::currentSceneName(*m_sceneEditor.app()), true);
                     }
             }
 
@@ -198,14 +200,14 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
                 RESET_ON_CHANGE(ImGui::Checkbox("enabled", &m_settings.EnvironmentMapParams.enabled));
                 RESET_ON_CHANGE(ImGui::Checkbox("Visible to Camera", &m_settings.EnvironmentMapParams.VisibleToCamera));
 
-                if (isProceduralSky(m_sceneEditor.envMapLocalPath().c_str()) ||
-                    isProceduralSky(m_sceneEditor.envMapOverrideSource().c_str()))
+                if (isProceduralSky(caustica::envMapLocalPath(*m_sceneEditor.app()).c_str()) ||
+                    isProceduralSky(caustica::envMapOverrideSource(*m_sceneEditor.app()).c_str()))
                     ImGui::TextWrapped("Source: Procedural Sky (Hillaire 2020)");
                 else
-                    ImGui::TextWrapped("Source: `%s`", m_sceneEditor.envMapLocalPath().c_str());
+                    ImGui::TextWrapped("Source: `%s`", caustica::envMapLocalPath(*m_sceneEditor.app()).c_str());
 
-                std::string overrideSource = m_sceneEditor.envMapOverrideSource();
-                const std::vector<std::filesystem::path> & envMapMediaList = m_sceneEditor.envMapMediaList();
+                std::string overrideSource = caustica::envMapOverrideSource(*m_sceneEditor.app());
+                const std::vector<std::filesystem::path> & envMapMediaList = caustica::envMapMediaList(*m_sceneEditor.app());
 
                 RAII_SCOPE( ImGui::PushItemWidth(-65.0f*m_currentScale);, ImGui::PopItemWidth(); );
                 const std::string overridePreview = isProceduralSky(overrideSource.c_str()) || overrideSource == c_EnvMapSceneDefault
@@ -247,10 +249,10 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
                 if (ImGui::IsItemHovered()) ImGui::SetTooltip(
                     "Overrides scene environment map.\n"
                     "'sky (manual)' = free elevation/azimuth control in Sky Atmosphere panel.");
-                if (m_sceneEditor.envMapOverrideSource() != overrideSource)
+                if (caustica::envMapOverrideSource(*m_sceneEditor.app()) != overrideSource)
                 {
                     m_settings.ResetAccumulation = true;
-                    m_sceneEditor.setEnvMapOverrideSource(overrideSource);
+                    caustica::setEnvMapOverrideSource(*m_sceneEditor.app(), overrideSource);
                 }
 
                 ImGui::Separator();
@@ -259,7 +261,7 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
                 RESET_ON_CHANGE( ImGui::InputFloat3("Rotation XYZ", (float*)&m_settings.EnvironmentMapParams.RotationXYZ.x) );
                 ImGui::Separator();
 
-                if (auto& envMapProcessor = m_sceneEditor.lightingPasses().environment();
+                if (auto& envMapProcessor = caustica::editor::requireGpu(m_sceneEditor).lightingPasses().environment();
                     envMapProcessor != nullptr && envMapProcessor->isProcedural() && envMapProcessor->getProceduralSky() != nullptr)
                 {
                     ImGui::TextColored(categoryColor, "Sky Atmosphere");
@@ -271,7 +273,7 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
             if (ImGui::CollapsingHeader("Materials"))
             {
                 RAII_SCOPE( ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
-                if (auto& materialGpuCache = m_sceneEditor.lightingPasses().materials(); materialGpuCache != nullptr)
+                if (auto& materialGpuCache = caustica::editor::requireGpu(m_sceneEditor).lightingPasses().materials(); materialGpuCache != nullptr)
                     materialGpuCache->debugGui(layout.indent);
             }
         }
@@ -302,7 +304,7 @@ void EditorUI::BuildSceneWidgetsPanel(const PanelLayout& layout)
         )
     {
 
-        std::string envMapOverrideSource = m_sceneEditor.envMapOverrideSource();
+        std::string envMapOverrideSource = caustica::envMapOverrideSource(*m_sceneEditor.app());
         std::vector<std::string> envOptions;
         envOptions.push_back( c_EnvMapSceneDefault );
         envOptions.push_back( c_EnvMapProcSky );
@@ -314,7 +316,7 @@ void EditorUI::BuildSceneWidgetsPanel(const PanelLayout& layout)
         int envOptionsCurrentIndex = -1; for (int i = 0; i < envOptions.size(); i++) if (envOptions[i]==envMapOverrideSource) envOptionsCurrentIndex = i;
 
         std::vector<std::string> materialVariants;
-        if (findSubStringIgnoreCase(m_sceneEditor.currentSceneName(), "bistro") != std::string::npos)
+        if (findSubStringIgnoreCase(caustica::currentSceneName(*m_sceneEditor.app()), "bistro") != std::string::npos)
             materialVariants = {"dry", "wet", "silly"};
         int materialVariantIndexPrev = m_settings.MaterialVariantIndex;
 
@@ -408,20 +410,20 @@ void EditorUI::BuildSceneWidgetsPanel(const PanelLayout& layout)
 
         if (envOptionsCurrentIndex >= 0 && envOptionsCurrentIndex < envOptions.size() && envOptions[envOptionsCurrentIndex] != envMapOverrideSource )
         {
-            m_sceneEditor.setEnvMapOverrideSource(envOptions[envOptionsCurrentIndex]);
+            caustica::setEnvMapOverrideSource(*m_sceneEditor.app(), envOptions[envOptionsCurrentIndex]);
         }
 
         if (m_settings.MaterialVariantIndex != materialVariantIndexPrev)
         {
-            if (findSubStringIgnoreCase(m_sceneEditor.currentSceneName(), "bistro") != std::string::npos)
+            if (findSubStringIgnoreCase(caustica::currentSceneName(*m_sceneEditor.app()), "bistro") != std::string::npos)
             {
                 // bistro dry-wet test
                 std::vector<std::string> pavementList = { "LMBR0000163Cobbl_a1d987f5", "LMBR000016bCobbl_8652c51e", "LMBR0000162Paris_c30c71f1", "LMBR0000162Paris_c30c71f1", "LMBR000016cCobbl_f202ecfa", "LMBR0000161Pavem_e2e87964", "LMBR0000168Cobbl_a5a7f4b4", "LMBR0000160Pavem_613287fe", "LMBR000016aCobbl_e1c68d26" };
                 for (std::string& id : pavementList)
-                    if (auto m = m_sceneEditor.lightingPasses().materials()->findByUniqueId(id))
+                    if (auto m = caustica::editor::requireGpu(m_sceneEditor).lightingPasses().materials()->findByUniqueId(id))
                     {
                         if (m_settings.MaterialVariantIndex == 0) // reset to default
-                            m_sceneEditor.lightingPasses().materials()->loadSingle(*m);
+                            caustica::editor::requireGpu(m_sceneEditor).lightingPasses().materials()->loadSingle(*m);
                         else
                         {   // make wet-looking
                             m->roughness = 0.0f;
@@ -432,10 +434,10 @@ void EditorUI::BuildSceneWidgetsPanel(const PanelLayout& layout)
 
                 std::vector<std::string> emissivesList = { "LMBR0000172Paris_1d83765c" /*bollards*/, "LMBR00000aeGreen_04f5ae02" /*green leaves*/, "LMBR00000afOrang_a907f305" /*yellow leaves*/, "LMBR00000b0Branc_5990161e" /*branches*/ };
                 for (std::string& id : emissivesList)
-                    if (auto m = m_sceneEditor.lightingPasses().materials()->findByUniqueId(id))
+                    if (auto m = caustica::editor::requireGpu(m_sceneEditor).lightingPasses().materials()->findByUniqueId(id))
                     {
                         if (m_settings.MaterialVariantIndex == 0 || m_settings.MaterialVariantIndex == 1) // reset to default
-                            m_sceneEditor.lightingPasses().materials()->loadSingle(*m);
+                            caustica::editor::requireGpu(m_sceneEditor).lightingPasses().materials()->loadSingle(*m);
                         else
                         {   // silly stuff
                             if (id == "LMBR0000172Paris_1d83765c")
@@ -474,8 +476,8 @@ void EditorUI::BuildHierarchyPanel(const PanelLayout& layout)
         ImGui::SetNextWindowSize(ImVec2(layout.defWindowWidth, layout.scaledHeight * 0.45f), ImGuiCond_Appearing);
         RAII_SCOPE(ImGui::Begin("Hierarchy", nullptr, ImGuiWindowFlags_None);, ImGui::End(););
 
-        auto scene = m_sceneEditor.scene();
-        auto* ew = m_sceneEditor.entityWorld();
+        auto scene = caustica::activeScene(*m_sceneEditor.app());
+        auto* ew = caustica::entityWorld(*m_sceneEditor.app());
 
         if (scene && ew && ew->root() != ecs::NullEntity)
         {

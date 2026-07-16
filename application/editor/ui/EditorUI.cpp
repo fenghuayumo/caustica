@@ -1,4 +1,5 @@
 #include "ui/EditorUIInternal.h"
+#include <engine/SceneApi.h>
 
 #include "SceneEditor.h"
 #include "common/ImGuiManager.h"
@@ -105,8 +106,8 @@ void EditorUI::buildUI(void)
         RAII_SCOPE( ImGui::Begin("settings", 0, ImGuiWindowFlags_None /*AlwaysAutoResize*/); , ImGui::End(); );
         RAII_SCOPE( ImGui::PushItemWidth(layout.defItemWidth); , ImGui::PopItemWidth(); );
 
-        ImGui::Text("%s, %s", getGpuDevice()->getRendererString(), m_sceneEditor.resolutionInfo().c_str() );
-        ImGui::TextUnformatted(m_sceneEditor.fpsInfo().c_str());
+        ImGui::Text("%s, %s", getGpuDevice()->getRendererString(), caustica::resolutionInfo(*m_sceneEditor.app()).c_str() );
+        ImGui::TextUnformatted(caustica::fpsInfo(*m_sceneEditor.app()).c_str());
 
         if (BuildUIScriptsAndEtc())
         {

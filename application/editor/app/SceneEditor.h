@@ -2,15 +2,11 @@
 
 #include <core/progress.h>
 
-struct GLFWwindow;
-#include <engine/SceneApi.h>
 #include <engine/SceneViewState.h>
 #include <engine/GpuRenderSubsystem.h>
 #include <math/math.h>
-#include <render/SceneLightingPasses.h>
 #include <render/RenderAppState.h>
 #include <render/AppDiagnostics.h>
-#include <scene/SceneManager.h>
 
 #include "ui/EditorUIData.h"
 #include "EditorInputRouter.h"
@@ -29,7 +25,6 @@ class App;
 class Event;
 } // namespace caustica
 
-class RenderTargets;
 class ZoomTool;
 struct DebugFeedbackStruct;
 
@@ -46,7 +41,8 @@ class CaptureScriptManager;
 
 using namespace caustica::math;
 
-// Scene editor shell (mesh edit, Inspector, capture). Frame logic lives in Scene.* systems.
+// Editor shell: selection/UI/capture/game/content. Scene/render queries go through
+// App + caustica::* / GpuRenderSubsystem (see EditorAccess.h), not this class.
 class SceneEditor
 {
 public:
@@ -64,11 +60,6 @@ public:
     void setApp(App& app) { m_app = &app; }
     [[nodiscard]] App* app() const { return m_app; }
 
-    [[nodiscard]] GpuRenderSubsystem* gpuRender() const;
-    [[nodiscard]] GpuDevice& gpuDevice() const;
-    [[nodiscard]] nvrhi::IDevice* device() const;
-    [[nodiscard]] uint32_t frameIndex() const;
-
     [[nodiscard]] render::RenderAppState& renderAppState() { return m_renderAppState; }
     [[nodiscard]] const render::RenderAppState& renderAppState() const { return m_renderAppState; }
     [[nodiscard]] PathTracerSettings& pathTracerSettings() { return m_settings; }
@@ -76,18 +67,6 @@ public:
     [[nodiscard]] render::RenderRuntimeState& renderRuntimeState() { return m_renderState; }
     [[nodiscard]] const render::RenderRuntimeState& renderRuntimeState() const { return m_renderState; }
     [[nodiscard]] const CommandLineOptions& cmdLine() const { return m_cmdLine; }
-
-    [[nodiscard]] std::shared_ptr<Scene> scene() const;
-    // Prefer over scene()->getEntityWorld() -- stable caustica::entityWorld entry.
-    [[nodiscard]] scene::SceneEntityWorld* entityWorld() const;
-    [[nodiscard]] bool shouldSkipRender() const;
-
-    SceneManager* sceneManager();
-    caustica::render::WorldRenderer* worldRenderer();
-    caustica::render::SceneLightingPasses& lightingPasses();
-    const SceneManager* sceneManager() const;
-    caustica::render::WorldRenderer* worldRenderer() const;
-    const caustica::render::SceneLightingPasses& lightingPasses() const;
 
     const std::unique_ptr<::GameScene>& game() const { return m_sampleGame; }
 
@@ -129,11 +108,8 @@ public:
         bool rebuildAccelerationStructure = true);
 
     void attachGpuRenderSubsystem(caustica::GpuRenderSubsystem& gpuRenderSubsystem);
-    void initializeScene(const std::string& preferredScene);
-    void initStreamlineAndWindow();
 
     void onBeforeInitialSceneLoad();
-    void onBeginFrameScheduled();
     void onAnimateBegin(float& elapsedTimeSeconds);
     void onAnimateGameTick(float elapsedTimeSeconds, bool enableAnimations);
     void onAnimateUpdateSceneTime(float elapsedTimeSeconds, bool enableAnimations, bool enableAnimationUpdate);
@@ -144,10 +120,8 @@ public:
     void syncLoadedSceneSystems();
     void updateWindowTitle();
     void afterWorldRender(caustica::GpuDevice& gpuDevice);
-    bool shouldRenderWhenUnfocused() const;
 
     void prepareEditorFrame();
-    void captureScriptPreRender();
     void captureScriptPostRender(std::function<bool(const char* fileName)> saveTexture);
     ::ZoomTool* getOrCreateZoomTool();
 
@@ -161,49 +135,8 @@ public:
     void setSceneTime(double sceneTime);
     double sceneTime() const;
 
-    [[nodiscard]] std::shared_ptr<Material> findMaterial(int materialID) const;
-    [[nodiscard]] ecs::Entity findEntityByInstanceIndex(int instanceIndex) const;
-    [[nodiscard]] const FirstPersonCamera& currentCamera() const;
-    [[nodiscard]] const std::shared_ptr<PlanarView>& currentView() const;
-    [[nodiscard]] const DebugFeedbackStruct& feedbackData() const;
-    [[nodiscard]] const DeltaTreeVizPathVertex* debugDeltaPathTree() const;
-    [[nodiscard]] int accumulationSampleIndex() const;
-    [[nodiscard]] math::uint2 renderSize() const;
-    [[nodiscard]] math::uint2 displaySize() const;
-    [[nodiscard]] std::string currentSceneName() const;
-    [[nodiscard]] const std::vector<std::string>& availableScenes() const;
-    void setCurrentScene(const std::string& sceneName, bool forceReload = false);
-
-    bool loadGaussianSplatFile(const std::filesystem::path& fileName, bool convertRdfToRub = true);
-    [[nodiscard]] uint32_t gaussianSplatCount() const;
-    [[nodiscard]] uint32_t gaussianSplatObjectCount() const;
-
-    [[nodiscard]] uint sceneCameraCount() const;
-    [[nodiscard]] uint& selectedCameraIndex();
-
-    void saveCurrentCamera() const;
-    void loadCurrentCamera();
-    [[nodiscard]] std::string currentCameraPosDirUp() const;
-    bool setCurrentCameraPosDirUp(const std::string& val);
-    void setCameraVerticalFOV(float cameraFOV);
-    [[nodiscard]] float cameraVerticalFOV() const;
-
-    [[nodiscard]] std::string resolutionInfo() const;
-    [[nodiscard]] std::string fpsInfo() const;
     auto& uncompressedTextures() { return m_viewState.uncompressedTextures; }
-
-    [[nodiscard]] const std::string& envMapLocalPath() const;
-    [[nodiscard]] const std::string& envMapOverrideSource() const;
-    [[nodiscard]] const std::vector<std::filesystem::path>& envMapMediaList();
-    void setEnvMapOverrideSource(const std::string& envMapOverride);
-
     [[nodiscard]] ProgressBar& loadingProgress() { return m_viewState.progressLoading; }
-    [[nodiscard]] bool hasAsyncLoadingInProgress() const;
-    [[nodiscard]] bool accumulationCompleted() const;
-    [[nodiscard]] GLFWwindow* glfwWindow() const;
-
-    [[nodiscard]] float avgTimePerFrame() const;
-    void debugDrawLine(math::float3 start, math::float3 stop, math::float4 col1, math::float4 col2);
 
     const std::unique_ptr<::ZoomTool>& zoomTool() const { return m_zoomTool; }
     const std::unique_ptr<CaptureScriptManager>& captureScriptManager() const { return m_captureScriptManager; }
@@ -218,6 +151,8 @@ private:
     void onSceneLoadedBeforeGpuPrep();
     void onSceneLoadedAfterCollectTextures();
     void onSceneLoadedComplete();
+
+    [[nodiscard]] GpuRenderSubsystem* gpuRender() const;
 
     const CommandLineOptions& m_cmdLine;
     render::RenderAppState& m_renderAppState;

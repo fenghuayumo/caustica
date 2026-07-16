@@ -1191,7 +1191,7 @@ void caustica::render::WorldRenderer::render(nvrhi::IFramebuffer* framebuffer)
         {
             m_context.camera.camera().lookTo(
                 renderData.camera.position, renderData.camera.direction, renderData.camera.up);
-            m_context.camera.setVerticalFOV(renderData.camera.verticalFovDegrees);
+            m_context.camera.setVerticalFOV(renderData.camera.verticalFovRadians);
             m_context.camera.setZNear(renderData.camera.zNear);
             m_context.camera.setSelectedCameraIndex(renderData.camera.selectedCameraIndex);
             if (renderData.camera.useCustomIntrinsics)
