@@ -1,9 +1,9 @@
 #include <engine/App.h>
 #include <engine/EntryPoint.h>
 #include <engine/GpuRenderScheduleRegistration.h>
-#include <engine/SceneSessionSystems.h>
+#include <engine/SceneApi.h>
 #include <engine/SceneViewState.h>
-#include <engine/SceneSessionScheduleRegistration.h>
+#include <engine/SceneScheduleRegistration.h>
 
 #include <backend/GpuDevice.h>
 #include <engine/cmdline_utils.h>
@@ -102,7 +102,7 @@ void App::buildPlugins()
     if (!m_defaultSchedulesRegistered)
         registerDefaultSchedules();
 
-    registerSceneSessionSchedules(*this);
+    registerSceneSchedules(*this);
     registerGpuRenderSchedules(*this);
 
     for (Plugin* plugin : m_pluginRefs)
@@ -332,7 +332,7 @@ void App::shutdown()
     m_schedules.clear();
     m_world.clear();
     m_defaultSchedulesRegistered = false;
-    m_sceneSessionSchedulesRegistered = false;
+    m_sceneSchedulesRegistered = false;
     m_gpuRenderSchedulesRegistered = false;
     m_updateTailRegistered = false;
     m_postUpdateTailRegistered = false;
@@ -380,7 +380,7 @@ void App::unbindFrameDriver(GpuDevice* gpuDevice)
 
 void App::notifyBackBufferResizing()
 {
-    sceneSession::backBufferResizing(*this);
+    caustica::backBufferResizing(*this);
 
     if (m_backBufferResizeHandler)
         m_backBufferResizeHandler(true, 0, 0, 0);
@@ -493,7 +493,7 @@ void App::render()
 bool App::skipRenderPhase() const
 {
     if (tryResource<SceneViewState>())
-        return sceneSession::shouldSkipRender(*this);
+        return caustica::shouldSkipRender(*this);
 
     return false;
 }
@@ -543,7 +543,7 @@ void App::onDisplayScaleChanged(float scaleX, float scaleY)
 bool App::shouldRenderWhenUnfocused() const
 {
     if (tryResource<SceneViewState>())
-        return sceneSession::shouldRenderWhenUnfocused(*this);
+        return caustica::shouldRenderWhenUnfocused(*this);
 
     return false;
 }
@@ -813,7 +813,7 @@ void App::run()
     while (!w->getExit())
     {
         w->onUpdate();
-        // Close was requested during event polling — skip another full path-trace
+        // Close was requested during event polling -- skip another full path-trace
         // frame so exit does not block on a multi-second render.
         if (w->getExit() || m_requestExit)
             break;

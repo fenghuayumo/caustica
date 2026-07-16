@@ -139,10 +139,10 @@ private:
         korgi::Knob   exposureCompensation;
 
         explicit KorgiBindings(EditorUIData& ui)
-            : play(0, korgi::Control::Play, korgi::ButtonMode::BoolToggle, &ui.session.settings.EnableAnimations)
-            , autoExposure(0, korgi::Control::S1, korgi::ButtonMode::BoolToggle, &ui.session.settings.ToneMappingParams.autoExposure)
-            , toneMapOperator(0, korgi::Control::M1, (int*)&ui.session.settings.ToneMappingParams.toneMapOperator, int(ToneMapperOperator::Linear), int(ToneMapperOperator::HableUc2))
-            , exposureCompensation(0, korgi::Control::Slider1, &ui.session.settings.ToneMappingParams.exposureCompensation, -8.f, 8.f)
+            : play(0, korgi::Control::Play, korgi::ButtonMode::BoolToggle, &ui.render.settings.EnableAnimations)
+            , autoExposure(0, korgi::Control::S1, korgi::ButtonMode::BoolToggle, &ui.render.settings.ToneMappingParams.autoExposure)
+            , toneMapOperator(0, korgi::Control::M1, (int*)&ui.render.settings.ToneMappingParams.toneMapOperator, int(ToneMapperOperator::Linear), int(ToneMapperOperator::HableUc2))
+            , exposureCompensation(0, korgi::Control::Slider1, &ui.render.settings.ToneMappingParams.exposureCompensation, -8.f, 8.f)
         {}
     };
     std::unique_ptr<KorgiBindings> m_korgiBindings;

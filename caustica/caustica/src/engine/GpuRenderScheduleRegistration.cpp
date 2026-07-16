@@ -1,5 +1,5 @@
 #include <engine/GpuRenderScheduleRegistration.h>
-#include <engine/SceneSessionStartup.h>
+#include <engine/SceneStartup.h>
 
 #include <engine/App.h>
 #include <engine/AppSchedules.h>
@@ -19,8 +19,8 @@ void registerGpuRenderSchedules(App& app)
         return;
 
     AppSystemOrdering ordering;
-    ordering.after.push_back("SceneSession.RenderScene");
-    ordering.after.push_back("SceneSession.AfterWorldRender");
+    ordering.after.push_back("Scene.RenderScene");
+    ordering.after.push_back("Scene.AfterWorldRender");
 
     app.addSystem(AppSchedule::render, "GpuRender.endFrame", [](SystemContext& ctx) {
         if (auto* gpuRender = ctx.tryRes<GpuRenderSubsystem>())

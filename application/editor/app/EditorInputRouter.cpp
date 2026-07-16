@@ -11,7 +11,7 @@
 #include <imgui.h>
 #include <ImGuizmo.h>
 #include <imgui/imgui_renderer.h>
-#include <render/RenderSessionState.h>
+#include <render/RenderAppState.h>
 #include <render/worldRenderer/WorldRenderer.h>
 #include "game/GameScene.h"
 #include <render/passes/debug/ZoomTool.h>
@@ -48,7 +48,7 @@ void requestInstancePick(caustica::render::RenderRuntimeState& runtime)
 
 void syncPickPositionFromCursor(SceneEditor& sceneEditor)
 {
-    auto& session = sceneEditor.renderSessionState();
+    auto& session = sceneEditor.renderAppState();
     GLFWwindow* window = sceneEditor.glfwWindow();
     if (!window)
         return;
@@ -96,7 +96,7 @@ bool onKeyPressed(SceneEditor& sceneEditor, caustica::KeyPressedEvent& e)
     if (game && game->keyboardUpdate(key, e.getScancode(), action, mods))
         return true;
 
-    auto& session = sceneEditor.renderSessionState();
+    auto& session = sceneEditor.renderAppState();
     auto& editor = sceneEditor.editorUIState();
 
     if (key == ToGlfwKey(caustica::Key::Space) && action == cGlfwPress
@@ -168,7 +168,7 @@ bool onMouseMoved(SceneEditor& sceneEditor, caustica::MouseMovedEvent& e)
     auto* game = sceneEditor.game().get();
     auto* camera = &gpuRender->camera();
     auto* worldRenderer = sceneEditor.worldRenderer();
-    auto& session = sceneEditor.renderSessionState();
+    auto& session = sceneEditor.renderAppState();
 
     if (!(game && game->CameraActive()))
         camera->camera().mousePosUpdate(e.getX(), e.getY());
@@ -206,7 +206,7 @@ bool onMouseButtonPressed(SceneEditor& sceneEditor, caustica::MouseButtonPressed
     auto* zoomTool = sceneEditor.zoomTool().get();
     auto* game = sceneEditor.game().get();
     auto* camera = &gpuRender->camera();
-    auto& session = sceneEditor.renderSessionState();
+    auto& session = sceneEditor.renderAppState();
 
     if (zoomTool && zoomTool->mouseButtonUpdate(button, cGlfwPress, mods))
         return true;
@@ -265,7 +265,7 @@ bool onMouseScrolled(SceneEditor& sceneEditor, caustica::MouseScrolledEvent& e)
 
     auto* game = sceneEditor.game().get();
     if (!(game && game->CameraActive()))
-        sceneEditor.renderSessionState().settings.CameraMoveSpeed *= 1.0f + static_cast<float>(e.getYOffset()) * 0.1f;
+        sceneEditor.renderAppState().settings.CameraMoveSpeed *= 1.0f + static_cast<float>(e.getYOffset()) * 0.1f;
     return true;
 }
 

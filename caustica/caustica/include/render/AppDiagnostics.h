@@ -7,8 +7,8 @@
 namespace caustica::render
 {
 
-// Host-owned session state consumed by the path tracer (progress UI, benchmarks, async load).
-struct SessionDiagnostics
+// Host-owned diagnostics consumed by the path tracer (progress UI, benchmarks, async load).
+struct AppDiagnostics
 {
     ProgressBar progressInitializingRenderer;
     bool asyncLoadingInProgress = false;

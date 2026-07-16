@@ -5,8 +5,8 @@
 #include <engine/GpuRenderSubsystem.h>
 #include <engine/SceneViewState.h>
 
-#include <render/RenderSessionState.h>
-#include <render/SessionDiagnostics.h>
+#include <render/RenderAppState.h>
+#include <render/AppDiagnostics.h>
 
 #include <string>
 
@@ -15,23 +15,23 @@ namespace caustica
 
 class App;
 
-struct SceneSessionConfig
+struct SceneAppConfig
 {
     SceneViewState& viewState;
-    render::SessionDiagnostics& diagnostics;
+    render::AppDiagnostics& diagnostics;
     std::string preferredScene;
 
-    render::RenderSessionState* sessionState = nullptr;
+    render::RenderAppState* renderState = nullptr;
     const CommandLineOptions* cmdLine = nullptr;
     bool refreshEnvMapMediaList = true;
-    bool applyCmdLineToSessionState = true;
+    bool applyCmdLineToRenderState = true;
     bool hasSceneCallbacks = false;
     EngineSceneCallbacks sceneCallbacks{};
 };
 
-void initializeSceneSession(App& app, const SceneSessionConfig& config);
+void initializeSceneApp(App& app, const SceneAppConfig& config);
 
-void registerSceneSessionStartup(App& app, const SceneSessionConfig& config);
+void registerSceneStartup(App& app, const SceneAppConfig& config);
 void registerGpuRenderShutdown(App& app);
 
 } // namespace caustica

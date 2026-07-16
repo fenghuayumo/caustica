@@ -1,13 +1,13 @@
 #pragma once
 
 #include <engine/App.h>
-#include <engine/SceneSessionStartup.h>
+#include <engine/SceneStartup.h>
 
-#include "EditorSession.h"
+#include "EditorHost.h"
 
 namespace caustica::editor
 {
 
-bool startupEditor(caustica::App& app, EditorSession& session, int argc, const char* const* argv);
+bool startupEditor(caustica::App& app, EditorHost& host, int argc, const char* const* argv);
 
 } // namespace caustica::editor

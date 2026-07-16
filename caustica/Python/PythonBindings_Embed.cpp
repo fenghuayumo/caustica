@@ -11,7 +11,7 @@
 
 #include "SceneEditor.h"
 #include <engine/App.h>
-#include <engine/SceneSessionSystems.h>
+#include <engine/SceneApi.h>
 
 #include <stdexcept>
 
@@ -49,7 +49,7 @@ NB_MODULE(caustica, m)
           "Return the App owned by the SceneEditor running in this caustica.exe.");
 
     m.def("settings", []() -> PathTracerSettings* {
-            return caustica::sceneSession::settings(RequireApp());
+            return caustica::settings(RequireApp());
         },
           nb::rv_policy::reference,
           "Shortcut for caustica.app().settings.");

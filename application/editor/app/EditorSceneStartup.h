@@ -1,6 +1,6 @@
 #pragma once
 
-#include <engine/SceneSessionStartup.h>
+#include <engine/SceneStartup.h>
 
 namespace caustica::editor
 {
@@ -9,7 +9,7 @@ class SceneEditor;
 
 struct EditorSceneStartupConfig
 {
-    caustica::SceneSessionConfig session;
+    caustica::SceneAppConfig appConfig;
     SceneEditor* sceneEditor = nullptr;
     bool postAppInit = true;
 };

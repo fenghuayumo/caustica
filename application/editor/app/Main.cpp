@@ -2,7 +2,7 @@
 #include <engine/EntryPoint.h>
 
 #include "EditorLaunch.h"
-#include "EditorSession.h"
+#include "EditorHost.h"
 
 #include <render/passes/debug/Korgi.h>
 
@@ -70,23 +70,23 @@ int main(int argc, char** argv)
         }
     };
 
-    caustica::editor::EditorSession session;
+    caustica::editor::EditorHost host;
     caustica::App app;
 
     const int exitCode = caustica::runApp(
         app,
         [&](caustica::App& targetApp) {
-            return caustica::editor::startupEditor(targetApp, session, __argc, (const char**)__argv);
+            return caustica::editor::startupEditor(targetApp, host, __argc, (const char**)__argv);
         },
         stopSplash);
 #else
-    caustica::editor::EditorSession session;
+    caustica::editor::EditorHost host;
     caustica::App app;
 
     const int exitCode = caustica::runApp(
         app,
         [&](caustica::App& targetApp) {
-            return caustica::editor::startupEditor(targetApp, session, argc, const_cast<const char* const*>(argv));
+            return caustica::editor::startupEditor(targetApp, host, argc, const_cast<const char* const*>(argv));
         });
 #endif
 

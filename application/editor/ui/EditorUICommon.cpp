@@ -75,12 +75,12 @@ namespace
 
 int ResolveGaussianSplatShadowMode(const EditorUIData& ui)
 {
-        if (!ui.session.settings.GaussianSplatShadows && ui.session.settings.GaussianSplatShadowsMode == GAUSSIAN_SPLAT_SHADOWS_DISABLED)
+        if (!ui.render.settings.GaussianSplatShadows && ui.render.settings.GaussianSplatShadowsMode == GAUSSIAN_SPLAT_SHADOWS_DISABLED)
             return GAUSSIAN_SPLAT_SHADOWS_DISABLED;
 
-        const int requestedMode = ui.session.settings.GaussianSplatShadowsMode == GAUSSIAN_SPLAT_SHADOWS_DISABLED
+        const int requestedMode = ui.render.settings.GaussianSplatShadowsMode == GAUSSIAN_SPLAT_SHADOWS_DISABLED
             ? GAUSSIAN_SPLAT_SHADOWS_HARD
-            : ui.session.settings.GaussianSplatShadowsMode;
+            : ui.render.settings.GaussianSplatShadowsMode;
         return dm::clamp(requestedMode, GAUSSIAN_SPLAT_SHADOWS_HARD, GAUSSIAN_SPLAT_SHADOWS_SOFT);
     }
 
@@ -92,17 +92,17 @@ int ResolveGaussianSplatShadowMode(const EditorUIData& ui)
 
         if (renderingMode == 1)
         {
-            ui.session.settings.GaussianSplatShadows = true;
-            if (ui.session.settings.GaussianSplatShadowsMode == GAUSSIAN_SPLAT_SHADOWS_DISABLED)
-                ui.session.settings.GaussianSplatShadowsMode = GAUSSIAN_SPLAT_SHADOWS_HARD;
+            ui.render.settings.GaussianSplatShadows = true;
+            if (ui.render.settings.GaussianSplatShadowsMode == GAUSSIAN_SPLAT_SHADOWS_DISABLED)
+                ui.render.settings.GaussianSplatShadowsMode = GAUSSIAN_SPLAT_SHADOWS_HARD;
         }
         else
         {
-            ui.session.settings.GaussianSplatShadows = false;
-            ui.session.settings.GaussianSplatShadowsMode = GAUSSIAN_SPLAT_SHADOWS_DISABLED;
+            ui.render.settings.GaussianSplatShadows = false;
+            ui.render.settings.GaussianSplatShadowsMode = GAUSSIAN_SPLAT_SHADOWS_DISABLED;
         }
-        ui.session.runtime.Invalidation.AccelerationStructRebuildRequested = true;
-        ui.session.settings.ResetAccumulation = true;
+        ui.render.runtime.Invalidation.AccelerationStructRebuildRequested = true;
+        ui.render.settings.ResetAccumulation = true;
         return true;
     }
 
@@ -111,26 +111,26 @@ int ResolveGaussianSplatShadowMode(const EditorUIData& ui)
         const bool wasEnabled = ResolveGaussianSplatShadowMode(ui) != GAUSSIAN_SPLAT_SHADOWS_DISABLED;
         int shadowMode = ResolveGaussianSplatShadowMode(ui);
 
-        ui.session.settings.GaussianSplatShadowsMode = shadowMode;
-        ui.session.settings.GaussianSplatShadows = shadowMode != GAUSSIAN_SPLAT_SHADOWS_DISABLED;
+        ui.render.settings.GaussianSplatShadowsMode = shadowMode;
+        ui.render.settings.GaussianSplatShadows = shadowMode != GAUSSIAN_SPLAT_SHADOWS_DISABLED;
 
         if (!ImGui::Combo("Shadows Mode", &shadowMode, "Shadows off\0Hard shadows\0Soft shadows\0\0"))
             return false;
 
         shadowMode = dm::clamp(shadowMode, GAUSSIAN_SPLAT_SHADOWS_DISABLED, GAUSSIAN_SPLAT_SHADOWS_SOFT);
-        ui.session.settings.GaussianSplatShadowsMode = shadowMode;
-        ui.session.settings.GaussianSplatShadows = shadowMode != GAUSSIAN_SPLAT_SHADOWS_DISABLED;
+        ui.render.settings.GaussianSplatShadowsMode = shadowMode;
+        ui.render.settings.GaussianSplatShadows = shadowMode != GAUSSIAN_SPLAT_SHADOWS_DISABLED;
 
-        if (wasEnabled != ui.session.settings.GaussianSplatShadows)
-            ui.session.runtime.Invalidation.AccelerationStructRebuildRequested = true;
-        ui.session.settings.ResetAccumulation = true;
+        if (wasEnabled != ui.render.settings.GaussianSplatShadows)
+            ui.render.runtime.Invalidation.AccelerationStructRebuildRequested = true;
+        ui.render.settings.ResetAccumulation = true;
         return true;
     }
 
     bool GaussianSplatSortingCombo(EditorUIData& ui)
     {
-        const bool changed = ImGui::Combo("Sorting Method", &ui.session.settings.GaussianSplatSortingMode, "GPU sort\0Stochastic Splats\0\0");
-        ui.session.settings.GaussianSplatSortingMode = dm::clamp(ui.session.settings.GaussianSplatSortingMode, 0, 1);
+        const bool changed = ImGui::Combo("Sorting Method", &ui.render.settings.GaussianSplatSortingMode, "GPU sort\0Stochastic Splats\0\0");
+        ui.render.settings.GaussianSplatSortingMode = dm::clamp(ui.render.settings.GaussianSplatSortingMode, 0, 1);
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("GPU sort uses the existing radix-sort path. Stochastic splats uses stable randomized order plus stochastic opacity accept/reject.");
         return changed;
@@ -147,8 +147,8 @@ int ResolveGaussianSplatShadowMode(const EditorUIData& ui)
 
     bool GaussianSplatFTBCombo(EditorUIData& ui)
     {
-        const bool changed = ImGui::Combo("FTB Sync Mode", &ui.session.settings.GaussianSplatFTBSyncMode, "Disabled (fast)\0Interlock\0\0");
-        ui.session.settings.GaussianSplatFTBSyncMode = dm::clamp(ui.session.settings.GaussianSplatFTBSyncMode, 0, 1);
+        const bool changed = ImGui::Combo("FTB Sync Mode", &ui.render.settings.GaussianSplatFTBSyncMode, "Disabled (fast)\0Interlock\0\0");
+        ui.render.settings.GaussianSplatFTBSyncMode = dm::clamp(ui.render.settings.GaussianSplatFTBSyncMode, 0, 1);
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("Front-to-back depth synchronization mode. The current RTXPT overlay path does not write a 3DGS depth iso buffer yet.");
         return changed;
@@ -156,14 +156,14 @@ int ResolveGaussianSplatShadowMode(const EditorUIData& ui)
 
     bool GaussianSplatRtxKernelDegreeCombo(EditorUIData& ui)
     {
-        const bool changed = ImGui::Combo("Kernel degree", &ui.session.settings.GaussianSplatRtxKernelDegree,
+        const bool changed = ImGui::Combo("Kernel degree", &ui.render.settings.GaussianSplatRtxKernelDegree,
             "0 (Linear)\0"
             "1 (Laplacian)\0"
             "2 (Quadratic)\0"
             "3 (Cubic)\0"
             "4 (Tesseractic)\0"
             "5 (Quintic)\0\0");
-        ui.session.settings.GaussianSplatRtxKernelDegree = dm::clamp(ui.session.settings.GaussianSplatRtxKernelDegree, 0, 5);
+        ui.render.settings.GaussianSplatRtxKernelDegree = dm::clamp(ui.render.settings.GaussianSplatRtxKernelDegree, 0, 5);
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("Kernel degree for the 3DGRT particle intersection shape. Changing it rebuilds Gaussian BLAS proxies.");
         return changed;
@@ -171,13 +171,13 @@ int ResolveGaussianSplatShadowMode(const EditorUIData& ui)
 
     bool GaussianSplatRtxParticleFormatCombo(EditorUIData& ui)
     {
-        int particleFormat = ui.session.settings.GaussianSplatUseAABBs ? 1 : 0;
+        int particleFormat = ui.render.settings.GaussianSplatUseAABBs ? 1 : 0;
         const bool changed = ImGui::Combo("Particles format", &particleFormat, "Icosahedron\0AABB + parametric\0\0");
         if (changed)
         {
-            ui.session.settings.GaussianSplatUseAABBs = particleFormat == 1;
-            if (ui.session.settings.GaussianSplatUseAABBs)
-                ui.session.settings.GaussianSplatUseTLASInstances = true;
+            ui.render.settings.GaussianSplatUseAABBs = particleFormat == 1;
+            if (ui.render.settings.GaussianSplatUseAABBs)
+                ui.render.settings.GaussianSplatUseTLASInstances = true;
         }
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("Shortcut for the 3DGS RTX acceleration proxy format. AABB + parametric forces TLAS instances.");
@@ -314,12 +314,12 @@ const ::PerformancePreset s_performancePresets[kPerformancePresetCount] = {
 };
 bool MatchesPreset(const EditorUIData& ui, const ::PerformancePreset& p)
 {
-    return caustica::render::MatchesPerformancePreset(ui.session.settings, p);
+    return caustica::render::MatchesPerformancePreset(ui.render.settings, p);
 }
 
 void ApplyPreset(EditorUIData& ui, const ::PerformancePreset& p)
 {
-    caustica::render::applyPerformancePreset(ui.session.settings, p);
+    caustica::render::applyPerformancePreset(ui.render.settings, p);
 }
 
 } // namespace caustica::editor

@@ -2,8 +2,9 @@
 #include <engine/App.h>
 #include <engine/AssetPlugin.h>
 #include <engine/EngineScheduleRegistration.h>
-#include <engine/SceneSessionResources.h>
-#include <engine/SceneSessionStartup.h>
+#include <engine/SceneAccess.h>
+#include <engine/SceneAppResources.h>
+#include <engine/SceneStartup.h>
 
 namespace caustica
 {
@@ -11,14 +12,15 @@ namespace caustica
 void DefaultPlugins::build(App& app)
 {
     registerAssetPlugin(app);
-    registerSceneSessionResources(app, sessionConfig);
+    registerSceneAppResources(app, appConfig);
+    app.emplaceResource<SceneAccess>();
     app.emplaceResource<GpuRenderSubsystem>();
 }
 
 void DefaultPlugins::configureSchedules(App& app)
 {
     registerEngineScheduleBridge(app);
-    registerSceneSessionStartup(app, sessionConfig);
+    registerSceneStartup(app, appConfig);
 }
 
 } // namespace caustica

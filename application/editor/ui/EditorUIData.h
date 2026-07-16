@@ -1,7 +1,7 @@
 #pragma once
 
 #include <core/command_line.h>
-#include <render/RenderSessionState.h>
+#include <render/RenderAppState.h>
 
 #include "EditorUIState.h"
 
@@ -10,7 +10,7 @@ namespace caustica::editor
 
 struct EditorUIData
 {
-    caustica::render::RenderSessionState session;
+    caustica::render::RenderAppState render;
     EditorUIState editor;
 };
 

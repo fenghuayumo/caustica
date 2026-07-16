@@ -2,7 +2,7 @@
 
 #include <engine/App.h>
 #include <engine/AssetPlugin.h>
-#include <engine/SceneSessionSystems.h>
+#include <engine/SceneApi.h>
 
 namespace caustica::editor
 {
@@ -10,7 +10,7 @@ namespace caustica::editor
 void EditorPlugin::build(App& app)
 {
     registerAssetPlugin(app);
-    registerSceneSessionResources(app, sessionConfig);
+    registerSceneAppResources(app, appConfig);
     app.insertResourceRef(m_sceneEditor);
     app.insertResourceRef(m_sceneEditor.editorState());
     app.insertResourceRef(m_sceneEditor.captureScriptState());
@@ -30,20 +30,20 @@ void EditorPlugin::configureSchedules(App& app)
     registerEngineScheduleBridge(app);
 
     m_sceneEditor.setApp(app);
-    sessionConfig.hasSceneCallbacks = true;
-    sessionConfig.sceneCallbacks = EngineSceneCallbacks{
+    appConfig.hasSceneCallbacks = true;
+    appConfig.sceneCallbacks = EngineSceneCallbacks{
         .OnSceneLoaded = [&app, this]() {
             m_sceneEditor.onSceneLoadedFromLoader();
         },
         .OnSceneUnloading = [&app, this]() {
-            sceneSession::onSceneUnloading(app);
+            caustica::onSceneUnloading(app);
             m_sceneEditor.onSceneUnloading();
         },
     };
 
-    registerSceneSessionStartup(app, sessionConfig);
+    registerSceneStartup(app, appConfig);
     registerEditorSceneStartup(app, EditorSceneStartupConfig{
-        .session = sessionConfig,
+        .appConfig = appConfig,
         .sceneEditor = &m_sceneEditor,
     });
 
@@ -53,7 +53,7 @@ void EditorPlugin::configureSchedules(App& app)
 
 void EditorPlugin::configureLateSchedules(App& app)
 {
-    app.addSystemBefore(AppSchedule::First, "EditorScene.beginFrame", "SceneSession.beginFrame", [](SystemContext& ctx) {
+    app.addSystemBefore(AppSchedule::First, "EditorScene.beginFrame", "Scene.beginFrame", [](SystemContext& ctx) {
         auto* capture = ctx.tryRes<CaptureScriptState>();
         if (capture && capture->manager)
             capture->manager->preRender();
@@ -107,12 +107,12 @@ void EditorPlugin::configureLateSchedules(App& app)
         m_sceneEditor.onAnimateUpdateSceneTime(ctx.deltaTimeSeconds, enableAnimations, enableAnimationUpdate);
     });
 
-    app.addSystemAfter(AppSchedule::update, "EditorScene.SyncLoadedScene", "SceneSession.animate", [this](SystemContext& ctx) {
+    app.addSystemAfter(AppSchedule::update, "EditorScene.SyncLoadedScene", "Scene.animate", [this](SystemContext& ctx) {
         (void)ctx;
         m_sceneEditor.syncLoadedSceneSystems();
     });
 
-    app.addSystemAfter(AppSchedule::update, "EditorScene.AnimateEnd", "SceneSession.animate", [this](SystemContext& ctx) {
+    app.addSystemAfter(AppSchedule::update, "EditorScene.AnimateEnd", "Scene.animate", [this](SystemContext& ctx) {
         if (!ctx.windowFocused)
             return;
 
@@ -128,7 +128,7 @@ void EditorPlugin::configureLateSchedules(App& app)
         m_sceneEditor.handleDroppedFiles();
     });
 
-    app.addSystemAfter(AppSchedule::Extract, "EditorScene.prepareEditorFrame", "SceneSession.PrepareRenderFrame", [this](SystemContext& ctx) {
+    app.addSystemAfter(AppSchedule::Extract, "EditorScene.prepareEditorFrame", "Scene.PrepareRenderFrame", [this](SystemContext& ctx) {
         if (!ctx.gpuDevice || m_sceneEditor.shouldSkipRender())
             return;
 
@@ -136,7 +136,7 @@ void EditorPlugin::configureLateSchedules(App& app)
     });
 
     AppSystemOrdering editorAfterWorldRenderOrdering;
-    editorAfterWorldRenderOrdering.before.push_back("SceneSession.AfterWorldRender");
+    editorAfterWorldRenderOrdering.before.push_back("Scene.AfterWorldRender");
     editorAfterWorldRenderOrdering.before.push_back("GpuRender.endFrame");
 
     app.addSystem(AppSchedule::render, "EditorScene.AfterWorldRender", [this](SystemContext& ctx) {
@@ -158,7 +158,7 @@ void EditorPlugin::configureLateSchedules(App& app)
     });
 
     AppSystemOrdering editorUiRenderOrdering;
-    editorUiRenderOrdering.after.push_back("SceneSession.AfterWorldRender");
+    editorUiRenderOrdering.after.push_back("Scene.AfterWorldRender");
     editorUiRenderOrdering.before.push_back("GpuRender.endFrame");
 
     app.addSystem(AppSchedule::render, "EditorUI.RenderScene", [](SystemContext& ctx) {

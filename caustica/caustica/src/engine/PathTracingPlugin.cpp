@@ -1,18 +1,18 @@
-#include <engine/SceneSessionPlugins.h>
+#include <engine/ScenePlugins.h>
 
 #include <engine/App.h>
 #include <engine/AppSchedules.h>
 #include <engine/GpuRenderSubsystem.h>
-#include <engine/SceneSessionSystems.h>
+#include <engine/SceneApi.h>
 
 #include <scene/SceneManager.h>
 
-namespace caustica::sceneSession
+namespace caustica
 {
 
 void registerPathTracingPlugin(App& app)
 {
-    app.addSystem(AppSchedule::render, "SceneSession.RenderScene", [](SystemContext& ctx) {
+    app.addSystem(AppSchedule::render, "Scene.RenderScene", [](SystemContext& ctx) {
         if (!ctx.gpuDevice)
             return;
 
@@ -23,7 +23,7 @@ void registerPathTracingPlugin(App& app)
         renderScene(ctx.app, *ctx.gpuDevice);
     });
 
-    app.addSystemAfter(AppSchedule::render, "SceneSession.AfterWorldRender", "SceneSession.RenderScene", [](SystemContext& ctx) {
+    app.addSystemAfter(AppSchedule::render, "Scene.AfterWorldRender", "Scene.RenderScene", [](SystemContext& ctx) {
         if (!ctx.gpuDevice)
             return;
 
@@ -31,4 +31,4 @@ void registerPathTracingPlugin(App& app)
     });
 }
 
-} // namespace caustica::sceneSession
+} // namespace caustica

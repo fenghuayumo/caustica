@@ -1,4 +1,4 @@
-#include <engine/SceneSessionPlugins.h>
+#include <engine/ScenePlugins.h>
 
 #include <engine/App.h>
 #include <engine/AppSchedules.h>
@@ -14,7 +14,7 @@
 
 #include <algorithm>
 
-namespace caustica::sceneSession
+namespace caustica
 {
 
 void updateCamera(App& app, float elapsedTimeSeconds)
@@ -84,11 +84,11 @@ void updateCamera(App& app, float elapsedTimeSeconds)
 
 void registerCameraPlugin(App& app)
 {
-    app.addSystem(AppSchedule::update, "SceneSession.updateCamera", [](SystemContext& ctx) {
+    app.addSystem(AppSchedule::update, "Scene.updateCamera", [](SystemContext& ctx) {
         if (!ctx.windowFocused)
             return;
         updateCamera(ctx.app, ctx.deltaTimeSeconds);
     });
 }
 
-} // namespace caustica::sceneSession
+} // namespace caustica

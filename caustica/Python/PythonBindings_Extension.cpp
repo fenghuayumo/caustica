@@ -16,7 +16,7 @@
 #include <nanobind/stl/optional.h>
 
 #include "SceneEditor.h"
-#include <engine/SceneSessionSystems.h>
+#include <engine/SceneApi.h>
 #include <engine/App.h>
 #include <engine/GpuRenderSubsystem.h>
 #include <backend/GpuDevice.h>
@@ -78,7 +78,7 @@ namespace
     {
         if (!app)
             return std::nullopt;
-        auto scene = caustica::sceneSession::scene(*app);
+        auto scene = caustica::activeScene(*app);
         if (!scene)
             return std::nullopt;
         const caustica::math::box3 bbox = scene->getSceneBounds();
@@ -138,7 +138,7 @@ public:
 
     bool LoadGaussianSplats(const std::string& fileName, bool convertRdfToRub) {
         return m_session && m_session->GetApp()
-            ? caustica::sceneSession::loadGaussianSplatFile(*m_session->GetApp(), fileName, convertRdfToRub)
+            ? caustica::loadGaussianSplatFile(*m_session->GetApp(), fileName, convertRdfToRub)
             : false;
     }
 
@@ -171,8 +171,8 @@ public:
 
         // Headless / DefaultPlugins sessions have no SceneEditor; load via SceneManager.
         caustica::App& app = *m_session->GetApp();
-        auto* sceneMgr = caustica::sceneSession::sceneManager(app);
-        auto* gpu = caustica::sceneSession::gpuRender(app);
+        auto* sceneMgr = caustica::sceneManager(app);
+        auto* gpu = caustica::gpuRender(app);
         if (!sceneMgr || !gpu || !gpu->textureLoader())
             return false;
 
@@ -363,7 +363,7 @@ NB_MODULE(caustica, m)
         .def_prop_ro("settings",
              [](PyRenderer& self) -> PathTracerSettings* {
                  App* app = self.GetApp();
-                 return app ? caustica::sceneSession::settings(*app) : nullptr;
+                 return app ? caustica::settings(*app) : nullptr;
              },
              nb::rv_policy::reference,
              "Live `settings` mirror (same object as caustica.settings()).")
@@ -380,7 +380,7 @@ NB_MODULE(caustica, m)
           "Return the Sample owned by the most recently created Renderer.");
 
     m.def("settings", []() -> PathTracerSettings* {
-            return caustica::sceneSession::settings(RequireCurrentApp());
+            return caustica::settings(RequireCurrentApp());
         },
           nb::rv_policy::reference,
           "Shortcut for the global settings (same as Renderer.settings).");

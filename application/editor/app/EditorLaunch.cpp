@@ -15,29 +15,29 @@ extern const char* g_windowTitle;
 namespace caustica::editor
 {
 
-bool startupEditor(caustica::App& app, EditorSession& session, int argc, const char* const* argv)
+bool startupEditor(caustica::App& app, EditorHost& host, int argc, const char* const* argv)
 {
     korgi::init();
-    installEditorLogFilter(session);
+    installEditorLogFilter(host);
 
     GpuDeviceCreateDesc createDesc{};
     std::string preferredScene = "default.json";
     LocalConfig::PreferredSceneOverride(preferredScene);
 
-    if (!ProcessEditorStartupCommandLine(argc, argv, session.cmdLine, createDesc, preferredScene))
+    if (!ProcessEditorStartupCommandLine(argc, argv, host.cmdLine, createDesc, preferredScene))
         return false;
 
-    createDesc.headless = session.cmdLine.noWindow;
+    createDesc.headless = host.cmdLine.noWindow;
     createDesc.windowTitle = g_windowTitle ? g_windowTitle : "caustica";
 
     if (!app.initializeGraphics(argc, argv, createDesc))
         return false;
 
-    app.setUseDedicatedRenderThread(!session.cmdLine.syncRender);
+    app.setUseDedicatedRenderThread(!host.cmdLine.syncRender);
 
-    const bool automatedRun = session.cmdLine.nonInteractive
-        || session.cmdLine.captureSimple
-        || session.cmdLine.captureSequence;
+    const bool automatedRun = host.cmdLine.nonInteractive
+        || host.cmdLine.captureSimple
+        || host.cmdLine.captureSequence;
 
     if (automatedRun)
     {
@@ -52,32 +52,32 @@ bool startupEditor(caustica::App& app, EditorSession& session, int argc, const c
         };
     }
 
-    const SceneSessionConfig sceneConfig{
-        .viewState = session.sceneEditor.viewState(),
-        .diagnostics = session.sessionDiagnostics,
+    const SceneAppConfig sceneConfig{
+        .viewState = host.sceneEditor.viewState(),
+        .diagnostics = host.diagnostics,
         .preferredScene = preferredScene,
-        .sessionState = &session.editorUiData.session,
-        .cmdLine = &session.cmdLine,
-        .applyCmdLineToSessionState = session.cmdLine.noWindow || automatedRun,
+        .renderState = &host.editorUiData.render,
+        .cmdLine = &host.cmdLine,
+        .applyCmdLineToRenderState = host.cmdLine.noWindow || automatedRun,
     };
 
-    if (!session.cmdLine.noWindow)
+    if (!host.cmdLine.noWindow)
     {
         EditorUISubsystemConfig uiConfig{
             .app = app,
-            .sceneEditor = session.sceneEditor,
-            .editorUiData = session.editorUiData,
-            .cmdLine = session.cmdLine,
+            .sceneEditor = host.sceneEditor,
+            .editorUiData = host.editorUiData,
+            .cmdLine = host.cmdLine,
         };
-        app.addPlugin<EditorPlugin>(sceneConfig, session.sceneEditor, &uiConfig);
+        app.addPlugin<EditorPlugin>(sceneConfig, host.sceneEditor, &uiConfig);
     }
     else
     {
-        app.addPlugin<EditorPlugin>(sceneConfig, session.sceneEditor, static_cast<const EditorUISubsystemConfig*>(nullptr));
+        app.addPlugin<EditorPlugin>(sceneConfig, host.sceneEditor, static_cast<const EditorUISubsystemConfig*>(nullptr));
     }
 
-    app.setEventHandler([&session, &app](Event& event) {
-        session.sceneEditor.onEvent(event);
+    app.setEventHandler([&host, &app](Event& event) {
+        host.sceneEditor.onEvent(event);
 
         EventDispatcher dispatcher(event);
         dispatcher.dispatch<WindowCloseEvent>([&app](WindowCloseEvent&) {

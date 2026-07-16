@@ -1,27 +1,27 @@
-#include <engine/SceneSessionPlugins.h>
+#include <engine/ScenePlugins.h>
 
 #include <engine/App.h>
 #include <engine/AppSchedules.h>
 #include <engine/GpuRenderSubsystem.h>
-#include <engine/SceneSessionSystems.h>
+#include <engine/SceneApi.h>
 #include <engine/SceneViewState.h>
 
 #include <backend/GpuDevice.h>
 #include <render/RenderRuntimeState.h>
-#include <render/SessionDiagnostics.h>
+#include <render/AppDiagnostics.h>
 #include <render/core/PathTracerSettings.h>
 #include <render/worldRenderer/WorldRenderer.h>
 #include <scene/Scene.h>
 #include <scene/SceneManager.h>
 #include <scene/SceneRenderData.h>
 
-namespace caustica::sceneSession
+namespace caustica
 {
 
 void prepareRenderFrame(App& app)
 {
     auto* vs = app.tryResource<SceneViewState>();
-    auto* diag = app.tryResource<render::SessionDiagnostics>();
+    auto* diag = app.tryResource<render::AppDiagnostics>();
     auto* gr = app.tryResource<GpuRenderSubsystem>();
     GpuDevice* device = app.getGpuDevice();
     if (vs)
@@ -38,6 +38,7 @@ void prepareRenderFrame(App& app)
         return;
 
     // Structure mutations from update systems are ECS-only until here.
+    syncSceneAccess(app);
     flushPendingStructureGpu(app);
 
     scene::SessionRenderExtractInputs sessionInputs;
@@ -54,7 +55,7 @@ void prepareRenderFrame(App& app)
 
 void registerRenderExtractPlugin(App& app)
 {
-    app.addSystemAfter(AppSchedule::Extract, "SceneSession.PrepareRenderFrame", "SetRenderFrameIndex", [](SystemContext& ctx) {
+    app.addSystemAfter(AppSchedule::Extract, "Scene.PrepareRenderFrame", "SetRenderFrameIndex", [](SystemContext& ctx) {
         if (!ctx.gpuDevice)
             return;
 
@@ -66,4 +67,4 @@ void registerRenderExtractPlugin(App& app)
     });
 }
 
-} // namespace caustica::sceneSession
+} // namespace caustica

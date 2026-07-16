@@ -33,7 +33,7 @@ void LocalConfig::PreferredSceneOverride(std::string& preferredScene)
     }
 }
 
-void LocalConfig::PostAppInit(caustica::render::RenderSessionState& sampleUI)
+void LocalConfig::PostAppInit(caustica::render::RenderAppState& sampleUI)
 {
     if (CAUSTICA_LOCAL_CONFIG_ID_STRING == "REF_VS_REALTIME")
     {
@@ -123,7 +123,7 @@ void LocalConfig::PostAppInit(caustica::render::RenderSessionState& sampleUI)
 
 }
 
-void LocalConfig::PostSceneLoad(SceneEditor& sample, caustica::render::RenderSessionState& sampleUI, EditorUIState& editorUI)
+void LocalConfig::PostSceneLoad(SceneEditor& sample, caustica::render::RenderAppState& sampleUI, EditorUIState& editorUI)
 {
     if (CAUSTICA_LOCAL_CONFIG_ID_STRING == "ENVMAP_ONLY_TESTING")
     {

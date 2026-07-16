@@ -5,7 +5,7 @@
 #include <render/core/PathTracerSettings.h>
 #include <render/PathTracerScenePasses.h>
 #include <render/RenderRuntimeState.h>
-#include <render/SessionDiagnostics.h>
+#include <render/AppDiagnostics.h>
 #include <assets/loader/TextureLoader.h>
 #include <render/core/DescriptorTableManager.h>
 #include <scene/SceneManager.h>
@@ -45,7 +45,7 @@ struct PathTracingContext
 
     double& sceneTime;
 
-    SessionDiagnostics& diagnostics;
+    AppDiagnostics& diagnostics;
 
     // Per-frame: pointed at SceneRenderData snapshot copies for the render phase.
     PathTracerSettings* frameSettings = nullptr;

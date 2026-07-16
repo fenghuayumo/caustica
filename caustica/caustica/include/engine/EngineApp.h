@@ -2,11 +2,11 @@
 
 #include <backend/GpuDevice.h>
 #include <engine/App.h>
-#include <engine/SceneSessionSystems.h>
+#include <engine/SceneApi.h>
 #include <engine/SceneViewState.h>
 #include <core/command_line.h>
-#include <render/RenderSessionState.h>
-#include <render/SessionDiagnostics.h>
+#include <render/RenderAppState.h>
+#include <render/AppDiagnostics.h>
 #include <render/core/PathTracerSettings.h>
 #include <scene/Scene.h>
 
@@ -19,7 +19,7 @@ namespace caustica
 {
 
 // Minimal config for embedding caustica in a new application.
-// Prefer EngineApp::create() over assembling SceneSessionConfig / DefaultPlugins yourself.
+// Prefer EngineApp::create() over assembling SceneAppConfig / DefaultPlugins yourself.
 struct EngineAppDesc
 {
     uint32_t width = 1920;
@@ -48,15 +48,18 @@ struct EngineAppDesc
 // Bevy-style embed entry: one create() call, then run() or stepFrame().
 //
 //   auto engine = caustica::EngineApp::create({ .scene = "Kitchen/kitchen.json" });
-//   engine->app().addSystem(AppSchedule::update, "MySim", [](SystemContext& ctx) { ... });
+//   engine->app().addSystem(AppSchedule::update, "MySim", [](SystemContext& ctx) {
+//       if (auto* ew = ctx.entityWorld())
+//           ew->world().each<scene::LocalTransformComponent>(...);
+//   });
 //   engine->run();
 //
 // Headless:
 //   auto engine = caustica::EngineApp::create({ .headless = true });
 //   while (running) engine->stepFrame();
 //
-// Scene / settings / camera: use sceneSession::load/spawn/despawn and free functions
-// on engine->app(), or the convenience methods below.
+// Scene mutations: caustica::load/spawn/despawn (ECS only; Extract flushes GPU).
+// Scene queries: ctx.entityWorld() / caustica::entityWorld(app) -- not GpuRenderSubsystem.
 class EngineApp
 {
 public:
@@ -84,8 +87,8 @@ public:
     [[nodiscard]] bool isSceneLoading() const;
     [[nodiscard]] PathTracerSettings& settings();
     [[nodiscard]] const PathTracerSettings& settings() const;
-    [[nodiscard]] render::RenderSessionState& renderSessionState();
-    [[nodiscard]] const render::RenderSessionState& renderSessionState() const;
+    [[nodiscard]] render::RenderAppState& renderAppState();
+    [[nodiscard]] const render::RenderAppState& renderAppState() const;
     [[nodiscard]] CommandLineOptions& commandLine();
     [[nodiscard]] const CommandLineOptions& commandLine() const;
 
@@ -103,8 +106,8 @@ private:
 
     EngineAppDesc m_desc{};
     CommandLineOptions m_cmdLine{};
-    render::RenderSessionState m_sessionState{};
-    render::SessionDiagnostics m_diagnostics{};
+    render::RenderAppState m_renderAppState{};
+    render::AppDiagnostics m_diagnostics{};
     SceneViewState m_viewState{};
 
     std::unique_ptr<GpuDevice> m_ownedDevice;

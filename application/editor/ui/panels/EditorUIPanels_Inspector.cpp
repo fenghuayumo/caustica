@@ -34,8 +34,7 @@ namespace caustica::editor
 void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
 {
     // Inspector panel: instance Transform + mesh name (right-click pick)
-    auto scene = m_sceneEditor.scene();
-    auto* ew = scene ? scene->getEntityWorld() : nullptr;
+    auto* ew = m_sceneEditor.entityWorld();
     if (m_editorUI.SelectedEntity != ecs::NullEntity && m_editorUI.ShowInspector && ew)
     {
         ImGui::SetNextWindowPos(ImVec2(float(layout.scaledWidth) - 10.f, 10.f), ImGuiCond_Appearing, ImVec2(1.f, 0.f));

@@ -3,13 +3,13 @@
 #include <core/progress.h>
 
 struct GLFWwindow;
-#include <engine/SceneSessionSystems.h>
+#include <engine/SceneApi.h>
 #include <engine/SceneViewState.h>
 #include <engine/GpuRenderSubsystem.h>
 #include <math/math.h>
 #include <render/SceneLightingPasses.h>
-#include <render/RenderSessionState.h>
-#include <render/SessionDiagnostics.h>
+#include <render/RenderAppState.h>
+#include <render/AppDiagnostics.h>
 #include <scene/SceneManager.h>
 
 #include "ui/EditorUIData.h"
@@ -46,15 +46,15 @@ class CaptureScriptManager;
 
 using namespace caustica::math;
 
-// Scene editor shell (mesh edit, Inspector, capture). Frame logic lives in sceneSession systems.
+// Scene editor shell (mesh edit, Inspector, capture). Frame logic lives in Scene.* systems.
 class SceneEditor
 {
 public:
     SceneEditor(const CommandLineOptions& cmdLine,
-        caustica::render::RenderSessionState& sessionState,
+        caustica::render::RenderAppState& renderAppState,
         EditorUIState& editorState,
-        caustica::render::SessionDiagnostics& diagnostics);
-    SceneEditor(const CommandLineOptions& cmdLine, EditorUIData& ui, caustica::render::SessionDiagnostics& diagnostics);
+        caustica::render::AppDiagnostics& diagnostics);
+    SceneEditor(const CommandLineOptions& cmdLine, EditorUIData& ui, caustica::render::AppDiagnostics& diagnostics);
 
     ~SceneEditor();
 
@@ -69,8 +69,8 @@ public:
     [[nodiscard]] nvrhi::IDevice* device() const;
     [[nodiscard]] uint32_t frameIndex() const;
 
-    [[nodiscard]] render::RenderSessionState& renderSessionState() { return m_sessionState; }
-    [[nodiscard]] const render::RenderSessionState& renderSessionState() const { return m_sessionState; }
+    [[nodiscard]] render::RenderAppState& renderAppState() { return m_renderAppState; }
+    [[nodiscard]] const render::RenderAppState& renderAppState() const { return m_renderAppState; }
     [[nodiscard]] PathTracerSettings& pathTracerSettings() { return m_settings; }
     [[nodiscard]] const PathTracerSettings& pathTracerSettings() const { return m_settings; }
     [[nodiscard]] render::RenderRuntimeState& renderRuntimeState() { return m_renderState; }
@@ -78,6 +78,8 @@ public:
     [[nodiscard]] const CommandLineOptions& cmdLine() const { return m_cmdLine; }
 
     [[nodiscard]] std::shared_ptr<Scene> scene() const;
+    // Prefer over scene()->getEntityWorld() -- stable caustica::entityWorld entry.
+    [[nodiscard]] scene::SceneEntityWorld* entityWorld() const;
     [[nodiscard]] bool shouldSkipRender() const;
 
     SceneManager* sceneManager();
@@ -127,7 +129,7 @@ public:
         bool rebuildAccelerationStructure = true);
 
     void attachGpuRenderSubsystem(caustica::GpuRenderSubsystem& gpuRenderSubsystem);
-    void initializeSession(const std::string& preferredScene);
+    void initializeScene(const std::string& preferredScene);
     void initStreamlineAndWindow();
 
     void onBeforeInitialSceneLoad();
@@ -218,10 +220,10 @@ private:
     void onSceneLoadedComplete();
 
     const CommandLineOptions& m_cmdLine;
-    render::RenderSessionState& m_sessionState;
+    render::RenderAppState& m_renderAppState;
     PathTracerSettings& m_settings;
     render::RenderRuntimeState& m_renderState;
-    render::SessionDiagnostics& m_sessionDiagnostics;
+    render::AppDiagnostics& m_diagnostics;
 
     SceneViewState m_viewState;
     EditorState m_editorState;

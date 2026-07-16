@@ -1,4 +1,4 @@
-#include <render/RenderSessionState.h>
+#include <render/RenderAppState.h>
 
 #include <core/command_line.h>
 #include <render/passes/denoisers/NrdConfig.h>
@@ -81,7 +81,7 @@ bool MatchesPerformancePreset(const PathTracerSettings& settings, const Performa
     return true;
 }
 
-void InitializeRenderSessionStateFromCommandLine(RenderSessionState& state, const CommandLineOptions& cmdLine)
+void InitializeRenderAppStateFromCommandLine(RenderAppState& state, const CommandLineOptions& cmdLine)
 {
     PathTracerSettings& settings = state.settings;
 

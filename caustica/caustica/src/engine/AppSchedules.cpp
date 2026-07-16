@@ -1,10 +1,32 @@
 #include <engine/AppSchedules.h>
+#include <engine/SceneApi.h>
 
 #include <algorithm>
 #include <utility>
 
 namespace caustica
 {
+
+scene::SceneEntityWorld* SystemContext::entityWorld()
+{
+    return caustica::entityWorld(app);
+}
+
+const scene::SceneEntityWorld* SystemContext::entityWorld() const
+{
+    return caustica::entityWorld(app);
+}
+
+ecs::World* SystemContext::sceneEcs()
+{
+    return caustica::sceneEcs(app);
+}
+
+const ecs::World* SystemContext::sceneEcs() const
+{
+    return caustica::sceneEcs(app);
+}
+
 
 const char* toString(AppSchedule schedule)
 {

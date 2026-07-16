@@ -2,7 +2,7 @@
 
 #include <core/command_line.h>
 #include <core/log.h>
-#include <render/SessionDiagnostics.h>
+#include <render/AppDiagnostics.h>
 
 #include "SceneEditor.h"
 #include "ui/EditorUIData.h"
@@ -10,16 +10,17 @@
 namespace caustica::editor
 {
 
-struct EditorSession
+// Host-owned editor bag: cmdline, UI data, diagnostics, SceneEditor shell.
+struct EditorHost
 {
     CommandLineOptions cmdLine;
     EditorUIData editorUiData;
-    render::SessionDiagnostics sessionDiagnostics;
+    render::AppDiagnostics diagnostics;
     SceneEditor sceneEditor;
 
-    EditorSession();
+    EditorHost();
 };
 
-void installEditorLogFilter(EditorSession& session);
+void installEditorLogFilter(EditorHost& host);
 
 } // namespace caustica::editor

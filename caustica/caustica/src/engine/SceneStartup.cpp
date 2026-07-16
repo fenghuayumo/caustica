@@ -1,21 +1,21 @@
-#include <engine/SceneSessionStartup.h>
+#include <engine/SceneStartup.h>
 
 #include <scene/Scene.h>
 
 #include <assets/AssetSystem.h>
 #include <engine/App.h>
 #include <engine/GpuRenderSubsystem.h>
-#include <engine/SceneSessionSystems.h>
+#include <engine/SceneApi.h>
 
 #include <core/path_utils.h>
 #include <render/core/RenderSceneTypeFactory.h>
-#include <render/RenderSessionState.h>
+#include <render/RenderAppState.h>
 #include <render/worldRenderer/WorldRenderer.h>
 
 namespace caustica
 {
 
-void initializeSceneSession(App& app, const SceneSessionConfig& config)
+void initializeSceneApp(App& app, const SceneAppConfig& config)
 {
     GpuDevice* gpuDevice = app.getGpuDevice();
     auto* assetSystem = app.tryResource<AssetSystem>();
@@ -25,21 +25,21 @@ void initializeSceneSession(App& app, const SceneSessionConfig& config)
 
     SceneViewState& viewState = config.viewState;
 
-    sceneSession::initStreamlineAndWindow(app);
-    assert(config.sessionState && "SceneSessionConfig.sessionState is required for GpuRenderSubsystem init");
+    caustica::initStreamlineAndWindow(app);
+    assert(config.renderState && "SceneAppConfig.renderState is required for GpuRenderSubsystem init");
 
     EngineSceneCallbacks sceneCallbacks{
-        .OnSceneLoaded = [&app]() { sceneSession::onSceneLoaded(app); },
-        .OnSceneUnloading = [&app]() { sceneSession::onSceneUnloading(app); },
+        .OnSceneLoaded = [&app]() { caustica::onSceneLoaded(app); },
+        .OnSceneUnloading = [&app]() { caustica::onSceneUnloading(app); },
     };
     if (config.hasSceneCallbacks)
         sceneCallbacks = config.sceneCallbacks;
 
-    gpuRenderSubsystem->initializeSession(GpuRenderSubsystemInitParams{
+    gpuRenderSubsystem->initialize(GpuRenderSubsystemInitParams{
         .gpuDevice = *gpuDevice,
         .assetSystem = *assetSystem,
-        .settings = config.sessionState->settings,
-        .runtimeState = config.sessionState->runtime,
+        .settings = config.renderState->settings,
+        .runtimeState = config.renderState->runtime,
         .sceneTime = viewState.sceneTime,
         .diagnostics = config.diagnostics,
         .cmdLine = config.cmdLine,
@@ -47,8 +47,8 @@ void initializeSceneSession(App& app, const SceneSessionConfig& config)
         .sceneCallbacks = std::move(sceneCallbacks),
     });
 
-    sceneSession::attachGpuRenderSubsystem(app, *gpuRenderSubsystem);
-    sceneSession::initializeSession(app, config.preferredScene);
+    caustica::attachGpuRenderSubsystem(app, *gpuRenderSubsystem);
+    caustica::initializeScene(app, config.preferredScene);
 
     if (config.refreshEnvMapMediaList)
     {
@@ -56,15 +56,15 @@ void initializeSceneSession(App& app, const SceneSessionConfig& config)
             getLocalPath(c_AssetsFolder), std::filesystem::path());
     }
 
-    if (config.sessionState && config.cmdLine && config.applyCmdLineToSessionState)
-        render::InitializeRenderSessionStateFromCommandLine(*config.sessionState, *config.cmdLine);
+    if (config.renderState && config.cmdLine && config.applyCmdLineToRenderState)
+        render::InitializeRenderAppStateFromCommandLine(*config.renderState, *config.cmdLine);
 }
 
-void registerSceneSessionStartup(App& app, const SceneSessionConfig& config)
+void registerSceneStartup(App& app, const SceneAppConfig& config)
 {
-    app.addSystem(AppSchedule::Startup, "SceneSession.Startup", [&app, config](SystemContext& ctx) {
+    app.addSystem(AppSchedule::Startup, "Scene.Startup", [&app, config](SystemContext& ctx) {
         (void)ctx;
-        initializeSceneSession(app, config);
+        initializeSceneApp(app, config);
     });
 }
 

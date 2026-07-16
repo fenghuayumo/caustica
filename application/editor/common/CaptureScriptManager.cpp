@@ -23,8 +23,8 @@ namespace caustica::editor
 using namespace caustica;
 using namespace caustica;
 
-CaptureScriptManager::CaptureScriptManager(SceneEditor & sample, caustica::render::RenderSessionState & sessionState, const CommandLineOptions & cmdLine)
-    : m_app(sample), m_ui(sessionState), m_cmdLine(cmdLine), m_sequencer(cmdLine)
+CaptureScriptManager::CaptureScriptManager(SceneEditor & sample, caustica::render::RenderAppState & renderState, const CommandLineOptions & cmdLine)
+    : m_app(sample), m_ui(renderState), m_cmdLine(cmdLine), m_sequencer(cmdLine)
 {
 }
 

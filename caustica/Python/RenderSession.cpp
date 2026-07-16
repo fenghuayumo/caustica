@@ -4,7 +4,7 @@
 
 #include <engine/EngineApp.h>
 #include <engine/GpuRenderSubsystem.h>
-#include <engine/SceneSessionSystems.h>
+#include <engine/SceneApi.h>
 #include <assets/loader/TextureLoader.h>
 #include <core/file_utils.h>
 #include <core/json.h>
@@ -362,7 +362,7 @@ RenderSession::RenderSession(const Config& cfg)
     cmdLine.OverrideToReferenceMode = !cfg.realtimeMode;
     cmdLine.OverrideToRealtimeMode = cfg.realtimeMode;
     cmdLine.ReferenceSamplesPerPixel = cfg.accumulationTarget;
-    m_engine->renderSessionState().settings.AccumulationTarget = cfg.accumulationTarget;
+    m_engine->renderAppState().settings.AccumulationTarget = cfg.accumulationTarget;
 
     m_engine->app().beforePresent = [this](caustica::GpuDevice& manager, uint32_t) {
         m_lastRenderedBackBufferIndex = manager.getCurrentBackBufferIndex();
@@ -464,7 +464,7 @@ int RenderSession::StepUntilAccumulated(int maxFrames)
 
     // Force reference / accumulation mode so we know "done" actually means
     // the SPP target has been reached.
-    auto& settings = m_engine->renderSessionState().settings;
+    auto& settings = m_engine->renderAppState().settings;
     settings.ResetAccumulation = true;
 
     int target = (maxFrames > 0)
@@ -515,7 +515,7 @@ bool RenderSession::SaveScreenshot(const std::string& outputPath)
     }
 
     auto* host = m_engine.get();
-    auto* gpuRender = host ? caustica::sceneSession::gpuRender(host->app()) : nullptr;
+    auto* gpuRender = host ? caustica::gpuRender(host->app()) : nullptr;
     auto* renderDevice = gpuRender ? &gpuRender->renderDevice() : nullptr;
     if (!renderDevice)
     {

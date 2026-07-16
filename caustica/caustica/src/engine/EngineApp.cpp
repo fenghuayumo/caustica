@@ -167,13 +167,13 @@ bool EngineApp::initialize(EngineAppDesc desc)
     const std::string preferredScene = m_desc.scene.empty() ? std::string("default.json") : m_desc.scene;
 
     m_app = std::make_unique<App>(m_device, m_desc.headless ? nullptr : m_window);
-    m_app->addPlugin<DefaultPlugins>(SceneSessionConfig{
+    m_app->addPlugin<DefaultPlugins>(SceneAppConfig{
         .viewState = m_viewState,
         .diagnostics = m_diagnostics,
         .preferredScene = preferredScene,
-        .sessionState = &m_sessionState,
+        .renderState = &m_renderAppState,
         .cmdLine = &m_cmdLine,
-        .applyCmdLineToSessionState = true,
+        .applyCmdLineToRenderState = true,
     });
     m_app->setUseDedicatedRenderThread(m_desc.dedicatedRenderThread && !m_desc.headless);
 
@@ -253,22 +253,22 @@ GpuDevice* EngineApp::device() const
 void EngineApp::setScene(const std::string& name, bool forceReload)
 {
     if (m_app)
-        sceneSession::setCurrentScene(*m_app, name, forceReload);
+        caustica::setCurrentScene(*m_app, name, forceReload);
 }
 
 std::shared_ptr<Scene> EngineApp::scene() const
 {
-    return m_app ? sceneSession::scene(*m_app) : nullptr;
+    return m_app ? caustica::activeScene(*m_app) : nullptr;
 }
 
 bool EngineApp::isSceneLoaded() const
 {
-    return m_app && sceneSession::isSceneLoaded(*m_app);
+    return m_app && caustica::isSceneLoaded(*m_app);
 }
 
 bool EngineApp::isSceneLoading() const
 {
-    return m_app && sceneSession::isSceneLoading(*m_app);
+    return m_app && caustica::isSceneLoading(*m_app);
 }
 
 PathTracerSettings& EngineApp::settings()
@@ -281,14 +281,14 @@ const PathTracerSettings& EngineApp::settings() const
     return m_app->resource<PathTracerSettings>();
 }
 
-render::RenderSessionState& EngineApp::renderSessionState()
+render::RenderAppState& EngineApp::renderAppState()
 {
-    return m_sessionState;
+    return m_renderAppState;
 }
 
-const render::RenderSessionState& EngineApp::renderSessionState() const
+const render::RenderAppState& EngineApp::renderAppState() const
 {
-    return m_sessionState;
+    return m_renderAppState;
 }
 
 CommandLineOptions& EngineApp::commandLine()
@@ -303,29 +303,29 @@ const CommandLineOptions& EngineApp::commandLine() const
 
 bool EngineApp::setCameraPosDirUp(const std::string& value)
 {
-    return m_app && sceneSession::setCurrentCameraPosDirUp(*m_app, value);
+    return m_app && caustica::setCurrentCameraPosDirUp(*m_app, value);
 }
 
 void EngineApp::setCameraVerticalFOV(float radians)
 {
     if (m_app)
-        sceneSession::setCameraVerticalFOV(*m_app, radians);
+        caustica::setCameraVerticalFOV(*m_app, radians);
 }
 
 void EngineApp::setCameraIntrinsics(float fx, float fy, float cx, float cy, float width, float height)
 {
     if (m_app)
-        sceneSession::setCameraIntrinsics(*m_app, fx, fy, cx, cy, width, height);
+        caustica::setCameraIntrinsics(*m_app, fx, fy, cx, cy, width, height);
 }
 
 bool EngineApp::accumulationCompleted() const
 {
-    return m_app && sceneSession::accumulationCompleted(*m_app);
+    return m_app && caustica::accumulationCompleted(*m_app);
 }
 
 nvrhi::ITexture* EngineApp::ldrColorTexture() const
 {
-    return m_app ? sceneSession::ldrColorTexture(*m_app) : nullptr;
+    return m_app ? caustica::ldrColorTexture(*m_app) : nullptr;
 }
 
 uint32_t EngineApp::frameIndex() const

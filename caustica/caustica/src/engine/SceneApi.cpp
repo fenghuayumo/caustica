@@ -1,13 +1,15 @@
-#include <engine/SceneSessionSystems.h>
-#include <engine/SceneSessionPlugins.h>
+#include <engine/SceneApi.h>
+#include <engine/ScenePlugins.h>
 
 #include <engine/App.h>
 #include <engine/GpuRenderSubsystem.h>
 #include <engine/RenderThread.h>
+#include <engine/SceneAccess.h>
 #include <engine/SceneViewState.h>
+#include <render/passes/lighting/MaterialGpuCache.h>
 
 #include <assets/AssetSystem.h>
-#include <render/RenderSessionState.h>
+#include <render/RenderAppState.h>
 #include <render/SceneGaussianSplatPasses.h>
 #include <render/SceneLightingPasses.h>
 #include <render/SceneRayTracingResources.h>
@@ -101,8 +103,8 @@ namespace
 
     void updateFpsInfo(App& app, double frameTimeSeconds)
     {
-        SceneViewState* vs = sceneSession::viewState(app);
-        PathTracerSettings* cfg = sceneSession::settings(app);
+        SceneViewState* vs = caustica::viewState(app);
+        PathTracerSettings* cfg = caustica::settings(app);
         if (!vs || !cfg || frameTimeSeconds <= 0.0)
             return;
 
@@ -124,7 +126,7 @@ namespace
 
     void recordFrameTiming(App& app, const GpuDevice& gpuDevice)
     {
-        SceneViewState* vs = sceneSession::viewState(app);
+        SceneViewState* vs = caustica::viewState(app);
         double frameTime = gpuDevice.getAverageFrameTimeSeconds();
         if (frameTime <= 0.0 && vs && vs->lastDeltaTime > 0.0f)
             frameTime = static_cast<double>(vs->lastDeltaTime);
@@ -134,8 +136,8 @@ namespace
     void applySceneSwitch(App& app, const std::string& sceneName, bool forceReload)
     {
         ::SceneManager* manager = localSceneManager(app);
-        PathTracerSettings* cfg = sceneSession::settings(app);
-        SceneViewState* vs = sceneSession::viewState(app);
+        PathTracerSettings* cfg = caustica::settings(app);
+        SceneViewState* vs = caustica::viewState(app);
         if (!manager || !cfg || !vs)
             return;
 
@@ -161,7 +163,7 @@ namespace
 
     bool processPendingSceneSwitch(App& app)
     {
-        SceneViewState* vs = sceneSession::viewState(app);
+        SceneViewState* vs = caustica::viewState(app);
         if (!vs)
             return false;
 
@@ -202,8 +204,8 @@ namespace
 
     void tickSceneSwitchTest(App& app)
     {
-        const CommandLineOptions* cmd = sceneSession::cmdLine(app);
-        SceneViewState* vs = sceneSession::viewState(app);
+        const CommandLineOptions* cmd = caustica::cmdLine(app);
+        SceneViewState* vs = caustica::viewState(app);
         if (!cmd || !vs || cmd->sceneSwitchTestInterval <= 0)
             return;
 
@@ -216,7 +218,7 @@ namespace
 
         vs->sceneSwitchTestFramesUntilSwitch = cmd->sceneSwitchTestInterval;
 
-        const std::vector<std::string>& scenes = sceneSession::availableScenes(app);
+        const std::vector<std::string>& scenes = caustica::availableScenes(app);
         if (scenes.size() < 2)
             return;
 
@@ -225,7 +227,7 @@ namespace
 
         const std::string& nextScene = scenes[vs->sceneSwitchTestSceneIndex++];
         caustica::info("SceneSwitchTest: requesting '%s' from render thread", nextScene.c_str());
-        sceneSession::setCurrentScene(app, nextScene);
+        caustica::setCurrentScene(app, nextScene);
 
         ++vs->sceneSwitchTestSwitchesDone;
         if (cmd->sceneSwitchTestCount > 0
@@ -244,14 +246,14 @@ namespace
 
     void syncCameraFromScene(App& app)
     {
-        auto activeScene = sceneSession::scene(app);
+        auto scenePtr = caustica::activeScene(app);
         CameraController* cam = sessionCamera(app);
-        SceneViewState* vs = sceneSession::viewState(app);
-        if (!activeScene || !cam || !vs)
+        SceneViewState* vs = caustica::viewState(app);
+        if (!scenePtr || !cam || !vs)
             return;
 
-        const auto& cameraEntities = activeScene->getCameraEntities();
-        const auto* ew = activeScene->getEntityWorld();
+        const auto& cameraEntities = scenePtr->getCameraEntities();
+        const auto* ew = scenePtr->getEntityWorld();
         bool syncedCamera = false;
         if (!cameraEntities.empty() && ew)
         {
@@ -277,13 +279,13 @@ namespace
 
     void afterWorldRenderDefault(App& app, GpuDevice& /*gpuDevice*/)
     {
-        RenderRuntimeState* runtime = sceneSession::runtimeState(app);
+        RenderRuntimeState* runtime = caustica::runtimeState(app);
         if (!runtime)
             return;
 
         // Clear only requests owned by the frame that just rendered. Using live
         // Picking here drops clicks stolen by an older in-flight frame.
-        const auto* wr = sceneSession::worldRenderer(app);
+        const auto* wr = caustica::worldRenderer(app);
         const caustica::render::RenderPickState renderedPick = wr
             ? wr->getLastRenderedPicking()
             : caustica::render::RenderPickState{};
@@ -299,7 +301,7 @@ namespace
     }
 }
 
-namespace caustica::sceneSession
+namespace caustica
 {
 
 GpuRenderSubsystem* gpuRender(const App& app)
@@ -336,9 +338,9 @@ RenderRuntimeState* runtimeState(const App& app)
     return const_cast<App&>(app).tryResource<RenderRuntimeState>();
 }
 
-SessionDiagnostics* diagnostics(const App& app)
+AppDiagnostics* diagnostics(const App& app)
 {
-    return const_cast<App&>(app).tryResource<SessionDiagnostics>();
+    return const_cast<App&>(app).tryResource<AppDiagnostics>();
 }
 
 const CommandLineOptions* cmdLine(const App& app)
@@ -377,10 +379,35 @@ const std::string& envMapLocalPath(const App& app) { return gpuRender(app)->ligh
 const std::string& envMapOverrideSource(const App& app) { return gpuRender(app)->lightingPasses().envMapOverride(); }
 const std::vector<std::filesystem::path>& envMapMediaList(App& app) { return gpuRender(app)->lightingPasses().envMapMediaList(); }
 
-std::shared_ptr<Scene> scene(const App& app)
+std::shared_ptr<Scene> activeScene(const App& app)
 {
     ::SceneManager* manager = sceneManager(app);
     return manager ? manager->getScene() : nullptr;
+}
+
+void syncSceneAccess(App& app)
+{
+    auto* access = app.tryResource<SceneAccess>();
+    if (!access)
+        return;
+    access->active = activeScene(app);
+}
+
+scene::SceneEntityWorld* entityWorld(const App& app)
+{
+    if (auto* access = const_cast<App&>(app).tryResource<SceneAccess>())
+    {
+        if (scene::SceneEntityWorld* ew = access->entityWorld())
+            return ew;
+    }
+    const std::shared_ptr<Scene> active = activeScene(app);
+    return active ? active->getEntityWorld() : nullptr;
+}
+
+ecs::World* sceneEcs(const App& app)
+{
+    scene::SceneEntityWorld* ew = entityWorld(app);
+    return ew ? &ew->world() : nullptr;
 }
 
 const std::vector<std::string>& availableScenes(const App& app)
@@ -398,10 +425,10 @@ std::string currentSceneName(const App& app)
 
 uint sceneCameraCount(const App& app)
 {
-    auto activeScene = scene(app);
-    if (!activeScene)
+    auto scenePtr = activeScene(app);
+    if (!scenePtr)
         return 1;
-    return (uint)activeScene->getCameraEntities().size() + 1;
+    return (uint)scenePtr->getCameraEntities().size() + 1;
 }
 
 uint& selectedCameraIndex(App& app)
@@ -449,7 +476,7 @@ void initStreamlineAndWindow(App& app)
 #endif
 }
 
-void initializeSession(App& app, const std::string& preferredScene)
+void initializeScene(App& app, const std::string& preferredScene)
 {
     if (SceneViewState* vs = viewState(app))
         initViewState(*vs);
@@ -457,14 +484,14 @@ void initializeSession(App& app, const std::string& preferredScene)
     GpuRenderSubsystem* gr = gpuRender(app);
     if (!gr)
     {
-        caustica::fatal("sceneSession::initializeSession requires GpuRenderSubsystem");
+        caustica::fatal("caustica::initializeScene requires GpuRenderSubsystem");
         return;
     }
 
     auto* wr = worldRenderer(app);
     if (!wr)
     {
-        caustica::fatal("sceneSession::initializeSession requires a path tracer world renderer");
+        caustica::fatal("caustica::initializeScene requires a path tracer world renderer");
         return;
     }
 
@@ -473,7 +500,7 @@ void initializeSession(App& app, const std::string& preferredScene)
     const auto textureLoader = gr->textureLoader();
     if (!shaderFactory || !descriptorTable || !textureLoader || !sessionCamera(app))
     {
-        caustica::fatal("sceneSession::initializeSession requires GpuRenderSubsystem session wiring");
+        caustica::fatal("caustica::initializeScene requires GpuRenderSubsystem wiring");
         return;
     }
 
@@ -483,7 +510,7 @@ void initializeSession(App& app, const std::string& preferredScene)
     ::SceneManager* manager = sceneManager(app);
     if (!manager)
     {
-        caustica::fatal("sceneSession::initializeSession requires scene manager");
+        caustica::fatal("caustica::initializeScene requires scene manager");
         return;
     }
 
@@ -593,6 +620,9 @@ void onSceneUnloading(App& app)
         if (GpuRenderSubsystem* gr = gpuRender(app))
             gr->onSceneUnloading();
     });
+
+    if (auto* access = app.tryResource<SceneAccess>())
+        access->active.reset();
 }
 
 void runGpuWorkOnRenderThread(App& app, const std::function<void()>& work)
@@ -606,7 +636,7 @@ void flushPendingStructureGpu(App& app)
 {
     GpuRenderSubsystem* gr = gpuRender(app);
     GpuDevice* device = gpuDevice(app);
-    auto scenePtr = scene(app);
+    auto scenePtr = activeScene(app);
     if (!gr || !device || !scenePtr || !scenePtr->needsGpuStructureSync())
         return;
 
@@ -690,7 +720,7 @@ ecs::Entity spawn(App& app, const Handle<ScenePrefabAsset>& prefab, const SceneA
 
     ::SceneManager* manager = sceneManager(app);
     GpuDevice* device = gpuDevice(app);
-    auto scenePtr = scene(app);
+    auto scenePtr = activeScene(app);
     if (!manager || !device || !scenePtr)
         return ecs::NullEntity;
 
@@ -714,9 +744,8 @@ ecs::Entity spawn(App& app, const Handle<ScenePrefabAsset>& prefab, const SceneA
     if (!ecs::isValid(root))
         return ecs::NullEntity;
 
-    // Upload meshes/AS before any later system or Extract publishes proxies.
-    // (Extract flush is a no-op when the pending flag is already cleared.)
-    flushPendingStructureGpu(app);
+    // GPU upload / AS rebuild happens in Extract (PrepareRenderFrame).
+    syncSceneAccess(app);
     return root;
 }
 
@@ -733,7 +762,7 @@ bool despawn(App& app, ecs::Entity entity)
     ::SceneManager* manager = sceneManager(app);
     GpuRenderSubsystem* gr = gpuRender(app);
     GpuDevice* device = gpuDevice(app);
-    auto scenePtr = scene(app);
+    auto scenePtr = activeScene(app);
     if (!manager || !gr || !device || !scenePtr || !ecs::isValid(entity))
         return false;
 
@@ -763,7 +792,8 @@ bool despawn(App& app, ecs::Entity entity)
         return false;
     }
 
-    flushPendingStructureGpu(app);
+    // GPU upload / AS rebuild happens in Extract (PrepareRenderFrame).
+    syncSceneAccess(app);
     return true;
 }
 
@@ -778,6 +808,8 @@ void onSceneLoaded(App& app)
     const CommandLineOptions* cmd = cmdLine(app);
     if (!manager || !vs || !cmd)
         return;
+
+    syncSceneAccess(app);
 
     const std::filesystem::path assetsRoot = getLocalPath(c_AssetsFolder);
     gr->refreshEnvironmentMapMediaList(assetsRoot, manager->getCurrentScenePath());
@@ -817,8 +849,8 @@ void onSceneLoaded(App& app)
     if (GpuDevice* device = gpuDevice(app))
     {
         device->setPreparedRenderFrameIndex(device->getFrameIndex());
-        if (const std::shared_ptr<Scene> activeScene = scene(app))
-            activeScene->extractAndPublishRenderSnapshot(device->getPreparedRenderFrameIndex());
+        if (const std::shared_ptr<Scene> scenePtr = activeScene(app))
+            scenePtr->extractAndPublishRenderSnapshot(device->getPreparedRenderFrameIndex());
     }
 
 }
@@ -866,7 +898,7 @@ void collectUncompressedTextures(App& app)
 
 bool hasAsyncLoadingInProgress(const App& app)
 {
-    SessionDiagnostics* diag = diagnostics(app);
+    AppDiagnostics* diag = diagnostics(app);
     RenderRuntimeState* runtime = runtimeState(app);
     if (!diag || !runtime)
         return false;
@@ -964,7 +996,7 @@ void animate(App& app, float fElapsedTimeSeconds)
                     deformParams.recomputeNormals = true;
                     deformParams.rebuildAccelerationStructure = true;
                     // Continuous playback must not wipe temporal denoise/TAA history every
-                    // source frame — that reads as whole-scene shimmer. Loop wraps are
+                    // source frame ??that reads as whole-scene shimmer. Loop wraps are
                     // handled separately via resetAccumulation when the sample index jumps.
                     deformParams.resetAccumulation = &temporalResetNeeded;
                     deformParams.requestMeshAccelRebuild = [&app](const std::shared_ptr<MeshInfo>& mesh) {
@@ -978,7 +1010,7 @@ void animate(App& app, float fElapsedTimeSeconds)
 
                     if (temporalResetNeeded)
                     {
-                        // Drop NRD/TAA history on loop wrap so the end→start pose jump
+                        // Drop NRD/TAA history on loop wrap so the end?start pose jump
                         // does not thrash temporal filters for many frames.
                         cfg->ResetRealtimeCaches = true;
                         cfg->ResetAccumulation = true;
@@ -1030,7 +1062,7 @@ std::string resolutionInfo(const App& app)
 
 float avgTimePerFrame(const App& app)
 {
-    SessionDiagnostics* diag = diagnostics(app);
+    AppDiagnostics* diag = diagnostics(app);
     if (!diag || diag->benchFrames == 0)
         return 0.0f;
     std::chrono::duration<double> elapsed = (diag->benchLast - diag->benchStart);
@@ -1127,10 +1159,27 @@ double& sceneTimeRef(App& app)
 
 std::shared_ptr<Material> findMaterial(const App& app, int materialID)
 {
-    ::SceneManager* manager = sceneManager(app);
-    if (!manager)
+    // Path-tracer pick / Material Editor use PTMaterial::gpuDataIndex.
+    // Material::materialID is a dense scene-list index and can diverge after imports.
+    if (materialID < 0)
         return nullptr;
-    return SceneManager::findMaterial(manager->getScene(), materialID);
+
+    const std::shared_ptr<Scene> active = activeScene(app);
+    if (!active)
+        return nullptr;
+
+    for (const auto& mat : active->getMaterials())
+    {
+        const auto pt = PTMaterial::safeCast(mat);
+        if (pt && int(pt->gpuDataIndex) == materialID)
+            return mat;
+    }
+    for (const auto& mat : active->getMaterials())
+    {
+        if (mat && mat->materialID == materialID)
+            return mat;
+    }
+    return nullptr;
 }
 
 ecs::Entity findEntityByInstanceIndex(const App& app, int instanceIndex)
@@ -1198,4 +1247,4 @@ void backBufferResizing(App& app)
         wr->onBackBufferResizing();
 }
 
-} // namespace caustica::sceneSession
+} // namespace caustica

@@ -7,7 +7,7 @@
 #include <engine/CaptureSequencer.h>
 #include <imgui/imgui_renderer.h>
 
-namespace caustica::render { struct RenderSessionState; }
+namespace caustica::render { struct RenderAppState; }
 
 namespace caustica::editor
 {
@@ -17,7 +17,7 @@ class SceneEditor;
 class CaptureScriptManager
 {
 public:
-	CaptureScriptManager(SceneEditor & sample, caustica::render::RenderSessionState & sessionState, const CommandLineOptions & cmdLine);
+	CaptureScriptManager(SceneEditor & sample, caustica::render::RenderAppState & renderState, const CommandLineOptions & cmdLine);
 	~CaptureScriptManager();
 
     bool ScriptProgressUI();
@@ -35,7 +35,7 @@ public:
 
 private:
     SceneEditor &                    m_app;
-    caustica::render::RenderSessionState & m_ui;
+    caustica::render::RenderAppState & m_ui;
     const CommandLineOptions &  m_cmdLine;
     caustica::CaptureSequencer  m_sequencer;
 };

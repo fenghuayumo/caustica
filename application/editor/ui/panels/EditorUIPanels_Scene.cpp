@@ -475,9 +475,9 @@ void EditorUI::BuildHierarchyPanel(const PanelLayout& layout)
         RAII_SCOPE(ImGui::Begin("Hierarchy", nullptr, ImGuiWindowFlags_None);, ImGui::End(););
 
         auto scene = m_sceneEditor.scene();
-        auto* ew = scene ? scene->getEntityWorld() : nullptr;
+        auto* ew = m_sceneEditor.entityWorld();
 
-        if (ew && ew->root() != ecs::NullEntity)
+        if (scene && ew && ew->root() != ecs::NullEntity)
         {
             bool deleteSelectedEntity = false;
             ImGui::Text("Objects: %zu mesh, %u 3DGS", scene->getMeshInstances().size(), m_runtime.GaussianSplats.ObjectCount);

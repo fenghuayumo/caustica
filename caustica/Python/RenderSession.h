@@ -69,8 +69,8 @@ public:
     caustica::EngineApp* GetEngine() { return m_engine.get(); }
     const caustica::EngineApp* GetEngine() const { return m_engine.get(); }
 
-    caustica::render::RenderSessionState& renderSessionState() { return m_engine->renderSessionState(); }
-    const caustica::render::RenderSessionState& renderSessionState() const { return m_engine->renderSessionState(); }
+    caustica::render::RenderAppState& renderAppState() { return m_engine->renderAppState(); }
+    const caustica::render::RenderAppState& renderAppState() const { return m_engine->renderAppState(); }
 
     caustica::GpuDevice* getGpuDevice() { return m_engine ? m_engine->device() : nullptr; }
     const Config&              GetConfig() const  { return m_config; }

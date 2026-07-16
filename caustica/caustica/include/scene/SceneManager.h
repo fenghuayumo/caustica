@@ -64,15 +64,14 @@ public:
     [[nodiscard]] bool isSceneLoaded() const;
 
     // Runtime attach/destroy while a full scene load (or another structure edit) is
-    // in flight races Extract → GPU upload → AS rebuild. Gate all ECS structure edits.
+    // in flight races Extract ??GPU upload ??AS rebuild. Gate all ECS structure edits.
     [[nodiscard]] bool tryBeginStructureEdit();
     void endStructureEdit();
     [[nodiscard]] bool isStructureEditInFlight() const { return m_structureEditDepth > 0; }
     [[nodiscard]] bool isSceneStructureBusy() const { return isSceneLoading() || isStructureEditInFlight(); }
 
-    // Looks up by Material::materialID (dense scene-list index). For path-tracer /
-    // Material Editor ids (PTMaterial::gpuDataIndex), use the editor/Python helpers —
-    // those two indices can diverge because getMaterials() is an unordered_map.
+    // Looks up by Material::materialID (dense scene-list index).
+    // Prefer caustica::findMaterial(app, id) -- it resolves PTMaterial::gpuDataIndex first.
     static std::shared_ptr<caustica::Material> findMaterial(
         const std::shared_ptr<caustica::Scene>& scene, int materialID)
     {

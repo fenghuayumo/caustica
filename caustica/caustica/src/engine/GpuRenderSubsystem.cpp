@@ -32,7 +32,7 @@ GpuRenderSubsystem::~GpuRenderSubsystem()
     shutdown();
 }
 
-bool GpuRenderSubsystem::initializeSession(const GpuRenderSubsystemInitParams& params)
+bool GpuRenderSubsystem::initialize(const GpuRenderSubsystemInitParams& params)
 {
     GpuDevice& gpuDevice = params.gpuDevice;
 

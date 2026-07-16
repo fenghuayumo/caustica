@@ -11,8 +11,8 @@
 
 #include "SceneEditor.h"
 #include <engine/App.h>
-#include <engine/SceneSessionSystems.h>
-#include <render/RenderSessionState.h>
+#include <engine/SceneApi.h>
+#include <render/RenderAppState.h>
 #include <EditorUI.h>
 #include <scene/Scene.h>
 #include <render/passes/lighting/MaterialGpuCache.h>
@@ -49,7 +49,7 @@ using caustica::math::double3;
 using caustica::math::double4;
 using caustica::editor::SceneEditor;
 using caustica::editor::EditorUIData;
-using caustica::render::RenderSessionState;
+using caustica::render::RenderAppState;
 
 // Singleton consumed by embed mode (set by PythonScripting before Py_Initialize).
 // In extension mode this stays nullptr - Renderer manages its own Sample.
@@ -1540,122 +1540,122 @@ void RegisterCoreBindings(nb::module_& m)
         "caustica renderer instance. In embed mode use caustica.app(); in extension\n"
         "mode use Renderer.app to retrieve the underlying instance.")
         .def_prop_ro("settings", [](App& self) -> PathTracerSettings* {
-                return sceneSession::settings(self);
+                return caustica::settings(self);
             }, nb::rv_policy::reference,
             "Live `settings` mirror of the current UI state.")
         .def_prop_ro("scene", [](App& self) {
-                return sceneSession::scene(self);
+                return caustica::activeScene(self);
             }, "Current loaded `Scene`, or None before a scene is available.")
 
-        .def_prop_ro("scene_name",  [](App& self) { return sceneSession::currentSceneName(self); })
-        .def_prop_ro("available_scenes", [](App& self) { return sceneSession::availableScenes(self); })
+        .def_prop_ro("scene_name",  [](App& self) { return caustica::currentSceneName(self); })
+        .def_prop_ro("available_scenes", [](App& self) { return caustica::availableScenes(self); })
 
         .def("get_scene", [](App& self) {
-                return sceneSession::scene(self);
+                return caustica::activeScene(self);
             }, "Return the current loaded Scene, matching the C++ scene() entry point.")
 
         .def("set_scene", [](App& self, const std::string& name, bool forceReload)
             {
-                sceneSession::setCurrentScene(self, name, forceReload);
+                caustica::setCurrentScene(self, name, forceReload);
             },
             nb::arg("scene_name"), nb::arg("force_reload") = false,
             "Switch to a different scene file from caustica.Sample.available_scenes.")
 
         .def("load_gaussian_splats", [](App& self, const std::string& fileName, bool convertRdfToRub)
             {
-                return sceneSession::loadGaussianSplatFile(self, fileName, convertRdfToRub);
+                return caustica::loadGaussianSplatFile(self, fileName, convertRdfToRub);
             },
             nb::arg("file_name"), nb::arg("convert_rdf_to_rub") = true,
             "load a 3DGS .ply file and rasterize it over the current scene.")
 
-        .def_prop_ro("gaussian_splat_count", [](App& self) { return sceneSession::gaussianSplatCount(self); })
-        .def_prop_ro("gaussian_splat_object_count", [](App& self) { return sceneSession::gaussianSplatObjectCount(self); })
-        .def_prop_ro("gaussian_splat_file_name", [](App& self) { return sceneSession::gaussianSplatFileName(self); })
+        .def_prop_ro("gaussian_splat_count", [](App& self) { return caustica::gaussianSplatCount(self); })
+        .def_prop_ro("gaussian_splat_object_count", [](App& self) { return caustica::gaussianSplatObjectCount(self); })
+        .def_prop_ro("gaussian_splat_file_name", [](App& self) { return caustica::gaussianSplatFileName(self); })
 
         .def("get_materials", [](App& self) {
-                return GetSceneMaterials(sceneSession::scene(self).get());
+                return GetSceneMaterials(caustica::activeScene(self).get());
             }, "Compatibility alias for `sample.scene.get_materials()`.")
 
         .def("find_material", [](App& self, const std::string& name) -> std::shared_ptr<PTMaterial> {
-                return FindSceneMaterial(sceneSession::scene(self).get(), name);
+                return FindSceneMaterial(caustica::activeScene(self).get(), name);
             }, nb::arg("name"), "Compatibility alias for `sample.scene.find_material(name)`.")
 
         .def("find_material_by_id", [](App& self, int materialId) -> std::shared_ptr<PTMaterial> {
-                return FindSceneMaterialById(sceneSession::scene(self).get(), materialId);
+                return FindSceneMaterialById(caustica::activeScene(self).get(), materialId);
             }, nb::arg("material_id"), "Compatibility alias for `sample.scene.find_material_by_id(material_id)`.")
 
         .def("get_lights", [](App& self) {
-                return GetSceneLights(sceneSession::scene(self).get());
+                return GetSceneLights(caustica::activeScene(self).get());
             }, "Compatibility alias for `sample.scene.get_lights()`.")
 
         .def("get_scene_bounds", [](App& self) {
-                return SceneBoundsTuple(SceneBoundsFromScene(sceneSession::scene(self)));
+                return SceneBoundsTuple(SceneBoundsFromScene(caustica::activeScene(self)));
             },
             "Compatibility alias for `sample.scene.get_scene_bounds()`.")
 
         .def_prop_ro("scene_bounds", [](App& self) {
-                return SceneBoundsTuple(SceneBoundsFromScene(sceneSession::scene(self)));
+                return SceneBoundsTuple(SceneBoundsFromScene(caustica::activeScene(self)));
             },
             "Shortcut for `sample.scene.bounds`. Returns the world-space\n"
             "((min.xyz), (max.xyz)) AABB or `None` if no scene is loaded.")
         .def_prop_ro("scene_bounds_center", [](App& self) {
-                return SceneBoundsCenter(SceneBoundsFromScene(sceneSession::scene(self)));
+                return SceneBoundsCenter(SceneBoundsFromScene(caustica::activeScene(self)));
             }, "Shortcut for `sample.scene.bounds_center` (or `None`).")
         .def_prop_ro("scene_bounds_size", [](App& self) {
-                return SceneBoundsSize(SceneBoundsFromScene(sceneSession::scene(self)));
+                return SceneBoundsSize(SceneBoundsFromScene(caustica::activeScene(self)));
             }, "Shortcut for `sample.scene.bounds_size` (or `None`).")
 
         .def("find_light", [](App& self, const std::string& name) -> std::shared_ptr<PySceneEntity> {
-                return FindSceneLight(sceneSession::scene(self).get(), name);
+                return FindSceneLight(caustica::activeScene(self).get(), name);
             }, nb::arg("name"), "Compatibility alias for `sample.scene.find_light(name)`.")
         .def("find_node", [](App& self, const std::string& path) -> std::shared_ptr<PySceneEntity> {
-                return FindSceneEntity(sceneSession::scene(self).get(), path);
+                return FindSceneEntity(caustica::activeScene(self).get(), path);
             }, nb::arg("path"), "Compatibility alias for `sample.scene.find_node(path)`.")
 
         .def("get_meshes", [](App& self) {
-                return GetSceneMeshes(sceneSession::scene(self).get());
+                return GetSceneMeshes(caustica::activeScene(self).get());
             }, "Compatibility alias for `sample.scene.get_meshes()`.")
         .def("find_mesh", [](App& self, const std::string& name) -> std::shared_ptr<MeshInfo> {
-                return FindSceneMesh(sceneSession::scene(self).get(), name);
+                return FindSceneMesh(caustica::activeScene(self).get(), name);
             }, nb::arg("name"), "Compatibility alias for `sample.scene.find_mesh(name)`.")
 
         .def("set_environment_map", [](App& self, const std::string& path) {
-                sceneSession::setEnvMapOverrideSource(self, path);
+                caustica::setEnvMapOverrideSource(self, path);
             }, nb::arg("path"))
 
         .def("get_camera_pos_dir_up", [](App& self) {
-                return sceneSession::currentCameraPosDirUp(self);
+                return caustica::currentCameraPosDirUp(self);
             }, "Returns a comma-separated string of pos.xyz, dir.xyz, up.xyz.")
 
         .def("set_camera_pos_dir_up", [](App& self, const std::string& v) {
-                return sceneSession::setCurrentCameraPosDirUp(self, v);
+                return caustica::setCurrentCameraPosDirUp(self, v);
             }, nb::arg("pos_dir_up"))
 
         .def("set_camera_fov", [](App& self, float fov) {
-                sceneSession::setCameraVerticalFOV(self, caustica::math::radians(fov));
+                caustica::setCameraVerticalFOV(self, caustica::math::radians(fov));
             },
             nb::arg("vertical_fov_degrees"))
 
         .def("set_camera_intrinsics",
             [](App& self, float fx, float fy, float cx, float cy, float width, float height) {
-                sceneSession::setCameraIntrinsics(self, fx, fy, cx, cy, width, height);
+                caustica::setCameraIntrinsics(self, fx, fy, cx, cy, width, height);
             },
             nb::arg("fx"), nb::arg("fy"), nb::arg("cx"), nb::arg("cy"), nb::arg("width"), nb::arg("height"))
 
-        .def("get_camera_fov", [](App& self) { return sceneSession::cameraVerticalFOV(self); })
+        .def("get_camera_fov", [](App& self) { return caustica::cameraVerticalFOV(self); })
 
-        .def("save_current_camera",  [](App& self) { sceneSession::saveCurrentCamera(self); })
-        .def("load_current_camera",  [](App& self) { sceneSession::loadCurrentCamera(self); })
+        .def("save_current_camera",  [](App& self) { caustica::saveCurrentCamera(self); })
+        .def("load_current_camera",  [](App& self) { caustica::loadCurrentCamera(self); })
 
         .def("request_shader_reload",  [](App& self) {
-                self.resource<RenderSessionState>().runtime.Invalidation.ShaderReloadRequested = true;
+                self.resource<RenderAppState>().runtime.Invalidation.ShaderReloadRequested = true;
             })
         .def("request_accel_rebuild",  [](App& self) {
-                self.resource<RenderSessionState>().runtime.Invalidation.AccelerationStructRebuildRequested = true;
+                self.resource<RenderAppState>().runtime.Invalidation.AccelerationStructRebuildRequested = true;
             })
         .def("request_mesh_accel_rebuild",
             [](App& self, const std::shared_ptr<MeshInfo>& mesh) {
-                sceneSession::requestMeshAccelRebuild(self, mesh);
+                caustica::requestMeshAccelRebuild(self, mesh);
             },
             nb::arg("mesh"),
             "Request a BLAS rebuild for one dirty mesh without forcing a full scene AS rebuild.")
@@ -1666,22 +1666,22 @@ void RegisterCoreBindings(nb::module_& m)
                 std::shared_ptr<MeshInfo> mesh = MeshFromEntity(*node);
                 if (!mesh)
                     throw std::runtime_error("request_mesh_accel_rebuild: entity has no mesh");
-                sceneSession::requestMeshAccelRebuild(self, mesh);
+                caustica::requestMeshAccelRebuild(self, mesh);
             },
             nb::arg("node"),
             "Request a BLAS rebuild for the mesh attached to one scene entity.")
         .def("reset_accumulation",     [](App& self) {
-                if (auto* s = sceneSession::settings(self))
+                if (auto* s = caustica::settings(self))
                     s->ResetAccumulation = true;
             })
         .def("reset_realtime_caches",  [](App& self) {
-                if (auto* s = sceneSession::settings(self))
+                if (auto* s = caustica::settings(self))
                     s->ResetRealtimeCaches = true;
             })
 
         .def("set_realtime_mode", [](App& self, bool standaloneDenoiser, int realtimeAA)
             {
-                PathTracerSettings& settings = *sceneSession::settings(self);
+                PathTracerSettings& settings = *caustica::settings(self);
                 if (!settings.RealtimeMode)
                 {
                     settings.ResetAccumulation = true;
@@ -1700,7 +1700,7 @@ void RegisterCoreBindings(nb::module_& m)
 
         .def("set_reference_mode", [](App& self, int spp, bool oidn, int oidnQuality, int oidnPasses, int oidnPrefilter)
             {
-                PathTracerSettings& settings = *sceneSession::settings(self);
+                PathTracerSettings& settings = *caustica::settings(self);
                 if (settings.RealtimeMode)
                     settings.ResetAccumulation = true;
                 settings.RealtimeMode             = false;
@@ -1726,9 +1726,9 @@ void RegisterCoreBindings(nb::module_& m)
             "    oidn_prefilter: caustica.OidnPrefilter (0=None, 1=Fast, 2=Accurate)")
 
         .def_prop_ro("accumulation_completed",
-            [](App& self) { return sceneSession::accumulationCompleted(self); })
+            [](App& self) { return caustica::accumulationCompleted(self); })
         .def_prop_ro("accumulation_sample_index",
-            [](App& self) { return sceneSession::accumulationSampleIndex(self); })
+            [](App& self) { return caustica::accumulationSampleIndex(self); })
         ;
 
     nb::class_<SceneEditor>(m, "EditorSample",

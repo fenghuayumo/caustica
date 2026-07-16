@@ -2,10 +2,10 @@
 
 #include <engine/App.h>
 #include <engine/EngineScheduleRegistration.h>
-#include <engine/SceneSessionResources.h>
+#include <engine/SceneAppResources.h>
 #include <engine/GpuRenderSubsystem.h>
 #include <engine/Plugin.h>
-#include <engine/SceneSessionStartup.h>
+#include <engine/SceneStartup.h>
 #include <render/worldRenderer/WorldRenderer.h>
 
 #include "EditorSceneStartup.h"
@@ -21,10 +21,10 @@ namespace caustica::editor
 
 struct EditorPlugin : Plugin
 {
-    EditorPlugin(SceneSessionConfig sessionConfig,
+    EditorPlugin(SceneAppConfig appConfig,
         SceneEditor& sceneEditor,
         const EditorUISubsystemConfig* uiConfig = nullptr)
-        : sessionConfig(std::move(sessionConfig))
+        : appConfig(std::move(appConfig))
         , m_sceneEditor(sceneEditor)
         , uiConfig(uiConfig
             ? std::optional<EditorUISubsystemConfig>(*uiConfig)
@@ -36,7 +36,7 @@ struct EditorPlugin : Plugin
     void configureSchedules(App& app) override;
     void configureLateSchedules(App& app) override;
 
-    SceneSessionConfig sessionConfig;
+    SceneAppConfig appConfig;
     SceneEditor& m_sceneEditor;
     std::optional<EditorUISubsystemConfig> uiConfig;
 };

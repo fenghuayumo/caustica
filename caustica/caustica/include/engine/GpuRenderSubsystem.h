@@ -11,7 +11,7 @@
 #include <render/core/CameraController.h>
 #include <render/core/AccelStructManager.h>
 #include <render/PathTracerScenePasses.h>
-#include <render/SessionDiagnostics.h>
+#include <render/AppDiagnostics.h>
 #include <render/worldRenderer/PathTracingContext.h>
 
 class SceneManager;
@@ -54,7 +54,7 @@ struct GpuRenderSubsystemInitParams
 
     double& sceneTime;
 
-    render::SessionDiagnostics& diagnostics;
+    render::AppDiagnostics& diagnostics;
 
     const CommandLineOptions* cmdLine = nullptr;
 
@@ -73,7 +73,7 @@ public:
 
     void shutdown();
 
-    bool initializeSession(const GpuRenderSubsystemInitParams& params);
+    bool initialize(const GpuRenderSubsystemInitParams& params);
 
     void endFrame();
 
@@ -134,7 +134,7 @@ private:
     AssetSystem* m_assetSystem = nullptr;
     PathTracerSettings* m_settings = nullptr;
     render::RenderRuntimeState* m_runtimeState = nullptr;
-    render::SessionDiagnostics* m_diagnostics = nullptr;
+    render::AppDiagnostics* m_diagnostics = nullptr;
     double* m_sceneTime = nullptr;
     const CommandLineOptions* m_cmdLine = nullptr;
     bool m_shutdown = false;

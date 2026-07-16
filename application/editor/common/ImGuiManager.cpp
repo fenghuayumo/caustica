@@ -49,11 +49,11 @@ void ImGuiManager::configureExtensions(int graphicsAPI)
 
 #if CAUSTICA_D3D_AGILITY_SDK_VERSION >= 619
     const bool isDX12 = (graphicsAPI == 2); // nvrhi::GraphicsAPI::D3D12
-    m_uiData.session.settings.DXHitObjectExtension = isDX12;
-    m_uiData.session.settings.NVAPIHitObjectExtension &= !isDX12 && m_nvapiSERSupported;
+    m_uiData.render.settings.DXHitObjectExtension = isDX12;
+    m_uiData.render.settings.NVAPIHitObjectExtension &= !isDX12 && m_nvapiSERSupported;
 #else
     (void)graphicsAPI;
-    m_uiData.session.settings.NVAPIHitObjectExtension &= m_nvapiSERSupported;
+    m_uiData.render.settings.NVAPIHitObjectExtension &= m_nvapiSERSupported;
 #endif
 }
 

@@ -25,15 +25,15 @@ namespace caustica::editor
 
 void InitializeEditorUIDataFromCommandLine(EditorUIData& ui, const CommandLineOptions& cmdLine)
 {
-    caustica::render::InitializeRenderSessionStateFromCommandLine(ui.session, cmdLine);
+    caustica::render::InitializeRenderAppStateFromCommandLine(ui.render, cmdLine);
 }
 
 EditorUI::EditorUI(GpuDevice* deviceManager, SceneEditor& sceneEditor, EditorUIData& ui, bool NVAPI_SERSupported, const CommandLineOptions& cmdLine)
         : ImGui_Renderer(deviceManager)
         , m_sceneEditor(sceneEditor)
         , m_ui(ui)
-        , m_settings(ui.session.settings)
-        , m_runtime(ui.session.runtime)
+        , m_settings(ui.render.settings)
+        , m_runtime(ui.render.runtime)
         , m_editorUI(ui.editor)
         , m_NVAPI_SERSupported(NVAPI_SERSupported)
 {

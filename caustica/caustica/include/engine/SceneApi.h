@@ -4,11 +4,12 @@
 #include <core/command_line.h>
 #include <ecs/Entity.h>
 #include <math/math.h>
-#include <render/RenderSessionState.h>
+#include <render/RenderAppState.h>
 #include <render/RenderRuntimeState.h>
-#include <render/SessionDiagnostics.h>
+#include <render/AppDiagnostics.h>
 #include <render/core/CameraController.h>
 #include <render/core/PathTracerSettings.h>
+#include <engine/SceneAccess.h>
 #include <scene/Scene.h>
 #include <scene/SceneApply.h>
 #include <assets/Handle.h>
@@ -43,20 +44,22 @@ namespace render
 class WorldRenderer;
 }
 
-namespace sceneSession
-{
-
 [[nodiscard]] GpuRenderSubsystem* gpuRender(const App& app);
 [[nodiscard]] GpuDevice* gpuDevice(const App& app);
 [[nodiscard]] SceneManager* sceneManager(const App& app);
 [[nodiscard]] render::WorldRenderer* worldRenderer(const App& app);
+
+// Prefer these for gameplay/editor scene queries (see also SystemContext::entityWorld).
+[[nodiscard]] scene::SceneEntityWorld* entityWorld(const App& app);
+[[nodiscard]] ecs::World* sceneEcs(const App& app);
+void syncSceneAccess(App& app);
 [[nodiscard]] PathTracerSettings* settings(const App& app);
 [[nodiscard]] render::RenderRuntimeState* runtimeState(const App& app);
-[[nodiscard]] render::SessionDiagnostics* diagnostics(const App& app);
+[[nodiscard]] render::AppDiagnostics* diagnostics(const App& app);
 [[nodiscard]] const CommandLineOptions* cmdLine(const App& app);
 [[nodiscard]] SceneViewState* viewState(const App& app);
 
-[[nodiscard]] std::shared_ptr<Scene> scene(const App& app);
+[[nodiscard]] std::shared_ptr<Scene> activeScene(const App& app);
 [[nodiscard]] const std::vector<std::string>& availableScenes(const App& app);
 [[nodiscard]] std::string currentSceneName(const App& app);
 [[nodiscard]] bool shouldSkipRender(const App& app);
@@ -64,7 +67,7 @@ namespace sceneSession
 
 void attachGpuRenderSubsystem(App& app, GpuRenderSubsystem& gpuRenderSubsystem);
 void initStreamlineAndWindow(App& app);
-void initializeSession(App& app, const std::string& preferredScene);
+void initializeScene(App& app, const std::string& preferredScene);
 
 void beginFrameScheduled(App& app);
 void animate(App& app, float elapsedTimeSeconds);
@@ -136,8 +139,9 @@ void debugDrawLine(App& app, math::float3 start, math::float3 stop, math::float4
 
 void runGpuWorkOnRenderThread(App& app, const std::function<void()>& work);
 
-// Bevy-style assets.load + spawn for mesh scene files (.glb/.gltf/.obj/…).
-// load caches a CPU prefab; spawn attaches ECS — Extract auto-flushes GPU/proxies.
+// Bevy-style assets.load + spawn for mesh scene files (.glb/.gltf/.obj/...).
+// load caches a CPU prefab; spawn/despawn only mutate ECS + mark structure dirty.
+// Extract (PrepareRenderFrame) owns GPU upload / AS rebuild -- do not call flush from apps.
 [[nodiscard]] Handle<ScenePrefabAsset> load(App& app, const std::filesystem::path& path);
 [[nodiscard]] ecs::Entity spawn(
     App& app,
@@ -149,6 +153,5 @@ void runGpuWorkOnRenderThread(App& app, const std::function<void()>& work);
     const SceneApplyCallbacks& callbacks = {});
 [[nodiscard]] bool despawn(App& app, ecs::Entity entity);
 
-} // namespace sceneSession
 
 } // namespace caustica

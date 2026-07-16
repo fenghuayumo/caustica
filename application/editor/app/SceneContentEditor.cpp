@@ -6,7 +6,7 @@
 
 #include <core/log.h>
 #include <engine/App.h>
-#include <engine/SceneSessionSystems.h>
+#include <engine/SceneApi.h>
 #include <render/core/SceneMeshEditing.h>
 #include <scene/SceneEcs.h>
 
@@ -99,7 +99,7 @@ bool SceneContentEditor::importMeshFile(const std::filesystem::path& filePath)
         return false;
 
     // assets.load + spawn ??one path for editor and future apps.
-    const auto root = caustica::sceneSession::spawnFromFile(*app, filePath, makeApplyCallbacks());
+    const auto root = caustica::spawnFromFile(*app, filePath, makeApplyCallbacks());
     return root != caustica::ecs::NullEntity;
 }
 
@@ -124,11 +124,10 @@ bool SceneContentEditor::deleteSceneNode(caustica::ecs::Entity entity)
     if (!app)
         return false;
 
-    if (!caustica::sceneSession::despawn(*app, entity))
+    if (!caustica::despawn(*app, entity))
         return false;
 
-    auto scene = m_sceneEditor.scene();
-    auto* ew = scene ? scene->getEntityWorld() : nullptr;
+    auto* ew = caustica::entityWorld(*app);
     auto& editor = m_sceneEditor.editorUIState();
     if (ew && editor.TogglableNodes != nullptr)
     {

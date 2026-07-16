@@ -1,14 +1,14 @@
-#include "EditorSession.h"
+#include "EditorHost.h"
 
 namespace caustica::editor
 {
 
-EditorSession::EditorSession()
-    : sceneEditor(cmdLine, editorUiData, sessionDiagnostics)
+EditorHost::EditorHost()
+    : sceneEditor(cmdLine, editorUiData, diagnostics)
 {
 }
 
-void installEditorLogFilter(EditorSession& /*session*/)
+void installEditorLogFilter(EditorHost& /*host*/)
 {
     Callback defaultCallback = getCallback();
     setCallback([defaultCallback](Severity severity, const char* message) {

@@ -72,8 +72,8 @@ public:
     void ensureUpdateTail();
     void ensurePostUpdateTail();
 
-    [[nodiscard]] bool sceneSessionSchedulesRegistered() const { return m_sceneSessionSchedulesRegistered; }
-    void markSceneSessionSchedulesRegistered() { m_sceneSessionSchedulesRegistered = true; }
+    [[nodiscard]] bool sceneSchedulesRegistered() const { return m_sceneSchedulesRegistered; }
+    void markSceneSchedulesRegistered() { m_sceneSchedulesRegistered = true; }
 
     [[nodiscard]] bool gpuRenderSchedulesRegistered() const { return m_gpuRenderSchedulesRegistered; }
     void markGpuRenderSchedulesRegistered() { m_gpuRenderSchedulesRegistered = true; }
@@ -231,7 +231,7 @@ protected:
     bool m_graphicsInitialized = false;
     bool m_started = false;
     bool m_defaultSchedulesRegistered = false;
-    bool m_sceneSessionSchedulesRegistered = false;
+    bool m_sceneSchedulesRegistered = false;
     bool m_gpuRenderSchedulesRegistered = false;
     bool m_updateTailRegistered = false;
     bool m_postUpdateTailRegistered = false;

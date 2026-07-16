@@ -13,6 +13,11 @@ namespace caustica
 class App;
 class GpuDevice;
 
+namespace scene
+{
+class SceneEntityWorld;
+}
+
 enum class AppSchedule
 {
     Startup,
@@ -75,6 +80,12 @@ struct SystemContext
     {
         return world.commands();
     }
+
+    // Live scene ECS (not App resource world). Prefer over GpuRenderSubsystem digs.
+    [[nodiscard]] scene::SceneEntityWorld* entityWorld();
+    [[nodiscard]] const scene::SceneEntityWorld* entityWorld() const;
+    [[nodiscard]] ecs::World* sceneEcs();
+    [[nodiscard]] const ecs::World* sceneEcs() const;
 };
 
 using SystemFn = std::function<void(SystemContext&)>;

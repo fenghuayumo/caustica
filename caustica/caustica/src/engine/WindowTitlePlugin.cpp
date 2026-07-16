@@ -1,9 +1,9 @@
-#include <engine/SceneSessionPlugins.h>
+#include <engine/ScenePlugins.h>
 
 #include <engine/App.h>
 #include <engine/AppSchedules.h>
 #include <engine/GpuRenderSubsystem.h>
-#include <engine/SceneSessionSystems.h>
+#include <engine/SceneApi.h>
 #include <engine/SceneViewState.h>
 
 #include <backend/GpuDevice.h>
@@ -14,7 +14,7 @@
 
 extern const char* g_windowTitle;
 
-namespace caustica::sceneSession
+namespace caustica
 {
 
 void updateWindowTitle(App& app)
@@ -45,7 +45,7 @@ void updateWindowTitle(App& app)
 
 void registerWindowTitlePlugin(App& app)
 {
-    app.addSystemAfter(AppSchedule::update, "SceneSession.UpdateWindowTitle", "SceneSession.TickSimulation", [](SystemContext& ctx) {
+    app.addSystemAfter(AppSchedule::update, "Scene.UpdateWindowTitle", "Scene.TickSimulation", [](SystemContext& ctx) {
         if (!ctx.windowFocused)
             return;
 
@@ -53,4 +53,4 @@ void registerWindowTitlePlugin(App& app)
     });
 }
 
-} // namespace caustica::sceneSession
+} // namespace caustica

@@ -200,8 +200,7 @@ bool caustica::editor::DrawTransformGizmo(const TransformGizmoContext& ctx)
 
     HandleTransformGizmoShortcuts(ctx.editorUI);
 
-    auto scene = ctx.sceneEditor.scene();
-    auto* entityWorld = scene ? scene->getEntityWorld() : nullptr;
+    auto* entityWorld = ctx.sceneEditor.entityWorld();
     const ecs::Entity entity = ctx.editorUI.SelectedEntity;
     if (!entityWorld || entity == ecs::NullEntity)
     {

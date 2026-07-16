@@ -6,7 +6,7 @@
 
 #include <engine/App.h>
 #include <engine/GpuRenderSubsystem.h>
-#include <render/RenderSessionState.h>
+#include <render/RenderAppState.h>
 
 namespace caustica::editor
 {
@@ -16,7 +16,7 @@ void registerEditorSceneStartup(caustica::App& app, const EditorSceneStartupConf
     app.addSystemBefore(
         AppSchedule::Startup,
         "EditorScene.PreStartup",
-        "SceneSession.Startup",
+        "Scene.Startup",
         [&app, config](SystemContext& ctx) {
             (void)ctx;
 
@@ -30,7 +30,7 @@ void registerEditorSceneStartup(caustica::App& app, const EditorSceneStartupConf
     app.addSystemAfter(
         AppSchedule::Startup,
         "EditorScene.PostStartup",
-        "SceneSession.Startup",
+        "Scene.Startup",
         [&app, config](SystemContext& ctx) {
             (void)ctx;
 
@@ -40,8 +40,8 @@ void registerEditorSceneStartup(caustica::App& app, const EditorSceneStartupConf
                     config.sceneEditor->attachGpuRenderSubsystem(*gpuRender);
             }
 
-            if (config.session.sessionState && config.postAppInit)
-                LocalConfig::PostAppInit(*config.session.sessionState);
+            if (config.appConfig.renderState && config.postAppInit)
+                LocalConfig::PostAppInit(*config.appConfig.renderState);
         });
 }
 
