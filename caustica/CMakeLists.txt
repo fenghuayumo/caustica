@@ -1,11 +1,6 @@
 include(../External/cmake/compileshaders.cmake)
 file(GLOB_RECURSE shaders "*.hlsl" "*.hlsli")
-file(GLOB_RECURSE shared_sources "*.cpp" "*.h" "*.md")
 list(FILTER shaders EXCLUDE REGEX "/caustica/(include|src|backend)/")
-list(FILTER shared_sources EXCLUDE REGEX "/caustica/(include|src|shaders|backend)/")
-list(FILTER shared_sources EXCLUDE REGEX "/application/")
-list(FILTER shared_sources EXCLUDE REGEX "/Python/")
-list(FILTER shared_sources EXCLUDE REGEX "/source/")
 
 # All render module sources are now in causticaEngine (see caustica/caustica/CMakeLists.txt)
 

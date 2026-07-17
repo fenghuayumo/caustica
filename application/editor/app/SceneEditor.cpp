@@ -264,12 +264,6 @@ void SceneEditor::onSceneLoadedFromLoader()
     onSceneLoadedComplete();
 }
 
-void SceneEditor::onSceneLoaded()
-{
-    if (m_app)
-        caustica::onSceneLoaded(*m_app);
-}
-
 void SceneEditor::syncLoadedSceneSystems()
 {
     if (!m_app || !caustica::isSceneLoaded(*m_app))

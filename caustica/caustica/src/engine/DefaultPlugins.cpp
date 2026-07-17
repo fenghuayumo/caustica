@@ -1,7 +1,6 @@
 #include <engine/DefaultPlugins.h>
 #include <engine/App.h>
 #include <engine/AssetPlugin.h>
-#include <engine/EngineScheduleRegistration.h>
 #include <engine/GpuRenderSubsystem.h>
 #include <engine/GpuSharedCaches.h>
 #include <engine/SessionCamera.h>
@@ -29,7 +28,7 @@ void DefaultPlugins::build(App& app)
 void DefaultPlugins::configureSchedules(App& app)
 {
     AssetPlugin{}.configureSchedules(app);
-    registerEngineScheduleBridge(app);
+    app.registerDefaultSchedules();
     registerSceneStartup(app, appConfig);
 }
 

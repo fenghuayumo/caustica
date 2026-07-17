@@ -145,7 +145,6 @@ public:
 #endif
 
 private:
-    void onSceneLoaded();
     void onSceneLoadedEarly();
     void onSceneLoadedBeforeGpuPrep();
     void onSceneLoadedAfterCollectTextures();
