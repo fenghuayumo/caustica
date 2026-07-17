@@ -6,8 +6,10 @@
 #include <render/PathTracerScenePasses.h>
 #include <render/RenderRuntimeState.h>
 #include <render/AppDiagnostics.h>
+#include <render/SceneGpuResources.h>
 #include <assets/loader/TextureLoader.h>
 #include <render/core/DescriptorTableManager.h>
+#include <scene/Scene.h>
 #include <scene/SceneManager.h>
 #include <scene/SceneRenderData.h>
 
@@ -55,12 +57,23 @@ struct PathTracingContext
     // Per-frame: pointed at SceneRenderData / snapshot copies for the render phase.
     // Valid only between beginGpuReadFrame and endGpuReadFrame in WorldRenderer::render().
     const scene::SceneRenderData* frameScene = nullptr;
+    SceneGpuFrameHandles frameGpu{};
     bool frameSceneStructureChanged = false;
     bool frameSceneTransformsChanged = false;
     PathTracerSettings* frameSettings = nullptr;
     RenderRuntimeState* frameRuntime = nullptr;
 
     [[nodiscard]] bool hasFrameScene() const { return frameScene != nullptr; }
+
+    // Prefer frameGpu; fall back to live SceneGpuResources when rebuilding outside render().
+    [[nodiscard]] SceneGpuFrameHandles resolveGpuHandles() const
+    {
+        if (frameGpu.valid())
+            return frameGpu;
+        if (const auto& scene = sceneManager.getScene())
+            return scene->getGpuResources().frameHandles();
+        return {};
+    }
 
     [[nodiscard]] std::span<const scene::GaussianSplatRenderProxy> frameGaussianSplats() const
     {

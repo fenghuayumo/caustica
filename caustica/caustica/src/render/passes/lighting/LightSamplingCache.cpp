@@ -592,13 +592,13 @@ bool LightSamplingCache::collectEnvmapLightPlaceholders(const UpdateSettings & s
 // #ifdef _DEBUG
 // #pragma optimize("gt", on)
 // #endif
-bool LightSamplingCache::collectAnalyticLightsCPU(const UpdateSettings & settings, const std::shared_ptr<caustica::Scene> & scene, LightingControlData & ctrlBuff, std::vector<PolymorphicLightInfo> & outLightBuffer, std::vector<PolymorphicLightInfoEx> & outLightExBuffer, std::vector<uint> & outLightHistoryRemapCurrentToPastBuffer, std::vector<uint> & outLightHistoryRemapPastToCurrent)
+bool LightSamplingCache::collectAnalyticLightsCPU(const UpdateSettings & settings, const caustica::scene::SceneRenderData& sceneData, LightingControlData & ctrlBuff, std::vector<PolymorphicLightInfo> & outLightBuffer, std::vector<PolymorphicLightInfoEx> & outLightExBuffer, std::vector<uint> & outLightHistoryRemapCurrentToPastBuffer, std::vector<uint> & outLightHistoryRemapPastToCurrent)
 {
     (void)settings;
     bool allGood = true;
     m_currentFrameAnalyticLightIndex.clear();
 
-    for (const scene::LightRenderProxy& lightProxy : scene->getRenderData().lights)
+    for (const scene::LightRenderProxy& lightProxy : sceneData.lights)
     {
         if (outLightBuffer.size() >= CAUSTICA_LIGHTING_MAX_LIGHTS)
         {
@@ -697,7 +697,7 @@ bool LightSamplingCache::collectGaussianSplatEmissionProxies(
 // #ifdef _DEBUG
 // #pragma optimize("gt", on)
 // #endif
-bool LightSamplingCache::processEmissiveGeometry( const UpdateSettings & settings, const std::shared_ptr<caustica::Scene> & scene, std::vector<SubInstanceData> & subInstanceData, LightingControlData & ctrlBuff, std::vector<struct EmissiveTrianglesProcTask> & tasks )
+bool LightSamplingCache::processEmissiveGeometry( const UpdateSettings & settings, const caustica::scene::SceneRenderData& sceneData, std::vector<SubInstanceData> & subInstanceData, LightingControlData & ctrlBuff, std::vector<struct EmissiveTrianglesProcTask> & tasks )
 {
     (void)settings;
     bool allGood = true;
@@ -709,7 +709,7 @@ bool LightSamplingCache::processEmissiveGeometry( const UpdateSettings & setting
     // Same dense geometryInstance prefix as TLAS / MaterialGpuCache / hit-group fill.
     // Stale proxy.geometryInstanceIndex after runtime import must not skip emissives.
     size_t compactedGeometryInstanceIndex = 0;
-    for (const scene::MeshInstanceRenderProxy& meshProxy : scene->getRenderData().meshInstances)
+    for (const scene::MeshInstanceRenderProxy& meshProxy : sceneData.meshInstances)
     {
         const auto& mesh = meshProxy.meshShared;
         if (!mesh)
@@ -754,7 +754,7 @@ bool LightSamplingCache::processEmissiveGeometry( const UpdateSettings & setting
                 if (ecs::isValid(meshProxy.parentLightEntity))
                 {
                     if (const scene::LightRenderProxy* parentLight =
-                            scene->getRenderData().findLight(meshProxy.parentLightEntity))
+                            sceneData.findLight(meshProxy.parentLightEntity))
                     {
                         const int lType = caustica::scene::getLightType(*parentLight);
                         if (lType == LightType_Spot || lType == LightType_Point)
@@ -838,9 +838,10 @@ bool LightSamplingCache::totalLightCountOverflow() const
     return !m_noOverflow;
 }
 
-void LightSamplingCache::fillBindings(nvrhi::BindingSetDesc& outBindingSetDesc, const std::shared_ptr<caustica::Scene>& scene, std::shared_ptr<class MaterialGpuCache> materialGpuCache, std::shared_ptr<OpacityMicromapBuilder> opacityMicromapBuilder, nvrhi::BufferHandle subInstanceDataBuffer,
+void LightSamplingCache::fillBindings(nvrhi::BindingSetDesc& outBindingSetDesc, const caustica::render::SceneGpuFrameHandles& gpuHandles, std::shared_ptr<class MaterialGpuCache> materialGpuCache, std::shared_ptr<OpacityMicromapBuilder> opacityMicromapBuilder, nvrhi::BufferHandle subInstanceDataBuffer,
 nvrhi::TextureHandle depthBuffer, nvrhi::TextureHandle motionVectors, nvrhi::TextureHandle envMapProcessed)
 {
+    (void)opacityMicromapBuilder;
     if( depthBuffer == nullptr )
         depthBuffer = ((nvrhi::TextureHandle)m_renderDevice->builtins().blackTexture().Get());
     if (motionVectors == nullptr)
@@ -879,8 +880,8 @@ nvrhi::TextureHandle depthBuffer, nvrhi::TextureHandle motionVectors, nvrhi::Tex
             nvrhi::BindingSetItem::Sampler(1, m_linearSampler),
             nvrhi::BindingSetItem::Sampler(2, m_renderDevice->samplers().anisotropicWrap()),    // s_MaterialSampler
             nvrhi::BindingSetItem::StructuredBuffer_SRV(1, subInstanceDataBuffer),
-            nvrhi::BindingSetItem::StructuredBuffer_SRV(2, scene->getGpuResources().instanceBuffer),
-            nvrhi::BindingSetItem::StructuredBuffer_SRV(3, scene->getGpuResources().geometryBuffer),
+            nvrhi::BindingSetItem::StructuredBuffer_SRV(2, gpuHandles.instanceBuffer),
+            nvrhi::BindingSetItem::StructuredBuffer_SRV(3, gpuHandles.geometryBuffer),
             //nvrhi::BindingSetItem::StructuredBuffer_SRV(4, opacityMicromapBuilder->getGeometryDebugBuffer()),
             nvrhi::BindingSetItem::StructuredBuffer_SRV(5, materialGpuCache->getMaterialDataBuffer()),
             nvrhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->getGPUWriteBuffer()),
@@ -968,12 +969,13 @@ void LightSamplingCache::updateLocalJitter()
     }
 }
 
-void LightSamplingCache::updateBegin(nvrhi::ICommandList* commandList, caustica::BindingCache & bindingCache, const UpdateSettings& _settings, double sceneTime, const std::shared_ptr<caustica::Scene>& scene, std::shared_ptr<class MaterialGpuCache> materialGpuCache, 
+void LightSamplingCache::updateBegin(nvrhi::ICommandList* commandList, caustica::BindingCache & bindingCache, const UpdateSettings& _settings, double sceneTime, const caustica::scene::SceneRenderData* sceneData, const caustica::render::SceneGpuFrameHandles& gpuHandles, nvrhi::IDescriptorTable* bindlessDescriptorTable, std::shared_ptr<class MaterialGpuCache> materialGpuCache, 
     std::shared_ptr<class OpacityMicromapBuilder> opacityMicromapBuilder, nvrhi::BufferHandle subInstanceDataBuffer, std::vector<SubInstanceData>& subInstanceData, nvrhi::TextureHandle envMapProcessed)
 {
     RAII_SCOPE( commandList->beginMarker("LightingUpdateBegin");, commandList->endMarker(); );
     // RAII_SCOPE( commandList->setEnableAutomaticBarriers(false);, commandList->setEnableAutomaticBarriers(true); );
 
+    assert(sceneData != nullptr && gpuHandles.valid());
     assert( _settings.FrameIndex != -1 && "forgot to set?" );
 
     assert(m_verifyBeginHasMatchingEnd == 0); m_verifyBeginHasMatchingEnd++; 
@@ -1084,11 +1086,11 @@ void LightSamplingCache::updateBegin(nvrhi::ICommandList* commandList, caustica:
     m_noOverflow = true;
     m_noOverflow &= collectEnvmapLightPlaceholders( m_currentSettings, ctrlBuff, m_scratchLightBuffer, m_scratchLightExBuffer, m_scratchLightHistoryRemapCurrentToPastBuffer, m_scratchLightHistoryRemapPastToCurrentBuffer );
     // collect all analytic lights
-    m_noOverflow &= collectAnalyticLightsCPU( m_currentSettings, scene, ctrlBuff, m_scratchLightBuffer, m_scratchLightExBuffer, m_scratchLightHistoryRemapCurrentToPastBuffer, m_scratchLightHistoryRemapPastToCurrentBuffer );
+    m_noOverflow &= collectAnalyticLightsCPU( m_currentSettings, *sceneData, ctrlBuff, m_scratchLightBuffer, m_scratchLightExBuffer, m_scratchLightHistoryRemapCurrentToPastBuffer, m_scratchLightHistoryRemapPastToCurrentBuffer );
     // inject 3DGS SH0/DC emission proxies as analytic sphere lights
     m_noOverflow &= collectGaussianSplatEmissionProxies( m_currentSettings, ctrlBuff, m_scratchLightBuffer, m_scratchLightExBuffer, m_scratchLightHistoryRemapCurrentToPastBuffer, m_scratchLightHistoryRemapPastToCurrentBuffer );
     // collect all emissive triangles and other geometry specific work - this builds batch jobs on the CPU that are executed on the GPU later, but at the end of this step we know the exact number of added emissive triangles (even though some might be black)
-    m_noOverflow &= processEmissiveGeometry(m_currentSettings, scene, subInstanceData, ctrlBuff, *m_scratchTaskBuffer);
+    m_noOverflow &= processEmissiveGeometry(m_currentSettings, *sceneData, subInstanceData, ctrlBuff, *m_scratchTaskBuffer);
     cacheConsts.TriangleLightTaskCount = (int)(*m_scratchTaskBuffer).size();
     assert( ctrlBuff.EnvmapQuadNodeCount == CAUSTICA_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT );
     assert( ctrlBuff.TotalLightCount == ctrlBuff.EnvmapQuadNodeCount + ctrlBuff.AnalyticLightCount + ctrlBuff.TriangleLightCount ); assert(ctrlBuff.TotalLightCount <= CAUSTICA_LIGHTING_MAX_LIGHTS);
@@ -1111,11 +1113,11 @@ void LightSamplingCache::updateBegin(nvrhi::ICommandList* commandList, caustica:
 
     // Bindings
     nvrhi::BindingSetDesc bindingSetDesc;
-    fillBindings(bindingSetDesc, scene, materialGpuCache, opacityMicromapBuilder, subInstanceDataBuffer, nullptr, nullptr, envMapProcessed);
+    fillBindings(bindingSetDesc, gpuHandles, materialGpuCache, opacityMicromapBuilder, subInstanceDataBuffer, nullptr, nullptr, envMapProcessed);
     nvrhi::BindingSetHandle bindingSet = bindingCache.getOrCreateBindingSet(bindingSetDesc, m_commonBindingLayout);
 
     nvrhi::BindingSetVector bindings = { bindingSet };
-    nvrhi::BindingSetVector bindingsEx = { bindingSet, scene->getDescriptorTable() };
+    nvrhi::BindingSetVector bindingsEx = { bindingSet, bindlessDescriptorTable };
 
     {
         // we can do this early although we might have to move it to a later location if doing multiple global updates per frame (unlikely?)
@@ -1337,7 +1339,7 @@ void LightSamplingCache::updateBegin(nvrhi::ICommandList* commandList, caustica:
 
 #define UAV_BARRIER_m_NEE_AT_LocalSamplingBuffer() { commandList->setBufferState(m_NEE_AT_LocalSamplingBuffer, nvrhi::ResourceStates::UnorderedAccess); }
 
-void LightSamplingCache::updateEnd(nvrhi::ICommandList * commandList, caustica::BindingCache & bindingCache, const std::shared_ptr<caustica::Scene> & scene, std::shared_ptr<class MaterialGpuCache> materialGpuCache, std::shared_ptr<class OpacityMicromapBuilder> opacityMicromapBuilder, nvrhi::BufferHandle subInstanceDataBuffer, nvrhi::TextureHandle depthBuffer, nvrhi::TextureHandle motionVectors)
+void LightSamplingCache::updateEnd(nvrhi::ICommandList * commandList, caustica::BindingCache & bindingCache, const caustica::render::SceneGpuFrameHandles& gpuHandles, std::shared_ptr<class MaterialGpuCache> materialGpuCache, std::shared_ptr<class OpacityMicromapBuilder> opacityMicromapBuilder, nvrhi::BufferHandle subInstanceDataBuffer, nvrhi::TextureHandle depthBuffer, nvrhi::TextureHandle motionVectors)
 {
     RAII_SCOPE(commandList->beginMarker("LightingUpdateEnd");, commandList->endMarker(); );
 
@@ -1348,7 +1350,7 @@ void LightSamplingCache::updateEnd(nvrhi::ICommandList * commandList, caustica::
     bool lastFrameFeedbackAvailable = m_NEE_AT_FeedbackBufferFilled;
 
     nvrhi::BindingSetDesc bindingSetDesc;
-    fillBindings(bindingSetDesc, scene, materialGpuCache, opacityMicromapBuilder, subInstanceDataBuffer, depthBuffer, motionVectors, nullptr);
+    fillBindings(bindingSetDesc, gpuHandles, materialGpuCache, opacityMicromapBuilder, subInstanceDataBuffer, depthBuffer, motionVectors, nullptr);
     nvrhi::BindingSetHandle bindingSet = bindingCache.getOrCreateBindingSet(bindingSetDesc, m_commonBindingLayout);
     nvrhi::BindingSetVector bindings = { bindingSet };
 

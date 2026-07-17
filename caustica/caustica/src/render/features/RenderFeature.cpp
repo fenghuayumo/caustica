@@ -55,6 +55,7 @@ namespace
         { "GaussianSplatComposite", registerGaussianSplatCompositeFeature },
         { "PostProcess", registerPostProcessFeature },
         { "Composite", registerCompositeFeature },
+        { "DebugOverlay", registerDebugOverlayFeature },
     };
 }
 

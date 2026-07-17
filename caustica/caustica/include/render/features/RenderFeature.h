@@ -22,5 +22,6 @@ void registerDenoiseAAFeature(RenderFeatureContext ctx);
 void registerGaussianSplatCompositeFeature(RenderFeatureContext ctx);
 void registerPostProcessFeature(RenderFeatureContext ctx);
 void registerCompositeFeature(RenderFeatureContext ctx);
+void registerDebugOverlayFeature(RenderFeatureContext ctx);
 
 } // namespace caustica::render

@@ -175,6 +175,7 @@ public:
 
     void buildFrameGraphPasses(RenderFrameContext& ctx, const RenderGraphRegistry& graphRegistry);
     void executeFrameRenderGraph(RenderFrameContext& ctx);
+    void registerDebugOverlayGraphPasses(RenderFeatureContext ctx);
 
     void addRenderPipelinePlugin(std::unique_ptr<IRenderPipelinePlugin> plugin);
     void addRenderPipelinePlugin(IRenderPipelinePlugin& plugin);
@@ -203,7 +204,6 @@ private:
     void framePassPathTracePrepare(PathTracingFrameContext& ctx);
     void framePassPathTrace(PathTracingFrameContext& ctx);
     void framePassDenoiseAndAA(PathTracingFrameContext& ctx);
-    void framePassDebugOverlay(PathTracingFrameContext& ctx);
     void framePassFinalize(PathTracingFrameContext& ctx);
 
     void createRenderPasses(bool& exposureResetRequired, nvrhi::CommandListHandle initializeCommandList);

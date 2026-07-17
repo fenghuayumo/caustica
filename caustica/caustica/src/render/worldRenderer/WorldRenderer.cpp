@@ -572,19 +572,23 @@ void caustica::render::WorldRenderer::updateLighting(nvrhi::CommandListHandle co
     buildGaussianSplatEmissionProxies();
 
     UpdateLightingParams params{
-        m_context.activeSettings(),
-        commandList,
-        m_context.scenePasses.lighting.environment().get(),
-        m_context.scenePasses.lighting.lightSampling().get(),
-        &m_context.bindingCache,
-        m_context.renderDevice,
-        m_context.sceneManager.getScene(),
-        m_context.scenePasses.lighting.materials(),
-        m_context.scenePasses.lighting.opacityMaps(),
-        m_context.scenePasses.lighting.envMapSceneParams(),
-        m_context.sceneTime,
-        m_frameIndex,
-        c_envMapRadianceScale,
+        .settings = m_context.activeSettings(),
+        .commandList = commandList,
+        .environment = m_context.scenePasses.lighting.environment().get(),
+        .lightSampling = m_context.scenePasses.lighting.lightSampling().get(),
+        .bindingCache = &m_context.bindingCache,
+        .renderDevice = m_context.renderDevice,
+        .sceneData = m_context.frameScene,
+        .gpuHandles = m_context.resolveGpuHandles(),
+        .bindlessDescriptorTable = m_context.descriptorTable
+            ? m_context.descriptorTable->getDescriptorTable()
+            : nullptr,
+        .materials = m_context.scenePasses.lighting.materials(),
+        .opacityMaps = m_context.scenePasses.lighting.opacityMaps(),
+        .envMapSceneParams = m_context.scenePasses.lighting.envMapSceneParams(),
+        .sceneTime = m_context.sceneTime,
+        .frameIndex = m_frameIndex,
+        .envMapRadianceScale = c_envMapRadianceScale,
     };
     if (!m_gaussianSplatEmissionProxies.empty())
         params.gaussianSplatEmissionProxies = &m_gaussianSplatEmissionProxies;
@@ -1190,6 +1194,7 @@ void caustica::render::WorldRenderer::render(nvrhi::IFramebuffer* framebuffer)
         m_context.frameSettings = &m_frameSettingsSnapshot;
         m_context.frameRuntime = &m_frameRuntimeSnapshot;
         m_context.frameScene = &renderData;
+        m_context.frameGpu = scene->getGpuResources().frameHandles();
         m_context.frameSceneStructureChanged = scene->hasSceneStructureChanged(renderPhaseFrameIndex);
         m_context.frameSceneTransformsChanged = scene->hasSceneTransformsChanged(renderPhaseFrameIndex);
 
@@ -1223,6 +1228,7 @@ void caustica::render::WorldRenderer::render(nvrhi::IFramebuffer* framebuffer)
         m_context.frameSettings = nullptr;
         m_context.frameRuntime = nullptr;
         m_context.frameScene = nullptr;
+        m_context.frameGpu = {};
         m_context.frameSceneStructureChanged = false;
         m_context.frameSceneTransformsChanged = false;
         m_frameGaussianSplatTemporalReset = false;
@@ -1240,6 +1246,7 @@ void caustica::render::WorldRenderer::render(nvrhi::IFramebuffer* framebuffer)
     m_context.frameSettings = nullptr;
     m_context.frameRuntime = nullptr;
     m_context.frameScene = nullptr;
+    m_context.frameGpu = {};
     m_context.frameSceneStructureChanged = false;
     m_context.frameSceneTransformsChanged = false;
 
@@ -1252,6 +1259,10 @@ void caustica::render::WorldRenderer::render(nvrhi::IFramebuffer* framebuffer)
 void caustica::render::WorldRenderer::recreateBindingSet()
 {
 	// WARNING: this must match the layout of the m_bindingLayout (or switch to CreateBindingSetAndLayout)
+    const SceneGpuFrameHandles gpuHandles = m_context.resolveGpuHandles();
+    if (!gpuHandles.valid())
+        return;
+
     nvrhi::rt::IAccelStruct* gaussianSplatAS = m_context.accelStructs.getTopLevelAS();
     nvrhi::IBuffer* gaussianSplatBuffer = m_context.scenePasses.lighting.materials()->getMaterialDataBuffer();
     // Prefer the frame snapshot; fall back to live SceneRenderData when rebuilding
@@ -1278,8 +1289,8 @@ void caustica::render::WorldRenderer::recreateBindingSet()
         //nvrhi::BindingSetItem::ConstantBuffer(2, m_context.scenePasses.lighting.lightSampling()->GetLightingConstants()),
         nvrhi::BindingSetItem::RayTracingAccelStruct(0, m_context.accelStructs.getTopLevelAS()),
         nvrhi::BindingSetItem::StructuredBuffer_SRV(1, m_context.accelStructs.getSubInstanceBuffer()),
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(2, m_context.sceneManager.getScene()->getGpuResources().instanceBuffer),
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(3, m_context.sceneManager.getScene()->getGpuResources().geometryBuffer),
+        nvrhi::BindingSetItem::StructuredBuffer_SRV(2, gpuHandles.instanceBuffer),
+        nvrhi::BindingSetItem::StructuredBuffer_SRV(3, gpuHandles.geometryBuffer),
         nvrhi::BindingSetItem::StructuredBuffer_SRV(4, m_context.scenePasses.lighting.opacityMaps() ?(m_context.scenePasses.lighting.opacityMaps()->getGeometryDebugBuffer()):(m_context.scenePasses.lighting.materials()->getMaterialDataBuffer().Get()) ),   // YUCK
         nvrhi::BindingSetItem::StructuredBuffer_SRV(5, m_context.scenePasses.lighting.materials()->getMaterialDataBuffer()),
         nvrhi::BindingSetItem::Texture_SRV(6,  m_renderTargets->ldrColorScratch, nvrhi::Format::SRGBA8_UNORM),
@@ -1441,15 +1452,15 @@ void caustica::render::WorldRenderer::vBufferExport(nvrhi::ICommandList* command
 void caustica::render::WorldRenderer::pathTraceLightingEndUpdate(nvrhi::ICommandList* commandList)
 {
     UpdateLightingEndParams lightingEndParams{
-        commandList,
-        m_context.scenePasses.lighting.lightSampling().get(),
-        &m_context.bindingCache,
-        m_context.sceneManager.getScene(),
-        m_context.scenePasses.lighting.materials(),
-        m_context.scenePasses.lighting.opacityMaps(),
-        m_context.accelStructs.getSubInstanceBuffer(),
-        m_renderTargets->depth,
-        m_renderTargets->screenMotionVectors,
+        .commandList = commandList,
+        .lightSampling = m_context.scenePasses.lighting.lightSampling().get(),
+        .bindingCache = &m_context.bindingCache,
+        .gpuHandles = m_context.resolveGpuHandles(),
+        .materials = m_context.scenePasses.lighting.materials(),
+        .opacityMaps = m_context.scenePasses.lighting.opacityMaps(),
+        .subInstanceDataBuffer = m_context.accelStructs.getSubInstanceBuffer(),
+        .depthBuffer = m_renderTargets->depth,
+        .motionVectors = m_renderTargets->screenMotionVectors,
     };
     caustica::updateLightingEnd(lightingEndParams);
 }

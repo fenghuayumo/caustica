@@ -8,8 +8,6 @@
 #include <render/passes/lighting/MaterialGpuCache.h>
 #include <render/passes/omm/OpacityMicromapBuilder.h>
 #include <render/passes/gaussian/GaussianSplatEmissionProxy.h>
-#include <scene/Scene.h>
-#include <scene/SceneObjects.h>
 #include <scene/SceneRenderData.h>
 #include <scene/SceneLightAccess.h>
 #include <core/scope.h>
@@ -54,7 +52,7 @@ void updateLighting(CameraController& camera, AccelStructManager& accelStructs, 
 {
     nvrhi::ICommandList* commandList = params.commandList;
     if (commandList == nullptr || params.environment == nullptr || params.lightSampling == nullptr
-        || params.bindingCache == nullptr || !params.scene)
+        || params.bindingCache == nullptr || params.sceneData == nullptr || !params.gpuHandles.valid())
     {
         return;
     }
@@ -66,7 +64,7 @@ void updateLighting(CameraController& camera, AccelStructManager& accelStructs, 
     {
         const float3 rotationInRadians = radians(params.settings.EnvironmentMapParams.RotationXYZ);
         const affine3 rotationTransform = dm::rotation(rotationInRadians);
-        for (const scene::LightRenderProxy& lightProxy : params.scene->getRenderData().lights)
+        for (const scene::LightRenderProxy& lightProxy : params.sceneData->lights)
         {
             if (!scene::tryGetDirectionalLightData(lightProxy.data))
                 continue;
@@ -146,7 +144,9 @@ void updateLighting(CameraController& camera, AccelStructManager& accelStructs, 
         *params.bindingCache,
         settings,
         params.sceneTime,
-        params.scene,
+        params.sceneData,
+        params.gpuHandles,
+        params.bindlessDescriptorTable,
         params.materials,
         params.opacityMaps,
         accelStructs.getSubInstanceBuffer(),
@@ -181,7 +181,7 @@ void syncEnvMapSceneParams(
 void updateLightingEnd(UpdateLightingEndParams& params)
 {
     if (params.commandList == nullptr || params.lightSampling == nullptr || params.bindingCache == nullptr
-        || !params.scene)
+        || !params.gpuHandles.valid())
     {
         return;
     }
@@ -189,7 +189,7 @@ void updateLightingEnd(UpdateLightingEndParams& params)
     params.lightSampling->updateEnd(
         params.commandList,
         *params.bindingCache,
-        params.scene,
+        params.gpuHandles,
         params.materials,
         params.opacityMaps,
         params.subInstanceDataBuffer,

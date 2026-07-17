@@ -61,10 +61,6 @@ void PathTracingPipelinePlugin::onFinalizeFrame(WorldRenderer& renderer, RenderF
     if (ctx.frame.aborted)
         return;
 
-    renderer.framePassDebugOverlay(ctx.frame);
-    if (ctx.frame.aborted)
-        return;
-
     renderer.framePassFinalize(ctx.frame);
 }
 

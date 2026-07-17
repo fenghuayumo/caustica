@@ -90,6 +90,7 @@ void PrepareLightsPass::setScene(std::shared_ptr<caustica::Scene> scene,
     std::shared_ptr<EnvMapProcessor> environmentMap, EnvMapSceneParams envMapSceneParams)
 {
     m_Scene = scene;
+    m_gpuHandles = scene ? scene->getGpuResources().frameHandles() : caustica::render::SceneGpuFrameHandles{};
     m_EnvironmentMap = environmentMap;
     m_EnvironmentMapSceneParams = envMapSceneParams;
 }
@@ -118,6 +119,9 @@ void PrepareLightsPass::createPipeline()
 
 void PrepareLightsPass::createBindingSet(RtxdiResources& resources, const RenderTargets& renderTargets)
 {
+    if (!m_gpuHandles.valid())
+        return;
+
     nvrhi::BindingSetDesc bindingSetDesc;
     bindingSetDesc.bindings = {
         nvrhi::BindingSetItem::ConstantBuffer(0, m_constantBuffer),// PushConstants(0, sizeof(PrepareLightsConstants)),
@@ -126,8 +130,8 @@ void PrepareLightsPass::createBindingSet(RtxdiResources& resources, const Render
         nvrhi::BindingSetItem::Texture_UAV(2, resources.LocalLightPdfTexture),
         nvrhi::BindingSetItem::StructuredBuffer_SRV(0, resources.TaskBuffer),
         nvrhi::BindingSetItem::StructuredBuffer_SRV(1, m_subInstanceData),
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(2, m_Scene->getGpuResources().instanceBuffer),
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(3, m_Scene->getGpuResources().geometryBuffer),
+        nvrhi::BindingSetItem::StructuredBuffer_SRV(2, m_gpuHandles.instanceBuffer),
+        nvrhi::BindingSetItem::StructuredBuffer_SRV(3, m_gpuHandles.geometryBuffer),
         //nvrhi::BindingSetItem::StructuredBuffer_SRV(4, (m_opacityMicromapBuilder!=nullptr)?(m_opacityMicromapBuilder->getGeometryDebugBuffer()):(resources.LightDataBuffer.Get())), // yuck
         nvrhi::BindingSetItem::StructuredBuffer_SRV(5, m_materialGpuCache->getMaterialDataBuffer()),
         nvrhi::BindingSetItem::Texture_SRV(6, m_EnvironmentMap ? m_EnvironmentMap->getEnvMapCube() : m_renderDevice.builtins().blackCubeMapArray()),

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <render/core/PathTracerSettings.h>
+#include <render/SceneGpuResources.h>
 #include <rhi/nvrhi.h>
 #include <math/math.h>
 
@@ -22,7 +23,7 @@ class AccelStructManager;
 class BindingCache;
 class CameraController;
 namespace render { class RenderDevice; }
-class Scene;
+namespace scene { class SceneRenderData; }
 
 struct PreUpdateLightingParams
 {
@@ -46,7 +47,9 @@ struct UpdateLightingParams
     BindingCache*                                  bindingCache = nullptr;
     caustica::render::RenderDevice&                             renderDevice;
 
-    const std::shared_ptr<Scene>&                  scene;
+    const scene::SceneRenderData*                  sceneData = nullptr;
+    render::SceneGpuFrameHandles                   gpuHandles{};
+    nvrhi::IDescriptorTable*                       bindlessDescriptorTable = nullptr;
     std::shared_ptr<MaterialGpuCache>              materials;
     std::shared_ptr<OpacityMicromapBuilder>        opacityMaps;
 
@@ -65,7 +68,7 @@ struct UpdateLightingEndParams
     LightSamplingCache*                          lightSampling = nullptr;
     BindingCache*                                  bindingCache = nullptr;
 
-    const std::shared_ptr<Scene>&                  scene;
+    render::SceneGpuFrameHandles                   gpuHandles{};
     std::shared_ptr<MaterialGpuCache>              materials;
     std::shared_ptr<OpacityMicromapBuilder>        opacityMaps;
 

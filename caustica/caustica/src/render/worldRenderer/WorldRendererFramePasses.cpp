@@ -587,57 +587,150 @@ void caustica::render::WorldRenderer::framePassDenoiseAndAA(PathTracingFrameCont
     m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
 }
 
-void caustica::render::WorldRenderer::framePassDebugOverlay(PathTracingFrameContext& ctx)
+void caustica::render::WorldRenderer::registerDebugOverlayGraphPasses(RenderFeatureContext ctx)
 {
-    nvrhi::IFramebuffer* framebuffer = ctx.framebuffer;
+    assert(ctx.graph);
+    assert(ctx.targetFramebuffer);
+
+    nvrhi::IFramebuffer* framebuffer = ctx.targetFramebuffer;
     const auto& fbinfo = framebuffer->getFramebufferInfo();
+    const bool showDebugLines = m_context.activeSettings().ShowDebugLines;
+    const bool copyDebugFeedback =
+        m_context.activeSettings().ContinuousDebugFeedback
+        || m_context.activeRuntime().Picking.hasActivePickRequest();
 
-    if (m_context.activeSettings().ShowDebugLines == true)
-    {
-        m_commandList->beginMarker("Debug Lines");
-
-        {
-            nvrhi::GraphicsState state;
-            state.bindings = { m_linesBindingSet };
-            state.vertexBuffers = { {m_debugLineBufferDisplay, 0, 0} };
-            state.pipeline = m_linesPipeline;
-            state.framebuffer = framebuffer;
-            state.viewport.addViewportAndScissorRect(fbinfo.getViewport());
-
-            m_commandList->setGraphicsState(state);
-
-            nvrhi::DrawArguments args;
-            args.vertexCount = m_feedbackData.lineVertexCount;
-            m_commandList->draw(args);
-        }
-
-        if (m_cpuSideDebugLines.size() > 0)
-        {
-            m_commandList->writeBuffer(m_debugLineBufferCapture, m_cpuSideDebugLines.data(), sizeof(DebugLineStruct) * m_cpuSideDebugLines.size());
-
-            nvrhi::GraphicsState state;
-            state.bindings = { m_linesBindingSet };
-            state.vertexBuffers = { {m_debugLineBufferCapture, 0, 0} };
-            state.pipeline = m_linesPipeline;
-            state.framebuffer = framebuffer;
-            state.viewport.addViewportAndScissorRect(fbinfo.getViewport());
-
-            m_commandList->setGraphicsState(state);
-
-            nvrhi::DrawArguments args;
-            args.vertexCount = (uint32_t)m_cpuSideDebugLines.size();
-            m_commandList->draw(args);
-        }
-
-        m_commandList->endMarker();
-    }
+    std::vector<DebugLineStruct> cpuSideDebugLines = std::move(m_cpuSideDebugLines);
     m_cpuSideDebugLines.clear();
 
-    if (m_context.activeSettings().ContinuousDebugFeedback || m_context.activeRuntime().Picking.hasActivePickRequest())
+    rg::BufferHandle debugLineCapture{};
+    rg::BufferHandle debugLineDisplay{};
+
+    if (showDebugLines || copyDebugFeedback)
     {
-        m_commandList->copyBuffer(m_feedback_Buffer_Cpu, 0, m_feedback_Buffer_Gpu, 0, sizeof(DebugFeedbackStruct) * 1);
-        m_commandList->copyBuffer(m_debugLineBufferDisplay, 0, m_debugLineBufferCapture, 0, sizeof(DebugLineStruct) * MAX_DEBUG_LINES);
-        m_commandList->copyBuffer(m_debugDeltaPathTree_Cpu, 0, m_debugDeltaPathTree_Gpu, 0, sizeof(DeltaTreeVizPathVertex) * cDeltaTreeVizMaxVertices);
+        debugLineCapture = ctx.graph->importBuffer(
+            m_debugLineBufferCapture,
+            rg::BufferAccess::UnorderedAccess);
+        debugLineDisplay = ctx.graph->importBuffer(
+            m_debugLineBufferDisplay,
+            rg::BufferAccess::VertexBuffer);
+
+        ctx.graph->extractBuffer(debugLineCapture, rg::BufferAccess::UnorderedAccess);
+        ctx.graph->extractBuffer(debugLineDisplay, rg::BufferAccess::VertexBuffer);
+    }
+
+    if (showDebugLines)
+    {
+        nvrhi::ITexture* targetColor = framebuffer->getDesc().colorAttachments[0].texture;
+        assert(targetColor);
+
+        const rg::TextureHandle targetColorHandle = ctx.graph->importTexture(
+            targetColor,
+            rg::TextureAccess::RenderTarget);
+        const rg::TextureHandle depth = ctx.graph->importTexture(
+            m_renderTargets->depth,
+            rg::TextureAccess::ShaderResource);
+        const rg::BufferHandle constantBuffer = ctx.graph->importBuffer(
+            m_constantBuffer,
+            rg::BufferAccess::ConstantBuffer);
+        const uint32_t capturedLineVertexCount = m_feedbackData.lineVertexCount;
+
+        ctx.graph->addPass(
+            "DebugLines",
+            [targetColorHandle, depth, constantBuffer, debugLineCapture, debugLineDisplay](rg::PassBuilder& setup) {
+                setup.write(targetColorHandle, rg::TextureAccess::RenderTarget);
+                setup.read(depth, rg::TextureAccess::ShaderResource);
+                setup.read(constantBuffer, rg::BufferAccess::ConstantBuffer);
+                setup.read(debugLineCapture, rg::BufferAccess::VertexBuffer);
+                setup.read(debugLineDisplay, rg::BufferAccess::VertexBuffer);
+            },
+            [this, framebuffer, viewport = fbinfo.getViewport(), capturedLineVertexCount,
+                debugLineCapture, debugLineDisplay, cpuSideDebugLines = std::move(cpuSideDebugLines)](
+                rg::RenderPassContext& passCtx) {
+                nvrhi::ICommandList* commandList = passCtx.commandList();
+                commandList->beginMarker("Debug Lines");
+
+                nvrhi::GraphicsState state;
+                state.bindings = { m_linesBindingSet };
+                state.vertexBuffers = { {passCtx.buffer(debugLineDisplay), 0, 0} };
+                state.pipeline = m_linesPipeline;
+                state.framebuffer = framebuffer;
+                state.viewport.addViewportAndScissorRect(viewport);
+                commandList->setGraphicsState(state);
+
+                nvrhi::DrawArguments args;
+                args.vertexCount = capturedLineVertexCount;
+                commandList->draw(args);
+
+                if (!cpuSideDebugLines.empty())
+                {
+                    commandList->writeBuffer(
+                        passCtx.buffer(debugLineCapture),
+                        cpuSideDebugLines.data(),
+                        sizeof(DebugLineStruct) * cpuSideDebugLines.size());
+
+                    state.vertexBuffers = { {passCtx.buffer(debugLineCapture), 0, 0} };
+                    commandList->setGraphicsState(state);
+
+                    args.vertexCount = static_cast<uint32_t>(cpuSideDebugLines.size());
+                    commandList->draw(args);
+                }
+
+                commandList->endMarker();
+            },
+            rg::PassOptions{ .sideEffect = true, .executeAfter = "Blit" });
+    }
+
+    if (copyDebugFeedback)
+    {
+        const rg::BufferHandle feedbackCpu = ctx.graph->importBuffer(
+            m_feedback_Buffer_Cpu,
+            rg::BufferAccess::CopyDest);
+        const rg::BufferHandle feedbackGpu = ctx.graph->importBuffer(
+            m_feedback_Buffer_Gpu,
+            rg::BufferAccess::UnorderedAccess);
+        const rg::BufferHandle debugDeltaPathTreeCpu = ctx.graph->importBuffer(
+            m_debugDeltaPathTree_Cpu,
+            rg::BufferAccess::CopyDest);
+        const rg::BufferHandle debugDeltaPathTreeGpu = ctx.graph->importBuffer(
+            m_debugDeltaPathTree_Gpu,
+            rg::BufferAccess::UnorderedAccess);
+
+        ctx.graph->extractBuffer(feedbackCpu, rg::BufferAccess::CopyDest);
+        ctx.graph->extractBuffer(feedbackGpu, rg::BufferAccess::UnorderedAccess);
+        ctx.graph->extractBuffer(debugDeltaPathTreeCpu, rg::BufferAccess::CopyDest);
+        ctx.graph->extractBuffer(debugDeltaPathTreeGpu, rg::BufferAccess::UnorderedAccess);
+
+        ctx.graph->addPass(
+            "DebugFeedbackCopies",
+            [feedbackCpu, feedbackGpu, debugLineCapture, debugLineDisplay,
+                debugDeltaPathTreeCpu, debugDeltaPathTreeGpu](rg::PassBuilder& setup) {
+                setup.read(feedbackGpu, rg::BufferAccess::CopySource);
+                setup.write(feedbackCpu, rg::BufferAccess::CopyDest);
+                setup.read(debugLineCapture, rg::BufferAccess::CopySource);
+                setup.write(debugLineDisplay, rg::BufferAccess::CopyDest);
+                setup.read(debugDeltaPathTreeGpu, rg::BufferAccess::CopySource);
+                setup.write(debugDeltaPathTreeCpu, rg::BufferAccess::CopyDest);
+            },
+            [feedbackCpu, feedbackGpu, debugLineCapture, debugLineDisplay,
+                debugDeltaPathTreeCpu, debugDeltaPathTreeGpu](rg::RenderPassContext& passCtx) {
+                nvrhi::ICommandList* commandList = passCtx.commandList();
+                commandList->copyBuffer(
+                    passCtx.buffer(feedbackCpu), 0,
+                    passCtx.buffer(feedbackGpu), 0,
+                    sizeof(DebugFeedbackStruct));
+                commandList->copyBuffer(
+                    passCtx.buffer(debugLineDisplay), 0,
+                    passCtx.buffer(debugLineCapture), 0,
+                    sizeof(DebugLineStruct) * MAX_DEBUG_LINES);
+                commandList->copyBuffer(
+                    passCtx.buffer(debugDeltaPathTreeCpu), 0,
+                    passCtx.buffer(debugDeltaPathTreeGpu), 0,
+                    sizeof(DeltaTreeVizPathVertex) * cDeltaTreeVizMaxVertices);
+            },
+            rg::PassOptions{
+                .sideEffect = true,
+                .executeAfter = showDebugLines ? "DebugLines" : "Blit",
+            });
     }
 }
 

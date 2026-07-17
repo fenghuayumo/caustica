@@ -24,6 +24,19 @@ struct SkinnedMeshGpuState
     bool skinningInitialized = false;
 };
 
+// Per-frame GPU buffer views for the render thread.
+// Filled at beginGpuReadFrame; prefer these over Scene::getGpuResources() digs.
+struct SceneGpuFrameHandles
+{
+    nvrhi::BufferHandle instanceBuffer;
+    nvrhi::BufferHandle geometryBuffer;
+
+    [[nodiscard]] bool valid() const
+    {
+        return instanceBuffer != nullptr && geometryBuffer != nullptr;
+    }
+};
+
 // GPU-side storage derived from a CPU scene.
 struct SceneGpuResources
 {
@@ -46,6 +59,11 @@ struct SceneGpuResources
     bool enableBindlessResources = false;
     bool useResourceDescriptorHeapBindless = false;
     bool rayTracingSupported = false;
+
+    [[nodiscard]] SceneGpuFrameHandles frameHandles() const
+    {
+        return SceneGpuFrameHandles{ instanceBuffer, geometryBuffer };
+    }
 };
 
 } // namespace caustica::render

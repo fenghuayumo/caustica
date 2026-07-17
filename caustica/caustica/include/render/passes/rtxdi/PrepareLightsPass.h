@@ -11,6 +11,7 @@
 #include <shaders/PathTracer/Lighting/LightingTypes.hlsli>
 #include <shaders/PathTracer/Lighting/EnvMap.hlsli>
 #include <render/passes/gaussian/GaussianSplatEmissionProxy.h>
+#include <render/SceneGpuResources.h>
 
 namespace caustica
 {
@@ -53,6 +54,7 @@ private:
     std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
     caustica::render::RenderDevice& m_renderDevice;
     std::shared_ptr<caustica::Scene> m_Scene;
+    caustica::render::SceneGpuFrameHandles m_gpuHandles{};
     std::shared_ptr<class MaterialGpuCache> m_materialGpuCache;
     std::shared_ptr<class OpacityMicromapBuilder> m_opacityMicromapBuilder;
     nvrhi::BufferHandle m_subInstanceData;
