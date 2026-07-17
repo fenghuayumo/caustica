@@ -13,7 +13,7 @@ namespace caustica
 class App;
 class GpuDevice;
 class SceneViewState;
-struct RenderInfra;
+struct GpuSharedCaches;
 struct SessionCamera;
 struct SceneSession;
 struct PathTracingRuntime;
@@ -24,7 +24,7 @@ class WorldRenderer;
 }
 
 [[nodiscard]] GpuDevice* gpuDevice(const App& app);
-[[nodiscard]] RenderInfra* renderInfra(const App& app);
+[[nodiscard]] GpuSharedCaches* gpuSharedCaches(const App& app);
 [[nodiscard]] SessionCamera* sessionCameraResource(const App& app);
 [[nodiscard]] SceneSession* sceneSession(const App& app);
 [[nodiscard]] PathTracingRuntime* pathTracingRuntime(const App& app);

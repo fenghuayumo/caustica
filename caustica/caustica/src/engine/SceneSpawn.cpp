@@ -1,6 +1,6 @@
 #include <engine/App.h>
 #include <engine/PathTracingRuntime.h>
-#include <engine/RenderInfra.h>
+#include <engine/GpuSharedCaches.h>
 #include <engine/AppResources.h>
 #include <engine/SceneViewState.h>
 #include <cassert>
@@ -32,10 +32,10 @@ namespace caustica
 void flushPendingStructureGpu(App& app)
 {
     PathTracingRuntime* pathTracing = pathTracingRuntime(app);
-    RenderInfra* infra = renderInfra(app);
+    GpuSharedCaches* caches = gpuSharedCaches(app);
     GpuDevice* device = gpuDevice(app);
     auto scenePtr = activeScene(app);
-    if (!pathTracing || !infra || !device || !scenePtr || !scenePtr->needsGpuStructureSync())
+    if (!pathTracing || !caches || !device || !scenePtr || !scenePtr->needsGpuStructureSync())
         return;
 
     // Exclusive access: no in-flight Extract/render reading an incomplete structure.
@@ -44,18 +44,21 @@ void flushPendingStructureGpu(App& app)
     // Use logic frame index (matches Extract after SetRenderFrameIndex; correct for
     // immediate flush from spawn/despawn in PostUpdate before Extract runs).
     const uint32_t frameIndex = device->getFrameIndex();
-    runGpuWorkOnRenderThread(app, [pathTracing, infra, scenePtr, device, frameIndex]() {
+    runGpuWorkOnRenderThread(app, [pathTracing, caches, scenePtr, device, frameIndex]() {
         if (nvrhi::IDevice* nvrhiDevice = device->getDevice())
             nvrhiDevice->waitForIdle();
 
-        if (infra->textureLoader && infra->renderDevice)
+        if (caches->textureLoader && caches->renderDevice)
         {
-            infra->textureLoader->processRenderingThreadCommands(*infra->renderDevice, 0.f);
-            infra->textureLoader->loadingFinished();
+            caches->textureLoader->processRenderingThreadCommands(*caches->renderDevice, 0.f);
+            caches->textureLoader->loadingFinished();
         }
 
         pathTracing->lightingPasses().ensureMaterialsFromScene(scenePtr);
-        render::SceneGpuUpdater::refreshAfterLoad(*scenePtr, frameIndex);
+        render::SceneGpuUpdater::refreshAfterLoad(
+            *scenePtr,
+            caches->descriptorTable.get(),
+            frameIndex);
 
         // Rebuild BLAS/TLAS immediately while exclusive. Leaving this to the next
         // render frame races new proxies against a stale TLAS and crashes nvwgf2umx.
@@ -87,14 +90,14 @@ void flushPendingStructureGpu(App& app)
 Handle<ScenePrefabAsset> load(App& app, const std::filesystem::path& path)
 {
     AssetSystem* assets = app.tryResource<AssetSystem>();
-    RenderInfra* infra = renderInfra(app);
-    if (!assets || !infra || path.empty())
+    GpuSharedCaches* caches = gpuSharedCaches(app);
+    if (!assets || !caches || path.empty())
         return {};
 
     if (Handle<ScenePrefabAsset> existing = assets->findScenePrefab(path))
         return existing;
 
-    auto textureLoader = infra->textureLoader;
+    auto textureLoader = caches->textureLoader;
     if (!textureLoader)
         return {};
 

@@ -30,12 +30,10 @@ namespace
 SceneManager::SceneManager(caustica::GpuDevice&                     device,
                            caustica::ShaderFactory&                 shaderFactory,
                            std::shared_ptr<caustica::TextureLoader>  textureCache,
-                           std::shared_ptr<caustica::IDescriptorTableManager> descriptorTable,
                            std::shared_ptr<caustica::SceneTypeFactory> sceneTypeFactory)
     : m_device(device)
     , m_shaderFactory(shaderFactory)
     , m_textureCache(std::move(textureCache))
-    , m_descriptorTable(std::move(descriptorTable))
     , m_sceneTypeFactory(sceneTypeFactory ? std::move(sceneTypeFactory)
                                           : std::make_shared<caustica::SceneTypeFactory>())
 {
@@ -142,7 +140,6 @@ std::shared_ptr<caustica::Scene> SceneManager::loadScene(
         m_shaderFactory,
         std::move(fs),
         m_textureCache,
-        m_descriptorTable,
         m_sceneTypeFactory);
 
     if (caustica::isInlineScenePath(sceneFileName))

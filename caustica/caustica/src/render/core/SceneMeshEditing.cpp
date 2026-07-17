@@ -437,7 +437,10 @@ void RebuildSceneMeshBuffersIfNeeded(const std::shared_ptr<MeshInfo>& mesh, cons
     }
 
     if (params.scene)
-        render::SceneGpuUpdater::refreshAfterLoad(*params.scene, params.frameIndex);
+        render::SceneGpuUpdater::refreshAfterLoad(
+            *params.scene,
+            params.descriptorTable,
+            params.frameIndex);
 }
 
 } // namespace

@@ -6,7 +6,7 @@
 #include <engine/App.h>
 #include <engine/GpuRenderSubsystem.h>
 #include <engine/PathTracingRuntime.h>
-#include <engine/RenderInfra.h>
+#include <engine/GpuSharedCaches.h>
 #include <engine/SessionCamera.h>
 #include <engine/SceneSession.h>
 #include <engine/SceneLifecycle.h>
@@ -23,12 +23,12 @@ void initializeSceneApp(App& app, const SceneAppConfig& config)
 {
     GpuDevice* gpuDevice = app.getGpuDevice();
     auto* assetSystem = app.tryResource<AssetSystem>();
-    auto* renderInfra = app.tryResource<RenderInfra>();
+    auto* gpuSharedCaches = app.tryResource<GpuSharedCaches>();
     auto* sessionCamera = app.tryResource<SessionCamera>();
     auto* sceneSession = app.tryResource<SceneSession>();
     auto* pathTracing = app.tryResource<PathTracingRuntime>();
     auto* gpuRenderSubsystem = app.tryResource<GpuRenderSubsystem>();
-    if (!gpuDevice || !assetSystem || !renderInfra || !sessionCamera || !sceneSession
+    if (!gpuDevice || !assetSystem || !gpuSharedCaches || !sessionCamera || !sceneSession
         || !pathTracing || !gpuRenderSubsystem)
         return;
 
@@ -47,7 +47,7 @@ void initializeSceneApp(App& app, const SceneAppConfig& config)
     gpuRenderSubsystem->initialize(GpuRenderSubsystemInitParams{
         .gpuDevice = *gpuDevice,
         .assetSystem = *assetSystem,
-        .renderInfra = *renderInfra,
+        .gpuSharedCaches = *gpuSharedCaches,
         .sessionCamera = *sessionCamera,
         .sceneSession = *sceneSession,
         .pathTracingRuntime = *pathTracing,

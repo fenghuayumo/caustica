@@ -8,7 +8,6 @@ class SceneManager;
 namespace caustica
 {
 
-class IDescriptorTableManager;
 class GpuDevice;
 class SceneTypeFactory;
 class ShaderFactory;
@@ -31,7 +30,6 @@ struct SceneSession
         GpuDevice& gpuDevice,
         ShaderFactory& shaderFactory,
         const std::shared_ptr<TextureLoader>& textureLoader,
-        const std::shared_ptr<IDescriptorTableManager>& descriptorTable,
         const std::shared_ptr<SceneTypeFactory>& sceneTypeFactory,
         std::function<void()> onLoaded,
         std::function<void()> onUnloading);

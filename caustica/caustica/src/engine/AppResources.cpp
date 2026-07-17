@@ -1,6 +1,6 @@
 #include <engine/App.h>
 #include <engine/AppResources.h>
-#include <engine/RenderInfra.h>
+#include <engine/GpuSharedCaches.h>
 #include <engine/SessionCamera.h>
 #include <engine/SceneSession.h>
 #include <engine/PathTracingRuntime.h>
@@ -20,9 +20,9 @@ GpuDevice* gpuDevice(const App& app)
     return app.getGpuDevice();
 }
 
-RenderInfra* renderInfra(const App& app)
+GpuSharedCaches* gpuSharedCaches(const App& app)
 {
-    return const_cast<RenderInfra*>(app.tryResource<RenderInfra>());
+    return const_cast<GpuSharedCaches*>(app.tryResource<GpuSharedCaches>());
 }
 
 SessionCamera* sessionCameraResource(const App& app)

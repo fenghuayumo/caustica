@@ -14,7 +14,7 @@ void AssetPlugin::build(App& app)
 
 void AssetPlugin::configureSchedules(App& app)
 {
-    // After GpuRender so RenderInfra has dropped its TextureLoader shared_ptr first.
+    // After GpuRender so GpuSharedCaches has dropped its TextureLoader shared_ptr first.
     app.addSystemAfter(AppSchedule::shutdown, "AssetSystem.shutdown", "GpuRender.shutdown", [](SystemContext& ctx) {
         if (auto* assets = ctx.tryRes<AssetSystem>())
             assets->shutdown();

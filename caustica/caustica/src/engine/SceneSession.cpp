@@ -16,7 +16,6 @@ bool SceneSession::create(
     GpuDevice& gpuDevice,
     ShaderFactory& shaderFactory,
     const std::shared_ptr<TextureLoader>& textureLoader,
-    const std::shared_ptr<IDescriptorTableManager>& descriptorTable,
     const std::shared_ptr<SceneTypeFactory>& sceneTypeFactory,
     std::function<void()> onLoaded,
     std::function<void()> onUnloading)
@@ -25,7 +24,6 @@ bool SceneSession::create(
         gpuDevice,
         shaderFactory,
         textureLoader,
-        descriptorTable,
         sceneTypeFactory);
     manager->setLoadingCallbacks(std::move(onLoaded), std::move(onUnloading));
     return true;

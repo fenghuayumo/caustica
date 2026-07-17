@@ -428,6 +428,7 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
         m_context.sessionScene,
         m_commandList,
     };
+    geoParams.descriptorTable = m_context.descriptorTable.get();
     geoParams.materials = m_context.scenePasses.lighting.materials().get();
     geoParams.opacityMaps = m_context.scenePasses.lighting.opacityMaps().get();
     geoParams.frameIndex = m_context.gpuDevice.getRenderPhaseFrameIndex();

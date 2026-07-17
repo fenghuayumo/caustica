@@ -12,6 +12,7 @@
 namespace caustica
 {
 
+class IDescriptorTableManager;
 class Scene;
 struct MeshInfo;
 
@@ -23,6 +24,7 @@ struct GeometrySequenceComponent;
 struct SetSceneMeshVerticesParams
 {
     nvrhi::IDevice* device = nullptr;
+    IDescriptorTableManager* descriptorTable = nullptr;
     std::shared_ptr<Scene> scene;
     uint32_t frameIndex = 0;
     bool recomputeNormals = true;

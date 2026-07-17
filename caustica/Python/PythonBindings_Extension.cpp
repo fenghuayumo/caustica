@@ -21,7 +21,7 @@
 #include <engine/RenderSessionApi.h>
 #include <engine/App.h>
 #include <engine/PathTracingRuntime.h>
-#include <engine/RenderInfra.h>
+#include <engine/GpuSharedCaches.h>
 #include <engine/AppResources.h>
 #include <backend/GpuDevice.h>
 #include <rhi/nvrhi.h>
@@ -176,7 +176,7 @@ public:
         // Headless / DefaultPlugins sessions have no SceneEditor; load via SceneManager.
         caustica::App& app = *m_session->GetApp();
         auto* sceneMgr = caustica::sceneManager(app);
-        auto* infra = caustica::renderInfra(app);
+        auto* infra = caustica::gpuSharedCaches(app);
         auto* pathTracing = caustica::pathTracingRuntime(app);
         if (!sceneMgr || !infra || !infra->textureLoader || !pathTracing)
             return false;
@@ -219,7 +219,10 @@ public:
                 infra->textureLoader->loadingFinished();
             }
             pathTracing->lightingPasses().ensureMaterialsFromScene(scene);
-            caustica::render::SceneGpuUpdater::refreshAfterLoad(*scene, frameIndex);
+            caustica::render::SceneGpuUpdater::refreshAfterLoad(
+                *scene,
+                infra->descriptorTable.get(),
+                frameIndex);
         });
 
         pathTracing->rayTracingResources().requestAccelerationStructureRebuild();

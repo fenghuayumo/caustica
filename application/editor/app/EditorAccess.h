@@ -5,7 +5,7 @@
 #include <engine/App.h>
 #include <engine/AppResources.h>
 #include <engine/PathTracingRuntime.h>
-#include <engine/RenderInfra.h>
+#include <engine/GpuSharedCaches.h>
 #include <engine/SessionCamera.h>
 #include <engine/SceneQuery.h>
 #include <render/core/CameraController.h>
@@ -104,14 +104,14 @@ namespace caustica::editor
     return *pt;
 }
 
-[[nodiscard]] inline RenderInfra* editorRenderInfra(SceneEditor& editor)
+[[nodiscard]] inline GpuSharedCaches* editorGpuSharedCaches(SceneEditor& editor)
 {
-    return editor.app() ? caustica::renderInfra(*editor.app()) : nullptr;
+    return editor.app() ? caustica::gpuSharedCaches(*editor.app()) : nullptr;
 }
 
-[[nodiscard]] inline const RenderInfra* editorRenderInfra(const SceneEditor& editor)
+[[nodiscard]] inline const GpuSharedCaches* editorGpuSharedCaches(const SceneEditor& editor)
 {
-    return editor.app() ? caustica::renderInfra(*editor.app()) : nullptr;
+    return editor.app() ? caustica::gpuSharedCaches(*editor.app()) : nullptr;
 }
 
 [[nodiscard]] inline render::WorldRenderer* editorWorldRenderer(SceneEditor& editor)

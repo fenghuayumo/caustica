@@ -3,7 +3,7 @@
 #include <engine/AssetPlugin.h>
 #include <engine/EngineScheduleRegistration.h>
 #include <engine/GpuRenderSubsystem.h>
-#include <engine/RenderInfra.h>
+#include <engine/GpuSharedCaches.h>
 #include <engine/SessionCamera.h>
 #include <engine/SceneSession.h>
 #include <engine/PathTracingRuntime.h>
@@ -19,7 +19,7 @@ void DefaultPlugins::build(App& app)
     AssetPlugin{}.build(app);
     registerSceneAppResources(app, appConfig);
     app.emplaceResource<SceneAccess>();
-    app.emplaceResource<RenderInfra>();
+    app.emplaceResource<GpuSharedCaches>();
     app.emplaceResource<SessionCamera>();
     app.emplaceResource<SceneSession>();
     app.emplaceResource<PathTracingRuntime>();

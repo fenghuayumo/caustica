@@ -1,5 +1,5 @@
 #include <engine/PathTracingRuntime.h>
-#include <engine/RenderInfra.h>
+#include <engine/GpuSharedCaches.h>
 
 #include <render/core/BindingCache.h>
 #include <render/core/RenderDevice.h>
@@ -18,7 +18,7 @@ bool PathTracingRuntime::create(const CreateParams& params)
 {
     destroy();
 
-    RenderInfra& infra = params.renderInfra;
+    GpuSharedCaches& infra = params.gpuSharedCaches;
     m_accelStructs = AccelStructManager(params.gpuDevice.getDevice());
 
     m_pathTracingContext = std::make_unique<render::PathTracingContext>(render::PathTracingContext{

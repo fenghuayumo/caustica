@@ -8,7 +8,6 @@
 #include <scene/SceneImport.h>
 #include <assets/Handle.h>
 #include <assets/TypedAssets.h>
-#include <backend/IDescriptorTableManager.h>
 #include <rhi/nvrhi.h>
 #include <atomic>
 #include <cstdint>
@@ -52,7 +51,6 @@ namespace caustica
         std::shared_ptr<caustica::IFileSystem> m_fs;
         std::shared_ptr<SceneTypeFactory> m_SceneTypeFactory;
         std::shared_ptr<TextureLoader> m_TextureLoader;
-        std::shared_ptr<IDescriptorTableManager> m_DescriptorTable;
         std::unique_ptr<scene::SceneEntityWorld> m_EntityWorld;
         scene::SceneRenderSnapshot m_RenderSnapshot;
         // Logic-thread extract cache (Bevy Extract / UE proxy sync). Triple-buffer slots
@@ -124,7 +122,6 @@ namespace caustica
             ShaderFactory& shaderFactory,
             std::shared_ptr<caustica::IFileSystem> fs,
             std::shared_ptr<TextureLoader> textureCache,
-            std::shared_ptr<IDescriptorTableManager> descriptorTable,
             std::shared_ptr<SceneTypeFactory> sceneTypeFactory);
 
         void refreshSceneWorld(uint32_t frameIndex);
@@ -183,8 +180,6 @@ namespace caustica
         void attachSpotLightToRoot(scene::SpotLightComponent component, const std::string& name = {});
         void attachPointLightToRoot(scene::PointLightComponent component, const std::string& name = {});
         void attachEnvironmentLightToRoot(scene::EnvironmentLightComponent component, const std::string& name = {});
-        [[nodiscard]] nvrhi::IDescriptorTable* getDescriptorTable() const { return m_DescriptorTable ? m_DescriptorTable->getDescriptorTable() : nullptr; }
-        [[nodiscard]] IDescriptorTableManager* getDescriptorTableManager() const { return m_DescriptorTable.get(); }
         [[nodiscard]] render::SceneGpuResources& getGpuResources() { return *m_GpuResources; }
         [[nodiscard]] const render::SceneGpuResources& getGpuResources() const { return *m_GpuResources; }
 

@@ -3,7 +3,7 @@
 #if CAUSTICA_WITH_PYTHON
 
 #include <engine/EngineApp.h>
-#include <engine/RenderInfra.h>
+#include <engine/GpuSharedCaches.h>
 #include <engine/AppResources.h>
 #include <assets/loader/TextureLoader.h>
 #include <core/file_utils.h>
@@ -515,7 +515,7 @@ bool RenderSession::SaveScreenshot(const std::string& outputPath)
     }
 
     auto* host = m_engine.get();
-    auto* infra = host ? caustica::renderInfra(host->app()) : nullptr;
+    auto* infra = host ? caustica::gpuSharedCaches(host->app()) : nullptr;
     auto* renderDevice = (infra && infra->renderDevice) ? infra->renderDevice.get() : nullptr;
     if (!renderDevice)
     {

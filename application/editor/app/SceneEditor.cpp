@@ -11,7 +11,7 @@
 #include <assets/loader/ShaderFactory.h>
 #include <engine/App.h>
 #include <engine/PathTracingRuntime.h>
-#include <engine/RenderInfra.h>
+#include <engine/GpuSharedCaches.h>
 #include <engine/SessionCamera.h>
 #include "EditorAccess.h"
 #include <engine/SceneQuery.h>
@@ -441,7 +441,7 @@ void SceneEditor::setMeshVertices(const std::shared_ptr<MeshInfo>& mesh,
 
 ZoomTool* SceneEditor::getOrCreateZoomTool()
 {
-    auto* infra = m_app ? caustica::renderInfra(*m_app) : nullptr;
+    auto* infra = m_app ? caustica::gpuSharedCaches(*m_app) : nullptr;
     auto* device = m_app ? m_app->getGpuDevice() : nullptr;
     if (m_zoomTool == nullptr && infra && infra->shaderFactory && device)
         m_zoomTool = std::make_unique<ZoomTool>(device->getDevice(), infra->shaderFactory);
@@ -488,7 +488,7 @@ void SceneEditor::afterWorldRender(GpuDevice& gpuDevice)
 
     auto saveFramebuffer = [this, &gpuDevice](const char* fileName) -> bool {
         nvrhi::IFramebuffer* framebuffer = gpuDevice.getCurrentFramebuffer(true);
-        auto* infra = m_app ? caustica::renderInfra(*m_app) : nullptr;
+        auto* infra = m_app ? caustica::gpuSharedCaches(*m_app) : nullptr;
         if (!framebuffer || !infra || !infra->renderDevice)
             return false;
         nvrhi::ITexture* texture = framebuffer->getDesc().colorAttachments[0].texture;

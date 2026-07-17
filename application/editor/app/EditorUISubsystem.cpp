@@ -5,7 +5,7 @@
 #include <imgui/imgui_renderer.h>
 
 #include <engine/App.h>
-#include <engine/RenderInfra.h>
+#include <engine/GpuSharedCaches.h>
 #include <platform/window.h>
 #include <render/passes/debug/ZoomTool.h>
 
@@ -21,8 +21,8 @@ EditorUISubsystem::~EditorUISubsystem() = default;
 
 void EditorUISubsystem::startup(caustica::GpuDevice& gpuDevice, caustica::Window& window, caustica::App& app)
 {
-    auto* renderInfra = app.tryResource<caustica::RenderInfra>();
-    if (!renderInfra || !renderInfra->shaderFactory)
+    auto* gpuSharedCaches = app.tryResource<caustica::GpuSharedCaches>();
+    if (!gpuSharedCaches || !gpuSharedCaches->shaderFactory)
         return;
 
     const bool serSupported = gpuDevice.supportsShaderExecutionReordering()
@@ -34,7 +34,7 @@ void EditorUISubsystem::startup(caustica::GpuDevice& gpuDevice, caustica::Window
         m_config.editorUiData,
         serSupported,
         m_config.cmdLine);
-    m_ui->init(renderInfra->shaderFactory);
+    m_ui->init(gpuSharedCaches->shaderFactory);
 
     if (caustica::Window* platformWindow = gpuDevice.getPlatformWindow())
     {

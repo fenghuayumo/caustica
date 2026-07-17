@@ -17,7 +17,7 @@ namespace caustica
 class GpuDevice;
 class SceneTypeFactory;
 class AssetSystem;
-struct RenderInfra;
+struct GpuSharedCaches;
 struct SessionCamera;
 struct SceneSession;
 struct PathTracingRuntime;
@@ -26,7 +26,7 @@ struct GpuRenderSubsystemInitParams
 {
     GpuDevice& gpuDevice;
     AssetSystem& assetSystem;
-    RenderInfra& renderInfra;
+    GpuSharedCaches& gpuSharedCaches;
     SessionCamera& sessionCamera;
     SceneSession& sceneSession;
     PathTracingRuntime& pathTracingRuntime;
@@ -45,7 +45,7 @@ struct GpuRenderSubsystemInitParams
 
 // Scene load/unload orchestration only.
 // Path-tracing GPU ownership: PathTracingRuntime
-// Shared caches: RenderInfra
+// Shared caches: GpuSharedCaches
 // Logic camera: SessionCamera
 // SceneManager: SceneSession
 // AssetSystem: borrowed for scene asset register/clear; lifecycle owned by AssetPlugin
@@ -75,7 +75,7 @@ private:
 
     [[nodiscard]] ::SceneManager* sceneManager() const;
 
-    RenderInfra* m_renderInfra = nullptr;
+    GpuSharedCaches* m_gpuSharedCaches = nullptr;
     SessionCamera* m_sessionCamera = nullptr;
     SceneSession* m_sceneSession = nullptr;
     PathTracingRuntime* m_pathTracing = nullptr;

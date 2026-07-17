@@ -22,11 +22,11 @@ class WorldRenderer;
 }
 
 class GpuDevice;
-struct RenderInfra;
+struct GpuSharedCaches;
 
 // Owns path-tracing GPU runtime: scene passes, accel structs, render-thread camera,
 // PathTracingContext, and WorldRenderer. Logic camera stays on SessionCamera;
-// session Scene is bound on load (not via SceneManager); shared caches on RenderInfra.
+// session Scene is bound on load (not via SceneManager); shared caches on GpuSharedCaches.
 struct PathTracingRuntime
 {
     PathTracingRuntime();
@@ -40,7 +40,7 @@ struct PathTracingRuntime
     struct CreateParams
     {
         GpuDevice& gpuDevice;
-        RenderInfra& renderInfra;
+        GpuSharedCaches& gpuSharedCaches;
         ::PathTracerSettings& settings;
         render::RenderRuntimeState& runtimeState;
         render::AppDiagnostics& diagnostics;

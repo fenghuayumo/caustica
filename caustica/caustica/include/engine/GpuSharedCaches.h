@@ -22,15 +22,15 @@ class TextureLoader;
 
 // GPU device-side caches shared by path tracing and scene loaders.
 // Owned as an App resource; PathTracingContext holds references into these members.
-struct RenderInfra
+struct GpuSharedCaches
 {
-    RenderInfra();
-    ~RenderInfra();
+    GpuSharedCaches();
+    ~GpuSharedCaches();
 
-    RenderInfra(const RenderInfra&) = delete;
-    RenderInfra& operator=(const RenderInfra&) = delete;
-    RenderInfra(RenderInfra&&) noexcept;
-    RenderInfra& operator=(RenderInfra&&) noexcept;
+    GpuSharedCaches(const GpuSharedCaches&) = delete;
+    GpuSharedCaches& operator=(const GpuSharedCaches&) = delete;
+    GpuSharedCaches(GpuSharedCaches&&) noexcept;
+    GpuSharedCaches& operator=(GpuSharedCaches&&) noexcept;
 
     nvrhi::BindingLayoutHandle bindlessLayout;
     std::shared_ptr<ShaderFactory> shaderFactory;

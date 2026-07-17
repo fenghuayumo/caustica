@@ -30,7 +30,7 @@ namespace render { class RenderDevice; }
 
 // Owns texture registry/cache and the TextureLoader that uses them.
 // App resource lifecycle: AssetPlugin emplaces + schedules shutdown.
-// initialize() is wired by RenderInfra once the GPU descriptor table exists.
+// initialize() is wired by GpuSharedCaches once the GPU descriptor table exists.
 class AssetSystem
 {
 public:

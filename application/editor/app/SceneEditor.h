@@ -41,7 +41,7 @@ class CaptureScriptManager;
 using namespace caustica::math;
 
 // Editor shell: selection/UI/capture/game/content. Scene/render queries go through
-// App + EditorAccess helpers (sessionCamera / pathTracing / renderInfra), not this class.
+// App + EditorAccess helpers (sessionCamera / pathTracing / gpuSharedCaches), not this class.
 class SceneEditor
 {
 public:

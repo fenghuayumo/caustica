@@ -1,7 +1,7 @@
 #include <engine/App.h>
 #include <engine/GpuRenderSubsystem.h>
 #include <engine/PathTracingRuntime.h>
-#include <engine/RenderInfra.h>
+#include <engine/GpuSharedCaches.h>
 #include <engine/AppResources.h>
 #include <engine/SceneViewState.h>
 #include <cassert>
@@ -129,17 +129,17 @@ void initializeScene(App& app, const std::string& preferredScene)
         return;
     }
 
-    RenderInfra* infra = renderInfra(app);
+    GpuSharedCaches* caches = gpuSharedCaches(app);
     PathTracingRuntime* pathTracing = pathTracingRuntime(app);
-    if (!infra || !infra->shaderFactory || !infra->descriptorTable || !infra->textureLoader
+    if (!caches || !caches->shaderFactory || !caches->descriptorTable || !caches->textureLoader
         || !detail::sessionCamera(app) || !pathTracing)
     {
-        caustica::fatal("caustica::initializeScene requires RenderInfra / SessionCamera / PathTracingRuntime wiring");
+        caustica::fatal("caustica::initializeScene requires GpuSharedCaches / SessionCamera / PathTracingRuntime wiring");
         return;
     }
-    const auto shaderFactory = infra->shaderFactory;
-    const auto descriptorTable = infra->descriptorTable;
-    const auto textureLoader = infra->textureLoader;
+    const auto shaderFactory = caches->shaderFactory;
+    const auto descriptorTable = caches->descriptorTable;
+    const auto textureLoader = caches->textureLoader;
 
     if (!wr->getRenderTargets())
         wr->createDeviceResources();

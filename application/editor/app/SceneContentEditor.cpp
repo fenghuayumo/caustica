@@ -30,8 +30,10 @@ namespace
 
     caustica::SetSceneMeshVerticesParams makeMeshEditParams(SceneEditor& sceneEditor)
     {
+        caustica::GpuSharedCaches* gpuSharedCaches = editorGpuSharedCaches(sceneEditor);
         return caustica::SetSceneMeshVerticesParams{
             .device = sceneEditor.app()->getGpuDevice()->getDevice(),
+            .descriptorTable = gpuSharedCaches ? gpuSharedCaches->descriptorTable.get() : nullptr,
             .scene = caustica::activeScene(*sceneEditor.app()),
             .frameIndex = sceneEditor.app()->getGpuDevice()->getFrameIndex(),
             .resetAccumulation = &sceneEditor.pathTracerSettings().ResetAccumulation,

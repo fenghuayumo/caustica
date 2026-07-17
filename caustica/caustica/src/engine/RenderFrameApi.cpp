@@ -3,6 +3,7 @@
 #include <engine/SceneViewState.h>
 #include <cassert>
 #include <engine/RenderFrameApi.h>
+#include <engine/GpuSharedCaches.h>
 #include <engine/SceneQuery.h>
 #include <engine/SceneLifecycle.h>
 #include <engine/RenderSessionApi.h>
@@ -286,6 +287,8 @@ void animate(App& app, float fElapsedTimeSeconds)
                     bool temporalResetNeeded = false;
                     SetSceneMeshVerticesParams deformParams;
                     deformParams.device = device->getDevice();
+                    if (GpuSharedCaches* caches = gpuSharedCaches(app))
+                        deformParams.descriptorTable = caches->descriptorTable.get();
                     deformParams.scene = manager->getScene();
                     deformParams.frameIndex = device->getFrameIndex();
                     deformParams.recomputeNormals = true;

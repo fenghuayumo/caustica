@@ -3,7 +3,7 @@
 #include <filesystem>
 #include <engine/GpuRenderSubsystem.h>
 #include <engine/PathTracingRuntime.h>
-#include <engine/RenderInfra.h>
+#include <engine/GpuSharedCaches.h>
 #include <engine/SessionCamera.h>
 #include <engine/SceneSession.h>
 
@@ -39,7 +39,7 @@ GpuRenderSubsystem::~GpuRenderSubsystem()
 bool GpuRenderSubsystem::initialize(const GpuRenderSubsystemInitParams& params)
 {
     GpuDevice& gpuDevice = params.gpuDevice;
-    RenderInfra& infra = params.renderInfra;
+    GpuSharedCaches& infra = params.gpuSharedCaches;
     SessionCamera& sessionCamera = params.sessionCamera;
     SceneSession& sceneSession = params.sceneSession;
     PathTracingRuntime& pathTracing = params.pathTracingRuntime;
@@ -49,12 +49,10 @@ bool GpuRenderSubsystem::initialize(const GpuRenderSubsystemInitParams& params)
 
     sessionCamera.camera.camera().setRotateSpeed(.003f);
 
-    std::shared_ptr<IDescriptorTableManager> descriptorTable = infra.descriptorTable;
     if (!sceneSession.create(
             gpuDevice,
             *infra.shaderFactory,
             infra.textureLoader,
-            descriptorTable,
             params.sceneTypeFactory,
             std::move(params.sceneCallbacks.OnSceneLoaded),
             std::move(params.sceneCallbacks.OnSceneUnloading)))
@@ -62,7 +60,7 @@ bool GpuRenderSubsystem::initialize(const GpuRenderSubsystemInitParams& params)
         return false;
     }
 
-    m_renderInfra = &infra;
+    m_gpuSharedCaches = &infra;
     m_sessionCamera = &sessionCamera;
     m_sceneSession = &sceneSession;
     m_pathTracing = &pathTracing;
@@ -76,7 +74,7 @@ bool GpuRenderSubsystem::initialize(const GpuRenderSubsystemInitParams& params)
 
     return pathTracing.create(PathTracingRuntime::CreateParams{
         .gpuDevice = gpuDevice,
-        .renderInfra = infra,
+        .gpuSharedCaches = infra,
         .settings = params.settings,
         .runtimeState = params.runtimeState,
         .diagnostics = params.diagnostics,
@@ -111,8 +109,8 @@ void GpuRenderSubsystem::onSceneUnloading()
         m_pathTracing->gaussianSplatPasses().sceneUnloading();
         m_pathTracing->clearSessionScene();
     }
-    if (m_renderInfra && m_renderInfra->bindingCache)
-        m_renderInfra->bindingCache->clear();
+    if (m_gpuSharedCaches && m_gpuSharedCaches->bindingCache)
+        m_gpuSharedCaches->bindingCache->clear();
 }
 
 void GpuRenderSubsystem::applySampleSettingsFromScene()
@@ -194,15 +192,18 @@ void GpuRenderSubsystem::onSceneLoadedGpuPrep()
             wr->onSceneLoaded(scene, scenePath);
     }
 
-    if (m_renderInfra && m_renderInfra->textureLoader && m_renderInfra->renderDevice && m_assetSystem)
+    if (m_gpuSharedCaches && m_gpuSharedCaches->textureLoader && m_gpuSharedCaches->renderDevice && m_assetSystem)
     {
-        m_assetSystem->processRenderingThreadCommands(*m_renderInfra->renderDevice, 0.f);
+        m_assetSystem->processRenderingThreadCommands(*m_gpuSharedCaches->renderDevice, 0.f);
         m_assetSystem->loadingFinished();
     }
 
     if (scene)
     {
-        render::SceneGpuUpdater::refreshAfterLoad(*scene, 0);
+        render::SceneGpuUpdater::refreshAfterLoad(
+            *scene,
+            m_gpuSharedCaches ? m_gpuSharedCaches->descriptorTable.get() : nullptr,
+            0);
         if (m_pathTracing)
             m_pathTracing->lightingPasses().notifySceneReloaded(*scene);
         registerLoadedSceneAssets();
@@ -307,10 +308,10 @@ void GpuRenderSubsystem::shutdown()
     m_sessionCamera = nullptr;
     m_sceneSession = nullptr;
 
-    if (m_renderInfra)
+    if (m_gpuSharedCaches)
     {
-        m_renderInfra->shutdown();
-        m_renderInfra = nullptr;
+        m_gpuSharedCaches->shutdown();
+        m_gpuSharedCaches = nullptr;
     }
 }
 

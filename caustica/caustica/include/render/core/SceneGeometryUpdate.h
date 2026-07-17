@@ -12,6 +12,7 @@ class OpacityMicromapBuilder;
 namespace caustica
 {
 class AccelStructManager;
+class IDescriptorTableManager;
 class Scene;
 
 struct UpdateSceneGeometryParams
@@ -21,6 +22,7 @@ struct UpdateSceneGeometryParams
 
     const std::shared_ptr<Scene>&    scene;
     nvrhi::ICommandList*             commandList = nullptr;
+    IDescriptorTableManager*         descriptorTable = nullptr;
     MaterialGpuCache*                materials = nullptr;
     OpacityMicromapBuilder*          opacityMaps = nullptr;
     uint64_t                         frameIndex = 0;

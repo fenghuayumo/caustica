@@ -474,12 +474,10 @@ Scene::Scene(
     ShaderFactory& shaderFactory,
     std::shared_ptr<IFileSystem> fs,
     std::shared_ptr<TextureLoader> textureCache,
-    std::shared_ptr<IDescriptorTableManager> descriptorTable,
     std::shared_ptr<SceneTypeFactory> sceneTypeFactory)
     : m_fs(std::move(fs))
     , m_SceneTypeFactory(std::move(sceneTypeFactory))
     , m_TextureLoader(std::move(textureCache))
-    , m_DescriptorTable(std::move(descriptorTable))
 {
     m_GpuResources = std::make_shared<render::SceneGpuResources>();
     m_GpuResources->device = device;
@@ -493,7 +491,6 @@ Scene::Scene(
     m_CausUsdImporter = std::make_shared<CausUsdImporter>(m_SceneTypeFactory);
     m_UrdfImporter = std::make_shared<UrdfImporter>(m_SceneTypeFactory);
 
-    m_GpuResources->enableBindlessResources = !!m_DescriptorTable;
     m_GpuResources->rayTracingSupported = m_GpuResources->device->queryFeatureSupport(nvrhi::Feature::RayTracingAccelStruct);
 
     m_GpuResources->skinningShader = shaderFactory.createAutoShader("engine/skinning_cs", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_skinning_cs), nullptr, nvrhi::ShaderType::Compute);

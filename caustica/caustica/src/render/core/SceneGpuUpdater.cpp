@@ -224,10 +224,12 @@ void UpdateInstance(Scene& scene, const scene::MeshInstanceRenderProxy& proxy,
     }
 }
 
-void EnsureMeshGpuBuffers(Scene& scene, nvrhi::ICommandList* commandList)
+void EnsureMeshGpuBuffers(
+    Scene& scene,
+    IDescriptorTableManager* descriptorTable,
+    nvrhi::ICommandList* commandList)
 {
     SceneGpuResources& gpu = scene.getGpuResources();
-    IDescriptorTableManager* descriptorTable = scene.getDescriptorTableManager();
 
     for (const auto& mesh : scene.getMeshes())
     {
@@ -270,6 +272,12 @@ void EnsureMeshGpuBuffers(Scene& scene, nvrhi::ICommandList* commandList)
 
             commandList->setPermanentBufferState(buffers->indexBuffer, state);
             commandList->commitBarriers();
+        }
+        if (descriptorTable && buffers->indexBuffer && !buffers->indexBufferDescriptor)
+        {
+            buffers->indexBufferDescriptor = std::make_shared<DescriptorHandle>(
+                descriptorTable->createDescriptorHandle(
+                    nvrhi::BindingSetItem::RawBuffer_SRV(0, buffers->indexBuffer)));
         }
 
         if (!buffers->vertexBuffer)
@@ -356,6 +364,12 @@ void EnsureMeshGpuBuffers(Scene& scene, nvrhi::ICommandList* commandList)
             commandList->setBufferState(buffers->vertexBuffer, state);
             commandList->commitBarriers();
         }
+        if (descriptorTable && buffers->vertexBuffer && !buffers->vertexBufferDescriptor)
+        {
+            buffers->vertexBufferDescriptor = std::make_shared<DescriptorHandle>(
+                descriptorTable->createDescriptorHandle(
+                    nvrhi::BindingSetItem::RawBuffer_SRV(0, buffers->vertexBuffer)));
+        }
     }
 
     auto& skinnedGpuMap = gpu.skinnedGpuByEntity;
@@ -412,6 +426,16 @@ void EnsureMeshGpuBuffers(Scene& scene, nvrhi::ICommandList* commandList)
                 skinnedBuffers->vertexBufferDescriptor = std::make_shared<DescriptorHandle>(
                     descriptorTable->createDescriptorHandle(nvrhi::BindingSetItem::RawBuffer_SRV(0, skinnedBuffers->vertexBuffer)));
             }
+        }
+        if (descriptorTable
+            && skinnedMesh->buffers->vertexBuffer
+            && !skinnedMesh->buffers->vertexBufferDescriptor)
+        {
+            skinnedMesh->buffers->vertexBufferDescriptor = std::make_shared<DescriptorHandle>(
+                descriptorTable->createDescriptorHandle(
+                    nvrhi::BindingSetItem::RawBuffer_SRV(
+                        0,
+                        skinnedMesh->buffers->vertexBuffer)));
         }
 
         if (!skinnedGpu.jointBuffer)
@@ -549,15 +573,22 @@ void DispatchSkinnedMeshUpdates(Scene& scene, nvrhi::ICommandList* commandList, 
     }
 }
 
-void UpdateGpuSceneBuffers(Scene& scene, nvrhi::ICommandList* commandList, uint32_t frameIndex, bool structureChanged, bool transformsChanged)
+void UpdateGpuSceneBuffers(
+    Scene& scene,
+    IDescriptorTableManager* descriptorTable,
+    nvrhi::ICommandList* commandList,
+    uint32_t frameIndex,
+    bool structureChanged,
+    bool transformsChanged)
 {
     SceneGpuResources& gpu = scene.getGpuResources();
+    gpu.enableBindlessResources = descriptorTable != nullptr;
     bool materialsChanged = false;
 
     if (structureChanged)
     {
         gpu.skinnedGpuByEntity.clear();
-        EnsureMeshGpuBuffers(scene, commandList);
+        EnsureMeshGpuBuffers(scene, descriptorTable, commandList);
     }
 
     const size_t allocationGranularity = 1024;
@@ -678,7 +709,11 @@ void UpdateGpuSceneBuffers(Scene& scene, nvrhi::ICommandList* commandList, uint3
 
 } // namespace
 
-void SceneGpuUpdater::refresh(Scene& scene, nvrhi::ICommandList* commandList, uint32_t frameIndex)
+void SceneGpuUpdater::refresh(
+    Scene& scene,
+    IDescriptorTableManager* descriptorTable,
+    nvrhi::ICommandList* commandList,
+    uint32_t frameIndex)
 {
     if (commandList == nullptr)
         return;
@@ -695,13 +730,22 @@ void SceneGpuUpdater::refresh(Scene& scene, nvrhi::ICommandList* commandList, ui
     const bool structureChanged = scene.hasSceneStructureChanged(frameIndex);
     const bool transformsChanged = scene.hasSceneTransformsChanged(frameIndex);
 
-    UpdateGpuSceneBuffers(scene, commandList, frameIndex, structureChanged, transformsChanged);
+    UpdateGpuSceneBuffers(
+        scene,
+        descriptorTable,
+        commandList,
+        frameIndex,
+        structureChanged,
+        transformsChanged);
     scene.syncRenderSnapshotGpuIndices(frameIndex);
     if (structureChanged)
         scene.acknowledgeGpuStructureConsumed();
 }
 
-void SceneGpuUpdater::refreshAfterLoad(Scene& scene, uint32_t frameIndex)
+void SceneGpuUpdater::refreshAfterLoad(
+    Scene& scene,
+    IDescriptorTableManager* descriptorTable,
+    uint32_t frameIndex)
 {
     // Fill the write slot first. beginGpuReadFrame lets UpdateGpuSceneBuffers read that
     // slot before publish — proxies must not become "latest" until bindless buffers exist.
@@ -715,8 +759,14 @@ void SceneGpuUpdater::refreshAfterLoad(Scene& scene, uint32_t frameIndex)
     commandList->open();
     {
         const GpuReadFrameScope gpuReadScope(scene, frameIndex);
-        EnsureMeshGpuBuffers(scene, commandList);
-        UpdateGpuSceneBuffers(scene, commandList, frameIndex, /*structureChanged=*/true, /*transformsChanged=*/true);
+        EnsureMeshGpuBuffers(scene, descriptorTable, commandList);
+        UpdateGpuSceneBuffers(
+            scene,
+            descriptorTable,
+            commandList,
+            frameIndex,
+            /*structureChanged=*/true,
+            /*transformsChanged=*/true);
         scene.acknowledgeGpuStructureConsumed();
     }
     commandList->close();

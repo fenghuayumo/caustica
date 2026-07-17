@@ -1,4 +1,4 @@
-#include <engine/RenderInfra.h>
+#include <engine/GpuSharedCaches.h>
 
 #include <assets/AssetSystem.h>
 #include <assets/loader/ShaderFactory.h>
@@ -18,10 +18,10 @@
 namespace caustica
 {
 
-RenderInfra::RenderInfra() = default;
-RenderInfra::~RenderInfra() = default;
-RenderInfra::RenderInfra(RenderInfra&&) noexcept = default;
-RenderInfra& RenderInfra::operator=(RenderInfra&&) noexcept = default;
+GpuSharedCaches::GpuSharedCaches() = default;
+GpuSharedCaches::~GpuSharedCaches() = default;
+GpuSharedCaches::GpuSharedCaches(GpuSharedCaches&&) noexcept = default;
+GpuSharedCaches& GpuSharedCaches::operator=(GpuSharedCaches&&) noexcept = default;
 
 namespace
 {
@@ -65,7 +65,7 @@ std::shared_ptr<ShaderFactory> CreateShaderFactory(GpuDevice& gpuDevice)
 
 } // namespace
 
-bool RenderInfra::initialize(GpuDevice& gpuDevice, AssetSystem& assetSystem)
+bool GpuSharedCaches::initialize(GpuDevice& gpuDevice, AssetSystem& assetSystem)
 {
     shaderFactory = CreateShaderFactory(gpuDevice);
 
@@ -83,13 +83,13 @@ bool RenderInfra::initialize(GpuDevice& gpuDevice, AssetSystem& assetSystem)
     return true;
 }
 
-void RenderInfra::endFrame()
+void GpuSharedCaches::endFrame()
 {
     if (bindlessTable)
         bindlessTable->flushDeferredFrees();
 }
 
-void RenderInfra::shutdown()
+void GpuSharedCaches::shutdown()
 {
     textureLoader.reset();
     descriptorTable.reset();
@@ -100,13 +100,13 @@ void RenderInfra::shutdown()
     bindlessLayout = nullptr;
 }
 
-render::RenderDevice& RenderInfra::device()
+render::RenderDevice& GpuSharedCaches::device()
 {
     assert(renderDevice != nullptr);
     return *renderDevice;
 }
 
-const render::RenderDevice& RenderInfra::device() const
+const render::RenderDevice& GpuSharedCaches::device() const
 {
     assert(renderDevice != nullptr);
     return *renderDevice;

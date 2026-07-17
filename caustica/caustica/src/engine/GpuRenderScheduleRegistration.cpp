@@ -4,7 +4,7 @@
 #include <engine/App.h>
 #include <engine/AppSchedules.h>
 #include <engine/PathTracingRuntime.h>
-#include <engine/RenderInfra.h>
+#include <engine/GpuSharedCaches.h>
 
 #include <utility>
 
@@ -16,14 +16,14 @@ void registerGpuRenderSchedules(App& app)
     if (app.gpuRenderSchedulesRegistered())
         return;
 
-    if (!app.tryResource<PathTracingRuntime>() || !app.tryResource<RenderInfra>())
+    if (!app.tryResource<PathTracingRuntime>() || !app.tryResource<GpuSharedCaches>())
         return;
 
     AppSystemOrdering ordering;
     ordering.after.push_back("Scene.RenderScene");
     ordering.after.push_back("Scene.AfterWorldRender");
 
-    app.addSystem(AppSchedule::render, "GpuRender.endFrame", [](ResMut<RenderInfra> infra) {
+    app.addSystem(AppSchedule::render, "GpuRender.endFrame", [](ResMut<GpuSharedCaches> infra) {
         infra->endFrame();
     }, std::move(ordering));
 
