@@ -17,6 +17,7 @@
 #include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace Json
 {
@@ -46,10 +47,17 @@ namespace caustica
         std::shared_ptr<TextureLoader> m_TextureLoader;
         std::unique_ptr<scene::SceneEntityWorld> m_EntityWorld;
         scene::SceneRenderSnapshot m_RenderSnapshot;
-        // Logic-thread extract cache (Bevy Extract / UE proxy sync). Triple-buffer slots
-        // receive a copy each publish so incremental extract does not depend on slot reuse.
+        // Private incremental extract workspace for extractAndPublishRenderSnapshot only.
+        // Never returned to callers; published slots are the sole read channel.
         scene::SceneRenderData m_LogicExtractCache;
         bool m_LogicExtractCacheValid = false;
+
+        // Logic-thread ECS query scratch for getMeshInstances / getLightEntities / etc.
+        // when called outside beginGpuReadFrame (not a published snapshot).
+        mutable std::vector<ecs::Entity> m_LogicQueryMeshInstances;
+        mutable std::vector<ecs::Entity> m_LogicQuerySkinnedMeshInstances;
+        mutable std::vector<ecs::Entity> m_LogicQueryLightEntities;
+        mutable std::vector<ecs::Entity> m_LogicQueryAnimationEntities;
         std::shared_ptr<GltfImporter> m_GltfImporter;
         std::shared_ptr<ObjImporter> m_ObjImporter;
         std::shared_ptr<CausUsdImporter> m_CausUsdImporter;
@@ -115,9 +123,6 @@ namespace caustica
             std::shared_ptr<TextureLoader> textureCache,
             std::shared_ptr<SceneTypeFactory> sceneTypeFactory);
 
-        // Logic-thread staging for exclusive GPU setup. Updates the extract cache only;
-        // AppSchedule::Extract remains the sole snapshot writer/publisher.
-        [[nodiscard]] const scene::SceneRenderData& extractRenderDataForGpuSetup(uint32_t frameIndex);
         void refreshEntityWorldForFrame(uint32_t frameIndex);
 
         // Main/logic thread: extract and publish (ECS refresh runs in App PostUpdate).
@@ -125,8 +130,17 @@ namespace caustica
         void extractAndPublishRenderSnapshot(
             uint32_t frameIndex, const scene::SessionRenderExtractInputs* session = nullptr);
 
+        // Extract + publish for exclusive GPU setup (load / structure flush).
+        // Returns published snapshot for frameIndex. Sole extract channel with prepareRenderFrame.
+        [[nodiscard]] const scene::SceneRenderData& extractAndPublishForGpuSetup(
+            uint32_t frameIndex, const scene::SessionRenderExtractInputs* session = nullptr);
+
         // Returns true when extractAndPublishRenderSnapshot already ran for `frameIndex`.
         [[nodiscard]] bool wasRenderSnapshotExtractedOnLogicThread(uint32_t frameIndex) const;
+
+        // Last frame index published into the triple buffer (editor / diagnostics).
+        // Not a substitute for beginGpuReadFrame or getRenderDataForFrame in render paths.
+        [[nodiscard]] uint32_t latestPublishedRenderFrameIndex() const;
 
         void beginGpuReadFrame(uint32_t frameIndex);
         void endGpuReadFrame();
@@ -163,12 +177,18 @@ namespace caustica
         [[nodiscard]] size_t getMaxGeometryCountPerMesh() const;
         [[nodiscard]] size_t getGeometryInstancesCount() const;
 
+        // Entity lists: beginGpuReadFrame → that slot; else latest published (pick/UI after
+        // endGpuReadFrame); else logic-thread ECS (pre-first-publish only).
         [[nodiscard]] const std::vector<ecs::Entity>& getMeshInstances() const;
         [[nodiscard]] const std::vector<ecs::Entity>& getSkinnedMeshInstances() const;
         [[nodiscard]] const std::vector<ecs::Entity>& getLightEntities() const;
         [[nodiscard]] const std::vector<ecs::Entity>& getCameraEntities() const;
         [[nodiscard]] const std::vector<ecs::Entity>& getAnimationEntities() const;
+
+        // Published snapshot for the active beginGpuReadFrame. Asserts when not in GPU read scope.
         [[nodiscard]] const scene::SceneRenderData& getRenderData() const;
+        // Explicit framed published slot (GPU setup / editor). No latest/slot-0 fallback.
+        [[nodiscard]] const scene::SceneRenderData& getRenderDataForFrame(uint32_t frameIndex) const;
 
         void attachDirectionalLightToRoot(scene::DirectionalLightComponent component, const std::string& name = {});
         void attachSpotLightToRoot(scene::SpotLightComponent component, const std::string& name = {});

@@ -201,7 +201,7 @@ public:
             return false;
 
         const caustica::scene::SceneRenderData& gpuSetupData =
-            scene->extractRenderDataForGpuSetup(frameIndex);
+            scene->extractAndPublishForGpuSetup(frameIndex);
         app.runGpuWorkOnRenderThread([&app, caches, worldRenderer, scene, frameIndex, &gpuSetupData]() {
             if (auto* device = app.getGpuDevice())
             {

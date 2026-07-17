@@ -11,10 +11,12 @@
 #include <scene/loader/CausUsdImporter.h>
 #include <scene/loader/UrdfImporter.h>
 #include <scene/scene_utils.h>
+#include <core/ThreadContext.h>
 #include <core/ThreadPool.h>
 #include <core/json.h>
 #include <core/log.h>
 #include <core/string_utils.h>
+#include <cassert>
 #include <rhi/common/misc.h>
 #include <json/json.h>
 
@@ -320,29 +322,145 @@ size_t Scene::getGeometryInstancesCount() const
     return m_EntityWorld ? m_EntityWorld->getGeometryInstancesCount() : 0;
 }
 
+namespace
+{
+const scene::SceneRenderData* publishedEntityListSource(const scene::SceneRenderSnapshot& snapshot,
+    uint32_t gpuFrameIndex)
+{
+    if (gpuFrameIndex != UINT32_MAX)
+        return &snapshot.readBufferForFrame(gpuFrameIndex);
+
+    // After endGpuReadFrame (editor pick / UI), use the last published Extract list so
+    // instance indices match the frame that produced the pick feedback.
+    const uint32_t latest = snapshot.latestExtractedFrameIndex();
+    if (latest != UINT32_MAX)
+        return &snapshot.readBufferForFrame(latest);
+
+    return nullptr;
+}
+} // namespace
+
 const std::vector<ecs::Entity>& Scene::getMeshInstances() const
 {
-    return getRenderSnapshotForRead().meshInstanceEntities;
+    if (const auto* published = publishedEntityListSource(
+            m_RenderSnapshot, m_gpuReadFrameIndex.load(std::memory_order_acquire)))
+    {
+        return published->meshInstanceEntities;
+    }
+
+    assertLogicThread();
+    m_LogicQueryMeshInstances.clear();
+    if (m_EntityWorld)
+    {
+        // Match Extract / refreshInstanceIndices: entity-id order for pick/index lookups.
+        m_EntityWorld->world().each<scene::MeshInstanceComponent, scene::GlobalTransformComponent,
+            scene::BoundsComponent, scene::SceneContentComponent>(
+            [&](ecs::Entity entity, scene::MeshInstanceComponent&, scene::GlobalTransformComponent&,
+                scene::BoundsComponent&, scene::SceneContentComponent&)
+            {
+                m_LogicQueryMeshInstances.push_back(entity);
+            });
+        std::sort(m_LogicQueryMeshInstances.begin(), m_LogicQueryMeshInstances.end(),
+            [](ecs::Entity a, ecs::Entity b) {
+                return static_cast<uint32_t>(a) < static_cast<uint32_t>(b);
+            });
+    }
+    return m_LogicQueryMeshInstances;
 }
 
 const std::vector<ecs::Entity>& Scene::getSkinnedMeshInstances() const
 {
-    return getRenderSnapshotForRead().skinnedMeshInstanceEntities;
+    if (const auto* published = publishedEntityListSource(
+            m_RenderSnapshot, m_gpuReadFrameIndex.load(std::memory_order_acquire)))
+    {
+        return published->skinnedMeshInstanceEntities;
+    }
+
+    assertLogicThread();
+    m_LogicQuerySkinnedMeshInstances.clear();
+    if (m_EntityWorld)
+    {
+        // Match ExtractSkinnedMeshes: EnTT iteration order (no sort).
+        m_EntityWorld->world().each<scene::SkinnedMeshComponent, scene::MeshInstanceComponent,
+            scene::GlobalTransformComponent>(
+            [&](ecs::Entity entity, scene::SkinnedMeshComponent&, scene::MeshInstanceComponent&,
+                scene::GlobalTransformComponent&)
+            {
+                m_LogicQuerySkinnedMeshInstances.push_back(entity);
+            });
+    }
+    return m_LogicQuerySkinnedMeshInstances;
 }
 
 const std::vector<ecs::Entity>& Scene::getLightEntities() const
 {
-    return getRenderSnapshotForRead().lightEntities;
+    if (const auto* published = publishedEntityListSource(
+            m_RenderSnapshot, m_gpuReadFrameIndex.load(std::memory_order_acquire)))
+    {
+        return published->lightEntities;
+    }
+
+    assertLogicThread();
+    m_LogicQueryLightEntities.clear();
+    if (m_EntityWorld)
+    {
+        // Match ExtractLightsFull: lights without GlobalTransform are not renderable.
+        auto& world = m_EntityWorld->world();
+        world.each<scene::DirectionalLightComponent, scene::GlobalTransformComponent>(
+            [&](ecs::Entity entity, scene::DirectionalLightComponent&, scene::GlobalTransformComponent&) {
+                m_LogicQueryLightEntities.push_back(entity);
+            });
+        world.each<scene::SpotLightComponent, scene::GlobalTransformComponent>(
+            [&](ecs::Entity entity, scene::SpotLightComponent&, scene::GlobalTransformComponent&) {
+                m_LogicQueryLightEntities.push_back(entity);
+            });
+        world.each<scene::PointLightComponent, scene::GlobalTransformComponent>(
+            [&](ecs::Entity entity, scene::PointLightComponent&, scene::GlobalTransformComponent&) {
+                m_LogicQueryLightEntities.push_back(entity);
+            });
+        world.each<scene::EnvironmentLightComponent, scene::GlobalTransformComponent>(
+            [&](ecs::Entity entity, scene::EnvironmentLightComponent&, scene::GlobalTransformComponent&) {
+                m_LogicQueryLightEntities.push_back(entity);
+            });
+    }
+    return m_LogicQueryLightEntities;
 }
 
 const std::vector<ecs::Entity>& Scene::getCameraEntities() const
 {
-    return getRenderSnapshotForRead().cameraEntities;
+    if (const auto* published = publishedEntityListSource(
+            m_RenderSnapshot, m_gpuReadFrameIndex.load(std::memory_order_acquire)))
+    {
+        return published->cameraEntities;
+    }
+
+    assertLogicThread();
+    if (!m_EntityWorld)
+    {
+        static const std::vector<ecs::Entity> empty;
+        return empty;
+    }
+    return m_EntityWorld->cameraEntitiesInRegistrationOrder();
 }
 
 const std::vector<ecs::Entity>& Scene::getAnimationEntities() const
 {
-    return getRenderSnapshotForRead().animationEntities;
+    if (const auto* published = publishedEntityListSource(
+            m_RenderSnapshot, m_gpuReadFrameIndex.load(std::memory_order_acquire)))
+    {
+        return published->animationEntities;
+    }
+
+    assertLogicThread();
+    m_LogicQueryAnimationEntities.clear();
+    if (m_EntityWorld)
+    {
+        m_EntityWorld->world().each<scene::AnimationComponent>(
+            [&](ecs::Entity entity, scene::AnimationComponent&) {
+                m_LogicQueryAnimationEntities.push_back(entity);
+            });
+    }
+    return m_LogicQueryAnimationEntities;
 }
 
 const scene::SceneRenderData& Scene::getRenderData() const
@@ -350,17 +468,17 @@ const scene::SceneRenderData& Scene::getRenderData() const
     return getRenderSnapshotForRead();
 }
 
+const scene::SceneRenderData& Scene::getRenderDataForFrame(uint32_t frameIndex) const
+{
+    return m_RenderSnapshot.readBufferForFrame(frameIndex);
+}
+
 const scene::SceneRenderData& Scene::getRenderSnapshotForRead() const
 {
     const uint32_t gpuFrameIndex = m_gpuReadFrameIndex.load(std::memory_order_acquire);
-    if (gpuFrameIndex != UINT32_MAX)
-        return m_RenderSnapshot.readBufferForFrame(gpuFrameIndex);
-
-    const uint32_t latestFrameIndex = m_RenderSnapshot.latestExtractedFrameIndex();
-    if (latestFrameIndex != UINT32_MAX)
-        return m_RenderSnapshot.readBufferForFrame(latestFrameIndex);
-
-    return m_RenderSnapshot.readBufferForFrame(0);
+    assert(gpuFrameIndex != UINT32_MAX &&
+        "Scene::getRenderData requires beginGpuReadFrame, or use getRenderDataForFrame");
+    return m_RenderSnapshot.readBufferForFrame(gpuFrameIndex);
 }
 
 void Scene::beginGpuReadFrame(uint32_t frameIndex)
@@ -1122,24 +1240,11 @@ void Scene::refreshEntityWorldForFrame(uint32_t frameIndex)
     m_EntityWorld->refresh(frameIndex);
 }
 
-const scene::SceneRenderData& Scene::extractRenderDataForGpuSetup(uint32_t frameIndex)
+const scene::SceneRenderData& Scene::extractAndPublishForGpuSetup(
+    uint32_t frameIndex, const scene::SessionRenderExtractInputs* session)
 {
-    assertLogicThread();
-
-    refreshEntityWorldForFrame(frameIndex);
-    if (!m_EntityWorld)
-        return m_LogicExtractCache;
-
-    // pending flags here are real ECS dirtiness (set by refreshEntityWorldForFrame),
-    // not the GPU structure-flush carry used on no-op frames.
-    const scene::SceneRenderPublishState& pending = m_RenderSnapshot.pendingState();
-    scene::SceneRenderExtractFlags flags{
-        .structureChanged = pending.structureChanged || !m_LogicExtractCacheValid,
-        .transformsChanged = pending.transformsChanged || !m_LogicExtractCacheValid,
-    };
-    scene::extractSceneRenderData(*m_EntityWorld, m_LogicExtractCache, frameIndex, flags);
-    m_LogicExtractCacheValid = true;
-    return m_LogicExtractCache;
+    extractAndPublishRenderSnapshot(frameIndex, session);
+    return m_RenderSnapshot.readBufferForFrame(frameIndex);
 }
 
 void Scene::extractAndPublishRenderSnapshot(uint32_t frameIndex, const scene::SessionRenderExtractInputs* session)
@@ -1190,6 +1295,11 @@ void Scene::extractAndPublishRenderSnapshot(uint32_t frameIndex, const scene::Se
 bool Scene::wasRenderSnapshotExtractedOnLogicThread(uint32_t frameIndex) const
 {
     return m_RenderSnapshot.wasExtractedForFrame(frameIndex);
+}
+
+uint32_t Scene::latestPublishedRenderFrameIndex() const
+{
+    return m_RenderSnapshot.latestExtractedFrameIndex();
 }
 
 void Scene::syncRenderSnapshotGpuIndices(uint32_t /*frameIndex*/)

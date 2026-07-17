@@ -23,6 +23,7 @@
 #include <common/CaptureScriptManager.h>
 
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <filesystem>
 
@@ -41,8 +42,13 @@ void EditorUI::BuildOpacityMicroMapsPanel(const PanelLayout& layout)
             if (auto& opacityMicromapBuilder = caustica::editor::requireWorldRenderer(m_sceneEditor).lightingPasses().opacityMaps(); opacityMicromapBuilder)
             {
                 if (const auto scene = caustica::activeScene(*m_sceneEditor.app()))
-                    opacityMicromapBuilder->debugGUI(
-                        layout.indent, scene->getRenderData());
+                {
+                    // Editor is outside beginGpuReadFrame; use the last published slot.
+                    const uint32_t publishedFrame = scene->latestPublishedRenderFrameIndex();
+                    if (publishedFrame != UINT32_MAX)
+                        opacityMicromapBuilder->debugGUI(
+                            layout.indent, scene->getRenderDataForFrame(publishedFrame));
+                }
             }
             else
                 ImGui::Text("<Opacity Micro-Maps not supported on the current device>");

@@ -401,7 +401,7 @@ void onSceneLoaded(App& app)
     if (const std::shared_ptr<Scene> scenePtr = activeScene(app))
     {
         if (GpuDevice* device = gpuDevice(app))
-            gpuSetupData = &scenePtr->extractRenderDataForGpuSetup(device->getFrameIndex());
+            gpuSetupData = &scenePtr->extractAndPublishForGpuSetup(device->getFrameIndex());
     }
 
     runGpuWorkOnRenderThread(app, [&app, gpuSetupData]() {

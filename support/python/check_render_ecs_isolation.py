@@ -14,7 +14,7 @@ FORBIDDEN = (
     ("Scene::getEntityWorld", re.compile(r"\bgetEntityWorld\s*\(")),
     ("direct ecs::World access", re.compile(r"(?:\.|->)\s*world\s*\(")),
     ("logic ECS refresh", re.compile(r"\brefreshEntityWorldForFrame\s*\(")),
-    ("logic-only GPU extract", re.compile(r"\bextractRenderDataForGpuSetup\s*\(")),
+    ("logic-only GPU extract/publish", re.compile(r"\bextractAndPublishForGpuSetup\s*\(")),
     ("render snapshot publish", re.compile(r"\bextractAndPublishRenderSnapshot\s*\(")),
     ("live scene mesh tracker", re.compile(r"\bgetMeshes\s*\(")),
     ("live scene material tracker", re.compile(r"\bgetMaterials\s*\(")),

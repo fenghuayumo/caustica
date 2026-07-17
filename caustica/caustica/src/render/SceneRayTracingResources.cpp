@@ -13,6 +13,8 @@
 
 #include <shaders/PathTracer/Lighting/LightingTypes.hlsli>
 
+#include <cassert>
+
 namespace caustica::render
 {
 
@@ -150,8 +152,9 @@ void SceneRayTracingResources::createAccelStructs(
     caustica::Scene& scene,
     const caustica::scene::SceneRenderData* renderData)
 {
-    const caustica::scene::SceneRenderData& data =
-        renderData ? *renderData : scene.getRenderData();
+    (void)scene;
+    assert(renderData && "createAccelStructs requires published SceneRenderData");
+    const caustica::scene::SceneRenderData& data = *renderData;
     m_lightingPasses->createOpacityMicromaps(data);
     createBlases(commandList, data);
     createTlas(commandList, data);
@@ -173,10 +176,11 @@ void SceneRayTracingResources::recreateAccelStructs(
     if (!m_gpuDevice->getDevice()->waitForIdle())
         return;
 
+    assert(renderData && "recreateAccelStructs requires published SceneRenderData");
+
     m_worldRenderer->invalidateBindingSet();
     m_accelStructs->releaseGpuResources();
-    const caustica::scene::SceneRenderData& data =
-        renderData ? *renderData : scene.getRenderData();
+    const caustica::scene::SceneRenderData& data = *renderData;
     m_accelStructs->clearMeshAccelStructs(data.meshSnapshots);
     m_gpuDevice->getDevice()->runGarbageCollection();
 

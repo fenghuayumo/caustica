@@ -8,6 +8,8 @@
 #include <scene/SceneRenderData.h>
 #include <scene/ResourceTracker.h>
 
+#include <cassert>
+
 namespace caustica
 {
 
@@ -55,9 +57,8 @@ void transitionSkinnedMeshBuffersToReadOnly(
 
 const scene::SceneRenderData& resolveRenderData(const UpdateSceneGeometryParams& params)
 {
-    if (params.renderData)
-        return *params.renderData;
-    return params.scene->getRenderData();
+    assert(params.renderData && "updateSceneGeometry requires published SceneRenderData");
+    return *params.renderData;
 }
 
 } // namespace

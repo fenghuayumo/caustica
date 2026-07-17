@@ -40,13 +40,10 @@ void flushPendingStructureGpu(App& app)
     if (!worldRendererResource || !caches || !device || !scenePtr || !scenePtr->needsGpuStructureSync())
         return;
 
-    // Exclusive access: no in-flight Extract/render reading an incomplete structure.
-    device->waitForRenderThreadIdle();
-
-    // Use logic frame index (matches Extract after SetRenderFrameIndex; correct for
-    // immediate flush from spawn/despawn in PostUpdate before Extract runs).
-    const uint32_t frameIndex = device->getFrameIndex();
-    const scene::SceneRenderData& gpuSetupData = scenePtr->extractRenderDataForGpuSetup(frameIndex);
+    // prepareRenderFrame already waited for RT idle and published this frame.
+    const uint32_t frameIndex = device->getPreparedRenderFrameIndex();
+    assert(scenePtr->wasRenderSnapshotExtractedOnLogicThread(frameIndex));
+    const scene::SceneRenderData& gpuSetupData = scenePtr->getRenderDataForFrame(frameIndex);
     runGpuWorkOnRenderThread(app, [worldRendererResource, caches, scenePtr, device, frameIndex, &gpuSetupData]() {
         if (nvrhi::IDevice* nvrhiDevice = device->getDevice())
             nvrhiDevice->waitForIdle();

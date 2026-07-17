@@ -46,7 +46,8 @@ void updateWindowTitle(App& app);
 void prepareRenderFrame(App& app);
 void refreshEntityWorld(App& app, uint32_t frameIndex);
 
-// Extract-only: upload meshes/AS for Scene::requestGpuStructureSync() before publish.
+// Extract-only: upload meshes/AS for Scene::requestGpuStructureSync() after publish.
+// Requires the current frame already published via extractAndPublishRenderSnapshot.
 // Applications must not call this -- spawn/despawn only mark dirty; Extract flushes.
 void flushPendingStructureGpu(App& app);
 

@@ -53,7 +53,7 @@ void SceneLightingPasses::sceneUnloading()
 
 void SceneLightingPasses::onSceneLoaded(const caustica::scene::SceneRenderData& renderData, PathTracerSettings& settings)
 {
-    // Prefer published light proxies (refreshAfterLoad publishes before this runs).
+    // Prefer published light proxies (extractAndPublishForGpuSetup before this runs).
     m_envMapLocalPath.clear();
     for (const scene::LightRenderProxy& light : renderData.lights)
     {

@@ -866,8 +866,6 @@ void caustica::render::WorldRenderer::rtxdiSetupFrame(nvrhi::IFramebuffer* frame
         m_rtxdiPass->reset();
 
     const scene::SceneRenderData* renderData = m_context->frameScene;
-    if (!renderData && m_context->sessionScene)
-        renderData = &m_context->sessionScene->getRenderData();
     size_t geometryInstanceCount = 0;
     if (renderData)
     {
@@ -1448,17 +1446,13 @@ void caustica::render::WorldRenderer::recreateBindingSet(const scene::SceneRende
 
     nvrhi::rt::IAccelStruct* gaussianSplatAS = m_context->accelStructs.getTopLevelAS();
     nvrhi::IBuffer* gaussianSplatBuffer = m_context->scenePasses.lighting.materials()->getMaterialDataBuffer();
-    // Prefer the frame snapshot; fall back to session SceneRenderData when rebuilding
-    // bindings outside WorldRenderer::render() (e.g. scene load).
+    // Prefer the explicit published pointer (GPU setup); else frameScene under beginGpuReadFrame.
     const std::span<const caustica::scene::GaussianSplatRenderProxy> gaussianSplats =
         renderData
             ? std::span<const caustica::scene::GaussianSplatRenderProxy>(renderData->gaussianSplats)
             : (m_context->hasFrameScene()
                 ? m_context->frameGaussianSplats()
-                : (m_context->sessionScene
-                    ? std::span<const caustica::scene::GaussianSplatRenderProxy>(
-                        m_context->sessionScene->getRenderData().gaussianSplats)
-                    : std::span<const caustica::scene::GaussianSplatRenderProxy>()));
+                : std::span<const caustica::scene::GaussianSplatRenderProxy>());
     const GaussianSplatBinding primaryGaussianBinding = getPrimaryGaussianSplatBinding(
         gaussianSplats, m_context->scenePasses.gaussianSplats);
     const GaussianSplatPass* primaryGaussianSplatPass = primaryGaussianBinding.splatPass;

@@ -62,7 +62,7 @@ namespace caustica::scene
         [[nodiscard]] bool wasExtractedForFrame(uint32_t frameIndex) const
         {
             const uint32_t slot = slotForFrame(frameIndex);
-            return m_publishedStates[slot].frameIndex == frameIndex;
+            return m_extractedFrameIndex[slot].load(std::memory_order_acquire) == frameIndex;
         }
 
         [[nodiscard]] uint32_t latestExtractedFrameIndex() const

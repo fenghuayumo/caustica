@@ -306,8 +306,6 @@ void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameCont
         std::span<const scene::MaterialRenderResourceSnapshot> materialResources;
         if (m_context->frameScene)
             materialResources = m_context->frameScene->materialSnapshots;
-        else if (m_context->sessionScene)
-            materialResources = m_context->sessionScene->getRenderData().materialSnapshots;
         m_context->scenePasses.lighting.materials()->createRenderPassesAndLoadMaterials(
             m_bindlessLayout, m_context->renderDevice, materialResources,
             m_context->sessionScenePath, getLocalPath(c_AssetsFolder));
@@ -317,8 +315,9 @@ void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameCont
         m_context->diagnostics.progressInitializingRenderer.Set(20);
     }
 
-    if (m_context->sessionScene)
-        m_context->scenePasses.rayTracing.recreateAccelStructs(m_commandList, *m_context->sessionScene);
+    if (m_context->sessionScene && m_context->frameScene)
+        m_context->scenePasses.rayTracing.recreateAccelStructs(
+            m_commandList, *m_context->sessionScene, m_context->frameScene);
     else
         m_context->scenePasses.rayTracing.accelerationStructRebuildRequested() = false;
     m_commandList = device()->createCommandList();
@@ -361,8 +360,6 @@ void caustica::render::WorldRenderer::framePassShaderUpdate(PathTracingFrameCont
 
     // Hit-group rebuild uses mesh proxies from the frame snapshot (indices assigned at Extract).
     const scene::SceneRenderData* sceneData = m_context->frameScene;
-    if (sceneData == nullptr && m_context->sessionScene)
-        sceneData = &m_context->sessionScene->getRenderData();
 
     m_pathTracingShaderCompiler->update(
         sceneData,
@@ -470,7 +467,7 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
         if (ctx.aborted)
             return;
 
-        recreateBindingSet();
+        recreateBindingSet(m_context->frameScene);
 
         m_context->diagnostics.progressInitializingRenderer.Set(100);
 

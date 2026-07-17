@@ -30,7 +30,8 @@ namespace caustica::scene
     //   Logic thread (Bevy-style): mutate SceneEntityWorld / resources only; never upload GPU.
     //   Structure edits call Scene::requestGpuStructureSync(); Extract flushes mesh/AS
     //   then builds *RenderProxy lists + ActiveCamera / RenderSettings into SceneRenderSnapshot.
-    //   Render thread: Scene::getRenderData() only — never touches live ECS components.
+    //   Render thread: Scene::getRenderData() under beginGpuReadFrame, or
+    //   getRenderDataForFrame(frameIndex) — never touches live ECS components.
     //
     // Proxy inventory (must stay complete for anything RT reads per frame):
     //   MeshInstanceRenderProxy, SkinnedMeshRenderProxy, LightRenderProxy,
