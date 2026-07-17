@@ -61,30 +61,35 @@ namespace
         if (!scenePtr || !cam)
             return;
 
-        const auto& cameraEntities = scenePtr->getCameraEntities();
         const auto* ew = scenePtr->getEntityWorld();
         bool syncedCamera = false;
-        if (!cameraEntities.empty() && ew)
+        if (ew)
         {
+            // The published render snapshot is still empty during onSceneLoaded.
+            // Read the logic-owned registration order while synchronizing the controller.
+            const auto& cameraEntities = ew->cameraEntitiesInRegistrationOrder();
             const uint32_t selectedIndex = cam->selectedCameraIndex();
-            const uint32_t camIdx = (selectedIndex > 0) ? (selectedIndex - 1)
-                : static_cast<uint32_t>(cameraEntities.size() - 1);
-            if (camIdx < cameraEntities.size())
+            if (!cameraEntities.empty())
             {
-                ecs::Entity camEntity = cameraEntities[camIdx];
-                const auto* camComp = scene::tryGetCamera(ew->world(), camEntity);
-                const auto* globalComp = ew->world().get<scene::GlobalTransformComponent>(camEntity);
-                if (camComp && globalComp)
+                const uint32_t camIdx = (selectedIndex > 0) ? (selectedIndex - 1)
+                    : static_cast<uint32_t>(cameraEntities.size() - 1);
+                if (camIdx < cameraEntities.size())
                 {
-                    const scene::CameraRenderProxy proxy =
-                        scene::makeCameraRenderProxy(camEntity, *camComp, *globalComp);
-                    PathTracerSettings* settingsPtr = caustica::settings(app);
-                    scene::applyCameraRenderProxyToController(proxy, *cam, settingsPtr);
-                    if (settingsPtr)
-                        settingsPtr->ResetAccumulation = true;
-                    if (auto* wr = caustica::worldRenderer(app))
-                        wr->setGaussianSplatTemporalReset(true);
-                    syncedCamera = proxy.projection == scene::CameraProjectionKind::Perspective;
+                    ecs::Entity camEntity = cameraEntities[camIdx];
+                    const auto* camComp = scene::tryGetCamera(ew->world(), camEntity);
+                    const auto* globalComp = ew->world().get<scene::GlobalTransformComponent>(camEntity);
+                    if (camComp && globalComp)
+                    {
+                        const scene::CameraRenderProxy proxy =
+                            scene::makeCameraRenderProxy(camEntity, *camComp, *globalComp);
+                        PathTracerSettings* settingsPtr = caustica::settings(app);
+                        scene::applyCameraRenderProxyToController(proxy, *cam, settingsPtr);
+                        if (settingsPtr)
+                            settingsPtr->ResetAccumulation = true;
+                        if (auto* wr = caustica::worldRenderer(app))
+                            wr->setGaussianSplatTemporalReset(true);
+                        syncedCamera = proxy.projection == scene::CameraProjectionKind::Perspective;
+                    }
                 }
             }
         }

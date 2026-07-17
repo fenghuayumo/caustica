@@ -28,21 +28,21 @@ void updateCamera(App& app, float elapsedTimeSeconds)
     cam.camera().setMoveSpeed(cfg->CameraMoveSpeed);
 
     const std::shared_ptr<Scene> scene = activeScene(app);
-    const uint cameraCount = scene
-        ? static_cast<uint>(scene->getCameraEntities().size()) + 1
+    const auto* ew = scene ? scene->getEntityWorld() : nullptr;
+    const auto* cameraEntities = ew ? &ew->cameraEntitiesInRegistrationOrder() : nullptr;
+    const uint cameraCount = cameraEntities
+        ? static_cast<uint>(cameraEntities->size()) + 1
         : 1;
     cam.selectedCameraIndex() = std::min(cam.selectedCameraIndex(), cameraCount - 1);
 
     // Logic-side preview of the selected scene camera (same proxy math Extract uses).
     // RT still consumes ActiveCameraRenderProxy from the published snapshot.
-    if (cam.selectedCameraIndex() > 0 && scene)
+    if (cam.selectedCameraIndex() > 0 && cameraEntities)
     {
-        const auto& cameraEntities = scene->getCameraEntities();
         const uint32_t camIdx = cam.selectedCameraIndex() - 1;
-        const auto* ew = (camIdx < cameraEntities.size()) ? scene->getEntityWorld() : nullptr;
-        if (ew)
+        if (camIdx < cameraEntities->size())
         {
-            const ecs::Entity camEntity = cameraEntities[camIdx];
+            const ecs::Entity camEntity = (*cameraEntities)[camIdx];
             const auto* camComp = scene::tryGetCamera(ew->world(), camEntity);
             const auto* globalComp = ew->world().get<scene::GlobalTransformComponent>(camEntity);
             if (camComp && globalComp)
