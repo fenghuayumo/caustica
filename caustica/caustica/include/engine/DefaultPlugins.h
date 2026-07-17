@@ -8,7 +8,7 @@ namespace caustica
 
 // Shared runtime bootstrap for headless apps and the editor:
 // assets, SceneApp resources, SceneAccess, GpuSharedCaches / SessionCamera / SceneSession /
-// PathTracingRuntime, GpuRenderSubsystem, schedule bridge, scene startup.
+// WorldRenderer, GpuRenderSubsystem, schedule bridge, scene startup.
 // EditorPlugin composes this and only adds editor resources / systems.
 struct DefaultPlugins : Plugin
 {

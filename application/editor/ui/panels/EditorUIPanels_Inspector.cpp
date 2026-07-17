@@ -165,7 +165,7 @@ void EditorUI::BuildMaterialEditorPanel(const PanelLayout& layout)
 {
     // Material Editor panel (right-click pick)
     std::shared_ptr<PTMaterial> material = PTMaterial::safeCast(m_editorUI.SelectedMaterial);
-    if (material != nullptr && caustica::editor::requirePathTracing(m_sceneEditor).lightingPasses().materials() != nullptr && m_editorUI.ShowMaterialEditor)
+    if (material != nullptr && caustica::editor::requireWorldRenderer(m_sceneEditor).lightingPasses().materials() != nullptr && m_editorUI.ShowMaterialEditor)
     {
         const bool inspectorVisible = m_editorUI.SelectedEntity != ecs::NullEntity && m_editorUI.ShowInspector;
         ImGui::SetNextWindowPos(ImVec2(float(layout.scaledWidth) - 10.f, inspectorVisible ? 350.f : 10.f), ImGuiCond_Appearing, ImVec2(1.f, 0.f));
@@ -183,7 +183,7 @@ void EditorUI::BuildMaterialEditorPanel(const PanelLayout& layout)
 
         MaterialShaderPermutationKey mspBefore = MaterialShaderPermutationKey(material->computeShaderPermutation(""));
 
-        bool dirty = material->editorGui(*caustica::editor::requirePathTracing(m_sceneEditor).lightingPasses().materials());
+        bool dirty = material->editorGui(*caustica::editor::requireWorldRenderer(m_sceneEditor).lightingPasses().materials());
 
         MaterialShaderPermutationKey mspAfter = MaterialShaderPermutationKey(material->computeShaderPermutation(""));
 

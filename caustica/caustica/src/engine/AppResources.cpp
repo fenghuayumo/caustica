@@ -3,7 +3,6 @@
 #include <engine/GpuSharedCaches.h>
 #include <engine/SessionCamera.h>
 #include <engine/SceneSession.h>
-#include <engine/PathTracingRuntime.h>
 #include <engine/SceneViewState.h>
 #include <cassert>
 #include <backend/GpuDevice.h>
@@ -35,11 +34,6 @@ SceneSession* sceneSession(const App& app)
     return const_cast<SceneSession*>(app.tryResource<SceneSession>());
 }
 
-PathTracingRuntime* pathTracingRuntime(const App& app)
-{
-    return const_cast<PathTracingRuntime*>(app.tryResource<PathTracingRuntime>());
-}
-
 ::SceneManager* sceneManager(const App& app)
 {
     if (SceneSession* session = sceneSession(app))
@@ -49,9 +43,7 @@ PathTracingRuntime* pathTracingRuntime(const App& app)
 
 render::WorldRenderer* worldRenderer(const App& app)
 {
-    if (PathTracingRuntime* pt = pathTracingRuntime(app))
-        return pt->worldRenderer();
-    return nullptr;
+    return const_cast<render::WorldRenderer*>(app.tryResource<render::WorldRenderer>());
 }
 
 PathTracerSettings* settings(const App& app)

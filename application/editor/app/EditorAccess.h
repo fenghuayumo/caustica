@@ -4,11 +4,11 @@
 
 #include <engine/App.h>
 #include <engine/AppResources.h>
-#include <engine/PathTracingRuntime.h>
 #include <engine/GpuSharedCaches.h>
 #include <engine/SessionCamera.h>
 #include <engine/SceneQuery.h>
 #include <render/core/CameraController.h>
+#include <render/worldRenderer/WorldRenderer.h>
 #include <scene/Scene.h>
 #include <scene/SceneManager.h>
 
@@ -87,21 +87,21 @@ namespace caustica::editor
     return nullptr;
 }
 
-[[nodiscard]] inline PathTracingRuntime* editorPathTracing(SceneEditor& editor)
+[[nodiscard]] inline render::WorldRenderer* editorWorldRenderer(SceneEditor& editor)
 {
-    return editor.app() ? caustica::pathTracingRuntime(*editor.app()) : nullptr;
+    return editor.app() ? caustica::worldRenderer(*editor.app()) : nullptr;
 }
 
-[[nodiscard]] inline const PathTracingRuntime* editorPathTracing(const SceneEditor& editor)
+[[nodiscard]] inline render::WorldRenderer* editorWorldRenderer(const SceneEditor& editor)
 {
-    return editor.app() ? caustica::pathTracingRuntime(*editor.app()) : nullptr;
+    return editor.app() ? caustica::worldRenderer(*editor.app()) : nullptr;
 }
 
-[[nodiscard]] inline PathTracingRuntime& requirePathTracing(SceneEditor& editor)
+[[nodiscard]] inline render::WorldRenderer& requireWorldRenderer(SceneEditor& editor)
 {
-    PathTracingRuntime* pt = editorPathTracing(editor);
-    assert(pt);
-    return *pt;
+    render::WorldRenderer* wr = editorWorldRenderer(editor);
+    assert(wr);
+    return *wr;
 }
 
 [[nodiscard]] inline GpuSharedCaches* editorGpuSharedCaches(SceneEditor& editor)
@@ -112,16 +112,6 @@ namespace caustica::editor
 [[nodiscard]] inline const GpuSharedCaches* editorGpuSharedCaches(const SceneEditor& editor)
 {
     return editor.app() ? caustica::gpuSharedCaches(*editor.app()) : nullptr;
-}
-
-[[nodiscard]] inline render::WorldRenderer* editorWorldRenderer(SceneEditor& editor)
-{
-    return editor.app() ? caustica::worldRenderer(*editor.app()) : nullptr;
-}
-
-[[nodiscard]] inline render::WorldRenderer* editorWorldRenderer(const SceneEditor& editor)
-{
-    return editor.app() ? caustica::worldRenderer(*editor.app()) : nullptr;
 }
 
 } // namespace caustica::editor

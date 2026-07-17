@@ -6,7 +6,7 @@
 #include <engine/GpuSharedCaches.h>
 #include <engine/SessionCamera.h>
 #include <engine/SceneSession.h>
-#include <engine/PathTracingRuntime.h>
+#include <render/worldRenderer/WorldRenderer.h>
 #include <engine/SceneAccess.h>
 #include <engine/SceneAppResources.h>
 #include <engine/SceneStartup.h>
@@ -22,7 +22,7 @@ void DefaultPlugins::build(App& app)
     app.emplaceResource<GpuSharedCaches>();
     app.emplaceResource<SessionCamera>();
     app.emplaceResource<SceneSession>();
-    app.emplaceResource<PathTracingRuntime>();
+    app.emplaceResource<render::WorldRenderer>();
     app.emplaceResource<GpuRenderSubsystem>();
 }
 

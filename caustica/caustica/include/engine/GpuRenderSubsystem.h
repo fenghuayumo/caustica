@@ -20,7 +20,11 @@ class AssetSystem;
 struct GpuSharedCaches;
 struct SessionCamera;
 struct SceneSession;
-struct PathTracingRuntime;
+
+namespace render
+{
+class WorldRenderer;
+}
 
 struct GpuRenderSubsystemInitParams
 {
@@ -29,7 +33,7 @@ struct GpuRenderSubsystemInitParams
     GpuSharedCaches& gpuSharedCaches;
     SessionCamera& sessionCamera;
     SceneSession& sceneSession;
-    PathTracingRuntime& pathTracingRuntime;
+    render::WorldRenderer& worldRenderer;
     PathTracerSettings& settings;
     render::RenderRuntimeState& runtimeState;
 
@@ -44,7 +48,7 @@ struct GpuRenderSubsystemInitParams
 };
 
 // Scene load/unload orchestration only.
-// Path-tracing GPU ownership: PathTracingRuntime
+// Path-tracing GPU ownership: WorldRenderer
 // Shared caches: GpuSharedCaches
 // Logic camera: SessionCamera
 // SceneManager: SceneSession
@@ -78,7 +82,7 @@ private:
     GpuSharedCaches* m_gpuSharedCaches = nullptr;
     SessionCamera* m_sessionCamera = nullptr;
     SceneSession* m_sceneSession = nullptr;
-    PathTracingRuntime* m_pathTracing = nullptr;
+    render::WorldRenderer* m_worldRenderer = nullptr;
     GpuDevice* m_gpuDevice = nullptr;
     AssetSystem* m_assetSystem = nullptr;
     PathTracerSettings* m_settings = nullptr;

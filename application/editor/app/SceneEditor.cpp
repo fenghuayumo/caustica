@@ -10,7 +10,6 @@
 #include <render/SceneGaussianSplatPasses.h>
 #include <assets/loader/ShaderFactory.h>
 #include <engine/App.h>
-#include <engine/PathTracingRuntime.h>
 #include <engine/GpuSharedCaches.h>
 #include <engine/SessionCamera.h>
 #include "EditorAccess.h"
@@ -82,7 +81,7 @@ ecs::Entity SceneEditor::pickGaussianSplatAtPixel(math::uint2 renderPixel) const
     if (!m_app)
         return ecs::NullEntity;
 
-    auto* pathTracing = caustica::pathTracingRuntime(*m_app);
+    auto* pathTracing = caustica::worldRenderer(*m_app);
     auto* entityWorld = caustica::entityWorld(*m_app);
     const auto& view = caustica::currentView(*m_app);
     if (!pathTracing || !entityWorld || !view)

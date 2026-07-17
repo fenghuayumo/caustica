@@ -263,7 +263,7 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
                 RESET_ON_CHANGE( ImGui::InputFloat3("Rotation XYZ", (float*)&m_settings.EnvironmentMapParams.RotationXYZ.x) );
                 ImGui::Separator();
 
-                if (auto& envMapProcessor = caustica::editor::requirePathTracing(m_sceneEditor).lightingPasses().environment();
+                if (auto& envMapProcessor = caustica::editor::requireWorldRenderer(m_sceneEditor).lightingPasses().environment();
                     envMapProcessor != nullptr && envMapProcessor->isProcedural() && envMapProcessor->getProceduralSky() != nullptr)
                 {
                     ImGui::TextColored(categoryColor, "Sky Atmosphere");
@@ -275,7 +275,7 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
             if (ImGui::CollapsingHeader("Materials"))
             {
                 RAII_SCOPE( ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
-                if (auto& materialGpuCache = caustica::editor::requirePathTracing(m_sceneEditor).lightingPasses().materials(); materialGpuCache != nullptr)
+                if (auto& materialGpuCache = caustica::editor::requireWorldRenderer(m_sceneEditor).lightingPasses().materials(); materialGpuCache != nullptr)
                     materialGpuCache->debugGui(layout.indent);
             }
         }
@@ -422,10 +422,10 @@ void EditorUI::BuildSceneWidgetsPanel(const PanelLayout& layout)
                 // bistro dry-wet test
                 std::vector<std::string> pavementList = { "LMBR0000163Cobbl_a1d987f5", "LMBR000016bCobbl_8652c51e", "LMBR0000162Paris_c30c71f1", "LMBR0000162Paris_c30c71f1", "LMBR000016cCobbl_f202ecfa", "LMBR0000161Pavem_e2e87964", "LMBR0000168Cobbl_a5a7f4b4", "LMBR0000160Pavem_613287fe", "LMBR000016aCobbl_e1c68d26" };
                 for (std::string& id : pavementList)
-                    if (auto m = caustica::editor::requirePathTracing(m_sceneEditor).lightingPasses().materials()->findByUniqueId(id))
+                    if (auto m = caustica::editor::requireWorldRenderer(m_sceneEditor).lightingPasses().materials()->findByUniqueId(id))
                     {
                         if (m_settings.MaterialVariantIndex == 0) // reset to default
-                            caustica::editor::requirePathTracing(m_sceneEditor).lightingPasses().materials()->loadSingle(*m);
+                            caustica::editor::requireWorldRenderer(m_sceneEditor).lightingPasses().materials()->loadSingle(*m);
                         else
                         {   // make wet-looking
                             m->roughness = 0.0f;
@@ -436,10 +436,10 @@ void EditorUI::BuildSceneWidgetsPanel(const PanelLayout& layout)
 
                 std::vector<std::string> emissivesList = { "LMBR0000172Paris_1d83765c" /*bollards*/, "LMBR00000aeGreen_04f5ae02" /*green leaves*/, "LMBR00000afOrang_a907f305" /*yellow leaves*/, "LMBR00000b0Branc_5990161e" /*branches*/ };
                 for (std::string& id : emissivesList)
-                    if (auto m = caustica::editor::requirePathTracing(m_sceneEditor).lightingPasses().materials()->findByUniqueId(id))
+                    if (auto m = caustica::editor::requireWorldRenderer(m_sceneEditor).lightingPasses().materials()->findByUniqueId(id))
                     {
                         if (m_settings.MaterialVariantIndex == 0 || m_settings.MaterialVariantIndex == 1) // reset to default
-                            caustica::editor::requirePathTracing(m_sceneEditor).lightingPasses().materials()->loadSingle(*m);
+                            caustica::editor::requireWorldRenderer(m_sceneEditor).lightingPasses().materials()->loadSingle(*m);
                         else
                         {   // silly stuff
                             if (id == "LMBR0000172Paris_1d83765c")

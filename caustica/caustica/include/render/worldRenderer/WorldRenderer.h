@@ -3,7 +3,12 @@
 #include <math/math.h>
 #include <rhi/nvrhi.h>
 
+#include <render/AppDiagnostics.h>
+#include <render/RenderRuntimeState.h>
+#include <render/core/AccelStructManager.h>
 #include <render/core/CameraController.h>
+#include <render/core/PathTracerSettings.h>
+#include <render/PathTracerScenePasses.h>
 #include <render/worldRenderer/PathTracingContext.h>
 #include <shaders/PathTracer/Config.h>
 #include <shaders/SampleConstantBuffer.h>
@@ -48,8 +53,12 @@ struct GaussianSplatGraphResources;
 
 namespace caustica
 {
+class GpuDevice;
 class ICompositeView;
 class IView;
+class Scene;
+struct GpuSharedCaches;
+
 namespace render
 {
 class TemporalAntiAliasingPass;
@@ -62,13 +71,45 @@ struct ExtractedFrameView;
 struct RenderFeatureContext;
 
 // =============================================================================
-// WorldRenderer — GPU path-tracing pipeline driven by PathTracingContext.
+// WorldRenderer — GPU path-tracing pipeline and runtime ownership.
 // =============================================================================
 class WorldRenderer
 {
 public:
-    WorldRenderer(PathTracingContext& context);
+    WorldRenderer();
     ~WorldRenderer();
+
+    WorldRenderer(const WorldRenderer&) = delete;
+    WorldRenderer& operator=(const WorldRenderer&) = delete;
+    WorldRenderer(WorldRenderer&&) = delete;
+    WorldRenderer& operator=(WorldRenderer&&) = delete;
+
+    struct CreateParams
+    {
+        GpuDevice& gpuDevice;
+        GpuSharedCaches& gpuSharedCaches;
+        ::PathTracerSettings& settings;
+        RenderRuntimeState& runtimeState;
+        AppDiagnostics& diagnostics;
+        double& sceneTime;
+    };
+
+    bool create(const CreateParams& params);
+    void destroy();
+
+    void bindSessionScene(std::shared_ptr<Scene> scene, std::filesystem::path scenePath);
+    void clearSessionScene();
+
+    [[nodiscard]] CameraController& renderCamera() { return m_renderCamera; }
+    [[nodiscard]] const CameraController& renderCamera() const { return m_renderCamera; }
+    [[nodiscard]] AccelStructManager& accelStructs() { return m_accelStructs; }
+    [[nodiscard]] const AccelStructManager& accelStructs() const { return m_accelStructs; }
+    [[nodiscard]] SceneLightingPasses& lightingPasses() { return m_scenePasses.lighting; }
+    [[nodiscard]] const SceneLightingPasses& lightingPasses() const { return m_scenePasses.lighting; }
+    [[nodiscard]] SceneRayTracingResources& rayTracingResources() { return m_scenePasses.rayTracing; }
+    [[nodiscard]] const SceneRayTracingResources& rayTracingResources() const { return m_scenePasses.rayTracing; }
+    [[nodiscard]] SceneGaussianSplatPasses& gaussianSplatPasses() { return m_scenePasses.gaussianSplats; }
+    [[nodiscard]] const SceneGaussianSplatPasses& gaussianSplatPasses() const { return m_scenePasses.gaussianSplats; }
 
     static nvrhi::BindingLayoutHandle createBindlessLayout(nvrhi::IDevice* device);
     void createBindingLayouts(nvrhi::IBindingLayout* precreatedBindless = nullptr);
@@ -146,9 +187,9 @@ public:
     AccumulationPass* getAccumulationPass() { return m_accumulationPass.get(); }
     BloomPass* getBloomPass() { return m_bloomPass.get(); }
     ToneMappingPass* getToneMappingPass() { return m_toneMappingPass.get(); }
-    CameraController& getCameraController() { return m_context.camera; }
-    PathTracingContext& getPathTracingContext() { return m_context; }
-    const PathTracingContext& getPathTracingContext() const { return m_context; }
+    CameraController& getCameraController() { return m_context->camera; }
+    PathTracingContext& getPathTracingContext() { return *m_context; }
+    const PathTracingContext& getPathTracingContext() const { return *m_context; }
 
     dm::uint2 getRenderSize() const { return m_renderSize; }
     dm::uint2 getDisplaySize() const { return m_displaySize; }
@@ -193,7 +234,7 @@ private:
     friend class PathTracingPipelinePlugin;
     friend class RenderPipelineRegistry;
 
-    [[nodiscard]] nvrhi::IDevice* device() const { return m_context.gpuDevice.getDevice(); }
+    [[nodiscard]] nvrhi::IDevice* device() const { return m_context->gpuDevice.getDevice(); }
 
     [[nodiscard]] CameraUpdateParams makeCameraUpdateParams() const;
     void syncCameraViews();
@@ -227,7 +268,11 @@ private:
     bool evaluateNativeDLSS(bool reset);
 #endif
 
-    PathTracingContext&          m_context;
+    PathTracerScenePasses        m_scenePasses;
+    CameraController             m_renderCamera;
+    AccelStructManager           m_accelStructs;
+    std::unique_ptr<PathTracingContext> m_pathTracingContext;
+    PathTracingContext*          m_context = nullptr;
 
     RenderPipelineRegistry       m_pipelineRegistry;
     rg::GraphBuilder             m_frameGraph;

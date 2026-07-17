@@ -44,7 +44,7 @@ void EditorUI::BuildLightingPanel(const PanelLayout& layout)
 
             {
                 RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent););
-                if (auto& lightSamplingCache = caustica::editor::requirePathTracing(m_sceneEditor).lightingPasses().lightSampling(); lightSamplingCache != nullptr)
+                if (auto& lightSamplingCache = caustica::editor::requireWorldRenderer(m_sceneEditor).lightingPasses().lightSampling(); lightSamplingCache != nullptr)
                     m_settings.ResetAccumulation |= lightSamplingCache->infoGUI(layout.indent);
             }
 
@@ -55,7 +55,7 @@ void EditorUI::BuildLightingPanel(const PanelLayout& layout)
                 if (ImGui::CollapsingHeader("Distant lighting (envmap+directional)", 0/*ImGuiTreeNodeFlags_DefaultOpen*/))
                 {
                     RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent););
-                    if (auto& envMapProcessor = caustica::editor::requirePathTracing(m_sceneEditor).lightingPasses().environment(); envMapProcessor != nullptr)
+                    if (auto& envMapProcessor = caustica::editor::requireWorldRenderer(m_sceneEditor).lightingPasses().environment(); envMapProcessor != nullptr)
                         m_settings.ResetAccumulation |= envMapProcessor->debugGUI(layout.indent);
                 }
             }
@@ -63,7 +63,7 @@ void EditorUI::BuildLightingPanel(const PanelLayout& layout)
             ImGui::TextColored(categoryColor, "Importance sampling:");
             {
                 RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent););
-                if (auto& lightSamplingCache = caustica::editor::requirePathTracing(m_sceneEditor).lightingPasses().lightSampling(); lightSamplingCache != nullptr)
+                if (auto& lightSamplingCache = caustica::editor::requireWorldRenderer(m_sceneEditor).lightingPasses().lightSampling(); lightSamplingCache != nullptr)
                 {
                     if( m_settings.NEEType != 2 )
                     {
@@ -98,7 +98,7 @@ void EditorUI::BuildLightingPanel(const PanelLayout& layout)
                     ImGui::TextColored(categoryColor, "Debugging:");
                     {
                         RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent););
-                        if (auto& lightSamplingCache = caustica::editor::requirePathTracing(m_sceneEditor).lightingPasses().lightSampling(); lightSamplingCache != nullptr)
+                        if (auto& lightSamplingCache = caustica::editor::requireWorldRenderer(m_sceneEditor).lightingPasses().lightSampling(); lightSamplingCache != nullptr)
                             m_settings.ResetAccumulation |= lightSamplingCache->debugGUI(layout.indent);
                     }
                 }

@@ -1,67 +1,130 @@
 #include <engine/ScenePlugins.h>
 
+
+
 #include <engine/App.h>
+
 #include <engine/AppSchedules.h>
-#include <engine/PathTracingRuntime.h>
+
 #include <engine/SessionCamera.h>
+
 #include <engine/SceneQuery.h>
+
 #include <engine/SceneViewState.h>
 
+
+
 #include <backend/GpuDevice.h>
+
 #include <render/RenderRuntimeState.h>
+
 #include <render/AppDiagnostics.h>
+
 #include <render/core/PathTracerSettings.h>
+
 #include <render/worldRenderer/WorldRenderer.h>
+
 #include <scene/Scene.h>
+
 #include <scene/SceneRenderData.h>
 
+
+
 namespace caustica
+
 {
+
+
 
 void prepareRenderFrame(App& app)
+
 {
+
     auto* vs = app.tryResource<SceneViewState>();
+
     auto* diag = app.tryResource<render::AppDiagnostics>();
-    auto* pathTracing = app.tryResource<PathTracingRuntime>();
+
+    auto* worldRendererResource = app.tryResource<render::WorldRenderer>();
+
     auto* sessionCam = app.tryResource<SessionCamera>();
+
     GpuDevice* device = app.getGpuDevice();
+
     if (vs)
+
         vs->progressLoading.stop();
+
     if (diag)
+
         diag->asyncLoadingInProgress = false;
 
-    if (!device || !pathTracing || !sessionCam)
+
+
+    if (!device || !worldRendererResource || !sessionCam)
+
         return;
+
+
 
     const std::shared_ptr<Scene> scene = activeScene(app);
+
     if (!scene)
+
         return;
 
+
+
     // Structure mutations from update systems are ECS-only until here.
+
     syncSceneAccess(app);
+
     flushPendingStructureGpu(app);
 
+
+
     scene::SessionRenderExtractInputs sessionInputs;
+
     sessionInputs.camera = &sessionCam->camera;
-    sessionInputs.gaussianSplatPasses = &pathTracing->gaussianSplatPasses();
-    if (render::WorldRenderer* wr = pathTracing->worldRenderer())
-        sessionInputs.gaussianSplatTemporalReset = wr->consumeGaussianSplatTemporalReset();
+
+    sessionInputs.gaussianSplatPasses = &worldRendererResource->gaussianSplatPasses();
+
+    sessionInputs.gaussianSplatTemporalReset = worldRendererResource->consumeGaussianSplatTemporalReset();
+
     sessionInputs.settings = app.tryResource<PathTracerSettings>();
+
     sessionInputs.runtime = app.tryResource<render::RenderRuntimeState>();
+
     if (vs)
+
         sessionInputs.sceneTime = vs->sceneTime;
 
+
+
     scene->extractAndPublishRenderSnapshot(device->getPreparedRenderFrameIndex(), &sessionInputs);
+
 }
+
+
 
 void RenderExtractPlugin::configureSchedules(App& app)
+
 {
+
     app.addSystemAfter(AppSchedule::Extract, "Scene.PrepareRenderFrame", "SetRenderFrameIndex", [](SystemContext& ctx) {
+
         if (!ctx.gpuDevice || !activeScene(ctx.app))
+
             return;
 
+
+
         prepareRenderFrame(ctx.app);
+
     });
+
 }
 
+
+
 } // namespace caustica
+

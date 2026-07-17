@@ -2,7 +2,6 @@
 #include <cfloat>
 #include <filesystem>
 #include <engine/GpuRenderSubsystem.h>
-#include <engine/PathTracingRuntime.h>
 #include <engine/GpuSharedCaches.h>
 #include <engine/SessionCamera.h>
 #include <engine/SceneSession.h>
@@ -42,7 +41,7 @@ bool GpuRenderSubsystem::initialize(const GpuRenderSubsystemInitParams& params)
     GpuSharedCaches& infra = params.gpuSharedCaches;
     SessionCamera& sessionCamera = params.sessionCamera;
     SceneSession& sceneSession = params.sceneSession;
-    PathTracingRuntime& pathTracing = params.pathTracingRuntime;
+    render::WorldRenderer& worldRenderer = params.worldRenderer;
 
     if (!infra.initialize(gpuDevice, params.assetSystem))
         return false;
@@ -63,7 +62,7 @@ bool GpuRenderSubsystem::initialize(const GpuRenderSubsystemInitParams& params)
     m_gpuSharedCaches = &infra;
     m_sessionCamera = &sessionCamera;
     m_sceneSession = &sceneSession;
-    m_pathTracing = &pathTracing;
+    m_worldRenderer = &worldRenderer;
     m_gpuDevice = &params.gpuDevice;
     m_assetSystem = &params.assetSystem;
     m_settings = &params.settings;
@@ -72,7 +71,7 @@ bool GpuRenderSubsystem::initialize(const GpuRenderSubsystemInitParams& params)
     m_sceneTime = &params.sceneTime;
     m_cmdLine = params.cmdLine;
 
-    return pathTracing.create(PathTracingRuntime::CreateParams{
+    return worldRenderer.create(render::WorldRenderer::CreateParams{
         .gpuDevice = gpuDevice,
         .gpuSharedCaches = infra,
         .settings = params.settings,
@@ -92,22 +91,21 @@ void GpuRenderSubsystem::onSceneUnloading()
         if (const std::shared_ptr<Scene> scene = manager->getScene())
         {
             scene->prepareForUnload();
-            if (m_pathTracing)
-                m_pathTracing->accelStructs().clearMeshAccelStructs(*scene);
+            if (m_worldRenderer)
+                m_worldRenderer->accelStructs().clearMeshAccelStructs(*scene);
         }
     }
 
     if (m_assetSystem)
         m_assetSystem->clearSceneAssets();
 
-    if (m_pathTracing)
+    if (m_worldRenderer)
     {
-        if (render::WorldRenderer* wr = m_pathTracing->worldRenderer())
-            wr->onSceneUnloading();
-        m_pathTracing->accelStructs().releaseGpuResources();
-        m_pathTracing->lightingPasses().sceneUnloading();
-        m_pathTracing->gaussianSplatPasses().sceneUnloading();
-        m_pathTracing->clearSessionScene();
+        m_worldRenderer->onSceneUnloading();
+        m_worldRenderer->accelStructs().releaseGpuResources();
+        m_worldRenderer->lightingPasses().sceneUnloading();
+        m_worldRenderer->gaussianSplatPasses().sceneUnloading();
+        m_worldRenderer->clearSessionScene();
     }
     if (m_gpuSharedCaches && m_gpuSharedCaches->bindingCache)
         m_gpuSharedCaches->bindingCache->clear();
@@ -185,11 +183,10 @@ void GpuRenderSubsystem::onSceneLoadedGpuPrep()
     auto scene = manager ? manager->getScene() : nullptr;
     const std::filesystem::path scenePath = manager ? manager->getCurrentScenePath() : std::filesystem::path{};
 
-    if (m_pathTracing)
+    if (m_worldRenderer)
     {
-        m_pathTracing->bindSessionScene(scene, scenePath);
-        if (render::WorldRenderer* wr = m_pathTracing->worldRenderer())
-            wr->onSceneLoaded(scene, scenePath);
+        m_worldRenderer->bindSessionScene(scene, scenePath);
+        m_worldRenderer->onSceneLoaded(scene, scenePath);
     }
 
     if (m_gpuSharedCaches && m_gpuSharedCaches->textureLoader && m_gpuSharedCaches->renderDevice && m_assetSystem)
@@ -204,8 +201,8 @@ void GpuRenderSubsystem::onSceneLoadedGpuPrep()
             *scene,
             m_gpuSharedCaches ? m_gpuSharedCaches->descriptorTable.get() : nullptr,
             0);
-        if (m_pathTracing)
-            m_pathTracing->lightingPasses().notifySceneReloaded(*scene);
+        if (m_worldRenderer)
+            m_worldRenderer->lightingPasses().notifySceneReloaded(*scene);
         registerLoadedSceneAssets();
     }
 }
@@ -213,7 +210,7 @@ void GpuRenderSubsystem::onSceneLoadedGpuPrep()
 void GpuRenderSubsystem::onSceneLoadedGpuFinish()
 {
     ::SceneManager* manager = sceneManager();
-    if (!manager || !m_settings || !m_runtimeState || !m_pathTracing)
+    if (!manager || !m_settings || !m_runtimeState || !m_worldRenderer)
         return;
 
     const auto scene = manager->getScene();
@@ -221,12 +218,12 @@ void GpuRenderSubsystem::onSceneLoadedGpuFinish()
         return;
 
     if (m_cmdLine)
-        m_pathTracing->gaussianSplatPasses().onSceneLoaded();
+        m_worldRenderer->gaussianSplatPasses().onSceneLoaded();
 
-    m_pathTracing->lightingPasses().onSceneLoaded(*scene, *m_settings);
+    m_worldRenderer->lightingPasses().onSceneLoaded(*scene, *m_settings);
 
     SceneManager::onSceneLoadedGpuPrep(*scene, m_runtimeState->Invalidation.AccelerationStructRebuildRequested);
-    m_pathTracing->accelStructs().resetSubInstanceCount();
+    m_worldRenderer->accelStructs().resetSubInstanceCount();
     m_runtimeState->Invalidation.ShaderReloadRequested = true;
 
     m_settings->MaterialVariantIndex = 0;
@@ -290,10 +287,10 @@ void GpuRenderSubsystem::shutdown()
         }
     }
 
-    if (m_pathTracing)
+    if (m_worldRenderer)
     {
-        m_pathTracing->destroy();
-        m_pathTracing = nullptr;
+        m_worldRenderer->destroy();
+        m_worldRenderer = nullptr;
     }
     if (m_sceneSession)
         m_sceneSession->reset();

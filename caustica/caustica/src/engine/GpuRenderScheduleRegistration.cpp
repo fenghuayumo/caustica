@@ -3,7 +3,7 @@
 
 #include <engine/App.h>
 #include <engine/AppSchedules.h>
-#include <engine/PathTracingRuntime.h>
+#include <render/worldRenderer/WorldRenderer.h>
 #include <engine/GpuSharedCaches.h>
 
 #include <utility>
@@ -16,7 +16,7 @@ void registerGpuRenderSchedules(App& app)
     if (app.gpuRenderSchedulesRegistered())
         return;
 
-    if (!app.tryResource<PathTracingRuntime>() || !app.tryResource<GpuSharedCaches>())
+    if (!app.tryResource<render::WorldRenderer>() || !app.tryResource<GpuSharedCaches>())
         return;
 
     AppSystemOrdering ordering;

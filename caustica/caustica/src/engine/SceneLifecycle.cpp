@@ -1,6 +1,5 @@
 #include <engine/App.h>
 #include <engine/GpuRenderSubsystem.h>
-#include <engine/PathTracingRuntime.h>
 #include <engine/GpuSharedCaches.h>
 #include <engine/AppResources.h>
 #include <engine/SceneViewState.h>
@@ -130,11 +129,11 @@ void initializeScene(App& app, const std::string& preferredScene)
     }
 
     GpuSharedCaches* caches = gpuSharedCaches(app);
-    PathTracingRuntime* pathTracing = pathTracingRuntime(app);
+    render::WorldRenderer* wrResource = worldRenderer(app);
     if (!caches || !caches->shaderFactory || !caches->descriptorTable || !caches->textureLoader
-        || !detail::sessionCamera(app) || !pathTracing)
+        || !detail::sessionCamera(app) || !wrResource)
     {
-        caustica::fatal("caustica::initializeScene requires GpuSharedCaches / SessionCamera / PathTracingRuntime wiring");
+        caustica::fatal("caustica::initializeScene requires GpuSharedCaches / SessionCamera / WorldRenderer wiring");
         return;
     }
     const auto shaderFactory = caches->shaderFactory;
@@ -159,7 +158,7 @@ void initializeScene(App& app, const std::string& preferredScene)
     GpuDevice* device = gpuDevice(app);
     if (device && device->getDevice()->queryFeatureSupport(nvrhi::Feature::RayTracingOpacityMicromap))
     {
-        pathTracing->lightingPasses().createOpacityMapsIfSupported(
+        wrResource->lightingPasses().createOpacityMapsIfSupported(
             device->getDevice(), descriptorTable, textureLoader, shaderFactory);
     }
 
@@ -228,8 +227,8 @@ void onSceneLoaded(App& app)
     syncSceneAccess(app);
 
     const std::filesystem::path assetsRoot = getLocalPath(c_AssetsFolder);
-    if (PathTracingRuntime* pt = pathTracingRuntime(app))
-        pt->lightingPasses().refreshEnvironmentMapMediaList(assetsRoot, manager->getCurrentScenePath());
+    if (render::WorldRenderer* wrResource = worldRenderer(app))
+        wrResource->lightingPasses().refreshEnvironmentMapMediaList(assetsRoot, manager->getCurrentScenePath());
 
     vs->progressLoading.Set(50);
     vs->progressLoading.Set(55);
@@ -292,10 +291,13 @@ void collectUncompressedTextures(App& app)
             return;
         }
     };
-    pathTracingRuntime(app)->lightingPasses().forEachUsedMaterialTexture([&](Handle<ImageAsset> texture, bool normalMap)
+    if (render::WorldRenderer* wrResource = worldRenderer(app))
     {
-        listUncompressedTextureIfNeeded(texture, normalMap);
-    });
+        wrResource->lightingPasses().forEachUsedMaterialTexture([&](Handle<ImageAsset> texture, bool normalMap)
+        {
+            listUncompressedTextureIfNeeded(texture, normalMap);
+        });
+    }
 }
 
 bool hasAsyncLoadingInProgress(const App& app)

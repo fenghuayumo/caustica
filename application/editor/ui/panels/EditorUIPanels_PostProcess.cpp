@@ -38,7 +38,7 @@ void EditorUI::BuildOpacityMicroMapsPanel(const PanelLayout& layout)
         {
             UI_SCOPED_INDENT(layout.indent);
 
-            if (auto& opacityMicromapBuilder = caustica::editor::requirePathTracing(m_sceneEditor).lightingPasses().opacityMaps(); opacityMicromapBuilder)
+            if (auto& opacityMicromapBuilder = caustica::editor::requireWorldRenderer(m_sceneEditor).lightingPasses().opacityMaps(); opacityMicromapBuilder)
             {
                 opacityMicromapBuilder->debugGUI(layout.indent, *caustica::activeScene(*m_sceneEditor.app()));
             }

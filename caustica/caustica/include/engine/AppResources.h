@@ -16,7 +16,6 @@ class SceneViewState;
 struct GpuSharedCaches;
 struct SessionCamera;
 struct SceneSession;
-struct PathTracingRuntime;
 
 namespace render
 {
@@ -27,7 +26,6 @@ class WorldRenderer;
 [[nodiscard]] GpuSharedCaches* gpuSharedCaches(const App& app);
 [[nodiscard]] SessionCamera* sessionCameraResource(const App& app);
 [[nodiscard]] SceneSession* sceneSession(const App& app);
-[[nodiscard]] PathTracingRuntime* pathTracingRuntime(const App& app);
 [[nodiscard]] ::SceneManager* sceneManager(const App& app);
 [[nodiscard]] render::WorldRenderer* worldRenderer(const App& app);
 

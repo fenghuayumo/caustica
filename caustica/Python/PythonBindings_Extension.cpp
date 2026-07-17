@@ -20,7 +20,6 @@
 #include <engine/SceneQuery.h>
 #include <engine/RenderSessionApi.h>
 #include <engine/App.h>
-#include <engine/PathTracingRuntime.h>
 #include <engine/GpuSharedCaches.h>
 #include <engine/AppResources.h>
 #include <backend/GpuDevice.h>
@@ -177,7 +176,7 @@ public:
         caustica::App& app = *m_session->GetApp();
         auto* sceneMgr = caustica::sceneManager(app);
         auto* infra = caustica::gpuSharedCaches(app);
-        auto* pathTracing = caustica::pathTracingRuntime(app);
+        auto* pathTracing = caustica::worldRenderer(app);
         if (!sceneMgr || !infra || !infra->textureLoader || !pathTracing)
             return false;
 
