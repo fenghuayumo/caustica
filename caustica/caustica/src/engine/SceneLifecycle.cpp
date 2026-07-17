@@ -2,6 +2,7 @@
 #include <engine/GpuRenderSubsystem.h>
 #include <engine/GpuSharedCaches.h>
 #include <engine/AppResources.h>
+#include <engine/SessionCamera.h>
 #include <engine/SceneViewState.h>
 #include <cassert>
 #include <engine/SceneLifecycle.h>
@@ -11,15 +12,19 @@
 #include <engine/SceneApiInternal.h>
 #include <engine/RenderThread.h>
 #include <engine/SceneAccess.h>
+#include <assets/AssetSystem.h>
 #include <backend/GpuDevice.h>
+#include <core/command_line.h>
 #include <core/log.h>
 #include <core/path_utils.h>
 #include <core/vfs/VFS.h>
+#include <scene/Scene.h>
 #include <scene/SceneManager.h>
 #include <scene/scene_utils.h>
 #include <scene/SceneCameraAccess.h>
 #include <scene/SceneEcs.h>
 #include <scene/SceneRenderExtract.h>
+#include <scene/SceneTypes.h>
 #include <render/core/PathTracerSettings.h>
 #include <render/worldRenderer/WorldRenderer.h>
 #include <render/core/CameraController.h>
@@ -27,6 +32,7 @@
 #include <assets/loader/TextureLoader.h>
 #include <algorithm>
 #include <cctype>
+#include <cfloat>
 
 
 namespace
@@ -212,6 +218,147 @@ void onSceneUnloading(App& app)
         access->active.reset();
 }
 
+namespace
+{
+
+void applySampleSettingsFromScene(App& app, ::SceneManager& manager)
+{
+    PathTracerSettings* cfg = settings(app);
+    SessionCamera* sessionCam = sessionCameraResource(app);
+    if (!cfg || !sessionCam)
+        return;
+
+    const auto scene = manager.getScene();
+    if (!scene)
+        return;
+
+    if (const SampleSettings* sampleSettings = scene->getSampleSettings())
+    {
+        cfg->RealtimeMode = sampleSettings->realtimeMode.value_or(cfg->RealtimeMode);
+        cfg->EnableAnimations = sampleSettings->enableAnimations.value_or(cfg->EnableAnimations);
+        if (sampleSettings->startingCamera.has_value())
+            sessionCam->camera.setSelectedCameraIndex(sampleSettings->startingCamera.value() + 1);
+        if (sampleSettings->realtimeFireflyFilter.has_value())
+        {
+            cfg->RealtimeFireflyFilterThreshold = sampleSettings->realtimeFireflyFilter.value();
+            cfg->RealtimeFireflyFilterEnabled = true;
+        }
+        cfg->BounceCount = sampleSettings->maxBounces.value_or(cfg->BounceCount);
+        cfg->DiffuseBounceCount = sampleSettings->maxDiffuseBounces.value_or(cfg->DiffuseBounceCount);
+        cfg->TexLODBias = sampleSettings->textureMIPBias.value_or(cfg->TexLODBias);
+    }
+}
+
+void applyLogicThreadSceneLoadSetup(App& app, ::SceneManager& manager, const CommandLineOptions& cmd)
+{
+    PathTracerSettings* cfg = settings(app);
+    SceneViewState* vs = viewState(app);
+    if (!cfg || !vs)
+        return;
+
+    vs->sceneTime = 0.0;
+    cfg->EnableAnimations = false;
+    cfg->RealtimeMode = false;
+
+    applySampleSettingsFromScene(app, manager);
+
+    if (cmd.stopAnimations)
+        cfg->EnableAnimations = false;
+    if (cmd.OverrideToRealtimeMode)
+        cfg->RealtimeMode = true;
+    if (cmd.OverrideToReferenceMode)
+        cfg->RealtimeMode = false;
+
+    cfg->ToneMappingParams.exposureCompensation = 2.0f;
+    cfg->ToneMappingParams.exposureValue = 0.0f;
+
+    // Logic-thread hierarchy snapshot before RT exclusive GPU upload.
+    if (auto scene = manager.getScene())
+    {
+        if (auto* entityWorld = scene->getEntityWorld())
+        {
+            entityWorld->refreshHierarchy(scene::PreviousTransformPolicy::CaptureCurrent);
+            entityWorld->syncPreviousTransformsFromCurrent();
+        }
+    }
+}
+
+void applyCmdLinePostLoadOverrides(PathTracerSettings& cfg, const CommandLineOptions& cmd)
+{
+    if (cmd.OverrideAutoexposureOff)
+    {
+        cfg.ToneMappingParams.autoExposure = false;
+        cfg.ToneMappingParams.exposureValue = 0.0f;
+    }
+    if (cmd.OverrideExposureOffset != FLT_MAX)
+        cfg.ToneMappingParams.exposureCompensation = cmd.OverrideExposureOffset;
+    if (cmd.DisableFireflyFilters)
+    {
+        cfg.RealtimeFireflyFilterEnabled = false;
+        cfg.ReferenceFireflyFilterEnabled = false;
+    }
+    if (cmd.DisablePostProcessFilters)
+        cfg.EnableBloom = false;
+}
+
+void registerLoadedSceneAssets(App& app, ::SceneManager& manager)
+{
+    AssetSystem* assets = app.tryResource<AssetSystem>();
+    const auto scene = manager.getScene();
+    if (!assets || !scene)
+        return;
+
+    assets->clearSceneAssets();
+
+    const std::filesystem::path scenePath = manager.getCurrentScenePath();
+    const std::string sceneName = manager.getCurrentSceneName().empty()
+        ? scenePath.filename().generic_string()
+        : manager.getCurrentSceneName();
+
+    Handle<SceneAsset> sceneAsset = assets->registerSceneAsset(scene, scenePath, sceneName);
+    if (!sceneAsset)
+        return;
+    scene->setAssetHandle(sceneAsset);
+
+    for (const std::shared_ptr<MeshInfo>& mesh : scene->getMeshes())
+    {
+        Handle<MeshAsset> meshAsset = assets->registerMeshAsset(mesh, scenePath, mesh ? mesh->name : std::string());
+        if (mesh)
+            mesh->asset = meshAsset;
+        if (meshAsset)
+            assets->addDependency(sceneAsset.id(), meshAsset.id());
+    }
+
+    for (const std::shared_ptr<Material>& material : scene->getMaterials())
+    {
+        Handle<MaterialAsset> materialAsset = assets->registerMaterialAsset(
+            material,
+            scenePath,
+            material ? material->name : std::string());
+        if (!materialAsset)
+            continue;
+        material->asset = materialAsset;
+        assets->addDependency(sceneAsset.id(), materialAsset.id());
+
+        const Handle<ImageAsset> textures[] = {
+            material->baseOrDiffuseTexture,
+            material->metalRoughOrSpecularTexture,
+            material->normalTexture,
+            material->emissiveTexture,
+            material->occlusionTexture,
+            material->transmissionTexture,
+            material->opacityTexture,
+        };
+        for (const Handle<ImageAsset>& texture : textures)
+        {
+            if (texture)
+                assets->addDependency(materialAsset.id(), texture.id());
+        }
+    }
+}
+
+} // namespace
+
 void onSceneLoaded(App& app)
 {
     GpuRenderSubsystem* gr = app.tryResource<GpuRenderSubsystem>();
@@ -221,7 +368,8 @@ void onSceneLoaded(App& app)
     ::SceneManager* manager = detail::sessionManager(app);
     SceneViewState* vs = viewState(app);
     const CommandLineOptions* cmd = cmdLine(app);
-    if (!manager || !vs || !cmd)
+    PathTracerSettings* cfg = settings(app);
+    if (!manager || !vs || !cmd || !cfg)
         return;
 
     syncSceneAccess(app);
@@ -233,12 +381,14 @@ void onSceneLoaded(App& app)
     vs->progressLoading.Set(50);
     vs->progressLoading.Set(55);
 
-    gr->onSceneLoadedBegin();
+    applyLogicThreadSceneLoadSetup(app, *manager, *cmd);
 
     runGpuWorkOnRenderThread(app, [&app]() {
         if (GpuRenderSubsystem* gpu = app.tryResource<GpuRenderSubsystem>())
             gpu->onSceneLoadedGpuPrep();
     });
+
+    registerLoadedSceneAssets(app, *manager);
 
     syncCameraFromScene(app);
 
@@ -251,7 +401,7 @@ void onSceneLoaded(App& app)
     vs->progressLoading.Set(70);
     vs->progressLoading.Set(90);
 
-    gr->applyCmdLinePostLoadOverrides();
+    applyCmdLinePostLoadOverrides(*cfg, *cmd);
     if (!cmd->cameraPosDirUp.empty())
         setCurrentCameraPosDirUp(app, cmd->cameraPosDirUp);
 

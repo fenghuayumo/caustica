@@ -54,8 +54,9 @@ struct PathTracingContext
 
     AppDiagnostics& diagnostics;
 
-    // Session scene for pass setup (materials, AS, RTXDI, geometry). Bound via
-    // WorldRenderer::onSceneLoaded; not a substitute for frameScene proxy reads.
+    // Sole session Scene ownership for the path tracer. Submodules take non-owning
+    // Scene* or SceneRenderData / SceneGpuFrameHandles per call — do not copy this.
+    // Bound via WorldRenderer::onSceneLoaded; not a substitute for frameScene reads.
     std::shared_ptr<Scene> sessionScene;
     std::filesystem::path sessionScenePath;
 

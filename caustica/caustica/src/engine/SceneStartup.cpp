@@ -1,6 +1,6 @@
 #include <engine/SceneStartup.h>
 
-#include <scene/Scene.h>
+#include <cassert>
 
 #include <assets/AssetSystem.h>
 #include <engine/App.h>
@@ -10,6 +10,7 @@
 #include <engine/SceneSession.h>
 #include <engine/SceneLifecycle.h>
 
+#include <core/log.h>
 #include <core/path_utils.h>
 #include <render/core/RenderSceneTypeFactory.h>
 #include <render/RenderAppState.h>
@@ -34,7 +35,7 @@ void initializeSceneApp(App& app, const SceneAppConfig& config)
     SceneViewState& viewState = config.viewState;
 
     caustica::initStreamlineAndWindow(app);
-    assert(config.renderState && "SceneAppConfig.renderState is required for GpuRenderSubsystem init");
+    assert(config.renderState && "SceneAppConfig.renderState is required for scene GPU bootstrap");
 
     EngineSceneCallbacks sceneCallbacks{
         .OnSceneLoaded = [&app]() { caustica::onSceneLoaded(app); },
@@ -43,21 +44,53 @@ void initializeSceneApp(App& app, const SceneAppConfig& config)
     if (config.hasSceneCallbacks)
         sceneCallbacks = config.sceneCallbacks;
 
-    gpuRenderSubsystem->initialize(GpuRenderSubsystemInitParams{
-        .gpuDevice = *gpuDevice,
-        .assetSystem = *assetSystem,
-        .gpuSharedCaches = *gpuSharedCaches,
-        .sessionCamera = *sessionCamera,
-        .sceneSession = *sceneSession,
-        .worldRenderer = *worldRenderer,
-        .settings = config.renderState->settings,
-        .runtimeState = config.renderState->runtime,
-        .sceneTime = viewState.sceneTime,
-        .diagnostics = config.diagnostics,
-        .cmdLine = config.cmdLine,
-        .sceneTypeFactory = std::make_shared<render::RenderSceneTypeFactory>(),
-        .sceneCallbacks = std::move(sceneCallbacks),
-    });
+    if (!gpuSharedCaches->initialize(*gpuDevice, *assetSystem))
+    {
+        caustica::error("GpuSharedCaches::initialize failed");
+        return;
+    }
+
+    sessionCamera->camera.camera().setRotateSpeed(.003f);
+
+    if (!sceneSession->create(
+            *gpuDevice,
+            *gpuSharedCaches->shaderFactory,
+            gpuSharedCaches->textureLoader,
+            std::make_shared<render::RenderSceneTypeFactory>(),
+            std::move(sceneCallbacks.OnSceneLoaded),
+            std::move(sceneCallbacks.OnSceneUnloading)))
+    {
+        caustica::error("SceneSession::create failed");
+        return;
+    }
+
+    if (!worldRenderer->create(render::WorldRenderer::CreateParams{
+            .gpuDevice = *gpuDevice,
+            .gpuSharedCaches = *gpuSharedCaches,
+            .settings = config.renderState->settings,
+            .runtimeState = config.renderState->runtime,
+            .diagnostics = config.diagnostics,
+            .sceneTime = viewState.sceneTime,
+        }))
+    {
+        caustica::error("WorldRenderer::create failed");
+        return;
+    }
+
+    if (!gpuRenderSubsystem->initialize(GpuRenderSubsystemInitParams{
+            .gpuDevice = *gpuDevice,
+            .assetSystem = *assetSystem,
+            .gpuSharedCaches = *gpuSharedCaches,
+            .sceneSession = *sceneSession,
+            .worldRenderer = *worldRenderer,
+            .settings = config.renderState->settings,
+            .runtimeState = config.renderState->runtime,
+            .diagnostics = config.diagnostics,
+        }))
+    {
+        caustica::error("GpuRenderSubsystem::initialize failed");
+        return;
+    }
 
     caustica::bindSessionCameraSideEffects(app);
     caustica::initializeScene(app, config.preferredScene);

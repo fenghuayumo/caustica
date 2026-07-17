@@ -42,8 +42,9 @@ public:
 
     void setOnRequestFullRebuild(std::function<void()> callback);
 
-    void bindSessionScene(std::shared_ptr<caustica::Scene> scene, std::filesystem::path scenePath);
-    void clearSessionScene();
+    // Non-owning session bind. Ownership stays on PathTracingContext::sessionScene.
+    void bindSession(caustica::Scene* scene, std::filesystem::path scenePath);
+    void clearSession();
     void sceneUnloading();
     void onSceneLoaded();
     bool loadFromFile(const std::filesystem::path& fileName, bool convertRdfToRub = true);
@@ -68,7 +69,7 @@ private:
     uint32_t totalSplatCount() const;
 
     caustica::GpuDevice* m_gpuDevice = nullptr;
-    std::shared_ptr<caustica::Scene> m_sessionScene;
+    caustica::Scene* m_sessionScene = nullptr; // non-owning; PathTracingContext holds shared_ptr
     std::filesystem::path m_sessionScenePath;
     PathTracerSettings* m_settings = nullptr;
     caustica::render::GaussianSplatSceneSummary* m_summary = nullptr;

@@ -1,23 +1,15 @@
 #pragma once
 
-#include <functional>
-#include <memory>
-
-#include <engine/EngineSceneCallbacks.h>
 #include <render/core/PathTracerSettings.h>
 #include <render/AppDiagnostics.h>
 #include <render/RenderRuntimeState.h>
-
-struct CommandLineOptions;
 
 namespace caustica
 {
 
 class GpuDevice;
-class SceneTypeFactory;
 class AssetSystem;
 struct GpuSharedCaches;
-struct SessionCamera;
 struct SceneSession;
 
 namespace render
@@ -25,33 +17,21 @@ namespace render
 class WorldRenderer;
 }
 
+// Wire already-created App resources for scene load/unload GPU orchestration.
+// Bootstrap (caches / SceneSession / WorldRenderer create): SceneStartup
+// Sample settings / hierarchy / cmdline overrides / asset register: SceneLifecycle / AssetSystem
 struct GpuRenderSubsystemInitParams
 {
     GpuDevice& gpuDevice;
     AssetSystem& assetSystem;
     GpuSharedCaches& gpuSharedCaches;
-    SessionCamera& sessionCamera;
     SceneSession& sceneSession;
     render::WorldRenderer& worldRenderer;
     PathTracerSettings& settings;
     render::RenderRuntimeState& runtimeState;
-
-    double& sceneTime;
-
     render::AppDiagnostics& diagnostics;
-
-    const CommandLineOptions* cmdLine = nullptr;
-
-    std::shared_ptr<SceneTypeFactory> sceneTypeFactory;
-    EngineSceneCallbacks sceneCallbacks = {};
 };
 
-// Scene load/unload orchestration only.
-// Path-tracing GPU ownership: WorldRenderer
-// Shared caches: GpuSharedCaches
-// Logic camera: SessionCamera
-// SceneManager: SceneSession
-// AssetSystem: borrowed for scene asset register/clear; lifecycle owned by AssetPlugin
 class GpuRenderSubsystem
 {
 public:
@@ -63,21 +43,15 @@ public:
 
     void shutdown();
 
+    // Store pointers only; callers must create GpuSharedCaches / SceneSession / WorldRenderer first.
     bool initialize(const GpuRenderSubsystemInitParams& params);
 
     void onSceneUnloading();
-    void onSceneLoadedBegin();
     void onSceneLoadedGpuPrep();
     void onSceneLoadedGpuFinish();
-    void applyCmdLinePostLoadOverrides();
-    void setSceneLoadingCallbacks(std::function<void()> onLoaded, std::function<void()> onUnloading);
 
 private:
-    void applySampleSettingsFromScene();
-    void registerLoadedSceneAssets();
-
     GpuSharedCaches* m_gpuSharedCaches = nullptr;
-    SessionCamera* m_sessionCamera = nullptr;
     SceneSession* m_sceneSession = nullptr;
     render::WorldRenderer* m_worldRenderer = nullptr;
     GpuDevice* m_gpuDevice = nullptr;
@@ -85,8 +59,6 @@ private:
     PathTracerSettings* m_settings = nullptr;
     render::RenderRuntimeState* m_runtimeState = nullptr;
     render::AppDiagnostics* m_diagnostics = nullptr;
-    double* m_sceneTime = nullptr;
-    const CommandLineOptions* m_cmdLine = nullptr;
     bool m_shutdown = false;
 };
 

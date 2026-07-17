@@ -312,7 +312,10 @@ void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameCont
         m_context->diagnostics.progressInitializingRenderer.Set(20);
     }
 
-    m_context->scenePasses.rayTracing.recreateAccelStructs(m_commandList);
+    if (m_context->sessionScene)
+        m_context->scenePasses.rayTracing.recreateAccelStructs(m_commandList, *m_context->sessionScene);
+    else
+        m_context->scenePasses.rayTracing.accelerationStructRebuildRequested() = false;
     m_commandList = device()->createCommandList();
 
     if (m_context->activeSettings().actualUseRTXDIPasses() && m_rtxdiPass == nullptr)

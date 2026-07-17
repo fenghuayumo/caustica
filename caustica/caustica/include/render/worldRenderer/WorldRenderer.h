@@ -97,9 +97,6 @@ public:
     bool create(const CreateParams& params);
     void destroy();
 
-    void bindSessionScene(std::shared_ptr<Scene> scene, std::filesystem::path scenePath);
-    void clearSessionScene();
-
     [[nodiscard]] CameraController& renderCamera() { return m_renderCamera; }
     [[nodiscard]] const CameraController& renderCamera() const { return m_renderCamera; }
     [[nodiscard]] AccelStructManager& accelStructs() { return m_accelStructs; }

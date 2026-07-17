@@ -65,7 +65,7 @@ void flushPendingStructureGpu(App& app)
         // render frame races new proxies against a stale TLAS and crashes nvwgf2umx.
         worldRendererResource->rayTracingResources().requestAccelerationStructureRebuild();
         nvrhi::CommandListHandle commandList = device->getDevice()->createCommandList();
-        worldRendererResource->rayTracingResources().recreateAccelStructs(commandList);
+        worldRendererResource->rayTracingResources().recreateAccelStructs(commandList, *scenePtr);
 
         // Keep SBT hit-group count in lockstep with the new TLAS while GPU is idle.
         // Otherwise the next DispatchRays can use new contribution indices against a

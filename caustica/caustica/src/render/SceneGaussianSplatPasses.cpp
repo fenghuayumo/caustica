@@ -68,17 +68,15 @@ void SceneGaussianSplatPasses::setOnRequestFullRebuild(std::function<void()> cal
     m_onRequestFullRebuild = std::move(callback);
 }
 
-void SceneGaussianSplatPasses::bindSessionScene(
-    std::shared_ptr<caustica::Scene> scene,
-    std::filesystem::path scenePath)
+void SceneGaussianSplatPasses::bindSession(caustica::Scene* scene, std::filesystem::path scenePath)
 {
-    m_sessionScene = std::move(scene);
+    m_sessionScene = scene;
     m_sessionScenePath = std::move(scenePath);
 }
 
-void SceneGaussianSplatPasses::clearSessionScene()
+void SceneGaussianSplatPasses::clearSession()
 {
-    m_sessionScene.reset();
+    m_sessionScene = nullptr;
     m_sessionScenePath.clear();
 }
 
@@ -238,7 +236,7 @@ void SceneGaussianSplatPasses::loadFromSceneEntities()
 
 bool SceneGaussianSplatPasses::attachToScene(const std::filesystem::path& fileName, bool convertRdfToRub)
 {
-    auto scene = m_sessionScene;
+    caustica::Scene* scene = m_sessionScene;
     auto* entityWorld = scene ? scene->getEntityWorld() : nullptr;
     if (!scene || !entityWorld || !ecs::isValid(entityWorld->root()))
     {

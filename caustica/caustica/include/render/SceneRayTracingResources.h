@@ -42,9 +42,6 @@ class SceneRayTracingResources
     friend struct PathTracerScenePasses;
 
 public:
-    void bindSessionScene(std::shared_ptr<caustica::Scene> scene);
-    void clearSessionScene();
-
     void setAdditionalAccelStructBuilder(AdditionalAccelStructBuilder builder);
 
     void fillPTPipelineGlobalMacros(std::vector<caustica::ShaderMacro>& macros);
@@ -52,11 +49,10 @@ public:
     void createRTPipelines();
     void ensureStablePlanePipelines();
 
-    void createBlases(nvrhi::ICommandList* commandList);
-    void createTlas(nvrhi::ICommandList* commandList);
     void uploadSubInstanceData(nvrhi::ICommandList* commandList);
-    void createAccelStructs(nvrhi::ICommandList* commandList);
-    void recreateAccelStructs(nvrhi::ICommandList* commandList);
+    // Session Scene is owned by PathTracingContext; pass it in for mesh/AS mutation.
+    void createAccelStructs(nvrhi::ICommandList* commandList, caustica::Scene& scene);
+    void recreateAccelStructs(nvrhi::ICommandList* commandList, caustica::Scene& scene);
     void requestMeshAccelRebuild(const std::shared_ptr<caustica::MeshInfo>& mesh, bool resetAccumulation = true);
 
     // Structure-only invalidation (no shader reload). Prefer this after runtime scene graph edits.
@@ -81,9 +77,10 @@ public:
 
 private:
     void wireSession(const ScenePassWireParams& params);
+    void createBlases(nvrhi::ICommandList* commandList, caustica::Scene& scene);
+    void createTlas(nvrhi::ICommandList* commandList, caustica::Scene& scene);
 
     caustica::GpuDevice*                        m_gpuDevice = nullptr;
-    std::shared_ptr<caustica::Scene>            m_sessionScene;
     caustica::AccelStructManager*               m_accelStructs = nullptr;
     caustica::render::WorldRenderer* m_worldRenderer = nullptr;
     PathTracerSettings*                         m_settings = nullptr;

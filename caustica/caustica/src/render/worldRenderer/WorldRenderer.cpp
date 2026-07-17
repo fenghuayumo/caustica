@@ -162,16 +162,6 @@ void caustica::render::WorldRenderer::destroy()
     m_scenePasses = {};
 }
 
-void caustica::render::WorldRenderer::bindSessionScene(std::shared_ptr<Scene> scene, std::filesystem::path scenePath)
-{
-    m_scenePasses.bindSessionScene(std::move(scene), std::move(scenePath));
-}
-
-void caustica::render::WorldRenderer::clearSessionScene()
-{
-    m_scenePasses.clearSessionScene();
-}
-
 nvrhi::BindingLayoutHandle caustica::render::WorldRenderer::createBindlessLayout(nvrhi::IDevice* device)
 {
     nvrhi::BindlessLayoutDesc bindlessLayoutDesc;
@@ -423,6 +413,7 @@ bool caustica::render::WorldRenderer::createPTPipeline()
 
 void caustica::render::WorldRenderer::onSceneUnloading()
 {
+    m_scenePasses.gaussianSplats.clearSession();
     m_context->sessionScene = nullptr;
     m_context->sessionScenePath.clear();
     m_context->frameScene = nullptr;
@@ -479,6 +470,8 @@ void caustica::render::WorldRenderer::onSceneLoaded(
 {
     m_context->sessionScene = std::move(scene);
     m_context->sessionScenePath = std::move(scenePath);
+    m_scenePasses.gaussianSplats.bindSession(
+        m_context->sessionScene.get(), m_context->sessionScenePath);
 
     resetFrameIndex();
     m_accumulationSampleIndex = 0;
