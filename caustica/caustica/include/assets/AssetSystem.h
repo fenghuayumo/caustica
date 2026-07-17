@@ -29,6 +29,8 @@ class ThreadPool;
 namespace render { class RenderDevice; }
 
 // Owns texture registry/cache and the TextureLoader that uses them.
+// App resource lifecycle: AssetPlugin emplaces + schedules shutdown.
+// initialize() is wired by RenderInfra once the GPU descriptor table exists.
 class AssetSystem
 {
 public:
@@ -36,6 +38,7 @@ public:
         nvrhi::IDevice* device,
         std::shared_ptr<IFileSystem> fileSystem,
         std::shared_ptr<IDescriptorTableManager> descriptorTable);
+    // Idempotent; safe if never initialized or already shut down.
     void shutdown();
 
     AssetRegistry& getRegistry() { return m_Registry; }

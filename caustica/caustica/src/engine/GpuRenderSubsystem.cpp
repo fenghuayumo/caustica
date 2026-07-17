@@ -1,5 +1,6 @@
 #include <cassert>
 #include <cfloat>
+#include <filesystem>
 #include <engine/GpuRenderSubsystem.h>
 #include <engine/PathTracingRuntime.h>
 #include <engine/RenderInfra.h>
@@ -76,7 +77,6 @@ bool GpuRenderSubsystem::initialize(const GpuRenderSubsystemInitParams& params)
     return pathTracing.create(PathTracingRuntime::CreateParams{
         .gpuDevice = gpuDevice,
         .renderInfra = infra,
-        .sceneManager = *sceneSession.manager,
         .settings = params.settings,
         .runtimeState = params.runtimeState,
         .diagnostics = params.diagnostics,
@@ -109,6 +109,7 @@ void GpuRenderSubsystem::onSceneUnloading()
         m_pathTracing->accelStructs().releaseGpuResources();
         m_pathTracing->lightingPasses().sceneUnloading();
         m_pathTracing->gaussianSplatPasses().sceneUnloading();
+        m_pathTracing->clearSessionScene();
     }
     if (m_renderInfra && m_renderInfra->bindingCache)
         m_renderInfra->bindingCache->clear();
@@ -182,10 +183,15 @@ void GpuRenderSubsystem::onSceneLoadedBegin()
 
 void GpuRenderSubsystem::onSceneLoadedGpuPrep()
 {
+    ::SceneManager* manager = sceneManager();
+    auto scene = manager ? manager->getScene() : nullptr;
+    const std::filesystem::path scenePath = manager ? manager->getCurrentScenePath() : std::filesystem::path{};
+
     if (m_pathTracing)
     {
+        m_pathTracing->bindSessionScene(scene, scenePath);
         if (render::WorldRenderer* wr = m_pathTracing->worldRenderer())
-            wr->onSceneLoaded();
+            wr->onSceneLoaded(scene, scenePath);
     }
 
     if (m_renderInfra && m_renderInfra->textureLoader && m_renderInfra->renderDevice && m_assetSystem)
@@ -194,15 +200,12 @@ void GpuRenderSubsystem::onSceneLoadedGpuPrep()
         m_assetSystem->loadingFinished();
     }
 
-    if (::SceneManager* manager = sceneManager())
+    if (scene)
     {
-        if (auto scene = manager->getScene())
-        {
-            render::SceneGpuUpdater::refreshAfterLoad(*scene, 0);
-            if (m_pathTracing)
-                m_pathTracing->lightingPasses().notifySceneReloaded(*scene);
-            registerLoadedSceneAssets();
-        }
+        render::SceneGpuUpdater::refreshAfterLoad(*scene, 0);
+        if (m_pathTracing)
+            m_pathTracing->lightingPasses().notifySceneReloaded(*scene);
+        registerLoadedSceneAssets();
     }
 }
 
@@ -295,8 +298,7 @@ void GpuRenderSubsystem::shutdown()
         m_sceneSession->reset();
 
     m_gpuDevice = nullptr;
-    AssetSystem* assetSystem = m_assetSystem;
-    m_assetSystem = nullptr;
+    m_assetSystem = nullptr; // borrowed; AssetPlugin owns AssetSystem::shutdown()
     m_settings = nullptr;
     m_runtimeState = nullptr;
     m_diagnostics = nullptr;
@@ -310,9 +312,6 @@ void GpuRenderSubsystem::shutdown()
         m_renderInfra->shutdown();
         m_renderInfra = nullptr;
     }
-
-    if (assetSystem)
-        assetSystem->shutdown();
 }
 
 void GpuRenderSubsystem::registerLoadedSceneAssets()

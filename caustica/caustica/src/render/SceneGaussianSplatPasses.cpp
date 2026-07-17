@@ -54,7 +54,6 @@ namespace
 void SceneGaussianSplatPasses::wireSession(const ScenePassWireParams& params)
 {
     m_gpuDevice = &params.gpuDevice;
-    m_sceneManager = &params.sceneManager;
     m_settings = &params.settings;
     m_summary = &params.gaussianSplatsSummary;
     m_shaderFactory = params.shaderFactory;
@@ -67,6 +66,20 @@ void SceneGaussianSplatPasses::wireSession(const ScenePassWireParams& params)
 void SceneGaussianSplatPasses::setOnRequestFullRebuild(std::function<void()> callback)
 {
     m_onRequestFullRebuild = std::move(callback);
+}
+
+void SceneGaussianSplatPasses::bindSessionScene(
+    std::shared_ptr<caustica::Scene> scene,
+    std::filesystem::path scenePath)
+{
+    m_sessionScene = std::move(scene);
+    m_sessionScenePath = std::move(scenePath);
+}
+
+void SceneGaussianSplatPasses::clearSessionScene()
+{
+    m_sessionScene.reset();
+    m_sessionScenePath.clear();
 }
 
 void SceneGaussianSplatPasses::sceneUnloading()
@@ -91,8 +104,8 @@ bool SceneGaussianSplatPasses::removeObjectsUnderEntity(ecs::Entity rootEntity)
     if (!ecs::isValid(rootEntity))
         return false;
 
-    const scene::SceneEntityWorld* entityWorld = m_sceneManager->getScene()
-        ? m_sceneManager->getScene()->getEntityWorld()
+    const scene::SceneEntityWorld* entityWorld = m_sessionScene
+        ? m_sessionScene->getEntityWorld()
         : nullptr;
     if (!entityWorld)
         return false;
@@ -130,8 +143,8 @@ std::filesystem::path SceneGaussianSplatPasses::resolveSplatPath(const caustica:
     if (splatPath.is_absolute())
         return splatPath;
 
-    const std::filesystem::path sceneFolder = m_sceneManager->getCurrentScenePath().parent_path();
-    if (!sceneFolder.empty() && m_sceneManager->getCurrentScenePath() != std::filesystem::path(SceneManager::inlineSceneSentinel()))
+    const std::filesystem::path sceneFolder = m_sessionScenePath.parent_path();
+    if (!sceneFolder.empty() && m_sessionScenePath != std::filesystem::path(SceneManager::inlineSceneSentinel()))
         return sceneFolder / splatPath;
 
     return std::filesystem::absolute(splatPath);
@@ -176,13 +189,13 @@ void SceneGaussianSplatPasses::loadFromSceneEntities()
     // callers publish a render snapshot. Frame rendering must not call this.
     m_objects.clear();
 
-    if (!m_sceneManager->getScene() || !m_sceneManager->getScene()->getEntityWorld() || !m_shaderFactory)
+    if (!m_sessionScene || !m_sessionScene->getEntityWorld() || !m_shaderFactory)
     {
         updateUIState();
         return;
     }
 
-    auto* entityWorld = m_sceneManager->getScene()->getEntityWorld();
+    auto* entityWorld = m_sessionScene->getEntityWorld();
     entityWorld->world().each<scene::GaussianSplatComponent>(
         [&](ecs::Entity entity, scene::GaussianSplatComponent& component)
         {
@@ -225,7 +238,7 @@ void SceneGaussianSplatPasses::loadFromSceneEntities()
 
 bool SceneGaussianSplatPasses::attachToScene(const std::filesystem::path& fileName, bool convertRdfToRub)
 {
-    auto scene = m_sceneManager->getScene();
+    auto scene = m_sessionScene;
     auto* entityWorld = scene ? scene->getEntityWorld() : nullptr;
     if (!scene || !entityWorld || !ecs::isValid(entityWorld->root()))
     {

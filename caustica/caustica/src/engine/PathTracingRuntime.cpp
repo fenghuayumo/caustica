@@ -4,7 +4,6 @@
 #include <render/core/BindingCache.h>
 #include <render/core/RenderDevice.h>
 #include <render/worldRenderer/WorldRenderer.h>
-#include <scene/SceneManager.h>
 
 namespace caustica
 {
@@ -24,7 +23,6 @@ bool PathTracingRuntime::create(const CreateParams& params)
 
     m_pathTracingContext = std::make_unique<render::PathTracingContext>(render::PathTracingContext{
         .gpuDevice = params.gpuDevice,
-        .sceneManager = params.sceneManager,
         .camera = m_renderCamera,
         .accelStructs = m_accelStructs,
         .settings = params.settings,
@@ -44,7 +42,6 @@ bool PathTracingRuntime::create(const CreateParams& params)
 
     render::ScenePassWireParams sceneWireParams{
         .gpuDevice = params.gpuDevice,
-        .sceneManager = params.sceneManager,
         .accelStructs = m_accelStructs,
         .worldRenderer = *m_worldRenderer,
         .settings = params.settings,
@@ -74,6 +71,16 @@ void PathTracingRuntime::destroy()
     m_pathTracingContext.reset();
     m_accelStructs = AccelStructManager{};
     m_scenePasses = {};
+}
+
+void PathTracingRuntime::bindSessionScene(std::shared_ptr<Scene> scene, std::filesystem::path scenePath)
+{
+    m_scenePasses.bindSessionScene(std::move(scene), std::move(scenePath));
+}
+
+void PathTracingRuntime::clearSessionScene()
+{
+    m_scenePasses.clearSessionScene();
 }
 
 } // namespace caustica

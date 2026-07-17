@@ -48,6 +48,7 @@ struct GpuRenderSubsystemInitParams
 // Shared caches: RenderInfra
 // Logic camera: SessionCamera
 // SceneManager: SceneSession
+// AssetSystem: borrowed for scene asset register/clear; lifecycle owned by AssetPlugin
 class GpuRenderSubsystem
 {
 public:

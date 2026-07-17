@@ -10,11 +10,11 @@
 #include <assets/loader/TextureLoader.h>
 #include <render/core/DescriptorTableManager.h>
 #include <scene/Scene.h>
-#include <scene/SceneManager.h>
 #include <scene/SceneRenderData.h>
 
 #include <backend/GpuDevice.h>
 
+#include <filesystem>
 #include <memory>
 #include <span>
 #include <string>
@@ -34,10 +34,10 @@ class RenderDevice;
 // Per-frame camera pose/settings come from SceneRenderData (ActiveCameraRenderProxy /
 // RenderSettingsSnapshot); camera is the RT frame camera, filled from ActiveCameraRenderProxy
 // every frame and never used as the logic-thread free-camera controller.
+// Session Scene is bound via WorldRenderer::onSceneLoaded (SceneManager stays on SceneSession).
 struct PathTracingContext
 {
     GpuDevice& gpuDevice;
-    SceneManager& sceneManager;
     CameraController& camera;
     AccelStructManager& accelStructs;
     PathTracerSettings& settings;
@@ -54,6 +54,11 @@ struct PathTracingContext
 
     AppDiagnostics& diagnostics;
 
+    // Session scene for pass setup (materials, AS, RTXDI, geometry). Bound via
+    // WorldRenderer::onSceneLoaded; not a substitute for frameScene proxy reads.
+    std::shared_ptr<Scene> sessionScene;
+    std::filesystem::path sessionScenePath;
+
     // Per-frame: pointed at SceneRenderData / snapshot copies for the render phase.
     // Valid only between beginGpuReadFrame and endGpuReadFrame in WorldRenderer::render().
     const scene::SceneRenderData* frameScene = nullptr;
@@ -64,14 +69,15 @@ struct PathTracingContext
     RenderRuntimeState* frameRuntime = nullptr;
 
     [[nodiscard]] bool hasFrameScene() const { return frameScene != nullptr; }
+    [[nodiscard]] bool hasSessionScene() const { return sessionScene != nullptr; }
 
-    // Prefer frameGpu; fall back to live SceneGpuResources when rebuilding outside render().
+    // Prefer frameGpu; fall back to session SceneGpuResources when rebuilding outside render().
     [[nodiscard]] SceneGpuFrameHandles resolveGpuHandles() const
     {
         if (frameGpu.valid())
             return frameGpu;
-        if (const auto& scene = sceneManager.getScene())
-            return scene->getGpuResources().frameHandles();
+        if (sessionScene)
+            return sessionScene->getGpuResources().frameHandles();
         return {};
     }
 

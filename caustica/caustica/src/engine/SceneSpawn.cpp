@@ -69,7 +69,7 @@ void flushPendingStructureGpu(App& app)
         if (auto compiler = pathTracing->rayTracingResources().pathTracingShaderCompiler())
         {
             compiler->update(
-                scenePtr,
+                &scenePtr->getRenderData(),
                 static_cast<unsigned int>(pathTracing->accelStructs().getSubInstanceData().size()),
                 [pathTracing](std::vector<caustica::ShaderMacro>& macros) {
                     pathTracing->rayTracingResources().fillPTPipelineGlobalMacros(macros);

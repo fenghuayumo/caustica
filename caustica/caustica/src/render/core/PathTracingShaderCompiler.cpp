@@ -618,7 +618,7 @@ void PathTracingShaderCompiler::enqueueShaderPermutation(PTPipelineVariant::Shad
     m_parallelCompileListAll.push_back(perm);
 }
 
-void PathTracingShaderCompiler::update(const std::shared_ptr<caustica::Scene>& scene, unsigned int subInstanceCount, const std::function<void(std::vector<caustica::ShaderMacro>& macros)>& globalMacrosGetter, bool forceShaderReload)
+void PathTracingShaderCompiler::update(const caustica::scene::SceneRenderData* sceneData, unsigned int subInstanceCount, const std::function<void(std::vector<caustica::ShaderMacro>& macros)>& globalMacrosGetter, bool forceShaderReload)
 {
     // Auto-reload: poll for source file changes
     if (m_compilerConfig.canCompile() && !forceShaderReload && !m_variants.empty())
@@ -671,8 +671,11 @@ void PathTracingShaderCompiler::update(const std::shared_ptr<caustica::Scene>& s
     {
         m_perSubInstanceHitGroup.clear();
         m_perSubInstanceHitGroup.assign(subInstanceCount, ComputeDefaultSubInstanceHitGroupInfo(*getMaterialGpuCache()));
+        if (sceneData == nullptr)
+            return;
+
         size_t compactedGeometryInstanceIndex = 0;
-        for (const scene::MeshInstanceRenderProxy& proxy : scene->getRenderData().meshInstances)
+        for (const scene::MeshInstanceRenderProxy& proxy : sceneData->meshInstances)
         {
             if (!proxy.meshShared)
                 continue;

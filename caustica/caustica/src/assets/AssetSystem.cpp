@@ -42,6 +42,9 @@ void AssetSystem::initialize(
 
 void AssetSystem::shutdown()
 {
+    if (!m_Initialized)
+        return;
+
     m_ArtifactCache.clear();
     m_HotReload.clear();
     m_Dependencies.clear();

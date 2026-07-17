@@ -10,7 +10,6 @@
 #include <render/core/PathTracingShaderCompiler.h>
 #include <render/core/AccelStructManager.h>
 #include <render/passes/omm/OpacityMicromapBuilder.h>
-#include <scene/SceneManager.h>
 #include <scene/Scene.h>
 
 #include <shaders/PathTracer/Lighting/LightingTypes.hlsli>
@@ -21,13 +20,22 @@ namespace caustica::render
 void SceneRayTracingResources::wireSession(const ScenePassWireParams& params)
 {
     m_gpuDevice = &params.gpuDevice;
-    m_sceneManager = &params.sceneManager;
     m_accelStructs = &params.accelStructs;
     m_worldRenderer = &params.worldRenderer;
     m_settings = &params.settings;
     m_invalidation = &params.invalidation;
     m_lightingPasses = &params.lighting;
     m_bindingCache = &params.bindingCache;
+}
+
+void SceneRayTracingResources::bindSessionScene(std::shared_ptr<caustica::Scene> scene)
+{
+    m_sessionScene = std::move(scene);
+}
+
+void SceneRayTracingResources::clearSessionScene()
+{
+    m_sessionScene.reset();
 }
 
 void SceneRayTracingResources::setAdditionalAccelStructBuilder(AdditionalAccelStructBuilder builder)
@@ -129,8 +137,10 @@ void SceneRayTracingResources::ensureStablePlanePipelines()
 
 void SceneRayTracingResources::createBlases(nvrhi::ICommandList* commandList)
 {
+    if (!m_sessionScene)
+        return;
     caustica::AccelStructBuildSettings settings = { .excludeTransmissive = m_settings->AS.ExcludeTransmissive };
-    m_accelStructs->createBlases(commandList, *m_sceneManager->getScene(), settings);
+    m_accelStructs->createBlases(commandList, *m_sessionScene, settings);
 }
 
 void SceneRayTracingResources::uploadSubInstanceData(nvrhi::ICommandList* commandList)
@@ -140,13 +150,17 @@ void SceneRayTracingResources::uploadSubInstanceData(nvrhi::ICommandList* comman
 
 void SceneRayTracingResources::createTlas(nvrhi::ICommandList* commandList)
 {
-    m_accelStructs->createTlas(commandList, *m_sceneManager->getScene());
+    if (!m_sessionScene)
+        return;
+    m_accelStructs->createTlas(commandList, *m_sessionScene);
 }
 
 void SceneRayTracingResources::createAccelStructs(nvrhi::ICommandList* commandList)
 {
+    if (!m_sessionScene)
+        return;
     info("AS rebuild: createOpacityMicromaps begin");
-    m_lightingPasses->createOpacityMicromaps(*m_sceneManager->getScene());
+    m_lightingPasses->createOpacityMicromaps(*m_sessionScene);
     info("AS rebuild: createOpacityMicromaps end");
     info("AS rebuild: createBlases begin");
     createBlases(commandList);
@@ -166,6 +180,11 @@ void SceneRayTracingResources::recreateAccelStructs(nvrhi::ICommandList* command
 {
     if (!m_invalidation->AccelerationStructRebuildRequested)
         return;
+    if (!m_sessionScene)
+    {
+        m_invalidation->AccelerationStructRebuildRequested = false;
+        return;
+    }
 
     m_invalidation->AccelerationStructRebuildRequested = false;
     m_settings->ResetAccumulation = true;
@@ -178,7 +197,7 @@ void SceneRayTracingResources::recreateAccelStructs(nvrhi::ICommandList* command
 
     m_worldRenderer->invalidateBindingSet();
     m_accelStructs->releaseGpuResources();
-    m_accelStructs->clearMeshAccelStructs(*m_sceneManager->getScene());
+    m_accelStructs->clearMeshAccelStructs(*m_sessionScene);
     m_gpuDevice->getDevice()->runGarbageCollection();
 
     commandList->open();

@@ -37,6 +37,26 @@ namespace
                 ctx.renderTargets->clear(passCtx.commandList());
             },
             rg::PassOptions{ .sideEffect = true });
+
+        if (!ctx.hasScene)
+        {
+            const rg::TextureHandle outputColor = ctx.graph->importTexture(
+                ctx.renderTargets->outputColor,
+                rg::TextureAccess::UnorderedAccess);
+
+            ctx.graph->addPass(
+                "ClearNoSceneOutput",
+                [outputColor](rg::PassBuilder& setup) {
+                    setup.write(outputColor, rg::TextureAccess::UnorderedAccess);
+                },
+                [outputColor](rg::RenderPassContext& passCtx) {
+                    passCtx.commandList()->clearTextureFloat(
+                        passCtx.texture(outputColor),
+                        nvrhi::AllSubresources,
+                        nvrhi::Color(1, 1, 0, 0));
+                },
+                rg::PassOptions{ .sideEffect = true, .executeAfter = "ClearFrameTargets" });
+        }
     }
 
     constexpr GraphFeatureRegistration kDefaultGraphFeatures[] = {

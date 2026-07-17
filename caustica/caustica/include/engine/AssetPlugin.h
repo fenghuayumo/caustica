@@ -7,6 +7,9 @@ namespace caustica
 
 class App;
 
+// Sole owner of AssetSystem App-resource lifecycle (emplace + shutdown schedule).
+// RenderInfra only calls AssetSystem::initialize(); GpuRenderSubsystem may clear
+// scene assets but must not shut the system down.
 struct AssetPlugin : Plugin
 {
     void build(App& app) override;

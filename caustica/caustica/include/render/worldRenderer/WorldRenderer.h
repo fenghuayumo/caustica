@@ -23,6 +23,7 @@
 #include <render/worldRenderer/PathTracingFrameContext.h>
 
 #include <chrono>
+#include <filesystem>
 #include <functional>
 #include <memory>
 #include <string>
@@ -93,6 +94,8 @@ public:
     void executeGaussianSplatAccelBuild(nvrhi::ICommandList* commandList);
     void executeGaussianSplatRender(nvrhi::ICommandList* commandList, bool renderToOutputColor);
     void executeGaussianSplatAccumulate(nvrhi::ICommandList* commandList);
+    [[nodiscard]] nvrhi::ITexture* gaussianSplatCurrentColor() const { return m_gaussianSplatCurrentColor.Get(); }
+    [[nodiscard]] nvrhi::ITexture* gaussianSplatAccumulatedColor() const { return m_gaussianSplatAccumulatedColor.Get(); }
     [[nodiscard]] const std::vector<GaussianSplatEmissionProxy>& gaussianSplatEmissionProxies() const
     {
         return m_gaussianSplatEmissionProxies;
@@ -100,7 +103,7 @@ public:
     void postProcessAA(nvrhi::IFramebuffer* framebuffer, bool reset);
     void recreateBindingSet();
     void onSceneUnloading();
-    void onSceneLoaded();
+    void onSceneLoaded(std::shared_ptr<Scene> scene, std::filesystem::path scenePath);
     void invalidateBindingSet() { m_bindingSet = nullptr; }
     void resetFrameIndex();
 

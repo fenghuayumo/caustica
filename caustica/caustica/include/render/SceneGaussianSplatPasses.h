@@ -18,11 +18,10 @@ namespace caustica
 {
 struct GaussianSplat;
 class GpuDevice;
+class Scene;
 class ShaderFactory;
 namespace render { class RenderDevice; }
 } // namespace caustica
-
-class SceneManager;
 
 namespace caustica::render
 {
@@ -43,6 +42,8 @@ public:
 
     void setOnRequestFullRebuild(std::function<void()> callback);
 
+    void bindSessionScene(std::shared_ptr<caustica::Scene> scene, std::filesystem::path scenePath);
+    void clearSessionScene();
     void sceneUnloading();
     void onSceneLoaded();
     bool loadFromFile(const std::filesystem::path& fileName, bool convertRdfToRub = true);
@@ -67,7 +68,8 @@ private:
     uint32_t totalSplatCount() const;
 
     caustica::GpuDevice* m_gpuDevice = nullptr;
-    SceneManager* m_sceneManager = nullptr;
+    std::shared_ptr<caustica::Scene> m_sessionScene;
+    std::filesystem::path m_sessionScenePath;
     PathTracerSettings* m_settings = nullptr;
     caustica::render::GaussianSplatSceneSummary* m_summary = nullptr;
     std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;

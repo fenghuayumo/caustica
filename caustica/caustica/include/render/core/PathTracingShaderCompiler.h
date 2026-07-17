@@ -5,7 +5,7 @@
 #include <rhi/nvrhi.h>
 #include <assets/loader/ShaderFactory.h>
 #include <core/ThreadPool.h>
-#include <scene/Scene.h>
+#include <scene/SceneRenderData.h>
 #include <unordered_set>
 
 #include <assets/loader/ShaderCompilerUtils.h>
@@ -111,7 +111,7 @@ public:
     PathTracingShaderCompiler(nvrhi::IDevice* device, std::shared_ptr<class MaterialGpuCache> & materialGpuCache, nvrhi::BindingLayoutHandle bindingLayout, nvrhi::BindingLayoutHandle bindlessLayout);
     ~PathTracingShaderCompiler();
     
-    void                                update(const std::shared_ptr<caustica::Scene> & scene, unsigned int subInstanceCount, const std::function<void(std::vector<caustica::ShaderMacro> & macros)>& globalMacrosGetter, bool forceShaderReload);
+    void                                update(const caustica::scene::SceneRenderData* sceneData, unsigned int subInstanceCount, const std::function<void(std::vector<caustica::ShaderMacro> & macros)>& globalMacrosGetter, bool forceShaderReload);
     std::shared_ptr<PTPipelineVariant>  createVariant(const std::string & relativeSourcePath, std::vector<caustica::ShaderMacro> variantMacros, const std::string & shortUniqueDebugID, bool rayGenOnly = false );
     void                                releaseVariant(std::shared_ptr<PTPipelineVariant> & variant);
     

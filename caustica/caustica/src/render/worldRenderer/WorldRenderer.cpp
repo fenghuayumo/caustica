@@ -12,6 +12,7 @@ namespace { constexpr int c_SwapchainCount = 3; }
 #include <scene/Scene.h>
 #include <scene/SceneEcs.h>
 #include <scene/SceneLightAccess.h>
+#include <scene/SceneManager.h>
 #include <render/core/PostProcessAA.h>
 #include <render/core/SceneGeometryUpdate.h>
 #include <render/core/LightingUpdate.h>
@@ -349,6 +350,11 @@ bool caustica::render::WorldRenderer::createPTPipeline()
 
 void caustica::render::WorldRenderer::onSceneUnloading()
 {
+    m_context.sessionScene = nullptr;
+    m_context.sessionScenePath.clear();
+    m_context.frameScene = nullptr;
+    m_context.frameGpu = {};
+
 #if CAUSTICA_WITH_STREAMLINE
     if (!m_context.gpuDevice.isHeadless())
     {
@@ -394,8 +400,13 @@ void caustica::render::WorldRenderer::resetFrameIndex()
     m_frameIndex = 0;
 }
 
-void caustica::render::WorldRenderer::onSceneLoaded()
+void caustica::render::WorldRenderer::onSceneLoaded(
+    std::shared_ptr<Scene> scene,
+    std::filesystem::path scenePath)
 {
+    m_context.sessionScene = std::move(scene);
+    m_context.sessionScenePath = std::move(scenePath);
+
     resetFrameIndex();
     m_accumulationSampleIndex = 0;
     m_sampleIndex = 0;
@@ -547,8 +558,8 @@ void caustica::render::WorldRenderer::createRenderPasses( bool& exposureResetReq
 void caustica::render::WorldRenderer::preUpdateLighting(nvrhi::CommandListHandle commandList, bool& needNewBindings)
 {
     std::filesystem::path sceneDirectory;
-    if (m_context.sceneManager.getCurrentScenePath() != std::filesystem::path(SceneManager::inlineSceneSentinel()))
-        sceneDirectory = m_context.sceneManager.getCurrentScenePath().parent_path();
+    if (m_context.sessionScenePath != std::filesystem::path(SceneManager::inlineSceneSentinel()))
+        sceneDirectory = m_context.sessionScenePath.parent_path();
 
     std::string envMapActualPath = m_context.scenePasses.lighting.envMapLocalPath();
     if (m_context.scenePasses.lighting.envMapOverride() != "" && m_context.scenePasses.lighting.envMapOverride() != c_EnvMapSceneDefault)
@@ -778,7 +789,7 @@ void caustica::render::WorldRenderer::rtxdiSetupFrame(nvrhi::IFramebuffer* frame
         m_rtxdiPass->reset();
 
 	m_rtxdiPass->prepareResources(m_commandList, *m_renderTargets, envMapPresent ? m_context.scenePasses.lighting.environment() : nullptr, m_context.scenePasses.lighting.envMapSceneParams(),
-        m_context.sceneManager.getScene(), m_context.scenePasses.lighting.materials(), m_context.scenePasses.lighting.opacityMaps(), m_context.accelStructs.getSubInstanceBuffer(), bridgeParameters, m_bindingLayout, m_shaderDebug );
+        m_context.sessionScene, m_context.scenePasses.lighting.materials(), m_context.scenePasses.lighting.opacityMaps(), m_context.accelStructs.getSubInstanceBuffer(), bridgeParameters, m_bindingLayout, m_shaderDebug );
  }
 #if CAUSTICA_WITH_STREAMLINE
 void caustica::render::WorldRenderer::streamlinePreRender()
@@ -1155,16 +1166,6 @@ void caustica::render::WorldRenderer::executeGaussianSplatAccumulate(nvrhi::ICom
     splatView.setPixelOffset(dm::float2::zero());
     splatView.updateCache();
 
-    commandList->setTextureState(m_renderTargets->processedOutputColor, nvrhi::AllSubresources, nvrhi::ResourceStates::CopySource);
-    commandList->setTextureState(m_gaussianSplatCurrentColor, nvrhi::AllSubresources, nvrhi::ResourceStates::CopyDest);
-    commandList->commitBarriers();
-    commandList->copyTexture(m_gaussianSplatCurrentColor, nvrhi::TextureSlice(), m_renderTargets->processedOutputColor, nvrhi::TextureSlice());
-
-    commandList->setTextureState(m_gaussianSplatCurrentColor, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-    commandList->setTextureState(m_gaussianSplatAccumulatedColor, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
-    commandList->setTextureState(m_renderTargets->processedOutputColor, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
-    commandList->commitBarriers();
-
     m_gaussianSplatAccumulationPass->render(commandList, splatView, splatView, accumulationWeight);
 
     m_gaussianSplatTemporalSampleIndex = std::min(m_gaussianSplatTemporalSampleIndex + 1, 1024 * 1024);
@@ -1178,7 +1179,7 @@ void caustica::render::WorldRenderer::render(nvrhi::IFramebuffer* framebuffer)
         framebuffer->getFramebufferInfo().height);
 
     const uint32_t renderPhaseFrameIndex = m_context.gpuDevice.getRenderPhaseFrameIndex();
-    std::shared_ptr<Scene> scene = m_context.sceneManager.getScene();
+    std::shared_ptr<Scene> scene = m_context.sessionScene;
     if (scene)
     {
         scene->beginGpuReadFrame(renderPhaseFrameIndex);
@@ -1265,14 +1266,14 @@ void caustica::render::WorldRenderer::recreateBindingSet()
 
     nvrhi::rt::IAccelStruct* gaussianSplatAS = m_context.accelStructs.getTopLevelAS();
     nvrhi::IBuffer* gaussianSplatBuffer = m_context.scenePasses.lighting.materials()->getMaterialDataBuffer();
-    // Prefer the frame snapshot; fall back to live SceneRenderData when rebuilding
+    // Prefer the frame snapshot; fall back to session SceneRenderData when rebuilding
     // bindings outside WorldRenderer::render() (e.g. scene load).
-    const std::shared_ptr<Scene> scene = m_context.sceneManager.getScene();
     const std::span<const caustica::scene::GaussianSplatRenderProxy> gaussianSplats =
         m_context.hasFrameScene()
             ? m_context.frameGaussianSplats()
-            : (scene ? std::span<const caustica::scene::GaussianSplatRenderProxy>(scene->getRenderData().gaussianSplats)
-                     : std::span<const caustica::scene::GaussianSplatRenderProxy>());
+            : (m_context.sessionScene
+                ? std::span<const caustica::scene::GaussianSplatRenderProxy>(m_context.sessionScene->getRenderData().gaussianSplats)
+                : std::span<const caustica::scene::GaussianSplatRenderProxy>());
     const GaussianSplatBinding primaryGaussianBinding = getPrimaryGaussianSplatBinding(gaussianSplats);
     const GaussianSplatPass* primaryGaussianSplatPass = primaryGaussianBinding.splatPass;
     if (primaryGaussianSplatPass != nullptr && primaryGaussianSplatPass->getTopLevelAS() != nullptr && primaryGaussianSplatPass->getSplatBuffer() != nullptr)

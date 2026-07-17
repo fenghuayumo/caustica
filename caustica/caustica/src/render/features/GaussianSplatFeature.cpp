@@ -43,10 +43,9 @@ void registerGaussianSplatPreAAFeature(RenderFeatureContext ctx)
 
     ctx.graph->addPass(
         "GaussianSplatsStochastic",
-        [&](rg::PassBuilder& setup) {
-            setup.read(outputColor, rg::TextureAccess::UnorderedAccess);
+        [outputColor, depth](rg::PassBuilder& setup) {
             setup.read(depth, rg::TextureAccess::ShaderResource);
-            setup.write(outputColor, rg::TextureAccess::UnorderedAccess);
+            setup.write(outputColor, rg::TextureAccess::RenderTarget);
         },
         [ctx](rg::RenderPassContext& passCtx) {
             if (!gaussianSplatsEnabled(ctx))
@@ -105,10 +104,9 @@ void registerGaussianSplatCompositeFeature(RenderFeatureContext ctx)
 
     ctx.graph->addPass(
         "GaussianSplatsComposite",
-        [&](rg::PassBuilder& setup) {
-            setup.read(processedOutputColor, rg::TextureAccess::UnorderedAccess);
+        [processedOutputColor, depth](rg::PassBuilder& setup) {
             setup.read(depth, rg::TextureAccess::ShaderResource);
-            setup.write(processedOutputColor, rg::TextureAccess::UnorderedAccess);
+            setup.write(processedOutputColor, rg::TextureAccess::RenderTarget);
         },
         [ctx](rg::RenderPassContext& passCtx) {
             if (!gaussianSplatsEnabled(ctx))
@@ -120,10 +118,42 @@ void registerGaussianSplatCompositeFeature(RenderFeatureContext ctx)
     if (!needsGaussianSplatStochasticAccumulate(*ctx.settings))
         return;
 
+    nvrhi::ITexture* currentColorTexture = ctx.renderer->gaussianSplatCurrentColor();
+    nvrhi::ITexture* accumulatedColorTexture = ctx.renderer->gaussianSplatAccumulatedColor();
+    if (currentColorTexture == nullptr || accumulatedColorTexture == nullptr)
+        return;
+
+    const rg::TextureHandle currentColor = ctx.graph->importTexture(
+        currentColorTexture,
+        rg::TextureAccess::ShaderResource);
+    const rg::TextureHandle accumulatedColor = ctx.graph->importTexture(
+        accumulatedColorTexture,
+        rg::TextureAccess::UnorderedAccess);
+
+    ctx.graph->addPass(
+        "GaussianSplatsCopyCurrent",
+        [processedOutputColor, currentColor](rg::PassBuilder& setup) {
+            setup.read(processedOutputColor, rg::TextureAccess::CopySource);
+            setup.write(currentColor, rg::TextureAccess::CopyDest);
+        },
+        [ctx, processedOutputColor, currentColor](rg::RenderPassContext& passCtx) {
+            if (!gaussianSplatsEnabled(ctx))
+                return;
+            passCtx.commandList()->copyTexture(
+                passCtx.texture(currentColor), nvrhi::TextureSlice(),
+                passCtx.texture(processedOutputColor), nvrhi::TextureSlice());
+        },
+        rg::PassOptions{
+            .sideEffect = true,
+            .executeAfter = "GaussianSplatsComposite",
+        });
+
     ctx.graph->addPass(
         "GaussianSplatsAccumulate",
-        [&](rg::PassBuilder& setup) {
-            setup.read(processedOutputColor, rg::TextureAccess::UnorderedAccess);
+        [processedOutputColor, currentColor, accumulatedColor](rg::PassBuilder& setup) {
+            setup.read(currentColor, rg::TextureAccess::ShaderResource);
+            setup.read(accumulatedColor, rg::TextureAccess::UnorderedAccess);
+            setup.write(accumulatedColor, rg::TextureAccess::UnorderedAccess);
             setup.write(processedOutputColor, rg::TextureAccess::UnorderedAccess);
         },
         [ctx](rg::RenderPassContext& passCtx) {
@@ -133,7 +163,7 @@ void registerGaussianSplatCompositeFeature(RenderFeatureContext ctx)
         },
         rg::PassOptions{
             .sideEffect = true,
-            .executeAfter = "GaussianSplatsComposite",
+            .executeAfter = "GaussianSplatsCopyCurrent",
         });
 }
 

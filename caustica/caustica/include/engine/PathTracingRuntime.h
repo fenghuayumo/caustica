@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <memory>
 
 #include <render/AppDiagnostics.h>
@@ -10,10 +11,10 @@
 #include <render/PathTracerScenePasses.h>
 #include <render/worldRenderer/PathTracingContext.h>
 
-class SceneManager;
-
 namespace caustica
 {
+
+class Scene;
 
 namespace render
 {
@@ -25,7 +26,7 @@ struct RenderInfra;
 
 // Owns path-tracing GPU runtime: scene passes, accel structs, render-thread camera,
 // PathTracingContext, and WorldRenderer. Logic camera stays on SessionCamera;
-// SceneManager on SceneSession; shared caches on RenderInfra.
+// session Scene is bound on load (not via SceneManager); shared caches on RenderInfra.
 struct PathTracingRuntime
 {
     PathTracingRuntime();
@@ -40,7 +41,6 @@ struct PathTracingRuntime
     {
         GpuDevice& gpuDevice;
         RenderInfra& renderInfra;
-        ::SceneManager& sceneManager;
         ::PathTracerSettings& settings;
         render::RenderRuntimeState& runtimeState;
         render::AppDiagnostics& diagnostics;
@@ -49,6 +49,9 @@ struct PathTracingRuntime
 
     bool create(const CreateParams& params);
     void destroy();
+
+    void bindSessionScene(std::shared_ptr<Scene> scene, std::filesystem::path scenePath);
+    void clearSessionScene();
 
     [[nodiscard]] render::WorldRenderer* worldRenderer() const { return m_worldRenderer.get(); }
     [[nodiscard]] CameraController& renderCamera() { return m_renderCamera; }

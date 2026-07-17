@@ -28,8 +28,6 @@ namespace caustica::render
 class WorldRenderer;
 }
 
-class SceneManager;
-
 namespace caustica::render
 {
 
@@ -44,6 +42,9 @@ class SceneRayTracingResources
     friend struct PathTracerScenePasses;
 
 public:
+    void bindSessionScene(std::shared_ptr<caustica::Scene> scene);
+    void clearSessionScene();
+
     void setAdditionalAccelStructBuilder(AdditionalAccelStructBuilder builder);
 
     void fillPTPipelineGlobalMacros(std::vector<caustica::ShaderMacro>& macros);
@@ -82,7 +83,7 @@ private:
     void wireSession(const ScenePassWireParams& params);
 
     caustica::GpuDevice*                        m_gpuDevice = nullptr;
-    SceneManager*                               m_sceneManager = nullptr;
+    std::shared_ptr<caustica::Scene>            m_sessionScene;
     caustica::AccelStructManager*               m_accelStructs = nullptr;
     caustica::render::WorldRenderer* m_worldRenderer = nullptr;
     PathTracerSettings*                         m_settings = nullptr;

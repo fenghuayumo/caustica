@@ -304,8 +304,8 @@ void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameCont
         }
 
         m_context.scenePasses.lighting.materials()->createRenderPassesAndLoadMaterials(
-            m_bindlessLayout, m_context.renderDevice, m_context.sceneManager.getScene(),
-            m_context.sceneManager.getCurrentScenePath(), getLocalPath(c_AssetsFolder));
+            m_bindlessLayout, m_context.renderDevice, m_context.sessionScene,
+            m_context.sessionScenePath, getLocalPath(c_AssetsFolder));
         m_context.diagnostics.progressInitializingRenderer.Set(5);
         if (m_context.scenePasses.lighting.opacityMaps())
             m_context.scenePasses.lighting.opacityMaps()->createRenderPasses(m_bindlessLayout, m_context.renderDevice);
@@ -351,12 +351,13 @@ void caustica::render::WorldRenderer::framePassShaderUpdate(PathTracingFrameCont
     if (m_context.gpuDevice.isShuttingDown())
         return;
 
-    // Hit-group rebuild uses instance indices already assigned at Extract.
-    if (const auto scene = m_context.sceneManager.getScene())
-        scene->syncRenderSnapshotGpuIndices(m_context.gpuDevice.getRenderPhaseFrameIndex());
+    // Hit-group rebuild uses mesh proxies from the frame snapshot (indices assigned at Extract).
+    const scene::SceneRenderData* sceneData = m_context.frameScene;
+    if (sceneData == nullptr && m_context.sessionScene)
+        sceneData = &m_context.sessionScene->getRenderData();
 
     m_pathTracingShaderCompiler->update(
-        m_context.sceneManager.getScene(),
+        sceneData,
         static_cast<unsigned int>(m_context.accelStructs.getSubInstanceData().size()),
         [this](std::vector<caustica::ShaderMacro>& macros) { m_context.scenePasses.rayTracing.fillPTPipelineGlobalMacros(macros); },
         // needNewPasses covers resize/bindings and must NOT force RT PSO recreation after
@@ -424,7 +425,7 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
     UpdateSceneGeometryParams geoParams{
         m_context.activeSettings(),
         m_context.scenePasses.rayTracing.accelerationStructRebuildRequested(),
-        m_context.sceneManager.getScene(),
+        m_context.sessionScene,
         m_commandList,
     };
     geoParams.materials = m_context.scenePasses.lighting.materials().get();
@@ -502,7 +503,6 @@ void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext
 
     if (!m_context.hasFrameScene())
     {
-        m_commandList->clearTextureFloat(m_renderTargets->outputColor, nvrhi::AllSubresources, nvrhi::Color(1, 1, 0, 0));
         m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
         return;
     }
@@ -609,13 +609,13 @@ void caustica::render::WorldRenderer::registerDebugOverlayGraphPasses(RenderFeat
     {
         debugLineCapture = ctx.graph->importBuffer(
             m_debugLineBufferCapture,
-            rg::BufferAccess::UnorderedAccess);
+            nvrhi::ResourceStates::Common);
         debugLineDisplay = ctx.graph->importBuffer(
             m_debugLineBufferDisplay,
-            rg::BufferAccess::VertexBuffer);
+            nvrhi::ResourceStates::Common);
 
-        ctx.graph->extractBuffer(debugLineCapture, rg::BufferAccess::UnorderedAccess);
-        ctx.graph->extractBuffer(debugLineDisplay, rg::BufferAccess::VertexBuffer);
+        ctx.graph->extractBuffer(debugLineCapture, nvrhi::ResourceStates::Common);
+        ctx.graph->extractBuffer(debugLineDisplay, nvrhi::ResourceStates::Common);
     }
 
     if (showDebugLines)
@@ -633,6 +633,24 @@ void caustica::render::WorldRenderer::registerDebugOverlayGraphPasses(RenderFeat
             m_constantBuffer,
             rg::BufferAccess::ConstantBuffer);
         const uint32_t capturedLineVertexCount = m_feedbackData.lineVertexCount;
+        const uint32_t cpuLineVertexCount = static_cast<uint32_t>(cpuSideDebugLines.size());
+
+        if (!cpuSideDebugLines.empty())
+        {
+            ctx.graph->addPass(
+                "UploadCpuDebugLines",
+                [debugLineCapture](rg::PassBuilder& setup) {
+                    setup.write(debugLineCapture, rg::BufferAccess::CopyDest);
+                },
+                [debugLineCapture, cpuSideDebugLines = std::move(cpuSideDebugLines)](
+                    rg::RenderPassContext& passCtx) {
+                    passCtx.commandList()->writeBuffer(
+                        passCtx.buffer(debugLineCapture),
+                        cpuSideDebugLines.data(),
+                        sizeof(DebugLineStruct) * cpuSideDebugLines.size());
+                },
+                rg::PassOptions{ .sideEffect = true });
+        }
 
         ctx.graph->addPass(
             "DebugLines",
@@ -644,8 +662,7 @@ void caustica::render::WorldRenderer::registerDebugOverlayGraphPasses(RenderFeat
                 setup.read(debugLineDisplay, rg::BufferAccess::VertexBuffer);
             },
             [this, framebuffer, viewport = fbinfo.getViewport(), capturedLineVertexCount,
-                debugLineCapture, debugLineDisplay, cpuSideDebugLines = std::move(cpuSideDebugLines)](
-                rg::RenderPassContext& passCtx) {
+                cpuLineVertexCount, debugLineCapture, debugLineDisplay](rg::RenderPassContext& passCtx) {
                 nvrhi::ICommandList* commandList = passCtx.commandList();
                 commandList->beginMarker("Debug Lines");
 
@@ -661,17 +678,12 @@ void caustica::render::WorldRenderer::registerDebugOverlayGraphPasses(RenderFeat
                 args.vertexCount = capturedLineVertexCount;
                 commandList->draw(args);
 
-                if (!cpuSideDebugLines.empty())
+                if (cpuLineVertexCount > 0)
                 {
-                    commandList->writeBuffer(
-                        passCtx.buffer(debugLineCapture),
-                        cpuSideDebugLines.data(),
-                        sizeof(DebugLineStruct) * cpuSideDebugLines.size());
-
                     state.vertexBuffers = { {passCtx.buffer(debugLineCapture), 0, 0} };
                     commandList->setGraphicsState(state);
 
-                    args.vertexCount = static_cast<uint32_t>(cpuSideDebugLines.size());
+                    args.vertexCount = cpuLineVertexCount;
                     commandList->draw(args);
                 }
 
@@ -687,18 +699,18 @@ void caustica::render::WorldRenderer::registerDebugOverlayGraphPasses(RenderFeat
             rg::BufferAccess::CopyDest);
         const rg::BufferHandle feedbackGpu = ctx.graph->importBuffer(
             m_feedback_Buffer_Gpu,
-            rg::BufferAccess::UnorderedAccess);
+            nvrhi::ResourceStates::Common);
         const rg::BufferHandle debugDeltaPathTreeCpu = ctx.graph->importBuffer(
             m_debugDeltaPathTree_Cpu,
             rg::BufferAccess::CopyDest);
         const rg::BufferHandle debugDeltaPathTreeGpu = ctx.graph->importBuffer(
             m_debugDeltaPathTree_Gpu,
-            rg::BufferAccess::UnorderedAccess);
+            nvrhi::ResourceStates::Common);
 
         ctx.graph->extractBuffer(feedbackCpu, rg::BufferAccess::CopyDest);
-        ctx.graph->extractBuffer(feedbackGpu, rg::BufferAccess::UnorderedAccess);
+        ctx.graph->extractBuffer(feedbackGpu, nvrhi::ResourceStates::Common);
         ctx.graph->extractBuffer(debugDeltaPathTreeCpu, rg::BufferAccess::CopyDest);
-        ctx.graph->extractBuffer(debugDeltaPathTreeGpu, rg::BufferAccess::UnorderedAccess);
+        ctx.graph->extractBuffer(debugDeltaPathTreeGpu, nvrhi::ResourceStates::Common);
 
         ctx.graph->addPass(
             "DebugFeedbackCopies",
