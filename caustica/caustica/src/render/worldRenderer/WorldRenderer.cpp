@@ -1065,13 +1065,9 @@ void caustica::render::WorldRenderer::prepareGaussianSplatPasses()
 
 void caustica::render::WorldRenderer::buildGaussianSplatEmissionProxies()
 {
-    const std::shared_ptr<Scene> scene = m_context.sceneManager.getScene();
-    const std::span<const caustica::scene::GaussianSplatRenderProxy> gaussianSplats =
-        scene ? std::span<const caustica::scene::GaussianSplatRenderProxy>(scene->getRenderData().gaussianSplats)
-              : std::span<const caustica::scene::GaussianSplatRenderProxy>();
     caustica::render::buildGaussianSplatEmissionProxies(
         m_gaussianSplatEmissionProxies,
-        gaussianSplats,
+        m_context.frameGaussianSplats(),
         m_context.activeSettings());
 }
 
@@ -1080,20 +1076,16 @@ void caustica::render::WorldRenderer::executeGaussianSplatAccelBuild(nvrhi::ICom
     if (commandList == nullptr || !hasActiveGaussianSplats())
         return;
 
-    const std::shared_ptr<Scene> scene = m_context.sceneManager.getScene();
-    const std::span<const caustica::scene::GaussianSplatRenderProxy> gaussianSplats =
-        scene ? std::span<const caustica::scene::GaussianSplatRenderProxy>(scene->getRenderData().gaussianSplats)
-              : std::span<const caustica::scene::GaussianSplatRenderProxy>();
-    buildGaussianSplatSceneAccelStructs(commandList, gaussianSplats, m_context.activeSettings());
+    buildGaussianSplatSceneAccelStructs(
+        commandList, m_context.frameGaussianSplats(), m_context.activeSettings());
 }
 
 bool caustica::render::WorldRenderer::hasActiveGaussianSplats() const
 {
-    const std::shared_ptr<Scene> scene = m_context.sceneManager.getScene();
-    if (!scene || !m_context.activeSettings().EnableGaussianSplats)
+    if (!m_context.hasFrameScene() || !m_context.activeSettings().EnableGaussianSplats)
         return false;
 
-    const auto& gaussianSplats = scene->getRenderData().gaussianSplats;
+    const auto gaussianSplats = m_context.frameGaussianSplats();
     return std::any_of(gaussianSplats.begin(), gaussianSplats.end(), isGaussianSplatProxyActive);
 }
 
@@ -1114,7 +1106,7 @@ void caustica::render::WorldRenderer::executeGaussianSplatRender(nvrhi::ICommand
         m_gaussianSplatTemporalSampleIndex,
         renderToOutputColor,
         dm::float2(float(m_displaySize.x), float(m_displaySize.y)),
-        resolveGaussianSplatShadowDirection(m_context.sceneManager),
+        resolveGaussianSplatShadowDirection(m_context.frameLights()),
     };
     const GaussianSplatRenderSettings settings = buildGaussianSplatRenderSettings(frameInputs);
 
@@ -1126,13 +1118,9 @@ void caustica::render::WorldRenderer::executeGaussianSplatRender(nvrhi::ICommand
     }
     splatView.updateCache();
 
-    const std::shared_ptr<Scene> scene = m_context.sceneManager.getScene();
-    const std::span<const caustica::scene::GaussianSplatRenderProxy> gaussianSplats =
-        scene ? std::span<const caustica::scene::GaussianSplatRenderProxy>(scene->getRenderData().gaussianSplats)
-              : std::span<const caustica::scene::GaussianSplatRenderProxy>();
     bool renderedAny = renderGaussianSplatScene(
         commandList,
-        gaussianSplats,
+        m_context.frameGaussianSplats(),
         splatView,
         m_context.accelStructs.getTopLevelAS().Get(),
         *m_renderTargets,
@@ -1201,6 +1189,9 @@ void caustica::render::WorldRenderer::render(nvrhi::IFramebuffer* framebuffer)
 
         m_context.frameSettings = &m_frameSettingsSnapshot;
         m_context.frameRuntime = &m_frameRuntimeSnapshot;
+        m_context.frameScene = &renderData;
+        m_context.frameSceneStructureChanged = scene->hasSceneStructureChanged(renderPhaseFrameIndex);
+        m_context.frameSceneTransformsChanged = scene->hasSceneTransformsChanged(renderPhaseFrameIndex);
 
         // Apply extracted camera pose before view update (RT owns view matrices).
         // Skip when snapshot has no session camera (structure-only republish / scene-load extract).
@@ -1231,6 +1222,9 @@ void caustica::render::WorldRenderer::render(nvrhi::IFramebuffer* framebuffer)
     {
         m_context.frameSettings = nullptr;
         m_context.frameRuntime = nullptr;
+        m_context.frameScene = nullptr;
+        m_context.frameSceneStructureChanged = false;
+        m_context.frameSceneTransformsChanged = false;
         m_frameGaussianSplatTemporalReset = false;
     }
 
@@ -1245,6 +1239,9 @@ void caustica::render::WorldRenderer::render(nvrhi::IFramebuffer* framebuffer)
 
     m_context.frameSettings = nullptr;
     m_context.frameRuntime = nullptr;
+    m_context.frameScene = nullptr;
+    m_context.frameSceneStructureChanged = false;
+    m_context.frameSceneTransformsChanged = false;
 
     if (scene)
         scene->endGpuReadFrame();
@@ -1257,10 +1254,14 @@ void caustica::render::WorldRenderer::recreateBindingSet()
 	// WARNING: this must match the layout of the m_bindingLayout (or switch to CreateBindingSetAndLayout)
     nvrhi::rt::IAccelStruct* gaussianSplatAS = m_context.accelStructs.getTopLevelAS();
     nvrhi::IBuffer* gaussianSplatBuffer = m_context.scenePasses.lighting.materials()->getMaterialDataBuffer();
+    // Prefer the frame snapshot; fall back to live SceneRenderData when rebuilding
+    // bindings outside WorldRenderer::render() (e.g. scene load).
     const std::shared_ptr<Scene> scene = m_context.sceneManager.getScene();
     const std::span<const caustica::scene::GaussianSplatRenderProxy> gaussianSplats =
-        scene ? std::span<const caustica::scene::GaussianSplatRenderProxy>(scene->getRenderData().gaussianSplats)
-              : std::span<const caustica::scene::GaussianSplatRenderProxy>();
+        m_context.hasFrameScene()
+            ? m_context.frameGaussianSplats()
+            : (scene ? std::span<const caustica::scene::GaussianSplatRenderProxy>(scene->getRenderData().gaussianSplats)
+                     : std::span<const caustica::scene::GaussianSplatRenderProxy>());
     const GaussianSplatBinding primaryGaussianBinding = getPrimaryGaussianSplatBinding(gaussianSplats);
     const GaussianSplatPass* primaryGaussianSplatPass = primaryGaussianBinding.splatPass;
     if (primaryGaussianSplatPass != nullptr && primaryGaussianSplatPass->getTopLevelAS() != nullptr && primaryGaussianSplatPass->getSplatBuffer() != nullptr)

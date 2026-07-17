@@ -1,5 +1,6 @@
 #include <engine/App.h>
 #include <engine/GpuRenderSubsystem.h>
+#include <engine/PathTracingRuntime.h>
 #include <engine/RenderInfra.h>
 #include <engine/AppResources.h>
 #include <engine/SceneViewState.h>
@@ -92,13 +93,13 @@ using namespace caustica::render;
 namespace caustica
 {
 
-void attachGpuRenderSubsystem(App& app, GpuRenderSubsystem& gpuRenderSubsystem)
+void bindSessionCameraSideEffects(App& app)
 {
     PathTracerSettings* cfg = settings(app);
     CameraController* cam = detail::sessionCamera(app);
     assert(cfg);
     assert(cam);
-    cam->bindSideEffects(*cfg, gpuRenderSubsystem.worldRenderer());
+    cam->bindSideEffects(*cfg, worldRenderer(app));
 }
 
 void initStreamlineAndWindow(App& app)
@@ -121,13 +122,6 @@ void initializeScene(App& app, const std::string& preferredScene)
     if (SceneViewState* vs = viewState(app))
         initViewState(*vs);
 
-    GpuRenderSubsystem* gr = gpuRender(app);
-    if (!gr)
-    {
-        caustica::fatal("caustica::initializeScene requires GpuRenderSubsystem");
-        return;
-    }
-
     auto* wr = worldRenderer(app);
     if (!wr)
     {
@@ -136,10 +130,11 @@ void initializeScene(App& app, const std::string& preferredScene)
     }
 
     RenderInfra* infra = renderInfra(app);
+    PathTracingRuntime* pathTracing = pathTracingRuntime(app);
     if (!infra || !infra->shaderFactory || !infra->descriptorTable || !infra->textureLoader
-        || !detail::sessionCamera(app))
+        || !detail::sessionCamera(app) || !pathTracing)
     {
-        caustica::fatal("caustica::initializeScene requires RenderInfra / SessionCamera wiring");
+        caustica::fatal("caustica::initializeScene requires RenderInfra / SessionCamera / PathTracingRuntime wiring");
         return;
     }
     const auto shaderFactory = infra->shaderFactory;
@@ -164,7 +159,7 @@ void initializeScene(App& app, const std::string& preferredScene)
     GpuDevice* device = gpuDevice(app);
     if (device && device->getDevice()->queryFeatureSupport(nvrhi::Feature::RayTracingOpacityMicromap))
     {
-        gr->lightingPasses().createOpacityMapsIfSupported(
+        pathTracing->lightingPasses().createOpacityMapsIfSupported(
             device->getDevice(), descriptorTable, textureLoader, shaderFactory);
     }
 
@@ -210,7 +205,7 @@ void onSceneUnloading(App& app)
     vs->uncompressedTextures.clear();
 
     runGpuWorkOnRenderThread(app, [&app]() {
-        if (GpuRenderSubsystem* gr = gpuRender(app))
+        if (GpuRenderSubsystem* gr = app.tryResource<GpuRenderSubsystem>())
             gr->onSceneUnloading();
     });
 
@@ -220,7 +215,7 @@ void onSceneUnloading(App& app)
 
 void onSceneLoaded(App& app)
 {
-    GpuRenderSubsystem* gr = gpuRender(app);
+    GpuRenderSubsystem* gr = app.tryResource<GpuRenderSubsystem>();
     if (!gr)
         return;
 
@@ -233,17 +228,17 @@ void onSceneLoaded(App& app)
     syncSceneAccess(app);
 
     const std::filesystem::path assetsRoot = getLocalPath(c_AssetsFolder);
-    gr->refreshEnvironmentMapMediaList(assetsRoot, manager->getCurrentScenePath());
+    if (PathTracingRuntime* pt = pathTracingRuntime(app))
+        pt->lightingPasses().refreshEnvironmentMapMediaList(assetsRoot, manager->getCurrentScenePath());
 
     vs->progressLoading.Set(50);
-
     vs->progressLoading.Set(55);
 
     gr->onSceneLoadedBegin();
 
     runGpuWorkOnRenderThread(app, [&app]() {
-        if (GpuRenderSubsystem* gr = gpuRender(app))
-            gr->onSceneLoadedGpuPrep();
+        if (GpuRenderSubsystem* gpu = app.tryResource<GpuRenderSubsystem>())
+            gpu->onSceneLoadedGpuPrep();
     });
 
     syncCameraFromScene(app);
@@ -255,7 +250,6 @@ void onSceneLoaded(App& app)
     collectUncompressedTextures(app);
 
     vs->progressLoading.Set(70);
-
     vs->progressLoading.Set(90);
 
     gr->applyCmdLinePostLoadOverrides();
@@ -273,7 +267,6 @@ void onSceneLoaded(App& app)
         if (const std::shared_ptr<Scene> scenePtr = activeScene(app))
             scenePtr->extractAndPublishRenderSnapshot(device->getPreparedRenderFrameIndex());
     }
-
 }
 
 void collectUncompressedTextures(App& app)
@@ -299,7 +292,7 @@ void collectUncompressedTextures(App& app)
             return;
         }
     };
-    gpuRender(app)->lightingPasses().forEachUsedMaterialTexture([&](Handle<ImageAsset> texture, bool normalMap)
+    pathTracingRuntime(app)->lightingPasses().forEachUsedMaterialTexture([&](Handle<ImageAsset> texture, bool normalMap)
     {
         listUncompressedTextureIfNeeded(texture, normalMap);
     });

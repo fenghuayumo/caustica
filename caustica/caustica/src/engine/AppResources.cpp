@@ -1,5 +1,4 @@
 #include <engine/App.h>
-#include <engine/GpuRenderSubsystem.h>
 #include <engine/AppResources.h>
 #include <engine/RenderInfra.h>
 #include <engine/SessionCamera.h>
@@ -15,11 +14,6 @@ using namespace caustica::render;
 
 namespace caustica
 {
-
-GpuRenderSubsystem* gpuRender(const App& app)
-{
-    return const_cast<GpuRenderSubsystem*>(app.tryResource<GpuRenderSubsystem>());
-}
 
 GpuDevice* gpuDevice(const App& app)
 {

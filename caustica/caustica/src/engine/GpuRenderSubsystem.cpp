@@ -114,13 +114,6 @@ void GpuRenderSubsystem::onSceneUnloading()
         m_renderInfra->bindingCache->clear();
 }
 
-void GpuRenderSubsystem::refreshEnvironmentMapMediaList(const std::filesystem::path& assetsRoot,
-    const std::filesystem::path& scenePath)
-{
-    if (m_pathTracing)
-        m_pathTracing->lightingPasses().refreshEnvironmentMapMediaList(assetsRoot, scenePath);
-}
-
 void GpuRenderSubsystem::applySampleSettingsFromScene()
 {
     ::SceneManager* manager = sceneManager();
@@ -383,134 +376,9 @@ void GpuRenderSubsystem::registerLoadedSceneAssets()
     }
 }
 
-std::shared_ptr<ShaderFactory> GpuRenderSubsystem::shaderFactory() const
-{
-    return m_renderInfra ? m_renderInfra->shaderFactory : nullptr;
-}
-
-caustica::render::RenderDevice& GpuRenderSubsystem::renderDevice()
-{
-    assert(m_renderInfra != nullptr);
-    return m_renderInfra->device();
-}
-
-const caustica::render::RenderDevice& GpuRenderSubsystem::renderDevice() const
-{
-    assert(m_renderInfra != nullptr);
-    return m_renderInfra->device();
-}
-
-std::shared_ptr<ShaderFactory>& GpuRenderSubsystem::shaderFactoryRef()
-{
-    assert(m_renderInfra != nullptr);
-    return m_renderInfra->shaderFactory;
-}
-
-std::shared_ptr<TextureLoader>& GpuRenderSubsystem::textureLoaderRef()
-{
-    assert(m_renderInfra != nullptr);
-    return m_renderInfra->textureLoader;
-}
-
-std::shared_ptr<DescriptorTableManager>& GpuRenderSubsystem::descriptorTableRef()
-{
-    assert(m_renderInfra != nullptr);
-    return m_renderInfra->descriptorTable;
-}
-
-BindingCache* GpuRenderSubsystem::bindingCache() const
-{
-    return m_renderInfra ? m_renderInfra->bindingCache.get() : nullptr;
-}
-
-std::shared_ptr<DescriptorTableManager> GpuRenderSubsystem::descriptorTable() const
-{
-    return m_renderInfra ? m_renderInfra->descriptorTable : nullptr;
-}
-
-BindlessTable* GpuRenderSubsystem::bindlessTable() const
-{
-    return m_renderInfra ? m_renderInfra->bindlessTable.get() : nullptr;
-}
-
-std::shared_ptr<TextureLoader> GpuRenderSubsystem::textureLoader() const
-{
-    return m_renderInfra ? m_renderInfra->textureLoader : nullptr;
-}
-
-CameraController& GpuRenderSubsystem::camera()
-{
-    assert(m_sessionCamera != nullptr);
-    return m_sessionCamera->camera;
-}
-
-const CameraController& GpuRenderSubsystem::camera() const
-{
-    assert(m_sessionCamera != nullptr);
-    return m_sessionCamera->camera;
-}
-
-AccelStructManager& GpuRenderSubsystem::accelStructs()
-{
-    assert(m_pathTracing != nullptr);
-    return m_pathTracing->accelStructs();
-}
-
-const AccelStructManager& GpuRenderSubsystem::accelStructs() const
-{
-    assert(m_pathTracing != nullptr);
-    return m_pathTracing->accelStructs();
-}
-
 SceneManager* GpuRenderSubsystem::sceneManager() const
 {
     return m_sceneSession ? m_sceneSession->manager.get() : nullptr;
-}
-
-render::WorldRenderer* GpuRenderSubsystem::worldRenderer() const
-{
-    return m_pathTracing ? m_pathTracing->worldRenderer() : nullptr;
-}
-
-nvrhi::BindingLayoutHandle GpuRenderSubsystem::bindlessLayout() const
-{
-    return m_renderInfra ? m_renderInfra->bindlessLayout : nullptr;
-}
-
-render::SceneLightingPasses& GpuRenderSubsystem::lightingPasses()
-{
-    assert(m_pathTracing != nullptr);
-    return m_pathTracing->lightingPasses();
-}
-
-const render::SceneLightingPasses& GpuRenderSubsystem::lightingPasses() const
-{
-    assert(m_pathTracing != nullptr);
-    return m_pathTracing->lightingPasses();
-}
-
-render::SceneRayTracingResources& GpuRenderSubsystem::rayTracingResources()
-{
-    assert(m_pathTracing != nullptr);
-    return m_pathTracing->rayTracingResources();
-}
-
-const render::SceneRayTracingResources& GpuRenderSubsystem::rayTracingResources() const
-{
-    assert(m_pathTracing != nullptr);
-    return m_pathTracing->rayTracingResources();
-}
-
-render::SceneGaussianSplatPasses& GpuRenderSubsystem::gaussianSplatPasses()
-{
-    assert(m_pathTracing != nullptr);
-    return m_pathTracing->gaussianSplatPasses();
-}
-
-const render::SceneGaussianSplatPasses& GpuRenderSubsystem::gaussianSplatPasses() const
-{
-    assert(m_pathTracing != nullptr);
-    return m_pathTracing->gaussianSplatPasses();
 }
 
 } // namespace caustica

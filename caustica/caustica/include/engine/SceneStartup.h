@@ -2,7 +2,7 @@
 
 #include <core/command_line.h>
 
-#include <engine/GpuRenderSubsystem.h>
+#include <engine/EngineSceneCallbacks.h>
 #include <engine/SceneViewState.h>
 
 #include <render/RenderAppState.h>

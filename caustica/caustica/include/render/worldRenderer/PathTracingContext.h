@@ -9,10 +9,12 @@
 #include <assets/loader/TextureLoader.h>
 #include <render/core/DescriptorTableManager.h>
 #include <scene/SceneManager.h>
+#include <scene/SceneRenderData.h>
 
 #include <backend/GpuDevice.h>
 
 #include <memory>
+#include <span>
 #include <string>
 
 namespace caustica
@@ -50,9 +52,29 @@ struct PathTracingContext
 
     AppDiagnostics& diagnostics;
 
-    // Per-frame: pointed at SceneRenderData snapshot copies for the render phase.
+    // Per-frame: pointed at SceneRenderData / snapshot copies for the render phase.
+    // Valid only between beginGpuReadFrame and endGpuReadFrame in WorldRenderer::render().
+    const scene::SceneRenderData* frameScene = nullptr;
+    bool frameSceneStructureChanged = false;
+    bool frameSceneTransformsChanged = false;
     PathTracerSettings* frameSettings = nullptr;
     RenderRuntimeState* frameRuntime = nullptr;
+
+    [[nodiscard]] bool hasFrameScene() const { return frameScene != nullptr; }
+
+    [[nodiscard]] std::span<const scene::GaussianSplatRenderProxy> frameGaussianSplats() const
+    {
+        if (!frameScene)
+            return {};
+        return frameScene->gaussianSplats;
+    }
+
+    [[nodiscard]] std::span<const scene::LightRenderProxy> frameLights() const
+    {
+        if (!frameScene)
+            return {};
+        return frameScene->lights;
+    }
 
     [[nodiscard]] PathTracerSettings& activeSettings()
     {

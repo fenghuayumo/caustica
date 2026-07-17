@@ -1,9 +1,6 @@
 #include <render/passes/gaussian/GaussianSplatGraph.h>
 
 #include <math/math.h>
-#include <scene/Scene.h>
-#include <scene/SceneManager.h>
-#include <scene/SceneRenderData.h>
 #include <scene/SceneLightAccess.h>
 #include <shaders/light_cb.h>
 #include <shaders/SampleConstantBuffer.h>
@@ -164,13 +161,9 @@ GaussianSplatRenderSettings buildGaussianSplatRenderSettings(const GaussianSplat
     return renderSettings;
 }
 
-dm::float3 resolveGaussianSplatShadowDirection(SceneManager& sceneManager)
+dm::float3 resolveGaussianSplatShadowDirection(std::span<const scene::LightRenderProxy> lights)
 {
-    const std::shared_ptr<Scene> scene = sceneManager.getScene();
-    if (!scene)
-        return dm::float3(0.0f, 1.0f, 0.0f);
-
-    for (const scene::LightRenderProxy& lightProxy : scene->getRenderData().lights)
+    for (const scene::LightRenderProxy& lightProxy : lights)
     {
         if (!caustica::scene::tryGetDirectionalLightData(lightProxy.data))
             continue;

@@ -60,7 +60,7 @@ void initializeSceneApp(App& app, const SceneAppConfig& config)
         .sceneCallbacks = std::move(sceneCallbacks),
     });
 
-    caustica::attachGpuRenderSubsystem(app, *gpuRenderSubsystem);
+    caustica::bindSessionCameraSideEffects(app);
     caustica::initializeScene(app, config.preferredScene);
 
     if (config.refreshEnvMapMediaList)

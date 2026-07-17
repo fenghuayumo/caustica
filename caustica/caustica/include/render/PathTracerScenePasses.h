@@ -54,7 +54,7 @@ struct ScenePassWireParams
     std::function<std::shared_ptr<ShaderDebug>()> getShaderDebug;
 };
 
-// Scene-scoped render pass bundles owned by GpuRenderSubsystem (not Application hosts).
+// Scene-scoped render pass bundles owned by PathTracingRuntime (not Application hosts).
 struct PathTracerScenePasses
 {
     SceneLightingPasses lighting;

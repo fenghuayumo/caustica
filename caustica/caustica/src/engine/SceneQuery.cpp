@@ -1,5 +1,4 @@
 #include <engine/App.h>
-#include <engine/GpuRenderSubsystem.h>
 #include <engine/AppResources.h>
 #include <engine/SceneViewState.h>
 #include <cassert>

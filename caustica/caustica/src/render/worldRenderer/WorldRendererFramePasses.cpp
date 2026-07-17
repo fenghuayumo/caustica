@@ -96,13 +96,9 @@ void caustica::render::WorldRenderer::populateRenderFrameContext(
 
     populateFrameView(ctx.view);
 
-    if (const std::shared_ptr<Scene> scene = m_context.sceneManager.getScene())
-    {
-        const uint32_t frameIndex = m_context.gpuDevice.getRenderPhaseFrameIndex();
-        ctx.scene = &scene->getRenderData();
-        ctx.sceneStructureChanged = scene->hasSceneStructureChanged(frameIndex);
-        ctx.sceneTransformsChanged = scene->hasSceneTransformsChanged(frameIndex);
-    }
+    ctx.scene = m_context.frameScene;
+    ctx.sceneStructureChanged = m_context.frameSceneStructureChanged;
+    ctx.sceneTransformsChanged = m_context.frameSceneTransformsChanged;
 }
 
 RenderFeatureContext caustica::render::WorldRenderer::makeRenderFeatureContext(RenderFrameContext& ctx)
@@ -120,7 +116,7 @@ RenderFeatureContext caustica::render::WorldRenderer::makeRenderFeatureContext(R
         .extractedView = &ctx.view,
         .bindingCache = &m_context.bindingCache,
         .blitPass = &m_context.renderDevice.blit(),
-        .hasScene = m_context.sceneManager.getScene() != nullptr,
+        .hasScene = m_context.hasFrameScene(),
         .aaReset = aaReset,
         .commandListWasClosed = &ctx.commandListWasClosed,
         .gaussianSplatTemporalSampleIndex = &m_gaussianSplatTemporalSampleIndex,
@@ -504,7 +500,7 @@ void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext
     SampleConstants& constants = m_currentConstants;
     memset(&constants, 0, sizeof(constants));
 
-    if (m_context.sceneManager.getScene() == nullptr)
+    if (!m_context.hasFrameScene())
     {
         m_commandList->clearTextureFloat(m_renderTargets->outputColor, nvrhi::AllSubresources, nvrhi::Color(1, 1, 0, 0));
         m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
@@ -516,14 +512,10 @@ void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext
 
     updatePathTracerConstants(constants.ptConsts, ctx.cameraData);
     constants.MaterialCount = m_context.scenePasses.lighting.materials()->getMaterialDataCount();
-    const std::shared_ptr<Scene> scene = m_context.sceneManager.getScene();
-    const std::span<const caustica::scene::GaussianSplatRenderProxy> gaussianSplats =
-        scene ? std::span<const caustica::scene::GaussianSplatRenderProxy>(scene->getRenderData().gaussianSplats)
-              : std::span<const caustica::scene::GaussianSplatRenderProxy>();
     fillGaussianSplatShadowConstants(
         constants,
         m_context.activeSettings(),
-        getPrimaryGaussianSplatBinding(gaussianSplats),
+        getPrimaryGaussianSplatBinding(m_context.frameGaussianSplats()),
         uint32_t(m_frameIndex & 0xffffffffu));
 
     constants.envMapSceneParams = m_context.scenePasses.lighting.envMapSceneParams();
@@ -578,7 +570,7 @@ void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext
 
 void caustica::render::WorldRenderer::framePassDenoiseAndAA(PathTracingFrameContext& ctx)
 {
-    if (m_context.sceneManager.getScene() == nullptr)
+    if (!m_context.hasFrameScene())
         return;
 
     SampleConstants& constants = m_currentConstants;

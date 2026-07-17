@@ -1,6 +1,5 @@
 #pragma once
 
-#include <engine/GpuRenderSubsystem.h>
 #include <engine/Plugin.h>
 #include <engine/SceneStartup.h>
 

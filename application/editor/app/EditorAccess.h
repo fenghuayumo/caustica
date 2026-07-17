@@ -4,8 +4,11 @@
 
 #include <engine/App.h>
 #include <engine/AppResources.h>
-#include <engine/GpuRenderSubsystem.h>
+#include <engine/PathTracingRuntime.h>
+#include <engine/RenderInfra.h>
+#include <engine/SessionCamera.h>
 #include <engine/SceneQuery.h>
+#include <render/core/CameraController.h>
 #include <scene/Scene.h>
 #include <scene/SceneManager.h>
 
@@ -16,7 +19,7 @@ namespace caustica::editor
 {
 
 // Stable access into App / scene / GPU for editor code.
-// Prefer editorScene / editorEntityWorld over digging through GpuRenderSubsystem.
+// Prefer these helpers over digging App resources by hand.
 
 [[nodiscard]] inline App& editorApp(SceneEditor& editor)
 {
@@ -60,21 +63,65 @@ namespace caustica::editor
     return editor.app() ? caustica::sceneManager(*editor.app()) : nullptr;
 }
 
-[[nodiscard]] inline GpuRenderSubsystem* editorGpu(SceneEditor& editor)
+[[nodiscard]] inline SessionCamera* editorSessionCamera(SceneEditor& editor)
 {
-    return editor.app() ? editor.app()->tryResource<GpuRenderSubsystem>() : nullptr;
+    return editor.app() ? caustica::sessionCameraResource(*editor.app()) : nullptr;
 }
 
-[[nodiscard]] inline const GpuRenderSubsystem* editorGpu(const SceneEditor& editor)
+[[nodiscard]] inline const SessionCamera* editorSessionCamera(const SceneEditor& editor)
 {
-    return editor.app() ? editor.app()->tryResource<GpuRenderSubsystem>() : nullptr;
+    return editor.app() ? caustica::sessionCameraResource(*editor.app()) : nullptr;
 }
 
-[[nodiscard]] inline GpuRenderSubsystem& requireGpu(SceneEditor& editor)
+[[nodiscard]] inline CameraController* editorCamera(SceneEditor& editor)
 {
-    GpuRenderSubsystem* gpu = editorGpu(editor);
-    assert(gpu);
-    return *gpu;
+    if (SessionCamera* session = editorSessionCamera(editor))
+        return &session->camera;
+    return nullptr;
+}
+
+[[nodiscard]] inline const CameraController* editorCamera(const SceneEditor& editor)
+{
+    if (const SessionCamera* session = editorSessionCamera(editor))
+        return &session->camera;
+    return nullptr;
+}
+
+[[nodiscard]] inline PathTracingRuntime* editorPathTracing(SceneEditor& editor)
+{
+    return editor.app() ? caustica::pathTracingRuntime(*editor.app()) : nullptr;
+}
+
+[[nodiscard]] inline const PathTracingRuntime* editorPathTracing(const SceneEditor& editor)
+{
+    return editor.app() ? caustica::pathTracingRuntime(*editor.app()) : nullptr;
+}
+
+[[nodiscard]] inline PathTracingRuntime& requirePathTracing(SceneEditor& editor)
+{
+    PathTracingRuntime* pt = editorPathTracing(editor);
+    assert(pt);
+    return *pt;
+}
+
+[[nodiscard]] inline RenderInfra* editorRenderInfra(SceneEditor& editor)
+{
+    return editor.app() ? caustica::renderInfra(*editor.app()) : nullptr;
+}
+
+[[nodiscard]] inline const RenderInfra* editorRenderInfra(const SceneEditor& editor)
+{
+    return editor.app() ? caustica::renderInfra(*editor.app()) : nullptr;
+}
+
+[[nodiscard]] inline render::WorldRenderer* editorWorldRenderer(SceneEditor& editor)
+{
+    return editor.app() ? caustica::worldRenderer(*editor.app()) : nullptr;
+}
+
+[[nodiscard]] inline render::WorldRenderer* editorWorldRenderer(const SceneEditor& editor)
+{
+    return editor.app() ? caustica::worldRenderer(*editor.app()) : nullptr;
 }
 
 } // namespace caustica::editor

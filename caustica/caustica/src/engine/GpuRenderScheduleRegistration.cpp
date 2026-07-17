@@ -3,7 +3,7 @@
 
 #include <engine/App.h>
 #include <engine/AppSchedules.h>
-#include <engine/GpuRenderSubsystem.h>
+#include <engine/PathTracingRuntime.h>
 #include <engine/RenderInfra.h>
 
 #include <utility>
@@ -16,7 +16,7 @@ void registerGpuRenderSchedules(App& app)
     if (app.gpuRenderSchedulesRegistered())
         return;
 
-    if (!app.tryResource<GpuRenderSubsystem>() || !app.tryResource<RenderInfra>())
+    if (!app.tryResource<PathTracingRuntime>() || !app.tryResource<RenderInfra>())
         return;
 
     AppSystemOrdering ordering;

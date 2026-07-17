@@ -3,7 +3,6 @@
 #include <core/progress.h>
 
 #include <engine/SceneViewState.h>
-#include <engine/GpuRenderSubsystem.h>
 #include <math/math.h>
 #include <render/RenderAppState.h>
 #include <render/AppDiagnostics.h>
@@ -42,7 +41,7 @@ class CaptureScriptManager;
 using namespace caustica::math;
 
 // Editor shell: selection/UI/capture/game/content. Scene/render queries go through
-// App + caustica::* / GpuRenderSubsystem (see EditorAccess.h), not this class.
+// App + EditorAccess helpers (sessionCamera / pathTracing / renderInfra), not this class.
 class SceneEditor
 {
 public:
@@ -107,7 +106,7 @@ public:
         bool recomputeNormals = true,
         bool rebuildAccelerationStructure = true);
 
-    void attachGpuRenderSubsystem(caustica::GpuRenderSubsystem& gpuRenderSubsystem);
+    void bindSessionCameraSideEffects();
 
     void onBeforeInitialSceneLoad();
     void onAnimateBegin(float& elapsedTimeSeconds);
@@ -152,8 +151,6 @@ private:
     void onSceneLoadedAfterCollectTextures();
     void onSceneLoadedComplete();
 
-    [[nodiscard]] GpuRenderSubsystem* gpuRender() const;
-
     const CommandLineOptions& m_cmdLine;
     render::RenderAppState& m_renderAppState;
     PathTracerSettings& m_settings;
@@ -164,7 +161,6 @@ private:
     EditorState m_editorState;
 
     App* m_app = nullptr;
-    GpuRenderSubsystem* m_gpuRenderSubsystem = nullptr;
 
     EditorUIState& m_editor;
     EditorUIData* m_editorUi = nullptr;

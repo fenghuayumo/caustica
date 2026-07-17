@@ -8,7 +8,7 @@
 
 #include <ImGuizmo.h>
 #include <imgui.h>
-#include <engine/GpuRenderSubsystem.h>
+#include <engine/SessionCamera.h>
 #include <math/affine.h>
 #include <math/quat.h>
 #include <scene/SceneEcs.h>
@@ -140,13 +140,13 @@ const float* GetSnapValues(const EditorUIState& editorUI)
 
 void BuildGizmoProjectionMatrix(const TransformGizmoContext& ctx, const PlanarView& view, float outMatrix[16])
 {
-    auto* gpuRender = caustica::editor::editorGpu(ctx.sceneEditor);
-    if (gpuRender && view.isReverseDepth())
+    auto* camera = caustica::editor::editorCamera(ctx.sceneEditor);
+    if (camera && view.isReverseDepth())
     {
         const ImGuiIO& io = ImGui::GetIO();
         const float aspect = (io.DisplaySize.y > 0.f) ? (io.DisplaySize.x / io.DisplaySize.y) : 1.f;
-        const float fov = gpuRender->camera().verticalFOV();
-        const float zNear = std::max(gpuRender->camera().zNear(), 0.01f);
+        const float fov = camera->verticalFOV();
+        const float zNear = std::max(camera->zNear(), 0.01f);
         const float zFar = std::max(zNear * 10000.f, 1000.f);
         Float4x4ToImGuizmoMatrix(dm::perspProjD3DStyle(fov, aspect, zNear, zFar), outMatrix);
         return;

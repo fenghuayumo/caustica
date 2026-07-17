@@ -59,7 +59,7 @@ void syncPickPositionFromCursor(SceneEditor& sceneEditor)
     glfwGetCursorPos(window, &cursorX, &cursorY);
 
     dm::float2 upscalingScale(1.0f, 1.0f);
-    if (auto* worldRenderer = caustica::editor::editorGpu(sceneEditor)->worldRenderer(); worldRenderer && worldRenderer->getRenderTargets())
+    if (auto* worldRenderer = caustica::editor::editorWorldRenderer(sceneEditor); worldRenderer && worldRenderer->getRenderTargets())
         upscalingScale = dm::float2(worldRenderer->getRenderSize())
             / dm::float2(worldRenderer->getDisplaySize());
 
@@ -80,13 +80,12 @@ bool onKeyPressed(SceneEditor& sceneEditor, caustica::KeyPressedEvent& e)
     if (ImGui::GetIO().WantCaptureKeyboard)
         return true;
 
-    auto* gpuRender = caustica::editor::editorGpu(sceneEditor);
-    if (!gpuRender)
+    auto* camera = caustica::editor::editorCamera(sceneEditor);
+    if (!camera)
         return true;
 
     auto* zoomTool = sceneEditor.zoomTool().get();
     auto* game = sceneEditor.game().get();
-    auto* camera = &gpuRender->camera();
 
     if (zoomTool && zoomTool->keyboardUpdate(key, e.getScancode(), action, mods))
         return true;
@@ -135,13 +134,12 @@ bool onKeyReleased(SceneEditor& sceneEditor, caustica::KeyReleasedEvent& e)
     if (ImGui::GetIO().WantCaptureKeyboard)
         return true;
 
-    auto* gpuRender = caustica::editor::editorGpu(sceneEditor);
-    if (!gpuRender)
+    auto* camera = caustica::editor::editorCamera(sceneEditor);
+    if (!camera)
         return true;
 
     auto* zoomTool = sceneEditor.zoomTool().get();
     auto* game = sceneEditor.game().get();
-    auto* camera = &gpuRender->camera();
 
     if (zoomTool && zoomTool->keyboardUpdate(key, e.getScancode(), cGlfwRelease, mods))
         return true;
@@ -163,13 +161,12 @@ bool onMouseMoved(SceneEditor& sceneEditor, caustica::MouseMovedEvent& e)
     if (ImGui::GetIO().WantCaptureMouse || gizmoCapturesInput(sceneEditor))
         return false;
 
-    auto* gpuRender = caustica::editor::editorGpu(sceneEditor);
-    if (!gpuRender)
+    auto* camera = caustica::editor::editorCamera(sceneEditor);
+    if (!camera)
         return true;
 
     auto* game = sceneEditor.game().get();
-    auto* camera = &gpuRender->camera();
-    auto* worldRenderer = caustica::editor::editorGpu(sceneEditor)->worldRenderer();
+    auto* worldRenderer = caustica::editor::editorWorldRenderer(sceneEditor);
     auto& session = sceneEditor.renderAppState();
 
     if (!(game && game->CameraActive()))
@@ -198,8 +195,8 @@ bool onMouseButtonPressed(SceneEditor& sceneEditor, caustica::MouseButtonPressed
     if (ImGui::GetIO().WantCaptureMouse || gizmoCapturesInput(sceneEditor))
         return false;
 
-    auto* gpuRender = caustica::editor::editorGpu(sceneEditor);
-    if (!gpuRender)
+    auto* camera = caustica::editor::editorCamera(sceneEditor);
+    if (!camera)
         return true;
 
     const int button = ToGlfwMouse(e.getButton());
@@ -207,7 +204,6 @@ bool onMouseButtonPressed(SceneEditor& sceneEditor, caustica::MouseButtonPressed
 
     auto* zoomTool = sceneEditor.zoomTool().get();
     auto* game = sceneEditor.game().get();
-    auto* camera = &gpuRender->camera();
     auto& session = sceneEditor.renderAppState();
 
     if (zoomTool && zoomTool->mouseButtonUpdate(button, cGlfwPress, mods))
@@ -239,8 +235,8 @@ bool onMouseButtonReleased(SceneEditor& sceneEditor, caustica::MouseButtonReleas
     if (ImGui::GetIO().WantCaptureMouse || gizmoCapturesInput(sceneEditor))
         return false;
 
-    auto* gpuRender = caustica::editor::editorGpu(sceneEditor);
-    if (!gpuRender)
+    auto* camera = caustica::editor::editorCamera(sceneEditor);
+    if (!camera)
         return true;
 
     const int button = ToGlfwMouse(e.getButton());
@@ -248,7 +244,6 @@ bool onMouseButtonReleased(SceneEditor& sceneEditor, caustica::MouseButtonReleas
 
     auto* zoomTool = sceneEditor.zoomTool().get();
     auto* game = sceneEditor.game().get();
-    auto* camera = &gpuRender->camera();
 
     if (zoomTool && zoomTool->mouseButtonUpdate(button, cGlfwRelease, mods))
         return true;

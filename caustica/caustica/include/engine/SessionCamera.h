@@ -6,7 +6,7 @@ namespace caustica
 {
 
 // Logic-thread free camera (Extract / CameraPlugin / editor input).
-// Render-thread camera stays on GpuRenderSubsystem (filled from ActiveCameraRenderProxy).
+// Render-thread camera lives on PathTracingRuntime (filled from ActiveCameraRenderProxy).
 struct SessionCamera
 {
     CameraController camera;

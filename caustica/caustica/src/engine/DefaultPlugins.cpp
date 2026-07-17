@@ -2,6 +2,7 @@
 #include <engine/App.h>
 #include <engine/AssetPlugin.h>
 #include <engine/EngineScheduleRegistration.h>
+#include <engine/GpuRenderSubsystem.h>
 #include <engine/RenderInfra.h>
 #include <engine/SessionCamera.h>
 #include <engine/SceneSession.h>

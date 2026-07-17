@@ -5,7 +5,6 @@
 #include "common/LocalConfig.h"
 
 #include <engine/App.h>
-#include <engine/GpuRenderSubsystem.h>
 #include <render/RenderAppState.h>
 
 namespace caustica::editor
@@ -36,8 +35,7 @@ void registerEditorSceneStartup(caustica::App& app, const EditorSceneStartupConf
 
             if (config.sceneEditor)
             {
-                if (auto* gpuRender = ctx.tryRes<caustica::GpuRenderSubsystem>())
-                    config.sceneEditor->attachGpuRenderSubsystem(*gpuRender);
+                config.sceneEditor->bindSessionCameraSideEffects();
             }
 
             if (config.appConfig.renderState && config.postAppInit)

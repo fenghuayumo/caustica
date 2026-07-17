@@ -62,7 +62,7 @@ void EditorPlugin::configureLateSchedules(App& app)
         if (ctx.runRender || !ctx.windowVisible || caustica::shouldSkipRender(*m_sceneEditor.app()))
             return;
 
-        auto* wr = caustica::editor::editorGpu(m_sceneEditor)->worldRenderer();
+        auto* wr = caustica::editor::editorWorldRenderer(m_sceneEditor);
         auto* ui = ctx.tryRes<EditorUiData>();
         auto* capture = ctx.tryRes<CaptureScriptState>();
         const auto& settings = m_sceneEditor.pathTracerSettings();

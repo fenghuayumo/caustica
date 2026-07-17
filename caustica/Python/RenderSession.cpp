@@ -3,7 +3,7 @@
 #if CAUSTICA_WITH_PYTHON
 
 #include <engine/EngineApp.h>
-#include <engine/GpuRenderSubsystem.h>
+#include <engine/RenderInfra.h>
 #include <engine/AppResources.h>
 #include <assets/loader/TextureLoader.h>
 #include <core/file_utils.h>
@@ -84,11 +84,11 @@ namespace
 
     std::filesystem::path ResolveResourceRoot(const std::filesystem::path& runtimeDirectory)
     {
-        if (std::filesystem::exists(runtimeDirectory / c_AssetsFolder))
+        if (std::filesystem::exists(runtimeDirectory / caustica::c_AssetsFolder))
             return runtimeDirectory;
 
         std::filesystem::path parentDirectory = runtimeDirectory.parent_path();
-        if (std::filesystem::exists(parentDirectory / c_AssetsFolder))
+        if (std::filesystem::exists(parentDirectory / caustica::c_AssetsFolder))
             return parentDirectory;
 
         return caustica::getDirectoryWithExecutable();
@@ -326,7 +326,7 @@ RenderSession::RenderSession(const Config& cfg)
         caustica::enableOutputToMessageBox(false);
         caustica::enableOutputToConsole(true);
         caustica::setMinSeverity(caustica::Severity::Warning);
-        helpersSetNonInteractive();
+        caustica::helpersSetNonInteractive();
     }
 
 #if CAUSTICA_WITH_DX12 && defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
@@ -515,8 +515,8 @@ bool RenderSession::SaveScreenshot(const std::string& outputPath)
     }
 
     auto* host = m_engine.get();
-    auto* gpuRender = host ? caustica::gpuRender(host->app()) : nullptr;
-    auto* renderDevice = gpuRender ? &gpuRender->renderDevice() : nullptr;
+    auto* infra = host ? caustica::renderInfra(host->app()) : nullptr;
+    auto* renderDevice = (infra && infra->renderDevice) ? infra->renderDevice.get() : nullptr;
     if (!renderDevice)
     {
         caustica::error("RenderSession: render device not initialized yet");
@@ -533,7 +533,7 @@ bool RenderSession::SaveScreenshot(const std::string& outputPath)
 
     std::filesystem::path p(outputPath);
     if (p.has_parent_path())
-        ensureDirectoryExists(p.parent_path());
+        caustica::ensureDirectoryExists(p.parent_path());
 
     return caustica::saveTextureToFile(
         device->getDevice(),

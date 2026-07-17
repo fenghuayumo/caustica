@@ -36,7 +36,7 @@ namespace
             .frameIndex = sceneEditor.app()->getGpuDevice()->getFrameIndex(),
             .resetAccumulation = &sceneEditor.pathTracerSettings().ResetAccumulation,
             .requestMeshAccelRebuild = [&sceneEditor](const std::shared_ptr<caustica::MeshInfo>& dirtyMesh) {
-                caustica::editor::editorGpu(sceneEditor)->rayTracingResources().requestMeshAccelRebuild(dirtyMesh);
+                caustica::editor::requirePathTracing(sceneEditor).rayTracingResources().requestMeshAccelRebuild(dirtyMesh);
             },
         };
     }
@@ -140,8 +140,8 @@ bool SceneContentEditor::deleteSceneNode(caustica::ecs::Entity entity)
 
 void SceneContentEditor::requestFullRebuild()
 {
-    if (auto* gpuRender = caustica::editor::editorGpu(m_sceneEditor))
-        gpuRender->rayTracingResources().requestFullRebuild();
+    if (auto* pathTracing = caustica::editor::editorPathTracing(m_sceneEditor))
+        pathTracing->rayTracingResources().requestFullRebuild();
 }
 
 std::vector<caustica::math::float3> SceneContentEditor::getMeshVertices(const std::shared_ptr<caustica::MeshInfo>& mesh) const

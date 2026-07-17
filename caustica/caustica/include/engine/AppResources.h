@@ -12,7 +12,6 @@ namespace caustica
 
 class App;
 class GpuDevice;
-class GpuRenderSubsystem;
 class SceneViewState;
 struct RenderInfra;
 struct SessionCamera;
@@ -24,7 +23,6 @@ namespace render
 class WorldRenderer;
 }
 
-[[nodiscard]] GpuRenderSubsystem* gpuRender(const App& app);
 [[nodiscard]] GpuDevice* gpuDevice(const App& app);
 [[nodiscard]] RenderInfra* renderInfra(const App& app);
 [[nodiscard]] SessionCamera* sessionCameraResource(const App& app);

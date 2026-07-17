@@ -10,7 +10,10 @@
 #include <render/SceneGaussianSplatPasses.h>
 #include <assets/loader/ShaderFactory.h>
 #include <engine/App.h>
-#include <engine/GpuRenderSubsystem.h>
+#include <engine/PathTracingRuntime.h>
+#include <engine/RenderInfra.h>
+#include <engine/SessionCamera.h>
+#include "EditorAccess.h"
 #include <engine/SceneQuery.h>
 #include <engine/CameraApi.h>
 #include <engine/SceneLifecycle.h>
@@ -73,22 +76,16 @@ SceneEditor::~SceneEditor()
 #endif
 }
 
-GpuRenderSubsystem* SceneEditor::gpuRender() const
-{
-    if (m_gpuRenderSubsystem)
-        return m_gpuRenderSubsystem;
-    return m_app ? m_app->tryResource<GpuRenderSubsystem>() : nullptr;
-}
 
 ecs::Entity SceneEditor::pickGaussianSplatAtPixel(math::uint2 renderPixel) const
 {
     if (!m_app)
         return ecs::NullEntity;
 
-    auto* gpu = gpuRender();
+    auto* pathTracing = caustica::pathTracingRuntime(*m_app);
     auto* entityWorld = caustica::entityWorld(*m_app);
     const auto& view = caustica::currentView(*m_app);
-    if (!gpu || !entityWorld || !view)
+    if (!pathTracing || !entityWorld || !view)
         return ecs::NullEntity;
 
     const uint2 disp = caustica::displaySize(*m_app);
@@ -121,7 +118,7 @@ ecs::Entity SceneEditor::pickGaussianSplatAtPixel(math::uint2 renderPixel) const
     ecs::Entity bestEntity = ecs::NullEntity;
     float bestDistance = FLT_MAX;
 
-    for (const auto& object : gpu->gaussianSplatPasses().objects())
+    for (const auto& object : pathTracing->gaussianSplatPasses().objects())
     {
         if (!ecs::isValid(object.entity) || !object.pass)
             continue;
@@ -172,11 +169,10 @@ ecs::Entity SceneEditor::pickGaussianSplatAtPixel(math::uint2 renderPixel) const
     return bestEntity;
 }
 
-void SceneEditor::attachGpuRenderSubsystem(GpuRenderSubsystem& gpuRenderSubsystem)
+void SceneEditor::bindSessionCameraSideEffects()
 {
-    m_gpuRenderSubsystem = &gpuRenderSubsystem;
     if (m_app)
-        caustica::attachGpuRenderSubsystem(*m_app, gpuRenderSubsystem);
+        caustica::bindSessionCameraSideEffects(*m_app);
 #if CAUSTICA_WITH_PYTHON
     if (!m_pythonScripting)
         m_pythonScripting = std::make_unique<PythonScripting>(*this);
@@ -311,9 +307,9 @@ void SceneEditor::onAnimateUpdateSceneTime(float /*fElapsedTimeSeconds*/, bool e
 
 void SceneEditor::onAnimateGameCamera(float fElapsedTimeSeconds)
 {
-    auto* gpu = gpuRender();
-    if (m_sampleGame && gpu)
-        m_sampleGame->TickCamera(fElapsedTimeSeconds, gpu->camera().camera());
+    auto* sessionCam = m_app ? caustica::sessionCameraResource(*m_app) : nullptr;
+    if (m_sampleGame && sessionCam)
+        m_sampleGame->TickCamera(fElapsedTimeSeconds, sessionCam->camera.camera());
 }
 
 void SceneEditor::onAnimateEnd(float /*fElapsedTimeSeconds*/)
@@ -445,10 +441,10 @@ void SceneEditor::setMeshVertices(const std::shared_ptr<MeshInfo>& mesh,
 
 ZoomTool* SceneEditor::getOrCreateZoomTool()
 {
-    auto* gpu = gpuRender();
+    auto* infra = m_app ? caustica::renderInfra(*m_app) : nullptr;
     auto* device = m_app ? m_app->getGpuDevice() : nullptr;
-    if (m_zoomTool == nullptr && gpu && device)
-        m_zoomTool = std::make_unique<ZoomTool>(device->getDevice(), gpu->shaderFactory());
+    if (m_zoomTool == nullptr && infra && infra->shaderFactory && device)
+        m_zoomTool = std::make_unique<ZoomTool>(device->getDevice(), infra->shaderFactory);
     return m_zoomTool.get();
 }
 
@@ -477,7 +473,7 @@ void SceneEditor::resolvePickFeedback(const DebugFeedbackStruct& feedback, const
 
 void SceneEditor::afterWorldRender(GpuDevice& gpuDevice)
 {
-    auto* wr = gpuRender() ? gpuRender()->worldRenderer() : nullptr;
+    auto* wr = m_app ? caustica::worldRenderer(*m_app) : nullptr;
     if (!wr)
         return;
 
@@ -492,10 +488,11 @@ void SceneEditor::afterWorldRender(GpuDevice& gpuDevice)
 
     auto saveFramebuffer = [this, &gpuDevice](const char* fileName) -> bool {
         nvrhi::IFramebuffer* framebuffer = gpuDevice.getCurrentFramebuffer(true);
-        if (!framebuffer || !gpuRender())
+        auto* infra = m_app ? caustica::renderInfra(*m_app) : nullptr;
+        if (!framebuffer || !infra || !infra->renderDevice)
             return false;
         nvrhi::ITexture* texture = framebuffer->getDesc().colorAttachments[0].texture;
-        auto* renderDevice = &gpuRender()->renderDevice();
+        auto* renderDevice = infra->renderDevice.get();
         return saveTextureToFile(
             gpuDevice.getDevice(), *renderDevice, texture, nvrhi::ResourceStates::Common, fileName);
     };

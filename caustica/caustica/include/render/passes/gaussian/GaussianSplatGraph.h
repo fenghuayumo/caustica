@@ -3,10 +3,11 @@
 #include <math/vector.h>
 #include <render/core/PathTracerSettings.h>
 #include <render/passes/gaussian/GaussianSplatPass.h>
+#include <scene/SceneRenderData.h>
 
 #include <shaders/SampleConstantBuffer.h>
 
-class SceneManager;
+#include <span>
 
 namespace caustica::render
 {
@@ -46,6 +47,6 @@ bool needsGaussianSplatAccelBuild(const PathTracerSettings& settings);
 
 GaussianSplatRenderSettings buildGaussianSplatRenderSettings(const GaussianSplatFrameInputs& inputs);
 
-dm::float3 resolveGaussianSplatShadowDirection(SceneManager& sceneManager);
+dm::float3 resolveGaussianSplatShadowDirection(std::span<const scene::LightRenderProxy> lights);
 
 } // namespace caustica::render

@@ -20,7 +20,9 @@
 #include <engine/SceneQuery.h>
 #include <engine/RenderSessionApi.h>
 #include <engine/App.h>
-#include <engine/GpuRenderSubsystem.h>
+#include <engine/PathTracingRuntime.h>
+#include <engine/RenderInfra.h>
+#include <engine/AppResources.h>
 #include <backend/GpuDevice.h>
 #include <rhi/nvrhi.h>
 
@@ -174,13 +176,14 @@ public:
         // Headless / DefaultPlugins sessions have no SceneEditor; load via SceneManager.
         caustica::App& app = *m_session->GetApp();
         auto* sceneMgr = caustica::sceneManager(app);
-        auto* gpu = caustica::gpuRender(app);
-        if (!sceneMgr || !gpu || !gpu->textureLoader())
+        auto* infra = caustica::renderInfra(app);
+        auto* pathTracing = caustica::pathTracingRuntime(app);
+        if (!sceneMgr || !infra || !infra->textureLoader || !pathTracing)
             return false;
 
         const std::filesystem::path meshPath(fileName);
         const caustica::RuntimeMeshLoadParams params{
-            .TextureCache = gpu->textureLoader().get(),
+            .TextureCache = infra->textureLoader.get(),
             .SceneTypes = std::make_shared<caustica::render::RenderSceneTypeFactory>(),
             .TextureSearchDirectory = meshPath.parent_path(),
         };
@@ -204,22 +207,22 @@ public:
         if (importedRoot == caustica::ecs::NullEntity)
             return false;
 
-        app.runGpuWorkOnRenderThread([&app, gpu, scene, frameIndex]() {
+        app.runGpuWorkOnRenderThread([&app, infra, pathTracing, scene, frameIndex]() {
             if (auto* device = app.getGpuDevice())
             {
                 if (nvrhi::IDevice* nvrhiDevice = device->getDevice())
                     nvrhiDevice->waitForIdle();
             }
-            if (auto textureLoader = gpu->textureLoader())
+            if (infra->textureLoader && infra->renderDevice)
             {
-                textureLoader->processRenderingThreadCommands(gpu->renderDevice(), 0.f);
-                textureLoader->loadingFinished();
+                infra->textureLoader->processRenderingThreadCommands(*infra->renderDevice, 0.f);
+                infra->textureLoader->loadingFinished();
             }
-            gpu->lightingPasses().ensureMaterialsFromScene(scene);
+            pathTracing->lightingPasses().ensureMaterialsFromScene(scene);
             caustica::render::SceneGpuUpdater::refreshAfterLoad(*scene, frameIndex);
         });
 
-        gpu->rayTracingResources().requestAccelerationStructureRebuild();
+        pathTracing->rayTracingResources().requestAccelerationStructureRebuild();
         return true;
     }
 
