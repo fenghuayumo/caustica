@@ -293,7 +293,7 @@ NB_MODULE(caustica, m)
 
         .def("load_mesh_file", &PyRenderer::loadMeshFile,
              nb::arg("file_name"),
-             "Append a mesh file (.gltf, .glb, .obj, .urdf, or .usd/.usda/.usdc/.caususd) to the current scene.")
+             "Append a mesh file (.gltf, .glb, .obj, .urdf, or .usd/.usda/.usdc) to the current scene.")
 
         .def("step", &PyRenderer::Step,
              nb::arg("dt") = -1.0f,

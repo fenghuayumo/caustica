@@ -31,7 +31,9 @@ namespace caustica
 }
 
 #include <render/passes/rtxdi/RtxdiUserSettings.h>
-#include <scene/Scene.h>
+#include <render/SceneGpuResources.h>
+
+namespace caustica::scene { class SceneRenderData; }
 
 struct RtxdiBridgeParameters
 {
@@ -65,7 +67,10 @@ public:
         const RenderTargets& renderTargets,
         std::shared_ptr<EnvMapProcessor> envMap,
         EnvMapSceneParams envMapSceneParams,
-        const std::shared_ptr<caustica::Scene> scene,
+        const caustica::scene::SceneRenderData* renderData,
+        size_t geometryInstanceCount,
+        nvrhi::IDescriptorTable* descriptorTable,
+        const caustica::render::SceneGpuFrameHandles& gpuHandles,
         std::shared_ptr<class MaterialGpuCache> materialGpuCache,
         std::shared_ptr<class OpacityMicromapBuilder> opacityMicromapBuilder,
         nvrhi::BufferHandle subInstanceDataBuffer,
@@ -103,10 +108,10 @@ private:
 	std::unique_ptr<PrepareLightsPass> m_PrepareLightsPass;
 	std::unique_ptr<GenerateMipsPass> m_LocalLightPdfMipmapPass;
 
-	nvrhi::DeviceHandle m_device; 
+	nvrhi::DeviceHandle m_device;
 	std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
 	caustica::render::RenderDevice& m_renderDevice;
-	std::shared_ptr<caustica::Scene> m_Scene;
+	nvrhi::IDescriptorTable* m_descriptorTable = nullptr;
 	nvrhi::BindingLayoutHandle m_bindingLayout;
 	nvrhi::BindingLayoutHandle m_bindlessLayout;
 	nvrhi::BindingSetHandle m_bindingSet;

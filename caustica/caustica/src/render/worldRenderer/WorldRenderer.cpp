@@ -12,7 +12,7 @@ namespace { constexpr int c_SwapchainCount = 3; }
 #include <scene/Scene.h>
 #include <scene/SceneEcs.h>
 #include <scene/SceneLightAccess.h>
-#include <scene/SceneManager.h>
+#include <scene/scene_utils.h>
 #include <render/core/PostProcessAA.h>
 #include <render/core/SceneGeometryUpdate.h>
 #include <render/core/LightingUpdate.h>
@@ -558,7 +558,7 @@ void caustica::render::WorldRenderer::createRenderPasses( bool& exposureResetReq
 void caustica::render::WorldRenderer::preUpdateLighting(nvrhi::CommandListHandle commandList, bool& needNewBindings)
 {
     std::filesystem::path sceneDirectory;
-    if (m_context.sessionScenePath != std::filesystem::path(SceneManager::inlineSceneSentinel()))
+    if (!isInlineScenePath(m_context.sessionScenePath))
         sceneDirectory = m_context.sessionScenePath.parent_path();
 
     std::string envMapActualPath = m_context.scenePasses.lighting.envMapLocalPath();
@@ -788,9 +788,32 @@ void caustica::render::WorldRenderer::rtxdiSetupFrame(nvrhi::IFramebuffer* frame
     if( m_context.activeSettings().ResetRealtimeCaches )
         m_rtxdiPass->reset();
 
-	m_rtxdiPass->prepareResources(m_commandList, *m_renderTargets, envMapPresent ? m_context.scenePasses.lighting.environment() : nullptr, m_context.scenePasses.lighting.envMapSceneParams(),
-        m_context.sessionScene, m_context.scenePasses.lighting.materials(), m_context.scenePasses.lighting.opacityMaps(), m_context.accelStructs.getSubInstanceBuffer(), bridgeParameters, m_bindingLayout, m_shaderDebug );
- }
+    const scene::SceneRenderData* renderData = m_context.frameScene;
+    if (!renderData && m_context.sessionScene)
+        renderData = &m_context.sessionScene->getRenderData();
+    const size_t geometryInstanceCount = m_context.sessionScene
+        ? m_context.sessionScene->getGeometryInstancesCount()
+        : 0;
+    nvrhi::IDescriptorTable* descriptorTable = m_context.descriptorTable
+        ? m_context.descriptorTable->getDescriptorTable()
+        : nullptr;
+
+    m_rtxdiPass->prepareResources(
+        m_commandList,
+        *m_renderTargets,
+        envMapPresent ? m_context.scenePasses.lighting.environment() : nullptr,
+        m_context.scenePasses.lighting.envMapSceneParams(),
+        renderData,
+        geometryInstanceCount,
+        descriptorTable,
+        m_context.resolveGpuHandles(),
+        m_context.scenePasses.lighting.materials(),
+        m_context.scenePasses.lighting.opacityMaps(),
+        m_context.accelStructs.getSubInstanceBuffer(),
+        bridgeParameters,
+        m_bindingLayout,
+        m_shaderDebug);
+}
 #if CAUSTICA_WITH_STREAMLINE
 void caustica::render::WorldRenderer::streamlinePreRender()
 {
@@ -1104,7 +1127,40 @@ bool caustica::render::WorldRenderer::hasActiveGaussianSplats() const
     return std::any_of(gaussianSplats.begin(), gaussianSplats.end(), isGaussianSplatProxyActive);
 }
 
-void caustica::render::WorldRenderer::executeGaussianSplatRender(nvrhi::ICommandList* commandList, bool renderToOutputColor)
+std::vector<GaussianSplatGraphResources>
+caustica::render::WorldRenderer::prepareGaussianSplatGraphResources(bool renderToOutputColor)
+{
+    std::vector<GaussianSplatGraphResources> resources;
+    if (!hasActiveGaussianSplats())
+        return resources;
+
+    const GaussianSplatFrameInputs frameInputs{
+        m_context.activeSettings(),
+        int(m_frameIndex),
+        int(m_sampleIndex),
+        m_gaussianSplatTemporalSampleIndex,
+        renderToOutputColor,
+        dm::float2(float(m_displaySize.x), float(m_displaySize.y)),
+        resolveGaussianSplatShadowDirection(m_context.frameLights()),
+    };
+    const GaussianSplatRenderSettings settings = buildGaussianSplatRenderSettings(frameInputs);
+
+    for (const scene::GaussianSplatRenderProxy& proxy : m_context.frameGaussianSplats())
+    {
+        if (!isGaussianSplatProxyActive(proxy))
+            continue;
+
+        GaussianSplatRenderSettings objectSettings = settings;
+        objectSettings.objectToWorld = gaussianSplatObjectToWorld(proxy);
+        proxy.pass->prepareGraphResources(objectSettings);
+        resources.push_back(proxy.pass->graphResources(objectSettings));
+    }
+    return resources;
+}
+
+void caustica::render::WorldRenderer::executeGaussianSplatUpload(
+    nvrhi::ICommandList* commandList,
+    bool renderToOutputColor)
 {
     m_gaussianSplatCompositeRendered = false;
     if (commandList == nullptr || !hasActiveGaussianSplats())
@@ -1133,13 +1189,42 @@ void caustica::render::WorldRenderer::executeGaussianSplatRender(nvrhi::ICommand
     }
     splatView.updateCache();
 
-    bool renderedAny = renderGaussianSplatScene(
+    (void)uploadGaussianSplatScene(
         commandList,
         m_context.frameGaussianSplats(),
         splatView,
         m_context.accelStructs.getTopLevelAS().Get(),
         *m_renderTargets,
         settings);
+}
+
+void caustica::render::WorldRenderer::executeGaussianSplatSort(nvrhi::ICommandList* commandList)
+{
+    if (commandList == nullptr || !hasActiveGaussianSplats())
+        return;
+
+    sortGaussianSplatScene(commandList, m_context.frameGaussianSplats());
+}
+
+void caustica::render::WorldRenderer::executeGaussianSplatRaster(
+    nvrhi::ICommandList* commandList,
+    bool renderToOutputColor)
+{
+    if (commandList == nullptr || !hasActiveGaussianSplats())
+        return;
+
+    caustica::PlanarView splatView = *m_context.camera.view();
+    if (!renderToOutputColor)
+    {
+        splatView.setViewport(ViewportDesc(float(m_displaySize.x), float(m_displaySize.y)));
+        splatView.setPixelOffset(dm::float2::zero());
+    }
+    splatView.updateCache();
+
+    const bool renderedAny = rasterGaussianSplatScene(
+        commandList,
+        m_context.frameGaussianSplats(),
+        splatView);
     m_gaussianSplatCompositeRendered = renderedAny && !renderToOutputColor;
 }
 

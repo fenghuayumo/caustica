@@ -10,7 +10,7 @@
 #include <render/passes/rtxdi/GeneratePdfMipsPass.h>
 #include <render/passes/lighting/distant/EnvMapProcessor.h>
 #include <render/passes/lighting/distant/EnvMapImportanceSamplingCache.h>
-#include <scene/Scene.h>
+#include <scene/SceneRenderData.h>
 #include <shaders/render/rtxdi/ShaderParameters.h>
 #include <shaders/SampleConstantBuffer.h>
 
@@ -211,7 +211,10 @@ void RtxdiPass::prepareResources(
     const RenderTargets& renderTargets,
     std::shared_ptr<EnvMapProcessor> envMap,
     EnvMapSceneParams envMapSceneParams,
-    const std::shared_ptr<caustica::Scene> scene,
+    const caustica::scene::SceneRenderData* renderData,
+    size_t geometryInstanceCount,
+    nvrhi::IDescriptorTable* descriptorTable,
+    const caustica::render::SceneGpuFrameHandles& gpuHandles,
     std::shared_ptr<class MaterialGpuCache> materialGpuCache,
     std::shared_ptr<class OpacityMicromapBuilder> opacityMicromapBuilder,
     nvrhi::BufferHandle subInstanceDataBuffer,
@@ -219,7 +222,7 @@ void RtxdiPass::prepareResources(
     const nvrhi::BindingLayoutHandle extraBindingLayout,
     std::shared_ptr<ShaderDebug> shaderDebug)
 {
-    m_Scene = scene;
+    m_descriptorTable = descriptorTable;
     m_BridgeParameters = bridgeParams;
 
     checkContextStaticParameters();
@@ -249,11 +252,14 @@ void RtxdiPass::prepareResources(
 
     if (!m_PrepareLightsPass)
     {
-        m_PrepareLightsPass = std::make_unique<PrepareLightsPass>(m_device, m_shaderFactory, m_renderDevice, nullptr, materialGpuCache, opacityMicromapBuilder, subInstanceDataBuffer, m_bindlessLayout, shaderDebug);
+        m_PrepareLightsPass = std::make_unique<PrepareLightsPass>(
+            m_device, m_shaderFactory, m_renderDevice, materialGpuCache, opacityMicromapBuilder,
+            subInstanceDataBuffer, m_bindlessLayout, shaderDebug);
         m_PrepareLightsPass->createPipeline();
     }
 
-    m_PrepareLightsPass->setScene(m_Scene, envMap, envMapSceneParams);
+    m_PrepareLightsPass->setFrameInputs(
+        renderData, geometryInstanceCount, descriptorTable, gpuHandles, envMap, envMapSceneParams);
     m_PrepareLightsPass->setGaussianSplatEmissionProxies(
         m_BridgeParameters.gaussianSplatEmissionProxies,
         m_BridgeParameters.gaussianSplatEmissionObjectToWorld,
@@ -263,10 +269,10 @@ void RtxdiPass::prepareResources(
     bool envMapPresent = envMap != nullptr;
     uint32_t numEmissiveMeshes, numEmissiveTriangles = 0;
     m_PrepareLightsPass->countLightsInScene(numEmissiveMeshes, numEmissiveTriangles);
-    uint32_t numPrimitiveLights = uint32_t(m_Scene->getLightEntities().size());
+    uint32_t numPrimitiveLights = renderData ? uint32_t(renderData->lights.size()) : 0;
     if (m_BridgeParameters.gaussianSplatEmissionProxies != nullptr && m_BridgeParameters.gaussianSplatEmissionIntensity > 0.0f)
         numPrimitiveLights += uint32_t(m_BridgeParameters.gaussianSplatEmissionProxies->size());
-    uint32_t numGeometryInstances = uint32_t(m_Scene->getGeometryInstancesCount());
+    uint32_t numGeometryInstances = uint32_t(geometryInstanceCount);
 
     if (m_rtxdiResources && (
         numEmissiveMeshes > m_rtxdiResources->getMaxEmissiveMeshes() ||
@@ -643,7 +649,7 @@ void RtxdiPass::executeComputePass(
     
     SampleMiniConstants unusedPushConstants = { };  // shared bindings require them
 	pass.execute(commandList, dispatchSize.x, dispatchSize.y, dispatchSize.z, m_bindingSet,
-		extraBindingSet, m_Scene->getDescriptorTable(), &unusedPushConstants, sizeof(unusedPushConstants));
+		extraBindingSet, m_descriptorTable, &unusedPushConstants, sizeof(unusedPushConstants));
 
 	commandList->endMarker();
 }
@@ -659,8 +665,8 @@ void RtxdiPass::executeRayTracingPass(
 	commandList->beginMarker(passName);
 	
     SampleMiniConstants unusedPushConstants = { };  // shared bindings require them
-	pass.execute(commandList, dispatchSize.x, dispatchSize.y, m_bindingSet, 
-		extraBindingSet, m_Scene->getDescriptorTable(), &unusedPushConstants, sizeof(unusedPushConstants));
+	pass.execute(commandList, dispatchSize.x, dispatchSize.y, m_bindingSet,
+		extraBindingSet, m_descriptorTable, &unusedPushConstants, sizeof(unusedPushConstants));
 
 	commandList->endMarker();
 }

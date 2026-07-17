@@ -45,13 +45,22 @@ void buildGaussianSplatEmissionProxies(
     std::span<const scene::GaussianSplatRenderProxy> gaussianSplats,
     const PathTracerSettings& settings);
 
-[[nodiscard]] bool renderGaussianSplatScene(
+[[nodiscard]] bool uploadGaussianSplatScene(
     nvrhi::ICommandList* commandList,
     std::span<const scene::GaussianSplatRenderProxy> gaussianSplats,
     const caustica::IView& splatView,
     nvrhi::rt::IAccelStruct* meshTopLevelAS,
     RenderTargets& renderTargets,
     const GaussianSplatRenderSettings& settings);
+
+void sortGaussianSplatScene(
+    nvrhi::ICommandList* commandList,
+    std::span<const scene::GaussianSplatRenderProxy> gaussianSplats);
+
+[[nodiscard]] bool rasterGaussianSplatScene(
+    nvrhi::ICommandList* commandList,
+    std::span<const scene::GaussianSplatRenderProxy> gaussianSplats,
+    const caustica::IView& splatView);
 
 void buildGaussianSplatSceneAccelStructs(
     nvrhi::ICommandList* commandList,

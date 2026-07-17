@@ -44,6 +44,7 @@ class PTPipelineVariant;
 class ToneMappingPass;
 struct PathTracerCameraData;
 struct PathTracerConstants;
+struct GaussianSplatGraphResources;
 
 namespace caustica
 {
@@ -92,7 +93,10 @@ public:
     void prepareGaussianSplatPasses();
     void buildGaussianSplatEmissionProxies();
     void executeGaussianSplatAccelBuild(nvrhi::ICommandList* commandList);
-    void executeGaussianSplatRender(nvrhi::ICommandList* commandList, bool renderToOutputColor);
+    [[nodiscard]] std::vector<GaussianSplatGraphResources> prepareGaussianSplatGraphResources(bool renderToOutputColor);
+    void executeGaussianSplatUpload(nvrhi::ICommandList* commandList, bool renderToOutputColor);
+    void executeGaussianSplatSort(nvrhi::ICommandList* commandList);
+    void executeGaussianSplatRaster(nvrhi::ICommandList* commandList, bool renderToOutputColor);
     void executeGaussianSplatAccumulate(nvrhi::ICommandList* commandList);
     [[nodiscard]] nvrhi::ITexture* gaussianSplatCurrentColor() const { return m_gaussianSplatCurrentColor.Get(); }
     [[nodiscard]] nvrhi::ITexture* gaussianSplatAccumulatedColor() const { return m_gaussianSplatAccumulatedColor.Get(); }

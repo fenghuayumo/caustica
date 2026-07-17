@@ -65,7 +65,7 @@ RuntimeMeshLoadResult loadRuntimeMeshFile(
         return loadRuntimeObjMeshFile(params, absPath);
     if (ext == ".urdf")
         return loadRuntimeUrdfMeshFile(params, absPath);
-    if (ext == ".usd" || ext == ".usda" || ext == ".usdc" || ext == ".caususd")
+    if (ext == ".usd" || ext == ".usda" || ext == ".usdc")
     {
         if (!params.TextureCache || !params.SceneTypes)
             return FailedRuntimeMeshLoad(absPath);

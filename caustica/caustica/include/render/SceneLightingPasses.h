@@ -10,7 +10,6 @@
 
 #include <assets/loader/TextureLoader.h>
 #include <render/core/DescriptorTableManager.h>
-#include <scene/SceneManager.h>
 
 #include <filesystem>
 #include <functional>

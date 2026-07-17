@@ -3,16 +3,13 @@
 #include <backend/GpuDevice.h>
 #include <assets/loader/TextureLoader.h>
 #include <scene/Scene.h>
+#include <scene/scene_utils.h>
 #include <core/vfs/VFS.h>
 #include <core/log.h>
 
 #include <algorithm>
 #include <cctype>
 #include <filesystem>
-
-// =============================================================================
-// Anonymous helpers
-// =============================================================================
 
 namespace
 {
@@ -23,33 +20,7 @@ namespace
         });
         return it != scene.end() && *it == '{';
     }
-
-    bool IsEnvironmentMapMediaFile(const std::filesystem::path& path)
-    {
-        if (!path.has_filename())
-            return false;
-        const std::string ext = path.extension().string();
-        return ext == ".exr" || ext == ".hdr" || ext == ".dds";
-    }
-
-    void AppendEnvironmentMapsFromFolder(
-        const std::filesystem::path& folder,
-        std::vector<std::filesystem::path>& outList)
-    {
-        if (folder.empty() || !std::filesystem::exists(folder))
-            return;
-
-        for (const auto& file : std::filesystem::directory_iterator(folder))
-        {
-            if (!file.is_regular_file() || !IsEnvironmentMapMediaFile(file.path()))
-                continue;
-
-            const std::filesystem::path absolutePath = std::filesystem::absolute(file.path());
-            if (std::find(outList.begin(), outList.end(), absolutePath) == outList.end())
-                outList.push_back(absolutePath);
-        }
-    }
-} // anonymous namespace
+} // namespace
 
 
 // =============================================================================
@@ -117,7 +88,7 @@ SceneManager::ResolvedScenePath SceneManager::resolveScenePath(
     if (inlineScene)
     {
         result.inlineJson = sceneName;
-        result.path = std::filesystem::path(SceneManager::inlineSceneSentinel());
+        result.path = std::filesystem::path(caustica::inlineSceneSentinel());
         return result;
     }
 
@@ -174,7 +145,7 @@ std::shared_ptr<caustica::Scene> SceneManager::loadScene(
         m_descriptorTable,
         m_sceneTypeFactory);
 
-    if (sceneFileName == std::filesystem::path(inlineSceneSentinel()))
+    if (caustica::isInlineScenePath(sceneFileName))
     {
         if (scene->loadFromJsonString(m_inlineSceneJson))
         {
@@ -255,31 +226,4 @@ void SceneManager::endStructureEdit()
 {
     if (m_structureEditDepth > 0)
         --m_structureEditDepth;
-}
-
-// --- Environment map listing ---
-
-void SceneManager::refreshEnvironmentMapMediaList(
-    const std::filesystem::path&              assetsPath,
-    const std::filesystem::path&              envMapSubFolder,
-    const std::filesystem::path&              currentScenePath,
-    std::vector<std::filesystem::path>&       outMediaList,
-    std::filesystem::path&                    outMediaFolder)
-{
-    outMediaList.clear();
-
-    std::filesystem::path sceneDirectory;
-    if (!currentScenePath.empty() && currentScenePath != std::filesystem::path(SceneManager::inlineSceneSentinel()))
-        sceneDirectory = currentScenePath.parent_path();
-
-    const std::filesystem::path sceneEnvFolder = sceneDirectory / envMapSubFolder;
-    const std::filesystem::path assetsEnvFolder = assetsPath / envMapSubFolder;
-
-    AppendEnvironmentMapsFromFolder(assetsEnvFolder, outMediaList);
-    AppendEnvironmentMapsFromFolder(sceneEnvFolder, outMediaList);
-
-    if (std::filesystem::exists(assetsEnvFolder))
-        outMediaFolder = assetsEnvFolder;
-    else
-        outMediaFolder = sceneEnvFolder;
 }

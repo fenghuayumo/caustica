@@ -34,6 +34,7 @@ enum class TextureAccess : uint8_t
 {
     ShaderResource,
     RenderTarget,
+    DepthWrite,
     UnorderedAccess,
     CopySource,
     CopyDest,

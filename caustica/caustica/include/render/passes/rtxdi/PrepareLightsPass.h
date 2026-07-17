@@ -1,7 +1,7 @@
 #pragma once
 
-#include <scene/SceneObjects.h>
 #include <ecs/Entity.h>
+#include <math/math.h>
 #include <rhi/nvrhi.h>
 #include <rtxdi/DI/ReSTIRDI.h>
 #include <memory>
@@ -16,10 +16,9 @@
 namespace caustica
 {
     namespace render { class RenderDevice; }
+    namespace scene { class SceneRenderData; }
     class ShaderFactory;
 }
-
-#include <scene/Scene.h>
 
 class RenderTargets;
 class RtxdiResources;
@@ -50,10 +49,12 @@ private:
 
     uint32_t m_MaxLightsInBuffer;
     bool m_OddFrame = false;
-    
+
     std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
     caustica::render::RenderDevice& m_renderDevice;
-    std::shared_ptr<caustica::Scene> m_Scene;
+    const caustica::scene::SceneRenderData* m_renderData = nullptr;
+    size_t m_geometryInstanceCount = 0;
+    nvrhi::IDescriptorTable* m_descriptorTable = nullptr;
     caustica::render::SceneGpuFrameHandles m_gpuHandles{};
     std::shared_ptr<class MaterialGpuCache> m_materialGpuCache;
     std::shared_ptr<class OpacityMicromapBuilder> m_opacityMicromapBuilder;
@@ -72,7 +73,6 @@ public:
         nvrhi::IDevice* device,
         std::shared_ptr<caustica::ShaderFactory> shaderFactory,
         caustica::render::RenderDevice& renderDevice,
-        std::shared_ptr<caustica::Scene> scene,
         std::shared_ptr<class MaterialGpuCache> materialGpuCache,
         std::shared_ptr<class OpacityMicromapBuilder> opacityMicromapBuilder,
         nvrhi::BufferHandle subInstanceData,
@@ -80,12 +80,18 @@ public:
         std::shared_ptr<ShaderDebug> shaderDebug
     );
 
-    void setScene(std::shared_ptr<caustica::Scene> scene, std::shared_ptr<EnvMapProcessor> environmentMap = nullptr, EnvMapSceneParams envMapSceneParams = {} );
+    void setFrameInputs(
+        const caustica::scene::SceneRenderData* renderData,
+        size_t geometryInstanceCount,
+        nvrhi::IDescriptorTable* descriptorTable,
+        const caustica::render::SceneGpuFrameHandles& gpuHandles,
+        std::shared_ptr<EnvMapProcessor> environmentMap = nullptr,
+        EnvMapSceneParams envMapSceneParams = {});
     void setGaussianSplatEmissionProxies(const std::vector<GaussianSplatEmissionProxy>* proxies, caustica::math::float4x4 objectToWorld, float emissionIntensity);
     void createPipeline();
     void createBindingSet(RtxdiResources& resources, const RenderTargets& renderTargets);
     void countLightsInScene(uint32_t& numEmissiveMeshes, uint32_t& numEmissiveTriangles);
-    
+
     RTXDI_LightBufferParameters process(nvrhi::ICommandList* commandList);
 
     nvrhi::TextureHandle getEnvironmentMapTexture();

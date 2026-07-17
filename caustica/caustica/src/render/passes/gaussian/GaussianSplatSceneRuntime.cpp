@@ -113,7 +113,7 @@ void buildGaussianSplatEmissionProxies(
     }
 }
 
-bool renderGaussianSplatScene(
+bool uploadGaussianSplatScene(
     nvrhi::ICommandList* commandList,
     std::span<const scene::GaussianSplatRenderProxy> gaussianSplats,
     const caustica::IView& splatView,
@@ -129,8 +129,39 @@ bool renderGaussianSplatScene(
 
         GaussianSplatRenderSettings objectSettings = settings;
         objectSettings.objectToWorld = gaussianSplatObjectToWorld(proxy);
-        proxy.pass->render(commandList, splatView, meshTopLevelAS, renderTargets, objectSettings);
-        renderedAny = true;
+        renderedAny |= proxy.pass->upload(
+            commandList,
+            splatView,
+            meshTopLevelAS,
+            renderTargets,
+            objectSettings);
+    }
+    return renderedAny;
+}
+
+void sortGaussianSplatScene(
+    nvrhi::ICommandList* commandList,
+    std::span<const scene::GaussianSplatRenderProxy> gaussianSplats)
+{
+    for (const scene::GaussianSplatRenderProxy& proxy : gaussianSplats)
+    {
+        if (isGaussianSplatProxyActive(proxy))
+            proxy.pass->sort(commandList);
+    }
+}
+
+bool rasterGaussianSplatScene(
+    nvrhi::ICommandList* commandList,
+    std::span<const scene::GaussianSplatRenderProxy> gaussianSplats,
+    const caustica::IView& splatView)
+{
+    bool renderedAny = false;
+    for (const scene::GaussianSplatRenderProxy& proxy : gaussianSplats)
+    {
+        if (!isGaussianSplatProxyActive(proxy))
+            continue;
+
+        renderedAny |= proxy.pass->raster(commandList, splatView);
     }
     return renderedAny;
 }

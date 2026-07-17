@@ -7,18 +7,159 @@
 #include <render/worldRenderer/WorldRenderer.h>
 
 #include <cassert>
+#include <vector>
 
 namespace caustica::render
 {
 
 namespace
 {
+    struct GaussianSplatGraphHandles
+    {
+        rg::BufferHandle constantBuffer;
+        rg::BufferHandle splatBuffer;
+        rg::BufferHandle colorBuffer;
+        rg::BufferHandle shBuffer;
+        rg::BufferHandle indexBuffer;
+        rg::BufferHandle sortKeyBuffer;
+        rg::BufferHandle sortControlBuffer;
+        rg::BufferHandle drawIndirectBuffer;
+        rg::TextureHandle stochasticDepth;
+        bool hasStochasticDepth = false;
+        GaussianSplatSortMode sortMode = GaussianSplatSortMode::GpuSort;
+        bool distanceStageCulling = false;
+    };
+
     bool gaussianSplatsEnabled(const RenderFeatureContext& ctx)
     {
         return ctx.settings != nullptr
             && ctx.renderer != nullptr
             && ctx.settings->EnableGaussianSplats
             && ctx.renderer->hasActiveGaussianSplats();
+    }
+
+    std::vector<GaussianSplatGraphHandles> importGaussianSplatGraphResources(
+        RenderFeatureContext ctx,
+        bool renderToOutputColor)
+    {
+        std::vector<GaussianSplatGraphHandles> handles;
+        for (const GaussianSplatGraphResources& resources :
+            ctx.renderer->prepareGaussianSplatGraphResources(renderToOutputColor))
+        {
+            if (!resources.constantBuffer || !resources.splatBuffer
+                || !resources.colorBuffer || !resources.shBuffer
+                || !resources.indexBuffer || !resources.sortKeyBuffer
+                || !resources.sortControlBuffer || !resources.drawIndirectBuffer)
+            {
+                continue;
+            }
+
+            GaussianSplatGraphHandles imported{
+                .constantBuffer = ctx.graph->importBuffer(resources.constantBuffer, rg::BufferAccess::ConstantBuffer),
+                .splatBuffer = ctx.graph->importBuffer(resources.splatBuffer, rg::BufferAccess::ShaderResource),
+                .colorBuffer = ctx.graph->importBuffer(resources.colorBuffer, rg::BufferAccess::ShaderResource),
+                .shBuffer = ctx.graph->importBuffer(resources.shBuffer, rg::BufferAccess::ShaderResource),
+                .indexBuffer = ctx.graph->importBuffer(resources.indexBuffer, rg::BufferAccess::UnorderedAccess),
+                .sortKeyBuffer = ctx.graph->importBuffer(resources.sortKeyBuffer, rg::BufferAccess::UnorderedAccess),
+                .sortControlBuffer = ctx.graph->importBuffer(resources.sortControlBuffer, rg::BufferAccess::UnorderedAccess),
+                .drawIndirectBuffer = ctx.graph->importBuffer(resources.drawIndirectBuffer, rg::BufferAccess::UnorderedAccess),
+                .sortMode = resources.sortMode,
+                .distanceStageCulling = resources.distanceStageCulling,
+            };
+            if (resources.stochasticDepth)
+            {
+                imported.stochasticDepth = ctx.graph->importTexture(
+                    resources.stochasticDepth,
+                    rg::TextureAccess::DepthWrite);
+                imported.hasStochasticDepth = true;
+            }
+            handles.push_back(imported);
+        }
+        return handles;
+    }
+
+    bool registerGaussianSplatRenderStages(
+        RenderFeatureContext ctx,
+        bool renderToOutputColor,
+        rg::TextureHandle colorTarget,
+        rg::TextureHandle sceneDepth,
+        const char* uploadPassName,
+        const char* sortPassName,
+        const char* rasterPassName)
+    {
+        const std::vector<GaussianSplatGraphHandles> resources =
+            importGaussianSplatGraphResources(ctx, renderToOutputColor);
+        if (resources.empty())
+            return false;
+
+        ctx.graph->addPass(
+            uploadPassName,
+            [resources](rg::PassBuilder& setup) {
+                for (const GaussianSplatGraphHandles& item : resources)
+                {
+                    setup.write(item.constantBuffer, rg::BufferAccess::CopyDest);
+                    setup.write(item.splatBuffer, rg::BufferAccess::CopyDest);
+                    setup.write(item.colorBuffer, rg::BufferAccess::CopyDest);
+                    setup.write(item.shBuffer, rg::BufferAccess::CopyDest);
+                }
+            },
+            [ctx, renderToOutputColor](rg::RenderPassContext& passCtx) {
+                if (gaussianSplatsEnabled(ctx))
+                    ctx.renderer->executeGaussianSplatUpload(passCtx.commandList(), renderToOutputColor);
+            },
+            rg::PassOptions{ .sideEffect = true });
+
+        ctx.graph->addPass(
+            sortPassName,
+            [resources](rg::PassBuilder& setup) {
+                for (const GaussianSplatGraphHandles& item : resources)
+                {
+                    if (item.sortMode == GaussianSplatSortMode::StochasticSplats
+                        && !item.distanceStageCulling)
+                    {
+                        setup.write(item.indexBuffer, rg::BufferAccess::CopyDest);
+                    }
+                    else
+                    {
+                        setup.read(item.constantBuffer, rg::BufferAccess::ConstantBuffer);
+                        setup.read(item.splatBuffer, rg::BufferAccess::ShaderResource);
+                        setup.write(item.indexBuffer, rg::BufferAccess::UnorderedAccess);
+                        setup.write(item.sortKeyBuffer, rg::BufferAccess::UnorderedAccess);
+                        setup.write(item.sortControlBuffer, rg::BufferAccess::UnorderedAccess);
+                        setup.write(item.drawIndirectBuffer, rg::BufferAccess::UnorderedAccess);
+                    }
+                }
+            },
+            [ctx](rg::RenderPassContext& passCtx) {
+                if (gaussianSplatsEnabled(ctx))
+                    ctx.renderer->executeGaussianSplatSort(passCtx.commandList());
+            },
+            rg::PassOptions{ .sideEffect = true, .executeAfter = uploadPassName });
+
+        ctx.graph->addPass(
+            rasterPassName,
+            [resources, colorTarget, sceneDepth](rg::PassBuilder& setup) {
+                setup.read(sceneDepth, rg::TextureAccess::ShaderResource);
+                setup.write(colorTarget, rg::TextureAccess::RenderTarget);
+                for (const GaussianSplatGraphHandles& item : resources)
+                {
+                    setup.read(item.constantBuffer, rg::BufferAccess::ConstantBuffer);
+                    setup.read(item.splatBuffer, rg::BufferAccess::ShaderResource);
+                    setup.read(item.colorBuffer, rg::BufferAccess::ShaderResource);
+                    setup.read(item.shBuffer, rg::BufferAccess::ShaderResource);
+                    setup.read(item.indexBuffer, rg::BufferAccess::ShaderResource);
+                    if (item.distanceStageCulling)
+                        setup.read(item.drawIndirectBuffer, rg::BufferAccess::IndirectArgument);
+                    if (item.hasStochasticDepth)
+                        setup.write(item.stochasticDepth, rg::TextureAccess::DepthWrite);
+                }
+            },
+            [ctx, renderToOutputColor](rg::RenderPassContext& passCtx) {
+                if (gaussianSplatsEnabled(ctx))
+                    ctx.renderer->executeGaussianSplatRaster(passCtx.commandList(), renderToOutputColor);
+            },
+            rg::PassOptions{ .sideEffect = true, .executeAfter = sortPassName });
+        return true;
     }
 }
 
@@ -41,18 +182,14 @@ void registerGaussianSplatPreAAFeature(RenderFeatureContext ctx)
         targets.depth,
         rg::TextureAccess::ShaderResource);
 
-    ctx.graph->addPass(
-        "GaussianSplatsStochastic",
-        [outputColor, depth](rg::PassBuilder& setup) {
-            setup.read(depth, rg::TextureAccess::ShaderResource);
-            setup.write(outputColor, rg::TextureAccess::RenderTarget);
-        },
-        [ctx](rg::RenderPassContext& passCtx) {
-            if (!gaussianSplatsEnabled(ctx))
-                return;
-            ctx.renderer->executeGaussianSplatRender(passCtx.commandList(), true);
-        },
-        rg::PassOptions{ .sideEffect = true });
+    (void)registerGaussianSplatRenderStages(
+        ctx,
+        true,
+        outputColor,
+        depth,
+        "GaussianSplatsStochasticUpload",
+        "GaussianSplatsStochasticSort",
+        "GaussianSplatsStochastic");
 }
 
 void registerGaussianSplatAccelBuildFeature(RenderFeatureContext ctx)
@@ -102,18 +239,16 @@ void registerGaussianSplatCompositeFeature(RenderFeatureContext ctx)
         targets.depth,
         rg::TextureAccess::ShaderResource);
 
-    ctx.graph->addPass(
-        "GaussianSplatsComposite",
-        [processedOutputColor, depth](rg::PassBuilder& setup) {
-            setup.read(depth, rg::TextureAccess::ShaderResource);
-            setup.write(processedOutputColor, rg::TextureAccess::RenderTarget);
-        },
-        [ctx](rg::RenderPassContext& passCtx) {
-            if (!gaussianSplatsEnabled(ctx))
-                return;
-            ctx.renderer->executeGaussianSplatRender(passCtx.commandList(), false);
-        },
-        rg::PassOptions{ .sideEffect = true });
+    const bool registeredRenderStages = registerGaussianSplatRenderStages(
+        ctx,
+        false,
+        processedOutputColor,
+        depth,
+        "GaussianSplatsCompositeUpload",
+        "GaussianSplatsCompositeSort",
+        "GaussianSplatsComposite");
+    if (!registeredRenderStages)
+        return;
 
     if (!needsGaussianSplatStochasticAccumulate(*ctx.settings))
         return;

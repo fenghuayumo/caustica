@@ -15,7 +15,7 @@ namespace caustica::render
 void SceneLightingPasses::refreshEnvironmentMapMediaList(const std::filesystem::path& assetsFolder,
     const std::filesystem::path& currentScenePath)
 {
-    SceneManager::refreshEnvironmentMapMediaList(
+    caustica::refreshEnvironmentMapMediaList(
         assetsFolder,
         c_EnvMapSubFolder,
         currentScenePath,

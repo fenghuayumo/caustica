@@ -633,6 +633,46 @@ void GaussianSplatPass::uploadSplatDataIfNeeded(nvrhi::ICommandList* commandList
     m_splatUploadPending = false;
 }
 
+void GaussianSplatPass::ensureFormatBuffers(
+    GaussianSplatStorageFormat shFormat,
+    GaussianSplatStorageFormat rgbaFormat)
+{
+    if (!hasSplats())
+        return;
+
+    const bool formatChanged = !m_colorBuffer || !m_shBuffer
+        || shFormat != m_currentShFormat || rgbaFormat != m_currentRgbaFormat;
+    if (!formatChanged)
+        return;
+
+    m_currentShFormat = shFormat;
+    m_currentRgbaFormat = rgbaFormat;
+    m_formatUploadPending = true;
+
+    const uint64_t colorByteSize = AlignRawBufferSize(uint64_t(m_splatCount) * 4u * FormatElementSize(rgbaFormat));
+    nvrhi::BufferDesc colorDesc;
+    colorDesc.byteSize = colorByteSize;
+    colorDesc.canHaveRawViews = true;
+    colorDesc.debugName = "GaussianSplatRGBAFormatBuffer";
+    colorDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+    colorDesc.keepInitialState = true;
+    m_colorBuffer = m_device->createBuffer(colorDesc);
+
+    constexpr uint32_t kShScalarStride = 45;
+    const uint64_t shByteSize = AlignRawBufferSize(uint64_t(m_splatCount) * kShScalarStride * FormatElementSize(shFormat));
+    nvrhi::BufferDesc shDesc;
+    shDesc.byteSize = shByteSize;
+    shDesc.canHaveRawViews = true;
+    shDesc.debugName = "GaussianSplatSHFormatBuffer";
+    shDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+    shDesc.keepInitialState = true;
+    m_shBuffer = m_device->createBuffer(shDesc);
+
+    m_rasterRenderBindingSet = nullptr;
+    m_hybridRenderBindingSet = nullptr;
+    m_hybridRenderMeshTopLevelAS = nullptr;
+}
+
 void GaussianSplatPass::uploadFormatDataIfNeeded(
     nvrhi::ICommandList* commandList,
     GaussianSplatStorageFormat shFormat,
@@ -641,36 +681,7 @@ void GaussianSplatPass::uploadFormatDataIfNeeded(
     if (!hasSplats())
         return;
 
-    const bool formatChanged = !m_colorBuffer || !m_shBuffer || shFormat != m_currentShFormat || rgbaFormat != m_currentRgbaFormat;
-    if (formatChanged)
-    {
-        m_currentShFormat = shFormat;
-        m_currentRgbaFormat = rgbaFormat;
-        m_formatUploadPending = true;
-
-        const uint64_t colorByteSize = AlignRawBufferSize(uint64_t(m_splatCount) * 4u * FormatElementSize(rgbaFormat));
-        nvrhi::BufferDesc colorDesc;
-        colorDesc.byteSize = colorByteSize;
-        colorDesc.canHaveRawViews = true;
-        colorDesc.debugName = "GaussianSplatRGBAFormatBuffer";
-        colorDesc.initialState = nvrhi::ResourceStates::ShaderResource;
-        colorDesc.keepInitialState = true;
-        m_colorBuffer = m_device->createBuffer(colorDesc);
-
-        constexpr uint32_t kShScalarStride = 45;
-        const uint64_t shByteSize = AlignRawBufferSize(uint64_t(m_splatCount) * kShScalarStride * FormatElementSize(shFormat));
-        nvrhi::BufferDesc shDesc;
-        shDesc.byteSize = shByteSize;
-        shDesc.canHaveRawViews = true;
-        shDesc.debugName = "GaussianSplatSHFormatBuffer";
-        shDesc.initialState = nvrhi::ResourceStates::ShaderResource;
-        shDesc.keepInitialState = true;
-        m_shBuffer = m_device->createBuffer(shDesc);
-
-        m_rasterRenderBindingSet = nullptr;
-        m_hybridRenderBindingSet = nullptr;
-        m_hybridRenderMeshTopLevelAS = nullptr;
-    }
+    ensureFormatBuffers(shFormat, rgbaFormat);
 
     if (!m_formatUploadPending)
         return;
@@ -708,18 +719,48 @@ void GaussianSplatPass::uploadFormatDataIfNeeded(
     m_formatUploadPending = false;
 }
 
-void GaussianSplatPass::render(
+void GaussianSplatPass::prepareGraphResources(const GaussianSplatRenderSettings& settings)
+{
+    ensureFormatBuffers(settings.shFormat, settings.rgbaFormat);
+}
+
+GaussianSplatGraphResources GaussianSplatPass::graphResources(const GaussianSplatRenderSettings& settings) const
+{
+    const bool stochasticSplats = settings.sortingMode == GaussianSplatSortMode::StochasticSplats;
+    const bool stochasticToOutput = stochasticSplats
+        && settings.renderTarget == GaussianSplatRenderTarget::OutputColor;
+
+    return GaussianSplatGraphResources{
+        .constantBuffer = m_constantBuffer.Get(),
+        .splatBuffer = m_splatBuffer.Get(),
+        .colorBuffer = m_colorBuffer.Get(),
+        .shBuffer = m_shBuffer.Get(),
+        .indexBuffer = m_indexBuffer.Get(),
+        .sortKeyBuffer = m_sortKeyBuffer.Get(),
+        .sortControlBuffer = m_sortControlBuffer.Get(),
+        .drawIndirectBuffer = m_drawIndirectBuffer.Get(),
+        .stochasticDepth = stochasticSplats
+            ? (stochasticToOutput ? m_stochasticDepthBuffer.Get() : m_stochasticProcessedDepthBuffer.Get())
+            : nullptr,
+        .sortMode = settings.sortingMode,
+        .distanceStageCulling =
+            settings.frustumCulling == GaussianSplatFrustumCulling::AtDistanceStage,
+    };
+}
+
+bool GaussianSplatPass::upload(
     nvrhi::ICommandList* commandList,
     const caustica::IView& view,
     nvrhi::rt::IAccelStruct* meshTopLevelAS,
     const RenderTargets& renderTargets,
     const GaussianSplatRenderSettings& settings)
 {
+    m_framePrepared = false;
     if (!settings.enabled || !hasSplats())
-        return;
+        return false;
 
     if (settings.sortingMode == GaussianSplatSortMode::GpuSort && !m_gpuSort)
-        return;
+        return false;
 
     const bool stochasticSplats = settings.sortingMode == GaussianSplatSortMode::StochasticSplats;
     const bool distanceStageCulling = settings.frustumCulling == GaussianSplatFrustumCulling::AtDistanceStage;
@@ -729,11 +770,11 @@ void GaussianSplatPass::render(
         ? m_stochasticFramebuffer
         : m_stochasticProcessedFramebuffer;
     if (stochasticSplats && (!stochasticFramebuffer || !stochasticDepthBuffer))
-        return;
+        return false;
     if (!stochasticSplats && !m_rasterRenderPipeline)
-        return;
+        return false;
 
-    commandList->beginMarker("GaussianSplats");
+    commandList->beginMarker("GaussianSplatsUpload");
 
     uploadSplatDataIfNeeded(commandList);
     uploadFormatDataIfNeeded(commandList, settings.shFormat, settings.rgbaFormat);
@@ -747,7 +788,7 @@ void GaussianSplatPass::render(
     if (!renderBindingSet)
     {
         commandList->endMarker();
-        return;
+        return false;
     }
 
     PlanarViewConstants planarView = {};
@@ -793,8 +834,6 @@ void GaussianSplatPass::render(
     constants.stochasticFrameIndex = settings.stochasticFrameIndex;
     commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
 
-    m_sorter.updateIndices(commandList, constants, settings.sortingMode, makeSortResources());
-
     nvrhi::GraphicsPipelineHandle renderPipeline;
     if (useHybridShadows)
     {
@@ -814,35 +853,70 @@ void GaussianSplatPass::render(
     if (!renderPipeline || !framebuffer)
     {
         commandList->endMarker();
-        return;
+        return false;
     }
 
-    commandList->setBufferState(m_indexBuffer, nvrhi::ResourceStates::ShaderResource);
-    if (distanceStageCulling)
-        commandList->setBufferState(m_drawIndirectBuffer, nvrhi::ResourceStates::IndirectArgument);
-    commandList->setTextureState(renderTargets.depth, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-    nvrhi::TextureHandle colorTarget = stochasticToOutput ? renderTargets.outputColor : renderTargets.processedOutputColor;
-    commandList->setTextureState(colorTarget, nvrhi::AllSubresources, nvrhi::ResourceStates::RenderTarget);
-    if (stochasticSplats)
-        commandList->setTextureState(stochasticDepthBuffer, nvrhi::AllSubresources, nvrhi::ResourceStates::DepthWrite);
-    commandList->commitBarriers();
+    m_frameRenderSettings = settings;
+    m_frameConstants = constants;
+    m_frameRenderBindingSet = renderBindingSet;
+    m_frameRenderPipeline = renderPipeline;
+    m_frameFramebuffer = framebuffer;
+    m_frameStochasticDepthBuffer = stochasticDepthBuffer;
+    m_frameDistanceStageCulling = distanceStageCulling;
+    m_framePrepared = true;
 
+    commandList->endMarker();
+    return true;
+}
+
+void GaussianSplatPass::sort(nvrhi::ICommandList* commandList)
+{
+    if (!m_framePrepared)
+        return;
+
+    commandList->beginMarker("GaussianSplatsSort");
+    m_sorter.updateIndices(
+        commandList,
+        m_frameConstants,
+        m_frameRenderSettings.sortingMode,
+        makeSortResources());
+    commandList->endMarker();
+}
+
+bool GaussianSplatPass::raster(
+    nvrhi::ICommandList* commandList,
+    const caustica::IView& view)
+{
+    if (!m_framePrepared)
+        return false;
+
+    commandList->beginMarker("GaussianSplatsRaster");
+
+    const bool stochasticSplats =
+        m_frameRenderSettings.sortingMode == GaussianSplatSortMode::StochasticSplats;
     if (stochasticSplats)
     {
-        const nvrhi::FormatInfo& depthFormatInfo = nvrhi::getFormatInfo(stochasticDepthBuffer->getDesc().format);
-        commandList->clearDepthStencilTexture(stochasticDepthBuffer, nvrhi::AllSubresources, true, 0.0f, depthFormatInfo.hasStencil, 0);
+        const nvrhi::FormatInfo& depthFormatInfo =
+            nvrhi::getFormatInfo(m_frameStochasticDepthBuffer->getDesc().format);
+        commandList->clearDepthStencilTexture(
+            m_frameStochasticDepthBuffer,
+            nvrhi::AllSubresources,
+            true,
+            0.0f,
+            depthFormatInfo.hasStencil,
+            0);
     }
 
     nvrhi::GraphicsState state;
-    state.pipeline = renderPipeline;
-    state.bindings = { renderBindingSet };
-    state.framebuffer = framebuffer;
+    state.pipeline = m_frameRenderPipeline;
+    state.bindings = { m_frameRenderBindingSet };
+    state.framebuffer = m_frameFramebuffer;
     state.viewport = caustica::toNvrhi(view.getViewportState());
-    if (distanceStageCulling)
+    if (m_frameDistanceStageCulling)
         state.indirectParams = m_drawIndirectBuffer;
     commandList->setGraphicsState(state);
 
-    if (distanceStageCulling)
+    if (m_frameDistanceStageCulling)
     {
         commandList->drawIndirect(0);
     }
@@ -855,4 +929,6 @@ void GaussianSplatPass::render(
     }
 
     commandList->endMarker();
+    m_framePrepared = false;
+    return true;
 }

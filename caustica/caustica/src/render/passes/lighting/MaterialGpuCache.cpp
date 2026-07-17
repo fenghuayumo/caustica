@@ -25,6 +25,7 @@
 #include <render/core/TextureUtils.h>
 #include <scene/Scene.h>
 #include <scene/SceneEcs.h>
+#include <scene/scene_utils.h>
 
 #include <core/json.h>
 #include <json/json.h>
@@ -1439,7 +1440,7 @@ void MaterialGpuCache::createRenderPassesAndLoadMaterials(nvrhi::IBindingLayout*
         info("MaterialGpuCache: first material load begin");
         m_mediaPath = mediaPath;
         m_sceneDirectory = sceneFilePath.parent_path();
-        if (!sceneFilePath.empty() && sceneFilePath.filename() == "__CAUSTICA_INLINE_SCENE_JSON__")
+        if (!sceneFilePath.empty() && isInlineScenePath(sceneFilePath))
             m_sceneDirectory = std::filesystem::path();
         if (!m_sceneDirectory.empty())
         {

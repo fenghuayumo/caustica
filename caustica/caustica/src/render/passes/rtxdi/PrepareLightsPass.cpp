@@ -1,9 +1,9 @@
 #include <render/passes/rtxdi/PrepareLightsPass.h>
 #include <render/SceneGpuResources.h>
 #include <render/passes/rtxdi/RtxdiResources.h>
-#include <scene/Scene.h>
 #include <scene/SceneRenderData.h>
 #include <scene/SceneLightAccess.h>
+#include <scene/SceneObjects.h>
 
 #include <assets/loader/ShaderFactory.h>
 #include <render/core/RenderDevice.h>
@@ -29,13 +29,11 @@ using namespace caustica;
 
 
 PrepareLightsPass::PrepareLightsPass(
-    nvrhi::IDevice* device, 
-    std::shared_ptr<caustica::ShaderFactory> shaderFactory, 
+    nvrhi::IDevice* device,
+    std::shared_ptr<caustica::ShaderFactory> shaderFactory,
     caustica::render::RenderDevice& renderDevice,
-    std::shared_ptr<caustica::Scene> scene,
     std::shared_ptr<MaterialGpuCache> materialGpuCache,
     std::shared_ptr<OpacityMicromapBuilder> opacityMicromapBuilder,
-
     nvrhi::BufferHandle subInstanceData,
     nvrhi::IBindingLayout* bindlessLayout,
     std::shared_ptr<ShaderDebug> shaderDebug)
@@ -43,7 +41,6 @@ PrepareLightsPass::PrepareLightsPass(
     , m_bindlessLayout(bindlessLayout)
     , m_shaderFactory(std::move(shaderFactory))
     , m_renderDevice(renderDevice)
-    , m_Scene(std::move(scene))
     , m_materialGpuCache(materialGpuCache)
     , m_opacityMicromapBuilder(opacityMicromapBuilder)
     , m_subInstanceData(subInstanceData)
@@ -86,12 +83,19 @@ PrepareLightsPass::PrepareLightsPass(
 }
 
 
-void PrepareLightsPass::setScene(std::shared_ptr<caustica::Scene> scene,
-    std::shared_ptr<EnvMapProcessor> environmentMap, EnvMapSceneParams envMapSceneParams)
+void PrepareLightsPass::setFrameInputs(
+    const scene::SceneRenderData* renderData,
+    size_t geometryInstanceCount,
+    nvrhi::IDescriptorTable* descriptorTable,
+    const caustica::render::SceneGpuFrameHandles& gpuHandles,
+    std::shared_ptr<EnvMapProcessor> environmentMap,
+    EnvMapSceneParams envMapSceneParams)
 {
-    m_Scene = scene;
-    m_gpuHandles = scene ? scene->getGpuResources().frameHandles() : caustica::render::SceneGpuFrameHandles{};
-    m_EnvironmentMap = environmentMap;
+    m_renderData = renderData;
+    m_geometryInstanceCount = geometryInstanceCount;
+    m_descriptorTable = descriptorTable;
+    m_gpuHandles = gpuHandles;
+    m_EnvironmentMap = std::move(environmentMap);
     m_EnvironmentMapSceneParams = envMapSceneParams;
 }
 
@@ -159,8 +163,10 @@ void PrepareLightsPass::countLightsInScene(uint32_t& numEmissiveMeshes, uint32_t
 {
     numEmissiveMeshes = 0;
     numEmissiveTriangles = 0;
+    if (!m_renderData)
+        return;
 
-    for (const scene::MeshInstanceRenderProxy& meshProxy : m_Scene->getRenderData().meshInstances)
+    for (const scene::MeshInstanceRenderProxy& meshProxy : m_renderData->meshInstances)
     {
         if (!meshProxy.mesh)
             continue;
@@ -393,17 +399,20 @@ static PolymorphicLightInfoFull ConvertGaussianSplatEmissionProxy(
 RTXDI_LightBufferParameters PrepareLightsPass::process(nvrhi::ICommandList* commandList)
 {
     RTXDI_LightBufferParameters lightBufferParams = {};
-    
+
+    if (!m_renderData || !m_descriptorTable)
+        return lightBufferParams;
+
     commandList->beginMarker("prepareLights");
 
     std::vector<PrepareLightsTask> tasks;
     std::vector<PolymorphicLightInfoFull> primitiveLightInfos;
     uint32_t lightBufferOffset = 0;
-    std::vector<uint32_t> geometryInstanceToLight(m_Scene->getGeometryInstancesCount(), RTXDI_INVALID_LIGHT_INDEX);
+    std::vector<uint32_t> geometryInstanceToLight(m_geometryInstanceCount, RTXDI_INVALID_LIGHT_INDEX);
 
     // Dense prefix must match AccelStructManager / MaterialGpuCache / PathTracingShaderCompiler.
     // Do not skip on stale proxy.geometryInstanceIndex after runtime import.
-    const auto& renderData = m_Scene->getRenderData();
+    const auto& renderData = *m_renderData;
     size_t compactedGeometryInstanceIndex = 0;
     for (const scene::MeshInstanceRenderProxy& meshProxy : renderData.meshInstances)
     {
@@ -559,7 +568,7 @@ RTXDI_LightBufferParameters PrepareLightsPass::process(nvrhi::ICommandList* comm
 
     nvrhi::ComputeState state;
     state.pipeline = m_computePipeline;
-    state.bindings = { m_bindingSet, m_Scene->getDescriptorTable() };
+    state.bindings = { m_bindingSet, m_descriptorTable };
 
     PrepareLightsConstants constants;
     constants.numTasks = uint32_t(tasks.size());

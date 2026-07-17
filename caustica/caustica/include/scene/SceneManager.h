@@ -27,8 +27,6 @@ class IDescriptorTableManager;
 class SceneManager
 {
 public:
-    static constexpr const char* inlineSceneSentinel() { return "__CAUSTICA_INLINE_SCENE_JSON__"; }
-
     SceneManager(caustica::GpuDevice&                     device,
                  caustica::ShaderFactory&                 shaderFactory,
                  std::shared_ptr<caustica::TextureLoader>  textureCache,
@@ -102,13 +100,6 @@ public:
         const std::filesystem::path&    assetsPath);
 
     static void onSceneLoadedGpuPrep(caustica::Scene& scene, bool& accelRebuildRequested);
-
-    static void refreshEnvironmentMapMediaList(
-        const std::filesystem::path&              assetsPath,
-        const std::filesystem::path&              envMapSubFolder,
-        const std::filesystem::path&              currentScenePath,
-        std::vector<std::filesystem::path>&       outMediaList,
-        std::filesystem::path&                    outMediaFolder);
 
     caustica::GpuDevice&                      getDevice()        { return m_device; }
     caustica::ShaderFactory&                  getShaderFactory()  { return m_shaderFactory; }

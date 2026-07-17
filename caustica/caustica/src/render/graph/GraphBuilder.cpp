@@ -88,6 +88,8 @@ nvrhi::ResourceStates GraphBuilder::accessToState(TextureAccess access)
         return nvrhi::ResourceStates::ShaderResource;
     case TextureAccess::RenderTarget:
         return nvrhi::ResourceStates::RenderTarget;
+    case TextureAccess::DepthWrite:
+        return nvrhi::ResourceStates::DepthWrite;
     case TextureAccess::UnorderedAccess:
         return nvrhi::ResourceStates::UnorderedAccess;
     case TextureAccess::CopySource:

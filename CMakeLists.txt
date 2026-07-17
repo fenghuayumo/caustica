@@ -205,7 +205,7 @@ endif()
 #----------------------------------------------------------------------------------------------------------------------
 
 #----------------------------------------------------------------------------------------------------------------------
-# Native OpenUSD C++ import (.usd/.usda/.usdc without .caususd bake)
+# Native OpenUSD C++ import (.usd/.usda/.usdc)
 option(CAUSTICA_WITH_OPENUSD "Enable native OpenUSD C++ stage loading" ON)
 set(CAUSTICA_USD_ROOT "D:/ProgramTool/OpenUSD" CACHE PATH "OpenUSD SDK root (include/, lib/, plugin/)")
 set(CAUSTICA_USD_PYTHON_DIR "D:/ProgramTool/Pyton3" CACHE PATH "Python 3.11 dir providing python311.dll for NVIDIA OpenUSD")

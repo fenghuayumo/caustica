@@ -650,7 +650,7 @@ bool Scene::loadModelFile(
     std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return char(std::tolower(c)); });
     if (ext == ".obj")
         return m_ObjImporter->load(fileName, *m_TextureLoader, g_LoadingStats, threadPool, result, m_textureSearchDirectory);
-    if (ext == ".usd" || ext == ".usda" || ext == ".usdc" || ext == ".caususd")
+    if (ext == ".usd" || ext == ".usda" || ext == ".usdc")
         return m_CausUsdImporter->load(fileName, *m_TextureLoader, g_LoadingStats, threadPool, result, m_textureSearchDirectory);
     if (ext == ".urdf")
         return m_UrdfImporter->load(fileName, *m_TextureLoader, g_LoadingStats, threadPool, result, m_textureSearchDirectory);

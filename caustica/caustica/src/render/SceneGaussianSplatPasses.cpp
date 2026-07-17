@@ -9,8 +9,8 @@
 #include <core/log.h>
 #include <render/core/RenderTargets.h>
 #include <scene/SceneEcs.h>
-#include <scene/SceneManager.h>
 #include <scene/Scene.h>
+#include <scene/scene_utils.h>
 #include <scene/SceneObjects.h>
 
 #include <algorithm>
@@ -144,7 +144,7 @@ std::filesystem::path SceneGaussianSplatPasses::resolveSplatPath(const caustica:
         return splatPath;
 
     const std::filesystem::path sceneFolder = m_sessionScenePath.parent_path();
-    if (!sceneFolder.empty() && m_sessionScenePath != std::filesystem::path(SceneManager::inlineSceneSentinel()))
+    if (!sceneFolder.empty() && !isInlineScenePath(m_sessionScenePath))
         return sceneFolder / splatPath;
 
     return std::filesystem::absolute(splatPath);

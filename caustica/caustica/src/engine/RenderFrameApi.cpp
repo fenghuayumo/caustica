@@ -13,6 +13,7 @@
 #include <scene/SceneAnimationAccess.h>
 #include <scene/SceneEcs.h>
 #include <scene/Scene.h>
+#include <scene/scene_utils.h>
 #include <render/core/SceneMeshEditing.h>
 #include <render/core/PathTracerSettings.h>
 #include <render/passes/postProcess/ToneMappingPasses.h>
@@ -99,7 +100,7 @@ namespace
 
         const std::string sceneName = manager->getCurrentSceneName();
         const std::filesystem::path scenePath = manager->getCurrentScenePath();
-        if (sceneName.empty() || scenePath == std::filesystem::path(SceneManager::inlineSceneSentinel()))
+        if (sceneName.empty() || isInlineScenePath(scenePath))
             return false;
 
         caustica::info("Hot reload: detected %zu asset source change(s), reloading scene '%s'",

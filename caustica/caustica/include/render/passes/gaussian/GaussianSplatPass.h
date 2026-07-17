@@ -87,6 +87,21 @@ struct GaussianSplatRenderSettings
     caustica::math::float4x4 objectToWorld = caustica::math::float4x4::identity();
 };
 
+struct GaussianSplatGraphResources
+{
+    nvrhi::IBuffer* constantBuffer = nullptr;
+    nvrhi::IBuffer* splatBuffer = nullptr;
+    nvrhi::IBuffer* colorBuffer = nullptr;
+    nvrhi::IBuffer* shBuffer = nullptr;
+    nvrhi::IBuffer* indexBuffer = nullptr;
+    nvrhi::IBuffer* sortKeyBuffer = nullptr;
+    nvrhi::IBuffer* sortControlBuffer = nullptr;
+    nvrhi::IBuffer* drawIndirectBuffer = nullptr;
+    nvrhi::ITexture* stochasticDepth = nullptr;
+    GaussianSplatSortMode sortMode = GaussianSplatSortMode::GpuSort;
+    bool distanceStageCulling = false;
+};
+
 class GaussianSplatPass
 {
 public:
@@ -116,12 +131,19 @@ public:
         caustica::math::float3 tintColor,
         float alphaCullThreshold);
 
-    void render(
+    void prepareGraphResources(const GaussianSplatRenderSettings& settings);
+    [[nodiscard]] GaussianSplatGraphResources graphResources(const GaussianSplatRenderSettings& settings) const;
+
+    bool upload(
         nvrhi::ICommandList* commandList,
         const caustica::IView& view,
         nvrhi::rt::IAccelStruct* meshTopLevelAS,
         const RenderTargets& renderTargets,
         const GaussianSplatRenderSettings& settings);
+    void sort(nvrhi::ICommandList* commandList);
+    bool raster(
+        nvrhi::ICommandList* commandList,
+        const caustica::IView& view);
 
     [[nodiscard]] bool hasSplats() const { return m_splatCount > 0; }
     [[nodiscard]] uint32_t getSplatCount() const { return m_splatCount; }
@@ -136,6 +158,7 @@ public:
 private:
     void createBindingSets(const RenderTargets& renderTargets, nvrhi::rt::IAccelStruct* meshTopLevelAS);
     void createStochasticFramebuffer(const RenderTargets& renderTargets);
+    void ensureFormatBuffers(GaussianSplatStorageFormat shFormat, GaussianSplatStorageFormat rgbaFormat);
     void uploadSplatDataIfNeeded(nvrhi::ICommandList* commandList);
     void uploadFormatDataIfNeeded(nvrhi::ICommandList* commandList, GaussianSplatStorageFormat shFormat, GaussianSplatStorageFormat rgbaFormat);
     [[nodiscard]] caustica::render::GaussianSplatSortResources makeSortResources() const;
@@ -202,5 +225,13 @@ private:
     bool m_emissionProxyBuildPending = true;
     GaussianSplatStorageFormat m_currentShFormat = GaussianSplatStorageFormat::Float32;
     GaussianSplatStorageFormat m_currentRgbaFormat = GaussianSplatStorageFormat::Float32;
+    GaussianSplatRenderSettings m_frameRenderSettings;
+    GaussianSplatConstants m_frameConstants = {};
+    nvrhi::BindingSetHandle m_frameRenderBindingSet;
+    nvrhi::GraphicsPipelineHandle m_frameRenderPipeline;
+    nvrhi::IFramebuffer* m_frameFramebuffer = nullptr;
+    nvrhi::TextureHandle m_frameStochasticDepthBuffer;
+    bool m_framePrepared = false;
+    bool m_frameDistanceStageCulling = false;
     std::string m_sourceFileName;
 };

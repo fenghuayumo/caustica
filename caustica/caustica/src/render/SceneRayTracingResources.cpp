@@ -5,7 +5,6 @@
 #include <render/worldRenderer/WorldRenderer.h>
 
 #include <backend/GpuDevice.h>
-#include <core/log.h>
 #include <render/core/BindingCache.h>
 #include <render/core/PathTracingShaderCompiler.h>
 #include <render/core/AccelStructManager.h>
@@ -159,21 +158,11 @@ void SceneRayTracingResources::createAccelStructs(nvrhi::ICommandList* commandLi
 {
     if (!m_sessionScene)
         return;
-    info("AS rebuild: createOpacityMicromaps begin");
     m_lightingPasses->createOpacityMicromaps(*m_sessionScene);
-    info("AS rebuild: createOpacityMicromaps end");
-    info("AS rebuild: createBlases begin");
     createBlases(commandList);
-    info("AS rebuild: createBlases end");
-    info("AS rebuild: createTlas begin");
     createTlas(commandList);
-    info("AS rebuild: createTlas end");
     if (m_additionalAccelStructBuilder)
-    {
-        info("AS rebuild: additional builder begin");
         m_additionalAccelStructBuilder(commandList);
-        info("AS rebuild: additional builder end");
-    }
 }
 
 void SceneRayTracingResources::recreateAccelStructs(nvrhi::ICommandList* commandList)
@@ -189,10 +178,7 @@ void SceneRayTracingResources::recreateAccelStructs(nvrhi::ICommandList* command
     m_invalidation->AccelerationStructRebuildRequested = false;
     m_settings->ResetAccumulation = true;
 
-    info("AS rebuild: pre-release wait begin");
-    const bool preReleaseWaitOk = m_gpuDevice->getDevice()->waitForIdle();
-    info("AS rebuild: pre-release wait end, ok=%s", preReleaseWaitOk ? "true" : "false");
-    if (!preReleaseWaitOk)
+    if (!m_gpuDevice->getDevice()->waitForIdle())
         return;
 
     m_worldRenderer->invalidateBindingSet();
@@ -203,11 +189,8 @@ void SceneRayTracingResources::recreateAccelStructs(nvrhi::ICommandList* command
     commandList->open();
     createAccelStructs(commandList);
     commandList->close();
-    info("AS rebuild: execute command list");
     m_gpuDevice->getDevice()->executeCommandList(commandList);
-    info("AS rebuild: post-build wait begin");
-    const bool postBuildWaitOk = m_gpuDevice->getDevice()->waitForIdle();
-    info("AS rebuild: post-build wait end, ok=%s", postBuildWaitOk ? "true" : "false");
+    m_gpuDevice->getDevice()->waitForIdle();
 }
 
 void SceneRayTracingResources::requestMeshAccelRebuild(const std::shared_ptr<caustica::MeshInfo>& mesh, bool resetAccumulation)

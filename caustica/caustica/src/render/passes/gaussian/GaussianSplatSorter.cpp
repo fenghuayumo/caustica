@@ -108,10 +108,6 @@ void GaussianSplatSorter::buildDistanceCulledSplatList(
             false);
     }
 
-    commandList->setBufferState(resources.indexBuffer, nvrhi::ResourceStates::ShaderResource);
-    commandList->setBufferState(resources.drawIndirectBuffer, nvrhi::ResourceStates::IndirectArgument);
-    commandList->commitBarriers();
-
     m_cachedSortMode = sortMode;
     m_sortCacheValid = false;
     m_randomIndexUploadPending = true;
