@@ -136,8 +136,6 @@ if (CAUSTICA_WITH_NVRHI)
         passes/dlss_exposure_cs
         passes/environment_map_ps
         passes/exposure_cs
-        passes/forward_ps
-        passes/forward_vs
         passes/gbuffer_ps
         passes/gbuffer_vs
         passes/histogram_cs
