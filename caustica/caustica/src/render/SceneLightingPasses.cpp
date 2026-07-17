@@ -85,7 +85,7 @@ int SceneLightingPasses::ensureMaterialsFromScene(
 {
     if (m_materials == nullptr)
         return 0;
-    return m_materials->ensureMaterialsFromScene(renderData.materialResources);
+    return m_materials->ensureMaterialsFromScene(renderData.materialSnapshots);
 }
 
 void SceneLightingPasses::applyShaderMacros(std::vector<caustica::ShaderMacro>& macros)
@@ -97,11 +97,13 @@ void SceneLightingPasses::applyShaderMacros(std::vector<caustica::ShaderMacro>& 
 }
 
 void SceneLightingPasses::createOpacityMicromaps(
-    std::span<const std::shared_ptr<caustica::MeshInfo>> meshes,
-    size_t geometryCount)
+    const caustica::scene::SceneRenderData& renderData)
 {
     if (m_opacityMaps != nullptr)
-        m_opacityMaps->createOpacityMicromaps(meshes, geometryCount);
+    {
+        m_opacityMaps->setMaterialGpuCache(m_materials.get());
+        m_opacityMaps->createOpacityMicromaps(renderData);
+    }
 }
 
 void SceneLightingPasses::forEachUsedMaterialTexture(

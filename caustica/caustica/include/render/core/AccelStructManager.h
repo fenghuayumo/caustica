@@ -3,7 +3,7 @@
 #include <rhi/nvrhi.h>
 #include <math/math.h>
 #include <shaders/SubInstanceData.h>
-#include <scene/SceneTypes.h>
+#include <scene/SceneRenderData.h>
 
 #include <cstdint>
 #include <memory>
@@ -12,6 +12,7 @@
 #include <vector>
 
 class OpacityMicromapBuilder;
+class MaterialGpuCache;
 
 namespace caustica
 {
@@ -45,18 +46,19 @@ public:
     AccelStructManager() = default;
     explicit AccelStructManager(nvrhi::IDevice* device);
     void bindSceneGpuResources(render::SceneGpuResources* resources) { m_sceneGpuResources = resources; }
+    void bindMaterialGpuCache(MaterialGpuCache* materials) { m_materialGpuCache = materials; }
 
     void createBlases(nvrhi::ICommandList* commandList,
-                      std::span<const std::shared_ptr<MeshInfo>> meshes,
+                      std::span<const scene::MeshRenderResourceSnapshot> meshes,
                       const AccelStructBuildSettings& settings);
 
     void createTlas(nvrhi::ICommandList* commandList, const scene::SceneRenderData& renderData);
 
     void uploadSubInstanceData(nvrhi::ICommandList* commandList) const;
 
-    void clearMeshAccelStructs(std::span<const std::shared_ptr<MeshInfo>> meshes);
+    void clearMeshAccelStructs(std::span<const scene::MeshRenderResourceSnapshot> meshes);
 
-    void requestMeshRebuild(const std::shared_ptr<MeshInfo>& mesh);
+    void requestMeshRebuild(scene::MeshRenderResourceId meshId);
 
     void rebuildDirtyMeshes(nvrhi::ICommandList*            commandList,
                             const scene::SceneRenderData&   renderData,
@@ -87,6 +89,8 @@ public:
 private:
     nvrhi::IDevice* m_device = nullptr;
     render::SceneGpuResources* m_sceneGpuResources = nullptr;
+    MaterialGpuCache* m_materialGpuCache = nullptr;
+    uint64_t m_materialStateRevision = 0;
 
     nvrhi::rt::AccelStructHandle                 m_topLevelAS;
     nvrhi::BufferHandle                          m_subInstanceBuffer;

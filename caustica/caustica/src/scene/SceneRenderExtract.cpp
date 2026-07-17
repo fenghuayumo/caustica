@@ -21,9 +21,10 @@ void SceneRenderData::clear()
     lights.clear();
     cameras.clear();
     gaussianSplats.clear();
-    meshResources.clear();
-    materialResources.clear();
+    meshSnapshots.clear();
     materialSnapshots.clear();
+    meshSnapshotIndex.clear();
+    materialSnapshotIndex.clear();
     geometryCount = 0;
     camera = {};
     renderSettings = {};
@@ -56,6 +57,22 @@ const CameraRenderProxy* SceneRenderData::findCamera(ecs::Entity entity) const
             return &cameraProxy;
     }
     return nullptr;
+}
+
+const MeshRenderResourceSnapshot* SceneRenderData::findMesh(MeshRenderResourceId id) const
+{
+    const auto it = meshSnapshotIndex.find(id);
+    return it == meshSnapshotIndex.end() || it->second >= meshSnapshots.size()
+        ? nullptr
+        : &meshSnapshots[it->second];
+}
+
+const MaterialRenderResourceSnapshot* SceneRenderData::findMaterial(MaterialRenderResourceId id) const
+{
+    const auto it = materialSnapshotIndex.find(id);
+    return it == materialSnapshotIndex.end() || it->second >= materialSnapshots.size()
+        ? nullptr
+        : &materialSnapshots[it->second];
 }
 
 namespace
@@ -92,18 +109,18 @@ void FillMeshInstanceProxy(
     proxy.entity = ref.entity;
     proxy.instanceIndex = ref.meshComp->instanceIndex;
     proxy.geometryInstanceIndex = ref.meshComp->geometryInstanceIndex;
-    proxy.meshShared = ref.meshComp->mesh;
-    proxy.meshId = proxy.meshShared ? proxy.meshShared->renderResourceId : MeshRenderResourceId{};
-    proxy.globalMeshIndex = proxy.meshShared ? proxy.meshShared->globalMeshIndex : -1;
-    proxy.geometryCount = proxy.meshShared
-        ? static_cast<uint32_t>(proxy.meshShared->geometries.size())
+    const std::shared_ptr<MeshInfo>& mesh = ref.meshComp->mesh;
+    proxy.meshId = mesh ? mesh->renderResourceId : MeshRenderResourceId{};
+    proxy.globalMeshIndex = mesh ? mesh->globalMeshIndex : -1;
+    proxy.geometryCount = mesh
+        ? static_cast<uint32_t>(mesh->geometries.size())
         : 0;
     proxy.firstGlobalGeometryIndex =
-        proxy.meshShared && !proxy.meshShared->geometries.empty() && proxy.meshShared->geometries[0]
-        ? proxy.meshShared->geometries[0]->globalGeometryIndex
+        mesh && !mesh->geometries.empty() && mesh->geometries[0]
+        ? mesh->geometries[0]->globalGeometryIndex
         : -1;
-    proxy.meshType = proxy.meshShared ? proxy.meshShared->type : MeshType::Triangles;
-    proxy.hasSkinPrototype = proxy.meshShared && proxy.meshShared->skinPrototype != nullptr;
+    proxy.meshType = mesh ? mesh->type : MeshType::Triangles;
+    proxy.hasSkinPrototype = mesh && mesh->skinPrototype != nullptr;
     proxy.transformFloat = ref.global->transformFloat;
     proxy.previousTransformFloat = ref.global->previousTransformFloat;
     proxy.globalBounds = ref.bounds->globalBounds;
@@ -165,11 +182,9 @@ void ExtractSkinnedMeshes(ecs::World& world, SceneRenderData& out, uint32_t fram
         {
             SkinnedMeshRenderProxy proxy;
             proxy.entity = entity;
-            proxy.mesh = meshInstance.mesh;
-            proxy.prototypeMesh = skinned.prototypeMesh;
-            proxy.meshId = proxy.mesh ? proxy.mesh->renderResourceId : MeshRenderResourceId{};
-            proxy.prototypeMeshId = proxy.prototypeMesh
-                ? proxy.prototypeMesh->renderResourceId
+            proxy.meshId = meshInstance.mesh ? meshInstance.mesh->renderResourceId : MeshRenderResourceId{};
+            proxy.prototypeMeshId = skinned.prototypeMesh
+                ? skinned.prototypeMesh->renderResourceId
                 : MeshRenderResourceId{};
             proxy.transformFloat = ownerGlobal.transformFloat;
             if (const auto* name = world.get<NameComponent>(entity))
@@ -422,6 +437,7 @@ void ExtractMaterialSnapshots(
     SceneRenderData& out)
 {
     out.materialSnapshots.clear();
+    out.materialSnapshotIndex.clear();
     out.materialSnapshots.reserve(entityWorld.getMaterials().size());
     for (const std::shared_ptr<Material>& material : entityWorld.getMaterials())
     {
@@ -432,9 +448,110 @@ void ExtractMaterialSnapshots(
         snapshot.id = material->renderResourceId;
         snapshot.materialIndex = material->materialID;
         snapshot.debugName = material->name;
+        snapshot.modelFileName = material->modelFileName;
+        snapshot.materialIndexInModel = material->materialIndexInModel;
+        snapshot.domain = material->domain;
+        snapshot.baseOrDiffuseTexture = material->baseOrDiffuseTexture;
+        snapshot.metalRoughOrSpecularTexture = material->metalRoughOrSpecularTexture;
+        snapshot.normalTexture = material->normalTexture;
+        snapshot.emissiveTexture = material->emissiveTexture;
+        snapshot.occlusionTexture = material->occlusionTexture;
+        snapshot.transmissionTexture = material->transmissionTexture;
+        snapshot.opacityTexture = material->opacityTexture;
+        snapshot.baseOrDiffuseColor = material->baseOrDiffuseColor;
+        snapshot.specularColor = material->specularColor;
+        snapshot.emissiveColor = material->emissiveColor;
+        snapshot.emissiveIntensity = material->emissiveIntensity;
+        snapshot.metalness = material->metalness;
+        snapshot.roughness = material->roughness;
+        snapshot.opacity = material->opacity;
+        snapshot.alphaCutoff = material->alphaCutoff;
+        snapshot.transmissionFactor = material->transmissionFactor;
+        snapshot.normalTextureScale = material->normalTextureScale;
+        snapshot.occlusionStrength = material->occlusionStrength;
+        snapshot.normalTextureTransformScale = material->normalTextureTransformScale;
+        snapshot.useSpecularGlossModel = material->useSpecularGlossModel;
+        snapshot.enableBaseOrDiffuseTexture = material->enableBaseOrDiffuseTexture;
+        snapshot.enableMetalRoughOrSpecularTexture = material->enableMetalRoughOrSpecularTexture;
+        snapshot.enableNormalTexture = material->enableNormalTexture;
+        snapshot.enableEmissiveTexture = material->enableEmissiveTexture;
+        snapshot.enableOcclusionTexture = material->enableOcclusionTexture;
+        snapshot.enableTransmissionTexture = material->enableTransmissionTexture;
+        snapshot.enableOpacityTexture = material->enableOpacityTexture;
+        snapshot.doubleSided = material->doubleSided;
+        snapshot.metalnessInRedChannel = material->metalnessInRedChannel;
         material->fillConstantBuffer(snapshot.constants, false);
         material->fillConstantBuffer(snapshot.bindlessConstants, true);
+        out.materialSnapshotIndex.emplace(
+            snapshot.id,
+            static_cast<uint32_t>(out.materialSnapshots.size()));
         out.materialSnapshots.push_back(std::move(snapshot));
+    }
+}
+
+void ExtractMeshSnapshots(const SceneEntityWorld& entityWorld, SceneRenderData& out)
+{
+    out.meshSnapshots.clear();
+    out.meshSnapshotIndex.clear();
+    out.meshSnapshots.reserve(entityWorld.getMeshes().size());
+    for (const std::shared_ptr<MeshInfo>& source : entityWorld.getMeshes())
+    {
+        if (!source || !source->renderResourceId)
+            continue;
+        MeshRenderResourceSnapshot mesh;
+        mesh.id = source->renderResourceId;
+        mesh.debugName = source->name;
+        mesh.type = source->type;
+        mesh.objectSpaceBounds = source->objectSpaceBounds;
+        mesh.indexOffset = source->indexOffset;
+        mesh.vertexOffset = source->vertexOffset;
+        mesh.totalIndices = source->totalIndices;
+        mesh.totalVertices = source->totalVertices;
+        mesh.globalMeshIndex = source->globalMeshIndex;
+        mesh.isMorphTargetAnimationMesh = source->isMorphTargetAnimationMesh;
+        mesh.isSkinPrototype = source->isSkinPrototype;
+        mesh.hasSkinPrototype = source->skinPrototype != nullptr;
+        mesh.hasDeformationSourcePositions = !source->DeformationSourcePositionIndices.empty();
+        if (source->buffers)
+        {
+            auto upload = std::make_shared<MeshUploadBlob>();
+            upload->indexData = source->buffers->indexData;
+            upload->positionData = source->buffers->positionData;
+            upload->texcoord1Data = source->buffers->texcoord1Data;
+            upload->texcoord2Data = source->buffers->texcoord2Data;
+            upload->normalData = source->buffers->normalData;
+            upload->tangentData = source->buffers->tangentData;
+            upload->jointData = source->buffers->jointData;
+            upload->weightData = source->buffers->weightData;
+            upload->radiusData = source->buffers->radiusData;
+            mesh.upload = std::move(upload);
+        }
+        mesh.geometries.reserve(source->geometries.size());
+        for (const std::shared_ptr<MeshGeometry>& sourceGeometry : source->geometries)
+        {
+            if (!sourceGeometry)
+                continue;
+            GeometryRenderResourceSnapshot geometry;
+            geometry.id = sourceGeometry->renderResourceId;
+            geometry.materialId = sourceGeometry->material
+                ? sourceGeometry->material->renderResourceId
+                : MaterialRenderResourceId{};
+            geometry.materialIndex = sourceGeometry->material
+                ? sourceGeometry->material->materialID
+                : ~0u;
+            geometry.objectSpaceBounds = sourceGeometry->objectSpaceBounds;
+            geometry.indexOffsetInMesh = sourceGeometry->indexOffsetInMesh;
+            geometry.vertexOffsetInMesh = sourceGeometry->vertexOffsetInMesh;
+            geometry.numIndices = sourceGeometry->numIndices;
+            geometry.numVertices = sourceGeometry->numVertices;
+            geometry.globalGeometryIndex = sourceGeometry->globalGeometryIndex;
+            geometry.type = sourceGeometry->type;
+            mesh.geometries.push_back(std::move(geometry));
+        }
+        out.meshSnapshotIndex.emplace(
+            mesh.id,
+            static_cast<uint32_t>(out.meshSnapshots.size()));
+        out.meshSnapshots.push_back(std::move(mesh));
     }
 }
 
@@ -455,14 +572,15 @@ void extractSceneRenderData(
         // Keep active camera/settings; callers preserve them across republish.
         const ActiveCameraRenderProxy camera = inout.camera;
         const RenderSettingsSnapshot renderSettings = inout.renderSettings;
+        uint64_t resourceBindingRevision = inout.resourceBindingRevision + 1;
+        if (resourceBindingRevision == 0)
+            resourceBindingRevision = 1;
         inout.clear();
         inout.camera = camera;
         inout.renderSettings = renderSettings;
+        inout.resourceBindingRevision = resourceBindingRevision;
         inout.geometryCount = entityWorld.getGeometryCount();
-        for (const std::shared_ptr<MeshInfo>& mesh : entityWorld.getMeshes())
-            inout.meshResources.push_back(mesh);
-        for (const std::shared_ptr<Material>& material : entityWorld.getMaterials())
-            inout.materialResources.push_back(material);
+        ExtractMeshSnapshots(entityWorld, inout);
         ExtractMaterialSnapshots(entityWorld, inout);
 
         ExtractMeshInstancesFull(world, inout);

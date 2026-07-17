@@ -25,6 +25,7 @@ public:
 		{
 			int geometryIndexInMesh = -1;
 			std::shared_ptr < caustica::ImageAsset > alphaTexture;
+			float alphaCutoff = 0.5f;
 
 			// settings
 			uint32_t maxSubdivisionLevel = 5;
@@ -44,7 +45,7 @@ public:
 			bool enableNsightDebugMode = false;
 		};
 
-		std::shared_ptr < caustica::MeshInfo > mesh;
+		caustica::scene::MeshRenderResourceSnapshot mesh;
 		std::vector < Geometry > geometries;
 		bvh::Config bvhCfg;
 	};
@@ -60,6 +61,10 @@ public:
 	void setSceneGpuResources(caustica::render::SceneGpuResources* resources)
 	{
 		m_sceneGpuResources = resources;
+	}
+	void setMaterialGpuCache(MaterialGpuCache* materials)
+	{
+		m_materialGpuCache = materials;
 	}
 	void cancelPendingBuilds();
 	void queueBuild(const BuildInput& inputs);
@@ -129,7 +134,8 @@ private:
 	void bakeOmmArrayData(nvrhi::ICommandList& commandList, BuildTask& task);
 	std::vector<bvh::OmmAttachment> buildOMMAttachments(nvrhi::ICommandList& commandList, BuildTask& task);
 	void buildBLASWithOMM(nvrhi::ICommandList& commandList, BuildTask& task, const std::vector<bvh::OmmAttachment>& ommAttachment);
-	caustica::render::MeshGpuRecord* findMeshGpu(const caustica::MeshInfo& mesh) const;
+	caustica::render::MeshGpuRecord* findMeshGpu(
+		const caustica::scene::MeshRenderResourceSnapshot& mesh) const;
 
 	bool readyToRecordWork();
 	void submitAndSubscribeQuery(nvrhi::ICommandList& commandList);
@@ -139,6 +145,7 @@ private:
 
 	nvrhi::DeviceHandle m_device;
 	caustica::render::SceneGpuResources* m_sceneGpuResources = nullptr;
+	MaterialGpuCache* m_materialGpuCache = nullptr;
 	std::shared_ptr<caustica::DescriptorTableManager> m_descriptorTable;
 	std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
 	std::unique_ptr<omm::GpuBakeNvrhi> m_baker;

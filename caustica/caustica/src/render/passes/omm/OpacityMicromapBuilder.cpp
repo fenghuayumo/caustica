@@ -104,13 +104,18 @@ void OpacityMicromapBuilder::createRenderPasses(
     m_ommBuildQueue->setSceneGpuResources(m_sceneGpuResources);
 }
 
+void OpacityMicromapBuilder::setMaterialGpuCache(MaterialGpuCache* materials)
+{
+    m_materialGpuCache = materials;
+    m_ommBuildQueue->setMaterialGpuCache(materials);
+}
+
 void OpacityMicromapBuilder::createOpacityMicromaps(
-    std::span<const std::shared_ptr<caustica::MeshInfo>> meshes,
-    size_t geometryCount)
+    const caustica::scene::SceneRenderData& renderData)
 {
     // Always grow the debug buffer for runtime imports — AS rebuild marks DebugDataDirty
     // and update() will write per-geometry slots even when OMM baking is disabled.
-    ensureGeometryDebugCapacity(geometryCount);
+    ensureGeometryDebugCapacity(renderData.geometryCount);
 
     m_ommBuildQueue->cancelPendingBuilds();
 
@@ -125,28 +130,50 @@ void OpacityMicromapBuilder::createOpacityMicromaps(
 
     m_uiData.ActiveState = m_uiData.DesiredState;
 
-    for (auto& mesh : meshes)
+    // Queue atomically only after every eligible alpha texture is GPU-ready. This
+    // avoids duplicate partial queues while still allowing a cheap retry next frame.
+    for (const auto& mesh : renderData.meshSnapshots)
     {
-        if (mesh->isSkinPrototype) //buffers->hasAttribute(caustica::VertexAttribute::JointWeights))
+        if (mesh.isSkinPrototype || mesh.hasSkinPrototype)
+            continue;
+        for (const auto& geometry : mesh.geometries)
+        {
+            const std::shared_ptr<PTMaterial> material = m_materialGpuCache
+                ? m_materialGpuCache->findByResourceId(geometry.materialId)
+                : nullptr;
+            if (material && material->enableAlphaTesting
+                && material->enableBaseTexture && material->baseTexture.loaded
+                && !material->baseTexture.loaded->gpu.texture)
+            {
+                m_waitingForMaterialTextures = true;
+                m_materialStateRevision = m_materialGpuCache->materialStateRevision();
+                return;
+            }
+        }
+    }
+
+    m_waitingForMaterialTextures = false;
+    for (const auto& mesh : renderData.meshSnapshots)
+    {
+        if (mesh.isSkinPrototype)
             continue; // skip the skinning prototypes
-        if (mesh->skinPrototype)
+        if (mesh.hasSkinPrototype)
             continue;
 
         OmmBuildQueue::BuildInput input;
         input.mesh = mesh;
 
-        for (size_t i = 0; i < mesh->geometries.size(); ++i)
+        for (size_t i = 0; i < mesh.geometries.size(); ++i)
         {
-            if (!mesh->geometries[i])
-                continue;
-
-            const caustica::MeshGeometry& geometry = *mesh->geometries[i];
-            const std::shared_ptr<PTMaterial> material = PTMaterial::safeCast(geometry.material);
-            if (material == nullptr)
-                continue;
-            if (!(material->enableBaseTexture && material->baseTexture.loaded != nullptr && material->baseTexture.loaded->gpu.texture != nullptr))
+            const auto& geometry = mesh.geometries[i];
+            const std::shared_ptr<PTMaterial> material = m_materialGpuCache
+                ? m_materialGpuCache->findByResourceId(geometry.materialId)
+                : nullptr;
+            if (!material)
                 continue;
             if (!material->enableAlphaTesting)
+                continue;
+            if (!material->enableBaseTexture || !material->baseTexture.loaded)
                 continue;
 
             std::shared_ptr<ImageAsset> alphaTexture = material->baseTexture.loaded.shared();
@@ -156,6 +183,7 @@ void OpacityMicromapBuilder::createOpacityMicromaps(
             OmmBuildQueue::BuildInput::Geometry geom;
             geom.geometryIndexInMesh = i;
             geom.alphaTexture = alphaTexture;
+            geom.alphaCutoff = material->alphaCutoff;
             geom.maxSubdivisionLevel = m_uiData.ActiveState->MaxSubdivisionLevel;
             geom.dynamicSubdivisionScale = m_uiData.ActiveState->EnableDynamicSubdivision ? m_uiData.ActiveState->DynamicSubdivisionScale : 0.f;
             geom.format = m_uiData.ActiveState->Format;
@@ -179,22 +207,24 @@ void OpacityMicromapBuilder::createOpacityMicromaps(
             m_ommBuildQueue->queueBuild(input);
         }
     }
+    if (m_materialGpuCache)
+        m_materialStateRevision = m_materialGpuCache->materialStateRevision();
 }
 
 void OpacityMicromapBuilder::destroyOpacityMicromaps(
     nvrhi::ICommandList& commandList,
-    std::span<const std::shared_ptr<caustica::MeshInfo>> meshes)
+    const caustica::scene::SceneRenderData& renderData)
 {
     commandList.close();
     m_device->executeCommandList(&commandList);
     m_device->waitForIdle();
     commandList.open();
 
-    for (const std::shared_ptr<MeshInfo>& _mesh : meshes)
+    for (const auto& mesh : renderData.meshSnapshots)
     {
-        if (!_mesh || m_sceneGpuResources == nullptr)
+        if (m_sceneGpuResources == nullptr)
             continue;
-        const auto meshGpuIt = m_sceneGpuResources->meshRegistry.find(_mesh->renderResourceId);
+        const auto meshGpuIt = m_sceneGpuResources->meshRegistry.find(mesh.id);
         if (meshGpuIt == m_sceneGpuResources->meshRegistry.end())
             continue;
         caustica::render::MeshGpuRecord& meshGpu = meshGpuIt->second;
@@ -208,10 +238,15 @@ void OpacityMicromapBuilder::destroyOpacityMicromaps(
 
 void OpacityMicromapBuilder::buildOpacityMicromaps(
     nvrhi::ICommandList& commandList,
-    std::span<const std::shared_ptr<caustica::MeshInfo>> meshes,
-    size_t geometryCount)
+    const caustica::scene::SceneRenderData& renderData)
 {
     commandList.beginMarker("OMM Updates");
+
+    if (m_materialGpuCache
+        && m_materialStateRevision != m_materialGpuCache->materialStateRevision())
+    {
+        m_uiData.TriggerRebuild = true;
+    }
 
     if (!m_uiData.Enable)
     {
@@ -224,13 +259,17 @@ void OpacityMicromapBuilder::buildOpacityMicromaps(
 
     if (m_uiData.TriggerRebuild)
     {
-        destroyOpacityMicromaps(commandList, meshes);
+        destroyOpacityMicromaps(commandList, renderData);
 
         m_ommBuildQueue->cancelPendingBuilds();
 
-        createOpacityMicromaps(meshes, geometryCount);
+        createOpacityMicromaps(renderData);
 
         m_uiData.TriggerRebuild = false;
+    }
+    else if (m_waitingForMaterialTextures)
+    {
+        createOpacityMicromaps(renderData);
     }
 
     m_ommBuildQueue->update(commandList);
@@ -246,24 +285,20 @@ void OpacityMicromapBuilder::writeGeometryDebugBuffer(nvrhi::ICommandList& comma
 }
 
 void OpacityMicromapBuilder::updateDebugGeometry(
-    const MeshInfo& _mesh,
+    const caustica::scene::MeshRenderResourceSnapshot& mesh,
     const caustica::render::MeshGpuRecord& meshGpu)
 {
-    const MeshInfoEx& mesh = static_cast<const MeshInfoEx&>(_mesh);
-    assert(&mesh != nullptr);
-
     for (size_t geometryIndex = 0; geometryIndex < mesh.geometries.size(); ++geometryIndex)
     {
-        const auto& _geometry = mesh.geometries[geometryIndex];
-        assert(std::dynamic_pointer_cast<MeshGeometryEx>(_geometry) != nullptr);
-        const std::shared_ptr<MeshGeometryEx>& geometry = std::static_pointer_cast<MeshGeometryEx>(_geometry);
+        const auto& geometry = mesh.geometries[geometryIndex];
 
-        if (geometry->globalGeometryIndex >= m_geometryDebugDataPtr.size())
+        if (geometry.globalGeometryIndex < 0
+            || static_cast<size_t>(geometry.globalGeometryIndex) >= m_geometryDebugDataPtr.size())
         {
             caustica::error(
                 "OpacityMicromapBuilder: globalGeometryIndex %u out of range (debug slots=%zu); "
                 "skipping debug write after runtime import.",
-                geometry->globalGeometryIndex,
+                geometry.globalGeometryIndex,
                 m_geometryDebugDataPtr.size());
             continue;
         }
@@ -273,7 +308,7 @@ void OpacityMicromapBuilder::updateDebugGeometry(
         {
             const caustica::render::MeshGeometryGpuDebugData& geometryDebug =
                 meshGpu.geometryDebugData[geometryIndex];
-            GeometryDebugData& dgdata = m_geometryDebugDataPtr[geometry->globalGeometryIndex];
+            GeometryDebugData& dgdata = m_geometryDebugDataPtr[geometry.globalGeometryIndex];
             dgdata.ommArrayDataBufferIndex = debugData->ommArrayDataBufferDescriptor ? debugData->ommArrayDataBufferDescriptor->Get() : -1;
             dgdata.ommArrayDataBufferOffset = geometryDebug.ommArrayDataOffset;
 
@@ -286,7 +321,7 @@ void OpacityMicromapBuilder::updateDebugGeometry(
         }
         else
         {
-            GeometryDebugData& dgdata = m_geometryDebugDataPtr[geometry->globalGeometryIndex];
+            GeometryDebugData& dgdata = m_geometryDebugDataPtr[geometry.globalGeometryIndex];
             dgdata.ommArrayDataBufferIndex = -1;
             dgdata.ommArrayDataBufferOffset = 0xFFFFFFFF;
             dgdata.ommDescArrayBufferIndex = -1;
@@ -300,23 +335,19 @@ void OpacityMicromapBuilder::updateDebugGeometry(
 
 bool OpacityMicromapBuilder::update(
     nvrhi::ICommandList& commandList,
-    std::span<const std::shared_ptr<caustica::MeshInfo>> meshes,
-    size_t geometryCount)
+    const caustica::scene::SceneRenderData& renderData)
 {
     RAII_SCOPE( commandList.beginMarker("OpacityMicromapBuilder");, commandList.endMarker(); );
 
     // Runtime drag-drop grows geometry count without sceneLoaded(); resize before any writes.
-    ensureGeometryDebugCapacity(geometryCount);
+    ensureGeometryDebugCapacity(renderData.geometryCount);
 
     bool anyDirty = false;
-    for (auto& _mesh : meshes)
+    for (const auto& mesh : renderData.meshSnapshots)
     {
-        MeshInfoEx& mesh = static_cast<MeshInfoEx&>(*_mesh);
-        assert(&mesh != nullptr);
-
         if (m_sceneGpuResources == nullptr)
             continue;
-        const auto meshGpuIt = m_sceneGpuResources->meshRegistry.find(mesh.renderResourceId);
+        const auto meshGpuIt = m_sceneGpuResources->meshRegistry.find(mesh.id);
         if (meshGpuIt == m_sceneGpuResources->meshRegistry.end())
             continue;
         caustica::render::MeshGpuRecord& meshGpu = meshGpuIt->second;
@@ -342,7 +373,7 @@ void OpacityMicromapBuilder::setGlobalShaderMacros(std::vector<caustica::ShaderM
 
 bool OpacityMicromapBuilder::debugGUI(
     float indent,
-    std::span<const std::shared_ptr<caustica::MeshInfo>> meshes)
+    const caustica::scene::SceneRenderData& renderData)
 {
     RAII_SCOPE(ImGui::PushID("OpacityMicromapBuilderDebugGUI"); , ImGui::PopID(); );
     
@@ -523,12 +554,12 @@ bool OpacityMicromapBuilder::debugGUI(
             {
                 UI_SCOPED_INDENT(indent);
 
-                for (const std::shared_ptr<caustica::MeshInfo>& mesh : meshes)
+                for (const auto& mesh : renderData.meshSnapshots)
                 {
-                    if (!mesh || m_sceneGpuResources == nullptr)
+                    if (m_sceneGpuResources == nullptr)
                         continue;
                     const auto meshGpuIt =
-                        m_sceneGpuResources->meshRegistry.find(mesh->renderResourceId);
+                        m_sceneGpuResources->meshRegistry.find(mesh.id);
                     if (meshGpuIt == m_sceneGpuResources->meshRegistry.end())
                         continue;
                     const auto& geometryDebugData = meshGpuIt->second.geometryDebugData;
@@ -545,7 +576,7 @@ bool OpacityMicromapBuilder::debugGUI(
                     if (!meshHasOmms)
                         continue;
 
-                    ImGui::Text(mesh->name.c_str());
+                    ImGui::Text(mesh.debugName.c_str());
 
                     {
                         UI_SCOPED_INDENT(indent);

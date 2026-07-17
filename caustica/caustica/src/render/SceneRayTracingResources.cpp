@@ -129,7 +129,8 @@ void SceneRayTracingResources::createBlases(
     const caustica::scene::SceneRenderData& renderData)
 {
     caustica::AccelStructBuildSettings settings = { .excludeTransmissive = m_settings->AS.ExcludeTransmissive };
-    m_accelStructs->createBlases(commandList, renderData.meshResources, settings);
+    m_accelStructs->bindMaterialGpuCache(m_lightingPasses->materials().get());
+    m_accelStructs->createBlases(commandList, renderData.meshSnapshots, settings);
 }
 
 void SceneRayTracingResources::uploadSubInstanceData(nvrhi::ICommandList* commandList)
@@ -151,7 +152,7 @@ void SceneRayTracingResources::createAccelStructs(
 {
     const caustica::scene::SceneRenderData& data =
         renderData ? *renderData : scene.getRenderData();
-    m_lightingPasses->createOpacityMicromaps(data.meshResources, data.geometryCount);
+    m_lightingPasses->createOpacityMicromaps(data);
     createBlases(commandList, data);
     createTlas(commandList, data);
     if (m_additionalAccelStructBuilder)
@@ -176,7 +177,7 @@ void SceneRayTracingResources::recreateAccelStructs(
     m_accelStructs->releaseGpuResources();
     const caustica::scene::SceneRenderData& data =
         renderData ? *renderData : scene.getRenderData();
-    m_accelStructs->clearMeshAccelStructs(data.meshResources);
+    m_accelStructs->clearMeshAccelStructs(data.meshSnapshots);
     m_gpuDevice->getDevice()->runGarbageCollection();
 
     commandList->open();
@@ -200,7 +201,7 @@ void SceneRayTracingResources::requestMeshAccelRebuild(const std::shared_ptr<cau
         return;
     }
 
-    m_accelStructs->requestMeshRebuild(mesh);
+    m_accelStructs->requestMeshRebuild(mesh->renderResourceId);
 }
 
 void SceneRayTracingResources::requestAccelerationStructureRebuild()

@@ -75,9 +75,7 @@ public:
     int ensureMaterialsFromScene(const caustica::scene::SceneRenderData& renderData);
 
     void applyShaderMacros(std::vector<caustica::ShaderMacro>& macros);
-    void createOpacityMicromaps(
-        std::span<const std::shared_ptr<caustica::MeshInfo>> meshes,
-        size_t geometryCount);
+    void createOpacityMicromaps(const caustica::scene::SceneRenderData& renderData);
 
     void forEachUsedMaterialTexture(
         const std::function<void(caustica::Handle<caustica::ImageAsset>, bool normalMap)>& visitor);

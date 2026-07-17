@@ -120,7 +120,7 @@ private:
     bool                            collectGaussianSplatEmissionProxies(const UpdateSettings & settings, LightingControlData & ctrlBuff, std::vector<PolymorphicLightInfo> & outLightBuffer, std::vector<PolymorphicLightInfoEx> & outLightExBuffer, std::vector<uint> & outLightHistoryRemapCurrentToPast, std::vector<uint> & outLightHistoryRemapPastToCurrent);
 
     // this creates emissive triangle proc tasks and also does any required geometry instance (subInstance) processing such as analyt light proxies; has to happen AFTER collectAnalyticLightsCPU
-    bool                            processEmissiveGeometry( const UpdateSettings & settings, const caustica::scene::SceneRenderData& sceneData, std::vector<SubInstanceData> & subInstanceData, LightingControlData & ctrlBuff, std::vector<struct EmissiveTrianglesProcTask> & tasks );
+    bool                            processEmissiveGeometry( const UpdateSettings & settings, const caustica::scene::SceneRenderData& sceneData, MaterialGpuCache& materialGpuCache, std::vector<SubInstanceData> & subInstanceData, LightingControlData & ctrlBuff, std::vector<struct EmissiveTrianglesProcTask> & tasks );
 
     void                            fillBindings(nvrhi::BindingSetDesc& outBindingSetDesc, const caustica::render::SceneGpuFrameHandles& gpuHandles, std::shared_ptr<class MaterialGpuCache> materialGpuCache, std::shared_ptr<class OpacityMicromapBuilder> opacityMicromapBuilder, nvrhi::BufferHandle subInstanceDataBuffer, nvrhi::TextureHandle depthBuffer, nvrhi::TextureHandle motionVectors, nvrhi::TextureHandle envMapProcessed);
 

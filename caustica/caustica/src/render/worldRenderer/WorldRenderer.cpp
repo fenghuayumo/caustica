@@ -873,8 +873,7 @@ void caustica::render::WorldRenderer::rtxdiSetupFrame(nvrhi::IFramebuffer* frame
     {
         for (const scene::MeshInstanceRenderProxy& proxy : renderData->meshInstances)
         {
-            if (proxy.meshShared)
-                geometryInstanceCount += proxy.meshShared->geometries.size();
+            geometryInstanceCount += proxy.geometryCount;
         }
     }
     nvrhi::IDescriptorTable* descriptorTable = m_context->descriptorTable

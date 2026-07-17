@@ -11,19 +11,14 @@
 namespace
 {
     static bool IsValidBakeGeometry(
-        const caustica::MeshInfo& mesh,
+        const caustica::scene::MeshRenderResourceSnapshot& mesh,
         const caustica::render::MeshGpuRecord* meshGpu,
         const OmmBuildQueue::BuildInput::Geometry& geometry)
     {
         if (geometry.geometryIndexInMesh < 0 || size_t(geometry.geometryIndexInMesh) >= mesh.geometries.size())
             return false;
 
-        const std::shared_ptr<caustica::MeshGeometry>& meshGeometry = mesh.geometries[size_t(geometry.geometryIndexInMesh)];
-        if (!meshGeometry)
-            return false;
-
-        const std::shared_ptr<PTMaterial> materialPT = PTMaterial::safeCast(meshGeometry->material);
-        if (!materialPT || !materialPT->baseTexture.loaded || !materialPT->baseTexture.loaded->gpu.texture)
+        if (!geometry.alphaTexture || !geometry.alphaTexture->gpu.texture)
             return false;
 
         return meshGpu && meshGpu->indexBuffer && meshGpu->vertexBuffer;
@@ -31,7 +26,7 @@ namespace
 
     static omm::GpuBakeNvrhi::Input GetBakeInput(
         omm::GpuBakeNvrhi::Operation op,
-        const caustica::MeshInfo& mesh,
+        const caustica::scene::MeshRenderResourceSnapshot& mesh,
         const caustica::render::MeshGpuRecord& meshGpu,
         const OmmBuildQueue::BuildInput::Geometry& geometry)
     {
@@ -40,17 +35,16 @@ namespace
 
         assert(IsValidBakeGeometry(mesh, &meshGpu, geometry));
 
-        const caustica::MeshGeometry* meshGeometry = mesh.geometries[size_t(geometry.geometryIndexInMesh)].get();
+        const caustica::scene::GeometryRenderResourceSnapshot* meshGeometry =
+            &mesh.geometries[size_t(geometry.geometryIndexInMesh)];
 
         const uint32_t indexOffset = mesh.indexOffset + meshGeometry->indexOffsetInMesh;
         const uint32_t vertexOffset = (mesh.vertexOffset + meshGeometry->vertexOffsetInMesh);
 
-        std::shared_ptr<PTMaterial> materialPT = PTMaterial::safeCast(meshGeometry->material);
-
         omm::GpuBakeNvrhi::Input params;
         params.operation = op;
-        params.alphaTexture = materialPT->baseTexture.loaded->gpu.texture;
-        params.alphaCutoff = materialPT->alphaCutoff;
+        params.alphaTexture = geometry.alphaTexture->gpu.texture;
+        params.alphaCutoff = geometry.alphaCutoff;
         params.alphaCutoffGreater = geometry.alphaCutoffGT;
         params.alphaCutoffLessEqual = geometry.alphaCutoffLE;
         params.bilinearFilter = true;
@@ -199,11 +193,11 @@ OmmBuildQueue::~OmmBuildQueue()
 }
 
 caustica::render::MeshGpuRecord* OmmBuildQueue::findMeshGpu(
-    const caustica::MeshInfo& mesh) const
+    const caustica::scene::MeshRenderResourceSnapshot& mesh) const
 {
     if (m_sceneGpuResources == nullptr)
         return nullptr;
-    const auto it = m_sceneGpuResources->meshRegistry.find(mesh.renderResourceId);
+    const auto it = m_sceneGpuResources->meshRegistry.find(mesh.id);
     return it != m_sceneGpuResources->meshRegistry.end() ? &it->second : nullptr;
 }
 
@@ -211,8 +205,8 @@ void OmmBuildQueue::runSetup(nvrhi::ICommandList& commandList, BuildTask& task)
 {
     assert(task.state == BuildState::None);
 
-    std::shared_ptr < caustica::MeshInfo > mesh = task.input.mesh;
-    caustica::render::MeshGpuRecord* meshGpu = findMeshGpu(*mesh);
+    const auto& mesh = task.input.mesh;
+    caustica::render::MeshGpuRecord* meshGpu = findMeshGpu(mesh);
     if (meshGpu == nullptr)
         return;
 
@@ -228,7 +222,7 @@ void OmmBuildQueue::runSetup(nvrhi::ICommandList& commandList, BuildTask& task)
     for (const OmmBuildQueue::BuildInput::Geometry& geom : task.input.geometries)
     {
         omm::GpuBakeNvrhi::Input input =
-            GetBakeInput(omm::GpuBakeNvrhi::Operation::Setup, *mesh, *meshGpu, geom);
+            GetBakeInput(omm::GpuBakeNvrhi::Operation::Setup, mesh, *meshGpu, geom);
 
         omm::GpuBakeNvrhi::PreDispatchInfo setupInfo;
         m_baker->GetPreDispatchInfo(input, setupInfo);
@@ -273,7 +267,7 @@ void OmmBuildQueue::runSetup(nvrhi::ICommandList& commandList, BuildTask& task)
         const OmmBuildQueue::BuildInput::Geometry& geom = task.input.geometries[i];
 
         omm::GpuBakeNvrhi::Input input =
-            GetBakeInput(omm::GpuBakeNvrhi::Operation::Setup, *mesh, *meshGpu, geom);
+            GetBakeInput(omm::GpuBakeNvrhi::Operation::Setup, mesh, *meshGpu, geom);
 
         omm::GpuBakeNvrhi::Buffers output;
         output.ommDescBuffer                        = buffers.ommDescBuffer;
@@ -340,8 +334,8 @@ void OmmBuildQueue::bakeOmmArrayData(nvrhi::ICommandList& commandList, BuildTask
 
     commandList.clearBufferUInt(task.buffers.ommArrayDataBuffer, 0);
 
-    std::shared_ptr < caustica::MeshInfo > mesh = task.input.mesh;
-    caustica::render::MeshGpuRecord* meshGpu = findMeshGpu(*mesh);
+    const auto& mesh = task.input.mesh;
+    caustica::render::MeshGpuRecord* meshGpu = findMeshGpu(mesh);
     if (meshGpu == nullptr)
         return;
 
@@ -351,7 +345,7 @@ void OmmBuildQueue::bakeOmmArrayData(nvrhi::ICommandList& commandList, BuildTask
         const OmmBuildQueue::BuildInput::Geometry& geom = task.input.geometries[i];
 
         omm::GpuBakeNvrhi::Input input =
-            GetBakeInput(omm::GpuBakeNvrhi::Operation::Bake, *mesh, *meshGpu, geom);
+            GetBakeInput(omm::GpuBakeNvrhi::Operation::Bake, mesh, *meshGpu, geom);
 
         omm::GpuBakeNvrhi::Buffers output;
         output.ommArrayBuffer = task.buffers.ommArrayDataBuffer;
@@ -379,8 +373,8 @@ void OmmBuildQueue::bakeOmmArrayData(nvrhi::ICommandList& commandList, BuildTask
 std::vector<bvh::OmmAttachment> OmmBuildQueue::buildOMMAttachments(nvrhi::ICommandList& commandList, BuildTask& task)
 {
     std::vector<bvh::OmmAttachment> ommAttachment;
-    ommAttachment.resize(task.input.mesh->geometries.size());
-    caustica::render::MeshGpuRecord* meshGpu = findMeshGpu(*task.input.mesh);
+    ommAttachment.resize(task.input.mesh.geometries.size());
+    caustica::render::MeshGpuRecord* meshGpu = findMeshGpu(task.input.mesh);
     if (meshGpu == nullptr)
         return ommAttachment;
 
@@ -419,11 +413,12 @@ std::vector<bvh::OmmAttachment> OmmBuildQueue::buildOMMAttachments(nvrhi::IComma
 
 void OmmBuildQueue::buildBLASWithOMM(nvrhi::ICommandList& commandList, BuildTask& task, const std::vector<bvh::OmmAttachment>& ommAttachment)
 {
-    caustica::render::MeshGpuRecord* meshGpu = findMeshGpu(*task.input.mesh);
+    caustica::render::MeshGpuRecord* meshGpu = findMeshGpu(task.input.mesh);
     if (meshGpu == nullptr)
         return;
     nvrhi::rt::AccelStructDesc blasDesc = bvh::getMeshBlasDesc(
-        task.input.bvhCfg, *task.input.mesh, *meshGpu, ommAttachment.data(), false);
+        task.input.bvhCfg, task.input.mesh, *meshGpu, ommAttachment.data(), false,
+        m_materialGpuCache);
     // The spec says instance Id is only 24 bits, and we already take 16 for the instance index, so we only have 8 bits for the geometry.
     // On the other side, we could completely skip this and just use DXR 1.1's GeometryIndex() directly in the shader.
     assert((int)blasDesc.bottomLevelGeometries.size() < (1 << 8)); // we can only hold 8 bits for the geometry index in the HitInfo - see GeometryInstanceID in SceneTypes.hlsli
@@ -462,7 +457,7 @@ void OmmBuildQueue::submitAndSubscribeQuery(nvrhi::ICommandList& commandList)
 
 void OmmBuildQueue::finalize(nvrhi::ICommandList& commandList, BuildTask& task)
 {
-    caustica::render::MeshGpuRecord* meshGpu = findMeshGpu(*task.input.mesh);
+    caustica::render::MeshGpuRecord* meshGpu = findMeshGpu(task.input.mesh);
     if (meshGpu == nullptr)
         return;
     std::unique_ptr<caustica::render::MeshGpuDebugData> debugData =
@@ -478,11 +473,10 @@ void OmmBuildQueue::finalize(nvrhi::ICommandList& commandList, BuildTask& task)
     debugData->ommIndexBufferDescriptor =
         std::make_shared<caustica::DescriptorHandle>(m_descriptorTable->createDescriptorHandle(nvrhi::BindingSetItem::RawBuffer_SRV(0, task.buffers.ommIndexBuffer)));
 
-    auto mesh = std::static_pointer_cast<MeshInfoEx>(task.input.mesh);
     assert(!meshGpu->debugData);
     meshGpu->debugData = std::move(debugData);
     meshGpu->debugDataDirty = true;
-    meshGpu->geometryDebugData.resize(mesh->geometries.size());
+    meshGpu->geometryDebugData.resize(task.input.mesh.geometries.size());
 
     void* pReadbackData = m_device->mapBuffer(task.buffers.ommReadbackBuffer, nvrhi::CpuAccessMode::Read);
     for (uint32_t i = 0; i < task.input.geometries.size(); ++i)
@@ -536,7 +530,7 @@ void OmmBuildQueue::consumeOneTask(nvrhi::ICommandList& commandList, BuildState 
 
 bool OmmBuildQueue::executeTask(nvrhi::ICommandList& commandList, BuildTask& task)
 {
-    if (!task.input.mesh || findMeshGpu(*task.input.mesh) == nullptr)
+    if (!task.input.mesh.id || findMeshGpu(task.input.mesh) == nullptr)
     {
         if (task.state != BuildState::None)
             m_baker->Clear();
@@ -602,15 +596,15 @@ void OmmBuildQueue::update(nvrhi::ICommandList& commandList)
 
 void OmmBuildQueue::queueBuild(const BuildInput& input)
 {
-    if (!input.mesh)
+    if (!input.mesh.id)
         return;
 
     BuildInput filteredInput = input;
     filteredInput.geometries.clear();
-    caustica::render::MeshGpuRecord* meshGpu = findMeshGpu(*input.mesh);
+    caustica::render::MeshGpuRecord* meshGpu = findMeshGpu(input.mesh);
     for (const BuildInput::Geometry& geometry : input.geometries)
     {
-        if (IsValidBakeGeometry(*input.mesh, meshGpu, geometry))
+        if (IsValidBakeGeometry(input.mesh, meshGpu, geometry))
             filteredInput.geometries.push_back(geometry);
     }
 

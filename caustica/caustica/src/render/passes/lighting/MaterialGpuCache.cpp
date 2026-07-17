@@ -138,7 +138,7 @@ static std::filesystem::path ResolveMaterialTexturePath(
     return fullPath;
 }
 
-void PTTexture::initFromLoadedTexture(caustica::Handle<caustica::ImageAsset> & loaded, bool _sRGB, bool _normalMap, const std::filesystem::path & mediaPath)
+void PTTexture::initFromLoadedTexture(const caustica::Handle<caustica::ImageAsset>& loaded, bool _sRGB, bool _normalMap, const std::filesystem::path & mediaPath)
 {
     if (loaded == nullptr)
     { localPath = ""; sRGB = false; this->loaded = nullptr; normalMap = false; enabled = false; return; }
@@ -733,6 +733,8 @@ bool PTMaterial::editorGui(MaterialGpuCache & cache)
 
     // mark for update
     gpuDataDirty |= update;
+    if (update)
+        cache.notifyMaterialEdited();
 
     return update;
 }
@@ -896,43 +898,6 @@ static bool DefaultTextureNormalMap(PTMaterialTextureSlot slot)
     return slot == PTMaterialTextureSlot::Normal;
 }
 
-static void UpdateEngineMaterialTexture(
-    PTMaterial& material,
-    PTMaterialTextureSlot slot,
-    const Handle<ImageAsset>& loaded,
-    bool enabled)
-{
-    if (material.engineMaterialCounterpart == nullptr)
-        return;
-
-    switch (slot)
-    {
-    case PTMaterialTextureSlot::Base:
-        material.engineMaterialCounterpart->baseOrDiffuseTexture = loaded;
-        material.engineMaterialCounterpart->enableBaseOrDiffuseTexture = enabled;
-        break;
-    case PTMaterialTextureSlot::OcclusionRoughnessMetallic:
-        material.engineMaterialCounterpart->metalRoughOrSpecularTexture = loaded;
-        material.engineMaterialCounterpart->enableMetalRoughOrSpecularTexture = enabled;
-        break;
-    case PTMaterialTextureSlot::Normal:
-        material.engineMaterialCounterpart->normalTexture = loaded;
-        material.engineMaterialCounterpart->enableNormalTexture = enabled;
-        break;
-    case PTMaterialTextureSlot::Emissive:
-        material.engineMaterialCounterpart->emissiveTexture = loaded;
-        material.engineMaterialCounterpart->enableEmissiveTexture = enabled;
-        break;
-    case PTMaterialTextureSlot::Transmission:
-        material.engineMaterialCounterpart->transmissionTexture = loaded;
-        material.engineMaterialCounterpart->enableTransmissionTexture = enabled;
-        break;
-    default:
-        assert(false);
-        break;
-    }
-}
-
 void MaterialGpuCache::recordTexture(const PTTexture& texture)
 {
     if (texture.loaded == nullptr)
@@ -1009,11 +974,11 @@ bool MaterialGpuCache::setMaterialTexture(
     }
 
     material.setTextureEnabled(slot, true);
-    UpdateEngineMaterialTexture(material, slot, texture.loaded, true);
     material.gpuDataDirty = true;
+    notifyMaterialEdited();
 
     m_deferredTextureLoadInProgress = true;
-    recordTexture(texture);
+    rebuildActiveTextureIndex();
     return true;
 }
 
@@ -1024,8 +989,9 @@ void MaterialGpuCache::clearMaterialTexture(PTMaterial& material, PTMaterialText
     texture.enabled = false;
 
     material.setTextureEnabled(slot, false);
-    UpdateEngineMaterialTexture(material, slot, nullptr, false);
     material.gpuDataDirty = true;
+    notifyMaterialEdited();
+    rebuildActiveTextureIndex();
 }
 
 void MaterialGpuCache::initializeUniqueDeterministicName(const std::shared_ptr<PTMaterialBase> & material)
@@ -1060,6 +1026,7 @@ void MaterialGpuCache::clear()
 
     m_materialDataWasReset = true;
     m_materials.clear();
+    m_materialsById.clear();
     m_materialsGPU.clear();
     m_textures.clear();
     m_mediaPath = std::filesystem::path();
@@ -1069,6 +1036,7 @@ void MaterialGpuCache::clear()
     m_materialsPath = std::filesystem::path();
     m_materialsSceneSpecializedPath = std::filesystem::path();
     m_uniqueNames.clear();
+    notifyMaterialEdited();
 }
 
 MaterialGpuCache::~MaterialGpuCache()
@@ -1105,11 +1073,12 @@ static bool IsBuiltinModelFileName(const std::string& modelFileName)
     return normalized.rfind(builtinPrefix, 0) == 0;
 }
 
-std::shared_ptr<PTMaterial> MaterialGpuCache::importFromEngineMaterial(caustica::Material& material)
+std::shared_ptr<PTMaterial> MaterialGpuCache::importFromEngineMaterial(
+    const caustica::scene::MaterialRenderResourceSnapshot& material)
 {
     std::shared_ptr<PTMaterial> materialPT = std::make_shared<PTMaterial>();
 
-    materialPT->name = material.name;
+    materialPT->name = material.debugName;
     materialPT->modelName = ModelNameFromModelFileName(material.modelFileName);
 
     materialPT->baseTexture.initFromLoadedTexture(material.baseOrDiffuseTexture, true, false, m_mediaPath);
@@ -1224,49 +1193,113 @@ void MaterialGpuCache::sceneReloaded()
     clear();
 }
 
-int MaterialGpuCache::ensureMaterialsFromScene(
-    std::span<const std::shared_ptr<caustica::Material>> materials)
+void MaterialGpuCache::notifyMaterialEdited()
 {
+    ++m_materialStateRevision;
+}
+
+void MaterialGpuCache::rebuildActiveTextureIndex()
+{
+    m_textures.clear();
+    for (const auto& material : m_materials)
+    {
+        recordTexture(material->baseTexture);
+        recordTexture(material->occlusionRoughnessMetallicTexture);
+        recordTexture(material->normalTexture);
+        recordTexture(material->emissiveTexture);
+        recordTexture(material->transmissionTexture);
+    }
+}
+
+bool MaterialGpuCache::reconcileLiveMaterials(
+    std::span<const caustica::scene::MaterialRenderResourceSnapshot> materials)
+{
+    std::unordered_set<caustica::scene::MaterialRenderResourceId,
+        caustica::scene::MaterialRenderResourceId::Hash> liveIds;
+    liveIds.reserve(materials.size());
+    for (const auto& material : materials)
+    {
+        if (material.id)
+            liveIds.insert(material.id);
+    }
+
+    const size_t oldCount = m_materialsById.size();
+    std::erase_if(m_materialsById, [&liveIds](const auto& entry) {
+        return !liveIds.contains(entry.first);
+    });
+    if (m_materialsById.size() == oldCount)
+        return false;
+
+    std::unordered_set<const PTMaterial*> activeMaterials;
+    activeMaterials.reserve(m_materialsById.size());
+    for (const auto& entry : m_materialsById)
+        activeMaterials.insert(entry.second.get());
+
+    std::erase_if(m_materials, [&activeMaterials](const auto& material) {
+        if (activeMaterials.contains(material.get()))
+            return false;
+        material->runtimeMaterialGpuCache = nullptr;
+        return true;
+    });
+
+    m_materialsGPU.assign(m_materials.size(), PTMaterialData{});
+    for (uint32_t index = 0; index < m_materials.size(); ++index)
+    {
+        m_materials[index]->gpuDataIndex = index;
+        m_materials[index]->gpuDataDirty = true;
+    }
+    m_uniqueNames.clear();
+    for (const auto& material : m_materials)
+        initializeUniqueDeterministicName(material);
+    m_materialDataWasReset = true;
+    rebuildActiveTextureIndex();
+    notifyMaterialEdited();
+    caustica::info("MaterialGpuCache: reclaimed %zu removed materials (remaining=%zu)",
+        oldCount - m_materialsById.size(), m_materials.size());
+    return true;
+}
+
+int MaterialGpuCache::ensureMaterialsFromScene(
+    std::span<const caustica::scene::MaterialRenderResourceSnapshot> materials)
+{
+    reconcileLiveMaterials(materials);
     int added = 0;
     for (const auto& material : materials)
     {
-        std::shared_ptr<MaterialEx> materialEx = std::dynamic_pointer_cast<MaterialEx>(material);
-        if (materialEx == nullptr)
-            continue;
-        if (materialEx->ptData != nullptr)
+        if (!material.id || m_materialsById.contains(material.id))
             continue;
 
         std::shared_ptr<PTMaterial> materialPT;
-        if (IsBuiltinModelFileName(material->modelFileName))
-            materialPT = importFromEngineMaterial(*material);
+        if (IsBuiltinModelFileName(material.modelFileName))
+            materialPT = importFromEngineMaterial(material);
         else
         {
-            materialPT = load(material->modelFileName, material->name);
+            materialPT = load(material.modelFileName, material.debugName);
             if (materialPT == nullptr)
-                materialPT = importFromEngineMaterial(*material);
+                materialPT = importFromEngineMaterial(material);
         }
 
-        materialEx->ptData = materialPT;
-        materialEx->ptData->engineMaterialCounterpart = materialEx.get();
-        materialEx->ptData->runtimeMaterialGpuCache = this;
+        materialPT->runtimeMaterialGpuCache = this;
 
-        m_materials.push_back(materialEx->ptData);
+        m_materials.push_back(materialPT);
+        m_materialsById[material.id] = materialPT;
         m_materialsGPU.push_back(PTMaterialData{});
-        materialEx->ptData->gpuDataIndex = uint(m_materialsGPU.size() - 1);
-        materialEx->ptData->gpuDataDirty = true;
+        materialPT->gpuDataIndex = uint(m_materialsGPU.size() - 1);
+        materialPT->gpuDataDirty = true;
         assert(m_materialsGPU.size() <= CAUSTICA_MATERIAL_MAX_COUNT);
 
-        recordTexture(materialEx->ptData->baseTexture);
-        recordTexture(materialEx->ptData->occlusionRoughnessMetallicTexture);
-        recordTexture(materialEx->ptData->normalTexture);
-        recordTexture(materialEx->ptData->emissiveTexture);
-        recordTexture(materialEx->ptData->transmissionTexture);
-        initializeUniqueDeterministicName(materialEx->ptData);
+        recordTexture(materialPT->baseTexture);
+        recordTexture(materialPT->occlusionRoughnessMetallicTexture);
+        recordTexture(materialPT->normalTexture);
+        recordTexture(materialPT->emissiveTexture);
+        recordTexture(materialPT->transmissionTexture);
+        initializeUniqueDeterministicName(materialPT);
         ++added;
     }
 
     if (added > 0)
     {
+        notifyMaterialEdited();
         m_materialDataWasReset = true;
         // Runtime import: do not rebuild the specialized permutation table.
         // Rebaking every material forces PathTracingShaderCompiler to reload/create
@@ -1287,6 +1320,27 @@ int MaterialGpuCache::ensureMaterialsFromScene(
         caustica::info("MaterialGpuCache: ensured %d new runtime materials (total=%zu)", added, m_materials.size());
     }
     return added;
+}
+
+std::shared_ptr<PTMaterial> MaterialGpuCache::findByResourceId(
+    caustica::scene::MaterialRenderResourceId id) const
+{
+    const auto it = m_materialsById.find(id);
+    return it == m_materialsById.end() ? nullptr : it->second;
+}
+
+MaterialGpuCache::RayTracingState MaterialGpuCache::resolveRayTracingState(
+    caustica::scene::MaterialRenderResourceId id) const
+{
+    const std::shared_ptr<PTMaterial> material = findByResourceId(id);
+    if (!material)
+        return {};
+    return {
+        .skipRender = material->skipRender,
+        .excludeFromNEE = material->excludeFromNEE,
+        .alphaTest = material->enableAlphaTesting,
+        .transmission = material->enableTransmission,
+    };
 }
 
 void MaterialGpuCache::completeDeferredTexturesLoad(nvrhi::ICommandList* commandList)
@@ -1410,7 +1464,7 @@ void MaterialGpuCache::bakeShaderPermutations()
     }
 }
 
-void MaterialGpuCache::createRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* bindlessLayout, caustica::render::RenderDevice& renderDevice, std::span<const std::shared_ptr<caustica::Material>> materials, const std::filesystem::path& sceneFilePath, const std::filesystem::path & mediaPath )
+void MaterialGpuCache::createRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* bindlessLayout, caustica::render::RenderDevice& renderDevice, std::span<const caustica::scene::MaterialRenderResourceSnapshot> materials, const std::filesystem::path& sceneFilePath, const std::filesystem::path & mediaPath )
 {
     info("MaterialGpuCache: createRenderPassesAndLoadMaterials begin");
     assert(!mediaPath.empty());
@@ -1455,65 +1509,12 @@ void MaterialGpuCache::createRenderPassesAndLoadMaterials(nvrhi::IBindingLayout*
 
         m_materialsSceneSpecializedPath = m_materialsPath / justName;
   
-        std::unordered_set<std::string> materialsPTUniqueNames;
-
-        int initializedFromEngineCount = 0;
-
-        for (const auto& material : materials)
-        {
-            std::shared_ptr<MaterialEx> materialEx = std::dynamic_pointer_cast<MaterialEx>(material);
-            if (materialEx == nullptr)
-            {
-                assert(false && "Is there something wrong with ExtendedSceneTypeFactory::createMaterial()?");
-                continue;
-            }
-            else
-            {
-                if (IsBuiltinModelFileName(material->modelFileName))
-                {
-                    materialEx->ptData = importFromEngineMaterial(*material);
-                }
-                else
-                {
-                    std::shared_ptr<PTMaterial> loaded = load(material->modelFileName, material->name);
-                    if (loaded != nullptr)
-                    {
-                        materialEx->ptData = loaded;
-                    }
-                    else // ...and if we didn't find it in our .scene.materials.json, then import from the engine material
-                    {
-                        std::shared_ptr<PTMaterial> materialPT = importFromEngineMaterial(*material);
-                        materialEx->ptData = materialPT;
-                        initializedFromEngineCount++;
-                    }
-                }
-                materialEx->ptData->engineMaterialCounterpart = materialEx.get(); // keep the link - only needed if using material animation from the engine
-                materialEx->ptData->runtimeMaterialGpuCache = this;
-
-                std::string keyName = materialEx->ptData->modelName+"."+materialEx->ptData->name;
-                auto existing = materialsPTUniqueNames.find(keyName);
-                if (existing != materialsPTUniqueNames.end() )
-                {
-                    caustica::warning("Potential error while loading/converting materials for scene '%s' - there are at least two materials with the same name key '%s'.\nThis is not supported and will result in errors.\nIt's possible to fix some name collisions by including Material::materialIndexInModel into the name.",
-                        sceneFilePath.string().c_str(), keyName.c_str());
-                }
-                else
-                    materialsPTUniqueNames.insert(keyName);
-
-                m_materials.push_back(materialEx->ptData);
-
-                m_materialsGPU.push_back(PTMaterialData{});
-                materialEx->ptData->gpuDataIndex = uint(m_materialsGPU.size() - 1);
-                materialEx->ptData->gpuDataDirty = true;
-                assert(m_materialsGPU.size() <= CAUSTICA_MATERIAL_MAX_COUNT);
-            }
-        }
+        const int initializedFromEngineCount = ensureMaterialsFromScene(materials);
 
         // sort by name so when we're saving it's consistent
         std::sort(m_materials.begin(), m_materials.end(), [](const auto & a, const auto & b) { return a->name < b->name; } );
 
-        if (initializedFromEngineCount > 0)
-            caustica::warning("There were %d materials not found in RTXPT material materials folder '%s'; consider doing Scene->Materials->Advanced->Save", initializedFromEngineCount, m_materialsPath.string().c_str());
+        (void)initializedFromEngineCount;
 
         m_deferredTextureLoadInProgress = true;
         info("MaterialGpuCache: first material load end, materials=%zu", m_materials.size());
@@ -1543,12 +1544,12 @@ void MaterialGpuCache::createRenderPassesAndLoadMaterials(nvrhi::IBindingLayout*
 // NOTE: this also handles some of the geometry data and mixed geometry&material stuff - it might be a good idea to rethink whether it needs to live outside of material baker
 void UpdateSubInstanceData(SubInstanceData& ret,
     const caustica::render::SceneGpuResources* gpuResources,
-    const std::shared_ptr<MeshInfo>& mesh,
-    const caustica::MeshGeometry& geometry,
+    const caustica::scene::MeshRenderResourceSnapshot& mesh,
+    const caustica::scene::GeometryRenderResourceSnapshot& geometry,
     uint meshGeometryIndex,
     const PTMaterial& material)
 {
-    if (!mesh || mesh->geometries.empty() || meshGeometryIndex >= mesh->geometries.size())
+    if (mesh.geometries.empty() || meshGeometryIndex >= mesh.geometries.size())
         return;
 
     bool alphaTest = material.hasAlphaTest();
@@ -1565,7 +1566,6 @@ void UpdateSubInstanceData(SubInstanceData& ret,
 
     float alphaCutoff = 0.0;
 
-    const std::shared_ptr<MeshInfo>& meshRef = mesh;
     ret.FlagsAndAlphaInfo = 0;
     if (alphaTest)
     {
@@ -1589,10 +1589,7 @@ void UpdateSubInstanceData(SubInstanceData& ret,
     if (material.excludeFromNEE)
         ret.FlagsAndAlphaInfo |= SubInstanceData::Flags_ExcludeFromNEE;
 
-    if (!meshRef->geometries[0])
-        return;
-
-    uint globalGeometryIndex = meshRef->geometries[0]->globalGeometryIndex + meshGeometryIndex;
+    uint globalGeometryIndex = mesh.geometries[0].globalGeometryIndex + meshGeometryIndex;
     uint globalMaterialIndex = material.gpuDataIndex;
     ret.GlobalGeometryIndex_PTMaterialDataIndex = (globalGeometryIndex << 16) | globalMaterialIndex;
 
@@ -1627,17 +1624,23 @@ void MaterialGpuCache::update(nvrhi::ICommandList* commandList,
 {
     RAII_SCOPE( commandList->beginMarker("MaterialGpuCache");, commandList->endMarker(); );
 
+    ensureMaterialsFromScene(renderData.materialSnapshots);
     completeDeferredTexturesLoad(commandList);
+
+    for (const auto& snapshot : renderData.materialSnapshots)
+    {
+        const std::shared_ptr<PTMaterial> materialPT = findByResourceId(snapshot.id);
+        if (materialPT && materialPT->useEngineEmissiveIntensity
+            && materialPT->emissiveIntensity != snapshot.emissiveIntensity)
+        {
+            materialPT->emissiveIntensity = snapshot.emissiveIntensity;
+            materialPT->gpuDataDirty = true;
+        }
+    }
 
     bool needsUpload = false;
     for (auto& materialPT : m_materials)
     {
-        if (materialPT->useEngineEmissiveIntensity && materialPT->engineMaterialCounterpart != nullptr && materialPT->emissiveIntensity != materialPT->engineMaterialCounterpart->emissiveIntensity)
-        {
-            materialPT->emissiveIntensity = materialPT->engineMaterialCounterpart->emissiveIntensity;
-            materialPT->gpuDataDirty = true;
-        }
-
         if (!materialPT->gpuDataDirty && !m_materialDataWasReset)
             continue;
 
@@ -1659,29 +1662,28 @@ void MaterialGpuCache::update(nvrhi::ICommandList* commandList,
     size_t compactedGeometryInstanceIndex = 0;
     for (const scene::MeshInstanceRenderProxy& proxy : renderData.meshInstances)
     {
-        if (!proxy.meshShared)
+        const auto* mesh = renderData.findMesh(proxy.meshId);
+        if (!mesh)
             continue;
 
-        const auto& mesh = proxy.meshShared;
         const size_t firstSubInstanceIndex = compactedGeometryInstanceIndex;
         compactedGeometryInstanceIndex += mesh->geometries.size();
         for (size_t geometryIndex = 0; geometryIndex < mesh->geometries.size(); ++geometryIndex)
         {
             const auto& geometry = mesh->geometries[geometryIndex];
             const size_t subInstanceIndex = firstSubInstanceIndex + geometryIndex;
-            if (!geometry || subInstanceIndex >= subInstanceData.size())
+            if (subInstanceIndex >= subInstanceData.size())
             {
                 assert(false && "Sub-instance data is out of sync with scene geometry instances");
                 continue;
             }
 
-            assert( geometry->material != nullptr && "No handling for null materials!" );
-            std::shared_ptr<PTMaterial> materialPT = PTMaterial::safeCast(geometry->material);
+            std::shared_ptr<PTMaterial> materialPT = findByResourceId(geometry.materialId);
             assert(materialPT != nullptr && "Unknown error - should never have happened" );
             if (!materialPT)
                 continue;
 
-            UpdateSubInstanceData(subInstanceData[subInstanceIndex], gpuResources, mesh, *geometry,
+            UpdateSubInstanceData(subInstanceData[subInstanceIndex], gpuResources, *mesh, geometry,
                 static_cast<uint>(geometryIndex), *materialPT);
         }
     }

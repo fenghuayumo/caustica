@@ -189,6 +189,8 @@ private:
     // this frozen unique set. Growing unique exports forces createRayTracingPipeline and
     // can stall the render thread for a very long time (and hang window close).
     bool                                            m_uniqueHitGroupsFrozen = false;
+    uint64_t                                        m_materialStateRevision = 0;
+    uint64_t                                        m_resourceBindingRevision = 0;
 
     std::mutex                                      m_mutex;    // for synchronizing work by variants
 

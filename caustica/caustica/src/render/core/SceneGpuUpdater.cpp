@@ -180,33 +180,32 @@ void UpdateMaterial(
         : material.constants;
 }
 
-void UpdateGeometry(SceneGpuResources& gpu, const std::shared_ptr<MeshInfo>& mesh)
+void UpdateGeometry(SceneGpuResources& gpu, const scene::MeshRenderResourceSnapshot& mesh)
 {
-    if (!mesh || !mesh->buffers)
+    if (!mesh.upload)
         return;
 
-    const auto recordIt = gpu.meshRegistry.find(mesh->renderResourceId);
+    const auto recordIt = gpu.meshRegistry.find(mesh.id);
     if (recordIt == gpu.meshRegistry.end())
         return;
     const MeshGpuRecord& meshGpu = recordIt->second;
 
-    for (const auto& geometry : mesh->geometries)
+    for (const auto& geometry : mesh.geometries)
     {
-        if (!geometry)
-            continue;
-        if (geometry->globalGeometryIndex >= gpu.geometryData.size())
+        if (geometry.globalGeometryIndex < 0
+            || static_cast<size_t>(geometry.globalGeometryIndex) >= gpu.geometryData.size())
         {
             caustica::warning("UpdateGeometry: geometry index %u out of range (size=%zu); skipping.",
-                geometry->globalGeometryIndex, gpu.geometryData.size());
+                geometry.globalGeometryIndex, gpu.geometryData.size());
             continue;
         }
 
-        const uint32_t indexOffset = mesh->indexOffset + geometry->indexOffsetInMesh;
-        const uint32_t vertexOffset = mesh->vertexOffset + geometry->vertexOffsetInMesh;
+        const uint32_t indexOffset = mesh.indexOffset + geometry.indexOffsetInMesh;
+        const uint32_t vertexOffset = mesh.vertexOffset + geometry.vertexOffsetInMesh;
 
-        GeometryData& gdata = gpu.geometryData[geometry->globalGeometryIndex];
-        gdata.numIndices = geometry->numIndices;
-        gdata.numVertices = geometry->numVertices;
+        GeometryData& gdata = gpu.geometryData[geometry.globalGeometryIndex];
+        gdata.numIndices = geometry.numIndices;
+        gdata.numVertices = geometry.numVertices;
         gdata.indexBufferIndex = meshGpu.indexBufferDescriptor ? meshGpu.indexBufferDescriptor->Get() : -1;
         gdata.indexOffset = indexOffset * sizeof(uint32_t);
         gdata.vertexBufferIndex = meshGpu.vertexBufferDescriptor ? meshGpu.vertexBufferDescriptor->Get() : -1;
@@ -224,7 +223,7 @@ void UpdateGeometry(SceneGpuResources& gpu, const std::shared_ptr<MeshInfo>& mes
             ? uint32_t(vertexOffset * sizeof(uint32_t) + meshGpu.vertexBufferRange(VertexAttribute::Tangent).byteOffset) : ~0u;
         gdata.curveRadiusOffset = meshGpu.hasAttribute(VertexAttribute::CurveRadius)
             ? uint32_t(vertexOffset * sizeof(float) + meshGpu.vertexBufferRange(VertexAttribute::CurveRadius).byteOffset) : ~0u;
-        gdata.materialIndex = geometry->material ? geometry->material->materialID : ~0u;
+        gdata.materialIndex = geometry.materialIndex;
     }
 }
 
@@ -264,14 +263,14 @@ void EnsureMeshGpuBuffers(
     IDescriptorTableManager* descriptorTable,
     nvrhi::ICommandList* commandList)
 {
-    for (const auto& mesh : renderData.meshResources)
+    for (const auto& mesh : renderData.meshSnapshots)
     {
-        auto buffers = mesh->buffers;
+        const auto& buffers = mesh.upload;
 
         if (!buffers)
             continue;
 
-        MeshGpuRecord& meshGpu = gpu.meshRegistry[mesh->renderResourceId];
+        MeshGpuRecord& meshGpu = gpu.meshRegistry[mesh.id];
 
         if (!buffers->indexData.empty() && !meshGpu.indexBuffer)
         {
@@ -288,7 +287,7 @@ void EnsureMeshGpuBuffers(
             if (!meshGpu.indexBuffer)
             {
                 caustica::error("Failed to create index buffer for mesh '%s' (%zu indices).",
-                    mesh->name.c_str(), buffers->indexData.size());
+                    mesh.debugName.c_str(), buffers->indexData.size());
                 continue;
             }
 
@@ -361,7 +360,7 @@ void EnsureMeshGpuBuffers(
             if (!meshGpu.vertexBuffer)
             {
                 caustica::error("Failed to create vertex buffer for mesh '%s' (%llu bytes).",
-                    mesh->name.c_str(),
+                    mesh.debugName.c_str(),
                     static_cast<unsigned long long>(bufferDesc.byteSize));
                 continue;
             }
@@ -410,10 +409,11 @@ void EnsureMeshGpuBuffers(
     auto& skinnedGpuMap = gpu.skinnedGpuByEntity;
     for (const scene::SkinnedMeshRenderProxy& proxy : renderData.skinnedMeshes)
     {
-        if (!proxy.mesh || !proxy.prototypeMesh || !proxy.meshId || !proxy.prototypeMeshId)
+        const scene::MeshRenderResourceSnapshot* skinnedMesh = renderData.findMesh(proxy.meshId);
+        const scene::MeshRenderResourceSnapshot* prototypeMesh = renderData.findMesh(proxy.prototypeMeshId);
+        if (!skinnedMesh || !prototypeMesh || !proxy.meshId || !proxy.prototypeMeshId)
             continue;
 
-        const auto& skinnedMesh = proxy.mesh;
         auto prototypeGpuIt = gpu.meshRegistry.find(proxy.prototypeMeshId);
         if (prototypeGpuIt == gpu.meshRegistry.end())
             continue;
@@ -512,7 +512,8 @@ void DispatchSkinnedMeshUpdates(
 
     for (const scene::SkinnedMeshRenderProxy& proxy : renderData.skinnedMeshes)
     {
-        if (!proxy.needsSkinningUpdate || !proxy.mesh || !proxy.prototypeMesh
+        const scene::MeshRenderResourceSnapshot* prototypeMesh = renderData.findMesh(proxy.prototypeMeshId);
+        if (!proxy.needsSkinningUpdate || !renderData.findMesh(proxy.meshId) || !prototypeMesh
             || !proxy.meshId || !proxy.prototypeMeshId)
             continue;
 
@@ -548,7 +549,7 @@ void DispatchSkinnedMeshUpdates(
         state.bindings = { skinnedGpu.skinningBindingSet };
         commandList->setComputeState(state);
 
-        uint32_t vertexOffset = proxy.prototypeMesh->vertexOffset;
+        uint32_t vertexOffset = prototypeMesh->vertexOffset;
         const auto prototypeGpuIt = gpu.meshRegistry.find(proxy.prototypeMeshId);
         const auto skinnedGpuIt = gpu.meshRegistry.find(proxy.meshId);
         if (prototypeGpuIt == gpu.meshRegistry.end() || skinnedGpuIt == gpu.meshRegistry.end())
@@ -557,7 +558,7 @@ void DispatchSkinnedMeshUpdates(
         const MeshGpuRecord& skinnedBuffers = skinnedGpuIt->second;
 
         SkinningConstants constants{};
-        constants.numVertices = proxy.prototypeMesh->totalVertices;
+        constants.numVertices = prototypeMesh->totalVertices;
 
         constants.flags = 0;
         if (prototypeBuffers.hasAttribute(VertexAttribute::Normal)) constants.flags |= SkinningFlag_Normals;
@@ -666,11 +667,11 @@ void PruneRemovedGpuResources(
 {
     std::unordered_set<scene::MeshRenderResourceId, scene::MeshRenderResourceId::Hash>
         liveMeshIds;
-    liveMeshIds.reserve(renderData.meshResources.size());
-    for (const std::shared_ptr<MeshInfo>& mesh : renderData.meshResources)
+    liveMeshIds.reserve(renderData.meshSnapshots.size());
+    for (const scene::MeshRenderResourceSnapshot& mesh : renderData.meshSnapshots)
     {
-        if (mesh && mesh->renderResourceId)
-            liveMeshIds.insert(mesh->renderResourceId);
+        if (mesh.id)
+            liveMeshIds.insert(mesh.id);
     }
     std::erase_if(gpu.meshRegistry, [&liveMeshIds](const auto& entry) {
         return !liveMeshIds.contains(entry.first);
@@ -787,15 +788,12 @@ void UpdateGpuSceneBuffers(
     if (!gpu.geometryData.empty())
     {
         uint32_t geometryResourceIndex = 0;
-        for (const auto& mesh : renderData.meshResources)
+        for (const auto& mesh : renderData.meshSnapshots)
         {
             if (arraysAllocated)
                 break;
 
-            if (!mesh)
-                continue;
-
-            for (const auto& geometry : mesh->geometries)
+            for (const auto& geometry : mesh.geometries)
             {
                 if (geometryResourceIndex >= gpu.geometryData.size())
                 {
@@ -804,7 +802,7 @@ void UpdateGpuSceneBuffers(
                     break;
                 }
 
-                if (geometry->numIndices != gpu.geometryData[geometryResourceIndex].numIndices)
+                if (geometry.numIndices != gpu.geometryData[geometryResourceIndex].numIndices)
                 {
                     arraysAllocated = true;
                     break;
@@ -816,12 +814,12 @@ void UpdateGpuSceneBuffers(
 
     if (structureChanged || arraysAllocated)
     {
-        for (const auto& mesh : renderData.meshResources)
+        for (const auto& mesh : renderData.meshSnapshots)
         {
-            if (!mesh || !mesh->buffers)
+            if (!mesh.upload)
                 continue;
 
-            gpu.meshRegistry[mesh->renderResourceId].instanceBuffer = gpu.instanceBuffer;
+            gpu.meshRegistry[mesh.id].instanceBuffer = gpu.instanceBuffer;
 
             if (gpu.enableBindlessResources)
                 UpdateGeometry(gpu, mesh);
@@ -837,8 +835,7 @@ void UpdateGpuSceneBuffers(
         for (const scene::MeshInstanceRenderProxy& proxy : renderData.meshInstances)
         {
             UpdateInstance(gpu, proxy, compactedGeometryInstanceIndex);
-            if (proxy.meshShared)
-                compactedGeometryInstanceIndex += static_cast<uint32_t>(proxy.meshShared->geometries.size());
+            compactedGeometryInstanceIndex += proxy.geometryCount;
         }
 
         WriteInstanceBuffer(commandList, gpu);

@@ -74,6 +74,9 @@ void updateSceneGeometry(AccelStructManager& accelStructs, UpdateSceneGeometryPa
     if (gpuResources == nullptr)
         return;
 
+    if (params.materials != nullptr)
+        params.materials->ensureMaterialsFromScene(renderData.materialSnapshots);
+
     render::SceneGpuUpdater::refresh(
         *scene,
         *gpuResources,
@@ -81,11 +84,8 @@ void updateSceneGeometry(AccelStructManager& accelStructs, UpdateSceneGeometryPa
         commandList,
         static_cast<uint32_t>(params.frameIndex));
 
-    const auto& meshes = renderData.meshResources;
-    const size_t geometryCount = renderData.geometryCount;
-
     if (params.opacityMaps != nullptr)
-        params.opacityMaps->buildOpacityMicromaps(*commandList, meshes, geometryCount);
+        params.opacityMaps->buildOpacityMicromaps(*commandList, renderData);
 
     const AccelStructBuildSettings rebuildSettings = makeAccelBuildSettings(params.settings, false);
     accelStructs.rebuildDirtyMeshes(
@@ -106,12 +106,12 @@ void updateSceneGeometry(AccelStructManager& accelStructs, UpdateSceneGeometryPa
     {
         if (params.asyncLoadingInProgress != nullptr)
         {
-            *params.asyncLoadingInProgress |= params.opacityMaps->update(*commandList, meshes, geometryCount);
+            *params.asyncLoadingInProgress |= params.opacityMaps->update(*commandList, renderData);
             *params.asyncLoadingInProgress |= params.opacityMaps->uiData().BuildsLeftInQueue > 0;
         }
         else
         {
-            (void)params.opacityMaps->update(*commandList, meshes, geometryCount);
+            (void)params.opacityMaps->update(*commandList, renderData);
         }
     }
 

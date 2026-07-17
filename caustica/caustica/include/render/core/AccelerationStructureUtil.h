@@ -3,6 +3,7 @@
 #include <core/log.h>
 #include <scene/SceneTypes.h>
 #include <rhi/nvrhi.h>
+#include <scene/SceneRenderData.h>
 #include <render/passes/lighting/MaterialGpuCache.h>
 #include <render/SceneGpuResources.h>
 
@@ -25,9 +26,9 @@ namespace bvh
     };
 
     static bool isValidTriangleGeometryForBlas(
-        const caustica::MeshInfo& mesh,
+        const caustica::scene::MeshRenderResourceSnapshot& mesh,
         const caustica::render::MeshGpuRecord& meshGpu,
-        const caustica::MeshGeometry& geometry)
+        const caustica::scene::GeometryRenderResourceSnapshot& geometry)
     {
         if (geometry.type != caustica::MeshGeometryPrimitiveType::Triangles)
             return false;
@@ -38,11 +39,11 @@ namespace bvh
         if ((geometry.numIndices % 3) != 0)
         {
             caustica::warning("Skipping BLAS geometry '%s': index count %u is not divisible by 3.",
-                mesh.name.c_str(), geometry.numIndices);
+                mesh.debugName.c_str(), geometry.numIndices);
             return false;
         }
 
-        if (!mesh.buffers || !meshGpu.indexBuffer || !meshGpu.vertexBuffer)
+        if (!mesh.upload || !meshGpu.indexBuffer || !meshGpu.vertexBuffer)
             return false;
 
         const nvrhi::BufferDesc& indexBufferDesc = meshGpu.indexBuffer->getDesc();
@@ -58,7 +59,7 @@ namespace bvh
         if (indexEnd > indexBufferDesc.byteSize)
         {
             caustica::warning("Skipping BLAS geometry '%s': index range [%llu, %llu) exceeds index buffer size %llu.",
-                mesh.name.c_str(),
+                mesh.debugName.c_str(),
                 static_cast<unsigned long long>(indexStart),
                 static_cast<unsigned long long>(indexEnd),
                 static_cast<unsigned long long>(indexBufferDesc.byteSize));
@@ -72,7 +73,7 @@ namespace bvh
         if (vertexEnd > vertexBufferDesc.byteSize || vertexEnd > positionRangeEnd)
         {
             caustica::warning("Skipping BLAS geometry '%s': position range [%llu, %llu) exceeds vertex buffer size %llu or position range end %llu.",
-                mesh.name.c_str(),
+                mesh.debugName.c_str(),
                 static_cast<unsigned long long>(vertexStart),
                 static_cast<unsigned long long>(vertexEnd),
                 static_cast<unsigned long long>(vertexBufferDesc.byteSize),
@@ -80,20 +81,20 @@ namespace bvh
             return false;
         }
 
-        if (!mesh.buffers->indexData.empty())
+        if (!mesh.upload->indexData.empty())
         {
             const uint64_t indexDataStart = uint64_t(mesh.indexOffset + geometry.indexOffsetInMesh);
             const uint64_t indexDataEnd = indexDataStart + geometry.numIndices;
-            if (indexDataEnd <= mesh.buffers->indexData.size())
+            if (indexDataEnd <= mesh.upload->indexData.size())
             {
                 uint32_t maxIndex = 0;
                 for (uint64_t indexIt = indexDataStart; indexIt < indexDataEnd; ++indexIt)
-                    maxIndex = std::max(maxIndex, mesh.buffers->indexData[size_t(indexIt)]);
+                    maxIndex = std::max(maxIndex, mesh.upload->indexData[size_t(indexIt)]);
 
                 if (maxIndex >= geometry.numVertices)
                 {
                     caustica::warning("Skipping BLAS geometry '%s': max index %u exceeds geometry vertex count %u.",
-                        mesh.name.c_str(), maxIndex, geometry.numVertices);
+                        mesh.debugName.c_str(), maxIndex, geometry.numVertices);
                     return false;
                 }
             }
@@ -104,23 +105,22 @@ namespace bvh
 
     static nvrhi::rt::AccelStructDesc getMeshBlasDesc(
         const Config& cfg,
-        const caustica::MeshInfo& mesh,
+        const caustica::scene::MeshRenderResourceSnapshot& mesh,
         const caustica::render::MeshGpuRecord& meshGpu,
         const OmmAttachment* ommAttachment,
-        bool updateSkinMeshes)
+        bool updateSkinMeshes,
+        const MaterialGpuCache* materialGpuCache)
     {
         nvrhi::rt::AccelStructDesc blasDesc;
         blasDesc.isTopLevel = false;
-        blasDesc.debugName = mesh.name;
+        blasDesc.debugName = mesh.debugName;
 
-        if (!mesh.buffers || !meshGpu.indexBuffer || !meshGpu.vertexBuffer)
+        if (!mesh.upload || !meshGpu.indexBuffer || !meshGpu.vertexBuffer)
             return blasDesc;
 
         for (uint32_t geomIt = 0; geomIt < mesh.geometries.size(); ++geomIt)
         {
-            const caustica::MeshGeometry* geometry = mesh.geometries[geomIt].get();
-            if (!geometry)
-                continue;
+            const caustica::scene::GeometryRenderResourceSnapshot* geometry = &mesh.geometries[geomIt];
             if (!isValidTriangleGeometryForBlas(mesh, meshGpu, *geometry))
                 continue;
 
@@ -137,11 +137,11 @@ namespace bvh
             triangles.vertexStride = sizeof(dm::float3);
             triangles.vertexCount = geometry->numVertices;
 
-            std::shared_ptr<PTMaterial> materialPT = PTMaterial::safeCast(geometry->material);
-            const bool skipRender = materialPT && materialPT->skipRender;
-            const bool isTransmissive = geometry->material && geometry->material->domain == caustica::MaterialDomain::Transmissive;
+            const MaterialGpuCache::RayTracingState materialState = materialGpuCache
+                ? materialGpuCache->resolveRayTracingState(geometry->materialId)
+                : MaterialGpuCache::RayTracingState{};
 
-            if ((cfg.excludeTransmissive && isTransmissive) || skipRender)
+            if ((cfg.excludeTransmissive && materialState.transmission) || materialState.skipRender)
             {
                 continue;
             }
@@ -161,7 +161,7 @@ namespace bvh
             
             // Alpha testing, NEE exclusion, and transparent shadow tinting require custom shader handling.
             const bool needsCustomShader =
-                materialPT && (materialPT->enableAlphaTesting || materialPT->excludeFromNEE || materialPT->enableTransmission);
+                materialState.alphaTest || materialState.excludeFromNEE || materialState.transmission;
             geometryDesc.flags = needsCustomShader ? nvrhi::rt::GeometryFlags::None : nvrhi::rt::GeometryFlags::Opaque;
             blasDesc.bottomLevelGeometries.push_back(geometryDesc);
         }
@@ -170,12 +170,12 @@ namespace bvh
         // DeformationSourcePositionIndices) are updated every frame. Build them with
         // AllowUpdate up front so the first animation tick can PerformUpdate in-place
         // instead of allocating a second BLAS (VRAM spike / TDR on large imports).
-        const bool needsDynamicUpdate = mesh.skinPrototype.use_count() != 0
-            || !mesh.DeformationSourcePositionIndices.empty();
+        const bool needsDynamicUpdate = mesh.hasSkinPrototype
+            || mesh.hasDeformationSourcePositions;
         if (needsDynamicUpdate)
         {
             const nvrhi::rt::AccelStructBuildFlags quality =
-                !mesh.DeformationSourcePositionIndices.empty()
+                mesh.hasDeformationSourcePositions
                     ? nvrhi::rt::AccelStructBuildFlags::PreferFastBuild
                     : nvrhi::rt::AccelStructBuildFlags::PreferFastTrace;
             blasDesc.buildFlags = quality

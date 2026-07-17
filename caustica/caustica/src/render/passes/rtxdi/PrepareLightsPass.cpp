@@ -168,19 +168,18 @@ void PrepareLightsPass::countLightsInScene(uint32_t& numEmissiveMeshes, uint32_t
 
     for (const scene::MeshInstanceRenderProxy& meshProxy : m_renderData->meshInstances)
     {
-        if (!meshProxy.meshShared)
+        const auto* mesh = m_renderData->findMesh(meshProxy.meshId);
+        if (!mesh)
             continue;
 
-        for (const auto& geometry : meshProxy.meshShared->geometries)
+        for (const auto& geometry : mesh->geometries)
         {
-            if (!geometry)
-                continue;
-
-            std::shared_ptr<PTMaterial> materialPT = PTMaterial::safeCast(geometry->material);
+            std::shared_ptr<PTMaterial> materialPT =
+                m_materialGpuCache->findByResourceId(geometry.materialId);
             if (materialPT && materialPT->isEmissive())
             {
                 numEmissiveMeshes += 1;
-                numEmissiveTriangles += geometry->numIndices / 3;
+                numEmissiveTriangles += geometry.numIndices / 3;
             }
         }
     }
@@ -416,7 +415,7 @@ RTXDI_LightBufferParameters PrepareLightsPass::process(nvrhi::ICommandList* comm
     size_t compactedGeometryInstanceIndex = 0;
     for (const scene::MeshInstanceRenderProxy& meshProxy : renderData.meshInstances)
     {
-        const auto& mesh = meshProxy.meshShared;
+        const auto* mesh = renderData.findMesh(meshProxy.meshId);
         if (!mesh)
             continue;
 
@@ -428,7 +427,7 @@ RTXDI_LightBufferParameters PrepareLightsPass::process(nvrhi::ICommandList* comm
         {
             const auto& geometry = mesh->geometries[geometryIndex];
             const size_t geometryInstanceIndex = size_t(firstGeometryInstanceIndex) + geometryIndex;
-            if (!geometry || geometryInstanceIndex >= geometryInstanceToLight.size())
+            if (geometryInstanceIndex >= geometryInstanceToLight.size())
             {
                 assert(false && "Geometry instance index is out of sync with scene geometry instances");
                 continue;
@@ -438,7 +437,8 @@ RTXDI_LightBufferParameters PrepareLightsPass::process(nvrhi::ICommandList* comm
             nvrhi::hash_combine(instanceHash, static_cast<uint32_t>(meshProxy.entity));
             nvrhi::hash_combine(instanceHash, geometryIndex);
 
-            std::shared_ptr<PTMaterial> materialPTPtr = PTMaterial::safeCast(geometry->material);
+            std::shared_ptr<PTMaterial> materialPTPtr =
+                m_materialGpuCache->findByResourceId(geometry.materialId);
             if (!materialPTPtr)
                 continue;
             PTMaterial & materialPT = *materialPTPtr;
@@ -459,7 +459,7 @@ RTXDI_LightBufferParameters PrepareLightsPass::process(nvrhi::ICommandList* comm
             PrepareLightsTask task;
             task.instanceAndGeometryIndex = (meshProxy.instanceIndex << 12) | uint32_t(geometryIndex & 0xfff);
             task.lightBufferOffset = lightBufferOffset;
-            task.triangleCount = geometry->numIndices / 3;
+            task.triangleCount = geometry.numIndices / 3;
             task.previousLightBufferOffset = (pOffset != m_InstanceLightBufferOffsets.end()) ? int(pOffset->second) : -1;
 
             // record the current offset of this instance for use on the next frame

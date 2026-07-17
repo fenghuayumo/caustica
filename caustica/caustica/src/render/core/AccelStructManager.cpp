@@ -21,7 +21,7 @@ AccelStructManager::AccelStructManager(nvrhi::IDevice* device)
 }
 
 void AccelStructManager::createBlases(nvrhi::ICommandList* commandList,
-                                      std::span<const std::shared_ptr<MeshInfo>> meshes,
+                                      std::span<const scene::MeshRenderResourceSnapshot> meshes,
                                       const AccelStructBuildSettings& settings)
 {
     uint32_t builtMeshCount = 0;
@@ -30,11 +30,11 @@ void AccelStructManager::createBlases(nvrhi::ICommandList* commandList,
     uint64_t maxMeshTriangleCount = 0;
     std::string maxMeshName;
 
-    for (const std::shared_ptr<MeshInfo>& mesh : meshes)
+    for (const scene::MeshRenderResourceSnapshot& mesh : meshes)
     {
-        if (mesh->isSkinPrototype || m_sceneGpuResources == nullptr)
+        if (mesh.isSkinPrototype || m_sceneGpuResources == nullptr)
             continue;
-        const auto meshGpuIt = m_sceneGpuResources->meshRegistry.find(mesh->renderResourceId);
+        const auto meshGpuIt = m_sceneGpuResources->meshRegistry.find(mesh.id);
         if (meshGpuIt == m_sceneGpuResources->meshRegistry.end())
             continue;
         render::MeshGpuRecord& meshGpu = meshGpuIt->second;
@@ -42,7 +42,7 @@ void AccelStructManager::createBlases(nvrhi::ICommandList* commandList,
         bvh::Config cfg = { .excludeTransmissive = settings.excludeTransmissive };
 
         nvrhi::rt::AccelStructDesc blasDesc =
-            bvh::getMeshBlasDesc(cfg, *mesh, meshGpu, nullptr, false);
+            bvh::getMeshBlasDesc(cfg, mesh, meshGpu, nullptr, false, m_materialGpuCache);
         assert((int)blasDesc.bottomLevelGeometries.size() < (1 << 12));
         if (blasDesc.bottomLevelGeometries.empty())
             continue;
@@ -59,20 +59,23 @@ void AccelStructManager::createBlases(nvrhi::ICommandList* commandList,
         if (meshTriangleCount > maxMeshTriangleCount)
         {
             maxMeshTriangleCount = meshTriangleCount;
-            maxMeshName = mesh->name;
+            maxMeshName = mesh.debugName;
         }
 
         nvrhi::rt::AccelStructHandle as = m_device->createAccelStruct(blasDesc);
         if (!as)
         {
             error("Failed to create BLAS for mesh '%s' (triangles=%llu). Skipping mesh AS.",
-                mesh->name.c_str(),
+                mesh.debugName.c_str(),
                 static_cast<unsigned long long>(meshTriangleCount));
             continue;
         }
         nvrhi::utils::BuildBottomLevelAccelStruct(commandList, as, blasDesc);
         meshGpu.accelStruct = as;
     }
+    m_materialStateRevision = m_materialGpuCache
+        ? m_materialGpuCache->materialStateRevision()
+        : 0;
 
     info("Queued BLAS builds: meshes=%u, geometries=%u, triangles=%llu, maxMeshTriangles=%llu, maxMesh='%s'",
         builtMeshCount,
@@ -93,8 +96,7 @@ void AccelStructManager::createTlas(nvrhi::ICommandList* commandList, const scen
     m_subInstanceCount = 0;
     for (const scene::MeshInstanceRenderProxy& proxy : renderData.meshInstances)
     {
-        if (proxy.meshShared)
-            m_subInstanceCount += static_cast<uint32_t>(proxy.meshShared->geometries.size());
+        m_subInstanceCount += proxy.geometryCount;
     }
 
     tlasDesc.topLevelMaxInstances = std::max<size_t>(1, renderData.meshInstanceEntities.size());
@@ -131,13 +133,13 @@ void AccelStructManager::uploadSubInstanceData(nvrhi::ICommandList* commandList)
 }
 
 void AccelStructManager::clearMeshAccelStructs(
-    std::span<const std::shared_ptr<MeshInfo>> meshes)
+    std::span<const scene::MeshRenderResourceSnapshot> meshes)
 {
     if (m_sceneGpuResources == nullptr)
         return;
-    for (const std::shared_ptr<MeshInfo>& mesh : meshes)
+    for (const scene::MeshRenderResourceSnapshot& mesh : meshes)
     {
-        const auto meshGpuIt = m_sceneGpuResources->meshRegistry.find(mesh->renderResourceId);
+        const auto meshGpuIt = m_sceneGpuResources->meshRegistry.find(mesh.id);
         if (meshGpuIt == m_sceneGpuResources->meshRegistry.end())
             continue;
         render::MeshGpuRecord& meshGpu = meshGpuIt->second;
@@ -151,15 +153,14 @@ void AccelStructManager::clearMeshAccelStructs(
     m_meshesPendingAccelRebuild.clear();
 }
 
-void AccelStructManager::requestMeshRebuild(const std::shared_ptr<MeshInfo>& mesh)
+void AccelStructManager::requestMeshRebuild(scene::MeshRenderResourceId meshId)
 {
-    if (!mesh)
+    if (!meshId)
         return;
 
     if (!m_topLevelAS)
         return;
 
-    const scene::MeshRenderResourceId meshId = mesh->renderResourceId;
     std::lock_guard lock(*m_pendingRebuildMutex);
     const auto it = std::find(m_meshesPendingAccelRebuild.begin(), m_meshesPendingAccelRebuild.end(), meshId);
     if (it == m_meshesPendingAccelRebuild.end())
@@ -171,6 +172,13 @@ void AccelStructManager::rebuildDirtyMeshes(nvrhi::ICommandList*            comm
                                             const AccelStructBuildSettings& settings,
                                             bool&                           fullRebuildRequested)
 {
+    if (m_materialGpuCache
+        && m_materialStateRevision != m_materialGpuCache->materialStateRevision())
+    {
+        fullRebuildRequested = true;
+        return;
+    }
+
     std::vector<scene::MeshRenderResourceId> dirtyMeshIds;
     {
         std::lock_guard lock(*m_pendingRebuildMutex);
@@ -182,15 +190,15 @@ void AccelStructManager::rebuildDirtyMeshes(nvrhi::ICommandList*            comm
     for (const scene::MeshRenderResourceId meshId : dirtyMeshIds)
     {
         const auto meshIt = std::find_if(
-            renderData.meshResources.begin(),
-            renderData.meshResources.end(),
-            [meshId](const std::shared_ptr<MeshInfo>& candidate) {
-                return candidate && candidate->renderResourceId == meshId;
+            renderData.meshSnapshots.begin(),
+            renderData.meshSnapshots.end(),
+            [meshId](const scene::MeshRenderResourceSnapshot& candidate) {
+                return candidate.id == meshId;
             });
-        if (meshIt == renderData.meshResources.end() || m_sceneGpuResources == nullptr)
+        if (meshIt == renderData.meshSnapshots.end() || m_sceneGpuResources == nullptr)
             continue;
-        const std::shared_ptr<MeshInfo>& mesh = *meshIt;
-        if (!mesh || mesh->isSkinPrototype)
+        const scene::MeshRenderResourceSnapshot& mesh = *meshIt;
+        if (mesh.isSkinPrototype)
             continue;
 
         const auto meshGpuIt = m_sceneGpuResources->meshRegistry.find(meshId);
@@ -210,7 +218,7 @@ void AccelStructManager::rebuildDirtyMeshes(nvrhi::ICommandList*            comm
         // Geometry-sequence / point-cache meshes keep fixed topology; rebuild like skinned
         // meshes via AllowUpdate + PerformUpdate so we do not allocate a new BLAS every frame.
         nvrhi::rt::AccelStructDesc blasDesc =
-            bvh::getMeshBlasDesc(cfg, *mesh, meshGpu, nullptr, true);
+            bvh::getMeshBlasDesc(cfg, mesh, meshGpu, nullptr, true, m_materialGpuCache);
         assert((int)blasDesc.bottomLevelGeometries.size() < (1 << 12));
         if (blasDesc.bottomLevelGeometries.empty())
             continue;
@@ -232,7 +240,7 @@ void AccelStructManager::rebuildDirtyMeshes(nvrhi::ICommandList*            comm
             if (!as)
             {
                 error("Failed to create updatable BLAS for mesh '%s'. Deferring full rebuild.",
-                    mesh->name.c_str());
+                    mesh.debugName.c_str());
                 fullRebuildRequested = true;
                 continue;
             }
@@ -266,7 +274,7 @@ void AccelStructManager::updateSkinnedBlases(nvrhi::ICommandList*            com
 
     for (const scene::SkinnedMeshRenderProxy& proxy : renderData.skinnedMeshes)
     {
-        if (!proxy.needsSkinningUpdate || !proxy.mesh || m_sceneGpuResources == nullptr)
+        if (!proxy.needsSkinningUpdate || !renderData.findMesh(proxy.meshId) || m_sceneGpuResources == nullptr)
             continue;
 
         const auto meshGpuIt = m_sceneGpuResources->meshRegistry.find(proxy.meshId);
@@ -288,7 +296,8 @@ void AccelStructManager::updateSkinnedBlases(nvrhi::ICommandList*            com
 
     for (const scene::SkinnedMeshRenderProxy& proxy : renderData.skinnedMeshes)
     {
-        if (!proxy.needsSkinningUpdate || !proxy.mesh || m_sceneGpuResources == nullptr)
+        const scene::MeshRenderResourceSnapshot* mesh = renderData.findMesh(proxy.meshId);
+        if (!proxy.needsSkinningUpdate || !mesh || m_sceneGpuResources == nullptr)
             continue;
 
         const auto meshGpuIt = m_sceneGpuResources->meshRegistry.find(proxy.meshId);
@@ -306,7 +315,7 @@ void AccelStructManager::updateSkinnedBlases(nvrhi::ICommandList*            com
 
         bvh::Config cfg = { .excludeTransmissive = settings.excludeTransmissive };
         nvrhi::rt::AccelStructDesc blasDesc =
-            bvh::getMeshBlasDesc(cfg, *proxy.mesh, meshGpu, nullptr, true);
+            bvh::getMeshBlasDesc(cfg, *mesh, meshGpu, nullptr, true, m_materialGpuCache);
         if (blasDesc.bottomLevelGeometries.empty())
         {
             skippedEmptySkinnedUpdateCount++;
@@ -359,7 +368,7 @@ void AccelStructManager::buildTlas(nvrhi::ICommandList*            commandList,
 
         // geometryInstanceIndex must be a dense prefix sum after refreshInstanceIndices.
         // Prefer the compacted running count if a stale snapshot slips through.
-        if (proxy.meshShared
+        if (proxy.meshId
             && subInstanceCount != static_cast<uint32_t>(proxy.geometryInstanceIndex))
         {
             static bool warnedStaleGeometryIndex = false;
@@ -378,7 +387,8 @@ void AccelStructManager::buildTlas(nvrhi::ICommandList*            commandList,
         instanceDesc.flags = nvrhi::rt::InstanceFlags::None;
         dm::affineToColumnMajor(proxy.transformFloat, instanceDesc.transform);
 
-        if (!proxy.meshShared)
+        const scene::MeshRenderResourceSnapshot* mesh = renderData.findMesh(proxy.meshId);
+        if (!mesh)
         {
             instanceDesc.bottomLevelAS = nullptr;
             instanceDesc.instanceMask = 0;
@@ -386,7 +396,6 @@ void AccelStructManager::buildTlas(nvrhi::ICommandList*            commandList,
             continue;
         }
 
-        const std::shared_ptr<MeshInfo>& mesh = proxy.meshShared;
         const uint32_t meshSubInstanceCount = (uint32_t)mesh->geometries.size();
         const auto meshGpuIt = m_sceneGpuResources
             ? m_sceneGpuResources->meshRegistry.find(proxy.meshId)

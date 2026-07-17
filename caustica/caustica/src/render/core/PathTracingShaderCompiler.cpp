@@ -666,6 +666,11 @@ void PathTracingShaderCompiler::update(const caustica::scene::SceneRenderData* s
 
     const bool countChanged = m_perSubInstanceHitGroup.size() != subInstanceCount;
     const bool uniqueEmpty = subInstanceCount > 0 && m_uniqueHitGroups.empty();
+    const uint64_t materialStateRevision = getMaterialGpuCache()->materialStateRevision();
+    const bool materialStateChanged = m_materialStateRevision != materialStateRevision;
+    const uint64_t resourceBindingRevision = sceneData ? sceneData->resourceBindingRevision : 0;
+    const bool resourceBindingsChanged =
+        m_resourceBindingRevision != resourceBindingRevision;
 
     const auto rebuildPerSubInstanceHitGroups = [&]()
     {
@@ -677,19 +682,20 @@ void PathTracingShaderCompiler::update(const caustica::scene::SceneRenderData* s
         size_t compactedGeometryInstanceIndex = 0;
         for (const scene::MeshInstanceRenderProxy& proxy : sceneData->meshInstances)
         {
-            if (!proxy.meshShared)
+            const scene::MeshRenderResourceSnapshot* mesh = sceneData->findMesh(proxy.meshId);
+            if (!mesh)
                 continue;
 
-            const MeshInfo& mesh = *proxy.meshShared;
             const size_t firstSubInstanceIndex = compactedGeometryInstanceIndex;
-            compactedGeometryInstanceIndex += mesh.geometries.size();
-            for (size_t gi = 0; gi < mesh.geometries.size(); gi++)
+            compactedGeometryInstanceIndex += mesh->geometries.size();
+            for (size_t gi = 0; gi < mesh->geometries.size(); gi++)
             {
                 const size_t subInstanceIndex = firstSubInstanceIndex + gi;
-                if (subInstanceIndex >= m_perSubInstanceHitGroup.size() || !mesh.geometries[gi])
+                if (subInstanceIndex >= m_perSubInstanceHitGroup.size())
                     continue;
 
-                std::shared_ptr<PTMaterial> materialPT = PTMaterial::safeCast(mesh.geometries[gi]->material);
+                std::shared_ptr<PTMaterial> materialPT =
+                    getMaterialGpuCache()->findByResourceId(mesh->geometries[gi].materialId);
                 if (!materialPT)
                     continue;
 
@@ -752,7 +758,7 @@ void PathTracingShaderCompiler::update(const caustica::scene::SceneRenderData* s
                 "create to avoid resetting live pipelines after runtime import");
         }
 
-        if (countChanged || uniqueEmpty)
+        if (countChanged || uniqueEmpty || materialStateChanged || resourceBindingsChanged)
         {
             rebuildPerSubInstanceHitGroups();
             remapHitGroupsOntoFrozenUnique();
@@ -780,6 +786,8 @@ void PathTracingShaderCompiler::update(const caustica::scene::SceneRenderData* s
                 if (variant->m_pipeline)
                     variant->rebuildShaderTableOnly();
             }
+            m_materialStateRevision = materialStateRevision;
+            m_resourceBindingRevision = resourceBindingRevision;
         }
 
         m_uniqueHitGroupsFrozen = true;
@@ -795,7 +803,9 @@ void PathTracingShaderCompiler::update(const caustica::scene::SceneRenderData* s
     if (macrosChanged)
         m_macros = newMacros;
 
-    const bool hitGroupsNeedRebuild = countChanged || uniqueEmpty || forceShaderReload || macrosChanged || !m_uniqueHitGroupsFrozen;
+    const bool hitGroupsNeedRebuild = countChanged || uniqueEmpty || materialStateChanged
+        || resourceBindingsChanged
+        || forceShaderReload || macrosChanged || !m_uniqueHitGroupsFrozen;
     if (!hitGroupsNeedRebuild && !missingPipelines)
         return;
 
@@ -804,7 +814,7 @@ void PathTracingShaderCompiler::update(const caustica::scene::SceneRenderData* s
         // Note: these map 1-1 to m_subInstanceData, and are used to (see '->addHitGroup' below) build 1-1 mapped hit groups.
         // Use the same dense prefix as AccelStructManager::buildTlas / MaterialGpuCache::update so a stale
         // proxy.geometryInstanceIndex cannot permanently mis-bind materials after runtime import.
-        // Same dense prefix as AccelStructManager / MaterialGpuCache (meshShared order).
+        // Same dense prefix as AccelStructManager / MaterialGpuCache (snapshot order).
         rebuildPerSubInstanceHitGroups();
 
         // Prime the instances to make sure we only include the necessary CHS variants in the PSO. Many (sub)instances can map to same materials.
@@ -823,6 +833,8 @@ void PathTracingShaderCompiler::update(const caustica::scene::SceneRenderData* s
                 hitGroup.hasAnyHitShader = true;
             m_uniqueHitGroups[hitGroup.getShaderPermutationIndex()] = hitGroup;
         }
+        m_materialStateRevision = materialStateRevision;
+        m_resourceBindingRevision = resourceBindingRevision;
     }
 
     bool needsUpdate = hitGroupsNeedRebuild || missingPipelines || forceShaderReload || macrosChanged;

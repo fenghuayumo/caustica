@@ -12,6 +12,7 @@
 #include <rhi/nvrhi.h>
 #include <math/math.h>
 #include <scene/SceneTypes.h>
+#include <scene/SceneRenderData.h>
 
 #include <render/core/ComputePass.h>
 #include <shaders/SubInstanceData.h>
@@ -105,13 +106,12 @@ struct PTTexture
     // float4                  ValueMultiply;
     // float4                  ValueAdd;
 
-    void                    initFromLoadedTexture(caustica::Handle<caustica::ImageAsset>& loaded, bool sRGB, bool normalMap, const std::filesystem::path& mediaPath);
+    void                    initFromLoadedTexture(const caustica::Handle<caustica::ImageAsset>& loaded, bool sRGB, bool normalMap, const std::filesystem::path& mediaPath);
 };
 
 // All materials share these base properties and some of them have tight integration with the rest of the renderer
 struct PTMaterialBase
 {
-    caustica::Material * engineMaterialCounterpart = nullptr;
     MaterialGpuCache*          runtimeMaterialGpuCache = nullptr;
 
     // modelName + name is unique identifier for the material; there cannot be two materials with the same modelName and name - hopefully.
@@ -270,10 +270,18 @@ struct MaterialEx : caustica::Material
 class MaterialGpuCache
 {
 public:
+    struct RayTracingState
+    {
+        bool skipRender = false;
+        bool excludeFromNEE = false;
+        bool alphaTest = false;
+        bool transmission = false;
+    };
+
     MaterialGpuCache(const std::string & relativeShaderSourcePath, nvrhi::IDevice* device, std::shared_ptr<caustica::TextureLoader> textureCache, std::shared_ptr<caustica::ShaderFactory> shaderFactory);
     ~MaterialGpuCache();
 
-    void                            createRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* bindlessLayout, caustica::render::RenderDevice& renderDevice, std::span<const std::shared_ptr<caustica::Material>> materials, const std::filesystem::path & sceneFilePath, const std::filesystem::path & mediaPath);
+    void                            createRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* bindlessLayout, caustica::render::RenderDevice& renderDevice, std::span<const caustica::scene::MaterialRenderResourceSnapshot> materials, const std::filesystem::path & sceneFilePath, const std::filesystem::path & mediaPath);
 
     // this update can happen in parallel with any other ray preparatory tracing work - anything from BVH building to laying down denoising layers
     void                            update(nvrhi::ICommandList* commandList,
@@ -292,7 +300,11 @@ public:
     void                            sceneReloaded();
     // Incrementally create PT materials for scene materials that do not yet have
     // ptData. Used by runtime mesh import so existing materials stay valid.
-    int                             ensureMaterialsFromScene(std::span<const std::shared_ptr<caustica::Material>> materials);
+    int                             ensureMaterialsFromScene(std::span<const caustica::scene::MaterialRenderResourceSnapshot> materials);
+    std::shared_ptr<PTMaterial>     findByResourceId(caustica::scene::MaterialRenderResourceId id) const;
+    RayTracingState                 resolveRayTracingState(caustica::scene::MaterialRenderResourceId id) const;
+    uint64_t                        materialStateRevision() const { return m_materialStateRevision; }
+    void                            notifyMaterialEdited();
 
     std::filesystem::path           getMaterialStoragePath(PTMaterialBase& material);
 
@@ -319,11 +331,13 @@ private:
     void                            clear();
 
     std::shared_ptr<PTMaterial>     load(const std::string & modelFileName, const std::string& name);
-    std::shared_ptr<PTMaterial>     importFromEngineMaterial(caustica::Material & material);
+    std::shared_ptr<PTMaterial>     importFromEngineMaterial(const caustica::scene::MaterialRenderResourceSnapshot& material);
     void                            saveAll();
 
     void                            completeDeferredTexturesLoad(nvrhi::ICommandList* commandList);
     void                            recordTexture(const PTTexture& texture);
+    bool                            reconcileLiveMaterials(std::span<const caustica::scene::MaterialRenderResourceSnapshot> materials);
+    void                            rebuildActiveTextureIndex();
 
     void                            bakeShaderPermutations();
 
@@ -345,6 +359,10 @@ private:
 
     std::vector<std::shared_ptr<PTMaterial>>    
                                     m_materials;
+    std::unordered_map<caustica::scene::MaterialRenderResourceId,
+        std::shared_ptr<PTMaterial>,
+        caustica::scene::MaterialRenderResourceId::Hash> m_materialsById;
+    uint64_t                        m_materialStateRevision = 1;
     std::vector<PTMaterialData>     m_materialsGPU;
 
     std::unordered_map<std::string, PTTexture> m_textures;

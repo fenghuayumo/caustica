@@ -14,6 +14,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace caustica
@@ -49,9 +50,6 @@ namespace caustica::scene
         uint32_t geometryCount = 0;
         MeshType meshType = MeshType::Triangles;
         bool hasSkinPrototype = false;
-        // Transitional lifetime pin for render resources still owned by MeshInfo.
-        // Render code must use the immutable fields above whenever it does not need GPU handles.
-        std::shared_ptr<MeshInfo> meshShared;
         dm::affine3 transformFloat = dm::affine3::identity();
         dm::affine3 previousTransformFloat = dm::affine3::identity();
         dm::box3 globalBounds = dm::box3::empty();
@@ -65,8 +63,6 @@ namespace caustica::scene
         ecs::Entity entity = ecs::NullEntity;
         MeshRenderResourceId meshId;
         MeshRenderResourceId prototypeMeshId;
-        std::shared_ptr<MeshInfo> mesh;
-        std::shared_ptr<MeshInfo> prototypeMesh;
         dm::affine3 transformFloat = dm::affine3::identity();
         std::string debugName;
         std::vector<dm::float4x4> jointMatrices;
@@ -157,8 +153,88 @@ namespace caustica::scene
         MaterialRenderResourceId id;
         uint32_t materialIndex = 0;
         std::string debugName;
+        std::string modelFileName;
+        int materialIndexInModel = -1;
+        MaterialDomain domain = MaterialDomain::Opaque;
+        Handle<ImageAsset> baseOrDiffuseTexture;
+        Handle<ImageAsset> metalRoughOrSpecularTexture;
+        Handle<ImageAsset> normalTexture;
+        Handle<ImageAsset> emissiveTexture;
+        Handle<ImageAsset> occlusionTexture;
+        Handle<ImageAsset> transmissionTexture;
+        Handle<ImageAsset> opacityTexture;
+        dm::float3 baseOrDiffuseColor = 1.f;
+        dm::float3 specularColor = 0.f;
+        dm::float3 emissiveColor = 0.f;
+        float emissiveIntensity = 1.f;
+        float metalness = 0.f;
+        float roughness = 0.f;
+        float opacity = 1.f;
+        float alphaCutoff = 0.5f;
+        float transmissionFactor = 0.f;
+        float normalTextureScale = 1.f;
+        float occlusionStrength = 1.f;
+        dm::float2 normalTextureTransformScale = 1.f;
+        bool useSpecularGlossModel = false;
+        bool enableBaseOrDiffuseTexture = true;
+        bool enableMetalRoughOrSpecularTexture = true;
+        bool enableNormalTexture = true;
+        bool enableEmissiveTexture = true;
+        bool enableOcclusionTexture = true;
+        bool enableTransmissionTexture = true;
+        bool enableOpacityTexture = true;
+        bool doubleSided = false;
+        bool metalnessInRedChannel = false;
         MaterialConstants constants = {};
         MaterialConstants bindlessConstants = {};
+    };
+
+    // Deep-copied only when structure is extracted. The immutable blob may be shared by
+    // the triple-buffered snapshots and never contains scene authoring objects.
+    struct MeshUploadBlob
+    {
+        std::vector<uint32_t> indexData;
+        std::vector<dm::float3> positionData;
+        std::vector<dm::float2> texcoord1Data;
+        std::vector<dm::float2> texcoord2Data;
+        std::vector<uint32_t> normalData;
+        std::vector<uint32_t> tangentData;
+        std::vector<dm::vector<uint16_t, 4>> jointData;
+        std::vector<dm::float4> weightData;
+        std::vector<float> radiusData;
+    };
+
+    struct GeometryRenderResourceSnapshot
+    {
+        GeometryRenderResourceId id;
+        MaterialRenderResourceId materialId;
+        uint32_t materialIndex = ~0u;
+        dm::box3 objectSpaceBounds = dm::box3::empty();
+        uint32_t indexOffsetInMesh = 0;
+        uint32_t vertexOffsetInMesh = 0;
+        uint32_t numIndices = 0;
+        uint32_t numVertices = 0;
+        int globalGeometryIndex = -1;
+        MeshGeometryPrimitiveType type = MeshGeometryPrimitiveType::Triangles;
+    };
+
+    struct MeshRenderResourceSnapshot
+    {
+        MeshRenderResourceId id;
+        std::string debugName;
+        MeshType type = MeshType::Triangles;
+        dm::box3 objectSpaceBounds = dm::box3::empty();
+        uint32_t indexOffset = 0;
+        uint32_t vertexOffset = 0;
+        uint32_t totalIndices = 0;
+        uint32_t totalVertices = 0;
+        int globalMeshIndex = -1;
+        bool isMorphTargetAnimationMesh = false;
+        bool isSkinPrototype = false;
+        bool hasSkinPrototype = false;
+        bool hasDeformationSourcePositions = false;
+        std::shared_ptr<const MeshUploadBlob> upload;
+        std::vector<GeometryRenderResourceSnapshot> geometries;
     };
 
     // Logic-thread session inputs consumed during Extract (not ECS).
@@ -181,6 +257,8 @@ namespace caustica::scene
 
         [[nodiscard]] const LightRenderProxy* findLight(ecs::Entity entity) const;
         [[nodiscard]] const CameraRenderProxy* findCamera(ecs::Entity entity) const;
+        [[nodiscard]] const MeshRenderResourceSnapshot* findMesh(MeshRenderResourceId id) const;
+        [[nodiscard]] const MaterialRenderResourceSnapshot* findMaterial(MaterialRenderResourceId id) const;
 
         std::vector<MeshInstanceRenderProxy> meshInstances;
         std::vector<SkinnedMeshRenderProxy> skinnedMeshes;
@@ -188,11 +266,13 @@ namespace caustica::scene
         std::vector<CameraRenderProxy> cameras;
         std::vector<GaussianSplatRenderProxy> gaussianSplats;
 
-        // Transitional lifetime snapshots. Render code may consume these stable
-        // resource lists but must not query SceneEntityWorld/ResourceTracker.
-        std::vector<std::shared_ptr<MeshInfo>> meshResources;
-        std::vector<std::shared_ptr<Material>> materialResources;
+        std::vector<MeshRenderResourceSnapshot> meshSnapshots;
         std::vector<MaterialRenderResourceSnapshot> materialSnapshots;
+        std::unordered_map<MeshRenderResourceId, uint32_t, MeshRenderResourceId::Hash>
+            meshSnapshotIndex;
+        std::unordered_map<MaterialRenderResourceId, uint32_t, MaterialRenderResourceId::Hash>
+            materialSnapshotIndex;
+        uint64_t resourceBindingRevision = 0;
         size_t geometryCount = 0;
 
         ActiveCameraRenderProxy camera;

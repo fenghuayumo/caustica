@@ -697,7 +697,7 @@ bool LightSamplingCache::collectGaussianSplatEmissionProxies(
 // #ifdef _DEBUG
 // #pragma optimize("gt", on)
 // #endif
-bool LightSamplingCache::processEmissiveGeometry( const UpdateSettings & settings, const caustica::scene::SceneRenderData& sceneData, std::vector<SubInstanceData> & subInstanceData, LightingControlData & ctrlBuff, std::vector<struct EmissiveTrianglesProcTask> & tasks )
+bool LightSamplingCache::processEmissiveGeometry( const UpdateSettings & settings, const caustica::scene::SceneRenderData& sceneData, MaterialGpuCache& materialGpuCache, std::vector<SubInstanceData> & subInstanceData, LightingControlData & ctrlBuff, std::vector<struct EmissiveTrianglesProcTask> & tasks )
 {
     (void)settings;
     bool allGood = true;
@@ -711,7 +711,7 @@ bool LightSamplingCache::processEmissiveGeometry( const UpdateSettings & setting
     size_t compactedGeometryInstanceIndex = 0;
     for (const scene::MeshInstanceRenderProxy& meshProxy : sceneData.meshInstances)
     {
-        const auto& mesh = meshProxy.meshShared;
+        const auto* mesh = sceneData.findMesh(meshProxy.meshId);
         if (!mesh)
             continue;
 
@@ -723,7 +723,7 @@ bool LightSamplingCache::processEmissiveGeometry( const UpdateSettings & setting
         {
             const auto& geometry = mesh->geometries[geometryIndex];
             const size_t subInstanceIndex = size_t(firstGeometryInstanceIndex) + geometryIndex;
-            if (!geometry || subInstanceIndex >= subInstanceData.size())
+            if (subInstanceIndex >= subInstanceData.size())
             {
                 assert(false && "Sub-instance data is out of sync with scene geometry instances");
                 continue;
@@ -733,7 +733,8 @@ bool LightSamplingCache::processEmissiveGeometry( const UpdateSettings & setting
             nvrhi::hash_combine(instanceHash, static_cast<uint32_t>(meshProxy.entity));
             nvrhi::hash_combine(instanceHash, geometryIndex);
 
-            std::shared_ptr<PTMaterial> materialPTPtr = PTMaterial::safeCast(geometry->material);
+            std::shared_ptr<PTMaterial> materialPTPtr =
+                materialGpuCache.findByResourceId(geometry.materialId);
             if (!materialPTPtr)
                 continue;
             PTMaterial & materialPT = *materialPTPtr;
@@ -769,7 +770,7 @@ bool LightSamplingCache::processEmissiveGeometry( const UpdateSettings & setting
             // now set the convertedLightIndex into subInstanceData - if CAUSTICA_INVALID_LIGHT_INDEX that's fine, nothing happens
             subInstanceData[subInstanceIndex].AnalyticProxyLightIndex = analyticProxyLightIndex;
 
-            bool overflow = (ctrlBuff.TotalLightCount + (geometry->numIndices / 3) >= CAUSTICA_LIGHTING_MAX_LIGHTS);
+            bool overflow = (ctrlBuff.TotalLightCount + (geometry.numIndices / 3) >= CAUSTICA_LIGHTING_MAX_LIGHTS);
             allGood &= !overflow;
 
             if (!materialPT.isEmissive() || materialPT.skipRender || overflow)
@@ -796,8 +797,8 @@ bool LightSamplingCache::processEmissiveGeometry( const UpdateSettings & setting
             assert(geometryIndex < 0xfff);
 
             int triangleFrom = 0;
-            int remainingTriangles = geometry->numIndices / 3;
-            assert( geometry->numIndices % 3 == 0 );
+            int remainingTriangles = geometry.numIndices / 3;
+            assert( geometry.numIndices % 3 == 0 );
 
             while( remainingTriangles > 0 )
             {
@@ -1090,7 +1091,7 @@ void LightSamplingCache::updateBegin(nvrhi::ICommandList* commandList, caustica:
     // inject 3DGS SH0/DC emission proxies as analytic sphere lights
     m_noOverflow &= collectGaussianSplatEmissionProxies( m_currentSettings, ctrlBuff, m_scratchLightBuffer, m_scratchLightExBuffer, m_scratchLightHistoryRemapCurrentToPastBuffer, m_scratchLightHistoryRemapPastToCurrentBuffer );
     // collect all emissive triangles and other geometry specific work - this builds batch jobs on the CPU that are executed on the GPU later, but at the end of this step we know the exact number of added emissive triangles (even though some might be black)
-    m_noOverflow &= processEmissiveGeometry(m_currentSettings, *sceneData, subInstanceData, ctrlBuff, *m_scratchTaskBuffer);
+    m_noOverflow &= processEmissiveGeometry(m_currentSettings, *sceneData, *materialGpuCache, subInstanceData, ctrlBuff, *m_scratchTaskBuffer);
     cacheConsts.TriangleLightTaskCount = (int)(*m_scratchTaskBuffer).size();
     assert( ctrlBuff.EnvmapQuadNodeCount == CAUSTICA_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT );
     assert( ctrlBuff.TotalLightCount == ctrlBuff.EnvmapQuadNodeCount + ctrlBuff.AnalyticLightCount + ctrlBuff.TriangleLightCount ); assert(ctrlBuff.TotalLightCount <= CAUSTICA_LIGHTING_MAX_LIGHTS);
