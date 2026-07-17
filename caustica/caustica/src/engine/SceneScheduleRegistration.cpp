@@ -15,12 +15,12 @@ void registerSceneSchedules(App& app)
     if (!app.tryResource<SceneViewState>())
         return;
 
-    caustica::registerSceneLoadingPlugin(app);
-    caustica::registerSceneAnimationPlugin(app);
-    caustica::registerCameraPlugin(app);
-    caustica::registerPathTracingPlugin(app);
-    caustica::registerRenderExtractPlugin(app);
-    caustica::registerWindowTitlePlugin(app);
+    SceneLoadingPlugin{}.configureSchedules(app);
+    SceneAnimationPlugin{}.configureSchedules(app);
+    CameraPlugin{}.configureSchedules(app);
+    PathTracingPlugin{}.configureSchedules(app);
+    RenderExtractPlugin{}.configureSchedules(app);
+    WindowTitlePlugin{}.configureSchedules(app);
 
     app.markSceneSchedulesRegistered();
 }

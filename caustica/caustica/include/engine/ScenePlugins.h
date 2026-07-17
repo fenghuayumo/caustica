@@ -1,5 +1,7 @@
 #pragma once
 
+#include <engine/Plugin.h>
+
 #include <cstdint>
 
 namespace caustica
@@ -7,19 +9,42 @@ namespace caustica
 
 class App;
 
-void registerSceneLoadingPlugin(App& app);
-void registerSceneAnimationPlugin(App& app);
-void registerCameraPlugin(App& app);
-void registerPathTracingPlugin(App& app);
-void registerRenderExtractPlugin(App& app);
-void registerWindowTitlePlugin(App& app);
+// Scene runtime plugins (schedules). Registered by App::buildPlugins via registerSceneSchedules.
+struct SceneLoadingPlugin : Plugin
+{
+    void configureSchedules(App& app) override;
+};
+
+struct SceneAnimationPlugin : Plugin
+{
+    void configureSchedules(App& app) override;
+};
+
+struct CameraPlugin : Plugin
+{
+    void configureSchedules(App& app) override;
+};
+
+struct PathTracingPlugin : Plugin
+{
+    void configureSchedules(App& app) override;
+};
+
+struct RenderExtractPlugin : Plugin
+{
+    void configureSchedules(App& app) override;
+};
+
+struct WindowTitlePlugin : Plugin
+{
+    void configureSchedules(App& app) override;
+};
 
 // Schedule entry points implemented by the plugins above / RenderFrameApi.
 void updateCamera(App& app, float elapsedTimeSeconds);
 void updateWindowTitle(App& app);
 void prepareRenderFrame(App& app);
 void refreshEntityWorld(App& app, uint32_t frameIndex);
-
 
 // Extract-only: upload meshes/AS for Scene::requestGpuStructureSync() before publish.
 // Applications must not call this -- spawn/despawn only mark dirty; Extract flushes.

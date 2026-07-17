@@ -20,7 +20,7 @@ void refreshEntityWorld(App& app, uint32_t frameIndex)
     scene->refreshEntityWorldForFrame(frameIndex);
 }
 
-void registerSceneAnimationPlugin(App& app)
+void SceneAnimationPlugin::configureSchedules(App& app)
 {
     app.addSystem(AppSchedule::update, "Scene.animate", [](SystemContext& ctx) {
         if (!ctx.windowFocused)

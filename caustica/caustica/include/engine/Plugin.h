@@ -13,7 +13,7 @@ struct Plugin
 {
     virtual ~Plugin() = default;
 
-    virtual void build(App& app) = 0;
+    virtual void build(App& app) {}
     virtual void configureSchedules(App& app) {}
     virtual void configureLateSchedules(App& app) {}
 };

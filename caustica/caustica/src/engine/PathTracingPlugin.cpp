@@ -7,7 +7,7 @@
 namespace caustica
 {
 
-void registerPathTracingPlugin(App& app)
+void PathTracingPlugin::configureSchedules(App& app)
 {
     app.addSystem(AppSchedule::render, "Scene.RenderScene", [](SystemContext& ctx) {
         if (!ctx.gpuDevice || !activeScene(ctx.app))

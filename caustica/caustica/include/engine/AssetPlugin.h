@@ -1,10 +1,16 @@
 #pragma once
 
+#include <engine/Plugin.h>
+
 namespace caustica
 {
 
 class App;
 
-void registerAssetPlugin(App& app);
+struct AssetPlugin : Plugin
+{
+    void build(App& app) override;
+    void configureSchedules(App& app) override;
+};
 
 } // namespace caustica

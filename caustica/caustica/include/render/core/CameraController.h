@@ -9,6 +9,13 @@
 #include <memory>
 #include <string>
 
+struct PathTracerSettings;
+
+namespace caustica::render
+{
+class WorldRenderer;
+}
+
 namespace caustica
 {
 
@@ -29,6 +36,7 @@ struct CameraUpdateParams
 
 // First-person camera, planar views, and file/string pose import.
 // Scene cameras sync via Extract → CameraRenderProxy → applyCameraRenderProxyToController.
+// Optional bindSideEffects() wires UI/API FOV changes to accumulation reset.
 class CameraController
 {
 public:
@@ -46,8 +54,14 @@ public:
 
     void swapViews();
 
+    // Bind path-tracer side effects for interactive FOV/intrinsics changes.
+    void bindSideEffects(::PathTracerSettings& settings, caustica::render::WorldRenderer* worldRenderer);
+    void markCameraChanged();
+
     [[nodiscard]] float verticalFOV() const { return m_verticalFOV; }
     void setVerticalFOV(float fov);
+    // Like setVerticalFOV but also markCameraChanged when side effects are bound.
+    void setVerticalFOVInteractive(float fov);
 
     [[nodiscard]] float zNear() const { return m_zNear; }
     void setZNear(float zNear) { m_zNear = zNear; }
@@ -59,7 +73,9 @@ public:
     [[nodiscard]] dm::float2 intrinsicsViewport() const { return m_intrinsicsViewport; }
 
     void setIntrinsics(float fx, float fy, float cx, float cy, float w, float h);
+    void setIntrinsicsInteractive(float fx, float fy, float cx, float cy, float w, float h);
     void clearIntrinsics();
+    void clearIntrinsicsInteractive();
 
     [[nodiscard]] uint32_t selectedCameraIndex() const { return m_selectedCameraIndex; }
     void setSelectedCameraIndex(uint32_t index) { m_selectedCameraIndex = index; }
@@ -72,6 +88,9 @@ public:
 
     void saveToFile(const std::filesystem::path& path, float zNear, float fovYRadians) const;
     void loadFromFile(const std::filesystem::path& path);
+    // Default campos.txt next to the executable (FOV from current projection).
+    void saveToDefaultFile() const;
+    void loadFromDefaultFile();
 
     [[nodiscard]] std::string getPosDirUpString() const;
     bool setFromPosDirUpString(const std::string& val);
@@ -98,6 +117,9 @@ private:
     dm::float3                      m_lastUp  = { 0, 0, 0 };
 
     uint32_t                        m_selectedCameraIndex = 0;
+
+    ::PathTracerSettings* m_settings = nullptr;
+    caustica::render::WorldRenderer* m_worldRenderer = nullptr;
 };
 
 } // namespace caustica

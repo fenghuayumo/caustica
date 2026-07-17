@@ -1,9 +1,13 @@
 #include <render/core/CameraController.h>
 
 #include <render/passes/geometry/TemporalAntiAliasingPass.h>
+#include <render/core/PathTracerSettings.h>
+#include <render/worldRenderer/WorldRenderer.h>
 #include <core/file_utils.h>
 #include <core/format.h>
+#include <core/path_utils.h>
 
+#include <cmath>
 #include <fstream>
 #include <limits>
 
@@ -231,6 +235,54 @@ void CameraController::updateLastCameraState()
     m_lastPos = m_camera.getPosition();
     m_lastDir = m_camera.getDir();
     m_lastUp = m_camera.getUp();
+}
+
+void CameraController::bindSideEffects(::PathTracerSettings& settings, caustica::render::WorldRenderer* worldRenderer)
+{
+    m_settings = &settings;
+    m_worldRenderer = worldRenderer;
+}
+
+void CameraController::markCameraChanged()
+{
+    if (m_settings)
+        m_settings->ResetAccumulation = true;
+    if (m_worldRenderer)
+        m_worldRenderer->setGaussianSplatTemporalReset(true);
+}
+
+void CameraController::setVerticalFOVInteractive(float fov)
+{
+    setVerticalFOV(fov);
+    markCameraChanged();
+}
+
+void CameraController::setIntrinsicsInteractive(float fx, float fy, float cx, float cy, float w, float h)
+{
+    setIntrinsics(fx, fy, cx, cy, w, h);
+    markCameraChanged();
+}
+
+void CameraController::clearIntrinsicsInteractive()
+{
+    clearIntrinsics();
+    markCameraChanged();
+}
+
+void CameraController::saveToDefaultFile() const
+{
+    if (!m_view)
+        return;
+
+    math::float4x4 projMatrix = m_view->getProjectionMatrix();
+    float tanHalfFOVY = 1.0f / (projMatrix.m_data[1 * 4 + 1]);
+    float fovY = atanf(tanHalfFOVY) * 2.0f;
+    saveToFile(getDirectoryWithExecutable() / "campos.txt", m_zNear, fovY);
+}
+
+void CameraController::loadFromDefaultFile()
+{
+    loadFromFile(getDirectoryWithExecutable() / "campos.txt");
 }
 
 } // namespace caustica

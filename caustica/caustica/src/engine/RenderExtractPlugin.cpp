@@ -52,7 +52,7 @@ void prepareRenderFrame(App& app)
     scene->extractAndPublishRenderSnapshot(device->getPreparedRenderFrameIndex(), &sessionInputs);
 }
 
-void registerRenderExtractPlugin(App& app)
+void RenderExtractPlugin::configureSchedules(App& app)
 {
     app.addSystemAfter(AppSchedule::Extract, "Scene.PrepareRenderFrame", "SetRenderFrameIndex", [](SystemContext& ctx) {
         if (!ctx.gpuDevice || !activeScene(ctx.app))

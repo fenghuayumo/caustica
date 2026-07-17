@@ -12,6 +12,7 @@ namespace detail
 {
 
 [[nodiscard]] CameraController* sessionCamera(App& app);
+[[nodiscard]] const CameraController* sessionCamera(const App& app);
 void applySceneSwitch(App& app, const std::string& sceneName, bool forceReload);
 
 } // namespace detail

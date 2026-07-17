@@ -11,7 +11,7 @@ namespace caustica
 
 void DefaultPlugins::build(App& app)
 {
-    registerAssetPlugin(app);
+    AssetPlugin{}.build(app);
     registerSceneAppResources(app, appConfig);
     app.emplaceResource<SceneAccess>();
     app.emplaceResource<GpuRenderSubsystem>();
@@ -19,6 +19,7 @@ void DefaultPlugins::build(App& app)
 
 void DefaultPlugins::configureSchedules(App& app)
 {
+    AssetPlugin{}.configureSchedules(app);
     registerEngineScheduleBridge(app);
     registerSceneStartup(app, appConfig);
 }

@@ -93,10 +93,9 @@ namespace caustica
 
 void attachGpuRenderSubsystem(App& app, GpuRenderSubsystem& gpuRenderSubsystem)
 {
-    SceneViewState* vs = viewState(app);
     PathTracerSettings* cfg = settings(app);
-    assert(vs && cfg);
-    vs->cameraController.bind(gpuRenderSubsystem.camera(), *cfg, gpuRenderSubsystem.worldRenderer());
+    assert(cfg);
+    gpuRenderSubsystem.camera().bindSideEffects(*cfg, gpuRenderSubsystem.worldRenderer());
 }
 
 void initStreamlineAndWindow(App& app)

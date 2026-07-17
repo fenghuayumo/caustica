@@ -82,7 +82,7 @@ void updateCamera(App& app, float elapsedTimeSeconds)
     }
 }
 
-void registerCameraPlugin(App& app)
+void CameraPlugin::configureSchedules(App& app)
 {
     app.addSystem(AppSchedule::update, "Scene.updateCamera", [](SystemContext& ctx) {
         if (!ctx.windowFocused)

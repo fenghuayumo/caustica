@@ -21,6 +21,11 @@ CameraController* sessionCamera(App& app)
     return nullptr;
 }
 
+const CameraController* sessionCamera(const App& app)
+{
+    return sessionCamera(const_cast<App&>(app));
+}
+
 void applySceneSwitch(App& app, const std::string& sceneName, bool forceReload)
 {
     ::SceneManager* manager = sceneManager(app);

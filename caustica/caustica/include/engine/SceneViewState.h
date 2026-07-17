@@ -1,7 +1,6 @@
 #pragma once
 
 #include <core/progress.h>
-#include <render/core/SceneCameraController.h>
 #include <render/core/TextureUtils.h>
 
 #include <map>
@@ -13,11 +12,10 @@
 namespace caustica
 {
 
-// Mutable per-session view state (camera, scene time, loading UI, scene switches).
+// Mutable per-session view state (scene time, loading UI, scene switches).
+// Interactive camera lives on GpuRenderSubsystem::camera() (see CameraApi / bindSideEffects).
 struct SceneViewState
 {
-    SceneCameraController cameraController;
-
     double sceneTime = 0.;
     float lastDeltaTime = 0.0f;
 

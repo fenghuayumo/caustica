@@ -7,7 +7,7 @@
 namespace caustica
 {
 
-void registerSceneLoadingPlugin(App& app)
+void SceneLoadingPlugin::configureSchedules(App& app)
 {
     app.addSystemAfter(AppSchedule::First, "Scene.beginFrame", "SyncRenderThread", [](SystemContext& ctx) {
         caustica::beginFrameScheduled(ctx.app);

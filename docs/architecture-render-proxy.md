@@ -63,6 +63,8 @@ Frame rendering already uses light proxies + cached splat transforms; do not mov
 | Scene API modules | Split from god-facade: `AppResources` / `SceneQuery` / `SceneSpawn` / `CameraApi` / `SceneLifecycle` / `RenderSessionApi` / `RenderFrameApi`; `SceneApi.h` is a compat umbrella |
 | Scene query path | Engine plugins + editor use `activeScene`/`entityWorld`; do not dig `gpu->sceneManager()->getScene()` |
 | `EditorPlugin` | Composes `DefaultPlugins` (shared bootstrap + `SceneAccess`) |
+| Scene plugins | `CameraPlugin` / `RenderExtractPlugin` / … are `Plugin` structs (via `registerSceneSchedules`) |
+| Camera wrappers | `SceneCameraController` removed; interactive side effects live on `CameraController::bindSideEffects` |
 
 ## File map
 

@@ -37,7 +37,7 @@ void updateWindowTitle(App& app)
     device->setInformativeWindowTitle(g_windowTitle, false, extraInfo.c_str());
 }
 
-void registerWindowTitlePlugin(App& app)
+void WindowTitlePlugin::configureSchedules(App& app)
 {
     app.addSystemAfter(AppSchedule::update, "Scene.UpdateWindowTitle", "Scene.TickSimulation", [](SystemContext& ctx) {
         if (!ctx.windowFocused)
