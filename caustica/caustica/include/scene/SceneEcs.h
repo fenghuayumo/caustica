@@ -19,9 +19,9 @@
 
 namespace caustica
 {
-class GaussianSplat;
+struct GaussianSplat;
 struct SampleSettings;
-class GameSettings;
+struct GameSettings;
 class SceneTypeFactory;
 struct SkinnedMeshJoint;
 }
@@ -250,7 +250,7 @@ struct GeometrySequenceComponent
 
 struct GaussianSplatComponent
 {
-    std::shared_ptr<GaussianSplat> splat;
+    GaussianSplat splat;
 };
 
 struct SampleSettingsComponent
@@ -260,7 +260,7 @@ struct SampleSettingsComponent
 
 struct GameSettingsComponent
 {
-    std::shared_ptr<GameSettings> settings;
+    GameSettings settings;
 };
 
 struct TransformChangedEvent
@@ -316,9 +316,9 @@ public:
     void setEnvironmentLight(ecs::Entity entity, EnvironmentLightComponent component);
     void setCamera(ecs::Entity entity, CameraComponent component);
     void setAnimation(ecs::Entity entity, AnimationComponent component);
-    void setGaussianSplat(ecs::Entity entity, const std::shared_ptr<GaussianSplat>& splat);
+    void setGaussianSplat(ecs::Entity entity, const GaussianSplat& splat);
     void setSampleSettings(ecs::Entity entity, const SampleSettings& settings);
-    void setGameSettings(ecs::Entity entity, const std::shared_ptr<GameSettings>& settings);
+    void setGameSettings(ecs::Entity entity, const GameSettings& settings);
 
     // Deep-copies a subtree from another world into this one under `parent`.
     ecs::Entity importSubtree(
@@ -361,7 +361,6 @@ private:
     void syncDirtyFlagsFromChangeDetection();
 
     void beginRefreshFrame();
-    void updateGaussianSplatTransforms();
     void markDirtySkinnedMeshes(uint32_t frameIndex);
     void markDirtySkinnedMeshesFromChangedJoints(uint32_t frameIndex);
     void applyDeferredCommands();

@@ -47,7 +47,7 @@ namespace
     {
         if (entity == ecs::NullEntity) return false;
         auto* comp = ew.world().tryGet<caustica::scene::GaussianSplatComponent>(entity);
-        return comp != nullptr && comp->splat != nullptr;
+        return comp != nullptr;
     }
 
     bool IsInspectableEntity(caustica::scene::SceneEntityWorld& ew, ecs::Entity entity)
@@ -222,8 +222,8 @@ void BuildHierarchyNodeUI(EditorUIData& ui, caustica::Scene& scene, ecs::Entity 
         else if (isGaussianSplatEntity)
         {
             auto* comp = ew->world().tryGet<caustica::scene::GaussianSplatComponent>(entity);
-            if (comp && comp->splat && comp->splat->loadedSplatCount > 0)
-                label += "  (" + std::to_string(comp->splat->loadedSplatCount) + " splats)";
+            if (comp && comp->splat.loadedSplatCount > 0)
+                label += "  (" + std::to_string(comp->splat.loadedSplatCount) + " splats)";
         }
 
         const bool open = ImGui::TreeNodeEx(reinterpret_cast<void*>(static_cast<uintptr_t>(entity)), flags, "%s", label.c_str());

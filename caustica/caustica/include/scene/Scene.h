@@ -109,8 +109,8 @@ namespace caustica
         
         virtual bool loadCustomData(Json::Value& rootNode, ThreadPool* threadPool);
 
-        std::optional<SampleSettings>         m_loadedSettings;
-        std::shared_ptr<class GameSettings>   m_loadedGameSettings;
+        std::optional<SampleSettings> m_loadedSettings;
+        std::optional<GameSettings>   m_loadedGameSettings;
 
         void attachLeafFromJson(ecs::Entity entity, const Json::Value& src);
 
@@ -196,7 +196,10 @@ namespace caustica
         {
             return m_loadedSettings ? &*m_loadedSettings : nullptr;
         }
-        [[nodiscard]] std::shared_ptr<GameSettings>   getGameSettingsNode() const   { return m_loadedGameSettings; }
+        [[nodiscard]] const GameSettings* getGameSettings() const
+        {
+            return m_loadedGameSettings ? &*m_loadedGameSettings : nullptr;
+        }
         [[nodiscard]] const std::vector<SceneImportResult>& getModels() const        { return m_Models; }
         [[nodiscard]] const Handle<SceneAsset>& getAssetHandle() const               { return m_Asset; }
         void setAssetHandle(Handle<SceneAsset> asset)                                { m_Asset = std::move(asset); }

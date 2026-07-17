@@ -16,7 +16,7 @@ class ShaderDebug;
 
 namespace caustica
 {
-class GaussianSplat;
+struct GaussianSplat;
 class GpuDevice;
 class ShaderFactory;
 namespace render { class RenderDevice; }
@@ -34,9 +34,9 @@ class SceneGaussianSplatPasses
     friend struct PathTracerScenePasses;
 
 public:
+    // GPU pass bound to an ECS GaussianSplatComponent entity (authoring stays on ECS).
     struct SceneObject
     {
-        std::shared_ptr<caustica::GaussianSplat> splat;
         ecs::Entity entity = ecs::NullEntity;
         std::shared_ptr<GaussianSplatPass> pass;
     };

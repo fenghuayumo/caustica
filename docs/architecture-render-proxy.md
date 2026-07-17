@@ -59,7 +59,7 @@ Frame rendering already uses light proxies + cached splat transforms; do not mov
 | --- | --- |
 | OO mesh/camera leaf classes | Removed; meshes/cameras are ECS components + Extract proxies |
 | `SceneRenderCommandQueue` | Removed (Extract + RenderThread dispatch is the sync path) |
-| SampleSettings | Value payload on ECS (`SampleSettingsComponent`); GaussianSplat / GameSettings still `shared_ptr` |
+| SampleSettings / GameSettings / GaussianSplat | Value payloads on ECS; GPU splat passes keyed by entity in `SceneGaussianSplatPasses` |
 | Scene API modules | Split from god-facade: `AppResources` / `SceneQuery` / `SceneSpawn` / `CameraApi` / `SceneLifecycle` / `RenderSessionApi` / `RenderFrameApi` (include the focused header you need) |
 | Scene query path | Engine plugins + editor use `activeScene`/`entityWorld`; do not dig `gpu->sceneManager()->getScene()` |
 | `EditorPlugin` | Composes `DefaultPlugins` (shared bootstrap + `SceneAccess`) |

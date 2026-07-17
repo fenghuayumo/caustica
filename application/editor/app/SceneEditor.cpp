@@ -123,7 +123,10 @@ ecs::Entity SceneEditor::pickGaussianSplatAtPixel(math::uint2 renderPixel) const
 
     for (const auto& object : gpu->gaussianSplatPasses().objects())
     {
-        if (!object.splat || !object.splat->enabled || !ecs::isValid(object.entity) || !object.pass)
+        if (!ecs::isValid(object.entity) || !object.pass)
+            continue;
+        const auto* splatComp = entityWorld->world().tryGet<scene::GaussianSplatComponent>(object.entity);
+        if (!splatComp || !splatComp->splat.enabled)
             continue;
 
         auto* boundsComp = entityWorld->world().tryGet<scene::BoundsComponent>(object.entity);

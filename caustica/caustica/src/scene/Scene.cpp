@@ -804,7 +804,7 @@ void Scene::attachLeafFromJson(ecs::Entity entity, const Json::Value& src)
     {
         auto splat = std::static_pointer_cast<GaussianSplat>(leaf);
         splat->load(src);
-        m_EntityWorld->setGaussianSplat(entity, splat);
+        m_EntityWorld->setGaussianSplat(entity, *splat);
     }
     else if (type == "SampleSettings")
     {
@@ -816,7 +816,7 @@ void Scene::attachLeafFromJson(ecs::Entity entity, const Json::Value& src)
     {
         auto settings = std::static_pointer_cast<GameSettings>(leaf);
         settings->load(src);
-        m_EntityWorld->setGameSettings(entity, settings);
+        m_EntityWorld->setGameSettings(entity, *settings);
     }
     else
     {
@@ -1291,7 +1291,6 @@ void Scene::processNodesRecursive()
 
     world.each<scene::GameSettingsComponent>([this](ecs::Entity, scene::GameSettingsComponent& component)
     {
-        assert(m_loadedGameSettings == nullptr || m_loadedGameSettings == component.settings);
         m_loadedGameSettings = component.settings;
     });
 

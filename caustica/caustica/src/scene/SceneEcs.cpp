@@ -366,8 +366,6 @@ bool SceneEntityWorld::hasPendingTransformChanges()
 void SceneEntityWorld::refreshHierarchy(PreviousTransformPolicy previousPolicy)
 {
     updateHierarchy(m_world, previousPolicy);
-    // Keep GaussianSplat::cachedGlobalTransform in sync for the splat render path.
-    updateGaussianSplatTransforms();
 }
 
 void SceneEntityWorld::syncPreviousTransformsFromCurrent()
@@ -398,17 +396,6 @@ void SceneEntityWorld::beginRefreshFrame()
 
     m_frameStructureDirty = m_structureDirty;
     m_frameTransformDirty = m_transformDirty;
-}
-
-void SceneEntityWorld::updateGaussianSplatTransforms()
-{
-    m_world.each<GaussianSplatComponent, GlobalTransformComponent>(
-        [](ecs::Entity entity, GaussianSplatComponent& splatComponent, GlobalTransformComponent& global) {
-            if (!splatComponent.splat)
-                return;
-            splatComponent.splat->ownerEntity = entity;
-            splatComponent.splat->cachedGlobalTransform = global.transform;
-        });
 }
 
 void SceneEntityWorld::markDirtySkinnedMeshes(uint32_t frameIndex)
@@ -870,11 +857,8 @@ void SceneEntityWorld::setAnimation(ecs::Entity entity, AnimationComponent compo
     updateLeafContentAndBounds(entity);
 }
 
-void SceneEntityWorld::setGaussianSplat(ecs::Entity entity, const std::shared_ptr<GaussianSplat>& splat)
+void SceneEntityWorld::setGaussianSplat(ecs::Entity entity, const GaussianSplat& splat)
 {
-    if (!splat)
-        return;
-    splat->ownerEntity = entity;
     m_world.emplace<GaussianSplatComponent>(entity, GaussianSplatComponent{ splat });
     updateLeafContentAndBounds(entity);
 }
@@ -885,10 +869,8 @@ void SceneEntityWorld::setSampleSettings(ecs::Entity entity, const SampleSetting
     updateLeafContentAndBounds(entity);
 }
 
-void SceneEntityWorld::setGameSettings(ecs::Entity entity, const std::shared_ptr<GameSettings>& settings)
+void SceneEntityWorld::setGameSettings(ecs::Entity entity, const GameSettings& settings)
 {
-    if (!settings)
-        return;
     m_world.emplace<GameSettingsComponent>(entity, GameSettingsComponent{ settings });
     updateLeafContentAndBounds(entity);
 }

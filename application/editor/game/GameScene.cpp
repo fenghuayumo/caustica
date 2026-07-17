@@ -142,7 +142,7 @@ void GameScene::sceneLoaded(const std::shared_ptr<caustica::Scene>& scene, const
 {
     Deinitialize();
 
-    auto gameSettings = scene->getGameSettingsNode();
+    const GameSettings* gameSettings = scene->getGameSettings();
     if (gameSettings == nullptr)
         return;
 

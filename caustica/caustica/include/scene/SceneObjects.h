@@ -31,29 +31,20 @@ namespace caustica
     };
 
     // =========================================================================
-    // GaussianSplat / SampleSettings / GameSettings
-    // SampleSettings is a value payload; GaussianSplat / GameSettings still shared_ptr.
+    // GaussianSplat / SampleSettings / GameSettings — value payloads on ECS
     // =========================================================================
 
-    class GaussianSplat
+    struct GaussianSplat
     {
-    public:
         std::string name;
-        ecs::Entity ownerEntity = ecs::NullEntity;
-        mutable dm::daffine3 cachedGlobalTransform = dm::daffine3::identity();
         std::string path;
         std::string resolvedPath;
         bool convertRdfToRub = true;
         bool enabled = true;
         uint32_t loadedSplatCount = 0;
 
-        [[nodiscard]] std::shared_ptr<GaussianSplat> clone() const;
         void load(const Json::Value& node);
         [[nodiscard]] SceneContentFlags getContentFlags() const { return SceneContentFlags::None; }
-
-        GaussianSplat() = default;
-        GaussianSplat(const GaussianSplat&) = delete;
-        GaussianSplat& operator=(const GaussianSplat&) = delete;
     };
 
     struct SampleSettings
@@ -71,21 +62,14 @@ namespace caustica
         [[nodiscard]] SceneContentFlags getContentFlags() const { return SceneContentFlags::None; }
     };
 
-    class GameSettings
+    struct GameSettings
     {
-        std::string m_JsonData;
-
-    public:
         std::string name;
+        std::string jsonData;
 
-        [[nodiscard]] std::shared_ptr<GameSettings> clone() const;
         void load(const Json::Value& node);
-        [[nodiscard]] const std::string& getJsonData() const { return m_JsonData; }
+        [[nodiscard]] const std::string& getJsonData() const { return jsonData; }
         [[nodiscard]] SceneContentFlags getContentFlags() const { return SceneContentFlags::None; }
-
-        GameSettings() = default;
-        GameSettings(const GameSettings&) = delete;
-        GameSettings& operator=(const GameSettings&) = delete;
     };
 
     // =========================================================================

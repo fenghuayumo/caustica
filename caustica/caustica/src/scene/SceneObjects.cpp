@@ -7,18 +7,6 @@ using namespace caustica;
 // GaussianSplat
 // =============================================================================
 
-std::shared_ptr<GaussianSplat> GaussianSplat::clone() const
-{
-    auto copy = std::make_shared<GaussianSplat>();
-    copy->name             = name;
-    copy->path             = path;
-    copy->resolvedPath     = resolvedPath;
-    copy->convertRdfToRub  = convertRdfToRub;
-    copy->enabled          = enabled;
-    copy->loadedSplatCount = loadedSplatCount;
-    return copy;
-}
-
 void GaussianSplat::load(const Json::Value& node)
 {
     node["path"] >> path;
@@ -49,18 +37,10 @@ void SampleSettings::load(const Json::Value& node)
 // GameSettings
 // =============================================================================
 
-std::shared_ptr<GameSettings> GameSettings::clone() const
-{
-    auto copy = std::make_shared<GameSettings>();
-    copy->name      = name;
-    copy->m_JsonData = m_JsonData;
-    return copy;
-}
-
 void GameSettings::load(const Json::Value& node)
 {
     Json::StreamWriterBuilder writer;
-    m_JsonData = Json::writeString(writer, node);
+    jsonData = Json::writeString(writer, node);
 }
 
 // =============================================================================

@@ -52,7 +52,7 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
         if (meshComp && meshComp->mesh)
             ImGui::Text("Mesh: %s", meshComp->mesh->name.c_str());
         auto* splatComp = ew->world().tryGet<caustica::scene::GaussianSplatComponent>(entity);
-        const auto& gaussianSplat = splatComp ? splatComp->splat : nullptr;
+        caustica::GaussianSplat* gaussianSplat = splatComp ? &splatComp->splat : nullptr;
         if (gaussianSplat)
         {
             ImGui::Text("Type: 3D Gaussian Splats");

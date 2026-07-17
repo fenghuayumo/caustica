@@ -304,12 +304,9 @@ void ExtractGaussianSplats(ecs::World& world, SceneRenderData& out)
     world.each<GaussianSplatComponent, GlobalTransformComponent>(
         [&](ecs::Entity entity, const GaussianSplatComponent& splat, const GlobalTransformComponent& global)
         {
-            if (!splat.splat)
-                return;
-
             GaussianSplatRenderProxy proxy;
             proxy.entity = entity;
-            proxy.enabled = splat.splat->enabled;
+            proxy.enabled = splat.splat.enabled;
             proxy.objectToWorld = global.transformFloat;
             out.gaussianSplats.push_back(std::move(proxy));
         });
