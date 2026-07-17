@@ -6,7 +6,6 @@
 #include <engine/SceneViewState.h>
 #include <cassert>
 #include <backend/GpuDevice.h>
-#include <scene/SceneManager.h>
 #include <render/worldRenderer/WorldRenderer.h>
 
 using namespace caustica::render;
@@ -32,13 +31,6 @@ SessionCamera* sessionCameraResource(const App& app)
 SceneSession* sceneSession(const App& app)
 {
     return const_cast<SceneSession*>(app.tryResource<SceneSession>());
-}
-
-::SceneManager* sceneManager(const App& app)
-{
-    if (SceneSession* session = sceneSession(app))
-        return session->manager.get();
-    return nullptr;
 }
 
 render::WorldRenderer* worldRenderer(const App& app)

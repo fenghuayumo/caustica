@@ -9,7 +9,11 @@
 namespace caustica
 {
     class ShaderFactory;
-    class Scene;
+
+    namespace scene
+    {
+    class SceneRenderData;
+    }
 }
 
 namespace caustica::render
@@ -44,7 +48,7 @@ namespace caustica::render
 
         std::vector<Vertex> m_Vertices;
 
-        void updateVertices(const caustica::Scene& scene);
+        void updateVertices(const caustica::scene::SceneRenderData& renderData);
 
     public:
 
@@ -58,6 +62,6 @@ namespace caustica::render
             nvrhi::ICommandList* commandList,
             const caustica::IView* view,
             nvrhi::IFramebuffer* framebuffer,
-            const caustica::Scene& scene);
+            const caustica::scene::SceneRenderData& renderData);
     };
 } // end namespace caustica::render

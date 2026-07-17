@@ -6,7 +6,7 @@
 #include <assets/loader/TextureLoader.h>
 
 #include <core/scope.h>
-#include <scene/Scene.h>
+#include <scene/ResourceTracker.h>
 
 #include <rhi/utils.h>
 #include <rhi/common/misc.h>
@@ -62,10 +62,9 @@ OpacityMicromapBuilder::~OpacityMicromapBuilder()
 {
 }
 
-void OpacityMicromapBuilder::ensureGeometryDebugCapacity(const caustica::Scene& scene)
+void OpacityMicromapBuilder::ensureGeometryDebugCapacity(size_t geometryCount)
 {
     const size_t allocationGranularity = 1024;
-    const size_t geometryCount = scene.getGeometryCount();
     if (geometryCount <= m_geometryDebugDataPtr.size())
         return;
 
@@ -83,10 +82,10 @@ void OpacityMicromapBuilder::ensureGeometryDebugCapacity(const caustica::Scene& 
     m_geometryDebugBuffer = m_device->createBuffer(bufferDesc);
 }
 
-void OpacityMicromapBuilder::sceneLoaded(const caustica::Scene& scene)
+void OpacityMicromapBuilder::sceneLoaded(size_t geometryCount)
 {
     // Runtime imports grow geometry count without calling sceneLoaded again.
-    ensureGeometryDebugCapacity(scene);
+    ensureGeometryDebugCapacity(geometryCount);
 }
 
 void OpacityMicromapBuilder::sceneUnloading()
@@ -99,11 +98,13 @@ void OpacityMicromapBuilder::createRenderPasses(nvrhi::BindingLayoutHandle bindl
     m_bindlessLayout = std::move(bindlessLayout);
 }
 
-void OpacityMicromapBuilder::createOpacityMicromaps(const caustica::Scene& scene)
+void OpacityMicromapBuilder::createOpacityMicromaps(
+    const caustica::ResourceTracker<caustica::MeshInfo>& meshes,
+    size_t geometryCount)
 {
     // Always grow the debug buffer for runtime imports — AS rebuild marks DebugDataDirty
     // and update() will write per-geometry slots even when OMM baking is disabled.
-    ensureGeometryDebugCapacity(scene);
+    ensureGeometryDebugCapacity(geometryCount);
 
     m_ommBuildQueue->cancelPendingBuilds();
 
@@ -118,7 +119,7 @@ void OpacityMicromapBuilder::createOpacityMicromaps(const caustica::Scene& scene
 
     m_uiData.ActiveState = m_uiData.DesiredState;
 
-    for (auto& mesh : scene.getMeshes())
+    for (auto& mesh : meshes)
     {
         if (mesh->isSkinPrototype) //buffers->hasAttribute(caustica::VertexAttribute::JointWeights))
             continue; // skip the skinning prototypes
@@ -174,14 +175,16 @@ void OpacityMicromapBuilder::createOpacityMicromaps(const caustica::Scene& scene
     }
 }
 
-void OpacityMicromapBuilder::destroyOpacityMicromaps(nvrhi::ICommandList& commandList, const caustica::Scene& scene)
+void OpacityMicromapBuilder::destroyOpacityMicromaps(
+    nvrhi::ICommandList& commandList,
+    const caustica::ResourceTracker<caustica::MeshInfo>& meshes)
 {
     commandList.close();
     m_device->executeCommandList(&commandList);
     m_device->waitForIdle();
     commandList.open();
 
-    for (const std::shared_ptr<MeshInfo>& _mesh : scene.getMeshes())
+    for (const std::shared_ptr<MeshInfo>& _mesh : meshes)
     {
         assert(std::dynamic_pointer_cast<MeshInfoEx>(_mesh) != nullptr);
         const std::shared_ptr<MeshInfoEx>& mesh = std::static_pointer_cast<MeshInfoEx>(_mesh);
@@ -192,7 +195,10 @@ void OpacityMicromapBuilder::destroyOpacityMicromaps(nvrhi::ICommandList& comman
     }
 }
 
-void OpacityMicromapBuilder::buildOpacityMicromaps(nvrhi::ICommandList& commandList, const caustica::Scene& scene)
+void OpacityMicromapBuilder::buildOpacityMicromaps(
+    nvrhi::ICommandList& commandList,
+    const caustica::ResourceTracker<caustica::MeshInfo>& meshes,
+    size_t geometryCount)
 {
     commandList.beginMarker("OMM Updates");
 
@@ -207,11 +213,11 @@ void OpacityMicromapBuilder::buildOpacityMicromaps(nvrhi::ICommandList& commandL
 
     if (m_uiData.TriggerRebuild)
     {
-        destroyOpacityMicromaps(commandList, scene);
+        destroyOpacityMicromaps(commandList, meshes);
 
         m_ommBuildQueue->cancelPendingBuilds();
 
-        createOpacityMicromaps(scene);
+        createOpacityMicromaps(meshes, geometryCount);
 
         m_uiData.TriggerRebuild = false;
     }
@@ -275,15 +281,18 @@ void OpacityMicromapBuilder::updateDebugGeometry(const MeshInfo& _mesh)
     }
 }
 
-bool OpacityMicromapBuilder::update(nvrhi::ICommandList& commandList, const caustica::Scene& scene)
+bool OpacityMicromapBuilder::update(
+    nvrhi::ICommandList& commandList,
+    const caustica::ResourceTracker<caustica::MeshInfo>& meshes,
+    size_t geometryCount)
 {
     RAII_SCOPE( commandList.beginMarker("OpacityMicromapBuilder");, commandList.endMarker(); );
 
     // Runtime drag-drop grows geometry count without sceneLoaded(); resize before any writes.
-    ensureGeometryDebugCapacity(scene);
+    ensureGeometryDebugCapacity(geometryCount);
 
     bool anyDirty = false;
-    for (auto& _mesh : scene.getMeshes())
+    for (auto& _mesh : meshes)
     {
         MeshInfoEx& mesh = static_cast<MeshInfoEx&>(*_mesh);
         assert(&mesh != nullptr);
@@ -308,7 +317,7 @@ void OpacityMicromapBuilder::setGlobalShaderMacros(std::vector<caustica::ShaderM
         macros.push_back( { "OMM_DEBUG_VIEW_OVERLAY", "1" } );
 }
 
-bool OpacityMicromapBuilder::debugGUI(float indent, const caustica::Scene& scene)
+bool OpacityMicromapBuilder::debugGUI(float indent, const caustica::ResourceTracker<caustica::MeshInfo>& meshes)
 {
     RAII_SCOPE(ImGui::PushID("OpacityMicromapBuilderDebugGUI"); , ImGui::PopID(); );
     
@@ -489,7 +498,7 @@ bool OpacityMicromapBuilder::debugGUI(float indent, const caustica::Scene& scene
             {
                 UI_SCOPED_INDENT(indent);
 
-                for (const std::shared_ptr<caustica::MeshInfo>& mesh : scene.getMeshes())
+                for (const std::shared_ptr<caustica::MeshInfo>& mesh : meshes)
                 {
                     bool meshHasOmms = false;
                     for (uint32_t i = 0; i < mesh->geometries.size(); ++i)

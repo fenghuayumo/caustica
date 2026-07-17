@@ -27,6 +27,15 @@
 
 namespace caustica
 {
+namespace
+{
+
+::SceneManager* sessionManager(const SceneSession* session)
+{
+    return session ? session->manager.get() : nullptr;
+}
+
+} // namespace
 
 GpuRenderSubsystem::GpuRenderSubsystem() = default;
 
@@ -86,13 +95,13 @@ void GpuRenderSubsystem::onSceneUnloading()
     // Break asset shared_ptr cycles and drop extract retained refs BEFORE clearing
     // the AssetSystem store / destroying the scene. Otherwise MeshInfo↔MeshAsset
     // cycles keep BLAS/buffers alive past GpuDevice::shutdown and heap-corrupt on close.
-    if (::SceneManager* manager = sceneManager())
+    if (::SceneManager* manager = sessionManager(m_sceneSession))
     {
         if (const std::shared_ptr<Scene> scene = manager->getScene())
         {
             scene->prepareForUnload();
             if (m_worldRenderer)
-                m_worldRenderer->accelStructs().clearMeshAccelStructs(*scene);
+                m_worldRenderer->accelStructs().clearMeshAccelStructs(scene->getMeshes());
         }
     }
 
@@ -113,7 +122,7 @@ void GpuRenderSubsystem::onSceneUnloading()
 
 void GpuRenderSubsystem::applySampleSettingsFromScene()
 {
-    ::SceneManager* manager = sceneManager();
+    ::SceneManager* manager = sessionManager(m_sceneSession);
     if (!m_settings || !manager || !m_sessionCamera)
         return;
 
@@ -164,7 +173,7 @@ void GpuRenderSubsystem::onSceneLoadedBegin()
     m_settings->ToneMappingParams.exposureValue = 0.0f;
 
     // Logic-thread hierarchy snapshot before RT exclusive GPU upload.
-    if (::SceneManager* manager = sceneManager())
+    if (::SceneManager* manager = sessionManager(m_sceneSession))
     {
         if (auto scene = manager->getScene())
         {
@@ -179,7 +188,7 @@ void GpuRenderSubsystem::onSceneLoadedBegin()
 
 void GpuRenderSubsystem::onSceneLoadedGpuPrep()
 {
-    ::SceneManager* manager = sceneManager();
+    ::SceneManager* manager = sessionManager(m_sceneSession);
     auto scene = manager ? manager->getScene() : nullptr;
     const std::filesystem::path scenePath = manager ? manager->getCurrentScenePath() : std::filesystem::path{};
 
@@ -202,14 +211,14 @@ void GpuRenderSubsystem::onSceneLoadedGpuPrep()
             m_gpuSharedCaches ? m_gpuSharedCaches->descriptorTable.get() : nullptr,
             0);
         if (m_worldRenderer)
-            m_worldRenderer->lightingPasses().notifySceneReloaded(*scene);
+            m_worldRenderer->lightingPasses().notifySceneReloaded(scene->getGeometryCount());
         registerLoadedSceneAssets();
     }
 }
 
 void GpuRenderSubsystem::onSceneLoadedGpuFinish()
 {
-    ::SceneManager* manager = sceneManager();
+    ::SceneManager* manager = sessionManager(m_sceneSession);
     if (!manager || !m_settings || !m_runtimeState || !m_worldRenderer)
         return;
 
@@ -220,7 +229,7 @@ void GpuRenderSubsystem::onSceneLoadedGpuFinish()
     if (m_cmdLine)
         m_worldRenderer->gaussianSplatPasses().onSceneLoaded();
 
-    m_worldRenderer->lightingPasses().onSceneLoaded(*scene, *m_settings);
+    m_worldRenderer->lightingPasses().onSceneLoaded(scene->getRenderData(), *m_settings);
 
     SceneManager::onSceneLoadedGpuPrep(*scene, m_runtimeState->Invalidation.AccelerationStructRebuildRequested);
     m_worldRenderer->accelStructs().resetSubInstanceCount();
@@ -234,7 +243,7 @@ void GpuRenderSubsystem::onSceneLoadedGpuFinish()
 
 void GpuRenderSubsystem::setSceneLoadingCallbacks(std::function<void()> onLoaded, std::function<void()> onUnloading)
 {
-    if (::SceneManager* manager = sceneManager())
+    if (::SceneManager* manager = sessionManager(m_sceneSession))
         manager->setLoadingCallbacks(std::move(onLoaded), std::move(onUnloading));
 }
 
@@ -314,7 +323,7 @@ void GpuRenderSubsystem::shutdown()
 
 void GpuRenderSubsystem::registerLoadedSceneAssets()
 {
-    ::SceneManager* manager = sceneManager();
+    ::SceneManager* manager = sessionManager(m_sceneSession);
     if (!m_assetSystem || !manager)
         return;
 
@@ -371,11 +380,6 @@ void GpuRenderSubsystem::registerLoadedSceneAssets()
                 m_assetSystem->addDependency(materialAsset.id(), texture.id());
         }
     }
-}
-
-SceneManager* GpuRenderSubsystem::sceneManager() const
-{
-    return m_sceneSession ? m_sceneSession->manager.get() : nullptr;
 }
 
 } // namespace caustica

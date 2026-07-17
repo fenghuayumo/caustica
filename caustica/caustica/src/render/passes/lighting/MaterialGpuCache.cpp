@@ -24,6 +24,8 @@
 #include <imgui/ui_macros.h>
 #include <render/core/TextureUtils.h>
 #include <scene/Scene.h>
+#include <scene/SceneRenderData.h>
+#include <render/SceneGpuResources.h>
 #include <scene/SceneEcs.h>
 #include <scene/scene_utils.h>
 
@@ -1542,7 +1544,12 @@ void MaterialGpuCache::createRenderPassesAndLoadMaterials(nvrhi::IBindingLayout*
 }
 
 // NOTE: this also handles some of the geometry data and mixed geometry&material stuff - it might be a good idea to rethink whether it needs to live outside of material baker
-void UpdateSubInstanceData(SubInstanceData & ret, const std::shared_ptr<caustica::Scene> & scene, const std::shared_ptr<MeshInfo>& mesh, const caustica::MeshGeometry& geometry, uint meshGeometryIndex, const PTMaterial& material)
+void UpdateSubInstanceData(SubInstanceData& ret,
+    const caustica::render::SceneGpuResources* gpuResources,
+    const std::shared_ptr<MeshInfo>& mesh,
+    const caustica::MeshGeometry& geometry,
+    uint meshGeometryIndex,
+    const PTMaterial& material)
 {
     if (!mesh || mesh->geometries.empty() || meshGeometryIndex >= mesh->geometries.size())
         return;
@@ -1594,25 +1601,33 @@ void UpdateSubInstanceData(SubInstanceData & ret, const std::shared_ptr<caustica
     ret.GlobalGeometryIndex_PTMaterialDataIndex = (globalGeometryIndex << 16) | globalMaterialIndex;
 
 #if SUBINSTANCEDATA_EXTENDED
-    GeometryData * gdata = scene->getGeometryData(geometry);
-    if( gdata != nullptr )
+    GeometryData* gdata = nullptr;
+    if (gpuResources && uint(geometry.globalGeometryIndex) < gpuResources->geometryData.size())
+        gdata = const_cast<GeometryData*>(&gpuResources->geometryData[geometry.globalGeometryIndex]);
+    if (gdata != nullptr)
     {
-        GeometryData & geometryData = *gdata;
-        assert( geometryData.indexBufferIndex < 0xFFFF );
-        assert( geometryData.vertexBufferIndex < 0xFFFF );
+        GeometryData& geometryData = *gdata;
+        assert(geometryData.indexBufferIndex < 0xFFFF);
+        assert(geometryData.vertexBufferIndex < 0xFFFF);
         ret.IndexBufferIndex_VertexBufferIndex = (geometryData.indexBufferIndex << 16) | geometryData.vertexBufferIndex;
         ret.IndexOffset = geometryData.indexOffset;
         ret.TexCoord1Offset = geometryData.texCoord1Offset;
     }
     else
     {
-        assert( false );
+        assert(false);
     }
+#else
+    (void)gpuResources;
+    (void)geometry;
 #endif
 
 }
 
-void MaterialGpuCache::update(nvrhi::ICommandList* commandList, const std::shared_ptr<caustica::Scene>& scene, std::vector<SubInstanceData>& subInstanceData)
+void MaterialGpuCache::update(nvrhi::ICommandList* commandList,
+    const caustica::scene::SceneRenderData& renderData,
+    const caustica::render::SceneGpuResources* gpuResources,
+    std::vector<SubInstanceData>& subInstanceData)
 {
     RAII_SCOPE( commandList->beginMarker("MaterialGpuCache");, commandList->endMarker(); );
 
@@ -1646,7 +1661,7 @@ void MaterialGpuCache::update(nvrhi::ICommandList* commandList, const std::share
     // prefix of SubInstanceData slots. Do not trust live geometryInstanceIndex alone — after
     // runtime import it can briefly disagree with the snapshot order TLAS already committed.
     size_t compactedGeometryInstanceIndex = 0;
-    for (const scene::MeshInstanceRenderProxy& proxy : scene->getRenderData().meshInstances)
+    for (const scene::MeshInstanceRenderProxy& proxy : renderData.meshInstances)
     {
         if (!proxy.meshShared)
             continue;
@@ -1670,7 +1685,8 @@ void MaterialGpuCache::update(nvrhi::ICommandList* commandList, const std::share
             if (!materialPT)
                 continue;
 
-            UpdateSubInstanceData(subInstanceData[subInstanceIndex], scene, mesh, *geometry, static_cast<uint>(geometryIndex), *materialPT);
+            UpdateSubInstanceData(subInstanceData[subInstanceIndex], gpuResources, mesh, *geometry,
+                static_cast<uint>(geometryIndex), *materialPT);
         }
     }
 }

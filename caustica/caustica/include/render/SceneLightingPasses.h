@@ -23,6 +23,14 @@ namespace caustica
 {
 class Scene;
 class ShaderFactory;
+struct MeshInfo;
+template<typename T>
+class ResourceTracker;
+
+namespace scene
+{
+class SceneRenderData;
+}
 } // namespace caustica
 
 namespace caustica::render
@@ -63,12 +71,12 @@ public:
         const std::shared_ptr<caustica::ShaderFactory>& shaderFactory);
 
     void sceneUnloading();
-    void onSceneLoaded(caustica::Scene& scene, PathTracerSettings& settings);
-    void notifySceneReloaded(caustica::Scene& scene);
+    void onSceneLoaded(const caustica::scene::SceneRenderData& renderData, PathTracerSettings& settings);
+    void notifySceneReloaded(size_t geometryCount);
     int ensureMaterialsFromScene(const std::shared_ptr<caustica::Scene>& scene);
 
     void applyShaderMacros(std::vector<caustica::ShaderMacro>& macros);
-    void createOpacityMicromaps(caustica::Scene& scene);
+    void createOpacityMicromaps(const caustica::ResourceTracker<caustica::MeshInfo>& meshes, size_t geometryCount);
 
     void forEachUsedMaterialTexture(
         const std::function<void(caustica::Handle<caustica::ImageAsset>, bool normalMap)>& visitor);

@@ -91,7 +91,7 @@ namespace
     bool processHotReloadChanges(App& app)
     {
         AssetSystem* assets = app.tryResource<AssetSystem>();
-        ::SceneManager* manager = sceneManager(app);
+        ::SceneManager* manager = detail::sessionManager(app);
         if (!assets || !manager || manager->isSceneLoading())
             return false;
 
@@ -117,7 +117,7 @@ namespace
         if (!cmd || !vs || cmd->sceneSwitchTestInterval <= 0)
             return;
 
-        ::SceneManager* manager = sceneManager(app);
+        ::SceneManager* manager = detail::sessionManager(app);
         if (!manager)
             return;
 
@@ -214,7 +214,7 @@ void animate(App& app, float fElapsedTimeSeconds)
 
     vs->lastDeltaTime = fElapsedTimeSeconds;
 
-    if (::SceneManager* manager = sceneManager(app))
+    if (::SceneManager* manager = detail::sessionManager(app))
         manager->updateLoading();
 
     if (runtime->Invalidation.ShaderAndACRefreshDelayedRequest > 0)
@@ -242,15 +242,15 @@ void animate(App& app, float fElapsedTimeSeconds)
         if (enableAnimations)
             vs->sceneTime += fElapsedTimeSeconds;
 
-        ::SceneManager* manager = sceneManager(app);
-        if (manager)
+        const std::shared_ptr<Scene> scene = activeScene(app);
+        if (scene)
         {
-            auto* ew = manager->getScene()->getEntityWorld();
+            auto* ew = scene->getEntityWorld();
             if (ew)
             {
                 auto& world = ew->world();
                 float loopDuration = 0.f;
-                for (ecs::Entity animEntity : manager->getScene()->getAnimationEntities())
+                for (ecs::Entity animEntity : scene->getAnimationEntities())
                 {
                     auto* animation = scene::tryGetAnimation(world, animEntity);
                     if (animation)
@@ -266,7 +266,7 @@ void animate(App& app, float fElapsedTimeSeconds)
                     ? float(fmod(vs->sceneTime, double(loopDuration)))
                     : float(vs->sceneTime);
 
-                for (ecs::Entity animEntity : manager->getScene()->getAnimationEntities())
+                for (ecs::Entity animEntity : scene->getAnimationEntities())
                 {
                     auto* animation = scene::tryGetAnimation(world, animEntity);
                     if (!animation || animation->channels.empty())
@@ -289,7 +289,7 @@ void animate(App& app, float fElapsedTimeSeconds)
                     deformParams.device = device->getDevice();
                     if (GpuSharedCaches* caches = gpuSharedCaches(app))
                         deformParams.descriptorTable = caches->descriptorTable.get();
-                    deformParams.scene = manager->getScene();
+                    deformParams.scene = scene;
                     deformParams.frameIndex = device->getFrameIndex();
                     deformParams.recomputeNormals = true;
                     deformParams.rebuildAccelerationStructure = true;
@@ -328,7 +328,7 @@ void tickSimulationAndFrameTiming(App& app, float fElapsedTimeSeconds)
 {
     if (isSceneLoaded(app))
     {
-        if (::SceneManager* manager = sceneManager(app))
+        if (::SceneManager* manager = detail::sessionManager(app))
         {
             if (GpuDevice* device = gpuDevice(app))
                 manager->tickSimulation(device->getFrameIndex());

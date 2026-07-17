@@ -1,6 +1,5 @@
 #include <render/passes/geometry/JointsRenderPass.h>
 #include <backend/ViewRhiConversion.h>
-#include <scene/Scene.h>
 #include <scene/SceneRenderData.h>
 #include <assets/loader/ShaderFactory.h>
 #include <math/math.h>
@@ -84,13 +83,13 @@ namespace caustica::render
         m_Vertices.clear();
     }
 
-    void caustica::render::JointsRenderPass::updateVertices(const caustica::Scene& scene)
+    void caustica::render::JointsRenderPass::updateVertices(const caustica::scene::SceneRenderData& renderData)
     {
         static const uint32_t blue = vectorToSnorm8(float3(0.f, 0.f, 1.f));
         static const uint32_t red = vectorToSnorm8(float3(1.f, 0.f, 0.f));
 
         uint32_t vertexId = 0;
-        for (const scene::SkinnedMeshRenderProxy& proxy : scene.getRenderData().skinnedMeshes)
+        for (const scene::SkinnedMeshRenderProxy& proxy : renderData.skinnedMeshes)
         {
             for (const scene::SkinnedMeshJointLineProxy& line : proxy.jointLines)
             {
@@ -109,12 +108,12 @@ namespace caustica::render
         nvrhi::ICommandList* commandList, 
         const caustica::IView* view,
         nvrhi::IFramebuffer* framebuffer,
-        const caustica::Scene& scene)
+        const caustica::scene::SceneRenderData& renderData)
     {
         if (m_Vertices.empty())
         {
             size_t totalJoints = 0;
-            for (const scene::SkinnedMeshRenderProxy& proxy : scene.getRenderData().skinnedMeshes)
+            for (const scene::SkinnedMeshRenderProxy& proxy : renderData.skinnedMeshes)
                 totalJoints += proxy.jointLines.size();
             
             size_t numVertices = totalJoints * 2;
@@ -133,7 +132,7 @@ namespace caustica::render
         view->fillPlanarViewConstants(constants);   
         commandList->writeBuffer(m_ConstantsBuffer, &constants, sizeof(PlanarViewConstants));
 
-        updateVertices(scene);
+        updateVertices(renderData);
 
         commandList->writeBuffer(m_VertexBuffer, m_Vertices.data(), m_Vertices.size() * sizeof(Vertex));
     

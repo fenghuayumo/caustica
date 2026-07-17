@@ -1,5 +1,5 @@
 #include <render/core/GeometryPasses.h>
-#include <scene/Scene.h>
+#include <scene/SceneRenderData.h>
 #include <scene/SceneDrawList.h>
 #include <render/core/FramebufferFactory.h>
 #include <backend/ViewRhiConversion.h>
@@ -129,7 +129,7 @@ void caustica::render::renderCompositeView(
     const ICompositeView* compositeView,
     const ICompositeView* compositeViewPrev,
     FramebufferFactory& framebufferFactory,
-    const caustica::Scene& scene,
+    const caustica::scene::SceneRenderData& renderData,
     MeshDrawDomain domain,
     IGeometryPass& pass,
     GeometryPassContext& passContext,
@@ -147,7 +147,6 @@ void caustica::render::renderCompositeView(
         assert(compositeView->getNumChildViews(supportedViewTypes) == compositeViewPrev->getNumChildViews(supportedViewTypes));
     }
 
-    const scene::SceneRenderData& renderData = scene.getRenderData();
     std::vector<DrawCommand> drawCommands;
 
     for (uint viewIndex = 0; viewIndex < compositeView->getNumChildViews(supportedViewTypes); viewIndex++)

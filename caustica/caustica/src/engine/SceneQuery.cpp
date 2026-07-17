@@ -4,6 +4,7 @@
 #include <cassert>
 #include <engine/SceneQuery.h>
 #include <engine/SceneAccess.h>
+#include <engine/SceneSession.h>
 #include <scene/Scene.h>
 #include <scene/SceneManager.h>
 #include <render/passes/lighting/MaterialGpuCache.h>
@@ -14,10 +15,26 @@ using namespace caustica::render;
 
 namespace caustica
 {
+namespace
+{
+
+::SceneManager* sessionManager(const App& app)
+{
+    if (SceneSession* session = sceneSession(app))
+        return session->manager.get();
+    return nullptr;
+}
+
+} // namespace
 
 std::shared_ptr<Scene> activeScene(const App& app)
 {
-    ::SceneManager* manager = sceneManager(app);
+    if (auto* access = const_cast<App&>(app).tryResource<SceneAccess>())
+    {
+        if (access->active)
+            return access->active;
+    }
+    ::SceneManager* manager = sessionManager(app);
     return manager ? manager->getScene() : nullptr;
 }
 
@@ -26,7 +43,10 @@ void syncSceneAccess(App& app)
     auto* access = app.tryResource<SceneAccess>();
     if (!access)
         return;
-    access->active = activeScene(app);
+    if (::SceneManager* manager = sessionManager(app))
+        access->active = manager->getScene();
+    else
+        access->active.reset();
 }
 
 scene::SceneEntityWorld* entityWorld(const App& app)
@@ -49,25 +69,25 @@ ecs::World* sceneEcs(const App& app)
 const std::vector<std::string>& availableScenes(const App& app)
 {
     static const std::vector<std::string> kEmpty;
-    ::SceneManager* manager = sceneManager(app);
+    ::SceneManager* manager = sessionManager(app);
     return manager ? manager->getAvailableScenes() : kEmpty;
 }
 
 std::string currentSceneName(const App& app)
 {
-    ::SceneManager* manager = sceneManager(app);
+    ::SceneManager* manager = sessionManager(app);
     return manager ? manager->getCurrentSceneName() : std::string();
 }
 
 std::filesystem::path currentScenePath(const App& app)
 {
-    ::SceneManager* manager = sceneManager(app);
+    ::SceneManager* manager = sessionManager(app);
     return manager ? manager->getCurrentScenePath() : std::filesystem::path{};
 }
 
 bool isSceneStructureBusy(const App& app)
 {
-    ::SceneManager* manager = sceneManager(app);
+    ::SceneManager* manager = sessionManager(app);
     return manager && manager->isSceneStructureBusy();
 }
 
@@ -78,13 +98,13 @@ bool shouldSkipRender(const App& app)
 
 bool isSceneLoading(const App& app)
 {
-    ::SceneManager* manager = sceneManager(app);
+    ::SceneManager* manager = sessionManager(app);
     return manager && manager->isSceneLoading();
 }
 
 bool isSceneLoaded(const App& app)
 {
-    ::SceneManager* manager = sceneManager(app);
+    ::SceneManager* manager = sessionManager(app);
     return manager && manager->isSceneLoaded();
 }
 
@@ -128,10 +148,7 @@ std::shared_ptr<Material> findMaterial(const App& app, int materialID)
 
 ecs::Entity findEntityByInstanceIndex(const App& app, int instanceIndex)
 {
-    ::SceneManager* manager = sceneManager(app);
-    if (!manager)
-        return ecs::NullEntity;
-    return SceneManager::findEntityByInstanceIndex(manager->getScene(), instanceIndex);
+    return SceneManager::findEntityByInstanceIndex(activeScene(app), instanceIndex);
 }
 
 } // namespace caustica

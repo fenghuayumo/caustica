@@ -7,12 +7,16 @@
 
 namespace caustica
 {
-    class Scene;
     struct MeshInfo;
     struct MeshGeometry;
     struct Material;
     struct BufferGroup;
     class FramebufferFactory;
+
+    namespace scene
+    {
+    class SceneRenderData;
+    }
 }
 
 namespace caustica::render
@@ -52,7 +56,7 @@ namespace caustica::render
         const caustica::ICompositeView* compositeView,
         const caustica::ICompositeView* compositeViewPrev,
         caustica::FramebufferFactory& framebufferFactory,
-        const caustica::Scene& scene,
+        const caustica::scene::SceneRenderData& renderData,
         MeshDrawDomain domain,
         IGeometryPass& pass,
         GeometryPassContext& passContext,

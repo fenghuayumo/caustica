@@ -5,6 +5,7 @@
 #include <cassert>
 #include <engine/SceneSpawn.h>
 #include <engine/SceneQuery.h>
+#include <engine/SceneApiInternal.h>
 #include <engine/RenderSessionApi.h>
 #include <engine/ScenePlugins.h>
 #include <assets/AssetSystem.h>
@@ -119,7 +120,7 @@ ecs::Entity spawn(App& app, const Handle<ScenePrefabAsset>& prefab, const SceneA
     if (!prefab || !prefab->import)
         return ecs::NullEntity;
 
-    ::SceneManager* manager = sceneManager(app);
+    ::SceneManager* manager = detail::sessionManager(app);
     GpuDevice* device = gpuDevice(app);
     auto scenePtr = activeScene(app);
     if (!manager || !device || !scenePtr)
@@ -160,7 +161,7 @@ ecs::Entity spawnFromFile(
 
 bool despawn(App& app, ecs::Entity entity)
 {
-    ::SceneManager* manager = sceneManager(app);
+    ::SceneManager* manager = detail::sessionManager(app);
     render::WorldRenderer* worldRendererResource = worldRenderer(app);
     GpuDevice* device = gpuDevice(app);
     auto scenePtr = activeScene(app);

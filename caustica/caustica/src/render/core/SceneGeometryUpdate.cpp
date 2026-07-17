@@ -3,8 +3,10 @@
 #include <render/core/SceneGpuUpdater.h>
 #include <render/passes/lighting/MaterialGpuCache.h>
 #include <render/passes/omm/OpacityMicromapBuilder.h>
+#include <render/SceneGpuResources.h>
 #include <scene/Scene.h>
 #include <scene/SceneRenderData.h>
+#include <scene/ResourceTracker.h>
 
 namespace caustica
 {
@@ -34,9 +36,11 @@ OmmAccelStructState makeOmmAccelState(OpacityMicromapBuilder* opacityMicromapBui
     return ommState;
 }
 
-void transitionSkinnedMeshBuffersToReadOnly(nvrhi::ICommandList* commandList, const Scene& scene)
+void transitionSkinnedMeshBuffersToReadOnly(
+    nvrhi::ICommandList* commandList,
+    const scene::SceneRenderData& renderData)
 {
-    for (const scene::SkinnedMeshRenderProxy& proxy : scene.getRenderData().skinnedMeshes)
+    for (const scene::SkinnedMeshRenderProxy& proxy : renderData.skinnedMeshes)
     {
         if (!proxy.mesh || !proxy.mesh->buffers || !proxy.mesh->buffers->vertexBuffer)
             continue;
@@ -45,6 +49,20 @@ void transitionSkinnedMeshBuffersToReadOnly(nvrhi::ICommandList* commandList, co
             nvrhi::ResourceStates::ShaderResource);
     }
     commandList->commitBarriers();
+}
+
+const scene::SceneRenderData& resolveRenderData(const UpdateSceneGeometryParams& params)
+{
+    if (params.renderData)
+        return *params.renderData;
+    return params.scene->getRenderData();
+}
+
+const render::SceneGpuResources* resolveGpuResources(const UpdateSceneGeometryParams& params)
+{
+    if (params.gpuResources)
+        return params.gpuResources;
+    return params.scene ? &params.scene->getGpuResources() : nullptr;
 }
 
 } // namespace
@@ -56,45 +74,51 @@ void updateSceneGeometry(AccelStructManager& accelStructs, UpdateSceneGeometryPa
     if (scene == nullptr)
         return;
 
+    const scene::SceneRenderData& renderData = resolveRenderData(params);
+    const render::SceneGpuResources* gpuResources = resolveGpuResources(params);
+
     render::SceneGpuUpdater::refresh(
         *scene,
         params.descriptorTable,
         commandList,
         static_cast<uint32_t>(params.frameIndex));
 
+    const ResourceTracker<MeshInfo>& meshes = scene->getMeshes();
+    const size_t geometryCount = scene->getGeometryCount();
+
     if (params.opacityMaps != nullptr)
-        params.opacityMaps->buildOpacityMicromaps(*commandList, *scene);
+        params.opacityMaps->buildOpacityMicromaps(*commandList, meshes, geometryCount);
 
     const AccelStructBuildSettings rebuildSettings = makeAccelBuildSettings(params.settings, false);
     accelStructs.rebuildDirtyMeshes(
-        commandList, *scene, rebuildSettings, params.accelStructRebuildRequested);
+        commandList, rebuildSettings, params.accelStructRebuildRequested);
 
     accelStructs.updateSkinnedBlases(
-        commandList, *scene, rebuildSettings, static_cast<uint32_t>(params.frameIndex));
+        commandList, renderData, rebuildSettings, static_cast<uint32_t>(params.frameIndex));
 
     commandList->compactBottomLevelAccelStructs();
 
     const AccelStructBuildSettings tlasSettings = makeAccelBuildSettings(params.settings, true);
     accelStructs.buildTlas(
-        commandList, *scene, tlasSettings, makeOmmAccelState(params.opacityMaps), params.opacityMaps);
+        commandList, renderData, tlasSettings, makeOmmAccelState(params.opacityMaps), params.opacityMaps);
 
-    transitionSkinnedMeshBuffersToReadOnly(commandList, *scene);
+    transitionSkinnedMeshBuffersToReadOnly(commandList, renderData);
 
     if (params.opacityMaps != nullptr)
     {
         if (params.asyncLoadingInProgress != nullptr)
         {
-            *params.asyncLoadingInProgress |= params.opacityMaps->update(*commandList, *scene);
+            *params.asyncLoadingInProgress |= params.opacityMaps->update(*commandList, meshes, geometryCount);
             *params.asyncLoadingInProgress |= params.opacityMaps->uiData().BuildsLeftInQueue > 0;
         }
         else
         {
-            (void)params.opacityMaps->update(*commandList, *scene);
+            (void)params.opacityMaps->update(*commandList, meshes, geometryCount);
         }
     }
 
     if (params.materials != nullptr)
-        params.materials->update(commandList, scene, accelStructs.getSubInstanceData());
+        params.materials->update(commandList, renderData, gpuResources, accelStructs.getSubInstanceData());
 
     accelStructs.uploadSubInstanceData(commandList);
 }

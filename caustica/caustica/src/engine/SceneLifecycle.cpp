@@ -143,7 +143,7 @@ void initializeScene(App& app, const std::string& preferredScene)
     if (!wr->getRenderTargets())
         wr->createDeviceResources();
 
-    ::SceneManager* manager = sceneManager(app);
+    ::SceneManager* manager = detail::sessionManager(app);
     if (!manager)
     {
         caustica::fatal("caustica::initializeScene requires scene manager");
@@ -218,7 +218,7 @@ void onSceneLoaded(App& app)
     if (!gr)
         return;
 
-    ::SceneManager* manager = sceneManager(app);
+    ::SceneManager* manager = detail::sessionManager(app);
     SceneViewState* vs = viewState(app);
     const CommandLineOptions* cmd = cmdLine(app);
     if (!manager || !vs || !cmd)

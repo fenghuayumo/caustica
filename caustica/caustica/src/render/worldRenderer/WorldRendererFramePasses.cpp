@@ -426,6 +426,8 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
         m_context->activeSettings(),
         m_context->scenePasses.rayTracing.accelerationStructRebuildRequested(),
         m_context->sessionScene,
+        m_context->frameScene,
+        m_context->sessionScene ? &m_context->sessionScene->getGpuResources() : nullptr,
         m_commandList,
     };
     geoParams.descriptorTable = m_context->descriptorTable.get();

@@ -2,6 +2,7 @@
 #include <engine/App.h>
 #include <engine/AppResources.h>
 #include <engine/SessionCamera.h>
+#include <engine/SceneSession.h>
 #include <engine/SceneViewState.h>
 #include <core/path_utils.h>
 #include <core/vfs/VFS.h>
@@ -26,9 +27,21 @@ const CameraController* sessionCamera(const App& app)
     return sessionCamera(const_cast<App&>(app));
 }
 
+::SceneManager* sessionManager(App& app)
+{
+    if (SceneSession* session = sceneSession(app))
+        return session->manager.get();
+    return nullptr;
+}
+
+::SceneManager* sessionManager(const App& app)
+{
+    return sessionManager(const_cast<App&>(app));
+}
+
 void applySceneSwitch(App& app, const std::string& sceneName, bool forceReload)
 {
-    ::SceneManager* manager = sceneManager(app);
+    ::SceneManager* manager = sessionManager(app);
     PathTracerSettings* cfg = settings(app);
     SceneViewState* vs = viewState(app);
     if (!manager || !cfg || !vs)

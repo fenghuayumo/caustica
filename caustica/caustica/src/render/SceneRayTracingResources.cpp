@@ -139,7 +139,7 @@ void SceneRayTracingResources::createBlases(nvrhi::ICommandList* commandList)
     if (!m_sessionScene)
         return;
     caustica::AccelStructBuildSettings settings = { .excludeTransmissive = m_settings->AS.ExcludeTransmissive };
-    m_accelStructs->createBlases(commandList, *m_sessionScene, settings);
+    m_accelStructs->createBlases(commandList, m_sessionScene->getMeshes(), settings);
 }
 
 void SceneRayTracingResources::uploadSubInstanceData(nvrhi::ICommandList* commandList)
@@ -151,14 +151,15 @@ void SceneRayTracingResources::createTlas(nvrhi::ICommandList* commandList)
 {
     if (!m_sessionScene)
         return;
-    m_accelStructs->createTlas(commandList, *m_sessionScene);
+    m_accelStructs->createTlas(commandList, m_sessionScene->getRenderData());
 }
 
 void SceneRayTracingResources::createAccelStructs(nvrhi::ICommandList* commandList)
 {
     if (!m_sessionScene)
         return;
-    m_lightingPasses->createOpacityMicromaps(*m_sessionScene);
+    m_lightingPasses->createOpacityMicromaps(
+        m_sessionScene->getMeshes(), m_sessionScene->getGeometryCount());
     createBlases(commandList);
     createTlas(commandList);
     if (m_additionalAccelStructBuilder)
@@ -183,7 +184,7 @@ void SceneRayTracingResources::recreateAccelStructs(nvrhi::ICommandList* command
 
     m_worldRenderer->invalidateBindingSet();
     m_accelStructs->releaseGpuResources();
-    m_accelStructs->clearMeshAccelStructs(*m_sessionScene);
+    m_accelStructs->clearMeshAccelStructs(m_sessionScene->getMeshes());
     m_gpuDevice->getDevice()->runGarbageCollection();
 
     commandList->open();

@@ -9,7 +9,6 @@
 #include <render/RenderRuntimeState.h>
 
 struct CommandLineOptions;
-class SceneManager;
 
 namespace caustica
 {
@@ -76,8 +75,6 @@ public:
 private:
     void applySampleSettingsFromScene();
     void registerLoadedSceneAssets();
-
-    [[nodiscard]] ::SceneManager* sceneManager() const;
 
     GpuSharedCaches* m_gpuSharedCaches = nullptr;
     SessionCamera* m_sessionCamera = nullptr;

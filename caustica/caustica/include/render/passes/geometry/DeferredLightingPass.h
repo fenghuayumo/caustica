@@ -17,8 +17,12 @@ namespace caustica
     class FramebufferFactory;
     class ICompositeView;
     class IView;
-    class Scene;
     struct LightProbe;
+
+    namespace scene
+    {
+    class SceneRenderData;
+    }
 }
 
 namespace caustica::render
@@ -60,7 +64,7 @@ namespace caustica::render
             nvrhi::ITexture* ambientOcclusion = nullptr;
             nvrhi::ITexture* output = nullptr;
 
-        const caustica::Scene* scene = nullptr;
+        const caustica::scene::SceneRenderData* scene = nullptr;
         const std::vector<std::shared_ptr<caustica::LightProbe>>* lightProbes = nullptr;
 
             dm::float3 ambientColorTop = 0.f;

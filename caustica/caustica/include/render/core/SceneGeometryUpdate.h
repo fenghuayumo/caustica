@@ -15,12 +15,26 @@ class AccelStructManager;
 class IDescriptorTableManager;
 class Scene;
 
+namespace scene
+{
+class SceneRenderData;
+}
+
+namespace render
+{
+struct SceneGpuResources;
+}
+
 struct UpdateSceneGeometryParams
 {
     PathTracerSettings&              settings;
     bool&                            accelStructRebuildRequested;
 
+    // Session scene for GPU upload / OMM / BLAS mutation. Prefer renderData for reads.
     const std::shared_ptr<Scene>&    scene;
+    const scene::SceneRenderData*    renderData = nullptr;
+    const render::SceneGpuResources* gpuResources = nullptr;
+
     nvrhi::ICommandList*             commandList = nullptr;
     IDescriptorTableManager*         descriptorTable = nullptr;
     MaterialGpuCache*                materials = nullptr;

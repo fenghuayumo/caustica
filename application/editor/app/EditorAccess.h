@@ -10,7 +10,6 @@
 #include <render/core/CameraController.h>
 #include <render/worldRenderer/WorldRenderer.h>
 #include <scene/Scene.h>
-#include <scene/SceneManager.h>
 
 #include <cassert>
 #include <memory>
@@ -51,16 +50,6 @@ namespace caustica::editor
 [[nodiscard]] inline scene::SceneEntityWorld* editorEntityWorld(const SceneEditor& editor)
 {
     return editor.app() ? caustica::entityWorld(*editor.app()) : nullptr;
-}
-
-[[nodiscard]] inline ::SceneManager* editorSceneManager(SceneEditor& editor)
-{
-    return editor.app() ? caustica::sceneManager(*editor.app()) : nullptr;
-}
-
-[[nodiscard]] inline const ::SceneManager* editorSceneManager(const SceneEditor& editor)
-{
-    return editor.app() ? caustica::sceneManager(*editor.app()) : nullptr;
 }
 
 [[nodiscard]] inline SessionCamera* editorSessionCamera(SceneEditor& editor)

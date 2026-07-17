@@ -27,8 +27,15 @@ namespace caustica
     class TextureLoader;
     class TextureHandle;
     class ShaderFactory;
-    namespace render { class RenderDevice; }
-    struct ImageAsset;
+    namespace render
+    {
+    class RenderDevice;
+    struct SceneGpuResources;
+    }
+    namespace scene
+    {
+    class SceneRenderData;
+    }
     struct ImageAsset;
 }
 
@@ -268,7 +275,10 @@ public:
     void                            createRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* bindlessLayout, caustica::render::RenderDevice& renderDevice, const std::shared_ptr<caustica::Scene>& scene, const std::filesystem::path & sceneFilePath, const std::filesystem::path & mediaPath);
 
     // this update can happen in parallel with any other ray preparatory tracing work - anything from BVH building to laying down denoising layers
-    void                            update(nvrhi::ICommandList * commandList, const std::shared_ptr<caustica::Scene> & scene, std::vector<SubInstanceData> & subInstanceData);
+    void                            update(nvrhi::ICommandList* commandList,
+                                           const caustica::scene::SceneRenderData& renderData,
+                                           const caustica::render::SceneGpuResources* gpuResources,
+                                           std::vector<SubInstanceData>& subInstanceData);
 
     nvrhi::BufferHandle             getMaterialDataBuffer() const           { return m_materialData; }
     uint                            getMaterialDataCount() const            { return m_materialsGPU.size(); }

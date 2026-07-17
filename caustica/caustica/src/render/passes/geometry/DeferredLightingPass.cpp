@@ -138,7 +138,7 @@ void DeferredLightingPass::render(
 
     if (inputs.scene)
     {
-        for (const scene::LightRenderProxy& lightProxy : inputs.scene->getRenderData().lights)
+        for (const scene::LightRenderProxy& lightProxy : inputs.scene->lights)
         {
             if (deferredConstants.numLights >= DEFERRED_MAX_LIGHTS)
             {

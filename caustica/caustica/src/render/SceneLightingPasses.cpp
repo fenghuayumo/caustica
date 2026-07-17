@@ -8,6 +8,8 @@
 #include <scene/Scene.h>
 #include <scene/SceneLightAccess.h>
 #include <scene/SceneRenderData.h>
+#include <scene/ResourceTracker.h>
+#include <scene/SceneTypes.h>
 
 namespace caustica::render
 {
@@ -49,11 +51,11 @@ void SceneLightingPasses::sceneUnloading()
     m_computePipelines = nullptr;
 }
 
-void SceneLightingPasses::onSceneLoaded(caustica::Scene& scene, PathTracerSettings& settings)
+void SceneLightingPasses::onSceneLoaded(const caustica::scene::SceneRenderData& renderData, PathTracerSettings& settings)
 {
     // Prefer published light proxies (refreshAfterLoad publishes before this runs).
     m_envMapLocalPath.clear();
-    for (const scene::LightRenderProxy& light : scene.getRenderData().lights)
+    for (const scene::LightRenderProxy& light : renderData.lights)
     {
         if (const scene::EnvironmentLightData* env = scene::tryGetEnvironmentLightData(light.data))
         {
@@ -66,7 +68,7 @@ void SceneLightingPasses::onSceneLoaded(caustica::Scene& scene, PathTracerSettin
     m_envMapOverride = c_EnvMapSceneDefault;
 }
 
-void SceneLightingPasses::notifySceneReloaded(caustica::Scene& scene)
+void SceneLightingPasses::notifySceneReloaded(size_t geometryCount)
 {
     if (m_materials != nullptr)
         m_materials->sceneReloaded();
@@ -75,7 +77,7 @@ void SceneLightingPasses::notifySceneReloaded(caustica::Scene& scene)
     if (m_lightSampling != nullptr)
         m_lightSampling->sceneReloaded();
     if (m_opacityMaps != nullptr)
-        m_opacityMaps->sceneLoaded(scene);
+        m_opacityMaps->sceneLoaded(geometryCount);
 }
 
 int SceneLightingPasses::ensureMaterialsFromScene(const std::shared_ptr<caustica::Scene>& scene)
@@ -93,10 +95,12 @@ void SceneLightingPasses::applyShaderMacros(std::vector<caustica::ShaderMacro>& 
         m_opacityMaps->setGlobalShaderMacros(macros);
 }
 
-void SceneLightingPasses::createOpacityMicromaps(caustica::Scene& scene)
+void SceneLightingPasses::createOpacityMicromaps(
+    const caustica::ResourceTracker<caustica::MeshInfo>& meshes,
+    size_t geometryCount)
 {
     if (m_opacityMaps != nullptr)
-        m_opacityMaps->createOpacityMicromaps(scene);
+        m_opacityMaps->createOpacityMicromaps(meshes, geometryCount);
 }
 
 void SceneLightingPasses::forEachUsedMaterialTexture(

@@ -23,8 +23,8 @@ void registerGpuRenderSchedules(App& app)
     ordering.after.push_back("Scene.RenderScene");
     ordering.after.push_back("Scene.AfterWorldRender");
 
-    app.addSystem(AppSchedule::render, "GpuRender.endFrame", [](ResMut<GpuSharedCaches> infra) {
-        infra->endFrame();
+    app.addSystem(AppSchedule::render, "GpuRender.endFrame", [](ResMut<GpuSharedCaches> caches) {
+        caches->endFrame();
     }, std::move(ordering));
 
     registerGpuRenderShutdown(app);

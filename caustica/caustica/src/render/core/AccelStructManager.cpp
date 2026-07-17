@@ -2,9 +2,9 @@
 
 #include <render/core/AccelerationStructureUtil.h>
 #include <render/passes/omm/OpacityMicromapBuilder.h>
-#include <scene/Scene.h>
 #include <scene/SceneRenderData.h>
 #include <scene/ResourceTracker.h>
+#include <scene/SceneTypes.h>
 #include <core/log.h>
 #include <rhi/utils.h>
 
@@ -20,7 +20,7 @@ AccelStructManager::AccelStructManager(nvrhi::IDevice* device)
 }
 
 void AccelStructManager::createBlases(nvrhi::ICommandList* commandList,
-                                      const Scene&         scene,
+                                      const ResourceTracker<MeshInfo>& meshes,
                                       const AccelStructBuildSettings& settings)
 {
     uint32_t builtMeshCount = 0;
@@ -29,7 +29,7 @@ void AccelStructManager::createBlases(nvrhi::ICommandList* commandList,
     uint64_t maxMeshTriangleCount = 0;
     std::string maxMeshName;
 
-    for (const std::shared_ptr<MeshInfo>& mesh : scene.getMeshes())
+    for (const std::shared_ptr<MeshInfo>& mesh : meshes)
     {
         if (mesh->isSkinPrototype)
             continue;
@@ -76,7 +76,7 @@ void AccelStructManager::createBlases(nvrhi::ICommandList* commandList,
         maxMeshName.c_str());
 }
 
-void AccelStructManager::createTlas(nvrhi::ICommandList* commandList, const Scene& scene)
+void AccelStructManager::createTlas(nvrhi::ICommandList* commandList, const scene::SceneRenderData& renderData)
 {
     (void)commandList;
 
@@ -85,7 +85,6 @@ void AccelStructManager::createTlas(nvrhi::ICommandList* commandList, const Scen
     tlasDesc.buildFlags = nvrhi::rt::AccelStructBuildFlags::PreferFastTrace;
 
     m_subInstanceCount = 0;
-    const scene::SceneRenderData& renderData = scene.getRenderData();
     for (const scene::MeshInstanceRenderProxy& proxy : renderData.meshInstances)
     {
         if (proxy.meshShared)
@@ -125,9 +124,9 @@ void AccelStructManager::uploadSubInstanceData(nvrhi::ICommandList* commandList)
                              m_subInstanceData.size() * sizeof(SubInstanceData));
 }
 
-void AccelStructManager::clearMeshAccelStructs(Scene& scene)
+void AccelStructManager::clearMeshAccelStructs(const ResourceTracker<MeshInfo>& meshes)
 {
-    for (const std::shared_ptr<MeshInfo>& mesh : scene.getMeshes())
+    for (const std::shared_ptr<MeshInfo>& mesh : meshes)
     {
         mesh->accelStruct = nullptr;
         mesh->AccelStructOMM = nullptr;
@@ -152,7 +151,6 @@ void AccelStructManager::requestMeshRebuild(const std::shared_ptr<MeshInfo>& mes
 }
 
 void AccelStructManager::rebuildDirtyMeshes(nvrhi::ICommandList*            commandList,
-                                            const Scene&                    scene,
                                             const AccelStructBuildSettings& settings,
                                             bool&                           fullRebuildRequested)
 {
@@ -215,7 +213,7 @@ void AccelStructManager::rebuildDirtyMeshes(nvrhi::ICommandList*            comm
 }
 
 void AccelStructManager::updateSkinnedBlases(nvrhi::ICommandList*            commandList,
-                                             const Scene&                    scene,
+                                             const scene::SceneRenderData&   renderData,
                                              const AccelStructBuildSettings& settings,
                                              uint32_t                        /*frameIndex*/) const
 {
@@ -225,8 +223,6 @@ void AccelStructManager::updateSkinnedBlases(nvrhi::ICommandList*            com
     uint32_t skippedDuplicateSkinnedUpdateCount = 0;
     std::unordered_set<const MeshInfo*> preparedSkinnedMeshes;
     std::unordered_set<const MeshInfo*> updatedSkinnedMeshes;
-
-    const scene::SceneRenderData& renderData = scene.getRenderData();
 
     for (const scene::SkinnedMeshRenderProxy& proxy : renderData.skinnedMeshes)
     {
@@ -287,7 +283,7 @@ void AccelStructManager::updateSkinnedBlases(nvrhi::ICommandList*            com
 }
 
 void AccelStructManager::buildTlas(nvrhi::ICommandList*            commandList,
-                                   const Scene&                    scene,
+                                   const scene::SceneRenderData&   renderData,
                                    const AccelStructBuildSettings& settings,
                                    const OmmAccelStructState&      ommState,
                                    OpacityMicromapBuilder*                       opacityMicromapBuilder) const
@@ -295,7 +291,6 @@ void AccelStructManager::buildTlas(nvrhi::ICommandList*            commandList,
     std::vector<nvrhi::rt::InstanceDesc> instances;
 
     uint subInstanceCount = 0;
-    const scene::SceneRenderData& renderData = scene.getRenderData();
     instances.reserve(renderData.meshInstances.size());
 
     // One TLAS slot per meshInstances entry so DXR InstanceIndex() matches ECS

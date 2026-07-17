@@ -13,7 +13,13 @@ class OpacityMicromapBuilder;
 
 namespace caustica
 {
-class Scene;
+template<typename T>
+class ResourceTracker;
+
+namespace scene
+{
+class SceneRenderData;
+}
 
 struct AccelStructBuildSettings
 {
@@ -40,29 +46,28 @@ public:
     explicit AccelStructManager(nvrhi::IDevice* device);
 
     void createBlases(nvrhi::ICommandList* commandList,
-                      const Scene&         scene,
+                      const ResourceTracker<MeshInfo>& meshes,
                       const AccelStructBuildSettings& settings);
 
-    void createTlas(nvrhi::ICommandList* commandList, const Scene& scene);
+    void createTlas(nvrhi::ICommandList* commandList, const scene::SceneRenderData& renderData);
 
     void uploadSubInstanceData(nvrhi::ICommandList* commandList) const;
 
-    void clearMeshAccelStructs(Scene& scene);
+    void clearMeshAccelStructs(const ResourceTracker<MeshInfo>& meshes);
 
     void requestMeshRebuild(const std::shared_ptr<MeshInfo>& mesh);
 
     void rebuildDirtyMeshes(nvrhi::ICommandList*            commandList,
-                            const Scene&                    scene,
                             const AccelStructBuildSettings& settings,
                             bool&                           fullRebuildRequested);
 
     void updateSkinnedBlases(nvrhi::ICommandList*            commandList,
-                             const Scene&                    scene,
+                             const scene::SceneRenderData&   renderData,
                              const AccelStructBuildSettings& settings,
                              uint32_t                        frameIndex) const;
 
     void buildTlas(nvrhi::ICommandList*            commandList,
-                   const Scene&                    scene,
+                   const scene::SceneRenderData&   renderData,
                    const AccelStructBuildSettings& settings,
                    const OmmAccelStructState&      ommState,
                    ::OpacityMicromapBuilder*                     opacityMicromapBuilder) const;
