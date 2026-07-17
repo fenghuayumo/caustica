@@ -1,6 +1,7 @@
 #include <engine/App.h>
 #include <engine/AppResources.h>
 #include <engine/GpuSharedCaches.h>
+#include <engine/SceneGaussianSplatLogic.h>
 #include <engine/SceneViewState.h>
 #include <cassert>
 #include <engine/SceneSpawn.h>
@@ -45,7 +46,8 @@ void flushPendingStructureGpu(App& app)
     // Use logic frame index (matches Extract after SetRenderFrameIndex; correct for
     // immediate flush from spawn/despawn in PostUpdate before Extract runs).
     const uint32_t frameIndex = device->getFrameIndex();
-    runGpuWorkOnRenderThread(app, [worldRendererResource, caches, scenePtr, device, frameIndex]() {
+    const scene::SceneRenderData& gpuSetupData = scenePtr->extractRenderDataForGpuSetup(frameIndex);
+    runGpuWorkOnRenderThread(app, [worldRendererResource, caches, scenePtr, device, frameIndex, &gpuSetupData]() {
         if (nvrhi::IDevice* nvrhiDevice = device->getDevice())
             nvrhiDevice->waitForIdle();
 
@@ -55,9 +57,10 @@ void flushPendingStructureGpu(App& app)
             caches->textureLoader->loadingFinished();
         }
 
-        worldRendererResource->lightingPasses().ensureMaterialsFromScene(scenePtr);
+        worldRendererResource->lightingPasses().ensureMaterialsFromScene(gpuSetupData);
         render::SceneGpuUpdater::refreshAfterLoad(
             *scenePtr,
+            gpuSetupData,
             caches->descriptorTable.get(),
             frameIndex);
 
@@ -65,7 +68,7 @@ void flushPendingStructureGpu(App& app)
         // render frame races new proxies against a stale TLAS and crashes nvwgf2umx.
         worldRendererResource->rayTracingResources().requestAccelerationStructureRebuild();
         nvrhi::CommandListHandle commandList = device->getDevice()->createCommandList();
-        worldRendererResource->rayTracingResources().recreateAccelStructs(commandList, *scenePtr);
+        worldRendererResource->rayTracingResources().recreateAccelStructs(commandList, *scenePtr, &gpuSetupData);
 
         // Keep SBT hit-group count in lockstep with the new TLAS while GPU is idle.
         // Otherwise the next DispatchRays can use new contribution indices against a
@@ -73,7 +76,7 @@ void flushPendingStructureGpu(App& app)
         if (auto compiler = worldRendererResource->rayTracingResources().pathTracingShaderCompiler())
         {
             compiler->update(
-                &scenePtr->getRenderData(),
+                &gpuSetupData,
                 static_cast<unsigned int>(worldRendererResource->accelStructs().getSubInstanceData().size()),
                 [worldRendererResource](std::vector<caustica::ShaderMacro>& macros) {
                     worldRendererResource->rayTracingResources().fillPTPipelineGlobalMacros(macros);
@@ -82,7 +85,7 @@ void flushPendingStructureGpu(App& app)
         }
 
         // Binding set still points at the destroyed TLAS until the next frame otherwise.
-        worldRendererResource->rayTracingResources().recreateBindingSet();
+        worldRendererResource->rayTracingResources().recreateBindingSet(&gpuSetupData);
     });
 
     scenePtr->clearGpuStructureSyncRequest();
@@ -187,7 +190,8 @@ bool despawn(App& app, ecs::Entity entity)
             .scene = scenePtr,
             .entity = entity,
             .beforeDetach = [worldRendererResource](ecs::Entity deletedEntity) {
-                worldRendererResource->gaussianSplatPasses().removeObjectsUnderEntity(deletedEntity);
+                SceneGaussianSplatLogic::removeObjectsUnderEntity(
+                    worldRendererResource->gaussianSplatPasses(), deletedEntity);
             },
         }))
     {

@@ -58,6 +58,7 @@ class ICompositeView;
 class IView;
 class Scene;
 struct GpuSharedCaches;
+namespace scene { class SceneRenderData; }
 
 namespace render
 {
@@ -84,7 +85,7 @@ public:
     WorldRenderer(WorldRenderer&&) = delete;
     WorldRenderer& operator=(WorldRenderer&&) = delete;
 
-    struct CreateParams
+    struct createParams
     {
         GpuDevice& gpuDevice;
         GpuSharedCaches& gpuSharedCaches;
@@ -94,7 +95,7 @@ public:
         double& sceneTime;
     };
 
-    bool create(const CreateParams& params);
+    bool create(const createParams& params);
     void destroy();
 
     [[nodiscard]] CameraController& renderCamera() { return m_renderCamera; }
@@ -143,7 +144,7 @@ public:
         return m_gaussianSplatEmissionProxies;
     }
     void postProcessAA(nvrhi::IFramebuffer* framebuffer, bool reset);
-    void recreateBindingSet();
+    void recreateBindingSet(const scene::SceneRenderData* renderData = nullptr);
     void onSceneUnloading();
     void onSceneLoaded(std::shared_ptr<Scene> scene, std::filesystem::path scenePath);
     void invalidateBindingSet() { m_bindingSet = nullptr; }

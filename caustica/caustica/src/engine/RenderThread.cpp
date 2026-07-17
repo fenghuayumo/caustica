@@ -1,18 +1,14 @@
 #include <engine/RenderThread.h>
+#include <core/ThreadContext.h>
 
 #include <cassert>
 
 namespace caustica
 {
 
-namespace
-{
-thread_local bool g_isRenderThread = false;
-} // namespace
-
 bool isRenderThread()
 {
-    return g_isRenderThread;
+    return currentThreadDomain() == ThreadDomain::Render;
 }
 
 RenderThread::~RenderThread()
@@ -161,7 +157,7 @@ std::optional<RenderFrameCompletion> RenderThread::consumeCompletedFrame()
 
 void RenderThread::threadMain()
 {
-    g_isRenderThread = true;
+    const ThreadDomainScope renderDomain(ThreadDomain::Render);
     m_renderThreadId.store(std::this_thread::get_id(), std::memory_order_release);
 
     std::unique_lock lock(m_mutex);
@@ -205,7 +201,6 @@ void RenderThread::threadMain()
         m_cv.notify_all();
     }
 
-    g_isRenderThread = false;
     m_renderThreadId.store(std::thread::id{}, std::memory_order_release);
 }
 

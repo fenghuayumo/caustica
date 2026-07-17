@@ -21,6 +21,7 @@ struct MeshInfo;
 class AccelStructManager;
 class Scene;
 class ShaderFactory;
+namespace scene { class SceneRenderData; }
 } // namespace caustica
 
 namespace caustica::render
@@ -51,15 +52,21 @@ public:
 
     void uploadSubInstanceData(nvrhi::ICommandList* commandList);
     // Session Scene is owned by PathTracingContext; pass it in for mesh/AS mutation.
-    void createAccelStructs(nvrhi::ICommandList* commandList, caustica::Scene& scene);
-    void recreateAccelStructs(nvrhi::ICommandList* commandList, caustica::Scene& scene);
+    void createAccelStructs(
+        nvrhi::ICommandList* commandList,
+        caustica::Scene& scene,
+        const caustica::scene::SceneRenderData* renderData = nullptr);
+    void recreateAccelStructs(
+        nvrhi::ICommandList* commandList,
+        caustica::Scene& scene,
+        const caustica::scene::SceneRenderData* renderData = nullptr);
     void requestMeshAccelRebuild(const std::shared_ptr<caustica::MeshInfo>& mesh, bool resetAccumulation = true);
 
     // Structure-only invalidation (no shader reload). Prefer this after runtime scene graph edits.
     void requestAccelerationStructureRebuild();
     void requestFullRebuild();
     void invalidateBindingSet();
-    void recreateBindingSet();
+    void recreateBindingSet(const caustica::scene::SceneRenderData* renderData = nullptr);
 
     void sampleRenderCode(nvrhi::IFramebuffer* framebuffer,
         nvrhi::CommandListHandle commandList,
@@ -77,8 +84,12 @@ public:
 
 private:
     void wireSession(const ScenePassWireParams& params);
-    void createBlases(nvrhi::ICommandList* commandList, caustica::Scene& scene);
-    void createTlas(nvrhi::ICommandList* commandList, caustica::Scene& scene);
+    void createBlases(
+        nvrhi::ICommandList* commandList,
+        const caustica::scene::SceneRenderData& renderData);
+    void createTlas(
+        nvrhi::ICommandList* commandList,
+        const caustica::scene::SceneRenderData& renderData);
 
     caustica::GpuDevice*                        m_gpuDevice = nullptr;
     caustica::AccelStructManager*               m_accelStructs = nullptr;

@@ -196,8 +196,6 @@ void EditorUI::BuildMaterialEditorPanel(const PanelLayout& layout)
             wasSkipRender != material->skipRender ||
             dirty)
         {
-            if (auto s = caustica::activeScene(*m_sceneEditor.app()))
-                s->refreshSceneWorld(m_sceneEditor.app()->getGpuDevice()->getFrameIndex());
             m_settings.ResetAccumulation = 1;
         }
 

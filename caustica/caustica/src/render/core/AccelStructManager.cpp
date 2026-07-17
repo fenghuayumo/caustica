@@ -20,7 +20,7 @@ AccelStructManager::AccelStructManager(nvrhi::IDevice* device)
 }
 
 void AccelStructManager::createBlases(nvrhi::ICommandList* commandList,
-                                      const ResourceTracker<MeshInfo>& meshes,
+                                      std::span<const std::shared_ptr<MeshInfo>> meshes,
                                       const AccelStructBuildSettings& settings)
 {
     uint32_t builtMeshCount = 0;
@@ -124,7 +124,8 @@ void AccelStructManager::uploadSubInstanceData(nvrhi::ICommandList* commandList)
                              m_subInstanceData.size() * sizeof(SubInstanceData));
 }
 
-void AccelStructManager::clearMeshAccelStructs(const ResourceTracker<MeshInfo>& meshes)
+void AccelStructManager::clearMeshAccelStructs(
+    std::span<const std::shared_ptr<MeshInfo>> meshes)
 {
     for (const std::shared_ptr<MeshInfo>& mesh : meshes)
     {

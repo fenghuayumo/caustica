@@ -1224,13 +1224,11 @@ void MaterialGpuCache::sceneReloaded()
     clear();
 }
 
-int MaterialGpuCache::ensureMaterialsFromScene(const std::shared_ptr<caustica::Scene>& scene)
+int MaterialGpuCache::ensureMaterialsFromScene(
+    std::span<const std::shared_ptr<caustica::Material>> materials)
 {
-    if (!scene)
-        return 0;
-
     int added = 0;
-    for (auto& material : scene->getMaterials())
+    for (const auto& material : materials)
     {
         std::shared_ptr<MaterialEx> materialEx = std::dynamic_pointer_cast<MaterialEx>(material);
         if (materialEx == nullptr)
@@ -1412,7 +1410,7 @@ void MaterialGpuCache::bakeShaderPermutations()
     }
 }
 
-void MaterialGpuCache::createRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* bindlessLayout, caustica::render::RenderDevice& renderDevice, const std::shared_ptr<caustica::Scene>& scene, const std::filesystem::path& sceneFilePath, const std::filesystem::path & mediaPath )
+void MaterialGpuCache::createRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* bindlessLayout, caustica::render::RenderDevice& renderDevice, std::span<const std::shared_ptr<caustica::Material>> materials, const std::filesystem::path& sceneFilePath, const std::filesystem::path & mediaPath )
 {
     info("MaterialGpuCache: createRenderPassesAndLoadMaterials begin");
     assert(!mediaPath.empty());
@@ -1434,8 +1432,8 @@ void MaterialGpuCache::createRenderPassesAndLoadMaterials(nvrhi::IBindingLayout*
 
     // Runtime imports can add materials after the first load. Keep existing PT
     // materials and only create missing ones (same path as ensureMaterialsFromScene).
-    if (m_mediaPath != "" && scene)
-        ensureMaterialsFromScene(scene);
+    if (m_mediaPath != "")
+        ensureMaterialsFromScene(materials);
 
     if (m_mediaPath == "") // first time load all
     {
@@ -1461,8 +1459,7 @@ void MaterialGpuCache::createRenderPassesAndLoadMaterials(nvrhi::IBindingLayout*
 
         int initializedFromEngineCount = 0;
 
-        auto& materials = scene->getMaterials();
-        for (auto& material : materials)
+        for (const auto& material : materials)
         {
             std::shared_ptr<MaterialEx> materialEx = std::dynamic_pointer_cast<MaterialEx>(material);
             if (materialEx == nullptr)

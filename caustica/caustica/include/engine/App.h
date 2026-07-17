@@ -362,6 +362,7 @@ private:
 
     RenderThread m_renderThread;
     bool m_useDedicatedRenderThread = true;
+    bool m_renderSkippedSinceLastSubmission = false;
     bool m_requestExit = false;
 };
 

@@ -11,6 +11,7 @@ namespace caustica
 {
 class IDescriptorTableManager;
 class Scene;
+namespace scene { class SceneRenderData; }
 }
 
 namespace caustica::render
@@ -25,10 +26,10 @@ public:
         nvrhi::ICommandList* commandList,
         uint32_t frameIndex);
 
-    // Upload mesh GPU buffers, then publish render proxies and fill instance buffers.
-    // Prefer this over publishing a snapshot before EnsureMeshGpuBuffers.
+    // Exclusive GPU setup from logic-thread staging data. Does not publish snapshots.
     static void refreshAfterLoad(
         Scene& scene,
+        const scene::SceneRenderData& renderData,
         IDescriptorTableManager* descriptorTable,
         uint32_t frameIndex);
 };

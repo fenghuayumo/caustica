@@ -1,4 +1,5 @@
 #include <engine/GpuRenderSubsystem.h>
+#include <engine/SceneGaussianSplatLogic.h>
 #include <engine/GpuSharedCaches.h>
 #include <engine/SceneSession.h>
 
@@ -31,7 +32,7 @@ GpuRenderSubsystem::~GpuRenderSubsystem()
     shutdown();
 }
 
-bool GpuRenderSubsystem::initialize(const GpuRenderSubsystemInitParams& params)
+bool GpuRenderSubsystem::initialize(const gpuRenderSubsystemInitParams& params)
 {
     m_gpuSharedCaches = &params.gpuSharedCaches;
     m_sceneSession = &params.sceneSession;
@@ -47,19 +48,6 @@ bool GpuRenderSubsystem::initialize(const GpuRenderSubsystemInitParams& params)
 
 void GpuRenderSubsystem::onSceneUnloading()
 {
-    // Break asset shared_ptr cycles and drop extract retained refs BEFORE clearing
-    // the AssetSystem store / destroying the scene. Otherwise MeshInfo↔MeshAsset
-    // cycles keep BLAS/buffers alive past GpuDevice::shutdown and heap-corrupt on close.
-    if (::SceneManager* manager = sessionManager(m_sceneSession))
-    {
-        if (const std::shared_ptr<Scene> scene = manager->getScene())
-        {
-            scene->prepareForUnload();
-            if (m_worldRenderer)
-                m_worldRenderer->accelStructs().clearMeshAccelStructs(scene->getMeshes());
-        }
-    }
-
     if (m_assetSystem)
         m_assetSystem->clearSceneAssets();
 
@@ -74,7 +62,7 @@ void GpuRenderSubsystem::onSceneUnloading()
         m_gpuSharedCaches->bindingCache->clear();
 }
 
-void GpuRenderSubsystem::onSceneLoadedGpuPrep()
+void GpuRenderSubsystem::onSceneLoadedGpuPrep(const scene::SceneRenderData& renderData)
 {
     ::SceneManager* manager = sessionManager(m_sceneSession);
     auto scene = manager ? manager->getScene() : nullptr;
@@ -93,14 +81,15 @@ void GpuRenderSubsystem::onSceneLoadedGpuPrep()
     {
         render::SceneGpuUpdater::refreshAfterLoad(
             *scene,
+            renderData,
             m_gpuSharedCaches ? m_gpuSharedCaches->descriptorTable.get() : nullptr,
             0);
         if (m_worldRenderer)
-            m_worldRenderer->lightingPasses().notifySceneReloaded(scene->getGeometryCount());
+            m_worldRenderer->lightingPasses().notifySceneReloaded(renderData.geometryCount);
     }
 }
 
-void GpuRenderSubsystem::onSceneLoadedGpuFinish()
+void GpuRenderSubsystem::onSceneLoadedGpuFinish(const scene::SceneRenderData& renderData)
 {
     ::SceneManager* manager = sessionManager(m_sceneSession);
     if (!manager || !m_settings || !m_runtimeState || !m_worldRenderer)
@@ -110,8 +99,8 @@ void GpuRenderSubsystem::onSceneLoadedGpuFinish()
     if (!scene)
         return;
 
-    m_worldRenderer->gaussianSplatPasses().onSceneLoaded();
-    m_worldRenderer->lightingPasses().onSceneLoaded(scene->getRenderData(), *m_settings);
+    SceneGaussianSplatLogic::onSceneLoaded(m_worldRenderer->gaussianSplatPasses());
+    m_worldRenderer->lightingPasses().onSceneLoaded(renderData, *m_settings);
 
     SceneManager::onSceneLoadedGpuPrep(*scene, m_runtimeState->Invalidation.AccelerationStructRebuildRequested);
     m_worldRenderer->accelStructs().resetSubInstanceCount();
@@ -138,6 +127,12 @@ void GpuRenderSubsystem::shutdown()
         m_gpuDevice->waitForRenderThreadIdle();
         if (nvrhi::IDevice* device = m_gpuDevice->getDevice())
             device->waitForIdle();
+    }
+
+    if (::SceneManager* manager = sessionManager(m_sceneSession))
+    {
+        if (const std::shared_ptr<Scene> scene = manager->getScene())
+            scene->prepareForUnload();
     }
 
     onSceneUnloading();

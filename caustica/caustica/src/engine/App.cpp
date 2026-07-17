@@ -7,6 +7,7 @@
 #include <engine/SceneScheduleRegistration.h>
 
 #include <backend/GpuDevice.h>
+#include <core/ThreadContext.h>
 #include <engine/cmdline_utils.h>
 #include <platform/window.h>
 
@@ -416,7 +417,10 @@ void App::runGpuWorkOnRenderThread(const std::function<void()>& work)
     if (m_useDedicatedRenderThread && m_renderThread.isRunning())
         m_renderThread.dispatchAndWait(work);
     else
+    {
+        const ThreadDomainScope renderDomain(ThreadDomain::Render);
         work();
+    }
 }
 
 void App::requestExit()
@@ -650,6 +654,8 @@ void App::finalizeFrameTiming(GpuDevice& gpuDevice, double elapsedTime, double c
 
 bool App::executeRenderPhase(GpuDevice* gpuDevice, double elapsedTime, double curTime, uint32_t frameIndex)
 {
+    const ThreadDomainScope renderDomain(ThreadDomain::Render);
+
     if (frameIndex == 0 && gpuDevice->m_SkipRenderOnFirstFrame)
         return true;
 
@@ -737,12 +743,24 @@ bool App::runFrame(std::optional<double> elapsedTimeOverride)
 
     if (scheduleContext.runRender)
     {
+        // Snapshot slots use the logic frame index. A no-render gap can advance that
+        // index onto a slot still owned by an older render frame, so drain once before
+        // resuming Extract. Consecutive render frames keep the normal two-frame pipeline.
+        if (m_renderSkippedSinceLastSubmission)
+        {
+            waitForRenderThreadIdle();
+            m_renderSkippedSinceLastSubmission = false;
+        }
         runSchedule(AppSchedule::Extract, scheduleContext);
         if (!dispatchScheduledRender(scheduleContext))
             scheduleContext.abortFrame = true;
         if (scheduleContext.abortFrame)
             return false;
         runSchedule(AppSchedule::postRender, scheduleContext);
+    }
+    else
+    {
+        m_renderSkippedSinceLastSubmission = true;
     }
 
     runSchedule(AppSchedule::Last, scheduleContext);

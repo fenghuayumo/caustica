@@ -41,7 +41,8 @@ void EditorUI::BuildOpacityMicroMapsPanel(const PanelLayout& layout)
             if (auto& opacityMicromapBuilder = caustica::editor::requireWorldRenderer(m_sceneEditor).lightingPasses().opacityMaps(); opacityMicromapBuilder)
             {
                 if (const auto scene = caustica::activeScene(*m_sceneEditor.app()))
-                    opacityMicromapBuilder->debugGUI(layout.indent, scene->getMeshes());
+                    opacityMicromapBuilder->debugGUI(
+                        layout.indent, scene->getRenderData().meshResources);
             }
             else
                 ImGui::Text("<Opacity Micro-Maps not supported on the current device>");

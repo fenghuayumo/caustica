@@ -54,7 +54,6 @@ public:
     void beginLoadingScene(std::shared_ptr<caustica::IFileSystem> fs,
                            const std::filesystem::path&           sceneFileName);
     void updateLoading();
-    void tickSimulation(uint32_t frameIndex);
     [[nodiscard]] bool isSceneLoading() const;
     [[nodiscard]] bool isSceneLoaded() const;
 

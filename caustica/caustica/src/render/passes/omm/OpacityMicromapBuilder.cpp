@@ -99,7 +99,7 @@ void OpacityMicromapBuilder::createRenderPasses(nvrhi::BindingLayoutHandle bindl
 }
 
 void OpacityMicromapBuilder::createOpacityMicromaps(
-    const caustica::ResourceTracker<caustica::MeshInfo>& meshes,
+    std::span<const std::shared_ptr<caustica::MeshInfo>> meshes,
     size_t geometryCount)
 {
     // Always grow the debug buffer for runtime imports — AS rebuild marks DebugDataDirty
@@ -177,7 +177,7 @@ void OpacityMicromapBuilder::createOpacityMicromaps(
 
 void OpacityMicromapBuilder::destroyOpacityMicromaps(
     nvrhi::ICommandList& commandList,
-    const caustica::ResourceTracker<caustica::MeshInfo>& meshes)
+    std::span<const std::shared_ptr<caustica::MeshInfo>> meshes)
 {
     commandList.close();
     m_device->executeCommandList(&commandList);
@@ -197,7 +197,7 @@ void OpacityMicromapBuilder::destroyOpacityMicromaps(
 
 void OpacityMicromapBuilder::buildOpacityMicromaps(
     nvrhi::ICommandList& commandList,
-    const caustica::ResourceTracker<caustica::MeshInfo>& meshes,
+    std::span<const std::shared_ptr<caustica::MeshInfo>> meshes,
     size_t geometryCount)
 {
     commandList.beginMarker("OMM Updates");
@@ -283,7 +283,7 @@ void OpacityMicromapBuilder::updateDebugGeometry(const MeshInfo& _mesh)
 
 bool OpacityMicromapBuilder::update(
     nvrhi::ICommandList& commandList,
-    const caustica::ResourceTracker<caustica::MeshInfo>& meshes,
+    std::span<const std::shared_ptr<caustica::MeshInfo>> meshes,
     size_t geometryCount)
 {
     RAII_SCOPE( commandList.beginMarker("OpacityMicromapBuilder");, commandList.endMarker(); );
@@ -317,7 +317,9 @@ void OpacityMicromapBuilder::setGlobalShaderMacros(std::vector<caustica::ShaderM
         macros.push_back( { "OMM_DEBUG_VIEW_OVERLAY", "1" } );
 }
 
-bool OpacityMicromapBuilder::debugGUI(float indent, const caustica::ResourceTracker<caustica::MeshInfo>& meshes)
+bool OpacityMicromapBuilder::debugGUI(
+    float indent,
+    std::span<const std::shared_ptr<caustica::MeshInfo>> meshes)
 {
     RAII_SCOPE(ImGui::PushID("OpacityMicromapBuilderDebugGUI"); , ImGui::PopID(); );
     

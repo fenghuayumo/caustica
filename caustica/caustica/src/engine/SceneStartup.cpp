@@ -64,7 +64,7 @@ void initializeSceneApp(App& app, const SceneAppConfig& config)
         return;
     }
 
-    if (!worldRenderer->create(render::WorldRenderer::CreateParams{
+    if (!worldRenderer->create(render::WorldRenderer::createParams{
             .gpuDevice = *gpuDevice,
             .gpuSharedCaches = *gpuSharedCaches,
             .settings = config.renderState->settings,
@@ -77,7 +77,7 @@ void initializeSceneApp(App& app, const SceneAppConfig& config)
         return;
     }
 
-    if (!gpuRenderSubsystem->initialize(GpuRenderSubsystemInitParams{
+    if (!gpuRenderSubsystem->initialize(gpuRenderSubsystemInitParams{
             .gpuDevice = *gpuDevice,
             .assetSystem = *assetSystem,
             .gpuSharedCaches = *gpuSharedCaches,

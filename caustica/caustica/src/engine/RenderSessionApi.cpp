@@ -1,5 +1,6 @@
 #include <engine/App.h>
 #include <engine/AppResources.h>
+#include <engine/SceneGaussianSplatLogic.h>
 #include <engine/SceneViewState.h>
 #include <cassert>
 #include <engine/RenderSessionApi.h>
@@ -43,7 +44,8 @@ void setEnvMapOverrideSource(App& app, const std::string& envMapOverride)
 
 bool loadGaussianSplatFile(App& app, const std::filesystem::path& fileName, bool convertRdfToRub)
 {
-    return worldRenderer(app)->gaussianSplatPasses().loadFromFile(fileName, convertRdfToRub);
+    return SceneGaussianSplatLogic::loadFromFile(
+        worldRenderer(app)->gaussianSplatPasses(), fileName, convertRdfToRub);
 }
 
 uint32_t gaussianSplatCount(const App& app)

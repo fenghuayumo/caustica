@@ -10,7 +10,7 @@
 #include <engine/SceneQuery.h>
 #include <engine/SceneSpawn.h>
 #include <engine/RenderSessionApi.h>
-#include <render/core/SceneMeshEditing.h>
+#include <engine/SceneMeshEditing.h>
 #include <scene/SceneEcs.h>
 
 #include <algorithm>

@@ -1,6 +1,7 @@
-#include <render/core/SceneMeshEditing.h>
+#include <engine/SceneMeshEditing.h>
 #include <render/core/SceneGpuUpdater.h>
 
+#include <core/ThreadContext.h>
 #include <scene/Scene.h>
 #include <scene/SceneEcs.h>
 #include <scene/SceneObjects.h>
@@ -437,16 +438,23 @@ void RebuildSceneMeshBuffersIfNeeded(const std::shared_ptr<MeshInfo>& mesh, cons
     }
 
     if (params.scene)
+    {
+        const scene::SceneRenderData& renderData =
+            params.scene->extractRenderDataForGpuSetup(params.frameIndex);
         render::SceneGpuUpdater::refreshAfterLoad(
             *params.scene,
+            renderData,
             params.descriptorTable,
             params.frameIndex);
+    }
 }
 
 } // namespace
 
 std::vector<dm::float3> getMeshVertices(const std::shared_ptr<MeshInfo>& mesh)
 {
+    assertLogicThread();
+
     std::vector<float3> renderVertices = GetMeshRenderVertices(mesh, "getMeshVertices");
     return BuildUniquePositionMap(
         renderVertices,
@@ -458,6 +466,8 @@ std::vector<dm::float3> getMeshVerticesWorld(
     const std::shared_ptr<MeshInfo>& mesh,
     uint32_t frameIndex)
 {
+    assertLogicThread();
+
     auto entity = FindUniqueMeshInstanceEntity(scene, mesh, "getMeshVerticesWorld");
     return getMeshVerticesWorld(scene, entity, frameIndex);
 }
@@ -467,10 +477,12 @@ std::vector<dm::float3> getMeshVerticesWorld(
     ecs::Entity entity,
     uint32_t frameIndex)
 {
+    assertLogicThread();
+
     if (!scene)
         throw std::runtime_error("getMeshVerticesWorld: no scene is loaded");
 
-    scene->refreshSceneWorld(frameIndex);
+    scene->refreshEntityWorldForFrame(frameIndex);
 
     const scene::SceneEntityWorld* entityWorld = scene->getEntityWorld();
     if (!entityWorld)
@@ -491,6 +503,8 @@ void setMeshVertices(
     const std::vector<dm::float3>& vertices,
     const SetSceneMeshVerticesParams& params)
 {
+    assertLogicThread();
+
     if (!mesh)
         throw std::runtime_error("setMeshVertices: mesh is null");
     if (!mesh->buffers)
@@ -548,10 +562,12 @@ void setMeshVerticesWorld(
     const std::vector<dm::float3>& vertices,
     const SetSceneMeshVerticesParams& params)
 {
+    assertLogicThread();
+
     if (!params.scene)
         throw std::runtime_error("setMeshVerticesWorld: no scene is loaded");
 
-    params.scene->refreshSceneWorld(params.frameIndex);
+    params.scene->refreshEntityWorldForFrame(params.frameIndex);
 
     const scene::SceneEntityWorld* entityWorld = params.scene->getEntityWorld();
     if (!entityWorld)
@@ -578,6 +594,8 @@ void setMeshVerticesWorld(
     const std::vector<dm::float3>& vertices,
     const SetSceneMeshVerticesParams& params)
 {
+    assertLogicThread();
+
     auto entity = FindUniqueMeshInstanceEntity(params.scene, mesh, "setMeshVerticesWorld");
     setMeshVerticesWorld(entity, vertices, params);
 }
@@ -588,6 +606,8 @@ void setMeshPositionsDirect(
     size_t count,
     const SetSceneMeshVerticesParams& params)
 {
+    assertLogicThread();
+
     if (!mesh)
         throw std::runtime_error("setMeshPositionsDirect: mesh is null");
     if (!mesh->buffers)
@@ -650,6 +670,8 @@ bool applyGeometrySequence(
     float timeSeconds,
     const SetSceneMeshVerticesParams& params)
 {
+    assertLogicThread();
+
     if (!sequence.mesh || sequence.vertexCount == 0 || sequence.timesSeconds.empty())
         return false;
 

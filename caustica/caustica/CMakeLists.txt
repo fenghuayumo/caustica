@@ -8,9 +8,6 @@
 # All module targets use the `caus` prefix to avoid name collisions with
 # the existing `causticaApp` application library and `caustica` executable.
 #
-# Legacy: `causticaLib` is preserved as an INTERFACE library that
-# aggregates all modules for backward compatibility.
-#
 # Dependency graph (top-down):
 #   causEngine → causRender → causScene → causAssets
 #              → causBackend → causPlatform → causEvents
@@ -75,7 +72,7 @@ function(caus_configure_static TARGET_NAME)
             target_compile_definitions(${TARGET_NAME} PRIVATE CAUSTICA_FORCE_DISCRETE_GPU=$<BOOL:${CAUSTICA_FORCE_DISCRETE_GPU}>)
         endif()
     endif()
-    set_target_properties(${TARGET_NAME} PROPERTIES FOLDER "causticaLib/modules")
+    set_target_properties(${TARGET_NAME} PROPERTIES FOLDER "caustica/modules")
 endfunction()
 
 function(caus_configure_interface TARGET_NAME)
@@ -87,7 +84,7 @@ function(caus_configure_interface TARGET_NAME)
     if (MSVC)
         target_compile_definitions(${TARGET_NAME} INTERFACE NOMINMAX _CRT_SECURE_NO_WARNINGS)
     endif()
-    set_target_properties(${TARGET_NAME} PROPERTIES FOLDER "causticaLib/modules")
+    set_target_properties(${TARGET_NAME} PROPERTIES FOLDER "caustica/modules")
 endfunction()
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -392,6 +389,23 @@ target_link_libraries(causRender
     PUBLIC causScene causBackend causImgui causAssets causEcs
     PUBLIC jsoncpp_static NRD Rtxdi omm-lib omm-gpu-nvrhi
 )
+
+option(CAUSTICA_CHECK_RENDER_ECS
+    "Fail the build when src/render accesses the live ECS world"
+    ON)
+if (CAUSTICA_CHECK_RENDER_ECS)
+    find_package(Python3 REQUIRED COMPONENTS Interpreter)
+    add_custom_target(causticaCheckRenderEcs
+        COMMAND ${Python3_EXECUTABLE}
+            "${CMAKE_SOURCE_DIR}/support/python/check_render_ecs_isolation.py"
+            --render-root "${CMAKE_CURRENT_SOURCE_DIR}/src/render"
+            --render-root "${CMAKE_CURRENT_SOURCE_DIR}/include/render"
+        COMMENT "Checking render/ECS isolation"
+        VERBATIM
+    )
+    add_dependencies(causRender causticaCheckRenderEcs)
+endif()
+
 # Optional render dependencies
 if (CAUSTICA_WITH_OIDN)
     target_link_libraries(causRender PUBLIC OpenImageDenoise)
@@ -429,6 +443,9 @@ target_link_libraries(causEngine
     PUBLIC causEvents causPlatform causBackend causRender causImgui
     PUBLIC cxxopts
 )
+if (NOT WIN32)
+    target_link_libraries(causEngine PUBLIC stdc++fs dl pthread)
+endif()
 # Streamline private include path
 if (CAUSTICA_WITH_STREAMLINE)
     target_include_directories(causEngine PRIVATE
@@ -447,38 +464,6 @@ if (CAUSTICA_WITH_STREAMLINE)
         endif()
     endforeach()
 endif()
-
-# ═══════════════════════════════════════════════════════════════════════════
-# Aggregate target — backward compatibility
-# ═══════════════════════════════════════════════════════════════════════════
-# causticaLib is an INTERFACE library that re-exports all modules.
-# External targets linking causticaLib will transitively link everything.
-# This preserves backward compatibility with the parent CMakeLists.txt
-# which does:  target_link_libraries(causticaApp PUBLIC causticaLib)
-
-add_library(causticaLib INTERFACE)
-target_link_libraries(causticaLib INTERFACE
-    causMath
-    causCore
-    causEvents
-    causAnimation
-    causEcs
-    causAudio
-    causPlatform
-    causBackend
-    causImgui
-    causAssets
-    causScene
-    causRender
-    causEngine
-)
-caus_configure_interface(causticaLib)
-
-if (NOT WIN32)
-    target_link_libraries(causticaLib INTERFACE stdc++fs dl pthread)
-endif()
-
-set_target_properties(causticaLib PROPERTIES FOLDER "causticaLib")
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Shader dependencies

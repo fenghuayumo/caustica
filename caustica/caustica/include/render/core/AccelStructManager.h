@@ -7,15 +7,13 @@
 
 #include <cstdint>
 #include <memory>
+#include <span>
 #include <vector>
 
 class OpacityMicromapBuilder;
 
 namespace caustica
 {
-template<typename T>
-class ResourceTracker;
-
 namespace scene
 {
 class SceneRenderData;
@@ -46,14 +44,14 @@ public:
     explicit AccelStructManager(nvrhi::IDevice* device);
 
     void createBlases(nvrhi::ICommandList* commandList,
-                      const ResourceTracker<MeshInfo>& meshes,
+                      std::span<const std::shared_ptr<MeshInfo>> meshes,
                       const AccelStructBuildSettings& settings);
 
     void createTlas(nvrhi::ICommandList* commandList, const scene::SceneRenderData& renderData);
 
     void uploadSubInstanceData(nvrhi::ICommandList* commandList) const;
 
-    void clearMeshAccelStructs(const ResourceTracker<MeshInfo>& meshes);
+    void clearMeshAccelStructs(std::span<const std::shared_ptr<MeshInfo>> meshes);
 
     void requestMeshRebuild(const std::shared_ptr<MeshInfo>& mesh);
 

@@ -209,6 +209,15 @@ void onSceneUnloading(App& app)
     cfg->EnvironmentMapParams = EnvironmentMapRuntimeParameters();
     vs->uncompressedTextures.clear();
 
+    // Scene::prepareForUnload mutates live ECS/resource ownership. Drain render
+    // work first, then perform that mutation in the logic domain.
+    app.waitForDedicatedRenderThreadIdle();
+    if (::SceneManager* manager = detail::sessionManager(app))
+    {
+        if (const std::shared_ptr<Scene> scene = manager->getScene())
+            scene->prepareForUnload();
+    }
+
     runGpuWorkOnRenderThread(app, [&app]() {
         if (GpuRenderSubsystem* gr = app.tryResource<GpuRenderSubsystem>())
             gr->onSceneUnloading();
@@ -383,9 +392,16 @@ void onSceneLoaded(App& app)
 
     applyLogicThreadSceneLoadSetup(app, *manager, *cmd);
 
-    runGpuWorkOnRenderThread(app, [&app]() {
-        if (GpuRenderSubsystem* gpu = app.tryResource<GpuRenderSubsystem>())
-            gpu->onSceneLoadedGpuPrep();
+    const scene::SceneRenderData* gpuSetupData = nullptr;
+    if (const std::shared_ptr<Scene> scenePtr = activeScene(app))
+    {
+        if (GpuDevice* device = gpuDevice(app))
+            gpuSetupData = &scenePtr->extractRenderDataForGpuSetup(device->getFrameIndex());
+    }
+
+    runGpuWorkOnRenderThread(app, [&app, gpuSetupData]() {
+        if (GpuRenderSubsystem* gpu = app.tryResource<GpuRenderSubsystem>(); gpu && gpuSetupData)
+            gpu->onSceneLoadedGpuPrep(*gpuSetupData);
     });
 
     registerLoadedSceneAssets(app, *manager);
@@ -394,7 +410,8 @@ void onSceneLoaded(App& app)
 
     vs->progressLoading.Set(60);
 
-    gr->onSceneLoadedGpuFinish();
+    if (gpuSetupData)
+        gr->onSceneLoadedGpuFinish(*gpuSetupData);
 
     collectUncompressedTextures(app);
 
@@ -410,12 +427,6 @@ void onSceneLoaded(App& app)
 
     vs->progressLoading.Set(100);
 
-    if (GpuDevice* device = gpuDevice(app))
-    {
-        device->setPreparedRenderFrameIndex(device->getFrameIndex());
-        if (const std::shared_ptr<Scene> scenePtr = activeScene(app))
-            scenePtr->extractAndPublishRenderSnapshot(device->getPreparedRenderFrameIndex());
-    }
 }
 
 void collectUncompressedTextures(App& app)

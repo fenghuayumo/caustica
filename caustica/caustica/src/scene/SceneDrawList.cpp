@@ -37,17 +37,17 @@ void AppendOpaqueGeometryCommands(
     const dm::frustum& viewFrustum,
     std::vector<DrawCommand>& out)
 {
-    if (!proxy.mesh)
+    if (!proxy.meshShared)
         return;
 
-    const caustica::MeshInfo* mesh = proxy.mesh;
+    const caustica::MeshInfo* mesh = proxy.meshShared.get();
     for (const auto& geometry : mesh->geometries)
     {
         const MaterialDomain domain = geometry->material->domain;
         if (domain != MaterialDomain::Opaque && domain != MaterialDomain::AlphaTested)
             continue;
 
-        if (mesh->geometries.size() > 1 && !mesh->skinPrototype)
+        if (proxy.geometryCount > 1 && !proxy.hasSkinPrototype)
         {
             const dm::box3 geometryGlobalBoundingBox = geometry->objectSpaceBounds * proxy.transformFloat;
             if (!viewFrustum.intersectsWith(geometryGlobalBoundingBox))
@@ -73,10 +73,10 @@ void AppendTransparentGeometryCommands(
     const DrawListBuildOptions& options,
     std::vector<DrawCommand>& out)
 {
-    if (!proxy.mesh)
+    if (!proxy.meshShared)
         return;
 
-    const caustica::MeshInfo* mesh = proxy.mesh;
+    const caustica::MeshInfo* mesh = proxy.meshShared.get();
     for (const auto& geometry : mesh->geometries)
     {
         const auto& material = geometry->material;
@@ -84,7 +84,7 @@ void AppendTransparentGeometryCommands(
             continue;
 
         dm::box3 geometryGlobalBoundingBox;
-        if (mesh->geometries.size() > 1 && mesh->skinPrototype.use_count() != 0)
+        if (proxy.geometryCount > 1 && proxy.hasSkinPrototype)
         {
             geometryGlobalBoundingBox = geometry->objectSpaceBounds * proxy.transformFloat;
             if (!viewFrustum.intersectsWith(geometryGlobalBoundingBox))

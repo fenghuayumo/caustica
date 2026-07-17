@@ -2,7 +2,6 @@
 
 #include <ecs/Entity.h>
 
-#include <cstdint>
 #include <functional>
 #include <memory>
 
@@ -40,14 +39,6 @@ void applyImportedSceneMaterialCallbacks(
     const std::shared_ptr<Scene>& scene,
     ecs::Entity importedRoot,
     const SceneApplyCallbacks& callbacks);
-
-// Marks GPU structure sync + extracts proxies for the current frame.
-// Prefer letting Extract auto-flush; this remains for rare immediate republish paths.
-void publishSceneRenderProxies(
-    const std::shared_ptr<Scene>& scene,
-    ecs::Entity importedRoot,
-    uint32_t frameIndex,
-    const SceneApplyCallbacks& callbacks = {});
 
 bool destroySceneEntity(const DestroySceneEntityParams& params);
 

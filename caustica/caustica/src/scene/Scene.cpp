@@ -248,6 +248,8 @@ const SceneLoadingStats& Scene::getLoadingStats()
 
 box3 Scene::getSceneBounds() const
 {
+    assertLogicThread();
+
     if (!m_EntityWorld || !ecs::isValid(m_EntityWorld->root()))
         return box3::empty();
 
@@ -262,6 +264,8 @@ box3 Scene::getSceneBounds() const
 
 void Scene::prepareForUnload()
 {
+    assertLogicThread();
+
     m_LogicExtractCache.clear();
     m_LogicExtractCacheValid = false;
     m_RenderSnapshot.clear();
@@ -308,6 +312,8 @@ void Scene::prepareForUnload()
 
 const ResourceTracker<Material>& Scene::getMaterials() const
 {
+    assertLogicThread();
+
     if (m_EntityWorld)
         return m_EntityWorld->getMaterials();
 
@@ -317,6 +323,8 @@ const ResourceTracker<Material>& Scene::getMaterials() const
 
 const ResourceTracker<MeshInfo>& Scene::getMeshes() const
 {
+    assertLogicThread();
+
     if (m_EntityWorld)
         return m_EntityWorld->getMeshes();
 
@@ -326,16 +334,19 @@ const ResourceTracker<MeshInfo>& Scene::getMeshes() const
 
 size_t Scene::getGeometryCount() const
 {
+    assertLogicThread();
     return m_EntityWorld ? m_EntityWorld->getGeometryCount() : 0;
 }
 
 size_t Scene::getMaxGeometryCountPerMesh() const
 {
+    assertLogicThread();
     return m_EntityWorld ? m_EntityWorld->getMaxGeometryCountPerMesh() : 0;
 }
 
 size_t Scene::getGeometryInstancesCount() const
 {
+    assertLogicThread();
     return m_EntityWorld ? m_EntityWorld->getGeometryInstancesCount() : 0;
 }
 
@@ -392,16 +403,6 @@ void Scene::endGpuReadFrame()
     m_gpuReadFrameIndex.store(UINT32_MAX, std::memory_order_release);
 }
 
-bool Scene::hasSceneTransformsChanged() const
-{
-    return m_SceneTransformsChanged;
-}
-
-bool Scene::hasSceneStructureChanged() const
-{
-    return m_SceneStructureChanged || m_gpuStructureFlushPending;
-}
-
 bool Scene::hasSceneTransformsChanged(uint32_t frameIndex) const
 {
     return m_RenderSnapshot.publishedStateForFrame(frameIndex).transformsChanged;
@@ -409,14 +410,21 @@ bool Scene::hasSceneTransformsChanged(uint32_t frameIndex) const
 
 bool Scene::hasSceneStructureChanged(uint32_t frameIndex) const
 {
-    return m_RenderSnapshot.publishedStateForFrame(frameIndex).structureChanged
-        || m_gpuStructureFlushPending;
+    const scene::SceneRenderPublishState& state = m_RenderSnapshot.publishedStateForFrame(frameIndex);
+    return state.structureGeneration
+        > m_gpuStructureConsumedGeneration.load(std::memory_order_acquire);
 }
 
-void Scene::acknowledgeGpuStructureConsumed()
+void Scene::acknowledgeGpuStructureConsumed(uint32_t frameIndex)
 {
-    m_gpuStructureFlushPending = false;
-    m_SceneStructureChanged = false;
+    const uint64_t generation =
+        m_RenderSnapshot.publishedStateForFrame(frameIndex).structureGeneration;
+    uint64_t consumed = m_gpuStructureConsumedGeneration.load(std::memory_order_relaxed);
+    while (consumed < generation
+        && !m_gpuStructureConsumedGeneration.compare_exchange_weak(
+            consumed, generation, std::memory_order_release, std::memory_order_relaxed))
+    {
+    }
 }
 
 void Scene::requestGpuStructureSync()
@@ -1143,6 +1151,8 @@ bool Scene::loadCustomData(Json::Value& rootNode, ThreadPool* threadPool)
 
 void Scene::refreshEntityWorldForFrame(uint32_t frameIndex)
 {
+    assertLogicThread();
+
     if (!m_EntityWorld)
         return;
 
@@ -1153,15 +1163,27 @@ void Scene::refreshEntityWorldForFrame(uint32_t frameIndex)
     pending.structureChanged = m_EntityWorld->hasPendingStructureChanges();
     pending.transformsChanged = m_EntityWorld->hasPendingTransformChanges();
     pending.frameIndex = frameIndex;
+    if (pending.structureChanged)
+    {
+        pending.structureGeneration =
+            m_gpuStructureGeneration.fetch_add(1, std::memory_order_acq_rel) + 1;
+    }
+    else
+    {
+        pending.structureGeneration =
+            m_gpuStructureGeneration.load(std::memory_order_acquire);
+    }
 
     m_EntityWorld->refresh(frameIndex);
 }
 
-void Scene::refreshSceneWorld(uint32_t frameIndex)
+const scene::SceneRenderData& Scene::extractRenderDataForGpuSetup(uint32_t frameIndex)
 {
+    assertLogicThread();
+
     refreshEntityWorldForFrame(frameIndex);
     if (!m_EntityWorld)
-        return;
+        return m_LogicExtractCache;
 
     // pending flags here are real ECS dirtiness (set by refreshEntityWorldForFrame),
     // not the GPU structure-flush carry used on no-op frames.
@@ -1172,33 +1194,13 @@ void Scene::refreshSceneWorld(uint32_t frameIndex)
     };
     scene::extractSceneRenderData(*m_EntityWorld, m_LogicExtractCache, frameIndex, flags);
     m_LogicExtractCacheValid = true;
-
-    scene::SceneRenderData& writeBuffer = m_RenderSnapshot.writeBufferForFrame(frameIndex);
-    const bool preserveSessionState = m_RenderSnapshot.wasExtractedForFrame(frameIndex);
-    const scene::CameraSnapshot preservedCamera = writeBuffer.camera;
-    const scene::RenderSettingsSnapshot preservedSettings = writeBuffer.renderSettings;
-
-    writeBuffer = m_LogicExtractCache;
-
-    if (preserveSessionState)
-    {
-        writeBuffer.camera = preservedCamera;
-        writeBuffer.renderSettings = preservedSettings;
-    }
-}
-
-void Scene::publishRenderSnapshot(uint32_t frameIndex)
-{
-    m_RenderSnapshot.publish(frameIndex);
-    const scene::SceneRenderPublishState& published = m_RenderSnapshot.publishedStateForFrame(frameIndex);
-    m_SceneStructureChanged = published.structureChanged;
-    m_SceneTransformsChanged = published.transformsChanged;
-    if (published.structureChanged)
-        m_gpuStructureFlushPending = true;
+    return m_LogicExtractCache;
 }
 
 void Scene::extractAndPublishRenderSnapshot(uint32_t frameIndex, const scene::SessionRenderExtractInputs* session)
 {
+    assertLogicThread();
+
     if (!m_EntityWorld)
         return;
 
@@ -1221,7 +1223,9 @@ void Scene::extractAndPublishRenderSnapshot(uint32_t frameIndex, const scene::Se
     {
         // Carry structure-flush across no-op frames until GPU consumes it.
         // Do not treat this as an extract structure rebuild — proxies are already current.
-        pending.structureChanged = m_gpuStructureFlushPending;
+        pending.structureGeneration = m_gpuStructureGeneration.load(std::memory_order_acquire);
+        pending.structureChanged = pending.structureGeneration
+            > m_gpuStructureConsumedGeneration.load(std::memory_order_acquire);
         pending.transformsChanged = false;
         pending.frameIndex = frameIndex;
     }
@@ -1231,23 +1235,11 @@ void Scene::extractAndPublishRenderSnapshot(uint32_t frameIndex, const scene::Se
 
     scene::SceneRenderData& writeBuffer = m_RenderSnapshot.writeBufferForFrame(frameIndex);
 
-    // Runtime import/delete re-publishes the same frame after PrepareRenderFrame.
-    // Preserve session camera/settings so a structure rebuild does not replace them
-    // with defaults that WorldRenderer would apply to the live camera.
-    const bool preserveSessionState =
-        session == nullptr && m_RenderSnapshot.wasExtractedForFrame(frameIndex);
-    const scene::CameraSnapshot preservedCamera = writeBuffer.camera;
-    const scene::RenderSettingsSnapshot preservedSettings = writeBuffer.renderSettings;
-
     writeBuffer = m_LogicExtractCache;
     if (session)
         scene::extractSessionRenderState(*session, writeBuffer);
-    else if (preserveSessionState)
-    {
-        writeBuffer.camera = preservedCamera;
-        writeBuffer.renderSettings = preservedSettings;
-    }
-    publishRenderSnapshot(frameIndex);
+
+    m_RenderSnapshot.publish(frameIndex);
 }
 
 bool Scene::wasRenderSnapshotExtractedOnLogicThread(uint32_t frameIndex) const

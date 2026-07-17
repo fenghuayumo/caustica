@@ -9,6 +9,7 @@
 #include <scene/SceneEcs.h>
 #include <scene/SceneTypes.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -49,7 +50,13 @@ namespace caustica::scene
         ecs::Entity entity = ecs::NullEntity;
         int instanceIndex = -1;
         int geometryInstanceIndex = -1;
-        MeshInfo* mesh = nullptr;
+        int globalMeshIndex = -1;
+        int firstGlobalGeometryIndex = -1;
+        uint32_t geometryCount = 0;
+        MeshType meshType = MeshType::Triangles;
+        bool hasSkinPrototype = false;
+        // Transitional lifetime pin for render resources still owned by MeshInfo.
+        // Render code must use the immutable fields above whenever it does not need GPU handles.
         std::shared_ptr<MeshInfo> meshShared;
         dm::affine3 transformFloat = dm::affine3::identity();
         dm::affine3 previousTransformFloat = dm::affine3::identity();
@@ -185,6 +192,12 @@ namespace caustica::scene
         std::vector<LightRenderProxy> lights;
         std::vector<CameraRenderProxy> cameras;
         std::vector<GaussianSplatRenderProxy> gaussianSplats;
+
+        // Transitional lifetime snapshots. Render code may consume these stable
+        // resource lists but must not query SceneEntityWorld/ResourceTracker.
+        std::vector<std::shared_ptr<MeshInfo>> meshResources;
+        std::vector<std::shared_ptr<Material>> materialResources;
+        size_t geometryCount = 0;
 
         ActiveCameraRenderProxy camera;
         RenderSettingsSnapshot renderSettings;

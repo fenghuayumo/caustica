@@ -74,21 +74,6 @@ void applyImportedSceneMaterialCallbacks(
     ApplyMaterialCallbacks(scene, importedRoot, callbacks);
 }
 
-void publishSceneRenderProxies(
-    const std::shared_ptr<Scene>& scene,
-    ecs::Entity importedRoot,
-    uint32_t frameIndex,
-    const SceneApplyCallbacks& callbacks)
-{
-    ApplyMaterialCallbacks(scene, importedRoot, callbacks);
-
-    if (!scene)
-        return;
-
-    scene->requestGpuStructureSync();
-    scene->extractAndPublishRenderSnapshot(frameIndex);
-}
-
 bool destroySceneEntity(const DestroySceneEntityParams& params)
 {
     if (!ecs::isValid(params.entity) || params.scene == nullptr)

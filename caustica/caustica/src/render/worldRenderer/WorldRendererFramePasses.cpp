@@ -303,8 +303,13 @@ void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameCont
             m_context->scenePasses.rayTracing.createRTPipelines();
         }
 
+        std::span<const std::shared_ptr<Material>> materialResources;
+        if (m_context->frameScene)
+            materialResources = m_context->frameScene->materialResources;
+        else if (m_context->sessionScene)
+            materialResources = m_context->sessionScene->getRenderData().materialResources;
         m_context->scenePasses.lighting.materials()->createRenderPassesAndLoadMaterials(
-            m_bindlessLayout, m_context->renderDevice, m_context->sessionScene,
+            m_bindlessLayout, m_context->renderDevice, materialResources,
             m_context->sessionScenePath, getLocalPath(c_AssetsFolder));
         m_context->diagnostics.progressInitializingRenderer.Set(5);
         if (m_context->scenePasses.lighting.opacityMaps())

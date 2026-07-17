@@ -1,5 +1,6 @@
 #pragma once
 
+#include <core/ThreadContext.h>
 #include <ecs/Entity.h>
 #include <ecs/World.h>
 #include <ecs/Events.h>
@@ -333,8 +334,16 @@ public:
     void assignGlobalResourceIndices();
     void refreshInstanceIndices();
 
-    [[nodiscard]] ecs::World& world() { return m_world; }
-    [[nodiscard]] const ecs::World& world() const { return m_world; }
+    [[nodiscard]] ecs::World& world()
+    {
+        assertLogicThread();
+        return m_world;
+    }
+    [[nodiscard]] const ecs::World& world() const
+    {
+        assertLogicThread();
+        return m_world;
+    }
 
     [[nodiscard]] ecs::Entity root() const { return m_root; }
     [[nodiscard]] ecs::Entity entityForPath(const std::filesystem::path& path) const;

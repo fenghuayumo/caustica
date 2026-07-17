@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <memory>
 #include <optional>
+#include <span>
 #include <vector>
 
 #include <render/core/BindingCache.h>
@@ -21,8 +22,6 @@ namespace caustica
     class TextureLoader;
     class TextureHandle;
     class ShaderFactory;
-    template<typename T>
-    class ResourceTracker;
     namespace render { class RenderDevice; }
     struct ImageAsset;
 }
@@ -103,21 +102,21 @@ public:
     void                            createRenderPasses(nvrhi::BindingLayoutHandle bindlessLayout, caustica::render::RenderDevice& renderDevice);
 
     bool                            update(nvrhi::ICommandList& commandList,
-                                           const caustica::ResourceTracker<caustica::MeshInfo>& meshes,
+                                           std::span<const std::shared_ptr<caustica::MeshInfo>> meshes,
                                            size_t geometryCount);
 
     OpacityMicroMapUIData &         uiData()    { return m_uiData; }
-    bool                            debugGUI(float indent, const caustica::ResourceTracker<caustica::MeshInfo>& meshes);
+    bool                            debugGUI(float indent, std::span<const std::shared_ptr<caustica::MeshInfo>> meshes);
 
     void                            sceneLoaded(size_t geometryCount);
     void                            sceneUnloading();
 
-    void                            createOpacityMicromaps(const caustica::ResourceTracker<caustica::MeshInfo>& meshes,
+    void                            createOpacityMicromaps(std::span<const std::shared_ptr<caustica::MeshInfo>> meshes,
                                                            size_t geometryCount);
     void                            destroyOpacityMicromaps(nvrhi::ICommandList& commandList,
-                                                            const caustica::ResourceTracker<caustica::MeshInfo>& meshes);
+                                                            std::span<const std::shared_ptr<caustica::MeshInfo>> meshes);
     void                            buildOpacityMicromaps(nvrhi::ICommandList& commandList,
-                                                          const caustica::ResourceTracker<caustica::MeshInfo>& meshes,
+                                                          std::span<const std::shared_ptr<caustica::MeshInfo>> meshes,
                                                           size_t geometryCount);
     void                            writeGeometryDebugBuffer(nvrhi::ICommandList& commandList);
     void                            updateDebugGeometry(const caustica::MeshInfo& mesh);

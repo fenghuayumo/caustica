@@ -273,7 +273,10 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         $<$<CXX_COMPILER_ID:GNU>:-Wno-error=unused-result>
     )
 endif()
-target_link_libraries(causticaApp PUBLIC causticaLib imguizmo)
+target_link_libraries(causticaApp PUBLIC causEngine imguizmo)
+if (CAUSTICA_WITH_AUDIO)
+    target_link_libraries(causticaApp PUBLIC causAudio)
+endif()
 target_include_directories(causticaApp PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}"
     "${CMAKE_SOURCE_DIR}/application/editor"

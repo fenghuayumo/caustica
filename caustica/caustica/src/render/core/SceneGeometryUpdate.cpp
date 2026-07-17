@@ -83,8 +83,8 @@ void updateSceneGeometry(AccelStructManager& accelStructs, UpdateSceneGeometryPa
         commandList,
         static_cast<uint32_t>(params.frameIndex));
 
-    const ResourceTracker<MeshInfo>& meshes = scene->getMeshes();
-    const size_t geometryCount = scene->getGeometryCount();
+    const auto& meshes = renderData.meshResources;
+    const size_t geometryCount = renderData.geometryCount;
 
     if (params.opacityMaps != nullptr)
         params.opacityMaps->buildOpacityMicromaps(*commandList, meshes, geometryCount);

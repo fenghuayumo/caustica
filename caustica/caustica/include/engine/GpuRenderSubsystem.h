@@ -16,11 +16,12 @@ namespace render
 {
 class WorldRenderer;
 }
+namespace scene { class SceneRenderData; }
 
 // Wire already-created App resources for scene load/unload GPU orchestration.
 // Bootstrap (caches / SceneSession / WorldRenderer create): SceneStartup
 // Sample settings / hierarchy / cmdline overrides / asset register: SceneLifecycle / AssetSystem
-struct GpuRenderSubsystemInitParams
+struct gpuRenderSubsystemInitParams
 {
     GpuDevice& gpuDevice;
     AssetSystem& assetSystem;
@@ -44,11 +45,11 @@ public:
     void shutdown();
 
     // Store pointers only; callers must create GpuSharedCaches / SceneSession / WorldRenderer first.
-    bool initialize(const GpuRenderSubsystemInitParams& params);
+    bool initialize(const gpuRenderSubsystemInitParams& params);
 
     void onSceneUnloading();
-    void onSceneLoadedGpuPrep();
-    void onSceneLoadedGpuFinish();
+    void onSceneLoadedGpuPrep(const scene::SceneRenderData& renderData);
+    void onSceneLoadedGpuFinish(const scene::SceneRenderData& renderData);
 
 private:
     GpuSharedCaches* m_gpuSharedCaches = nullptr;

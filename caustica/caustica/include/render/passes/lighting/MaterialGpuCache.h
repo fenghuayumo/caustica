@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <memory>
 #include <optional>
+#include <span>
 
 #include <assets/loader/ShaderCompilerUtils.h>
 #include <assets/loader/ShaderKey.h>
@@ -272,7 +273,7 @@ public:
     MaterialGpuCache(const std::string & relativeShaderSourcePath, nvrhi::IDevice* device, std::shared_ptr<caustica::TextureLoader> textureCache, std::shared_ptr<caustica::ShaderFactory> shaderFactory);
     ~MaterialGpuCache();
 
-    void                            createRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* bindlessLayout, caustica::render::RenderDevice& renderDevice, const std::shared_ptr<caustica::Scene>& scene, const std::filesystem::path & sceneFilePath, const std::filesystem::path & mediaPath);
+    void                            createRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* bindlessLayout, caustica::render::RenderDevice& renderDevice, std::span<const std::shared_ptr<caustica::Material>> materials, const std::filesystem::path & sceneFilePath, const std::filesystem::path & mediaPath);
 
     // this update can happen in parallel with any other ray preparatory tracing work - anything from BVH building to laying down denoising layers
     void                            update(nvrhi::ICommandList* commandList,
@@ -291,7 +292,7 @@ public:
     void                            sceneReloaded();
     // Incrementally create PT materials for scene materials that do not yet have
     // ptData. Used by runtime mesh import so existing materials stay valid.
-    int                             ensureMaterialsFromScene(const std::shared_ptr<caustica::Scene>& scene);
+    int                             ensureMaterialsFromScene(std::span<const std::shared_ptr<caustica::Material>> materials);
 
     std::filesystem::path           getMaterialStoragePath(PTMaterialBase& material);
 

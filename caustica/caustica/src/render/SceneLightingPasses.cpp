@@ -80,11 +80,12 @@ void SceneLightingPasses::notifySceneReloaded(size_t geometryCount)
         m_opacityMaps->sceneLoaded(geometryCount);
 }
 
-int SceneLightingPasses::ensureMaterialsFromScene(const std::shared_ptr<caustica::Scene>& scene)
+int SceneLightingPasses::ensureMaterialsFromScene(
+    const caustica::scene::SceneRenderData& renderData)
 {
-    if (m_materials == nullptr || !scene)
+    if (m_materials == nullptr)
         return 0;
-    return m_materials->ensureMaterialsFromScene(scene);
+    return m_materials->ensureMaterialsFromScene(renderData.materialResources);
 }
 
 void SceneLightingPasses::applyShaderMacros(std::vector<caustica::ShaderMacro>& macros)
@@ -96,7 +97,7 @@ void SceneLightingPasses::applyShaderMacros(std::vector<caustica::ShaderMacro>& 
 }
 
 void SceneLightingPasses::createOpacityMicromaps(
-    const caustica::ResourceTracker<caustica::MeshInfo>& meshes,
+    std::span<const std::shared_ptr<caustica::MeshInfo>> meshes,
     size_t geometryCount)
 {
     if (m_opacityMaps != nullptr)

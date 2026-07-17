@@ -17,16 +17,6 @@ inline ecs::Entity attachRuntimeSceneImport(
     return attachImportedScene(scene, importResult, callbacks);
 }
 
-inline void finalizeRuntimeSceneMutation(
-    const std::shared_ptr<Scene>& scene,
-    ecs::Entity importedRoot,
-    uint32_t frameIndex,
-    const RuntimeSceneMutationCallbacks& callbacks = {})
-{
-    // Prefer spawn() / Extract auto-flush. This only marks sync + republishes proxies.
-    publishSceneRenderProxies(scene, importedRoot, frameIndex, callbacks);
-}
-
 inline void applyRuntimeSceneMaterialCallbacks(
     const std::shared_ptr<Scene>& scene,
     ecs::Entity importedRoot,

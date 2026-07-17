@@ -195,12 +195,6 @@ void SceneManager::updateLoading()
     m_loader.update();
 }
 
-void SceneManager::tickSimulation(uint32_t frameIndex)
-{
-    if (m_scene)
-        m_scene->refreshSceneWorld(frameIndex);
-}
-
 bool SceneManager::isSceneLoading() const
 {
     return m_loader.isLoading();

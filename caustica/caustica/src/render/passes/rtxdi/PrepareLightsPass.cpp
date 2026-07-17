@@ -168,10 +168,10 @@ void PrepareLightsPass::countLightsInScene(uint32_t& numEmissiveMeshes, uint32_t
 
     for (const scene::MeshInstanceRenderProxy& meshProxy : m_renderData->meshInstances)
     {
-        if (!meshProxy.mesh)
+        if (!meshProxy.meshShared)
             continue;
 
-        for (const auto& geometry : meshProxy.mesh->geometries)
+        for (const auto& geometry : meshProxy.meshShared->geometries)
         {
             if (!geometry)
                 continue;

@@ -19,6 +19,7 @@ namespace caustica
 struct GaussianSplat;
 class GpuDevice;
 class Scene;
+class SceneGaussianSplatLogic;
 class ShaderFactory;
 namespace render { class RenderDevice; }
 } // namespace caustica
@@ -31,6 +32,7 @@ struct ScenePassWireParams;
 class SceneGaussianSplatPasses
 {
     friend struct PathTracerScenePasses;
+    friend class ::caustica::SceneGaussianSplatLogic;
 
 public:
     // GPU pass bound to an ECS GaussianSplatComponent entity (authoring stays on ECS).
@@ -46,9 +48,6 @@ public:
     void bindSession(caustica::Scene* scene, std::filesystem::path scenePath);
     void clearSession();
     void sceneUnloading();
-    void onSceneLoaded();
-    bool loadFromFile(const std::filesystem::path& fileName, bool convertRdfToRub = true);
-    bool removeObjectsUnderEntity(ecs::Entity rootEntity);
 
     [[nodiscard]] const std::vector<SceneObject>& objects() const { return m_objects; }
     [[nodiscard]] std::vector<SceneObject>& objects() { return m_objects; }
@@ -62,8 +61,6 @@ private:
     void wireSession(const ScenePassWireParams& params);
 
     std::filesystem::path resolveSplatPath(const caustica::GaussianSplat& splat) const;
-    void loadFromSceneEntities();
-    bool attachToScene(const std::filesystem::path& fileName, bool convertRdfToRub);
     void updateUIState();
     void onPassLoaded(GaussianSplatPass& pass);
     uint32_t totalSplatCount() const;

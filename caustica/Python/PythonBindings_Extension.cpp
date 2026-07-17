@@ -193,15 +193,16 @@ public:
             ? m_session->GetEngine()->frameIndex()
             : 0u;
 
-        // attach grafts ECS only; snapshot publish waits until GPU buffers exist
-        // inside refreshAfterLoad on the render thread (same as SceneContentEditor).
+        // Attach mutates ECS only; the regular Extract schedule publishes the snapshot.
         app.waitForDedicatedRenderThreadIdle();
         const auto importedRoot = caustica::attachRuntimeSceneImport(
             scene, *loadResult.ImportResult);
         if (importedRoot == caustica::ecs::NullEntity)
             return false;
 
-        app.runGpuWorkOnRenderThread([&app, caches, worldRenderer, scene, frameIndex]() {
+        const caustica::scene::SceneRenderData& gpuSetupData =
+            scene->extractRenderDataForGpuSetup(frameIndex);
+        app.runGpuWorkOnRenderThread([&app, caches, worldRenderer, scene, frameIndex, &gpuSetupData]() {
             if (auto* device = app.getGpuDevice())
             {
                 if (nvrhi::IDevice* nvrhiDevice = device->getDevice())
@@ -212,9 +213,10 @@ public:
                 caches->textureLoader->processRenderingThreadCommands(*caches->renderDevice, 0.f);
                 caches->textureLoader->loadingFinished();
             }
-            worldRenderer->lightingPasses().ensureMaterialsFromScene(scene);
+            worldRenderer->lightingPasses().ensureMaterialsFromScene(gpuSetupData);
             caustica::render::SceneGpuUpdater::refreshAfterLoad(
                 *scene,
+                gpuSetupData,
                 caches->descriptorTable.get(),
                 frameIndex);
         });

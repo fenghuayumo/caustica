@@ -63,11 +63,10 @@ namespace caustica
         std::shared_ptr<UrdfImporter> m_UrdfImporter;
         std::vector<SceneImportResult> m_Models;
 
-        bool m_SceneTransformsChanged = false;
-        bool m_SceneStructureChanged = false;
-        // Stays true after a structure publish until SceneGpuUpdater consumes it, so a
-        // delete on a no-render frame still forces GPU buffer rebuild on the next render.
-        bool m_gpuStructureFlushPending = false;
+        // Monotonic handoff prevents an old render frame from acknowledging a newer
+        // structure publish. Logic writes published generation; render advances consumed.
+        std::atomic<uint64_t> m_gpuStructureGeneration{0};
+        std::atomic<uint64_t> m_gpuStructureConsumedGeneration{0};
         // Logic mutated ECS structure; Extract must exclusive-upload meshes/AS before
         // publishing proxies that reference the new graph.
         bool m_pendingGpuStructureSync = false;
@@ -124,9 +123,10 @@ namespace caustica
             std::shared_ptr<TextureLoader> textureCache,
             std::shared_ptr<SceneTypeFactory> sceneTypeFactory);
 
-        void refreshSceneWorld(uint32_t frameIndex);
+        // Logic-thread staging for exclusive GPU setup. Updates the extract cache only;
+        // AppSchedule::Extract remains the sole snapshot writer/publisher.
+        [[nodiscard]] const scene::SceneRenderData& extractRenderDataForGpuSetup(uint32_t frameIndex);
         void refreshEntityWorldForFrame(uint32_t frameIndex);
-        void publishRenderSnapshot(uint32_t frameIndex);
 
         // Main/logic thread: extract and publish (ECS refresh runs in App PostUpdate).
         // Optional session inputs resolve ActiveCamera + RenderSettingsSnapshot in the same slot.
@@ -140,15 +140,13 @@ namespace caustica
         void endGpuReadFrame();
 
         void syncRenderSnapshotGpuIndices(uint32_t frameIndex);
-        void acknowledgeGpuStructureConsumed();
+        void acknowledgeGpuStructureConsumed(uint32_t frameIndex);
 
         // Bevy-style: mutate ECS only; engine flushes GPU/AS before Extract.
         void requestGpuStructureSync();
         [[nodiscard]] bool needsGpuStructureSync() const { return m_pendingGpuStructureSync; }
         void clearGpuStructureSyncRequest();
 
-        [[nodiscard]] bool hasSceneTransformsChanged() const;
-        [[nodiscard]] bool hasSceneStructureChanged() const;
         [[nodiscard]] bool hasSceneTransformsChanged(uint32_t frameIndex) const;
         [[nodiscard]] bool hasSceneStructureChanged(uint32_t frameIndex) const;
 
@@ -159,7 +157,11 @@ namespace caustica
 
         static const SceneLoadingStats& getLoadingStats();
 
-        [[nodiscard]] scene::SceneEntityWorld* getEntityWorld() const { return m_EntityWorld.get(); }
+        [[nodiscard]] scene::SceneEntityWorld* getEntityWorld() const
+        {
+            assertLogicThread();
+            return m_EntityWorld.get();
+        }
         [[nodiscard]] const std::shared_ptr<SceneTypeFactory>& getSceneTypeFactory() const { return m_SceneTypeFactory; }
         [[nodiscard]] dm::box3 getSceneBounds() const;
 

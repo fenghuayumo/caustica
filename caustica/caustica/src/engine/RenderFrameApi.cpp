@@ -15,7 +15,7 @@
 #include <scene/SceneEcs.h>
 #include <scene/Scene.h>
 #include <scene/scene_utils.h>
-#include <render/core/SceneMeshEditing.h>
+#include <engine/SceneMeshEditing.h>
 #include <render/core/PathTracerSettings.h>
 #include <render/passes/postProcess/ToneMappingPasses.h>
 #include <render/worldRenderer/WorldRenderer.h>
@@ -326,15 +326,6 @@ void animate(App& app, float fElapsedTimeSeconds)
 
 void tickSimulationAndFrameTiming(App& app, float fElapsedTimeSeconds)
 {
-    if (isSceneLoaded(app))
-    {
-        if (::SceneManager* manager = detail::sessionManager(app))
-        {
-            if (GpuDevice* device = gpuDevice(app))
-                manager->tickSimulation(device->getFrameIndex());
-        }
-    }
-
     GpuDevice* device = gpuDevice(app);
     double frameTime = device ? device->getAverageFrameTimeSeconds() : 0.0;
     if (frameTime <= 0.0 && fElapsedTimeSeconds > 0.0f)

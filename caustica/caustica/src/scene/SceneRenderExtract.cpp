@@ -22,6 +22,9 @@ void SceneRenderData::clear()
     lights.clear();
     cameras.clear();
     gaussianSplats.clear();
+    meshResources.clear();
+    materialResources.clear();
+    geometryCount = 0;
     camera = {};
     renderSettings = {};
     meshInstanceEntities.clear();
@@ -90,7 +93,16 @@ void FillMeshInstanceProxy(
     proxy.instanceIndex = ref.meshComp->instanceIndex;
     proxy.geometryInstanceIndex = ref.meshComp->geometryInstanceIndex;
     proxy.meshShared = ref.meshComp->mesh;
-    proxy.mesh = ref.meshComp->mesh.get();
+    proxy.globalMeshIndex = proxy.meshShared ? proxy.meshShared->globalMeshIndex : -1;
+    proxy.geometryCount = proxy.meshShared
+        ? static_cast<uint32_t>(proxy.meshShared->geometries.size())
+        : 0;
+    proxy.firstGlobalGeometryIndex =
+        proxy.meshShared && !proxy.meshShared->geometries.empty() && proxy.meshShared->geometries[0]
+        ? proxy.meshShared->geometries[0]->globalGeometryIndex
+        : -1;
+    proxy.meshType = proxy.meshShared ? proxy.meshShared->type : MeshType::Triangles;
+    proxy.hasSkinPrototype = proxy.meshShared && proxy.meshShared->skinPrototype != nullptr;
     proxy.transformFloat = ref.global->transformFloat;
     proxy.previousTransformFloat = ref.global->previousTransformFloat;
     proxy.globalBounds = ref.bounds->globalBounds;
@@ -445,6 +457,11 @@ void extractSceneRenderData(
         inout.clear();
         inout.camera = camera;
         inout.renderSettings = renderSettings;
+        inout.geometryCount = entityWorld.getGeometryCount();
+        for (const std::shared_ptr<MeshInfo>& mesh : entityWorld.getMeshes())
+            inout.meshResources.push_back(mesh);
+        for (const std::shared_ptr<Material>& material : entityWorld.getMaterials())
+            inout.materialResources.push_back(material);
 
         ExtractMeshInstancesFull(world, inout);
         ExtractSkinnedMeshes(world, inout, frameIndex);
