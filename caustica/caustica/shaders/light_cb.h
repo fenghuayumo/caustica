@@ -40,18 +40,4 @@ struct LightConstants
     int4 shadowChannel;
 };
 
-struct LightProbeConstants
-{
-    float diffuseScale;
-    float specularScale;
-    float mipLevels;
-    float padding1;
-
-    uint diffuseArrayIndex;
-    uint specularArrayIndex;
-    uint2 padding2;
-
-    float4 frustumPlanes[6];
-};
-
 #endif // LIGHT_CB_H

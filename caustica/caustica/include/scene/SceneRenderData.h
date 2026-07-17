@@ -4,10 +4,10 @@
 #include <math/math.h>
 #include <render/RenderRuntimeState.h>
 #include <render/core/PathTracerSettings.h>
-#include <render/passes/gaussian/GaussianSplatPass.h>
 #include <scene/SceneContent.h>
 #include <scene/SceneEcs.h>
 #include <scene/SceneTypes.h>
+#include <shaders/material_cb.h>
 
 #include <cstddef>
 #include <cstdint>
@@ -16,16 +16,9 @@
 #include <string>
 #include <vector>
 
-class GaussianSplatPass;
-
 namespace caustica
 {
 class CameraController;
-}
-
-namespace caustica::render
-{
-class SceneGaussianSplatPasses;
 }
 
 namespace caustica::scene
@@ -50,6 +43,7 @@ namespace caustica::scene
         ecs::Entity entity = ecs::NullEntity;
         int instanceIndex = -1;
         int geometryInstanceIndex = -1;
+        MeshRenderResourceId meshId;
         int globalMeshIndex = -1;
         int firstGlobalGeometryIndex = -1;
         uint32_t geometryCount = 0;
@@ -66,22 +60,16 @@ namespace caustica::scene
         ecs::Entity parentLightEntity = ecs::NullEntity;
     };
 
-    struct SkinnedMeshJointLineProxy
-    {
-        dm::float3 jointPosition = { 0.f, 0.f, 0.f };
-        dm::float3 parentPosition = { 0.f, 0.f, 0.f };
-        bool hasParent = false;
-    };
-
     struct SkinnedMeshRenderProxy
     {
         ecs::Entity entity = ecs::NullEntity;
+        MeshRenderResourceId meshId;
+        MeshRenderResourceId prototypeMeshId;
         std::shared_ptr<MeshInfo> mesh;
         std::shared_ptr<MeshInfo> prototypeMesh;
         dm::affine3 transformFloat = dm::affine3::identity();
         std::string debugName;
         std::vector<dm::float4x4> jointMatrices;
-        std::vector<SkinnedMeshJointLineProxy> jointLines;
         bool needsSkinningUpdate = false;
     };
 
@@ -147,13 +135,12 @@ namespace caustica::scene
     using CameraSnapshot = ActiveCameraRenderProxy;
 
     // One ECS GaussianSplatComponent + GlobalTransform, extracted for the render world.
-    // The pass is bound from SceneGaussianSplatPasses during session extract, never from ECS.
+    // GPU pass ownership stays in SceneGaussianSplatPasses and is resolved by entity.
     struct GaussianSplatRenderProxy
     {
         ecs::Entity entity = ecs::NullEntity;
         bool enabled = true;
         dm::affine3 objectToWorld = dm::affine3::identity();
-        std::shared_ptr<::GaussianSplatPass> pass;
     };
 
     struct RenderSettingsSnapshot
@@ -165,6 +152,15 @@ namespace caustica::scene
         double sceneTime = 0.0;
     };
 
+    struct MaterialRenderResourceSnapshot
+    {
+        MaterialRenderResourceId id;
+        uint32_t materialIndex = 0;
+        std::string debugName;
+        MaterialConstants constants = {};
+        MaterialConstants bindlessConstants = {};
+    };
+
     // Logic-thread session inputs consumed during Extract (not ECS).
     // Free-camera pose / selection come from CameraController; PathTracerSettings is copied
     // into RenderSettingsSnapshot (one-shot flags cleared after copy). Scene cameras are
@@ -174,7 +170,6 @@ namespace caustica::scene
         const class CameraController* camera = nullptr;
         PathTracerSettings* settings = nullptr; // non-const: one-shot flags cleared after copy
         const render::RenderRuntimeState* runtime = nullptr;
-        const render::SceneGaussianSplatPasses* gaussianSplatPasses = nullptr;
         double sceneTime = 0.0;
         bool gaussianSplatTemporalReset = false;
     };
@@ -197,6 +192,7 @@ namespace caustica::scene
         // resource lists but must not query SceneEntityWorld/ResourceTracker.
         std::vector<std::shared_ptr<MeshInfo>> meshResources;
         std::vector<std::shared_ptr<Material>> materialResources;
+        std::vector<MaterialRenderResourceSnapshot> materialSnapshots;
         size_t geometryCount = 0;
 
         ActiveCameraRenderProxy camera;

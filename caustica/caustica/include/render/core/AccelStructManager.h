@@ -7,6 +7,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <span>
 #include <vector>
 
@@ -18,6 +19,7 @@ namespace scene
 {
 class SceneRenderData;
 }
+namespace render { struct SceneGpuResources; }
 
 struct AccelStructBuildSettings
 {
@@ -42,6 +44,7 @@ class AccelStructManager
 public:
     AccelStructManager() = default;
     explicit AccelStructManager(nvrhi::IDevice* device);
+    void bindSceneGpuResources(render::SceneGpuResources* resources) { m_sceneGpuResources = resources; }
 
     void createBlases(nvrhi::ICommandList* commandList,
                       std::span<const std::shared_ptr<MeshInfo>> meshes,
@@ -56,6 +59,7 @@ public:
     void requestMeshRebuild(const std::shared_ptr<MeshInfo>& mesh);
 
     void rebuildDirtyMeshes(nvrhi::ICommandList*            commandList,
+                            const scene::SceneRenderData&   renderData,
                             const AccelStructBuildSettings& settings,
                             bool&                           fullRebuildRequested);
 
@@ -82,12 +86,15 @@ public:
 
 private:
     nvrhi::IDevice* m_device = nullptr;
+    render::SceneGpuResources* m_sceneGpuResources = nullptr;
 
     nvrhi::rt::AccelStructHandle                 m_topLevelAS;
     nvrhi::BufferHandle                          m_subInstanceBuffer;
     std::vector<SubInstanceData>                 m_subInstanceData;
     uint32_t                                         m_subInstanceCount = 0;
-    std::vector<std::shared_ptr<MeshInfo>>       m_meshesPendingAccelRebuild;
+    std::vector<scene::MeshRenderResourceId>     m_meshesPendingAccelRebuild;
+    std::shared_ptr<std::mutex>                  m_pendingRebuildMutex =
+        std::make_shared<std::mutex>();
 };
 
 } // namespace caustica

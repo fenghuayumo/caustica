@@ -435,7 +435,7 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
         m_context->scenePasses.rayTracing.accelerationStructRebuildRequested(),
         m_context->sessionScene,
         m_context->frameScene,
-        m_context->sessionScene ? &m_context->sessionScene->getGpuResources() : nullptr,
+        m_context->sessionScene ? &m_context->sceneGpuResources : nullptr,
         m_commandList,
     };
     geoParams.descriptorTable = m_context->descriptorTable.get();
@@ -526,7 +526,9 @@ void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext
     fillGaussianSplatShadowConstants(
         constants,
         m_context->activeSettings(),
-        getPrimaryGaussianSplatBinding(m_context->frameGaussianSplats()),
+        getPrimaryGaussianSplatBinding(
+            m_context->frameGaussianSplats(),
+            m_context->scenePasses.gaussianSplats),
         uint32_t(m_frameIndex & 0xffffffffu));
 
     constants.envMapSceneParams = m_context->scenePasses.lighting.envMapSceneParams();

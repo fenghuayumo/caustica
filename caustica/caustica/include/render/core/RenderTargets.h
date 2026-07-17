@@ -5,7 +5,6 @@
 #include <rhi/utils.h>
 #include <rhi/common/misc.h>
 #include <memory>
-#include <render/core/GBuffer.h>
 
 #include <shaders/PathTracer/Config.h>
 
@@ -14,7 +13,7 @@ namespace caustica
     class FramebufferFactory;
 }
 
-class RenderTargets// : public caustica::render::GBufferRenderTargets
+class RenderTargets
 {
     const dm::uint m_sampleCount = 1; // no MSAA supported in this sample
     bool m_useReverseProjection = false;

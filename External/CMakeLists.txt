@@ -129,31 +129,12 @@ if (CAUSTICA_WITH_NVRHI)
         sharpen_ps
         skinning_cs
         passes/bloom_ps
-        passes/cubemap_gs
-        passes/deferred_lighting_cs
-        passes/depth_ps
-        passes/depth_vs
         passes/dlss_exposure_cs
-        passes/environment_map_ps
         passes/exposure_cs
-        passes/gbuffer_ps
-        passes/gbuffer_vs
         passes/histogram_cs
-        passes/joints_main_ps
-        passes/joints_main_vs
-        passes/light_probe_cubemap_gs
-        passes/light_probe_diffuse_probe_ps
-        passes/light_probe_environment_brdf_ps
-        passes/light_probe_mip_ps
-        passes/light_probe_specular_probe_ps
-        passes/material_id_ps
         passes/mipmapgen_cs
         passes/motion_vectors_ps
         passes/pixel_readback_cs
-        passes/sky_ps
-        passes/ssao_blur_cs
-        passes/ssao_compute_cs
-        passes/ssao_deinterleave_cs
         passes/taa_cs
     )
 

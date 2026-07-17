@@ -1,4 +1,6 @@
 #include <render/passes/omm/OpacityMicromapBuilder.h>
+#include <render/core/RenderDevice.h>
+#include <render/SceneGpuResources.h>
 #include <render/passes/lighting/MaterialGpuCache.h> // for PTMaterial full definition
 
 #include <assets/loader/ShaderFactory.h>
@@ -93,9 +95,13 @@ void OpacityMicromapBuilder::sceneUnloading()
     m_ommBuildQueue->cancelPendingBuilds();
 }
 
-void OpacityMicromapBuilder::createRenderPasses(nvrhi::BindingLayoutHandle bindlessLayout, caustica::render::RenderDevice& /*renderDevice*/)
+void OpacityMicromapBuilder::createRenderPasses(
+    nvrhi::BindingLayoutHandle bindlessLayout,
+    caustica::render::RenderDevice& renderDevice)
 {
     m_bindlessLayout = std::move(bindlessLayout);
+    m_sceneGpuResources = renderDevice.activeSceneGpuResources();
+    m_ommBuildQueue->setSceneGpuResources(m_sceneGpuResources);
 }
 
 void OpacityMicromapBuilder::createOpacityMicromaps(
@@ -186,12 +192,17 @@ void OpacityMicromapBuilder::destroyOpacityMicromaps(
 
     for (const std::shared_ptr<MeshInfo>& _mesh : meshes)
     {
-        assert(std::dynamic_pointer_cast<MeshInfoEx>(_mesh) != nullptr);
-        const std::shared_ptr<MeshInfoEx>& mesh = std::static_pointer_cast<MeshInfoEx>(_mesh);
-        mesh->AccelStructOMM = nullptr;
-        mesh->OpacityMicroMaps.clear();
-        mesh->DebugData = nullptr;
-        mesh->DebugDataDirty = true;
+        if (!_mesh || m_sceneGpuResources == nullptr)
+            continue;
+        const auto meshGpuIt = m_sceneGpuResources->meshRegistry.find(_mesh->renderResourceId);
+        if (meshGpuIt == m_sceneGpuResources->meshRegistry.end())
+            continue;
+        caustica::render::MeshGpuRecord& meshGpu = meshGpuIt->second;
+        meshGpu.accelStructOmm = nullptr;
+        meshGpu.opacityMicromaps.clear();
+        meshGpu.debugData = nullptr;
+        meshGpu.geometryDebugData.clear();
+        meshGpu.debugDataDirty = true;
     }
 }
 
@@ -234,13 +245,16 @@ void OpacityMicromapBuilder::writeGeometryDebugBuffer(nvrhi::ICommandList& comma
     commandList.writeBuffer(m_geometryDebugBuffer, m_geometryDebugDataPtr.data(), m_geometryDebugDataPtr.size() * sizeof(GeometryDebugData));
 }
 
-void OpacityMicromapBuilder::updateDebugGeometry(const MeshInfo& _mesh)
+void OpacityMicromapBuilder::updateDebugGeometry(
+    const MeshInfo& _mesh,
+    const caustica::render::MeshGpuRecord& meshGpu)
 {
     const MeshInfoEx& mesh = static_cast<const MeshInfoEx&>(_mesh);
     assert(&mesh != nullptr);
 
-    for (const auto& _geometry : mesh.geometries)
+    for (size_t geometryIndex = 0; geometryIndex < mesh.geometries.size(); ++geometryIndex)
     {
+        const auto& _geometry = mesh.geometries[geometryIndex];
         assert(std::dynamic_pointer_cast<MeshGeometryEx>(_geometry) != nullptr);
         const std::shared_ptr<MeshGeometryEx>& geometry = std::static_pointer_cast<MeshGeometryEx>(_geometry);
 
@@ -254,18 +268,21 @@ void OpacityMicromapBuilder::updateDebugGeometry(const MeshInfo& _mesh)
             continue;
         }
 
-        if (MeshDebugData* debugData = mesh.DebugData.get())
+        if (const caustica::render::MeshGpuDebugData* debugData = meshGpu.debugData.get();
+            debugData != nullptr && geometryIndex < meshGpu.geometryDebugData.size())
         {
+            const caustica::render::MeshGeometryGpuDebugData& geometryDebug =
+                meshGpu.geometryDebugData[geometryIndex];
             GeometryDebugData& dgdata = m_geometryDebugDataPtr[geometry->globalGeometryIndex];
             dgdata.ommArrayDataBufferIndex = debugData->ommArrayDataBufferDescriptor ? debugData->ommArrayDataBufferDescriptor->Get() : -1;
-            dgdata.ommArrayDataBufferOffset = geometry->DebugData.ommArrayDataOffset;
+            dgdata.ommArrayDataBufferOffset = geometryDebug.ommArrayDataOffset;
 
             dgdata.ommDescArrayBufferIndex = debugData->ommDescBufferDescriptor ? debugData->ommDescBufferDescriptor->Get() : -1;
-            dgdata.ommDescArrayBufferOffset = geometry->DebugData.ommDescBufferOffset;
+            dgdata.ommDescArrayBufferOffset = geometryDebug.ommDescBufferOffset;
 
             dgdata.ommIndexBufferIndex = debugData->ommIndexBufferDescriptor ? debugData->ommIndexBufferDescriptor->Get() : -1;
-            dgdata.ommIndexBufferOffset = geometry->DebugData.ommIndexBufferOffset;
-            dgdata.ommIndexBuffer16Bit = geometry->DebugData.ommIndexBufferFormat == nvrhi::Format::R16_UINT;
+            dgdata.ommIndexBufferOffset = geometryDebug.ommIndexBufferOffset;
+            dgdata.ommIndexBuffer16Bit = geometryDebug.ommIndexBufferFormat == nvrhi::Format::R16_UINT;
         }
         else
         {
@@ -297,11 +314,17 @@ bool OpacityMicromapBuilder::update(
         MeshInfoEx& mesh = static_cast<MeshInfoEx&>(*_mesh);
         assert(&mesh != nullptr);
 
-        if (mesh.DebugDataDirty)
+        if (m_sceneGpuResources == nullptr)
+            continue;
+        const auto meshGpuIt = m_sceneGpuResources->meshRegistry.find(mesh.renderResourceId);
+        if (meshGpuIt == m_sceneGpuResources->meshRegistry.end())
+            continue;
+        caustica::render::MeshGpuRecord& meshGpu = meshGpuIt->second;
+        if (meshGpu.debugDataDirty)
         {
-            mesh.DebugDataDirty = false;
+            meshGpu.debugDataDirty = false;
             anyDirty = true;
-            updateDebugGeometry(mesh);
+            updateDebugGeometry(mesh, meshGpu);
         }
     }
     if (anyDirty)
@@ -502,10 +525,17 @@ bool OpacityMicromapBuilder::debugGUI(
 
                 for (const std::shared_ptr<caustica::MeshInfo>& mesh : meshes)
                 {
+                    if (!mesh || m_sceneGpuResources == nullptr)
+                        continue;
+                    const auto meshGpuIt =
+                        m_sceneGpuResources->meshRegistry.find(mesh->renderResourceId);
+                    if (meshGpuIt == m_sceneGpuResources->meshRegistry.end())
+                        continue;
+                    const auto& geometryDebugData = meshGpuIt->second.geometryDebugData;
                     bool meshHasOmms = false;
-                    for (uint32_t i = 0; i < mesh->geometries.size(); ++i)
+                    for (const caustica::render::MeshGeometryGpuDebugData& debugData : geometryDebugData)
                     {
-                        if (std::static_pointer_cast<MeshGeometryEx>(mesh->geometries[i])->DebugData.ommIndexBufferOffset != 0xFFFFFFFF)
+                        if (debugData.ommIndexBufferOffset != 0xFFFFFFFF)
                         {
                             meshHasOmms = true;
                             break;
@@ -520,15 +550,13 @@ bool OpacityMicromapBuilder::debugGUI(
                     {
                         UI_SCOPED_INDENT(indent);
 
-                        for (uint32_t i = 0; i < mesh->geometries.size(); ++i)
+                        for (const caustica::render::MeshGeometryGpuDebugData& debugData : geometryDebugData)
                         {
-                            auto geometry = std::static_pointer_cast<MeshGeometryEx>(mesh->geometries[i]);
-
-                            if (geometry->DebugData.ommIndexBufferOffset == 0xFFFFFFFF)
+                            if (debugData.ommIndexBufferOffset == 0xFFFFFFFF)
                                 continue;
 
-                            const uint64_t known = geometry->DebugData.ommStatsTotalKnown;
-                            const uint64_t unknown = geometry->DebugData.ommStatsTotalUnknown;
+                            const uint64_t known = debugData.ommStatsTotalKnown;
+                            const uint64_t unknown = debugData.ommStatsTotalUnknown;
                             const uint64_t total = known + unknown;
                             const float ratio = total == 0 ? -1.f : 100.f * float(known) / float(total);
 

@@ -11,15 +11,12 @@
 #include <scene/loader/CausUsdImporter.h>
 #include <scene/loader/UrdfImporter.h>
 #include <scene/scene_utils.h>
-#include <render/SceneGpuResources.h>
 #include <core/ThreadPool.h>
 #include <core/json.h>
 #include <core/log.h>
 #include <core/string_utils.h>
 #include <rhi/common/misc.h>
 #include <json/json.h>
-
-#include <assets/loader/ShaderFactory.h>
 
 #include <algorithm>
 #include <array>
@@ -30,21 +27,8 @@
 #include <type_traits>
 #include <variant>
 
-#if CAUSTICA_WITH_STATIC_SHADERS
-#if CAUSTICA_WITH_DX11
-#include "compiled_shaders/skinning_cs.dxbc.h"
-#endif
-#if CAUSTICA_WITH_DX12
-#include "compiled_shaders/skinning_cs.dxil.h"
-#endif
-#if CAUSTICA_WITH_VULKAN
-#include "compiled_shaders/skinning_cs.spirv.h"
-#endif
-#endif
-
 using namespace caustica::math;
 #include <shaders/material_cb.h>
-#include <shaders/skinning_cb.h>
 #include <shaders/bindless.h>
 
 using namespace caustica;
@@ -273,38 +257,24 @@ void Scene::prepareForUnload()
 
     if (m_EntityWorld)
     {
-        auto releaseMeshGpu = [](const std::shared_ptr<MeshInfo>& mesh) {
+        auto releaseMeshCpu = [](const std::shared_ptr<MeshInfo>& mesh) {
             if (!mesh)
                 return;
             mesh->asset = nullptr;
-            mesh->accelStruct = nullptr;
-            mesh->AccelStructOMM = nullptr;
-            mesh->OpacityMicroMaps.clear();
             mesh->buffers.reset();
         };
 
         for (const std::shared_ptr<MeshInfo>& mesh : m_EntityWorld->getMeshes())
         {
-            releaseMeshGpu(mesh);
+            releaseMeshCpu(mesh);
             if (mesh)
-                releaseMeshGpu(mesh->skinPrototype);
+                releaseMeshCpu(mesh->skinPrototype);
         }
         for (const std::shared_ptr<Material>& material : m_EntityWorld->getMaterials())
         {
             if (material)
                 material->asset = nullptr;
         }
-    }
-
-    if (m_GpuResources)
-    {
-        m_GpuResources->skinnedGpuByEntity.clear();
-        m_GpuResources->materialBuffer = nullptr;
-        m_GpuResources->geometryBuffer = nullptr;
-        m_GpuResources->instanceBuffer = nullptr;
-        m_GpuResources->materialData.clear();
-        m_GpuResources->geometryData.clear();
-        m_GpuResources->instanceData.clear();
     }
 
     m_Asset = nullptr;
@@ -478,8 +448,8 @@ void Scene::attachEnvironmentLightToRoot(scene::EnvironmentLightComponent compon
 }
 
 Scene::Scene(
-    nvrhi::IDevice* device,
-    ShaderFactory& shaderFactory,
+    nvrhi::IDevice* /*device*/,
+    ShaderFactory& /*shaderFactory*/,
     std::shared_ptr<IFileSystem> fs,
     std::shared_ptr<TextureLoader> textureCache,
     std::shared_ptr<SceneTypeFactory> sceneTypeFactory)
@@ -487,8 +457,6 @@ Scene::Scene(
     , m_SceneTypeFactory(std::move(sceneTypeFactory))
     , m_TextureLoader(std::move(textureCache))
 {
-    m_GpuResources = std::make_shared<render::SceneGpuResources>();
-    m_GpuResources->device = device;
     m_EntityWorld = std::make_unique<scene::SceneEntityWorld>();
 
     if (!m_SceneTypeFactory)
@@ -499,29 +467,6 @@ Scene::Scene(
     m_CausUsdImporter = std::make_shared<CausUsdImporter>(m_SceneTypeFactory);
     m_UrdfImporter = std::make_shared<UrdfImporter>(m_SceneTypeFactory);
 
-    m_GpuResources->rayTracingSupported = m_GpuResources->device->queryFeatureSupport(nvrhi::Feature::RayTracingAccelStruct);
-
-    m_GpuResources->skinningShader = shaderFactory.createAutoShader("engine/skinning_cs", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_skinning_cs), nullptr, nvrhi::ShaderType::Compute);
-
-    {
-        nvrhi::BindingLayoutDesc layoutDesc;
-        layoutDesc.visibility = nvrhi::ShaderType::Compute;
-        layoutDesc.bindings = {
-            nvrhi::BindingLayoutItem::PushConstants(0, sizeof(SkinningConstants)),
-            nvrhi::BindingLayoutItem::RawBuffer_SRV(0),
-            nvrhi::BindingLayoutItem::RawBuffer_SRV(1),
-            nvrhi::BindingLayoutItem::RawBuffer_UAV(0)
-        };
-
-        m_GpuResources->skinningBindingLayout = m_GpuResources->device->createBindingLayout(layoutDesc);
-    }
-
-    {
-        nvrhi::ComputePipelineDesc pipelineDesc;
-        pipelineDesc.bindingLayouts = { m_GpuResources->skinningBindingLayout };
-        pipelineDesc.CS = m_GpuResources->skinningShader;
-        m_GpuResources->skinningPipeline = m_GpuResources->device->createComputePipeline(pipelineDesc);
-    }
 }
 
 bool Scene::load(const std::filesystem::path& jsonFileName)
@@ -1251,14 +1196,6 @@ void Scene::syncRenderSnapshotGpuIndices(uint32_t /*frameIndex*/)
 {
     // Instance indices are assigned during logic-thread refresh and copied into
     // MeshInstanceRenderProxy at Extract. render thread must not patch from ECS.
-}
-
-GeometryData* Scene::getGeometryData(const MeshGeometry& geometry) const
-{
-    if (m_GpuResources == nullptr || uint(geometry.globalGeometryIndex) >= m_GpuResources->geometryData.size() )
-        return nullptr;
-
-    return &m_GpuResources->geometryData[geometry.globalGeometryIndex];
 }
 
 

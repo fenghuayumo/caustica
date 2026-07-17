@@ -1,5 +1,5 @@
 #include <engine/SceneMeshEditing.h>
-#include <render/core/SceneGpuUpdater.h>
+#include <render/SceneGpuResources.h>
 
 #include <core/ThreadContext.h>
 #include <scene/Scene.h>
@@ -308,92 +308,45 @@ void UpdateMeshBoundsFromPositions(const std::shared_ptr<MeshInfo>& mesh)
     }
 }
 
-bool BufferRangeContainsBytes(const nvrhi::BufferRange& range, uint64_t relativeOffset, uint64_t byteSize)
-{
-    return range.byteSize != 0 && relativeOffset <= range.byteSize && byteSize <= range.byteSize - relativeOffset;
-}
-
-nvrhi::ResourceStates GetMeshVertexBufferReadyState(const nvrhi::BufferDesc& desc)
-{
-    nvrhi::ResourceStates state = nvrhi::ResourceStates::VertexBuffer | nvrhi::ResourceStates::ShaderResource;
-    if (desc.isAccelStructBuildInput)
-        state = state | nvrhi::ResourceStates::AccelStructBuildInput;
-    return state;
-}
-
 bool UploadMeshDeformationToGpu(
-    nvrhi::IDevice* device,
+    nvrhi::IDevice* /*device*/,
+    render::SceneGpuResources* gpuResources,
     const std::shared_ptr<MeshInfo>& mesh,
     size_t renderVertexCount,
     const std::vector<float3>* previousRenderVertices,
     bool uploadNormals)
 {
-    if (!device || !mesh || !mesh->buffers)
+    if (!gpuResources || !mesh || !mesh->buffers)
         return false;
 
     auto& buffers = *mesh->buffers;
-    if (!buffers.vertexBuffer)
-        return false;
-
     const size_t begin = size_t(mesh->vertexOffset);
     const size_t end = begin + renderVertexCount;
     if (buffers.positionData.size() < end)
         return false;
 
-    const nvrhi::BufferRange& positionRange = buffers.getVertexBufferRange(VertexAttribute::Position);
-    const uint64_t positionOffset = uint64_t(begin) * sizeof(float3);
-    const uint64_t positionBytes = uint64_t(renderVertexCount) * sizeof(float3);
-    if (!BufferRangeContainsBytes(positionRange, positionOffset, positionBytes))
-        return false;
-
-    nvrhi::CommandListHandle commandList = device->createCommandList();
-    commandList->open();
-    commandList->writeBuffer(
-        buffers.vertexBuffer,
-        buffers.positionData.data() + begin,
-        positionBytes,
-        positionRange.byteOffset + positionOffset);
+    render::MeshGpuUploadCommand command;
+    command.meshId = mesh->renderResourceId;
+    command.vertexOffset = mesh->vertexOffset;
+    command.positions.assign(buffers.positionData.begin() + begin, buffers.positionData.begin() + end);
 
     if (previousRenderVertices && previousRenderVertices->size() == renderVertexCount)
-    {
-        const nvrhi::BufferRange& prevPositionRange = buffers.getVertexBufferRange(VertexAttribute::PrevPosition);
-        if (BufferRangeContainsBytes(prevPositionRange, positionOffset, positionBytes))
-        {
-            commandList->writeBuffer(
-                buffers.vertexBuffer,
-                previousRenderVertices->data(),
-                positionBytes,
-                prevPositionRange.byteOffset + positionOffset);
-        }
-    }
+        command.previousPositions = *previousRenderVertices;
 
     if (uploadNormals && buffers.normalData.size() >= end)
-    {
-        const nvrhi::BufferRange& normalRange = buffers.getVertexBufferRange(VertexAttribute::Normal);
-        const uint64_t normalOffset = uint64_t(begin) * sizeof(uint32_t);
-        const uint64_t normalBytes = uint64_t(renderVertexCount) * sizeof(uint32_t);
-        if (BufferRangeContainsBytes(normalRange, normalOffset, normalBytes))
-        {
-            commandList->writeBuffer(
-                buffers.vertexBuffer,
-                buffers.normalData.data() + begin,
-                normalBytes,
-                normalRange.byteOffset + normalOffset);
-        }
-    }
+        command.normals.assign(buffers.normalData.begin() + begin, buffers.normalData.begin() + end);
 
-    commandList->setBufferState(buffers.vertexBuffer, GetMeshVertexBufferReadyState(buffers.vertexBuffer->getDesc()));
-    commandList->close();
-    device->executeCommandList(commandList);
+    gpuResources->enqueueMeshUpload(std::move(command));
     return true;
 }
 
 // Copy current Position → PrevPosition so held keyframes report zero object motion.
 bool SyncMeshPrevPositionFromCurrent(
-    nvrhi::IDevice* device,
+    nvrhi::IDevice* /*device*/,
+    render::SceneGpuResources* gpuResources,
     const std::shared_ptr<MeshInfo>& mesh)
 {
-    if (!device || !mesh || !mesh->buffers || !mesh->buffers->vertexBuffer)
+    if (!gpuResources || !mesh || !mesh->buffers)
         return false;
 
     auto& buffers = *mesh->buffers;
@@ -403,22 +356,13 @@ bool SyncMeshPrevPositionFromCurrent(
     if (count == 0 || buffers.positionData.size() < end)
         return false;
 
-    const nvrhi::BufferRange& prevPositionRange = buffers.getVertexBufferRange(VertexAttribute::PrevPosition);
-    const uint64_t positionOffset = uint64_t(begin) * sizeof(float3);
-    const uint64_t positionBytes = uint64_t(count) * sizeof(float3);
-    if (!BufferRangeContainsBytes(prevPositionRange, positionOffset, positionBytes))
-        return false;
-
-    nvrhi::CommandListHandle commandList = device->createCommandList();
-    commandList->open();
-    commandList->writeBuffer(
-        buffers.vertexBuffer,
-        buffers.positionData.data() + begin,
-        positionBytes,
-        prevPositionRange.byteOffset + positionOffset);
-    commandList->setBufferState(buffers.vertexBuffer, GetMeshVertexBufferReadyState(buffers.vertexBuffer->getDesc()));
-    commandList->close();
-    device->executeCommandList(commandList);
+    render::MeshGpuUploadCommand command;
+    command.meshId = mesh->renderResourceId;
+    command.vertexOffset = mesh->vertexOffset;
+    command.previousPositions.assign(
+        buffers.positionData.begin() + begin,
+        buffers.positionData.begin() + end);
+    gpuResources->enqueueMeshUpload(std::move(command));
     return true;
 }
 
@@ -427,25 +371,12 @@ void RebuildSceneMeshBuffersIfNeeded(const std::shared_ptr<MeshInfo>& mesh, cons
     if (!params.device)
         return;
 
-    params.device->waitForIdle();
-
-    auto& buffers = *mesh->buffers;
-    if (buffers.vertexBuffer)
+    if (params.gpuResources)
     {
-        buffers.vertexBuffer = nullptr;
-        buffers.vertexBufferDescriptor.reset();
-        buffers.vertexBufferRanges.fill(nvrhi::BufferRange());
-    }
-
-    if (params.scene)
-    {
-        const scene::SceneRenderData& renderData =
-            params.scene->extractRenderDataForGpuSetup(params.frameIndex);
-        render::SceneGpuUpdater::refreshAfterLoad(
-            *params.scene,
-            renderData,
-            params.descriptorTable,
-            params.frameIndex);
+        render::MeshGpuUploadCommand command;
+        command.meshId = mesh->renderResourceId;
+        command.recreateVertexBuffer = true;
+        params.gpuResources->enqueueMeshUpload(std::move(command));
     }
 }
 
@@ -538,6 +469,7 @@ void setMeshVertices(
 
     const bool uploadedToExistingGpuBuffer = UploadMeshDeformationToGpu(
         params.device,
+        params.gpuResources,
         mesh,
         renderVertices.size(),
         &previousRenderVertices,
@@ -646,6 +578,7 @@ void setMeshPositionsDirect(
 
     const bool uploadedToExistingGpuBuffer = UploadMeshDeformationToGpu(
         params.device,
+        params.gpuResources,
         mesh,
         count,
         prevForUpload,
@@ -717,7 +650,8 @@ bool applyGeometrySequence(
         // Position→PrevPosition copy on idle frames).
         if (sequence.prevPositionsNeedSync && params.device)
         {
-            if (SyncMeshPrevPositionFromCurrent(params.device, sequence.mesh))
+            if (SyncMeshPrevPositionFromCurrent(
+                    params.device, params.gpuResources, sequence.mesh))
                 sequence.prevPositionsNeedSync = false;
         }
         return false;

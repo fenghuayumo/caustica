@@ -18,8 +18,8 @@ bool CompareOpaqueDrawCommands(const DrawCommand& a, const DrawCommand& b)
 {
     if (a.material != b.material)
         return a.material < b.material;
-    if (a.buffers != b.buffers)
-        return a.buffers < b.buffers;
+    if (a.meshId != b.meshId)
+        return a.meshId.getValue() < b.meshId.getValue();
     if (a.meshEntity != b.meshEntity)
         return a.meshEntity < b.meshEntity;
     return a.instanceIndex < b.instanceIndex;
@@ -56,11 +56,11 @@ void AppendOpaqueGeometryCommands(
 
         DrawCommand& item = out.emplace_back();
         item.meshEntity = proxy.entity;
+        item.meshId = proxy.meshId;
         item.instanceIndex = proxy.instanceIndex;
         item.mesh = mesh;
         item.geometry = geometry.get();
         item.material = geometry->material.get();
-        item.buffers = mesh->buffers.get();
         item.cullMode = item.material->doubleSided ? nvrhi::RasterCullMode::None : nvrhi::RasterCullMode::Back;
         item.distanceToCamera = 0.f;
     }
@@ -97,11 +97,11 @@ void AppendTransparentGeometryCommands(
 
         DrawCommand item{};
         item.meshEntity = proxy.entity;
+        item.meshId = proxy.meshId;
         item.instanceIndex = proxy.instanceIndex;
         item.mesh = mesh;
         item.geometry = geometry.get();
         item.material = material.get();
-        item.buffers = mesh->buffers.get();
         item.distanceToCamera = length(geometryGlobalBoundingBox.center() - viewOrigin);
 
         if (material->doubleSided)

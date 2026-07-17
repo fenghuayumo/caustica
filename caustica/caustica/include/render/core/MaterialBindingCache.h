@@ -9,6 +9,7 @@
 
 namespace caustica
 {
+namespace render { struct SceneGpuResources; }
 
 enum class MaterialResource
 {
@@ -40,6 +41,7 @@ public:
         const std::vector<MaterialResourceBinding>& bindings,
         nvrhi::ISampler* sampler,
         nvrhi::ITexture* fallbackTexture,
+        render::SceneGpuResources* sceneGpuResources,
         bool trackLiveness = true);
 
     nvrhi::IBindingLayout* getLayout() const;
@@ -56,6 +58,7 @@ private:
     std::vector<MaterialResourceBinding> m_bindingDesc;
     nvrhi::TextureHandle m_fallbackTexture;
     nvrhi::SamplerHandle m_sampler;
+    render::SceneGpuResources* m_sceneGpuResources = nullptr;
     std::mutex m_mutex;
     bool m_trackLiveness;
 };

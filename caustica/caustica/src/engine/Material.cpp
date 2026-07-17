@@ -141,10 +141,10 @@ namespace caustica
 
     bool Material::setProperty(const std::string& name, const dm::float4& value)
     {
-#define FLOAT3_PROPERTY(pname) if (name == #pname) { pname = value.xyz(); dirty = true; return true; }
-#define FLOAT_PROPERTY(pname) if (name == #pname) { pname = value.x; dirty = true; return true; }
-#define FLOAT2_PROPERTY(pname) if (name == #pname) { pname = value.xy(); dirty = true; return true; }
-#define BOOL_PROPERTY(pname) if (name == #pname) { pname = (value.x > 0.5f); dirty = true; return true; }
+#define FLOAT3_PROPERTY(pname) if (name == #pname) { pname = value.xyz(); return true; }
+#define FLOAT_PROPERTY(pname) if (name == #pname) { pname = value.x; return true; }
+#define FLOAT2_PROPERTY(pname) if (name == #pname) { pname = value.xy(); return true; }
+#define BOOL_PROPERTY(pname) if (name == #pname) { pname = (value.x > 0.5f); return true; }
         FLOAT3_PROPERTY(baseOrDiffuseColor);
         FLOAT3_PROPERTY(specularColor);
         FLOAT3_PROPERTY(emissiveColor);
@@ -166,6 +166,7 @@ namespace caustica
         BOOL_PROPERTY(enableOpacityTexture);
 #undef FLOAT3_PROPERTY
 #undef FLOAT_PROPERTY
+#undef FLOAT2_PROPERTY
 #undef BOOL_PROPERTY
 
         return false;

@@ -217,6 +217,7 @@ public:
             caustica::render::SceneGpuUpdater::refreshAfterLoad(
                 *scene,
                 gpuSetupData,
+                worldRenderer->sceneGpuResources(),
                 caches->descriptorTable.get(),
                 frameIndex);
         });

@@ -7,7 +7,6 @@
 #include <render/core/CameraController.h>
 #include <render/core/PathTracerSettings.h>
 #include <render/core/ToneMappingParameters.h>
-#include <render/SceneGaussianSplatPasses.h>
 
 #include <algorithm>
 #include <vector>
@@ -24,6 +23,7 @@ void SceneRenderData::clear()
     gaussianSplats.clear();
     meshResources.clear();
     materialResources.clear();
+    materialSnapshots.clear();
     geometryCount = 0;
     camera = {};
     renderSettings = {};
@@ -93,6 +93,7 @@ void FillMeshInstanceProxy(
     proxy.instanceIndex = ref.meshComp->instanceIndex;
     proxy.geometryInstanceIndex = ref.meshComp->geometryInstanceIndex;
     proxy.meshShared = ref.meshComp->mesh;
+    proxy.meshId = proxy.meshShared ? proxy.meshShared->renderResourceId : MeshRenderResourceId{};
     proxy.globalMeshIndex = proxy.meshShared ? proxy.meshShared->globalMeshIndex : -1;
     proxy.geometryCount = proxy.meshShared
         ? static_cast<uint32_t>(proxy.meshShared->geometries.size())
@@ -166,6 +167,10 @@ void ExtractSkinnedMeshes(ecs::World& world, SceneRenderData& out, uint32_t fram
             proxy.entity = entity;
             proxy.mesh = meshInstance.mesh;
             proxy.prototypeMesh = skinned.prototypeMesh;
+            proxy.meshId = proxy.mesh ? proxy.mesh->renderResourceId : MeshRenderResourceId{};
+            proxy.prototypeMeshId = proxy.prototypeMesh
+                ? proxy.prototypeMesh->renderResourceId
+                : MeshRenderResourceId{};
             proxy.transformFloat = ownerGlobal.transformFloat;
             if (const auto* name = world.get<NameComponent>(entity))
                 proxy.debugName = name->value;
@@ -179,7 +184,6 @@ void ExtractSkinnedMeshes(ecs::World& world, SceneRenderData& out, uint32_t fram
 
             const dm::daffine3 worldToRoot = inverse(ownerGlobal.transform);
             proxy.jointMatrices.resize(skinned.joints.size());
-            proxy.jointLines.resize(skinned.joints.size());
 
             for (size_t i = 0; i < skinned.joints.size(); ++i)
             {
@@ -194,30 +198,6 @@ void ExtractSkinnedMeshes(ecs::World& world, SceneRenderData& out, uint32_t fram
                 const dm::float4x4 jointLocalToRoot =
                     dm::affineToHomogeneous(dm::affine3(jointGlobal->transform * worldToRoot));
                 proxy.jointMatrices[i] = joint.inverseBindMatrix * jointLocalToRoot;
-
-                SkinnedMeshJointLineProxy& line = proxy.jointLines[i];
-                line.jointPosition = (dm::float4(0.f, 0.f, 0.f, 1.f) * jointLocalToRoot).xyz();
-                line.hasParent = false;
-
-                ecs::Entity parentEntity = ecs::NullEntity;
-                if (const auto* parent = world.get<ParentComponent>(joint.jointEntity))
-                    parentEntity = parent->parent;
-
-                if (ecs::isValid(parentEntity))
-                {
-                    if (const auto* parentGlobal = world.get<GlobalTransformComponent>(parentEntity))
-                    {
-                        const dm::float4x4 parentLocalToRoot =
-                            dm::affineToHomogeneous(dm::affine3(parentGlobal->transform * worldToRoot));
-                        line.parentPosition = (dm::float4(0.f, 0.f, 0.f, 1.f) * parentLocalToRoot).xyz();
-                        line.hasParent = true;
-                    }
-                }
-
-                const dm::float4x4 instanceTransform = dm::affineToHomogeneous(proxy.transformFloat);
-                line.jointPosition = (dm::float4(line.jointPosition, 1.f) * instanceTransform).xyz();
-                if (line.hasParent)
-                    line.parentPosition = (dm::float4(line.parentPosition, 1.f) * instanceTransform).xyz();
             }
 
             out.skinnedMeshes.push_back(std::move(proxy));
@@ -437,6 +417,27 @@ void applyCameraRenderProxyToController(
         ApplyCameraExposureToSettings(proxy, *settings);
 }
 
+void ExtractMaterialSnapshots(
+    const SceneEntityWorld& entityWorld,
+    SceneRenderData& out)
+{
+    out.materialSnapshots.clear();
+    out.materialSnapshots.reserve(entityWorld.getMaterials().size());
+    for (const std::shared_ptr<Material>& material : entityWorld.getMaterials())
+    {
+        if (!material || !material->renderResourceId)
+            continue;
+
+        MaterialRenderResourceSnapshot snapshot;
+        snapshot.id = material->renderResourceId;
+        snapshot.materialIndex = material->materialID;
+        snapshot.debugName = material->name;
+        material->fillConstantBuffer(snapshot.constants, false);
+        material->fillConstantBuffer(snapshot.bindlessConstants, true);
+        out.materialSnapshots.push_back(std::move(snapshot));
+    }
+}
+
 void extractSceneRenderData(
     SceneEntityWorld& entityWorld,
     SceneRenderData& inout,
@@ -462,6 +463,7 @@ void extractSceneRenderData(
             inout.meshResources.push_back(mesh);
         for (const std::shared_ptr<Material>& material : entityWorld.getMaterials())
             inout.materialResources.push_back(material);
+        ExtractMaterialSnapshots(entityWorld, inout);
 
         ExtractMeshInstancesFull(world, inout);
         ExtractSkinnedMeshes(world, inout, frameIndex);
@@ -487,6 +489,8 @@ void extractSceneRenderData(
     ExtractCameras(entityWorld, world, inout);
     // Gaussian splats are few; refresh transforms and enabled state every frame.
     ExtractGaussianSplats(world, inout);
+    // Material authoring data is copied on the logic thread; render never reads it live.
+    ExtractMaterialSnapshots(entityWorld, inout);
 }
 
 void extractSessionRenderState(const SessionRenderExtractInputs& inputs, SceneRenderData& out)
@@ -507,22 +511,6 @@ void extractSessionRenderState(const SessionRenderExtractInputs& inputs, SceneRe
 
     out.renderSettings.gaussianSplatTemporalReset = inputs.gaussianSplatTemporalReset;
     out.renderSettings.sceneTime = inputs.sceneTime;
-
-    if (inputs.gaussianSplatPasses)
-    {
-        for (GaussianSplatRenderProxy& proxy : out.gaussianSplats)
-        {
-            proxy.pass.reset();
-            for (const render::SceneGaussianSplatPasses::SceneObject& object : inputs.gaussianSplatPasses->objects())
-            {
-                if (object.entity == proxy.entity)
-                {
-                    proxy.pass = object.pass;
-                    break;
-                }
-            }
-        }
-    }
 
     if (!inputs.camera)
         return;

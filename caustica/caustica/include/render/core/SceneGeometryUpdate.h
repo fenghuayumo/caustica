@@ -33,7 +33,7 @@ struct UpdateSceneGeometryParams
     // Session scene for GPU upload / OMM / BLAS mutation. Prefer renderData for reads.
     const std::shared_ptr<Scene>&    scene;
     const scene::SceneRenderData*    renderData = nullptr;
-    const render::SceneGpuResources* gpuResources = nullptr;
+    render::SceneGpuResources*       gpuResources = nullptr;
 
     nvrhi::ICommandList*             commandList = nullptr;
     IDescriptorTableManager*         descriptorTable = nullptr;

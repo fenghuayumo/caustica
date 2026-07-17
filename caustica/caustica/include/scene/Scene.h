@@ -28,8 +28,6 @@ namespace caustica
     class IFileSystem;
 }
 
-struct GeometryData;
-
 namespace caustica
 {
     class ShaderFactory;
@@ -40,11 +38,6 @@ namespace caustica
     class CausUsdImporter;
     class UrdfImporter;
 
-    namespace render
-    {
-        struct SceneGpuResources;
-    }
-    
     class Scene
     {
     protected:
@@ -75,7 +68,6 @@ namespace caustica
 
         std::filesystem::path m_textureSearchDirectory;
 
-        std::shared_ptr<render::SceneGpuResources> m_GpuResources;
         Handle<SceneAsset> m_Asset;
 
         void loadModelAsync(
@@ -182,11 +174,6 @@ namespace caustica
         void attachSpotLightToRoot(scene::SpotLightComponent component, const std::string& name = {});
         void attachPointLightToRoot(scene::PointLightComponent component, const std::string& name = {});
         void attachEnvironmentLightToRoot(scene::EnvironmentLightComponent component, const std::string& name = {});
-        [[nodiscard]] render::SceneGpuResources& getGpuResources() { return *m_GpuResources; }
-        [[nodiscard]] const render::SceneGpuResources& getGpuResources() const { return *m_GpuResources; }
-
-        GeometryData* getGeometryData(const MeshGeometry& geometry) const;
-
         void processNodesRecursive();
 
         [[nodiscard]] const SampleSettings* getSampleSettings() const

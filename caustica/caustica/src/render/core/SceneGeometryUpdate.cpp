@@ -38,14 +38,16 @@ OmmAccelStructState makeOmmAccelState(OpacityMicromapBuilder* opacityMicromapBui
 
 void transitionSkinnedMeshBuffersToReadOnly(
     nvrhi::ICommandList* commandList,
-    const scene::SceneRenderData& renderData)
+    const scene::SceneRenderData& renderData,
+    render::SceneGpuResources& gpuResources)
 {
     for (const scene::SkinnedMeshRenderProxy& proxy : renderData.skinnedMeshes)
     {
-        if (!proxy.mesh || !proxy.mesh->buffers || !proxy.mesh->buffers->vertexBuffer)
+        const auto meshGpuIt = gpuResources.meshRegistry.find(proxy.meshId);
+        if (meshGpuIt == gpuResources.meshRegistry.end() || !meshGpuIt->second.vertexBuffer)
             continue;
         commandList->setBufferState(
-            proxy.mesh->buffers->vertexBuffer,
+            meshGpuIt->second.vertexBuffer,
             nvrhi::ResourceStates::ShaderResource);
     }
     commandList->commitBarriers();
@@ -58,13 +60,6 @@ const scene::SceneRenderData& resolveRenderData(const UpdateSceneGeometryParams&
     return params.scene->getRenderData();
 }
 
-const render::SceneGpuResources* resolveGpuResources(const UpdateSceneGeometryParams& params)
-{
-    if (params.gpuResources)
-        return params.gpuResources;
-    return params.scene ? &params.scene->getGpuResources() : nullptr;
-}
-
 } // namespace
 
 void updateSceneGeometry(AccelStructManager& accelStructs, UpdateSceneGeometryParams& params)
@@ -75,10 +70,13 @@ void updateSceneGeometry(AccelStructManager& accelStructs, UpdateSceneGeometryPa
         return;
 
     const scene::SceneRenderData& renderData = resolveRenderData(params);
-    const render::SceneGpuResources* gpuResources = resolveGpuResources(params);
+    render::SceneGpuResources* gpuResources = params.gpuResources;
+    if (gpuResources == nullptr)
+        return;
 
     render::SceneGpuUpdater::refresh(
         *scene,
+        *gpuResources,
         params.descriptorTable,
         commandList,
         static_cast<uint32_t>(params.frameIndex));
@@ -91,7 +89,7 @@ void updateSceneGeometry(AccelStructManager& accelStructs, UpdateSceneGeometryPa
 
     const AccelStructBuildSettings rebuildSettings = makeAccelBuildSettings(params.settings, false);
     accelStructs.rebuildDirtyMeshes(
-        commandList, rebuildSettings, params.accelStructRebuildRequested);
+        commandList, renderData, rebuildSettings, params.accelStructRebuildRequested);
 
     accelStructs.updateSkinnedBlases(
         commandList, renderData, rebuildSettings, static_cast<uint32_t>(params.frameIndex));
@@ -102,7 +100,7 @@ void updateSceneGeometry(AccelStructManager& accelStructs, UpdateSceneGeometryPa
     accelStructs.buildTlas(
         commandList, renderData, tlasSettings, makeOmmAccelState(params.opacityMaps), params.opacityMaps);
 
-    transitionSkinnedMeshBuffersToReadOnly(commandList, renderData);
+    transitionSkinnedMeshBuffersToReadOnly(commandList, renderData, *gpuResources);
 
     if (params.opacityMaps != nullptr)
     {

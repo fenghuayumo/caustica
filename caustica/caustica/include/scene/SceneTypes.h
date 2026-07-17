@@ -1,10 +1,10 @@
 #pragma once
 
 #include <math/math.h>
-#include <core/DescriptorHandle.h>
 #include <assets/Handle.h>
 #include <assets/ImageAsset.h>
 #include <assets/TypedAssets.h>
+#include <scene/SceneRenderResourceIds.h>
 #include <shaders/light_types.h>
 #include <rhi/nvrhi.h>
 #include <memory>
@@ -14,7 +14,6 @@
 
 struct MaterialConstants;
 struct LightConstants;
-struct LightProbeConstants;
 
 namespace Json
 {
@@ -79,6 +78,7 @@ namespace caustica
 
     struct Material
     {
+        scene::MaterialRenderResourceId renderResourceId;
         Handle<MaterialAsset> asset;
         std::string name;
         std::string modelFileName;      // where this material originated from, e.g. GLTF file name
@@ -91,7 +91,6 @@ namespace caustica
         Handle<ImageAsset> occlusionTexture;
         Handle<ImageAsset> transmissionTexture; // see KHR_materials_transmission; undefined on specular-gloss materials
         Handle<ImageAsset> opacityTexture; // for renderers that store opacity or alpha mask separately, overrides baseOrDiffuse.a
-        nvrhi::BufferHandle materialConstants;
         dm::float3 baseOrDiffuseColor = 1.f; // metal-rough: base color, spec-gloss: diffuse color (if no texture present)
         dm::float3 specularColor = 0.f; // spec-gloss: specular color
         dm::float3 emissiveColor = 0.f;
@@ -149,7 +148,6 @@ namespace caustica
         bool metalnessInRedChannel = false;
 
         int materialID = 0;
-        bool dirty = true; // set this to true to make Scene update the material data
 
         virtual ~Material() = default;
         void fillConstantBuffer(struct MaterialConstants& constants, bool useResourceDescriptorHeapBindless = false) const;
@@ -165,14 +163,6 @@ namespace caustica
 
     struct BufferGroup
     {
-        nvrhi::BufferHandle indexBuffer;
-        nvrhi::BufferHandle vertexBuffer;
-        nvrhi::BufferHandle instanceBuffer;
-        std::shared_ptr<DescriptorHandle> indexBufferDescriptor;
-        std::shared_ptr<DescriptorHandle> vertexBufferDescriptor;
-        std::shared_ptr<DescriptorHandle> instnaceBufferDescriptor;
-        std::array<nvrhi::BufferRange, size_t(VertexAttribute::Count)> vertexBufferRanges;
-        std::vector<nvrhi::BufferRange> morphTargetBufferRange;
         std::vector<uint32_t> indexData;
         std::vector<dm::float3> positionData;
         std::vector<dm::float2> texcoord1Data;
@@ -183,10 +173,6 @@ namespace caustica
         std::vector<dm::float4> weightData;
         std::vector<float> radiusData;
         std::vector<dm::float4> morphTargetData;
-
-        [[nodiscard]] bool hasAttribute(VertexAttribute attr) const { return vertexBufferRanges[int(attr)].byteSize != 0; }
-        nvrhi::BufferRange& getVertexBufferRange(VertexAttribute attr) { return vertexBufferRanges[int(attr)]; }
-        [[nodiscard]] const nvrhi::BufferRange& getVertexBufferRange(VertexAttribute attr) const { return vertexBufferRanges[int(attr)]; }
     };
 
     enum class MeshGeometryPrimitiveType : uint8_t
@@ -198,30 +184,9 @@ namespace caustica
         Count
     };
 
-    // OMM debug buffer data (merged from MeshGeometryEx)
-    struct MeshGeometryDebugData
-    {
-        uint32_t ommArrayDataOffset = 0xFFFFFFFF;
-        uint32_t ommDescBufferOffset = 0xFFFFFFFF;
-        uint32_t ommIndexBufferOffset = 0xFFFFFFFF;
-        nvrhi::Format ommIndexBufferFormat = nvrhi::Format::R32_UINT;
-        uint64_t ommStatsTotalKnown = 0;
-        uint64_t ommStatsTotalUnknown = 0;
-    };
-
-    // Mesh debug data (merged from MeshInfoEx)
-    struct MeshDebugData
-    {
-        std::shared_ptr<DescriptorHandle> ommArrayDataBufferDescriptor;
-        std::shared_ptr<DescriptorHandle> ommDescBufferDescriptor;
-        std::shared_ptr<DescriptorHandle> ommIndexBufferDescriptor;
-        nvrhi::BufferHandle ommArrayDataBuffer;
-        nvrhi::BufferHandle ommDescBuffer;
-        nvrhi::BufferHandle ommIndexBuffer;
-    };
-
     struct MeshGeometry
     {
+        scene::GeometryRenderResourceId renderResourceId;
         std::shared_ptr<Material> material;
         dm::box3 objectSpaceBounds;
         uint32_t indexOffsetInMesh = 0;
@@ -231,9 +196,6 @@ namespace caustica
         int globalGeometryIndex = 0;
 
         MeshGeometryPrimitiveType type = MeshGeometryPrimitiveType::Triangles;
-
-        // OMM debug data (merged from MeshGeometryEx)
-        MeshGeometryDebugData DebugData;
 
         virtual ~MeshGeometry() = default;
     };
@@ -250,6 +212,7 @@ namespace caustica
 
     struct MeshInfo
     {
+        scene::MeshRenderResourceId renderResourceId;
         Handle<MeshAsset> asset;
         std::string name;
         MeshType type = MeshType::Triangles;
@@ -263,15 +226,9 @@ namespace caustica
         uint32_t totalVertices = 0;
         int globalMeshIndex = 0;
         bool isMorphTargetAnimationMesh = false;
-        nvrhi::rt::AccelStructHandle accelStruct; // standard BLAS
         bool isSkinPrototype = false;
 
-        // OMM extension fields (merged from MeshInfoEx)
-        nvrhi::rt::AccelStructHandle AccelStructOMM;
-        std::vector<nvrhi::rt::OpacityMicromapHandle> OpacityMicroMaps;
         std::vector<uint32_t> DeformationSourcePositionIndices; // preserves OBJ v-order for deformation APIs
-        std::unique_ptr<MeshDebugData> DebugData;
-        bool DebugDataDirty = true;
 
         virtual ~MeshInfo() = default;
         bool isCurve() const
@@ -282,25 +239,42 @@ namespace caustica
         }
     };
 
-    struct LightProbe
-    {
-        std::string name;
-        nvrhi::TextureHandle diffuseMap;
-        nvrhi::TextureHandle specularMap;
-        nvrhi::TextureHandle environmentBrdf;
-        uint32_t diffuseArrayIndex = 0;
-        uint32_t specularArrayIndex = 0;
-        float diffuseScale = 1.f;
-        float specularScale = 1.f;
-        bool enabled = true;
-        dm::frustum bounds = dm::frustum::infinite();
-
-        [[nodiscard]] bool isActive() const;
-        void fillLightProbeConstants(LightProbeConstants& lightProbeConstants) const;
-    };
-
     inline nvrhi::IBuffer* bufferOrFallback(nvrhi::IBuffer* primary, nvrhi::IBuffer* secondary)
     {
         return primary ? primary : secondary;
     }
+
+    namespace detail
+    {
+        template <typename T>
+        concept HasCpuOwnedMeshAccelStruct = requires(T value) { value.accelStruct; };
+        template <typename T>
+        concept HasCpuOwnedMeshOmm = requires(T value) { value.AccelStructOMM; };
+        template <typename T>
+        concept HasCpuOwnedMeshDirty = requires(T value) { value.DebugDataDirty; };
+
+        template <typename T>
+        concept HasCpuOwnedVertexBuffer = requires(T value) { value.vertexBuffer; };
+        template <typename T>
+        concept HasCpuOwnedDescriptor = requires(T value) { value.indexBufferDescriptor; };
+        template <typename T>
+        concept HasCpuOwnedBufferRanges = requires(T value) { value.vertexBufferRanges; };
+
+        template <typename T>
+        concept HasCpuOwnedMaterialConstants = requires(T value) { value.materialConstants; };
+        template <typename T>
+        concept HasCpuOwnedMaterialDirty = requires(T value) { value.dirty; };
+    }
+
+    static_assert(!detail::HasCpuOwnedMeshAccelStruct<MeshInfo>
+            && !detail::HasCpuOwnedMeshOmm<MeshInfo>
+            && !detail::HasCpuOwnedMeshDirty<MeshInfo>,
+        "MeshInfo must remain CPU-only; GPU state belongs in render::MeshGpuRecord.");
+    static_assert(!detail::HasCpuOwnedVertexBuffer<BufferGroup>
+            && !detail::HasCpuOwnedDescriptor<BufferGroup>
+            && !detail::HasCpuOwnedBufferRanges<BufferGroup>,
+        "BufferGroup must remain CPU staging-only; GPU handles belong to Render.");
+    static_assert(!detail::HasCpuOwnedMaterialConstants<Material>
+            && !detail::HasCpuOwnedMaterialDirty<Material>,
+        "Material must remain authoring-only; GPU buffers and dirty state belong to Render.");
 }

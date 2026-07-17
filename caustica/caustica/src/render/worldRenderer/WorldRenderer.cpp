@@ -1,6 +1,7 @@
 namespace { constexpr int c_SwapchainCount = 3; }
 
 #include <render/worldRenderer/WorldRenderer.h>
+#include <render/core/SceneGpuUpdater.h>
 #include <engine/GpuSharedCaches.h>
 #include <scene/Scene.h>
 #include <render/pipeline/RenderPipelineRegistry.h>
@@ -125,6 +126,12 @@ bool caustica::render::WorldRenderer::create(const createParams& params)
         .diagnostics = params.diagnostics,
     });
     m_context = m_pathTracingContext.get();
+    SceneGpuUpdater::initialize(
+        m_context->sceneGpuResources,
+        params.gpuDevice.getDevice(),
+        *m_context->shaderFactory);
+    m_accelStructs.bindSceneGpuResources(&m_context->sceneGpuResources);
+    m_context->renderDevice.setActiveSceneGpuResources(&m_context->sceneGpuResources);
     m_lastRealtimeMode = m_context->activeSettings().RealtimeMode;
 
     createBindingLayouts(infra.bindlessLayout);
@@ -156,6 +163,8 @@ bool caustica::render::WorldRenderer::create(const createParams& params)
 
 void caustica::render::WorldRenderer::destroy()
 {
+    if (m_context)
+        m_context->renderDevice.setActiveSceneGpuResources(nullptr);
     m_context = nullptr;
     m_pathTracingContext.reset();
     m_accelStructs = AccelStructManager{};
@@ -414,6 +423,7 @@ bool caustica::render::WorldRenderer::createPTPipeline()
 void caustica::render::WorldRenderer::onSceneUnloading()
 {
     m_scenePasses.gaussianSplats.clearSession();
+    m_context->sceneGpuResources.clearSceneResources();
     m_context->sessionScene = nullptr;
     m_context->sessionScenePath.clear();
     m_context->frameScene = nullptr;
@@ -468,6 +478,7 @@ void caustica::render::WorldRenderer::onSceneLoaded(
     std::shared_ptr<Scene> scene,
     std::filesystem::path scenePath)
 {
+    m_context->sceneGpuResources.clearSceneResources();
     m_context->sessionScene = std::move(scene);
     m_context->sessionScenePath = std::move(scenePath);
     m_scenePasses.gaussianSplats.bindSession(
@@ -1178,6 +1189,7 @@ void caustica::render::WorldRenderer::buildGaussianSplatEmissionProxies()
     caustica::render::buildGaussianSplatEmissionProxies(
         m_gaussianSplatEmissionProxies,
         m_context->frameGaussianSplats(),
+        m_context->scenePasses.gaussianSplats,
         m_context->activeSettings());
 }
 
@@ -1187,7 +1199,10 @@ void caustica::render::WorldRenderer::executeGaussianSplatAccelBuild(nvrhi::ICom
         return;
 
     buildGaussianSplatSceneAccelStructs(
-        commandList, m_context->frameGaussianSplats(), m_context->activeSettings());
+        commandList,
+        m_context->frameGaussianSplats(),
+        m_context->scenePasses.gaussianSplats,
+        m_context->activeSettings());
 }
 
 bool caustica::render::WorldRenderer::hasActiveGaussianSplats() const
@@ -1196,7 +1211,12 @@ bool caustica::render::WorldRenderer::hasActiveGaussianSplats() const
         return false;
 
     const auto gaussianSplats = m_context->frameGaussianSplats();
-    return std::any_of(gaussianSplats.begin(), gaussianSplats.end(), isGaussianSplatProxyActive);
+    return std::any_of(
+        gaussianSplats.begin(),
+        gaussianSplats.end(),
+        [this](const scene::GaussianSplatRenderProxy& proxy) {
+            return isGaussianSplatProxyActive(proxy, m_context->scenePasses.gaussianSplats);
+        });
 }
 
 std::vector<GaussianSplatGraphResources>
@@ -1219,13 +1239,14 @@ caustica::render::WorldRenderer::prepareGaussianSplatGraphResources(bool renderT
 
     for (const scene::GaussianSplatRenderProxy& proxy : m_context->frameGaussianSplats())
     {
-        if (!isGaussianSplatProxyActive(proxy))
+        GaussianSplatPass* pass = m_context->scenePasses.gaussianSplats.findPass(proxy.entity);
+        if (!proxy.enabled || pass == nullptr || !pass->hasSplats())
             continue;
 
         GaussianSplatRenderSettings objectSettings = settings;
         objectSettings.objectToWorld = gaussianSplatObjectToWorld(proxy);
-        proxy.pass->prepareGraphResources(objectSettings);
-        resources.push_back(proxy.pass->graphResources(objectSettings));
+        pass->prepareGraphResources(objectSettings);
+        resources.push_back(pass->graphResources(objectSettings));
     }
     return resources;
 }
@@ -1264,6 +1285,7 @@ void caustica::render::WorldRenderer::executeGaussianSplatUpload(
     (void)uploadGaussianSplatScene(
         commandList,
         m_context->frameGaussianSplats(),
+        m_context->scenePasses.gaussianSplats,
         splatView,
         m_context->accelStructs.getTopLevelAS().Get(),
         *m_renderTargets,
@@ -1275,7 +1297,10 @@ void caustica::render::WorldRenderer::executeGaussianSplatSort(nvrhi::ICommandLi
     if (commandList == nullptr || !hasActiveGaussianSplats())
         return;
 
-    sortGaussianSplatScene(commandList, m_context->frameGaussianSplats());
+    sortGaussianSplatScene(
+        commandList,
+        m_context->frameGaussianSplats(),
+        m_context->scenePasses.gaussianSplats);
 }
 
 void caustica::render::WorldRenderer::executeGaussianSplatRaster(
@@ -1296,6 +1321,7 @@ void caustica::render::WorldRenderer::executeGaussianSplatRaster(
     const bool renderedAny = rasterGaussianSplatScene(
         commandList,
         m_context->frameGaussianSplats(),
+        m_context->scenePasses.gaussianSplats,
         splatView);
     m_gaussianSplatCompositeRendered = renderedAny && !renderToOutputColor;
 }
@@ -1352,7 +1378,7 @@ void caustica::render::WorldRenderer::render(nvrhi::IFramebuffer* framebuffer)
         m_context->frameSettings = &m_frameSettingsSnapshot;
         m_context->frameRuntime = &m_frameRuntimeSnapshot;
         m_context->frameScene = &renderData;
-        m_context->frameGpu = scene->getGpuResources().frameHandles();
+        m_context->frameGpu = m_context->sceneGpuResources.frameHandles();
         m_context->frameSceneStructureChanged = scene->hasSceneStructureChanged(renderPhaseFrameIndex);
         m_context->frameSceneTransformsChanged = scene->hasSceneTransformsChanged(renderPhaseFrameIndex);
 
@@ -1434,7 +1460,8 @@ void caustica::render::WorldRenderer::recreateBindingSet(const scene::SceneRende
                     ? std::span<const caustica::scene::GaussianSplatRenderProxy>(
                         m_context->sessionScene->getRenderData().gaussianSplats)
                     : std::span<const caustica::scene::GaussianSplatRenderProxy>()));
-    const GaussianSplatBinding primaryGaussianBinding = getPrimaryGaussianSplatBinding(gaussianSplats);
+    const GaussianSplatBinding primaryGaussianBinding = getPrimaryGaussianSplatBinding(
+        gaussianSplats, m_context->scenePasses.gaussianSplats);
     const GaussianSplatPass* primaryGaussianSplatPass = primaryGaussianBinding.splatPass;
     if (primaryGaussianSplatPass != nullptr && primaryGaussianSplatPass->getTopLevelAS() != nullptr && primaryGaussianSplatPass->getSplatBuffer() != nullptr)
     {

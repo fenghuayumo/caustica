@@ -22,22 +22,13 @@ namespace caustica
     class TextureLoader;
     class TextureHandle;
     class ShaderFactory;
-    namespace render { class RenderDevice; }
+    namespace render { class RenderDevice; struct SceneGpuResources; struct MeshGpuRecord; }
     struct ImageAsset;
 }
 
 // =============================================================================
-// MeshGeometryEx / MeshInfoEx �?Now merged into base types in SceneTypes.h.
-//
-// MeshGeometry now has DebugData (MeshGeometryDebugData).
-// MeshInfo now has AccelStructOMM, OpacityMicroMaps,
-//   DeformationSourcePositionIndices, DebugData, DebugDataDirty.
-//
-// These aliases are kept for backward compatibility.
-// =============================================================================
-
-using MeshGeometryDebugData = caustica::MeshGeometryDebugData;
-using MeshDebugData         = caustica::MeshDebugData;
+// Legacy extension type names now map to CPU authoring types; all OMM GPU state
+// is held by render::MeshGpuRecord.
 using MeshGeometryEx        = caustica::MeshGeometry;
 using MeshInfoEx            = caustica::MeshInfo;
 
@@ -119,7 +110,9 @@ public:
                                                           std::span<const std::shared_ptr<caustica::MeshInfo>> meshes,
                                                           size_t geometryCount);
     void                            writeGeometryDebugBuffer(nvrhi::ICommandList& commandList);
-    void                            updateDebugGeometry(const caustica::MeshInfo& mesh);
+    void                            updateDebugGeometry(
+                                        const caustica::MeshInfo& mesh,
+                                        const caustica::render::MeshGpuRecord& meshGpu);
 
     [[nodiscard]] nvrhi::IBuffer*   getGeometryDebugBuffer() const { return m_geometryDebugBuffer; }
     [[nodiscard]] bool              shouldUseRayTracingOpacityMicromaps() const { return m_uiData.Enable; }
@@ -131,6 +124,7 @@ private:
     void                            ensureGeometryDebugCapacity(size_t geometryCount);
 
     nvrhi::DeviceHandle             m_device;
+    caustica::render::SceneGpuResources* m_sceneGpuResources = nullptr;
     std::shared_ptr<caustica::TextureLoader> m_textureCache;
     std::shared_ptr<caustica::FramebufferFactory> m_framebufferFactory;
     std::shared_ptr<caustica::DescriptorTableManager> m_descriptorTableManager;

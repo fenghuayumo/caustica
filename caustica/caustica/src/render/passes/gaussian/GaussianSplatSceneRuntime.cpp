@@ -14,21 +14,26 @@ dm::float4x4 gaussianSplatObjectToWorld(const scene::GaussianSplatRenderProxy& p
     return dm::affineToHomogeneous(proxy.objectToWorld);
 }
 
-bool isGaussianSplatProxyActive(const scene::GaussianSplatRenderProxy& proxy)
+bool isGaussianSplatProxyActive(
+    const scene::GaussianSplatRenderProxy& proxy,
+    const SceneGaussianSplatPasses& scenePasses)
 {
-    return proxy.enabled && proxy.pass != nullptr && proxy.pass->hasSplats();
+    const GaussianSplatPass* pass = scenePasses.findPass(proxy.entity);
+    return proxy.enabled && pass != nullptr && pass->hasSplats();
 }
 
 GaussianSplatBinding getPrimaryGaussianSplatBinding(
-    std::span<const scene::GaussianSplatRenderProxy> gaussianSplats)
+    std::span<const scene::GaussianSplatRenderProxy> gaussianSplats,
+    const SceneGaussianSplatPasses& scenePasses)
 {
     GaussianSplatBinding binding;
     for (const scene::GaussianSplatRenderProxy& proxy : gaussianSplats)
     {
-        if (!isGaussianSplatProxyActive(proxy))
+        const GaussianSplatPass* pass = scenePasses.findPass(proxy.entity);
+        if (!proxy.enabled || pass == nullptr || !pass->hasSplats())
             continue;
 
-        binding.splatPass = proxy.pass.get();
+        binding.splatPass = pass;
         binding.objectToWorld = gaussianSplatObjectToWorld(proxy);
         return binding;
     }
@@ -68,6 +73,7 @@ void prepareGaussianSplatScenePasses(SceneGaussianSplatPasses& scenePasses, Gaus
 void buildGaussianSplatEmissionProxies(
     std::vector<GaussianSplatEmissionProxy>& out,
     std::span<const scene::GaussianSplatRenderProxy> gaussianSplats,
+    SceneGaussianSplatPasses& scenePasses,
     const PathTracerSettings& settings)
 {
     out.clear();
@@ -78,7 +84,8 @@ void buildGaussianSplatEmissionProxies(
     const uint32_t maxProxyCount = clampGaussianSplatEmissionProxyCount(settings.GaussianSplatEmissionMaxProxyCount);
     for (const scene::GaussianSplatRenderProxy& proxy : gaussianSplats)
     {
-        if (!isGaussianSplatProxyActive(proxy))
+        GaussianSplatPass* pass = scenePasses.findPass(proxy.entity);
+        if (!proxy.enabled || pass == nullptr || !pass->hasSplats())
             continue;
 
         const uint32_t remainingProxyCount = maxProxyCount > out.size()
@@ -87,7 +94,7 @@ void buildGaussianSplatEmissionProxies(
         if (remainingProxyCount == 0)
             break;
 
-        proxy.pass->buildEmissionProxies(
+        pass->buildEmissionProxies(
             remainingProxyCount,
             settings.GaussianSplatScale,
             uint32_t(std::clamp(settings.GaussianSplatRtxKernelDegree, 0, 5)),
@@ -101,7 +108,7 @@ void buildGaussianSplatEmissionProxies(
             length(objectToWorldTransform.transformVector(dm::float3(0.0f, 1.0f, 0.0f))),
             length(objectToWorldTransform.transformVector(dm::float3(0.0f, 0.0f, 1.0f))) });
 
-        const auto& proxies = proxy.pass->getEmissionProxies();
+        const auto& proxies = pass->getEmissionProxies();
         out.reserve(out.size() + proxies.size());
         for (const GaussianSplatEmissionProxy& proxy : proxies)
         {
@@ -116,6 +123,7 @@ void buildGaussianSplatEmissionProxies(
 bool uploadGaussianSplatScene(
     nvrhi::ICommandList* commandList,
     std::span<const scene::GaussianSplatRenderProxy> gaussianSplats,
+    SceneGaussianSplatPasses& scenePasses,
     const caustica::IView& splatView,
     nvrhi::rt::IAccelStruct* meshTopLevelAS,
     RenderTargets& renderTargets,
@@ -124,12 +132,13 @@ bool uploadGaussianSplatScene(
     bool renderedAny = false;
     for (const scene::GaussianSplatRenderProxy& proxy : gaussianSplats)
     {
-        if (!isGaussianSplatProxyActive(proxy))
+        GaussianSplatPass* pass = scenePasses.findPass(proxy.entity);
+        if (!proxy.enabled || pass == nullptr || !pass->hasSplats())
             continue;
 
         GaussianSplatRenderSettings objectSettings = settings;
         objectSettings.objectToWorld = gaussianSplatObjectToWorld(proxy);
-        renderedAny |= proxy.pass->upload(
+        renderedAny |= pass->upload(
             commandList,
             splatView,
             meshTopLevelAS,
@@ -141,27 +150,33 @@ bool uploadGaussianSplatScene(
 
 void sortGaussianSplatScene(
     nvrhi::ICommandList* commandList,
-    std::span<const scene::GaussianSplatRenderProxy> gaussianSplats)
+    std::span<const scene::GaussianSplatRenderProxy> gaussianSplats,
+    SceneGaussianSplatPasses& scenePasses)
 {
     for (const scene::GaussianSplatRenderProxy& proxy : gaussianSplats)
     {
-        if (isGaussianSplatProxyActive(proxy))
-            proxy.pass->sort(commandList);
+        if (GaussianSplatPass* pass = scenePasses.findPass(proxy.entity);
+            proxy.enabled && pass != nullptr && pass->hasSplats())
+        {
+            pass->sort(commandList);
+        }
     }
 }
 
 bool rasterGaussianSplatScene(
     nvrhi::ICommandList* commandList,
     std::span<const scene::GaussianSplatRenderProxy> gaussianSplats,
+    SceneGaussianSplatPasses& scenePasses,
     const caustica::IView& splatView)
 {
     bool renderedAny = false;
     for (const scene::GaussianSplatRenderProxy& proxy : gaussianSplats)
     {
-        if (!isGaussianSplatProxyActive(proxy))
+        GaussianSplatPass* pass = scenePasses.findPass(proxy.entity);
+        if (!proxy.enabled || pass == nullptr || !pass->hasSplats())
             continue;
 
-        renderedAny |= proxy.pass->raster(commandList, splatView);
+        renderedAny |= pass->raster(commandList, splatView);
     }
     return renderedAny;
 }
@@ -169,17 +184,19 @@ bool rasterGaussianSplatScene(
 void buildGaussianSplatSceneAccelStructs(
     nvrhi::ICommandList* commandList,
     std::span<const scene::GaussianSplatRenderProxy> gaussianSplats,
+    SceneGaussianSplatPasses& scenePasses,
     const PathTracerSettings& settings)
 {
     const bool buildShadowAccelStructs = resolveGaussianSplatShadowMode(settings) != GAUSSIAN_SPLAT_SHADOWS_DISABLED;
     for (const scene::GaussianSplatRenderProxy& proxy : gaussianSplats)
     {
-        if (!isGaussianSplatProxyActive(proxy))
+        GaussianSplatPass* pass = scenePasses.findPass(proxy.entity);
+        if (!proxy.enabled || pass == nullptr || !pass->hasSplats())
             continue;
 
         if (buildShadowAccelStructs)
         {
-            proxy.pass->buildAccelerationStructures(
+            pass->buildAccelerationStructures(
                 commandList,
                 settings.GaussianSplatUseAABBs,
                 settings.GaussianSplatUseTLASInstances,
@@ -190,7 +207,7 @@ void buildGaussianSplatSceneAccelStructs(
         }
         else
         {
-            proxy.pass->releaseAccelerationStructures();
+            pass->releaseAccelerationStructures();
         }
     }
 }

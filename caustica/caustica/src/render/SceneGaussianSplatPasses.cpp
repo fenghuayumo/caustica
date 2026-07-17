@@ -49,6 +49,7 @@ void SceneGaussianSplatPasses::clearSession()
 void SceneGaussianSplatPasses::sceneUnloading()
 {
     m_objects.clear();
+    m_passByEntity.clear();
 }
 
 std::filesystem::path SceneGaussianSplatPasses::resolveSplatPath(const caustica::GaussianSplat& splat) const
@@ -87,8 +88,28 @@ uint32_t SceneGaussianSplatPasses::totalSplatCount() const
     return uint32_t(std::min<uint64_t>(total, std::numeric_limits<uint32_t>::max()));
 }
 
+GaussianSplatPass* SceneGaussianSplatPasses::findPass(ecs::Entity entity)
+{
+    return const_cast<GaussianSplatPass*>(
+        static_cast<const SceneGaussianSplatPasses&>(*this).findPass(entity));
+}
+
+const GaussianSplatPass* SceneGaussianSplatPasses::findPass(ecs::Entity entity) const
+{
+    const auto it = m_passByEntity.find(uint32_t(entity));
+    return it != m_passByEntity.end() ? it->second : nullptr;
+}
+
 void SceneGaussianSplatPasses::updateUIState()
 {
+    m_passByEntity.clear();
+    m_passByEntity.reserve(m_objects.size());
+    for (const SceneObject& object : m_objects)
+    {
+        if (ecs::isValid(object.entity) && object.pass)
+            m_passByEntity[uint32_t(object.entity)] = object.pass.get();
+    }
+
     m_summary->ObjectCount = uint32_t(m_objects.size());
     m_summary->SplatCount = totalSplatCount();
 

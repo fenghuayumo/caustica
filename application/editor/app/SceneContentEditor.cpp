@@ -34,6 +34,7 @@ namespace
         return caustica::SetSceneMeshVerticesParams{
             .device = sceneEditor.app()->getGpuDevice()->getDevice(),
             .descriptorTable = gpuSharedCaches ? gpuSharedCaches->descriptorTable.get() : nullptr,
+            .gpuResources = &requireWorldRenderer(sceneEditor).sceneGpuResources(),
             .scene = caustica::activeScene(*sceneEditor.app()),
             .frameIndex = sceneEditor.app()->getGpuDevice()->getFrameIndex(),
             .resetAccumulation = &sceneEditor.pathTracerSettings().ResetAccumulation,

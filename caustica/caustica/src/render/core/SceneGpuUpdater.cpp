@@ -1,6 +1,7 @@
 #include <render/core/SceneGpuUpdater.h>
 
 #include <render/SceneGpuResources.h>
+#include <assets/loader/ShaderFactory.h>
 #include <scene/Scene.h>
 #include <scene/SceneRenderData.h>
 #include <backend/IDescriptorTableManager.h>
@@ -12,12 +13,25 @@
 #include <cassert>
 #include <algorithm>
 #include <memory>
+#include <span>
 #include <string>
 #include <unordered_set>
 #include <vector>
 
 using namespace caustica::math;
 #include <shaders/skinning_cb.h>
+
+#if CAUSTICA_WITH_STATIC_SHADERS
+#if CAUSTICA_WITH_DX11
+#include "compiled_shaders/skinning_cs.dxbc.h"
+#endif
+#if CAUSTICA_WITH_DX12
+#include "compiled_shaders/skinning_cs.dxil.h"
+#endif
+#if CAUSTICA_WITH_VULKAN
+#include "compiled_shaders/skinning_cs.spirv.h"
+#endif
+#endif
 
 namespace caustica::render
 {
@@ -140,18 +154,41 @@ void WriteInstanceBuffer(nvrhi::ICommandList* commandList, const SceneGpuResourc
         gpu.instanceData.size() * sizeof(InstanceData));
 }
 
-void UpdateMaterial(SceneGpuResources& gpu, const std::shared_ptr<Material>& material)
+uint64_t HashMaterialConstants(const MaterialConstants& constants)
 {
-    if (!material || material->materialID >= gpu.materialData.size())
+    constexpr uint64_t fnvOffset = 14695981039346656037ull;
+    constexpr uint64_t fnvPrime = 1099511628211ull;
+    uint64_t hash = fnvOffset;
+    const auto bytes = std::as_bytes(std::span{ &constants, size_t(1) });
+    for (std::byte value : bytes)
+    {
+        hash ^= std::to_integer<uint8_t>(value);
+        hash *= fnvPrime;
+    }
+    return hash;
+}
+
+void UpdateMaterial(
+    SceneGpuResources& gpu,
+    const scene::MaterialRenderResourceSnapshot& material)
+{
+    if (material.materialIndex >= gpu.materialData.size())
         return;
 
-    material->fillConstantBuffer(gpu.materialData[material->materialID], gpu.useResourceDescriptorHeapBindless);
+    gpu.materialData[material.materialIndex] = gpu.useResourceDescriptorHeapBindless
+        ? material.bindlessConstants
+        : material.constants;
 }
 
 void UpdateGeometry(SceneGpuResources& gpu, const std::shared_ptr<MeshInfo>& mesh)
 {
     if (!mesh || !mesh->buffers)
         return;
+
+    const auto recordIt = gpu.meshRegistry.find(mesh->renderResourceId);
+    if (recordIt == gpu.meshRegistry.end())
+        return;
+    const MeshGpuRecord& meshGpu = recordIt->second;
 
     for (const auto& geometry : mesh->geometries)
     {
@@ -170,34 +207,33 @@ void UpdateGeometry(SceneGpuResources& gpu, const std::shared_ptr<MeshInfo>& mes
         GeometryData& gdata = gpu.geometryData[geometry->globalGeometryIndex];
         gdata.numIndices = geometry->numIndices;
         gdata.numVertices = geometry->numVertices;
-        gdata.indexBufferIndex = mesh->buffers->indexBufferDescriptor ? mesh->buffers->indexBufferDescriptor->Get() : -1;
+        gdata.indexBufferIndex = meshGpu.indexBufferDescriptor ? meshGpu.indexBufferDescriptor->Get() : -1;
         gdata.indexOffset = indexOffset * sizeof(uint32_t);
-        gdata.vertexBufferIndex = mesh->buffers->vertexBufferDescriptor ? mesh->buffers->vertexBufferDescriptor->Get() : -1;
-        gdata.positionOffset = mesh->buffers->hasAttribute(VertexAttribute::Position)
-            ? uint32_t(vertexOffset * sizeof(float3) + mesh->buffers->getVertexBufferRange(VertexAttribute::Position).byteOffset) : ~0u;
-        gdata.prevPositionOffset = mesh->buffers->hasAttribute(VertexAttribute::PrevPosition)
-            ? uint32_t(vertexOffset * sizeof(float3) + mesh->buffers->getVertexBufferRange(VertexAttribute::PrevPosition).byteOffset) : ~0u;
-        gdata.texCoord1Offset = mesh->buffers->hasAttribute(VertexAttribute::TexCoord1)
-            ? uint32_t(vertexOffset * sizeof(float2) + mesh->buffers->getVertexBufferRange(VertexAttribute::TexCoord1).byteOffset) : ~0u;
-        gdata.texCoord2Offset = mesh->buffers->hasAttribute(VertexAttribute::TexCoord2)
-            ? uint32_t(vertexOffset * sizeof(float2) + mesh->buffers->getVertexBufferRange(VertexAttribute::TexCoord2).byteOffset) : ~0u;
-        gdata.normalOffset = mesh->buffers->hasAttribute(VertexAttribute::Normal)
-            ? uint32_t(vertexOffset * sizeof(uint32_t) + mesh->buffers->getVertexBufferRange(VertexAttribute::Normal).byteOffset) : ~0u;
-        gdata.tangentOffset = mesh->buffers->hasAttribute(VertexAttribute::Tangent)
-            ? uint32_t(vertexOffset * sizeof(uint32_t) + mesh->buffers->getVertexBufferRange(VertexAttribute::Tangent).byteOffset) : ~0u;
-        gdata.curveRadiusOffset = mesh->buffers->hasAttribute(VertexAttribute::CurveRadius)
-            ? uint32_t(vertexOffset * sizeof(float) + mesh->buffers->getVertexBufferRange(VertexAttribute::CurveRadius).byteOffset) : ~0u;
+        gdata.vertexBufferIndex = meshGpu.vertexBufferDescriptor ? meshGpu.vertexBufferDescriptor->Get() : -1;
+        gdata.positionOffset = meshGpu.hasAttribute(VertexAttribute::Position)
+            ? uint32_t(vertexOffset * sizeof(float3) + meshGpu.vertexBufferRange(VertexAttribute::Position).byteOffset) : ~0u;
+        gdata.prevPositionOffset = meshGpu.hasAttribute(VertexAttribute::PrevPosition)
+            ? uint32_t(vertexOffset * sizeof(float3) + meshGpu.vertexBufferRange(VertexAttribute::PrevPosition).byteOffset) : ~0u;
+        gdata.texCoord1Offset = meshGpu.hasAttribute(VertexAttribute::TexCoord1)
+            ? uint32_t(vertexOffset * sizeof(float2) + meshGpu.vertexBufferRange(VertexAttribute::TexCoord1).byteOffset) : ~0u;
+        gdata.texCoord2Offset = meshGpu.hasAttribute(VertexAttribute::TexCoord2)
+            ? uint32_t(vertexOffset * sizeof(float2) + meshGpu.vertexBufferRange(VertexAttribute::TexCoord2).byteOffset) : ~0u;
+        gdata.normalOffset = meshGpu.hasAttribute(VertexAttribute::Normal)
+            ? uint32_t(vertexOffset * sizeof(uint32_t) + meshGpu.vertexBufferRange(VertexAttribute::Normal).byteOffset) : ~0u;
+        gdata.tangentOffset = meshGpu.hasAttribute(VertexAttribute::Tangent)
+            ? uint32_t(vertexOffset * sizeof(uint32_t) + meshGpu.vertexBufferRange(VertexAttribute::Tangent).byteOffset) : ~0u;
+        gdata.curveRadiusOffset = meshGpu.hasAttribute(VertexAttribute::CurveRadius)
+            ? uint32_t(vertexOffset * sizeof(float) + meshGpu.vertexBufferRange(VertexAttribute::CurveRadius).byteOffset) : ~0u;
         gdata.materialIndex = geometry->material ? geometry->material->materialID : ~0u;
     }
 }
 
-void UpdateInstance(Scene& scene, const scene::MeshInstanceRenderProxy& proxy,
+void UpdateInstance(SceneGpuResources& gpu, const scene::MeshInstanceRenderProxy& proxy,
     uint32_t compactedGeometryInstanceIndex)
 {
     if (proxy.instanceIndex < 0)
         return;
 
-    SceneGpuResources& gpu = scene.getGpuResources();
     if (static_cast<size_t>(proxy.instanceIndex) >= gpu.instanceData.size())
         return;
 
@@ -223,13 +259,11 @@ void UpdateInstance(Scene& scene, const scene::MeshInstanceRenderProxy& proxy,
 }
 
 void EnsureMeshGpuBuffers(
-    Scene& scene,
+    SceneGpuResources& gpu,
     const scene::SceneRenderData& renderData,
     IDescriptorTableManager* descriptorTable,
     nvrhi::ICommandList* commandList)
 {
-    SceneGpuResources& gpu = scene.getGpuResources();
-
     for (const auto& mesh : renderData.meshResources)
     {
         auto buffers = mesh->buffers;
@@ -237,7 +271,9 @@ void EnsureMeshGpuBuffers(
         if (!buffers)
             continue;
 
-        if (!buffers->indexData.empty() && !buffers->indexBuffer)
+        MeshGpuRecord& meshGpu = gpu.meshRegistry[mesh->renderResourceId];
+
+        if (!buffers->indexData.empty() && !meshGpu.indexBuffer)
         {
             nvrhi::BufferDesc bufferDesc;
             bufferDesc.isIndexBuffer = true;
@@ -248,8 +284,8 @@ void EnsureMeshGpuBuffers(
             bufferDesc.format = nvrhi::Format::R32_UINT;
             bufferDesc.isAccelStructBuildInput = gpu.rayTracingSupported;
 
-            buffers->indexBuffer = gpu.device->createBuffer(bufferDesc);
-            if (!buffers->indexBuffer)
+            meshGpu.indexBuffer = gpu.device->createBuffer(bufferDesc);
+            if (!meshGpu.indexBuffer)
             {
                 caustica::error("Failed to create index buffer for mesh '%s' (%zu indices).",
                     mesh->name.c_str(), buffers->indexData.size());
@@ -258,28 +294,28 @@ void EnsureMeshGpuBuffers(
 
             if (descriptorTable)
             {
-                buffers->indexBufferDescriptor = std::make_shared<DescriptorHandle>(
-                    descriptorTable->createDescriptorHandle(nvrhi::BindingSetItem::RawBuffer_SRV(0, buffers->indexBuffer)));
+                meshGpu.indexBufferDescriptor = std::make_shared<DescriptorHandle>(
+                    descriptorTable->createDescriptorHandle(nvrhi::BindingSetItem::RawBuffer_SRV(0, meshGpu.indexBuffer)));
             }
 
-            commandList->beginTrackingBufferState(buffers->indexBuffer, nvrhi::ResourceStates::Common);
-            commandList->writeBuffer(buffers->indexBuffer, buffers->indexData.data(), buffers->indexData.size() * sizeof(uint32_t));
+            commandList->beginTrackingBufferState(meshGpu.indexBuffer, nvrhi::ResourceStates::Common);
+            commandList->writeBuffer(meshGpu.indexBuffer, buffers->indexData.data(), buffers->indexData.size() * sizeof(uint32_t));
 
             nvrhi::ResourceStates state = nvrhi::ResourceStates::IndexBuffer | nvrhi::ResourceStates::ShaderResource;
             if (bufferDesc.isAccelStructBuildInput)
                 state = state | nvrhi::ResourceStates::AccelStructBuildInput;
 
-            commandList->setPermanentBufferState(buffers->indexBuffer, state);
+            commandList->setPermanentBufferState(meshGpu.indexBuffer, state);
             commandList->commitBarriers();
         }
-        if (descriptorTable && buffers->indexBuffer && !buffers->indexBufferDescriptor)
+        if (descriptorTable && meshGpu.indexBuffer && !meshGpu.indexBufferDescriptor)
         {
-            buffers->indexBufferDescriptor = std::make_shared<DescriptorHandle>(
+            meshGpu.indexBufferDescriptor = std::make_shared<DescriptorHandle>(
                 descriptorTable->createDescriptorHandle(
-                    nvrhi::BindingSetItem::RawBuffer_SRV(0, buffers->indexBuffer)));
+                    nvrhi::BindingSetItem::RawBuffer_SRV(0, meshGpu.indexBuffer)));
         }
 
-        if (!buffers->vertexBuffer)
+        if (!meshGpu.vertexBuffer)
         {
             nvrhi::BufferDesc bufferDesc;
             bufferDesc.isVertexBuffer = true;
@@ -297,32 +333,32 @@ void EnsureMeshGpuBuffers(
 
             if (!buffers->positionData.empty())
             {
-                AppendBufferRange(buffers->getVertexBufferRange(VertexAttribute::Position),
+                AppendBufferRange(meshGpu.vertexBufferRange(VertexAttribute::Position),
                     buffers->positionData.size() * sizeof(buffers->positionData[0]), bufferDesc.byteSize);
-                AppendBufferRange(buffers->getVertexBufferRange(VertexAttribute::PrevPosition),
+                AppendBufferRange(meshGpu.vertexBufferRange(VertexAttribute::PrevPosition),
                     buffers->positionData.size() * sizeof(buffers->positionData[0]), bufferDesc.byteSize);
             }
 
             if (!buffers->normalData.empty())
-                AppendBufferRange(buffers->getVertexBufferRange(VertexAttribute::Normal), buffers->normalData.size() * sizeof(buffers->normalData[0]), bufferDesc.byteSize);
+                AppendBufferRange(meshGpu.vertexBufferRange(VertexAttribute::Normal), buffers->normalData.size() * sizeof(buffers->normalData[0]), bufferDesc.byteSize);
             if (!buffers->tangentData.empty())
-                AppendBufferRange(buffers->getVertexBufferRange(VertexAttribute::Tangent), buffers->tangentData.size() * sizeof(buffers->tangentData[0]), bufferDesc.byteSize);
+                AppendBufferRange(meshGpu.vertexBufferRange(VertexAttribute::Tangent), buffers->tangentData.size() * sizeof(buffers->tangentData[0]), bufferDesc.byteSize);
             if (!buffers->texcoord1Data.empty())
-                AppendBufferRange(buffers->getVertexBufferRange(VertexAttribute::TexCoord1), buffers->texcoord1Data.size() * sizeof(buffers->texcoord1Data[0]), bufferDesc.byteSize);
+                AppendBufferRange(meshGpu.vertexBufferRange(VertexAttribute::TexCoord1), buffers->texcoord1Data.size() * sizeof(buffers->texcoord1Data[0]), bufferDesc.byteSize);
             if (!buffers->texcoord2Data.empty())
-                AppendBufferRange(buffers->getVertexBufferRange(VertexAttribute::TexCoord2), buffers->texcoord2Data.size() * sizeof(buffers->texcoord2Data[0]), bufferDesc.byteSize);
+                AppendBufferRange(meshGpu.vertexBufferRange(VertexAttribute::TexCoord2), buffers->texcoord2Data.size() * sizeof(buffers->texcoord2Data[0]), bufferDesc.byteSize);
             if (!buffers->weightData.empty())
-                AppendBufferRange(buffers->getVertexBufferRange(VertexAttribute::JointWeights), buffers->weightData.size() * sizeof(buffers->weightData[0]), bufferDesc.byteSize);
+                AppendBufferRange(meshGpu.vertexBufferRange(VertexAttribute::JointWeights), buffers->weightData.size() * sizeof(buffers->weightData[0]), bufferDesc.byteSize);
             if (!buffers->jointData.empty())
-                AppendBufferRange(buffers->getVertexBufferRange(VertexAttribute::JointIndices), buffers->jointData.size() * sizeof(buffers->jointData[0]), bufferDesc.byteSize);
+                AppendBufferRange(meshGpu.vertexBufferRange(VertexAttribute::JointIndices), buffers->jointData.size() * sizeof(buffers->jointData[0]), bufferDesc.byteSize);
             if (!buffers->radiusData.empty())
-                AppendBufferRange(buffers->getVertexBufferRange(VertexAttribute::CurveRadius), buffers->radiusData.size() * sizeof(buffers->radiusData[0]), bufferDesc.byteSize);
+                AppendBufferRange(meshGpu.vertexBufferRange(VertexAttribute::CurveRadius), buffers->radiusData.size() * sizeof(buffers->radiusData[0]), bufferDesc.byteSize);
 
             if (bufferDesc.byteSize == 0)
                 continue;
 
-            buffers->vertexBuffer = gpu.device->createBuffer(bufferDesc);
-            if (!buffers->vertexBuffer)
+            meshGpu.vertexBuffer = gpu.device->createBuffer(bufferDesc);
+            if (!meshGpu.vertexBuffer)
             {
                 caustica::error("Failed to create vertex buffer for mesh '%s' (%llu bytes).",
                     mesh->name.c_str(),
@@ -331,81 +367,81 @@ void EnsureMeshGpuBuffers(
             }
             if (descriptorTable)
             {
-                buffers->vertexBufferDescriptor = std::make_shared<DescriptorHandle>(
-                    descriptorTable->createDescriptorHandle(nvrhi::BindingSetItem::RawBuffer_SRV(0, buffers->vertexBuffer)));
+                meshGpu.vertexBufferDescriptor = std::make_shared<DescriptorHandle>(
+                    descriptorTable->createDescriptorHandle(nvrhi::BindingSetItem::RawBuffer_SRV(0, meshGpu.vertexBuffer)));
             }
 
-            commandList->beginTrackingBufferState(buffers->vertexBuffer, nvrhi::ResourceStates::Common);
+            commandList->beginTrackingBufferState(meshGpu.vertexBuffer, nvrhi::ResourceStates::Common);
 
             if (!buffers->positionData.empty())
             {
-                WriteAttributeRange(commandList, buffers->vertexBuffer, buffers->positionData,
-                    buffers->getVertexBufferRange(VertexAttribute::Position));
-                WriteAttributeRange(commandList, buffers->vertexBuffer, buffers->positionData,
-                    buffers->getVertexBufferRange(VertexAttribute::PrevPosition));
+                WriteAttributeRange(commandList, meshGpu.vertexBuffer, buffers->positionData,
+                    meshGpu.vertexBufferRange(VertexAttribute::Position));
+                WriteAttributeRange(commandList, meshGpu.vertexBuffer, buffers->positionData,
+                    meshGpu.vertexBufferRange(VertexAttribute::PrevPosition));
             }
 
-            WriteAttributeRange(commandList, buffers->vertexBuffer, buffers->normalData,
-                buffers->getVertexBufferRange(VertexAttribute::Normal));
-            WriteAttributeRange(commandList, buffers->vertexBuffer, buffers->tangentData,
-                buffers->getVertexBufferRange(VertexAttribute::Tangent));
-            WriteAttributeRange(commandList, buffers->vertexBuffer, buffers->texcoord1Data,
-                buffers->getVertexBufferRange(VertexAttribute::TexCoord1));
-            WriteAttributeRange(commandList, buffers->vertexBuffer, buffers->texcoord2Data,
-                buffers->getVertexBufferRange(VertexAttribute::TexCoord2));
-            WriteAttributeRange(commandList, buffers->vertexBuffer, buffers->weightData,
-                buffers->getVertexBufferRange(VertexAttribute::JointWeights));
-            WriteAttributeRange(commandList, buffers->vertexBuffer, buffers->jointData,
-                buffers->getVertexBufferRange(VertexAttribute::JointIndices));
-            WriteAttributeRange(commandList, buffers->vertexBuffer, buffers->radiusData,
-                buffers->getVertexBufferRange(VertexAttribute::CurveRadius));
+            WriteAttributeRange(commandList, meshGpu.vertexBuffer, buffers->normalData,
+                meshGpu.vertexBufferRange(VertexAttribute::Normal));
+            WriteAttributeRange(commandList, meshGpu.vertexBuffer, buffers->tangentData,
+                meshGpu.vertexBufferRange(VertexAttribute::Tangent));
+            WriteAttributeRange(commandList, meshGpu.vertexBuffer, buffers->texcoord1Data,
+                meshGpu.vertexBufferRange(VertexAttribute::TexCoord1));
+            WriteAttributeRange(commandList, meshGpu.vertexBuffer, buffers->texcoord2Data,
+                meshGpu.vertexBufferRange(VertexAttribute::TexCoord2));
+            WriteAttributeRange(commandList, meshGpu.vertexBuffer, buffers->weightData,
+                meshGpu.vertexBufferRange(VertexAttribute::JointWeights));
+            WriteAttributeRange(commandList, meshGpu.vertexBuffer, buffers->jointData,
+                meshGpu.vertexBufferRange(VertexAttribute::JointIndices));
+            WriteAttributeRange(commandList, meshGpu.vertexBuffer, buffers->radiusData,
+                meshGpu.vertexBufferRange(VertexAttribute::CurveRadius));
 
-            commandList->setBufferState(buffers->vertexBuffer, state);
+            commandList->setBufferState(meshGpu.vertexBuffer, state);
             commandList->commitBarriers();
         }
-        if (descriptorTable && buffers->vertexBuffer && !buffers->vertexBufferDescriptor)
+        if (descriptorTable && meshGpu.vertexBuffer && !meshGpu.vertexBufferDescriptor)
         {
-            buffers->vertexBufferDescriptor = std::make_shared<DescriptorHandle>(
+            meshGpu.vertexBufferDescriptor = std::make_shared<DescriptorHandle>(
                 descriptorTable->createDescriptorHandle(
-                    nvrhi::BindingSetItem::RawBuffer_SRV(0, buffers->vertexBuffer)));
+                    nvrhi::BindingSetItem::RawBuffer_SRV(0, meshGpu.vertexBuffer)));
         }
     }
 
     auto& skinnedGpuMap = gpu.skinnedGpuByEntity;
     for (const scene::SkinnedMeshRenderProxy& proxy : renderData.skinnedMeshes)
     {
-        if (!proxy.mesh || !proxy.prototypeMesh)
+        if (!proxy.mesh || !proxy.prototypeMesh || !proxy.meshId || !proxy.prototypeMeshId)
             continue;
 
         const auto& skinnedMesh = proxy.mesh;
+        auto prototypeGpuIt = gpu.meshRegistry.find(proxy.prototypeMeshId);
+        if (prototypeGpuIt == gpu.meshRegistry.end())
+            continue;
+        MeshGpuRecord& prototypeGpu = prototypeGpuIt->second;
+        MeshGpuRecord& skinnedGpuMesh = gpu.meshRegistry[proxy.meshId];
         SkinnedMeshGpuState& skinnedGpu = skinnedGpuMap[static_cast<uint32_t>(proxy.entity)];
 
-        if (!skinnedMesh->buffers)
+        if (!skinnedGpuMesh.vertexBuffer)
         {
-            skinnedMesh->buffers = std::make_shared<BufferGroup>();
-
             const uint32_t totalVertices = skinnedMesh->totalVertices;
 
-            skinnedMesh->buffers->indexBuffer = proxy.prototypeMesh->buffers->indexBuffer;
-            skinnedMesh->buffers->indexBufferDescriptor = proxy.prototypeMesh->buffers->indexBufferDescriptor;
-
-            const auto& prototypeBuffers = proxy.prototypeMesh->buffers;
-            const auto& skinnedBuffers = skinnedMesh->buffers;
+            skinnedGpuMesh.indexBuffer = prototypeGpu.indexBuffer;
+            skinnedGpuMesh.indexBufferDescriptor = prototypeGpu.indexBufferDescriptor;
 
             size_t skinnedVertexBufferSize = 0;
-            assert(prototypeBuffers->hasAttribute(VertexAttribute::Position));
+            assert(prototypeGpu.hasAttribute(VertexAttribute::Position));
 
-            AppendBufferRange(skinnedBuffers->getVertexBufferRange(VertexAttribute::Position), totalVertices * sizeof(float3), skinnedVertexBufferSize);
-            AppendBufferRange(skinnedBuffers->getVertexBufferRange(VertexAttribute::PrevPosition), totalVertices * sizeof(float3), skinnedVertexBufferSize);
+            AppendBufferRange(skinnedGpuMesh.vertexBufferRange(VertexAttribute::Position), totalVertices * sizeof(float3), skinnedVertexBufferSize);
+            AppendBufferRange(skinnedGpuMesh.vertexBufferRange(VertexAttribute::PrevPosition), totalVertices * sizeof(float3), skinnedVertexBufferSize);
 
-            if (prototypeBuffers->hasAttribute(VertexAttribute::Normal))
-                AppendBufferRange(skinnedBuffers->getVertexBufferRange(VertexAttribute::Normal), totalVertices * sizeof(uint32_t), skinnedVertexBufferSize);
-            if (prototypeBuffers->hasAttribute(VertexAttribute::Tangent))
-                AppendBufferRange(skinnedBuffers->getVertexBufferRange(VertexAttribute::Tangent), totalVertices * sizeof(uint32_t), skinnedVertexBufferSize);
-            if (prototypeBuffers->hasAttribute(VertexAttribute::TexCoord1))
-                AppendBufferRange(skinnedBuffers->getVertexBufferRange(VertexAttribute::TexCoord1), totalVertices * sizeof(float2), skinnedVertexBufferSize);
-            if (prototypeBuffers->hasAttribute(VertexAttribute::TexCoord2))
-                AppendBufferRange(skinnedBuffers->getVertexBufferRange(VertexAttribute::TexCoord2), totalVertices * sizeof(float2), skinnedVertexBufferSize);
+            if (prototypeGpu.hasAttribute(VertexAttribute::Normal))
+                AppendBufferRange(skinnedGpuMesh.vertexBufferRange(VertexAttribute::Normal), totalVertices * sizeof(uint32_t), skinnedVertexBufferSize);
+            if (prototypeGpu.hasAttribute(VertexAttribute::Tangent))
+                AppendBufferRange(skinnedGpuMesh.vertexBufferRange(VertexAttribute::Tangent), totalVertices * sizeof(uint32_t), skinnedVertexBufferSize);
+            if (prototypeGpu.hasAttribute(VertexAttribute::TexCoord1))
+                AppendBufferRange(skinnedGpuMesh.vertexBufferRange(VertexAttribute::TexCoord1), totalVertices * sizeof(float2), skinnedVertexBufferSize);
+            if (prototypeGpu.hasAttribute(VertexAttribute::TexCoord2))
+                AppendBufferRange(skinnedGpuMesh.vertexBufferRange(VertexAttribute::TexCoord2), totalVertices * sizeof(float2), skinnedVertexBufferSize);
 
             nvrhi::BufferDesc bufferDesc;
             bufferDesc.isVertexBuffer = true;
@@ -418,23 +454,23 @@ void EnsureMeshGpuBuffers(
             bufferDesc.keepInitialState = true;
             bufferDesc.initialState = nvrhi::ResourceStates::VertexBuffer;
 
-            skinnedBuffers->vertexBuffer = gpu.device->createBuffer(bufferDesc);
+            skinnedGpuMesh.vertexBuffer = gpu.device->createBuffer(bufferDesc);
 
             if (descriptorTable)
             {
-                skinnedBuffers->vertexBufferDescriptor = std::make_shared<DescriptorHandle>(
-                    descriptorTable->createDescriptorHandle(nvrhi::BindingSetItem::RawBuffer_SRV(0, skinnedBuffers->vertexBuffer)));
+                skinnedGpuMesh.vertexBufferDescriptor = std::make_shared<DescriptorHandle>(
+                    descriptorTable->createDescriptorHandle(nvrhi::BindingSetItem::RawBuffer_SRV(0, skinnedGpuMesh.vertexBuffer)));
             }
         }
         if (descriptorTable
-            && skinnedMesh->buffers->vertexBuffer
-            && !skinnedMesh->buffers->vertexBufferDescriptor)
+            && skinnedGpuMesh.vertexBuffer
+            && !skinnedGpuMesh.vertexBufferDescriptor)
         {
-            skinnedMesh->buffers->vertexBufferDescriptor = std::make_shared<DescriptorHandle>(
+            skinnedGpuMesh.vertexBufferDescriptor = std::make_shared<DescriptorHandle>(
                 descriptorTable->createDescriptorHandle(
                     nvrhi::BindingSetItem::RawBuffer_SRV(
                         0,
-                        skinnedMesh->buffers->vertexBuffer)));
+                        skinnedGpuMesh.vertexBuffer)));
         }
 
         if (!skinnedGpu.jointBuffer)
@@ -450,15 +486,12 @@ void EnsureMeshGpuBuffers(
 
         if (!skinnedGpu.skinningBindingSet)
         {
-            const auto& prototypeBuffers = proxy.prototypeMesh->buffers;
-            const auto& skinnedBuffers = skinnedMesh->buffers;
-
             nvrhi::BindingSetDesc setDesc;
             setDesc.bindings = {
                 nvrhi::BindingSetItem::PushConstants(0, sizeof(SkinningConstants)),
-                nvrhi::BindingSetItem::RawBuffer_SRV(0, prototypeBuffers->vertexBuffer),
+                nvrhi::BindingSetItem::RawBuffer_SRV(0, prototypeGpu.vertexBuffer),
                 nvrhi::BindingSetItem::RawBuffer_SRV(1, skinnedGpu.jointBuffer),
-                nvrhi::BindingSetItem::RawBuffer_UAV(0, skinnedBuffers->vertexBuffer)
+                nvrhi::BindingSetItem::RawBuffer_UAV(0, skinnedGpuMesh.vertexBuffer)
             };
 
             skinnedGpu.skinningBindingSet = gpu.device->createBindingSet(setDesc, gpu.skinningBindingLayout);
@@ -467,21 +500,20 @@ void EnsureMeshGpuBuffers(
 }
 
 void DispatchSkinnedMeshUpdates(
-    Scene& scene,
+    SceneGpuResources& gpu,
     const scene::SceneRenderData& renderData,
     nvrhi::ICommandList* commandList,
     uint32_t /*frameIndex*/)
 {
-    SceneGpuResources& gpu = scene.getGpuResources();
-
     bool skinningMarkerPlaced = false;
     std::vector<nvrhi::BufferHandle> skinnedVertexBuffersWritten;
-    std::unordered_set<const MeshInfo*> skinnedMeshesWritten;
+    std::unordered_set<scene::MeshRenderResourceId, scene::MeshRenderResourceId::Hash> skinnedMeshesWritten;
     uint32_t skippedDuplicateSkinnedDispatchCount = 0;
 
     for (const scene::SkinnedMeshRenderProxy& proxy : renderData.skinnedMeshes)
     {
-        if (!proxy.needsSkinningUpdate || !proxy.mesh || !proxy.prototypeMesh)
+        if (!proxy.needsSkinningUpdate || !proxy.mesh || !proxy.prototypeMesh
+            || !proxy.meshId || !proxy.prototypeMeshId)
             continue;
 
         auto gpuIt = gpu.skinnedGpuByEntity.find(static_cast<uint32_t>(proxy.entity));
@@ -491,7 +523,7 @@ void DispatchSkinnedMeshUpdates(
         if (!skinnedGpu.jointBuffer || !skinnedGpu.skinningBindingSet)
             continue;
 
-        if (!skinnedMeshesWritten.insert(proxy.mesh.get()).second)
+        if (!skinnedMeshesWritten.insert(proxy.meshId).second)
         {
             skippedDuplicateSkinnedDispatchCount++;
             continue;
@@ -517,37 +549,41 @@ void DispatchSkinnedMeshUpdates(
         commandList->setComputeState(state);
 
         uint32_t vertexOffset = proxy.prototypeMesh->vertexOffset;
-        const auto& prototypeBuffers = proxy.prototypeMesh->buffers;
-        const auto& skinnedBuffers = proxy.mesh->buffers;
+        const auto prototypeGpuIt = gpu.meshRegistry.find(proxy.prototypeMeshId);
+        const auto skinnedGpuIt = gpu.meshRegistry.find(proxy.meshId);
+        if (prototypeGpuIt == gpu.meshRegistry.end() || skinnedGpuIt == gpu.meshRegistry.end())
+            continue;
+        const MeshGpuRecord& prototypeBuffers = prototypeGpuIt->second;
+        const MeshGpuRecord& skinnedBuffers = skinnedGpuIt->second;
 
         SkinningConstants constants{};
         constants.numVertices = proxy.prototypeMesh->totalVertices;
 
         constants.flags = 0;
-        if (prototypeBuffers->hasAttribute(VertexAttribute::Normal)) constants.flags |= SkinningFlag_Normals;
-        if (prototypeBuffers->hasAttribute(VertexAttribute::Tangent)) constants.flags |= SkinningFlag_Tangents;
-        if (prototypeBuffers->hasAttribute(VertexAttribute::TexCoord1)) constants.flags |= SkinningFlag_TexCoord1;
-        if (prototypeBuffers->hasAttribute(VertexAttribute::TexCoord2)) constants.flags |= SkinningFlag_TexCoord2;
+        if (prototypeBuffers.hasAttribute(VertexAttribute::Normal)) constants.flags |= SkinningFlag_Normals;
+        if (prototypeBuffers.hasAttribute(VertexAttribute::Tangent)) constants.flags |= SkinningFlag_Tangents;
+        if (prototypeBuffers.hasAttribute(VertexAttribute::TexCoord1)) constants.flags |= SkinningFlag_TexCoord1;
+        if (prototypeBuffers.hasAttribute(VertexAttribute::TexCoord2)) constants.flags |= SkinningFlag_TexCoord2;
         if (!skinnedGpu.skinningInitialized) constants.flags |= SkinningFlag_FirstFrame;
         skinnedGpu.skinningInitialized = true;
 
-        constants.inputPositionOffset = uint32_t(prototypeBuffers->getVertexBufferRange(VertexAttribute::Position).byteOffset + vertexOffset * sizeof(float3));
-        constants.inputNormalOffset = uint32_t(prototypeBuffers->getVertexBufferRange(VertexAttribute::Normal).byteOffset + vertexOffset * sizeof(uint32_t));
-        constants.inputTangentOffset = uint32_t(prototypeBuffers->getVertexBufferRange(VertexAttribute::Tangent).byteOffset + vertexOffset * sizeof(uint32_t));
-        constants.inputTexCoord1Offset = uint32_t(prototypeBuffers->getVertexBufferRange(VertexAttribute::TexCoord1).byteOffset + vertexOffset * sizeof(float2));
-        constants.inputTexCoord2Offset = uint32_t(prototypeBuffers->getVertexBufferRange(VertexAttribute::TexCoord2).byteOffset + vertexOffset * sizeof(float2));
-        constants.inputJointIndexOffset = uint32_t(prototypeBuffers->getVertexBufferRange(VertexAttribute::JointIndices).byteOffset + vertexOffset * sizeof(uint2));
-        constants.inputJointWeightOffset = uint32_t(prototypeBuffers->getVertexBufferRange(VertexAttribute::JointWeights).byteOffset + vertexOffset * sizeof(float4));
-        constants.outputPositionOffset = uint32_t(skinnedBuffers->getVertexBufferRange(VertexAttribute::Position).byteOffset);
-        constants.outputPrevPositionOffset = uint32_t(skinnedBuffers->getVertexBufferRange(VertexAttribute::PrevPosition).byteOffset);
-        constants.outputNormalOffset = uint32_t(skinnedBuffers->getVertexBufferRange(VertexAttribute::Normal).byteOffset);
-        constants.outputTangentOffset = uint32_t(skinnedBuffers->getVertexBufferRange(VertexAttribute::Tangent).byteOffset);
-        constants.outputTexCoord1Offset = uint32_t(skinnedBuffers->getVertexBufferRange(VertexAttribute::TexCoord1).byteOffset);
-        constants.outputTexCoord2Offset = uint32_t(skinnedBuffers->getVertexBufferRange(VertexAttribute::TexCoord2).byteOffset);
+        constants.inputPositionOffset = uint32_t(prototypeBuffers.vertexBufferRange(VertexAttribute::Position).byteOffset + vertexOffset * sizeof(float3));
+        constants.inputNormalOffset = uint32_t(prototypeBuffers.vertexBufferRange(VertexAttribute::Normal).byteOffset + vertexOffset * sizeof(uint32_t));
+        constants.inputTangentOffset = uint32_t(prototypeBuffers.vertexBufferRange(VertexAttribute::Tangent).byteOffset + vertexOffset * sizeof(uint32_t));
+        constants.inputTexCoord1Offset = uint32_t(prototypeBuffers.vertexBufferRange(VertexAttribute::TexCoord1).byteOffset + vertexOffset * sizeof(float2));
+        constants.inputTexCoord2Offset = uint32_t(prototypeBuffers.vertexBufferRange(VertexAttribute::TexCoord2).byteOffset + vertexOffset * sizeof(float2));
+        constants.inputJointIndexOffset = uint32_t(prototypeBuffers.vertexBufferRange(VertexAttribute::JointIndices).byteOffset + vertexOffset * sizeof(uint2));
+        constants.inputJointWeightOffset = uint32_t(prototypeBuffers.vertexBufferRange(VertexAttribute::JointWeights).byteOffset + vertexOffset * sizeof(float4));
+        constants.outputPositionOffset = uint32_t(skinnedBuffers.vertexBufferRange(VertexAttribute::Position).byteOffset);
+        constants.outputPrevPositionOffset = uint32_t(skinnedBuffers.vertexBufferRange(VertexAttribute::PrevPosition).byteOffset);
+        constants.outputNormalOffset = uint32_t(skinnedBuffers.vertexBufferRange(VertexAttribute::Normal).byteOffset);
+        constants.outputTangentOffset = uint32_t(skinnedBuffers.vertexBufferRange(VertexAttribute::Tangent).byteOffset);
+        constants.outputTexCoord1Offset = uint32_t(skinnedBuffers.vertexBufferRange(VertexAttribute::TexCoord1).byteOffset);
+        constants.outputTexCoord2Offset = uint32_t(skinnedBuffers.vertexBufferRange(VertexAttribute::TexCoord2).byteOffset);
         commandList->setPushConstants(&constants, sizeof(constants));
 
         commandList->dispatch(dm::div_ceil(constants.numVertices, 256));
-        skinnedVertexBuffersWritten.push_back(skinnedBuffers->vertexBuffer);
+        skinnedVertexBuffersWritten.push_back(skinnedBuffers.vertexBuffer);
 
         if (!proxy.debugName.empty())
             commandList->endMarker();
@@ -575,8 +611,86 @@ void DispatchSkinnedMeshUpdates(
     }
 }
 
+void ApplyMeshGpuUploadCommands(
+    SceneGpuResources& gpu,
+    std::span<const MeshGpuUploadCommand> commands,
+    nvrhi::ICommandList* commandList)
+{
+    for (const MeshGpuUploadCommand& command : commands)
+    {
+        const auto meshGpuIt = gpu.meshRegistry.find(command.meshId);
+        if (meshGpuIt == gpu.meshRegistry.end() || !meshGpuIt->second.vertexBuffer)
+            continue;
+        MeshGpuRecord& meshGpu = meshGpuIt->second;
+
+        const uint64_t vertexOffset = command.vertexOffset;
+        if (!command.positions.empty() && meshGpu.hasAttribute(VertexAttribute::Position))
+        {
+            commandList->writeBuffer(
+                meshGpu.vertexBuffer,
+                command.positions.data(),
+                command.positions.size() * sizeof(dm::float3),
+                meshGpu.vertexBufferRange(VertexAttribute::Position).byteOffset
+                    + vertexOffset * sizeof(dm::float3));
+        }
+        if (!command.previousPositions.empty() && meshGpu.hasAttribute(VertexAttribute::PrevPosition))
+        {
+            commandList->writeBuffer(
+                meshGpu.vertexBuffer,
+                command.previousPositions.data(),
+                command.previousPositions.size() * sizeof(dm::float3),
+                meshGpu.vertexBufferRange(VertexAttribute::PrevPosition).byteOffset
+                    + vertexOffset * sizeof(dm::float3));
+        }
+        if (!command.normals.empty() && meshGpu.hasAttribute(VertexAttribute::Normal))
+        {
+            commandList->writeBuffer(
+                meshGpu.vertexBuffer,
+                command.normals.data(),
+                command.normals.size() * sizeof(uint32_t),
+                meshGpu.vertexBufferRange(VertexAttribute::Normal).byteOffset
+                    + vertexOffset * sizeof(uint32_t));
+        }
+
+        nvrhi::ResourceStates readyState =
+            nvrhi::ResourceStates::VertexBuffer | nvrhi::ResourceStates::ShaderResource;
+        if (meshGpu.vertexBuffer->getDesc().isAccelStructBuildInput)
+            readyState = readyState | nvrhi::ResourceStates::AccelStructBuildInput;
+        commandList->setBufferState(meshGpu.vertexBuffer, readyState);
+    }
+}
+
+void PruneRemovedGpuResources(
+    SceneGpuResources& gpu,
+    const scene::SceneRenderData& renderData)
+{
+    std::unordered_set<scene::MeshRenderResourceId, scene::MeshRenderResourceId::Hash>
+        liveMeshIds;
+    liveMeshIds.reserve(renderData.meshResources.size());
+    for (const std::shared_ptr<MeshInfo>& mesh : renderData.meshResources)
+    {
+        if (mesh && mesh->renderResourceId)
+            liveMeshIds.insert(mesh->renderResourceId);
+    }
+    std::erase_if(gpu.meshRegistry, [&liveMeshIds](const auto& entry) {
+        return !liveMeshIds.contains(entry.first);
+    });
+
+    std::unordered_set<scene::MaterialRenderResourceId, scene::MaterialRenderResourceId::Hash>
+        liveMaterialIds;
+    liveMaterialIds.reserve(renderData.materialSnapshots.size());
+    for (const scene::MaterialRenderResourceSnapshot& material : renderData.materialSnapshots)
+    {
+        if (material.id)
+            liveMaterialIds.insert(material.id);
+    }
+    std::erase_if(gpu.materialRegistry, [&liveMaterialIds](const auto& entry) {
+        return !liveMaterialIds.contains(entry.first);
+    });
+}
+
 void UpdateGpuSceneBuffers(
-    Scene& scene,
+    SceneGpuResources& gpu,
     const scene::SceneRenderData& renderData,
     IDescriptorTableManager* descriptorTable,
     nvrhi::ICommandList* commandList,
@@ -584,15 +698,31 @@ void UpdateGpuSceneBuffers(
     bool structureChanged,
     bool transformsChanged)
 {
-    SceneGpuResources& gpu = scene.getGpuResources();
     gpu.enableBindlessResources = descriptorTable != nullptr;
+    std::vector<MeshGpuUploadCommand> meshUploads = gpu.takePendingMeshUploads();
+    for (const MeshGpuUploadCommand& upload : meshUploads)
+    {
+        if (!upload.recreateVertexBuffer)
+            continue;
+        const auto meshGpuIt = gpu.meshRegistry.find(upload.meshId);
+        if (meshGpuIt == gpu.meshRegistry.end())
+            continue;
+        meshGpuIt->second.vertexBuffer = nullptr;
+        meshGpuIt->second.vertexBufferDescriptor.reset();
+        meshGpuIt->second.vertexBufferRanges.fill(nvrhi::BufferRange{});
+    }
     bool materialsChanged = false;
 
-    if (structureChanged)
+    if (structureChanged || !meshUploads.empty())
     {
-        gpu.skinnedGpuByEntity.clear();
-        EnsureMeshGpuBuffers(scene, renderData, descriptorTable, commandList);
+        if (structureChanged)
+        {
+            gpu.skinnedGpuByEntity.clear();
+            PruneRemovedGpuResources(gpu, renderData);
+        }
+        EnsureMeshGpuBuffers(gpu, renderData, descriptorTable, commandList);
     }
+    ApplyMeshGpuUploadCommands(gpu, meshUploads, commandList);
 
     const size_t allocationGranularity = 1024;
     bool arraysAllocated = false;
@@ -604,9 +734,9 @@ void UpdateGpuSceneBuffers(
         arraysAllocated = true;
     }
 
-    if (renderData.materialResources.size() > gpu.materialData.size())
+    if (renderData.materialSnapshots.size() > gpu.materialData.size())
     {
-        gpu.materialData.resize(nvrhi::align<size_t>(renderData.materialResources.size(), allocationGranularity));
+        gpu.materialData.resize(nvrhi::align<size_t>(renderData.materialSnapshots.size(), allocationGranularity));
         if (gpu.enableBindlessResources)
             gpu.materialBuffer = CreateMaterialBuffer(gpu);
         arraysAllocated = true;
@@ -619,27 +749,37 @@ void UpdateGpuSceneBuffers(
         arraysAllocated = true;
     }
 
-    for (const auto& material : renderData.materialResources)
+    for (const scene::MaterialRenderResourceSnapshot& material : renderData.materialSnapshots)
     {
-        if (material->dirty || structureChanged || arraysAllocated)
+        if (!material.id)
+            continue;
+
+        const MaterialConstants& selectedConstants = gpu.useResourceDescriptorHeapBindless
+            ? material.bindlessConstants
+            : material.constants;
+        const uint64_t contentHash = HashMaterialConstants(selectedConstants);
+        MaterialGpuRecord& materialGpu = gpu.materialRegistry[material.id];
+        const bool needsUpload =
+            materialGpu.uploadedContentHash != contentHash
+            || structureChanged
+            || arraysAllocated;
+
+        if (needsUpload)
             UpdateMaterial(gpu, material);
 
-        if (!material->materialConstants)
-        {
-            material->materialConstants = CreateMaterialConstantBuffer(gpu, material->name);
-            material->dirty = true;
-        }
+        if (!materialGpu.constantsBuffer)
+            materialGpu.constantsBuffer = CreateMaterialConstantBuffer(gpu, material.debugName);
 
-        if (material->dirty)
+        if (needsUpload)
         {
-            if (material->materialID >= gpu.materialData.size())
+            if (material.materialIndex >= gpu.materialData.size())
                 continue;
 
-            commandList->writeBuffer(material->materialConstants,
-                &gpu.materialData[material->materialID],
+            commandList->writeBuffer(materialGpu.constantsBuffer,
+                &gpu.materialData[material.materialIndex],
                 sizeof(MaterialConstants));
 
-            material->dirty = false;
+            materialGpu.uploadedContentHash = contentHash;
             materialsChanged = true;
         }
     }
@@ -681,7 +821,7 @@ void UpdateGpuSceneBuffers(
             if (!mesh || !mesh->buffers)
                 continue;
 
-            mesh->buffers->instanceBuffer = gpu.instanceBuffer;
+            gpu.meshRegistry[mesh->renderResourceId].instanceBuffer = gpu.instanceBuffer;
 
             if (gpu.enableBindlessResources)
                 UpdateGeometry(gpu, mesh);
@@ -696,7 +836,7 @@ void UpdateGpuSceneBuffers(
         uint32_t compactedGeometryInstanceIndex = 0;
         for (const scene::MeshInstanceRenderProxy& proxy : renderData.meshInstances)
         {
-            UpdateInstance(scene, proxy, compactedGeometryInstanceIndex);
+            UpdateInstance(gpu, proxy, compactedGeometryInstanceIndex);
             if (proxy.meshShared)
                 compactedGeometryInstanceIndex += static_cast<uint32_t>(proxy.meshShared->geometries.size());
         }
@@ -707,13 +847,45 @@ void UpdateGpuSceneBuffers(
     if (gpu.enableBindlessResources && (materialsChanged || structureChanged || arraysAllocated))
         WriteMaterialBuffer(commandList, gpu);
 
-    DispatchSkinnedMeshUpdates(scene, renderData, commandList, frameIndex);
+    DispatchSkinnedMeshUpdates(gpu, renderData, commandList, frameIndex);
 }
 
 } // namespace
 
+void SceneGpuUpdater::initialize(
+    SceneGpuResources& gpu,
+    nvrhi::IDevice* device,
+    ShaderFactory& shaderFactory)
+{
+    gpu.clearSceneResources();
+    gpu.device = device;
+    gpu.rayTracingSupported = device->queryFeatureSupport(nvrhi::Feature::RayTracingAccelStruct);
+    gpu.skinningShader = shaderFactory.createAutoShader(
+        "engine/skinning_cs",
+        "main",
+        CAUSTICA_MAKE_PLATFORM_SHADER(g_skinning_cs),
+        nullptr,
+        nvrhi::ShaderType::Compute);
+
+    nvrhi::BindingLayoutDesc layoutDesc;
+    layoutDesc.visibility = nvrhi::ShaderType::Compute;
+    layoutDesc.bindings = {
+        nvrhi::BindingLayoutItem::PushConstants(0, sizeof(SkinningConstants)),
+        nvrhi::BindingLayoutItem::RawBuffer_SRV(0),
+        nvrhi::BindingLayoutItem::RawBuffer_SRV(1),
+        nvrhi::BindingLayoutItem::RawBuffer_UAV(0)
+    };
+    gpu.skinningBindingLayout = device->createBindingLayout(layoutDesc);
+
+    nvrhi::ComputePipelineDesc pipelineDesc;
+    pipelineDesc.bindingLayouts = { gpu.skinningBindingLayout };
+    pipelineDesc.CS = gpu.skinningShader;
+    gpu.skinningPipeline = device->createComputePipeline(pipelineDesc);
+}
+
 void SceneGpuUpdater::refresh(
     Scene& scene,
+    SceneGpuResources& gpu,
     IDescriptorTableManager* descriptorTable,
     nvrhi::ICommandList* commandList,
     uint32_t frameIndex)
@@ -737,7 +909,7 @@ void SceneGpuUpdater::refresh(
     const scene::SceneRenderData& renderData = scene.getRenderData();
 
     UpdateGpuSceneBuffers(
-        scene,
+        gpu,
         renderData,
         descriptorTable,
         commandList,
@@ -752,19 +924,19 @@ void SceneGpuUpdater::refresh(
 void SceneGpuUpdater::refreshAfterLoad(
     Scene& scene,
     const scene::SceneRenderData& renderData,
+    SceneGpuResources& gpu,
     IDescriptorTableManager* descriptorTable,
     uint32_t frameIndex)
 {
-    SceneGpuResources& gpu = scene.getGpuResources();
     if (!gpu.device->waitForIdle())
         return;
 
     nvrhi::CommandListHandle commandList = gpu.device->createCommandList();
     commandList->open();
     {
-        EnsureMeshGpuBuffers(scene, renderData, descriptorTable, commandList);
+        EnsureMeshGpuBuffers(gpu, renderData, descriptorTable, commandList);
         UpdateGpuSceneBuffers(
-            scene,
+            gpu,
             renderData,
             descriptorTable,
             commandList,

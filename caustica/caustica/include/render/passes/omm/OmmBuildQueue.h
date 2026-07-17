@@ -1,6 +1,7 @@
 #pragma once
 
 #include <scene/SceneTypes.h>
+#include <render/SceneGpuResources.h>
 #include <assets/loader/TextureLoader.h>
 #include <render/core/AccelerationStructureUtil.h>
 
@@ -56,6 +57,10 @@ public:
 	~OmmBuildQueue();
 
 	void update(nvrhi::ICommandList& commandList);
+	void setSceneGpuResources(caustica::render::SceneGpuResources* resources)
+	{
+		m_sceneGpuResources = resources;
+	}
 	void cancelPendingBuilds();
 	void queueBuild(const BuildInput& inputs);
 	uint32_t numPendingBuilds() const;
@@ -124,6 +129,7 @@ private:
 	void bakeOmmArrayData(nvrhi::ICommandList& commandList, BuildTask& task);
 	std::vector<bvh::OmmAttachment> buildOMMAttachments(nvrhi::ICommandList& commandList, BuildTask& task);
 	void buildBLASWithOMM(nvrhi::ICommandList& commandList, BuildTask& task, const std::vector<bvh::OmmAttachment>& ommAttachment);
+	caustica::render::MeshGpuRecord* findMeshGpu(const caustica::MeshInfo& mesh) const;
 
 	bool readyToRecordWork();
 	void submitAndSubscribeQuery(nvrhi::ICommandList& commandList);
@@ -132,6 +138,7 @@ private:
 	nvrhi::EventQueryHandle m_InFlightQuery;
 
 	nvrhi::DeviceHandle m_device;
+	caustica::render::SceneGpuResources* m_sceneGpuResources = nullptr;
 	std::shared_ptr<caustica::DescriptorTableManager> m_descriptorTable;
 	std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
 	std::unique_ptr<omm::GpuBakeNvrhi> m_baker;

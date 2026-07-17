@@ -1571,7 +1571,6 @@ void UpdateSubInstanceData(SubInstanceData& ret,
     {
         ret.FlagsAndAlphaInfo |= SubInstanceData::Flags_AlphaTested;
 
-        assert(meshRef->buffers->hasAttribute(VertexAttribute::TexCoord1));
         assert(material.enableBaseTexture && material.baseTexture.loaded != nullptr); // disable alpha testing if this happens to be possible
         // ret.alphaCutoff = material.alphaCutoff;
         alphaCutoff = material.alphaCutoff;

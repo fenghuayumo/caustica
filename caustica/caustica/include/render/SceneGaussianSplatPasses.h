@@ -9,6 +9,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 class RenderTargets;
@@ -52,6 +53,8 @@ public:
     [[nodiscard]] const std::vector<SceneObject>& objects() const { return m_objects; }
     [[nodiscard]] std::vector<SceneObject>& objects() { return m_objects; }
     [[nodiscard]] bool objectsEmpty() const { return m_objects.empty(); }
+    [[nodiscard]] GaussianSplatPass* findPass(ecs::Entity entity);
+    [[nodiscard]] const GaussianSplatPass* findPass(ecs::Entity entity) const;
 
     uint32_t splatCount() const;
     uint32_t objectCount() const;
@@ -78,6 +81,7 @@ private:
     std::function<std::shared_ptr<ShaderDebug>()> m_getShaderDebug;
 
     std::vector<SceneObject> m_objects;
+    std::unordered_map<uint32_t, GaussianSplatPass*> m_passByEntity;
     std::string m_fileNameSummary;
     std::function<void()> m_onRequestFullRebuild;
 };

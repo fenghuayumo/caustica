@@ -59,7 +59,6 @@ nvrhi::VertexAttributeDesc caustica::getVertexAttributeDesc(VertexAttribute attr
 
     return result;
 }
-
 const char* caustica::materialDomainToString(MaterialDomain domain)
 {
     switch (domain)
@@ -72,31 +71,5 @@ const char* caustica::materialDomainToString(MaterialDomain domain)
     case MaterialDomain::TransmissiveAlphaBlended: return "TransmissiveAlphaBlended";
     case MaterialDomain::Count: return "Count";
     default: return "<Invalid>";
-    }
-}
-
-bool LightProbe::isActive() const
-{
-    if (!enabled)
-        return false;
-    if (bounds.isempty())
-        return false;
-    if ((diffuseScale == 0.f || !diffuseMap) && (specularScale == 0.f || !specularMap))
-        return false;
-
-    return true;
-}
-
-void LightProbe::fillLightProbeConstants(LightProbeConstants& lightProbeConstants) const
-{
-    lightProbeConstants.diffuseArrayIndex = diffuseArrayIndex;
-    lightProbeConstants.specularArrayIndex = specularArrayIndex;
-    lightProbeConstants.diffuseScale = diffuseScale;
-    lightProbeConstants.specularScale = specularScale;
-    lightProbeConstants.mipLevels = specularMap ? static_cast<float>(specularMap->getDesc().mipLevels) : 0.f;
-
-    for (uint32_t nPlane = 0; nPlane < frustum::PLANES_COUNT; nPlane++)
-    {
-        lightProbeConstants.frustumPlanes[nPlane] = float4(bounds.planes[nPlane].normal, bounds.planes[nPlane].distance);
     }
 }

@@ -86,8 +86,6 @@ void prepareRenderFrame(App& app)
 
     sessionInputs.camera = &sessionCam->camera;
 
-    sessionInputs.gaussianSplatPasses = &worldRendererResource->gaussianSplatPasses();
-
     sessionInputs.gaussianSplatTemporalReset = worldRendererResource->consumeGaussianSplatTemporalReset();
 
     sessionInputs.settings = app.tryResource<PathTracerSettings>();

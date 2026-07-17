@@ -108,6 +108,8 @@ public:
     [[nodiscard]] const SceneRayTracingResources& rayTracingResources() const { return m_scenePasses.rayTracing; }
     [[nodiscard]] SceneGaussianSplatPasses& gaussianSplatPasses() { return m_scenePasses.gaussianSplats; }
     [[nodiscard]] const SceneGaussianSplatPasses& gaussianSplatPasses() const { return m_scenePasses.gaussianSplats; }
+    [[nodiscard]] SceneGpuResources& sceneGpuResources() { return m_context->sceneGpuResources; }
+    [[nodiscard]] const SceneGpuResources& sceneGpuResources() const { return m_context->sceneGpuResources; }
 
     static nvrhi::BindingLayoutHandle createBindlessLayout(nvrhi::IDevice* device);
     void createBindingLayouts(nvrhi::IBindingLayout* precreatedBindless = nullptr);

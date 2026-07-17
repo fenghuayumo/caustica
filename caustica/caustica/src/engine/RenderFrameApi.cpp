@@ -289,6 +289,8 @@ void animate(App& app, float fElapsedTimeSeconds)
                     deformParams.device = device->getDevice();
                     if (GpuSharedCaches* caches = gpuSharedCaches(app))
                         deformParams.descriptorTable = caches->descriptorTable.get();
+                    if (auto* renderer = worldRenderer(app))
+                        deformParams.gpuResources = &renderer->sceneGpuResources();
                     deformParams.scene = scene;
                     deformParams.frameIndex = device->getFrameIndex();
                     deformParams.recomputeNormals = true;

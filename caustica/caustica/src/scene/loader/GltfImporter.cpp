@@ -1652,18 +1652,11 @@ bool GltfImporter::load(
 
         if (morphTargetData.size() > 0)
         {
-            const size_t morphTargetFrameBufferSize = morphTargetData[0].size() * sizeof(float4);
             buffers->morphTargetData.reserve(morphTargetDataCount);
-            buffers->morphTargetBufferRange.reserve(morphTargetData.size());
 
             size_t morphTargetDataOffsetCounter = 0;
             for (const auto& morphTargetCurrentFrameData : morphTargetData)
             {
-                nvrhi::BufferRange range = {};
-                range.byteOffset = morphTargetDataOffsetCounter * sizeof(float4);
-                range.byteSize = morphTargetFrameBufferSize;
-                buffers->morphTargetBufferRange.push_back(range);
-
                 for (const auto& morphTargetCurrentData : morphTargetCurrentFrameData)
                 {
                     buffers->morphTargetData.push_back(float4(morphTargetCurrentData, 0.0f));

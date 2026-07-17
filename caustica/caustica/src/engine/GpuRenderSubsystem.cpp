@@ -77,11 +77,12 @@ void GpuRenderSubsystem::onSceneLoadedGpuPrep(const scene::SceneRenderData& rend
         m_assetSystem->loadingFinished();
     }
 
-    if (scene)
+    if (scene && m_worldRenderer)
     {
         render::SceneGpuUpdater::refreshAfterLoad(
             *scene,
             renderData,
+            m_worldRenderer->sceneGpuResources(),
             m_gpuSharedCaches ? m_gpuSharedCaches->descriptorTable.get() : nullptr,
             0);
         if (m_worldRenderer)

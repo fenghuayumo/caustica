@@ -61,6 +61,7 @@ void flushPendingStructureGpu(App& app)
         render::SceneGpuUpdater::refreshAfterLoad(
             *scenePtr,
             gpuSetupData,
+            worldRendererResource->sceneGpuResources(),
             caches->descriptorTable.get(),
             frameIndex);
 

@@ -209,8 +209,6 @@ def migrate(path: Path) -> bool:
     if path.name in CLASS_METHOD_FILES:
         n = re.sub(r"\bRenderTargets::Init\b", "RenderTargets::init", n)
         n = re.sub(r"\bRenderTargets::Clear\b", "RenderTargets::clear", n)
-        n = re.sub(r"\bGBufferRenderTargets::Init\b", "GBufferRenderTargets::init", n)
-        n = re.sub(r"\bGBufferRenderTargets::Clear\b", "GBufferRenderTargets::clear", n)
         n = re.sub(r"m_renderTargets->Init\b", "m_renderTargets->init", n)
         n = re.sub(r"m_renderTargets->Clear\b", "m_renderTargets->clear", n)
         n = re.sub(r"renderTargets->Init\b", "renderTargets->init", n)

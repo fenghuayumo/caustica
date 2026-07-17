@@ -14,6 +14,7 @@ namespace caustica
 
 class IDescriptorTableManager;
 class Scene;
+namespace render { struct SceneGpuResources; }
 struct MeshInfo;
 
 namespace scene
@@ -25,6 +26,7 @@ struct SetSceneMeshVerticesParams
 {
     nvrhi::IDevice* device = nullptr;
     IDescriptorTableManager* descriptorTable = nullptr;
+    render::SceneGpuResources* gpuResources = nullptr;
     std::shared_ptr<Scene> scene;
     uint32_t frameIndex = 0;
     bool recomputeNormals = true;

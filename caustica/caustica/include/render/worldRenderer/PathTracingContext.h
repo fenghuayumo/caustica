@@ -54,6 +54,9 @@ struct PathTracingContext
 
     AppDiagnostics& diagnostics;
 
+    // Render-owned GPU state for the active scene. Scene/ECS never owns GPU handles.
+    SceneGpuResources sceneGpuResources;
+
     // Sole session Scene ownership for the path tracer. Submodules take non-owning
     // Scene* or SceneRenderData / SceneGpuFrameHandles per call — do not copy this.
     // Bound via WorldRenderer::onSceneLoaded; not a substitute for frameScene reads.
@@ -72,14 +75,12 @@ struct PathTracingContext
     [[nodiscard]] bool hasFrameScene() const { return frameScene != nullptr; }
     [[nodiscard]] bool hasSessionScene() const { return sessionScene != nullptr; }
 
-    // Prefer frameGpu; fall back to session SceneGpuResources when rebuilding outside render().
+    // Prefer frameGpu; fall back to the render-owned active-scene resources.
     [[nodiscard]] SceneGpuFrameHandles resolveGpuHandles() const
     {
         if (frameGpu.valid())
             return frameGpu;
-        if (sessionScene)
-            return sessionScene->getGpuResources().frameHandles();
-        return {};
+        return sceneGpuResources.frameHandles();
     }
 
     [[nodiscard]] std::span<const scene::GaussianSplatRenderProxy> frameGaussianSplats() const

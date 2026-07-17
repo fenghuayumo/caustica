@@ -4,6 +4,7 @@
 #include <scene/SceneTypes.h>
 #include <rhi/nvrhi.h>
 #include <render/passes/lighting/MaterialGpuCache.h>
+#include <render/SceneGpuResources.h>
 
 namespace bvh
 {
@@ -23,7 +24,10 @@ namespace bvh
         uint32_t ommArrayDataBufferOffset = 0;
     };
 
-    static bool isValidTriangleGeometryForBlas(const caustica::MeshInfo& mesh, const caustica::MeshGeometry& geometry)
+    static bool isValidTriangleGeometryForBlas(
+        const caustica::MeshInfo& mesh,
+        const caustica::render::MeshGpuRecord& meshGpu,
+        const caustica::MeshGeometry& geometry)
     {
         if (geometry.type != caustica::MeshGeometryPrimitiveType::Triangles)
             return false;
@@ -38,12 +42,13 @@ namespace bvh
             return false;
         }
 
-        if (!mesh.buffers || !mesh.buffers->indexBuffer || !mesh.buffers->vertexBuffer)
+        if (!mesh.buffers || !meshGpu.indexBuffer || !meshGpu.vertexBuffer)
             return false;
 
-        const nvrhi::BufferDesc& indexBufferDesc = mesh.buffers->indexBuffer->getDesc();
-        const nvrhi::BufferDesc& vertexBufferDesc = mesh.buffers->vertexBuffer->getDesc();
-        const nvrhi::BufferRange& positionRange = mesh.buffers->getVertexBufferRange(caustica::VertexAttribute::Position);
+        const nvrhi::BufferDesc& indexBufferDesc = meshGpu.indexBuffer->getDesc();
+        const nvrhi::BufferDesc& vertexBufferDesc = meshGpu.vertexBuffer->getDesc();
+        const nvrhi::BufferRange& positionRange =
+            meshGpu.vertexBufferRange(caustica::VertexAttribute::Position);
 
         if (positionRange.byteSize == 0)
             return false;
@@ -100,6 +105,7 @@ namespace bvh
     static nvrhi::rt::AccelStructDesc getMeshBlasDesc(
         const Config& cfg,
         const caustica::MeshInfo& mesh,
+        const caustica::render::MeshGpuRecord& meshGpu,
         const OmmAttachment* ommAttachment,
         bool updateSkinMeshes)
     {
@@ -107,7 +113,7 @@ namespace bvh
         blasDesc.isTopLevel = false;
         blasDesc.debugName = mesh.name;
 
-        if (!mesh.buffers || !mesh.buffers->indexBuffer || !mesh.buffers->vertexBuffer)
+        if (!mesh.buffers || !meshGpu.indexBuffer || !meshGpu.vertexBuffer)
             return blasDesc;
 
         for (uint32_t geomIt = 0; geomIt < mesh.geometries.size(); ++geomIt)
@@ -115,17 +121,18 @@ namespace bvh
             const caustica::MeshGeometry* geometry = mesh.geometries[geomIt].get();
             if (!geometry)
                 continue;
-            if (!isValidTriangleGeometryForBlas(mesh, *geometry))
+            if (!isValidTriangleGeometryForBlas(mesh, meshGpu, *geometry))
                 continue;
 
             nvrhi::rt::GeometryDesc geometryDesc;
             auto& triangles = geometryDesc.geometryData.triangles;
-            triangles.indexBuffer = mesh.buffers->indexBuffer;
+            triangles.indexBuffer = meshGpu.indexBuffer;
             triangles.indexOffset = (mesh.indexOffset + geometry->indexOffsetInMesh) * sizeof(uint32_t);
             triangles.indexFormat = nvrhi::Format::R32_UINT;
             triangles.indexCount = geometry->numIndices;
-            triangles.vertexBuffer = mesh.buffers->vertexBuffer;
-            triangles.vertexOffset = (mesh.vertexOffset + geometry->vertexOffsetInMesh) * sizeof(dm::float3) + mesh.buffers->getVertexBufferRange(caustica::VertexAttribute::Position).byteOffset;
+            triangles.vertexBuffer = meshGpu.vertexBuffer;
+            triangles.vertexOffset = (mesh.vertexOffset + geometry->vertexOffsetInMesh) * sizeof(dm::float3)
+                + meshGpu.vertexBufferRange(caustica::VertexAttribute::Position).byteOffset;
             triangles.vertexFormat = nvrhi::Format::RGB32_FLOAT;
             triangles.vertexStride = sizeof(dm::float3);
             triangles.vertexCount = geometry->numVertices;

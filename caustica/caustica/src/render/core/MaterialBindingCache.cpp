@@ -1,4 +1,5 @@
 #include <render/core/MaterialBindingCache.h>
+#include <render/SceneGpuResources.h>
 
 #include <core/log.h>
 
@@ -13,11 +14,13 @@ MaterialBindingCache::MaterialBindingCache(
     const std::vector<MaterialResourceBinding>& bindings,
     nvrhi::ISampler* sampler,
     nvrhi::ITexture* fallbackTexture,
+    render::SceneGpuResources* sceneGpuResources,
     bool trackLiveness)
     : m_device(device)
     , m_bindingDesc(bindings)
     , m_fallbackTexture(fallbackTexture)
     , m_sampler(sampler)
+    , m_sceneGpuResources(sceneGpuResources)
     , m_trackLiveness(trackLiveness)
 {
     nvrhi::BindingLayoutDesc layoutDesc;
@@ -102,10 +105,21 @@ nvrhi::BindingSetHandle MaterialBindingCache::createMaterialBindingSet(const Mat
         switch (item.resource)
         {
         case MaterialResource::ConstantBuffer:
+        {
+            if (m_sceneGpuResources == nullptr)
+                return nullptr;
+            const auto materialGpuIt =
+                m_sceneGpuResources->materialRegistry.find(material->renderResourceId);
+            if (materialGpuIt == m_sceneGpuResources->materialRegistry.end()
+                || !materialGpuIt->second.constantsBuffer)
+            {
+                return nullptr;
+            }
             setItem = nvrhi::BindingSetItem::ConstantBuffer(
                 item.slot,
-                material->materialConstants);
+                materialGpuIt->second.constantsBuffer);
             break;
+        }
 
         case MaterialResource::Sampler:
             setItem = nvrhi::BindingSetItem::Sampler(

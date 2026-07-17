@@ -2,6 +2,7 @@
 
 #include <ecs/Entity.h>
 #include <rhi/nvrhi.h>
+#include <scene/SceneRenderResourceIds.h>
 #include <vector>
 
 namespace caustica
@@ -10,7 +11,6 @@ namespace caustica
     struct MeshInfo;
     struct MeshGeometry;
     struct Material;
-    struct BufferGroup;
 }
 
 namespace caustica::scene
@@ -21,11 +21,11 @@ namespace caustica::scene
     struct DrawCommand
     {
         ecs::Entity meshEntity = ecs::NullEntity;
+        MeshRenderResourceId meshId;
         int instanceIndex = -1;
         const caustica::MeshInfo* mesh = nullptr;
         const caustica::MeshGeometry* geometry = nullptr;
         const caustica::Material* material = nullptr;
-        const caustica::BufferGroup* buffers = nullptr;
         float distanceToCamera = 0.f;
         nvrhi::RasterCullMode cullMode = nvrhi::RasterCullMode::Back;
     };
