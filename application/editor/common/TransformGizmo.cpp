@@ -2,7 +2,8 @@
 
 #include "SceneEditor.h"
 #include "EditorAccess.h"
-#include <engine/SceneApi.h>
+#include <engine/SceneQuery.h>
+#include <engine/CameraApi.h>
 #include "ui/EditorUIInternal.h"
 
 #include <ImGuizmo.h>

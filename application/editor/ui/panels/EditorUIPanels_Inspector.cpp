@@ -2,7 +2,7 @@
 
 #include "SceneEditor.h"
 #include "EditorAccess.h"
-#include <engine/SceneApi.h>
+#include <engine/SceneQuery.h>
 #include "common/ImGuiManager.h"
 #include "common/TransformGizmo.h"
 

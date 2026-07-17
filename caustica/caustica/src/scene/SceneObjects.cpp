@@ -34,20 +34,6 @@ void GaussianSplat::load(const Json::Value& node)
 // SampleSettings
 // =============================================================================
 
-std::shared_ptr<SampleSettings> SampleSettings::clone() const
-{
-    auto copy = std::make_shared<SampleSettings>();
-    copy->name                  = name;
-    copy->realtimeMode          = realtimeMode;
-    copy->enableAnimations      = enableAnimations;
-    copy->startingCamera        = startingCamera;
-    copy->realtimeFireflyFilter = realtimeFireflyFilter;
-    copy->maxBounces            = maxBounces;
-    copy->maxDiffuseBounces     = maxDiffuseBounces;
-    copy->textureMIPBias        = textureMIPBias;
-    return copy;
-}
-
 void SampleSettings::load(const Json::Value& node)
 {
     node["realtimeMode"]          >> realtimeMode;

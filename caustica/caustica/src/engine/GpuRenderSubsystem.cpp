@@ -1,6 +1,7 @@
 #include <cassert>
 #include <cfloat>
 #include <engine/GpuRenderSubsystem.h>
+#include <engine/PathTracingRuntime.h>
 #include <engine/RenderInfra.h>
 #include <engine/SessionCamera.h>
 #include <engine/SceneSession.h>
@@ -8,6 +9,7 @@
 #include <assets/AssetSystem.h>
 #include <assets/loader/ShaderFactory.h>
 #include <backend/GpuDevice.h>
+#include <backend/IDescriptorTableManager.h>
 #include <core/command_line.h>
 #include <core/log.h>
 #include <core/path_utils.h>
@@ -18,7 +20,6 @@
 #include <render/core/RenderDevice.h>
 #include <render/PathTracerScenePasses.h>
 #include <render/worldRenderer/WorldRenderer.h>
-#include <render/worldRenderer/PathTracingContext.h>
 #include <scene/Scene.h>
 #include <scene/SceneEcs.h>
 #include <scene/SceneManager.h>
@@ -40,11 +41,11 @@ bool GpuRenderSubsystem::initialize(const GpuRenderSubsystemInitParams& params)
     RenderInfra& infra = params.renderInfra;
     SessionCamera& sessionCamera = params.sessionCamera;
     SceneSession& sceneSession = params.sceneSession;
+    PathTracingRuntime& pathTracing = params.pathTracingRuntime;
 
     if (!infra.initialize(gpuDevice, params.assetSystem))
         return false;
 
-    m_accelStructs = AccelStructManager(gpuDevice.getDevice());
     sessionCamera.camera.camera().setRotateSpeed(.003f);
 
     std::shared_ptr<IDescriptorTableManager> descriptorTable = infra.descriptorTable;
@@ -63,6 +64,7 @@ bool GpuRenderSubsystem::initialize(const GpuRenderSubsystemInitParams& params)
     m_renderInfra = &infra;
     m_sessionCamera = &sessionCamera;
     m_sceneSession = &sceneSession;
+    m_pathTracing = &pathTracing;
     m_gpuDevice = &params.gpuDevice;
     m_assetSystem = &params.assetSystem;
     m_settings = &params.settings;
@@ -71,50 +73,15 @@ bool GpuRenderSubsystem::initialize(const GpuRenderSubsystemInitParams& params)
     m_sceneTime = &params.sceneTime;
     m_cmdLine = params.cmdLine;
 
-    m_pathTracingContext = std::make_unique<render::PathTracingContext>(render::PathTracingContext{
-        .gpuDevice = params.gpuDevice,
+    return pathTracing.create(PathTracingRuntime::CreateParams{
+        .gpuDevice = gpuDevice,
+        .renderInfra = infra,
         .sceneManager = *sceneSession.manager,
-        .camera = m_renderCamera,
-        .accelStructs = m_accelStructs,
         .settings = params.settings,
         .runtimeState = params.runtimeState,
-        .scenePasses = m_scenePasses,
-        .shaderFactory = infra.shaderFactory,
-        .renderDevice = *infra.renderDevice,
-        .bindingCache = *infra.bindingCache,
-        .textureCache = infra.textureLoader,
-        .descriptorTable = infra.descriptorTable,
-        .sceneTime = params.sceneTime,
         .diagnostics = params.diagnostics,
+        .sceneTime = params.sceneTime,
     });
-
-    m_worldRenderer = std::make_unique<render::WorldRenderer>(*m_pathTracingContext);
-    m_worldRenderer->createBindingLayouts(infra.bindlessLayout);
-
-    render::ScenePassWireParams sceneWireParams{
-        .gpuDevice = params.gpuDevice,
-        .sceneManager = *sceneSession.manager,
-        .accelStructs = m_accelStructs,
-        .worldRenderer = *m_worldRenderer,
-        .settings = params.settings,
-        .invalidation = params.runtimeState.Invalidation,
-        .gaussianSplatsSummary = params.runtimeState.GaussianSplats,
-        .lighting = m_scenePasses.lighting,
-        .bindingCache = *infra.bindingCache,
-        .shaderFactory = infra.shaderFactory,
-        .renderDevice = *infra.renderDevice,
-    };
-    sceneWireParams.onGaussianSplatTemporalReset = [worldRenderer = m_worldRenderer.get()]() {
-        worldRenderer->setGaussianSplatTemporalReset(true);
-    };
-    sceneWireParams.getRenderTargets = [worldRenderer = m_worldRenderer.get()]() {
-        return worldRenderer->getRenderTargets();
-    };
-    sceneWireParams.getShaderDebug = [worldRenderer = m_worldRenderer.get()]() {
-        return worldRenderer->getShaderDebug();
-    };
-    m_scenePasses.wireSession(sceneWireParams);
-    return true;
 }
 
 void GpuRenderSubsystem::onSceneUnloading()
@@ -127,26 +94,31 @@ void GpuRenderSubsystem::onSceneUnloading()
         if (const std::shared_ptr<Scene> scene = manager->getScene())
         {
             scene->prepareForUnload();
-            m_accelStructs.clearMeshAccelStructs(*scene);
+            if (m_pathTracing)
+                m_pathTracing->accelStructs().clearMeshAccelStructs(*scene);
         }
     }
 
     if (m_assetSystem)
         m_assetSystem->clearSceneAssets();
 
-    if (m_worldRenderer)
-        m_worldRenderer->onSceneUnloading();
-    m_accelStructs.releaseGpuResources();
+    if (m_pathTracing)
+    {
+        if (render::WorldRenderer* wr = m_pathTracing->worldRenderer())
+            wr->onSceneUnloading();
+        m_pathTracing->accelStructs().releaseGpuResources();
+        m_pathTracing->lightingPasses().sceneUnloading();
+        m_pathTracing->gaussianSplatPasses().sceneUnloading();
+    }
     if (m_renderInfra && m_renderInfra->bindingCache)
         m_renderInfra->bindingCache->clear();
-    m_scenePasses.lighting.sceneUnloading();
-    m_scenePasses.gaussianSplats.sceneUnloading();
 }
 
 void GpuRenderSubsystem::refreshEnvironmentMapMediaList(const std::filesystem::path& assetsRoot,
     const std::filesystem::path& scenePath)
 {
-    m_scenePasses.lighting.refreshEnvironmentMapMediaList(assetsRoot, scenePath);
+    if (m_pathTracing)
+        m_pathTracing->lightingPasses().refreshEnvironmentMapMediaList(assetsRoot, scenePath);
 }
 
 void GpuRenderSubsystem::applySampleSettingsFromScene()
@@ -159,7 +131,7 @@ void GpuRenderSubsystem::applySampleSettingsFromScene()
     if (!scene)
         return;
 
-    if (std::shared_ptr<SampleSettings> sampleSettings = scene->getSampleSettingsNode())
+    if (const SampleSettings* sampleSettings = scene->getSampleSettings())
     {
         m_settings->RealtimeMode = sampleSettings->realtimeMode.value_or(m_settings->RealtimeMode);
         m_settings->EnableAnimations = sampleSettings->enableAnimations.value_or(m_settings->EnableAnimations);
@@ -217,8 +189,11 @@ void GpuRenderSubsystem::onSceneLoadedBegin()
 
 void GpuRenderSubsystem::onSceneLoadedGpuPrep()
 {
-    if (m_worldRenderer)
-        m_worldRenderer->onSceneLoaded();
+    if (m_pathTracing)
+    {
+        if (render::WorldRenderer* wr = m_pathTracing->worldRenderer())
+            wr->onSceneLoaded();
+    }
 
     if (m_renderInfra && m_renderInfra->textureLoader && m_renderInfra->renderDevice && m_assetSystem)
     {
@@ -231,7 +206,8 @@ void GpuRenderSubsystem::onSceneLoadedGpuPrep()
         if (auto scene = manager->getScene())
         {
             render::SceneGpuUpdater::refreshAfterLoad(*scene, 0);
-            m_scenePasses.lighting.notifySceneReloaded(*scene);
+            if (m_pathTracing)
+                m_pathTracing->lightingPasses().notifySceneReloaded(*scene);
             registerLoadedSceneAssets();
         }
     }
@@ -240,7 +216,7 @@ void GpuRenderSubsystem::onSceneLoadedGpuPrep()
 void GpuRenderSubsystem::onSceneLoadedGpuFinish()
 {
     ::SceneManager* manager = sceneManager();
-    if (!manager || !m_settings || !m_runtimeState)
+    if (!manager || !m_settings || !m_runtimeState || !m_pathTracing)
         return;
 
     const auto scene = manager->getScene();
@@ -248,12 +224,12 @@ void GpuRenderSubsystem::onSceneLoadedGpuFinish()
         return;
 
     if (m_cmdLine)
-        m_scenePasses.gaussianSplats.onSceneLoaded();
+        m_pathTracing->gaussianSplatPasses().onSceneLoaded();
 
-    m_scenePasses.lighting.onSceneLoaded(*scene, *m_settings);
+    m_pathTracing->lightingPasses().onSceneLoaded(*scene, *m_settings);
 
     SceneManager::onSceneLoadedGpuPrep(*scene, m_runtimeState->Invalidation.AccelerationStructRebuildRequested);
-    m_accelStructs.resetSubInstanceCount();
+    m_pathTracing->accelStructs().resetSubInstanceCount();
     m_runtimeState->Invalidation.ShaderReloadRequested = true;
 
     m_settings->MaterialVariantIndex = 0;
@@ -317,12 +293,13 @@ void GpuRenderSubsystem::shutdown()
         }
     }
 
-    m_worldRenderer.reset();
-    m_pathTracingContext.reset();
+    if (m_pathTracing)
+    {
+        m_pathTracing->destroy();
+        m_pathTracing = nullptr;
+    }
     if (m_sceneSession)
         m_sceneSession->reset();
-    m_accelStructs = AccelStructManager{};
-    m_scenePasses = {};
 
     m_gpuDevice = nullptr;
     AssetSystem* assetSystem = m_assetSystem;
@@ -473,14 +450,67 @@ const CameraController& GpuRenderSubsystem::camera() const
     return m_sessionCamera->camera;
 }
 
+AccelStructManager& GpuRenderSubsystem::accelStructs()
+{
+    assert(m_pathTracing != nullptr);
+    return m_pathTracing->accelStructs();
+}
+
+const AccelStructManager& GpuRenderSubsystem::accelStructs() const
+{
+    assert(m_pathTracing != nullptr);
+    return m_pathTracing->accelStructs();
+}
+
 SceneManager* GpuRenderSubsystem::sceneManager() const
 {
     return m_sceneSession ? m_sceneSession->manager.get() : nullptr;
 }
 
+render::WorldRenderer* GpuRenderSubsystem::worldRenderer() const
+{
+    return m_pathTracing ? m_pathTracing->worldRenderer() : nullptr;
+}
+
 nvrhi::BindingLayoutHandle GpuRenderSubsystem::bindlessLayout() const
 {
     return m_renderInfra ? m_renderInfra->bindlessLayout : nullptr;
+}
+
+render::SceneLightingPasses& GpuRenderSubsystem::lightingPasses()
+{
+    assert(m_pathTracing != nullptr);
+    return m_pathTracing->lightingPasses();
+}
+
+const render::SceneLightingPasses& GpuRenderSubsystem::lightingPasses() const
+{
+    assert(m_pathTracing != nullptr);
+    return m_pathTracing->lightingPasses();
+}
+
+render::SceneRayTracingResources& GpuRenderSubsystem::rayTracingResources()
+{
+    assert(m_pathTracing != nullptr);
+    return m_pathTracing->rayTracingResources();
+}
+
+const render::SceneRayTracingResources& GpuRenderSubsystem::rayTracingResources() const
+{
+    assert(m_pathTracing != nullptr);
+    return m_pathTracing->rayTracingResources();
+}
+
+render::SceneGaussianSplatPasses& GpuRenderSubsystem::gaussianSplatPasses()
+{
+    assert(m_pathTracing != nullptr);
+    return m_pathTracing->gaussianSplatPasses();
+}
+
+const render::SceneGaussianSplatPasses& GpuRenderSubsystem::gaussianSplatPasses() const
+{
+    assert(m_pathTracing != nullptr);
+    return m_pathTracing->gaussianSplatPasses();
 }
 
 } // namespace caustica

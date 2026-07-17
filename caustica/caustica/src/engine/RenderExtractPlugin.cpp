@@ -2,9 +2,9 @@
 
 #include <engine/App.h>
 #include <engine/AppSchedules.h>
-#include <engine/GpuRenderSubsystem.h>
+#include <engine/PathTracingRuntime.h>
 #include <engine/SessionCamera.h>
-#include <engine/SceneApi.h>
+#include <engine/SceneQuery.h>
 #include <engine/SceneViewState.h>
 
 #include <backend/GpuDevice.h>
@@ -22,7 +22,7 @@ void prepareRenderFrame(App& app)
 {
     auto* vs = app.tryResource<SceneViewState>();
     auto* diag = app.tryResource<render::AppDiagnostics>();
-    auto* gr = app.tryResource<GpuRenderSubsystem>();
+    auto* pathTracing = app.tryResource<PathTracingRuntime>();
     auto* sessionCam = app.tryResource<SessionCamera>();
     GpuDevice* device = app.getGpuDevice();
     if (vs)
@@ -30,7 +30,7 @@ void prepareRenderFrame(App& app)
     if (diag)
         diag->asyncLoadingInProgress = false;
 
-    if (!device || !gr || !sessionCam)
+    if (!device || !pathTracing || !sessionCam)
         return;
 
     const std::shared_ptr<Scene> scene = activeScene(app);
@@ -43,8 +43,8 @@ void prepareRenderFrame(App& app)
 
     scene::SessionRenderExtractInputs sessionInputs;
     sessionInputs.camera = &sessionCam->camera;
-    sessionInputs.gaussianSplatPasses = &gr->gaussianSplatPasses();
-    if (render::WorldRenderer* wr = gr->worldRenderer())
+    sessionInputs.gaussianSplatPasses = &pathTracing->gaussianSplatPasses();
+    if (render::WorldRenderer* wr = pathTracing->worldRenderer())
         sessionInputs.gaussianSplatTemporalReset = wr->consumeGaussianSplatTemporalReset();
     sessionInputs.settings = app.tryResource<PathTracerSettings>();
     sessionInputs.runtime = app.tryResource<render::RenderRuntimeState>();

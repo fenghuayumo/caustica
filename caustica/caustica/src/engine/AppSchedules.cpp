@@ -1,5 +1,5 @@
 #include <engine/AppSchedules.h>
-#include <engine/SceneApi.h>
+#include <engine/SceneQuery.h>
 
 #include <algorithm>
 #include <utility>

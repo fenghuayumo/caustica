@@ -810,7 +810,7 @@ void Scene::attachLeafFromJson(ecs::Entity entity, const Json::Value& src)
     {
         auto settings = std::static_pointer_cast<SampleSettings>(leaf);
         settings->load(src);
-        m_EntityWorld->setSampleSettings(entity, settings);
+        m_EntityWorld->setSampleSettings(entity, *settings);
     }
     else if (type == "GameSettings")
     {
@@ -1286,7 +1286,6 @@ void Scene::processNodesRecursive()
 
     world.each<scene::SampleSettingsComponent>([this](ecs::Entity, scene::SampleSettingsComponent& component)
     {
-        assert(m_loadedSettings == nullptr || m_loadedSettings == component.settings);
         m_loadedSettings = component.settings;
     });
 

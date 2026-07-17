@@ -16,7 +16,9 @@
 #include <nanobind/stl/optional.h>
 
 #include "SceneEditor.h"
-#include <engine/SceneApi.h>
+#include <engine/AppResources.h>
+#include <engine/SceneQuery.h>
+#include <engine/RenderSessionApi.h>
 #include <engine/App.h>
 #include <engine/GpuRenderSubsystem.h>
 #include <backend/GpuDevice.h>

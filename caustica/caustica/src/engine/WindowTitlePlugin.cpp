@@ -2,7 +2,8 @@
 
 #include <engine/App.h>
 #include <engine/AppSchedules.h>
-#include <engine/SceneApi.h>
+#include <engine/SceneQuery.h>
+#include <engine/RenderSessionApi.h>
 #include <engine/SceneViewState.h>
 
 #include <backend/GpuDevice.h>

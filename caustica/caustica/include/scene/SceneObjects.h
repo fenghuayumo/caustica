@@ -32,7 +32,7 @@ namespace caustica
 
     // =========================================================================
     // GaussianSplat / SampleSettings / GameSettings
-    // (JSON leaf payloads still stored as shared_ptr on ECS components)
+    // SampleSettings is a value payload; GaussianSplat / GameSettings still shared_ptr.
     // =========================================================================
 
     class GaussianSplat
@@ -56,9 +56,8 @@ namespace caustica
         GaussianSplat& operator=(const GaussianSplat&) = delete;
     };
 
-    class SampleSettings
+    struct SampleSettings
     {
-    public:
         std::string name;
         std::optional<bool>  realtimeMode;
         std::optional<bool>  enableAnimations;
@@ -68,13 +67,8 @@ namespace caustica
         std::optional<int>   maxDiffuseBounces;
         std::optional<float> textureMIPBias;
 
-        [[nodiscard]] std::shared_ptr<SampleSettings> clone() const;
         void load(const Json::Value& node);
         [[nodiscard]] SceneContentFlags getContentFlags() const { return SceneContentFlags::None; }
-
-        SampleSettings() = default;
-        SampleSettings(const SampleSettings&) = delete;
-        SampleSettings& operator=(const SampleSettings&) = delete;
     };
 
     class GameSettings

@@ -15,6 +15,7 @@
 #include <filesystem>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -108,7 +109,7 @@ namespace caustica
         
         virtual bool loadCustomData(Json::Value& rootNode, ThreadPool* threadPool);
 
-        std::shared_ptr<class SampleSettings> m_loadedSettings;
+        std::optional<SampleSettings>         m_loadedSettings;
         std::shared_ptr<class GameSettings>   m_loadedGameSettings;
 
         void attachLeafFromJson(ecs::Entity entity, const Json::Value& src);
@@ -191,7 +192,10 @@ namespace caustica
 
         void processNodesRecursive();
 
-        [[nodiscard]] std::shared_ptr<SampleSettings> getSampleSettingsNode() const { return m_loadedSettings; }
+        [[nodiscard]] const SampleSettings* getSampleSettings() const
+        {
+            return m_loadedSettings ? &*m_loadedSettings : nullptr;
+        }
         [[nodiscard]] std::shared_ptr<GameSettings>   getGameSettingsNode() const   { return m_loadedGameSettings; }
         [[nodiscard]] const std::vector<SceneImportResult>& getModels() const        { return m_Models; }
         [[nodiscard]] const Handle<SceneAsset>& getAssetHandle() const               { return m_Asset; }

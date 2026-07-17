@@ -12,7 +12,6 @@
 #include <render/core/AccelStructManager.h>
 #include <render/PathTracerScenePasses.h>
 #include <render/AppDiagnostics.h>
-#include <render/worldRenderer/PathTracingContext.h>
 
 class SceneManager;
 struct CommandLineOptions;
@@ -37,6 +36,7 @@ class AssetSystem;
 struct RenderInfra;
 struct SessionCamera;
 struct SceneSession;
+struct PathTracingRuntime;
 
 struct EngineSceneCallbacks
 {
@@ -51,6 +51,7 @@ struct GpuRenderSubsystemInitParams
     RenderInfra& renderInfra;
     SessionCamera& sessionCamera;
     SceneSession& sceneSession;
+    PathTracingRuntime& pathTracingRuntime;
     PathTracerSettings& settings;
     render::RenderRuntimeState& runtimeState;
 
@@ -64,9 +65,8 @@ struct GpuRenderSubsystemInitParams
     EngineSceneCallbacks sceneCallbacks = {};
 };
 
-// Path-tracing runtime: scene passes, accel structs, render-thread camera,
-// PathTracingContext, and WorldRenderer. Shared GPU caches live on RenderInfra;
-// logic camera on SessionCamera; SceneManager on SceneSession.
+// Scene load/unload orchestration. Path-tracing GPU ownership lives on PathTracingRuntime;
+// shared caches on RenderInfra; logic camera on SessionCamera; SceneManager on SceneSession.
 class GpuRenderSubsystem
 {
 public:
@@ -89,6 +89,7 @@ public:
     void applyCmdLinePostLoadOverrides();
     void setSceneLoadingCallbacks(std::function<void()> onLoaded, std::function<void()> onUnloading);
 
+    // Temporary facades — prefer renderInfra / sessionCamera / sceneSession / pathTracingRuntime.
     [[nodiscard]] std::shared_ptr<ShaderFactory> shaderFactory() const;
     [[nodiscard]] caustica::render::RenderDevice& renderDevice();
     [[nodiscard]] const caustica::render::RenderDevice& renderDevice() const;
@@ -101,33 +102,27 @@ public:
     [[nodiscard]] std::shared_ptr<TextureLoader> textureLoader() const;
     [[nodiscard]] CameraController& camera();
     [[nodiscard]] const CameraController& camera() const;
-    [[nodiscard]] AccelStructManager& accelStructs() { return m_accelStructs; }
-    [[nodiscard]] const AccelStructManager& accelStructs() const { return m_accelStructs; }
+    [[nodiscard]] AccelStructManager& accelStructs();
+    [[nodiscard]] const AccelStructManager& accelStructs() const;
     [[nodiscard]] SceneManager* sceneManager() const;
-    [[nodiscard]] render::WorldRenderer* worldRenderer() const { return m_worldRenderer.get(); }
+    [[nodiscard]] render::WorldRenderer* worldRenderer() const;
     [[nodiscard]] nvrhi::BindingLayoutHandle bindlessLayout() const;
 
-    [[nodiscard]] render::SceneLightingPasses& lightingPasses() { return m_scenePasses.lighting; }
-    [[nodiscard]] const render::SceneLightingPasses& lightingPasses() const { return m_scenePasses.lighting; }
-    [[nodiscard]] render::SceneRayTracingResources& rayTracingResources() { return m_scenePasses.rayTracing; }
-    [[nodiscard]] const render::SceneRayTracingResources& rayTracingResources() const { return m_scenePasses.rayTracing; }
-    [[nodiscard]] render::SceneGaussianSplatPasses& gaussianSplatPasses() { return m_scenePasses.gaussianSplats; }
-    [[nodiscard]] const render::SceneGaussianSplatPasses& gaussianSplatPasses() const { return m_scenePasses.gaussianSplats; }
+    [[nodiscard]] render::SceneLightingPasses& lightingPasses();
+    [[nodiscard]] const render::SceneLightingPasses& lightingPasses() const;
+    [[nodiscard]] render::SceneRayTracingResources& rayTracingResources();
+    [[nodiscard]] const render::SceneRayTracingResources& rayTracingResources() const;
+    [[nodiscard]] render::SceneGaussianSplatPasses& gaussianSplatPasses();
+    [[nodiscard]] const render::SceneGaussianSplatPasses& gaussianSplatPasses() const;
 
 private:
     void applySampleSettingsFromScene();
     void registerLoadedSceneAssets();
 
-    render::PathTracerScenePasses m_scenePasses;
-    // Render-thread camera populated from ActiveCameraRenderProxy each frame.
-    CameraController m_renderCamera;
-    AccelStructManager m_accelStructs;
-    std::unique_ptr<render::PathTracingContext> m_pathTracingContext;
-    std::unique_ptr<render::WorldRenderer> m_worldRenderer;
-
     RenderInfra* m_renderInfra = nullptr;
     SessionCamera* m_sessionCamera = nullptr;
     SceneSession* m_sceneSession = nullptr;
+    PathTracingRuntime* m_pathTracing = nullptr;
     GpuDevice* m_gpuDevice = nullptr;
     AssetSystem* m_assetSystem = nullptr;
     PathTracerSettings* m_settings = nullptr;

@@ -5,10 +5,11 @@
 #include <assets/AssetSystem.h>
 #include <engine/App.h>
 #include <engine/GpuRenderSubsystem.h>
+#include <engine/PathTracingRuntime.h>
 #include <engine/RenderInfra.h>
 #include <engine/SessionCamera.h>
 #include <engine/SceneSession.h>
-#include <engine/SceneApi.h>
+#include <engine/SceneLifecycle.h>
 
 #include <core/path_utils.h>
 #include <render/core/RenderSceneTypeFactory.h>
@@ -25,8 +26,10 @@ void initializeSceneApp(App& app, const SceneAppConfig& config)
     auto* renderInfra = app.tryResource<RenderInfra>();
     auto* sessionCamera = app.tryResource<SessionCamera>();
     auto* sceneSession = app.tryResource<SceneSession>();
+    auto* pathTracing = app.tryResource<PathTracingRuntime>();
     auto* gpuRenderSubsystem = app.tryResource<GpuRenderSubsystem>();
-    if (!gpuDevice || !assetSystem || !renderInfra || !sessionCamera || !sceneSession || !gpuRenderSubsystem)
+    if (!gpuDevice || !assetSystem || !renderInfra || !sessionCamera || !sceneSession
+        || !pathTracing || !gpuRenderSubsystem)
         return;
 
     SceneViewState& viewState = config.viewState;
@@ -47,6 +50,7 @@ void initializeSceneApp(App& app, const SceneAppConfig& config)
         .renderInfra = *renderInfra,
         .sessionCamera = *sessionCamera,
         .sceneSession = *sceneSession,
+        .pathTracingRuntime = *pathTracing,
         .settings = config.renderState->settings,
         .runtimeState = config.renderState->runtime,
         .sceneTime = viewState.sceneTime,
@@ -61,7 +65,7 @@ void initializeSceneApp(App& app, const SceneAppConfig& config)
 
     if (config.refreshEnvMapMediaList)
     {
-        gpuRenderSubsystem->lightingPasses().refreshEnvironmentMapMediaList(
+        pathTracing->lightingPasses().refreshEnvironmentMapMediaList(
             getLocalPath(c_AssetsFolder), std::filesystem::path());
     }
 

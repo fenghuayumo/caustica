@@ -4,7 +4,7 @@
 
 #include <engine/EngineApp.h>
 #include <engine/GpuRenderSubsystem.h>
-#include <engine/SceneApi.h>
+#include <engine/AppResources.h>
 #include <assets/loader/TextureLoader.h>
 #include <core/file_utils.h>
 #include <core/json.h>

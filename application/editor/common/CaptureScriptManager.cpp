@@ -1,5 +1,6 @@
 #include "ui/ui_macros.h"
-#include <engine/SceneApi.h>
+#include <engine/SceneLifecycle.h>
+#include <engine/RenderSessionApi.h>
 #include "CaptureScriptManager.h"
 
 #include <string>

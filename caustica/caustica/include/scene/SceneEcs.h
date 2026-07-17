@@ -20,7 +20,7 @@
 namespace caustica
 {
 class GaussianSplat;
-class SampleSettings;
+struct SampleSettings;
 class GameSettings;
 class SceneTypeFactory;
 struct SkinnedMeshJoint;
@@ -255,7 +255,7 @@ struct GaussianSplatComponent
 
 struct SampleSettingsComponent
 {
-    std::shared_ptr<SampleSettings> settings;
+    SampleSettings settings;
 };
 
 struct GameSettingsComponent
@@ -317,7 +317,7 @@ public:
     void setCamera(ecs::Entity entity, CameraComponent component);
     void setAnimation(ecs::Entity entity, AnimationComponent component);
     void setGaussianSplat(ecs::Entity entity, const std::shared_ptr<GaussianSplat>& splat);
-    void setSampleSettings(ecs::Entity entity, const std::shared_ptr<SampleSettings>& settings);
+    void setSampleSettings(ecs::Entity entity, const SampleSettings& settings);
     void setGameSettings(ecs::Entity entity, const std::shared_ptr<GameSettings>& settings);
 
     // Deep-copies a subtree from another world into this one under `parent`.

@@ -2,7 +2,6 @@
 
 #include "SceneEditor.h"
 #include "EditorAccess.h"
-#include <engine/SceneApi.h>
 #include "EditorUIState.h"
 
 #include <backend/GpuDevice.h>

@@ -4,7 +4,7 @@
 #include <engine/AppSchedules.h>
 #include <engine/AppResources.h>
 #include <engine/SessionCamera.h>
-#include <engine/SceneApi.h>
+#include <engine/SceneQuery.h>
 #include <render/core/PathTracerSettings.h>
 #include <render/worldRenderer/WorldRenderer.h>
 #include <scene/Scene.h>

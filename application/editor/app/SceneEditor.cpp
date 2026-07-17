@@ -11,7 +11,10 @@
 #include <assets/loader/ShaderFactory.h>
 #include <engine/App.h>
 #include <engine/GpuRenderSubsystem.h>
-#include <engine/SceneApi.h>
+#include <engine/SceneQuery.h>
+#include <engine/CameraApi.h>
+#include <engine/SceneLifecycle.h>
+#include <engine/RenderSessionApi.h>
 #include <core/path_utils.h>
 #include <scene/SceneEcs.h>
 #include <scene/View.h>

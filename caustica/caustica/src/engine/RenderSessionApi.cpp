@@ -1,5 +1,5 @@
 #include <engine/App.h>
-#include <engine/GpuRenderSubsystem.h>
+#include <engine/PathTracingRuntime.h>
 #include <engine/AppResources.h>
 #include <engine/SceneViewState.h>
 #include <cassert>
@@ -31,35 +31,35 @@ void debugDrawLine(App& app, float3 start, float3 stop, float4 col1, float4 col2
     lines.push_back(dle);
 }
 
-const std::string& envMapLocalPath(const App& app) { return gpuRender(app)->lightingPasses().envMapLocalPath(); }
+const std::string& envMapLocalPath(const App& app) { return pathTracingRuntime(app)->lightingPasses().envMapLocalPath(); }
 
-const std::string& envMapOverrideSource(const App& app) { return gpuRender(app)->lightingPasses().envMapOverride(); }
+const std::string& envMapOverrideSource(const App& app) { return pathTracingRuntime(app)->lightingPasses().envMapOverride(); }
 
-const std::vector<std::filesystem::path>& envMapMediaList(App& app) { return gpuRender(app)->lightingPasses().envMapMediaList(); }
+const std::vector<std::filesystem::path>& envMapMediaList(App& app) { return pathTracingRuntime(app)->lightingPasses().envMapMediaList(); }
 
 void setEnvMapOverrideSource(App& app, const std::string& envMapOverride)
 {
-    gpuRender(app)->lightingPasses().setEnvMapOverrideSource(envMapOverride);
+    pathTracingRuntime(app)->lightingPasses().setEnvMapOverrideSource(envMapOverride);
 }
 
 bool loadGaussianSplatFile(App& app, const std::filesystem::path& fileName, bool convertRdfToRub)
 {
-    return gpuRender(app)->gaussianSplatPasses().loadFromFile(fileName, convertRdfToRub);
+    return pathTracingRuntime(app)->gaussianSplatPasses().loadFromFile(fileName, convertRdfToRub);
 }
 
 uint32_t gaussianSplatCount(const App& app)
 {
-    return gpuRender(app)->gaussianSplatPasses().splatCount();
+    return pathTracingRuntime(app)->gaussianSplatPasses().splatCount();
 }
 
 uint32_t gaussianSplatObjectCount(const App& app)
 {
-    return gpuRender(app)->gaussianSplatPasses().objectCount();
+    return pathTracingRuntime(app)->gaussianSplatPasses().objectCount();
 }
 
 const std::string& gaussianSplatFileName(const App& app)
 {
-    return gpuRender(app)->gaussianSplatPasses().fileNameSummary();
+    return pathTracingRuntime(app)->gaussianSplatPasses().fileNameSummary();
 }
 
 void runGpuWorkOnRenderThread(App& app, const std::function<void()>& work)
@@ -101,7 +101,7 @@ void requestMeshAccelRebuild(App& app, const std::shared_ptr<MeshInfo>& mesh)
 
 void requestMeshAccelRebuild(App& app, const std::shared_ptr<MeshInfo>& mesh, bool resetAccumulation)
 {
-    gpuRender(app)->rayTracingResources().requestMeshAccelRebuild(mesh, resetAccumulation);
+    pathTracingRuntime(app)->rayTracingResources().requestMeshAccelRebuild(mesh, resetAccumulation);
 }
 
 nvrhi::ITexture* ldrColorTexture(const App& app)

@@ -1,5 +1,6 @@
 #include <engine/App.h>
-#include <engine/GpuRenderSubsystem.h>
+#include <engine/PathTracingRuntime.h>
+#include <engine/RenderInfra.h>
 #include <engine/AppResources.h>
 #include <engine/SceneViewState.h>
 #include <cassert>
@@ -30,10 +31,11 @@ namespace caustica
 
 void flushPendingStructureGpu(App& app)
 {
-    GpuRenderSubsystem* gr = gpuRender(app);
+    PathTracingRuntime* pathTracing = pathTracingRuntime(app);
+    RenderInfra* infra = renderInfra(app);
     GpuDevice* device = gpuDevice(app);
     auto scenePtr = activeScene(app);
-    if (!gr || !device || !scenePtr || !scenePtr->needsGpuStructureSync())
+    if (!pathTracing || !infra || !device || !scenePtr || !scenePtr->needsGpuStructureSync())
         return;
 
     // Exclusive access: no in-flight Extract/render reading an incomplete structure.
@@ -42,41 +44,41 @@ void flushPendingStructureGpu(App& app)
     // Use logic frame index (matches Extract after SetRenderFrameIndex; correct for
     // immediate flush from spawn/despawn in PostUpdate before Extract runs).
     const uint32_t frameIndex = device->getFrameIndex();
-    runGpuWorkOnRenderThread(app, [gr, scenePtr, device, frameIndex]() {
+    runGpuWorkOnRenderThread(app, [pathTracing, infra, scenePtr, device, frameIndex]() {
         if (nvrhi::IDevice* nvrhiDevice = device->getDevice())
             nvrhiDevice->waitForIdle();
 
-        if (auto textureLoader = gr->textureLoader())
+        if (infra->textureLoader && infra->renderDevice)
         {
-            textureLoader->processRenderingThreadCommands(gr->renderDevice(), 0.f);
-            textureLoader->loadingFinished();
+            infra->textureLoader->processRenderingThreadCommands(*infra->renderDevice, 0.f);
+            infra->textureLoader->loadingFinished();
         }
 
-        gr->lightingPasses().ensureMaterialsFromScene(scenePtr);
+        pathTracing->lightingPasses().ensureMaterialsFromScene(scenePtr);
         render::SceneGpuUpdater::refreshAfterLoad(*scenePtr, frameIndex);
 
         // Rebuild BLAS/TLAS immediately while exclusive. Leaving this to the next
         // render frame races new proxies against a stale TLAS and crashes nvwgf2umx.
-        gr->rayTracingResources().requestAccelerationStructureRebuild();
+        pathTracing->rayTracingResources().requestAccelerationStructureRebuild();
         nvrhi::CommandListHandle commandList = device->getDevice()->createCommandList();
-        gr->rayTracingResources().recreateAccelStructs(commandList);
+        pathTracing->rayTracingResources().recreateAccelStructs(commandList);
 
         // Keep SBT hit-group count in lockstep with the new TLAS while GPU is idle.
         // Otherwise the next DispatchRays can use new contribution indices against a
         // short/stale shader table (intermittent hang after drag-drop import).
-        if (auto compiler = gr->rayTracingResources().pathTracingShaderCompiler())
+        if (auto compiler = pathTracing->rayTracingResources().pathTracingShaderCompiler())
         {
             compiler->update(
                 scenePtr,
-                static_cast<unsigned int>(gr->accelStructs().getSubInstanceData().size()),
-                [gr](std::vector<caustica::ShaderMacro>& macros) {
-                    gr->rayTracingResources().fillPTPipelineGlobalMacros(macros);
+                static_cast<unsigned int>(pathTracing->accelStructs().getSubInstanceData().size()),
+                [pathTracing](std::vector<caustica::ShaderMacro>& macros) {
+                    pathTracing->rayTracingResources().fillPTPipelineGlobalMacros(macros);
                 },
                 false);
         }
 
         // Binding set still points at the destroyed TLAS until the next frame otherwise.
-        gr->rayTracingResources().recreateBindingSet();
+        pathTracing->rayTracingResources().recreateBindingSet();
     });
 
     scenePtr->clearGpuStructureSyncRequest();
@@ -85,14 +87,14 @@ void flushPendingStructureGpu(App& app)
 Handle<ScenePrefabAsset> load(App& app, const std::filesystem::path& path)
 {
     AssetSystem* assets = app.tryResource<AssetSystem>();
-    GpuRenderSubsystem* gr = gpuRender(app);
-    if (!assets || !gr || path.empty())
+    RenderInfra* infra = renderInfra(app);
+    if (!assets || !infra || path.empty())
         return {};
 
     if (Handle<ScenePrefabAsset> existing = assets->findScenePrefab(path))
         return existing;
 
-    auto textureLoader = gr->textureLoader();
+    auto textureLoader = infra->textureLoader;
     if (!textureLoader)
         return {};
 
@@ -156,10 +158,10 @@ ecs::Entity spawnFromFile(
 bool despawn(App& app, ecs::Entity entity)
 {
     ::SceneManager* manager = sceneManager(app);
-    GpuRenderSubsystem* gr = gpuRender(app);
+    PathTracingRuntime* pathTracing = pathTracingRuntime(app);
     GpuDevice* device = gpuDevice(app);
     auto scenePtr = activeScene(app);
-    if (!manager || !gr || !device || !scenePtr || !ecs::isValid(entity))
+    if (!manager || !pathTracing || !device || !scenePtr || !ecs::isValid(entity))
         return false;
 
     if (!manager->tryBeginStructureEdit())
@@ -180,8 +182,8 @@ bool despawn(App& app, ecs::Entity entity)
     if (!destroySceneEntity(DestroySceneEntityParams{
             .scene = scenePtr,
             .entity = entity,
-            .beforeDetach = [gr](ecs::Entity deletedEntity) {
-                gr->gaussianSplatPasses().removeObjectsUnderEntity(deletedEntity);
+            .beforeDetach = [pathTracing](ecs::Entity deletedEntity) {
+                pathTracing->gaussianSplatPasses().removeObjectsUnderEntity(deletedEntity);
             },
         }))
     {

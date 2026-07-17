@@ -3,7 +3,8 @@
 #include "common/CaptureScriptManager.h"
 
 #include <engine/App.h>
-#include <engine/SceneApi.h>
+#include <engine/SceneQuery.h>
+#include <engine/SceneLifecycle.h>
 #include <render/worldRenderer/WorldRenderer.h>
 
 namespace caustica::editor

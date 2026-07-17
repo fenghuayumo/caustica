@@ -11,7 +11,11 @@
 
 #include "SceneEditor.h"
 #include <engine/App.h>
-#include <engine/SceneApi.h>
+#include <engine/AppResources.h>
+#include <engine/SceneQuery.h>
+#include <engine/CameraApi.h>
+#include <engine/SceneLifecycle.h>
+#include <engine/RenderSessionApi.h>
 #include <render/RenderAppState.h>
 #include <EditorUI.h>
 #include <scene/Scene.h>

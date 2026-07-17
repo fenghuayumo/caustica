@@ -1,5 +1,5 @@
 #include "ui/EditorUIInternal.h"
-#include <engine/SceneApi.h>
+#include <engine/CameraApi.h>
 
 #include "SceneEditor.h"
 #include "common/ImGuiManager.h"

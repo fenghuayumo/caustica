@@ -2,7 +2,8 @@
 
 #include "SceneEditor.h"
 #include "EditorAccess.h"
-#include <engine/SceneApi.h>
+#include <engine/SceneQuery.h>
+#include <engine/RenderSessionApi.h>
 #include "common/ImGuiManager.h"
 
 #include <render/core/PathTracerSettings.h>

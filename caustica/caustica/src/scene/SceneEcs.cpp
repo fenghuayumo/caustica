@@ -879,10 +879,8 @@ void SceneEntityWorld::setGaussianSplat(ecs::Entity entity, const std::shared_pt
     updateLeafContentAndBounds(entity);
 }
 
-void SceneEntityWorld::setSampleSettings(ecs::Entity entity, const std::shared_ptr<SampleSettings>& settings)
+void SceneEntityWorld::setSampleSettings(ecs::Entity entity, const SampleSettings& settings)
 {
-    if (!settings)
-        return;
     m_world.emplace<SampleSettingsComponent>(entity, SampleSettingsComponent{ settings });
     updateLeafContentAndBounds(entity);
 }

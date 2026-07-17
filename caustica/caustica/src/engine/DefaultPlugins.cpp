@@ -5,6 +5,7 @@
 #include <engine/RenderInfra.h>
 #include <engine/SessionCamera.h>
 #include <engine/SceneSession.h>
+#include <engine/PathTracingRuntime.h>
 #include <engine/SceneAccess.h>
 #include <engine/SceneAppResources.h>
 #include <engine/SceneStartup.h>
@@ -20,6 +21,7 @@ void DefaultPlugins::build(App& app)
     app.emplaceResource<RenderInfra>();
     app.emplaceResource<SessionCamera>();
     app.emplaceResource<SceneSession>();
+    app.emplaceResource<PathTracingRuntime>();
     app.emplaceResource<GpuRenderSubsystem>();
 }
 

@@ -1,7 +1,8 @@
 #include <engine/App.h>
 #include <engine/EntryPoint.h>
 #include <engine/GpuRenderScheduleRegistration.h>
-#include <engine/SceneApi.h>
+#include <engine/SceneQuery.h>
+#include <engine/RenderFrameApi.h>
 #include <engine/SceneViewState.h>
 #include <engine/SceneScheduleRegistration.h>
 

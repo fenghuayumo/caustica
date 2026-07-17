@@ -7,7 +7,9 @@
 
 #include <core/log.h>
 #include <engine/App.h>
-#include <engine/SceneApi.h>
+#include <engine/SceneQuery.h>
+#include <engine/SceneSpawn.h>
+#include <engine/RenderSessionApi.h>
 #include <render/core/SceneMeshEditing.h>
 #include <scene/SceneEcs.h>
 

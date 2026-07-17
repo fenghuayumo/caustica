@@ -11,7 +11,7 @@
 
 #include "SceneEditor.h"
 #include <engine/App.h>
-#include <engine/SceneApi.h>
+#include <engine/AppResources.h>
 
 #include <stdexcept>
 

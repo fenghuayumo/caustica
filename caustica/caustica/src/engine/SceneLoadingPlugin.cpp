@@ -2,7 +2,7 @@
 
 #include <engine/App.h>
 #include <engine/AppSchedules.h>
-#include <engine/SceneApi.h>
+#include <engine/RenderFrameApi.h>
 
 namespace caustica
 {
