@@ -14,6 +14,9 @@ class App;
 class GpuDevice;
 class GpuRenderSubsystem;
 class SceneViewState;
+struct RenderInfra;
+struct SessionCamera;
+struct SceneSession;
 
 namespace render
 {
@@ -22,6 +25,9 @@ class WorldRenderer;
 
 [[nodiscard]] GpuRenderSubsystem* gpuRender(const App& app);
 [[nodiscard]] GpuDevice* gpuDevice(const App& app);
+[[nodiscard]] RenderInfra* renderInfra(const App& app);
+[[nodiscard]] SessionCamera* sessionCameraResource(const App& app);
+[[nodiscard]] SceneSession* sceneSession(const App& app);
 [[nodiscard]] ::SceneManager* sceneManager(const App& app);
 [[nodiscard]] render::WorldRenderer* worldRenderer(const App& app);
 

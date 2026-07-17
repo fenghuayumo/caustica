@@ -1,6 +1,9 @@
 #include <engine/App.h>
 #include <engine/GpuRenderSubsystem.h>
 #include <engine/AppResources.h>
+#include <engine/RenderInfra.h>
+#include <engine/SessionCamera.h>
+#include <engine/SceneSession.h>
 #include <engine/SceneViewState.h>
 #include <cassert>
 #include <backend/GpuDevice.h>
@@ -22,10 +25,25 @@ GpuDevice* gpuDevice(const App& app)
     return app.getGpuDevice();
 }
 
+RenderInfra* renderInfra(const App& app)
+{
+    return const_cast<RenderInfra*>(app.tryResource<RenderInfra>());
+}
+
+SessionCamera* sessionCameraResource(const App& app)
+{
+    return const_cast<SessionCamera*>(app.tryResource<SessionCamera>());
+}
+
+SceneSession* sceneSession(const App& app)
+{
+    return const_cast<SceneSession*>(app.tryResource<SceneSession>());
+}
+
 ::SceneManager* sceneManager(const App& app)
 {
-    if (GpuRenderSubsystem* gr = gpuRender(app))
-        return gr->sceneManager();
+    if (SceneSession* session = sceneSession(app))
+        return session->manager.get();
     return nullptr;
 }
 

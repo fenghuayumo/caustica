@@ -5,6 +5,9 @@
 #include <assets/AssetSystem.h>
 #include <engine/App.h>
 #include <engine/GpuRenderSubsystem.h>
+#include <engine/RenderInfra.h>
+#include <engine/SessionCamera.h>
+#include <engine/SceneSession.h>
 #include <engine/SceneApi.h>
 
 #include <core/path_utils.h>
@@ -19,8 +22,11 @@ void initializeSceneApp(App& app, const SceneAppConfig& config)
 {
     GpuDevice* gpuDevice = app.getGpuDevice();
     auto* assetSystem = app.tryResource<AssetSystem>();
+    auto* renderInfra = app.tryResource<RenderInfra>();
+    auto* sessionCamera = app.tryResource<SessionCamera>();
+    auto* sceneSession = app.tryResource<SceneSession>();
     auto* gpuRenderSubsystem = app.tryResource<GpuRenderSubsystem>();
-    if (!gpuDevice || !assetSystem || !gpuRenderSubsystem)
+    if (!gpuDevice || !assetSystem || !renderInfra || !sessionCamera || !sceneSession || !gpuRenderSubsystem)
         return;
 
     SceneViewState& viewState = config.viewState;
@@ -38,6 +44,9 @@ void initializeSceneApp(App& app, const SceneAppConfig& config)
     gpuRenderSubsystem->initialize(GpuRenderSubsystemInitParams{
         .gpuDevice = *gpuDevice,
         .assetSystem = *assetSystem,
+        .renderInfra = *renderInfra,
+        .sessionCamera = *sessionCamera,
+        .sceneSession = *sceneSession,
         .settings = config.renderState->settings,
         .runtimeState = config.renderState->runtime,
         .sceneTime = viewState.sceneTime,

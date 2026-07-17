@@ -1,7 +1,7 @@
 #include <engine/SceneApiInternal.h>
 #include <engine/App.h>
 #include <engine/AppResources.h>
-#include <engine/GpuRenderSubsystem.h>
+#include <engine/SessionCamera.h>
 #include <engine/SceneViewState.h>
 #include <core/path_utils.h>
 #include <core/vfs/VFS.h>
@@ -16,8 +16,8 @@ namespace caustica::detail
 
 CameraController* sessionCamera(App& app)
 {
-    if (GpuRenderSubsystem* gpu = gpuRender(app))
-        return &gpu->camera();
+    if (SessionCamera* session = sessionCameraResource(app))
+        return &session->camera;
     return nullptr;
 }
 

@@ -1,17 +1,19 @@
 #include <cassert>
+#include <cfloat>
 #include <engine/GpuRenderSubsystem.h>
+#include <engine/RenderInfra.h>
+#include <engine/SessionCamera.h>
+#include <engine/SceneSession.h>
 
 #include <assets/AssetSystem.h>
 #include <assets/loader/ShaderFactory.h>
-#include <assets/loader/ShaderPackFileSystem.h>
 #include <backend/GpuDevice.h>
-#include <backend/ShaderUtils.h>
 #include <core/command_line.h>
 #include <core/log.h>
 #include <core/path_utils.h>
-#include <core/vfs/VFS.h>
 #include <render/core/BindingCache.h>
 #include <render/core/BindlessTable.h>
+#include <render/core/DescriptorTableManager.h>
 #include <render/core/SceneGpuUpdater.h>
 #include <render/core/RenderDevice.h>
 #include <render/PathTracerScenePasses.h>
@@ -35,35 +37,32 @@ GpuRenderSubsystem::~GpuRenderSubsystem()
 bool GpuRenderSubsystem::initialize(const GpuRenderSubsystemInitParams& params)
 {
     GpuDevice& gpuDevice = params.gpuDevice;
+    RenderInfra& infra = params.renderInfra;
+    SessionCamera& sessionCamera = params.sessionCamera;
+    SceneSession& sceneSession = params.sceneSession;
 
-    createShaderFactory(gpuDevice);
+    if (!infra.initialize(gpuDevice, params.assetSystem))
+        return false;
 
-    auto* device = gpuDevice.getDevice();
-    m_bindlessLayout = render::WorldRenderer::createBindlessLayout(device);
+    m_accelStructs = AccelStructManager(gpuDevice.getDevice());
+    sessionCamera.camera.camera().setRotateSpeed(.003f);
 
-    m_renderDevice = std::make_unique<caustica::render::RenderDevice>(device, m_shaderFactory);
-    m_bindingCache = std::make_unique<BindingCache>(device);
-    m_bindlessTable = std::make_unique<BindlessTable>(device, m_bindlessLayout);
-    m_descriptorTable = m_bindlessTable->getDescriptorTableManager();
+    std::shared_ptr<IDescriptorTableManager> descriptorTable = infra.descriptorTable;
+    if (!sceneSession.create(
+            gpuDevice,
+            *infra.shaderFactory,
+            infra.textureLoader,
+            descriptorTable,
+            params.sceneTypeFactory,
+            std::move(params.sceneCallbacks.OnSceneLoaded),
+            std::move(params.sceneCallbacks.OnSceneUnloading)))
+    {
+        return false;
+    }
 
-    auto nativeFS = std::make_shared<NativeFileSystem>();
-    params.assetSystem.initialize(device, nativeFS, m_descriptorTable);
-    m_textureCache = params.assetSystem.getTextureLoader();
-
-    m_accelStructs = AccelStructManager(device);
-    m_camera.camera().setRotateSpeed(.003f);
-
-    m_sceneManager = std::make_unique<SceneManager>(
-        gpuDevice,
-        *m_shaderFactory,
-        m_textureCache,
-        m_descriptorTable,
-        params.sceneTypeFactory);
-
-    m_sceneManager->setLoadingCallbacks(
-        std::move(params.sceneCallbacks.OnSceneLoaded),
-        std::move(params.sceneCallbacks.OnSceneUnloading));
-
+    m_renderInfra = &infra;
+    m_sessionCamera = &sessionCamera;
+    m_sceneSession = &sceneSession;
     m_gpuDevice = &params.gpuDevice;
     m_assetSystem = &params.assetSystem;
     m_settings = &params.settings;
@@ -74,36 +73,36 @@ bool GpuRenderSubsystem::initialize(const GpuRenderSubsystemInitParams& params)
 
     m_pathTracingContext = std::make_unique<render::PathTracingContext>(render::PathTracingContext{
         .gpuDevice = params.gpuDevice,
-        .sceneManager = *m_sceneManager,
+        .sceneManager = *sceneSession.manager,
         .camera = m_renderCamera,
         .accelStructs = m_accelStructs,
         .settings = params.settings,
         .runtimeState = params.runtimeState,
         .scenePasses = m_scenePasses,
-        .shaderFactory = m_shaderFactory,
-        .renderDevice = *m_renderDevice,
-        .bindingCache = *m_bindingCache,
-        .textureCache = m_textureCache,
-        .descriptorTable = m_descriptorTable,
+        .shaderFactory = infra.shaderFactory,
+        .renderDevice = *infra.renderDevice,
+        .bindingCache = *infra.bindingCache,
+        .textureCache = infra.textureLoader,
+        .descriptorTable = infra.descriptorTable,
         .sceneTime = params.sceneTime,
         .diagnostics = params.diagnostics,
     });
 
     m_worldRenderer = std::make_unique<render::WorldRenderer>(*m_pathTracingContext);
-    m_worldRenderer->createBindingLayouts(m_bindlessLayout);
+    m_worldRenderer->createBindingLayouts(infra.bindlessLayout);
 
     render::ScenePassWireParams sceneWireParams{
         .gpuDevice = params.gpuDevice,
-        .sceneManager = *m_sceneManager,
+        .sceneManager = *sceneSession.manager,
         .accelStructs = m_accelStructs,
         .worldRenderer = *m_worldRenderer,
         .settings = params.settings,
         .invalidation = params.runtimeState.Invalidation,
         .gaussianSplatsSummary = params.runtimeState.GaussianSplats,
         .lighting = m_scenePasses.lighting,
-        .bindingCache = *m_bindingCache,
-        .shaderFactory = m_shaderFactory,
-        .renderDevice = *m_renderDevice,
+        .bindingCache = *infra.bindingCache,
+        .shaderFactory = infra.shaderFactory,
+        .renderDevice = *infra.renderDevice,
     };
     sceneWireParams.onGaussianSplatTemporalReset = [worldRenderer = m_worldRenderer.get()]() {
         worldRenderer->setGaussianSplatTemporalReset(true);
@@ -118,20 +117,14 @@ bool GpuRenderSubsystem::initialize(const GpuRenderSubsystemInitParams& params)
     return true;
 }
 
-void GpuRenderSubsystem::endFrame()
-{
-    if (m_bindlessTable)
-        m_bindlessTable->flushDeferredFrees();
-}
-
 void GpuRenderSubsystem::onSceneUnloading()
 {
     // Break asset shared_ptr cycles and drop extract retained refs BEFORE clearing
     // the AssetSystem store / destroying the scene. Otherwise MeshInfo↔MeshAsset
     // cycles keep BLAS/buffers alive past GpuDevice::shutdown and heap-corrupt on close.
-    if (m_sceneManager)
+    if (::SceneManager* manager = sceneManager())
     {
-        if (const std::shared_ptr<Scene> scene = m_sceneManager->getScene())
+        if (const std::shared_ptr<Scene> scene = manager->getScene())
         {
             scene->prepareForUnload();
             m_accelStructs.clearMeshAccelStructs(*scene);
@@ -144,8 +137,8 @@ void GpuRenderSubsystem::onSceneUnloading()
     if (m_worldRenderer)
         m_worldRenderer->onSceneUnloading();
     m_accelStructs.releaseGpuResources();
-    if (m_bindingCache)
-        m_bindingCache->clear();
+    if (m_renderInfra && m_renderInfra->bindingCache)
+        m_renderInfra->bindingCache->clear();
     m_scenePasses.lighting.sceneUnloading();
     m_scenePasses.gaussianSplats.sceneUnloading();
 }
@@ -158,10 +151,11 @@ void GpuRenderSubsystem::refreshEnvironmentMapMediaList(const std::filesystem::p
 
 void GpuRenderSubsystem::applySampleSettingsFromScene()
 {
-    if (!m_settings || !m_sceneManager)
+    ::SceneManager* manager = sceneManager();
+    if (!m_settings || !manager || !m_sessionCamera)
         return;
 
-    const auto scene = m_sceneManager->getScene();
+    const auto scene = manager->getScene();
     if (!scene)
         return;
 
@@ -170,7 +164,7 @@ void GpuRenderSubsystem::applySampleSettingsFromScene()
         m_settings->RealtimeMode = sampleSettings->realtimeMode.value_or(m_settings->RealtimeMode);
         m_settings->EnableAnimations = sampleSettings->enableAnimations.value_or(m_settings->EnableAnimations);
         if (sampleSettings->startingCamera.has_value())
-            m_camera.setSelectedCameraIndex(sampleSettings->startingCamera.value() + 1);
+            m_sessionCamera->camera.setSelectedCameraIndex(sampleSettings->startingCamera.value() + 1);
         if (sampleSettings->realtimeFireflyFilter.has_value())
         {
             m_settings->RealtimeFireflyFilterThreshold = sampleSettings->realtimeFireflyFilter.value();
@@ -208,9 +202,9 @@ void GpuRenderSubsystem::onSceneLoadedBegin()
     m_settings->ToneMappingParams.exposureValue = 0.0f;
 
     // Logic-thread hierarchy snapshot before RT exclusive GPU upload.
-    if (m_sceneManager)
+    if (::SceneManager* manager = sceneManager())
     {
-        if (auto scene = m_sceneManager->getScene())
+        if (auto scene = manager->getScene())
         {
             if (auto* entityWorld = scene->getEntityWorld())
             {
@@ -226,15 +220,15 @@ void GpuRenderSubsystem::onSceneLoadedGpuPrep()
     if (m_worldRenderer)
         m_worldRenderer->onSceneLoaded();
 
-    if (m_textureCache && m_renderDevice)
+    if (m_renderInfra && m_renderInfra->textureLoader && m_renderInfra->renderDevice && m_assetSystem)
     {
-        m_assetSystem->processRenderingThreadCommands(*m_renderDevice, 0.f);
+        m_assetSystem->processRenderingThreadCommands(*m_renderInfra->renderDevice, 0.f);
         m_assetSystem->loadingFinished();
     }
 
-    if (m_sceneManager)
+    if (::SceneManager* manager = sceneManager())
     {
-        if (auto scene = m_sceneManager->getScene())
+        if (auto scene = manager->getScene())
         {
             render::SceneGpuUpdater::refreshAfterLoad(*scene, 0);
             m_scenePasses.lighting.notifySceneReloaded(*scene);
@@ -245,10 +239,11 @@ void GpuRenderSubsystem::onSceneLoadedGpuPrep()
 
 void GpuRenderSubsystem::onSceneLoadedGpuFinish()
 {
-    if (!m_sceneManager || !m_settings || !m_runtimeState)
+    ::SceneManager* manager = sceneManager();
+    if (!manager || !m_settings || !m_runtimeState)
         return;
 
-    const auto scene = m_sceneManager->getScene();
+    const auto scene = manager->getScene();
     if (!scene)
         return;
 
@@ -269,8 +264,8 @@ void GpuRenderSubsystem::onSceneLoadedGpuFinish()
 
 void GpuRenderSubsystem::setSceneLoadingCallbacks(std::function<void()> onLoaded, std::function<void()> onUnloading)
 {
-    if (m_sceneManager)
-        m_sceneManager->setLoadingCallbacks(std::move(onLoaded), std::move(onUnloading));
+    if (::SceneManager* manager = sceneManager())
+        manager->setLoadingCallbacks(std::move(onLoaded), std::move(onUnloading));
 }
 
 void GpuRenderSubsystem::applyCmdLinePostLoadOverrides()
@@ -324,7 +319,8 @@ void GpuRenderSubsystem::shutdown()
 
     m_worldRenderer.reset();
     m_pathTracingContext.reset();
-    m_sceneManager.reset();
+    if (m_sceneSession)
+        m_sceneSession->reset();
     m_accelStructs = AccelStructManager{};
     m_scenePasses = {};
 
@@ -336,14 +332,14 @@ void GpuRenderSubsystem::shutdown()
     m_diagnostics = nullptr;
     m_sceneTime = nullptr;
     m_cmdLine = nullptr;
+    m_sessionCamera = nullptr;
+    m_sceneSession = nullptr;
 
-    m_textureCache.reset();
-    m_descriptorTable.reset();
-    m_bindlessTable.reset();
-    m_bindingCache.reset();
-    m_renderDevice.reset();
-    m_shaderFactory.reset();
-    m_bindlessLayout = nullptr;
+    if (m_renderInfra)
+    {
+        m_renderInfra->shutdown();
+        m_renderInfra = nullptr;
+    }
 
     if (assetSystem)
         assetSystem->shutdown();
@@ -351,19 +347,20 @@ void GpuRenderSubsystem::shutdown()
 
 void GpuRenderSubsystem::registerLoadedSceneAssets()
 {
-    if (!m_assetSystem || !m_sceneManager)
+    ::SceneManager* manager = sceneManager();
+    if (!m_assetSystem || !manager)
         return;
 
-    const std::shared_ptr<Scene> scene = m_sceneManager->getScene();
+    const std::shared_ptr<Scene> scene = manager->getScene();
     if (!scene)
         return;
 
     m_assetSystem->clearSceneAssets();
 
-    const std::filesystem::path scenePath = m_sceneManager->getCurrentScenePath();
-    const std::string sceneName = m_sceneManager->getCurrentSceneName().empty()
+    const std::filesystem::path scenePath = manager->getCurrentScenePath();
+    const std::string sceneName = manager->getCurrentSceneName().empty()
         ? scenePath.filename().generic_string()
-        : m_sceneManager->getCurrentSceneName();
+        : manager->getCurrentSceneName();
 
     Handle<SceneAsset> sceneAsset = m_assetSystem->registerSceneAsset(scene, scenePath, sceneName);
     if (!sceneAsset)
@@ -409,53 +406,81 @@ void GpuRenderSubsystem::registerLoadedSceneAssets()
     }
 }
 
-void GpuRenderSubsystem::createShaderFactory(GpuDevice& gpuDevice)
+std::shared_ptr<ShaderFactory> GpuRenderSubsystem::shaderFactory() const
 {
-    const char* shaderTypeName = getShaderTypeName(gpuDevice.getGraphicsAPI());
-    const std::filesystem::path appDirectory = getRuntimeDirectory();
-    const std::filesystem::path engineShaderPath = appDirectory / "ShaderPrecompiled/engine" / shaderTypeName;
-    const std::filesystem::path appShaderPath = appDirectory / "ShaderPrecompiled/caustica" / shaderTypeName;
-    const std::filesystem::path nrdShaderPath = appDirectory / "ShaderPrecompiled/nrd" / shaderTypeName;
-    const std::filesystem::path ommShaderPath = appDirectory / "ShaderPrecompiled/omm" / shaderTypeName;
-
-    std::shared_ptr<RootFileSystem> rootFS = std::make_shared<RootFileSystem>();
-    const std::filesystem::path shaderPackPath = appDirectory / (std::string("caustica.shaders.") + shaderTypeName + ".pack");
-    auto shaderPackFS = std::make_shared<ShaderPackFileSystem>(shaderPackPath, "ShaderPrecompiled");
-    const bool shaderPackHasCurrentLayout = shaderPackFS->isOpen()
-        && shaderPackFS->fileExists("caustica/caustica/shaders/render/misc/DebugLines_main_vs.bin")
-        && shaderPackFS->fileExists("engine/fullscreen_vs.bin");
-
-    if (shaderPackFS->isOpen() && !shaderPackHasCurrentLayout)
-    {
-        warning("Shader pack '%s' does not match the current shader layout; falling back to ShaderPrecompiled directories",
-            shaderPackPath.string().c_str());
-    }
-
-    if (shaderPackHasCurrentLayout)
-    {
-        rootFS->mount("/ShaderPrecompiled", shaderPackFS);
-    }
-    else
-    {
-        rootFS->mount("/ShaderPrecompiled/engine", engineShaderPath);
-        rootFS->mount("/ShaderPrecompiled/caustica", appShaderPath);
-        rootFS->mount("/ShaderPrecompiled/nrd", nrdShaderPath);
-        rootFS->mount("/ShaderPrecompiled/omm", ommShaderPath);
-    }
-
-    m_shaderFactory = std::make_shared<ShaderFactory>(gpuDevice.getDevice(), rootFS, "/ShaderPrecompiled");
+    return m_renderInfra ? m_renderInfra->shaderFactory : nullptr;
 }
 
 caustica::render::RenderDevice& GpuRenderSubsystem::renderDevice()
 {
-    assert(m_renderDevice != nullptr);
-    return *m_renderDevice;
+    assert(m_renderInfra != nullptr);
+    return m_renderInfra->device();
 }
 
 const caustica::render::RenderDevice& GpuRenderSubsystem::renderDevice() const
 {
-    assert(m_renderDevice != nullptr);
-    return *m_renderDevice;
+    assert(m_renderInfra != nullptr);
+    return m_renderInfra->device();
+}
+
+std::shared_ptr<ShaderFactory>& GpuRenderSubsystem::shaderFactoryRef()
+{
+    assert(m_renderInfra != nullptr);
+    return m_renderInfra->shaderFactory;
+}
+
+std::shared_ptr<TextureLoader>& GpuRenderSubsystem::textureLoaderRef()
+{
+    assert(m_renderInfra != nullptr);
+    return m_renderInfra->textureLoader;
+}
+
+std::shared_ptr<DescriptorTableManager>& GpuRenderSubsystem::descriptorTableRef()
+{
+    assert(m_renderInfra != nullptr);
+    return m_renderInfra->descriptorTable;
+}
+
+BindingCache* GpuRenderSubsystem::bindingCache() const
+{
+    return m_renderInfra ? m_renderInfra->bindingCache.get() : nullptr;
+}
+
+std::shared_ptr<DescriptorTableManager> GpuRenderSubsystem::descriptorTable() const
+{
+    return m_renderInfra ? m_renderInfra->descriptorTable : nullptr;
+}
+
+BindlessTable* GpuRenderSubsystem::bindlessTable() const
+{
+    return m_renderInfra ? m_renderInfra->bindlessTable.get() : nullptr;
+}
+
+std::shared_ptr<TextureLoader> GpuRenderSubsystem::textureLoader() const
+{
+    return m_renderInfra ? m_renderInfra->textureLoader : nullptr;
+}
+
+CameraController& GpuRenderSubsystem::camera()
+{
+    assert(m_sessionCamera != nullptr);
+    return m_sessionCamera->camera;
+}
+
+const CameraController& GpuRenderSubsystem::camera() const
+{
+    assert(m_sessionCamera != nullptr);
+    return m_sessionCamera->camera;
+}
+
+SceneManager* GpuRenderSubsystem::sceneManager() const
+{
+    return m_sceneSession ? m_sceneSession->manager.get() : nullptr;
+}
+
+nvrhi::BindingLayoutHandle GpuRenderSubsystem::bindlessLayout() const
+{
+    return m_renderInfra ? m_renderInfra->bindlessLayout : nullptr;
 }
 
 } // namespace caustica

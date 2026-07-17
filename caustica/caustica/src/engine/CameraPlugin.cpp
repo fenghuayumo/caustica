@@ -2,7 +2,8 @@
 
 #include <engine/App.h>
 #include <engine/AppSchedules.h>
-#include <engine/GpuRenderSubsystem.h>
+#include <engine/AppResources.h>
+#include <engine/SessionCamera.h>
 #include <engine/SceneApi.h>
 #include <render/core/PathTracerSettings.h>
 #include <render/worldRenderer/WorldRenderer.h>
@@ -19,11 +20,11 @@ namespace caustica
 void updateCamera(App& app, float elapsedTimeSeconds)
 {
     auto* cfg = app.tryResource<PathTracerSettings>();
-    auto* gr = app.tryResource<GpuRenderSubsystem>();
-    if (!cfg || !gr)
+    auto* sessionCam = app.tryResource<SessionCamera>();
+    if (!cfg || !sessionCam)
         return;
 
-    CameraController& cam = gr->camera();
+    CameraController& cam = sessionCam->camera;
     cam.camera().setMoveSpeed(cfg->CameraMoveSpeed);
 
     const std::shared_ptr<Scene> scene = activeScene(app);
@@ -55,7 +56,7 @@ void updateCamera(App& app, float elapsedTimeSeconds)
 
     cam.camera().animate(elapsedTimeSeconds);
 
-    if (auto* wr = gr->worldRenderer())
+    if (auto* wr = worldRenderer(app))
     {
         if (cfg->CameraAntiRRSleepJitter > 0)
         {
@@ -77,7 +78,7 @@ void updateCamera(App& app, float elapsedTimeSeconds)
         cam.updateLastCameraState();
         if (!cfg->RealtimeMode)
             cfg->ResetAccumulation = true;
-        if (auto* wr = gr->worldRenderer())
+        if (auto* wr = worldRenderer(app))
             wr->setGaussianSplatTemporalReset(true);
     }
 }

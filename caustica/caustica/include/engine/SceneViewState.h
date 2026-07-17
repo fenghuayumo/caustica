@@ -13,7 +13,7 @@ namespace caustica
 {
 
 // Mutable per-session view state (scene time, loading UI, scene switches).
-// Interactive camera lives on GpuRenderSubsystem::camera() (see CameraApi / bindSideEffects).
+// Interactive camera lives on SessionCamera (see CameraApi / bindSideEffects).
 struct SceneViewState
 {
     double sceneTime = 0.;

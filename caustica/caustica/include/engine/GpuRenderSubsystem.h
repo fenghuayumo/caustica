@@ -23,7 +23,8 @@ namespace caustica
 namespace render
 {
 class RenderDevice;
-}
+class WorldRenderer;
+} // namespace render
 
 class BindingCache;
 class BindlessTable;
@@ -33,11 +34,9 @@ class SceneTypeFactory;
 class ShaderFactory;
 class TextureLoader;
 class AssetSystem;
-
-namespace render
-{
-class WorldRenderer;
-} // namespace render
+struct RenderInfra;
+struct SessionCamera;
+struct SceneSession;
 
 struct EngineSceneCallbacks
 {
@@ -49,6 +48,9 @@ struct GpuRenderSubsystemInitParams
 {
     GpuDevice& gpuDevice;
     AssetSystem& assetSystem;
+    RenderInfra& renderInfra;
+    SessionCamera& sessionCamera;
+    SceneSession& sceneSession;
     PathTracerSettings& settings;
     render::RenderRuntimeState& runtimeState;
 
@@ -62,6 +64,9 @@ struct GpuRenderSubsystemInitParams
     EngineSceneCallbacks sceneCallbacks = {};
 };
 
+// Path-tracing runtime: scene passes, accel structs, render-thread camera,
+// PathTracingContext, and WorldRenderer. Shared GPU caches live on RenderInfra;
+// logic camera on SessionCamera; SceneManager on SceneSession.
 class GpuRenderSubsystem
 {
 public:
@@ -75,8 +80,6 @@ public:
 
     bool initialize(const GpuRenderSubsystemInitParams& params);
 
-    void endFrame();
-
     void onSceneUnloading();
     void refreshEnvironmentMapMediaList(const std::filesystem::path& assetsRoot,
         const std::filesystem::path& scenePath);
@@ -86,23 +89,23 @@ public:
     void applyCmdLinePostLoadOverrides();
     void setSceneLoadingCallbacks(std::function<void()> onLoaded, std::function<void()> onUnloading);
 
-    [[nodiscard]] std::shared_ptr<ShaderFactory> shaderFactory() const { return m_shaderFactory; }
+    [[nodiscard]] std::shared_ptr<ShaderFactory> shaderFactory() const;
     [[nodiscard]] caustica::render::RenderDevice& renderDevice();
     [[nodiscard]] const caustica::render::RenderDevice& renderDevice() const;
-    [[nodiscard]] std::shared_ptr<ShaderFactory>& shaderFactoryRef() { return m_shaderFactory; }
-    [[nodiscard]] std::shared_ptr<TextureLoader>& textureLoaderRef() { return m_textureCache; }
-    [[nodiscard]] std::shared_ptr<DescriptorTableManager>& descriptorTableRef() { return m_descriptorTable; }
-    [[nodiscard]] BindingCache* bindingCache() const { return m_bindingCache.get(); }
-    [[nodiscard]] std::shared_ptr<DescriptorTableManager> descriptorTable() const { return m_descriptorTable; }
-    [[nodiscard]] BindlessTable* bindlessTable() const { return m_bindlessTable.get(); }
-    [[nodiscard]] std::shared_ptr<TextureLoader> textureLoader() const { return m_textureCache; }
-    [[nodiscard]] CameraController& camera() { return m_camera; }
-    [[nodiscard]] const CameraController& camera() const { return m_camera; }
+    [[nodiscard]] std::shared_ptr<ShaderFactory>& shaderFactoryRef();
+    [[nodiscard]] std::shared_ptr<TextureLoader>& textureLoaderRef();
+    [[nodiscard]] std::shared_ptr<DescriptorTableManager>& descriptorTableRef();
+    [[nodiscard]] BindingCache* bindingCache() const;
+    [[nodiscard]] std::shared_ptr<DescriptorTableManager> descriptorTable() const;
+    [[nodiscard]] BindlessTable* bindlessTable() const;
+    [[nodiscard]] std::shared_ptr<TextureLoader> textureLoader() const;
+    [[nodiscard]] CameraController& camera();
+    [[nodiscard]] const CameraController& camera() const;
     [[nodiscard]] AccelStructManager& accelStructs() { return m_accelStructs; }
     [[nodiscard]] const AccelStructManager& accelStructs() const { return m_accelStructs; }
-    [[nodiscard]] SceneManager* sceneManager() const { return m_sceneManager.get(); }
+    [[nodiscard]] SceneManager* sceneManager() const;
     [[nodiscard]] render::WorldRenderer* worldRenderer() const { return m_worldRenderer.get(); }
-    [[nodiscard]] nvrhi::BindingLayoutHandle bindlessLayout() const { return m_bindlessLayout; }
+    [[nodiscard]] nvrhi::BindingLayoutHandle bindlessLayout() const;
 
     [[nodiscard]] render::SceneLightingPasses& lightingPasses() { return m_scenePasses.lighting; }
     [[nodiscard]] const render::SceneLightingPasses& lightingPasses() const { return m_scenePasses.lighting; }
@@ -112,27 +115,19 @@ public:
     [[nodiscard]] const render::SceneGaussianSplatPasses& gaussianSplatPasses() const { return m_scenePasses.gaussianSplats; }
 
 private:
-    void createShaderFactory(GpuDevice& gpuDevice);
     void applySampleSettingsFromScene();
     void registerLoadedSceneAssets();
 
     render::PathTracerScenePasses m_scenePasses;
-    nvrhi::BindingLayoutHandle m_bindlessLayout;
-    std::shared_ptr<ShaderFactory> m_shaderFactory;
-    std::unique_ptr<caustica::render::RenderDevice> m_renderDevice;
-    std::unique_ptr<BindingCache> m_bindingCache;
-    std::unique_ptr<BindlessTable> m_bindlessTable;
-    std::shared_ptr<DescriptorTableManager> m_descriptorTable;
-    std::shared_ptr<TextureLoader> m_textureCache;
-    // Logic-thread free camera used by Extract, CameraPlugin, and editor input.
-    CameraController m_camera;
     // Render-thread camera populated from ActiveCameraRenderProxy each frame.
     CameraController m_renderCamera;
     AccelStructManager m_accelStructs;
-    std::unique_ptr<SceneManager> m_sceneManager;
     std::unique_ptr<render::PathTracingContext> m_pathTracingContext;
     std::unique_ptr<render::WorldRenderer> m_worldRenderer;
 
+    RenderInfra* m_renderInfra = nullptr;
+    SessionCamera* m_sessionCamera = nullptr;
+    SceneSession* m_sceneSession = nullptr;
     GpuDevice* m_gpuDevice = nullptr;
     AssetSystem* m_assetSystem = nullptr;
     PathTracerSettings* m_settings = nullptr;

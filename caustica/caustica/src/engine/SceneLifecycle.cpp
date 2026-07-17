@@ -1,5 +1,6 @@
 #include <engine/App.h>
 #include <engine/GpuRenderSubsystem.h>
+#include <engine/RenderInfra.h>
 #include <engine/AppResources.h>
 #include <engine/SceneViewState.h>
 #include <cassert>
@@ -94,8 +95,10 @@ namespace caustica
 void attachGpuRenderSubsystem(App& app, GpuRenderSubsystem& gpuRenderSubsystem)
 {
     PathTracerSettings* cfg = settings(app);
+    CameraController* cam = detail::sessionCamera(app);
     assert(cfg);
-    gpuRenderSubsystem.camera().bindSideEffects(*cfg, gpuRenderSubsystem.worldRenderer());
+    assert(cam);
+    cam->bindSideEffects(*cfg, gpuRenderSubsystem.worldRenderer());
 }
 
 void initStreamlineAndWindow(App& app)
@@ -132,14 +135,16 @@ void initializeScene(App& app, const std::string& preferredScene)
         return;
     }
 
-    const auto shaderFactory = gr->shaderFactory();
-    const auto descriptorTable = gr->descriptorTable();
-    const auto textureLoader = gr->textureLoader();
-    if (!shaderFactory || !descriptorTable || !textureLoader || !detail::sessionCamera(app))
+    RenderInfra* infra = renderInfra(app);
+    if (!infra || !infra->shaderFactory || !infra->descriptorTable || !infra->textureLoader
+        || !detail::sessionCamera(app))
     {
-        caustica::fatal("caustica::initializeScene requires GpuRenderSubsystem wiring");
+        caustica::fatal("caustica::initializeScene requires RenderInfra / SessionCamera wiring");
         return;
     }
+    const auto shaderFactory = infra->shaderFactory;
+    const auto descriptorTable = infra->descriptorTable;
+    const auto textureLoader = infra->textureLoader;
 
     if (!wr->getRenderTargets())
         wr->createDeviceResources();

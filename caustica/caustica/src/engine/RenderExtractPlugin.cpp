@@ -3,6 +3,7 @@
 #include <engine/App.h>
 #include <engine/AppSchedules.h>
 #include <engine/GpuRenderSubsystem.h>
+#include <engine/SessionCamera.h>
 #include <engine/SceneApi.h>
 #include <engine/SceneViewState.h>
 
@@ -22,13 +23,14 @@ void prepareRenderFrame(App& app)
     auto* vs = app.tryResource<SceneViewState>();
     auto* diag = app.tryResource<render::AppDiagnostics>();
     auto* gr = app.tryResource<GpuRenderSubsystem>();
+    auto* sessionCam = app.tryResource<SessionCamera>();
     GpuDevice* device = app.getGpuDevice();
     if (vs)
         vs->progressLoading.stop();
     if (diag)
         diag->asyncLoadingInProgress = false;
 
-    if (!device || !gr)
+    if (!device || !gr || !sessionCam)
         return;
 
     const std::shared_ptr<Scene> scene = activeScene(app);
@@ -40,7 +42,7 @@ void prepareRenderFrame(App& app)
     flushPendingStructureGpu(app);
 
     scene::SessionRenderExtractInputs sessionInputs;
-    sessionInputs.camera = &gr->camera();
+    sessionInputs.camera = &sessionCam->camera;
     sessionInputs.gaussianSplatPasses = &gr->gaussianSplatPasses();
     if (render::WorldRenderer* wr = gr->worldRenderer())
         sessionInputs.gaussianSplatTemporalReset = wr->consumeGaussianSplatTemporalReset();
