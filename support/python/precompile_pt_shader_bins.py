@@ -139,6 +139,90 @@ def macro_map_to_list(values: dict[str, str]) -> list[tuple[str, str]]:
     return list(values.items())
 
 
+# Keep names/order in sync with caustica::render::PtFeaturePresetId
+# (PtPipelineFeaturePresets.h) and fillPtFeaturePresetMacros().
+# Curated combos only — do not expand into a full cartesian product.
+COVERAGE_PRESET_OVERRIDES: list[tuple[str, dict[str, str]]] = [
+    # Single-axis
+    ("Default", {}),
+    ("ReSTIR_DI", {"PT_USE_RESTIR_DI": "1"}),
+    ("ReSTIR_GI", {"PT_USE_RESTIR_GI": "1"}),
+    ("ReSTIR_PT", {"PT_USE_RESTIR_PT": "1"}),
+    ("OMM_On", {"CAUSTICA_ENABLE_OPACITY_MICROMAPS": "1"}),
+    ("NEE_Off", {"PT_NEE_ENABLED": "0"}),
+    ("RR_Off", {"PT_ENABLE_RUSSIAN_ROULETTE": "0"}),
+    ("Fp32Types", {"CAUSTICA_LP_TYPES_USE_16BIT_PRECISION": "0"}),
+    ("LD_Off", {"CAUSTICA_ENABLE_LOW_DISCREPANCY_SAMPLER_FOR_BSDF": "0"}),
+    ("Firefly_Off", {"CAUSTICA_FIREFLY_FILTER": "0"}),
+    ("ApproxMIS_Off", {"CAUSTICA_USE_APPROXIMATE_MIS": "0"}),
+    ("BakedEnv_On", {"NEE_AT_SAMPLE_BAKED_ENVIRONMENT": "1"}),
+    ("NEE_Off_BakedEnv", {"PT_NEE_ENABLED": "0", "NEE_AT_SAMPLE_BAKED_ENVIRONMENT": "1"}),
+    (
+        "NEE_Candidates_8",
+        {
+            "CAUSTICA_NEE_TOTAL_CANDIDATE_SAMPLE_COUNT": "8",
+            "CAUSTICA_NEE_LOCAL_CANDIDATE_SAMPLE_COUNT": "5",
+            "CAUSTICA_NEE_GLOBAL_CANDIDATE_SAMPLE_COUNT": "3",
+        },
+    ),
+    ("StablePlanes_1", {"CAUSTICA_ACTIVE_STABLE_PLANE_COUNT": "1"}),
+    ("NestedQuality_2", {"CAUSTICA_NESTED_DIELECTRICS_QUALITY": "2"}),
+    # Curated multi-feature combos (common editor / realtime paths)
+    (
+        "ReSTIR_DI_OMM",
+        {"PT_USE_RESTIR_DI": "1", "CAUSTICA_ENABLE_OPACITY_MICROMAPS": "1"},
+    ),
+    (
+        "ReSTIR_GI_OMM",
+        {"PT_USE_RESTIR_GI": "1", "CAUSTICA_ENABLE_OPACITY_MICROMAPS": "1"},
+    ),
+    (
+        "ReSTIR_PT_OMM",
+        {"PT_USE_RESTIR_PT": "1", "CAUSTICA_ENABLE_OPACITY_MICROMAPS": "1"},
+    ),
+    (
+        "ReSTIR_DI_BakedEnv",
+        {"PT_USE_RESTIR_DI": "1", "NEE_AT_SAMPLE_BAKED_ENVIRONMENT": "1"},
+    ),
+    (
+        "ReSTIR_GI_BakedEnv",
+        {"PT_USE_RESTIR_GI": "1", "NEE_AT_SAMPLE_BAKED_ENVIRONMENT": "1"},
+    ),
+    (
+        "ReSTIR_PT_BakedEnv",
+        {"PT_USE_RESTIR_PT": "1", "NEE_AT_SAMPLE_BAKED_ENVIRONMENT": "1"},
+    ),
+    (
+        "ReSTIR_DI_OMM_BakedEnv",
+        {
+            "PT_USE_RESTIR_DI": "1",
+            "CAUSTICA_ENABLE_OPACITY_MICROMAPS": "1",
+            "NEE_AT_SAMPLE_BAKED_ENVIRONMENT": "1",
+        },
+    ),
+    (
+        "OMM_BakedEnv",
+        {
+            "CAUSTICA_ENABLE_OPACITY_MICROMAPS": "1",
+            "NEE_AT_SAMPLE_BAKED_ENVIRONMENT": "1",
+        },
+    ),
+    (
+        "ReSTIR_DI_NEE8",
+        {
+            "PT_USE_RESTIR_DI": "1",
+            "CAUSTICA_NEE_TOTAL_CANDIDATE_SAMPLE_COUNT": "8",
+            "CAUSTICA_NEE_LOCAL_CANDIDATE_SAMPLE_COUNT": "5",
+            "CAUSTICA_NEE_GLOBAL_CANDIDATE_SAMPLE_COUNT": "3",
+        },
+    ),
+    (
+        "ReSTIR_DI_StablePlanes_1",
+        {"PT_USE_RESTIR_DI": "1", "CAUSTICA_ACTIVE_STABLE_PLANE_COUNT": "1"},
+    ),
+]
+
+
 def global_macro_presets(preset: str) -> list[list[tuple[str, str]]]:
     base = base_global_macro_map()
     if preset == "default":
@@ -147,38 +231,16 @@ def global_macro_presets(preset: str) -> list[list[tuple[str, str]]]:
     if preset != "coverage":
         raise ValueError(f"Unknown global macro preset: {preset}")
 
-    coverage_overrides: list[dict[str, str]] = [
-        {},
-        {"PT_USE_RESTIR_DI": "1"},
-        {"PT_USE_RESTIR_GI": "1"},
-        {"PT_USE_RESTIR_PT": "1"},
-        {"CAUSTICA_ENABLE_OPACITY_MICROMAPS": "1"},
-        {"PT_NEE_ENABLED": "0"},
-        {"PT_ENABLE_RUSSIAN_ROULETTE": "0"},
-        {"CAUSTICA_LP_TYPES_USE_16BIT_PRECISION": "0"},
-        {"CAUSTICA_ENABLE_LOW_DISCREPANCY_SAMPLER_FOR_BSDF": "0"},
-        {"CAUSTICA_FIREFLY_FILTER": "0"},
-        {"CAUSTICA_USE_APPROXIMATE_MIS": "0"},
-        {"NEE_AT_SAMPLE_BAKED_ENVIRONMENT": "1"},
-        {"PT_NEE_ENABLED": "0", "NEE_AT_SAMPLE_BAKED_ENVIRONMENT": "1"},
-        {
-            "CAUSTICA_NEE_TOTAL_CANDIDATE_SAMPLE_COUNT": "8",
-            "CAUSTICA_NEE_LOCAL_CANDIDATE_SAMPLE_COUNT": "5",
-            "CAUSTICA_NEE_GLOBAL_CANDIDATE_SAMPLE_COUNT": "3",
-        },
-        {"CAUSTICA_ACTIVE_STABLE_PLANE_COUNT": "1"},
-        {"CAUSTICA_NESTED_DIELECTRICS_QUALITY": "2"},
-    ]
-
     presets: list[list[tuple[str, str]]] = []
     seen: set[tuple[tuple[str, str], ...]] = set()
-    for overrides in coverage_overrides:
+    for name, overrides in COVERAGE_PRESET_OVERRIDES:
         merged = {**base, **overrides}
         macro_list = macro_map_to_list(merged)
         key = tuple(macro_list)
         if key in seen:
             continue
         seen.add(key)
+        print(f"[caustica] PT feature preset: {name}")
         presets.append(macro_list)
     return presets
 
@@ -396,7 +458,7 @@ def run_pt_shader_precompile(
     shader_api: str,
     *,
     force: bool = False,
-    global_preset: str = "default",
+    global_preset: str = "coverage",
 ) -> None:
     apis = ["dxil"] if shader_api == "d3d12" else ["spirv"] if shader_api == "vulkan" else ["dxil", "spirv"]
     api_map = {"dxil": "d3d12", "spirv": "vulkan"}
@@ -416,8 +478,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--global-preset",
         choices=["default", "coverage"],
-        default="default",
-        help="Global macro combinations to precompile. 'coverage' warms common runtime toggles.",
+        default="coverage",
+        help=(
+            "Closed feature-preset matrix to precompile. "
+            "'coverage' is required for UE-style load-only runtime switching."
+        ),
     )
     parser.add_argument("--force", action="store_true", help="Recompile even if output bins already exist.")
     return parser.parse_args()

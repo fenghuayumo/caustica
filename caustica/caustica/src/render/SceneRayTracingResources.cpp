@@ -5,15 +5,16 @@
 #include <render/WorldRenderer.h>
 
 #include <backend/GpuDevice.h>
+#include <core/log.h>
 #include <render/core/BindingCache.h>
 #include <render/core/PathTracingShaderCompiler.h>
+#include <render/core/RtPipelineCache.h>
 #include <render/core/AccelStructManager.h>
 #include <render/passes/omm/OpacityMicromapBuilder.h>
 #include <scene/Scene.h>
 
-#include <shaders/PathTracer/Lighting/LightingTypes.hlsli>
-
 #include <cassert>
+#include <vector>
 
 namespace caustica::render
 {
@@ -34,60 +35,21 @@ void SceneRayTracingResources::setAdditionalAccelStructBuilder(AdditionalAccelSt
     m_additionalAccelStructBuilder = std::move(builder);
 }
 
+PtFeaturePresetId SceneRayTracingResources::resolveFeaturePreset() const
+{
+    PtFeaturePresetResolveInput input;
+    input.settings = m_settings;
+    const std::shared_ptr<OpacityMicromapBuilder>& opacityMaps = m_lightingPasses->opacityMaps();
+    input.useOpacityMicromaps = opacityMaps != nullptr && opacityMaps->shouldUseRayTracingOpacityMicromaps();
+    if (m_lightingPasses->lightSampling())
+        input.sampleBakedEnvironment = m_lightingPasses->lightSampling()->sampleBakedEnvironment();
+    return resolvePtFeaturePreset(input);
+}
+
 void SceneRayTracingResources::fillPTPipelineGlobalMacros(std::vector<caustica::ShaderMacro>& macros)
 {
-    macros.clear();
-
-    auto* device = m_gpuDevice->getDevice();
-    const bool canUseNvapiHitObject =
-        m_settings->NVAPIHitObjectExtension &&
-        device->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D12 &&
-        device->queryFeatureSupport(nvrhi::Feature::HlslExtensionUAV);
-    const bool canUseDxHitObject =
-        m_settings->DXHitObjectExtension &&
-        device->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D12;
-
-    assert(!canUseNvapiHitObject || !canUseDxHitObject);
-
-    macros.push_back({ "ENABLE_DEBUG_SURFACE_VIZ",  (m_settings->DebugView != DebugViewType::Disabled)?("1"):("0") });
-    macros.push_back({ "ENABLE_DEBUG_LINES_VIZ",    (m_settings->ShowDebugLines)?("1"):("0") });
-
-    macros.push_back({ "USE_NVAPI_HIT_OBJECT_EXTENSION", canUseNvapiHitObject ? "1" : "0" });
-    macros.push_back({ "USE_NVAPI_REORDER_THREADS", (canUseNvapiHitObject && m_settings->NVAPIReorderThreads) ? "1" : "0" });
-
-    macros.push_back({ "USE_DX_HIT_OBJECT_EXTENSION", canUseDxHitObject ? "1" : "0" });
-    macros.push_back({ "USE_DX_MAYBE_REORDER_THREADS", (canUseDxHitObject && m_settings->DXMaybeReorderThreads) ? "1" : "0" });
-
-    macros.push_back({ "PT_ENABLE_RUSSIAN_ROULETTE", (m_settings->EnableRussianRoulette) ? ("1") : ("0") });
-    macros.push_back({ "PT_NEE_ENABLED", (m_settings->UseNEE)?("1"):("0") });
-    macros.push_back({ "PT_USE_RESTIR_DI", (m_settings->actualUseReSTIRDI()) ? ("1") : ("0") });
-    macros.push_back({ "PT_USE_RESTIR_GI", (m_settings->actualUseReSTIRGI()) ? ("1") : ("0") });
-    macros.push_back({ "PT_USE_RESTIR_PT", (m_settings->actualUseReSTIRPT()) ? ("1") : ("0") });
-
-    const std::shared_ptr<OpacityMicromapBuilder>& opacityMaps = m_lightingPasses->opacityMaps();
-    const bool useOpacityMicromaps = opacityMaps != nullptr && opacityMaps->shouldUseRayTracingOpacityMicromaps();
-    macros.push_back({ "CAUSTICA_ENABLE_OPACITY_MICROMAPS", useOpacityMicromaps ? "1" : "0" });
-
-    macros.push_back({ "CAUSTICA_USE_APPROXIMATE_MIS", (m_settings->actualUseApproximateMIS()) ? ("1") : ("0") });
-
-    macros.push_back({ "CAUSTICA_NEE_FULL_SAMPLE_COUNT", std::to_string(m_settings->NEEFullSamples) });
-    uint localCandidateSamples = ComputeCandidateSampleLocalCount(m_settings->ActualNEEAT_LocalToGlobalSampleRatio(), m_settings->NEECandidateSamples);
-    uint globalCandidateSamples = ComputeCandidateSampleGlobalCount(m_settings->ActualNEEAT_LocalToGlobalSampleRatio(), m_settings->NEECandidateSamples);
-    macros.push_back({ "CAUSTICA_NEE_LOCAL_CANDIDATE_SAMPLE_COUNT", std::to_string(localCandidateSamples) });
-    macros.push_back({ "CAUSTICA_NEE_GLOBAL_CANDIDATE_SAMPLE_COUNT", std::to_string(globalCandidateSamples) });
-    macros.push_back({ "CAUSTICA_NEE_TOTAL_CANDIDATE_SAMPLE_COUNT", std::to_string(m_settings->NEECandidateSamples) });
-
-    macros.push_back({ "CAUSTICA_DISABLE_SER_TERMINATION_HINT", (m_settings->DbgDisableSERTerminationHint)?("1"):("0") });
-    macros.push_back({ "CAUSTICA_DISCARD_NON_NEE_LIGHTING", (m_settings->DbgDiscardNonNEELighting) ? ("1") : ("0") });
-    macros.push_back({ "CAUSTICA_DISCARD_NEE_LIGHTING", (m_settings->DbgDiscardNEELighting) ? ("1") : ("0") });
-
-    macros.push_back({ "CAUSTICA_FIREFLY_FILTER", (m_settings->actualFireflyFilterEnabled()) ? ("1") : ("0") });
-    macros.push_back({ "CAUSTICA_ACTIVE_STABLE_PLANE_COUNT", std::to_string(m_settings->StablePlanesActiveCount) });
-    macros.push_back({ "CAUSTICA_NESTED_DIELECTRICS_QUALITY", std::to_string(m_settings->NestedDielectricsQuality) });
-    macros.push_back({ "CAUSTICA_LP_TYPES_USE_16BIT_PRECISION", (m_settings->UseFp16Types) ? ("1") : ("0") });
-    macros.push_back({ "CAUSTICA_ENABLE_LOW_DISCREPANCY_SAMPLER_FOR_BSDF", (m_settings->EnableLDSamplerForBSDF) ? ("1") : ("0") });
-
-    m_lightingPasses->applyShaderMacros(macros);
+    // Always emit a cooked preset macro list so runtime hashes match offline bins / RT PSO cache.
+    fillPtFeaturePresetMacros(resolveFeaturePreset(), macros);
 }
 
 bool SceneRayTracingResources::createPTPipeline()
@@ -98,32 +60,98 @@ bool SceneRayTracingResources::createPTPipeline()
 void SceneRayTracingResources::createRTPipelines()
 {
     auto compiler = pathTracingShaderCompiler();
+    assert(compiler);
+    auto cache = m_worldRenderer->getRtPipelineCache();
+    assert(cache);
+
+    // Product startup: only materialize the active preset. Remaining presets warm
+    // on the render thread with a per-frame budget (see RtPipelineCache::tickIdleWarmup).
+    const PtFeaturePresetId active = resolveFeaturePreset();
+    cache->ensurePresetVariants(active);
+
     using SM = caustica::ShaderMacro;
-    pipelineReference() = compiler->createVariant("PathTracerSample.hlsl", { SM("PATH_TRACER_MODE", "PATH_TRACER_MODE_REFERENCE") }, "REF");
-    ensureStablePlanePipelines();
-    if (m_settings->PostProcessTestPassHDR)
-        pipelineTestRaygenPPHDR() = compiler->createVariant("TestRaygenPP.hlsl", { SM("PP_TEST_HDR", "1") }, "TESTRG", true);
-    if (m_settings->PostProcessEdgeDetection)
-        pipelineEdgeDetection() = compiler->createVariant("TestRaygenPP.hlsl", { SM("PP_EDGE_DETECTION", "1") }, "EDGY", true);
+    // Optional editor-only raygen variants stay on the Default macro set.
+    std::vector<caustica::ShaderMacro> defaultMacros;
+    fillPtFeaturePresetMacros(PtFeaturePresetId::Default, defaultMacros);
+    if (m_settings->PostProcessTestPassHDR && !pipelineTestRaygenPPHDR())
+    {
+        pipelineTestRaygenPPHDR() = compiler->createVariant(
+            "TestRaygenPP.hlsl", { SM("PP_TEST_HDR", "1") }, "TESTRG", true, defaultMacros);
+    }
+    if (m_settings->PostProcessEdgeDetection && !pipelineEdgeDetection())
+    {
+        pipelineEdgeDetection() = compiler->createVariant(
+            "TestRaygenPP.hlsl", { SM("PP_EDGE_DETECTION", "1") }, "EDGY", true, defaultMacros);
+    }
+
+    if (!bindFeaturePreset(active))
+    {
+        caustica::error(
+            "RtPipelineCache: failed to bind preset '%s' after createRTPipelines",
+            ptFeaturePresetName(active).data());
+    }
 }
 
 void SceneRayTracingResources::ensureStablePlanePipelines()
 {
-    auto compiler = pathTracingShaderCompiler();
-    if (!compiler)
+    auto cache = m_worldRenderer->getRtPipelineCache();
+    if (!cache)
         return;
+    cache->ensurePresetVariants(cache->activePreset());
+    bindFeaturePreset(cache->activePreset());
+}
 
-    using SM = caustica::ShaderMacro;
-    if (!pipelineBuildStablePlanes())
+bool SceneRayTracingResources::bindFeaturePreset(PtFeaturePresetId id)
+{
+    auto cache = m_worldRenderer->getRtPipelineCache();
+    if (!cache)
+        return false;
+
+    cache->ensurePresetVariants(id);
+    const PtFeaturePresetId previous = cache->activePreset();
+    if (!cache->bind(id, pipelineReference(), pipelineBuildStablePlanes(), pipelineFillStablePlanes()))
+        return false;
+
+    if (previous != id)
     {
-        pipelineBuildStablePlanes() = compiler->createVariant(
-            "PathTracerSample.hlsl", { SM("PATH_TRACER_MODE", "PATH_TRACER_MODE_BUILD_STABLE_PLANES") }, "BUILD");
+        caustica::info("RtPipelineCache: bound feature preset '%s'", ptFeaturePresetName(id).data());
+        m_settings->ResetAccumulation = true;
     }
-    if (!pipelineFillStablePlanes())
+    return true;
+}
+
+bool SceneRayTracingResources::ensureFeaturePresetReady(PtFeaturePresetId id, bool showProgress)
+{
+    auto compiler = pathTracingShaderCompiler();
+    auto cache = m_worldRenderer->getRtPipelineCache();
+    if (!compiler || !cache)
+        return false;
+
+    cache->ensurePresetVariants(id);
+    if (cache->isReady(id))
     {
-        pipelineFillStablePlanes() = compiler->createVariant(
-            "PathTracerSample.hlsl", { SM("PATH_TRACER_MODE", "PATH_TRACER_MODE_FILL_STABLE_PLANES") }, "FILL");
+        cache->recordLookup(id, /*hit=*/true, "ensure");
+        return bindFeaturePreset(id);
     }
+
+    cache->recordLookup(id, /*hit=*/false, "ensure");
+    cache->prioritizeWarmup(id);
+    auto* bundle = cache->findBundle(id);
+    if (!bundle)
+        return false;
+
+    std::vector<std::shared_ptr<PTPipelineVariant>> variants;
+    if (bundle->reference && !bundle->reference->hasPipeline())
+        variants.push_back(bundle->reference);
+    if (bundle->buildStablePlanes && !bundle->buildStablePlanes->hasPipeline())
+        variants.push_back(bundle->buildStablePlanes);
+    if (bundle->fillStablePlanes && !bundle->fillStablePlanes->hasPipeline())
+        variants.push_back(bundle->fillStablePlanes);
+
+    if (!variants.empty())
+        compiler->buildPipelines(variants, showProgress);
+
+    return cache->isReady(id) && bindFeaturePreset(id);
 }
 
 void SceneRayTracingResources::createBlases(
@@ -212,7 +240,6 @@ void SceneRayTracingResources::requestAccelerationStructureRebuild()
 {
     m_invalidation->AccelerationStructRebuildRequested = true;
     m_settings->ResetAccumulation = true;
-    // Binding set is invalidated again inside recreateAccelStructs once GPU is idle.
 }
 
 void SceneRayTracingResources::requestFullRebuild()

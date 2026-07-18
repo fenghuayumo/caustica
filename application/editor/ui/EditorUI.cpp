@@ -1,16 +1,19 @@
 #include "ui/EditorUIInternal.h"
 #include <engine/RenderSessionApi.h>
+#include <engine/App.h>
 
 #include "SceneEditor.h"
 #include "common/ImGuiManager.h"
 #include "common/TransformGizmo.h"
 
+#include <render/AppDiagnostics.h>
 #include <render/SceneLightingPasses.h>
 #include <render/SceneGaussianSplatPasses.h>
 #include <engine/UserInterfaceUtils.h>
 #include <core/vfs/VFS.h>
 #include <scene/Scene.h>
 #include <imgui_internal.h>
+#include <cstdio>
 #include <render/passes/debug/Korgi.h>
 #include <common/CaptureScriptManager.h>
 
@@ -86,6 +89,41 @@ void EditorUI::animate(float elapsedTimeSeconds)
 
 void EditorUI::buildUI(void)
 {
+    // Non-modal product status: visible even when the settings UI is hidden.
+    if (auto* diag = m_sceneEditor.app()
+            ? m_sceneEditor.app()->tryResource<caustica::render::AppDiagnostics>()
+            : nullptr)
+    {
+        const auto& warm = diag->rtPipelineWarmup;
+        if (warm.active && warm.total > 0)
+        {
+            const char* preset = warm.currentPreset.empty() ? "..." : warm.currentPreset.data();
+            char label[160];
+            snprintf(
+                label,
+                sizeof(label),
+                "Warming RT pipelines %u/%u (%s)",
+                warm.completed,
+                warm.total,
+                preset);
+            const ImVec2 pad(12.f, 8.f);
+            const ImVec2 textSize = ImGui::CalcTextSize(label);
+            const ImVec2 pos(
+                ImGui::GetIO().DisplaySize.x - textSize.x - pad.x * 2.f - 16.f,
+                16.f);
+            ImDrawList* drawList = ImGui::GetForegroundDrawList();
+            drawList->AddRectFilled(
+                pos,
+                ImVec2(pos.x + textSize.x + pad.x * 2.f, pos.y + textSize.y + pad.y * 2.f),
+                IM_COL32(20, 20, 20, 180),
+                4.f);
+            drawList->AddText(
+                ImVec2(pos.x + pad.x, pos.y + pad.y),
+                IM_COL32(230, 200, 90, 255),
+                label);
+        }
+    }
+
     if (!m_editorUI.ShowUI)
         return;
 

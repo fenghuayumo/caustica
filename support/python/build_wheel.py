@@ -568,6 +568,13 @@ def main() -> int:
             )
         sys.path.insert(0, str(ROOT / "support" / "python"))
         run_pt_shader_precompile(args)
+        from verify_pt_shader_bins import verify_apis
+
+        if verify_apis(args.shader_api, args.precompile_pt_global_preset) != 0:
+            raise RuntimeError(
+                "PT shader coverage verify failed. "
+                "Run: python support/python/cook_shaders.py --global-preset coverage"
+            )
 
     if args.precompile_dynamic_shaders:
         if dynamic_shaders == "none":

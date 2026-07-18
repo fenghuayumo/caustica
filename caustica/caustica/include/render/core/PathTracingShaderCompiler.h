@@ -6,7 +6,9 @@
 #include <assets/loader/ShaderFactory.h>
 #include <core/ThreadPool.h>
 #include <scene/SceneRenderData.h>
+#include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 #include <assets/loader/ShaderCompilerUtils.h>
 #include <assets/loader/ShaderKey.h>
@@ -58,6 +60,7 @@ public:
     //void                                    SetMacros(const std::vector<caustica::ShaderMacro> & variantMacros);
 
     const nvrhi::rt::ShaderTableHandle &    getShaderTable() const { return m_shaderTable; }
+    [[nodiscard]] bool                      hasPipeline() const { return m_pipeline != nullptr; }
 
 private:
     void                                    updateStart(std::filesystem::file_time_type lastModifiedSourceCode);
@@ -81,8 +84,9 @@ private:
     std::shared_ptr<class PathTracingShaderCompiler>  m_lockedCompiler;
 
 
-    std::vector<caustica::ShaderMacro> m_macros;                   // global macros (obtained from PathTracingShaderCompiler::getMacros)
-    std::vector<caustica::ShaderMacro> m_combinedMacros;           // per-PTPipelineVariant macros 
+    std::vector<caustica::ShaderMacro> m_macros;                   // per-variant macros (e.g. PATH_TRACER_MODE)
+    std::vector<caustica::ShaderMacro> m_bakedGlobalMacros;        // optional: closed feature-preset macros
+    std::vector<caustica::ShaderMacro> m_combinedMacros;           // variant + global macros used for compile
 
 
     // Raygen and (optional) Miss
@@ -112,8 +116,24 @@ public:
     ~PathTracingShaderCompiler();
     
     void                                update(const caustica::scene::SceneRenderData* sceneData, unsigned int subInstanceCount, const std::function<void(std::vector<caustica::ShaderMacro> & macros)>& globalMacrosGetter, bool forceShaderReload);
-    std::shared_ptr<PTPipelineVariant>  createVariant(const std::string & relativeSourcePath, std::vector<caustica::ShaderMacro> variantMacros, const std::string & shortUniqueDebugID, bool rayGenOnly = false );
+    // When bakedGlobalMacros is non-empty, the variant ignores compiler-wide macros at build time
+    // (used by RtPipelineCache so multiple feature presets can coexist).
+    std::shared_ptr<PTPipelineVariant>  createVariant(
+        const std::string & relativeSourcePath,
+        std::vector<caustica::ShaderMacro> variantMacros,
+        const std::string & shortUniqueDebugID,
+        bool rayGenOnly = false,
+        const std::vector<caustica::ShaderMacro>& bakedGlobalMacros = {});
     void                                releaseVariant(std::shared_ptr<PTPipelineVariant> & variant);
+
+    // CreateStateObject only for variants that still have a null pipeline (does not reset live PSOs).
+    void                                buildMissingPipelines(bool showProgress = true);
+    // Build a specific set of variants. showProgress=false for idle warmup (non-modal).
+    void                                buildPipelines(
+        const std::vector<std::shared_ptr<PTPipelineVariant>>& variants,
+        bool showProgress = true);
+
+    [[nodiscard]] bool                  isLoadOnlyMode() const { return !m_compilerConfig.canCompile(); }
     
     const std::shared_ptr<class MaterialGpuCache> & 
                                         getMaterialGpuCache() const           { return m_materialGpuCache; }
@@ -140,7 +160,6 @@ private:
     bool                                isVerbose() const                       { return m_verbose; }
     bool                                isNvapiShaderExtensionEnabled() const   { return m_enableNVAPIShaderExtension; }
     bool                                canCompileShaders() const               { return m_compilerConfig.canCompile(); }
-    bool                                isLoadOnlyMode() const                  { return !m_compilerConfig.canCompile(); }
 
     const ShaderCompilerUtils::ShaderCompilerConfig& 
                                         getCompilerConfig() const           { return m_compilerConfig; }
@@ -171,7 +190,8 @@ private:
     std::vector<PTPipelineVariant::ShaderPermutation*> m_parallelCompileListAll;
     std::unordered_map<std::string, PTPipelineVariant::ShaderPermutation*> m_parallelCompileListUnique; // one big list of enqueued files to compile, tracked by output name to avoid duplicates as multiple PTPipelineVariant-s can request same outputs
 
-    std::unordered_set<std::string>                 m_shortUniqueDebugIDs;
+    // Ref-counted: RtPipelineCache may keep multiple REF/BUILD/FILL variants (one per preset).
+    std::unordered_map<std::string, int>            m_shortUniqueDebugIDRefCount;
 
     // Hit groups shared between pipeline variants.
     std::vector<HitGroupInfo>                       m_perSubInstanceHitGroup;

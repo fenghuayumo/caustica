@@ -93,14 +93,23 @@ class BuildPyWithRuntime(_build_py):
         if env_bool("CAUSTICA_WHEEL_PRECOMPILE_PT_SHADERS", True, "CAUSTICA_WHEEL_PRECOMPILE_PT_SHADERS"):
             if dynamic_shaders == "none":
                 print("WARNING: CAUSTICA_WHEEL_PRECOMPILE_PT_SHADERS is set while dynamic shader bins are omitted.")
+            pt_preset = os.environ.get(
+                "CAUSTICA_WHEEL_PRECOMPILE_PT_GLOBAL_PRESET",
+                "coverage",
+            )
             run_pt_shader_precompile(SimpleNamespace(
                 shader_api=shader_api,
                 precompile_pt_force=env_bool("CAUSTICA_WHEEL_PRECOMPILE_PT_FORCE", legacy_name="CAUSTICA_WHEEL_PRECOMPILE_PT_FORCE"),
-                precompile_pt_global_preset=os.environ.get(
-                    "CAUSTICA_WHEEL_PRECOMPILE_PT_GLOBAL_PRESET",
-                    os.environ.get("CAUSTICA_WHEEL_PRECOMPILE_PT_GLOBAL_PRESET", "coverage"),
-                ),
+                precompile_pt_global_preset=pt_preset,
             ))
+            if env_bool("CAUSTICA_WHEEL_VERIFY_PT_SHADERS", True, "CAUSTICA_WHEEL_VERIFY_PT_SHADERS"):
+                from verify_pt_shader_bins import verify_apis
+
+                if verify_apis(shader_api, pt_preset) != 0:
+                    raise RuntimeError(
+                        "PT shader coverage verify failed. "
+                        "Run: python support/python/cook_shaders.py"
+                    )
 
         if env_bool("CAUSTICA_WHEEL_PRECOMPILE_DYNAMIC_SHADERS", legacy_name="CAUSTICA_WHEEL_PRECOMPILE_DYNAMIC_SHADERS"):
             if dynamic_shaders == "none":

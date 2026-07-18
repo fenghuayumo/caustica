@@ -2,6 +2,7 @@
 
 #include <assets/loader/ShaderMacro.h>
 #include <render/core/PathTracerSettings.h>
+#include <render/core/PtPipelineFeaturePresets.h>
 #include <render/RenderRuntimeState.h>
 #include <rhi/nvrhi.h>
 #include <shaders/SampleConstantBuffer.h>
@@ -46,9 +47,14 @@ public:
     void setAdditionalAccelStructBuilder(AdditionalAccelStructBuilder builder);
 
     void fillPTPipelineGlobalMacros(std::vector<caustica::ShaderMacro>& macros);
+    [[nodiscard]] PtFeaturePresetId resolveFeaturePreset() const;
     bool createPTPipeline();
     void createRTPipelines();
     void ensureStablePlanePipelines();
+    // Bind cooked preset pipelines (lightweight). Variants must already exist.
+    bool bindFeaturePreset(PtFeaturePresetId id);
+    // Ensure CreateStateObject for a preset (blocking for that preset only), then bind.
+    bool ensureFeaturePresetReady(PtFeaturePresetId id, bool showProgress = false);
 
     void uploadSubInstanceData(nvrhi::ICommandList* commandList);
     // Session Scene is owned by PathTracingContext; pass it in for mesh/AS mutation.

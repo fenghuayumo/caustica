@@ -199,12 +199,20 @@ void EditorUI::BuildMaterialEditorPanel(const PanelLayout& layout)
             m_settings.ResetAccumulation = 1;
         }
 
-        if (wasAlphaTestedEnabled != material->enableAlphaTesting || alphaCutoffBefore != alphaCutoffAfter ||
-            wasExcludedFromNEE != material->excludeFromNEE || mspBefore != mspAfter || wasSkipRender != material->skipRender)
-            m_runtime.Invalidation.ShaderAndACRefreshDelayedRequest = 1.0f;
+        // UE-style: material edits must not force RTPSO CreateStateObject.
+        // Alpha/skip/NEE visibility changes only need acceleration-structure refresh + SBT remap.
+        if (wasAlphaTestedEnabled != material->enableAlphaTesting ||
+            wasExcludedFromNEE != material->excludeFromNEE ||
+            mspBefore != mspAfter ||
+            wasSkipRender != material->skipRender)
+        {
+            m_runtime.Invalidation.AccelerationStructRebuildRequested = true;
+        }
+        (void)alphaCutoffBefore;
+        (void)alphaCutoffAfter;
 
-        if (m_runtime.Invalidation.ShaderAndACRefreshDelayedRequest > 0)
-            ImGui::TextColored(ImVec4(1, 0.5f, 0.5f, 1), "PLEASE NOTE: shader and AC rebuild scheduled!\nUI might freeze for a bit.");
+        if (m_runtime.Invalidation.AccelerationStructRebuildRequested)
+            ImGui::TextColored(ImVec4(1, 0.5f, 0.5f, 1), "Acceleration structure refresh scheduled.");
         else
             ImGui::Text(" ");
 

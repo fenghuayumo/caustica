@@ -19,6 +19,7 @@
 #include <core/progress.h>
 #include <core/system_utils.h>
 
+#include <atomic>
 #include <cstdio>
 
 using namespace caustica;
@@ -167,7 +168,8 @@ void PTPipelineVariant::ShaderPermutation::resolveCacheIdentity(
     if (!compiler.canCompileShaders())
     {
         usCompileError = stringFormat(
-            "Missing precompiled shader '%s' for permutation '%s' and runtime shader compilation is disabled.",
+            "Missing cooked PT shader '%s' for permutation '%s' (load-only mode). "
+            "Run: python support/python/cook_shaders.py --global-preset coverage",
             compiledFullPath.c_str(),
             permutationName.c_str());
         std::string macroList;
@@ -214,10 +216,7 @@ PTPipelineVariant::PTPipelineVariant(const std::string & relativeSourcePath, con
         assert( false ); // too big
         m_shortUniqueDebugID = m_shortUniqueDebugID.substr(0, 6);
     }
-    if (!compiler->registerShortUniqueDebugID(m_shortUniqueDebugID))
-    {
-        assert( false ); // not unique!
-    }
+    compiler->registerShortUniqueDebugID(m_shortUniqueDebugID);
 #else
     m_shortUniqueDebugID = "UNK";
 #endif
@@ -294,10 +293,13 @@ void PTPipelineVariant::updateStart(std::filesystem::file_time_type lastModified
         return;
     }
 
-    m_combinedMacros.clear(); m_combinedMacros.reserve( m_macros.size() + compiler->getMacros().size() );
+    const std::vector<caustica::ShaderMacro>& globalMacros =
+        m_bakedGlobalMacros.empty() ? compiler->getMacros() : m_bakedGlobalMacros;
+    m_combinedMacros.clear();
+    m_combinedMacros.reserve(m_macros.size() + globalMacros.size());
     for (auto& macro : m_macros)
         m_combinedMacros.push_back(macro);
-    for (auto& macro : compiler->getMacros())
+    for (const auto& macro : globalMacros)
         m_combinedMacros.push_back(macro);
     
     bool foundExportAnyHitDependency = false;
@@ -753,9 +755,12 @@ void PathTracingShaderCompiler::update(const caustica::scene::SceneRenderData* s
         }
         if (missingPipelines)
         {
-            caustica::warning(
-                "PathTracingShaderCompiler: some RT variants have no PSO yet; skipping their "
-                "create to avoid resetting live pipelines after runtime import");
+            // UE-style cache: late presets may be ensured after the default bundle is live.
+            // Build only null-pipeline variants — never resetPipeline() on existing PSOs.
+            caustica::info(
+                "PathTracingShaderCompiler: building missing RT pipeline variants without "
+                "resetting live PSOs");
+            buildMissingPipelines(/*showProgress=*/false);
         }
 
         if (countChanged || uniqueEmpty || materialStateChanged || resourceBindingsChanged)
@@ -1021,6 +1026,122 @@ void PathTracingShaderCompiler::update(const caustica::scene::SceneRenderData* s
     } while (true);
 }
 
+void PathTracingShaderCompiler::buildMissingPipelines(bool showProgress)
+{
+    std::vector<std::shared_ptr<PTPipelineVariant>> missing;
+    for (const std::shared_ptr<PTPipelineVariant>& variant : m_variants)
+    {
+        if (variant && variant->m_pipeline == nullptr)
+            missing.push_back(variant);
+    }
+    buildPipelines(missing, showProgress);
+}
+
+void PathTracingShaderCompiler::buildPipelines(
+    const std::vector<std::shared_ptr<PTPipelineVariant>>& variants,
+    bool showProgress)
+{
+    if (m_device == nullptr || variants.empty())
+        return;
+
+    std::vector<std::shared_ptr<PTPipelineVariant>> missing;
+    missing.reserve(variants.size());
+    for (const std::shared_ptr<PTPipelineVariant>& variant : variants)
+    {
+        if (variant && variant->m_pipeline == nullptr)
+            missing.push_back(variant);
+    }
+    if (missing.empty())
+        return;
+
+    if (!m_lastUpdatedSourceTimestamp.has_value())
+    {
+        m_lastUpdatedSourceTimestamp = m_compilerConfig.canCompile()
+            ? getLatestModifiedTimeDirectoryRecursive(m_compilerConfig.ShadersPath)
+            : std::optional<std::filesystem::file_time_type>(std::filesystem::file_time_type::min());
+    }
+    if (!m_lastUpdatedSourceTimestamp.has_value())
+    {
+        caustica::error("PathTracingShaderCompiler: cannot build pipelines — no shader timestamp");
+        return;
+    }
+
+    if (m_version < 0)
+        m_version = 0;
+
+    assert(m_parallelCompileListAll.empty() && m_parallelCompileListUnique.empty());
+
+    ProgressBar progressMissing;
+    if (showProgress)
+        progressMissing.start(stringFormat("Warming RT pipelines (%d)...", (int)missing.size()).c_str());
+
+    for (const std::shared_ptr<PTPipelineVariant>& variant : missing)
+        variant->updateStart(*m_lastUpdatedSourceTimestamp);
+
+    std::atomic_int progressCounterCompleted = 0;
+    const int progressTotal = (int)m_parallelCompileListUnique.size();
+    for (auto it : m_parallelCompileListUnique)
+    {
+        PTPipelineVariant::ShaderPermutation* permutation = it.second;
+#if BAKER_ENABLE_MULTITHREADED_COMPILE_SHADER
+        m_threadPool.addTask([permutation, &progressMissing, &progressCounterCompleted, progressTotal, showProgress]() {
+#endif
+            permutation->compileIfNeeded();
+            const int completed = progressCounterCompleted.fetch_add(1) + 1;
+            if (showProgress && progressTotal > 0)
+                progressMissing.Set(50 * completed / progressTotal);
+#if BAKER_ENABLE_MULTITHREADED_COMPILE_SHADER
+        });
+#endif
+    }
+#if BAKER_ENABLE_MULTITHREADED_COMPILE_SHADER
+    m_threadPool.waitForTasks();
+#endif
+
+    std::string firstError;
+    for (PTPipelineVariant::ShaderPermutation* permutation : m_parallelCompileListAll)
+    {
+        if (permutation->usCompileError != "")
+        {
+            firstError = permutation->usCompileError;
+            break;
+        }
+        permutation->loadShaderLibraryIfNeeded(*this);
+        if (permutation->shaderLibrary == nullptr)
+        {
+            firstError = permutation->usCompileError;
+            break;
+        }
+    }
+
+    m_parallelCompileListAll.clear();
+    m_parallelCompileListUnique.clear();
+
+    if (firstError != "")
+    {
+        caustica::error("%s", firstError.c_str());
+        if (showProgress)
+            progressMissing.Set(100);
+        return;
+    }
+
+    int completed = 0;
+    for (const std::shared_ptr<PTPipelineVariant>& variant : missing)
+    {
+        variant->updateFinalize();
+        ++completed;
+        if (showProgress)
+            progressMissing.Set(50 + 50 * completed / (int)missing.size());
+    }
+    if (showProgress)
+        progressMissing.Set(100);
+
+    caustica::info(
+        "PathTracingShaderCompiler: built %d RT pipeline variant(s)%s",
+        (int)missing.size(),
+        showProgress ? "" : " (idle warmup)");
+}
+
 void PathTracingShaderCompiler::releaseVariant(std::shared_ptr<PTPipelineVariant>& variant)
 {
     if (variant == nullptr)
@@ -1038,22 +1159,34 @@ void PathTracingShaderCompiler::releaseVariant(std::shared_ptr<PTPipelineVariant
     assert(false);
 }
 
-std::shared_ptr<PTPipelineVariant> PathTracingShaderCompiler::createVariant(const std::string & relativeSourcePath, std::vector<caustica::ShaderMacro> variantMacros, const std::string & shortUniqueDebugID, bool rayGenOnly)
+std::shared_ptr<PTPipelineVariant> PathTracingShaderCompiler::createVariant(
+    const std::string & relativeSourcePath,
+    std::vector<caustica::ShaderMacro> variantMacros,
+    const std::string & shortUniqueDebugID,
+    bool rayGenOnly,
+    const std::vector<caustica::ShaderMacro>& bakedGlobalMacros)
 {
-    std::shared_ptr<PTPipelineVariant> variant = std::shared_ptr<PTPipelineVariant>(new PTPipelineVariant(relativeSourcePath, variantMacros, this->shared_from_this(), shortUniqueDebugID, rayGenOnly));
+    std::shared_ptr<PTPipelineVariant> variant = std::shared_ptr<PTPipelineVariant>(
+        new PTPipelineVariant(relativeSourcePath, variantMacros, this->shared_from_this(), shortUniqueDebugID, rayGenOnly));
+    variant->m_bakedGlobalMacros = bakedGlobalMacros;
     m_variants.push_back(variant);
     return variant;
 }
 
 bool PathTracingShaderCompiler::registerShortUniqueDebugID(const std::string& id)
 {
-    auto [it, inserted] = m_shortUniqueDebugIDs.insert(id);
-
-    return inserted;
+    m_shortUniqueDebugIDRefCount[id] += 1;
+    return true;
 }
 
 void PathTracingShaderCompiler::unregisterShortUniqueDebugID(const std::string& id)
 {
-    int count = m_shortUniqueDebugIDs.erase(id);
-    assert( count > 0 );
+    auto it = m_shortUniqueDebugIDRefCount.find(id);
+    if (it == m_shortUniqueDebugIDRefCount.end())
+    {
+        assert(false);
+        return;
+    }
+    if (--it->second <= 0)
+        m_shortUniqueDebugIDRefCount.erase(it);
 }

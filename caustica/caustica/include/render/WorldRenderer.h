@@ -48,6 +48,8 @@ class PathTracingShaderCompiler;
 class PTPipelineVariant;
 class ToneMappingPass;
 struct PathTracerCameraData;
+
+namespace caustica::render { class RtPipelineCache; }
 struct PathTracerConstants;
 
 namespace caustica
@@ -154,6 +156,7 @@ public:
     const PathTracePass* getPathTracePass() const { return m_pathTracePass.get(); }
 
     std::shared_ptr<PathTracingShaderCompiler> getPathTracingShaderCompiler() const { return m_pathTracingShaderCompiler; }
+    std::shared_ptr<RtPipelineCache> getRtPipelineCache() const { return m_rtPipelineCache; }
     std::shared_ptr<ShaderDebug> getShaderDebug() const { return m_shaderDebug; }
 
     std::shared_ptr<PTPipelineVariant>& ptPipelineReference() { return m_ptPipelineReference; }
@@ -267,6 +270,7 @@ private:
     std::shared_ptr<PTPipelineVariant>          m_ptPipelineTestRaygenPPHDR;
     std::shared_ptr<PTPipelineVariant>          m_ptPipelineEdgeDetection;
     std::shared_ptr<PathTracingShaderCompiler>            m_pathTracingShaderCompiler;
+    std::shared_ptr<RtPipelineCache>                      m_rtPipelineCache;
 
     nvrhi::CommandListHandle                    m_commandList;
     nvrhi::BufferHandle                         m_constantBuffer;

@@ -30,6 +30,7 @@
 #include <render/core/RenderSceneTypeFactory.h>
 #include <render/core/SceneGpuUpdater.h>
 #include <render/SceneLightingPasses.h>
+#include <render/WorldRenderer.h>
 #include <scene/Scene.h>
 #include <scene/SceneRuntimeMutation.h>
 #include <scene/loader/RuntimeMeshLoader.h>

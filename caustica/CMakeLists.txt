@@ -105,11 +105,17 @@ file(GLOB_RECURSE caustica_pt_shader_sources
 )
 set_source_files_properties(${caustica_pt_shader_sources} PROPERTIES VS_TOOL_OVERRIDE "None")
 
+# Formal PT cook: coverage matrix → ShaderDynamic/Bin (required for UE-style runtime PSO switch).
+# Official release entry point is also: python support/python/cook_shaders.py
 option(CAUSTICA_PRECOMPILE_PT_SHADERS "Precompile path-tracing DXC shader bins into ShaderDynamic/Bin" ON)
+option(CAUSTICA_VERIFY_PT_SHADERS "Verify cooked PT bins cover the coverage feature-preset matrix" ON)
+option(CAUSTICA_PACKAGE_SHADER_PACK
+    "Build caustica.shaders.<api>.pack after PT cook (default ON for distribution builds)"
+    ${CAUSTICA_DISTRIBUTION_BUILD})
 option(CAUSTICA_WITH_RUNTIME_SHADER_COMPILATION
     "Deploy shader sources/DXC beside the executable for runtime DXC compilation (dev only)"
     OFF)
-if (CAUSTICA_PRECOMPILE_PT_SHADERS AND NOT CAUSTICA_DISTRIBUTION_BUILD)
+if (CAUSTICA_PRECOMPILE_PT_SHADERS)
     find_package(Python3 COMPONENTS Interpreter)
     if (Python3_FOUND)
         if (WIN32)
@@ -124,23 +130,49 @@ if (CAUSTICA_PRECOMPILE_PT_SHADERS AND NOT CAUSTICA_DISTRIBUTION_BUILD)
         if (DXC_SPIRV_PATH)
             list(APPEND caustica_pt_precompile_env "SHADERMAKE_DXC_VK_PATH=${DXC_SPIRV_PATH}")
         endif()
-        add_custom_target(causticaPathTracerShaders
+        set(caustica_pt_precompile_cmds
             COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Bin"
             COMMAND ${caustica_pt_precompile_env}
                 ${Python3_EXECUTABLE}
                 "${CMAKE_SOURCE_DIR}/support/python/precompile_pt_shader_bins.py"
                 --shader-api ${caustica_pt_precompile_api}
                 --global-preset coverage
+        )
+        if (CAUSTICA_VERIFY_PT_SHADERS)
+            list(APPEND caustica_pt_precompile_cmds
+                COMMAND ${Python3_EXECUTABLE}
+                    "${CMAKE_SOURCE_DIR}/support/python/verify_pt_shader_bins.py"
+                    --shader-api ${caustica_pt_precompile_api}
+                    --global-preset coverage
+            )
+        endif()
+        add_custom_target(causticaPathTracerShaders
+            ${caustica_pt_precompile_cmds}
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
             DEPENDS ShaderDynamicAssets_CopyAlways
-            COMMENT "Precompiling path-tracing shader bins (DXC hash layout)"
+            COMMENT "Cooking path-tracing shaders (coverage preset + verify)"
             SOURCES ${caustica_pt_shader_sources}
+        )
+        # Pack step only (bins already produced by causticaPathTracerShaders).
+        # Full one-shot cook for humans/CI: python support/python/cook_shaders.py
+        add_custom_target(causticaShaderPack
+            COMMAND ${Python3_EXECUTABLE}
+                "${CMAKE_SOURCE_DIR}/support/python/package_shaders.py"
+                --shader-api ${caustica_pt_precompile_api}
+                --no-precompile-pt
+                --output-dir "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+            DEPENDS causticaPathTracerShaders
+            COMMENT "Packaging caustica.shaders.<api>.pack from cooked bins"
         )
     else()
         add_custom_target(causticaPathTracerShaders
             COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Bin"
             COMMENT "Path-tracing shader precompile skipped (Python3 not found)"
             SOURCES ${caustica_pt_shader_sources}
+        )
+        add_custom_target(causticaShaderPack
+            COMMENT "causticaShaderPack skipped (Python3 not found)"
         )
     endif()
 else()
@@ -149,8 +181,12 @@ else()
         COMMENT "Path-tracing shader precompile disabled"
         SOURCES ${caustica_pt_shader_sources}
     )
+    add_custom_target(causticaShaderPack
+        COMMENT "causticaShaderPack skipped (CAUSTICA_PRECOMPILE_PT_SHADERS=OFF)"
+    )
 endif()
 set_target_properties(causticaPathTracerShaders PROPERTIES FOLDER ${folder})
+set_target_properties(causticaShaderPack PROPERTIES FOLDER ${folder})
 
 
 ##########################################################################
@@ -332,6 +368,9 @@ if (CAUSTICA_WITH_PYTHON AND caustica_python_core_sources)
 endif()
 
 add_dependencies(causticaApp caustica_shaders nrd_shaders omm_shaders causticaPathTracerShaders ShaderDynamicAssets ShaderDynamicAssets_CopyAlways)
+if (CAUSTICA_PACKAGE_SHADER_PACK)
+    add_dependencies(causticaApp causticaShaderPack)
+endif()
 set_target_properties(causticaApp PROPERTIES FOLDER ${folder})
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${shaders})
 # AgilitySDK support for causticaApp
@@ -378,6 +417,9 @@ macro(add_caustica_sample TARGET_NAME MAIN_SOURCE)
     endif()
     target_link_libraries(${TARGET_NAME} PRIVATE causticaApp nvrhi)
     add_dependencies(${TARGET_NAME} caustica_shaders nrd_shaders omm_shaders causticaEngineShaders causticaPathTracerShaders ShaderDynamicAssets ShaderDynamicAssets_CopyAlways)
+    if (CAUSTICA_PACKAGE_SHADER_PACK)
+        add_dependencies(${TARGET_NAME} causticaShaderPack)
+    endif()
     set_target_properties(${TARGET_NAME} PROPERTIES 
         FOLDER ${folder}
         OUTPUT_NAME_DEBUG "${TARGET_NAME}D"

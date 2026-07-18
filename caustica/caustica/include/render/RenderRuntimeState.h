@@ -10,8 +10,10 @@ namespace caustica::render
 
 struct RenderInvalidationState
 {
+    // Full RTPSO rebuild (Ctrl+R / source hot-reload / scene load). Prefer RtPipelineCache binds.
     bool ShaderReloadRequested = false;
     bool AccelerationStructRebuildRequested = false;
+    // Legacy timer: now only schedules AccelerationStructRebuildRequested (never ShaderReload).
     float ShaderAndACRefreshDelayedRequest = 0.0f;
 };
 

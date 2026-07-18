@@ -109,6 +109,7 @@ public:
     bool                            debugGUI(float indent);
 
     void                            setGlobalShaderMacros(std::vector<caustica::ShaderMacro> & macros);
+    [[nodiscard]] bool              sampleBakedEnvironment() const { return m_advSetting_SampleBakedEnvironment; }
 
     bool                            totalLightCountOverflow() const;
 

@@ -21,6 +21,8 @@ namespace { constexpr int c_SwapchainCount = 3; }
 #include <render/core/AccelStructManager.h>
 #include <render/core/CameraController.h>
 #include <render/core/PathTracingShaderCompiler.h>
+#include <render/core/RtPipelineCache.h>
+#include <render/core/PtPipelineFeaturePresets.h>
 #include <render/core/ComputePipelineRegistry.h>
 #include <render/passes/lighting/LightingFrame.h>
 #include <render/passes/lighting/MaterialGpuCache.h>
@@ -385,6 +387,7 @@ void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameCont
 
             m_pathTracingShaderCompiler = std::make_shared<PathTracingShaderCompiler>(
                 device(), m_context->scenePasses.lighting.materials(), m_bindingLayout, m_bindlessLayout);
+            m_rtPipelineCache = std::make_shared<RtPipelineCache>(m_pathTracingShaderCompiler);
 
             std::vector<std::filesystem::path> additionalShaderPaths;
             m_context->scenePasses.lighting.computePipelines() = std::make_shared<ComputePipelineRegistry>(device(), additionalShaderPaths);
@@ -450,6 +453,13 @@ void caustica::render::WorldRenderer::framePassShaderUpdate(PathTracingFrameCont
     // Hit-group rebuild uses mesh proxies from the frame snapshot (indices assigned at Extract).
     const scene::SceneRenderData* sceneData = m_context->frameScene;
 
+    // UE-style: feature toggles snap to a cooked preset and bind prebuilt RT PSOs.
+    // forcePathTracingShaderReload remains for source hot-reload / Ctrl+R / scene load only.
+    const PtFeaturePresetId desiredPreset = m_context->scenePasses.rayTracing.resolveFeaturePreset();
+
+    if (m_rtPipelineCache && m_rtPipelineCache->activePreset() != desiredPreset)
+        m_context->activeSettings().ResetAccumulation = true;
+
     m_pathTracingShaderCompiler->update(
         sceneData,
         static_cast<unsigned int>(m_context->accelStructs.getSubInstanceData().size()),
@@ -457,6 +467,26 @@ void caustica::render::WorldRenderer::framePassShaderUpdate(PathTracingFrameCont
         // needNewPasses covers resize/bindings and must NOT force RT PSO recreation after
         // runtime import (that recreates DXR state objects and can hang close).
         ctx.forcePathTracingShaderReload);
+
+    if (m_rtPipelineCache)
+    {
+        // Block only for the active preset (startup / first switch to a cold preset).
+        // No modal ProgressBar — remaining presets warm via tickIdleWarmup + HUD status.
+        m_context->scenePasses.rayTracing.ensureFeaturePresetReady(
+            desiredPreset,
+            /*showProgress=*/false);
+
+        const auto warmStatus = m_rtPipelineCache->warmupStatus();
+        if (!warmStatus.active && warmStatus.completed < warmStatus.total)
+            m_rtPipelineCache->scheduleBackgroundWarmup(desiredPreset);
+
+        // One preset per frame after the active path is ready.
+        if (m_rtPipelineCache->isReady(desiredPreset))
+            m_rtPipelineCache->tickIdleWarmup(1);
+
+        m_context->diagnostics.rtPipelineWarmup = m_rtPipelineCache->warmupStatus();
+        m_context->diagnostics.rtPipelineCacheStats = m_rtPipelineCache->stats();
+    }
 
     if (m_context->scenePasses.lighting.computePipelines())
         m_context->scenePasses.lighting.computePipelines()->update(ctx.needNewPasses);

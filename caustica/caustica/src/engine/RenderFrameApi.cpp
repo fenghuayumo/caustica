@@ -223,7 +223,8 @@ void animate(App& app, float fElapsedTimeSeconds)
         if (runtime->Invalidation.ShaderAndACRefreshDelayedRequest <= 0)
         {
             runtime->Invalidation.ShaderAndACRefreshDelayedRequest = 0;
-            runtime->Invalidation.ShaderReloadRequested = true;
+            // UE-style RT pipeline cache: delayed material/scene edits must not CreateStateObject.
+            // Only refresh acceleration structures; SBT remap happens on the frozen-PSO path.
             runtime->Invalidation.AccelerationStructRebuildRequested = true;
         }
     }

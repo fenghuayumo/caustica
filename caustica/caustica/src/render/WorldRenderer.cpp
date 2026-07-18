@@ -24,6 +24,7 @@ namespace { constexpr int c_SwapchainCount = 3; }
 #include <render/core/AccelStructManager.h>
 #include <render/core/CameraController.h>
 #include <render/core/PathTracingShaderCompiler.h>
+#include <render/core/RtPipelineCache.h>
 #include <render/core/ComputePipelineRegistry.h>
 #include <render/core/BindingCache.h>
 #include <scene/View.h>
@@ -441,6 +442,7 @@ void caustica::render::WorldRenderer::onSceneUnloading()
     m_gaussianSplatEmissionProxies.clear();
     if (m_rtxdiPass != nullptr)
         m_rtxdiPass->reset();
+    m_rtPipelineCache = nullptr;
     m_pathTracingShaderCompiler = nullptr;
     m_ptPipelineReference = nullptr;
     m_ptPipelineBuildStablePlanes = nullptr;
