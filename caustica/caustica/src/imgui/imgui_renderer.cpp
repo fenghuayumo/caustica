@@ -1,6 +1,8 @@
 #include <imgui/imgui_renderer.h>
 #include <core/vfs/VFS.h>
 
+#include <algorithm>
+
 using namespace caustica;
 
 ImGui_Renderer::ImGui_Renderer(GpuDevice *devManager)
@@ -176,6 +178,33 @@ std::shared_ptr<RegisteredFont> ImGui_Renderer::createFontFromFile(IFileSystem& 
     return font;
 }
 
+void ImGui_Renderer::setDefaultFont(std::shared_ptr<RegisteredFont> font)
+{
+    if (!font || !font->hasFontData())
+        return;
+
+    if (m_defaultFont && m_defaultFont != font)
+    {
+        m_fonts.erase(
+            std::remove(m_fonts.begin(), m_fonts.end(), m_defaultFont),
+            m_fonts.end());
+    }
+
+    m_defaultFont = std::move(font);
+
+    auto it = std::find(m_fonts.begin(), m_fonts.end(), m_defaultFont);
+    if (it == m_fonts.end())
+    {
+        m_fonts.insert(m_fonts.begin(), m_defaultFont);
+    }
+    else if (it != m_fonts.begin())
+    {
+        auto held = *it;
+        m_fonts.erase(it);
+        m_fonts.insert(m_fonts.begin(), std::move(held));
+    }
+}
+
 std::shared_ptr<RegisteredFont> ImGui_Renderer::createFontFromMemoryInternal(void const* pData, size_t size,
     bool compressed, float fontSize)
 {
@@ -338,6 +367,11 @@ void RegisteredFont::createScaledFont(float displayScale)
 {
     ImFontConfig fontConfig;
     fontConfig.SizePixels = m_sizeAtDefaultScale * displayScale;
+    fontConfig.OversampleH = 2;
+    fontConfig.OversampleV = 1;
+    fontConfig.PixelSnapH = true;
+    // Slight brighten helps thin UI fonts stay readable on dark themes.
+    fontConfig.RasterizerMultiply = 1.05f;
 
     m_imFont = nullptr;
 

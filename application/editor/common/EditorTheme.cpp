@@ -15,19 +15,20 @@ ImVec4 WithAlpha(const ImVec4& c, float a)
     return ImVec4(c.x, c.y, c.z, a);
 }
 
+// Cool graphite shell + clear cyan accent (readable with proportional UI fonts).
 const EditorColors kColors = {
-    /* Text */               Rgba(232, 234, 237),
-    /* TextMuted */          Rgba(154, 160, 166),
-    /* TextWarning */        Rgba(232, 168, 120),
-    /* TextCategory */       Rgba(126, 200, 175),
+    /* Text */               Rgba(236, 238, 241),
+    /* TextMuted */          Rgba(148, 154, 162),
+    /* TextWarning */        Rgba(236, 176, 112),
+    /* TextCategory */       Rgba(120, 196, 176),
 
-    /* Accent */             Rgba(61, 158, 173),
-    /* AccentHovered */      Rgba(80, 180, 196),
-    /* AccentActive */       Rgba(45, 130, 145),
+    /* Accent */             Rgba(72, 168, 184),
+    /* AccentHovered */      Rgba(98, 192, 206),
+    /* AccentActive */       Rgba(52, 140, 156),
 
-    /* ToolbarIdle */        Rgba(42, 47, 54, 0.85f),
-    /* ToolbarIdleHovered */ Rgba(58, 64, 72, 0.95f),
-    /* ToolbarIdleActive */  Rgba(61, 158, 173, 0.55f),
+    /* ToolbarIdle */        Rgba(38, 42, 48, 0.88f),
+    /* ToolbarIdleHovered */ Rgba(54, 60, 68, 0.95f),
+    /* ToolbarIdleActive */  Rgba(72, 168, 184, 0.50f),
 };
 
 float Scaled(float value, float displayScale)
@@ -60,96 +61,103 @@ void ApplyEditorTheme(float displayScale)
     const float fontScaleDpi = style.FontScaleDpi;
     const float nextFrameFontSizeBase = style._NextFrameFontSizeBase;
 
-    // Geometry — write absolute scaled values (do not call ScaleAllSizes).
-    style.WindowRounding = Scaled(4.0f, displayScale);
-    style.ChildRounding = Scaled(3.0f, displayScale);
+    // Flat DCC shell tuned for proportional UI type.
+    style.WindowRounding = 0.0f;
+    style.ChildRounding = 0.0f;
     style.FrameRounding = Scaled(3.0f, displayScale);
-    style.PopupRounding = Scaled(3.0f, displayScale);
+    style.PopupRounding = Scaled(4.0f, displayScale);
     style.ScrollbarRounding = Scaled(3.0f, displayScale);
-    style.GrabRounding = Scaled(2.0f, displayScale);
-    style.TabRounding = Scaled(3.0f, displayScale);
+    style.GrabRounding = Scaled(3.0f, displayScale);
+    style.TabRounding = 0.0f;
 
-    style.WindowPadding = Scaled(ImVec2(10.0f, 10.0f), displayScale);
+    style.WindowPadding = Scaled(ImVec2(10.0f, 8.0f), displayScale);
     style.FramePadding = Scaled(ImVec2(8.0f, 4.0f), displayScale);
     style.CellPadding = Scaled(ImVec2(6.0f, 3.0f), displayScale);
-    style.ItemSpacing = Scaled(ImVec2(8.0f, 6.0f), displayScale);
-    style.ItemInnerSpacing = Scaled(ImVec2(6.0f, 4.0f), displayScale);
+    style.ItemSpacing = Scaled(ImVec2(8.0f, 5.0f), displayScale);
+    style.ItemInnerSpacing = Scaled(ImVec2(5.0f, 4.0f), displayScale);
     style.IndentSpacing = Scaled(16.0f, displayScale);
-    style.ScrollbarSize = Scaled(12.0f, displayScale);
-    style.GrabMinSize = Scaled(10.0f, displayScale);
+    style.ScrollbarSize = Scaled(11.0f, displayScale);
+    style.GrabMinSize = Scaled(9.0f, displayScale);
 
-    style.WindowBorderSize = 1.0f;
-    style.ChildBorderSize = 1.0f;
+    style.WindowBorderSize = 0.0f;
+    style.ChildBorderSize = 0.0f;
     style.PopupBorderSize = 1.0f;
     style.FrameBorderSize = 0.0f;
     style.TabBorderSize = 0.0f;
+    style.TabBarBorderSize = 0.0f;
+    style.TabBarOverlineSize = Scaled(2.0f, displayScale);
+    style.DockingSeparatorSize = Scaled(1.0f, displayScale);
 
     style.WindowTitleAlign = ImVec2(0.02f, 0.5f);
-    style.WindowMenuButtonPosition = ImGuiDir_Left;
+    style.WindowMenuButtonPosition = ImGuiDir_None;
     style.ColorButtonPosition = ImGuiDir_Right;
     style.ButtonTextAlign = ImVec2(0.5f, 0.5f);
+    style.TabCloseButtonMinWidthSelected = 0.0f;
+    style.TabCloseButtonMinWidthUnselected = 0.0f;
 
-    // Palette — cool neutral dark + teal accent
-    const ImVec4 bg0 = Rgba(26, 29, 33);
-    const ImVec4 bg1 = Rgba(34, 38, 43);
-    const ImVec4 bg2 = Rgba(42, 47, 54);
-    const ImVec4 bg3 = Rgba(48, 54, 62);
+    const ImVec4 bg0 = Rgba(24, 26, 29);
+    const ImVec4 bg1 = Rgba(30, 33, 37);
+    const ImVec4 bg2 = Rgba(38, 42, 47);
+    const ImVec4 bg3 = Rgba(46, 51, 57);
     const ImVec4 border = Rgba(58, 64, 72);
-    const ImVec4 separator = Rgba(58, 64, 72, 0.85f);
+    const ImVec4 separator = Rgba(44, 48, 54, 1.0f);
 
     const EditorColors& col = kColors;
     ImVec4* c = style.Colors;
 
     c[ImGuiCol_Text] = col.Text;
-    c[ImGuiCol_TextDisabled] = Rgba(120, 126, 134);
-    c[ImGuiCol_WindowBg] = WithAlpha(bg0, 0.96f);
-    c[ImGuiCol_ChildBg] = WithAlpha(bg1, 0.0f);
+    c[ImGuiCol_TextDisabled] = Rgba(118, 124, 132);
+    c[ImGuiCol_WindowBg] = WithAlpha(bg0, 1.0f);
+    c[ImGuiCol_ChildBg] = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
     c[ImGuiCol_PopupBg] = WithAlpha(bg2, 0.98f);
-    c[ImGuiCol_Border] = WithAlpha(border, 0.70f);
+    c[ImGuiCol_Border] = WithAlpha(border, 0.45f);
     c[ImGuiCol_BorderShadow] = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
 
-    c[ImGuiCol_FrameBg] = WithAlpha(bg2, 0.90f);
-    c[ImGuiCol_FrameBgHovered] = Rgba(58, 64, 72, 0.95f);
-    c[ImGuiCol_FrameBgActive] = WithAlpha(col.Accent, 0.35f);
+    c[ImGuiCol_FrameBg] = WithAlpha(bg2, 1.0f);
+    c[ImGuiCol_FrameBgHovered] = Rgba(52, 58, 66, 1.0f);
+    c[ImGuiCol_FrameBgActive] = WithAlpha(col.Accent, 0.30f);
 
     c[ImGuiCol_TitleBg] = WithAlpha(bg1, 1.0f);
-    c[ImGuiCol_TitleBgActive] = WithAlpha(bg3, 1.0f);
-    c[ImGuiCol_TitleBgCollapsed] = WithAlpha(bg1, 0.85f);
+    c[ImGuiCol_TitleBgActive] = WithAlpha(bg1, 1.0f);
+    c[ImGuiCol_TitleBgCollapsed] = WithAlpha(bg1, 1.0f);
 
     c[ImGuiCol_MenuBarBg] = WithAlpha(bg1, 1.0f);
 
-    c[ImGuiCol_ScrollbarBg] = WithAlpha(bg0, 0.60f);
-    c[ImGuiCol_ScrollbarGrab] = Rgba(72, 80, 90, 0.90f);
+    c[ImGuiCol_ScrollbarBg] = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
+    c[ImGuiCol_ScrollbarGrab] = Rgba(72, 80, 90, 0.80f);
     c[ImGuiCol_ScrollbarGrabHovered] = Rgba(96, 106, 118, 0.95f);
-    c[ImGuiCol_ScrollbarGrabActive] = WithAlpha(col.Accent, 0.85f);
+    c[ImGuiCol_ScrollbarGrabActive] = WithAlpha(col.Accent, 0.80f);
 
-    c[ImGuiCol_CheckMark] = col.Accent;
+    c[ImGuiCol_CheckMark] = col.AccentHovered;
     c[ImGuiCol_SliderGrab] = WithAlpha(col.Accent, 0.85f);
     c[ImGuiCol_SliderGrabActive] = col.AccentHovered;
 
-    c[ImGuiCol_Button] = WithAlpha(bg3, 0.90f);
-    c[ImGuiCol_ButtonHovered] = WithAlpha(col.Accent, 0.55f);
-    c[ImGuiCol_ButtonActive] = WithAlpha(col.Accent, 0.80f);
+    c[ImGuiCol_Button] = WithAlpha(bg3, 1.0f);
+    c[ImGuiCol_ButtonHovered] = WithAlpha(col.Accent, 0.42f);
+    c[ImGuiCol_ButtonActive] = WithAlpha(col.Accent, 0.68f);
 
-    c[ImGuiCol_Header] = WithAlpha(col.Accent, 0.28f);
-    c[ImGuiCol_HeaderHovered] = WithAlpha(col.Accent, 0.45f);
-    c[ImGuiCol_HeaderActive] = WithAlpha(col.Accent, 0.60f);
+    c[ImGuiCol_Header] = WithAlpha(bg3, 0.90f);
+    c[ImGuiCol_HeaderHovered] = WithAlpha(col.Accent, 0.28f);
+    c[ImGuiCol_HeaderActive] = WithAlpha(col.Accent, 0.42f);
 
     c[ImGuiCol_Separator] = separator;
-    c[ImGuiCol_SeparatorHovered] = WithAlpha(col.Accent, 0.70f);
+    c[ImGuiCol_SeparatorHovered] = WithAlpha(col.Accent, 0.55f);
     c[ImGuiCol_SeparatorActive] = col.Accent;
 
-    c[ImGuiCol_ResizeGrip] = WithAlpha(col.Accent, 0.20f);
-    c[ImGuiCol_ResizeGripHovered] = WithAlpha(col.Accent, 0.50f);
-    c[ImGuiCol_ResizeGripActive] = WithAlpha(col.Accent, 0.75f);
+    c[ImGuiCol_ResizeGrip] = WithAlpha(col.Accent, 0.10f);
+    c[ImGuiCol_ResizeGripHovered] = WithAlpha(col.Accent, 0.40f);
+    c[ImGuiCol_ResizeGripActive] = WithAlpha(col.Accent, 0.65f);
 
-    c[ImGuiCol_Tab] = WithAlpha(bg2, 0.90f);
-    c[ImGuiCol_TabHovered] = WithAlpha(col.Accent, 0.55f);
-    c[ImGuiCol_TabSelected] = WithAlpha(col.Accent, 0.40f);
+    c[ImGuiCol_Tab] = WithAlpha(bg1, 1.0f);
+    c[ImGuiCol_TabHovered] = WithAlpha(bg3, 1.0f);
+    c[ImGuiCol_TabSelected] = WithAlpha(bg0, 1.0f);
     c[ImGuiCol_TabSelectedOverline] = col.Accent;
-    c[ImGuiCol_TabDimmed] = WithAlpha(bg1, 0.90f);
-    c[ImGuiCol_TabDimmedSelected] = WithAlpha(col.Accent, 0.30f);
-    c[ImGuiCol_TabDimmedSelectedOverline] = WithAlpha(col.Accent, 0.60f);
+    c[ImGuiCol_TabDimmed] = WithAlpha(bg1, 1.0f);
+    c[ImGuiCol_TabDimmedSelected] = WithAlpha(bg0, 1.0f);
+    c[ImGuiCol_TabDimmedSelectedOverline] = WithAlpha(col.Accent, 0.75f);
+
+    c[ImGuiCol_DockingPreview] = WithAlpha(col.Accent, 0.32f);
+    c[ImGuiCol_DockingEmptyBg] = WithAlpha(bg0, 1.0f);
 
     c[ImGuiCol_PlotLines] = col.Accent;
     c[ImGuiCol_PlotLinesHovered] = col.AccentHovered;
@@ -157,15 +165,15 @@ void ApplyEditorTheme(float displayScale)
     c[ImGuiCol_PlotHistogramHovered] = col.AccentHovered;
 
     c[ImGuiCol_TableHeaderBg] = WithAlpha(bg3, 1.0f);
-    c[ImGuiCol_TableBorderStrong] = WithAlpha(border, 0.90f);
-    c[ImGuiCol_TableBorderLight] = WithAlpha(border, 0.50f);
+    c[ImGuiCol_TableBorderStrong] = WithAlpha(border, 0.70f);
+    c[ImGuiCol_TableBorderLight] = WithAlpha(border, 0.35f);
     c[ImGuiCol_TableRowBg] = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
-    c[ImGuiCol_TableRowBgAlt] = Rgba(255, 255, 255, 0.03f);
+    c[ImGuiCol_TableRowBgAlt] = Rgba(255, 255, 255, 0.025f);
 
     c[ImGuiCol_TextLink] = col.AccentHovered;
     c[ImGuiCol_TextSelectedBg] = WithAlpha(col.Accent, 0.35f);
     c[ImGuiCol_InputTextCursor] = col.Text;
-    c[ImGuiCol_TreeLines] = WithAlpha(border, 0.80f);
+    c[ImGuiCol_TreeLines] = WithAlpha(border, 0.65f);
 
     c[ImGuiCol_DragDropTarget] = WithAlpha(col.AccentHovered, 0.90f);
     c[ImGuiCol_NavCursor] = col.Accent;
@@ -173,7 +181,6 @@ void ApplyEditorTheme(float displayScale)
     c[ImGuiCol_NavWindowingDimBg] = Rgba(0, 0, 0, 0.45f);
     c[ImGuiCol_ModalWindowDimBg] = Rgba(0, 0, 0, 0.55f);
 
-    // Restore font metrics wiped only if a caller ever did a full style assign.
     style.FontSizeBase = fontSizeBase;
     style.FontScaleMain = fontScaleMain;
     style.FontScaleDpi = fontScaleDpi;

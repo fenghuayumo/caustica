@@ -39,7 +39,7 @@ namespace caustica::editor
 #include <backend/GpuDevice.h>
 void EditorUI::BuildSystemPanel(const PanelLayout& layout)
 {
-        if (ImGui::CollapsingHeader("System")) //, ImGuiTreeNodeFlags_DefaultOpen))
+        if (ImGui::CollapsingHeader("System", ImGuiTreeNodeFlags_DefaultOpen))
         {
             RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
             if (ImGui::Button("Reload Shaders (requires VS .hlsl->.bin build)"))
@@ -94,7 +94,7 @@ void EditorUI::BuildSystemPanel(const PanelLayout& layout)
 
 void EditorUI::BuildCameraPanel(const PanelLayout& layout)
 {
-        if (ImGui::CollapsingHeader("Camera", 0/*ImGuiTreeNodeFlags_DefaultOpen*/))
+        if (ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen))
         {
             RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
             std::vector<std::string> options; options.push_back("free flight");

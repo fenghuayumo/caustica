@@ -21,6 +21,27 @@ struct TogglableNode
     void SetSelected(bool selected);
 };
 
+struct EditorViewportState
+{
+    bool ShowViewport = true;
+    bool ShowHierarchy = true;
+    bool ShowRenderSettings = true;
+    bool ShowStatusBar = true;
+    // Set by menu / first-run; consumed once by BuildDockSpace().
+    bool RequestResetDockLayout = false;
+
+    // Content-region screen rect (ImGui coordinates) filled by BuildViewportPanel.
+    float PosX = 0.f;
+    float PosY = 0.f;
+    float SizeX = 0.f;
+    float SizeY = 0.f;
+    uint32_t DesiredWidth = 0;
+    uint32_t DesiredHeight = 0;
+    bool Hovered = false;
+    bool Focused = false;
+    bool RectValid = false;
+};
+
 struct EditorWindowState
 {
     bool ShowUI = true;
@@ -30,6 +51,7 @@ struct EditorWindowState
     bool ShowDeltaTree = false;
     bool ShowMaterialEditor = true;
     bool ShowInspector = true;
+    EditorViewportState Viewport;
 };
 
 struct EditorSelectionState

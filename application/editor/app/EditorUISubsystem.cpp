@@ -2,12 +2,16 @@
 
 #include "SceneEditor.h"
 #include <EditorUI.h>
+#include "common/EditorViewport.h"
 #include <imgui/imgui_renderer.h>
 
 #include <engine/App.h>
 #include <engine/GpuSharedCaches.h>
+#include <engine/RenderFramebufferOverride.h>
 #include <platform/window.h>
 #include <render/passes/debug/ZoomTool.h>
+#include <backend/GpuDevice.h>
+#include <backend/rhi/utils.h>
 
 namespace caustica::editor
 {
@@ -35,6 +39,9 @@ void EditorUISubsystem::startup(caustica::GpuDevice& gpuDevice, caustica::Window
         serSupported,
         m_config.cmdLine);
     m_ui->init(gpuSharedCaches->shaderFactory);
+    m_viewport = std::make_unique<EditorViewport>();
+
+    app.emplaceResource<caustica::RenderFramebufferOverride>();
 
     if (caustica::Window* platformWindow = gpuDevice.getPlatformWindow())
     {
@@ -51,6 +58,11 @@ void EditorUISubsystem::startup(caustica::GpuDevice& gpuDevice, caustica::Window
 
 void EditorUISubsystem::shutdown()
 {
+    if (auto* overrideFb = m_config.app.tryResource<caustica::RenderFramebufferOverride>())
+        overrideFb->framebuffer = nullptr;
+    if (m_viewport)
+        m_viewport->release();
+    m_viewport.reset();
     m_ui.reset();
 }
 
@@ -64,26 +76,68 @@ void EditorUISubsystem::animateScheduled(float elapsedTimeSeconds, bool windowFo
         ui.animate(elapsedTimeSeconds);
 }
 
+void EditorUISubsystem::prepareViewportForRender(caustica::GpuDevice& gpuDevice)
+{
+    auto* overrideFb = m_config.app.tryResource<caustica::RenderFramebufferOverride>();
+    if (!overrideFb || !m_viewport || !m_ui)
+        return;
+
+    const auto& vp = m_config.editorUiData.editor.Viewport;
+    if (!vp.ShowViewport || !vp.RectValid || vp.DesiredWidth < 16 || vp.DesiredHeight < 16)
+    {
+        overrideFb->framebuffer = nullptr;
+        m_ui->setViewportColorTexture(nullptr);
+        return;
+    }
+
+    m_viewport->ensureSize(gpuDevice, vp.DesiredWidth, vp.DesiredHeight);
+    if (!m_viewport->isValid())
+    {
+        overrideFb->framebuffer = nullptr;
+        m_ui->setViewportColorTexture(nullptr);
+        return;
+    }
+
+    overrideFb->framebuffer = m_viewport->framebuffer();
+    m_ui->setViewportColorTexture(m_viewport->colorTexture());
+}
+
 void EditorUISubsystem::renderSceneScheduled(caustica::GpuDevice& gpuDevice)
 {
     if (!m_ui)
         return;
 
-    nvrhi::IFramebuffer* framebuffer = gpuDevice.getCurrentFramebuffer(m_ui->supportsDepthBuffer());
+    nvrhi::IFramebuffer* swapchainFb = gpuDevice.getCurrentFramebuffer(m_ui->supportsDepthBuffer());
+
+    // Clear the window back buffer to editor chrome background; scene lives in the viewport texture.
+    if (swapchainFb && m_viewport && m_viewport->isValid())
+    {
+        nvrhi::CommandListHandle cmd = gpuDevice.getDevice()->createCommandList();
+        cmd->open();
+        nvrhi::utils::ClearColorAttachment(cmd, swapchainFb, 0, nvrhi::Color(0.08f, 0.09f, 0.11f, 1.f));
+        cmd->close();
+        gpuDevice.getDevice()->executeCommandList(cmd);
+    }
+
     if (ZoomTool* zoom = m_config.sceneEditor.getOrCreateZoomTool())
     {
         if (zoom->enabled())
         {
-            nvrhi::ITexture* color = framebuffer->getDesc().colorAttachments[0].texture;
-            nvrhi::CommandListHandle commandList = gpuDevice.getDevice()->createCommandList();
-            commandList->open();
-            zoom->render(commandList, color);
-            commandList->close();
-            gpuDevice.getDevice()->executeCommandList(commandList);
+            nvrhi::ITexture* color = (m_viewport && m_viewport->isValid())
+                ? m_viewport->colorTexture()
+                : (swapchainFb ? swapchainFb->getDesc().colorAttachments[0].texture : nullptr);
+            if (color)
+            {
+                nvrhi::CommandListHandle commandList = gpuDevice.getDevice()->createCommandList();
+                commandList->open();
+                zoom->render(commandList, color);
+                commandList->close();
+                gpuDevice.getDevice()->executeCommandList(commandList);
+            }
         }
     }
 
-    m_ui->render(framebuffer);
+    m_ui->render(swapchainFb);
 }
 
 void EditorUISubsystem::onBackBufferResizing()

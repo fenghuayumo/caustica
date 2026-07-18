@@ -3,6 +3,7 @@
 #include <engine/SceneViewState.h>
 #include <cassert>
 #include <engine/RenderFrameApi.h>
+#include <engine/RenderFramebufferOverride.h>
 #include <engine/GpuSharedCaches.h>
 #include <engine/SceneQuery.h>
 #include <engine/SceneLifecycle.h>
@@ -193,7 +194,14 @@ void renderScene(App& app, GpuDevice& gpuDevice)
     if (!wr)
         return;
 
-    wr->render(gpuDevice.getCurrentFramebuffer(true));
+    nvrhi::IFramebuffer* target = gpuDevice.getCurrentFramebuffer(true);
+    if (auto* overrideFb = app.tryResource<RenderFramebufferOverride>();
+        overrideFb && overrideFb->framebuffer)
+    {
+        target = overrideFb->framebuffer;
+    }
+
+    wr->render(target);
     recordFrameTiming(app, gpuDevice);
 }
 

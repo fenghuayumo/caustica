@@ -156,7 +156,7 @@ void EditorUI::DLSSFGSelectorUI()
 
 void EditorUI::BuildDisplayPerformancePanel(const PanelLayout& layout)
 {
-        if (ImGui::CollapsingHeader("display and performance")) //, ImGuiTreeNodeFlags_DefaultOpen))
+        if (ImGui::CollapsingHeader("display and performance", ImGuiTreeNodeFlags_DefaultOpen))
         {
             RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
             

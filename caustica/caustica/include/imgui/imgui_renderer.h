@@ -110,6 +110,10 @@ namespace caustica
         // Returns the default font.
         std::shared_ptr<RegisteredFont> getDefaultFont() { return m_defaultFont; }
 
+        // Promote a loaded font to the UI default (Fonts[0] / PushFont target).
+        // Removes the placeholder Proggy font if it is still installed.
+        void setDefaultFont(std::shared_ptr<RegisteredFont> font);
+
         virtual void animate(float elapsedTimeSeconds);
         virtual void render(nvrhi::IFramebuffer* framebuffer);
         virtual void backBufferResizing();

@@ -35,7 +35,7 @@ namespace caustica::editor
 
 void EditorUI::BuildOpacityMicroMapsPanel(const PanelLayout& layout)
 {
-        if (ImGui::CollapsingHeader("Opacity Micro-Maps"))
+        if (ImGui::CollapsingHeader("Opacity Micro-Maps", ImGuiTreeNodeFlags_DefaultOpen))
         {
             UI_SCOPED_INDENT(layout.indent);
 
@@ -59,7 +59,7 @@ void EditorUI::BuildOpacityMicroMapsPanel(const PanelLayout& layout)
 
 void EditorUI::BuildAccelerationStructurePanel(const PanelLayout& layout)
 {
-        if (ImGui::CollapsingHeader("Acceleration Structure"))
+        if (ImGui::CollapsingHeader("Acceleration Structure", ImGuiTreeNodeFlags_DefaultOpen))
         {
             UI_SCOPED_INDENT(layout.indent);
 
@@ -92,7 +92,7 @@ void EditorUI::BuildAccelerationStructurePanel(const PanelLayout& layout)
 
 void EditorUI::BuildPostProcessPanel(const PanelLayout& layout)
 {
-        if (ImGui::CollapsingHeader("Post-process"))
+        if (ImGui::CollapsingHeader("Post-process", ImGuiTreeNodeFlags_DefaultOpen))
         {
             RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
 
@@ -195,7 +195,7 @@ void EditorUI::BuildPostProcessPanel(const PanelLayout& layout)
 void EditorUI::BuildDebuggingPanel(const PanelLayout& layout)
 {
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.8f, 0.5, 1.0f));
-        bool debuggingIsOpen = ImGui::CollapsingHeader("Debugging"); //, ImGuiTreeNodeFlags_DefaultOpen ) )
+        bool debuggingIsOpen = ImGui::CollapsingHeader("Debugging", ImGuiTreeNodeFlags_DefaultOpen);
         ImGui::PopStyleColor(1);
         if (debuggingIsOpen)
         {

@@ -18,8 +18,9 @@ struct CommandLineOptions
     bool nonInteractive = false;
     bool noWindow = false;
     bool debug = false;
-    uint32_t width = 1920;
-    uint32_t height = 1080;
+    // Defaults leave room for OS window chrome on common 1080p displays.
+    uint32_t width = 1600;
+    uint32_t height = 900;
     bool fullscreen = false;
     std::string adapter;
     std::string graphicsBackend;

@@ -7,6 +7,7 @@
 #include <events/application_event.h>
 
 #include <GLFW/glfw3.h>
+#include <algorithm>
 #include <cstdio>
 
 #ifdef _WIN32
@@ -120,7 +121,25 @@ bool GlfwWindow::initialise(const WindowDesc& desc)
         setIcon(desc);
     }
 
-    // Position the window if requested
+    // Windowed mode: center on the primary monitor work area so the title bar
+    // (and close button) stays visible instead of sitting off-screen.
+    if (!desc.Fullscreen)
+    {
+        if (GLFWmonitor* monitor = glfwGetPrimaryMonitor())
+        {
+            int workX = 0, workY = 0, workW = 0, workH = 0;
+            glfwGetMonitorWorkarea(monitor, &workX, &workY, &workW, &workH);
+            int winW = 0, winH = 0;
+            glfwGetWindowSize(m_Window, &winW, &winH);
+            if (workW > 0 && workH > 0 && winW > 0 && winH > 0)
+            {
+                const int posX = workX + std::max(0, (workW - winW) / 2);
+                const int posY = workY + std::max(0, (workH - winH) / 2);
+                glfwSetWindowPos(m_Window, posX, posY);
+            }
+        }
+    }
+
     glfwShowWindow(m_Window);
 
     m_Init = true;

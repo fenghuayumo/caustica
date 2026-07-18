@@ -73,7 +73,7 @@ bool EditorUI::BuildSceneComboPanel(const PanelLayout& layout)
 
 void EditorUI::BuildScenePanel(const PanelLayout& layout)
 {
-        if (ImGui::CollapsingHeader("Scene"/*, ImGuiTreeNodeFlags_DefaultOpen*/))
+        if (ImGui::CollapsingHeader("Scene", ImGuiTreeNodeFlags_DefaultOpen))
         {
             RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
             uint uncompressedTextureCount = (uint)m_sceneEditor.uncompressedTextures().size();
@@ -470,9 +470,8 @@ void EditorUI::BuildSceneWidgetsPanel(const PanelLayout& layout)
 void EditorUI::BuildHierarchyPanel(const PanelLayout& layout)
 {
     {
-        ImGui::SetNextWindowPos(ImVec2(20.f + layout.defWindowWidth, 10.f), ImGuiCond_Appearing);
-        ImGui::SetNextWindowSize(ImVec2(layout.defWindowWidth, layout.scaledHeight * 0.45f), ImGuiCond_Appearing);
-        RAII_SCOPE(ImGui::Begin("Hierarchy", nullptr, ImGuiWindowFlags_None);, ImGui::End(););
+        (void)layout;
+        RAII_SCOPE(ImGui::Begin("Hierarchy", &m_editorUI.Viewport.ShowHierarchy, ImGuiWindowFlags_None);, ImGui::End(););
 
         auto scene = caustica::activeScene(*m_sceneEditor.app());
         auto* ew = caustica::entityWorld(*m_sceneEditor.app());

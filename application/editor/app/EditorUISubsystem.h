@@ -16,6 +16,7 @@ namespace caustica::editor
 
 class EditorUI;
 class EditorUIData;
+class EditorViewport;
 class SceneEditor;
 
 struct EditorUISubsystemConfig
@@ -36,6 +37,8 @@ public:
     void shutdown();
 
     void animateScheduled(float elapsedTimeSeconds, bool windowFocused);
+    // Prepare viewport FB + RenderFramebufferOverride before WorldRenderer::render.
+    void prepareViewportForRender(caustica::GpuDevice& gpuDevice);
     void renderSceneScheduled(caustica::GpuDevice& gpuDevice);
     void onBackBufferResizing();
     void onBackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount);
@@ -45,6 +48,7 @@ public:
 private:
     EditorUISubsystemConfig m_config;
     std::unique_ptr<EditorUI> m_ui;
+    std::unique_ptr<EditorViewport> m_viewport;
 };
 
 } // namespace caustica::editor

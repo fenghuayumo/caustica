@@ -1,3 +1,4 @@
+#include <algorithm>
 #include "EditorInputRouter.h"
 
 #include "SceneEditor.h"
@@ -22,6 +23,16 @@ namespace caustica::editor
 
 namespace
 {
+bool uiCapturesMouseForEditor(const SceneEditor& sceneEditor)
+{
+    // Viewport canvas is an ImGui item, but camera/gizmo must still receive mouse there.
+    if (!ImGui::GetIO().WantCaptureMouse)
+        return false;
+    if (sceneEditor.editorUIState().Viewport.Hovered)
+        return false;
+    return true;
+}
+
 inline constexpr int ToGlfwKey(caustica::KeyCode k) { return static_cast<int>(k); }
 inline constexpr int ToGlfwMouse(caustica::MouseCode m) { return static_cast<int>(m); }
 inline constexpr int ToGlfwMods(caustica::ModifierKey m) { return static_cast<int>(m); }
@@ -58,12 +69,22 @@ void syncPickPositionFromCursor(SceneEditor& sceneEditor)
     double cursorY = 0.0;
     glfwGetCursorPos(window, &cursorX, &cursorY);
 
-    // Keep display/window space here. Path-trace pick pixels are derived later
-    // from this frame's settled renderSize (after DLSS), not from a live
-    // WorldRenderer::getRenderSize() that the render thread mutates mid-frame.
+    // Map window cursor into viewport-local display pixels when the true viewport is active.
+    // Path-trace pick pixels are derived later from this frame's settled renderSize (after DLSS).
+    const auto& vp = sceneEditor.editorUIState().Viewport;
+    double pickX = cursorX;
+    double pickY = cursorY;
+    if (vp.RectValid && vp.SizeX > 1.f && vp.SizeY > 1.f)
+    {
+        pickX = cursorX - static_cast<double>(vp.PosX);
+        pickY = cursorY - static_cast<double>(vp.PosY);
+        pickX = std::clamp(pickX, 0.0, static_cast<double>(vp.SizeX) - 1.0);
+        pickY = std::clamp(pickY, 0.0, static_cast<double>(vp.SizeY) - 1.0);
+    }
+
     session.runtime.Picking.Position = dm::uint2{
-        static_cast<uint>(cursorX),
-        static_cast<uint>(cursorY)};
+        static_cast<uint>(pickX),
+        static_cast<uint>(pickY)};
     session.settings.MousePos = session.runtime.Picking.Position;
     session.settings.DebugPixel = session.runtime.Picking.Position;
 }
@@ -156,7 +177,7 @@ bool onKeyTyped(SceneEditor& /*sceneEditor*/, caustica::KeyTypedEvent& e)
 
 bool onMouseMoved(SceneEditor& sceneEditor, caustica::MouseMovedEvent& e)
 {
-    if (ImGui::GetIO().WantCaptureMouse || gizmoCapturesInput(sceneEditor))
+    if (uiCapturesMouseForEditor(sceneEditor) || gizmoCapturesInput(sceneEditor))
         return false;
 
     auto* camera = caustica::editor::editorCamera(sceneEditor);
@@ -185,7 +206,7 @@ bool onMouseMoved(SceneEditor& sceneEditor, caustica::MouseMovedEvent& e)
 
 bool onMouseButtonPressed(SceneEditor& sceneEditor, caustica::MouseButtonPressedEvent& e)
 {
-    if (ImGui::GetIO().WantCaptureMouse || gizmoCapturesInput(sceneEditor))
+    if (uiCapturesMouseForEditor(sceneEditor) || gizmoCapturesInput(sceneEditor))
         return false;
 
     auto* camera = caustica::editor::editorCamera(sceneEditor);
@@ -225,7 +246,7 @@ bool onMouseButtonPressed(SceneEditor& sceneEditor, caustica::MouseButtonPressed
 
 bool onMouseButtonReleased(SceneEditor& sceneEditor, caustica::MouseButtonReleasedEvent& e)
 {
-    if (ImGui::GetIO().WantCaptureMouse || gizmoCapturesInput(sceneEditor))
+    if (uiCapturesMouseForEditor(sceneEditor) || gizmoCapturesInput(sceneEditor))
         return false;
 
     auto* camera = caustica::editor::editorCamera(sceneEditor);
@@ -251,7 +272,7 @@ bool onMouseScrolled(SceneEditor& sceneEditor, caustica::MouseScrolledEvent& e)
 {
     ImGuiIO& io = ImGui::GetIO();
     io.AddMouseWheelEvent(static_cast<float>(e.getXOffset()), static_cast<float>(e.getYOffset()));
-    if (io.WantCaptureMouse)
+    if (uiCapturesMouseForEditor(sceneEditor))
         return true;
 
     auto* game = sceneEditor.game().get();

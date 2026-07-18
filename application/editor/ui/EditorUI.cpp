@@ -134,8 +134,14 @@ void EditorUI::buildUI(void)
         }
     }
 
+    BuildMainMenuBar();
+    BuildDockSpace();
+
     if (!m_editorUI.ShowUI)
+    {
+        BuildStatusBar();
         return;
+    }
 
     RAII_SCOPE( ImGui::PushFont(m_defaultFont->getScaledFont());, ImGui::PopFont(); );
 
@@ -147,25 +153,33 @@ void EditorUI::buildUI(void)
     layout.defItemWidth = layout.defWindowWidth * 0.3f * m_currentScale;
     layout.indent = (int)ImGui::GetStyle().IndentSpacing * 0.4f;
 
+    BuildViewportPanel(layout);
+
+    if (m_editorUI.Viewport.ShowRenderSettings)
     {
-        ImGui::SetNextWindowPos(ImVec2(10.f, 10.f), ImGuiCond_Appearing);
-        ImGui::SetNextWindowSize(ImVec2(layout.defWindowWidth, layout.scaledHeight - 20), ImGuiCond_Appearing);
+        RAII_SCOPE(ImGui::Begin("Render Settings", &m_editorUI.Viewport.ShowRenderSettings);, ImGui::End(););
+        RAII_SCOPE(ImGui::PushItemWidth(layout.defItemWidth);, ImGui::PopItemWidth(););
 
-        RAII_SCOPE( ImGui::Begin("settings", 0, ImGuiWindowFlags_None /*AlwaysAutoResize*/); , ImGui::End(); );
-        RAII_SCOPE( ImGui::PushItemWidth(layout.defItemWidth); , ImGui::PopItemWidth(); );
-
-        ImGui::Text("%s, %s", getGpuDevice()->getRendererString(), caustica::resolutionInfo(*m_sceneEditor.app()).c_str() );
-        ImGui::TextUnformatted(caustica::fpsInfo(*m_sceneEditor.app()).c_str());
+        if (m_sceneEditor.app())
+        {
+            ImGui::TextUnformatted(getGpuDevice()->getRendererString());
+            ImGui::TextUnformatted(caustica::resolutionInfo(*m_sceneEditor.app()).c_str());
+            ImGui::TextUnformatted(caustica::fpsInfo(*m_sceneEditor.app()).c_str());
+        }
 
         if (BuildUIScriptsAndEtc())
         {
+            BuildStatusBar();
             return;
         }
 
         BuildDisplayPerformancePanel(layout);
         BuildSystemPanel(layout);
         if (BuildSceneComboPanel(layout))
+        {
+            BuildStatusBar();
             return;
+        }
         BuildScenePanel(layout);
         BuildSampleGamePanel(layout);
         BuildCameraPanel(layout);
@@ -188,10 +202,12 @@ void EditorUI::buildUI(void)
     BuildMaterialEditorPanel(layout);
     BuildDeltaTreeExplorerPanel(layout);
     BuildSceneWidgetsPanel(layout);
-    BuildHierarchyPanel(layout);
+    if (m_editorUI.Viewport.ShowHierarchy)
+        BuildHierarchyPanel(layout);
     BuildGameStandalonePanel(layout);
 
     DrawTransformGizmo(TransformGizmoContext{ m_sceneEditor, m_editorUI, m_settings });
+    BuildStatusBar();
 }
 
 
@@ -202,6 +218,5 @@ bool EditorUI::CheckboxUInt32(const char* label, uint32_t* v)
     *v = pv ? (1) : (0);
     return ret;
 }
-
 
 } // namespace caustica::editor

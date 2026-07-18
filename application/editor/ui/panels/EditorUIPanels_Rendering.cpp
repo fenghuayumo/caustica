@@ -33,7 +33,7 @@ namespace caustica::editor
 
 void EditorUI::BuildLightingPanel(const PanelLayout& layout)
 {
-        if (ImGui::CollapsingHeader("Light pre-processing and sampling", 0/*ImGuiTreeNodeFlags_DefaultOpen*/))
+        if (ImGui::CollapsingHeader("Light pre-processing and sampling", ImGuiTreeNodeFlags_DefaultOpen))
         {
             RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent););
 

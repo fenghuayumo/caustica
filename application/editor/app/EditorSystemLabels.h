@@ -21,6 +21,7 @@ struct EditorScenePrepareEditorFrame { static constexpr const char* name = "Edit
 struct EditorSceneAfterWorldRender { static constexpr const char* name = "EditorScene.AfterWorldRender"; };
 
 struct EditorUIAnimate { static constexpr const char* name = "EditorUI.animate"; };
+struct EditorUIPrepareViewport { static constexpr const char* name = "EditorUI.PrepareViewport"; };
 struct EditorUIRenderScene { static constexpr const char* name = "EditorUI.RenderScene"; };
 
 } // namespace caustica::editor::system_label

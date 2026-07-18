@@ -17,10 +17,53 @@
 #include <render/core/ScopedPerfMarker.h>
 #include <render/core/TextureUtils.h>
 
+#include <filesystem>
+#include <cstdlib>
+
 namespace caustica::editor
 {
 
 using namespace caustica;
+
+namespace
+{
+
+// Must outlive ImGui IO — ImGui stores IniFilename as a raw pointer.
+std::string& EditorIniPathStorage()
+{
+    static std::string path;
+    return path;
+}
+
+std::filesystem::path ResolveEditorIniPath()
+{
+#if defined(_WIN32)
+    if (const char* appData = std::getenv("APPDATA"))
+        return std::filesystem::path(appData) / "Caustica" / "editor.ini";
+#endif
+    return std::filesystem::current_path() / "caustica_editor.ini";
+}
+
+std::shared_ptr<RegisteredFont> TryLoadFont(
+    ImGui_Renderer& renderer,
+    IFileSystem& fs,
+    const std::filesystem::path& fontPath,
+    float sizePx)
+{
+    if (fontPath.empty())
+        return nullptr;
+
+    std::error_code ec;
+    if (!std::filesystem::exists(fontPath, ec))
+        return nullptr;
+
+    auto font = renderer.createFontFromFile(fs, fontPath, sizePx);
+    if (!font || !font->hasFontData())
+        return nullptr;
+    return font;
+}
+
+} // namespace
 
 ImGuiManager::ImGuiManager(EditorUIData&           uiData,
                            const CommandLineOptions& cmdLine,
@@ -29,7 +72,20 @@ ImGuiManager::ImGuiManager(EditorUIData&           uiData,
     , m_cmdLine(cmdLine)
     , m_nvapiSERSupported(nvapiSERSupported)
 {
-    ImGui::GetIO().IniFilename = nullptr;
+    const std::filesystem::path iniPath = ResolveEditorIniPath();
+    std::error_code ec;
+    std::filesystem::create_directories(iniPath.parent_path(), ec);
+    EditorIniPathStorage() = iniPath.string();
+
+    ImGuiIO& io = ImGui::GetIO();
+    io.IniFilename = EditorIniPathStorage().c_str();
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+    io.ConfigDockingWithShift = false;
+
+    // First launch (no saved layout): build the default DockSpace split once.
+    if (!std::filesystem::exists(iniPath))
+        m_uiData.editor.Viewport.RequestResetDockLayout = true;
+
     applyTheme(1.0f);
 }
 
@@ -39,8 +95,27 @@ void ImGuiManager::loadDefaultFont(caustica::ImGui_Renderer& renderer,
                                     const std::filesystem::path& assetsPath)
 {
     auto nativeFS = std::make_shared<NativeFileSystem>();
-    auto fontPath = assetsPath / "fonts/DroidSans/DroidSans-Mono.ttf";
-    renderer.createFontFromFile(*nativeFS, fontPath, 16.0f);
+    constexpr float kUiFontSize = 15.0f;
+
+    std::shared_ptr<RegisteredFont> font;
+
+#if defined(_WIN32)
+    // Prefer the system UI face — much cleaner than Proggy / monospace.
+    const char* windir = std::getenv("WINDIR");
+    const std::filesystem::path fontsDir =
+        windir ? (std::filesystem::path(windir) / "Fonts") : std::filesystem::path("C:/Windows/Fonts");
+    font = TryLoadFont(renderer, *nativeFS, fontsDir / "segoeui.ttf", kUiFontSize);
+#endif
+
+    if (!font)
+        font = TryLoadFont(renderer, *nativeFS, assetsPath / "Fonts/OpenSans/OpenSans-Regular.ttf", kUiFontSize);
+    if (!font)
+        font = TryLoadFont(renderer, *nativeFS, assetsPath / "fonts/OpenSans/OpenSans-Regular.ttf", kUiFontSize);
+    if (!font)
+        font = TryLoadFont(renderer, *nativeFS, assetsPath / "Fonts/DroidSans/DroidSans-Mono.ttf", kUiFontSize);
+
+    if (font)
+        renderer.setDefaultFont(font);
 }
 
 void ImGuiManager::applyTheme(float displayScale)

@@ -34,7 +34,7 @@ public:
     ~ImGuiManager();
 
     // --- Font loading ---
-    // Loads the default DroidSans-Mono font from assets/fonts/.
+    // Loads the editor UI font (Segoe UI on Windows, else OpenSans) and sets it as default.
     void loadDefaultFont(caustica::ImGui_Renderer& renderer, const std::filesystem::path& assetsPath);
 
     // --- Theme ---

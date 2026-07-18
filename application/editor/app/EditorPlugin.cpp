@@ -163,6 +163,21 @@ void EditorPlugin::configureLateSchedules(App& app)
             uiSubsystem->animateScheduled(ctx.deltaTimeSeconds, ctx.windowFocused);
         });
 
+    app.addSystem<system_label::EditorUIPrepareViewport>(
+        AppSchedule::render,
+        [](SystemContext& ctx) {
+            if (!ctx.gpuDevice)
+                return;
+
+            auto* uiSubsystem = ctx.tryRes<EditorUISubsystem>();
+            if (!uiSubsystem)
+                return;
+
+            uiSubsystem->prepareViewportForRender(*ctx.gpuDevice);
+        },
+        AppSystemOrdering{}
+            .runBefore<caustica::system_label::SceneRenderScene>());
+
     app.addSystem<system_label::EditorUIRenderScene>(
         AppSchedule::render,
         [](SystemContext& ctx) {

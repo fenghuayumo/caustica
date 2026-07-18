@@ -143,8 +143,15 @@ void BuildGizmoProjectionMatrix(const TransformGizmoContext& ctx, const PlanarVi
     auto* camera = caustica::editor::editorCamera(ctx.sceneEditor);
     if (camera && view.isReverseDepth())
     {
-        const ImGuiIO& io = ImGui::GetIO();
-        const float aspect = (io.DisplaySize.y > 0.f) ? (io.DisplaySize.x / io.DisplaySize.y) : 1.f;
+        const auto& vp = ctx.editorUI.Viewport;
+        float aspect = 1.f;
+        if (vp.RectValid && vp.SizeY > 1.f)
+            aspect = vp.SizeX / vp.SizeY;
+        else
+        {
+            const ImGuiIO& io = ImGui::GetIO();
+            aspect = (io.DisplaySize.y > 0.f) ? (io.DisplaySize.x / io.DisplaySize.y) : 1.f;
+        }
         const float fov = camera->verticalFOV();
         const float zNear = std::max(camera->zNear(), 0.01f);
         const float zFar = std::max(zNear * 10000.f, 1000.f);
@@ -162,34 +169,6 @@ bool IsEditingInspectorUi()
 }
 
 } // namespace
-
-void caustica::editor::BuildTransformGizmoToolbar(EditorUIState& editorUI)
-{
-    const auto operation = static_cast<ImGuizmo::OPERATION>(editorUI.GizmoOperation);
-    const auto mode = static_cast<ImGuizmo::MODE>(editorUI.GizmoMode);
-
-    if (ImGui::RadioButton("Move", operation == ImGuizmo::TRANSLATE))
-        editorUI.GizmoOperation = static_cast<int>(ImGuizmo::TRANSLATE);
-    ImGui::SameLine();
-    if (ImGui::RadioButton("Rotate", operation == ImGuizmo::ROTATE))
-        editorUI.GizmoOperation = static_cast<int>(ImGuizmo::ROTATE);
-    ImGui::SameLine();
-    if (ImGui::RadioButton("Scale", operation == ImGuizmo::SCALE))
-        editorUI.GizmoOperation = static_cast<int>(ImGuizmo::SCALE);
-
-    if (operation != ImGuizmo::SCALE)
-    {
-        if (ImGui::RadioButton("Local", mode == ImGuizmo::LOCAL))
-            editorUI.GizmoMode = static_cast<int>(ImGuizmo::LOCAL);
-        ImGui::SameLine();
-        if (ImGui::RadioButton("World", mode == ImGuizmo::WORLD))
-            editorUI.GizmoMode = static_cast<int>(ImGuizmo::WORLD);
-    }
-
-    ImGui::Checkbox("Snap", &editorUI.GizmoSnapEnabled);
-    ImGui::SameLine();
-    ImGui::TextDisabled("(W/E/T)");
-}
 
 bool caustica::editor::DrawTransformGizmo(const TransformGizmoContext& ctx)
 {
@@ -247,7 +226,11 @@ bool caustica::editor::DrawTransformGizmo(const TransformGizmoContext& ctx)
     ImGuizmo::SetID(static_cast<int>(entt::to_integral(entity)));
 
     ImGuiIO& io = ImGui::GetIO();
-    ImGuizmo::SetRect(0.f, 0.f, io.DisplaySize.x, io.DisplaySize.y);
+    const auto& vp = ctx.editorUI.Viewport;
+    if (vp.RectValid && vp.SizeX > 1.f && vp.SizeY > 1.f)
+        ImGuizmo::SetRect(vp.PosX, vp.PosY, vp.SizeX, vp.SizeY);
+    else
+        ImGuizmo::SetRect(0.f, 0.f, io.DisplaySize.x, io.DisplaySize.y);
     ImGuizmo::SetOrthographic(view->isOrthographicProjection());
 
     float viewMatrix[16];

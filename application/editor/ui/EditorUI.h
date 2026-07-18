@@ -103,6 +103,13 @@ private:
     void BuildSceneWidgetsPanel(const PanelLayout& layout);
     void BuildHierarchyPanel(const PanelLayout& layout);
     void BuildGameStandalonePanel(const PanelLayout& layout);
+    void BuildMainMenuBar();
+    void BuildStatusBar();
+    void BuildDockSpace();
+    void BuildViewportPanel(const PanelLayout& layout);
+
+public:
+    void setViewportColorTexture(nvrhi::ITexture* texture) { m_viewportColor = texture; }
 
 private:
     SceneEditor& m_sceneEditor;
@@ -117,6 +124,7 @@ private:
     std::string                 m_pythonOutputLog;      // Captured stdout/stderr from scripts
 
     float                       m_showSceneWidgets = 0.0f;
+    nvrhi::ITexture*            m_viewportColor = nullptr;
 
     std::unique_ptr<caustica::ImGui_Console> m_console;
 
