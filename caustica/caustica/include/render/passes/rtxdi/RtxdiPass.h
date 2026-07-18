@@ -63,6 +63,39 @@ public:
 	~RtxdiPass();
 
 	void reset();
+
+	// Per-frame RTXDI resource prep (formerly WorldRenderer::rtxdiSetupFrame).
+	struct SetupParams
+	{
+		nvrhi::CommandListHandle commandList;
+		const RenderTargets* renderTargets = nullptr;
+		std::shared_ptr<EnvMapProcessor> environment;
+		EnvMapSceneParams envMapSceneParams{};
+		const caustica::scene::SceneRenderData* renderData = nullptr;
+		nvrhi::IDescriptorTable* descriptorTable = nullptr;
+		caustica::render::SceneGpuFrameHandles gpuHandles{};
+		std::shared_ptr<class MaterialGpuCache> materials;
+		std::shared_ptr<class OpacityMicromapBuilder> opacityMaps;
+		nvrhi::BufferHandle subInstanceDataBuffer;
+		nvrhi::BindingLayoutHandle bindingLayout;
+		std::shared_ptr<ShaderDebug> shaderDebug;
+
+		uint32_t frameIndex = 0;
+		caustica::math::uint2 frameDims{};
+		caustica::math::float3 cameraPosition{};
+		RtxdiUserSettings userSettings{};
+		bool usingLightSampling = false;
+		bool usingReGIR = false;
+		bool environmentMapImportanceSampling = false;
+		bool resetRealtimeCaches = false;
+
+		const std::vector<GaussianSplatEmissionProxy>* gaussianSplatEmissionProxies = nullptr;
+		caustica::math::float4x4 gaussianSplatEmissionObjectToWorld = caustica::math::float4x4::identity();
+		float gaussianSplatEmissionIntensity = 0.0f;
+	};
+
+	void setupFrame(const SetupParams& params);
+
     void prepareResources(
         nvrhi::CommandListHandle commandList,
         const RenderTargets& renderTargets,

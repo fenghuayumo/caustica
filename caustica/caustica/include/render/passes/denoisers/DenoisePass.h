@@ -17,7 +17,6 @@ class ShaderDebug;
 namespace caustica
 {
 class CameraController;
-class GpuDevice;
 class ShaderFactory;
 }
 
@@ -33,9 +32,10 @@ namespace caustica::render
 
 class PathTracingContext;
 class TemporalAntiAliasingPass;
+struct FrameGraphContext;
 
-// Denoise / AA / NRD execute helpers for the frame graph (UE RDG style).
-// Owns NRD integrations and denoising-guide pass; other GPU objects are bound per frame.
+// Denoise / AA / NRD execute helpers for the frame graph.
+// Holds PathTracingContext* from create; per-frame state comes from FrameGraphContext.
 class DenoisePass
 {
 public:
@@ -45,47 +45,16 @@ public:
     DenoisePass(const DenoisePass&) = delete;
     DenoisePass& operator=(const DenoisePass&) = delete;
 
-    struct FrameBindings
-    {
-        PathTracingContext* context = nullptr;
-        nvrhi::IDevice* device = nullptr;
-        RenderTargets* renderTargets = nullptr;
-        PostProcess* postProcess = nullptr;
-        nvrhi::BindingSetHandle bindingSet;
-        nvrhi::BindingLayoutHandle bindingLayout;
-        nvrhi::BufferHandle constantBuffer;
-        nvrhi::ICommandList* commandList = nullptr;
-
-        dm::uint2 renderSize{};
-        dm::uint2 displaySize{};
-        float displayAspectRatio = 1.f;
-        dm::float2 cameraJitter{};
-        uint32_t sampleIndex = 0;
-        uint64_t frameIndex = 0;
-        int accumulationSampleIndex = 0;
-        bool accumulationCompleted = false;
-        int* gaussianSplatTemporalSampleIndex = nullptr;
-        bool* gaussianSplatTemporalReset = nullptr;
-        TemporalAntiAliasingPass* temporalAntiAliasing = nullptr;
-        AccumulationPass* accumulation = nullptr;
-        CameraController* camera = nullptr;
-
-#if CAUSTICA_WITH_STREAMLINE
-        StreamlineInterface::DLSSRROptions* dlssRROptions = nullptr;
-#endif
-#if CAUSTICA_WITH_NATIVE_DLSS
-        DLSS* nativeDLSS = nullptr;
-#endif
-    };
-
     void createGuides(
+        PathTracingContext* context,
         nvrhi::IDevice* device,
         const std::shared_ptr<caustica::ShaderFactory>& shaderFactory,
         const std::unique_ptr<RenderTargets>& renderTargets,
         const std::shared_ptr<ShaderDebug>& shaderDebug,
         nvrhi::BindingLayoutHandle bindingLayout);
 
-    void bindFrame(const FrameBindings& bindings);
+    // Sync per-frame handles from the graph context (replaces mega FrameBindings copy).
+    void bindFrame(const FrameGraphContext& ctx);
 
     void prepareGuides(nvrhi::ICommandList* commandList);
     void stablePlanesDebugViz(nvrhi::ICommandList* commandList);
@@ -96,7 +65,7 @@ public:
     void runDlssUpscale(nvrhi::ICommandList* commandList, bool reset);
 
     void resetReferenceOIDN();
-    void applyReferenceOIDN();
+    void applyReferenceOIDN(nvrhi::ICommandList* commandList);
     void invalidateNrdIntegrations();
     void invalidateOidnOutput();
 
@@ -105,7 +74,36 @@ private:
     bool evaluateNativeDLSS(nvrhi::ICommandList* commandList, bool reset);
 #endif
 
-    FrameBindings m_bindings{};
+    PathTracingContext* m_context = nullptr;
+    nvrhi::IDevice* m_device = nullptr;
+
+    // Per-frame snapshot filled by bindFrame from FrameGraphContext.
+    RenderTargets* m_renderTargets = nullptr;
+    PostProcess* m_postProcess = nullptr;
+    nvrhi::BindingSetHandle m_bindingSet;
+    nvrhi::BindingLayoutHandle m_bindingLayout;
+    nvrhi::BufferHandle m_constantBuffer;
+    nvrhi::ICommandList* m_commandList = nullptr;
+    dm::uint2 m_renderSize{};
+    dm::uint2 m_displaySize{};
+    float m_displayAspectRatio = 1.f;
+    dm::float2 m_cameraJitter{};
+    uint32_t m_sampleIndex = 0;
+    uint64_t m_frameIndex = 0;
+    int m_accumulationSampleIndex = 0;
+    bool m_accumulationCompleted = false;
+    int* m_gaussianSplatTemporalSampleIndex = nullptr;
+    bool* m_gaussianSplatTemporalReset = nullptr;
+    TemporalAntiAliasingPass* m_temporalAntiAliasing = nullptr;
+    AccumulationPass* m_accumulation = nullptr;
+    caustica::CameraController* m_camera = nullptr;
+#if CAUSTICA_WITH_STREAMLINE
+    StreamlineInterface::DLSSRROptions* m_dlssRROptions = nullptr;
+#endif
+#if CAUSTICA_WITH_NATIVE_DLSS
+    DLSS* m_nativeDLSS = nullptr;
+#endif
+
     std::unique_ptr<NrdIntegration> m_nrd[cStablePlaneCount];
     std::shared_ptr<DenoisingGuidesPass> m_denoisingGuidesPass;
     std::unique_ptr<OidnDenoiser> m_oidnDenoiser;

@@ -3,6 +3,7 @@
 #include <render/SceneGpuResources.h>
 #include <render/core/PathTracerSettings.h>
 #include <render/ecs/RenderFrameContext.h>
+#include <math/math.h>
 #include <rhi/nvrhi.h>
 #include <shaders/PathTracer/Config.h>
 #include <shaders/SampleConstantBuffer.h>
@@ -10,6 +11,10 @@
 #include <cstdint>
 #include <memory>
 #include <vector>
+
+#if CAUSTICA_WITH_STREAMLINE
+#include <backend/StreamlineInterface.h>
+#endif
 
 class AccumulationPass;
 class EnvMapProcessor;
@@ -24,7 +29,9 @@ class ToneMappingPass;
 
 namespace caustica
 {
+class AccelStructManager;
 class BindingCache;
+class CameraController;
 class ICompositeView;
 class IView;
 }
@@ -39,10 +46,13 @@ namespace caustica::render
 
 class BloomPass;
 class DenoisePass;
+class DLSS;
 class FullscreenBlitPass;
 class GaussianSplatFramePass;
 class PathTracePass;
+class PathTracingContext;
 class PathTracingFrameContext;
+class SceneGaussianSplatPasses;
 class TemporalAntiAliasingPass;
 class WorldRenderer;
 
@@ -94,8 +104,21 @@ struct FrameGraphContext
     SceneGpuFrameHandles gpuHandles{};
     nvrhi::BufferHandle subInstanceDataBuffer;
 
+    PathTracingContext* pathTracingContext = nullptr;
+    nvrhi::IDevice* device = nullptr;
+    nvrhi::ICommandList* commandList = nullptr;
+    caustica::AccelStructManager* accelStructs = nullptr;
+    SceneGaussianSplatPasses* gaussianScenePasses = nullptr;
+    caustica::CameraController* camera = nullptr;
+
+    dm::uint2 renderSize{};
+    dm::uint2 displaySize{};
+    float displayAspectRatio = 1.f;
+    dm::float2 cameraJitter{};
+    uint32_t sampleIndex = 0;
     uint64_t frameIndex = 0;
     int accumulationSampleIndex = 0;
+    bool accumulationCompleted = false;
     const caustica::IView* view = nullptr;
     const caustica::ICompositeView* compositeView = nullptr;
 
@@ -103,7 +126,15 @@ struct FrameGraphContext
     bool aaReset = false;
     bool* commandListWasClosed = nullptr;
     int* gaussianSplatTemporalSampleIndex = nullptr;
-    bool* gaussianSplatTemporalReset = nullptr;
+    bool* gaussianSplatTemporalReset = nullptr; // per-frame published reset
+    bool* gaussianSplatOwnedTemporalReset = nullptr; // WR-owned sticky reset
+
+#if CAUSTICA_WITH_STREAMLINE
+    StreamlineInterface::DLSSRROptions* dlssRROptions = nullptr;
+#endif
+#if CAUSTICA_WITH_NATIVE_DLSS
+    DLSS* nativeDLSS = nullptr;
+#endif
 
     // Debug overlay graph registration (filled by makeFrameGraphContext)
     bool showDebugLines = false;

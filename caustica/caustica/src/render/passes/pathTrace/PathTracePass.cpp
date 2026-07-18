@@ -2,22 +2,174 @@
 
 #include <render/FrameGraphPasses.h>
 #include <render/FrameGraphContext.h>
+#include <render/PathTracingContext.h>
+#include <render/core/CameraController.h>
 #include <render/core/LightingUpdate.h>
 #include <render/core/PathTracerSettings.h>
 #include <render/core/PathTracingShaderCompiler.h>
 #include <render/core/RenderTargets.h>
 #include <render/graph/GraphBuilder.h>
 #include <render/passes/pathTrace/PathTraceGraphResources.h>
+#include <render/passes/postProcess/ToneMappingPasses.h>
+#include <assets/loader/ShaderFactory.h>
 #include <core/scope.h>
+#include <math/math.h>
+#include <scene/View.h>
 #include <shaders/PathTracer/Config.h>
+#include <shaders/PathTracer/StablePlanes.hlsli>
 #include <shaders/SampleConstantBuffer.h>
 
+#include <algorithm>
 #include <cassert>
+#include <cmath>
 
 using namespace caustica::math;
 
 namespace caustica::render
 {
+
+bool PathTracePass::createExportPipeline(
+    nvrhi::IDevice* device,
+    caustica::ShaderFactory* shaderFactory,
+    nvrhi::BindingLayoutHandle bindingLayout,
+    nvrhi::BindingLayoutHandle bindlessLayout)
+{
+    assert(device);
+    assert(shaderFactory);
+
+    std::vector<caustica::ShaderMacro> shaderMacros;
+    m_exportVBufferCS = shaderFactory->createShader(
+        "caustica/shaders/render/processingPasses/ExportVisibilityBuffer.hlsl",
+        "main",
+        &shaderMacros,
+        nvrhi::ShaderType::Compute);
+
+    nvrhi::ComputePipelineDesc pipelineDesc;
+    pipelineDesc.bindingLayouts = { bindingLayout, bindlessLayout };
+    pipelineDesc.CS = m_exportVBufferCS;
+    m_exportVBufferPSO = device->createComputePipeline(pipelineDesc);
+    return m_exportVBufferPSO != nullptr;
+}
+
+void PathTracePass::fillConstants(
+    PathTracerConstants& constants,
+    const PathTracerCameraData& cameraData,
+    const FillConstantsParams& params) const
+{
+    assert(params.context);
+
+#if CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
+    auto GetStfMagnificationMethod = [](StfMagnificationMethod method)->int {
+        switch (method)
+        {
+        case StfMagnificationMethod::Default:   return STF_MAGNIFICATION_METHOD_NONE;
+        case StfMagnificationMethod::Quad2x2:   return STF_MAGNIFICATION_METHOD_2x2_QUAD;
+        case StfMagnificationMethod::Fine2x2:   return STF_MAGNIFICATION_METHOD_2x2_FINE;
+        case StfMagnificationMethod::FineTemporal2x2: return STF_MAGNIFICATION_METHOD_2x2_FINE_TEMPORAL;
+        case StfMagnificationMethod::FineAlu3x3: return STF_MAGNIFICATION_METHOD_3x3_FINE_ALU;
+        case StfMagnificationMethod::FineLut3x3: return STF_MAGNIFICATION_METHOD_3x3_FINE_LUT;
+        case StfMagnificationMethod::Fine4x4:    return STF_MAGNIFICATION_METHOD_4x4_FINE;
+        default:
+            assert(!"Not Implemented");
+            return 0;
+        }
+    };
+
+    auto GetStfFilterMode = [](StfFilterMode mode)->int {
+        switch (mode)
+        {
+        case StfFilterMode::Point:      return STF_FILTER_TYPE_POINT;
+        case StfFilterMode::Linear:     return STF_FILTER_TYPE_LINEAR;
+        case StfFilterMode::Cubic:      return STF_FILTER_TYPE_CUBIC;
+        case StfFilterMode::Gaussian:   return STF_FILTER_TYPE_GAUSSIAN;
+        default:
+            assert(!"Not Implemented");
+            return 0;
+        }
+    };
+#endif
+
+    const PathTracerSettings& settings = params.context->activeSettings();
+
+    constants.camera = cameraData;
+    constants.prevCamera = cameraData;
+    if (params.context->camera.viewPrevious())
+        constants.prevCamera.PosW = params.context->camera.viewPrevious()->getInverseViewMatrix().m_translation;
+
+    constants.bounceCount = settings.BounceCount;
+    constants.diffuseBounceCount = settings.DiffuseBounceCount;
+    constants.perPixelJitterAAScale = (!settings.RealtimeMode && settings.AccumulationAA)
+        ? 1.0f
+        : ((settings.RealtimeMode && settings.RealtimeAA == 3) ? settings.DLSSRRMicroJitter : 0.0f);
+
+    const float dlssBias = -dm::log2f(sqrtf(
+        (params.displaySize.x * params.displaySize.y) / float(params.renderSize.x * params.renderSize.y)));
+
+    constants.texLODBias = settings.TexLODBias + dlssBias;
+    constants.sampleBaseIndex = params.sampleIndex * settings.actualSamplesPerPixel();
+    constants.invSubSampleCount = 1.0f / float(settings.actualSamplesPerPixel());
+
+    constants.imageWidth = params.renderSize.x;
+    constants.imageHeight = params.renderSize.y;
+    if (params.renderTargets != nullptr)
+    {
+        assert(params.renderSize.x == params.renderTargets->outputColor->getDesc().width);
+        assert(params.renderSize.y == params.renderTargets->outputColor->getDesc().height);
+    }
+
+    if (settings.EnableToneMapping && params.toneMapping != nullptr)
+        constants.preExposedGrayLuminance = dm::luminance(params.toneMapping->getPreExposedGray(0));
+    else
+        constants.preExposedGrayLuminance = 1.0f;
+
+    constexpr float disabledFF = 0.0f;
+    if (settings.RealtimeMode)
+        constants.fireflyFilterThreshold = settings.RealtimeFireflyFilterEnabled
+            ? (settings.RealtimeFireflyFilterThreshold * sqrtf(constants.preExposedGrayLuminance) * 1e3f)
+            : disabledFF;
+    else
+        constants.fireflyFilterThreshold = settings.ReferenceFireflyFilterEnabled
+            ? (settings.ReferenceFireflyFilterThreshold * sqrtf(constants.preExposedGrayLuminance) * 1e3f)
+            : disabledFF;
+
+    constants.useReSTIRDI = settings.actualUseReSTIRDI();
+    constants.useReSTIRGI = settings.actualUseReSTIRGI();
+    constants.useReSTIRPT = settings.actualUseReSTIRPT();
+    constants.environmentMapVisibleToCamera = settings.EnvironmentMapParams.VisibleToCamera ? 1u : 0u;
+    constants.denoiserRadianceClampK = settings.DenoiserRadianceClampK;
+    constants.DLSSRRBrightnessClampK = (settings.DLSSRRBrightnessClampK > 0)
+        ? (settings.DLSSRRBrightnessClampK * constants.preExposedGrayLuminance)
+        : 0.0f;
+
+    constants.denoisingEnabled = settings.actualUseStandaloneDenoiser() || settings.RealtimeAA == 3;
+
+    constants._activeStablePlaneCount = settings.StablePlanesActiveCount;
+    constants.maxStablePlaneVertexDepth = std::min(
+        std::min((uint)settings.StablePlanesMaxVertexDepth, cStablePlaneMaxVertexIndex),
+        (uint)settings.BounceCount);
+    constants.allowPrimarySurfaceReplacement = settings.AllowPrimarySurfaceReplacement;
+    constants.stablePlanesSplitStopThreshold = settings.StablePlanesSplitStopThreshold;
+    constants._padding3 = 0;
+    constants.stablePlanesSuppressPrimaryIndirectSpecularK = settings.StablePlanesSuppressPrimaryIndirectSpecular
+        ? settings.StablePlanesSuppressPrimaryIndirectSpecularK
+        : 0.0f;
+    constants.stablePlanesAntiAliasingFallthrough = settings.StablePlanesAntiAliasingFallthrough;
+    constants.frameIndex = params.frameIndex & 0xFFFFFFFFu;
+    constants.genericTSLineStride = GenericTSComputeLineStride(constants.imageWidth, constants.imageHeight);
+    constants.genericTSPlaneStride = GenericTSComputePlaneStride(constants.imageWidth, constants.imageHeight);
+
+    constants.NEEEnabled = settings.UseNEE;
+    constants.NEEType = settings.NEEType;
+    constants.NEECandidateSamples = settings.NEECandidateSamples;
+    constants.NEEFullSamples = settings.NEEFullSamples;
+    constants.EnvironmentMapDiffuseSampleMIPLevel = settings.EnvironmentMapDiffuseSampleMIPLevel;
+
+#if CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
+    constants.STFMagnificationMethod = GetStfMagnificationMethod(settings.STFMagnificationMethod);
+    constants.STFFilterMode = GetStfFilterMode(settings.STFFilterMode);
+    constants.STFGaussianSigma = settings.STFGaussianSigma;
+#endif
+}
 
 void PathTracePass::prePass(
     nvrhi::ICommandList* commandList,

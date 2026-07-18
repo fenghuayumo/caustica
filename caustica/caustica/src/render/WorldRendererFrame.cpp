@@ -22,12 +22,18 @@ namespace { constexpr int c_SwapchainCount = 3; }
 #include <render/core/CameraController.h>
 #include <render/core/PathTracingShaderCompiler.h>
 #include <render/core/ComputePipelineRegistry.h>
+#include <render/passes/lighting/LightingFrame.h>
 #include <render/passes/lighting/MaterialGpuCache.h>
 #include <render/passes/lighting/distant/EnvMapImportanceSamplingCache.h>
 #include <render/passes/omm/OpacityMicromapBuilder.h>
 #include <render/passes/gaussian/GaussianSplatGraph.h>
 #include <render/passes/gaussian/GaussianSplatSceneRuntime.h>
+#include <render/passes/gaussian/GaussianSplatFramePass.h>
+#include <render/passes/denoisers/DenoisePass.h>
+#include <render/passes/pathTrace/PathTracePass.h>
+#include <render/passes/rtxdi/RtxdiPass.h>
 #include <render/passes/debug/ShaderDebug.h>
+#include <render/passes/gaussian/GaussianSplatEmissionProxy.h>
 #include <render/core/FramebufferFactory.h>
 #include <assets/loader/ShaderFactory.h>
 #include <assets/loader/TextureLoader.h>
@@ -110,14 +116,12 @@ FrameGraphContext caustica::render::WorldRenderer::makeFrameGraphContext(RenderF
         ? m_context->descriptorTable->getDescriptorTable()
         : nullptr;
 
-    bindPassFrameResources();
-
     const bool showDebugLines = m_context->activeSettings().ShowDebugLines;
     const bool copyDebugFeedback =
         m_context->activeSettings().ContinuousDebugFeedback
         || m_context->activeRuntime().Picking.hasActivePickRequest();
 
-    return FrameGraphContext{
+    FrameGraphContext featureCtx{
         .graph = ctx.graph,
         .renderer = this,
         .frame = &ctx.frame,
@@ -142,7 +146,7 @@ FrameGraphContext caustica::render::WorldRenderer::makeFrameGraphContext(RenderF
         .ptReference = m_ptPipelineReference.get(),
         .ptTestRaygenPPHDR = m_ptPipelineTestRaygenPPHDR.get(),
         .ptEdgeDetection = m_ptPipelineEdgeDetection.get(),
-        .exportVBufferPSO = m_exportVBufferPSO,
+        .exportVBufferPSO = m_pathTracePass ? m_pathTracePass->exportVBufferPSO() : nullptr,
         .toneMapping = m_toneMappingPass.get(),
         .bloom = m_bloomPass.get(),
         .temporalAntiAliasing = m_temporalAntiAliasingPass.get(),
@@ -153,8 +157,20 @@ FrameGraphContext caustica::render::WorldRenderer::makeFrameGraphContext(RenderF
         .opacityMaps = m_context->scenePasses.lighting.opacityMaps(),
         .gpuHandles = m_context->resolveGpuHandles(),
         .subInstanceDataBuffer = m_context->accelStructs.getSubInstanceBuffer(),
+        .pathTracingContext = m_context,
+        .device = device(),
+        .commandList = m_commandList,
+        .accelStructs = &m_accelStructs,
+        .gaussianScenePasses = &m_context->scenePasses.gaussianSplats,
+        .camera = &m_context->camera,
+        .renderSize = m_renderSize,
+        .displaySize = m_displaySize,
+        .displayAspectRatio = m_displayAspectRatio,
+        .cameraJitter = computeCameraJitter(),
+        .sampleIndex = m_sampleIndex,
         .frameIndex = m_frameIndex,
         .accumulationSampleIndex = m_accumulationSampleIndex,
+        .accumulationCompleted = m_accumulationCompleted,
         .view = m_context->camera.view().get(),
         .compositeView = m_context->camera.view().get(),
         .hasScene = m_context->hasFrameScene(),
@@ -162,6 +178,13 @@ FrameGraphContext caustica::render::WorldRenderer::makeFrameGraphContext(RenderF
         .commandListWasClosed = &ctx.commandListWasClosed,
         .gaussianSplatTemporalSampleIndex = &m_gaussianSplatTemporalSampleIndex,
         .gaussianSplatTemporalReset = &m_frameGaussianSplatTemporalReset,
+        .gaussianSplatOwnedTemporalReset = &m_gaussianSplatTemporalReset,
+#if CAUSTICA_WITH_STREAMLINE
+        .dlssRROptions = &m_lastDLSSRROptions,
+#endif
+#if CAUSTICA_WITH_NATIVE_DLSS
+        .nativeDLSS = m_nativeDLSS.get(),
+#endif
         .showDebugLines = showDebugLines,
         .copyDebugFeedback = copyDebugFeedback,
         .capturedLineVertexCount = static_cast<uint32_t>(m_feedbackData.lineVertexCount),
@@ -175,6 +198,13 @@ FrameGraphContext caustica::render::WorldRenderer::makeFrameGraphContext(RenderF
         .linesBindingSet = m_linesBindingSet,
         .linesPipeline = m_linesPipeline,
     };
+
+    if (m_denoisePass)
+        m_denoisePass->bindFrame(featureCtx);
+    if (m_gaussianFramePass)
+        m_gaussianFramePass->bindFrame(featureCtx);
+
+    return featureCtx;
 }
 
 void caustica::render::WorldRenderer::addRenderPipelinePlugin(std::unique_ptr<IRenderPipelinePlugin> plugin)
@@ -496,7 +526,7 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
     if (ctx.aborted)
         return;
 
-    preUpdateLighting(m_commandList, ctx.needNewBindings);
+    preUpdateLightingFrame(*m_context, m_commandList, ctx.needNewBindings);
     abortIfSubmitFailed(ctx, "preUpdateLighting");
     if (ctx.aborted)
         return;
@@ -505,7 +535,42 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
     {
         if (ctx.needNewPasses || ctx.needNewBindings || m_bindingSet == nullptr)
             m_rtxdiPass->reset();
-        rtxdiSetupFrame(framebuffer, ctx.cameraData, m_renderSize);
+
+        buildGaussianSplatEmissionProxies();
+
+        const bool envMapPresent = m_context->activeSettings().EnvironmentMapParams.enabled;
+        RtxdiPass::SetupParams rtxdiParams{};
+        rtxdiParams.commandList = m_commandList;
+        rtxdiParams.renderTargets = m_renderTargets.get();
+        rtxdiParams.environment = envMapPresent ? m_context->scenePasses.lighting.environment() : nullptr;
+        rtxdiParams.envMapSceneParams = m_context->scenePasses.lighting.envMapSceneParams();
+        rtxdiParams.renderData = m_context->frameScene;
+        rtxdiParams.descriptorTable = m_context->descriptorTable
+            ? m_context->descriptorTable->getDescriptorTable()
+            : nullptr;
+        rtxdiParams.gpuHandles = m_context->resolveGpuHandles();
+        rtxdiParams.materials = m_context->scenePasses.lighting.materials();
+        rtxdiParams.opacityMaps = m_context->scenePasses.lighting.opacityMaps();
+        rtxdiParams.subInstanceDataBuffer = m_context->accelStructs.getSubInstanceBuffer();
+        rtxdiParams.bindingLayout = m_bindingLayout;
+        rtxdiParams.shaderDebug = m_shaderDebug;
+        rtxdiParams.frameIndex = m_frameIndex & 0xFFFFFFFFu;
+        rtxdiParams.frameDims = m_renderSize;
+        rtxdiParams.cameraPosition = m_context->camera.camera().getPosition();
+        rtxdiParams.userSettings = m_context->activeSettings().RTXDI;
+        rtxdiParams.usingLightSampling = m_context->activeSettings().actualUseReSTIRDI();
+        rtxdiParams.usingReGIR = m_context->activeSettings().actualUseReSTIRDI();
+        rtxdiParams.environmentMapImportanceSampling = envMapPresent;
+        rtxdiParams.resetRealtimeCaches = m_context->activeSettings().ResetRealtimeCaches;
+        if (!m_gaussianSplatEmissionProxies.empty()
+            && isGaussianSplatEmissionEnabled(m_context->activeSettings()))
+        {
+            rtxdiParams.gaussianSplatEmissionProxies = &m_gaussianSplatEmissionProxies;
+            rtxdiParams.gaussianSplatEmissionObjectToWorld = float4x4::identity();
+            rtxdiParams.gaussianSplatEmissionIntensity =
+                m_context->activeSettings().GaussianSplatEmissionIntensity;
+        }
+        m_rtxdiPass->setupFrame(rtxdiParams);
         abortIfSubmitFailed(ctx, "rtxdiSetupFrame");
         if (ctx.aborted)
             return;
@@ -569,7 +634,18 @@ void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext
     if (m_toneMappingPass != nullptr && m_context->activeSettings().EnableToneMapping)
         m_toneMappingPass->preRender(m_context->activeSettings().ToneMappingParams);
 
-    updatePathTracerConstants(constants.ptConsts, ctx.cameraData);
+    if (m_pathTracePass)
+    {
+        PathTracePass::FillConstantsParams fillParams{};
+        fillParams.context = m_context;
+        fillParams.toneMapping = m_toneMappingPass.get();
+        fillParams.renderTargets = m_renderTargets.get();
+        fillParams.renderSize = m_renderSize;
+        fillParams.displaySize = m_displaySize;
+        fillParams.sampleIndex = m_sampleIndex;
+        fillParams.frameIndex = m_frameIndex;
+        m_pathTracePass->fillConstants(constants.ptConsts, ctx.cameraData, fillParams);
+    }
     constants.MaterialCount = m_context->scenePasses.lighting.materials()->getMaterialDataCount();
     fillGaussianSplatShadowConstants(
         constants,
@@ -620,7 +696,12 @@ void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext
         m_context->activeSettings().ReblurSettings.hitDistanceParameters.D
     };
 
-    updateLighting(m_commandList);
+    buildGaussianSplatEmissionProxies();
+    updateLightingFrame(
+        *m_context,
+        m_commandList,
+        m_frameIndex,
+        m_gaussianSplatEmissionProxies.empty() ? nullptr : &m_gaussianSplatEmissionProxies);
     m_context->scenePasses.rayTracing.uploadSubInstanceData(m_commandList);
     abortIfSubmitFailed(ctx, "updateLighting");
     if (ctx.aborted)
@@ -637,9 +718,22 @@ void caustica::render::WorldRenderer::framePassDenoiseAndAA(PathTracingFrameCont
     SampleConstants& constants = m_currentConstants;
 
     // Copy, TAA, DLSS, accumulation, and Gaussian splats run in the frame graph after path trace and NRD.
-    bindPassFrameResources();
     if (m_denoisePass)
-        m_denoisePass->applyReferenceOIDN();
+    {
+        FrameGraphContext oidnCtx{};
+        oidnCtx.pathTracingContext = m_context;
+        oidnCtx.device = device();
+        oidnCtx.commandList = m_commandList;
+        oidnCtx.renderTargets = m_renderTargets.get();
+        oidnCtx.postProcess = m_postProcess.get();
+        oidnCtx.bindingSet = m_bindingSet;
+        oidnCtx.bindingLayout = m_bindingLayout;
+        oidnCtx.constantBuffer = m_constantBuffer;
+        oidnCtx.accumulationSampleIndex = m_accumulationSampleIndex;
+        oidnCtx.accumulationCompleted = m_accumulationCompleted;
+        m_denoisePass->bindFrame(oidnCtx);
+        m_denoisePass->applyReferenceOIDN(m_commandList);
+    }
     if (m_context->activeSettings().ReferenceOIDNDenoiser)
         m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
 

@@ -236,19 +236,9 @@ private:
     void framePassFinalize(PathTracingFrameContext& ctx);
 
     void createRenderPasses(bool& exposureResetRequired, nvrhi::CommandListHandle initializeCommandList);
-    void createRtxdiRenderPasses();
-    void createAccumulationRenderPasses();
-    void createGaussianTemporalRenderPasses();
     void createPostProcessRenderPasses();
-    void createLightingRenderPasses(nvrhi::CommandListHandle initializeCommandList);
-    void createDenoiserRenderPasses();
-    void bindPassFrameResources();
-    void preUpdateLighting(nvrhi::CommandListHandle commandList, bool& needNewBindings);
-    void updateLighting(nvrhi::CommandListHandle commandList);
     void preUpdatePathTracing(bool resetAccum, nvrhi::CommandListHandle commandList);
     void postUpdatePathTracing();
-    void updatePathTracerConstants(PathTracerConstants& constants, const PathTracerCameraData& cameraData);
-    void rtxdiSetupFrame(nvrhi::IFramebuffer* framebuffer, PathTracerCameraData cameraData, dm::uint2 renderDims);
 
     PathTracerScenePasses        m_scenePasses;
     CameraController             m_renderCamera;
@@ -289,9 +279,6 @@ private:
     std::unique_ptr<AccumulationPass>           m_accumulationPass;
 
     std::shared_ptr<ShaderDebug>                m_shaderDebug;
-
-    nvrhi::ShaderHandle                         m_exportVBufferCS;
-    nvrhi::ComputePipelineHandle                m_exportVBufferPSO;
 
 #if CAUSTICA_WITH_STREAMLINE
     caustica::StreamlineInterface::DLSSSettings   m_recommendedDLSSSettings = {};

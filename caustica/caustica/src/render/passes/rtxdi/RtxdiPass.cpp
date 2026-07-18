@@ -214,6 +214,50 @@ void RtxdiPass::reset()
     m_PrevBindingSet = nullptr;
 }
 
+void RtxdiPass::setupFrame(const SetupParams& params)
+{
+	assert(params.renderTargets);
+
+	RtxdiBridgeParameters bridgeParameters;
+	bridgeParameters.frameIndex = params.frameIndex;
+	bridgeParameters.frameDims = params.frameDims;
+	bridgeParameters.cameraPosition = params.cameraPosition;
+	bridgeParameters.userSettings = params.userSettings;
+	bridgeParameters.usingLightSampling = params.usingLightSampling;
+	bridgeParameters.usingReGIR = params.usingReGIR;
+	bridgeParameters.userSettings.restirDI.initialSamplingParams.environmentMapImportanceSampling =
+		params.environmentMapImportanceSampling;
+	bridgeParameters.gaussianSplatEmissionProxies = params.gaussianSplatEmissionProxies;
+	bridgeParameters.gaussianSplatEmissionObjectToWorld = params.gaussianSplatEmissionObjectToWorld;
+	bridgeParameters.gaussianSplatEmissionIntensity = params.gaussianSplatEmissionIntensity;
+
+	if (params.resetRealtimeCaches)
+		reset();
+
+	size_t geometryInstanceCount = 0;
+	if (params.renderData)
+	{
+		for (const scene::MeshInstanceRenderProxy& proxy : params.renderData->meshInstances)
+			geometryInstanceCount += proxy.geometryCount;
+	}
+
+	prepareResources(
+		params.commandList,
+		*params.renderTargets,
+		params.environment,
+		params.envMapSceneParams,
+		params.renderData,
+		geometryInstanceCount,
+		params.descriptorTable,
+		params.gpuHandles,
+		params.materials,
+		params.opacityMaps,
+		params.subInstanceDataBuffer,
+		bridgeParameters,
+		params.bindingLayout,
+		params.shaderDebug);
+}
+
 void RtxdiPass::prepareResources(
     nvrhi::CommandListHandle commandList,
     const RenderTargets& renderTargets,

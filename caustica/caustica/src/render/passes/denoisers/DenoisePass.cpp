@@ -1,5 +1,6 @@
 #include <render/passes/denoisers/DenoisePass.h>
 
+#include <render/FrameGraphContext.h>
 #include <render/PathTracingContext.h>
 #include <render/core/CameraController.h>
 #include <render/core/PostProcessAA.h>
@@ -124,57 +125,86 @@ namespace
 #endif
 
 void DenoisePass::createGuides(
+    PathTracingContext* context,
     nvrhi::IDevice* device,
     const std::shared_ptr<caustica::ShaderFactory>& shaderFactory,
     const std::unique_ptr<RenderTargets>& renderTargets,
     const std::shared_ptr<ShaderDebug>& shaderDebug,
     nvrhi::BindingLayoutHandle bindingLayout)
 {
+    m_context = context;
+    m_device = device;
     m_denoisingGuidesPass = std::make_shared<DenoisingGuidesPass>(
         device, shaderFactory, renderTargets, shaderDebug, bindingLayout);
 }
 
-void DenoisePass::bindFrame(const FrameBindings& bindings)
+void DenoisePass::bindFrame(const FrameGraphContext& ctx)
 {
-    m_bindings = bindings;
+    m_context = ctx.pathTracingContext ? ctx.pathTracingContext : m_context;
+    m_device = ctx.device ? ctx.device : m_device;
+    m_renderTargets = ctx.renderTargets;
+    m_postProcess = ctx.postProcess;
+    m_bindingSet = ctx.bindingSet;
+    m_bindingLayout = ctx.bindingLayout;
+    m_constantBuffer = ctx.constantBuffer;
+    m_commandList = ctx.commandList;
+    m_renderSize = ctx.renderSize;
+    m_displaySize = ctx.displaySize;
+    m_displayAspectRatio = ctx.displayAspectRatio;
+    m_cameraJitter = ctx.cameraJitter;
+    m_sampleIndex = ctx.sampleIndex;
+    m_frameIndex = ctx.frameIndex;
+    m_accumulationSampleIndex = ctx.accumulationSampleIndex;
+    m_accumulationCompleted = ctx.accumulationCompleted;
+    m_gaussianSplatTemporalSampleIndex = ctx.gaussianSplatTemporalSampleIndex;
+    m_gaussianSplatTemporalReset = ctx.gaussianSplatTemporalReset;
+    m_temporalAntiAliasing = ctx.temporalAntiAliasing;
+    m_accumulation = ctx.accumulation;
+    m_camera = ctx.camera;
+#if CAUSTICA_WITH_STREAMLINE
+    m_dlssRROptions = ctx.dlssRROptions;
+#endif
+#if CAUSTICA_WITH_NATIVE_DLSS
+    m_nativeDLSS = ctx.nativeDLSS;
+#endif
 }
 
 void DenoisePass::prepareGuides(nvrhi::ICommandList* commandList)
 {
     assert(commandList);
     assert(m_denoisingGuidesPass);
-    assert(m_bindings.context);
-    assert(m_bindings.bindingSet);
+    assert(m_context);
+    assert(m_bindingSet);
 
     RAII_SCOPE(commandList->beginMarker("Denoising Guides Bake"); , commandList->endMarker(); );
 
-    m_denoisingGuidesPass->denoiseSpecHitT(commandList, m_bindings.bindingSet);
-    m_denoisingGuidesPass->computeAvgLayerRadiance(commandList, m_bindings.bindingSet);
+    m_denoisingGuidesPass->denoiseSpecHitT(commandList, m_bindingSet);
+    m_denoisingGuidesPass->computeAvgLayerRadiance(commandList, m_bindingSet);
 
-    if (m_bindings.context->activeSettings().DebugView != DebugViewType::Disabled)
+    if (m_context->activeSettings().DebugView != DebugViewType::Disabled)
         m_denoisingGuidesPass->renderDebugViz(
             commandList,
-            m_bindings.context->activeSettings().DebugView,
-            m_bindings.bindingSet);
+            m_context->activeSettings().DebugView,
+            m_bindingSet);
 }
 
 void DenoisePass::stablePlanesDebugViz(nvrhi::ICommandList* commandList)
 {
     assert(commandList);
-    assert(m_bindings.postProcess);
-    assert(m_bindings.renderTargets);
+    assert(m_postProcess);
+    assert(m_renderTargets);
 
     SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
 
     commandList->beginMarker("StablePlanesDebugViz");
-    nvrhi::TextureDesc tdesc = m_bindings.renderTargets->outputColor->getDesc();
-    m_bindings.postProcess->apply(
+    nvrhi::TextureDesc tdesc = m_renderTargets->outputColor->getDesc();
+    m_postProcess->apply(
         commandList,
         PostProcess::ComputePassType::StablePlanesDebugViz,
-        m_bindings.constantBuffer,
+        m_constantBuffer,
         miniConstants,
-        m_bindings.bindingSet,
-        m_bindings.bindingLayout,
+        m_bindingSet,
+        m_bindingLayout,
         tdesc.width,
         tdesc.height);
     commandList->endMarker();
@@ -182,10 +212,10 @@ void DenoisePass::stablePlanesDebugViz(nvrhi::ICommandList* commandList)
 
 void DenoisePass::ensureNrdIntegrations()
 {
-    assert(m_bindings.context);
-    assert(m_bindings.device);
+    assert(m_context);
+    assert(m_device);
 
-    if (!m_bindings.context->activeSettings().actualUseStandaloneDenoiser())
+    if (!m_context->activeSettings().actualUseStandaloneDenoiser())
         return;
 
     for (int i = 0; i < std::size(m_nrd); i++)
@@ -193,12 +223,12 @@ void DenoisePass::ensureNrdIntegrations()
         if (m_nrd[i] != nullptr)
             continue;
 
-        nrd::Denoiser denoiserMethod = m_bindings.context->activeSettings().NRDMethod == NrdConfig::DenoiserMethod::REBLUR
+        nrd::Denoiser denoiserMethod = m_context->activeSettings().NRDMethod == NrdConfig::DenoiserMethod::REBLUR
             ? nrd::Denoiser::REBLUR_DIFFUSE_SPECULAR
             : nrd::Denoiser::RELAX_DIFFUSE_SPECULAR;
 
-        m_nrd[i] = std::make_unique<NrdIntegration>(m_bindings.device, denoiserMethod);
-        m_nrd[i]->initialize(m_bindings.renderSize.x, m_bindings.renderSize.y, *m_bindings.context->shaderFactory);
+        m_nrd[i] = std::make_unique<NrdIntegration>(m_device, denoiserMethod);
+        m_nrd[i]->initialize(m_renderSize.x, m_renderSize.y, *m_context->shaderFactory);
     }
 }
 
@@ -210,18 +240,18 @@ void DenoisePass::denoiseStablePlane(
     (void)framebuffer;
 
     assert(commandList);
-    assert(m_bindings.context);
-    assert(m_bindings.renderTargets);
-    assert(m_bindings.postProcess);
+    assert(m_context);
+    assert(m_renderTargets);
+    assert(m_postProcess);
 
-    if (!m_bindings.context->activeSettings().actualUseStandaloneDenoiser())
+    if (!m_context->activeSettings().actualUseStandaloneDenoiser())
         return;
 
     const char* passNames[] = { "Denoising plane 0", "Denoising plane 1", "Denoising plane 2", "Denoising plane 3" };
     assert(planeIndex >= 0 && planeIndex < static_cast<int>(std::size(m_nrd)));
     assert(planeIndex < static_cast<int>(std::size(passNames)));
 
-    const bool nrdUseRelax = m_bindings.context->activeSettings().NRDMethod == NrdConfig::DenoiserMethod::RELAX;
+    const bool nrdUseRelax = m_context->activeSettings().NRDMethod == NrdConfig::DenoiserMethod::RELAX;
     const PostProcess::ComputePassType preparePassType = nrdUseRelax
         ? PostProcess::ComputePassType::RELAXDenoiserPrepareInputs
         : PostProcess::ComputePassType::REBLURDenoiserPrepareInputs;
@@ -229,9 +259,9 @@ void DenoisePass::denoiseStablePlane(
         ? PostProcess::ComputePassType::RELAXDenoiserFinalMerge
         : PostProcess::ComputePassType::REBLURDenoiserFinalMerge;
 
-    const bool resetHistory = m_bindings.context->activeSettings().ResetRealtimeCaches;
+    const bool resetHistory = m_context->activeSettings().ResetRealtimeCaches;
     const int maxPassCount = std::min(
-        m_bindings.context->activeSettings().StablePlanesActiveCount,
+        m_context->activeSettings().StablePlanesActiveCount,
         static_cast<int>(std::size(m_nrd)));
     const bool initWithStableRadiance = planeIndex == (maxPassCount - 1);
 
@@ -239,66 +269,66 @@ void DenoisePass::denoiseStablePlane(
 
     SampleMiniConstants miniConstants = { uint4(static_cast<uint>(planeIndex), initWithStableRadiance ? 1u : 0u, 0, 0) };
 
-    nvrhi::TextureDesc tdesc = m_bindings.renderTargets->outputColor->getDesc();
+    nvrhi::TextureDesc tdesc = m_renderTargets->outputColor->getDesc();
     commandList->beginMarker("PrepareInputs");
-    m_bindings.postProcess->apply(
+    m_postProcess->apply(
         commandList,
         preparePassType,
-        m_bindings.constantBuffer,
+        m_constantBuffer,
         miniConstants,
-        m_bindings.bindingSet,
-        m_bindings.bindingLayout,
+        m_bindingSet,
+        m_bindingLayout,
         tdesc.width,
         tdesc.height);
     commandList->endMarker();
 
-    const float timeDeltaBetweenFrames = m_bindings.context->gpuDevice.isHeadless() ? 1.f / 60.f : -1.f;
+    const float timeDeltaBetweenFrames = m_context->gpuDevice.isHeadless() ? 1.f / 60.f : -1.f;
     const bool enableValidation =
-        m_bindings.context->activeSettings().DebugView == DebugViewType::StablePlane_DenoiserValidation;
+        m_context->activeSettings().DebugView == DebugViewType::StablePlane_DenoiserValidation;
     if (nrdUseRelax)
     {
         m_nrd[planeIndex]->runDenoiserPasses(
             commandList,
-            *m_bindings.renderTargets,
+            *m_renderTargets,
             planeIndex,
-            *m_bindings.context->camera.view(),
-            *m_bindings.context->camera.viewPrevious(),
-            m_bindings.context->gpuDevice.getRenderPhaseFrameIndex(),
-            m_bindings.context->activeSettings().NRDDisocclusionThreshold,
-            m_bindings.context->activeSettings().NRDDisocclusionThresholdAlternate,
-            m_bindings.context->activeSettings().NRDUseAlternateDisocclusionThresholdMix,
+            *m_context->camera.view(),
+            *m_context->camera.viewPrevious(),
+            m_context->gpuDevice.getRenderPhaseFrameIndex(),
+            m_context->activeSettings().NRDDisocclusionThreshold,
+            m_context->activeSettings().NRDDisocclusionThresholdAlternate,
+            m_context->activeSettings().NRDUseAlternateDisocclusionThresholdMix,
             timeDeltaBetweenFrames,
             enableValidation,
             resetHistory,
-            &m_bindings.context->activeSettings().RelaxSettings);
+            &m_context->activeSettings().RelaxSettings);
     }
     else
     {
         m_nrd[planeIndex]->runDenoiserPasses(
             commandList,
-            *m_bindings.renderTargets,
+            *m_renderTargets,
             planeIndex,
-            *m_bindings.context->camera.view(),
-            *m_bindings.context->camera.viewPrevious(),
-            m_bindings.context->gpuDevice.getRenderPhaseFrameIndex(),
-            m_bindings.context->activeSettings().NRDDisocclusionThreshold,
-            m_bindings.context->activeSettings().NRDDisocclusionThresholdAlternate,
-            m_bindings.context->activeSettings().NRDUseAlternateDisocclusionThresholdMix,
+            *m_context->camera.view(),
+            *m_context->camera.viewPrevious(),
+            m_context->gpuDevice.getRenderPhaseFrameIndex(),
+            m_context->activeSettings().NRDDisocclusionThreshold,
+            m_context->activeSettings().NRDDisocclusionThresholdAlternate,
+            m_context->activeSettings().NRDUseAlternateDisocclusionThresholdMix,
             timeDeltaBetweenFrames,
             enableValidation,
             resetHistory,
-            &m_bindings.context->activeSettings().ReblurSettings);
+            &m_context->activeSettings().ReblurSettings);
     }
 
     commandList->beginMarker("MergeOutputs");
-    m_bindings.postProcess->apply(
+    m_postProcess->apply(
         commandList,
         mergePassType,
         planeIndex,
-        m_bindings.constantBuffer,
+        m_constantBuffer,
         miniConstants,
-        m_bindings.renderTargets->outputColor,
-        *m_bindings.renderTargets,
+        m_renderTargets->outputColor,
+        *m_renderTargets,
         nullptr);
     commandList->endMarker();
 
@@ -307,15 +337,15 @@ void DenoisePass::denoiseStablePlane(
 
 void DenoisePass::denoise(nvrhi::ICommandList* commandList, nvrhi::IFramebuffer* framebuffer)
 {
-    assert(m_bindings.context);
+    assert(m_context);
 
-    if (!m_bindings.context->activeSettings().actualUseStandaloneDenoiser())
+    if (!m_context->activeSettings().actualUseStandaloneDenoiser())
         return;
 
     ensureNrdIntegrations();
 
     const int maxPassCount = std::min(
-        m_bindings.context->activeSettings().StablePlanesActiveCount,
+        m_context->activeSettings().StablePlanesActiveCount,
         static_cast<int>(std::size(m_nrd)));
     for (int pass = maxPassCount - 1; pass >= 0; pass--)
         denoiseStablePlane(commandList, framebuffer, pass);
@@ -324,28 +354,28 @@ void DenoisePass::denoise(nvrhi::ICommandList* commandList, nvrhi::IFramebuffer*
 void DenoisePass::runNoDenoiserFinalMerge(nvrhi::ICommandList* commandList)
 {
     assert(commandList);
-    assert(m_bindings.context);
-    assert(m_bindings.renderTargets);
-    assert(m_bindings.postProcess);
+    assert(m_context);
+    assert(m_renderTargets);
+    assert(m_postProcess);
 
-    if (!m_bindings.context->activeSettings().RealtimeMode
-        || m_bindings.context->activeSettings().actualUseStandaloneDenoiser())
+    if (!m_context->activeSettings().RealtimeMode
+        || m_context->activeSettings().actualUseStandaloneDenoiser())
         return;
 
-    if (m_bindings.context->activeSettings().RealtimeAA == 2
-        || m_bindings.context->activeSettings().RealtimeAA == 3)
+    if (m_context->activeSettings().RealtimeAA == 2
+        || m_context->activeSettings().RealtimeAA == 3)
         return;
 
     SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
-    nvrhi::TextureDesc tdesc = m_bindings.renderTargets->outputColor->getDesc();
+    nvrhi::TextureDesc tdesc = m_renderTargets->outputColor->getDesc();
     commandList->beginMarker("NoDenoiserFinalMerge");
-    m_bindings.postProcess->apply(
+    m_postProcess->apply(
         commandList,
         PostProcess::ComputePassType::NoDenoiserFinalMerge,
-        m_bindings.constantBuffer,
+        m_constantBuffer,
         miniConstants,
-        m_bindings.bindingSet,
-        m_bindings.bindingLayout,
+        m_bindingSet,
+        m_bindingLayout,
         tdesc.width,
         tdesc.height);
     commandList->endMarker();
@@ -355,18 +385,18 @@ void DenoisePass::runNoDenoiserFinalMerge(nvrhi::ICommandList* commandList)
 bool DenoisePass::evaluateNativeDLSS(nvrhi::ICommandList* commandList, bool reset)
 {
     assert(commandList);
-    assert(m_bindings.context);
-    assert(m_bindings.renderTargets);
+    assert(m_context);
+    assert(m_renderTargets);
 
-    if (!m_bindings.nativeDLSS
-        || !(m_bindings.context->activeSettings().RealtimeAA == 2
-            || m_bindings.context->activeSettings().RealtimeAA == 3))
+    if (!m_nativeDLSS
+        || !(m_context->activeSettings().RealtimeAA == 2
+            || m_context->activeSettings().RealtimeAA == 3))
         return false;
 
-    const bool useRayReconstruction = m_bindings.context->activeSettings().RealtimeAA == 3;
-    if (useRayReconstruction && !m_bindings.nativeDLSS->isRayReconstructionSupported())
+    const bool useRayReconstruction = m_context->activeSettings().RealtimeAA == 3;
+    if (useRayReconstruction && !m_nativeDLSS->isRayReconstructionSupported())
         return false;
-    if (!useRayReconstruction && !m_bindings.nativeDLSS->isDlssSupported())
+    if (!useRayReconstruction && !m_nativeDLSS->isDlssSupported())
         return false;
 
     if (useRayReconstruction)
@@ -374,53 +404,53 @@ bool DenoisePass::evaluateNativeDLSS(nvrhi::ICommandList* commandList, bool rese
         RAII_SCOPE(commandList->beginMarker("DLSSRR_PrepareInputs");, commandList->endMarker(););
 
         SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
-        nvrhi::TextureDesc tdesc = m_bindings.renderTargets->outputColor->getDesc();
-        m_bindings.postProcess->apply(
+        nvrhi::TextureDesc tdesc = m_renderTargets->outputColor->getDesc();
+        m_postProcess->apply(
             commandList,
             PostProcess::ComputePassType::DLSSRRDenoiserPrepareInputs,
-            m_bindings.constantBuffer,
+            m_constantBuffer,
             miniConstants,
-            m_bindings.bindingSet,
-            m_bindings.bindingLayout,
+            m_bindingSet,
+            m_bindingLayout,
             tdesc.width,
             tdesc.height);
     }
 
     caustica::render::DLSS::InitParameters initParams;
-    initParams.inputWidth = m_bindings.renderSize.x;
-    initParams.inputHeight = m_bindings.renderSize.y;
-    initParams.outputWidth = m_bindings.displaySize.x;
-    initParams.outputHeight = m_bindings.displaySize.y;
+    initParams.inputWidth = m_renderSize.x;
+    initParams.inputHeight = m_renderSize.y;
+    initParams.outputWidth = m_displaySize.x;
+    initParams.outputHeight = m_displaySize.y;
     initParams.useLinearDepth = false;
     initParams.useAutoExposure = true;
     initParams.useRayReconstruction = useRayReconstruction;
 
-    m_bindings.nativeDLSS->init(initParams);
+    m_nativeDLSS->init(initParams);
 
     const bool initialized = useRayReconstruction
-        ? m_bindings.nativeDLSS->isRayReconstructionInitialized()
-        : m_bindings.nativeDLSS->isDlssInitialized();
+        ? m_nativeDLSS->isRayReconstructionInitialized()
+        : m_nativeDLSS->isDlssInitialized();
     if (!initialized)
         return false;
 
     caustica::render::DLSS::EvaluateParameters evaluateParams;
-    evaluateParams.inputColorTexture = m_bindings.renderTargets->outputColor;
-    evaluateParams.outputColorTexture = m_bindings.renderTargets->processedOutputColor;
-    evaluateParams.depthTexture = m_bindings.renderTargets->depth;
-    evaluateParams.motionVectorsTexture = m_bindings.renderTargets->screenMotionVectors;
-    evaluateParams.motionVectorScaleX = 1.0f / float(m_bindings.renderSize.x);
-    evaluateParams.motionVectorScaleY = 1.0f / float(m_bindings.renderSize.y);
-    evaluateParams.resetHistory = reset || m_bindings.context->activeSettings().ResetRealtimeCaches;
+    evaluateParams.inputColorTexture = m_renderTargets->outputColor;
+    evaluateParams.outputColorTexture = m_renderTargets->processedOutputColor;
+    evaluateParams.depthTexture = m_renderTargets->depth;
+    evaluateParams.motionVectorsTexture = m_renderTargets->screenMotionVectors;
+    evaluateParams.motionVectorScaleX = 1.0f / float(m_renderSize.x);
+    evaluateParams.motionVectorScaleY = 1.0f / float(m_renderSize.y);
+    evaluateParams.resetHistory = reset || m_context->activeSettings().ResetRealtimeCaches;
 
     if (useRayReconstruction)
     {
-        evaluateParams.diffuseAlbedo = m_bindings.renderTargets->rrDiffuseAlbedo;
-        evaluateParams.specularAlbedo = m_bindings.renderTargets->rrSpecAlbedo;
-        evaluateParams.normalRoughness = m_bindings.renderTargets->rrNormalsAndRoughness;
+        evaluateParams.diffuseAlbedo = m_renderTargets->rrDiffuseAlbedo;
+        evaluateParams.specularAlbedo = m_renderTargets->rrSpecAlbedo;
+        evaluateParams.normalRoughness = m_renderTargets->rrNormalsAndRoughness;
     }
 
-    const bool evaluated = m_bindings.nativeDLSS->evaluate(
-        commandList, evaluateParams, *m_bindings.context->camera.view());
+    const bool evaluated = m_nativeDLSS->evaluate(
+        commandList, evaluateParams, *m_context->camera.view());
     if (evaluated)
     {
         static bool loggedNativeDLSSEvaluation = false;
@@ -428,8 +458,8 @@ bool DenoisePass::evaluateNativeDLSS(nvrhi::ICommandList* commandList, bool rese
         {
             caustica::info("Native NGX %s evaluated successfully at %ux%u -> %ux%u.",
                 useRayReconstruction ? "DLSS-RR" : "DLSS",
-                m_bindings.renderSize.x, m_bindings.renderSize.y,
-                m_bindings.displaySize.x, m_bindings.displaySize.y);
+                m_renderSize.x, m_renderSize.y,
+                m_displaySize.x, m_displaySize.y);
             loggedNativeDLSSEvaluation = true;
         }
     }
@@ -441,67 +471,67 @@ bool DenoisePass::evaluateNativeDLSS(nvrhi::ICommandList* commandList, bool rese
 void DenoisePass::runDlssUpscale(nvrhi::ICommandList* commandList, bool reset)
 {
     assert(commandList);
-    assert(m_bindings.context);
-    assert(m_bindings.camera);
+    assert(m_context);
+    assert(m_camera);
 
-    if (!m_bindings.context->activeSettings().RealtimeMode)
+    if (!m_context->activeSettings().RealtimeMode)
         return;
 
-    if (!(m_bindings.context->activeSettings().RealtimeAA == 2
-        || m_bindings.context->activeSettings().RealtimeAA == 3))
+    if (!(m_context->activeSettings().RealtimeAA == 2
+        || m_context->activeSettings().RealtimeAA == 3))
         return;
 
     PostProcessAAParams params{
-        m_bindings.context->activeSettings(),
+        m_context->activeSettings(),
         commandList,
-        m_bindings.renderTargets,
-        &m_bindings.context->gpuDevice,
+        m_renderTargets,
+        &m_context->gpuDevice,
     };
-    params.renderSize = m_bindings.renderSize;
-    params.displaySize = m_bindings.displaySize;
-    params.displayAspectRatio = m_bindings.displayAspectRatio;
-    params.cameraJitter = m_bindings.cameraJitter;
-    params.sampleIndex = m_bindings.sampleIndex;
-    params.frameIndex = static_cast<uint32_t>(m_bindings.frameIndex);
+    params.renderSize = m_renderSize;
+    params.displaySize = m_displaySize;
+    params.displayAspectRatio = m_displayAspectRatio;
+    params.cameraJitter = m_cameraJitter;
+    params.sampleIndex = m_sampleIndex;
+    params.frameIndex = static_cast<uint32_t>(m_frameIndex);
     params.reset = reset;
-    params.temporalAAPass = m_bindings.temporalAntiAliasing;
-    params.accumulationPass = m_bindings.accumulation;
-    params.postProcess = m_bindings.postProcess;
-    params.bindingSet = m_bindings.bindingSet;
-    params.bindingLayout = m_bindings.bindingLayout;
-    params.constantBuffer = m_bindings.constantBuffer;
-    params.accumulationSampleIndex = m_bindings.accumulationSampleIndex;
-    params.gaussianSplatTemporalSampleIndex = m_bindings.gaussianSplatTemporalSampleIndex;
-    params.gaussianSplatTemporalReset = m_bindings.gaussianSplatTemporalReset;
+    params.temporalAAPass = m_temporalAntiAliasing;
+    params.accumulationPass = m_accumulation;
+    params.postProcess = m_postProcess;
+    params.bindingSet = m_bindingSet;
+    params.bindingLayout = m_bindingLayout;
+    params.constantBuffer = m_constantBuffer;
+    params.accumulationSampleIndex = m_accumulationSampleIndex;
+    params.gaussianSplatTemporalSampleIndex = m_gaussianSplatTemporalSampleIndex;
+    params.gaussianSplatTemporalReset = m_gaussianSplatTemporalReset;
 #if CAUSTICA_WITH_STREAMLINE
-    params.dlssRROptions = m_bindings.dlssRROptions;
+    params.dlssRROptions = m_dlssRROptions;
 #endif
 
-    caustica::postProcessAA(*m_bindings.camera, params);
+    caustica::postProcessAA(*m_camera, params);
 
 #if CAUSTICA_WITH_NATIVE_DLSS
     bool nativeDLSSEvaluated = evaluateNativeDLSS(commandList, reset);
 
     if (!nativeDLSSEvaluated)
     {
-        if (m_bindings.context->activeSettings().actualUseStandaloneDenoiser())
+        if (m_context->activeSettings().actualUseStandaloneDenoiser())
         {
             commandList->copyTexture(
-                m_bindings.renderTargets->processedOutputColor, nvrhi::TextureSlice(),
-                m_bindings.renderTargets->outputColor, nvrhi::TextureSlice());
+                m_renderTargets->processedOutputColor, nvrhi::TextureSlice(),
+                m_renderTargets->outputColor, nvrhi::TextureSlice());
         }
         else
         {
             SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
-            nvrhi::TextureDesc tdesc = m_bindings.renderTargets->outputColor->getDesc();
+            nvrhi::TextureDesc tdesc = m_renderTargets->outputColor->getDesc();
             commandList->beginMarker("NoDenoiserFinalMerge");
-            m_bindings.postProcess->apply(
+            m_postProcess->apply(
                 commandList,
                 PostProcess::ComputePassType::NoDenoiserFinalMerge,
-                m_bindings.constantBuffer,
+                m_constantBuffer,
                 miniConstants,
-                m_bindings.bindingSet,
-                m_bindings.bindingLayout,
+                m_bindingSet,
+                m_bindingLayout,
                 tdesc.width,
                 tdesc.height);
             commandList->endMarker();
@@ -531,30 +561,29 @@ void DenoisePass::resetReferenceOIDN()
         m_oidnDenoiser->reset();
 }
 
-void DenoisePass::applyReferenceOIDN()
+void DenoisePass::applyReferenceOIDN(nvrhi::ICommandList* commandList)
 {
-    assert(m_bindings.context);
+    assert(m_context);
+    assert(commandList);
 
-    if (m_bindings.context->activeSettings().RealtimeMode
-        || !m_bindings.context->activeSettings().ReferenceOIDNDenoiser
-        || m_bindings.renderTargets == nullptr)
+    if (m_context->activeSettings().RealtimeMode
+        || !m_context->activeSettings().ReferenceOIDNDenoiser
+        || m_renderTargets == nullptr)
         return;
 
 #if CAUSTICA_WITH_OIDN
-    nvrhi::ICommandList* commandList = m_bindings.commandList;
-    nvrhi::IDevice* device = m_bindings.device;
-    assert(commandList);
+    nvrhi::IDevice* device = m_device;
     assert(device);
 
-    const bool accumulationReady = m_bindings.accumulationCompleted
-        || m_bindings.accumulationSampleIndex >= m_bindings.context->activeSettings().AccumulationTarget;
+    const bool accumulationReady = m_accumulationCompleted
+        || m_accumulationSampleIndex >= m_context->activeSettings().AccumulationTarget;
     if (!accumulationReady)
         return;
 
     if (m_oidnDenoiserFailed)
         return;
 
-    const nvrhi::TextureDesc processedDesc = m_bindings.renderTargets->processedOutputColor->getDesc();
+    const nvrhi::TextureDesc processedDesc = m_renderTargets->processedOutputColor->getDesc();
     if (m_oidnDenoisedOutput == nullptr
         || m_oidnDenoisedOutput->getDesc().width != processedDesc.width
         || m_oidnDenoisedOutput->getDesc().height != processedDesc.height
@@ -571,12 +600,12 @@ void DenoisePass::applyReferenceOIDN()
     if (m_oidnDenoisedOutputValid)
     {
         commandList->copyTexture(
-            m_bindings.renderTargets->processedOutputColor, nvrhi::TextureSlice(),
+            m_renderTargets->processedOutputColor, nvrhi::TextureSlice(),
             m_oidnDenoisedOutput, nvrhi::TextureSlice());
         return;
     }
 
-    nvrhi::ITexture* sourceTexture = m_bindings.renderTargets->accumulatedRadiance;
+    nvrhi::ITexture* sourceTexture = m_renderTargets->accumulatedRadiance;
     nvrhi::TextureDesc sourceDesc = sourceTexture->getDesc();
     if (sourceDesc.format != nvrhi::Format::RGBA32_FLOAT)
     {
@@ -591,13 +620,13 @@ void DenoisePass::applyReferenceOIDN()
     const uint32_t height = sourceDesc.height;
 
     OidnDenoiser::Options oidnOptions;
-    oidnOptions.UseGPU = m_bindings.context->activeSettings().ReferenceOIDNUseGPU;
+    oidnOptions.UseGPU = m_context->activeSettings().ReferenceOIDNUseGPU;
     oidnOptions.GuidePasses = static_cast<OidnDenoiser::Passes>(
-        std::clamp(m_bindings.context->activeSettings().ReferenceOIDNPasses, 0, 2));
+        std::clamp(m_context->activeSettings().ReferenceOIDNPasses, 0, 2));
     oidnOptions.GuidePrefilter = static_cast<OidnDenoiser::Prefilter>(
-        std::clamp(m_bindings.context->activeSettings().ReferenceOIDNPrefilter, 0, 2));
+        std::clamp(m_context->activeSettings().ReferenceOIDNPrefilter, 0, 2));
     oidnOptions.FilterQuality = static_cast<OidnDenoiser::Quality>(
-        std::clamp(m_bindings.context->activeSettings().ReferenceOIDNQuality, 0, 2));
+        std::clamp(m_context->activeSettings().ReferenceOIDNQuality, 0, 2));
 
     const bool requestAlbedoGuide = oidnOptions.GuidePasses == OidnDenoiser::Passes::Albedo
         || oidnOptions.GuidePasses == OidnDenoiser::Passes::AlbedoNormal;
@@ -605,15 +634,15 @@ void DenoisePass::applyReferenceOIDN()
     if (requestAlbedoGuide || requestNormalGuide)
     {
         SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
-        nvrhi::TextureDesc tdesc = m_bindings.renderTargets->outputColor->getDesc();
+        nvrhi::TextureDesc tdesc = m_renderTargets->outputColor->getDesc();
         commandList->beginMarker("OIDN_PrepareGuides");
-        m_bindings.postProcess->apply(
+        m_postProcess->apply(
             commandList,
             PostProcess::ComputePassType::DLSSRRDenoiserPrepareInputs,
-            m_bindings.constantBuffer,
+            m_constantBuffer,
             miniConstants,
-            m_bindings.bindingSet,
-            m_bindings.bindingLayout,
+            m_bindingSet,
+            m_bindingLayout,
             tdesc.width,
             tdesc.height);
         commandList->endMarker();
@@ -631,29 +660,29 @@ void DenoisePass::applyReferenceOIDN()
 
     nvrhi::StagingTextureHandle albedoStagingTexture;
     nvrhi::StagingTextureHandle normalStagingTexture;
-    if (requestAlbedoGuide && m_bindings.renderTargets->rrDiffuseAlbedo != nullptr)
+    if (requestAlbedoGuide && m_renderTargets->rrDiffuseAlbedo != nullptr)
     {
         albedoStagingTexture = device->createStagingTexture(
             makeReadbackTextureDesc(
-                m_bindings.renderTargets->rrDiffuseAlbedo->getDesc(),
+                m_renderTargets->rrDiffuseAlbedo->getDesc(),
                 "ReferenceOIDN Albedo Readback"),
             nvrhi::CpuAccessMode::Read);
         if (albedoStagingTexture != nullptr)
             commandList->copyTexture(
                 albedoStagingTexture, nvrhi::TextureSlice(),
-                m_bindings.renderTargets->rrDiffuseAlbedo, nvrhi::TextureSlice());
+                m_renderTargets->rrDiffuseAlbedo, nvrhi::TextureSlice());
     }
-    if (requestNormalGuide && m_bindings.renderTargets->rrNormalsAndRoughness != nullptr)
+    if (requestNormalGuide && m_renderTargets->rrNormalsAndRoughness != nullptr)
     {
         normalStagingTexture = device->createStagingTexture(
             makeReadbackTextureDesc(
-                m_bindings.renderTargets->rrNormalsAndRoughness->getDesc(),
+                m_renderTargets->rrNormalsAndRoughness->getDesc(),
                 "ReferenceOIDN Normal Readback"),
             nvrhi::CpuAccessMode::Read);
         if (normalStagingTexture != nullptr)
             commandList->copyTexture(
                 normalStagingTexture, nvrhi::TextureSlice(),
-                m_bindings.renderTargets->rrNormalsAndRoughness, nvrhi::TextureSlice());
+                m_renderTargets->rrNormalsAndRoughness, nvrhi::TextureSlice());
     }
 
     commandList->copyTexture(stagingTexture, nvrhi::TextureSlice(), sourceTexture, nvrhi::TextureSlice());
@@ -740,7 +769,7 @@ void DenoisePass::applyReferenceOIDN()
 
     commandList->writeTexture(m_oidnDenoisedOutput, 0, 0, outputHalf.data(), size_t(width) * sizeof(float16_t4));
     commandList->copyTexture(
-        m_bindings.renderTargets->processedOutputColor, nvrhi::TextureSlice(),
+        m_renderTargets->processedOutputColor, nvrhi::TextureSlice(),
         m_oidnDenoisedOutput, nvrhi::TextureSlice());
     m_oidnDenoisedOutputValid = true;
 

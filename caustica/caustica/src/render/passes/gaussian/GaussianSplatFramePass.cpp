@@ -1,5 +1,6 @@
 #include <render/passes/gaussian/GaussianSplatFramePass.h>
 
+#include <render/FrameGraphContext.h>
 #include <render/PathTracingContext.h>
 #include <render/SceneGaussianSplatPasses.h>
 #include <render/core/AccelStructManager.h>
@@ -30,6 +31,9 @@ void GaussianSplatFramePass::createTemporalResources(
     assert(device);
     assert(renderTargets);
 
+    m_device = device;
+    m_renderTargets = renderTargets;
+
     nvrhi::TextureDesc gaussianCurrentDesc = renderTargets->processedOutputColor->getDesc();
     gaussianCurrentDesc.debugName = "GaussianSplatTemporalCurrentColor";
     gaussianCurrentDesc.isUAV = false;
@@ -55,41 +59,82 @@ void GaussianSplatFramePass::createTemporalResources(
         m_currentColor, m_accumulatedColor, renderTargets->processedOutputColor);
 }
 
-void GaussianSplatFramePass::bindFrame(const FrameBindings& bindings)
+void GaussianSplatFramePass::bindStable(
+    PathTracingContext* context,
+    nvrhi::IDevice* device,
+    caustica::AccelStructManager* accelStructs,
+    SceneGaussianSplatPasses* scenePasses)
 {
-    m_bindings = bindings;
+    m_context = context;
+    m_device = device;
+    m_accelStructs = accelStructs;
+    m_scenePasses = scenePasses;
+}
+
+void GaussianSplatFramePass::bindFrame(const FrameGraphContext& ctx)
+{
+    if (ctx.pathTracingContext)
+        m_context = ctx.pathTracingContext;
+    if (ctx.device)
+        m_device = ctx.device;
+    if (ctx.renderTargets)
+        m_renderTargets = ctx.renderTargets;
+    if (ctx.accelStructs)
+        m_accelStructs = ctx.accelStructs;
+    if (ctx.gaussianScenePasses)
+        m_scenePasses = ctx.gaussianScenePasses;
+
+    m_displaySize = ctx.displaySize;
+    m_frameIndex = ctx.frameIndex;
+    m_sampleIndex = ctx.sampleIndex;
+    m_temporalSampleIndex = ctx.gaussianSplatTemporalSampleIndex;
+    m_frameTemporalReset = ctx.gaussianSplatTemporalReset;
+    m_temporalReset = ctx.gaussianSplatOwnedTemporalReset;
 }
 
 void GaussianSplatFramePass::prepareScenePasses(const std::shared_ptr<ShaderDebug>& shaderDebug)
 {
-    assert(m_bindings.context);
-    assert(m_bindings.device);
-    assert(m_bindings.scenePasses);
+    assert(m_context);
+    assert(m_device);
+    assert(m_scenePasses);
 
     GaussianSplatPrepareContext context;
-    context.device = m_bindings.device;
-    context.shaderFactory = m_bindings.context->shaderFactory;
-    context.renderTargets = m_bindings.renderTargets;
+    context.device = m_device;
+    context.shaderFactory = m_context->shaderFactory;
+    context.renderTargets = m_renderTargets;
     context.shaderDebug = shaderDebug;
     context.gpuSort = m_gpuSort;
-    prepareGaussianSplatScenePasses(*m_bindings.scenePasses, context);
+    prepareGaussianSplatScenePasses(*m_scenePasses, context);
     m_gpuSort = context.gpuSort;
+}
+
+void GaussianSplatFramePass::buildEmissionProxies(
+    std::vector<GaussianSplatEmissionProxy>& outProxies,
+    const PathTracerSettings& settings) const
+{
+    assert(m_context);
+    assert(m_scenePasses);
+    caustica::render::buildGaussianSplatEmissionProxies(
+        outProxies,
+        m_context->frameGaussianSplats(),
+        *m_scenePasses,
+        settings);
 }
 
 bool GaussianSplatFramePass::hasActiveSplats() const
 {
-    assert(m_bindings.context);
-    assert(m_bindings.scenePasses);
+    assert(m_context);
+    assert(m_scenePasses);
 
-    if (!m_bindings.context->hasFrameScene() || !m_bindings.context->activeSettings().EnableGaussianSplats)
+    if (!m_context->hasFrameScene() || !m_context->activeSettings().EnableGaussianSplats)
         return false;
 
-    const auto gaussianSplats = m_bindings.context->frameGaussianSplats();
+    const auto gaussianSplats = m_context->frameGaussianSplats();
     return std::any_of(
         gaussianSplats.begin(),
         gaussianSplats.end(),
         [this](const scene::GaussianSplatRenderProxy& proxy) {
-            return isGaussianSplatProxyActive(proxy, *m_bindings.scenePasses);
+            return isGaussianSplatProxyActive(proxy, *m_scenePasses);
         });
 }
 
@@ -100,24 +145,24 @@ GaussianSplatFramePass::prepareGraphResources(bool renderToOutputColor)
     if (!hasActiveSplats())
         return resources;
 
-    assert(m_bindings.context);
-    assert(m_bindings.scenePasses);
-    assert(m_bindings.temporalSampleIndex);
+    assert(m_context);
+    assert(m_scenePasses);
+    assert(m_temporalSampleIndex);
 
     const GaussianSplatFrameInputs frameInputs{
-        m_bindings.context->activeSettings(),
-        int(m_bindings.frameIndex),
-        int(m_bindings.sampleIndex),
-        *m_bindings.temporalSampleIndex,
+        m_context->activeSettings(),
+        int(m_frameIndex),
+        int(m_sampleIndex),
+        *m_temporalSampleIndex,
         renderToOutputColor,
-        dm::float2(float(m_bindings.displaySize.x), float(m_bindings.displaySize.y)),
-        resolveGaussianSplatShadowDirection(m_bindings.context->frameLights()),
+        dm::float2(float(m_displaySize.x), float(m_displaySize.y)),
+        resolveGaussianSplatShadowDirection(m_context->frameLights()),
     };
     const GaussianSplatRenderSettings settings = buildGaussianSplatRenderSettings(frameInputs);
 
-    for (const scene::GaussianSplatRenderProxy& proxy : m_bindings.context->frameGaussianSplats())
+    for (const scene::GaussianSplatRenderProxy& proxy : m_context->frameGaussianSplats())
     {
-        GaussianSplatPass* pass = m_bindings.scenePasses->findPass(proxy.entity);
+        GaussianSplatPass* pass = m_scenePasses->findPass(proxy.entity);
         if (!proxy.enabled || pass == nullptr || !pass->hasSplats())
             continue;
 
@@ -134,14 +179,14 @@ void GaussianSplatFramePass::executeAccelBuild(nvrhi::ICommandList* commandList)
     if (commandList == nullptr || !hasActiveSplats())
         return;
 
-    assert(m_bindings.context);
-    assert(m_bindings.scenePasses);
+    assert(m_context);
+    assert(m_scenePasses);
 
     buildGaussianSplatSceneAccelStructs(
         commandList,
-        m_bindings.context->frameGaussianSplats(),
-        *m_bindings.scenePasses,
-        m_bindings.context->activeSettings());
+        m_context->frameGaussianSplats(),
+        *m_scenePasses,
+        m_context->activeSettings());
 }
 
 void GaussianSplatFramePass::executeUpload(nvrhi::ICommandList* commandList, bool renderToOutputColor)
@@ -150,51 +195,51 @@ void GaussianSplatFramePass::executeUpload(nvrhi::ICommandList* commandList, boo
     if (commandList == nullptr || !hasActiveSplats())
         return;
 
-    assert(m_bindings.context);
-    assert(m_bindings.scenePasses);
-    assert(m_bindings.accelStructs);
-    assert(m_bindings.renderTargets);
-    assert(m_bindings.temporalSampleIndex);
+    assert(m_context);
+    assert(m_scenePasses);
+    assert(m_accelStructs);
+    assert(m_renderTargets);
+    assert(m_temporalSampleIndex);
 
-    const bool stochasticSplats = m_bindings.context->activeSettings().EnableGaussianSplats
-        && m_bindings.context->activeSettings().GaussianSplatSortingMode == 1;
+    const bool stochasticSplats = m_context->activeSettings().EnableGaussianSplats
+        && m_context->activeSettings().GaussianSplatSortingMode == 1;
     const bool temporalReset =
-        (m_bindings.frameTemporalReset && *m_bindings.frameTemporalReset)
-        || (m_bindings.temporalReset && *m_bindings.temporalReset);
+        (m_frameTemporalReset && *m_frameTemporalReset)
+        || (m_temporalReset && *m_temporalReset);
     if (stochasticSplats
-        && (m_bindings.context->activeSettings().ResetAccumulation
-            || m_bindings.context->activeSettings().ResetRealtimeCaches
+        && (m_context->activeSettings().ResetAccumulation
+            || m_context->activeSettings().ResetRealtimeCaches
             || temporalReset))
     {
-        *m_bindings.temporalSampleIndex = 0;
+        *m_temporalSampleIndex = 0;
     }
 
     const GaussianSplatFrameInputs frameInputs{
-        m_bindings.context->activeSettings(),
-        int(m_bindings.frameIndex),
-        int(m_bindings.sampleIndex),
-        *m_bindings.temporalSampleIndex,
+        m_context->activeSettings(),
+        int(m_frameIndex),
+        int(m_sampleIndex),
+        *m_temporalSampleIndex,
         renderToOutputColor,
-        dm::float2(float(m_bindings.displaySize.x), float(m_bindings.displaySize.y)),
-        resolveGaussianSplatShadowDirection(m_bindings.context->frameLights()),
+        dm::float2(float(m_displaySize.x), float(m_displaySize.y)),
+        resolveGaussianSplatShadowDirection(m_context->frameLights()),
     };
     const GaussianSplatRenderSettings settings = buildGaussianSplatRenderSettings(frameInputs);
 
-    caustica::PlanarView splatView = *m_bindings.context->camera.view();
+    caustica::PlanarView splatView = *m_context->camera.view();
     if (!renderToOutputColor)
     {
-        splatView.setViewport(ViewportDesc(float(m_bindings.displaySize.x), float(m_bindings.displaySize.y)));
+        splatView.setViewport(ViewportDesc(float(m_displaySize.x), float(m_displaySize.y)));
         splatView.setPixelOffset(dm::float2::zero());
     }
     splatView.updateCache();
 
     (void)uploadGaussianSplatScene(
         commandList,
-        m_bindings.context->frameGaussianSplats(),
-        *m_bindings.scenePasses,
+        m_context->frameGaussianSplats(),
+        *m_scenePasses,
         splatView,
-        m_bindings.accelStructs->getTopLevelAS().Get(),
-        *m_bindings.renderTargets,
+        m_accelStructs->getTopLevelAS().Get(),
+        *m_renderTargets,
         settings);
 }
 
@@ -203,13 +248,13 @@ void GaussianSplatFramePass::executeSort(nvrhi::ICommandList* commandList)
     if (commandList == nullptr || !hasActiveSplats())
         return;
 
-    assert(m_bindings.context);
-    assert(m_bindings.scenePasses);
+    assert(m_context);
+    assert(m_scenePasses);
 
     sortGaussianSplatScene(
         commandList,
-        m_bindings.context->frameGaussianSplats(),
-        *m_bindings.scenePasses);
+        m_context->frameGaussianSplats(),
+        *m_scenePasses);
 }
 
 void GaussianSplatFramePass::executeRaster(nvrhi::ICommandList* commandList, bool renderToOutputColor)
@@ -217,21 +262,21 @@ void GaussianSplatFramePass::executeRaster(nvrhi::ICommandList* commandList, boo
     if (commandList == nullptr || !hasActiveSplats())
         return;
 
-    assert(m_bindings.context);
-    assert(m_bindings.scenePasses);
+    assert(m_context);
+    assert(m_scenePasses);
 
-    caustica::PlanarView splatView = *m_bindings.context->camera.view();
+    caustica::PlanarView splatView = *m_context->camera.view();
     if (!renderToOutputColor)
     {
-        splatView.setViewport(ViewportDesc(float(m_bindings.displaySize.x), float(m_bindings.displaySize.y)));
+        splatView.setViewport(ViewportDesc(float(m_displaySize.x), float(m_displaySize.y)));
         splatView.setPixelOffset(dm::float2::zero());
     }
     splatView.updateCache();
 
     const bool renderedAny = rasterGaussianSplatScene(
         commandList,
-        m_bindings.context->frameGaussianSplats(),
-        *m_bindings.scenePasses,
+        m_context->frameGaussianSplats(),
+        *m_scenePasses,
         splatView);
     m_compositeRendered = renderedAny && !renderToOutputColor;
 }
@@ -241,36 +286,36 @@ void GaussianSplatFramePass::executeAccumulate(nvrhi::ICommandList* commandList)
     if (commandList == nullptr || !m_compositeRendered)
         return;
 
-    if (m_accumulationPass == nullptr || m_bindings.renderTargets == nullptr
+    if (m_accumulationPass == nullptr || m_renderTargets == nullptr
         || m_currentColor == nullptr || m_accumulatedColor == nullptr)
         return;
 
-    assert(m_bindings.context);
-    assert(m_bindings.temporalSampleIndex);
+    assert(m_context);
+    assert(m_temporalSampleIndex);
 
     const bool temporalReset =
-        (m_bindings.frameTemporalReset && *m_bindings.frameTemporalReset)
-        || (m_bindings.temporalReset && *m_bindings.temporalReset);
-    if (m_bindings.context->activeSettings().ResetAccumulation
-        || m_bindings.context->activeSettings().ResetRealtimeCaches
+        (m_frameTemporalReset && *m_frameTemporalReset)
+        || (m_temporalReset && *m_temporalReset);
+    if (m_context->activeSettings().ResetAccumulation
+        || m_context->activeSettings().ResetRealtimeCaches
         || temporalReset)
     {
-        *m_bindings.temporalSampleIndex = 0;
-        if (m_bindings.frameTemporalReset)
-            *m_bindings.frameTemporalReset = false;
-        if (m_bindings.temporalReset)
-            *m_bindings.temporalReset = false;
+        *m_temporalSampleIndex = 0;
+        if (m_frameTemporalReset)
+            *m_frameTemporalReset = false;
+        if (m_temporalReset)
+            *m_temporalReset = false;
     }
 
-    const float accumulationWeight = 1.0f / float(*m_bindings.temporalSampleIndex + 1);
+    const float accumulationWeight = 1.0f / float(*m_temporalSampleIndex + 1);
 
-    caustica::PlanarView splatView = *m_bindings.context->camera.view();
-    splatView.setViewport(ViewportDesc(float(m_bindings.displaySize.x), float(m_bindings.displaySize.y)));
+    caustica::PlanarView splatView = *m_context->camera.view();
+    splatView.setViewport(ViewportDesc(float(m_displaySize.x), float(m_displaySize.y)));
     splatView.setPixelOffset(dm::float2::zero());
     splatView.updateCache();
 
     m_accumulationPass->render(commandList, splatView, splatView, accumulationWeight);
 
-    *m_bindings.temporalSampleIndex = std::min(*m_bindings.temporalSampleIndex + 1, 1024 * 1024);
+    *m_temporalSampleIndex = std::min(*m_temporalSampleIndex + 1, 1024 * 1024);
     m_compositeRendered = false;
 }
