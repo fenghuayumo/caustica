@@ -155,21 +155,47 @@ bool shouldRenderWhenUnfocused(const App& app)
 
 std::shared_ptr<Material> findMaterial(const App& app, int materialID)
 {
-    // Path-tracer pick / Material Editor use PTMaterial::gpuDataIndex.
-    // Material::materialID is a dense scene-list index and can diverge after imports.
+    // Path-tracer pick stores PTMaterial::gpuDataIndex. After the snapshot refactor,
+    // PT materials live in MaterialGpuCache (not MaterialEx::ptData on scene materials).
     if (materialID < 0)
         return nullptr;
 
+    auto* wr = worldRenderer(app);
+    const auto& cache = wr ? wr->lightingPasses().materials() : nullptr;
+    const std::shared_ptr<PTMaterial> ptFromCache =
+        cache ? cache->findByGpuDataIndex(uint(materialID)) : nullptr;
+
+    if (ptFromCache)
+    {
+        // Prefer a live scene MaterialEx so the editor keeps a stable identity;
+        // re-link ptData for PTMaterial::safeCast / Material Editor.
+        if (const std::shared_ptr<Scene> active = activeScene(app))
+        {
+            for (const auto& mat : active->getMaterials())
+            {
+                auto materialEx = std::dynamic_pointer_cast<MaterialEx>(mat);
+                if (!materialEx || !mat)
+                    continue;
+                if (cache->findByResourceId(mat->renderResourceId).get() != ptFromCache.get())
+                    continue;
+                materialEx->ptData = ptFromCache;
+                return mat;
+            }
+        }
+
+        // No scene counterpart (or id mismatch) — wrap for Material Editor only.
+        auto wrap = std::make_shared<MaterialEx>();
+        wrap->ptData = ptFromCache;
+        wrap->name = ptFromCache->name;
+        wrap->modelFileName = ptFromCache->modelName;
+        return wrap;
+    }
+
+    // Fallback: dense scene-list Material::materialID (can diverge from gpuDataIndex).
     const std::shared_ptr<Scene> active = activeScene(app);
     if (!active)
         return nullptr;
 
-    for (const auto& mat : active->getMaterials())
-    {
-        const auto pt = PTMaterial::safeCast(mat);
-        if (pt && int(pt->gpuDataIndex) == materialID)
-            return mat;
-    }
     for (const auto& mat : active->getMaterials())
     {
         if (mat && mat->materialID == materialID)

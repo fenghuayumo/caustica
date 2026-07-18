@@ -454,11 +454,14 @@ void SceneEditor::resolvePickFeedback(const DebugFeedbackStruct& feedback, const
     if (renderedPick.InstanceRequested)
     {
         ecs::Entity picked = caustica::findEntityByInstanceIndex(*m_app, int(feedback.pickedInstanceIndex));
+        bool pickedGaussian = false;
         if (picked == ecs::NullEntity)
+        {
             picked = pickGaussianSplatAtPixel(renderedPick.Position);
+            pickedGaussian = (picked != ecs::NullEntity);
+        }
         m_editor.SelectedEntity = picked;
-        if (m_editor.SelectedEntity != caustica::ecs::NullEntity)
-            m_editor.SelectedGaussianSplat = false;
+        m_editor.SelectedGaussianSplat = pickedGaussian;
     }
 }
 

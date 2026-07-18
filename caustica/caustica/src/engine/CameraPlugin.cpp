@@ -6,6 +6,8 @@
 #include <engine/SessionCamera.h>
 #include <engine/SceneQuery.h>
 #include <engine/SystemLabels.h>
+#include <backend/GpuDevice.h>
+#include <render/core/CameraController.h>
 #include <render/core/PathTracerSettings.h>
 #include <render/WorldRenderer.h>
 #include <scene/Scene.h>
@@ -71,6 +73,24 @@ void updateCamera(App& app, float elapsedTimeSeconds)
             dir = rot.transformVector(dir);
 
             cam.camera().lookTo(cam.camera().getPosition(), dir, cam.camera().getUp());
+        }
+    }
+
+    // SessionCamera's PlanarView is logic-side only (gizmo / 3DGS CPU pick). The
+    // render thread owns a separate CameraController filled from Extract — keep
+    // this view in sync with the free-camera pose using the window framebuffer
+    // size (display space), not WorldRenderer::getRenderSize().
+    if (GpuDevice* device = app.getGpuDevice(); device && !device->isHeadless())
+    {
+        int width = 0;
+        int height = 0;
+        device->getWindowDimensions(width, height);
+        if (width > 0 && height > 0)
+        {
+            CameraUpdateParams viewParams;
+            viewParams.renderSize = math::uint2{ uint(width), uint(height) };
+            viewParams.displayAspectRatio = float(width) / float(height);
+            cam.updateViews(viewParams);
         }
     }
 

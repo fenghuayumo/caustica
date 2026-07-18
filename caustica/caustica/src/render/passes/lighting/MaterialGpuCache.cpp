@@ -1329,6 +1329,18 @@ std::shared_ptr<PTMaterial> MaterialGpuCache::findByResourceId(
     return it == m_materialsById.end() ? nullptr : it->second;
 }
 
+std::shared_ptr<PTMaterial> MaterialGpuCache::findByGpuDataIndex(uint gpuDataIndex) const
+{
+    if (gpuDataIndex == 0xFFFFFFFFu)
+        return nullptr;
+    for (const auto& material : m_materials)
+    {
+        if (material && material->gpuDataIndex == gpuDataIndex)
+            return material;
+    }
+    return nullptr;
+}
+
 MaterialGpuCache::RayTracingState MaterialGpuCache::resolveRayTracingState(
     caustica::scene::MaterialRenderResourceId id) const
 {

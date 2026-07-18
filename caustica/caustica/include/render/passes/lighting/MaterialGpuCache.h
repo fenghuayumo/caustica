@@ -302,6 +302,8 @@ public:
     // ptData. Used by runtime mesh import so existing materials stay valid.
     int                             ensureMaterialsFromScene(std::span<const caustica::scene::MaterialRenderResourceSnapshot> materials);
     std::shared_ptr<PTMaterial>     findByResourceId(caustica::scene::MaterialRenderResourceId id) const;
+    // Path-tracer pick feedback stores PTMaterial::gpuDataIndex.
+    std::shared_ptr<PTMaterial>     findByGpuDataIndex(uint gpuDataIndex) const;
     RayTracingState                 resolveRayTracingState(caustica::scene::MaterialRenderResourceId id) const;
     uint64_t                        materialStateRevision() const { return m_materialStateRevision; }
     void                            notifyMaterialEdited();
