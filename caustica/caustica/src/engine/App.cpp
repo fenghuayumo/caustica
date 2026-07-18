@@ -409,7 +409,13 @@ void App::requestExit()
     if (Window* w = window())
         w->setExit(true);
     if (GpuDevice* gpuDevice = device())
+    {
         gpuDevice->setShuttingDown(true);
+        // Hide immediately so title-bar Close feels instant while the render
+        // thread / GPU drain finishes in the background (not a hang/crash).
+        if (GLFWwindow* glfwWindow = gpuDevice->getWindow())
+            glfwHideWindow(glfwWindow);
+    }
 }
 
 void App::requestRenderUnfocused()
@@ -463,10 +469,19 @@ void App::updateWindowSize()
     if (!gpuDevice)
         return;
 
+    // Per-frame dispatchAndWait stalls the UI thread behind a full path-trace
+    // frame even when the window size is unchanged — Windows title-bar Close
+    // then looks hung (spinning cursor). Only sync when something changed.
     if (m_useDedicatedRenderThread && m_renderThread.isRunning())
+    {
+        if (!gpuDevice->needsWindowSizeSync())
+            return;
         m_renderThread.dispatchAndWait([gpuDevice]() { gpuDevice->updateWindowSize(); });
+    }
     else
+    {
         gpuDevice->updateWindowSize();
+    }
 }
 
 void App::animate(double elapsedTime, bool windowIsFocused)

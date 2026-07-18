@@ -323,6 +323,9 @@ namespace caustica
         bool initializeHeadlessGraphics(const DeviceCreationParameters& params);
 
         void updateWindowSize();
+        // UI-thread probe: true when resize / minimize / vsync actually needs a
+        // render-thread sync. Avoids per-frame dispatchAndWait behind path-trace.
+        [[nodiscard]] bool needsWindowSizeSync() const;
         void backBufferResizing();
         void backBufferResized();
         void createDepthBuffer();

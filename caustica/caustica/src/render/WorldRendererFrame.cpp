@@ -819,7 +819,11 @@ void caustica::render::WorldRenderer::framePassFinalize(PathTracingFrameContext&
         }
     }
 
-    if (m_context->activeSettings().ContinuousDebugFeedback || m_context->activeRuntime().Picking.hasActivePickRequest())
+    // Full-device idle for pick/debug readback is expensive; skip on shutdown so
+    // Close is not blocked behind a path-trace + waitForIdle frame.
+    if (!m_context->gpuDevice.isShuttingDown()
+        && (m_context->activeSettings().ContinuousDebugFeedback
+            || m_context->activeRuntime().Picking.hasActivePickRequest()))
     {
         device()->waitForIdle();
         void* pData = device()->mapBuffer(m_feedback_Buffer_Cpu, nvrhi::CpuAccessMode::Read);

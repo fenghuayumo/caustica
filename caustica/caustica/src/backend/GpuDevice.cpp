@@ -454,6 +454,32 @@ caustica::GpuDevice::GpuDevice()
 {
 }
 
+bool GpuDevice::needsWindowSizeSync() const
+{
+    if (!m_Window)
+        return false;
+
+    int width = 0;
+    int height = 0;
+    glfwGetWindowSize(m_Window, &width, &height);
+
+    if (width == 0 || height == 0)
+        return m_CanPresentSwapChain;
+
+    if (!m_CanPresentSwapChain)
+        return true;
+
+    if (int(m_DeviceParams.backBufferWidth) != width
+        || int(m_DeviceParams.backBufferHeight) != height)
+        return true;
+
+    // VSync toggles apply through updateWindowSize (Vulkan may rebuild the swapchain).
+    if (m_DeviceParams.vsyncEnabled != m_RequestedVSync)
+        return true;
+
+    return false;
+}
+
 void GpuDevice::updateWindowSize()
 {
     if (!m_Window)
@@ -471,7 +497,7 @@ void GpuDevice::updateWindowSize()
 
     m_CanPresentSwapChain = true;
 
-    if (int(m_DeviceParams.backBufferWidth) != width || 
+    if (int(m_DeviceParams.backBufferWidth) != width ||
         int(m_DeviceParams.backBufferHeight) != height ||
         (m_DeviceParams.vsyncEnabled != m_RequestedVSync && getGraphicsAPI() == nvrhi::GraphicsAPI::VULKAN))
     {
