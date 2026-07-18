@@ -514,27 +514,38 @@ void DenoisePass::runDlssUpscale(nvrhi::ICommandList* commandList, bool reset)
 
     if (!nativeDLSSEvaluated)
     {
-        if (m_context->activeSettings().actualUseStandaloneDenoiser())
+        // Never 1:1-copy render-res output into display-res processedOutputColor —
+        // that leaves the unfilled region as uninitialized garbage (black/white bands).
+        if (m_renderSize.x == m_displaySize.x && m_renderSize.y == m_displaySize.y)
         {
-            commandList->copyTexture(
-                m_renderTargets->processedOutputColor, nvrhi::TextureSlice(),
-                m_renderTargets->outputColor, nvrhi::TextureSlice());
+            if (m_context->activeSettings().actualUseStandaloneDenoiser())
+            {
+                commandList->copyTexture(
+                    m_renderTargets->processedOutputColor, nvrhi::TextureSlice(),
+                    m_renderTargets->outputColor, nvrhi::TextureSlice());
+            }
+            else
+            {
+                SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
+                nvrhi::TextureDesc tdesc = m_renderTargets->outputColor->getDesc();
+                commandList->beginMarker("NoDenoiserFinalMerge");
+                m_postProcess->apply(
+                    commandList,
+                    PostProcess::ComputePassType::NoDenoiserFinalMerge,
+                    m_constantBuffer,
+                    miniConstants,
+                    m_bindingSet,
+                    m_bindingLayout,
+                    tdesc.width,
+                    tdesc.height);
+                commandList->endMarker();
+            }
         }
         else
         {
-            SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
-            nvrhi::TextureDesc tdesc = m_renderTargets->outputColor->getDesc();
-            commandList->beginMarker("NoDenoiserFinalMerge");
-            m_postProcess->apply(
-                commandList,
-                PostProcess::ComputePassType::NoDenoiserFinalMerge,
-                m_constantBuffer,
-                miniConstants,
-                m_bindingSet,
-                m_bindingLayout,
-                tdesc.width,
-                tdesc.height);
-            commandList->endMarker();
+            caustica::warning(
+                "Native DLSS fallback skipped: render size %ux%u != display size %ux%u",
+                m_renderSize.x, m_renderSize.y, m_displaySize.x, m_displaySize.y);
         }
     }
 #endif

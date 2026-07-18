@@ -304,19 +304,26 @@ void registerDenoiseAAPass(FrameGraphContext ctx)
 
     if (needsRealtimeCopyPass(*ctx.settings))
     {
-        ctx.graph->addPass(
-            "CopyOutputToProcessed",
-            [&](rg::PassBuilder& setup) {
-                setup.read(outputColor, rg::TextureAccess::CopySource);
-                setup.write(processedOutputColor, rg::TextureAccess::CopyDest);
-            },
-            [outputColor, processedOutputColor](rg::RenderPassContext& passCtx) {
-                passCtx.commandList()->copyTexture(
-                    passCtx.texture(processedOutputColor),
-                    nvrhi::TextureSlice(),
-                    passCtx.texture(outputColor),
-                    nvrhi::TextureSlice());
-            });
+        // RealtimeAA==0 should keep renderSize == displaySize; refuse a mismatched
+        // copy that would leave the rest of processedOutputColor uninitialized.
+        const bool sizesMatch =
+            ctx.renderSize.x == ctx.displaySize.x && ctx.renderSize.y == ctx.displaySize.y;
+        if (sizesMatch)
+        {
+            ctx.graph->addPass(
+                "CopyOutputToProcessed",
+                [&](rg::PassBuilder& setup) {
+                    setup.read(outputColor, rg::TextureAccess::CopySource);
+                    setup.write(processedOutputColor, rg::TextureAccess::CopyDest);
+                },
+                [outputColor, processedOutputColor](rg::RenderPassContext& passCtx) {
+                    passCtx.commandList()->copyTexture(
+                        passCtx.texture(processedOutputColor),
+                        nvrhi::TextureSlice(),
+                        passCtx.texture(outputColor),
+                        nvrhi::TextureSlice());
+                });
+        }
     }
 
     if (needsTemporalAAPass(*ctx.settings, temporalAAPass))

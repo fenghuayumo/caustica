@@ -140,8 +140,12 @@ void postProcessAAPlatform(CameraController& camera, PostProcessAAParams& params
         params.gpuDevice->getStreamline().evaluateDLSSRR(commandList);
         commandList->clearState();
     }
-    else if (!settings.actualUseStandaloneDenoiser())
+    else if (
+        settings.RealtimeAA != 2
+        && settings.RealtimeAA != 3
+        && !settings.actualUseStandaloneDenoiser())
     {
+        // Skip after DLSS/DLSS-RR: merge is for native-res realtime without AA upscale.
         SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
         nvrhi::TextureDesc tdesc = renderTargets->outputColor->getDesc();
         commandList->beginMarker("NoDenoiserFinalMerge");

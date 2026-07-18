@@ -268,7 +268,6 @@ void registerPathTracePrePass(FrameGraphContext ctx)
     assert(ctx.pathTrace);
     assert(ctx.renderTargets);
     assert(ctx.settings);
-    assert(ctx.extractedView);
 
     if (!ctx.hasScene || !ctx.settings->RealtimeMode)
         return;
@@ -288,7 +287,7 @@ void registerPathTracePrePass(FrameGraphContext ctx)
                 passCtx.commandList(),
                 ctx.bindingSet,
                 ctx.descriptorTable,
-                ctx.extractedView->renderSize,
+                ctx.renderSize,
                 ctx.ptBuildStablePlanes);
         },
         passOptions);
@@ -300,7 +299,6 @@ void registerVBufferExportPass(FrameGraphContext ctx)
     assert(ctx.pathTrace);
     assert(ctx.renderTargets);
     assert(ctx.settings);
-    assert(ctx.extractedView);
 
     if (!ctx.hasScene || !ctx.settings->RealtimeMode)
         return;
@@ -320,7 +318,7 @@ void registerVBufferExportPass(FrameGraphContext ctx)
                 passCtx.commandList(),
                 ctx.bindingSet,
                 ctx.descriptorTable,
-                ctx.extractedView->renderSize,
+                ctx.renderSize,
                 ctx.exportVBufferPSO);
         },
         passOptions);
@@ -369,7 +367,6 @@ void registerMainPathTracePass(FrameGraphContext ctx)
     assert(ctx.pathTrace);
     assert(ctx.renderTargets);
     assert(ctx.settings);
-    assert(ctx.extractedView);
 
     if (!ctx.hasScene)
         return;
@@ -392,7 +389,7 @@ void registerMainPathTracePass(FrameGraphContext ctx)
                 passCtx.commandList(),
                 ctx.bindingSet,
                 ctx.descriptorTable,
-                ctx.extractedView->renderSize,
+                ctx.renderSize,
                 pipeline,
                 ctx.settings->actualSamplesPerPixel());
         },

@@ -223,6 +223,14 @@ void caustica::render::WorldRenderer::buildFrameGraphPasses(
 {
     assert(ctx.graph != nullptr);
 
+    // Refresh after framePassSetup (DLSS/native DLSS may have changed m_renderSize and
+    // synced camera views). populateRenderFrameContext runs before that and would leave
+    // a stale display-sized snapshot — path-trace would over-dispatch into render-sized
+    // buffers and corrupt the lower portion of the frame.
+    populateFrameView(ctx.view);
+    ctx.frame.renderSize = m_renderSize;
+    ctx.frame.displaySize = m_displaySize;
+
     rg::GraphBuilder& graph = *ctx.graph;
     graph.reset();
     graph.setDevice(device());

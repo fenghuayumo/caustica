@@ -186,9 +186,16 @@ void RenderTargets::init(
     desc.debugName = "rrTransparencyLayer";
     // rrTransparencyLayer = device->createTexture(desc); // not currently used
 
+    // Half-res denoiser guide must use the real render size before GBuffer placeholders
+    // temporarily force 1x1 dimensions below.
+    const dm::uint2 halfRenderSize = {
+        (renderSize.x + 1) / 2,
+        (renderSize.y + 1) / 2
+    };
+
     // GBuffer targets are kept as placeholders for the main path-tracing renderer.
-    renderSize.x = 1;
-    renderSize.y = 1;
+    desc.width = 1;
+    desc.height = 1;
 
     desc.debugName = "GBufferBaseColor"; // Can reuse rrDiffuseAlbedo?
     desc.format = nvrhi::Format::R11G11B10_FLOAT;
@@ -203,9 +210,8 @@ void RenderTargets::init(
     desc.format = nvrhi::Format::R32_UINT;
     materialInfo = device->createTexture(desc);
 
-    // !!! NOTE !!! setting desc.width/desc.height to half render size (was render size!)
-    desc.width = (renderSize.x + 1) / 2;
-    desc.height = (renderSize.y + 1) / 2;
+    desc.width = halfRenderSize.x;
+    desc.height = halfRenderSize.y;
     desc.format = nvrhi::Format::RGBA16_FLOAT;
     desc.debugName = "DenoiserAvgRadianceHalfRes";
     denoiserAvgLayerRadianceHalfRes = device->createTexture(desc);
