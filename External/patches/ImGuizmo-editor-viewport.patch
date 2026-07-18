@@ -1,0 +1,76 @@
+diff --git a/src/ImGuizmo.cpp b/src/ImGuizmo.cpp
+index 9256e8c..539c92e 100755
+--- a/src/ImGuizmo.cpp
++++ b/src/ImGuizmo.cpp
+@@ -937,16 +937,18 @@ namespace IMGUIZMO_NAMESPACE
+    static bool IsHoveringWindow()
+    {
+       ImGuiContext& g = *ImGui::GetCurrentContext();
+-      ImGuiWindow* window = ImGui::FindWindowByName(gContext.mDrawList->_OwnerName);
+-      if (g.HoveredWindow == window)   // Mouse hovering drawlist window
++      ImGuiWindow* window = gContext.mDrawList ? ImGui::FindWindowByName(gContext.mDrawList->_OwnerName) : nullptr;
++      if (window != nullptr && g.HoveredWindow == window)   // Mouse hovering drawlist window
+          return true;
+       if (gContext.mAlternativeWindow != nullptr && g.HoveredWindow == gContext.mAlternativeWindow)
+          return true;
+-      if (g.HoveredWindow != NULL)     // Any other window is hovered
+-         return false;
+-      if (ImGui::IsMouseHoveringRect(window->InnerRect.Min, window->InnerRect.Max, false))   // Hovering drawlist window rect, while no other window is hovered (for _NoInputs windows)
++      // NoInputs overlays (BeginFrame's "gizmo" window) must not block viewport interaction.
++      if (g.HoveredWindow != NULL && (g.HoveredWindow->Flags & ImGuiWindowFlags_NoInputs) == 0)
++         return false; // A real interactive ImGui panel is hovered
++      if (window != nullptr && ImGui::IsMouseHoveringRect(window->InnerRect.Min, window->InnerRect.Max, false))
+          return true;
+-      return false;
++      // Fullscreen editor viewport: allow gizmo hits whenever no interactive UI is hovered.
++      return g.HoveredWindow == nullptr || (g.HoveredWindow->Flags & ImGuiWindowFlags_NoInputs) != 0;
+    }
+ 
+    void SetRect(float x, float y, float width, float height)
+@@ -956,7 +958,7 @@ namespace IMGUIZMO_NAMESPACE
+       gContext.mWidth = width;
+       gContext.mHeight = height;
+       gContext.mXMax = gContext.mX + gContext.mWidth;
+-      gContext.mYMax = gContext.mY + gContext.mXMax;
++      gContext.mYMax = gContext.mY + gContext.mHeight;
+       gContext.mDisplayRatio = width / height;
+    }
+ 
+@@ -1688,11 +1690,34 @@ namespace IMGUIZMO_NAMESPACE
+ 
+    static bool CanActivate()
+    {
+-      if (ImGui::IsMouseClicked(0) && !ImGui::IsAnyItemHovered() && !ImGui::IsAnyItemActive())
++      if (!ImGui::IsMouseClicked(0))
++         return false;
++
++      // Embedded viewport hosts (full-canvas InvisibleButton / Dummy) report
++      // IsAnyItemHovered/Active even when the user is grabbing the gizmo. When
++      // SetAlternativeWindow() points at that host, allow activation anyway.
++      if (gContext.mAlternativeWindow != nullptr)
+       {
+-         return true;
++         ImGuiContext& g = *ImGui::GetCurrentContext();
++         ImGuiWindow* hovered = g.HoveredWindow;
++         if (hovered != nullptr
++             && (hovered == gContext.mAlternativeWindow
++                 || hovered->RootWindow == gContext.mAlternativeWindow
++                 || ImGui::IsWindowChildOf(hovered, gContext.mAlternativeWindow, true, true)))
++         {
++            if (g.ActiveId == 0)
++               return true;
++            ImGuiWindow* activeWin = g.ActiveIdWindow;
++            if (activeWin != nullptr
++                && (activeWin == gContext.mAlternativeWindow
++                    || activeWin->RootWindow == gContext.mAlternativeWindow
++                    || ImGui::IsWindowChildOf(activeWin, gContext.mAlternativeWindow, true, true)))
++               return true;
++            return false;
++         }
+       }
+-      return false;
++
++      return !ImGui::IsAnyItemHovered() && !ImGui::IsAnyItemActive();
+    }
+ 
+    static bool HandleAndDrawLocalBounds(const float* bounds, matrix_t* matrix, const float* snapValues, OPERATION operation)

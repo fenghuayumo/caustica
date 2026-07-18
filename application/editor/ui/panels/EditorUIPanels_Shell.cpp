@@ -239,10 +239,9 @@ void EditorUI::BuildViewportPanel(const PanelLayout& layout)
     vp.RectValid = true;
 
     nvrhi::ITexture* color = m_viewportColor;
-    // Allow the floating tool strip (drawn later) to receive hover/click over this canvas.
-    ImGui::SetNextItemAllowOverlap();
-    ImGui::InvisibleButton("##ViewportCanvas", canvasSize);
-    vp.Hovered = ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
+    // Do NOT cover the canvas with InvisibleButton/Dummy: ImGuizmo::CanActivate()
+    // rejects grabs while any item is hovered/active. Hover comes from the window.
+    vp.Hovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
     vp.Focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 
     ImDrawList* drawList = ImGui::GetWindowDrawList();
@@ -268,11 +267,10 @@ void EditorUI::BuildViewportPanel(const PanelLayout& layout)
             msg);
     }
 
-    // Gizmo must run inside the Viewport window so SetDrawlist targets this draw list.
-    // Draw before the toolbar so tool icons stay on top of gizmo lines.
-    DrawTransformGizmo(TransformGizmoContext{ m_sceneEditor, m_editorUI, m_settings });
+    // Keep layout cursor past the image so later siblings don't stack at (0,0).
+    ImGui::SetCursorScreenPos(ImVec2(canvasPos.x, canvasPos.y + canvasSize.y));
 
-    // Child window gives the tool strip its own hit-test layer above the canvas button.
+    // Child window gives the tool strip its own hit-test layer above the canvas.
     {
         constexpr float kToolbarPad = 6.f;
         // Match TransformGizmoToolbar strip: 6 buttons + 1 separator + padding.

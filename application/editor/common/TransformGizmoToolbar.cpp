@@ -160,7 +160,7 @@ void DrawSnapIcon(ImDrawList* dl, ImVec2 c, float s, ImU32 col)
 enum class ToolIcon : int
 {
     Select = 0,
-    Move,
+    Translate,
     Rotate,
     Scale,
     Space,
@@ -174,12 +174,12 @@ void DrawToolIcon(ImDrawList* dl, ImVec2 min, ImVec2 max, ToolIcon kind, ImU32 f
 
     switch (kind)
     {
-    case ToolIcon::Select: DrawSelectIcon(dl, c, s, fg); break;
-    case ToolIcon::Move:   DrawMoveIcon(dl, c, s, fg); break;
-    case ToolIcon::Rotate: DrawRotateIcon(dl, c, s, fg); break;
-    case ToolIcon::Scale:  DrawScaleIcon(dl, c, s, fg); break;
-    case ToolIcon::Space:  DrawSpaceIcon(dl, c, s, fg, spaceLocal); break;
-    case ToolIcon::Snap:   DrawSnapIcon(dl, c, s, fg); break;
+    case ToolIcon::Select:    DrawSelectIcon(dl, c, s, fg); break;
+    case ToolIcon::Translate: DrawMoveIcon(dl, c, s, fg); break;
+    case ToolIcon::Rotate:    DrawRotateIcon(dl, c, s, fg); break;
+    case ToolIcon::Scale:     DrawScaleIcon(dl, c, s, fg); break;
+    case ToolIcon::Space:     DrawSpaceIcon(dl, c, s, fg, spaceLocal); break;
+    case ToolIcon::Snap:      DrawSnapIcon(dl, c, s, fg); break;
     }
 }
 
@@ -231,7 +231,7 @@ void BuildTransformGizmoToolbar(EditorUIState& editorUI)
     const auto operation = static_cast<ImGuizmo::OPERATION>(editorUI.GizmoOperation);
     const auto mode = static_cast<ImGuizmo::MODE>(editorUI.GizmoMode);
     const bool selectMode = !editorUI.GizmoEnabled;
-    const bool isMove = !selectMode && (operation == ImGuizmo::TRANSLATE);
+    const bool isTranslate = !selectMode && (operation == ImGuizmo::TRANSLATE);
     const bool isRotate = !selectMode && (operation == ImGuizmo::ROTATE);
     const bool isScale = !selectMode && (operation == ImGuizmo::SCALE);
     const bool isLocal = (mode == ImGuizmo::LOCAL);
@@ -239,7 +239,7 @@ void BuildTransformGizmoToolbar(EditorUIState& editorUI)
     ImDrawList* dl = ImGui::GetWindowDrawList();
     const ImVec2 origin = ImGui::GetCursorScreenPos();
 
-    // Select | Move | Rotate | Scale | Space | Snap  (matches reference strip)
+    // Select | Translate | Rotate | Scale | Space | Snap
     const int toolCount = 6;
     const float stripW = kPad * 2.f + kBtn * toolCount + kGap * (toolCount - 1) + 5.f * 2.f;
     const float stripH = kBtn + kPad * 2.f;
@@ -264,21 +264,21 @@ void BuildTransformGizmoToolbar(EditorUIState& editorUI)
         editorUI.GizmoEnabled = false;
     ImGui::SameLine(0.f, kGap);
 
-    if (ToolButton("##GizmoMove", ToolIcon::Move, isMove, "Move (W)"))
+    if (ToolButton("##GizmoTranslate", ToolIcon::Translate, isTranslate, "Translate (T)"))
     {
         editorUI.GizmoEnabled = true;
         editorUI.GizmoOperation = static_cast<int>(ImGuizmo::TRANSLATE);
     }
     ImGui::SameLine(0.f, kGap);
 
-    if (ToolButton("##GizmoRotate", ToolIcon::Rotate, isRotate, "Rotate (E)"))
+    if (ToolButton("##GizmoRotate", ToolIcon::Rotate, isRotate, "Rotate (R)"))
     {
         editorUI.GizmoEnabled = true;
         editorUI.GizmoOperation = static_cast<int>(ImGuizmo::ROTATE);
     }
     ImGui::SameLine(0.f, kGap);
 
-    if (ToolButton("##GizmoScale", ToolIcon::Scale, isScale, "Scale (T)"))
+    if (ToolButton("##GizmoScale", ToolIcon::Scale, isScale, "Scale (S)"))
     {
         editorUI.GizmoEnabled = true;
         editorUI.GizmoOperation = static_cast<int>(ImGuizmo::SCALE);

@@ -36,11 +36,10 @@ struct GizmoDragState
 
 GizmoDragState g_drag;
 
-// caustica/dm uses row-vector math (v' = v * M). ImGuizmo uses column-vector
-// OpenGL-style matrices (v' = M * v) with translation in the last column.
+// Match the layout that worked before DockSpace: caustica/ImGuizmo both consume
+// this buffer as the same row-major affine dump (see commit 5240cfa9).
 void Affine3ToImGuizmoMatrix(const dm::affine3& affine, float matrix[16])
 {
-    // Columns = basis axes (caustica rows) + translation
     matrix[0] = affine.m_linear.m00;
     matrix[1] = affine.m_linear.m01;
     matrix[2] = affine.m_linear.m02;
@@ -61,10 +60,9 @@ void Affine3ToImGuizmoMatrix(const dm::affine3& affine, float matrix[16])
 
 void Float4x4ToImGuizmoMatrix(const dm::float4x4& source, float matrix[16])
 {
-    // Transpose row-major dm::float4x4 into ImGuizmo column-major layout.
     for (int row = 0; row < 4; ++row)
         for (int col = 0; col < 4; ++col)
-            matrix[col * 4 + row] = source[row][col];
+            matrix[row * 4 + col] = source[row][col];
 }
 
 dm::affine3 ImGuizmoMatrixToAffine3(const float matrix[16])
@@ -114,22 +112,26 @@ void ApplyWorldMatrixToLocalTransform(
 
 void HandleTransformGizmoShortcuts(EditorUIState& editorUI)
 {
-    if (ImGui::GetIO().WantCaptureKeyboard || ImGui::IsAnyItemActive())
+    const ImGuiIO& io = ImGui::GetIO();
+    if (io.WantCaptureKeyboard || ImGui::IsAnyItemActive())
+        return;
+    // Avoid stealing Ctrl/Alt/Super chords (e.g. Ctrl+R shader reload).
+    if (io.KeyCtrl || io.KeyAlt || io.KeySuper)
         return;
 
     if (ImGui::IsKeyPressed(ImGuiKey_Q, false))
         editorUI.GizmoEnabled = false;
-    if (ImGui::IsKeyPressed(ImGuiKey_W, false))
+    if (ImGui::IsKeyPressed(ImGuiKey_T, false))
     {
         editorUI.GizmoEnabled = true;
         editorUI.GizmoOperation = static_cast<int>(ImGuizmo::TRANSLATE);
     }
-    if (ImGui::IsKeyPressed(ImGuiKey_E, false))
+    if (ImGui::IsKeyPressed(ImGuiKey_R, false))
     {
         editorUI.GizmoEnabled = true;
         editorUI.GizmoOperation = static_cast<int>(ImGuizmo::ROTATE);
     }
-    if (ImGui::IsKeyPressed(ImGuiKey_T, false))
+    if (ImGui::IsKeyPressed(ImGuiKey_S, false))
     {
         editorUI.GizmoEnabled = true;
         editorUI.GizmoOperation = static_cast<int>(ImGuizmo::SCALE);
@@ -180,19 +182,21 @@ void BuildGizmoProjectionMatrix(const TransformGizmoContext& ctx, const PlanarVi
 
 bool IsEditingInspectorUi()
 {
-    // Only block the gizmo when a panel widget (Inspector DragFloat, etc.) is active.
-    // Viewport canvas / toolbar InvisibleButtons also set ActiveId — those must NOT
-    // disable drawing or input for ImGuizmo.
+    // Only block gizmo *writeback* when a side-panel widget is active.
+    // Viewport canvas / gizmo toolbar also set ActiveId — those must not gray-out
+    // the gizmo (ImGuizmo::Enable(false) draws the inactive gray style).
     if (!ImGui::IsAnyItemActive())
         return false;
 
-    ImGuiContext* ctx = ImGui::GetCurrentContext();
-    ImGuiWindow* win = ctx ? ctx->ActiveIdWindow : nullptr;
+    ImGuiContext* g = ImGui::GetCurrentContext();
+    ImGuiWindow* win = g ? g->ActiveIdWindow : nullptr;
     if (!win || !win->Name)
         return false;
 
-    // Allow gizmo while interacting with the Viewport chrome itself.
+    // "Viewport", "Viewport/##GizmoToolbarOverlay", etc.
     if (std::strncmp(win->Name, "Viewport", 8) == 0)
+        return false;
+    if (std::strstr(win->Name, "GizmoToolbar") != nullptr)
         return false;
 
     return true;
@@ -255,11 +259,14 @@ bool caustica::editor::DrawTransformGizmo(const TransformGizmoContext& ctx)
         return false;
     }
 
+    // Select tool: do not draw the inactive gray gizmo at all.
+    if (!ctx.editorUI.GizmoEnabled)
+        return false;
+
     const bool editingUi = IsEditingInspectorUi();
 
     ImGuizmo::BeginFrame();
     {
-        // Default ImGuizmo line weights are a bit thin in this editor; scale to 1.5x.
         constexpr float kGizmoStyleScale = 1.5f;
         ImGuizmo::Style& style = ImGuizmo::GetStyle();
         style.TranslationLineThickness = 3.0f * kGizmoStyleScale;
@@ -272,11 +279,18 @@ bool caustica::editor::DrawTransformGizmo(const TransformGizmoContext& ctx)
         style.CenterCircleSize = 6.0f * kGizmoStyleScale;
     }
 
-    // Draw above the viewport image and other window content (dock-safe).
+    // DockSpace covers BeginFrame's default fullscreen window. Draw on the
+    // foreground list (above every docked panel / viewport image) and map hover
+    // to the Viewport window for gizmo picking.
+    ImGuiWindow* viewportWindow = ImGui::FindWindowByName("Viewport");
     ImGuizmo::SetDrawlist(ImGui::GetForegroundDrawList());
+    if (viewportWindow)
+        ImGuizmo::SetAlternativeWindow(viewportWindow);
 
-    // While Inspector DragFloats are active, keep drawing but block gizmo input/writeback.
-    ImGuizmo::Enable(ctx.editorUI.GizmoEnabled && !editingUi);
+    // Keep Enable(true) whenever a transform tool is active so axes stay RGB.
+    // Inspector edits only block writeback below — they must not switch ImGuizmo
+    // into its gray INACTIVE draw style.
+    ImGuizmo::Enable(true);
     ImGuizmo::SetID(static_cast<int>(entt::to_integral(entity)));
 
     ImGuiIO& io = ImGui::GetIO();
@@ -315,9 +329,11 @@ bool caustica::editor::DrawTransformGizmo(const TransformGizmoContext& ctx)
     const bool usingGizmo = ImGuizmo::IsUsing();
     g_drag.active = usingGizmo && !editingUi;
 
-    // Only capture input while actively dragging (not merely hovering) so Inspector UI stays usable.
-    ctx.editorUI.GizmoCapturingInput = usingGizmo;
-    if (usingGizmo)
+    // Capture while dragging, or while hovering a handle so the first click does not
+    // fall through to camera orbit / instance picking.
+    const bool overGizmo = ImGuizmo::IsOver();
+    ctx.editorUI.GizmoCapturingInput = (usingGizmo || overGizmo) && !editingUi;
+    if (ctx.editorUI.GizmoCapturingInput)
         io.WantCaptureMouse = true;
 
     if (!manipulated || editingUi)

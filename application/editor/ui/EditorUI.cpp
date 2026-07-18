@@ -4,6 +4,7 @@
 
 #include "SceneEditor.h"
 #include "common/ImGuiManager.h"
+#include "common/TransformGizmo.h"
 
 #include <render/AppDiagnostics.h>
 #include <render/SceneLightingPasses.h>
@@ -205,6 +206,9 @@ void EditorUI::buildUI(void)
         BuildHierarchyPanel(layout);
     BuildGameStandalonePanel(layout);
 
+    // After all dock panels (same ordering as pre-DockSpace): ImGuizmo BeginFrame +
+    // foreground draw list so the gizmo is never covered by the Viewport image.
+    DrawTransformGizmo(TransformGizmoContext{ m_sceneEditor, m_editorUI, m_settings });
     BuildStatusBar();
 }
 
