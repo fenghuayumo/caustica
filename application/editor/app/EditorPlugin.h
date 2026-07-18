@@ -1,6 +1,5 @@
 #pragma once
 
-#include <engine/DefaultPlugins.h>
 #include <engine/Plugin.h>
 #include <engine/SceneStartup.h>
 
@@ -13,13 +12,13 @@
 namespace caustica::editor
 {
 
-// Editor delta on top of DefaultPlugins (GPU + scene bootstrap + SceneAccess).
+// Editor delta on top of DefaultPlugins (GPU + scene bootstrap + ActiveScene).
 struct EditorPlugin : Plugin
 {
     EditorPlugin(SceneAppConfig appConfig,
         SceneEditor& sceneEditor,
         const EditorUISubsystemConfig* uiConfig = nullptr)
-        : defaults(std::move(appConfig))
+        : appConfig(std::move(appConfig))
         , m_sceneEditor(sceneEditor)
         , uiConfig(uiConfig
             ? std::optional<EditorUISubsystemConfig>(*uiConfig)
@@ -31,7 +30,7 @@ struct EditorPlugin : Plugin
     void configureSchedules(App& app) override;
     void configureLateSchedules(App& app) override;
 
-    DefaultPlugins defaults;
+    SceneAppConfig appConfig;
     SceneEditor& m_sceneEditor;
     std::optional<EditorUISubsystemConfig> uiConfig;
 };

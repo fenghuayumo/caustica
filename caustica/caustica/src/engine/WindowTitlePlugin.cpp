@@ -5,6 +5,7 @@
 #include <engine/SceneQuery.h>
 #include <engine/RenderSessionApi.h>
 #include <engine/SceneViewState.h>
+#include <engine/SystemLabels.h>
 
 #include <backend/GpuDevice.h>
 #include <scene/Scene.h>
@@ -40,12 +41,17 @@ void updateWindowTitle(App& app)
 
 void WindowTitlePlugin::configureSchedules(App& app)
 {
-    app.addSystemAfter(AppSchedule::update, "Scene.UpdateWindowTitle", "Scene.TickSimulation", [](SystemContext& ctx) {
-        if (!ctx.windowFocused)
-            return;
+    app.addSystemAfter<system_label::SceneUpdateWindowTitle, system_label::SceneTickSimulation>(
+        AppSchedule::update,
+        [](SystemContext& ctx) {
+            if (!ctx.windowFocused)
+                return;
 
-        updateWindowTitle(ctx.app);
-    });
+            updateWindowTitle(ctx.app);
+        });
+    // Last DefaultPlugins scene-schedule member: mark after systems exist so
+    // App::buildPlugins skips the registerSceneSchedules fallback.
+    app.markSceneSchedulesRegistered();
 }
 
 } // namespace caustica

@@ -148,7 +148,6 @@ ecs::Entity spawn(App& app, const Handle<ScenePrefabAsset>& prefab, const SceneA
         return ecs::NullEntity;
 
     // GPU upload / AS rebuild happens in Extract (PrepareRenderFrame).
-    syncSceneAccess(app);
     return root;
 }
 
@@ -197,7 +196,6 @@ bool despawn(App& app, ecs::Entity entity)
     }
 
     // GPU upload / AS rebuild happens in Extract (PrepareRenderFrame).
-    syncSceneAccess(app);
     return true;
 }
 

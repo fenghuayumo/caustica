@@ -103,11 +103,11 @@ SystemFn makeTypedSystem(F&& system)
 //
 // Prefer EngineApp::create for new apps (Bevy-like one-liner):
 //   auto engine = EngineApp::create({ .scene = "Kitchen/kitchen.json" });
-//   engine->app().addSystem(AppSchedule::update, "MySim", ...);
+//   engine->app().addSystem<MySimLabel>(AppSchedule::update, ...);
 //   engine->run();
 //
 // Low-level lifecycle (advanced):
-//   app.addPlugin<DefaultPlugins>(sceneConfig);
+//   app.addPlugins(DefaultPlugins{sceneConfig});
 //   app.initializeGraphics(argc, argv, desc);
 //   app.finishStartup();
 //   app.run();
@@ -133,6 +133,27 @@ public:
     {
         m_pluginRefs.push_back(&plugin);
         m_pluginsBuilt = false;
+        return *this;
+    }
+
+    template<typename G, typename... Args>
+    App& addPlugins(Args&&... args)
+    {
+        static_assert(std::is_base_of_v<PluginGroup, G>, "G must derive from PluginGroup");
+        G group(std::forward<Args>(args)...);
+        group.build(*this);
+        return *this;
+    }
+
+    App& addPlugins(PluginGroup& group)
+    {
+        group.build(*this);
+        return *this;
+    }
+
+    App& addPlugins(PluginGroup&& group)
+    {
+        group.build(*this);
         return *this;
     }
 
@@ -200,32 +221,54 @@ public:
 
     App& addSystem(
         AppSchedule schedule,
-        std::string name,
+        SystemLabel label,
         SystemFn system,
         AppSystemOrdering ordering = {});
-    template<class F>
-    App& addSystem(AppSchedule schedule, std::string name, F&& system)
-        requires (!std::is_convertible_v<std::decay_t<F>, SystemFn>)
+
+    template<typename Label>
+    App& addSystem(AppSchedule schedule, SystemFn system, AppSystemOrdering ordering = {})
     {
-        return addSystem(schedule, std::move(name), detail::makeTypedSystem(std::forward<F>(system)));
+        return addSystem(schedule, systemLabel<Label>(), std::move(system), std::move(ordering));
     }
-    template<class F>
-    App& addSystem(AppSchedule schedule, std::string name, F&& system, AppSystemOrdering ordering)
+
+    template<typename Label, class F>
+    App& addSystem(AppSchedule schedule, F&& system, AppSystemOrdering ordering = {})
         requires (!std::is_convertible_v<std::decay_t<F>, SystemFn>)
     {
         return addSystem(
-            schedule, std::move(name), detail::makeTypedSystem(std::forward<F>(system)), std::move(ordering));
+            schedule,
+            systemLabel<Label>(),
+            detail::makeTypedSystem(std::forward<F>(system)),
+            std::move(ordering));
     }
-    App& addSystemBefore(
-        AppSchedule schedule,
-        std::string name,
-        std::string before,
-        SystemFn system);
-    App& addSystemAfter(
-        AppSchedule schedule,
-        std::string name,
-        std::string after,
-        SystemFn system);
+
+    template<typename Label, typename AfterLabel>
+    App& addSystemAfter(AppSchedule schedule, SystemFn system)
+    {
+        return addSystem<Label>(schedule, std::move(system), AppSystemOrdering{}.runAfter<AfterLabel>());
+    }
+
+    template<typename Label, typename AfterLabel, class F>
+    App& addSystemAfter(AppSchedule schedule, F&& system)
+        requires (!std::is_convertible_v<std::decay_t<F>, SystemFn>)
+    {
+        return addSystemAfter<Label, AfterLabel>(
+            schedule, detail::makeTypedSystem(std::forward<F>(system)));
+    }
+
+    template<typename Label, typename BeforeLabel>
+    App& addSystemBefore(AppSchedule schedule, SystemFn system)
+    {
+        return addSystem<Label>(schedule, std::move(system), AppSystemOrdering{}.runBefore<BeforeLabel>());
+    }
+
+    template<typename Label, typename BeforeLabel, class F>
+    App& addSystemBefore(AppSchedule schedule, F&& system)
+        requires (!std::is_convertible_v<std::decay_t<F>, SystemFn>)
+    {
+        return addSystemBefore<Label, BeforeLabel>(
+            schedule, detail::makeTypedSystem(std::forward<F>(system)));
+    }
     void runSchedule(AppSchedule schedule, SystemContext& context);
     [[nodiscard]] AppSchedules& schedules() { return m_schedules; }
     [[nodiscard]] const AppSchedules& schedules() const { return m_schedules; }

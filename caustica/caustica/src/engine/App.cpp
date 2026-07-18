@@ -5,6 +5,7 @@
 #include <engine/RenderFrameApi.h>
 #include <engine/SceneViewState.h>
 #include <engine/SceneScheduleRegistration.h>
+#include <engine/SystemLabels.h>
 
 #include <backend/GpuDevice.h>
 #include <core/ThreadContext.h>
@@ -121,31 +122,11 @@ void App::buildPlugins()
 
 App& App::addSystem(
     AppSchedule schedule,
-    std::string name,
+    SystemLabel label,
     SystemFn system,
     AppSystemOrdering ordering)
 {
-    m_schedules.addSystem(schedule, std::move(name), std::move(system), std::move(ordering));
-    return *this;
-}
-
-App& App::addSystemBefore(
-    AppSchedule schedule,
-    std::string name,
-    std::string before,
-    SystemFn system)
-{
-    m_schedules.addSystemBefore(schedule, std::move(name), std::move(before), std::move(system));
-    return *this;
-}
-
-App& App::addSystemAfter(
-    AppSchedule schedule,
-    std::string name,
-    std::string after,
-    SystemFn system)
-{
-    m_schedules.addSystemAfter(schedule, std::move(name), std::move(after), std::move(system));
+    m_schedules.addSystem(schedule, std::move(label), std::move(system), std::move(ordering));
     return *this;
 }
 
@@ -165,27 +146,27 @@ void App::registerDefaultSchedules()
         return;
 
 #if CAUSTICA_WITH_STREAMLINE
-    addSystem(AppSchedule::First, "StreamlineSimStart", [](SystemContext& ctx) {
+    addSystem<system_label::StreamlineSimStart>(AppSchedule::First, [](SystemContext& ctx) {
         if (ctx.gpuDevice && !ctx.gpuDevice->m_DeviceParams.headlessDevice)
             StreamlineIntegration::Get().simStart(*ctx.gpuDevice);
     });
 #endif
 
-    addSystem(AppSchedule::First, "BeforeFrame", [](SystemContext& ctx) {
+    addSystem<system_label::BeforeFrame>(AppSchedule::First, [](SystemContext& ctx) {
         if (ctx.gpuDevice && ctx.app.beforeFrame)
             ctx.app.beforeFrame(*ctx.gpuDevice, ctx.frameIndex);
     });
 
-    addSystem(AppSchedule::First, "ProcessEventQueue", [](SystemContext& ctx) {
+    addSystem<system_label::ProcessEventQueue>(AppSchedule::First, [](SystemContext& ctx) {
         ctx.app.processEventQueue();
     });
 
-    addSystem(AppSchedule::preUpdate, "NotifyDpiScale", [](SystemContext& ctx) {
+    addSystem<system_label::NotifyDpiScale>(AppSchedule::preUpdate, [](SystemContext& ctx) {
         if (ctx.runRender && ctx.gpuDevice)
             ctx.app.notifyDpiScaleIfChanged(*ctx.gpuDevice);
     });
 
-    addSystem(AppSchedule::preUpdate, "BeforeAnimate", [](SystemContext& ctx) {
+    addSystem<system_label::BeforeAnimate>(AppSchedule::preUpdate, [](SystemContext& ctx) {
         if (!ctx.gpuDevice)
             return;
 
@@ -194,7 +175,7 @@ void App::registerDefaultSchedules()
         ctx.app.onBeforeAnimate(*ctx.gpuDevice, ctx.frameIndex);
     });
 
-    addSystem(AppSchedule::Extract, "SetRenderFrameIndex", [](SystemContext& ctx) {
+    addSystem<system_label::SetRenderFrameIndex>(AppSchedule::Extract, [](SystemContext& ctx) {
         if (ctx.gpuDevice)
             ctx.gpuDevice->setPreparedRenderFrameIndex(ctx.frameIndex);
     });
@@ -207,13 +188,12 @@ void App::ensureUpdateTail()
     if (m_updateTailRegistered)
         return;
 
-    AppSystemOrdering ordering;
-    ordering.after.push_back("ProcessEventQueue");
-
-    addSystem(AppSchedule::First, "SyncRenderThread", [](SystemContext& ctx) {
-        if (!ctx.app.syncRenderThreadCompletedFrames(ctx))
-            ctx.abortFrame = true;
-    }, std::move(ordering));
+    addSystemAfter<system_label::SyncRenderThread, system_label::ProcessEventQueue>(
+        AppSchedule::First,
+        [](SystemContext& ctx) {
+            if (!ctx.app.syncRenderThreadCompletedFrames(ctx))
+                ctx.abortFrame = true;
+        });
 
     m_updateTailRegistered = true;
 }
@@ -223,7 +203,7 @@ void App::ensurePostUpdateTail()
     if (m_postUpdateTailRegistered)
         return;
 
-    addSystem(AppSchedule::Last, "AfterAnimate", [](SystemContext& ctx) {
+    addSystem<system_label::AfterAnimate>(AppSchedule::Last, [](SystemContext& ctx) {
         if (!ctx.runUpdate || !ctx.gpuDevice)
             return;
 

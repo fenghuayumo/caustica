@@ -1,6 +1,7 @@
 #include <engine/EngineApp.h>
 
 #include <engine/DefaultPlugins.h>
+#include <engine/EntryPoint.h>
 #include <core/path_utils.h>
 #include <core/log.h>
 #include <platform/window.h>
@@ -106,6 +107,11 @@ bool EngineApp::initialize(EngineAppDesc desc)
 {
     m_desc = std::move(desc);
 
+    m_viewStatePtr = m_desc.viewState ? m_desc.viewState : &m_viewState;
+    m_diagnosticsPtr = m_desc.diagnostics ? m_desc.diagnostics : &m_diagnostics;
+    m_renderStatePtr = m_desc.renderState ? m_desc.renderState : &m_renderAppState;
+    m_cmdLinePtr = m_desc.cmdLine ? m_desc.cmdLine : &m_cmdLine;
+
     const std::filesystem::path runtimeDirectory = m_desc.runtimeDirectory.empty()
         ? ResolveDefaultRuntimeDirectory()
         : m_desc.runtimeDirectory;
@@ -116,14 +122,17 @@ bool EngineApp::initialize(EngineAppDesc desc)
     setRuntimeDirectoryOverride(runtimeDirectory);
     setLocalPathBaseOverride(resourceRoot);
 
-    m_cmdLine.width = m_desc.width;
-    m_cmdLine.height = m_desc.height;
-    m_cmdLine.noWindow = m_desc.headless;
-    m_cmdLine.useVulkan = m_desc.useVulkan;
-    m_cmdLine.adapterIndex = m_desc.adapterIndex;
-    m_cmdLine.debug = m_desc.debugDevice;
-    m_cmdLine.scene = m_desc.scene;
-    m_cmdLine.syncRender = !m_desc.dedicatedRenderThread;
+    if (!m_desc.cmdLine)
+    {
+        m_cmdLine.width = m_desc.width;
+        m_cmdLine.height = m_desc.height;
+        m_cmdLine.noWindow = m_desc.headless;
+        m_cmdLine.useVulkan = m_desc.useVulkan;
+        m_cmdLine.adapterIndex = m_desc.adapterIndex;
+        m_cmdLine.debug = m_desc.debugDevice;
+        m_cmdLine.scene = m_desc.scene;
+        m_cmdLine.syncRender = !m_desc.dedicatedRenderThread;
+    }
 
     if (m_desc.device)
     {
@@ -133,6 +142,9 @@ bool EngineApp::initialize(EngineAppDesc desc)
     }
     else
     {
+        if (m_desc.preGpuDeviceInit)
+            m_desc.preGpuDeviceInit();
+
         GpuDeviceCreateDesc createDesc{};
         createDesc.api = ResolveGraphicsApi(m_desc);
         createDesc.headless = m_desc.headless;
@@ -141,6 +153,7 @@ bool EngineApp::initialize(EngineAppDesc desc)
         createDesc.backBufferHeight = m_desc.height;
         createDesc.adapterIndex = m_desc.adapterIndex;
         createDesc.enableDebug = m_desc.debugDevice;
+        createDesc.startFullscreen = m_desc.fullscreen;
         if (m_desc.headless)
             createDesc.vsyncEnabled = false;
 #if CAUSTICA_WITH_DX12
@@ -161,21 +174,45 @@ bool EngineApp::initialize(EngineAppDesc desc)
         m_ownsDevice = true;
     }
 
-    m_viewState.progressLoading.start("Initializing...");
-    m_viewState.progressLoading.Set(50);
+    m_viewStatePtr->progressLoading.start("Initializing...");
+    m_viewStatePtr->progressLoading.Set(50);
 
     const std::string preferredScene = m_desc.scene.empty() ? std::string("default.json") : m_desc.scene;
 
     m_app = std::make_unique<App>(m_device, m_desc.headless ? nullptr : m_window);
-    m_app->addPlugin<DefaultPlugins>(SceneAppConfig{
-        .viewState = m_viewState,
-        .diagnostics = m_diagnostics,
+    m_app->addPlugins(DefaultPlugins{SceneAppConfig{
+        .viewState = *m_viewStatePtr,
+        .diagnostics = *m_diagnosticsPtr,
         .preferredScene = preferredScene,
-        .renderState = &m_renderAppState,
-        .cmdLine = &m_cmdLine,
-        .applyCmdLineToRenderState = true,
-    });
+        .renderState = m_renderStatePtr,
+        .cmdLine = m_cmdLinePtr,
+        .applyCmdLineToRenderState = m_desc.applyCmdLineToRenderState,
+        .hasSceneCallbacks = m_desc.hasSceneCallbacks,
+        .sceneCallbacks = m_desc.sceneCallbacks,
+    }});
     m_app->setUseDedicatedRenderThread(m_desc.dedicatedRenderThread && !m_desc.headless);
+
+    if (m_desc.finishStartup)
+    {
+        if (!m_app->finishStartup())
+        {
+            error("EngineApp: finishStartup failed");
+            shutdown();
+            return false;
+        }
+    }
+
+    m_valid = true;
+    return true;
+}
+
+bool EngineApp::finishStartup()
+{
+    if (!m_valid || !m_app)
+        return false;
+
+    if (m_app->isStarted())
+        return true;
 
     if (!m_app->finishStartup())
     {
@@ -184,7 +221,6 @@ bool EngineApp::initialize(EngineAppDesc desc)
         return false;
     }
 
-    m_valid = true;
     return true;
 }
 
@@ -283,22 +319,22 @@ const PathTracerSettings& EngineApp::settings() const
 
 render::RenderAppState& EngineApp::renderAppState()
 {
-    return m_renderAppState;
+    return *m_renderStatePtr;
 }
 
 const render::RenderAppState& EngineApp::renderAppState() const
 {
-    return m_renderAppState;
+    return *m_renderStatePtr;
 }
 
 CommandLineOptions& EngineApp::commandLine()
 {
-    return m_cmdLine;
+    return *m_cmdLinePtr;
 }
 
 const CommandLineOptions& EngineApp::commandLine() const
 {
-    return m_cmdLine;
+    return *m_cmdLinePtr;
 }
 
 bool EngineApp::setCameraPosDirUp(const std::string& value)

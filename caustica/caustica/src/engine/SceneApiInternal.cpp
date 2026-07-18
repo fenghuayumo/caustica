@@ -3,6 +3,7 @@
 #include <engine/AppResources.h>
 #include <engine/SessionCamera.h>
 #include <engine/SceneSession.h>
+#include <engine/SceneQuery.h>
 #include <engine/SceneViewState.h>
 #include <core/path_utils.h>
 #include <core/vfs/VFS.h>
@@ -63,6 +64,7 @@ void applySceneSwitch(App& app, const std::string& sceneName, bool forceReload)
     {
         caustica::error("Unable to load scene '%s'", sceneName.c_str());
         manager->clearScene();
+        clearActiveScene(app);
         vs->progressLoading.stop();
     }
 }

@@ -3,6 +3,7 @@
 
 #include <engine/App.h>
 #include <engine/AppSchedules.h>
+#include <engine/SystemLabels.h>
 #include <render/worldRenderer/WorldRenderer.h>
 #include <engine/GpuSharedCaches.h>
 
@@ -19,13 +20,12 @@ void registerGpuRenderSchedules(App& app)
     if (!app.tryResource<render::WorldRenderer>() || !app.tryResource<GpuSharedCaches>())
         return;
 
-    AppSystemOrdering ordering;
-    ordering.after.push_back("Scene.RenderScene");
-    ordering.after.push_back("Scene.AfterWorldRender");
-
-    app.addSystem(AppSchedule::render, "GpuRender.endFrame", [](ResMut<GpuSharedCaches> caches) {
-        caches->endFrame();
-    }, std::move(ordering));
+    app.addSystem<system_label::GpuRenderEndFrame>(
+        AppSchedule::render,
+        [](ResMut<GpuSharedCaches> caches) {
+            caches->endFrame();
+        },
+        AppSystemOrdering{}.runAfter<system_label::SceneRenderScene, system_label::SceneAfterWorldRender>());
 
     registerGpuRenderShutdown(app);
 

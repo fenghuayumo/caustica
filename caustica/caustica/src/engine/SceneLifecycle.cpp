@@ -11,7 +11,7 @@
 #include <engine/RenderSessionApi.h>
 #include <engine/SceneApiInternal.h>
 #include <engine/RenderThread.h>
-#include <engine/SceneAccess.h>
+#include <engine/ActiveScene.h>
 #include <assets/AssetSystem.h>
 #include <backend/GpuDevice.h>
 #include <core/command_line.h>
@@ -228,8 +228,7 @@ void onSceneUnloading(App& app)
             gr->onSceneUnloading();
     });
 
-    if (auto* access = app.tryResource<SceneAccess>())
-        access->active.reset();
+    clearActiveScene(app);
 }
 
 namespace
@@ -324,10 +323,10 @@ void registerLoadedSceneAssets(App& app, ::SceneManager& manager)
 
     assets->clearSceneAssets();
 
-    const std::filesystem::path scenePath = manager.getCurrentScenePath();
-    const std::string sceneName = manager.getCurrentSceneName().empty()
+    const std::filesystem::path scenePath = currentScenePath(app);
+    const std::string sceneName = currentSceneName(app).empty()
         ? scenePath.filename().generic_string()
-        : manager.getCurrentSceneName();
+        : currentSceneName(app);
 
     Handle<SceneAsset> sceneAsset = assets->registerSceneAsset(scene, scenePath, sceneName);
     if (!sceneAsset)
@@ -386,11 +385,11 @@ void onSceneLoaded(App& app)
     if (!manager || !vs || !cmd || !cfg)
         return;
 
-    syncSceneAccess(app);
+    // ActiveScene is committed before this callback (see SceneStartup loader wrap).
 
     const std::filesystem::path assetsRoot = getLocalPath(c_AssetsFolder);
     if (render::WorldRenderer* wrResource = worldRenderer(app))
-        wrResource->lightingPasses().refreshEnvironmentMapMediaList(assetsRoot, manager->getCurrentScenePath());
+        wrResource->lightingPasses().refreshEnvironmentMapMediaList(assetsRoot, currentScenePath(app));
 
     vs->progressLoading.Set(50);
     vs->progressLoading.Set(55);

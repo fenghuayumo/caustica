@@ -5,6 +5,7 @@
 #include <engine/SessionCamera.h>
 #include <engine/SceneQuery.h>
 #include <engine/SceneViewState.h>
+#include <engine/SystemLabels.h>
 
 #include <backend/GpuDevice.h>
 #include <render/RenderRuntimeState.h>
@@ -36,9 +37,6 @@ void prepareRenderFrame(App& app)
     if (!scene)
         return;
 
-    // Structure mutations from update systems are ECS-only until here.
-    syncSceneAccess(app);
-
     const bool structureSync = scene->needsGpuStructureSync();
     if (structureSync)
     {
@@ -64,12 +62,14 @@ void prepareRenderFrame(App& app)
 
 void RenderExtractPlugin::configureSchedules(App& app)
 {
-    app.addSystemAfter(AppSchedule::Extract, "Scene.PrepareRenderFrame", "SetRenderFrameIndex", [](SystemContext& ctx) {
-        if (!ctx.gpuDevice || !activeScene(ctx.app))
-            return;
+    app.addSystemAfter<system_label::ScenePrepareRenderFrame, system_label::SetRenderFrameIndex>(
+        AppSchedule::Extract,
+        [](SystemContext& ctx) {
+            if (!ctx.gpuDevice || !activeScene(ctx.app))
+                return;
 
-        prepareRenderFrame(ctx.app);
-    });
+            prepareRenderFrame(ctx.app);
+        });
 }
 
 } // namespace caustica

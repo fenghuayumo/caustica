@@ -1,10 +1,12 @@
 #include "EditorPlugin.h"
 #include "EditorAccess.h"
+#include "EditorSystemLabels.h"
 #include "common/CaptureScriptManager.h"
 
 #include <engine/App.h>
 #include <engine/SceneQuery.h>
 #include <engine/SceneLifecycle.h>
+#include <engine/SystemLabels.h>
 #include <render/worldRenderer/WorldRenderer.h>
 
 namespace caustica::editor
@@ -12,8 +14,6 @@ namespace caustica::editor
 
 void EditorPlugin::build(App& app)
 {
-    defaults.build(app);
-
     app.insertResourceRef(m_sceneEditor);
     app.insertResourceRef(m_sceneEditor.editorState());
     app.insertResourceRef(m_sceneEditor.captureScriptState());
@@ -29,20 +29,11 @@ void EditorPlugin::build(App& app)
 void EditorPlugin::configureSchedules(App& app)
 {
     m_sceneEditor.setApp(app);
-    defaults.appConfig.hasSceneCallbacks = true;
-    defaults.appConfig.sceneCallbacks = EngineSceneCallbacks{
-        .OnSceneLoaded = [this]() {
-            m_sceneEditor.onSceneLoadedFromLoader();
-        },
-        .OnSceneUnloading = [&app, this]() {
-            caustica::onSceneUnloading(app);
-            m_sceneEditor.onSceneUnloading();
-        },
-    };
 
-    defaults.configureSchedules(app);
+    // Scene.Startup callbacks are owned by EngineAppDesc / SceneRuntimePlugin.
+    // EditorPlugin only registers editor Pre/Post startup around that system.
     registerEditorSceneStartup(app, EditorSceneStartupConfig{
-        .appConfig = defaults.appConfig,
+        .appConfig = appConfig,
         .sceneEditor = &m_sceneEditor,
     });
 
@@ -52,124 +43,141 @@ void EditorPlugin::configureSchedules(App& app)
 
 void EditorPlugin::configureLateSchedules(App& app)
 {
-    app.addSystemBefore(AppSchedule::First, "EditorScene.beginFrame", "Scene.beginFrame", [](SystemContext& ctx) {
-        auto* capture = ctx.tryRes<CaptureScriptState>();
-        if (capture && capture->manager)
-            capture->manager->preRender();
-    });
+    app.addSystemBefore<system_label::EditorSceneBeginFrame, caustica::system_label::SceneBeginFrame>(
+        AppSchedule::First,
+        [](SystemContext& ctx) {
+            auto* capture = ctx.tryRes<CaptureScriptState>();
+            if (capture && capture->manager)
+                capture->manager->preRender();
+        });
 
-    app.addSystemAfter(AppSchedule::preUpdate, "EditorScene.RequestUnfocusedRender", "NotifyDpiScale", [this](SystemContext& ctx) {
-        if (ctx.runRender || !ctx.windowVisible || caustica::shouldSkipRender(*m_sceneEditor.app()))
-            return;
+    app.addSystemAfter<system_label::EditorSceneRequestUnfocusedRender, caustica::system_label::NotifyDpiScale>(
+        AppSchedule::preUpdate,
+        [this](SystemContext& ctx) {
+            if (ctx.runRender || !ctx.windowVisible || caustica::shouldSkipRender(*m_sceneEditor.app()))
+                return;
 
-        auto* wr = caustica::editor::editorWorldRenderer(m_sceneEditor);
-        auto* ui = ctx.tryRes<EditorUiData>();
-        auto* capture = ctx.tryRes<CaptureScriptState>();
-        const auto& settings = m_sceneEditor.pathTracerSettings();
+            auto* wr = caustica::editor::editorWorldRenderer(m_sceneEditor);
+            auto* ui = ctx.tryRes<EditorUiData>();
+            auto* capture = ctx.tryRes<CaptureScriptState>();
+            const auto& settings = m_sceneEditor.pathTracerSettings();
 
-        const bool captureActive = capture && capture->manager && capture->manager->isDoingWork();
-        const bool editorRequestsRender = ui && ui->editor.RenderWhenOutOfFocus;
-        const bool accumulationIncomplete = wr
-            && !settings.RealtimeMode
-            && wr->getAccumulationSampleIndex() < settings.AccumulationTarget;
+            const bool captureActive = capture && capture->manager && capture->manager->isDoingWork();
+            const bool editorRequestsRender = ui && ui->editor.RenderWhenOutOfFocus;
+            const bool accumulationIncomplete = wr
+                && !settings.RealtimeMode
+                && wr->getAccumulationSampleIndex() < settings.AccumulationTarget;
 
-        if (!wr || (
-            wr->getFrameIndex() >= 16
-            && !settings.ResetAccumulation
-            && !settings.ResetRealtimeCaches
-            && !captureActive
-            && !editorRequestsRender
-            && !accumulationIncomplete))
-            return;
+            if (!wr || (
+                wr->getFrameIndex() >= 16
+                && !settings.ResetAccumulation
+                && !settings.ResetRealtimeCaches
+                && !captureActive
+                && !editorRequestsRender
+                && !accumulationIncomplete))
+                return;
 
-        ctx.runRender = true;
-        ctx.windowFocused = true;
-        ctx.app.requestRenderUnfocused();
-    });
+            ctx.runRender = true;
+            ctx.windowFocused = true;
+            ctx.app.requestRenderUnfocused();
+        });
 
-    app.addSystemAfter(AppSchedule::preUpdate, "EditorScene.ProcessPendingMutations", "BeforeAnimate", [this](SystemContext& ctx) {
-        (void)ctx;
-        m_sceneEditor.processPendingSceneDeletes();
-    });
+    app.addSystemAfter<system_label::EditorSceneProcessPendingMutations, caustica::system_label::BeforeAnimate>(
+        AppSchedule::preUpdate,
+        [this](SystemContext& ctx) {
+            (void)ctx;
+            m_sceneEditor.processPendingSceneDeletes();
+        });
 
-    app.addSystemAfter(AppSchedule::preUpdate, "EditorScene.AnimateBegin", "EditorScene.ProcessPendingMutations", [this](SystemContext& ctx) {
-        if (!ctx.windowFocused)
-            return;
+    app.addSystemAfter<system_label::EditorSceneAnimateBegin, system_label::EditorSceneProcessPendingMutations>(
+        AppSchedule::preUpdate,
+        [this](SystemContext& ctx) {
+            if (!ctx.windowFocused)
+                return;
 
-        m_sceneEditor.onAnimateBegin(ctx.deltaTimeSeconds);
-        ctx.elapsedTime = ctx.deltaTimeSeconds;
+            m_sceneEditor.onAnimateBegin(ctx.deltaTimeSeconds);
+            ctx.elapsedTime = ctx.deltaTimeSeconds;
 
-        const auto& settings = m_sceneEditor.pathTracerSettings();
-        const bool enableAnimations = settings.EnableAnimations && settings.RealtimeMode;
-        const bool enableAnimationUpdate = enableAnimations || settings.ResetAccumulation;
-        m_sceneEditor.onAnimateGameTick(ctx.deltaTimeSeconds, enableAnimations);
-        m_sceneEditor.onAnimateUpdateSceneTime(ctx.deltaTimeSeconds, enableAnimations, enableAnimationUpdate);
-    });
+            const auto& settings = m_sceneEditor.pathTracerSettings();
+            const bool enableAnimations = settings.EnableAnimations && settings.RealtimeMode;
+            const bool enableAnimationUpdate = enableAnimations || settings.ResetAccumulation;
+            m_sceneEditor.onAnimateGameTick(ctx.deltaTimeSeconds, enableAnimations);
+            m_sceneEditor.onAnimateUpdateSceneTime(ctx.deltaTimeSeconds, enableAnimations, enableAnimationUpdate);
+        });
 
-    app.addSystemAfter(AppSchedule::update, "EditorScene.SyncLoadedScene", "Scene.animate", [this](SystemContext& ctx) {
-        (void)ctx;
-        m_sceneEditor.syncLoadedSceneSystems();
-    });
+    app.addSystemAfter<system_label::EditorSceneSyncLoadedScene, caustica::system_label::SceneAnimate>(
+        AppSchedule::update,
+        [this](SystemContext& ctx) {
+            (void)ctx;
+            m_sceneEditor.syncLoadedSceneSystems();
+        });
 
-    app.addSystemAfter(AppSchedule::update, "EditorScene.AnimateEnd", "Scene.animate", [this](SystemContext& ctx) {
-        if (!ctx.windowFocused)
-            return;
+    app.addSystemAfter<system_label::EditorSceneAnimateEnd, caustica::system_label::SceneAnimate>(
+        AppSchedule::update,
+        [this](SystemContext& ctx) {
+            if (!ctx.windowFocused)
+                return;
 
-        m_sceneEditor.onAnimateGameCamera(ctx.deltaTimeSeconds);
-        m_sceneEditor.onAnimateEnd(ctx.deltaTimeSeconds);
-        m_sceneEditor.updateWindowTitle();
-    });
+            m_sceneEditor.onAnimateGameCamera(ctx.deltaTimeSeconds);
+            m_sceneEditor.onAnimateEnd(ctx.deltaTimeSeconds);
+            m_sceneEditor.updateWindowTitle();
+        });
 
-    app.addSystem(AppSchedule::PostUpdate, "EditorScene.handleDroppedFiles", [this](SystemContext& ctx) {
+    app.addSystem<system_label::EditorSceneHandleDroppedFiles>(AppSchedule::PostUpdate, [this](SystemContext& ctx) {
         (void)ctx;
         // Import before Extract so PrepareRenderFrame sees the final ECS graph and
         // the render phase does not race a mid-Extract snapshot overwrite.
         m_sceneEditor.handleDroppedFiles();
     });
 
-    app.addSystemAfter(AppSchedule::Extract, "EditorScene.prepareEditorFrame", "Scene.PrepareRenderFrame", [this](SystemContext& ctx) {
-        if (!ctx.gpuDevice || caustica::shouldSkipRender(*m_sceneEditor.app()))
-            return;
+    app.addSystemAfter<system_label::EditorScenePrepareEditorFrame, caustica::system_label::ScenePrepareRenderFrame>(
+        AppSchedule::Extract,
+        [this](SystemContext& ctx) {
+            if (!ctx.gpuDevice || caustica::shouldSkipRender(*m_sceneEditor.app()))
+                return;
 
-        m_sceneEditor.prepareEditorFrame();
-    });
+            m_sceneEditor.prepareEditorFrame();
+        });
 
-    AppSystemOrdering editorAfterWorldRenderOrdering;
-    editorAfterWorldRenderOrdering.before.push_back("Scene.AfterWorldRender");
-    editorAfterWorldRenderOrdering.before.push_back("GpuRender.endFrame");
+    app.addSystem<system_label::EditorSceneAfterWorldRender>(
+        AppSchedule::render,
+        [this](SystemContext& ctx) {
+            if (!ctx.gpuDevice)
+                return;
 
-    app.addSystem(AppSchedule::render, "EditorScene.AfterWorldRender", [this](SystemContext& ctx) {
-        if (!ctx.gpuDevice)
-            return;
-
-        m_sceneEditor.afterWorldRender(*ctx.gpuDevice);
-    }, std::move(editorAfterWorldRenderOrdering));
+            m_sceneEditor.afterWorldRender(*ctx.gpuDevice);
+        },
+        AppSystemOrdering{}
+            .runBefore<caustica::system_label::SceneAfterWorldRender, caustica::system_label::GpuRenderEndFrame>());
 
     if (!uiConfig)
         return;
 
-    app.addSystemAfter(AppSchedule::update, "EditorUI.animate", "EditorScene.AnimateEnd", [](SystemContext& ctx) {
-        auto* uiSubsystem = ctx.tryRes<EditorUISubsystem>();
-        if (!uiSubsystem)
-            return;
+    app.addSystemAfter<system_label::EditorUIAnimate, system_label::EditorSceneAnimateEnd>(
+        AppSchedule::update,
+        [](SystemContext& ctx) {
+            auto* uiSubsystem = ctx.tryRes<EditorUISubsystem>();
+            if (!uiSubsystem)
+                return;
 
-        uiSubsystem->animateScheduled(ctx.deltaTimeSeconds, ctx.windowFocused);
-    });
+            uiSubsystem->animateScheduled(ctx.deltaTimeSeconds, ctx.windowFocused);
+        });
 
-    AppSystemOrdering editorUiRenderOrdering;
-    editorUiRenderOrdering.after.push_back("Scene.AfterWorldRender");
-    editorUiRenderOrdering.before.push_back("GpuRender.endFrame");
+    app.addSystem<system_label::EditorUIRenderScene>(
+        AppSchedule::render,
+        [](SystemContext& ctx) {
+            if (!ctx.gpuDevice)
+                return;
 
-    app.addSystem(AppSchedule::render, "EditorUI.RenderScene", [](SystemContext& ctx) {
-        if (!ctx.gpuDevice)
-            return;
+            auto* uiSubsystem = ctx.tryRes<EditorUISubsystem>();
+            if (!uiSubsystem)
+                return;
 
-        auto* uiSubsystem = ctx.tryRes<EditorUISubsystem>();
-        if (!uiSubsystem)
-            return;
-
-        uiSubsystem->renderSceneScheduled(*ctx.gpuDevice);
-    }, std::move(editorUiRenderOrdering));
+            uiSubsystem->renderSceneScheduled(*ctx.gpuDevice);
+        },
+        AppSystemOrdering{}
+            .runAfter<caustica::system_label::SceneAfterWorldRender>()
+            .runBefore<caustica::system_label::GpuRenderEndFrame>());
 }
 
 } // namespace caustica::editor

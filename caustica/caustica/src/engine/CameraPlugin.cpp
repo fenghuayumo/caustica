@@ -5,6 +5,7 @@
 #include <engine/AppResources.h>
 #include <engine/SessionCamera.h>
 #include <engine/SceneQuery.h>
+#include <engine/SystemLabels.h>
 #include <render/core/PathTracerSettings.h>
 #include <render/worldRenderer/WorldRenderer.h>
 #include <scene/Scene.h>
@@ -85,7 +86,7 @@ void updateCamera(App& app, float elapsedTimeSeconds)
 
 void CameraPlugin::configureSchedules(App& app)
 {
-    app.addSystem(AppSchedule::update, "Scene.updateCamera", [](SystemContext& ctx) {
+    app.addSystem<system_label::SceneUpdateCamera>(AppSchedule::update, [](SystemContext& ctx) {
         if (!ctx.windowFocused)
             return;
         updateCamera(ctx.app, ctx.deltaTimeSeconds);

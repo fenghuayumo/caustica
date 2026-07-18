@@ -5,19 +5,19 @@
 #include <engine/GpuSharedCaches.h>
 #include <engine/SessionCamera.h>
 #include <engine/SceneSession.h>
+#include <engine/ScenePlugins.h>
 #include <render/worldRenderer/WorldRenderer.h>
-#include <engine/SceneAccess.h>
+#include <engine/ActiveScene.h>
 #include <engine/SceneAppResources.h>
 #include <engine/SceneStartup.h>
 
 namespace caustica
 {
 
-void DefaultPlugins::build(App& app)
+void SceneRuntimePlugin::build(App& app)
 {
-    AssetPlugin{}.build(app);
     registerSceneAppResources(app, appConfig);
-    app.emplaceResource<SceneAccess>();
+    app.emplaceResource<ActiveScene>();
     app.emplaceResource<GpuSharedCaches>();
     app.emplaceResource<SessionCamera>();
     app.emplaceResource<SceneSession>();
@@ -25,11 +25,22 @@ void DefaultPlugins::build(App& app)
     app.emplaceResource<GpuRenderSubsystem>();
 }
 
-void DefaultPlugins::configureSchedules(App& app)
+void SceneRuntimePlugin::configureSchedules(App& app)
 {
-    AssetPlugin{}.configureSchedules(app);
     app.registerDefaultSchedules();
     registerSceneStartup(app, appConfig);
+}
+
+void DefaultPlugins::build(App& app)
+{
+    app.addPlugin<AssetPlugin>();
+    app.addPlugin<SceneRuntimePlugin>(appConfig);
+    app.addPlugin<SceneLoadingPlugin>();
+    app.addPlugin<SceneAnimationPlugin>();
+    app.addPlugin<CameraPlugin>();
+    app.addPlugin<PathTracingPlugin>();
+    app.addPlugin<RenderExtractPlugin>();
+    app.addPlugin<WindowTitlePlugin>();
 }
 
 } // namespace caustica

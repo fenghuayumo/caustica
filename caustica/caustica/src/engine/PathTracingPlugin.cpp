@@ -4,25 +4,28 @@
 #include <engine/AppSchedules.h>
 #include <engine/SceneQuery.h>
 #include <engine/RenderFrameApi.h>
+#include <engine/SystemLabels.h>
 
 namespace caustica
 {
 
 void PathTracingPlugin::configureSchedules(App& app)
 {
-    app.addSystem(AppSchedule::render, "Scene.RenderScene", [](SystemContext& ctx) {
+    app.addSystem<system_label::SceneRenderScene>(AppSchedule::render, [](SystemContext& ctx) {
         if (!ctx.gpuDevice || !activeScene(ctx.app))
             return;
 
         renderScene(ctx.app, *ctx.gpuDevice);
     });
 
-    app.addSystemAfter(AppSchedule::render, "Scene.AfterWorldRender", "Scene.RenderScene", [](SystemContext& ctx) {
-        if (!ctx.gpuDevice)
-            return;
+    app.addSystemAfter<system_label::SceneAfterWorldRender, system_label::SceneRenderScene>(
+        AppSchedule::render,
+        [](SystemContext& ctx) {
+            if (!ctx.gpuDevice)
+                return;
 
-        afterWorldRenderScheduled(ctx.app, *ctx.gpuDevice);
-    });
+            afterWorldRenderScheduled(ctx.app, *ctx.gpuDevice);
+        });
 }
 
 } // namespace caustica

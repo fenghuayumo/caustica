@@ -1,4 +1,4 @@
-#include <engine/App.h>
+#include <engine/EngineApp.h>
 #include <engine/EntryPoint.h>
 
 #include "EditorLaunch.h"
@@ -7,6 +7,7 @@
 #include <render/passes/debug/Korgi.h>
 
 #include <cstring>
+#include <memory>
 
 #ifdef _WIN32
 #include <engine/SplashScreen.h>
@@ -27,12 +28,16 @@ bool WantsHeadlessStartup(int argc, const char* const* argv)
 }
 
 #ifdef _WIN32
+SplashScreen* g_activeSplash = nullptr;
+
 void StopSplashBeforeGpuInit()
 {
-    // Splash screen lifetime is managed in WinMain.
+    if (g_activeSplash)
+    {
+        g_activeSplash->stop();
+        g_activeSplash = nullptr;
+    }
 }
-
-SplashScreen* g_activeSplash = nullptr;
 #endif
 
 } // namespace
@@ -61,34 +66,31 @@ int main(int argc, char** argv)
         splashScreen.start(L"loading_splash.png");
         g_activeSplash = &splashScreen;
     }
-
-    auto stopSplash = []() {
-        if (g_activeSplash)
-        {
-            g_activeSplash->stop();
-            g_activeSplash = nullptr;
-        }
-    };
-
-    caustica::editor::EditorHost host;
-    caustica::App app;
-
-    const int exitCode = caustica::runApp(
-        app,
-        [&](caustica::App& targetApp) {
-            return caustica::editor::startupEditor(targetApp, host, __argc, (const char**)__argv);
-        },
-        stopSplash);
-#else
-    caustica::editor::EditorHost host;
-    caustica::App app;
-
-    const int exitCode = caustica::runApp(
-        app,
-        [&](caustica::App& targetApp) {
-            return caustica::editor::startupEditor(targetApp, host, argc, const_cast<const char* const*>(argv));
-        });
 #endif
+
+    caustica::initializeAppPlatform();
+
+    caustica::editor::EditorHost host;
+
+#ifdef _WIN32
+    auto engine = caustica::editor::createEditorEngine(
+        host, __argc, (const char**)__argv, StopSplashBeforeGpuInit);
+#else
+    auto engine = caustica::editor::createEditorEngine(
+        host, argc, const_cast<const char* const*>(argv));
+#endif
+
+    if (!engine)
+    {
+        caustica::shutdownAppPlatform();
+        korgi::shutdown();
+#ifdef _WIN32
+        caustica::shutdownNativeConsole();
+#endif
+        return 1;
+    }
+
+    const int exitCode = caustica::runEngineApp(std::move(engine));
 
     korgi::shutdown();
 #ifdef _WIN32

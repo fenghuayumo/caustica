@@ -9,7 +9,8 @@ namespace caustica
 
 class App;
 
-// Scene runtime plugins (schedules). Registered by App::buildPlugins via registerSceneSchedules.
+// Scene runtime plugins (schedules). DefaultPlugins adds these; App::buildPlugins
+// still calls registerSceneSchedules as a fallback when they were not registered.
 struct SceneLoadingPlugin : Plugin
 {
     void configureSchedules(App& app) override;

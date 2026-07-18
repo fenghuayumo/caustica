@@ -1,5 +1,6 @@
 #include <engine/EntryPoint.h>
 #include <engine/App.h>
+#include <engine/EngineApp.h>
 
 #include <assets/loader/TextureLoader.h>
 #include <core/JobSystem.h>
@@ -16,6 +17,10 @@ namespace caustica
 namespace
 {
 AppHook s_preGpuInit = nullptr;
+
+#ifdef _WIN32
+bool s_comNeedsUninit = false;
+#endif
 }
 
 void invokePreGpuDeviceInitHook()
@@ -24,21 +29,39 @@ void invokePreGpuDeviceInitHook()
         s_preGpuInit();
 }
 
-int runApp(App& app, const std::function<bool(App&)>& startup, AppHook preGpuInit)
+void initializeAppPlatform()
 {
-    s_preGpuInit = preGpuInit;
-
 #ifdef _WIN32
     const HRESULT comHr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
-    const bool comNeedsUninit = SUCCEEDED(comHr);
+    s_comNeedsUninit = SUCCEEDED(comHr);
 #endif
 
     OS::initialize();
     JobSystem::Initialize();
+}
+
+void shutdownAppPlatform()
+{
+    JobSystem::shutdown();
+
+#ifdef _WIN32
+    if (s_comNeedsUninit)
+    {
+        CoUninitialize();
+        s_comNeedsUninit = false;
+    }
+#endif
+}
+
+int runApp(App& app, const std::function<bool(App&)>& startup, AppHook preGpuInit)
+{
+    s_preGpuInit = preGpuInit;
+
+    initializeAppPlatform();
 
     const auto shutdownOnFailure = [&app]() {
         app.shutdown();
-        JobSystem::shutdown();
+        shutdownAppPlatform();
     };
 
     if (!startup)
@@ -46,10 +69,6 @@ int runApp(App& app, const std::function<bool(App&)>& startup, AppHook preGpuIni
         error("runApp requires a startup callback");
         shutdownOnFailure();
         s_preGpuInit = nullptr;
-#ifdef _WIN32
-        if (comNeedsUninit)
-            CoUninitialize();
-#endif
         return 1;
     }
 
@@ -57,10 +76,6 @@ int runApp(App& app, const std::function<bool(App&)>& startup, AppHook preGpuIni
     {
         shutdownOnFailure();
         s_preGpuInit = nullptr;
-#ifdef _WIN32
-        if (comNeedsUninit)
-            CoUninitialize();
-#endif
         return 1;
     }
 
@@ -69,10 +84,6 @@ int runApp(App& app, const std::function<bool(App&)>& startup, AppHook preGpuIni
         error("runApp startup must call finishStartup");
         shutdownOnFailure();
         s_preGpuInit = nullptr;
-#ifdef _WIN32
-        if (comNeedsUninit)
-            CoUninitialize();
-#endif
         return 1;
     }
 
@@ -80,12 +91,23 @@ int runApp(App& app, const std::function<bool(App&)>& startup, AppHook preGpuIni
 
     app.run();
 
-    JobSystem::shutdown();
+    shutdownAppPlatform();
+    return 0;
+}
 
-#ifdef _WIN32
-    if (comNeedsUninit)
-        CoUninitialize();
-#endif
+int runEngineApp(std::unique_ptr<EngineApp> engine)
+{
+    if (!engine || !engine->isValid() || !engine->app().isStarted())
+    {
+        error("runEngineApp requires a started EngineApp");
+        if (engine)
+            engine->shutdown();
+        shutdownAppPlatform();
+        return 1;
+    }
+
+    engine->run();
+    shutdownAppPlatform();
     return 0;
 }
 

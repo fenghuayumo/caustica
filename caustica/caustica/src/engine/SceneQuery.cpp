@@ -3,7 +3,7 @@
 #include <engine/SceneViewState.h>
 #include <cassert>
 #include <engine/SceneQuery.h>
-#include <engine/SceneAccess.h>
+#include <engine/ActiveScene.h>
 #include <engine/SceneSession.h>
 #include <scene/Scene.h>
 #include <scene/SceneManager.h>
@@ -29,35 +29,65 @@ namespace
 
 std::shared_ptr<Scene> activeScene(const App& app)
 {
-    if (auto* access = const_cast<App&>(app).tryResource<SceneAccess>())
-    {
-        if (access->active)
-            return access->active;
-    }
-    ::SceneManager* manager = sessionManager(app);
-    return manager ? manager->getScene() : nullptr;
+    if (const ActiveScene* active = tryActiveScene(app))
+        return active->scene;
+    return nullptr;
 }
 
-void syncSceneAccess(App& app)
+const ActiveScene* tryActiveScene(const App& app)
 {
-    auto* access = app.tryResource<SceneAccess>();
-    if (!access)
+    return const_cast<App&>(app).tryResource<ActiveScene>();
+}
+
+void commitActiveScene(
+    App& app,
+    std::shared_ptr<Scene> scene,
+    std::string name,
+    std::filesystem::path path)
+{
+    ActiveScene* active = app.tryResource<ActiveScene>();
+    if (!active)
         return;
-    if (::SceneManager* manager = sessionManager(app))
-        access->active = manager->getScene();
-    else
-        access->active.reset();
+
+    active->scene = std::move(scene);
+    active->name = std::move(name);
+    active->path = std::move(path);
+    ++active->generation;
+}
+
+void commitActiveSceneFromManager(App& app)
+{
+    ::SceneManager* manager = sessionManager(app);
+    if (!manager)
+    {
+        clearActiveScene(app);
+        return;
+    }
+
+    commitActiveScene(
+        app,
+        manager->getScene(),
+        manager->getCurrentSceneName(),
+        manager->getCurrentScenePath());
+}
+
+void clearActiveScene(App& app)
+{
+    ActiveScene* active = app.tryResource<ActiveScene>();
+    if (!active)
+        return;
+
+    active->scene.reset();
+    active->name.clear();
+    active->path.clear();
+    ++active->generation;
 }
 
 scene::SceneEntityWorld* entityWorld(const App& app)
 {
-    if (auto* access = const_cast<App&>(app).tryResource<SceneAccess>())
-    {
-        if (scene::SceneEntityWorld* ew = access->entityWorld())
-            return ew;
-    }
-    const std::shared_ptr<Scene> active = activeScene(app);
-    return active ? active->getEntityWorld() : nullptr;
+    if (const ActiveScene* active = tryActiveScene(app))
+        return active->entityWorld();
+    return nullptr;
 }
 
 ecs::World* sceneEcs(const App& app)
@@ -75,14 +105,16 @@ const std::vector<std::string>& availableScenes(const App& app)
 
 std::string currentSceneName(const App& app)
 {
-    ::SceneManager* manager = sessionManager(app);
-    return manager ? manager->getCurrentSceneName() : std::string();
+    if (const ActiveScene* active = tryActiveScene(app))
+        return active->name;
+    return {};
 }
 
 std::filesystem::path currentScenePath(const App& app)
 {
-    ::SceneManager* manager = sessionManager(app);
-    return manager ? manager->getCurrentScenePath() : std::filesystem::path{};
+    if (const ActiveScene* active = tryActiveScene(app))
+        return active->path;
+    return {};
 }
 
 bool isSceneStructureBusy(const App& app)

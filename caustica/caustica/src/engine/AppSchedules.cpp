@@ -53,35 +53,13 @@ std::size_t AppSchedules::phaseIndex(AppSchedule schedule)
 
 AppSchedules& AppSchedules::addSystem(
     AppSchedule schedule,
-    std::string name,
+    SystemLabel label,
     SystemFn system,
     AppSystemOrdering ordering)
 {
     PhaseSchedule& phase = m_phases[phaseIndex(schedule)];
-    phase.systems.push_back(System{ std::move(name), std::move(system), std::move(ordering) });
+    phase.systems.push_back(System{ std::move(label), std::move(system), std::move(ordering) });
     return *this;
-}
-
-AppSchedules& AppSchedules::addSystemBefore(
-    AppSchedule schedule,
-    std::string name,
-    std::string before,
-    SystemFn system)
-{
-    AppSystemOrdering ordering;
-    ordering.before.push_back(std::move(before));
-    return addSystem(schedule, std::move(name), std::move(system), std::move(ordering));
-}
-
-AppSchedules& AppSchedules::addSystemAfter(
-    AppSchedule schedule,
-    std::string name,
-    std::string after,
-    SystemFn system)
-{
-    AppSystemOrdering ordering;
-    ordering.after.push_back(std::move(after));
-    return addSystem(schedule, std::move(name), std::move(system), std::move(ordering));
 }
 
 void AddEdge(std::vector<std::vector<int>>& outgoing, std::vector<int>& indegree, int from, int to)
@@ -104,9 +82,11 @@ std::vector<int> AppSchedules::buildExecutionOrder(const PhaseSchedule& phase)
     std::vector<std::vector<int>> outgoing(static_cast<std::size_t>(count));
     std::vector<int> indegree(static_cast<std::size_t>(count), 0);
 
-    auto findSystemIndex = [&systems](const std::string& name) -> int {
-        const auto it = std::find_if(systems.begin(), systems.end(), [&name](const System& system) {
-            return system.name == name;
+    auto findSystemIndex = [&systems](const SystemLabel& label) -> int {
+        if (!label.valid())
+            return -1;
+        const auto it = std::find_if(systems.begin(), systems.end(), [&label](const System& system) {
+            return system.label == label;
         });
         if (it == systems.end())
             return -1;
@@ -116,9 +96,9 @@ std::vector<int> AppSchedules::buildExecutionOrder(const PhaseSchedule& phase)
     for (int i = 0; i < count; ++i)
     {
         const AppSystemOrdering& ordering = systems[static_cast<std::size_t>(i)].ordering;
-        for (const std::string& before : ordering.before)
+        for (const SystemLabel& before : ordering.before)
             AddEdge(outgoing, indegree, i, findSystemIndex(before));
-        for (const std::string& after : ordering.after)
+        for (const SystemLabel& after : ordering.after)
             AddEdge(outgoing, indegree, findSystemIndex(after), i);
     }
 

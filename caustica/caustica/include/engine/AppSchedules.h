@@ -1,10 +1,10 @@
 #pragma once
 
 #include <ecs/World.h>
+#include <engine/SystemLabel.h>
 
 #include <cstdint>
 #include <functional>
-#include <string>
 #include <vector>
 
 namespace caustica
@@ -130,38 +130,22 @@ struct SystemContext
 
 using SystemFn = std::function<void(SystemContext&)>;
 
-struct AppSystemOrdering
-{
-    std::vector<std::string> before;
-    std::vector<std::string> after;
-};
-
 // Ordered systems for a single AppSchedule phase.
 class AppSchedules
 {
 public:
     AppSchedules& addSystem(
         AppSchedule schedule,
-        std::string name,
+        SystemLabel label,
         SystemFn system,
         AppSystemOrdering ordering = {});
-    AppSchedules& addSystemBefore(
-        AppSchedule schedule,
-        std::string name,
-        std::string before,
-        SystemFn system);
-    AppSchedules& addSystemAfter(
-        AppSchedule schedule,
-        std::string name,
-        std::string after,
-        SystemFn system);
     void run(AppSchedule schedule, SystemContext& context) const;
     void clear();
 
 private:
     struct System
     {
-        std::string name;
+        SystemLabel label;
         SystemFn fn;
         AppSystemOrdering ordering;
     };

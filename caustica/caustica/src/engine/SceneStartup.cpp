@@ -9,6 +9,8 @@
 #include <engine/SessionCamera.h>
 #include <engine/SceneSession.h>
 #include <engine/SceneLifecycle.h>
+#include <engine/SceneQuery.h>
+#include <engine/SystemLabels.h>
 
 #include <core/log.h>
 #include <core/path_utils.h>
@@ -52,13 +54,26 @@ void initializeSceneApp(App& app, const SceneAppConfig& config)
 
     sessionCamera->camera.camera().setRotateSpeed(.003f);
 
+    // Commit ActiveScene before host/editor loaded callbacks so early hooks see SSOT.
+    auto onLoadedCb = std::move(sceneCallbacks.OnSceneLoaded);
+    auto onUnloadingCb = std::move(sceneCallbacks.OnSceneUnloading);
+    auto onLoaded = [onLoadedCb = std::move(onLoadedCb), &app]() {
+        commitActiveSceneFromManager(app);
+        if (onLoadedCb)
+            onLoadedCb();
+    };
+    auto onUnloading = [onUnloadingCb = std::move(onUnloadingCb)]() {
+        if (onUnloadingCb)
+            onUnloadingCb();
+    };
+
     if (!sceneSession->create(
             *gpuDevice,
             *gpuSharedCaches->shaderFactory,
             gpuSharedCaches->textureLoader,
             std::make_shared<render::RenderSceneTypeFactory>(),
-            std::move(sceneCallbacks.OnSceneLoaded),
-            std::move(sceneCallbacks.OnSceneUnloading)))
+            std::move(onLoaded),
+            std::move(onUnloading)))
     {
         caustica::error("SceneSession::create failed");
         return;
@@ -107,7 +122,7 @@ void initializeSceneApp(App& app, const SceneAppConfig& config)
 
 void registerSceneStartup(App& app, const SceneAppConfig& config)
 {
-    app.addSystem(AppSchedule::Startup, "Scene.Startup", [&app, config](SystemContext& ctx) {
+    app.addSystem<system_label::SceneStartup>(AppSchedule::Startup, [&app, config](SystemContext& ctx) {
         (void)ctx;
         initializeSceneApp(app, config);
     });
@@ -115,7 +130,7 @@ void registerSceneStartup(App& app, const SceneAppConfig& config)
 
 void registerGpuRenderShutdown(App& app)
 {
-    app.addSystem(AppSchedule::shutdown, "GpuRender.shutdown", [](SystemContext& ctx) {
+    app.addSystem<system_label::GpuRenderShutdown>(AppSchedule::shutdown, [](SystemContext& ctx) {
         if (auto* gpuRender = ctx.tryRes<GpuRenderSubsystem>())
             gpuRender->shutdown();
     });

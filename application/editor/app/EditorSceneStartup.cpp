@@ -1,10 +1,12 @@
 #include "EditorSceneStartup.h"
 
+#include "EditorSystemLabels.h"
 #include "EditorUISubsystem.h"
 #include "SceneEditor.h"
 #include "common/LocalConfig.h"
 
 #include <engine/App.h>
+#include <engine/SystemLabels.h>
 #include <render/RenderAppState.h>
 
 namespace caustica::editor
@@ -12,10 +14,8 @@ namespace caustica::editor
 
 void registerEditorSceneStartup(caustica::App& app, const EditorSceneStartupConfig& config)
 {
-    app.addSystemBefore(
+    app.addSystemBefore<system_label::EditorScenePreStartup, caustica::system_label::SceneStartup>(
         AppSchedule::Startup,
-        "EditorScene.PreStartup",
-        "Scene.Startup",
         [&app, config](SystemContext& ctx) {
             (void)ctx;
 
@@ -26,10 +26,8 @@ void registerEditorSceneStartup(caustica::App& app, const EditorSceneStartupConf
                 config.sceneEditor->onBeforeInitialSceneLoad();
         });
 
-    app.addSystemAfter(
+    app.addSystemAfter<system_label::EditorScenePostStartup, caustica::system_label::SceneStartup>(
         AppSchedule::Startup,
-        "EditorScene.PostStartup",
-        "Scene.Startup",
         [&app, config](SystemContext& ctx) {
             (void)ctx;
 
@@ -45,10 +43,8 @@ void registerEditorSceneStartup(caustica::App& app, const EditorSceneStartupConf
 
 void registerEditorUISubsystemLifecycle(caustica::App& app)
 {
-    app.addSystemAfter(
+    app.addSystemAfter<system_label::EditorUIStartup, system_label::EditorScenePostStartup>(
         AppSchedule::Startup,
-        "EditorUI.Startup",
-        "EditorScene.PostStartup",
         [&app](SystemContext& ctx) {
             auto* uiSubsystem = ctx.tryRes<EditorUISubsystem>();
             if (!uiSubsystem || !ctx.gpuDevice)
@@ -59,10 +55,12 @@ void registerEditorUISubsystemLifecycle(caustica::App& app)
         });
 
     // ImGui/UI must tear down before GpuRender destroys device-owned resources.
-    app.addSystemBefore(AppSchedule::shutdown, "EditorUI.shutdown", "GpuRender.shutdown", [](SystemContext& ctx) {
-        if (auto* uiSubsystem = ctx.tryRes<EditorUISubsystem>())
-            uiSubsystem->shutdown();
-    });
+    app.addSystemBefore<system_label::EditorUIShutdown, caustica::system_label::GpuRenderShutdown>(
+        AppSchedule::shutdown,
+        [](SystemContext& ctx) {
+            if (auto* uiSubsystem = ctx.tryRes<EditorUISubsystem>())
+                uiSubsystem->shutdown();
+        });
 }
 
 } // namespace caustica::editor

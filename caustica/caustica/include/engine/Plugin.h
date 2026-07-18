@@ -18,4 +18,11 @@ struct Plugin
     virtual void configureLateSchedules(App& app) {}
 };
 
+// Bevy-style group: build() should call app.addPlugin<...>(...) for members.
+struct PluginGroup
+{
+    virtual ~PluginGroup() = default;
+    virtual void build(App& app) = 0;
+};
+
 } // namespace caustica

@@ -1,13 +1,20 @@
 #pragma once
 
-#include <engine/App.h>
-#include <engine/SceneStartup.h>
+#include <engine/EngineApp.h>
+#include <engine/EntryPoint.h>
 
 #include "EditorHost.h"
+
+#include <memory>
 
 namespace caustica::editor
 {
 
-bool startupEditor(caustica::App& app, EditorHost& host, int argc, const char* const* argv);
+// Shared graphics/bootstrap via EngineApp; EditorPlugin is a pure delta.
+[[nodiscard]] std::unique_ptr<caustica::EngineApp> createEditorEngine(
+    EditorHost& host,
+    int argc,
+    const char* const* argv,
+    caustica::AppHook preGpuDeviceInit = nullptr);
 
 } // namespace caustica::editor

@@ -4,6 +4,7 @@
 #include <engine/AppSchedules.h>
 #include <engine/SceneQuery.h>
 #include <engine/RenderFrameApi.h>
+#include <engine/SystemLabels.h>
 
 #include <scene/Scene.h>
 
@@ -12,8 +13,6 @@ namespace caustica
 
 void refreshEntityWorld(App& app, uint32_t frameIndex)
 {
-    syncSceneAccess(app);
-
     const std::shared_ptr<Scene> scene = activeScene(app);
     if (!scene)
         return;
@@ -23,23 +22,25 @@ void refreshEntityWorld(App& app, uint32_t frameIndex)
 
 void SceneAnimationPlugin::configureSchedules(App& app)
 {
-    app.addSystem(AppSchedule::update, "Scene.animate", [](SystemContext& ctx) {
+    app.addSystem<system_label::SceneAnimate>(AppSchedule::update, [](SystemContext& ctx) {
         if (!ctx.windowFocused)
             return;
 
         animate(ctx.app, ctx.deltaTimeSeconds);
     });
 
-    app.addSystem(AppSchedule::PostUpdate, "Scene.RefreshEntityWorld", [](SystemContext& ctx) {
+    app.addSystem<system_label::SceneRefreshEntityWorld>(AppSchedule::PostUpdate, [](SystemContext& ctx) {
         refreshEntityWorld(ctx.app, ctx.frameIndex);
     });
 
-    app.addSystemAfter(AppSchedule::update, "Scene.TickSimulation", "Scene.updateCamera", [](SystemContext& ctx) {
-        if (!ctx.windowFocused)
-            return;
+    app.addSystemAfter<system_label::SceneTickSimulation, system_label::SceneUpdateCamera>(
+        AppSchedule::update,
+        [](SystemContext& ctx) {
+            if (!ctx.windowFocused)
+                return;
 
-        tickSimulationAndFrameTiming(ctx.app, ctx.deltaTimeSeconds);
-    });
+            tickSimulationAndFrameTiming(ctx.app, ctx.deltaTimeSeconds);
+        });
 }
 
 } // namespace caustica
