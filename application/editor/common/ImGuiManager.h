@@ -21,7 +21,7 @@ namespace caustica::editor
 class EditorUIData;
 
 // =============================================================================
-// ImGuiManager — ImGui lifecycle helper: fonts, context config, input setup.
+// ImGuiManager — ImGui lifecycle helper: fonts, theme, context config.
 //
 // Extracted from EditorUI constructor.  Handles ImGui initialization concerns
 // so EditorUI can focus on panel definitions.
@@ -36,6 +36,10 @@ public:
     // --- Font loading ---
     // Loads the default DroidSans-Mono font from assets/fonts/.
     void loadDefaultFont(caustica::ImGui_Renderer& renderer, const std::filesystem::path& assetsPath);
+
+    // --- Theme ---
+    // Applies the editor ImGui theme. Call again after DPI style resets.
+    void applyTheme(float displayScale = 1.0f);
 
     // --- Extension detection ---
     // Configures DX/NVAPI hit object extensions based on device capabilities.

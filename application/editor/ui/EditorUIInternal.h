@@ -3,6 +3,7 @@
 #include "ui/ui_macros.h"
 #include "EditorUI.h"
 #include "EditorUIData.h"
+#include "common/EditorTheme.h"
 
 #include <render/core/PathTracerSettings.h>
 #include <imgui.h>

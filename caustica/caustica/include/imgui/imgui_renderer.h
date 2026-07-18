@@ -83,6 +83,11 @@ namespace caustica
 
         bool m_supportExplicitDisplayScaling;
         bool m_imguiFrameOpened = false;
+        bool m_pendingDisplayScaleChanged = false;
+        float m_pendingDisplayScaleX = 1.0f;
+        float m_pendingDisplayScaleY = 1.0f;
+
+        void prepareImGuiFrame(float elapsedTimeSeconds);
 
     public:
         ImGui_Renderer(GpuDevice *devManager);

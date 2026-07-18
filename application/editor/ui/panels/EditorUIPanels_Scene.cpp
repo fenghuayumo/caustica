@@ -387,17 +387,13 @@ void EditorUI::BuildSceneWidgetsPanel(const PanelLayout& layout)
                     bool selected = buttons[i].IsSelected();
 
                     ImGui::PushID(i);
-                    float h = 0.33f; 
-                    float b = selected ? 1.0f : 0.1f;
-                    ImGui::PushStyleColor(ImGuiCol_Button, (ImVec4)ImColor::HSV(h, 0.6f * b, 0.6f * b));
-                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, (ImVec4)ImColor::HSV(h, 0.7f * b, 0.7f * b));
-                    ImGui::PushStyleColor(ImGuiCol_ButtonActive, (ImVec4)ImColor::HSV(h, 0.8f * b, 0.8f * b));
+                    PushToolbarButtonColors(selected);
                     if (ImGui::Button(buttons[i].GetText().c_str(), ImVec2(buttonWidth, texSizeA.y * 2)))
                     {
                         buttons[i].SetSelected(!selected);
                         m_settings.ResetAccumulation = true;
                     }
-                    ImGui::PopStyleColor(3);
+                    PopToolbarButtonColors();
                     ImGui::PopID();
 
                     if (buttons[i].HoverText.has_value())

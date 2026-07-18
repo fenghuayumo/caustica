@@ -1,5 +1,6 @@
 #include "ui/ui_macros.h"
 #include "GameScene.h"
+#include "common/EditorTheme.h"
 
 #include <core/log.h>
 #include <core/json.h>
@@ -573,16 +574,12 @@ void GameScene::StandaloneGUI(const std::shared_ptr<caustica::PlanarView> & view
                 bool selected = buttons[i].IsSelected();
 
                 ImGui::PushID(i);
-                float h = 0.33f;
-                float b = selected ? 1.0f : 0.1f;
-                ImGui::PushStyleColor(ImGuiCol_Button, (ImVec4)ImColor::HSV(h, 0.6f * b, 0.6f * b));
-                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, (ImVec4)ImColor::HSV(h, 0.7f * b, 0.7f * b));
-                ImGui::PushStyleColor(ImGuiCol_ButtonActive, (ImVec4)ImColor::HSV(h, 0.8f * b, 0.8f * b));
+                caustica::editor::PushToolbarButtonColors(selected);
                 if (ImGui::Button(buttons[i].GetText().c_str(), ImVec2(buttonWidth, texSizeA.y * 2)))
                 {
                     buttons[i].OnClick();
                 }
-                ImGui::PopStyleColor(3);
+                caustica::editor::PopToolbarButtonColors();
                 ImGui::PopID();
 
                 if (buttons[i].HoverText.has_value())

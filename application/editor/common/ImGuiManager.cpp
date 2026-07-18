@@ -1,4 +1,5 @@
 #include "common/ImGuiManager.h"
+#include "common/EditorTheme.h"
 
 #include <imgui/imgui_renderer.h>
 #include <core/vfs/VFS.h>
@@ -29,6 +30,7 @@ ImGuiManager::ImGuiManager(EditorUIData&           uiData,
     , m_nvapiSERSupported(nvapiSERSupported)
 {
     ImGui::GetIO().IniFilename = nullptr;
+    applyTheme(1.0f);
 }
 
 ImGuiManager::~ImGuiManager() = default;
@@ -39,6 +41,11 @@ void ImGuiManager::loadDefaultFont(caustica::ImGui_Renderer& renderer,
     auto nativeFS = std::make_shared<NativeFileSystem>();
     auto fontPath = assetsPath / "fonts/DroidSans/DroidSans-Mono.ttf";
     renderer.createFontFromFile(*nativeFS, fontPath, 16.0f);
+}
+
+void ImGuiManager::applyTheme(float displayScale)
+{
+    ApplyEditorTheme(displayScale);
 }
 
 void ImGuiManager::configureExtensions(int graphicsAPI)

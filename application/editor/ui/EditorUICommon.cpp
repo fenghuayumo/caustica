@@ -31,8 +31,9 @@ using namespace caustica::editor;
 namespace caustica::editor
 {
 
-const ImVec4 warnColor = { 1,0.5f,0.5f,1 };
-const ImVec4 categoryColor = { 0.5f,1.0f,0.7f,1 };
+// Keep in sync with EditorTheme semantic tokens (TextWarning / TextCategory).
+const ImVec4 warnColor = { 232.f / 255.f, 168.f / 255.f, 120.f / 255.f, 1.f };
+const ImVec4 categoryColor = { 126.f / 255.f, 200.f / 255.f, 175.f / 255.f, 1.f };
 
 namespace
 {

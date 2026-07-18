@@ -214,17 +214,30 @@ void ImGui_Renderer::animate(float elapsedTimeSeconds)
     if (!imgui_nvrhi)
         return;
 
-    // When the app doesn't call render(), we may have left a frame open. Close it now.
-    // This may happen when the app is unfocused and its ShouldRenderUnfocused() returns false.
-    // We still process ImGui messages while unfocused to make sure that a first click on an ImGui object
-    // in an unfocused window doesn't propagate to the app handlers, such as camera controls.
-    if (m_imguiFrameOpened)
+    // ImGui CPU frame (NewFrame/buildUI/Render) must run on the update thread:
+    // buildUI touches App resources (tryResource) which are not thread-safe with
+    // the dedicated render thread. GPU submit uses a captured draw snapshot.
+    prepareImGuiFrame(elapsedTimeSeconds);
+    buildUI();
+    ImGui::Render();
+    imgui_nvrhi->captureDrawData();
+    m_imguiFrameOpened = false;
+}
+
+void ImGui_Renderer::prepareImGuiFrame(float elapsedTimeSeconds)
+{
+    if (m_pendingDisplayScaleChanged)
     {
-        ImGui::EndFrame();
-        m_imguiFrameOpened = false;
+        auto& ioPending = ImGui::GetIO();
+        ioPending.Fonts->Clear();
+        ioPending.Fonts->TexRef = ImTextureRef();
+        for (auto& font : m_fonts)
+            font->releaseScaledFont();
+        // Keep live FontSizeBase/FontScale*; full style assign is unsafe on ImGui 1.92.
+        ImGui::GetStyle().ScaleAllSizes(m_pendingDisplayScaleX);
+        m_pendingDisplayScaleChanged = false;
     }
 
-    // make sure that all registered fonts have corresponding ImFont objects at the current DPI scale
     float scaleX, scaleY;
     getGpuDevice()->getDPIScaleInfo(scaleX, scaleY);
     for (auto& font : m_fonts)
@@ -233,9 +246,8 @@ void ImGui_Renderer::animate(float elapsedTimeSeconds)
             font->createScaledFont(m_supportExplicitDisplayScaling ? scaleX : 1.f);
     }
 
-    // Creates the font texture if it's not yet valid
     imgui_nvrhi->updateFontTexture();
-    
+
     int w, h;
     getGpuDevice()->getWindowDimensions(w, h);
 
@@ -247,10 +259,9 @@ void ImGui_Renderer::animate(float elapsedTimeSeconds)
         io.DisplayFramebufferScale.y = scaleY;
     }
 
-    io.DeltaTime = elapsedTimeSeconds;
+    io.DeltaTime = (elapsedTimeSeconds > 0.0f) ? elapsedTimeSeconds : (1.0f / 60.0f);
     io.MouseDrawCursor = false;
 
-    // Forward mouse input to ImGui (keyboard is handled via GLFW callbacks)
     GLFWwindow* glfwWindow = getGpuDevice()->getWindow();
     if (glfwWindow)
     {
@@ -262,13 +273,9 @@ void ImGui_Renderer::animate(float elapsedTimeSeconds)
 
         for (int i = 0; i < ImGuiMouseButton_COUNT; i++)
             io.AddMouseButtonEvent(i, glfwGetMouseButton(glfwWindow, i) == GLFW_PRESS);
-
-        // Scroll wheel is event-based; we poll the cached value
-        // (ImGui clears the wheel delta each frame, so polling is safe)
     }
 
     ImGui::NewFrame();
-
     m_imguiFrameOpened = true;
 }
 
@@ -277,11 +284,8 @@ void ImGui_Renderer::render(nvrhi::IFramebuffer* framebuffer)
     if (!imgui_nvrhi)
         return;
 
-    buildUI();
-
-    ImGui::Render();
+    // Draw data was captured on the update thread after ImGui::Render().
     imgui_nvrhi->render(framebuffer);
-    m_imguiFrameOpened = false;
 }
 
 void ImGui_Renderer::backBufferResizing()
@@ -295,28 +299,11 @@ void ImGui_Renderer::displayScaleChanged(float scaleX, float scaleY)
     if (!m_supportExplicitDisplayScaling)
         return;
 
-    // When the application starts unfocused, we open and close ImGui frames without rendering anything,
-    // and the first call to displayScaleChanged happens before animate and tries to update fonts.
-    // Since the ImGui frame is open at that time, the call crashes because the font atlas is locked.
-    // Prevent that by closing the frame first.
-    if (m_imguiFrameOpened)
-    {
-        ImGui::EndFrame();
-        m_imguiFrameOpened = false;
-    }
-
-    auto& io = ImGui::GetIO();
-
-    // clear the ImGui font atlas and invalidate the font texture
-    // to re-register and re-rasterize all fonts on the next frame (see animate)
-    io.Fonts->Clear();
-    io.Fonts->TexRef = ImTextureRef();
-
-    for (auto& font : m_fonts)
-        font->releaseScaledFont();
-        
-    ImGui::GetStyle() = ImGuiStyle();
-    ImGui::GetStyle().ScaleAllSizes(scaleX);
+    // Defer atlas rebuild to the render thread. Doing EndFrame/Fonts->Clear here races
+    // with buildUI() when a dedicated render thread is in flight.
+    m_pendingDisplayScaleX = scaleX;
+    m_pendingDisplayScaleY = scaleY;
+    m_pendingDisplayScaleChanged = true;
 }
 
 void ImGui_Renderer::beginFullScreenWindow()

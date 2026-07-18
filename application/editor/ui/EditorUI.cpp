@@ -46,6 +46,7 @@ EditorUI::EditorUI(GpuDevice* deviceManager, SceneEditor& sceneEditor, EditorUID
     // ImGui lifecycle management (fonts, context config, extensions)
     m_imguiManager = std::make_unique<ImGuiManager>(m_ui, cmdLine, NVAPI_SERSupported);
     m_imguiManager->loadDefaultFont(*this, getLocalPath(c_AssetsFolder));
+    m_defaultStyle = ImGui::GetStyle();
 
     // Choose which, if any, hit object extension we can use
     m_imguiManager->configureExtensions((int)getDevice()->getGraphicsAPI());
@@ -73,6 +74,15 @@ bool EditorUI::mousePosUpdate(double xpos, double ypos)
 {
     (void)xpos; (void)ypos;
     return false;
+}
+
+void EditorUI::displayScaleChanged(float scaleX, float scaleY)
+{
+    // Match historical EditorUI behavior: track scale only.
+    // Do not clear fonts (base ImGui_Renderer path) and do not mutate ImGuiStyle
+    // here — theme is applied once at ImGuiManager construction.
+    m_currentScale = scaleX;
+    assert(scaleX == scaleY);
 }
 
 void EditorUI::animate(float elapsedTimeSeconds)

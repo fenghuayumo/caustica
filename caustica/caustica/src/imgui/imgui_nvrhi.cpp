@@ -217,81 +217,134 @@ nvrhi::IBindingSet* ImGui_NVRHI::getBindingSet(nvrhi::ITexture* texture)
     return binding;
 }
 
-bool ImGui_NVRHI::updateGeometry(nvrhi::ICommandList* commandList)
+void ImGui_NVRHI::captureDrawData()
 {
-    ImDrawData *drawData = ImGui::GetDrawData();
+    ImDrawData* drawData = ImGui::GetDrawData();
+    CapturedFrame& frame = m_frames[m_writeSlot];
+    frame.vtx.clear();
+    frame.idx.clear();
+    frame.cmds.clear();
+    frame.valid = false;
 
-    // create/resize vertex and index buffers if needed
-    if (!reallocateBuffer(vertexBuffer, 
-        drawData->TotalVtxCount * sizeof(ImDrawVert), 
-        (drawData->TotalVtxCount + 5000) * sizeof(ImDrawVert), 
+    if (!drawData || drawData->CmdListsCount == 0 || drawData->TotalVtxCount == 0)
+    {
+        m_readSlot.store(-1, std::memory_order_release);
+        return;
+    }
+
+    const ImGuiIO& io = ImGui::GetIO();
+    frame.displaySize = io.DisplaySize;
+    frame.framebufferScale = io.DisplayFramebufferScale;
+    if (frame.displaySize.x <= 0.f || frame.displaySize.y <= 0.f)
+    {
+        m_readSlot.store(-1, std::memory_order_release);
+        return;
+    }
+
+    frame.vtx.resize(static_cast<size_t>(drawData->TotalVtxCount));
+    frame.idx.resize(static_cast<size_t>(drawData->TotalIdxCount));
+
+    ImDrawVert* vtxDst = frame.vtx.data();
+    ImDrawIdx* idxDst = frame.idx.data();
+    uint32_t vtxOffset = 0;
+    uint32_t idxOffset = 0;
+
+    const ImVec2 clipScale = frame.framebufferScale;
+
+    for (int n = 0; n < drawData->CmdListsCount; n++)
+    {
+        const ImDrawList* cmdList = drawData->CmdLists[n];
+        memcpy(vtxDst, cmdList->VtxBuffer.Data, cmdList->VtxBuffer.Size * sizeof(ImDrawVert));
+        memcpy(idxDst, cmdList->IdxBuffer.Data, cmdList->IdxBuffer.Size * sizeof(ImDrawIdx));
+
+        for (int i = 0; i < cmdList->CmdBuffer.Size; i++)
+        {
+            const ImDrawCmd& srcCmd = cmdList->CmdBuffer[i];
+            if (!srcCmd.UserCallback)
+            {
+                CapturedDrawCmd cmd;
+                cmd.texture = reinterpret_cast<nvrhi::ITexture*>(srcCmd.TexRef.GetTexID());
+                cmd.elemCount = srcCmd.ElemCount;
+                cmd.idxOffset = idxOffset;
+                cmd.vtxOffset = vtxOffset;
+                cmd.clipRect = ImVec4(
+                    srcCmd.ClipRect.x * clipScale.x,
+                    srcCmd.ClipRect.y * clipScale.y,
+                    srcCmd.ClipRect.z * clipScale.x,
+                    srcCmd.ClipRect.w * clipScale.y);
+                frame.cmds.push_back(cmd);
+            }
+            idxOffset += srcCmd.ElemCount;
+        }
+
+        vtxDst += cmdList->VtxBuffer.Size;
+        idxDst += cmdList->IdxBuffer.Size;
+        vtxOffset += static_cast<uint32_t>(cmdList->VtxBuffer.Size);
+    }
+
+    frame.valid = !frame.cmds.empty();
+    const int published = m_writeSlot;
+    m_writeSlot = 1 - m_writeSlot;
+    m_readSlot.store(frame.valid ? published : -1, std::memory_order_release);
+}
+
+bool ImGui_NVRHI::updateGeometry(nvrhi::ICommandList* commandList, const CapturedFrame& frame)
+{
+    if (!reallocateBuffer(vertexBuffer,
+        frame.vtx.size() * sizeof(ImDrawVert),
+        (frame.vtx.size() + 5000) * sizeof(ImDrawVert),
         false))
     {
         return false;
     }
 
     if (!reallocateBuffer(indexBuffer,
-        drawData->TotalIdxCount * sizeof(ImDrawIdx),
-        (drawData->TotalIdxCount + 5000) * sizeof(ImDrawIdx),
+        frame.idx.size() * sizeof(ImDrawIdx),
+        (frame.idx.size() + 5000) * sizeof(ImDrawIdx),
         true))
     {
         return false;
     }
 
-    vtxBuffer.resize(vertexBuffer->getDesc().byteSize / sizeof(ImDrawVert));
-    idxBuffer.resize(indexBuffer->getDesc().byteSize / sizeof(ImDrawIdx));
-
-    // copy and convert all vertices into a single contiguous buffer
-    ImDrawVert *vtxDst = &vtxBuffer[0];
-    ImDrawIdx *idxDst = &idxBuffer[0];
-
-    for(int n = 0; n < drawData->CmdListsCount; n++)
-    {
-        const ImDrawList *cmdList = drawData->CmdLists[n];
-
-        memcpy(vtxDst, cmdList->VtxBuffer.Data, cmdList->VtxBuffer.Size * sizeof(ImDrawVert));
-        memcpy(idxDst, cmdList->IdxBuffer.Data, cmdList->IdxBuffer.Size * sizeof(ImDrawIdx));
-
-        vtxDst += cmdList->VtxBuffer.Size;
-        idxDst += cmdList->IdxBuffer.Size;
-    }
-    
-    commandList->writeBuffer(vertexBuffer, &vtxBuffer[0], vertexBuffer->getDesc().byteSize);
-    commandList->writeBuffer(indexBuffer, &idxBuffer[0], indexBuffer->getDesc().byteSize);
+    if (!frame.vtx.empty())
+        commandList->writeBuffer(vertexBuffer, frame.vtx.data(), frame.vtx.size() * sizeof(ImDrawVert));
+    if (!frame.idx.empty())
+        commandList->writeBuffer(indexBuffer, frame.idx.data(), frame.idx.size() * sizeof(ImDrawIdx));
 
     return true;
 }
 
 bool ImGui_NVRHI::render(nvrhi::IFramebuffer* framebuffer)
 {
-    ImDrawData *drawData = ImGui::GetDrawData();
-    const auto& io = ImGui::GetIO();
+    const int slot = m_readSlot.load(std::memory_order_acquire);
+    if (slot < 0 || slot > 1)
+        return false;
+
+    const CapturedFrame& frame = m_frames[slot];
+    if (!frame.valid || frame.cmds.empty())
+        return false;
 
     m_commandList->open();
     m_commandList->beginMarker("ImGUI");
 
-    if (!updateGeometry(m_commandList))
+    if (!updateGeometry(m_commandList, frame))
     {
         m_commandList->close();
         return false;
     }
 
-    // handle DPI scaling
-    drawData->ScaleClipRects(io.DisplayFramebufferScale);
+    float invDisplaySize[2] = { 1.f / frame.displaySize.x, 1.f / frame.displaySize.y };
 
-    float invDisplaySize[2] = { 1.f / io.DisplaySize.x, 1.f / io.DisplaySize.y };
-
-    // set up graphics state
     nvrhi::GraphicsState drawState;
-
     drawState.framebuffer = framebuffer;
     assert(drawState.framebuffer);
-    
+
     drawState.pipeline = getPSO(framebuffer->getFramebufferInfo());
 
-    drawState.viewport.viewports.push_back(nvrhi::Viewport(io.DisplaySize.x * io.DisplayFramebufferScale.x,
-                                           io.DisplaySize.y * io.DisplayFramebufferScale.y));
-    drawState.viewport.scissorRects.resize(1);  // updated below
+    drawState.viewport.viewports.push_back(nvrhi::Viewport(
+        frame.displaySize.x * frame.framebufferScale.x,
+        frame.displaySize.y * frame.framebufferScale.y));
+    drawState.viewport.scissorRects.resize(1);
 
     nvrhi::VertexBufferBinding vbufBinding;
     vbufBinding.buffer = vertexBuffer;
@@ -303,42 +356,25 @@ bool ImGui_NVRHI::render(nvrhi::IFramebuffer* framebuffer)
     drawState.indexBuffer.format = (sizeof(ImDrawIdx) == 2 ? nvrhi::Format::R16_UINT : nvrhi::Format::R32_UINT);
     drawState.indexBuffer.offset = 0;
 
-    // render command lists
-    int vtxOffset = 0;
-    int idxOffset = 0;
-    for(int n = 0; n < drawData->CmdListsCount; n++)
+    for (const CapturedDrawCmd& cmd : frame.cmds)
     {
-        const ImDrawList *cmdList = drawData->CmdLists[n];
-        for(int i = 0; i < cmdList->CmdBuffer.Size; i++)
-        {
-            const ImDrawCmd *pCmd = &cmdList->CmdBuffer[i];
+        drawState.bindings = { getBindingSet(cmd.texture) };
+        assert(drawState.bindings[0]);
 
-            if (pCmd->UserCallback)
-            {
-                pCmd->UserCallback(cmdList, pCmd);
-            } else {
-                drawState.bindings = { getBindingSet((nvrhi::ITexture*)pCmd->TexRef.GetTexID()) };
-                assert(drawState.bindings[0]);
+        drawState.viewport.scissorRects[0] = nvrhi::Rect(
+            int(cmd.clipRect.x),
+            int(cmd.clipRect.z),
+            int(cmd.clipRect.y),
+            int(cmd.clipRect.w));
 
-                drawState.viewport.scissorRects[0] = nvrhi::Rect(int(pCmd->ClipRect.x),
-                                                                 int(pCmd->ClipRect.z),
-                                                                 int(pCmd->ClipRect.y),
-                                                                 int(pCmd->ClipRect.w));
+        nvrhi::DrawArguments drawArguments;
+        drawArguments.vertexCount = cmd.elemCount;
+        drawArguments.startIndexLocation = cmd.idxOffset;
+        drawArguments.startVertexLocation = cmd.vtxOffset;
 
-                nvrhi::DrawArguments drawArguments;
-                drawArguments.vertexCount = pCmd->ElemCount;
-                drawArguments.startIndexLocation = idxOffset;
-                drawArguments.startVertexLocation = vtxOffset;
-
-                m_commandList->setGraphicsState(drawState);
-                m_commandList->setPushConstants(invDisplaySize, sizeof(invDisplaySize));
-                m_commandList->drawIndexed(drawArguments);
-            }
-
-            idxOffset += pCmd->ElemCount;
-        }
-
-        vtxOffset += cmdList->VtxBuffer.Size;
+        m_commandList->setGraphicsState(drawState);
+        m_commandList->setPushConstants(invDisplaySize, sizeof(invDisplaySize));
+        m_commandList->drawIndexed(drawArguments);
     }
 
     m_commandList->endMarker();
