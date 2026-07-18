@@ -4,7 +4,6 @@
 
 #include "SceneEditor.h"
 #include "common/ImGuiManager.h"
-#include "common/TransformGizmo.h"
 
 #include <render/AppDiagnostics.h>
 #include <render/SceneLightingPasses.h>
@@ -206,7 +205,6 @@ void EditorUI::buildUI(void)
         BuildHierarchyPanel(layout);
     BuildGameStandalonePanel(layout);
 
-    DrawTransformGizmo(TransformGizmoContext{ m_sceneEditor, m_editorUI, m_settings });
     BuildStatusBar();
 }
 

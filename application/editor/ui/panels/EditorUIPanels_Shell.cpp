@@ -27,23 +27,21 @@ void ApplyDefaultDockLayout(ImGuiID dockspaceId, const ImVec2& size)
     ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace);
     ImGui::DockBuilderSetNodeSize(dockspaceId, size);
 
+    // Default: Render Settings | Viewport | Hierarchy / Inspector(+Material Editor tabs)
     ImGuiID dockMain = dockspaceId;
     ImGuiID dockLeft = 0;
     ImGuiID dockRight = 0;
-    ImGuiID dockLeftTop = 0;
-    ImGuiID dockLeftBottom = 0;
     ImGuiID dockRightTop = 0;
     ImGuiID dockRightBottom = 0;
 
     ImGui::DockBuilderSplitNode(dockMain, ImGuiDir_Left, 0.22f, &dockLeft, &dockMain);
     ImGui::DockBuilderSplitNode(dockMain, ImGuiDir_Right, 0.24f, &dockRight, &dockMain);
-    ImGui::DockBuilderSplitNode(dockLeft, ImGuiDir_Down, 0.45f, &dockLeftBottom, &dockLeftTop);
-    ImGui::DockBuilderSplitNode(dockRight, ImGuiDir_Down, 0.45f, &dockRightBottom, &dockRightTop);
+    ImGui::DockBuilderSplitNode(dockRight, ImGuiDir_Down, 0.55f, &dockRightBottom, &dockRightTop);
 
-    ImGui::DockBuilderDockWindow("Render Settings", dockLeftTop);
-    ImGui::DockBuilderDockWindow("Hierarchy", dockLeftBottom);
+    ImGui::DockBuilderDockWindow("Render Settings", dockLeft);
     ImGui::DockBuilderDockWindow("Viewport", dockMain);
-    ImGui::DockBuilderDockWindow("Inspector", dockRightTop);
+    ImGui::DockBuilderDockWindow("Hierarchy", dockRightTop);
+    ImGui::DockBuilderDockWindow("Inspector", dockRightBottom);
     ImGui::DockBuilderDockWindow("Material Editor", dockRightBottom);
 
     ImGui::DockBuilderFinish(dockspaceId);
@@ -131,7 +129,7 @@ void EditorUI::BuildDockSpace()
     ImGui::PopStyleVar(3);
 
     // Bump id when default dock window set changes so old ini layouts migrate.
-    const ImGuiID dockspaceId = ImGui::GetID("EditorDockSpace_v3");
+    const ImGuiID dockspaceId = ImGui::GetID("EditorDockSpace_v4");
     if (m_editorUI.Viewport.RequestResetDockLayout || ImGui::DockBuilderGetNode(dockspaceId) == nullptr)
     {
         ApplyDefaultDockLayout(dockspaceId, ImGui::GetContentRegionAvail());
@@ -241,8 +239,10 @@ void EditorUI::BuildViewportPanel(const PanelLayout& layout)
     vp.RectValid = true;
 
     nvrhi::ITexture* color = m_viewportColor;
+    // Allow the floating tool strip (drawn later) to receive hover/click over this canvas.
+    ImGui::SetNextItemAllowOverlap();
     ImGui::InvisibleButton("##ViewportCanvas", canvasSize);
-    vp.Hovered = ImGui::IsItemHovered();
+    vp.Hovered = ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
     vp.Focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 
     ImDrawList* drawList = ImGui::GetWindowDrawList();
@@ -268,13 +268,35 @@ void EditorUI::BuildViewportPanel(const PanelLayout& layout)
             msg);
     }
 
-    // Overlay toolbar on the image (does not reserve layout space / create gutters).
+    // Gizmo must run inside the Viewport window so SetDrawlist targets this draw list.
+    // Draw before the toolbar so tool icons stay on top of gizmo lines.
+    DrawTransformGizmo(TransformGizmoContext{ m_sceneEditor, m_editorUI, m_settings });
+
+    // Child window gives the tool strip its own hit-test layer above the canvas button.
     {
-        const float pad = 6.f;
-        ImGui::SetCursorScreenPos(ImVec2(canvasPos.x + pad, canvasPos.y + pad));
-        ImGui::BeginGroup();
-        BuildTransformGizmoToolbar(m_editorUI);
-        ImGui::EndGroup();
+        constexpr float kToolbarPad = 6.f;
+        // Match TransformGizmoToolbar strip: 6 buttons + 1 separator + padding.
+        constexpr float kToolbarW = 3.f * 2.f + 28.f * 6.f + 1.f * 5.f + 5.f;
+        constexpr float kToolbarH = 28.f + 3.f * 2.f;
+        ImGui::SetCursorScreenPos(ImVec2(canvasPos.x + kToolbarPad, canvasPos.y + kToolbarPad));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.f, 0.f));
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.f, 0.f, 0.f, 0.f));
+        if (ImGui::BeginChild(
+                "##GizmoToolbarOverlay",
+                ImVec2(kToolbarW + 2.f, kToolbarH + 2.f),
+                ImGuiChildFlags_None,
+                ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse
+                    | ImGuiWindowFlags_NoBackground))
+        {
+            BuildTransformGizmoToolbar(m_editorUI);
+        }
+        ImGui::EndChild();
+        ImGui::PopStyleColor();
+        ImGui::PopStyleVar();
+
+        // Hovering the tool strip should not drive camera / picking.
+        if (ImGui::IsItemHovered())
+            vp.Hovered = false;
     }
 
     ImGui::End();

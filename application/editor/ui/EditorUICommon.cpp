@@ -211,6 +211,10 @@ void BuildHierarchyNodeUI(EditorUIData& ui, caustica::Scene& scene, ecs::Entity 
         if (ui.editor.SelectedEntity == entity)
             flags |= ImGuiTreeNodeFlags_Selected;
 
+        // Expand groups once so meshes / 3DGS are one click away for gizmo selection.
+        if (hasVisibleChildren && !isMeshEntity && !isGaussianSplatEntity)
+            ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+
         std::string nodeName = ew->getEntityName(entity);
         if (nodeName.empty()) nodeName = "<unnamed>";
         std::string label = isMeshEntity ? "[Mesh] " + nodeName : (isGaussianSplatEntity ? "[3DGS] " + nodeName : "[Group] " + nodeName);

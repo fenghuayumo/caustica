@@ -8,6 +8,7 @@
 
 #include <ImGuizmo.h>
 #include <imgui.h>
+#include <imgui_internal.h>
 #include <engine/SessionCamera.h>
 #include <math/affine.h>
 #include <math/quat.h>
@@ -35,8 +36,11 @@ struct GizmoDragState
 
 GizmoDragState g_drag;
 
+// caustica/dm uses row-vector math (v' = v * M). ImGuizmo uses column-vector
+// OpenGL-style matrices (v' = M * v) with translation in the last column.
 void Affine3ToImGuizmoMatrix(const dm::affine3& affine, float matrix[16])
 {
+    // Columns = basis axes (caustica rows) + translation
     matrix[0] = affine.m_linear.m00;
     matrix[1] = affine.m_linear.m01;
     matrix[2] = affine.m_linear.m02;
@@ -57,9 +61,10 @@ void Affine3ToImGuizmoMatrix(const dm::affine3& affine, float matrix[16])
 
 void Float4x4ToImGuizmoMatrix(const dm::float4x4& source, float matrix[16])
 {
+    // Transpose row-major dm::float4x4 into ImGuizmo column-major layout.
     for (int row = 0; row < 4; ++row)
         for (int col = 0; col < 4; ++col)
-            matrix[row * 4 + col] = source[row][col];
+            matrix[col * 4 + row] = source[row][col];
 }
 
 dm::affine3 ImGuizmoMatrixToAffine3(const float matrix[16])
@@ -112,12 +117,23 @@ void HandleTransformGizmoShortcuts(EditorUIState& editorUI)
     if (ImGui::GetIO().WantCaptureKeyboard || ImGui::IsAnyItemActive())
         return;
 
+    if (ImGui::IsKeyPressed(ImGuiKey_Q, false))
+        editorUI.GizmoEnabled = false;
     if (ImGui::IsKeyPressed(ImGuiKey_W, false))
+    {
+        editorUI.GizmoEnabled = true;
         editorUI.GizmoOperation = static_cast<int>(ImGuizmo::TRANSLATE);
+    }
     if (ImGui::IsKeyPressed(ImGuiKey_E, false))
+    {
+        editorUI.GizmoEnabled = true;
         editorUI.GizmoOperation = static_cast<int>(ImGuizmo::ROTATE);
+    }
     if (ImGui::IsKeyPressed(ImGuiKey_T, false))
+    {
+        editorUI.GizmoEnabled = true;
         editorUI.GizmoOperation = static_cast<int>(ImGuizmo::SCALE);
+    }
 }
 
 const float* GetSnapValues(const EditorUIState& editorUI)
@@ -164,8 +180,40 @@ void BuildGizmoProjectionMatrix(const TransformGizmoContext& ctx, const PlanarVi
 
 bool IsEditingInspectorUi()
 {
-    // DragFloat / radio buttons in Inspector must win over the viewport gizmo.
-    return ImGui::IsAnyItemActive();
+    // Only block the gizmo when a panel widget (Inspector DragFloat, etc.) is active.
+    // Viewport canvas / toolbar InvisibleButtons also set ActiveId — those must NOT
+    // disable drawing or input for ImGuizmo.
+    if (!ImGui::IsAnyItemActive())
+        return false;
+
+    ImGuiContext* ctx = ImGui::GetCurrentContext();
+    ImGuiWindow* win = ctx ? ctx->ActiveIdWindow : nullptr;
+    if (!win || !win->Name)
+        return false;
+
+    // Allow gizmo while interacting with the Viewport chrome itself.
+    if (std::strncmp(win->Name, "Viewport", 8) == 0)
+        return false;
+
+    return true;
+}
+
+void DrawNoSelectionHint(const EditorUIState& editorUI)
+{
+    const auto& vp = editorUI.Viewport;
+    if (!vp.RectValid || vp.SizeX < 8.f || vp.SizeY < 8.f)
+        return;
+
+    const char* msg = "Select a mesh / 3DGS (click viewport or Hierarchy) to show Transform Gizmo";
+    const ImVec2 ts = ImGui::CalcTextSize(msg);
+    const ImVec2 pos(vp.PosX + 10.f, vp.PosY + vp.SizeY - ts.y - 12.f);
+    ImDrawList* dl = ImGui::GetForegroundDrawList();
+    dl->AddRectFilled(
+        ImVec2(pos.x - 6.f, pos.y - 4.f),
+        ImVec2(pos.x + ts.x + 6.f, pos.y + ts.y + 4.f),
+        IM_COL32(12, 14, 18, 180),
+        4.f);
+    dl->AddText(pos, IM_COL32(210, 214, 220, 230), msg);
 }
 
 } // namespace
@@ -187,6 +235,7 @@ bool caustica::editor::DrawTransformGizmo(const TransformGizmoContext& ctx)
     if (!entityWorld || entity == ecs::NullEntity)
     {
         g_drag = {};
+        DrawNoSelectionHint(ctx.editorUI);
         return false;
     }
 
@@ -195,6 +244,7 @@ bool caustica::editor::DrawTransformGizmo(const TransformGizmoContext& ctx)
     if (!localTransform || !globalTransform)
     {
         g_drag = {};
+        DrawNoSelectionHint(ctx.editorUI);
         return false;
     }
 
@@ -221,6 +271,10 @@ bool caustica::editor::DrawTransformGizmo(const TransformGizmoContext& ctx)
         style.HatchedAxisLineThickness = 6.0f * kGizmoStyleScale;
         style.CenterCircleSize = 6.0f * kGizmoStyleScale;
     }
+
+    // Draw above the viewport image and other window content (dock-safe).
+    ImGuizmo::SetDrawlist(ImGui::GetForegroundDrawList());
+
     // While Inspector DragFloats are active, keep drawing but block gizmo input/writeback.
     ImGuizmo::Enable(ctx.editorUI.GizmoEnabled && !editingUi);
     ImGuizmo::SetID(static_cast<int>(entt::to_integral(entity)));

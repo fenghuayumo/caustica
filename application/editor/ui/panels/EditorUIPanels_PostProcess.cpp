@@ -291,8 +291,23 @@ void EditorUI::BuildDebuggingPanel(const PanelLayout& layout)
 #endif
             ImGui::Separator();
 
-            for (int i = 0; i < MAX_DEBUG_PRINT_SLOTS; i++)
-                ImGui::Text("debugPrint %d: %f, %f, %f, %f", i, feedback.debugPrint[i].x, feedback.debugPrint[i].y, feedback.debugPrint[i].z, feedback.debugPrint[i].w);
+            // Slots are reset to (-1,-1,-1,-1) when unused. Only list slots that shaders
+            // actually wrote, and only while feedback is being sampled — avoids a noisy
+            // idle wall of -1s when Continuous feedback is off.
+            if (m_settings.ContinuousDebugFeedback)
+            {
+                int written = 0;
+                for (int i = 0; i < MAX_DEBUG_PRINT_SLOTS; i++)
+                {
+                    const auto& v = feedback.debugPrint[i];
+                    if (v.x == -1.f && v.y == -1.f && v.z == -1.f && v.w == -1.f)
+                        continue;
+                    ImGui::Text("debugPrint %d: %f, %f, %f, %f", i, v.x, v.y, v.z, v.w);
+                    ++written;
+                }
+                if (written == 0)
+                    ImGui::TextDisabled("debugPrint: idle (no shader Print for this pixel)");
+            }
             ImGui::Text("Debug line count: %d", feedback.lineVertexCount / 2);
             ImGui::InputFloat("Debug Line Scale", &m_settings.DebugLineScale);
 #else

@@ -13,6 +13,8 @@
 #include <backend/GpuDevice.h>
 #include <backend/rhi/utils.h>
 
+#include <algorithm>
+
 namespace caustica::editor
 {
 
@@ -90,7 +92,29 @@ void EditorUISubsystem::prepareViewportForRender(caustica::GpuDevice& gpuDevice)
         return;
     }
 
-    m_viewport->ensureSize(gpuDevice, vp.DesiredWidth, vp.DesiredHeight);
+    // Quantize + debounce: continuous dock/window drags would otherwise recreate
+    // path-tracer targets every frame and flash "Initializing renderer...".
+    constexpr uint32_t kQuantize = 4u;
+    constexpr auto kSettle = std::chrono::milliseconds(150);
+    const uint32_t desiredW = std::max(16u, (vp.DesiredWidth + kQuantize / 2u) / kQuantize * kQuantize);
+    const uint32_t desiredH = std::max(16u, (vp.DesiredHeight + kQuantize / 2u) / kQuantize * kQuantize);
+    const auto now = std::chrono::steady_clock::now();
+
+    if (desiredW != m_pendingViewportWidth || desiredH != m_pendingViewportHeight)
+    {
+        m_pendingViewportWidth = desiredW;
+        m_pendingViewportHeight = desiredH;
+        m_viewportSizeChangedAt = now;
+    }
+
+    const bool hasValidFb = m_viewport->isValid();
+    const bool sizeMatches =
+        hasValidFb && m_viewport->width() == desiredW && m_viewport->height() == desiredH;
+    const bool settled = (now - m_viewportSizeChangedAt) >= kSettle;
+
+    if (!hasValidFb || (settled && !sizeMatches))
+        m_viewport->ensureSize(gpuDevice, desiredW, desiredH);
+
     if (!m_viewport->isValid())
     {
         overrideFb->framebuffer = nullptr;

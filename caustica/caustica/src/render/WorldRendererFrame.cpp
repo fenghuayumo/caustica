@@ -377,9 +377,14 @@ void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameCont
 
     if (ctx.needNewPasses)
     {
-        m_context->diagnostics.progressInitializingRenderer.start("Initializing renderer...");
+        // Only show the OS progress dialog on cold init / first material bootstrap.
+        // Viewport resize also sets needNewPasses; flashing "Initializing renderer..."
+        // on every dock drag is poor UX and causes visible flicker.
+        const bool coldInit = (m_context->scenePasses.lighting.materials() == nullptr);
+        if (coldInit)
+            m_context->diagnostics.progressInitializingRenderer.start("Initializing renderer...");
 
-        if (m_context->scenePasses.lighting.materials() == nullptr)
+        if (coldInit)
         {
             m_context->scenePasses.lighting.materials() = std::make_shared<MaterialGpuCache>(
                 std::string("PathTracerMaterialSpecializations.hlsl"), device(), m_context->textureCache, m_context->shaderFactory);
@@ -401,10 +406,12 @@ void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameCont
         m_context->scenePasses.lighting.materials()->createRenderPassesAndLoadMaterials(
             m_bindlessLayout, m_context->renderDevice, materialResources,
             m_context->sessionScenePath, getLocalPath(c_AssetsFolder));
-        m_context->diagnostics.progressInitializingRenderer.Set(5);
+        if (coldInit)
+            m_context->diagnostics.progressInitializingRenderer.Set(5);
         if (m_context->scenePasses.lighting.opacityMaps())
             m_context->scenePasses.lighting.opacityMaps()->createRenderPasses(m_bindlessLayout, m_context->renderDevice);
-        m_context->diagnostics.progressInitializingRenderer.Set(20);
+        if (coldInit)
+            m_context->diagnostics.progressInitializingRenderer.Set(20);
     }
 
     if (m_context->sessionScene && m_context->frameScene)
@@ -421,7 +428,8 @@ void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameCont
 
     if (ctx.needNewPasses)
     {
-        m_context->diagnostics.progressInitializingRenderer.Set(40);
+        if (m_context->diagnostics.progressInitializingRenderer.Active())
+            m_context->diagnostics.progressInitializingRenderer.Set(40);
         const bool preCreatePassesWaitOk = device()->waitForIdle();
         if (!preCreatePassesWaitOk)
         {
@@ -438,7 +446,8 @@ void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameCont
             ctx.aborted = true;
             return;
         }
-        m_context->diagnostics.progressInitializingRenderer.Set(70);
+        if (m_context->diagnostics.progressInitializingRenderer.Active())
+            m_context->diagnostics.progressInitializingRenderer.Set(70);
     }
 }
 
