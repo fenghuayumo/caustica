@@ -4,12 +4,15 @@
 #include <render/core/PathTracerSettings.h>
 #include <render/ecs/RenderFrameContext.h>
 #include <rhi/nvrhi.h>
+#include <shaders/PathTracer/Config.h>
 #include <shaders/SampleConstantBuffer.h>
 
 #include <cstdint>
 #include <memory>
+#include <vector>
 
 class AccumulationPass;
+class EnvMapProcessor;
 class LightSamplingCache;
 class MaterialGpuCache;
 class OpacityMicromapBuilder;
@@ -35,7 +38,9 @@ namespace caustica::render
 {
 
 class BloomPass;
+class DenoisePass;
 class FullscreenBlitPass;
+class GaussianSplatFramePass;
 class PathTracePass;
 class PathTracingFrameContext;
 class TemporalAntiAliasingPass;
@@ -60,10 +65,14 @@ struct FrameGraphContext
 
     RtxdiPass* rtxdi = nullptr;
     PathTracePass* pathTrace = nullptr;
+    DenoisePass* denoise = nullptr;
+    GaussianSplatFramePass* gaussian = nullptr;
+    std::shared_ptr<EnvMapProcessor> environment;
 
     nvrhi::BindingLayoutHandle bindingLayout;
     nvrhi::BindingSetHandle bindingSet;
     nvrhi::IDescriptorTable* descriptorTable = nullptr;
+    nvrhi::BufferHandle constantBuffer;
 
     PTPipelineVariant* ptBuildStablePlanes = nullptr;
     PTPipelineVariant* ptFillStablePlanes = nullptr;
@@ -95,6 +104,20 @@ struct FrameGraphContext
     bool* commandListWasClosed = nullptr;
     int* gaussianSplatTemporalSampleIndex = nullptr;
     bool* gaussianSplatTemporalReset = nullptr;
+
+    // Debug overlay graph registration (filled by makeFrameGraphContext)
+    bool showDebugLines = false;
+    bool copyDebugFeedback = false;
+    uint32_t capturedLineVertexCount = 0;
+    std::vector<DebugLineStruct>* cpuSideDebugLines = nullptr;
+    nvrhi::BufferHandle debugLineBufferCapture;
+    nvrhi::BufferHandle debugLineBufferDisplay;
+    nvrhi::BufferHandle feedbackBufferCpu;
+    nvrhi::BufferHandle feedbackBufferGpu;
+    nvrhi::BufferHandle debugDeltaPathTreeCpu;
+    nvrhi::BufferHandle debugDeltaPathTreeGpu;
+    nvrhi::BindingSetHandle linesBindingSet;
+    nvrhi::GraphicsPipelineHandle linesPipeline;
 };
 
 } // namespace caustica::render

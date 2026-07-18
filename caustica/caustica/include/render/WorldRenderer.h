@@ -16,11 +16,12 @@
 #include <render/passes/postProcess/PostProcess.h>
 #include <render/passes/postProcess/AccumulationPass.h>
 #include <render/passes/geometry/BloomPass.h>
-#include <render/passes/denoisers/NrdIntegration.h>
+#include <render/passes/denoisers/DenoisePass.h>
 #include <render/passes/rtxdi/RtxdiPass.h>
 #include <render/passes/pathTrace/PathTracePass.h>
 #include <render/passes/debug/ShaderDebug.h>
 #include <render/passes/gaussian/GaussianSplatEmissionProxy.h>
+#include <render/passes/gaussian/GaussianSplatFramePass.h>
 
 #include <render/ecs/RenderFrameContext.h>
 #include <render/pipeline/RenderPipelineRegistry.h>
@@ -43,14 +44,11 @@
 #endif
 
 class ComputePipelineRegistry;
-class OidnDenoiser;
-class DenoisingGuidesPass;
 class PathTracingShaderCompiler;
 class PTPipelineVariant;
 class ToneMappingPass;
 struct PathTracerCameraData;
 struct PathTracerConstants;
-struct GaussianSplatGraphResources;
 
 namespace caustica
 {
@@ -66,7 +64,6 @@ namespace render
 class TemporalAntiAliasingPass;
 class BloomPass;
 class DLSS;
-class GPUSort;
 class RenderGraphRegistry;
 class PathTracingPipelinePlugin;
 struct ExtractedFrameView;
@@ -119,29 +116,16 @@ public:
     void preRender();
     void render(nvrhi::IFramebuffer* framebuffer);
 
-    void prepareDenoiserGuides(nvrhi::ICommandList* commandList);
-    void stablePlanesDebugViz(nvrhi::ICommandList* commandList);
-    void ensureNrdIntegrations();
-    void denoiseStablePlane(nvrhi::ICommandList* commandList, nvrhi::IFramebuffer* framebuffer, int planeIndex);
-    void denoise(nvrhi::ICommandList* commandList, nvrhi::IFramebuffer* framebuffer);
-    void runDlssUpscale(nvrhi::ICommandList* commandList, bool reset);
-    void runNoDenoiserFinalMerge(nvrhi::ICommandList* commandList);
-    [[nodiscard]] bool hasActiveGaussianSplats() const;
     void prepareGaussianSplatPasses();
     void buildGaussianSplatEmissionProxies();
-    void executeGaussianSplatAccelBuild(nvrhi::ICommandList* commandList);
-    [[nodiscard]] std::vector<GaussianSplatGraphResources> prepareGaussianSplatGraphResources(bool renderToOutputColor);
-    void executeGaussianSplatUpload(nvrhi::ICommandList* commandList, bool renderToOutputColor);
-    void executeGaussianSplatSort(nvrhi::ICommandList* commandList);
-    void executeGaussianSplatRaster(nvrhi::ICommandList* commandList, bool renderToOutputColor);
-    void executeGaussianSplatAccumulate(nvrhi::ICommandList* commandList);
-    [[nodiscard]] nvrhi::ITexture* gaussianSplatCurrentColor() const { return m_gaussianSplatCurrentColor.Get(); }
-    [[nodiscard]] nvrhi::ITexture* gaussianSplatAccumulatedColor() const { return m_gaussianSplatAccumulatedColor.Get(); }
     [[nodiscard]] const std::vector<GaussianSplatEmissionProxy>& gaussianSplatEmissionProxies() const
     {
         return m_gaussianSplatEmissionProxies;
     }
-    void postProcessAA(nvrhi::IFramebuffer* framebuffer, bool reset);
+    [[nodiscard]] DenoisePass* getDenoisePass() { return m_denoisePass.get(); }
+    [[nodiscard]] const DenoisePass* getDenoisePass() const { return m_denoisePass.get(); }
+    [[nodiscard]] GaussianSplatFramePass* getGaussianSplatFramePass() { return m_gaussianFramePass.get(); }
+    [[nodiscard]] const GaussianSplatFramePass* getGaussianSplatFramePass() const { return m_gaussianFramePass.get(); }
     void recreateBindingSet(const scene::SceneRenderData* renderData = nullptr);
     void onSceneUnloading();
     void onSceneLoaded(std::shared_ptr<Scene> scene, std::filesystem::path scenePath);
@@ -221,7 +205,6 @@ public:
 
     void buildFrameGraphPasses(RenderFrameContext& ctx, const RenderGraphRegistry& graphRegistry);
     void executeFrameRenderGraph(RenderFrameContext& ctx);
-    void registerDebugOverlayGraphPasses(FrameGraphContext ctx);
 
     void addRenderPipelinePlugin(std::unique_ptr<IRenderPipelinePlugin> plugin);
     void addRenderPipelinePlugin(IRenderPipelinePlugin& plugin);
@@ -259,18 +242,13 @@ private:
     void createPostProcessRenderPasses();
     void createLightingRenderPasses(nvrhi::CommandListHandle initializeCommandList);
     void createDenoiserRenderPasses();
+    void bindPassFrameResources();
     void preUpdateLighting(nvrhi::CommandListHandle commandList, bool& needNewBindings);
     void updateLighting(nvrhi::CommandListHandle commandList);
     void preUpdatePathTracing(bool resetAccum, nvrhi::CommandListHandle commandList);
     void postUpdatePathTracing();
     void updatePathTracerConstants(PathTracerConstants& constants, const PathTracerCameraData& cameraData);
     void rtxdiSetupFrame(nvrhi::IFramebuffer* framebuffer, PathTracerCameraData cameraData, dm::uint2 renderDims);
-
-    void resetReferenceOIDN();
-    void applyReferenceOIDN();
-#if CAUSTICA_WITH_NATIVE_DLSS
-    bool evaluateNativeDLSS(bool reset);
-#endif
 
     PathTracerScenePasses        m_scenePasses;
     CameraController             m_renderCamera;
@@ -286,6 +264,8 @@ private:
 
     std::unique_ptr<RtxdiPass>                  m_rtxdiPass;
     std::unique_ptr<PathTracePass>              m_pathTracePass;
+    std::unique_ptr<DenoisePass>                m_denoisePass;
+    std::unique_ptr<GaussianSplatFramePass>     m_gaussianFramePass;
     std::unique_ptr<RenderTargets>              m_renderTargets;
     nvrhi::BindingLayoutHandle                  m_bindingLayout;
     nvrhi::BindingLayoutHandle                  m_bindlessLayout;
@@ -306,15 +286,9 @@ private:
     std::unique_ptr<ToneMappingPass>            m_toneMappingPass;
     std::shared_ptr<PostProcess>                m_postProcess;
 
-    std::unique_ptr<NrdIntegration>             m_nrd[cStablePlaneCount];
     std::unique_ptr<AccumulationPass>           m_accumulationPass;
-    std::unique_ptr<OidnDenoiser>               m_oidnDenoiser;
-    nvrhi::TextureHandle                        m_oidnDenoisedOutput;
-    bool                                        m_oidnDenoisedOutputValid = false;
-    bool                                        m_oidnDenoiserFailed = false;
 
     std::shared_ptr<ShaderDebug>                m_shaderDebug;
-    std::shared_ptr<DenoisingGuidesPass>       m_denoisingGuidesPass;
 
     nvrhi::ShaderHandle                         m_exportVBufferCS;
     nvrhi::ComputePipelineHandle                m_exportVBufferPSO;
@@ -339,14 +313,9 @@ private:
     bool                                        m_lastRealtimeMode = true;
     int                                         m_lastScheduledRealtimeAA = -1;
 
-    nvrhi::TextureHandle                        m_gaussianSplatCurrentColor;
-    nvrhi::TextureHandle                        m_gaussianSplatAccumulatedColor;
-    std::unique_ptr<AccumulationPass>           m_gaussianSplatAccumulationPass;
-    std::shared_ptr<GPUSort>                    m_gaussianSplatGpuSort;
     std::vector<GaussianSplatEmissionProxy>     m_gaussianSplatEmissionProxies;
     int                                         m_gaussianSplatTemporalSampleIndex = 0;
     bool                                        m_gaussianSplatTemporalReset = true;
-    bool                                        m_gaussianSplatCompositeRendered = false;
 
     // Per-frame copies from SceneRenderData (filled at render() begin).
     PathTracerSettings                          m_frameSettingsSnapshot;

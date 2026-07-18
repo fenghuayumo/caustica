@@ -1,7 +1,6 @@
 #include <render/FrameGraphPasses.h>
 
 #include <render/FrameGraphContext.h>
-#include <render/WorldRenderer.h>
 #include <render/core/FullscreenBlitPass.h>
 #include <render/core/PathTracingShaderCompiler.h>
 #include <render/core/RenderTargets.h>
@@ -22,7 +21,7 @@ namespace
         rg::TextureHandle processedOutputColor,
         FrameGraphContext ctx)
     {
-        auto environment = ctx.renderer->getPathTracingContext().scenePasses.lighting.environment();
+        auto environment = ctx.environment;
         if (!environment || !environment->isProcedural() || !ctx.settings->EnvironmentMapParams.enabled)
             return;
 
@@ -153,7 +152,6 @@ namespace
 void registerPostProcess(FrameGraphContext ctx)
 {
     assert(ctx.extractedView);
-    assert(ctx.renderer);
     assert(ctx.renderTargets);
     assert(ctx.settings);
     assert(ctx.graph);

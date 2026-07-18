@@ -108,6 +108,8 @@ bool caustica::render::WorldRenderer::create(const createParams& params)
 
     createBindingLayouts(infra.bindlessLayout);
     m_pathTracePass = std::make_unique<PathTracePass>();
+    m_denoisePass = std::make_unique<DenoisePass>();
+    m_gaussianFramePass = std::make_unique<GaussianSplatFramePass>();
 
     ScenePassWireParams sceneWireParams{
         .gpuDevice = params.gpuDevice,
@@ -471,8 +473,8 @@ void caustica::render::WorldRenderer::onBackBufferResizing()
     m_context->bindingCache.clear();
     m_renderTargets = nullptr;
     m_linesPipeline = nullptr; // the pipeline is based on the framebuffer so needs a reset
-    for (int i=0; i < std::size(m_nrd); i++ )
-        m_nrd[i] = nullptr;
+    if (m_denoisePass)
+        m_denoisePass->invalidateNrdIntegrations();
     if (m_rtxdiPass)
         m_rtxdiPass->reset();
 

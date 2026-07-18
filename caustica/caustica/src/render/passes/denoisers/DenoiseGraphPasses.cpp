@@ -1,11 +1,11 @@
 #include <render/FrameGraphPasses.h>
 
 #include <render/FrameGraphContext.h>
-#include <render/WorldRenderer.h>
 #include <render/core/CameraController.h>
 #include <render/core/PathTracerSettings.h>
 #include <render/core/RenderTargets.h>
 #include <render/graph/GraphBuilder.h>
+#include <render/passes/denoisers/DenoisePass.h>
 #include <render/passes/geometry/TemporalAntiAliasingPass.h>
 #include <render/passes/pathTrace/PathTraceGraphResources.h>
 #include <render/passes/postProcess/AccumulationPass.h>
@@ -35,7 +35,7 @@ namespace
 void registerDenoiserPreparePass(FrameGraphContext ctx)
 {
     assert(ctx.graph);
-    assert(ctx.renderer);
+    assert(ctx.denoise);
     assert(ctx.renderTargets);
     assert(ctx.settings);
 
@@ -54,7 +54,7 @@ void registerDenoiserPreparePass(FrameGraphContext ctx)
             declareDenoiserPrepareAccess(setup, handles);
         },
         [ctx](rg::RenderPassContext& passCtx) {
-            ctx.renderer->prepareDenoiserGuides(passCtx.commandList());
+            ctx.denoise->prepareGuides(passCtx.commandList());
         },
         denoiserPassOptions);
 
@@ -69,7 +69,7 @@ void registerDenoiserPreparePass(FrameGraphContext ctx)
                 declareStablePlanesDebugVizAccess(setup, handles);
             },
             [ctx](rg::RenderPassContext& passCtx) {
-                ctx.renderer->stablePlanesDebugViz(passCtx.commandList());
+                ctx.denoise->stablePlanesDebugViz(passCtx.commandList());
             },
             debugVizPassOptions);
     }
@@ -131,7 +131,7 @@ namespace
 void registerNrdPass(FrameGraphContext ctx)
 {
     assert(ctx.targetFramebuffer);
-    assert(ctx.renderer);
+    assert(ctx.denoise);
     assert(ctx.renderTargets);
     assert(ctx.settings);
     assert(ctx.graph);
@@ -139,7 +139,7 @@ void registerNrdPass(FrameGraphContext ctx)
     if (!ctx.hasScene || !ctx.settings->actualUseStandaloneDenoiser())
         return;
 
-    ctx.renderer->ensureNrdIntegrations();
+    ctx.denoise->ensureNrdIntegrations();
 
     const int maxPassCount = std::min(
         ctx.settings->StablePlanesActiveCount,
@@ -155,7 +155,7 @@ void registerNrdPass(FrameGraphContext ctx)
                 declareNrdPlaneAccess(setup, *ctx.graph, *ctx.renderTargets, planeIndex, readsOutputColor);
             },
             [ctx, planeIndex](rg::RenderPassContext& passCtx) {
-                ctx.renderer->denoiseStablePlane(
+                ctx.denoise->denoiseStablePlane(
                     passCtx.commandList(),
                     ctx.targetFramebuffer,
                     planeIndex);
@@ -236,7 +236,7 @@ namespace
 void registerDenoiseAAPass(FrameGraphContext ctx)
 {
     assert(ctx.graph);
-    assert(ctx.renderer);
+    assert(ctx.denoise);
     assert(ctx.renderTargets);
     assert(ctx.settings);
 
@@ -297,7 +297,7 @@ void registerDenoiseAAPass(FrameGraphContext ctx)
                 setup.write(outputColor, rg::TextureAccess::UnorderedAccess);
             },
             [ctx](rg::RenderPassContext& passCtx) {
-                ctx.renderer->runNoDenoiserFinalMerge(passCtx.commandList());
+                ctx.denoise->runNoDenoiserFinalMerge(passCtx.commandList());
             },
             rg::PassOptions{ .sideEffect = true });
     }
@@ -392,7 +392,7 @@ void registerDenoiseAAPass(FrameGraphContext ctx)
                 }
             },
             [ctx](rg::RenderPassContext& passCtx) {
-                ctx.renderer->runDlssUpscale(passCtx.commandList(), ctx.aaReset);
+                ctx.denoise->runDlssUpscale(passCtx.commandList(), ctx.aaReset);
             },
             rg::PassOptions{ .sideEffect = true });
     }

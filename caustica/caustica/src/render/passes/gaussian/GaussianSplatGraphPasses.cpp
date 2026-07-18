@@ -1,9 +1,9 @@
 #include <render/FrameGraphPasses.h>
 
 #include <render/FrameGraphContext.h>
-#include <render/WorldRenderer.h>
 #include <render/core/RenderTargets.h>
 #include <render/graph/GraphBuilder.h>
+#include <render/passes/gaussian/GaussianSplatFramePass.h>
 #include <render/passes/gaussian/GaussianSplatGraph.h>
 #include <render/passes/pathTrace/PathTraceGraphResources.h>
 
@@ -34,9 +34,9 @@ namespace
     bool gaussianSplatsEnabled(const FrameGraphContext& ctx)
     {
         return ctx.settings != nullptr
-            && ctx.renderer != nullptr
+            && ctx.gaussian != nullptr
             && ctx.settings->EnableGaussianSplats
-            && ctx.renderer->hasActiveGaussianSplats();
+            && ctx.gaussian->hasActiveSplats();
     }
 
     std::vector<GaussianSplatGraphHandles> importGaussianSplatGraphResources(
@@ -44,8 +44,11 @@ namespace
         bool renderToOutputColor)
     {
         std::vector<GaussianSplatGraphHandles> handles;
+        if (!ctx.gaussian)
+            return handles;
+
         for (const GaussianSplatGraphResources& resources :
-            ctx.renderer->prepareGaussianSplatGraphResources(renderToOutputColor))
+            ctx.gaussian->prepareGraphResources(renderToOutputColor))
         {
             if (!resources.constantBuffer || !resources.splatBuffer
                 || !resources.colorBuffer || !resources.shBuffer
@@ -106,7 +109,7 @@ namespace
             },
             [ctx, renderToOutputColor](rg::RenderPassContext& passCtx) {
                 if (gaussianSplatsEnabled(ctx))
-                    ctx.renderer->executeGaussianSplatUpload(passCtx.commandList(), renderToOutputColor);
+                    ctx.gaussian->executeUpload(passCtx.commandList(), renderToOutputColor);
             },
             rg::PassOptions{ .sideEffect = true });
 
@@ -133,7 +136,7 @@ namespace
             },
             [ctx](rg::RenderPassContext& passCtx) {
                 if (gaussianSplatsEnabled(ctx))
-                    ctx.renderer->executeGaussianSplatSort(passCtx.commandList());
+                    ctx.gaussian->executeSort(passCtx.commandList());
             },
             rg::PassOptions{ .sideEffect = true, .executeAfter = uploadPassName });
 
@@ -157,7 +160,7 @@ namespace
             },
             [ctx, renderToOutputColor](rg::RenderPassContext& passCtx) {
                 if (gaussianSplatsEnabled(ctx))
-                    ctx.renderer->executeGaussianSplatRaster(passCtx.commandList(), renderToOutputColor);
+                    ctx.gaussian->executeRaster(passCtx.commandList(), renderToOutputColor);
             },
             rg::PassOptions{ .sideEffect = true, .executeAfter = sortPassName });
         return true;
@@ -167,7 +170,7 @@ namespace
 void registerGaussianSplatPreAAPass(FrameGraphContext ctx)
 {
     assert(ctx.graph);
-    assert(ctx.renderer);
+    assert(ctx.gaussian);
     assert(ctx.renderTargets);
     assert(ctx.settings);
 
@@ -196,7 +199,7 @@ void registerGaussianSplatPreAAPass(FrameGraphContext ctx)
 void registerGaussianSplatAccelBuildPass(FrameGraphContext ctx)
 {
     assert(ctx.graph);
-    assert(ctx.renderer);
+    assert(ctx.gaussian);
     assert(ctx.settings);
 
     if (!needsGaussianSplatAccelBuild(*ctx.settings))
@@ -216,7 +219,7 @@ void registerGaussianSplatAccelBuildPass(FrameGraphContext ctx)
         [ctx](rg::RenderPassContext& passCtx) {
             if (!gaussianSplatsEnabled(ctx))
                 return;
-            ctx.renderer->executeGaussianSplatAccelBuild(passCtx.commandList());
+            ctx.gaussian->executeAccelBuild(passCtx.commandList());
         },
         passOptions);
 }
@@ -224,7 +227,7 @@ void registerGaussianSplatAccelBuildPass(FrameGraphContext ctx)
 void registerGaussianSplatCompositePass(FrameGraphContext ctx)
 {
     assert(ctx.graph);
-    assert(ctx.renderer);
+    assert(ctx.gaussian);
     assert(ctx.renderTargets);
     assert(ctx.settings);
 
@@ -254,8 +257,8 @@ void registerGaussianSplatCompositePass(FrameGraphContext ctx)
     if (!needsGaussianSplatStochasticAccumulate(*ctx.settings))
         return;
 
-    nvrhi::ITexture* currentColorTexture = ctx.renderer->gaussianSplatCurrentColor();
-    nvrhi::ITexture* accumulatedColorTexture = ctx.renderer->gaussianSplatAccumulatedColor();
+    nvrhi::ITexture* currentColorTexture = ctx.gaussian->currentColor();
+    nvrhi::ITexture* accumulatedColorTexture = ctx.gaussian->accumulatedColor();
     if (currentColorTexture == nullptr || accumulatedColorTexture == nullptr)
         return;
 
@@ -295,7 +298,7 @@ void registerGaussianSplatCompositePass(FrameGraphContext ctx)
         [ctx](rg::RenderPassContext& passCtx) {
             if (!gaussianSplatsEnabled(ctx))
                 return;
-            ctx.renderer->executeGaussianSplatAccumulate(passCtx.commandList());
+            ctx.gaussian->executeAccumulate(passCtx.commandList());
         },
         rg::PassOptions{
             .sideEffect = true,

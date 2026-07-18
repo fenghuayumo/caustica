@@ -145,7 +145,8 @@ void caustica::render::WorldRenderer::preUpdatePathTracing( bool resetAccum, nvr
     const bool resetReferenceOidn = !m_context->activeSettings().RealtimeMode && (resetAccum || m_context->activeSettings().ResetAccumulation || m_context->activeSettings().ReferenceOIDNDenoiserChanged);
     if (resetReferenceOidn || m_context->activeSettings().ReferenceOIDNDenoiserChanged)
     {
-        resetReferenceOIDN();
+        if (m_denoisePass)
+            m_denoisePass->resetReferenceOIDN();
         m_context->activeSettings().ReferenceOIDNDenoiserChanged = false;
     }
 
@@ -193,28 +194,5 @@ void caustica::render::WorldRenderer::postUpdatePathTracing( )
     m_context->activeSettings().ResetAccumulation = false;
     m_context->activeSettings().ResetRealtimeCaches = false;
     m_frameIndex++;
-}
-
-void caustica::render::WorldRenderer::stablePlanesDebugViz(nvrhi::ICommandList* commandList)
-{
-    nvrhi::CommandListHandle savedCommandList = m_commandList;
-    m_commandList = commandList;
-
-    SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
-
-    m_commandList->beginMarker("StablePlanesDebugViz");
-    nvrhi::TextureDesc tdesc = m_renderTargets->outputColor->getDesc();
-    m_postProcess->apply(
-        m_commandList,
-        PostProcess::ComputePassType::StablePlanesDebugViz,
-        m_constantBuffer,
-        miniConstants,
-        m_bindingSet,
-        m_bindingLayout,
-        tdesc.width,
-        tdesc.height);
-    m_commandList->endMarker();
-
-    m_commandList = savedCommandList;
 }
 
