@@ -292,10 +292,18 @@ void BuildHierarchyNodeUI(EditorUIData& ui, caustica::Scene& scene, ecs::Entity 
         ? ImGui::ColorConvertFloat4ToU32(GetEditorColors().Text)
         : muted;
 
+    const float iconSize = std::min(ImGui::GetFrameHeight() - 6.f, 14.f);
+    constexpr float kIconTextGap = 3.f;
+    // Pad the label so text starts after [type icon + gap], while the icon itself
+    // sits at TreeNode label origin (to the right of the fold arrow — never over it).
+    const float spaceW = std::max(1.f, ImGui::CalcTextSize(" ").x);
+    const int padSpaces = std::max(1, static_cast<int>(std::ceil((iconSize + kIconTextGap) / spaceW)));
+    const std::string paddedLabel = std::string(static_cast<size_t>(padSpaces), ' ') + nodeName;
+
     ImGui::PushID(static_cast<int>(static_cast<uint32_t>(entity)));
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(textCol));
     ImGui::SetNextItemAllowOverlap();
-    const bool open = ImGui::TreeNodeEx("##node", flags, "  %s", nodeName.c_str());
+    const bool open = ImGui::TreeNodeEx("##node", flags, "%s", paddedLabel.c_str());
     const bool treeClicked = ImGui::IsItemClicked();
     ImGui::PopStyleColor();
 
@@ -304,17 +312,15 @@ void BuildHierarchyNodeUI(EditorUIData& ui, caustica::Scene& scene, ecs::Entity 
     const float rowH = rowMax.y - rowMin.y;
     ImDrawList* dl = ImGui::GetWindowDrawList();
 
-    // Type icon after the tree arrow / indent.
-    const float iconPad = 3.f;
-    const float iconSize = rowH - iconPad * 2.f;
-    const float iconX = rowMin.x + ImGui::GetTreeNodeToLabelSpacing() - 2.f;
+    const float labelStartX = rowMin.x + ImGui::GetTreeNodeToLabelSpacing();
+    const float iconX = labelStartX;
     const HierarchyTypeIcon typeIcon = isMeshEntity
         ? HierarchyTypeIcon::Mesh
         : (isGaussianSplatEntity ? HierarchyTypeIcon::GaussianSplat : HierarchyTypeIcon::Group);
     DrawHierarchyTypeIcon(
         dl,
-        ImVec2(iconX, rowMin.y + iconPad),
-        ImVec2(iconX + iconSize, rowMin.y + iconPad + iconSize),
+        ImVec2(iconX, rowMin.y + (rowH - iconSize) * 0.5f),
+        ImVec2(iconX + iconSize, rowMin.y + (rowH - iconSize) * 0.5f + iconSize),
         typeIcon,
         enabled ? textCol : muted);
 
