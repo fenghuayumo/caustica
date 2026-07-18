@@ -1,14 +1,14 @@
-#include <render/features/RenderFeature.h>
+#include <render/FrameGraphPasses.h>
 
-#include <render/features/RenderFeatureContext.h>
-#include <render/worldRenderer/WorldRenderer.h>
+#include <render/FrameGraphContext.h>
+#include <render/WorldRenderer.h>
 
 #include <cassert>
 
 namespace caustica::render
 {
 
-void registerDebugOverlayFeature(RenderFeatureContext ctx)
+void registerDebugOverlayGraphPasses(FrameGraphContext ctx)
 {
     assert(ctx.graph);
     assert(ctx.renderer);

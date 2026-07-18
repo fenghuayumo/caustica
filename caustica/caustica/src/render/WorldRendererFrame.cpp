@@ -1,13 +1,15 @@
-#include <render/features/RenderFeature.h>
-#include <render/features/PathTraceGraphResources.h>
-#include <render/features/RenderFeatureContext.h>
+#include <render/FrameGraphPasses.h>
+#include <render/FrameGraphContext.h>
+#include <render/core/RenderTargets.h>
+#include <render/graph/GraphBuilder.h>
+#include <render/passes/pathTrace/PathTraceGraphResources.h>
 #include <render/pipeline/RenderGraphRegistry.h>
 #include <render/pipeline/RenderPipelineRegistry.h>
 
 namespace { constexpr int c_SwapchainCount = 3; }
 
-#include <render/worldRenderer/WorldRenderer.h>
-#include <render/worldRenderer/PathTracingFrameContext.h>
+#include <render/WorldRenderer.h>
+#include <render/PathTracingFrameContext.h>
 #include <scene/Scene.h>
 #include <render/SceneGpuResources.h>
 #include <render/SceneGaussianSplatPasses.h>
@@ -101,11 +103,11 @@ void caustica::render::WorldRenderer::populateRenderFrameContext(
     ctx.sceneTransformsChanged = m_context->frameSceneTransformsChanged;
 }
 
-RenderFeatureContext caustica::render::WorldRenderer::makeRenderFeatureContext(RenderFrameContext& ctx)
+FrameGraphContext caustica::render::WorldRenderer::makeFrameGraphContext(RenderFrameContext& ctx)
 {
     const bool aaReset = ctx.frame.needNewPasses || m_context->activeSettings().ResetRealtimeCaches;
 
-    return RenderFeatureContext{
+    return FrameGraphContext{
         .graph = ctx.graph,
         .renderer = this,
         .frame = &ctx.frame,
@@ -161,7 +163,7 @@ void caustica::render::WorldRenderer::buildFrameGraphPasses(
             fbinfo.getViewport());
     }
 
-    RenderFeatureContext featureCtx = makeRenderFeatureContext(ctx);
+    FrameGraphContext featureCtx = makeFrameGraphContext(ctx);
     graphRegistry.build(featureCtx);
 }
 
@@ -597,7 +599,7 @@ void caustica::render::WorldRenderer::framePassDenoiseAndAA(PathTracingFrameCont
     m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
 }
 
-void caustica::render::WorldRenderer::registerDebugOverlayGraphPasses(RenderFeatureContext ctx)
+void caustica::render::WorldRenderer::registerDebugOverlayGraphPasses(FrameGraphContext ctx)
 {
     assert(ctx.graph);
     assert(ctx.targetFramebuffer);
@@ -796,3 +798,72 @@ void caustica::render::WorldRenderer::framePassFinalize(PathTracingFrameContext&
 
     postUpdatePathTracing();
 }
+
+namespace caustica::render
+{
+
+void registerClearFrameTargetsPass(FrameGraphContext ctx)
+{
+    if (!ctx.graph || !ctx.renderTargets)
+        return;
+
+    const rg::TextureHandle depth = ctx.graph->importTexture(
+        ctx.renderTargets->depth,
+        rg::TextureAccess::UnorderedAccess);
+    const rg::TextureHandle combinedHistoryClampRelax = ctx.graph->importTexture(
+        ctx.renderTargets->combinedHistoryClampRelax,
+        rg::TextureAccess::UnorderedAccess);
+
+    ctx.graph->addPass(
+        "ClearFrameTargets",
+        [depth, combinedHistoryClampRelax](rg::PassBuilder& setup) {
+            setup.write(depth, rg::TextureAccess::UnorderedAccess);
+            setup.write(combinedHistoryClampRelax, rg::TextureAccess::UnorderedAccess);
+        },
+        [ctx](rg::RenderPassContext& passCtx) {
+            ctx.renderTargets->clear(passCtx.commandList());
+        },
+        rg::PassOptions{ .sideEffect = true });
+
+    if (!ctx.hasScene)
+    {
+        const rg::TextureHandle outputColor = ctx.graph->importTexture(
+            ctx.renderTargets->outputColor,
+            rg::TextureAccess::UnorderedAccess);
+
+        ctx.graph->addPass(
+            "ClearNoSceneOutput",
+            [outputColor](rg::PassBuilder& setup) {
+                setup.write(outputColor, rg::TextureAccess::UnorderedAccess);
+            },
+            [outputColor](rg::RenderPassContext& passCtx) {
+                passCtx.commandList()->clearTextureFloat(
+                    passCtx.texture(outputColor),
+                    nvrhi::AllSubresources,
+                    nvrhi::Color(1, 1, 0, 0));
+            },
+            rg::PassOptions{ .sideEffect = true, .executeAfter = "ClearFrameTargets" });
+    }
+}
+
+void registerDefaultFrameGraphPasses(FrameGraphContext ctx)
+{
+    registerClearFrameTargetsPass(ctx);
+    registerRtxdiBeginFramePass(ctx);
+    registerPathTracePrePass(ctx);
+    registerVBufferExportPass(ctx);
+    registerPathTraceLightingEndPass(ctx);
+    registerGaussianSplatAccelBuildPass(ctx);
+    registerMainPathTracePass(ctx);
+    registerRtxdiExecutePass(ctx);
+    registerDenoiserPreparePass(ctx);
+    registerNrdPass(ctx);
+    registerGaussianSplatPreAAPass(ctx);
+    registerDenoiseAAPass(ctx);
+    registerGaussianSplatCompositePass(ctx);
+    registerPostProcessGraphPasses(ctx);
+    registerCompositeGraphPasses(ctx);
+    registerDebugOverlayGraphPasses(ctx);
+}
+
+} // namespace caustica::render

@@ -3,7 +3,7 @@
 #include <engine/App.h>
 #include <engine/AppResources.h>
 #include <render/pipeline/RenderPipelineRegistry.h>
-#include <render/worldRenderer/WorldRenderer.h>
+#include <render/WorldRenderer.h>
 
 #include <memory>
 

@@ -4,7 +4,7 @@
 #include <engine/App.h>
 #include <engine/AppSchedules.h>
 #include <engine/SystemLabels.h>
-#include <render/worldRenderer/WorldRenderer.h>
+#include <render/WorldRenderer.h>
 #include <engine/GpuSharedCaches.h>
 
 #include <utility>

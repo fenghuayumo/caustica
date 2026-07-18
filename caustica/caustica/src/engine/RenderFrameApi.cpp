@@ -18,7 +18,7 @@
 #include <engine/SceneMeshEditing.h>
 #include <render/core/PathTracerSettings.h>
 #include <render/passes/postProcess/ToneMappingPasses.h>
-#include <render/worldRenderer/WorldRenderer.h>
+#include <render/WorldRenderer.h>
 #include <render/RenderRuntimeState.h>
 #include <backend/GpuDevice.h>
 #include <core/format.h>

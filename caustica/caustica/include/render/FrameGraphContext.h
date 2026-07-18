@@ -25,7 +25,7 @@ class PathTracingFrameContext;
 class WorldRenderer;
 
 // Pointer-based so graph execute lambdas can capture a copy by value safely.
-struct RenderFeatureContext
+struct FrameGraphContext
 {
     rg::GraphBuilder* graph = nullptr;
     WorldRenderer* renderer = nullptr;

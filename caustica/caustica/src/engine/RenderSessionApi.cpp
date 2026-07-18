@@ -8,7 +8,7 @@
 #include <render/SceneLightingPasses.h>
 #include <render/SceneGaussianSplatPasses.h>
 #include <render/SceneRayTracingResources.h>
-#include <render/worldRenderer/WorldRenderer.h>
+#include <render/WorldRenderer.h>
 #include <render/core/RenderTargets.h>
 #include <math/math.h>
 

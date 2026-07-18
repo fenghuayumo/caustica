@@ -4,7 +4,7 @@
 #include "common/LocalConfig.h"
 #include "common/CaptureScriptManager.h"
 
-#include <render/worldRenderer/WorldRenderer.h>
+#include <render/WorldRenderer.h>
 #include <render/core/TextureUtils.h>
 #include <render/passes/debug/ZoomTool.h>
 #include <render/SceneGaussianSplatPasses.h>

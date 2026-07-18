@@ -26,7 +26,7 @@
 #include <scene/SceneRenderExtract.h>
 #include <scene/SceneTypes.h>
 #include <render/core/PathTracerSettings.h>
-#include <render/worldRenderer/WorldRenderer.h>
+#include <render/WorldRenderer.h>
 #include <render/core/CameraController.h>
 #include <render/SceneLightingPasses.h>
 #include <assets/loader/TextureLoader.h>

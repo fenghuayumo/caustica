@@ -13,7 +13,7 @@
 #include <ImGuizmo.h>
 #include <imgui/imgui_renderer.h>
 #include <render/RenderAppState.h>
-#include <render/worldRenderer/WorldRenderer.h>
+#include <render/WorldRenderer.h>
 #include "game/GameScene.h"
 #include <render/passes/debug/ZoomTool.h>
 

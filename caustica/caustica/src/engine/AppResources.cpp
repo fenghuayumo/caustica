@@ -6,7 +6,7 @@
 #include <engine/SceneViewState.h>
 #include <cassert>
 #include <backend/GpuDevice.h>
-#include <render/worldRenderer/WorldRenderer.h>
+#include <render/WorldRenderer.h>
 
 using namespace caustica::render;
 

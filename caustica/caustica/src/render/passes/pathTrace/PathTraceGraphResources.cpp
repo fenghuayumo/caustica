@@ -1,4 +1,4 @@
-#include <render/features/PathTraceGraphResources.h>
+#include <render/passes/pathTrace/PathTraceGraphResources.h>
 
 #include <render/core/RenderTargets.h>
 #include <render/core/PathTracerSettings.h>

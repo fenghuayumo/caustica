@@ -6,7 +6,7 @@
 #include <engine/SessionCamera.h>
 #include <engine/SceneSession.h>
 #include <engine/ScenePlugins.h>
-#include <render/worldRenderer/WorldRenderer.h>
+#include <render/WorldRenderer.h>
 #include <engine/ActiveScene.h>
 #include <engine/SceneAppResources.h>
 #include <engine/SceneStartup.h>

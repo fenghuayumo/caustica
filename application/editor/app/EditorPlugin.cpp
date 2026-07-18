@@ -7,7 +7,7 @@
 #include <engine/SceneQuery.h>
 #include <engine/SceneLifecycle.h>
 #include <engine/SystemLabels.h>
-#include <render/worldRenderer/WorldRenderer.h>
+#include <render/WorldRenderer.h>
 
 namespace caustica::editor
 {

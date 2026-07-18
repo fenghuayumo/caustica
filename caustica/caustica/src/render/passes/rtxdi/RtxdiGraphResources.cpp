@@ -1,7 +1,7 @@
-#include <render/features/RtxdiGraphResources.h>
+#include <render/passes/rtxdi/RtxdiGraphResources.h>
 
 #include <render/core/PathTracerSettings.h>
-#include <render/features/PathTraceGraphResources.h>
+#include <render/passes/pathTrace/PathTraceGraphResources.h>
 #include <render/passes/rtxdi/RtxdiPass.h>
 #include <render/passes/rtxdi/RtxdiResources.h>
 

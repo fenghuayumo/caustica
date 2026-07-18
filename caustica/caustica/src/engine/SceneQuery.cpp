@@ -9,7 +9,7 @@
 #include <scene/SceneManager.h>
 #include <render/passes/lighting/MaterialGpuCache.h>
 #include <render/core/PathTracerSettings.h>
-#include <render/worldRenderer/WorldRenderer.h>
+#include <render/WorldRenderer.h>
 
 using namespace caustica::render;
 

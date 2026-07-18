@@ -1,10 +1,11 @@
-#include <render/features/RenderFeature.h>
+#include <render/FrameGraphPasses.h>
 
-#include <render/features/RenderFeatureContext.h>
-#include <render/features/PathTraceGraphResources.h>
+#include <render/FrameGraphContext.h>
+#include <render/WorldRenderer.h>
+#include <render/core/RenderTargets.h>
 #include <render/graph/GraphBuilder.h>
 #include <render/passes/gaussian/GaussianSplatGraph.h>
-#include <render/worldRenderer/WorldRenderer.h>
+#include <render/passes/pathTrace/PathTraceGraphResources.h>
 
 #include <cassert>
 #include <vector>
@@ -30,7 +31,7 @@ namespace
         bool distanceStageCulling = false;
     };
 
-    bool gaussianSplatsEnabled(const RenderFeatureContext& ctx)
+    bool gaussianSplatsEnabled(const FrameGraphContext& ctx)
     {
         return ctx.settings != nullptr
             && ctx.renderer != nullptr
@@ -39,7 +40,7 @@ namespace
     }
 
     std::vector<GaussianSplatGraphHandles> importGaussianSplatGraphResources(
-        RenderFeatureContext ctx,
+        FrameGraphContext ctx,
         bool renderToOutputColor)
     {
         std::vector<GaussianSplatGraphHandles> handles;
@@ -79,7 +80,7 @@ namespace
     }
 
     bool registerGaussianSplatRenderStages(
-        RenderFeatureContext ctx,
+        FrameGraphContext ctx,
         bool renderToOutputColor,
         rg::TextureHandle colorTarget,
         rg::TextureHandle sceneDepth,
@@ -163,7 +164,7 @@ namespace
     }
 }
 
-void registerGaussianSplatPreAAFeature(RenderFeatureContext ctx)
+void registerGaussianSplatPreAAPass(FrameGraphContext ctx)
 {
     assert(ctx.graph);
     assert(ctx.renderer);
@@ -192,7 +193,7 @@ void registerGaussianSplatPreAAFeature(RenderFeatureContext ctx)
         "GaussianSplatsStochastic");
 }
 
-void registerGaussianSplatAccelBuildFeature(RenderFeatureContext ctx)
+void registerGaussianSplatAccelBuildPass(FrameGraphContext ctx)
 {
     assert(ctx.graph);
     assert(ctx.renderer);
@@ -220,7 +221,7 @@ void registerGaussianSplatAccelBuildFeature(RenderFeatureContext ctx)
         passOptions);
 }
 
-void registerGaussianSplatCompositeFeature(RenderFeatureContext ctx)
+void registerGaussianSplatCompositePass(FrameGraphContext ctx)
 {
     assert(ctx.graph);
     assert(ctx.renderer);
@@ -300,6 +301,13 @@ void registerGaussianSplatCompositeFeature(RenderFeatureContext ctx)
             .sideEffect = true,
             .executeAfter = "GaussianSplatsCopyCurrent",
         });
+}
+
+void registerGaussianSplatGraphPasses(FrameGraphContext ctx)
+{
+    registerGaussianSplatAccelBuildPass(ctx);
+    registerGaussianSplatPreAAPass(ctx);
+    registerGaussianSplatCompositePass(ctx);
 }
 
 } // namespace caustica::render

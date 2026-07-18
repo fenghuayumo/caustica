@@ -9,7 +9,7 @@
 #include <backend/GpuDevice.h>
 #include <render/core/BindingCache.h>
 #include <render/core/SceneGpuUpdater.h>
-#include <render/worldRenderer/WorldRenderer.h>
+#include <render/WorldRenderer.h>
 #include <scene/Scene.h>
 #include <scene/SceneManager.h>
 

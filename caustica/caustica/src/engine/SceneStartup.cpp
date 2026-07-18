@@ -16,7 +16,7 @@
 #include <core/path_utils.h>
 #include <render/core/RenderSceneTypeFactory.h>
 #include <render/RenderAppState.h>
-#include <render/worldRenderer/WorldRenderer.h>
+#include <render/WorldRenderer.h>
 
 namespace caustica
 {

@@ -1,18 +1,18 @@
-#include <render/features/RenderFeature.h>
+#include <render/FrameGraphPasses.h>
 
-#include <render/features/PathTraceGraphResources.h>
-#include <render/features/RtxdiGraphResources.h>
-#include <render/features/RenderFeatureContext.h>
+#include <render/FrameGraphContext.h>
+#include <render/WorldRenderer.h>
 #include <render/graph/GraphBuilder.h>
+#include <render/passes/pathTrace/PathTraceGraphResources.h>
+#include <render/passes/rtxdi/RtxdiGraphResources.h>
 #include <render/passes/rtxdi/RtxdiPass.h>
-#include <render/worldRenderer/WorldRenderer.h>
 
 #include <cassert>
 
 namespace caustica::render
 {
 
-void registerRtxdiBeginFrameFeature(RenderFeatureContext ctx)
+void registerRtxdiBeginFramePass(FrameGraphContext ctx)
 {
     assert(ctx.graph);
     assert(ctx.renderer);
@@ -50,7 +50,7 @@ void registerRtxdiBeginFrameFeature(RenderFeatureContext ctx)
         passOptions);
 }
 
-void registerRtxdiExecuteFeature(RenderFeatureContext ctx)
+void registerRtxdiExecutePass(FrameGraphContext ctx)
 {
     assert(ctx.graph);
     assert(ctx.renderer);
@@ -79,6 +79,12 @@ void registerRtxdiExecuteFeature(RenderFeatureContext ctx)
             ctx.renderer->executeRtxdi(passCtx.commandList());
         },
         passOptions);
+}
+
+void registerRtxdiGraphPasses(FrameGraphContext ctx)
+{
+    registerRtxdiBeginFramePass(ctx);
+    registerRtxdiExecutePass(ctx);
 }
 
 } // namespace caustica::render

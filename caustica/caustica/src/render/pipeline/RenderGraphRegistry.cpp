@@ -9,7 +9,7 @@ void RenderGraphRegistry::add(RegistrationFn registration)
         m_registrations.push_back(std::move(registration));
 }
 
-void RenderGraphRegistry::build(RenderFeatureContext& ctx) const
+void RenderGraphRegistry::build(FrameGraphContext& ctx) const
 {
     for (const RegistrationFn& registration : m_registrations)
         registration(ctx);

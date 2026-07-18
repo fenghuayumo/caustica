@@ -1,14 +1,14 @@
-#include <render/features/RenderFeature.h>
+#include <render/FrameGraphPasses.h>
 
+#include <render/FrameGraphContext.h>
+#include <render/WorldRenderer.h>
+#include <render/core/FullscreenBlitPass.h>
 #include <render/core/PathTracingShaderCompiler.h>
 #include <render/core/RenderTargets.h>
-#include <render/features/RenderFeatureContext.h>
 #include <render/graph/GraphBuilder.h>
-#include <render/features/RenderFeatureContext.h>
 #include <render/passes/geometry/BloomPass.h>
 #include <render/passes/lighting/distant/EnvMapProcessor.h>
 #include <render/passes/postProcess/ToneMappingPasses.h>
-#include <render/worldRenderer/WorldRenderer.h>
 #include <shaders/SampleConstantBuffer.h>
 
 #include <cassert>
@@ -20,7 +20,7 @@ namespace
 {
     void registerAerialPerspectivePass(
         rg::TextureHandle processedOutputColor,
-        RenderFeatureContext ctx)
+        FrameGraphContext ctx)
     {
         auto environment = ctx.renderer->getPathTracingContext().scenePasses.lighting.environment();
         if (!environment || !environment->isProcedural() || !ctx.settings->EnvironmentMapParams.enabled)
@@ -65,7 +65,7 @@ namespace
 
     void registerTestRaygenHdrPass(
         rg::TextureHandle processedOutputColor,
-        RenderFeatureContext ctx,
+        FrameGraphContext ctx,
         bool enabled)
     {
         assert(ctx.graph);
@@ -106,7 +106,7 @@ namespace
     void registerEdgeDetectionGraphPasses(
         rg::TextureHandle ldrColor,
         rg::TextureHandle ldrColorScratch,
-        RenderFeatureContext ctx,
+        FrameGraphContext ctx,
         bool enabled)
     {
         assert(ctx.graph);
@@ -162,7 +162,7 @@ namespace
     }
 }
 
-void registerPostProcessFeature(RenderFeatureContext ctx)
+void registerPostProcess(FrameGraphContext ctx)
 {
     assert(ctx.extractedView);
     assert(ctx.renderer);
@@ -221,6 +221,44 @@ void registerPostProcessFeature(RenderFeatureContext ctx)
         ldrColorScratch,
         ctx,
         ctx.settings->PostProcessEdgeDetection && ctx.renderer->ptPipelineEdgeDetection() != nullptr);
+}
+
+void registerCompositeGraphPasses(FrameGraphContext ctx)
+{
+    assert(ctx.targetFramebuffer);
+    assert(ctx.bindingCache);
+    assert(ctx.blitPass);
+    assert(ctx.renderTargets);
+    assert(ctx.graph);
+
+    const rg::TextureHandle ldrColor = ctx.graph->importTexture(
+        ctx.renderTargets->ldrColor,
+        nvrhi::ResourceStates::ShaderResource);
+
+    nvrhi::ITexture* targetColor = ctx.targetFramebuffer->getDesc().colorAttachments[0].texture;
+    assert(targetColor);
+
+    const rg::TextureHandle targetColorHandle = ctx.graph->importTexture(targetColor, rg::TextureAccess::RenderTarget);
+    ctx.graph->extractTexture(targetColorHandle, rg::TextureAccess::RenderTarget);
+
+    ctx.graph->addPass(
+        "Blit",
+        [ldrColor, targetColorHandle](rg::PassBuilder& setup) {
+            setup.read(ldrColor, rg::TextureAccess::ShaderResource);
+            setup.write(targetColorHandle, rg::TextureAccess::RenderTarget);
+        },
+        [ctx, ldrColor](rg::RenderPassContext& passCtx) {
+            BlitParameters blitParams{};
+            blitParams.targetFramebuffer = ctx.targetFramebuffer;
+            blitParams.sourceTexture = passCtx.texture(ldrColor);
+            ctx.blitPass->blitTexture(passCtx.commandList(), blitParams, nullptr);
+        },
+        rg::PassOptions{ .sideEffect = true });
+}
+
+void registerPostProcessGraphPasses(FrameGraphContext ctx)
+{
+    registerPostProcess(ctx);
 }
 
 } // namespace caustica::render

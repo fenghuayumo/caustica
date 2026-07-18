@@ -8,7 +8,7 @@ class RenderTargets;
 namespace caustica::render
 {
 
-struct RenderFeatureContext;
+struct FrameGraphContext;
 
 struct PathTraceGraphTargets
 {

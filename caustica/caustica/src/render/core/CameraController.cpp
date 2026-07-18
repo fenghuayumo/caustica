@@ -2,7 +2,7 @@
 
 #include <render/passes/geometry/TemporalAntiAliasingPass.h>
 #include <render/core/PathTracerSettings.h>
-#include <render/worldRenderer/WorldRenderer.h>
+#include <render/WorldRenderer.h>
 #include <core/file_utils.h>
 #include <core/format.h>
 #include <core/path_utils.h>

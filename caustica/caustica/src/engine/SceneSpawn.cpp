@@ -21,7 +21,7 @@
 #include <render/SceneRayTracingResources.h>
 #include <render/SceneLightingPasses.h>
 #include <render/SceneGaussianSplatPasses.h>
-#include <render/worldRenderer/WorldRenderer.h>
+#include <render/WorldRenderer.h>
 #include <assets/loader/TextureLoader.h>
 #include <assets/loader/ShaderMacro.h>
 #include <backend/GpuDevice.h>

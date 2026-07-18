@@ -11,7 +11,7 @@
 #include <render/RenderRuntimeState.h>
 #include <render/AppDiagnostics.h>
 #include <render/core/PathTracerSettings.h>
-#include <render/worldRenderer/WorldRenderer.h>
+#include <render/WorldRenderer.h>
 #include <scene/Scene.h>
 #include <scene/SceneRenderData.h>
 

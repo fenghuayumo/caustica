@@ -1,7 +1,7 @@
 #include <render/pipeline/PathTracingPipelinePlugin.h>
 
-#include <render/features/RenderFeature.h>
-#include <render/worldRenderer/WorldRenderer.h>
+#include <render/FrameGraphPasses.h>
+#include <render/WorldRenderer.h>
 
 namespace caustica::render
 {
@@ -51,8 +51,8 @@ void PathTracingPipelinePlugin::registerGraphPasses(
     WorldRenderer& /*renderer*/,
     RenderFrameContext& /*ctx*/)
 {
-    registry.add([](RenderFeatureContext& featureCtx) {
-        registerDefaultGraphFeatures(featureCtx);
+    registry.add([](FrameGraphContext& featureCtx) {
+        registerDefaultFrameGraphPasses(featureCtx);
     });
 }
 

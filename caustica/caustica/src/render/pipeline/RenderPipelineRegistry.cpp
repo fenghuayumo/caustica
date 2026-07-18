@@ -2,7 +2,7 @@
 
 #include <render/pipeline/PathTracingPipelinePlugin.h>
 #include <render/pipeline/RenderGraphRegistry.h>
-#include <render/worldRenderer/WorldRenderer.h>
+#include <render/WorldRenderer.h>
 
 namespace caustica::render
 {

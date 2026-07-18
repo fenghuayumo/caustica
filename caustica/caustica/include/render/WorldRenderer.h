@@ -9,7 +9,7 @@
 #include <render/core/CameraController.h>
 #include <render/core/PathTracerSettings.h>
 #include <render/PathTracerScenePasses.h>
-#include <render/worldRenderer/PathTracingContext.h>
+#include <render/PathTracingContext.h>
 #include <shaders/PathTracer/Config.h>
 #include <shaders/SampleConstantBuffer.h>
 #include <render/core/RenderTargets.h>
@@ -25,7 +25,7 @@
 #include <render/pipeline/RenderPipelineRegistry.h>
 #include <render/graph/RenderTargetPool.h>
 #include <render/graph/RenderBufferPool.h>
-#include <render/worldRenderer/PathTracingFrameContext.h>
+#include <render/PathTracingFrameContext.h>
 
 #include <chrono>
 #include <filesystem>
@@ -69,7 +69,7 @@ class GPUSort;
 class RenderGraphRegistry;
 class PathTracingPipelinePlugin;
 struct ExtractedFrameView;
-struct RenderFeatureContext;
+struct FrameGraphContext;
 
 // =============================================================================
 // WorldRenderer — GPU path-tracing pipeline and runtime ownership.
@@ -223,7 +223,7 @@ public:
 
     void buildFrameGraphPasses(RenderFrameContext& ctx, const RenderGraphRegistry& graphRegistry);
     void executeFrameRenderGraph(RenderFrameContext& ctx);
-    void registerDebugOverlayGraphPasses(RenderFeatureContext ctx);
+    void registerDebugOverlayGraphPasses(FrameGraphContext ctx);
 
     void addRenderPipelinePlugin(std::unique_ptr<IRenderPipelinePlugin> plugin);
     void addRenderPipelinePlugin(IRenderPipelinePlugin& plugin);
@@ -242,7 +242,7 @@ private:
 
     void populateRenderFrameContext(nvrhi::IFramebuffer* framebuffer, RenderFrameContext& ctx);
     void populateFrameView(ExtractedFrameView& view);
-    [[nodiscard]] RenderFeatureContext makeRenderFeatureContext(RenderFrameContext& ctx);
+    [[nodiscard]] FrameGraphContext makeFrameGraphContext(RenderFrameContext& ctx);
     void framePassSetup(PathTracingFrameContext& ctx);
     void framePassEnsureRenderTargets(PathTracingFrameContext& ctx);
     void framePassRendererInit(PathTracingFrameContext& ctx);
@@ -255,6 +255,12 @@ private:
     void framePassFinalize(PathTracingFrameContext& ctx);
 
     void createRenderPasses(bool& exposureResetRequired, nvrhi::CommandListHandle initializeCommandList);
+    void createRtxdiRenderPasses();
+    void createAccumulationRenderPasses();
+    void createGaussianTemporalRenderPasses();
+    void createPostProcessRenderPasses();
+    void createLightingRenderPasses(nvrhi::CommandListHandle initializeCommandList);
+    void createDenoiserRenderPasses();
     void preUpdateLighting(nvrhi::CommandListHandle commandList, bool& needNewBindings);
     void updateLighting(nvrhi::CommandListHandle commandList);
     void preUpdatePathTracing(bool resetAccum, nvrhi::CommandListHandle commandList);

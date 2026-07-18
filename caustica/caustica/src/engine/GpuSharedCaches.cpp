@@ -11,7 +11,7 @@
 #include <render/core/BindingCache.h>
 #include <render/core/BindlessTable.h>
 #include <render/core/RenderDevice.h>
-#include <render/worldRenderer/WorldRenderer.h>
+#include <render/WorldRenderer.h>
 
 #include <cassert>
 

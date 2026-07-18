@@ -1,19 +1,167 @@
-#include <render/features/RenderFeature.h>
+#include <render/FrameGraphPasses.h>
 
+#include <render/FrameGraphContext.h>
+#include <render/WorldRenderer.h>
 #include <render/core/CameraController.h>
+#include <render/core/PathTracerSettings.h>
 #include <render/core/RenderTargets.h>
 #include <render/graph/GraphBuilder.h>
-#include <render/features/RenderFeatureContext.h>
-#include <render/passes/postProcess/AccumulationPass.h>
 #include <render/passes/geometry/TemporalAntiAliasingPass.h>
-#include <render/worldRenderer/WorldRenderer.h>
+#include <render/passes/pathTrace/PathTraceGraphResources.h>
+#include <render/passes/postProcess/AccumulationPass.h>
 #include <scene/View.h>
+#include <shaders/PathTracer/Config.h>
 
 #include <algorithm>
 #include <cassert>
+#include <format>
 
 namespace caustica::render
 {
+
+namespace
+{
+    bool needsStablePlanesDebugViz(const PathTracerSettings& settings)
+    {
+        if (!settings.RealtimeMode)
+            return false;
+
+        return (settings.DebugView > DebugViewType::Disabled
+                && settings.DebugView <= DebugViewType::StablePlane_SpecRadiance)
+            || settings.DebugView == DebugViewType::StableRadiance;
+    }
+}
+
+void registerDenoiserPreparePass(FrameGraphContext ctx)
+{
+    assert(ctx.graph);
+    assert(ctx.renderer);
+    assert(ctx.renderTargets);
+    assert(ctx.settings);
+
+    if (!ctx.hasScene)
+        return;
+
+    const PathTraceGraphTargets handles = importPathTraceGraphTargets(*ctx.graph, *ctx.renderTargets);
+    extractPathTraceGraphOutputs(*ctx.graph, handles);
+
+    rg::PassOptions denoiserPassOptions{};
+    denoiserPassOptions.executeAfter = ctx.settings->actualUseRTXDIPasses() ? "Rtxdi" : "MainPathTrace";
+
+    ctx.graph->addPass(
+        "DenoiserPrepare",
+        [handles](rg::PassBuilder& setup) {
+            declareDenoiserPrepareAccess(setup, handles);
+        },
+        [ctx](rg::RenderPassContext& passCtx) {
+            ctx.renderer->prepareDenoiserGuides(passCtx.commandList());
+        },
+        denoiserPassOptions);
+
+    if (needsStablePlanesDebugViz(*ctx.settings))
+    {
+        rg::PassOptions debugVizPassOptions{};
+        debugVizPassOptions.executeAfter = "DenoiserPrepare";
+
+        ctx.graph->addPass(
+            "StablePlanesDebugViz",
+            [handles](rg::PassBuilder& setup) {
+                declareStablePlanesDebugVizAccess(setup, handles);
+            },
+            [ctx](rg::RenderPassContext& passCtx) {
+                ctx.renderer->stablePlanesDebugViz(passCtx.commandList());
+            },
+            debugVizPassOptions);
+    }
+}
+
+namespace
+{
+    void declareNrdPlaneAccess(
+        rg::PassBuilder& setup,
+        rg::GraphBuilder& graph,
+        RenderTargets& targets,
+        int planeIndex,
+        bool readsOutputColor)
+    {
+        const rg::TextureHandle denoiserViewspaceZ = graph.importTexture(
+            targets.denoiserViewspaceZ, rg::TextureAccess::ShaderResource);
+        const rg::TextureHandle denoiserMotionVectors = graph.importTexture(
+            targets.denoiserMotionVectors, rg::TextureAccess::ShaderResource);
+        const rg::TextureHandle denoiserNormalRoughness = graph.importTexture(
+            targets.denoiserNormalRoughness, rg::TextureAccess::ShaderResource);
+        const rg::TextureHandle denoiserDiffRadianceHitDist = graph.importTexture(
+            targets.denoiserDiffRadianceHitDist, rg::TextureAccess::ShaderResource);
+        const rg::TextureHandle denoiserSpecRadianceHitDist = graph.importTexture(
+            targets.denoiserSpecRadianceHitDist, rg::TextureAccess::ShaderResource);
+        const rg::TextureHandle denoiserDisocclusionThresholdMix = graph.importTexture(
+            targets.denoiserDisocclusionThresholdMix, rg::TextureAccess::ShaderResource);
+        const rg::TextureHandle outputColor = graph.importTexture(
+            targets.outputColor, rg::TextureAccess::UnorderedAccess);
+        const rg::TextureHandle outDiff = graph.importTexture(
+            targets.denoiserOutDiffRadianceHitDist[planeIndex], rg::TextureAccess::UnorderedAccess);
+        const rg::TextureHandle outSpec = graph.importTexture(
+            targets.denoiserOutSpecRadianceHitDist[planeIndex], rg::TextureAccess::UnorderedAccess);
+
+        graph.extractTexture(outputColor, rg::TextureAccess::UnorderedAccess);
+        graph.extractTexture(outDiff, rg::TextureAccess::UnorderedAccess);
+        graph.extractTexture(outSpec, rg::TextureAccess::UnorderedAccess);
+
+        setup.read(denoiserViewspaceZ, rg::TextureAccess::ShaderResource);
+        setup.read(denoiserMotionVectors, rg::TextureAccess::ShaderResource);
+        setup.read(denoiserNormalRoughness, rg::TextureAccess::ShaderResource);
+        setup.read(denoiserDiffRadianceHitDist, rg::TextureAccess::ShaderResource);
+        setup.read(denoiserSpecRadianceHitDist, rg::TextureAccess::ShaderResource);
+        setup.read(denoiserDisocclusionThresholdMix, rg::TextureAccess::ShaderResource);
+        if (readsOutputColor)
+            setup.read(outputColor, rg::TextureAccess::ShaderResource);
+        setup.write(outDiff, rg::TextureAccess::UnorderedAccess);
+        setup.write(outSpec, rg::TextureAccess::UnorderedAccess);
+        setup.write(outputColor, rg::TextureAccess::UnorderedAccess);
+
+        if (targets.denoiserOutValidation != nullptr)
+        {
+            const rg::TextureHandle validation = graph.importTexture(
+                targets.denoiserOutValidation, rg::TextureAccess::UnorderedAccess);
+            setup.write(validation, rg::TextureAccess::UnorderedAccess);
+        }
+    }
+}
+
+void registerNrdPass(FrameGraphContext ctx)
+{
+    assert(ctx.targetFramebuffer);
+    assert(ctx.renderer);
+    assert(ctx.renderTargets);
+    assert(ctx.settings);
+    assert(ctx.graph);
+
+    if (!ctx.hasScene || !ctx.settings->actualUseStandaloneDenoiser())
+        return;
+
+    ctx.renderer->ensureNrdIntegrations();
+
+    const int maxPassCount = std::min(
+        ctx.settings->StablePlanesActiveCount,
+        static_cast<int>(cStablePlaneCount));
+
+    for (int pass = maxPassCount - 1; pass >= 0; --pass)
+    {
+        const int planeIndex = pass;
+        const bool readsOutputColor = planeIndex < (maxPassCount - 1);
+        ctx.graph->addPass(
+            std::format("NRD Plane {}", planeIndex),
+            [ctx, planeIndex, readsOutputColor](rg::PassBuilder& setup) {
+                declareNrdPlaneAccess(setup, *ctx.graph, *ctx.renderTargets, planeIndex, readsOutputColor);
+            },
+            [ctx, planeIndex](rg::RenderPassContext& passCtx) {
+                ctx.renderer->denoiseStablePlane(
+                    passCtx.commandList(),
+                    ctx.targetFramebuffer,
+                    planeIndex);
+            });
+    }
+}
 
 namespace
 {
@@ -45,7 +193,7 @@ namespace
             && settings.RealtimeAA != 3;
     }
 
-    TemporalAntiAliasingParameters makeTemporalAAParameters(const RenderFeatureContext& ctx)
+    TemporalAntiAliasingParameters makeTemporalAAParameters(const FrameGraphContext& ctx)
     {
         TemporalAntiAliasingParameters taaParams = ctx.settings->TemporalAntiAliasingParams;
 
@@ -60,7 +208,7 @@ namespace
         return taaParams;
     }
 
-    bool computeTemporalFeedbackValid(const RenderFeatureContext& ctx)
+    bool computeTemporalFeedbackValid(const FrameGraphContext& ctx)
     {
         const bool stochasticSplats = ctx.settings->EnableGaussianSplats && ctx.settings->GaussianSplatSortingMode == 1;
         const bool stochasticReset = stochasticSplats && ctx.gaussianSplatTemporalReset != nullptr
@@ -69,7 +217,7 @@ namespace
         return !ctx.aaReset && !stochasticReset && ctx.renderer->getFrameIndex() != 0;
     }
 
-    void prepareDenoiseAAState(RenderFeatureContext& ctx)
+    void prepareDenoiseAAState(FrameGraphContext& ctx)
     {
         if (!ctx.settings->RealtimeMode || ctx.settings->RealtimeAA != 1)
             return;
@@ -85,7 +233,7 @@ namespace
     }
 }
 
-void registerDenoiseAAFeature(RenderFeatureContext ctx)
+void registerDenoiseAAPass(FrameGraphContext ctx)
 {
     assert(ctx.graph);
     assert(ctx.renderer);
@@ -272,6 +420,13 @@ void registerDenoiseAAFeature(RenderFeatureContext ctx)
                     accumulationWeight);
             });
     }
+}
+
+void registerDenoiseGraphPasses(FrameGraphContext ctx)
+{
+    registerDenoiserPreparePass(ctx);
+    registerNrdPass(ctx);
+    registerDenoiseAAPass(ctx);
 }
 
 } // namespace caustica::render

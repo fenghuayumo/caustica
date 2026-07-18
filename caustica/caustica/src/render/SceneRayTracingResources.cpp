@@ -2,7 +2,7 @@
 
 #include <render/PathTracerScenePasses.h>
 #include <render/SceneLightingPasses.h>
-#include <render/worldRenderer/WorldRenderer.h>
+#include <render/WorldRenderer.h>
 
 #include <backend/GpuDevice.h>
 #include <render/core/BindingCache.h>

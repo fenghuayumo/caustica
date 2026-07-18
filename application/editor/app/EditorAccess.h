@@ -8,7 +8,7 @@
 #include <engine/SessionCamera.h>
 #include <engine/SceneQuery.h>
 #include <render/core/CameraController.h>
-#include <render/worldRenderer/WorldRenderer.h>
+#include <render/WorldRenderer.h>
 #include <scene/Scene.h>
 
 #include <cassert>
