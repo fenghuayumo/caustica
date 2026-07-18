@@ -13,7 +13,7 @@ struct AppDiagnostics
 {
     ProgressBar progressInitializingRenderer;
     bool asyncLoadingInProgress = false;
-    // Non-modal RT pipeline idle-warmup status (updated each render frame).
+    // RT feature-preset PSO readiness (updated each render frame; active during precache).
     RtPipelineWarmupStatus rtPipelineWarmup{};
     RtPipelineCacheStats rtPipelineCacheStats{};
 

@@ -157,6 +157,10 @@ public:
 
     std::shared_ptr<PathTracingShaderCompiler> getPathTracingShaderCompiler() const { return m_pathTracingShaderCompiler; }
     std::shared_ptr<RtPipelineCache> getRtPipelineCache() const { return m_rtPipelineCache; }
+
+    // Explicit load/cook precache of every cooked feature-preset RT PSO bundle.
+    // Call on the render thread after the first PT update has a hit-group set.
+    uint32_t precacheAllRtFeaturePresets(bool showProgress = true);
     std::shared_ptr<ShaderDebug> getShaderDebug() const { return m_shaderDebug; }
 
     std::shared_ptr<PTPipelineVariant>& ptPipelineReference() { return m_ptPipelineReference; }

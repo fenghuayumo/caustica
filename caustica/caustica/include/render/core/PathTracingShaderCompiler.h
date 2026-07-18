@@ -133,6 +133,9 @@ public:
         const std::vector<std::shared_ptr<PTPipelineVariant>>& variants,
         bool showProgress = true);
 
+    // True after the first update() that primed unique CHS/AHS exports for CreateStateObject.
+    [[nodiscard]] bool                  hasUniqueHitGroups() const { return !m_uniqueHitGroups.empty(); }
+
     [[nodiscard]] bool                  isLoadOnlyMode() const { return !m_compilerConfig.canCompile(); }
     
     const std::shared_ptr<class MaterialGpuCache> & 

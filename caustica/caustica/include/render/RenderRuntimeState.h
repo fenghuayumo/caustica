@@ -26,6 +26,8 @@ struct GaussianSplatSceneSummary
 
 struct RenderPickState
 {
+    // Cursor position in display/window pixels (not path-trace renderSize).
+    // WorldRenderer maps to render pixels after DLSS settles for the frame.
     dm::uint2 Position = { 0, 0 };
     bool MaterialRequested = false;
     bool InstanceRequested = false;

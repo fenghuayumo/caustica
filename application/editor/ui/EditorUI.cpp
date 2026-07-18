@@ -102,7 +102,7 @@ void EditorUI::buildUI(void)
             snprintf(
                 label,
                 sizeof(label),
-                "Warming RT pipelines %u/%u (%s)",
+                "RT presets ready %u/%u (%s)",
                 warm.completed,
                 warm.total,
                 preset);

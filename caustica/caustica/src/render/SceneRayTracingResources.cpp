@@ -64,8 +64,8 @@ void SceneRayTracingResources::createRTPipelines()
     auto cache = m_worldRenderer->getRtPipelineCache();
     assert(cache);
 
-    // Product startup: only materialize the active preset. Remaining presets warm
-    // on the render thread with a per-frame budget (see RtPipelineCache::tickIdleWarmup).
+    // UE-style startup: only the active cooked preset. Other presets stay cold until
+    // first use, or explicit RtPipelineCache::precacheAll during load/cook.
     const PtFeaturePresetId active = resolveFeaturePreset();
     cache->ensurePresetVariants(active);
 
@@ -84,6 +84,10 @@ void SceneRayTracingResources::createRTPipelines()
             "TestRaygenPP.hlsl", { SM("PP_EDGE_DETECTION", "1") }, "EDGY", true, defaultMacros);
     }
 
+    // Bind variant pointers only. CreateStateObject must wait until
+    // PathTracingShaderCompiler::update() has built the hit-group export set
+    // (materials loaded + scene sub-instances). Calling ensureReady here
+    // CreateStateObjects with an empty hit-group map and crashes / freezes PSOs.
     if (!bindFeaturePreset(active))
     {
         caustica::error(
@@ -122,36 +126,14 @@ bool SceneRayTracingResources::bindFeaturePreset(PtFeaturePresetId id)
 
 bool SceneRayTracingResources::ensureFeaturePresetReady(PtFeaturePresetId id, bool showProgress)
 {
-    auto compiler = pathTracingShaderCompiler();
     auto cache = m_worldRenderer->getRtPipelineCache();
-    if (!compiler || !cache)
+    if (!cache)
         return false;
 
-    cache->ensurePresetVariants(id);
-    if (cache->isReady(id))
-    {
-        cache->recordLookup(id, /*hit=*/true, "ensure");
-        return bindFeaturePreset(id);
-    }
-
-    cache->recordLookup(id, /*hit=*/false, "ensure");
-    cache->prioritizeWarmup(id);
-    auto* bundle = cache->findBundle(id);
-    if (!bundle)
+    // Single CreateStateObject owner: RtPipelineCache::ensureReady / buildPreset.
+    if (!cache->ensureReady(id, showProgress))
         return false;
-
-    std::vector<std::shared_ptr<PTPipelineVariant>> variants;
-    if (bundle->reference && !bundle->reference->hasPipeline())
-        variants.push_back(bundle->reference);
-    if (bundle->buildStablePlanes && !bundle->buildStablePlanes->hasPipeline())
-        variants.push_back(bundle->buildStablePlanes);
-    if (bundle->fillStablePlanes && !bundle->fillStablePlanes->hasPipeline())
-        variants.push_back(bundle->fillStablePlanes);
-
-    if (!variants.empty())
-        compiler->buildPipelines(variants, showProgress);
-
-    return cache->isReady(id) && bindFeaturePreset(id);
+    return bindFeaturePreset(id);
 }
 
 void SceneRayTracingResources::createBlases(

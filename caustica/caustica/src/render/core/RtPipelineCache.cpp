@@ -4,7 +4,6 @@
 
 #include <core/log.h>
 
-#include <algorithm>
 #include <cstdlib>
 #include <utility>
 
@@ -19,18 +18,12 @@ bool envFlagEnabled(const char* name)
     return value != nullptr && value[0] != '\0' && value[0] != '0';
 }
 
-bool envDisableIdleWarmup()
-{
-    return envFlagEnabled("CAUSTICA_DISABLE_RT_IDLE_WARMUP");
-}
-
 } // namespace
 
 RtPipelineCache::RtPipelineCache(std::shared_ptr<PathTracingShaderCompiler> compiler)
     : m_compiler(std::move(compiler))
 {
     m_bundles.resize(ptFeaturePresetCount());
-    m_idleWarmupEnabled = !envDisableIdleWarmup();
     m_verboseLogs = envFlagEnabled("CAUSTICA_RT_PIPELINE_CACHE_VERBOSE");
 }
 
@@ -46,10 +39,8 @@ void RtPipelineCache::clear()
         m_compiler->releaseVariant(bundle.fillStablePlanes);
         bundle = {};
     }
-    m_warmupQueue.clear();
     m_activePreset = PtFeaturePresetId::Default;
-    m_warmingPreset = PtFeaturePresetId::Count;
-    m_warmupTotal = 0;
+    m_buildingPreset = PtFeaturePresetId::Count;
     m_stats = {};
 }
 
@@ -58,41 +49,35 @@ void RtPipelineCache::recordLookup(PtFeaturePresetId id, bool hit, std::string_v
     if (hit)
     {
         ++m_stats.hits;
-        // Avoid per-frame spam: log HIT only on preset switch, or when verbose.
         const bool switched = (id != m_activePreset);
         if (m_verboseLogs || switched)
         {
             caustica::info(
-                "RtPipelineCache: HIT preset='%s' reason=%.*s (hits=%llu misses=%llu warms=%llu)",
+                "RtPipelineCache: HIT preset='%s' reason=%.*s (hits=%llu misses=%llu)",
                 ptFeaturePresetName(id).data(),
                 static_cast<int>(reason.size()),
                 reason.data(),
                 static_cast<unsigned long long>(m_stats.hits),
-                static_cast<unsigned long long>(m_stats.misses),
-                static_cast<unsigned long long>(m_stats.idleWarms));
+                static_cast<unsigned long long>(m_stats.misses));
         }
+        return;
     }
-    else
-    {
-        ++m_stats.misses;
-        caustica::warning(
-            "RtPipelineCache: MISS preset='%s' reason=%.*s — CreateStateObject (hits=%llu misses=%llu warms=%llu)",
-            ptFeaturePresetName(id).data(),
-            static_cast<int>(reason.size()),
-            reason.data(),
-            static_cast<unsigned long long>(m_stats.hits),
-            static_cast<unsigned long long>(m_stats.misses),
-            static_cast<unsigned long long>(m_stats.idleWarms));
-        logStatsSummary(true);
-    }
+
+    ++m_stats.misses;
+    caustica::info(
+        "RtPipelineCache: MISS preset='%s' reason=%.*s — CreateStateObject "
+        "(hits=%llu misses=%llu)",
+        ptFeaturePresetName(id).data(),
+        static_cast<int>(reason.size()),
+        reason.data(),
+        static_cast<unsigned long long>(m_stats.hits),
+        static_cast<unsigned long long>(m_stats.misses));
 }
 
 void RtPipelineCache::logStatsSummary(bool force)
 {
-    const uint64_t total = m_stats.hits + m_stats.misses + m_stats.idleWarms;
+    const uint64_t total = m_stats.hits + m_stats.misses + m_stats.precached;
     if (!force && total == m_stats.lastLoggedTotal)
-        return;
-    if (!force && (total - m_stats.lastLoggedTotal) < 8 && m_stats.misses == 0)
         return;
 
     m_stats.lastLoggedTotal = total;
@@ -100,13 +85,16 @@ void RtPipelineCache::logStatsSummary(bool force)
         ? (100.0 * static_cast<double>(m_stats.hits)
            / static_cast<double>(m_stats.hits + m_stats.misses))
         : 100.0;
+    const RtPipelineWarmupStatus s = status();
     caustica::info(
-        "RtPipelineCache: stats hits=%llu misses=%llu idleWarms=%llu binds=%llu hitRate=%.1f%%",
+        "RtPipelineCache: stats hits=%llu misses=%llu precached=%llu binds=%llu hitRate=%.1f%% ready=%u/%u",
         static_cast<unsigned long long>(m_stats.hits),
         static_cast<unsigned long long>(m_stats.misses),
-        static_cast<unsigned long long>(m_stats.idleWarms),
+        static_cast<unsigned long long>(m_stats.precached),
         static_cast<unsigned long long>(m_stats.binds),
-        hitRate);
+        hitRate,
+        s.completed,
+        s.total);
 }
 
 bool RtPipelineCache::bundleReady(const Bundle& bundle)
@@ -153,7 +141,7 @@ void RtPipelineCache::ensurePresetVariants(PtFeaturePresetId id)
         globalMacros);
 
     caustica::info(
-        "RtPipelineCache: created variants for preset '%s'",
+        "RtPipelineCache: created variants for preset '%s' (cooked library macros)",
         ptFeaturePresetName(id).data());
 }
 
@@ -161,6 +149,92 @@ void RtPipelineCache::ensurePresets(std::span<const PtFeaturePresetId> ids)
 {
     for (PtFeaturePresetId id : ids)
         ensurePresetVariants(id);
+}
+
+bool RtPipelineCache::buildPreset(PtFeaturePresetId id, bool showProgress)
+{
+    if (!m_compiler)
+        return false;
+    if (isReady(id))
+        return true;
+
+    // REF/BUILD/FILL need a live hit-group export set from compiler update().
+    // Creating state objects earlier yields empty/invalid PSOs and hard crashes.
+    if (!m_compiler->hasUniqueHitGroups())
+    {
+        caustica::warning(
+            "RtPipelineCache: defer CreateStateObject for '%s' — hit groups not ready yet",
+            ptFeaturePresetName(id).data());
+        ensurePresetVariants(id);
+        return false;
+    }
+
+    ensurePresetVariants(id);
+    Bundle* bundle = findBundle(id);
+    if (!bundle)
+        return false;
+
+    std::vector<std::shared_ptr<PTPipelineVariant>> variants;
+    if (bundle->reference && !bundle->reference->hasPipeline())
+        variants.push_back(bundle->reference);
+    if (bundle->buildStablePlanes && !bundle->buildStablePlanes->hasPipeline())
+        variants.push_back(bundle->buildStablePlanes);
+    if (bundle->fillStablePlanes && !bundle->fillStablePlanes->hasPipeline())
+        variants.push_back(bundle->fillStablePlanes);
+
+    if (!variants.empty())
+    {
+        m_buildingPreset = id;
+        m_compiler->buildPipelines(variants, showProgress);
+        m_buildingPreset = PtFeaturePresetId::Count;
+    }
+
+    return isReady(id);
+}
+
+bool RtPipelineCache::ensureReady(PtFeaturePresetId id, bool showProgress)
+{
+    if (isReady(id))
+    {
+        recordLookup(id, /*hit=*/true, "ensure");
+        return true;
+    }
+
+    recordLookup(id, /*hit=*/false, "ensure");
+    return buildPreset(id, showProgress);
+}
+
+uint32_t RtPipelineCache::precacheAll(bool showProgress)
+{
+    if (!m_compiler)
+        return 0;
+
+    caustica::info(
+        "RtPipelineCache: precacheAll begin (%u presets) — CreateStateObject owned by cache",
+        ptFeaturePresetCount());
+
+    uint32_t ready = 0;
+    for (uint32_t i = 0; i < ptFeaturePresetCount(); ++i)
+    {
+        const auto id = static_cast<PtFeaturePresetId>(i);
+        m_buildingPreset = id;
+        if (buildPreset(id, showProgress))
+        {
+            ++ready;
+            ++m_stats.precached;
+        }
+        else
+        {
+            caustica::error(
+                "RtPipelineCache: precache failed for preset '%s'",
+                ptFeaturePresetName(id).data());
+        }
+    }
+    m_buildingPreset = PtFeaturePresetId::Count;
+
+    logStatsSummary(true);
+    caustica::info("RtPipelineCache: precacheAll end ready=%u/%u", ready, ptFeaturePresetCount());
+    return ready;
 }
 
 bool RtPipelineCache::bind(
@@ -209,131 +283,21 @@ const RtPipelineCache::Bundle* RtPipelineCache::findBundle(PtFeaturePresetId id)
     return &m_bundles[index];
 }
 
-void RtPipelineCache::enqueueWarmup(PtFeaturePresetId id)
+RtPipelineWarmupStatus RtPipelineCache::status() const
 {
-    if (isReady(id))
-        return;
-    if (std::find(m_warmupQueue.begin(), m_warmupQueue.end(), id) != m_warmupQueue.end())
-        return;
-    m_warmupQueue.push_back(id);
-}
-
-void RtPipelineCache::scheduleBackgroundWarmup(PtFeaturePresetId exclude)
-{
-    if (!m_idleWarmupEnabled)
-        return;
-
-    m_warmupQueue.clear();
-    m_warmingPreset = PtFeaturePresetId::Count;
-    m_warmupTotal = ptFeaturePresetCount();
-
-    for (uint32_t i = 0; i < ptFeaturePresetCount(); ++i)
-    {
-        const auto id = static_cast<PtFeaturePresetId>(i);
-        if (id == exclude || isReady(id))
-            continue;
-        m_warmupQueue.push_back(id);
-    }
-
-    if (!m_warmupQueue.empty())
-    {
-        caustica::info(
-            "RtPipelineCache: scheduled idle warmup for %zu presets (active '%s' bound first)",
-            m_warmupQueue.size(),
-            ptFeaturePresetName(exclude).data());
-    }
-}
-
-void RtPipelineCache::prioritizeWarmup(PtFeaturePresetId id)
-{
-    if (isReady(id))
-        return;
-
-    ensurePresetVariants(id);
-    m_warmupQueue.erase(
-        std::remove(m_warmupQueue.begin(), m_warmupQueue.end(), id),
-        m_warmupQueue.end());
-    m_warmupQueue.push_front(id);
-}
-
-bool RtPipelineCache::tickIdleWarmup(uint32_t maxPresets)
-{
-    if (!m_idleWarmupEnabled || !m_compiler || maxPresets == 0)
-        return false;
-
-    bool didWork = false;
-    uint32_t built = 0;
-    while (built < maxPresets && !m_warmupQueue.empty())
-    {
-        const PtFeaturePresetId id = m_warmupQueue.front();
-        m_warmupQueue.pop_front();
-
-        if (isReady(id))
-            continue;
-
-        m_warmingPreset = id;
-        ensurePresetVariants(id);
-
-        std::vector<std::shared_ptr<PTPipelineVariant>> variants;
-        if (Bundle* bundle = findBundle(id))
-        {
-            if (bundle->reference && !bundle->reference->hasPipeline())
-                variants.push_back(bundle->reference);
-            if (bundle->buildStablePlanes && !bundle->buildStablePlanes->hasPipeline())
-                variants.push_back(bundle->buildStablePlanes);
-            if (bundle->fillStablePlanes && !bundle->fillStablePlanes->hasPipeline())
-                variants.push_back(bundle->fillStablePlanes);
-        }
-
-        if (!variants.empty())
-        {
-            // Silent: no modal ProgressBar on the interactive path.
-            m_compiler->buildPipelines(variants, /*showProgress=*/false);
-            ++m_stats.idleWarms;
-            const RtPipelineWarmupStatus status = warmupStatus();
-            caustica::info(
-                "RtPipelineCache: WARM preset='%s' (idle %u/%u) hits=%llu misses=%llu warms=%llu",
-                ptFeaturePresetName(id).data(),
-                status.completed,
-                status.total,
-                static_cast<unsigned long long>(m_stats.hits),
-                static_cast<unsigned long long>(m_stats.misses),
-                static_cast<unsigned long long>(m_stats.idleWarms));
-            didWork = true;
-        }
-
-        ++built;
-    }
-
-    if (m_warmupQueue.empty())
-    {
-        if (m_warmingPreset != PtFeaturePresetId::Count || didWork)
-            logStatsSummary(true);
-        m_warmingPreset = PtFeaturePresetId::Count;
-    }
-
-    return didWork;
-}
-
-RtPipelineWarmupStatus RtPipelineCache::warmupStatus() const
-{
-    RtPipelineWarmupStatus status;
-    status.total = ptFeaturePresetCount();
-    uint32_t ready = 0;
+    RtPipelineWarmupStatus s;
+    s.total = ptFeaturePresetCount();
     for (uint32_t i = 0; i < ptFeaturePresetCount(); ++i)
     {
         if (isReady(static_cast<PtFeaturePresetId>(i)))
-            ++ready;
+            ++s.completed;
     }
-    status.completed = ready;
-    status.active = m_idleWarmupEnabled
-        && ready < status.total
-        && (!m_warmupQueue.empty() || m_warmingPreset != PtFeaturePresetId::Count);
-    if (m_warmingPreset != PtFeaturePresetId::Count)
-        status.currentPreset = ptFeaturePresetName(m_warmingPreset);
-    else if (!m_warmupQueue.empty())
-        status.currentPreset = ptFeaturePresetName(m_warmupQueue.front());
-    return status;
+    if (m_buildingPreset != PtFeaturePresetId::Count)
+    {
+        s.active = true;
+        s.currentPreset = ptFeaturePresetName(m_buildingPreset);
+    }
+    return s;
 }
 
 } // namespace caustica::render

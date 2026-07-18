@@ -1,16 +1,23 @@
 from __future__ import annotations
 
 """
-Official Caustica PT shader cook entry point (UE-style offline specialization).
+Official Caustica PT cook entry point (UE-style offline specialization).
 
-Pipeline:
-  1) DXC-precompile closed feature-preset matrix into ShaderDynamic/Bin
-  2) Verify every cooked bin exists
-  3) Package caustica.shaders.<api>.pack for load-only runtime
+Two layers (do not confuse them):
+
+  A) Shader libraries (this script, required for release):
+     DXC-precompile the closed feature-preset matrix → ShaderDynamic/Bin
+     → verify → package caustica.shaders.<api>.pack
+
+  B) DXR state objects (CreateStateObject):
+     Device-local, scene hit-group dependent. Not serialized as .bin files.
+     Runtime builds only the *active* preset on first use.
+     Optional GPU validation: --precache-rt-psos (headless CreateStateObject
+     for every preset on the cook machine).
 
 Usage:
   python support/python/cook_shaders.py --shader-api d3d12
-  python support/python/cook_shaders.py --shader-api both --force
+  python support/python/cook_shaders.py --shader-api d3d12 --precache-rt-psos
 """
 
 import argparse
@@ -28,8 +35,9 @@ from verify_pt_shader_bins import verify_apis
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Cook path-tracing shaders for load-only runtime: "
-            "coverage precompile + verify + shader pack."
+            "Cook path-tracing shader libraries for load-only runtime: "
+            "coverage precompile + verify + shader pack "
+            "(+ optional GPU RT PSO precache validation)."
         )
     )
     parser.add_argument(
@@ -64,6 +72,19 @@ def parse_args() -> argparse.Namespace:
         help="Skip writing caustica.shaders.<api>.pack.",
     )
     parser.add_argument(
+        "--precache-rt-psos",
+        action="store_true",
+        help=(
+            "After packing, headless-CreateStateObject every feature preset "
+            "(validates cooked bins link; does not persist PSOs to disk)."
+        ),
+    )
+    parser.add_argument(
+        "--precache-scene",
+        default="builtin:plane_cube",
+        help="Scene used when --precache-rt-psos is set.",
+    )
+    parser.add_argument(
         "--output-dir",
         type=Path,
         default=BIN_DIR,
@@ -81,26 +102,31 @@ def main() -> int:
             f"'{args.global_preset}'. Release builds should use 'coverage'."
         )
 
+    step = 1
+    total_steps = 3 + (1 if args.precache_rt_psos else 0)
+
     if not args.skip_precompile:
-        print(f"[caustica] Cook step 1/3: precompile ({args.global_preset})")
+        print(f"[caustica] Cook step {step}/{total_steps}: precompile libraries ({args.global_preset})")
         run_pt_shader_precompile(
             args.shader_api,
             force=args.force,
             global_preset=args.global_preset,
         )
     else:
-        print("[caustica] Cook step 1/3: precompile skipped")
+        print(f"[caustica] Cook step {step}/{total_steps}: precompile skipped")
+    step += 1
 
     if not args.skip_verify:
-        print(f"[caustica] Cook step 2/3: verify ({args.global_preset})")
+        print(f"[caustica] Cook step {step}/{total_steps}: verify libraries ({args.global_preset})")
         rc = verify_apis(args.shader_api, args.global_preset)
         if rc != 0:
             return rc
     else:
-        print("[caustica] Cook step 2/3: verify skipped")
+        print(f"[caustica] Cook step {step}/{total_steps}: verify skipped")
+    step += 1
 
     if not args.skip_pack:
-        print("[caustica] Cook step 3/3: package shader packs")
+        print(f"[caustica] Cook step {step}/{total_steps}: package shader packs")
         shader_types = (
             ["dxil"]
             if args.shader_api == "d3d12"
@@ -113,11 +139,29 @@ def main() -> int:
             pack_path = write_shader_pack(shader_type, "bin", args.output_dir)
             print(f"[caustica] wrote {pack_path}")
     else:
-        print("[caustica] Cook step 3/3: pack skipped")
+        print(f"[caustica] Cook step {step}/{total_steps}: pack skipped")
+    step += 1
+
+    if args.precache_rt_psos:
+        print(f"[caustica] Cook step {step}/{total_steps}: GPU precache RT PSOs")
+        from precache_rt_presets import precache
+
+        apis = (
+            ["d3d12"]
+            if args.shader_api == "d3d12"
+            else ["vulkan"]
+            if args.shader_api == "vulkan"
+            else ["d3d12", "vulkan"]
+        )
+        for api in apis:
+            rc = precache(shader_api=api, scene=args.precache_scene, frames_before=1)
+            if rc != 0:
+                return rc
 
     print("[caustica] Cook complete.")
-    print("  Runtime load-only expects caustica.shaders.<api>.pack next to the binary.")
-    print("  Dev without pack can still use ShaderDynamic/Bin + optional runtime DXC.")
+    print("  Layer A (libraries): load-only uses ShaderDynamic/Bin or caustica.shaders.<api>.pack")
+    print("  Layer B (RT PSOs): runtime CreateStateObject for active preset only;")
+    print("                     use Renderer.precache_rt_feature_presets() at load if desired.")
     return 0
 
 

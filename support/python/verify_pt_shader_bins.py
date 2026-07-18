@@ -10,18 +10,20 @@ from precompile_pt_shader_bins import (
     build_jobs,
     cache_paths,
     hash_hex,
+    runtime_bin_folder,
 )
 
 
-def verify(api: str, global_preset: str = "coverage") -> tuple[int, list[str]]:
+def verify(compile_api: str, global_preset: str = "coverage") -> tuple[int, list[str]]:
     missing: list[str] = []
     checked = 0
+    folder = runtime_bin_folder(compile_api)
     for job in build_jobs(global_preset):
-        digest = hash_hex(build_hash_command(job["logical"], job["macros"], api=api))
-        out_path, rel = cache_paths(api, digest)
+        digest = hash_hex(build_hash_command(job["logical"], job["macros"], api=compile_api))
+        out_path, rel = cache_paths(compile_api, digest)
         checked += 1
         if not out_path.exists():
-            missing.append(f"{job['label']}: ShaderDynamic/Bin/{api}/{rel}")
+            missing.append(f"{job['label']}: ShaderDynamic/Bin/{folder}/{rel}")
     return checked, missing
 
 
@@ -38,9 +40,10 @@ def verify_apis(shader_api: str, global_preset: str = "coverage") -> int:
     for api in apis:
         checked, missing = verify(api, global_preset)
         total_checked += checked
-        total_missing.extend(f"[{api}] {item}" for item in missing)
+        folder = runtime_bin_folder(api)
+        total_missing.extend(f"[{folder}] {item}" for item in missing)
         print(
-            f"[caustica] PT shader verify ({api}, preset={global_preset}): "
+            f"[caustica] PT shader verify ({folder}, preset={global_preset}): "
             f"checked={checked}, missing={len(missing)}"
         )
 

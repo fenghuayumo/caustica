@@ -3,10 +3,8 @@
 #include <render/core/PtPipelineFeaturePresets.h>
 
 #include <cstdint>
-#include <deque>
 #include <memory>
 #include <span>
-#include <string>
 #include <string_view>
 #include <vector>
 
@@ -16,27 +14,34 @@ class PTPipelineVariant;
 namespace caustica::render
 {
 
+// Diagnostics / HUD: how many cooked-preset RT PSO bundles are device-ready.
 struct RtPipelineWarmupStatus
 {
-    bool active = false;
+    bool active = false; // true while an explicit precache/build is in progress
     uint32_t completed = 0;
     uint32_t total = 0;
     std::string_view currentPreset = {};
 };
 
-// Interactive bind lookups + idle warmup counters (lifetime of the cache instance).
 struct RtPipelineCacheStats
 {
-    uint64_t hits = 0;          // ensure/bind found a ready PSO bundle
-    uint64_t misses = 0;        // interactive path had to CreateStateObject
-    uint64_t idleWarms = 0;     // presets built by tickIdleWarmup
-    uint64_t binds = 0;         // successful bind() calls
+    uint64_t hits = 0;    // ensure found a ready PSO bundle
+    uint64_t misses = 0;  // ensure had to CreateStateObject
+    uint64_t binds = 0;
+    uint64_t precached = 0;
     uint64_t lastLoggedTotal = 0;
 };
 
-// Prebuilt RT pipeline bundles keyed by cooked feature presets.
-// Startup: bind active preset immediately. Remaining presets warm on the render
-// thread with a per-frame budget (CreateStateObject is not freely multithreaded).
+// UE-style RT pipeline cache (two layers):
+//
+//  1) Offline cook (cook_shaders.py): DXC shader *libraries* for the closed
+//     feature-preset matrix → ShaderDynamic/Bin (+ optional .pack).
+//  2) Runtime: CreateStateObject is owned *only* by this cache, and only when a
+//     preset is actually needed (active bind) or explicitly precached at
+//     load/cook time. Interactive frames never background-warm other presets.
+//
+// Hot path: resolve preset → ensureReady(active) → bind. Switching to a cold
+// preset pays one CreateStateObject; that is the intended UE tradeoff.
 class RtPipelineCache
 {
 public:
@@ -51,11 +56,22 @@ public:
 
     void clear();
 
-    // Create variant objects for presets (no CreateStateObject yet).
+    // Create variant objects for a preset (loads cooked libraries later; no CreateStateObject).
     void ensurePresetVariants(PtFeaturePresetId id);
     void ensurePresets(std::span<const PtFeaturePresetId> ids);
 
-    // Point WorldRenderer active pipeline slots at a bundle (variants must exist).
+    // Sole CreateStateObject path for a preset's REF/BUILD/FILL bundle.
+    // No-op if already ready. Returns true when the bundle is ready afterward.
+    bool buildPreset(PtFeaturePresetId id, bool showProgress = false);
+
+    // buildPreset + isReady. Used by the interactive active-preset path.
+    bool ensureReady(PtFeaturePresetId id, bool showProgress = false);
+
+    // Explicit load-screen / offline-cook precache of the full matrix.
+    // Must run on the render thread after the compiler has a live hit-group set
+    // (typically after the first successful PT update). Returns ready count.
+    uint32_t precacheAll(bool showProgress = true);
+
     bool bind(
         PtFeaturePresetId id,
         std::shared_ptr<PTPipelineVariant>& outReference,
@@ -68,33 +84,19 @@ public:
     [[nodiscard]] Bundle* findBundle(PtFeaturePresetId id);
     [[nodiscard]] const Bundle* findBundle(PtFeaturePresetId id) const;
 
-    // Queue every preset except `exclude` for idle-time CreateStateObject.
-    void scheduleBackgroundWarmup(PtFeaturePresetId exclude);
-    // Ensure + build at most `maxPresets` pending entries. Call on render thread.
-    // Returns true if any work was done.
-    bool tickIdleWarmup(uint32_t maxPresets = 1);
-    void prioritizeWarmup(PtFeaturePresetId id);
-
-    [[nodiscard]] RtPipelineWarmupStatus warmupStatus() const;
+    [[nodiscard]] RtPipelineWarmupStatus status() const;
     [[nodiscard]] const RtPipelineCacheStats& stats() const { return m_stats; }
-    [[nodiscard]] bool isIdleWarmupEnabled() const { return m_idleWarmupEnabled; }
-    void setIdleWarmupEnabled(bool enabled) { m_idleWarmupEnabled = enabled; }
 
-    // Record an interactive lookup (ready PSO = hit, CreateStateObject = miss).
     void recordLookup(PtFeaturePresetId id, bool hit, std::string_view reason);
     void logStatsSummary(bool force = false);
 
 private:
     [[nodiscard]] static bool bundleReady(const Bundle& bundle);
-    void enqueueWarmup(PtFeaturePresetId id);
 
     std::shared_ptr<PathTracingShaderCompiler> m_compiler;
     std::vector<Bundle> m_bundles;
-    std::deque<PtFeaturePresetId> m_warmupQueue;
     PtFeaturePresetId m_activePreset = PtFeaturePresetId::Default;
-    PtFeaturePresetId m_warmingPreset = PtFeaturePresetId::Count;
-    uint32_t m_warmupTotal = 0;
-    bool m_idleWarmupEnabled = true;
+    PtFeaturePresetId m_buildingPreset = PtFeaturePresetId::Count;
     bool m_verboseLogs = false;
     RtPipelineCacheStats m_stats{};
 };

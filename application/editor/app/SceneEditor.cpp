@@ -76,7 +76,7 @@ SceneEditor::~SceneEditor()
 }
 
 
-ecs::Entity SceneEditor::pickGaussianSplatAtPixel(math::uint2 renderPixel) const
+ecs::Entity SceneEditor::pickGaussianSplatAtPixel(math::uint2 displayPixel) const
 {
     if (!m_app)
         return ecs::NullEntity;
@@ -88,13 +88,11 @@ ecs::Entity SceneEditor::pickGaussianSplatAtPixel(math::uint2 renderPixel) const
         return ecs::NullEntity;
 
     const uint2 disp = caustica::displaySize(*m_app);
-    const uint2 rend = caustica::renderSize(*m_app);
-    if (disp.x == 0 || disp.y == 0 || rend.x == 0 || rend.y == 0)
+    if (disp.x == 0 || disp.y == 0)
         return ecs::NullEntity;
 
-    const float2 mousePos = float2(
-        float(renderPixel.x) * float(disp.x) / float(rend.x),
-        float(renderPixel.y) * float(disp.y) / float(rend.y));
+    // Picking.Position is already display/window space (see EditorInputRouter).
+    const float2 mousePos = float2(float(displayPixel.x), float(displayPixel.y));
     const float2 displaySizeF = float2(float(disp.x), float(disp.y));
     const float4x4 viewProj = view->getViewProjectionMatrix();
 

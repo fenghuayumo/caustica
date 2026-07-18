@@ -239,6 +239,21 @@ public:
         return m_session && m_session->GetEngine() ? &m_session->GetEngine()->app() : nullptr;
     }
 
+    // Offline/load precache: CreateStateObject for every cooked feature preset.
+    // Call after at least one successful step() so hit groups exist.
+    uint32_t PrecacheRtFeaturePresets(bool showProgress = true)
+    {
+        App* app = GetApp();
+        auto* wr = app ? caustica::worldRenderer(*app) : nullptr;
+        if (!app || !wr)
+            return 0;
+        uint32_t ready = 0;
+        app->runGpuWorkOnRenderThread([wr, showProgress, &ready]() {
+            ready = wr->precacheAllRtFeaturePresets(showProgress);
+        });
+        return ready;
+    }
+
     bool isValid() const { return m_session && m_session->GetEngine() != nullptr; }
 
 private:
@@ -303,6 +318,12 @@ NB_MODULE(caustica, m)
         .def("step_n", &PyRenderer::StepN,
              nb::arg("frames"),
              "render N frames.")
+
+        .def("precache_rt_feature_presets", &PyRenderer::PrecacheRtFeaturePresets,
+             nb::arg("show_progress") = true,
+             "UE-style load/cook precache: CreateStateObject for every cooked PT feature\n"
+             "preset (REF/BUILD/FILL). Call after step()/step_n(1). Returns ready count.\n"
+             "Interactive runtime does not background-warm these on the frame loop.")
 
         .def("step_until_accumulated", &PyRenderer::StepUntilAccumulated,
              nb::arg("max_frames") = 0,

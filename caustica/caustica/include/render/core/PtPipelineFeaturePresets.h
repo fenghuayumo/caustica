@@ -11,9 +11,10 @@ struct PathTracerSettings;
 namespace caustica::render
 {
 
-// Closed feature-preset matrix cooked offline (see support/python/precompile_pt_shader_bins.py).
-// Includes curated multi-feature combos for common editor paths — not a full combinatorial grid.
-// Runtime snaps to the nearest cooked preset and binds prebuilt RT PSOs.
+// Closed feature-preset matrix. Offline cook (cook_shaders.py) produces shader *libraries*
+// for this matrix. Runtime snaps to the nearest cooked preset, loads those libraries, and
+// CreateStateObjects the active preset's REF/BUILD/FILL bundle on first use (UE-style).
+// Includes curated multi-feature combos — not a full combinatorial grid.
 enum class PtFeaturePresetId : uint32_t
 {
     Default = 0,

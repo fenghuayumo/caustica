@@ -306,12 +306,29 @@ def hash_hex(command: str) -> str:
     return hashlib.sha256(command.encode("utf-8")).hexdigest()
 
 
-def cache_paths(api: str, digest: str) -> tuple[Path, str]:
+# Compile API names (d3d12/vulkan) vs runtime bin folders (dxil/spirv).
+# Must match caustica::getShaderTypeName() / ShaderCompilerConfig::ShaderBinariesPath.
+RUNTIME_BIN_FOLDER = {
+    "d3d12": "dxil",
+    "vulkan": "spirv",
+}
+
+
+def runtime_bin_folder(compile_api: str) -> str:
+    try:
+        return RUNTIME_BIN_FOLDER[compile_api]
+    except KeyError as exc:
+        raise ValueError(f"Unsupported compile API '{compile_api}'") from exc
+
+
+def cache_paths(compile_api: str, digest: str) -> tuple[Path, str]:
     # Match ShaderKey::formatCacheFileNameNoExt: split the first two hex chars
     # into the directory and store only the remaining suffix as the file name.
+    # Folder must be the runtime type name (dxil/spirv), not the cook CLI name.
+    folder = runtime_bin_folder(compile_api)
     file_stem = digest[2:] if len(digest) >= 2 else digest
     rel = f"{digest[:2]}/{file_stem}.bin"
-    out_dir = BIN_DIR / "ShaderDynamic" / "Bin" / api / digest[:2]
+    out_dir = BIN_DIR / "ShaderDynamic" / "Bin" / folder / digest[:2]
     out_dir.mkdir(parents=True, exist_ok=True)
     return out_dir / f"{file_stem}.bin", rel
 
@@ -393,15 +410,18 @@ def build_jobs(global_preset: str) -> list[dict]:
     for global_macros in global_macro_presets(global_preset):
         for variant in PIPELINE_VARIANTS:
             pipeline_id = variant["pipeline_id"]
+            # Match PathTracingShaderCompiler: variant macros + baked globals.
+            # CAUSTICA_PIPELINE_PERMUTATION_NAME is raygen-only (not on hit materials).
             pipeline_macros = list(variant["macros"])
             pipeline_macros.extend(global_macros)
-            pipeline_macros.append(("CAUSTICA_PIPELINE_PERMUTATION_NAME", pipeline_id))
 
+            raygen_macros = list(pipeline_macros)
+            raygen_macros.append(("CAUSTICA_PIPELINE_PERMUTATION_NAME", pipeline_id))
             jobs.append(
                 {
                     "source": SHADER_ROOT / variant["source"],
                     "logical": variant["source"],
-                    "macros": list(pipeline_macros),
+                    "macros": raygen_macros,
                     "label": f"{pipeline_id}_raygen",
                 }
             )
@@ -460,10 +480,15 @@ def run_pt_shader_precompile(
     force: bool = False,
     global_preset: str = "coverage",
 ) -> None:
-    apis = ["dxil"] if shader_api == "d3d12" else ["spirv"] if shader_api == "vulkan" else ["dxil", "spirv"]
-    api_map = {"dxil": "d3d12", "spirv": "vulkan"}
-    for api_folder in apis:
-        precompile(api_map[api_folder], force, global_preset)
+    compile_apis = (
+        ["d3d12"]
+        if shader_api == "d3d12"
+        else ["vulkan"]
+        if shader_api == "vulkan"
+        else ["d3d12", "vulkan"]
+    )
+    for compile_api in compile_apis:
+        precompile(compile_api, force, global_preset)
 
 
 def parse_args() -> argparse.Namespace:

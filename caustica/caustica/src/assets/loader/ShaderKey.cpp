@@ -95,7 +95,12 @@ std::string ShaderKey::cacheFileNameNoExt() const
 
 std::filesystem::path ShaderKey::cacheFilePath(const std::filesystem::path& binariesRoot) const
 {
-    return binariesRoot / (cacheFileNameNoExt() + ".bin");
+    // Build real path components — do not embed '/' in a single filename segment
+    // (Windows path APIs are brittle with mixed separators from formatCacheFileNameNoExt).
+    const std::string hashHex = effectiveCacheHashHex();
+    if (hashHex.size() >= 2)
+        return binariesRoot / hashHex.substr(0, 2) / (hashHex.substr(2) + ".bin");
+    return binariesRoot / (hashHex + ".bin");
 }
 
 std::string ShaderKey::packVfsPath(std::string_view packRoot) const

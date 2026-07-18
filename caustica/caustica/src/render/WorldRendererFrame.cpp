@@ -470,21 +470,19 @@ void caustica::render::WorldRenderer::framePassShaderUpdate(PathTracingFrameCont
 
     if (m_rtPipelineCache)
     {
-        // Block only for the active preset (startup / first switch to a cold preset).
-        // No modal ProgressBar — remaining presets warm via tickIdleWarmup + HUD status.
-        m_context->scenePasses.rayTracing.ensureFeaturePresetReady(
-            desiredPreset,
-            /*showProgress=*/false);
+        // After update() has primed hit-group exports: bind cooked preset.
+        // CreateStateObject only on cold miss / switch (never during createRTPipelines).
+        // No per-frame background warmup — that belongs in cook/load precacheAll.
+        if (m_pathTracingShaderCompiler->hasUniqueHitGroups()
+            && (m_rtPipelineCache->activePreset() != desiredPreset
+                || !m_rtPipelineCache->isReady(desiredPreset)))
+        {
+            m_context->scenePasses.rayTracing.ensureFeaturePresetReady(
+                desiredPreset,
+                /*showProgress=*/false);
+        }
 
-        const auto warmStatus = m_rtPipelineCache->warmupStatus();
-        if (!warmStatus.active && warmStatus.completed < warmStatus.total)
-            m_rtPipelineCache->scheduleBackgroundWarmup(desiredPreset);
-
-        // One preset per frame after the active path is ready.
-        if (m_rtPipelineCache->isReady(desiredPreset))
-            m_rtPipelineCache->tickIdleWarmup(1);
-
-        m_context->diagnostics.rtPipelineWarmup = m_rtPipelineCache->warmupStatus();
+        m_context->diagnostics.rtPipelineWarmup = m_rtPipelineCache->status();
         m_context->diagnostics.rtPipelineCacheStats = m_rtPipelineCache->stats();
     }
 
@@ -709,8 +707,29 @@ void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext
     const bool pickActive = m_context->activeRuntime().Picking.hasActivePickRequest()
         || m_context->activeSettings().ContinuousDebugFeedback;
     constants.debug.pick = pickActive;
-    constants.debug.pickX = pickActive ? (m_context->activeSettings().DebugPixel.x) : (-1);
-    constants.debug.pickY = pickActive ? (m_context->activeSettings().DebugPixel.y) : (-1);
+
+    // DebugPixel / MousePos are display/window pixels from the host. Convert to
+    // this frame's path-trace space only here — after DLSS has settled m_renderSize.
+    // Input must not pre-scale with live getRenderSize() (render thread resets it
+    // to framebuffer size at the start of every render()).
+    auto displayToRenderPixel = [this](dm::uint2 displayPixel) -> dm::int2 {
+        if (m_displaySize.x == 0 || m_displaySize.y == 0
+            || m_renderSize.x == 0 || m_renderSize.y == 0)
+            return { -1, -1 };
+        const int x = int(displayPixel.x * m_renderSize.x / m_displaySize.x);
+        const int y = int(displayPixel.y * m_renderSize.y / m_displaySize.y);
+        if (x < 0 || y < 0 || x >= int(m_renderSize.x) || y >= int(m_renderSize.y))
+            return { -1, -1 };
+        return { x, y };
+    };
+
+    const dm::int2 pickPixel = pickActive
+        ? displayToRenderPixel(m_context->activeSettings().DebugPixel)
+        : dm::int2{ -1, -1 };
+    const dm::int2 mousePixel = displayToRenderPixel(m_context->activeSettings().MousePos);
+
+    constants.debug.pickX = pickPixel.x;
+    constants.debug.pickY = pickPixel.y;
     constants.debug.debugLineScale = (m_context->activeSettings().ShowDebugLines) ? (m_context->activeSettings().DebugLineScale) : (0.0f);
     constants.debug.showWireframe = m_context->activeSettings().ShowWireframe;
     constants.debug.debugViewType = (int)m_context->activeSettings().DebugView;
@@ -722,8 +741,8 @@ void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext
 #endif
     constants.debug.imageWidth = constants.ptConsts.imageWidth;
     constants.debug.imageHeight = constants.ptConsts.imageHeight;
-    constants.debug.mouseX = m_context->activeSettings().MousePos.x;
-    constants.debug.mouseY = m_context->activeSettings().MousePos.y;
+    constants.debug.mouseX = mousePixel.x;
+    constants.debug.mouseY = mousePixel.y;
     constants.debug.cameraPosW = constants.ptConsts.camera.PosW;
     constants.debug._padding0 = 0;
 

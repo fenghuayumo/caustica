@@ -276,11 +276,17 @@ python -m pip install dist/caustica-*.whl
 
 ### Official shader cook (required for release / load-only)
 
-Path-tracing feature toggles use a closed offline specialization matrix (`coverage`): single-axis presets plus a small set of **curated multi-feature combos** (e.g. `ReSTIR_DI_OMM`, `ReSTIR_DI_OMM_BakedEnv`). This is not a full cartesian product. Runtime picks the nearest cooked preset by weighted macro distance, then binds a prebuilt RT pipeline — it must not DXC or `CreateStateObject` on UI changes.
+UE-style two-layer model:
+
+1. **Offline cook (shader libraries)** — closed feature-preset matrix (`coverage`: single-axis + curated combos like `ReSTIR_DI_OMM`). DXC writes `ShaderDynamic/Bin/{dxil|spirv}/` and optionally `caustica.shaders.<api>.pack`. Runtime must **not DXC** on UI toggles.
+2. **Runtime RT PSOs** — `CreateStateObject` is device-local and hit-group dependent; it is **not** a `.bin` cook artifact. The app CreateStateObjects only the **active** preset on first use / switch, then binds. Interactive frames never background-warm the other ~25 presets.
 
 ```
-# One-shot official cook: coverage precompile + verify + shader pack
+# Official library cook: coverage precompile + verify + shader pack
 python support/python/cook_shaders.py --shader-api d3d12
+
+# Optional: GPU-validate CreateStateObject for every preset on the cook machine
+python support/python/cook_shaders.py --shader-api d3d12 --precache-rt-psos
 
 # Or via CMake targets (writes under bin/)
 cmake --build build --target causticaPathTracerShaders   # cook + verify bins
@@ -289,18 +295,18 @@ cmake --build build --target causticaShaderPack          # package .pack from bi
 
 Distribution builds (`-DCAUSTICA_DISTRIBUTION_BUILD=ON`) default to packaging the shader pack (`CAUSTICA_PACKAGE_SHADER_PACK=ON`). Place `caustica.shaders.<api>.pack` next to the executable.
 
-If a cooked bin is missing at runtime (load-only), the error points back to:
+If a cooked library bin is missing at runtime (load-only):
 
 ```
 python support/python/cook_shaders.py --global-preset coverage
 ```
 
-### Runtime RT pipeline warmup
+Load-time precache (optional, not the frame loop):
 
-After cook, the app binds the **active feature preset first** so rendering can start immediately. Remaining presets are warmed on the render thread at **one preset per frame** (CreateStateObject is not freely offloaded). A non-modal HUD shows `Warming RT pipelines x/y (...)`.
-
-- Disable idle warmup: `CAUSTICA_DISABLE_RT_IDLE_WARMUP=1`
-- Switching to a cold preset prioritizes that preset, then continues background warmup
+```
+renderer.step_n(1)
+renderer.precache_rt_feature_presets()
+```
 
 ## Building Vulkan
 

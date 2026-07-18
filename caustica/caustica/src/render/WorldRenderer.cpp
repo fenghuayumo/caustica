@@ -456,6 +456,13 @@ void caustica::render::WorldRenderer::resetFrameIndex()
     m_frameIndex = 0;
 }
 
+uint32_t caustica::render::WorldRenderer::precacheAllRtFeaturePresets(bool showProgress)
+{
+    if (!m_rtPipelineCache)
+        return 0;
+    return m_rtPipelineCache->precacheAll(showProgress);
+}
+
 void caustica::render::WorldRenderer::onSceneLoaded(
     std::shared_ptr<Scene> scene,
     std::filesystem::path scenePath)

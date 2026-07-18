@@ -18,6 +18,7 @@
 #include <core/path_utils.h>
 #include <core/progress.h>
 #include <core/system_utils.h>
+#include <core/vfs/VFS.h>
 
 #include <atomic>
 #include <cstdio>
@@ -106,6 +107,12 @@ void PTPipelineVariant::ShaderPermutation::loadShaderLibraryIfNeeded(PathTracing
         return;
 
     std::shared_ptr<caustica::IBlob> data = compiler.getFs()->readFile(packVfsPath.c_str());
+    if (!data && !compiledFullPath.empty())
+    {
+        // Fallback when VFS mount misses a bin that already exists on disk.
+        caustica::NativeFileSystem nativeFs;
+        data = nativeFs.readFile(compiledFullPath);
+    }
 
     if (data)
         shaderLibrary = compiler.getDevice()->createShaderLibrary(data->data(), data->size());
@@ -148,7 +155,12 @@ void PTPipelineVariant::ShaderPermutation::resolveCacheIdentity(
     compiledFullPath = cacheKey.cacheFilePath(compiler.getShaderBinariesPath()).string();
     packVfsPath = cacheKey.packVfsPath(c_PTShaderPackMount);
 
-    const bool compiledBlobAvailable = compiler.getFs()->fileExists(packVfsPath);
+    // Prefer VFS (pack or mounted Bin/), but also accept a native disk hit.
+    // Load-only errors previously keyed only on VFS, which can miss after cook
+    // while the absolute path already exists beside the executable.
+    const bool compiledBlobAvailable = compiler.getFs()->fileExists(packVfsPath)
+        || (std::filesystem::exists(compiledFullPath)
+            && std::filesystem::is_regular_file(compiledFullPath));
     const bool diskBlobUpToDate = ShaderCompilerUtils::isCompiledShaderUpToDate(
         compiledFullPath,
         lastModifiedSourceCode);
@@ -181,7 +193,12 @@ void PTPipelineVariant::ShaderPermutation::resolveCacheIdentity(
         }
         if (!macroList.empty())
             usCompileError += stringFormat(" Macros: [%s]", macroList.c_str());
-        caustica::error("%s", usCompileError.c_str());
+        // One modal for the first miss; further misses stay in the log only.
+        static std::atomic<bool> s_reportedLoadOnlyMiss{false};
+        if (!s_reportedLoadOnlyMiss.exchange(true))
+            caustica::error("%s", usCompileError.c_str());
+        else
+            caustica::warning("%s", usCompileError.c_str());
         return;
     }
 
@@ -753,15 +770,9 @@ void PathTracingShaderCompiler::update(const caustica::scene::SceneRenderData* s
                 "(avoid CreateStateObject hang). Use shader reload to apply macros.");
             m_macros = newMacros;
         }
-        if (missingPipelines)
-        {
-            // UE-style cache: late presets may be ensured after the default bundle is live.
-            // Build only null-pipeline variants — never resetPipeline() on existing PSOs.
-            caustica::info(
-                "PathTracingShaderCompiler: building missing RT pipeline variants without "
-                "resetting live PSOs");
-            buildMissingPipelines(/*showProgress=*/false);
-        }
+        // Do NOT buildMissingPipelines here. RtPipelineCache owns CreateStateObject for
+        // late presets (ensureFeaturePresetReady / optional idle warmup). Retrying every
+        // frame for null cache variants stalls the render thread to <1 FPS.
 
         if (countChanged || uniqueEmpty || materialStateChanged || resourceBindingsChanged)
         {

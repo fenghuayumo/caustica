@@ -126,7 +126,7 @@ public:
 
     bool showDeltaTree() const;
     void resolvePickFeedback(const DebugFeedbackStruct& feedback, const caustica::render::RenderPickState& renderedPick);
-    [[nodiscard]] ecs::Entity pickGaussianSplatAtPixel(math::uint2 renderPixel) const;
+    [[nodiscard]] ecs::Entity pickGaussianSplatAtPixel(math::uint2 displayPixel) const;
     bool consumeExperimentalPhotoScreenshot();
 
     void onEvent(caustica::Event& event);

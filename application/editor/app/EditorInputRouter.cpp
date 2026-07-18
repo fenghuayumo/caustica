@@ -58,14 +58,12 @@ void syncPickPositionFromCursor(SceneEditor& sceneEditor)
     double cursorY = 0.0;
     glfwGetCursorPos(window, &cursorX, &cursorY);
 
-    dm::float2 upscalingScale(1.0f, 1.0f);
-    if (auto* worldRenderer = caustica::editor::editorWorldRenderer(sceneEditor); worldRenderer && worldRenderer->getRenderTargets())
-        upscalingScale = dm::float2(worldRenderer->getRenderSize())
-            / dm::float2(worldRenderer->getDisplaySize());
-
+    // Keep display/window space here. Path-trace pick pixels are derived later
+    // from this frame's settled renderSize (after DLSS), not from a live
+    // WorldRenderer::getRenderSize() that the render thread mutates mid-frame.
     session.runtime.Picking.Position = dm::uint2{
-        static_cast<uint>(cursorX * upscalingScale.x),
-        static_cast<uint>(cursorY * upscalingScale.y)};
+        static_cast<uint>(cursorX),
+        static_cast<uint>(cursorY)};
     session.settings.MousePos = session.runtime.Picking.Position;
     session.settings.DebugPixel = session.runtime.Picking.Position;
 }
@@ -166,7 +164,6 @@ bool onMouseMoved(SceneEditor& sceneEditor, caustica::MouseMovedEvent& e)
         return true;
 
     auto* game = sceneEditor.game().get();
-    auto* worldRenderer = caustica::editor::editorWorldRenderer(sceneEditor);
     auto& session = sceneEditor.renderAppState();
 
     if (!(game && game->CameraActive()))
@@ -174,14 +171,10 @@ bool onMouseMoved(SceneEditor& sceneEditor, caustica::MouseMovedEvent& e)
     if (game)
         game->mousePosUpdate(e.getX(), e.getY());
 
-    dm::float2 upscalingScale(1.0f, 1.0f);
-    if (worldRenderer && worldRenderer->getRenderTargets())
-        upscalingScale = dm::float2(worldRenderer->getRenderSize())
-            / dm::float2(worldRenderer->getDisplaySize());
-
+    // Display/window space — see syncPickPositionFromCursor.
     session.runtime.Picking.Position = dm::uint2{
-        static_cast<uint>(e.getX() * upscalingScale.x),
-        static_cast<uint>(e.getY() * upscalingScale.y)};
+        static_cast<uint>(e.getX()),
+        static_cast<uint>(e.getY())};
     session.settings.MousePos = session.runtime.Picking.Position;
 
     auto* zoomTool = sceneEditor.zoomTool().get();

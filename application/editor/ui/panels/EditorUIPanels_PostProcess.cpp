@@ -250,6 +250,7 @@ void EditorUI::BuildDebuggingPanel(const PanelLayout& layout)
             }
 
             const DebugFeedbackStruct& feedback = caustica::feedbackData(*m_sceneEditor.app());
+            // Display/window pixels; WorldRenderer maps to renderSize after DLSS.
             if (ImGui::InputInt2("Debug pixel", (int*)&m_settings.DebugPixel.x))
                 m_sceneEditor.renderRuntimeState().Picking.requestMaterialPick();
 
