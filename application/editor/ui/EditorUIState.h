@@ -29,6 +29,8 @@ struct EditorViewportState
     bool ShowStatusBar = true;
     // Set by menu / first-run; consumed once by BuildDockSpace().
     bool RequestResetDockLayout = false;
+    // Hierarchy panel name filter (case-insensitive substring).
+    char HierarchyFilter[128] = {};
 
     // Content-region screen rect (ImGui coordinates) filled by BuildViewportPanel.
     float PosX = 0.f;

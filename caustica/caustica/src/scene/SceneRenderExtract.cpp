@@ -121,6 +121,7 @@ void FillMeshInstanceProxy(
         : -1;
     proxy.meshType = mesh ? mesh->type : MeshType::Triangles;
     proxy.hasSkinPrototype = mesh && mesh->skinPrototype != nullptr;
+    proxy.enabled = ref.meshComp->enabled;
     proxy.transformFloat = ref.global->transformFloat;
     proxy.previousTransformFloat = ref.global->previousTransformFloat;
     proxy.globalBounds = ref.bounds->globalBounds;
@@ -607,6 +608,12 @@ void extractSceneRenderData(
     ExtractCameras(entityWorld, world, inout);
     // Gaussian splats are few; refresh transforms and enabled state every frame.
     ExtractGaussianSplats(world, inout);
+    // Mesh visibility can toggle without a transform/structure dirty bit.
+    for (MeshInstanceRenderProxy& proxy : inout.meshInstances)
+    {
+        if (const auto* meshComp = world.tryGet<MeshInstanceComponent>(proxy.entity))
+            proxy.enabled = meshComp->enabled;
+    }
     // Material authoring data is copied on the logic thread; render never reads it live.
     ExtractMaterialSnapshots(entityWorld, inout);
 }

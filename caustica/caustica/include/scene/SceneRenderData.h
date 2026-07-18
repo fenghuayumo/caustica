@@ -51,6 +51,7 @@ namespace caustica::scene
         uint32_t geometryCount = 0;
         MeshType meshType = MeshType::Triangles;
         bool hasSkinPrototype = false;
+        bool enabled = true;
         dm::affine3 transformFloat = dm::affine3::identity();
         dm::affine3 previousTransformFloat = dm::affine3::identity();
         dm::box3 globalBounds = dm::box3::empty();

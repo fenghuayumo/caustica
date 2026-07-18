@@ -116,6 +116,29 @@ void ImGuiManager::loadDefaultFont(caustica::ImGui_Renderer& renderer,
 
     if (font)
         renderer.setDefaultFont(font);
+
+#if defined(_WIN32)
+    // Merge Fluent / MDL2 icons into the default face so editor chrome can use
+    // professional system glyphs (eye, lock, refresh, folder, …).
+    static const ImWchar kEditorIconRanges[] = {
+        0xE721, 0xE721, // Search
+        0xE72C, 0xE72E, // Refresh … Lock
+        0xE785, 0xE785, // Unlock
+        0xE7B3, 0xE7B3, // RedEye
+        0xED1A, 0xED1A, // Hide
+        0,
+    };
+    const char* windirIcons = std::getenv("WINDIR");
+    const std::filesystem::path iconsDir =
+        windirIcons ? (std::filesystem::path(windirIcons) / "Fonts")
+                    : std::filesystem::path("C:/Windows/Fonts");
+    std::shared_ptr<RegisteredFont> icons =
+        TryLoadFont(renderer, *nativeFS, iconsDir / "SegoeIcons.ttf", kUiFontSize);
+    if (!icons)
+        icons = TryLoadFont(renderer, *nativeFS, iconsDir / "segmdl2.ttf", kUiFontSize);
+    if (icons)
+        icons->configureMerge(kEditorIconRanges);
+#endif
 }
 
 void ImGuiManager::applyTheme(float displayScale)

@@ -479,12 +479,18 @@ void EditorUI::BuildHierarchyPanel(const PanelLayout& layout)
         if (scene && ew && ew->root() != ecs::NullEntity)
         {
             bool deleteSelectedEntity = false;
-            ImGui::Text("Objects: %zu mesh, %u 3DGS", scene->getMeshInstances().size(), m_runtime.GaussianSplats.ObjectCount);
-            ImGui::Separator();
+
+            ImGui::SetNextItemWidth(-1.f);
+            ImGui::InputTextWithHint(
+                "##HierarchySearch",
+                "Search entities...",
+                m_editorUI.Viewport.HierarchyFilter,
+                IM_ARRAYSIZE(m_editorUI.Viewport.HierarchyFilter));
+            ImGui::Spacing();
 
             if (ImGui::TreeNodeEx("Scene", ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_SpanAvailWidth))
             {
-                BuildHierarchyNodeUI(m_ui, *scene, ew->root());
+                BuildHierarchyNodeUI(m_ui, *scene, ew->root(), m_editorUI.Viewport.HierarchyFilter);
                 ImGui::TreePop();
             }
 

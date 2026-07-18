@@ -41,35 +41,66 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
 
     auto* ew = caustica::entityWorld(*m_sceneEditor.app());
     ImGui::Begin("Inspector", &m_editorUI.ShowInspector);
-    ImGui::PushItemWidth(layout.defItemWidth);
+    (void)layout;
 
     if (!ew || m_editorUI.SelectedEntity == ecs::NullEntity)
     {
         ImGui::TextDisabled("No selection");
-        ImGui::PopItemWidth();
         ImGui::End();
         return;
     }
 
     const ecs::Entity entity = m_editorUI.SelectedEntity;
     std::string entityName = ew->getEntityName(entity);
-    ImGui::Text("Node: %s", entityName.c_str());
+    if (entityName.empty())
+        entityName = "<unnamed>";
 
     auto* meshComp = ew->world().tryGet<caustica::scene::MeshInstanceComponent>(entity);
-    if (meshComp && meshComp->mesh)
-        ImGui::Text("Mesh: %s", meshComp->mesh->name.c_str());
     auto* splatComp = ew->world().tryGet<caustica::scene::GaussianSplatComponent>(entity);
     caustica::GaussianSplat* gaussianSplat = splatComp ? &splatComp->splat : nullptr;
-    if (gaussianSplat)
+
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8.f, 6.f));
+
+    ImGui::TextUnformatted(entityName.c_str());
+    ImGui::PushStyleColor(ImGuiCol_Text, GetEditorColors().TextMuted);
+    if (meshComp && meshComp->mesh)
+        ImGui::Text("Mesh · %s", meshComp->mesh->name.c_str());
+    else if (gaussianSplat)
+        ImGui::Text("3DGS · %u splats", gaussianSplat->loadedSplatCount);
+    else
+        ImGui::TextUnformatted("Group");
+    ImGui::PopStyleColor();
+
+    if (meshComp || gaussianSplat)
     {
-        ImGui::Text("Type: 3D Gaussian Splats");
-        ImGui::Text("Splats: %u", gaussianSplat->loadedSplatCount);
-        const std::string source = gaussianSplat->resolvedPath.empty() ? gaussianSplat->path : gaussianSplat->resolvedPath;
-        ImGui::TextWrapped("Source: %s", source.c_str());
+        bool visible = meshComp ? meshComp->enabled : gaussianSplat->enabled;
+        if (InspectorCheckbox("Visible", &visible))
+        {
+            if (meshComp)
+                meshComp->enabled = visible;
+            if (gaussianSplat)
+            {
+                gaussianSplat->enabled = visible;
+                m_runtime.Invalidation.AccelerationStructRebuildRequested = true;
+            }
+            m_settings.ResetAccumulation = true;
+        }
     }
 
+    ImGui::Spacing();
     ImGui::Separator();
+    ImGui::Spacing();
 
+    // Section header with accent marker (DCC-style Transform block).
+    {
+        const ImVec2 hp = ImGui::GetCursorScreenPos();
+        const float hh = ImGui::GetFrameHeight();
+        ImGui::GetWindowDrawList()->AddCircleFilled(
+            ImVec2(hp.x + 6.f, hp.y + hh * 0.5f),
+            4.5f,
+            ImGui::ColorConvertFloat4ToU32(GetEditorColors().Accent));
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 16.f);
+    }
     if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen))
     {
         auto* ltc = ew->world().tryGet<caustica::scene::LocalTransformComponent>(entity);
@@ -77,8 +108,13 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
         dm::dquat rotation = ltc ? ltc->rotation : dm::dquat::identity();
         dm::double3 scaling = ltc ? ltc->scaling : dm::double3(1.0);
 
+        static bool lockPos = false;
+        static bool lockRot = false;
+        static bool lockScl = false;
+
         float pos[3] = { float(translation.x), float(translation.y), float(translation.z) };
-        if (ImGui::DragFloat3("Position", pos, 0.01f))
+        constexpr float kResetPos[3] = { 0.f, 0.f, 0.f };
+        if (TransformVec3Row("pos", "Position", pos, 0.01f, 0.f, 0.f, "%.3f", kResetPos, &lockPos, false))
         {
             ew->setTranslation(entity, dm::double3(pos[0], pos[1], pos[2]));
             ew->refreshHierarchy(caustica::scene::PreviousTransformPolicy::PreserveExisting);
@@ -101,11 +137,9 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
             m_editorUI.InspectorRotationEulerDeg.y,
             m_editorUI.InspectorRotationEulerDeg.z
         };
-        if (ImGui::DragFloat3("Rotation (deg)", euler, 0.5f, 0.0f, 360.0f, "%.1f"))
+        constexpr float kResetRot[3] = { 0.f, 0.f, 0.f };
+        if (TransformVec3Row("rot", "Rotation", euler, 0.5f, 0.f, 0.f, "%.2f", kResetRot, &lockRot, false))
         {
-            euler[0] = dm::clamp(euler[0], 0.0f, 360.0f);
-            euler[1] = dm::clamp(euler[1], 0.0f, 360.0f);
-            euler[2] = dm::clamp(euler[2], 0.0f, 360.0f);
             m_editorUI.InspectorRotationEulerDeg = dm::float3(euler[0], euler[1], euler[2]);
             const dm::dquat newRotation = dm::rotationQuat(dm::double3(euler[0] * deg2rad, euler[1] * deg2rad, euler[2] * deg2rad));
             m_editorUI.InspectorRotationQuat = newRotation;
@@ -115,7 +149,8 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
         }
 
         float scl[3] = { float(scaling.x), float(scaling.y), float(scaling.z) };
-        if (ImGui::DragFloat3("Scale", scl, 0.01f, 0.001f, 1000.0f))
+        constexpr float kResetScl[3] = { 1.f, 1.f, 1.f };
+        if (TransformVec3Row("scl", "Scale", scl, 0.01f, 0.001f, 1000.0f, "%.3f", kResetScl, &lockScl, true))
         {
             ew->setScaling(entity, dm::double3(scl[0], scl[1], scl[2]));
             ew->refreshHierarchy(caustica::scene::PreviousTransformPolicy::PreserveExisting);
@@ -125,40 +160,52 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
 
     if (gaussianSplat)
     {
+        ImGui::Spacing();
         if (ImGui::CollapsingHeader("3D Gaussian Splats", ImGuiTreeNodeFlags_DefaultOpen))
         {
-            if (ImGui::Checkbox("enabled", &gaussianSplat->enabled))
-            {
-                m_runtime.Invalidation.AccelerationStructRebuildRequested = true;
-                m_settings.ResetAccumulation = true;
-            }
-            if (ImGui::DragFloat("Footprint Scale", &m_settings.GaussianSplatScale, 0.01f, 0.01f, 10.0f, "%.2f"))
+            ImGui::Spacing();
+            if (InspectorDragFloat("Footprint Scale", &m_settings.GaussianSplatScale, 0.01f, 0.01f, 10.0f, "%.2f"))
             {
                 if (ResolveGaussianSplatShadowMode(m_ui) != GAUSSIAN_SPLAT_SHADOWS_DISABLED)
                     m_runtime.Invalidation.AccelerationStructRebuildRequested = true;
                 m_settings.ResetAccumulation = true;
             }
-            RESET_ON_CHANGE(ImGui::DragFloat("Alpha", &m_settings.GaussianSplatAlphaScale, 0.01f, 0.0f, 4.0f, "%.2f"));
-            RESET_ON_CHANGE(ImGui::DragFloat("Brightness", &m_settings.GaussianSplatBrightness, 0.01f, 0.0f, 16.0f, "%.2f"));
-            RESET_ON_CHANGE(ImGui::InputFloat3("Tint Color", (float*)&m_settings.GaussianSplatTintColor.x));
+            RESET_ON_CHANGE(InspectorDragFloat("Alpha", &m_settings.GaussianSplatAlphaScale, 0.01f, 0.0f, 4.0f, "%.2f"));
+            RESET_ON_CHANGE(InspectorDragFloat("Brightness", &m_settings.GaussianSplatBrightness, 0.01f, 0.0f, 16.0f, "%.2f"));
+            RESET_ON_CHANGE(InspectorColorEdit3("Tint Color", &m_settings.GaussianSplatTintColor.x));
 
-            RESET_ON_CHANGE(ImGui::Checkbox("As Emitter", &m_settings.GaussianSplatAsEmitter));
+            ImGui::Spacing();
+            ImGui::Separator();
+            ImGui::Spacing();
+
+            RESET_ON_CHANGE(InspectorCheckbox("As Emitter", &m_settings.GaussianSplatAsEmitter));
             ImGui::BeginDisabled(!m_settings.GaussianSplatAsEmitter);
-            RESET_ON_CHANGE(ImGui::DragFloat("Emission Intensity", &m_settings.GaussianSplatEmissionIntensity, 0.01f, 0.0f, 100.0f, "%.2f"));
-            if (ImGui::InputInt("Emission Proxy Limit", &m_settings.GaussianSplatEmissionMaxProxyCount, 256, 4096))
+            RESET_ON_CHANGE(InspectorDragFloat(
+                "Emission Intensity", &m_settings.GaussianSplatEmissionIntensity, 0.01f, 0.0f, 100.0f, "%.2f"));
+            if (InspectorDragInt(
+                    "Proxy Limit", &m_settings.GaussianSplatEmissionMaxProxyCount, 256.f, 0, 262144))
             {
-                m_settings.GaussianSplatEmissionMaxProxyCount = dm::clamp(m_settings.GaussianSplatEmissionMaxProxyCount, 0, 262144);
+                m_settings.GaussianSplatEmissionMaxProxyCount =
+                    dm::clamp(m_settings.GaussianSplatEmissionMaxProxyCount, 0, 262144);
                 m_settings.ResetAccumulation = true;
             }
             ImGui::EndDisabled();
 
-            RESET_ON_CHANGE(ImGui::DragFloat("Alpha Cull", &m_settings.GaussianSplatAlphaCullThreshold, 0.001f, 0.0f, 0.25f, "%.3f"));
+            ImGui::Spacing();
+            ImGui::Separator();
+            ImGui::Spacing();
+
+            RESET_ON_CHANGE(InspectorDragFloat(
+                "Alpha Cull", &m_settings.GaussianSplatAlphaCullThreshold, 0.001f, 0.0f, 0.25f, "%.3f"));
             if (ResolveGaussianSplatShadowMode(m_ui) != GAUSSIAN_SPLAT_SHADOWS_DISABLED)
-                RESET_ON_CHANGE(ImGui::DragFloat("Shadow Strength", &m_settings.GaussianSplatShadowStrength, 0.01f, 0.0f, 1.0f, "%.2f"));
+            {
+                RESET_ON_CHANGE(InspectorDragFloat(
+                    "Shadow Strength", &m_settings.GaussianSplatShadowStrength, 0.01f, 0.0f, 1.0f, "%.2f"));
+            }
         }
     }
 
-    ImGui::PopItemWidth();
+    ImGui::PopStyleVar();
     ImGui::End();
 }
 

@@ -397,6 +397,16 @@ void AccelStructManager::buildTlas(nvrhi::ICommandList*            commandList,
         }
 
         const uint32_t meshSubInstanceCount = (uint32_t)mesh->geometries.size();
+        // Hierarchy-hidden instances keep their slot but contribute no hits.
+        if (!proxy.enabled)
+        {
+            instanceDesc.bottomLevelAS = nullptr;
+            instanceDesc.instanceMask = 0;
+            subInstanceCount += meshSubInstanceCount;
+            instances.push_back(instanceDesc);
+            continue;
+        }
+
         const auto meshGpuIt = m_sceneGpuResources
             ? m_sceneGpuResources->meshRegistry.find(proxy.meshId)
             : decltype(m_sceneGpuResources->meshRegistry.find(proxy.meshId)){};

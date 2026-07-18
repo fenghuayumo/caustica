@@ -1,6 +1,7 @@
 #include "ui/EditorUIInternal.h"
 
 #include "SceneEditor.h"
+#include "common/EditorIcons.h"
 #include "common/ImGuiManager.h"
 
 #include <render/core/PathTracerSettings.h>
@@ -21,9 +22,12 @@
 #include <render/passes/debug/ZoomTool.h>
 #include <common/CaptureScriptManager.h>
 
+#include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <filesystem>
+#include <string>
 
 using namespace caustica;
 using namespace caustica::editor;
@@ -185,72 +189,175 @@ int ResolveGaussianSplatShadowMode(const EditorUIData& ui)
         return changed;
     }
 
-void BuildHierarchyNodeUI(EditorUIData& ui, caustica::Scene& scene, ecs::Entity entity)
+namespace
+{
+
+bool NameMatchesFilter(const std::string& name, const char* filter)
+{
+    if (!filter || filter[0] == '\0')
+        return true;
+    if (name.empty())
+        return false;
+    std::string hay = name;
+    std::string needle = filter;
+    for (char& c : hay)
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    for (char& c : needle)
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    return hay.find(needle) != std::string::npos;
+}
+
+bool HierarchyNodePassesFilter(
+    caustica::scene::SceneEntityWorld& ew,
+    ecs::Entity entity,
+    const char* filter)
+{
+    if (!filter || filter[0] == '\0')
+        return HasHierarchyEntity(ew, entity);
+    if (!HasHierarchyEntity(ew, entity))
+        return false;
+
+    std::string nodeName = ew.getEntityName(entity);
+    if (NameMatchesFilter(nodeName, filter))
+        return true;
+    for (ecs::Entity child : ew.getEntityChildren(entity))
     {
-        auto* ew = scene.getEntityWorld();
-        if (!ew || entity == ecs::NullEntity) return;
-        if (!HasHierarchyEntity(*ew, entity)) return;
+        if (HierarchyNodePassesFilter(ew, child, filter))
+            return true;
+    }
+    return false;
+}
 
-        const bool isMeshEntity = IsMeshInstanceEntity(*ew, entity);
-        const bool isGaussianSplatEntity = IsGaussianSplatEntity(*ew, entity);
-        const auto& children = ew->getEntityChildren(entity);
+bool GetEntityEnabled(caustica::scene::SceneEntityWorld& ew, ecs::Entity entity)
+{
+    if (auto* mesh = ew.world().tryGet<caustica::scene::MeshInstanceComponent>(entity))
+        return mesh->enabled;
+    if (auto* splat = ew.world().tryGet<caustica::scene::GaussianSplatComponent>(entity))
+        return splat->splat.enabled;
+    return true;
+}
 
-        bool hasVisibleChildren = false;
-        for (ecs::Entity child : children)
+void SetEntityEnabled(caustica::scene::SceneEntityWorld& ew, ecs::Entity entity, bool enabled)
+{
+    if (auto* mesh = ew.world().tryGet<caustica::scene::MeshInstanceComponent>(entity))
+        mesh->enabled = enabled;
+    if (auto* splat = ew.world().tryGet<caustica::scene::GaussianSplatComponent>(entity))
+        splat->splat.enabled = enabled;
+}
+
+} // namespace
+
+void BuildHierarchyNodeUI(EditorUIData& ui, caustica::Scene& scene, ecs::Entity entity, const char* filter)
+{
+    auto* ew = scene.getEntityWorld();
+    if (!ew || entity == ecs::NullEntity)
+        return;
+    if (!HierarchyNodePassesFilter(*ew, entity, filter))
+        return;
+
+    const bool isMeshEntity = IsMeshInstanceEntity(*ew, entity);
+    const bool isGaussianSplatEntity = IsGaussianSplatEntity(*ew, entity);
+    const bool isInspectable = isMeshEntity || isGaussianSplatEntity;
+    const auto& children = ew->getEntityChildren(entity);
+
+    bool hasVisibleChildren = false;
+    for (ecs::Entity child : children)
+    {
+        if (HierarchyNodePassesFilter(*ew, child, filter))
         {
-            if (HasHierarchyEntity(*ew, child))
-            {
-                hasVisibleChildren = true;
-                break;
-            }
-        }
-
-        ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth;
-        if (!hasVisibleChildren)
-            flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
-        if (ui.editor.SelectedEntity == entity)
-            flags |= ImGuiTreeNodeFlags_Selected;
-
-        // Expand groups once so meshes / 3DGS are one click away for gizmo selection.
-        if (hasVisibleChildren && !isMeshEntity && !isGaussianSplatEntity)
-            ImGui::SetNextItemOpen(true, ImGuiCond_Once);
-
-        std::string nodeName = ew->getEntityName(entity);
-        if (nodeName.empty()) nodeName = "<unnamed>";
-        std::string label = isMeshEntity ? "[Mesh] " + nodeName : (isGaussianSplatEntity ? "[3DGS] " + nodeName : "[Group] " + nodeName);
-        if (isMeshEntity)
-        {
-            auto* comp = ew->world().tryGet<caustica::scene::MeshInstanceComponent>(entity);
-            if (comp && comp->mesh)
-                label += "  (" + comp->mesh->name + ")";
-        }
-        else if (isGaussianSplatEntity)
-        {
-            auto* comp = ew->world().tryGet<caustica::scene::GaussianSplatComponent>(entity);
-            if (comp && comp->splat.loadedSplatCount > 0)
-                label += "  (" + std::to_string(comp->splat.loadedSplatCount) + " splats)";
-        }
-
-        const bool open = ImGui::TreeNodeEx(reinterpret_cast<void*>(static_cast<uintptr_t>(entity)), flags, "%s", label.c_str());
-
-        if (IsInspectableEntity(*ew, entity) && ImGui::IsItemClicked())
-        {
-            ui.editor.SelectedEntity = entity;
-            ui.editor.SelectedGaussianSplat = false;
-        }
-
-        if (isMeshEntity && ImGui::IsItemHovered())
-            ImGui::SetTooltip("Mesh instance. Click to open it in Inspector.");
-        if (isGaussianSplatEntity && ImGui::IsItemHovered())
-            ImGui::SetTooltip("3D Gaussian Splat scene object. Click to open it in Inspector.");
-
-        if (open && hasVisibleChildren)
-        {
-            for (ecs::Entity child : children)
-                BuildHierarchyNodeUI(ui, scene, child);
-            ImGui::TreePop();
+            hasVisibleChildren = true;
+            break;
         }
     }
+
+    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth
+        | ImGuiTreeNodeFlags_AllowOverlap;
+    if (!hasVisibleChildren)
+        flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+    if (ui.editor.SelectedEntity == entity)
+        flags |= ImGuiTreeNodeFlags_Selected;
+
+    if (hasVisibleChildren && !isMeshEntity && !isGaussianSplatEntity)
+        ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+    if (filter && filter[0] != '\0' && hasVisibleChildren)
+        ImGui::SetNextItemOpen(true, ImGuiCond_Always);
+
+    std::string nodeName = ew->getEntityName(entity);
+    if (nodeName.empty())
+        nodeName = "<unnamed>";
+
+    const bool enabled = GetEntityEnabled(*ew, entity);
+    const ImU32 muted = ImGui::ColorConvertFloat4ToU32(GetEditorColors().TextMuted);
+    const ImU32 textCol = enabled
+        ? ImGui::ColorConvertFloat4ToU32(GetEditorColors().Text)
+        : muted;
+
+    ImGui::PushID(static_cast<int>(static_cast<uint32_t>(entity)));
+    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(textCol));
+    ImGui::SetNextItemAllowOverlap();
+    const bool open = ImGui::TreeNodeEx("##node", flags, "  %s", nodeName.c_str());
+    const bool treeClicked = ImGui::IsItemClicked();
+    ImGui::PopStyleColor();
+
+    const ImVec2 rowMin = ImGui::GetItemRectMin();
+    const ImVec2 rowMax = ImGui::GetItemRectMax();
+    const float rowH = rowMax.y - rowMin.y;
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+
+    // Type icon after the tree arrow / indent.
+    const float iconPad = 3.f;
+    const float iconSize = rowH - iconPad * 2.f;
+    const float iconX = rowMin.x + ImGui::GetTreeNodeToLabelSpacing() - 2.f;
+    const HierarchyTypeIcon typeIcon = isMeshEntity
+        ? HierarchyTypeIcon::Mesh
+        : (isGaussianSplatEntity ? HierarchyTypeIcon::GaussianSplat : HierarchyTypeIcon::Group);
+    DrawHierarchyTypeIcon(
+        dl,
+        ImVec2(iconX, rowMin.y + iconPad),
+        ImVec2(iconX + iconSize, rowMin.y + iconPad + iconSize),
+        typeIcon,
+        enabled ? textCol : muted);
+
+    bool eyeClicked = false;
+    if (isInspectable)
+    {
+        const float eyeSize = rowH;
+        const ImVec2 eyePos(rowMax.x - eyeSize - 2.f, rowMin.y);
+        ImGui::SetCursorScreenPos(eyePos);
+        eyeClicked = ImGui::InvisibleButton("##eye", ImVec2(eyeSize, eyeSize));
+        const bool eyeHovered = ImGui::IsItemHovered();
+        DrawIconGlyph(
+            dl,
+            eyePos,
+            ImVec2(eyePos.x + eyeSize, eyePos.y + eyeSize),
+            enabled ? Icon::Eye : Icon::Hide,
+            eyeHovered ? textCol : muted);
+        if (eyeHovered)
+            ImGui::SetTooltip(enabled ? "Hide" : "Show");
+
+        if (eyeClicked)
+        {
+            SetEntityEnabled(*ew, entity, !enabled);
+            ui.render.settings.ResetAccumulation = true;
+            if (isGaussianSplatEntity)
+                ui.render.runtime.Invalidation.AccelerationStructRebuildRequested = true;
+        }
+    }
+
+    if (isInspectable && treeClicked && !eyeClicked)
+    {
+        ui.editor.SelectedEntity = entity;
+        ui.editor.SelectedGaussianSplat = isGaussianSplatEntity;
+    }
+
+    if (open && hasVisibleChildren)
+    {
+        for (ecs::Entity child : children)
+            BuildHierarchyNodeUI(ui, scene, child, filter);
+        ImGui::TreePop();
+    }
+    ImGui::PopID();
+}
 
 dm::float3 QuaternionToEulerDegreesXYZ(const dm::dquat& rotation)
     {
@@ -288,6 +395,183 @@ dm::float3 QuaternionToEulerDegreesXYZ(const dm::dquat& rotation)
         const double cosine = std::abs(dm::dot(a / lenA, b / lenB));
         return cosine > 0.999999999;
     }
+
+namespace
+{
+
+bool AxisDragFloat(char axis, ImU32 axisCol, float* value, float speed, float vMin, float vMax, const char* format, bool disabled)
+{
+    ImGui::PushID(static_cast<int>(axis));
+    if (disabled)
+        ImGui::BeginDisabled();
+
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(36, 38, 44, 255));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, IM_COL32(46, 50, 58, 255));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgActive, IM_COL32(52, 58, 68, 255));
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.f);
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(14.f, ImGui::GetStyle().FramePadding.y));
+
+    // Leading spaces reserve room for the axis letter drawn on top.
+    char fmtBuf[32];
+    std::snprintf(fmtBuf, sizeof(fmtBuf), "   %s", format);
+    const bool changed = ImGui::DragFloat("##axis", value, speed, vMin, vMax, fmtBuf);
+
+    ImGui::PopStyleVar(2);
+    ImGui::PopStyleColor(3);
+
+    const ImVec2 r0 = ImGui::GetItemRectMin();
+    const ImVec2 r1 = ImGui::GetItemRectMax();
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    const float strip = 3.f;
+    dl->AddRectFilled(r0, ImVec2(r0.x + strip, r1.y), axisCol, 3.f, ImDrawFlags_RoundCornersLeft);
+    const char letter[2] = { axis, '\0' };
+    const ImVec2 ts = ImGui::CalcTextSize(letter);
+    dl->AddText(
+        ImVec2(r0.x + strip + 4.f, r0.y + (r1.y - r0.y - ts.y) * 0.5f),
+        axisCol,
+        letter);
+
+    if (disabled)
+        ImGui::EndDisabled();
+    ImGui::PopID();
+    return changed;
+}
+
+} // namespace
+
+bool TransformVec3Row(
+    const char* id,
+    const char* label,
+    float values[3],
+    float speed,
+    float vMin,
+    float vMax,
+    const char* format,
+    const float resetValues[3],
+    bool* locked,
+    bool lockUniform)
+{
+    ImGui::PushID(id);
+
+    bool changed = false;
+    const float gap = 3.f;
+    constexpr float kLabelColW = 70.f;
+
+    if (IconButton("##reset", Icon::Refresh, false, "Reset"))
+    {
+        values[0] = resetValues[0];
+        values[1] = resetValues[1];
+        values[2] = resetValues[2];
+        changed = true;
+    }
+    ImGui::SameLine(0.f, gap);
+
+    const bool isLocked = locked && *locked;
+    if (IconButton(
+            "##lock",
+            isLocked ? Icon::Lock : Icon::Unlock,
+            isLocked,
+            lockUniform ? "Uniform scale" : "Lock values"))
+    {
+        if (locked)
+            *locked = !*locked;
+    }
+    ImGui::SameLine(0.f, gap);
+
+    const float labelX = ImGui::GetCursorPosX();
+    ImGui::AlignTextToFramePadding();
+    ImGui::PushStyleColor(ImGuiCol_Text, GetEditorColors().TextMuted);
+    ImGui::TextUnformatted(label);
+    ImGui::PopStyleColor();
+    ImGui::SameLine(0.f, 0.f);
+    ImGui::SetCursorPosX(labelX + kLabelColW);
+
+    const float avail = ImGui::GetContentRegionAvail().x;
+    const float fieldW = std::max(48.f, (avail - gap * 2.f) / 3.f);
+
+    const ImU32 axisCols[3] = {
+        IM_COL32(220, 72, 72, 255),
+        IM_COL32(88, 180, 96, 255),
+        IM_COL32(72, 140, 230, 255),
+    };
+    const char axes[3] = { 'X', 'Y', 'Z' };
+
+    const bool disableEdits = locked && *locked && !lockUniform;
+    const bool uniform = lockUniform && locked && *locked;
+
+    for (int i = 0; i < 3; ++i)
+    {
+        if (i > 0)
+            ImGui::SameLine(0.f, gap);
+        ImGui::SetNextItemWidth(fieldW);
+        if (AxisDragFloat(axes[i], axisCols[i], &values[i], speed, vMin, vMax, format, disableEdits))
+        {
+            changed = true;
+            if (uniform)
+                values[0] = values[1] = values[2] = values[i];
+        }
+    }
+
+    ImGui::PopID();
+    return changed;
+}
+
+namespace
+{
+
+void InspectorBeginLabeledRow(const char* label)
+{
+    const float rowStartX = ImGui::GetCursorPosX();
+    ImGui::AlignTextToFramePadding();
+    ImGui::PushStyleColor(ImGuiCol_Text, GetEditorColors().TextMuted);
+    ImGui::TextUnformatted(label);
+    ImGui::PopStyleColor();
+    ImGui::SameLine(0.f, 0.f);
+    ImGui::SetCursorPosX(rowStartX + kInspectorLabelWidth);
+    ImGui::SetNextItemWidth(std::max(40.f, ImGui::GetContentRegionAvail().x));
+}
+
+} // namespace
+
+bool InspectorDragFloat(const char* label, float* v, float speed, float vMin, float vMax, const char* format)
+{
+    ImGui::PushID(label);
+    InspectorBeginLabeledRow(label);
+    const bool changed = ImGui::DragFloat("##v", v, speed, vMin, vMax, format);
+    ImGui::PopID();
+    return changed;
+}
+
+bool InspectorDragInt(const char* label, int* v, float speed, int vMin, int vMax)
+{
+    ImGui::PushID(label);
+    InspectorBeginLabeledRow(label);
+    const bool changed = ImGui::DragInt("##v", v, speed, vMin, vMax);
+    ImGui::PopID();
+    return changed;
+}
+
+bool InspectorCheckbox(const char* label, bool* v)
+{
+    ImGui::PushID(label);
+    InspectorBeginLabeledRow(label);
+    const bool changed = ImGui::Checkbox("##v", v);
+    ImGui::PopID();
+    return changed;
+}
+
+bool InspectorColorEdit3(const char* label, float color[3])
+{
+    ImGui::PushID(label);
+    InspectorBeginLabeledRow(label);
+    const bool changed = ImGui::ColorEdit3(
+        "##v",
+        color,
+        ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel
+            | ImGuiColorEditFlags_DisplayRGB);
+    ImGui::PopID();
+    return changed;
+}
 
 const ::PerformancePreset s_performancePresets[kPerformancePresetCount] = {
     //                                    NEECand  NEEFull  NEEMIS  SPP  Bounce  DiffBnc   TexLOD  NestDiel  EnvMIP  SPActive  PrimRepl  Bloom    LDSampl    FflyTrhld    DLSS (on separate line due to macros)

@@ -95,6 +95,9 @@ struct MeshInstanceComponent
     int geometryInstanceIndex = -1;
     std::vector<LightSamplerLink> perGeometryLightSamplerLinks;
     ecs::Entity proxiedAnalyticLight = ecs::NullEntity;
+    // Hierarchy / Inspector visibility. Hidden instances keep their TLAS slot
+    // (instanceMask = 0) so InstanceIndex stays aligned with ECS.
+    bool enabled = true;
 };
 
 inline constexpr uint32_t kForceSkinnedMeshUpdateFrameIndex = UINT32_MAX;

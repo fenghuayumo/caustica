@@ -719,6 +719,9 @@ bool LightSamplingCache::processEmissiveGeometry( const UpdateSettings & setting
             static_cast<uint32_t>(compactedGeometryInstanceIndex);
         compactedGeometryInstanceIndex += mesh->geometries.size();
 
+        if (!meshProxy.enabled)
+            continue;
+
         for (size_t geometryIndex = 0; geometryIndex < mesh->geometries.size(); ++geometryIndex)
         {
             const auto& geometry = mesh->geometries[geometryIndex];

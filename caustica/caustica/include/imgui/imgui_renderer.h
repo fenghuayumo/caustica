@@ -7,6 +7,9 @@
 #include <filesystem>
 #include <memory>
 #include <optional>
+#include <vector>
+
+#include <imgui.h>
 
 namespace caustica
 {
@@ -31,6 +34,9 @@ namespace caustica
         bool const m_isCompressed;
         float const m_sizeAtDefaultScale;
         ImFont* m_imFont = nullptr;
+        bool m_mergeMode = false;
+        // ImGui glyph-range pairs (min,max,...,0). Empty => font default ranges.
+        std::vector<ImWchar> m_glyphRanges;
 
         void createScaledFont(float displayScale);
         void releaseScaledFont();
@@ -56,6 +62,19 @@ namespace caustica
             , m_isCompressed(isCompressed)
             , m_sizeAtDefaultScale(size)
         { }
+
+        // Merge this face into the previous font (e.g. Segoe Icons into Segoe UI).
+        // `ranges` must be ImGui-style inclusive pairs terminated by 0.
+        void configureMerge(const ImWchar* ranges)
+        {
+            m_mergeMode = true;
+            m_glyphRanges.clear();
+            if (!ranges)
+                return;
+            for (const ImWchar* p = ranges; *p; ++p)
+                m_glyphRanges.push_back(*p);
+            m_glyphRanges.push_back(0);
+        }
 
         // Returns true if the custom font data has been successfully loaded.
         // This doesn't necessarily mean that the font data is valid: the actual font object is only created

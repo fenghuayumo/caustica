@@ -372,6 +372,9 @@ void RegisteredFont::createScaledFont(float displayScale)
     fontConfig.PixelSnapH = true;
     // Slight brighten helps thin UI fonts stay readable on dark themes.
     fontConfig.RasterizerMultiply = 1.05f;
+    fontConfig.MergeMode = m_mergeMode;
+    if (!m_glyphRanges.empty())
+        fontConfig.GlyphRanges = m_glyphRanges.data();
 
     m_imFont = nullptr;
 

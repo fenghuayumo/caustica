@@ -36,9 +36,31 @@ bool GaussianSplatSortingCombo(EditorUIData& ui);
 bool GaussianSplatFTBCombo(EditorUIData& ui);
 bool GaussianSplatRtxKernelDegreeCombo(EditorUIData& ui);
 bool GaussianSplatRtxParticleFormatCombo(EditorUIData& ui);
-void BuildHierarchyNodeUI(EditorUIData& ui, caustica::Scene& scene, ecs::Entity entity);
+void BuildHierarchyNodeUI(EditorUIData& ui, caustica::Scene& scene, ecs::Entity entity, const char* filter);
 dm::float3 QuaternionToEulerDegreesXYZ(const dm::dquat& rotation);
 bool SameRotation(const dm::dquat& a, const dm::dquat& b);
+
+// Colored XYZ transform row (reset / lock / label / axis fields), matching DCC-style inspectors.
+// When lockUniform is non-null and true, editing any axis copies that value to all three (Scale).
+// When lockUniform is null, locked disables editing.
+bool TransformVec3Row(
+    const char* id,
+    const char* label,
+    float values[3],
+    float speed,
+    float vMin,
+    float vMax,
+    const char* format,
+    const float resetValues[3],
+    bool* locked,
+    bool lockUniform = false);
+
+// Inspector property rows: fixed label column on the left, control fills the right.
+inline constexpr float kInspectorLabelWidth = 148.f;
+bool InspectorDragFloat(const char* label, float* v, float speed, float vMin, float vMax, const char* format);
+bool InspectorDragInt(const char* label, int* v, float speed, int vMin, int vMax);
+bool InspectorCheckbox(const char* label, bool* v);
+bool InspectorColorEdit3(const char* label, float color[3]);
 
 #if CAUSTICA_WITH_ANY_DLSS
 SI::DLSSMode DLSSModeUI(SI::DLSSMode dlssModeCurrent);
