@@ -2,10 +2,15 @@
 #include <rtxdi/ImportanceSamplingContext.h>
 #include <rtxdi/PT/ReSTIRPT.h>
 
+#include <render/FrameGraphPasses.h>
+#include <render/FrameGraphContext.h>
 #include <render/passes/rtxdi/RtxdiResources.h>
+#include <render/passes/rtxdi/RtxdiGraphResources.h>
 #include <render/passes/rtxdi/PrepareLightsPass.h>
+#include <render/passes/pathTrace/PathTraceGraphResources.h>
 #include <assets/loader/ShaderFactory.h>
 #include <render/core/RenderDevice.h>
+#include <render/graph/GraphBuilder.h>
 #include <scene/View.h>
 #include <render/passes/rtxdi/GeneratePdfMipsPass.h>
 #include <render/passes/lighting/distant/EnvMapProcessor.h>
@@ -13,8 +18,11 @@
 #include <scene/SceneRenderData.h>
 #include <shaders/render/rtxdi/ShaderParameters.h>
 #include <shaders/SampleConstantBuffer.h>
+#include <core/scope.h>
 
 #include <render/core/RenderTargets.h>
+
+#include <cassert>
 
 using namespace caustica::math;
 using namespace caustica;
@@ -637,6 +645,111 @@ void RtxdiPass::executePT(nvrhi::CommandListHandle commandList, nvrhi::BindingSe
 }
 
 void RtxdiPass::endFrame(){}
+
+void RtxdiPass::executeFrame(
+	nvrhi::ICommandList* commandList,
+	nvrhi::BindingSetHandle globalBindingSet,
+	const PathTracerSettings& settings)
+{
+	static bool enableFusedDIGIFinal = true;
+	const bool useFusedDIGIFinal = settings.actualUseReSTIRDI()
+		&& settings.actualUseReSTIRGI()
+		&& enableFusedDIGIFinal;
+
+	RAII_SCOPE(commandList->beginMarker("RTXDI");, commandList->endMarker(););
+
+	if (settings.actualUseReSTIRDI())
+		execute(commandList, globalBindingSet, useFusedDIGIFinal);
+
+	if (settings.actualUseReSTIRGI())
+		executeGI(commandList, globalBindingSet, useFusedDIGIFinal);
+
+	if (useFusedDIGIFinal)
+		executeFusedDIGIFinal(commandList, globalBindingSet);
+
+	if (settings.actualUseReSTIRPT())
+		executePT(commandList, globalBindingSet);
+}
+
+namespace caustica::render
+{
+
+void registerRtxdiBeginFramePass(FrameGraphContext ctx)
+{
+	assert(ctx.graph);
+	assert(ctx.renderTargets);
+	assert(ctx.settings);
+
+	if (!ctx.hasScene || !ctx.settings->actualUseRTXDIPasses())
+		return;
+
+	RtxdiPass* rtxdiPass = ctx.rtxdi;
+	RtxdiGraphResources rtxdiResources{};
+	if (!tryImportRtxdiGraphResources(*ctx.graph, rtxdiPass, rtxdiResources))
+		return;
+
+	const PathTraceGraphTargets pathTraceTargets = importPathTraceGraphTargets(*ctx.graph, *ctx.renderTargets);
+
+	rg::PassOptions passOptions{};
+	passOptions.executeAfter = "FrameClear";
+
+	ctx.graph->addPass(
+		"RtxdiBeginFrame",
+		[rtxdiResources, pathTraceTargets](rg::PassBuilder& setup) {
+			declareRtxdiBeginFrameAccess(setup, rtxdiResources, pathTraceTargets);
+		},
+		[ctx, rtxdiPass](rg::RenderPassContext& passCtx) {
+			if (rtxdiPass == nullptr)
+				return;
+
+			rtxdiPass->beginFrame(
+				passCtx.commandList(),
+				*ctx.renderTargets,
+				ctx.bindingLayout,
+				ctx.bindingSet);
+		},
+		passOptions);
+}
+
+void registerRtxdiExecutePass(FrameGraphContext ctx)
+{
+	assert(ctx.graph);
+	assert(ctx.renderTargets);
+	assert(ctx.settings);
+
+	if (!ctx.hasScene || !ctx.settings->actualUseRTXDIPasses())
+		return;
+
+	RtxdiPass* rtxdiPass = ctx.rtxdi;
+	RtxdiGraphResources rtxdiResources{};
+	if (!tryImportRtxdiGraphResources(*ctx.graph, rtxdiPass, rtxdiResources))
+		return;
+
+	const PathTraceGraphTargets pathTraceTargets = importPathTraceGraphTargets(*ctx.graph, *ctx.renderTargets);
+
+	rg::PassOptions passOptions{};
+	passOptions.executeAfter = "MainPathTrace";
+
+	ctx.graph->addPass(
+		"Rtxdi",
+		[rtxdiResources, pathTraceTargets, settings = *ctx.settings](rg::PassBuilder& setup) {
+			declareRtxdiExecuteAccess(setup, rtxdiResources, pathTraceTargets, settings);
+		},
+		[ctx](rg::RenderPassContext& passCtx) {
+			assert(ctx.rtxdi);
+			assert(ctx.settings);
+			ctx.rtxdi->executeFrame(passCtx.commandList(), ctx.bindingSet, *ctx.settings);
+		},
+		passOptions);
+}
+
+void registerRtxdiGraphPasses(FrameGraphContext ctx)
+{
+	registerRtxdiBeginFramePass(ctx);
+	registerRtxdiExecutePass(ctx);
+}
+
+} // namespace caustica::render
 
 void RtxdiPass::executeComputePass(
 	nvrhi::CommandListHandle& commandList,

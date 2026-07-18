@@ -77,8 +77,7 @@ namespace
             },
             [processedOutputColor, ctx](rg::RenderPassContext& passCtx) {
                 assert(ctx.extractedView);
-                assert(ctx.renderer);
-                PTPipelineVariant* pipeline = ctx.renderer->ptPipelineTestRaygenPPHDR().get();
+                PTPipelineVariant* pipeline = ctx.ptTestRaygenPPHDR;
                 assert(pipeline);
 
                 nvrhi::rt::DispatchRaysArguments args;
@@ -87,12 +86,7 @@ namespace
 
                 nvrhi::rt::State state;
                 state.shaderTable = pipeline->getShaderTable();
-                state.bindings = {
-                    ctx.renderer->getBindingSet(),
-                    ctx.renderer->getPathTracingContext().descriptorTable
-                        ? ctx.renderer->getPathTracingContext().descriptorTable->getDescriptorTable()
-                        : nullptr
-                };
+                state.bindings = { ctx.bindingSet, ctx.descriptorTable };
                 passCtx.commandList()->setRayTracingState(state);
 
                 SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
@@ -133,9 +127,8 @@ namespace
             },
             [ctx](rg::RenderPassContext& passCtx) {
                 assert(ctx.extractedView);
-                assert(ctx.renderer);
                 assert(ctx.settings);
-                PTPipelineVariant* pipeline = ctx.renderer->ptPipelineEdgeDetection().get();
+                PTPipelineVariant* pipeline = ctx.ptEdgeDetection;
                 assert(pipeline);
 
                 nvrhi::rt::DispatchRaysArguments args;
@@ -144,12 +137,7 @@ namespace
 
                 nvrhi::rt::State state;
                 state.shaderTable = pipeline->getShaderTable();
-                state.bindings = {
-                    ctx.renderer->getBindingSet(),
-                    ctx.renderer->getPathTracingContext().descriptorTable
-                        ? ctx.renderer->getPathTracingContext().descriptorTable->getDescriptorTable()
-                        : nullptr
-                };
+                state.bindings = { ctx.bindingSet, ctx.descriptorTable };
                 passCtx.commandList()->setRayTracingState(state);
 
                 SampleMiniConstants miniConstants = {
@@ -170,7 +158,7 @@ void registerPostProcess(FrameGraphContext ctx)
     assert(ctx.settings);
     assert(ctx.graph);
 
-    ToneMappingPass* toneMappingPass = ctx.renderer->getToneMappingPass();
+    ToneMappingPass* toneMappingPass = ctx.toneMapping;
     assert(toneMappingPass);
 
     RenderTargets& targets = *ctx.renderTargets;
@@ -190,7 +178,7 @@ void registerPostProcess(FrameGraphContext ctx)
 
     registerAerialPerspectivePass(processedOutputColor, ctx);
 
-    BloomPass* bloomPass = ctx.renderer->getBloomPass();
+    BloomPass* bloomPass = ctx.bloom;
     if (bloomPass != nullptr)
     {
         bloomPass->registerGraphPass(
@@ -206,7 +194,7 @@ void registerPostProcess(FrameGraphContext ctx)
     registerTestRaygenHdrPass(
         processedOutputColor,
         ctx,
-        ctx.settings->PostProcessTestPassHDR && ctx.renderer->ptPipelineTestRaygenPPHDR() != nullptr);
+        ctx.settings->PostProcessTestPassHDR && ctx.ptTestRaygenPPHDR != nullptr);
 
     toneMappingPass->registerGraphPass(
         *ctx.graph,
@@ -220,7 +208,7 @@ void registerPostProcess(FrameGraphContext ctx)
         ldrColor,
         ldrColorScratch,
         ctx,
-        ctx.settings->PostProcessEdgeDetection && ctx.renderer->ptPipelineEdgeDetection() != nullptr);
+        ctx.settings->PostProcessEdgeDetection && ctx.ptEdgeDetection != nullptr);
 }
 
 void registerCompositeGraphPasses(FrameGraphContext ctx)

@@ -107,6 +107,7 @@ bool caustica::render::WorldRenderer::create(const createParams& params)
     m_lastRealtimeMode = m_context->activeSettings().RealtimeMode;
 
     createBindingLayouts(infra.bindlessLayout);
+    m_pathTracePass = std::make_unique<PathTracePass>();
 
     ScenePassWireParams sceneWireParams{
         .gpuDevice = params.gpuDevice,

@@ -214,7 +214,7 @@ namespace
         const bool stochasticReset = stochasticSplats && ctx.gaussianSplatTemporalReset != nullptr
             && (ctx.aaReset || ctx.settings->ResetAccumulation || ctx.settings->ResetRealtimeCaches
                 || *ctx.gaussianSplatTemporalReset);
-        return !ctx.aaReset && !stochasticReset && ctx.renderer->getFrameIndex() != 0;
+        return !ctx.aaReset && !stochasticReset && ctx.frameIndex != 0;
     }
 
     void prepareDenoiseAAState(FrameGraphContext& ctx)
@@ -272,8 +272,8 @@ void registerDenoiseAAPass(FrameGraphContext ctx)
     ctx.graph->extractTexture(temporalFeedback1, rg::TextureAccess::UnorderedAccess);
     ctx.graph->extractTexture(temporalFeedback2, rg::TextureAccess::UnorderedAccess);
 
-    TemporalAntiAliasingPass* temporalAAPass = ctx.renderer->getTemporalAntiAliasingPass();
-    AccumulationPass* accumulationPass = ctx.renderer->getAccumulationPass();
+    TemporalAntiAliasingPass* temporalAAPass = ctx.temporalAntiAliasing;
+    AccumulationPass* accumulationPass = ctx.accumulation;
 
     if (needsNoDenoiserFinalMergePass(*ctx.settings))
     {
@@ -338,7 +338,7 @@ void registerDenoiseAAPass(FrameGraphContext ctx)
                 setup.write(temporalFeedback2, rg::TextureAccess::UnorderedAccess);
             },
             [ctx, temporalAAPass, taaParams, feedbackIsValid, stochasticSplats](rg::RenderPassContext& passCtx) {
-                const ICompositeView& taaView = *ctx.renderer->getCameraController().view();
+                const ICompositeView& taaView = *ctx.compositeView;
                 temporalAAPass->temporalResolve(
                     passCtx.commandList(),
                     taaParams,
@@ -399,7 +399,7 @@ void registerDenoiseAAPass(FrameGraphContext ctx)
 
     if (needsAccumulationPass(*ctx.settings, accumulationPass))
     {
-        const int accumulationSampleIndex = ctx.renderer->getAccumulationSampleIndex();
+        const int accumulationSampleIndex = ctx.accumulationSampleIndex;
         const float accumulationWeight = (accumulationSampleIndex < ctx.settings->AccumulationTarget)
             ? (1.f / float(std::max(0, accumulationSampleIndex) + 1))
             : 0.0f;
@@ -412,7 +412,7 @@ void registerDenoiseAAPass(FrameGraphContext ctx)
                 setup.write(processedOutputColor, rg::TextureAccess::UnorderedAccess);
             },
             [ctx, accumulationPass, accumulationWeight](rg::RenderPassContext& passCtx) {
-                const IView& view = *ctx.renderer->getCameraController().view();
+                const IView& view = *ctx.view;
                 accumulationPass->render(
                     passCtx.commandList(),
                     view,

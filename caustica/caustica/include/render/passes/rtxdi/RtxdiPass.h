@@ -32,6 +32,7 @@ namespace caustica
 
 #include <render/passes/rtxdi/RtxdiUserSettings.h>
 #include <render/SceneGpuResources.h>
+#include <render/core/PathTracerSettings.h>
 
 namespace caustica::scene { class SceneRenderData; }
 
@@ -91,6 +92,11 @@ public:
         nvrhi::BindingSetHandle extraBindingSet);
     void executePT(nvrhi::CommandListHandle commandList,
         nvrhi::BindingSetHandle extraBindingSet);
+	// Fused DIGI / GI / PT sequence for one frame. No WorldRenderer command-list swap.
+	void executeFrame(
+		nvrhi::ICommandList* commandList,
+		nvrhi::BindingSetHandle globalBindingSet,
+		const PathTracerSettings& settings);
 	void endFrame();
 	
 	std::shared_ptr<RtxdiResources> getRTXDIResources() { return m_rtxdiResources; }

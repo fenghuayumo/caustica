@@ -8,7 +8,6 @@
 #include <render/passes/omm/OpacityMicromapBuilder.h>
 #include <render/core/AccelStructManager.h>
 #include <render/core/PathTracerSettings.h>
-#include <core/scope.h>
 #include <scene/Scene.h>
 #include <scene/SceneEcs.h>
 
@@ -77,32 +76,5 @@ void caustica::render::WorldRenderer::rtxdiSetupFrame(nvrhi::IFramebuffer* frame
         bridgeParameters,
         m_bindingLayout,
         m_shaderDebug);
-}
-
-void caustica::render::WorldRenderer::executeRtxdi(nvrhi::ICommandList* commandList)
-{
-    nvrhi::CommandListHandle savedCommandList = m_commandList;
-    m_commandList = commandList;
-
-    static bool enableFusedDIGIFinal = true;
-    const bool useFusedDIGIFinal = m_context->activeSettings().actualUseReSTIRDI()
-        && m_context->activeSettings().actualUseReSTIRGI()
-        && enableFusedDIGIFinal;
-
-    RAII_SCOPE(m_commandList->beginMarker("RTXDI");, m_commandList->endMarker(); );
-
-    if (m_context->activeSettings().actualUseReSTIRDI())
-        m_rtxdiPass->execute(m_commandList, m_bindingSet, useFusedDIGIFinal);
-
-    if (m_context->activeSettings().actualUseReSTIRGI())
-        m_rtxdiPass->executeGI(m_commandList, m_bindingSet, useFusedDIGIFinal);
-
-    if (useFusedDIGIFinal)
-        m_rtxdiPass->executeFusedDIGIFinal(m_commandList, m_bindingSet);
-
-    if (m_context->activeSettings().actualUseReSTIRPT())
-        m_rtxdiPass->executePT(m_commandList, m_bindingSet);
-
-    m_commandList = savedCommandList;
 }
 

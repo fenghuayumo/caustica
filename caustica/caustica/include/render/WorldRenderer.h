@@ -18,6 +18,7 @@
 #include <render/passes/geometry/BloomPass.h>
 #include <render/passes/denoisers/NrdIntegration.h>
 #include <render/passes/rtxdi/RtxdiPass.h>
+#include <render/passes/pathTrace/PathTracePass.h>
 #include <render/passes/debug/ShaderDebug.h>
 #include <render/passes/gaussian/GaussianSplatEmissionProxy.h>
 
@@ -118,11 +119,6 @@ public:
     void preRender();
     void render(nvrhi::IFramebuffer* framebuffer);
 
-    void pathTracePrePass(nvrhi::ICommandList* commandList);
-    void vBufferExport(nvrhi::ICommandList* commandList);
-    void pathTraceLightingEndUpdate(nvrhi::ICommandList* commandList);
-    void mainPathTrace(nvrhi::ICommandList* commandList);
-    void executeRtxdi(nvrhi::ICommandList* commandList);
     void prepareDenoiserGuides(nvrhi::ICommandList* commandList);
     void stablePlanesDebugViz(nvrhi::ICommandList* commandList);
     void ensureNrdIntegrations();
@@ -170,6 +166,8 @@ public:
 
     RtxdiPass* getRtxdiPass() { return m_rtxdiPass.get(); }
     const RtxdiPass* getRtxdiPass() const { return m_rtxdiPass.get(); }
+    PathTracePass* getPathTracePass() { return m_pathTracePass.get(); }
+    const PathTracePass* getPathTracePass() const { return m_pathTracePass.get(); }
 
     std::shared_ptr<PathTracingShaderCompiler> getPathTracingShaderCompiler() const { return m_pathTracingShaderCompiler; }
     std::shared_ptr<ShaderDebug> getShaderDebug() const { return m_shaderDebug; }
@@ -287,6 +285,7 @@ private:
     RenderFrameContext           m_renderFrameCtx{};
 
     std::unique_ptr<RtxdiPass>                  m_rtxdiPass;
+    std::unique_ptr<PathTracePass>              m_pathTracePass;
     std::unique_ptr<RenderTargets>              m_renderTargets;
     nvrhi::BindingLayoutHandle                  m_bindingLayout;
     nvrhi::BindingLayoutHandle                  m_bindlessLayout;

@@ -106,6 +106,9 @@ void caustica::render::WorldRenderer::populateRenderFrameContext(
 FrameGraphContext caustica::render::WorldRenderer::makeFrameGraphContext(RenderFrameContext& ctx)
 {
     const bool aaReset = ctx.frame.needNewPasses || m_context->activeSettings().ResetRealtimeCaches;
+    nvrhi::IDescriptorTable* descriptorTable = m_context->descriptorTable
+        ? m_context->descriptorTable->getDescriptorTable()
+        : nullptr;
 
     return FrameGraphContext{
         .graph = ctx.graph,
@@ -118,6 +121,31 @@ FrameGraphContext caustica::render::WorldRenderer::makeFrameGraphContext(RenderF
         .extractedView = &ctx.view,
         .bindingCache = &m_context->bindingCache,
         .blitPass = &m_context->renderDevice.blit(),
+        .rtxdi = m_rtxdiPass.get(),
+        .pathTrace = m_pathTracePass.get(),
+        .bindingLayout = m_bindingLayout,
+        .bindingSet = m_bindingSet,
+        .descriptorTable = descriptorTable,
+        .ptBuildStablePlanes = m_ptPipelineBuildStablePlanes.get(),
+        .ptFillStablePlanes = m_ptPipelineFillStablePlanes.get(),
+        .ptReference = m_ptPipelineReference.get(),
+        .ptTestRaygenPPHDR = m_ptPipelineTestRaygenPPHDR.get(),
+        .ptEdgeDetection = m_ptPipelineEdgeDetection.get(),
+        .exportVBufferPSO = m_exportVBufferPSO,
+        .toneMapping = m_toneMappingPass.get(),
+        .bloom = m_bloomPass.get(),
+        .temporalAntiAliasing = m_temporalAntiAliasingPass.get(),
+        .accumulation = m_accumulationPass.get(),
+        .postProcess = m_postProcess.get(),
+        .lightSampling = m_context->scenePasses.lighting.lightSampling().get(),
+        .materials = m_context->scenePasses.lighting.materials(),
+        .opacityMaps = m_context->scenePasses.lighting.opacityMaps(),
+        .gpuHandles = m_context->resolveGpuHandles(),
+        .subInstanceDataBuffer = m_context->accelStructs.getSubInstanceBuffer(),
+        .frameIndex = m_frameIndex,
+        .accumulationSampleIndex = m_accumulationSampleIndex,
+        .view = m_context->camera.view().get(),
+        .compositeView = m_context->camera.view().get(),
         .hasScene = m_context->hasFrameScene(),
         .aaReset = aaReset,
         .commandListWasClosed = &ctx.commandListWasClosed,
