@@ -633,10 +633,16 @@ void SceneEditor::evaluateAnimationsAt(float timeSeconds)
         if (auto* entityWorld = caustica::entityWorld(*m_app))
         {
             entityWorld->applyAnimations(std::max(0.f, timeSeconds));
+            // Scrub jumps are discontinuous: keep previous==current so motion
+            // vectors / TAA / NRD do not treat the seek as high-speed motion.
             entityWorld->refreshHierarchy(scene::PreviousTransformPolicy::PreserveExisting);
+            entityWorld->syncPreviousTransformsFromCurrent();
         }
     }
+    // Accumulation alone is not enough — realtime temporal history (TAA/NRD/DLSS)
+    // must also drop, otherwise scrubbing reads as whole-scene jitter/ghosting.
     m_settings.ResetAccumulation = true;
+    m_settings.ResetRealtimeCaches = true;
 }
 
 void SceneEditor::handleDroppedFiles()

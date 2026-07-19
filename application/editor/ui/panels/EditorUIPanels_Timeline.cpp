@@ -255,8 +255,11 @@ void EditorUI::BuildTimelinePanel(const PanelLayout& layout)
 
     const auto setFrame = [&](int frame) {
         frame = std::clamp(frame, m_editorUI.StartFrame, m_editorUI.EndFrame);
+        if (frame == currentFrame && !m_settings.EnableAnimations)
+            return;
         m_settings.EnableAnimations = false;
-        m_sceneEditor.evaluateAnimationsAt(frame * frameSeconds);
+        m_sceneEditor.evaluateAnimationsAt(static_cast<float>(frame) * frameSeconds);
+        currentFrame = frame;
     };
 
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(3.f, 4.f));

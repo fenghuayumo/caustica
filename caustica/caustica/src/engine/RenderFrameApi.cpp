@@ -288,7 +288,15 @@ void animate(App& app, float fElapsedTimeSeconds)
                 }
 
                 if (enableAnimations)
+                {
                     ew->refreshHierarchy(scene::PreviousTransformPolicy::CaptureCurrent);
+                }
+                else
+                {
+                    // ResetAccumulation-only seeks: update globals and zero motion.
+                    ew->refreshHierarchy(scene::PreviousTransformPolicy::PreserveExisting);
+                    ew->syncPreviousTransformsFromCurrent();
+                }
 
                 // Fixed-topology USD / soft-body point caches.
                 if (GpuDevice* device = gpuDevice(app))

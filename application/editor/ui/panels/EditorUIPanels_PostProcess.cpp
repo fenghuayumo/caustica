@@ -101,7 +101,9 @@ void EditorUI::BuildPostProcessPanel(const PanelLayout& layout)
         return;
     }
 
-    RAII_SCOPE(ImGui::PushID("PostProcessPanel");, ImGui::PopID(););
+    // Keep PushID/PopID inside the window and before End(); RAII after End()
+    // trips ImGui's "Missing PopID()" assert for docked panels.
+    ImGui::PushID("PostProcessPanel");
 
     if (ImGui::CollapsingHeader("Early (HDR)", ImGuiTreeNodeFlags_DefaultOpen))
     {
@@ -211,6 +213,7 @@ void EditorUI::BuildPostProcessPanel(const PanelLayout& layout)
             "Edge Threshold", &m_settings.PostProcessEdgeDetectionThreshold, 0.0f, 1.0f);
     }
 
+    ImGui::PopID();
     ImGui::End();
 }
 
