@@ -775,6 +775,66 @@ void RegisterCoreBindings(nb::module_& m)
         .def_prop_rw("fuzz_roughness",
             [](PTMaterial& self) { return self.fuzzRoughness; },
             [](PTMaterial& self, float v) { self.fuzzRoughness = v; self.gpuDataDirty = true; })
+        .def_prop_rw("coat_weight",
+            [](PTMaterial& self) { return self.coatWeight; },
+            [](PTMaterial& self, float v) { self.coatWeight = v; self.gpuDataDirty = true; })
+        .def_prop_rw("coat_color",
+            [](PTMaterial& self) { return Float3ToTuple(self.coatColor); },
+            [](PTMaterial& self, nb::object v) { self.coatColor = ToFloat3(v); self.gpuDataDirty = true; })
+        .def_prop_rw("coat_roughness",
+            [](PTMaterial& self) { return self.coatRoughness; },
+            [](PTMaterial& self, float v) { self.coatRoughness = v; self.gpuDataDirty = true; })
+        .def_prop_rw("coat_roughness_anisotropy",
+            [](PTMaterial& self) { return self.coatAnisotropy; },
+            [](PTMaterial& self, float v) { self.coatAnisotropy = v; self.gpuDataDirty = true; })
+        .def_prop_rw("coat_ior",
+            [](PTMaterial& self) { return self.coatIor; },
+            [](PTMaterial& self, float v) { self.coatIor = v; self.gpuDataDirty = true; })
+        .def_prop_rw("coat_darkening",
+            [](PTMaterial& self) { return self.coatDarkening; },
+            [](PTMaterial& self, float v) { self.coatDarkening = v; self.gpuDataDirty = true; })
+        .def_prop_rw("subsurface_weight",
+            [](PTMaterial& self) { return self.subsurfaceWeight; },
+            [](PTMaterial& self, float v) { self.subsurfaceWeight = v; self.gpuDataDirty = true; })
+        .def_prop_rw("subsurface_color",
+            [](PTMaterial& self) { return Float3ToTuple(self.subsurfaceColor); },
+            [](PTMaterial& self, nb::object v) { self.subsurfaceColor = ToFloat3(v); self.gpuDataDirty = true; })
+        .def_prop_rw("subsurface_radius",
+            [](PTMaterial& self) { return self.subsurfaceRadius; },
+            [](PTMaterial& self, float v) { self.subsurfaceRadius = v; self.gpuDataDirty = true; })
+        .def_prop_rw("subsurface_scale",
+            [](PTMaterial& self) { return self.subsurfaceScale; },
+            [](PTMaterial& self, float v) { self.subsurfaceScale = v; self.gpuDataDirty = true; })
+        .def_prop_rw("subsurface_anisotropy",
+            [](PTMaterial& self) { return self.subsurfaceAnisotropy; },
+            [](PTMaterial& self, float v) { self.subsurfaceAnisotropy = v; self.gpuDataDirty = true; })
+        .def_prop_rw("thin_film_weight",
+            [](PTMaterial& self) { return self.thinFilmWeight; },
+            [](PTMaterial& self, float v) { self.thinFilmWeight = v; self.gpuDataDirty = true; })
+        .def_prop_rw("thin_film_thickness",
+            [](PTMaterial& self) { return self.thinFilmThickness; },
+            [](PTMaterial& self, float v) { self.thinFilmThickness = v; self.gpuDataDirty = true; })
+        .def_prop_rw("thin_film_ior",
+            [](PTMaterial& self) { return self.thinFilmIor; },
+            [](PTMaterial& self, float v) { self.thinFilmIor = v; self.gpuDataDirty = true; })
+        .def_prop_rw("transmission_color",
+            [](PTMaterial& self) { return Float3ToTuple(self.transmissionColor); },
+            [](PTMaterial& self, nb::object v) { self.transmissionColor = ToFloat3(v); self.gpuDataDirty = true; })
+        .def_prop_rw("transmission_depth",
+            [](PTMaterial& self) { return self.transmissionDepth; },
+            [](PTMaterial& self, float v) { self.transmissionDepth = v; self.gpuDataDirty = true; })
+        .def_prop_rw("transmission_scatter",
+            [](PTMaterial& self) { return Float3ToTuple(self.transmissionScatter); },
+            [](PTMaterial& self, nb::object v) { self.transmissionScatter = ToFloat3(v); self.gpuDataDirty = true; })
+        .def_prop_rw("transmission_scatter_anisotropy",
+            [](PTMaterial& self) { return self.transmissionScatterAnisotropy; },
+            [](PTMaterial& self, float v) { self.transmissionScatterAnisotropy = v; self.gpuDataDirty = true; })
+        .def_prop_rw("transmission_dispersion_scale",
+            [](PTMaterial& self) { return self.transmissionDispersionScale; },
+            [](PTMaterial& self, float v) { self.transmissionDispersionScale = v; self.gpuDataDirty = true; })
+        .def_prop_rw("transmission_dispersion_abbe_number",
+            [](PTMaterial& self) { return self.transmissionDispersionAbbeNumber; },
+            [](PTMaterial& self, float v) { self.transmissionDispersionAbbeNumber = v; self.gpuDataDirty = true; })
         .def_prop_rw("opacity",
             [](PTMaterial& self) { return self.opacity; },
             [](PTMaterial& self, float v) { self.opacity = v; self.gpuDataDirty = true; })

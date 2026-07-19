@@ -5,7 +5,7 @@ struct PackedPathTracerSurfaceData
 {
     float3 _posW;
     uint _faceNCorrected;                   // fp16[3]
-    uint2 _mtl;                             // Falcor::MaterialDefinition
+    uint2 _mtl;                             // MaterialHeader | PTMaterialData index
     uint2 _V;                               // fp16[3]
 
     // misc (mostly subset of struct ShadingData)
@@ -19,6 +19,7 @@ struct PackedPathTracerSurfaceData
     uint _roughnessMetallicEta;				// R11G11B10_FLOAT
     uint _transmission;						// R11G11B10_FLOAT
     uint _diffuseSpecularTransmission;		// fp16 | fp16
+
 };
 
 #endif // __BINDING_DATA_TYPES_HLSLI__

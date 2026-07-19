@@ -42,11 +42,16 @@ struct BSDFSample
 
     // If delta lobe, returns an unique 2-bit delta lobe identifier (0...3); if not delta lobe returns 0xFFFFFFFF
     // NOTE: this ID must match delta lobe index used in IBSDF::evalDeltaLobes
+    // Order: 0 = transmission, 1 = base reflection, 2 = OpenPBR coat reflection
     uint    getDeltaLobeIndex()
     { 
         if ((lobe & (uint)LobeType::Delta) == 0u)
             return 0xFFFFFFFF;
-        return (lobe & (uint)LobeType::Transmission) == 0u;    // if transmission return 0, if reflection return 1; TODO: when clearcoat gets added, use 2 for clearcoat reflection
+        if ((lobe & (uint)LobeType::Transmission) != 0u)
+            return 0u;
+        if ((lobe & (uint)LobeType::ClearcoatDeltaReflection) != 0u)
+            return 2u;
+        return 1u;
     }
 };
 

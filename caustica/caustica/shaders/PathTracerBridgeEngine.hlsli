@@ -6,6 +6,7 @@
 
 #include "PathTracerBridge.hlsli"
 #include "PathTracer/Materials/MaterialTypes.hlsli"
+#include "PathTracer/Rendering/Materials/OpenPBRHelpers.hlsli"
 
 #include "Misc/OmmDebug.hlsli"
 
@@ -378,6 +379,30 @@ MaterialProperties EvaluateSceneMaterialRTXPT(float3 normal, float4 tangent, PTM
     result.ior = lpfloat( material.IoR );
     
     result.shadowNoLFadeout = lpfloat( material.ShadowNoLFadeout );
+
+    result.coatWeight = lpfloat(saturate(material.CoatWeight));
+    result.coatColor = lpfloat3(saturate(material.CoatColor));
+    result.coatRoughness = lpfloat(saturate(material.CoatRoughness));
+    result.coatAnisotropy = lpfloat(clamp(material.CoatAnisotropy, -1.0, 1.0));
+    result.coatIor = lpfloat(max(material.CoatIor, 1.0));
+    result.coatDarkening = lpfloat(saturate(material.CoatDarkening));
+
+    result.subsurfaceWeight = lpfloat(saturate(material.SubsurfaceWeight));
+    result.subsurfaceColor = lpfloat3(saturate(material.SubsurfaceColor));
+    result.subsurfaceRadius = lpfloat(max(material.SubsurfaceRadius, 0.0));
+    result.subsurfaceScale = lpfloat(max(material.SubsurfaceScale, 0.0));
+    result.subsurfaceAnisotropy = lpfloat(clamp(material.SubsurfaceAnisotropy, -1.0, 1.0));
+
+    result.thinFilmWeight = lpfloat(saturate(material.ThinFilmWeight));
+    result.thinFilmThickness = lpfloat(max(material.ThinFilmThickness, 0.0));
+    result.thinFilmIor = lpfloat(max(material.ThinFilmIor, 1.0));
+
+    result.transmissionColor = lpfloat3(saturate(material.TransmissionColor));
+    result.transmissionDepth = lpfloat(max(material.TransmissionDepth, 0.0));
+    result.transmissionScatter = lpfloat3(max(material.TransmissionScatter, float3(0, 0, 0)));
+    result.transmissionScatterAnisotropy = lpfloat(clamp(material.TransmissionScatterAnisotropy, -1.0, 1.0));
+    result.transmissionDispersionScale = lpfloat(saturate(material.TransmissionDispersionScale));
+    result.transmissionDispersionAbbeNumber = lpfloat(max(material.TransmissionDispersionAbbeNumber, 0.0));
     
     #if defined(CAUSTICA_MATERIAL_USE_NORMAL_TEXTURE)
         #if CAUSTICA_MATERIAL_USE_NORMAL_TEXTURE
@@ -755,7 +780,8 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
     // "This microfacet lobe is exactly the same as the specular lobe except sampled along the line of sight through the surface."
     lpfloat     bsdfDataSpecularTransmission = bridgeMaterial.transmission * (1 - bridgeMaterial.metalness);    // (1 - bridgeMaterial.metalness) is from https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Khronos/KHR_materials_transmission/README.md#transparent-metals
     lpfloat     bsdfDataDiffuseTransmission = bridgeMaterial.diffuseTransmission * (1 - bridgeMaterial.metalness);    // (1 - bridgeMaterial.metalness) is from https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Khronos/KHR_materials_transmission/README.md#transparent-metals
-    lpfloat3    bsdfDataTransmission = bridgeMaterial.baseColor;
+    // OpenPBR transmission_color; fall back to base_color when unset/white path matches legacy behaviour.
+    lpfloat3    bsdfDataTransmission = bridgeMaterial.transmissionColor * bridgeMaterial.baseColor;
 #else
     lpfloat     bsdfDataDiffuseTransmission  = 0;
     lpfloat     bsdfDataSpecularTransmission = 0;    
@@ -837,7 +863,11 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
 
     StandardBSDF bsdf = StandardBSDF::make(
         StandardBSDFData::make( bsdfDataDiffuse, bsdfDataSpecular, bsdfDataRoughness, bsdfDataMetallic, bsdfDataEta, bsdfDataTransmission, bsdfDataDiffuseTransmission, bsdfDataSpecularTransmission,
-            bridgeMaterial.anisotropy, bridgeMaterial.fuzzWeight, bridgeMaterial.fuzzColor, bridgeMaterial.fuzzRoughness ) );
+            bridgeMaterial.anisotropy, bridgeMaterial.fuzzWeight, bridgeMaterial.fuzzColor, bridgeMaterial.fuzzRoughness,
+            bridgeMaterial.coatWeight, bridgeMaterial.coatColor, bridgeMaterial.coatRoughness, bridgeMaterial.coatAnisotropy, bridgeMaterial.coatIor, bridgeMaterial.coatDarkening,
+            bridgeMaterial.subsurfaceWeight, bridgeMaterial.subsurfaceColor,
+            bridgeMaterial.thinFilmWeight, bridgeMaterial.thinFilmThickness, bridgeMaterial.thinFilmIor,
+            bridgeMaterial.transmissionDispersionScale, bridgeMaterial.transmissionDispersionAbbeNumber ) );
 
     // if you think tangent space is broken, test with this (won't make it correctly oriented)
     //ConstructONB( ptShadingData.N, ptShadingData.T, ptShadingData.B );
@@ -888,11 +918,21 @@ HomogeneousVolumeData Bridge::loadHomogeneousVolumeData(const uint materialDataI
     if( materialDataIndex >= g_Const.MaterialCount )
         return ptVolume;
 
-    VolumePTConstants volumeInfo = t_PTMaterialData[materialDataIndex].Volume;
+    PTMaterialData material = t_PTMaterialData[materialDataIndex];
+    VolumePTConstants volumeInfo = material.Volume;
         
-    // these should be precomputed on the C++ side!!
-    ptVolume.sigmaS = float3(0,0,0); // no scattering yet
-    ptVolume.sigmaA = -log( clamp( volumeInfo.AttenuationColor, 1e-7, 1 ) ) / max( 1e-30, volumeInfo.AttenuationDistance.xxx );
+    // Absorption from volume attenuation (glTF / OpenPBR transmission depth path).
+    float attenDistance = volumeInfo.AttenuationDistance;
+    if (material.TransmissionDepth > 0.0f)
+        attenDistance = min(attenDistance, material.TransmissionDepth);
+    ptVolume.sigmaA = -log( clamp( volumeInfo.AttenuationColor * saturate(material.TransmissionColor), 1e-7, 1 ) ) / max( 1e-30, attenDistance.xxx );
+
+    // OpenPBR scattering: transmission_scatter and/or subsurface (dense medium approx).
+    float3 sigmaS = OpenPBRTransmissionSigmaS(material.TransmissionScatter, max(material.TransmissionDepth, attenDistance));
+    if (material.SubsurfaceWeight > 0.0f)
+        sigmaS += material.SubsurfaceWeight * OpenPBRSubsurfaceSigmaS(material.SubsurfaceColor, material.SubsurfaceRadius, material.SubsurfaceScale);
+    ptVolume.sigmaS = max(sigmaS, float3(0, 0, 0));
+    ptVolume.g = clamp(material.TransmissionScatterAnisotropy != 0.0f ? material.TransmissionScatterAnisotropy : material.SubsurfaceAnisotropy, -0.999f, 0.999f);
     return ptVolume;
 }
 

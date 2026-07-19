@@ -163,6 +163,34 @@ struct PTMaterial : public PTMaterialBase
     dm::float3              fuzzColor                           = 1.f;
     float                   fuzzRoughness                       = 0.6f;
 
+    // OpenPBR coat
+    float                   coatWeight                          = 0.f;
+    dm::float3              coatColor                           = 1.f;
+    float                   coatRoughness                       = 0.f;
+    float                   coatAnisotropy                      = 0.f;
+    float                   coatIor                             = 1.6f;
+    float                   coatDarkening                       = 1.f;
+
+    // OpenPBR subsurface (dense scattering approx via lobe mix + volume sigmaS)
+    float                   subsurfaceWeight                    = 0.f;
+    dm::float3              subsurfaceColor                     = 1.f;
+    float                   subsurfaceRadius                    = 1.f;
+    float                   subsurfaceScale                     = 1.f;
+    float                   subsurfaceAnisotropy                = 0.f;
+
+    // OpenPBR thin-film
+    float                   thinFilmWeight                      = 0.f;
+    float                   thinFilmThickness                   = 0.5f; // micrometers
+    float                   thinFilmIor                         = 1.4f;
+
+    // OpenPBR transmission extras
+    dm::float3              transmissionColor                   = 1.f;
+    float                   transmissionDepth                   = 0.f;
+    dm::float3              transmissionScatter                 = 0.f;
+    float                   transmissionScatterAnisotropy       = 0.f;
+    float                   transmissionDispersionScale         = 0.f;
+    float                   transmissionDispersionAbbeNumber    = 20.f;
+
     float                   emissiveIntensity                   = 1.f; // additional multiplier for emissiveColor
     float                   metalness                           = 0.f; // metal-rough only
     float                   roughness                           = 0.f; // both metal-rough and spec-gloss

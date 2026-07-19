@@ -30,6 +30,31 @@ struct MaterialProperties
     lpfloat shadowNoLFadeout;
     uint flags;
 
+    // OpenPBR coat / subsurface / thin-film / transmission extras
+    lpfloat coatWeight;
+    lpfloat3 coatColor;
+    lpfloat coatRoughness;
+    lpfloat coatAnisotropy;
+    lpfloat coatIor;
+    lpfloat coatDarkening;
+
+    lpfloat subsurfaceWeight;
+    lpfloat3 subsurfaceColor;
+    lpfloat subsurfaceRadius;
+    lpfloat subsurfaceScale;
+    lpfloat subsurfaceAnisotropy;
+
+    lpfloat thinFilmWeight;
+    lpfloat thinFilmThickness;
+    lpfloat thinFilmIor;
+
+    lpfloat3 transmissionColor;
+    lpfloat transmissionDepth;
+    lpfloat3 transmissionScatter;
+    lpfloat transmissionScatterAnisotropy;
+    lpfloat transmissionDispersionScale;
+    lpfloat transmissionDispersionAbbeNumber;
+
     static MaterialProperties make()
     {
         MaterialProperties result;
@@ -55,6 +80,31 @@ struct MaterialProperties
 #endif
         result.ior = 1.5;
         result.flags = 0;
+        result.shadowNoLFadeout = 0;
+
+        result.coatWeight = 0;
+        result.coatColor = 1;
+        result.coatRoughness = 0;
+        result.coatAnisotropy = 0;
+        result.coatIor = 1.6;
+        result.coatDarkening = 1;
+
+        result.subsurfaceWeight = 0;
+        result.subsurfaceColor = 1;
+        result.subsurfaceRadius = 1;
+        result.subsurfaceScale = 1;
+        result.subsurfaceAnisotropy = 0;
+
+        result.thinFilmWeight = 0;
+        result.thinFilmThickness = 0.5;
+        result.thinFilmIor = 1.4;
+
+        result.transmissionColor = 1;
+        result.transmissionDepth = 0;
+        result.transmissionScatter = 0;
+        result.transmissionScatterAnisotropy = 0;
+        result.transmissionDispersionScale = 0;
+        result.transmissionDispersionAbbeNumber = 20;
         return result;
     }
 };

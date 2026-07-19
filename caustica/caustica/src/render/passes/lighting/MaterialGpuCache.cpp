@@ -99,7 +99,12 @@ static bool HasOpenPBRFields(const Json::Value& input)
             || input.isMember("specular_roughness_anisotropy")
             || input.isMember("transmission_weight")
             || input.isMember("geometry_opacity")
-            || input.isMember("fuzz_weight"));
+            || input.isMember("fuzz_weight")
+            || input.isMember("coat_weight")
+            || input.isMember("subsurface_weight")
+            || input.isMember("thin_film_weight")
+            || input.isMember("transmission_color")
+            || input.isMember("transmission_dispersion_scale"));
 }
 
 template <typename T>
@@ -200,6 +205,30 @@ void PTMaterial::write(Json::Value& output)
     STORE_FIELD(fuzzColor);
     STORE_FIELD(fuzzRoughness);
 
+    STORE_FIELD(coatWeight);
+    STORE_FIELD(coatColor);
+    STORE_FIELD(coatRoughness);
+    STORE_FIELD(coatAnisotropy);
+    STORE_FIELD(coatIor);
+    STORE_FIELD(coatDarkening);
+
+    STORE_FIELD(subsurfaceWeight);
+    STORE_FIELD(subsurfaceColor);
+    STORE_FIELD(subsurfaceRadius);
+    STORE_FIELD(subsurfaceScale);
+    STORE_FIELD(subsurfaceAnisotropy);
+
+    STORE_FIELD(thinFilmWeight);
+    STORE_FIELD(thinFilmThickness);
+    STORE_FIELD(thinFilmIor);
+
+    STORE_FIELD(transmissionColor);
+    STORE_FIELD(transmissionDepth);
+    STORE_FIELD(transmissionScatter);
+    STORE_FIELD(transmissionScatterAnisotropy);
+    STORE_FIELD(transmissionDispersionScale);
+    STORE_FIELD(transmissionDispersionAbbeNumber);
+
     STORE_FIELD(emissiveIntensity);
     STORE_FIELD(metalness);
     STORE_FIELD(roughness);
@@ -259,6 +288,30 @@ void PTMaterial::write(Json::Value& output)
         openPBR["fuzz_weight"] << fuzzWeight;
         openPBR["fuzz_color"] << fuzzColor;
         openPBR["fuzz_roughness"] << fuzzRoughness;
+
+        openPBR["coat_weight"] << coatWeight;
+        openPBR["coat_color"] << coatColor;
+        openPBR["coat_roughness"] << coatRoughness;
+        openPBR["coat_roughness_anisotropy"] << coatAnisotropy;
+        openPBR["coat_ior"] << coatIor;
+        openPBR["coat_darkening"] << coatDarkening;
+
+        openPBR["subsurface_weight"] << subsurfaceWeight;
+        openPBR["subsurface_color"] << subsurfaceColor;
+        openPBR["subsurface_radius"] << subsurfaceRadius;
+        openPBR["subsurface_scale"] << subsurfaceScale;
+        openPBR["subsurface_anisotropy"] << subsurfaceAnisotropy;
+
+        openPBR["thin_film_weight"] << thinFilmWeight;
+        openPBR["thin_film_thickness"] << thinFilmThickness;
+        openPBR["thin_film_ior"] << thinFilmIor;
+
+        openPBR["transmission_color"] << transmissionColor;
+        openPBR["transmission_depth"] << transmissionDepth;
+        openPBR["transmission_scatter"] << transmissionScatter;
+        openPBR["transmission_scatter_anisotropy"] << transmissionScatterAnisotropy;
+        openPBR["transmission_dispersion_scale"] << transmissionDispersionScale;
+        openPBR["transmission_dispersion_abbe_number"] << transmissionDispersionAbbeNumber;
     }
 }
 
@@ -336,6 +389,30 @@ bool PTMaterial::read(
     LOAD_FIELD_EITHER(fuzzWeight, "FuzzWeight");
     LOAD_FIELD_EITHER(fuzzColor, "FuzzColor");
     LOAD_FIELD_EITHER(fuzzRoughness, "FuzzRoughness");
+
+    LOAD_FIELD_EITHER(coatWeight, "CoatWeight");
+    LOAD_FIELD_EITHER(coatColor, "CoatColor");
+    LOAD_FIELD_EITHER(coatRoughness, "CoatRoughness");
+    LOAD_FIELD_EITHER(coatAnisotropy, "CoatAnisotropy");
+    LOAD_FIELD_EITHER(coatIor, "CoatIor");
+    LOAD_FIELD_EITHER(coatDarkening, "CoatDarkening");
+
+    LOAD_FIELD_EITHER(subsurfaceWeight, "SubsurfaceWeight");
+    LOAD_FIELD_EITHER(subsurfaceColor, "SubsurfaceColor");
+    LOAD_FIELD_EITHER(subsurfaceRadius, "SubsurfaceRadius");
+    LOAD_FIELD_EITHER(subsurfaceScale, "SubsurfaceScale");
+    LOAD_FIELD_EITHER(subsurfaceAnisotropy, "SubsurfaceAnisotropy");
+
+    LOAD_FIELD_EITHER(thinFilmWeight, "ThinFilmWeight");
+    LOAD_FIELD_EITHER(thinFilmThickness, "ThinFilmThickness");
+    LOAD_FIELD_EITHER(thinFilmIor, "ThinFilmIor");
+
+    LOAD_FIELD_EITHER(transmissionColor, "TransmissionColor");
+    LOAD_FIELD_EITHER(transmissionDepth, "TransmissionDepth");
+    LOAD_FIELD_EITHER(transmissionScatter, "TransmissionScatter");
+    LOAD_FIELD_EITHER(transmissionScatterAnisotropy, "TransmissionScatterAnisotropy");
+    LOAD_FIELD_EITHER(transmissionDispersionScale, "TransmissionDispersionScale");
+    LOAD_FIELD_EITHER(transmissionDispersionAbbeNumber, "TransmissionDispersionAbbeNumber");
 
     LOAD_FIELD_EITHER(emissiveIntensity, "EmissiveIntensity");
     LOAD_FIELD_EITHER(metalness, "Metalness");
@@ -416,6 +493,30 @@ bool PTMaterial::read(
         ReadJsonMember(openPBR, "fuzz_color", fuzzColor);
         ReadJsonMember(openPBR, "fuzz_roughness", fuzzRoughness);
 
+        ReadJsonMember(openPBR, "coat_weight", coatWeight);
+        ReadJsonMember(openPBR, "coat_color", coatColor);
+        ReadJsonMember(openPBR, "coat_roughness", coatRoughness);
+        ReadJsonMember(openPBR, "coat_roughness_anisotropy", coatAnisotropy);
+        ReadJsonMember(openPBR, "coat_ior", coatIor);
+        ReadJsonMember(openPBR, "coat_darkening", coatDarkening);
+
+        ReadJsonMember(openPBR, "subsurface_weight", subsurfaceWeight);
+        ReadJsonMember(openPBR, "subsurface_color", subsurfaceColor);
+        ReadJsonMember(openPBR, "subsurface_radius", subsurfaceRadius);
+        ReadJsonMember(openPBR, "subsurface_scale", subsurfaceScale);
+        ReadJsonMember(openPBR, "subsurface_anisotropy", subsurfaceAnisotropy);
+
+        ReadJsonMember(openPBR, "thin_film_weight", thinFilmWeight);
+        ReadJsonMember(openPBR, "thin_film_thickness", thinFilmThickness);
+        ReadJsonMember(openPBR, "thin_film_ior", thinFilmIor);
+
+        ReadJsonMember(openPBR, "transmission_color", transmissionColor);
+        ReadJsonMember(openPBR, "transmission_depth", transmissionDepth);
+        ReadJsonMember(openPBR, "transmission_scatter", transmissionScatter);
+        ReadJsonMember(openPBR, "transmission_scatter_anisotropy", transmissionScatterAnisotropy);
+        ReadJsonMember(openPBR, "transmission_dispersion_scale", transmissionDispersionScale);
+        ReadJsonMember(openPBR, "transmission_dispersion_abbe_number", transmissionDispersionAbbeNumber);
+
         useSpecularGlossModel = false;
     };
 
@@ -436,6 +537,22 @@ bool PTMaterial::read(
     anisotropy = std::clamp(anisotropy, -1.0f, 1.0f);
     fuzzWeight = std::clamp(fuzzWeight, 0.0f, 1.0f);
     fuzzRoughness = std::clamp(fuzzRoughness, 0.0f, 1.0f);
+    coatWeight = std::clamp(coatWeight, 0.0f, 1.0f);
+    coatRoughness = std::clamp(coatRoughness, 0.0f, 1.0f);
+    coatAnisotropy = std::clamp(coatAnisotropy, -1.0f, 1.0f);
+    coatIor = std::max(coatIor, 1.0f);
+    coatDarkening = std::clamp(coatDarkening, 0.0f, 1.0f);
+    subsurfaceWeight = std::clamp(subsurfaceWeight, 0.0f, 1.0f);
+    subsurfaceRadius = std::max(subsurfaceRadius, 0.0f);
+    subsurfaceScale = std::max(subsurfaceScale, 0.0f);
+    subsurfaceAnisotropy = std::clamp(subsurfaceAnisotropy, -1.0f, 1.0f);
+    thinFilmWeight = std::clamp(thinFilmWeight, 0.0f, 1.0f);
+    thinFilmThickness = std::max(thinFilmThickness, 0.0f);
+    thinFilmIor = std::max(thinFilmIor, 1.0f);
+    transmissionDepth = std::max(transmissionDepth, 0.0f);
+    transmissionScatterAnisotropy = std::clamp(transmissionScatterAnisotropy, -1.0f, 1.0f);
+    transmissionDispersionScale = std::clamp(transmissionDispersionScale, 0.0f, 1.0f);
+    transmissionDispersionAbbeNumber = std::max(transmissionDispersionAbbeNumber, 0.0f);
 
     return true;
 }
@@ -631,6 +748,36 @@ bool PTMaterial::editorGui(MaterialGpuCache & cache)
     update |= ImGui::ColorEdit3("fuzz_color", fuzzColor.data(), ImGuiColorEditFlags_Float);
     update |= ImGui::SliderFloat("fuzz_roughness", &fuzzRoughness, 0.f, 1.f);
 
+    if (ImGui::CollapsingHeader("Coat", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        update |= ImGui::SliderFloat("coat_weight", &coatWeight, 0.f, 1.f);
+        update |= ImGui::ColorEdit3("coat_color", coatColor.data(), ImGuiColorEditFlags_Float);
+        update |= ImGui::SliderFloat("coat_roughness", &coatRoughness, 0.f, 1.f);
+        update |= ImGui::SliderFloat("coat_roughness_anisotropy", &coatAnisotropy, -1.f, 1.f);
+        update |= ImGui::InputFloat("coat_ior", &coatIor);
+        if (coatIor < 1.0f) { coatIor = 1.0f; update = true; }
+        update |= ImGui::SliderFloat("coat_darkening", &coatDarkening, 0.f, 1.f);
+    }
+
+    if (ImGui::CollapsingHeader("Subsurface"))
+    {
+        update |= ImGui::SliderFloat("subsurface_weight", &subsurfaceWeight, 0.f, 1.f);
+        update |= ImGui::ColorEdit3("subsurface_color", subsurfaceColor.data(), ImGuiColorEditFlags_Float);
+        update |= ImGui::InputFloat("subsurface_radius", &subsurfaceRadius);
+        if (subsurfaceRadius < 0.0f) { subsurfaceRadius = 0.0f; update = true; }
+        update |= ImGui::InputFloat("subsurface_scale", &subsurfaceScale);
+        if (subsurfaceScale < 0.0f) { subsurfaceScale = 0.0f; update = true; }
+        update |= ImGui::SliderFloat("subsurface_anisotropy", &subsurfaceAnisotropy, -1.f, 1.f);
+    }
+
+    if (ImGui::CollapsingHeader("Thin Film"))
+    {
+        update |= ImGui::SliderFloat("thin_film_weight", &thinFilmWeight, 0.f, 1.f);
+        update |= ImGui::SliderFloat("thin_film_thickness", &thinFilmThickness, 0.f, 3.f);
+        update |= ImGui::InputFloat("thin_film_ior", &thinFilmIor);
+        if (thinFilmIor < 1.0f) { thinFilmIor = 1.0f; update = true; }
+    }
+
     update |= ImGui::SliderFloat("geometry_opacity", &opacity, 0.f, 1.f);
     update |= ImGui::Checkbox("geometry_thin_walled", &thinSurface);
 
@@ -640,6 +787,14 @@ bool PTMaterial::editorGui(MaterialGpuCache & cache)
     float previousDiffuseTransmissionFactor = diffuseTransmissionFactor;
     update |= ImGui::SliderFloat("transmission_weight", &transmissionFactor, 0.f, 1.f);
     update |= ImGui::SliderFloat("transmission_diffuse_weight", &diffuseTransmissionFactor, 0.f, 1.f);
+    update |= ImGui::ColorEdit3("transmission_color", transmissionColor.data(), ImGuiColorEditFlags_Float);
+    update |= ImGui::InputFloat("transmission_depth", &transmissionDepth);
+    if (transmissionDepth < 0.0f) { transmissionDepth = 0.0f; update = true; }
+    update |= ImGui::ColorEdit3("transmission_scatter", transmissionScatter.data(), ImGuiColorEditFlags_Float);
+    update |= ImGui::SliderFloat("transmission_scatter_anisotropy", &transmissionScatterAnisotropy, -1.f, 1.f);
+    update |= ImGui::SliderFloat("transmission_dispersion_scale", &transmissionDispersionScale, 0.f, 1.f);
+    update |= ImGui::InputFloat("transmission_dispersion_abbe_number", &transmissionDispersionAbbeNumber);
+    if (transmissionDispersionAbbeNumber < 0.0f) { transmissionDispersionAbbeNumber = 0.0f; update = true; }
 
     bool openPBRTransmissionEnabled = (transmissionFactor > 0.f) || (diffuseTransmissionFactor > 0.f);
     if (openPBRTransmissionEnabled != enableTransmission)
@@ -703,9 +858,9 @@ bool PTMaterial::editorGui(MaterialGpuCache & cache)
         
         {
             UI_SCOPED_DISABLE(psdExclude);
-            int dominantDeltaLobeP1 = dm::clamp(psdDominantDeltaLobe, -1, 1) + 1;
-            update |= ImGui::Combo("Dominant bounce", &dominantDeltaLobeP1, "None (surface)\0Transparency\0Reflection\0\0");
-            psdDominantDeltaLobe = dm::clamp(dominantDeltaLobeP1 - 1, -1, 1);
+            int dominantDeltaLobeP1 = dm::clamp(psdDominantDeltaLobe, -1, 2) + 1;
+            update |= ImGui::Combo("Dominant bounce", &dominantDeltaLobeP1, "None (surface)\0Transparency\0Reflection\0Coat\0\0");
+            psdDominantDeltaLobe = dm::clamp(dominantDeltaLobeP1 - 1, -1, 2);
             if (ImGui::IsItemHovered()) ImGui::SetTooltip("Determines which surface will:\n * provide motion vectors for denoising\n * get ReSTIR DI lighting\n * get 'boost samples' for NEE lighting");
         }
         ImGui::Unindent();
@@ -839,6 +994,31 @@ void PTMaterial::fillData(PTMaterialData & data)
     data.Volume.AttenuationColor    = volumeAttenuationColor;
     data.Volume.AttenuationDistance = volumeAttenuationDistance;
 
+    data.CoatWeight = std::clamp(coatWeight, 0.0f, 1.0f);
+    data.CoatColor = coatColor;
+    data.CoatRoughness = std::clamp(coatRoughness, 0.0f, 1.0f);
+    data.CoatAnisotropy = std::clamp(coatAnisotropy, -1.0f, 1.0f);
+    data.CoatIor = std::max(coatIor, 1.0f);
+    data.CoatDarkening = std::clamp(coatDarkening, 0.0f, 1.0f);
+
+    data.SubsurfaceWeight = std::clamp(subsurfaceWeight, 0.0f, 1.0f);
+    data.SubsurfaceColor = subsurfaceColor;
+    data.SubsurfaceRadius = std::max(subsurfaceRadius, 0.0f);
+    data.SubsurfaceScale = std::max(subsurfaceScale, 0.0f);
+    data.SubsurfaceAnisotropy = std::clamp(subsurfaceAnisotropy, -1.0f, 1.0f);
+
+    data.ThinFilmWeight = std::clamp(thinFilmWeight, 0.0f, 1.0f);
+    data.ThinFilmThickness = std::max(thinFilmThickness, 0.0f);
+    data.ThinFilmIor = std::max(thinFilmIor, 1.0f);
+
+    data.TransmissionColor = transmissionColor;
+    data.TransmissionDepth = std::max(transmissionDepth, 0.0f);
+    data.TransmissionScatter = transmissionScatter;
+    data.TransmissionScatterAnisotropy = std::clamp(transmissionScatterAnisotropy, -1.0f, 1.0f);
+    data.TransmissionDispersionScale = std::clamp(transmissionDispersionScale, 0.0f, 1.0f);
+    data.TransmissionDispersionAbbeNumber = std::max(transmissionDispersionAbbeNumber, 0.0f);
+    data._padOpenPBR0 = data._padOpenPBR1 = data._padOpenPBR2 = 0.f;
+
     // bindless textures
 
     GetBindlessTextureIndex(baseTexture.loaded, data.BaseOrDiffuseTextureIndex, data.Flags, PTMaterialFlags_UseBaseOrDiffuseTexture);
@@ -851,8 +1031,6 @@ void PTMaterial::fillData(PTMaterialData & data)
     data.Flags |= (uint)(clamp(psdDominantDeltaLobe + 1, 0, 7)) << PTMaterialFlags_PSDDominantDeltaLobeP1Shift;
 
     data.ShadowNoLFadeout = std::clamp(shadowNoLFadeout, 0.0f, 0.25f);
-
-    data._padding0 = data._padding1 = 42;
 }
 
 std::filesystem::path MaterialGpuCache::getMaterialStoragePath(PTMaterialBase& material)

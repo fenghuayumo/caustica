@@ -39,7 +39,7 @@ struct PTMaterialData
     uint        Flags;
 
     float3      SpecularColor;
-    int         _padding0;
+    float       CoatWeight;
 
     float3      EmissiveColor;
     float       ShadowNoLFadeout;
@@ -49,7 +49,7 @@ struct PTMaterialData
     float       Metalness;
     float       NormalTextureScale;
 
-    float       _padding1;
+    float       CoatRoughness;
     float       AlphaCutoff;
     float       TransmissionFactor;
     uint        BaseOrDiffuseTextureIndex;
@@ -61,7 +61,7 @@ struct PTMaterialData
 
     uint        TransmissionTextureIndex;
     float       IoR;
-    float       ThicknessFactor;
+    float       CoatIor;
     float       DiffuseTransmissionFactor;
 
     float       BaseWeight;
@@ -72,6 +72,33 @@ struct PTMaterialData
     float3      FuzzColor;
     float       FuzzRoughness;
 
+    float3      CoatColor;
+    float       CoatDarkening;
+
+    float       CoatAnisotropy;
+    float       SubsurfaceWeight;
+    float       SubsurfaceRadius;
+    float       SubsurfaceScale;
+
+    float3      SubsurfaceColor;
+    float       SubsurfaceAnisotropy;
+
+    float       ThinFilmWeight;
+    float       ThinFilmThickness;
+    float       ThinFilmIor;
+    float       TransmissionDepth;
+
+    float3      TransmissionColor;
+    float       TransmissionDispersionScale;
+
+    float3      TransmissionScatter;
+    float       TransmissionDispersionAbbeNumber;
+
+    float       TransmissionScatterAnisotropy;
+    float       _padOpenPBR0;
+    float       _padOpenPBR1;
+    float       _padOpenPBR2;
+
     VolumePTConstants Volume;
 };
 
@@ -79,5 +106,3 @@ struct PTMaterialData
 #endif
 
 #endif
-
- 

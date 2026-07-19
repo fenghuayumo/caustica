@@ -12,6 +12,7 @@
 #include "../../Utils/ColorHelpers.hlsli"
 #include "Fresnel.hlsli"
 #include "Microfacet.hlsli"
+#include "OpenPBRHelpers.hlsli"
 
 #include "../../StablePlanes.hlsli"
 
@@ -355,6 +356,7 @@ struct SpecularReflectionMicrofacet // : IBxDF
     float alpha;        ///< GGX width parameter.
     float anisotropy;   ///< OpenPBR specular_roughness_anisotropy.
     uint activeLobes;   ///< BSDF lobes to include for sampling and evaluation. See LobeType.hlsli.
+    bool isCoat;        ///< OpenPBR coat lobe (uses ClearcoatDeltaReflection for delta PSD index 2).
 
     bool hasLobe(LobeType lobe) { return (activeLobes & (uint)lobe) != 0; }
 
@@ -412,12 +414,12 @@ struct SpecularReflectionMicrofacet // : IBxDF
         // Handle delta reflection.
         if (alpha == 0.f)
         {
-            if (!hasLobe(LobeType::DeltaReflection)) return false;
+            if (!hasLobe(LobeType::DeltaReflection) && !hasLobe(LobeType::ClearcoatDeltaReflection)) return false;
 
             wo = float3(-wi.x, -wi.y, wi.z);
             pdf = 0.f;
             weight = evalFresnelSchlick(albedo, 1.f, wi.z);
-            lobe = (uint)LobeType::DeltaReflection;
+            lobe = isCoat ? (uint)LobeType::ClearcoatDeltaReflection : (uint)LobeType::DeltaReflection;
             return true;
         }
 #endif
@@ -730,9 +732,29 @@ struct StandardBSDFData
     lpfloat3    _fuzzColor;              ///< OpenPBR fuzz color.
     lpfloat     _fuzzRoughness;          ///< OpenPBR fuzz roughness.
 
+    lpfloat     _coatWeight;
+    lpfloat3    _coatColor;
+    lpfloat     _coatRoughness;
+    lpfloat     _coatAnisotropy;
+    lpfloat     _coatIor;
+    lpfloat     _coatDarkening;
+
+    lpfloat     _subsurfaceWeight;
+    lpfloat3    _subsurfaceColor;
+
+    lpfloat     _thinFilmWeight;
+    lpfloat     _thinFilmThickness;
+    lpfloat     _thinFilmIor;
+    lpfloat     _dispersionScale;
+    lpfloat     _dispersionAbbeNumber;
+
     static StandardBSDFData make(
         lpfloat3 diffuse, lpfloat3 specular, lpfloat roughness, lpfloat metallic, lpfloat eta, lpfloat3 transmission, lpfloat diffuseTransmission, lpfloat specularTransmission,
-        lpfloat anisotropy, lpfloat fuzzWeight, lpfloat3 fuzzColor, lpfloat fuzzRoughness )
+        lpfloat anisotropy, lpfloat fuzzWeight, lpfloat3 fuzzColor, lpfloat fuzzRoughness,
+        lpfloat coatWeight, lpfloat3 coatColor, lpfloat coatRoughness, lpfloat coatAnisotropy, lpfloat coatIor, lpfloat coatDarkening,
+        lpfloat subsurfaceWeight, lpfloat3 subsurfaceColor,
+        lpfloat thinFilmWeight, lpfloat thinFilmThickness, lpfloat thinFilmIor,
+        lpfloat dispersionScale, lpfloat dispersionAbbeNumber )
     {
         StandardBSDFData d;
 #if CAUSTICA_STANDARD_BSDF_DATA_MANUAL_PACK
@@ -758,6 +780,19 @@ struct StandardBSDFData
         d._fuzzWeight = fuzzWeight;
         d._fuzzColor = fuzzColor;
         d._fuzzRoughness = fuzzRoughness;
+        d._coatWeight = coatWeight;
+        d._coatColor = coatColor;
+        d._coatRoughness = coatRoughness;
+        d._coatAnisotropy = coatAnisotropy;
+        d._coatIor = coatIor;
+        d._coatDarkening = coatDarkening;
+        d._subsurfaceWeight = subsurfaceWeight;
+        d._subsurfaceColor = subsurfaceColor;
+        d._thinFilmWeight = thinFilmWeight;
+        d._thinFilmThickness = thinFilmThickness;
+        d._thinFilmIor = thinFilmIor;
+        d._dispersionScale = dispersionScale;
+        d._dispersionAbbeNumber = dispersionAbbeNumber;
         return d;
     }
 
@@ -804,6 +839,19 @@ struct StandardBSDFData
     lpfloat     FuzzWeight          ()  { return _fuzzWeight;           }
     lpfloat3    FuzzColor           ()  { return _fuzzColor;            }
     lpfloat     FuzzRoughness       ()  { return _fuzzRoughness;        }
+    lpfloat     CoatWeight          ()  { return _coatWeight;           }
+    lpfloat3    CoatColor           ()  { return _coatColor;            }
+    lpfloat     CoatRoughness       ()  { return _coatRoughness;        }
+    lpfloat     CoatAnisotropy      ()  { return _coatAnisotropy;       }
+    lpfloat     CoatIor             ()  { return _coatIor;              }
+    lpfloat     CoatDarkening       ()  { return _coatDarkening;        }
+    lpfloat     SubsurfaceWeight    ()  { return _subsurfaceWeight;     }
+    lpfloat3    SubsurfaceColor     ()  { return _subsurfaceColor;      }
+    lpfloat     ThinFilmWeight      ()  { return _thinFilmWeight;       }
+    lpfloat     ThinFilmThickness   ()  { return _thinFilmThickness;    }
+    lpfloat     ThinFilmIor         ()  { return _thinFilmIor;          }
+    lpfloat     DispersionScale     ()  { return _dispersionScale;      }
+    lpfloat     DispersionAbbeNumber()  { return _dispersionAbbeNumber; }
 };
 
 /** Mixed BSDF used for the standard material in Falcor.
@@ -824,16 +872,19 @@ struct FalcorBSDF // : IBxDF
     FuzzReflection fuzzReflection;
 
     SpecularReflectionMicrofacet specularReflection;
+    SpecularReflectionMicrofacet coatReflection;
     SpecularReflectionTransmissionMicrofacet specularReflectionTransmission;
 
     float diffTrans;                        ///< Mix between diffuse BRDF and diffuse BTDF.
     float specTrans;                        ///< Mix between dielectric BRDF and specular BSDF.
+    float coatWeight;                       ///< OpenPBR coat_weight used for base attenuation.
 
     float pDiffuseReflection;               ///< Probability for sampling the diffuse BRDF.
     float pDiffuseTransmission;             ///< Probability for sampling the diffuse BTDF.
     float pFuzzReflection;                  ///< Probability for sampling the OpenPBR fuzz BRDF.
     float pSpecularReflection;              ///< Probability for sampling the specular BRDF.
     float pSpecularReflectionTransmission;  ///< Probability for sampling the specular BSDF.
+    float pCoatReflection;                  ///< Probability for sampling the OpenPBR coat BRDF.
 
     bool psdExclude; // disable PSD
 
@@ -858,14 +909,24 @@ struct FalcorBSDF // : IBxDF
         float3 transmissionAlbedo = isThinSurface ? dataTransmission : sqrt(dataTransmission);
 
         float dataRoughness = data.Roughness();
+        float NdotV = saturate(dot(V, N));
+
+        // OpenPBR coat attenuation of the coated base substrate.
+        coatWeight = saturate(data.CoatWeight());
+        float3 coatBaseAtten = OpenPBRCoatBaseAttenuation(
+            coatWeight, data.CoatColor(), data.CoatDarkening(), data.CoatIor(), NdotV);
+
+        // Subsurface mixes opaque base diffuse toward subsurface_color (OpenPBR opaque-base mix).
+        float sssW = saturate(data.SubsurfaceWeight()) * (1.f - data.Metallic()) * (1.f - data.SpecularTransmission());
+        float3 baseDiffuse = lerp(data.Diffuse(), data.Diffuse() * data.SubsurfaceColor(), sssW);
 
         // Setup lobes.
-        diffuseReflection.albedo = data.Diffuse();
+        diffuseReflection.albedo = baseDiffuse * coatBaseAtten;
 #if DiffuseBrdf != DiffuseBrdfLambert
         diffuseReflection.roughness = dataRoughness;
 #endif
-        diffuseTransmission.albedo = transmissionAlbedo;
-        fuzzReflection.color = data.FuzzColor();
+        diffuseTransmission.albedo = transmissionAlbedo * coatBaseAtten;
+        fuzzReflection.color = data.FuzzColor() * coatBaseAtten;
         fuzzReflection.weight = data.FuzzWeight();
         fuzzReflection.roughness = data.FuzzRoughness();
 
@@ -881,13 +942,38 @@ struct FalcorBSDF // : IBxDF
 
         psdExclude = mtl.isPSDExclude();
 
-        lpfloat3 dataSpecular = data.Specular();
+        lpfloat3 dataSpecular = (lpfloat3)(data.Specular() * coatBaseAtten);
+        // Thin-film iridescence on base specular F0.
+        dataSpecular = (lpfloat3)OpenPBRApplyThinFilmToF0(
+            dataSpecular, data.ThinFilmWeight(), data.ThinFilmThickness(), data.ThinFilmIor(),
+            abs(data.Eta()) > 0.f ? (1.f / max(data.Eta(), 1e-3f)) : 1.5f, NdotV);
+
         lpfloat dataEta = data.Eta();
+        // Dispersion: scale relative eta per RGB via Abbe number (applied as scalar mean for microfacet eta).
+        float3 dispScale = OpenPBRDispersionEtaScale(data.DispersionAbbeNumber(), data.DispersionScale());
+        if (any(dispScale != 1.f))
+            dataEta *= (lpfloat)Average(dispScale);
 
         specularReflection.albedo = dataSpecular;
         specularReflection.alpha = alpha;
         specularReflection.anisotropy = data.Anisotropy();
         specularReflection.activeLobes = activeLobes;
+        specularReflection.isCoat = false;
+
+        // OpenPBR coat lobe (dielectric GGX with coat_ior).
+        float coatF0 = OpenPBRDielectricF0(max(data.CoatIor(), 1.f));
+        float coatRough = saturate(data.CoatRoughness());
+        float coatAlpha = coatRough * coatRough;
+#if EnableDeltaBSDF
+        if (coatAlpha < kMinGGXAlpha) coatAlpha = 0.f;
+#else
+        coatAlpha = max(coatAlpha, kMinGGXAlpha);
+#endif
+        coatReflection.albedo = float3(coatF0, coatF0, coatF0);
+        coatReflection.alpha = coatAlpha;
+        coatReflection.anisotropy = data.CoatAnisotropy();
+        coatReflection.activeLobes = activeLobes | (uint)LobeType::ClearcoatDeltaReflection;
+        coatReflection.isCoat = true;
 
         specularReflectionTransmission.transmissionAlbedo = transmissionAlbedo;
         // Transmission through rough interface with same IoR on both sides is not well defined, switch to delta lobe instead.
@@ -897,6 +983,9 @@ struct FalcorBSDF // : IBxDF
         specularReflectionTransmission.isThinSurface = isThinSurface;
 
         diffTrans = data.DiffuseTransmission();
+        // Thin-walled subsurface contributes as diffuse transmission of subsurface_color.
+        if (isThinSurface && sssW > 0.f)
+            diffTrans = saturate(max(diffTrans, sssW));
         specTrans = data.SpecularTransmission();
 
         // Compute sampling weights.
@@ -905,17 +994,19 @@ struct FalcorBSDF // : IBxDF
         float dielectricBSDF = (1.f - dataMetallic) * (1.f - specTrans);
         float specularBSDF = specTrans;
 
-        float diffuseWeight = Luminance(data.Diffuse());
-        float fuzzWeight = Luminance(data.FuzzColor()) * data.FuzzWeight();
-        float specularWeight = Luminance(evalFresnelSchlick(dataSpecular, 1.f, dot(V, N)));
+        float diffuseWeight = Luminance(diffuseReflection.albedo);
+        float fuzzWeight = Luminance(fuzzReflection.color) * fuzzReflection.weight;
+        float specularWeight = Luminance(evalFresnelSchlick(dataSpecular, 1.f, NdotV));
+        float coatSampleWeight = coatWeight * Luminance(evalFresnelSchlick(coatReflection.albedo, 1.f, NdotV));
 
         pDiffuseReflection = (activeLobes & (uint)LobeType::DiffuseReflection) ? diffuseWeight * dielectricBSDF * (1.f - diffTrans) : 0.f;
         pDiffuseTransmission = (activeLobes & (uint)LobeType::DiffuseTransmission) ? diffuseWeight * dielectricBSDF * diffTrans : 0.f;
         pFuzzReflection = (activeLobes & (uint)LobeType::DiffuseReflection) ? fuzzWeight * dielectricBSDF * (1.f - diffTrans) : 0.f;
         pSpecularReflection = (activeLobes & ((uint)LobeType::SpecularReflection | (uint)LobeType::DeltaReflection)) ? specularWeight * (metallicBRDF + dielectricBSDF) : 0.f;
         pSpecularReflectionTransmission = (activeLobes & ((uint)LobeType::SpecularReflection | (uint)LobeType::DeltaReflection | (uint)LobeType::SpecularTransmission | (uint)LobeType::DeltaTransmission)) ? specularBSDF : 0.f;
+        pCoatReflection = (activeLobes & ((uint)LobeType::SpecularReflection | (uint)LobeType::DeltaReflection | (uint)LobeType::ClearcoatDeltaReflection)) ? coatSampleWeight : 0.f;
 
-        float normFactor = pDiffuseReflection + pDiffuseTransmission + pFuzzReflection + pSpecularReflection + pSpecularReflectionTransmission;
+        float normFactor = pDiffuseReflection + pDiffuseTransmission + pFuzzReflection + pSpecularReflection + pSpecularReflectionTransmission + pCoatReflection;
         if (normFactor > 0.f)
         {
             normFactor = 1.f / normFactor;
@@ -924,6 +1015,7 @@ struct FalcorBSDF // : IBxDF
             pFuzzReflection *= normFactor;
             pSpecularReflection *= normFactor;
             pSpecularReflectionTransmission *= normFactor;
+            pCoatReflection *= normFactor;
         }
     }
     
@@ -966,12 +1058,17 @@ struct FalcorBSDF // : IBxDF
         lpfloat specTrans = data.SpecularTransmission();
 
         uint lobes = isDelta ? (uint)LobeType::DeltaReflection : (uint)LobeType::SpecularReflection;
-        if ((any(data.Diffuse() > 0.f) || data.FuzzWeight() > 0.f) && specTrans < 1.f)
+        if ((any(data.Diffuse() > 0.f) || data.FuzzWeight() > 0.f || data.SubsurfaceWeight() > 0.f) && specTrans < 1.f)
         {
             if (diffTrans < 1.f) lobes |= (uint)LobeType::DiffuseReflection;
             if (diffTrans > 0.f) lobes |= (uint)LobeType::DiffuseTransmission;
         }
         if (specTrans > 0.f) lobes |= (isDelta ? (uint)LobeType::DeltaTransmission : (uint)LobeType::SpecularTransmission);
+        if (data.CoatWeight() > 0.f)
+        {
+            float coatAlpha = data.CoatRoughness() * data.CoatRoughness();
+            lobes |= (coatAlpha < kMinGGXAlpha) ? (uint)LobeType::ClearcoatDeltaReflection : (uint)LobeType::SpecularReflection;
+        }
 
         return lobes;
     }
@@ -984,6 +1081,7 @@ struct FalcorBSDF // : IBxDF
         if (pFuzzReflection > 0.f) diffuse += (1.f - specTrans) * (1.f - diffTrans) * fuzzReflection.eval(wi, wo);
         if (pSpecularReflection > 0.f) specular += (1.f - specTrans) * specularReflection.eval(wi, wo);
         if (pSpecularReflectionTransmission > 0.f) specular += specTrans * (specularReflectionTransmission.eval(wi, wo));   // <- do we want to consider transmission as specular? this depends entirely on denoiser - should ask RR folks
+        if (pCoatReflection > 0.f) specular += coatWeight * coatReflection.eval(wi, wo);
 
         return float4(diffuse+specular, Average(specular)); // use average instead of sum to avoid hitting fp16 ceiling early
     }
@@ -1026,6 +1124,7 @@ struct FalcorBSDF // : IBxDF
             if (pFuzzReflection > 0.f) pdf += pFuzzReflection * fuzzReflection.evalPdf(wi, wo);
             if (pSpecularReflection > 0.f) pdf += pSpecularReflection * specularReflection.evalPdf(wi, wo);
             if (pSpecularReflectionTransmission > 0.f) pdf += pSpecularReflectionTransmission * specularReflectionTransmission.evalPdf(wi, wo);
+            if (pCoatReflection > 0.f) pdf += pCoatReflection * coatReflection.evalPdf(wi, wo);
         }
         else if (uSelect < pDiffuseReflection + pDiffuseTransmission)
         {
@@ -1038,6 +1137,7 @@ struct FalcorBSDF // : IBxDF
             if (pFuzzReflection > 0.f) pdf += pFuzzReflection * fuzzReflection.evalPdf(wi, wo);
             // if (pSpecularReflection > 0.f) pdf += pSpecularReflection * specularReflection.evalPdf(wi, wo);
             if (pSpecularReflectionTransmission > 0.f) pdf += pSpecularReflectionTransmission * specularReflectionTransmission.evalPdf(wi, wo);
+            if (pCoatReflection > 0.f) pdf += pCoatReflection * coatReflection.evalPdf(wi, wo);
         }
         else if (uSelect < pDiffuseReflection + pDiffuseTransmission + pFuzzReflection)
         {
@@ -1053,6 +1153,7 @@ struct FalcorBSDF // : IBxDF
             if (pDiffuseReflection > 0.f) pdf += pDiffuseReflection * diffuseReflection.evalPdf(wi, wo);
             if (pSpecularReflection > 0.f) pdf += pSpecularReflection * specularReflection.evalPdf(wi, wo);
             if (pSpecularReflectionTransmission > 0.f) pdf += pSpecularReflectionTransmission * specularReflectionTransmission.evalPdf(wi, wo);
+            if (pCoatReflection > 0.f) pdf += pCoatReflection * coatReflection.evalPdf(wi, wo);
         }
         else if (uSelect < pDiffuseReflection + pDiffuseTransmission + pFuzzReflection + pSpecularReflection)
         {
@@ -1069,11 +1170,12 @@ struct FalcorBSDF // : IBxDF
             if (pFuzzReflection > 0.f) pdf += pFuzzReflection * fuzzReflection.evalPdf(wi, wo);
             // if (pDiffuseTransmission > 0.f) pdf += pDiffuseTransmission * diffuseTransmission.evalPdf(wi, wo);
             if (pSpecularReflectionTransmission > 0.f) pdf += pSpecularReflectionTransmission * specularReflectionTransmission.evalPdf(wi, wo);
+            if (pCoatReflection > 0.f) pdf += pCoatReflection * coatReflection.evalPdf(wi, wo);
         }
-        else if (pSpecularReflectionTransmission > 0.f)
+        else if (uSelect < pDiffuseReflection + pDiffuseTransmission + pFuzzReflection + pSpecularReflection + pSpecularReflectionTransmission)
         {
 #if RecycleSelectSamples
-            preGeneratedSample.z = clamp((uSelect - (pDiffuseReflection + pDiffuseTransmission + pFuzzReflection + pSpecularReflection))/pSpecularReflectionTransmission, 0, cOneMinusEpsilon);
+            preGeneratedSample.z = clamp((uSelect - (pDiffuseReflection + pDiffuseTransmission + pFuzzReflection + pSpecularReflection))/max(pSpecularReflectionTransmission, 1e-6f), 0, cOneMinusEpsilon);
 #endif
 
             valid = specularReflectionTransmission.sample(wi, wo, pdf, weight, lobe, lobeP, preGeneratedSample.xyz);
@@ -1085,6 +1187,22 @@ struct FalcorBSDF // : IBxDF
             if (pDiffuseTransmission > 0.f) pdf += pDiffuseTransmission * diffuseTransmission.evalPdf(wi, wo);
             if (pFuzzReflection > 0.f) pdf += pFuzzReflection * fuzzReflection.evalPdf(wi, wo);
             if (pSpecularReflection > 0.f) pdf += pSpecularReflection * specularReflection.evalPdf(wi, wo);
+            if (pCoatReflection > 0.f) pdf += pCoatReflection * coatReflection.evalPdf(wi, wo);
+        }
+        else if (pCoatReflection > 0.f)
+        {
+#if RecycleSelectSamples
+            preGeneratedSample.z = clamp((uSelect - (pDiffuseReflection + pDiffuseTransmission + pFuzzReflection + pSpecularReflection + pSpecularReflectionTransmission))/pCoatReflection, 0, cOneMinusEpsilon);
+#endif
+            valid = coatReflection.sample(wi, wo, pdf, weight, lobe, lobeP, preGeneratedSample.xyz);
+            weight /= pCoatReflection;
+            weight *= coatWeight;
+            pdf *= pCoatReflection;
+            lobeP *= pCoatReflection;
+            if (pDiffuseReflection > 0.f) pdf += pDiffuseReflection * diffuseReflection.evalPdf(wi, wo);
+            if (pFuzzReflection > 0.f) pdf += pFuzzReflection * fuzzReflection.evalPdf(wi, wo);
+            if (pSpecularReflection > 0.f) pdf += pSpecularReflection * specularReflection.evalPdf(wi, wo);
+            if (pSpecularReflectionTransmission > 0.f) pdf += pSpecularReflectionTransmission * specularReflectionTransmission.evalPdf(wi, wo);
         }
 
         if( !valid || (lobe & (uint)LobeType::Delta) != 0 )
@@ -1101,12 +1219,13 @@ struct FalcorBSDF // : IBxDF
         if (pFuzzReflection > 0.f) pdf += pFuzzReflection * fuzzReflection.evalPdf(wi, wo);
         if (pSpecularReflection > 0.f) pdf += pSpecularReflection * specularReflection.evalPdf(wi, wo);
         if (pSpecularReflectionTransmission > 0.f) pdf += pSpecularReflectionTransmission * specularReflectionTransmission.evalPdf(wi, wo);
+        if (pCoatReflection > 0.f) pdf += pCoatReflection * coatReflection.evalPdf(wi, wo);
         return pdf;
     }
 
     void evalDeltaLobes(const float3 wi, out DeltaLobe deltaLobes[cMaxDeltaLobes], out int deltaLobeCount, out float nonDeltaPart)  // wi is in local space
     {
-        deltaLobeCount = 2;             // currently - will be 1 more if we add clear coat :)
+        deltaLobeCount = 3; // transmission, base reflection, OpenPBR coat reflection
         for (int i = 0; i < deltaLobeCount; i++)
             deltaLobes[i] = DeltaLobe::make(); // init to zero
 #if EnableDeltaBSDF == 0
@@ -1119,18 +1238,22 @@ struct FalcorBSDF // : IBxDF
             nonDeltaPart += pSpecularReflection;
         if ( specularReflectionTransmission.alpha > 0 ) // if roughness > 0, lobe is not delta
             nonDeltaPart += pSpecularReflectionTransmission;
+        if ( coatReflection.alpha > 0 )
+            nonDeltaPart += pCoatReflection;
 
         // no spec reflection or transmission? delta lobes are zero (we can just return, already initialized to 0)!
-        if ( (pSpecularReflection+pSpecularReflectionTransmission) == 0 || psdExclude )    
+        if ( (pSpecularReflection+pSpecularReflectionTransmission+pCoatReflection) == 0 || psdExclude )
             return;
 
         // note, deltaReflection here represents both this.specularReflection and this.specularReflectionTransmission's
-        DeltaLobe deltaReflection, deltaTransmission;
-        deltaReflection = deltaTransmission = DeltaLobe::make(); // init to zero
+        DeltaLobe deltaReflection, deltaTransmission, deltaCoat;
+        deltaReflection = deltaTransmission = deltaCoat = DeltaLobe::make(); // init to zero
         deltaReflection.transmission    = false;
         deltaTransmission.transmission  = true;
+        deltaCoat.transmission          = false;
 
         deltaReflection.dir  = float3(-wi.x, -wi.y, wi.z);
+        deltaCoat.dir = deltaReflection.dir;
 
         if (specularReflection.alpha == 0 && specularReflection.hasLobe(LobeType::DeltaReflection))
         {
@@ -1181,10 +1304,16 @@ struct FalcorBSDF // : IBxDF
             }
         }
 
+        if (coatReflection.alpha == 0.f && pCoatReflection > 0.f)
+        {
+            deltaCoat.probability = pCoatReflection;
+            deltaCoat.thp = coatWeight * evalFresnelSchlick(coatReflection.albedo, 1.f, wi.z);
+        }
+
         // Lobes are by convention in this order, and the index must match BSDFSample::getDeltaLobeIndex() as well as the UI.
-        // When we add clearcoat it goes after deltaReflection and so on.
         deltaLobes[0] = deltaTransmission;
         deltaLobes[1] = deltaReflection;
+        deltaLobes[2] = deltaCoat;
     }
 };
 

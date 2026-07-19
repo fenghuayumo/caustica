@@ -2,11 +2,13 @@
 #define __GBUFFER_HELPERS_HLSLI__
 
 #include "../PathTracer/PathTracerTypes.hlsli"
+#include "../Bindings/SceneBindings.hlsli"
 
 struct PathTracerCollectedSurfaceData
 {
 	// Only store these (plus more, potentially)
 	MaterialHeader _mtl; // (2x uint)
+	uint _materialID;
 
 	// misc (mostly subset of struct ShadingData)
 	float3 _T;
@@ -194,6 +196,7 @@ struct PathTracerCollectedSurfaceData
 	(
 		 // FalcorBSDF
 		const MaterialHeader mtl,
+		const uint materialID,
 		float3 T,
 		float3 B,
 		float3 N,
@@ -211,6 +214,7 @@ struct PathTracerCollectedSurfaceData
 		PathTracerCollectedSurfaceData surface;
 
 		surface._mtl = mtl;
+		surface._materialID = materialID;
 
 		surface._T = T;
 		surface._B = B;
@@ -282,7 +286,7 @@ PackedPathTracerSurfaceData RunCompress(PathTracerCollectedSurfaceData d)
 {
 	PackedPathTracerSurfaceData c;
 
-	c._mtl = uint2(d._mtl.packedData, 0);
+	c._mtl = uint2(d._mtl.packedData, d._materialID);
 	c._T = Fp32ToFp16(Encode_Oct(d._T));
 	c._N = Fp32ToFp16(Encode_Oct(d._N));
     float btNormal = -sign(dot( cross(d._T, d._N), d._B ));
@@ -306,6 +310,7 @@ PathTracerCollectedSurfaceData RunDecompress(PackedPathTracerSurfaceData c)
 	PathTracerCollectedSurfaceData d;
 
 	d._mtl.packedData = c._mtl.x;
+	d._materialID = c._mtl.y;
     float4 VandTW = Fp16ToFp32(c._V);
 	d._T = Decode_Oct(Fp16ToFp32(c._T));
 	d._N = Decode_Oct(Fp16ToFp32(c._N));
@@ -350,8 +355,61 @@ PathTracerCollectedSurfaceData RunDecompress(PackedPathTracerSurfaceData c)
 	bsdfDataMetallic = roughnessMetallicEta.y;
 	bsdfDataEta = roughnessMetallicEta.z;
 
+	lpfloat anisotropy = 0;
+	lpfloat fuzzWeight = 0;
+	lpfloat3 fuzzColor = (lpfloat3)1;
+	lpfloat fuzzRoughness = (lpfloat)0.6;
+	lpfloat subsurfaceWeight = 0;
+	lpfloat3 subsurfaceColor = (lpfloat3)1;
+
+	lpfloat coatWeight = 0;
+	lpfloat3 coatColor = (lpfloat3)1;
+	lpfloat coatRoughness = 0;
+	lpfloat coatAnisotropy = 0;
+	lpfloat coatIor = (lpfloat)1.6;
+	lpfloat coatDarkening = 1;
+
+	lpfloat thinFilmWeight = 0;
+	lpfloat thinFilmThickness = (lpfloat)0.5;
+	lpfloat thinFilmIor = (lpfloat)1.4;
+	lpfloat dispersionScale = 0;
+	lpfloat dispersionAbbeNumber = 20;
+
+	// These parameters are currently uniform per material. Reconstructing them
+	// by material ID preserves the complete OpenPBR BSDF without enlarging the
+	// packed surface record. History uses the current material table, so
+	// material edits must invalidate temporal reuse/accumulation.
+	// The bounds check also handles the 0xffffffff invalid-ID sentinel.
+	if (!d._isEmpty && d._materialID < g_Const.MaterialCount)
+	{
+		const PTMaterialData material = t_PTMaterialData[d._materialID];
+		anisotropy = (lpfloat)material.Anisotropy;
+		fuzzWeight = (lpfloat)material.FuzzWeight;
+		fuzzColor = (lpfloat3)material.FuzzColor;
+		fuzzRoughness = (lpfloat)material.FuzzRoughness;
+		subsurfaceWeight = (lpfloat)material.SubsurfaceWeight;
+		subsurfaceColor = (lpfloat3)material.SubsurfaceColor;
+
+		coatWeight = (lpfloat)material.CoatWeight;
+		coatColor = (lpfloat3)material.CoatColor;
+		coatRoughness = (lpfloat)material.CoatRoughness;
+		coatAnisotropy = (lpfloat)material.CoatAnisotropy;
+		coatIor = (lpfloat)material.CoatIor;
+		coatDarkening = (lpfloat)material.CoatDarkening;
+
+		thinFilmWeight = (lpfloat)material.ThinFilmWeight;
+		thinFilmThickness = (lpfloat)material.ThinFilmThickness;
+		thinFilmIor = (lpfloat)material.ThinFilmIor;
+		dispersionScale = (lpfloat)material.TransmissionDispersionScale;
+		dispersionAbbeNumber = (lpfloat)material.TransmissionDispersionAbbeNumber;
+	}
+
     d._data = StandardBSDFData::make( bsdfDataDiffuse, bsdfDataSpecular, bsdfDataRoughness, bsdfDataMetallic, bsdfDataEta, bsdfDataTransmission, bsdfDataDiffuseTransmission, bsdfDataSpecularTransmission,
-        0, 0, lpfloat3(1,1,1), 0.6 );
+        anisotropy, fuzzWeight, fuzzColor, fuzzRoughness,
+        coatWeight, coatColor, coatRoughness, coatAnisotropy, coatIor, coatDarkening,
+        subsurfaceWeight, subsurfaceColor,
+        thinFilmWeight, thinFilmThickness, thinFilmIor,
+        dispersionScale, dispersionAbbeNumber );
 
 	return d;
 }
@@ -381,6 +439,7 @@ PathTracerCollectedSurfaceData CollectGBufferSurface(PathState path, PathTracer:
 	{
 		PathTracerCollectedSurfaceData surface = PathTracerCollectedSurfaceData::create(
 			shadingData.mtl,
+			shadingData.materialID,
 			shadingData.T,
 			shadingData.B,
 			shadingData.N,

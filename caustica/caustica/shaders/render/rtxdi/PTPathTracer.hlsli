@@ -50,6 +50,7 @@ RAB_Surface CAUSTICA_RtxdiPT_CollectSurface(PathTracer::SurfaceData surfaceData,
 
     return PathTracerCollectedSurfaceData::create(
         shadingData.mtl,
+        shadingData.materialID,
         shadingData.T,
         shadingData.B,
         shadingData.N,
