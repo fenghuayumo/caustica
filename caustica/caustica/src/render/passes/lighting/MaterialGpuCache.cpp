@@ -84,10 +84,11 @@ static std::string LowerCopy(std::string value)
 static bool IsOpenPBRMaterialModel(const std::string& materialModel)
 {
     std::string normalized = LowerCopy(materialModel);
+    // Accept former spelling variants when loading older files.
     return normalized == "openpbr" || normalized == "openpbr-lite" || normalized == "openpbr_lite";
 }
 
-static bool HasOpenPBRLiteFields(const Json::Value& input)
+static bool HasOpenPBRFields(const Json::Value& input)
 {
     return input.isObject()
         && (input.isMember("base_weight")
@@ -276,7 +277,7 @@ bool PTMaterial::read(
 
     const bool hasMaterialModelField = input.isMember("materialModel") || input.isMember("MaterialModel");
     const bool hasOpenPBRBlock = input.isMember("OpenPBR");
-    const bool hasTopLevelOpenPBRFields = HasOpenPBRLiteFields(input);
+    const bool hasTopLevelOpenPBRFields = HasOpenPBRFields(input);
 
     auto loadTexture = [&](const char* camelName, const char* pascalName, PTTexture& output)
     {
@@ -381,7 +382,7 @@ bool PTMaterial::read(
 
     LOAD_FIELD_EITHER(skipRender, "SkipRender");
 
-    auto readOpenPBRLite = [this](const Json::Value& openPBR)
+    auto readOpenPBR = [this](const Json::Value& openPBR)
     {
         if (!openPBR.isObject())
             return;
@@ -419,9 +420,9 @@ bool PTMaterial::read(
     };
 
     if (hasOpenPBRBlock)
-        readOpenPBRLite(input["OpenPBR"]);
+        readOpenPBR(input["OpenPBR"]);
     else if ((hasMaterialModelField && IsOpenPBRMaterialModel(materialModel)) || hasTopLevelOpenPBRFields)
-        readOpenPBRLite(input);
+        readOpenPBR(input);
     else if (!hasMaterialModelField && !useSpecularGlossModel)
     {
         materialModel = "OpenPBR";

@@ -152,13 +152,13 @@ struct PTMaterial : public PTMaterialBase
     PTTexture               transmissionTexture;                // see KHR_materials_transmission; undefined on specular-gloss materials
 
     dm::float3              baseOrDiffuseColor                  = 1.f; // metal-rough: base color, spec-gloss: diffuse color (if no texture present)
-    dm::float3              specularColor                       = 1.f; // spec-gloss: specular color; OpenPBR-lite: dielectric specular tint
+    dm::float3              specularColor                       = 1.f; // spec-gloss: specular color; OpenPBR: dielectric specular tint
     dm::float3              emissiveColor                       = 0.f;
     
-    std::string             materialModel                       = "OpenPBR"; // "RTXPT" keeps legacy naming; "OpenPBR" enables OpenPBR-lite authoring fields.
+    std::string             materialModel                       = "OpenPBR"; // Built-in material model. "RTXPT" keeps legacy naming only.
     float                   baseWeight                          = 1.f;
     float                   specularWeight                      = 1.f;
-    float                   anisotropy                          = 0.f; // OpenPBR-lite specular_roughness_anisotropy, range [-1, 1].
+    float                   anisotropy                          = 0.f; // OpenPBR specular_roughness_anisotropy, range [-1, 1].
     float                   fuzzWeight                          = 0.f;
     dm::float3              fuzzColor                           = 1.f;
     float                   fuzzRoughness                       = 0.6f;

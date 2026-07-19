@@ -1,17 +1,14 @@
-# OpenPBR-lite materials
+# OpenPBR materials
 
-Caustica supports an OpenPBR-lite authoring layer on top of the existing
-`PTMaterial` shader backend. Existing `.material.json` files remain valid. The
-OpenPBR-lite layer gives materials a standard parameter naming scheme and maps
-the supported fields onto Caustica's current diffuse, GGX specular, transmission,
-anisotropy, and fuzz lobes.
+Caustica uses OpenPBR as the built-in material model (`MaterialModel`: `"OpenPBR"`).
+Parameters map onto the existing `PTMaterial` shader backend (diffuse, GGX specular,
+transmission, anisotropy, and fuzz lobes). Existing `.material.json` files remain valid.
 
-The material UI is OpenPBR-first: when `MaterialModel` is `"OpenPBR"`, the
-inspector shows OpenPBR-lite parameter names and converts them internally to the
-existing `PTMaterial` fields and GPU data layout.
+When `MaterialModel` is `"OpenPBR"`, the inspector shows OpenPBR parameter names and
+converts them internally to `PTMaterial` fields and the GPU data layout.
 
-This is not full OpenPBR yet. Coat, subsurface, thin-film, dispersion, and the
-full OpenPBR energy model are not implemented in this pass.
+Not yet implemented from the full OpenPBR specification: coat, subsurface, thin-film,
+dispersion, and the complete OpenPBR energy model.
 
 ## Existing material parameters
 
@@ -30,7 +27,7 @@ Core scalar and color fields:
 | Field | Meaning |
 | --- | --- |
 | `BaseOrDiffuseColor` | Metal-rough base color, or spec-gloss diffuse color. |
-| `SpecularColor` | Specular color. In OpenPBR-lite this tints dielectric specular. |
+| `SpecularColor` | Specular color. In OpenPBR this tints dielectric specular. |
 | `Metalness` | Metalness in metal-rough mode. |
 | `Roughness` | Surface roughness. |
 | `Opacity` | Scalar opacity, multiplied by base texture alpha. |
@@ -43,11 +40,11 @@ Core scalar and color fields:
 | `VolumeAttenuationColor` | Volume attenuation color for non-thin transmission. |
 | `VolumeAttenuationDistance` | Volume attenuation distance. |
 
-New OpenPBR-lite / cloth fields:
+OpenPBR / cloth fields:
 
 | Field | Meaning |
 | --- | --- |
-| `MaterialModel` | Use `"OpenPBR"` to save an `OpenPBR` block and enable OpenPBR-lite specular tinting. |
+| `MaterialModel` | Use `"OpenPBR"` to save an `OpenPBR` block and enable OpenPBR specular tinting. |
 | `BaseWeight` | Multiplies the diffuse/base contribution. |
 | `SpecularWeight` | Multiplies dielectric specular. |
 | `Anisotropy` | Directional GGX highlight amount, range `[-1, 1]`. |
@@ -71,7 +68,7 @@ Render/control fields:
 | `IgnoreMeshTangentSpace` | Rebuild/ignore mesh tangent space for shading. |
 | `SkipRender` | Hide geometry using this material. |
 
-## OpenPBR-lite Mapping
+## OpenPBR Mapping
 
 You can write fields inside an `OpenPBR` object:
 
@@ -100,10 +97,10 @@ You can write fields inside an `OpenPBR` object:
 }
 ```
 
-Or write the same snake_case fields at the top level. If any OpenPBR-lite field
-is present at the top level, Caustica treats the material as OpenPBR-lite.
+Or write the same snake_case fields at the top level. If any OpenPBR field
+is present at the top level, Caustica treats the material as OpenPBR.
 
-| OpenPBR-lite field | Backend field |
+| OpenPBR field | Backend field |
 | --- | --- |
 | `base_weight` | `BaseWeight` |
 | `base_color` | `BaseOrDiffuseColor` |

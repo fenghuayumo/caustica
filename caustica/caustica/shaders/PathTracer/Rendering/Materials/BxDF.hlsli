@@ -236,7 +236,7 @@ struct DiffuseTransmissionLambert // : IBxDF
     }
 };
 
-/** OpenPBR-lite fuzz/sheen approximation for cloth, velvet, and dusty fibers.
+/** OpenPBR fuzz/sheen approximation for cloth, velvet, and dusty fibers.
     It is sampled with cosine-weighted hemisphere sampling for robustness.
 */
 struct FuzzReflection // : IBxDF
@@ -353,7 +353,7 @@ struct SpecularReflectionMicrofacet // : IBxDF
 {
     float3 albedo;      ///< Specular albedo.
     float alpha;        ///< GGX width parameter.
-    float anisotropy;   ///< OpenPBR-lite specular_roughness_anisotropy.
+    float anisotropy;   ///< OpenPBR specular_roughness_anisotropy.
     uint activeLobes;   ///< BSDF lobes to include for sampling and evaluation. See LobeType.hlsli.
 
     bool hasLobe(LobeType lobe) { return (activeLobes & (uint)lobe) != 0; }
@@ -725,10 +725,10 @@ struct StandardBSDFData
 #endif
     lpfloat     _eta;                    ///< Relative index of refraction (incident IoR / transmissive IoR).
 #endif
-    lpfloat     _anisotropy;             ///< OpenPBR-lite specular_roughness_anisotropy.
-    lpfloat     _fuzzWeight;             ///< OpenPBR-lite fuzz weight.
-    lpfloat3    _fuzzColor;              ///< OpenPBR-lite fuzz color.
-    lpfloat     _fuzzRoughness;          ///< OpenPBR-lite fuzz roughness.
+    lpfloat     _anisotropy;             ///< OpenPBR specular_roughness_anisotropy.
+    lpfloat     _fuzzWeight;             ///< OpenPBR fuzz weight.
+    lpfloat3    _fuzzColor;              ///< OpenPBR fuzz color.
+    lpfloat     _fuzzRoughness;          ///< OpenPBR fuzz roughness.
 
     static StandardBSDFData make(
         lpfloat3 diffuse, lpfloat3 specular, lpfloat roughness, lpfloat metallic, lpfloat eta, lpfloat3 transmission, lpfloat diffuseTransmission, lpfloat specularTransmission,
@@ -831,7 +831,7 @@ struct FalcorBSDF // : IBxDF
 
     float pDiffuseReflection;               ///< Probability for sampling the diffuse BRDF.
     float pDiffuseTransmission;             ///< Probability for sampling the diffuse BTDF.
-    float pFuzzReflection;                  ///< Probability for sampling the OpenPBR-lite fuzz BRDF.
+    float pFuzzReflection;                  ///< Probability for sampling the OpenPBR fuzz BRDF.
     float pSpecularReflection;              ///< Probability for sampling the specular BRDF.
     float pSpecularReflectionTransmission;  ///< Probability for sampling the specular BSDF.
 

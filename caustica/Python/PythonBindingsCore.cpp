@@ -108,12 +108,13 @@ namespace
     bool IsOpenPBRMaterialModelName(const std::string& materialModel)
     {
         std::string normalized = LowerCopy(materialModel);
+        // Accept former spelling variants when loading older scripts/files.
         return normalized == "openpbr" || normalized == "openpbr-lite" || normalized == "openpbr_lite";
     }
 
     void SetMaterialModelFromPython(PTMaterial& self, const std::string& value)
     {
-        self.materialModel = value;
+        self.materialModel = IsOpenPBRMaterialModelName(value) ? "OpenPBR" : value;
         if (IsOpenPBRMaterialModelName(value))
         {
             self.useSpecularGlossModel = false;
@@ -726,7 +727,7 @@ void RegisterCoreBindings(nb::module_& m)
         .def_prop_rw("emission_color",
             [](PTMaterial& self) { return Float3ToTuple(self.emissiveColor); },
             [](PTMaterial& self, nb::object v) { self.emissiveColor = ToFloat3(v); self.gpuDataDirty = true; },
-            "OpenPBR-lite alias for emissive_color.")
+            "OpenPBR alias for emissive_color.")
 
         .def_prop_rw("emissive_intensity",
             [](PTMaterial& self) { return self.emissiveIntensity; },
@@ -734,21 +735,21 @@ void RegisterCoreBindings(nb::module_& m)
         .def_prop_rw("emission_luminance",
             [](PTMaterial& self) { return self.emissiveIntensity; },
             [](PTMaterial& self, float v) { self.emissiveIntensity = v; self.gpuDataDirty = true; },
-            "OpenPBR-lite alias for emissive_intensity.")
+            "OpenPBR alias for emissive_intensity.")
         .def_prop_rw("metalness",
             [](PTMaterial& self) { return self.metalness; },
             [](PTMaterial& self, float v) { self.metalness = v; self.gpuDataDirty = true; })
         .def_prop_rw("base_metalness",
             [](PTMaterial& self) { return self.metalness; },
             [](PTMaterial& self, float v) { self.metalness = v; self.gpuDataDirty = true; },
-            "OpenPBR-lite alias for metalness.")
+            "OpenPBR alias for metalness.")
         .def_prop_rw("roughness",
             [](PTMaterial& self) { return self.roughness; },
             [](PTMaterial& self, float v) { self.roughness = v; self.gpuDataDirty = true; })
         .def_prop_rw("specular_roughness",
             [](PTMaterial& self) { return self.roughness; },
             [](PTMaterial& self, float v) { self.roughness = v; self.gpuDataDirty = true; },
-            "OpenPBR-lite alias for roughness.")
+            "OpenPBR alias for roughness.")
         .def_prop_rw("material_model",
             [](PTMaterial& self) { return self.materialModel; },
             [](PTMaterial& self, const std::string& v) { SetMaterialModelFromPython(self, v); })
@@ -764,7 +765,7 @@ void RegisterCoreBindings(nb::module_& m)
         .def_prop_rw("specular_roughness_anisotropy",
             [](PTMaterial& self) { return self.anisotropy; },
             [](PTMaterial& self, float v) { self.anisotropy = v; self.gpuDataDirty = true; },
-            "OpenPBR-lite alias for anisotropy.")
+            "OpenPBR alias for anisotropy.")
         .def_prop_rw("fuzz_weight",
             [](PTMaterial& self) { return self.fuzzWeight; },
             [](PTMaterial& self, float v) { self.fuzzWeight = v; self.gpuDataDirty = true; })
@@ -780,42 +781,42 @@ void RegisterCoreBindings(nb::module_& m)
         .def_prop_rw("geometry_opacity",
             [](PTMaterial& self) { return self.opacity; },
             [](PTMaterial& self, float v) { self.opacity = v; self.gpuDataDirty = true; },
-            "OpenPBR-lite alias for opacity.")
+            "OpenPBR alias for opacity.")
         .def_prop_rw("transmission_factor",
             [](PTMaterial& self) { return self.transmissionFactor; },
             [](PTMaterial& self, float v) { self.transmissionFactor = v; self.gpuDataDirty = true; })
         .def_prop_rw("transmission_weight",
             [](PTMaterial& self) { return self.transmissionFactor; },
             [](PTMaterial& self, float v) { SetOpenPBRTransmissionWeightFromPython(self, v); },
-            "OpenPBR-lite alias for transmission_factor; toggles enable_transmission from the weight.")
+            "OpenPBR alias for transmission_factor; toggles enable_transmission from the weight.")
         .def_prop_rw("diffuse_transmission_factor",
             [](PTMaterial& self) { return self.diffuseTransmissionFactor; },
             [](PTMaterial& self, float v) { self.diffuseTransmissionFactor = v; self.gpuDataDirty = true; })
         .def_prop_rw("transmission_diffuse_weight",
             [](PTMaterial& self) { return self.diffuseTransmissionFactor; },
             [](PTMaterial& self, float v) { SetOpenPBRDiffuseTransmissionWeightFromPython(self, v); },
-            "OpenPBR-lite alias for diffuse_transmission_factor; toggles enable_transmission from the weight.")
+            "OpenPBR alias for diffuse_transmission_factor; toggles enable_transmission from the weight.")
         .def_prop_rw("normal_texture_scale",
             [](PTMaterial& self) { return self.normalTextureScale; },
             [](PTMaterial& self, float v) { self.normalTextureScale = v; self.gpuDataDirty = true; })
         .def_prop_rw("geometry_normal_scale",
             [](PTMaterial& self) { return self.normalTextureScale; },
             [](PTMaterial& self, float v) { self.normalTextureScale = v; self.gpuDataDirty = true; },
-            "OpenPBR-lite alias for normal_texture_scale.")
+            "OpenPBR alias for normal_texture_scale.")
         .def_prop_rw("ior",
             [](PTMaterial& self) { return self.IoR; },
             [](PTMaterial& self, float v) { self.IoR = v; self.gpuDataDirty = true; })
         .def_prop_rw("specular_ior",
             [](PTMaterial& self) { return self.IoR; },
             [](PTMaterial& self, float v) { self.IoR = v; self.gpuDataDirty = true; },
-            "OpenPBR-lite alias for ior.")
+            "OpenPBR alias for ior.")
         .def_prop_rw("alpha_cutoff",
             [](PTMaterial& self) { return self.alphaCutoff; },
             [](PTMaterial& self, float v) { self.alphaCutoff = v; self.gpuDataDirty = true; })
         .def_prop_rw("geometry_alpha_cutoff",
             [](PTMaterial& self) { return self.alphaCutoff; },
             [](PTMaterial& self, float v) { self.alphaCutoff = v; self.gpuDataDirty = true; },
-            "OpenPBR-lite alias for alpha_cutoff.")
+            "OpenPBR alias for alpha_cutoff.")
 
         .def_prop_rw("volume_attenuation_distance",
             [](PTMaterial& self) { return self.volumeAttenuationDistance; },
@@ -836,7 +837,7 @@ void RegisterCoreBindings(nb::module_& m)
         .def_prop_rw("geometry_enable_alpha_test",
             [](PTMaterial& self) { return self.enableAlphaTesting; },
             [](PTMaterial& self, bool v) { self.enableAlphaTesting = v; self.gpuDataDirty = true; },
-            "OpenPBR-lite UI alias for enable_alpha_testing.")
+            "OpenPBR UI alias for enable_alpha_testing.")
         .def_prop_rw("enable_transmission",
             [](PTMaterial& self) { return self.enableTransmission; },
             [](PTMaterial& self, bool v) { self.enableTransmission = v; self.gpuDataDirty = true; })
@@ -846,7 +847,7 @@ void RegisterCoreBindings(nb::module_& m)
         .def_prop_rw("geometry_thin_walled",
             [](PTMaterial& self) { return self.thinSurface; },
             [](PTMaterial& self, bool v) { self.thinSurface = v; self.gpuDataDirty = true; },
-            "OpenPBR-lite alias for thin_surface.")
+            "OpenPBR alias for thin_surface.")
         .def_prop_rw("exclude_from_nee",
             [](PTMaterial& self) { return self.excludeFromNEE; },
             [](PTMaterial& self, bool v) { self.excludeFromNEE = v; self.gpuDataDirty = true; })
@@ -866,35 +867,35 @@ void RegisterCoreBindings(nb::module_& m)
         .def_prop_rw("enable_base_color_texture",
             [](PTMaterial& self) { return self.enableBaseTexture; },
             [](PTMaterial& self, bool v) { self.enableBaseTexture = v; self.gpuDataDirty = true; },
-            "OpenPBR-lite alias for enable_base_texture.")
+            "OpenPBR alias for enable_base_texture.")
         .def_prop_rw("enable_orm_texture",
             [](PTMaterial& self) { return self.enableOcclusionRoughnessMetallicTexture; },
             [](PTMaterial& self, bool v) { self.enableOcclusionRoughnessMetallicTexture = v; self.gpuDataDirty = true; })
         .def_prop_rw("enable_base_metalness_specular_roughness_texture",
             [](PTMaterial& self) { return self.enableOcclusionRoughnessMetallicTexture; },
             [](PTMaterial& self, bool v) { self.enableOcclusionRoughnessMetallicTexture = v; self.gpuDataDirty = true; },
-            "OpenPBR-lite alias for enable_orm_texture.")
+            "OpenPBR alias for enable_orm_texture.")
         .def_prop_rw("enable_normal_texture",
             [](PTMaterial& self) { return self.enableNormalTexture; },
             [](PTMaterial& self, bool v) { self.enableNormalTexture = v; self.gpuDataDirty = true; })
         .def_prop_rw("enable_geometry_normal_texture",
             [](PTMaterial& self) { return self.enableNormalTexture; },
             [](PTMaterial& self, bool v) { self.enableNormalTexture = v; self.gpuDataDirty = true; },
-            "OpenPBR-lite alias for enable_normal_texture.")
+            "OpenPBR alias for enable_normal_texture.")
         .def_prop_rw("enable_emissive_texture",
             [](PTMaterial& self) { return self.enableEmissiveTexture; },
             [](PTMaterial& self, bool v) { self.enableEmissiveTexture = v; self.gpuDataDirty = true; })
         .def_prop_rw("enable_emission_color_texture",
             [](PTMaterial& self) { return self.enableEmissiveTexture; },
             [](PTMaterial& self, bool v) { self.enableEmissiveTexture = v; self.gpuDataDirty = true; },
-            "OpenPBR-lite alias for enable_emissive_texture.")
+            "OpenPBR alias for enable_emissive_texture.")
         .def_prop_rw("enable_transmission_texture",
             [](PTMaterial& self) { return self.enableTransmissionTexture; },
             [](PTMaterial& self, bool v) { self.enableTransmissionTexture = v; self.gpuDataDirty = true; })
         .def_prop_rw("enable_transmission_weight_texture",
             [](PTMaterial& self) { return self.enableTransmissionTexture; },
             [](PTMaterial& self, bool v) { self.enableTransmissionTexture = v; self.gpuDataDirty = true; },
-            "OpenPBR-lite alias for enable_transmission_texture.")
+            "OpenPBR alias for enable_transmission_texture.")
 
         .def_prop_ro("base_texture_path",
             [](PTMaterial& self) { return MaterialTexturePath(self, PTMaterialTextureSlot::Base); })

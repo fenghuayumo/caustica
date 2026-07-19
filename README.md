@@ -20,7 +20,7 @@ It takes **RTX Path Tracing (RTXPT)** as its functional and shading reference, b
 
 * **Simulation-friendly runtime** — Bevy-inspired ECS (`App`, `Plugin`, `ecs::World`, `AppSchedule` systems) for scenes made of robots, objects, lights, and cameras that update every simulation step
 * **Production-style rendering** — Unreal Engine–inspired pipeline (`WorldRenderer`, render graph, pass features) for stable real-time previews and batch offline captures from the same scene description
-* **Physically based imagery** — path-traced diffuse/specular/transmission/fuzz (**OpenPBR-lite**), dynamic lighting (**ReSTIR DI/GI/PT**), and denoising/upscaling (**NRD**, **DLSS**) to reduce the visual gap between synthetic and real sensor data
+* **Physically based imagery** — path-traced diffuse/specular/transmission/fuzz (**OpenPBR**), dynamic lighting (**ReSTIR DI/GI/PT**), and denoising/upscaling (**NRD**, **DLSS**) to reduce the visual gap between synthetic and real sensor data
 
 Typical embodied-AI uses include: domain-randomized tabletop/manipulation scenes, indoor navigation environments, multi-camera rig rendering, scripted material/lighting variations, and headless dataset generation from Python.
 
@@ -50,7 +50,7 @@ What fits embodied-AI workflows well:
 | Need | Caustica capability |
 | --- | --- |
 | Programmatic scenes | [Scene JSON](docs/scene-json.md) — models, transforms, lights, cameras, animation channels |
-| Consistent object appearance | **OpenPBR-lite** materials + glTF import with per-model `.material.json` overrides |
+| Consistent object appearance | **OpenPBR** materials + glTF import with per-model `.material.json` overrides |
 | Multi-view / sensor rigs | Multiple scene cameras; runtime camera selection and transform control via Python/C++ |
 | Interactive + batch modes | Real-time path tracing with denoisers; reference accumulation for ground-truth frames |
 | Headless farm rendering | Python `Renderer(..., headless=True)` — no window/swap chain; see `caustica/Python/Examples/offline_render.py` |
@@ -60,7 +60,7 @@ What fits embodied-AI workflows well:
 Recommended starting points:
 
 * Scene authoring: [docs/scene-json.md](docs/scene-json.md)
-* Materials for sim-to-real variation: [docs/openpbr-lite.md](docs/openpbr-lite.md)
+* Materials for sim-to-real variation: [docs/openpbr.md](docs/openpbr.md)
 * ECS + render proxies: [docs/architecture-render-proxy.md](docs/architecture-render-proxy.md)
 * Python batch/headless API: [py_caustica.md](py_caustica.md), `caustica/Python/Examples/offline_render.py`
 
@@ -96,7 +96,7 @@ Key code locations:
 | Render proxies | `caustica/caustica/include/scene/SceneRenderData.h`, `docs/architecture-render-proxy.md` |
 | World renderer | `caustica/caustica/include/render/worldRenderer/` |
 | Render graph | `caustica/caustica/include/render/graph/` |
-| Materials (OpenPBR-lite) | `caustica/caustica/src/render/passes/lighting/MaterialGpuCache.cpp`, `shaders/PathTracer/Rendering/Materials/BxDF.hlsli` |
+| Materials (OpenPBR) | `caustica/caustica/src/render/passes/lighting/MaterialGpuCache.cpp`, `shaders/PathTracer/Rendering/Materials/BxDF.hlsli` |
 | Path tracing shaders | `caustica/caustica/shaders/PathTracer/` |
 | Sample app | `application/editor/app/Main.cpp` |
 
@@ -142,16 +142,16 @@ Key paths: `caustica/caustica/src/render/passes/rtxdi/`, `caustica/caustica/shad
 * TAA, tone mapping, bloom, and accumulation for non-DLSS paths
 * Reference-mode OptiX denoiser for offline captures
 
-### OpenPBR material system (OpenPBR-lite)
+### OpenPBR material system
 
-Caustica uses an **OpenPBR-first** material authoring layer on top of the internal `PTMaterial` GPU/shader backend. Scene materials are authored in `Assets/Materials/*.material.json` (see [scene JSON](docs/scene-json.md#材质覆盖)); existing legacy field names remain valid.
+Caustica uses **OpenPBR** as the built-in material model on top of the internal `PTMaterial` GPU/shader backend. Scene materials are authored in `Assets/Materials/*.material.json` (see [scene JSON](docs/scene-json.md#材质覆盖)); existing legacy field names remain valid.
 
-* **Authoring model** — set `MaterialModel` to `"OpenPBR"` (default for new materials) and write parameters in OpenPBR-lite snake_case (`base_color`, `specular_roughness`, `fuzz_weight`, …) or inside an `OpenPBR` JSON block
+* **Authoring model** — set `MaterialModel` to `"OpenPBR"` (default for new materials) and write parameters in OpenPBR snake_case (`base_color`, `specular_roughness`, `fuzz_weight`, …) or inside an `OpenPBR` JSON block
 * **Shader lobes** — diffuse/base, GGX specular (with **anisotropy**), specular/diffuse **transmission**, and **fuzz** (cloth/velvet/sheen approximation)
 * **Backward compatible** — legacy `BaseOrDiffuseColor`, `Metalness`, `Roughness`, ORM textures, and related RTXPT-era fields still load and bake to the same GPU layout
-* **Editor UI** — material inspector shows OpenPBR-lite names when `MaterialModel` is `"OpenPBR"` and converts internally to `PTMaterial` constants
+* **Editor UI** — material inspector shows OpenPBR names when `MaterialModel` is `"OpenPBR"` and converts internally to `PTMaterial` constants
 
-Not yet implemented (full OpenPBR spec): coat, subsurface, thin-film, dispersion, and the complete OpenPBR energy model.
+Not yet implemented from the full OpenPBR specification: coat, subsurface, thin-film, dispersion, and the complete OpenPBR energy model.
 
 Example:
 
@@ -173,13 +173,13 @@ Example:
 
 Key paths: `caustica/caustica/src/render/passes/lighting/MaterialGpuCache.cpp`, `caustica/caustica/shaders/PathTracer/Rendering/Materials/BxDF.hlsli`
 
-Full field reference: [OpenPBR-lite materials](docs/openpbr-lite.md)
+Full field reference: [OpenPBR materials](docs/openpbr.md)
 
 ### Rendering platform & assets
 
 * DirectX 12 and Vulkan back-ends
 * Shader Execution Reordering (SER) and Opacity Micromaps (OMM) on supported DXR 1.2 builds
-* glTF 2.0 asset pipeline (subset of extensions, including animation) with **OpenPBR-lite** `.material.json` overrides
+* glTF 2.0 asset pipeline (subset of extensions, including animation) with **OpenPBR** `.material.json` overrides
 * RTXTF stochastic texture filtering
 * 3D Gaussian Splat rendering and shadow proxy support
 
@@ -359,7 +359,7 @@ Version 717-preview enables native DirectX support for [Shader Execution Reorder
 ## Developer Documentation
 
 * [Scene JSON format](docs/scene-json.md)
-* [OpenPBR Lite notes](docs/openpbr-lite.md)
+* [OpenPBR materials](docs/openpbr.md)
 * [Python API overview](py_caustica.md)
 
 More detailed engine documentation is in progress.
