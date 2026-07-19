@@ -41,7 +41,7 @@ enum class PathFlags
     restirGICollectSecondarySurface = (1<<8),   ///< This path has started collecting data for ReSTIR GI - next hit surface (or sky) info needs to be saved into ReSTIR GI buffers !!and the flag will be removed then!!
 
     enableThreadReorder             = (1<<9),   ///< Path has become divergent, it's probably good to invoke Shader Execution Reordering for the next bounce
-    // exportSpecHitTBlocked           = (1<<10),  ///< This is how PTMaterialFlags_PSDAutoBlockMVsAtSurface is implemented <- actually unnecessary, we can rely on GetMotionVectorSceneLength() != 0
+    // exportSpecHitTBlocked           = (1<<10),  ///< This is how StandardMaterialFlags_PSDAutoBlockMVsAtSurface is implemented <- actually unnecessary, we can rely on GetMotionVectorSceneLength() != 0
     deltaTransmissionPath           = (1<<11),  ///< Path started with and followed delta transmission events (whenever possible - TIR could be an exception) until it hit the first non-delta event.
     deltaOnlyPath                   = (1<<12),  ///< There was no non-delta events along the path so far.
 
@@ -139,7 +139,7 @@ struct /*PAYLOAD_QUALIFIER*/ PathState
     lpuint  GetPackedMISInfo() PS_CONST         { return lpuint(pack1 >> 16); }
     lpfloat GetThpRuRuCorrection() PS_CONST     { return lpfloat(f16tof32(pack1 & 0xFFFF)); }
 #else
-    // see PTMaterialFlags_PSDAutoBlockMVsAtSurface - if enabled at surface, current SceneLength will be rememberded and used for all subsequent motion vector computation, as well as disable future Xform updates
+    // see StandardMaterialFlags_PSDAutoBlockMVsAtSurface - if enabled at surface, current SceneLength will be rememberded and used for all subsequent motion vector computation, as well as disable future Xform updates
     void    SetMotionVectorSceneLength(float l) { pack0 = asuint(l); }
     float   GetMotionVectorSceneLength()        { return asfloat(pack0); }
     //void    SetMotionVectorBounceNormal(float3 n) { pack1 = NDirToOctUnorm30(n); }        // too complex

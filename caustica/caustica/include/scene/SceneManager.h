@@ -65,7 +65,7 @@ public:
     [[nodiscard]] bool isSceneStructureBusy() const { return isSceneLoading() || isStructureEditInFlight(); }
 
     // Looks up by Material::materialID (dense scene-list index).
-    // Prefer caustica::findMaterial(app, id) -- it resolves PTMaterial::gpuDataIndex first.
+    // Prefer caustica::findMaterial(app, id) -- it resolves StandardMaterial::gpuDataIndex first.
     static std::shared_ptr<caustica::Material> findMaterial(
         const std::shared_ptr<caustica::Scene>& scene, int materialID)
     {

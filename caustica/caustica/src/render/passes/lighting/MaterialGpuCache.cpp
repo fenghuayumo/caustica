@@ -144,7 +144,7 @@ static std::filesystem::path ResolveMaterialTexturePath(
     return fullPath;
 }
 
-void PTTexture::initFromLoadedTexture(const caustica::Handle<caustica::ImageAsset>& loaded, bool _sRGB, bool _normalMap, const std::filesystem::path & mediaPath)
+void StandardMaterialTexture::initFromLoadedTexture(const caustica::Handle<caustica::ImageAsset>& loaded, bool _sRGB, bool _normalMap, const std::filesystem::path & mediaPath)
 {
     if (loaded == nullptr)
     { localPath = ""; sRGB = false; this->loaded = nullptr; normalMap = false; enabled = false; return; }
@@ -159,19 +159,19 @@ void PTTexture::initFromLoadedTexture(const caustica::Handle<caustica::ImageAsse
     enabled = true;
 }
 
-std::shared_ptr<PTMaterial> PTMaterial::safeCast(const std::shared_ptr<Material>& bridgeMaterial)
+std::shared_ptr<StandardMaterial> StandardMaterial::safeCast(const std::shared_ptr<Material>& bridgeMaterial)
 {
     if (bridgeMaterial == nullptr)
         return nullptr;
 
     const std::shared_ptr<MaterialEx> materialEx = std::dynamic_pointer_cast<MaterialEx>(bridgeMaterial);
     assert(materialEx != nullptr);
-    return materialEx ? materialEx->ptData : nullptr;
+    return materialEx ? materialEx->standardData : nullptr;
 }
 
-void PTMaterial::write(Json::Value& output)
+void StandardMaterial::write(Json::Value& output)
 {
-    auto saveTexture = [ ](Json::Value& output, const PTTexture & texture, const std::string& name)
+    auto saveTexture = [ ](Json::Value& output, const StandardMaterialTexture & texture, const std::string& name)
     {
         if (texture.loaded == nullptr)
             return;
@@ -315,7 +315,7 @@ void PTMaterial::write(Json::Value& output)
     }
 }
 
-bool PTMaterial::read(
+bool StandardMaterial::read(
     Json::Value& input,
     const std::filesystem::path& mediaPath,
     const std::shared_ptr<caustica::TextureLoader>& textureCache,
@@ -332,9 +332,9 @@ bool PTMaterial::read(
     const bool hasOpenPBRBlock = input.isMember("OpenPBR");
     const bool hasTopLevelOpenPBRFields = HasOpenPBRFields(input);
 
-    auto loadTexture = [&](const char* camelName, const char* pascalName, PTTexture& output)
+    auto loadTexture = [&](const char* camelName, const char* pascalName, StandardMaterialTexture& output)
     {
-        output = PTTexture();
+        output = StandardMaterialTexture();
         Json::Value texJ = JsonMemberEither(input, camelName, pascalName);
 
         if (texJ.empty())
@@ -557,7 +557,7 @@ bool PTMaterial::read(
     return true;
 }
 
-std::shared_ptr<PTMaterial> PTMaterial::fromJson(
+std::shared_ptr<StandardMaterial> StandardMaterial::fromJson(
     Json::Value& input,
     const std::filesystem::path& mediaPath,
     const std::shared_ptr<caustica::TextureLoader>& textureCache,
@@ -565,7 +565,7 @@ std::shared_ptr<PTMaterial> PTMaterial::fromJson(
     const std::string& name,
     const std::filesystem::path& sceneDirectory)
 {
-    std::shared_ptr<PTMaterial> material = std::make_shared<PTMaterial>();
+    std::shared_ptr<StandardMaterial> material = std::make_shared<StandardMaterial>();
 
     material->read(input, mediaPath, textureCache, sceneDirectory);
     material->name = name;
@@ -574,19 +574,19 @@ std::shared_ptr<PTMaterial> PTMaterial::fromJson(
     return material;
 }
 
-PTTexture& PTMaterial::getTexture(PTMaterialTextureSlot slot)
+StandardMaterialTexture& StandardMaterial::getTexture(StandardMaterialTextureSlot slot)
 {
     switch (slot)
     {
-    case PTMaterialTextureSlot::Base:
+    case StandardMaterialTextureSlot::Base:
         return baseTexture;
-    case PTMaterialTextureSlot::OcclusionRoughnessMetallic:
+    case StandardMaterialTextureSlot::OcclusionRoughnessMetallic:
         return occlusionRoughnessMetallicTexture;
-    case PTMaterialTextureSlot::Normal:
+    case StandardMaterialTextureSlot::Normal:
         return normalTexture;
-    case PTMaterialTextureSlot::Emissive:
+    case StandardMaterialTextureSlot::Emissive:
         return emissiveTexture;
-    case PTMaterialTextureSlot::Transmission:
+    case StandardMaterialTextureSlot::Transmission:
         return transmissionTexture;
     default:
         assert(false);
@@ -594,24 +594,24 @@ PTTexture& PTMaterial::getTexture(PTMaterialTextureSlot slot)
     }
 }
 
-const PTTexture& PTMaterial::getTexture(PTMaterialTextureSlot slot) const
+const StandardMaterialTexture& StandardMaterial::getTexture(StandardMaterialTextureSlot slot) const
 {
-    return const_cast<PTMaterial*>(this)->getTexture(slot);
+    return const_cast<StandardMaterial*>(this)->getTexture(slot);
 }
 
-bool PTMaterial::isTextureEnabled(PTMaterialTextureSlot slot) const
+bool StandardMaterial::isTextureEnabled(StandardMaterialTextureSlot slot) const
 {
     switch (slot)
     {
-    case PTMaterialTextureSlot::Base:
+    case StandardMaterialTextureSlot::Base:
         return enableBaseTexture;
-    case PTMaterialTextureSlot::OcclusionRoughnessMetallic:
+    case StandardMaterialTextureSlot::OcclusionRoughnessMetallic:
         return enableOcclusionRoughnessMetallicTexture;
-    case PTMaterialTextureSlot::Normal:
+    case StandardMaterialTextureSlot::Normal:
         return enableNormalTexture;
-    case PTMaterialTextureSlot::Emissive:
+    case StandardMaterialTextureSlot::Emissive:
         return enableEmissiveTexture;
-    case PTMaterialTextureSlot::Transmission:
+    case StandardMaterialTextureSlot::Transmission:
         return enableTransmissionTexture;
     default:
         assert(false);
@@ -619,23 +619,23 @@ bool PTMaterial::isTextureEnabled(PTMaterialTextureSlot slot) const
     }
 }
 
-void PTMaterial::setTextureEnabled(PTMaterialTextureSlot slot, bool enabled)
+void StandardMaterial::setTextureEnabled(StandardMaterialTextureSlot slot, bool enabled)
 {
     switch (slot)
     {
-    case PTMaterialTextureSlot::Base:
+    case StandardMaterialTextureSlot::Base:
         enableBaseTexture = enabled;
         break;
-    case PTMaterialTextureSlot::OcclusionRoughnessMetallic:
+    case StandardMaterialTextureSlot::OcclusionRoughnessMetallic:
         enableOcclusionRoughnessMetallicTexture = enabled;
         break;
-    case PTMaterialTextureSlot::Normal:
+    case StandardMaterialTextureSlot::Normal:
         enableNormalTexture = enabled;
         break;
-    case PTMaterialTextureSlot::Emissive:
+    case StandardMaterialTextureSlot::Emissive:
         enableEmissiveTexture = enabled;
         break;
-    case PTMaterialTextureSlot::Transmission:
+    case StandardMaterialTextureSlot::Transmission:
         enableTransmissionTexture = enabled;
         break;
     default:
@@ -644,13 +644,13 @@ void PTMaterial::setTextureEnabled(PTMaterialTextureSlot slot, bool enabled)
     }
 }
 
-bool PTMaterial::editorGui(MaterialGpuCache & cache)
+bool StandardMaterial::editorGui(MaterialGpuCache & cache)
 {
     bool update = false;
 
     float itemWidth = ImGui::CalcItemWidth();
 
-    auto getShortTexturePath = [ ](const PTTexture & texture) -> std::string
+    auto getShortTexturePath = [ ](const StandardMaterialTexture & texture) -> std::string
     {
         if( texture.loaded == nullptr ) return "<nullptr>";
         return texture.localPath.string();
@@ -700,7 +700,7 @@ bool PTMaterial::editorGui(MaterialGpuCache & cache)
 
     const ImVec4 filenameColor = ImVec4(0.474f, 0.722f, 0.176f, 1.0f);
 
-    auto drawTextureToggle = [&](const char* label, PTTexture& texture, bool& enabled)
+    auto drawTextureToggle = [&](const char* label, StandardMaterialTexture& texture, bool& enabled)
     {
         if (texture.loaded != nullptr)
         {
@@ -919,58 +919,58 @@ static void GetBindlessTextureIndex(const Handle<ImageAsset>& texture, uint& out
     outEncodedInfo = (baseLOD << 24) | (mipLevels << 16) | bindlessDescIndex;
 }
 
-bool PTMaterial::isEmissive() const
+bool StandardMaterial::isEmissive() const
 {
     return (emissiveIntensity > 0) && (caustica::math::any(emissiveColor>0.0f)) || useEngineEmissiveIntensity;  // useEngineEmissiveIntensity can animate on/off so just assume we're emissive and pay the cost
 }
 
-void PTMaterial::fillData(PTMaterialData & data)
+void StandardMaterial::fillData(StandardMaterialData & data)
 {
     // flags
 
     data.Flags = 0;
 
     if (useSpecularGlossModel)
-        data.Flags |= PTMaterialFlags_UseSpecularGlossModel;
+        data.Flags |= StandardMaterialFlags_UseSpecularGlossModel;
 
     if (baseTexture.loaded && enableBaseTexture)
-        data.Flags |= PTMaterialFlags_UseBaseOrDiffuseTexture;
+        data.Flags |= StandardMaterialFlags_UseBaseOrDiffuseTexture;
 
     if (occlusionRoughnessMetallicTexture.loaded && enableOcclusionRoughnessMetallicTexture)
-        data.Flags |= PTMaterialFlags_UseMetalRoughOrSpecularTexture;
+        data.Flags |= StandardMaterialFlags_UseMetalRoughOrSpecularTexture;
 
     if (emissiveTexture.loaded && enableEmissiveTexture)
-        data.Flags |= PTMaterialFlags_UseEmissiveTexture;
+        data.Flags |= StandardMaterialFlags_UseEmissiveTexture;
 
     if (normalTexture.loaded && enableNormalTexture)
-        data.Flags |= PTMaterialFlags_UseNormalTexture;
+        data.Flags |= StandardMaterialFlags_UseNormalTexture;
 
     if (transmissionTexture.loaded && enableTransmissionTexture && enableTransmission)
-        data.Flags |= PTMaterialFlags_UseTransmissionTexture;
+        data.Flags |= StandardMaterialFlags_UseTransmissionTexture;
 
     if (metalnessInRedChannel)
-        data.Flags |= PTMaterialFlags_MetalnessInRedChannel;
+        data.Flags |= StandardMaterialFlags_MetalnessInRedChannel;
 
     if (thinSurface || !enableTransmission) // materials with no transmission are automatically considered thin surface - simplifies a lot of things
-        data.Flags |= PTMaterialFlags_ThinSurface;
+        data.Flags |= StandardMaterialFlags_ThinSurface;
 
     if (psdExclude)
-        data.Flags |= PTMaterialFlags_PSDExclude;
+        data.Flags |= StandardMaterialFlags_PSDExclude;
 
     if (psdBlockMotionVectorsAtSurfaceType % 2)
-        data.Flags |= PTMaterialFlags_PSDBlockMVsAtSurfaceTypeB0;
+        data.Flags |= StandardMaterialFlags_PSDBlockMVsAtSurfaceTypeB0;
 
     if (psdBlockMotionVectorsAtSurfaceType / 2)
-        data.Flags |= PTMaterialFlags_PSDBlockMVsAtSurfaceTypeB1;
+        data.Flags |= StandardMaterialFlags_PSDBlockMVsAtSurfaceTypeB1;
 
     if (enableAsAnalyticLightProxy)
-        data.Flags |= PTMaterialFlags_EnableAsAnalyticLightProxy;
+        data.Flags |= StandardMaterialFlags_EnableAsAnalyticLightProxy;
 
     if (ignoreMeshTangentSpace)
-        data.Flags |= PTMaterialFlags_IgnoreMeshTangentSpace;
+        data.Flags |= StandardMaterialFlags_IgnoreMeshTangentSpace;
 
     if (IsOpenPBRMaterialModel(materialModel))
-        data.Flags |= PTMaterialFlags_UseOpenPBRMaterialModel;
+        data.Flags |= StandardMaterialFlags_UseOpenPBRMaterialModel;
 
     // free parameters
 
@@ -1021,19 +1021,19 @@ void PTMaterial::fillData(PTMaterialData & data)
 
     // bindless textures
 
-    GetBindlessTextureIndex(baseTexture.loaded, data.BaseOrDiffuseTextureIndex, data.Flags, PTMaterialFlags_UseBaseOrDiffuseTexture);
-    GetBindlessTextureIndex(occlusionRoughnessMetallicTexture.loaded, data.MetalRoughOrSpecularTextureIndex, data.Flags, PTMaterialFlags_UseMetalRoughOrSpecularTexture);
-    GetBindlessTextureIndex(emissiveTexture.loaded, data.EmissiveTextureIndex, data.Flags, PTMaterialFlags_UseEmissiveTexture);
-    GetBindlessTextureIndex(normalTexture.loaded, data.NormalTextureIndex, data.Flags, PTMaterialFlags_UseNormalTexture);
-    GetBindlessTextureIndex(transmissionTexture.loaded, data.TransmissionTextureIndex, data.Flags, PTMaterialFlags_UseTransmissionTexture);
+    GetBindlessTextureIndex(baseTexture.loaded, data.BaseOrDiffuseTextureIndex, data.Flags, StandardMaterialFlags_UseBaseOrDiffuseTexture);
+    GetBindlessTextureIndex(occlusionRoughnessMetallicTexture.loaded, data.MetalRoughOrSpecularTextureIndex, data.Flags, StandardMaterialFlags_UseMetalRoughOrSpecularTexture);
+    GetBindlessTextureIndex(emissiveTexture.loaded, data.EmissiveTextureIndex, data.Flags, StandardMaterialFlags_UseEmissiveTexture);
+    GetBindlessTextureIndex(normalTexture.loaded, data.NormalTextureIndex, data.Flags, StandardMaterialFlags_UseNormalTexture);
+    GetBindlessTextureIndex(transmissionTexture.loaded, data.TransmissionTextureIndex, data.Flags, StandardMaterialFlags_UseTransmissionTexture);
 
-    data.Flags |= (uint)(min(nestedPriority, kMaterialMaxNestedPriority)) << PTMaterialFlags_NestedPriorityShift;
-    data.Flags |= (uint)(clamp(psdDominantDeltaLobe + 1, 0, 7)) << PTMaterialFlags_PSDDominantDeltaLobeP1Shift;
+    data.Flags |= (uint)(min(nestedPriority, kMaterialMaxNestedPriority)) << StandardMaterialFlags_NestedPriorityShift;
+    data.Flags |= (uint)(clamp(psdDominantDeltaLobe + 1, 0, 7)) << StandardMaterialFlags_PSDDominantDeltaLobeP1Shift;
 
     data.ShadowNoLFadeout = std::clamp(shadowNoLFadeout, 0.0f, 0.25f);
 }
 
-std::filesystem::path MaterialGpuCache::getMaterialStoragePath(PTMaterialBase& material)
+std::filesystem::path MaterialGpuCache::getMaterialStoragePath(StandardMaterialBase& material)
 {
     std::filesystem::path matPath = m_materialsPath;
     if (!material.sharedWithAllScenes)
@@ -1054,17 +1054,17 @@ MaterialGpuCache::MaterialGpuCache(const std::string & relativeShaderSourcePath,
 {
 }
 
-static bool DefaultTextureSRGB(const PTMaterial& material, PTMaterialTextureSlot slot)
+static bool DefaultTextureSRGB(const StandardMaterial& material, StandardMaterialTextureSlot slot)
 {
     switch (slot)
     {
-    case PTMaterialTextureSlot::Base:
-    case PTMaterialTextureSlot::Emissive:
+    case StandardMaterialTextureSlot::Base:
+    case StandardMaterialTextureSlot::Emissive:
         return true;
-    case PTMaterialTextureSlot::OcclusionRoughnessMetallic:
+    case StandardMaterialTextureSlot::OcclusionRoughnessMetallic:
         return material.useSpecularGlossModel;
-    case PTMaterialTextureSlot::Normal:
-    case PTMaterialTextureSlot::Transmission:
+    case StandardMaterialTextureSlot::Normal:
+    case StandardMaterialTextureSlot::Transmission:
         return false;
     default:
         assert(false);
@@ -1072,12 +1072,12 @@ static bool DefaultTextureSRGB(const PTMaterial& material, PTMaterialTextureSlot
     }
 }
 
-static bool DefaultTextureNormalMap(PTMaterialTextureSlot slot)
+static bool DefaultTextureNormalMap(StandardMaterialTextureSlot slot)
 {
-    return slot == PTMaterialTextureSlot::Normal;
+    return slot == StandardMaterialTextureSlot::Normal;
 }
 
-void MaterialGpuCache::recordTexture(const PTTexture& texture)
+void MaterialGpuCache::recordTexture(const StandardMaterialTexture& texture)
 {
     if (texture.loaded == nullptr)
         return;
@@ -1109,8 +1109,8 @@ void MaterialGpuCache::recordTexture(const PTTexture& texture)
 }
 
 bool MaterialGpuCache::setMaterialTexture(
-    PTMaterial& material,
-    PTMaterialTextureSlot slot,
+    StandardMaterial& material,
+    StandardMaterialTextureSlot slot,
     const std::filesystem::path& localPath,
     std::optional<bool> sRGB,
     std::optional<bool> normalMap)
@@ -1137,7 +1137,7 @@ bool MaterialGpuCache::setMaterialTexture(
         return false;
     }
 
-    PTTexture& texture = material.getTexture(slot);
+    StandardMaterialTexture& texture = material.getTexture(slot);
     texture.localPath = storagePath;
     texture.sRGB = sRGB.value_or(DefaultTextureSRGB(material, slot));
     texture.normalMap = normalMap.value_or(DefaultTextureNormalMap(slot));
@@ -1147,7 +1147,7 @@ bool MaterialGpuCache::setMaterialTexture(
     if (texture.loaded == nullptr ||
         (!m_textureCache->isTextureLoaded(texture.loaded) && !m_textureCache->isTextureFinalized(texture.loaded)))
     {
-        texture = PTTexture();
+        texture = StandardMaterialTexture();
         texture.enabled = false;
         return false;
     }
@@ -1161,10 +1161,10 @@ bool MaterialGpuCache::setMaterialTexture(
     return true;
 }
 
-void MaterialGpuCache::clearMaterialTexture(PTMaterial& material, PTMaterialTextureSlot slot)
+void MaterialGpuCache::clearMaterialTexture(StandardMaterial& material, StandardMaterialTextureSlot slot)
 {
-    PTTexture& texture = material.getTexture(slot);
-    texture = PTTexture();
+    StandardMaterialTexture& texture = material.getTexture(slot);
+    texture = StandardMaterialTexture();
     texture.enabled = false;
 
     material.setTextureEnabled(slot, false);
@@ -1173,7 +1173,7 @@ void MaterialGpuCache::clearMaterialTexture(PTMaterial& material, PTMaterialText
     rebuildActiveTextureIndex();
 }
 
-void MaterialGpuCache::initializeUniqueDeterministicName(const std::shared_ptr<PTMaterialBase> & material)
+void MaterialGpuCache::initializeUniqueDeterministicName(const std::shared_ptr<StandardMaterialBase> & material)
 {
     std::string hashBase = material->modelName + "_" + material->name;
     uint evenShorterHash = ShortHash(HashMyString(hashBase));
@@ -1252,55 +1252,55 @@ static bool IsBuiltinModelFileName(const std::string& modelFileName)
     return normalized.rfind(builtinPrefix, 0) == 0;
 }
 
-std::shared_ptr<PTMaterial> MaterialGpuCache::importFromEngineMaterial(
+std::shared_ptr<StandardMaterial> MaterialGpuCache::importFromEngineMaterial(
     const caustica::scene::MaterialRenderResourceSnapshot& material)
 {
-    std::shared_ptr<PTMaterial> materialPT = std::make_shared<PTMaterial>();
+    std::shared_ptr<StandardMaterial> standardMaterial = std::make_shared<StandardMaterial>();
 
-    materialPT->name = material.debugName;
-    materialPT->modelName = ModelNameFromModelFileName(material.modelFileName);
+    standardMaterial->name = material.debugName;
+    standardMaterial->modelName = ModelNameFromModelFileName(material.modelFileName);
 
-    materialPT->baseTexture.initFromLoadedTexture(material.baseOrDiffuseTexture, true, false, m_mediaPath);
+    standardMaterial->baseTexture.initFromLoadedTexture(material.baseOrDiffuseTexture, true, false, m_mediaPath);
 
     if( material.useSpecularGlossModel ) // spec-gloss model is a special case hack where we use metalRoughOrSpecularTexture to store specular color, which is handled as sRGB
-        materialPT->occlusionRoughnessMetallicTexture.initFromLoadedTexture(material.metalRoughOrSpecularTexture, true, false, m_mediaPath);
+        standardMaterial->occlusionRoughnessMetallicTexture.initFromLoadedTexture(material.metalRoughOrSpecularTexture, true, false, m_mediaPath);
     else
-        materialPT->occlusionRoughnessMetallicTexture.initFromLoadedTexture(material.metalRoughOrSpecularTexture, false, false, m_mediaPath);
+        standardMaterial->occlusionRoughnessMetallicTexture.initFromLoadedTexture(material.metalRoughOrSpecularTexture, false, false, m_mediaPath);
 
-    materialPT->normalTexture.initFromLoadedTexture(material.normalTexture, false, true, m_mediaPath);
-    materialPT->emissiveTexture.initFromLoadedTexture(material.emissiveTexture, true, false, m_mediaPath);
-    materialPT->transmissionTexture.initFromLoadedTexture(material.transmissionTexture, false, false, m_mediaPath);
+    standardMaterial->normalTexture.initFromLoadedTexture(material.normalTexture, false, true, m_mediaPath);
+    standardMaterial->emissiveTexture.initFromLoadedTexture(material.emissiveTexture, true, false, m_mediaPath);
+    standardMaterial->transmissionTexture.initFromLoadedTexture(material.transmissionTexture, false, false, m_mediaPath);
 
     // Toggles for the textures. Only effective if the corresponding texture is non-null.
-    materialPT->enableBaseTexture = material.enableBaseOrDiffuseTexture;
-    materialPT->enableOcclusionRoughnessMetallicTexture = material.enableMetalRoughOrSpecularTexture;
-    materialPT->enableNormalTexture = material.enableNormalTexture;
-    materialPT->enableEmissiveTexture = material.enableEmissiveTexture;
-    materialPT->enableTransmissionTexture = material.enableTransmissionTexture;
+    standardMaterial->enableBaseTexture = material.enableBaseOrDiffuseTexture;
+    standardMaterial->enableOcclusionRoughnessMetallicTexture = material.enableMetalRoughOrSpecularTexture;
+    standardMaterial->enableNormalTexture = material.enableNormalTexture;
+    standardMaterial->enableEmissiveTexture = material.enableEmissiveTexture;
+    standardMaterial->enableTransmissionTexture = material.enableTransmissionTexture;
 
-    materialPT->baseOrDiffuseColor = material.baseOrDiffuseColor;
-    materialPT->specularColor = material.specularColor;
-    materialPT->emissiveColor = material.emissiveColor;
+    standardMaterial->baseOrDiffuseColor = material.baseOrDiffuseColor;
+    standardMaterial->specularColor = material.specularColor;
+    standardMaterial->emissiveColor = material.emissiveColor;
 
-    materialPT->emissiveIntensity = material.emissiveIntensity;
-    materialPT->metalness = material.metalness;
-    materialPT->roughness = material.roughness;
-    materialPT->opacity = material.opacity;
-    materialPT->alphaCutoff = material.alphaCutoff;
-    materialPT->transmissionFactor = material.transmissionFactor;
-    //materialPT->diffuseTransmissionFactor = material.diffuseTransmissionFactor;
-    materialPT->normalTextureScale = material.normalTextureScale;
-    //materialPT->IoR = material.ior;
-    materialPT->useSpecularGlossModel = material.useSpecularGlossModel;
-    materialPT->metalnessInRedChannel = material.metalnessInRedChannel;
+    standardMaterial->emissiveIntensity = material.emissiveIntensity;
+    standardMaterial->metalness = material.metalness;
+    standardMaterial->roughness = material.roughness;
+    standardMaterial->opacity = material.opacity;
+    standardMaterial->alphaCutoff = material.alphaCutoff;
+    standardMaterial->transmissionFactor = material.transmissionFactor;
+    //standardMaterial->diffuseTransmissionFactor = material.diffuseTransmissionFactor;
+    standardMaterial->normalTextureScale = material.normalTextureScale;
+    //standardMaterial->IoR = material.ior;
+    standardMaterial->useSpecularGlossModel = material.useSpecularGlossModel;
+    standardMaterial->metalnessInRedChannel = material.metalnessInRedChannel;
 
-    materialPT->enableAlphaTesting = (material.domain == MaterialDomain::AlphaTested || material.domain == MaterialDomain::TransmissiveAlphaTested);
-    materialPT->enableTransmission = (material.domain == MaterialDomain::Transmissive || material.domain == MaterialDomain::TransmissiveAlphaBlended || material.domain == MaterialDomain::TransmissiveAlphaTested);
+    standardMaterial->enableAlphaTesting = (material.domain == MaterialDomain::AlphaTested || material.domain == MaterialDomain::TransmissiveAlphaTested);
+    standardMaterial->enableTransmission = (material.domain == MaterialDomain::Transmissive || material.domain == MaterialDomain::TransmissiveAlphaBlended || material.domain == MaterialDomain::TransmissiveAlphaTested);
 
-    return materialPT;
+    return standardMaterial;
 }
 
-std::shared_ptr<PTMaterial> MaterialGpuCache::load(const std::string & modelFileName, const std::string & name)
+std::shared_ptr<StandardMaterial> MaterialGpuCache::load(const std::string & modelFileName, const std::string & name)
 {
     std::string modelName = ModelNameFromModelFileName(modelFileName);
 
@@ -1357,14 +1357,14 @@ std::shared_ptr<PTMaterial> MaterialGpuCache::load(const std::string & modelFile
         return nullptr;
     }
 
-    std::shared_ptr<PTMaterial> materialPT = materialPT->fromJson(rootJ, m_mediaPath, m_textureCache, modelName, name, m_sceneDirectory);
-    if (materialPT == nullptr)
+    std::shared_ptr<StandardMaterial> standardMaterial = standardMaterial->fromJson(rootJ, m_mediaPath, m_textureCache, modelName, name, m_sceneDirectory);
+    if (standardMaterial == nullptr)
     {
         caustica::warning("Error while parsing material file '%s'", actualLoadedFileName.c_str()); 
         return nullptr;
     }
-    materialPT->sharedWithAllScenes = shared; // this property is not loaded from the file, but determined based on where the file was loaded from
-    return materialPT;
+    standardMaterial->sharedWithAllScenes = shared; // this property is not loaded from the file, but determined based on where the file was loaded from
+    return standardMaterial;
 }
 
 void MaterialGpuCache::sceneReloaded()
@@ -1409,7 +1409,7 @@ bool MaterialGpuCache::reconcileLiveMaterials(
     if (m_materialsById.size() == oldCount)
         return false;
 
-    std::unordered_set<const PTMaterial*> activeMaterials;
+    std::unordered_set<const StandardMaterial*> activeMaterials;
     activeMaterials.reserve(m_materialsById.size());
     for (const auto& entry : m_materialsById)
         activeMaterials.insert(entry.second.get());
@@ -1421,7 +1421,7 @@ bool MaterialGpuCache::reconcileLiveMaterials(
         return true;
     });
 
-    m_materialsGPU.assign(m_materials.size(), PTMaterialData{});
+    m_materialsGPU.assign(m_materials.size(), StandardMaterialData{});
     for (uint32_t index = 0; index < m_materials.size(); ++index)
     {
         m_materials[index]->gpuDataIndex = index;
@@ -1448,31 +1448,31 @@ int MaterialGpuCache::ensureMaterialsFromScene(
         if (!material.id || m_materialsById.contains(material.id))
             continue;
 
-        std::shared_ptr<PTMaterial> materialPT;
+        std::shared_ptr<StandardMaterial> standardMaterial;
         if (IsBuiltinModelFileName(material.modelFileName))
-            materialPT = importFromEngineMaterial(material);
+            standardMaterial = importFromEngineMaterial(material);
         else
         {
-            materialPT = load(material.modelFileName, material.debugName);
-            if (materialPT == nullptr)
-                materialPT = importFromEngineMaterial(material);
+            standardMaterial = load(material.modelFileName, material.debugName);
+            if (standardMaterial == nullptr)
+                standardMaterial = importFromEngineMaterial(material);
         }
 
-        materialPT->runtimeMaterialGpuCache = this;
+        standardMaterial->runtimeMaterialGpuCache = this;
 
-        m_materials.push_back(materialPT);
-        m_materialsById[material.id] = materialPT;
-        m_materialsGPU.push_back(PTMaterialData{});
-        materialPT->gpuDataIndex = uint(m_materialsGPU.size() - 1);
-        materialPT->gpuDataDirty = true;
+        m_materials.push_back(standardMaterial);
+        m_materialsById[material.id] = standardMaterial;
+        m_materialsGPU.push_back(StandardMaterialData{});
+        standardMaterial->gpuDataIndex = uint(m_materialsGPU.size() - 1);
+        standardMaterial->gpuDataDirty = true;
         assert(m_materialsGPU.size() <= CAUSTICA_MATERIAL_MAX_COUNT);
 
-        recordTexture(materialPT->baseTexture);
-        recordTexture(materialPT->occlusionRoughnessMetallicTexture);
-        recordTexture(materialPT->normalTexture);
-        recordTexture(materialPT->emissiveTexture);
-        recordTexture(materialPT->transmissionTexture);
-        initializeUniqueDeterministicName(materialPT);
+        recordTexture(standardMaterial->baseTexture);
+        recordTexture(standardMaterial->occlusionRoughnessMetallicTexture);
+        recordTexture(standardMaterial->normalTexture);
+        recordTexture(standardMaterial->emissiveTexture);
+        recordTexture(standardMaterial->transmissionTexture);
+        initializeUniqueDeterministicName(standardMaterial);
         ++added;
     }
 
@@ -1486,10 +1486,10 @@ int MaterialGpuCache::ensureMaterialsFromScene(
         // New materials use the ubershader until the next full scene material bake.
         if (m_ubershader)
         {
-            for (auto& materialPT : m_materials)
+            for (auto& standardMaterial : m_materials)
             {
-                if (!materialPT->bakedShaderPermutation)
-                    materialPT->bakedShaderPermutation = m_ubershader;
+                if (!standardMaterial->bakedShaderPermutation)
+                    standardMaterial->bakedShaderPermutation = m_ubershader;
             }
         }
         else
@@ -1501,14 +1501,14 @@ int MaterialGpuCache::ensureMaterialsFromScene(
     return added;
 }
 
-std::shared_ptr<PTMaterial> MaterialGpuCache::findByResourceId(
+std::shared_ptr<StandardMaterial> MaterialGpuCache::findByResourceId(
     caustica::scene::MaterialRenderResourceId id) const
 {
     const auto it = m_materialsById.find(id);
     return it == m_materialsById.end() ? nullptr : it->second;
 }
 
-std::shared_ptr<PTMaterial> MaterialGpuCache::findByGpuDataIndex(uint gpuDataIndex) const
+std::shared_ptr<StandardMaterial> MaterialGpuCache::findByGpuDataIndex(uint gpuDataIndex) const
 {
     if (gpuDataIndex == 0xFFFFFFFFu)
         return nullptr;
@@ -1523,7 +1523,7 @@ std::shared_ptr<PTMaterial> MaterialGpuCache::findByGpuDataIndex(uint gpuDataInd
 MaterialGpuCache::RayTracingState MaterialGpuCache::resolveRayTracingState(
     caustica::scene::MaterialRenderResourceId id) const
 {
-    const std::shared_ptr<PTMaterial> material = findByResourceId(id);
+    const std::shared_ptr<StandardMaterial> material = findByResourceId(id);
     if (!material)
         return {};
     return {
@@ -1627,9 +1627,9 @@ void MaterialGpuCache::bakeShaderPermutations()
     // Map materials to offline-compilable feature tiers (multiple materials can share a tier).
     m_shaderPermutations.clear();
     m_shaderPermutationTable.clear();
-    for (auto& materialPT : m_materials)
+    for (auto& standardMaterial : m_materials)
     {
-        MaterialShaderPermutation variant = materialPT->computeShaderPermutation(m_relativeShaderSourcePath);
+        MaterialShaderPermutation variant = standardMaterial->computeShaderPermutation(m_relativeShaderSourcePath);
         InitializeStableShaderIdentity(variant);
         MaterialShaderPermutationKey key(variant);
         std::shared_ptr<MaterialShaderPermutation> ptVariant;
@@ -1647,11 +1647,11 @@ void MaterialGpuCache::bakeShaderPermutations()
             assert( ptVariant->macros == variant.macros );
         }
 
-        std::string proposedName = materialPT->uniqueFullName();
+        std::string proposedName = standardMaterial->uniqueFullName();
         if (ptVariant->uniqueMaterialName == "" || (ptVariant->uniqueMaterialName.compare(proposedName)>0) )  // keep the "smallest" name out of all - still not deterministic between different scenes but goodenough!
             ptVariant->uniqueMaterialName = proposedName;
 
-        materialPT->bakedShaderPermutation = ptVariant;
+        standardMaterial->bakedShaderPermutation = ptVariant;
     }
 }
 
@@ -1667,9 +1667,9 @@ void MaterialGpuCache::createRenderPassesAndLoadMaterials(nvrhi::IBindingLayout*
         bufferDesc.initialState = nvrhi::ResourceStates::ShaderResource;
         bufferDesc.keepInitialState = true;
         bufferDesc.canHaveUAVs = true;
-        bufferDesc.byteSize = sizeof(PTMaterialData) * CAUSTICA_MATERIAL_MAX_COUNT;
-        bufferDesc.structStride = sizeof(PTMaterialData);
-        bufferDesc.debugName = "PTMaterialDataStorage";
+        bufferDesc.byteSize = sizeof(StandardMaterialData) * CAUSTICA_MATERIAL_MAX_COUNT;
+        bufferDesc.structStride = sizeof(StandardMaterialData);
+        bufferDesc.debugName = "StandardMaterialDataStorage";
         if (!m_materialData)
             m_materialData = m_device->createBuffer(bufferDesc);
         m_materialDataWasReset = true;
@@ -1715,15 +1715,15 @@ void MaterialGpuCache::createRenderPassesAndLoadMaterials(nvrhi::IBindingLayout*
 
     info("MaterialGpuCache: record material textures begin");
     m_uniqueNames.clear(); // must be done before initializeUniqueDeterministicName
-    for (auto& materialPT : m_materials)
+    for (auto& standardMaterial : m_materials)
     {
-        recordTexture(materialPT->baseTexture);
-        recordTexture(materialPT->occlusionRoughnessMetallicTexture);
-        recordTexture(materialPT->normalTexture);
-        recordTexture(materialPT->emissiveTexture);
-        recordTexture(materialPT->transmissionTexture);
+        recordTexture(standardMaterial->baseTexture);
+        recordTexture(standardMaterial->occlusionRoughnessMetallicTexture);
+        recordTexture(standardMaterial->normalTexture);
+        recordTexture(standardMaterial->emissiveTexture);
+        recordTexture(standardMaterial->transmissionTexture);
 
-        initializeUniqueDeterministicName(materialPT);
+        initializeUniqueDeterministicName(standardMaterial);
     }
     info("MaterialGpuCache: record material textures end, uniqueTextures=%zu", m_textures.size());
     info("MaterialGpuCache: bake shader permutations begin");
@@ -1738,7 +1738,7 @@ void UpdateSubInstanceData(SubInstanceData& ret,
     const caustica::scene::MeshRenderResourceSnapshot& mesh,
     const caustica::scene::GeometryRenderResourceSnapshot& geometry,
     uint meshGeometryIndex,
-    const PTMaterial& material)
+    const StandardMaterial& material)
 {
     if (mesh.geometries.empty() || meshGeometryIndex >= mesh.geometries.size())
         return;
@@ -1782,7 +1782,7 @@ void UpdateSubInstanceData(SubInstanceData& ret,
 
     uint globalGeometryIndex = mesh.geometries[0].globalGeometryIndex + meshGeometryIndex;
     uint globalMaterialIndex = material.gpuDataIndex;
-    ret.GlobalGeometryIndex_PTMaterialDataIndex = (globalGeometryIndex << 16) | globalMaterialIndex;
+    ret.GlobalGeometryIndex_StandardMaterialDataIndex = (globalGeometryIndex << 16) | globalMaterialIndex;
 
 #if SUBINSTANCEDATA_EXTENDED
     GeometryData* gdata = nullptr;
@@ -1820,35 +1820,35 @@ void MaterialGpuCache::update(nvrhi::ICommandList* commandList,
 
     for (const auto& snapshot : renderData.materialSnapshots)
     {
-        const std::shared_ptr<PTMaterial> materialPT = findByResourceId(snapshot.id);
-        if (materialPT && materialPT->useEngineEmissiveIntensity
-            && materialPT->emissiveIntensity != snapshot.emissiveIntensity)
+        const std::shared_ptr<StandardMaterial> standardMaterial = findByResourceId(snapshot.id);
+        if (standardMaterial && standardMaterial->useEngineEmissiveIntensity
+            && standardMaterial->emissiveIntensity != snapshot.emissiveIntensity)
         {
-            materialPT->emissiveIntensity = snapshot.emissiveIntensity;
-            materialPT->gpuDataDirty = true;
+            standardMaterial->emissiveIntensity = snapshot.emissiveIntensity;
+            standardMaterial->gpuDataDirty = true;
         }
     }
 
     bool needsUpload = false;
-    for (auto& materialPT : m_materials)
+    for (auto& standardMaterial : m_materials)
     {
-        if (!materialPT->gpuDataDirty && !m_materialDataWasReset)
+        if (!standardMaterial->gpuDataDirty && !m_materialDataWasReset)
             continue;
 
-        materialPT->fillData(m_materialsGPU[materialPT->gpuDataIndex]);
-        materialPT->gpuDataDirty = false;
+        standardMaterial->fillData(m_materialsGPU[standardMaterial->gpuDataIndex]);
+        standardMaterial->gpuDataDirty = false;
         needsUpload = true;
     }
 
     if ( needsUpload )
     {
-        commandList->writeBuffer( m_materialData, m_materialsGPU.data(), m_materialsGPU.size() * sizeof(PTMaterialData), 0 );
+        commandList->writeBuffer( m_materialData, m_materialsGPU.data(), m_materialsGPU.size() * sizeof(StandardMaterialData), 0 );
         m_materialDataWasReset = false;
     }
 
     // NOTE: this also handles some of the geometry data and mixed geometry&material stuff - it might be a good idea to rethink whether it needs to live outside of material baker.
     // Walk the render snapshot in the same order as TLAS / hit-group setup and write a dense
-    // prefix of SubInstanceData slots. Do not trust live geometryInstanceIndex alone — after
+    // prefix of SubInstanceData slots. Do not trust live geometryInstanceIndex alone ??after
     // runtime import it can briefly disagree with the snapshot order TLAS already committed.
     size_t compactedGeometryInstanceIndex = 0;
     for (const scene::MeshInstanceRenderProxy& proxy : renderData.meshInstances)
@@ -1869,19 +1869,19 @@ void MaterialGpuCache::update(nvrhi::ICommandList* commandList,
                 continue;
             }
 
-            std::shared_ptr<PTMaterial> materialPT = findByResourceId(geometry.materialId);
-            assert(materialPT != nullptr && "Unknown error - should never have happened" );
-            if (!materialPT)
+            std::shared_ptr<StandardMaterial> standardMaterial = findByResourceId(geometry.materialId);
+            assert(standardMaterial != nullptr && "Unknown error - should never have happened" );
+            if (!standardMaterial)
                 continue;
 
             UpdateSubInstanceData(subInstanceData[subInstanceIndex], gpuResources, *mesh, geometry,
-                static_cast<uint>(geometryIndex), *materialPT);
+                static_cast<uint>(geometryIndex), *standardMaterial);
         }
     }
 }
 
 /*
-void MaterialGpuCache::loadAll(std::unordered_map<std::string, std::shared_ptr<PTMaterial>>& container)
+void MaterialGpuCache::loadAll(std::unordered_map<std::string, std::shared_ptr<StandardMaterial>>& container)
 {
     std::ifstream inFile(m_sceneMaterialsFilePath);
 
@@ -1904,19 +1904,19 @@ void MaterialGpuCache::loadAll(std::unordered_map<std::string, std::shared_ptr<P
 
     for ( Json::Value materialJ : materialsJ )
     {
-        std::shared_ptr<PTMaterial> materialPT = materialPT->fromJson(materialJ, m_mediaPath, m_textureCache);
-        if (materialPT == nullptr)
+        std::shared_ptr<StandardMaterial> standardMaterial = standardMaterial->fromJson(materialJ, m_mediaPath, m_textureCache);
+        if (standardMaterial == nullptr)
             { caustica::warning("Error while reading material in material definition file '%s'", m_sceneMaterialsFilePath.string().c_str()); continue; }
         
-        auto existing = container.find(materialPT->name);
+        auto existing = container.find(standardMaterial->name);
         if (existing != container.end())
-            { caustica::warning("Duplicated materials with name '%s' found in material definition file '%s' - subsequent instances ignored.", materialPT->name.c_str(), m_sceneMaterialsFilePath.string().c_str()); assert( false ); continue; }
+            { caustica::warning("Duplicated materials with name '%s' found in material definition file '%s' - subsequent instances ignored.", standardMaterial->name.c_str(), m_sceneMaterialsFilePath.string().c_str()); assert( false ); continue; }
         else
-            container.insert( make_pair(materialPT->name, materialPT) );
+            container.insert( make_pair(standardMaterial->name, standardMaterial) );
     }
 }*/
 
-bool MaterialGpuCache::loadSingle(PTMaterialBase & material)
+bool MaterialGpuCache::loadSingle(StandardMaterialBase & material)
 {
     std::filesystem::path inPath = getMaterialStoragePath(material);
 
@@ -1931,7 +1931,7 @@ bool MaterialGpuCache::loadSingle(PTMaterialBase & material)
     return material.read(rootJ, m_mediaPath, m_textureCache, m_sceneDirectory);
 }
 
-bool MaterialGpuCache::saveSingle(PTMaterialBase & material)
+bool MaterialGpuCache::saveSingle(StandardMaterialBase & material)
 {
     if (!ensureDirectoryExists(m_materialsPath))
         return false;
@@ -1972,10 +1972,10 @@ void MaterialGpuCache::saveAll()
 
     rootJ["RTXPTMaterials"]["version"] = 1;
     Json::Value materialsJ;
-    for (auto& materialPT : m_materials)
+    for (auto& standardMaterial : m_materials)
     {
         Json::Value materialJ;
-        materialPT->write(materialJ, m_mediaPath);
+        standardMaterial->write(materialJ, m_mediaPath);
         materialsJ.append(materialJ);
     }
 
@@ -1989,8 +1989,8 @@ void MaterialGpuCache::saveAll()
     writer->write(rootJ, &outFile);
     outFile.close();
 #else
-    for (auto& materialPT : m_materials)
-        saveSingle(*materialPT);
+    for (auto& standardMaterial : m_materials)
+        saveSingle(*standardMaterial);
 #endif
 }
 
@@ -2025,12 +2025,12 @@ bool MaterialGpuCache::debugGui(float indent)
         {
             RAII_SCOPE(ImGui::Indent();, ImGui::Unindent(););
             if (ImGui::Button("Shared"))
-                for (auto& materialPT : m_materials)
-                    materialPT->sharedWithAllScenes = true;
+                for (auto& standardMaterial : m_materials)
+                    standardMaterial->sharedWithAllScenes = true;
             ImGui::SameLine();
             if (ImGui::Button("Not Shared"))
-                for (auto& materialPT : m_materials)
-                    materialPT->sharedWithAllScenes = false;
+                for (auto& standardMaterial : m_materials)
+                    standardMaterial->sharedWithAllScenes = false;
         }
 
         if( ImGui::Button("Save all") )
@@ -2040,7 +2040,7 @@ bool MaterialGpuCache::debugGui(float indent)
     return resetAccumulation;
 }
 
-MaterialShaderPermutation PTMaterial::computeShaderPermutation(const std::string& defaultShaderPath)
+MaterialShaderPermutation StandardMaterial::computeShaderPermutation(const std::string& defaultShaderPath)
 {
     const caustica::render::materialFeatureMask featureMask = caustica::render::computeMaterialFeatureMask(*this);
     const uint32_t tierIndex = caustica::render::mapFeatureMaskToTier(featureMask);
@@ -2050,7 +2050,7 @@ MaterialShaderPermutation PTMaterial::computeShaderPermutation(const std::string
     };
 }
 
-std::shared_ptr<PTMaterial> MaterialGpuCache::findByUniqueId(const std::string & name)
+std::shared_ptr<StandardMaterial> MaterialGpuCache::findByUniqueId(const std::string & name)
 {
     for( int i = 0; i < m_materials.size(); i++)
         if (equalsIgnoreCase(name, m_materials[i]->uniqueFullName()))

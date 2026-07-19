@@ -2,7 +2,7 @@
 
 #include <render/passes/lighting/MaterialGpuCache.h>
 
-#include <shaders/PathTracer/Materials/MaterialPT.h>
+#include <shaders/PathTracer/Materials/StandardMaterial.h>
 
 #include <array>
 #include <cassert>
@@ -53,7 +53,7 @@ namespace
     }
 }
 
-materialFeatureMask computeMaterialFeatureMask(const PTMaterial& material)
+materialFeatureMask computeMaterialFeatureMask(const StandardMaterial& material)
 {
     materialFeatureMask mask = materialFeatureMask(MaterialFeature::Specialized);
 
@@ -66,16 +66,16 @@ materialFeatureMask computeMaterialFeatureMask(const PTMaterial& material)
         mask = mask | MaterialFeature::NonAnalyticProxy;
 
 #if 0 // keep disabled until shader-side tiers are validated
-    PTMaterialData data{};
+    StandardMaterialData data{};
     material.fillData(data);
 
     if (material.enableTransmission)
         mask = mask | MaterialFeature::HasTransmission;
 
-    if ((data.Flags & PTMaterialFlags_ThinSurface) != 0)
+    if ((data.Flags & StandardMaterialFlags_ThinSurface) != 0)
         mask = mask | MaterialFeature::ThinSurface;
 
-    if ((data.Flags & PTMaterialFlags_UseNormalTexture) != 0)
+    if ((data.Flags & StandardMaterialFlags_UseNormalTexture) != 0)
         mask = mask | MaterialFeature::UseNormalTexture;
 
     if (material.enableAlphaTesting)
@@ -85,7 +85,7 @@ materialFeatureMask computeMaterialFeatureMask(const PTMaterial& material)
     const bool onlyDeltaLobes =
         ((material.enableTransmission && material.transmissionFactor == 1.0f) || (material.metalness == 1.0f))
         && (material.roughness < kMinGGXRoughness)
-        && ((data.Flags & PTMaterialFlags_UseMetalRoughOrSpecularTexture) == 0);
+        && ((data.Flags & StandardMaterialFlags_UseMetalRoughOrSpecularTexture) == 0);
     if (onlyDeltaLobes)
         mask = mask | MaterialFeature::OnlyDeltaLobes;
 #endif

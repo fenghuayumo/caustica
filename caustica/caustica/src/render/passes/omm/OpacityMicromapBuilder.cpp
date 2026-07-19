@@ -1,7 +1,7 @@
 #include <render/passes/omm/OpacityMicromapBuilder.h>
 #include <render/core/RenderDevice.h>
 #include <render/SceneGpuResources.h>
-#include <render/passes/lighting/MaterialGpuCache.h> // for PTMaterial full definition
+#include <render/passes/lighting/MaterialGpuCache.h> // for StandardMaterial full definition
 
 #include <assets/loader/ShaderFactory.h>
 #include <render/core/FramebufferFactory.h>
@@ -138,7 +138,7 @@ void OpacityMicromapBuilder::createOpacityMicromaps(
             continue;
         for (const auto& geometry : mesh.geometries)
         {
-            const std::shared_ptr<PTMaterial> material = m_materialGpuCache
+            const std::shared_ptr<StandardMaterial> material = m_materialGpuCache
                 ? m_materialGpuCache->findByResourceId(geometry.materialId)
                 : nullptr;
             if (material && material->enableAlphaTesting
@@ -166,7 +166,7 @@ void OpacityMicromapBuilder::createOpacityMicromaps(
         for (size_t i = 0; i < mesh.geometries.size(); ++i)
         {
             const auto& geometry = mesh.geometries[i];
-            const std::shared_ptr<PTMaterial> material = m_materialGpuCache
+            const std::shared_ptr<StandardMaterial> material = m_materialGpuCache
                 ? m_materialGpuCache->findByResourceId(geometry.materialId)
                 : nullptr;
             if (!material)

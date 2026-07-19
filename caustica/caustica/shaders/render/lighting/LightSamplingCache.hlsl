@@ -18,7 +18,7 @@
 #include <shaders/binding_helpers.hlsli>
 
 #include <shaders/SubInstanceData.h>
-#include <shaders/PathTracer/Materials/MaterialPT.h>
+#include <shaders/PathTracer/Materials/StandardMaterial.h>
 
 #include <shaders/PathTracer/Utils/Math/MathHelpers.hlsli>
 #include <shaders/PathTracer/Lighting/LightingTypes.hlsli>
@@ -62,7 +62,7 @@ Texture2D<float4>                           t_envRadianceAndImportanceMap   : re
 StructuredBuffer<SubInstanceData>           t_SubInstanceData               : register(t1);
 StructuredBuffer<InstanceData>              t_InstanceData                  : register(t2);
 StructuredBuffer<GeometryData>              t_GeometryData                  : register(t3);
-StructuredBuffer<PTMaterialData>            t_PTMaterialData                : register(t5);
+StructuredBuffer<StandardMaterialData>      t_StandardMaterialData          : register(t5);
 
 VK_BINDING(0, 1) ByteAddressBuffer          t_BindlessBuffers[]             : register(t0, space1);
 VK_BINDING(1, 1) Texture2D                  t_BindlessTextures[]            : register(t0, space2);
@@ -543,8 +543,8 @@ void BakeEmissiveTriangles( uint dispatchThreadID : SV_DispatchThreadID, uint gr
     //uint geometryInstanceIndex = instance.firstGeometryIndex + task.geometryIndex;
     GeometryData geometry = t_GeometryData[instance.firstGeometryIndex + task.GeometryIndex];   // <- can precompute this into task.geometryIndex
 
-    uint materialIndex = t_SubInstanceData[instance.firstGeometryInstanceIndex + task.GeometryIndex].GlobalGeometryIndex_PTMaterialDataIndex & 0xFFFF;
-    PTMaterialData material = t_PTMaterialData[materialIndex];
+    uint materialIndex = t_SubInstanceData[instance.firstGeometryInstanceIndex + task.GeometryIndex].GlobalGeometryIndex_StandardMaterialDataIndex & 0xFFFF;
+    StandardMaterialData material = t_StandardMaterialData[materialIndex];
 
     //DebugPrint( "tID {0}; fgii {1}, fgi {2}, ng {3}", dispatchThreadID, instance.firstGeometryInstanceIndex, instance.firstGeometryIndex, instance.numGeometries  );
     // if( task.EmissiveLightMappingOffset != (instance.firstGeometryInstanceIndex + task.GeometryIndex) )
@@ -580,7 +580,7 @@ void BakeEmissiveTriangles( uint dispatchThreadID : SV_DispatchThreadID, uint gr
 
         float3 radiance = material.EmissiveColor;
 
-        if ((material.EmissiveTextureIndex != 0xFFFFFFFF) && (geometry.texCoord1Offset != ~0u) && ((material.Flags & PTMaterialFlags_UseEmissiveTexture) != 0))
+        if ((material.EmissiveTextureIndex != 0xFFFFFFFF) && (geometry.texCoord1Offset != ~0u) && ((material.Flags & StandardMaterialFlags_UseEmissiveTexture) != 0))
         {
             Texture2D emissiveTexture = t_BindlessTextures[NonUniformResourceIndex(material.EmissiveTextureIndex & 0xFFFF)];
 

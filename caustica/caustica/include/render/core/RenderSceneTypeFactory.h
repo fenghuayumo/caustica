@@ -9,7 +9,7 @@ namespace caustica::render
 // =============================================================================
 // RenderSceneTypeFactory — SceneTypeFactory that creates render-specific types.
 //
-// Only overrides createMaterial() to produce MaterialEx (path-tracing PTMaterial).
+// Only overrides createMaterial() to produce MaterialEx (StandardMaterial).
 // Mesh / camera instances are ECS components; factory only creates mesh/material assets.
 // =============================================================================
 class RenderSceneTypeFactory : public SceneTypeFactory

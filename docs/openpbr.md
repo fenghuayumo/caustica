@@ -6,7 +6,7 @@ anisotropy, fuzz, coat, subsurface approximation, thin-film, and dispersion).
 Existing `.material.json` files remain valid.
 
 When `MaterialModel` is `"OpenPBR"`, the inspector shows OpenPBR parameter names and
-converts them internally to `PTMaterial` fields and the GPU data layout.
+converts them internally to `StandardMaterial` fields and the GPU data layout.
 
 ## Coverage
 

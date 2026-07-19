@@ -174,9 +174,9 @@ void PrepareLightsPass::countLightsInScene(uint32_t& numEmissiveMeshes, uint32_t
 
         for (const auto& geometry : mesh->geometries)
         {
-            std::shared_ptr<PTMaterial> materialPT =
+            std::shared_ptr<StandardMaterial> standardMaterial =
                 m_materialGpuCache->findByResourceId(geometry.materialId);
-            if (materialPT && materialPT->isEmissive())
+            if (standardMaterial && standardMaterial->isEmissive())
             {
                 numEmissiveMeshes += 1;
                 numEmissiveTriangles += geometry.numIndices / 3;
@@ -437,12 +437,12 @@ RTXDI_LightBufferParameters PrepareLightsPass::process(nvrhi::ICommandList* comm
             nvrhi::hash_combine(instanceHash, static_cast<uint32_t>(meshProxy.entity));
             nvrhi::hash_combine(instanceHash, geometryIndex);
 
-            std::shared_ptr<PTMaterial> materialPTPtr =
+            std::shared_ptr<StandardMaterial> standardMaterialPtr =
                 m_materialGpuCache->findByResourceId(geometry.materialId);
-            if (!materialPTPtr)
+            if (!standardMaterialPtr)
                 continue;
-            PTMaterial & materialPT = *materialPTPtr;
-            if (!materialPT.isEmissive())
+            StandardMaterial & standardMaterial = *standardMaterialPtr;
+            if (!standardMaterial.isEmissive())
             {
                 // remove the info about this instance, just in case it was emissive and now it's not
                 m_InstanceLightBufferOffsets.erase(instanceHash);

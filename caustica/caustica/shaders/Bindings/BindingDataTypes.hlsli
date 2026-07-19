@@ -5,7 +5,7 @@ struct PackedPathTracerSurfaceData
 {
     float3 _posW;
     uint _faceNCorrected;                   // fp16[3]
-    uint2 _mtl;                             // MaterialHeader | PTMaterialData index
+    uint2 _mtl;                             // MaterialHeader | StandardMaterialData index
     uint2 _V;                               // fp16[3]
 
     // misc (mostly subset of struct ShadingData)

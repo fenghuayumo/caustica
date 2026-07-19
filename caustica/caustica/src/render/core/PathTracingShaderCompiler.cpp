@@ -591,7 +591,7 @@ int HitGroupInfo::getShaderPermutationIndex() const
     return materialShaderPermutation ? materialShaderPermutation->indexInTable : -1;
 }
 
-HitGroupInfo ComputeSubInstanceHitGroupInfo(const MaterialGpuCache & baker, const PTMaterial& material)
+HitGroupInfo ComputeSubInstanceHitGroupInfo(const MaterialGpuCache & baker, const StandardMaterial& material)
 {
     HitGroupInfo info;
 
@@ -713,12 +713,12 @@ void PathTracingShaderCompiler::update(const caustica::scene::SceneRenderData* s
                 if (subInstanceIndex >= m_perSubInstanceHitGroup.size())
                     continue;
 
-                std::shared_ptr<PTMaterial> materialPT =
+                std::shared_ptr<StandardMaterial> standardMaterial =
                     getMaterialGpuCache()->findByResourceId(mesh->geometries[gi].materialId);
-                if (!materialPT)
+                if (!standardMaterial)
                     continue;
 
-                m_perSubInstanceHitGroup[subInstanceIndex] = ComputeSubInstanceHitGroupInfo(*getMaterialGpuCache(), *materialPT);
+                m_perSubInstanceHitGroup[subInstanceIndex] = ComputeSubInstanceHitGroupInfo(*getMaterialGpuCache(), *standardMaterial);
             }
         }
         assert(m_perSubInstanceHitGroup.size() == subInstanceCount);

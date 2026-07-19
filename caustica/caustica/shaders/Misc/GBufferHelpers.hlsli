@@ -382,7 +382,7 @@ PathTracerCollectedSurfaceData RunDecompress(PackedPathTracerSurfaceData c)
 	// The bounds check also handles the 0xffffffff invalid-ID sentinel.
 	if (!d._isEmpty && d._materialID < g_Const.MaterialCount)
 	{
-		const PTMaterialData material = t_PTMaterialData[d._materialID];
+		const StandardMaterialData material = t_StandardMaterialData[d._materialID];
 		anisotropy = (lpfloat)material.Anisotropy;
 		fuzzWeight = (lpfloat)material.FuzzWeight;
 		fuzzColor = (lpfloat3)material.FuzzColor;

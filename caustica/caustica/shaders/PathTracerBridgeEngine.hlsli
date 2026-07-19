@@ -300,7 +300,7 @@ void ApplyNormalMapRTXPT(inout MaterialProperties result, float4 tangent, float4
     result.shadingNormal = normalize(tangent.xyz * localNormal.x + bitangent.xyz * localNormal.y + result.geometryNormal.xyz * localNormal.z);
 }
 
-MaterialProperties EvaluateSceneMaterialRTXPT(float3 normal, float4 tangent, PTMaterialData material, MaterialTextureSample textures)
+MaterialProperties EvaluateStandardMaterial(float3 normal, float4 tangent, StandardMaterialData material, MaterialTextureSample textures)
 {
     MaterialProperties result = MaterialProperties::make();
     result.geometryNormal   = normalize(normal);
@@ -313,7 +313,7 @@ MaterialProperties EvaluateSceneMaterialRTXPT(float3 normal, float4 tangent, PTM
     result.fuzzColor = lpfloat3(saturate(material.FuzzColor));
     result.fuzzRoughness = lpfloat(saturate(material.FuzzRoughness));
     
-    if ((material.Flags & PTMaterialFlags_UseSpecularGlossModel) != 0)
+    if ((material.Flags & StandardMaterialFlags_UseSpecularGlossModel) != 0)
     {
         float3 diffuseColor = material.BaseOrDiffuseColor.rgb * textures.baseOrDiffuse.rgb * result.baseWeight;
         float3 specularColor = material.SpecularColor.rgb * textures.metalRoughOrSpecular.rgb * result.specularWeight;
@@ -333,7 +333,7 @@ MaterialProperties EvaluateSceneMaterialRTXPT(float3 normal, float4 tangent, PTM
     {
         result.baseColor = lpfloat3(material.BaseOrDiffuseColor.rgb * textures.baseOrDiffuse.rgb);
         result.roughness = lpfloat(material.Roughness * textures.metalRoughOrSpecular.g);
-        if ((material.Flags & PTMaterialFlags_MetalnessInRedChannel) != 0)
+        if ((material.Flags & StandardMaterialFlags_MetalnessInRedChannel) != 0)
             result.metalness = lpfloat(material.Metalness * textures.metalRoughOrSpecular.r);
         else
             result.metalness = lpfloat(material.Metalness * textures.metalRoughOrSpecular.b);
@@ -341,7 +341,7 @@ MaterialProperties EvaluateSceneMaterialRTXPT(float3 normal, float4 tangent, PTM
 
         // Compute the BRDF inputs for the metal-rough model
         // https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#metal-brdf-and-dielectric-brdf
-        float3 specularTint = (material.Flags & PTMaterialFlags_UseOpenPBRMaterialModel) != 0 ? material.SpecularColor.rgb : float3(1, 1, 1);
+        float3 specularTint = (material.Flags & StandardMaterialFlags_UseOpenPBRMaterialModel) != 0 ? material.SpecularColor.rgb : float3(1, 1, 1);
         float f = (material.IoR - 1.f) / (material.IoR + 1.f);
         float dielectricF0 = f * f;
         result.diffuseAlbedo = result.baseColor * result.baseWeight * (1.0 - result.metalness); // Don't compensate for specular energy here. Energy compensation is built into Frostbite's diffuse, so this would be double dipping.
@@ -350,7 +350,7 @@ MaterialProperties EvaluateSceneMaterialRTXPT(float3 normal, float4 tangent, PTM
 
 #if 0    
     result.occlusion = 1.0;
-    if ((material.Flags & PTMaterialFlags_UseOcclusionTexture) != 0)
+    if ((material.Flags & StandardMaterialFlags_UseOcclusionTexture) != 0)
     {
         result.occlusion = lpfloat( textures.occlusion.r );
     }
@@ -358,14 +358,14 @@ MaterialProperties EvaluateSceneMaterialRTXPT(float3 normal, float4 tangent, PTM
 #endif
 
     result.opacity = lpfloat( material.Opacity );
-    if ((material.Flags & PTMaterialFlags_UseBaseOrDiffuseTexture) != 0)
+    if ((material.Flags & StandardMaterialFlags_UseBaseOrDiffuseTexture) != 0)
         result.opacity *= lpfloat( textures.baseOrDiffuse.a );
     result.opacity = saturate(result.opacity);
 
 #if !defined(CAUSTICA_MATERIAL_HAS_TRANSMISSION) || CAUSTICA_MATERIAL_HAS_TRANSMISSION
     result.transmission = lpfloat( material.TransmissionFactor );
     result.diffuseTransmission = lpfloat( material.DiffuseTransmissionFactor );
-    if ((material.Flags & PTMaterialFlags_UseTransmissionTexture) != 0)
+    if ((material.Flags & StandardMaterialFlags_UseTransmissionTexture) != 0)
     {
         result.transmission *= lpfloat( textures.transmission.r );
         result.diffuseTransmission *= lpfloat( textures.transmission.r );
@@ -373,7 +373,7 @@ MaterialProperties EvaluateSceneMaterialRTXPT(float3 normal, float4 tangent, PTM
 #endif
     
     result.emissiveColor = lpfloat3( material.EmissiveColor );
-    if ((material.Flags & PTMaterialFlags_UseEmissiveTexture) != 0)
+    if ((material.Flags & StandardMaterialFlags_UseEmissiveTexture) != 0)
         result.emissiveColor *= lpfloat3( textures.emissive.rgb );
 
     result.ior = lpfloat( material.IoR );
@@ -409,7 +409,7 @@ MaterialProperties EvaluateSceneMaterialRTXPT(float3 normal, float4 tangent, PTM
             ApplyNormalMapRTXPT(result, tangent, textures.normal, material.NormalTextureScale);  // there's an incorrect "error X3508: 'ApplyNormalMap': output parameter 'result' not completely initialized" if this line happens before result is fully initialized
         #endif
     #else
-        if ((material.Flags & PTMaterialFlags_UseNormalTexture) != 0)
+        if ((material.Flags & StandardMaterialFlags_UseNormalTexture) != 0)
             ApplyNormalMapRTXPT(result, tangent, textures.normal, material.NormalTextureScale);  // there's an incorrect "error X3508: 'ApplyNormalMap': output parameter 'result' not completely initialized" if this line happens before result is fully initialized
     #endif
 
@@ -420,14 +420,14 @@ MaterialProperties sampleGeometryMaterialRTXPT(const BridgeGeometrySample gs, ui
 {
     MaterialTextureSample textures = DefaultMaterialTextures();
 
-    PTMaterialData material = t_PTMaterialData[materialIndex];
+    StandardMaterialData material = t_StandardMaterialData[materialIndex];
 
     //if( !optimizationHints.NoTextures )
     {
-        if ((attributes & MatAttr_BaseColor) && (material.Flags & PTMaterialFlags_UseBaseOrDiffuseTexture) != 0)
+        if ((attributes & MatAttr_BaseColor) && (material.Flags & StandardMaterialFlags_UseBaseOrDiffuseTexture) != 0)
             textures.baseOrDiffuse = sampleTexture(material.BaseOrDiffuseTextureIndex, materialSampler, textureSampler, gs.texcoord);
 
-        if ((attributes & MatAttr_Emissive) && (material.Flags & PTMaterialFlags_UseEmissiveTexture) != 0)
+        if ((attributes & MatAttr_Emissive) && (material.Flags & StandardMaterialFlags_UseEmissiveTexture) != 0)
             textures.emissive = sampleTexture(material.EmissiveTextureIndex, materialSampler, textureSampler, gs.texcoord);
     
         #if defined(CAUSTICA_MATERIAL_USE_NORMAL_TEXTURE)
@@ -436,20 +436,20 @@ MaterialProperties sampleGeometryMaterialRTXPT(const BridgeGeometrySample gs, ui
                     textures.normal = sampleTexture(material.NormalTextureIndex, materialSampler, textureSampler, gs.texcoord);
             #endif
         #else
-            if ((attributes & MatAttr_Normal) && (material.Flags & PTMaterialFlags_UseNormalTexture) != 0)
+            if ((attributes & MatAttr_Normal) && (material.Flags & StandardMaterialFlags_UseNormalTexture) != 0)
                 textures.normal = sampleTexture(material.NormalTextureIndex, materialSampler, textureSampler, gs.texcoord);
         #endif
 
-        if ((attributes & MatAttr_MetalRough) && (material.Flags & PTMaterialFlags_UseMetalRoughOrSpecularTexture) != 0)
+        if ((attributes & MatAttr_MetalRough) && (material.Flags & StandardMaterialFlags_UseMetalRoughOrSpecularTexture) != 0)
             textures.metalRoughOrSpecular = sampleTexture(material.MetalRoughOrSpecularTextureIndex, materialSampler, textureSampler, gs.texcoord);
 
 #if !defined(CAUSTICA_MATERIAL_HAS_TRANSMISSION) || CAUSTICA_MATERIAL_HAS_TRANSMISSION
-        if ((attributes & MatAttr_Transmission) && (material.Flags & PTMaterialFlags_UseTransmissionTexture) != 0)
+        if ((attributes & MatAttr_Transmission) && (material.Flags & StandardMaterialFlags_UseTransmissionTexture) != 0)
             textures.transmission = sampleTexture(material.TransmissionTextureIndex, materialSampler, textureSampler, gs.texcoord);
 #endif
     }
 
-    return EvaluateSceneMaterialRTXPT(gs.geometryNormal, gs.tangent, material, textures);
+    return EvaluateStandardMaterial(gs.geometryNormal, gs.tangent, material, textures);
 }
 
 static OpacityMicroMapDebugInfo loadOmmDebugInfo(const BridgeGeometrySample bridgeGS, const uint triangleIndex, float2 barycentrics)
@@ -709,12 +709,12 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
 
     uint subInstanceDataIndex = bridgeGS.instance.firstGeometryInstanceIndex + geometryIndex;
 
-    uint materialIndex = t_SubInstanceData[subInstanceDataIndex].GlobalGeometryIndex_PTMaterialDataIndex & 0xFFFF;
+    uint materialIndex = t_SubInstanceData[subInstanceDataIndex].GlobalGeometryIndex_StandardMaterialDataIndex & 0xFFFF;
 
     // Get engine material (normal map is evaluated here)
     MaterialProperties bridgeMaterial = sampleGeometryMaterialRTXPT(bridgeGS, materialIndex, MatAttr_All, s_MaterialSampler, textureSampler);
 
-    bool ignoreTangent = (bridgeMaterial.flags & PTMaterialFlags_IgnoreMeshTangentSpace) != 0;
+    bool ignoreTangent = (bridgeMaterial.flags & StandardMaterialFlags_IgnoreMeshTangentSpace) != 0;
 
     // after this point we have valid tangent space in ptShadingData.N/.T/.B using geometry (interpolated) normal, but without normalmap yet
     computeTangentSpace(ptShadingData, bridgeGS.tangent, ignoreTangent);
@@ -727,19 +727,19 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
     ptShadingData.N = (bridgeGS.frontFacing)?(bridgeMaterial.shadingNormal):(-bridgeMaterial.shadingNormal);
 
     // Engine -> RTXPT
-    const bool bridgeMaterialThinSurface = (bridgeMaterial.flags & PTMaterialFlags_ThinSurface) != 0;
+    const bool bridgeMaterialThinSurface = (bridgeMaterial.flags & StandardMaterialFlags_ThinSurface) != 0;
     ptShadingData.materialID = materialIndex;
     ptShadingData.mtl = MaterialHeader::make();
-    ptShadingData.mtl.setNestedPriority( min( InteriorList::kMaxNestedPriority, 1 + (uint(bridgeMaterial.flags) >> PTMaterialFlags_NestedPriorityShift)) );   // priorities are from (1, ... kMaxNestedPriority) because 0 is used to mark empty slots and remapped to kMaxNestedPriority
+    ptShadingData.mtl.setNestedPriority( min( InteriorList::kMaxNestedPriority, 1 + (uint(bridgeMaterial.flags) >> StandardMaterialFlags_NestedPriorityShift)) );   // priorities are from (1, ... kMaxNestedPriority) because 0 is used to mark empty slots and remapped to kMaxNestedPriority
     ptShadingData.mtl.setThinSurface( bridgeMaterialThinSurface );
-    ptShadingData.mtl.setPSDExclude( (bridgeMaterial.flags & PTMaterialFlags_PSDExclude) != 0 );
-    ptShadingData.mtl.setPSDDominantDeltaLobeP1( (bridgeMaterial.flags & PTMaterialFlags_PSDDominantDeltaLobeP1Mask) >> PTMaterialFlags_PSDDominantDeltaLobeP1Shift );
+    ptShadingData.mtl.setPSDExclude( (bridgeMaterial.flags & StandardMaterialFlags_PSDExclude) != 0 );
+    ptShadingData.mtl.setPSDDominantDeltaLobeP1( (bridgeMaterial.flags & StandardMaterialFlags_PSDDominantDeltaLobeP1Mask) >> StandardMaterialFlags_PSDDominantDeltaLobeP1Shift );
 
 
     // stopping motion vectors from being calculated behind/beyond this surface
     {
         // types are 0 - Off; 1 - AutoLow; 2 - AutoHigh; 3 - Full
-        const int blockType = ((bridgeMaterial.flags & PTMaterialFlags_PSDBlockMVsAtSurfaceTypeB0) != 0) + ((bridgeMaterial.flags & PTMaterialFlags_PSDBlockMVsAtSurfaceTypeB1) != 0) * 2;
+        const int blockType = ((bridgeMaterial.flags & StandardMaterialFlags_PSDBlockMVsAtSurfaceTypeB0) != 0) + ((bridgeMaterial.flags & StandardMaterialFlags_PSDBlockMVsAtSurfaceTypeB1) != 0) * 2;
         bool blockMVs = (blockType) == 3;
 
         if (blockType == 1 || blockType == 2)
@@ -857,7 +857,7 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
 #endif
 
 #if !defined(CAUSTICA_MATERIAL_IS_ANALYTIC_LIGHT_PROXY) || CAUSTICA_MATERIAL_IS_ANALYTIC_LIGHT_PROXY
-    if ( (bridgeMaterial.flags & PTMaterialFlags_EnableAsAnalyticLightProxy) != 0 )
+    if ( (bridgeMaterial.flags & StandardMaterialFlags_EnableAsAnalyticLightProxy) != 0 )
         neeAnalyticLightIndex = t_SubInstanceData[subInstanceDataIndex].AnalyticProxyLightIndex;
 #endif
 
@@ -905,7 +905,7 @@ lpfloat Bridge::loadIoR(const uint materialDataIndex)
     if( materialDataIndex >= g_Const.MaterialCount )
         return 1.0;
     else
-        return (lpfloat)t_PTMaterialData[materialDataIndex].IoR;
+        return (lpfloat)t_StandardMaterialData[materialDataIndex].IoR;
 }
 
 HomogeneousVolumeData Bridge::loadHomogeneousVolumeData(const uint materialDataIndex)
@@ -918,8 +918,8 @@ HomogeneousVolumeData Bridge::loadHomogeneousVolumeData(const uint materialDataI
     if( materialDataIndex >= g_Const.MaterialCount )
         return ptVolume;
 
-    PTMaterialData material = t_PTMaterialData[materialDataIndex];
-    VolumePTConstants volumeInfo = material.Volume;
+    StandardMaterialData material = t_StandardMaterialData[materialDataIndex];
+    StandardVolumeConstants volumeInfo = material.Volume;
         
     // Absorption from volume attenuation (glTF / OpenPBR transmission depth path).
     float attenDistance = volumeInfo.AttenuationDistance;
@@ -979,7 +979,7 @@ float3 Bridge::computeSkyMotionVector( const uint2 pixelPos )
 float2 GetSubInstanceTexcoord(SubInstanceData subInstanceData, uint triangleIndex, float2 rayBarycentrics)
 {
 #if !SUBINSTANCEDATA_EXTENDED
-    GeometryData geometry = t_GeometryData[subInstanceData.GlobalGeometryIndex_PTMaterialDataIndex>>16];
+    GeometryData geometry = t_GeometryData[subInstanceData.GlobalGeometryIndex_StandardMaterialDataIndex>>16];
     if (geometry.texCoord1Offset == 0xFFFFFFFF)
         return float2(0, 0);
 
@@ -1035,33 +1035,33 @@ bool AlphaTestImpl(SubInstanceData subInstanceData, uint triangleIndex, float2 r
     return opacityValue >= subInstanceData.AlphaCutoff();
 }
 
-bool IsTransparentShadowMaterial(PTMaterialData material)
+bool IsTransparentShadowMaterial(StandardMaterialData material)
 {
     return max(material.TransmissionFactor, material.DiffuseTransmissionFactor) > 0.0;
 }
 
-float3 ComputeTransparentShadowSurfaceTransmittance(SubInstanceData subInstanceData, PTMaterialData material, uint triangleIndex, float2 rayBarycentrics)
+float3 ComputeTransparentShadowSurfaceTransmittance(SubInstanceData subInstanceData, StandardMaterialData material, uint triangleIndex, float2 rayBarycentrics)
 {
     float transmission = saturate(max(material.TransmissionFactor, material.DiffuseTransmissionFactor));
     float3 tint = saturate(material.BaseOrDiffuseColor.rgb);
 
     const bool needsTexcoord =
-        ((material.Flags & PTMaterialFlags_UseBaseOrDiffuseTexture) != 0) ||
-        ((material.Flags & PTMaterialFlags_UseTransmissionTexture) != 0);
+        ((material.Flags & StandardMaterialFlags_UseBaseOrDiffuseTexture) != 0) ||
+        ((material.Flags & StandardMaterialFlags_UseTransmissionTexture) != 0);
 
     if (needsTexcoord)
     {
         float2 texcoord = GetSubInstanceTexcoord(subInstanceData, triangleIndex, rayBarycentrics);
 
-        if ((material.Flags & PTMaterialFlags_UseBaseOrDiffuseTexture) != 0)
+        if ((material.Flags & StandardMaterialFlags_UseBaseOrDiffuseTexture) != 0)
             tint *= saturate(SamplePackedMaterialTexture(material.BaseOrDiffuseTextureIndex, texcoord).rgb);
 
-        if ((material.Flags & PTMaterialFlags_UseTransmissionTexture) != 0)
+        if ((material.Flags & StandardMaterialFlags_UseTransmissionTexture) != 0)
             transmission *= saturate(SamplePackedMaterialTexture(material.TransmissionTextureIndex, texcoord).r);
     }
 
     float3 interfaceTransmittance = saturate(tint * transmission.xxx);
-    if ((material.Flags & PTMaterialFlags_ThinSurface) == 0)
+    if ((material.Flags & StandardMaterialFlags_ThinSurface) == 0)
         interfaceTransmittance = sqrt(interfaceTransmittance);
 
     float fresnelF0 = square((material.IoR - 1.0) / max(material.IoR + 1.0, 1e-4));
@@ -1071,7 +1071,7 @@ float3 ComputeTransparentShadowSurfaceTransmittance(SubInstanceData subInstanceD
     return interfaceTransmittance;
 }
 
-float3 ComputeTransparentShadowVolumeTransmittance(PTMaterialData material, float distance)
+float3 ComputeTransparentShadowVolumeTransmittance(StandardMaterialData material, float distance)
 {
     const float attenuationDistance = material.Volume.AttenuationDistance;
     if (distance <= 0.0 || attenuationDistance <= 0.0 || attenuationDistance >= 1.0e20)
@@ -1127,17 +1127,17 @@ float3 Bridge::traceVisibilityRay(RayDesc ray, const RayCone rayCone, const int 
 
             [branch]if (AlphaTestImpl(subInstanceData, candidatePrimitiveIndex, candidateBarycentrics))
             {
-                const uint materialID = subInstanceData.GlobalGeometryIndex_PTMaterialDataIndex & 0xFFFF;
+                const uint materialID = subInstanceData.GlobalGeometryIndex_StandardMaterialDataIndex & 0xFFFF;
                 if (materialID < g_Const.MaterialCount)
                 {
-                    PTMaterialData material = t_PTMaterialData[materialID];
+                    StandardMaterialData material = t_StandardMaterialData[materialID];
 
                     if (IsTransparentShadowMaterial(material))
                     {
                         const float candidateRayT = rayQuery.CandidateTriangleRayT();
                         transmittance *= ComputeTransparentShadowSurfaceTransmittance(subInstanceData, material, candidatePrimitiveIndex, candidateBarycentrics);
 
-                        if ((material.Flags & PTMaterialFlags_ThinSurface) == 0)
+                        if ((material.Flags & StandardMaterialFlags_ThinSurface) == 0)
                         {
                             if (insideTransparentMaterialID == materialID)
                             {
@@ -1177,7 +1177,7 @@ float3 Bridge::traceVisibilityRay(RayDesc ray, const RayCone rayCone, const int 
 
     if (insideTransparentMaterialID != 0xFFFFFFFFu && insideTransparentMaterialID < g_Const.MaterialCount)
     {
-        PTMaterialData material = t_PTMaterialData[insideTransparentMaterialID];
+        StandardMaterialData material = t_StandardMaterialData[insideTransparentMaterialID];
         transmittance *= ComputeTransparentShadowVolumeTransmittance(material, ray.TMax - insideTransparentRayT);
     }
 

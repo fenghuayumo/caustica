@@ -16,7 +16,7 @@
 
 #include <render/core/ComputePass.h>
 #include <shaders/SubInstanceData.h>
-#include <shaders/PathTracer/Materials/MaterialPT.h>
+#include <shaders/PathTracer/Materials/StandardMaterial.h>
 
 #include <unordered_map>
 
@@ -45,7 +45,7 @@ class ShaderDebug;
 #include <scene/Scene.h>
 class MaterialGpuCache;
 
-enum class PTMaterialTextureSlot
+enum class StandardMaterialTextureSlot
 {
     Base,
     OcclusionRoughnessMetallic,
@@ -92,7 +92,7 @@ struct MaterialShaderPermutationKeyHash
     std::size_t operator()(const MaterialShaderPermutationKey & s) const noexcept   { return s.hash; }
 };
 
-struct PTTexture
+struct StandardMaterialTexture
 {
     std::filesystem::path   localPath;
     bool                    sRGB = false;   // whether to assume that, when loading from sRGB agnostic formats, the texture's .rgb channels are in sRGB (.a is always linear)
@@ -110,7 +110,7 @@ struct PTTexture
 };
 
 // All materials share these base properties and some of them have tight integration with the rest of the renderer
-struct PTMaterialBase
+struct StandardMaterialBase
 {
     MaterialGpuCache*          runtimeMaterialGpuCache = nullptr;
 
@@ -143,13 +143,13 @@ struct PTMaterialBase
     virtual MaterialShaderPermutation computeShaderPermutation(const std::string & defaultShaderPath) = 0;
 };                                                                                                                      
 
-struct PTMaterial : public PTMaterialBase
+struct StandardMaterial : public StandardMaterialBase
 {
-    PTTexture               baseTexture;                        // .rgb base color; .a = opacity (both modes)
-    PTTexture               occlusionRoughnessMetallicTexture;  // .rgb ORM; (spec-gloss fallback: specular color, .a = glossiness)
-    PTTexture               normalTexture;
-    PTTexture               emissiveTexture;
-    PTTexture               transmissionTexture;                // see KHR_materials_transmission; undefined on specular-gloss materials
+    StandardMaterialTexture baseTexture;                        // .rgb base color; .a = opacity (both modes)
+    StandardMaterialTexture occlusionRoughnessMetallicTexture;  // .rgb ORM; (spec-gloss fallback: specular color, .a = glossiness)
+    StandardMaterialTexture normalTexture;
+    StandardMaterialTexture emissiveTexture;
+    StandardMaterialTexture transmissionTexture;                // see KHR_materials_transmission; undefined on specular-gloss materials
 
     dm::float3              baseOrDiffuseColor                  = 1.f; // metal-rough: base color, spec-gloss: diffuse color (if no texture present)
     dm::float3              specularColor                       = 1.f; // spec-gloss: specular color; OpenPBR: dielectric specular tint
@@ -256,17 +256,17 @@ struct PTMaterial : public PTMaterialBase
     
     bool                    skipRender                          = false;        // if 'true', we just skip drawing all geometries with this material; sometimes we can't edit a specific mesh but we can remove it this way; note: it can also be used for hidden emissives
 
-    void                    fillData(PTMaterialData & data);
+    void                    fillData(StandardMaterialData & data);
     bool                    editorGui(class MaterialGpuCache & cache);
     bool                    isEmissive() const;
-    PTTexture&              getTexture(PTMaterialTextureSlot slot);
-    const PTTexture&        getTexture(PTMaterialTextureSlot slot) const;
-    bool                    isTextureEnabled(PTMaterialTextureSlot slot) const;
-    void                    setTextureEnabled(PTMaterialTextureSlot slot, bool enabled);
+    StandardMaterialTexture& getTexture(StandardMaterialTextureSlot slot);
+    const StandardMaterialTexture& getTexture(StandardMaterialTextureSlot slot) const;
+    bool                    isTextureEnabled(StandardMaterialTextureSlot slot) const;
+    void                    setTextureEnabled(StandardMaterialTextureSlot slot, bool enabled);
 
-    static std::shared_ptr<PTMaterial> safeCast(const std::shared_ptr<caustica::Material>& bridgeMaterial);
+    static std::shared_ptr<StandardMaterial> safeCast(const std::shared_ptr<caustica::Material>& bridgeMaterial);
 
-    static std::shared_ptr<PTMaterial> fromJson(
+    static std::shared_ptr<StandardMaterial> fromJson(
         Json::Value& input,
         const std::filesystem::path& mediaPath,
         const std::shared_ptr<caustica::TextureLoader>& textureCache,
@@ -288,11 +288,11 @@ struct PTMaterial : public PTMaterialBase
 };
 
 // Thin wrapper: adds path-tracing material data to the engine Material.
-// PTMaterial lives in the render layer, so this can't be merged into
+// StandardMaterial lives in the render layer, so this can't be merged into
 // scene/SceneTypes.h without creating a layer dependency violation.
 struct MaterialEx : caustica::Material
 {
-    std::shared_ptr<PTMaterial> ptData;
+    std::shared_ptr<StandardMaterial> standardData;
 };
 
 class MaterialGpuCache
@@ -320,58 +320,58 @@ public:
     nvrhi::BufferHandle             getMaterialDataBuffer() const           { return m_materialData; }
     uint                            getMaterialDataCount() const            { return m_materialsGPU.size(); }
 
-    const std::unordered_map<std::string, PTTexture> &
+    const std::unordered_map<std::string, StandardMaterialTexture> &
                                     getUsedTextures() const                 { return m_textures; }
 
     bool                            debugGui(float indent);
 
     void                            sceneReloaded();
-    // Incrementally create PT materials for scene materials that do not yet have
-    // ptData. Used by runtime mesh import so existing materials stay valid.
+    // Incrementally create StandardMaterial objects for scene materials that do not yet have
+    // standardData. Used by runtime mesh import so existing materials stay valid.
     int                             ensureMaterialsFromScene(std::span<const caustica::scene::MaterialRenderResourceSnapshot> materials);
-    std::shared_ptr<PTMaterial>     findByResourceId(caustica::scene::MaterialRenderResourceId id) const;
-    // Path-tracer pick feedback stores PTMaterial::gpuDataIndex.
-    std::shared_ptr<PTMaterial>     findByGpuDataIndex(uint gpuDataIndex) const;
+    std::shared_ptr<StandardMaterial> findByResourceId(caustica::scene::MaterialRenderResourceId id) const;
+    // Path-tracer pick feedback stores StandardMaterial::gpuDataIndex.
+    std::shared_ptr<StandardMaterial> findByGpuDataIndex(uint gpuDataIndex) const;
     RayTracingState                 resolveRayTracingState(caustica::scene::MaterialRenderResourceId id) const;
     uint64_t                        materialStateRevision() const { return m_materialStateRevision; }
     void                            notifyMaterialEdited();
 
-    std::filesystem::path           getMaterialStoragePath(PTMaterialBase& material);
+    std::filesystem::path           getMaterialStoragePath(StandardMaterialBase& material);
 
     const std::shared_ptr<MaterialShaderPermutation> & 
                                     getUbershader() const                   { return m_ubershader; }
     const std::vector<std::shared_ptr<MaterialShaderPermutation>> & 
                                     getShaderPermutationTable() const       { return m_shaderPermutationTable; }
 
-    bool                            saveSingle(PTMaterialBase& material);
-    bool                            loadSingle(PTMaterialBase& material);
+    bool                            saveSingle(StandardMaterialBase& material);
+    bool                            loadSingle(StandardMaterialBase& material);
     bool                            setMaterialTexture(
-                                        PTMaterial& material,
-                                        PTMaterialTextureSlot slot,
+                                        StandardMaterial& material,
+                                        StandardMaterialTextureSlot slot,
                                         const std::filesystem::path& localPath,
                                         std::optional<bool> sRGB = std::nullopt,
                                         std::optional<bool> normalMap = std::nullopt);
     void                            clearMaterialTexture(
-                                        PTMaterial& material,
-                                        PTMaterialTextureSlot slot);
+                                        StandardMaterial& material,
+                                        StandardMaterialTextureSlot slot);
 
-    std::shared_ptr<PTMaterial>     findByUniqueId(const std::string & name);
+    std::shared_ptr<StandardMaterial> findByUniqueId(const std::string & name);
 
 private:
     void                            clear();
 
-    std::shared_ptr<PTMaterial>     load(const std::string & modelFileName, const std::string& name);
-    std::shared_ptr<PTMaterial>     importFromEngineMaterial(const caustica::scene::MaterialRenderResourceSnapshot& material);
+    std::shared_ptr<StandardMaterial> load(const std::string & modelFileName, const std::string& name);
+    std::shared_ptr<StandardMaterial> importFromEngineMaterial(const caustica::scene::MaterialRenderResourceSnapshot& material);
     void                            saveAll();
 
     void                            completeDeferredTexturesLoad(nvrhi::ICommandList* commandList);
-    void                            recordTexture(const PTTexture& texture);
+    void                            recordTexture(const StandardMaterialTexture& texture);
     bool                            reconcileLiveMaterials(std::span<const caustica::scene::MaterialRenderResourceSnapshot> materials);
     void                            rebuildActiveTextureIndex();
 
     void                            bakeShaderPermutations();
 
-    void                            initializeUniqueDeterministicName(const std::shared_ptr<PTMaterialBase> & material);
+    void                            initializeUniqueDeterministicName(const std::shared_ptr<StandardMaterialBase> & material);
 
 private:
     nvrhi::DeviceHandle             m_device;
@@ -387,15 +387,15 @@ private:
     bool                            m_materialDataWasReset = true;
     bool                            m_deferredTextureLoadInProgress = false;
 
-    std::vector<std::shared_ptr<PTMaterial>>    
+    std::vector<std::shared_ptr<StandardMaterial>>
                                     m_materials;
     std::unordered_map<caustica::scene::MaterialRenderResourceId,
-        std::shared_ptr<PTMaterial>,
+        std::shared_ptr<StandardMaterial>,
         caustica::scene::MaterialRenderResourceId::Hash> m_materialsById;
     uint64_t                        m_materialStateRevision = 1;
-    std::vector<PTMaterialData>     m_materialsGPU;
+    std::vector<StandardMaterialData> m_materialsGPU;
 
-    std::unordered_map<std::string, PTTexture> m_textures;
+    std::unordered_map<std::string, StandardMaterialTexture> m_textures;
 
     std::filesystem::path           m_mediaPath;
     std::filesystem::path           m_sceneDirectory;                     // parent directory of the loaded scene description file
@@ -413,5 +413,5 @@ private:
                                     m_shaderPermutations;
     std::vector<std::shared_ptr<MaterialShaderPermutation>> m_shaderPermutationTable;
 
-    std::unordered_map<std::string, std::weak_ptr<PTMaterialBase> > m_uniqueNames;
+    std::unordered_map<std::string, std::weak_ptr<StandardMaterialBase> > m_uniqueNames;
 };

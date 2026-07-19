@@ -132,7 +132,7 @@ void LightSamplingCache::createRenderPasses(std::shared_ptr<caustica::ShaderFact
             nvrhi::BindingLayoutItem::StructuredBuffer_SRV(2),      // StructuredBuffer<InstanceData> t_InstanceData          
             nvrhi::BindingLayoutItem::StructuredBuffer_SRV(3),      // StructuredBuffer<GeometryData> t_GeometryData          
             //nvrhi::BindingLayoutItem::StructuredBuffer_SRV(4),      // geometry debug buffer not needed here?
-            nvrhi::BindingLayoutItem::StructuredBuffer_SRV(5),      // StructuredBuffer<PTMaterialData> t_PTMaterialData
+            nvrhi::BindingLayoutItem::StructuredBuffer_SRV(5),      // StructuredBuffer<StandardMaterialData> t_StandardMaterialData
             nvrhi::BindingLayoutItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX),
             nvrhi::BindingLayoutItem::Texture_UAV(SHADER_DEBUG_VIZ_TEXTURE_UAV_INDEX),
         };
@@ -736,15 +736,15 @@ bool LightSamplingCache::processEmissiveGeometry( const UpdateSettings & setting
             nvrhi::hash_combine(instanceHash, static_cast<uint32_t>(meshProxy.entity));
             nvrhi::hash_combine(instanceHash, geometryIndex);
 
-            std::shared_ptr<PTMaterial> materialPTPtr =
+            std::shared_ptr<StandardMaterial> standardMaterialPtr =
                 materialGpuCache.findByResourceId(geometry.materialId);
-            if (!materialPTPtr)
+            if (!standardMaterialPtr)
                 continue;
-            PTMaterial & materialPT = *materialPTPtr;
+            StandardMaterial & standardMaterial = *standardMaterialPtr;
 
             // Analytic-light proxy binding after hitting this mesh (not emissive geometry).
             uint analyticProxyLightIndex = CAUSTICA_INVALID_LIGHT_INDEX;
-            if (materialPT.enableAsAnalyticLightProxy)
+            if (standardMaterial.enableAsAnalyticLightProxy)
             {
                 auto resolveAnalyticIndex = [&](ecs::Entity lightEntity) -> uint {
                     if (!ecs::isValid(lightEntity))
@@ -776,7 +776,7 @@ bool LightSamplingCache::processEmissiveGeometry( const UpdateSettings & setting
             bool overflow = (ctrlBuff.TotalLightCount + (geometry.numIndices / 3) >= CAUSTICA_LIGHTING_MAX_LIGHTS);
             allGood &= !overflow;
 
-            if (!materialPT.isEmissive() || materialPT.skipRender || overflow)
+            if (!standardMaterial.isEmissive() || standardMaterial.skipRender || overflow)
             {
                 // remove the info about this instance, just in case it was emissive and now it's not
                 m_historyRemapEmissiveLightBlockOffsets.erase(instanceHash);

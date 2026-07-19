@@ -604,9 +604,9 @@ Assets/Materials/default/antman_merged.antman_merged_0.material.json
 | `sRGB` | bool | 是否按 sRGB 读取。 |
 | `NormalMap` | bool | 是否是法线贴图。 |
 
-如果缺少材质覆盖文件，RTXPT 会从 glTF/GLB 或 runtime OBJ importer 的原始材质导入默认 PTMaterial，并在日志中提示可通过 UI 保存材质文件。
+如果缺少材质覆盖文件，引擎会从 glTF/GLB 或 runtime OBJ importer 的原始材质导入默认 StandardMaterial（OpenPBR），并在日志中提示可通过 UI 保存材质文件。
 
-注意：一旦写了 `.material.json` 覆盖文件，RTXPT 会用这个 PTMaterial 文件替代导入材质，而不是只覆盖其中几个字段。因此，如果原模型依赖 base color、normal、emissive 等贴图，覆盖文件里也要显式写对应的 `BaseTexture`、`NormalTexture`、`EmissiveTexture` 等字段；否则贴图会丢失，只剩颜色常量。
+注意：一旦写了 `.material.json` 覆盖文件，引擎会用这个 StandardMaterial 文件替代导入材质，而不是只覆盖其中几个字段。因此，如果原模型依赖 base color、normal、emissive 等贴图，覆盖文件里也要显式写对应的 `BaseTexture`、`NormalTexture`、`EmissiveTexture` 等字段；否则贴图会丢失，只剩颜色常量。
 
 ## 常见注意事项
 

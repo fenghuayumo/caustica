@@ -8,7 +8,7 @@
 #include <shaders/PathTracer/Utils/Utils.hlsli>
 
 #include <shaders/SubInstanceData.h>
-#include <shaders/PathTracer/Materials/MaterialPT.h>
+#include <shaders/PathTracer/Materials/StandardMaterial.h>
 
 
 
@@ -21,7 +21,7 @@ StructuredBuffer<SubInstanceData> t_SubInstanceData             : register(t1);
 StructuredBuffer<InstanceData> t_InstanceData                   : register(t2);
 StructuredBuffer<GeometryData> t_GeometryData                   : register(t3);
 // StructuredBuffer<GeometryDebugData> t_GeometryDebugData         : register(t4);  // #include <shaders/Misc/OmmGeometryDebugData.hlsli>
-StructuredBuffer<PTMaterialData> t_PTMaterialData               : register(t5);
+StructuredBuffer<StandardMaterialData> t_StandardMaterialData   : register(t5);
 TextureCube<float4> t_EnvironmentMap                            : register(t6);
 Texture2D<float> t_EnvironmentMapImportanceMap                  : register(t7);
 StructuredBuffer<PolymorphicLightInfoFull> t_PrimitiveLights    : register(t8);
@@ -89,8 +89,8 @@ void main(uint dispatchThreadId : SV_DispatchThreadID, uint groupThreadId : SV_G
         InstanceData instance = t_InstanceData[(task.instanceAndGeometryIndex >> 12) & 0x7FFFF];
         GeometryData geometry = t_GeometryData[instance.firstGeometryIndex + (task.instanceAndGeometryIndex & 0xfff)];
 
-        uint materialIndex = t_SubInstanceData[instance.firstGeometryInstanceIndex + (task.instanceAndGeometryIndex & 0xfff)].GlobalGeometryIndex_PTMaterialDataIndex & 0xFFFF;
-        PTMaterialData material = t_PTMaterialData[materialIndex];
+        uint materialIndex = t_SubInstanceData[instance.firstGeometryInstanceIndex + (task.instanceAndGeometryIndex & 0xfff)].GlobalGeometryIndex_StandardMaterialDataIndex & 0xFFFF;
+        StandardMaterialData material = t_StandardMaterialData[materialIndex];
 
         // DebugPrint( "RTXDI: ii {0}; gi {1}, gii {2}, ti {3}, T0{4}, T1{5}, T2{6}", instanceIndex, geometryIndex, geometryInstanceIndex, triangleIdx, instance.transform[0], instance.transform[1], instance.transform[2] );
         //DebugPrint( "ii {0}; t0 {1}, t1 {2}, t2 {3}", instanceIndex, instance.transform[0], instance.transform[1], instance.transform[2] );
@@ -116,7 +116,7 @@ void main(uint dispatchThreadId : SV_DispatchThreadID, uint groupThreadId : SV_G
 
         float3 radiance = material.EmissiveColor;
 
-        if ((material.EmissiveTextureIndex != 0xFFFFFFFF) && (geometry.texCoord1Offset != ~0u) && ((material.Flags & PTMaterialFlags_UseEmissiveTexture) != 0))
+        if ((material.EmissiveTextureIndex != 0xFFFFFFFF) && (geometry.texCoord1Offset != ~0u) && ((material.Flags & StandardMaterialFlags_UseEmissiveTexture) != 0))
         {
             Texture2D emissiveTexture = t_BindlessTextures[NonUniformResourceIndex(material.EmissiveTextureIndex & 0xFFFF)];
 

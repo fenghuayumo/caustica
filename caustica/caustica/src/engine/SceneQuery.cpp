@@ -155,20 +155,20 @@ bool shouldRenderWhenUnfocused(const App& app)
 
 std::shared_ptr<Material> findMaterial(const App& app, int materialID)
 {
-    // Path-tracer pick stores PTMaterial::gpuDataIndex. After the snapshot refactor,
-    // PT materials live in MaterialGpuCache (not MaterialEx::ptData on scene materials).
+    // Path-tracer pick stores StandardMaterial::gpuDataIndex. After the snapshot refactor,
+    // Standard materials live in MaterialGpuCache (not MaterialEx::standardData on scene materials).
     if (materialID < 0)
         return nullptr;
 
     auto* wr = worldRenderer(app);
     const auto& cache = wr ? wr->lightingPasses().materials() : nullptr;
-    const std::shared_ptr<PTMaterial> ptFromCache =
+    const std::shared_ptr<StandardMaterial> standardFromCache =
         cache ? cache->findByGpuDataIndex(uint(materialID)) : nullptr;
 
-    if (ptFromCache)
+    if (standardFromCache)
     {
         // Prefer a live scene MaterialEx so the editor keeps a stable identity;
-        // re-link ptData for PTMaterial::safeCast / Material Editor.
+        // re-link standardData for StandardMaterial::safeCast / Material Editor.
         if (const std::shared_ptr<Scene> active = activeScene(app))
         {
             for (const auto& mat : active->getMaterials())
@@ -176,18 +176,18 @@ std::shared_ptr<Material> findMaterial(const App& app, int materialID)
                 auto materialEx = std::dynamic_pointer_cast<MaterialEx>(mat);
                 if (!materialEx || !mat)
                     continue;
-                if (cache->findByResourceId(mat->renderResourceId).get() != ptFromCache.get())
+                if (cache->findByResourceId(mat->renderResourceId).get() != standardFromCache.get())
                     continue;
-                materialEx->ptData = ptFromCache;
+                materialEx->standardData = standardFromCache;
                 return mat;
             }
         }
 
-        // No scene counterpart (or id mismatch) — wrap for Material Editor only.
+        // No scene counterpart (or id mismatch) ??wrap for Material Editor only.
         auto wrap = std::make_shared<MaterialEx>();
-        wrap->ptData = ptFromCache;
-        wrap->name = ptFromCache->name;
-        wrap->modelFileName = ptFromCache->modelName;
+        wrap->standardData = standardFromCache;
+        wrap->name = standardFromCache->name;
+        wrap->modelFileName = standardFromCache->modelName;
         return wrap;
     }
 

@@ -770,7 +770,7 @@ Scene material lookup and the `Material` class for runtime edits and texture rep
 
 | API | Return | Notes |
 | --- | --- | --- |
-| `scene.get_materials()` | `list[Material]` | All `PTMaterial` materials in the current scene. |
+| `scene.get_materials()` | `list[Material]` | All `StandardMaterial` (OpenPBR) materials in the current scene. |
 | `scene.find_material(name)` | `Material | None` | Match by `Name` or `UniqueName`. |
 | `scene.find_material_by_id(material_id)` | `Material | None` | Lookup by material ID. |
 | `scene.material_count` | `int` | Number of PT materials in the current scene. |

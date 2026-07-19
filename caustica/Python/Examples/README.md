@@ -92,7 +92,7 @@ entries may use `builtin:plane`, `builtin:cube`, `builtin:sphere`, or
 | `Sample.scene`                  | Current loaded `Scene`                        |
 | `Sample.set_realtime_mode(...)` | Switch to realtime mode + AA + denoiser       |
 | `Sample.set_reference_mode(...)`| Switch to reference accumulation + OIDN       |
-| `Scene.get_materials()`         | List of `PTMaterial` in the current scene     |
+| `Scene.get_materials()`         | List of `StandardMaterial` in the current scene |
 | `Scene.find_material(name)`     | Lookup by `Name` or `UniqueName`              |
 | `Scene.get_lights()`            | List of `Light` (Directional/Spot/Point/Env)  |
 | `Sample.set_environment_map`    | Override the scene's HDRI                     |

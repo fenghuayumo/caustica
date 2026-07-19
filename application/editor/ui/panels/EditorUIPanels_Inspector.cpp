@@ -217,7 +217,7 @@ void EditorUI::BuildMaterialEditorPanel(const PanelLayout& layout)
     ImGui::Begin("Material Editor", &m_editorUI.ShowMaterialEditor);
     ImGui::PushItemWidth(layout.defItemWidth);
 
-    std::shared_ptr<PTMaterial> material = PTMaterial::safeCast(m_editorUI.SelectedMaterial);
+    std::shared_ptr<StandardMaterial> material = StandardMaterial::safeCast(m_editorUI.SelectedMaterial);
     auto* wr = caustica::editor::editorWorldRenderer(m_sceneEditor);
     auto materials = wr ? wr->lightingPasses().materials() : nullptr;
     if (material == nullptr || materials == nullptr)
