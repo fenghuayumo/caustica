@@ -269,7 +269,7 @@ float4 sampleTexture(uint textureIndexAndInfo, SamplerState materialSampler, con
     return textureSampler.sampleTexture(tex2D, materialSampler, uv, baseLOD, mipLevels);
 }
 
-void ApplyNormalMapRTXPT(inout MaterialProperties result, float4 tangent, float4 normalsTextureValue, float normalTextureScale)
+void ApplyStandardMaterialNormalMap(inout MaterialProperties result, float4 tangent, float4 normalsTextureValue, float normalTextureScale)
 {
     float squareTangentLength = dot(tangent.xyz, tangent.xyz);
     if (squareTangentLength == 0)
@@ -406,17 +406,17 @@ MaterialProperties EvaluateStandardMaterial(float3 normal, float4 tangent, Stand
     
     #if defined(CAUSTICA_MATERIAL_USE_NORMAL_TEXTURE)
         #if CAUSTICA_MATERIAL_USE_NORMAL_TEXTURE
-            ApplyNormalMapRTXPT(result, tangent, textures.normal, material.NormalTextureScale);  // there's an incorrect "error X3508: 'ApplyNormalMap': output parameter 'result' not completely initialized" if this line happens before result is fully initialized
+            ApplyStandardMaterialNormalMap(result, tangent, textures.normal, material.NormalTextureScale);  // there's an incorrect "error X3508: 'ApplyNormalMap': output parameter 'result' not completely initialized" if this line happens before result is fully initialized
         #endif
     #else
         if ((material.Flags & StandardMaterialFlags_UseNormalTexture) != 0)
-            ApplyNormalMapRTXPT(result, tangent, textures.normal, material.NormalTextureScale);  // there's an incorrect "error X3508: 'ApplyNormalMap': output parameter 'result' not completely initialized" if this line happens before result is fully initialized
+            ApplyStandardMaterialNormalMap(result, tangent, textures.normal, material.NormalTextureScale);  // there's an incorrect "error X3508: 'ApplyNormalMap': output parameter 'result' not completely initialized" if this line happens before result is fully initialized
     #endif
 
     return result;
 }
 
-MaterialProperties sampleGeometryMaterialRTXPT(const BridgeGeometrySample gs, uint materialIndex, const MaterialAttributes attributes, const SamplerState materialSampler, const ActiveTextureSampler textureSampler)
+MaterialProperties sampleGeometryStandardMaterial(const BridgeGeometrySample gs, uint materialIndex, const MaterialAttributes attributes, const SamplerState materialSampler, const ActiveTextureSampler textureSampler)
 {
     MaterialTextureSample textures = DefaultMaterialTextures();
 
@@ -712,7 +712,7 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
     uint materialIndex = t_SubInstanceData[subInstanceDataIndex].GlobalGeometryIndex_StandardMaterialDataIndex & 0xFFFF;
 
     // Get engine material (normal map is evaluated here)
-    MaterialProperties bridgeMaterial = sampleGeometryMaterialRTXPT(bridgeGS, materialIndex, MatAttr_All, s_MaterialSampler, textureSampler);
+    MaterialProperties bridgeMaterial = sampleGeometryStandardMaterial(bridgeGS, materialIndex, MatAttr_All, s_MaterialSampler, textureSampler);
 
     bool ignoreTangent = (bridgeMaterial.flags & StandardMaterialFlags_IgnoreMeshTangentSpace) != 0;
 

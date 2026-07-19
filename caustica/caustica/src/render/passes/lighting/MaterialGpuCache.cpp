@@ -1353,11 +1353,11 @@ std::shared_ptr<StandardMaterial> MaterialGpuCache::load(const std::string & mod
     }
     if (actualLoadedFileName=="")
     {
-        caustica::warning("No RTXPT material definition file found '%s' - consider doing Scene->Materials->Advanced->Save All", (modelName + "." + name + c_MaterialsExtension).c_str()); 
+        caustica::warning("No material definition file found '%s' - consider doing Scene->Materials->Advanced->Save All", (modelName + "." + name + c_MaterialsExtension).c_str());
         return nullptr;
     }
 
-    std::shared_ptr<StandardMaterial> standardMaterial = standardMaterial->fromJson(rootJ, m_mediaPath, m_textureCache, modelName, name, m_sceneDirectory);
+    std::shared_ptr<StandardMaterial> standardMaterial = StandardMaterial::fromJson(rootJ, m_mediaPath, m_textureCache, modelName, name, m_sceneDirectory);
     if (standardMaterial == nullptr)
     {
         caustica::warning("Error while parsing material file '%s'", actualLoadedFileName.c_str()); 
@@ -1886,7 +1886,7 @@ void MaterialGpuCache::loadAll(std::unordered_map<std::string, std::shared_ptr<S
     std::ifstream inFile(m_sceneMaterialsFilePath);
 
     if (!inFile.is_open())
-        { caustica::warning("No RTXPT material definition file found at '%s' - consider doing Scene->Materials->Advanced->Save", m_sceneMaterialsFilePath.string().c_str()); return; }
+        { caustica::warning("No material definition file found at '%s' - consider doing Scene->Materials->Advanced->Save", m_sceneMaterialsFilePath.string().c_str()); return; }
 
     Json::Value rootJ;
     inFile >> rootJ;
@@ -1894,7 +1894,7 @@ void MaterialGpuCache::loadAll(std::unordered_map<std::string, std::shared_ptr<S
     int version = -1;
     rootJ["RTXPTMaterials"]["version"] >> version;
     if (version != 1)
-        { caustica::warning("Malformed or unsupported RTXPT material definition file version '%s' - consider doing Scene->Materials->Advanced->Save", m_sceneMaterialsFilePath.string().c_str()); return; }
+        { caustica::warning("Malformed or unsupported material definition file version '%s' - consider doing Scene->Materials->Advanced->Save", m_sceneMaterialsFilePath.string().c_str()); return; }
 
     Json::Value materialsJ;
 
@@ -1904,7 +1904,7 @@ void MaterialGpuCache::loadAll(std::unordered_map<std::string, std::shared_ptr<S
 
     for ( Json::Value materialJ : materialsJ )
     {
-        std::shared_ptr<StandardMaterial> standardMaterial = standardMaterial->fromJson(materialJ, m_mediaPath, m_textureCache);
+        std::shared_ptr<StandardMaterial> standardMaterial = StandardMaterial::fromJson(materialJ, m_mediaPath, m_textureCache);
         if (standardMaterial == nullptr)
             { caustica::warning("Error while reading material in material definition file '%s'", m_sceneMaterialsFilePath.string().c_str()); continue; }
         
@@ -1923,7 +1923,7 @@ bool MaterialGpuCache::loadSingle(StandardMaterialBase & material)
     Json::Value rootJ;
     if ( !caustica::json::loadFromFile(inPath, rootJ) )
     {
-        caustica::warning("No RTXPT material definition file found '%s'- consider doing Scene->Materials->Advanced->Save All", inPath.string().c_str());
+        caustica::warning("No material definition file found '%s' - consider doing Scene->Materials->Advanced->Save All", inPath.string().c_str());
         return false;
     }
     assert( material.name != "" );

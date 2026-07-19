@@ -183,7 +183,7 @@ std::shared_ptr<Material> findMaterial(const App& app, int materialID)
             }
         }
 
-        // No scene counterpart (or id mismatch) ??wrap for Material Editor only.
+        // No scene counterpart (or id mismatch) - wrap for Material Editor only.
         auto wrap = std::make_shared<MaterialEx>();
         wrap->standardData = standardFromCache;
         wrap->name = standardFromCache->name;
