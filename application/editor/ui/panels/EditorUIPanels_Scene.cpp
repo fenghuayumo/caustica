@@ -195,82 +195,8 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
                 }
             }
 
-            if (ImGui::CollapsingHeader("Environment Map"))
-            {
-                RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
-
-                RESET_ON_CHANGE(ImGui::Checkbox("enabled", &m_settings.EnvironmentMapParams.enabled));
-                RESET_ON_CHANGE(ImGui::Checkbox("Visible to Camera", &m_settings.EnvironmentMapParams.VisibleToCamera));
-
-                if (isProceduralSky(caustica::envMapLocalPath(*m_sceneEditor.app()).c_str()) ||
-                    isProceduralSky(caustica::envMapOverrideSource(*m_sceneEditor.app()).c_str()))
-                    ImGui::TextWrapped("Source: Procedural Sky (Hillaire 2020)");
-                else
-                    ImGui::TextWrapped("Source: `%s`", caustica::envMapLocalPath(*m_sceneEditor.app()).c_str());
-
-                std::string overrideSource = caustica::envMapOverrideSource(*m_sceneEditor.app());
-                const std::vector<std::filesystem::path> & envMapMediaList = caustica::envMapMediaList(*m_sceneEditor.app());
-
-                RAII_SCOPE( ImGui::PushItemWidth(-65.0f*m_currentScale);, ImGui::PopItemWidth(); );
-                const std::string overridePreview = isProceduralSky(overrideSource.c_str()) || overrideSource == c_EnvMapSceneDefault
-                    ? TrimSkyDisplayName(overrideSource)
-                    : overrideSource;
-                if (ImGui::BeginCombo("Override", overridePreview.c_str()))
-                {
-                    for (int i = -7; i < (int)envMapMediaList.size(); i++)
-                    {
-                        std::string itemName;
-                        if (i == -7)
-                            itemName = c_EnvMapSceneDefault;
-                        else if (i == -6)
-                            itemName = c_EnvMapProcSky;
-                        else if (i == -5)
-                            itemName = c_EnvMapProcSky_Morning;
-                        else if (i == -4)
-                            itemName = c_EnvMapProcSky_Midday;
-                        else if (i == -3)
-                            itemName = c_EnvMapProcSky_Evening;
-                        else if (i == -2)
-                            itemName = c_EnvMapProcSky_Dawn;
-                        else if (i == -1)
-                            itemName = c_EnvMapProcSky_PitchBlack;
-                        else
-                            itemName = envMapMediaList[i].filename().string();
-
-                        const std::string displayName =
-                            (i < 0) ? TrimSkyDisplayName(itemName) : itemName;
-
-                        bool is_selected = itemName == overrideSource;
-                        if (ImGui::Selectable(displayName.c_str(), is_selected))
-                            overrideSource = itemName;
-                        if (is_selected)
-                            ImGui::SetItemDefaultFocus();
-                    }
-                    ImGui::EndCombo();
-                }
-                if (ImGui::IsItemHovered()) ImGui::SetTooltip(
-                    "Overrides scene environment map.\n"
-                    "'sky (manual)' = free elevation/azimuth control in Sky Atmosphere panel.");
-                if (caustica::envMapOverrideSource(*m_sceneEditor.app()) != overrideSource)
-                {
-                    m_settings.ResetAccumulation = true;
-                    caustica::setEnvMapOverrideSource(*m_sceneEditor.app(), overrideSource);
-                }
-
-                ImGui::Separator();
-                RESET_ON_CHANGE( ImGui::InputFloat3("Tint Color", (float*)&m_settings.EnvironmentMapParams.TintColor.x) );
-                RESET_ON_CHANGE( ImGui::InputFloat("Intensity", &m_settings.EnvironmentMapParams.Intensity) );
-                RESET_ON_CHANGE( ImGui::InputFloat3("Rotation XYZ", (float*)&m_settings.EnvironmentMapParams.RotationXYZ.x) );
-                ImGui::Separator();
-
-                if (auto& envMapProcessor = caustica::editor::requireWorldRenderer(m_sceneEditor).lightingPasses().environment();
-                    envMapProcessor != nullptr && envMapProcessor->isProcedural() && envMapProcessor->getProceduralSky() != nullptr)
-                {
-                    ImGui::TextColored(categoryColor, "Sky Atmosphere");
-                    RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent););
-                    m_settings.ResetAccumulation |= envMapProcessor->getProceduralSky()->debugGUI(layout.indent);
-                }
-            }
+            // Environment Map / Sky moved to Hierarchy → Environment Light → Inspector
+            // (Blender-style: world lighting is a scene entity, not a render-settings dump).
 
             if (ImGui::CollapsingHeader("Materials"))
             {

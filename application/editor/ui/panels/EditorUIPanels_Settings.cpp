@@ -1,5 +1,6 @@
 #include "ui/EditorUIInternal.h"
 #include <engine/CameraApi.h>
+#include <engine/SceneQuery.h>
 
 #include "SceneEditor.h"
 #include "common/ImGuiManager.h"
@@ -10,6 +11,9 @@
 #include <engine/UserInterfaceUtils.h>
 #include <core/vfs/VFS.h>
 #include <scene/SceneTypes.h>
+#include <scene/Scene.h>
+#include <scene/SceneEcs.h>
+#include <vector>
 #include <imgui_internal.h>
 #include <assets/loader/ShaderFactory.h>
 #include <render/passes/lighting/MaterialGpuCache.h>
@@ -94,39 +98,76 @@ void EditorUI::BuildSystemPanel(const PanelLayout& layout)
 
 void EditorUI::BuildCameraPanel(const PanelLayout& layout)
 {
-        if (ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen))
+        // Viewport / session camera controls. Scene camera objects live in Hierarchy
+        // and expose FOV/clip planes in the Inspector (Blender-style).
+        if (ImGui::CollapsingHeader("Viewport Camera", ImGuiTreeNodeFlags_DefaultOpen))
         {
             RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
-            std::vector<std::string> options; options.push_back("free flight");
-            for (uint i = 0; i < caustica::sceneCameraCount(*m_sceneEditor.app()); i++)
-                options.push_back("Scene cam " + std::to_string(i));
-            uint& currentlySelected = caustica::selectedCameraIndex(*m_sceneEditor.app());
-            currentlySelected = std::min(currentlySelected, (uint)caustica::sceneCameraCount(*m_sceneEditor.app()) - 1);
-            if (ImGui::BeginCombo("Motion", options[currentlySelected].c_str()))
+
+            auto scene = caustica::activeScene(*m_sceneEditor.app());
+            auto* ew = scene ? scene->getEntityWorld() : nullptr;
+            static const std::vector<ecs::Entity> kNoCameras;
+            const auto& cameraEntities = scene ? scene->getCameraEntities() : kNoCameras;
+
+            std::vector<std::string> options;
+            options.reserve(cameraEntities.size() + 1);
+            options.push_back("Free Flight");
+            for (size_t i = 0; i < cameraEntities.size(); ++i)
             {
-                for (uint i = 0; i < caustica::sceneCameraCount(*m_sceneEditor.app()); i++)
+                std::string name = ew ? ew->getEntityName(cameraEntities[i]) : std::string{};
+                if (name.empty())
+                    name = "Scene Camera " + std::to_string(i);
+                options.push_back(std::move(name));
+            }
+
+            uint& currentlySelected = caustica::selectedCameraIndex(*m_sceneEditor.app());
+            currentlySelected = std::min(currentlySelected, (uint)options.size() - 1u);
+            if (ImGui::BeginCombo("Active Camera", options[currentlySelected].c_str()))
+            {
+                for (uint i = 0; i < (uint)options.size(); i++)
                 {
                     bool is_selected = i == currentlySelected;
                     if (ImGui::Selectable(options[i].c_str(), is_selected))
+                    {
                         currentlySelected = i;
+                        // Selecting a scene camera also focuses it in Hierarchy/Inspector.
+                        if (i > 0 && (i - 1) < cameraEntities.size())
+                        {
+                            m_editorUI.SelectedEntity = cameraEntities[i - 1];
+                            m_editorUI.SelectedGaussianSplat = false;
+                        }
+                    }
                     if (is_selected)
                         ImGui::SetItemDefaultFocus();
                 }
                 ImGui::EndCombo();
             }
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Free Flight = editor navigation camera.\nScene cameras are editable in Hierarchy / Inspector.");
 
             if (currentlySelected == 0)
             {
-                ImGui::Text("Camera position: "); 
+                ImGui::Text("Free Flight pose:");
                 RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
                 if (ImGui::Button("Save to file", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) caustica::saveCurrentCamera(*m_sceneEditor.app()); ImGui::SameLine();
-                if (ImGui::Button("load from file", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) caustica::loadCurrentCamera(*m_sceneEditor.app());
+                if (ImGui::Button("Load from file", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) caustica::loadCurrentCamera(*m_sceneEditor.app());
                 if (ImGui::Button("Save to clipboard", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) ImGui::SetClipboardText(caustica::currentCameraPosDirUp(*m_sceneEditor.app()).c_str()); ImGui::SameLine();
                 const char *cpbrdtxt = ImGui::GetClipboardText();
-                if (ImGui::Button("load from clipboard", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) caustica::setCurrentCameraPosDirUp(*m_sceneEditor.app(), cpbrdtxt?cpbrdtxt:"");
+                if (ImGui::Button("Load from clipboard", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) caustica::setCurrentCameraPosDirUp(*m_sceneEditor.app(), cpbrdtxt?cpbrdtxt:"");
+
+                float cameraFOV = 2.0f * dm::degrees(caustica::cameraVerticalFOV(*m_sceneEditor.app()));
+                if (ImGui::InputFloat("Vertical FOV", &cameraFOV, 0.1f))
+                {
+                    cameraFOV = dm::clamp(cameraFOV, 1.0f, 360.0f);
+                    m_settings.ResetAccumulation = true;
+                    caustica::setCameraVerticalFOV(*m_sceneEditor.app(), dm::radians(cameraFOV / 2.0f));
+                }
+            }
+            else
+            {
+                ImGui::TextDisabled("Scene camera properties: select entity in Hierarchy / Inspector.");
             }
 
-    #if 1
             RESET_ON_CHANGE( ImGui::InputFloat("Aperture", &m_settings.CameraAperture, 0.001f, 0.01f, "%.4f") );
             m_settings.CameraAperture = dm::clamp(m_settings.CameraAperture, 0.0f, 1.0f);
 
@@ -134,17 +175,8 @@ void EditorUI::BuildCameraPanel(const PanelLayout& layout)
             m_settings.CameraFocalDistance = dm::clamp(m_settings.CameraFocalDistance, 0.001f, 1e16f);
             ImGui::SliderFloat("Keyboard move speed", &m_settings.CameraMoveSpeed, 0.1f, 10.0f);
 
-            float cameraFOV = 2.0f * dm::degrees(caustica::cameraVerticalFOV(*m_sceneEditor.app()));
-            if (ImGui::InputFloat("Vertical FOV", &cameraFOV, 0.1f))
-            {
-                cameraFOV = dm::clamp(cameraFOV, 1.0f, 360.0f);
-                m_settings.ResetAccumulation = true;
-                caustica::setCameraVerticalFOV(*m_sceneEditor.app(), dm::radians(cameraFOV / 2.0f));
-            }
-
             RESET_ON_CHANGE( ImGui::InputFloat("CameraAntiRRSleepJitter", &m_settings.CameraAntiRRSleepJitter, 0.001f ) );
             m_settings.CameraAntiRRSleepJitter = clamp( m_settings.CameraAntiRRSleepJitter, 0.0f, 1.0f );
-    #endif
         }
 
 

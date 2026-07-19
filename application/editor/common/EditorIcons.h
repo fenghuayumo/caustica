@@ -21,6 +21,9 @@ enum class HierarchyTypeIcon : int
     Group = 0,
     Mesh,
     GaussianSplat,
+    Camera,
+    Light,
+    EnvironmentLight,
 };
 
 // UTF-8 buffer for a single PUA glyph (ImGui text APIs).

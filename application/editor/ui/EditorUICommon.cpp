@@ -11,6 +11,7 @@
 #include <core/vfs/VFS.h>
 #include <scene/SceneTypes.h>
 #include <scene/SceneEcs.h>
+#include <scene/SceneLightAccess.h>
 #include <scene/Scene.h>
 #include <imgui_internal.h>
 #include <assets/loader/ShaderFactory.h>
@@ -55,18 +56,62 @@ namespace
         return comp != nullptr;
     }
 
-    bool IsInspectableEntity(caustica::scene::SceneEntityWorld& ew, ecs::Entity entity)
+    bool IsCameraEntity(caustica::scene::SceneEntityWorld& ew, ecs::Entity entity)
     {
-        return IsMeshInstanceEntity(ew, entity) || IsGaussianSplatEntity(ew, entity);
+        if (entity == ecs::NullEntity) return false;
+        return ew.world().tryGet<caustica::scene::CameraComponent>(entity) != nullptr;
+    }
+
+    bool IsEnvironmentLightEntity(caustica::scene::SceneEntityWorld& ew, ecs::Entity entity)
+    {
+        if (entity == ecs::NullEntity) return false;
+        return caustica::scene::tryGetEnvironmentLight(ew.world(), entity) != nullptr;
+    }
+
+    bool IsLocalLightEntity(caustica::scene::SceneEntityWorld& ew, ecs::Entity entity)
+    {
+        if (entity == ecs::NullEntity) return false;
+        return caustica::scene::tryGetDirectionalLight(ew.world(), entity) != nullptr
+            || caustica::scene::tryGetSpotLight(ew.world(), entity) != nullptr
+            || caustica::scene::tryGetPointLight(ew.world(), entity) != nullptr;
+    }
+
+    bool IsLightEntity(caustica::scene::SceneEntityWorld& ew, ecs::Entity entity)
+    {
+        return IsEnvironmentLightEntity(ew, entity) || IsLocalLightEntity(ew, entity);
+    }
+
+    // Entities that appear as selectable leaves in Hierarchy (Blender Outliner style).
+    bool IsHierarchyLeafEntity(caustica::scene::SceneEntityWorld& ew, ecs::Entity entity)
+    {
+        return IsMeshInstanceEntity(ew, entity)
+            || IsGaussianSplatEntity(ew, entity)
+            || IsCameraEntity(ew, entity)
+            || IsLightEntity(ew, entity);
     }
 
     bool HasHierarchyEntity(caustica::scene::SceneEntityWorld& ew, ecs::Entity entity)
     {
         if (entity == ecs::NullEntity) return false;
-        if (IsInspectableEntity(ew, entity)) return true;
+        if (IsHierarchyLeafEntity(ew, entity)) return true;
         for (ecs::Entity child : ew.getEntityChildren(entity))
             if (HasHierarchyEntity(ew, child)) return true;
         return false;
+    }
+
+    HierarchyTypeIcon ResolveHierarchyTypeIcon(caustica::scene::SceneEntityWorld& ew, ecs::Entity entity)
+    {
+        if (IsMeshInstanceEntity(ew, entity))
+            return HierarchyTypeIcon::Mesh;
+        if (IsGaussianSplatEntity(ew, entity))
+            return HierarchyTypeIcon::GaussianSplat;
+        if (IsCameraEntity(ew, entity))
+            return HierarchyTypeIcon::Camera;
+        if (IsEnvironmentLightEntity(ew, entity))
+            return HierarchyTypeIcon::EnvironmentLight;
+        if (IsLocalLightEntity(ew, entity))
+            return HierarchyTypeIcon::Light;
+        return HierarchyTypeIcon::Group;
     }
 
     float WrapDegrees(float degrees)
@@ -257,7 +302,8 @@ void BuildHierarchyNodeUI(EditorUIData& ui, caustica::Scene& scene, ecs::Entity 
 
     const bool isMeshEntity = IsMeshInstanceEntity(*ew, entity);
     const bool isGaussianSplatEntity = IsGaussianSplatEntity(*ew, entity);
-    const bool isInspectable = isMeshEntity || isGaussianSplatEntity;
+    const bool isSelectable = IsHierarchyLeafEntity(*ew, entity);
+    const bool showVisibilityToggle = isMeshEntity || isGaussianSplatEntity;
     const auto& children = ew->getEntityChildren(entity);
 
     bool hasVisibleChildren = false;
@@ -277,7 +323,7 @@ void BuildHierarchyNodeUI(EditorUIData& ui, caustica::Scene& scene, ecs::Entity 
     if (ui.editor.SelectedEntity == entity)
         flags |= ImGuiTreeNodeFlags_Selected;
 
-    if (hasVisibleChildren && !isMeshEntity && !isGaussianSplatEntity)
+    if (hasVisibleChildren && !isSelectable)
         ImGui::SetNextItemOpen(true, ImGuiCond_Once);
     if (filter && filter[0] != '\0' && hasVisibleChildren)
         ImGui::SetNextItemOpen(true, ImGuiCond_Always);
@@ -314,9 +360,7 @@ void BuildHierarchyNodeUI(EditorUIData& ui, caustica::Scene& scene, ecs::Entity 
 
     const float labelStartX = rowMin.x + ImGui::GetTreeNodeToLabelSpacing();
     const float iconX = labelStartX;
-    const HierarchyTypeIcon typeIcon = isMeshEntity
-        ? HierarchyTypeIcon::Mesh
-        : (isGaussianSplatEntity ? HierarchyTypeIcon::GaussianSplat : HierarchyTypeIcon::Group);
+    const HierarchyTypeIcon typeIcon = ResolveHierarchyTypeIcon(*ew, entity);
     DrawHierarchyTypeIcon(
         dl,
         ImVec2(iconX, rowMin.y + (rowH - iconSize) * 0.5f),
@@ -325,7 +369,7 @@ void BuildHierarchyNodeUI(EditorUIData& ui, caustica::Scene& scene, ecs::Entity 
         enabled ? textCol : muted);
 
     bool eyeClicked = false;
-    if (isInspectable)
+    if (showVisibilityToggle)
     {
         const float eyeSize = rowH;
         const ImVec2 eyePos(rowMax.x - eyeSize - 2.f, rowMin.y);
@@ -350,7 +394,7 @@ void BuildHierarchyNodeUI(EditorUIData& ui, caustica::Scene& scene, ecs::Entity 
         }
     }
 
-    if (isInspectable && treeClicked && !eyeClicked)
+    if (isSelectable && treeClicked && !eyeClicked)
     {
         ui.editor.SelectedEntity = entity;
         ui.editor.SelectedGaussianSplat = isGaussianSplatEntity;
@@ -548,6 +592,15 @@ bool InspectorDragFloat(const char* label, float* v, float speed, float vMin, fl
     return changed;
 }
 
+bool InspectorDragFloat3(const char* label, float v[3], float speed, float vMin, float vMax, const char* format)
+{
+    ImGui::PushID(label);
+    InspectorBeginLabeledRow(label);
+    const bool changed = ImGui::DragFloat3("##v", v, speed, vMin, vMax, format);
+    ImGui::PopID();
+    return changed;
+}
+
 bool InspectorDragInt(const char* label, int* v, float speed, int vMin, int vMax)
 {
     ImGui::PushID(label);
@@ -577,6 +630,16 @@ bool InspectorColorEdit3(const char* label, float color[3])
             | ImGuiColorEditFlags_DisplayRGB);
     ImGui::PopID();
     return changed;
+}
+
+bool InspectorBeginCombo(const char* label, const char* preview)
+{
+    ImGui::PushID(label);
+    InspectorBeginLabeledRow(label);
+    const bool open = ImGui::BeginCombo("##v", preview);
+    if (!open)
+        ImGui::PopID();
+    return open; // when true, caller must EndCombo() then PopID()
 }
 
 const ::PerformancePreset s_performancePresets[kPerformancePresetCount] = {

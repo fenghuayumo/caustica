@@ -3,6 +3,8 @@
 #include "SceneEditor.h"
 #include "EditorAccess.h"
 #include <engine/SceneQuery.h>
+#include <engine/CameraApi.h>
+#include <engine/RenderSessionApi.h>
 #include "common/ImGuiManager.h"
 #include "common/TransformGizmo.h"
 
@@ -11,8 +13,12 @@
 #include <render/SceneGaussianSplatPasses.h>
 #include <engine/UserInterfaceUtils.h>
 #include <core/vfs/VFS.h>
+#include <core/path_utils.h>
 #include <scene/SceneTypes.h>
 #include <scene/SceneEcs.h>
+#include <scene/SceneCameraAccess.h>
+#include <scene/SceneLightAccess.h>
+#include <scene/Scene.h>
 #include <imgui_internal.h>
 #include <assets/loader/ShaderFactory.h>
 #include <render/passes/lighting/MaterialGpuCache.h>
@@ -26,6 +32,8 @@
 #include <cmath>
 #include <cstdio>
 #include <filesystem>
+#include <string>
+#include <vector>
 
 using namespace caustica;
 using namespace caustica::editor;
@@ -57,6 +65,11 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
 
     auto* meshComp = ew->world().tryGet<caustica::scene::MeshInstanceComponent>(entity);
     auto* splatComp = ew->world().tryGet<caustica::scene::GaussianSplatComponent>(entity);
+    auto* cameraComp = caustica::scene::tryGetCamera(ew->world(), entity);
+    auto* envLightComp = caustica::scene::tryGetEnvironmentLight(ew->world(), entity);
+    auto* dirLightComp = caustica::scene::tryGetDirectionalLight(ew->world(), entity);
+    auto* spotLightComp = caustica::scene::tryGetSpotLight(ew->world(), entity);
+    auto* pointLightComp = caustica::scene::tryGetPointLight(ew->world(), entity);
     caustica::GaussianSplat* gaussianSplat = splatComp ? &splatComp->splat : nullptr;
 
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8.f, 6.f));
@@ -67,6 +80,16 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
         ImGui::Text("Mesh · %s", meshComp->mesh->name.c_str());
     else if (gaussianSplat)
         ImGui::Text("3DGS · %u splats", gaussianSplat->loadedSplatCount);
+    else if (cameraComp)
+        ImGui::TextUnformatted(caustica::scene::isPerspectiveCamera(*cameraComp) ? "Camera · Perspective" : "Camera · Orthographic");
+    else if (envLightComp)
+        ImGui::TextUnformatted("Light · Environment");
+    else if (dirLightComp)
+        ImGui::TextUnformatted("Light · Directional");
+    else if (spotLightComp)
+        ImGui::TextUnformatted("Light · Spot");
+    else if (pointLightComp)
+        ImGui::TextUnformatted("Light · Point");
     else
         ImGui::TextUnformatted("Group");
     ImGui::PopStyleColor();
@@ -201,6 +224,183 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
             {
                 RESET_ON_CHANGE(InspectorDragFloat(
                     "Shadow Strength", &m_settings.GaussianSplatShadowStrength, 0.01f, 0.0f, 1.0f, "%.2f"));
+            }
+        }
+    }
+
+    if (cameraComp)
+    {
+        ImGui::Spacing();
+        if (ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            ImGui::Spacing();
+            if (auto* pers = caustica::scene::tryGetPerspectiveCameraData(*cameraComp))
+            {
+                float fovDeg = dm::degrees(pers->verticalFov);
+                if (InspectorDragFloat("Vertical FOV", &fovDeg, 0.1f, 1.f, 179.f, "%.1f°"))
+                {
+                    pers->verticalFov = dm::radians(dm::clamp(fovDeg, 1.f, 179.f));
+                    m_settings.ResetAccumulation = true;
+                }
+                RESET_ON_CHANGE(InspectorDragFloat("Near Clip", &pers->zNear, 0.01f, 0.001f, 1e6f, "%.3f"));
+                if (pers->zFar.has_value())
+                {
+                    float zFar = *pers->zFar;
+                    if (InspectorDragFloat("Far Clip", &zFar, 1.f, pers->zNear + 0.01f, 1e7f, "%.1f"))
+                    {
+                        pers->zFar = zFar;
+                        m_settings.ResetAccumulation = true;
+                    }
+                }
+            }
+            else if (auto* ortho = caustica::scene::tryGetOrthographicCameraData(*cameraComp))
+            {
+                RESET_ON_CHANGE(InspectorDragFloat("Near Clip", &ortho->zNear, 0.01f, 0.f, 1e6f, "%.3f"));
+                RESET_ON_CHANGE(InspectorDragFloat("Far Clip", &ortho->zFar, 1.f, ortho->zNear + 0.01f, 1e7f, "%.1f"));
+                RESET_ON_CHANGE(InspectorDragFloat("X Mag", &ortho->xMag, 0.01f, 0.001f, 1e6f, "%.3f"));
+                RESET_ON_CHANGE(InspectorDragFloat("Y Mag", &ortho->yMag, 0.01f, 0.001f, 1e6f, "%.3f"));
+            }
+
+            ImGui::Spacing();
+            auto scene = caustica::activeScene(*m_sceneEditor.app());
+            static const std::vector<ecs::Entity> kNoCameras;
+            const auto& cameraEntities = scene ? scene->getCameraEntities() : kNoCameras;
+            int sceneCamIndex = -1;
+            for (size_t i = 0; i < cameraEntities.size(); ++i)
+            {
+                if (cameraEntities[i] == entity)
+                {
+                    sceneCamIndex = static_cast<int>(i);
+                    break;
+                }
+            }
+            uint& activeCam = caustica::selectedCameraIndex(*m_sceneEditor.app());
+            const bool isActive = sceneCamIndex >= 0 && activeCam == static_cast<uint>(sceneCamIndex + 1);
+            ImGui::BeginDisabled(isActive || sceneCamIndex < 0);
+            if (ImGui::Button("Set as Active Camera", ImVec2(-1.f, 0.f)) && sceneCamIndex >= 0)
+                activeCam = static_cast<uint>(sceneCamIndex + 1);
+            ImGui::EndDisabled();
+            if (isActive)
+            {
+                ImGui::PushStyleColor(ImGuiCol_Text, GetEditorColors().TextMuted);
+                ImGui::TextUnformatted("Active viewport camera");
+                ImGui::PopStyleColor();
+            }
+        }
+    }
+
+    if (envLightComp)
+    {
+        ImGui::Spacing();
+        if (ImGui::CollapsingHeader("Environment Light", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            ImGui::Spacing();
+            ImGui::PushStyleColor(ImGuiCol_Text, GetEditorColors().TextMuted);
+            if (isProceduralSky(caustica::envMapLocalPath(*m_sceneEditor.app()).c_str()) ||
+                isProceduralSky(caustica::envMapOverrideSource(*m_sceneEditor.app()).c_str()))
+                ImGui::TextWrapped("Source: Procedural Sky (Hillaire 2020)");
+            else if (!envLightComp->path.empty())
+                ImGui::TextWrapped("Scene path: %s", envLightComp->path.c_str());
+            else
+                ImGui::TextWrapped("Source: `%s`", caustica::envMapLocalPath(*m_sceneEditor.app()).c_str());
+            ImGui::PopStyleColor();
+
+            // Live controls bind to the session EnvironmentMapParams (same path the
+            // renderer consumes). Scene JSON EnvironmentLight fields seed load-time state.
+            RESET_ON_CHANGE(InspectorCheckbox("Enabled", &m_settings.EnvironmentMapParams.enabled));
+            RESET_ON_CHANGE(InspectorCheckbox("Visible to Camera", &m_settings.EnvironmentMapParams.VisibleToCamera));
+
+            std::string overrideSource = caustica::envMapOverrideSource(*m_sceneEditor.app());
+            const std::vector<std::filesystem::path>& envMapMediaList = caustica::envMapMediaList(*m_sceneEditor.app());
+            const std::string overridePreview = isProceduralSky(overrideSource.c_str()) || overrideSource == c_EnvMapSceneDefault
+                ? TrimSkyDisplayName(overrideSource)
+                : overrideSource;
+            if (InspectorBeginCombo("Override", overridePreview.c_str()))
+            {
+                for (int i = -7; i < (int)envMapMediaList.size(); i++)
+                {
+                    std::string itemName;
+                    if (i == -7)
+                        itemName = c_EnvMapSceneDefault;
+                    else if (i == -6)
+                        itemName = c_EnvMapProcSky;
+                    else if (i == -5)
+                        itemName = c_EnvMapProcSky_Morning;
+                    else if (i == -4)
+                        itemName = c_EnvMapProcSky_Midday;
+                    else if (i == -3)
+                        itemName = c_EnvMapProcSky_Evening;
+                    else if (i == -2)
+                        itemName = c_EnvMapProcSky_Dawn;
+                    else if (i == -1)
+                        itemName = c_EnvMapProcSky_PitchBlack;
+                    else
+                        itemName = envMapMediaList[i].filename().string();
+
+                    const std::string displayName = (i < 0) ? TrimSkyDisplayName(itemName) : itemName;
+                    const bool is_selected = itemName == overrideSource;
+                    if (ImGui::Selectable(displayName.c_str(), is_selected))
+                        overrideSource = itemName;
+                    if (is_selected)
+                        ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+                ImGui::PopID();
+            }
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip(
+                    "Overrides scene environment map.\n"
+                    "'sky (manual)' = free elevation/azimuth control in Sky Atmosphere.");
+            if (caustica::envMapOverrideSource(*m_sceneEditor.app()) != overrideSource)
+            {
+                m_settings.ResetAccumulation = true;
+                caustica::setEnvMapOverrideSource(*m_sceneEditor.app(), overrideSource);
+            }
+
+            RESET_ON_CHANGE(InspectorColorEdit3("Tint Color", &m_settings.EnvironmentMapParams.TintColor.x));
+            RESET_ON_CHANGE(InspectorDragFloat("Intensity", &m_settings.EnvironmentMapParams.Intensity, 0.01f, 0.f, 100.f, "%.3f"));
+            RESET_ON_CHANGE(InspectorDragFloat3(
+                "Rotation XYZ", &m_settings.EnvironmentMapParams.RotationXYZ.x, 0.5f, -360.f, 360.f, "%.1f"));
+
+            if (auto& envMapProcessor = caustica::editor::requireWorldRenderer(m_sceneEditor).lightingPasses().environment();
+                envMapProcessor != nullptr && envMapProcessor->isProcedural() && envMapProcessor->getProceduralSky() != nullptr)
+            {
+                ImGui::Spacing();
+                ImGui::Separator();
+                ImGui::Spacing();
+                ImGui::TextColored(categoryColor, "Sky Atmosphere");
+                m_settings.ResetAccumulation |= envMapProcessor->getProceduralSky()->debugGUI(layout.indent);
+            }
+        }
+    }
+
+    if (dirLightComp || spotLightComp || pointLightComp)
+    {
+        ImGui::Spacing();
+        if (ImGui::CollapsingHeader("Light", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            ImGui::Spacing();
+            if (dirLightComp)
+            {
+                RESET_ON_CHANGE(InspectorColorEdit3("Color", &dirLightComp->color.x));
+                RESET_ON_CHANGE(InspectorDragFloat("Irradiance", &dirLightComp->irradiance, 0.01f, 0.f, 1000.f, "%.3f"));
+                RESET_ON_CHANGE(InspectorDragFloat("Angular Size", &dirLightComp->angularSize, 0.01f, 0.f, 90.f, "%.2f"));
+            }
+            else if (spotLightComp)
+            {
+                RESET_ON_CHANGE(InspectorColorEdit3("Color", &spotLightComp->color.x));
+                RESET_ON_CHANGE(InspectorDragFloat("Intensity", &spotLightComp->intensity, 0.01f, 0.f, 1e6f, "%.3f"));
+                RESET_ON_CHANGE(InspectorDragFloat("Radius", &spotLightComp->radius, 0.01f, 0.f, 100.f, "%.3f"));
+                RESET_ON_CHANGE(InspectorDragFloat("Range", &spotLightComp->range, 0.1f, 0.f, 1e6f, "%.2f"));
+                RESET_ON_CHANGE(InspectorDragFloat("Inner Angle", &spotLightComp->innerAngle, 0.5f, 0.f, 180.f, "%.1f"));
+                RESET_ON_CHANGE(InspectorDragFloat("Outer Angle", &spotLightComp->outerAngle, 0.5f, 0.f, 180.f, "%.1f"));
+            }
+            else if (pointLightComp)
+            {
+                RESET_ON_CHANGE(InspectorColorEdit3("Color", &pointLightComp->color.x));
+                RESET_ON_CHANGE(InspectorDragFloat("Intensity", &pointLightComp->intensity, 0.01f, 0.f, 1e6f, "%.3f"));
+                RESET_ON_CHANGE(InspectorDragFloat("Radius", &pointLightComp->radius, 0.01f, 0.f, 100.f, "%.3f"));
+                RESET_ON_CHANGE(InspectorDragFloat("Range", &pointLightComp->range, 0.1f, 0.f, 1e6f, "%.2f"));
             }
         }
     }

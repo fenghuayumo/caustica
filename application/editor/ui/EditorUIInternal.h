@@ -58,9 +58,11 @@ bool TransformVec3Row(
 // Inspector property rows: fixed label column on the left, control fills the right.
 inline constexpr float kInspectorLabelWidth = 148.f;
 bool InspectorDragFloat(const char* label, float* v, float speed, float vMin, float vMax, const char* format);
+bool InspectorDragFloat3(const char* label, float v[3], float speed, float vMin, float vMax, const char* format);
 bool InspectorDragInt(const char* label, int* v, float speed, int vMin, int vMax);
 bool InspectorCheckbox(const char* label, bool* v);
 bool InspectorColorEdit3(const char* label, float color[3]);
+bool InspectorBeginCombo(const char* label, const char* preview);
 
 #if CAUSTICA_WITH_ANY_DLSS
 SI::DLSSMode DLSSModeUI(SI::DLSSMode dlssModeCurrent);

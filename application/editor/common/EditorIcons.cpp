@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cfloat>
+#include <cmath>
 
 namespace caustica::editor
 {
@@ -77,6 +78,46 @@ void DrawHierarchyTypeIcon(ImDrawList* dl, ImVec2 min, ImVec2 max, HierarchyType
         dl->AddCircleFilled(ImVec2(c.x, c.y - s * 0.18f), r0, col, 12);
         dl->AddCircleFilled(ImVec2(c.x - s * 0.22f, c.y + s * 0.16f), r1, col, 12);
         dl->AddCircleFilled(ImVec2(c.x + s * 0.24f, c.y + s * 0.14f), r2, col, 12);
+        break;
+    }
+    case HierarchyTypeIcon::Camera:
+    {
+        // Simple camera body + lens.
+        const float left = c.x - s * 0.34f;
+        const float right = c.x + s * 0.10f;
+        const float top = c.y - s * 0.20f;
+        const float bot = c.y + s * 0.20f;
+        dl->AddRect(ImVec2(left, top), ImVec2(right, bot), col, s * 0.08f, 0, t);
+        dl->AddCircle(ImVec2(c.x + s * 0.28f, c.y), s * 0.16f, col, 12, t);
+        dl->AddLine(ImVec2(right, c.y - s * 0.08f), ImVec2(c.x + s * 0.16f, c.y - s * 0.08f), col, t);
+        dl->AddLine(ImVec2(right, c.y + s * 0.08f), ImVec2(c.x + s * 0.16f, c.y + s * 0.08f), col, t);
+        break;
+    }
+    case HierarchyTypeIcon::Light:
+    {
+        // Sun: center disk + short rays.
+        dl->AddCircleFilled(c, s * 0.16f, col, 12);
+        for (int i = 0; i < 8; ++i)
+        {
+            const float a = (IM_PI * 2.f * float(i)) / 8.f;
+            const float ca = cosf(a);
+            const float sa = sinf(a);
+            dl->AddLine(
+                ImVec2(c.x + ca * s * 0.28f, c.y + sa * s * 0.28f),
+                ImVec2(c.x + ca * s * 0.42f, c.y + sa * s * 0.42f),
+                col,
+                t);
+        }
+        break;
+    }
+    case HierarchyTypeIcon::EnvironmentLight:
+    {
+        // Hemisphere / dome.
+        const float r = s * 0.34f;
+        dl->PathClear();
+        dl->PathArcTo(c, r, IM_PI, 0.f, 16);
+        dl->PathStroke(col, 0, t);
+        dl->AddLine(ImVec2(c.x - r, c.y), ImVec2(c.x + r, c.y), col, t);
         break;
     }
     case HierarchyTypeIcon::Group:
