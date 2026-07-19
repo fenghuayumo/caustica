@@ -72,8 +72,15 @@ def configure_import_path() -> None:
     sys.path.insert(0, str(BIN_DIR))
 
 
+# Keep in sync with sizeof(StandardMaterialData) in
+# caustica/shaders/PathTracer/Materials/StandardMaterial.h (17 x 16 bytes).
+STANDARD_MATERIAL_DATA_BYTES = "272"
+
+
 def tier_macros(tier: int) -> list[tuple[str, str]]:
     macros = [
+        # Include after rebuilding caustica.exe that emits the same macro.
+        # ("CAUSTICA_STANDARD_MATERIAL_DATA_BYTES", STANDARD_MATERIAL_DATA_BYTES),
         ("CAUSTICA_MATERIAL_FEATURE_TIER", str(tier)),
     ]
     if tier == 0:
@@ -102,8 +109,11 @@ def tier_macros(tier: int) -> list[tuple[str, str]]:
 
 
 def base_global_macro_map() -> dict[str, str]:
-    # Keep in sync with SceneRayTracingResources::fillPTPipelineGlobalMacros defaults.
+    # Keep in sync with PtPipelineFeaturePresets.cpp::fillBaseMacros defaults.
+    # Omit CAUSTICA_STANDARD_MATERIAL_DATA_BYTES until the matching exe is rebuilt,
+    # so --force can overwrite the pre-OpenPBR ClosestHit bins still referenced at runtime.
     return {
+        # "CAUSTICA_STANDARD_MATERIAL_DATA_BYTES": STANDARD_MATERIAL_DATA_BYTES,
         "ENABLE_DEBUG_SURFACE_VIZ": "0",
         "ENABLE_DEBUG_LINES_VIZ": "0",
         "USE_NVAPI_HIT_OBJECT_EXTENSION": "0",

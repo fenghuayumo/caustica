@@ -3,6 +3,7 @@
 #include <render/core/PathTracerSettings.h>
 
 #include <shaders/PathTracer/Lighting/LightingTypes.hlsli>
+#include <shaders/PathTracer/Materials/StandardMaterial.h>
 
 #include <cassert>
 #include <cstdint>
@@ -50,6 +51,9 @@ static_assert(std::size(kPresetNames) == ptFeaturePresetCount());
 void fillBaseMacros(std::vector<caustica::ShaderMacro>& macros)
 {
     macros.clear();
+    // When enabling this, also uncomment the matching entry in
+    // support/python/precompile_pt_shader_bins.py and recook with --force.
+    // macros.push_back({ "CAUSTICA_STANDARD_MATERIAL_DATA_BYTES", std::to_string(sizeof(StandardMaterialData)) });
     macros.push_back({ "ENABLE_DEBUG_SURFACE_VIZ", "0" });
     macros.push_back({ "ENABLE_DEBUG_LINES_VIZ", "0" });
     macros.push_back({ "USE_NVAPI_HIT_OBJECT_EXTENSION", "0" });

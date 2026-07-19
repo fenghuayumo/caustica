@@ -127,7 +127,10 @@ std::vector<caustica::ShaderMacro> buildMaterialShaderMacros(uint32_t tierIndex)
     assert(tierIndex < kMaterialFeatureTierCount);
 
     std::vector<caustica::ShaderMacro> macros;
-    macros.reserve(6);
+    macros.reserve(8);
+    // When enabling this, also uncomment the matching entry in
+    // support/python/precompile_pt_shader_bins.py and recook with --force.
+    // macros.push_back({ "CAUSTICA_STANDARD_MATERIAL_DATA_BYTES", std::to_string(sizeof(StandardMaterialData)) });
     macros.push_back({ "CAUSTICA_MATERIAL_FEATURE_TIER", std::to_string(tierIndex) });
 
     if (tierIndex == 0)

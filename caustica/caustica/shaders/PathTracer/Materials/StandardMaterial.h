@@ -32,7 +32,10 @@ static const int StandardMaterialFlags_NestedPriorityShift            = 28;
 static const int StandardMaterialFlags_PSDDominantDeltaLobeP1Mask     = 0x0F000000;
 static const int StandardMaterialFlags_PSDDominantDeltaLobeP1Shift    = 24;
 
-/// Data with the packed layout in GPU memory
+/// Data with the packed layout in GPU memory.
+/// sizeof must stay 272 (17 x 16). Update CAUSTICA_STANDARD_MATERIAL_DATA_BYTES in
+/// PtPipelineFeaturePresets.cpp / MaterialFeatureMask.cpp / precompile_pt_shader_bins.py
+/// when this layout changes so cooked PT libs invalidate correctly.
 struct StandardMaterialData
 {
     float3      BaseOrDiffuseColor;

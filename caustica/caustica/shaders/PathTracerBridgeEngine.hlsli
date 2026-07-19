@@ -420,6 +420,11 @@ MaterialProperties sampleGeometryStandardMaterial(const BridgeGeometrySample gs,
 {
     MaterialTextureSample textures = DefaultMaterialTextures();
 
+    // Guard against stale SubInstanceData / unallocated gpuDataIndex (0xFFFF after masking).
+    // Wrong stride from outdated PT libs also shows up as OOB indices → garbage blue / TDR.
+    if (materialIndex >= g_Const.MaterialCount)
+        materialIndex = 0;
+
     StandardMaterialData material = t_StandardMaterialData[materialIndex];
 
     //if( !optimizationHints.NoTextures )

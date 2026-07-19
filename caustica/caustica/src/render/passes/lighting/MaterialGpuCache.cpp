@@ -532,6 +532,14 @@ bool StandardMaterial::read(
     else if (!hasMaterialModelField && useSpecularGlossModel)
         materialModel = "RTXPT";
 
+    // Legacy RTXPT JSON often stores SpecularColor as 0 (unused in metal-rough).
+    // OpenPBR uses it as dielectric specular tint — keep 0 and F0 collapses to black.
+    if (IsOpenPBRMaterialModel(materialModel) && !useSpecularGlossModel
+        && specularColor.x == 0.f && specularColor.y == 0.f && specularColor.z == 0.f)
+    {
+        specularColor = dm::float3(1.f);
+    }
+
     baseWeight = std::clamp(baseWeight, 0.0f, 1.0f);
     specularWeight = std::max(specularWeight, 0.0f);
     anisotropy = std::clamp(anisotropy, -1.0f, 1.0f);
@@ -1279,7 +1287,13 @@ std::shared_ptr<StandardMaterial> MaterialGpuCache::importFromEngineMaterial(
     standardMaterial->enableTransmissionTexture = material.enableTransmissionTexture;
 
     standardMaterial->baseOrDiffuseColor = material.baseOrDiffuseColor;
-    standardMaterial->specularColor = material.specularColor;
+    // Engine Material defaults specularColor to 0 (metal-rough unused). OpenPBR uses it as
+    // dielectric specular tint — leave 0 and EvaluateStandardMaterial zeros specular F0.
+    const bool zeroSpecular =
+        material.specularColor.x == 0.f && material.specularColor.y == 0.f && material.specularColor.z == 0.f;
+    standardMaterial->specularColor = (!material.useSpecularGlossModel && zeroSpecular)
+        ? dm::float3(1.f)
+        : material.specularColor;
     standardMaterial->emissiveColor = material.emissiveColor;
 
     standardMaterial->emissiveIntensity = material.emissiveIntensity;
@@ -1290,9 +1304,11 @@ std::shared_ptr<StandardMaterial> MaterialGpuCache::importFromEngineMaterial(
     standardMaterial->transmissionFactor = material.transmissionFactor;
     //standardMaterial->diffuseTransmissionFactor = material.diffuseTransmissionFactor;
     standardMaterial->normalTextureScale = material.normalTextureScale;
-    //standardMaterial->IoR = material.ior;
     standardMaterial->useSpecularGlossModel = material.useSpecularGlossModel;
     standardMaterial->metalnessInRedChannel = material.metalnessInRedChannel;
+    // OpenPBR is the built-in model; imported engine materials should shade as OpenPBR.
+    if (!material.useSpecularGlossModel)
+        standardMaterial->materialModel = "OpenPBR";
 
     standardMaterial->enableAlphaTesting = (material.domain == MaterialDomain::AlphaTested || material.domain == MaterialDomain::TransmissiveAlphaTested);
     standardMaterial->enableTransmission = (material.domain == MaterialDomain::Transmissive || material.domain == MaterialDomain::TransmissiveAlphaBlended || material.domain == MaterialDomain::TransmissiveAlphaTested);
@@ -1551,6 +1567,15 @@ void MaterialGpuCache::completeDeferredTexturesLoad(nvrhi::ICommandList* command
         m_deferredTextureLoadInProgress = false;
         info("MaterialGpuCache: deferred texture flush end, ok=%s", texturesFinalized ? "true" : "false");
 
+        // Bindless indices are only valid after finalize. First fillData() may have
+        // cleared Use*Texture flags — dirty all materials so the next update re-encodes.
+        for (auto& material : m_materials)
+        {
+            if (material)
+                material->gpuDataDirty = true;
+        }
+        m_materialDataWasReset = true;
+
         if (commandList != nullptr)
         {
             commandList->open();
@@ -1661,6 +1686,10 @@ void MaterialGpuCache::createRenderPassesAndLoadMaterials(nvrhi::IBindingLayout*
     assert(!mediaPath.empty());
     //m_bindlessLayout = bindlessLayout;
     m_renderDevice = &renderDevice;
+
+    static_assert(sizeof(StandardMaterialData) == 272,
+        "StandardMaterialData size changed — update CAUSTICA_STANDARD_MATERIAL_DATA_BYTES in "
+        "PtPipelineFeaturePresets.cpp, MaterialFeatureMask.cpp, and precompile_pt_shader_bins.py");
 
     {
         nvrhi::BufferDesc bufferDesc;
@@ -1782,7 +1811,15 @@ void UpdateSubInstanceData(SubInstanceData& ret,
 
     uint globalGeometryIndex = mesh.geometries[0].globalGeometryIndex + meshGeometryIndex;
     uint globalMaterialIndex = material.gpuDataIndex;
-    ret.GlobalGeometryIndex_StandardMaterialDataIndex = (globalGeometryIndex << 16) | globalMaterialIndex;
+    if (globalMaterialIndex == 0xFFFFFFFFu || globalMaterialIndex > 0xFFFFu)
+    {
+        caustica::warning(
+            "MaterialGpuCache: material '%s' has invalid gpuDataIndex %u — binding slot 0",
+            material.name.c_str(),
+            globalMaterialIndex);
+        globalMaterialIndex = 0;
+    }
+    ret.GlobalGeometryIndex_StandardMaterialDataIndex = (globalGeometryIndex << 16) | (globalMaterialIndex & 0xFFFFu);
 
 #if SUBINSTANCEDATA_EXTENDED
     GeometryData* gdata = nullptr;
@@ -1872,7 +1909,13 @@ void MaterialGpuCache::update(nvrhi::ICommandList* commandList,
             std::shared_ptr<StandardMaterial> standardMaterial = findByResourceId(geometry.materialId);
             assert(standardMaterial != nullptr && "Unknown error - should never have happened" );
             if (!standardMaterial)
+            {
+                caustica::warning(
+                    "MaterialGpuCache: no StandardMaterial for geometry materialId on mesh '%s' (subInstance %zu) — leaving stale SubInstanceData",
+                    mesh->debugName.c_str(),
+                    subInstanceIndex);
                 continue;
+            }
 
             UpdateSubInstanceData(subInstanceData[subInstanceIndex], gpuResources, *mesh, geometry,
                 static_cast<uint>(geometryIndex), *standardMaterial);
